@@ -12,8 +12,15 @@ class JobMatcher:
     def __init__(self, cv_text: str):
         self.cv_text = cv_text
         self.client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+        self._sectors: list[str] = []
 
-    def score_offers(self, offers: list[JobOffer], min_score: int = 6) -> list[JobOffer]:
+    def score_offers(
+        self,
+        offers: list[JobOffer],
+        min_score: int = 6,
+        sectors: list[str] | None = None,
+    ) -> list[JobOffer]:
+        self._sectors = sectors or []
         scored = []
         for i in range(0, len(offers), BATCH_SIZE):
             batch = offers[i: i + BATCH_SIZE]
@@ -31,13 +38,22 @@ class JobMatcher:
             f"[JOB_{i}]\n{job.to_text()}" for i, job in enumerate(batch)
         )
 
+        sector_instruction = ""
+        if self._sectors:
+            joined = ", ".join(self._sectors)
+            sector_instruction = (
+                f"\nSECTEURS CIBLES : Le candidat souhaite travailler dans : {joined}. "
+                "Pénalise fortement (score ≤ 3) les offres hors de ces secteurs, "
+                "même si les compétences techniques correspondent. "
+                "Précise dans les raisons si le secteur correspond ou non.\n"
+            )
+
         prompt = f"""Voici {len(batch)} offres d'emploi à analyser. Pour chaque offre, donne :
 - Un score de correspondance de 0 à 10 (10 = correspondance parfaite)
-- 2-3 raisons courtes
-
+- 2-3 raisons courtes (compétences ET secteur){sector_instruction}
 Réponds UNIQUEMENT avec un JSON valide sous cette forme exacte :
 [
-  {{"job_index": 0, "score": 8, "reasons": "Correspond au profil Python senior. Secteur fintech comme demandé."}},
+  {{"job_index": 0, "score": 8, "reasons": "Correspond au profil Python senior. Secteur fintech ciblé."}},
   ...
 ]
 

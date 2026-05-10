@@ -26,6 +26,25 @@ from ai import JobMatcher, CoverLetterGenerator
 
 console = Console()
 
+SECTORS: list[tuple[str, str]] = [
+    ("tech",       "Informatique / Tech / IA / Cybersécurité"),
+    ("finance",    "Finance / Banque / Assurance / Comptabilité"),
+    ("marketing",  "Marketing / Communication / Digital / SEO"),
+    ("health",     "Santé / Médical / Pharmaceutique / Biotech"),
+    ("industry",   "Industrie / Ingénierie / BTP / Mécanique"),
+    ("commerce",   "Commerce / Vente / Retail / E-commerce"),
+    ("education",  "Éducation / Formation / Recherche"),
+    ("legal",      "Juridique / Droit / Compliance"),
+    ("hr",         "Ressources Humaines / Recrutement"),
+    ("logistics",  "Logistique / Transport / Supply Chain"),
+    ("realestate", "Immobilier / Architecture / Construction"),
+    ("consulting", "Conseil / Management / Stratégie"),
+    ("media",      "Art / Culture / Médias / Audiovisuel / Jeux vidéo"),
+    ("energy",     "Énergie / Environnement / Développement durable"),
+    ("food",       "Agroalimentaire / Restauration / Hôtellerie"),
+    ("public",     "Secteur public / Associations / ONG"),
+]
+
 SOURCE_MAP = {
     "ft": ("France Travail", FranceTravailScraper),
     "indeed": ("Indeed", IndeedScraper),
@@ -55,10 +74,72 @@ def parse_args():
         help="Score minimum de correspondance /10 (défaut: 6)",
     )
     parser.add_argument(
+        "--sectors",
+        default="",
+        help=(
+            "Secteurs cibles séparés par virgule (ex: tech,finance). "
+            "Si absent, un sélecteur interactif s'affiche. "
+            "Valeurs : " + ", ".join(k for k, _ in SECTORS)
+        ),
+    )
+    parser.add_argument(
         "--no-letters", action="store_true",
         help="Ne pas générer les lettres de motivation",
     )
     return parser.parse_args()
+
+
+def select_sectors(preselected: str = "") -> list[str]:
+    """Interactive sector picker. Returns list of sector labels (empty = no filter)."""
+    if preselected:
+        keys = [s.strip() for s in preselected.split(",")]
+        valid = {k for k, _ in SECTORS}
+        unknown = [k for k in keys if k not in valid]
+        if unknown:
+            console.print(f"[yellow]Secteurs inconnus ignorés : {', '.join(unknown)}[/yellow]")
+        chosen = [label for k, label in SECTORS if k in keys]
+        if chosen:
+            console.print(f"[dim]Filtres secteur : {', '.join(chosen)}[/dim]")
+        return chosen
+
+    # Build display grid (2 columns)
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(width=4, style="bold cyan")
+    grid.add_column(width=38)
+    grid.add_column(width=4, style="bold cyan")
+    grid.add_column(width=38)
+
+    rows = [(f"{i+1}.", label) for i, (_, label) in enumerate(SECTORS)]
+    for left, right in zip(rows[::2], rows[1::2]):
+        grid.add_row(left[0], left[1], right[0], right[1])
+    if len(rows) % 2:
+        last = rows[-1]
+        grid.add_row(last[0], last[1], "", "")
+
+    console.print(Panel(
+        grid,
+        title="[bold cyan]Filtrer par secteur d'activité[/bold cyan]",
+        subtitle="[dim]Entrez les numéros, 'all' pour tous, ou Entrée pour ignorer[/dim]",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+    while True:
+        choice = Prompt.ask("[bold cyan]Secteurs[/bold cyan]", default="all").strip().lower()
+        if choice in ("", "all", "0"):
+            console.print("[dim]Aucun filtre secteur appliqué.[/dim]")
+            return []
+        if choice == "q":
+            sys.exit(0)
+        try:
+            indices = [int(x.strip()) - 1 for x in choice.split(",")]
+            selected = [SECTORS[i][1] for i in indices if 0 <= i < len(SECTORS)]
+            if selected:
+                console.print(f"[green]Secteurs retenus : {', '.join(selected)}[/green]")
+                return selected
+            console.print("[red]Numéros hors plage, réessayez.[/red]")
+        except ValueError:
+            console.print("[red]Format invalide. Exemple : 1,3  ou  all[/red]")
 
 
 def scrape_all(sources: list[str], query: str, location: str, max_per_source: int) -> list[JobOffer]:
@@ -218,9 +299,13 @@ def main():
         console.print(f"[red]Erreur CV : {e}[/red]")
         sys.exit(1)
 
-    # 2. Scraping
+    # 2. Sélection des secteurs
+    console.print("\n[bold]2. Secteurs d'activité ciblés[/bold]")
+    sectors = select_sectors(args.sectors)
+
+    # 3. Scraping
     sources = [s.strip() for s in args.sources.split(",")]
-    console.print(f"\n[bold]2. Scraping des offres[/bold] (sources : {', '.join(sources)})")
+    console.print(f"\n[bold]3. Scraping des offres[/bold] (sources : {', '.join(sources)})")
     all_offers = scrape_all(sources, args.query, args.location, args.max)
 
     if not all_offers:
@@ -229,13 +314,14 @@ def main():
 
     console.print(f"\n[bold]Total :[/bold] {len(all_offers)} offres collectées (doublons supprimés)")
 
-    # 3. Matching IA
-    console.print(f"\n[bold]3. Analyse de correspondance avec Claude[/bold] (score min : {args.min_score}/10)")
+    # 4. Matching IA
+    sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""
+    console.print(f"\n[bold]4. Analyse de correspondance avec Claude[/bold] (score min : {args.min_score}/10{sector_label})")
     with Progress(SpinnerColumn(), TextColumn("[cyan]Analyse en cours..."), console=console) as progress:
         progress.add_task("", total=None)
         try:
             matcher = JobMatcher(cv_text)
-            matched_offers = matcher.score_offers(all_offers, min_score=args.min_score)
+            matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
         except anthropic.AuthenticationError:
             console.print("[red]Clé ANTHROPIC_API_KEY invalide ou manquante.[/red]")
             sys.exit(1)
@@ -244,11 +330,11 @@ def main():
         console.print(f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10. Essayez --min-score 5.[/yellow]")
         sys.exit(0)
 
-    # 4. Affichage
+    # 5. Affichage
     display_matches(matched_offers)
     save_results(matched_offers, args.query)
 
-    # 5. Génération des lettres
+    # 6. Génération des lettres
     if args.no_letters:
         console.print("\n[dim]Génération des lettres désactivée (--no-letters).[/dim]")
         return
@@ -258,7 +344,7 @@ def main():
         console.print("[dim]Aucune offre sélectionnée.[/dim]")
         return
 
-    console.print(f"\n[bold]4. Génération des lettres de motivation[/bold] ({len(selected)} offre(s))")
+    console.print(f"\n[bold]6. Génération des lettres de motivation[/bold] ({len(selected)} offre(s))")
     generator = CoverLetterGenerator(cv_text)
     generate_letters(selected, generator)
 
