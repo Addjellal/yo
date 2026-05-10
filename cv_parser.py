@@ -1,4 +1,5 @@
 import base64
+import hashlib
 from pathlib import Path
 
 
@@ -6,7 +7,10 @@ def _cache_path(path: Path) -> Path:
     from config import config
     cache_dir = Path(config.output_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / f".cv_{path.stem}.txt"
+    # Hash sur le chemin absolu pour éviter les collisions entre CVs
+    # de même nom dans des dossiers différents.
+    digest = hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()[:10]
+    return cache_dir / f".cv_{path.stem}_{digest}.txt"
 
 
 def parse_cv(cv_path: str, force_reparse: bool = False) -> str:

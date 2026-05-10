@@ -3,6 +3,9 @@
 *.docx
 output/*.txt
 output/*.json
+output/*.csv
+output/.cv_*
+output/.tracker.json
 __pycache__/
 *.pyc
 .venv/

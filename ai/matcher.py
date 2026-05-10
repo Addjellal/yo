@@ -1,9 +1,33 @@
 import json
+import re
+from collections import Counter
 from scrapers.base import JobOffer
 from config import config
 from utils import console
 
 BATCH_SIZE = 10
+
+# Mots vides FR/EN les plus courants — exclus du pré-filtre keyword
+_STOPWORDS = {
+    # Français
+    "le","la","les","un","une","des","de","du","et","ou","à","au","aux","en","dans",
+    "sur","pour","par","avec","sans","sous","vers","chez","plus","moins","ce","cet",
+    "cette","ces","mon","ma","mes","ton","ta","tes","son","sa","ses","notre","votre",
+    "leur","leurs","est","sont","être","avoir","fait","faire","plus","tout","tous",
+    "toute","toutes","aussi","comme","mais","donc","car","si","ne","pas","ni","que",
+    "qui","quoi","dont","où","y","an","ans","année","années","jour","jours","mois",
+    "h","heures","minimum","poste","emploi","offre","offres","entreprise","candidat",
+    "candidate","profil","mission","missions","équipe","activité","activités",
+    # Anglais
+    "the","a","an","and","or","of","to","in","on","at","by","for","with","from",
+    "is","are","was","were","be","been","being","have","has","had","do","does","did",
+    "this","that","these","those","it","its","you","your","we","our","they","their",
+    "as","but","not","if","then","than","so","no","yes","up","down","out","over",
+    "under","more","most","less","other","some","any","all","each","every","both",
+    "such","same","new","also","very","can","will","just","like","into","about",
+}
+_TOKEN_RE = re.compile(r"[a-zA-ZÀ-ÿ][a-zA-ZÀ-ÿ0-9+#./-]{2,}")
+PRE_FILTER_THRESHOLD = 3  # min keywords overlap to keep an offer
 
 SYSTEM_PROMPT = (
     "Tu es un expert RH qui analyse la correspondance entre un CV et des offres d'emploi. "
@@ -12,11 +36,20 @@ SYSTEM_PROMPT = (
 )
 
 
+def _tokenize(text: str) -> list[str]:
+    return [
+        t.lower() for t in _TOKEN_RE.findall(text or "")
+        if t.lower() not in _STOPWORDS
+    ]
+
+
 class JobMatcher:
     def __init__(self, cv_text: str):
         self.cv_text = cv_text
         self._sectors: list[str] = []
         self._client = None
+        # Vocabulaire CV : mots significatifs avec leur fréquence
+        self._cv_vocab: Counter[str] = Counter(_tokenize(cv_text))
 
     def _get_client(self):
         if self._client is None:
@@ -28,6 +61,22 @@ class JobMatcher:
                 self._client = anthropic.Anthropic(api_key=config.anthropic_api_key)
         return self._client
 
+    def _prefilter(self, offers: list[JobOffer]) -> tuple[list[JobOffer], int]:
+        """Heuristique rapide : garde les offres ayant un overlap minimal de mots-clés
+        avec le CV. Retourne (offres_retenues, nombre_filtrées)."""
+        if not self._cv_vocab:
+            return offers, 0
+        kept: list[JobOffer] = []
+        dropped = 0
+        for offer in offers:
+            offer_tokens = set(_tokenize(f"{offer.title} {offer.description}"))
+            overlap = sum(1 for t in offer_tokens if t in self._cv_vocab)
+            if overlap >= PRE_FILTER_THRESHOLD:
+                kept.append(offer)
+            else:
+                dropped += 1
+        return kept, dropped
+
     def score_offers(
         self,
         offers: list[JobOffer],
@@ -35,10 +84,20 @@ class JobMatcher:
         sectors: list[str] | None = None,
     ) -> list[JobOffer]:
         self._sectors = sectors or []
+
+        # Pré-filtre keyword (économise les appels LLM)
+        offers, dropped = self._prefilter(offers)
+        if dropped:
+            console.print(f"[dim]Pré-filtre : {dropped} offre(s) clairement hors-sujet écartée(s).[/dim]")
+
+        if not offers:
+            return []
+
         self._get_client()
         scored = []
         for i in range(0, len(offers), BATCH_SIZE):
             batch = offers[i: i + BATCH_SIZE]
+            console.print(f"[dim]  Analyse IA : lot {i // BATCH_SIZE + 1}/{(len(offers) - 1) // BATCH_SIZE + 1} ({len(batch)} offres)...[/dim]")
             self._score_batch(batch)
             scored.extend(batch)
 
@@ -99,7 +158,7 @@ class JobMatcher:
                 {"role": "system", "content": SYSTEM_PROMPT.format(cv=self.cv_text)},
                 {"role": "user", "content": prompt},
             ],
-            options={"temperature": 0},
+            options={"temperature": 0, "num_ctx": 8192},
         )
         return response.message.content.strip()
 

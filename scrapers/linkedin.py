@@ -37,11 +37,16 @@ class LinkedInScraper(BaseScraper):
         return offers
 
     def _login(self, page) -> None:
-        page.goto("https://www.linkedin.com/login", wait_until="networkidle")
+        page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
         page.fill("#username", config.linkedin_email)
         page.fill("#password", config.linkedin_password)
-        page.click("[data-litms-control-urn='login-submit']")
-        page.wait_for_timeout(3000)
+        # Sélecteur le plus stable : le bouton submit du formulaire de login
+        page.click("button[type='submit'][aria-label]")
+        try:
+            page.wait_for_url("**/feed/**", timeout=10000)
+        except Exception:
+            # Soit captcha, soit 2FA, soit redirect inattendu — on continue prudemment
+            page.wait_for_timeout(3000)
 
     def _scrape_jobs(self, page, query: str, location: str, max_results: int) -> list[JobOffer]:
         offers = []

@@ -51,7 +51,6 @@ class CoverLetterGenerator:
         return self._call_anthropic(system, user)
 
     def _call_anthropic(self, system: str, user: str) -> str:
-        import anthropic
         response = self._client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1200,

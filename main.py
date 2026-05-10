@@ -14,6 +14,7 @@ import json
 import sys
 import time
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from rich.console import Console
@@ -25,10 +26,27 @@ from rich import box
 
 from config import config, save_to_env
 from cv_parser import parse_cv
-from scrapers import JobOffer, FranceTravailScraper, IndeedScraper, WTTJScraper, LinkedInScraper
+from scrapers import (
+    JobOffer,
+    FranceTravailScraper,
+    IndeedScraper,
+    WTTJScraper,
+    LinkedInScraper,
+    ApecScraper,
+)
 from ai import JobMatcher, CoverLetterGenerator
+from tracker import Tracker
 
 console = Console()
+
+# Marqueurs visuels pour les statuts de tracking
+STATUS_BADGE = {
+    "new":      "",
+    "seen":     "[dim]·[/dim]",
+    "favorite": "[yellow]★[/yellow]",
+    "applied":  "[green]✓[/green]",
+    "rejected": "[red]✗[/red]",
+}
 
 SECTORS: list[tuple[str, str]] = [
     ("tech",       "Informatique / Tech / IA / Cybersécurité"),
@@ -53,6 +71,7 @@ SOURCE_MAP = {
     "ft": ("France Travail", FranceTravailScraper),
     "indeed": ("Indeed", IndeedScraper),
     "wttj": ("Welcome to the Jungle", WTTJScraper),
+    "apec": ("Apec", ApecScraper),
     "linkedin": ("LinkedIn", LinkedInScraper),
 }
 
@@ -148,15 +167,16 @@ def check_setup() -> None:
     playwright_ok = importlib.util.find_spec("playwright") is not None
 
     lines.append("[bold]Sources disponibles[/bold]")
-    lines.append(f"  {ok}  Indeed              [dim](sans configuration)[/dim]")
+    lines.append(f"  {ok}  Indeed                 [dim](sans configuration)[/dim]")
     lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration)[/dim]")
+    lines.append(f"  {ok}  Apec                   [dim](cadres France, sans configuration)[/dim]")
     lines.append(
         f"  {ok}  France Travail" if ft_ok
-        else f"  {warn}  France Travail      [dim]non configuré — optionnel[/dim]"
+        else f"  {warn}  France Travail         [dim]non configuré — optionnel[/dim]"
     )
     lines.append(
         f"  {ok}  LinkedIn" if (li_ok and playwright_ok)
-        else f"  {warn}  LinkedIn            [dim]désactivé"
+        else f"  {warn}  LinkedIn               [dim]désactivé"
              + (" (playwright absent)" if not playwright_ok else " (identifiants manquants)")
              + "[/dim]"
     )
@@ -300,6 +320,12 @@ _SOURCE_INFO: list[dict] = [
         "note": "Pas d'authentification requise",
     },
     {
+        "key": "apec",
+        "label": "Apec",
+        "auth": False,
+        "note": "Cadres en France — sans authentification",
+    },
+    {
         "key": "ft",
         "label": "France Travail",
         "auth": True,
@@ -402,34 +428,52 @@ def select_sources(preselected: str = "") -> list[str]:
 
 # ─── Scraping ─────────────────────────────────────────────────────────────────
 
+def _run_one_scraper(source_key: str, query: str, location: str, max_per_source: int) -> tuple[str, list[JobOffer], str | None]:
+    """Lance un scraper. Retourne (source_name, offers, error_message_or_None)."""
+    source_name, scraper_cls = SOURCE_MAP[source_key]
+    try:
+        scraper = scraper_cls()
+        offers = scraper.search(query, location, max_per_source)
+        return source_name, offers, None
+    except ValueError as e:
+        return source_name, [], f"désactivé : {e}"
+    except Exception as e:
+        return source_name, [], f"erreur – {e}"
+
+
 def scrape_all(sources: list[str], query: str, location: str, max_per_source: int) -> list[JobOffer]:
+    """Scrape toutes les sources EN PARALLÈLE via un pool de threads."""
+    valid_sources = [s for s in sources if s in SOURCE_MAP]
+    for s in sources:
+        if s not in SOURCE_MAP:
+            console.print(f"[yellow]Source inconnue ignorée : {s}[/yellow]")
+
+    if not valid_sources:
+        return []
+
+    if "linkedin" in valid_sources:
+        console.print("[yellow]⚠  LinkedIn : scraping contraire aux CGU, utilisation à vos risques.[/yellow]")
+
     all_offers: list[JobOffer] = []
     seen_keys: set[str] = set()
 
-    for source_key in sources:
-        if source_key not in SOURCE_MAP:
-            console.print(f"[yellow]Source inconnue ignorée : {source_key}[/yellow]")
-            continue
-
-        source_name, scraper_cls = SOURCE_MAP[source_key]
-
-        if source_key == "linkedin":
-            console.print("[yellow]⚠  LinkedIn : scraping contraire aux CGU, utilisation à vos risques.[/yellow]")
-
-        with Progress(SpinnerColumn(), TextColumn(f"[cyan]Scraping {source_name}..."), console=console) as progress:
-            progress.add_task("", total=None)
-            try:
-                scraper = scraper_cls()
-                offers = scraper.search(query, location, max_per_source)
+    with Progress(SpinnerColumn(), TextColumn(f"[cyan]Scraping {len(valid_sources)} source(s) en parallèle..."), console=console) as progress:
+        progress.add_task("", total=None)
+        with ThreadPoolExecutor(max_workers=min(len(valid_sources), 5)) as executor:
+            futures = {
+                executor.submit(_run_one_scraper, key, query, location, max_per_source): key
+                for key in valid_sources
+            }
+            for future in as_completed(futures):
+                source_name, offers, error = future.result()
+                if error:
+                    color = "yellow" if "désactivé" in error else "red"
+                    console.print(f"[{color}]⚠  {source_name} : {error}[/{color}]")
+                    continue
                 new_offers = [o for o in offers if o.unique_key() not in seen_keys]
-                for o in new_offers:
-                    seen_keys.add(o.unique_key())
+                seen_keys.update(o.unique_key() for o in new_offers)
                 all_offers.extend(new_offers)
-                console.print(f"[green]✓ {source_name} : {len(new_offers)} offres trouvées[/green]")
-            except ValueError as e:
-                console.print(f"[yellow]⚠  {source_name} désactivé : {e}[/yellow]")
-            except Exception as e:
-                console.print(f"[red]✗ {source_name} : erreur – {e}[/red]")
+                console.print(f"[green]✓ {source_name} : {len(new_offers)} offres[/green]")
 
     return all_offers
 
@@ -444,7 +488,7 @@ def _score_color(score: int) -> str:
     return "red"
 
 
-def display_matches(offers: list[JobOffer]) -> None:
+def display_matches(offers: list[JobOffer], tracker: Tracker | None = None) -> None:
     table = Table(
         title=f"\n{len(offers)} offres correspondantes",
         box=box.ROUNDED,
@@ -452,6 +496,7 @@ def display_matches(offers: list[JobOffer]) -> None:
         header_style="bold cyan",
     )
     table.add_column("#", style="dim", width=4)
+    table.add_column("", width=2)  # badge statut
     table.add_column("Score", width=7, justify="center")
     table.add_column("Poste", min_width=25)
     table.add_column("Entreprise", min_width=18)
@@ -464,8 +509,10 @@ def display_matches(offers: list[JobOffer]) -> None:
     for i, offer in enumerate(offers, 1):
         score = offer.match_score or 0
         color = _score_color(score)
+        badge = STATUS_BADGE.get(tracker.status_of(offer), "") if tracker else ""
         table.add_row(
             str(i),
+            badge,
             f"[{color}]{score}/10[/{color}]",
             offer.title,
             offer.company,
@@ -479,13 +526,37 @@ def display_matches(offers: list[JobOffer]) -> None:
     console.print(table)
 
 
-def browse_offers(offers: list[JobOffer]) -> None:
+def _parse_indices(raw: str, max_idx: int) -> list[int]:
+    """Parse '1,3,5' ou '1-5' ou 'all' en liste d'index 0-based."""
+    raw = raw.strip().lower()
+    if raw == "all":
+        return list(range(max_idx))
+    indices: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if "-" in part:
+            try:
+                lo, hi = part.split("-", 1)
+                indices.extend(range(int(lo) - 1, int(hi)))
+            except ValueError:
+                continue
+        else:
+            try:
+                indices.append(int(part) - 1)
+            except ValueError:
+                continue
+    return [i for i in indices if 0 <= i < max_idx]
+
+
+def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> None:
     """Navigation interactive après un scan."""
     console.print(
-        "\n[dim]Commandes : [bold]numéro[/bold] → détail  "
-        "[bold]o N[/bold] → ouvrir dans le navigateur  "
-        "[bold]l[/bold] → relister  "
-        "[bold]Entrée[/bold] → quitter[/dim]"
+        "\n[dim]Commandes : [bold]N[/bold] détail · [bold]o N[/bold] ouvrir · "
+        "[bold]f N[/bold] favori · [bold]a N[/bold] postulé · [bold]r N[/bold] rejeter · "
+        "[bold]l[/bold] relister · [bold]Entrée[/bold] quitter[/dim]"
+    )
+    console.print(
+        "[dim]N peut être : [bold]3[/bold], [bold]1,3,5[/bold], [bold]1-5[/bold] ou [bold]all[/bold][/dim]"
     )
 
     while True:
@@ -493,21 +564,35 @@ def browse_offers(offers: list[JobOffer]) -> None:
         if choice == "":
             break
         if choice == "l":
-            display_matches(offers)
+            display_matches(offers, tracker)
             continue
-        # Commande "o N" : ouvrir URL dans navigateur
-        if choice.startswith("o "):
-            try:
-                idx = int(choice[2:].strip()) - 1
-                if 0 <= idx < len(offers):
-                    url = offers[idx].url
-                    webbrowser.open(url)
-                    console.print(f"[dim]Ouverture : {url}[/dim]")
-                else:
-                    console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
-            except ValueError:
-                console.print("[red]Usage : o 3[/red]")
+
+        # Commandes à 2 lettres : "o N", "f N", "a N", "r N"
+        cmd, _, arg = choice.partition(" ")
+        if cmd in ("o", "f", "a", "r") and arg:
+            indices = _parse_indices(arg, len(offers))
+            if not indices:
+                console.print(f"[red]Numéros invalides (1–{len(offers)}).[/red]")
+                continue
+            targets = [offers[i] for i in indices]
+            if cmd == "o":
+                for offer in targets:
+                    webbrowser.open(offer.url)
+                    console.print(f"[dim]Ouverture : {offer.url}[/dim]")
+            elif tracker is not None and cmd == "f":
+                tracker.mark_many(targets, "favorite")
+                console.print(f"[yellow]★ {len(targets)} offre(s) marquée(s) comme favori.[/yellow]")
+            elif tracker is not None and cmd == "a":
+                tracker.mark_many(targets, "applied")
+                console.print(f"[green]✓ {len(targets)} offre(s) marquée(s) comme postulée(s).[/green]")
+            elif tracker is not None and cmd == "r":
+                tracker.mark_many(targets, "rejected")
+                console.print(f"[red]✗ {len(targets)} offre(s) rejetée(s) (ne réapparaîtront plus).[/red]")
+            elif tracker is None:
+                console.print("[yellow]Tracking désactivé.[/yellow]")
             continue
+
+        # Numéro seul : afficher détail
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(offers):
@@ -515,7 +600,7 @@ def browse_offers(offers: list[JobOffer]) -> None:
             else:
                 console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
         except ValueError:
-            console.print("[red]Commande inconnue. Tapez un numéro, 'o N', 'l' ou Entrée.[/red]")
+            console.print("[red]Commande inconnue. Tapez un numéro, 'o/f/a/r N', 'l' ou Entrée.[/red]")
 
 
 def _show_detail(offer: JobOffer) -> None:
@@ -640,6 +725,61 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     return json_path, csv_path
 
 
+# ─── Statistiques tracking ────────────────────────────────────────────────────
+
+def show_stats() -> None:
+    """Affiche un récap des offres trackées sur toutes les sessions."""
+    tracker = Tracker(Path(config.output_dir) / ".tracker.json")
+    counts = tracker.stats()
+
+    if counts["total"] == 0:
+        console.print(Panel(
+            "[dim]Aucune offre encore trackée. Lancez un scan pour commencer ![/dim]",
+            title="[bold cyan]Historique de candidature[/bold cyan]",
+            border_style="cyan",
+        ))
+        return
+
+    summary = "\n".join([
+        f"  [bold]{counts['total']}[/bold] offres connues au total",
+        "",
+        f"  [yellow]★ Favoris   :[/yellow]  {counts['favorite']}",
+        f"  [green]✓ Postulées :[/green]  {counts['applied']}",
+        f"  [red]✗ Rejetées  :[/red]  {counts['rejected']}",
+        f"  [dim]· Vues       :  {counts['seen']}[/dim]",
+    ])
+    console.print(Panel(
+        summary,
+        title="[bold cyan]Historique de candidature[/bold cyan]",
+        border_style="cyan",
+        padding=(1, 3),
+    ))
+
+    # Détail des candidatures envoyées (toujours intéressant à voir)
+    applied = tracker.list_by_status("applied")
+    if applied:
+        table = Table(title="\nCandidatures envoyées", box=box.ROUNDED, header_style="bold green")
+        table.add_column("Date", style="dim", width=11)
+        table.add_column("Poste", min_width=25)
+        table.add_column("Entreprise", min_width=18)
+        table.add_column("Source", width=10)
+        for entry in sorted(applied, key=lambda x: x.get("updated", ""), reverse=True)[:20]:
+            date = entry.get("updated", "")[:10]
+            table.add_row(date, entry["title"], entry["company"], entry["source"])
+        console.print(table)
+
+    favs = tracker.list_by_status("favorite")
+    if favs:
+        table = Table(title="\nFavoris", box=box.ROUNDED, header_style="bold yellow")
+        table.add_column("Poste", min_width=25)
+        table.add_column("Entreprise", min_width=18)
+        table.add_column("Source", width=10)
+        table.add_column("URL", overflow="fold")
+        for entry in favs[:20]:
+            table.add_row(entry["title"], entry["company"], entry["source"], entry["url"])
+        console.print(table)
+
+
 # ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 def parse_args():
@@ -648,18 +788,21 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Exemples :\n"
-            "  python main.py --check\n"
-            "  python main.py --cv cv.pdf --scan\n"
+            "  python main.py --check                           # Diagnostic\n"
+            "  python main.py --stats                           # Historique candidatures\n"
+            "  python main.py --cv cv.pdf --scan                # Scan sans postuler\n"
             "  python main.py --cv cv.pdf --query \"dev Python\" --location \"Paris\" --sectors tech\n"
+            "  python main.py --cv cv.pdf --scan --include-seen # Réafficher l'historique\n"
         ),
     )
     parser.add_argument("--check", action="store_true", help="Vérifier l'environnement et quitter")
+    parser.add_argument("--stats", action="store_true", help="Afficher l'historique des candidatures et favoris")
     parser.add_argument("--cv", help="Chemin vers votre CV (PDF, DOCX ou TXT)")
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
     parser.add_argument("--location", default="", help='Localisation ex: "Paris"')
     parser.add_argument(
-        "--sources", default="indeed,wttj",
-        help="Sources : ft,indeed,wttj,linkedin (défaut: indeed,wttj)",
+        "--sources", default="indeed,wttj,apec",
+        help="Sources : ft,indeed,wttj,apec,linkedin (défaut: indeed,wttj,apec)",
     )
     parser.add_argument("--max", type=int, default=config.max_jobs_per_source, help="Max offres par source")
     parser.add_argument("--min-score", type=int, default=config.min_match_score, help="Score minimum /10 (défaut: 6)")
@@ -669,6 +812,10 @@ def parse_args():
     )
     parser.add_argument("--scan", action="store_true", help="Scan uniquement : affiche et exporte sans générer de lettres")
     parser.add_argument("--no-letters", action="store_true", help="Analyse complète mais sans étape de génération de lettres")
+    parser.add_argument(
+        "--include-seen", action="store_true",
+        help="Inclure les offres déjà postulées ou rejetées dans les résultats",
+    )
     return parser.parse_args()
 
 
@@ -678,6 +825,11 @@ def main():
     # Mode vérification
     if args.check:
         check_setup()
+        return
+
+    # Mode stats
+    if args.stats:
+        show_stats()
         return
 
     console.print(Panel.fit(
@@ -725,6 +877,16 @@ def main():
     # Matcher initialisé une seule fois (CV en mémoire)
     matcher = JobMatcher(cv_text)
 
+    # Tracker persistant : suit les offres vues / favoris / postulées / rejetées
+    tracker = Tracker(Path(config.output_dir) / ".tracker.json")
+    initial_stats = tracker.stats()
+    if initial_stats["total"] > 0:
+        console.print(
+            f"[dim]Historique : {initial_stats['favorite']} favoris · "
+            f"{initial_stats['applied']} postulées · "
+            f"{initial_stats['rejected']} rejetées (filtrées par défaut)[/dim]"
+        )
+
     # 5. Boucle de recherche
     first_query = args.query.strip()
     console.print(
@@ -767,6 +929,18 @@ def main():
             )
             continue  # ← retour à la demande de requête, pas de sys.exit
 
+        # Filtrer les offres déjà postulées / rejetées (sauf si --include-seen)
+        if not args.include_seen:
+            before = len(all_offers)
+            all_offers = tracker.filter_visible(all_offers)
+            hidden = before - len(all_offers)
+            if hidden:
+                console.print(f"[dim]{hidden} offre(s) déjà traitée(s) filtrée(s) (utilisez --include-seen pour les voir).[/dim]")
+
+        if not all_offers:
+            console.print("[yellow]Toutes les offres trouvées sont déjà dans votre historique.[/yellow]")
+            continue
+
         console.print(f"[bold]Total :[/bold] {len(all_offers)} offres collectées")
 
         # Matching IA
@@ -791,12 +965,15 @@ def main():
             continue  # ← retour à la demande de requête
 
         # Affichage + export
-        display_matches(matched_offers)
+        display_matches(matched_offers, tracker)
         save_results(matched_offers, query)
+
+        # Marquer comme "vues" en bulk (n'écrase pas favorite/applied)
+        tracker.mark_many(matched_offers, "seen")
 
         # Mode scan : navigation interactive
         if args.scan:
-            browse_offers(matched_offers)
+            browse_offers(matched_offers, tracker)
             console.print(f"[dim]{len(matched_offers)} offres exportées dans {config.output_dir}/[/dim]")
             continue  # ← propose une nouvelle recherche
 
@@ -813,7 +990,10 @@ def main():
                 console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s))")
                 generator = CoverLetterGenerator(cv_text)
                 generate_letters(selected, generator)
+                # Marquer auto comme "applied" : la lettre est prête à être envoyée
+                tracker.mark_many(selected, "applied")
                 console.print(f"[bold green]✓[/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")
+                console.print(f"[dim]→ {len(selected)} offre(s) marquée(s) comme postulée(s) dans l'historique.[/dim]")
 
 
 if __name__ == "__main__":

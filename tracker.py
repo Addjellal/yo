@@ -1,0 +1,131 @@
+"""
+Persistent tracking of job offer states across sessions.
+
+States:
+    new       — never seen before (default for unknown offers)
+    seen      — auto-marked as soon as displayed in results
+    favorite  — user marked with `f N` in browse mode
+    applied   — user marked with `a N` (or sent a cover letter)
+    rejected  — user marked with `r N` (hidden from future searches)
+
+Storage: a single JSON file in OUTPUT_DIR/.tracker.json
+Schema:
+    {
+        "offers": {
+            "<unique_key>": {
+                "id":      "indeed_xyz",
+                "title":   "...",
+                "company": "...",
+                "url":     "...",
+                "source":  "Indeed",
+                "status":  "favorite",
+                "score":   8,
+                "first_seen": "2026-05-10T10:23:00",
+                "updated":     "2026-05-10T11:45:00"
+            },
+            ...
+        }
+    }
+"""
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Iterable
+
+from scrapers.base import JobOffer
+
+
+VALID_STATUSES = ("new", "seen", "favorite", "applied", "rejected")
+HIDDEN_STATUSES = ("applied", "rejected")  # hidden from future searches by default
+
+
+class Tracker:
+    def __init__(self, store_path: Path):
+        self.path = store_path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._data: dict = self._load()
+
+    def _load(self) -> dict:
+        if not self.path.exists():
+            return {"offers": {}}
+        try:
+            return json.loads(self.path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {"offers": {}}
+
+    def _save(self) -> None:
+        self.path.write_text(
+            json.dumps(self._data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    # ─── Lecture ──────────────────────────────────────────────────────────────
+
+    def status_of(self, offer: JobOffer) -> str:
+        entry = self._data["offers"].get(offer.unique_key())
+        return entry["status"] if entry else "new"
+
+    def is_hidden(self, offer: JobOffer) -> bool:
+        return self.status_of(offer) in HIDDEN_STATUSES
+
+    def filter_visible(self, offers: Iterable[JobOffer]) -> list[JobOffer]:
+        """Drop offers marked as applied or rejected."""
+        return [o for o in offers if not self.is_hidden(o)]
+
+    def stats(self) -> dict[str, int]:
+        counts = {s: 0 for s in VALID_STATUSES}
+        for entry in self._data["offers"].values():
+            counts[entry.get("status", "seen")] = counts.get(entry.get("status", "seen"), 0) + 1
+        counts["total"] = len(self._data["offers"])
+        return counts
+
+    # ─── Écriture ─────────────────────────────────────────────────────────────
+
+    def mark(self, offer: JobOffer, status: str) -> None:
+        if status not in VALID_STATUSES:
+            raise ValueError(f"Statut invalide : {status}")
+        key = offer.unique_key()
+        now = datetime.now().isoformat(timespec="seconds")
+        existing = self._data["offers"].get(key, {})
+        self._data["offers"][key] = {
+            "id": offer.id,
+            "title": offer.title,
+            "company": offer.company,
+            "url": offer.url,
+            "source": offer.source,
+            "status": status,
+            "score": offer.match_score if offer.match_score is not None else existing.get("score"),
+            "first_seen": existing.get("first_seen", now),
+            "updated": now,
+        }
+        self._save()
+
+    def mark_many(self, offers: Iterable[JobOffer], status: str) -> None:
+        """Bulk update — single save."""
+        if status not in VALID_STATUSES:
+            raise ValueError(f"Statut invalide : {status}")
+        now = datetime.now().isoformat(timespec="seconds")
+        for offer in offers:
+            key = offer.unique_key()
+            existing = self._data["offers"].get(key, {})
+            # Don't downgrade favorite/applied to "seen"
+            if status == "seen" and existing.get("status") in ("favorite", "applied"):
+                continue
+            self._data["offers"][key] = {
+                "id": offer.id,
+                "title": offer.title,
+                "company": offer.company,
+                "url": offer.url,
+                "source": offer.source,
+                "status": status,
+                "score": offer.match_score if offer.match_score is not None else existing.get("score"),
+                "first_seen": existing.get("first_seen", now),
+                "updated": now,
+            }
+        self._save()
+
+    def list_by_status(self, status: str) -> list[dict]:
+        return [
+            entry for entry in self._data["offers"].values()
+            if entry.get("status") == status
+        ]
