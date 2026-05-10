@@ -1,5 +1,6 @@
 .env
-output/*.pdf
+*.pdf
+*.docx
 output/*.txt
 output/*.json
 __pycache__/
