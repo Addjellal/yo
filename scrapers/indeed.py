@@ -1,86 +1,107 @@
-import time
+import html as html_module
 import re
+import time
+import urllib.parse
+import xml.etree.ElementTree as ET
+
 import requests
-from bs4 import BeautifulSoup
+
 from .base import BaseScraper, JobOffer
 from config import config
 from utils import console
 
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept-Language": "fr-FR,fr;q=0.9",
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
 }
+
+INDEED_NS = "https://www.indeed.com/about/rss"
 
 
 class IndeedScraper(BaseScraper):
     source_name = "Indeed"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
+        """Scrape Indeed via their RSS feed — more reliable than HTML scraping."""
         offers = []
         start = 0
-        seen = set()
+        seen: set[str] = set()
         session = requests.Session()
         session.headers.update(HEADERS)
 
         while len(offers) < max_results:
-            params = {"q": query, "l": location, "start": start, "lang": "fr"}
+            params = {"q": query, "l": location, "sort": "date", "start": start}
             try:
-                resp = session.get("https://fr.indeed.com/emplois", params=params, timeout=15)
+                resp = session.get("https://fr.indeed.com/rss", params=params, timeout=15)
                 resp.raise_for_status()
             except requests.RequestException as e:
                 console.print(f"[yellow][Indeed] Erreur réseau : {e}[/yellow]")
                 break
 
-            soup = BeautifulSoup(resp.text, "html.parser")
-            cards = soup.select("div.job_seen_beacon, li.css-1ac2h1w")
-
-            if not cards:
+            try:
+                root = ET.fromstring(resp.content)
+            except ET.ParseError as e:
+                console.print(f"[yellow][Indeed] Erreur parsing RSS : {e}[/yellow]")
                 break
 
-            for card in cards:
-                job = self._parse_card(card)
+            items = root.findall(".//item")
+            if not items:
+                break
+
+            for item in items:
+                job = self._parse_item(item)
                 if job and job.unique_key() not in seen:
                     seen.add(job.unique_key())
                     offers.append(job)
                 if len(offers) >= max_results:
                     break
 
+            if len(items) < 10:
+                break
             start += 10
             time.sleep(config.request_delay)
 
         return offers
 
-    def _parse_card(self, card) -> JobOffer | None:
+    def _parse_item(self, item: ET.Element) -> JobOffer | None:
         try:
-            title_el = card.select_one("h2.jobTitle a, a.jcs-JobTitle")
-            if not title_el:
+            ns = INDEED_NS
+            raw_title = item.findtext("title", "").strip()
+
+            # Indeed title format: "Job Title - Company Name"
+            if " - " in raw_title:
+                title, company = raw_title.rsplit(" - ", 1)
+                title = title.strip()
+                company = company.strip()
+            else:
+                title = raw_title
+                company = item.findtext(f"{{{ns}}}source", "N/A").strip()
+
+            link = item.findtext("link", "").strip()
+            raw_desc = item.findtext("description", "")
+            description = re.sub(r"<[^>]+>", " ", html_module.unescape(raw_desc)).strip()
+            description = re.sub(r"\s+", " ", description)
+
+            city = item.findtext(f"{{{ns}}}city", "").strip()
+            state = item.findtext(f"{{{ns}}}state", "").strip()
+            location = ", ".join(filter(None, [city, state]))
+
+            jobkey = item.findtext(f"{{{ns}}}jobkey", "").strip()
+            salary = item.findtext(f"{{{ns}}}salary", "").strip() or None
+
+            if not title or not link:
                 return None
-            title = title_el.get_text(strip=True)
-            job_id = title_el.get("id", "") or title_el.get("data-jk", "")
-            href = title_el.get("href", "")
-            url = f"https://fr.indeed.com{href}" if href.startswith("/") else href
 
-            company = (card.select_one("[data-testid='company-name'], .companyName") or {}).get_text(strip=True) if card.select_one("[data-testid='company-name'], .companyName") else "N/A"
-            location = (card.select_one("[data-testid='text-location'], .companyLocation") or {}).get_text(strip=True) if card.select_one("[data-testid='text-location'], .companyLocation") else ""
-            salary_el = card.select_one("[data-testid='attribute_snippet_testid'], .salary-snippet-container")
-            salary = salary_el.get_text(strip=True) if salary_el else None
-            desc_el = card.select_one(".job-snippet, [data-testid='jobsnippet_footer']")
-            description = desc_el.get_text(" ", strip=True) if desc_el else ""
-
-            unique_id = re.sub(r"[^a-z0-9]", "", job_id.lower()) or re.sub(r"[^a-z0-9]", "", f"{title}{company}".lower())
-
+            uid = jobkey or re.sub(r"[^a-z0-9]", "", f"{title}{company}".lower())
             return JobOffer(
-                id=f"indeed_{unique_id}",
+                id=f"indeed_{uid}",
                 title=title,
                 company=company,
                 location=location,
                 description=description,
-                url=url,
-                apply_url=url,
+                url=link,
+                apply_url=link,
                 source=self.source_name,
                 salary=salary,
             )

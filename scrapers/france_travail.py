@@ -14,8 +14,12 @@ REGISTER_URL = "https://francetravail.io/produits-et-services/portail-partenaire
 class FranceTravailScraper(BaseScraper):
     source_name = "France Travail"
 
+    _PLACEHOLDERS = {"your_client_id", "your_client_secret", "votre_client_id", "votre_client_secret"}
+
     def __init__(self):
-        if not config.france_travail_client_id or not config.france_travail_client_secret:
+        cid = config.france_travail_client_id
+        csecret = config.france_travail_client_secret
+        if not cid or not csecret or cid in self._PLACEHOLDERS or csecret in self._PLACEHOLDERS:
             raise ValueError(
                 "FRANCE_TRAVAIL_CLIENT_ID et FRANCE_TRAVAIL_CLIENT_SECRET manquants.\n"
                 f"Inscrivez-vous sur {REGISTER_URL}"

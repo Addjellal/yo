@@ -658,8 +658,8 @@ def parse_args():
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
     parser.add_argument("--location", default="", help='Localisation ex: "Paris"')
     parser.add_argument(
-        "--sources", default="ft,indeed,wttj",
-        help="Sources : ft,indeed,wttj,linkedin (défaut: ft,indeed,wttj)",
+        "--sources", default="indeed,wttj",
+        help="Sources : ft,indeed,wttj,linkedin (défaut: indeed,wttj)",
     )
     parser.add_argument("--max", type=int, default=config.max_jobs_per_source, help="Max offres par source")
     parser.add_argument("--min-score", type=int, default=config.min_match_score, help="Score minimum /10 (défaut: 6)")
