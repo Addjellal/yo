@@ -1,10 +1,7 @@
 import html as html_module
 import re
 import time
-import urllib.parse
 import xml.etree.ElementTree as ET
-
-import requests
 
 from .base import BaseScraper, JobOffer
 from config import config
@@ -13,30 +10,55 @@ from utils import console
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
-    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
 }
 
 INDEED_NS = "https://www.indeed.com/about/rss"
+RSS_URL = "https://fr.indeed.com/rss"
+
+
+def _make_session():
+    """Crée une session qui contourne Cloudflare/anti-bot si cloudscraper est disponible."""
+    try:
+        import cloudscraper
+        return cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
+    except ImportError:
+        import requests as _r
+        s = _r.Session()
+        s.headers.update(HEADERS)
+        return s
 
 
 class IndeedScraper(BaseScraper):
     source_name = "Indeed"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
-        """Scrape Indeed via their RSS feed — more reliable than HTML scraping."""
+        """Scrape Indeed via leur flux RSS."""
         offers = []
         start = 0
         seen: set[str] = set()
-        session = requests.Session()
-        session.headers.update(HEADERS)
+        session = _make_session()
+        if hasattr(session, "headers"):
+            session.headers.update(HEADERS)
 
         while len(offers) < max_results:
             params = {"q": query, "l": location, "sort": "date", "start": start}
             try:
-                resp = session.get("https://fr.indeed.com/rss", params=params, timeout=15)
+                resp = session.get(RSS_URL, params=params, timeout=15)
+                if resp.status_code == 403:
+                    console.print(
+                        "[yellow][Indeed] Bloqué (403). "
+                        "Installez cloudscraper : pip install cloudscraper[/yellow]"
+                    )
+                    break
                 resp.raise_for_status()
-            except requests.RequestException as e:
-                console.print(f"[yellow][Indeed] Erreur réseau : {e}[/yellow]")
+            except Exception as e:
+                if "403" not in str(e):
+                    console.print(f"[yellow][Indeed] Erreur réseau : {e}[/yellow]")
                 break
 
             try:
@@ -69,7 +91,6 @@ class IndeedScraper(BaseScraper):
             ns = INDEED_NS
             raw_title = item.findtext("title", "").strip()
 
-            # Indeed title format: "Job Title - Company Name"
             if " - " in raw_title:
                 title, company = raw_title.rsplit(" - ", 1)
                 title = title.strip()

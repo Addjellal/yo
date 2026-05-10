@@ -1,9 +1,7 @@
 """
 Scraper Apec.fr — site n°1 pour les cadres en France.
 
-Utilise leur API publique de recherche d'offres :
-    POST https://www.apec.fr/cms/webservices/rechercheOffre
-
+Utilise leur API publique de recherche d'offres.
 Aucune authentification requise.
 """
 import time
@@ -26,33 +24,43 @@ HEADERS = {
 }
 
 
+def _build_payload(query: str, start: int, page_size: int) -> dict:
+    """Payload correct pour l'API APEC (format validé)."""
+    return {
+        "typeOffre": [],
+        "motsCles": query,
+        "lieu": [],
+        "fonctions": [],
+        "secteurs": [],
+        "niveauFormation": [],
+        "experience": [],
+        "statutPoste": [],
+        "salaire": None,
+        "nombreSalaries": [],
+        "tri": 0,
+        "indiceDebut": start,
+        "nombreResultats": page_size,
+        "accesHand": False,
+    }
+
+
 class ApecScraper(BaseScraper):
     source_name = "Apec"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         offers: list[JobOffer] = []
-        page = 0
         page_size = 20
+        start = 0
         session = requests.Session()
         session.headers.update(HEADERS)
 
         while len(offers) < max_results:
-            payload = {
-                "motsCles": query,
-                "lieux": [location] if location else [],
-                "typesContrat": [],
-                "typesConvention": [],
-                "niveauxExperience": [],
-                "fonctions": [],
-                "secteursActivite": [],
-                "salaireMinimum": 0,
-                "salaireMaximum": 200,
-                "pagination": {"range": page_size, "startIndex": page * page_size},
-                "sorts": [{"type": "DATE", "direction": "DESCENDING"}],
-                "activeFiltre": "ACTIF",
-            }
+            payload = _build_payload(query, start, page_size)
             try:
                 resp = session.post(API_URL, json=payload, timeout=15)
+                if resp.status_code == 400:
+                    console.print(f"[yellow][Apec] Payload rejeté (400). Réponse : {resp.text[:200]}[/yellow]")
+                    break
                 resp.raise_for_status()
                 data = resp.json()
             except (requests.RequestException, ValueError) as e:
@@ -72,7 +80,7 @@ class ApecScraper(BaseScraper):
 
             if len(results) < page_size:
                 break
-            page += 1
+            start += page_size
             time.sleep(config.request_delay)
 
         return offers
@@ -84,11 +92,29 @@ class ApecScraper(BaseScraper):
             if not title or not offer_id:
                 return None
 
-            company = item.get("nomCommercial") or item.get("entreprise") or "N/A"
-            city = item.get("lieuTexte") or item.get("lieuPrincipal") or ""
+            entreprise = item.get("employeur") or {}
+            if isinstance(entreprise, dict):
+                company = entreprise.get("nom") or item.get("nomCommercial") or "N/A"
+            else:
+                company = str(entreprise) or item.get("nomCommercial") or "N/A"
+
+            # localisation
+            lieu = item.get("lieux") or item.get("lieu") or []
+            if isinstance(lieu, list) and lieu:
+                loc = lieu[0]
+                city = loc.get("libelle") or loc.get("label") or ""
+            else:
+                city = item.get("lieuTexte") or ""
+
             description = item.get("texteAccroche") or item.get("descriptifPoste") or ""
-            contract = item.get("typeContrat") or ""
-            salary = item.get("salaireTexte") or None
+
+            # contrat
+            contrat_obj = item.get("typeContrat") or {}
+            contract = contrat_obj.get("libelle") if isinstance(contrat_obj, dict) else str(contrat_obj or "")
+
+            # salaire
+            sal = item.get("salaire") or {}
+            salary = sal.get("libelle") if isinstance(sal, dict) else None
 
             url = DETAIL_URL_TEMPLATE.format(offer_id=offer_id)
 

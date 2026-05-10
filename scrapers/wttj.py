@@ -2,7 +2,6 @@ import json
 import time
 import urllib.parse
 
-import requests
 from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer
@@ -13,8 +12,26 @@ BASE_URL = "https://www.welcometothejungle.com"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,*/*",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "max-age=0",
 }
+
+
+def _make_session():
+    """Crée une session qui contourne Cloudflare si cloudscraper est disponible."""
+    try:
+        import cloudscraper
+        return cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False}
+        )
+    except ImportError:
+        import requests as _r
+        s = _r.Session()
+        s.headers.update(HEADERS)
+        return s
 
 
 class WTTJScraper(BaseScraper):
@@ -24,8 +41,9 @@ class WTTJScraper(BaseScraper):
         """Scrape WTTJ via __NEXT_DATA__ JSON embedded in their HTML pages."""
         offers = []
         page = 1
-        session = requests.Session()
-        session.headers.update(HEADERS)
+        session = _make_session()
+        if hasattr(session, "headers"):
+            session.headers.update(HEADERS)
 
         while len(offers) < max_results:
             params: dict = {"query": query, "page": page}
@@ -34,9 +52,15 @@ class WTTJScraper(BaseScraper):
 
             url = f"{BASE_URL}/fr/jobs?" + urllib.parse.urlencode(params)
             try:
-                resp = session.get(url, timeout=15)
+                resp = session.get(url, timeout=20)
+                if resp.status_code == 403:
+                    console.print(
+                        "[yellow][WTTJ] Bloqué par Cloudflare. "
+                        "Installez cloudscraper : pip install cloudscraper[/yellow]"
+                    )
+                    break
                 resp.raise_for_status()
-            except requests.RequestException as e:
+            except Exception as e:
                 console.print(f"[yellow][WTTJ] Erreur réseau : {e}[/yellow]")
                 break
 
@@ -66,14 +90,11 @@ class WTTJScraper(BaseScraper):
             if not script or not script.string:
                 return []
             data = json.loads(script.string)
-            # Navigate the Next.js data tree
             props = data.get("props", {}).get("pageProps", {})
-            # Try several known key paths
-            for key in ("jobs", "jobOffers", "results"):
+            for key in ("jobs", "jobOffers", "results", "hits"):
                 if key in props:
                     return props[key]
-            # Fallback: look inside nested 'data'
-            for key in ("jobs", "jobOffers", "results"):
+            for key in ("jobs", "jobOffers", "results", "hits"):
                 val = props.get("data", {}).get(key)
                 if val:
                     return val
