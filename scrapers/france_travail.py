@@ -8,22 +8,24 @@ TOKEN_URL = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?r
 SEARCH_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
 
 
+REGISTER_URL = "https://francetravail.io/produits-et-services/portail-partenaire"
+
+
 class FranceTravailScraper(BaseScraper):
     source_name = "France Travail"
 
     def __init__(self):
+        if not config.france_travail_client_id or not config.france_travail_client_secret:
+            raise ValueError(
+                "FRANCE_TRAVAIL_CLIENT_ID et FRANCE_TRAVAIL_CLIENT_SECRET manquants.\n"
+                f"Inscrivez-vous sur {REGISTER_URL}"
+            )
         self._token: str | None = None
         self._token_expires: float = 0
 
     def _get_token(self) -> str:
         if self._token and time.time() < self._token_expires - 60:
             return self._token
-
-        if not config.france_travail_client_id or not config.france_travail_client_secret:
-            raise ValueError(
-                "FRANCE_TRAVAIL_CLIENT_ID et FRANCE_TRAVAIL_CLIENT_SECRET requis.\n"
-                "Inscrivez-vous sur https://francetravail.io/produits-et-services/portail-partenaire"
-            )
 
         resp = requests.post(
             TOKEN_URL,

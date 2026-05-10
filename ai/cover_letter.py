@@ -3,6 +3,7 @@ from pathlib import Path
 import anthropic
 from scrapers.base import JobOffer
 from config import config
+from utils import console
 
 
 class CoverLetterGenerator:
@@ -92,6 +93,6 @@ class CoverLetterGenerator:
 
             pdf.output(str(path))
         except ImportError:
-            pass  # PDF optionnel, le TXT suffit
-        except Exception:
-            pass
+            pass  # fpdf2 optionnel
+        except Exception as e:
+            console.print(f"[yellow]Avertissement : génération PDF échouée ({e}). Le fichier TXT est disponible.[/yellow]")

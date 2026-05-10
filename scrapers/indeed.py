@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from .base import BaseScraper, JobOffer
 from config import config
+from utils import console
 
 HEADERS = {
     "User-Agent": (
@@ -31,7 +32,7 @@ class IndeedScraper(BaseScraper):
                 resp = session.get("https://fr.indeed.com/emplois", params=params, timeout=15)
                 resp.raise_for_status()
             except requests.RequestException as e:
-                print(f"[Indeed] Erreur réseau : {e}")
+                console.print(f"[yellow][Indeed] Erreur réseau : {e}[/yellow]")
                 break
 
             soup = BeautifulSoup(resp.text, "html.parser")

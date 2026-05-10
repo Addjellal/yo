@@ -2,6 +2,7 @@ import time
 import requests
 from .base import BaseScraper, JobOffer
 from config import config
+from utils import console
 
 SEARCH_URL = "https://api.welcometothejungle.com/api/v1/jobs"
 HEADERS = {
@@ -38,7 +39,7 @@ class WTTJScraper(BaseScraper):
                 resp.raise_for_status()
                 data = resp.json()
             except Exception as e:
-                print(f"[WTTJ] Erreur : {e}")
+                console.print(f"[yellow][WTTJ] Erreur : {e}[/yellow]")
                 break
 
             jobs = data.get("jobs", data.get("results", []))

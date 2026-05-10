@@ -2,27 +2,26 @@
 """
 Auto Job Application – recherche, matching IA et génération de lettres de motivation.
 
-Usage:
-    # Mode scan : parcourir les offres sans postuler
-    python main.py --cv mon_cv.pdf --query "développeur Python" --scan
-
-    # Mode complet : scan + génération de lettres de motivation
-    python main.py --cv mon_cv.pdf --query "data scientist" --location "Paris"
+Usage rapide :
+    python main.py --check                          # Vérifier l'environnement
+    python main.py --cv cv.pdf --scan               # Scanner sans postuler
+    python main.py --cv cv.pdf --query "dev Python" # Mode complet
 """
 import argparse
 import csv
+import importlib.util
 import json
 import sys
 import time
+import webbrowser
 from pathlib import Path
 
+import anthropic
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
-from rich.columns import Columns
-from rich.text import Text
 from rich import box
 
 from config import config
@@ -59,48 +58,116 @@ SOURCE_MAP = {
 }
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Recherche et postule automatiquement aux offres d'emploi."
-    )
-    parser.add_argument("--cv", required=True, help="Chemin vers votre CV (PDF, DOCX ou TXT)")
-    parser.add_argument("--query", required=True, help='Recherche ex: "développeur Python senior"')
-    parser.add_argument("--location", default="", help='Localisation ex: "Paris" ou "Lyon"')
-    parser.add_argument(
-        "--sources",
-        default="ft,indeed,wttj",
-        help="Sources séparées par virgule : ft,indeed,wttj,linkedin (défaut: ft,indeed,wttj)",
-    )
-    parser.add_argument(
-        "--max", type=int, default=config.max_jobs_per_source,
-        help="Nombre max d'offres par source",
-    )
-    parser.add_argument(
-        "--min-score", type=int, default=config.min_match_score,
-        help="Score minimum de correspondance /10 (défaut: 6)",
-    )
-    parser.add_argument(
-        "--sectors",
-        default="",
-        help=(
-            "Secteurs cibles séparés par virgule (ex: tech,finance). "
-            "Si absent, un sélecteur interactif s'affiche. "
-            "Valeurs : " + ", ".join(k for k, _ in SECTORS)
-        ),
-    )
-    parser.add_argument(
-        "--scan", action="store_true",
-        help="Mode scan uniquement : affiche et exporte les offres sans générer de lettres ni postuler",
-    )
-    parser.add_argument(
-        "--no-letters", action="store_true",
-        help="Ne pas générer les lettres de motivation (ignoré en mode --scan)",
-    )
-    return parser.parse_args()
+# ─── Vérification de l'environnement ─────────────────────────────────────────
 
+def check_setup() -> None:
+    """Affiche un rapport complet de l'environnement et des étapes manquantes."""
+    ok = "[bold green]✓[/bold green]"
+    ko = "[bold red]✗[/bold red]"
+    warn = "[bold yellow]⚠[/bold yellow]"
+
+    lines: list[str] = []
+
+    # Python
+    v = sys.version_info
+    py_ok = v >= (3, 10)
+    lines += [
+        "[bold]Python[/bold]",
+        f"  {ok if py_ok else ko}  Python {v.major}.{v.minor}.{v.micro}"
+        + ("" if py_ok else "  → Requiert Python 3.10+"),
+        "",
+    ]
+
+    # Dépendances
+    deps = [
+        ("anthropic",     "anthropic",      True,  None),
+        ("pdfplumber",    "pdfplumber",     True,  "Pour les CV PDF"),
+        ("docx",          "python-docx",    True,  "Pour les CV DOCX"),
+        ("requests",      "requests",       True,  None),
+        ("bs4",           "beautifulsoup4", True,  "Scraping Indeed"),
+        ("rich",          "rich",           True,  None),
+        ("playwright",    "playwright",     False, "Scraping LinkedIn — pip install playwright && playwright install chromium"),
+        ("fpdf",          "fpdf2",          False, "Génération PDF — pip install fpdf2"),
+    ]
+    lines.append("[bold]Dépendances Python[/bold]")
+    for module, pkg, required, note in deps:
+        installed = importlib.util.find_spec(module) is not None
+        if installed:
+            lines.append(f"  {ok}  {pkg}")
+        elif required:
+            hint = f"  → pip install {pkg}"
+            lines.append(f"  {ko}  {pkg}  [red]MANQUANT[/red]{hint}")
+        else:
+            hint = f"  [dim]optionnel{' — ' + note if note else ''}[/dim]"
+            lines.append(f"  {warn}  {pkg}  {hint}")
+    lines.append("")
+
+    # Clés API
+    lines.append("[bold]Configuration (.env)[/bold]")
+
+    api_key = bool(config.anthropic_api_key)
+    lines.append(
+        f"  {ok}  ANTHROPIC_API_KEY  [dim]configurée[/dim]" if api_key
+        else f"  {ko}  ANTHROPIC_API_KEY  [red]MANQUANTE[/red]  → Obligatoire : platform.anthropic.com"
+    )
+
+    ft_ok = bool(config.france_travail_client_id and config.france_travail_client_secret)
+    lines.append(
+        f"  {ok}  France Travail (CLIENT_ID + SECRET)  [dim]configurés[/dim]" if ft_ok
+        else f"  {warn}  France Travail  [dim]non configuré — optionnel[/dim]\n"
+             f"         → francetravail.io/produits-et-services/portail-partenaire"
+    )
+
+    li_ok = bool(config.linkedin_email and config.linkedin_password)
+    lines.append(
+        f"  {ok}  LinkedIn (EMAIL + PASSWORD)  [dim]configurés[/dim]" if li_ok
+        else f"  {warn}  LinkedIn  [dim]non configuré — optionnel[/dim]"
+    )
+    lines.append("")
+
+    # Sources disponibles
+    lines.append("[bold]Sources disponibles[/bold]")
+    lines.append(f"  {ok}  Indeed              [dim](sans configuration)[/dim]")
+    lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration)[/dim]")
+    lines.append(
+        f"  {ok}  France Travail" if ft_ok
+        else f"  {warn}  France Travail      [dim]désactivé (identifiants manquants)[/dim]"
+    )
+    playwright_ok = importlib.util.find_spec("playwright") is not None
+    lines.append(
+        f"  {ok}  LinkedIn" if (li_ok and playwright_ok)
+        else f"  {warn}  LinkedIn            [dim]désactivé"
+             + (" (playwright absent)" if not playwright_ok else " (identifiants manquants)")
+             + "[/dim]"
+    )
+    lines.append("")
+
+    # Verdict
+    ready = api_key and py_ok
+    if ready:
+        lines.append(f"  {ok}  [bold green]Prêt à démarrer ![/bold green]")
+    else:
+        lines.append(f"  {ko}  [bold red]Configuration incomplète[/bold red] — corrigez les points ci-dessus.")
+
+    console.print(Panel(
+        "\n".join(lines),
+        title="[bold cyan]Vérification de l'environnement[/bold cyan]",
+        border_style="cyan",
+        padding=(1, 3),
+    ))
+
+    if ready:
+        console.print("\n[bold]Prochaines étapes :[/bold]")
+        console.print("  [cyan]1.[/cyan] Placez votre CV à la racine du projet")
+        console.print("  [cyan]2.[/cyan] Lancez un scan :")
+        console.print('     [dim]python main.py --cv votre_cv.pdf --scan[/dim]')
+        console.print("  [cyan]3.[/cyan] Ou mode complet avec lettres de motivation :")
+        console.print('     [dim]python main.py --cv votre_cv.pdf --query "votre métier" --location "Paris"[/dim]')
+
+
+# ─── Sélection des secteurs ───────────────────────────────────────────────────
 
 def select_sectors(preselected: str = "") -> list[str]:
-    """Interactive sector picker. Returns list of sector labels (empty = no filter)."""
     if preselected:
         keys = [s.strip() for s in preselected.split(",")]
         valid = {k for k, _ in SECTORS}
@@ -112,7 +179,6 @@ def select_sectors(preselected: str = "") -> list[str]:
             console.print(f"[dim]Filtres secteur : {', '.join(chosen)}[/dim]")
         return chosen
 
-    # Build display grid (2 columns)
     grid = Table.grid(padding=(0, 2))
     grid.add_column(width=4, style="bold cyan")
     grid.add_column(width=38)
@@ -129,7 +195,7 @@ def select_sectors(preselected: str = "") -> list[str]:
     console.print(Panel(
         grid,
         title="[bold cyan]Filtrer par secteur d'activité[/bold cyan]",
-        subtitle="[dim]Entrez les numéros, 'all' pour tous, ou Entrée pour ignorer[/dim]",
+        subtitle="[dim]Numéros séparés par virgule, 'all' pour tous, Entrée pour ignorer[/dim]",
         border_style="cyan",
         padding=(1, 2),
     ))
@@ -152,6 +218,8 @@ def select_sectors(preselected: str = "") -> list[str]:
             console.print("[red]Format invalide. Exemple : 1,3  ou  all[/red]")
 
 
+# ─── Scraping ─────────────────────────────────────────────────────────────────
+
 def scrape_all(sources: list[str], query: str, location: str, max_per_source: int) -> list[JobOffer]:
     all_offers: list[JobOffer] = []
     seen_keys: set[str] = set()
@@ -164,21 +232,16 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
         source_name, scraper_cls = SOURCE_MAP[source_key]
 
         if source_key == "linkedin":
-            console.print(
-                "[yellow]⚠  LinkedIn : scraping contraire aux CGU, utilisation à vos risques.[/yellow]"
-            )
+            console.print("[yellow]⚠  LinkedIn : scraping contraire aux CGU, utilisation à vos risques.[/yellow]")
 
         with Progress(SpinnerColumn(), TextColumn(f"[cyan]Scraping {source_name}..."), console=console) as progress:
             progress.add_task("", total=None)
             try:
                 scraper = scraper_cls()
                 offers = scraper.search(query, location, max_per_source)
-                new_offers = []
-                for o in offers:
-                    key = o.unique_key()
-                    if key not in seen_keys:
-                        seen_keys.add(key)
-                        new_offers.append(o)
+                new_offers = [o for o in offers if o.unique_key() not in seen_keys]
+                for o in new_offers:
+                    seen_keys.add(o.unique_key())
                 all_offers.extend(new_offers)
                 console.print(f"[green]✓ {source_name} : {len(new_offers)} offres trouvées[/green]")
             except ValueError as e:
@@ -188,6 +251,8 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
 
     return all_offers
 
+
+# ─── Affichage ────────────────────────────────────────────────────────────────
 
 def _score_color(score: int) -> str:
     if score >= 8:
@@ -233,34 +298,49 @@ def display_matches(offers: list[JobOffer]) -> None:
 
 
 def browse_offers(offers: list[JobOffer]) -> None:
-    """Interactive detail viewer for scan mode."""
+    """Navigation interactive après un scan."""
     console.print(
-        "\n[dim]Tapez un [bold]numéro[/bold] pour voir le détail d'une offre, "
-        "[bold]'l'[/bold] pour lister à nouveau, ou [bold]Entrée[/bold] pour quitter.[/dim]"
+        "\n[dim]Commandes : [bold]numéro[/bold] → détail  "
+        "[bold]o N[/bold] → ouvrir dans le navigateur  "
+        "[bold]l[/bold] → relister  "
+        "[bold]Entrée[/bold] → quitter[/dim]"
     )
 
     while True:
-        choice = Prompt.ask("[bold cyan]Offre #[/bold cyan]", default="").strip().lower()
+        choice = Prompt.ask("[bold cyan]>[/bold cyan]", default="").strip().lower()
         if choice == "":
             break
         if choice == "l":
             display_matches(offers)
             continue
+        # Commande "o N" : ouvrir URL dans navigateur
+        if choice.startswith("o "):
+            try:
+                idx = int(choice[2:].strip()) - 1
+                if 0 <= idx < len(offers):
+                    url = offers[idx].url
+                    webbrowser.open(url)
+                    console.print(f"[dim]Ouverture : {url}[/dim]")
+                else:
+                    console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
+            except ValueError:
+                console.print("[red]Usage : o 3[/red]")
+            continue
         try:
             idx = int(choice) - 1
-            if not (0 <= idx < len(offers)):
+            if 0 <= idx < len(offers):
+                _show_detail(offers[idx])
+            else:
                 console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
-                continue
-            _show_detail(offers[idx])
         except ValueError:
-            console.print("[red]Entrez un numéro, 'l' ou Entrée.[/red]")
+            console.print("[red]Commande inconnue. Tapez un numéro, 'o N', 'l' ou Entrée.[/red]")
 
 
 def _show_detail(offer: JobOffer) -> None:
     score = offer.match_score or 0
     color = _score_color(score)
 
-    meta_lines = [
+    meta = "\n".join([
         f"[bold]Entreprise :[/bold] {offer.company}",
         f"[bold]Lieu :[/bold]       {offer.location or '–'}",
         f"[bold]Contrat :[/bold]    {offer.contract_type or '–'}",
@@ -268,12 +348,11 @@ def _show_detail(offer: JobOffer) -> None:
         f"[bold]Source :[/bold]     {offer.source}",
         f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {offer.match_reasons or ''}",
         f"[bold]URL :[/bold]        [link={offer.url}]{offer.url}[/link]",
-    ]
-    meta = "\n".join(meta_lines)
+    ])
 
     desc = (offer.description or "Pas de description disponible.").strip()
     if len(desc) > 1500:
-        desc = desc[:1500] + "\n[dim]… (tronqué)[/dim]"
+        desc = desc[:1500] + "\n[dim]… (tronqué — ouvrez l'URL pour la suite)[/dim]"
 
     console.print(Panel(
         meta + "\n\n" + desc,
@@ -283,16 +362,31 @@ def _show_detail(offer: JobOffer) -> None:
     ))
 
 
+# ─── Sélection et génération des lettres ──────────────────────────────────────
+
 def select_offers(offers: list[JobOffer]) -> list[JobOffer]:
     console.print("\n[bold]Sélectionnez les offres pour lesquelles générer une lettre de motivation.[/bold]")
-    console.print("Entrez les numéros séparés par des virgules, [cyan]'all'[/cyan] pour tout, ou [cyan]'q'[/cyan] pour quitter.")
+    console.print(
+        "Numéros séparés par virgule, [cyan]'all'[/cyan] pour tout, "
+        "[cyan]'o N'[/cyan] pour voir le détail, [cyan]'q'[/cyan] pour annuler."
+    )
 
     while True:
-        choice = Prompt.ask("[bold cyan]Votre sélection[/bold cyan]").strip().lower()
+        choice = Prompt.ask("[bold cyan]Sélection[/bold cyan]").strip().lower()
         if choice == "q":
             return []
         if choice == "all":
             return offers
+        if choice.startswith("o "):
+            try:
+                idx = int(choice[2:].strip()) - 1
+                if 0 <= idx < len(offers):
+                    _show_detail(offers[idx])
+                else:
+                    console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
+            except ValueError:
+                console.print("[red]Usage : o 3[/red]")
+            continue
         try:
             indices = [int(x.strip()) - 1 for x in choice.split(",")]
             selected = [offers[i] for i in indices if 0 <= i < len(offers)]
@@ -319,13 +413,15 @@ def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator) ->
                 ))
 
                 if pdf_path.exists():
-                    console.print(f"  [dim]PDF sauvegardé : {pdf_path}[/dim]")
+                    console.print(f"  [dim]PDF : {pdf_path}[/dim]")
 
             except Exception as e:
                 console.print(f"[red]Erreur génération pour {offer.title} : {e}[/red]")
 
         time.sleep(0.5)
 
+
+# ─── Export ───────────────────────────────────────────────────────────────────
 
 def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     out = Path(config.output_dir)
@@ -339,7 +435,7 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
         {
             "titre": o.title,
             "entreprise": o.company,
-            "lieu": o.location,
+            "lieu": o.location or "",
             "contrat": o.contract_type or "",
             "salaire": o.salary or "",
             "source": o.source,
@@ -358,23 +454,63 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
         writer.writerows(rows)
 
     console.print(f"\n[dim]JSON : {json_path}[/dim]")
-    console.print(f"[dim]CSV  : {csv_path}  (ouvrable dans Excel / Google Sheets)[/dim]")
+    console.print(f"[dim]CSV  : {csv_path}  (Excel / Google Sheets)[/dim]")
     return json_path, csv_path
+
+
+# ─── Point d'entrée ───────────────────────────────────────────────────────────
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Recherche et postule automatiquement aux offres d'emploi.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemples :\n"
+            "  python main.py --check\n"
+            "  python main.py --cv cv.pdf --scan\n"
+            "  python main.py --cv cv.pdf --query \"dev Python\" --location \"Paris\" --sectors tech\n"
+        ),
+    )
+    parser.add_argument("--check", action="store_true", help="Vérifier l'environnement et quitter")
+    parser.add_argument("--cv", help="Chemin vers votre CV (PDF, DOCX ou TXT)")
+    parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
+    parser.add_argument("--location", default="", help='Localisation ex: "Paris"')
+    parser.add_argument(
+        "--sources", default="ft,indeed,wttj",
+        help="Sources : ft,indeed,wttj,linkedin (défaut: ft,indeed,wttj)",
+    )
+    parser.add_argument("--max", type=int, default=config.max_jobs_per_source, help="Max offres par source")
+    parser.add_argument("--min-score", type=int, default=config.min_match_score, help="Score minimum /10 (défaut: 6)")
+    parser.add_argument(
+        "--sectors", default="",
+        help="Secteurs cibles : " + ", ".join(k for k, _ in SECTORS),
+    )
+    parser.add_argument("--scan", action="store_true", help="Scan uniquement : affiche et exporte sans générer de lettres")
+    parser.add_argument("--no-letters", action="store_true", help="Analyse complète mais sans étape de génération de lettres")
+    return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    scan_only = args.scan or args.no_letters
 
-    mode_label = "[bold yellow]MODE SCAN[/bold yellow]" if args.scan else "Recherche · Matching IA · Lettres de motivation"
+    # Mode vérification
+    if args.check:
+        check_setup()
+        return
+
     console.print(Panel.fit(
-        f"[bold cyan]Auto Job Application[/bold cyan]\n{mode_label}",
+        "[bold cyan]Auto Job Application[/bold cyan]\n"
+        + ("[bold yellow]MODE SCAN — aucune candidature ne sera envoyée[/bold yellow]" if args.scan
+           else "Recherche · Matching IA · Lettres de motivation"),
         border_style="cyan",
     ))
-    if args.scan:
-        console.print("[dim]Mode scan : aucune candidature ne sera envoyée.[/dim]")
 
-    # 1. Parsing CV
+    # 1. CV (obligatoire sauf --check)
+    if not args.cv:
+        console.print("[red]--cv est requis. Exemple : python main.py --cv mon_cv.pdf --scan[/red]")
+        console.print("[dim]Conseil : lancez d'abord  python main.py --check  pour vérifier votre configuration.[/dim]")
+        sys.exit(1)
+
     console.print(f"\n[bold]1. Lecture du CV :[/bold] {args.cv}")
     try:
         cv_text = parse_cv(args.cv)
@@ -383,66 +519,87 @@ def main():
         console.print(f"[red]Erreur CV : {e}[/red]")
         sys.exit(1)
 
-    # 2. Sélection des secteurs
+    # 2. Clé API (vérification immédiate)
+    if not config.anthropic_api_key:
+        console.print("[red]ANTHROPIC_API_KEY manquante dans votre fichier .env[/red]")
+        console.print("[dim]Lancez  python main.py --check  pour un diagnostic complet.[/dim]")
+        sys.exit(1)
+
+    # 3. Recherche (interactive si absente)
+    query = args.query.strip()
+    if not query:
+        query = Prompt.ask("\n[bold cyan]Que recherchez-vous ?[/bold cyan] (ex: développeur Python)").strip()
+        if not query:
+            console.print("[red]Recherche vide, abandon.[/red]")
+            sys.exit(1)
+
+    # 4. Secteurs
     console.print("\n[bold]2. Secteurs d'activité ciblés[/bold]")
     sectors = select_sectors(args.sectors)
 
-    # 3. Scraping
+    # 5. Scraping
     sources = [s.strip() for s in args.sources.split(",")]
     console.print(f"\n[bold]3. Scraping des offres[/bold] (sources : {', '.join(sources)})")
-    all_offers = scrape_all(sources, args.query, args.location, args.max)
+    all_offers = scrape_all(sources, query, args.location, args.max)
 
     if not all_offers:
-        console.print("[red]Aucune offre trouvée. Vérifiez vos paramètres et identifiants API.[/red]")
+        console.print("[red]Aucune offre trouvée.[/red]")
+        console.print("[dim]Vérifiez que vos sources sont actives (python main.py --check) ou élargissez la requête.[/dim]")
         sys.exit(1)
 
     console.print(f"\n[bold]Total :[/bold] {len(all_offers)} offres collectées (doublons supprimés)")
 
-    # 4. Matching IA
+    # 6. Matching IA
     sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""
-    console.print(f"\n[bold]4. Analyse de correspondance avec Claude[/bold] (score min : {args.min_score}/10{sector_label})")
-    with Progress(SpinnerColumn(), TextColumn("[cyan]Analyse en cours..."), console=console) as progress:
+    console.print(f"\n[bold]4. Analyse de correspondance[/bold] (score min : {args.min_score}/10{sector_label})")
+    with Progress(SpinnerColumn(), TextColumn("[cyan]Claude analyse les offres..."), console=console) as progress:
         progress.add_task("", total=None)
         try:
             matcher = JobMatcher(cv_text)
             matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
         except anthropic.AuthenticationError:
-            console.print("[red]Clé ANTHROPIC_API_KEY invalide ou manquante.[/red]")
+            console.print("[red]Clé ANTHROPIC_API_KEY invalide. Vérifiez votre fichier .env.[/red]")
             sys.exit(1)
 
     if not matched_offers:
-        console.print(f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10. Essayez --min-score 5.[/yellow]")
+        console.print(
+            f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10.[/yellow]\n"
+            f"[dim]Essayez --min-score {args.min_score - 1} ou élargissez les secteurs.[/dim]"
+        )
         sys.exit(0)
 
-    # 5. Affichage + export
+    # 7. Affichage + export
     display_matches(matched_offers)
-    save_results(matched_offers, args.query)
+    save_results(matched_offers, query)
 
-    # 6a. Mode scan : navigation interactive, puis sortie
-    if scan_only:
+    # 8a. Mode scan : navigation interactive uniquement
+    if args.scan:
         browse_offers(matched_offers)
-        console.print(f"\n[bold green]✓ Scan terminé.[/bold green] {len(matched_offers)} offres exportées dans [cyan]{config.output_dir}/[/cyan]")
+        console.print(f"\n[bold green]✓ Scan terminé.[/bold green] {len(matched_offers)} offres dans [cyan]{config.output_dir}/[/cyan]")
         return
 
-    # 6b. Mode complet : génération des lettres de motivation
+    # 8b. Mode --no-letters : affichage seul, pas de prompt lettres
+    if args.no_letters:
+        console.print(f"\n[dim]Résultats exportés dans [cyan]{config.output_dir}/[/cyan].[/dim]")
+        return
+
+    # 8c. Mode complet : proposition de générer des lettres
     console.print()
     if not Confirm.ask("[bold cyan]Générer des lettres de motivation pour certaines offres ?[/bold cyan]"):
-        console.print("[dim]Aucune lettre générée. Résultats disponibles dans le dossier output/.[/dim]")
+        console.print(f"[dim]Résultats disponibles dans [cyan]{config.output_dir}/[/cyan].[/dim]")
         return
 
     selected = select_offers(matched_offers)
     if not selected:
-        console.print("[dim]Aucune offre sélectionnée.[/dim]")
         return
 
-    console.print(f"\n[bold]Génération des lettres de motivation[/bold] ({len(selected)} offre(s))")
+    console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s))")
     generator = CoverLetterGenerator(cv_text)
     generate_letters(selected, generator)
 
-    console.print(f"\n[bold green]✓ Terminé ![/bold green] Lettres sauvegardées dans [cyan]{config.output_dir}/[/cyan]")
+    console.print(f"\n[bold green]✓ Terminé ![/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")
     console.print("[dim]Relisez et personnalisez chaque lettre avant envoi.[/dim]")
 
 
 if __name__ == "__main__":
-    import anthropic  # noqa: F401 – vérification import
     main()

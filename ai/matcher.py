@@ -2,6 +2,7 @@ import json
 import anthropic
 from scrapers.base import JobOffer
 from config import config
+from utils import console
 
 BATCH_SIZE = 10
 
@@ -78,13 +79,18 @@ Offres à analyser :
         )
 
         raw = response.content[0].text.strip()
-        # Extraire le JSON même si Claude ajoute du texte autour
         start = raw.find("[")
         end = raw.rfind("]") + 1
         if start == -1 or end == 0:
+            console.print("[yellow]Avertissement : Claude n'a pas retourné de JSON valide pour ce lot.[/yellow]")
             return
 
-        results = json.loads(raw[start:end])
+        try:
+            results = json.loads(raw[start:end])
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow]Avertissement : erreur de parsing JSON du matcher ({e}). Lot ignoré.[/yellow]")
+            return
+
         for item in results:
             idx = item.get("job_index", -1)
             if 0 <= idx < len(batch):

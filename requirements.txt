@@ -1,5 +1,5 @@
 # IA
-anthropic>=0.39.0
+anthropic>=0.40.0
 
 # Configuration
 python-dotenv>=1.0.0
