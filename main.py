@@ -33,6 +33,7 @@ from scrapers import (
     WTTJScraper,
     LinkedInScraper,
     ApecScraper,
+    AdzunaScraper,
 )
 from ai import JobMatcher, CoverLetterGenerator
 from tracker import Tracker
@@ -72,6 +73,7 @@ SOURCE_MAP = {
     "indeed": ("Indeed", IndeedScraper),
     "wttj": ("Welcome to the Jungle", WTTJScraper),
     "apec": ("Apec", ApecScraper),
+    "adzuna": ("Adzuna", AdzunaScraper),
     "linkedin": ("LinkedIn", LinkedInScraper),
 }
 
@@ -166,10 +168,16 @@ def check_setup() -> None:
     li_ok = bool(config.linkedin_email and config.linkedin_password)
     playwright_ok = importlib.util.find_spec("playwright") is not None
 
+    adzuna_ok = bool(config.adzuna_app_id and config.adzuna_app_key)
+
     lines.append("[bold]Sources disponibles[/bold]")
-    lines.append(f"  {ok}  Indeed                 [dim](sans configuration)[/dim]")
-    lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration)[/dim]")
+    lines.append(f"  {ok}  Indeed                 [dim](sans configuration — dépend de Cloudflare)[/dim]")
+    lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration — dépend de Cloudflare)[/dim]")
     lines.append(f"  {ok}  Apec                   [dim](cadres France, sans configuration)[/dim]")
+    lines.append(
+        f"  {ok}  Adzuna                 [green]API gratuite configurée[/green]" if adzuna_ok
+        else f"  {warn}  Adzuna                 [dim]non configuré — [bold]recommandé[/bold] : developer.adzuna.com (gratuit)[/dim]"
+    )
     lines.append(
         f"  {ok}  France Travail" if ft_ok
         else f"  {warn}  France Travail         [dim]non configuré — optionnel[/dim]"
@@ -306,6 +314,27 @@ def _prompt_linkedin_creds() -> bool:
     return True
 
 
+def _prompt_adzuna_creds() -> bool:
+    """Ask for Adzuna API credentials. Returns True if provided."""
+    console.print(
+        "\n[cyan]Adzuna nécessite des clés API (gratuit, sans CB, inscription 2 min).[/cyan]\n"
+        "[dim]Inscription : https://developer.adzuna.com[/dim]\n"
+        "[dim]Une fois inscrit, récupérez App ID et App Key dans votre tableau de bord.[/dim]"
+    )
+    app_id = Prompt.ask("  ADZUNA_APP_ID").strip()
+    app_key = Prompt.ask("  ADZUNA_APP_KEY").strip()
+    if not app_id or not app_key:
+        console.print("[yellow]Clés vides — Adzuna ignoré.[/yellow]")
+        return False
+    config.adzuna_app_id = app_id
+    config.adzuna_app_key = app_key
+    if Confirm.ask("  Sauvegarder dans .env pour les prochaines sessions ?", default=True):
+        save_to_env("ADZUNA_APP_ID", app_id)
+        save_to_env("ADZUNA_APP_KEY", app_key)
+        console.print("[dim]Sauvegardé dans .env[/dim]")
+    return True
+
+
 _SOURCE_INFO: list[dict] = [
     {
         "key": "indeed",
@@ -324,6 +353,14 @@ _SOURCE_INFO: list[dict] = [
         "label": "Apec",
         "auth": False,
         "note": "Cadres en France — sans authentification",
+    },
+    {
+        "key": "adzuna",
+        "label": "Adzuna",
+        "auth": True,
+        "note": "API gratuite (1 000 appels/mois) — developer.adzuna.com",
+        "configured": lambda: bool(config.adzuna_app_id and config.adzuna_app_key),
+        "prompt": _prompt_adzuna_creds,
     },
     {
         "key": "ft",
@@ -801,8 +838,8 @@ def parse_args():
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
     parser.add_argument("--location", default="", help='Localisation ex: "Paris"')
     parser.add_argument(
-        "--sources", default="indeed,wttj,apec",
-        help="Sources : ft,indeed,wttj,apec,linkedin (défaut: indeed,wttj,apec)",
+        "--sources", default="apec,adzuna,indeed,wttj",
+        help="Sources : ft,indeed,wttj,apec,adzuna,linkedin (défaut: apec,adzuna,indeed,wttj)",
     )
     parser.add_argument("--max", type=int, default=config.max_jobs_per_source, help="Max offres par source")
     parser.add_argument("--min-score", type=int, default=config.min_match_score, help="Score minimum /10 (défaut: 6)")

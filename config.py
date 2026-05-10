@@ -24,6 +24,8 @@ class Config:
     france_travail_client_secret: str = field(default_factory=lambda: os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET", ""))
     linkedin_email: str = field(default_factory=lambda: os.getenv("LINKEDIN_EMAIL", ""))
     linkedin_password: str = field(default_factory=lambda: os.getenv("LINKEDIN_PASSWORD", ""))
+    adzuna_app_id: str = field(default_factory=lambda: os.getenv("ADZUNA_APP_ID", ""))
+    adzuna_app_key: str = field(default_factory=lambda: os.getenv("ADZUNA_APP_KEY", ""))
 
     # Paramètres
     output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", "output"))
