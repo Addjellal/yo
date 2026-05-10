@@ -1,5 +1,6 @@
-# IA
-anthropic>=0.40.0
+# IA providers (installez selon votre choix)
+anthropic>=0.40.0   # requis si PROVIDER=anthropic
+ollama>=0.4.0       # requis si PROVIDER=ollama
 
 # Configuration
 python-dotenv>=1.0.0

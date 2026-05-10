@@ -16,7 +16,6 @@ import time
 import webbrowser
 from pathlib import Path
 
-import anthropic
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -60,6 +59,17 @@ SOURCE_MAP = {
 
 # ─── Vérification de l'environnement ─────────────────────────────────────────
 
+def _check_ollama() -> tuple[bool, list[str]]:
+    """Return (is_running, list_of_pulled_model_names)."""
+    try:
+        import requests as _req
+        r = _req.get(f"{config.ollama_base_url}/api/tags", timeout=3)
+        models = [m["name"] for m in r.json().get("models", [])]
+        return True, models
+    except Exception:
+        return False, []
+
+
 def check_setup() -> None:
     """Affiche un rapport complet de l'environnement et des étapes manquantes."""
     ok = "[bold green]✓[/bold green]"
@@ -78,16 +88,48 @@ def check_setup() -> None:
         "",
     ]
 
+    # Provider IA
+    provider = config.provider
+    lines.append(f"[bold]Provider IA[/bold] : [cyan]{provider}[/cyan]")
+
+    if provider == "ollama":
+        ollama_ok, ollama_models = _check_ollama()
+        if ollama_ok:
+            lines.append(f"  {ok}  Ollama en cours d'exécution sur {config.ollama_base_url}")
+            model_pulled = any(config.ollama_model in m for m in ollama_models)
+            vision_pulled = any(config.ollama_vision_model in m for m in ollama_models)
+            lines.append(
+                f"  {ok}  Modèle texte : {config.ollama_model}" if model_pulled
+                else f"  {ko}  Modèle texte : {config.ollama_model}  [red]non téléchargé[/red]"
+                     f"  → ollama pull {config.ollama_model}"
+            )
+            lines.append(
+                f"  {ok}  Modèle vision : {config.ollama_vision_model}  [dim](OCR PDF)[/dim]" if vision_pulled
+                else f"  {warn}  Modèle vision : {config.ollama_vision_model}  [dim]non téléchargé (optionnel pour PDF scannés)[/dim]"
+                     f"  → ollama pull {config.ollama_vision_model}"
+            )
+        else:
+            lines.append(f"  {ko}  Ollama [red]non démarré[/red]  → Lancez Ollama puis réessayez")
+    else:
+        api_key = bool(config.anthropic_api_key)
+        lines.append(
+            f"  {ok}  ANTHROPIC_API_KEY  [dim]configurée[/dim]" if api_key
+            else f"  {ko}  ANTHROPIC_API_KEY  [red]MANQUANTE[/red]  → platform.anthropic.com"
+        )
+        ollama_ok = False
+    lines.append("")
+
     # Dépendances
     deps = [
-        ("anthropic",     "anthropic",      True,  None),
-        ("pdfplumber",    "pdfplumber",     True,  "Pour les CV PDF"),
+        ("fitz",          "pymupdf",        True,  "Lecture PDF"),
         ("docx",          "python-docx",    True,  "Pour les CV DOCX"),
         ("requests",      "requests",       True,  None),
         ("bs4",           "beautifulsoup4", True,  "Scraping Indeed"),
         ("rich",          "rich",           True,  None),
+        ("ollama",        "ollama",         provider == "ollama", "Requis si PROVIDER=ollama"),
+        ("anthropic",     "anthropic",      provider == "anthropic", "Requis si PROVIDER=anthropic"),
         ("playwright",    "playwright",     False, "Scraping LinkedIn — pip install playwright && playwright install chromium"),
-        ("fpdf",          "fpdf2",          False, "Génération PDF — pip install fpdf2"),
+        ("fpdf",          "fpdf2",          False, "Génération PDF lettres"),
     ]
     lines.append("[bold]Dépendances Python[/bold]")
     for module, pkg, required, note in deps:
@@ -95,45 +137,23 @@ def check_setup() -> None:
         if installed:
             lines.append(f"  {ok}  {pkg}")
         elif required:
-            hint = f"  → pip install {pkg}"
-            lines.append(f"  {ko}  {pkg}  [red]MANQUANT[/red]{hint}")
+            lines.append(f"  {ko}  {pkg}  [red]MANQUANT[/red]  → pip install {pkg}")
         else:
-            hint = f"  [dim]optionnel{' — ' + note if note else ''}[/dim]"
-            lines.append(f"  {warn}  {pkg}  {hint}")
+            lines.append(f"  {warn}  {pkg}  [dim]optionnel{' — ' + note if note else ''}[/dim]")
     lines.append("")
 
-    # Clés API
-    lines.append("[bold]Configuration (.env)[/bold]")
-
-    api_key = bool(config.anthropic_api_key)
-    lines.append(
-        f"  {ok}  ANTHROPIC_API_KEY  [dim]configurée[/dim]" if api_key
-        else f"  {ko}  ANTHROPIC_API_KEY  [red]MANQUANTE[/red]  → Obligatoire : platform.anthropic.com"
-    )
-
+    # Sources scraping
     ft_ok = bool(config.france_travail_client_id and config.france_travail_client_secret)
-    lines.append(
-        f"  {ok}  France Travail (CLIENT_ID + SECRET)  [dim]configurés[/dim]" if ft_ok
-        else f"  {warn}  France Travail  [dim]non configuré — optionnel[/dim]\n"
-             f"         → francetravail.io/produits-et-services/portail-partenaire"
-    )
-
     li_ok = bool(config.linkedin_email and config.linkedin_password)
-    lines.append(
-        f"  {ok}  LinkedIn (EMAIL + PASSWORD)  [dim]configurés[/dim]" if li_ok
-        else f"  {warn}  LinkedIn  [dim]non configuré — optionnel[/dim]"
-    )
-    lines.append("")
+    playwright_ok = importlib.util.find_spec("playwright") is not None
 
-    # Sources disponibles
     lines.append("[bold]Sources disponibles[/bold]")
     lines.append(f"  {ok}  Indeed              [dim](sans configuration)[/dim]")
     lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration)[/dim]")
     lines.append(
         f"  {ok}  France Travail" if ft_ok
-        else f"  {warn}  France Travail      [dim]désactivé (identifiants manquants)[/dim]"
+        else f"  {warn}  France Travail      [dim]non configuré — optionnel[/dim]"
     )
-    playwright_ok = importlib.util.find_spec("playwright") is not None
     lines.append(
         f"  {ok}  LinkedIn" if (li_ok and playwright_ok)
         else f"  {warn}  LinkedIn            [dim]désactivé"
@@ -143,7 +163,11 @@ def check_setup() -> None:
     lines.append("")
 
     # Verdict
-    ready = api_key and py_ok
+    if provider == "ollama":
+        ready = py_ok and ollama_ok
+    else:
+        ready = py_ok and bool(config.anthropic_api_key)
+
     if ready:
         lines.append(f"  {ok}  [bold green]Prêt à démarrer ![/bold green]")
     else:
@@ -677,11 +701,18 @@ def main():
         console.print(f"[red]Erreur CV : {e}[/red]")
         sys.exit(1)
 
-    # 2. Clé API (vérification immédiate)
-    if not config.anthropic_api_key:
-        console.print("[red]ANTHROPIC_API_KEY manquante dans votre fichier .env[/red]")
-        console.print("[dim]Lancez  python main.py --check  pour un diagnostic complet.[/dim]")
-        sys.exit(1)
+    # 2. Vérification provider IA
+    if config.provider == "ollama":
+        ollama_ok, _ = _check_ollama()
+        if not ollama_ok:
+            console.print(f"[red]Ollama n'est pas démarré sur {config.ollama_base_url}[/red]")
+            console.print("[dim]Lancez Ollama puis réessayez. Diagnostic : python main.py --check[/dim]")
+            sys.exit(1)
+    else:
+        if not config.anthropic_api_key:
+            console.print("[red]ANTHROPIC_API_KEY manquante dans votre fichier .env[/red]")
+            console.print("[dim]Diagnostic : python main.py --check[/dim]")
+            sys.exit(1)
 
     # 3. Recherche (interactive si absente)
     query = args.query.strip()
@@ -718,8 +749,11 @@ def main():
         try:
             matcher = JobMatcher(cv_text)
             matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
-        except anthropic.AuthenticationError:
-            console.print("[red]Clé ANTHROPIC_API_KEY invalide. Vérifiez votre fichier .env.[/red]")
+        except Exception as e:
+            if "AuthenticationError" in type(e).__name__:
+                console.print("[red]Clé ANTHROPIC_API_KEY invalide. Vérifiez votre fichier .env.[/red]")
+            else:
+                console.print(f"[red]Erreur IA : {e}[/red]")
             sys.exit(1)
 
     if not matched_offers:

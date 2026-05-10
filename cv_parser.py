@@ -50,7 +50,7 @@ def _extract_text_native(path: Path) -> str:
 
 
 def _extract_text_vision(path: Path) -> str:
-    """Render each PDF page as an image and send to Claude Vision for OCR."""
+    """Render each PDF page as image and OCR via Claude Vision or Ollama vision."""
     try:
         import fitz
     except ImportError:
@@ -59,54 +59,19 @@ def _extract_text_vision(path: Path) -> str:
             "Installez-le : pip install pymupdf"
         )
 
-    import anthropic
     from config import config
-
-    if not config.anthropic_api_key:
-        raise ValueError("ANTHROPIC_API_KEY manquante — impossible de faire l'OCR du CV scanné.")
-
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-    doc = fitz.open(str(path))
-
     from utils import console
-    console.print(f"[yellow]PDF image-based détecté ({len(doc)} page(s)) — OCR via Claude Vision...[/yellow]")
+
+    doc = fitz.open(str(path))
+    console.print(f"[yellow]PDF image-based détecté ({len(doc)} page(s)) — OCR via {config.provider}...[/yellow]")
 
     all_text: list[str] = []
+    ocr_fn = _ocr_page_ollama if config.provider == "ollama" else _ocr_page_anthropic
 
     for page_num, page in enumerate(doc):
         pix = page.get_pixmap(dpi=150)
         img_bytes = pix.tobytes("png")
-        img_b64 = base64.standard_b64encode(img_bytes).decode()
-
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": img_b64,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Voici la page d'un CV. Extrait tout le texte visible "
-                                "en préservant la structure (sections, puces, dates). "
-                                "Réponds uniquement avec le texte extrait, sans commentaire."
-                            ),
-                        },
-                    ],
-                }
-            ],
-        )
-
-        page_text = response.content[0].text.strip()
+        page_text = ocr_fn(img_bytes, config)
         if page_text:
             all_text.append(f"--- Page {page_num + 1} ---\n{page_text}")
         console.print(f"[dim]  Page {page_num + 1}/{len(doc)} traitée[/dim]")
@@ -115,6 +80,47 @@ def _extract_text_vision(path: Path) -> str:
         raise ValueError("Impossible d'extraire le texte du CV, même via OCR.")
 
     return "\n\n".join(all_text)
+
+
+_OCR_PROMPT = (
+    "Voici la page d'un CV. Extrait tout le texte visible "
+    "en préservant la structure (sections, puces, dates). "
+    "Réponds uniquement avec le texte extrait, sans commentaire."
+)
+
+
+def _ocr_page_anthropic(img_bytes: bytes, config) -> str:
+    import anthropic
+    if not config.anthropic_api_key:
+        raise ValueError("ANTHROPIC_API_KEY manquante — impossible de faire l'OCR.")
+    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    img_b64 = base64.standard_b64encode(img_bytes).decode()
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+                {"type": "text", "text": _OCR_PROMPT},
+            ],
+        }],
+    )
+    return response.content[0].text.strip()
+
+
+def _ocr_page_ollama(img_bytes: bytes, config) -> str:
+    import ollama
+    client = ollama.Client(host=config.ollama_base_url)
+    response = client.chat(
+        model=config.ollama_vision_model,
+        messages=[{
+            "role": "user",
+            "content": _OCR_PROMPT,
+            "images": [img_bytes],
+        }],
+    )
+    return response.message.content.strip()
 
 
 def _parse_docx(path: Path) -> str:

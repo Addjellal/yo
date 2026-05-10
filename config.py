@@ -8,11 +8,24 @@ load_dotenv()
 
 @dataclass
 class Config:
+    # IA provider : "anthropic" ou "ollama"
+    provider: str = field(default_factory=lambda: os.getenv("PROVIDER", "anthropic"))
+
+    # Anthropic (requis si provider=anthropic)
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+
+    # Ollama (requis si provider=ollama)
+    ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+    ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3.2"))
+    ollama_vision_model: str = field(default_factory=lambda: os.getenv("OLLAMA_VISION_MODEL", "llava"))
+
+    # Sources
     france_travail_client_id: str = field(default_factory=lambda: os.getenv("FRANCE_TRAVAIL_CLIENT_ID", ""))
     france_travail_client_secret: str = field(default_factory=lambda: os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET", ""))
     linkedin_email: str = field(default_factory=lambda: os.getenv("LINKEDIN_EMAIL", ""))
     linkedin_password: str = field(default_factory=lambda: os.getenv("LINKEDIN_PASSWORD", ""))
+
+    # Paramètres
     output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", "output"))
     max_jobs_per_source: int = field(default_factory=lambda: int(os.getenv("MAX_JOBS_PER_SOURCE", "50")))
     min_match_score: int = field(default_factory=lambda: int(os.getenv("MIN_MATCH_SCORE", "6")))
