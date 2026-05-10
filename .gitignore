@@ -1,0 +1,9 @@
+.env
+output/*.pdf
+output/*.txt
+output/*.json
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
