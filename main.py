@@ -714,86 +714,106 @@ def main():
             console.print("[dim]Diagnostic : python main.py --check[/dim]")
             sys.exit(1)
 
-    # 3. Recherche (interactive si absente)
-    query = args.query.strip()
-    if not query:
-        query = Prompt.ask("\n[bold cyan]Que recherchez-vous ?[/bold cyan] (ex: développeur Python)").strip()
-        if not query:
-            console.print("[red]Recherche vide, abandon.[/red]")
-            sys.exit(1)
-
-    # 4. Sélection des sources
+    # 3. Sélection des sources (une fois pour toutes les recherches)
     console.print("\n[bold]2. Sources de recherche[/bold]")
     sources = select_sources(args.sources)
 
-    # 5. Secteurs
+    # 4. Secteurs (une fois, modifiable en cours de session)
     console.print("\n[bold]3. Secteurs d'activité ciblés[/bold]")
     sectors = select_sectors(args.sectors)
 
-    # 6. Scraping
-    console.print(f"\n[bold]4. Scraping des offres[/bold] (sources : {', '.join(sources)})")
-    all_offers = scrape_all(sources, query, args.location, args.max)
+    # Matcher initialisé une seule fois (CV en mémoire)
+    matcher = JobMatcher(cv_text)
 
-    if not all_offers:
-        console.print("[red]Aucune offre trouvée.[/red]")
-        console.print("[dim]Vérifiez que vos sources sont actives (python main.py --check) ou élargissez la requête.[/dim]")
-        sys.exit(1)
+    # 5. Boucle de recherche
+    first_query = args.query.strip()
+    console.print(
+        "\n[dim]À tout moment : tapez [bold]x[/bold] pour quitter, "
+        "[bold]s[/bold] pour changer les sources, "
+        "[bold]f[/bold] pour changer les filtres secteur.[/dim]"
+    )
 
-    console.print(f"\n[bold]Total :[/bold] {len(all_offers)} offres collectées (doublons supprimés)")
+    while True:
+        # Demande de la requête
+        if first_query:
+            query = first_query
+            first_query = ""
+        else:
+            console.print("\n" + "─" * 60)
+            raw = Prompt.ask(
+                "[bold cyan]Nouvelle recherche[/bold cyan] [dim](x=quitter  s=sources  f=filtres)[/dim]"
+            ).strip()
+            if raw.lower() == "x":
+                console.print("[dim]Au revoir ![/dim]")
+                break
+            if raw.lower() == "s":
+                sources = select_sources("")
+                continue
+            if raw.lower() == "f":
+                sectors = select_sectors("")
+                continue
+            query = raw
+            if not query:
+                continue
 
-    # 7. Matching IA
-    sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""
-    console.print(f"\n[bold]5. Analyse de correspondance[/bold] (score min : {args.min_score}/10{sector_label})")
-    with Progress(SpinnerColumn(), TextColumn("[cyan]Claude analyse les offres..."), console=console) as progress:
-        progress.add_task("", total=None)
-        try:
-            matcher = JobMatcher(cv_text)
-            matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
-        except Exception as e:
-            if "AuthenticationError" in type(e).__name__:
-                console.print("[red]Clé ANTHROPIC_API_KEY invalide. Vérifiez votre fichier .env.[/red]")
-            else:
+        # Scraping
+        console.print(f"\n[bold]Scraping :[/bold] « {query} » sur {', '.join(sources)}")
+        all_offers = scrape_all(sources, query, args.location, args.max)
+
+        if not all_offers:
+            console.print(
+                "[yellow]Aucune offre trouvée pour cette recherche.[/yellow] "
+                "[dim]Essayez un autre intitulé ou de nouvelles sources.[/dim]"
+            )
+            continue  # ← retour à la demande de requête, pas de sys.exit
+
+        console.print(f"[bold]Total :[/bold] {len(all_offers)} offres collectées")
+
+        # Matching IA
+        sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""
+        console.print(f"[bold]Analyse[/bold] (score min : {args.min_score}/10{sector_label})")
+        with Progress(SpinnerColumn(), TextColumn("[cyan]Analyse en cours..."), console=console) as progress:
+            progress.add_task("", total=None)
+            try:
+                matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
+            except Exception as e:
+                if "AuthenticationError" in type(e).__name__:
+                    console.print("[red]Clé ANTHROPIC_API_KEY invalide.[/red]")
+                    sys.exit(1)
                 console.print(f"[red]Erreur IA : {e}[/red]")
-            sys.exit(1)
+                continue
 
-    if not matched_offers:
-        console.print(
-            f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10.[/yellow]\n"
-            f"[dim]Essayez --min-score {args.min_score - 1} ou élargissez les secteurs.[/dim]"
-        )
-        sys.exit(0)
+        if not matched_offers:
+            console.print(
+                f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10.[/yellow] "
+                f"[dim]Essayez un autre intitulé ou --min-score {args.min_score - 1}.[/dim]"
+            )
+            continue  # ← retour à la demande de requête
 
-    # 8. Affichage + export
-    display_matches(matched_offers)
-    save_results(matched_offers, query)
+        # Affichage + export
+        display_matches(matched_offers)
+        save_results(matched_offers, query)
 
-    # 8a. Mode scan : navigation interactive uniquement
-    if args.scan:
-        browse_offers(matched_offers)
-        console.print(f"\n[bold green]✓ Scan terminé.[/bold green] {len(matched_offers)} offres dans [cyan]{config.output_dir}/[/cyan]")
-        return
+        # Mode scan : navigation interactive
+        if args.scan:
+            browse_offers(matched_offers)
+            console.print(f"[dim]{len(matched_offers)} offres exportées dans {config.output_dir}/[/dim]")
+            continue  # ← propose une nouvelle recherche
 
-    # 8b. Mode --no-letters : affichage seul, pas de prompt lettres
-    if args.no_letters:
-        console.print(f"\n[dim]Résultats exportés dans [cyan]{config.output_dir}/[/cyan].[/dim]")
-        return
+        # Mode --no-letters
+        if args.no_letters:
+            console.print(f"[dim]Résultats exportés dans {config.output_dir}/[/dim]")
+            continue
 
-    # 8c. Mode complet : proposition de générer des lettres
-    console.print()
-    if not Confirm.ask("[bold cyan]Générer des lettres de motivation pour certaines offres ?[/bold cyan]"):
-        console.print(f"[dim]Résultats disponibles dans [cyan]{config.output_dir}/[/cyan].[/dim]")
-        return
-
-    selected = select_offers(matched_offers)
-    if not selected:
-        return
-
-    console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s))")
-    generator = CoverLetterGenerator(cv_text)
-    generate_letters(selected, generator)
-
-    console.print(f"\n[bold green]✓ Terminé ![/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")
-    console.print("[dim]Relisez et personnalisez chaque lettre avant envoi.[/dim]")
+        # Mode complet : lettres de motivation
+        console.print()
+        if Confirm.ask("[bold cyan]Générer des lettres de motivation ?[/bold cyan]"):
+            selected = select_offers(matched_offers)
+            if selected:
+                console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s))")
+                generator = CoverLetterGenerator(cv_text)
+                generate_letters(selected, generator)
+                console.print(f"[bold green]✓[/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")
 
 
 if __name__ == "__main__":

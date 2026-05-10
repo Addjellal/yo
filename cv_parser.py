@@ -2,20 +2,38 @@ import base64
 from pathlib import Path
 
 
-def parse_cv(cv_path: str) -> str:
+def _cache_path(path: Path) -> Path:
+    from config import config
+    cache_dir = Path(config.output_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f".cv_{path.stem}.txt"
+
+
+def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     path = Path(cv_path)
     if not path.exists():
         raise FileNotFoundError(f"CV introuvable : {cv_path}")
 
+    # Utiliser le cache si disponible et plus récent que le PDF
+    cache = _cache_path(path)
+    if not force_reparse and cache.exists() and cache.stat().st_mtime >= path.stat().st_mtime:
+        from utils import console
+        console.print(f"[dim]CV chargé depuis le cache ({cache.name})[/dim]")
+        return cache.read_text(encoding="utf-8")
+
     suffix = path.suffix.lower()
     if suffix == ".pdf":
-        return _parse_pdf(path)
+        text = _parse_pdf(path)
     elif suffix in (".docx", ".doc"):
-        return _parse_docx(path)
+        text = _parse_docx(path)
     elif suffix == ".txt":
-        return path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
     else:
         raise ValueError(f"Format non supporté : {suffix}. Utilisez PDF, DOCX ou TXT.")
+
+    # Sauvegarder en cache
+    cache.write_text(text, encoding="utf-8")
+    return text
 
 
 def _parse_pdf(path: Path) -> str:
