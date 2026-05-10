@@ -547,6 +547,10 @@ def display_matches(offers: list[JobOffer], tracker: Tracker | None = None) -> N
         score = offer.match_score or 0
         color = _score_color(score)
         badge = STATUS_BADGE.get(tracker.status_of(offer), "") if tracker else ""
+        reasons = offer.match_reasons
+        if isinstance(reasons, list):
+            reasons = " · ".join(str(r) for r in reasons if r)
+        reasons_str = str(reasons).strip() if reasons else "–"
         table.add_row(
             str(i),
             badge,
@@ -557,7 +561,7 @@ def display_matches(offers: list[JobOffer], tracker: Tracker | None = None) -> N
             offer.contract_type or "–",
             offer.salary or "–",
             offer.source,
-            offer.match_reasons or "–",
+            reasons_str,
         )
 
     console.print(table)
@@ -643,6 +647,10 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
 def _show_detail(offer: JobOffer) -> None:
     score = offer.match_score or 0
     color = _score_color(score)
+    reasons = offer.match_reasons
+    if isinstance(reasons, list):
+        reasons = " · ".join(str(r) for r in reasons if r)
+    reasons_str = str(reasons).strip() if reasons else ""
 
     meta = "\n".join([
         f"[bold]Entreprise :[/bold] {offer.company}",
@@ -650,7 +658,7 @@ def _show_detail(offer: JobOffer) -> None:
         f"[bold]Contrat :[/bold]    {offer.contract_type or '–'}",
         f"[bold]Salaire :[/bold]    {offer.salary or '–'}",
         f"[bold]Source :[/bold]     {offer.source}",
-        f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {offer.match_reasons or ''}",
+        f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {reasons_str}",
         f"[bold]URL :[/bold]        [link={offer.url}]{offer.url}[/link]",
     ])
 

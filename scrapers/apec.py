@@ -48,6 +48,11 @@ class ApecScraper(BaseScraper):
     source_name = "Apec"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
+        # APEC retourne 500 sur les requêtes trop courtes ou les mots tronqués
+        if len(query.strip()) < 3:
+            console.print(f"[yellow][Apec] Requête trop courte ({query!r}), ignorée.[/yellow]")
+            return []
+
         offers: list[JobOffer] = []
         page_size = 20
         start = 0

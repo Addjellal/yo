@@ -123,8 +123,11 @@ class JobMatcher:
             f"Voici {len(batch)} offres d'emploi à analyser. Pour chaque offre, donne :\n"
             f"- Un score de correspondance de 0 à 10 (10 = correspondance parfaite)\n"
             f"- 2-3 raisons courtes (compétences ET secteur){sector_instruction}\n"
-            "Réponds UNIQUEMENT avec un JSON valide sous cette forme exacte :\n"
-            '[\n  {"job_index": 0, "score": 8, "reasons": "..."},\n  ...\n]\n\n'
+            "IMPORTANT : réponds UNIQUEMENT avec un tableau JSON valide, sans texte avant ni après.\n"
+            'Le champ "reasons" doit être une CHAÎNE DE CARACTÈRES (pas une liste), '
+            'exemple : "Expérience Python · Django · correspond au secteur tech"\n'
+            "Format exact :\n"
+            '[\n  {"job_index": 0, "score": 8, "reasons": "raison1 · raison2"},\n  ...\n]\n\n'
             f"Offres à analyser :\n{jobs_text}"
         )
 
@@ -163,6 +166,7 @@ class JobMatcher:
         return response.message.content.strip()
 
     def _parse_response(self, raw: str, batch: list[JobOffer]) -> None:
+        # Chercher un tableau JSON — le LLM peut ajouter du texte autour
         start = raw.find("[")
         end = raw.rfind("]") + 1
         if start == -1 or end == 0:
@@ -170,11 +174,46 @@ class JobMatcher:
             return
         try:
             results = json.loads(raw[start:end])
-        except json.JSONDecodeError as e:
-            console.print(f"[yellow]Avertissement : erreur JSON du matcher ({e}). Lot ignoré.[/yellow]")
-            return
+        except json.JSONDecodeError:
+            # Tentative de récupération : trouver les objets JSON individuels
+            results = _extract_json_objects(raw)
+            if not results:
+                console.print("[yellow]Avertissement : JSON du matcher illisible, lot ignoré.[/yellow]")
+                return
+
         for item in results:
+            if not isinstance(item, dict):
+                continue
             idx = item.get("job_index", -1)
-            if 0 <= idx < len(batch):
-                batch[idx].match_score = item.get("score", 0)
-                batch[idx].match_reasons = item.get("reasons", "")
+            if not isinstance(idx, int) or not (0 <= idx < len(batch)):
+                continue
+            score = item.get("score", 0)
+            batch[idx].match_score = int(score) if isinstance(score, (int, float)) else 0
+            # Le LLM peut retourner reasons comme string ou liste — normaliser
+            reasons = item.get("reasons", "")
+            if isinstance(reasons, list):
+                reasons = " · ".join(str(r).strip() for r in reasons if r)
+            batch[idx].match_reasons = str(reasons).strip()
+
+
+def _extract_json_objects(text: str) -> list[dict]:
+    """Tente d'extraire des objets JSON individuels depuis un texte malformé."""
+    results = []
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start != -1:
+                try:
+                    obj = json.loads(text[start:i + 1])
+                    if isinstance(obj, dict):
+                        results.append(obj)
+                except json.JSONDecodeError:
+                    pass
+                start = -1
+    return results
