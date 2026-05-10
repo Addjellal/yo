@@ -21,7 +21,6 @@ HEADERS = {
 
 
 def _make_session():
-    """Crée une session qui contourne Cloudflare si cloudscraper est disponible."""
     try:
         import cloudscraper
         return cloudscraper.create_scraper(
@@ -38,52 +37,66 @@ class WTTJScraper(BaseScraper):
     source_name = "Welcome to the Jungle"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
-        """Scrape WTTJ via __NEXT_DATA__ JSON embedded in their HTML pages."""
         offers = []
         page = 1
         session = _make_session()
         if hasattr(session, "headers"):
             session.headers.update(HEADERS)
 
-        while len(offers) < max_results:
-            params: dict = {"query": query, "page": page}
-            if location:
-                params["aroundQuery"] = location
+        # Playwright session, initialisée paresseusement si cloudscraper bloque
+        from ._browser import BrowserSession
+        browser = BrowserSession()
+        browser_tried = False
 
-            url = f"{BASE_URL}/fr/jobs?" + urllib.parse.urlencode(params)
-            try:
-                resp = session.get(url, timeout=20)
-                if resp.status_code == 403:
-                    console.print(
-                        "[yellow][WTTJ] Bloqué par Cloudflare. "
-                        "Installez cloudscraper : pip install cloudscraper[/yellow]"
-                    )
+        try:
+            while len(offers) < max_results:
+                params: dict = {"query": query, "page": page}
+                if location:
+                    params["aroundQuery"] = location
+                url = f"{BASE_URL}/fr/jobs?" + urllib.parse.urlencode(params)
+
+                html = None
+                # 1. Essai rapide via requests/cloudscraper
+                try:
+                    resp = session.get(url, timeout=20)
+                    if resp.status_code == 200:
+                        html = resp.text
+                except Exception:
+                    pass
+
+                # 2. Fallback Playwright si bloqué
+                if html is None:
+                    if not browser_tried:
+                        browser_tried = True
+                        browser.start()
+                    if browser.ready:
+                        html = browser.fetch(url, wait="networkidle", extra_ms=1000)
+
+                if html is None:
                     break
-                resp.raise_for_status()
-            except Exception as e:
-                console.print(f"[yellow][WTTJ] Erreur réseau : {e}[/yellow]")
-                break
 
-            jobs_page = self._extract_from_next_data(resp.text)
-            if not jobs_page:
-                break
-
-            for item in jobs_page:
-                job = self._parse_item(item)
-                if job:
-                    offers.append(job)
-                if len(offers) >= max_results:
+                jobs_page = self._extract_from_next_data(html)
+                if not jobs_page:
                     break
 
-            if len(jobs_page) < 15:
-                break
-            page += 1
-            time.sleep(config.request_delay)
+                for item in jobs_page:
+                    job = self._parse_item(item)
+                    if job:
+                        offers.append(job)
+                    if len(offers) >= max_results:
+                        break
+
+                if len(jobs_page) < 15:
+                    break
+                page += 1
+                time.sleep(config.request_delay)
+
+        finally:
+            browser.close()
 
         return offers
 
     def _extract_from_next_data(self, html: str) -> list[dict]:
-        """Extract job list from Next.js __NEXT_DATA__ script tag."""
         try:
             soup = BeautifulSoup(html, "html.parser")
             script = soup.find("script", id="__NEXT_DATA__")
@@ -109,10 +122,7 @@ class WTTJScraper(BaseScraper):
             org = item.get("organization", item.get("company", {}))
             org_slug = org.get("slug", "")
 
-            url = (
-                item.get("url")
-                or f"{BASE_URL}/fr/companies/{org_slug}/jobs/{slug}"
-            )
+            url = item.get("url") or f"{BASE_URL}/fr/companies/{org_slug}/jobs/{slug}"
 
             offices = item.get("offices", [])
             office = offices[0] if offices else {}
