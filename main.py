@@ -3,10 +3,14 @@
 Auto Job Application – recherche, matching IA et génération de lettres de motivation.
 
 Usage:
-    python main.py --cv mon_cv.pdf --query "développeur Python" --location "Paris"
-    python main.py --cv mon_cv.pdf --query "data scientist" --sources ft,indeed,wttj
+    # Mode scan : parcourir les offres sans postuler
+    python main.py --cv mon_cv.pdf --query "développeur Python" --scan
+
+    # Mode complet : scan + génération de lettres de motivation
+    python main.py --cv mon_cv.pdf --query "data scientist" --location "Paris"
 """
 import argparse
+import csv
 import json
 import sys
 import time
@@ -17,6 +21,8 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+from rich.columns import Columns
+from rich.text import Text
 from rich import box
 
 from config import config
@@ -83,8 +89,12 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--scan", action="store_true",
+        help="Mode scan uniquement : affiche et exporte les offres sans générer de lettres ni postuler",
+    )
+    parser.add_argument(
         "--no-letters", action="store_true",
-        help="Ne pas générer les lettres de motivation",
+        help="Ne pas générer les lettres de motivation (ignoré en mode --scan)",
     )
     return parser.parse_args()
 
@@ -179,6 +189,14 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
     return all_offers
 
 
+def _score_color(score: int) -> str:
+    if score >= 8:
+        return "green"
+    if score >= 6:
+        return "yellow"
+    return "red"
+
+
 def display_matches(offers: list[JobOffer]) -> None:
     table = Table(
         title=f"\n{len(offers)} offres correspondantes",
@@ -191,25 +209,78 @@ def display_matches(offers: list[JobOffer]) -> None:
     table.add_column("Poste", min_width=25)
     table.add_column("Entreprise", min_width=18)
     table.add_column("Lieu", min_width=12)
-    table.add_column("Source", width=12)
-    table.add_column("Pourquoi", min_width=30)
+    table.add_column("Contrat", width=8)
+    table.add_column("Salaire", width=14)
+    table.add_column("Source", width=10)
+    table.add_column("Correspondance", min_width=30)
 
     for i, offer in enumerate(offers, 1):
         score = offer.match_score or 0
-        score_str = f"[green]{score}/10[/green]" if score >= 8 else (
-            f"[yellow]{score}/10[/yellow]" if score >= 6 else f"[red]{score}/10[/red]"
-        )
+        color = _score_color(score)
         table.add_row(
             str(i),
-            score_str,
+            f"[{color}]{score}/10[/{color}]",
             offer.title,
             offer.company,
             offer.location or "–",
+            offer.contract_type or "–",
+            offer.salary or "–",
             offer.source,
             offer.match_reasons or "–",
         )
 
     console.print(table)
+
+
+def browse_offers(offers: list[JobOffer]) -> None:
+    """Interactive detail viewer for scan mode."""
+    console.print(
+        "\n[dim]Tapez un [bold]numéro[/bold] pour voir le détail d'une offre, "
+        "[bold]'l'[/bold] pour lister à nouveau, ou [bold]Entrée[/bold] pour quitter.[/dim]"
+    )
+
+    while True:
+        choice = Prompt.ask("[bold cyan]Offre #[/bold cyan]", default="").strip().lower()
+        if choice == "":
+            break
+        if choice == "l":
+            display_matches(offers)
+            continue
+        try:
+            idx = int(choice) - 1
+            if not (0 <= idx < len(offers)):
+                console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
+                continue
+            _show_detail(offers[idx])
+        except ValueError:
+            console.print("[red]Entrez un numéro, 'l' ou Entrée.[/red]")
+
+
+def _show_detail(offer: JobOffer) -> None:
+    score = offer.match_score or 0
+    color = _score_color(score)
+
+    meta_lines = [
+        f"[bold]Entreprise :[/bold] {offer.company}",
+        f"[bold]Lieu :[/bold]       {offer.location or '–'}",
+        f"[bold]Contrat :[/bold]    {offer.contract_type or '–'}",
+        f"[bold]Salaire :[/bold]    {offer.salary or '–'}",
+        f"[bold]Source :[/bold]     {offer.source}",
+        f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {offer.match_reasons or ''}",
+        f"[bold]URL :[/bold]        [link={offer.url}]{offer.url}[/link]",
+    ]
+    meta = "\n".join(meta_lines)
+
+    desc = (offer.description or "Pas de description disponible.").strip()
+    if len(desc) > 1500:
+        desc = desc[:1500] + "\n[dim]… (tronqué)[/dim]"
+
+    console.print(Panel(
+        meta + "\n\n" + desc,
+        title=f"[bold cyan]{offer.title}[/bold cyan]",
+        border_style=color,
+        padding=(1, 2),
+    ))
 
 
 def select_offers(offers: list[JobOffer]) -> list[JobOffer]:
@@ -256,39 +327,52 @@ def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator) ->
         time.sleep(0.5)
 
 
-def save_results(offers: list[JobOffer], query: str) -> None:
+def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     out = Path(config.output_dir)
     out.mkdir(parents=True, exist_ok=True)
     safe_query = "".join(c if c.isalnum() else "_" for c in query)[:30]
-    results_file = out / f"resultats_{safe_query}.json"
 
-    data = [
+    json_path = out / f"resultats_{safe_query}.json"
+    csv_path = out / f"resultats_{safe_query}.csv"
+
+    rows = [
         {
             "titre": o.title,
             "entreprise": o.company,
             "lieu": o.location,
+            "contrat": o.contract_type or "",
+            "salaire": o.salary or "",
             "source": o.source,
             "score": o.match_score,
-            "raisons": o.match_reasons,
+            "correspondance": o.match_reasons or "",
             "url": o.url,
-            "salaire": o.salary,
-            "contrat": o.contract_type,
         }
         for o in offers
     ]
 
-    results_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    console.print(f"\n[dim]Résultats sauvegardés : {results_file}[/dim]")
+    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+    console.print(f"\n[dim]JSON : {json_path}[/dim]")
+    console.print(f"[dim]CSV  : {csv_path}  (ouvrable dans Excel / Google Sheets)[/dim]")
+    return json_path, csv_path
 
 
 def main():
     args = parse_args()
+    scan_only = args.scan or args.no_letters
 
+    mode_label = "[bold yellow]MODE SCAN[/bold yellow]" if args.scan else "Recherche · Matching IA · Lettres de motivation"
     console.print(Panel.fit(
-        "[bold cyan]Auto Job Application[/bold cyan]\n"
-        "Recherche · Matching IA · Lettres de motivation",
+        f"[bold cyan]Auto Job Application[/bold cyan]\n{mode_label}",
         border_style="cyan",
     ))
+    if args.scan:
+        console.print("[dim]Mode scan : aucune candidature ne sera envoyée.[/dim]")
 
     # 1. Parsing CV
     console.print(f"\n[bold]1. Lecture du CV :[/bold] {args.cv}")
@@ -330,13 +414,20 @@ def main():
         console.print(f"[yellow]Aucune offre avec un score ≥ {args.min_score}/10. Essayez --min-score 5.[/yellow]")
         sys.exit(0)
 
-    # 5. Affichage
+    # 5. Affichage + export
     display_matches(matched_offers)
     save_results(matched_offers, args.query)
 
-    # 6. Génération des lettres
-    if args.no_letters:
-        console.print("\n[dim]Génération des lettres désactivée (--no-letters).[/dim]")
+    # 6a. Mode scan : navigation interactive, puis sortie
+    if scan_only:
+        browse_offers(matched_offers)
+        console.print(f"\n[bold green]✓ Scan terminé.[/bold green] {len(matched_offers)} offres exportées dans [cyan]{config.output_dir}/[/cyan]")
+        return
+
+    # 6b. Mode complet : génération des lettres de motivation
+    console.print()
+    if not Confirm.ask("[bold cyan]Générer des lettres de motivation pour certaines offres ?[/bold cyan]"):
+        console.print("[dim]Aucune lettre générée. Résultats disponibles dans le dossier output/.[/dim]")
         return
 
     selected = select_offers(matched_offers)
@@ -344,7 +435,7 @@ def main():
         console.print("[dim]Aucune offre sélectionnée.[/dim]")
         return
 
-    console.print(f"\n[bold]6. Génération des lettres de motivation[/bold] ({len(selected)} offre(s))")
+    console.print(f"\n[bold]Génération des lettres de motivation[/bold] ({len(selected)} offre(s))")
     generator = CoverLetterGenerator(cv_text)
     generate_letters(selected, generator)
 
