@@ -24,7 +24,7 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich import box
 
-from config import config
+from config import config, save_to_env
 from cv_parser import parse_cv
 from scrapers import JobOffer, FranceTravailScraper, IndeedScraper, WTTJScraper, LinkedInScraper
 from ai import JobMatcher, CoverLetterGenerator
@@ -216,6 +216,164 @@ def select_sectors(preselected: str = "") -> list[str]:
             console.print("[red]Numéros hors plage, réessayez.[/red]")
         except ValueError:
             console.print("[red]Format invalide. Exemple : 1,3  ou  all[/red]")
+
+
+# ─── Sélection interactive des sources ───────────────────────────────────────
+
+def _prompt_france_travail_creds() -> bool:
+    """Ask for France Travail API credentials. Returns True if provided."""
+    console.print(
+        "\n[cyan]France Travail nécessite des identifiants API partenaire (gratuit).[/cyan]\n"
+        "[dim]Inscription : https://francetravail.io/produits-et-services/portail-partenaire[/dim]"
+    )
+    client_id = Prompt.ask("  CLIENT_ID").strip()
+    client_secret = Prompt.ask("  CLIENT_SECRET", password=True).strip()
+    if not client_id or not client_secret:
+        console.print("[yellow]Identifiants vides — France Travail ignoré.[/yellow]")
+        return False
+    config.france_travail_client_id = client_id
+    config.france_travail_client_secret = client_secret
+    if Confirm.ask("  Sauvegarder dans .env pour les prochaines sessions ?", default=True):
+        save_to_env("FRANCE_TRAVAIL_CLIENT_ID", client_id)
+        save_to_env("FRANCE_TRAVAIL_CLIENT_SECRET", client_secret)
+        console.print("[dim]Sauvegardé dans .env[/dim]")
+    return True
+
+
+def _prompt_linkedin_creds() -> bool:
+    """Ask for LinkedIn credentials. Returns True if provided."""
+    console.print(
+        "\n[yellow]⚠  Le scraping LinkedIn est contraire à leurs CGU.[/yellow]\n"
+        "[dim]Playwright doit être installé : pip install playwright && playwright install chromium[/dim]"
+    )
+    if not Confirm.ask("  Continuer quand même ?", default=False):
+        return False
+    email = Prompt.ask("  Email LinkedIn").strip()
+    password = Prompt.ask("  Mot de passe LinkedIn", password=True).strip()
+    if not email or not password:
+        console.print("[yellow]Identifiants vides — LinkedIn ignoré.[/yellow]")
+        return False
+    config.linkedin_email = email
+    config.linkedin_password = password
+    if Confirm.ask("  Sauvegarder dans .env ?", default=False):
+        save_to_env("LINKEDIN_EMAIL", email)
+        save_to_env("LINKEDIN_PASSWORD", password)
+        console.print("[dim]Sauvegardé dans .env[/dim]")
+    return True
+
+
+_SOURCE_INFO: list[dict] = [
+    {
+        "key": "indeed",
+        "label": "Indeed",
+        "auth": False,
+        "note": "Pas d'authentification requise",
+    },
+    {
+        "key": "wttj",
+        "label": "Welcome to the Jungle",
+        "auth": False,
+        "note": "Pas d'authentification requise",
+    },
+    {
+        "key": "ft",
+        "label": "France Travail",
+        "auth": True,
+        "note": "Nécessite un compte partenaire (gratuit)",
+        "configured": lambda: bool(config.france_travail_client_id and config.france_travail_client_secret),
+        "prompt": _prompt_france_travail_creds,
+    },
+    {
+        "key": "linkedin",
+        "label": "LinkedIn",
+        "auth": True,
+        "note": "⚠  Contraire aux CGU LinkedIn — à vos risques",
+        "configured": lambda: bool(config.linkedin_email and config.linkedin_password),
+        "prompt": _prompt_linkedin_creds,
+    },
+]
+
+
+def select_sources(preselected: str = "") -> list[str]:
+    """Interactive source picker with on-the-fly credential prompting."""
+    ok_mark = "[bold green]✓[/bold green]"
+    lock_mark = "[bold yellow]⚠[/bold yellow]"
+
+    # Si sources passées en argument CLI, on les prend telles quelles
+    if preselected:
+        keys = [s.strip() for s in preselected.split(",")]
+        valid = {s["key"] for s in _SOURCE_INFO}
+        unknown = [k for k in keys if k not in valid]
+        if unknown:
+            console.print(f"[yellow]Sources inconnues ignorées : {', '.join(unknown)}[/yellow]")
+        return [k for k in keys if k in valid]
+
+    # Sinon, afficher le menu interactif
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(width=3, style="bold cyan")
+    grid.add_column(width=5)
+    grid.add_column(width=28)
+    grid.add_column()
+
+    for i, src in enumerate(_SOURCE_INFO, 1):
+        if src["auth"]:
+            configured = src["configured"]()
+            status = ok_mark if configured else lock_mark
+            note = "[green]configuré[/green]" if configured else f"[yellow]auth requise[/yellow] — {src['note']}"
+        else:
+            status = ok_mark
+            note = f"[dim]{src['note']}[/dim]"
+        grid.add_row(f"{i}.", status, src["label"], note)
+
+    console.print(Panel(
+        grid,
+        title="[bold cyan]Choisir les sources de recherche[/bold cyan]",
+        subtitle="[dim]Numéros séparés par virgule ou 'all' (défaut)[/dim]",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+    while True:
+        choice = Prompt.ask("[bold cyan]Sources[/bold cyan]", default="all").strip().lower()
+        if choice in ("", "all"):
+            selected_info = _SOURCE_INFO
+        elif choice == "q":
+            sys.exit(0)
+        else:
+            try:
+                indices = [int(x.strip()) - 1 for x in choice.split(",")]
+                selected_info = [_SOURCE_INFO[i] for i in indices if 0 <= i < len(_SOURCE_INFO)]
+                if not selected_info:
+                    console.print("[red]Numéros hors plage, réessayez.[/red]")
+                    continue
+            except ValueError:
+                console.print("[red]Format invalide. Exemple : 1,2  ou  all[/red]")
+                continue
+
+        # Pour chaque source avec auth non configurée, proposer de saisir les creds
+        final_keys = []
+        for src in selected_info:
+            key = src["key"]
+            if src["auth"] and not src["configured"]():
+                console.print(f"\n[bold]{src['label']}[/bold] nécessite une authentification.")
+                if Confirm.ask(f"  Configurer {src['label']} maintenant ?", default=True):
+                    success = src["prompt"]()
+                    if success:
+                        final_keys.append(key)
+                    else:
+                        console.print(f"[dim]{src['label']} ignoré.[/dim]")
+                else:
+                    console.print(f"[dim]{src['label']} ignoré.[/dim]")
+            else:
+                final_keys.append(key)
+
+        if not final_keys:
+            console.print("[yellow]Aucune source valide. Au moins Indeed ou WTTJ recommandé.[/yellow]")
+            continue
+
+        labels = [s["label"] for s in _SOURCE_INFO if s["key"] in final_keys]
+        console.print(f"[green]Sources retenues : {', '.join(labels)}[/green]")
+        return final_keys
 
 
 # ─── Scraping ─────────────────────────────────────────────────────────────────
@@ -533,13 +691,16 @@ def main():
             console.print("[red]Recherche vide, abandon.[/red]")
             sys.exit(1)
 
-    # 4. Secteurs
-    console.print("\n[bold]2. Secteurs d'activité ciblés[/bold]")
+    # 4. Sélection des sources
+    console.print("\n[bold]2. Sources de recherche[/bold]")
+    sources = select_sources(args.sources)
+
+    # 5. Secteurs
+    console.print("\n[bold]3. Secteurs d'activité ciblés[/bold]")
     sectors = select_sectors(args.sectors)
 
-    # 5. Scraping
-    sources = [s.strip() for s in args.sources.split(",")]
-    console.print(f"\n[bold]3. Scraping des offres[/bold] (sources : {', '.join(sources)})")
+    # 6. Scraping
+    console.print(f"\n[bold]4. Scraping des offres[/bold] (sources : {', '.join(sources)})")
     all_offers = scrape_all(sources, query, args.location, args.max)
 
     if not all_offers:
@@ -549,9 +710,9 @@ def main():
 
     console.print(f"\n[bold]Total :[/bold] {len(all_offers)} offres collectées (doublons supprimés)")
 
-    # 6. Matching IA
+    # 7. Matching IA
     sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""
-    console.print(f"\n[bold]4. Analyse de correspondance[/bold] (score min : {args.min_score}/10{sector_label})")
+    console.print(f"\n[bold]5. Analyse de correspondance[/bold] (score min : {args.min_score}/10{sector_label})")
     with Progress(SpinnerColumn(), TextColumn("[cyan]Claude analyse les offres..."), console=console) as progress:
         progress.add_task("", total=None)
         try:
@@ -568,7 +729,7 @@ def main():
         )
         sys.exit(0)
 
-    # 7. Affichage + export
+    # 8. Affichage + export
     display_matches(matched_offers)
     save_results(matched_offers, query)
 

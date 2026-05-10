@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
 load_dotenv()
@@ -19,3 +20,20 @@ class Config:
 
 
 config = Config()
+
+
+def save_to_env(key: str, value: str) -> None:
+    """Persist a new key=value line into .env (creates file if absent)."""
+    env_path = Path(".env")
+    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+    updated = False
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+            lines[i] = f"{key}={value}"
+            updated = True
+            break
+    if not updated:
+        lines.append(f"{key}={value}")
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Reflect in the live config object too
+    setattr(config, key.lower(), value)
