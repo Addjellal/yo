@@ -1,5 +1,5 @@
 # IA providers (installez selon votre choix)
-anthropic>=0.40.0   # requis si PROVIDER=anthropic
+anthropic>=0.69.0   # requis si PROVIDER=anthropic (Claude Fable 5 + sorties structurées)
 ollama>=0.4.0       # requis si PROVIDER=ollama
 
 # Configuration

@@ -28,6 +28,8 @@ Schema:
     }
 """
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -49,15 +51,36 @@ class Tracker:
         if not self.path.exists():
             return {"offers": {}}
         try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or not isinstance(data.get("offers"), dict):
+                raise ValueError("structure inattendue")
+            return data
+        except (json.JSONDecodeError, OSError, ValueError):
+            # Fichier corrompu : on le met de côté plutôt que d'écraser l'historique
+            try:
+                backup = self.path.with_suffix(".json.corrupt")
+                self.path.replace(backup)
+            except OSError:
+                pass
             return {"offers": {}}
 
     def _save(self) -> None:
-        self.path.write_text(
-            json.dumps(self._data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        """Écriture atomique : fichier temporaire puis rename — un crash ou un
+        Ctrl+C en pleine écriture ne peut pas corrompre l'historique."""
+        payload = json.dumps(self._data, ensure_ascii=False, indent=2)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=str(self.path.parent), prefix=".tracker_", suffix=".tmp"
         )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(payload)
+            os.replace(tmp_name, self.path)
+        except OSError:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     # ─── Lecture ──────────────────────────────────────────────────────────────
 

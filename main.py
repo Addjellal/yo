@@ -13,6 +13,7 @@ import importlib.util
 import json
 import sys
 import time
+import urllib.parse
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -67,6 +68,20 @@ SECTORS: list[tuple[str, str]] = [
     ("food",       "Agroalimentaire / Restauration / Hôtellerie"),
     ("public",     "Secteur public / Associations / ONG"),
 ]
+
+def _safe_open_url(url: str) -> bool:
+    """N'ouvre que des URLs http(s) : une offre scrapée pourrait contenir un
+    lien file:// ou javascript: malveillant."""
+    try:
+        scheme = urllib.parse.urlparse(url).scheme.lower()
+    except ValueError:
+        return False
+    if scheme not in ("http", "https"):
+        console.print(f"[red]URL bloquée (schéma {scheme!r} non autorisé) : {url[:80]}[/red]")
+        return False
+    webbrowser.open(url)
+    return True
+
 
 SOURCE_MAP = {
     "ft": ("France Travail", FranceTravailScraper),
@@ -135,8 +150,9 @@ def check_setup() -> None:
         api_key = bool(config.anthropic_api_key)
         lines.append(
             f"  {ok}  ANTHROPIC_API_KEY  [dim]configurée[/dim]" if api_key
-            else f"  {ko}  ANTHROPIC_API_KEY  [red]MANQUANTE[/red]  → platform.anthropic.com"
+            else f"  {ko}  ANTHROPIC_API_KEY  [red]MANQUANTE[/red]  → platform.claude.com"
         )
+        lines.append(f"  {ok}  Modèle : [cyan]{config.anthropic_model}[/cyan]")
         ollama_ok = False
     lines.append("")
 
@@ -149,7 +165,7 @@ def check_setup() -> None:
         ("rich",          "rich",           True,  None),
         ("ollama",        "ollama",         provider == "ollama", "Requis si PROVIDER=ollama"),
         ("anthropic",     "anthropic",      provider == "anthropic", "Requis si PROVIDER=anthropic"),
-        ("playwright",    "playwright",     False, "Scraping LinkedIn — pip install playwright && playwright install chromium"),
+        ("playwright",    "playwright",     False, "Contournement Cloudflare (Indeed, WTTJ) + LinkedIn — python -m playwright install chromium"),
         ("fpdf",          "fpdf2",          False, "Génération PDF lettres"),
     ]
     lines.append("[bold]Dépendances Python[/bold]")
@@ -618,8 +634,8 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
             targets = [offers[i] for i in indices]
             if cmd == "o":
                 for offer in targets:
-                    webbrowser.open(offer.url)
-                    console.print(f"[dim]Ouverture : {offer.url}[/dim]")
+                    if _safe_open_url(offer.url):
+                        console.print(f"[dim]Ouverture : {offer.url}[/dim]")
             elif tracker is not None and cmd == "f":
                 tracker.mark_many(targets, "favorite")
                 console.print(f"[yellow]★ {len(targets)} offre(s) marquée(s) comme favori.[/yellow]")
@@ -866,6 +882,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    # Bornes de sécurité sur les arguments numériques
+    args.max = max(1, min(200, args.max))
+    args.min_score = max(0, min(10, args.min_score))
 
     # Mode vérification
     if args.check:

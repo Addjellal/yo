@@ -13,10 +13,15 @@ def _cache_path(path: Path) -> Path:
     return cache_dir / f".cv_{path.stem}_{digest}.txt"
 
 
+_MAX_CV_BYTES = 25 * 1024 * 1024  # garde-fou : un CV ne devrait jamais dépasser 25 Mo
+
+
 def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     path = Path(cv_path)
-    if not path.exists():
+    if not path.is_file():
         raise FileNotFoundError(f"CV introuvable : {cv_path}")
+    if path.stat().st_size > _MAX_CV_BYTES:
+        raise ValueError(f"Fichier trop volumineux ({path.stat().st_size // 1024 // 1024} Mo, max 25 Mo).")
 
     # Utiliser le cache si disponible et plus récent que le PDF
     cache = _cache_path(path)
@@ -115,10 +120,10 @@ def _ocr_page_anthropic(img_bytes: bytes, config) -> str:
     import anthropic
     if not config.anthropic_api_key:
         raise ValueError("ANTHROPIC_API_KEY manquante — impossible de faire l'OCR.")
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    client = anthropic.Anthropic(api_key=config.anthropic_api_key, max_retries=3)
     img_b64 = base64.standard_b64encode(img_bytes).decode()
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=config.anthropic_model,
         max_tokens=4096,
         messages=[{
             "role": "user",
@@ -128,7 +133,7 @@ def _ocr_page_anthropic(img_bytes: bytes, config) -> str:
             ],
         }],
     )
-    return response.content[0].text.strip()
+    return next((b.text for b in response.content if b.type == "text"), "").strip()
 
 
 def _ocr_page_ollama(img_bytes: bytes, config) -> str:
