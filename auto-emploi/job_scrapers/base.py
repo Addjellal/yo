@@ -64,6 +64,8 @@ class JobOffer:
     apply_url: Optional[str] = None
     match_score: Optional[int] = None
     match_reasons: Optional[str] = None
+    match_strengths: Optional[str] = None  # ce que le CV apporte précisément
+    match_gaps: Optional[str] = None       # ce qui manque pour ce poste
 
     def __post_init__(self):
         # Sanitisation systématique : quel que soit le scraper, aucune donnée
@@ -93,6 +95,16 @@ class JobOffer:
         return "\n".join(parts)
 
     def unique_key(self) -> str:
+        # Le lieu fait partie de la clé : deux postes identiques de la même
+        # entreprise dans deux villes sont des offres distinctes.
+        return (
+            f"{self.title.lower().strip()}|{self.company.lower().strip()}"
+            f"|{self.location.lower().strip()}"
+        )
+
+    def legacy_key(self) -> str:
+        """Ancienne clé (sans lieu) : permet de retrouver le statut des offres
+        trackées avant le changement de format — l'historique n'est pas perdu."""
         return f"{self.title.lower().strip()}|{self.company.lower().strip()}"
 
 

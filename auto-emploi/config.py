@@ -7,7 +7,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Le .env et output/ vivent dans le dossier du projet, pas dans le cwd :
+# l'application fonctionne quel que soit le dossier d'où elle est lancée.
+_PROJECT_DIR = Path(__file__).resolve().parent
+load_dotenv(_PROJECT_DIR / ".env")
 
 
 def _env_choice(name: str, default: str, allowed: tuple[str, ...]) -> str:
@@ -77,8 +80,15 @@ class Config:
     adzuna_app_id: str = field(default_factory=lambda: os.getenv("ADZUNA_APP_ID", ""))
     adzuna_app_key: str = field(default_factory=lambda: os.getenv("ADZUNA_APP_KEY", ""))
 
+    # Notion (optionnel : export des offres retenues vers une base Notion)
+    notion_token: str = field(default_factory=lambda: os.getenv("NOTION_TOKEN", "").strip())
+    notion_database_id: str = field(default_factory=lambda: os.getenv("NOTION_DATABASE_ID", "").strip())
+
+    # Mots-clés éliminatoires (séparés par virgule) : offres écartées avant l'IA
+    exclude_keywords: str = field(default_factory=lambda: os.getenv("EXCLUDE_KEYWORDS", "").strip())
+
     # Paramètres (bornés pour éviter les valeurs absurdes ou hostiles)
-    output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", "output"))
+    output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", str(_PROJECT_DIR / "output")))
     max_jobs_per_source: int = field(default_factory=lambda: _env_int("MAX_JOBS_PER_SOURCE", 50, 1, 200))
     min_match_score: int = field(default_factory=lambda: _env_int("MIN_MATCH_SCORE", 6, 0, 10))
     request_delay: float = field(default_factory=lambda: _env_float("REQUEST_DELAY", 2.0, 0.0, 30.0))
@@ -93,7 +103,9 @@ _ALLOWED_ENV_KEYS = {
     "FRANCE_TRAVAIL_CLIENT_ID", "FRANCE_TRAVAIL_CLIENT_SECRET",
     "LINKEDIN_EMAIL", "LINKEDIN_PASSWORD",
     "ADZUNA_APP_ID", "ADZUNA_APP_KEY",
+    "NOTION_TOKEN", "NOTION_DATABASE_ID",
     "OUTPUT_DIR", "MAX_JOBS_PER_SOURCE", "MIN_MATCH_SCORE", "REQUEST_DELAY",
+    "EXCLUDE_KEYWORDS",
 }
 _KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
@@ -108,7 +120,7 @@ def save_to_env(key: str, value: str) -> None:
     # Une valeur multi-lignes pourrait injecter d'autres variables : on neutralise.
     value = str(value).replace("\r", " ").replace("\n", " ").strip()[:2000]
 
-    env_path = Path(".env")
+    env_path = _PROJECT_DIR / ".env"
     lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
     updated = False
     for i, line in enumerate(lines):

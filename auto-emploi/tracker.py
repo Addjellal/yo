@@ -30,7 +30,7 @@ Schema:
 import json
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
@@ -90,7 +90,11 @@ class Tracker:
 
     def status_of(self, offer: JobOffer) -> str:
         entry = self._data["offers"].get(offer.unique_key())
-        return entry["status"] if entry else "new"
+        if entry is None:
+            # Compatibilité : l'historique d'avant le changement de clé
+            # (titre|entreprise sans lieu) reste reconnu.
+            entry = self._data["offers"].get(offer.legacy_key())
+        return entry.get("status", "new") if entry else "new"
 
     def is_hidden(self, offer: JobOffer) -> bool:
         return self.status_of(offer) in HIDDEN_STATUSES
@@ -98,6 +102,31 @@ class Tracker:
     def filter_visible(self, offers: Iterable[JobOffer]) -> list[JobOffer]:
         """Drop offers marked as applied or rejected."""
         return [o for o in offers if not self.is_hidden(o)]
+
+    def filter_unseen(self, offers: Iterable[JobOffer]) -> list[JobOffer]:
+        """Ne garde que les offres jamais vues (mode --watch)."""
+        return [o for o in offers if self.status_of(o) == "new"]
+
+    def recent_rejections(self, limit: int = 30) -> list[str]:
+        """Titres des dernières offres rejetées — sert à l'apprentissage des
+        préférences par le matcher."""
+        rejected = [
+            e for e in self._data["offers"].values()
+            if e.get("status") == "rejected" and e.get("title")
+        ]
+        rejected.sort(key=lambda e: e.get("updated", ""), reverse=True)
+        return [f"{e['title']} — {e.get('company', '')}" for e in rejected[:limit]]
+
+    def needing_followup(self, days: int = 14) -> list[dict]:
+        """Candidatures envoyées il y a plus de `days` jours : à relancer."""
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        return sorted(
+            [
+                e for e in self._data["offers"].values()
+                if e.get("status") == "applied" and e.get("updated", "") < cutoff
+            ],
+            key=lambda e: e.get("updated", ""),
+        )
 
     def stats(self) -> dict[str, int]:
         counts = {s: 0 for s in VALID_STATUSES}

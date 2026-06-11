@@ -1,0 +1,11 @@
+# Sorties et données locales du projet auto-emploi
+.env.tmp
+.env_*.tmp
+output/*.txt
+output/*.json
+output/*.csv
+output/.cv_*
+output/.tracker.json
+output/.tracker.json.corrupt
+output/.tracker_*.tmp
+*.corrupt

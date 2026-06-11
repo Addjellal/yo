@@ -45,7 +45,10 @@ from job_scrapers import (
     AdzunaScraper,
 )
 from ai import JobMatcher, CoverLetterGenerator
+from ai.matcher import parse_exclude_keywords
+from ai.cover_letter import TONES
 from tracker import Tracker
+from integrations import notion_configured, export_to_notion, desktop_notify
 
 console = Console()
 
@@ -316,28 +319,6 @@ def _prompt_france_travail_creds() -> bool:
     return True
 
 
-def _prompt_linkedin_creds() -> bool:
-    """Ask for LinkedIn credentials. Returns True if provided."""
-    console.print(
-        "\n[yellow]⚠  Le scraping LinkedIn est contraire à leurs CGU.[/yellow]\n"
-        "[dim]Playwright doit être installé : pip install playwright && playwright install chromium[/dim]"
-    )
-    if not Confirm.ask("  Continuer quand même ?", default=False):
-        return False
-    email = Prompt.ask("  Email LinkedIn").strip()
-    password = Prompt.ask("  Mot de passe LinkedIn", password=True).strip()
-    if not email or not password:
-        console.print("[yellow]Identifiants vides — LinkedIn ignoré.[/yellow]")
-        return False
-    config.linkedin_email = email
-    config.linkedin_password = password
-    if Confirm.ask("  Sauvegarder dans .env ?", default=False):
-        save_to_env("LINKEDIN_EMAIL", email)
-        save_to_env("LINKEDIN_PASSWORD", password)
-        console.print("[dim]Sauvegardé dans .env[/dim]")
-    return True
-
-
 def _prompt_adzuna_creds() -> bool:
     """Ask for Adzuna API credentials. Returns True if provided."""
     console.print(
@@ -397,10 +378,8 @@ _SOURCE_INFO: list[dict] = [
     {
         "key": "linkedin",
         "label": "LinkedIn",
-        "auth": True,
-        "note": "⚠  Contraire aux CGU LinkedIn — à vos risques",
-        "configured": lambda: bool(config.linkedin_email and config.linkedin_password),
-        "prompt": _prompt_linkedin_creds,
+        "auth": False,
+        "note": "Mode invité sans compte (identifiants optionnels dans .env — CGU à vos risques)",
     },
 ]
 
@@ -512,8 +491,8 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
     if not valid_sources:
         return []
 
-    if "linkedin" in valid_sources:
-        console.print("[yellow]⚠  LinkedIn : scraping contraire aux CGU, utilisation à vos risques.[/yellow]")
+    if "linkedin" in valid_sources and config.linkedin_email and config.linkedin_password:
+        console.print("[yellow]⚠  LinkedIn en mode connecté : contraire aux CGU, à vos risques (mode invité : retirez les identifiants du .env).[/yellow]")
 
     all_offers: list[JobOffer] = []
     seen_keys: set[str] = set()
@@ -684,7 +663,7 @@ def _show_detail(offer: JobOffer) -> None:
     else:
         url_line = escape(offer.url) or "–"
 
-    meta = "\n".join([
+    meta_lines = [
         f"[bold]Entreprise :[/bold] {escape(offer.company)}",
         f"[bold]Lieu :[/bold]       {escape(offer.location or '–')}",
         f"[bold]Contrat :[/bold]    {escape(offer.contract_type or '–')}",
@@ -692,7 +671,12 @@ def _show_detail(offer: JobOffer) -> None:
         f"[bold]Source :[/bold]     {escape(offer.source)}",
         f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {escape(reasons_str)}",
         f"[bold]URL :[/bold]        {url_line}",
-    ])
+    ]
+    if offer.match_strengths:
+        meta_lines.append(f"\n[bold green]Vos atouts :[/bold green]  {escape(offer.match_strengths)}")
+    if offer.match_gaps:
+        meta_lines.append(f"[bold yellow]À combler :[/bold yellow]   {escape(offer.match_gaps)}")
+    meta = "\n".join(meta_lines)
 
     desc = escape((offer.description or "Pas de description disponible.").strip())
     if len(desc) > 1500:
@@ -741,26 +725,41 @@ def select_offers(offers: list[JobOffer]) -> list[JobOffer]:
             console.print("[red]Format invalide. Exemple : 1,3,5[/red]")
 
 
-def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator) -> None:
+def _ask_tone() -> str:
+    console.print("\n[bold]Ton des lettres :[/bold]")
+    for key, desc in TONES.items():
+        console.print(f"  [cyan]{key}[/cyan] — {desc}")
+    return Prompt.ask(
+        "[bold cyan]Ton[/bold cyan]",
+        choices=list(TONES.keys()),
+        default="standard",
+    )
+
+
+def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator, tone: str = "standard") -> None:
     for offer in offers:
         label = escape(f"{offer.title} @ {offer.company}")
         with Progress(SpinnerColumn(), TextColumn(f"[cyan]Génération : {label}..."), console=console) as progress:
             progress.add_task("", total=None)
             try:
-                letter = generator.generate(offer)
-                txt_path, pdf_path = generator.save(offer, letter)
+                result = generator.generate(offer, tone=tone)
+                txt_path, pdf_path = generator.save(offer, result)
 
                 # La lettre vient du LLM (lui-même exposé au texte de l'offre) :
                 # on l'affiche comme du texte brut, jamais comme du balisage.
+                body = ""
+                if result.get("email_subject"):
+                    body += f"[bold]Objet du mail :[/bold] {escape(result['email_subject'])}\n\n"
+                body += escape(result["letter"])
                 console.print(Panel(
-                    escape(letter),
+                    body,
                     title=f"[bold green]{escape(offer.title)} – {escape(offer.company)}[/bold green]",
                     subtitle=f"[dim]{escape(str(txt_path))}[/dim]",
                     expand=False,
                 ))
 
                 if pdf_path.exists():
-                    console.print(f"  [dim]PDF : {escape(str(pdf_path))}[/dim]")
+                    console.print(f"  [dim]PDF : {escape(str(pdf_path))}  (email d'accompagnement dans le .txt)[/dim]")
 
             except Exception as e:
                 console.print(f"[red]Erreur génération pour {escape(offer.title)} : {escape(str(e))}[/red]")
@@ -844,6 +843,27 @@ def show_stats() -> None:
         padding=(1, 3),
     ))
 
+    # Relances : candidatures sans suite depuis plus de 14 jours
+    followups = tracker.needing_followup(days=14)
+    if followups:
+        table = Table(
+            title="\n⏰ À relancer (postulées il y a plus de 14 jours)",
+            box=box.ROUNDED, header_style="bold magenta",
+        )
+        table.add_column("Postulée le", style="dim", width=12)
+        table.add_column("Poste", min_width=25)
+        table.add_column("Entreprise", min_width=18)
+        table.add_column("URL", overflow="fold")
+        for entry in followups[:15]:
+            table.add_row(
+                escape(entry.get("updated", "")[:10]),
+                escape(str(entry.get("title", "–"))),
+                escape(str(entry.get("company", "–"))),
+                escape(str(entry.get("url", "–"))),
+            )
+        console.print(table)
+        console.print("[dim]Conseil : une relance courte 2-3 semaines après l'envoi double les taux de réponse.[/dim]")
+
     # Détail des candidatures envoyées (toujours intéressant à voir)
     applied = tracker.list_by_status("applied")
     if applied:
@@ -877,6 +897,60 @@ def show_stats() -> None:
                 escape(str(entry.get("url", "–"))),
             )
         console.print(table)
+
+
+# ─── Mode veille ──────────────────────────────────────────────────────────────
+
+def watch_loop(args, sources, sectors, matcher, tracker, exclude) -> None:
+    """Relance la recherche à intervalle régulier et ne signale que les
+    offres jamais vues. Notification desktop quand il y a du nouveau."""
+    interval_min = max(15, min(1440, args.watch))
+    query = args.query.strip()
+    console.print(Panel.fit(
+        f"[bold cyan]Mode veille[/bold cyan] — « {escape(query)} » toutes les {interval_min} min\n"
+        "[dim]Seules les offres jamais vues sont signalées. Ctrl+C pour arrêter.[/dim]",
+        border_style="cyan",
+    ))
+    cycle = 0
+    while True:
+        cycle += 1
+        console.print(f"\n[bold]── Cycle {cycle} — {time.strftime('%H:%M')} ──[/bold]")
+        try:
+            all_offers = scrape_all(sources, query, args.location, args.max)
+            new_offers = tracker.filter_unseen(all_offers)
+            if not new_offers:
+                console.print("[dim]Aucune nouvelle offre depuis le dernier cycle.[/dim]")
+            else:
+                matched = matcher.score_offers(
+                    new_offers, min_score=args.min_score, sectors=sectors, exclude=exclude
+                )
+                # Tout ce qui a été analysé est marqué vu : pas de re-scoring au prochain cycle
+                tracker.mark_many(new_offers, "seen")
+                if matched:
+                    display_matches(matched, tracker)
+                    save_results(matched, query)
+                    if args.notion and notion_configured():
+                        export_to_notion(matched)
+                    best = matched[0]
+                    desktop_notify(
+                        f"{len(matched)} nouvelle(s) offre(s) d'emploi",
+                        f"Meilleure : {best.title} @ {best.company} ({best.match_score}/10)",
+                    )
+                else:
+                    console.print(f"[dim]{len(new_offers)} nouvelle(s) offre(s), aucune ≥ {args.min_score}/10.[/dim]")
+        except KeyboardInterrupt:
+            console.print("\n[dim]Mode veille arrêté.[/dim]")
+            return
+        except Exception as e:
+            console.print(f"[red]Erreur du cycle : {escape(str(e))}[/red]")
+
+        next_at = time.strftime("%H:%M", time.localtime(time.time() + interval_min * 60))
+        console.print(f"[dim]Prochain scan à {next_at}. Ctrl+C pour arrêter.[/dim]")
+        try:
+            time.sleep(interval_min * 60)
+        except KeyboardInterrupt:
+            console.print("\n[dim]Mode veille arrêté.[/dim]")
+            return
 
 
 # ─── Point d'entrée ───────────────────────────────────────────────────────────
@@ -914,6 +988,22 @@ def parse_args():
     parser.add_argument(
         "--include-seen", action="store_true",
         help="Inclure les offres déjà postulées ou rejetées dans les résultats",
+    )
+    parser.add_argument(
+        "--exclude", default="",
+        help='Mots-clés éliminatoires, séparés par virgule (ex: "senior,anglais courant") — s\'ajoutent à EXCLUDE_KEYWORDS du .env',
+    )
+    parser.add_argument(
+        "--tone", default="", choices=["", *TONES.keys()],
+        help="Ton des lettres : standard, formelle ou directe (sinon demandé interactivement)",
+    )
+    parser.add_argument(
+        "--notion", action="store_true",
+        help="Exporter les offres retenues vers Notion (NOTION_TOKEN + NOTION_DATABASE_ID requis)",
+    )
+    parser.add_argument(
+        "--watch", type=int, default=0, metavar="MINUTES",
+        help="Mode veille : relance la recherche toutes les N minutes (15-1440) et notifie les nouvelles offres. Requiert --query.",
     )
     return parser.parse_args()
 
@@ -990,6 +1080,25 @@ def main():
             f"{initial_stats['rejected']} rejetées (filtrées par défaut)[/dim]"
         )
 
+    # Apprentissage des préférences : les rejets passés pénalisent les offres similaires
+    rejections = tracker.recent_rejections()
+    if rejections:
+        matcher.set_rejected_examples(rejections)
+        console.print(f"[dim]Préférences : {len(rejections)} rejet(s) récent(s) pris en compte dans le scoring.[/dim]")
+
+    # Mots-clés éliminatoires : .env et CLI cumulés
+    exclude = parse_exclude_keywords(config.exclude_keywords) + parse_exclude_keywords(args.exclude)
+    if exclude:
+        console.print(f"[dim]Mots-clés exclus : {escape(', '.join(exclude))}[/dim]")
+
+    # Mode veille : boucle autonome, pas d'interaction
+    if args.watch:
+        if not args.query.strip():
+            console.print("[red]--watch nécessite --query (mode non interactif).[/red]")
+            sys.exit(1)
+        watch_loop(args, sources, sectors, matcher, tracker, exclude)
+        return
+
     # 5. Boucle de recherche
     first_query = args.query.strip()
     console.print(
@@ -1052,7 +1161,9 @@ def main():
         with Progress(SpinnerColumn(), TextColumn("[cyan]Analyse en cours..."), console=console) as progress:
             progress.add_task("", total=None)
             try:
-                matched_offers = matcher.score_offers(all_offers, min_score=args.min_score, sectors=sectors)
+                matched_offers = matcher.score_offers(
+                    all_offers, min_score=args.min_score, sectors=sectors, exclude=exclude
+                )
             except Exception as e:
                 if "AuthenticationError" in type(e).__name__:
                     console.print("[red]Clé ANTHROPIC_API_KEY invalide.[/red]")
@@ -1070,6 +1181,13 @@ def main():
         # Affichage + export
         display_matches(matched_offers, tracker)
         save_results(matched_offers, query)
+
+        # Export Notion (opt-in via --notion)
+        if args.notion:
+            if notion_configured():
+                export_to_notion(matched_offers)
+            else:
+                console.print("[yellow]--notion ignoré : NOTION_TOKEN et NOTION_DATABASE_ID manquants dans .env.[/yellow]")
 
         # Marquer comme "vues" en bulk (n'écrase pas favorite/applied)
         tracker.mark_many(matched_offers, "seen")
@@ -1090,9 +1208,13 @@ def main():
         if Confirm.ask("[bold cyan]Générer des lettres de motivation ?[/bold cyan]"):
             selected = select_offers(matched_offers)
             if selected:
-                console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s))")
-                generator = CoverLetterGenerator(cv_text)
-                generate_letters(selected, generator)
+                tone = args.tone or _ask_tone()
+                applied_titles = [
+                    str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
+                ]
+                console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s), ton {tone})")
+                generator = CoverLetterGenerator(cv_text, applied_history=applied_titles)
+                generate_letters(selected, generator, tone=tone)
                 # Marquer auto comme "applied" : la lettre est prête à être envoyée
                 tracker.mark_many(selected, "applied")
                 console.print(f"[bold green]✓[/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")

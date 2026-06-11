@@ -1,3 +1,4 @@
+import json
 import re
 import unicodedata
 from pathlib import Path
@@ -8,6 +9,12 @@ from job_scrapers.base import JobOffer
 from config import config
 from app_utils import console
 from ._client import LLMClient
+
+TONES = {
+    "standard": "professionnel mais authentique",
+    "formelle": "soutenu et classique (grandes entreprises, secteur public)",
+    "directe": "direct et énergique, sans formules convenues (startups, scale-ups)",
+}
 
 SYSTEM_PROMPT = (
     "Tu es un expert en rédaction de lettres de motivation en français. "
@@ -20,16 +27,29 @@ SYSTEM_PROMPT = (
 )
 
 USER_PROMPT = (
-    "Rédige une lettre de motivation pour ce poste.\n\n"
+    "Rédige une candidature pour ce poste.\n\n"
     "<offre>\n{job}\n</offre>\n\n"
+    "Ton demandé : {tone}.\n{history}"
     "La lettre doit :\n"
     "1. Commencer par une accroche qui montre la connaissance de l'entreprise/poste\n"
     "2. Mettre en avant 2-3 compétences clés du CV qui correspondent à l'offre\n"
     "3. Conclure avec une invitation à un entretien\n"
-    "4. Utiliser un ton professionnel mais authentique\n"
-    "5. Inclure les formules de politesse habituelles\n\n"
-    "Commence directement par la lettre (sans titre ni commentaires)."
+    "4. Inclure les formules de politesse habituelles\n\n"
+    "Fournis aussi l'email d'accompagnement : un objet percutant et un corps "
+    "court (5-6 lignes max) qui renvoie à la lettre et au CV joints.\n\n"
+    'Réponds en JSON : {{"letter": "...", "email_subject": "...", "email_body": "..."}}'
 )
+
+LETTER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "letter": {"type": "string"},
+        "email_subject": {"type": "string"},
+        "email_body": {"type": "string"},
+    },
+    "required": ["letter", "email_subject", "email_body"],
+    "additionalProperties": False,
+}
 
 # Caractères hors latin-1 fréquents dans les sorties LLM → équivalents PDF sûrs
 _PDF_REPLACEMENTS = {
@@ -37,7 +57,7 @@ _PDF_REPLACEMENTS = {
     "‘": "'", "’": "'",      # apostrophes typographiques
     "“": '"', "”": '"',      # guillemets typographiques
     "…": "...",
-    " ": " ", " ": " ",      # espaces insécables
+    " ": " ", " ": " ",      # espaces insécables
     "•": "-",
     "œ": "oe", "Œ": "OE",
 }
@@ -65,31 +85,65 @@ def _pdf_safe(text: str) -> str:
 
 
 class CoverLetterGenerator:
-    def __init__(self, cv_text: str):
+    def __init__(self, cv_text: str, applied_history: list[str] | None = None):
         self.cv_text = cv_text
+        # Postes déjà candidatés : le modèle varie les formulations
+        self.applied_history = [str(t)[:120] for t in (applied_history or [])[:8]]
         self._llm = LLMClient()
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
 
-    def generate(self, job: JobOffer) -> str:
-        return self._llm.generate(
+    def generate(self, job: JobOffer, tone: str = "standard") -> dict:
+        """Retourne {'letter': ..., 'email_subject': ..., 'email_body': ...}."""
+        tone_label = TONES.get(tone, TONES["standard"])
+        history = ""
+        if self.applied_history:
+            listed = "\n".join(f"- {t}" for t in self.applied_history)
+            history = (
+                "Le candidat a déjà postulé aux postes suivants — varie le "
+                f"vocabulaire et les accroches par rapport à ces candidatures :\n{listed}\n\n"
+            )
+        raw = self._llm.generate(
             system=SYSTEM_PROMPT.format(cv=self.cv_text),
-            user=USER_PROMPT.format(job=job.to_text()),
-            max_tokens=2048,
+            user=USER_PROMPT.format(job=job.to_text(), tone=tone_label, history=history),
+            max_tokens=3072,
+            json_schema=LETTER_SCHEMA,
         )
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # Le modèle a répondu en texte brut : on le traite comme la lettre seule
+            data = {}
+        letter = str(data.get("letter", "")).strip() or raw.strip()
+        return {
+            "letter": letter,
+            "email_subject": str(data.get("email_subject", "")).strip()[:200],
+            "email_body": str(data.get("email_body", "")).strip()[:2000],
+        }
 
-    def save(self, job: JobOffer, letter: str) -> tuple[Path, Path]:
+    def save(self, job: JobOffer, result: dict) -> tuple[Path, Path]:
         # Nom de fichier strictement alphanumérique : aucune traversée de chemin possible
         safe_name = re.sub(r"[^a-z0-9_-]", "_", f"{job.title}_{job.company}".lower())[:60].strip("_") or "lettre"
         out_dir = Path(config.output_dir).resolve()
         txt_path = out_dir / f"{safe_name}.txt"
         pdf_path = out_dir / f"{safe_name}.pdf"
 
+        email_block = ""
+        if result.get("email_subject") or result.get("email_body"):
+            email_block = (
+                "EMAIL D'ACCOMPAGNEMENT\n"
+                + "-" * 60 + "\n"
+                + f"Objet : {result.get('email_subject', '')}\n\n"
+                + result.get("email_body", "")
+                + "\n\n" + "=" * 60 + "\n\n"
+            )
+
         txt_path.write_text(
             f"Poste : {job.title}\nEntreprise : {job.company}\nSource : {job.source}\nURL : {job.url}\n\n"
-            + "=" * 60 + "\n\n" + letter,
+            + "=" * 60 + "\n\n" + email_block + "LETTRE DE MOTIVATION\n" + "-" * 60 + "\n\n"
+            + result["letter"],
             encoding="utf-8",
         )
-        self._save_pdf(pdf_path, job, letter)
+        self._save_pdf(pdf_path, job, result["letter"])
         return txt_path, pdf_path
 
     def _save_pdf(self, path: Path, job: JobOffer, letter: str) -> None:
