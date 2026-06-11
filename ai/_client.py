@@ -8,7 +8,7 @@ Client LLM unifié (Anthropic Claude Fable 5 ou Ollama local).
 import time
 
 from config import config
-from utils import console
+from app_utils import console
 
 
 class LLMClient:

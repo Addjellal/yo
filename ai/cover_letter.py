@@ -4,7 +4,7 @@ from pathlib import Path
 
 from job_scrapers.base import JobOffer
 from config import config
-from utils import console
+from app_utils import console
 from ._client import LLMClient
 
 SYSTEM_PROMPT = (

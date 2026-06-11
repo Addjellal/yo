@@ -9,7 +9,7 @@ import requests
 
 from .base import BaseScraper, JobOffer
 from config import config
-from utils import console
+from app_utils import console
 
 API_URL = "https://api.adzuna.com/v1/api/jobs/fr/search/{page}"
 REGISTER_URL = "https://developer.adzuna.com"

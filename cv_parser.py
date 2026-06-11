@@ -26,7 +26,7 @@ def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     # Utiliser le cache si disponible et plus récent que le PDF
     cache = _cache_path(path)
     if not force_reparse and cache.exists() and cache.stat().st_mtime >= path.stat().st_mtime:
-        from utils import console
+        from app_utils import console
         console.print(f"[dim]CV chargé depuis le cache ({cache.name})[/dim]")
         return cache.read_text(encoding="utf-8")
 
@@ -87,7 +87,7 @@ def _extract_text_vision(path: Path) -> str:
         )
 
     from config import config
-    from utils import console
+    from app_utils import console
 
     doc = fitz.open(str(path))
     console.print(f"[yellow]PDF image-based détecté ({len(doc)} page(s)) — OCR via {config.provider}...[/yellow]")

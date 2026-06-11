@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer
 from config import config
-from utils import console
+from app_utils import console
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

@@ -3,7 +3,7 @@ import re
 from collections import Counter
 
 from job_scrapers.base import JobOffer
-from utils import console
+from app_utils import console
 from ._client import LLMClient
 
 BATCH_SIZE = 10

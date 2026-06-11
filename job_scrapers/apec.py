@@ -9,7 +9,7 @@ import requests
 
 from .base import BaseScraper, JobOffer
 from config import config
-from utils import console
+from app_utils import console
 
 API_URL = "https://www.apec.fr/cms/webservices/rechercheOffre"
 DETAIL_URL_TEMPLATE = "https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/{offer_id}"

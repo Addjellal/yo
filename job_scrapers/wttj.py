@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer
 from config import config
-from utils import console
+from app_utils import console
 
 BASE_URL = "https://www.welcometothejungle.com"
 HEADERS = {
