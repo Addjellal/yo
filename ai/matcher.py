@@ -2,7 +2,7 @@ import json
 import re
 from collections import Counter
 
-from scrapers.base import JobOffer
+from job_scrapers.base import JobOffer
 from utils import console
 from ._client import LLMClient
 

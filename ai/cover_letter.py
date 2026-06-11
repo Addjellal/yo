@@ -2,7 +2,7 @@ import re
 import unicodedata
 from pathlib import Path
 
-from scrapers.base import JobOffer
+from job_scrapers.base import JobOffer
 from config import config
 from utils import console
 from ._client import LLMClient

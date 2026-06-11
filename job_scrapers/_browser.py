@@ -2,7 +2,7 @@
 Utilitaire Playwright pour contourner Cloudflare avec un vrai navigateur Chromium.
 
 Usage :
-    from scrapers._browser import fetch_html, BrowserSession
+    from job_scrapers._browser import fetch_html, BrowserSession
 
 Prérequis :
     pip install playwright

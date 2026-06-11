@@ -8,7 +8,7 @@ Usage rapide :
     python main.py --cv cv.pdf --query "dev Python" # Mode complet
 """
 # Garantit que le dossier du projet est résolu en premier,
-# avant les packages tiers (ex: PyPI "scrapers" qui masquerait ./scrapers/).
+# avant les packages tiers installés dans site-packages.
 import sys as _sys
 import os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
@@ -34,7 +34,7 @@ from rich import box
 
 from config import config, save_to_env
 from cv_parser import parse_cv
-from scrapers import (
+from job_scrapers import (
     JobOffer,
     FranceTravailScraper,
     IndeedScraper,
