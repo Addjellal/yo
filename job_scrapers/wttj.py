@@ -4,10 +4,11 @@ import urllib.parse
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 from app_utils import console
 
+MAX_PAGES = 20
 BASE_URL = "https://www.welcometothejungle.com"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -49,7 +50,7 @@ class WTTJScraper(BaseScraper):
         browser_tried = False
 
         try:
-            while len(offers) < max_results:
+            while len(offers) < max_results and page <= MAX_PAGES:
                 params: dict = {"query": query, "page": page}
                 if location:
                     params["aroundQuery"] = location
@@ -59,7 +60,7 @@ class WTTJScraper(BaseScraper):
                 # 1. Essai rapide via requests/cloudscraper
                 try:
                     resp = session.get(url, timeout=20)
-                    if resp.status_code == 200:
+                    if resp.status_code == 200 and len(resp.content) <= MAX_RESPONSE_BYTES:
                         html = resp.text
                 except Exception:
                     pass

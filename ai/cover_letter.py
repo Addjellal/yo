@@ -2,6 +2,8 @@ import re
 import unicodedata
 from pathlib import Path
 
+from rich.markup import escape
+
 from job_scrapers.base import JobOffer
 from config import config
 from app_utils import console
@@ -114,4 +116,4 @@ class CoverLetterGenerator:
         except ImportError:
             pass
         except Exception as e:
-            console.print(f"[yellow]Avertissement : PDF échoué ({e}). TXT disponible.[/yellow]")
+            console.print(f"[yellow]Avertissement : PDF échoué ({escape(str(e))}). TXT disponible.[/yellow]")

@@ -194,11 +194,11 @@ class JobMatcher:
             if not isinstance(idx, int) or not (0 <= idx < len(batch)):
                 continue
             batch[idx].match_score = _clamp_score(item.get("score"))
-            # Le LLM peut retourner reasons comme string ou liste — normaliser
+            # Le LLM peut retourner reasons comme string ou liste — normaliser et borner
             reasons = item.get("reasons", "")
             if isinstance(reasons, list):
                 reasons = " · ".join(str(r).strip() for r in reasons if r)
-            batch[idx].match_reasons = str(reasons).strip()
+            batch[idx].match_reasons = str(reasons).strip()[:400]
 
 
 def _extract_json_objects(text: str) -> list[dict]:

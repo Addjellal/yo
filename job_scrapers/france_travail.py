@@ -1,6 +1,6 @@
 import time
 import requests
-from .base import BaseScraper, JobOffer
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 
 
@@ -45,7 +45,11 @@ class FranceTravailScraper(BaseScraper):
         resp.raise_for_status()
         data = resp.json()
         self._token = data["access_token"]
-        self._token_expires = time.time() + data.get("expires_in", 1200)
+        try:
+            expires_in = float(data.get("expires_in") or 1200)
+        except (TypeError, ValueError):
+            expires_in = 1200
+        self._token_expires = time.time() + expires_in
         return self._token
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
@@ -62,6 +66,8 @@ class FranceTravailScraper(BaseScraper):
         if resp.status_code == 204:
             return []
         resp.raise_for_status()
+        if len(resp.content) > MAX_RESPONSE_BYTES:
+            return []
 
         offers = []
         for item in resp.json().get("resultats", []):

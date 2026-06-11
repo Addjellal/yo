@@ -7,10 +7,13 @@ Aucune authentification requise.
 import time
 import requests
 
-from .base import BaseScraper, JobOffer
+from rich.markup import escape
+
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 from app_utils import console
 
+MAX_START = 400  # plafond de pagination : ~20 pages de 20
 API_URL = "https://www.apec.fr/cms/webservices/rechercheOffre"
 DETAIL_URL_TEMPLATE = "https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/{offer_id}"
 
@@ -50,7 +53,7 @@ class ApecScraper(BaseScraper):
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         # APEC retourne 500 sur les requêtes trop courtes ou les mots tronqués
         if len(query.strip()) < 3:
-            console.print(f"[yellow][Apec] Requête trop courte ({query!r}), ignorée.[/yellow]")
+            console.print(f"[yellow][Apec] Requête trop courte ({escape(repr(query))}), ignorée.[/yellow]")
             return []
 
         offers: list[JobOffer] = []
@@ -59,17 +62,20 @@ class ApecScraper(BaseScraper):
         session = requests.Session()
         session.headers.update(HEADERS)
 
-        while len(offers) < max_results:
+        while len(offers) < max_results and start <= MAX_START:
             payload = _build_payload(query, start, page_size)
             try:
                 resp = session.post(API_URL, json=payload, timeout=15)
                 if resp.status_code == 400:
-                    console.print(f"[yellow][Apec] Payload rejeté (400). Réponse : {resp.text[:200]}[/yellow]")
+                    console.print(f"[yellow][Apec] Payload rejeté (400). Réponse : {escape(resp.text[:200])}[/yellow]")
                     break
                 resp.raise_for_status()
+                if len(resp.content) > MAX_RESPONSE_BYTES:
+                    console.print("[yellow][Apec] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                    break
                 data = resp.json()
             except (requests.RequestException, ValueError) as e:
-                console.print(f"[yellow][Apec] Erreur réseau : {e}[/yellow]")
+                console.print(f"[yellow][Apec] Erreur réseau : {escape(str(e))}[/yellow]")
                 break
 
             results = data.get("resultats", [])

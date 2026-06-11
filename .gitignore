@@ -1,4 +1,6 @@
 .env
+.env.tmp
+.env_*.tmp
 *.pdf
 *.docx
 output/*.txt
@@ -6,6 +8,8 @@ output/*.json
 output/*.csv
 output/.cv_*
 output/.tracker.json
+output/.tracker.json.corrupt
+output/.tracker_*.tmp
 __pycache__/
 *.pyc
 .venv/

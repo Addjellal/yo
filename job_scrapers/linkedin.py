@@ -19,12 +19,15 @@ class LinkedInScraper(BaseScraper):
         except ImportError:
             raise ImportError("Playwright requis : pip install playwright && playwright install chromium")
 
+        from ._browser import _launch_args
+
         offers = []
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=True, args=_launch_args())
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
                 locale="fr-FR",
+                accept_downloads=False,
             )
             page = context.new_page()
 

@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
@@ -84,7 +85,7 @@ def _safe_open_url(url: str) -> bool:
     except ValueError:
         return False
     if scheme not in ("http", "https"):
-        console.print(f"[red]URL bloquée (schéma {scheme!r} non autorisé) : {url[:80]}[/red]")
+        console.print(f"[red]URL bloquée (schéma {scheme!r} non autorisé) : {escape(url[:80])}[/red]")
         return False
     webbrowser.open(url)
     return True
@@ -248,7 +249,7 @@ def select_sectors(preselected: str = "") -> list[str]:
         valid = {k for k, _ in SECTORS}
         unknown = [k for k in keys if k not in valid]
         if unknown:
-            console.print(f"[yellow]Secteurs inconnus ignorés : {', '.join(unknown)}[/yellow]")
+            console.print(f"[yellow]Secteurs inconnus ignorés : {escape(', '.join(unknown))}[/yellow]")
         chosen = [label for k, label in SECTORS if k in keys]
         if chosen:
             console.print(f"[dim]Filtres secteur : {', '.join(chosen)}[/dim]")
@@ -415,7 +416,7 @@ def select_sources(preselected: str = "") -> list[str]:
         valid = {s["key"] for s in _SOURCE_INFO}
         unknown = [k for k in keys if k not in valid]
         if unknown:
-            console.print(f"[yellow]Sources inconnues ignorées : {', '.join(unknown)}[/yellow]")
+            console.print(f"[yellow]Sources inconnues ignorées : {escape(', '.join(unknown))}[/yellow]")
         return [k for k in keys if k in valid]
 
     # Sinon, afficher le menu interactif
@@ -506,7 +507,7 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
     valid_sources = [s for s in sources if s in SOURCE_MAP]
     for s in sources:
         if s not in SOURCE_MAP:
-            console.print(f"[yellow]Source inconnue ignorée : {s}[/yellow]")
+            console.print(f"[yellow]Source inconnue ignorée : {escape(s)}[/yellow]")
 
     if not valid_sources:
         return []
@@ -528,7 +529,7 @@ def scrape_all(sources: list[str], query: str, location: str, max_per_source: in
                 source_name, offers, error = future.result()
                 if error:
                     color = "yellow" if "désactivé" in error else "red"
-                    console.print(f"[{color}]⚠  {source_name} : {error}[/{color}]")
+                    console.print(f"[{color}]⚠  {source_name} : {escape(error)}[/{color}]")
                     continue
                 new_offers = [o for o in offers if o.unique_key() not in seen_keys]
                 seen_keys.update(o.unique_key() for o in new_offers)
@@ -574,17 +575,19 @@ def display_matches(offers: list[JobOffer], tracker: Tracker | None = None) -> N
         if isinstance(reasons, list):
             reasons = " · ".join(str(r) for r in reasons if r)
         reasons_str = str(reasons).strip() if reasons else "–"
+        # escape() : le contenu vient du web ou du LLM — il ne doit jamais être
+        # interprété comme du balisage Rich (spoofing de badges, liens cachés…)
         table.add_row(
             str(i),
             badge,
             f"[{color}]{score}/10[/{color}]",
-            offer.title,
-            offer.company,
-            offer.location or "–",
-            offer.contract_type or "–",
-            offer.salary or "–",
-            offer.source,
-            reasons_str,
+            escape(offer.title),
+            escape(offer.company),
+            escape(offer.location or "–"),
+            escape(offer.contract_type or "–"),
+            escape(offer.salary or "–"),
+            escape(offer.source),
+            escape(reasons_str),
         )
 
     console.print(table)
@@ -642,7 +645,7 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
             if cmd == "o":
                 for offer in targets:
                     if _safe_open_url(offer.url):
-                        console.print(f"[dim]Ouverture : {offer.url}[/dim]")
+                        console.print(f"[dim]Ouverture : {escape(offer.url)}[/dim]")
             elif tracker is not None and cmd == "f":
                 tracker.mark_many(targets, "favorite")
                 console.print(f"[yellow]★ {len(targets)} offre(s) marquée(s) comme favori.[/yellow]")
@@ -675,23 +678,29 @@ def _show_detail(offer: JobOffer) -> None:
         reasons = " · ".join(str(r) for r in reasons if r)
     reasons_str = str(reasons).strip() if reasons else ""
 
+    # Lien cliquable seulement si l'URL est http(s) et ne peut pas casser le balisage
+    if offer.url.startswith(("http://", "https://")) and "]" not in offer.url:
+        url_line = f"[link={offer.url}]{escape(offer.url)}[/link]"
+    else:
+        url_line = escape(offer.url) or "–"
+
     meta = "\n".join([
-        f"[bold]Entreprise :[/bold] {offer.company}",
-        f"[bold]Lieu :[/bold]       {offer.location or '–'}",
-        f"[bold]Contrat :[/bold]    {offer.contract_type or '–'}",
-        f"[bold]Salaire :[/bold]    {offer.salary or '–'}",
-        f"[bold]Source :[/bold]     {offer.source}",
-        f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {reasons_str}",
-        f"[bold]URL :[/bold]        [link={offer.url}]{offer.url}[/link]",
+        f"[bold]Entreprise :[/bold] {escape(offer.company)}",
+        f"[bold]Lieu :[/bold]       {escape(offer.location or '–')}",
+        f"[bold]Contrat :[/bold]    {escape(offer.contract_type or '–')}",
+        f"[bold]Salaire :[/bold]    {escape(offer.salary or '–')}",
+        f"[bold]Source :[/bold]     {escape(offer.source)}",
+        f"[bold]Score :[/bold]      [{color}]{score}/10[/{color}]  {escape(reasons_str)}",
+        f"[bold]URL :[/bold]        {url_line}",
     ])
 
-    desc = (offer.description or "Pas de description disponible.").strip()
+    desc = escape((offer.description or "Pas de description disponible.").strip())
     if len(desc) > 1500:
         desc = desc[:1500] + "\n[dim]… (tronqué — ouvrez l'URL pour la suite)[/dim]"
 
     console.print(Panel(
         meta + "\n\n" + desc,
-        title=f"[bold cyan]{offer.title}[/bold cyan]",
+        title=f"[bold cyan]{escape(offer.title)}[/bold cyan]",
         border_style=color,
         padding=(1, 2),
     ))
@@ -734,29 +743,41 @@ def select_offers(offers: list[JobOffer]) -> list[JobOffer]:
 
 def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator) -> None:
     for offer in offers:
-        with Progress(SpinnerColumn(), TextColumn(f"[cyan]Génération : {offer.title} @ {offer.company}..."), console=console) as progress:
+        label = escape(f"{offer.title} @ {offer.company}")
+        with Progress(SpinnerColumn(), TextColumn(f"[cyan]Génération : {label}..."), console=console) as progress:
             progress.add_task("", total=None)
             try:
                 letter = generator.generate(offer)
                 txt_path, pdf_path = generator.save(offer, letter)
 
+                # La lettre vient du LLM (lui-même exposé au texte de l'offre) :
+                # on l'affiche comme du texte brut, jamais comme du balisage.
                 console.print(Panel(
-                    letter,
-                    title=f"[bold green]{offer.title} – {offer.company}[/bold green]",
-                    subtitle=f"[dim]{txt_path}[/dim]",
+                    escape(letter),
+                    title=f"[bold green]{escape(offer.title)} – {escape(offer.company)}[/bold green]",
+                    subtitle=f"[dim]{escape(str(txt_path))}[/dim]",
                     expand=False,
                 ))
 
                 if pdf_path.exists():
-                    console.print(f"  [dim]PDF : {pdf_path}[/dim]")
+                    console.print(f"  [dim]PDF : {escape(str(pdf_path))}[/dim]")
 
             except Exception as e:
-                console.print(f"[red]Erreur génération pour {offer.title} : {e}[/red]")
+                console.print(f"[red]Erreur génération pour {escape(offer.title)} : {escape(str(e))}[/red]")
 
         time.sleep(0.5)
 
 
 # ─── Export ───────────────────────────────────────────────────────────────────
+
+def _csv_safe(value) -> str:
+    """Neutralise l'injection de formules : Excel/Sheets exécutent les cellules
+    commençant par = + - @ — un titre d'offre hostile pourrait en profiter."""
+    s = str(value) if value is not None else ""
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
 
 def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     out = Path(config.output_dir)
@@ -786,7 +807,7 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows([{k: _csv_safe(v) for k, v in row.items()} for row in rows])
 
     console.print(f"\n[dim]JSON : {json_path}[/dim]")
     console.print(f"[dim]CSV  : {csv_path}  (Excel / Google Sheets)[/dim]")
@@ -833,7 +854,12 @@ def show_stats() -> None:
         table.add_column("Source", width=10)
         for entry in sorted(applied, key=lambda x: x.get("updated", ""), reverse=True)[:20]:
             date = entry.get("updated", "")[:10]
-            table.add_row(date, entry["title"], entry["company"], entry["source"])
+            table.add_row(
+                escape(date),
+                escape(str(entry.get("title", "–"))),
+                escape(str(entry.get("company", "–"))),
+                escape(str(entry.get("source", "–"))),
+            )
         console.print(table)
 
     favs = tracker.list_by_status("favorite")
@@ -844,7 +870,12 @@ def show_stats() -> None:
         table.add_column("Source", width=10)
         table.add_column("URL", overflow="fold")
         for entry in favs[:20]:
-            table.add_row(entry["title"], entry["company"], entry["source"], entry["url"])
+            table.add_row(
+                escape(str(entry.get("title", "–"))),
+                escape(str(entry.get("company", "–"))),
+                escape(str(entry.get("source", "–"))),
+                escape(str(entry.get("url", "–"))),
+            )
         console.print(table)
 
 
@@ -922,7 +953,7 @@ def main():
         cv_text = parse_cv(args.cv)
         console.print(f"[green]✓ CV parsé ({len(cv_text)} caractères)[/green]")
     except (FileNotFoundError, ValueError) as e:
-        console.print(f"[red]Erreur CV : {e}[/red]")
+        console.print(f"[red]Erreur CV : {escape(str(e))}[/red]")
         sys.exit(1)
 
     # 2. Vérification provider IA
@@ -991,7 +1022,7 @@ def main():
                 continue
 
         # Scraping
-        console.print(f"\n[bold]Scraping :[/bold] « {query} » sur {', '.join(sources)}")
+        console.print(f"\n[bold]Scraping :[/bold] « {escape(query)} » sur {', '.join(sources)}")
         all_offers = scrape_all(sources, query, args.location, args.max)
 
         if not all_offers:
@@ -1026,7 +1057,7 @@ def main():
                 if "AuthenticationError" in type(e).__name__:
                     console.print("[red]Clé ANTHROPIC_API_KEY invalide.[/red]")
                     sys.exit(1)
-                console.print(f"[red]Erreur IA : {e}[/red]")
+                console.print(f"[red]Erreur IA : {escape(str(e))}[/red]")
                 continue
 
         if not matched_offers:

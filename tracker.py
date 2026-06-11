@@ -40,6 +40,8 @@ from job_scrapers.base import JobOffer
 VALID_STATUSES = ("new", "seen", "favorite", "applied", "rejected")
 HIDDEN_STATUSES = ("applied", "rejected")  # hidden from future searches by default
 
+_MAX_TRACKER_BYTES = 50 * 1024 * 1024  # un historique > 50 Mo est forcément corrompu
+
 
 class Tracker:
     def __init__(self, store_path: Path):
@@ -51,6 +53,8 @@ class Tracker:
         if not self.path.exists():
             return {"offers": {}}
         try:
+            if self.path.stat().st_size > _MAX_TRACKER_BYTES:
+                raise ValueError("fichier anormalement volumineux")
             data = json.loads(self.path.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or not isinstance(data.get("offers"), dict):
                 raise ValueError("structure inattendue")

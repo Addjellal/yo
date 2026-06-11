@@ -5,11 +5,21 @@ import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+# defusedxml neutralise les attaques XML (XXE, billion laughs) sur le flux RSS,
+# qui est du contenu externe non fiable. Fallback stdlib si non installé.
+try:
+    from defusedxml import ElementTree as SafeET
+except ImportError:
+    SafeET = ET
+
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 from app_utils import console
+
+MAX_RSS_START = 500        # plafond pagination RSS (~50 pages de 10)
+MAX_BROWSER_START = 300    # plafond pagination Playwright (~20 pages de 15)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -59,18 +69,18 @@ class IndeedScraper(BaseScraper):
         if hasattr(session, "headers"):
             session.headers.update(HEADERS)
 
-        while len(offers) < max_results:
+        while len(offers) < max_results and start <= MAX_RSS_START:
             params = {"q": query, "l": location, "sort": "date", "start": start}
             try:
                 resp = session.get(RSS_URL, params=params, timeout=15)
-                if resp.status_code != 200:
+                if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
                     break
             except Exception:
                 break
 
             try:
-                root = ET.fromstring(resp.content)
-            except ET.ParseError:
+                root = SafeET.fromstring(resp.content)
+            except Exception:
                 break
 
             items = root.findall(".//item")
@@ -146,7 +156,7 @@ class IndeedScraper(BaseScraper):
                 return []
 
             start = 0
-            while len(offers) < max_results:
+            while len(offers) < max_results and start <= MAX_BROWSER_START:
                 params = {"q": query, "l": location, "sort": "date", "start": start}
                 url = JOBS_URL + "?" + urllib.parse.urlencode(params)
 

@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import os
+import sys
 from pathlib import Path
 
 
@@ -26,8 +28,9 @@ def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     # Utiliser le cache si disponible et plus récent que le PDF
     cache = _cache_path(path)
     if not force_reparse and cache.exists() and cache.stat().st_mtime >= path.stat().st_mtime:
+        from rich.markup import escape
         from app_utils import console
-        console.print(f"[dim]CV chargé depuis le cache ({cache.name})[/dim]")
+        console.print(f"[dim]CV chargé depuis le cache ({escape(cache.name)})[/dim]")
         return cache.read_text(encoding="utf-8")
 
     suffix = path.suffix.lower()
@@ -40,8 +43,13 @@ def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     else:
         raise ValueError(f"Format non supporté : {suffix}. Utilisez PDF, DOCX ou TXT.")
 
-    # Sauvegarder en cache
+    # Sauvegarder en cache — le CV est une donnée personnelle : accès propriétaire seul
     cache.write_text(text, encoding="utf-8")
+    if sys.platform != "win32":
+        try:
+            os.chmod(cache, 0o600)
+        except OSError:
+            pass
     return text
 
 

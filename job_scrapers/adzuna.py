@@ -4,15 +4,27 @@ Scraper Adzuna — agrégateur de millions d'offres d'emploi via leur API publiq
 API gratuite (1 000 appels/mois) : https://developer.adzuna.com
 Inscription rapide, sans carte bancaire.
 """
+import re
 import time
 import requests
 
-from .base import BaseScraper, JobOffer
+from rich.markup import escape
+
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 from app_utils import console
 
 API_URL = "https://api.adzuna.com/v1/api/jobs/fr/search/{page}"
 REGISTER_URL = "https://developer.adzuna.com"
+MAX_PAGES = 20
+
+_SECRET_PARAM_RE = re.compile(r"(app_(?:id|key))=[^&\s]+")
+
+
+def _redact(message: str) -> str:
+    """Les exceptions requests incluent l'URL complète — donc app_id/app_key.
+    On masque ces valeurs avant tout affichage."""
+    return _SECRET_PARAM_RE.sub(r"\1=***", str(message))
 
 
 class AdzunaScraper(BaseScraper):
@@ -34,7 +46,7 @@ class AdzunaScraper(BaseScraper):
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
-        while len(offers) < max_results:
+        while len(offers) < max_results and page <= MAX_PAGES:
             params: dict = {
                 "app_id": config.adzuna_app_id,
                 "app_key": config.adzuna_app_key,
@@ -53,12 +65,15 @@ class AdzunaScraper(BaseScraper):
                     timeout=15,
                 )
                 resp.raise_for_status()
+                if len(resp.content) > MAX_RESPONSE_BYTES:
+                    console.print("[yellow][Adzuna] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                    break
                 data = resp.json()
             except requests.RequestException as e:
-                console.print(f"[yellow][Adzuna] Erreur réseau : {e}[/yellow]")
+                console.print(f"[yellow][Adzuna] Erreur réseau : {escape(_redact(e))}[/yellow]")
                 break
             except ValueError as e:
-                console.print(f"[yellow][Adzuna] Erreur JSON : {e}[/yellow]")
+                console.print(f"[yellow][Adzuna] Erreur JSON : {escape(_redact(e))}[/yellow]")
                 break
 
             results = data.get("results", [])

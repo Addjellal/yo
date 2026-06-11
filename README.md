@@ -61,16 +61,38 @@ OLLAMA_VISION_MODEL=qwen3-vl:4b
 
 ## Sécurité
 
-- `.env` n'est jamais commité (`.gitignore`) et passe en permissions `600`
-  sur Linux/macOS lors d'une sauvegarde automatique.
+**Secrets et données personnelles**
+- `.env` n'est jamais commité (`.gitignore`), est écrit de façon atomique et
+  créé en permissions `600` (propriétaire seul) sur Linux/macOS.
 - Les valeurs écrites dans `.env` sont validées (liste blanche de clés,
   neutralisation des retours à la ligne → pas d'injection de variables).
+- Les clés Adzuna sont expurgées des messages d'erreur réseau (l'URL d'une
+  erreur HTTP contiendrait sinon `app_key=...` en clair).
+- Le cache du CV et l'historique de candidatures passent en permissions `600`.
+
+**Données du web = données hostiles**
+- Tous les champs d'une offre sont sanitisés dès le scraping : caractères de
+  contrôle supprimés, longueurs bornées, URLs limitées à `http(s)` (un lien
+  `javascript:` ou `file:` devient vide).
+- Tout affichage console de contenu web ou LLM est échappé : aucune offre ne
+  peut injecter du balisage Rich (faux badges « postulée », liens déguisés…).
+- Export CSV protégé contre l'injection de formules Excel/Sheets (`=`, `+`,
+  `-`, `@` en début de cellule).
+- Le texte des offres est isolé dans le prompt (balises XML) et le modèle a
+  pour consigne d'ignorer toute instruction qu'il contiendrait.
+- Flux RSS parsé via `defusedxml` (anti-XXE, anti-billion-laughs).
 - Seules les URLs `http(s)` peuvent être ouvertes dans le navigateur.
-- Le texte des offres (non fiable, vient du web) est isolé dans le prompt et
-  le modèle a pour consigne d'ignorer toute instruction qu'il contiendrait.
-- Scores IA bornés 0–10, paramètres CLI et d'environnement bornés.
+
+**Limites et robustesse**
+- Sandbox Chromium conservée (désactivée uniquement sous root Linux, où
+  Chromium refuse de démarrer sinon) ; téléchargements bloqués.
+- Réponses HTTP plafonnées à 10 Mo, pagination plafonnée par source,
+  timeouts sur toutes les requêtes.
+- Scores IA bornés 0–10, paramètres CLI et d'environnement bornés et validés
+  (provider, URLs, noms de modèles).
 - Noms de fichiers générés strictement alphanumériques (pas de traversée de
-  chemin), historique écrit de façon atomique.
+  chemin), historique écrit de façon atomique avec récupération en cas de
+  corruption.
 
 ## Avertissement
 
