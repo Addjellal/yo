@@ -51,6 +51,8 @@ class ApecScraper(BaseScraper):
     source_name = "Apec"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
+        if config.country != "fr":
+            raise ValueError("couvre uniquement la France")
         # APEC retourne 500 sur les requêtes trop courtes ou les mots tronqués
         if len(query.strip()) < 3:
             console.print(f"[yellow][Apec] Requête trop courte ({escape(repr(query))}), ignorée.[/yellow]")

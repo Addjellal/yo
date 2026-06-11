@@ -87,6 +87,9 @@ class Config:
     # Mots-clés éliminatoires (séparés par virgule) : offres écartées avant l'IA
     exclude_keywords: str = field(default_factory=lambda: os.getenv("EXCLUDE_KEYWORDS", "").strip())
 
+    # Pays courant (code ISO, défini par le sélecteur de localisation au runtime)
+    country: str = "fr"
+
     # Paramètres (bornés pour éviter les valeurs absurdes ou hostiles)
     output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", str(_PROJECT_DIR / "output")))
     max_jobs_per_source: int = field(default_factory=lambda: _env_int("MAX_JOBS_PER_SOURCE", 50, 1, 200))

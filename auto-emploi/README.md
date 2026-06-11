@@ -16,6 +16,11 @@ et suivi persistant de vos candidatures.
   pénalisent automatiquement les offres similaires aux scans suivants.
 - **Mots-clés éliminatoires** : `--exclude "senior,anglais courant"` (ou
   `EXCLUDE_KEYWORDS` dans `.env`) écarte les offres avant l'analyse IA.
+- **Localisation pays → région → ville** : sélecteur interactif avec
+  recherche par texte (sans accents : « bret » → Bretagne) et option `all`
+  à chaque niveau. 12 pays (Adzuna et Indeed basculent automatiquement sur
+  le bon pays ; Apec/France Travail restent France). Commande `v` en cours
+  de session pour changer de lieu, ou `--location "Lyon" --country fr`.
 - **Deux providers IA** :
   - `anthropic` — Claude Fable 5 par défaut (sorties JSON structurées
     garanties, OCR haute résolution des CV scannés) ;

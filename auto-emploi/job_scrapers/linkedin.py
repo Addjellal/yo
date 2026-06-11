@@ -46,9 +46,10 @@ class LinkedInScraper(BaseScraper):
         start = 0
 
         while len(offers) < max_results and start <= MAX_GUEST_START:
+            from locations import COUNTRY_NAMES
             params = {
                 "keywords": query,
-                "location": location or "France",
+                "location": location or COUNTRY_NAMES.get(config.country, "France"),
                 "start": start,
                 "f_TPR": "r604800",  # offres de moins de 7 jours
             }

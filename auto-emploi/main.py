@@ -49,6 +49,7 @@ from ai.matcher import parse_exclude_keywords
 from ai.cover_letter import TONES
 from tracker import Tracker
 from integrations import notion_configured, export_to_notion, desktop_notify
+from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS, search_names, _fold
 
 console = Console()
 
@@ -295,6 +296,103 @@ def select_sectors(preselected: str = "") -> list[str]:
             console.print("[red]Numéros hors plage, réessayez.[/red]")
         except ValueError:
             console.print("[red]Format invalide. Exemple : 1,3  ou  all[/red]")
+
+
+# ─── Sélection de la localisation ─────────────────────────────────────────────
+
+def _two_column_panel(names: list[str], title: str, subtitle: str) -> None:
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(width=4, style="bold cyan")
+    grid.add_column(width=32)
+    grid.add_column(width=4, style="bold cyan")
+    grid.add_column(width=32)
+    rows = [(f"{i + 1}.", name) for i, name in enumerate(names)]
+    for left, right in zip(rows[::2], rows[1::2]):
+        grid.add_row(left[0], left[1], right[0], right[1])
+    if len(rows) % 2:
+        grid.add_row(rows[-1][0], rows[-1][1], "", "")
+    console.print(Panel(grid, title=title, subtitle=subtitle, border_style="cyan", padding=(1, 2)))
+
+
+def _resolve_choice(raw: str, names: list[str]) -> str | None:
+    """Numéro ou recherche par texte (insensible casse/accents).
+    Retourne le nom choisi, ou None si ambigu/introuvable."""
+    raw = raw.strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        i = int(raw) - 1
+        if 0 <= i < len(names):
+            return names[i]
+        console.print(f"[red]Numéro hors plage (1–{len(names)}).[/red]")
+        return None
+    exact = [n for n in names if _fold(n) == _fold(raw)]
+    if exact:
+        return exact[0]
+    matches = search_names(raw, names)
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        console.print(f"[yellow]Plusieurs correspondances : {escape(', '.join(matches[:6]))} — précisez.[/yellow]")
+    else:
+        console.print("[red]Aucune correspondance, réessayez.[/red]")
+    return None
+
+
+def select_location() -> str:
+    """Sélecteur pays → région (France) → ville, avec recherche par texte et
+    option 'all' à chaque niveau. Définit config.country et retourne la
+    localisation à transmettre aux scrapers ('' = pas de filtre)."""
+    # ── Pays ──
+    country_names = [name for _, name in COUNTRIES]
+    _two_column_panel(
+        country_names,
+        "[bold cyan]Pays[/bold cyan]",
+        "[dim]Numéro, nom à rechercher (ex: 'bel'), 'all' = sans filtre géographique — Entrée = France[/dim]",
+    )
+    while True:
+        raw = Prompt.ask("[bold cyan]Pays[/bold cyan]", default="France").strip()
+        if raw.lower() in ("all", "0"):
+            config.country = "fr"
+            console.print("[dim]Aucun filtre géographique (Apec/France Travail restent centrés France).[/dim]")
+            return ""
+        chosen = _resolve_choice(raw, country_names)
+        if chosen:
+            break
+    code = next(c for c, n in COUNTRIES if n == chosen)
+    config.country = code
+
+    region = ""
+    if code == "fr":
+        # ── Région (France uniquement) ──
+        _two_column_panel(
+            FR_REGIONS,
+            "[bold cyan]Région[/bold cyan]",
+            "[dim]Numéro, nom à rechercher (ex: 'bret'), 'all' ou Entrée = toutes les régions[/dim]",
+        )
+        while True:
+            raw = Prompt.ask("[bold cyan]Région[/bold cyan]", default="all").strip()
+            if raw.lower() in ("", "all", "0"):
+                break
+            picked = _resolve_choice(raw, FR_REGIONS)
+            if picked:
+                region = picked
+                break
+
+    # ── Ville (recherche libre, optionnelle) ──
+    city = Prompt.ask(
+        "[bold cyan]Ville[/bold cyan] [dim](recherche libre, Entrée pour ignorer)[/dim]",
+        default="",
+    ).strip()[:80]
+
+    location = city or region
+    summary = " › ".join(filter(None, [
+        COUNTRY_NAMES[code],
+        region or "toutes régions",
+        city or "toutes villes",
+    ]))
+    console.print(f"[green]Localisation : {escape(summary)}[/green]")
+    return location
 
 
 # ─── Sélection interactive des sources ───────────────────────────────────────
@@ -901,7 +999,7 @@ def show_stats() -> None:
 
 # ─── Mode veille ──────────────────────────────────────────────────────────────
 
-def watch_loop(args, sources, sectors, matcher, tracker, exclude) -> None:
+def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="") -> None:
     """Relance la recherche à intervalle régulier et ne signale que les
     offres jamais vues. Notification desktop quand il y a du nouveau."""
     interval_min = max(15, min(1440, args.watch))
@@ -916,7 +1014,7 @@ def watch_loop(args, sources, sectors, matcher, tracker, exclude) -> None:
         cycle += 1
         console.print(f"\n[bold]── Cycle {cycle} — {time.strftime('%H:%M')} ──[/bold]")
         try:
-            all_offers = scrape_all(sources, query, args.location, args.max)
+            all_offers = scrape_all(sources, query, location, args.max)
             new_offers = tracker.filter_unseen(all_offers)
             if not new_offers:
                 console.print("[dim]Aucune nouvelle offre depuis le dernier cycle.[/dim]")
@@ -972,7 +1070,11 @@ def parse_args():
     parser.add_argument("--stats", action="store_true", help="Afficher l'historique des candidatures et favoris")
     parser.add_argument("--cv", help="Chemin vers votre CV (PDF, DOCX ou TXT)")
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
-    parser.add_argument("--location", default="", help='Localisation ex: "Paris"')
+    parser.add_argument("--location", default="", help='Localisation ex: "Paris" (sinon sélecteur interactif pays/région/ville)')
+    parser.add_argument(
+        "--country", default="fr", choices=[c for c, _ in COUNTRIES],
+        help="Pays de recherche (défaut: fr) — utilisé avec --location ou --watch",
+    )
     parser.add_argument(
         "--sources", default="apec,adzuna,indeed,wttj",
         help="Sources : ft,indeed,wttj,apec,adzuna,linkedin (défaut: apec,adzuna,indeed,wttj)",
@@ -1067,6 +1169,18 @@ def main():
     console.print("\n[bold]3. Secteurs d'activité ciblés[/bold]")
     sectors = select_sectors(args.sectors)
 
+    # 5. Localisation : pays → région → ville (modifiable en session avec 'v')
+    console.print("\n[bold]4. Localisation[/bold]")
+    if args.location.strip() or args.watch:
+        location = args.location.strip()
+        config.country = args.country
+        console.print(
+            f"[dim]Localisation : {escape(location) if location else 'sans filtre'}"
+            f" ({COUNTRY_NAMES.get(config.country, 'France')})[/dim]"
+        )
+    else:
+        location = select_location()
+
     # Matcher initialisé une seule fois (CV en mémoire)
     matcher = JobMatcher(cv_text)
 
@@ -1096,7 +1210,7 @@ def main():
         if not args.query.strip():
             console.print("[red]--watch nécessite --query (mode non interactif).[/red]")
             sys.exit(1)
-        watch_loop(args, sources, sectors, matcher, tracker, exclude)
+        watch_loop(args, sources, sectors, matcher, tracker, exclude, location)
         return
 
     # 5. Boucle de recherche
@@ -1104,7 +1218,8 @@ def main():
     console.print(
         "\n[dim]À tout moment : tapez [bold]x[/bold] pour quitter, "
         "[bold]s[/bold] pour changer les sources, "
-        "[bold]f[/bold] pour changer les filtres secteur.[/dim]"
+        "[bold]f[/bold] pour changer les filtres secteur, "
+        "[bold]v[/bold] pour changer la localisation.[/dim]"
     )
 
     while True:
@@ -1115,7 +1230,7 @@ def main():
         else:
             console.print("\n" + "─" * 60)
             raw = Prompt.ask(
-                "[bold cyan]Nouvelle recherche[/bold cyan] [dim](x=quitter  s=sources  f=filtres)[/dim]"
+                "[bold cyan]Nouvelle recherche[/bold cyan] [dim](x=quitter  s=sources  f=filtres  v=lieu)[/dim]"
             ).strip()
             if raw.lower() == "x":
                 console.print("[dim]Au revoir ![/dim]")
@@ -1126,13 +1241,17 @@ def main():
             if raw.lower() == "f":
                 sectors = select_sectors("")
                 continue
+            if raw.lower() == "v":
+                location = select_location()
+                continue
             query = raw
             if not query:
                 continue
 
         # Scraping
-        console.print(f"\n[bold]Scraping :[/bold] « {escape(query)} » sur {', '.join(sources)}")
-        all_offers = scrape_all(sources, query, args.location, args.max)
+        where = f" à {escape(location)}" if location else ""
+        console.print(f"\n[bold]Scraping :[/bold] « {escape(query)} »{where} sur {', '.join(sources)}")
+        all_offers = scrape_all(sources, query, location, args.max)
 
         if not all_offers:
             console.print(

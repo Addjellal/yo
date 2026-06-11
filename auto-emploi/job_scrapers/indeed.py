@@ -30,8 +30,12 @@ HEADERS = {
 }
 
 INDEED_NS = "https://www.indeed.com/about/rss"
-RSS_URL = "https://fr.indeed.com/rss"
-JOBS_URL = "https://fr.indeed.com/jobs"
+
+
+def _domain() -> str:
+    """Domaine Indeed du pays sélectionné (fr.indeed.com par défaut)."""
+    from locations import INDEED_DOMAINS
+    return INDEED_DOMAINS.get(config.country, "fr.indeed.com")
 
 
 def _make_session():
@@ -72,7 +76,7 @@ class IndeedScraper(BaseScraper):
         while len(offers) < max_results and start <= MAX_RSS_START:
             params = {"q": query, "l": location, "sort": "date", "start": start}
             try:
-                resp = session.get(RSS_URL, params=params, timeout=15)
+                resp = session.get(f"https://{_domain()}/rss", params=params, timeout=15)
                 if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
                     break
             except Exception:
@@ -158,7 +162,7 @@ class IndeedScraper(BaseScraper):
             start = 0
             while len(offers) < max_results and start <= MAX_BROWSER_START:
                 params = {"q": query, "l": location, "sort": "date", "start": start}
-                url = JOBS_URL + "?" + urllib.parse.urlencode(params)
+                url = f"https://{_domain()}/jobs?" + urllib.parse.urlencode(params)
 
                 html = browser.fetch(url, wait="domcontentloaded", extra_ms=2000)
                 if html is None:
@@ -223,7 +227,7 @@ class IndeedScraper(BaseScraper):
             company = item.get("company", "N/A")
             location = item.get("formattedLocation") or item.get("jobLocationCity", "")
             description = re.sub(r"<[^>]+>", " ", item.get("snippet") or "").strip()
-            url = f"https://fr.indeed.com/viewjob?jk={job_key}"
+            url = f"https://{_domain()}/viewjob?jk={job_key}"
 
             sal = item.get("salarySnippet") or {}
             salary = sal.get("text") if isinstance(sal, dict) else None
@@ -261,7 +265,7 @@ class IndeedScraper(BaseScraper):
                 loc_el = card.find(attrs={"data-testid": "text-location"}) or card.find(class_=re.compile(r"companyLocation"))
                 location = loc_el.get_text(strip=True) if loc_el else ""
 
-                url = f"https://fr.indeed.com/viewjob?jk={job_key}" if job_key else ""
+                url = f"https://{_domain()}/viewjob?jk={job_key}" if job_key else ""
                 if not url:
                     continue
 

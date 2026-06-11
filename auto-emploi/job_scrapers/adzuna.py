@@ -38,6 +38,11 @@ class AdzunaScraper(BaseScraper):
             )
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
+        from locations import ADZUNA_COUNTRIES
+        country = config.country if config.country in ADZUNA_COUNTRIES else None
+        if country is None:
+            raise ValueError(f"ne couvre pas le pays sélectionné ({config.country})")
+
         offers: list[JobOffer] = []
         page = 1
         page_size = min(50, max_results)
@@ -60,7 +65,7 @@ class AdzunaScraper(BaseScraper):
 
             try:
                 resp = session.get(
-                    API_URL.format(page=page),
+                    API_URL.format(country=country, page=page),
                     params=params,
                     timeout=15,
                 )

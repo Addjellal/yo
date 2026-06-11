@@ -53,6 +53,8 @@ class FranceTravailScraper(BaseScraper):
         return self._token
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
+        if config.country != "fr":
+            raise ValueError("couvre uniquement la France")
         token = self._get_token()
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
         params = {
