@@ -1,8 +1,37 @@
 # Auto Job Application
 
-Recherche d'emploi automatisée en ligne de commande : scraping multi-sources,
-matching IA entre votre CV et les offres, génération de lettres de motivation,
-et suivi persistant de vos candidatures.
+Recherche d'emploi automatisée : scraping multi-sources, matching IA entre
+votre CV et les offres, génération de lettres de motivation, et suivi
+persistant de vos candidatures. **Interface web locale** ou ligne de commande.
+
+## Interface web
+
+```bash
+python web.py        # démarre sur http://127.0.0.1:8765 et ouvre le navigateur
+```
+
+Aucune dépendance supplémentaire (serveur 100 % bibliothèque standard).
+L'interface offre :
+
+- **Recherche** : formulaire complet (CV, pays/région/ville, secteurs, niveau
+  d'expérience, sources, mots-clés exclus, score minimum), import de CV en un
+  clic, historique des recherches, progression du scan en direct ;
+- **Résultats** : cartes avec anneau de score coloré, atouts/lacunes détaillés,
+  actions favori / postulée / rejeter, tri, export CSV+JSON, export Notion ;
+- **Lettres** : génération dans une modale (3 tons), email d'accompagnement,
+  copie en un clic, téléchargement .txt/.pdf ;
+- **Suivi** : tableau kanban favoris / postulées / à relancer (>14 jours sans
+  réponse) avec actions directes ;
+- **Statistiques** : compteurs, candidatures par semaine et par source ;
+- **Réglages** : édition des clés API (écrites dans le `.env` local), thème
+  sombre/clair.
+
+Sécurité de l'interface web : serveur accessible uniquement depuis
+`127.0.0.1`, jeton de session aléatoire anti-CSRF/anti-DNS-rebinding sur
+toutes les routes API, Content-Security-Policy stricte, aucun contenu web/LLM
+injecté en HTML (textContent uniquement), téléchargements limités au dossier
+`output/` avec liste blanche d'extensions (le `.env` et le `.tracker.json`
+sont inaccessibles).
 
 ## Fonctionnalités
 
@@ -16,6 +45,10 @@ et suivi persistant de vos candidatures.
   pénalisent automatiquement les offres similaires aux scans suivants.
 - **Mots-clés éliminatoires** : `--exclude "senior,anglais courant"` (ou
   `EXCLUDE_KEYWORDS` dans `.env`) écarte les offres avant l'analyse IA.
+- **Filtre niveau d'expérience** : stage/alternance, junior, confirmé,
+  senior, expert — pré-filtre instantané (titre/contrat incompatibles) puis
+  pénalisation IA des niveaux inadaptés. `--experience junior` ou sélection
+  interactive (commande `e` en session).
 - **Localisation pays → région → ville** : sélecteur interactif avec
   recherche par texte (sans accents : « bret » → Bretagne) et option `all`
   à chaque niveau. 12 pays (Adzuna et Indeed basculent automatiquement sur
@@ -49,6 +82,7 @@ python main.py --check                  # diagnostic complet
 ## Usage
 
 ```bash
+python web.py                                         # interface web (recommandé)
 python main.py --cv mon_cv.pdf --scan                 # scanner sans postuler
 python main.py --cv mon_cv.pdf --query "data engineer" --location "Paris"
 python main.py --cv mon_cv.pdf --query "robotique" --watch 60   # veille + notifications

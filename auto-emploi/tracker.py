@@ -164,8 +164,8 @@ class Tracker:
         for offer in offers:
             key = offer.unique_key()
             existing = self._data["offers"].get(key, {})
-            # Don't downgrade favorite/applied to "seen"
-            if status == "seen" and existing.get("status") in ("favorite", "applied"):
+            # Don't downgrade an explicit user decision to "seen"
+            if status == "seen" and existing.get("status") in ("favorite", "applied", "rejected"):
                 continue
             self._data["offers"][key] = {
                 "id": offer.id,
@@ -180,8 +180,40 @@ class Tracker:
             }
         self._save()
 
+    def mark_key(self, key: str, status: str) -> bool:
+        """Met à jour le statut d'une entrée existante par sa clé de stockage
+        (utilisé par l'interface web, qui n'a que la clé sous la main).
+        Retourne False si la clé est inconnue."""
+        if status not in VALID_STATUSES:
+            raise ValueError(f"Statut invalide : {status}")
+        entry = self._data["offers"].get(key)
+        if not isinstance(entry, dict):
+            return False
+        entry["status"] = status
+        entry["updated"] = datetime.now().isoformat(timespec="seconds")
+        self._save()
+        return True
+
     def list_by_status(self, status: str) -> list[dict]:
         return [
             entry for entry in self._data["offers"].values()
             if entry.get("status") == status
         ]
+
+    def entries_by_status(self, status: str) -> list[tuple[str, dict]]:
+        """Comme list_by_status mais avec la clé de stockage (interface web)."""
+        return [
+            (key, entry) for key, entry in self._data["offers"].items()
+            if entry.get("status") == status
+        ]
+
+    def followup_entries(self, days: int = 14) -> list[tuple[str, dict]]:
+        """Candidatures à relancer, avec leur clé de stockage (interface web)."""
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        return sorted(
+            [
+                (key, e) for key, e in self._data["offers"].items()
+                if e.get("status") == "applied" and e.get("updated", "") < cutoff
+            ],
+            key=lambda kv: kv[1].get("updated", ""),
+        )

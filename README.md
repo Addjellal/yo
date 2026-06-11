@@ -5,7 +5,7 @@ configuration.
 
 | Projet | Description |
 |---|---|
-| [`auto-emploi/`](auto-emploi/) | Recherche d'emploi automatisée : scraping multi-sources, matching IA (Claude Fable 5), lettres de motivation, suivi de candidatures et relances. |
+| [`auto-emploi/`](auto-emploi/) | Recherche d'emploi automatisée : interface web locale (`python web.py`), scraping multi-sources, matching IA (Claude Fable 5), lettres de motivation, suivi de candidatures et relances. |
 
 ## Démarrer un projet
 

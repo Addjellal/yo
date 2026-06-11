@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="auth-token" content="__AUTH_TOKEN__">
+<title>Auto Emploi — Recherche d'emploi assistée par IA</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%BC%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">
+    <span class="logo-icon">💼</span>
+    <div>
+      <div class="logo-title">Auto Emploi</div>
+      <div class="logo-sub">Assistant IA</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" data-tab="search">
+      <span class="nav-ico">🔍</span> Recherche
+    </button>
+    <button class="nav-btn" data-tab="track">
+      <span class="nav-ico">📌</span> Suivi
+    </button>
+    <button class="nav-btn" data-tab="stats">
+      <span class="nav-ico">📊</span> Statistiques
+    </button>
+    <button class="nav-btn" data-tab="settings">
+      <span class="nav-ico">⚙️</span> Réglages
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="provider-status">
+      <span id="provider-dot" class="dot"></span>
+      <span id="provider-label">…</span>
+    </div>
+    <button id="theme-toggle" class="btn-ghost" title="Changer de thème">🌗 Thème</button>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- ════════ Onglet Recherche ════════ -->
+  <section id="tab-search" class="tab">
+    <header class="page-head">
+      <h1>Nouvelle recherche</h1>
+      <p class="muted">Scan multi-sources, matching IA avec votre CV, suivi des candidatures.</p>
+    </header>
+
+    <div class="card search-card">
+      <div class="search-row">
+        <div class="field grow">
+          <label for="f-query">Poste recherché</label>
+          <input id="f-query" type="text" placeholder="Ex : ingénieur robotique, data engineer…" maxlength="200" autocomplete="off">
+          <div id="query-history" class="history-chips"></div>
+        </div>
+        <div class="field">
+          <label for="f-cv">CV</label>
+          <div class="cv-row">
+            <select id="f-cv"></select>
+            <button id="cv-upload-btn" class="btn-ghost" title="Importer un CV (PDF, DOCX, TXT)">＋</button>
+            <input id="cv-file" type="file" accept=".pdf,.docx,.txt" hidden>
+          </div>
+        </div>
+        <button id="btn-scan" class="btn-primary big">Lancer&nbsp;la&nbsp;recherche</button>
+      </div>
+
+      <details class="filters" open>
+        <summary>Filtres</summary>
+        <div class="filters-grid">
+
+          <div class="field">
+            <label for="f-country">Pays</label>
+            <select id="f-country"></select>
+          </div>
+          <div class="field" id="region-field">
+            <label for="f-region">Région</label>
+            <select id="f-region"></select>
+          </div>
+          <div class="field">
+            <label for="f-city">Ville</label>
+            <input id="f-city" type="text" placeholder="Ex : Rennes (optionnel)" maxlength="120">
+          </div>
+
+          <div class="field span-3">
+            <label>Niveau d'expérience</label>
+            <div id="f-experience" class="pills"></div>
+          </div>
+
+          <div class="field span-3">
+            <label>Secteurs <span class="muted">(aucun = tous)</span></label>
+            <div id="f-sectors" class="chips"></div>
+          </div>
+
+          <div class="field span-3">
+            <label>Sources</label>
+            <div id="f-sources" class="chips"></div>
+          </div>
+
+          <div class="field">
+            <label for="f-minscore">Score minimum : <strong id="minscore-val">6</strong>/10</label>
+            <input id="f-minscore" type="range" min="0" max="10" value="6">
+          </div>
+          <div class="field">
+            <label for="f-max">Offres max / source</label>
+            <input id="f-max" type="number" min="1" max="200" value="50">
+          </div>
+          <div class="field">
+            <label for="f-exclude">Mots-clés éliminatoires</label>
+            <input id="f-exclude" type="text" placeholder="Ex : senior, anglais courant" maxlength="500">
+          </div>
+
+          <div class="field span-3 checkbox-row">
+            <label class="check"><input id="f-include-seen" type="checkbox"> Inclure les offres déjà traitées</label>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Progression du scan -->
+    <div id="scan-progress" class="card progress-card" hidden>
+      <div class="progress-head">
+        <span class="spinner"></span>
+        <strong id="progress-title">Recherche en cours…</strong>
+        <button id="btn-progress-hide" class="btn-ghost small">Masquer</button>
+      </div>
+      <div id="progress-log" class="progress-log"></div>
+    </div>
+
+    <!-- Résultats -->
+    <div id="results-zone" hidden>
+      <div class="results-toolbar">
+        <h2 id="results-count">0 offre</h2>
+        <div class="toolbar-actions">
+          <select id="sort-select" title="Trier">
+            <option value="score">Tri : score</option>
+            <option value="source">Tri : source</option>
+            <option value="company">Tri : entreprise</option>
+          </select>
+          <button id="btn-export" class="btn-ghost">⬇ CSV / JSON</button>
+          <button id="btn-notion" class="btn-ghost" hidden>Notion ↗</button>
+        </div>
+      </div>
+      <div id="results-grid" class="results-grid"></div>
+    </div>
+
+    <div id="search-empty" class="empty-state">
+      <div class="empty-icon">🛰️</div>
+      <p>Lancez une recherche pour scanner les offres et les comparer à votre CV.</p>
+    </div>
+  </section>
+
+  <!-- ════════ Onglet Suivi ════════ -->
+  <section id="tab-track" class="tab" hidden>
+    <header class="page-head">
+      <h1>Suivi des candidatures</h1>
+      <p class="muted">Favoris, candidatures envoyées et relances à faire.</p>
+    </header>
+    <div class="kanban">
+      <div class="kanban-col">
+        <h3>★ Favoris <span id="count-fav" class="pill-count">0</span></h3>
+        <div id="col-favorites" class="kanban-list"></div>
+      </div>
+      <div class="kanban-col">
+        <h3>✓ Postulées <span id="count-applied" class="pill-count">0</span></h3>
+        <div id="col-applied" class="kanban-list"></div>
+      </div>
+      <div class="kanban-col col-warn">
+        <h3>⏰ À relancer <span id="count-followup" class="pill-count">0</span></h3>
+        <p class="muted small">Sans réponse depuis plus de 14 jours.</p>
+        <div id="col-followups" class="kanban-list"></div>
+      </div>
+    </div>
+    <details class="rejected-zone">
+      <summary>✗ Rejetées récemment <span id="count-rejected" class="pill-count">0</span></summary>
+      <div id="col-rejected" class="kanban-list rejected-list"></div>
+    </details>
+  </section>
+
+  <!-- ════════ Onglet Statistiques ════════ -->
+  <section id="tab-stats" class="tab" hidden>
+    <header class="page-head">
+      <h1>Statistiques</h1>
+      <p class="muted">Votre activité de recherche d'emploi en un coup d'œil.</p>
+    </header>
+    <div id="stats-counters" class="counters"></div>
+    <div class="stats-row">
+      <div class="card chart-card">
+        <h3>Candidatures par semaine</h3>
+        <div id="chart-weekly" class="bar-chart"></div>
+      </div>
+      <div class="card chart-card">
+        <h3>Candidatures par source</h3>
+        <div id="chart-sources" class="hbar-chart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ Onglet Réglages ════════ -->
+  <section id="tab-settings" class="tab" hidden>
+    <header class="page-head">
+      <h1>Réglages</h1>
+      <p class="muted">Les clés sont stockées dans le fichier <code>.env</code> local (jamais envoyées ailleurs). Champ vide = valeur inchangée.</p>
+    </header>
+
+    <div class="card settings-card">
+      <h3>Intelligence artificielle</h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-provider">Provider</label>
+          <select id="s-provider" data-key="PROVIDER">
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="ollama">Ollama (local, gratuit)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-anthropic-key">Clé API Anthropic <span class="set-hint" data-hint="ANTHROPIC_API_KEY"></span></label>
+          <input id="s-anthropic-key" type="password" data-key="ANTHROPIC_API_KEY" placeholder="sk-ant-…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-anthropic-model">Modèle Anthropic <span class="set-hint" data-hint="ANTHROPIC_MODEL"></span></label>
+          <input id="s-anthropic-model" type="text" data-key="ANTHROPIC_MODEL" placeholder="claude-fable-5">
+        </div>
+        <div class="field">
+          <label for="s-ollama-url">URL Ollama <span class="set-hint" data-hint="OLLAMA_BASE_URL"></span></label>
+          <input id="s-ollama-url" type="text" data-key="OLLAMA_BASE_URL" placeholder="http://localhost:11434">
+        </div>
+        <div class="field">
+          <label for="s-ollama-model">Modèle Ollama <span class="set-hint" data-hint="OLLAMA_MODEL"></span></label>
+          <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2">
+        </div>
+      </div>
+
+      <h3>Sources d'offres</h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-adzuna-id">Adzuna App ID <span class="set-hint" data-hint="ADZUNA_APP_ID"></span></label>
+          <input id="s-adzuna-id" type="text" data-key="ADZUNA_APP_ID" placeholder="developer.adzuna.com (gratuit)">
+        </div>
+        <div class="field">
+          <label for="s-adzuna-key">Adzuna App Key <span class="set-hint" data-hint="ADZUNA_APP_KEY"></span></label>
+          <input id="s-adzuna-key" type="password" data-key="ADZUNA_APP_KEY" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-ft-id">France Travail Client ID <span class="set-hint" data-hint="FRANCE_TRAVAIL_CLIENT_ID"></span></label>
+          <input id="s-ft-id" type="text" data-key="FRANCE_TRAVAIL_CLIENT_ID" placeholder="francetravail.io (gratuit)">
+        </div>
+        <div class="field">
+          <label for="s-ft-secret">France Travail Secret <span class="set-hint" data-hint="FRANCE_TRAVAIL_CLIENT_SECRET"></span></label>
+          <input id="s-ft-secret" type="password" data-key="FRANCE_TRAVAIL_CLIENT_SECRET" autocomplete="off">
+        </div>
+      </div>
+
+      <h3>Intégrations</h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-notion-token">Token Notion <span class="set-hint" data-hint="NOTION_TOKEN"></span></label>
+          <input id="s-notion-token" type="password" data-key="NOTION_TOKEN" placeholder="secret_…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="s-notion-db">Base Notion (ID) <span class="set-hint" data-hint="NOTION_DATABASE_ID"></span></label>
+          <input id="s-notion-db" type="text" data-key="NOTION_DATABASE_ID" placeholder="32 caractères hexadécimaux">
+        </div>
+        <div class="field">
+          <label for="s-exclude">Mots-clés exclus par défaut <span class="set-hint" data-hint="EXCLUDE_KEYWORDS"></span></label>
+          <input id="s-exclude" type="text" data-key="EXCLUDE_KEYWORDS" placeholder="Ex : senior, freelance">
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button id="btn-save-settings" class="btn-primary">Enregistrer</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Modale lettre de motivation -->
+<div id="modal-overlay" class="modal-overlay" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title">Lettre de motivation</h2>
+      <button id="modal-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="letter-config">
+        <label>Ton de la lettre</label>
+        <div id="letter-tones" class="pills"></div>
+        <button id="btn-generate-letter" class="btn-primary">Générer la lettre</button>
+      </div>
+      <div id="letter-loading" class="letter-loading" hidden>
+        <span class="spinner"></span> Rédaction en cours… (15–30 s)
+      </div>
+      <div id="letter-result" hidden>
+        <div class="letter-section">
+          <div class="letter-section-head">
+            <h4>Email d'accompagnement</h4>
+            <button class="btn-ghost small" data-copy="email">Copier</button>
+          </div>
+          <p class="email-subject"><strong>Objet :</strong> <span id="letter-subject"></span></p>
+          <pre id="letter-email" class="letter-text"></pre>
+        </div>
+        <div class="letter-section">
+          <div class="letter-section-head">
+            <h4>Lettre</h4>
+            <button class="btn-ghost small" data-copy="letter">Copier</button>
+          </div>
+          <pre id="letter-body" class="letter-text"></pre>
+        </div>
+        <div class="letter-downloads">
+          <a id="letter-dl-txt" class="btn-ghost" download>⬇ .txt</a>
+          <a id="letter-dl-pdf" class="btn-ghost" download hidden>⬇ .pdf</a>
+          <span class="muted small">L'offre est marquée « postulée » dans votre historique.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
