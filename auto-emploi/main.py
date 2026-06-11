@@ -45,7 +45,7 @@ from job_scrapers import (
     AdzunaScraper,
 )
 from ai import JobMatcher, CoverLetterGenerator
-from ai.matcher import parse_exclude_keywords
+from ai.matcher import parse_exclude_keywords, EXPERIENCE_LEVEL_LABELS
 from ai.cover_letter import TONES
 from tracker import Tracker
 from integrations import notion_configured, export_to_notion, desktop_notify
@@ -61,6 +61,14 @@ STATUS_BADGE = {
     "applied":  "[green]✓[/green]",
     "rejected": "[red]✗[/red]",
 }
+
+EXPERIENCE_LEVELS: list[tuple[str, str]] = [
+    ("stage",    "Stage / Alternance"),
+    ("junior",   "Junior (0–2 ans)"),
+    ("confirme", "Confirmé (2–5 ans)"),
+    ("senior",   "Senior (5–10 ans)"),
+    ("expert",   "Expert (10+ ans)"),
+]
 
 SECTORS: list[tuple[str, str]] = [
     ("tech",       "Informatique / Tech / IA / Cybersécurité"),
@@ -296,6 +304,51 @@ def select_sectors(preselected: str = "") -> list[str]:
             console.print("[red]Numéros hors plage, réessayez.[/red]")
         except ValueError:
             console.print("[red]Format invalide. Exemple : 1,3  ou  all[/red]")
+
+
+# ─── Sélection du niveau d'expérience ────────────────────────────────────────
+
+def select_experience(preselected: str = "") -> str:
+    """Retourne le code niveau ('stage', 'junior', …) ou '' (pas de filtre)."""
+    if preselected:
+        valid = {k for k, _ in EXPERIENCE_LEVELS}
+        if preselected in valid:
+            label = next(label for k, label in EXPERIENCE_LEVELS if k == preselected)
+            console.print(f"[dim]Filtre expérience : {escape(label)}[/dim]")
+            return preselected
+        console.print(f"[yellow]Niveau inconnu : {escape(preselected)} — ignoré. Valeurs : {', '.join(k for k, _ in EXPERIENCE_LEVELS)}[/yellow]")
+        return ""
+
+    grid = Table.grid(padding=(0, 2))
+    grid.add_column(width=4, style="bold cyan")
+    grid.add_column(width=32)
+    for i, (_, label) in enumerate(EXPERIENCE_LEVELS, 1):
+        grid.add_row(f"{i}.", label)
+
+    console.print(Panel(
+        grid,
+        title="[bold cyan]Niveau d'expérience recherché[/bold cyan]",
+        subtitle="[dim]Numéro, 'all' ou Entrée = sans filtre[/dim]",
+        border_style="cyan",
+        padding=(1, 2),
+    ))
+
+    while True:
+        choice = Prompt.ask("[bold cyan]Niveau[/bold cyan]", default="all").strip().lower()
+        if choice in ("", "all", "0"):
+            console.print("[dim]Aucun filtre niveau d'expérience.[/dim]")
+            return ""
+        if choice == "q":
+            sys.exit(0)
+        try:
+            i = int(choice) - 1
+            if 0 <= i < len(EXPERIENCE_LEVELS):
+                key, label = EXPERIENCE_LEVELS[i]
+                console.print(f"[green]Niveau retenu : {escape(label)}[/green]")
+                return key
+            console.print(f"[red]Numéro hors plage (1–{len(EXPERIENCE_LEVELS)}).[/red]")
+        except ValueError:
+            console.print("[red]Format invalide. Entrez un numéro ou 'all'.[/red]")
 
 
 # ─── Sélection de la localisation ─────────────────────────────────────────────
@@ -999,7 +1052,7 @@ def show_stats() -> None:
 
 # ─── Mode veille ──────────────────────────────────────────────────────────────
 
-def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="") -> None:
+def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", experience="") -> None:
     """Relance la recherche à intervalle régulier et ne signale que les
     offres jamais vues. Notification desktop quand il y a du nouveau."""
     interval_min = max(15, min(1440, args.watch))
@@ -1020,7 +1073,8 @@ def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="") -
                 console.print("[dim]Aucune nouvelle offre depuis le dernier cycle.[/dim]")
             else:
                 matched = matcher.score_offers(
-                    new_offers, min_score=args.min_score, sectors=sectors, exclude=exclude
+                    new_offers, min_score=args.min_score, sectors=sectors,
+                    exclude=exclude, experience_level=experience,
                 )
                 # Tout ce qui a été analysé est marqué vu : pas de re-scoring au prochain cycle
                 tracker.mark_many(new_offers, "seen")
@@ -1104,6 +1158,12 @@ def parse_args():
         help="Exporter les offres retenues vers Notion (NOTION_TOKEN + NOTION_DATABASE_ID requis)",
     )
     parser.add_argument(
+        "--experience", default="",
+        choices=["", *[k for k, _ in EXPERIENCE_LEVELS]],
+        metavar="{" + ",".join(k for k, _ in EXPERIENCE_LEVELS) + "}",
+        help="Niveau d'expérience : stage, junior, confirme, senior, expert (sinon demandé interactivement)",
+    )
+    parser.add_argument(
         "--watch", type=int, default=0, metavar="MINUTES",
         help="Mode veille : relance la recherche toutes les N minutes (15-1440) et notifie les nouvelles offres. Requiert --query.",
     )
@@ -1181,6 +1241,10 @@ def main():
     else:
         location = select_location()
 
+    # 6. Niveau d'expérience (modifiable en session avec 'e')
+    console.print("\n[bold]5. Niveau d'expérience recherché[/bold]")
+    experience = select_experience(args.experience)
+
     # Matcher initialisé une seule fois (CV en mémoire)
     matcher = JobMatcher(cv_text)
 
@@ -1210,7 +1274,7 @@ def main():
         if not args.query.strip():
             console.print("[red]--watch nécessite --query (mode non interactif).[/red]")
             sys.exit(1)
-        watch_loop(args, sources, sectors, matcher, tracker, exclude, location)
+        watch_loop(args, sources, sectors, matcher, tracker, exclude, location, experience)
         return
 
     # 5. Boucle de recherche
@@ -1219,7 +1283,8 @@ def main():
         "\n[dim]À tout moment : tapez [bold]x[/bold] pour quitter, "
         "[bold]s[/bold] pour changer les sources, "
         "[bold]f[/bold] pour changer les filtres secteur, "
-        "[bold]v[/bold] pour changer la localisation.[/dim]"
+        "[bold]v[/bold] pour changer la localisation, "
+        "[bold]e[/bold] pour changer le niveau d'expérience.[/dim]"
     )
 
     while True:
@@ -1243,6 +1308,9 @@ def main():
                 continue
             if raw.lower() == "v":
                 location = select_location()
+                continue
+            if raw.lower() == "e":
+                experience = select_experience("")
                 continue
             query = raw
             if not query:
@@ -1281,7 +1349,8 @@ def main():
             progress.add_task("", total=None)
             try:
                 matched_offers = matcher.score_offers(
-                    all_offers, min_score=args.min_score, sectors=sectors, exclude=exclude
+                    all_offers, min_score=args.min_score, sectors=sectors,
+                    exclude=exclude, experience_level=experience,
                 )
             except Exception as e:
                 if "AuthenticationError" in type(e).__name__:

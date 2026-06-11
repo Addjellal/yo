@@ -8,6 +8,32 @@ from ._client import LLMClient
 
 BATCH_SIZE = 10
 
+# Libellés affichés dans le prompt LLM
+EXPERIENCE_LEVEL_LABELS: dict[str, str] = {
+    "stage":    "Stage / Alternance (débutant, pas encore entré dans la vie active)",
+    "junior":   "Junior (0–2 ans d'expérience)",
+    "confirme": "Confirmé (2–5 ans d'expérience)",
+    "senior":   "Senior (5–10 ans d'expérience)",
+    "expert":   "Expert (10+ ans d'expérience)",
+}
+
+# Mots dans le TITRE qui trahissent un niveau trop élevé pour le candidat
+_EXP_TOO_HIGH_IN_TITLE: dict[str, list[str]] = {
+    "stage":  ["confirmé", "sénior", "senior", "expert", "directeur", "manager", "lead"],
+    "junior": ["expert", "staff engineer", "principal engineer"],
+}
+# Mots dans le TITRE ou CONTRAT qui trahissent un niveau trop bas
+_EXP_TOO_LOW_IN_TITLE: dict[str, list[str]] = {
+    "senior": ["stagiaire", "alternant", "apprenti"],
+    "expert": ["stagiaire", "alternant", "apprenti", "junior"],
+}
+# Mots dans le type de CONTRAT qui écartent les offres de stage/alternance
+_EXP_TOO_LOW_CONTRACT: dict[str, list[str]] = {
+    "confirme": ["stage", "alternance", "apprentissage"],
+    "senior":   ["stage", "alternance", "apprentissage"],
+    "expert":   ["stage", "alternance", "apprentissage"],
+}
+
 # Mots vides FR/EN les plus courants — exclus du pré-filtre keyword
 _STOPWORDS = {
     # Français
@@ -87,6 +113,7 @@ class JobMatcher:
     def __init__(self, cv_text: str):
         self.cv_text = cv_text
         self._sectors: list[str] = []
+        self._experience_level: str = ""
         self._rejected_examples: list[str] = []
         self._llm = LLMClient()
         # Vocabulaire CV : mots significatifs avec leur fréquence
@@ -111,6 +138,33 @@ class JobMatcher:
                 kept.append(offer)
         return kept, dropped
 
+    def _experience_filter(self, offers: list[JobOffer]) -> tuple[list[JobOffer], int]:
+        """Écarte les offres incompatibles avec le niveau d'expérience souhaité.
+        Seuls les cas non-ambigus (titre/contrat explicites) sont filtrés ;
+        les cas nuancés sont laissés au scoring LLM."""
+        level = self._experience_level
+        if not level:
+            return offers, 0
+        kept: list[JobOffer] = []
+        dropped = 0
+        too_high = _EXP_TOO_HIGH_IN_TITLE.get(level, [])
+        too_low_title = _EXP_TOO_LOW_IN_TITLE.get(level, [])
+        too_low_contract = _EXP_TOO_LOW_CONTRACT.get(level, [])
+        for offer in offers:
+            title_lower = offer.title.lower()
+            contract_lower = (offer.contract_type or "").lower()
+            if too_high and any(m in title_lower for m in too_high):
+                dropped += 1
+                continue
+            if too_low_title and any(m in title_lower for m in too_low_title):
+                dropped += 1
+                continue
+            if too_low_contract and any(m in contract_lower for m in too_low_contract):
+                dropped += 1
+                continue
+            kept.append(offer)
+        return kept, dropped
+
     def _prefilter(self, offers: list[JobOffer]) -> tuple[list[JobOffer], int]:
         """Heuristique rapide : garde les offres ayant un overlap minimal de mots-clés
         avec le CV. Retourne (offres_retenues, nombre_filtrées)."""
@@ -133,15 +187,22 @@ class JobMatcher:
         min_score: int = 6,
         sectors: list[str] | None = None,
         exclude: list[str] | None = None,
+        experience_level: str = "",
     ) -> list[JobOffer]:
         self._sectors = sectors or []
+        self._experience_level = experience_level or ""
 
         # 1. Mots-clés éliminatoires (gratuit, instantané)
         offers, excluded = self._exclude_filter(offers, exclude or [])
         if excluded:
             console.print(f"[dim]Mots-clés exclus : {excluded} offre(s) écartée(s).[/dim]")
 
-        # 2. Pré-filtre keyword (économise les appels LLM)
+        # 2. Filtre niveau d'expérience (avant appel LLM)
+        offers, exp_dropped = self._experience_filter(offers)
+        if exp_dropped:
+            console.print(f"[dim]Niveau d'expérience : {exp_dropped} offre(s) incompatible(s) écartée(s).[/dim]")
+
+        # 3. Pré-filtre keyword (économise les appels LLM)
         offers, dropped = self._prefilter(offers)
         if dropped:
             console.print(f"[dim]Pré-filtre : {dropped} offre(s) clairement hors-sujet écartée(s).[/dim]")
@@ -185,6 +246,15 @@ class JobMatcher:
                 f"<offres_rejetees>\n{listed}\n</offres_rejetees>\n"
                 "Pénalise de 2-3 points les offres très similaires à celles-ci.\n"
             )
+        experience_instruction = ""
+        if self._experience_level and self._experience_level in EXPERIENCE_LEVEL_LABELS:
+            exp_label = EXPERIENCE_LEVEL_LABELS[self._experience_level]
+            experience_instruction = (
+                f"\nNIVEAU D'EXPÉRIENCE RECHERCHÉ : {exp_label}. "
+                "Pénalise fortement (score ≤ 3) les offres dont le niveau requis ne correspond "
+                "pas (ex : offre senior si le candidat cherche un stage, ou stage si le "
+                "candidat est expert). Mentionne dans les raisons si le niveau correspond.\n"
+            )
         return (
             f"Voici {len(batch)} offres d'emploi à analyser. Pour chaque offre, donne :\n"
             f"- score : correspondance de 0 à 10 (10 = correspondance parfaite)\n"
@@ -192,7 +262,7 @@ class JobMatcher:
             f"- strengths : quelles expériences/compétences PRÉCISES du CV répondent "
             f"à quelles exigences PRÉCISES de l'offre (1-2 phrases)\n"
             f"- gaps : ce qui manque au candidat pour ce poste, ou « aucune lacune "
-            f"majeure » (1 phrase){sector_instruction}{rejected_instruction}\n"
+            f"majeure » (1 phrase){sector_instruction}{experience_instruction}{rejected_instruction}\n"
             'Réponds avec un objet JSON : {"results": [{"job_index": 0, "score": 8, '
             '"reasons": "...", "strengths": "...", "gaps": "..."}, ...]}\n'
             "Tous les champs texte sont des chaînes de caractères, pas des listes.\n\n"
