@@ -66,6 +66,10 @@ class JobOffer:
     match_reasons: Optional[str] = None
     match_strengths: Optional[str] = None  # ce que le CV apporte précisément
     match_gaps: Optional[str] = None       # ce qui manque pour ce poste
+    # Matching multi-CV : résultat par CV {label: {score, reasons, strengths, gaps}}
+    # et label du CV au meilleur score (les champs match_* portent ce meilleur résultat)
+    cv_scores: Optional[dict] = None
+    best_cv: Optional[str] = None
 
     def __post_init__(self):
         # Sanitisation systématique : quel que soit le scraper, aucune donnée

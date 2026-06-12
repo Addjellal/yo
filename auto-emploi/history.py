@@ -57,6 +57,19 @@ def _offer_to_dict(offer: JobOffer) -> dict:
     d["reasons"] = offer.match_reasons or ""
     d["strengths"] = offer.match_strengths or ""
     d["gaps"] = offer.match_gaps or ""
+    if offer.best_cv:
+        d["best_cv"] = str(offer.best_cv)[:80]
+    if isinstance(offer.cv_scores, dict) and offer.cv_scores:
+        d["cv_scores"] = {
+            str(label)[:80]: {
+                "score": max(0, min(10, int(r.get("score", 0)))) if isinstance(r.get("score"), int) else 0,
+                "reasons": str(r.get("reasons", ""))[:400],
+                "strengths": str(r.get("strengths", ""))[:600],
+                "gaps": str(r.get("gaps", ""))[:400],
+            }
+            for label, r in list(offer.cv_scores.items())[:6]
+            if isinstance(r, dict)
+        }
     return d
 
 
@@ -85,6 +98,19 @@ def _offer_from_dict(d: dict) -> JobOffer | None:
     offer.match_reasons = str(d.get("reasons", ""))[:400] or None
     offer.match_strengths = str(d.get("strengths", ""))[:600] or None
     offer.match_gaps = str(d.get("gaps", ""))[:400] or None
+    offer.best_cv = str(d.get("best_cv", ""))[:80] or None
+    raw_scores = d.get("cv_scores")
+    if isinstance(raw_scores, dict) and raw_scores:
+        offer.cv_scores = {
+            str(label)[:80]: {
+                "score": max(0, min(10, int(r.get("score", 0)))) if isinstance(r.get("score"), int) else 0,
+                "reasons": str(r.get("reasons", ""))[:400],
+                "strengths": str(r.get("strengths", ""))[:600],
+                "gaps": str(r.get("gaps", ""))[:400],
+            }
+            for label, r in list(raw_scores.items())[:6]
+            if isinstance(r, dict)
+        }
     return offer
 
 

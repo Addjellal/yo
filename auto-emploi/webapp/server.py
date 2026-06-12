@@ -29,13 +29,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from config import config, save_to_env
-from cv_parser import parse_cv
+from cv_parser import parse_cv, _cache_path
 from tracker import Tracker
 from history import SessionStore
+from cv_store import CVStore, list_cv_files
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
-from ai import JobMatcher, CoverLetterGenerator
-from ai.matcher import parse_exclude_keywords
-from ai.cover_letter import TONES
+from ai import CoverLetterGenerator
+from ai.matcher import parse_exclude_keywords, score_offers_multi
+from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
+from ai.cv_extract import CVExtractor
 from integrations import notion_configured, export_to_notion
 from job_scrapers.base import JobOffer
 
@@ -59,6 +61,7 @@ AUTH_TOKEN = secrets.token_urlsafe(32)
 _STATIC_FILES = {
     "style.css": "text/css; charset=utf-8",
     "app.js": "application/javascript; charset=utf-8",
+    "fonts/space-grotesk.woff2": "font/woff2",
 }
 
 _MAX_BODY_DEFAULT = 1 * 1024 * 1024        # 1 Mo pour les requêtes JSON
@@ -81,14 +84,15 @@ _COUNTRY_CODES = {c for c, _ in COUNTRIES}
 class _Job:
     def __init__(self, kind: str):
         self.id = uuid.uuid4().hex
-        self.kind = kind                  # "scan" | "letter"
+        self.kind = kind                  # "scan" | "letter" | "cv"
         self.status = "running"           # running | done | error
         self.error = ""
         self.log: list[str] = []
         self.offers: list[JobOffer] = []  # résultats d'un scan
-        self.cv_text = ""                 # CV parsé (réutilisé pour les lettres)
+        self.cv_text = ""                 # CV fusionné (réutilisé pour les lettres)
+        self.cv_texts: dict[str, str] = {}  # {label → texte} (matching multi-CV)
         self.query = ""
-        self.result: dict = {}            # résultat d'une lettre
+        self.result: dict = {}            # résultat d'une lettre / d'une analyse CV
         self.created = time.time()
         self._lock = threading.Lock()
 
@@ -108,7 +112,9 @@ _TRACKER_LOCK = threading.Lock()   # sérialise les écritures du tracker
 
 _tracker: Tracker | None = None
 _store: SessionStore | None = None
+_cv_store: CVStore | None = None
 _STORE_LOCK = threading.Lock()
+_CV_LOCK = threading.Lock()        # sérialise les accès au registre des CV
 
 
 def _get_tracker() -> Tracker:
@@ -123,6 +129,13 @@ def _get_store() -> SessionStore:
     if _store is None:
         _store = SessionStore(Path(config.output_dir) / ".sessions.json")
     return _store
+
+
+def _get_cv_store() -> CVStore:
+    global _cv_store
+    if _cv_store is None:
+        _cv_store = CVStore(Path(config.output_dir) / ".cvs.json")
+    return _cv_store
 
 
 def _register_job(job: _Job) -> None:
@@ -143,7 +156,7 @@ def _get_job(job_id: str) -> _Job | None:
 # ─── Sérialisation des offres pour le front ─────────────────────────────────
 
 def _offer_dict(offer: JobOffer, index: int, status: str = "new") -> dict:
-    return {
+    d = {
         "index": index,
         "title": offer.title,
         "company": offer.company,
@@ -159,6 +172,16 @@ def _offer_dict(offer: JobOffer, index: int, status: str = "new") -> dict:
         "gaps": offer.match_gaps or "",
         "status": status,
     }
+    if offer.best_cv and isinstance(offer.cv_scores, dict) and offer.cv_scores:
+        d["best_cv"] = offer.best_cv
+        d["cv_scores"] = [
+            {"cv": label, "score": r.get("score", 0), "reasons": r.get("reasons", ""),
+             "strengths": r.get("strengths", ""), "gaps": r.get("gaps", "")}
+            for label, r in sorted(offer.cv_scores.items(),
+                                   key=lambda kv: -kv[1].get("score", 0))
+            if isinstance(r, dict)
+        ]
+    return d
 
 
 def _entry_dict(key: str, entry: dict) -> dict:
@@ -174,32 +197,82 @@ def _entry_dict(key: str, entry: dict) -> dict:
     }
 
 
-# ─── Liste des CV disponibles ────────────────────────────────────────────────
-
-_EXCLUDED_TXT = {"requirements.txt", "robots.txt"}
-
+# ─── Liste des CV disponibles + registre ─────────────────────────────────────
 
 def _list_cv_files() -> list[str]:
-    files = []
-    for path in sorted(_PROJECT_DIR.iterdir()):
-        if not path.is_file() or path.name.startswith("."):
-            continue
-        if path.suffix.lower() not in _CV_EXTENSIONS:
-            continue
-        if path.name.lower() in _EXCLUDED_TXT:
-            continue
-        files.append(path.name)
-    return files
+    return list_cv_files(_PROJECT_DIR)
+
+
+def _cv_payload(entry: dict) -> dict:
+    """Entrée du registre sérialisée pour le front : profil effectif fusionné
+    (manuel > IA) + provenance par section."""
+    profile, sources = CVStore.effective_profile(entry)
+    return {
+        "id": entry.get("id", ""),
+        "filename": entry.get("filename", ""),
+        "label": entry.get("label", ""),
+        "added": entry.get("added", ""),
+        "analyzed": entry.get("analyzed", ""),
+        "file_exists": (_PROJECT_DIR / entry.get("filename", "")).is_file(),
+        "profile": profile,
+        "sources": sources,
+        "overrides": entry.get("overrides") or {},
+        "extracted": entry.get("profile") or {},
+    }
+
+
+def _cvs_payload() -> list[dict]:
+    """CV actifs, registre synchronisé avec les fichiers du dossier projet."""
+    with _CV_LOCK:
+        store = _get_cv_store()
+        store.sync(_list_cv_files())
+        return [_cv_payload(e) for e in store.list_cvs()]
+
+
+def _load_cv_texts(names: list[str]) -> dict[str, str]:
+    """Parse chaque CV et retourne {label → texte effectif} (corrections
+    manuelles incluses)."""
+    texts: dict[str, str] = {}
+    for name in names:
+        raw = parse_cv(str(_PROJECT_DIR / name))
+        with _CV_LOCK:
+            entry = _get_cv_store().register(name)
+            label = entry.get("label") or name
+            if label in texts:
+                label = name
+            texts[label] = _get_cv_store().effective_text(entry, raw)
+    return texts
+
+
+def _cv_history_display(criteria_cv: str) -> str:
+    """Libellé du/des CV d'une session : « CV supprimé : x » si disparu."""
+    names = [Path(n.strip()).name for n in str(criteria_cv or "").split(",") if n.strip()]
+    if not names:
+        return ""
+    with _CV_LOCK:
+        store = _get_cv_store()
+        return " + ".join(
+            store.history_label(n, (_PROJECT_DIR / n).is_file()) for n in names
+        )
+
+
+def _style_examples() -> dict[str, list[str]] | None:
+    """Exemples few-shot depuis les lettres passées, si LETTER_EXAMPLES=on."""
+    if config.letter_examples != "on":
+        return None
+    with _STORE_LOCK:
+        examples = recent_letter_examples(_get_store())
+    return examples if any(examples.values()) else None
 
 
 # ─── Exécution d'un scan (thread) ────────────────────────────────────────────
 
 def _run_scan(job: _Job, p: dict) -> None:
     try:
-        job.add_log(f"Lecture du CV : {p['cv']}")
-        cv_text = parse_cv(str(_PROJECT_DIR / p["cv"]))
-        job.cv_text = cv_text
-        job.add_log(f"CV parsé ({len(cv_text)} caractères)")
+        job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
+        job.cv_texts = _load_cv_texts(p["cvs"])
+        job.cv_text = merge_cv_texts(job.cv_texts)
+        job.add_log(f"{len(job.cv_texts)} CV parsé(s) ({len(job.cv_text)} caractères)")
 
         config.country = p["country"]
         tracker = _get_tracker()
@@ -235,20 +308,21 @@ def _run_scan(job: _Job, p: dict) -> None:
             job.status = "done"
             return
 
-        job.add_log(f"Analyse IA de {len(all_offers)} offres (score min {p['min_score']}/10)…")
-        matcher = JobMatcher(cv_text)
+        multi = f" × {len(job.cv_texts)} CV" if len(job.cv_texts) > 1 else ""
+        job.add_log(f"Analyse IA de {len(all_offers)} offres{multi} (score min {p['min_score']}/10)…")
         with _TRACKER_LOCK:
             rejections = tracker.recent_rejections()
         if rejections:
-            matcher.set_rejected_examples(rejections)
             job.add_log(f"Préférences : {len(rejections)} rejet(s) pris en compte")
 
-        matched = matcher.score_offers(
+        matched = score_offers_multi(
+            job.cv_texts,
             all_offers,
             min_score=p["min_score"],
             sectors=p["sectors"],
             exclude=p["exclude"],
             experience_level=p["experience"],
+            rejected_examples=rejections,
         )
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
@@ -274,7 +348,7 @@ def _session_criteria(p: dict) -> dict:
     label_to_key = {label: key for key, label in SECTORS}
     return {
         "query": p["query"],
-        "cv": p["cv"],
+        "cv": ",".join(p["cvs"]),
         "country": p["country"],
         "location": p["location"],
         "sectors": [label_to_key[s] for s in p["sectors"] if s in label_to_key],
@@ -286,11 +360,11 @@ def _session_criteria(p: dict) -> dict:
 
 
 def _run_rescore(job: _Job, p: dict) -> None:
-    """Re-score le CV contre toutes les offres connues, sans scraper."""
+    """Re-score le(s) CV contre toutes les offres connues, sans scraper."""
     try:
-        job.add_log(f"Lecture du CV : {p['cv']}")
-        cv_text = parse_cv(str(_PROJECT_DIR / p["cv"]))
-        job.cv_text = cv_text
+        job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
+        job.cv_texts = _load_cv_texts(p["cvs"])
+        job.cv_text = merge_cv_texts(job.cv_texts)
 
         with _STORE_LOCK:
             offers = _get_store().all_offers()
@@ -306,18 +380,17 @@ def _run_rescore(job: _Job, p: dict) -> None:
 
         job.add_log(f"Re-scoring de {len(offers)} offre(s) — pré-filtre code pur "
                     f"(top {RESCORE_TOP_K}) puis pré-scoring IA…")
-        matcher = JobMatcher(cv_text)
         with _TRACKER_LOCK:
             rejections = tracker.recent_rejections()
-        if rejections:
-            matcher.set_rejected_examples(rejections)
 
-        matched = matcher.score_offers(
+        matched = score_offers_multi(
+            job.cv_texts,
             offers,
             min_score=p["min_score"],
             sectors=p["sectors"],
             exclude=p["exclude"],
             experience_level=p["experience"],
+            rejected_examples=rejections,
             top_k=RESCORE_TOP_K,
             two_stage=True,
         )
@@ -349,7 +422,11 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
             applied_titles = [
                 str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
             ]
-        generator = CoverLetterGenerator(scan_job.cv_text, applied_history=applied_titles)
+        generator = CoverLetterGenerator(
+            scan_job.cv_text,
+            applied_history=applied_titles,
+            style_examples=_style_examples(),
+        )
         result = generator.generate(offer, tone=tone)
         txt_path, pdf_path = generator.save(offer, result)
         pdf_name = pdf_path.name if pdf_path.exists() else ""
@@ -373,16 +450,52 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
         job.status = "error"
 
 
+def _run_cv_analyze(job: _Job, cv_id: str) -> None:
+    """Extraction IA du profil structuré d'un CV (page « Mes CV »)."""
+    try:
+        with _CV_LOCK:
+            entry = _get_cv_store().get(cv_id)
+        if entry is None:
+            raise ValueError("CV introuvable dans le registre")
+        filename = entry.get("filename", "")
+        job.add_log(f"Lecture de {filename}…")
+        raw = parse_cv(str(_PROJECT_DIR / filename))
+        job.add_log(f"CV parsé ({len(raw)} caractères) — extraction IA en cours…")
+        profile = CVExtractor().extract(raw)
+        with _CV_LOCK:
+            store = _get_cv_store()
+            store.set_profile(entry["id"], profile)
+            fresh = store.get(entry["id"])
+        job.result = {"cv": _cv_payload(fresh)} if fresh else {}
+        job.add_log("Profil extrait.")
+        job.status = "done"
+    except Exception as e:
+        job.error = str(e)[:500]
+        job.status = "error"
+
+
 # ─── Validation des paramètres de scan ───────────────────────────────────────
+
+def _validate_cvs(body: dict) -> list[str]:
+    """Liste `cvs` (cases à cocher) avec repli sur `cv` (ancien format) :
+    seuls les fichiers réellement présents sont retenus, 5 maximum."""
+    raw = body.get("cvs")
+    if isinstance(raw, list):
+        names = [str(c).strip() for c in raw if isinstance(c, str)]
+    else:
+        names = [str(body.get("cv", "")).strip()]
+    files = set(_list_cv_files())
+    return [n for n in names if n in files][:5]
+
 
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     query = str(body.get("query", "")).strip()[:200]
     if not query:
         return None, "La recherche est vide."
 
-    cv = str(body.get("cv", "")).strip()
-    if cv not in _list_cv_files():
-        return None, "CV introuvable : déposez un fichier PDF/DOCX/TXT dans le dossier du projet."
+    cvs = _validate_cvs(body)
+    if not cvs:
+        return None, "CV introuvable : importez un fichier PDF/DOCX/TXT ou cochez au moins un CV."
 
     country = str(body.get("country", "fr")).strip().lower()
     if country not in _COUNTRY_CODES:
@@ -415,7 +528,7 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
 
     return {
         "query": query,
-        "cv": cv,
+        "cvs": cvs,
         "country": country,
         "location": str(body.get("location", "")).strip()[:120],
         "sources": sources,
@@ -430,9 +543,9 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
 
 def _validate_rescore_params(body: dict) -> tuple[dict | None, str]:
     """Paramètres du re-scoring : comme un scan, sans requête ni sources."""
-    cv = str(body.get("cv", "")).strip()
-    if cv not in _list_cv_files():
-        return None, "CV introuvable : déposez un fichier PDF/DOCX/TXT dans le dossier du projet."
+    cvs = _validate_cvs(body)
+    if not cvs:
+        return None, "CV introuvable : importez un fichier PDF/DOCX/TXT ou cochez au moins un CV."
 
     raw_sectors = body.get("sectors") or []
     sectors = [_SECTOR_LABELS[s] for s in raw_sectors if isinstance(s, str) and s in _SECTOR_LABELS]
@@ -448,7 +561,7 @@ def _validate_rescore_params(body: dict) -> tuple[dict | None, str]:
     )
     return {
         "query": "",
-        "cv": cv,
+        "cvs": cvs,
         "country": config.country,
         "location": "",
         "sources": [],
@@ -487,6 +600,7 @@ _SETTINGS_KEYS: list[tuple[str, bool]] = [
     ("AI_MATCH_MODEL", False),
     ("AI_LETTER_MODEL", False),
     ("AI_FALLBACK", False),
+    ("LETTER_EXAMPLES", False),
     ("DEFAULT_SOURCES", False),
     ("DEFAULT_SECTORS", False),
     ("DEFAULT_LOCATION", False),
@@ -643,6 +757,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(_stats_payload())
         elif path == "/api/sessions":
             self._api_sessions()
+        elif path == "/api/cvs":
+            self._json({"cvs": _cvs_payload()})
         elif path == "/api/download":
             self._api_download(query.get("file", [""])[0])
         else:
@@ -675,6 +791,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_settings()
         elif path == "/api/cv":
             self._api_cv_upload()
+        elif path == "/api/cv-analyze":
+            self._api_cv_analyze()
+        elif path == "/api/cv-update":
+            self._api_cv_update()
+        elif path == "/api/cv-delete":
+            self._api_cv_delete()
         elif path == "/api/export":
             self._api_export()
         elif path == "/api/notion":
@@ -747,6 +869,11 @@ class _Handler(BaseHTTPRequestHandler):
             "tones": [{"key": k, "label": v} for k, v in TONES.items()],
             "sources": sources,
             "cv_files": _list_cv_files(),
+            "cvs": [
+                {"id": c["id"], "filename": c["filename"], "label": c["label"],
+                 "analyzed": bool(c["analyzed"])}
+                for c in _cvs_payload()
+            ],
             "notion": notion_configured(),
             "min_score": config.min_match_score,
             "max_per_source": config.max_jobs_per_source,
@@ -791,7 +918,7 @@ class _Handler(BaseHTTPRequestHandler):
                 payload["offers"] = [
                     _offer_dict(o, i, tracker.status_of(o)) for i, o in enumerate(job.offers)
                 ]
-        if job.status == "done" and job.kind == "letter":
+        if job.status == "done" and job.kind in ("letter", "cv"):
             payload["result"] = job.result
         self._json(payload)
 
@@ -819,7 +946,8 @@ class _Handler(BaseHTTPRequestHandler):
             letters = store.list_letters()
         for s in sessions:
             s["summary"] = _criteria_summary(s.get("criteria", {}))
-        self._json({"sessions": sessions[:100], "letters": letters[:50]})
+            s["cv_display"] = _cv_history_display(s.get("criteria", {}).get("cv", ""))
+        self._json({"sessions": sessions[:100], "letters": letters[:100]})
 
     def _api_session_load(self):
         """Recharge une session passée comme un job terminé : le suivi, les
@@ -838,11 +966,14 @@ class _Handler(BaseHTTPRequestHandler):
         job = _Job("scan")
         job.offers = offers
         job.query = session.get("criteria", {}).get("query", "")
-        # CV de la session : reparsé si le fichier existe encore (pour les lettres)
-        cv_name = session.get("criteria", {}).get("cv", "")
-        if cv_name in _list_cv_files():
+        # CV de la session : reparsés si les fichiers existent encore (lettres)
+        criteria_cv = session.get("criteria", {}).get("cv", "")
+        names = [n.strip() for n in criteria_cv.split(",") if n.strip()]
+        available = [n for n in names if n in _list_cv_files()]
+        if available:
             try:
-                job.cv_text = parse_cv(str(_PROJECT_DIR / cv_name))
+                job.cv_texts = _load_cv_texts(available)
+                job.cv_text = merge_cv_texts(job.cv_texts)
             except (FileNotFoundError, ValueError):
                 pass
         job.status = "done"
@@ -1006,7 +1137,89 @@ class _Handler(BaseHTTPRequestHandler):
         stem = re.sub(r"[^A-Za-z0-9_-]", "_", Path(raw_name).stem)[:50] or "cv"
         target = _PROJECT_DIR / f"{stem}{ext}"
         target.write_bytes(data)
-        self._json({"ok": True, "name": target.name, "cv_files": _list_cv_files()})
+        with _CV_LOCK:
+            entry = _get_cv_store().register(target.name)
+        self._json({
+            "ok": True, "name": target.name, "cv_files": _list_cv_files(),
+            "cv_id": entry.get("id", ""), "label": entry.get("label", ""),
+        })
+
+    def _api_cv_analyze(self):
+        """Lance l'extraction IA du profil structuré d'un CV (asynchrone)."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        cv_id = str(body.get("id", ""))[:40]
+        with _CV_LOCK:
+            entry = _get_cv_store().get(cv_id)
+        if entry is None:
+            self._error("CV introuvable", 404)
+            return
+        if not (_PROJECT_DIR / entry.get("filename", "")).is_file():
+            self._error("Le fichier de ce CV n'existe plus dans le dossier du projet.", 404)
+            return
+        job = _Job("cv")
+        _register_job(job)
+        threading.Thread(target=_run_cv_analyze, args=(job, entry["id"]), daemon=True).start()
+        self._json({"job_id": job.id})
+
+    def _api_cv_update(self):
+        """Enregistre le label et/ou les corrections manuelles d'un CV.
+        Les sections envoyées remplacent les overrides existants : une section
+        absente revient à l'extraction IA."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        cv_id = str(body.get("id", ""))[:40]
+        with _CV_LOCK:
+            store = _get_cv_store()
+            entry = store.get(cv_id)
+            if entry is None:
+                self._error("CV introuvable", 404)
+                return
+            label = body.get("label")
+            if isinstance(label, str) and label.strip():
+                store.set_label(entry["id"], label)
+            overrides = body.get("overrides")
+            if isinstance(overrides, dict):
+                store.set_overrides(entry["id"], overrides)
+            fresh = store.get(entry["id"])
+        self._json({"ok": True, "cv": _cv_payload(fresh)})
+
+    def _api_cv_delete(self):
+        """Suppression définitive : fichier + cache effacés, tombstone dans le
+        registre — l'historique affichera « CV supprimé : x »."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        cv_id = str(body.get("id", ""))[:40]
+        with _CV_LOCK:
+            entry = _get_cv_store().mark_deleted(cv_id)
+        if entry is None:
+            self._error("CV introuvable", 404)
+            return
+        # Fichier du projet (nom nu, résolution vérifiée : jamais en dehors)
+        target = (_PROJECT_DIR / Path(entry.get("filename", "")).name).resolve()
+        if target.parent == _PROJECT_DIR and target.is_file():
+            try:
+                target.unlink()
+            except OSError:
+                pass
+            cache = _cache_path(target)
+            if cache.is_file():
+                try:
+                    cache.unlink()
+                except OSError:
+                    pass
+        self._json({
+            "ok": True,
+            "label": entry.get("label", ""),
+            "cvs": _cvs_payload(),
+            "cv_files": _list_cv_files(),
+        })
 
     def _api_export(self):
         body = self._read_body()

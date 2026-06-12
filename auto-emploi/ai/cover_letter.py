@@ -26,6 +26,81 @@ SYSTEM_PROMPT = (
     "CV du candidat :\n{cv}"
 )
 
+# ─── Skills de rédaction (prompts/skills/*.md, éditables par l'utilisateur) ───
+
+_SKILLS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "skills"
+SKILL_FILES = {"fr": "lettre_fr.md", "en": "cover_letter_en.md"}
+_MAX_SKILL_CHARS = 8000
+
+
+def load_skill(language: str) -> str:
+    """Guide de rédaction pour la langue donnée ('fr' ou 'en'), relu à chaque
+    appel : l'utilisateur peut éditer prompts/skills/*.md sans redémarrer.
+    Retourne '' si le fichier est absent."""
+    name = SKILL_FILES.get(language, SKILL_FILES["fr"])
+    try:
+        return (_SKILLS_DIR / name).read_text(encoding="utf-8").strip()[:_MAX_SKILL_CHARS]
+    except OSError:
+        return ""
+
+
+def merge_cv_texts(cv_texts: dict[str, str]) -> str:
+    """Fusionne plusieurs CV en un document unique pour le LLM, chaque CV
+    délimité et nommé (provenance connue → pas de doublons ni contradictions)."""
+    items = [(label, text) for label, text in cv_texts.items() if text]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0][1]
+    parts = [
+        "PLUSIEURS CV DU MÊME CANDIDAT SONT FOURNIS CI-DESSOUS. "
+        "Fusionne les informations pertinentes (compétences, expériences) sans "
+        "doublons ni contradictions ; en cas de divergence entre deux CV, "
+        "privilégie la version la plus détaillée. Chaque CV est délimité et "
+        "nommé : tu connais la provenance de chaque élément."
+    ]
+    for label, text in items:
+        safe_label = str(label).replace('"', "'")[:80]
+        parts.append(f'<cv source="{safe_label}">\n{text}\n</cv>')
+    return "\n\n".join(parts)
+
+
+# ─── Exemples de style (few-shot depuis les lettres déjà générées) ────────────
+
+_LETTER_MARKER = "LETTRE DE MOTIVATION\n" + "-" * 60
+
+
+def _letter_body_from_txt(path: Path) -> str:
+    """Extrait le corps de la lettre d'un fichier .txt généré par save()."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    idx = content.find(_LETTER_MARKER)
+    if idx == -1:
+        return ""
+    return content[idx + len(_LETTER_MARKER):].strip()[:1800]
+
+
+def recent_letter_examples(store, limit: int = 2) -> dict[str, list[str]]:
+    """Dernières lettres générées, par langue : {'fr': [...], 'en': [...]} —
+    servies comme exemples de style (few-shot) quand LETTER_EXAMPLES=on."""
+    out: dict[str, list[str]] = {"fr": [], "en": []}
+    for letter in store.list_letters():
+        lang = letter.get("language") or "fr"
+        if lang not in out or len(out[lang]) >= limit:
+            continue
+        name = Path(str(letter.get("txt_file", ""))).name  # jamais de chemin
+        if not name:
+            continue
+        body = _letter_body_from_txt(Path(config.output_dir) / name)
+        if body:
+            out[lang].append(body)
+        if all(len(v) >= limit for v in out.values()):
+            break
+    return out
+
+
 USER_PROMPT_FR = (
     "Rédige une candidature EN FRANÇAIS pour ce poste.\n\n"
     "<offre>\n{job}\n</offre>\n\n"
@@ -121,17 +196,32 @@ def _pdf_safe(text: str) -> str:
 
 
 class CoverLetterGenerator:
-    def __init__(self, cv_text: str, applied_history: list[str] | None = None):
+    def __init__(self, cv_text: str, applied_history: list[str] | None = None,
+                 style_examples: dict[str, list[str]] | None = None):
         self.cv_text = cv_text
         # Postes déjà candidatés : le modèle varie les formulations
         self.applied_history = [str(t)[:120] for t in (applied_history or [])[:8]]
+        # Exemples de style par langue (few-shot, voir recent_letter_examples)
+        self.style_examples = style_examples or {}
         self._llm = LLMClient(task="letter")
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
+
+    def _system_prompt(self, language: str) -> str:
+        """Prompt système : CV + guide de rédaction (skill) de la langue."""
+        system = SYSTEM_PROMPT.format(cv=self.cv_text)
+        skill = load_skill(language)
+        if skill:
+            system += (
+                "\n\nGUIDE DE RÉDACTION À RESPECTER (conventions internes, "
+                "prioritaires sur tes habitudes) :\n<guide>\n" + skill + "\n</guide>"
+            )
+        return system
 
     def generate(self, job: JobOffer, tone: str = "standard") -> dict:
         """Retourne {'letter', 'email_subject', 'email_body', 'language'}.
         La langue de la lettre suit celle de l'offre (FR → structure
-        Vous-Moi-Nous ; EN → cover letter orientée résultats)."""
+        Vous-Moi-Nous ; EN → cover letter orientée résultats), et le guide
+        de rédaction prompts/skills/ correspondant est injecté."""
         tone_label = TONES.get(tone, TONES["standard"])
         language = detect_language(f"{job.title} {job.description}")
         prompt = USER_PROMPT_EN if language == "en" else USER_PROMPT_FR
@@ -142,8 +232,16 @@ class CoverLetterGenerator:
                 "Le candidat a déjà postulé aux postes suivants — varie le "
                 f"vocabulaire et les accroches par rapport à ces candidatures :\n{listed}\n\n"
             )
+        examples = self.style_examples.get(language) or []
+        if examples:
+            listed = "\n\n".join(f"<exemple>\n{e}\n</exemple>" for e in examples[:2])
+            history += (
+                "EXEMPLES DE STYLE — lettres précédentes du candidat : imite le "
+                "ton et le rythme, sans recopier les phrases ni les accroches :\n"
+                f"{listed}\n\n"
+            )
         raw = self._llm.generate(
-            system=SYSTEM_PROMPT.format(cv=self.cv_text),
+            system=self._system_prompt(language),
             user=prompt.format(job=job.to_text(), tone=tone_label, history=history),
             max_tokens=3072,
             json_schema=LETTER_SCHEMA,

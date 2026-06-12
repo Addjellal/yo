@@ -104,6 +104,9 @@ class Config:
     # Si le backend d'une tâche échoue : "none" = erreur claire, sinon bascule
     ai_fallback: str = field(default_factory=lambda: _env_choice("AI_FALLBACK", "none", ("none", "local", "claude")))
 
+    # Lettres : réutiliser les lettres précédentes comme exemples de style (few-shot)
+    letter_examples: str = field(default_factory=lambda: _env_choice("LETTER_EXAMPLES", "off", ("off", "on")))
+
     # Derniers critères choisis (persistés pour les reproposer au prochain lancement)
     default_sources: str = field(default_factory=lambda: os.getenv("DEFAULT_SOURCES", "").strip()[:200])
     default_sectors: str = field(default_factory=lambda: os.getenv("DEFAULT_SECTORS", "").strip()[:400])
@@ -136,6 +139,7 @@ _ALLOWED_ENV_KEYS = {
     "CANDIDATE_NAME", "CANDIDATE_EMAIL", "CANDIDATE_PHONE", "CANDIDATE_CITY",
     "AI_PRESCORE_BACKEND", "AI_MATCH_BACKEND", "AI_LETTER_BACKEND",
     "AI_PRESCORE_MODEL", "AI_MATCH_MODEL", "AI_LETTER_MODEL", "AI_FALLBACK",
+    "LETTER_EXAMPLES",
     "DEFAULT_SOURCES", "DEFAULT_SECTORS", "DEFAULT_LOCATION",
     "DEFAULT_COUNTRY", "DEFAULT_EXPERIENCE",
 }

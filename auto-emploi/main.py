@@ -44,16 +44,20 @@ from job_scrapers import (
     ApecScraper,
     AdzunaScraper,
 )
-from ai import JobMatcher, CoverLetterGenerator
-from ai.matcher import parse_exclude_keywords, EXPERIENCE_LEVEL_LABELS
-from ai.cover_letter import TONES
+from ai import CoverLetterGenerator
+from ai.matcher import parse_exclude_keywords, EXPERIENCE_LEVEL_LABELS, score_offers_multi
+from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
 from tracker import Tracker
 from history import SessionStore
+from cv_store import CVStore, list_cv_files
 from integrations import notion_configured, export_to_notion, desktop_notify
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS, search_names, _fold
 
 # Plafond du pré-filtre code pur avant le re-scoring IA de toute la base
 RESCORE_TOP_K = 150
+
+# Dossier du projet : les CV uploadés via le web y vivent, le registre les référence
+_PROJECT_DIR = Path(__file__).resolve().parent
 
 console = Console()
 
@@ -75,6 +79,7 @@ EXPERIENCE_LEVELS: list[tuple[str, str]] = [
 ]
 
 _SESSION_STORE: SessionStore | None = None
+_CV_STORE: CVStore | None = None
 
 
 def _get_store() -> SessionStore:
@@ -82,6 +87,38 @@ def _get_store() -> SessionStore:
     if _SESSION_STORE is None:
         _SESSION_STORE = SessionStore(Path(config.output_dir) / ".sessions.json")
     return _SESSION_STORE
+
+
+def _get_cv_store() -> CVStore:
+    global _CV_STORE
+    if _CV_STORE is None:
+        _CV_STORE = CVStore(Path(config.output_dir) / ".cvs.json")
+    return _CV_STORE
+
+
+def _load_cv_texts(paths: list[str]) -> dict[str, str]:
+    """Parse chaque CV, l'enregistre dans le registre et retourne
+    {label → texte effectif} (corrections manuelles incluses, prioritaires).
+    Lève FileNotFoundError/ValueError comme parse_cv."""
+    store = _get_cv_store()
+    texts: dict[str, str] = {}
+    for path in paths:
+        raw = parse_cv(path)
+        name = Path(path).name
+        entry = store.register(name)
+        label = entry.get("label") or name
+        if label in texts:  # deux CV avec le même label : le nom de fichier tranche
+            label = name
+        texts[label] = store.effective_text(entry, raw)
+    return texts
+
+
+def _style_examples() -> dict[str, list[str]] | None:
+    """Exemples few-shot depuis les lettres passées, si LETTER_EXAMPLES=on."""
+    if config.letter_examples != "on":
+        return None
+    examples = recent_letter_examples(_get_store())
+    return examples if any(examples.values()) else None
 
 
 SECTORS: list[tuple[str, str]] = [
@@ -726,6 +763,8 @@ def display_matches(offers: list[JobOffer], tracker: Tracker | None = None) -> N
         if isinstance(reasons, list):
             reasons = " · ".join(str(r) for r in reasons if r)
         reasons_str = str(reasons).strip() if reasons else "–"
+        if offer.best_cv and offer.cv_scores:
+            reasons_str = f"[CV : {offer.best_cv}] {reasons_str}"
         # escape() : le contenu vient du web ou du LLM — il ne doit jamais être
         # interprété comme du balisage Rich (spoofing de badges, liens cachés…)
         table.add_row(
@@ -856,6 +895,15 @@ def _show_detail(offer: JobOffer) -> None:
         meta_lines.append(f"\n[bold green]Vos atouts :[/bold green]  {escape(offer.match_strengths)}")
     if offer.match_gaps:
         meta_lines.append(f"[bold yellow]À combler :[/bold yellow]   {escape(offer.match_gaps)}")
+    if offer.cv_scores:
+        meta_lines.append("\n[bold]Détail par CV :[/bold]")
+        for label, r in sorted(offer.cv_scores.items(), key=lambda kv: -kv[1]["score"]):
+            mark = " [cyan]◀ meilleur[/cyan]" if label == offer.best_cv else ""
+            c = _score_color(r["score"])
+            meta_lines.append(
+                f"  [{c}]{r['score']}/10[/{c}]  {escape(label)}{mark}"
+                + (f" — {escape(r['reasons'][:120])}" if r.get("reasons") else "")
+            )
     meta = "\n".join(meta_lines)
 
     desc = escape((offer.description or "Pas de description disponible.").strip())
@@ -1014,6 +1062,18 @@ def _criteria_summary(criteria: dict) -> str:
     return " · ".join(parts) or "–"
 
 
+def _session_cv_display(cv_store: CVStore, criteria_cv: str) -> str:
+    """Libellé(s) du/des CV d'une session : « CV supprimé : x » si le CV
+    n'existe plus — l'historique reste cohérent après une suppression."""
+    names = [n.strip() for n in str(criteria_cv or "").split(",") if n.strip()]
+    labels = []
+    for name in names:
+        name = Path(name).name
+        exists = (_PROJECT_DIR / name).is_file() or Path(name).is_file()
+        labels.append(cv_store.history_label(name, exists))
+    return " + ".join(lab for lab in labels if lab)
+
+
 def show_sessions() -> None:
     """Liste les sessions de recherche passées (--sessions)."""
     store = _get_store()
@@ -1025,11 +1085,13 @@ def show_sessions() -> None:
         ))
         return
 
+    cv_store = _get_cv_store()
     table = Table(title="Historique des sessions", box=box.ROUNDED, header_style="bold cyan")
     table.add_column("#", style="dim", width=4)
     table.add_column("Date", width=17)
     table.add_column("Type", width=8)
     table.add_column("Recherche", min_width=18)
+    table.add_column("CV", min_width=12)
     table.add_column("Critères", min_width=16)
     table.add_column("Offres", width=12, justify="center")
     table.add_column("ID", style="dim")
@@ -1040,6 +1102,7 @@ def show_sessions() -> None:
             escape(s["date"].replace("T", " ")[:16]),
             escape(s["kind"]),
             escape(c.get("query") or "–"),
+            escape(_session_cv_display(cv_store, c.get("cv", "")) or "–"),
             escape(_criteria_summary(c)),
             f"{s['kept']}/{s['found']}",
             escape(s["id"]),
@@ -1053,6 +1116,96 @@ def show_sessions() -> None:
         "\n[dim]Revoir une session : [bold]python main.py --session N[/bold] · "
         "Relancer avec les mêmes critères : [bold]python main.py --rerun N --cv cv.pdf[/bold][/dim]"
     )
+
+
+# ─── Gestion des CV (registre) ───────────────────────────────────────────────
+
+def show_cvs() -> None:
+    """Liste les CV connus du registre (--list-cvs)."""
+    store = _get_cv_store()
+    store.sync(list_cv_files(_PROJECT_DIR))
+    entries = store.list_cvs(include_deleted=True)
+    if not entries:
+        console.print(Panel(
+            "[dim]Aucun CV connu. Déposez un PDF/DOCX/TXT dans le dossier du "
+            "projet ou lancez un scan avec --cv.[/dim]",
+            title="[bold cyan]Mes CV[/bold cyan]", border_style="cyan",
+        ))
+        return
+
+    table = Table(title="CV connus", box=box.ROUNDED, header_style="bold cyan")
+    table.add_column("ID", style="dim", width=10)
+    table.add_column("Label", min_width=16)
+    table.add_column("Fichier", min_width=16)
+    table.add_column("Ajouté", width=12)
+    table.add_column("Profil IA", width=12)
+    table.add_column("Statut", width=22)
+    for e in entries:
+        exists = (_PROJECT_DIR / e.get("filename", "")).is_file()
+        if e.get("deleted"):
+            status = f"[red]supprimé le {e.get('deleted_date', '')[:10]}[/red]"
+        elif not exists:
+            status = "[yellow]fichier introuvable[/yellow]"
+        else:
+            status = "[green]actif[/green]"
+        analyzed = e.get("analyzed", "")
+        overrides = "✎ " if e.get("overrides") else ""
+        table.add_row(
+            escape(e.get("id", "")),
+            escape(e.get("label", "")),
+            escape(e.get("filename", "")),
+            escape(e.get("added", "")[:10]),
+            f"{overrides}{escape(analyzed[:10])}" if analyzed else "[dim]non analysé[/dim]",
+            status,
+        )
+    console.print(table)
+    console.print(
+        "[dim]Profil détaillé + édition : interface web (python web.py → Mes CV) · "
+        "Suppression : python main.py --delete-cv ID_OU_NOM[/dim]"
+    )
+
+
+def delete_cv(ref: str) -> None:
+    """Supprime un CV (--delete-cv) : fichier + cache effacés, tombstone dans
+    le registre — l'historique des sessions garde « CV supprimé : x »."""
+    store = _get_cv_store()
+    store.sync(list_cv_files(_PROJECT_DIR))
+    entry = store.get(ref)
+    if entry is None:
+        console.print(f"[red]CV introuvable : {escape(ref)}[/red]")
+        console.print("[dim]Listez les CV connus avec : python main.py --list-cvs[/dim]")
+        sys.exit(1)
+
+    filename = entry.get("filename", "")
+    label = entry.get("label", filename)
+    console.print(
+        f"[bold]CV à supprimer :[/bold] {escape(label)} [dim]({escape(filename)})[/dim]\n"
+        "[yellow]Action irréversible : le fichier et son cache seront effacés. "
+        "Les sessions et lettres déjà générées restent dans l'historique, où ce "
+        f"CV apparaîtra comme « CV supprimé : {escape(label)} ».[/yellow]"
+    )
+    if not Confirm.ask("[bold red]Confirmer la suppression ?[/bold red]", default=False):
+        console.print("[dim]Suppression annulée.[/dim]")
+        return
+
+    store.mark_deleted(entry["id"])
+    # Fichier du projet (jamais en dehors : nom nu, résolution vérifiée)
+    target = (_PROJECT_DIR / Path(filename).name).resolve()
+    if target.parent == _PROJECT_DIR and target.is_file():
+        try:
+            target.unlink()
+            console.print(f"[dim]Fichier effacé : {escape(target.name)}[/dim]")
+        except OSError as e:
+            console.print(f"[yellow]Fichier non effacé ({escape(str(e))}) — registre mis à jour quand même.[/yellow]")
+        # Cache de parsing associé (output/.cv_<stem>_<hash>.txt)
+        from cv_parser import _cache_path
+        cache = _cache_path(target)
+        if cache.is_file():
+            try:
+                cache.unlink()
+            except OSError:
+                pass
+    console.print(f"[green]✓ CV supprimé : {escape(label)}[/green]")
 
 
 def _resolve_session(ref: str) -> dict | None:
@@ -1071,7 +1224,7 @@ def _resolve_session(ref: str) -> dict | None:
     return None
 
 
-def browse_session(ref: str, cv_path: str = "") -> None:
+def browse_session(ref: str, cv_paths: list[str] | None = None) -> None:
     """Affiche les offres d'une session passée avec leurs scores de l'époque
     (--session N). Avec --cv, la génération de lettres ('m N') est disponible."""
     session = _resolve_session(ref)
@@ -1083,10 +1236,12 @@ def browse_session(ref: str, cv_path: str = "") -> None:
     store = _get_store()
     offers = store.session_offers(session)
     c = session.get("criteria", {})
+    cv_display = _session_cv_display(_get_cv_store(), c.get("cv", ""))
     console.print(Panel.fit(
         f"[bold cyan]Session {escape(session['id'])}[/bold cyan]\n"
         f"Date : {escape(session.get('date', '').replace('T', ' ')[:16])} · "
-        f"Type : {escape(session.get('kind', ''))}\n"
+        f"Type : {escape(session.get('kind', ''))}"
+        + (f" · CV : {escape(cv_display)}" if cv_display else "") + "\n"
         f"Recherche : « {escape(c.get('query') or '–')} » · {escape(_criteria_summary(c))}\n"
         f"Offres : {len(offers)} retenue(s) sur {session.get('found', 0)} collectée(s)",
         border_style="cyan",
@@ -1098,10 +1253,10 @@ def browse_session(ref: str, cv_path: str = "") -> None:
     display_matches(offers, tracker)
 
     letter_cb = None
-    if cv_path:
+    if cv_paths:
         try:
-            cv_text = parse_cv(cv_path)
-            letter_cb = _make_letter_cb(cv_text, tracker)
+            cv_texts = _load_cv_texts(cv_paths)
+            letter_cb = _make_letter_cb(cv_texts, tracker)
         except (FileNotFoundError, ValueError) as e:
             console.print(f"[yellow]CV illisible ({escape(str(e))}) — lettres indisponibles.[/yellow]")
     else:
@@ -1109,8 +1264,9 @@ def browse_session(ref: str, cv_path: str = "") -> None:
     browse_offers(offers, tracker, letter_cb=letter_cb)
 
 
-def _make_letter_cb(cv_text: str, tracker: Tracker):
-    """Callback 'm N' du mode navigation : génère les lettres des offres ciblées."""
+def _make_letter_cb(cv_texts: dict[str, str], tracker: Tracker):
+    """Callback 'm N' du mode navigation : génère les lettres des offres
+    ciblées. Plusieurs CV → fusion avec provenance dans le prompt."""
     state: dict = {"generator": None}
 
     def callback(targets: list[JobOffer]) -> None:
@@ -1119,7 +1275,11 @@ def _make_letter_cb(cv_text: str, tracker: Tracker):
             applied_titles = [
                 str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
             ]
-            state["generator"] = CoverLetterGenerator(cv_text, applied_history=applied_titles)
+            state["generator"] = CoverLetterGenerator(
+                merge_cv_texts(cv_texts),
+                applied_history=applied_titles,
+                style_examples=_style_examples(),
+            )
         generate_letters(targets, state["generator"], tone=tone, store=_get_store())
         tracker.mark_many(targets, "applied")
         console.print(f"[dim]→ {len(targets)} offre(s) marquée(s) comme postulée(s).[/dim]")
@@ -1215,8 +1375,8 @@ def show_stats() -> None:
 
 # ─── Re-scoring sans nouvelle recherche ───────────────────────────────────────
 
-def rescore_known_offers(args, cv_text: str) -> None:
-    """Re-score le CV actuel contre toutes les offres déjà connues (toutes
+def rescore_known_offers(args, cv_texts: dict[str, str]) -> None:
+    """Re-score le(s) CV contre toutes les offres déjà connues (toutes
     sessions confondues), sans relancer les scrapers. Pré-filtre code pur
     (top {RESCORE_TOP_K} par similarité mots-clés) puis pré-scoring IA rapide
     avant l'analyse détaillée."""
@@ -1244,20 +1404,18 @@ def rescore_known_offers(args, cv_text: str) -> None:
 
     sectors = select_sectors(args.sectors) if args.sectors else []
     exclude = parse_exclude_keywords(config.exclude_keywords) + parse_exclude_keywords(args.exclude)
-
-    matcher = JobMatcher(cv_text)
     rejections = tracker.recent_rejections()
-    if rejections:
-        matcher.set_rejected_examples(rejections)
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]Re-scoring en cours..."), console=console) as progress:
         progress.add_task("", total=None)
-        matched = matcher.score_offers(
+        matched = score_offers_multi(
+            cv_texts,
             offers,
             min_score=args.min_score,
             sectors=sectors,
             exclude=exclude,
             experience_level=args.experience,
+            rejected_examples=rejections,
             top_k=RESCORE_TOP_K,
             two_stage=True,
         )
@@ -1273,7 +1431,7 @@ def rescore_known_offers(args, cv_text: str) -> None:
         kind="rescore",
         criteria={
             "query": "(re-scoring de la base)",
-            "cv": Path(args.cv).name,
+            "cv": ",".join(Path(p).name for p in args.cv),
             "country": config.country,
             "location": "",
             "sectors": _sector_keys(sectors),
@@ -1285,7 +1443,7 @@ def rescore_known_offers(args, cv_text: str) -> None:
         offers=matched,
         found=len(offers),
     )
-    browse_offers(matched, tracker, letter_cb=_make_letter_cb(cv_text, tracker))
+    browse_offers(matched, tracker, letter_cb=_make_letter_cb(cv_texts, tracker))
 
 
 # ─── Critères par défaut (persistés entre les sessions) ───────────────────────
@@ -1320,11 +1478,12 @@ def _describe_defaults() -> str:
 
 # ─── Mode veille ──────────────────────────────────────────────────────────────
 
-def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", experience="") -> None:
+def watch_loop(args, sources, sectors, cv_texts, tracker, exclude, location="", experience="") -> None:
     """Relance la recherche à intervalle régulier et ne signale que les
     offres jamais vues. Notification desktop quand il y a du nouveau."""
     interval_min = max(15, min(1440, args.watch))
     query = args.query.strip()
+    rejections = tracker.recent_rejections()
     console.print(Panel.fit(
         f"[bold cyan]Mode veille[/bold cyan] — « {escape(query)} » toutes les {interval_min} min\n"
         "[dim]Seules les offres jamais vues sont signalées. Ctrl+C pour arrêter.[/dim]",
@@ -1340,9 +1499,10 @@ def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", e
             if not new_offers:
                 console.print("[dim]Aucune nouvelle offre depuis le dernier cycle.[/dim]")
             else:
-                matched = matcher.score_offers(
-                    new_offers, min_score=args.min_score, sectors=sectors,
+                matched = score_offers_multi(
+                    cv_texts, new_offers, min_score=args.min_score, sectors=sectors,
                     exclude=exclude, experience_level=experience,
+                    rejected_examples=rejections,
                 )
                 # Tout ce qui a été analysé est marqué vu : pas de re-scoring au prochain cycle
                 tracker.mark_many(new_offers, "seen")
@@ -1352,7 +1512,8 @@ def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", e
                     _get_store().add_session(
                         kind="watch",
                         criteria={
-                            "query": query, "cv": Path(args.cv).name,
+                            "query": query,
+                            "cv": ",".join(Path(p).name for p in args.cv),
                             "country": config.country, "location": location,
                             "sectors": _sector_keys(sectors), "experience": experience,
                             "sources": sources, "min_score": args.min_score,
@@ -1401,6 +1562,9 @@ def parse_args():
             "  python main.py --session 1 --cv cv.pdf           # Revoir une session (lettres : m N)\n"
             "  python main.py --rerun 1 --cv cv.pdf             # Relancer avec les mêmes critères\n"
             "  python main.py --rescore --cv cv.pdf             # Re-scorer la base sans scraper\n"
+            "  python main.py --cv a.pdf --cv b.pdf --scan      # Matching multi-CV (meilleur score par offre)\n"
+            "  python main.py --list-cvs                        # CV connus du registre\n"
+            "  python main.py --delete-cv mon_cv.pdf            # Supprimer un CV (l'historique garde son nom)\n"
         ),
     )
     parser.add_argument("--check", action="store_true", help="Vérifier l'environnement et quitter")
@@ -1412,7 +1576,12 @@ def parse_args():
                         help="Relancer une recherche avec les critères d'une session passée")
     parser.add_argument("--rescore", action="store_true",
                         help="Re-scorer le CV contre toutes les offres déjà connues, sans scraper")
-    parser.add_argument("--cv", help="Chemin vers votre CV (PDF, DOCX ou TXT)")
+    parser.add_argument("--list-cvs", action="store_true",
+                        help="Lister les CV connus du registre (labels, profils, statut)")
+    parser.add_argument("--delete-cv", default="", metavar="ID|NOM",
+                        help="Supprimer un CV par identifiant, nom de fichier ou label (irréversible ; l'historique garde son nom)")
+    parser.add_argument("--cv", action="append",
+                        help="Chemin vers votre CV (PDF, DOCX ou TXT) — répétable pour un matching multi-CV : --cv a.pdf --cv b.pdf")
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
     parser.add_argument("--location", default="", help='Localisation ex: "Paris" (sinon sélecteur interactif pays/région/ville)')
     parser.add_argument(
@@ -1477,12 +1646,20 @@ def main():
         show_stats()
         return
 
+    # Gestion des CV (registre)
+    if args.list_cvs:
+        show_cvs()
+        return
+    if args.delete_cv:
+        delete_cv(args.delete_cv)
+        return
+
     # Historique des sessions
     if args.sessions:
         show_sessions()
         return
     if args.session:
-        browse_session(args.session, args.cv or "")
+        browse_session(args.session, args.cv or [])
         return
 
     # Relance d'une session passée : reprendre ses critères
@@ -1503,8 +1680,13 @@ def main():
         args.min_score = max(0, min(10, int(c.get("min_score", args.min_score))))
         if c.get("exclude"):
             args.exclude = ",".join(c["exclude"])
-        if not args.cv and c.get("cv") and Path(c["cv"]).is_file():
-            args.cv = c["cv"]
+        if not args.cv and c.get("cv"):
+            # Le critère CV peut référencer plusieurs fichiers ("a.pdf,b.pdf")
+            candidates = [n.strip() for n in c["cv"].split(",") if n.strip()]
+            found = [n for n in candidates
+                     if Path(n).is_file() or (_PROJECT_DIR / Path(n).name).is_file()]
+            args.cv = [n if Path(n).is_file() else str(_PROJECT_DIR / Path(n).name)
+                       for n in found] or None
         console.print(f"[dim]Critères repris de la session {escape(past['id'])} : "
                       f"« {escape(args.query or '–')} » · {escape(_criteria_summary(c))}[/dim]")
 
@@ -1515,16 +1697,19 @@ def main():
         border_style="cyan",
     ))
 
-    # 1. CV (obligatoire sauf --check)
+    # 1. CV (obligatoire sauf --check) — répétable pour le matching multi-CV
     if not args.cv:
         console.print("[red]--cv est requis. Exemple : python main.py --cv mon_cv.pdf --scan[/red]")
         console.print("[dim]Conseil : lancez d'abord  python main.py --check  pour vérifier votre configuration.[/dim]")
         sys.exit(1)
 
-    console.print(f"\n[bold]1. Lecture du CV :[/bold] {args.cv}")
+    args.cv = args.cv[:5]  # garde-fou : 5 CV max par session
+    plural = "x" if len(args.cv) > 1 else ""
+    console.print(f"\n[bold]1. Lecture du{plural} CV :[/bold] {', '.join(args.cv)}")
     try:
-        cv_text = parse_cv(args.cv)
-        console.print(f"[green]✓ CV parsé ({len(cv_text)} caractères)[/green]")
+        cv_texts = _load_cv_texts(args.cv)
+        total = sum(len(t) for t in cv_texts.values())
+        console.print(f"[green]✓ {len(cv_texts)} CV parsé(s) ({total} caractères)[/green]")
     except (FileNotFoundError, ValueError) as e:
         console.print(f"[red]Erreur CV : {escape(str(e))}[/red]")
         sys.exit(1)
@@ -1544,7 +1729,7 @@ def main():
 
     # Mode re-scoring : toutes les offres connues, sans scraper
     if args.rescore:
-        rescore_known_offers(args, cv_text)
+        rescore_known_offers(args, cv_texts)
         return
 
     # Critères par défaut : reproposer les derniers choix interactifs
@@ -1607,9 +1792,6 @@ def main():
     if interactive and not use_defaults:
         _persist_defaults(sources, sectors, location, experience)
 
-    # Matcher initialisé une seule fois (CV en mémoire)
-    matcher = JobMatcher(cv_text)
-
     # Tracker persistant : suit les offres vues / favoris / postulées / rejetées
     tracker = Tracker(Path(config.output_dir) / ".tracker.json")
     initial_stats = tracker.stats()
@@ -1623,7 +1805,6 @@ def main():
     # Apprentissage des préférences : les rejets passés pénalisent les offres similaires
     rejections = tracker.recent_rejections()
     if rejections:
-        matcher.set_rejected_examples(rejections)
         console.print(f"[dim]Préférences : {len(rejections)} rejet(s) récent(s) pris en compte dans le scoring.[/dim]")
 
     # Mots-clés éliminatoires : .env et CLI cumulés
@@ -1636,7 +1817,7 @@ def main():
         if not args.query.strip():
             console.print("[red]--watch nécessite --query (mode non interactif).[/red]")
             sys.exit(1)
-        watch_loop(args, sources, sectors, matcher, tracker, exclude, location, experience)
+        watch_loop(args, sources, sectors, cv_texts, tracker, exclude, location, experience)
         return
 
     # 5. Boucle de recherche
@@ -1714,9 +1895,10 @@ def main():
         with Progress(SpinnerColumn(), TextColumn("[cyan]Analyse en cours..."), console=console) as progress:
             progress.add_task("", total=None)
             try:
-                matched_offers = matcher.score_offers(
-                    all_offers, min_score=args.min_score, sectors=sectors,
+                matched_offers = score_offers_multi(
+                    cv_texts, all_offers, min_score=args.min_score, sectors=sectors,
                     exclude=exclude, experience_level=experience,
+                    rejected_examples=rejections,
                 )
             except Exception as e:
                 if "AuthenticationError" in type(e).__name__:
@@ -1741,7 +1923,7 @@ def main():
             kind="scan",
             criteria={
                 "query": query,
-                "cv": Path(args.cv).name,
+                "cv": ",".join(Path(p).name for p in args.cv),
                 "country": config.country,
                 "location": location,
                 "sectors": _sector_keys(sectors),
@@ -1766,7 +1948,7 @@ def main():
 
         # Mode scan : navigation interactive (lettres disponibles via 'm N')
         if args.scan:
-            browse_offers(matched_offers, tracker, letter_cb=_make_letter_cb(cv_text, tracker))
+            browse_offers(matched_offers, tracker, letter_cb=_make_letter_cb(cv_texts, tracker))
             console.print(f"[dim]{len(matched_offers)} offres exportées dans {config.output_dir}/[/dim]")
             continue  # ← propose une nouvelle recherche
 
@@ -1785,7 +1967,11 @@ def main():
                     str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
                 ]
                 console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s), ton {tone})")
-                generator = CoverLetterGenerator(cv_text, applied_history=applied_titles)
+                generator = CoverLetterGenerator(
+                    merge_cv_texts(cv_texts),
+                    applied_history=applied_titles,
+                    style_examples=_style_examples(),
+                )
                 generate_letters(selected, generator, tone=tone, store=_get_store())
                 # Marquer auto comme "applied" : la lettre est prête à être envoyée
                 tracker.mark_many(selected, "applied")

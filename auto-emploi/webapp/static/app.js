@@ -52,16 +52,36 @@ function scoreColor(score) {
   return "var(--red)";
 }
 
+// Modale de confirmation (suppression de CV) — promesse résolue true/false
+function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
+  return new Promise((resolve) => {
+    $("#confirm-title").textContent = title;
+    $("#confirm-text").textContent = text;
+    $("#confirm-ok").textContent = okLabel;
+    $("#confirm-overlay").hidden = false;
+    const done = (result) => {
+      $("#confirm-overlay").hidden = true;
+      $("#confirm-ok").onclick = $("#confirm-cancel").onclick = $("#confirm-close").onclick = null;
+      resolve(result);
+    };
+    $("#confirm-ok").onclick = () => done(true);
+    $("#confirm-cancel").onclick = () => done(false);
+    $("#confirm-close").onclick = () => done(false);
+  });
+}
+
 // ─── État global ────────────────────────────────────────────────────────────
 
 let APP = null;            // réponse de /api/state
 let SCAN_JOB = null;       // id du scan courant
 let OFFERS = [];           // offres du dernier scan
 let POLL_TIMER = null;
-const SELECTED = { sectors: new Set(), sources: new Set(), experience: "" };
+let CVS = [];              // registre des CV (cartes /api/cvs ou résumé /api/state)
+const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "" };
 let EXP_PILLS = {};        // key → élément pill
 let SEC_CHIPS = {};        // key → élément chip
 let SRC_CHIPS = {};        // key → élément chip
+let CV_CHIPS = {};         // filename → élément chip
 let SRC_USABLE = {};       // key → bool
 
 function toggleSector(key, force) {
@@ -78,6 +98,15 @@ function toggleSource(key, force) {
   const on = force !== undefined ? force : !SELECTED.sources.has(key);
   if (on) { SELECTED.sources.add(key); chip.classList.add("active"); }
   else { SELECTED.sources.delete(key); chip.classList.remove("active"); }
+}
+
+function toggleCv(name, force) {
+  const chip = CV_CHIPS[name];
+  if (!chip) return;
+  const on = force !== undefined ? force : !SELECTED.cvs.has(name);
+  if (on) { SELECTED.cvs.add(name); chip.classList.add("active"); }
+  else { SELECTED.cvs.delete(name); chip.classList.remove("active"); }
+  localStorage.setItem("cvs", JSON.stringify([...SELECTED.cvs]));
 }
 
 function applyCriteria(c) {
@@ -112,7 +141,14 @@ function applyCriteria(c) {
     $("#minscore-val").textContent = c.min_score;
   }
   if (Array.isArray(c.exclude)) $("#f-exclude").value = c.exclude.join(", ");
-  if (c.cv && [...$("#f-cv").options].some((o) => o.value === c.cv)) $("#f-cv").value = c.cv;
+  if (c.cv) {
+    // Critère CV possiblement multiple : "a.pdf,b.pdf"
+    const names = String(c.cv).split(",").map((n) => n.trim()).filter(Boolean);
+    const known = names.filter((n) => CV_CHIPS[n]);
+    if (known.length) {
+      for (const name of Object.keys(CV_CHIPS)) toggleCv(name, known.includes(name));
+    }
+  }
 }
 
 // ─── Onglets ────────────────────────────────────────────────────────────────
@@ -125,6 +161,8 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     $(`#tab-${btn.dataset.tab}`).hidden = false;
     if (btn.dataset.tab === "track") loadTrack();
     if (btn.dataset.tab === "history") loadHistory();
+    if (btn.dataset.tab === "cvs") loadCvs();
+    if (btn.dataset.tab === "letters") loadLetters();
     if (btn.dataset.tab === "stats") loadStats();
   });
 });
@@ -161,8 +199,9 @@ async function init() {
     : `${APP.provider} — clé manquante`;
   if (!APP.provider_ready) toast("Provider IA non configuré : voir l'onglet Réglages.", "err");
 
-  // CV
-  rebuildCvSelect(APP.cv_files);
+  // CV (cases à cocher multi)
+  CVS = APP.cvs || [];
+  rebuildCvChips();
 
   // Pays / régions
   const countrySel = $("#f-country");
@@ -250,20 +289,50 @@ async function init() {
   $("#btn-notion").hidden = !APP.notion;
 }
 
-function rebuildCvSelect(files) {
-  const sel = $("#f-cv");
-  sel.replaceChildren();
-  if (!files.length) {
-    sel.appendChild(el("option", { value: "", text: "Aucun CV trouvé" }));
+// ─── Sélection des CV (cases à cocher) ──────────────────────────────────────
+
+function rebuildCvChips() {
+  const box = $("#f-cvs");
+  box.replaceChildren();
+  CV_CHIPS = {};
+  if (!CVS.length) {
+    box.appendChild(el("span", { class: "muted small", text: "Aucun CV — importez-en un (PDF, DOCX, TXT)." }));
+    SELECTED.cvs.clear();
     return;
   }
-  for (const f of files) sel.appendChild(el("option", { value: f, text: f }));
-  const saved = localStorage.getItem("cv");
-  if (saved && files.includes(saved)) sel.value = saved;
-  sel.addEventListener("change", () => localStorage.setItem("cv", sel.value));
+  // Sélection mémorisée (migration depuis l'ancien stockage mono-CV)
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem("cvs") || "[]"); } catch { saved = []; }
+  const legacy = localStorage.getItem("cv");
+  if (!saved.length && legacy) saved = [legacy];
+  const names = CVS.map((c) => c.filename);
+  saved = saved.filter((n) => names.includes(n));
+
+  SELECTED.cvs.clear();
+  for (const cv of CVS) {
+    const chip = el("span", { class: "chip cv-chip", text: cv.label || cv.filename });
+    chip.title = cv.filename + (cv.analyzed ? " — profil IA extrait" : "");
+    chip.addEventListener("click", () => toggleCv(cv.filename));
+    CV_CHIPS[cv.filename] = chip;
+    box.appendChild(chip);
+  }
+  const initial = saved.length ? saved : [names[0]];
+  for (const n of initial) toggleCv(n, true);
 }
 
-// ─── Upload CV (bouton + glisser-déposer) ───────────────────────────────────
+async function refreshCvData() {
+  /* Recharge le registre des CV (après upload / suppression / analyse). */
+  try {
+    const out = await api("/api/cvs");
+    CVS = out.cvs;
+    rebuildCvChips();
+    if (!$("#tab-cvs").hidden) renderCvList();
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+// ─── Upload CV (boutons + glisser-déposer) ──────────────────────────────────
 
 function uploadCvFile(file) {
   if (!file) return;
@@ -277,9 +346,8 @@ function uploadCvFile(file) {
     try {
       const b64 = reader.result.split(",", 2)[1] || "";
       const out = await api("/api/cv", { method: "POST", body: JSON.stringify({ filename: file.name, data: b64 }) });
-      rebuildCvSelect(out.cv_files);
-      $("#f-cv").value = out.name;
-      localStorage.setItem("cv", out.name);
+      await refreshCvData();
+      toggleCv(out.name, true);
       toast(`CV importé : ${out.name}`, "ok");
     } catch (err) {
       toast("Import échoué : " + err.message, "err");
@@ -289,7 +357,8 @@ function uploadCvFile(file) {
 }
 
 $("#cv-upload-btn").addEventListener("click", () => $("#cv-file").click());
-$("#cv-file").addEventListener("change", (e) => uploadCvFile(e.target.files[0]));
+$("#cvs-upload-btn").addEventListener("click", () => $("#cv-file").click());
+$("#cv-file").addEventListener("change", (e) => { uploadCvFile(e.target.files[0]); e.target.value = ""; });
 
 // Glisser-déposer sur la carte de recherche
 const searchCard = document.querySelector(".search-card");
@@ -339,8 +408,7 @@ $("#btn-progress-hide").addEventListener("click", () => ($("#scan-progress").hid
 async function startScan() {
   const query = $("#f-query").value.trim();
   if (!query) { toast("Indiquez un poste à rechercher.", "err"); return; }
-  const cv = $("#f-cv").value;
-  if (!cv) { toast("Importez d'abord un CV (bouton ＋).", "err"); return; }
+  if (!SELECTED.cvs.size) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
   if (!SELECTED.sources.size) { toast("Sélectionnez au moins une source.", "err"); return; }
 
   const country = $("#f-country").value;
@@ -348,7 +416,9 @@ async function startScan() {
   const region = country === "fr" ? $("#f-region").value : "";
 
   const body = {
-    query, cv, country,
+    query,
+    cvs: [...SELECTED.cvs],
+    country,
     location: city || region,
     sources: [...SELECTED.sources],
     sectors: [...SELECTED.sectors],
@@ -380,10 +450,9 @@ async function startScan() {
 // ─── Re-scoring de la base (sans scraper) ───────────────────────────────────
 
 $("#btn-rescore").addEventListener("click", async () => {
-  const cv = $("#f-cv").value;
-  if (!cv) { toast("Importez d'abord un CV (bouton ＋).", "err"); return; }
+  if (!SELECTED.cvs.size) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
   const body = {
-    cv,
+    cvs: [...SELECTED.cvs],
     sectors: [...SELECTED.sectors],
     experience: SELECTED.experience,
     min_score: parseInt($("#f-minscore").value, 10),
@@ -468,7 +537,11 @@ function renderResults() {
     return (b.score || 0) - (a.score || 0);
   });
 
-  for (const offer of sorted) grid.appendChild(offerCard(offer));
+  sorted.forEach((offer, i) => {
+    const card = offerCard(offer);
+    card.style.setProperty("--i", Math.min(i, 12));
+    grid.appendChild(card);
+  });
 }
 
 function offerCard(offer) {
@@ -477,7 +550,12 @@ function offerCard(offer) {
   ring.style.setProperty("--pct", score * 10);
   ring.style.setProperty("--ring", scoreColor(score));
 
+  const scoreBar = el("div", { class: "score-bar" }, [el("i")]);
+  scoreBar.style.setProperty("--pct", score * 10);
+  scoreBar.style.setProperty("--ring", scoreColor(score));
+
   const badges = el("div", { class: "offer-badges" }, [
+    offer.best_cv ? el("span", { class: "badge cv", text: "🗎 " + offer.best_cv }) : null,
     offer.location ? el("span", { class: "badge", text: "📍 " + offer.location }) : null,
     offer.contract ? el("span", { class: "badge", text: offer.contract }) : null,
     offer.salary ? el("span", { class: "badge", text: "💰 " + offer.salary }) : null,
@@ -486,10 +564,25 @@ function offerCard(offer) {
   const statusBadge = el("span", { class: "badge status-badge", text: "" });
   badges.appendChild(statusBadge);
 
-  // Détails repliables : atouts, lacunes, description
+  // Détails repliables : atouts, lacunes, détail par CV, description
+  let breakdown = null;
+  if (Array.isArray(offer.cv_scores) && offer.cv_scores.length > 1) {
+    breakdown = el("div", { class: "cv-breakdown" });
+    for (const r of offer.cv_scores) {
+      const row = el("div", { class: "cv-breakdown-row" }, [
+        el("span", { class: "cb-score", text: `${r.score}/10` }),
+        el("span", { class: "cb-label", text: r.cv }),
+        r.cv === offer.best_cv ? el("span", { class: "cb-best", text: "◀ meilleur" }) : null,
+        r.reasons ? el("span", { class: "cb-reasons", text: r.reasons }) : null,
+      ]);
+      row.querySelector(".cb-score").style.color = scoreColor(r.score);
+      breakdown.appendChild(row);
+    }
+  }
   const details = el("div", { class: "offer-details" }, [
     offer.strengths ? el("div", { class: "strengths", text: "✔ Vos atouts : " + offer.strengths }) : null,
     offer.gaps ? el("div", { class: "gaps", text: "△ À combler : " + offer.gaps }) : null,
+    breakdown,
     offer.description ? el("div", { class: "desc", text: offer.description }) : null,
   ]);
   details.hidden = true;
@@ -504,7 +597,7 @@ function offerCard(offer) {
   if (offer.url && /^https?:\/\//i.test(offer.url)) openLink.href = offer.url;
   else openLink.style.display = "none";
 
-  const btnFav = el("button", { class: "btn-ghost act-fav", text: "★" , title: "Favori" });
+  const btnFav = el("button", { class: "btn-ghost act-fav", text: "★", title: "Favori" });
   const btnApplied = el("button", { class: "btn-ghost act-applied", text: "✓", title: "Marquer postulée" });
   const btnReject = el("button", { class: "btn-ghost act-reject", text: "✗", title: "Rejeter (n'apparaîtra plus)" });
   const btnLetter = el("button", { class: "btn-ghost act-letter", text: "✉ Lettre" });
@@ -517,6 +610,7 @@ function offerCard(offer) {
         el("div", { class: "offer-company", text: offer.company }),
       ]),
     ]),
+    scoreBar,
     badges,
     offer.reasons ? el("p", { class: "offer-reasons", text: offer.reasons }) : null,
     toggle,
@@ -715,12 +809,8 @@ async function loadHistory() {
   }
   const list = $("#history-list");
   list.replaceChildren();
-  if (!data.sessions.length) {
-    list.appendChild(el("div", { class: "empty-state" }, [
-      el("div", { class: "empty-icon", text: "🕘" }),
-      el("p", { text: "Aucune session pour l'instant — chaque recherche sera enregistrée ici avec ses critères et ses scores." }),
-    ]));
-  }
+  $("#history-empty").hidden = data.sessions.length > 0;
+
   const kindLabels = { web: "Web", scan: "CLI", watch: "Veille", rescore: "Re-scoring" };
   for (const s of data.sessions) {
     const btnView = el("button", { class: "btn-ghost small", text: "Voir les offres" });
@@ -732,43 +822,28 @@ async function loadHistory() {
       toast("Critères repris — lancez la recherche quand vous êtes prêt.", "ok");
     });
     if (s.kind === "rescore") btnRerun.hidden = true;
+
+    const metaBits = [
+      `${s.date.replace("T", " ").slice(0, 16)} · ${s.summary} · ` +
+      `${s.kept} offre(s) retenue(s) sur ${s.found}`,
+    ];
+    const meta = el("div", { class: "session-meta muted small", text: metaBits.join("") });
+    if (s.cv_display) {
+      meta.appendChild(el("span", { text: " · " }));
+      meta.appendChild(el("span", {
+        class: s.cv_display.includes("CV supprimé") ? "cv-deleted" : "",
+        text: s.cv_display,
+      }));
+    }
     list.appendChild(el("div", { class: "card session-item" }, [
       el("div", { class: "session-main" }, [
         el("div", { class: "session-title" }, [
           el("strong", { text: s.criteria.query || "(re-scoring de la base)" }),
           el("span", { class: "badge src", text: kindLabels[s.kind] || s.kind }),
         ]),
-        el("div", { class: "session-meta muted small", text:
-          `${s.date.replace("T", " ").slice(0, 16)} · ${s.summary} · ` +
-          `${s.kept} offre(s) retenue(s) sur ${s.found}` }),
+        meta,
       ]),
       el("div", { class: "session-actions" }, [btnView, btnRerun]),
-    ]));
-  }
-
-  $("#count-letters").textContent = data.letters.length;
-  const lettersBox = $("#letters-list");
-  lettersBox.replaceChildren();
-  if (!data.letters.length) {
-    lettersBox.appendChild(el("div", { class: "muted small", text: "Aucune lettre générée pour l'instant." }));
-  }
-  for (const letter of data.letters) {
-    const actions = el("div", { class: "ti-actions" });
-    for (const [file, label] of [[letter.txt_file, "⬇ .txt"], [letter.pdf_file, "⬇ .pdf"]]) {
-      if (file) actions.appendChild(el("a", {
-        class: "btn-ghost", text: label, download: file,
-        href: `/api/download?file=${encodeURIComponent(file)}`,
-      }));
-    }
-    lettersBox.appendChild(el("div", { class: "track-item" }, [
-      el("div", { class: "ti-title", text: letter.title || "—" }),
-      el("div", { class: "ti-meta" }, [
-        el("span", { text: letter.company || "—" }),
-        el("span", { text: letter.date.replace("T", " ").slice(0, 16) }),
-        el("span", { text: `ton ${letter.tone}` }),
-        el("span", { text: letter.language === "en" ? "🇬🇧 EN" : "🇫🇷 FR" }),
-      ]),
-      actions,
     ]));
   }
 }
@@ -789,6 +864,444 @@ async function loadSession(id) {
   const when = out.date ? out.date.replace("T", " ").slice(0, 16) : "";
   toast(`Session du ${when} rechargée (${OFFERS.length} offre(s), scores de l'époque).`
     + (out.letters_available ? "" : " CV introuvable : lettres indisponibles."), "ok");
+}
+
+// ─── Onglet Lettres ─────────────────────────────────────────────────────────
+
+async function loadLetters() {
+  let data;
+  try {
+    data = await api("/api/sessions");
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  const grid = $("#letters-grid");
+  grid.replaceChildren();
+  $("#letters-empty").hidden = data.letters.length > 0;
+
+  data.letters.forEach((letter, i) => {
+    const actions = el("div", { class: "lt-actions" });
+    for (const [file, label] of [[letter.txt_file, "⬇ .txt"], [letter.pdf_file, "⬇ .pdf"]]) {
+      if (file) actions.appendChild(el("a", {
+        class: "btn-ghost small", text: label, download: file,
+        href: `/api/download?file=${encodeURIComponent(file)}`,
+      }));
+    }
+    const card = el("div", { class: "card letter-card" }, [
+      el("div", { class: "lt-title", text: letter.title || "—" }),
+      el("div", { class: "lt-meta" }, [
+        el("span", { text: letter.company || "—" }),
+        el("span", { text: letter.date.replace("T", " ").slice(0, 16) }),
+        el("span", { text: `ton ${letter.tone}` }),
+        el("span", { text: letter.language === "en" ? "🇬🇧 EN" : "🇫🇷 FR" }),
+      ]),
+      actions,
+    ]);
+    card.style.setProperty("--i", Math.min(i, 12));
+    grid.appendChild(card);
+  });
+}
+
+// ─── Onglet Mes CV ──────────────────────────────────────────────────────────
+
+const SECTION_DEFS = [
+  { key: "contact", title: "Coordonnées" },
+  { key: "skills", title: "Compétences" },
+  { key: "experiences", title: "Expériences" },
+  { key: "education", title: "Formations" },
+  { key: "languages", title: "Langues" },
+];
+
+// État du détail ouvert : entrée, sections marquées manuelles, sections éditées
+let CVD = null;
+
+async function loadCvs() {
+  try {
+    const out = await api("/api/cvs");
+    CVS = out.cvs;
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  rebuildCvChips();
+  renderCvList();
+}
+
+function renderCvList() {
+  const list = $("#cv-list");
+  list.replaceChildren();
+  $("#cvs-empty").hidden = CVS.length > 0;
+  if (!CVS.length) { $("#cv-detail").hidden = true; CVD = null; return; }
+
+  for (const cv of CVS) {
+    const item = el("div", { class: "cv-item" + (CVD && CVD.entry.id === cv.id ? " active" : "") }, [
+      el("div", { class: "ci-label", text: cv.label || cv.filename }),
+      el("div", { class: "ci-meta" }, [
+        el("span", { text: cv.filename }),
+        el("span", { text: "ajouté " + (cv.added || "").slice(0, 10) }),
+        cv.analyzed
+          ? el("span", { text: "profil IA " + cv.analyzed.slice(0, 10) })
+          : el("span", { text: "non analysé" }),
+        Object.keys(cv.overrides || {}).length
+          ? el("span", { text: "✎ corrigé" }) : null,
+        cv.file_exists ? null : el("span", { class: "ci-missing", text: "fichier introuvable" }),
+      ]),
+    ]);
+    item.addEventListener("click", () => openCvDetail(cv));
+    list.appendChild(item);
+  }
+}
+
+function openCvDetail(cv) {
+  CVD = {
+    entry: cv,
+    manual: new Set(Object.keys(cv.overrides || {})),
+    dirty: new Set(),
+    sections: {},   // key → {body, badge, revert}
+  };
+  renderCvList();
+  const box = $("#cv-detail");
+  box.replaceChildren();
+  box.hidden = false;
+
+  // En-tête : label éditable + méta
+  const labelInput = el("input", { type: "text", maxlength: "80", value: cv.label || "" });
+  box.appendChild(el("div", { class: "cvd-head" }, [
+    el("div", { class: "field" }, [el("label", { text: "Label du CV" }), labelInput]),
+  ]));
+  box.appendChild(el("div", { class: "cvd-meta", text:
+    `${cv.filename} · ajouté le ${(cv.added || "").slice(0, 10)}`
+    + (cv.analyzed ? ` · profil extrait le ${cv.analyzed.slice(0, 10)}` : " · pas encore analysé par l'IA") }));
+  CVD.labelInput = labelInput;
+
+  // Sections
+  for (const def of SECTION_DEFS) {
+    box.appendChild(buildSection(def, cv));
+  }
+
+  // Zone de progression d'analyse
+  const progress = el("div", { class: "letter-loading", hidden: "" }, [
+    el("span", { class: "spinner" }), "Analyse IA du CV en cours…",
+  ]);
+  progress.hidden = true;
+  box.appendChild(progress);
+  CVD.progress = progress;
+
+  // Actions
+  const btnAnalyze = el("button", { class: "btn-ghost", text: "🔄 Ré-analyser avec l'IA" });
+  btnAnalyze.addEventListener("click", () => analyzeCv(cv.id, btnAnalyze));
+  if (!cv.file_exists) { btnAnalyze.disabled = true; btnAnalyze.title = "Fichier introuvable"; }
+  const btnSave = el("button", { class: "btn-primary", text: "💾 Enregistrer les corrections" });
+  btnSave.addEventListener("click", saveCvDetail);
+  const btnDelete = el("button", { class: "btn-danger", text: "🗑 Supprimer ce CV" });
+  btnDelete.addEventListener("click", () => deleteCv(cv));
+  box.appendChild(el("div", { class: "cvd-actions" }, [btnAnalyze, btnSave, btnDelete]));
+}
+
+function sectionBadge(key) {
+  /* Badge de provenance : manuel (prioritaire) / IA / vide. */
+  const manual = CVD.manual.has(key) || CVD.dirty.has(key);
+  const fromAi = (CVD.entry.sources || {})[key] === "ai";
+  if (manual) return { text: "✎ modifié manuellement", cls: "src-badge manual" };
+  if (fromAi) return { text: "✓ extrait par l'IA", cls: "src-badge ai" };
+  return { text: "à compléter", cls: "src-badge" };
+}
+
+function buildSection(def, cv) {
+  const profile = cv.profile || {};
+  const data = profile[def.key];
+
+  const badgeInfo = { ...sectionBadge(def.key) };
+  const badge = el("span", { class: badgeInfo.cls, text: badgeInfo.text });
+  const revert = el("button", { class: "btn-ghost small revert-btn", text: "↺ Revenir à l'extraction IA" });
+  const body = el("div");
+
+  const section = el("div", { class: "cv-section" }, [
+    el("div", { class: "cv-section-head" }, [
+      el("h4", { text: def.title }), badge, revert,
+    ]),
+    body,
+  ]);
+
+  const fill = (value) => {
+    body.replaceChildren();
+    FILLERS[def.key](body, value);
+  };
+  fill(data);
+
+  const refreshBadge = () => {
+    const info = sectionBadge(def.key);
+    badge.className = info.cls;
+    badge.textContent = info.text;
+    revert.hidden = !(CVD.manual.has(def.key) || CVD.dirty.has(def.key))
+      || !((CVD.entry.extracted || {})[def.key]);
+  };
+  refreshBadge();
+
+  body.addEventListener("input", () => {
+    CVD.dirty.add(def.key);
+    refreshBadge();
+  });
+  revert.addEventListener("click", () => {
+    CVD.manual.delete(def.key);
+    CVD.dirty.delete(def.key);
+    fill((CVD.entry.extracted || {})[def.key]);
+    refreshBadge();
+    toast(`Section « ${def.title} » revenue à l'extraction IA — enregistrez pour confirmer.`, "ok");
+  });
+
+  CVD.sections[def.key] = { body, refreshBadge };
+  return section;
+}
+
+/* Constructeurs de formulaires par section (remplissage) */
+
+function labeledInput(labelText, value, attrs = {}) {
+  return el("div", { class: "field" }, [
+    el("label", { text: labelText }),
+    el("input", { type: "text", value: value || "", ...attrs }),
+  ]);
+}
+
+const FILLERS = {
+  contact(body, data) {
+    const c = data || {};
+    body.appendChild(el("div", { class: "grid2" }, [
+      labeledInput("Nom", c.name, { dataset: { f: "name" }, maxlength: "80" }),
+      labeledInput("Intitulé pro", c.headline, { dataset: { f: "headline" }, maxlength: "120" }),
+      labeledInput("Email", c.email, { dataset: { f: "email" }, maxlength: "120" }),
+      labeledInput("Téléphone", c.phone, { dataset: { f: "phone" }, maxlength: "40" }),
+      labeledInput("Ville", c.city, { dataset: { f: "city" }, maxlength: "80" }),
+    ]));
+  },
+  skills(body, data) {
+    const lines = (data || []).map((cat) => `${cat.category} : ${(cat.items || []).join(", ")}`);
+    body.appendChild(el("div", { class: "field" }, [
+      el("label", { text: "Une catégorie par ligne — « Catégorie : item1, item2 »" }),
+      el("textarea", { rows: "6", text: lines.join("\n"), placeholder: "Langages : Python, C++\nOutils : Git, Docker" }),
+    ]));
+  },
+  experiences(body, data) {
+    const rows = el("div");
+    const addRow = (exp = {}) => rows.appendChild(experienceRow(exp, rows));
+    for (const exp of data || []) addRow(exp);
+    if (!(data || []).length) body.appendChild(el("div", { class: "cv-empty-hint", text: "Aucune expérience extraite — ajoutez-en ou lancez l'analyse IA." }));
+    body.appendChild(rows);
+    const add = el("button", { class: "btn-ghost small add-row-btn", text: "＋ Ajouter une expérience" });
+    add.addEventListener("click", () => { addRow(); body.dispatchEvent(new Event("input", { bubbles: true })); });
+    body.appendChild(add);
+  },
+  education(body, data) {
+    const rows = el("div");
+    const addRow = (edu = {}) => rows.appendChild(educationRow(edu, rows));
+    for (const edu of data || []) addRow(edu);
+    if (!(data || []).length) body.appendChild(el("div", { class: "cv-empty-hint", text: "Aucune formation extraite." }));
+    body.appendChild(rows);
+    const add = el("button", { class: "btn-ghost small add-row-btn", text: "＋ Ajouter une formation" });
+    add.addEventListener("click", () => { addRow(); body.dispatchEvent(new Event("input", { bubbles: true })); });
+    body.appendChild(add);
+  },
+  languages(body, data) {
+    const rows = el("div");
+    const addRow = (lang = {}) => rows.appendChild(languageRow(lang, rows));
+    for (const lang of data || []) addRow(lang);
+    if (!(data || []).length) body.appendChild(el("div", { class: "cv-empty-hint", text: "Aucune langue extraite." }));
+    body.appendChild(rows);
+    const add = el("button", { class: "btn-ghost small add-row-btn", text: "＋ Ajouter une langue" });
+    add.addEventListener("click", () => { addRow(); body.dispatchEvent(new Event("input", { bubbles: true })); });
+    body.appendChild(add);
+  },
+};
+
+function removableRow(cls, children, rows) {
+  const row = el("div", { class: "cv-row-item " + cls }, children);
+  const remove = el("button", { class: "btn-ghost small row-remove", text: "✕", title: "Supprimer" });
+  remove.addEventListener("click", () => {
+    row.remove();
+    rows.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  row.appendChild(remove);
+  return row;
+}
+
+function experienceRow(exp, rows) {
+  return removableRow("exp-row", [
+    el("div", { class: "grid2" }, [
+      labeledInput("Poste", exp.title, { dataset: { f: "title" }, maxlength: "120" }),
+      labeledInput("Entreprise", exp.company, { dataset: { f: "company" }, maxlength: "120" }),
+      labeledInput("Début", exp.start, { dataset: { f: "start" }, maxlength: "20", placeholder: "2023" }),
+      labeledInput("Fin", exp.end, { dataset: { f: "end" }, maxlength: "20", placeholder: "auj." }),
+      el("div", { class: "field span2" }, [
+        el("label", { text: "Réalisations (1-2 phrases)" }),
+        el("textarea", { rows: "2", dataset: { f: "description" }, text: exp.description || "" }),
+      ]),
+    ]),
+  ], rows);
+}
+
+function educationRow(edu, rows) {
+  return removableRow("edu-row", [
+    el("div", { class: "grid2" }, [
+      labeledInput("Diplôme", edu.degree, { dataset: { f: "degree" }, maxlength: "150" }),
+      labeledInput("École", edu.school, { dataset: { f: "school" }, maxlength: "120" }),
+      labeledInput("Année", edu.year, { dataset: { f: "year" }, maxlength: "20" }),
+    ]),
+  ], rows);
+}
+
+function languageRow(lang, rows) {
+  return removableRow("lang-row", [
+    el("div", { class: "grid2" }, [
+      labeledInput("Langue", lang.name, { dataset: { f: "name" }, maxlength: "40" }),
+      labeledInput("Niveau", lang.level, { dataset: { f: "level" }, maxlength: "60", placeholder: "B2, courant…" }),
+    ]),
+  ], rows);
+}
+
+/* Sérialisation des formulaires par section */
+
+const SERIALIZERS = {
+  contact(body) {
+    const out = {};
+    body.querySelectorAll("input[data-f]").forEach((inp) => (out[inp.dataset.f] = inp.value.trim()));
+    return Object.values(out).some(Boolean) ? out : null;
+  },
+  skills(body) {
+    const raw = body.querySelector("textarea").value;
+    const cats = [];
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const sep = trimmed.indexOf(":");
+      const category = sep > 0 ? trimmed.slice(0, sep).trim() : "Autres";
+      const items = (sep > 0 ? trimmed.slice(sep + 1) : trimmed)
+        .split(",").map((s) => s.trim()).filter(Boolean);
+      if (items.length) cats.push({ category, items });
+    }
+    return cats.length ? cats : null;
+  },
+  experiences(body) {
+    const out = [];
+    body.querySelectorAll(".exp-row").forEach((row) => {
+      const get = (f) => {
+        const node = row.querySelector(`[data-f="${f}"]`);
+        return node ? node.value.trim() : "";
+      };
+      const entry = {
+        title: get("title"), company: get("company"),
+        start: get("start"), end: get("end"), description: get("description"),
+      };
+      if (entry.title || entry.company) out.push(entry);
+    });
+    return out.length ? out : null;
+  },
+  education(body) {
+    const out = [];
+    body.querySelectorAll(".edu-row").forEach((row) => {
+      const get = (f) => (row.querySelector(`[data-f="${f}"]`) || { value: "" }).value.trim();
+      const entry = { degree: get("degree"), school: get("school"), year: get("year") };
+      if (entry.degree || entry.school) out.push(entry);
+    });
+    return out.length ? out : null;
+  },
+  languages(body) {
+    const out = [];
+    body.querySelectorAll(".lang-row").forEach((row) => {
+      const get = (f) => (row.querySelector(`[data-f="${f}"]`) || { value: "" }).value.trim();
+      const entry = { name: get("name"), level: get("level") };
+      if (entry.name) out.push(entry);
+    });
+    return out.length ? out : null;
+  },
+};
+
+async function saveCvDetail() {
+  if (!CVD) return;
+  // Une section reste « manuelle » si elle l'était déjà ou vient d'être éditée
+  const overrides = {};
+  for (const def of SECTION_DEFS) {
+    if (!CVD.manual.has(def.key) && !CVD.dirty.has(def.key)) continue;
+    const value = SERIALIZERS[def.key](CVD.sections[def.key].body);
+    if (value !== null) overrides[def.key] = value;
+  }
+  try {
+    const out = await api("/api/cv-update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: CVD.entry.id,
+        label: CVD.labelInput.value.trim(),
+        overrides,
+      }),
+    });
+    toast("CV enregistré — vos corrections priment sur l'extraction IA.", "ok");
+    await refreshCvData();
+    const fresh = CVS.find((c) => c.id === out.cv.id);
+    if (fresh) openCvDetail(fresh);
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+function analyzeCv(cvId, btn) {
+  btn.disabled = true;
+  CVD.progress.hidden = false;
+  api("/api/cv-analyze", { method: "POST", body: JSON.stringify({ id: cvId }) })
+    .then((out) => pollCvJob(out.job_id, btn))
+    .catch((e) => {
+      btn.disabled = false;
+      CVD.progress.hidden = true;
+      toast(e.message, "err");
+    });
+}
+
+function pollCvJob(jobId, btn) {
+  setTimeout(async () => {
+    let job;
+    try {
+      job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
+    } catch (e) {
+      btn.disabled = false;
+      if (CVD) CVD.progress.hidden = true;
+      toast(e.message, "err");
+      return;
+    }
+    if (job.status === "running") { pollCvJob(jobId, btn); return; }
+    btn.disabled = false;
+    if (CVD) CVD.progress.hidden = true;
+    if (job.status === "error") {
+      toast("Analyse échouée : " + (job.error || "erreur"), "err");
+      return;
+    }
+    toast("Profil extrait par l'IA — vos corrections manuelles restent prioritaires.", "ok");
+    await refreshCvData();
+    const fresh = CVS.find((c) => c.id === (job.result.cv || {}).id);
+    if (fresh) openCvDetail(fresh);
+  }, 900);
+}
+
+async function deleteCv(cv) {
+  const ok = await confirmDialog(
+    "Supprimer ce CV ?",
+    `« ${cv.label || cv.filename} » sera définitivement supprimé (fichier + profil). ` +
+    "Les sessions et lettres déjà générées restent dans l'historique, où ce CV " +
+    `apparaîtra comme « CV supprimé : ${cv.label || cv.filename} ». Action irréversible.`,
+  );
+  if (!ok) return;
+  try {
+    const out = await api("/api/cv-delete", { method: "POST", body: JSON.stringify({ id: cv.id }) });
+    CVS = out.cvs;
+    // Sélection de recherche : retirer le CV disparu, état propre si plus rien
+    SELECTED.cvs.delete(cv.filename);
+    localStorage.setItem("cvs", JSON.stringify([...SELECTED.cvs]));
+    rebuildCvChips();
+    renderCvList();
+    $("#cv-detail").hidden = true;
+    CVD = null;
+    toast(`CV supprimé : ${out.label}. L'historique garde son nom.`, "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
 }
 
 // ─── Onglet Suivi ───────────────────────────────────────────────────────────

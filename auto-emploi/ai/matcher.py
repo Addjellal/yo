@@ -1,6 +1,9 @@
+import copy
 import json
 import re
 from collections import Counter
+
+from rich.markup import escape
 
 from job_scrapers.base import JobOffer
 from app_utils import console
@@ -401,6 +404,83 @@ class JobMatcher:
             batch[idx].match_reasons = str(reasons).strip()[:400]
             batch[idx].match_strengths = str(item.get("strengths", "")).strip()[:600]
             batch[idx].match_gaps = str(item.get("gaps", "")).strip()[:400]
+
+
+def score_offers_multi(
+    cv_texts: dict[str, str],
+    offers: list[JobOffer],
+    min_score: int = 6,
+    sectors: list[str] | None = None,
+    exclude: list[str] | None = None,
+    experience_level: str = "",
+    rejected_examples: list[str] | None = None,
+    top_k: int | None = None,
+    two_stage: bool = False,
+) -> list[JobOffer]:
+    """Matching multi-CV : un score par CV pour chaque offre.
+
+    cv_texts : {label → texte du CV}. Avec un seul CV, comportement identique
+    à JobMatcher.score_offers. Avec plusieurs, chaque offre porte le meilleur
+    résultat dans ses champs match_* plus le détail par CV dans cv_scores
+    (et best_cv = label du CV gagnant). Une offre est retenue dès qu'un CV
+    atteint min_score."""
+    labels = [lab for lab in cv_texts if cv_texts[lab]]
+    if not labels or not offers:
+        return []
+
+    if len(labels) == 1:
+        matcher = JobMatcher(cv_texts[labels[0]])
+        if rejected_examples:
+            matcher.set_rejected_examples(rejected_examples)
+        return matcher.score_offers(
+            offers, min_score=min_score, sectors=sectors, exclude=exclude,
+            experience_level=experience_level, top_k=top_k, two_stage=two_stage,
+        )
+
+    # Un passage complet par CV (sur des copies : les objets d'origine restent
+    # intacts), min_score=0 pour conserver tous les scores du détail par CV.
+    merged: dict[str, JobOffer] = {}
+    for label in labels:
+        console.print(f"[bold]Matching avec le CV « {escape(label)} »[/bold]")
+        matcher = JobMatcher(cv_texts[label])
+        if rejected_examples:
+            matcher.set_rejected_examples(rejected_examples)
+        copies = [copy.copy(o) for o in offers]
+        scored = matcher.score_offers(
+            copies, min_score=0, sectors=sectors, exclude=exclude,
+            experience_level=experience_level, top_k=top_k, two_stage=two_stage,
+        )
+        for offer in scored:
+            key = offer.unique_key()
+            canonical = merged.get(key)
+            if canonical is None:
+                canonical = copy.copy(offer)
+                canonical.cv_scores = {}
+                merged[key] = canonical
+            canonical.cv_scores[label] = {
+                "score": offer.match_score or 0,
+                "reasons": offer.match_reasons or "",
+                "strengths": offer.match_strengths or "",
+                "gaps": offer.match_gaps or "",
+            }
+
+    # Le meilleur CV de chaque offre fournit les champs match_* principaux
+    results: list[JobOffer] = []
+    for offer in merged.values():
+        best_label = max(
+            offer.cv_scores,
+            key=lambda lab: (offer.cv_scores[lab]["score"], -labels.index(lab)),
+        )
+        best = offer.cv_scores[best_label]
+        offer.best_cv = best_label
+        offer.match_score = best["score"]
+        offer.match_reasons = best["reasons"] or None
+        offer.match_strengths = best["strengths"] or None
+        offer.match_gaps = best["gaps"] or None
+        if best["score"] >= min_score:
+            results.append(offer)
+
+    return sorted(results, key=lambda o: o.match_score or 0, reverse=True)
 
 
 def _extract_json_objects(text: str) -> list[dict]:

@@ -11,20 +11,33 @@ python web.py        # démarre sur http://127.0.0.1:8765 et ouvre le navigateur
 ```
 
 Aucune dépendance supplémentaire (serveur 100 % bibliothèque standard).
-L'interface offre :
+Identité visuelle dédiée (palette émeraude/ambre, typographie Space Grotesk
+auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
 
-- **Recherche** : formulaire complet (CV, pays/région/ville, secteurs, niveau
-  d'expérience, sources, mots-clés exclus, score minimum), import de CV en un
-  clic, historique des recherches, progression du scan en direct ;
-- **Résultats** : cartes avec anneau de score coloré, atouts/lacunes détaillés,
-  actions favori / postulée / rejeter, tri, export CSV+JSON, export Notion ;
-- **Lettres** : génération dans une modale (3 tons), email d'accompagnement,
-  copie en un clic, téléchargement .txt/.pdf ;
+- **Recherche** : formulaire complet (pays/région/ville, secteurs, niveau
+  d'expérience, sources, mots-clés exclus, score minimum), **sélection
+  multi-CV par cases à cocher**, import par bouton ou glisser-déposer,
+  progression du scan en direct, re-scoring de la base sans scraper ;
+- **Résultats** : cartes avec anneau + barre de score, badge du **CV
+  gagnant** et détail des scores par CV, atouts/lacunes, actions favori /
+  postulée / rejeter, tri, export CSV+JSON, export Notion ;
+- **Mes CV** : liste des CV importés, **profil structuré extrait par l'IA**
+  (coordonnées, compétences catégorisées, expériences, formations, langues),
+  formulaire de correction — les modifications manuelles priment sur
+  l'extraction pour le matching et les lettres (badge « ✎ modifié
+  manuellement » vs « ✓ extrait par l'IA »), bouton « Ré-analyser avec
+  l'IA », **suppression avec confirmation** (l'historique garde le nom :
+  « CV supprimé : x ») ;
+- **Lettres** : page dédiée listant toutes les lettres générées
+  (.txt/.pdf) ; génération depuis une offre dans une modale (3 tons), texte
+  éditable, email d'accompagnement, copie en un clic ;
+- **Historique** : sessions passées (critères, CV utilisés, scores de
+  l'époque), rechargement ou relance d'une session ;
 - **Suivi** : tableau kanban favoris / postulées / à relancer (>14 jours sans
   réponse) avec actions directes ;
 - **Statistiques** : compteurs, candidatures par semaine et par source ;
-- **Réglages** : édition des clés API (écrites dans le `.env` local), thème
-  sombre/clair.
+- **Réglages** : clés API, routage IA par tâche, coordonnées candidat,
+  exemples de style pour les lettres (few-shot), critères par défaut.
 
 Sécurité de l'interface web : serveur accessible uniquement depuis
 `127.0.0.1`, jeton de session aléatoire anti-CSRF/anti-DNS-rebinding sur
@@ -58,9 +71,26 @@ sont inaccessibles).
   - `anthropic` — Claude Fable 5 par défaut (sorties JSON structurées
     garanties, OCR haute résolution des CV scannés) ;
   - `ollama` — 100 % local et gratuit (llama3.2 + modèle vision).
+- **Matching multi-CV** : cochez plusieurs CV (web) ou répétez `--cv` (CLI) —
+  chaque offre est scorée avec chaque CV, le meilleur score gagne et le
+  détail par CV reste consultable. Pour les lettres, les CV sont fusionnés
+  dans le prompt avec leur provenance (pas de doublons ni contradictions).
+- **Profils de CV structurés** : extraction IA (coordonnées, compétences
+  catégorisées, expériences, formations, langues) éditable dans la page
+  « Mes CV » — **vos corrections manuelles priment sur l'extraction** pour
+  tous les usages. `--list-cvs` et `--delete-cv NOM` côté CLI (suppression
+  irréversible, l'historique garde « CV supprimé : x »).
 - **Lettres de motivation** : 3 tons au choix (standard, formelle, directe),
   **email d'accompagnement** (objet + corps) inclus, variation automatique
   par rapport à vos candidatures passées. Export TXT + PDF.
+  - **Skills de rédaction éditables** : avant chaque génération, le guide
+    `prompts/skills/lettre_fr.md` (structure Vous-Moi-Nous, formules,
+    erreurs à éviter, mots-clés ATS) ou `cover_letter_en.md` (cover letter
+    orientée résultats) est injecté dans le prompt — modifiez ces fichiers
+    pour affiner les consignes, ils sont relus à chaque lettre.
+  - **Exemples de style (few-shot)** : `LETTER_EXAMPLES=on` réutilise vos
+    deux dernières lettres (par langue) comme référence de ton.
+  - Détection automatique de la langue de l'offre (FR/EN).
 - **Mode veille** `--watch 60` : re-scanne toutes les heures, n'affiche que
   les nouvelles offres et envoie une **notification desktop**.
 - **Relances** : `--stats` liste les candidatures sans réponse depuis plus
@@ -84,9 +114,14 @@ python main.py --check                  # diagnostic complet
 ```bash
 python web.py                                         # interface web (recommandé)
 python main.py --cv mon_cv.pdf --scan                 # scanner sans postuler
+python main.py --cv a.pdf --cv b.pdf --scan           # matching multi-CV (meilleur score)
 python main.py --cv mon_cv.pdf --query "data engineer" --location "Paris"
 python main.py --cv mon_cv.pdf --query "robotique" --watch 60   # veille + notifications
 python main.py --cv mon_cv.pdf --scan --exclude "senior,5 ans"  # filtres éliminatoires
+python main.py --cv mon_cv.pdf --rescore              # re-scorer la base sans scraper
+python main.py --sessions                             # sessions passées (+ --session N, --rerun N)
+python main.py --list-cvs                             # CV connus du registre
+python main.py --delete-cv mon_cv.pdf                 # supprimer un CV (historique conservé)
 python main.py --stats                                # historique + relances à faire
 ```
 

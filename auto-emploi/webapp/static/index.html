@@ -5,35 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="auth-token" content="__AUTH_TOKEN__">
 <title>Auto Emploi — Recherche d'emploi assistée par IA</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%BC%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%B1%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <aside class="sidebar">
   <div class="logo">
-    <span class="logo-icon">💼</span>
+    <span class="logo-icon" aria-hidden="true"></span>
     <div>
-      <div class="logo-title">Auto Emploi</div>
+      <div class="logo-title">Auto&nbsp;Emploi</div>
       <div class="logo-sub">Assistant IA</div>
     </div>
   </div>
 
   <nav class="nav">
     <button class="nav-btn active" data-tab="search">
-      <span class="nav-ico">🔍</span> Recherche
+      <span class="nav-ico">⌕</span> <span class="nav-label">Recherche</span>
     </button>
     <button class="nav-btn" data-tab="track">
-      <span class="nav-ico">📌</span> Suivi
+      <span class="nav-ico">◫</span> <span class="nav-label">Suivi</span>
     </button>
     <button class="nav-btn" data-tab="history">
-      <span class="nav-ico">🕘</span> Historique
+      <span class="nav-ico">↺</span> <span class="nav-label">Historique</span>
+    </button>
+    <button class="nav-btn" data-tab="cvs">
+      <span class="nav-ico">≡</span> <span class="nav-label">Mes CV</span>
+    </button>
+    <button class="nav-btn" data-tab="letters">
+      <span class="nav-ico">✉</span> <span class="nav-label">Lettres</span>
     </button>
     <button class="nav-btn" data-tab="stats">
-      <span class="nav-ico">📊</span> Statistiques
+      <span class="nav-ico">◔</span> <span class="nav-label">Statistiques</span>
     </button>
     <button class="nav-btn" data-tab="settings">
-      <span class="nav-ico">⚙️</span> Réglages
+      <span class="nav-ico">⚙</span> <span class="nav-label">Réglages</span>
     </button>
   </nav>
 
@@ -42,7 +48,7 @@
       <span id="provider-dot" class="dot"></span>
       <span id="provider-label">…</span>
     </div>
-    <button id="theme-toggle" class="btn-ghost" title="Changer de thème">🌗 Thème</button>
+    <button id="theme-toggle" class="btn-ghost" title="Changer de thème">◑ Thème</button>
   </div>
 </aside>
 
@@ -52,7 +58,7 @@
   <section id="tab-search" class="tab">
     <header class="page-head">
       <h1>Nouvelle recherche</h1>
-      <p class="muted">Scan multi-sources, matching IA avec votre CV, suivi des candidatures.</p>
+      <p class="muted">Scan multi-sources, matching IA avec vos CV, suivi des candidatures.</p>
     </header>
 
     <div class="card search-card">
@@ -62,18 +68,20 @@
           <input id="f-query" type="text" placeholder="Ex : ingénieur robotique, data engineer…" maxlength="200" autocomplete="off">
           <div id="query-history" class="history-chips"></div>
         </div>
-        <div class="field">
-          <label for="f-cv">CV</label>
-          <div class="cv-row">
-            <select id="f-cv"></select>
-            <button id="cv-upload-btn" class="btn-ghost" title="Importer un CV (PDF, DOCX, TXT)">＋</button>
-            <input id="cv-file" type="file" accept=".pdf,.docx,.txt" hidden>
-          </div>
-        </div>
         <button id="btn-scan" class="btn-primary big">Lancer&nbsp;la&nbsp;recherche</button>
       </div>
+
+      <div class="field cv-field">
+        <label>CV utilisés pour le matching <span class="muted">(plusieurs possibles — le meilleur score gagne)</span></label>
+        <div class="cv-row">
+          <div id="f-cvs" class="chips"></div>
+          <button id="cv-upload-btn" class="btn-ghost" title="Importer un CV (PDF, DOCX, TXT)">＋ Importer</button>
+          <input id="cv-file" type="file" accept=".pdf,.docx,.txt" hidden>
+        </div>
+      </div>
+
       <div class="rescore-row">
-        <button id="btn-rescore" class="btn-ghost" title="Re-score le CV contre toutes les offres déjà connues, sans relancer les scrapers">
+        <button id="btn-rescore" class="btn-ghost" title="Re-score les CV cochés contre toutes les offres déjà connues, sans relancer les scrapers">
           ♻ Re-scorer la base d'offres connues (sans scraper)
         </button>
         <span class="muted small">Glissez-déposez un CV n'importe où sur cette carte pour l'importer.</span>
@@ -159,8 +167,10 @@
     </div>
 
     <div id="search-empty" class="empty-state">
-      <div class="empty-icon">🛰️</div>
-      <p>Lancez une recherche pour scanner les offres et les comparer à votre CV.</p>
+      <div class="empty-art" aria-hidden="true"><span>⌕</span></div>
+      <h3>Prêt à scanner</h3>
+      <p>Lancez une recherche pour collecter les offres et les comparer à vos CV.<br>
+      Chaque session est enregistrée dans l'historique.</p>
     </div>
   </section>
 
@@ -198,10 +208,45 @@
       <p class="muted">Chaque recherche est enregistrée avec ses critères et les scores de l'époque. Rechargez une session ou relancez-la avec les mêmes critères.</p>
     </header>
     <div id="history-list" class="history-list"></div>
-    <details class="letters-zone">
-      <summary>✉ Lettres générées <span id="count-letters" class="pill-count">0</span></summary>
-      <div id="letters-list" class="kanban-list rejected-list"></div>
-    </details>
+    <div id="history-empty" class="empty-state" hidden>
+      <div class="empty-art" aria-hidden="true"><span>↺</span></div>
+      <h3>Aucune session</h3>
+      <p>Chaque recherche sera enregistrée ici avec ses critères et ses scores.</p>
+    </div>
+  </section>
+
+  <!-- ════════ Onglet Mes CV ════════ -->
+  <section id="tab-cvs" class="tab" hidden>
+    <header class="page-head">
+      <h1>Mes CV</h1>
+      <p class="muted">Profil structuré extrait par l'IA pour chaque CV — corrigez les champs : vos modifications priment sur l'extraction pour le matching et les lettres.</p>
+    </header>
+    <div class="cv-layout">
+      <div class="cv-side">
+        <button id="cvs-upload-btn" class="btn-primary">＋ Importer un CV</button>
+        <div id="cv-list" class="cv-list"></div>
+      </div>
+      <div id="cv-detail" class="card cv-detail" hidden></div>
+      <div id="cvs-empty" class="empty-state grow-empty">
+        <div class="empty-art" aria-hidden="true"><span>≡</span></div>
+        <h3>Aucun CV</h3>
+        <p>Importez un PDF, DOCX ou TXT — ou déposez-le dans le dossier du projet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ Onglet Lettres ════════ -->
+  <section id="tab-letters" class="tab" hidden>
+    <header class="page-head">
+      <h1>Lettres générées</h1>
+      <p class="muted">Toutes les lettres de motivation produites, avec leurs fichiers texte et PDF. Les guides de rédaction sont éditables dans <code>prompts/skills/</code>.</p>
+    </header>
+    <div id="letters-grid" class="letters-grid"></div>
+    <div id="letters-empty" class="empty-state" hidden>
+      <div class="empty-art" aria-hidden="true"><span>✉</span></div>
+      <h3>Aucune lettre pour l'instant</h3>
+      <p>Générez une lettre depuis une offre (bouton « ✉ Lettre » sur les résultats).</p>
+    </div>
   </section>
 
   <!-- ════════ Onglet Statistiques ════════ -->
@@ -306,8 +351,15 @@
         </div>
       </div>
 
-      <h3>Coordonnées candidat <span class="muted small">— en-tête des lettres PDF</span></h3>
+      <h3>Lettres de motivation <span class="muted small">— guides de rédaction FR/EN éditables dans <code>prompts/skills/</code> (relus à chaque génération)</span></h3>
       <div class="settings-grid">
+        <div class="field">
+          <label for="s-letter-examples">Exemples de style (few-shot) <span class="set-hint" data-hint="LETTER_EXAMPLES"></span></label>
+          <select id="s-letter-examples" data-key="LETTER_EXAMPLES">
+            <option value="off">off — chaque lettre repart de zéro</option>
+            <option value="on">on — imiter le style de vos lettres passées</option>
+          </select>
+        </div>
         <div class="field">
           <label for="s-cand-name">Nom complet <span class="set-hint" data-hint="CANDIDATE_NAME"></span></label>
           <input id="s-cand-name" type="text" data-key="CANDIDATE_NAME" placeholder="Prénom Nom">
@@ -430,11 +482,28 @@
           <textarea id="letter-body" class="letter-edit" rows="14" spellcheck="true"></textarea>
         </div>
         <div class="letter-downloads">
-          <button id="btn-letter-save" class="btn-primary">💾 Enregistrer les modifications (txt + PDF)</button>
+          <button id="btn-letter-save" class="btn-primary">💾 Enregistrer (txt + PDF)</button>
           <a id="letter-dl-txt" class="btn-ghost" download>⬇ .txt</a>
           <a id="letter-dl-pdf" class="btn-ghost" download hidden>⬇ .pdf</a>
           <span class="muted small">L'offre est marquée « postulée » dans votre historique.</span>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modale de confirmation (suppression de CV) -->
+<div id="confirm-overlay" class="modal-overlay" hidden>
+  <div class="modal modal-confirm">
+    <div class="modal-head">
+      <h2 id="confirm-title">Confirmer</h2>
+      <button id="confirm-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-text"></p>
+      <div class="confirm-actions">
+        <button id="confirm-cancel" class="btn-ghost">Annuler</button>
+        <button id="confirm-ok" class="btn-danger">Supprimer définitivement</button>
       </div>
     </div>
   </div>
