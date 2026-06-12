@@ -429,6 +429,12 @@ def score_offers_multi(
         return []
 
     if len(labels) == 1:
+        # Les offres rechargées d'une session multi-CV portent encore best_cv /
+        # cv_scores : sans remise à zéro, l'affichage et la persistance
+        # mélangeraient les anciens scores par CV avec le nouveau score global.
+        for offer in offers:
+            offer.best_cv = None
+            offer.cv_scores = None
         matcher = JobMatcher(cv_texts[labels[0]])
         if rejected_examples:
             matcher.set_rejected_examples(rejected_examples)

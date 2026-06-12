@@ -38,7 +38,7 @@ _MAX_STORE_BYTES = 20 * 1024 * 1024
 PROFILE_SECTIONS = ("contact", "skills", "experiences", "education", "languages")
 
 CV_EXTENSIONS = (".pdf", ".docx", ".txt")
-_EXCLUDED_TXT = {"requirements.txt", "robots.txt"}
+EXCLUDED_FILENAMES = {"requirements.txt", "robots.txt"}
 
 
 def list_cv_files(directory: Path) -> list[str]:
@@ -54,7 +54,7 @@ def list_cv_files(directory: Path) -> list[str]:
             continue
         if path.suffix.lower() not in CV_EXTENSIONS:
             continue
-        if path.name.lower() in _EXCLUDED_TXT:
+        if path.name.lower() in EXCLUDED_FILENAMES:
             continue
         files.append(path.name)
     return files

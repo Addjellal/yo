@@ -32,7 +32,7 @@ from config import config, save_to_env
 from cv_parser import parse_cv, _cache_path
 from tracker import Tracker
 from history import SessionStore
-from cv_store import CVStore, list_cv_files
+from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi
@@ -675,7 +675,11 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
     def _host_ok(self) -> bool:
-        host = (self.headers.get("Host") or "").split(":")[0].strip().lower()
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host.startswith("["):  # IPv6 : [::1] ou [::1]:8765
+            host = host.split("]")[0] + "]"
+        else:
+            host = host.split(":")[0]
         return host in ("127.0.0.1", "localhost", "[::1]")
 
     def _auth_ok(self) -> bool:
@@ -1136,6 +1140,9 @@ class _Handler(BaseHTTPRequestHandler):
         # Nom strictement assaini, préfixé : aucune traversée de chemin possible
         stem = re.sub(r"[^A-Za-z0-9_-]", "_", Path(raw_name).stem)[:50] or "cv"
         target = _PROJECT_DIR / f"{stem}{ext}"
+        if target.name.lower() in EXCLUDED_FILENAMES:
+            self._error("Ce nom de fichier est réservé — renommez votre CV.")
+            return
         target.write_bytes(data)
         with _CV_LOCK:
             entry = _get_cv_store().register(target.name)
@@ -1197,23 +1204,28 @@ class _Handler(BaseHTTPRequestHandler):
             return
         cv_id = str(body.get("id", ""))[:40]
         with _CV_LOCK:
-            entry = _get_cv_store().mark_deleted(cv_id)
-        if entry is None:
-            self._error("CV introuvable", 404)
-            return
-        # Fichier du projet (nom nu, résolution vérifiée : jamais en dehors)
-        target = (_PROJECT_DIR / Path(entry.get("filename", "")).name).resolve()
-        if target.parent == _PROJECT_DIR and target.is_file():
-            try:
-                target.unlink()
-            except OSError:
-                pass
-            cache = _cache_path(target)
-            if cache.is_file():
+            store = _get_cv_store()
+            entry = store.get(cv_id)
+            if entry is None or entry.get("deleted"):
+                self._error("CV introuvable", 404)
+                return
+            # Fichier effacé AVANT le tombstone : si l'effacement échoue, le
+            # sync suivant ré-enregistrerait le fichier restant comme un CV
+            # actif neuf et la « suppression » serait silencieusement annulée.
+            target = (_PROJECT_DIR / Path(entry.get("filename", "")).name).resolve()
+            if target.parent == _PROJECT_DIR and target.is_file():
                 try:
-                    cache.unlink()
+                    target.unlink()
                 except OSError:
-                    pass
+                    self._error("Impossible d'effacer le fichier — suppression annulée.", 500)
+                    return
+                cache = _cache_path(target)
+                if cache.is_file():
+                    try:
+                        cache.unlink()
+                    except OSError:
+                        pass
+            store.mark_deleted(entry["id"])
         self._json({
             "ok": True,
             "label": entry.get("label", ""),

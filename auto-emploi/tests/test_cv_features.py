@@ -403,6 +403,17 @@ class TestMultiCV:
         assert results[0].cv_scores is None       # pas de détail multi en mono-CV
         assert results[0].best_cv is None
 
+    def test_single_cv_resets_stale_multi_fields(self):
+        # Offres rechargées d'une session multi-CV puis re-scorées avec 1 CV :
+        # best_cv/cv_scores de l'ancienne session ne doivent pas survivre.
+        offers = self.offers()
+        for o in offers:
+            o.best_cv = "Ancien CV"
+            o.cv_scores = {"Ancien CV": {"score": 9, "reasons": "", "strengths": "", "gaps": ""}}
+        results = score_offers_multi({"CV Robot": CV_ROBOT}, offers, min_score=0)
+        assert results and all(o.best_cv is None for o in results)
+        assert all(o.cv_scores is None for o in results)
+
     def test_original_offers_untouched(self):
         offers = self.offers()
         score_offers_multi({"CV Robot": CV_ROBOT, "CV Web": CV_WEB}, offers, min_score=0)

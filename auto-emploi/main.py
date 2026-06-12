@@ -1188,15 +1188,18 @@ def delete_cv(ref: str) -> None:
         console.print("[dim]Suppression annulée.[/dim]")
         return
 
-    store.mark_deleted(entry["id"])
-    # Fichier du projet (jamais en dehors : nom nu, résolution vérifiée)
+    # Fichier effacé AVANT le tombstone : si l'effacement échouait après coup,
+    # le prochain sync ré-enregistrerait le fichier restant comme un CV actif
+    # neuf et la suppression serait silencieusement annulée.
+    # (Jamais en dehors du projet : nom nu, résolution vérifiée.)
     target = (_PROJECT_DIR / Path(filename).name).resolve()
     if target.parent == _PROJECT_DIR and target.is_file():
         try:
             target.unlink()
             console.print(f"[dim]Fichier effacé : {escape(target.name)}[/dim]")
         except OSError as e:
-            console.print(f"[yellow]Fichier non effacé ({escape(str(e))}) — registre mis à jour quand même.[/yellow]")
+            console.print(f"[red]Impossible d'effacer le fichier ({escape(str(e))}) — suppression annulée.[/red]")
+            sys.exit(1)
         # Cache de parsing associé (output/.cv_<stem>_<hash>.txt)
         from cv_parser import _cache_path
         cache = _cache_path(target)
@@ -1205,6 +1208,7 @@ def delete_cv(ref: str) -> None:
                 cache.unlink()
             except OSError:
                 pass
+    store.mark_deleted(entry["id"])
     console.print(f"[green]✓ CV supprimé : {escape(label)}[/green]")
 
 

@@ -40,6 +40,24 @@ async function api(path, options = {}) {
   return data;
 }
 
+// Téléchargement authentifié : un <a href> nu n'envoie pas X-Auth-Token et
+// recevrait un 401 — on passe par fetch puis un blob temporaire.
+async function downloadFile(file) {
+  const resp = await fetch(`/api/download?file=${encodeURIComponent(file)}`, {
+    headers: { "X-Auth-Token": TOKEN },
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.error || `Erreur ${resp.status}`);
+  }
+  const url = URL.createObjectURL(await resp.blob());
+  const a = el("a", { href: url, download: file.split("/").pop() });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function toast(message, kind = "") {
   const box = el("div", { class: `toast ${kind}`, text: message });
   $("#toasts").appendChild(box);
@@ -653,10 +671,7 @@ async function exportResults() {
   try {
     const out = await api("/api/export", { method: "POST", body: JSON.stringify({ job_id: SCAN_JOB }) });
     for (const f of [out.csv_file, out.json_file]) {
-      const a = el("a", { href: `/api/download?file=${encodeURIComponent(f)}`, download: f });
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      await downloadFile(f);
     }
     toast("Export CSV + JSON téléchargé.", "ok");
   } catch (e) {
@@ -746,10 +761,10 @@ function pollLetter(jobId) {
     $("#letter-subject").textContent = r.email_subject || "—";
     $("#letter-email").textContent = r.email_body || "—";
     $("#letter-body").value = r.letter;
-    $("#letter-dl-txt").href = `/api/download?file=${encodeURIComponent(r.txt_file)}`;
+    $("#letter-dl-txt").dataset.file = r.txt_file;
     if (r.pdf_file) {
       $("#letter-dl-pdf").hidden = false;
-      $("#letter-dl-pdf").href = `/api/download?file=${encodeURIComponent(r.pdf_file)}`;
+      $("#letter-dl-pdf").dataset.file = r.pdf_file;
     } else {
       $("#letter-dl-pdf").hidden = true;
     }
@@ -774,16 +789,24 @@ $("#btn-letter-save").addEventListener("click", async () => {
         email_body: $("#letter-email").textContent === "—" ? "" : $("#letter-email").textContent,
       }),
     });
-    $("#letter-dl-txt").href = `/api/download?file=${encodeURIComponent(out.txt_file)}`;
+    $("#letter-dl-txt").dataset.file = out.txt_file;
     if (out.pdf_file) {
       $("#letter-dl-pdf").hidden = false;
-      $("#letter-dl-pdf").href = `/api/download?file=${encodeURIComponent(out.pdf_file)}`;
+      $("#letter-dl-pdf").dataset.file = out.pdf_file;
     }
     toast("Modifications enregistrées (txt + PDF régénérés).", "ok");
   } catch (e) {
     toast(e.message, "err");
   }
 });
+
+for (const id of ["#letter-dl-txt", "#letter-dl-pdf"]) {
+  $(id).addEventListener("click", (ev) => {
+    ev.preventDefault();
+    const file = ev.currentTarget.dataset.file;
+    if (file) downloadFile(file).catch((e) => toast(e.message, "err"));
+  });
+}
 
 document.querySelectorAll("[data-copy]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -883,10 +906,13 @@ async function loadLetters() {
   data.letters.forEach((letter, i) => {
     const actions = el("div", { class: "lt-actions" });
     for (const [file, label] of [[letter.txt_file, "⬇ .txt"], [letter.pdf_file, "⬇ .pdf"]]) {
-      if (file) actions.appendChild(el("a", {
-        class: "btn-ghost small", text: label, download: file,
-        href: `/api/download?file=${encodeURIComponent(file)}`,
-      }));
+      if (!file) continue;
+      const a = el("a", { class: "btn-ghost small", text: label, href: "#" });
+      a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        downloadFile(file).catch((e) => toast(e.message, "err"));
+      });
+      actions.appendChild(a);
     }
     const card = el("div", { class: "card letter-card" }, [
       el("div", { class: "lt-title", text: letter.title || "—" }),
