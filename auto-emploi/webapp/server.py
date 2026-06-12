@@ -50,7 +50,13 @@ from main import (
     _run_one_scraper,
     _criteria_summary,
     save_results,
+    save_raw_offers,
+    save_dropped_offers,
 )
+from app_utils import get_logger
+from output_paths import cv_dir, find_output_file
+
+_LOG = get_logger()
 
 _PROJECT_DIR = Path(__file__).resolve().parent.parent
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -70,12 +76,13 @@ _CV_EXTENSIONS = (".pdf", ".docx", ".txt")
 # « Sans plafond » : valeur sentinelle bien au-delà des limites de pagination
 # internes de chaque scraper (MAX_PAGES, MAX_START…), qui bornent le réel.
 _UNLIMITED_MAX = 10_000
-_DOWNLOAD_EXTENSIONS = (".txt", ".pdf", ".csv", ".json")
+_DOWNLOAD_EXTENSIONS = (".txt", ".pdf", ".csv", ".json", ".jsonl")
 _DOWNLOAD_TYPES = {
     ".txt": "text/plain; charset=utf-8",
     ".pdf": "application/pdf",
     ".csv": "text/csv; charset=utf-8",
     ".json": "application/json; charset=utf-8",
+    ".jsonl": "application/json; charset=utf-8",
 }
 
 _SECTOR_LABELS = dict(SECTORS)
@@ -142,14 +149,27 @@ def _get_cv_store() -> CVStore:
     return _cv_store
 
 
+# Plafonds de rétention par type de job. Les jobs « scan » portent les offres
+# que la page Résultats référence pour les lettres, le suivi et l'export : ils
+# doivent survivre aux jobs lettre/CV qui s'accumulent. (Bug historique : une
+# purge globale à 20 jobs supprimait le scan courant après quelques recherches
+# → « Scan introuvable » sur toute génération de lettre.)
+_JOB_RETENTION = {"scan": 6, "letter": 20, "cv": 20}
+
+
 def _register_job(job: _Job) -> None:
     with _JOBS_LOCK:
         _JOBS[job.id] = job
-        # Purge des vieux jobs : garde les 20 plus récents
-        if len(_JOBS) > 20:
-            for jid in sorted(_JOBS, key=lambda j: _JOBS[j].created)[:-20]:
-                if _JOBS[jid].status != "running":
-                    del _JOBS[jid]
+        _LOG.info("job %s créé (%s)", job.id[:8], job.kind)
+        # Purge par type : les vieux jobs du même type, jamais ceux d'un autre
+        keep = _JOB_RETENTION.get(job.kind, 20)
+        same_kind = sorted(
+            (j for j in _JOBS.values() if j.kind == job.kind),
+            key=lambda j: j.created,
+        )
+        for old in same_kind[:-keep]:
+            if old.status != "running":
+                del _JOBS[old.id]
 
 
 def _get_job(job_id: str) -> _Job | None:
@@ -201,9 +221,25 @@ def _entry_dict(key: str, entry: dict) -> dict:
 
 
 # ─── Liste des CV disponibles + registre ─────────────────────────────────────
+# Les nouveaux imports vont dans output/cv/ ; les CV historiques restés à la
+# racine du projet restent visibles et utilisables (résolution dans les deux).
 
 def _list_cv_files() -> list[str]:
-    return list_cv_files(_PROJECT_DIR)
+    names = list_cv_files(cv_dir())
+    seen = set(names)
+    names += [n for n in list_cv_files(_PROJECT_DIR) if n not in seen]
+    return names
+
+
+def _cv_path(name: str) -> Path:
+    """Chemin réel d'un CV par nom nu : output/cv/ d'abord, puis la racine du
+    projet (anciens imports). Retourne le chemin output/cv même inexistant."""
+    name = Path(name).name
+    candidate = cv_dir() / name
+    if candidate.is_file():
+        return candidate
+    legacy = _PROJECT_DIR / name
+    return legacy if legacy.is_file() else candidate
 
 
 def _cv_payload(entry: dict) -> dict:
@@ -216,7 +252,7 @@ def _cv_payload(entry: dict) -> dict:
         "label": entry.get("label", ""),
         "added": entry.get("added", ""),
         "analyzed": entry.get("analyzed", ""),
-        "file_exists": (_PROJECT_DIR / entry.get("filename", "")).is_file(),
+        "file_exists": _cv_path(entry.get("filename", "")).is_file(),
         "profile": profile,
         "sources": sources,
         "overrides": entry.get("overrides") or {},
@@ -237,7 +273,7 @@ def _load_cv_texts(names: list[str]) -> dict[str, str]:
     manuelles incluses)."""
     texts: dict[str, str] = {}
     for name in names:
-        raw = parse_cv(str(_PROJECT_DIR / name))
+        raw = parse_cv(str(_cv_path(name)))
         with _CV_LOCK:
             entry = _get_cv_store().register(name)
             label = entry.get("label") or name
@@ -255,7 +291,7 @@ def _cv_history_display(criteria_cv: str) -> str:
     with _CV_LOCK:
         store = _get_cv_store()
         return " + ".join(
-            store.history_label(n, (_PROJECT_DIR / n).is_file()) for n in names
+            store.history_label(n, _cv_path(n).is_file()) for n in names
         )
 
 
@@ -272,10 +308,15 @@ def _style_examples() -> dict[str, list[str]] | None:
 
 def _run_scan(job: _Job, p: dict) -> None:
     try:
-        job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
-        job.cv_texts = _load_cv_texts(p["cvs"])
-        job.cv_text = merge_cv_texts(job.cv_texts)
-        job.add_log(f"{len(job.cv_texts)} CV parsé(s) ({len(job.cv_text)} caractères)")
+        _LOG.info("scan %s : début (query=%r, sources=%s, no_ai=%s)",
+                  job.id[:8], p.get("query", ""), ",".join(p["sources"]), p.get("no_ai"))
+        if p["cvs"]:
+            job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
+            job.cv_texts = _load_cv_texts(p["cvs"])
+            job.cv_text = merge_cv_texts(job.cv_texts)
+            job.add_log(f"{len(job.cv_texts)} CV parsé(s) ({len(job.cv_text)} caractères)")
+        else:  # mode test scraper sans CV
+            job.add_log("Mode test scraper : aucun CV nécessaire.")
 
         if p.get("global"):
             job.add_log("Recherche globale : génération des requêtes depuis vos CV…")
@@ -321,17 +362,40 @@ def _run_scan(job: _Job, p: dict) -> None:
             stopped = job.stop_event.is_set()
             executor.shutdown(wait=not stopped, cancel_futures=stopped)
 
+        # Trace brute : toutes les offres collectées, avant tout filtrage
+        if all_offers:
+            raw_path = save_raw_offers(all_offers, p["query"])
+            job.add_log(f"Offres brutes sauvegardées : {raw_path.name}")
+
         if not p["include_seen"]:
-            before = len(all_offers)
+            before_filter = list(all_offers)
             with _TRACKER_LOCK:
                 all_offers = tracker.filter_visible(all_offers)
-            hidden = before - len(all_offers)
+            hidden = len(before_filter) - len(all_offers)
             if hidden:
                 job.add_log(f"{hidden} offre(s) déjà traitée(s) filtrée(s)")
+                visible_keys = {o.unique_key() for o in all_offers}
+                save_dropped_offers(
+                    [o for o in before_filter if o.unique_key() not in visible_keys],
+                    p["query"], "déjà traitée (favori/postulée/rejetée)",
+                )
 
         if not all_offers:
             job.add_log("Aucune offre à analyser.")
             job.status = "done"
+            return
+
+        # Mode test scraper : prévisualisation brute, AUCUN appel IA — pour
+        # ajuster requête/filtres avant de connecter le pipeline IA
+        if p.get("no_ai"):
+            job.offers = all_offers
+            job.query = p["query"]
+            job.add_log(
+                f"🔌 Mode test scraper : {len(all_offers)} offre(s) brute(s), aucune analyse IA. "
+                "Ajustez vos filtres puis relancez sans ce mode."
+            )
+            job.status = "done"
+            _LOG.info("scan %s : terminé en mode test (%d offres brutes)", job.id[:8], len(all_offers))
             return
 
         multi = f" × {len(job.cv_texts)} CV" if len(job.cv_texts) > 1 else ""
@@ -354,6 +418,13 @@ def _run_scan(job: _Job, p: dict) -> None:
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
 
+        # Traçabilité : offres analysées mais sous le score minimum / exclues
+        matched_keys = {o.unique_key() for o in matched}
+        save_dropped_offers(
+            [o for o in all_offers if o.unique_key() not in matched_keys],
+            p["query"], f"score < {p['min_score']}/10 ou exclue par filtre",
+        )
+
         job.offers = matched
         job.query = p["query"]
         # Session enregistrée sauf arrêt sans aucun résultat (rien à garder)
@@ -368,7 +439,10 @@ def _run_scan(job: _Job, p: dict) -> None:
         else:
             job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
         job.status = "done"
+        _LOG.info("scan %s : terminé (%d offres retenues / %d collectées)",
+                  job.id[:8], len(matched), len(all_offers))
     except Exception as e:
+        _LOG.exception("scan %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
     finally:
@@ -455,6 +529,8 @@ def _run_rescore(job: _Job, p: dict) -> None:
 def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
     try:
         offer = scan_job.offers[index]
+        _LOG.info("lettre %s : début (offre « %s » @ %s, ton %s)",
+                  job.id[:8], offer.title[:60], offer.company[:40], tone)
         tracker = _get_tracker()
         with _TRACKER_LOCK:
             applied_titles = [
@@ -465,7 +541,10 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
             applied_history=applied_titles,
             style_examples=_style_examples(),
         )
+        _LOG.info("lettre %s : appel LLM…", job.id[:8])
         result = generator.generate(offer, tone=tone)
+        _LOG.info("lettre %s : LLM ok (%d caractères) — écriture fichiers",
+                  job.id[:8], len(result.get("letter", "")))
         txt_path, pdf_path = generator.save(offer, result)
         pdf_name = pdf_path.name if pdf_path.exists() else ""
         with _TRACKER_LOCK:
@@ -483,7 +562,9 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
             "pdf_file": pdf_name,
         }
         job.status = "done"
+        _LOG.info("lettre %s : terminée (%s)", job.id[:8], txt_path.name)
     except Exception as e:
+        _LOG.exception("lettre %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
 
@@ -497,7 +578,7 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
             raise ValueError("CV introuvable dans le registre")
         filename = entry.get("filename", "")
         job.add_log(f"Lecture de {filename}…")
-        raw = parse_cv(str(_PROJECT_DIR / filename))
+        raw = parse_cv(str(_cv_path(filename)))
         job.add_log(f"CV parsé ({len(raw)} caractères) — extraction IA en cours…")
         profile = CVExtractor().extract(raw)
         with _CV_LOCK:
@@ -525,12 +606,17 @@ def _validate_cvs(body: dict) -> list[str]:
 
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     is_global = bool(body.get("global"))
+    no_ai = bool(body.get("no_ai", False))
+    if no_ai and is_global:
+        # La recherche globale génère ses requêtes par IA : incompatible avec
+        # le mode test sans IA — une requête explicite est exigée.
+        return None, "Mode test scraper : saisissez une requête (la recherche globale utilise l'IA)."
     query = str(body.get("query", "")).strip()[:200]
     if not query and not is_global:
         return None, "La recherche est vide."
 
     cvs = _validate_cvs(body)
-    if not cvs:
+    if not cvs and not no_ai:
         return None, "CV introuvable : importez un fichier PDF/DOCX/TXT ou cochez au moins un CV."
 
     country = str(body.get("country", "fr")).strip().lower()
@@ -578,6 +664,8 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
         "max": max_per_source,
         "exclude": exclude,
         "include_seen": bool(body.get("include_seen", False)),
+        # Mode test scraper : collecte sans aucun appel IA (offres brutes)
+        "no_ai": no_ai,
     }, ""
 
 
@@ -805,6 +893,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"cvs": _cvs_payload()})
         elif path == "/api/download":
             self._api_download(query.get("file", [""])[0])
+        elif path == "/api/local-models":
+            self._api_local_models()
         else:
             self._error("Route inconnue", 404)
 
@@ -876,20 +966,30 @@ class _Handler(BaseHTTPRequestHandler):
     def _api_download(self, name: str):
         # Nom nu uniquement : caractères sûrs, pas de dotfile, extension sûre.
         # (le jeu de caractères restreint empêche aussi toute injection d'en-tête
-        # via Content-Disposition)
+        # via Content-Disposition). Le serveur résout le nom dans les
+        # sous-dossiers connus de output/ — jamais de chemin fourni par le client.
         if (not name or not re.fullmatch(r"[A-Za-z0-9 ._-]{1,120}", name)
                 or name.startswith(".")
                 or Path(name).suffix.lower() not in _DOWNLOAD_EXTENSIONS):
             self._error("Fichier non autorisé", 403)
             return
-        out_dir = Path(config.output_dir).resolve()
-        target = (out_dir / name).resolve()
-        if target.parent != out_dir or not target.is_file():
+        target = find_output_file(name)
+        if target is None:
             self._error("Fichier introuvable", 404)
             return
         self._send(200, _DOWNLOAD_TYPES[target.suffix.lower()], target.read_bytes(), download_name=name)
 
     # ── API ──
+
+    def _api_local_models(self):
+        """Détection des serveurs LLM locaux (Ollama, LM Studio, llama.cpp) +
+        RAM/VRAM + suggestions de modèles — sondes localhost uniquement."""
+        from integrations import scan_local_models
+        try:
+            self._json(scan_local_models())
+        except Exception as e:
+            _LOG.exception("scan modèles locaux : échec")
+            self._error(f"Détection impossible : {str(e)[:200]}", 500)
 
     def _api_state(self):
         provider_ready = (
@@ -1062,7 +1162,12 @@ class _Handler(BaseHTTPRequestHandler):
             return
         scan_job = _get_job(str(body.get("job_id", "")))
         if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
-            self._error("Scan introuvable — relancez une recherche.", 404)
+            _LOG.warning("lettre refusée : scan job %s introuvable ou non terminé "
+                         "(%d jobs en mémoire)", str(body.get("job_id", ""))[:8], len(_JOBS))
+            self._error(
+                "Session de scan introuvable — rechargez une session depuis "
+                "l'onglet Historique ou relancez une recherche.", 404,
+            )
             return
         if not scan_job.cv_text:
             self._error("CV de cette session introuvable — relancez une recherche avec un CV.", 400)
@@ -1202,7 +1307,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         # Nom strictement assaini, préfixé : aucune traversée de chemin possible
         stem = re.sub(r"[^A-Za-z0-9_-]", "_", Path(raw_name).stem)[:50] or "cv"
-        target = _PROJECT_DIR / f"{stem}{ext}"
+        target = cv_dir() / f"{stem}{ext}"
         if target.name.lower() in EXCLUDED_FILENAMES:
             self._error("Ce nom de fichier est réservé — renommez votre CV.")
             return
@@ -1232,8 +1337,8 @@ class _Handler(BaseHTTPRequestHandler):
         if entry is None:
             self._error("CV introuvable", 404)
             return
-        if not (_PROJECT_DIR / entry.get("filename", "")).is_file():
-            self._error("Le fichier de ce CV n'existe plus dans le dossier du projet.", 404)
+        if not _cv_path(entry.get("filename", "")).is_file():
+            self._error("Le fichier de ce CV n'existe plus.", 404)
             return
         job = _Job("cv")
         _register_job(job)
@@ -1281,8 +1386,8 @@ class _Handler(BaseHTTPRequestHandler):
             # Fichier effacé AVANT le tombstone : si l'effacement échoue, le
             # sync suivant ré-enregistrerait le fichier restant comme un CV
             # actif neuf et la « suppression » serait silencieusement annulée.
-            target = (_PROJECT_DIR / Path(entry.get("filename", "")).name).resolve()
-            if target.parent == _PROJECT_DIR and target.is_file():
+            target = _cv_path(Path(entry.get("filename", "")).name).resolve()
+            if target.parent in (_PROJECT_DIR, cv_dir().resolve()) and target.is_file():
                 try:
                     target.unlink()
                 except OSError:

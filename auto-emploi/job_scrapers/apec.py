@@ -9,7 +9,10 @@ import requests
 
 from rich.markup import escape
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import (
+    BaseScraper, JobOffer, MAX_RESPONSE_BYTES,
+    fetch_with_retry, cache_results, cached_results,
+)
 from config import config
 from app_utils import console
 
@@ -67,7 +70,11 @@ class ApecScraper(BaseScraper):
         while len(offers) < max_results and start <= MAX_START:
             payload = _build_payload(query, start, page_size)
             try:
-                resp = session.post(API_URL, json=payload, timeout=15)
+                resp = fetch_with_retry(
+                    lambda: session.post(API_URL, json=payload, timeout=15),
+                    source="Apec",
+                    log=lambda m: console.print(f"[dim]{escape(m)}[/dim]"),
+                )
                 if resp.status_code == 400:
                     console.print(f"[yellow][Apec] Payload rejeté (400). Réponse : {escape(resp.text[:200])}[/yellow]")
                     break
@@ -77,7 +84,16 @@ class ApecScraper(BaseScraper):
                     break
                 data = resp.json()
             except (requests.RequestException, ValueError) as e:
-                console.print(f"[yellow][Apec] Erreur réseau : {escape(str(e))}[/yellow]")
+                # Erreur externe (le serveur Apec, pas l'application) : message
+                # clair + secours sur le dernier résultat réussi de la session.
+                console.print(
+                    f"[yellow][Apec] L'API Apec ne répond pas malgré 4 tentatives "
+                    f"({escape(type(e).__name__)}) — erreur côté Apec, réessayez plus tard.[/yellow]"
+                )
+                cached = cached_results("Apec", query, location)
+                if cached and not offers:
+                    console.print(f"[dim][Apec] Réutilisation du dernier résultat en mémoire ({len(cached)} offres).[/dim]")
+                    return list(cached)
                 break
 
             results = data.get("resultats", [])
@@ -96,6 +112,7 @@ class ApecScraper(BaseScraper):
             start += page_size
             time.sleep(config.request_delay)
 
+        cache_results("Apec", query, location, offers)
         return offers
 
     def _parse_item(self, item: dict) -> JobOffer | None:

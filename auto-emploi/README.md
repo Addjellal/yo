@@ -21,7 +21,11 @@ auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
   **recherche globale** (intitulés de poste générés par l'IA depuis vos CV),
   plafond d'offres par source **optionnel** (vide = illimité, pensé pour les
   LLM locaux gratuits), progression en direct avec **bouton ⏹ Stopper**
-  (les offres déjà scorées sont conservées), re-scoring sans scraper ;
+  (les offres déjà scorées sont conservées), re-scoring sans scraper,
+  **mode test scraper** (case « sans IA » : collecte et prévisualise les
+  offres brutes sans aucun appel IA — ajustez requête et filtres avant de
+  reconnecter le matching), bouton « ↺ Recharger la dernière session »
+  (offres servies depuis l'historique local, zéro appel API) ;
 - **Résultats** : cartes avec anneau + barre de score, badge du **CV
   gagnant** et détail des scores par CV, atouts/lacunes, actions favori /
   postulée / rejeter, tri, export CSV+JSON, export Notion ;
@@ -43,7 +47,10 @@ auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
   aux prochains scans) ;
 - **Statistiques** : compteurs, candidatures par semaine et par source ;
 - **Réglages** : clés API, routage IA par tâche, coordonnées candidat,
-  exemples de style pour les lettres (few-shot), critères par défaut.
+  exemples de style pour les lettres (few-shot), critères par défaut,
+  **détection des modèles locaux** (sonde Ollama / LM Studio / llama.cpp,
+  mesure RAM/VRAM et conseille un modèle adapté — bouton « Utiliser » pour
+  le renseigner en un clic).
 
 Sécurité de l'interface web : serveur accessible uniquement depuis
 `127.0.0.1`, jeton de session aléatoire anti-CSRF/anti-DNS-rebinding sur
@@ -92,7 +99,10 @@ sont inaccessibles).
   irréversible, l'historique garde « CV supprimé : x »).
 - **Lettres de motivation** : 3 tons au choix (standard, formelle, directe),
   **email d'accompagnement** (objet + corps) inclus, variation automatique
-  par rapport à vos candidatures passées. Export TXT + PDF.
+  par rapport à vos candidatures passées. Export TXT + PDF. **Correction
+  typographique automatique** après génération (les petits modèles locaux
+  produisent parfois « Îquipe » pour « Équipe », « 2Îme » pour « 2ème » —
+  réparé en code pur, sans timeout ni appel IA supplémentaire).
   - **Skills de rédaction éditables** : avant chaque génération, le guide
     `prompts/skills/lettre_fr.md` (structure Vous-Moi-Nous, formules,
     erreurs à éviter, mots-clés ATS) ou `cover_letter_en.md` (cover letter
@@ -108,6 +118,22 @@ sont inaccessibles).
 - **Tracking persistant** : favoris (`f`), postulées (`a`), rejetées (`r`) —
   les offres déjà traitées ne réapparaissent plus. Écriture atomique.
 - **Exports** : JSON + CSV (Excel / Google Sheets) et **Notion** (`--notion`).
+- **Dossier output/ organisé** : `cv/` (CV importés), `offres/brutes/`
+  (avant analyse), `offres/analysees/` (exports scorés), `offres/ecartees/`
+  (traçabilité de ce qui a été filtré et pourquoi), `lettres/par_offre/`,
+  `logs/` (journal `web.log` : cycle de vie des scans et lettres, erreurs
+  complètes). Les anciens fichiers à la racine restent lisibles.
+- **APIs externes instables** : Apec (500) et Adzuna (503) sont retentées
+  avec délais exponentiels (2 s, 4 s, 8 s) ; en cas de panne persistante,
+  message clair « erreur côté Apec/Adzuna » + réutilisation du dernier
+  résultat réussi de la session si disponible. Ces erreurs viennent des
+  serveurs externes : l'application ne peut que retenter et attendre.
+- **Prétraitement des offres** : HTML résiduel nettoyé (balises, entités)
+  et sections détectées (missions / profil recherché / compétences) mises
+  en avant dans le prompt de matching.
+- **Détection LLM locaux** : `--scan-models` (CLI) ou bouton dans Réglages —
+  liste les modèles installés (Ollama/LM Studio/llama.cpp), détecte RAM et
+  VRAM, et suggère un modèle adapté (tinyllama → mistral → mixtral).
 
 ## Installation
 
@@ -130,6 +156,8 @@ python main.py --cv mon_cv.pdf --scan --max 0         # sans plafond d'offres (L
 python main.py --cv mon_cv.pdf --query "data engineer" --location "Paris"
 python main.py --cv mon_cv.pdf --query "robotique" --watch 60   # veille + notifications
 python main.py --cv mon_cv.pdf --scan --exclude "senior,5 ans"  # filtres éliminatoires
+python main.py --no-ai --query "data engineer" --scan # test scraper : offres brutes, zéro appel IA
+python main.py --scan-models                          # détecter Ollama/LM Studio + suggestions
 python main.py --cv mon_cv.pdf --rescore              # re-scorer la base sans scraper
 python main.py --sessions                             # sessions passées (+ --session N, --rerun N)
 python main.py --list-cvs                             # CV connus du registre

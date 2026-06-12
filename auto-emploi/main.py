@@ -1027,10 +1027,20 @@ def _csv_safe(value) -> str:
     return s
 
 
+def _ascii_slug(text: str, limit: int = 30) -> str:
+    """Nom de fichier sûr ET téléchargeable : accents translittérés (é → e),
+    tout caractère hors [a-zA-Z0-9_-] remplacé. Les accents conservés
+    cassaient le téléchargement web (« développeur » → « Fichier non autorisé »)."""
+    import unicodedata
+    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return ("".join(c if c.isalnum() else "_" for c in folded)[:limit].strip("_")
+            or "recherche")
+
+
 def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
-    out = Path(config.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    safe_query = "".join(c if c.isalnum() else "_" for c in query)[:30]
+    from output_paths import offers_scored_dir
+    out = offers_scored_dir()
+    safe_query = _ascii_slug(query)
 
     json_path = out / f"resultats_{safe_query}.json"
     csv_path = out / f"resultats_{safe_query}.csv"
@@ -1060,6 +1070,43 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     console.print(f"\n[dim]JSON : {json_path}[/dim]")
     console.print(f"[dim]CSV  : {csv_path}  (Excel / Google Sheets)[/dim]")
     return json_path, csv_path
+
+
+def save_raw_offers(offers: list[JobOffer], query: str) -> Path:
+    """Offres brutes (avant analyse IA) → output/offres/brutes/ — sert au mode
+    test scraper (sans IA) pour prévisualiser et ajuster les filtres."""
+    from output_paths import offers_raw_dir
+    path = offers_raw_dir() / f"brutes_{_ascii_slug(query)}.json"
+    rows = [
+        {
+            "titre": o.title, "entreprise": o.company, "lieu": o.location or "",
+            "contrat": o.contract_type or "", "salaire": o.salary or "",
+            "source": o.source, "url": o.url,
+            "description": (o.description or "")[:4000],
+        }
+        for o in offers
+    ]
+    path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def save_dropped_offers(offers: list[JobOffer], query: str, reason: str) -> Path | None:
+    """Offres collectées mais non retenues → output/offres/ecartees/ —
+    traçabilité de ce que le pipeline a éliminé (déjà vues, score insuffisant…)."""
+    if not offers:
+        return None
+    from output_paths import offers_dropped_dir
+    path = offers_dropped_dir() / f"ecartees_{_ascii_slug(query)}.json"
+    rows = [
+        {
+            "titre": o.title, "entreprise": o.company, "lieu": o.location or "",
+            "source": o.source, "url": o.url, "score": o.match_score,
+            "raison": reason,
+        }
+        for o in offers
+    ]
+    path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
 
 
 # ─── Historique des sessions ──────────────────────────────────────────────────
@@ -1304,6 +1351,39 @@ def _make_letter_cb(cv_texts: dict[str, str], tracker: Tracker):
         console.print(f"[dim]→ {len(targets)} offre(s) marquée(s) comme postulée(s).[/dim]")
 
     return callback
+
+
+# ─── Détection des LLM locaux ─────────────────────────────────────────────────
+
+def show_local_models() -> None:
+    """`--scan-models` : serveurs LLM locaux actifs, matériel, suggestions."""
+    from integrations import scan_local_models
+    console.print("[dim]Détection des serveurs LLM locaux (Ollama, LM Studio, llama.cpp)…[/dim]")
+    report = scan_local_models()
+
+    ram, vram = report["ram_gb"], report["vram_gb"]
+    hw = f"RAM : {ram} Go" if ram else "RAM : inconnue"
+    hw += f" · VRAM GPU : {vram} Go" if vram else " · pas de GPU NVIDIA détecté"
+    console.print(f"[bold]Matériel[/bold] — {hw}")
+
+    if not report["servers"]:
+        console.print(
+            "[yellow]Aucun serveur LLM local détecté.[/yellow] "
+            "[dim]Ollama : https://ollama.com · LM Studio : https://lmstudio.ai[/dim]"
+        )
+    for server in report["servers"]:
+        table = Table(title=f"{server['server']} — {server['url']}", box=box.SIMPLE)
+        table.add_column("Modèle")
+        table.add_column("Taille", justify="right")
+        for m in server["models"] or [{"name": "(aucun modèle installé)", "size_gb": None}]:
+            table.add_row(escape(m["name"]), f"{m['size_gb']} Go" if m["size_gb"] else "–")
+        console.print(table)
+
+    if report["suggestions"]:
+        console.print("[bold]Modèles conseillés pour cette machine :[/bold]")
+        for s in report["suggestions"]:
+            console.print(f"  • [cyan]{escape(s['model'])}[/cyan] — {escape(s['reason'])}")
+        console.print("[dim]Installation : ollama pull <modèle> · puis OLLAMA_MODEL=<modèle> dans .env[/dim]")
 
 
 # ─── Statistiques tracking ────────────────────────────────────────────────────
@@ -1625,7 +1705,16 @@ def parse_args():
         help="Secteurs cibles : " + ", ".join(k for k, _ in SECTORS),
     )
     parser.add_argument("--scan", action="store_true", help="Scan uniquement : affiche et exporte sans générer de lettres")
+    parser.add_argument(
+        "--no-ai", action="store_true", dest="no_ai",
+        help="Mode test scraper : collecte et affiche les offres brutes SANS aucun appel IA "
+             "(export dans output/offres/brutes/) — pour ajuster requête et filtres sans consommer de tokens",
+    )
     parser.add_argument("--no-letters", action="store_true", help="Analyse complète mais sans étape de génération de lettres")
+    parser.add_argument(
+        "--scan-models", action="store_true", dest="scan_models",
+        help="Détecter les serveurs LLM locaux (Ollama, LM Studio, llama.cpp), la RAM/VRAM et suggérer des modèles",
+    )
     parser.add_argument(
         "--include-seen", action="store_true",
         help="Inclure les offres déjà postulées ou rejetées dans les résultats",
@@ -1672,6 +1761,11 @@ def main():
     # Mode stats
     if args.stats:
         show_stats()
+        return
+
+    # Détection des LLM locaux
+    if args.scan_models:
+        show_local_models()
         return
 
     # Gestion des CV (registre)
@@ -1725,25 +1819,33 @@ def main():
         border_style="cyan",
     ))
 
-    # 1. CV (obligatoire sauf --check) — répétable pour le matching multi-CV
-    if not args.cv:
+    # 1. CV (obligatoire sauf --check et --no-ai) — répétable pour le matching multi-CV
+    if not args.cv and not args.no_ai:
         console.print("[red]--cv est requis. Exemple : python main.py --cv mon_cv.pdf --scan[/red]")
         console.print("[dim]Conseil : lancez d'abord  python main.py --check  pour vérifier votre configuration.[/dim]")
+        console.print("[dim]Sans CV ni IA : python main.py --no-ai --query \"...\" (test scraper).[/dim]")
         sys.exit(1)
 
-    args.cv = args.cv[:5]  # garde-fou : 5 CV max par session
-    plural = "x" if len(args.cv) > 1 else ""
-    console.print(f"\n[bold]1. Lecture du{plural} CV :[/bold] {', '.join(args.cv)}")
-    try:
-        cv_texts = _load_cv_texts(args.cv)
-        total = sum(len(t) for t in cv_texts.values())
-        console.print(f"[green]✓ {len(cv_texts)} CV parsé(s) ({total} caractères)[/green]")
-    except (FileNotFoundError, ValueError) as e:
-        console.print(f"[red]Erreur CV : {escape(str(e))}[/red]")
-        sys.exit(1)
+    cv_texts: dict[str, str] = {}
+    if args.cv:
+        args.cv = args.cv[:5]  # garde-fou : 5 CV max par session
+        plural = "x" if len(args.cv) > 1 else ""
+        console.print(f"\n[bold]1. Lecture du{plural} CV :[/bold] {', '.join(args.cv)}")
+        try:
+            cv_texts = _load_cv_texts(args.cv)
+            total = sum(len(t) for t in cv_texts.values())
+            console.print(f"[green]✓ {len(cv_texts)} CV parsé(s) ({total} caractères)[/green]")
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[red]Erreur CV : {escape(str(e))}[/red]")
+            sys.exit(1)
+    else:
+        args.cv = []
+        console.print("\n[bold yellow]Mode test scraper (--no-ai) : aucun CV ni appel IA.[/bold yellow]")
 
-    # 2. Vérification provider IA
-    if config.provider == "ollama":
+    # 2. Vérification provider IA (inutile en mode test scraper)
+    if args.no_ai:
+        pass
+    elif config.provider == "ollama":
         ollama_ok, _ = _check_ollama()
         if not ollama_ok:
             console.print(f"[red]Ollama n'est pas démarré sur {config.ollama_base_url}[/red]")
@@ -1757,6 +1859,9 @@ def main():
 
     # Mode re-scoring : toutes les offres connues, sans scraper
     if args.rescore:
+        if args.no_ai or not cv_texts:
+            console.print("[red]--rescore nécessite l'IA et au moins un --cv (incompatible avec --no-ai).[/red]")
+            sys.exit(1)
         rescore_known_offers(args, cv_texts)
         return
 
@@ -1842,6 +1947,9 @@ def main():
 
     # Mode veille : boucle autonome, pas d'interaction
     if args.watch:
+        if args.no_ai:
+            console.print("[red]--watch est incompatible avec --no-ai (la veille score les nouvelles offres).[/red]")
+            sys.exit(1)
         if not args.query.strip():
             console.print("[red]--watch nécessite --query (mode non interactif).[/red]")
             sys.exit(1)
@@ -1849,7 +1957,11 @@ def main():
         return
 
     # 5. Boucle de recherche
-    # --global-search prend le dessus sur --query si les deux sont fournis
+    # --global-search prend le dessus sur --query si les deux sont fournis ;
+    # incompatible avec --no-ai (les requêtes globales sont générées par IA)
+    if args.no_ai and args.global_search:
+        console.print("[yellow]--global-search ignoré : incompatible avec --no-ai (requêtes générées par l'IA).[/yellow]")
+        args.global_search = False
     first_query = "" if args.global_search else args.query.strip()
     pending_global = args.global_search
     console.print(
@@ -1939,6 +2051,17 @@ def main():
             continue
 
         console.print(f"[bold]Total :[/bold] {len(all_offers)} offres collectées")
+
+        # Mode test scraper (--no-ai) : aperçu brut, AUCUN appel IA — pour
+        # ajuster requête/sources/filtres avant de consommer des tokens
+        if args.no_ai:
+            raw_path = save_raw_offers(all_offers, query)
+            console.print(
+                f"[bold yellow]Mode test scraper :[/bold yellow] aucune analyse IA. "
+                f"[dim]Export brut : {escape(str(raw_path))}[/dim]"
+            )
+            browse_offers(all_offers, tracker)
+            continue
 
         # Matching IA
         sector_label = f", secteurs : {', '.join(sectors)}" if sectors else ""

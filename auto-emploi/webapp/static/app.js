@@ -307,6 +307,19 @@ async function init() {
 
   // Notion
   $("#btn-notion").hidden = !APP.notion;
+
+  // « Recharger la dernière session » : offres servies depuis l'historique
+  // local, sans scraping ni appel IA
+  try {
+    const data = await api("/api/sessions");
+    if (data.sessions && data.sessions.length) {
+      const last = data.sessions[0];
+      const btn = $("#btn-reload-last");
+      btn.hidden = false;
+      btn.textContent = `↺ Recharger « ${last.criteria.query || "dernière session"} » (sans appel API)`;
+      btn.addEventListener("click", () => loadSession(last.id));
+    }
+  } catch (e) { /* pas bloquant */ }
 }
 
 // ─── Sélection des CV (cases à cocher) ──────────────────────────────────────
@@ -476,9 +489,11 @@ $("#btn-scan-stop").addEventListener("click", async () => {
 
 async function startScan() {
   const isGlobal = $("#f-global").checked;
+  const noAi = $("#f-no-ai").checked;
   const query = $("#f-query").value.trim();
+  if (noAi && isGlobal) { toast("Mode test scraper : saisissez une requête (la recherche globale utilise l'IA).", "err"); return; }
   if (!query && !isGlobal) { toast("Indiquez un poste à rechercher (ou cochez la recherche globale).", "err"); return; }
-  if (!SELECTED.cvs.size) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
+  if (!SELECTED.cvs.size && !noAi) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
   if (!SELECTED.sources.size) { toast("Sélectionnez au moins une source.", "err"); return; }
 
   const country = $("#f-country").value;
@@ -499,6 +514,7 @@ async function startScan() {
     max: maxRaw === "" ? 0 : parseInt(maxRaw, 10) || 0,  // 0 = sans plafond
     exclude: $("#f-exclude").value,
     include_seen: $("#f-include-seen").checked,
+    no_ai: noAi,
   };
 
   let out;
@@ -515,9 +531,11 @@ async function startScan() {
   $("#results-zone").hidden = true;
   $("#scan-progress").hidden = false;
   $("#btn-scan-stop").disabled = false;
-  $("#progress-title").textContent = isGlobal
-    ? "Recherche globale d'après vos CV…"
-    : `Recherche : « ${query} »`;
+  $("#progress-title").textContent = noAi
+    ? `Test scraper (sans IA) : « ${query} »`
+    : isGlobal
+      ? "Recherche globale d'après vos CV…"
+      : `Recherche : « ${query} »`;
   $("#progress-log").replaceChildren();
   pollScan();
 }
@@ -631,13 +649,16 @@ function renderResults() {
 }
 
 function offerCard(offer) {
+  // score null = offre brute non analysée (mode test scraper sans IA)
+  const rawMode = offer.score === null || offer.score === undefined;
   const score = offer.score || 0;
-  const ring = el("div", { class: "score-ring", text: String(score) });
-  ring.style.setProperty("--pct", score * 10);
+  const ring = el("div", { class: "score-ring", text: rawMode ? "—" : String(score) });
+  ring.style.setProperty("--pct", rawMode ? 0 : score * 10);
   ring.style.setProperty("--ring", scoreColor(score));
+  if (rawMode) ring.title = "Non analysée (mode test scraper)";
 
   const scoreBar = el("div", { class: "score-bar" }, [el("i")]);
-  scoreBar.style.setProperty("--pct", score * 10);
+  scoreBar.style.setProperty("--pct", rawMode ? 0 : score * 10);
   scoreBar.style.setProperty("--ring", scoreColor(score));
 
   const badges = el("div", { class: "offer-badges" }, [
@@ -1603,6 +1624,68 @@ $("#btn-save-settings").addEventListener("click", async () => {
     toast(`Enregistré dans .env : ${out.saved.join(", ")}`, "ok");
   } catch (e) {
     toast(e.message, "err");
+  }
+});
+
+// ─── Détection des modèles LLM locaux (Ollama, LM Studio, llama.cpp) ─────────
+
+$("#btn-scan-models").addEventListener("click", async () => {
+  const btn = $("#btn-scan-models");
+  const box = $("#local-models-result");
+  btn.disabled = true;
+  btn.textContent = "Détection en cours…";
+  box.hidden = false;
+  box.replaceChildren(el("span", { class: "muted small", text: "Sonde des ports locaux (Ollama 11434, LM Studio 1234, llama.cpp 8080)…" }));
+  let report;
+  try {
+    report = await api("/api/local-models");
+  } catch (e) {
+    box.replaceChildren(el("span", { class: "muted small", text: "Détection impossible : " + e.message }));
+    btn.disabled = false;
+    btn.textContent = "🔍 Détecter les modèles locaux (Ollama, LM Studio, llama.cpp)";
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = "🔍 Détecter les modèles locaux (Ollama, LM Studio, llama.cpp)";
+  box.replaceChildren();
+
+  const hw = [];
+  if (report.ram_gb) hw.push(`RAM : ${report.ram_gb} Go`);
+  if (report.vram_gb) hw.push(`VRAM GPU : ${report.vram_gb} Go`);
+  else hw.push("pas de GPU NVIDIA détecté");
+  box.appendChild(el("div", { class: "lm-hw", text: "Matériel — " + hw.join(" · ") }));
+
+  if (!report.servers.length) {
+    box.appendChild(el("div", { class: "muted small", text:
+      "Aucun serveur LLM local détecté. Installez Ollama (ollama.com) ou LM Studio (lmstudio.ai), puis relancez la détection." }));
+  }
+  for (const server of report.servers) {
+    const head = el("div", { class: "lm-server", text: `${server.server} — ${server.url}` });
+    box.appendChild(head);
+    if (!server.models.length) {
+      box.appendChild(el("div", { class: "muted small", text: "Serveur actif mais aucun modèle installé." }));
+    }
+    for (const m of server.models) {
+      const useBtn = el("button", { class: "btn-ghost small", text: "Utiliser" });
+      useBtn.title = "Renseigne ce modèle dans « Modèle Ollama » (pensez à Enregistrer)";
+      useBtn.addEventListener("click", () => {
+        $("#s-ollama-model").value = m.name;
+        toast(`Modèle « ${m.name} » prérempli — cliquez sur Enregistrer pour l'activer.`, "ok");
+      });
+      box.appendChild(el("div", { class: "lm-model" }, [
+        el("span", { text: m.name + (m.size_gb ? ` (${m.size_gb} Go)` : "") }),
+        server.server === "Ollama" ? useBtn : null,
+      ]));
+    }
+  }
+  if (report.suggestions && report.suggestions.length) {
+    box.appendChild(el("div", { class: "lm-server", text: "Modèles conseillés pour cette machine :" }));
+    for (const s of report.suggestions) {
+      box.appendChild(el("div", { class: "lm-model" }, [
+        el("span", { text: `${s.model} — ${s.reason}` }),
+      ]));
+    }
+    box.appendChild(el("div", { class: "muted small", text: "Installation : « ollama pull <modèle> » dans un terminal, puis bouton Utiliser." }));
   }
 });
 

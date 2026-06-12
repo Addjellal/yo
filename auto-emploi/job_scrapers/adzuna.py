@@ -10,7 +10,10 @@ import requests
 
 from rich.markup import escape
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import (
+    BaseScraper, JobOffer, MAX_RESPONSE_BYTES,
+    fetch_with_retry, cache_results, cached_results,
+)
 from config import config
 from app_utils import console
 
@@ -64,10 +67,14 @@ class AdzunaScraper(BaseScraper):
                 params["where"] = location
 
             try:
-                resp = session.get(
-                    API_URL.format(country=country, page=page),
-                    params=params,
-                    timeout=15,
+                resp = fetch_with_retry(
+                    lambda: session.get(
+                        API_URL.format(country=country, page=page),
+                        params=params,
+                        timeout=15,
+                    ),
+                    source="Adzuna",
+                    log=lambda m: console.print(f"[dim]{escape(_redact(m))}[/dim]"),
                 )
                 resp.raise_for_status()
                 if len(resp.content) > MAX_RESPONSE_BYTES:
@@ -75,7 +82,16 @@ class AdzunaScraper(BaseScraper):
                     break
                 data = resp.json()
             except requests.RequestException as e:
-                console.print(f"[yellow][Adzuna] Erreur réseau : {escape(_redact(e))}[/yellow]")
+                # Erreur externe (503 fréquent côté Adzuna) : message clair +
+                # secours sur le dernier résultat réussi de la session.
+                console.print(
+                    f"[yellow][Adzuna] L'API Adzuna ne répond pas malgré 4 tentatives "
+                    f"({escape(_redact(e))}) — erreur côté Adzuna, réessayez plus tard.[/yellow]"
+                )
+                cached = cached_results("Adzuna", query, location)
+                if cached and not offers:
+                    console.print(f"[dim][Adzuna] Réutilisation du dernier résultat en mémoire ({len(cached)} offres).[/dim]")
+                    return list(cached)
                 break
             except ValueError as e:
                 console.print(f"[yellow][Adzuna] Erreur JSON : {escape(_redact(e))}[/yellow]")
@@ -97,6 +113,7 @@ class AdzunaScraper(BaseScraper):
             page += 1
             time.sleep(config.request_delay)
 
+        cache_results("Adzuna", query, location, offers)
         return offers
 
     def _parse_item(self, item: dict) -> JobOffer | None:

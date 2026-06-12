@@ -702,3 +702,17 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
 }
 .ti-forget { margin-left: auto; }
 .ti-forget:hover { color: var(--red); border-color: var(--red); }
+
+/* ─── Détection des modèles LLM locaux (Réglages) ────────────────────────── */
+.local-models-row { margin: 4px 0 16px; }
+.local-models-result {
+  margin-top: 10px; padding: 12px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border: 1px solid var(--border); font-size: .9rem;
+}
+.lm-hw { font-weight: 600; margin-bottom: 6px; }
+.lm-server { margin-top: 10px; font-weight: 600; color: var(--accent); }
+.lm-model { display: flex; align-items: center; gap: 10px; padding: 3px 0 3px 12px; }
+
+/* ─── Mode test scraper (sans IA) ────────────────────────────────────────── */
+.checkbox-row { display: flex; flex-wrap: wrap; gap: 18px; }

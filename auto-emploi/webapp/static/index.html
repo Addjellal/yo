@@ -138,6 +138,9 @@
 
           <div class="field span-3 checkbox-row">
             <label class="check"><input id="f-include-seen" type="checkbox"> Inclure les offres déjà traitées</label>
+            <label class="check" title="Collecte et affiche les offres brutes SANS aucun appel IA — pour ajuster requête, sources et filtres sans consommer de tokens, avant de reconnecter le matching IA">
+              <input id="f-no-ai" type="checkbox"> 🔌 Mode test scraper (sans IA — offres brutes)
+            </label>
           </div>
         </div>
       </details>
@@ -176,6 +179,10 @@
       <h3>Prêt à scanner</h3>
       <p>Lancez une recherche pour collecter les offres et les comparer à vos CV.<br>
       Chaque session est enregistrée dans l'historique.</p>
+      <button id="btn-reload-last" class="btn-ghost" hidden
+              title="Recharge les offres de votre dernière session — aucun scraping, aucun appel IA">
+        ↺ Recharger la dernière session (sans appel API)
+      </button>
     </div>
   </section>
 
@@ -307,6 +314,14 @@
           <label for="s-ollama-model">Modèle Ollama <span class="set-hint" data-hint="OLLAMA_MODEL"></span></label>
           <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2">
         </div>
+      </div>
+
+      <div class="local-models-row">
+        <button id="btn-scan-models" class="btn-ghost"
+                title="Sonde Ollama, LM Studio et llama.cpp en local, mesure la RAM/VRAM et conseille des modèles adaptés">
+          🔍 Détecter les modèles locaux (Ollama, LM Studio, llama.cpp)
+        </button>
+        <div id="local-models-result" class="local-models-result" hidden></div>
       </div>
 
       <h3>Routage IA par tâche <span class="muted small">— vide = suivre le provider principal. Recommandé : pré-scoring → local (gratuit), analyse + lettres → Claude (qualité)</span></h3>
