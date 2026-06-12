@@ -59,6 +59,61 @@ let SCAN_JOB = null;       // id du scan courant
 let OFFERS = [];           // offres du dernier scan
 let POLL_TIMER = null;
 const SELECTED = { sectors: new Set(), sources: new Set(), experience: "" };
+let EXP_PILLS = {};        // key → élément pill
+let SEC_CHIPS = {};        // key → élément chip
+let SRC_CHIPS = {};        // key → élément chip
+let SRC_USABLE = {};       // key → bool
+
+function toggleSector(key, force) {
+  const chip = SEC_CHIPS[key];
+  if (!chip) return;
+  const on = force !== undefined ? force : !SELECTED.sectors.has(key);
+  if (on) { SELECTED.sectors.add(key); chip.classList.add("active"); }
+  else { SELECTED.sectors.delete(key); chip.classList.remove("active"); }
+}
+
+function toggleSource(key, force) {
+  const chip = SRC_CHIPS[key];
+  if (!chip || !SRC_USABLE[key]) return;
+  const on = force !== undefined ? force : !SELECTED.sources.has(key);
+  if (on) { SELECTED.sources.add(key); chip.classList.add("active"); }
+  else { SELECTED.sources.delete(key); chip.classList.remove("active"); }
+}
+
+function applyCriteria(c) {
+  /* Pré-remplit le formulaire de recherche avec des critères (défauts .env
+     ou critères d'une session passée à relancer). */
+  if (!c) return;
+  if (c.query !== undefined && c.query && !c.query.startsWith("(")) $("#f-query").value = c.query;
+  if (c.country && [...$("#f-country").options].some((o) => o.value === c.country)) {
+    $("#f-country").value = c.country;
+    $("#region-field").style.display = c.country === "fr" ? "" : "none";
+  }
+  if (c.location !== undefined) {
+    if (APP.regions.includes(c.location) && $("#f-country").value === "fr") {
+      $("#f-region").value = c.location;
+      $("#f-city").value = "";
+    } else {
+      $("#f-region").value = "";
+      $("#f-city").value = c.location || "";
+    }
+  }
+  if (c.experience !== undefined && EXP_PILLS[c.experience || ""]) {
+    EXP_PILLS[c.experience || ""].click();
+  }
+  if (Array.isArray(c.sectors)) {
+    for (const key of Object.keys(SEC_CHIPS)) toggleSector(key, c.sectors.includes(key));
+  }
+  if (Array.isArray(c.sources) && c.sources.length) {
+    for (const key of Object.keys(SRC_CHIPS)) toggleSource(key, c.sources.includes(key));
+  }
+  if (c.min_score !== undefined && Number.isInteger(c.min_score)) {
+    $("#f-minscore").value = c.min_score;
+    $("#minscore-val").textContent = c.min_score;
+  }
+  if (Array.isArray(c.exclude)) $("#f-exclude").value = c.exclude.join(", ");
+  if (c.cv && [...$("#f-cv").options].some((o) => o.value === c.cv)) $("#f-cv").value = c.cv;
+}
 
 // ─── Onglets ────────────────────────────────────────────────────────────────
 
@@ -69,9 +124,14 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     document.querySelectorAll(".tab").forEach((t) => (t.hidden = true));
     $(`#tab-${btn.dataset.tab}`).hidden = false;
     if (btn.dataset.tab === "track") loadTrack();
+    if (btn.dataset.tab === "history") loadHistory();
     if (btn.dataset.tab === "stats") loadStats();
   });
 });
+
+function switchTab(name) {
+  document.querySelector(`.nav-btn[data-tab="${name}"]`).click();
+}
 
 // ─── Thème ──────────────────────────────────────────────────────────────────
 
@@ -117,11 +177,14 @@ async function init() {
 
   // Expérience (pills radio)
   const expBox = $("#f-experience");
+  EXP_PILLS = {};
   const allPill = el("span", { class: "pill active", text: "Tous niveaux", onclick: () => pickExperience("", allPill) });
+  EXP_PILLS[""] = allPill;
   expBox.appendChild(allPill);
   for (const lvl of APP.experience_levels) {
     const pill = el("span", { class: "pill", text: lvl.label });
     pill.addEventListener("click", () => pickExperience(lvl.key, pill));
+    EXP_PILLS[lvl.key] = pill;
     expBox.appendChild(pill);
   }
   function pickExperience(key, pill) {
@@ -132,18 +195,19 @@ async function init() {
 
   // Secteurs (chips multi)
   const secBox = $("#f-sectors");
+  SEC_CHIPS = {};
   for (const s of APP.sectors) {
     const chip = el("span", { class: "chip", text: s.label.split(" / ")[0] + " " });
     chip.title = s.label;
-    chip.addEventListener("click", () => {
-      if (SELECTED.sectors.has(s.key)) { SELECTED.sectors.delete(s.key); chip.classList.remove("active"); }
-      else { SELECTED.sectors.add(s.key); chip.classList.add("active"); }
-    });
+    chip.addEventListener("click", () => toggleSector(s.key));
+    SEC_CHIPS[s.key] = chip;
     secBox.appendChild(chip);
   }
 
   // Sources (chips multi, présélection des sources sans auth + configurées)
   const srcBox = $("#f-sources");
+  SRC_CHIPS = {};
+  SRC_USABLE = {};
   for (const s of APP.sources) {
     const usable = !s.auth || s.configured;
     const chip = el("span", { class: "chip" + (usable ? "" : " locked") }, [
@@ -153,11 +217,15 @@ async function init() {
     if (usable && s.key !== "linkedin") { SELECTED.sources.add(s.key); chip.classList.add("active"); }
     chip.addEventListener("click", () => {
       if (!usable) { toast(`${s.label} nécessite des clés API : onglet Réglages.`, "err"); return; }
-      if (SELECTED.sources.has(s.key)) { SELECTED.sources.delete(s.key); chip.classList.remove("active"); }
-      else { SELECTED.sources.add(s.key); chip.classList.add("active"); }
+      toggleSource(s.key);
     });
+    SRC_CHIPS[s.key] = chip;
+    SRC_USABLE[s.key] = usable;
     srcBox.appendChild(chip);
   }
+
+  // Derniers critères persistés (.env DEFAULT_*) : pré-remplir le formulaire
+  applyCriteria(APP.defaults);
 
   // Score min
   $("#f-minscore").value = APP.min_score;
@@ -165,9 +233,15 @@ async function init() {
   $("#f-minscore").addEventListener("input", (e) => ($("#minscore-val").textContent = e.target.value));
   $("#f-max").value = APP.max_per_source;
 
-  // Réglages : indicateurs "configuré"
+  // Réglages : indicateurs "configuré" + valeurs courantes des listes
   refreshSettingsHints(APP.settings);
   $("#s-provider").value = APP.provider;
+  for (const sel of document.querySelectorAll("select[data-key]")) {
+    const info = APP.settings[sel.dataset.key];
+    if (info && info.set && [...sel.options].some((o) => o.value === info.display)) {
+      sel.value = info.display;
+    }
+  }
 
   // Historique de recherches
   renderHistory();
@@ -189,12 +263,14 @@ function rebuildCvSelect(files) {
   sel.addEventListener("change", () => localStorage.setItem("cv", sel.value));
 }
 
-// ─── Upload CV ──────────────────────────────────────────────────────────────
+// ─── Upload CV (bouton + glisser-déposer) ───────────────────────────────────
 
-$("#cv-upload-btn").addEventListener("click", () => $("#cv-file").click());
-$("#cv-file").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+function uploadCvFile(file) {
   if (!file) return;
+  if (!/\.(pdf|docx|txt)$/i.test(file.name)) {
+    toast("Format non supporté : utilisez PDF, DOCX ou TXT.", "err");
+    return;
+  }
   if (file.size > 25 * 1024 * 1024) { toast("Fichier trop volumineux (max 25 Mo).", "err"); return; }
   const reader = new FileReader();
   reader.onload = async () => {
@@ -210,6 +286,28 @@ $("#cv-file").addEventListener("change", async (e) => {
     }
   };
   reader.readAsDataURL(file);
+}
+
+$("#cv-upload-btn").addEventListener("click", () => $("#cv-file").click());
+$("#cv-file").addEventListener("change", (e) => uploadCvFile(e.target.files[0]));
+
+// Glisser-déposer sur la carte de recherche
+const searchCard = document.querySelector(".search-card");
+["dragenter", "dragover"].forEach((evt) =>
+  searchCard.addEventListener(evt, (e) => {
+    e.preventDefault();
+    searchCard.classList.add("dropzone-active");
+  })
+);
+["dragleave", "drop"].forEach((evt) =>
+  searchCard.addEventListener(evt, (e) => {
+    e.preventDefault();
+    searchCard.classList.remove("dropzone-active");
+  })
+);
+searchCard.addEventListener("drop", (e) => {
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  uploadCvFile(file);
 });
 
 // ─── Historique de recherches (localStorage) ────────────────────────────────
@@ -278,6 +376,36 @@ async function startScan() {
   $("#progress-log").replaceChildren();
   pollScan();
 }
+
+// ─── Re-scoring de la base (sans scraper) ───────────────────────────────────
+
+$("#btn-rescore").addEventListener("click", async () => {
+  const cv = $("#f-cv").value;
+  if (!cv) { toast("Importez d'abord un CV (bouton ＋).", "err"); return; }
+  const body = {
+    cv,
+    sectors: [...SELECTED.sectors],
+    experience: SELECTED.experience,
+    min_score: parseInt($("#f-minscore").value, 10),
+    exclude: $("#f-exclude").value,
+    include_seen: $("#f-include-seen").checked,
+  };
+  let out;
+  try {
+    out = await api("/api/rescore", { method: "POST", body: JSON.stringify(body) });
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  SCAN_JOB = out.job_id;
+  $("#btn-scan").disabled = true;
+  $("#search-empty").hidden = true;
+  $("#results-zone").hidden = true;
+  $("#scan-progress").hidden = false;
+  $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
+  $("#progress-log").replaceChildren();
+  pollScan();
+});
 
 function pollScan() {
   clearTimeout(POLL_TIMER);
@@ -523,7 +651,7 @@ function pollLetter(jobId) {
     const r = job.result;
     $("#letter-subject").textContent = r.email_subject || "—";
     $("#letter-email").textContent = r.email_body || "—";
-    $("#letter-body").textContent = r.letter;
+    $("#letter-body").value = r.letter;
     $("#letter-dl-txt").href = `/api/download?file=${encodeURIComponent(r.txt_file)}`;
     if (r.pdf_file) {
       $("#letter-dl-pdf").hidden = false;
@@ -533,21 +661,135 @@ function pollLetter(jobId) {
     }
     $("#letter-result").hidden = false;
     if (LETTER_APPLY_STATUS) LETTER_APPLY_STATUS("applied");
-    toast("Lettre générée — offre marquée postulée.", "ok");
+    const lang = r.language === "en" ? " (offre en anglais → cover letter EN)" : "";
+    toast(`Lettre générée${lang} — offre marquée postulée. Vous pouvez l'éditer avant export.`, "ok");
   }, 900);
 }
+
+// Édition de la lettre : réécrit le .txt et le .pdf, sans appel IA
+$("#btn-letter-save").addEventListener("click", async () => {
+  if (!LETTER_OFFER) return;
+  try {
+    const out = await api("/api/letter-save", {
+      method: "POST",
+      body: JSON.stringify({
+        job_id: SCAN_JOB,
+        index: LETTER_OFFER.index,
+        letter: $("#letter-body").value,
+        email_subject: $("#letter-subject").textContent === "—" ? "" : $("#letter-subject").textContent,
+        email_body: $("#letter-email").textContent === "—" ? "" : $("#letter-email").textContent,
+      }),
+    });
+    $("#letter-dl-txt").href = `/api/download?file=${encodeURIComponent(out.txt_file)}`;
+    if (out.pdf_file) {
+      $("#letter-dl-pdf").hidden = false;
+      $("#letter-dl-pdf").href = `/api/download?file=${encodeURIComponent(out.pdf_file)}`;
+    }
+    toast("Modifications enregistrées (txt + PDF régénérés).", "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+});
 
 document.querySelectorAll("[data-copy]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const text = btn.dataset.copy === "email"
       ? `Objet : ${$("#letter-subject").textContent}\n\n${$("#letter-email").textContent}`
-      : $("#letter-body").textContent;
+      : $("#letter-body").value;
     navigator.clipboard.writeText(text).then(
       () => toast("Copié dans le presse-papier.", "ok"),
       () => toast("Copie impossible.", "err"),
     );
   });
 });
+
+// ─── Onglet Historique ──────────────────────────────────────────────────────
+
+async function loadHistory() {
+  let data;
+  try {
+    data = await api("/api/sessions");
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  const list = $("#history-list");
+  list.replaceChildren();
+  if (!data.sessions.length) {
+    list.appendChild(el("div", { class: "empty-state" }, [
+      el("div", { class: "empty-icon", text: "🕘" }),
+      el("p", { text: "Aucune session pour l'instant — chaque recherche sera enregistrée ici avec ses critères et ses scores." }),
+    ]));
+  }
+  const kindLabels = { web: "Web", scan: "CLI", watch: "Veille", rescore: "Re-scoring" };
+  for (const s of data.sessions) {
+    const btnView = el("button", { class: "btn-ghost small", text: "Voir les offres" });
+    btnView.addEventListener("click", () => loadSession(s.id));
+    const btnRerun = el("button", { class: "btn-ghost small", text: "↻ Relancer" });
+    btnRerun.addEventListener("click", () => {
+      applyCriteria(s.criteria);
+      switchTab("search");
+      toast("Critères repris — lancez la recherche quand vous êtes prêt.", "ok");
+    });
+    if (s.kind === "rescore") btnRerun.hidden = true;
+    list.appendChild(el("div", { class: "card session-item" }, [
+      el("div", { class: "session-main" }, [
+        el("div", { class: "session-title" }, [
+          el("strong", { text: s.criteria.query || "(re-scoring de la base)" }),
+          el("span", { class: "badge src", text: kindLabels[s.kind] || s.kind }),
+        ]),
+        el("div", { class: "session-meta muted small", text:
+          `${s.date.replace("T", " ").slice(0, 16)} · ${s.summary} · ` +
+          `${s.kept} offre(s) retenue(s) sur ${s.found}` }),
+      ]),
+      el("div", { class: "session-actions" }, [btnView, btnRerun]),
+    ]));
+  }
+
+  $("#count-letters").textContent = data.letters.length;
+  const lettersBox = $("#letters-list");
+  lettersBox.replaceChildren();
+  if (!data.letters.length) {
+    lettersBox.appendChild(el("div", { class: "muted small", text: "Aucune lettre générée pour l'instant." }));
+  }
+  for (const letter of data.letters) {
+    const actions = el("div", { class: "ti-actions" });
+    for (const [file, label] of [[letter.txt_file, "⬇ .txt"], [letter.pdf_file, "⬇ .pdf"]]) {
+      if (file) actions.appendChild(el("a", {
+        class: "btn-ghost", text: label, download: file,
+        href: `/api/download?file=${encodeURIComponent(file)}`,
+      }));
+    }
+    lettersBox.appendChild(el("div", { class: "track-item" }, [
+      el("div", { class: "ti-title", text: letter.title || "—" }),
+      el("div", { class: "ti-meta" }, [
+        el("span", { text: letter.company || "—" }),
+        el("span", { text: letter.date.replace("T", " ").slice(0, 16) }),
+        el("span", { text: `ton ${letter.tone}` }),
+        el("span", { text: letter.language === "en" ? "🇬🇧 EN" : "🇫🇷 FR" }),
+      ]),
+      actions,
+    ]));
+  }
+}
+
+async function loadSession(id) {
+  let out;
+  try {
+    out = await api("/api/session-load", { method: "POST", body: JSON.stringify({ id }) });
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  SCAN_JOB = out.job_id;
+  OFFERS = out.offers;
+  switchTab("search");
+  $("#scan-progress").hidden = true;
+  renderResults();
+  const when = out.date ? out.date.replace("T", " ").slice(0, 16) : "";
+  toast(`Session du ${when} rechargée (${OFFERS.length} offre(s), scores de l'époque).`
+    + (out.letters_available ? "" : " CV introuvable : lettres indisponibles."), "ok");
+}
 
 // ─── Onglet Suivi ───────────────────────────────────────────────────────────
 

@@ -31,6 +31,7 @@ from pathlib import Path
 from config import config, save_to_env
 from cv_parser import parse_cv
 from tracker import Tracker
+from history import SessionStore
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
 from ai import JobMatcher, CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords
@@ -43,7 +44,9 @@ from main import (
     SOURCE_MAP,
     SECTORS,
     EXPERIENCE_LEVELS,
+    RESCORE_TOP_K,
     _run_one_scraper,
+    _criteria_summary,
     save_results,
 )
 
@@ -104,6 +107,8 @@ _SCAN_LOCK = threading.Lock()      # un seul scan à la fois
 _TRACKER_LOCK = threading.Lock()   # sérialise les écritures du tracker
 
 _tracker: Tracker | None = None
+_store: SessionStore | None = None
+_STORE_LOCK = threading.Lock()
 
 
 def _get_tracker() -> Tracker:
@@ -111,6 +116,13 @@ def _get_tracker() -> Tracker:
     if _tracker is None:
         _tracker = Tracker(Path(config.output_dir) / ".tracker.json")
     return _tracker
+
+
+def _get_store() -> SessionStore:
+    global _store
+    if _store is None:
+        _store = SessionStore(Path(config.output_dir) / ".sessions.json")
+    return _store
 
 
 def _register_job(job: _Job) -> None:
@@ -243,6 +255,83 @@ def _run_scan(job: _Job, p: dict) -> None:
 
         job.offers = matched
         job.query = p["query"]
+        with _STORE_LOCK:
+            _get_store().add_session(
+                kind="web", criteria=_session_criteria(p), offers=matched,
+                found=len(all_offers),
+            )
+        job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
+        job.status = "done"
+    except Exception as e:
+        job.error = str(e)[:500]
+        job.status = "error"
+    finally:
+        _SCAN_LOCK.release()
+
+
+def _session_criteria(p: dict) -> dict:
+    """Critères d'un scan web au format de l'historique (secteurs en clés)."""
+    label_to_key = {label: key for key, label in SECTORS}
+    return {
+        "query": p["query"],
+        "cv": p["cv"],
+        "country": p["country"],
+        "location": p["location"],
+        "sectors": [label_to_key[s] for s in p["sectors"] if s in label_to_key],
+        "experience": p["experience"],
+        "sources": p["sources"],
+        "min_score": p["min_score"],
+        "exclude": p["exclude"],
+    }
+
+
+def _run_rescore(job: _Job, p: dict) -> None:
+    """Re-score le CV contre toutes les offres connues, sans scraper."""
+    try:
+        job.add_log(f"Lecture du CV : {p['cv']}")
+        cv_text = parse_cv(str(_PROJECT_DIR / p["cv"]))
+        job.cv_text = cv_text
+
+        with _STORE_LOCK:
+            offers = _get_store().all_offers()
+        job.add_log(f"{len(offers)} offre(s) connue(s) dans l'historique")
+        tracker = _get_tracker()
+        if not p["include_seen"]:
+            with _TRACKER_LOCK:
+                offers = tracker.filter_visible(offers)
+        if not offers:
+            job.add_log("Aucune offre à re-scorer (historique vide ou tout déjà traité).")
+            job.status = "done"
+            return
+
+        job.add_log(f"Re-scoring de {len(offers)} offre(s) — pré-filtre code pur "
+                    f"(top {RESCORE_TOP_K}) puis pré-scoring IA…")
+        matcher = JobMatcher(cv_text)
+        with _TRACKER_LOCK:
+            rejections = tracker.recent_rejections()
+        if rejections:
+            matcher.set_rejected_examples(rejections)
+
+        matched = matcher.score_offers(
+            offers,
+            min_score=p["min_score"],
+            sectors=p["sectors"],
+            exclude=p["exclude"],
+            experience_level=p["experience"],
+            top_k=RESCORE_TOP_K,
+            two_stage=True,
+        )
+        with _TRACKER_LOCK:
+            tracker.mark_many(matched, "seen")
+
+        job.offers = matched
+        job.query = "(re-scoring de la base)"
+        p2 = dict(p, query="(re-scoring de la base)", sources=[])
+        with _STORE_LOCK:
+            _get_store().add_session(
+                kind="rescore", criteria=_session_criteria(p2), offers=matched,
+                found=len(offers),
+            )
         job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
         job.status = "done"
     except Exception as e:
@@ -263,14 +352,20 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
         generator = CoverLetterGenerator(scan_job.cv_text, applied_history=applied_titles)
         result = generator.generate(offer, tone=tone)
         txt_path, pdf_path = generator.save(offer, result)
+        pdf_name = pdf_path.name if pdf_path.exists() else ""
         with _TRACKER_LOCK:
             tracker.mark(offer, "applied")
+        with _STORE_LOCK:
+            _get_store().add_letter(
+                offer, tone, result.get("language", "fr"), txt_path.name, pdf_name,
+            )
         job.result = {
             "letter": result["letter"],
             "email_subject": result["email_subject"],
             "email_body": result["email_body"],
+            "language": result.get("language", "fr"),
             "txt_file": txt_path.name,
-            "pdf_file": pdf_path.name if pdf_path.exists() else "",
+            "pdf_file": pdf_name,
         }
         job.status = "done"
     except Exception as e:
@@ -333,6 +428,38 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     }, ""
 
 
+def _validate_rescore_params(body: dict) -> tuple[dict | None, str]:
+    """Paramètres du re-scoring : comme un scan, sans requête ni sources."""
+    cv = str(body.get("cv", "")).strip()
+    if cv not in _list_cv_files():
+        return None, "CV introuvable : déposez un fichier PDF/DOCX/TXT dans le dossier du projet."
+
+    raw_sectors = body.get("sectors") or []
+    sectors = [_SECTOR_LABELS[s] for s in raw_sectors if isinstance(s, str) and s in _SECTOR_LABELS]
+    experience = str(body.get("experience", "")).strip()
+    if experience not in _EXPERIENCE_KEYS:
+        experience = ""
+    try:
+        min_score = max(0, min(10, int(body.get("min_score", config.min_match_score))))
+    except (TypeError, ValueError):
+        min_score = config.min_match_score
+    exclude = parse_exclude_keywords(config.exclude_keywords) + parse_exclude_keywords(
+        str(body.get("exclude", ""))[:1000]
+    )
+    return {
+        "query": "",
+        "cv": cv,
+        "country": config.country,
+        "location": "",
+        "sources": [],
+        "sectors": sectors,
+        "experience": experience,
+        "min_score": min_score,
+        "exclude": exclude,
+        "include_seen": bool(body.get("include_seen", False)),
+    }, ""
+
+
 # ─── Réglages exposés dans l'interface ───────────────────────────────────────
 
 # (clé .env, secret ?) — seules ces clés sont lisibles/modifiables depuis le web
@@ -349,6 +476,22 @@ _SETTINGS_KEYS: list[tuple[str, bool]] = [
     ("NOTION_TOKEN", True),
     ("NOTION_DATABASE_ID", False),
     ("EXCLUDE_KEYWORDS", False),
+    ("CANDIDATE_NAME", False),
+    ("CANDIDATE_EMAIL", False),
+    ("CANDIDATE_PHONE", False),
+    ("CANDIDATE_CITY", False),
+    ("AI_PRESCORE_BACKEND", False),
+    ("AI_MATCH_BACKEND", False),
+    ("AI_LETTER_BACKEND", False),
+    ("AI_PRESCORE_MODEL", False),
+    ("AI_MATCH_MODEL", False),
+    ("AI_LETTER_MODEL", False),
+    ("AI_FALLBACK", False),
+    ("DEFAULT_SOURCES", False),
+    ("DEFAULT_SECTORS", False),
+    ("DEFAULT_LOCATION", False),
+    ("DEFAULT_COUNTRY", False),
+    ("DEFAULT_EXPERIENCE", False),
 ]
 
 
@@ -498,6 +641,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_job(query.get("id", [""])[0])
         elif path == "/api/stats":
             self._json(_stats_payload())
+        elif path == "/api/sessions":
+            self._api_sessions()
         elif path == "/api/download":
             self._api_download(query.get("file", [""])[0])
         else:
@@ -514,8 +659,14 @@ class _Handler(BaseHTTPRequestHandler):
 
         if path == "/api/scan":
             self._api_scan()
+        elif path == "/api/rescore":
+            self._api_rescore()
+        elif path == "/api/session-load":
+            self._api_session_load()
         elif path == "/api/letter":
             self._api_letter()
+        elif path == "/api/letter-save":
+            self._api_letter_save()
         elif path == "/api/track":
             self._api_track()
         elif path == "/api/track-key":
@@ -600,6 +751,13 @@ class _Handler(BaseHTTPRequestHandler):
             "min_score": config.min_match_score,
             "max_per_source": config.max_jobs_per_source,
             "settings": _masked_settings(),
+            "defaults": {
+                "sources": [s for s in config.default_sources.split(",") if s.strip()],
+                "sectors": [s for s in config.default_sectors.split(",") if s.strip()],
+                "location": config.default_location,
+                "country": config.default_country if config.default_country in COUNTRY_NAMES else "fr",
+                "experience": config.default_experience if config.default_experience in _EXPERIENCE_KEYS else "",
+            },
         })
 
     def _api_scan(self):
@@ -637,6 +795,71 @@ class _Handler(BaseHTTPRequestHandler):
             payload["result"] = job.result
         self._json(payload)
 
+    def _api_rescore(self):
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        params, err = _validate_rescore_params(body)
+        if params is None:
+            self._error(err)
+            return
+        if not _SCAN_LOCK.acquire(blocking=False):
+            self._error("Un scan est déjà en cours — attendez qu'il se termine.", 409)
+            return
+        job = _Job("scan")
+        _register_job(job)
+        threading.Thread(target=_run_rescore, args=(job, params), daemon=True).start()
+        self._json({"job_id": job.id})
+
+    def _api_sessions(self):
+        with _STORE_LOCK:
+            store = _get_store()
+            sessions = store.list_sessions()
+            letters = store.list_letters()
+        for s in sessions:
+            s["summary"] = _criteria_summary(s.get("criteria", {}))
+        self._json({"sessions": sessions[:100], "letters": letters[:50]})
+
+    def _api_session_load(self):
+        """Recharge une session passée comme un job terminé : le suivi, les
+        lettres et l'export fonctionnent dessus comme sur un scan frais."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        with _STORE_LOCK:
+            store = _get_store()
+            session = store.get_session(str(body.get("id", ""))[:60])
+            offers = store.session_offers(session) if session else []
+        if session is None:
+            self._error("Session introuvable", 404)
+            return
+        job = _Job("scan")
+        job.offers = offers
+        job.query = session.get("criteria", {}).get("query", "")
+        # CV de la session : reparsé si le fichier existe encore (pour les lettres)
+        cv_name = session.get("criteria", {}).get("cv", "")
+        if cv_name in _list_cv_files():
+            try:
+                job.cv_text = parse_cv(str(_PROJECT_DIR / cv_name))
+            except (FileNotFoundError, ValueError):
+                pass
+        job.status = "done"
+        _register_job(job)
+        tracker = _get_tracker()
+        with _TRACKER_LOCK:
+            payload_offers = [
+                _offer_dict(o, i, tracker.status_of(o)) for i, o in enumerate(offers)
+            ]
+        self._json({
+            "job_id": job.id,
+            "offers": payload_offers,
+            "query": job.query,
+            "letters_available": bool(job.cv_text),
+            "date": session.get("date", ""),
+        })
+
     def _api_letter(self):
         body = self._read_body()
         if body is None:
@@ -645,6 +868,9 @@ class _Handler(BaseHTTPRequestHandler):
         scan_job = _get_job(str(body.get("job_id", "")))
         if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
             self._error("Scan introuvable — relancez une recherche.", 404)
+            return
+        if not scan_job.cv_text:
+            self._error("CV de cette session introuvable — relancez une recherche avec un CV.", 400)
             return
         try:
             index = int(body.get("index", -1))
@@ -660,6 +886,42 @@ class _Handler(BaseHTTPRequestHandler):
         _register_job(job)
         threading.Thread(target=_run_letter, args=(job, scan_job, index, tone), daemon=True).start()
         self._json({"job_id": job.id})
+
+    def _api_letter_save(self):
+        """Réécrit les fichiers (txt + PDF) d'une lettre éditée dans le
+        navigateur — aucun appel IA."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        scan_job = _get_job(str(body.get("job_id", "")))
+        if scan_job is None or scan_job.kind != "scan":
+            self._error("Session introuvable", 404)
+            return
+        try:
+            index = int(body.get("index", -1))
+        except (TypeError, ValueError):
+            index = -1
+        if not (0 <= index < len(scan_job.offers)):
+            self._error("Offre inconnue", 404)
+            return
+        letter = str(body.get("letter", "")).strip()[:20000]
+        if not letter:
+            self._error("Lettre vide")
+            return
+        result = {
+            "letter": letter,
+            "email_subject": str(body.get("email_subject", "")).strip()[:200],
+            "email_body": str(body.get("email_body", "")).strip()[:2000],
+        }
+        # save() n'utilise pas le CV ni le LLM : instance minimale suffisante
+        generator = CoverLetterGenerator(scan_job.cv_text or "")
+        txt_path, pdf_path = generator.save(scan_job.offers[index], result)
+        self._json({
+            "ok": True,
+            "txt_file": txt_path.name,
+            "pdf_file": pdf_path.name if pdf_path.exists() else "",
+        })
 
     def _api_track(self):
         body = self._read_body()

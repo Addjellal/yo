@@ -65,6 +65,33 @@ SYSTEM_PROMPT = (
     "CV du candidat :\n{cv}"
 )
 
+# Re-scoring de la base : au-delà de ce volume, un pré-scoring rapide
+# (tâche "prescore", routable vers Ollama) sélectionne le top avant
+# l'analyse détaillée (tâche "match").
+TWO_STAGE_THRESHOLD = 30
+TWO_STAGE_KEEP = 30
+
+# Schéma minimal du pré-scoring : un score par offre, rien d'autre
+PRESCORE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "job_index": {"type": "integer"},
+                    "score": {"type": "integer"},
+                },
+                "required": ["job_index", "score"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["results"],
+    "additionalProperties": False,
+}
+
 # Schéma JSON pour les sorties structurées (Anthropic et Ollama le supportent)
 RESULTS_SCHEMA = {
     "type": "object",
@@ -115,7 +142,8 @@ class JobMatcher:
         self._sectors: list[str] = []
         self._experience_level: str = ""
         self._rejected_examples: list[str] = []
-        self._llm = LLMClient()
+        self._llm = LLMClient(task="match")
+        self._llm_prescore = LLMClient(task="prescore")
         # Vocabulaire CV : mots significatifs avec leur fréquence
         self._cv_vocab: Counter[str] = Counter(_tokenize(cv_text))
 
@@ -165,21 +193,25 @@ class JobMatcher:
             kept.append(offer)
         return kept, dropped
 
-    def _prefilter(self, offers: list[JobOffer]) -> tuple[list[JobOffer], int]:
-        """Heuristique rapide : garde les offres ayant un overlap minimal de mots-clés
-        avec le CV. Retourne (offres_retenues, nombre_filtrées)."""
+    def _overlap(self, offer: JobOffer) -> int:
+        """Nombre de mots significatifs communs entre l'offre et le CV."""
+        offer_tokens = set(_tokenize(f"{offer.title} {offer.description}"))
+        return sum(1 for t in offer_tokens if t in self._cv_vocab)
+
+    def _prefilter(self, offers: list[JobOffer], top_k: int | None = None) -> tuple[list[JobOffer], int]:
+        """Heuristique rapide (code pur, aucun appel IA) : garde les offres ayant
+        un overlap minimal de mots-clés avec le CV. Si top_k est fourni, ne garde
+        que les top_k meilleures par overlap (re-scoring de grosses bases).
+        Retourne (offres_retenues, nombre_filtrées)."""
         if not self._cv_vocab:
             return offers, 0
-        kept: list[JobOffer] = []
-        dropped = 0
-        for offer in offers:
-            offer_tokens = set(_tokenize(f"{offer.title} {offer.description}"))
-            overlap = sum(1 for t in offer_tokens if t in self._cv_vocab)
-            if overlap >= PRE_FILTER_THRESHOLD:
-                kept.append(offer)
-            else:
-                dropped += 1
-        return kept, dropped
+        scored = [(self._overlap(o), o) for o in offers]
+        kept = [(ov, o) for ov, o in scored if ov >= PRE_FILTER_THRESHOLD]
+        if top_k is not None and len(kept) > top_k:
+            kept.sort(key=lambda pair: pair[0], reverse=True)
+            kept = kept[:top_k]
+        result = [o for _, o in kept]
+        return result, len(offers) - len(result)
 
     def score_offers(
         self,
@@ -188,7 +220,12 @@ class JobMatcher:
         sectors: list[str] | None = None,
         exclude: list[str] | None = None,
         experience_level: str = "",
+        top_k: int | None = None,
+        two_stage: bool = False,
     ) -> list[JobOffer]:
+        """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
+        two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
+        modèle local) puis analyse détaillée du top uniquement."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
 
@@ -203,12 +240,16 @@ class JobMatcher:
             console.print(f"[dim]Niveau d'expérience : {exp_dropped} offre(s) incompatible(s) écartée(s).[/dim]")
 
         # 3. Pré-filtre keyword (économise les appels LLM)
-        offers, dropped = self._prefilter(offers)
+        offers, dropped = self._prefilter(offers, top_k=top_k)
         if dropped:
             console.print(f"[dim]Pré-filtre : {dropped} offre(s) clairement hors-sujet écartée(s).[/dim]")
 
         if not offers:
             return []
+
+        # 4. Pré-scoring IA rapide en masse, puis analyse détaillée du top
+        if two_stage and len(offers) > TWO_STAGE_THRESHOLD:
+            offers = self._prescore(offers)
 
         scored = []
         for i in range(0, len(offers), BATCH_SIZE):
@@ -222,6 +263,49 @@ class JobMatcher:
             key=lambda o: o.match_score or 0,
             reverse=True,
         )
+
+    def _prescore(self, offers: list[JobOffer]) -> list[JobOffer]:
+        """Scoring grossier (un entier par offre, descriptions raccourcies) sur la
+        tâche « prescore » — par défaut le même provider, mais routable vers un
+        modèle local gratuit via AI_PRESCORE_BACKEND=local. Garde le top."""
+        console.print(
+            f"[dim]Pré-scoring IA de {len(offers)} offres "
+            f"(top {TWO_STAGE_KEEP} retenu pour l'analyse détaillée)...[/dim]"
+        )
+        prescored: list[tuple[int, JobOffer]] = []
+        batch_size = 20
+        for i in range(0, len(offers), batch_size):
+            batch = offers[i: i + batch_size]
+            jobs_text = "\n\n".join(
+                f"<offre index=\"{j}\">\nPoste : {o.title}\nEntreprise : {o.company}\n"
+                f"{(o.description or '')[:600]}\n</offre>"
+                for j, o in enumerate(batch)
+            )
+            prompt = (
+                f"Évalue RAPIDEMENT l'adéquation entre le CV et ces {len(batch)} offres. "
+                "Un score entier de 0 à 10 par offre, sans justification.\n"
+                'Réponds en JSON : {"results": [{"job_index": 0, "score": 7}, ...]}\n\n'
+                f"{jobs_text}"
+            )
+            scores = {j: 5 for j in range(len(batch))}  # neutre si le lot échoue
+            try:
+                raw = self._llm_prescore.generate(
+                    system=SYSTEM_PROMPT.format(cv=self.cv_text[:6000]),
+                    user=prompt,
+                    max_tokens=1024,
+                    json_schema=PRESCORE_SCHEMA,
+                )
+                data = json.loads(raw)
+                for item in data.get("results", []):
+                    idx = item.get("job_index", -1)
+                    if isinstance(idx, int) and 0 <= idx < len(batch):
+                        scores[idx] = _clamp_score(item.get("score"))
+            except Exception as e:
+                console.print(f"[yellow]Pré-scoring : lot ignoré ({type(e).__name__}).[/yellow]")
+            prescored.extend((scores[j], o) for j, o in enumerate(batch))
+
+        prescored.sort(key=lambda pair: pair[0], reverse=True)
+        return [o for _, o in prescored[:TWO_STAGE_KEEP]]
 
     def _build_prompt(self, batch: list[JobOffer]) -> str:
         # Chaque offre est isolée dans des balises : le modèle sait que ce

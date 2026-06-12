@@ -295,6 +295,46 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
 }
 .empty-icon { font-size: 44px; margin-bottom: 10px; }
 
+/* ════════ Re-scoring + drag & drop ════════ */
+.rescore-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 13px; padding-top: 13px;
+  border-top: 1px dashed var(--border);
+}
+.search-card.dropzone-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ════════ Historique ════════ */
+.history-list { display: flex; flex-direction: column; gap: 12px; }
+.session-item {
+  display: flex; align-items: center; gap: 16px;
+  padding: 15px 19px;
+}
+.session-main { flex: 1; min-width: 0; }
+.session-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.session-title strong { font-size: 14.5px; }
+.session-meta { margin-top: 3px; }
+.session-actions { display: flex; gap: 8px; flex: none; }
+.letters-zone { margin-top: 22px; }
+.letters-zone summary { cursor: pointer; font-weight: 600; color: var(--text-soft); }
+.letters-zone .kanban-list { margin-top: 12px; }
+
+/* ════════ Lettre éditable ════════ */
+.letter-edit {
+  width: 100%;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 13px;
+  font: 13.5px/1.6 inherit;
+  resize: vertical;
+  outline: none;
+}
+.letter-edit:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+
 /* ════════ Suivi (kanban) ════════ */
 .kanban { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .kanban-col {

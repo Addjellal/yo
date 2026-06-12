@@ -26,6 +26,9 @@
     <button class="nav-btn" data-tab="track">
       <span class="nav-ico">📌</span> Suivi
     </button>
+    <button class="nav-btn" data-tab="history">
+      <span class="nav-ico">🕘</span> Historique
+    </button>
     <button class="nav-btn" data-tab="stats">
       <span class="nav-ico">📊</span> Statistiques
     </button>
@@ -68,6 +71,12 @@
           </div>
         </div>
         <button id="btn-scan" class="btn-primary big">Lancer&nbsp;la&nbsp;recherche</button>
+      </div>
+      <div class="rescore-row">
+        <button id="btn-rescore" class="btn-ghost" title="Re-score le CV contre toutes les offres déjà connues, sans relancer les scrapers">
+          ♻ Re-scorer la base d'offres connues (sans scraper)
+        </button>
+        <span class="muted small">Glissez-déposez un CV n'importe où sur cette carte pour l'importer.</span>
       </div>
 
       <details class="filters" open>
@@ -182,6 +191,19 @@
     </details>
   </section>
 
+  <!-- ════════ Onglet Historique ════════ -->
+  <section id="tab-history" class="tab" hidden>
+    <header class="page-head">
+      <h1>Historique des sessions</h1>
+      <p class="muted">Chaque recherche est enregistrée avec ses critères et les scores de l'époque. Rechargez une session ou relancez-la avec les mêmes critères.</p>
+    </header>
+    <div id="history-list" class="history-list"></div>
+    <details class="letters-zone">
+      <summary>✉ Lettres générées <span id="count-letters" class="pill-count">0</span></summary>
+      <div id="letters-list" class="kanban-list rejected-list"></div>
+    </details>
+  </section>
+
   <!-- ════════ Onglet Statistiques ════════ -->
   <section id="tab-stats" class="tab" hidden>
     <header class="page-head">
@@ -233,6 +255,101 @@
         <div class="field">
           <label for="s-ollama-model">Modèle Ollama <span class="set-hint" data-hint="OLLAMA_MODEL"></span></label>
           <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2">
+        </div>
+      </div>
+
+      <h3>Routage IA par tâche <span class="muted small">— vide = suivre le provider principal. Recommandé : pré-scoring → local (gratuit), analyse + lettres → Claude (qualité)</span></h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-ai-prescore">Pré-scoring en masse <span class="set-hint" data-hint="AI_PRESCORE_BACKEND"></span></label>
+          <select id="s-ai-prescore" data-key="AI_PRESCORE_BACKEND">
+            <option value="">— suivre le provider —</option>
+            <option value="local">local (Ollama)</option>
+            <option value="claude">claude (API Anthropic)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-ai-match">Analyse détaillée <span class="set-hint" data-hint="AI_MATCH_BACKEND"></span></label>
+          <select id="s-ai-match" data-key="AI_MATCH_BACKEND">
+            <option value="">— suivre le provider —</option>
+            <option value="local">local (Ollama)</option>
+            <option value="claude">claude (API Anthropic)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-ai-letter">Lettres de motivation <span class="set-hint" data-hint="AI_LETTER_BACKEND"></span></label>
+          <select id="s-ai-letter" data-key="AI_LETTER_BACKEND">
+            <option value="">— suivre le provider —</option>
+            <option value="local">local (Ollama)</option>
+            <option value="claude">claude (API Anthropic)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-ai-prescore-model">Modèle pré-scoring <span class="set-hint" data-hint="AI_PRESCORE_MODEL"></span></label>
+          <input id="s-ai-prescore-model" type="text" data-key="AI_PRESCORE_MODEL" placeholder="vide = modèle du backend">
+        </div>
+        <div class="field">
+          <label for="s-ai-match-model">Modèle analyse <span class="set-hint" data-hint="AI_MATCH_MODEL"></span></label>
+          <input id="s-ai-match-model" type="text" data-key="AI_MATCH_MODEL" placeholder="vide = modèle du backend">
+        </div>
+        <div class="field">
+          <label for="s-ai-letter-model">Modèle lettres <span class="set-hint" data-hint="AI_LETTER_MODEL"></span></label>
+          <input id="s-ai-letter-model" type="text" data-key="AI_LETTER_MODEL" placeholder="vide = modèle du backend">
+        </div>
+        <div class="field">
+          <label for="s-ai-fallback">Si le backend échoue <span class="set-hint" data-hint="AI_FALLBACK"></span></label>
+          <select id="s-ai-fallback" data-key="AI_FALLBACK">
+            <option value="none">erreur claire (défaut)</option>
+            <option value="claude">basculer sur Claude</option>
+            <option value="local">basculer sur Ollama</option>
+          </select>
+        </div>
+      </div>
+
+      <h3>Coordonnées candidat <span class="muted small">— en-tête des lettres PDF</span></h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-cand-name">Nom complet <span class="set-hint" data-hint="CANDIDATE_NAME"></span></label>
+          <input id="s-cand-name" type="text" data-key="CANDIDATE_NAME" placeholder="Prénom Nom">
+        </div>
+        <div class="field">
+          <label for="s-cand-email">Email <span class="set-hint" data-hint="CANDIDATE_EMAIL"></span></label>
+          <input id="s-cand-email" type="text" data-key="CANDIDATE_EMAIL" placeholder="vous@exemple.com">
+        </div>
+        <div class="field">
+          <label for="s-cand-phone">Téléphone <span class="set-hint" data-hint="CANDIDATE_PHONE"></span></label>
+          <input id="s-cand-phone" type="text" data-key="CANDIDATE_PHONE" placeholder="06 12 34 56 78">
+        </div>
+        <div class="field">
+          <label for="s-cand-city">Ville <span class="set-hint" data-hint="CANDIDATE_CITY"></span></label>
+          <input id="s-cand-city" type="text" data-key="CANDIDATE_CITY" placeholder="Rennes">
+        </div>
+      </div>
+
+      <h3>Critères par défaut <span class="muted small">— pré-remplis à chaque ouverture (mis à jour par le CLI interactif)</span></h3>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="s-def-sources">Sources <span class="set-hint" data-hint="DEFAULT_SOURCES"></span></label>
+          <input id="s-def-sources" type="text" data-key="DEFAULT_SOURCES" placeholder="apec,adzuna,indeed,wttj">
+        </div>
+        <div class="field">
+          <label for="s-def-sectors">Secteurs <span class="set-hint" data-hint="DEFAULT_SECTORS"></span></label>
+          <input id="s-def-sectors" type="text" data-key="DEFAULT_SECTORS" placeholder="tech,industry">
+        </div>
+        <div class="field">
+          <label for="s-def-location">Localisation <span class="set-hint" data-hint="DEFAULT_LOCATION"></span></label>
+          <input id="s-def-location" type="text" data-key="DEFAULT_LOCATION" placeholder="Rennes">
+        </div>
+        <div class="field">
+          <label for="s-def-experience">Niveau d'expérience <span class="set-hint" data-hint="DEFAULT_EXPERIENCE"></span></label>
+          <select id="s-def-experience" data-key="DEFAULT_EXPERIENCE">
+            <option value="">— aucun —</option>
+            <option value="stage">stage</option>
+            <option value="junior">junior</option>
+            <option value="confirme">confirmé</option>
+            <option value="senior">senior</option>
+            <option value="expert">expert</option>
+          </select>
         </div>
       </div>
 
@@ -307,12 +424,13 @@
         </div>
         <div class="letter-section">
           <div class="letter-section-head">
-            <h4>Lettre</h4>
+            <h4>Lettre <span class="muted small">(modifiable)</span></h4>
             <button class="btn-ghost small" data-copy="letter">Copier</button>
           </div>
-          <pre id="letter-body" class="letter-text"></pre>
+          <textarea id="letter-body" class="letter-edit" rows="14" spellcheck="true"></textarea>
         </div>
         <div class="letter-downloads">
+          <button id="btn-letter-save" class="btn-primary">💾 Enregistrer les modifications (txt + PDF)</button>
           <a id="letter-dl-txt" class="btn-ghost" download>⬇ .txt</a>
           <a id="letter-dl-pdf" class="btn-ghost" download hidden>⬇ .pdf</a>
           <span class="muted small">L'offre est marquée « postulée » dans votre historique.</span>

@@ -87,6 +87,30 @@ class Config:
     # Mots-clés éliminatoires (séparés par virgule) : offres écartées avant l'IA
     exclude_keywords: str = field(default_factory=lambda: os.getenv("EXCLUDE_KEYWORDS", "").strip())
 
+    # Coordonnées du candidat : en-tête des lettres de motivation (PDF + TXT)
+    candidate_name: str = field(default_factory=lambda: os.getenv("CANDIDATE_NAME", "").strip()[:80])
+    candidate_email: str = field(default_factory=lambda: os.getenv("CANDIDATE_EMAIL", "").strip()[:120])
+    candidate_phone: str = field(default_factory=lambda: os.getenv("CANDIDATE_PHONE", "").strip()[:40])
+    candidate_city: str = field(default_factory=lambda: os.getenv("CANDIDATE_CITY", "").strip()[:80])
+
+    # Routage IA par tâche : "" = suivre PROVIDER, sinon "local" (Ollama) ou
+    # "claude" (API Anthropic). Modèle vide = modèle par défaut du backend.
+    ai_prescore_backend: str = field(default_factory=lambda: _env_choice("AI_PRESCORE_BACKEND", "", ("", "local", "claude")))
+    ai_match_backend: str = field(default_factory=lambda: _env_choice("AI_MATCH_BACKEND", "", ("", "local", "claude")))
+    ai_letter_backend: str = field(default_factory=lambda: _env_choice("AI_LETTER_BACKEND", "", ("", "local", "claude")))
+    ai_prescore_model: str = field(default_factory=lambda: _env_model("AI_PRESCORE_MODEL", ""))
+    ai_match_model: str = field(default_factory=lambda: _env_model("AI_MATCH_MODEL", ""))
+    ai_letter_model: str = field(default_factory=lambda: _env_model("AI_LETTER_MODEL", ""))
+    # Si le backend d'une tâche échoue : "none" = erreur claire, sinon bascule
+    ai_fallback: str = field(default_factory=lambda: _env_choice("AI_FALLBACK", "none", ("none", "local", "claude")))
+
+    # Derniers critères choisis (persistés pour les reproposer au prochain lancement)
+    default_sources: str = field(default_factory=lambda: os.getenv("DEFAULT_SOURCES", "").strip()[:200])
+    default_sectors: str = field(default_factory=lambda: os.getenv("DEFAULT_SECTORS", "").strip()[:400])
+    default_location: str = field(default_factory=lambda: os.getenv("DEFAULT_LOCATION", "").strip()[:120])
+    default_country: str = field(default_factory=lambda: os.getenv("DEFAULT_COUNTRY", "fr").strip().lower()[:2] or "fr")
+    default_experience: str = field(default_factory=lambda: os.getenv("DEFAULT_EXPERIENCE", "").strip()[:20])
+
     # Pays courant (code ISO, défini par le sélecteur de localisation au runtime)
     country: str = "fr"
 
@@ -109,6 +133,11 @@ _ALLOWED_ENV_KEYS = {
     "NOTION_TOKEN", "NOTION_DATABASE_ID",
     "OUTPUT_DIR", "MAX_JOBS_PER_SOURCE", "MIN_MATCH_SCORE", "REQUEST_DELAY",
     "EXCLUDE_KEYWORDS",
+    "CANDIDATE_NAME", "CANDIDATE_EMAIL", "CANDIDATE_PHONE", "CANDIDATE_CITY",
+    "AI_PRESCORE_BACKEND", "AI_MATCH_BACKEND", "AI_LETTER_BACKEND",
+    "AI_PRESCORE_MODEL", "AI_MATCH_MODEL", "AI_LETTER_MODEL", "AI_FALLBACK",
+    "DEFAULT_SOURCES", "DEFAULT_SECTORS", "DEFAULT_LOCATION",
+    "DEFAULT_COUNTRY", "DEFAULT_EXPERIENCE",
 }
 _KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

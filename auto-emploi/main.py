@@ -48,8 +48,12 @@ from ai import JobMatcher, CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, EXPERIENCE_LEVEL_LABELS
 from ai.cover_letter import TONES
 from tracker import Tracker
+from history import SessionStore
 from integrations import notion_configured, export_to_notion, desktop_notify
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS, search_names, _fold
+
+# Plafond du pré-filtre code pur avant le re-scoring IA de toute la base
+RESCORE_TOP_K = 150
 
 console = Console()
 
@@ -70,6 +74,16 @@ EXPERIENCE_LEVELS: list[tuple[str, str]] = [
     ("expert",   "Expert (10+ ans)"),
 ]
 
+_SESSION_STORE: SessionStore | None = None
+
+
+def _get_store() -> SessionStore:
+    global _SESSION_STORE
+    if _SESSION_STORE is None:
+        _SESSION_STORE = SessionStore(Path(config.output_dir) / ".sessions.json")
+    return _SESSION_STORE
+
+
 SECTORS: list[tuple[str, str]] = [
     ("tech",       "Informatique / Tech / IA / Cybersécurité"),
     ("finance",    "Finance / Banque / Assurance / Comptabilité"),
@@ -88,6 +102,13 @@ SECTORS: list[tuple[str, str]] = [
     ("food",       "Agroalimentaire / Restauration / Hôtellerie"),
     ("public",     "Secteur public / Associations / ONG"),
 ]
+
+_SECTOR_KEY_BY_LABEL = {label: key for key, label in SECTORS}
+
+
+def _sector_keys(labels: list[str]) -> list[str]:
+    return [_SECTOR_KEY_BY_LABEL[lab] for lab in labels if lab in _SECTOR_KEY_BY_LABEL]
+
 
 def _safe_open_url(url: str) -> bool:
     """N'ouvre que des URLs http(s) : une offre scrapée pourrait contenir un
@@ -745,12 +766,15 @@ def _parse_indices(raw: str, max_idx: int) -> list[int]:
     return [i for i in indices if 0 <= i < max_idx]
 
 
-def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> None:
-    """Navigation interactive après un scan."""
+def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None,
+                  letter_cb=None) -> None:
+    """Navigation interactive après un scan. letter_cb(targets) : génération
+    de lettres pour une sélection ('m N'), si un CV est disponible."""
+    letter_hint = "[bold]m N[/bold] lettre · " if letter_cb else ""
     console.print(
         "\n[dim]Commandes : [bold]N[/bold] détail · [bold]o N[/bold] ouvrir · "
         "[bold]f N[/bold] favori · [bold]a N[/bold] postulé · [bold]r N[/bold] rejeter · "
-        "[bold]l[/bold] relister · [bold]Entrée[/bold] quitter[/dim]"
+        f"{letter_hint}[bold]l[/bold] relister · [bold]Entrée[/bold] quitter[/dim]"
     )
     console.print(
         "[dim]N peut être : [bold]3[/bold], [bold]1,3,5[/bold], [bold]1-5[/bold] ou [bold]all[/bold][/dim]"
@@ -764,9 +788,9 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
             display_matches(offers, tracker)
             continue
 
-        # Commandes à 2 lettres : "o N", "f N", "a N", "r N"
+        # Commandes à 2 lettres : "o N", "f N", "a N", "r N", "m N"
         cmd, _, arg = choice.partition(" ")
-        if cmd in ("o", "f", "a", "r") and arg:
+        if cmd in ("o", "f", "a", "r", "m") and arg:
             indices = _parse_indices(arg, len(offers))
             if not indices:
                 console.print(f"[red]Numéros invalides (1–{len(offers)}).[/red]")
@@ -776,6 +800,11 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
                 for offer in targets:
                     if _safe_open_url(offer.url):
                         console.print(f"[dim]Ouverture : {escape(offer.url)}[/dim]")
+            elif cmd == "m":
+                if letter_cb is None:
+                    console.print("[yellow]Lettres indisponibles ici (CV non chargé — relancez avec --cv).[/yellow]")
+                else:
+                    letter_cb(targets)
             elif tracker is not None and cmd == "f":
                 tracker.mark_many(targets, "favorite")
                 console.print(f"[yellow]★ {len(targets)} offre(s) marquée(s) comme favori.[/yellow]")
@@ -797,7 +826,7 @@ def browse_offers(offers: list[JobOffer], tracker: Tracker | None = None) -> Non
             else:
                 console.print(f"[red]Numéro hors plage (1–{len(offers)}).[/red]")
         except ValueError:
-            console.print("[red]Commande inconnue. Tapez un numéro, 'o/f/a/r N', 'l' ou Entrée.[/red]")
+            console.print("[red]Commande inconnue. Tapez un numéro, 'o/f/a/r/m N', 'l' ou Entrée.[/red]")
 
 
 def _show_detail(offer: JobOffer) -> None:
@@ -887,7 +916,8 @@ def _ask_tone() -> str:
     )
 
 
-def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator, tone: str = "standard") -> None:
+def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator,
+                     tone: str = "standard", store: SessionStore | None = None) -> None:
     for offer in offers:
         label = escape(f"{offer.title} @ {offer.company}")
         with Progress(SpinnerColumn(), TextColumn(f"[cyan]Génération : {label}..."), console=console) as progress:
@@ -895,6 +925,11 @@ def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator, to
             try:
                 result = generator.generate(offer, tone=tone)
                 txt_path, pdf_path = generator.save(offer, result)
+                if store is not None:
+                    store.add_letter(
+                        offer, tone, result.get("language", "fr"),
+                        txt_path.name, pdf_path.name if pdf_path.exists() else "",
+                    )
 
                 # La lettre vient du LLM (lui-même exposé au texte de l'offre) :
                 # on l'affiche comme du texte brut, jamais comme du balisage.
@@ -962,6 +997,134 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     console.print(f"\n[dim]JSON : {json_path}[/dim]")
     console.print(f"[dim]CSV  : {csv_path}  (Excel / Google Sheets)[/dim]")
     return json_path, csv_path
+
+
+# ─── Historique des sessions ──────────────────────────────────────────────────
+
+def _criteria_summary(criteria: dict) -> str:
+    parts = []
+    if criteria.get("location"):
+        parts.append(criteria["location"])
+    if criteria.get("country") and criteria.get("country") != "fr":
+        parts.append(COUNTRY_NAMES.get(criteria["country"], criteria["country"]))
+    if criteria.get("experience"):
+        parts.append(criteria["experience"])
+    if criteria.get("sectors"):
+        parts.append(f"{len(criteria['sectors'])} secteur(s)")
+    return " · ".join(parts) or "–"
+
+
+def show_sessions() -> None:
+    """Liste les sessions de recherche passées (--sessions)."""
+    store = _get_store()
+    sessions = store.list_sessions()
+    if not sessions:
+        console.print(Panel(
+            "[dim]Aucune session enregistrée. Lancez un scan pour commencer ![/dim]",
+            title="[bold cyan]Historique des sessions[/bold cyan]", border_style="cyan",
+        ))
+        return
+
+    table = Table(title="Historique des sessions", box=box.ROUNDED, header_style="bold cyan")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Date", width=17)
+    table.add_column("Type", width=8)
+    table.add_column("Recherche", min_width=18)
+    table.add_column("Critères", min_width=16)
+    table.add_column("Offres", width=12, justify="center")
+    table.add_column("ID", style="dim")
+    for i, s in enumerate(sessions, 1):
+        c = s["criteria"]
+        table.add_row(
+            str(i),
+            escape(s["date"].replace("T", " ")[:16]),
+            escape(s["kind"]),
+            escape(c.get("query") or "–"),
+            escape(_criteria_summary(c)),
+            f"{s['kept']}/{s['found']}",
+            escape(s["id"]),
+        )
+    console.print(table)
+
+    letters = store.list_letters()
+    if letters:
+        console.print(f"[dim]{len(letters)} lettre(s) générée(s) au total — fichiers dans {config.output_dir}/[/dim]")
+    console.print(
+        "\n[dim]Revoir une session : [bold]python main.py --session N[/bold] · "
+        "Relancer avec les mêmes critères : [bold]python main.py --rerun N --cv cv.pdf[/bold][/dim]"
+    )
+
+
+def _resolve_session(ref: str) -> dict | None:
+    """Accepte l'ID complet ou le numéro affiché par --sessions (1 = plus récente)."""
+    store = _get_store()
+    session = store.get_session(ref.strip())
+    if session is not None:
+        return session
+    try:
+        index = int(ref) - 1
+    except ValueError:
+        return None
+    summaries = store.list_sessions()
+    if 0 <= index < len(summaries):
+        return store.get_session(summaries[index]["id"])
+    return None
+
+
+def browse_session(ref: str, cv_path: str = "") -> None:
+    """Affiche les offres d'une session passée avec leurs scores de l'époque
+    (--session N). Avec --cv, la génération de lettres ('m N') est disponible."""
+    session = _resolve_session(ref)
+    if session is None:
+        console.print(f"[red]Session introuvable : {escape(ref)}[/red]")
+        console.print("[dim]Listez les sessions avec : python main.py --sessions[/dim]")
+        sys.exit(1)
+
+    store = _get_store()
+    offers = store.session_offers(session)
+    c = session.get("criteria", {})
+    console.print(Panel.fit(
+        f"[bold cyan]Session {escape(session['id'])}[/bold cyan]\n"
+        f"Date : {escape(session.get('date', '').replace('T', ' ')[:16])} · "
+        f"Type : {escape(session.get('kind', ''))}\n"
+        f"Recherche : « {escape(c.get('query') or '–')} » · {escape(_criteria_summary(c))}\n"
+        f"Offres : {len(offers)} retenue(s) sur {session.get('found', 0)} collectée(s)",
+        border_style="cyan",
+    ))
+    if not offers:
+        return
+
+    tracker = Tracker(Path(config.output_dir) / ".tracker.json")
+    display_matches(offers, tracker)
+
+    letter_cb = None
+    if cv_path:
+        try:
+            cv_text = parse_cv(cv_path)
+            letter_cb = _make_letter_cb(cv_text, tracker)
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[yellow]CV illisible ({escape(str(e))}) — lettres indisponibles.[/yellow]")
+    else:
+        console.print("[dim]Ajoutez --cv votre_cv.pdf pour générer des lettres depuis cette session.[/dim]")
+    browse_offers(offers, tracker, letter_cb=letter_cb)
+
+
+def _make_letter_cb(cv_text: str, tracker: Tracker):
+    """Callback 'm N' du mode navigation : génère les lettres des offres ciblées."""
+    state: dict = {"generator": None}
+
+    def callback(targets: list[JobOffer]) -> None:
+        tone = _ask_tone()
+        if state["generator"] is None:
+            applied_titles = [
+                str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
+            ]
+            state["generator"] = CoverLetterGenerator(cv_text, applied_history=applied_titles)
+        generate_letters(targets, state["generator"], tone=tone, store=_get_store())
+        tracker.mark_many(targets, "applied")
+        console.print(f"[dim]→ {len(targets)} offre(s) marquée(s) comme postulée(s).[/dim]")
+
+    return callback
 
 
 # ─── Statistiques tracking ────────────────────────────────────────────────────
@@ -1050,6 +1213,111 @@ def show_stats() -> None:
         console.print(table)
 
 
+# ─── Re-scoring sans nouvelle recherche ───────────────────────────────────────
+
+def rescore_known_offers(args, cv_text: str) -> None:
+    """Re-score le CV actuel contre toutes les offres déjà connues (toutes
+    sessions confondues), sans relancer les scrapers. Pré-filtre code pur
+    (top {RESCORE_TOP_K} par similarité mots-clés) puis pré-scoring IA rapide
+    avant l'analyse détaillée."""
+    store = _get_store()
+    offers = store.all_offers()
+    if not offers:
+        console.print(
+            "[yellow]Aucune offre connue pour l'instant.[/yellow] "
+            "[dim]Lancez d'abord un scan : python main.py --cv cv.pdf --scan[/dim]"
+        )
+        return
+
+    console.print(f"\n[bold]Re-scoring :[/bold] {len(offers)} offre(s) connue(s) dans l'historique")
+
+    tracker = Tracker(Path(config.output_dir) / ".tracker.json")
+    if not args.include_seen:
+        before = len(offers)
+        offers = tracker.filter_visible(offers)
+        hidden = before - len(offers)
+        if hidden:
+            console.print(f"[dim]{hidden} offre(s) déjà traitée(s) filtrée(s) (--include-seen pour les inclure).[/dim]")
+    if not offers:
+        console.print("[yellow]Toutes les offres connues sont déjà traitées.[/yellow]")
+        return
+
+    sectors = select_sectors(args.sectors) if args.sectors else []
+    exclude = parse_exclude_keywords(config.exclude_keywords) + parse_exclude_keywords(args.exclude)
+
+    matcher = JobMatcher(cv_text)
+    rejections = tracker.recent_rejections()
+    if rejections:
+        matcher.set_rejected_examples(rejections)
+
+    with Progress(SpinnerColumn(), TextColumn("[cyan]Re-scoring en cours..."), console=console) as progress:
+        progress.add_task("", total=None)
+        matched = matcher.score_offers(
+            offers,
+            min_score=args.min_score,
+            sectors=sectors,
+            exclude=exclude,
+            experience_level=args.experience,
+            top_k=RESCORE_TOP_K,
+            two_stage=True,
+        )
+
+    if not matched:
+        console.print(f"[yellow]Aucune offre connue avec un score ≥ {args.min_score}/10 pour ce CV.[/yellow]")
+        return
+
+    display_matches(matched, tracker)
+    save_results(matched, "rescore")
+    tracker.mark_many(matched, "seen")
+    store.add_session(
+        kind="rescore",
+        criteria={
+            "query": "(re-scoring de la base)",
+            "cv": Path(args.cv).name,
+            "country": config.country,
+            "location": "",
+            "sectors": _sector_keys(sectors),
+            "experience": args.experience,
+            "sources": [],
+            "min_score": args.min_score,
+            "exclude": exclude,
+        },
+        offers=matched,
+        found=len(offers),
+    )
+    browse_offers(matched, tracker, letter_cb=_make_letter_cb(cv_text, tracker))
+
+
+# ─── Critères par défaut (persistés entre les sessions) ───────────────────────
+
+def _persist_defaults(sources: list[str], sector_labels: list[str],
+                      location: str, experience: str) -> None:
+    """Mémorise les derniers critères choisis interactivement — reproposés au
+    prochain lancement et utilisés comme défauts par l'interface web."""
+    try:
+        save_to_env("DEFAULT_SOURCES", ",".join(sources))
+        save_to_env("DEFAULT_SECTORS", ",".join(_sector_keys(sector_labels)))
+        save_to_env("DEFAULT_LOCATION", location)
+        save_to_env("DEFAULT_COUNTRY", config.country)
+        save_to_env("DEFAULT_EXPERIENCE", experience)
+    except (ValueError, OSError):
+        pass  # défauts non persistés : sans gravité
+
+
+def _describe_defaults() -> str:
+    parts = []
+    if config.default_sectors:
+        parts.append(f"secteurs : {config.default_sectors}")
+    loc = config.default_location or "sans filtre"
+    country = COUNTRY_NAMES.get(config.default_country, "France")
+    parts.append(f"lieu : {loc} ({country})")
+    if config.default_experience:
+        parts.append(f"niveau : {config.default_experience}")
+    if config.default_sources:
+        parts.append(f"sources : {config.default_sources}")
+    return " · ".join(parts)
+
+
 # ─── Mode veille ──────────────────────────────────────────────────────────────
 
 def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", experience="") -> None:
@@ -1081,6 +1349,18 @@ def watch_loop(args, sources, sectors, matcher, tracker, exclude, location="", e
                 if matched:
                     display_matches(matched, tracker)
                     save_results(matched, query)
+                    _get_store().add_session(
+                        kind="watch",
+                        criteria={
+                            "query": query, "cv": Path(args.cv).name,
+                            "country": config.country, "location": location,
+                            "sectors": _sector_keys(sectors), "experience": experience,
+                            "sources": sources, "min_score": args.min_score,
+                            "exclude": exclude,
+                        },
+                        offers=matched,
+                        found=len(new_offers),
+                    )
                     if args.notion and notion_configured():
                         export_to_notion(matched)
                     best = matched[0]
@@ -1117,11 +1397,21 @@ def parse_args():
             "  python main.py --stats                           # Historique candidatures\n"
             "  python main.py --cv cv.pdf --scan                # Scan sans postuler\n"
             "  python main.py --cv cv.pdf --query \"dev Python\" --location \"Paris\" --sectors tech\n"
-            "  python main.py --cv cv.pdf --scan --include-seen # Réafficher l'historique\n"
+            "  python main.py --sessions                        # Sessions de recherche passées\n"
+            "  python main.py --session 1 --cv cv.pdf           # Revoir une session (lettres : m N)\n"
+            "  python main.py --rerun 1 --cv cv.pdf             # Relancer avec les mêmes critères\n"
+            "  python main.py --rescore --cv cv.pdf             # Re-scorer la base sans scraper\n"
         ),
     )
     parser.add_argument("--check", action="store_true", help="Vérifier l'environnement et quitter")
     parser.add_argument("--stats", action="store_true", help="Afficher l'historique des candidatures et favoris")
+    parser.add_argument("--sessions", action="store_true", help="Lister les sessions de recherche passées")
+    parser.add_argument("--session", default="", metavar="ID",
+                        help="Revoir les offres d'une session passée (numéro ou ID de --sessions)")
+    parser.add_argument("--rerun", default="", metavar="ID",
+                        help="Relancer une recherche avec les critères d'une session passée")
+    parser.add_argument("--rescore", action="store_true",
+                        help="Re-scorer le CV contre toutes les offres déjà connues, sans scraper")
     parser.add_argument("--cv", help="Chemin vers votre CV (PDF, DOCX ou TXT)")
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
     parser.add_argument("--location", default="", help='Localisation ex: "Paris" (sinon sélecteur interactif pays/région/ville)')
@@ -1187,6 +1477,37 @@ def main():
         show_stats()
         return
 
+    # Historique des sessions
+    if args.sessions:
+        show_sessions()
+        return
+    if args.session:
+        browse_session(args.session, args.cv or "")
+        return
+
+    # Relance d'une session passée : reprendre ses critères
+    if args.rerun:
+        past = _resolve_session(args.rerun)
+        if past is None:
+            console.print(f"[red]Session introuvable : {escape(args.rerun)}[/red]")
+            console.print("[dim]Listez les sessions avec : python main.py --sessions[/dim]")
+            sys.exit(1)
+        c = past.get("criteria", {})
+        args.query = c.get("query", "") if not c.get("query", "").startswith("(") else ""
+        args.location = c.get("location", "")
+        args.country = c.get("country", "fr")
+        if c.get("sources"):
+            args.sources = ",".join(c["sources"])
+        args.sectors = ",".join(c.get("sectors") or [])
+        args.experience = c.get("experience", "")
+        args.min_score = max(0, min(10, int(c.get("min_score", args.min_score))))
+        if c.get("exclude"):
+            args.exclude = ",".join(c["exclude"])
+        if not args.cv and c.get("cv") and Path(c["cv"]).is_file():
+            args.cv = c["cv"]
+        console.print(f"[dim]Critères repris de la session {escape(past['id'])} : "
+                      f"« {escape(args.query or '–')} » · {escape(_criteria_summary(c))}[/dim]")
+
     console.print(Panel.fit(
         "[bold cyan]Auto Job Application[/bold cyan]\n"
         + ("[bold yellow]MODE SCAN — aucune candidature ne sera envoyée[/bold yellow]" if args.scan
@@ -1221,17 +1542,48 @@ def main():
             console.print("[dim]Diagnostic : python main.py --check[/dim]")
             sys.exit(1)
 
+    # Mode re-scoring : toutes les offres connues, sans scraper
+    if args.rescore:
+        rescore_known_offers(args, cv_text)
+        return
+
+    # Critères par défaut : reproposer les derniers choix interactifs
+    interactive = not (args.sectors or args.location.strip() or args.experience
+                       or args.watch or args.rerun)
+    use_defaults = False
+    if interactive and (config.default_sectors or config.default_location or config.default_experience):
+        console.print()
+        use_defaults = Confirm.ask(
+            f"[bold cyan]Reprendre vos derniers critères ?[/bold cyan] [dim]{_describe_defaults()}[/dim]",
+            default=True,
+        )
+
     # 3. Sélection des sources (une fois pour toutes les recherches)
     console.print("\n[bold]2. Sources de recherche[/bold]")
-    sources = select_sources(args.sources)
+    if use_defaults and config.default_sources:
+        sources = select_sources(config.default_sources)
+    else:
+        sources = select_sources(args.sources)
 
     # 4. Secteurs (une fois, modifiable en cours de session)
     console.print("\n[bold]3. Secteurs d'activité ciblés[/bold]")
-    sectors = select_sectors(args.sectors)
+    if use_defaults:
+        sectors = select_sectors(config.default_sectors) if config.default_sectors else []
+        if not config.default_sectors:
+            console.print("[dim]Aucun filtre secteur appliqué.[/dim]")
+    else:
+        sectors = select_sectors(args.sectors)
 
     # 5. Localisation : pays → région → ville (modifiable en session avec 'v')
     console.print("\n[bold]4. Localisation[/bold]")
-    if args.location.strip() or args.watch:
+    if use_defaults:
+        location = config.default_location
+        config.country = config.default_country if config.default_country in COUNTRY_NAMES else "fr"
+        console.print(
+            f"[dim]Localisation : {escape(location) if location else 'sans filtre'}"
+            f" ({COUNTRY_NAMES.get(config.country, 'France')})[/dim]"
+        )
+    elif args.location.strip() or args.watch or args.rerun:
         location = args.location.strip()
         config.country = args.country
         console.print(
@@ -1243,7 +1595,17 @@ def main():
 
     # 6. Niveau d'expérience (modifiable en session avec 'e')
     console.print("\n[bold]5. Niveau d'expérience recherché[/bold]")
-    experience = select_experience(args.experience)
+    if use_defaults:
+        experience = select_experience(config.default_experience) if config.default_experience else ""
+        if not config.default_experience:
+            console.print("[dim]Aucun filtre niveau d'expérience.[/dim]")
+    else:
+        experience = select_experience(args.experience)
+
+    # Mémoriser les choix interactifs : reproposés au prochain lancement,
+    # et utilisés comme défauts par l'interface web.
+    if interactive and not use_defaults:
+        _persist_defaults(sources, sectors, location, experience)
 
     # Matcher initialisé une seule fois (CV en mémoire)
     matcher = JobMatcher(cv_text)
@@ -1302,15 +1664,19 @@ def main():
                 break
             if raw.lower() == "s":
                 sources = select_sources("")
+                _persist_defaults(sources, sectors, location, experience)
                 continue
             if raw.lower() == "f":
                 sectors = select_sectors("")
+                _persist_defaults(sources, sectors, location, experience)
                 continue
             if raw.lower() == "v":
                 location = select_location()
+                _persist_defaults(sources, sectors, location, experience)
                 continue
             if raw.lower() == "e":
                 experience = select_experience("")
+                _persist_defaults(sources, sectors, location, experience)
                 continue
             query = raw
             if not query:
@@ -1370,6 +1736,24 @@ def main():
         display_matches(matched_offers, tracker)
         save_results(matched_offers, query)
 
+        # Historique : la session est rejouable (--rerun) et re-scorable (--rescore)
+        _get_store().add_session(
+            kind="scan",
+            criteria={
+                "query": query,
+                "cv": Path(args.cv).name,
+                "country": config.country,
+                "location": location,
+                "sectors": _sector_keys(sectors),
+                "experience": experience,
+                "sources": sources,
+                "min_score": args.min_score,
+                "exclude": exclude,
+            },
+            offers=matched_offers,
+            found=len(all_offers),
+        )
+
         # Export Notion (opt-in via --notion)
         if args.notion:
             if notion_configured():
@@ -1380,9 +1764,9 @@ def main():
         # Marquer comme "vues" en bulk (n'écrase pas favorite/applied)
         tracker.mark_many(matched_offers, "seen")
 
-        # Mode scan : navigation interactive
+        # Mode scan : navigation interactive (lettres disponibles via 'm N')
         if args.scan:
-            browse_offers(matched_offers, tracker)
+            browse_offers(matched_offers, tracker, letter_cb=_make_letter_cb(cv_text, tracker))
             console.print(f"[dim]{len(matched_offers)} offres exportées dans {config.output_dir}/[/dim]")
             continue  # ← propose une nouvelle recherche
 
@@ -1402,7 +1786,7 @@ def main():
                 ]
                 console.print(f"\n[bold]Génération des lettres[/bold] ({len(selected)} offre(s), ton {tone})")
                 generator = CoverLetterGenerator(cv_text, applied_history=applied_titles)
-                generate_letters(selected, generator, tone=tone)
+                generate_letters(selected, generator, tone=tone, store=_get_store())
                 # Marquer auto comme "applied" : la lettre est prête à être envoyée
                 tracker.mark_many(selected, "applied")
                 console.print(f"[bold green]✓[/bold green] Lettres dans [cyan]{config.output_dir}/[/cyan]")
