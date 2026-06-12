@@ -118,7 +118,8 @@ PROFILE_SCHEMA = {
     "additionalProperties": False,
 }
 
-_MAX_CV_CHARS = 15000  # un CV dépasse rarement 3 pages de texte
+_MAX_CV_CHARS = 15000       # un CV dépasse rarement 3 pages de texte
+_MAX_MERGED_CV_CHARS = 45000  # texte fusionné de jusqu'à 3 CV
 
 
 class CVExtractor:
@@ -188,7 +189,7 @@ def derive_search_queries(cv_text: str, limit: int = MAX_GLOBAL_QUERIES) -> list
     llm = LLMClient(task="match")
     raw = llm.generate(
         system=QUERIES_SYSTEM_PROMPT,
-        user=QUERIES_PROMPT.format(cv=(cv_text or "")[:_MAX_CV_CHARS], n=limit),
+        user=QUERIES_PROMPT.format(cv=(cv_text or "")[:_MAX_MERGED_CV_CHARS], n=limit),
         max_tokens=512,
         json_schema=QUERIES_SCHEMA,
         cache_system=False,

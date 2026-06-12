@@ -252,4 +252,5 @@ def _clean_criteria(criteria: dict) -> dict:
         "sources": [str(s)[:20] for s in (c.get("sources") or [])][:10],
         "min_score": int(c.get("min_score", 6)) if isinstance(c.get("min_score"), int) else 6,
         "exclude": [str(e)[:60] for e in (c.get("exclude") or [])][:50],
+        "global": bool(c.get("global")),
     }

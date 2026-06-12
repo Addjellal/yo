@@ -14,7 +14,7 @@ from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
 from app_utils import console
 
-API_URL = "https://api.adzuna.com/v1/api/jobs/fr/search/{page}"
+API_URL = "https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
 REGISTER_URL = "https://developer.adzuna.com"
 MAX_PAGES = 20
 

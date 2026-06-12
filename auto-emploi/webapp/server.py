@@ -197,7 +197,6 @@ def _entry_dict(key: str, entry: dict) -> dict:
         "source": str(entry.get("source", ""))[:60],
         "score": entry.get("score"),
         "updated": str(entry.get("updated", ""))[:19],
-        "first_seen": str(entry.get("first_seen", ""))[:19],
     }
 
 
@@ -315,8 +314,7 @@ def _run_scan(job: _Job, p: dict) -> None:
                 seen_keys.update(o.unique_key() for o in fresh)
                 all_offers.extend(fresh)
                 counts[source_name] = counts.get(source_name, 0) + len(fresh)
-            for source_name, n in counts.items():
-                job.add_log(f"✓ {source_name} : {n} offres")
+                job.add_log(f"✓ {source_name} : {counts[source_name]} offres")
         finally:
             # Sur arrêt : ne pas attendre les scrapers en cours, annuler les
             # lots en file. Sinon, attente normale de la fin des threads.
@@ -517,13 +515,10 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
 # ─── Validation des paramètres de scan ───────────────────────────────────────
 
 def _validate_cvs(body: dict) -> list[str]:
-    """Liste `cvs` (cases à cocher) avec repli sur `cv` (ancien format) :
-    seuls les fichiers réellement présents sont retenus, 5 maximum."""
+    """Liste `cvs` (cases à cocher) : seuls les fichiers réellement présents
+    sont retenus, 5 maximum."""
     raw = body.get("cvs")
-    if isinstance(raw, list):
-        names = [str(c).strip() for c in raw if isinstance(c, str)]
-    else:
-        names = [str(body.get("cv", "")).strip()]
+    names = [str(c).strip() for c in raw if isinstance(c, str)] if isinstance(raw, list) else []
     files = set(_list_cv_files())
     return [n for n in names if n in files][:5]
 

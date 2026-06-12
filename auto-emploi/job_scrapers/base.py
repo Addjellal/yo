@@ -1,6 +1,6 @@
 import re
 import urllib.parse
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
 

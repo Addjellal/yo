@@ -131,10 +131,8 @@ function applyCriteria(c) {
   /* Pré-remplit le formulaire de recherche avec des critères (défauts .env
      ou critères d'une session passée à relancer). */
   if (!c) return;
-  if (c.global !== undefined) {
-    $("#f-global").checked = !!c.global;
-    $("#f-global").dispatchEvent(new Event("change"));
-  }
+  $("#f-global").checked = !!c.global;
+  $("#f-global").dispatchEvent(new Event("change"));
   if (c.query !== undefined && c.query && !c.query.startsWith("(") && !c.global) $("#f-query").value = c.query;
   if (c.country && [...$("#f-country").options].some((o) => o.value === c.country)) {
     $("#f-country").value = c.country;
@@ -577,6 +575,7 @@ function pollScan() {
     renderLog(job.log);
     if (job.status === "running") { pollScan(); return; }
     $("#btn-scan").disabled = false;
+    $("#btn-scan-stop").disabled = true;
     if (job.status === "error") {
       toast("Scan échoué : " + (job.error || "erreur inconnue"), "err");
       return;
@@ -1442,6 +1441,7 @@ async function setTrackStatus(key, status) {
 
 // Glisser-déposer entre colonnes du kanban
 let DRAG_KEY = null;
+let DRAG_STATUS = null;
 document.querySelectorAll(".kanban-list[data-drop]").forEach((zone) => {
   zone.addEventListener("dragover", (e) => {
     if (!DRAG_KEY) return;
@@ -1452,8 +1452,10 @@ document.querySelectorAll(".kanban-list[data-drop]").forEach((zone) => {
   zone.addEventListener("drop", (e) => {
     e.preventDefault();
     zone.classList.remove("drop-target");
-    if (DRAG_KEY) setTrackStatus(DRAG_KEY, zone.dataset.drop);
+    const target = zone.dataset.drop;
+    if (DRAG_KEY && target !== DRAG_STATUS) setTrackStatus(DRAG_KEY, target);
     DRAG_KEY = null;
+    DRAG_STATUS = null;
   });
 });
 
@@ -1493,12 +1495,14 @@ function fillColumn(box, entries, actions) {
     ]);
     card.addEventListener("dragstart", (e) => {
       DRAG_KEY = entry.key;
+      DRAG_STATUS = box.dataset.drop || null;
       card.classList.add("dragging");
       if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     });
     card.addEventListener("dragend", () => {
       card.classList.remove("dragging");
       DRAG_KEY = null;
+      DRAG_STATUS = null;
     });
     box.appendChild(card);
   }

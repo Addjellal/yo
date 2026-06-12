@@ -256,7 +256,7 @@ class JobMatcher:
 
         # 4. Pré-scoring IA rapide en masse, puis analyse détaillée du top
         if two_stage and len(offers) > TWO_STAGE_THRESHOLD:
-            offers = self._prescore(offers)
+            offers = self._prescore(offers, should_stop=should_stop)
 
         scored = []
         for i in range(0, len(offers), BATCH_SIZE):
@@ -274,7 +274,11 @@ class JobMatcher:
             reverse=True,
         )
 
-    def _prescore(self, offers: list[JobOffer]) -> list[JobOffer]:
+    def _prescore(
+        self,
+        offers: list[JobOffer],
+        should_stop: Callable[[], bool] | None = None,
+    ) -> list[JobOffer]:
         """Scoring grossier (un entier par offre, descriptions raccourcies) sur la
         tâche « prescore » — par défaut le même provider, mais routable vers un
         modèle local gratuit via AI_PRESCORE_BACKEND=local. Garde le top."""
@@ -285,6 +289,9 @@ class JobMatcher:
         prescored: list[tuple[int, JobOffer]] = []
         batch_size = 20
         for i in range(0, len(offers), batch_size):
+            if should_stop and should_stop():
+                console.print("[yellow]⏹ Pré-scoring stoppé.[/yellow]")
+                break
             batch = offers[i: i + batch_size]
             jobs_text = "\n\n".join(
                 f"<offre index=\"{j}\">\nPoste : {o.title}\nEntreprise : {o.company}\n"

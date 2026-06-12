@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
-from app_utils import console
 
 MAX_PAGES = 20
 BASE_URL = "https://www.welcometothejungle.com"

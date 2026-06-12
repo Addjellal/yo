@@ -16,7 +16,6 @@ from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
-from app_utils import console
 
 MAX_RSS_START = 500        # plafond pagination RSS (~50 pages de 10)
 MAX_BROWSER_START = 300    # plafond pagination Playwright (~20 pages de 15)

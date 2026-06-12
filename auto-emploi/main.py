@@ -45,7 +45,7 @@ from job_scrapers import (
     AdzunaScraper,
 )
 from ai import CoverLetterGenerator
-from ai.matcher import parse_exclude_keywords, EXPERIENCE_LEVEL_LABELS, score_offers_multi
+from ai.matcher import parse_exclude_keywords, score_offers_multi
 from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
 from tracker import Tracker
 from history import SessionStore
@@ -1849,7 +1849,8 @@ def main():
         return
 
     # 5. Boucle de recherche
-    first_query = args.query.strip()
+    # --global-search prend le dessus sur --query si les deux sont fournis
+    first_query = "" if args.global_search else args.query.strip()
     pending_global = args.global_search
     console.print(
         "\n[dim]À tout moment : tapez [bold]x[/bold] pour quitter, "
