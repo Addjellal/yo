@@ -429,3 +429,73 @@ class TestMultiCV:
         robot = next(o for o in rebuilt if "Robotique" in o.title)
         assert robot.best_cv == "CV Robot"
         assert robot.cv_scores["CV Web"]["score"] == 2
+
+
+# ─── 7. Recherche globale, arrêt propre, retrait du suivi ─────────────────────
+
+from tracker import Tracker
+from ai import cv_extract as cvx
+
+
+class TestDeriveQueries:
+    def test_parses_dedupes_and_bounds(self, monkeypatch):
+        fake = FakeLLM({"queries": [
+            "Data Engineer", "data engineer", "  Ingénieur   ML  ", "", "X" * 200,
+        ]})
+        monkeypatch.setattr(cvx, "LLMClient", lambda task: fake)
+        queries = cvx.derive_search_queries("texte du cv")
+        assert queries[0] == "Data Engineer"
+        assert "Ingénieur ML" in queries          # espaces normalisés
+        assert len(queries) == 3                  # doublon + vide écartés
+        assert all(len(q) <= 80 for q in queries)
+        assert "<cv>" in fake.last_user           # CV isolé dans le prompt
+
+    def test_limit_clamped(self, monkeypatch):
+        fake = FakeLLM({"queries": [f"poste {i}" for i in range(10)]})
+        monkeypatch.setattr(cvx, "LLMClient", lambda task: fake)
+        assert len(cvx.derive_search_queries("cv", limit=99)) == cvx.MAX_GLOBAL_QUERIES
+
+    def test_empty_raises(self, monkeypatch):
+        fake = FakeLLM({"queries": []})
+        monkeypatch.setattr(cvx, "LLMClient", lambda task: fake)
+        with pytest.raises(ValueError):
+            cvx.derive_search_queries("cv")
+
+
+class TestTrackerForget:
+    def test_forget_then_offer_reappears(self, tmp_path):
+        t = Tracker(tmp_path / ".tracker.json")
+        offer = make_offer(1, "Dev Python")
+        t.mark(offer, "applied")
+        assert t.filter_visible([offer]) == []     # suivie → masquée des scans
+        assert t.forget_key(offer.unique_key()) is True
+        assert t.filter_visible([offer]) == [offer]  # retraitée aux prochains scans
+        assert t.forget_key(offer.unique_key()) is False  # déjà oubliée
+
+    def test_forget_persists(self, tmp_path):
+        t = Tracker(tmp_path / ".tracker.json")
+        offer = make_offer(2, "Data Engineer")
+        t.mark(offer, "favorite")
+        t.forget_key(offer.unique_key())
+        assert Tracker(tmp_path / ".tracker.json").filter_visible([offer]) == [offer]
+
+
+class TestShouldStop:
+    @pytest.fixture(autouse=True)
+    def no_prefilter(self, monkeypatch):
+        monkeypatch.setattr(matcher_mod, "PRE_FILTER_THRESHOLD", 0)
+        monkeypatch.setattr(JobMatcher, "_score_batch", fake_score_batch)
+
+    def test_stop_before_first_batch_returns_empty(self):
+        offers = [make_offer(1, "Ingénieur Robotique", "Python ROS2")]
+        results = score_offers_multi(
+            {"CV Robot": CV_ROBOT}, offers, min_score=0, should_stop=lambda: True,
+        )
+        assert results == []
+
+    def test_no_stop_keeps_behavior(self):
+        offers = [make_offer(1, "Ingénieur Robotique", "Python ROS2 navigation")]
+        results = score_offers_multi(
+            {"CV Robot": CV_ROBOT}, offers, min_score=0, should_stop=lambda: False,
+        )
+        assert len(results) == 1 and results[0].match_score == 9

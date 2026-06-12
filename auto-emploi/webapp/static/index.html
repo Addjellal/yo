@@ -66,6 +66,9 @@
         <div class="field grow">
           <label for="f-query">Poste recherché</label>
           <input id="f-query" type="text" placeholder="Ex : ingénieur robotique, data engineer…" maxlength="200" autocomplete="off">
+          <label class="check global-check" title="L'IA déduit les intitulés de poste depuis vos CV cochés et cherche sur chacun — rien à saisir">
+            <input id="f-global" type="checkbox"> 🌐 Recherche globale d'après mes CV (requêtes générées par l'IA)
+          </label>
           <div id="query-history" class="history-chips"></div>
         </div>
         <button id="btn-scan" class="btn-primary big">Lancer&nbsp;la&nbsp;recherche</button>
@@ -75,8 +78,8 @@
         <label>CV utilisés pour le matching <span class="muted">(plusieurs possibles — le meilleur score gagne)</span></label>
         <div class="cv-row">
           <div id="f-cvs" class="chips"></div>
-          <button id="cv-upload-btn" class="btn-ghost" title="Importer un CV (PDF, DOCX, TXT)">＋ Importer</button>
-          <input id="cv-file" type="file" accept=".pdf,.docx,.txt" hidden>
+          <button id="cv-upload-btn" class="btn-ghost" title="Importer un ou plusieurs CV (PDF, DOCX, TXT) — profil analysé par l'IA dès l'import">＋ Importer</button>
+          <input id="cv-file" type="file" accept=".pdf,.docx,.txt" multiple hidden>
         </div>
       </div>
 
@@ -124,8 +127,9 @@
             <input id="f-minscore" type="range" min="0" max="10" value="6">
           </div>
           <div class="field">
-            <label for="f-max">Offres max / source</label>
-            <input id="f-max" type="number" min="1" max="200" value="50">
+            <label for="f-max">Offres max / source <span class="muted">(vide&nbsp;=&nbsp;∞)</span></label>
+            <input id="f-max" type="number" min="0" max="10000" value="50" placeholder="∞ sans plafond"
+                   title="Vide ou 0 = sans plafond (les sources gardent leurs limites internes) — recommandé surtout avec un LLM local, gratuit">
           </div>
           <div class="field">
             <label for="f-exclude">Mots-clés éliminatoires</label>
@@ -144,6 +148,7 @@
       <div class="progress-head">
         <span class="spinner"></span>
         <strong id="progress-title">Recherche en cours…</strong>
+        <button id="btn-scan-stop" class="btn-danger small" title="Les offres déjà scorées sont conservées">⏹ Stopper</button>
         <button id="btn-progress-hide" class="btn-ghost small">Masquer</button>
       </div>
       <div id="progress-log" class="progress-log"></div>
@@ -180,24 +185,25 @@
       <h1>Suivi des candidatures</h1>
       <p class="muted">Favoris, candidatures envoyées et relances à faire.</p>
     </header>
+    <p class="muted small">Glissez une carte d'une colonne à l'autre pour changer son statut. 🗑 retire l'offre du suivi : elle pourra réapparaître aux prochains scans.</p>
     <div class="kanban">
       <div class="kanban-col">
         <h3>★ Favoris <span id="count-fav" class="pill-count">0</span></h3>
-        <div id="col-favorites" class="kanban-list"></div>
+        <div id="col-favorites" class="kanban-list" data-drop="favorite"></div>
       </div>
       <div class="kanban-col">
         <h3>✓ Postulées <span id="count-applied" class="pill-count">0</span></h3>
-        <div id="col-applied" class="kanban-list"></div>
+        <div id="col-applied" class="kanban-list" data-drop="applied"></div>
       </div>
       <div class="kanban-col col-warn">
         <h3>⏰ À relancer <span id="count-followup" class="pill-count">0</span></h3>
         <p class="muted small">Sans réponse depuis plus de 14 jours.</p>
-        <div id="col-followups" class="kanban-list"></div>
+        <div id="col-followups" class="kanban-list" data-drop="applied"></div>
       </div>
     </div>
     <details class="rejected-zone">
       <summary>✗ Rejetées récemment <span id="count-rejected" class="pill-count">0</span></summary>
-      <div id="col-rejected" class="kanban-list rejected-list"></div>
+      <div id="col-rejected" class="kanban-list rejected-list" data-drop="rejected"></div>
     </details>
   </section>
 

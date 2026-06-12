@@ -131,7 +131,11 @@ function applyCriteria(c) {
   /* Pré-remplit le formulaire de recherche avec des critères (défauts .env
      ou critères d'une session passée à relancer). */
   if (!c) return;
-  if (c.query !== undefined && c.query && !c.query.startsWith("(")) $("#f-query").value = c.query;
+  if (c.global !== undefined) {
+    $("#f-global").checked = !!c.global;
+    $("#f-global").dispatchEvent(new Event("change"));
+  }
+  if (c.query !== undefined && c.query && !c.query.startsWith("(") && !c.global) $("#f-query").value = c.query;
   if (c.country && [...$("#f-country").options].some((o) => o.value === c.country)) {
     $("#f-country").value = c.country;
     $("#region-field").style.display = c.country === "fr" ? "" : "none";
@@ -352,31 +356,71 @@ async function refreshCvData() {
 
 // ─── Upload CV (boutons + glisser-déposer) ──────────────────────────────────
 
-function uploadCvFile(file) {
-  if (!file) return;
-  if (!/\.(pdf|docx|txt)$/i.test(file.name)) {
-    toast("Format non supporté : utilisez PDF, DOCX ou TXT.", "err");
-    return;
-  }
-  if (file.size > 25 * 1024 * 1024) { toast("Fichier trop volumineux (max 25 Mo).", "err"); return; }
-  const reader = new FileReader();
-  reader.onload = async () => {
+function readAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",", 2)[1] || "");
+    reader.onerror = () => reject(new Error("lecture impossible"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Suivi discret d'une analyse IA lancée à l'import (pas de spinner bloquant)
+function watchCvAnalysis(jobId, name) {
+  setTimeout(async () => {
+    let job;
     try {
-      const b64 = reader.result.split(",", 2)[1] || "";
-      const out = await api("/api/cv", { method: "POST", body: JSON.stringify({ filename: file.name, data: b64 }) });
-      await refreshCvData();
-      toggleCv(out.name, true);
-      toast(`CV importé : ${out.name}`, "ok");
-    } catch (err) {
-      toast("Import échoué : " + err.message, "err");
+      job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
+    } catch { return; }
+    if (job.status === "running") { watchCvAnalysis(jobId, name); return; }
+    if (job.status === "error") {
+      toast(`Analyse IA de ${name} échouée : ${job.error || "erreur"} — bouton « Ré-analyser » dans Mes CV.`, "err");
+      return;
     }
-  };
-  reader.readAsDataURL(file);
+    await refreshCvData();
+    if (CVD && job.result.cv && CVD.entry.id === job.result.cv.id) {
+      openCvDetail(CVS.find((c) => c.id === CVD.entry.id) || job.result.cv);
+    }
+    toast(`Profil IA extrait : ${name} (visible dans Mes CV).`, "ok");
+  }, 1500);
+}
+
+async function uploadCvFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  const imported = [];
+  for (const file of files) {
+    if (!/\.(pdf|docx|txt)$/i.test(file.name)) {
+      toast(`${file.name} : format non supporté (PDF, DOCX ou TXT).`, "err");
+      continue;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast(`${file.name} : trop volumineux (max 25 Mo).`, "err");
+      continue;
+    }
+    try {
+      const b64 = await readAsBase64(file);
+      const out = await api("/api/cv", { method: "POST", body: JSON.stringify({ filename: file.name, data: b64 }) });
+      imported.push(out.name);
+      if (out.analyze_job_id) watchCvAnalysis(out.analyze_job_id, out.name);
+    } catch (err) {
+      toast(`Import de ${file.name} échoué : ${err.message}`, "err");
+    }
+  }
+  if (!imported.length) return;
+  await refreshCvData();
+  for (const name of imported) toggleCv(name, true);
+  toast(
+    imported.length === 1
+      ? `CV importé : ${imported[0]} — analyse IA en cours…`
+      : `${imported.length} CV importés (${imported.join(", ")}) — analyses IA en cours…`,
+    "ok",
+  );
 }
 
 $("#cv-upload-btn").addEventListener("click", () => $("#cv-file").click());
 $("#cvs-upload-btn").addEventListener("click", () => $("#cv-file").click());
-$("#cv-file").addEventListener("change", (e) => { uploadCvFile(e.target.files[0]); e.target.value = ""; });
+$("#cv-file").addEventListener("change", (e) => { uploadCvFiles(e.target.files); e.target.value = ""; });
 
 // Glisser-déposer sur la carte de recherche
 const searchCard = document.querySelector(".search-card");
@@ -393,8 +437,7 @@ const searchCard = document.querySelector(".search-card");
   })
 );
 searchCard.addEventListener("drop", (e) => {
-  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  uploadCvFile(file);
+  if (e.dataTransfer && e.dataTransfer.files) uploadCvFiles(e.dataTransfer.files);
 });
 
 // ─── Historique de recherches (localStorage) ────────────────────────────────
@@ -422,19 +465,32 @@ function pushHistory(query) {
 $("#btn-scan").addEventListener("click", startScan);
 $("#f-query").addEventListener("keydown", (e) => { if (e.key === "Enter") startScan(); });
 $("#btn-progress-hide").addEventListener("click", () => ($("#scan-progress").hidden = true));
+$("#btn-scan-stop").addEventListener("click", async () => {
+  if (!SCAN_JOB) return;
+  $("#btn-scan-stop").disabled = true;
+  try {
+    await api("/api/stop", { method: "POST", body: JSON.stringify({ job_id: SCAN_JOB }) });
+    toast("Arrêt demandé — les offres déjà scorées seront affichées.", "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+});
 
 async function startScan() {
+  const isGlobal = $("#f-global").checked;
   const query = $("#f-query").value.trim();
-  if (!query) { toast("Indiquez un poste à rechercher.", "err"); return; }
+  if (!query && !isGlobal) { toast("Indiquez un poste à rechercher (ou cochez la recherche globale).", "err"); return; }
   if (!SELECTED.cvs.size) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
   if (!SELECTED.sources.size) { toast("Sélectionnez au moins une source.", "err"); return; }
 
   const country = $("#f-country").value;
   const city = $("#f-city").value.trim();
   const region = country === "fr" ? $("#f-region").value : "";
+  const maxRaw = $("#f-max").value.trim();
 
   const body = {
-    query,
+    query: isGlobal ? "" : query,
+    global: isGlobal,
     cvs: [...SELECTED.cvs],
     country,
     location: city || region,
@@ -442,7 +498,7 @@ async function startScan() {
     sectors: [...SELECTED.sectors],
     experience: SELECTED.experience,
     min_score: parseInt($("#f-minscore").value, 10),
-    max: parseInt($("#f-max").value, 10) || 50,
+    max: maxRaw === "" ? 0 : parseInt(maxRaw, 10) || 0,  // 0 = sans plafond
     exclude: $("#f-exclude").value,
     include_seen: $("#f-include-seen").checked,
   };
@@ -454,16 +510,28 @@ async function startScan() {
     toast(e.message, "err");
     return;
   }
-  pushHistory(query);
+  if (!isGlobal) pushHistory(query);
   SCAN_JOB = out.job_id;
   $("#btn-scan").disabled = true;
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
   $("#scan-progress").hidden = false;
-  $("#progress-title").textContent = `Recherche : « ${query} »`;
+  $("#btn-scan-stop").disabled = false;
+  $("#progress-title").textContent = isGlobal
+    ? "Recherche globale d'après vos CV…"
+    : `Recherche : « ${query} »`;
   $("#progress-log").replaceChildren();
   pollScan();
 }
+
+// Recherche globale : le champ « poste » devient inutile
+$("#f-global").addEventListener("change", () => {
+  const on = $("#f-global").checked;
+  $("#f-query").disabled = on;
+  $("#f-query").placeholder = on
+    ? "Requêtes générées automatiquement depuis vos CV cochés"
+    : "Ex : ingénieur robotique, data engineer…";
+});
 
 // ─── Re-scoring de la base (sans scraper) ───────────────────────────────────
 
@@ -489,6 +557,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
   $("#scan-progress").hidden = false;
+  $("#btn-scan-stop").disabled = false;
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
   pollScan();
@@ -1361,6 +1430,33 @@ async function loadTrack() {
   ]);
 }
 
+async function setTrackStatus(key, status) {
+  try {
+    await api("/api/track-key", { method: "POST", body: JSON.stringify({ key, status }) });
+    loadTrack();
+    if (status === "forget") toast("Offre retirée du suivi — elle pourra réapparaître aux prochains scans.", "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+// Glisser-déposer entre colonnes du kanban
+let DRAG_KEY = null;
+document.querySelectorAll(".kanban-list[data-drop]").forEach((zone) => {
+  zone.addEventListener("dragover", (e) => {
+    if (!DRAG_KEY) return;
+    e.preventDefault();
+    zone.classList.add("drop-target");
+  });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drop-target"));
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    zone.classList.remove("drop-target");
+    if (DRAG_KEY) setTrackStatus(DRAG_KEY, zone.dataset.drop);
+    DRAG_KEY = null;
+  });
+});
+
 function fillColumn(box, entries, actions) {
   box.replaceChildren();
   if (!entries.length) {
@@ -1380,21 +1476,31 @@ function fillColumn(box, entries, actions) {
     }
     for (const act of actions) {
       const btn = el("button", { class: "btn-ghost", text: act.label });
-      btn.addEventListener("click", async () => {
-        try {
-          await api("/api/track-key", { method: "POST", body: JSON.stringify({ key: entry.key, status: act.status }) });
-          loadTrack();
-        } catch (e) {
-          toast(e.message, "err");
-        }
-      });
+      btn.addEventListener("click", () => setTrackStatus(entry.key, act.status));
       actionBox.appendChild(btn);
     }
-    box.appendChild(el("div", { class: "track-item" }, [
+    const btnForget = el("button", {
+      class: "btn-ghost ti-forget", text: "🗑",
+      title: "Retirer du suivi : l'offre pourra réapparaître aux prochains scans",
+    });
+    btnForget.addEventListener("click", () => setTrackStatus(entry.key, "forget"));
+    actionBox.appendChild(btnForget);
+
+    const card = el("div", { class: "track-item", draggable: "true" }, [
       el("div", { class: "ti-title", text: entry.title || "—" }),
       meta,
       actionBox,
-    ]));
+    ]);
+    card.addEventListener("dragstart", (e) => {
+      DRAG_KEY = entry.key;
+      card.classList.add("dragging");
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      DRAG_KEY = null;
+    });
+    box.appendChild(card);
   }
 }
 

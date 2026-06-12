@@ -37,7 +37,7 @@ from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi
 from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
-from ai.cv_extract import CVExtractor
+from ai.cv_extract import CVExtractor, derive_search_queries
 from integrations import notion_configured, export_to_notion
 from job_scrapers.base import JobOffer
 
@@ -67,6 +67,9 @@ _STATIC_FILES = {
 _MAX_BODY_DEFAULT = 1 * 1024 * 1024        # 1 Mo pour les requêtes JSON
 _MAX_BODY_UPLOAD = 36 * 1024 * 1024        # CV 25 Mo → ~34 Mo en base64
 _CV_EXTENSIONS = (".pdf", ".docx", ".txt")
+# « Sans plafond » : valeur sentinelle bien au-delà des limites de pagination
+# internes de chaque scraper (MAX_PAGES, MAX_START…), qui bornent le réel.
+_UNLIMITED_MAX = 10_000
 _DOWNLOAD_EXTENSIONS = (".txt", ".pdf", ".csv", ".json")
 _DOWNLOAD_TYPES = {
     ".txt": "text/plain; charset=utf-8",
@@ -94,6 +97,7 @@ class _Job:
         self.query = ""
         self.result: dict = {}            # résultat d'une lettre / d'une analyse CV
         self.created = time.time()
+        self.stop_event = threading.Event()  # bouton « Stopper » (scan/rescore)
         self._lock = threading.Lock()
 
     def add_log(self, message: str) -> None:
@@ -274,18 +278,35 @@ def _run_scan(job: _Job, p: dict) -> None:
         job.cv_text = merge_cv_texts(job.cv_texts)
         job.add_log(f"{len(job.cv_texts)} CV parsé(s) ({len(job.cv_text)} caractères)")
 
+        if p.get("global"):
+            job.add_log("Recherche globale : génération des requêtes depuis vos CV…")
+            queries = derive_search_queries(job.cv_text)
+            p["query"] = " · ".join(queries)
+            job.add_log(f"Requêtes générées : {p['query']}")
+        else:
+            queries = [p["query"]]
+
         config.country = p["country"]
         tracker = _get_tracker()
 
-        job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle…")
+        if p["max"] >= _UNLIMITED_MAX:
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle (sans plafond)…")
+        else:
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle…")
         all_offers: list[JobOffer] = []
         seen_keys: set[str] = set()
-        with ThreadPoolExecutor(max_workers=min(len(p["sources"]), 5)) as executor:
+        executor = ThreadPoolExecutor(max_workers=min(len(p["sources"]), 5))
+        try:
             futures = {
-                executor.submit(_run_one_scraper, key, p["query"], p["location"], p["max"]): key
-                for key in p["sources"]
+                executor.submit(_run_one_scraper, key, query, p["location"], p["max"]):
+                    (key, query)
+                for key in p["sources"] for query in queries
             }
+            counts: dict[str, int] = {}
             for future in as_completed(futures):
+                if job.stop_event.is_set():
+                    job.add_log("⏹ Arrêt demandé — scraping interrompu.")
+                    break
                 source_name, offers, error = future.result()
                 if error:
                     job.add_log(f"⚠ {source_name} : {error}")
@@ -293,7 +314,14 @@ def _run_scan(job: _Job, p: dict) -> None:
                 fresh = [o for o in offers if o.unique_key() not in seen_keys]
                 seen_keys.update(o.unique_key() for o in fresh)
                 all_offers.extend(fresh)
-                job.add_log(f"✓ {source_name} : {len(fresh)} offres")
+                counts[source_name] = counts.get(source_name, 0) + len(fresh)
+            for source_name, n in counts.items():
+                job.add_log(f"✓ {source_name} : {n} offres")
+        finally:
+            # Sur arrêt : ne pas attendre les scrapers en cours, annuler les
+            # lots en file. Sinon, attente normale de la fin des threads.
+            stopped = job.stop_event.is_set()
+            executor.shutdown(wait=not stopped, cancel_futures=stopped)
 
         if not p["include_seen"]:
             before = len(all_offers)
@@ -323,18 +351,24 @@ def _run_scan(job: _Job, p: dict) -> None:
             exclude=p["exclude"],
             experience_level=p["experience"],
             rejected_examples=rejections,
+            should_stop=job.stop_event.is_set,
         )
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
 
         job.offers = matched
         job.query = p["query"]
-        with _STORE_LOCK:
-            _get_store().add_session(
-                kind="web", criteria=_session_criteria(p), offers=matched,
-                found=len(all_offers),
-            )
-        job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
+        # Session enregistrée sauf arrêt sans aucun résultat (rien à garder)
+        if matched or not job.stop_event.is_set():
+            with _STORE_LOCK:
+                _get_store().add_session(
+                    kind="web", criteria=_session_criteria(p), offers=matched,
+                    found=len(all_offers),
+                )
+        if job.stop_event.is_set():
+            job.add_log(f"⏹ Recherche stoppée : {len(matched)} offre(s) déjà scorées conservées.")
+        else:
+            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
         job.status = "done"
     except Exception as e:
         job.error = str(e)[:500]
@@ -348,6 +382,7 @@ def _session_criteria(p: dict) -> dict:
     label_to_key = {label: key for key, label in SECTORS}
     return {
         "query": p["query"],
+        "global": bool(p.get("global")),
         "cv": ",".join(p["cvs"]),
         "country": p["country"],
         "location": p["location"],
@@ -393,6 +428,7 @@ def _run_rescore(job: _Job, p: dict) -> None:
             rejected_examples=rejections,
             top_k=RESCORE_TOP_K,
             two_stage=True,
+            should_stop=job.stop_event.is_set,
         )
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
@@ -400,12 +436,16 @@ def _run_rescore(job: _Job, p: dict) -> None:
         job.offers = matched
         job.query = "(re-scoring de la base)"
         p2 = dict(p, query="(re-scoring de la base)", sources=[])
-        with _STORE_LOCK:
-            _get_store().add_session(
-                kind="rescore", criteria=_session_criteria(p2), offers=matched,
-                found=len(offers),
-            )
-        job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
+        if matched or not job.stop_event.is_set():
+            with _STORE_LOCK:
+                _get_store().add_session(
+                    kind="rescore", criteria=_session_criteria(p2), offers=matched,
+                    found=len(offers),
+                )
+        if job.stop_event.is_set():
+            job.add_log(f"⏹ Re-scoring stoppé : {len(matched)} offre(s) déjà scorées conservées.")
+        else:
+            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
         job.status = "done"
     except Exception as e:
         job.error = str(e)[:500]
@@ -489,8 +529,9 @@ def _validate_cvs(body: dict) -> list[str]:
 
 
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
+    is_global = bool(body.get("global"))
     query = str(body.get("query", "")).strip()[:200]
-    if not query:
+    if not query and not is_global:
         return None, "La recherche est vide."
 
     cvs = _validate_cvs(body)
@@ -517,10 +558,13 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
         min_score = max(0, min(10, int(body.get("min_score", config.min_match_score))))
     except (TypeError, ValueError):
         min_score = config.min_match_score
+    # max vide ou 0 = sans plafond (les scrapers gardent leurs propres limites
+    # de pagination) — pensé pour les LLM locaux où le volume ne coûte rien
     try:
-        max_per_source = max(1, min(200, int(body.get("max", config.max_jobs_per_source))))
+        max_per_source = int(body.get("max", config.max_jobs_per_source))
     except (TypeError, ValueError):
         max_per_source = config.max_jobs_per_source
+    max_per_source = _UNLIMITED_MAX if max_per_source <= 0 else min(max_per_source, _UNLIMITED_MAX)
 
     exclude = parse_exclude_keywords(config.exclude_keywords) + parse_exclude_keywords(
         str(body.get("exclude", ""))[:1000]
@@ -528,6 +572,7 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
 
     return {
         "query": query,
+        "global": is_global,
         "cvs": cvs,
         "country": country,
         "location": str(body.get("location", "")).strip()[:120],
@@ -781,6 +826,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_scan()
         elif path == "/api/rescore":
             self._api_rescore()
+        elif path == "/api/stop":
+            self._api_stop()
         elif path == "/api/session-load":
             self._api_session_load()
         elif path == "/api/letter":
@@ -943,6 +990,24 @@ class _Handler(BaseHTTPRequestHandler):
         threading.Thread(target=_run_rescore, args=(job, params), daemon=True).start()
         self._json({"job_id": job.id})
 
+    def _api_stop(self):
+        """Arrêt propre d'un scan/re-scoring : les offres déjà scorées sont
+        conservées, le reste est abandonné."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        job = _get_job(str(body.get("job_id", "")))
+        if job is None or job.kind != "scan":
+            self._error("Recherche introuvable", 404)
+            return
+        if job.status != "running":
+            self._json({"ok": True, "already_done": True})
+            return
+        job.stop_event.set()
+        job.add_log("⏹ Arrêt demandé — fin du lot en cours puis bilan…")
+        self._json({"ok": True})
+
     def _api_sessions(self):
         with _STORE_LOCK:
             store = _get_store()
@@ -1090,7 +1155,10 @@ class _Handler(BaseHTTPRequestHandler):
         status = str(body.get("status", ""))
         try:
             with _TRACKER_LOCK:
-                found = _get_tracker().mark_key(key, status)
+                if status == "forget":  # retirée du suivi : retraitée aux prochains scans
+                    found = _get_tracker().forget_key(key)
+                else:
+                    found = _get_tracker().mark_key(key, status)
         except ValueError as e:
             self._error(str(e))
             return
@@ -1146,9 +1214,15 @@ class _Handler(BaseHTTPRequestHandler):
         target.write_bytes(data)
         with _CV_LOCK:
             entry = _get_cv_store().register(target.name)
+        # Analyse IA lancée dès l'import : le profil structuré apparaît dans
+        # « Mes CV » sans action manuelle (ré-analyse possible à tout moment)
+        analyze_job = _Job("cv")
+        _register_job(analyze_job)
+        threading.Thread(target=_run_cv_analyze, args=(analyze_job, entry["id"]), daemon=True).start()
         self._json({
             "ok": True, "name": target.name, "cv_files": _list_cv_files(),
             "cv_id": entry.get("id", ""), "label": entry.get("label", ""),
+            "analyze_job_id": analyze_job.id,
         })
 
     def _api_cv_analyze(self):

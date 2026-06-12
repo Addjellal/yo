@@ -685,3 +685,20 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   .cvd-actions .btn-danger { margin-left: 0; }
   .cv-section .grid2 { grid-template-columns: 1fr; }
 }
+
+/* ─── Recherche globale ──────────────────────────────────────────────────── */
+.global-check { margin-top: 8px; }
+.global-check input { accent-color: var(--accent); }
+#f-query:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ─── Kanban : glisser-déposer + retrait du suivi ────────────────────────── */
+.track-item[draggable="true"] { cursor: grab; }
+.track-item.dragging { opacity: .45; cursor: grabbing; }
+.kanban-list.drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.ti-forget { margin-left: auto; }
+.ti-forget:hover { color: var(--red); border-color: var(--red); }

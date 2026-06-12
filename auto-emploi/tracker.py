@@ -194,6 +194,14 @@ class Tracker:
         self._save()
         return True
 
+    def forget_key(self, key: str) -> bool:
+        """Retire une entrée du suivi : l'offre n'est plus ni suivie ni masquée
+        et réapparaîtra donc aux prochains scans. Retourne False si inconnue."""
+        if self._data["offers"].pop(key, None) is None:
+            return False
+        self._save()
+        return True
+
     def list_by_status(self, status: str) -> list[dict]:
         return [
             entry for entry in self._data["offers"].values()

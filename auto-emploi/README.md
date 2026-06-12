@@ -16,8 +16,12 @@ auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
 
 - **Recherche** : formulaire complet (pays/région/ville, secteurs, niveau
   d'expérience, sources, mots-clés exclus, score minimum), **sélection
-  multi-CV par cases à cocher**, import par bouton ou glisser-déposer,
-  progression du scan en direct, re-scoring de la base sans scraper ;
+  multi-CV par cases à cocher**, import par bouton ou glisser-déposer
+  (**plusieurs fichiers à la fois**, profil analysé par l'IA dès l'import),
+  **recherche globale** (intitulés de poste générés par l'IA depuis vos CV),
+  plafond d'offres par source **optionnel** (vide = illimité, pensé pour les
+  LLM locaux gratuits), progression en direct avec **bouton ⏹ Stopper**
+  (les offres déjà scorées sont conservées), re-scoring sans scraper ;
 - **Résultats** : cartes avec anneau + barre de score, badge du **CV
   gagnant** et détail des scores par CV, atouts/lacunes, actions favori /
   postulée / rejeter, tri, export CSV+JSON, export Notion ;
@@ -34,7 +38,9 @@ auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
 - **Historique** : sessions passées (critères, CV utilisés, scores de
   l'époque), rechargement ou relance d'une session ;
 - **Suivi** : tableau kanban favoris / postulées / à relancer (>14 jours sans
-  réponse) avec actions directes ;
+  réponse) — **glissez-déposez** une carte d'une colonne à l'autre pour
+  changer son statut, 🗑 retire l'offre du suivi (elle pourra réapparaître
+  aux prochains scans) ;
 - **Statistiques** : compteurs, candidatures par semaine et par source ;
 - **Réglages** : clés API, routage IA par tâche, coordonnées candidat,
   exemples de style pour les lettres (few-shot), critères par défaut.
@@ -71,6 +77,10 @@ sont inaccessibles).
   - `anthropic` — Claude Fable 5 par défaut (sorties JSON structurées
     garanties, OCR haute résolution des CV scannés) ;
   - `ollama` — 100 % local et gratuit (llama3.2 + modèle vision).
+- **Recherche globale** : l'IA déduit les intitulés de poste depuis vos CV
+  et scrape chaque requête (doublons fusionnés) — case à cocher sur le web,
+  `--global-search` ou commande `g` en CLI. Combinez avec le plafond
+  illimité (`--max 0`, champ vide sur le web) si votre LLM est local.
 - **Matching multi-CV** : cochez plusieurs CV (web) ou répétez `--cv` (CLI) —
   chaque offre est scorée avec chaque CV, le meilleur score gagne et le
   détail par CV reste consultable. Pour les lettres, les CV sont fusionnés
@@ -115,6 +125,8 @@ python main.py --check                  # diagnostic complet
 python web.py                                         # interface web (recommandé)
 python main.py --cv mon_cv.pdf --scan                 # scanner sans postuler
 python main.py --cv a.pdf --cv b.pdf --scan           # matching multi-CV (meilleur score)
+python main.py --cv mon_cv.pdf --global-search --scan # requêtes générées par l'IA depuis le CV
+python main.py --cv mon_cv.pdf --scan --max 0         # sans plafond d'offres (LLM local conseillé)
 python main.py --cv mon_cv.pdf --query "data engineer" --location "Paris"
 python main.py --cv mon_cv.pdf --query "robotique" --watch 60   # veille + notifications
 python main.py --cv mon_cv.pdf --scan --exclude "senior,5 ans"  # filtres éliminatoires

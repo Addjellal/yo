@@ -2,6 +2,7 @@ import copy
 import json
 import re
 from collections import Counter
+from typing import Callable
 
 from rich.markup import escape
 
@@ -225,10 +226,13 @@ class JobMatcher:
         experience_level: str = "",
         top_k: int | None = None,
         two_stage: bool = False,
+        should_stop: Callable[[], bool] | None = None,
     ) -> list[JobOffer]:
         """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
         two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
-        modèle local) puis analyse détaillée du top uniquement."""
+        modèle local) puis analyse détaillée du top uniquement.
+        should_stop : vérifié entre chaque lot IA — arrêt propre avec résultats
+        partiels (bouton « Stopper » de l'interface web)."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
 
@@ -256,6 +260,9 @@ class JobMatcher:
 
         scored = []
         for i in range(0, len(offers), BATCH_SIZE):
+            if should_stop and should_stop():
+                console.print("[yellow]⏹ Analyse stoppée — résultats partiels conservés.[/yellow]")
+                break
             batch = offers[i: i + BATCH_SIZE]
             console.print(f"[dim]  Analyse IA : lot {i // BATCH_SIZE + 1}/{(len(offers) - 1) // BATCH_SIZE + 1} ({len(batch)} offres)...[/dim]")
             self._score_batch(batch)
@@ -416,6 +423,7 @@ def score_offers_multi(
     rejected_examples: list[str] | None = None,
     top_k: int | None = None,
     two_stage: bool = False,
+    should_stop: Callable[[], bool] | None = None,
 ) -> list[JobOffer]:
     """Matching multi-CV : un score par CV pour chaque offre.
 
@@ -441,12 +449,15 @@ def score_offers_multi(
         return matcher.score_offers(
             offers, min_score=min_score, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
+            should_stop=should_stop,
         )
 
     # Un passage complet par CV (sur des copies : les objets d'origine restent
     # intacts), min_score=0 pour conserver tous les scores du détail par CV.
     merged: dict[str, JobOffer] = {}
     for label in labels:
+        if should_stop and should_stop():
+            break
         console.print(f"[bold]Matching avec le CV « {escape(label)} »[/bold]")
         matcher = JobMatcher(cv_texts[label])
         if rejected_examples:
@@ -455,6 +466,7 @@ def score_offers_multi(
         scored = matcher.score_offers(
             copies, min_score=0, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
+            should_stop=should_stop,
         )
         for offer in scored:
             key = offer.unique_key()

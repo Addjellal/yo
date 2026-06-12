@@ -121,6 +121,21 @@ def _style_examples() -> dict[str, list[str]] | None:
     return examples if any(examples.values()) else None
 
 
+def _global_queries(cv_texts: dict[str, str]) -> list[str] | None:
+    """Recherche globale : intitulés de poste générés par l'IA depuis les CV.
+    None si la génération échoue (message déjà affiché)."""
+    from ai.cv_extract import derive_search_queries
+    console.print("[bold]Recherche globale :[/bold] génération des requêtes depuis vos CV…")
+    try:
+        queries = derive_search_queries(merge_cv_texts(cv_texts))
+    except Exception as e:
+        console.print(f"[red]Génération impossible : {escape(str(e))}[/red] "
+                      "[dim]Saisissez une recherche manuellement.[/dim]")
+        return None
+    console.print("[bold]Requêtes générées :[/bold] " + " · ".join(escape(q) for q in queries))
+    return queries
+
+
 SECTORS: list[tuple[str, str]] = [
     ("tech",       "Informatique / Tech / IA / Cybersécurité"),
     ("finance",    "Finance / Banque / Assurance / Comptabilité"),
@@ -1587,6 +1602,10 @@ def parse_args():
     parser.add_argument("--cv", action="append",
                         help="Chemin vers votre CV (PDF, DOCX ou TXT) — répétable pour un matching multi-CV : --cv a.pdf --cv b.pdf")
     parser.add_argument("--query", default="", help='Recherche ex: "développeur Python senior" (optionnel : demandé interactivement si absent)')
+    parser.add_argument(
+        "--global-search", action="store_true", dest="global_search",
+        help="Recherche globale : les intitulés de poste sont générés par l'IA depuis vos CV (aucune --query à fournir)",
+    )
     parser.add_argument("--location", default="", help='Localisation ex: "Paris" (sinon sélecteur interactif pays/région/ville)')
     parser.add_argument(
         "--country", default="fr", choices=[c for c, _ in COUNTRIES],
@@ -1596,7 +1615,10 @@ def parse_args():
         "--sources", default="apec,adzuna,indeed,wttj",
         help="Sources : ft,indeed,wttj,apec,adzuna,linkedin (défaut: apec,adzuna,indeed,wttj)",
     )
-    parser.add_argument("--max", type=int, default=config.max_jobs_per_source, help="Max offres par source")
+    parser.add_argument(
+        "--max", type=int, default=config.max_jobs_per_source,
+        help="Max offres par source — 0 = sans plafond (les sources gardent leurs limites internes), recommandé surtout avec un LLM local",
+    )
     parser.add_argument("--min-score", type=int, default=config.min_match_score, help="Score minimum /10 (défaut: 6)")
     parser.add_argument(
         "--sectors", default="",
@@ -1637,7 +1659,9 @@ def main():
     args = parse_args()
 
     # Bornes de sécurité sur les arguments numériques
-    args.max = max(1, min(200, args.max))
+    # --max 0 = sans plafond : sentinelle au-delà des limites de pagination
+    # internes des scrapers, qui bornent le volume réel
+    args.max = 10_000 if args.max <= 0 else min(args.max, 10_000)
     args.min_score = max(0, min(10, args.min_score))
 
     # Mode vérification
@@ -1826,23 +1850,32 @@ def main():
 
     # 5. Boucle de recherche
     first_query = args.query.strip()
+    pending_global = args.global_search
     console.print(
         "\n[dim]À tout moment : tapez [bold]x[/bold] pour quitter, "
         "[bold]s[/bold] pour changer les sources, "
         "[bold]f[/bold] pour changer les filtres secteur, "
         "[bold]v[/bold] pour changer la localisation, "
-        "[bold]e[/bold] pour changer le niveau d'expérience.[/dim]"
+        "[bold]e[/bold] pour changer le niveau d'expérience, "
+        "[bold]g[/bold] pour une recherche globale d'après vos CV.[/dim]"
     )
 
     while True:
-        # Demande de la requête
-        if first_query:
+        # Demande de la requête (ou requêtes générées par l'IA en mode global)
+        queries: list[str] | None = None
+        if pending_global:
+            pending_global = False
+            queries = _global_queries(cv_texts)
+            if not queries:
+                continue
+            query = " · ".join(queries)
+        elif first_query:
             query = first_query
             first_query = ""
         else:
             console.print("\n" + "─" * 60)
             raw = Prompt.ask(
-                "[bold cyan]Nouvelle recherche[/bold cyan] [dim](x=quitter  s=sources  f=filtres  v=lieu)[/dim]"
+                "[bold cyan]Nouvelle recherche[/bold cyan] [dim](x=quitter  s=sources  f=filtres  v=lieu  g=globale)[/dim]"
             ).strip()
             if raw.lower() == "x":
                 console.print("[dim]Au revoir ![/dim]")
@@ -1863,14 +1896,27 @@ def main():
                 experience = select_experience("")
                 _persist_defaults(sources, sectors, location, experience)
                 continue
-            query = raw
-            if not query:
-                continue
+            if raw.lower() == "g":
+                queries = _global_queries(cv_texts)
+                if not queries:
+                    continue
+                query = " · ".join(queries)
+            else:
+                query = raw
+                if not query:
+                    continue
 
-        # Scraping
+        # Scraping (une passe par requête en mode global, doublons fusionnés)
         where = f" à {escape(location)}" if location else ""
         console.print(f"\n[bold]Scraping :[/bold] « {escape(query)} »{where} sur {', '.join(sources)}")
-        all_offers = scrape_all(sources, query, location, args.max)
+        all_offers = []
+        seen_keys: set[str] = set()
+        for q in (queries or [query]):
+            for offer in scrape_all(sources, q, location, args.max):
+                key = offer.unique_key()
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    all_offers.append(offer)
 
         if not all_offers:
             console.print(
