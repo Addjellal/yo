@@ -54,7 +54,7 @@ from main import (
     save_dropped_offers,
 )
 from app_utils import get_logger
-from output_paths import cv_dir, find_output_file
+from output_paths import cv_dir, find_output_file, migrate_legacy_files
 
 _LOG = get_logger()
 
@@ -1579,6 +1579,14 @@ class _Handler(BaseHTTPRequestHandler):
 # ─── Démarrage ───────────────────────────────────────────────────────────────
 
 def run(port: int = 8765, open_browser: bool = True) -> None:
+    # Range une fois les anciens fichiers (racine d'output/) dans leurs dossiers.
+    try:
+        moved = migrate_legacy_files()
+        if moved:
+            _LOG.info("Arborescence : %d ancien(s) fichier(s) rangé(s) dans output/.", moved)
+            print(f"  {moved} ancien(s) fichier(s) rangé(s) dans la nouvelle arborescence output/.")
+    except Exception:
+        _LOG.exception("Migration des anciens fichiers échouée (sans gravité).")
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"\n  Auto Emploi — interface web : {url}")

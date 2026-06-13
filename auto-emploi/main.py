@@ -1747,6 +1747,15 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # Range une fois les anciens fichiers (racine d'output/) dans leurs dossiers.
+    try:
+        from output_paths import migrate_legacy_files
+        moved = migrate_legacy_files()
+        if moved:
+            console.print(f"[dim]{moved} ancien(s) fichier(s) rangé(s) dans l'arborescence output/.[/dim]")
+    except Exception:
+        pass
+
     # Bornes de sécurité sur les arguments numériques
     # --max 0 = sans plafond : sentinelle au-delà des limites de pagination
     # internes des scrapers, qui bornent le volume réel

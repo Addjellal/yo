@@ -76,3 +76,39 @@ def find_output_file(name: str) -> Path | None:
         if resolved.is_file() and root in resolved.parents:
             return resolved
     return None
+
+
+# Routage des anciens fichiers (versions antérieures écrivaient à la racine).
+# Par extension : exports → offres/analysees, lettres → lettres/par_offre.
+_LEGACY_ROUTES = {
+    ".txt": letters_dir, ".pdf": letters_dir,
+    ".csv": offers_scored_dir, ".json": offers_scored_dir,
+}
+
+
+def migrate_legacy_files() -> int:
+    """Range les fichiers laissés à la RACINE d'output/ par d'anciennes versions
+    dans leurs sous-dossiers. Idempotent et prudent : ignore les sous-dossiers,
+    les fichiers d'état interne (dotfiles : .tracker.json, .sessions.json…) et
+    les .corrupt ; n'écrase jamais un fichier déjà présent à destination.
+    Retourne le nombre de fichiers déplacés."""
+    root = Path(config.output_dir)
+    if not root.is_dir():
+        return 0
+    moved = 0
+    for entry in list(root.iterdir()):
+        # Dossiers intacts ; dotfiles = état interne, jamais déplacés.
+        if not entry.is_file() or entry.name.startswith("."):
+            continue
+        dest_dir = _LEGACY_ROUTES.get(entry.suffix.lower())
+        if dest_dir is None:
+            continue
+        dest = dest_dir() / entry.name
+        if dest.exists():
+            continue  # ne jamais écraser une version déjà rangée
+        try:
+            entry.rename(dest)
+            moved += 1
+        except OSError:
+            pass
+    return moved

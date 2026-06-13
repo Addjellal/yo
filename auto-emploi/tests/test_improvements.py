@@ -295,6 +295,31 @@ class TestOutputPaths(unittest.TestCase):
         self.assertIsNone(find_output_file("../../etc/passwd"))
         self.assertIsNone(find_output_file("/etc/passwd"))
 
+    def test_migration_anciens_fichiers(self):
+        import tempfile
+        from pathlib import Path
+        from config import config
+        import output_paths as op
+        old_dir = config.output_dir
+        tmp = tempfile.mkdtemp()
+        config.output_dir = tmp
+        try:
+            root = Path(tmp)
+            (root / "dev.json").write_text("[]")
+            (root / "dev.csv").write_text("x")
+            (root / "Lettre_ACME.txt").write_text("l")
+            (root / ".tracker.json").write_text("{}")     # état interne
+            (root / "x.corrupt").write_text("x")           # non concerné
+            self.assertEqual(op.migrate_legacy_files(), 3)
+            self.assertTrue((op.offers_scored_dir() / "dev.json").exists())
+            self.assertTrue((op.offers_scored_dir() / "dev.csv").exists())
+            self.assertTrue((op.letters_dir() / "Lettre_ACME.txt").exists())
+            self.assertTrue((root / ".tracker.json").exists())   # jamais déplacé
+            self.assertTrue((root / "x.corrupt").exists())
+            self.assertEqual(op.migrate_legacy_files(), 0)       # idempotent
+        finally:
+            config.output_dir = old_dir
+
     def test_sous_dossiers_crees(self):
         from output_paths import letters_dir, offers_raw_dir, logs_dir
         self.assertTrue(letters_dir().is_dir())
