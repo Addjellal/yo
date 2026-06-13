@@ -166,6 +166,36 @@ class TestRescorePrefilter:
         assert top[0].title == "Poste 0"  # meilleur score simulé en premier
 
 
+# ─── 2b. Robustesse du parsing de réponse (modèles locaux capricieux) ─────────
+
+class TestParseResponse:
+    CV = "Python, ROS2, navigation autonome"
+
+    def _scored(self, raw: str):
+        matcher = JobMatcher(self.CV)
+        batch = [make_offer(0, "Roboticien", "Python ROS2")]
+        matcher._parse_response(raw, batch)  # ne doit jamais lever
+        return batch[0]
+
+    def test_resultats_non_liste_ne_plantent_pas(self):
+        # "results" en entier / dict / chaîne : un for naïf lèverait TypeError
+        for raw in ('{"results": 5}', '{"results": {"job_index": 0}}',
+                    '{"results": "oops"}'):
+            offer = self._scored(raw)
+            assert offer.match_score is None  # aucun score appliqué, pas de crash
+
+    def test_resultats_liste_valide_applique_score(self):
+        offer = self._scored('{"results": [{"job_index": 0, "score": 8, '
+                             '"reasons": "ok", "strengths": "x", "gaps": "y"}]}')
+        assert offer.match_score == 8
+
+    def test_recuperation_tableau_dans_texte(self):
+        # Pas de clé "results" : récupération du tableau noyé dans du texte
+        offer = self._scored('blabla [{"job_index": 0, "score": 7, "reasons": "", '
+                             '"strengths": "", "gaps": ""}] fin')
+        assert offer.match_score == 7
+
+
 # ─── 3. Génération de lettre (LLM simulé) ─────────────────────────────────────
 
 class FakeLLM:

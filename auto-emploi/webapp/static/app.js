@@ -608,7 +608,11 @@ function pollScan() {
       return;
     }
     OFFERS = job.offers || [];
-    $("#scan-progress").hidden = OFFERS.length > 0;
+    // Offres trouvées → le journal s'efface mais reste récupérable via le
+    // bouton « Revoir le journal ». Aucune offre → le journal reste visible.
+    const logHidden = OFFERS.length > 0;
+    $("#scan-progress").hidden = logHidden;
+    $("#btn-show-log").hidden = !logHidden;
     renderResults();
   }, 850);
 }
@@ -995,6 +999,7 @@ async function loadSession(id) {
   OFFERS = out.offers;
   switchTab("search");
   $("#scan-progress").hidden = true;
+  $("#btn-show-log").hidden = true;
   renderResults();
   const when = out.date ? out.date.replace("T", " ").slice(0, 16) : "";
   toast(`Session du ${when} rechargée (${OFFERS.length} offre(s), scores de l'époque).`

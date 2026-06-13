@@ -157,6 +157,11 @@
       <div id="progress-log" class="progress-log"></div>
     </div>
 
+    <!-- Réouverture du journal après « Masquer » (hors results-zone : reste
+         atteignable même pendant un scan où les résultats sont masqués) -->
+    <button id="btn-show-log" class="btn-ghost small progress-restore" hidden
+            title="Revoir le journal du scan">📋 Revoir le journal du scan</button>
+
     <!-- Résultats -->
     <div id="results-zone" hidden>
       <div class="results-toolbar">
@@ -169,7 +174,6 @@
           </select>
           <button id="btn-export" class="btn-ghost">⬇ CSV / JSON</button>
           <button id="btn-notion" class="btn-ghost" hidden>Notion ↗</button>
-          <button id="btn-show-log" class="btn-ghost small" hidden title="Revoir le journal du dernier scan">📋 Journal</button>
         </div>
       </div>
       <div id="results-grid" class="results-grid"></div>

@@ -390,6 +390,12 @@ class JobMatcher:
         except json.JSONDecodeError:
             pass
 
+        # Un modèle local peut renvoyer "results" sous une forme non itérable
+        # (entier, dict, chaîne) si le schéma JSON n'est pas honoré : on force
+        # la récupération depuis le texte brut plutôt que de planter sur le for.
+        if results is not None and not isinstance(results, list):
+            results = None
+
         if results is None:
             # Récupération : chercher un tableau ou des objets JSON dans le texte
             start, end = raw.find("["), raw.rfind("]") + 1

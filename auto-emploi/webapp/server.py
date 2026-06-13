@@ -857,7 +857,9 @@ class _Handler(BaseHTTPRequestHandler):
             return None
         try:
             data = json.loads(self.rfile.read(length).decode("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            # ValueError couvre JSONDecodeError ; RecursionError protège d'un
+            # JSON volontairement très imbriqué ([[[…]]]) tenant dans la limite.
             return None
         return data if isinstance(data, dict) else None
 
