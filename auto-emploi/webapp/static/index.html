@@ -351,6 +351,14 @@
           </select>
         </div>
         <div class="field">
+          <label for="s-ai-review">Relecture lettres <span class="set-hint" data-hint="AI_REVIEW_BACKEND"></span></label>
+          <select id="s-ai-review" data-key="AI_REVIEW_BACKEND">
+            <option value="">— suivre le provider —</option>
+            <option value="local">local (Ollama)</option>
+            <option value="claude">claude (API Anthropic)</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="s-ai-prescore-model">Modèle pré-scoring <span class="set-hint" data-hint="AI_PRESCORE_MODEL"></span></label>
           <input id="s-ai-prescore-model" type="text" data-key="AI_PRESCORE_MODEL" placeholder="vide = modèle du backend">
         </div>
@@ -361,6 +369,10 @@
         <div class="field">
           <label for="s-ai-letter-model">Modèle lettres <span class="set-hint" data-hint="AI_LETTER_MODEL"></span></label>
           <input id="s-ai-letter-model" type="text" data-key="AI_LETTER_MODEL" placeholder="vide = modèle du backend">
+        </div>
+        <div class="field">
+          <label for="s-ai-review-model">Modèle relecture <span class="set-hint" data-hint="AI_REVIEW_MODEL"></span></label>
+          <input id="s-ai-review-model" type="text" data-key="AI_REVIEW_MODEL" placeholder="vide = modèle du backend">
         </div>
         <div class="field">
           <label for="s-ai-fallback">Si le backend échoue <span class="set-hint" data-hint="AI_FALLBACK"></span></label>
@@ -379,6 +391,13 @@
           <select id="s-letter-examples" data-key="LETTER_EXAMPLES">
             <option value="off">off — chaque lettre repart de zéro</option>
             <option value="on">on — imiter le style de vos lettres passées</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="s-letter-review">Relecture après génération <span class="set-hint" data-hint="LETTER_REVIEW"></span></label>
+          <select id="s-letter-review" data-key="LETTER_REVIEW">
+            <option value="off">off — pas de seconde passe</option>
+            <option value="on">on — vérifie cohérence CV/offre et fautes (un appel de plus)</option>
           </select>
         </div>
         <div class="field">
@@ -487,6 +506,10 @@
         <span class="spinner"></span> Rédaction en cours… (15–30 s)
       </div>
       <div id="letter-result" hidden>
+        <div id="letter-notes" class="letter-notes" hidden>
+          <strong>⚠ Points de cohérence à vérifier :</strong>
+          <ul id="letter-notes-list"></ul>
+        </div>
         <div class="letter-section">
           <div class="letter-section-head">
             <h4>Email d'accompagnement</h4>

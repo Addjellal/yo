@@ -98,14 +98,18 @@ class Config:
     ai_prescore_backend: str = field(default_factory=lambda: _env_choice("AI_PRESCORE_BACKEND", "", ("", "local", "claude")))
     ai_match_backend: str = field(default_factory=lambda: _env_choice("AI_MATCH_BACKEND", "", ("", "local", "claude")))
     ai_letter_backend: str = field(default_factory=lambda: _env_choice("AI_LETTER_BACKEND", "", ("", "local", "claude")))
+    ai_review_backend: str = field(default_factory=lambda: _env_choice("AI_REVIEW_BACKEND", "", ("", "local", "claude")))
     ai_prescore_model: str = field(default_factory=lambda: _env_model("AI_PRESCORE_MODEL", ""))
     ai_match_model: str = field(default_factory=lambda: _env_model("AI_MATCH_MODEL", ""))
     ai_letter_model: str = field(default_factory=lambda: _env_model("AI_LETTER_MODEL", ""))
+    ai_review_model: str = field(default_factory=lambda: _env_model("AI_REVIEW_MODEL", ""))
     # Si le backend d'une tâche échoue : "none" = erreur claire, sinon bascule
     ai_fallback: str = field(default_factory=lambda: _env_choice("AI_FALLBACK", "none", ("none", "local", "claude")))
 
     # Lettres : réutiliser les lettres précédentes comme exemples de style (few-shot)
     letter_examples: str = field(default_factory=lambda: _env_choice("LETTER_EXAMPLES", "off", ("off", "on")))
+    # Lettres : passe de relecture IA après génération (cohérence CV/offre, français)
+    letter_review: str = field(default_factory=lambda: _env_choice("LETTER_REVIEW", "off", ("off", "on")))
 
     # Derniers critères choisis (persistés pour les reproposer au prochain lancement)
     default_sources: str = field(default_factory=lambda: os.getenv("DEFAULT_SOURCES", "").strip()[:200])
@@ -137,9 +141,9 @@ _ALLOWED_ENV_KEYS = {
     "OUTPUT_DIR", "MAX_JOBS_PER_SOURCE", "MIN_MATCH_SCORE", "REQUEST_DELAY",
     "EXCLUDE_KEYWORDS",
     "CANDIDATE_NAME", "CANDIDATE_EMAIL", "CANDIDATE_PHONE", "CANDIDATE_CITY",
-    "AI_PRESCORE_BACKEND", "AI_MATCH_BACKEND", "AI_LETTER_BACKEND",
-    "AI_PRESCORE_MODEL", "AI_MATCH_MODEL", "AI_LETTER_MODEL", "AI_FALLBACK",
-    "LETTER_EXAMPLES",
+    "AI_PRESCORE_BACKEND", "AI_MATCH_BACKEND", "AI_LETTER_BACKEND", "AI_REVIEW_BACKEND",
+    "AI_PRESCORE_MODEL", "AI_MATCH_MODEL", "AI_LETTER_MODEL", "AI_REVIEW_MODEL", "AI_FALLBACK",
+    "LETTER_EXAMPLES", "LETTER_REVIEW",
     "DEFAULT_SOURCES", "DEFAULT_SECTORS", "DEFAULT_LOCATION",
     "DEFAULT_COUNTRY", "DEFAULT_EXPERIENCE",
 }

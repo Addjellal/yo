@@ -20,7 +20,7 @@ import time
 from config import config
 from app_utils import console
 
-TASKS = ("prescore", "match", "letter")
+TASKS = ("prescore", "match", "letter", "review")
 
 _BACKEND_ALIASES = {
     "local": "ollama", "ollama": "ollama",

@@ -1,12 +1,15 @@
 """Tests des correctifs : typo lettres, HTML/sections offres, noms d'export
 ASCII, arborescence output/, retries scrapers, suggestions de modèles locaux."""
+import json
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ai.cover_letter import fix_typography
+from ai.cover_letter import (
+    fix_typography, letter_issues, CoverLetterGenerator,
+)
 from job_scrapers.base import (
     strip_html, extract_sections, fetch_with_retry, JobOffer,
 )
@@ -31,6 +34,91 @@ class TestFixTypography(unittest.TestCase):
     def test_texte_sain_inchange(self):
         text = "Madame, Monsieur,\n\nVotre offre d'Équipe m'intéresse."
         self.assertEqual(fix_typography(text), text)
+
+
+class TestLetterIssues(unittest.TestCase):
+    GOOD = "Madame, Monsieur,\n\n" + "Votre offre m'intéresse vivement. " * 25
+
+    def test_lettre_correcte_aucun_defaut(self):
+        self.assertEqual(letter_issues(self.GOOD), [])
+
+    def test_trop_courte(self):
+        self.assertTrue(any("courte" in i for i in letter_issues("Bonjour.")))
+
+    def test_marqueurs_gabarit(self):
+        issues = letter_issues(self.GOOD + "\n\nSignature [Votre nom], réf XXXX.")
+        self.assertTrue(any("gabarit" in i for i in issues))
+
+    def test_paragraphe_duplique(self):
+        para = "Je suis très motivé par ce poste et votre entreprise me passionne."
+        issues = letter_issues(f"Madame,\n\n{para}\n\n{para}")
+        self.assertTrue(any("dupliqué" in i for i in issues))
+
+
+class TestLetterReview(unittest.TestCase):
+    """La relecture IA est conservatrice : elle n'adopte une correction que si
+    elle est plausible (longueur proche, pas de nouveaux défauts)."""
+
+    def _gen(self):
+        gen = CoverLetterGenerator.__new__(CoverLetterGenerator)
+        gen.cv_text = "Développeur Python, 5 ans d'expérience."
+        return gen
+
+    def _job(self):
+        return JobOffer(id="j1", title="Dev Python", company="ACME",
+                        location="Paris", description="Poste Python.",
+                        url="https://example.com", source="Test")
+
+    def _patch_review(self, gen, payload):
+        import ai.cover_letter as cl
+
+        class _FakeClient:
+            def __init__(self, task="match"):
+                pass
+
+            def generate(self, **kw):
+                return json.dumps(payload)
+
+        self._orig = cl.LLMClient
+        cl.LLMClient = _FakeClient
+
+    def tearDown(self):
+        import ai.cover_letter as cl
+        if hasattr(self, "_orig"):
+            cl.LLMClient = self._orig
+
+    def test_correction_plausible_adoptee(self):
+        original = "Madame, Monsieur,\n\n" + "Phrase correcte. " * 30
+        fixed = "Madame, Monsieur,\n\n" + "Phrase corrigée. " * 30
+        gen = self._gen()
+        self._patch_review(gen, {"issues": ["accent corrigé"], "corrected_letter": fixed})
+        out, notes = gen._review(self._job(), "fr", original, [])
+        self.assertEqual(out, fixed.strip())
+        self.assertIn("accent corrigé", notes)
+
+    def test_correction_tronquee_rejetee(self):
+        original = "Madame, Monsieur,\n\n" + "Phrase correcte. " * 30
+        gen = self._gen()
+        self._patch_review(gen, {"issues": ["x"], "corrected_letter": "Trop court."})
+        out, _ = gen._review(self._job(), "fr", original, [])
+        self.assertEqual(out, original)  # original conservé
+
+    def test_backend_indisponible_garde_original(self):
+        import ai.cover_letter as cl
+        original = "Madame, Monsieur,\n\n" + "Phrase correcte. " * 30
+
+        class _Boom:
+            def __init__(self, task="match"):
+                pass
+
+            def generate(self, **kw):
+                raise RuntimeError("backend down")
+
+        self._orig = cl.LLMClient
+        cl.LLMClient = _Boom
+        out, notes = self._gen()._review(self._job(), "fr", original, ["défaut"])
+        self.assertEqual(out, original)
+        self.assertEqual(notes, ["défaut"])
 
 
 class TestStripHtml(unittest.TestCase):

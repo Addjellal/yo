@@ -103,6 +103,18 @@ sont inaccessibles).
   typographique automatique** après génération (les petits modèles locaux
   produisent parfois « Îquipe » pour « Équipe », « 2Îme » pour « 2ème » —
   réparé en code pur, sans timeout ni appel IA supplémentaire).
+  - **Contrôle de cohérence** : chaque lettre passe par des vérifications
+    gratuites (code pur) qui repèrent les marqueurs de gabarit laissés
+    (« [Nom] », « XXXX »), un texte tronqué ou un paragraphe dupliqué — les
+    points douteux sont signalés dans la modale (bandeau ambre).
+  - **Relecture IA optionnelle** (`LETTER_REVIEW=on` ou réglage web) : une
+    seconde passe relit le brouillon face au CV et à l'offre et corrige
+    uniquement les incohérences factuelles (compétences inventées, mauvaise
+    entreprise) et les fautes, sans toucher au style. Routable vers un modèle
+    bon marché ou local (`AI_REVIEW_BACKEND`/`AI_REVIEW_MODEL`) — c'est surtout
+    utile avec les petits LLM. Conservatrice : la correction n'est adoptée que
+    si elle reste plausible (longueur proche, aucun nouveau défaut), sinon le
+    brouillon d'origine est conservé. Off par défaut (un appel IA de plus).
   - **Skills de rédaction éditables** : avant chaque génération, le guide
     `prompts/skills/lettre_fr.md` (structure Vous-Moi-Nous, formules,
     erreurs à éviter, mots-clés ATS) ou `cover_letter_en.md` (cover letter

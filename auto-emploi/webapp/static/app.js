@@ -847,6 +847,20 @@ function pollLetter(jobId) {
       return;
     }
     const r = job.result;
+    const notes = Array.isArray(r.review_notes) ? r.review_notes : [];
+    const notesBox = $("#letter-notes");
+    const notesList = $("#letter-notes-list");
+    notesList.textContent = "";
+    if (notes.length) {
+      notes.forEach((n) => {
+        const li = document.createElement("li");
+        li.textContent = String(n);
+        notesList.appendChild(li);
+      });
+      notesBox.hidden = false;
+    } else {
+      notesBox.hidden = true;
+    }
     $("#letter-subject").textContent = r.email_subject || "—";
     $("#letter-email").textContent = r.email_body || "—";
     $("#letter-body").value = r.letter;
