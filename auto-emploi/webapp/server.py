@@ -1579,6 +1579,10 @@ class _Handler(BaseHTTPRequestHandler):
 # ─── Démarrage ───────────────────────────────────────────────────────────────
 
 def run(port: int = 8765, open_browser: bool = True) -> None:
+    # Crée les singletons d'état dans le thread principal, avant tout thread de
+    # requête : évite toute course à la création (chacun ouvre un fichier .json
+    # à écriture atomique, mais on garantit ici une instance unique).
+    _get_tracker(); _get_store(); _get_cv_store()
     # Range une fois les anciens fichiers (racine d'output/) dans leurs dossiers.
     try:
         moved = migrate_legacy_files()

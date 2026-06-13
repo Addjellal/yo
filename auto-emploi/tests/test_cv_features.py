@@ -428,6 +428,24 @@ class TestMultiCV:
         )
         assert len(analyzed) == 8  # 4 retenues × 2 CV (pas 140)
 
+    def test_contrat_filtre_avant_pre_filtre_commun(self, monkeypatch):
+        """Le filtre type de contrat doit s'appliquer AVANT le tri par pertinence
+        du pré-filtre commun : sinon des offres du bon contrat classées au-delà
+        du plafond seraient perdues."""
+        monkeypatch.setattr(config, "multi_cv_shared_keep", 5)
+        monkeypatch.setattr(
+            JobMatcher, "_prescore",
+            lambda self, offers, should_stop=None, progress=None, keep=30, cv_chars=6000: offers[:keep],
+        )
+        # 3 CDI noyées dans 30 alternances (l'ordre ne doit pas les perdre)
+        offers = [make_offer(i, f"Dev {i}", "Python ROS2 " + ("CDI" if i < 3 else "alternance"))
+                  for i in range(33)]
+        res = score_offers_multi(
+            {"CV Robot": CV_ROBOT, "CV Web": CV_WEB}, offers,
+            min_score=5, shared_prefilter=True, contracts=["cdi"],
+        )
+        assert sorted(o.title for o in res) == ["Dev 0", "Dev 1", "Dev 2"]
+
     def test_sans_shared_prefilter_analyse_tout(self, monkeypatch):
         offers = [make_offer(i, "Ingénieur Robotique", "Python ROS2") for i in range(70)]
         analyzed: list[str] = []

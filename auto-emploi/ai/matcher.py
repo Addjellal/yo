@@ -611,24 +611,36 @@ def score_offers_multi(
         return []
 
     # Pré-filtre commun : on ne paie le pré-scoring qu'UNE fois (profil fusionné)
-    # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV. Ne
-    # se déclenche que s'il y a vraiment à couper (pool > nombre gardé).
+    # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV.
     shared_keep = shared_prescore_keep()
-    if (shared_prefilter and len(labels) > 1 and len(offers) > shared_keep):
+    if shared_prefilter and len(labels) > 1 and len(offers) > shared_keep:
         merged_text = "\n\n".join(f"### CV : {lab}\n{cv_texts[lab]}" for lab in labels)
         gate = JobMatcher(merged_text)
         if rejected_examples:
             gate.set_rejected_examples(rejected_examples)
+        # IMPORTANT : appliquer d'ABORD les filtres éliminatoires (mots-clés
+        # exclus, type de contrat, niveau d'expérience) — sinon le tri par
+        # pertinence (top N) pourrait couper des offres valides classées au-delà
+        # de N avant même que ces filtres ne s'appliquent (par CV ensuite).
+        gate._experience_level = experience_level or ""
+        gate._contracts = {c for c in (contracts or []) if c in CONTRACT_TYPES}
+        pool = offers
+        pool, _ = gate._exclude_filter(pool, exclude or [])
+        pool, _ = gate._contract_filter(pool)
+        pool, _ = gate._experience_filter(pool)
         if progress:
-            progress(f"Pré-filtre commun : tri des {len(offers)} offres avec le profil fusionné des {len(labels)} CV…")
-        sub = (lambda m: progress(f"[commun] {m}")) if progress else None
-        kept = gate._prescore(
-            offers, should_stop=should_stop, progress=sub,
-            keep=shared_keep, cv_chars=SHARED_PRESCORE_CV_CHARS,
-        )
+            progress(f"Pré-filtre commun : {len(pool)}/{len(offers)} offres après filtres, "
+                     f"tri avec le profil fusionné des {len(labels)} CV…")
+        # Tri par pertinence seulement s'il reste plus d'offres que le plafond.
+        if len(pool) > shared_keep:
+            sub = (lambda m: progress(f"[commun] {m}")) if progress else None
+            pool = gate._prescore(
+                pool, should_stop=should_stop, progress=sub,
+                keep=shared_keep, cv_chars=SHARED_PRESCORE_CV_CHARS,
+            )
         if progress:
-            progress(f"Pré-filtre commun : {len(kept)}/{len(offers)} offres retenues pour l'analyse détaillée par CV.")
-        offers = kept
+            progress(f"Pré-filtre commun : {len(pool)}/{len(offers)} offres retenues pour l'analyse détaillée par CV.")
+        offers = pool
 
     if len(labels) == 1:
         # Les offres rechargées d'une session multi-CV portent encore best_cv /
