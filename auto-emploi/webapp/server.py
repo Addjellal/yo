@@ -736,6 +736,7 @@ _SETTINGS_KEYS: list[tuple[str, bool]] = [
     ("AI_FALLBACK", False),
     ("LETTER_EXAMPLES", False),
     ("LETTER_REVIEW", False),
+    ("MULTI_CV_SHARED_KEEP", False),
     ("DEFAULT_SOURCES", False),
     ("DEFAULT_SECTORS", False),
     ("DEFAULT_LOCATION", False),

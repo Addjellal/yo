@@ -398,9 +398,10 @@ class TestMultiCV:
         assert [o.title for o in results] == ["Ingénieur Robotique"]  # web : best 8 < 9
 
     def test_shared_prefilter_reduit_analyse_detaillee(self, monkeypatch):
-        """Au-delà du seuil, un pré-scoring commun (profil fusionné) réduit le
-        pool UNE fois ; l'analyse détaillée par CV ne porte que sur les retenues,
-        au lieu de scorer N× toutes les offres."""
+        """Au-delà du nombre gardé, un pré-scoring commun (profil fusionné) réduit
+        le pool UNE fois ; l'analyse détaillée par CV ne porte que sur les
+        retenues, au lieu de scorer N× toutes les offres."""
+        monkeypatch.setattr(config, "multi_cv_shared_keep", 5)  # gate dès 6 offres
         offers = [make_offer(i, "Ingénieur Robotique", "Python ROS2") for i in range(70)]
 
         # Le gate commun ne garde que 4 offres

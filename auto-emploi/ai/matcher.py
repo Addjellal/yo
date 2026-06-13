@@ -8,6 +8,7 @@ from rich.markup import escape
 
 from job_scrapers.base import JobOffer
 from app_utils import console
+from config import config
 from ._client import LLMClient
 
 BATCH_SIZE = 10
@@ -76,16 +77,25 @@ TWO_STAGE_THRESHOLD = 30
 TWO_STAGE_KEEP = 30
 
 # Multi-CV : matcher chaque offre avec chaque CV coûte N× (N = nombre de CV).
-# Au-delà de ce volume d'offres, un pré-filtre COMMUN (un seul pré-scoring avec
-# le profil fusionné des CV) écarte d'abord les offres hors-sujet pour TOUS les
-# CV, puis seules les `SHARED_PRESCORE_KEEP` meilleures passent en analyse
-# détaillée par CV. Préserve la couverture (une offre pertinente pour un seul CV
-# survit), divise l'analyse détaillée par ~N.
-SHARED_PRESCORE_THRESHOLD = 60
-SHARED_PRESCORE_KEEP = 150
+# Au-delà du nombre d'offres gardées (MULTI_CV_SHARED_KEEP, réglable), un
+# pré-filtre COMMUN (un seul pré-scoring avec le profil fusionné des CV) écarte
+# d'abord les offres hors-sujet pour TOUS les CV, puis seules les meilleures
+# passent en analyse détaillée par CV. Préserve la couverture (une offre
+# pertinente pour un seul CV survit), divise l'analyse détaillée par ~N.
+SHARED_PRESCORE_KEEP_DEFAULT = 150
 # Le profil fusionné est plus long qu'un CV : on élargit le budget injecté
 # (mis en cache côté Anthropic dès le 2ᵉ lot, gratuit côté Ollama local).
 SHARED_PRESCORE_CV_CHARS = 24000
+
+
+def shared_prescore_keep() -> int:
+    """Nombre d'offres gardées par le pré-filtre commun, lu depuis la config
+    (réglable dans .env / Réglages). Robuste si la valeur est invalide ou a été
+    persistée en chaîne par l'interface web."""
+    try:
+        return max(20, min(1000, int(config.multi_cv_shared_keep)))
+    except (TypeError, ValueError, AttributeError):
+        return SHARED_PRESCORE_KEEP_DEFAULT
 
 # Schéma minimal du pré-scoring : un score par offre, rien d'autre
 PRESCORE_SCHEMA = {
@@ -502,9 +512,10 @@ def score_offers_multi(
         return []
 
     # Pré-filtre commun : on ne paie le pré-scoring qu'UNE fois (profil fusionné)
-    # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV.
-    if (shared_prefilter and len(labels) > 1
-            and len(offers) > SHARED_PRESCORE_THRESHOLD):
+    # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV. Ne
+    # se déclenche que s'il y a vraiment à couper (pool > nombre gardé).
+    shared_keep = shared_prescore_keep()
+    if (shared_prefilter and len(labels) > 1 and len(offers) > shared_keep):
         merged_text = "\n\n".join(f"### CV : {lab}\n{cv_texts[lab]}" for lab in labels)
         gate = JobMatcher(merged_text)
         if rejected_examples:
@@ -514,7 +525,7 @@ def score_offers_multi(
         sub = (lambda m: progress(f"[commun] {m}")) if progress else None
         kept = gate._prescore(
             offers, should_stop=should_stop, progress=sub,
-            keep=SHARED_PRESCORE_KEEP, cv_chars=SHARED_PRESCORE_CV_CHARS,
+            keep=shared_keep, cv_chars=SHARED_PRESCORE_CV_CHARS,
         )
         if progress:
             progress(f"Pré-filtre commun : {len(kept)}/{len(offers)} offres retenues pour l'analyse détaillée par CV.")

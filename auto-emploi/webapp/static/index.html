@@ -387,6 +387,11 @@
             <option value="local">basculer sur Ollama</option>
           </select>
         </div>
+        <div class="field">
+          <label for="s-shared-keep">Multi-CV : offres gardées avant analyse détaillée <span class="set-hint" data-hint="MULTI_CV_SHARED_KEEP"></span></label>
+          <input id="s-shared-keep" type="number" min="20" max="1000" step="10" data-key="MULTI_CV_SHARED_KEEP" placeholder="150 (défaut)">
+          <p class="field-hint muted small">Sur les grosses recherches multi-CV, un pré-scoring commun ne garde que ce nombre d'offres pour l'analyse détaillée par CV. Plus bas = plus rapide/économe, plus haut = plus exhaustif.</p>
+        </div>
       </div>
 
       <h3>Lettres de motivation <span class="muted small">— guides de rédaction FR/EN éditables dans <code>prompts/skills/</code> (relus à chaque génération)</span></h3>
