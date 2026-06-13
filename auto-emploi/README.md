@@ -77,9 +77,15 @@ sont inaccessibles).
 - **Mots-clés éliminatoires** : `--exclude "senior,anglais courant"` (ou
   `EXCLUDE_KEYWORDS` dans `.env`) écarte les offres avant l'analyse IA.
 - **Filtre niveau d'expérience** : stage/alternance, junior, confirmé,
-  senior, expert — pré-filtre instantané (titre/contrat incompatibles) puis
-  pénalisation IA des niveaux inadaptés. `--experience junior` ou sélection
-  interactive (commande `e` en session).
+  senior, expert — pré-filtre instantané (titre/contrat incompatibles **et
+  années exigées détectées dans l'offre** : ex. « 3 ans d'expérience » écarté
+  si vous visez junior) puis pénalisation IA des niveaux inadaptés.
+  `--experience junior` ou sélection interactive (commande `e` en session).
+- **Filtre type de contrat** : CDI, CDD, alternance, stage, VIE, intérim,
+  freelance (cases sur le web ; aucun coché = tous). Une offre clairement
+  d'un type non sélectionné est écartée avant l'analyse IA (ex. les offres en
+  alternance disparaissent si vous ne cochez que CDI/CDD) ; les offres au type
+  ambigu sont conservées pour ne pas sur-filtrer.
 - **Localisation pays → région → ville** : sélecteur interactif avec
   recherche par texte (sans accents : « bret » → Bretagne) et option `all`
   à chaque niveau. 12 pays (Adzuna et Indeed basculent automatiquement sur

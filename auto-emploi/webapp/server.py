@@ -35,7 +35,7 @@ from history import SessionStore
 from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
 from ai import CoverLetterGenerator
-from ai.matcher import parse_exclude_keywords, score_offers_multi
+from ai.matcher import parse_exclude_keywords, score_offers_multi, CONTRACT_TYPES
 from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
 from ai.cv_extract import CVExtractor, derive_search_queries
 from integrations import notion_configured, export_to_notion
@@ -88,6 +88,7 @@ _DOWNLOAD_TYPES = {
 _SECTOR_LABELS = dict(SECTORS)
 _EXPERIENCE_KEYS = {k for k, _ in EXPERIENCE_LEVELS}
 _COUNTRY_CODES = {c for c, _ in COUNTRIES}
+_CONTRACT_KEYS = set(CONTRACT_TYPES)
 
 # ─── Jobs d'arrière-plan (scan, lettre) ──────────────────────────────────────
 
@@ -414,6 +415,7 @@ def _run_scan(job: _Job, p: dict) -> None:
             experience_level=p["experience"],
             rejected_examples=rejections,
             shared_prefilter=True,
+            contracts=p.get("contracts"),
             should_stop=job.stop_event.is_set,
             progress=job.add_log,
         )
@@ -745,6 +747,9 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     if experience not in _EXPERIENCE_KEYS:
         experience = ""
 
+    raw_contracts = body.get("contracts") or []
+    contracts = [c for c in raw_contracts if isinstance(c, str) and c in _CONTRACT_KEYS]
+
     try:
         min_score = max(0, min(10, int(body.get("min_score", config.min_match_score))))
     except (TypeError, ValueError):
@@ -773,6 +778,7 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
         "min_score": min_score,
         "max": max_per_source,
         "exclude": exclude,
+        "contracts": contracts,
         "include_seen": bool(body.get("include_seen", False)),
         # Mode test scraper : collecte sans aucun appel IA (offres brutes)
         "no_ai": no_ai,

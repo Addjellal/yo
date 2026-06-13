@@ -39,6 +39,68 @@ _EXP_TOO_LOW_CONTRACT: dict[str, list[str]] = {
     "expert":   ["stage", "alternance", "apprentissage"],
 }
 
+# Années d'expérience max tolérées par niveau — au-delà (détecté dans l'offre),
+# l'offre est écartée (ex. junior + « 3 ans d'expérience » → écartée).
+_EXP_MAX_YEARS: dict[str, int] = {
+    "stage": 0, "junior": 2, "confirme": 5, "senior": 10, "expert": 99,
+}
+# Extraction des années d'expérience EXIGÉES (on prend le minimum mentionné,
+# le plus indulgent : si même le plancher dépasse le niveau, on écarte).
+_YEARS_RES = [
+    re.compile(r"(\d{1,2})\s*(?:à|-|–|to)\s*\d{1,2}\s*(?:ans?|années?|years?)", re.IGNORECASE),
+    re.compile(r"(?:minimum|min\.?|au\s+moins|at\s+least)\s*(\d{1,2})\s*(?:ans?|années?|years?)", re.IGNORECASE),
+    re.compile(r"(\d{1,2})\s*(?:ans?|années?)\s+d['’\s]*exp[ée]?", re.IGNORECASE),
+    re.compile(r"(\d{1,2})\+?\s*years?\s+(?:of\s+)?experience", re.IGNORECASE),
+    re.compile(r"exp[ée]rience\s*(?:professionnelle)?\s*(?:de|:|d['’]au moins)?\s*(\d{1,2})\s*(?:ans?|années?|years?)", re.IGNORECASE),
+]
+
+
+def min_required_years(text: str) -> int | None:
+    """Années d'expérience minimales exigées détectées dans le texte d'une offre,
+    ou None si rien d'explicite. Conservateur : motifs liés à « expérience »,
+    « minimum », « X à Y ans » — pas un simple « il y a 3 ans »."""
+    if not text:
+        return None
+    found: list[int] = []
+    for rx in _YEARS_RES:
+        for m in rx.finditer(text):
+            try:
+                y = int(m.group(1))
+            except (TypeError, ValueError):
+                continue
+            if 0 < y <= 40:
+                found.append(y)
+    return min(found) if found else None
+
+
+# Détection du type de contrat (depuis contract_type + titre + description).
+CONTRACT_TYPES = ("cdi", "cdd", "alternance", "stage", "vie", "interim", "freelance")
+CONTRACT_LABELS = {
+    "cdi": "CDI", "cdd": "CDD", "alternance": "Alternance", "stage": "Stage",
+    "vie": "VIE / VIA", "interim": "Intérim", "freelance": "Freelance",
+}
+_CONTRACT_RES = {
+    "cdi": [re.compile(r"\bcdi\b", re.I), re.compile(r"dur[ée]e\s+ind[ée]termin", re.I),
+            re.compile(r"\bpermanent\b", re.I)],
+    "cdd": [re.compile(r"\bcdd\b", re.I), re.compile(r"dur[ée]e\s+d[ée]termin", re.I),
+            re.compile(r"fixed[\s-]term", re.I)],
+    "alternance": [re.compile(r"alternan", re.I), re.compile(r"apprenti", re.I),
+                   re.compile(r"contrat\s+pro", re.I), re.compile(r"professionnalisation", re.I),
+                   re.compile(r"work[\s-]study", re.I)],
+    "stage": [re.compile(r"\bstages?\b", re.I), re.compile(r"stagiaire", re.I),
+              re.compile(r"internship", re.I), re.compile(r"\binterns?\b", re.I)],
+    "vie": [re.compile(r"\bv\.?\s?i\.?\s?e\.?\b", re.I), re.compile(r"volontariat\s+international", re.I)],
+    "interim": [re.compile(r"int[ée]rim", re.I), re.compile(r"\btemporaire\b", re.I)],
+    "freelance": [re.compile(r"freelance", re.I), re.compile(r"ind[ée]pendant", re.I),
+                  re.compile(r"portage", re.I)],
+}
+
+
+def detect_contracts(offer: JobOffer) -> set[str]:
+    """Types de contrat détectés dans une offre (peut être vide si ambigu)."""
+    hay = f"{offer.contract_type or ''} {offer.title} {(offer.description or '')[:1500]}"
+    return {key for key, res in _CONTRACT_RES.items() if any(r.search(hay) for r in res)}
+
 # Mots vides FR/EN les plus courants — exclus du pré-filtre keyword
 _STOPWORDS = {
     # Français
@@ -167,6 +229,7 @@ class JobMatcher:
         self.cv_text = cv_text
         self._sectors: list[str] = []
         self._experience_level: str = ""
+        self._contracts: set[str] = set()
         self._rejected_examples: list[str] = []
         self._llm = LLMClient(task="match")
         self._llm_prescore = LLMClient(task="prescore")
@@ -225,7 +288,33 @@ class JobMatcher:
             if too_low_contract and any(m in contract_lower for m in too_low_contract):
                 dropped += 1
                 continue
+            # Années d'expérience exigées dans l'offre > plafond du niveau choisi
+            # (ex. junior + « 3 ans d'expérience » → écartée).
+            max_years = _EXP_MAX_YEARS.get(level)
+            if max_years is not None:
+                req = min_required_years(f"{offer.title}\n{offer.description or ''}")
+                if req is not None and req > max_years:
+                    dropped += 1
+                    continue
             kept.append(offer)
+        return kept, dropped
+
+    def _contract_filter(self, offers: list[JobOffer]) -> tuple[list[JobOffer], int]:
+        """Garde uniquement les offres dont le type de contrat correspond aux
+        types voulus. Une offre au type ambigu (non détecté) est conservée pour
+        ne pas sur-filtrer ; une offre clairement d'un autre type est écartée
+        (ex. alternance écartée si l'utilisateur veut CDI/CDD)."""
+        wanted = self._contracts
+        if not wanted:
+            return offers, 0
+        kept: list[JobOffer] = []
+        dropped = 0
+        for offer in offers:
+            types = detect_contracts(offer)
+            if not types or (types & wanted):
+                kept.append(offer)
+            else:
+                dropped += 1
         return kept, dropped
 
     def _overlap(self, offer: JobOffer) -> int:
@@ -257,30 +346,39 @@ class JobMatcher:
         experience_level: str = "",
         top_k: int | None = None,
         two_stage: bool = False,
+        contracts: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
         progress: Callable[[str], None] | None = None,
     ) -> list[JobOffer]:
         """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
         two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
         modèle local) puis analyse détaillée du top uniquement.
+        contracts : types de contrat voulus (cdi, cdd, alternance…) — les autres
+        types clairement identifiés sont écartés.
         should_stop : vérifié entre chaque lot IA — arrêt propre avec résultats
         partiels (bouton « Stopper » de l'interface web).
         progress : callback recevant chaque étape (lot par lot) — alimente le
         journal en direct de l'interface web."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
+        self._contracts = {c for c in (contracts or []) if c in CONTRACT_TYPES}
 
         # 1. Mots-clés éliminatoires (gratuit, instantané)
         offers, excluded = self._exclude_filter(offers, exclude or [])
         if excluded:
             self._step(progress, f"Mots-clés exclus : {excluded} offre(s) écartée(s).")
 
-        # 2. Filtre niveau d'expérience (avant appel LLM)
+        # 2. Filtre type de contrat (CDI/CDD/alternance/stage…)
+        offers, contract_dropped = self._contract_filter(offers)
+        if contract_dropped:
+            self._step(progress, f"Type de contrat : {contract_dropped} offre(s) hors sélection écartée(s).")
+
+        # 3. Filtre niveau d'expérience (avant appel LLM)
         offers, exp_dropped = self._experience_filter(offers)
         if exp_dropped:
             self._step(progress, f"Niveau d'expérience : {exp_dropped} offre(s) incompatible(s) écartée(s).")
 
-        # 3. Pré-filtre keyword (économise les appels LLM)
+        # 4. Pré-filtre keyword (économise les appels LLM)
         offers, dropped = self._prefilter(offers, top_k=top_k)
         if dropped:
             self._step(progress, f"Pré-filtre mots-clés : {dropped} offre(s) clairement hors-sujet écartée(s).")
@@ -492,6 +590,7 @@ def score_offers_multi(
     top_k: int | None = None,
     two_stage: bool = False,
     shared_prefilter: bool = False,
+    contracts: list[str] | None = None,
     should_stop: Callable[[], bool] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> list[JobOffer]:
@@ -544,7 +643,7 @@ def score_offers_multi(
         return matcher.score_offers(
             offers, min_score=min_score, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
-            should_stop=should_stop, progress=progress,
+            contracts=contracts, should_stop=should_stop, progress=progress,
         )
 
     # Un passage complet par CV (sur des copies : les objets d'origine restent
@@ -566,7 +665,7 @@ def score_offers_multi(
         scored = matcher.score_offers(
             copies, min_score=0, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
-            should_stop=should_stop, progress=sub_progress,
+            contracts=contracts, should_stop=should_stop, progress=sub_progress,
         )
         for offer in scored:
             key = offer.unique_key()

@@ -166,6 +166,52 @@ class TestRescorePrefilter:
         assert top[0].title == "Poste 0"  # meilleur score simulé en premier
 
 
+# ─── 2a-bis. Filtres type de contrat + années d'expérience ───────────────────
+
+class TestContractFilter:
+    def test_skip_alternance_quand_cdi_voulu(self):
+        m = JobMatcher("CV")
+        m._contracts = {"cdi", "cdd"}
+        offers = [
+            make_offer(1, "Dev Python", "Poste en CDI à pourvoir"),
+            make_offer(2, "Data", "contrat en alternance / apprentissage"),
+            make_offer(3, "Ingénieur", "rejoignez notre belle équipe"),  # ambigu
+        ]
+        kept, dropped = m._contract_filter(offers)
+        titles = [o.title for o in kept]
+        assert "Data" not in titles          # alternance écartée
+        assert dropped == 1
+        assert "Ingénieur" in titles         # ambigu conservé
+
+    def test_aucun_contrat_selectionne_ne_filtre_pas(self):
+        m = JobMatcher("CV")
+        m._contracts = set()
+        offers = [make_offer(1, "Alternance", "alternance")]
+        kept, dropped = m._contract_filter(offers)
+        assert dropped == 0 and len(kept) == 1
+
+
+class TestExperienceYears:
+    def test_junior_ecarte_3_ans(self):
+        m = JobMatcher("CV")
+        m._experience_level = "junior"
+        offers = [
+            make_offer(1, "Dev", "Vous avez 3 ans d'expérience minimum"),  # 3 > 2 → écartée
+            make_offer(2, "Dev", "Débutant accepté, formation assurée"),    # conservée
+            make_offer(3, "Dev", "2 ans d'expérience souhaités"),           # 2 ≤ 2 → conservée
+        ]
+        kept, dropped = m._experience_filter(offers)
+        assert dropped == 1
+        assert all("3 ans" not in o.description for o in kept)
+
+    def test_sans_niveau_ne_filtre_pas(self):
+        m = JobMatcher("CV")
+        m._experience_level = ""
+        offers = [make_offer(1, "Dev", "10 ans d'expérience exigés")]
+        kept, dropped = m._experience_filter(offers)
+        assert dropped == 0 and len(kept) == 1
+
+
 # ─── 2b. Robustesse du parsing de réponse (modèles locaux capricieux) ─────────
 
 class TestParseResponse:

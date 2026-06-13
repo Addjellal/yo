@@ -98,12 +98,26 @@ let POLL_TIMER = null;
 // ancien (scan ou check) s'arrête de lui-même et n'écrase plus le journal.
 let POLL_GEN = 0;
 let CVS = [];              // registre des CV (cartes /api/cvs ou résumé /api/state)
-const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "" };
+const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "", contracts: new Set() };
 let EXP_PILLS = {};        // key → élément pill
 let SEC_CHIPS = {};        // key → élément chip
 let SRC_CHIPS = {};        // key → élément chip
 let CV_CHIPS = {};         // filename → élément chip
 let SRC_USABLE = {};       // key → bool
+let CON_CHIPS = {};        // key → élément chip (types de contrat)
+// Types de contrat proposés (clés alignées avec CONTRACT_TYPES côté serveur)
+const CONTRACT_OPTS = [
+  ["cdi", "CDI"], ["cdd", "CDD"], ["alternance", "Alternance"], ["stage", "Stage"],
+  ["vie", "VIE / VIA"], ["interim", "Intérim"], ["freelance", "Freelance"],
+];
+
+function toggleContract(key, force) {
+  const chip = CON_CHIPS[key];
+  if (!chip) return;
+  const on = force !== undefined ? force : !SELECTED.contracts.has(key);
+  if (on) { SELECTED.contracts.add(key); chip.classList.add("active"); }
+  else { SELECTED.contracts.delete(key); chip.classList.remove("active"); }
+}
 
 function toggleSector(key, force) {
   const chip = SEC_CHIPS[key];
@@ -264,6 +278,19 @@ async function init() {
     chip.addEventListener("click", () => toggleSector(s.key));
     SEC_CHIPS[s.key] = chip;
     secBox.appendChild(chip);
+  }
+
+  // Types de contrat (chips multi ; aucun = tous)
+  const conBox = $("#f-contracts");
+  if (conBox) {
+    conBox.replaceChildren();
+    CON_CHIPS = {};
+    for (const [key, label] of CONTRACT_OPTS) {
+      const chip = el("span", { class: "chip", text: label });
+      chip.addEventListener("click", () => toggleContract(key));
+      CON_CHIPS[key] = chip;
+      conBox.appendChild(chip);
+    }
   }
 
   // Sources (chips multi, présélection des sources sans auth + configurées)
@@ -520,6 +547,7 @@ async function startScan() {
     sources: [...SELECTED.sources],
     sectors: [...SELECTED.sectors],
     experience: SELECTED.experience,
+    contracts: [...SELECTED.contracts],
     min_score: parseInt($("#f-minscore").value, 10),
     max: maxRaw === "" ? 0 : parseInt(maxRaw, 10) || 0,  // 0 = sans plafond
     exclude: $("#f-exclude").value,
