@@ -1601,7 +1601,7 @@ def watch_loop(args, sources, sectors, cv_texts, tracker, exclude, location="", 
                 matched = score_offers_multi(
                     cv_texts, new_offers, min_score=args.min_score, sectors=sectors,
                     exclude=exclude, experience_level=experience,
-                    rejected_examples=rejections,
+                    rejected_examples=rejections, shared_prefilter=True,
                 )
                 # Tout ce qui a été analysé est marqué vu : pas de re-scoring au prochain cycle
                 tracker.mark_many(new_offers, "seen")
@@ -2072,7 +2072,7 @@ def main():
                 matched_offers = score_offers_multi(
                     cv_texts, all_offers, min_score=args.min_score, sectors=sectors,
                     exclude=exclude, experience_level=experience,
-                    rejected_examples=rejections,
+                    rejected_examples=rejections, shared_prefilter=True,
                 )
             except Exception as e:
                 if "AuthenticationError" in type(e).__name__:

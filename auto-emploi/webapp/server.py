@@ -413,6 +413,7 @@ def _run_scan(job: _Job, p: dict) -> None:
             exclude=p["exclude"],
             experience_level=p["experience"],
             rejected_examples=rejections,
+            shared_prefilter=True,
             should_stop=job.stop_event.is_set,
             progress=job.add_log,
         )

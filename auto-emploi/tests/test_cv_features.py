@@ -397,6 +397,47 @@ class TestMultiCV:
         )
         assert [o.title for o in results] == ["Ingénieur Robotique"]  # web : best 8 < 9
 
+    def test_shared_prefilter_reduit_analyse_detaillee(self, monkeypatch):
+        """Au-delà du seuil, un pré-scoring commun (profil fusionné) réduit le
+        pool UNE fois ; l'analyse détaillée par CV ne porte que sur les retenues,
+        au lieu de scorer N× toutes les offres."""
+        offers = [make_offer(i, "Ingénieur Robotique", "Python ROS2") for i in range(70)]
+
+        # Le gate commun ne garde que 4 offres
+        monkeypatch.setattr(
+            JobMatcher, "_prescore",
+            lambda self, offers, should_stop=None, progress=None, keep=30, cv_chars=6000: offers[:4],
+        )
+        analyzed: list[str] = []
+
+        def recording_batch(self, batch):
+            for o in batch:
+                analyzed.append(o.id)
+                o.match_score = 7
+        monkeypatch.setattr(JobMatcher, "_score_batch", recording_batch)
+
+        score_offers_multi(
+            {"CV Robot": CV_ROBOT, "CV Web": CV_WEB}, offers,
+            min_score=6, shared_prefilter=True,
+        )
+        assert len(analyzed) == 8  # 4 retenues × 2 CV (pas 140)
+
+    def test_sans_shared_prefilter_analyse_tout(self, monkeypatch):
+        offers = [make_offer(i, "Ingénieur Robotique", "Python ROS2") for i in range(70)]
+        analyzed: list[str] = []
+
+        def recording_batch(self, batch):
+            for o in batch:
+                analyzed.append(o.id)
+                o.match_score = 7
+        monkeypatch.setattr(JobMatcher, "_score_batch", recording_batch)
+
+        score_offers_multi(
+            {"CV Robot": CV_ROBOT, "CV Web": CV_WEB}, offers,
+            min_score=6, shared_prefilter=False,
+        )
+        assert len(analyzed) == 140  # 70 × 2 CV, aucun pré-filtre commun
+
     def test_single_cv_keeps_legacy_behavior(self):
         results = score_offers_multi({"CV Robot": CV_ROBOT}, self.offers(), min_score=6)
         assert len(results) == 1                  # l'offre web score 3 → filtrée

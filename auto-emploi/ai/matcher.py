@@ -75,6 +75,18 @@ SYSTEM_PROMPT = (
 TWO_STAGE_THRESHOLD = 30
 TWO_STAGE_KEEP = 30
 
+# Multi-CV : matcher chaque offre avec chaque CV coûte N× (N = nombre de CV).
+# Au-delà de ce volume d'offres, un pré-filtre COMMUN (un seul pré-scoring avec
+# le profil fusionné des CV) écarte d'abord les offres hors-sujet pour TOUS les
+# CV, puis seules les `SHARED_PRESCORE_KEEP` meilleures passent en analyse
+# détaillée par CV. Préserve la couverture (une offre pertinente pour un seul CV
+# survit), divise l'analyse détaillée par ~N.
+SHARED_PRESCORE_THRESHOLD = 60
+SHARED_PRESCORE_KEEP = 150
+# Le profil fusionné est plus long qu'un CV : on élargit le budget injecté
+# (mis en cache côté Anthropic dès le 2ᵉ lot, gratuit côté Ollama local).
+SHARED_PRESCORE_CV_CHARS = 24000
+
 # Schéma minimal du pré-scoring : un score par offre, rien d'autre
 PRESCORE_SCHEMA = {
     "type": "object",
@@ -298,16 +310,22 @@ class JobMatcher:
         offers: list[JobOffer],
         should_stop: Callable[[], bool] | None = None,
         progress: Callable[[str], None] | None = None,
+        keep: int | None = None,
+        cv_chars: int = 6000,
     ) -> list[JobOffer]:
         """Scoring grossier (un entier par offre, descriptions raccourcies) sur la
         tâche « prescore » — par défaut le même provider, mais routable vers un
-        modèle local gratuit via AI_PRESCORE_BACKEND=local. Garde le top."""
+        modèle local gratuit via AI_PRESCORE_BACKEND=local. Garde le top `keep`
+        (défaut TWO_STAGE_KEEP, résolu à l'exécution). `cv_chars` borne le CV
+        injecté (plus large pour un profil fusionné)."""
+        if keep is None:
+            keep = TWO_STAGE_KEEP
         batch_size = 20
         total_batches = (len(offers) - 1) // batch_size + 1
         self._step(
             progress,
             f"Pré-scoring IA de {len(offers)} offre(s) en {total_batches} lot(s) "
-            f"(top {TWO_STAGE_KEEP} retenu pour l'analyse détaillée)…",
+            f"(top {keep} retenu pour l'analyse détaillée)…",
         )
         prescored: list[tuple[int, JobOffer]] = []
         for i in range(0, len(offers), batch_size):
@@ -331,13 +349,16 @@ class JobMatcher:
             scores = {j: 5 for j in range(len(batch))}  # neutre si le lot échoue
             try:
                 raw = self._llm_prescore.generate(
-                    system=SYSTEM_PROMPT.format(cv=self.cv_text[:6000]),
+                    system=SYSTEM_PROMPT.format(cv=self.cv_text[:cv_chars]),
                     user=prompt,
                     max_tokens=1024,
                     json_schema=PRESCORE_SCHEMA,
                 )
                 data = json.loads(raw)
-                for item in data.get("results", []):
+                results = data.get("results")
+                for item in (results if isinstance(results, list) else []):
+                    if not isinstance(item, dict):
+                        continue
                     idx = item.get("job_index", -1)
                     if isinstance(idx, int) and 0 <= idx < len(batch):
                         scores[idx] = _clamp_score(item.get("score"))
@@ -346,7 +367,7 @@ class JobMatcher:
             prescored.extend((scores[j], o) for j, o in enumerate(batch))
 
         prescored.sort(key=lambda pair: pair[0], reverse=True)
-        return [o for _, o in prescored[:TWO_STAGE_KEEP]]
+        return [o for _, o in prescored[:keep]]
 
     def _build_prompt(self, batch: list[JobOffer]) -> str:
         # Chaque offre est isolée dans des balises : le modèle sait que ce
@@ -460,6 +481,7 @@ def score_offers_multi(
     rejected_examples: list[str] | None = None,
     top_k: int | None = None,
     two_stage: bool = False,
+    shared_prefilter: bool = False,
     should_stop: Callable[[], bool] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> list[JobOffer]:
@@ -470,11 +492,33 @@ def score_offers_multi(
     résultat dans ses champs match_* plus le détail par CV dans cv_scores
     (et best_cv = label du CV gagnant). Une offre est retenue dès qu'un CV
     atteint min_score.
+    shared_prefilter : si plusieurs CV et beaucoup d'offres, un pré-scoring
+    COMMUN (profil fusionné) réduit le pool une seule fois avant l'analyse
+    détaillée par CV — évite de scorer N× des offres hors-sujet pour tous.
     progress : callback de progression (lot par lot, CV par CV) pour le
     journal en direct de l'interface web."""
     labels = [lab for lab in cv_texts if cv_texts[lab]]
     if not labels or not offers:
         return []
+
+    # Pré-filtre commun : on ne paie le pré-scoring qu'UNE fois (profil fusionné)
+    # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV.
+    if (shared_prefilter and len(labels) > 1
+            and len(offers) > SHARED_PRESCORE_THRESHOLD):
+        merged_text = "\n\n".join(f"### CV : {lab}\n{cv_texts[lab]}" for lab in labels)
+        gate = JobMatcher(merged_text)
+        if rejected_examples:
+            gate.set_rejected_examples(rejected_examples)
+        if progress:
+            progress(f"Pré-filtre commun : tri des {len(offers)} offres avec le profil fusionné des {len(labels)} CV…")
+        sub = (lambda m: progress(f"[commun] {m}")) if progress else None
+        kept = gate._prescore(
+            offers, should_stop=should_stop, progress=sub,
+            keep=SHARED_PRESCORE_KEEP, cv_chars=SHARED_PRESCORE_CV_CHARS,
+        )
+        if progress:
+            progress(f"Pré-filtre commun : {len(kept)}/{len(offers)} offres retenues pour l'analyse détaillée par CV.")
+        offers = kept
 
     if len(labels) == 1:
         # Les offres rechargées d'une session multi-CV portent encore best_cv /

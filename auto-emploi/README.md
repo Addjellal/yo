@@ -92,6 +92,11 @@ sont inaccessibles).
   chaque offre est scorée avec chaque CV, le meilleur score gagne et le
   détail par CV reste consultable. Pour les lettres, les CV sont fusionnés
   dans le prompt avec leur provenance (pas de doublons ni contradictions).
+  Sur les grosses recherches (recherche globale × plusieurs CV), un
+  **pré-filtre commun** évite de scorer en détail N× les mêmes offres : un
+  seul pré-scoring rapide avec le profil fusionné des CV écarte d'abord les
+  offres hors-sujet pour *tous* les CV, puis l'analyse détaillée par CV ne
+  porte que sur les meilleures (couverture préservée, coût divisé par ~N).
 - **Profils de CV structurés** : extraction IA (coordonnées, compétences
   catégorisées, expériences, formations, langues) éditable dans la page
   « Mes CV » — **vos corrections manuelles priment sur l'extraction** pour
