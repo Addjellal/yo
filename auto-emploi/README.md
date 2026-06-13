@@ -28,7 +28,12 @@ auto-hébergée, thème sombre/clair), utilisable sur tablette. Les pages :
   (offres servies depuis l'historique local, zéro appel API) ;
 - **Résultats** : cartes avec anneau + barre de score, badge du **CV
   gagnant** et détail des scores par CV, atouts/lacunes, actions favori /
-  postulée / rejeter, tri, export CSV+JSON, export Notion ;
+  postulée / rejeter, tri, export CSV+JSON, export Notion. Cliquer **Ouvrir**
+  surligne la carte (la dernière ouverte reste marquée jusqu'au choix d'un
+  statut) ; **choisir un statut retire l'offre des résultats** (elle reste dans
+  l'onglet Suivi, en tête de colonne). Bouton **« Vérifier la dispo (sans IA) »** :
+  reparcourt les offres et teste leur disponibilité réelle sur les plateformes
+  par simple requête HTTP (🟢 en ligne / 🔴 retirée / ⚪ indéterminée), zéro appel IA ;
 - **Mes CV** : liste des CV importés, **profil structuré extrait par l'IA**
   (coordonnées, compétences catégorisées, expériences, formations, langues),
   formulaire de correction — les modifications manuelles priment sur
@@ -104,7 +109,9 @@ sont inaccessibles).
   irréversible, l'historique garde « CV supprimé : x »).
 - **Lettres de motivation** : 3 tons au choix (standard, formelle, directe),
   **email d'accompagnement** (objet + corps) inclus, variation automatique
-  par rapport à vos candidatures passées. Export TXT + PDF. **Correction
+  par rapport à vos candidatures passées. En multi-CV, la lettre se fonde sur
+  le **seul CV le mieux corresp. à l'offre** (le « CV gagnant » affiché sur la
+  carte) — prompt plus ciblé, pas de mélange des profils. Export TXT + PDF. **Correction
   typographique automatique** après génération (les petits modèles locaux
   produisent parfois « Îquipe » pour « Équipe », « 2Îme » pour « 2ème » —
   réparé en code pur, sans timeout ni appel IA supplémentaire).

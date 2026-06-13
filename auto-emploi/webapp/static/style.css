@@ -331,6 +331,25 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   box-shadow: var(--shadow);
 }
 .offer-card.is-rejected { opacity: .45; }
+/* Offre déjà ouverte (lien cliqué) : désaturée, effet « visité ». On utilise
+   filter (et non opacity, verrouillée à 1 par l'animation cardin fill:both). */
+.offer-card.is-opened { filter: saturate(.5) brightness(.93); }
+/* Dernière offre ouverte : surlignée tant qu'aucun statut n'est choisi */
+.offer-card.is-last-opened {
+  filter: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+/* Disponibilité (vérif sans IA) */
+.offer-card.avail-gone { filter: saturate(.4) brightness(.9); }
+.badge.avail-badge { font-weight: 600; }
+.offer-card.is-last-opened::after {
+  content: "👁 dernière ouverte";
+  position: absolute; top: 10px; right: 12px;
+  font-size: 11px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  padding: 2px 8px; border-radius: 999px;
+}
 .offer-head { display: flex; gap: 14px; align-items: flex-start; }
 .offer-title { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; line-height: 1.3; margin: 0; word-break: break-word; }
 .offer-company { color: var(--text-soft); font-size: 13.5px; margin-top: 2px; }

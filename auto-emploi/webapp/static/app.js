@@ -539,6 +539,7 @@ async function startScan() {
   $("#scan-progress").hidden = false;
   $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
+  { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = noAi
     ? `Test scraper (sans IA) : « ${query} »`
     : isGlobal
@@ -583,6 +584,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   $("#scan-progress").hidden = false;
   $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
+  { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
   pollScan();
@@ -601,12 +603,18 @@ function pollScan() {
     }
     renderLog(job.log);
     if (job.status === "running") { pollScan(); return; }
+    // Terminé : on arrête le spinner et on fige le titre (sinon l'UI semble
+    // « tourner encore » alors que le scan est fini, surtout si 0 offre).
     $("#btn-scan").disabled = false;
     $("#btn-scan-stop").disabled = true;
+    const spinner = $("#scan-progress .spinner");
+    if (spinner) spinner.style.display = "none";
     if (job.status === "error") {
+      $("#progress-title").textContent = "Recherche échouée";
       toast("Scan échoué : " + (job.error || "erreur inconnue"), "err");
       return;
     }
+    $("#progress-title").textContent = "Recherche terminée";
     OFFERS = job.offers || [];
     // Offres trouvées → le journal s'efface mais reste récupérable via le
     // bouton « Revoir le journal ». Aucune offre → le journal reste visible.
@@ -631,10 +639,14 @@ $("#sort-select").addEventListener("change", renderResults);
 $("#btn-export").addEventListener("click", exportResults);
 $("#btn-notion").addEventListener("click", exportNotion);
 
+// Dernière offre dont on a cliqué « Ouvrir » : marquée jusqu'au choix d'un statut
+let LAST_OPENED_CARD = null;
+
 function renderResults() {
   const zone = $("#results-zone");
   const grid = $("#results-grid");
   grid.replaceChildren();
+  LAST_OPENED_CARD = null;
 
   if (!OFFERS.length) {
     zone.hidden = true;
@@ -737,6 +749,7 @@ function offerCard(offer) {
     details,
     el("div", { class: "offer-actions" }, [openLink, btnFav, btnApplied, btnReject, btnLetter]),
   ]);
+  card.dataset.index = offer.index;  // pour le marquage de disponibilité (#check)
 
   function applyStatus(status) {
     offer.status = status;
@@ -750,6 +763,16 @@ function offerCard(offer) {
   }
   applyStatus(offer.status);
 
+  const TERMINAL = ["favorite", "applied", "rejected"];
+  function removeFromResults() {
+    const idx = OFFERS.indexOf(offer);
+    if (idx !== -1) OFFERS.splice(idx, 1);
+    if (LAST_OPENED_CARD === card) LAST_OPENED_CARD = null;
+    card.remove();
+    if (!OFFERS.length) renderResults();  // bascule sur l'état vide
+    else $("#results-count").textContent = `${OFFERS.length} offre${OFFERS.length > 1 ? "s" : ""}`;
+  }
+
   async function mark(status) {
     try {
       await api("/api/track", {
@@ -757,14 +780,30 @@ function offerCard(offer) {
         body: JSON.stringify({ job_id: SCAN_JOB, indices: [offer.index], status }),
       });
       applyStatus(status);
+      // Statut choisi → l'offre quitte les résultats (reste visible dans Suivi)
+      if (TERMINAL.includes(status)) removeFromResults();
     } catch (e) {
       toast(e.message, "err");
     }
   }
-  btnFav.addEventListener("click", () => mark(offer.status === "favorite" ? "seen" : "favorite"));
-  btnApplied.addEventListener("click", () => mark(offer.status === "applied" ? "seen" : "applied"));
-  btnReject.addEventListener("click", () => mark(offer.status === "rejected" ? "seen" : "rejected"));
-  btnLetter.addEventListener("click", () => openLetterModal(offer, applyStatus));
+
+  // « Ouvrir » : surligne la carte ; la dernière ouverte reste marquée jusqu'à
+  // ce qu'un statut soit choisi (la carte quitte alors les résultats).
+  openLink.addEventListener("click", () => {
+    card.classList.add("is-opened");
+    if (LAST_OPENED_CARD && LAST_OPENED_CARD !== card) {
+      LAST_OPENED_CARD.classList.remove("is-last-opened");
+    }
+    card.classList.add("is-last-opened");
+    LAST_OPENED_CARD = card;
+  });
+  btnFav.addEventListener("click", () => mark("favorite"));
+  btnApplied.addEventListener("click", () => mark("applied"));
+  btnReject.addEventListener("click", () => mark("rejected"));
+  btnLetter.addEventListener("click", () => openLetterModal(offer, (st) => {
+    applyStatus(st);
+    if (TERMINAL.includes(st)) removeFromResults();
+  }));
 
   return card;
 }
@@ -788,6 +827,61 @@ async function exportNotion() {
   } catch (e) {
     toast(e.message, "err");
   }
+}
+
+// ─── Vérification de disponibilité (sans IA) ────────────────────────────────
+
+$("#btn-check-avail").addEventListener("click", checkAvailability);
+
+async function checkAvailability() {
+  if (!OFFERS.length) { toast("Aucune offre à vérifier.", "err"); return; }
+  let out;
+  try {
+    out = await api("/api/check-availability", { method: "POST", body: JSON.stringify({ job_id: SCAN_JOB }) });
+  } catch (e) { toast(e.message, "err"); return; }
+  $("#btn-check-avail").disabled = true;
+  $("#scan-progress").hidden = false;
+  $("#btn-show-log").hidden = true;
+  { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
+  $("#progress-title").textContent = "Vérification de disponibilité (sans IA)…";
+  $("#progress-log").replaceChildren();
+  pollCheck(out.job_id);
+}
+
+function pollCheck(jobId) {
+  setTimeout(async () => {
+    let job;
+    try { job = await api(`/api/job?id=${encodeURIComponent(jobId)}`); }
+    catch (e) { $("#btn-check-avail").disabled = false; toast("Suivi perdu : " + e.message, "err"); return; }
+    renderLog(job.log);
+    if (job.status === "running") { pollCheck(jobId); return; }
+    $("#btn-check-avail").disabled = false;
+    const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = "none";
+    $("#progress-title").textContent = "Vérification terminée";
+    if (job.status === "error") { toast("Vérification échouée : " + (job.error || ""), "err"); return; }
+    applyAvailability((job.result && job.result.results) || []);
+    $("#scan-progress").hidden = true;
+    $("#btn-show-log").hidden = false;
+  }, 850);
+}
+
+function applyAvailability(results) {
+  const grid = $("#results-grid");
+  let online = 0, gone = 0, unknown = 0;
+  for (const r of results) {
+    const card = grid.querySelector(`[data-index="${r.index}"]`);
+    if (!card) continue;  // carte retirée (statut déjà choisi)
+    card.classList.remove("avail-online", "avail-gone", "avail-unknown");
+    let badge = card.querySelector(".avail-badge");
+    if (!badge) {
+      badge = el("span", { class: "badge avail-badge" });
+      (card.querySelector(".offer-badges") || card).appendChild(badge);
+    }
+    if (r.available === true) { card.classList.add("avail-online"); badge.textContent = "🟢 en ligne"; online++; }
+    else if (r.available === false) { card.classList.add("avail-gone"); badge.textContent = "🔴 retirée"; gone++; }
+    else { card.classList.add("avail-unknown"); badge.textContent = "⚪ indéterminée"; unknown++; }
+  }
+  toast(`Disponibilité : ${online} en ligne · ${gone} retirée(s) · ${unknown} indéterminée(s).`, "ok");
 }
 
 // ─── Modale lettre ──────────────────────────────────────────────────────────

@@ -239,6 +239,45 @@ class TestSuggestModels(unittest.TestCase):
         self.assertTrue(suggest_models(None, None))
 
 
+class TestAvailabilityCheck(unittest.TestCase):
+    """Vérification de disponibilité sans IA : mapping des codes HTTP."""
+
+    def _check(self, head_code, get_code=None, raise_exc=False):
+        import requests
+        import webapp.server as srv
+
+        class _R:
+            def __init__(self, code):
+                self.status_code = code
+
+        orig_head, orig_get = requests.head, requests.get
+        try:
+            if raise_exc:
+                requests.head = lambda *a, **k: (_ for _ in ()).throw(requests.RequestException("x"))
+            else:
+                requests.head = lambda *a, **k: _R(head_code)
+            requests.get = lambda *a, **k: _R(get_code if get_code is not None else head_code)
+            return srv._check_one("https://example.com/offre")
+        finally:
+            requests.head, requests.get = orig_head, orig_get
+
+    def test_en_ligne(self):
+        self.assertIs(self._check(200)["available"], True)
+
+    def test_retiree(self):
+        self.assertIs(self._check(404)["available"], False)
+        self.assertIs(self._check(410)["available"], False)
+
+    def test_indetermine(self):
+        self.assertIsNone(self._check(500, 500)["available"])
+        self.assertIsNone(self._check(0, raise_exc=True)["available"])
+
+    def test_url_non_http_rejetee(self):
+        import webapp.server as srv
+        self.assertIsNone(srv._check_one("javascript:alert(1)")["available"])
+        self.assertIsNone(srv._check_one("")["available"])
+
+
 class TestOutputPaths(unittest.TestCase):
     def test_find_refuse_chemins(self):
         from output_paths import find_output_file

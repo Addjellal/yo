@@ -154,7 +154,7 @@ def _get_cv_store() -> CVStore:
 # doivent survivre aux jobs lettre/CV qui s'accumulent. (Bug historique : une
 # purge globale à 20 jobs supprimait le scan courant après quelques recherches
 # → « Scan introuvable » sur toute génération de lettre.)
-_JOB_RETENTION = {"scan": 6, "letter": 20, "cv": 20}
+_JOB_RETENTION = {"scan": 6, "letter": 20, "cv": 20, "check": 6}
 
 
 def _register_job(job: _Job) -> None:
@@ -539,8 +539,16 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
             applied_titles = [
                 str(e.get("title", "")) for e in tracker.list_by_status("applied") if e.get("title")
             ]
+        # Lettre fondée sur le SEUL CV le mieux corresp. à l'offre (best_cv,
+        # déjà départagé par score puis ordre des CV dans le matching) — évite
+        # de surcharger le prompt avec les autres CV. Repli : texte fusionné.
+        cv_text = scan_job.cv_text
+        if offer.best_cv and scan_job.cv_texts.get(offer.best_cv):
+            cv_text = scan_job.cv_texts[offer.best_cv]
+            _LOG.info("lettre %s : CV retenu « %s » (meilleure correspondance)",
+                      job.id[:8], offer.best_cv)
         generator = CoverLetterGenerator(
-            scan_job.cv_text,
+            cv_text,
             applied_history=applied_titles,
             style_examples=_style_examples(),
         )
@@ -569,6 +577,71 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
         _LOG.info("lettre %s : terminée (%s)", job.id[:8], txt_path.name)
     except Exception as e:
         _LOG.exception("lettre %s : échec", job.id[:8])
+        job.error = str(e)[:500]
+        job.status = "error"
+
+
+# Vérification de disponibilité : requête HTTP légère par offre, AUCUN appel IA.
+# 200–3xx = en ligne ; 404/410 = retirée ; échec réseau/timeout = indéterminé.
+_CHECK_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+
+def _check_one(url: str) -> dict:
+    """État d'une URL d'offre : available True/False/None (indéterminé)."""
+    import requests
+    if not url or not url.startswith(("http://", "https://")):
+        return {"available": None, "status": 0}
+    try:
+        # HEAD d'abord (léger) ; certains sites refusent HEAD → repli GET.
+        resp = requests.head(url, timeout=8, allow_redirects=True, headers=_CHECK_HEADERS)
+        if resp.status_code in (403, 405) or resp.status_code >= 500:
+            resp = requests.get(url, timeout=8, allow_redirects=True,
+                                headers=_CHECK_HEADERS, stream=True)
+        code = resp.status_code
+        if code in (404, 410):
+            available = False                 # retirée
+        elif 200 <= code < 400:
+            available = True                  # en ligne
+        else:
+            available = None                  # 403/500… : indéterminé
+        return {"available": available, "status": code}
+    except requests.RequestException:
+        return {"available": None, "status": 0}
+
+
+def _run_check(job: _Job, scan_job: _Job) -> None:
+    """Reparcourt les offres et teste leur disponibilité sur les plateformes,
+    sans aucun appel IA (simple requête HTTP par offre, en parallèle)."""
+    try:
+        offers = list(scan_job.offers)
+        job.add_log(f"Vérification de la disponibilité de {len(offers)} offre(s) (sans IA)…")
+        results: dict[int, dict] = {}
+        done = 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_check_one, o.url): i for i, o in enumerate(offers)}
+            for fut in as_completed(futures):
+                if job.stop_event.is_set():
+                    job.add_log("⏹ Vérification interrompue.")
+                    break
+                i = futures[fut]
+                results[i] = fut.result()
+                done += 1
+                if done % 10 == 0 or done == len(offers):
+                    job.add_log(f"  ↳ {done}/{len(offers)} vérifiées")
+        online = sum(1 for r in results.values() if r["available"] is True)
+        gone = sum(1 for r in results.values() if r["available"] is False)
+        unknown = len(results) - online - gone
+        job.result = {
+            "results": [{"index": i, **r} for i, r in sorted(results.items())],
+        }
+        job.add_log(f"Terminé : {online} en ligne · {gone} retirée(s) · {unknown} indéterminée(s).")
+        job.status = "done"
+    except Exception as e:
+        _LOG.exception("check %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
 
@@ -927,6 +1000,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_session_load()
         elif path == "/api/letter":
             self._api_letter()
+        elif path == "/api/check-availability":
+            self._api_check_availability()
         elif path == "/api/letter-save":
             self._api_letter_save()
         elif path == "/api/track":
@@ -1074,7 +1149,7 @@ class _Handler(BaseHTTPRequestHandler):
                 payload["offers"] = [
                     _offer_dict(o, i, tracker.status_of(o)) for i, o in enumerate(job.offers)
                 ]
-        if job.status == "done" and job.kind in ("letter", "cv"):
+        if job.status == "done" and job.kind in ("letter", "cv", "check"):
             payload["result"] = job.result
         self._json(payload)
 
@@ -1195,6 +1270,23 @@ class _Handler(BaseHTTPRequestHandler):
         job = _Job("letter")
         _register_job(job)
         threading.Thread(target=_run_letter, args=(job, scan_job, index, tone), daemon=True).start()
+        self._json({"job_id": job.id})
+
+    def _api_check_availability(self):
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        scan_job = _get_job(str(body.get("job_id", "")))
+        if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
+            self._error("Session de scan introuvable — relancez une recherche.", 404)
+            return
+        if not scan_job.offers:
+            self._error("Aucune offre à vérifier.", 400)
+            return
+        job = _Job("check")
+        _register_job(job)
+        threading.Thread(target=_run_check, args=(job, scan_job), daemon=True).start()
         self._json({"job_id": job.id})
 
     def _api_letter_save(self):

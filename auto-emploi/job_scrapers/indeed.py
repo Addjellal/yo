@@ -97,6 +97,7 @@ class IndeedScraper(BaseScraper):
             if not items:
                 break
 
+            before = len(offers)
             for item in items:
                 job = self._parse_rss_item(item)
                 if job and job.unique_key() not in seen:
@@ -105,7 +106,9 @@ class IndeedScraper(BaseScraper):
                 if len(offers) >= max_results:
                     break
 
-            if len(items) < 10:
+            # Aucune offre nouvelle (page identique renvoyée) ou page partielle :
+            # on arrête plutôt que de boucler sur des doublons.
+            if len(offers) == before or len(items) < 10:
                 break
             start += 10
             time.sleep(config.request_delay)
@@ -174,6 +177,8 @@ class IndeedScraper(BaseScraper):
                 if html is None:
                     break
 
+                before = len(offers)
+
                 # Essai 1 : données JSON embarquées (mosaic)
                 jobs_raw = self._extract_from_mosaic(html)
                 if jobs_raw:
@@ -184,9 +189,12 @@ class IndeedScraper(BaseScraper):
                             offers.append(job)
                         if len(offers) >= max_results:
                             break
-                    if len(jobs_raw) < 15:
+                    # Indeed sert parfois la même page quel que soit `start`
+                    # (anti-scraping) : si aucune offre nouvelle, inutile
+                    # d'insister sur les pages suivantes.
+                    if len(offers) == before or len(jobs_raw) < 15:
                         break
-                    start += 15
+                    start += len(jobs_raw)
                     time.sleep(config.request_delay)
                     continue
 
@@ -200,9 +208,9 @@ class IndeedScraper(BaseScraper):
                         offers.append(job)
                     if len(offers) >= max_results:
                         break
-                if len(cards) < 10:
+                if len(offers) == before or len(cards) < 10:
                     break
-                start += 15
+                start += len(cards)
                 time.sleep(config.request_delay)
 
         return offers
