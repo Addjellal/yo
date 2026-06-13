@@ -132,10 +132,13 @@ class AdzunaScraper(BaseScraper):
             salary_min = item.get("salary_min")
             salary_max = item.get("salary_max")
             salary = None
-            if salary_min and salary_max:
-                salary = f"{int(salary_min):,}–{int(salary_max):,} €/an".replace(",", " ")
-            elif salary_min:
-                salary = f"À partir de {int(salary_min):,} €/an".replace(",", " ")
+            try:
+                if salary_min and salary_max:
+                    salary = f"{int(salary_min):,}–{int(salary_max):,} €/an".replace(",", " ")
+                elif salary_min:
+                    salary = f"À partir de {int(salary_min):,} €/an".replace(",", " ")
+            except (TypeError, ValueError):
+                pass
 
             contract = item.get("contract_time") or item.get("contract_type") or ""
 

@@ -4,7 +4,6 @@ import time
 import urllib.parse
 from dataclasses import dataclass
 from typing import Callable, Optional
-from datetime import datetime
 
 # Garde-fou mémoire : une réponse HTTP plus grosse que ça est suspecte
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
@@ -178,7 +177,6 @@ class JobOffer:
     source: str
     salary: Optional[str] = None
     contract_type: Optional[str] = None
-    posted_date: Optional[datetime] = None
     apply_url: Optional[str] = None
     match_score: Optional[int] = None
     match_reasons: Optional[str] = None

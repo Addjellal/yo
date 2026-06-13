@@ -492,6 +492,8 @@ def score_offers_multi(
     # Le meilleur CV de chaque offre fournit les champs match_* principaux
     results: list[JobOffer] = []
     for offer in merged.values():
+        if not offer.cv_scores:
+            continue
         best_label = max(
             offer.cv_scores,
             key=lambda lab: (offer.cv_scores[lab]["score"], -labels.index(lab)),

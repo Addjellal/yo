@@ -203,7 +203,7 @@ def derive_search_queries(cv_text: str, limit: int = MAX_GLOBAL_QUERIES) -> list
         data = json.loads(raw[start:end])
     queries: list[str] = []
     seen: set[str] = set()
-    for q in data.get("queries", []):
+    for q in (data.get("queries") if isinstance(data.get("queries"), list) else []):
         q = " ".join(str(q).split())[:80].strip()
         if q and q.lower() not in seen:
             seen.add(q.lower())

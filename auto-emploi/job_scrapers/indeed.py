@@ -6,10 +6,17 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 # defusedxml neutralise les attaques XML (XXE, billion laughs) sur le flux RSS,
-# qui est du contenu externe non fiable. Fallback stdlib si non installé.
+# qui est du contenu externe non fiable.
 try:
     from defusedxml import ElementTree as SafeET
 except ImportError:
+    import warnings
+    warnings.warn(
+        "defusedxml non installé : le parsing RSS Indeed utilise la stdlib XML, "
+        "vulnérable aux attaques XXE sur un flux RSS hostile. "
+        "Installez defusedxml : pip install defusedxml",
+        stacklevel=2,
+    )
     SafeET = ET
 
 from bs4 import BeautifulSoup
