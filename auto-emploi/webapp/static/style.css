@@ -439,6 +439,13 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   margin-top: 14px; padding-top: 13px;
   border-top: 1px dashed var(--border);
 }
+/* Lancement en bas de carte : bouton bien visible après les filtres. */
+.launch-row {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+.launch-row .btn-primary.big { flex: 0 0 auto; }
 .search-card.dropzone-active {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);

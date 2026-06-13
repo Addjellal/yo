@@ -71,7 +71,6 @@
           </label>
           <div id="query-history" class="history-chips"></div>
         </div>
-        <button id="btn-scan" class="btn-primary big">Lancer&nbsp;la&nbsp;recherche</button>
       </div>
 
       <div class="field cv-field">
@@ -150,6 +149,13 @@
           </div>
         </div>
       </details>
+
+      <!-- Lancement EN BAS : après tous les choix et filtres, pour n'en rater
+           aucun avant de scanner. -->
+      <div class="launch-row">
+        <button id="btn-scan" class="btn-primary big">Lancer la recherche</button>
+        <span class="muted small">Vérifiez vos CV, le lieu et les filtres ci-dessus avant de lancer.</span>
+      </div>
     </div>
 
     <!-- Progression du scan -->
@@ -581,7 +587,7 @@
           <button id="btn-letter-save" class="btn-primary">💾 Enregistrer (txt + PDF)</button>
           <a id="letter-dl-txt" class="btn-ghost" download>⬇ .txt</a>
           <a id="letter-dl-pdf" class="btn-ghost" download hidden>⬇ .pdf</a>
-          <span class="muted small">L'offre est marquée « postulée » dans votre historique.</span>
+          <span class="muted small">Générer un document ne marque pas l'offre « postulée » : choisissez son statut quand vous aurez candidaté.</span>
         </div>
       </div>
     </div>
