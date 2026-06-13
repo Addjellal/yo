@@ -196,6 +196,42 @@ class TestParseResponse:
         assert offer.match_score == 7
 
 
+# ─── 2c. Transparence : progression lot par lot vers le journal web ───────────
+
+class TestProgressCallback:
+    CV = "Python, ROS2, navigation autonome, simulation, vision"
+
+    def test_progress_recoit_chaque_lot(self, monkeypatch):
+        """Le callback progress doit recevoir un message par lot d'analyse —
+        c'est ce qui alimente le journal en direct de l'interface web."""
+        matcher = JobMatcher(self.CV)
+
+        def fake_score_batch(batch):
+            for o in batch:
+                o.match_score = 7
+        monkeypatch.setattr(matcher, "_score_batch", fake_score_batch)
+
+        offers = [make_offer(i, f"Dev {i}", "Python ROS2 navigation simulation vision")
+                  for i in range(25)]  # 3 lots de 10
+        logs: list[str] = []
+        matcher.score_offers(offers, min_score=5, progress=logs.append)
+
+        # Un message « Lot k/3 » par lot + un suivi cumulatif « analysée(s) »
+        lots = [m for m in logs if m.startswith("Lot ")]
+        assert len(lots) == 3
+        assert any("3/3" in m for m in lots)
+        assert any("offre(s) analysée(s)" in m for m in logs)
+
+    def test_sans_progress_aucune_erreur(self, monkeypatch):
+        """progress=None (mode CLI) : le scoring fonctionne sans callback."""
+        matcher = JobMatcher(self.CV)
+        monkeypatch.setattr(matcher, "_score_batch",
+                            lambda batch: [setattr(o, "match_score", 8) for o in batch])
+        offers = [make_offer(i, f"Dev {i}", "Python ROS2 navigation simulation") for i in range(5)]
+        result = matcher.score_offers(offers, min_score=5)  # progress par défaut = None
+        assert len(result) == 5
+
+
 # ─── 3. Génération de lettre (LLM simulé) ─────────────────────────────────────
 
 class FakeLLM:

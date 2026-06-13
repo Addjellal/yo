@@ -414,6 +414,7 @@ def _run_scan(job: _Job, p: dict) -> None:
             experience_level=p["experience"],
             rejected_examples=rejections,
             should_stop=job.stop_event.is_set,
+            progress=job.add_log,
         )
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
@@ -501,6 +502,7 @@ def _run_rescore(job: _Job, p: dict) -> None:
             top_k=RESCORE_TOP_K,
             two_stage=True,
             should_stop=job.stop_event.is_set,
+            progress=job.add_log,
         )
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")

@@ -156,6 +156,15 @@ class JobMatcher:
         offres similaires (apprentissage des préférences au fil des sessions)."""
         self._rejected_examples = [str(e)[:120] for e in examples[:30]]
 
+    @staticmethod
+    def _step(progress: Callable[[str], None] | None, msg: str, style: str = "dim") -> None:
+        """Émet un message d'étape vers la console (CLI) et, si fourni, vers le
+        callback de progression (journal de l'interface web). Texte brut côté
+        web, balisé côté console — la transparence des lots passe par ici."""
+        console.print(f"[{style}]{escape(msg)}[/{style}]")
+        if progress:
+            progress(msg)
+
     def _exclude_filter(self, offers: list[JobOffer], exclude: list[str]) -> tuple[list[JobOffer], int]:
         """Écarte les offres contenant un mot-clé éliminatoire (avant tout appel IA)."""
         if not exclude:
@@ -227,46 +236,56 @@ class JobMatcher:
         top_k: int | None = None,
         two_stage: bool = False,
         should_stop: Callable[[], bool] | None = None,
+        progress: Callable[[str], None] | None = None,
     ) -> list[JobOffer]:
         """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
         two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
         modèle local) puis analyse détaillée du top uniquement.
         should_stop : vérifié entre chaque lot IA — arrêt propre avec résultats
-        partiels (bouton « Stopper » de l'interface web)."""
+        partiels (bouton « Stopper » de l'interface web).
+        progress : callback recevant chaque étape (lot par lot) — alimente le
+        journal en direct de l'interface web."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
 
         # 1. Mots-clés éliminatoires (gratuit, instantané)
         offers, excluded = self._exclude_filter(offers, exclude or [])
         if excluded:
-            console.print(f"[dim]Mots-clés exclus : {excluded} offre(s) écartée(s).[/dim]")
+            self._step(progress, f"Mots-clés exclus : {excluded} offre(s) écartée(s).")
 
         # 2. Filtre niveau d'expérience (avant appel LLM)
         offers, exp_dropped = self._experience_filter(offers)
         if exp_dropped:
-            console.print(f"[dim]Niveau d'expérience : {exp_dropped} offre(s) incompatible(s) écartée(s).[/dim]")
+            self._step(progress, f"Niveau d'expérience : {exp_dropped} offre(s) incompatible(s) écartée(s).")
 
         # 3. Pré-filtre keyword (économise les appels LLM)
         offers, dropped = self._prefilter(offers, top_k=top_k)
         if dropped:
-            console.print(f"[dim]Pré-filtre : {dropped} offre(s) clairement hors-sujet écartée(s).[/dim]")
+            self._step(progress, f"Pré-filtre mots-clés : {dropped} offre(s) clairement hors-sujet écartée(s).")
 
         if not offers:
             return []
 
         # 4. Pré-scoring IA rapide en masse, puis analyse détaillée du top
         if two_stage and len(offers) > TWO_STAGE_THRESHOLD:
-            offers = self._prescore(offers, should_stop=should_stop)
+            offers = self._prescore(offers, should_stop=should_stop, progress=progress)
 
         scored = []
+        total_batches = (len(offers) - 1) // BATCH_SIZE + 1
+        analyzed = 0
+        self._step(progress, f"Analyse détaillée : {len(offers)} offre(s) en {total_batches} lot(s) de {BATCH_SIZE}.")
         for i in range(0, len(offers), BATCH_SIZE):
             if should_stop and should_stop():
-                console.print("[yellow]⏹ Analyse stoppée — résultats partiels conservés.[/yellow]")
+                self._step(progress, "⏹ Analyse stoppée — résultats partiels conservés.", style="yellow")
                 break
             batch = offers[i: i + BATCH_SIZE]
-            console.print(f"[dim]  Analyse IA : lot {i // BATCH_SIZE + 1}/{(len(offers) - 1) // BATCH_SIZE + 1} ({len(batch)} offres)...[/dim]")
+            n = i // BATCH_SIZE + 1
+            self._step(progress, f"Lot {n}/{total_batches} : analyse de {len(batch)} offre(s) en cours…")
             self._score_batch(batch)
             scored.extend(batch)
+            analyzed += len(batch)
+            kept = sum(1 for o in scored if (o.match_score or 0) >= min_score)
+            self._step(progress, f"  ↳ {analyzed}/{len(offers)} offre(s) analysée(s) · {kept} retenue(s) ≥ {min_score}/10")
 
         return sorted(
             [o for o in scored if (o.match_score or 0) >= min_score],
@@ -278,20 +297,25 @@ class JobMatcher:
         self,
         offers: list[JobOffer],
         should_stop: Callable[[], bool] | None = None,
+        progress: Callable[[str], None] | None = None,
     ) -> list[JobOffer]:
         """Scoring grossier (un entier par offre, descriptions raccourcies) sur la
         tâche « prescore » — par défaut le même provider, mais routable vers un
         modèle local gratuit via AI_PRESCORE_BACKEND=local. Garde le top."""
-        console.print(
-            f"[dim]Pré-scoring IA de {len(offers)} offres "
-            f"(top {TWO_STAGE_KEEP} retenu pour l'analyse détaillée)...[/dim]"
+        batch_size = 20
+        total_batches = (len(offers) - 1) // batch_size + 1
+        self._step(
+            progress,
+            f"Pré-scoring IA de {len(offers)} offre(s) en {total_batches} lot(s) "
+            f"(top {TWO_STAGE_KEEP} retenu pour l'analyse détaillée)…",
         )
         prescored: list[tuple[int, JobOffer]] = []
-        batch_size = 20
         for i in range(0, len(offers), batch_size):
             if should_stop and should_stop():
-                console.print("[yellow]⏹ Pré-scoring stoppé.[/yellow]")
+                self._step(progress, "⏹ Pré-scoring stoppé.", style="yellow")
                 break
+            n = i // batch_size + 1
+            self._step(progress, f"Pré-scoring : lot {n}/{total_batches} ({min(batch_size, len(offers) - i)} offres)…")
             batch = offers[i: i + batch_size]
             jobs_text = "\n\n".join(
                 f"<offre index=\"{j}\">\nPoste : {o.title}\nEntreprise : {o.company}\n"
@@ -437,6 +461,7 @@ def score_offers_multi(
     top_k: int | None = None,
     two_stage: bool = False,
     should_stop: Callable[[], bool] | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> list[JobOffer]:
     """Matching multi-CV : un score par CV pour chaque offre.
 
@@ -444,7 +469,9 @@ def score_offers_multi(
     à JobMatcher.score_offers. Avec plusieurs, chaque offre porte le meilleur
     résultat dans ses champs match_* plus le détail par CV dans cv_scores
     (et best_cv = label du CV gagnant). Une offre est retenue dès qu'un CV
-    atteint min_score."""
+    atteint min_score.
+    progress : callback de progression (lot par lot, CV par CV) pour le
+    journal en direct de l'interface web."""
     labels = [lab for lab in cv_texts if cv_texts[lab]]
     if not labels or not offers:
         return []
@@ -462,24 +489,29 @@ def score_offers_multi(
         return matcher.score_offers(
             offers, min_score=min_score, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
-            should_stop=should_stop,
+            should_stop=should_stop, progress=progress,
         )
 
     # Un passage complet par CV (sur des copies : les objets d'origine restent
     # intacts), min_score=0 pour conserver tous les scores du détail par CV.
     merged: dict[str, JobOffer] = {}
-    for label in labels:
+    for ci, label in enumerate(labels, 1):
         if should_stop and should_stop():
             break
-        console.print(f"[bold]Matching avec le CV « {escape(label)} »[/bold]")
+        header = f"Matching avec le CV « {label} » ({ci}/{len(labels)})"
+        console.print(f"[bold]{escape(header)}[/bold]")
+        if progress:
+            progress(header)
         matcher = JobMatcher(cv_texts[label])
         if rejected_examples:
             matcher.set_rejected_examples(rejected_examples)
         copies = [copy.copy(o) for o in offers]
+        # Les lots de ce CV sont préfixés par son label pour rester lisibles
+        sub_progress = (lambda m, lab=label: progress(f"[{lab}] {m}")) if progress else None
         scored = matcher.score_offers(
             copies, min_score=0, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
-            should_stop=should_stop,
+            should_stop=should_stop, progress=sub_progress,
         )
         for offer in scored:
             key = offer.unique_key()
