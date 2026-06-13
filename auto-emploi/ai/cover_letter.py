@@ -1,5 +1,6 @@
 import json
 import re
+import time
 import unicodedata
 from pathlib import Path
 
@@ -194,6 +195,35 @@ def fix_typography(text: str) -> str:
     return text
 
 
+_LETTER_FIELD_RE = re.compile(r'"letter"\s*:\s*"')
+_JSON_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/"}
+
+
+def _salvage_letter(raw: str) -> str:
+    """Récupère le texte de la lettre d'une réponse JSON éventuellement tronquée
+    (génération interrompue par un timeout). Décode les échappements simples ;
+    si le champ « letter » est absent, renvoie le texte brut nettoyé."""
+    if not raw:
+        return ""
+    m = _LETTER_FIELD_RE.search(raw)
+    if not m:
+        return raw.strip().lstrip("{").strip()
+    rest = raw[m.end():]
+    out: list[str] = []
+    i = 0
+    while i < len(rest):
+        c = rest[i]
+        if c == "\\" and i + 1 < len(rest):
+            out.append(_JSON_ESCAPES.get(rest[i + 1], rest[i + 1]))
+            i += 2
+            continue
+        if c == '"':  # fin de la valeur JSON
+            break
+        out.append(c)
+        i += 1
+    return "".join(out).strip()
+
+
 # ─── Vérifications de cohérence (code pur, gratuit, toujours actif) ───────────
 # Détecte les défauts objectifs qu'un LLM (surtout local) laisse parfois passer :
 # marqueurs de gabarit non remplis, texte tronqué, paragraphe dupliqué. Aucune
@@ -347,18 +377,52 @@ class CoverLetterGenerator:
                 "ton et le rythme, sans recopier les phrases ni les accroches :\n"
                 f"{listed}\n\n"
             )
-        raw = self._llm.generate(
-            system=self._system_prompt(language),
-            user=prompt.format(job=job.to_text(), tone=tone_label, history=history),
-            max_tokens=3072,
-            json_schema=LETTER_SCHEMA,
-        )
+        system = self._system_prompt(language)
+        user = prompt.format(job=job.to_text(), tone=tone_label, history=history)
+
+        # Génération en FLUX : on conserve tout ce qui a déjà été produit si un
+        # délai (config.llm_timeout) ou une coupure interrompt l'appel — pas de
+        # perte du travail déjà fait.
+        try:
+            timeout = float(config.llm_timeout)
+        except (TypeError, ValueError):
+            timeout = 120.0
+        deadline = time.monotonic() + timeout
+        chunks: list[str] = []
+        partial = False
+        try:
+            for delta in self._llm.stream(system=system, user=user, max_tokens=3072):
+                chunks.append(delta)
+                if time.monotonic() > deadline:
+                    partial = True
+                    _LOG.warning("Lettre « %s » : délai dépassé (%ss) — partiel conservé.",
+                                 job.title, int(timeout))
+                    break
+        except Exception as e:
+            if not chunks:
+                raise  # rien reçu : vraie erreur, on remonte
+            partial = True
+            _LOG.warning("Lettre « %s » : interrompue (%s) — partiel conservé.",
+                         job.title, type(e).__name__)
+        raw = "".join(chunks)
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
-            # Le modèle a répondu en texte brut : on le traite comme la lettre seule
             data = {}
-        letter = fix_typography(str(data.get("letter", "")).strip() or raw.strip())
+        letter = fix_typography(str(data.get("letter", "")).strip() or _salvage_letter(raw))
+        email_subject = fix_typography(str(data.get("email_subject", "")).strip()[:200])
+        email_body = fix_typography(str(data.get("email_body", "")).strip()[:2000])
+
+        if partial:
+            # Lettre incomplète : on la renvoie pour édition, sans relecture ni
+            # validation (elle est tronquée). Le serveur ne la marque pas postulée.
+            return {
+                "letter": letter, "email_subject": email_subject, "email_body": email_body,
+                "language": language, "partial": True,
+                "review_notes": ["⚠ Génération interrompue (délai dépassé) — "
+                                 "lettre partielle, complétez-la avant d'envoyer."],
+            }
 
         # Garde-fou gratuit (toujours) + relecture IA (si LETTER_REVIEW=on)
         issues = letter_issues(letter)
@@ -371,10 +435,11 @@ class CoverLetterGenerator:
 
         return {
             "letter": letter,
-            "email_subject": fix_typography(str(data.get("email_subject", "")).strip()[:200]),
-            "email_body": fix_typography(str(data.get("email_body", "")).strip()[:2000]),
+            "email_subject": email_subject,
+            "email_body": email_body,
             "language": language,
             "review_notes": review_notes,
+            "partial": False,
         }
 
     def _review(self, job: JobOffer, language: str, letter: str,

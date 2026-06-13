@@ -129,6 +129,9 @@ class Config:
     # Multi-CV : nombre d'offres gardées par le pré-filtre commun avant l'analyse
     # détaillée par CV (au-delà, un pré-scoring unique sur le profil fusionné trie).
     multi_cv_shared_keep: int = field(default_factory=lambda: _env_int("MULTI_CV_SHARED_KEEP", 150, 20, 1000))
+    # Délai max (secondes) d'un appel LLM avant abandon — évite qu'un serveur
+    # Ollama bloqué fige un scan ou une lettre indéfiniment.
+    llm_timeout: int = field(default_factory=lambda: _env_int("LLM_TIMEOUT", 120, 10, 600))
 
 
 config = Config()
@@ -142,7 +145,7 @@ _ALLOWED_ENV_KEYS = {
     "ADZUNA_APP_ID", "ADZUNA_APP_KEY",
     "NOTION_TOKEN", "NOTION_DATABASE_ID",
     "OUTPUT_DIR", "MAX_JOBS_PER_SOURCE", "MIN_MATCH_SCORE", "REQUEST_DELAY",
-    "MULTI_CV_SHARED_KEEP",
+    "MULTI_CV_SHARED_KEEP", "LLM_TIMEOUT",
     "EXCLUDE_KEYWORDS",
     "CANDIDATE_NAME", "CANDIDATE_EMAIL", "CANDIDATE_PHONE", "CANDIDATE_CITY",
     "AI_PRESCORE_BACKEND", "AI_MATCH_BACKEND", "AI_LETTER_BACKEND", "AI_REVIEW_BACKEND",

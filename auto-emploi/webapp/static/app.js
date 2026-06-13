@@ -979,9 +979,15 @@ function pollLetter(jobId) {
       $("#letter-dl-pdf").hidden = true;
     }
     $("#letter-result").hidden = false;
-    if (LETTER_APPLY_STATUS) LETTER_APPLY_STATUS("applied");
-    const lang = r.language === "en" ? " (offre en anglais → cover letter EN)" : "";
-    toast(`Lettre générée${lang} — offre marquée postulée. Vous pouvez l'éditer avant export.`, "ok");
+    if (r.partial) {
+      // Lettre interrompue : on l'affiche pour édition, mais on ne marque PAS
+      // l'offre postulée (elle reste dans les résultats).
+      toast("⚠ Génération interrompue — lettre partielle récupérée, complétez-la puis enregistrez.", "err");
+    } else {
+      if (LETTER_APPLY_STATUS) LETTER_APPLY_STATUS("applied");
+      const lang = r.language === "en" ? " (offre en anglais → cover letter EN)" : "";
+      toast(`Lettre générée${lang} — offre marquée postulée. Vous pouvez l'éditer avant export.`, "ok");
+    }
   }, 900);
 }
 

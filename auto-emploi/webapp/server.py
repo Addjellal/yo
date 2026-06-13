@@ -554,27 +554,35 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
         )
         _LOG.info("lettre %s : appel LLM…", job.id[:8])
         result = generator.generate(offer, tone=tone)
-        _LOG.info("lettre %s : LLM ok (%d caractères) — écriture fichiers",
-                  job.id[:8], len(result.get("letter", "")))
+        is_partial = bool(result.get("partial"))
+        _LOG.info("lettre %s : LLM ok (%d caractères%s) — écriture fichiers",
+                  job.id[:8], len(result.get("letter", "")),
+                  ", PARTIELLE" if is_partial else "")
         txt_path, pdf_path = generator.save(offer, result)
         pdf_name = pdf_path.name if pdf_path.exists() else ""
-        with _TRACKER_LOCK:
-            tracker.mark(offer, "applied")
-        with _STORE_LOCK:
-            _get_store().add_letter(
-                offer, tone, result.get("language", "fr"), txt_path.name, pdf_name,
-            )
+        # Lettre partielle (interrompue) : on l'enregistre et on la renvoie pour
+        # édition, mais on NE marque PAS l'offre postulée et on ne l'ajoute pas à
+        # la liste des lettres — elle est incomplète.
+        if not is_partial:
+            with _TRACKER_LOCK:
+                tracker.mark(offer, "applied")
+            with _STORE_LOCK:
+                _get_store().add_letter(
+                    offer, tone, result.get("language", "fr"), txt_path.name, pdf_name,
+                )
         job.result = {
             "letter": result["letter"],
             "email_subject": result["email_subject"],
             "email_body": result["email_body"],
             "language": result.get("language", "fr"),
             "review_notes": result.get("review_notes") or [],
+            "partial": is_partial,
             "txt_file": txt_path.name,
             "pdf_file": pdf_name,
         }
         job.status = "done"
-        _LOG.info("lettre %s : terminée (%s)", job.id[:8], txt_path.name)
+        _LOG.info("lettre %s : terminée%s (%s)", job.id[:8],
+                  " (partielle)" if is_partial else "", txt_path.name)
     except Exception as e:
         _LOG.exception("lettre %s : échec", job.id[:8])
         job.error = str(e)[:500]

@@ -111,7 +111,10 @@ sont inaccessibles).
   **email d'accompagnement** (objet + corps) inclus, variation automatique
   par rapport à vos candidatures passées. En multi-CV, la lettre se fonde sur
   le **seul CV le mieux corresp. à l'offre** (le « CV gagnant » affiché sur la
-  carte) — prompt plus ciblé, pas de mélange des profils. Export TXT + PDF. **Correction
+  carte) — prompt plus ciblé, pas de mélange des profils. **Génération en flux
+  avec délai** (`LLM_TIMEOUT`) : si l'appel dépasse le délai ou est coupé, le
+  texte déjà produit est **récupéré** (lettre partielle, à compléter — l'offre
+  n'est alors pas marquée postulée). Export TXT + PDF. **Correction
   typographique automatique** après génération (les petits modèles locaux
   produisent parfois « Îquipe » pour « Équipe », « 2Îme » pour « 2ème » —
   réparé en code pur, sans timeout ni appel IA supplémentaire).

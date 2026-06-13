@@ -53,6 +53,11 @@ class FakeLLM:
         self.last_user = user
         return json.dumps(self.payload)
 
+    def stream(self, system, user, max_tokens=2048, cache_system=True):
+        self.last_system = system
+        self.last_user = user
+        yield json.dumps(self.payload)
+
 
 @pytest.fixture(autouse=True)
 def isolated_config(tmp_path, monkeypatch):

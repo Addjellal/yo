@@ -243,6 +243,11 @@ class FakeLLM:
         self.last_user_prompt = user
         return json.dumps(self.payload)
 
+    def stream(self, system, user, max_tokens=2048, cache_system=True):
+        # La lettre est générée en flux : on renvoie le JSON en un morceau.
+        self.last_user_prompt = user
+        yield json.dumps(self.payload)
+
 
 class TestCoverLetter:
     def test_language_detection(self):
@@ -273,6 +278,29 @@ class TestCoverLetter:
         assert result["language"] == "en"
         assert "IN ENGLISH" in fake.last_user_prompt
         assert "achievements" in fake.last_user_prompt  # orientée résultats
+
+    def test_generate_partial_recovery(self):
+        """Streaming interrompu (timeout/coupure) : on récupère le texte déjà
+        produit, marqué partiel, sans relecture."""
+        generator = CoverLetterGenerator("CV : Python, ROS2")
+
+        class Cut:
+            def stream(self, system, user, max_tokens=2048, cache_system=True):
+                yield '{"letter": "Madame, Monsieur, je candidate au poste'
+                raise RuntimeError("connexion coupée")
+
+        generator._llm = Cut()
+        offer = make_offer(1, "Dev", "Nous recherchons pour notre équipe")
+        result = generator.generate(offer)
+        assert result["partial"] is True
+        assert result["letter"].startswith("Madame, Monsieur, je candidate")
+        assert any("interrompue" in n.lower() for n in result["review_notes"])
+
+    def test_salvage_letter_decode(self):
+        from ai.cover_letter import _salvage_letter
+        assert _salvage_letter('{"letter": "Bonjour\\nMonde", "email_subject": "x"}') == "Bonjour\nMonde"
+        assert _salvage_letter('{"letter": "Tronqué sans fin') == "Tronqué sans fin"
+        assert _salvage_letter("texte brut sans json") == "texte brut sans json"
 
     def test_save_includes_candidate_contact(self, monkeypatch, tmp_path):
         monkeypatch.setattr(config, "candidate_name", "Jean Dupont")

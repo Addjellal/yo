@@ -54,11 +54,19 @@ class LLMClient:
         self.task = task if task in TASKS else "match"
         self._clients: dict[str, object] = {}
 
+    def _timeout(self) -> float:
+        try:
+            return float(config.llm_timeout)
+        except (TypeError, ValueError):
+            return 120.0
+
     def _get(self, backend: str):
         if backend not in self._clients:
+            timeout = self._timeout()
             if backend == "ollama":
                 import ollama
-                self._clients[backend] = ollama.Client(host=config.ollama_base_url)
+                # Un serveur Ollama bloqué ne doit pas figer un scan/lettre.
+                self._clients[backend] = ollama.Client(host=config.ollama_base_url, timeout=timeout)
             else:
                 import anthropic
                 if not config.anthropic_api_key:
@@ -66,6 +74,7 @@ class LLMClient:
                 self._clients[backend] = anthropic.Anthropic(
                     api_key=config.anthropic_api_key,
                     max_retries=3,
+                    timeout=timeout,
                 )
         return self._clients[backend]
 
@@ -157,3 +166,46 @@ class LLMClient:
                     console.print(f"[dim]Ollama indisponible, nouvel essai dans {wait}s...[/dim]")
                     time.sleep(wait)
         raise last_err
+
+    # ─── Streaming (récupération du partiel en cas d'interruption) ─────────────
+
+    def stream(self, system: str, user: str, max_tokens: int = 2048,
+               cache_system: bool = True):
+        """Génère en flux, yieldant le texte au fur et à mesure. L'appelant peut
+        ainsi conserver ce qui a déjà été produit si l'opération est interrompue
+        (timeout, coupure réseau). Pas de json_schema en streaming."""
+        backend, model = resolve_backend(self.task)
+        client = self._get(backend)
+        if backend == "ollama":
+            yield from self._ollama_stream(client, model, system, user)
+        else:
+            yield from self._anthropic_stream(client, model, system, user, max_tokens, cache_system)
+
+    def _anthropic_stream(self, client, model, system, user, max_tokens, cache_system):
+        system_blocks = [{"type": "text", "text": system}]
+        if cache_system:
+            system_blocks[0]["cache_control"] = {"type": "ephemeral"}
+        with client.messages.stream(
+            model=model, max_tokens=max_tokens, system=system_blocks,
+            messages=[{"role": "user", "content": user}],
+        ) as stream:
+            for text in stream.text_stream:
+                if text:
+                    yield text
+
+    def _ollama_stream(self, client, model, system, user):
+        for chunk in client.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            options={"temperature": 0, "num_ctx": 8192},
+            stream=True,
+        ):
+            msg = getattr(chunk, "message", None)
+            part = getattr(msg, "content", None) if msg is not None else None
+            if part is None and isinstance(chunk, dict):
+                part = (chunk.get("message") or {}).get("content")
+            if part:
+                yield part
