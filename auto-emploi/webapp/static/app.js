@@ -475,7 +475,14 @@ function pushHistory(query) {
 
 $("#btn-scan").addEventListener("click", startScan);
 $("#f-query").addEventListener("keydown", (e) => { if (e.key === "Enter") startScan(); });
-$("#btn-progress-hide").addEventListener("click", () => ($("#scan-progress").hidden = true));
+$("#btn-progress-hide").addEventListener("click", () => {
+  $("#scan-progress").hidden = true;
+  $("#btn-show-log").hidden = false;
+});
+$("#btn-show-log").addEventListener("click", () => {
+  $("#scan-progress").hidden = false;
+  $("#btn-show-log").hidden = true;
+});
 $("#btn-scan-stop").addEventListener("click", async () => {
   if (!SCAN_JOB) return;
   $("#btn-scan-stop").disabled = true;
@@ -530,6 +537,7 @@ async function startScan() {
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
   $("#scan-progress").hidden = false;
+  $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
   $("#progress-title").textContent = noAi
     ? `Test scraper (sans IA) : « ${query} »`
@@ -573,6 +581,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
   $("#scan-progress").hidden = false;
+  $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
