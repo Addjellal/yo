@@ -598,16 +598,41 @@ _CHECK_HEADERS = {
 }
 
 
+def _is_public_http_url(url: str) -> bool:
+    """N'autorise que http(s) vers un hôte public — bloque localhost et les IP
+    privées/loopback/link-local (anti-SSRF : une offre du web ne doit pas faire
+    sonder le réseau interne de la machine)."""
+    import ipaddress
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False
+    host = parsed.hostname
+    if host.lower() in ("localhost", "localhost.localdomain"):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True  # nom d'hôte (non résolu ici) : autorisé
+    return not (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
+
+
 def _check_one(url: str) -> dict:
     """État d'une URL d'offre : available True/False/None (indéterminé)."""
     import requests
-    if not url or not url.startswith(("http://", "https://")):
+    if not _is_public_http_url(url):
         return {"available": None, "status": 0}
     try:
-        # HEAD d'abord (léger) ; certains sites refusent HEAD → repli GET.
-        resp = requests.head(url, timeout=8, allow_redirects=True, headers=_CHECK_HEADERS)
+        # allow_redirects=False : on ne suit pas les redirections (un 3xx
+        # signifie que l'offre existe et renvoie ailleurs) — évite qu'une
+        # redirection mène vers une IP interne (anti-SSRF). HEAD léger d'abord,
+        # repli GET si le site le refuse.
+        resp = requests.head(url, timeout=8, allow_redirects=False, headers=_CHECK_HEADERS)
         if resp.status_code in (403, 405) or resp.status_code >= 500:
-            resp = requests.get(url, timeout=8, allow_redirects=True,
+            resp = requests.get(url, timeout=8, allow_redirects=False,
                                 headers=_CHECK_HEADERS, stream=True)
         code = resp.status_code
         if code in (404, 410):

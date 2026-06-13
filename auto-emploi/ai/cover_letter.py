@@ -399,11 +399,20 @@ class CoverLetterGenerator:
                                  job.title, int(timeout))
                     break
         except Exception as e:
-            if not chunks:
-                raise  # rien reçu : vraie erreur, on remonte
-            partial = True
-            _LOG.warning("Lettre « %s » : interrompue (%s) — partiel conservé.",
-                         job.title, type(e).__name__)
+            if chunks:
+                partial = True
+                _LOG.warning("Lettre « %s » : interrompue (%s) — partiel conservé.",
+                             job.title, type(e).__name__)
+            else:
+                # Aucun flux reçu (backend KO avant le 1er token) : on retombe
+                # sur l'appel non-streamé, qui gère le backend de secours
+                # (AI_FALLBACK) et garantit le JSON structuré. S'il échoue
+                # aussi, l'exception remonte (vraie panne).
+                _LOG.warning("Lettre « %s » : streaming indisponible (%s) — "
+                             "repli sur l'appel standard.", job.title, type(e).__name__)
+                chunks = [self._llm.generate(
+                    system=system, user=user, max_tokens=3072, json_schema=LETTER_SCHEMA,
+                )]
         raw = "".join(chunks)
 
         try:

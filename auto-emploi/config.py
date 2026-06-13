@@ -155,6 +155,12 @@ _ALLOWED_ENV_KEYS = {
     "DEFAULT_COUNTRY", "DEFAULT_EXPERIENCE",
 }
 _KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+# Clés numériques : on recoerce le type avant de l'écrire dans l'objet config,
+# sinon une valeur saisie dans l'UI web y resterait en chaîne (« 120 »).
+_NUMERIC_ENV_KEYS = {
+    "MAX_JOBS_PER_SOURCE": int, "MIN_MATCH_SCORE": int, "REQUEST_DELAY": float,
+    "MULTI_CV_SHARED_KEEP": int, "LLM_TIMEOUT": int,
+}
 
 
 def save_to_env(key: str, value: str) -> None:
@@ -192,4 +198,13 @@ def save_to_env(key: str, value: str) -> None:
             pass
         raise
 
-    setattr(config, key.lower(), value)
+    # Stocke le bon type dans l'objet config (les champs numériques ne doivent
+    # pas rester en chaîne après une sauvegarde depuis l'interface web).
+    typed: object = value
+    caster = _NUMERIC_ENV_KEYS.get(key)
+    if caster is not None:
+        try:
+            typed = caster(value)
+        except (TypeError, ValueError):
+            typed = getattr(config, key.lower(), value)  # garde l'ancienne valeur valide
+    setattr(config, key.lower(), typed)

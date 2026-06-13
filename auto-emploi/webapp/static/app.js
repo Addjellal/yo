@@ -94,6 +94,9 @@ let APP = null;            // réponse de /api/state
 let SCAN_JOB = null;       // id du scan courant
 let OFFERS = [];           // offres du dernier scan
 let POLL_TIMER = null;
+// Génération de polling : tout nouveau scan/vérif l'incrémente ; un poll plus
+// ancien (scan ou check) s'arrête de lui-même et n'écrase plus le journal.
+let POLL_GEN = 0;
 let CVS = [];              // registre des CV (cartes /api/cvs ou résumé /api/state)
 const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "" };
 let EXP_PILLS = {};        // key → élément pill
@@ -546,7 +549,7 @@ async function startScan() {
       ? "Recherche globale d'après vos CV…"
       : `Recherche : « ${query} »`;
   $("#progress-log").replaceChildren();
-  pollScan();
+  pollScan(++POLL_GEN);
 }
 
 // Recherche globale : le champ « poste » devient inutile
@@ -587,12 +590,13 @@ $("#btn-rescore").addEventListener("click", async () => {
   { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
-  pollScan();
+  pollScan(++POLL_GEN);
 });
 
-function pollScan() {
+function pollScan(gen = POLL_GEN) {
   clearTimeout(POLL_TIMER);
   POLL_TIMER = setTimeout(async () => {
+    if (gen !== POLL_GEN) return;  // un scan/vérif plus récent a pris la main
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(SCAN_JOB)}`);
@@ -601,8 +605,9 @@ function pollScan() {
       toast("Suivi du scan perdu : " + e.message, "err");
       return;
     }
+    if (gen !== POLL_GEN) return;
     renderLog(job.log);
-    if (job.status === "running") { pollScan(); return; }
+    if (job.status === "running") { pollScan(gen); return; }
     // Terminé : on arrête le spinner et on fige le titre (sinon l'UI semble
     // « tourner encore » alors que le scan est fini, surtout si 0 offre).
     $("#btn-scan").disabled = false;
@@ -845,16 +850,18 @@ async function checkAvailability() {
   { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = "Vérification de disponibilité (sans IA)…";
   $("#progress-log").replaceChildren();
-  pollCheck(out.job_id);
+  pollCheck(out.job_id, ++POLL_GEN);
 }
 
-function pollCheck(jobId) {
+function pollCheck(jobId, gen) {
   setTimeout(async () => {
+    if (gen !== POLL_GEN) return;  // un scan/vérif plus récent a pris la main
     let job;
     try { job = await api(`/api/job?id=${encodeURIComponent(jobId)}`); }
     catch (e) { $("#btn-check-avail").disabled = false; toast("Suivi perdu : " + e.message, "err"); return; }
+    if (gen !== POLL_GEN) return;
     renderLog(job.log);
-    if (job.status === "running") { pollCheck(jobId); return; }
+    if (job.status === "running") { pollCheck(jobId, gen); return; }
     $("#btn-check-avail").disabled = false;
     const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = "none";
     $("#progress-title").textContent = "Vérification terminée";

@@ -296,6 +296,25 @@ class TestCoverLetter:
         assert result["letter"].startswith("Madame, Monsieur, je candidate")
         assert any("interrompue" in n.lower() for n in result["review_notes"])
 
+    def test_generate_stream_fail_falls_back(self):
+        """Si le streaming échoue avant tout chunk, on retombe sur l'appel
+        non-streamé (qui gère AI_FALLBACK) — lettre complète, pas partielle."""
+        generator = CoverLetterGenerator("CV : Python, ROS2")
+
+        class FailStream:
+            def stream(self, system, user, max_tokens=2048, cache_system=True):
+                raise ConnectionError("stream indisponible")
+                yield  # noqa: marque la fonction comme générateur
+
+            def generate(self, system, user, max_tokens=2048, json_schema=None, **kw):
+                return json.dumps({"letter": "Madame (repli non-streamé)",
+                                   "email_subject": "x", "email_body": "y"})
+
+        generator._llm = FailStream()
+        result = generator.generate(make_offer(1, "Dev", "Nous recherchons pour notre équipe"))
+        assert result["partial"] is False
+        assert "repli" in result["letter"]
+
     def test_salvage_letter_decode(self):
         from ai.cover_letter import _salvage_letter
         assert _salvage_letter('{"letter": "Bonjour\\nMonde", "email_subject": "x"}') == "Bonjour\nMonde"

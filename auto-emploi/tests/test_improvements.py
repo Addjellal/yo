@@ -277,6 +277,16 @@ class TestAvailabilityCheck(unittest.TestCase):
         self.assertIsNone(srv._check_one("javascript:alert(1)")["available"])
         self.assertIsNone(srv._check_one("")["available"])
 
+    def test_ssrf_guard(self):
+        """Anti-SSRF : seules les URLs http(s) vers un hôte public passent."""
+        import webapp.server as srv
+        self.assertTrue(srv._is_public_http_url("https://www.apec.fr/offre/1"))
+        self.assertTrue(srv._is_public_http_url("https://fr.indeed.com/viewjob?jk=ab"))
+        for bad in ("http://127.0.0.1:8765/", "http://localhost/x",
+                    "http://169.254.169.254/latest/meta-data/", "http://192.168.0.1/",
+                    "http://10.1.1.1/", "ftp://example.com/x", "http://[::1]/"):
+            self.assertFalse(srv._is_public_http_url(bad), bad)
+
 
 class TestOutputPaths(unittest.TestCase):
     def test_find_refuse_chemins(self):
