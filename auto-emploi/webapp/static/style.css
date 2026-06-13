@@ -522,6 +522,7 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   animation-delay: calc(var(--i, 0) * 40ms);
 }
 .letter-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-2px); }
+.letter-card.clickable { cursor: pointer; }
 .letter-card .lt-title { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; }
 .letter-card .lt-meta { color: var(--text-soft); font-size: 12.5px; display: flex; gap: 9px; flex-wrap: wrap; }
 .letter-card .lt-actions { display: flex; gap: 7px; margin-top: 4px; }

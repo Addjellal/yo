@@ -349,6 +349,7 @@ class JobMatcher:
         contracts: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
         progress: Callable[[str], None] | None = None,
+        display_min_score: int | None = None,
     ) -> list[JobOffer]:
         """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
         two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
@@ -358,10 +359,15 @@ class JobMatcher:
         should_stop : vérifié entre chaque lot IA — arrêt propre avec résultats
         partiels (bouton « Stopper » de l'interface web).
         progress : callback recevant chaque étape (lot par lot) — alimente le
-        journal en direct de l'interface web."""
+        journal en direct de l'interface web.
+        display_min_score : seuil affiché dans le journal (lot par lot) — utile en
+        multi-CV où le filtrage réel est fait après agrégation des CV (on passe
+        min_score=0 pour conserver tous les scores par CV, mais on affiche le vrai
+        seuil voulu par l'utilisateur)."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
         self._contracts = {c for c in (contracts or []) if c in CONTRACT_TYPES}
+        shown_min = min_score if display_min_score is None else display_min_score
 
         # 1. Mots-clés éliminatoires (gratuit, instantané)
         offers, excluded = self._exclude_filter(offers, exclude or [])
@@ -404,8 +410,8 @@ class JobMatcher:
             self._score_batch(batch)
             scored.extend(batch)
             analyzed += len(batch)
-            kept = sum(1 for o in scored if (o.match_score or 0) >= min_score)
-            self._step(progress, f"  ↳ {analyzed}/{len(offers)} offre(s) analysée(s) · {kept} retenue(s) ≥ {min_score}/10")
+            kept = sum(1 for o in scored if (o.match_score or 0) >= shown_min)
+            self._step(progress, f"  ↳ {analyzed}/{len(offers)} offre(s) analysée(s) · {kept} retenue(s) ≥ {shown_min}/10")
 
         return sorted(
             [o for o in scored if (o.match_score or 0) >= min_score],
@@ -678,6 +684,7 @@ def score_offers_multi(
             copies, min_score=0, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
             contracts=contracts, should_stop=should_stop, progress=sub_progress,
+            display_min_score=min_score,
         )
         for offer in scored:
             key = offer.unique_key()

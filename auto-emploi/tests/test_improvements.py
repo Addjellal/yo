@@ -288,6 +288,65 @@ class TestAvailabilityCheck(unittest.TestCase):
             self.assertFalse(srv._is_public_http_url(bad), bad)
 
 
+class TestLetterFileParsing(unittest.TestCase):
+    """Aperçu d'une lettre : décodage du fichier .txt généré par save()."""
+
+    SEP = "=" * 60
+
+    def _make(self, with_email=True):
+        email = ""
+        if with_email:
+            email = ("EMAIL D'ACCOMPAGNEMENT\n" + "-" * 60 + "\n"
+                     + "Objet : Candidature Dev\n\nBonjour, ma candidature.\n\n"
+                     + self.SEP + "\n\n")
+        return ("Jean Dupont\njean@x.fr\n\n"
+                "Poste : Dev\nEntreprise : ACME\nSource : apec\nURL : https://x/y\n\n"
+                + self.SEP + "\n\n" + email
+                + "LETTRE DE MOTIVATION\n" + "-" * 60 + "\n\nMadame, Monsieur,\n\nCorps.")
+
+    def test_parse_avec_email(self):
+        import webapp.server as srv
+        d = srv._parse_letter_file(self._make(True))
+        self.assertEqual(d["email_subject"], "Candidature Dev")
+        self.assertEqual(d["email_body"], "Bonjour, ma candidature.")
+        self.assertTrue(d["letter"].startswith("Madame, Monsieur,"))
+
+    def test_parse_sans_email(self):
+        import webapp.server as srv
+        d = srv._parse_letter_file(self._make(False))
+        self.assertEqual(d["email_subject"], "")
+        self.assertEqual(d["letter"], "Madame, Monsieur,\n\nCorps.")
+
+    def test_header_block_preserve(self):
+        import webapp.server as srv
+        h = srv._letter_header_block(self._make(True))
+        self.assertIn("Poste : Dev", h)
+        self.assertIn("Jean Dupont", h)
+        self.assertTrue(h.endswith("\n\n"))
+        self.assertNotIn("LETTRE DE MOTIVATION", h)
+
+
+class TestMultiLocation(unittest.TestCase):
+    """Plusieurs localisations : normalisation de la saisie utilisateur."""
+
+    def test_split_separateurs(self):
+        import webapp.server as srv
+        self.assertEqual(srv._parse_locations(None, "Rennes, Nantes; Paris\nLyon"),
+                         ["Rennes", "Nantes", "Paris", "Lyon"])
+
+    def test_dedoublonne_insensible_casse(self):
+        import webapp.server as srv
+        self.assertEqual(srv._parse_locations(["Lyon", "lyon", "  "], ""), ["Lyon"])
+
+    def test_vide_sans_filtre(self):
+        import webapp.server as srv
+        self.assertEqual(srv._parse_locations(None, ""), [])
+
+    def test_plafond_huit(self):
+        import webapp.server as srv
+        self.assertEqual(len(srv._parse_locations(None, ",".join(str(i) for i in range(20)))), 8)
+
+
 class TestOutputPaths(unittest.TestCase):
     def test_find_refuse_chemins(self):
         from output_paths import find_output_file

@@ -367,6 +367,38 @@ class TestCoverLetter:
         assert _salvage_letter('{"letter": "Tronqué sans fin') == "Tronqué sans fin"
         assert _salvage_letter("texte brut sans json") == "texte brut sans json"
 
+    def test_doc_type_message_uses_message_prompt(self):
+        """doc_type='message' → gabarit « message d'approche », pas la lettre."""
+        generator = CoverLetterGenerator("CV : Python")
+        fake = FakeLLM({"letter": "Bonjour, je suis intéressé.",
+                        "email_subject": "Candidature", "email_body": ""})
+        generator._llm = fake
+        offer = make_offer(1, "Dev", "Nous recherchons pour notre équipe à Paris")
+        result = generator.generate(offer, doc_type="message", max_words=150)
+        assert result["doc_type"] == "message"
+        assert "MESSAGE COURT" in fake.last_user_prompt
+        assert "150 mots" in fake.last_user_prompt
+        assert "Vous-Moi-Nous" not in fake.last_user_prompt
+
+    def test_doc_type_default_is_lettre(self):
+        generator = CoverLetterGenerator("CV : Python")
+        fake = FakeLLM({"letter": "Madame, Monsieur,", "email_subject": "x", "email_body": "y"})
+        generator._llm = fake
+        result = generator.generate(make_offer(1, "Dev", "Nous recherchons pour notre équipe"))
+        assert result["doc_type"] == "lettre"
+        assert "LETTRE DE MOTIVATION" in fake.last_user_prompt
+
+    def test_max_words_borne(self):
+        """max_words est borné (80–1200) dans generate() avant injection."""
+        generator = CoverLetterGenerator("CV : Python")
+        fake = FakeLLM({"letter": "Madame,", "email_subject": "x", "email_body": "y"})
+        generator._llm = fake
+        offer = make_offer(1, "Dev", "Nous recherchons pour notre équipe")
+        generator.generate(offer, max_words=5)
+        assert "80 mots" in fake.last_user_prompt   # plancher
+        generator.generate(offer, max_words=99999)
+        assert "1200 mots" in fake.last_user_prompt  # plafond
+
     def test_save_includes_candidate_contact(self, monkeypatch, tmp_path):
         monkeypatch.setattr(config, "candidate_name", "Jean Dupont")
         monkeypatch.setattr(config, "candidate_email", "jean@exemple.com")

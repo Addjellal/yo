@@ -103,8 +103,9 @@
             <select id="f-region"></select>
           </div>
           <div class="field">
-            <label for="f-city">Ville</label>
-            <input id="f-city" type="text" placeholder="Ex : Rennes (optionnel)" maxlength="120">
+            <label for="f-city">Ville(s) <span class="muted">(plusieurs séparées par des virgules)</span></label>
+            <input id="f-city" type="text" placeholder="Ex : Rennes, Nantes, Paris (optionnel)" maxlength="200"
+                   title="Une recherche est lancée pour chaque localisation ; les doublons sont fusionnés. Vide = sans filtre de lieu.">
           </div>
 
           <div class="field span-3">
@@ -174,6 +175,7 @@
         <div class="toolbar-actions">
           <select id="sort-select" title="Trier">
             <option value="score">Tri : score</option>
+            <option value="cv">Tri : meilleur CV</option>
             <option value="source">Tri : source</option>
             <option value="company">Tri : entreprise</option>
           </select>
@@ -328,7 +330,7 @@
         </div>
         <div class="field">
           <label for="s-anthropic-model">Modèle Anthropic <span class="set-hint" data-hint="ANTHROPIC_MODEL"></span></label>
-          <input id="s-anthropic-model" type="text" data-key="ANTHROPIC_MODEL" placeholder="claude-fable-5">
+          <input id="s-anthropic-model" type="text" data-key="ANTHROPIC_MODEL" placeholder="claude-fable-5" list="dl-anthropic-models">
         </div>
         <div class="field">
           <label for="s-ollama-url">URL Ollama <span class="set-hint" data-hint="OLLAMA_BASE_URL"></span></label>
@@ -336,7 +338,7 @@
         </div>
         <div class="field">
           <label for="s-ollama-model">Modèle Ollama <span class="set-hint" data-hint="OLLAMA_MODEL"></span></label>
-          <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2">
+          <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2" list="dl-local-models">
         </div>
       </div>
 
@@ -384,19 +386,19 @@
         </div>
         <div class="field">
           <label for="s-ai-prescore-model">Modèle pré-scoring <span class="set-hint" data-hint="AI_PRESCORE_MODEL"></span></label>
-          <input id="s-ai-prescore-model" type="text" data-key="AI_PRESCORE_MODEL" placeholder="vide = modèle du backend">
+          <input id="s-ai-prescore-model" type="text" data-key="AI_PRESCORE_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
         </div>
         <div class="field">
           <label for="s-ai-match-model">Modèle analyse <span class="set-hint" data-hint="AI_MATCH_MODEL"></span></label>
-          <input id="s-ai-match-model" type="text" data-key="AI_MATCH_MODEL" placeholder="vide = modèle du backend">
+          <input id="s-ai-match-model" type="text" data-key="AI_MATCH_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
         </div>
         <div class="field">
           <label for="s-ai-letter-model">Modèle lettres <span class="set-hint" data-hint="AI_LETTER_MODEL"></span></label>
-          <input id="s-ai-letter-model" type="text" data-key="AI_LETTER_MODEL" placeholder="vide = modèle du backend">
+          <input id="s-ai-letter-model" type="text" data-key="AI_LETTER_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
         </div>
         <div class="field">
           <label for="s-ai-review-model">Modèle relecture <span class="set-hint" data-hint="AI_REVIEW_MODEL"></span></label>
-          <input id="s-ai-review-model" type="text" data-key="AI_REVIEW_MODEL" placeholder="vide = modèle du backend">
+          <input id="s-ai-review-model" type="text" data-key="AI_REVIEW_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
         </div>
         <div class="field">
           <label for="s-ai-fallback">Si le backend échoue <span class="set-hint" data-hint="AI_FALLBACK"></span></label>
@@ -527,9 +529,17 @@
     </div>
     <div class="modal-body">
       <div id="letter-config">
-        <label>Ton de la lettre</label>
+        <label>Type de document</label>
+        <div id="letter-doctypes" class="pills">
+          <span class="pill active" data-doctype="lettre">Lettre de motivation</span>
+          <span class="pill" data-doctype="message">Message pour recruteur</span>
+        </div>
+        <label>Ton</label>
         <div id="letter-tones" class="pills"></div>
-        <button id="btn-generate-letter" class="btn-primary">Générer la lettre</button>
+        <label for="letter-maxwords">Longueur maximale : <strong id="letter-maxwords-val">350</strong> mots</label>
+        <input id="letter-maxwords" type="range" min="80" max="800" step="10" value="350"
+               title="Plafond indicatif transmis à l'IA — par défaut sous 500 mots, ajustable.">
+        <button id="btn-generate-letter" class="btn-primary">Générer</button>
       </div>
       <div id="letter-loading" class="letter-loading" hidden>
         <span class="spinner"></span> Rédaction en cours… (15–30 s)
@@ -583,6 +593,12 @@
 </div>
 
 <div id="toasts" class="toasts"></div>
+
+<!-- Modèles disponibles (peuplés au chargement par /api/models) : suggestions
+     dans les champs « Modèle … » des réglages, sans empêcher la saisie libre -->
+<datalist id="dl-anthropic-models"></datalist>
+<datalist id="dl-local-models"></datalist>
+<datalist id="dl-all-models"></datalist>
 
 <script src="/static/app.js"></script>
 </body>

@@ -220,7 +220,7 @@ class SessionStore:
     # ─── Lettres ─────────────────────────────────────────────────────────────
 
     def add_letter(self, offer: JobOffer, tone: str, language: str,
-                   txt_file: str, pdf_file: str = "") -> None:
+                   txt_file: str, pdf_file: str = "", doc_type: str = "lettre") -> None:
         self._data["letters"].append({
             "date": datetime.now().isoformat(timespec="seconds"),
             "offer_key": offer.unique_key(),
@@ -228,6 +228,7 @@ class SessionStore:
             "company": offer.company,
             "tone": str(tone)[:20],
             "language": str(language)[:5],
+            "doc_type": str(doc_type)[:20],
             "txt_file": str(txt_file)[:200],
             "pdf_file": str(pdf_file)[:200],
         })

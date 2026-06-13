@@ -402,6 +402,19 @@ class TestMultiCV:
         )
         assert [o.title for o in results] == ["Ingénieur Robotique"]  # web : best 8 < 9
 
+    def test_journal_affiche_le_vrai_seuil_en_multi_cv(self):
+        """Bug d'affichage : en multi-CV le filtrage réel se fait après agrégation
+        (min_score=0 par CV), mais le journal doit montrer le seuil voulu, pas 0."""
+        logs: list[str] = []
+        score_offers_multi(
+            {"CV Robot": CV_ROBOT, "CV Web": CV_WEB}, self.offers(),
+            min_score=8, progress=logs.append,
+        )
+        retenue_lines = [m for m in logs if "retenue(s) ≥" in m]
+        assert retenue_lines, "aucune ligne de progression d'analyse détaillée"
+        assert all("≥ 8/10" in m for m in retenue_lines)
+        assert not any("≥ 0/10" in m for m in logs)
+
     def test_shared_prefilter_reduit_analyse_detaillee(self, monkeypatch):
         """Au-delà du nombre gardé, un pré-scoring commun (profil fusionné) réduit
         le pool UNE fois ; l'analyse détaillée par CV ne porte que sur les

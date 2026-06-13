@@ -54,7 +54,7 @@ from main import (
     save_dropped_offers,
 )
 from app_utils import get_logger
-from output_paths import cv_dir, find_output_file, migrate_legacy_files
+from output_paths import cv_dir, find_output_file, letters_dir, migrate_legacy_files
 
 _LOG = get_logger()
 
@@ -88,6 +88,16 @@ _DOWNLOAD_TYPES = {
 _SECTOR_LABELS = dict(SECTORS)
 _EXPERIENCE_KEYS = {k for k, _ in EXPERIENCE_LEVELS}
 _COUNTRY_CODES = {c for c, _ in COUNTRIES}
+
+# Modèles Claude connus, proposés dans les menus déroulants des réglages (les
+# modèles locaux, eux, sont détectés en direct). Liste indicative et éditable —
+# le champ reste libre, on peut saisir un identifiant absent de la liste.
+_KNOWN_ANTHROPIC_MODELS = (
+    "claude-fable-5",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+)
 _CONTRACT_KEYS = set(CONTRACT_TYPES)
 
 # ─── Jobs d'arrière-plan (scan, lettre) ──────────────────────────────────────
@@ -330,18 +340,24 @@ def _run_scan(job: _Job, p: dict) -> None:
         config.country = p["country"]
         tracker = _get_tracker()
 
+        # Une passe par localisation (liste vide → une seule passe sans filtre).
+        locations = p.get("locations") or [""]
+        loc_note = ""
+        if len([loc for loc in locations if loc]) > 1:
+            loc_note = f" sur {len([loc for loc in locations if loc])} localisations ({', '.join(l for l in locations if l)})"
         if p["max"] >= _UNLIMITED_MAX:
-            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle (sans plafond)…")
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle (sans plafond){loc_note}…")
         else:
-            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle…")
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle{loc_note}…")
         all_offers: list[JobOffer] = []
         seen_keys: set[str] = set()
-        executor = ThreadPoolExecutor(max_workers=min(len(p["sources"]), 5))
+        max_workers = min(len(p["sources"]) * max(1, len(locations)), 8)
+        executor = ThreadPoolExecutor(max_workers=max_workers)
         try:
             futures = {
-                executor.submit(_run_one_scraper, key, query, p["location"], p["max"]):
-                    (key, query)
-                for key in p["sources"] for query in queries
+                executor.submit(_run_one_scraper, key, query, loc, p["max"]):
+                    (key, query, loc)
+                for key in p["sources"] for query in queries for loc in locations
             }
             counts: dict[str, int] = {}
             for future in as_completed(futures):
@@ -531,11 +547,12 @@ def _run_rescore(job: _Job, p: dict) -> None:
         _SCAN_LOCK.release()
 
 
-def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
+def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
+                doc_type: str = "lettre", max_words: int = 350) -> None:
     try:
         offer = scan_job.offers[index]
-        _LOG.info("lettre %s : début (offre « %s » @ %s, ton %s)",
-                  job.id[:8], offer.title[:60], offer.company[:40], tone)
+        _LOG.info("lettre %s : début (offre « %s » @ %s, ton %s, type %s, %d mots max)",
+                  job.id[:8], offer.title[:60], offer.company[:40], tone, doc_type, max_words)
         tracker = _get_tracker()
         with _TRACKER_LOCK:
             applied_titles = [
@@ -555,28 +572,30 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str) -> None:
             style_examples=_style_examples(),
         )
         _LOG.info("lettre %s : appel LLM…", job.id[:8])
-        result = generator.generate(offer, tone=tone)
+        result = generator.generate(offer, tone=tone, doc_type=doc_type, max_words=max_words)
         is_partial = bool(result.get("partial"))
         _LOG.info("lettre %s : LLM ok (%d caractères%s) — écriture fichiers",
                   job.id[:8], len(result.get("letter", "")),
                   ", PARTIELLE" if is_partial else "")
         txt_path, pdf_path = generator.save(offer, result)
         pdf_name = pdf_path.name if pdf_path.exists() else ""
-        # Lettre partielle (interrompue) : on l'enregistre et on la renvoie pour
-        # édition, mais on NE marque PAS l'offre postulée et on ne l'ajoute pas à
-        # la liste des lettres — elle est incomplète.
+        # Générer un texte n'équivaut PAS à postuler : on enregistre le document
+        # dans la liste des lettres (onglet Lettres) mais on NE marque PAS l'offre
+        # « postulée » — l'utilisateur choisit lui-même le statut quand il a
+        # réellement candidaté. Une lettre partielle (interrompue) n'est pas
+        # ajoutée du tout : elle est incomplète.
         if not is_partial:
-            with _TRACKER_LOCK:
-                tracker.mark(offer, "applied")
             with _STORE_LOCK:
                 _get_store().add_letter(
                     offer, tone, result.get("language", "fr"), txt_path.name, pdf_name,
+                    doc_type=result.get("doc_type", doc_type),
                 )
         job.result = {
             "letter": result["letter"],
             "email_subject": result["email_subject"],
             "email_body": result["email_body"],
             "language": result.get("language", "fr"),
+            "doc_type": result.get("doc_type", doc_type),
             "review_notes": result.get("review_notes") or [],
             "partial": is_partial,
             "txt_file": txt_path.name,
@@ -716,6 +735,25 @@ def _validate_cvs(body: dict) -> list[str]:
     return [n for n in names if n in files][:5]
 
 
+def _parse_locations(raw_list, raw_str: str) -> list[str]:
+    """Normalise les localisations : liste explicite ou chaîne séparée par
+    virgules / points-virgules / sauts de ligne. Dédoublonnage insensible à la
+    casse, ordre conservé, 8 max. Liste vide = pas de filtre de lieu."""
+    items: list[str] = []
+    if isinstance(raw_list, list):
+        items.extend(str(x) for x in raw_list)
+    items.extend(re.split(r"[,;\n]", str(raw_str or "")))
+    seen: set[str] = set()
+    out: list[str] = []
+    for it in items:
+        loc = it.strip()[:120]
+        key = loc.lower()
+        if loc and key not in seen:
+            seen.add(key)
+            out.append(loc)
+    return out[:8]
+
+
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     is_global = bool(body.get("global"))
     no_ai = bool(body.get("no_ai", False))
@@ -766,12 +804,19 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
         str(body.get("exclude", ""))[:1000]
     )
 
+    # Plusieurs localisations possibles : on accepte une liste explicite OU une
+    # saisie texte séparée par virgules / points-virgules / sauts de ligne. Le
+    # scan tourne une fois par localisation, puis dédoublonne. Aucune = comme
+    # avant (une passe sans filtre de lieu).
+    locations = _parse_locations(body.get("locations"), body.get("location", ""))
+
     return {
         "query": query,
         "global": is_global,
         "cvs": cvs,
         "country": country,
-        "location": str(body.get("location", "")).strip()[:120],
+        "location": ", ".join(locations)[:200],
+        "locations": locations,
         "sources": sources,
         "sectors": sectors,
         "experience": experience,
@@ -885,6 +930,53 @@ def _weekly_applied(entries: list[dict], weeks: int = 12) -> list[dict]:
         counts[f"{year}-S{week:02d}"] += 1
     labels = sorted(counts)[-weeks:]
     return [{"week": w, "count": counts[w]} for w in labels]
+
+
+_SEP = "=" * 60
+_LETTER_SECTION_MARKER = "LETTRE DE MOTIVATION\n" + "-" * 60
+_EMAIL_SECTION_MARKER = "EMAIL D'ACCOMPAGNEMENT\n" + "-" * 60
+
+
+def _parse_letter_file(content: str) -> dict:
+    """Extrait email_subject, email_body et letter depuis le format texte généré par save()."""
+    email_subject = ""
+    email_body = ""
+    letter = ""
+
+    # La lettre commence après "LETTRE DE MOTIVATION\n---…"
+    if _LETTER_SECTION_MARKER in content:
+        after_marker = content.split(_LETTER_SECTION_MARKER, 1)[1]
+        letter = after_marker.lstrip("\n")
+    else:
+        # Format inconnu : tout le contenu comme lettre
+        letter = content
+
+    # Email éventuel : entre "EMAIL D'ACCOMPAGNEMENT\n---…" et le prochain "==="
+    if _EMAIL_SECTION_MARKER in content:
+        email_part = content.split(_EMAIL_SECTION_MARKER, 1)[1]
+        # Arrêt au séparateur suivant ou à la section lettre
+        for stop in (_SEP, "LETTRE DE MOTIVATION"):
+            if stop in email_part:
+                email_part = email_part.split(stop, 1)[0]
+        email_part = email_part.strip()
+        first_line = email_part.split("\n", 1)
+        subj_line = first_line[0].strip()
+        if subj_line.startswith("Objet :"):
+            email_subject = subj_line[len("Objet :"):].strip()
+            email_body = first_line[1].strip() if len(first_line) > 1 else ""
+        else:
+            email_body = email_part
+
+    return {"ok": True, "email_subject": email_subject, "email_body": email_body, "letter": letter}
+
+
+def _letter_header_block(content: str) -> str:
+    """Retourne la partie d'en-tête du fichier (avant le premier séparateur '===')
+    suivie d'une ligne vide, pour la réécriture."""
+    if _SEP in content:
+        header = content.split(_SEP, 1)[0]
+        return header if header.endswith("\n\n") else header.rstrip("\n") + "\n\n"
+    return ""
 
 
 def _stats_payload() -> dict:
@@ -1015,8 +1107,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"cvs": _cvs_payload()})
         elif path == "/api/download":
             self._api_download(query.get("file", [""])[0])
+        elif path == "/api/letter-read":
+            self._api_letter_read(query.get("file", [""])[0])
         elif path == "/api/local-models":
             self._api_local_models()
+        elif path == "/api/models":
+            self._api_models()
         else:
             self._error("Route inconnue", 404)
 
@@ -1043,6 +1139,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_check_availability()
         elif path == "/api/letter-save":
             self._api_letter_save()
+        elif path == "/api/letter-edit":
+            self._api_letter_edit()
         elif path == "/api/track":
             self._api_track()
         elif path == "/api/track-key":
@@ -1114,6 +1212,22 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as e:
             _LOG.exception("scan modèles locaux : échec")
             self._error(f"Détection impossible : {str(e)[:200]}", 500)
+
+    def _api_models(self):
+        """Modèles disponibles pour peupler les menus déroulants des réglages :
+        modèles locaux détectés (Ollama/LM Studio/llama.cpp) + modèles Claude
+        connus. Sondes localhost uniquement, jamais d'appel réseau externe."""
+        local: list[str] = []
+        try:
+            from integrations import scan_local_models
+            for server in scan_local_models().get("servers", []):
+                for m in server.get("models", []):
+                    name = m.get("name") if isinstance(m, dict) else None
+                    if name and name not in local:
+                        local.append(name)
+        except Exception:
+            _LOG.warning("liste des modèles locaux indisponible", exc_info=True)
+        self._json({"local": local[:100], "anthropic": list(_KNOWN_ANTHROPIC_MODELS)})
 
     def _api_state(self):
         provider_ready = (
@@ -1306,9 +1420,16 @@ class _Handler(BaseHTTPRequestHandler):
         tone = str(body.get("tone", "standard"))
         if tone not in TONES:
             tone = "standard"
+        doc_type = "message" if str(body.get("doc_type", "lettre")) == "message" else "lettre"
+        try:
+            max_words = max(80, min(1200, int(body.get("max_words", 350))))
+        except (TypeError, ValueError):
+            max_words = 350
         job = _Job("letter")
         _register_job(job)
-        threading.Thread(target=_run_letter, args=(job, scan_job, index, tone), daemon=True).start()
+        threading.Thread(target=_run_letter,
+                         args=(job, scan_job, index, tone, doc_type, max_words),
+                         daemon=True).start()
         self._json({"job_id": job.id})
 
     def _api_check_availability(self):
@@ -1358,6 +1479,91 @@ class _Handler(BaseHTTPRequestHandler):
         # save() n'utilise pas le CV ni le LLM : instance minimale suffisante
         generator = CoverLetterGenerator(scan_job.cv_text or "")
         txt_path, pdf_path = generator.save(scan_job.offers[index], result)
+        self._json({
+            "ok": True,
+            "txt_file": txt_path.name,
+            "pdf_file": pdf_path.name if pdf_path.exists() else "",
+        })
+
+    def _api_letter_read(self, name: str):
+        """Lit et décode un fichier lettre .txt — renvoie email_subject, email_body, letter."""
+        if (not name or not re.fullmatch(r"[A-Za-z0-9 ._-]{1,120}", name)
+                or name.startswith(".")
+                or Path(name).suffix.lower() != ".txt"):
+            self._error("Fichier non autorisé", 403)
+            return
+        target = letters_dir() / name
+        if not target.exists():
+            target = find_output_file(name)
+        if target is None or not target.exists():
+            self._error("Fichier introuvable", 404)
+            return
+        content = target.read_text(encoding="utf-8", errors="replace")
+        self._json(_parse_letter_file(content))
+
+    def _api_letter_edit(self):
+        """Réécrit un fichier lettre .txt + PDF sans contexte de scan."""
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        txt_name = str(body.get("txt_file", "")).strip()
+        if (not txt_name or not re.fullmatch(r"[A-Za-z0-9 ._-]{1,120}", txt_name)
+                or txt_name.startswith(".")
+                or Path(txt_name).suffix.lower() != ".txt"):
+            self._error("Nom de fichier non autorisé", 403)
+            return
+        txt_path = letters_dir() / txt_name
+        if not txt_path.exists():
+            found = find_output_file(txt_name)
+            if found and found.exists():
+                txt_path = found
+            else:
+                self._error("Fichier introuvable", 404)
+                return
+        letter = str(body.get("letter", "")).strip()[:20000]
+        if not letter:
+            self._error("Lettre vide")
+            return
+        email_subject = str(body.get("email_subject", "")).strip()[:200]
+        email_body = str(body.get("email_body", "")).strip()[:2000]
+        # Reconstruit le fichier en préservant le bloc d'en-tête (Poste, Entreprise…)
+        old_content = txt_path.read_text(encoding="utf-8", errors="replace")
+        header = _letter_header_block(old_content)
+        email_block = ""
+        if email_subject or email_body:
+            email_block = (
+                "EMAIL D'ACCOMPAGNEMENT\n"
+                + "-" * 60 + "\n"
+                + f"Objet : {email_subject}\n\n"
+                + email_body
+                + "\n\n" + "=" * 60 + "\n\n"
+            )
+        new_content = (
+            header
+            + "=" * 60 + "\n\n"
+            + email_block
+            + "LETTRE DE MOTIVATION\n" + "-" * 60 + "\n\n"
+            + letter
+        )
+        txt_path.write_text(new_content, encoding="utf-8")
+        pdf_name = txt_name[:-4] + ".pdf"
+        pdf_path = txt_path.parent / pdf_name
+        try:
+            import types
+            from ai.cover_letter import CoverLetterGenerator as _CLG
+            # Reconstruit un objet minimal depuis l'en-tête conservé
+            mock_job = types.SimpleNamespace(title="", company="", url="")
+            for line in header.splitlines():
+                if line.startswith("Poste :"):
+                    mock_job.title = line[len("Poste :"):].strip()
+                elif line.startswith("Entreprise :"):
+                    mock_job.company = line[len("Entreprise :"):].strip()
+                elif line.startswith("URL :"):
+                    mock_job.url = line[len("URL :"):].strip()
+            _CLG("")._save_pdf(pdf_path, mock_job, letter)
+        except Exception:
+            pass
         self._json({
             "ok": True,
             "txt_file": txt_path.name,

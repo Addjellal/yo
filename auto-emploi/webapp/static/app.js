@@ -350,6 +350,31 @@ async function init() {
       btn.addEventListener("click", () => loadSession(last.id));
     }
   } catch (e) { /* pas bloquant */ }
+
+  // Modèles disponibles (scan local + modèles Claude connus) pour les menus
+  // déroulants des réglages — non bloquant, en arrière-plan.
+  loadModelLists();
+}
+
+// Peuple les <datalist> des champs « Modèle … » : modèles locaux détectés
+// (Ollama/LM Studio/llama.cpp) + modèles Claude connus. Sans appel réseau
+// externe ; échec silencieux (le champ reste libre).
+async function loadModelLists() {
+  let data;
+  try {
+    data = await api("/api/models");
+  } catch (e) { return; }
+  const fill = (id, names) => {
+    const dl = $(id);
+    if (!dl) return;
+    dl.replaceChildren();
+    for (const name of names) dl.appendChild(el("option", { value: name }));
+  };
+  const local = data.local || [];
+  const anthropic = data.anthropic || [];
+  fill("#dl-local-models", local);
+  fill("#dl-anthropic-models", anthropic);
+  fill("#dl-all-models", [...local, ...anthropic]);
 }
 
 // ─── Sélection des CV (cases à cocher) ──────────────────────────────────────
@@ -684,6 +709,11 @@ function renderOfferCards(offers, ctx, mode = "score") {
   const sorted = [...offers].sort((a, b) => {
     if (mode === "source") return a.source.localeCompare(b.source) || (b.score || 0) - (a.score || 0);
     if (mode === "company") return a.company.localeCompare(b.company);
+    // Tri par meilleur CV correspondant : regroupe les offres par CV gagnant,
+    // puis par score décroissant à l'intérieur de chaque groupe.
+    if (mode === "cv") {
+      return (a.best_cv || "").localeCompare(b.best_cv || "") || (b.score || 0) - (a.score || 0);
+    }
     return (b.score || 0) - (a.score || 0);
   });
   sorted.forEach((offer, i) => {
@@ -930,18 +960,32 @@ function applyAvailability(results) {
 // ─── Modale lettre ──────────────────────────────────────────────────────────
 
 let LETTER_TONE = "standard";
+let LETTER_DOCTYPE = "lettre";  // "lettre" (motivation) ou "message" (recruteur)
 let LETTER_OFFER = null;
 let LETTER_APPLY_STATUS = null;
 let LETTER_JOB = null;     // job portant l'offre (scan courant ou session d'historique)
+let LETTER_PREVIEW_FILE = null;  // nom du fichier txt en mode aperçu (depuis onglet Lettres)
 
 function openLetterModal(offer, applyStatus, jobId) {
   LETTER_OFFER = offer;
   LETTER_APPLY_STATUS = applyStatus;
   LETTER_JOB = jobId || SCAN_JOB;
-  $("#modal-title").textContent = `Lettre — ${offer.title} · ${offer.company}`;
+  LETTER_PREVIEW_FILE = null;
+  $("#modal-title").textContent = `Candidature — ${offer.title} · ${offer.company}`;
+  $("#btn-generate-letter").textContent = "Générer";
   $("#letter-config").hidden = false;
   $("#letter-loading").hidden = true;
   $("#letter-result").hidden = true;
+
+  // Pills « type de document » (lettre de motivation / message recruteur)
+  $("#letter-doctypes").querySelectorAll(".pill").forEach((p) => {
+    p.classList.toggle("active", p.dataset.doctype === LETTER_DOCTYPE);
+    p.onclick = () => {
+      LETTER_DOCTYPE = p.dataset.doctype;
+      $("#letter-doctypes").querySelectorAll(".pill").forEach((q) => q.classList.remove("active"));
+      p.classList.add("active");
+    };
+  });
 
   const tonesBox = $("#letter-tones");
   tonesBox.replaceChildren();
@@ -957,19 +1001,81 @@ function openLetterModal(offer, applyStatus, jobId) {
   $("#modal-overlay").hidden = false;
 }
 
-$("#modal-close").addEventListener("click", () => ($("#modal-overlay").hidden = true));
-$("#modal-overlay").addEventListener("click", (e) => {
-  if (e.target === $("#modal-overlay")) $("#modal-overlay").hidden = true;
+// Ouvre la modale en mode aperçu (depuis l'onglet Lettres) — pas de génération,
+// lecture du fichier txt existant.
+async function openLetterPreview(letter) {
+  LETTER_OFFER = null;
+  LETTER_APPLY_STATUS = null;
+  LETTER_JOB = null;
+  LETTER_PREVIEW_FILE = letter.txt_file || null;
+
+  $("#modal-title").textContent = `Aperçu — ${letter.title || "—"} · ${letter.company || "—"}`;
+  $("#letter-config").hidden = true;
+  $("#letter-loading").hidden = false;
+  $("#letter-result").hidden = true;
+  $("#letter-notes").hidden = true;
+  $("#modal-overlay").hidden = false;
+
+  let data;
+  try {
+    data = await api(`/api/letter-read?file=${encodeURIComponent(letter.txt_file)}`);
+  } catch (e) {
+    $("#letter-loading").hidden = true;
+    $("#letter-config").hidden = false;
+    toast("Impossible de lire la lettre : " + e.message, "err");
+    return;
+  }
+
+  $("#letter-loading").hidden = true;
+  $("#letter-subject").textContent = data.email_subject || "—";
+  $("#letter-email").textContent = data.email_body || "—";
+  $("#letter-body").value = data.letter || "";
+  const txtFile = letter.txt_file || "";
+  const pdfFile = letter.pdf_file || "";
+  $("#letter-dl-txt").dataset.file = txtFile;
+  if (pdfFile) {
+    $("#letter-dl-pdf").hidden = false;
+    $("#letter-dl-pdf").dataset.file = pdfFile;
+  } else {
+    $("#letter-dl-pdf").hidden = true;
+  }
+  $("#btn-letter-save").textContent = "💾 Enregistrer les modifications (txt + PDF)";
+  $("#letter-result").hidden = false;
+}
+
+$("#modal-close").addEventListener("click", () => {
+  $("#modal-overlay").hidden = true;
+  LETTER_PREVIEW_FILE = null;
+  $("#btn-letter-save").textContent = "💾 Enregistrer (txt + PDF)";
 });
+$("#modal-overlay").addEventListener("click", (e) => {
+  if (e.target === $("#modal-overlay")) {
+    $("#modal-overlay").hidden = true;
+    LETTER_PREVIEW_FILE = null;
+    $("#btn-letter-save").textContent = "💾 Enregistrer (txt + PDF)";
+  }
+});
+
+// Curseur de longueur maximale
+const maxWordsInput = $("#letter-maxwords");
+if (maxWordsInput) {
+  maxWordsInput.addEventListener("input", (e) => {
+    $("#letter-maxwords-val").textContent = e.target.value;
+  });
+}
 
 $("#btn-generate-letter").addEventListener("click", async () => {
   $("#letter-config").hidden = true;
   $("#letter-loading").hidden = false;
+  const maxWords = parseInt($("#letter-maxwords").value, 10) || 350;
   let out;
   try {
     out = await api("/api/letter", {
       method: "POST",
-      body: JSON.stringify({ job_id: LETTER_JOB, index: LETTER_OFFER.index, tone: LETTER_TONE }),
+      body: JSON.stringify({
+        job_id: LETTER_JOB, index: LETTER_OFFER.index, tone: LETTER_TONE,
+        doc_type: LETTER_DOCTYPE, max_words: maxWords,
+      }),
     });
   } catch (e) {
     $("#letter-loading").hidden = true;
@@ -1024,32 +1130,51 @@ function pollLetter(jobId) {
       $("#letter-dl-pdf").hidden = true;
     }
     $("#letter-result").hidden = false;
+    const kind = r.doc_type === "message" ? "Message" : "Lettre";
     if (r.partial) {
-      // Lettre interrompue : on l'affiche pour édition, mais on ne marque PAS
-      // l'offre postulée (elle reste dans les résultats).
-      toast("⚠ Génération interrompue — lettre partielle récupérée, complétez-la puis enregistrez.", "err");
+      // Texte interrompu : affiché pour édition, l'offre reste dans les résultats.
+      toast(`⚠ Génération interrompue — ${kind.toLowerCase()} partiel récupéré, complétez-le puis enregistrez.`, "err");
     } else {
-      if (LETTER_APPLY_STATUS) LETTER_APPLY_STATUS("applied");
-      const lang = r.language === "en" ? " (offre en anglais → cover letter EN)" : "";
-      toast(`Lettre générée${lang} — offre marquée postulée. Vous pouvez l'éditer avant export.`, "ok");
+      // Générer un texte ≠ postuler : on NE marque PAS l'offre « postulée ».
+      // L'offre reste dans les résultats ; l'utilisateur choisit lui-même le
+      // statut quand il a réellement candidaté. Le document est dans l'onglet Lettres.
+      const lang = r.language === "en" ? " (offre en anglais → version EN)" : "";
+      toast(`${kind} généré${lang} — éditez-la si besoin. L'offre n'est PAS marquée postulée : choisissez son statut quand vous aurez candidaté.`, "ok");
     }
   }, 900);
 }
 
-// Édition de la lettre : réécrit le .txt et le .pdf, sans appel IA
+// Édition de la lettre : réécrit le .txt et le .pdf, sans appel IA.
+// En mode aperçu (LETTER_PREVIEW_FILE) on utilise /api/letter-edit (sans job context).
 $("#btn-letter-save").addEventListener("click", async () => {
-  if (!LETTER_OFFER) return;
+  const letter = $("#letter-body").value;
+  const emailSubject = $("#letter-subject").textContent === "—" ? "" : $("#letter-subject").textContent;
+  const emailBody = $("#letter-email").textContent === "—" ? "" : $("#letter-email").textContent;
   try {
-    const out = await api("/api/letter-save", {
-      method: "POST",
-      body: JSON.stringify({
-        job_id: LETTER_JOB,
-        index: LETTER_OFFER.index,
-        letter: $("#letter-body").value,
-        email_subject: $("#letter-subject").textContent === "—" ? "" : $("#letter-subject").textContent,
-        email_body: $("#letter-email").textContent === "—" ? "" : $("#letter-email").textContent,
-      }),
-    });
+    let out;
+    if (LETTER_PREVIEW_FILE) {
+      out = await api("/api/letter-edit", {
+        method: "POST",
+        body: JSON.stringify({
+          txt_file: LETTER_PREVIEW_FILE,
+          letter,
+          email_subject: emailSubject,
+          email_body: emailBody,
+        }),
+      });
+    } else {
+      if (!LETTER_OFFER) return;
+      out = await api("/api/letter-save", {
+        method: "POST",
+        body: JSON.stringify({
+          job_id: LETTER_JOB,
+          index: LETTER_OFFER.index,
+          letter,
+          email_subject: emailSubject,
+          email_body: emailBody,
+        }),
+      });
+    }
     $("#letter-dl-txt").dataset.file = out.txt_file;
     if (out.pdf_file) {
       $("#letter-dl-pdf").hidden = false;
@@ -1189,25 +1314,34 @@ async function loadLetters() {
 
   data.letters.forEach((letter, i) => {
     const actions = el("div", { class: "lt-actions" });
+    const btnPreview = el("button", { class: "btn-ghost small", text: "👁 Aperçu" });
+    btnPreview.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      openLetterPreview(letter).catch((e) => toast(e.message, "err"));
+    });
+    actions.appendChild(btnPreview);
     for (const [file, label] of [[letter.txt_file, "⬇ .txt"], [letter.pdf_file, "⬇ .pdf"]]) {
       if (!file) continue;
       const a = el("a", { class: "btn-ghost small", text: label, href: "#" });
       a.addEventListener("click", (ev) => {
         ev.preventDefault();
+        ev.stopPropagation();
         downloadFile(file).catch((e) => toast(e.message, "err"));
       });
       actions.appendChild(a);
     }
-    const card = el("div", { class: "card letter-card" }, [
+    const card = el("div", { class: "card letter-card clickable", title: "Cliquer pour prévisualiser la lettre" }, [
       el("div", { class: "lt-title", text: letter.title || "—" }),
       el("div", { class: "lt-meta" }, [
         el("span", { text: letter.company || "—" }),
         el("span", { text: letter.date.replace("T", " ").slice(0, 16) }),
+        el("span", { text: letter.doc_type === "message" ? "✉ message" : "📄 lettre" }),
         el("span", { text: `ton ${letter.tone}` }),
         el("span", { text: letter.language === "en" ? "🇬🇧 EN" : "🇫🇷 FR" }),
       ]),
       actions,
     ]);
+    card.addEventListener("click", () => openLetterPreview(letter).catch((e) => toast(e.message, "err")));
     card.style.setProperty("--i", Math.min(i, 12));
     grid.appendChild(card);
   });
