@@ -237,6 +237,19 @@
       <h3>Aucune session</h3>
       <p>Chaque recherche sera enregistrée ici avec ses critères et ses scores.</p>
     </div>
+
+    <!-- Offres d'une session consultée : affichées ICI, sans quitter l'historique
+         ni perturber un scan en cours -->
+    <div id="history-offers-panel" hidden>
+      <div class="results-toolbar">
+        <h2 id="history-offers-title">Offres de la session</h2>
+        <div class="toolbar-actions">
+          <span id="history-offers-count" class="muted small"></span>
+          <button id="btn-history-offers-close" class="btn-ghost small">✕ Fermer</button>
+        </div>
+      </div>
+      <div id="history-offers-grid" class="results-grid"></div>
+    </div>
   </section>
 
   <!-- ════════ Onglet Mes CV ════════ -->

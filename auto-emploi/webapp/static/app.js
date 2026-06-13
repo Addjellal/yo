@@ -675,14 +675,30 @@ $("#btn-notion").addEventListener("click", exportNotion);
 // Dernière offre dont on a cliqué « Ouvrir » : marquée jusqu'au choix d'un statut
 let LAST_OPENED_CARD = null;
 
+// Rendu générique d'une liste d'offres dans un conteneur, avec un contexte
+// (job + liste + compteur). Partagé par les résultats de recherche ET la
+// consultation d'une session d'historique.
+function renderOfferCards(offers, ctx, mode = "score") {
+  ctx.grid.replaceChildren();
+  LAST_OPENED_CARD = null;
+  const sorted = [...offers].sort((a, b) => {
+    if (mode === "source") return a.source.localeCompare(b.source) || (b.score || 0) - (a.score || 0);
+    if (mode === "company") return a.company.localeCompare(b.company);
+    return (b.score || 0) - (a.score || 0);
+  });
+  sorted.forEach((offer, i) => {
+    const card = offerCard(offer, ctx);
+    card.style.setProperty("--i", Math.min(i, 12));
+    ctx.grid.appendChild(card);
+  });
+  if (ctx.countEl) ctx.countEl.textContent = `${offers.length} offre${offers.length > 1 ? "s" : ""}`;
+}
+
 function renderResults() {
   const zone = $("#results-zone");
-  const grid = $("#results-grid");
-  grid.replaceChildren();
-  LAST_OPENED_CARD = null;
-
   if (!OFFERS.length) {
     zone.hidden = true;
+    $("#results-grid").replaceChildren();
     $("#search-empty").hidden = false;
     $("#search-empty").querySelector("p").textContent =
       "Aucune offre au-dessus du score minimum. Essayez d'autres mots-clés ou baissez le score.";
@@ -690,23 +706,15 @@ function renderResults() {
   }
   zone.hidden = false;
   $("#search-empty").hidden = true;
-  $("#results-count").textContent = `${OFFERS.length} offre${OFFERS.length > 1 ? "s" : ""}`;
-
-  const mode = $("#sort-select").value;
-  const sorted = [...OFFERS].sort((a, b) => {
-    if (mode === "source") return a.source.localeCompare(b.source) || (b.score || 0) - (a.score || 0);
-    if (mode === "company") return a.company.localeCompare(b.company);
-    return (b.score || 0) - (a.score || 0);
-  });
-
-  sorted.forEach((offer, i) => {
-    const card = offerCard(offer);
-    card.style.setProperty("--i", Math.min(i, 12));
-    grid.appendChild(card);
-  });
+  renderOfferCards(OFFERS, {
+    jobId: SCAN_JOB, offers: OFFERS, grid: $("#results-grid"),
+    countEl: $("#results-count"), onEmpty: renderResults,
+  }, $("#sort-select").value);
 }
 
-function offerCard(offer) {
+function offerCard(offer, ctx) {
+  // ctx = { jobId, offers, grid, countEl, onEmpty } — découple la carte du scan
+  // courant : une session d'historique s'affiche avec son propre job.
   // score null = offre brute non analysée (mode test scraper sans IA)
   const rawMode = offer.score === null || offer.score === undefined;
   const score = offer.score || 0;
@@ -798,19 +806,19 @@ function offerCard(offer) {
 
   const TERMINAL = ["favorite", "applied", "rejected"];
   function removeFromResults() {
-    const idx = OFFERS.indexOf(offer);
-    if (idx !== -1) OFFERS.splice(idx, 1);
+    const idx = ctx.offers.indexOf(offer);
+    if (idx !== -1) ctx.offers.splice(idx, 1);
     if (LAST_OPENED_CARD === card) LAST_OPENED_CARD = null;
     card.remove();
-    if (!OFFERS.length) renderResults();  // bascule sur l'état vide
-    else $("#results-count").textContent = `${OFFERS.length} offre${OFFERS.length > 1 ? "s" : ""}`;
+    if (!ctx.offers.length) ctx.onEmpty();  // bascule sur l'état vide
+    else if (ctx.countEl) ctx.countEl.textContent = `${ctx.offers.length} offre${ctx.offers.length > 1 ? "s" : ""}`;
   }
 
   async function mark(status) {
     try {
       await api("/api/track", {
         method: "POST",
-        body: JSON.stringify({ job_id: SCAN_JOB, indices: [offer.index], status }),
+        body: JSON.stringify({ job_id: ctx.jobId, indices: [offer.index], status }),
       });
       applyStatus(status);
       // Statut choisi → l'offre quitte les résultats (reste visible dans Suivi)
@@ -836,7 +844,7 @@ function offerCard(offer) {
   btnLetter.addEventListener("click", () => openLetterModal(offer, (st) => {
     applyStatus(st);
     if (TERMINAL.includes(st)) removeFromResults();
-  }));
+  }, ctx.jobId));
 
   return card;
 }
@@ -924,10 +932,12 @@ function applyAvailability(results) {
 let LETTER_TONE = "standard";
 let LETTER_OFFER = null;
 let LETTER_APPLY_STATUS = null;
+let LETTER_JOB = null;     // job portant l'offre (scan courant ou session d'historique)
 
-function openLetterModal(offer, applyStatus) {
+function openLetterModal(offer, applyStatus, jobId) {
   LETTER_OFFER = offer;
   LETTER_APPLY_STATUS = applyStatus;
+  LETTER_JOB = jobId || SCAN_JOB;
   $("#modal-title").textContent = `Lettre — ${offer.title} · ${offer.company}`;
   $("#letter-config").hidden = false;
   $("#letter-loading").hidden = true;
@@ -959,7 +969,7 @@ $("#btn-generate-letter").addEventListener("click", async () => {
   try {
     out = await api("/api/letter", {
       method: "POST",
-      body: JSON.stringify({ job_id: SCAN_JOB, index: LETTER_OFFER.index, tone: LETTER_TONE }),
+      body: JSON.stringify({ job_id: LETTER_JOB, index: LETTER_OFFER.index, tone: LETTER_TONE }),
     });
   } catch (e) {
     $("#letter-loading").hidden = true;
@@ -1033,7 +1043,7 @@ $("#btn-letter-save").addEventListener("click", async () => {
     const out = await api("/api/letter-save", {
       method: "POST",
       body: JSON.stringify({
-        job_id: SCAN_JOB,
+        job_id: LETTER_JOB,
         index: LETTER_OFFER.index,
         letter: $("#letter-body").value,
         email_subject: $("#letter-subject").textContent === "—" ? "" : $("#letter-subject").textContent,
@@ -1083,12 +1093,13 @@ async function loadHistory() {
   }
   const list = $("#history-list");
   list.replaceChildren();
+  $("#history-offers-panel").hidden = true;  // referme une éventuelle vue de session
   $("#history-empty").hidden = data.sessions.length > 0;
 
   const kindLabels = { web: "Web", scan: "CLI", watch: "Veille", rescore: "Re-scoring" };
   for (const s of data.sessions) {
     const btnView = el("button", { class: "btn-ghost small", text: "Voir les offres" });
-    btnView.addEventListener("click", () => loadSession(s.id));
+    btnView.addEventListener("click", () => loadSession(s.id, "history"));
     const btnRerun = el("button", { class: "btn-ghost small", text: "↻ Relancer" });
     btnRerun.addEventListener("click", () => {
       applyCriteria(s.criteria);
@@ -1122,7 +1133,13 @@ async function loadHistory() {
   }
 }
 
-async function loadSession(id) {
+let HISTORY_OFFERS = [];
+
+$("#btn-history-offers-close").addEventListener("click", () => {
+  $("#history-offers-panel").hidden = true;
+});
+
+async function loadSession(id, target = "search") {
   let out;
   try {
     out = await api("/api/session-load", { method: "POST", body: JSON.stringify({ id }) });
@@ -1130,14 +1147,29 @@ async function loadSession(id) {
     toast(e.message, "err");
     return;
   }
-  SCAN_JOB = out.job_id;
-  OFFERS = out.offers;
-  switchTab("search");
-  $("#scan-progress").hidden = true;
-  $("#btn-show-log").hidden = true;
-  renderResults();
   const when = out.date ? out.date.replace("T", " ").slice(0, 16) : "";
-  toast(`Session du ${when} rechargée (${OFFERS.length} offre(s), scores de l'époque).`
+  const offers = out.offers || [];
+  if (target === "history") {
+    // Affiche les offres DANS l'onglet Historique, avec leur propre job — ne
+    // touche ni au scan en cours (SCAN_JOB) ni à l'onglet courant.
+    HISTORY_OFFERS = offers;
+    const panel = $("#history-offers-panel");
+    $("#history-offers-title").textContent = `Offres de la session du ${when}`;
+    renderOfferCards(HISTORY_OFFERS, {
+      jobId: out.job_id, offers: HISTORY_OFFERS, grid: $("#history-offers-grid"),
+      countEl: $("#history-offers-count"), onEmpty: () => { panel.hidden = true; },
+    });
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } else {
+    SCAN_JOB = out.job_id;
+    OFFERS = offers;
+    switchTab("search");
+    $("#scan-progress").hidden = true;
+    $("#btn-show-log").hidden = true;
+    renderResults();
+  }
+  toast(`Session du ${when} rechargée (${offers.length} offre(s), scores de l'époque).`
     + (out.letters_available ? "" : " CV introuvable : lettres indisponibles."), "ok");
 }
 
