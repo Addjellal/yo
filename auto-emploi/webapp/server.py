@@ -36,6 +36,7 @@ from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
 from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi, CONTRACT_TYPES
+from ai._client import llm_available
 from ai.cover_letter import TONES, merge_cv_texts, recent_letter_examples
 from ai.cv_extract import CVExtractor, derive_search_queries
 from integrations import notion_configured, export_to_notion
@@ -109,7 +110,11 @@ class _Job:
         self.status = "running"           # running | done | error
         self.error = ""
         self.log: list[str] = []
-        self.offers: list[JobOffer] = []  # résultats d'un scan
+        self.offers: list[JobOffer] = []  # résultats d'un scan (retenus + mis de côté)
+        # Frontière dans self.offers : [0:aside_from) = retenus ≥ seuil ; le reste
+        # = offres analysées mais sous le seuil (« mises de côté », consultables).
+        # None = pas de mise de côté (toutes retenues — sessions rechargées, etc.).
+        self.aside_from: int | None = None
         self.cv_text = ""                 # CV fusionné (réutilisé pour les lettres)
         self.cv_texts: dict[str, str] = {}  # {label → texte} (matching multi-CV)
         self.query = ""
@@ -186,6 +191,20 @@ def _register_job(job: _Job) -> None:
 def _get_job(job_id: str) -> _Job | None:
     with _JOBS_LOCK:
         return _JOBS.get(job_id)
+
+
+# Cap d'offres mises de côté renvoyées au front : déjà triées par score, on
+# garde les plus pertinentes (les autres restent traçables dans le fichier
+# output/offres/ecartees/). Évite des charges utiles démesurées.
+_SET_ASIDE_CAP = 80
+
+
+def _matched_offers(job: "_Job") -> list[JobOffer]:
+    """Offres réellement retenues d'un scan (hors mises de côté) — base de
+    l'export, de Notion, de la vérification de dispo et de l'historique."""
+    if job.aside_from is None:
+        return job.offers
+    return job.offers[:job.aside_from]
 
 
 # ─── Sérialisation des offres pour le front ─────────────────────────────────
@@ -402,39 +421,70 @@ def _run_scan(job: _Job, p: dict) -> None:
             job.status = "done"
             return
 
-        # Mode test scraper : prévisualisation brute, AUCUN appel IA — pour
-        # ajuster requête/filtres avant de connecter le pipeline IA
-        if p.get("no_ai"):
+        # Moteur de scoring :
+        # - no_ai = analyse locale explicite (aucun appel IA, score par mots-clés) ;
+        # - sinon, repli AUTOMATIQUE sur l'analyse locale si aucun modèle IA n'est
+        #   disponible (pas de clé / pas de backend) plutôt que d'échouer.
+        # Le scoring local compare le CV à l'offre : sans CV, on retombe sur
+        # l'aperçu brut (mode test scraper historique).
+        has_cv = bool(job.cv_texts)
+        code_mode = bool(p.get("no_ai")) or not llm_available("match")
+
+        if code_mode and not has_cv:
             job.offers = all_offers
+            job.aside_from = None
             job.query = p["query"]
             job.add_log(
-                f"🔌 Mode test scraper : {len(all_offers)} offre(s) brute(s), aucune analyse IA. "
-                "Ajustez vos filtres puis relancez sans ce mode."
+                f"🔌 Aperçu brut : {len(all_offers)} offre(s), aucun scoring (aucun CV "
+                "pour comparer). Ajoutez un CV pour un score local sans IA."
             )
             job.status = "done"
-            _LOG.info("scan %s : terminé en mode test (%d offres brutes)", job.id[:8], len(all_offers))
+            _LOG.info("scan %s : terminé en aperçu brut (%d offres)", job.id[:8], len(all_offers))
             return
 
-        multi = f" × {len(job.cv_texts)} CV" if len(job.cv_texts) > 1 else ""
-        job.add_log(f"Analyse IA de {len(all_offers)} offres{multi} (score min {p['min_score']}/10)…")
-        with _TRACKER_LOCK:
-            rejections = tracker.recent_rejections()
-        if rejections:
-            job.add_log(f"Préférences : {len(rejections)} rejet(s) pris en compte")
+        if code_mode:
+            if p.get("no_ai"):
+                job.add_log(f"🔌 Analyse locale (sans IA) de {len(all_offers)} offre(s) : "
+                            "score par recouvrement de mots-clés CV/offre.")
+            else:
+                job.add_log(f"Aucun modèle IA disponible → analyse locale (sans IA) de "
+                            f"{len(all_offers)} offre(s).")
+            rejections: list[str] = []
+        else:
+            multi = f" × {len(job.cv_texts)} CV" if len(job.cv_texts) > 1 else ""
+            job.add_log(f"Analyse IA de {len(all_offers)} offres{multi} (score min {p['min_score']}/10)…")
+            with _TRACKER_LOCK:
+                rejections = tracker.recent_rejections()
+            if rejections:
+                job.add_log(f"Préférences : {len(rejections)} rejet(s) pris en compte")
 
-        matched = score_offers_multi(
-            job.cv_texts,
-            all_offers,
-            min_score=p["min_score"],
-            sectors=p["sectors"],
-            exclude=p["exclude"],
-            experience_level=p["experience"],
-            rejected_examples=rejections,
-            shared_prefilter=True,
-            contracts=p.get("contracts"),
-            should_stop=job.stop_event.is_set,
-            progress=job.add_log,
-        )
+        set_aside: list[JobOffer] = []
+        try:
+            matched = score_offers_multi(
+                job.cv_texts, all_offers, min_score=p["min_score"], sectors=p["sectors"],
+                exclude=p["exclude"], experience_level=p["experience"],
+                rejected_examples=rejections, shared_prefilter=not code_mode,
+                contracts=p.get("contracts"), should_stop=job.stop_event.is_set,
+                progress=job.add_log, code=code_mode, set_aside_out=set_aside,
+            )
+        except Exception as e:
+            # IA tombée en cours (serveur Ollama éteint, etc.) : plutôt qu'échouer,
+            # on bascule sur le scoring local — sauf si déjà en mode code ou si
+            # l'utilisateur a stoppé.
+            if code_mode or job.stop_event.is_set():
+                raise
+            job.add_log(f"⚠ IA indisponible ({type(e).__name__}) → bascule sur l'analyse locale (sans IA).")
+            code_mode = True
+            set_aside = []
+            matched = score_offers_multi(
+                job.cv_texts, all_offers, min_score=p["min_score"], sectors=p["sectors"],
+                exclude=p["exclude"], experience_level=p["experience"],
+                shared_prefilter=False, contracts=p.get("contracts"),
+                should_stop=job.stop_event.is_set, progress=job.add_log,
+                code=True, set_aside_out=set_aside,
+            )
+
+        set_aside = set_aside[:_SET_ASIDE_CAP]
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
 
@@ -445,7 +495,10 @@ def _run_scan(job: _Job, p: dict) -> None:
             p["query"], f"score < {p['min_score']}/10 ou exclue par filtre",
         )
 
-        job.offers = matched
+        # Retenues puis mises de côté dans une seule liste : indices stables pour
+        # le suivi/les lettres ; aside_from sépare les deux côté interface.
+        job.offers = matched + set_aside
+        job.aside_from = len(matched)
         job.query = p["query"]
         # Session enregistrée sauf arrêt sans aucun résultat (rien à garder)
         if matched or not job.stop_event.is_set():
@@ -454,13 +507,15 @@ def _run_scan(job: _Job, p: dict) -> None:
                     kind="web", criteria=_session_criteria(p), offers=matched,
                     found=len(all_offers),
                 )
+        aside_note = (f" · {len(set_aside)} mise(s) de côté (sous le seuil, consultables)"
+                      if set_aside else "")
         if job.stop_event.is_set():
-            job.add_log(f"⏹ Recherche stoppée : {len(matched)} offre(s) déjà scorées conservées.")
+            job.add_log(f"⏹ Recherche stoppée : {len(matched)} offre(s) déjà scorées conservées.{aside_note}")
         else:
-            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
+            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10{aside_note}")
         job.status = "done"
-        _LOG.info("scan %s : terminé (%d offres retenues / %d collectées)",
-                  job.id[:8], len(matched), len(all_offers))
+        _LOG.info("scan %s : terminé (%d retenues / %d mises de côté / %d collectées)",
+                  job.id[:8], len(matched), len(set_aside), len(all_offers))
     except Exception as e:
         _LOG.exception("scan %s : échec", job.id[:8])
         job.error = str(e)[:500]
@@ -505,11 +560,17 @@ def _run_rescore(job: _Job, p: dict) -> None:
             job.status = "done"
             return
 
-        job.add_log(f"Re-scoring de {len(offers)} offre(s) — pré-filtre code pur "
-                    f"(top {RESCORE_TOP_K}) puis pré-scoring IA…")
-        with _TRACKER_LOCK:
-            rejections = tracker.recent_rejections()
+        code_mode = not llm_available("match")
+        if code_mode:
+            job.add_log(f"Aucun modèle IA disponible → re-scoring local (sans IA) de {len(offers)} offre(s).")
+            rejections: list[str] = []
+        else:
+            job.add_log(f"Re-scoring de {len(offers)} offre(s) — pré-filtre code pur "
+                        f"(top {RESCORE_TOP_K}) puis pré-scoring IA…")
+            with _TRACKER_LOCK:
+                rejections = tracker.recent_rejections()
 
+        set_aside: list[JobOffer] = []
         matched = score_offers_multi(
             job.cv_texts,
             offers,
@@ -519,14 +580,18 @@ def _run_rescore(job: _Job, p: dict) -> None:
             experience_level=p["experience"],
             rejected_examples=rejections,
             top_k=RESCORE_TOP_K,
-            two_stage=True,
+            two_stage=not code_mode,
             should_stop=job.stop_event.is_set,
             progress=job.add_log,
+            code=code_mode,
+            set_aside_out=set_aside,
         )
+        set_aside = set_aside[:_SET_ASIDE_CAP]
         with _TRACKER_LOCK:
             tracker.mark_many(matched, "seen")
 
-        job.offers = matched
+        job.offers = matched + set_aside
+        job.aside_from = len(matched)
         job.query = "(re-scoring de la base)"
         p2 = dict(p, query="(re-scoring de la base)", sources=[])
         if matched or not job.stop_event.is_set():
@@ -535,10 +600,12 @@ def _run_rescore(job: _Job, p: dict) -> None:
                     kind="rescore", criteria=_session_criteria(p2), offers=matched,
                     found=len(offers),
                 )
+        aside_note = (f" · {len(set_aside)} mise(s) de côté (sous le seuil, consultables)"
+                      if set_aside else "")
         if job.stop_event.is_set():
-            job.add_log(f"⏹ Re-scoring stoppé : {len(matched)} offre(s) déjà scorées conservées.")
+            job.add_log(f"⏹ Re-scoring stoppé : {len(matched)} offre(s) déjà scorées conservées.{aside_note}")
         else:
-            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10")
+            job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10{aside_note}")
         job.status = "done"
     except Exception as e:
         job.error = str(e)[:500]
@@ -671,7 +738,9 @@ def _run_check(job: _Job, scan_job: _Job) -> None:
     """Reparcourt les offres et teste leur disponibilité sur les plateformes,
     sans aucun appel IA (simple requête HTTP par offre, en parallèle)."""
     try:
-        offers = list(scan_job.offers)
+        # Offres retenues uniquement : leurs indices 0..n-1 coïncident avec les
+        # cartes #results-grid (les mises de côté ne sont pas vérifiées).
+        offers = list(_matched_offers(scan_job))
         job.add_log(f"Vérification de la disponibilité de {len(offers)} offre(s) (sans IA)…")
         results: dict[int, dict] = {}
         done = 0
@@ -1299,9 +1368,17 @@ class _Handler(BaseHTTPRequestHandler):
         if job.status == "done" and job.kind == "scan":
             tracker = _get_tracker()
             with _TRACKER_LOCK:
-                payload["offers"] = [
-                    _offer_dict(o, i, tracker.status_of(o)) for i, o in enumerate(job.offers)
-                ]
+                statuses = [tracker.status_of(o) for o in job.offers]
+            # Indices vrais dans job.offers (suivi/lettres) ; aside_from sépare
+            # les retenues des mises de côté (déjà analysées, sous le seuil).
+            aside = job.aside_from if job.aside_from is not None else len(job.offers)
+            payload["offers"] = [
+                _offer_dict(o, i, statuses[i]) for i, o in enumerate(job.offers[:aside])
+            ]
+            payload["set_aside"] = [
+                _offer_dict(o, aside + i, statuses[aside + i])
+                for i, o in enumerate(job.offers[aside:])
+            ]
         if job.status == "done" and job.kind in ("letter", "cv", "check"):
             payload["result"] = job.result
         self._json(payload)
@@ -1763,7 +1840,8 @@ class _Handler(BaseHTTPRequestHandler):
         if scan_job is None or scan_job.kind != "scan" or not scan_job.offers:
             self._error("Aucun résultat à exporter", 404)
             return
-        json_path, csv_path = save_results(scan_job.offers, scan_job.query or "recherche")
+        # Export = offres retenues uniquement (pas les mises de côté sous le seuil)
+        json_path, csv_path = save_results(_matched_offers(scan_job), scan_job.query or "recherche")
         self._json({"ok": True, "json_file": json_path.name, "csv_file": csv_path.name})
 
     def _api_notion(self):
@@ -1778,7 +1856,7 @@ class _Handler(BaseHTTPRequestHandler):
         if scan_job is None or scan_job.kind != "scan" or not scan_job.offers:
             self._error("Aucun résultat à exporter", 404)
             return
-        count = export_to_notion(scan_job.offers)
+        count = export_to_notion(_matched_offers(scan_job))
         self._json({"ok": True, "count": count})
 
 

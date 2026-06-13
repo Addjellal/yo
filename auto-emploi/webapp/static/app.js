@@ -92,7 +92,8 @@ function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
 
 let APP = null;            // réponse de /api/state
 let SCAN_JOB = null;       // id du scan courant
-let OFFERS = [];           // offres du dernier scan
+let OFFERS = [];           // offres retenues du dernier scan (≥ score min)
+let SET_ASIDE = [];        // offres analysées mais sous le seuil (consultables)
 let POLL_TIMER = null;
 // Génération de polling : tout nouveau scan/vérif l'incrémente ; un poll plus
 // ancien (scan ou check) s'arrête de lui-même et n'écrase plus le journal.
@@ -592,12 +593,13 @@ async function startScan() {
   $("#btn-scan").disabled = true;
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
+  $("#setaside-zone").hidden = true;
   $("#scan-progress").hidden = false;
   $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
   { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = noAi
-    ? `Test scraper (sans IA) : « ${query} »`
+    ? `Analyse locale sans IA : « ${query} »`
     : isGlobal
       ? "Recherche globale d'après vos CV…"
       : `Recherche : « ${query} »`;
@@ -637,6 +639,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   $("#btn-scan").disabled = true;
   $("#search-empty").hidden = true;
   $("#results-zone").hidden = true;
+  $("#setaside-zone").hidden = true;
   $("#scan-progress").hidden = false;
   $("#btn-show-log").hidden = true;
   $("#btn-scan-stop").disabled = false;
@@ -674,12 +677,14 @@ function pollScan(gen = POLL_GEN) {
     }
     $("#progress-title").textContent = "Recherche terminée";
     OFFERS = job.offers || [];
-    // Offres trouvées → le journal s'efface mais reste récupérable via le
-    // bouton « Revoir le journal ». Aucune offre → le journal reste visible.
-    const logHidden = OFFERS.length > 0;
+    SET_ASIDE = job.set_aside || [];
+    // Offres trouvées (retenues OU mises de côté) → le journal s'efface mais
+    // reste récupérable via « Revoir le journal ». Sinon il reste visible.
+    const logHidden = OFFERS.length > 0 || SET_ASIDE.length > 0;
     $("#scan-progress").hidden = logHidden;
     $("#btn-show-log").hidden = !logHidden;
     renderResults();
+    renderSetAside();
   }, 850);
 }
 
@@ -729,7 +734,9 @@ function renderResults() {
   if (!OFFERS.length) {
     zone.hidden = true;
     $("#results-grid").replaceChildren();
-    $("#search-empty").hidden = false;
+    // Rien au-dessus du seuil : on n'affiche le grand état vide que s'il n'y a
+    // pas non plus d'offres mises de côté (sinon leur section porte le contenu).
+    $("#search-empty").hidden = SET_ASIDE.length > 0;
     $("#search-empty").querySelector("p").textContent =
       "Aucune offre au-dessus du score minimum. Essayez d'autres mots-clés ou baissez le score.";
     return;
@@ -741,6 +748,36 @@ function renderResults() {
     countEl: $("#results-count"), onEmpty: renderResults,
   }, $("#sort-select").value);
 }
+
+// Offres mises de côté (analysées mais sous le score minimum). Repliées par
+// défaut : déjà évaluées, mais secondaires. Les cartes ne sont peintes qu'à
+// l'ouverture. Elles partagent les indices du scan (job.offers), donc favori /
+// lettre / rejet fonctionnent comme sur un résultat normal.
+function renderSetAside() {
+  const zone = $("#setaside-zone");
+  const grid = $("#setaside-grid");
+  const toggle = $("#btn-setaside-toggle");
+  grid.replaceChildren();
+  grid.hidden = true;
+  toggle.textContent = "Afficher ▾";
+  if (!SET_ASIDE.length) { zone.hidden = true; return; }
+  zone.hidden = false;
+  const n = SET_ASIDE.length;
+  $("#setaside-count").textContent = `${n} offre${n > 1 ? "s" : ""} mise${n > 1 ? "s" : ""} de côté`;
+}
+
+$("#btn-setaside-toggle").addEventListener("click", () => {
+  const grid = $("#setaside-grid");
+  const show = grid.hidden;
+  if (show && !grid.children.length) {
+    renderOfferCards(SET_ASIDE, {
+      jobId: SCAN_JOB, offers: SET_ASIDE, grid,
+      countEl: null, onEmpty: renderSetAside,
+    }, "score");
+  }
+  grid.hidden = !show;
+  $("#btn-setaside-toggle").textContent = show ? "Masquer ▴" : "Afficher ▾";
+});
 
 function offerCard(offer, ctx) {
   // ctx = { jobId, offers, grid, countEl, onEmpty } — découple la carte du scan

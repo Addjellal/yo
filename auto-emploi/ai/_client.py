@@ -39,6 +39,22 @@ def resolve_backend(task: str) -> tuple[str, str]:
     return backend, model
 
 
+def llm_available(task: str = "match") -> bool:
+    """Indique si un backend LLM est vraisemblablement utilisable pour la tâche.
+    - Anthropic exige une clé API ; sans clé, on ne le considère dispo que si un
+      fallback Ollama est configuré.
+    - Ollama est supposé disponible (un ping bloquant à chaque scan serait
+      coûteux) ; un serveur réellement éteint est rattrapé en aval (bascule sur
+      le scoring local sans IA).
+    Sert à choisir, au lancement d'un scan, entre l'analyse IA et le repli code
+    pur — plutôt que d'échouer faute de modèle."""
+    backend, _ = resolve_backend(task)
+    if backend == "anthropic" and not config.anthropic_api_key:
+        fb = _fallback_backend("anthropic")
+        return fb is not None and fb[0] == "ollama"
+    return True
+
+
 def _fallback_backend(primary: str) -> tuple[str, str] | None:
     """Backend de secours configuré via AI_FALLBACK, ou None.
     Jamais le même que le backend primaire."""

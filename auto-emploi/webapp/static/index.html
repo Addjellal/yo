@@ -144,8 +144,8 @@
 
           <div class="field span-3 checkbox-row">
             <label class="check"><input id="f-include-seen" type="checkbox"> Inclure les offres déjà traitées</label>
-            <label class="check" title="Collecte et affiche les offres brutes SANS aucun appel IA — pour ajuster requête, sources et filtres sans consommer de tokens, avant de reconnecter le matching IA">
-              <input id="f-no-ai" type="checkbox"> 🔌 Mode test scraper (sans IA — offres brutes)
+            <label class="check" title="Score les offres SANS aucun appel IA : recouvrement de mots-clés entre votre CV et chaque offre (titre pondéré). Gratuit et instantané, mais sans compréhension sémantique — utile sans clé API ni modèle local. Sans CV : aperçu brut des offres.">
+              <input id="f-no-ai" type="checkbox"> 🔌 Analyse locale sans IA (score par mots-clés)
             </label>
           </div>
         </div>
@@ -185,6 +185,19 @@
         </div>
       </div>
       <div id="results-grid" class="results-grid"></div>
+    </div>
+
+    <!-- Offres analysées mais sous le score minimum : déjà évaluées (aucun
+         calcul supplémentaire), repliées par défaut pour ne pas encombrer. -->
+    <div id="setaside-zone" hidden>
+      <div class="results-toolbar setaside-head">
+        <h3 id="setaside-count">0 offre mise de côté</h3>
+        <button id="btn-setaside-toggle" class="btn-ghost small"
+                title="Offres déjà analysées mais sous votre score minimum">Afficher ▾</button>
+      </div>
+      <p class="setaside-note">Analysées mais sous votre score minimum — déjà évaluées,
+        aucun calcul supplémentaire. Repassez-les en revue : favori, lettre ou rejet.</p>
+      <div id="setaside-grid" class="results-grid" hidden></div>
     </div>
 
     <div id="search-empty" class="empty-state">

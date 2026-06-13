@@ -182,6 +182,44 @@ class TestAsciiSlug(unittest.TestCase):
         self.assertEqual(_ascii_slug("···"), "recherche")
 
 
+class TestLetterFileName(unittest.TestCase):
+    """Nom de fichier d'une lettre : accents translittérés (é → e), pas
+    remplacés par « _ » — sinon le téléchargement affichait « d_veloppeur »."""
+
+    def _name(self, title, company):
+        import re
+        import unicodedata
+        folded = unicodedata.normalize("NFKD", f"{title}_{company}").encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9_-]", "_", folded.lower())[:60].strip("_") or "lettre"
+
+    def test_save_translittere_les_accents(self):
+        import re
+        from ai.cover_letter import CoverLetterGenerator
+        gen = CoverLetterGenerator("CV")
+        offer = JobOffer(id="1", title="Développeur Réseau", company="Société Générale",
+                         location="Paris", description="", url="https://x/1", source="t")
+
+        captured = {}
+        gen._save_pdf = lambda path, job, letter: captured.setdefault("pdf", path)
+        import output_paths
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            original = output_paths.letters_dir
+            output_paths.letters_dir = lambda: Path(d)
+            try:
+                txt, pdf = gen.save(offer, {"letter": "Madame, Monsieur,", "email_subject": "", "email_body": ""})
+            finally:
+                output_paths.letters_dir = original
+        self.assertEqual(txt.stem, "developpeur_reseau_societe_generale")
+        self.assertNotIn("_veloppeur", txt.stem)        # é n'a pas été perdu
+        self.assertTrue(re.fullmatch(r"[a-z0-9_-]+", txt.stem))  # toujours sûr
+
+    def test_pas_de_traversee_de_chemin(self):
+        import re
+        self.assertTrue(re.fullmatch(r"[a-z0-9_-]+", self._name("../../etc", "passwd")))
+        self.assertNotIn("/", self._name("a/b\\c", ".."))
+
+
 class TestFetchWithRetry(unittest.TestCase):
     class _Resp:
         def __init__(self, status):
@@ -324,6 +362,39 @@ class TestLetterFileParsing(unittest.TestCase):
         self.assertIn("Jean Dupont", h)
         self.assertTrue(h.endswith("\n\n"))
         self.assertNotIn("LETTRE DE MOTIVATION", h)
+
+
+class TestMatchedOffersSplit(unittest.TestCase):
+    """Retenues + mises de côté cohabitent dans job.offers ; aside_from sépare
+    les deux. _matched_offers ne renvoie que les retenues (export, Notion, dispo,
+    historique) — sans recalcul ni pollution par les offres sous le seuil."""
+
+    def _offer(self, i):
+        return JobOffer(id=f"o{i}", title=f"Poste {i}", company="C", location="P",
+                        description="", url=f"https://x/{i}", source="t")
+
+    def test_sans_mise_de_cote(self):
+        import webapp.server as srv
+        job = srv._Job("scan")
+        job.offers = [self._offer(0), self._offer(1)]
+        job.aside_from = None  # session rechargée : tout est retenu
+        self.assertEqual(srv._matched_offers(job), job.offers)
+
+    def test_frontiere_aside_from(self):
+        import webapp.server as srv
+        job = srv._Job("scan")
+        kept = [self._offer(0), self._offer(1)]
+        aside = [self._offer(2)]
+        job.offers = kept + aside
+        job.aside_from = len(kept)
+        self.assertEqual([o.id for o in srv._matched_offers(job)], ["o0", "o1"])
+
+    def test_aucune_retenue_que_des_mises_de_cote(self):
+        import webapp.server as srv
+        job = srv._Job("scan")
+        job.offers = [self._offer(0)]
+        job.aside_from = 0  # 0 retenue, 1 mise de côté
+        self.assertEqual(srv._matched_offers(job), [])
 
 
 class TestMultiLocation(unittest.TestCase):

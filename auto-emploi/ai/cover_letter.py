@@ -564,8 +564,12 @@ class CoverLetterGenerator:
 
     def save(self, job: JobOffer, result: dict) -> tuple[Path, Path]:
         from output_paths import letters_dir
-        # Nom de fichier strictement alphanumérique : aucune traversée de chemin possible
-        safe_name = re.sub(r"[^a-z0-9_-]", "_", f"{job.title}_{job.company}".lower())[:60].strip("_") or "lettre"
+        # Nom de fichier sûr ET lisible : on translittère d'abord les accents
+        # (é → e, à → a, ç → c…) AVANT de neutraliser le reste — sinon « é »
+        # devenait « _ » (« développeur » → « d_veloppeur »). Résultat strictement
+        # [a-z0-9_-] : toujours aucune traversée de chemin possible.
+        folded = unicodedata.normalize("NFKD", f"{job.title}_{job.company}").encode("ascii", "ignore").decode("ascii")
+        safe_name = re.sub(r"[^a-z0-9_-]", "_", folded.lower())[:60].strip("_") or "lettre"
         out_dir = letters_dir().resolve()
         txt_path = out_dir / f"{safe_name}.txt"
         pdf_path = out_dir / f"{safe_name}.pdf"

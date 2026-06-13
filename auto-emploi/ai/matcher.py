@@ -1,6 +1,8 @@
 import copy
 import json
+import math
 import re
+import unicodedata
 from collections import Counter
 from typing import Callable
 
@@ -212,6 +214,23 @@ def _tokenize(text: str) -> list[str]:
     ]
 
 
+def _fold(text: str) -> str:
+    """Retire les accents (NFKD) — pour le scoring code pur, où « ingénieur » et
+    « ingenieur » doivent s'apparier (un scraper renvoie parfois sans accent)."""
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", text or "") if not unicodedata.combining(c)
+    )
+
+
+def _fold_tokens(text: str) -> set[str]:
+    """Jetons significatifs, accents repliés et pluriels canonisés (« pipelines »
+    → « pipeline ») — base du scoring 100 % code, pour un meilleur rappel."""
+    out: set[str] = set()
+    for t in _tokenize(_fold(text)):
+        out.add(t[:-1] if len(t) > 4 and t.endswith("s") else t)
+    return out
+
+
 def _clamp_score(value) -> int:
     try:
         return max(0, min(10, int(value)))
@@ -235,6 +254,8 @@ class JobMatcher:
         self._llm_prescore = LLMClient(task="prescore")
         # Vocabulaire CV : mots significatifs avec leur fréquence
         self._cv_vocab: Counter[str] = Counter(_tokenize(cv_text))
+        # Vocabulaire replié (sans accents) pour le scoring 100 % code
+        self._cv_vocab_folded: set[str] = _fold_tokens(cv_text)
 
     def set_rejected_examples(self, examples: list[str]) -> None:
         """Titres d'offres rejetées par le candidat : le modèle pénalise les
@@ -322,6 +343,81 @@ class JobMatcher:
         offer_tokens = set(_tokenize(f"{offer.title} {offer.description}"))
         return sum(1 for t in offer_tokens if t in self._cv_vocab)
 
+    # ─── Scoring 100 % code (aucun appel IA) ──────────────────────────────────
+    # Repli quand aucun LLM n'est disponible (mode local / bascule automatique).
+    # Pertinence = recouvrement de mots-clés CV/offre pondéré TF-IDF, le titre
+    # du poste comptant davantage que la description. Honnête sur ses limites :
+    # pas de compréhension sémantique (« data engineer » ≈ « ingénieur data »).
+
+    def _build_idf(self, offers: list[JobOffer]) -> dict[str, float]:
+        """Poids IDF lissé depuis le corpus d'offres : un mot présent dans
+        presque toutes les offres (boilerplate) pèse ~0, un mot rare pèse plus —
+        il discrimine mieux la correspondance."""
+        n = len(offers) or 1
+        df: Counter[str] = Counter()
+        for o in offers:
+            df.update(_fold_tokens(f"{o.title} {o.description or ''}"))
+        # +0.1 : plancher pour qu'aucun terme retenu ne pèse exactement zéro.
+        return {term: math.log((n + 1) / (count + 1)) + 0.1 for term, count in df.items()}
+
+    def _code_score(self, offer: JobOffer, idf: dict[str, float]) -> tuple[int, list[str]]:
+        """Score 0-10 + termes communs saillants, par recouvrement pondéré.
+        Le titre pèse 0.6, la description 0.4 ; courbe concave douce pour
+        exploiter la plage 0-10 sans gonfler les correspondances faibles."""
+        if not self._cv_vocab_folded:
+            return 0, []
+        title_tokens = _fold_tokens(offer.title)
+        desc_tokens = _fold_tokens(offer.description or "") - title_tokens
+
+        def coverage(tokens: set[str]) -> tuple[float, list[str]]:
+            total = sum(idf.get(t, 0.1) for t in tokens)
+            if total <= 0:
+                return 0.0, []
+            matched = [t for t in tokens if t in self._cv_vocab_folded]
+            got = sum(idf.get(t, 0.1) for t in matched)
+            return got / total, matched
+
+        title_cov, title_matched = coverage(title_tokens)
+        desc_cov, desc_matched = coverage(desc_tokens)
+        # Titre pondéré un peu plus fort que la description ; courbe concave
+        # douce (exposant < 1) pour que les bonnes correspondances atteignent
+        # 7-10 sans gonfler les faibles.
+        relevance = 0.55 * title_cov + 0.45 * desc_cov
+        score = max(0, min(10, round(10 * relevance ** 0.6)))
+        # Termes communs les plus discriminants (IDF élevé) pour l'affichage.
+        seen: set[str] = set()
+        terms: list[str] = []
+        for t in sorted(set(title_matched + desc_matched), key=lambda t: -idf.get(t, 0.0)):
+            if t not in seen:
+                seen.add(t)
+                terms.append(t)
+        return score, terms[:8]
+
+    def _apply_code_score(self, offer: JobOffer, idf: dict[str, float]) -> None:
+        score, terms = self._code_score(offer, idf)
+        offer.match_score = score
+        offer.match_reasons = (
+            "Estimation locale (sans IA) : recouvrement de mots-clés entre votre "
+            "CV et l'offre, titre du poste pondéré."
+        )
+        offer.match_strengths = "Termes communs CV/offre : " + ", ".join(terms) if terms else ""
+        offer.match_gaps = (
+            "Analyse sémantique indisponible (aucun modèle IA) — score indicatif, "
+            "vérifiez l'offre vous-même."
+        )
+
+    def _score_offers_code(
+        self,
+        offers: list[JobOffer],
+        progress: Callable[[str], None] | None = None,
+    ) -> list[JobOffer]:
+        """Applique le scoring code pur à toutes les offres (déjà filtrées)."""
+        idf = self._build_idf(offers)
+        self._step(progress, f"Scoring local (sans IA) : {len(offers)} offre(s) évaluée(s) par mots-clés.")
+        for o in offers:
+            self._apply_code_score(o, idf)
+        return offers
+
     def _prefilter(self, offers: list[JobOffer], top_k: int | None = None) -> tuple[list[JobOffer], int]:
         """Heuristique rapide (code pur, aucun appel IA) : garde les offres ayant
         un overlap minimal de mots-clés avec le CV. Si top_k est fourni, ne garde
@@ -350,6 +446,8 @@ class JobMatcher:
         should_stop: Callable[[], bool] | None = None,
         progress: Callable[[str], None] | None = None,
         display_min_score: int | None = None,
+        code: bool = False,
+        set_aside_out: list[JobOffer] | None = None,
     ) -> list[JobOffer]:
         """top_k : plafond du pré-filtre code pur (re-scoring de grosses bases).
         two_stage : pré-scoring IA rapide (tâche « prescore », routable vers un
@@ -363,7 +461,12 @@ class JobMatcher:
         display_min_score : seuil affiché dans le journal (lot par lot) — utile en
         multi-CV où le filtrage réel est fait après agrégation des CV (on passe
         min_score=0 pour conserver tous les scores par CV, mais on affiche le vrai
-        seuil voulu par l'utilisateur)."""
+        seuil voulu par l'utilisateur).
+        code : scoring 100 % code (aucun appel IA) — repli local quand aucun LLM
+        n'est disponible. Pertinence par recouvrement de mots-clés pondéré.
+        set_aside_out : si fourni, reçoit les offres ANALYSÉES mais sous le seuil
+        (0 < score < min_score), triées par score décroissant — déjà évaluées,
+        donc consultables sans calcul supplémentaire (« offres mises de côté »)."""
         self._sectors = sectors or []
         self._experience_level = experience_level or ""
         self._contracts = {c for c in (contracts or []) if c in CONTRACT_TYPES}
@@ -392,26 +495,41 @@ class JobMatcher:
         if not offers:
             return []
 
-        # 4. Pré-scoring IA rapide en masse, puis analyse détaillée du top
-        if two_stage and len(offers) > TWO_STAGE_THRESHOLD:
-            offers = self._prescore(offers, should_stop=should_stop, progress=progress)
-
-        scored = []
-        total_batches = (len(offers) - 1) // BATCH_SIZE + 1
-        analyzed = 0
-        self._step(progress, f"Analyse détaillée : {len(offers)} offre(s) en {total_batches} lot(s) de {BATCH_SIZE}.")
-        for i in range(0, len(offers), BATCH_SIZE):
-            if should_stop and should_stop():
-                self._step(progress, "⏹ Analyse stoppée — résultats partiels conservés.", style="yellow")
-                break
-            batch = offers[i: i + BATCH_SIZE]
-            n = i // BATCH_SIZE + 1
-            self._step(progress, f"Lot {n}/{total_batches} : analyse de {len(batch)} offre(s) en cours…")
-            self._score_batch(batch)
-            scored.extend(batch)
-            analyzed += len(batch)
+        if code:
+            # Scoring local sans IA (mots-clés pondérés) : pas de lots, pas d'appel.
+            scored = self._score_offers_code(offers, progress=progress)
             kept = sum(1 for o in scored if (o.match_score or 0) >= shown_min)
-            self._step(progress, f"  ↳ {analyzed}/{len(offers)} offre(s) analysée(s) · {kept} retenue(s) ≥ {shown_min}/10")
+            self._step(progress, f"  ↳ {len(scored)} offre(s) évaluée(s) · {kept} retenue(s) ≥ {shown_min}/10 (sans IA)")
+        else:
+            # 4. Pré-scoring IA rapide en masse, puis analyse détaillée du top
+            if two_stage and len(offers) > TWO_STAGE_THRESHOLD:
+                offers = self._prescore(offers, should_stop=should_stop, progress=progress)
+
+            scored = []
+            total_batches = (len(offers) - 1) // BATCH_SIZE + 1
+            analyzed = 0
+            self._step(progress, f"Analyse détaillée : {len(offers)} offre(s) en {total_batches} lot(s) de {BATCH_SIZE}.")
+            for i in range(0, len(offers), BATCH_SIZE):
+                if should_stop and should_stop():
+                    self._step(progress, "⏹ Analyse stoppée — résultats partiels conservés.", style="yellow")
+                    break
+                batch = offers[i: i + BATCH_SIZE]
+                n = i // BATCH_SIZE + 1
+                self._step(progress, f"Lot {n}/{total_batches} : analyse de {len(batch)} offre(s) en cours…")
+                self._score_batch(batch)
+                scored.extend(batch)
+                analyzed += len(batch)
+                kept = sum(1 for o in scored if (o.match_score or 0) >= shown_min)
+                self._step(progress, f"  ↳ {analyzed}/{len(offers)} offre(s) analysée(s) · {kept} retenue(s) ≥ {shown_min}/10")
+
+        # Offres analysées mais sous le seuil : déjà évaluées, donc restituées à
+        # l'appelant pour consultation (« mises de côté ») sans recalcul.
+        if set_aside_out is not None:
+            set_aside_out.extend(sorted(
+                [o for o in scored if 0 < (o.match_score or 0) < min_score],
+                key=lambda o: o.match_score or 0,
+                reverse=True,
+            ))
 
         return sorted(
             [o for o in scored if (o.match_score or 0) >= min_score],
@@ -599,6 +717,8 @@ def score_offers_multi(
     contracts: list[str] | None = None,
     should_stop: Callable[[], bool] | None = None,
     progress: Callable[[str], None] | None = None,
+    code: bool = False,
+    set_aside_out: list[JobOffer] | None = None,
 ) -> list[JobOffer]:
     """Matching multi-CV : un score par CV pour chaque offre.
 
@@ -611,15 +731,19 @@ def score_offers_multi(
     COMMUN (profil fusionné) réduit le pool une seule fois avant l'analyse
     détaillée par CV — évite de scorer N× des offres hors-sujet pour tous.
     progress : callback de progression (lot par lot, CV par CV) pour le
-    journal en direct de l'interface web."""
+    journal en direct de l'interface web.
+    code : scoring 100 % code (aucun appel IA) — repli local.
+    set_aside_out : reçoit les offres analysées mais sous le seuil (cf.
+    JobMatcher.score_offers)."""
     labels = [lab for lab in cv_texts if cv_texts[lab]]
     if not labels or not offers:
         return []
 
     # Pré-filtre commun : on ne paie le pré-scoring qu'UNE fois (profil fusionné)
     # plutôt que N analyses détaillées d'offres hors-sujet pour tous les CV.
+    # Inutile en mode code (le scoring local est déjà gratuit pour tous les CV).
     shared_keep = shared_prescore_keep()
-    if shared_prefilter and len(labels) > 1 and len(offers) > shared_keep:
+    if shared_prefilter and not code and len(labels) > 1 and len(offers) > shared_keep:
         merged_text = "\n\n".join(f"### CV : {lab}\n{cv_texts[lab]}" for lab in labels)
         gate = JobMatcher(merged_text)
         if rejected_examples:
@@ -662,6 +786,7 @@ def score_offers_multi(
             offers, min_score=min_score, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
             contracts=contracts, should_stop=should_stop, progress=progress,
+            code=code, set_aside_out=set_aside_out,
         )
 
     # Un passage complet par CV (sur des copies : les objets d'origine restent
@@ -684,7 +809,7 @@ def score_offers_multi(
             copies, min_score=0, sectors=sectors, exclude=exclude,
             experience_level=experience_level, top_k=top_k, two_stage=two_stage,
             contracts=contracts, should_stop=should_stop, progress=sub_progress,
-            display_min_score=min_score,
+            display_min_score=min_score, code=code,
         )
         for offer in scored:
             key = offer.unique_key()
@@ -702,6 +827,7 @@ def score_offers_multi(
 
     # Le meilleur CV de chaque offre fournit les champs match_* principaux
     results: list[JobOffer] = []
+    aside: list[JobOffer] = []
     for offer in merged.values():
         if not offer.cv_scores:
             continue
@@ -717,6 +843,11 @@ def score_offers_multi(
         offer.match_gaps = best["gaps"] or None
         if best["score"] >= min_score:
             results.append(offer)
+        elif best["score"] > 0:
+            aside.append(offer)
+
+    if set_aside_out is not None:
+        set_aside_out.extend(sorted(aside, key=lambda o: o.match_score or 0, reverse=True))
 
     return sorted(results, key=lambda o: o.match_score or 0, reverse=True)
 

@@ -523,6 +523,16 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
 }
 .letter-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-2px); }
 .letter-card.clickable { cursor: pointer; }
+
+/* Offres mises de côté : section secondaire, repliable, visuellement en retrait
+   du bloc de résultats principal. */
+#setaside-zone { margin-top: 28px; border-top: 1px dashed var(--border); padding-top: 18px; }
+.setaside-head { margin-bottom: 4px; }
+.setaside-head h3 { font-size: 16px; color: var(--text-soft); letter-spacing: -.01em; }
+.setaside-head .btn-ghost { margin-left: auto; }
+.setaside-note { margin: 0 0 14px; color: var(--text-soft); font-size: 12.5px; line-height: 1.6; max-width: 62ch; }
+#setaside-grid .offer-card { opacity: .82; }
+#setaside-grid .offer-card:hover { opacity: 1; }
 .letter-card .lt-title { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; }
 .letter-card .lt-meta { color: var(--text-soft); font-size: 12.5px; display: flex; gap: 9px; flex-wrap: wrap; }
 .letter-card .lt-actions { display: flex; gap: 7px; margin-top: 4px; }
