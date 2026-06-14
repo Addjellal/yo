@@ -123,6 +123,18 @@ class LinkedInScraper(BaseScraper):
 
         from ._browser import _launch_args
 
+        # Le mode connecté est contraire aux CGU LinkedIn (le mode invité ne l'est
+        # pas). On le rappelle ici aussi, car ce chemin est emprunté par l'UI web
+        # et pas seulement par le CLI.
+        try:
+            from app_utils import console
+            console.print(
+                "[yellow]⚠ LinkedIn : mode connecté (contraire aux CGU) — "
+                "votre compte peut être restreint. Préférez le mode invité.[/yellow]"
+            )
+        except Exception:
+            pass
+
         offers = []
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=_launch_args())
@@ -140,6 +152,12 @@ class LinkedInScraper(BaseScraper):
 
     def _login(self, page) -> None:
         page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
+
+        # Garde-fou anti-hameçonnage : on ne saisit jamais les identifiants si la
+        # page n'est pas réellement sur le domaine LinkedIn (redirect/interstitiel
+        # inattendu). Dans ce cas on tente directement la recherche.
+        if not str(page.url or "").startswith(("https://www.linkedin.com/", "https://linkedin.com/")):
+            return
 
         # LinkedIn peut afficher : formulaire complet, mot de passe seul (session partielle)
         # ou rien (déjà connecté — redirigé vers /feed ou /jobs).

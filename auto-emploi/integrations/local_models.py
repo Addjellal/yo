@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import urllib.parse
 import urllib.request
 
 from config import config
@@ -21,11 +22,14 @@ _LLAMACPP_URL = "http://localhost:8080/v1/models"
 
 
 def _get_json(url: str) -> dict | list | None:
-    """GET local en JSON, None si le serveur est absent — n'autorise que
-    localhost (aucune URL externe ne passe par ici)."""
+    """GET JSON court vers un serveur LLM (Ollama/LM Studio/llama.cpp), None si
+    absent. N'autorise que les schémas http(s) : aucun file://, gopher://… ne
+    peut être sondé même si OLLAMA_BASE_URL était mal configuré."""
     try:
+        if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+            return None
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (localhost)
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (http(s) only)
             return json.loads(resp.read(1_000_000).decode("utf-8", "replace"))
     except Exception:
         return None

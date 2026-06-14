@@ -1,4 +1,7 @@
 # Sorties et données locales du projet auto-emploi
+# Secrets : ignorés ici aussi (et pas seulement par le .gitignore racine) pour
+# rester protégés si auto-emploi/ est extrait dans son propre dépôt.
+.env
 .env.tmp
 .env_*.tmp
 # Tout le dossier output/ : exports, CV importés, lettres, logs, état interne

@@ -21,15 +21,23 @@ from app_utils import console
 _API = "https://api.notion.com/v1/pages"
 _VERSION = "2022-06-28"
 _DB_ID_RE = re.compile(r"^[a-f0-9-]{32,36}$")
+# Formats de jeton Notion (secret_… historique, ntn_… actuel) + en-tête Bearer,
+# masqués indépendamment du token configuré : même un secret tiers ne fuite pas.
+_SECRET_RE = re.compile(r"(?:secret_|ntn_)[A-Za-z0-9]{8,}|Bearer\s+\S+", re.I)
 
 
 def notion_configured() -> bool:
     return bool(config.notion_token and config.notion_database_id)
 
 
-def _redact(message: str) -> str:
-    """Jamais de token Notion dans la console."""
-    return str(message).replace(config.notion_token, "***") if config.notion_token else str(message)
+def _redact(message) -> str:
+    """Jamais de jeton Notion dans la console : on masque le token configuré
+    (s'il apparaît verbatim) ET tout motif de secret/en-tête Bearer."""
+    text = str(message)
+    token = config.notion_token
+    if token:
+        text = text.replace(token, "***")
+    return _SECRET_RE.sub("***", text)
 
 
 def export_to_notion(offers) -> int:

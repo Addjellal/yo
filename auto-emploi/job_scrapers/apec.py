@@ -130,8 +130,8 @@ class ApecScraper(BaseScraper):
 
             # localisation
             lieu = item.get("lieux") or item.get("lieu") or []
-            if isinstance(lieu, list) and lieu:
-                loc = lieu[0]
+            loc = lieu[0] if isinstance(lieu, list) and lieu else None
+            if isinstance(loc, dict):
                 city = loc.get("libelle") or loc.get("label") or ""
             else:
                 city = item.get("lieuTexte") or ""

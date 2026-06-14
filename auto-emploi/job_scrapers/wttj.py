@@ -119,13 +119,17 @@ class WTTJScraper(BaseScraper):
         try:
             job_id = str(item.get("id", item.get("slug", "")))
             slug = item.get("slug", job_id)
-            org = item.get("organization", item.get("company", {}))
+            org = item.get("organization") or item.get("company") or {}
+            if not isinstance(org, dict):
+                org = {}
             org_slug = org.get("slug", "")
 
             url = item.get("url") or f"{BASE_URL}/fr/companies/{org_slug}/jobs/{slug}"
 
-            offices = item.get("offices", [])
+            offices = item.get("offices") or []
             office = offices[0] if offices else {}
+            if not isinstance(office, dict):
+                office = {}
             city = office.get("city", item.get("city", ""))
             country = office.get("country", {})
             country_name = country.get("name", "") if isinstance(country, dict) else str(country)

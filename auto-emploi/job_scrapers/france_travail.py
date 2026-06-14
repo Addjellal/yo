@@ -1,7 +1,9 @@
 import time
 import requests
+from rich.markup import escape
 from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
+from app_utils import console
 
 
 TOKEN_URL = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=%2Fpartenaire"
@@ -44,7 +46,10 @@ class FranceTravailScraper(BaseScraper):
         )
         resp.raise_for_status()
         data = resp.json()
-        self._token = data["access_token"]
+        token = data.get("access_token")
+        if not token:
+            raise ValueError("réponse d'authentification sans access_token")
+        self._token = token
         try:
             expires_in = float(data.get("expires_in") or 1200)
         except (TypeError, ValueError):
@@ -55,37 +60,64 @@ class FranceTravailScraper(BaseScraper):
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         if config.country != "fr":
             raise ValueError("couvre uniquement la France")
-        token = self._get_token()
-        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-        params = {
-            "motsCles": query,
-            "range": f"0-{min(max_results, 149) - 1}",
-        }
-        if location:
-            params["commune"] = location
+        # L'API plafonne à 150 résultats par requête (range 0-149) ; on borne
+        # aussi par le bas pour éviter un range invalide « 0--1 » si max_results≤0.
+        last = min(max(max_results, 1), 150) - 1
 
-        resp = requests.get(SEARCH_URL, params=params, headers=headers, timeout=15)
-        if resp.status_code == 204:
-            return []
-        resp.raise_for_status()
-        if len(resp.content) > MAX_RESPONSE_BYTES:
+        try:
+            token = self._get_token()
+            headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+            params = {"motsCles": query, "range": f"0-{last}"}
+            if location:
+                params["commune"] = location
+
+            resp = requests.get(SEARCH_URL, params=params, headers=headers, timeout=15)
+            if resp.status_code == 204:
+                return []
+            resp.raise_for_status()
+            if len(resp.content) > MAX_RESPONSE_BYTES:
+                console.print("[yellow][France Travail] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                return []
+            results = resp.json().get("resultats", [])
+        except (requests.RequestException, ValueError) as e:
+            # Erreur côté France Travail (réseau, auth, JSON) : on dégrade
+            # proprement comme les autres sources plutôt que de crasher le scan.
+            console.print(
+                f"[yellow][France Travail] L'API ne répond pas correctement "
+                f"({escape(type(e).__name__)}) — erreur côté France Travail, réessayez plus tard.[/yellow]"
+            )
             return []
 
         offers = []
-        for item in resp.json().get("resultats", []):
+        for item in results:
+            job = self._parse_item(item, location)
+            if job:
+                offers.append(job)
+        return offers
+
+    def _parse_item(self, item: dict, location: str) -> JobOffer | None:
+        try:
             offer_id = item.get("id", "")
-            lieuTravail = item.get("lieuTravail", {})
-            salaire = item.get("salaire", {})
-            offers.append(JobOffer(
+            lieu = item.get("lieuTravail")
+            lieu = lieu if isinstance(lieu, dict) else {}
+            entreprise = item.get("entreprise")
+            entreprise = entreprise if isinstance(entreprise, dict) else {}
+            salaire = item.get("salaire")
+            salaire = salaire if isinstance(salaire, dict) else {}
+            contact = item.get("contact")
+            contact = contact if isinstance(contact, dict) else {}
+            detail_url = f"https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}"
+            return JobOffer(
                 id=f"ft_{offer_id}",
                 title=item.get("intitule", ""),
-                company=item.get("entreprise", {}).get("nom", "N/A"),
-                location=lieuTravail.get("libelle", location),
+                company=entreprise.get("nom") or "N/A",
+                location=lieu.get("libelle") or location,
                 description=item.get("description", ""),
-                url=f"https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}",
-                apply_url=item.get("contact", {}).get("urlPostulation") or f"https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}",
+                url=detail_url,
+                apply_url=contact.get("urlPostulation") or detail_url,
                 source=self.source_name,
                 salary=salaire.get("libelle"),
                 contract_type=item.get("typeContrat"),
-            ))
-        return offers
+            )
+        except Exception:
+            return None

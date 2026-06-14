@@ -1536,7 +1536,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Requête invalide")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        if scan_job is None or scan_job.kind != "scan":
+        if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
             self._error("Session introuvable", 404)
             return
         try:
@@ -1655,7 +1655,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Requête invalide")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        if scan_job is None or scan_job.kind != "scan":
+        if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
             self._error("Scan introuvable", 404)
             return
         status = str(body.get("status", ""))
@@ -1839,7 +1839,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Requête invalide")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        matched = _matched_offers(scan_job) if scan_job and scan_job.kind == "scan" else []
+        valid = scan_job and scan_job.kind == "scan" and scan_job.status == "done"
+        matched = _matched_offers(scan_job) if valid else []
         if not matched:
             self._error("Aucun résultat retenu à exporter", 404)
             return
@@ -1856,7 +1857,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Notion non configuré (NOTION_TOKEN + NOTION_DATABASE_ID)")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        matched = _matched_offers(scan_job) if scan_job and scan_job.kind == "scan" else []
+        valid = scan_job and scan_job.kind == "scan" and scan_job.status == "done"
+        matched = _matched_offers(scan_job) if valid else []
         if not matched:
             self._error("Aucun résultat retenu à exporter vers Notion", 404)
             return

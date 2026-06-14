@@ -358,7 +358,7 @@ class JobMatcher:
 
     def _code_score(self, offer: JobOffer, idf: dict[str, float]) -> tuple[int, list[str]]:
         """Score 0-10 + termes communs saillants, par recouvrement pondéré.
-        Le titre pèse 0.6, la description 0.4 ; courbe concave douce pour
+        Le titre pèse 0.55, la description 0.45 ; courbe concave douce pour
         exploiter la plage 0-10 sans gonfler les correspondances faibles."""
         if not self._cv_vocab_folded:
             return 0, []
@@ -821,7 +821,11 @@ def score_offers_multi(
                 "gaps": offer.match_gaps or "",
             }
 
-    # Le meilleur CV de chaque offre fournit les champs match_* principaux
+    # Le meilleur CV de chaque offre fournit les champs match_* principaux.
+    # Ordre des labels précalculé : départage les ex æquo en faveur du CV listé
+    # en premier, sans appel O(L²) à list.index — et sans ValueError si un label
+    # hérité d'une session rechargée n'est plus dans la liste courante.
+    label_order = {lab: i for i, lab in enumerate(labels)}
     results: list[JobOffer] = []
     aside: list[JobOffer] = []
     for offer in merged.values():
@@ -829,7 +833,7 @@ def score_offers_multi(
             continue
         best_label = max(
             offer.cv_scores,
-            key=lambda lab: (offer.cv_scores[lab]["score"], -labels.index(lab)),
+            key=lambda lab: (offer.cv_scores[lab]["score"], -label_order.get(lab, len(labels))),
         )
         best = offer.cv_scores[best_label]
         offer.best_cv = best_label

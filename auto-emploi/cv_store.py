@@ -311,11 +311,18 @@ class CVStore:
         }
         self._data["cvs"].append(entry)
         if len(self._data["cvs"]) > _MAX_CVS:
-            # Plafond : on élimine d'abord les plus vieux tombstones
-            tombstones = [e for e in self._data["cvs"] if e.get("deleted")]
-            for victim in tombstones[: len(self._data["cvs"]) - _MAX_CVS]:
-                self._data["cvs"].remove(victim)
-            self._data["cvs"] = self._data["cvs"][-_MAX_CVS:]
+            # Plafond : on purge d'abord les tombstones (les plus anciens d'abord)
+            # — jamais un CV actif tant qu'il reste une entrée supprimée à éliminer.
+            cvs = self._data["cvs"]
+            while len(cvs) > _MAX_CVS:
+                idx = next((i for i, e in enumerate(cvs) if e.get("deleted")), None)
+                if idx is None:
+                    break
+                cvs.pop(idx)
+            # S'il ne reste que des CV actifs au-delà du plafond, on conserve les
+            # plus récents (les seuls perdus possibles sont alors des CV actifs).
+            if len(cvs) > _MAX_CVS:
+                self._data["cvs"] = cvs[-_MAX_CVS:]
         self._save()
         return entry
 

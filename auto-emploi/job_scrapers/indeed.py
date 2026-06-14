@@ -228,7 +228,7 @@ class IndeedScraper(BaseScraper):
                 .get("mosaicProviderJobCardsModel", {})
                 .get("results", [])
             )
-        except (json.JSONDecodeError, Exception):
+        except Exception:
             return []
 
     def _parse_mosaic_item(self, item: dict) -> JobOffer | None:

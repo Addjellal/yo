@@ -189,8 +189,31 @@ class LLMClient:
                cache_system: bool = True):
         """Génère en flux, yieldant le texte au fur et à mesure. L'appelant peut
         ainsi conserver ce qui a déjà été produit si l'opération est interrompue
-        (timeout, coupure réseau). Pas de json_schema en streaming."""
+        (timeout, coupure réseau). Pas de json_schema en streaming.
+
+        Bascule sur le backend de secours (AI_FALLBACK) si le primaire échoue
+        *avant* d'avoir produit le moindre texte ; une fois le flux entamé on
+        relaie l'erreur telle quelle (relancer dupliquerait le partiel déjà émis,
+        que l'appelant récupère via son mécanisme de sauvegarde)."""
         backend, model = resolve_backend(self.task)
+        yielded = False
+        try:
+            for text in self._stream_backend(backend, model, system, user, max_tokens, cache_system):
+                yielded = True
+                yield text
+        except Exception as primary_error:
+            fallback = _fallback_backend(backend)
+            if yielded or fallback is None:
+                raise
+            fb_backend, fb_model = fallback
+            console.print(
+                f"[yellow]Backend {backend} indisponible pour la tâche "
+                f"« {self.task} » ({type(primary_error).__name__}) — "
+                f"bascule sur {fb_backend}.[/yellow]"
+            )
+            yield from self._stream_backend(fb_backend, fb_model, system, user, max_tokens, cache_system)
+
+    def _stream_backend(self, backend, model, system, user, max_tokens, cache_system):
         client = self._get(backend)
         if backend == "ollama":
             yield from self._ollama_stream(client, model, system, user)

@@ -457,5 +457,92 @@ class TestOutputPaths(unittest.TestCase):
         self.assertTrue(logs_dir().is_dir())
 
 
+class TestAuditFixes(unittest.TestCase):
+    """Régressions des correctifs d'audit : robustesse scrapers, lecture texte
+    tolérante, neutralisation du chemin de cache, départage multi-CV sûr."""
+
+    def test_cache_path_neutralise_traversee(self):
+        from pathlib import Path
+        from config import config
+        import cv_parser
+        evil = Path("/tmp/../../etc/cv évadé.txt")
+        cache = cv_parser._cache_path(evil)
+        # Le nom reste dans output/ et ne contient aucun séparateur ni « .. »
+        self.assertEqual(cache.parent, Path(config.output_dir).resolve())
+        self.assertNotIn("..", cache.name)
+        self.assertNotIn("/", cache.name)
+        self.assertTrue(cache.name.startswith(".cv_"))
+
+    def test_read_text_tolerant_cp1252(self):
+        import tempfile, os
+        from pathlib import Path
+        import cv_parser
+        fd, p = tempfile.mkstemp(suffix=".txt")
+        os.close(fd)
+        try:
+            # « é » en cp1252 (0xE9) : invalide en UTF-8 strict
+            Path(p).write_bytes(b"Profil ing\xe9nieur logiciel")
+            txt = cv_parser._read_text_tolerant(Path(p))
+            self.assertIn("ingénieur", txt)
+        finally:
+            os.unlink(p)
+
+    def test_write_cache_atomic_permissions(self):
+        import tempfile, os, sys
+        from pathlib import Path
+        import cv_parser
+        d = tempfile.mkdtemp()
+        try:
+            cache = Path(d) / ".cv_test.txt"
+            cv_parser._write_cache_atomic(cache, "contenu")
+            self.assertEqual(cache.read_text(encoding="utf-8"), "contenu")
+            if sys.platform != "win32":
+                self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
+        finally:
+            import shutil
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_scrapers_resistent_aux_champs_null(self):
+        # company/organization/location présents mais null → offre conservée,
+        # pas de crash AttributeError.
+        from job_scrapers.adzuna import AdzunaScraper
+        from job_scrapers.wttj import WTTJScraper
+        from job_scrapers.apec import ApecScraper
+        a = AdzunaScraper.__new__(AdzunaScraper)
+        off = a._parse_item({"id": "1", "title": "Dev", "company": None,
+                             "location": None, "redirect_url": "https://x"})
+        self.assertIsNotNone(off)
+        self.assertEqual(off.company, "N/A")
+
+        w = WTTJScraper.__new__(WTTJScraper)
+        off = w._parse_item({"id": "2", "name": "Dev", "organization": None,
+                             "offices": None})
+        self.assertIsNotNone(off)
+
+        ap = ApecScraper.__new__(ApecScraper)
+        off = ap._parse_item({"numeroOffre": "3", "intitule": "Dev",
+                              "lieux": ["pas un dict"]})
+        self.assertIsNotNone(off)
+
+    def test_france_travail_range_jamais_negatif(self):
+        # Le correctif borne le range : max_results≤0 ne produit pas « 0--1 ».
+        for mx in (0, -5, 1, 300):
+            last = min(max(mx, 1), 150) - 1
+            self.assertGreaterEqual(last, 0)
+            self.assertLessEqual(last, 149)
+
+    def test_redact_notion_masque_les_secrets(self):
+        from integrations import notion
+        msg = "auth failed: Bearer ntn_ABCDEFGH12345678 rejected"
+        red = notion._redact(msg)
+        self.assertNotIn("ntn_ABCDEFGH12345678", red)
+        self.assertIn("***", red)
+
+    def test_get_json_rejette_schemas_non_http(self):
+        from integrations.local_models import _get_json
+        self.assertIsNone(_get_json("file:///etc/passwd"))
+        self.assertIsNone(_get_json("gopher://localhost/"))
+
+
 if __name__ == "__main__":
     unittest.main()

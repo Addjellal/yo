@@ -1,18 +1,57 @@
 import base64
 import hashlib
 import os
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 
 def _cache_path(path: Path) -> Path:
     from config import config
-    cache_dir = Path(config.output_dir)
+    cache_dir = Path(config.output_dir).resolve()
     cache_dir.mkdir(parents=True, exist_ok=True)
     # Hash sur le chemin absolu pour éviter les collisions entre CVs
-    # de même nom dans des dossiers différents.
+    # de même nom dans des dossiers différents. Le stem n'est que cosmétique :
+    # on le neutralise strictement ([A-Za-z0-9_-]) pour qu'aucun « ../ » ni
+    # séparateur ne puisse faire sortir l'écriture du cache de output/.
     digest = hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()[:10]
-    return cache_dir / f".cv_{path.stem}_{digest}.txt"
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]", "_", path.stem)[:50] or "cv"
+    return cache_dir / f".cv_{safe_stem}_{digest}.txt"
+
+
+def _read_text_tolerant(path: Path) -> str:
+    """Lit un fichier texte sans crasher sur un encodage non-UTF-8 (CV exportés
+    en latin-1/cp1252, ou avec BOM) : UTF-8 d'abord, repli cp1252, puis
+    remplacement des octets restants."""
+    raw = path.read_bytes()
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", "replace")
+
+
+def _write_cache_atomic(cache: Path, text: str) -> None:
+    """Écrit le cache du CV (donnée personnelle) en 0600 dès la création, via
+    fichier temporaire + remplacement atomique — pas de fenêtre à 0644."""
+    fd, tmp = tempfile.mkstemp(dir=str(cache.parent), prefix=".cvtmp_")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        if sys.platform != "win32":
+            try:
+                os.chmod(tmp, 0o600)
+            except OSError:
+                pass
+        os.replace(tmp, cache)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 _MAX_CV_BYTES = 25 * 1024 * 1024  # garde-fou : un CV ne devrait jamais dépasser 25 Mo
@@ -36,20 +75,16 @@ def parse_cv(cv_path: str, force_reparse: bool = False) -> str:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         text = _parse_pdf(path)
-    elif suffix in (".docx", ".doc"):
+    elif suffix == ".docx":
         text = _parse_docx(path)
     elif suffix == ".txt":
-        text = path.read_text(encoding="utf-8")
+        text = _read_text_tolerant(path)
     else:
         raise ValueError(f"Format non supporté : {suffix}. Utilisez PDF, DOCX ou TXT.")
 
-    # Sauvegarder en cache — le CV est une donnée personnelle : accès propriétaire seul
-    cache.write_text(text, encoding="utf-8")
-    if sys.platform != "win32":
-        try:
-            os.chmod(cache, 0o600)
-        except OSError:
-            pass
+    # Sauvegarder en cache — le CV est une donnée personnelle : accès propriétaire
+    # seul, écriture atomique en 0600 (aucune fenêtre à 0644).
+    _write_cache_atomic(cache, text)
     return text
 
 

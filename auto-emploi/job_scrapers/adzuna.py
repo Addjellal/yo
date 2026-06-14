@@ -123,9 +123,10 @@ class AdzunaScraper(BaseScraper):
             if not title or not job_id:
                 return None
 
-            company = item.get("company", {}).get("display_name", "N/A")
-            loc_obj = item.get("location", {})
-            location = loc_obj.get("display_name", "")
+            company_obj = item.get("company")
+            company = company_obj.get("display_name", "N/A") if isinstance(company_obj, dict) else "N/A"
+            loc_obj = item.get("location")
+            location = loc_obj.get("display_name", "") if isinstance(loc_obj, dict) else ""
             description = (item.get("description") or "").strip()
             url = item.get("redirect_url", "")
 
