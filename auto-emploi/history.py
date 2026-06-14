@@ -46,7 +46,7 @@ _DESC_LIMIT = 4000  # assez pour le matching (to_text tronque à 3000)
 
 _OFFER_FIELDS = (
     "id", "title", "company", "location", "url", "apply_url",
-    "source", "salary", "contract_type",
+    "source", "salary", "contract_type", "date_posted",
 )
 
 
@@ -96,6 +96,7 @@ def _offer_from_dict(d: dict) -> JobOffer | None:
             source=str(d.get("source", "")),
             salary=str(d.get("salary") or "") or None,
             contract_type=str(d.get("contract_type") or "") or None,
+            date_posted=str(d.get("date_posted") or "") or None,
         )
     except Exception:
         return None

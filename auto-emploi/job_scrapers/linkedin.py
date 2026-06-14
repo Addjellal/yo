@@ -101,6 +101,9 @@ class LinkedInScraper(BaseScraper):
             m = re.search(r"/jobs/view/[^/]*?(\d+)", url)
             unique_id = m.group(1) if m else re.sub(r"[^a-z0-9]", "", f"{title}{company}".lower())[:60]
 
+            time_el = card.select_one("time.job-search-card__listdate, time[datetime]")
+            date_posted = (time_el.get("datetime") or "")[:10] if time_el else None
+
             return JobOffer(
                 id=f"linkedin_{unique_id}",
                 title=title,
@@ -110,6 +113,7 @@ class LinkedInScraper(BaseScraper):
                 url=url,
                 apply_url=url,
                 source=self.source_name,
+                date_posted=date_posted,
             )
         except Exception:
             return None

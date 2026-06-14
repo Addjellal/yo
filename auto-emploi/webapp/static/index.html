@@ -185,6 +185,16 @@
             <option value="source">Tri : source</option>
             <option value="company">Tri : entreprise</option>
           </select>
+          <select id="date-filter" title="Filtrer par date de publication">
+            <option value="all">Toutes dates</option>
+            <option value="1d">Dernières 24h</option>
+            <option value="3d">3 derniers jours</option>
+            <option value="7d">7 derniers jours</option>
+            <option value="14d">14 derniers jours</option>
+            <option value="1m">1 mois</option>
+            <option value="3m">3 mois</option>
+            <option value="1y">1 an</option>
+          </select>
           <button id="btn-check-avail" class="btn-ghost" title="Reparcourt les offres et teste leur disponibilité sur les plateformes — aucun appel IA">🔗 Vérifier la dispo (sans IA)</button>
           <button id="btn-export" class="btn-ghost">⬇ CSV / JSON</button>
           <button id="btn-notion" class="btn-ghost" hidden>Notion ↗</button>
@@ -606,6 +616,24 @@
       <div class="confirm-actions">
         <button id="confirm-cancel" class="btn-ghost">Annuler</button>
         <button id="confirm-ok" class="btn-danger">Supprimer définitivement</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modale choix format export -->
+<div id="export-overlay" class="modal-overlay" hidden>
+  <div class="modal modal-confirm">
+    <div class="modal-head">
+      <h2>Exporter les résultats</h2>
+      <button id="export-close" class="btn-ghost">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);margin:0">Choisissez le format de téléchargement</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="export-csv" class="btn-primary" style="flex:1">⬇ CSV</button>
+        <button id="export-json" class="btn-primary" style="flex:1">⬇ JSON</button>
+        <button id="export-both" class="btn-ghost" style="flex:1">⬇ Les deux</button>
       </div>
     </div>
   </div>

@@ -225,6 +225,7 @@ def _offer_dict(offer: JobOffer, index: int, status: str = "new") -> dict:
         "strengths": offer.match_strengths or "",
         "gaps": offer.match_gaps or "",
         "status": status,
+        "date_posted": offer.date_posted,
     }
     if offer.best_cv and isinstance(offer.cv_scores, dict) and offer.cv_scores:
         d["best_cv"] = offer.best_cv

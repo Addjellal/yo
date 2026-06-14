@@ -141,6 +141,15 @@ class IndeedScraper(BaseScraper):
             if not title or not link:
                 return None
 
+            pub_date_raw = item.findtext("pubDate", "").strip()
+            date_posted = None
+            if pub_date_raw:
+                try:
+                    from email.utils import parsedate_to_datetime
+                    date_posted = parsedate_to_datetime(pub_date_raw).strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+
             uid = jobkey or re.sub(r"[^a-z0-9]", "", f"{title}{company}".lower())
             return JobOffer(
                 id=f"indeed_{uid}",
@@ -152,6 +161,7 @@ class IndeedScraper(BaseScraper):
                 apply_url=link,
                 source=self.source_name,
                 salary=salary,
+                date_posted=date_posted,
             )
         except Exception:
             return None

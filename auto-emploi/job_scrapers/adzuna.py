@@ -154,6 +154,7 @@ class AdzunaScraper(BaseScraper):
                 source=self.source_name,
                 salary=salary,
                 contract_type=contract,
+                date_posted=(item.get("created") or "")[:10] or None,
             )
         except Exception:
             return None

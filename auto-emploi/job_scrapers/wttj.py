@@ -154,6 +154,8 @@ class WTTJScraper(BaseScraper):
             if not title:
                 return None
 
+            published = str(item.get("published_at") or item.get("publishedAt") or "")
+
             return JobOffer(
                 id=f"wttj_{job_id}",
                 title=title,
@@ -165,6 +167,7 @@ class WTTJScraper(BaseScraper):
                 source=self.source_name,
                 salary=salary,
                 contract_type=contract,
+                date_posted=published[:10] or None,
             )
         except Exception:
             return None

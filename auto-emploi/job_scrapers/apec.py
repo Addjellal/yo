@@ -159,6 +159,7 @@ class ApecScraper(BaseScraper):
                 source=self.source_name,
                 salary=salary,
                 contract_type=contract,
+                date_posted=(str(item.get("datePublication") or ""))[:10] or None,
             )
         except Exception:
             return None

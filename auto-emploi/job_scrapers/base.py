@@ -186,6 +186,7 @@ class JobOffer:
     # et label du CV au meilleur score (les champs match_* portent ce meilleur résultat)
     cv_scores: Optional[dict] = None
     best_cv: Optional[str] = None
+    date_posted: Optional[str] = None  # YYYY-MM-DD quand disponible (null sinon)
 
     def __post_init__(self):
         # Sanitisation systématique : quel que soit le scraper, aucune donnée
@@ -200,6 +201,7 @@ class JobOffer:
         self.description = _clean_block(self.description, _LIMITS["description"])
         self.url = safe_url(self.url, _LIMITS["url"])
         self.apply_url = safe_url(self.apply_url, _LIMITS["apply_url"])
+        self.date_posted = _clean_line(self.date_posted, 30) or None
 
     def to_text(self) -> str:
         parts = [

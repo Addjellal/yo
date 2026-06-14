@@ -699,8 +699,59 @@ function renderLog(lines) {
 // ─── Rendu des résultats ────────────────────────────────────────────────────
 
 $("#sort-select").addEventListener("change", renderResults);
+$("#date-filter").addEventListener("change", applyDateFilter);
 $("#btn-export").addEventListener("click", exportResults);
 $("#btn-notion").addEventListener("click", exportNotion);
+
+// ─── Modal export format ─────────────────────────────────────────────────────
+
+let _exportResolve = null;
+
+function showExportPicker() {
+  return new Promise(res => { _exportResolve = res; $("#export-overlay").hidden = false; });
+}
+
+function _closeExportPicker(fmt = null) {
+  $("#export-overlay").hidden = true;
+  if (_exportResolve) { _exportResolve(fmt); _exportResolve = null; }
+}
+
+$("#export-close").addEventListener("click", () => _closeExportPicker(null));
+$("#export-csv").addEventListener("click",  () => _closeExportPicker("csv"));
+$("#export-json").addEventListener("click", () => _closeExportPicker("json"));
+$("#export-both").addEventListener("click", () => _closeExportPicker("both"));
+
+// ─── Filtre date de publication ──────────────────────────────────────────────
+
+function dateFilterCutoff() {
+  const val = $("#date-filter").value;
+  if (!val || val === "all") return null;
+  const d = new Date();
+  if (val === "1d")  d.setDate(d.getDate() - 1);
+  else if (val === "3d")  d.setDate(d.getDate() - 3);
+  else if (val === "7d")  d.setDate(d.getDate() - 7);
+  else if (val === "14d") d.setDate(d.getDate() - 14);
+  else if (val === "1m")  d.setMonth(d.getMonth() - 1);
+  else if (val === "3m")  d.setMonth(d.getMonth() - 3);
+  else if (val === "1y")  d.setFullYear(d.getFullYear() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function applyDateFilter() {
+  const cutoff = dateFilterCutoff();
+  const cards = Array.from(document.querySelectorAll("#results-grid .offer-card"));
+  let count = 0;
+  for (const card of cards) {
+    const dp = card.dataset.datePosted;
+    // Offres sans date connue : toujours affichées (on ne pénalise pas les
+    // sources qui ne fournissent pas de date).
+    const hide = !!(cutoff && dp && dp < cutoff);
+    card.hidden = hide;
+    if (!hide) count++;
+  }
+  const countEl = $("#results-count");
+  if (countEl) countEl.textContent = `${count} offre${count !== 1 ? "s" : ""}`;
+}
 
 // Dernière offre dont on a cliqué « Ouvrir » : marquée jusqu'au choix d'un statut
 let LAST_OPENED_CARD = null;
@@ -747,6 +798,7 @@ function renderResults() {
     jobId: SCAN_JOB, offers: OFFERS, grid: $("#results-grid"),
     countEl: $("#results-count"), onEmpty: renderResults,
   }, $("#sort-select").value);
+  applyDateFilter();
 }
 
 // Offres mises de côté (analysées mais sous le score minimum). Repliées par
@@ -857,7 +909,8 @@ function offerCard(offer, ctx) {
     details,
     el("div", { class: "offer-actions" }, [openLink, btnFav, btnApplied, btnReject, btnLetter]),
   ]);
-  card.dataset.index = offer.index;  // pour le marquage de disponibilité (#check)
+  card.dataset.index = offer.index;       // pour le marquage de disponibilité (#check)
+  card.dataset.datePosted = offer.date_posted || "";
 
   function applyStatus(status) {
     offer.status = status;
@@ -917,12 +970,14 @@ function offerCard(offer, ctx) {
 }
 
 async function exportResults() {
+  const fmt = await showExportPicker();
+  if (!fmt) return;
   try {
     const out = await api("/api/export", { method: "POST", body: JSON.stringify({ job_id: SCAN_JOB }) });
-    for (const f of [out.csv_file, out.json_file]) {
-      await downloadFile(f);
-    }
-    toast("Export CSV + JSON téléchargé.", "ok");
+    if (fmt === "csv"  || fmt === "both") await downloadFile(out.csv_file);
+    if (fmt === "json" || fmt === "both") await downloadFile(out.json_file);
+    const label = fmt === "both" ? "CSV + JSON" : fmt.toUpperCase();
+    toast(`Export ${label} téléchargé.`, "ok");
   } catch (e) {
     toast(e.message, "err");
   }

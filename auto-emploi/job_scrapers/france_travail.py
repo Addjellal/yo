@@ -135,6 +135,7 @@ class FranceTravailScraper(BaseScraper):
                 source=self.source_name,
                 salary=salaire.get("libelle"),
                 contract_type=item.get("typeContrat"),
+                date_posted=(item.get("dateCreation") or "")[:10] or None,
             )
         except Exception:
             return None
