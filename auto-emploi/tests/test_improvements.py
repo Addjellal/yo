@@ -524,12 +524,53 @@ class TestAuditFixes(unittest.TestCase):
                               "lieux": ["pas un dict"]})
         self.assertIsNotNone(off)
 
-    def test_france_travail_range_jamais_negatif(self):
-        # Le correctif borne le range : max_results≤0 ne produit pas « 0--1 ».
-        for mx in (0, -5, 1, 300):
-            last = min(max(mx, 1), 150) - 1
-            self.assertGreaterEqual(last, 0)
-            self.assertLessEqual(last, 149)
+    def test_france_travail_range_pagination_valide(self):
+        # Invariant de la pagination : tant que len(offers) < target, le range
+        # calculé reste valide (last >= start), donc jamais de « 50-49 » / « 0--1 ».
+        from job_scrapers.france_travail import PAGE_SIZE, MAX_RANGE
+        for target in (1, 50, 300, 10_000):
+            start = 0
+            got = 0
+            steps = 0
+            while got < target and start <= MAX_RANGE and steps < 50:
+                last = min(start + PAGE_SIZE - 1, MAX_RANGE, start + (target - got) - 1)
+                self.assertGreaterEqual(last, start)   # range jamais inversé
+                self.assertLessEqual(last, MAX_RANGE)
+                got += (last - start + 1)              # simule une page pleine
+                start = last + 1
+                steps += 1
+
+    def test_clamp_score_accepte_float(self):
+        from history import _clamp_score
+        self.assertEqual(_clamp_score(7.0), 7)
+        self.assertEqual(_clamp_score(7.6), 8)
+        self.assertEqual(_clamp_score(42), 10)        # borné à 10
+        self.assertEqual(_clamp_score(-3), 0)         # borné à 0
+        self.assertEqual(_clamp_score("9"), 0)        # non numérique → défaut
+        self.assertIsNone(_clamp_score(None, default=None))
+        self.assertEqual(_clamp_score(True), 0)       # bool exclu
+
+    def test_save_to_env_rejette_numerique_invalide(self):
+        from config import config, save_to_env
+        before = config.min_match_score
+        with self.assertRaises(ValueError):
+            save_to_env("MIN_MATCH_SCORE", "pas-un-nombre")
+        # La valeur en mémoire n'a pas changé (et rien n'a été écrit dans .env).
+        self.assertEqual(config.min_match_score, before)
+
+    def test_tracker_stats_statut_inconnu(self):
+        import tracker as tk
+        t = tk.Tracker.__new__(tk.Tracker)
+        t._data = {"offers": {
+            "a": {"status": "applied"},
+            "b": {"status": "zombie"},   # statut hérité/inconnu
+            "c": {"status": "seen"},
+        }}
+        stats = t.stats()
+        self.assertNotIn("zombie", stats)
+        self.assertEqual(stats["total"], 3)
+        # « zombie » est rattaché à seen (avec c) → 2.
+        self.assertEqual(stats["seen"], 2)
 
     def test_redact_notion_masque_les_secrets(self):
         from integrations import notion

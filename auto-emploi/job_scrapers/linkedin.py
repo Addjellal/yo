@@ -38,18 +38,19 @@ class LinkedInScraper(BaseScraper):
     def _search_guest(self, query: str, location: str, max_results: int) -> list[JobOffer]:
         import requests
         from bs4 import BeautifulSoup
+        from locations import COUNTRY_NAMES
 
         offers: list[JobOffer] = []
         seen: set[str] = set()
         session = requests.Session()
         session.headers.update(_HEADERS)
         start = 0
+        default_location = location or COUNTRY_NAMES.get(config.country, "France")
 
         while len(offers) < max_results and start <= MAX_GUEST_START:
-            from locations import COUNTRY_NAMES
             params = {
                 "keywords": query,
-                "location": location or COUNTRY_NAMES.get(config.country, "France"),
+                "location": default_location,
                 "start": start,
                 "f_TPR": "r604800",  # offres de moins de 7 jours
             }

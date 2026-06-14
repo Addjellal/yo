@@ -131,7 +131,12 @@ class Tracker:
     def stats(self) -> dict[str, int]:
         counts = {s: 0 for s in VALID_STATUSES}
         for entry in self._data["offers"].values():
-            counts[entry.get("status", "seen")] = counts.get(entry.get("status", "seen"), 0) + 1
+            # Un statut hérité/inconnu est rattaché à « seen » plutôt que d'ajouter
+            # une clé parasite au tableau de bord.
+            status = entry.get("status", "seen")
+            if status not in counts:
+                status = "seen"
+            counts[status] += 1
         counts["total"] = len(self._data["offers"])
         return counts
 

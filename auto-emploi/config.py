@@ -173,6 +173,16 @@ def save_to_env(key: str, value: str) -> None:
     # Une valeur multi-lignes pourrait injecter d'autres variables : on neutralise.
     value = str(value).replace("\r", " ").replace("\n", " ").strip()[:2000]
 
+    # Pour une clé numérique, on valide AVANT toute écriture : un cast invalide
+    # rejette la sauvegarde plutôt que de laisser une valeur corrompue dans .env.
+    caster = _NUMERIC_ENV_KEYS.get(key)
+    typed: object = value
+    if caster is not None:
+        try:
+            typed = caster(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"Valeur numérique invalide pour {key} : {value!r}")
+
     env_path = _PROJECT_DIR / ".env"
     lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
     updated = False
@@ -198,13 +208,6 @@ def save_to_env(key: str, value: str) -> None:
             pass
         raise
 
-    # Stocke le bon type dans l'objet config (les champs numériques ne doivent
-    # pas rester en chaîne après une sauvegarde depuis l'interface web).
-    typed: object = value
-    caster = _NUMERIC_ENV_KEYS.get(key)
-    if caster is not None:
-        try:
-            typed = caster(value)
-        except (TypeError, ValueError):
-            typed = getattr(config, key.lower(), value)  # garde l'ancienne valeur valide
+    # Stocke le bon type dans l'objet config (déjà validé plus haut pour les
+    # champs numériques : ils ne restent jamais en chaîne après une sauvegarde).
     setattr(config, key.lower(), typed)

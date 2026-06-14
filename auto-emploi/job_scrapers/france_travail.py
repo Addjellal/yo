@@ -9,6 +9,9 @@ from app_utils import console
 TOKEN_URL = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=%2Fpartenaire"
 SEARCH_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
 
+PAGE_SIZE = 150       # l'API plafonne une requête à 150 résultats (range 0-149)
+MAX_RANGE = 1149      # plafond de pagination (≈ 8 pages), aligné sur les autres sources
+
 
 REGISTER_URL = "https://francetravail.io/produits-et-services/portail-partenaire"
 
@@ -60,25 +63,45 @@ class FranceTravailScraper(BaseScraper):
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         if config.country != "fr":
             raise ValueError("couvre uniquement la France")
-        # L'API plafonne à 150 résultats par requête (range 0-149) ; on borne
-        # aussi par le bas pour éviter un range invalide « 0--1 » si max_results≤0.
-        last = min(max(max_results, 1), 150) - 1
+        target = max(max_results, 1)
+        offers: list[JobOffer] = []
+        seen: set[str] = set()
+        start = 0
 
         try:
             token = self._get_token()
             headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-            params = {"motsCles": query, "range": f"0-{last}"}
-            if location:
-                params["commune"] = location
 
-            resp = requests.get(SEARCH_URL, params=params, headers=headers, timeout=15)
-            if resp.status_code == 204:
-                return []
-            resp.raise_for_status()
-            if len(resp.content) > MAX_RESPONSE_BYTES:
-                console.print("[yellow][France Travail] Réponse anormalement volumineuse, ignorée.[/yellow]")
-                return []
-            results = resp.json().get("resultats", [])
+            while len(offers) < target and start <= MAX_RANGE:
+                # Range borné par le plafond ET par le nombre encore voulu — jamais
+                # de range invalide « 0--1 » (target≥1 garantit last≥start).
+                last = min(start + PAGE_SIZE - 1, MAX_RANGE, start + (target - len(offers)) - 1)
+                params = {"motsCles": query, "range": f"{start}-{last}"}
+                if location:
+                    params["commune"] = location
+
+                resp = requests.get(SEARCH_URL, params=params, headers=headers, timeout=15)
+                if resp.status_code == 204:
+                    break
+                resp.raise_for_status()
+                if len(resp.content) > MAX_RESPONSE_BYTES:
+                    console.print("[yellow][France Travail] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                    break
+                results = resp.json().get("resultats", [])
+                if not results:
+                    break
+
+                for item in results:
+                    job = self._parse_item(item, location)
+                    if job and job.unique_key() not in seen:
+                        seen.add(job.unique_key())
+                        offers.append(job)
+
+                # Dernière page : l'API a renvoyé moins que la fenêtre demandée.
+                if len(results) < (last - start + 1):
+                    break
+                start = last + 1
+                time.sleep(config.request_delay)
         except (requests.RequestException, ValueError) as e:
             # Erreur côté France Travail (réseau, auth, JSON) : on dégrade
             # proprement comme les autres sources plutôt que de crasher le scan.
@@ -86,14 +109,8 @@ class FranceTravailScraper(BaseScraper):
                 f"[yellow][France Travail] L'API ne répond pas correctement "
                 f"({escape(type(e).__name__)}) — erreur côté France Travail, réessayez plus tard.[/yellow]"
             )
-            return []
-
-        offers = []
-        for item in results:
-            job = self._parse_item(item, location)
-            if job:
-                offers.append(job)
-        return offers
+            # On conserve ce qui a déjà été collecté avant l'erreur.
+        return offers[:target]
 
     def _parse_item(self, item: dict, location: str) -> JobOffer | None:
         try:

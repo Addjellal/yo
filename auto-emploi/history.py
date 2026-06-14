@@ -50,6 +50,14 @@ _OFFER_FIELDS = (
 )
 
 
+def _clamp_score(value, default=0):
+    """Borne un score à 0-10 (entier). Accepte int comme float (un score
+    sérialisé/relu en JSON peut revenir en float) ; sinon renvoie `default`."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return max(0, min(10, int(round(value))))
+
+
 def _offer_to_dict(offer: JobOffer) -> dict:
     d = {f: getattr(offer, f) for f in _OFFER_FIELDS}
     d["description"] = (offer.description or "")[:_DESC_LIMIT]
@@ -62,7 +70,7 @@ def _offer_to_dict(offer: JobOffer) -> dict:
     if isinstance(offer.cv_scores, dict) and offer.cv_scores:
         d["cv_scores"] = {
             str(label)[:80]: {
-                "score": max(0, min(10, int(r.get("score", 0)))) if isinstance(r.get("score"), int) else 0,
+                "score": _clamp_score(r.get("score")),
                 "reasons": str(r.get("reasons", ""))[:400],
                 "strengths": str(r.get("strengths", ""))[:600],
                 "gaps": str(r.get("gaps", ""))[:400],
@@ -94,7 +102,7 @@ def _offer_from_dict(d: dict) -> JobOffer | None:
     if not offer.title:
         return None
     score = d.get("score")
-    offer.match_score = max(0, min(10, int(score))) if isinstance(score, int) else None
+    offer.match_score = _clamp_score(score, default=None)
     offer.match_reasons = str(d.get("reasons", ""))[:400] or None
     offer.match_strengths = str(d.get("strengths", ""))[:600] or None
     offer.match_gaps = str(d.get("gaps", ""))[:400] or None
@@ -103,7 +111,7 @@ def _offer_from_dict(d: dict) -> JobOffer | None:
     if isinstance(raw_scores, dict) and raw_scores:
         offer.cv_scores = {
             str(label)[:80]: {
-                "score": max(0, min(10, int(r.get("score", 0)))) if isinstance(r.get("score"), int) else 0,
+                "score": _clamp_score(r.get("score")),
                 "reasons": str(r.get("reasons", ""))[:400],
                 "strengths": str(r.get("strengths", ""))[:600],
                 "gaps": str(r.get("gaps", ""))[:400],

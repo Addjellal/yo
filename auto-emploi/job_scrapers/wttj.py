@@ -39,9 +39,10 @@ class WTTJScraper(BaseScraper):
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         offers = []
         page = 1
+        # _make_session() pose déjà HEADERS sur le repli requests ; on ne réécrit
+        # PAS les en-têtes d'un scraper cloudscraper (son émulation navigateur,
+        # plus crédible face à l'anti-bot, serait sinon écrasée par HEADERS).
         session = _make_session()
-        if hasattr(session, "headers"):
-            session.headers.update(HEADERS)
 
         # Playwright session, initialisée paresseusement si cloudscraper bloque
         from ._browser import BrowserSession
