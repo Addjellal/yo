@@ -77,10 +77,6 @@ def min_required_years(text: str) -> int | None:
 
 # Détection du type de contrat (depuis contract_type + titre + description).
 CONTRACT_TYPES = ("cdi", "cdd", "alternance", "stage", "vie", "interim", "freelance")
-CONTRACT_LABELS = {
-    "cdi": "CDI", "cdd": "CDD", "alternance": "Alternance", "stage": "Stage",
-    "vie": "VIE / VIA", "interim": "Intérim", "freelance": "Freelance",
-}
 _CONTRACT_RES = {
     "cdi": [re.compile(r"\bcdi\b", re.I), re.compile(r"dur[ée]e\s+ind[ée]termin", re.I),
             re.compile(r"\bpermanent\b", re.I)],

@@ -140,14 +140,34 @@ class LinkedInScraper(BaseScraper):
 
     def _login(self, page) -> None:
         page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
-        page.fill("#username", config.linkedin_email)
-        page.fill("#password", config.linkedin_password)
-        # Sélecteur le plus stable : le bouton submit du formulaire de login
-        page.click("button[type='submit'][aria-label]")
+
+        # LinkedIn peut afficher : formulaire complet, mot de passe seul (session partielle)
+        # ou rien (déjà connecté — redirigé vers /feed ou /jobs).
+        # On détecte l'état réel plutôt que d'attendre un sélecteur absent.
+        _T = 4000  # timeout court pour les vérifications de présence
+
+        has_username = page.locator("#username").count() > 0
+        if has_username:
+            page.fill("#username", config.linkedin_email)
+
+        has_password = page.locator("#password").count() > 0
+        if has_password:
+            page.fill("#password", config.linkedin_password)
+
+        if not has_username and not has_password:
+            # Déjà connecté : LinkedIn a redirigé avant même d'afficher le login.
+            return
+
+        # Soumettre uniquement si un champ était présent
+        try:
+            page.click("button[type='submit']", timeout=_T)
+        except Exception:
+            pass
+
         try:
             page.wait_for_url("**/feed/**", timeout=10000)
         except Exception:
-            # Soit captcha, soit 2FA, soit redirect inattendu — on continue prudemment
+            # Captcha, 2FA ou redirect inattendu — on continue prudemment
             page.wait_for_timeout(3000)
 
     def _scrape_jobs(self, page, query: str, location: str, max_results: int) -> list[JobOffer]:

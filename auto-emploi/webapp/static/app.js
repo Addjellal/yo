@@ -554,7 +554,7 @@ async function startScan() {
   const isGlobal = $("#f-global").checked;
   const noAi = $("#f-no-ai").checked;
   const query = $("#f-query").value.trim();
-  if (noAi && isGlobal) { toast("Mode test scraper : saisissez une requête (la recherche globale utilise l'IA).", "err"); return; }
+  if (noAi && isGlobal) { toast("Analyse locale sans IA : saisissez une requête (la recherche globale utilise l'IA).", "err"); return; }
   if (!query && !isGlobal) { toast("Indiquez un poste à rechercher (ou cochez la recherche globale).", "err"); return; }
   if (!SELECTED.cvs.size && !noAi) { toast("Cochez au moins un CV (bouton ＋ Importer si besoin).", "err"); return; }
   if (!SELECTED.sources.size) { toast("Sélectionnez au moins une source.", "err"); return; }
@@ -782,13 +782,13 @@ $("#btn-setaside-toggle").addEventListener("click", () => {
 function offerCard(offer, ctx) {
   // ctx = { jobId, offers, grid, countEl, onEmpty } — découple la carte du scan
   // courant : une session d'historique s'affiche avec son propre job.
-  // score null = offre brute non analysée (mode test scraper sans IA)
+  // score null = offre brute non analysée (sans IA, scraping seul)
   const rawMode = offer.score === null || offer.score === undefined;
   const score = offer.score || 0;
   const ring = el("div", { class: "score-ring", text: rawMode ? "—" : String(score) });
   ring.style.setProperty("--pct", rawMode ? 0 : score * 10);
   ring.style.setProperty("--ring", scoreColor(score));
-  if (rawMode) ring.title = "Non analysée (mode test scraper)";
+  if (rawMode) ring.title = "Non analysée (scraping sans scoring)";
 
   const scoreBar = el("div", { class: "score-bar" }, [el("i")]);
   scoreBar.style.setProperty("--pct", rawMode ? 0 : score * 10);

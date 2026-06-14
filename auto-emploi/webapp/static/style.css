@@ -243,7 +243,6 @@ input:focus, select:focus, textarea:focus {
   padding-top: 8px;
 }
 .span-3 { grid-column: 1 / -1; }
-.checkbox-row { flex-direction: row; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 14px !important; font-weight: 400 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--text) !important; cursor: pointer; }
 input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
 
@@ -341,6 +340,7 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 /* Disponibilité (vérif sans IA) */
+.offer-card.avail-online { box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 50%, transparent); }
 .offer-card.avail-gone { filter: saturate(.4) brightness(.9); }
 .badge.avail-badge { font-weight: 600; }
 .offer-card.is-last-opened::after {
@@ -760,5 +760,5 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
 .lm-server { margin-top: 10px; font-weight: 600; color: var(--accent); }
 .lm-model { display: flex; align-items: center; gap: 10px; padding: 3px 0 3px 12px; }
 
-/* ─── Mode test scraper (sans IA) ────────────────────────────────────────── */
+/* ─── Options sans IA ────────────────────────────────────────────────────── */
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 18px; }

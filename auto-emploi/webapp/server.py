@@ -231,9 +231,10 @@ def _offer_dict(offer: JobOffer, index: int, status: str = "new") -> dict:
         d["cv_scores"] = [
             {"cv": label, "score": r.get("score", 0), "reasons": r.get("reasons", ""),
              "strengths": r.get("strengths", ""), "gaps": r.get("gaps", "")}
-            for label, r in sorted(offer.cv_scores.items(),
-                                   key=lambda kv: -kv[1].get("score", 0))
-            if isinstance(r, dict)
+            for label, r in sorted(
+                ((k, v) for k, v in offer.cv_scores.items() if isinstance(v, dict)),
+                key=lambda kv: -kv[1].get("score", 0),
+            )
         ]
     return d
 
@@ -581,6 +582,7 @@ def _run_rescore(job: _Job, p: dict) -> None:
             rejected_examples=rejections,
             top_k=RESCORE_TOP_K,
             two_stage=not code_mode,
+            shared_prefilter=not code_mode,
             should_stop=job.stop_event.is_set,
             progress=job.add_log,
             code=code_mode,
@@ -1518,8 +1520,8 @@ class _Handler(BaseHTTPRequestHandler):
         if scan_job is None or scan_job.kind != "scan" or scan_job.status != "done":
             self._error("Session de scan introuvable — relancez une recherche.", 404)
             return
-        if not scan_job.offers:
-            self._error("Aucune offre à vérifier.", 400)
+        if not _matched_offers(scan_job):
+            self._error("Aucune offre retenue à vérifier.", 400)
             return
         job = _Job("check")
         _register_job(job)
@@ -1837,11 +1839,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Requête invalide")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        if scan_job is None or scan_job.kind != "scan" or not scan_job.offers:
-            self._error("Aucun résultat à exporter", 404)
+        matched = _matched_offers(scan_job) if scan_job and scan_job.kind == "scan" else []
+        if not matched:
+            self._error("Aucun résultat retenu à exporter", 404)
             return
         # Export = offres retenues uniquement (pas les mises de côté sous le seuil)
-        json_path, csv_path = save_results(_matched_offers(scan_job), scan_job.query or "recherche")
+        json_path, csv_path = save_results(matched, scan_job.query or "recherche")
         self._json({"ok": True, "json_file": json_path.name, "csv_file": csv_path.name})
 
     def _api_notion(self):
@@ -1853,10 +1856,11 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Notion non configuré (NOTION_TOKEN + NOTION_DATABASE_ID)")
             return
         scan_job = _get_job(str(body.get("job_id", "")))
-        if scan_job is None or scan_job.kind != "scan" or not scan_job.offers:
-            self._error("Aucun résultat à exporter", 404)
+        matched = _matched_offers(scan_job) if scan_job and scan_job.kind == "scan" else []
+        if not matched:
+            self._error("Aucun résultat retenu à exporter vers Notion", 404)
             return
-        count = export_to_notion(_matched_offers(scan_job))
+        count = export_to_notion(matched)
         self._json({"ok": True, "count": count})
 
 
