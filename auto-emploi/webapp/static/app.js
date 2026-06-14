@@ -531,12 +531,18 @@ function pushHistory(query) {
 
 $("#btn-scan").addEventListener("click", startScan);
 $("#f-query").addEventListener("keydown", (e) => { if (e.key === "Enter") startScan(); });
+// « Masquer le journal » replie seulement le texte : le spinner et la barre
+// d'avancement restent visibles pour suivre le scan d'un coup d'œil.
 $("#btn-progress-hide").addEventListener("click", () => {
-  $("#scan-progress").hidden = true;
-  $("#btn-show-log").hidden = false;
+  const card = $("#scan-progress");
+  const minimized = card.classList.toggle("minimized");
+  $("#btn-progress-hide").textContent = minimized ? "Afficher le journal" : "Masquer le journal";
 });
 $("#btn-show-log").addEventListener("click", () => {
-  $("#scan-progress").hidden = false;
+  const card = $("#scan-progress");
+  card.hidden = false;
+  card.classList.remove("minimized");  // rouvrir doit montrer le texte
+  $("#btn-progress-hide").textContent = "Masquer le journal";
   $("#btn-show-log").hidden = true;
 });
 $("#btn-scan-stop").addEventListener("click", async () => {
@@ -604,6 +610,7 @@ async function startScan() {
       ? "Recherche globale d'après vos CV…"
       : `Recherche : « ${query} »`;
   $("#progress-log").replaceChildren();
+  resetProgressBar();
   pollScan(++POLL_GEN);
 }
 
@@ -646,6 +653,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
+  resetProgressBar();
   pollScan(++POLL_GEN);
 });
 
@@ -676,6 +684,7 @@ function pollScan(gen = POLL_GEN) {
       return;
     }
     $("#progress-title").textContent = "Recherche terminée";
+    setProgressBar(100);
     OFFERS = job.offers || [];
     SET_ASIDE = job.set_aside || [];
     // Offres trouvées (retenues OU mises de côté) → le journal s'efface mais
@@ -694,6 +703,48 @@ function renderLog(lines) {
     box.appendChild(el("div", { text: lines[box.children.length] }));
   }
   box.scrollTop = box.scrollHeight;
+  updateProgressBar(lines);
+}
+
+// Déduit un pourcentage d'avancement des lignes du journal. Deux phases IA
+// (pré-scoring puis analyse détaillée) progressent chacune sur sa plage pour
+// que la barre n'aille jamais à reculons. Retourne null tant qu'on en est à la
+// collecte (avancement indéterminé → barre masquée, le spinner suffit).
+function computeProgressPercent(lines) {
+  let pct = null, phase = 0;  // 0 collecte · 1 pré-scoring · 2 analyse
+  for (const line of lines || []) {
+    let m;
+    if ((m = line.match(/(\d+)\s*\/\s*(\d+)\s*offre\(s\)\s*analys/i))) {
+      const t = +m[2]; if (t > 0) { pct = 45 + 50 * (+m[1] / t); phase = 2; }
+    } else if (/analyse détaillée/i.test(line)) {
+      if (phase < 2) { pct = 45; phase = 2; }
+    } else if ((m = line.match(/pré-scoring\s*:\s*lot\s*(\d+)\s*\/\s*(\d+)/i))) {
+      if (phase < 2) { const t = +m[2]; if (t > 0) { pct = 5 + 40 * (+m[1] / t); phase = 1; } }
+    } else if (/pré-scoring ia de/i.test(line)) {
+      if (phase < 1) { pct = 5; phase = 1; }
+    }
+  }
+  return pct;
+}
+
+function setProgressBar(pct) {
+  const bar = $("#progress-bar"), fill = $("#progress-bar-fill"), label = $("#progress-percent");
+  if (pct == null) { bar.hidden = true; label.hidden = true; return; }
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  bar.hidden = false;
+  fill.style.width = v + "%";
+  label.hidden = false;
+  label.textContent = v + "/100";
+}
+
+function updateProgressBar(lines) {
+  setProgressBar(computeProgressPercent(lines));
+}
+
+function resetProgressBar() {
+  $("#scan-progress").classList.remove("minimized");
+  $("#btn-progress-hide").textContent = "Masquer le journal";
+  setProgressBar(null);
 }
 
 // ─── Rendu des résultats ────────────────────────────────────────────────────
@@ -1008,6 +1059,7 @@ async function checkAvailability() {
   { const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = ""; }
   $("#progress-title").textContent = "Vérification de disponibilité (sans IA)…";
   $("#progress-log").replaceChildren();
+  resetProgressBar();
   pollCheck(out.job_id, ++POLL_GEN);
 }
 
@@ -1464,29 +1516,152 @@ async function loadCvs() {
   renderCvList();
 }
 
+// Sélection multiple pour les actions groupées (distincte de la sélection de
+// recherche SELECTED.cvs) — ne contient que des ids de CV actifs.
+const CV_SELECTED = new Set();
+let CV_BULK_BUSY = false;  // une analyse groupée est en cours
+
+function renderCvToolbar() {
+  const bar = $("#cv-toolbar");
+  bar.replaceChildren();
+  bar.hidden = CVS.length === 0;
+  if (!CVS.length) return;
+
+  // On ne garde dans la sélection que des CV encore présents.
+  const ids = new Set(CVS.map((c) => c.id));
+  for (const id of [...CV_SELECTED]) if (!ids.has(id)) CV_SELECTED.delete(id);
+
+  const analyzable = CVS.filter((c) => c.file_exists);
+  const allSelected = analyzable.length > 0 && analyzable.every((c) => CV_SELECTED.has(c.id));
+
+  const btnAll = el("button", {
+    class: "btn-ghost small",
+    text: "🔄 Tout analyser",
+    title: "Lance l'analyse IA de tous les CV (un par un)",
+  });
+  btnAll.disabled = CV_BULK_BUSY || analyzable.length === 0;
+  btnAll.addEventListener("click", () => analyzeCvBatch(analyzable, "tous les CV"));
+
+  const btnToggle = el("button", {
+    class: "btn-ghost small",
+    text: allSelected ? "☐ Tout désélectionner" : "☑ Tout sélectionner",
+  });
+  btnToggle.addEventListener("click", () => {
+    if (allSelected) CV_SELECTED.clear();
+    else for (const c of analyzable) CV_SELECTED.add(c.id);
+    renderCvList();
+  });
+
+  const row = el("div", { class: "cv-toolbar-row" }, [btnAll, btnToggle]);
+  bar.appendChild(row);
+
+  if (CV_SELECTED.size > 0) {
+    const btnSel = el("button", {
+      class: "btn-primary small",
+      text: `🔄 Analyser la sélection (${CV_SELECTED.size})`,
+    });
+    btnSel.disabled = CV_BULK_BUSY;
+    btnSel.addEventListener("click", () => {
+      const chosen = CVS.filter((c) => CV_SELECTED.has(c.id) && c.file_exists);
+      analyzeCvBatch(chosen, `${chosen.length} CV sélectionné(s)`);
+    });
+    bar.appendChild(el("div", { class: "cv-toolbar-row" }, [btnSel]));
+  }
+
+  const status = el("div", { class: "cv-bulk-status", id: "cv-bulk-status" });
+  status.hidden = true;
+  bar.appendChild(status);
+}
+
 function renderCvList() {
+  renderCvToolbar();
   const list = $("#cv-list");
   list.replaceChildren();
   $("#cvs-empty").hidden = CVS.length > 0;
   if (!CVS.length) { $("#cv-detail").hidden = true; CVD = null; return; }
 
   for (const cv of CVS) {
+    const check = el("input", { type: "checkbox", class: "ci-check", title: "Sélectionner pour une action groupée" });
+    check.checked = CV_SELECTED.has(cv.id);
+    check.disabled = !cv.file_exists;
+    check.addEventListener("click", (e) => {
+      e.stopPropagation();  // ne pas ouvrir le détail
+      if (check.checked) CV_SELECTED.add(cv.id); else CV_SELECTED.delete(cv.id);
+      renderCvToolbar();
+    });
+
+    const trash = el("button", {
+      class: "ci-del", title: "Supprimer ce CV", text: "🗑", "aria-label": "Supprimer ce CV",
+    });
+    trash.addEventListener("click", (e) => { e.stopPropagation(); deleteCv(cv); });
+
     const item = el("div", { class: "cv-item" + (CVD && CVD.entry.id === cv.id ? " active" : "") }, [
-      el("div", { class: "ci-label", text: cv.label || cv.filename }),
-      el("div", { class: "ci-meta" }, [
-        el("span", { text: cv.filename }),
-        el("span", { text: "ajouté " + (cv.added || "").slice(0, 10) }),
-        cv.analyzed
-          ? el("span", { text: "profil IA " + cv.analyzed.slice(0, 10) })
-          : el("span", { text: "non analysé" }),
-        Object.keys(cv.overrides || {}).length
-          ? el("span", { text: "✎ corrigé" }) : null,
-        cv.file_exists ? null : el("span", { class: "ci-missing", text: "fichier introuvable" }),
+      el("div", { class: "ci-row" }, [
+        check,
+        el("div", { class: "ci-main" }, [
+          el("div", { class: "ci-label", text: cv.label || cv.filename }),
+          el("div", { class: "ci-meta" }, [
+            el("span", { text: cv.filename }),
+            el("span", { text: "ajouté " + (cv.added || "").slice(0, 10) }),
+            cv.analyzed
+              ? el("span", { text: "profil IA " + cv.analyzed.slice(0, 10) })
+              : el("span", { text: "non analysé" }),
+            Object.keys(cv.overrides || {}).length
+              ? el("span", { text: "✎ corrigé" }) : null,
+            cv.file_exists ? null : el("span", { class: "ci-missing", text: "fichier introuvable" }),
+          ]),
+        ]),
+        trash,
       ]),
     ]);
     item.addEventListener("click", () => openCvDetail(cv));
     list.appendChild(item);
   }
+}
+
+// Attend la fin d'un job (analyse CV) en résolvant/rejetant une promesse.
+function waitForJob(jobId) {
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      let job;
+      try { job = await api(`/api/job?id=${encodeURIComponent(jobId)}`); }
+      catch (e) { reject(e); return; }
+      if (job.status === "running") { setTimeout(tick, 900); return; }
+      if (job.status === "error") { reject(new Error(job.error || "erreur")); return; }
+      resolve(job);
+    };
+    setTimeout(tick, 900);
+  });
+}
+
+// Analyse IA d'une liste de CV, séquentiellement (ne sature pas le LLM).
+async function analyzeCvBatch(cvList, label) {
+  if (CV_BULK_BUSY) return;
+  const targets = (cvList || []).filter((c) => c.file_exists);
+  if (!targets.length) { toast("Aucun CV analysable (fichiers introuvables).", "err"); return; }
+  CV_BULK_BUSY = true;
+  renderCvToolbar();
+  const status = $("#cv-bulk-status");
+  const setStatus = (txt) => { if (status) { status.hidden = false; status.textContent = txt; } };
+  let done = 0, failed = 0;
+  setStatus(`Analyse IA de ${label} : 0/${targets.length}…`);
+  for (const cv of targets) {
+    try {
+      const out = await api("/api/cv-analyze", { method: "POST", body: JSON.stringify({ id: cv.id }) });
+      await waitForJob(out.job_id);
+    } catch (e) {
+      failed += 1;
+    }
+    done += 1;
+    setStatus(`Analyse IA de ${label} : ${done}/${targets.length}…`);
+  }
+  CV_BULK_BUSY = false;
+  await refreshCvData();
+  if (CVD) { const fresh = CVS.find((c) => c.id === CVD.entry.id); if (fresh) openCvDetail(fresh); }
+  renderCvList();
+  const okCount = done - failed;
+  if (failed === 0) toast(`${okCount} CV analysé(s) par l'IA.`, "ok");
+  else toast(`${okCount}/${targets.length} CV analysé(s) — ${failed} échec(s).`, okCount ? "ok" : "err");
 }
 
 function openCvDetail(cv) {
@@ -1827,6 +2002,7 @@ async function deleteCv(cv) {
   try {
     const out = await api("/api/cv-delete", { method: "POST", body: JSON.stringify({ id: cv.id }) });
     CVS = out.cvs;
+    CV_SELECTED.delete(cv.id);
     // Sélection de recherche : retirer le CV disparu, état propre si plus rien
     SELECTED.cvs.delete(cv.filename);
     localStorage.setItem("cvs", JSON.stringify([...SELECTED.cvs]));

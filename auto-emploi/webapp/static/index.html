@@ -163,9 +163,12 @@
       <div class="progress-head">
         <span class="spinner"></span>
         <strong id="progress-title">Recherche en cours…</strong>
+        <span id="progress-percent" class="progress-percent" hidden>0/100</span>
         <button id="btn-scan-stop" class="btn-danger small" title="Les offres déjà scorées sont conservées">⏹ Stopper</button>
-        <button id="btn-progress-hide" class="btn-ghost small">Masquer</button>
+        <button id="btn-progress-hide" class="btn-ghost small" title="Replie le journal — l'avancement reste visible">Masquer le journal</button>
       </div>
+      <!-- Barre d'avancement : reste visible même journal replié -->
+      <div id="progress-bar" class="progress-bar" hidden><span id="progress-bar-fill" class="progress-bar-fill"></span></div>
       <div id="progress-log" class="progress-log"></div>
     </div>
 
@@ -292,6 +295,7 @@
     <div class="cv-layout">
       <div class="cv-side">
         <button id="cvs-upload-btn" class="btn-primary">＋ Importer un CV</button>
+        <div id="cv-toolbar" class="cv-toolbar" hidden></div>
         <div id="cv-list" class="cv-list"></div>
       </div>
       <div id="cv-detail" class="card cv-detail" hidden></div>
