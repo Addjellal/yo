@@ -3,6 +3,7 @@ Arborescence du dossier output/ — un sous-dossier par type de donnée :
 
     output/
         cv/                  CV importés via l'interface web
+        cv/.cache/           cache du texte extrait des CV (.cv_*.txt)
         offres/brutes/       offres scrapées avant analyse IA (mode test inclus)
         offres/analysees/    exports JSON/CSV des offres scorées
         offres/ecartees/     offres collectées mais non retenues (traçabilité)
@@ -111,4 +112,37 @@ def migrate_legacy_files() -> int:
             moved += 1
         except OSError:
             pass
+    moved += _tidy_output_root(root)
+    return moved
+
+
+def _tidy_output_root(root: Path) -> int:
+    """Nettoie la racine d'output/ : déplace les caches de CV `.cv_*.txt` (laissés
+    à la racine par d'anciennes versions) vers cv/.cache/, et supprime les
+    fichiers temporaires orphelins (`*.tmp` d'une écriture atomique interrompue).
+    Retourne le nombre de fichiers déplacés."""
+    moved = 0
+    cache_dir = cv_dir() / ".cache"
+    for entry in list(root.iterdir()):
+        if not entry.is_file():
+            continue
+        name = entry.name
+        # Caches de CV historiquement à la racine → cv/.cache/
+        if name.startswith(".cv_") and name.endswith(".txt"):
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            dest = cache_dir / name
+            if not dest.exists():
+                try:
+                    entry.rename(dest)
+                    moved += 1
+                except OSError:
+                    pass
+            continue
+        # Fichiers temporaires orphelins (.tracker_*.tmp, .sessions_*.tmp,
+        # .cvs_*.tmp, .cvtmp_*) : restes d'une écriture interrompue, sans valeur.
+        if name.endswith(".tmp") or name.startswith(".cvtmp_"):
+            try:
+                entry.unlink()
+            except OSError:
+                pass
     return moved

@@ -19,6 +19,11 @@ from config import config
 GUEST_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 MAX_GUEST_START = 200  # plafond pagination mode invité
 
+# L'avertissement « mode connecté » ne s'affiche qu'une fois par processus : une
+# recherche globale invoque le scraper une fois par requête dérivée des CV, ce
+# qui inondait sinon le journal de la même ligne (15× observé).
+_LOGGED_IN_WARNED = False
+
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
@@ -130,15 +135,18 @@ class LinkedInScraper(BaseScraper):
 
         # Le mode connecté est contraire aux CGU LinkedIn (le mode invité ne l'est
         # pas). On le rappelle ici aussi, car ce chemin est emprunté par l'UI web
-        # et pas seulement par le CLI.
-        try:
-            from app_utils import console
-            console.print(
-                "[yellow]⚠ LinkedIn : mode connecté (contraire aux CGU) — "
-                "votre compte peut être restreint. Préférez le mode invité.[/yellow]"
-            )
-        except Exception:
-            pass
+        # et pas seulement par le CLI — mais une seule fois par processus.
+        global _LOGGED_IN_WARNED
+        if not _LOGGED_IN_WARNED:
+            _LOGGED_IN_WARNED = True
+            try:
+                from app_utils import console
+                console.print(
+                    "[yellow]⚠ LinkedIn : mode connecté (contraire aux CGU) — "
+                    "votre compte peut être restreint. Préférez le mode invité.[/yellow]"
+                )
+            except Exception:
+                pass
 
         offers = []
         with sync_playwright() as p:

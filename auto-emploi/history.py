@@ -150,7 +150,10 @@ class SessionStore:
             return empty
 
     def _save(self) -> None:
-        payload = json.dumps(self._data, ensure_ascii=False)
+        # Les surrogates isolés (\ud800-\udfff) issus de PDF/scraping malformés
+        # font planter l'encodage utf-8 (« surrogates not allowed ») : on les
+        # neutralise avant écriture pour ne jamais corrompre un scan terminé.
+        payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".sessions_", suffix=".tmp"
         )
@@ -158,7 +161,9 @@ class SessionStore:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(payload)
             os.replace(tmp_name, self.path)
-        except OSError:
+        except Exception:
+            # Toute erreur (OSError, encodage…) : on retire le fichier temporaire
+            # pour ne pas laisser de .tmp orphelin à la racine d'output/.
             try:
                 os.unlink(tmp_name)
             except OSError:

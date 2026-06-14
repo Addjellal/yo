@@ -9,7 +9,9 @@ from pathlib import Path
 
 def _cache_path(path: Path) -> Path:
     from config import config
-    cache_dir = Path(config.output_dir).resolve()
+    # Le cache du texte des CV vit dans output/cv/.cache/ plutôt qu'en vrac à la
+    # racine d'output/ — un dossier par type de donnée garde la racine lisible.
+    cache_dir = (Path(config.output_dir).resolve() / "cv" / ".cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
     # Hash sur le chemin absolu pour éviter les collisions entre CVs
     # de même nom dans des dossiers différents. Le stem n'est que cosmétique :
@@ -102,7 +104,11 @@ def _extract_text_native(path: Path) -> str:
     try:
         import fitz  # pymupdf
         doc = fitz.open(str(path))
-        pages = [page.get_text() for page in doc]
+        # sort=True réordonne les blocs de texte de haut en bas (puis de gauche à
+        # droite) : sur les CV où les réalisations sont dans un bloc/colonne à
+        # part, cela les rapproche du poste concerné au lieu de les rejeter en fin
+        # de document — l'IA associe alors bien mieux titre/employeur/missions.
+        pages = [page.get_text("text", sort=True) for page in doc]
         return "\n".join(p for p in pages if p.strip())
     except ImportError:
         pass

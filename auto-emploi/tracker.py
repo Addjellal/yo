@@ -71,7 +71,9 @@ class Tracker:
     def _save(self) -> None:
         """Écriture atomique : fichier temporaire puis rename — un crash ou un
         Ctrl+C en pleine écriture ne peut pas corrompre l'historique."""
-        payload = json.dumps(self._data, ensure_ascii=False, indent=2)
+        # Neutralise les surrogates isolés (utf-8 « surrogates not allowed »)
+        # avant écriture — un caractère malformé ne doit pas corrompre le suivi.
+        payload = json.dumps(self._data, ensure_ascii=False, indent=2).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".tracker_", suffix=".tmp"
         )
@@ -79,7 +81,7 @@ class Tracker:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(payload)
             os.replace(tmp_name, self.path)
-        except OSError:
+        except Exception:
             try:
                 os.unlink(tmp_name)
             except OSError:

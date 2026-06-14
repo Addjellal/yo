@@ -504,6 +504,7 @@ class JobMatcher:
             scored = []
             total_batches = (len(offers) - 1) // BATCH_SIZE + 1
             analyzed = 0
+            code_idf = None  # construit à la demande si un lot doit être dégradé
             self._step(progress, f"Analyse détaillée : {len(offers)} offre(s) en {total_batches} lot(s) de {BATCH_SIZE}.")
             for i in range(0, len(offers), BATCH_SIZE):
                 if should_stop and should_stop():
@@ -512,7 +513,23 @@ class JobMatcher:
                 batch = offers[i: i + BATCH_SIZE]
                 n = i // BATCH_SIZE + 1
                 self._step(progress, f"Lot {n}/{total_batches} : analyse de {len(batch)} offre(s) en cours…")
-                self._score_batch(batch)
+                try:
+                    self._score_batch(batch)
+                except Exception as e:
+                    # L'IA est tombée (timeout Ollama, coupure réseau, pas de
+                    # fallback configuré…) : plutôt que de planter tout le scan,
+                    # on évalue ce lot par le scoring local (mots-clés) et on
+                    # continue. Les offres restent classées, le scan aboutit.
+                    if code_idf is None:
+                        code_idf = self._build_idf(offers)
+                    for o in batch:
+                        self._apply_code_score(o, code_idf)
+                    self._step(
+                        progress,
+                        f"  ↳ Lot {n}/{total_batches} : IA indisponible ({type(e).__name__}), "
+                        f"évalué localement (sans IA).",
+                        style="yellow",
+                    )
                 scored.extend(batch)
                 analyzed += len(batch)
                 kept = sum(1 for o in scored if (o.match_score or 0) >= shown_min)

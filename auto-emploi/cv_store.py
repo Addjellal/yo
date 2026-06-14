@@ -186,7 +186,9 @@ class CVStore:
             return empty
 
     def _save(self) -> None:
-        payload = json.dumps(self._data, ensure_ascii=False)
+        # Neutralise les surrogates isolés (utf-8 « surrogates not allowed »)
+        # avant écriture — un caractère malformé ne doit pas corrompre le registre.
+        payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".cvs_", suffix=".tmp"
         )
@@ -194,7 +196,7 @@ class CVStore:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(payload)
             os.replace(tmp_name, self.path)
-        except OSError:
+        except Exception:
             try:
                 os.unlink(tmp_name)
             except OSError:

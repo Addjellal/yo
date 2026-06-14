@@ -467,8 +467,9 @@ class TestAuditFixes(unittest.TestCase):
         import cv_parser
         evil = Path("/tmp/../../etc/cv évadé.txt")
         cache = cv_parser._cache_path(evil)
-        # Le nom reste dans output/ et ne contient aucun séparateur ni « .. »
-        self.assertEqual(cache.parent, Path(config.output_dir).resolve())
+        # Le cache reste sous output/ (sous-dossier cv/.cache) et le nom ne
+        # contient aucun séparateur ni « .. »
+        self.assertEqual(cache.parent, Path(config.output_dir).resolve() / "cv" / ".cache")
         self.assertNotIn("..", cache.name)
         self.assertNotIn("/", cache.name)
         self.assertTrue(cache.name.startswith(".cv_"))
@@ -583,6 +584,49 @@ class TestAuditFixes(unittest.TestCase):
         from integrations.local_models import _get_json
         self.assertIsNone(_get_json("file:///etc/passwd"))
         self.assertIsNone(_get_json("gopher://localhost/"))
+
+    def test_save_survit_aux_surrogates(self):
+        # Un surrogate isolé (\udfde, issu d'un PDF/scraping malformé) ne doit
+        # PAS faire planter l'écriture utf-8 (« surrogates not allowed »).
+        import tempfile, shutil
+        from pathlib import Path
+        from history import SessionStore
+        from job_scrapers.base import JobOffer
+        d = tempfile.mkdtemp()
+        try:
+            store = SessionStore(Path(d) / ".sessions.json")
+            bad = JobOffer(id="x", title="Dev \udfde embarqué", company="ACME",
+                           location="", description="desc \udfde", url="https://x",
+                           source="Test")
+            store.add_session(kind="web", criteria={}, offers=[bad], found=1)  # ne lève pas
+            reloaded = SessionStore(Path(d) / ".sessions.json")
+            self.assertEqual(len(reloaded.list_sessions()), 1)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_tidy_output_root_nettoie_la_racine(self):
+        # Les caches .cv_*.txt sont déplacés vers cv/.cache/, les .tmp orphelins
+        # supprimés ; les fichiers d'état (.sessions.json…) restent intacts.
+        import tempfile, shutil
+        from pathlib import Path
+        from unittest import mock
+        from config import config
+        import output_paths
+        d = tempfile.mkdtemp()
+        try:
+            root = Path(d)
+            (root / ".cv_mon_cv_abc123.txt").write_text("cache", encoding="utf-8")
+            (root / ".sessions_orphelin.tmp").write_text("", encoding="utf-8")
+            (root / ".sessions.json").write_text("{}", encoding="utf-8")
+            with mock.patch.object(config, "output_dir", str(root)):
+                moved = output_paths._tidy_output_root(root)
+            self.assertEqual(moved, 1)
+            self.assertFalse((root / ".cv_mon_cv_abc123.txt").exists())
+            self.assertTrue((root / "cv" / ".cache" / ".cv_mon_cv_abc123.txt").exists())
+            self.assertFalse((root / ".sessions_orphelin.tmp").exists())
+            self.assertTrue((root / ".sessions.json").exists())  # état préservé
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 if __name__ == "__main__":
