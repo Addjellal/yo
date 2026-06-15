@@ -1793,7 +1793,21 @@ async function loadCvs() {
 // Sélection multiple pour les actions groupées (distincte de la sélection de
 // recherche SELECTED.cvs) — ne contient que des ids de CV actifs.
 const CV_SELECTED = new Set();
-let CV_BULK_BUSY = false;  // une analyse groupée est en cours
+let CV_BULK_BUSY = false;     // une analyse groupée est en cours
+// Avancement de l'analyse groupée, conservé hors du DOM pour survivre aux
+// re-rendus (changement d'onglet, (dé)sélection) : { label, done, total } ou null.
+let CV_BULK_STATE = null;
+
+// Réaffiche l'avancement dans l'élément #cv-bulk-status COURANT — la barre
+// d'outils étant reconstruite à chaque rendu, on ne capture jamais l'élément.
+function renderCvBulkStatus() {
+  const status = $("#cv-bulk-status");
+  if (!status) return;
+  if (!CV_BULK_STATE) { status.hidden = true; status.textContent = ""; return; }
+  const { label, done, total } = CV_BULK_STATE;
+  status.hidden = false;
+  status.textContent = `Analyse IA de ${label} : ${done}/${total}…`;
+}
 
 function renderCvToolbar() {
   const bar = $("#cv-toolbar");
@@ -1845,6 +1859,7 @@ function renderCvToolbar() {
   const status = el("div", { class: "cv-bulk-status", id: "cv-bulk-status" });
   status.hidden = true;
   bar.appendChild(status);
+  renderCvBulkStatus();   // restaure l'avancement d'une analyse en cours après un re-rendu
 }
 
 function renderCvList() {
@@ -1914,11 +1929,9 @@ async function analyzeCvBatch(cvList, label) {
   const targets = (cvList || []).filter((c) => c.file_exists);
   if (!targets.length) { toast("Aucun CV analysable (fichiers introuvables).", "err"); return; }
   CV_BULK_BUSY = true;
-  renderCvToolbar();
-  const status = $("#cv-bulk-status");
-  const setStatus = (txt) => { if (status) { status.hidden = false; status.textContent = txt; } };
-  let done = 0, failed = 0;
-  setStatus(`Analyse IA de ${label} : 0/${targets.length}…`);
+  CV_BULK_STATE = { label, done: 0, total: targets.length };
+  renderCvToolbar();   // affiche les boutons désactivés + l'avancement initial
+  let failed = 0;
   for (const cv of targets) {
     try {
       const out = await api("/api/cv-analyze", { method: "POST", body: JSON.stringify({ id: cv.id }) });
@@ -1926,16 +1939,18 @@ async function analyzeCvBatch(cvList, label) {
     } catch (e) {
       failed += 1;
     }
-    done += 1;
-    setStatus(`Analyse IA de ${label} : ${done}/${targets.length}…`);
+    CV_BULK_STATE.done += 1;
+    renderCvBulkStatus();
   }
+  const total = targets.length;
+  const okCount = CV_BULK_STATE.done - failed;
   CV_BULK_BUSY = false;
+  CV_BULK_STATE = null;
   await refreshCvData();
   if (CVD) { const fresh = CVS.find((c) => c.id === CVD.entry.id); if (fresh) openCvDetail(fresh); }
   renderCvList();
-  const okCount = done - failed;
   if (failed === 0) toast(`${okCount} CV analysé(s) par l'IA.`, "ok");
-  else toast(`${okCount}/${targets.length} CV analysé(s) — ${failed} échec(s).`, okCount ? "ok" : "err");
+  else toast(`${okCount}/${total} CV analysé(s) — ${failed} échec(s).`, okCount ? "ok" : "err");
 }
 
 function openCvDetail(cv) {
