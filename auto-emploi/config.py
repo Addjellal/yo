@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+import threading
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -163,6 +164,17 @@ _NUMERIC_ENV_KEYS = {
     "MAX_JOBS_PER_SOURCE": int, "MIN_MATCH_SCORE": int, "REQUEST_DELAY": float,
     "MULTI_CV_SHARED_KEEP": int, "LLM_TIMEOUT": int,
 }
+# Clés dont la valeur est un nom de modèle : validées contre _MODEL_RE (mêmes
+# caractères qu'au chargement) pour ne pas persister une valeur ingérable.
+_MODEL_VALUE_KEYS = {
+    "ANTHROPIC_MODEL", "OLLAMA_MODEL", "OLLAMA_VISION_MODEL",
+    "AI_PRESCORE_MODEL", "AI_MATCH_MODEL", "AI_LETTER_MODEL", "AI_REVIEW_MODEL",
+}
+
+# Sérialise les écritures de .env : un auto-save de modèle (thread de scan) et
+# une sauvegarde des réglages (thread de requête) peuvent survenir en parallèle.
+# Sans verrou, le read-modify-write pourrait perdre une mise à jour.
+_ENV_LOCK = threading.Lock()
 
 
 def save_to_env(key: str, value: str) -> None:
@@ -185,30 +197,39 @@ def save_to_env(key: str, value: str) -> None:
         except (TypeError, ValueError):
             raise ValueError(f"Valeur numérique invalide pour {key} : {value!r}")
 
-    env_path = _PROJECT_DIR / ".env"
-    lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-    updated = False
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
-            lines[i] = f"{key}={value}"
-            updated = True
-            break
-    if not updated:
-        lines.append(f"{key}={value}")
+    # Nom de modèle : on rejette une valeur invalide AVANT d'écrire, sinon elle
+    # serait silencieusement ignorée au prochain chargement (_env_model) et
+    # remplacée par le défaut — comportement déroutant. Une valeur vide reste
+    # permise (AI_*_MODEL vide = suivre le modèle par défaut du backend).
+    if key in _MODEL_VALUE_KEYS and value and not _MODEL_RE.match(value):
+        raise ValueError(f"Nom de modèle invalide pour {key} : {value!r}")
 
-    # mkstemp crée le fichier en 0600 : les secrets ne sont jamais lisibles par
-    # d'autres comptes, même pendant l'écriture. os.replace = pas de .env tronqué.
-    fd, tmp_name = tempfile.mkstemp(dir=str(env_path.resolve().parent), prefix=".env_", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-        os.replace(tmp_name, env_path)
-    except OSError:
+    env_path = _PROJECT_DIR / ".env"
+    # Verrou : read-modify-write atomique vis-à-vis des autres threads.
+    with _ENV_LOCK:
+        lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+        updated = False
+        for i, line in enumerate(lines):
+            if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+                lines[i] = f"{key}={value}"
+                updated = True
+                break
+        if not updated:
+            lines.append(f"{key}={value}")
+
+        # mkstemp crée le fichier en 0600 : les secrets ne sont jamais lisibles par
+        # d'autres comptes, même pendant l'écriture. os.replace = pas de .env tronqué.
+        fd, tmp_name = tempfile.mkstemp(dir=str(env_path.resolve().parent), prefix=".env_", suffix=".tmp")
         try:
-            os.unlink(tmp_name)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+            os.replace(tmp_name, env_path)
         except OSError:
-            pass
-        raise
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
 
     # Stocke le bon type dans l'objet config (déjà validé plus haut pour les
     # champs numériques : ils ne restent jamais en chaîne après une sauvegarde).

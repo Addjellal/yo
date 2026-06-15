@@ -120,14 +120,11 @@ def _model_env_key(task: str, model: str) -> str:
 
 
 def _save_model(task: str, old_model: str, new_model: str) -> None:
-    """Persiste le nouveau modèle dans config en mémoire et dans .env."""
+    """Persiste le nouveau modèle dans .env (save_to_env met aussi à jour
+    l'attribut correspondant de config en mémoire)."""
     from config import save_to_env
-    env_key = _model_env_key(task, old_model)
     try:
-        save_to_env(env_key, new_model)
-        attr = env_key.lower()          # ex. OLLAMA_MODEL → ollama_model
-        if hasattr(config, attr):
-            setattr(config, attr, new_model)
+        save_to_env(_model_env_key(task, old_model), new_model)
     except Exception as exc:
         console.print(f"[dim]Impossible d'enregistrer le nouveau modèle dans .env : {exc}[/dim]")
 

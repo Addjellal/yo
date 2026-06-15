@@ -139,6 +139,41 @@ class TestStripHtml(unittest.TestCase):
         self.assertIn("ligne 1\nligne 2", out)
 
 
+class TestCleanLlmHtml(unittest.TestCase):
+    """Nettoyage conservateur du HTML émis par les modèles dans les lettres :
+    retire les vraies balises sans abîmer les « < » / « > » en prose."""
+
+    def setUp(self):
+        from ai.cover_letter import _clean_llm_html
+        self.clean = _clean_llm_html
+
+    def test_br_devient_paragraphe(self):
+        self.assertEqual(self.clean("Mon experience <br><br> en auto."),
+                         "Mon experience\n\nen auto.")
+
+    def test_balises_bloc_et_inline(self):
+        self.assertEqual(self.clean("<p>Bonjour,</p><p>Je postule.</p>"), "Bonjour,\nJe postule.")
+        self.assertEqual(self.clean("Je suis <strong>autonome</strong>."), "Je suis autonome.")
+
+    def test_comparaison_en_prose_preservee(self):
+        # Régression : « < 45k et > » ne doit JAMAIS être pris pour une balise.
+        self.assertEqual(self.clean("Salaire < 45k et > 35k selon profil."),
+                         "Salaire < 45k et > 35k selon profil.")
+        self.assertEqual(self.clean("si x<y alors ok"), "si x<y alors ok")
+
+    def test_entites_decodees(self):
+        self.assertEqual(self.clean("Python &amp; C++, prix &lt; 100&euro;."),
+                         "Python & C++, prix < 100€.")
+
+    def test_texte_propre_inchange(self):
+        # Sans « < » ni « & » : aucun traitement, formatage intact.
+        txt = "Para 1.\n\nPara 2 avec   espaces.\n\nCordialement,"
+        self.assertEqual(self.clean(txt), txt)
+
+    def test_rd_sans_point_virgule_preserve(self):
+        self.assertEqual(self.clean("experience en R&D et gestion"), "experience en R&D et gestion")
+
+
 class TestExtractSections(unittest.TestCase):
     DESC = (
         "Entreprise leader.\n"
@@ -704,6 +739,33 @@ class TestPickBestAvailable(unittest.TestCase):
             self.assertEqual(_model_env_key("match", "gemma3:12b"), "OLLAMA_MODEL")
         finally:
             config.ai_match_model = orig
+
+
+class TestSaveToEnvModelValidation(unittest.TestCase):
+    """save_to_env rejette un nom de modèle invalide AVANT toute écriture
+    (sinon il serait silencieusement remplacé par le défaut au chargement)."""
+
+    def test_nom_modele_invalide_rejete_sans_ecrire(self):
+        from unittest import mock
+        from config import save_to_env
+        import config as cfg
+        # Si la validation échoue, l'exception doit survenir avant mkstemp.
+        with mock.patch.object(cfg.tempfile, "mkstemp",
+                               side_effect=AssertionError("ne doit pas écrire")):
+            with self.assertRaises(ValueError):
+                save_to_env("OLLAMA_MODEL", "modèle invalide avec espaces")
+
+    def test_valeur_vide_autorisee_pour_modele_de_tache(self):
+        # AI_*_MODEL vide = « suivre le backend » : la validation ne doit pas
+        # rejeter une chaîne vide (on vérifie juste qu'aucune ValueError de
+        # format n'est levée ; l'écriture réelle est court-circuitée).
+        from unittest import mock
+        from config import save_to_env
+        import config as cfg
+        with mock.patch.object(cfg.tempfile, "mkstemp",
+                               side_effect=RuntimeError("stop avant écriture")):
+            with self.assertRaises(RuntimeError):   # pas ValueError de format
+                save_to_env("AI_MATCH_MODEL", "")
 
 
 class TestLLMTimeout(unittest.TestCase):

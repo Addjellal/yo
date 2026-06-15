@@ -1,3 +1,4 @@
+import html as _html
 import json
 import re
 import time
@@ -254,6 +255,28 @@ def fix_typography(text: str) -> str:
     return text
 
 
+# Balises de bloc → saut de ligne ; autres balises HTML bien formées → retirées.
+# On EXIGE une lettre juste après « < » (ou « </ ») : une comparaison en prose
+# comme « salaire < 45k et > 35k » n'est donc jamais prise pour une balise.
+_LETTER_BLOCK_TAG_RE = re.compile(r"<br\s*/?>|</(?:p|div|li|h[1-6])\s*>", re.IGNORECASE)
+_LETTER_TAG_RE = re.compile(r"</?[a-zA-Z][a-zA-Z0-9]*(?:\s[^>]*)?>")
+
+
+def _clean_llm_html(text: str) -> str:
+    """Nettoie le HTML que certains modèles locaux insèrent dans leurs réponses
+    texte (<br>, <p>…</p>, &amp;…) SANS toucher aux « < » / « > » employés en
+    prose (ex. « salaire < 45k »). Ne retire que des balises bien formées dont
+    le nom commence par une lettre, et décode les entités HTML."""
+    if not text or ("<" not in text and "&" not in text):
+        return text
+    text = _LETTER_BLOCK_TAG_RE.sub("\n", text)
+    text = _LETTER_TAG_RE.sub("", text)
+    text = _html.unescape(text).replace("\xa0", " ")
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)  # espaces autour des sauts de ligne
+    text = re.sub(r"\n{3,}", "\n\n", text)        # 3+ sauts → paragraphe
+    return text.strip()
+
+
 _LETTER_FIELD_RE = re.compile(r'"letter"\s*:\s*"')
 _JSON_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/"}
 
@@ -485,14 +508,11 @@ class CoverLetterGenerator:
             data = json.loads(raw)
         except json.JSONDecodeError:
             data = {}
-        letter = fix_typography(str(data.get("letter", "")).strip() or _salvage_letter(raw))
-        email_subject = fix_typography(str(data.get("email_subject", "")).strip()[:200])
-        email_body = fix_typography(str(data.get("email_body", "")).strip()[:2000])
         # Certains modèles locaux (gemma, llama) insèrent du HTML dans leurs
         # réponses texte (<br><br>, <p>…</p>, &amp;…). On nettoie avant affichage.
-        from job_scrapers.base import strip_html
-        letter = strip_html(letter)
-        email_body = strip_html(email_body)
+        letter = _clean_llm_html(fix_typography(str(data.get("letter", "")).strip() or _salvage_letter(raw)))
+        email_subject = _clean_llm_html(fix_typography(str(data.get("email_subject", "")).strip()[:200]))
+        email_body = _clean_llm_html(fix_typography(str(data.get("email_body", "")).strip()[:2000]))
 
         if partial:
             # Lettre incomplète : on la renvoie pour édition, sans relecture ni

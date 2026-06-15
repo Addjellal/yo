@@ -2280,6 +2280,7 @@ $("#btn-save-settings").addEventListener("click", async () => {
   if (!Object.keys(body).length) { toast("Aucun champ rempli — rien à enregistrer.", "err"); return; }
   try {
     const out = await api("/api/settings", { method: "POST", body: JSON.stringify(body) });
+    APP.settings = out.settings;   // évite que les menus reviennent à l'ancienne valeur
     refreshSettingsHints(out.settings);
     document.querySelectorAll("[data-key]").forEach((input) => {
       if (input.tagName === "INPUT") input.value = "";

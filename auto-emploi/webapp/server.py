@@ -1881,11 +1881,15 @@ def _startup_model_check() -> None:
         _LOG.warning("Vérification des modèles locaux au démarrage : échec", exc_info=True)
         return
 
-    installed: set[str] = set()
+    # On ne compare les modèles configurés qu'à ceux d'Ollama (c'est lui que
+    # vise OLLAMA_MODEL / AI_*_MODEL) — pas à LM Studio/llama.cpp dont les noms
+    # pourraient masquer une absence côté Ollama.
+    ollama_models: set[str] = set()
     for server in servers:
         names = [str(m.get("name", "")) for m in server.get("models", []) if isinstance(m, dict)]
         names = [n for n in names if n]
-        installed.update(names)
+        if str(server.get("server", "")).lower() == "ollama":
+            ollama_models.update(names)
         listing = ", ".join(names) if names else "aucun modèle installé"
         print(f"  Modèles locaux — {server.get('server')} : {listing}")
         _LOG.info("modèles locaux %s (%s) : %s", server.get("server"), server.get("url"), names)
@@ -1893,19 +1897,18 @@ def _startup_model_check() -> None:
         print("  Aucun serveur LLM local détecté (Ollama/LM Studio/llama.cpp).")
 
     # Si une tâche IA est routée en local, prévenir des modèles configurés mais
-    # absents du serveur (Ollama tolère l'absence du tag « :latest »).
+    # absents d'Ollama. Un nom nu (« llama3.2 ») correspond au tag « :latest ».
     uses_local = config.provider == "ollama" or any(
         getattr(config, f"ai_{t}_backend", "") == "local" for t in ("prescore", "match", "letter", "review")
     )
-    if installed and uses_local:
+    if ollama_models and uses_local:
         wanted = {
             config.ollama_model, config.ai_prescore_model, config.ai_match_model,
             config.ai_letter_model, config.ai_review_model,
         }
-        bases = {n.split(":", 1)[0] for n in installed}
         for model in sorted(w for w in wanted if w):
-            if model not in installed and f"{model}:latest" not in installed and model.split(":", 1)[0] not in bases:
-                print(f"  ⚠ Modèle « {model} » configuré mais non installé localement — « ollama pull {model} ».")
+            if model not in ollama_models and f"{model}:latest" not in ollama_models:
+                print(f"  ⚠ Modèle « {model} » configuré mais non installé sur Ollama — « ollama pull {model} ».")
                 _LOG.warning("modèle configuré absent du serveur local : %s", model)
 
 
