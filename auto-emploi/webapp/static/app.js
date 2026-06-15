@@ -202,6 +202,7 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     if (btn.dataset.tab === "cvs") loadCvs();
     if (btn.dataset.tab === "letters") loadLetters();
     if (btn.dataset.tab === "stats") loadStats();
+    if (btn.dataset.tab === "settings") loadModelLists();
   });
 });
 

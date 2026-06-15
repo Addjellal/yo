@@ -61,6 +61,12 @@ def llm_available(task: str = "match") -> bool:
     return True
 
 
+def _is_model_not_found(exc: Exception) -> bool:
+    """Vrai si l'exception Ollama indique que le modèle n'est pas installé."""
+    msg = str(exc).lower()
+    return "not found" in msg or "no such file" in msg or "pull the model" in msg
+
+
 def _fallback_backend(primary: str) -> tuple[str, str] | None:
     """Backend de secours configuré via AI_FALLBACK, ou None.
     Jamais le même que le backend primaire."""
@@ -190,6 +196,16 @@ class LLMClient:
                 return response.message.content.strip()
             except Exception as e:
                 last_err = e
+                # Modèle absent (pas installé ou désinstallé depuis la config) :
+                # on rebasule immédiatement sur le modèle par défaut s'il est
+                # différent — inutile de retenter avec le même nom introuvable.
+                if _is_model_not_found(e) and kwargs["model"] != config.ollama_model:
+                    console.print(
+                        f"[yellow]Ollama : modèle « {kwargs['model']} » introuvable, "
+                        f"bascule sur « {config.ollama_model} ».[/yellow]"
+                    )
+                    kwargs["model"] = config.ollama_model
+                    continue
                 if attempt < 2:
                     wait = 2 ** attempt
                     console.print(f"[dim]Ollama indisponible, nouvel essai dans {wait}s...[/dim]")
@@ -245,7 +261,22 @@ class LLMClient:
                 if text:
                     yield text
 
-    def _ollama_stream(self, client, model, system, user):
+    def _ollama_stream(self, client, model, system, user, _retried: bool = False):
+        # Si le modèle configuré est absent, on rebasule sur le modèle par défaut
+        # plutôt que de faire échouer la génération de lettre.
+        try:
+            yield from self._ollama_stream_inner(client, model, system, user)
+        except Exception as e:
+            if _is_model_not_found(e) and not _retried and model != config.ollama_model:
+                console.print(
+                    f"[yellow]Ollama : modèle « {model} » introuvable en streaming, "
+                    f"bascule sur « {config.ollama_model} ».[/yellow]"
+                )
+                yield from self._ollama_stream(client, config.ollama_model, system, user, _retried=True)
+            else:
+                raise
+
+    def _ollama_stream_inner(self, client, model, system, user):
         for chunk in client.chat(
             model=model,
             messages=[
