@@ -19,27 +19,27 @@
     </div>
   </div>
 
-  <nav class="nav">
-    <button class="nav-btn active" data-tab="search">
-      <span class="nav-ico">⌕</span> <span class="nav-label">Recherche</span>
+  <nav class="nav" aria-label="Navigation principale">
+    <button class="nav-btn active" data-tab="search" aria-label="Recherche" aria-current="page">
+      <span class="nav-ico" aria-hidden="true">⌕</span> <span class="nav-label">Recherche</span>
     </button>
-    <button class="nav-btn" data-tab="track">
-      <span class="nav-ico">◫</span> <span class="nav-label">Suivi</span>
+    <button class="nav-btn" data-tab="track" aria-label="Suivi">
+      <span class="nav-ico" aria-hidden="true">◫</span> <span class="nav-label">Suivi</span>
     </button>
-    <button class="nav-btn" data-tab="history">
-      <span class="nav-ico">↺</span> <span class="nav-label">Historique</span>
+    <button class="nav-btn" data-tab="history" aria-label="Historique">
+      <span class="nav-ico" aria-hidden="true">↺</span> <span class="nav-label">Historique</span>
     </button>
-    <button class="nav-btn" data-tab="cvs">
-      <span class="nav-ico">≡</span> <span class="nav-label">Mes CV</span>
+    <button class="nav-btn" data-tab="cvs" aria-label="Mes CV">
+      <span class="nav-ico" aria-hidden="true">≡</span> <span class="nav-label">Mes CV</span>
     </button>
-    <button class="nav-btn" data-tab="letters">
-      <span class="nav-ico">✉</span> <span class="nav-label">Lettres</span>
+    <button class="nav-btn" data-tab="letters" aria-label="Lettres">
+      <span class="nav-ico" aria-hidden="true">✉</span> <span class="nav-label">Lettres</span>
     </button>
-    <button class="nav-btn" data-tab="stats">
-      <span class="nav-ico">◔</span> <span class="nav-label">Statistiques</span>
+    <button class="nav-btn" data-tab="stats" aria-label="Statistiques">
+      <span class="nav-ico" aria-hidden="true">◔</span> <span class="nav-label">Statistiques</span>
     </button>
-    <button class="nav-btn" data-tab="settings">
-      <span class="nav-ico">⚙</span> <span class="nav-label">Réglages</span>
+    <button class="nav-btn" data-tab="settings" aria-label="Réglages">
+      <span class="nav-ico" aria-hidden="true">⚙</span> <span class="nav-label">Réglages</span>
     </button>
   </nav>
 
@@ -108,23 +108,23 @@
           </div>
 
           <div class="field span-3">
-            <label>Niveau d'expérience</label>
-            <div id="f-experience" class="pills"></div>
+            <label id="lbl-experience">Niveau d'expérience</label>
+            <div id="f-experience" class="pills" role="radiogroup" aria-labelledby="lbl-experience"></div>
           </div>
 
           <div class="field span-3">
-            <label>Type de contrat <span class="muted">(aucun = tous ; sinon les autres types sont écartés)</span></label>
-            <div id="f-contracts" class="chips"></div>
+            <label id="lbl-contracts">Type de contrat <span class="muted">(aucun = tous ; sinon les autres types sont écartés)</span></label>
+            <div id="f-contracts" class="chips" role="group" aria-labelledby="lbl-contracts"></div>
           </div>
 
           <div class="field span-3">
-            <label>Secteurs <span class="muted">(aucun = tous)</span></label>
-            <div id="f-sectors" class="chips"></div>
+            <label id="lbl-sectors">Secteurs <span class="muted">(aucun = tous)</span></label>
+            <div id="f-sectors" class="chips" role="group" aria-labelledby="lbl-sectors"></div>
           </div>
 
           <div class="field span-3">
-            <label>Sources</label>
-            <div id="f-sources" class="chips"></div>
+            <label id="lbl-sources">Sources</label>
+            <div id="f-sources" class="chips" role="group" aria-labelledby="lbl-sources"></div>
           </div>
 
           <div class="field">
@@ -160,8 +160,8 @@
 
     <!-- Progression du scan -->
     <div id="scan-progress" class="card progress-card" hidden>
-      <div class="progress-head">
-        <span class="spinner"></span>
+      <div class="progress-head" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
         <strong id="progress-title">Recherche en cours…</strong>
         <span id="progress-percent" class="progress-percent" hidden>0/100</span>
         <button id="btn-scan-stop" class="btn-danger small" title="Les offres déjà scorées sont conservées">⏹ Stopper</button>
@@ -180,7 +180,7 @@
     <!-- Résultats -->
     <div id="results-zone" hidden>
       <div class="results-toolbar">
-        <h2 id="results-count">0 offre</h2>
+        <h2 id="results-count" aria-live="polite">0 offre</h2>
         <div class="toolbar-actions">
           <select id="sort-select" title="Trier">
             <option value="score">Tri : score</option>
@@ -555,20 +555,20 @@
 
 <!-- Modale lettre de motivation -->
 <div id="modal-overlay" class="modal-overlay" hidden>
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-head">
       <h2 id="modal-title">Lettre de motivation</h2>
-      <button id="modal-close" class="btn-ghost">✕</button>
+      <button id="modal-close" class="btn-ghost" aria-label="Fermer">✕</button>
     </div>
     <div class="modal-body">
       <div id="letter-config">
-        <label>Type de document</label>
-        <div id="letter-doctypes" class="pills">
+        <label id="lbl-doctype">Type de document</label>
+        <div id="letter-doctypes" class="pills" role="radiogroup" aria-labelledby="lbl-doctype">
           <span class="pill active" data-doctype="lettre">Lettre de motivation</span>
           <span class="pill" data-doctype="message">Message pour recruteur</span>
         </div>
-        <label>Ton</label>
-        <div id="letter-tones" class="pills"></div>
+        <label id="lbl-tone">Ton</label>
+        <div id="letter-tones" class="pills" role="radiogroup" aria-labelledby="lbl-tone"></div>
         <label for="letter-maxwords">Longueur maximale : <strong id="letter-maxwords-val">350</strong> mots</label>
         <input id="letter-maxwords" type="range" min="80" max="800" step="10" value="350"
                title="Plafond indicatif transmis à l'IA — par défaut sous 500 mots, ajustable.">
@@ -610,10 +610,10 @@
 
 <!-- Modale de confirmation (suppression de CV) -->
 <div id="confirm-overlay" class="modal-overlay" hidden>
-  <div class="modal modal-confirm">
+  <div class="modal modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
     <div class="modal-head">
       <h2 id="confirm-title">Confirmer</h2>
-      <button id="confirm-close" class="btn-ghost">✕</button>
+      <button id="confirm-close" class="btn-ghost" aria-label="Fermer">✕</button>
     </div>
     <div class="modal-body">
       <p id="confirm-text"></p>
@@ -627,23 +627,23 @@
 
 <!-- Modale choix format export -->
 <div id="export-overlay" class="modal-overlay" hidden>
-  <div class="modal modal-confirm">
+  <div class="modal modal-confirm" role="dialog" aria-modal="true" aria-labelledby="export-title">
     <div class="modal-head">
-      <h2>Exporter les résultats</h2>
-      <button id="export-close" class="btn-ghost">✕</button>
+      <h2 id="export-title">Exporter les résultats</h2>
+      <button id="export-close" class="btn-ghost" aria-label="Fermer">✕</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--muted);margin:0">Choisissez le format de téléchargement</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button id="export-csv" class="btn-primary" style="flex:1">⬇ CSV</button>
-        <button id="export-json" class="btn-primary" style="flex:1">⬇ JSON</button>
-        <button id="export-both" class="btn-ghost" style="flex:1">⬇ Les deux</button>
+      <p class="muted export-hint">Choisissez le format de téléchargement</p>
+      <div class="export-choices">
+        <button id="export-csv" class="btn-primary">⬇ CSV</button>
+        <button id="export-json" class="btn-primary">⬇ JSON</button>
+        <button id="export-both" class="btn-ghost">⬇ Les deux</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="toasts" class="toasts"></div>
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
 <script src="/static/app.js"></script>
 </body>

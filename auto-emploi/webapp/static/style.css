@@ -181,6 +181,15 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
+/* Anneau de focus clavier homogène — visible uniquement au clavier, pas à la
+   souris (focus-visible). Les champs gardent leur halo dédié ci-dessus.
+   (Pas de border-radius ici : il déformerait la forme des éléments focalisés ;
+   l'outline épouse déjà le border-radius natif de chaque élément.) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 #f-query { font-size: 16px; padding: 12px 15px; }
 .cv-field { margin-top: 16px; }
 .cv-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
@@ -729,9 +738,16 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   box-shadow: var(--shadow);
   max-width: 380px;
   animation: slidein .25s ease;
+  display: flex; align-items: flex-start; gap: 10px;
 }
 .toast.ok { border-left-color: var(--green); }
 .toast.err { border-left-color: var(--red); }
+.toast-msg { flex: 1; min-width: 0; }
+.toast-close {
+  flex: none; background: none; border: 0; color: var(--text-soft);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.toast-close:hover { color: var(--text); }
 @keyframes slidein { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ════════ Responsive (tablette puis mobile) ════════ */
@@ -765,6 +781,28 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   .filters-grid { grid-template-columns: 1fr; }
   .cvd-actions .btn-danger { margin-left: 0; }
   .cv-section .grid2 { grid-template-columns: 1fr; }
+  /* Une seule colonne : évite le défilement horizontal sur petit écran. */
+  .results-grid, .letters-grid, .rejected-list { grid-template-columns: 1fr; }
+  .toasts { left: 12px; right: 12px; bottom: 12px; }
+  .toast { max-width: none; }
+}
+
+.model-custom-input { margin-top: 6px; }
+
+/* ════════ Modale d'export ════════ */
+.export-hint { margin: 0; }
+.export-choices { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.export-choices > button { flex: 1; min-width: 120px; }
+
+/* ════════ Mouvement réduit : respecte la préférence système ════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .spinner { animation-duration: .8s !important; }  /* le spinner reste utile */
 }
 
 /* ─── Recherche globale ──────────────────────────────────────────────────── */

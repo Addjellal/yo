@@ -58,10 +58,98 @@ async function downloadFile(file) {
   URL.revokeObjectURL(url);
 }
 
+const _TOAST_MAX = 4;
 function toast(message, kind = "") {
-  const box = el("div", { class: `toast ${kind}`, text: message });
-  $("#toasts").appendChild(box);
-  setTimeout(() => box.remove(), 5200);
+  const box = $("#toasts");
+  // Erreurs annoncées sans attendre (assertive) ; le reste poliment.
+  box.setAttribute("aria-live", kind === "err" ? "assertive" : "polite");
+  const node = el("div", { class: `toast ${kind}` }, [
+    el("span", { class: "toast-msg", text: message }),
+    el("button", { class: "toast-close", "aria-label": "Fermer", text: "✕" }),
+  ]);
+  // Durée proportionnée à la longueur (4–10 s) ; en pause au survol/focus pour
+  // laisser le temps de lire ou de cliquer un lien.
+  const ms = Math.min(10000, Math.max(4000, message.length * 70));
+  let timer = setTimeout(() => node.remove(), ms);
+  node.addEventListener("mouseenter", () => clearTimeout(timer));
+  node.addEventListener("focusin", () => clearTimeout(timer));
+  node.addEventListener("mouseleave", () => { timer = setTimeout(() => node.remove(), 2500); });
+  node.querySelector(".toast-close").addEventListener("click", () => { clearTimeout(timer); node.remove(); });
+  box.appendChild(node);
+  while (box.children.length > _TOAST_MAX) box.firstElementChild.remove();
+}
+
+// ─── Modales : focus, piège de tabulation, Échap, retour du focus ────────────
+const _MODAL_FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+let _modalStack = [];
+
+function _modalKeydown(e) {
+  const overlay = _modalStack[_modalStack.length - 1];
+  if (!overlay) return;
+  if (e.key === "Escape") { e.preventDefault(); closeModal(overlay); return; }
+  if (e.key !== "Tab") return;
+  const items = [...overlay.querySelectorAll(_MODAL_FOCUSABLE)].filter((n) => n.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function openModal(overlay, { initialFocus = null, onClose = null } = {}) {
+  overlay._opener = document.activeElement;
+  overlay._onClose = onClose;
+  overlay.hidden = false;
+  if (!_modalStack.length) {
+    document.addEventListener("keydown", _modalKeydown, true);
+    $(".main").setAttribute("inert", "");
+    $(".sidebar").setAttribute("inert", "");
+  }
+  _modalStack.push(overlay);
+  const target = initialFocus || overlay.querySelector(_MODAL_FOCUSABLE);
+  if (target) target.focus();
+}
+
+function closeModal(overlay) {
+  if (overlay.hidden) return;
+  overlay.hidden = true;
+  _modalStack = _modalStack.filter((m) => m !== overlay);
+  if (!_modalStack.length) {
+    document.removeEventListener("keydown", _modalKeydown, true);
+    $(".main").removeAttribute("inert");
+    $(".sidebar").removeAttribute("inert");
+  }
+  const cb = overlay._onClose; overlay._onClose = null;
+  if (cb) cb();
+  const opener = overlay._opener; overlay._opener = null;
+  if (opener && opener.focus) opener.focus();
+}
+
+// Ferme une modale quand on clique sur le fond (hors de la boîte).
+function _bindBackdropClose(overlay) {
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(overlay); });
+}
+
+// Modale de confirmation (suppression de CV) — promesse résolue true/false
+function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
+  return new Promise((resolve) => {
+    const overlay = $("#confirm-overlay");
+    $("#confirm-title").textContent = title;
+    $("#confirm-text").textContent = text;
+    $("#confirm-ok").textContent = okLabel;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      $("#confirm-ok").onclick = $("#confirm-cancel").onclick = $("#confirm-close").onclick = null;
+      closeModal(overlay);
+      resolve(result);
+    };
+    $("#confirm-ok").onclick = () => finish(true);
+    $("#confirm-cancel").onclick = () => finish(false);
+    $("#confirm-close").onclick = () => finish(false);
+    openModal(overlay, { initialFocus: $("#confirm-cancel"), onClose: () => finish(false) });
+  });
 }
 
 function scoreColor(score) {
@@ -69,6 +157,41 @@ function scoreColor(score) {
   if (score >= 6) return "var(--yellow)";
   return "var(--red)";
 }
+
+// ─── Chips/pills opérables au clavier ────────────────────────────────────────
+// Les chips et pills sont des <span> (faux boutons). On les rend focusables et
+// on garde leur état sélectionné (aria-pressed/aria-checked) synchronisé avec
+// la classe .active, quelle que soit la façon dont elle change, via un
+// observateur unique par conteneur.
+function enhanceChips(container, role = "button") {
+  if (!container) return;
+  const stateKey = role === "radio" ? "aria-checked" : "aria-pressed";
+  const apply = (node) => {
+    if (!node.matches || !node.matches(".chip, .pill")) return;
+    if (!node.hasAttribute("tabindex")) node.setAttribute("tabindex", "0");
+    if (!node.hasAttribute("role")) node.setAttribute("role", role);
+    node.setAttribute(stateKey, node.classList.contains("active") ? "true" : "false");
+  };
+  container.querySelectorAll(".chip, .pill").forEach(apply);
+  if (container._chipObserver) return;            // un seul observateur par conteneur
+  const obs = new MutationObserver((muts) => {
+    for (const m of muts) {
+      if (m.type === "childList") m.addedNodes.forEach((n) => n.nodeType === 1 && apply(n));
+      else if (m.type === "attributes" && m.target.matches && m.target.matches(".chip, .pill")) apply(m.target);
+    }
+  });
+  obs.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+  container._chipObserver = obs;
+}
+
+// Entrée / Espace activent un chip/pill focalisé, comme un vrai bouton.
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t && t.matches && t.matches(".chip, .pill") && (e.key === "Enter" || e.key === " ")) {
+    e.preventDefault();
+    t.click();
+  }
+});
 
 // Modale de confirmation (suppression de CV) — promesse résolue true/false
 function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
@@ -193,16 +316,28 @@ function applyCriteria(c) {
 
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".nav-btn").forEach((b) => {
+      b.classList.remove("active");
+      b.removeAttribute("aria-current");
+    });
     btn.classList.add("active");
+    btn.setAttribute("aria-current", "page");
     document.querySelectorAll(".tab").forEach((t) => (t.hidden = true));
-    $(`#tab-${btn.dataset.tab}`).hidden = false;
+    const panel = $(`#tab-${btn.dataset.tab}`);
+    panel.hidden = false;
     if (btn.dataset.tab === "track") loadTrack();
     if (btn.dataset.tab === "history") loadHistory();
     if (btn.dataset.tab === "cvs") loadCvs();
     if (btn.dataset.tab === "letters") loadLetters();
     if (btn.dataset.tab === "stats") loadStats();
     if (btn.dataset.tab === "settings") loadModelLists();
+    // Remet la vue en haut et amène le titre dans le champ (lecteurs d'écran).
+    panel.scrollIntoView({ block: "start" });
+    const heading = panel.querySelector("h1");
+    if (heading) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    }
   });
 });
 
@@ -315,13 +450,24 @@ async function init() {
     srcBox.appendChild(chip);
   }
 
+  // Rend les chips/pills du formulaire opérables au clavier (Tab + Entrée/Espace).
+  enhanceChips($("#f-experience"), "radio");
+  enhanceChips($("#f-sectors"));
+  enhanceChips($("#f-contracts"));
+  enhanceChips($("#f-sources"));
+
   // Derniers critères persistés (.env DEFAULT_*) : pré-remplir le formulaire
   applyCriteria(APP.defaults);
 
   // Score min
   $("#f-minscore").value = APP.min_score;
   $("#minscore-val").textContent = APP.min_score;
-  $("#f-minscore").addEventListener("input", (e) => ($("#minscore-val").textContent = e.target.value));
+  const syncMinScore = (v) => {
+    $("#minscore-val").textContent = v;
+    $("#f-minscore").setAttribute("aria-valuetext", `${v} sur 10`);
+  };
+  syncMinScore(APP.min_score);
+  $("#f-minscore").addEventListener("input", (e) => syncMinScore(e.target.value));
   $("#f-max").value = APP.max_per_source;
 
   // Réglages : indicateurs "configuré" + valeurs courantes des listes
@@ -412,20 +558,45 @@ function populateModelSelect(select, local, anthropic) {
   if (current && !seen.has(current)) addInto(select, current);
   select.appendChild(el("option", { value: MODEL_CUSTOM, text: "✏️ Autre (saisir un nom)…" }));
   select.value = current && seen.has(current) ? current : "";
+  _hideCustomInput(select);
 
   if (!select._modelWired) {
     select._modelWired = true;
     select.addEventListener("change", () => {
-      if (select.value !== MODEL_CUSTOM) return;
-      const name = (window.prompt("Nom du modèle (ex. qwen2.5:3b) :", "") || "").trim();
-      if (name && MODEL_NAME_RE.test(name)) {
-        selectModelValue(select, name);
-      } else {
-        if (name) toast("Nom de modèle invalide.", "err");
-        select.value = "";
-      }
+      if (select.value === MODEL_CUSTOM) _showCustomInput(select);
+      else _hideCustomInput(select);
     });
   }
+}
+
+// Saisie libre d'un modèle non détecté : un champ texte inline (remplace une
+// invite native window.prompt, plus accessible et cohérente avec l'UI).
+function _showCustomInput(select) {
+  let input = select._customInput;
+  if (!input) {
+    input = el("input", { type: "text", class: "model-custom-input", placeholder: "ex. qwen2.5:3b",
+                          maxlength: "100", autocomplete: "off", "aria-label": "Nom du modèle personnalisé" });
+    const commit = (fromBlur) => {
+      const name = input.value.trim();
+      if (name && MODEL_NAME_RE.test(name)) { selectModelValue(select, name); _hideCustomInput(select); }
+      else if (name && !fromBlur) { toast("Nom de modèle invalide (lettres, chiffres, . _ : -).", "err"); }
+      else { select.value = ""; _hideCustomInput(select); }   // vide ou abandon → annule
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(false); }
+      else if (e.key === "Escape") { e.preventDefault(); select.value = ""; _hideCustomInput(select); select.focus(); }
+    });
+    input.addEventListener("blur", () => commit(true));
+    select.insertAdjacentElement("afterend", input);
+    select._customInput = input;
+  }
+  input.hidden = false;
+  input.value = "";
+  input.focus();
+}
+
+function _hideCustomInput(select) {
+  if (select._customInput) select._customInput.hidden = true;
 }
 
 // Peuple les menus « Modèle … » : modèles locaux détectés (Ollama/LM Studio/
@@ -470,6 +641,7 @@ function rebuildCvChips() {
     CV_CHIPS[cv.filename] = chip;
     box.appendChild(chip);
   }
+  enhanceChips(box);
   const initial = saved.length ? saved : [names[0]];
   for (const n of initial) toggleCv(n, true);
 }
@@ -580,9 +752,11 @@ function renderHistory() {
   const history = JSON.parse(localStorage.getItem("queries") || "[]");
   for (const q of history.slice(0, 6)) {
     const chip = el("span", { class: "chip", text: q });
+    chip.title = `Réutiliser « ${q} »`;
     chip.addEventListener("click", () => ($("#f-query").value = q));
     box.appendChild(chip);
   }
+  enhanceChips(box);
 }
 
 function pushHistory(query) {
@@ -595,7 +769,11 @@ function pushHistory(query) {
 // ─── Lancement du scan ──────────────────────────────────────────────────────
 
 $("#btn-scan").addEventListener("click", startScan);
-$("#f-query").addEventListener("keydown", (e) => { if (e.key === "Enter") startScan(); });
+// Entrée lance la recherche depuis n'importe quel champ texte du formulaire —
+// y compris quand « recherche globale » désactive le champ « poste ».
+for (const id of ["#f-query", "#f-city", "#f-exclude"]) {
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); startScan(); } });
+}
 // « Masquer le journal » replie seulement le texte : le spinner et la barre
 // d'avancement restent visibles pour suivre le scan d'un coup d'œil.
 $("#btn-progress-hide").addEventListener("click", () => {
@@ -824,12 +1002,17 @@ $("#btn-notion").addEventListener("click", exportNotion);
 let _exportResolve = null;
 
 function showExportPicker() {
-  return new Promise(res => { _exportResolve = res; $("#export-overlay").hidden = false; });
+  return new Promise(res => {
+    _exportResolve = res;
+    // Échap / clic sur le fond = annulation (résout null).
+    openModal($("#export-overlay"), { onClose: () => { if (_exportResolve) { _exportResolve(null); _exportResolve = null; } } });
+  });
 }
 
 function _closeExportPicker(fmt = null) {
-  $("#export-overlay").hidden = true;
-  if (_exportResolve) { _exportResolve(fmt); _exportResolve = null; }
+  const res = _exportResolve; _exportResolve = null;  // consommé avant la fermeture
+  closeModal($("#export-overlay"));
+  if (res) res(fmt);
 }
 
 $("#export-close").addEventListener("click", () => _closeExportPicker(null));
@@ -1005,9 +1188,9 @@ function offerCard(offer, ctx) {
   if (offer.url && /^https?:\/\//i.test(offer.url)) openLink.href = offer.url;
   else openLink.style.display = "none";
 
-  const btnFav = el("button", { class: "btn-ghost act-fav", text: "★", title: "Favori" });
-  const btnApplied = el("button", { class: "btn-ghost act-applied", text: "✓", title: "Marquer postulée" });
-  const btnReject = el("button", { class: "btn-ghost act-reject", text: "✗", title: "Rejeter (n'apparaîtra plus)" });
+  const btnFav = el("button", { class: "btn-ghost act-fav", text: "★", title: "Favori", "aria-label": "Ajouter aux favoris" });
+  const btnApplied = el("button", { class: "btn-ghost act-applied", text: "✓", title: "Marquer postulée", "aria-label": "Marquer comme postulée" });
+  const btnReject = el("button", { class: "btn-ghost act-reject", text: "✗", title: "Rejeter (n'apparaîtra plus)", "aria-label": "Rejeter cette offre" });
   const btnLetter = el("button", { class: "btn-ghost act-letter", text: "✉ Lettre" });
 
   const card = el("div", { class: "card offer-card" }, [
@@ -1207,7 +1390,9 @@ function openLetterModal(offer, applyStatus, jobId) {
     });
     tonesBox.appendChild(pill);
   }
-  $("#modal-overlay").hidden = false;
+  enhanceChips($("#letter-doctypes"), "radio");
+  enhanceChips($("#letter-tones"), "radio");
+  openModal($("#modal-overlay"), { initialFocus: $("#btn-generate-letter"), onClose: _resetLetterModal });
 }
 
 // Ouvre la modale en mode aperçu (depuis l'onglet Lettres) — pas de génération,
@@ -1223,7 +1408,7 @@ async function openLetterPreview(letter) {
   $("#letter-loading").hidden = false;
   $("#letter-result").hidden = true;
   $("#letter-notes").hidden = true;
-  $("#modal-overlay").hidden = false;
+  openModal($("#modal-overlay"), { onClose: _resetLetterModal });
 
   let data;
   try {
@@ -1252,28 +1437,29 @@ async function openLetterPreview(letter) {
   $("#letter-result").hidden = false;
 }
 
-$("#modal-close").addEventListener("click", () => {
-  $("#modal-overlay").hidden = true;
+function _resetLetterModal() {
   LETTER_PREVIEW_FILE = null;
   $("#btn-letter-save").textContent = "💾 Enregistrer (txt + PDF)";
-});
-$("#modal-overlay").addEventListener("click", (e) => {
-  if (e.target === $("#modal-overlay")) {
-    $("#modal-overlay").hidden = true;
-    LETTER_PREVIEW_FILE = null;
-    $("#btn-letter-save").textContent = "💾 Enregistrer (txt + PDF)";
-  }
-});
+}
+$("#modal-close").addEventListener("click", () => closeModal($("#modal-overlay")));
+_bindBackdropClose($("#modal-overlay"));
+_bindBackdropClose($("#confirm-overlay"));
+_bindBackdropClose($("#export-overlay"));
 
 // Curseur de longueur maximale
 const maxWordsInput = $("#letter-maxwords");
 if (maxWordsInput) {
   maxWordsInput.addEventListener("input", (e) => {
     $("#letter-maxwords-val").textContent = e.target.value;
+    e.target.setAttribute("aria-valuetext", `${e.target.value} mots`);
   });
 }
 
+let LETTER_BUSY = false;
 $("#btn-generate-letter").addEventListener("click", async () => {
+  if (LETTER_BUSY) return;                 // anti double-clic (appel LLM de 15–30 s)
+  LETTER_BUSY = true;
+  $("#btn-generate-letter").disabled = true;
   $("#letter-config").hidden = true;
   $("#letter-loading").hidden = false;
   const maxWords = parseInt($("#letter-maxwords").value, 10) || 350;
@@ -1287,6 +1473,8 @@ $("#btn-generate-letter").addEventListener("click", async () => {
       }),
     });
   } catch (e) {
+    LETTER_BUSY = false;
+    $("#btn-generate-letter").disabled = false;
     $("#letter-loading").hidden = true;
     $("#letter-config").hidden = false;
     toast(e.message, "err");
@@ -1301,12 +1489,14 @@ function pollLetter(jobId) {
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
     } catch (e) {
+      LETTER_BUSY = false; $("#btn-generate-letter").disabled = false;
       $("#letter-loading").hidden = true;
       $("#letter-config").hidden = false;
       toast(e.message, "err");
       return;
     }
     if (job.status === "running") { pollLetter(jobId); return; }
+    LETTER_BUSY = false; $("#btn-generate-letter").disabled = false;
     $("#letter-loading").hidden = true;
     if (job.status === "error") {
       $("#letter-config").hidden = false;
@@ -2157,7 +2347,7 @@ function fillColumn(box, entries, actions) {
     ]);
     const actionBox = el("div", { class: "ti-actions" });
     if (entry.url && /^https?:\/\//i.test(entry.url)) {
-      actionBox.appendChild(el("a", { class: "btn-ghost", text: "↗", target: "_blank", rel: "noopener noreferrer", href: entry.url }));
+      actionBox.appendChild(el("a", { class: "btn-ghost", text: "↗", target: "_blank", rel: "noopener noreferrer", href: entry.url, title: "Ouvrir l'offre", "aria-label": "Ouvrir l'offre dans un nouvel onglet" }));
     }
     for (const act of actions) {
       const btn = el("button", { class: "btn-ghost", text: act.label });
@@ -2167,6 +2357,7 @@ function fillColumn(box, entries, actions) {
     const btnForget = el("button", {
       class: "btn-ghost ti-forget", text: "🗑",
       title: "Retirer du suivi : l'offre pourra réapparaître aux prochains scans",
+      "aria-label": "Retirer du suivi",
     });
     btnForget.addEventListener("click", () => setTrackStatus(entry.key, "forget"));
     actionBox.appendChild(btnForget);
