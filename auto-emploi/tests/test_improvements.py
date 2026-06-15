@@ -629,6 +629,83 @@ class TestAuditFixes(unittest.TestCase):
             shutil.rmtree(d, ignore_errors=True)
 
 
+class TestPickBestAvailable(unittest.TestCase):
+    """Sélection automatique du modèle de remplacement le plus adapté."""
+
+    def _probe(self, models_gb):
+        """Simule probe_ollama() avec une liste (nom, taille_go)."""
+        return {"models": [{"name": n, "size_gb": s} for n, s in models_gb]}
+
+    def _pick(self, missing, models_gb):
+        from unittest import mock
+        from ai._client import _pick_best_available
+        import integrations.local_models as lm
+        with mock.patch.object(lm, "probe_ollama", lambda: self._probe(models_gb)):
+            return _pick_best_available(missing)
+
+    def test_prend_le_plus_grand_en_dessous(self):
+        # gemma3:12b (~7.8 GB) → préfère le plus grand modèle ≤ 7.8 GB
+        result = self._pick("gemma3:12b", [
+            ("llama3.2:latest", 2.0), ("qwen2.5:7b", 4.7), ("llama3.1:8b", 4.9),
+        ])
+        self.assertEqual(result, "llama3.1:8b")  # 4.9 GB : le plus grand ≤ 7.8
+
+    def test_prend_le_plus_petit_au_dessus_si_rien_en_dessous(self):
+        # gemma3:1b (~0.65 GB) → rien en-dessous, prend le plus petit au-dessus
+        result = self._pick("gemma3:1b", [
+            ("llama3.2:latest", 2.0), ("qwen2.5:7b", 4.7),
+        ])
+        self.assertEqual(result, "llama3.2:latest")
+
+    def test_taille_inconnue_prend_le_plus_gros(self):
+        # nom sans paramétrie → le plus gros disponible
+        result = self._pick("mon-modele-custom", [
+            ("llama3.2:latest", 2.0), ("qwen2.5:7b", 4.7),
+        ])
+        self.assertEqual(result, "qwen2.5:7b")
+
+    def test_aucun_modele_retourne_none(self):
+        from unittest import mock
+        from ai._client import _pick_best_available
+        import integrations.local_models as lm
+        with mock.patch.object(lm, "probe_ollama", lambda: {"models": []}):
+            self.assertIsNone(_pick_best_available("gemma3:12b"))
+
+    def test_probe_echoue_retourne_none(self):
+        from unittest import mock
+        from ai._client import _pick_best_available
+        import integrations.local_models as lm
+        with mock.patch.object(lm, "probe_ollama", lambda: None):
+            self.assertIsNone(_pick_best_available("gemma3:12b"))
+
+    def test_estimate_model_gb(self):
+        from ai._client import _estimate_model_gb
+        self.assertAlmostEqual(_estimate_model_gb("gemma3:12b"), 7.8, places=1)
+        self.assertAlmostEqual(_estimate_model_gb("qwen2.5:3b"), 1.95, places=1)
+        self.assertIsNone(_estimate_model_gb("nomic-embed-text:latest"))
+
+    def test_model_env_key_tache_specifique(self):
+        from ai._client import _model_env_key
+        from config import config
+        orig = config.ai_match_model
+        config.ai_match_model = "gemma3:12b"
+        try:
+            self.assertEqual(_model_env_key("match", "gemma3:12b"), "AI_MATCH_MODEL")
+        finally:
+            config.ai_match_model = orig
+
+    def test_model_env_key_defaut(self):
+        from ai._client import _model_env_key
+        from config import config
+        orig = config.ai_match_model
+        config.ai_match_model = ""
+        try:
+            # Si la clé de tâche est vide, c'est OLLAMA_MODEL qui porte la valeur
+            self.assertEqual(_model_env_key("match", "gemma3:12b"), "OLLAMA_MODEL")
+        finally:
+            config.ai_match_model = orig
+
+
 class TestLLMTimeout(unittest.TestCase):
     """Délai LLM par tâche : les analyses (prescore/match) n'ont aucun plafond,
     les tâches interactives (lettres/relecture) gardent LLM_TIMEOUT (0 = aucun)."""

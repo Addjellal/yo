@@ -67,6 +67,71 @@ def _is_model_not_found(exc: Exception) -> bool:
     return "not found" in msg or "no such file" in msg or "pull the model" in msg
 
 
+def _estimate_model_gb(name: str) -> float | None:
+    """Estime la taille d'un modèle en GB à partir de son nom.
+    Ex. gemma3:12b → ~7.8 GB (12 × 0.65), qwen2.5:3b → ~1.95 GB."""
+    import re
+    m = re.search(r"(\d+\.?\d*)b", name.lower())
+    if m:
+        return float(m.group(1)) * 0.65  # approximation q4
+    return None
+
+
+def _pick_best_available(missing: str) -> str | None:
+    """Choisit le meilleur modèle installé comme remplaçant de `missing`.
+    Stratégie : équivalent ou modèle le moins cher juste en-dessous (même
+    qualité, moins de VRAM) ; à défaut, le moins cher juste au-dessus.
+    Retourne None si Ollama est injoignable ou aucun modèle installé."""
+    try:
+        from integrations.local_models import probe_ollama
+        result = probe_ollama()
+    except Exception:
+        return None
+    if not result:
+        return None
+    models = [(m["name"], m["size_gb"] or 0.0)
+              for m in result.get("models", []) if m.get("name")]
+    if not models:
+        return None
+
+    target_gb = _estimate_model_gb(missing)
+    if target_gb is None:
+        # Taille inconnue : prendre le plus gros modèle disponible
+        return max(models, key=lambda x: x[1])[0]
+
+    models.sort(key=lambda x: x[1])
+    below = [(n, s) for n, s in models if s <= target_gb]
+    if below:
+        return max(below, key=lambda x: x[1])[0]   # le plus grand en-dessous
+    above = [(n, s) for n, s in models if s > target_gb]
+    if above:
+        return min(above, key=lambda x: x[1])[0]   # le plus petit au-dessus
+    return models[0][0]
+
+
+def _model_env_key(task: str, model: str) -> str:
+    """Clé .env à mettre à jour : la clé de tâche si c'est elle qui porte le
+    modèle manquant, sinon OLLAMA_MODEL (le modèle par défaut du backend)."""
+    if task in TASKS:
+        task_model = getattr(config, f"ai_{task}_model", "")
+        if task_model == model:
+            return f"AI_{task.upper()}_MODEL"
+    return "OLLAMA_MODEL"
+
+
+def _save_model(task: str, old_model: str, new_model: str) -> None:
+    """Persiste le nouveau modèle dans config en mémoire et dans .env."""
+    from config import save_to_env
+    env_key = _model_env_key(task, old_model)
+    try:
+        save_to_env(env_key, new_model)
+        attr = env_key.lower()          # ex. OLLAMA_MODEL → ollama_model
+        if hasattr(config, attr):
+            setattr(config, attr, new_model)
+    except Exception as exc:
+        console.print(f"[dim]Impossible d'enregistrer le nouveau modèle dans .env : {exc}[/dim]")
+
+
 def _fallback_backend(primary: str) -> tuple[str, str] | None:
     """Backend de secours configuré via AI_FALLBACK, ou None.
     Jamais le même que le backend primaire."""
@@ -196,16 +261,20 @@ class LLMClient:
                 return response.message.content.strip()
             except Exception as e:
                 last_err = e
-                # Modèle absent (pas installé ou désinstallé depuis la config) :
-                # on rebasule immédiatement sur le modèle par défaut s'il est
-                # différent — inutile de retenter avec le même nom introuvable.
-                if _is_model_not_found(e) and kwargs["model"] != config.ollama_model:
-                    console.print(
-                        f"[yellow]Ollama : modèle « {kwargs['model']} » introuvable, "
-                        f"bascule sur « {config.ollama_model} ».[/yellow]"
-                    )
-                    kwargs["model"] = config.ollama_model
-                    continue
+                # Modèle absent : choisir automatiquement le meilleur remplaçant
+                # installé (équivalent ou juste en-dessous en taille, sinon juste
+                # au-dessus) et le persister dans .env pour les prochains appels.
+                if _is_model_not_found(e):
+                    old = kwargs["model"]
+                    replacement = _pick_best_available(old)
+                    if replacement and replacement != old:
+                        console.print(
+                            f"[yellow]Ollama : modèle « {old} » introuvable — "
+                            f"sélection automatique de « {replacement} » et sauvegarde dans .env.[/yellow]"
+                        )
+                        _save_model(self.task, old, replacement)
+                        kwargs["model"] = replacement
+                        continue
                 if attempt < 2:
                     wait = 2 ** attempt
                     console.print(f"[dim]Ollama indisponible, nouvel essai dans {wait}s...[/dim]")
@@ -262,19 +331,20 @@ class LLMClient:
                     yield text
 
     def _ollama_stream(self, client, model, system, user, _retried: bool = False):
-        # Si le modèle configuré est absent, on rebasule sur le modèle par défaut
-        # plutôt que de faire échouer la génération de lettre.
         try:
             yield from self._ollama_stream_inner(client, model, system, user)
         except Exception as e:
-            if _is_model_not_found(e) and not _retried and model != config.ollama_model:
-                console.print(
-                    f"[yellow]Ollama : modèle « {model} » introuvable en streaming, "
-                    f"bascule sur « {config.ollama_model} ».[/yellow]"
-                )
-                yield from self._ollama_stream(client, config.ollama_model, system, user, _retried=True)
-            else:
-                raise
+            if _is_model_not_found(e) and not _retried:
+                replacement = _pick_best_available(model)
+                if replacement and replacement != model:
+                    console.print(
+                        f"[yellow]Ollama : modèle « {model} » introuvable en streaming — "
+                        f"sélection automatique de « {replacement} » et sauvegarde dans .env.[/yellow]"
+                    )
+                    _save_model(self.task, model, replacement)
+                    yield from self._ollama_stream(client, replacement, system, user, _retried=True)
+                    return
+            raise
 
     def _ollama_stream_inner(self, client, model, system, user):
         for chunk in client.chat(
