@@ -129,9 +129,11 @@ class Config:
     # Multi-CV : nombre d'offres gardées par le pré-filtre commun avant l'analyse
     # détaillée par CV (au-delà, un pré-scoring unique sur le profil fusionné trie).
     multi_cv_shared_keep: int = field(default_factory=lambda: _env_int("MULTI_CV_SHARED_KEEP", 150, 20, 1000))
-    # Délai max (secondes) d'un appel LLM avant abandon — évite qu'un serveur
-    # Ollama bloqué fige un scan ou une lettre indéfiniment.
-    llm_timeout: int = field(default_factory=lambda: _env_int("LLM_TIMEOUT", 120, 10, 600))
+    # Délai max (secondes) d'un appel LLM avant abandon, pour les tâches
+    # interactives (lettres, relecture) — évite qu'un serveur Ollama bloqué fige
+    # une génération. 0 = aucun plafond. Les analyses (pré-scoring + analyse
+    # détaillée) n'ont jamais de plafond : elles vont toujours au bout.
+    llm_timeout: int = field(default_factory=lambda: _env_int("LLM_TIMEOUT", 120, 0, 600))
 
 
 config = Config()

@@ -1869,6 +1869,46 @@ class _Handler(BaseHTTPRequestHandler):
 
 # ─── Démarrage ───────────────────────────────────────────────────────────────
 
+def _startup_model_check() -> None:
+    """Au démarrage : sonde les serveurs LLM locaux (Ollama/LM Studio/llama.cpp)
+    et liste les modèles installés. Prévient si un modèle Ollama configuré est
+    introuvable, pour éviter un scan qui échouerait au premier appel. Jamais
+    bloquant : une détection en échec n'empêche pas le serveur de démarrer."""
+    try:
+        from integrations import detect_servers
+        servers = detect_servers()
+    except Exception:
+        _LOG.warning("Vérification des modèles locaux au démarrage : échec", exc_info=True)
+        return
+
+    installed: set[str] = set()
+    for server in servers:
+        names = [str(m.get("name", "")) for m in server.get("models", []) if isinstance(m, dict)]
+        names = [n for n in names if n]
+        installed.update(names)
+        listing = ", ".join(names) if names else "aucun modèle installé"
+        print(f"  Modèles locaux — {server.get('server')} : {listing}")
+        _LOG.info("modèles locaux %s (%s) : %s", server.get("server"), server.get("url"), names)
+    if not servers:
+        print("  Aucun serveur LLM local détecté (Ollama/LM Studio/llama.cpp).")
+
+    # Si une tâche IA est routée en local, prévenir des modèles configurés mais
+    # absents du serveur (Ollama tolère l'absence du tag « :latest »).
+    uses_local = config.provider == "ollama" or any(
+        getattr(config, f"ai_{t}_backend", "") == "local" for t in ("prescore", "match", "letter", "review")
+    )
+    if installed and uses_local:
+        wanted = {
+            config.ollama_model, config.ai_prescore_model, config.ai_match_model,
+            config.ai_letter_model, config.ai_review_model,
+        }
+        bases = {n.split(":", 1)[0] for n in installed}
+        for model in sorted(w for w in wanted if w):
+            if model not in installed and f"{model}:latest" not in installed and model.split(":", 1)[0] not in bases:
+                print(f"  ⚠ Modèle « {model} » configuré mais non installé localement — « ollama pull {model} ».")
+                _LOG.warning("modèle configuré absent du serveur local : %s", model)
+
+
 def run(port: int = 8765, open_browser: bool = True) -> None:
     # Crée les singletons d'état dans le thread principal, avant tout thread de
     # requête : évite toute course à la création (chacun ouvre un fichier .json
@@ -1882,6 +1922,9 @@ def run(port: int = 8765, open_browser: bool = True) -> None:
             print(f"  {moved} ancien(s) fichier(s) rangé(s) dans la nouvelle arborescence output/.")
     except Exception:
         _LOG.exception("Migration des anciens fichiers échouée (sans gravité).")
+    # Sonde les serveurs LLM locaux au démarrage (liste les modèles installés,
+    # prévient si un modèle configuré manque). Sans gravité en cas d'échec.
+    _startup_model_check()
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"\n  Auto Emploi — interface web : {url}")

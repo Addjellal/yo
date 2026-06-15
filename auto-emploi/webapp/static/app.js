@@ -357,25 +357,89 @@ async function init() {
   loadModelLists();
 }
 
-// Peuple les <datalist> des champs « Modèle … » : modèles locaux détectés
-// (Ollama/LM Studio/llama.cpp) + modèles Claude connus. Sans appel réseau
-// externe ; échec silencieux (le champ reste libre).
+// Menus déroulants « Modèle … » des réglages. Option spéciale pour saisir un
+// modèle non détecté (ex. à installer plus tard via « ollama pull »).
+const MODEL_CUSTOM = "__custom__";
+// Mêmes caractères autorisés que la validation serveur (_MODEL_RE).
+const MODEL_NAME_RE = /^[A-Za-z0-9._:-]{1,100}$/;
+
+// Garantit qu'un nom de modèle existe comme <option> puis le sélectionne — sert
+// au bouton « Utiliser » et à la saisie libre, même si le modèle n'a pas été
+// détecté au chargement.
+function selectModelValue(select, name) {
+  if (!select || !name) return;
+  if (![...select.options].some((o) => o.value === name)) {
+    const opt = el("option", { value: name, text: name });
+    const customOpt = [...select.options].find((o) => o.value === MODEL_CUSTOM);
+    if (customOpt) select.insertBefore(opt, customOpt);
+    else select.appendChild(opt);
+  }
+  select.value = name;
+}
+
+// Remplit un <select data-models> avec les modèles disponibles, en conservant
+// la valeur déjà enregistrée (même si le serveur local est éteint) et en
+// ajoutant une option de saisie libre.
+function populateModelSelect(select, local, anthropic) {
+  const kind = select.dataset.models;            // "anthropic" | "local" | "all"
+  const info = (APP.settings || {})[select.dataset.key];
+  const current = info && info.set ? info.display : "";
+
+  select.replaceChildren();
+  const emptyLabel = kind === "all" ? "— modèle du backend —" : "— choisir un modèle —";
+  select.appendChild(el("option", { value: "", text: emptyLabel }));
+
+  const seen = new Set([""]);
+  const addInto = (parent, name) => {
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    parent.appendChild(el("option", { value: name, text: name }));
+  };
+  const addGroup = (label, names) => {
+    const fresh = names.filter((n) => n && !seen.has(n));
+    if (!fresh.length) return;
+    const group = el("optgroup", { label });
+    for (const n of fresh) addInto(group, n);
+    select.appendChild(group);
+  };
+
+  if (kind === "anthropic") for (const n of anthropic) addInto(select, n);
+  else if (kind === "local") for (const n of local) addInto(select, n);
+  else { addGroup("Local (Ollama, LM Studio…)", local); addGroup("Claude (API Anthropic)", anthropic); }
+
+  // Valeur enregistrée non détectée : on la garde pour ne pas l'effacer.
+  if (current && !seen.has(current)) addInto(select, current);
+  select.appendChild(el("option", { value: MODEL_CUSTOM, text: "✏️ Autre (saisir un nom)…" }));
+  select.value = current && seen.has(current) ? current : "";
+
+  if (!select._modelWired) {
+    select._modelWired = true;
+    select.addEventListener("change", () => {
+      if (select.value !== MODEL_CUSTOM) return;
+      const name = (window.prompt("Nom du modèle (ex. qwen2.5:3b) :", "") || "").trim();
+      if (name && MODEL_NAME_RE.test(name)) {
+        selectModelValue(select, name);
+      } else {
+        if (name) toast("Nom de modèle invalide.", "err");
+        select.value = "";
+      }
+    });
+  }
+}
+
+// Peuple les menus « Modèle … » : modèles locaux détectés (Ollama/LM Studio/
+// llama.cpp) + modèles Claude connus. Sondes localhost uniquement ; en cas
+// d'échec les menus restent utilisables (option vide + valeur enregistrée).
 async function loadModelLists() {
   let data;
   try {
     data = await api("/api/models");
-  } catch (e) { return; }
-  const fill = (id, names) => {
-    const dl = $(id);
-    if (!dl) return;
-    dl.replaceChildren();
-    for (const name of names) dl.appendChild(el("option", { value: name }));
-  };
+  } catch (e) { data = {}; }
   const local = data.local || [];
   const anthropic = data.anthropic || [];
-  fill("#dl-local-models", local);
-  fill("#dl-anthropic-models", anthropic);
-  fill("#dl-all-models", [...local, ...anthropic]);
+  for (const select of document.querySelectorAll("select[data-models]")) {
+    populateModelSelect(select, local, anthropic);
+  }
 }
 
 // ─── Sélection des CV (cases à cocher) ──────────────────────────────────────
@@ -2209,7 +2273,8 @@ $("#btn-save-settings").addEventListener("click", async () => {
   const body = {};
   document.querySelectorAll("[data-key]").forEach((input) => {
     const value = input.value.trim();
-    if (value) body[input.dataset.key] = value;
+    // MODEL_CUSTOM n'est qu'un déclencheur de saisie, jamais une valeur à persister.
+    if (value && value !== MODEL_CUSTOM) body[input.dataset.key] = value;
   });
   if (!Object.keys(body).length) { toast("Aucun champ rempli — rien à enregistrer.", "err"); return; }
   try {
@@ -2264,10 +2329,10 @@ $("#btn-scan-models").addEventListener("click", async () => {
     }
     for (const m of server.models) {
       const useBtn = el("button", { class: "btn-ghost small", text: "Utiliser" });
-      useBtn.title = "Renseigne ce modèle dans « Modèle Ollama » (pensez à Enregistrer)";
+      useBtn.title = "Sélectionne ce modèle dans « Modèle Ollama » (pensez à Enregistrer)";
       useBtn.addEventListener("click", () => {
-        $("#s-ollama-model").value = m.name;
-        toast(`Modèle « ${m.name} » prérempli — cliquez sur Enregistrer pour l'activer.`, "ok");
+        selectModelValue($("#s-ollama-model"), m.name);
+        toast(`Modèle « ${m.name} » sélectionné — cliquez sur Enregistrer pour l'activer.`, "ok");
       });
       box.appendChild(el("div", { class: "lm-model" }, [
         el("span", { text: m.name + (m.size_gb ? ` (${m.size_gb} Go)` : "") }),

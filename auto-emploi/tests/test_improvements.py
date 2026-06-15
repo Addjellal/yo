@@ -629,5 +629,81 @@ class TestAuditFixes(unittest.TestCase):
             shutil.rmtree(d, ignore_errors=True)
 
 
+class TestLLMTimeout(unittest.TestCase):
+    """Délai LLM par tâche : les analyses (prescore/match) n'ont aucun plafond,
+    les tâches interactives (lettres/relecture) gardent LLM_TIMEOUT (0 = aucun)."""
+
+    def setUp(self):
+        from config import config
+        self._orig = config.llm_timeout
+
+    def tearDown(self):
+        from config import config
+        config.llm_timeout = self._orig
+
+    def test_analyses_sans_plafond(self):
+        from ai._client import LLMClient
+        from config import config
+        config.llm_timeout = 120
+        self.assertIsNone(LLMClient(task="prescore")._timeout())
+        self.assertIsNone(LLMClient(task="match")._timeout())
+
+    def test_taches_interactives_bornees(self):
+        from ai._client import LLMClient
+        from config import config
+        config.llm_timeout = 90
+        self.assertEqual(LLMClient(task="letter")._timeout(), 90.0)
+        self.assertEqual(LLMClient(task="review")._timeout(), 90.0)
+
+    def test_zero_desactive_le_plafond(self):
+        from ai._client import LLMClient
+        from config import config
+        config.llm_timeout = 0
+        self.assertIsNone(LLMClient(task="letter")._timeout())
+
+    def test_valeur_invalide_retombe_sur_defaut(self):
+        from ai._client import LLMClient
+        from config import config
+        config.llm_timeout = "pas un nombre"
+        self.assertEqual(LLMClient(task="letter")._timeout(), 120.0)
+
+    def test_config_accepte_zero(self):
+        import os
+        from config import _env_int
+        os.environ["LLM_TIMEOUT_TEST_TMP"] = "0"
+        try:
+            self.assertEqual(_env_int("LLM_TIMEOUT_TEST_TMP", 120, 0, 600), 0)
+        finally:
+            del os.environ["LLM_TIMEOUT_TEST_TMP"]
+
+
+class TestStartupModelCheck(unittest.TestCase):
+    """Sonde des modèles locaux au démarrage : ne lève jamais, même sans serveur."""
+
+    def test_aucun_serveur_ne_leve_pas(self):
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+        import integrations
+        import webapp.server as srv
+        with mock.patch.object(integrations, "detect_servers", lambda: []):
+            with redirect_stdout(io.StringIO()):
+                srv._startup_model_check()  # ne doit pas lever
+
+    def test_detection_en_echec_ne_leve_pas(self):
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+        import integrations
+        import webapp.server as srv
+
+        def _boom():
+            raise RuntimeError("nvidia-smi absent")
+
+        with mock.patch.object(integrations, "detect_servers", _boom):
+            with redirect_stdout(io.StringIO()):
+                srv._startup_model_check()  # échec avalé, pas de crash
+
+
 if __name__ == "__main__":
     unittest.main()

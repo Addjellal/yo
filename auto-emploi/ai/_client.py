@@ -22,6 +22,12 @@ from app_utils import console
 
 TASKS = ("prescore", "match", "letter", "review")
 
+# Tâches d'analyse de masse (pré-scoring + analyse détaillée) : aucun plafond de
+# temps. Sur un modèle local lent, on préfère laisser l'analyse aller au bout
+# plutôt que de la couper (puis dégrader en scoring sans IA). Les tâches
+# interactives (lettres, relecture) gardent le garde-fou LLM_TIMEOUT.
+_UNBOUNDED_TASKS = ("prescore", "match")
+
 _BACKEND_ALIASES = {
     "local": "ollama", "ollama": "ollama",
     "claude": "anthropic", "anthropic": "anthropic",
@@ -70,18 +76,25 @@ class LLMClient:
         self.task = task if task in TASKS else "match"
         self._clients: dict[str, object] = {}
 
-    def _timeout(self) -> float:
+    def _timeout(self) -> float | None:
+        """Délai max d'un appel LLM en secondes, ou None = aucun plafond.
+        - tâches d'analyse (prescore, match) → None : l'analyse va au bout ;
+        - autres tâches → LLM_TIMEOUT, où 0 signifie « désactivé »."""
+        if self.task in _UNBOUNDED_TASKS:
+            return None
         try:
-            return float(config.llm_timeout)
+            seconds = float(config.llm_timeout)
         except (TypeError, ValueError):
             return 120.0
+        return seconds if seconds > 0 else None
 
     def _get(self, backend: str):
         if backend not in self._clients:
             timeout = self._timeout()
             if backend == "ollama":
                 import ollama
-                # Un serveur Ollama bloqué ne doit pas figer un scan/lettre.
+                # timeout=None pour les analyses (pas de plafond) ; sinon un
+                # serveur Ollama bloqué ne doit pas figer une lettre.
                 self._clients[backend] = ollama.Client(host=config.ollama_base_url, timeout=timeout)
             else:
                 import anthropic

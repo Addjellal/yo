@@ -363,7 +363,7 @@
         </div>
         <div class="field">
           <label for="s-anthropic-model">Modèle Anthropic <span class="set-hint" data-hint="ANTHROPIC_MODEL"></span></label>
-          <input id="s-anthropic-model" type="text" data-key="ANTHROPIC_MODEL" placeholder="claude-fable-5" list="dl-anthropic-models">
+          <select id="s-anthropic-model" data-key="ANTHROPIC_MODEL" data-models="anthropic"></select>
         </div>
         <div class="field">
           <label for="s-ollama-url">URL Ollama <span class="set-hint" data-hint="OLLAMA_BASE_URL"></span></label>
@@ -371,7 +371,7 @@
         </div>
         <div class="field">
           <label for="s-ollama-model">Modèle Ollama <span class="set-hint" data-hint="OLLAMA_MODEL"></span></label>
-          <input id="s-ollama-model" type="text" data-key="OLLAMA_MODEL" placeholder="llama3.2" list="dl-local-models">
+          <select id="s-ollama-model" data-key="OLLAMA_MODEL" data-models="local"></select>
         </div>
       </div>
 
@@ -419,19 +419,19 @@
         </div>
         <div class="field">
           <label for="s-ai-prescore-model">Modèle pré-scoring <span class="set-hint" data-hint="AI_PRESCORE_MODEL"></span></label>
-          <input id="s-ai-prescore-model" type="text" data-key="AI_PRESCORE_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
+          <select id="s-ai-prescore-model" data-key="AI_PRESCORE_MODEL" data-models="all"></select>
         </div>
         <div class="field">
           <label for="s-ai-match-model">Modèle analyse <span class="set-hint" data-hint="AI_MATCH_MODEL"></span></label>
-          <input id="s-ai-match-model" type="text" data-key="AI_MATCH_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
+          <select id="s-ai-match-model" data-key="AI_MATCH_MODEL" data-models="all"></select>
         </div>
         <div class="field">
           <label for="s-ai-letter-model">Modèle lettres <span class="set-hint" data-hint="AI_LETTER_MODEL"></span></label>
-          <input id="s-ai-letter-model" type="text" data-key="AI_LETTER_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
+          <select id="s-ai-letter-model" data-key="AI_LETTER_MODEL" data-models="all"></select>
         </div>
         <div class="field">
           <label for="s-ai-review-model">Modèle relecture <span class="set-hint" data-hint="AI_REVIEW_MODEL"></span></label>
-          <input id="s-ai-review-model" type="text" data-key="AI_REVIEW_MODEL" placeholder="vide = modèle du backend" list="dl-all-models">
+          <select id="s-ai-review-model" data-key="AI_REVIEW_MODEL" data-models="all"></select>
         </div>
         <div class="field">
           <label for="s-ai-fallback">Si le backend échoue <span class="set-hint" data-hint="AI_FALLBACK"></span></label>
@@ -644,12 +644,6 @@
 </div>
 
 <div id="toasts" class="toasts"></div>
-
-<!-- Modèles disponibles (peuplés au chargement par /api/models) : suggestions
-     dans les champs « Modèle … » des réglages, sans empêcher la saisie libre -->
-<datalist id="dl-anthropic-models"></datalist>
-<datalist id="dl-local-models"></datalist>
-<datalist id="dl-all-models"></datalist>
 
 <script src="/static/app.js"></script>
 </body>
