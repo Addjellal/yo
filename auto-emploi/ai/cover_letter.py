@@ -488,6 +488,11 @@ class CoverLetterGenerator:
         letter = fix_typography(str(data.get("letter", "")).strip() or _salvage_letter(raw))
         email_subject = fix_typography(str(data.get("email_subject", "")).strip()[:200])
         email_body = fix_typography(str(data.get("email_body", "")).strip()[:2000])
+        # Certains modèles locaux (gemma, llama) insèrent du HTML dans leurs
+        # réponses texte (<br><br>, <p>…</p>, &amp;…). On nettoie avant affichage.
+        from job_scrapers.base import strip_html
+        letter = strip_html(letter)
+        email_body = strip_html(email_body)
 
         if partial:
             # Lettre incomplète : on la renvoie pour édition, sans relecture ni
