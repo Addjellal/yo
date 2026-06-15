@@ -193,6 +193,16 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Indicateur de chargement dans un conteneur (remplacé au rendu des données) —
+// évite d'afficher un onglet vide ou le contenu précédent pendant un fetch.
+function showLoading(container, label = "Chargement…") {
+  if (!container) return;
+  container.replaceChildren(el("div", { class: "tab-loading" }, [
+    el("span", { class: "spinner", "aria-hidden": "true" }),
+    el("span", { text: label }),
+  ]));
+}
+
 // Modale de confirmation (suppression de CV) — promesse résolue true/false
 function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
   return new Promise((resolve) => {
@@ -1608,10 +1618,13 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
 // ─── Onglet Historique ──────────────────────────────────────────────────────
 
 async function loadHistory() {
+  $("#history-empty").hidden = true;
+  showLoading($("#history-list"));
   let data;
   try {
     data = await api("/api/sessions");
   } catch (e) {
+    $("#history-list").replaceChildren();
     toast(e.message, "err");
     return;
   }
@@ -1700,10 +1713,13 @@ async function loadSession(id, target = "search") {
 // ─── Onglet Lettres ─────────────────────────────────────────────────────────
 
 async function loadLetters() {
+  $("#letters-empty").hidden = true;
+  showLoading($("#letters-grid"));
   let data;
   try {
     data = await api("/api/sessions");
   } catch (e) {
+    $("#letters-grid").replaceChildren();
     toast(e.message, "err");
     return;
   }
@@ -1760,10 +1776,13 @@ const SECTION_DEFS = [
 let CVD = null;
 
 async function loadCvs() {
+  $("#cvs-empty").hidden = true;
+  showLoading($("#cv-list"));
   try {
     const out = await api("/api/cvs");
     CVS = out.cvs;
   } catch (e) {
+    $("#cv-list").replaceChildren();
     toast(e.message, "err");
     return;
   }
