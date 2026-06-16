@@ -844,5 +844,33 @@ class TestStartupModelCheck(unittest.TestCase):
                 srv._startup_model_check()  # échec avalé, pas de crash
 
 
+class TestTeeProgress(unittest.TestCase):
+    """Le callback de progression alimente À LA FOIS le journal du job (affiché
+    dans le navigateur) et le terminal — l'utilisateur suit l'état d'avancement
+    et la fin des tâches directement dans le CMD."""
+
+    def test_ecrit_dans_log_et_console(self):
+        import webapp.server as srv
+        from app_utils import console
+        job = srv._Job("scan")
+        cb = srv._tee_progress(job)
+        with console.capture() as cap:
+            cb("Lot 3/12 : analyse de 10 offre(s)…")
+        self.assertIn("Lot 3/12 : analyse de 10 offre(s)…", job.log)
+        self.assertIn("Lot 3/12", cap.get())
+
+    def test_markup_rich_echappe(self):
+        # Un message contenant des crochets ne doit pas être interprété comme du
+        # balisage Rich (ni planter) : il s'affiche tel quel dans le terminal.
+        import webapp.server as srv
+        from app_utils import console
+        job = srv._Job("scan")
+        cb = srv._tee_progress(job)
+        with console.capture() as cap:
+            cb("[gras] texte brut")
+        self.assertIn("[gras] texte brut", job.log)
+        self.assertIn("[gras] texte brut", cap.get())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Callable
 
 from config import config, save_to_env
 from cv_parser import parse_cv, _cache_path
@@ -54,7 +55,9 @@ from main import (
     save_raw_offers,
     save_dropped_offers,
 )
-from app_utils import get_logger
+from rich.markup import escape
+
+from app_utils import console, get_logger
 from output_paths import cv_dir, find_output_file, letters_dir, migrate_legacy_files
 
 _LOG = get_logger()
@@ -338,10 +341,26 @@ def _style_examples() -> dict[str, list[str]] | None:
 
 # ─── Exécution d'un scan (thread) ────────────────────────────────────────────
 
+def _tee_progress(job: _Job) -> Callable[[str], None]:
+    """Callback de progression qui alimente À LA FOIS le journal de l'interface
+    web et le terminal. Les étapes « état d'avancement » (lots analysés, offres
+    retenues…) s'affichent ainsi en direct dans la console (CMD) en gris, en
+    plus du navigateur. Le texte est échappé (markup Rich) par prudence."""
+    def _cb(msg: str) -> None:
+        job.add_log(msg)
+        console.print(f"    [dim]{escape(str(msg))}[/]")
+    return _cb
+
+
 def _run_scan(job: _Job, p: dict) -> None:
     try:
         _LOG.info("scan %s : début (query=%r, sources=%s, no_ai=%s)",
                   job.id[:8], p.get("query", ""), ",".join(p["sources"]), p.get("no_ai"))
+        _multi_cv = f" × {len(p['cvs'])} CV" if len(p['cvs']) > 1 else ""
+        console.print(
+            f"\n  [bold cyan]🔍 Recherche :[/] "
+            f"{p.get('query') or '(requêtes IA)'} — {len(p['sources'])} source(s){_multi_cv}"
+        )
         if p["cvs"]:
             job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
             job.cv_texts = _load_cv_texts(p["cvs"])
@@ -394,6 +413,7 @@ def _run_scan(job: _Job, p: dict) -> None:
                 all_offers.extend(fresh)
                 counts[source_name] = counts.get(source_name, 0) + len(fresh)
                 job.add_log(f"✓ {source_name} : {counts[source_name]} offres")
+                console.print(f"    [green]✓[/] {source_name} : {counts[source_name]} offre(s)")
         finally:
             # Sur arrêt : ne pas attendre les scrapers en cours, annuler les
             # lots en file. Sinon, attente normale de la fin des threads.
@@ -440,6 +460,7 @@ def _run_scan(job: _Job, p: dict) -> None:
                 f"🔌 Aperçu brut : {len(all_offers)} offre(s), aucun scoring (aucun CV "
                 "pour comparer). Ajoutez un CV pour un score local sans IA."
             )
+            console.print(f"  [yellow]🔌 Aperçu brut :[/] {len(all_offers)} offre(s) — aucun CV pour scorer\n")
             job.status = "done"
             _LOG.info("scan %s : terminé en aperçu brut (%d offres)", job.id[:8], len(all_offers))
             return
@@ -451,15 +472,18 @@ def _run_scan(job: _Job, p: dict) -> None:
             else:
                 job.add_log(f"Aucun modèle IA disponible → analyse locale (sans IA) de "
                             f"{len(all_offers)} offre(s).")
+            console.print(f"  Analyse locale (sans IA) de {len(all_offers)} offre(s)…")
             rejections: list[str] = []
         else:
             multi = f" × {len(job.cv_texts)} CV" if len(job.cv_texts) > 1 else ""
             job.add_log(f"Analyse IA de {len(all_offers)} offres{multi} (score min {p['min_score']}/10)…")
+            console.print(f"  [cyan]🤖 Analyse IA de {len(all_offers)} offre(s){multi}…")
             with _TRACKER_LOCK:
                 rejections = tracker.recent_rejections()
             if rejections:
                 job.add_log(f"Préférences : {len(rejections)} rejet(s) pris en compte")
 
+        progress_cb = _tee_progress(job)
         set_aside: list[JobOffer] = []
         try:
             matched = score_offers_multi(
@@ -467,7 +491,7 @@ def _run_scan(job: _Job, p: dict) -> None:
                 exclude=p["exclude"], experience_level=p["experience"],
                 rejected_examples=rejections, shared_prefilter=not code_mode,
                 contracts=p.get("contracts"), should_stop=job.stop_event.is_set,
-                progress=job.add_log, code=code_mode, set_aside_out=set_aside,
+                progress=progress_cb, code=code_mode, set_aside_out=set_aside,
             )
         except Exception as e:
             # IA tombée en cours (serveur Ollama éteint, etc.) : plutôt qu'échouer,
@@ -476,13 +500,14 @@ def _run_scan(job: _Job, p: dict) -> None:
             if code_mode or job.stop_event.is_set():
                 raise
             job.add_log(f"⚠ IA indisponible ({type(e).__name__}) → bascule sur l'analyse locale (sans IA).")
+            console.print(f"  [yellow]⚠ IA indisponible[/] ({type(e).__name__}) → bascule sur l'analyse locale.")
             code_mode = True
             set_aside = []
             matched = score_offers_multi(
                 job.cv_texts, all_offers, min_score=p["min_score"], sectors=p["sectors"],
                 exclude=p["exclude"], experience_level=p["experience"],
                 shared_prefilter=False, contracts=p.get("contracts"),
-                should_stop=job.stop_event.is_set, progress=job.add_log,
+                should_stop=job.stop_event.is_set, progress=progress_cb,
                 code=True, set_aside_out=set_aside,
             )
 
@@ -513,8 +538,13 @@ def _run_scan(job: _Job, p: dict) -> None:
                       if set_aside else "")
         if job.stop_event.is_set():
             job.add_log(f"⏹ Recherche stoppée : {len(matched)} offre(s) déjà scorées conservées.{aside_note}")
+            console.print(f"  [yellow]⏹ Recherche stoppée[/] : {len(matched)} offre(s) conservée(s).\n")
         else:
             job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10{aside_note}")
+            console.print(
+                f"  [bold green]✅ Recherche terminée[/] : {len(matched)} offre(s) "
+                f"retenue(s) ≥ {p['min_score']}/10{aside_note}\n"
+            )
         job.status = "done"
         _LOG.info("scan %s : terminé (%d retenues / %d mises de côté / %d collectées)",
                   job.id[:8], len(matched), len(set_aside), len(all_offers))
@@ -522,6 +552,7 @@ def _run_scan(job: _Job, p: dict) -> None:
         _LOG.exception("scan %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
+        console.print(f"  [bold red]❌ Recherche échouée[/] : {escape(str(e)[:200])}\n")
     finally:
         _SCAN_LOCK.release()
 
@@ -546,6 +577,7 @@ def _session_criteria(p: dict) -> dict:
 def _run_rescore(job: _Job, p: dict) -> None:
     """Re-score le(s) CV contre toutes les offres connues, sans scraper."""
     try:
+        console.print(f"\n  [bold cyan]🔁 Re-scoring de la base[/] — CV : {', '.join(p['cvs'])}")
         job.add_log(f"Lecture du/des CV : {', '.join(p['cvs'])}")
         job.cv_texts = _load_cv_texts(p["cvs"])
         job.cv_text = merge_cv_texts(job.cv_texts)
@@ -585,7 +617,7 @@ def _run_rescore(job: _Job, p: dict) -> None:
             two_stage=not code_mode,
             shared_prefilter=not code_mode,
             should_stop=job.stop_event.is_set,
-            progress=job.add_log,
+            progress=_tee_progress(job),
             code=code_mode,
             set_aside_out=set_aside,
         )
@@ -607,12 +639,18 @@ def _run_rescore(job: _Job, p: dict) -> None:
                       if set_aside else "")
         if job.stop_event.is_set():
             job.add_log(f"⏹ Re-scoring stoppé : {len(matched)} offre(s) déjà scorées conservées.{aside_note}")
+            console.print(f"  [yellow]⏹ Re-scoring stoppé[/] : {len(matched)} offre(s) conservée(s).\n")
         else:
             job.add_log(f"Terminé : {len(matched)} offre(s) avec un score ≥ {p['min_score']}/10{aside_note}")
+            console.print(
+                f"  [bold green]✅ Re-scoring terminé[/] : {len(matched)} offre(s) "
+                f"retenue(s) ≥ {p['min_score']}/10{aside_note}\n"
+            )
         job.status = "done"
     except Exception as e:
         job.error = str(e)[:500]
         job.status = "error"
+        console.print(f"  [bold red]❌ Re-scoring échoué[/] : {escape(str(e)[:200])}\n")
     finally:
         _SCAN_LOCK.release()
 
@@ -623,6 +661,11 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
         offer = scan_job.offers[index]
         _LOG.info("lettre %s : début (offre « %s » @ %s, ton %s, type %s, %d mots max)",
                   job.id[:8], offer.title[:60], offer.company[:40], tone, doc_type, max_words)
+        _kind_label = "Message" if doc_type == "message" else "Lettre"
+        console.print(
+            f"\n  [bold cyan]✍ {_kind_label} en cours[/] : "
+            f"{escape(offer.title[:60])} @ {escape(offer.company[:40])}…"
+        )
         tracker = _get_tracker()
         with _TRACKER_LOCK:
             applied_titles = [
@@ -674,10 +717,15 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
         job.status = "done"
         _LOG.info("lettre %s : terminée%s (%s)", job.id[:8],
                   " (partielle)" if is_partial else "", txt_path.name)
+        if is_partial:
+            console.print(f"  [yellow]⚠ {_kind_label} partielle[/] (interrompue) : {escape(txt_path.name)}\n")
+        else:
+            console.print(f"  [bold green]✅ {_kind_label} prête[/] : {escape(txt_path.name)}\n")
     except Exception as e:
         _LOG.exception("lettre %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
+        console.print(f"  [bold red]❌ Génération échouée[/] : {escape(str(e)[:200])}\n")
 
 
 # Vérification de disponibilité : requête HTTP légère par offre, AUCUN appel IA.
@@ -745,6 +793,7 @@ def _run_check(job: _Job, scan_job: _Job) -> None:
         # cartes #results-grid (les mises de côté ne sont pas vérifiées).
         offers = list(_matched_offers(scan_job))
         job.add_log(f"Vérification de la disponibilité de {len(offers)} offre(s) (sans IA)…")
+        console.print(f"\n  [bold cyan]🌐 Vérification de {len(offers)} offre(s)[/] (disponibilité)…")
         results: dict[int, dict] = {}
         done = 0
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -758,6 +807,7 @@ def _run_check(job: _Job, scan_job: _Job) -> None:
                 done += 1
                 if done % 10 == 0 or done == len(offers):
                     job.add_log(f"  ↳ {done}/{len(offers)} vérifiées")
+                    console.print(f"    [dim]↳ {done}/{len(offers)} vérifiées[/]")
         online = sum(1 for r in results.values() if r["available"] is True)
         gone = sum(1 for r in results.values() if r["available"] is False)
         unknown = len(results) - online - gone
@@ -765,11 +815,16 @@ def _run_check(job: _Job, scan_job: _Job) -> None:
             "results": [{"index": i, **r} for i, r in sorted(results.items())],
         }
         job.add_log(f"Terminé : {online} en ligne · {gone} retirée(s) · {unknown} indéterminée(s).")
+        console.print(
+            f"  [bold green]✅ Vérification terminée[/] : {online} en ligne · "
+            f"{gone} retirée(s) · {unknown} indéterminée(s).\n"
+        )
         job.status = "done"
     except Exception as e:
         _LOG.exception("check %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
+        console.print(f"  [bold red]❌ Vérification échouée[/] : {escape(str(e)[:200])}\n")
 
 
 def _run_cv_analyze(job: _Job, cv_id: str) -> None:
@@ -781,6 +836,7 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
             raise ValueError("CV introuvable dans le registre")
         filename = entry.get("filename", "")
         job.add_log(f"Lecture de {filename}…")
+        console.print(f"\n  [bold cyan]📄 Analyse IA du CV[/] : {escape(filename)}…")
         raw = parse_cv(str(_cv_path(filename)))
         job.add_log(f"CV parsé ({len(raw)} caractères) — extraction IA en cours…")
         profile = CVExtractor().extract(raw)
@@ -790,10 +846,12 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
             fresh = store.get(entry["id"])
         job.result = {"cv": _cv_payload(fresh)} if fresh else {}
         job.add_log("Profil extrait.")
+        console.print(f"  [bold green]✅ Profil CV extrait[/] : {escape(filename)}\n")
         job.status = "done"
     except Exception as e:
         job.error = str(e)[:500]
         job.status = "error"
+        console.print(f"  [bold red]❌ Analyse CV échouée[/] : {escape(str(e)[:200])}\n")
 
 
 # ─── Validation des paramètres de scan ───────────────────────────────────────
