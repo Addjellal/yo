@@ -341,14 +341,28 @@ def _style_examples() -> dict[str, list[str]] | None:
 
 # ─── Exécution d'un scan (thread) ────────────────────────────────────────────
 
+def _fmt_elapsed(seconds: float) -> str:
+    """Durée écoulée lisible : « 12s » ou « 1m05s » — affichée dans le terminal
+    pour donner une idée du temps que prend chaque étape (lots IA, lettres…)."""
+    seconds = max(0.0, seconds)
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes, rest = divmod(int(seconds), 60)
+    return f"{minutes}m{rest:02d}s"
+
+
 def _tee_progress(job: _Job) -> Callable[[str], None]:
     """Callback de progression qui alimente À LA FOIS le journal de l'interface
     web et le terminal. Les étapes « état d'avancement » (lots analysés, offres
-    retenues…) s'affichent ainsi en direct dans la console (CMD) en gris, en
-    plus du navigateur. Le texte est échappé (markup Rich) par prudence."""
+    retenues…) s'affichent ainsi en direct dans la console (CMD) en gris, avec
+    le temps écoulé depuis le début de cette analyse — en plus du navigateur.
+    Le texte est échappé (markup Rich) par prudence."""
+    start = time.time()
+
     def _cb(msg: str) -> None:
         job.add_log(msg)
-        console.print(f"    [dim]{escape(str(msg))}[/]")
+        elapsed = _fmt_elapsed(time.time() - start)
+        console.print(f"    [dim]({elapsed}) {escape(str(msg))}[/]")
     return _cb
 
 
@@ -657,6 +671,7 @@ def _run_rescore(job: _Job, p: dict) -> None:
 
 def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
                 doc_type: str = "lettre", max_words: int = 350) -> None:
+    start = time.time()
     try:
         offer = scan_job.offers[index]
         _LOG.info("lettre %s : début (offre « %s » @ %s, ton %s, type %s, %d mots max)",
@@ -717,15 +732,20 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
         job.status = "done"
         _LOG.info("lettre %s : terminée%s (%s)", job.id[:8],
                   " (partielle)" if is_partial else "", txt_path.name)
+        _elapsed = _fmt_elapsed(time.time() - start)
         if is_partial:
-            console.print(f"  [yellow]⚠ {_kind_label} partielle[/] (interrompue) : {escape(txt_path.name)}\n")
+            console.print(
+                f"  [yellow]⚠ {_kind_label} partielle[/] (interrompue, {_elapsed}) : "
+                f"{escape(txt_path.name)}\n"
+            )
         else:
-            console.print(f"  [bold green]✅ {_kind_label} prête[/] : {escape(txt_path.name)}\n")
+            console.print(f"  [bold green]✅ {_kind_label} prête[/] ({_elapsed}) : {escape(txt_path.name)}\n")
     except Exception as e:
         _LOG.exception("lettre %s : échec", job.id[:8])
         job.error = str(e)[:500]
         job.status = "error"
-        console.print(f"  [bold red]❌ Génération échouée[/] : {escape(str(e)[:200])}\n")
+        _elapsed = _fmt_elapsed(time.time() - start)
+        console.print(f"  [bold red]❌ Génération échouée[/] ({_elapsed}) : {escape(str(e)[:200])}\n")
 
 
 # Vérification de disponibilité : requête HTTP légère par offre, AUCUN appel IA.
