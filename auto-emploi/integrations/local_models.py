@@ -21,12 +21,53 @@ _LMSTUDIO_URL = "http://localhost:1234/v1/models"
 _LLAMACPP_URL = "http://localhost:8080/v1/models"
 
 
+def _is_local_url(url: str) -> bool:
+    """Vrai si l'URL vise un serveur LLM réellement LOCAL : schéma http(s) et
+    hôte en loopback ou réseau privé (LAN). Bloque tout hôte public et les
+    adresses link-local (ex. 169.254.169.254, métadonnées cloud) — même si
+    OLLAMA_BASE_URL est mal/malicieusement configuré. Le contrat de ces sondes
+    est « local uniquement » : on ne doit jamais émettre de requête externe."""
+    import ipaddress
+    import socket
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False
+    host = parsed.hostname
+    if host.lower() in ("localhost", "localhost.localdomain"):
+        return True
+
+    def _local(ip_str: str) -> bool:
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+        # is_private englobe le link-local (169.254/16) en Python : on l'exclut
+        # explicitement pour bloquer l'endpoint de métadonnées cloud.
+        return (ip.is_loopback or ip.is_private) and not ip.is_link_local
+
+    try:
+        ipaddress.ip_address(host)
+        return _local(host)                 # IP littérale
+    except ValueError:
+        pass
+    # Nom d'hôte : on le résout et on exige que TOUTES ses IP soient locales.
+    try:
+        addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except (socket.gaierror, UnicodeError, OSError):
+        return False
+    return bool(addrs) and all(_local(a) for a in addrs)
+
+
 def _get_json(url: str) -> dict | list | None:
     """GET JSON court vers un serveur LLM (Ollama/LM Studio/llama.cpp), None si
-    absent. N'autorise que les schémas http(s) : aucun file://, gopher://… ne
-    peut être sondé même si OLLAMA_BASE_URL était mal configuré."""
+    absent. N'autorise qu'un hôte LOCAL en http(s) : aucun file://, gopher://…
+    ni hôte public/link-local ne peut être sondé même si OLLAMA_BASE_URL était
+    mal configuré (anti-SSRF)."""
     try:
-        if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        if not _is_local_url(url):
             return None
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (http(s) only)

@@ -151,15 +151,19 @@ class LinkedInScraper(BaseScraper):
         offers = []
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=_launch_args())
-            context = browser.new_context(
-                user_agent=_HEADERS["User-Agent"],
-                locale="fr-FR",
-                accept_downloads=False,
-            )
-            page = context.new_page()
-            self._login(page)
-            offers = self._scrape_jobs(page, query, location, max_results)
-            browser.close()
+            # finally : fermeture garantie même si le login ou le scraping lève,
+            # pour ne pas laisser un Chromium orphelin derrière soi.
+            try:
+                context = browser.new_context(
+                    user_agent=_HEADERS["User-Agent"],
+                    locale="fr-FR",
+                    accept_downloads=False,
+                )
+                page = context.new_page()
+                self._login(page)
+                offers = self._scrape_jobs(page, query, location, max_results)
+            finally:
+                browser.close()
 
         return offers
 

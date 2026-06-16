@@ -203,24 +203,6 @@ function showLoading(container, label = "Chargement…") {
   ]));
 }
 
-// Modale de confirmation (suppression de CV) — promesse résolue true/false
-function confirmDialog(title, text, okLabel = "Supprimer définitivement") {
-  return new Promise((resolve) => {
-    $("#confirm-title").textContent = title;
-    $("#confirm-text").textContent = text;
-    $("#confirm-ok").textContent = okLabel;
-    $("#confirm-overlay").hidden = false;
-    const done = (result) => {
-      $("#confirm-overlay").hidden = true;
-      $("#confirm-ok").onclick = $("#confirm-cancel").onclick = $("#confirm-close").onclick = null;
-      resolve(result);
-    };
-    $("#confirm-ok").onclick = () => done(true);
-    $("#confirm-cancel").onclick = () => done(false);
-    $("#confirm-close").onclick = () => done(false);
-  });
-}
-
 // ─── État global ────────────────────────────────────────────────────────────
 
 let APP = null;            // réponse de /api/state

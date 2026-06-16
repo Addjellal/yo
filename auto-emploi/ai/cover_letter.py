@@ -476,7 +476,9 @@ class CoverLetterGenerator:
             timeout = float(config.llm_timeout)
         except (TypeError, ValueError):
             timeout = 120.0
-        deadline = time.monotonic() + timeout
+        # LLM_TIMEOUT=0 (ou négatif) = illimité : sinon deadline = maintenant+0,
+        # ce qui couperait la lettre dès le 1er chunk (« partiel » immédiat).
+        deadline = (time.monotonic() + timeout) if timeout > 0 else float("inf")
         chunks: list[str] = []
         partial = False
         try:

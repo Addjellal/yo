@@ -61,13 +61,16 @@ def fetch_html(url: str, wait: str = "domcontentloaded", extra_ms: int = 1500) -
         from playwright.sync_api import sync_playwright
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=_launch_args())
-            page = _new_context(browser).new_page()
-            page.goto(url, wait_until=wait, timeout=30000)
-            if extra_ms:
-                page.wait_for_timeout(extra_ms)
-            html = page.content()
-            browser.close()
-            return html
+            # finally : on ferme le navigateur même si goto/content lève, sinon
+            # un processus Chromium reste orphelin à chaque échec de fetch.
+            try:
+                page = _new_context(browser).new_page()
+                page.goto(url, wait_until=wait, timeout=30000)
+                if extra_ms:
+                    page.wait_for_timeout(extra_ms)
+                return page.content()
+            finally:
+                browser.close()
     except Exception:
         return None
 

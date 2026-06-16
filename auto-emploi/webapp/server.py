@@ -762,6 +762,7 @@ def _is_public_http_url(url: str) -> bool:
     privées/loopback/link-local (anti-SSRF : une offre du web ne doit pas faire
     sonder le réseau interne de la machine)."""
     import ipaddress
+    import socket
     try:
         parsed = urllib.parse.urlparse(url)
     except ValueError:
@@ -771,12 +772,28 @@ def _is_public_http_url(url: str) -> bool:
     host = parsed.hostname
     if host.lower() in ("localhost", "localhost.localdomain"):
         return False
+
+    def _public(ip_str: str) -> bool:
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
+
     try:
-        ip = ipaddress.ip_address(host)
+        ipaddress.ip_address(host)
+        return _public(host)                # IP littérale
     except ValueError:
-        return True  # nom d'hôte (non résolu ici) : autorisé
-    return not (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified)
+        pass
+    # Nom d'hôte : on le résout et on exige que TOUTES ses IP soient publiques.
+    # Un nom pointant (même partiellement) vers une IP interne est rejeté — sinon
+    # une offre du web pourrait faire sonder le réseau privé via un nom DNS.
+    try:
+        addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except (socket.gaierror, UnicodeError, OSError):
+        return False
+    return bool(addrs) and all(_public(a) for a in addrs)
 
 
 def _check_one(url: str) -> dict:
@@ -1433,9 +1450,19 @@ class _Handler(BaseHTTPRequestHandler):
         if not _SCAN_LOCK.acquire(blocking=False):
             self._error("Un scan est déjà en cours — attendez qu'il se termine.", 409)
             return
-        job = _Job("scan")
-        _register_job(job)
-        threading.Thread(target=_run_scan, args=(job, params), daemon=True).start()
+        # Le verrou est relâché par le finally de _run_scan, qui ne tourne QUE si
+        # le thread démarre. Si l'enregistrement ou le démarrage échoue (mémoire,
+        # threads épuisés…), on relâche ici — sinon le verrou fuit définitivement
+        # et plus aucun scan n'est possible jusqu'au redémarrage.
+        try:
+            job = _Job("scan")
+            _register_job(job)
+            threading.Thread(target=_run_scan, args=(job, params), daemon=True).start()
+        except Exception as e:
+            _SCAN_LOCK.release()
+            _LOG.exception("scan : démarrage du thread impossible")
+            self._error(f"Impossible de démarrer la recherche : {str(e)[:200]}", 500)
+            return
         self._json({"job_id": job.id})
 
     def _api_job(self, job_id: str):
@@ -1476,9 +1503,17 @@ class _Handler(BaseHTTPRequestHandler):
         if not _SCAN_LOCK.acquire(blocking=False):
             self._error("Un scan est déjà en cours — attendez qu'il se termine.", 409)
             return
-        job = _Job("scan")
-        _register_job(job)
-        threading.Thread(target=_run_rescore, args=(job, params), daemon=True).start()
+        # Cf. _api_scan : on relâche le verrou si le thread ne démarre pas, sinon
+        # il fuit (son finally libérateur vit dans _run_rescore, jamais lancé).
+        try:
+            job = _Job("scan")
+            _register_job(job)
+            threading.Thread(target=_run_rescore, args=(job, params), daemon=True).start()
+        except Exception as e:
+            _SCAN_LOCK.release()
+            _LOG.exception("re-scoring : démarrage du thread impossible")
+            self._error(f"Impossible de démarrer le re-scoring : {str(e)[:200]}", 500)
+            return
         self._json({"job_id": job.id})
 
     def _api_stop(self):

@@ -872,5 +872,74 @@ class TestTeeProgress(unittest.TestCase):
         self.assertIn("[gras] texte brut", cap.get())
 
 
+class TestSsrfGuards(unittest.TestCase):
+    """Garde-fous anti-SSRF : la vérification de dispo d'une offre du web ne doit
+    cibler que des hôtes publics ; les sondes de modèles locaux que des hôtes
+    réellement locaux (loopback/LAN), jamais le link-local (métadonnées cloud)."""
+
+    def test_offre_publique_autorisee(self):
+        import webapp.server as srv
+        self.assertTrue(srv._is_public_http_url("https://example.com/job"))
+        self.assertTrue(srv._is_public_http_url("http://8.8.8.8/job"))
+
+    def test_offre_interne_bloquee(self):
+        import webapp.server as srv
+        for u in ("http://127.0.0.1/x", "http://localhost/x",
+                  "http://192.168.1.10/x", "http://10.0.0.5/x",
+                  "http://169.254.169.254/latest/meta-data/",
+                  "ftp://8.8.8.8/x"):
+            self.assertFalse(srv._is_public_http_url(u), u)
+
+    def test_sonde_locale_autorisee(self):
+        from integrations.local_models import _is_local_url
+        for u in ("http://localhost:11434/api/tags",
+                  "http://127.0.0.1:11434/api/tags",
+                  "http://192.168.1.50:11434/api/tags",
+                  "http://10.0.0.5:11434/"):
+            self.assertTrue(_is_local_url(u), u)
+
+    def test_sonde_non_locale_bloquee(self):
+        from integrations.local_models import _is_local_url
+        for u in ("http://169.254.169.254/", "http://8.8.8.8/",
+                  "https://evil.example.com/", "file:///etc/passwd"):
+            self.assertFalse(_is_local_url(u), u)
+
+
+class TestLetterTimeoutZero(unittest.TestCase):
+    """LLM_TIMEOUT=0 = illimité : la lettre ne doit PAS être tronquée (« partiel »)
+    dès le premier chunk reçu en flux."""
+
+    def test_timeout_zero_ne_tronque_pas(self):
+        import time
+        import json as _json
+        from unittest import mock
+        from config import config
+        from job_scrapers.base import JobOffer
+
+        offer = JobOffer(id="1", title="Développeur Python", company="Acme",
+                         location="Paris", description="Poste de dev backend.",
+                         url="https://example.com/job", source="test")
+        payload = _json.dumps({
+            "letter": "Madame, Monsieur,\n\n" + "Je suis motivé. " * 30,
+            "email_subject": "Candidature", "email_body": "Bonjour, ci-joint.",
+            "language": "fr",
+        })
+
+        def fake_stream(*a, **k):
+            # Plusieurs chunks avec une micro-pause : si la deadline valait
+            # « maintenant+0 », le 2e chunk déclencherait « partiel ».
+            for piece in (payload[:40], payload[40:]):
+                time.sleep(0.01)
+                yield piece
+
+        gen = CoverLetterGenerator("CV de test")
+        with mock.patch.object(config, "llm_timeout", 0), \
+             mock.patch.object(config, "letter_review", "off"), \
+             mock.patch.object(gen._llm, "stream", fake_stream):
+            result = gen.generate(offer, tone="standard")
+        self.assertFalse(result["partial"], "LLM_TIMEOUT=0 ne doit pas tronquer")
+        self.assertIn("Je suis motivé", result["letter"])
+
+
 if __name__ == "__main__":
     unittest.main()
