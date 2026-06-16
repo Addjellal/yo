@@ -76,15 +76,30 @@ class WTTJScraper(BaseScraper):
                     source="WTTJ",
                     log=lambda m: console.print(f"[dim]{m}[/dim]"),
                 )
-                if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
+                if resp.status_code != 200:
+                    console.print(
+                        f"[yellow]WTTJ : Algolia a répondu HTTP {resp.status_code} "
+                        f"(identifiants peut-être périmés) — {resp.text[:200]}[/yellow]"
+                    )
+                    break
+                if len(resp.content) > MAX_RESPONSE_BYTES:
                     break
                 data = resp.json()
-            except (requests.RequestException, ValueError):
+            except (requests.RequestException, ValueError) as e:
+                console.print(f"[yellow]WTTJ : requête Algolia échouée — {e}[/yellow]")
                 break
 
+            res_msg = data.get("message")
+            if res_msg:  # erreur Algolia (index inconnu, clé invalide…)
+                console.print(f"[yellow]WTTJ : Algolia a renvoyé une erreur — {res_msg}[/yellow]")
+                break
             results = (data.get("results") or [{}])[0]
             hits = results.get("hits") or []
             if not hits:
+                if page == 0:
+                    console.print(
+                        f"[dim]WTTJ : 0 résultat (nbHits={results.get('nbHits')})[/dim]"
+                    )
                 break
 
             before = len(offers)

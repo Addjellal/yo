@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 
 from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
 from config import config
+from app_utils import console
 
 MAX_PAGES = 20
 PAGE_SIZE_HINT = 10  # talent.com sert ~10 offres/page
@@ -75,13 +76,24 @@ class TalentScraper(BaseScraper):
                     resp = session.get(url, timeout=20)
                     if resp.status_code == 200 and len(resp.content) <= MAX_RESPONSE_BYTES:
                         html = resp.text
-                except Exception:
-                    pass
+                    elif page == 1:
+                        console.print(
+                            f"[yellow]Talent.com : HTTP {resp.status_code} en direct "
+                            f"(blocage anti-bot probable) — tentative navigateur…[/yellow]"
+                        )
+                except Exception as e:
+                    if page == 1:
+                        console.print(f"[dim]Talent.com : requête directe échouée ({e}) — navigateur…[/dim]")
 
                 if html is None:  # repli navigateur (anti-bot)
                     if not browser_tried:
                         browser_tried = True
                         browser.start()
+                        if not browser.ready and page == 1:
+                            console.print(
+                                "[yellow]Talent.com : Playwright indisponible "
+                                "(navigateur non installé ?) — source ignorée.[/yellow]"
+                            )
                     if browser.ready:
                         html = browser.fetch(url, wait="domcontentloaded", extra_ms=1500)
 
@@ -90,6 +102,11 @@ class TalentScraper(BaseScraper):
 
                 page_jobs = self._parse_page(html, base)
                 if not page_jobs:
+                    if page == 1:
+                        console.print(
+                            "[yellow]Talent.com : page reçue mais 0 offre extraite "
+                            "(sélecteurs HTML à mettre à jour).[/yellow]"
+                        )
                     break
 
                 before = len(offers)
