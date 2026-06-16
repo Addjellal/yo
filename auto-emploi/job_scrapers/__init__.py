@@ -3,7 +3,7 @@ from .france_travail import FranceTravailScraper
 from .indeed import IndeedScraper
 from .wttj import WTTJScraper
 from .linkedin import LinkedInScraper
-from .apec import ApecScraper
+from .talent import TalentScraper
 from .adzuna import AdzunaScraper
 
 __all__ = [
@@ -12,6 +12,6 @@ __all__ = [
     "IndeedScraper",
     "WTTJScraper",
     "LinkedInScraper",
-    "ApecScraper",
+    "TalentScraper",
     "AdzunaScraper",
 ]

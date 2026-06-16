@@ -63,7 +63,7 @@ class TestSessionStore:
         offers = [make_offer(1, "Ingénieur Robotique", "ROS2 Python", score=8)]
         criteria = {"query": "robotique", "cv": "cv.pdf", "country": "fr",
                     "location": "Rennes", "sectors": ["tech"], "experience": "junior",
-                    "sources": ["apec"], "min_score": 6, "exclude": ["senior"]}
+                    "sources": ["adzuna"], "min_score": 6, "exclude": ["senior"]}
         session_id = store.add_session("scan", criteria, offers, found=12)
 
         # Relecture depuis le disque par une nouvelle instance

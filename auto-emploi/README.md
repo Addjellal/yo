@@ -66,8 +66,9 @@ sont inaccessibles).
 
 ## Fonctionnalités
 
-- **Scraping parallèle** : Apec, Adzuna (API), Indeed, Welcome to the Jungle,
-  France Travail (API), LinkedIn (mode invité sans compte, ou connecté).
+- **Scraping parallèle** : Adzuna (API), Indeed, Welcome to the Jungle (API
+  Algolia), Talent.com, France Travail (API), LinkedIn (mode invité sans
+  compte, ou connecté).
   Contournement Cloudflare silencieux via Chromium headless (Playwright).
 - **Matching IA** : score 0–10 par offre, avec raisons + **atouts précis du
   CV** et **lacunes à combler** (visible dans le détail). Pré-filtre par
@@ -88,8 +89,8 @@ sont inaccessibles).
   ambigu sont conservées pour ne pas sur-filtrer.
 - **Localisation pays → région → ville** : sélecteur interactif avec
   recherche par texte (sans accents : « bret » → Bretagne) et option `all`
-  à chaque niveau. 12 pays (Adzuna et Indeed basculent automatiquement sur
-  le bon pays ; Apec/France Travail restent France). Commande `v` en cours
+  à chaque niveau. 12 pays (Adzuna, Indeed et Talent.com basculent
+  automatiquement sur le bon pays ; France Travail reste France). Commande `v` en cours
   de session pour changer de lieu, ou `--location "Lyon" --country fr`.
 - **Deux providers IA** :
   - `anthropic` — Claude Fable 5 par défaut (sorties JSON structurées
@@ -156,9 +157,9 @@ sont inaccessibles).
   (traçabilité de ce qui a été filtré et pourquoi), `lettres/par_offre/`,
   `logs/` (journal `web.log` : cycle de vie des scans et lettres, erreurs
   complètes). Les anciens fichiers à la racine restent lisibles.
-- **APIs externes instables** : Apec (500) et Adzuna (503) sont retentées
+- **APIs externes instables** : Adzuna (503) et les autres APIs sont retentées
   avec délais exponentiels (2 s, 4 s, 8 s) ; en cas de panne persistante,
-  message clair « erreur côté Apec/Adzuna » + réutilisation du dernier
+  message clair « erreur côté <source> » + réutilisation du dernier
   résultat réussi de la session si disponible. Ces erreurs viennent des
   serveurs externes : l'application ne peut que retenter et attendre.
 - **Prétraitement des offres** : HTML résiduel nettoyé (balises, entités)

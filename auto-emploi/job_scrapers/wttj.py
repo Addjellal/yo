@@ -1,120 +1,108 @@
+"""
+Scraper Welcome to the Jungle.
+
+WTTJ charge ses offres côté client via Algolia (le HTML ne contient plus les
+annonces — d'où « 0 offre » avec l'ancien parsing de __NEXT_DATA__). On interroge
+donc directement l'API de recherche Algolia, comme le fait le site lui-même.
+
+Les identifiants Algolia (App ID + clé publique de recherche) sont ceux,
+publics, embarqués dans le frontend de WTTJ. Ils tournent de temps en temps :
+on peut les surcharger sans toucher au code via les variables d'environnement
+WTTJ_ALGOLIA_APP_ID / WTTJ_ALGOLIA_API_KEY / WTTJ_ALGOLIA_INDEX.
+Pour les rafraîchir : ouvrir welcometothejungle.com → DevTools → Réseau →
+filtrer « algolia.net », lire les en-têtes x-algolia-application-id et
+x-algolia-api-key d'une requête /queries.
+"""
 import json
+import os
 import time
 import urllib.parse
 
-from bs4 import BeautifulSoup
+import requests
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, fetch_with_retry
 from config import config
+from app_utils import console
 
 MAX_PAGES = 20
+HITS_PER_PAGE = 20
 BASE_URL = "https://www.welcometothejungle.com"
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "fr-FR,fr;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    "Cache-Control": "max-age=0",
-}
+
+# Identifiants publics de recherche Algolia de WTTJ (surchargés par l'env).
+ALGOLIA_APP_ID = os.environ.get("WTTJ_ALGOLIA_APP_ID", "CSEKHVMS53").strip()
+ALGOLIA_API_KEY = os.environ.get(
+    "WTTJ_ALGOLIA_API_KEY", "02d2eef2400a39e26d764e2b50522f31"
+).strip()
+ALGOLIA_INDEX = os.environ.get(
+    "WTTJ_ALGOLIA_INDEX", "wttj_jobs_production_published_at_desc"
+).strip()
 
 
-def _make_session():
-    try:
-        import cloudscraper
-        return cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "windows", "mobile": False}
-        )
-    except ImportError:
-        import requests as _r
-        s = _r.Session()
-        s.headers.update(HEADERS)
-        return s
+def _algolia_url() -> str:
+    return f"https://{ALGOLIA_APP_ID.lower()}-dsn.algolia.net/1/indexes/*/queries"
 
 
 class WTTJScraper(BaseScraper):
     source_name = "Welcome to the Jungle"
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
-        offers = []
-        page = 1
-        # _make_session() pose déjà HEADERS sur le repli requests ; on ne réécrit
-        # PAS les en-têtes d'un scraper cloudscraper (son émulation navigateur,
-        # plus crédible face à l'anti-bot, serait sinon écrasée par HEADERS).
-        session = _make_session()
+        if not (ALGOLIA_APP_ID and ALGOLIA_API_KEY):
+            return []
 
-        # Playwright session, initialisée paresseusement si cloudscraper bloque
-        from ._browser import BrowserSession
-        browser = BrowserSession()
-        browser_tried = False
+        offers: list[JobOffer] = []
+        seen: set[str] = set()
+        session = requests.Session()
+        session.headers.update({
+            "X-Algolia-Application-Id": ALGOLIA_APP_ID,
+            "X-Algolia-API-Key": ALGOLIA_API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        })
+        # La recherche géographique précise exige des coordonnées ; à défaut, on
+        # ajoute le lieu aux mots-clés (suffisant pour une ville/région nommée).
+        full_query = f"{query} {location}".strip() if location else query
 
-        try:
-            while len(offers) < max_results and page <= MAX_PAGES:
-                params: dict = {"query": query, "page": page}
-                if location:
-                    params["aroundQuery"] = location
-                url = f"{BASE_URL}/fr/jobs?" + urllib.parse.urlencode(params)
+        page = 0
+        while len(offers) < max_results and page < MAX_PAGES:
+            params = urllib.parse.urlencode({
+                "query": full_query,
+                "hitsPerPage": HITS_PER_PAGE,
+                "page": page,
+            })
+            body = json.dumps({"requests": [{"indexName": ALGOLIA_INDEX, "params": params}]})
+            try:
+                resp = fetch_with_retry(
+                    lambda: session.post(_algolia_url(), data=body, timeout=15),
+                    source="WTTJ",
+                    log=lambda m: console.print(f"[dim]{m}[/dim]"),
+                )
+                if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
+                    break
+                data = resp.json()
+            except (requests.RequestException, ValueError):
+                break
 
-                html = None
-                # 1. Essai rapide via requests/cloudscraper
-                try:
-                    resp = session.get(url, timeout=20)
-                    if resp.status_code == 200 and len(resp.content) <= MAX_RESPONSE_BYTES:
-                        html = resp.text
-                except Exception:
-                    pass
+            results = (data.get("results") or [{}])[0]
+            hits = results.get("hits") or []
+            if not hits:
+                break
 
-                # 2. Fallback Playwright si bloqué
-                if html is None:
-                    if not browser_tried:
-                        browser_tried = True
-                        browser.start()
-                    if browser.ready:
-                        html = browser.fetch(url, wait="networkidle", extra_ms=1000)
-
-                if html is None:
+            before = len(offers)
+            for item in hits:
+                job = self._parse_item(item)
+                if job and job.unique_key() not in seen:
+                    seen.add(job.unique_key())
+                    offers.append(job)
+                if len(offers) >= max_results:
                     break
 
-                jobs_page = self._extract_from_next_data(html)
-                if not jobs_page:
-                    break
-
-                for item in jobs_page:
-                    job = self._parse_item(item)
-                    if job:
-                        offers.append(job)
-                    if len(offers) >= max_results:
-                        break
-
-                if len(jobs_page) < 15:
-                    break
-                page += 1
-                time.sleep(config.request_delay)
-
-        finally:
-            browser.close()
+            nb_pages = results.get("nbPages", page + 1)
+            if len(offers) == before or page + 1 >= nb_pages:
+                break
+            page += 1
+            time.sleep(config.request_delay)
 
         return offers
-
-    def _extract_from_next_data(self, html: str) -> list[dict]:
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            script = soup.find("script", id="__NEXT_DATA__")
-            if not script or not script.string:
-                return []
-            data = json.loads(script.string)
-            props = data.get("props", {}).get("pageProps", {})
-            for key in ("jobs", "jobOffers", "results", "hits"):
-                if key in props:
-                    return props[key]
-            for key in ("jobs", "jobOffers", "results", "hits"):
-                val = props.get("data", {}).get(key)
-                if val:
-                    return val
-            return []
-        except (json.JSONDecodeError, AttributeError):
-            return []
 
     def _parse_item(self, item: dict) -> JobOffer | None:
         try:

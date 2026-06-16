@@ -543,7 +543,7 @@ class TestAuditFixes(unittest.TestCase):
         # pas de crash AttributeError.
         from job_scrapers.adzuna import AdzunaScraper
         from job_scrapers.wttj import WTTJScraper
-        from job_scrapers.apec import ApecScraper
+        from job_scrapers.talent import TalentScraper
         a = AdzunaScraper.__new__(AdzunaScraper)
         off = a._parse_item({"id": "1", "title": "Dev", "company": None,
                              "location": None, "redirect_url": "https://x"})
@@ -555,10 +555,11 @@ class TestAuditFixes(unittest.TestCase):
                              "offices": None})
         self.assertIsNotNone(off)
 
-        ap = ApecScraper.__new__(ApecScraper)
-        off = ap._parse_item({"numeroOffre": "3", "intitule": "Dev",
-                              "lieux": ["pas un dict"]})
+        t = TalentScraper.__new__(TalentScraper)
+        off = t._parse_jsonld_item({"title": "Dev", "hiringOrganization": None,
+                                    "jobLocation": None}, "https://fr.talent.com")
         self.assertIsNotNone(off)
+        self.assertEqual(off.company, "N/A")
 
     def test_france_travail_range_pagination_valide(self):
         # Invariant de la pagination : tant que len(offers) < target, le range
@@ -939,6 +940,125 @@ class TestLetterTimeoutZero(unittest.TestCase):
             result = gen.generate(offer, tone="standard")
         self.assertFalse(result["partial"], "LLM_TIMEOUT=0 ne doit pas tronquer")
         self.assertIn("Je suis motivé", result["letter"])
+
+
+class TestWttjAlgolia(unittest.TestCase):
+    """WTTJ interroge Algolia : on vérifie le parsing d'un hit réaliste
+    (le réseau, lui, n'est pas testable hors machine de l'utilisateur)."""
+
+    def test_parse_hit_algolia(self):
+        from job_scrapers.wttj import WTTJScraper, BASE_URL
+        hit = {
+            "id": "abc123", "slug": "dev-python",
+            "name": "Développeur Python", "contract_type": "CDI",
+            "organization": {"name": "Acme", "slug": "acme"},
+            "offices": [{"city": "Paris", "country": {"name": "France"}}],
+            "salary_min": 45000, "salary_max": 55000,
+            "published_at": "2026-05-01T10:00:00Z",
+        }
+        w = WTTJScraper.__new__(WTTJScraper)
+        off = w._parse_item(hit)
+        self.assertIsNotNone(off)
+        self.assertEqual(off.title, "Développeur Python")
+        self.assertEqual(off.company, "Acme")
+        self.assertEqual(off.location, "Paris")
+        self.assertEqual(off.contract_type, "CDI")
+        self.assertEqual(off.date_posted, "2026-05-01")
+        self.assertTrue(off.url.startswith(BASE_URL))
+        self.assertIn("acme", off.url)
+
+    def test_url_construite_depuis_slug(self):
+        from job_scrapers.wttj import WTTJScraper
+        w = WTTJScraper.__new__(WTTJScraper)
+        off = w._parse_item({"slug": "lead", "name": "Lead",
+                             "organization": {"name": "X", "slug": "x"}})
+        self.assertIn("/companies/x/jobs/lead", off.url)
+
+
+class TestTalentScraper(unittest.TestCase):
+    """Talent.com : parsing JSON-LD (prioritaire) et cartes HTML (repli)."""
+
+    def test_parse_jsonld_itemlist(self):
+        from job_scrapers.talent import TalentScraper
+        page = '''
+        <html><head>
+        <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"ItemList","itemListElement":[
+          {"@type":"ListItem","item":{"@type":"JobPosting","title":"Data Engineer",
+            "url":"/view?id=42","employmentType":"CDI","datePosted":"2026-04-10",
+            "hiringOrganization":{"@type":"Organization","name":"DataCorp"},
+            "jobLocation":{"address":{"addressLocality":"Lyon","addressRegion":"ARA"}},
+            "baseSalary":{"@type":"MonetaryAmount","currency":"EUR",
+              "value":{"minValue":40000,"maxValue":50000}}}}]}
+        </script></head><body></body></html>'''
+        t = TalentScraper.__new__(TalentScraper)
+        from bs4 import BeautifulSoup
+        jobs = t._parse_jsonld(BeautifulSoup(page, "html.parser"), "https://fr.talent.com")
+        self.assertEqual(len(jobs), 1)
+        j = jobs[0]
+        self.assertEqual(j.title, "Data Engineer")
+        self.assertEqual(j.company, "DataCorp")
+        self.assertEqual(j.location, "Lyon, ARA")
+        self.assertEqual(j.url, "https://fr.talent.com/view?id=42")
+        self.assertEqual(j.contract_type, "CDI")
+        self.assertIn("40000", j.salary or "")
+
+    def test_parse_cards_html(self):
+        from job_scrapers.talent import TalentScraper
+        page = '''
+        <div class="card link__job-link" data-id="7">
+          <a href="/view?id=7"><h2 class="card__job-title">Ingénieur QA</h2></a>
+          <div class="card__job-empname-label">TestCo</div>
+          <div class="card__job-location">Nantes</div>
+          <div class="card__job-snippet">Tests automatisés, CI/CD.</div>
+        </div>'''
+        t = TalentScraper.__new__(TalentScraper)
+        from bs4 import BeautifulSoup
+        jobs = t._parse_cards(BeautifulSoup(page, "html.parser"), "https://fr.talent.com")
+        self.assertEqual(len(jobs), 1)
+        j = jobs[0]
+        self.assertEqual(j.title, "Ingénieur QA")
+        self.assertEqual(j.company, "TestCo")
+        self.assertEqual(j.location, "Nantes")
+        self.assertEqual(j.url, "https://fr.talent.com/view?id=7")
+
+    def test_jsonld_prioritaire_sur_cartes(self):
+        # Si du JSON-LD est présent, _parse_page ne retombe pas sur les cartes.
+        from job_scrapers.talent import TalentScraper
+        page = '''
+        <script type="application/ld+json">
+        {"@type":"JobPosting","title":"Dev","url":"/view?id=1",
+         "hiringOrganization":{"name":"Co"}}</script>
+        <div class="card"><h2 class="card__job-title">NE PAS LIRE</h2></div>'''
+        t = TalentScraper.__new__(TalentScraper)
+        jobs = t._parse_page(page, "https://fr.talent.com")
+        self.assertEqual([j.title for j in jobs], ["Dev"])
+
+    def test_domaine_par_pays(self):
+        from job_scrapers import talent
+        from config import config
+        from unittest import mock
+        with mock.patch.object(config, "country", "fr"):
+            self.assertEqual(talent._domain(), "fr.talent.com")
+        with mock.patch.object(config, "country", "us"):
+            self.assertEqual(talent._domain(), "www.talent.com")
+        with mock.patch.object(config, "country", "zz"):  # inconnu → défaut FR
+            self.assertEqual(talent._domain(), "fr.talent.com")
+
+
+class TestSourceMap(unittest.TestCase):
+    """APEC retiré, Talent.com ajouté dans la liste des sources."""
+
+    def test_apec_retire_talent_present(self):
+        from main import SOURCE_MAP
+        self.assertNotIn("apec", SOURCE_MAP)
+        self.assertIn("talent", SOURCE_MAP)
+        self.assertEqual(SOURCE_MAP["talent"][0], "Talent.com")
+
+    def test_apec_module_supprime(self):
+        import importlib
+        with self.assertRaises(ImportError):
+            importlib.import_module("job_scrapers.apec")
 
 
 if __name__ == "__main__":

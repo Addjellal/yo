@@ -41,7 +41,7 @@ from job_scrapers import (
     IndeedScraper,
     WTTJScraper,
     LinkedInScraper,
-    ApecScraper,
+    TalentScraper,
     AdzunaScraper,
 )
 from ai import CoverLetterGenerator
@@ -180,7 +180,7 @@ SOURCE_MAP = {
     "ft": ("France Travail", FranceTravailScraper),
     "indeed": ("Indeed", IndeedScraper),
     "wttj": ("Welcome to the Jungle", WTTJScraper),
-    "apec": ("Apec", ApecScraper),
+    "talent": ("Talent.com", TalentScraper),
     "adzuna": ("Adzuna", AdzunaScraper),
     "linkedin": ("LinkedIn", LinkedInScraper),
 }

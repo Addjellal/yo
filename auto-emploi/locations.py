@@ -1,7 +1,7 @@
 """
 Données de localisation : pays supportés, régions françaises, et
-correspondances par source (Adzuna a un endpoint par pays, Indeed un
-domaine par pays, Apec/France Travail sont France uniquement).
+correspondances par source (Adzuna a un endpoint par pays, Indeed et
+Talent.com un domaine par pays, France Travail est France uniquement).
 """
 import unicodedata
 
@@ -40,6 +40,22 @@ INDEED_DOMAINS = {
     "gb": "uk.indeed.com",
     "ca": "ca.indeed.com",
     "us": "www.indeed.com",
+}
+
+# Domaine Talent.com par pays (sous-domaines pays ; www = international/US)
+TALENT_DOMAINS = {
+    "fr": "fr.talent.com",
+    "be": "be.talent.com",
+    "ch": "ch.talent.com",
+    "lu": "lu.talent.com",
+    "de": "de.talent.com",
+    "es": "es.talent.com",
+    "it": "it.talent.com",
+    "nl": "nl.talent.com",
+    "pt": "pt.talent.com",
+    "gb": "uk.talent.com",
+    "ca": "ca.talent.com",
+    "us": "www.talent.com",
 }
 
 # Régions françaises (métropole + outre-mer)
