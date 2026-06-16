@@ -39,7 +39,6 @@ from job_scrapers import (
     JobOffer,
     FranceTravailScraper,
     IndeedScraper,
-    WTTJScraper,
     LinkedInScraper,
     TalentScraper,
     AdzunaScraper,
@@ -179,7 +178,6 @@ def _safe_open_url(url: str) -> bool:
 SOURCE_MAP = {
     "ft": ("France Travail", FranceTravailScraper),
     "indeed": ("Indeed", IndeedScraper),
-    "wttj": ("Welcome to the Jungle", WTTJScraper),
     "talent": ("Talent.com", TalentScraper),
     "adzuna": ("Adzuna", AdzunaScraper),
     "linkedin": ("LinkedIn", LinkedInScraper),
@@ -258,7 +256,7 @@ def check_setup() -> None:
         ("rich",          "rich",           True,  None),
         ("ollama",        "ollama",         provider == "ollama", "Requis si PROVIDER=ollama"),
         ("anthropic",     "anthropic",      provider == "anthropic", "Requis si PROVIDER=anthropic"),
-        ("playwright",    "playwright",     False, "Contournement Cloudflare (Indeed, WTTJ) + LinkedIn — python -m playwright install chromium"),
+        ("playwright",    "playwright",     False, "Contournement anti-bot (Indeed, Talent.com) + LinkedIn — python -m playwright install chromium"),
         ("fpdf",          "fpdf2",          False, "Génération PDF lettres"),
     ]
     lines.append("[bold]Dépendances Python[/bold]")
@@ -280,9 +278,8 @@ def check_setup() -> None:
     adzuna_ok = bool(config.adzuna_app_id and config.adzuna_app_key)
 
     lines.append("[bold]Sources disponibles[/bold]")
-    lines.append(f"  {ok}  Indeed                 [dim](sans configuration — dépend de Cloudflare)[/dim]")
-    lines.append(f"  {ok}  Welcome to the Jungle  [dim](sans configuration — dépend de Cloudflare)[/dim]")
-    lines.append(f"  {ok}  Apec                   [dim](cadres France, sans configuration)[/dim]")
+    lines.append(f"  {ok}  Indeed                 [dim](sans configuration — dépend de l'anti-bot)[/dim]")
+    lines.append(f"  {ok}  Talent.com             [dim](sans configuration — dépend de l'anti-bot)[/dim]")
     lines.append(
         f"  {ok}  Adzuna                 [green]API gratuite configurée[/green]" if adzuna_ok
         else f"  {warn}  Adzuna                 [dim]non configuré — [bold]recommandé[/bold] : developer.adzuna.com (gratuit)[/dim]"
@@ -572,16 +569,10 @@ _SOURCE_INFO: list[dict] = [
         "note": "Pas d'authentification requise",
     },
     {
-        "key": "wttj",
-        "label": "Welcome to the Jungle",
+        "key": "talent",
+        "label": "Talent.com",
         "auth": False,
         "note": "Pas d'authentification requise",
-    },
-    {
-        "key": "apec",
-        "label": "Apec",
-        "auth": False,
-        "note": "Cadres en France — sans authentification",
     },
     {
         "key": "adzuna",
@@ -682,7 +673,7 @@ def select_sources(preselected: str = "") -> list[str]:
                 final_keys.append(key)
 
         if not final_keys:
-            console.print("[yellow]Aucune source valide. Au moins Indeed ou WTTJ recommandé.[/yellow]")
+            console.print("[yellow]Aucune source valide. Au moins Indeed ou Adzuna recommandé.[/yellow]")
             continue
 
         labels = [s["label"] for s in _SOURCE_INFO if s["key"] in final_keys]
@@ -1692,8 +1683,8 @@ def parse_args():
         help="Pays de recherche (défaut: fr) — utilisé avec --location ou --watch",
     )
     parser.add_argument(
-        "--sources", default="apec,adzuna,indeed,wttj",
-        help="Sources : ft,indeed,wttj,apec,adzuna,linkedin (défaut: apec,adzuna,indeed,wttj)",
+        "--sources", default="adzuna,indeed,talent",
+        help="Sources : ft,indeed,talent,adzuna,linkedin (défaut: adzuna,indeed,talent)",
     )
     parser.add_argument(
         "--max", type=int, default=config.max_jobs_per_source,

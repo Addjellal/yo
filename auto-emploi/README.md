@@ -66,10 +66,9 @@ sont inaccessibles).
 
 ## Fonctionnalités
 
-- **Scraping parallèle** : Adzuna (API), Indeed, Welcome to the Jungle (API
-  Algolia), Talent.com, France Travail (API), LinkedIn (mode invité sans
-  compte, ou connecté).
-  Contournement Cloudflare silencieux via Chromium headless (Playwright).
+- **Scraping parallèle** : Adzuna (API), Indeed, Talent.com,
+  France Travail (API), LinkedIn (mode invité sans compte, ou connecté).
+  Contournement anti-bot silencieux via Chromium headless (Playwright).
 - **Matching IA** : score 0–10 par offre, avec raisons + **atouts précis du
   CV** et **lacunes à combler** (visible dans le détail). Pré-filtre par
   mots-clés avant l'appel IA pour économiser les tokens.

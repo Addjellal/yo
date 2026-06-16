@@ -542,18 +542,12 @@ class TestAuditFixes(unittest.TestCase):
         # company/organization/location présents mais null → offre conservée,
         # pas de crash AttributeError.
         from job_scrapers.adzuna import AdzunaScraper
-        from job_scrapers.wttj import WTTJScraper
         from job_scrapers.talent import TalentScraper
         a = AdzunaScraper.__new__(AdzunaScraper)
         off = a._parse_item({"id": "1", "title": "Dev", "company": None,
                              "location": None, "redirect_url": "https://x"})
         self.assertIsNotNone(off)
         self.assertEqual(off.company, "N/A")
-
-        w = WTTJScraper.__new__(WTTJScraper)
-        off = w._parse_item({"id": "2", "name": "Dev", "organization": None,
-                             "offices": None})
-        self.assertIsNotNone(off)
 
         t = TalentScraper.__new__(TalentScraper)
         off = t._parse_jsonld_item({"title": "Dev", "hiringOrganization": None,
@@ -942,39 +936,6 @@ class TestLetterTimeoutZero(unittest.TestCase):
         self.assertIn("Je suis motivé", result["letter"])
 
 
-class TestWttjAlgolia(unittest.TestCase):
-    """WTTJ interroge Algolia : on vérifie le parsing d'un hit réaliste
-    (le réseau, lui, n'est pas testable hors machine de l'utilisateur)."""
-
-    def test_parse_hit_algolia(self):
-        from job_scrapers.wttj import WTTJScraper, BASE_URL
-        hit = {
-            "id": "abc123", "slug": "dev-python",
-            "name": "Développeur Python", "contract_type": "CDI",
-            "organization": {"name": "Acme", "slug": "acme"},
-            "offices": [{"city": "Paris", "country": {"name": "France"}}],
-            "salary_min": 45000, "salary_max": 55000,
-            "published_at": "2026-05-01T10:00:00Z",
-        }
-        w = WTTJScraper.__new__(WTTJScraper)
-        off = w._parse_item(hit)
-        self.assertIsNotNone(off)
-        self.assertEqual(off.title, "Développeur Python")
-        self.assertEqual(off.company, "Acme")
-        self.assertEqual(off.location, "Paris")
-        self.assertEqual(off.contract_type, "CDI")
-        self.assertEqual(off.date_posted, "2026-05-01")
-        self.assertTrue(off.url.startswith(BASE_URL))
-        self.assertIn("acme", off.url)
-
-    def test_url_construite_depuis_slug(self):
-        from job_scrapers.wttj import WTTJScraper
-        w = WTTJScraper.__new__(WTTJScraper)
-        off = w._parse_item({"slug": "lead", "name": "Lead",
-                             "organization": {"name": "X", "slug": "x"}})
-        self.assertIn("/companies/x/jobs/lead", off.url)
-
-
 class TestTalentScraper(unittest.TestCase):
     """Talent.com : parsing JSON-LD (prioritaire) et cartes HTML (repli)."""
 
@@ -1047,18 +1008,20 @@ class TestTalentScraper(unittest.TestCase):
 
 
 class TestSourceMap(unittest.TestCase):
-    """APEC retiré, Talent.com ajouté dans la liste des sources."""
+    """APEC et WTTJ retirés, Talent.com ajouté dans la liste des sources."""
 
-    def test_apec_retire_talent_present(self):
+    def test_sources_retirees_et_talent_present(self):
         from main import SOURCE_MAP
         self.assertNotIn("apec", SOURCE_MAP)
+        self.assertNotIn("wttj", SOURCE_MAP)
         self.assertIn("talent", SOURCE_MAP)
         self.assertEqual(SOURCE_MAP["talent"][0], "Talent.com")
 
-    def test_apec_module_supprime(self):
+    def test_modules_supprimes(self):
         import importlib
-        with self.assertRaises(ImportError):
-            importlib.import_module("job_scrapers.apec")
+        for mod in ("job_scrapers.apec", "job_scrapers.wttj"):
+            with self.assertRaises(ImportError):
+                importlib.import_module(mod)
 
 
 if __name__ == "__main__":
