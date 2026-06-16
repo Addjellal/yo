@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Diagnostic WTTJ + Talent.com (v2) — À LANCER SUR TA MACHINE (accès réseau requis).
+Diagnostic Talent.com (v3) — structure de la LISTE d'offres.
 
     cd auto-emploi
     python diag_scrapers.py
 
-v2 : on cherche les VRAIS identifiants Algolia de WTTJ (embarqués dans la page)
-et on extrait le HTML exact d'une carte Talent.com. Colle toute la sortie.
+Colle toute la sortie.
 """
+import json
 import re
 import urllib.parse
 
@@ -32,83 +32,58 @@ def make_session():
         return s
 
 
-print("=" * 70)
-print("1) WTTJ — découverte des identifiants Algolia dans la page")
-print("=" * 70)
-
-session = make_session()
-search_page = "https://www.welcometothejungle.com/fr/jobs?query=ing%C3%A9nieur"
-print(f"GET {search_page}")
-try:
-    r = session.get(search_page, timeout=30)
-    html = r.text
-    print(f"HTTP {r.status_code}  ({len(html)} octets)")
-
-    # a) hôte Algolia <app-id>-dsn.algolia.net  → donne directement l'App ID
-    hosts = sorted(set(re.findall(r'([A-Za-z0-9]{6,})-dsn\.algolia\.net', html)))
-    print(f"\nHôtes *-dsn.algolia.net trouvés : {hosts or '(aucun)'}")
-
-    # b) App ID via clés de config courantes
-    app_ids = sorted(set(re.findall(
-        r'["\'](?:algoliaAppId|applicationId|appId|ALGOLIA_APP_ID'
-        r'|NEXT_PUBLIC_ALGOLIA[A-Za-z_]*?APP[A-Za-z_]*?ID)["\']\s*:\s*["\']([A-Za-z0-9]{6,})["\']',
-        html, re.I)))
-    print(f"App ID candidats : {app_ids or '(aucun)'}")
-
-    # c) clé de recherche (32 hexa) via clés de config courantes
-    keys = sorted(set(re.findall(
-        r'["\'](?:algoliaApiKey|apiKey|searchApiKey|searchKey'
-        r'|NEXT_PUBLIC_ALGOLIA[A-Za-z_]*?KEY)["\']\s*:\s*["\']([a-f0-9]{32})["\']',
-        html, re.I)))
-    print(f"Clés API candidates (clé nommée) : {keys or '(aucune)'}")
-
-    # d) toutes les chaînes 32-hexa (la clé publique en fait partie)
-    raw_hex = sorted(set(re.findall(r'\b[a-f0-9]{32}\b', html)))
-    print(f"Chaînes 32-hexa présentes : {raw_hex[:8] or '(aucune)'}"
-          + (" …" if len(raw_hex) > 8 else ""))
-
-    # e) noms d'index
-    idx = sorted(set(re.findall(r'["\'](wttj_[A-Za-z0-9_]+)["\']', html)))
-    print(f"Index candidats : {idx or '(aucun)'}")
-
-    # f) contexte autour du 1er 'algolia' pour inspection manuelle
-    m = re.search(r'.{80}algolia.{200}', html, re.I | re.S)
-    if m:
-        print("\nContexte autour de 'algolia' :")
-        print(m.group(0).replace("\n", " "))
-except Exception as e:
-    print(f"ÉCHEC : {type(e).__name__}: {e}")
-
-print()
-print("=" * 70)
-print("2) TALENT.COM — HTML exact d'une carte JobCard")
-print("=" * 70)
-
 page_url = "https://fr.talent.com/jobs?" + urllib.parse.urlencode(
     {"k": "ingénieur", "l": "", "p": 1}
 )
+print("=" * 70)
+print("TALENT.COM — structure de la liste d'offres")
+print("=" * 70)
 print(f"GET {page_url}")
-try:
-    r = session.get(page_url, timeout=30)
-    print(f"HTTP {r.status_code}  ({len(r.content)} octets)")
-    if r.status_code == 200:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(r.text, "html.parser")
-        cards = soup.find_all(class_=re.compile(r"JobCard_card__"))
-        print(f"Cartes 'JobCard_card__' trouvées : {len(cards)}")
-        if cards:
-            card = cards[0]
-            html_card = card.prettify()
-            print("\n--- HTML de la 1re carte (2500 car. max) ---")
-            print(html_card[:2500])
-            print("--- fin carte ---")
-            # liens dans la carte
-            links = [a.get("href") for a in card.find_all("a", href=True)]
-            print(f"\nLiens (href) dans la carte : {links[:5]}")
-except Exception as e:
-    print(f"ÉCHEC : {type(e).__name__}: {e}")
+
+session = make_session()
+r = session.get(page_url, timeout=30)
+html = r.text
+print(f"HTTP {r.status_code}  ({len(html)} octets)\n")
+
+from bs4 import BeautifulSoup
+soup = BeautifulSoup(html, "html.parser")
+
+# 1) Tous les liens /view?id= (= les offres de la liste)
+view_links = soup.find_all("a", href=re.compile(r"/view\?id="))
+print(f"Liens <a href='/view?id='> dans le HTML : {len(view_links)}")
+for i, a in enumerate(view_links[:3]):
+    print(f"\n--- Lien #{i+1} (HTML, 900 car.) ---")
+    # on remonte au conteneur d'offre le plus proche pour voir titre/société
+    container = a
+    for _ in range(4):
+        if container.parent:
+            container = container.parent
+    print(container.prettify()[:900])
+
+# 2) Combien de JobPosting / d'items dans le JSON-LD ItemList ?
+total_items = 0
+for sc in soup.find_all("script", attrs={"type": "application/ld+json"}):
+    if not sc.string:
+        continue
+    try:
+        data = json.loads(sc.string)
+    except Exception:
+        continue
+    txt = json.dumps(data)
+    total_items += txt.count('"@type": "ListItem"') + txt.count('"@type":"ListItem"')
+print(f"\nItemList → nb de ListItem : {total_items}")
+
+# 3) Données embarquées dans un payload JS (Next.js app router) ?
+for marker in ("__NEXT_DATA__", "self.__next_f", "__NUXT__", "window.__INITIAL"):
+    print(f"Présence '{marker}' : {marker in html}")
+
+# 4) Le HTML contient-il les titres des offres en clair (hors carte active) ?
+titles = soup.find_all(class_=re.compile(r"JobCard_title__"))
+print(f"\nÉléments 'JobCard_title__' : {len(titles)}")
+for t in titles[:8]:
+    print("  •", t.get_text(strip=True)[:70])
 
 print()
 print("=" * 70)
-print("FIN — colle toute cette sortie dans le chat.")
+print("FIN — colle toute cette sortie.")
 print("=" * 70)
