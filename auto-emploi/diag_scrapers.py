@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Diagnostic Talent.com (v3) — structure de la LISTE d'offres.
+Diagnostic Talent.com (v4) — structure JSON des offres dans le payload __next_f.
 
     cd auto-emploi
     python diag_scrapers.py
@@ -15,7 +15,6 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
 
@@ -36,52 +35,53 @@ page_url = "https://fr.talent.com/jobs?" + urllib.parse.urlencode(
     {"k": "ingénieur", "l": "", "p": 1}
 )
 print("=" * 70)
-print("TALENT.COM — structure de la liste d'offres")
+print("TALENT.COM — payload __next_f (RSC)")
 print("=" * 70)
 print(f"GET {page_url}")
-
-session = make_session()
-r = session.get(page_url, timeout=30)
+r = make_session().get(page_url, timeout=30)
 html = r.text
 print(f"HTTP {r.status_code}  ({len(html)} octets)\n")
 
-from bs4 import BeautifulSoup
-soup = BeautifulSoup(html, "html.parser")
-
-# 1) Tous les liens /view?id= (= les offres de la liste)
-view_links = soup.find_all("a", href=re.compile(r"/view\?id="))
-print(f"Liens <a href='/view?id='> dans le HTML : {len(view_links)}")
-for i, a in enumerate(view_links[:3]):
-    print(f"\n--- Lien #{i+1} (HTML, 900 car.) ---")
-    # on remonte au conteneur d'offre le plus proche pour voir titre/société
-    container = a
-    for _ in range(4):
-        if container.parent:
-            container = container.parent
-    print(container.prettify()[:900])
-
-# 2) Combien de JobPosting / d'items dans le JSON-LD ItemList ?
-total_items = 0
-for sc in soup.find_all("script", attrs={"type": "application/ld+json"}):
-    if not sc.string:
-        continue
+# 1) Décodage des chunks self.__next_f.push([1,"...."])
+chunks = re.findall(r'self\.__next_f\.push\(\[1,\s*("(?:[^"\\]|\\.)*")\]\)', html, re.S)
+print(f"Chunks __next_f trouvés : {len(chunks)}")
+payload = ""
+for c in chunks:
     try:
-        data = json.loads(sc.string)
+        payload += json.loads(c)
     except Exception:
-        continue
-    txt = json.dumps(data)
-    total_items += txt.count('"@type": "ListItem"') + txt.count('"@type":"ListItem"')
-print(f"\nItemList → nb de ListItem : {total_items}")
+        pass
+print(f"Payload décodé : {len(payload)} caractères\n")
 
-# 3) Données embarquées dans un payload JS (Next.js app router) ?
-for marker in ("__NEXT_DATA__", "self.__next_f", "__NUXT__", "window.__INITIAL"):
-    print(f"Présence '{marker}' : {marker in html}")
+target = payload if payload else html  # repli : html brut (JSON échappé)
 
-# 4) Le HTML contient-il les titres des offres en clair (hors carte active) ?
-titles = soup.find_all(class_=re.compile(r"JobCard_title__"))
-print(f"\nÉléments 'JobCard_title__' : {len(titles)}")
-for t in titles[:8]:
-    print("  •", t.get_text(strip=True)[:70])
+# 2) Noms de clés candidates présentes autour des offres
+keys = ["jobTitle", "title", "company", "employer", "companyName", "city",
+        "location", "jobId", "newId", "id", "salary", "contractType",
+        "employmentType", "datePosted", "postedAt", "url", "applyUrl",
+        "description", "snippet"]
+print("Clés présentes dans le payload :")
+for k in keys:
+    n = target.count(f'"{k}"')
+    if n:
+        print(f'  "{k}" : {n}×')
+
+# 3) Combien d'offres ? (on compte un identifiant qui se répète)
+ids = re.findall(r'"(?:newId|jobId)"\s*:\s*"(\d+)"', target)
+print(f"\nIdentifiants d'offres (newId/jobId) : {len(ids)} (uniques : {len(set(ids))})")
+
+# 4) Contexte JSON autour de la 1re offre connue
+title = "INGENIEUR ENVIRONNEMENT ET ENERGIE"
+idx = target.find(title)
+if idx == -1:  # titre échappé ?
+    idx = target.find(title.split()[0])
+if idx != -1:
+    start = max(0, idx - 400)
+    print(f"\n--- Contexte JSON autour de la 1re offre (1800 car.) ---")
+    print(target[start:start + 1800])
+    print("--- fin ---")
+else:
+    print("\n(Titre non retrouvé dans le payload — colle quand même le reste.)")
 
 print()
 print("=" * 70)
