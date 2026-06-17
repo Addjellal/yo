@@ -793,9 +793,10 @@ function restoreLastSources() {
 const _AC_TYPE_LABEL = { city: "ville", region: "région" };
 
 // Menu déroulant dynamique sous le champ Ville(s) : à chaque frappe, on
-// interroge /api/locations (régions intégrées + communes via l'API officielle
-// pour la France, repli hors-ligne sinon). Le champ acceptant plusieurs villes
-// séparées par des virgules, on n'autocomplète que le dernier terme saisi.
+// interroge /api/locations (régions intégrées + villes en ligne : geo.api.gouv.fr
+// pour la France, Photon/OpenStreetMap pour les autres pays). Le champ acceptant
+// plusieurs villes séparées par des virgules, on n'autocomplète que le dernier
+// terme saisi.
 function setupLocationAutocomplete() {
   const input = $("#f-city");
   if (!input || input.dataset.acReady) return;

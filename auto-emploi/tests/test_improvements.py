@@ -1105,11 +1105,15 @@ class TestLocationSuggest(unittest.TestCase):
         types = {s["value"]: s["type"] for s in suggest_locations("fr", "bret")}
         self.assertEqual(types.get("Bretagne"), "region")
 
-    def test_pays_etranger_villes_seulement(self):
+    def test_regions_etrangeres(self):
         from locations import suggest_locations
-        res = suggest_locations("be", "brux")
-        self.assertEqual([s["value"] for s in res], ["Bruxelles"])
-        self.assertTrue(all(s["type"] == "city" for s in res))  # pas de région hors France
+        # Les régions des autres pays sont aussi suggérées (type "region").
+        types_de = {s["value"]: s["type"] for s in suggest_locations("de", "bav")}
+        self.assertEqual(types_de.get("Bavière"), "region")
+        types_us = {s["value"]: s["type"] for s in suggest_locations("us", "calif")}
+        self.assertEqual(types_us.get("Californie"), "region")
+        # Et les villes étrangères restent disponibles (repli intégré).
+        self.assertIn("Munich", [s["value"] for s in suggest_locations("de", "munich")])
 
     def test_requete_vide_et_limite(self):
         from locations import suggest_locations
@@ -1129,6 +1133,39 @@ class TestLocationSuggest(unittest.TestCase):
 
         with mock.patch.object(requests, "get", _boom):
             self.assertIsNone(server._gouv_communes("rennes"))
+
+    def test_photon_filtre_pays_et_type(self):
+        # Photon renvoie le monde entier : on ne garde que les lieux peuplés du
+        # pays sélectionné, avec la région en métadonnée.
+        import sys
+        sys.path.insert(0, "webapp")
+        import server
+        import requests
+        from unittest import mock
+
+        class _Resp:
+            status_code = 200
+            content = b"x"
+
+            def json(self):
+                return {"features": [
+                    {"properties": {"name": "Munich", "osm_key": "place",
+                                    "osm_value": "city", "countrycode": "DE",
+                                    "state": "Bavière"}},
+                    {"properties": {"name": "Paris", "osm_key": "place",
+                                    "osm_value": "city", "countrycode": "FR"}},
+                    {"properties": {"name": "Une rue", "osm_key": "highway",
+                                    "osm_value": "residential", "countrycode": "DE"}},
+                ]}
+
+        with mock.patch.object(requests, "get", lambda *a, **k: _Resp()):
+            res = server._photon_cities("mun", "de")
+        vals = [s["value"] for s in res]
+        self.assertIn("Munich", vals)
+        self.assertNotIn("Paris", vals)        # mauvais pays
+        self.assertNotIn("Une rue", vals)      # pas un lieu peuplé
+        self.assertTrue(all(s["type"] == "city" for s in res))
+        self.assertEqual(res[0]["label"], "Munich (Bavière)")
 
 
 if __name__ == "__main__":

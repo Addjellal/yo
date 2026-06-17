@@ -34,7 +34,9 @@ from cv_parser import parse_cv, _cache_path
 from tracker import Tracker
 from history import SessionStore
 from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
-from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS, search_names, suggest_locations
+from locations import (
+    COUNTRIES, COUNTRY_NAMES, FR_REGIONS, REGIONS, search_names, suggest_locations,
+)
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi, CONTRACT_TYPES
 from ai._client import llm_available
@@ -956,6 +958,55 @@ def _gouv_communes(query: str, limit: int = 7) -> list[dict] | None:
     return out
 
 
+def _photon_cities(query: str, country: str, limit: int = 7) -> list[dict] | None:
+    """Villes du monde via Photon (OpenStreetMap, gratuit, sans clé, conçu pour
+    la saisie semi-automatique). Filtre sur le pays sélectionné et les types de
+    lieu peuplé. Renvoie None en cas d'échec — repli sur la liste intégrée.
+    URL constante (pas de SSRF) ; appel côté serveur (CSP du navigateur préservée)."""
+    import requests
+    url = "https://photon.komoot.io/api?" + urllib.parse.urlencode({
+        "q": query, "lang": "fr", "limit": max(limit * 3, 15),
+    })
+    try:
+        resp = requests.get(url, timeout=2.5, headers={"User-Agent": "auto-emploi"})
+        if resp.status_code != 200 or len(resp.content) > 2_000_000:
+            return None
+        data = resp.json()
+    except (requests.RequestException, ValueError):
+        return None
+    feats = data.get("features") if isinstance(data, dict) else None
+    if not isinstance(feats, list):
+        return None
+    cc = (country or "").upper()
+    place_values = {"city", "town", "village", "municipality", "hamlet"}
+    out: list[dict] = []
+    seen: set[tuple] = set()
+    for f in feats:
+        props = (f or {}).get("properties") if isinstance(f, dict) else None
+        if not isinstance(props, dict):
+            continue
+        if props.get("osm_key") != "place" or props.get("osm_value") not in place_values:
+            continue
+        if cc and (props.get("countrycode") or "").upper() != cc:
+            continue
+        name = props.get("name")
+        if not name:
+            continue
+        region = props.get("state") or props.get("county") or ""
+        key = (str(name).lower(), str(region).lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "value": str(name),
+            "label": f"{name} ({region})" if region else str(name),
+            "type": "city",
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     is_global = bool(body.get("global"))
     no_ai = bool(body.get("no_ai", False))
@@ -1436,31 +1487,30 @@ class _Handler(BaseHTTPRequestHandler):
         self._json({"local": local[:100], "anthropic": list(_KNOWN_ANTHROPIC_MODELS)})
 
     def _api_locations(self, country: str, q: str):
-        """Suggestions de localisation pour l'autocomplétion. Pour la France, on
-        interroge l'API officielle geo.api.gouv.fr (communes exhaustives) et on
-        préfixe les régions correspondantes ; à défaut (hors ligne) ou pour les
-        autres pays, on retombe sur la liste intégrée. L'appel externe est fait
-        côté serveur pour préserver la CSP stricte du navigateur."""
+        """Suggestions de localisation pour l'autocomplétion : régions intégrées
+        + villes en ligne. France → API officielle geo.api.gouv.fr (communes
+        exhaustives) ; autres pays → Photon (OpenStreetMap, mondial). À défaut
+        (API injoignable), repli sur la liste intégrée. Les appels externes sont
+        faits côté serveur pour préserver la CSP stricte du navigateur."""
         country = (country or "fr").strip().lower()[:2]
         q = (q or "").strip()[:80]
         if not q:
             self._json({"suggestions": []})
             return
-        if country == "fr":
-            cities = _gouv_communes(q)
-            if cities is not None:
-                merged, seen = [], set()
-                regions = [{"value": n, "label": n, "type": "region"}
-                           for n in search_names(q, FR_REGIONS)]
-                for s in regions + cities:
-                    key = s["value"].lower()
-                    if key not in seen:
-                        seen.add(key)
-                        merged.append(s)
-                self._json({"suggestions": merged[:8]})
-                return
-        # Repli hors-ligne / pays hors France
-        self._json({"suggestions": suggest_locations(country, q, limit=8)})
+        cities = _gouv_communes(q) if country == "fr" else _photon_cities(q, country)
+        if cities is None:
+            # API ville injoignable → repli liste intégrée (régions + grandes villes)
+            self._json({"suggestions": suggest_locations(country, q, limit=8)})
+            return
+        regions = [{"value": n, "label": n, "type": "region"}
+                   for n in search_names(q, REGIONS.get(country, []))]
+        merged, seen = [], set()
+        for s in regions + cities:
+            key = s["value"].lower()
+            if key not in seen:
+                seen.add(key)
+                merged.append(s)
+        self._json({"suggestions": merged[:8]})
 
     def _api_state(self):
         provider_ready = (

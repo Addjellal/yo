@@ -137,6 +137,60 @@ FR_REGIONS: list[str] = [
     "Mayotte",
 ]
 
+# Régions / états / provinces par pays (exonymes français usuels) — pour
+# suggérer une région étrangère dans l'autocomplétion. La France réutilise
+# FR_REGIONS ci-dessus.
+REGIONS: dict[str, list[str]] = {
+    "fr": FR_REGIONS,
+    "be": ["Bruxelles-Capitale", "Flandre", "Wallonie", "Anvers",
+           "Brabant flamand", "Brabant wallon", "Flandre-Occidentale",
+           "Flandre-Orientale", "Hainaut", "Liège", "Limbourg", "Luxembourg",
+           "Namur"],
+    "ch": ["Zurich", "Berne", "Lucerne", "Uri", "Schwytz", "Obwald", "Nidwald",
+           "Glaris", "Zoug", "Fribourg", "Soleure", "Bâle-Ville", "Bâle-Campagne",
+           "Schaffhouse", "Appenzell Rhodes-Extérieures",
+           "Appenzell Rhodes-Intérieures", "Saint-Gall", "Grisons", "Argovie",
+           "Thurgovie", "Tessin", "Vaud", "Valais", "Neuchâtel", "Genève", "Jura"],
+    "lu": ["Capellen", "Esch-sur-Alzette", "Luxembourg", "Mersch", "Clervaux",
+           "Diekirch", "Redange", "Vianden", "Wiltz", "Echternach", "Grevenmacher",
+           "Remich"],
+    "de": ["Bade-Wurtemberg", "Bavière", "Berlin", "Brandebourg", "Brême",
+           "Hambourg", "Hesse", "Mecklembourg-Poméranie-Occidentale", "Basse-Saxe",
+           "Rhénanie-du-Nord-Westphalie", "Rhénanie-Palatinat", "Sarre", "Saxe",
+           "Saxe-Anhalt", "Schleswig-Holstein", "Thuringe"],
+    "es": ["Andalousie", "Aragon", "Asturies", "Îles Baléares", "Pays basque",
+           "Îles Canaries", "Cantabrie", "Castille-et-León", "Castille-La Manche",
+           "Catalogne", "Estrémadure", "Galice", "La Rioja", "Madrid", "Murcie",
+           "Navarre", "Communauté valencienne"],
+    "it": ["Abruzzes", "Vallée d'Aoste", "Pouilles", "Basilicate", "Calabre",
+           "Campanie", "Émilie-Romagne", "Frioul-Vénétie Julienne", "Latium",
+           "Ligurie", "Lombardie", "Marches", "Molise", "Piémont", "Sardaigne",
+           "Sicile", "Toscane", "Trentin-Haut-Adige", "Ombrie", "Vénétie"],
+    "nl": ["Drenthe", "Flevoland", "Frise", "Gueldre", "Groningue", "Limbourg",
+           "Brabant-Septentrional", "Hollande-Septentrionale", "Overijssel",
+           "Utrecht", "Zélande", "Hollande-Méridionale"],
+    "pt": ["Nord", "Centre", "Lisbonne", "Alentejo", "Algarve", "Açores", "Madère",
+           "Aveiro", "Braga", "Coimbra", "Faro", "Porto", "Setúbal"],
+    "gb": ["Angleterre", "Écosse", "Pays de Galles", "Irlande du Nord",
+           "Grand Londres", "Sud-Est", "Sud-Ouest", "Midlands de l'Ouest",
+           "Midlands de l'Est", "Nord-Ouest", "Nord-Est", "Yorkshire-et-Humber",
+           "Est de l'Angleterre"],
+    "ca": ["Alberta", "Colombie-Britannique", "Manitoba", "Nouveau-Brunswick",
+           "Terre-Neuve-et-Labrador", "Nouvelle-Écosse", "Ontario",
+           "Île-du-Prince-Édouard", "Québec", "Saskatchewan",
+           "Territoires du Nord-Ouest", "Nunavut", "Yukon"],
+    "us": ["Alabama", "Alaska", "Arizona", "Arkansas", "Californie",
+           "Caroline du Nord", "Caroline du Sud", "Colorado", "Connecticut",
+           "Dakota du Nord", "Dakota du Sud", "Delaware", "Floride", "Géorgie",
+           "Hawaï", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky",
+           "Louisiane", "Maine", "Maryland", "Massachusetts", "Michigan",
+           "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+           "New Hampshire", "New Jersey", "Nouveau-Mexique", "New York", "Ohio",
+           "Oklahoma", "Oregon", "Pennsylvanie", "Rhode Island", "Tennessee",
+           "Texas", "Utah", "Vermont", "Virginie", "Virginie-Occidentale",
+           "Washington", "Wisconsin", "Wyoming"],
+}
+
 
 def _fold(text: str) -> str:
     """Minuscules sans accents — pour la recherche tolérante ('ile' = 'Île')."""
@@ -169,9 +223,8 @@ def suggest_locations(country: str, query: str, limit: int = 8) -> list[dict]:
             seen.add(key)
             out.append({"value": name, "label": name, "type": kind})
 
-    if country == "fr":
-        for name in search_names(query, FR_REGIONS):
-            _add(name, "region")
+    for name in search_names(query, REGIONS.get(country, [])):
+        _add(name, "region")
     for name in search_names(query, MAJOR_CITIES.get(country, [])):
         _add(name, "city")
     return out[:limit]
