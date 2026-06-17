@@ -451,6 +451,12 @@ async function init() {
   // Derniers critères persistés (.env DEFAULT_*) : pré-remplir le formulaire
   applyCriteria(APP.defaults);
 
+  // Sources : sauf si l'utilisateur a épinglé des sources par défaut (Réglages →
+  // DEFAULT_SOURCES), on restaure celles de sa dernière session.
+  if (!(Array.isArray(APP.defaults.sources) && APP.defaults.sources.length)) {
+    restoreLastSources();
+  }
+
   // Score min
   $("#f-minscore").value = APP.min_score;
   $("#minscore-val").textContent = APP.min_score;
@@ -758,6 +764,29 @@ function pushHistory(query) {
   renderHistory();
 }
 
+// ─── Mémoire des sources de la dernière session (localStorage) ───────────────
+
+function saveLastSources() {
+  try {
+    localStorage.setItem("sources", JSON.stringify([...SELECTED.sources]));
+  } catch { /* localStorage indisponible (navigation privée) : on ignore */ }
+}
+
+// Restaure la sélection de sources du dernier scan, en ne gardant que les
+// sources encore connues et utilisables (une clé API retirée depuis ne doit pas
+// resélectionner une source verrouillée). Renvoie true si une mémoire a été
+// appliquée.
+function restoreLastSources() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem("sources") || "null"); }
+  catch { saved = null; }
+  if (!Array.isArray(saved) || !saved.length) return false;
+  const valid = saved.filter((k) => SRC_CHIPS[k] && SRC_USABLE[k]);
+  if (!valid.length) return false;
+  for (const key of Object.keys(SRC_CHIPS)) toggleSource(key, valid.includes(key));
+  return true;
+}
+
 // ─── Lancement du scan ──────────────────────────────────────────────────────
 
 $("#btn-scan").addEventListener("click", startScan);
@@ -830,6 +859,7 @@ async function startScan() {
     return;
   }
   if (!isGlobal) pushHistory(query);
+  saveLastSources();  // mémorise les sources utilisées pour la prochaine session
   SCAN_JOB = out.job_id;
   $("#btn-scan").disabled = true;
   $("#search-empty").hidden = true;
