@@ -1465,6 +1465,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_cv_delete()
         elif path == "/api/export":
             self._api_export()
+        elif path == "/api/session-export":
+            self._api_session_export()
         elif path == "/api/notion":
             self._api_notion()
         else:
@@ -2122,6 +2124,25 @@ class _Handler(BaseHTTPRequestHandler):
         # Export = offres retenues uniquement (pas les mises de côté sous le seuil)
         json_path, csv_path = save_results(matched, scan_job.query or "recherche")
         self._json({"ok": True, "json_file": json_path.name, "csv_file": csv_path.name})
+
+    def _api_session_export(self):
+        body = self._read_body()
+        if body is None:
+            self._error("Requête invalide")
+            return
+        with _STORE_LOCK:
+            store = _get_store()
+            session = store.get_session(str(body.get("id", ""))[:60])
+            offers = store.session_offers(session) if session else []
+        if session is None:
+            self._error("Session introuvable", 404)
+            return
+        if not offers:
+            self._error("Aucune offre à exporter", 404)
+            return
+        query = session.get("criteria", {}).get("query", "recherche")
+        _, csv_path = save_results(offers, query)
+        self._json({"ok": True, "csv_file": csv_path.name})
 
     def _api_notion(self):
         body = self._read_body()

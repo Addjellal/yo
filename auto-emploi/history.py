@@ -268,4 +268,9 @@ def _clean_criteria(criteria: dict) -> dict:
         "min_score": int(c.get("min_score", 6)) if isinstance(c.get("min_score"), int) else 6,
         "exclude": [str(e)[:60] for e in (c.get("exclude") or [])][:50],
         "global": bool(c.get("global")),
+        "location_configs": [
+            {"country": str(lc.get("country", ""))[:2], "location": str(lc.get("location", ""))[:120]}
+            for lc in (c.get("location_configs") or [])
+            if isinstance(lc, dict)
+        ][:20],
     }

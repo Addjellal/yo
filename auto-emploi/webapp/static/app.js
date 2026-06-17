@@ -1890,6 +1890,19 @@ async function loadHistory() {
   for (const s of data.sessions) {
     const btnView = el("button", { class: "btn-ghost small", text: "Voir les offres" });
     btnView.addEventListener("click", () => loadSession(s.id, "history"));
+    const btnCsv = el("button", { class: "btn-ghost small", text: "⬇ CSV" });
+    btnCsv.addEventListener("click", async () => {
+      btnCsv.disabled = true;
+      try {
+        const out = await api("/api/session-export", { method: "POST", body: JSON.stringify({ id: s.id }) });
+        await downloadFile(out.csv_file);
+        toast("CSV téléchargé.", "ok");
+      } catch (e) {
+        toast(e.message, "err");
+      } finally {
+        btnCsv.disabled = false;
+      }
+    });
     const btnRerun = el("button", { class: "btn-ghost small", text: "↻ Relancer" });
     btnRerun.addEventListener("click", () => {
       applyCriteria(s.criteria);
@@ -1918,7 +1931,7 @@ async function loadHistory() {
         ]),
         meta,
       ]),
-      el("div", { class: "session-actions" }, [btnView, btnRerun]),
+      el("div", { class: "session-actions" }, [btnView, btnCsv, btnRerun]),
     ]));
   }
 }
