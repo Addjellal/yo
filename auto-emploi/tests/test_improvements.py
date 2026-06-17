@@ -937,7 +937,67 @@ class TestLetterTimeoutZero(unittest.TestCase):
 
 
 class TestTalentScraper(unittest.TestCase):
-    """Talent.com : parsing JSON-LD (prioritaire) et cartes HTML (repli)."""
+    """Talent.com : payload RSC __next_f (principal), JSON-LD et cartes (repli)."""
+
+    @staticmethod
+    def _rsc_html(jobs):
+        # Reconstitue un <script>self.__next_f.push([1,"…"])</script> réaliste :
+        # Next.js double-encode (le tableau jobs est une chaîne JSON échappée).
+        inner = '["$","$L2c",null,' + json.dumps({"jobs": jobs}) + ']'
+        chunk = "self.__next_f.push([1," + json.dumps(inner) + "])"
+        return f"<html><body><script>{chunk}</script></body></html>"
+
+    def test_parse_next_f(self):
+        from job_scrapers.talent import TalentScraper
+        html = self._rsc_html([{
+            "id": "606894651927700468",
+            "source_title": "INGENIEUR ENVIRONNEMENT ET ENERGIE H/F",
+            "distilled_title": "INGENIEUR ENVIRONNEMENT ET ENERGIE HF",
+            "enrich_company_name": "Délifrance",
+            "source_location": "Romans-sur-Isère, Drôme, France",
+            "source_jobdesc_text": "Description du poste avec [crochets] et \"guillemets\".",
+            "source_link": "https://inrecruitingfr.intervieweb.it/annunci.php?l=x",
+            "show_salary_on_front": True,
+            "enrich_salary_min": 40000, "enrich_salary_max": 50000,
+            "enrich_salary_currency": "EUR",
+        }])
+        t = TalentScraper.__new__(TalentScraper)
+        jobs = t._parse_next_f(html, "https://fr.talent.com")
+        self.assertEqual(len(jobs), 1)
+        j = jobs[0]
+        self.assertEqual(j.title, "INGENIEUR ENVIRONNEMENT ET ENERGIE H/F")
+        self.assertEqual(j.company, "Délifrance")
+        self.assertEqual(j.location, "Romans-sur-Isère, Drôme, France")
+        self.assertEqual(j.url, "https://fr.talent.com/view?id=606894651927700468")
+        self.assertEqual(j.apply_url, "https://inrecruitingfr.intervieweb.it/annunci.php?l=x")
+        self.assertIn("40000", j.salary or "")
+        self.assertIn("[crochets]", j.description)  # crochets dans une chaîne : pas de coupure
+
+    def test_next_f_prioritaire_sur_jsonld_et_cartes(self):
+        # Si le payload RSC est présent, _parse_page ne retombe pas sur le reste.
+        from job_scrapers.talent import TalentScraper
+        rsc = self._rsc_html([{"id": "1", "source_title": "Vrai poste RSC",
+                               "enrich_company_name": "Co"}])
+        page = rsc.replace(
+            "</body>",
+            '<script type="application/ld+json">{"@type":"JobPosting",'
+            '"title":"NE PAS LIRE","hiringOrganization":{"name":"X"}}</script>'
+            '<div class="card"><h2 class="card__job-title">NON PLUS</h2></div></body>',
+        )
+        t = TalentScraper.__new__(TalentScraper)
+        jobs = t._parse_page(page, "https://fr.talent.com")
+        self.assertEqual([j.title for j in jobs], ["Vrai poste RSC"])
+
+    def test_next_f_plusieurs_offres(self):
+        from job_scrapers.talent import TalentScraper
+        html = self._rsc_html([
+            {"id": str(i), "source_title": f"Poste {i}",
+             "enrich_company_name": f"Co{i}"} for i in range(5)
+        ])
+        t = TalentScraper.__new__(TalentScraper)
+        jobs = t._parse_next_f(html, "https://fr.talent.com")
+        self.assertEqual(len(jobs), 5)
+        self.assertEqual(jobs[2].title, "Poste 2")
 
     def test_parse_jsonld_itemlist(self):
         from job_scrapers.talent import TalentScraper

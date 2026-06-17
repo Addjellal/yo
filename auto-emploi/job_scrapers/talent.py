@@ -130,12 +130,116 @@ class TalentScraper(BaseScraper):
     # ─── Parsing ────────────────────────────────────────────────────────────
 
     def _parse_page(self, html: str, base: str) -> list[JobOffer]:
-        """JSON-LD d'abord (structuré), puis cartes HTML en repli."""
+        """Les offres vivent dans le payload RSC Next.js (self.__next_f) : c'est
+        la source principale. JSON-LD (souvent juste des liens) et cartes HTML
+        (une seule rendue côté serveur) ne servent que de repli."""
+        jobs = self._parse_next_f(html, base)
+        if jobs:
+            return jobs
         soup = BeautifulSoup(html, "html.parser")
         jobs = self._parse_jsonld(soup, base)
         if jobs:
             return jobs
         return self._parse_cards(soup, base)
+
+    # ─── Payload RSC (self.__next_f) ─────────────────────────────────────────
+
+    def _parse_next_f(self, html: str, base: str) -> list[JobOffer]:
+        """Reconstitue le flux RSC (suite de self.__next_f.push([1,"…"])) puis en
+        extrait le tableau "jobs":[…] sérialisé par Next.js."""
+        import re
+        chunks = re.findall(
+            r'self\.__next_f\.push\(\[1,\s*("(?:[^"\\]|\\.)*")\]\)', html, re.S
+        )
+        if not chunks:
+            return []
+        parts: list[str] = []
+        for c in chunks:
+            try:
+                parts.append(json.loads(c))
+            except (json.JSONDecodeError, ValueError):
+                pass
+        payload = "".join(parts)
+        offers: list[JobOffer] = []
+        for job in self._extract_jobs_array(payload):
+            off = self._parse_next_f_job(job, base)
+            if off:
+                offers.append(off)
+        return offers
+
+    @staticmethod
+    def _extract_jobs_array(payload: str) -> list[dict]:
+        """Extrait le tableau "jobs":[…] (parenthésage équilibré, en ignorant
+        crochets et guillemets situés à l'intérieur des chaînes)."""
+        key = '"jobs":'
+        pos = payload.find(key)
+        while pos != -1:
+            start = payload.find("[", pos)
+            if start == -1:
+                break
+            depth, in_str, esc = 0, False, False
+            for k in range(start, len(payload)):
+                ch = payload[k]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif ch == "\\":
+                        esc = True
+                    elif ch == '"':
+                        in_str = False
+                elif ch == '"':
+                    in_str = True
+                elif ch == "[":
+                    depth += 1
+                elif ch == "]":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            arr = json.loads(payload[start:k + 1])
+                            if (isinstance(arr, list) and arr
+                                    and isinstance(arr[0], dict)
+                                    and ("source_title" in arr[0]
+                                         or "distilled_title" in arr[0])):
+                                return arr
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                        break
+            pos = payload.find(key, pos + 1)
+        return []
+
+    def _parse_next_f_job(self, j: dict, base: str) -> JobOffer | None:
+        try:
+            title = str(j.get("source_title") or j.get("distilled_title") or "").strip()
+            if not title:
+                return None
+            job_id = str(j.get("id") or "").strip()
+            company = str(j.get("enrich_company_name") or "").strip() or "N/A"
+            location = str(j.get("source_location")
+                           or j.get("enrich_geo_city") or "").strip()
+            description = str(j.get("source_jobdesc_text") or "").strip()
+            view_url = f"{base}/view?id={job_id}" if job_id else ""
+            apply_url = str(j.get("source_link") or "").strip() or view_url
+            url = view_url or apply_url
+
+            salary = None
+            if j.get("show_salary_on_front"):
+                mn = j.get("enrich_salary_min") or 0
+                mx = j.get("enrich_salary_max") or 0
+                cur = j.get("enrich_salary_currency") or "€"
+                if mn and mx:
+                    salary = f"{mn}–{mx} {cur}"
+                elif mn or mx:
+                    salary = f"{mn or mx} {cur}"
+
+            uid = job_id or f"{title}|{company}"
+            return JobOffer(
+                id=f"talent_{job_id or abs(hash(uid)) % 10**12}",
+                title=title, company=company, location=location,
+                description=description, url=url, apply_url=apply_url,
+                source=self.source_name, salary=salary,
+            )
+        except Exception:
+            return None
 
     def _parse_jsonld(self, soup: BeautifulSoup, base: str) -> list[JobOffer]:
         """Blocs <script type="application/ld+json"> de type JobPosting."""
@@ -238,10 +342,10 @@ class TalentScraper(BaseScraper):
         offers: list[JobOffer] = []
         seen: set[str] = set()
         # Cartes candidates : conteneurs portant une classe « card » avec un titre.
-        cards = soup.find_all(class_=re.compile(r"\bcard\b"))
+        cards = soup.find_all(class_=re.compile(r"JobCard_card__|\bcard\b"))
         for card in cards:
             try:
-                title_el = card.find(class_=re.compile(r"job-?title", re.I)) \
+                title_el = card.find(class_=re.compile(r"JobCard_title__|job-?title", re.I)) \
                     or card.find(["h2", "h3"])
                 title = title_el.get_text(strip=True) if title_el else ""
                 if not title:
