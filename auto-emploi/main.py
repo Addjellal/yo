@@ -1054,7 +1054,7 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys(), delimiter=";")
         writer.writeheader()
         writer.writerows([{k: _csv_safe(v) for k, v in row.items()} for row in rows])
 
