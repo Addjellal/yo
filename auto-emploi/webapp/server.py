@@ -34,7 +34,7 @@ from cv_parser import parse_cv, _cache_path
 from tracker import Tracker
 from history import SessionStore
 from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
-from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS
+from locations import COUNTRIES, COUNTRY_NAMES, FR_REGIONS, search_names, suggest_locations
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi, CONTRACT_TYPES
 from ai._client import llm_available
@@ -921,6 +921,41 @@ def _parse_locations(raw_list, raw_str: str) -> list[str]:
     return out[:8]
 
 
+def _gouv_communes(query: str, limit: int = 7) -> list[dict] | None:
+    """Communes françaises via l'API officielle geo.api.gouv.fr (gratuite, sans
+    clé). Renvoie None en cas d'échec/indisponibilité — l'appelant retombe alors
+    sur la liste intégrée. URL constante (pas de SSRF), réponse minuscule."""
+    import requests
+    url = "https://geo.api.gouv.fr/communes?" + urllib.parse.urlencode({
+        "nom": query, "fields": "nom,departement",
+        "boost": "population", "limit": limit,
+    })
+    try:
+        resp = requests.get(url, timeout=2.5)
+        if resp.status_code != 200 or len(resp.content) > 1_000_000:
+            return None
+        data = resp.json()
+    except (requests.RequestException, ValueError):
+        return None
+    if not isinstance(data, list):
+        return None
+    out: list[dict] = []
+    for c in data:
+        if not isinstance(c, dict):
+            continue
+        nom = c.get("nom")
+        if not nom:
+            continue
+        dep = c.get("departement")
+        dep_name = dep.get("nom") if isinstance(dep, dict) else None
+        out.append({
+            "value": str(nom),
+            "label": f"{nom} ({dep_name})" if dep_name else str(nom),
+            "type": "city",
+        })
+    return out
+
+
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     is_global = bool(body.get("global"))
     no_ai = bool(body.get("no_ai", False))
@@ -1276,6 +1311,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_download(query.get("file", [""])[0])
         elif path == "/api/letter-read":
             self._api_letter_read(query.get("file", [""])[0])
+        elif path == "/api/locations":
+            self._api_locations(
+                query.get("country", ["fr"])[0], query.get("q", [""])[0]
+            )
         elif path == "/api/local-models":
             self._api_local_models()
         elif path == "/api/models":
@@ -1395,6 +1434,33 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             _LOG.warning("liste des modèles locaux indisponible", exc_info=True)
         self._json({"local": local[:100], "anthropic": list(_KNOWN_ANTHROPIC_MODELS)})
+
+    def _api_locations(self, country: str, q: str):
+        """Suggestions de localisation pour l'autocomplétion. Pour la France, on
+        interroge l'API officielle geo.api.gouv.fr (communes exhaustives) et on
+        préfixe les régions correspondantes ; à défaut (hors ligne) ou pour les
+        autres pays, on retombe sur la liste intégrée. L'appel externe est fait
+        côté serveur pour préserver la CSP stricte du navigateur."""
+        country = (country or "fr").strip().lower()[:2]
+        q = (q or "").strip()[:80]
+        if not q:
+            self._json({"suggestions": []})
+            return
+        if country == "fr":
+            cities = _gouv_communes(q)
+            if cities is not None:
+                merged, seen = [], set()
+                regions = [{"value": n, "label": n, "type": "region"}
+                           for n in search_names(q, FR_REGIONS)]
+                for s in regions + cities:
+                    key = s["value"].lower()
+                    if key not in seen:
+                        seen.add(key)
+                        merged.append(s)
+                self._json({"suggestions": merged[:8]})
+                return
+        # Repli hors-ligne / pays hors France
+        self._json({"suggestions": suggest_locations(country, q, limit=8)})
 
     def _api_state(self):
         provider_ready = (

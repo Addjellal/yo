@@ -379,6 +379,7 @@ async function init() {
   countrySel.addEventListener("change", () => {
     $("#region-field").style.display = countrySel.value === "fr" ? "" : "none";
   });
+  setupLocationAutocomplete();
 
   // Expérience (pills radio)
   const expBox = $("#f-experience");
@@ -785,6 +786,95 @@ function restoreLastSources() {
   if (!valid.length) return false;
   for (const key of Object.keys(SRC_CHIPS)) toggleSource(key, valid.includes(key));
   return true;
+}
+
+// ─── Autocomplétion de localisation (villes / régions) ───────────────────────
+
+const _AC_TYPE_LABEL = { city: "ville", region: "région" };
+
+// Menu déroulant dynamique sous le champ Ville(s) : à chaque frappe, on
+// interroge /api/locations (régions intégrées + communes via l'API officielle
+// pour la France, repli hors-ligne sinon). Le champ acceptant plusieurs villes
+// séparées par des virgules, on n'autocomplète que le dernier terme saisi.
+function setupLocationAutocomplete() {
+  const input = $("#f-city");
+  if (!input || input.dataset.acReady) return;
+  input.dataset.acReady = "1";
+  input.setAttribute("autocomplete", "off");
+
+  const wrap = el("div", { class: "ac-wrap" });
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const dd = el("div", { class: "ac-dropdown", hidden: true });
+  wrap.appendChild(dd);
+
+  let items = [], active = -1, seq = 0, ctrl = null, timer = null;
+
+  const lastTerm = () => {
+    const v = input.value;
+    return v.slice(v.lastIndexOf(",") + 1).trim();
+  };
+  const close = () => { dd.hidden = true; active = -1; };
+  const applySelection = (value) => {
+    const v = input.value;
+    const i = v.lastIndexOf(",");
+    input.value = (i >= 0 ? v.slice(0, i + 1) + " " : "") + value;
+    close();
+    input.focus();
+  };
+  const setActive = (idx) => {
+    active = idx;
+    [...dd.children].forEach((c, i) => c.classList.toggle("active", i === idx));
+    if (idx >= 0 && dd.children[idx]) dd.children[idx].scrollIntoView({ block: "nearest" });
+  };
+  const render = (results) => {
+    items = results; active = -1;
+    dd.replaceChildren();
+    if (!results.length) { close(); return; }
+    results.forEach((s, idx) => {
+      const item = el("div", { class: "ac-item" }, [
+        el("span", { text: s.label }),
+        el("span", { class: "ac-type", text: _AC_TYPE_LABEL[s.type] || "" }),
+      ]);
+      // mousedown (et non click) : sélectionne avant que le blur du champ ne
+      // ferme le menu.
+      item.addEventListener("mousedown", (e) => { e.preventDefault(); applySelection(s.value); });
+      item.addEventListener("mouseenter", () => setActive(idx));
+      dd.appendChild(item);
+    });
+    dd.hidden = false;
+  };
+  const run = async (term) => {
+    if (ctrl) ctrl.abort();
+    ctrl = new AbortController();
+    const my = ++seq;
+    const country = $("#f-country").value || "fr";
+    let data;
+    try {
+      data = await api(
+        `/api/locations?country=${encodeURIComponent(country)}&q=${encodeURIComponent(term)}`,
+        { signal: ctrl.signal },
+      );
+    } catch { return; }            // requête annulée ou erreur réseau
+    if (my !== seq) return;        // réponse périmée (une frappe plus récente a suivi)
+    render(data.suggestions || []);
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const term = lastTerm();
+    if (term.length < 1) { close(); return; }
+    timer = setTimeout(() => run(term), 180);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (dd.hidden) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive(Math.min(active + 1, items.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActive(Math.max(active - 1, 0)); }
+    else if (e.key === "Enter" && active >= 0 && items[active]) { e.preventDefault(); applySelection(items[active].value); }
+    else if (e.key === "Escape") { e.preventDefault(); close(); }
+  });
+  input.addEventListener("blur", () => setTimeout(close, 120));
+  $("#f-country").addEventListener("change", close);
 }
 
 // ─── Lancement du scan ──────────────────────────────────────────────────────

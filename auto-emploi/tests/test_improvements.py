@@ -1084,5 +1084,52 @@ class TestSourceMap(unittest.TestCase):
                 importlib.import_module(mod)
 
 
+class TestLocationSuggest(unittest.TestCase):
+    """Autocomplétion : suggestions régions + villes, tolérantes aux accents."""
+
+    def test_ville_prefixe(self):
+        from locations import suggest_locations
+        vals = [s["value"] for s in suggest_locations("fr", "renn")]
+        self.assertIn("Rennes", vals)
+
+    def test_accents_et_casse_ignores(self):
+        from locations import suggest_locations
+        # "ile" doit trouver "Île-de-France" (région), "PARI" → "Paris" (ville)
+        self.assertIn("Île-de-France", [s["value"] for s in suggest_locations("fr", "ile")])
+        self.assertEqual(
+            [s["value"] for s in suggest_locations("fr", "PARI")][0], "Paris"
+        )
+
+    def test_type_region_vs_ville(self):
+        from locations import suggest_locations
+        types = {s["value"]: s["type"] for s in suggest_locations("fr", "bret")}
+        self.assertEqual(types.get("Bretagne"), "region")
+
+    def test_pays_etranger_villes_seulement(self):
+        from locations import suggest_locations
+        res = suggest_locations("be", "brux")
+        self.assertEqual([s["value"] for s in res], ["Bruxelles"])
+        self.assertTrue(all(s["type"] == "city" for s in res))  # pas de région hors France
+
+    def test_requete_vide_et_limite(self):
+        from locations import suggest_locations
+        self.assertEqual(suggest_locations("fr", ""), [])
+        self.assertLessEqual(len(suggest_locations("fr", "a", limit=3)), 3)
+
+    def test_gouv_communes_repli_silencieux(self):
+        # Sans réseau (ou API en échec), le repli ne lève pas : renvoie None.
+        import sys
+        sys.path.insert(0, "webapp")
+        import server
+        import requests
+        from unittest import mock
+
+        def _boom(*a, **k):
+            raise requests.RequestException("offline")
+
+        with mock.patch.object(requests, "get", _boom):
+            self.assertIsNone(server._gouv_communes("rennes"))
+
+
 if __name__ == "__main__":
     unittest.main()
