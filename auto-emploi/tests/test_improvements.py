@@ -217,6 +217,38 @@ class TestAsciiSlug(unittest.TestCase):
         self.assertEqual(_ascii_slug("···"), "recherche")
 
 
+class TestCsvSafe(unittest.TestCase):
+    """Anti-injection de formules ET anti-injection de lignes dans l'export CSV."""
+
+    def test_prefixe_formule_neutralise(self):
+        from main import _csv_safe
+        for dangereux in ("=CMD()", "+1+2", "-2+3", "@SUM", "|cmd", "%bad"):
+            self.assertTrue(_csv_safe(dangereux).startswith("'"),
+                            f"{dangereux!r} devrait être préfixé d'une apostrophe")
+
+    def test_tabulation_neutralisee(self):
+        from main import _csv_safe
+        self.assertEqual(_csv_safe("\t=evil")[0], "'")
+
+    def test_valeur_normale_inchangee(self):
+        from main import _csv_safe
+        self.assertEqual(_csv_safe("Développeur Python"), "Développeur Python")
+        self.assertEqual(_csv_safe("Lyon, Rhône"), "Lyon, Rhône")
+
+    def test_sauts_de_ligne_internes_neutralises(self):
+        """Un \\r\\n interne pourrait injecter une fausse ligne CSV → remplacé par espace."""
+        from main import _csv_safe
+        out = _csv_safe("Dev\r\n=CMD|' /C calc'!A0")
+        self.assertNotIn("\n", out)
+        self.assertNotIn("\r", out)
+        # Le = ne se retrouve plus en début de cellule (pas de nouvelle ligne)
+        self.assertFalse(out.startswith("'"))  # commence par "Dev", inoffensif
+
+    def test_none_donne_chaine_vide(self):
+        from main import _csv_safe
+        self.assertEqual(_csv_safe(None), "")
+
+
 class TestLetterFileName(unittest.TestCase):
     """Nom de fichier d'une lettre : accents translittérés (é → e), pas
     remplacés par « _ » — sinon le téléchargement affichait « d_veloppeur »."""

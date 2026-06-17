@@ -14,6 +14,7 @@ Sécurité :
 - toutes les écritures .env passent par save_to_env (liste blanche de clés).
 """
 import base64
+import html as _html
 import json
 import re
 import secrets
@@ -177,19 +178,26 @@ def _get_cv_store() -> CVStore:
 # → « Scan introuvable » sur toute génération de lettre.)
 _JOB_RETENTION = {"scan": 6, "letter": 20, "cv": 20, "check": 6}
 
+# Filet de sécurité : un job bloqué en « running » (thread mort sans avoir mis le
+# statut à jour) n'est jamais purgé par la rétention normale et fuirait en mémoire.
+# Au-delà de ce délai, on le considère orphelin et purgeable.
+_JOB_RUNNING_TTL = 2 * 60 * 60  # 2 h
+
 
 def _register_job(job: _Job) -> None:
     with _JOBS_LOCK:
         _JOBS[job.id] = job
         _LOG.info("job %s créé (%s)", job.id[:8], job.kind)
-        # Purge par type : les vieux jobs du même type, jamais ceux d'un autre
+        now = time.time()
+        # Purge par type : les vieux jobs du même type, jamais ceux d'un autre.
+        # Un job « running » est conservé, SAUF s'il est orphelin (TTL dépassé).
         keep = _JOB_RETENTION.get(job.kind, 20)
         same_kind = sorted(
             (j for j in _JOBS.values() if j.kind == job.kind),
             key=lambda j: j.created,
         )
         for old in same_kind[:-keep]:
-            if old.status != "running":
+            if old.status != "running" or (now - old.created) > _JOB_RUNNING_TTL:
                 del _JOBS[old.id]
 
 
@@ -1312,6 +1320,9 @@ def _stats_payload() -> dict:
 class _Handler(BaseHTTPRequestHandler):
     server_version = "AutoEmploi/1.0"
     protocol_version = "HTTP/1.1"
+    # Timeout par connexion (StreamRequestHandler.setup l'applique au socket) :
+    # un client lent ou muet ne peut plus immobiliser un thread indéfiniment.
+    timeout = 30
 
     # ── Helpers ──
 
@@ -1480,7 +1491,9 @@ class _Handler(BaseHTTPRequestHandler):
         except OSError:
             self._error("index.html manquant", 500)
             return
-        html = html.replace("__AUTH_TOKEN__", AUTH_TOKEN)
+        # Défense en profondeur : le token est alphanumérique (token_urlsafe),
+        # mais on l'échappe au cas où la génération changerait un jour.
+        html = html.replace("__AUTH_TOKEN__", _html.escape(AUTH_TOKEN, quote=True))
         self._send(200, "text/html; charset=utf-8", html.encode("utf-8"))
 
     def _serve_static(self, name: str):

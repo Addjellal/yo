@@ -1011,9 +1011,12 @@ def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator,
 
 def _csv_safe(value) -> str:
     """Neutralise l'injection de formules : Excel/Sheets exécutent les cellules
-    commençant par = + - @ — un titre d'offre hostile pourrait en profiter."""
+    commençant par = + - @ (et | % sur certaines suites comme WPS). On neutralise
+    aussi les sauts de ligne internes, qui pourraient injecter une fausse ligne CSV
+    depuis un titre d'offre hostile."""
     s = str(value) if value is not None else ""
-    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+    s = s.replace("\r", " ").replace("\n", " ")
+    if s and s[0] in ("=", "+", "-", "@", "\t", "|", "%"):
         return "'" + s
     return s
 
