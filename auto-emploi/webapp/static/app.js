@@ -214,7 +214,7 @@ let POLL_TIMER = null;
 // ancien (scan ou check) s'arrête de lui-même et n'écrase plus le journal.
 let POLL_GEN = 0;
 let CVS = [];              // registre des CV (cartes /api/cvs ou résumé /api/state)
-const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "", contracts: new Set() };
+const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "", contracts: new Set(), locations: [] };
 let EXP_PILLS = {};        // key → élément pill
 let SEC_CHIPS = {};        // key → élément chip
 let SRC_CHIPS = {};        // key → élément chip
@@ -267,12 +267,24 @@ function applyCriteria(c) {
   $("#f-global").checked = !!c.global;
   $("#f-global").dispatchEvent(new Event("change"));
   if (c.query !== undefined && c.query && !c.query.startsWith("(") && !c.global) $("#f-query").value = c.query;
-  if (c.country && [...$("#f-country").options].some((o) => o.value === c.country)) {
-    $("#f-country").value = c.country;
-    $("#region-field").style.display = c.country === "fr" ? "" : "none";
-  }
-  if (c.location !== undefined) {
-    if (APP.regions.includes(c.location) && $("#f-country").value === "fr") {
+  if (c.country) setCountry(c.country);
+  if (Array.isArray(c.location_configs) && c.location_configs.length) {
+    // Session multi-lieux : on reconstitue la liste, on vide le builder.
+    SELECTED.locations = c.location_configs.map((cfg) => {
+      const code = String(cfg.country || "fr");
+      const countryName = (APP.countries.find((x) => x.code === code) || {}).name || code;
+      const loc = String(cfg.location || "");
+      const isReg = ((APP.regions_by_country || {})[code] || []).includes(loc);
+      return { country: code, countryName, region: isReg ? loc : "", city: isReg ? "" : loc };
+    });
+    renderLocationConfigs();
+    $("#f-region").value = "";
+    $("#f-city").value = "";
+  } else if (c.location !== undefined) {
+    SELECTED.locations = [];
+    renderLocationConfigs();
+    const regs = (APP.regions_by_country || {})[$("#f-country").value] || [];
+    if (regs.includes(c.location)) {
       $("#f-region").value = c.location;
       $("#f-city").value = "";
     } else {
@@ -369,17 +381,13 @@ async function init() {
   CVS = APP.cvs || [];
   rebuildCvChips();
 
-  // Pays / régions
+  // Pays / régions / villes : combos dynamiques (menu au focus + filtrage).
+  // Le <select> caché #f-country détient le code pays (lu par les scrapers).
   const countrySel = $("#f-country");
   for (const c of APP.countries) countrySel.appendChild(el("option", { value: c.code, text: c.name }));
   countrySel.value = "fr";
-  const regionSel = $("#f-region");
-  regionSel.appendChild(el("option", { value: "", text: "Toutes les régions" }));
-  for (const r of APP.regions) regionSel.appendChild(el("option", { value: r, text: r }));
-  countrySel.addEventListener("change", () => {
-    $("#region-field").style.display = countrySel.value === "fr" ? "" : "none";
-  });
-  setupLocationAutocomplete();
+  setupLocationFields();
+  renderLocationConfigs();
 
   // Expérience (pills radio)
   const expBox = $("#f-experience");
@@ -788,17 +796,33 @@ function restoreLastSources() {
   return true;
 }
 
-// ─── Autocomplétion de localisation (villes / régions) ───────────────────────
+// ─── Autocomplétion de localisation (pays / région / ville) ──────────────────
 
-const _AC_TYPE_LABEL = { city: "ville", region: "région" };
+const _AC_TYPE_LABEL = { city: "ville", region: "région", country: "pays" };
 
-// Menu déroulant dynamique sous le champ Ville(s) : à chaque frappe, on
-// interroge /api/locations (régions intégrées + villes en ligne : geo.api.gouv.fr
-// pour la France, Photon/OpenStreetMap pour les autres pays). Le champ acceptant
-// plusieurs villes séparées par des virgules, on n'autocomplète que le dernier
-// terme saisi.
-function setupLocationAutocomplete() {
-  const input = $("#f-city");
+// Repli accent/casse pour le filtrage client (pays, régions).
+function fold(s) {
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+function filterNames(names, q, limit = 8) {
+  const f = fold(q);
+  if (!f) return names.slice(0, limit);
+  const starts = [], contains = [];
+  for (const n of names) {
+    const fn = fold(n);
+    if (fn.startsWith(f)) starts.push(n);
+    else if (fn.includes(f)) contains.push(n);
+  }
+  return [...starts, ...contains].slice(0, limit);
+}
+
+// Composant d'autocomplétion réutilisable. opts :
+//   fetchItems(term, signal) -> [{value, label, type}] (sync ou Promise)
+//   onPick(item, input)       : applique la sélection
+//   onBlur(input)             : optionnel, réconciliation à la perte de focus
+//   multi (bool)              : champ à valeurs multiples (virgules) → ne lit que le dernier terme
+//   selectOnFocus (bool)      : sélectionne le texte au focus et propose toute la liste
+function attachAutocomplete(input, opts) {
   if (!input || input.dataset.acReady) return;
   input.dataset.acReady = "1";
   input.setAttribute("autocomplete", "off");
@@ -811,18 +835,11 @@ function setupLocationAutocomplete() {
 
   let items = [], active = -1, seq = 0, ctrl = null, timer = null;
 
-  const lastTerm = () => {
-    const v = input.value;
-    return v.slice(v.lastIndexOf(",") + 1).trim();
-  };
+  const termOf = () => opts.multi
+    ? input.value.slice(input.value.lastIndexOf(",") + 1).trim()
+    : input.value.trim();
   const close = () => { dd.hidden = true; active = -1; };
-  const applySelection = (value) => {
-    const v = input.value;
-    const i = v.lastIndexOf(",");
-    input.value = (i >= 0 ? v.slice(0, i + 1) + " " : "") + value;
-    close();
-    input.focus();
-  };
+  const pick = (item) => { opts.onPick(item, input); close(); input.focus(); };
   const setActive = (idx) => {
     active = idx;
     [...dd.children].forEach((c, i) => c.classList.toggle("active", i === idx));
@@ -833,15 +850,14 @@ function setupLocationAutocomplete() {
     dd.replaceChildren();
     if (!results.length) { close(); return; }
     results.forEach((s, idx) => {
-      const item = el("div", { class: "ac-item" }, [
+      const node = el("div", { class: "ac-item" }, [
         el("span", { text: s.label }),
         el("span", { class: "ac-type", text: _AC_TYPE_LABEL[s.type] || "" }),
       ]);
-      // mousedown (et non click) : sélectionne avant que le blur du champ ne
-      // ferme le menu.
-      item.addEventListener("mousedown", (e) => { e.preventDefault(); applySelection(s.value); });
-      item.addEventListener("mouseenter", () => setActive(idx));
-      dd.appendChild(item);
+      // mousedown (et non click) : sélectionne avant le blur du champ.
+      node.addEventListener("mousedown", (e) => { e.preventDefault(); pick(s); });
+      node.addEventListener("mouseenter", () => setActive(idx));
+      dd.appendChild(node);
     });
     dd.hidden = false;
   };
@@ -849,33 +865,157 @@ function setupLocationAutocomplete() {
     if (ctrl) ctrl.abort();
     ctrl = new AbortController();
     const my = ++seq;
-    const country = $("#f-country").value || "fr";
-    let data;
-    try {
-      data = await api(
-        `/api/locations?country=${encodeURIComponent(country)}&q=${encodeURIComponent(term)}`,
-        { signal: ctrl.signal },
-      );
-    } catch { return; }            // requête annulée ou erreur réseau
-    if (my !== seq) return;        // réponse périmée (une frappe plus récente a suivi)
-    render(data.suggestions || []);
+    let results;
+    try { results = await opts.fetchItems(term, ctrl.signal); }
+    catch { return; }              // requête annulée ou erreur réseau
+    if (my !== seq) return;        // réponse périmée
+    render(results || []);
   };
 
   input.addEventListener("input", () => {
     clearTimeout(timer);
-    const term = lastTerm();
-    if (term.length < 1) { close(); return; }
-    timer = setTimeout(() => run(term), 180);
+    const t = termOf();
+    timer = setTimeout(() => run(t), 150);
+  });
+  input.addEventListener("focus", () => {
+    if (opts.selectOnFocus) { input.select(); run(""); }   // propose toute la liste
+    else run(termOf());
   });
   input.addEventListener("keydown", (e) => {
     if (dd.hidden) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setActive(Math.min(active + 1, items.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive(Math.max(active - 1, 0)); }
-    else if (e.key === "Enter" && active >= 0 && items[active]) { e.preventDefault(); applySelection(items[active].value); }
+    else if (e.key === "Enter" && active >= 0 && items[active]) { e.preventDefault(); pick(items[active]); }
     else if (e.key === "Escape") { e.preventDefault(); close(); }
   });
-  input.addEventListener("blur", () => setTimeout(close, 120));
-  $("#f-country").addEventListener("change", close);
+  input.addEventListener("blur", () => setTimeout(() => { close(); if (opts.onBlur) opts.onBlur(input); }, 150));
+}
+
+// Pose le code pays dans le <select> caché + met à jour l'affichage du combo.
+function setCountry(code) {
+  const sel = $("#f-country");
+  if (!sel || ![...sel.options].some((o) => o.value === code)) return;
+  sel.value = code;
+  const name = (APP.countries.find((c) => c.code === code) || {}).name || code;
+  const ac = $("#f-country-ac");
+  if (ac) ac.value = name;
+  sel.dispatchEvent(new Event("change"));
+}
+
+// Câble les trois combos (pays / région / ville) + le bouton « Ajouter ».
+function setupLocationFields() {
+  const countryAc = $("#f-country-ac");
+  const regionInput = $("#f-region");
+  const cityInput = $("#f-city");
+  setCountry($("#f-country").value || "fr");
+
+  attachAutocomplete(countryAc, {
+    selectOnFocus: true,
+    fetchItems: (term) => APP.countries
+      .filter((c) => fold(c.name).includes(fold(term)))
+      .slice(0, 12)
+      .map((c) => ({ value: c.name, code: c.code, label: c.name, type: "country" })),
+    onPick: (item, input) => { input.value = item.label; setCountry(item.code); },
+    onBlur: (input) => {
+      // Texte libre invalide → on rétablit le pays courant (jamais de pays inconnu).
+      const m = APP.countries.find((c) => fold(c.name) === fold(input.value));
+      if (m) setCountry(m.code);
+      else input.value = (APP.countries.find((c) => c.code === $("#f-country").value) || {}).name || "";
+    },
+  });
+
+  attachAutocomplete(regionInput, {
+    selectOnFocus: true,
+    fetchItems: (term) => {
+      const regs = (APP.regions_by_country || {})[$("#f-country").value] || [];
+      return filterNames(regs, term, 50).map((r) => ({ value: r, label: r, type: "region" }));
+    },
+    onPick: (item, input) => { input.value = item.value; },
+  });
+
+  attachAutocomplete(cityInput, {
+    multi: true,
+    fetchItems: async (term, signal) => {
+      const country = $("#f-country").value || "fr";
+      const data = await api(
+        `/api/locations?country=${encodeURIComponent(country)}&q=${encodeURIComponent(term)}`,
+        { signal },
+      );
+      return data.suggestions || [];
+    },
+    onPick: (item, input) => {
+      const v = input.value, i = v.lastIndexOf(",");
+      input.value = (i >= 0 ? v.slice(0, i + 1) + " " : "") + item.value;
+    },
+  });
+
+  // Changer de pays : région et ville d'un autre pays n'ont plus de sens → on efface.
+  $("#f-country").addEventListener("change", () => { regionInput.value = ""; cityInput.value = ""; });
+
+  const addBtn = $("#btn-add-loc");
+  if (addBtn) addBtn.addEventListener("click", addLocationConfig);
+}
+
+// ─── Configurations de lieu multiples (pays · région · ville) ────────────────
+
+function currentBuilderConfig() {
+  const code = $("#f-country").value || "fr";
+  const countryName = (APP.countries.find((c) => c.code === code) || {}).name || code;
+  return { country: code, countryName, region: $("#f-region").value.trim(), city: $("#f-city").value.trim() };
+}
+
+function renderLocationConfigs() {
+  const box = $("#loc-configs");
+  if (!box) return;
+  box.replaceChildren();
+  SELECTED.locations.forEach((cfg, idx) => {
+    const parts = [cfg.countryName];
+    if (cfg.region) parts.push(cfg.region);
+    if (cfg.city) parts.push(cfg.city);
+    box.appendChild(el("span", { class: "loc-chip" }, [
+      el("span", { text: parts.join(" · ") }),
+      el("button", {
+        class: "loc-chip-x", type: "button", "aria-label": "Retirer cette localisation", text: "✕",
+        onclick: () => { SELECTED.locations.splice(idx, 1); renderLocationConfigs(); },
+      }),
+    ]));
+  });
+  box.hidden = SELECTED.locations.length === 0;
+}
+
+function addLocationConfig() {
+  const cfg = currentBuilderConfig();
+  const dup = SELECTED.locations.some(
+    (c) => c.country === cfg.country && c.region === cfg.region && c.city === cfg.city);
+  if (dup) { toast("Cette localisation est déjà ajoutée.", "err"); return; }
+  SELECTED.locations.push(cfg);
+  renderLocationConfigs();
+  // Prépare la saisie suivante : on garde le pays, on vide région + ville.
+  $("#f-region").value = "";
+  $("#f-city").value = "";
+  $("#f-city").focus();
+}
+
+// Aplati les configs en paires {country, location} pour le backend : une ville
+// par paire (le champ ville peut en contenir plusieurs), sinon la région, sinon
+// le pays entier (""). Inclut la saisie courante non encore ajoutée.
+function buildLocationConfigs() {
+  const pairs = [], seen = new Set();
+  const push = (country, location) => {
+    const k = country + "|" + location.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); pairs.push({ country, location }); }
+  };
+  const fromCfg = (cfg) => {
+    const cities = cfg.city ? cfg.city.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    if (cities.length) cities.forEach((c) => push(cfg.country, c));
+    else if (cfg.region) push(cfg.country, cfg.region);
+    else push(cfg.country, "");
+  };
+  SELECTED.locations.forEach(fromCfg);
+  const cur = currentBuilderConfig();
+  if (cur.region || cur.city) fromCfg(cur);   // ne rien perdre si « Ajouter » oublié
+  if (!pairs.length) fromCfg(cur);             // au moins le pays courant, sans lieu
+  return pairs;
 }
 
 // ─── Lancement du scan ──────────────────────────────────────────────────────
@@ -884,7 +1024,15 @@ $("#btn-scan").addEventListener("click", startScan);
 // Entrée lance la recherche depuis n'importe quel champ texte du formulaire —
 // y compris quand « recherche globale » désactive le champ « poste ».
 for (const id of ["#f-query", "#f-city", "#f-exclude"]) {
-  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); startScan(); } });
+  $(id).addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    // Si un menu d'autocomplétion est ouvert sur ce champ, Entrée sélectionne
+    // une suggestion (géré par l'autocomplétion) et ne lance pas le scan.
+    const dd = e.target.parentElement && e.target.parentElement.querySelector(".ac-dropdown");
+    if (dd && !dd.hidden) return;
+    e.preventDefault();
+    startScan();
+  });
 }
 // « Masquer le journal » replie seulement le texte : le spinner et la barre
 // d'avancement restent visibles pour suivre le scan d'un coup d'œil.
@@ -922,8 +1070,9 @@ async function startScan() {
 
   const country = $("#f-country").value;
   const city = $("#f-city").value.trim();
-  const region = country === "fr" ? $("#f-region").value : "";
+  const region = $("#f-region").value.trim();
   const maxRaw = $("#f-max").value.trim();
+  const locationConfigs = buildLocationConfigs();
 
   const body = {
     query: isGlobal ? "" : query,
@@ -931,6 +1080,7 @@ async function startScan() {
     cvs: [...SELECTED.cvs],
     country,
     location: city || region,
+    location_configs: locationConfigs,
     sources: [...SELECTED.sources],
     sectors: [...SELECTED.sectors],
     experience: SELECTED.experience,

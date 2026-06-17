@@ -1168,5 +1168,69 @@ class TestLocationSuggest(unittest.TestCase):
         self.assertEqual(res[0]["label"], "Munich (Bavière)")
 
 
+class TestLocationConfigs(unittest.TestCase):
+    """Configs de lieu multiples (pays + localisation) du scan."""
+
+    def _server(self):
+        import sys
+        sys.path.insert(0, "webapp")
+        import server
+        return server
+
+    def test_parse_configs_dedup_et_pays_inconnu(self):
+        server = self._server()
+        raw = [
+            {"country": "fr", "location": "Rennes"},
+            {"country": "FR", "location": "rennes"},   # doublon (casse)
+            {"country": "de", "location": "Munich"},
+            {"country": "zz", "location": "X"},        # pays inconnu → ignoré
+            {"country": "us", "location": ""},         # pays entier
+            "pas un dict",
+        ]
+        out = server._parse_location_configs(raw)
+        self.assertEqual(out, [
+            {"country": "fr", "location": "Rennes"},
+            {"country": "de", "location": "Munich"},
+            {"country": "us", "location": ""},
+        ])
+
+    def test_validate_multi_pays(self):
+        server = self._server()
+        body = {"query": "ingénieur", "no_ai": True, "sources": ["indeed"],
+                "location_configs": [
+                    {"country": "fr", "location": "Rennes"},
+                    {"country": "de", "location": "Munich"},
+                ]}
+        p, err = server._validate_scan_params(body)
+        self.assertEqual(err, "")
+        self.assertEqual(p["country"], "fr")               # premier pays
+        self.assertEqual(p["location"], "Rennes, Munich")  # affichage
+        self.assertEqual(len(p["configs"]), 2)
+
+    def test_retrocompat_sans_configs(self):
+        server = self._server()
+        body = {"query": "dev", "no_ai": True, "sources": ["indeed"],
+                "country": "be", "location": "Bruxelles, Liège"}
+        p, _ = server._validate_scan_params(body)
+        self.assertEqual(p["configs"],
+                         [{"country": "be", "location": "Bruxelles"},
+                          {"country": "be", "location": "Liège"}])
+
+    def test_groupement_par_pays(self):
+        # Le regroupement (logique de _run_scan) : pays → localisations uniques.
+        server = self._server()
+        configs = [
+            {"country": "fr", "location": "Rennes"},
+            {"country": "fr", "location": "Nantes"},
+            {"country": "de", "location": "Munich"},
+        ]
+        groups = {}
+        for cfg in configs:
+            groups.setdefault(cfg["country"], [])
+            if cfg["location"] not in groups[cfg["country"]]:
+                groups[cfg["country"]].append(cfg["location"])
+        self.assertEqual(groups, {"fr": ["Rennes", "Nantes"], "de": ["Munich"]})
+
+
 if __name__ == "__main__":
     unittest.main()

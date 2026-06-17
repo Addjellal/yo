@@ -35,7 +35,7 @@ from tracker import Tracker
 from history import SessionStore
 from cv_store import CVStore, EXCLUDED_FILENAMES, list_cv_files
 from locations import (
-    COUNTRIES, COUNTRY_NAMES, FR_REGIONS, REGIONS, search_names, suggest_locations,
+    COUNTRIES, COUNTRY_NAMES, FR_REGIONS, MAJOR_CITIES, REGIONS, search_names,
 )
 from ai import CoverLetterGenerator
 from ai.matcher import parse_exclude_keywords, score_offers_multi, CONTRACT_TYPES
@@ -393,48 +393,66 @@ def _run_scan(job: _Job, p: dict) -> None:
         else:
             queries = [p["query"]]
 
-        config.country = p["country"]
         tracker = _get_tracker()
 
-        # Une passe par localisation (liste vide → une seule passe sans filtre).
-        locations = p.get("locations") or [""]
-        loc_note = ""
-        if len([loc for loc in locations if loc]) > 1:
-            loc_note = f" sur {len([loc for loc in locations if loc])} localisations ({', '.join(l for l in locations if l)})"
-        if p["max"] >= _UNLIMITED_MAX:
-            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle (sans plafond){loc_note}…")
+        # Les scrapers lisent config.country (global) : pour gérer plusieurs pays
+        # dans un même scan, on regroupe les localisations par pays et on traite
+        # un pays à la fois (en parallélisant ses localisations × sources × requêtes).
+        groups: dict[str, list[str]] = {}
+        for cfg in p["configs"]:
+            locs = groups.setdefault(cfg["country"], [])
+            if cfg["location"] not in locs:
+                locs.append(cfg["location"])
+
+        multi_country = len(groups) > 1
+        plafond = " (sans plafond)" if p["max"] >= _UNLIMITED_MAX else ""
+        if multi_country or any(loc for v in groups.values() for loc in v):
+            apercu = " ; ".join(
+                COUNTRY_NAMES.get(c, c) + (f" [{', '.join(l for l in v if l)}]" if any(v) else "")
+                for c, v in groups.items()
+            )
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle{plafond} — {apercu}")
         else:
-            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle{loc_note}…")
+            job.add_log(f"Scraping de {len(p['sources'])} source(s) en parallèle{plafond}…")
+
         all_offers: list[JobOffer] = []
         seen_keys: set[str] = set()
-        max_workers = min(len(p["sources"]) * max(1, len(locations)), 8)
-        executor = ThreadPoolExecutor(max_workers=max_workers)
-        try:
-            futures = {
-                executor.submit(_run_one_scraper, key, query, loc, p["max"]):
-                    (key, query, loc)
-                for key in p["sources"] for query in queries for loc in locations
-            }
-            counts: dict[str, int] = {}
-            for future in as_completed(futures):
-                if job.stop_event.is_set():
-                    job.add_log("⏹ Arrêt demandé — scraping interrompu.")
-                    break
-                source_name, offers, error = future.result()
-                if error:
-                    job.add_log(f"⚠ {source_name} : {error}")
-                    continue
-                fresh = [o for o in offers if o.unique_key() not in seen_keys]
-                seen_keys.update(o.unique_key() for o in fresh)
-                all_offers.extend(fresh)
-                counts[source_name] = counts.get(source_name, 0) + len(fresh)
-                job.add_log(f"✓ {source_name} : {counts[source_name]} offres")
-                console.print(f"    [green]✓[/] {source_name} : {counts[source_name]} offre(s)")
-        finally:
-            # Sur arrêt : ne pas attendre les scrapers en cours, annuler les
-            # lots en file. Sinon, attente normale de la fin des threads.
-            stopped = job.stop_event.is_set()
-            executor.shutdown(wait=not stopped, cancel_futures=stopped)
+        counts: dict[str, int] = {}
+
+        for country_code, locs in groups.items():
+            if job.stop_event.is_set():
+                break
+            config.country = country_code
+            locs = locs or [""]
+            if multi_country:
+                console.print(f"  [cyan]→ {COUNTRY_NAMES.get(country_code, country_code)}[/]")
+            max_workers = min(len(p["sources"]) * max(1, len(locs)), 8)
+            executor = ThreadPoolExecutor(max_workers=max_workers)
+            try:
+                futures = {
+                    executor.submit(_run_one_scraper, key, query, loc, p["max"]):
+                        (key, query, loc)
+                    for key in p["sources"] for query in queries for loc in locs
+                }
+                for future in as_completed(futures):
+                    if job.stop_event.is_set():
+                        job.add_log("⏹ Arrêt demandé — scraping interrompu.")
+                        break
+                    source_name, offers, error = future.result()
+                    if error:
+                        job.add_log(f"⚠ {source_name} : {error}")
+                        continue
+                    fresh = [o for o in offers if o.unique_key() not in seen_keys]
+                    seen_keys.update(o.unique_key() for o in fresh)
+                    all_offers.extend(fresh)
+                    counts[source_name] = counts.get(source_name, 0) + len(fresh)
+                    job.add_log(f"✓ {source_name} : {counts[source_name]} offres")
+                    console.print(f"    [green]✓[/] {source_name} : {counts[source_name]} offre(s)")
+            finally:
+                # Sur arrêt : ne pas attendre les scrapers en cours, annuler les
+                # lots en file. Sinon, attente normale de la fin des threads.
+                stopped = job.stop_event.is_set()
+                executor.shutdown(wait=not stopped, cancel_futures=stopped)
 
         # Trace brute : toutes les offres collectées, avant tout filtrage
         if all_offers:
@@ -582,6 +600,7 @@ def _session_criteria(p: dict) -> dict:
         "cv": ",".join(p["cvs"]),
         "country": p["country"],
         "location": p["location"],
+        "location_configs": p.get("configs", []),
         "sectors": [label_to_key[s] for s in p["sectors"] if s in label_to_key],
         "experience": p["experience"],
         "sources": p["sources"],
@@ -1007,6 +1026,28 @@ def _photon_cities(query: str, country: str, limit: int = 7) -> list[dict] | Non
     return out
 
 
+def _parse_location_configs(raw) -> list[dict]:
+    """Valide une liste de configs {country, location} envoyée par l'UI. Pays
+    inconnu → ignoré ; localisation bornée ; dédoublonnage (pays, lieu)."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    seen: set[tuple] = set()
+    for item in raw[:50]:
+        if not isinstance(item, dict):
+            continue
+        c = str(item.get("country", "")).strip().lower()
+        if c not in _COUNTRY_CODES:
+            continue
+        loc = str(item.get("location", "")).strip()[:120]
+        key = (c, loc.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"country": c, "location": loc})
+    return out
+
+
 def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     is_global = bool(body.get("global"))
     no_ai = bool(body.get("no_ai", False))
@@ -1063,13 +1104,23 @@ def _validate_scan_params(body: dict) -> tuple[dict | None, str]:
     # avant (une passe sans filtre de lieu).
     locations = _parse_locations(body.get("locations"), body.get("location", ""))
 
+    # Configurations de lieu (pays + localisation). L'UI envoie une liste
+    # explicite (multi pays/région/ville) ; sinon, rétrocompat : une config par
+    # localisation sous le pays choisi (ou le pays seul si aucune localisation).
+    configs = _parse_location_configs(body.get("location_configs"))
+    if not configs:
+        configs = [{"country": country, "location": loc} for loc in (locations or [""])]
+    p_country = configs[0]["country"]
+    loc_display = ", ".join(dict.fromkeys(c["location"] for c in configs if c["location"]))[:200]
+
     return {
         "query": query,
         "global": is_global,
         "cvs": cvs,
-        "country": country,
-        "location": ", ".join(locations)[:200],
+        "country": p_country,
+        "location": loc_display,
         "locations": locations,
+        "configs": configs,
         "sources": sources,
         "sectors": sectors,
         "experience": experience,
@@ -1487,30 +1538,23 @@ class _Handler(BaseHTTPRequestHandler):
         self._json({"local": local[:100], "anthropic": list(_KNOWN_ANTHROPIC_MODELS)})
 
     def _api_locations(self, country: str, q: str):
-        """Suggestions de localisation pour l'autocomplétion : régions intégrées
-        + villes en ligne. France → API officielle geo.api.gouv.fr (communes
-        exhaustives) ; autres pays → Photon (OpenStreetMap, mondial). À défaut
-        (API injoignable), repli sur la liste intégrée. Les appels externes sont
-        faits côté serveur pour préserver la CSP stricte du navigateur."""
+        """Suggestions de VILLES pour l'autocomplétion (les pays et régions sont
+        gérés côté client à partir de listes fixes). France → API officielle
+        geo.api.gouv.fr (communes exhaustives) ; autres pays → Photon
+        (OpenStreetMap, mondial). Sans saisie, on propose les grandes villes
+        intégrées du pays ; si l'API ville est injoignable, repli sur cette même
+        liste. Les appels externes sont faits côté serveur (CSP préservée)."""
         country = (country or "fr").strip().lower()[:2]
         q = (q or "").strip()[:80]
         if not q:
-            self._json({"suggestions": []})
+            major = MAJOR_CITIES.get(country, [])[:8]
+            self._json({"suggestions": [{"value": n, "label": n, "type": "city"} for n in major]})
             return
         cities = _gouv_communes(q) if country == "fr" else _photon_cities(q, country)
-        if cities is None:
-            # API ville injoignable → repli liste intégrée (régions + grandes villes)
-            self._json({"suggestions": suggest_locations(country, q, limit=8)})
-            return
-        regions = [{"value": n, "label": n, "type": "region"}
-                   for n in search_names(q, REGIONS.get(country, []))]
-        merged, seen = [], set()
-        for s in regions + cities:
-            key = s["value"].lower()
-            if key not in seen:
-                seen.add(key)
-                merged.append(s)
-        self._json({"suggestions": merged[:8]})
+        if cities is None:  # API injoignable → repli grandes villes intégrées filtrées
+            cities = [{"value": n, "label": n, "type": "city"}
+                      for n in search_names(q, MAJOR_CITIES.get(country, []))]
+        self._json({"suggestions": cities[:8]})
 
     def _api_state(self):
         provider_ready = (
@@ -1531,6 +1575,7 @@ class _Handler(BaseHTTPRequestHandler):
             "model": config.anthropic_model if config.provider == "anthropic" else config.ollama_model,
             "countries": [{"code": c, "name": n} for c, n in COUNTRIES],
             "regions": FR_REGIONS,
+            "regions_by_country": REGIONS,
             "sectors": [{"key": k, "label": v} for k, v in SECTORS],
             "experience_levels": [{"key": k, "label": v} for k, v in EXPERIENCE_LEVELS],
             "tones": [{"key": k, "label": v} for k, v in TONES.items()],

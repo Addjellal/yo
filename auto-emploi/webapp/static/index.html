@@ -94,17 +94,24 @@
         <div class="filters-grid">
 
           <div class="field">
-            <label for="f-country">Pays</label>
-            <select id="f-country"></select>
+            <label for="f-country-ac">Pays</label>
+            <input id="f-country-ac" type="text" autocomplete="off" placeholder="Pays"
+                   title="Pilote les sources et leurs domaines par pays.">
+            <select id="f-country" hidden></select>
           </div>
           <div class="field" id="region-field">
             <label for="f-region">Région</label>
-            <select id="f-region"></select>
+            <input id="f-region" type="text" autocomplete="off" placeholder="Toutes les régions">
           </div>
           <div class="field">
             <label for="f-city">Ville(s) <span class="muted">(plusieurs séparées par des virgules)</span></label>
             <input id="f-city" type="text" placeholder="Ex : Rennes, Nantes, Paris (optionnel)" maxlength="200"
                    title="Une recherche est lancée pour chaque localisation ; les doublons sont fusionnés. Vide = sans filtre de lieu.">
+          </div>
+          <div class="field span-3" id="loc-add-row">
+            <button id="btn-add-loc" type="button" class="btn-ghost small">＋ Ajouter cette localisation</button>
+            <div id="loc-configs" class="loc-chips" hidden
+                 title="Localisations qui seront toutes recherchées. ✕ pour retirer."></div>
           </div>
 
           <div class="field span-3">
