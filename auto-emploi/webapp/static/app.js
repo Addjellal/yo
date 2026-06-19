@@ -213,6 +213,22 @@ let POLL_TIMER = null;
 // Génération de polling : tout nouveau scan/vérif l'incrémente ; un poll plus
 // ancien (scan ou check) s'arrête de lui-même et n'écrase plus le journal.
 let POLL_GEN = 0;
+let POLL_STARTED = 0;      // horodatage du début de la génération courante
+
+// Démarre une nouvelle génération de polling (réinitialise la cadence).
+function nextPollGen() {
+  POLL_STARTED = Date.now();
+  return ++POLL_GEN;
+}
+
+// Cadence de polling : réactive au début, puis espacée pour ne pas marteler
+// /api/job pendant un long scan (plusieurs minutes). Pure optimisation réseau.
+function pollDelay() {
+  const elapsed = Date.now() - POLL_STARTED;
+  if (elapsed < 30000) return 850;    // 30 premières secondes : réactif
+  if (elapsed < 120000) return 1500;  // 30 s – 2 min
+  return 3000;                        // au-delà de 2 min
+}
 let CVS = [];              // registre des CV (cartes /api/cvs ou résumé /api/state)
 const SELECTED = { sectors: new Set(), sources: new Set(), cvs: new Set(), experience: "", contracts: new Set(), locations: [] };
 let EXP_PILLS = {};        // key → élément pill
@@ -1117,7 +1133,7 @@ async function startScan() {
       : `Recherche : « ${query} »`;
   $("#progress-log").replaceChildren();
   resetProgressBar();
-  pollScan(++POLL_GEN);
+  pollScan(nextPollGen());
 }
 
 // Recherche globale : le champ « poste » devient inutile
@@ -1160,7 +1176,7 @@ $("#btn-rescore").addEventListener("click", async () => {
   $("#progress-title").textContent = "Re-scoring de la base d'offres connues…";
   $("#progress-log").replaceChildren();
   resetProgressBar();
-  pollScan(++POLL_GEN);
+  pollScan(nextPollGen());
 });
 
 function pollScan(gen = POLL_GEN) {
@@ -1200,7 +1216,7 @@ function pollScan(gen = POLL_GEN) {
     $("#btn-show-log").hidden = !logHidden;
     renderResults();
     renderSetAside();
-  }, 850);
+  }, pollDelay());
 }
 
 function renderLog(lines) {
@@ -1571,7 +1587,7 @@ async function checkAvailability() {
   $("#progress-title").textContent = "Vérification de disponibilité (sans IA)…";
   $("#progress-log").replaceChildren();
   resetProgressBar();
-  pollCheck(out.job_id, ++POLL_GEN);
+  pollCheck(out.job_id, nextPollGen());
 }
 
 function pollCheck(jobId, gen) {
@@ -1590,7 +1606,7 @@ function pollCheck(jobId, gen) {
     applyAvailability((job.result && job.result.results) || []);
     $("#scan-progress").hidden = true;
     $("#btn-show-log").hidden = false;
-  }, 850);
+  }, pollDelay());
 }
 
 function applyAvailability(results) {
