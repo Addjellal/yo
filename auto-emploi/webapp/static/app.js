@@ -273,7 +273,7 @@ function toggleCv(name, force) {
   const on = force !== undefined ? force : !SELECTED.cvs.has(name);
   if (on) { SELECTED.cvs.add(name); chip.classList.add("active"); }
   else { SELECTED.cvs.delete(name); chip.classList.remove("active"); }
-  localStorage.setItem("cvs", JSON.stringify([...SELECTED.cvs]));
+  lsSet("cvs", JSON.stringify([...SELECTED.cvs]));
 }
 
 function applyCriteria(c) {
@@ -367,12 +367,12 @@ function switchTab(name) {
 
 // ─── Thème ──────────────────────────────────────────────────────────────────
 
-const savedTheme = localStorage.getItem("theme");
+const savedTheme = lsGet("theme");
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
 $("#theme-toggle").addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
-  localStorage.setItem("theme", next);
+  lsSet("theme", next);
 });
 
 // ─── Initialisation ─────────────────────────────────────────────────────────
@@ -767,12 +767,29 @@ searchCard.addEventListener("drop", (e) => {
   if (e.dataTransfer && e.dataTransfer.files) uploadCvFiles(e.dataTransfer.files);
 });
 
+// ─── localStorage : accès tolérant aux pannes (navigation privée, quota, JSON
+// corrompu). Un échec de stockage ne doit jamais interrompre l'init ni une action.
+function lsGet(key) {
+  try { return localStorage.getItem(key); }
+  catch { return null; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, value); }
+  catch { /* localStorage indisponible (navigation privée, quota) : on ignore */ }
+}
+function lsGetJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch { return fallback; }
+}
+
 // ─── Historique de recherches (localStorage) ────────────────────────────────
 
 function renderHistory() {
   const box = $("#query-history");
   box.replaceChildren();
-  const history = JSON.parse(localStorage.getItem("queries") || "[]");
+  const history = lsGetJSON("queries", []);
   for (const q of history.slice(0, 6)) {
     const chip = el("span", { class: "chip", text: q });
     chip.title = `Réutiliser « ${q} »`;
@@ -783,9 +800,10 @@ function renderHistory() {
 }
 
 function pushHistory(query) {
-  let history = JSON.parse(localStorage.getItem("queries") || "[]");
+  let history = lsGetJSON("queries", []);
+  if (!Array.isArray(history)) history = [];
   history = [query, ...history.filter((q) => q !== query)].slice(0, 10);
-  localStorage.setItem("queries", JSON.stringify(history));
+  lsSet("queries", JSON.stringify(history));
   renderHistory();
 }
 
@@ -904,7 +922,10 @@ function attachAutocomplete(input, opts) {
     else if (e.key === "Enter" && active >= 0 && items[active]) { e.preventDefault(); pick(items[active]); }
     else if (e.key === "Escape") { e.preventDefault(); close(); }
   });
-  input.addEventListener("blur", () => setTimeout(() => { close(); if (opts.onBlur) opts.onBlur(input); }, 150));
+  input.addEventListener("blur", () => {
+    clearTimeout(timer);   // annule un debounce en vol → pas de réouverture après fermeture
+    setTimeout(() => { close(); if (opts.onBlur) opts.onBlur(input); }, 150);
+  });
 }
 
 // Pose le code pays dans le <select> caché + met à jour l'affichage du combo.
@@ -1644,6 +1665,10 @@ function openLetterModal(offer, applyStatus, jobId) {
   LETTER_PREVIEW_FILE = null;
   $("#modal-title").textContent = `Candidature — ${offer.title} · ${offer.company}`;
   $("#btn-generate-letter").textContent = "Générer";
+  // État sain à chaque ouverture : si une génération précédente a été abandonnée
+  // (modale fermée en cours), on réactive le bouton et on libère le verrou.
+  $("#btn-generate-letter").disabled = false;
+  LETTER_BUSY = false;
   $("#letter-config").hidden = false;
   $("#letter-loading").hidden = true;
   $("#letter-result").hidden = true;
@@ -1764,6 +1789,9 @@ $("#btn-generate-letter").addEventListener("click", async () => {
 
 function pollLetter(jobId) {
   setTimeout(async () => {
+    // Modale fermée pendant la génération : on cesse de sonder (la lettre se
+    // termine côté serveur et reste dans l'onglet Lettres). Libère le verrou.
+    if ($("#modal-overlay").hidden) { LETTER_BUSY = false; return; }
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
@@ -1877,6 +1905,10 @@ document.querySelectorAll("[data-copy]").forEach((btn) => {
     const text = btn.dataset.copy === "email"
       ? `Objet : ${$("#letter-subject").textContent}\n\n${$("#letter-email").textContent}`
       : $("#letter-body").value;
+    if (!navigator.clipboard) {   // absent hors contexte sécurisé (accès LAN en HTTP nu)
+      toast("Copie impossible : presse-papier indisponible. Sélectionnez et copiez manuellement.", "err");
+      return;
+    }
     navigator.clipboard.writeText(text).then(
       () => toast("Copié dans le presse-papier.", "ok"),
       () => toast("Copie impossible.", "err"),
@@ -2539,6 +2571,9 @@ function analyzeCv(cvId, btn) {
 
 function pollCvJob(jobId, btn) {
   setTimeout(async () => {
+    // Panneau CV fermé/changé pendant l'analyse : on cesse de sonder pour ne
+    // pas rouvrir le détail de force (l'analyse aboutit côté serveur).
+    if (!CVD) return;
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
@@ -2576,7 +2611,7 @@ async function deleteCv(cv) {
     CV_SELECTED.delete(cv.id);
     // Sélection de recherche : retirer le CV disparu, état propre si plus rien
     SELECTED.cvs.delete(cv.filename);
-    localStorage.setItem("cvs", JSON.stringify([...SELECTED.cvs]));
+    lsSet("cvs", JSON.stringify([...SELECTED.cvs]));
     rebuildCvChips();
     renderCvList();
     $("#cv-detail").hidden = true;

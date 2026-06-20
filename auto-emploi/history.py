@@ -265,7 +265,11 @@ def _clean_criteria(criteria: dict) -> dict:
         "sectors": [str(s)[:100] for s in (c.get("sectors") or [])][:20],
         "experience": str(c.get("experience", ""))[:20],
         "sources": [str(s)[:20] for s in (c.get("sources") or [])][:10],
-        "min_score": int(c.get("min_score", 6)) if isinstance(c.get("min_score"), int) else 6,
+        "min_score": (
+            max(0, min(10, c.get("min_score")))
+            if isinstance(c.get("min_score"), int) and not isinstance(c.get("min_score"), bool)
+            else 6
+        ),
         "exclude": [str(e)[:60] for e in (c.get("exclude") or [])][:50],
         "global": bool(c.get("global")),
         "location_configs": [

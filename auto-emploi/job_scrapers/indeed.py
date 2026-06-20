@@ -44,6 +44,35 @@ def _domain() -> str:
     return INDEED_DOMAINS.get(config.country, "fr.indeed.com")
 
 
+def _balanced_object(text: str, pos: int) -> str | None:
+    """À partir de `pos`, renvoie le premier objet JSON `{...}` à accolades
+    équilibrées (chaînes et échappements respectés), ou None. Linéaire, sans
+    backtracking : robuste face à un JSON volumineux contenant des `}` internes
+    suivis de `\\n` (cas que la regex non-gourmande tronquait)."""
+    start = text.find("{", pos)
+    if start == -1:
+        return None
+    depth, in_str, esc = 0, False, False
+    for k in range(start, len(text)):
+        ch = text[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:k + 1]
+    return None
+
+
 def _make_session():
     try:
         import cloudscraper
@@ -226,13 +255,21 @@ class IndeedScraper(BaseScraper):
         return offers
 
     def _extract_from_mosaic(self, html: str) -> list[dict]:
-        """Extrait les données JSON du bundle mosaic embedé par Indeed."""
-        pattern = r'window\.mosaic\.providerData\["mosaic-provider-jobcards"\]\s*=\s*(\{.*?\})(?:;|\n)'
-        m = re.search(pattern, html, re.DOTALL)
-        if not m:
+        """Extrait les données JSON du bundle mosaic embarqué par Indeed.
+        Extraction par accolades équilibrées (et non regex non-gourmande) : le
+        JSON est volumineux et un `}` interne suivi d'un saut de ligne tronquait
+        l'ancienne capture, faisant échouer le parsing le plus riche."""
+        anchor = re.search(
+            r'window\.mosaic\.providerData\["mosaic-provider-jobcards"\]\s*=\s*',
+            html,
+        )
+        if not anchor:
+            return []
+        blob = _balanced_object(html, anchor.end())
+        if blob is None:
             return []
         try:
-            data = json.loads(m.group(1))
+            data = json.loads(blob)
             return (
                 data.get("metaData", {})
                 .get("mosaicProviderJobCardsModel", {})

@@ -148,26 +148,33 @@ _store: SessionStore | None = None
 _cv_store: CVStore | None = None
 _STORE_LOCK = threading.Lock()
 _CV_LOCK = threading.Lock()        # sérialise les accès au registre des CV
+_INIT_LOCK = threading.Lock()      # sérialise la création paresseuse des singletons
 
 
 def _get_tracker() -> Tracker:
     global _tracker
     if _tracker is None:
-        _tracker = Tracker(Path(config.output_dir) / ".tracker.json")
+        with _INIT_LOCK:   # double vérification : une seule instance même sous course
+            if _tracker is None:
+                _tracker = Tracker(Path(config.output_dir) / ".tracker.json")
     return _tracker
 
 
 def _get_store() -> SessionStore:
     global _store
     if _store is None:
-        _store = SessionStore(Path(config.output_dir) / ".sessions.json")
+        with _INIT_LOCK:
+            if _store is None:
+                _store = SessionStore(Path(config.output_dir) / ".sessions.json")
     return _store
 
 
 def _get_cv_store() -> CVStore:
     global _cv_store
     if _cv_store is None:
-        _cv_store = CVStore(Path(config.output_dir) / ".cvs.json")
+        with _INIT_LOCK:
+            if _cv_store is None:
+                _cv_store = CVStore(Path(config.output_dir) / ".cvs.json")
     return _cv_store
 
 
@@ -204,6 +211,23 @@ def _register_job(job: _Job) -> None:
 def _get_job(job_id: str) -> _Job | None:
     with _JOBS_LOCK:
         return _JOBS.get(job_id)
+
+
+# Plafond de jobs simultanés par type coûteux (chaque lettre/analyse CV = un
+# appel LLM long dans un thread dédié). Borne les threads et la mémoire qu'un
+# client authentifié peut accumuler en lançant des générations en rafale.
+_MAX_CONCURRENT = {"letter": 4, "cv": 4}
+
+
+def _running_count(kind: str) -> int:
+    with _JOBS_LOCK:
+        return sum(1 for j in _JOBS.values()
+                   if j.kind == kind and j.status == "running")
+
+
+def _too_many_running(kind: str) -> bool:
+    cap = _MAX_CONCURRENT.get(kind)
+    return bool(cap) and _running_count(kind) >= cap
 
 
 # Cap d'offres mises de côté renvoyées au front : déjà triées par score, on
@@ -1794,6 +1818,9 @@ class _Handler(BaseHTTPRequestHandler):
             max_words = max(80, min(1200, int(body.get("max_words", 350))))
         except (TypeError, ValueError):
             max_words = 350
+        if _too_many_running("letter"):
+            self._error("Trop de générations de lettre en cours — réessayez dans un instant.", 429)
+            return
         job = _Job("letter")
         _register_job(job)
         threading.Thread(target=_run_letter,
@@ -2055,6 +2082,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if not _cv_path(entry.get("filename", "")).is_file():
             self._error("Le fichier de ce CV n'existe plus.", 404)
+            return
+        if _too_many_running("cv"):
+            self._error("Trop d'analyses de CV en cours — réessayez dans un instant.", 429)
             return
         job = _Job("cv")
         _register_job(job)

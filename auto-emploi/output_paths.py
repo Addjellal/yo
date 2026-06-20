@@ -68,6 +68,11 @@ def find_output_file(name: str) -> Path | None:
     """Résout un nom de fichier nu (sans chemin) dans les sous-dossiers connus
     puis à la racine de output/ (anciens exports). None si introuvable."""
     name = Path(name).name  # défense en profondeur : jamais de chemin
+    # Dotfiles = état interne (.sessions.json, .cvs.json, .tracker.json) : jamais
+    # exposables au téléchargement, même par leur nom nu (le handler les refuse
+    # déjà, ceci ferme la porte au niveau de la résolution elle-même).
+    if name.startswith("."):
+        return None
     root = Path(config.output_dir).resolve()
     candidates = [root.joinpath(*parts, name) for parts in _SEARCH_SUBDIRS]
     candidates.append(root / name)

@@ -248,6 +248,106 @@ class TestCsvSafe(unittest.TestCase):
         from main import _csv_safe
         self.assertEqual(_csv_safe(None), "")
 
+    def test_espace_avant_formule_neutralise(self):
+        """Un tableur qui rogne les espaces de tête ne doit pas re-exposer
+        une formule cachée derrière un espace (« \\u00a0=cmd »)."""
+        from main import _csv_safe
+        self.assertTrue(_csv_safe("  =1+1").startswith("'"))
+        self.assertTrue(_csv_safe(" \t@SUM").startswith("'"))
+
+    def test_tabulation_interne_devient_espace(self):
+        from main import _csv_safe
+        self.assertEqual(_csv_safe("a\tb\tc"), "a b c")
+
+
+class TestSaveResultsEmpty(unittest.TestCase):
+    """save_results ne doit pas planter sur une liste d'offres vide (P5)."""
+
+    def test_export_vide_ecrit_entete_seul(self):
+        import os
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"OUTPUT_DIR": tmp}):
+                from config import config
+                old = config.output_dir
+                config.output_dir = tmp
+                try:
+                    from main import save_results
+                    _, csv_path = save_results([], "rien")
+                    content = csv_path.read_text(encoding="utf-8-sig").strip()
+                finally:
+                    config.output_dir = old
+        self.assertEqual(
+            content,
+            "titre;entreprise;lieu;contrat;salaire;source;score;correspondance;url",
+        )
+
+
+class TestMinScoreClamp(unittest.TestCase):
+    """_clean_criteria : min_score typé, borné 0–10, bool refusé (P4)."""
+
+    def test_bool_refuse(self):
+        from history import _clean_criteria
+        self.assertEqual(_clean_criteria({"min_score": True})["min_score"], 6)
+        self.assertEqual(_clean_criteria({"min_score": False})["min_score"], 6)
+
+    def test_borne_haut_et_bas(self):
+        from history import _clean_criteria
+        self.assertEqual(_clean_criteria({"min_score": 9999})["min_score"], 10)
+        self.assertEqual(_clean_criteria({"min_score": -5})["min_score"], 0)
+
+    def test_valeur_valide_conservee(self):
+        from history import _clean_criteria
+        self.assertEqual(_clean_criteria({"min_score": 7})["min_score"], 7)
+
+    def test_non_entier_donne_defaut(self):
+        from history import _clean_criteria
+        self.assertEqual(_clean_criteria({"min_score": "8"})["min_score"], 6)
+
+
+class TestIndeedBalancedObject(unittest.TestCase):
+    """Extraction du bundle mosaic Indeed par accolades équilibrées (Sc1)."""
+
+    def test_objet_pretty_printed_complet(self):
+        import json
+        from job_scrapers.indeed import _balanced_object
+        # '}' suivi d'un saut de ligne EN INTERNE : l'ancienne regex tronquait ici.
+        html = ('window.x = {\n  "meta": {\n    "c": 1\n  },\n'
+                '  "results": [1, 2, 3]\n}\n;tail')
+        data = json.loads(_balanced_object(html, html.index("=")))
+        self.assertEqual(data, {"meta": {"c": 1}, "results": [1, 2, 3]})
+
+    def test_accolade_dans_chaine_ignoree(self):
+        import json
+        from job_scrapers.indeed import _balanced_object
+        html = 'z = {"title": "Dev } H/F", "n": 5};'
+        self.assertEqual(json.loads(_balanced_object(html, 0)),
+                         {"title": "Dev } H/F", "n": 5})
+
+    def test_absence_dobjet_donne_none(self):
+        from job_scrapers.indeed import _balanced_object
+        self.assertIsNone(_balanced_object("aucune accolade", 0))
+
+
+class TestCleanLineStripHtml(unittest.TestCase):
+    """Champs mono-ligne d'une offre : HTML retiré, rendu inerte (Sc3)."""
+
+    def test_balise_script_retiree(self):
+        from job_scrapers.base import _clean_line
+        out = _clean_line("<script>alert(1)</script>Dev", 300)
+        self.assertNotIn("<", out)
+        self.assertNotIn("script", out.lower())
+        self.assertIn("Dev", out)
+
+    def test_entites_decodees(self):
+        from job_scrapers.base import _clean_line
+        self.assertEqual(_clean_line("Smith &amp; Co", 300), "Smith & Co")
+
+    def test_texte_simple_inchange(self):
+        from job_scrapers.base import _clean_line
+        self.assertEqual(_clean_line("Développeur Python", 300), "Développeur Python")
+
 
 class TestLetterFileName(unittest.TestCase):
     """Nom de fichier d'une lettre : accents translittérés (é → e), pas
@@ -491,6 +591,26 @@ class TestOutputPaths(unittest.TestCase):
         # Tout chemin est réduit à son nom nu : pas de traversée possible
         self.assertIsNone(find_output_file("../../etc/passwd"))
         self.assertIsNone(find_output_file("/etc/passwd"))
+
+    def test_find_refuse_dotfiles(self):
+        """État interne jamais exposable au téléchargement, même par nom nu (P1)."""
+        import os
+        import tempfile
+        from unittest import mock
+        from config import config
+        with tempfile.TemporaryDirectory() as tmp:
+            # Crée de vrais fichiers d'état pour prouver qu'ils restent introuvables
+            for name in (".sessions.json", ".cvs.json", ".tracker.json", ".env"):
+                (Path(tmp) / name).write_text("secret")
+            with mock.patch.dict(os.environ, {"OUTPUT_DIR": tmp}):
+                old = config.output_dir
+                config.output_dir = tmp
+                try:
+                    from output_paths import find_output_file
+                    for name in (".sessions.json", ".cvs.json", ".tracker.json", ".env"):
+                        self.assertIsNone(find_output_file(name), name)
+                finally:
+                    config.output_dir = old
 
     def test_migration_anciens_fichiers(self):
         import tempfile

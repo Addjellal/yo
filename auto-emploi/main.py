@@ -1012,11 +1012,14 @@ def generate_letters(offers: list[JobOffer], generator: CoverLetterGenerator,
 def _csv_safe(value) -> str:
     """Neutralise l'injection de formules : Excel/Sheets exécutent les cellules
     commençant par = + - @ (et | % sur certaines suites comme WPS). On neutralise
-    aussi les sauts de ligne internes, qui pourraient injecter une fausse ligne CSV
-    depuis un titre d'offre hostile."""
+    aussi les caractères de contrôle internes (\\r \\n \\t), qui pourraient injecter
+    une fausse ligne/colonne CSV depuis un titre d'offre hostile."""
     s = str(value) if value is not None else ""
-    s = s.replace("\r", " ").replace("\n", " ")
-    if s and s[0] in ("=", "+", "-", "@", "\t", "|", "%"):
+    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    # Test sur le premier caractère NON blanc : un tableur qui rogne les espaces
+    # de tête ne doit pas re-exposer une formule (« =cmd » caché derrière un espace).
+    stripped = s.lstrip()
+    if stripped and stripped[0] in ("=", "+", "-", "@", "|", "%"):
         return "'" + s
     return s
 
@@ -1039,6 +1042,10 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     json_path = out / f"resultats_{safe_query}.json"
     csv_path = out / f"resultats_{safe_query}.csv"
 
+    # Colonnes statiques : l'écriture reste correcte même si `offers` est vide
+    # (en-tête seul), sans dépendre de rows[0].
+    fieldnames = ["titre", "entreprise", "lieu", "contrat", "salaire",
+                  "source", "score", "correspondance", "url"]
     rows = [
         {
             "titre": o.title,
@@ -1057,7 +1064,7 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys(), delimiter=";")
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
         writer.writeheader()
         writer.writerows([{k: _csv_safe(v) for k, v in row.items()} for row in rows])
 

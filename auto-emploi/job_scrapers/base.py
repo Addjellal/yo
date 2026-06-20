@@ -21,10 +21,14 @@ _LIMITS = {
 
 
 def _clean_line(value: Optional[str], limit: int) -> str:
-    """Champ mono-ligne : caractères de contrôle supprimés, espaces normalisés."""
+    """Champ mono-ligne : HTML résiduel retiré, caractères de contrôle supprimés,
+    espaces normalisés. Le strip HTML est une défense en profondeur — le rendu web
+    passe déjà par textContent, mais aucun titre/entreprise ne doit charrier de
+    balise (titre `<script>…` hostile rendu inerte et propre)."""
     if not value:
         return ""
-    value = _CTRL_RE.sub("", str(value).replace("\n", " ").replace("\t", " "))
+    value = strip_html(str(value))
+    value = _CTRL_RE.sub("", value.replace("\n", " ").replace("\t", " "))
     return _WS_RE.sub(" ", value).strip()[:limit]
 
 
