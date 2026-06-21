@@ -1363,7 +1363,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _auth_ok(self) -> bool:
         token = self.headers.get("X-Auth-Token") or ""
-        return secrets.compare_digest(token, AUTH_TOKEN)
+        return secrets.compare_digest(token.encode(), AUTH_TOKEN.encode())
 
     def _send(self, status: int, content_type: str, body: bytes,
               download_name: str = "", close: bool = False) -> None:
@@ -1378,6 +1378,8 @@ class _Handler(BaseHTTPRequestHandler):
             "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         )
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
         if download_name:
             self.send_header("Content-Disposition", f'attachment; filename="{download_name}"')
         if close:
@@ -1894,6 +1896,9 @@ class _Handler(BaseHTTPRequestHandler):
         if target is None or not target.exists():
             self._error("Fichier introuvable", 404)
             return
+        if not str(target.resolve()).startswith(str(letters_dir().resolve())):
+            self._error("Fichier non trouvé.", 404)
+            return
         content = target.read_text(encoding="utf-8", errors="replace")
         self._json(_parse_letter_file(content))
 
@@ -1917,6 +1922,10 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 self._error("Fichier introuvable", 404)
                 return
+        # Ensure we only write files that belong to the letters directory
+        if txt_path.resolve().parent != letters_dir().resolve():
+            self._error("Fichier non trouvé dans le répertoire des lettres.", 404)
+            return
         letter = str(body.get("letter", "")).strip()[:20000]
         if not letter:
             self._error("Lettre vide")
@@ -1995,6 +2004,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Requête invalide")
             return
         key = str(body.get("key", ""))[:600]
+        if not key or not re.fullmatch(r"[^\r\n\x00]{1,600}", key):
+            self._error("Clé invalide.", 400)
+            return
         status = str(body.get("status", ""))
         try:
             with _TRACKER_LOCK:
@@ -2054,7 +2066,22 @@ class _Handler(BaseHTTPRequestHandler):
         if target.name.lower() in EXCLUDED_FILENAMES:
             self._error("Ce nom de fichier est réservé — renommez votre CV.")
             return
-        target.write_bytes(data)
+        import tempfile, os
+        fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".tmp_cv_")
+        try:
+            os.write(fd, data)
+            os.close(fd)
+            os.replace(tmp, target)
+        except Exception:
+            try:
+                os.close(fd)
+            except Exception:
+                pass
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+            raise
         with _CV_LOCK:
             entry = _get_cv_store().register(target.name)
         # Analyse IA lancée dès l'import : le profil structuré apparaît dans
@@ -2270,6 +2297,19 @@ def run(port: int = 8765, open_browser: bool = True) -> None:
     url = f"http://127.0.0.1:{port}/"
     print(f"\n  Auto Emploi — interface web : {url}")
     print("  (accessible uniquement depuis cet ordinateur — Ctrl+C pour arrêter)\n")
+    def _reaper():
+        while True:
+            import time as _t
+            _t.sleep(300)  # check every 5 minutes
+            now = _t.time()
+            with _JOBS_LOCK:
+                for jid, job in list(_JOBS.items()):
+                    if (job.status == "running"
+                            and (now - job.created) > _JOB_RUNNING_TTL):
+                        job.status = "error"
+                        job.error = "Tâche expirée (TTL dépassé)."
+
+    threading.Thread(target=_reaper, daemon=True, name="job-reaper").start()
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

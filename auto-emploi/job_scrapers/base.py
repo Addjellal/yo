@@ -1,5 +1,7 @@
 import html as _html
+import random as _random
 import re
+import threading as _threading
 import time
 import urllib.parse
 from dataclasses import dataclass
@@ -114,6 +116,7 @@ RETRY_DELAYS = (2.0, 4.0, 8.0)
 # Dernier résultat réussi par (source, requête, lieu) — secours en mémoire si
 # l'API externe tombe en panne au scan suivant dans la même session.
 _RESULT_CACHE: dict[tuple[str, str, str], list["JobOffer"]] = {}
+_CACHE_LOCK = _threading.Lock()
 
 
 def fetch_with_retry(send: Callable[[], "object"], source: str,
@@ -145,14 +148,21 @@ def fetch_with_retry(send: Callable[[], "object"], source: str,
     raise last_error  # type: ignore[misc]
 
 
+def jitter_sleep(base: float) -> None:
+    """Sleep for `base` seconds plus up to 1 second of random jitter."""
+    time.sleep(max(0.5, base) + _random.uniform(0.0, 1.0))
+
+
 def cache_results(source: str, query: str, location: str,
                   offers: list["JobOffer"]) -> None:
     if offers:
-        _RESULT_CACHE[(source, query.lower().strip(), location.lower().strip())] = list(offers)
+        with _CACHE_LOCK:
+            _RESULT_CACHE[(source, query.lower().strip(), location.lower().strip())] = list(offers)
 
 
 def cached_results(source: str, query: str, location: str) -> list["JobOffer"] | None:
-    return _RESULT_CACHE.get((source, query.lower().strip(), location.lower().strip()))
+    with _CACHE_LOCK:
+        return _RESULT_CACHE.get((source, query.lower().strip(), location.lower().strip()))
 
 
 def safe_url(value: Optional[str], limit: int = 2000) -> str:

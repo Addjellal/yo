@@ -28,11 +28,14 @@ Schema:
     }
 """
 import json
+import logging as _log_module
 import os
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
+
+_LOG = _log_module.getLogger(__name__)
 
 from job_scrapers.base import JobOffer
 
@@ -61,11 +64,12 @@ class Tracker:
             return data
         except (json.JSONDecodeError, OSError, ValueError):
             # Fichier corrompu : on le met de côté plutôt que d'écraser l'historique
+            bak = self.path.with_suffix(".json.corrupt")
             try:
-                backup = self.path.with_suffix(".json.corrupt")
-                self.path.replace(backup)
+                self.path.replace(bak)
             except OSError:
                 pass
+            _LOG.warning("Store JSON corrompu, réinitialisé : %s (sauvegardé en %s)", self.path, bak)
             return {"offers": {}}
 
     def _save(self) -> None:

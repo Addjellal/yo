@@ -12,7 +12,7 @@ from rich.markup import escape
 
 from .base import (
     BaseScraper, JobOffer, MAX_RESPONSE_BYTES,
-    fetch_with_retry, cache_results, cached_results,
+    fetch_with_retry, cache_results, cached_results, jitter_sleep,
 )
 from config import config
 from app_utils import console
@@ -47,6 +47,7 @@ class AdzunaScraper(BaseScraper):
             raise ValueError(f"ne couvre pas le pays sélectionné ({config.country})")
 
         offers: list[JobOffer] = []
+        seen: set[str] = set()
         page = 1
         page_size = min(50, max_results)
         session = requests.Session()
@@ -103,7 +104,8 @@ class AdzunaScraper(BaseScraper):
 
             for item in results:
                 job = self._parse_item(item)
-                if job:
+                if job and job.unique_key() not in seen:
+                    seen.add(job.unique_key())
                     offers.append(job)
                 if len(offers) >= max_results:
                     break
@@ -111,7 +113,7 @@ class AdzunaScraper(BaseScraper):
             if len(results) < page_size:
                 break
             page += 1
-            time.sleep(config.request_delay)
+            jitter_sleep(config.request_delay)
 
         cache_results("Adzuna", query, location, offers)
         return offers

@@ -30,11 +30,14 @@ Schéma :
     }
 """
 import json
+import logging as _log_module
 import os
 import secrets
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+_LOG = _log_module.getLogger(__name__)
 
 from job_scrapers.base import JobOffer
 
@@ -143,10 +146,12 @@ class SessionStore:
                 raise ValueError("structure inattendue")
             return data
         except (json.JSONDecodeError, OSError, ValueError):
+            bak = self.path.with_suffix(".json.corrupt")
             try:
-                self.path.replace(self.path.with_suffix(".json.corrupt"))
+                self.path.replace(bak)
             except OSError:
                 pass
+            _LOG.warning("Store JSON corrompu, réinitialisé : %s (sauvegardé en %s)", self.path, bak)
             return empty
 
     def _save(self) -> None:

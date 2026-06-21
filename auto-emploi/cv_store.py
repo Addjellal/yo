@@ -26,11 +26,14 @@ Une section présente dans "overrides" prime sur "profile" pour tous les
 usages (matching, lettres) — c'est la garantie « le manuel gagne ».
 """
 import json
+import logging as _log_module
 import os
 import secrets
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+_LOG = _log_module.getLogger(__name__)
 
 _MAX_CVS = 100
 _MAX_STORE_BYTES = 20 * 1024 * 1024
@@ -179,10 +182,12 @@ class CVStore:
                 raise ValueError("structure inattendue")
             return data
         except (json.JSONDecodeError, OSError, ValueError):
+            bak = self.path.with_suffix(".json.corrupt")
             try:
-                self.path.replace(self.path.with_suffix(".json.corrupt"))
+                self.path.replace(bak)
             except OSError:
                 pass
+            _LOG.warning("Store JSON corrompu, réinitialisé : %s (sauvegardé en %s)", self.path, bak)
             return empty
 
     def _save(self) -> None:

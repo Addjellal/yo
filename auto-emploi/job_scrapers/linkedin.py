@@ -13,7 +13,7 @@ import re
 import time
 import urllib.parse
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
 from config import config
 
 GUEST_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -25,7 +25,7 @@ MAX_GUEST_START = 200  # plafond pagination mode invité
 _LOGGED_IN_WARNED = False
 
 _HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
 }
 
@@ -84,7 +84,7 @@ class LinkedInScraper(BaseScraper):
             if added == 0:
                 break
             start += 25
-            time.sleep(config.request_delay)
+            jitter_sleep(config.request_delay)
 
         return offers
 
@@ -234,7 +234,7 @@ class LinkedInScraper(BaseScraper):
             if len(cards) < 25:
                 break
             start += 25
-            time.sleep(config.request_delay)
+            jitter_sleep(config.request_delay)
 
         return offers
 

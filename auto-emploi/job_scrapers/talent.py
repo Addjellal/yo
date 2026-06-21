@@ -16,7 +16,7 @@ import urllib.parse
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
 from config import config
 from app_utils import console
 
@@ -24,7 +24,7 @@ MAX_PAGES = 20
 PAGE_SIZE_HINT = 10  # talent.com sert ~10 offres/page
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
@@ -121,7 +121,7 @@ class TalentScraper(BaseScraper):
                 if len(offers) == before or len(page_jobs) < PAGE_SIZE_HINT:
                     break
                 page += 1
-                time.sleep(config.request_delay)
+                jitter_sleep(config.request_delay)
         finally:
             browser.close()
 
@@ -232,8 +232,9 @@ class TalentScraper(BaseScraper):
                     salary = f"{mn or mx} {cur}"
 
             uid = job_id or f"{title}|{company}"
+            import hashlib
             return JobOffer(
-                id=f"talent_{job_id or abs(hash(uid)) % 10**12}",
+                id=f"talent_{job_id or int(hashlib.md5(uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
                 title=title, company=company, location=location,
                 description=description, url=url, apply_url=apply_url,
                 source=self.source_name, salary=salary,
@@ -298,8 +299,9 @@ class TalentScraper(BaseScraper):
             posted = str(item.get("datePosted") or "")[:10] or None
 
             uid = url or f"{title}|{company}"
+            import hashlib
             return JobOffer(
-                id=f"talent_{abs(hash(uid)) % 10**12}",
+                id=f"talent_{int(hashlib.md5(uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
                 title=title, company=str(company).strip(), location=loc,
                 description=description, url=url, apply_url=url,
                 source=self.source_name, salary=salary,
@@ -370,8 +372,10 @@ class TalentScraper(BaseScraper):
                 if key in seen:
                     continue
                 seen.add(key)
+                import hashlib
+                _uid = href or key
                 offers.append(JobOffer(
-                    id=f"talent_{abs(hash(href or key)) % 10**12}",
+                    id=f"talent_{int(hashlib.md5(_uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
                     title=title, company=company, location=location,
                     description=description, url=href, apply_url=href,
                     source=self.source_name,

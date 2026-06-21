@@ -1,7 +1,7 @@
 import time
 import requests
 from rich.markup import escape
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
 from config import config
 from app_utils import console
 
@@ -101,7 +101,7 @@ class FranceTravailScraper(BaseScraper):
                 if len(results) < (last - start + 1):
                     break
                 start = last + 1
-                time.sleep(config.request_delay)
+                jitter_sleep(config.request_delay)
         except (requests.RequestException, ValueError) as e:
             # Erreur côté France Travail (réseau, auth, JSON) : on dégrade
             # proprement comme les autres sources plutôt que de crasher le scan.
@@ -115,6 +115,8 @@ class FranceTravailScraper(BaseScraper):
     def _parse_item(self, item: dict, location: str) -> JobOffer | None:
         try:
             offer_id = item.get("id", "")
+            if not offer_id:
+                return None
             lieu = item.get("lieuTravail")
             lieu = lieu if isinstance(lieu, dict) else {}
             entreprise = item.get("entreprise")

@@ -3,7 +3,7 @@
    (jamais innerHTML) — une offre hostile ne peut pas exécuter de script ici. */
 "use strict";
 
-const TOKEN = document.querySelector('meta[name="auth-token"]').content;
+const TOKEN = document.querySelector('meta[name="auth-token"]')?.content ?? "";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -61,8 +61,6 @@ async function downloadFile(file) {
 const _TOAST_MAX = 4;
 function toast(message, kind = "") {
   const box = $("#toasts");
-  // Erreurs annoncées sans attendre (assertive) ; le reste poliment.
-  box.setAttribute("aria-live", kind === "err" ? "assertive" : "polite");
   const node = el("div", { class: `toast ${kind}` }, [
     el("span", { class: "toast-msg", text: message }),
     el("button", { class: "toast-close", "aria-label": "Fermer", text: "✕" }),
@@ -649,8 +647,7 @@ function rebuildCvChips() {
     return;
   }
   // Sélection mémorisée (migration depuis l'ancien stockage mono-CV)
-  let saved = [];
-  try { saved = JSON.parse(localStorage.getItem("cvs") || "[]"); } catch { saved = []; }
+  let saved = lsGetJSON("cvs", []);
   const legacy = localStorage.getItem("cv");
   if (!saved.length && legacy) saved = [legacy];
   const names = CVS.map((c) => c.filename);
@@ -810,9 +807,7 @@ function pushHistory(query) {
 // ─── Mémoire des sources de la dernière session (localStorage) ───────────────
 
 function saveLastSources() {
-  try {
-    localStorage.setItem("sources", JSON.stringify([...SELECTED.sources]));
-  } catch { /* localStorage indisponible (navigation privée) : on ignore */ }
+  lsSet("sources", JSON.stringify([...SELECTED.sources]));
 }
 
 // Restaure la sélection de sources du dernier scan, en ne gardant que les
@@ -1200,21 +1195,29 @@ $("#btn-rescore").addEventListener("click", async () => {
   pollScan(nextPollGen());
 });
 
-function pollScan(gen = POLL_GEN) {
+function pollScan(gen = POLL_GEN, iter = 0) {
   clearTimeout(POLL_TIMER);
   POLL_TIMER = setTimeout(async () => {
     if (gen !== POLL_GEN) return;  // un scan/vérif plus récent a pris la main
+    iter++;
+    if (iter > 7200) { // 7200 * ~1.5s avg ≈ 3 hours max
+      toast("La recherche semble bloquée — rechargez la page si nécessaire.", "err");
+      $("#btn-scan").disabled = false;
+      $("#btn-scan-stop").disabled = true;
+      return;
+    }
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(SCAN_JOB)}`);
     } catch (e) {
       $("#btn-scan").disabled = false;
+      $("#btn-scan-stop").disabled = true;
       toast("Suivi du scan perdu : " + e.message, "err");
       return;
     }
     if (gen !== POLL_GEN) return;
     renderLog(job.log);
-    if (job.status === "running") { pollScan(gen); return; }
+    if (job.status === "running") { pollScan(gen, iter); return; }
     // Terminé : on arrête le spinner et on fige le titre (sinon l'UI semble
     // « tourner encore » alors que le scan est fini, surtout si 0 offre).
     $("#btn-scan").disabled = false;
@@ -1611,15 +1614,21 @@ async function checkAvailability() {
   pollCheck(out.job_id, nextPollGen());
 }
 
-function pollCheck(jobId, gen) {
+function pollCheck(jobId, gen, iter = 0) {
   setTimeout(async () => {
     if (gen !== POLL_GEN) return;  // un scan/vérif plus récent a pris la main
+    iter++;
+    if (iter > 7200) { // 7200 * ~1.5s avg ≈ 3 hours max
+      toast("La recherche semble bloquée — rechargez la page si nécessaire.", "err");
+      $("#btn-check-avail").disabled = false;
+      return;
+    }
     let job;
     try { job = await api(`/api/job?id=${encodeURIComponent(jobId)}`); }
     catch (e) { $("#btn-check-avail").disabled = false; toast("Suivi perdu : " + e.message, "err"); return; }
     if (gen !== POLL_GEN) return;
     renderLog(job.log);
-    if (job.status === "running") { pollCheck(jobId, gen); return; }
+    if (job.status === "running") { pollCheck(jobId, gen, iter); return; }
     $("#btn-check-avail").disabled = false;
     const sp = $("#scan-progress .spinner"); if (sp) sp.style.display = "none";
     $("#progress-title").textContent = "Vérification terminée";
@@ -1847,7 +1856,7 @@ function pollLetter(jobId) {
       const lang = r.language === "en" ? " (offre en anglais → version EN)" : "";
       toast(`${kind} généré${lang} — éditez-la si besoin. L'offre n'est PAS marquée postulée : choisissez son statut quand vous aurez candidaté.`, "ok");
     }
-  }, 900);
+  }, pollDelay());
 }
 
 // Édition de la lettre : réécrit le .txt et le .pdf, sans appel IA.
@@ -2013,6 +2022,7 @@ async function loadSession(id, target = "search") {
     panel.hidden = false;
     panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } else {
+    nextPollGen();
     SCAN_JOB = out.job_id;
     OFFERS = offers;
     switchTab("search");

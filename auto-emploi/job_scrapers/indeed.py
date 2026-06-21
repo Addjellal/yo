@@ -21,14 +21,14 @@ except ImportError:
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES
+from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
 from config import config
 
 MAX_RSS_START = 500        # plafond pagination RSS (~50 pages de 10)
 MAX_BROWSER_START = 300    # plafond pagination Playwright (~20 pages de 15)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
     "Accept-Language": "fr-FR,fr;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
@@ -140,7 +140,7 @@ class IndeedScraper(BaseScraper):
             if len(offers) == before or len(items) < 10:
                 break
             start += 10
-            time.sleep(config.request_delay)
+            jitter_sleep(config.request_delay)
 
         return offers
 
@@ -234,7 +234,7 @@ class IndeedScraper(BaseScraper):
                     if len(offers) == before or len(jobs_raw) < 15:
                         break
                     start += len(jobs_raw)
-                    time.sleep(config.request_delay)
+                    jitter_sleep(config.request_delay)
                     continue
 
                 # Essai 2 : parsing HTML des cartes
@@ -250,7 +250,7 @@ class IndeedScraper(BaseScraper):
                 if len(offers) == before or len(cards) < 10:
                     break
                 start += len(cards)
-                time.sleep(config.request_delay)
+                jitter_sleep(config.request_delay)
 
         return offers
 
