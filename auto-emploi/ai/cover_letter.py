@@ -600,6 +600,13 @@ class CoverLetterGenerator:
         out_dir = letters_dir().resolve()
         txt_path = out_dir / f"{safe_name}.txt"
         pdf_path = out_dir / f"{safe_name}.pdf"
+        # Si un fichier du même nom existe déjà (regénération), on ajoute un
+        # horodatage pour ne pas écraser la lettre précédente.
+        if txt_path.exists():
+            import datetime as _dt
+            stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+            txt_path = out_dir / f"{safe_name}_{stamp}.txt"
+            pdf_path = out_dir / f"{safe_name}_{stamp}.pdf"
 
         email_block = ""
         if result.get("email_subject") or result.get("email_body"):

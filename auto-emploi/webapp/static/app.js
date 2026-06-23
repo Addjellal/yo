@@ -1668,16 +1668,42 @@ let LETTER_JOB = null;     // job portant l'offre (scan courant ou session d'his
 let LETTER_PREVIEW_FILE = null;  // nom du fichier txt en mode aperçu (depuis onglet Lettres)
 
 function openLetterModal(offer, applyStatus, jobId) {
+  const offerKey = `${offer.title}|${offer.company}`;
   LETTER_OFFER = offer;
   LETTER_APPLY_STATUS = applyStatus;
   LETTER_JOB = jobId || SCAN_JOB;
   LETTER_PREVIEW_FILE = null;
   $("#modal-title").textContent = `Candidature — ${offer.title} · ${offer.company}`;
-  $("#btn-generate-letter").textContent = "Générer";
-  // État sain à chaque ouverture : si une génération précédente a été abandonnée
-  // (modale fermée en cours), on réactive le bouton et on libère le verrou.
-  $("#btn-generate-letter").disabled = false;
+
+  // Reprise : même offre, génération toujours en cours côté serveur
+  if (LETTER_CUR_OFFER_KEY === offerKey && LETTER_BUSY && LETTER_CUR_JOB_ID) {
+    $("#btn-generate-letter").disabled = true;
+    $("#letter-config").hidden = true;
+    $("#letter-loading").hidden = false;
+    $("#letter-result").hidden = true;
+    openModal($("#modal-overlay"), { onClose: _resetLetterModal });
+    pollLetter(LETTER_CUR_JOB_ID);
+    return;
+  }
+
+  // Résultat en cache : même offre, génération terminée → afficher directement
+  if (LETTER_CUR_OFFER_KEY === offerKey && LETTER_CUR_RESULT) {
+    LETTER_BUSY = false;
+    $("#btn-generate-letter").disabled = false;
+    $("#letter-config").hidden = true;
+    $("#letter-loading").hidden = true;
+    _applyLetterResult(LETTER_CUR_RESULT);
+    openModal($("#modal-overlay"), { onClose: _resetLetterModal });
+    return;
+  }
+
+  // Nouvelle offre ou état réinitialisé → afficher la configuration
+  LETTER_CUR_OFFER_KEY = offerKey;
+  LETTER_CUR_JOB_ID = null;
+  LETTER_CUR_RESULT = null;
   LETTER_BUSY = false;
+  $("#btn-generate-letter").textContent = "Générer";
+  $("#btn-generate-letter").disabled = false;
   $("#letter-config").hidden = false;
   $("#letter-loading").hidden = true;
   $("#letter-result").hidden = true;
@@ -1769,6 +1795,55 @@ if (maxWordsInput) {
 }
 
 let LETTER_BUSY = false;
+let LETTER_CUR_JOB_ID = null;    // ID du job lettre actif (en cours ou terminé)
+let LETTER_CUR_OFFER_KEY = null;  // clé de l'offre associée (titre|entreprise)
+let LETTER_CUR_RESULT = null;     // résultat mis en cache à la fin du poll
+
+// Affiche le résultat d'une génération dans la modale (factorisé pour la reprise).
+function _applyLetterResult(r) {
+  const notes = Array.isArray(r.review_notes) ? r.review_notes : [];
+  const notesBox = $("#letter-notes");
+  const notesList = $("#letter-notes-list");
+  notesList.textContent = "";
+  if (notes.length) {
+    notes.forEach((n) => {
+      const li = document.createElement("li");
+      li.textContent = String(n);
+      notesList.appendChild(li);
+    });
+    notesBox.hidden = false;
+  } else {
+    notesBox.hidden = true;
+  }
+  $("#letter-subject").textContent = r.email_subject || "—";
+  $("#letter-email").textContent = r.email_body || "—";
+  $("#letter-body").value = r.letter;
+  $("#letter-dl-txt").dataset.file = r.txt_file;
+  if (r.pdf_file) {
+    $("#letter-dl-pdf").hidden = false;
+    $("#letter-dl-pdf").dataset.file = r.pdf_file;
+  } else {
+    $("#letter-dl-pdf").hidden = true;
+  }
+  // Bouton "Régénérer" — ajouté dynamiquement la première fois
+  if (!document.getElementById("btn-regen-letter")) {
+    const regenBtn = el("button", { id: "btn-regen-letter", class: "btn-secondary",
+      text: "← Modifier les spécificités / Régénérer" });
+    regenBtn.addEventListener("click", () => {
+      LETTER_CUR_RESULT = null;
+      LETTER_CUR_JOB_ID = null;
+      LETTER_BUSY = false;
+      $("#btn-generate-letter").disabled = false;
+      $("#letter-result").hidden = true;
+      if (notesBox) notesBox.hidden = true;
+      $("#letter-config").hidden = false;
+    });
+    const resultEl = $("#letter-result");
+    resultEl.insertBefore(regenBtn, resultEl.firstChild);
+  }
+  $("#letter-result").hidden = false;
+}
+
 $("#btn-generate-letter").addEventListener("click", async () => {
   if (LETTER_BUSY) return;                 // anti double-clic (appel LLM de 15–30 s)
   LETTER_BUSY = true;
@@ -1793,14 +1868,17 @@ $("#btn-generate-letter").addEventListener("click", async () => {
     toast(e.message, "err");
     return;
   }
+  LETTER_CUR_JOB_ID = out.job_id;
+  LETTER_CUR_RESULT = null;  // nouvelle génération, invalide le cache précédent
   pollLetter(out.job_id);
 });
 
 function pollLetter(jobId) {
   setTimeout(async () => {
-    // Modale fermée pendant la génération : on cesse de sonder (la lettre se
-    // termine côté serveur et reste dans l'onglet Lettres). Libère le verrou.
-    if ($("#modal-overlay").hidden) { LETTER_BUSY = false; return; }
+    // Modale fermée pendant la génération : on suspend le poll sans libérer le
+    // verrou — la génération continue côté serveur et le poll reprendra quand
+    // l'utilisateur rouvrira la modale pour la même offre.
+    if ($("#modal-overlay").hidden) { return; }
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
@@ -1815,44 +1893,18 @@ function pollLetter(jobId) {
     LETTER_BUSY = false; $("#btn-generate-letter").disabled = false;
     $("#letter-loading").hidden = true;
     if (job.status === "error") {
+      LETTER_CUR_RESULT = null;
       $("#letter-config").hidden = false;
       toast("Génération échouée : " + (job.error || "erreur"), "err");
       return;
     }
     const r = job.result;
-    const notes = Array.isArray(r.review_notes) ? r.review_notes : [];
-    const notesBox = $("#letter-notes");
-    const notesList = $("#letter-notes-list");
-    notesList.textContent = "";
-    if (notes.length) {
-      notes.forEach((n) => {
-        const li = document.createElement("li");
-        li.textContent = String(n);
-        notesList.appendChild(li);
-      });
-      notesBox.hidden = false;
-    } else {
-      notesBox.hidden = true;
-    }
-    $("#letter-subject").textContent = r.email_subject || "—";
-    $("#letter-email").textContent = r.email_body || "—";
-    $("#letter-body").value = r.letter;
-    $("#letter-dl-txt").dataset.file = r.txt_file;
-    if (r.pdf_file) {
-      $("#letter-dl-pdf").hidden = false;
-      $("#letter-dl-pdf").dataset.file = r.pdf_file;
-    } else {
-      $("#letter-dl-pdf").hidden = true;
-    }
-    $("#letter-result").hidden = false;
+    LETTER_CUR_RESULT = r;  // mise en cache pour réouverture
+    _applyLetterResult(r);
     const kind = r.doc_type === "message" ? "Message" : "Lettre";
     if (r.partial) {
-      // Texte interrompu : affiché pour édition, l'offre reste dans les résultats.
       toast(`⚠ Génération interrompue — ${kind.toLowerCase()} partiel récupéré, complétez-le puis enregistrez.`, "err");
     } else {
-      // Générer un texte ≠ postuler : on NE marque PAS l'offre « postulée ».
-      // L'offre reste dans les résultats ; l'utilisateur choisit lui-même le
-      // statut quand il a réellement candidaté. Le document est dans l'onglet Lettres.
       const lang = r.language === "en" ? " (offre en anglais → version EN)" : "";
       toast(`${kind} généré${lang} — éditez-la si besoin. L'offre n'est PAS marquée postulée : choisissez son statut quand vous aurez candidaté.`, "ok");
     }
