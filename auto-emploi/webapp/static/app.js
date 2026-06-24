@@ -1850,6 +1850,8 @@ $("#btn-generate-letter").addEventListener("click", async () => {
   $("#btn-generate-letter").disabled = true;
   $("#letter-config").hidden = true;
   $("#letter-loading").hidden = false;
+  const lt0 = $("#letter-loading-text");
+  if (lt0) lt0.textContent = "Rédaction en cours… (15–30 s)";
   const maxWords = parseInt($("#letter-maxwords").value, 10) || 350;
   let out;
   try {
@@ -1889,7 +1891,17 @@ function pollLetter(jobId) {
       toast(e.message, "err");
       return;
     }
-    if (job.status === "running") { pollLetter(jobId); return; }
+    if (job.status === "running") {
+      // Génération sérialisée côté serveur : en file d'attente derrière une autre.
+      const lt = $("#letter-loading-text");
+      if (lt) {
+        lt.textContent = job.queued
+          ? "En attente d'une autre génération en cours…"
+          : "Rédaction en cours… (15–30 s)";
+      }
+      pollLetter(jobId);
+      return;
+    }
     LETTER_BUSY = false; $("#btn-generate-letter").disabled = false;
     $("#letter-loading").hidden = true;
     if (job.status === "error") {

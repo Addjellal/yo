@@ -114,6 +114,7 @@ class _Job:
         self.id = uuid.uuid4().hex
         self.kind = kind                  # "scan" | "letter" | "cv"
         self.status = "running"           # running | done | error
+        self.queued = False               # en file d'attente derrière une autre génération
         self.error = ""
         self.log: list[str] = []
         self.offers: list[JobOffer] = []  # résultats d'un scan (retenus + mis de côté)
@@ -141,6 +142,9 @@ class _Job:
 _JOBS: dict[str, _Job] = {}
 _JOBS_LOCK = threading.Lock()
 _SCAN_LOCK = threading.Lock()      # un seul scan à la fois
+_GEN_LOCK = threading.Lock()       # génération (lettres + analyses CV) sérialisée :
+                                   # une seule à la fois, jamais en parallèle (économie
+                                   # de ressources LLM — les autres patientent en file).
 _TRACKER_LOCK = threading.Lock()   # sérialise les écritures du tracker
 
 _tracker: Tracker | None = None
@@ -213,9 +217,10 @@ def _get_job(job_id: str) -> _Job | None:
         return _JOBS.get(job_id)
 
 
-# Plafond de jobs simultanés par type coûteux (chaque lettre/analyse CV = un
-# appel LLM long dans un thread dédié). Borne les threads et la mémoire qu'un
-# client authentifié peut accumuler en lançant des générations en rafale.
+# Plafond de générations en vol par type (une en cours + les suivantes en file
+# derrière _GEN_LOCK). Les générations s'exécutent l'une après l'autre ; ce
+# plafond borne seulement la profondeur de la file qu'un client peut accumuler
+# en lançant des générations en rafale (threads + mémoire).
 _MAX_CONCURRENT = {"letter": 4, "cv": 4}
 
 
@@ -724,6 +729,14 @@ def _run_rescore(job: _Job, p: dict) -> None:
 
 def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
                 doc_type: str = "lettre", max_words: int = 350) -> None:
+    # Génération sérialisée : on patiente derrière toute lettre/analyse CV déjà
+    # en cours (économie de ressources LLM). Le flag `queued` signale au front
+    # que la génération est en file d'attente, pas encore démarrée. Sans
+    # contention, l'acquisition est immédiate et `queued` repasse à False avant
+    # tout sondage du client.
+    job.queued = True
+    _GEN_LOCK.acquire()
+    job.queued = False
     start = time.time()
     try:
         offer = scan_job.offers[index]
@@ -799,6 +812,8 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
         job.status = "error"
         _elapsed = _fmt_elapsed(time.time() - start)
         console.print(f"  [bold red]❌ Génération échouée[/] ({_elapsed}) : {escape(str(e)[:200])}\n")
+    finally:
+        _GEN_LOCK.release()
 
 
 # Vérification de disponibilité : requête HTTP légère par offre, AUCUN appel IA.
@@ -919,6 +934,11 @@ def _run_check(job: _Job, scan_job: _Job) -> None:
 
 def _run_cv_analyze(job: _Job, cv_id: str) -> None:
     """Extraction IA du profil structuré d'un CV (page « Mes CV »)."""
+    # Génération sérialisée derrière _GEN_LOCK (cf. _run_letter) : analyses CV et
+    # lettres ne tournent jamais en parallèle.
+    job.queued = True
+    _GEN_LOCK.acquire()
+    job.queued = False
     try:
         with _CV_LOCK:
             entry = _get_cv_store().get(cv_id)
@@ -942,6 +962,8 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
         job.error = str(e)[:500]
         job.status = "error"
         console.print(f"  [bold red]❌ Analyse CV échouée[/] : {escape(str(e)[:200])}\n")
+    finally:
+        _GEN_LOCK.release()
 
 
 # ─── Validation des paramètres de scan ───────────────────────────────────────
@@ -1673,6 +1695,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Job inconnu", 404)
             return
         payload: dict = {"status": job.status, "log": job.snapshot_log(), "kind": job.kind}
+        if job.status == "running" and job.queued:
+            payload["queued"] = True
         if job.status == "error":
             payload["error"] = job.error
         if job.status == "done" and job.kind == "scan":
@@ -1821,7 +1845,7 @@ class _Handler(BaseHTTPRequestHandler):
         except (TypeError, ValueError):
             max_words = 350
         if _too_many_running("letter"):
-            self._error("Trop de générations de lettre en cours — réessayez dans un instant.", 429)
+            self._error("Trop de lettres en file d'attente — patientez qu'une génération se termine.", 429)
             return
         job = _Job("letter")
         _register_job(job)
@@ -2111,7 +2135,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Le fichier de ce CV n'existe plus.", 404)
             return
         if _too_many_running("cv"):
-            self._error("Trop d'analyses de CV en cours — réessayez dans un instant.", 429)
+            self._error("Trop d'analyses de CV en file d'attente — patientez qu'une se termine.", 429)
             return
         job = _Job("cv")
         _register_job(job)

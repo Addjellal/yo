@@ -1384,5 +1384,46 @@ class TestLocationConfigs(unittest.TestCase):
         self.assertEqual(groups, {"fr": ["Rennes", "Nantes"], "de": ["Munich"]})
 
 
+class TestGenerationSerialisee(unittest.TestCase):
+    """La génération (lettres + analyses CV) est sérialisée par _GEN_LOCK :
+    jamais deux en parallèle, les suivantes patientent en file d'attente."""
+
+    def test_run_cv_analyze_attend_le_verrou(self):
+        import threading
+        import time as _t
+        import webapp.server as srv
+
+        # Store factice : get() renvoie None → _run_cv_analyze lève « CV
+        # introuvable », mais SEULEMENT après avoir acquis _GEN_LOCK.
+        class _DummyStore:
+            def get(self, _id):
+                return None
+
+        orig = srv._get_cv_store
+        srv._get_cv_store = lambda: _DummyStore()
+        try:
+            self.assertFalse(srv._GEN_LOCK.locked())
+            srv._GEN_LOCK.acquire()              # simule une génération en cours
+            job = srv._Job("cv")
+            try:
+                t = threading.Thread(
+                    target=srv._run_cv_analyze, args=(job, "inexistant"), daemon=True
+                )
+                t.start()
+                _t.sleep(0.1)
+                # Bloqué sur l'acquisition → marqué en file, statut toujours running.
+                self.assertEqual(job.status, "running")
+                self.assertTrue(job.queued)
+            finally:
+                srv._GEN_LOCK.release()          # libère : le thread peut démarrer
+            t.join(timeout=2.0)
+            self.assertFalse(t.is_alive())
+            self.assertFalse(job.queued)
+            self.assertEqual(job.status, "error")     # CV introuvable
+            self.assertFalse(srv._GEN_LOCK.locked())   # verrou toujours relâché (finally)
+        finally:
+            srv._get_cv_store = orig
+
+
 if __name__ == "__main__":
     unittest.main()
