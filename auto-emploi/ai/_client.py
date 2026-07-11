@@ -22,11 +22,14 @@ from app_utils import console
 
 TASKS = ("prescore", "match", "letter", "review")
 
-# Tâches d'analyse de masse (pré-scoring + analyse détaillée) : aucun plafond de
-# temps. Sur un modèle local lent, on préfère laisser l'analyse aller au bout
-# plutôt que de la couper (puis dégrader en scoring sans IA). Les tâches
-# interactives (lettres, relecture) gardent le garde-fou LLM_TIMEOUT.
+# Tâches d'analyse de masse (pré-scoring + analyse détaillée) : plafond très
+# large plutôt qu'aucun. Sur un modèle local lent, on laisse l'analyse aller
+# au bout — mais un plafond fini reste indispensable : un appel réellement
+# suspendu (connexion TCP morte, serveur figé) tiendrait sinon _SCAN_LOCK /
+# _GEN_LOCK pour toujours et bloquerait scans et générations jusqu'au
+# redémarrage. Les tâches interactives (lettres, relecture) gardent LLM_TIMEOUT.
 _UNBOUNDED_TASKS = ("prescore", "match")
+_SLOW_TASK_CEILING = 1800.0  # 30 min par appel : jamais atteint sauf blocage réel
 
 _BACKEND_ALIASES = {
     "local": "ollama", "ollama": "ollama",
@@ -144,25 +147,26 @@ class LLMClient:
         self.task = task if task in TASKS else "match"
         self._clients: dict[str, object] = {}
 
-    def _timeout(self) -> float | None:
-        """Délai max d'un appel LLM en secondes, ou None = aucun plafond.
-        - tâches d'analyse (prescore, match) → None : l'analyse va au bout ;
-        - autres tâches → LLM_TIMEOUT, où 0 signifie « désactivé »."""
+    def _timeout(self) -> float:
+        """Délai max d'un appel LLM en secondes — toujours fini : un appel
+        suspendu ne doit jamais tenir indéfiniment les verrous de scan ou de
+        génération. « Illimité » (tâches d'analyse, LLM_TIMEOUT=0) signifie en
+        réalité un plafond très large (_SLOW_TASK_CEILING)."""
         if self.task in _UNBOUNDED_TASKS:
-            return None
+            return _SLOW_TASK_CEILING
         try:
             seconds = float(config.llm_timeout)
         except (TypeError, ValueError):
             return 120.0
-        return seconds if seconds > 0 else None
+        return seconds if seconds > 0 else _SLOW_TASK_CEILING
 
     def _get(self, backend: str):
         if backend not in self._clients:
             timeout = self._timeout()
             if backend == "ollama":
                 import ollama
-                # timeout=None pour les analyses (pas de plafond) ; sinon un
-                # serveur Ollama bloqué ne doit pas figer une lettre.
+                # Plafond fini même pour les analyses : un serveur Ollama figé
+                # ne doit jamais bloquer indéfiniment un scan ou une lettre.
                 self._clients[backend] = ollama.Client(host=config.ollama_base_url, timeout=timeout)
             else:
                 import anthropic
@@ -234,7 +238,13 @@ class LLMClient:
             kwargs.pop("output_config", None)
             response = client.messages.create(**kwargs)
 
-        return next((b.text for b in response.content if b.type == "text"), "").strip()
+        text = next((b.text for b in response.content if b.type == "text"), "").strip()
+        if not text:
+            # Réponse sans bloc texte (refus, max_tokens épuisé…) : lever plutôt
+            # que renvoyer "" en silence — le retry/fallback existant s'enclenche
+            # au lieu de propager des scores nuls ou une lettre vide.
+            raise ValueError("réponse LLM vide (aucun bloc texte)")
+        return text
 
     # ─── Ollama ───────────────────────────────────────────────────────────────
 
@@ -255,7 +265,10 @@ class LLMClient:
         for attempt in range(3):
             try:
                 response = client.chat(**kwargs)
-                return response.message.content.strip()
+                text = (response.message.content or "").strip()
+                if not text:
+                    raise ValueError("réponse LLM vide")
+                return text
             except Exception as e:
                 last_err = e
                 # Modèle absent : choisir automatiquement le meilleur remplaçant

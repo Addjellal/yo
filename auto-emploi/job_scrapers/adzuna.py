@@ -5,7 +5,6 @@ API gratuite (1 000 appels/mois) : https://developer.adzuna.com
 Inscription rapide, sans carte bancaire.
 """
 import re
-import time
 import requests
 
 from rich.markup import escape
@@ -13,6 +12,7 @@ from rich.markup import escape
 from .base import (
     BaseScraper, JobOffer, MAX_RESPONSE_BYTES,
     fetch_with_retry, cache_results, cached_results, jitter_sleep,
+    log_parse_error,
 )
 from config import config
 from app_utils import console
@@ -55,65 +55,72 @@ class AdzunaScraper(BaseScraper):
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
-        while len(offers) < max_results and page <= MAX_PAGES:
-            params: dict = {
-                "app_id": config.adzuna_app_id,
-                "app_key": config.adzuna_app_key,
-                "results_per_page": page_size,
-                "what": query,
-                "sort_by": "date",
-                "content-type": "application/json",
-            }
-            if location:
-                params["where"] = location
+        try:
+            while len(offers) < max_results and page <= MAX_PAGES:
+                params: dict = {
+                    "app_id": config.adzuna_app_id,
+                    "app_key": config.adzuna_app_key,
+                    "results_per_page": page_size,
+                    "what": query,
+                    "sort_by": "date",
+                    "content-type": "application/json",
+                }
+                if location:
+                    params["where"] = location
 
-            try:
-                resp = fetch_with_retry(
-                    lambda: session.get(
-                        API_URL.format(country=country, page=page),
-                        params=params,
-                        timeout=15,
-                    ),
-                    source="Adzuna",
-                    log=lambda m: console.print(f"[dim]{escape(_redact(m))}[/dim]"),
-                )
-                resp.raise_for_status()
-                if len(resp.content) > MAX_RESPONSE_BYTES:
-                    console.print("[yellow][Adzuna] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                try:
+                    # Valeurs capturées par défauts d'arguments : les retries de
+                    # fetch_with_retry rejouent exactement cette page-là, même si
+                    # la boucle évoluait entre-temps (pas de late-binding).
+                    resp = fetch_with_retry(
+                        lambda u=API_URL.format(country=country, page=page),
+                               p=dict(params): session.get(u, params=p, timeout=15),
+                        source="Adzuna",
+                        log=lambda m: console.print(f"[dim]{escape(_redact(m))}[/dim]"),
+                    )
+                    resp.raise_for_status()
+                    if len(resp.content) > MAX_RESPONSE_BYTES:
+                        console.print("[yellow][Adzuna] Réponse anormalement volumineuse, ignorée.[/yellow]")
+                        break
+                    data = resp.json()
+                except requests.RequestException as e:
+                    # Erreur externe (503 fréquent côté Adzuna) : message clair +
+                    # secours sur le dernier résultat réussi de la session.
+                    console.print(
+                        f"[yellow][Adzuna] L'API Adzuna ne répond pas malgré 4 tentatives "
+                        f"({escape(_redact(e))}) — erreur côté Adzuna, réessayez plus tard.[/yellow]"
+                    )
+                    cached = cached_results("Adzuna", query, location)
+                    if cached and not offers:
+                        console.print(f"[dim][Adzuna] Réutilisation du dernier résultat en mémoire ({len(cached)} offres).[/dim]")
+                        return list(cached)
                     break
-                data = resp.json()
-            except requests.RequestException as e:
-                # Erreur externe (503 fréquent côté Adzuna) : message clair +
-                # secours sur le dernier résultat réussi de la session.
-                console.print(
-                    f"[yellow][Adzuna] L'API Adzuna ne répond pas malgré 4 tentatives "
-                    f"({escape(_redact(e))}) — erreur côté Adzuna, réessayez plus tard.[/yellow]"
-                )
-                cached = cached_results("Adzuna", query, location)
-                if cached and not offers:
-                    console.print(f"[dim][Adzuna] Réutilisation du dernier résultat en mémoire ({len(cached)} offres).[/dim]")
-                    return list(cached)
-                break
-            except ValueError as e:
-                console.print(f"[yellow][Adzuna] Erreur JSON : {escape(_redact(e))}[/yellow]")
-                break
-
-            results = data.get("results", [])
-            if not results:
-                break
-
-            for item in results:
-                job = self._parse_item(item)
-                if job and job.unique_key() not in seen:
-                    seen.add(job.unique_key())
-                    offers.append(job)
-                if len(offers) >= max_results:
+                except ValueError as e:
+                    console.print(f"[yellow][Adzuna] Erreur JSON : {escape(_redact(e))}[/yellow]")
                     break
 
-            if len(results) < page_size:
-                break
-            page += 1
-            jitter_sleep(config.request_delay)
+                # Un 200 dont le corps n'est pas un objet JSON (chaîne d'erreur…)
+                # ne doit pas lever AttributeError et perdre les pages déjà lues.
+                if not isinstance(data, dict):
+                    break
+                results = data.get("results", [])
+                if not results:
+                    break
+
+                for item in results:
+                    job = self._parse_item(item)
+                    if job and job.unique_key() not in seen:
+                        seen.add(job.unique_key())
+                        offers.append(job)
+                    if len(offers) >= max_results:
+                        break
+
+                if len(results) < page_size:
+                    break
+                page += 1
+                jitter_sleep(config.request_delay)
+        finally:
+            session.close()
 
         cache_results("Adzuna", query, location, offers)
         return offers
@@ -158,5 +165,6 @@ class AdzunaScraper(BaseScraper):
                 contract_type=contract,
                 date_posted=(item.get("created") or "")[:10] or None,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "item API")
             return None

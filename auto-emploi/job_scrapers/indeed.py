@@ -1,7 +1,6 @@
 import html as html_module
 import json
 import re
-import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 
@@ -21,7 +20,8 @@ except ImportError:
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
+from .base import (BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep,
+                   log_http_failure, log_parse_error)
 from config import config
 
 MAX_RSS_START = 500        # plafond pagination RSS (~50 pages de 10)
@@ -108,39 +108,53 @@ class IndeedScraper(BaseScraper):
         if hasattr(session, "headers"):
             session.headers.update(HEADERS)
 
-        while len(offers) < max_results and start <= MAX_RSS_START:
-            params = {"q": query, "l": location, "sort": "date", "start": start}
-            try:
-                resp = session.get(f"https://{_domain()}/rss", params=params, timeout=15)
-                if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
-                    break
-            except Exception:
-                break
-
-            try:
-                root = SafeET.fromstring(resp.content)
-            except Exception:
-                break
-
-            items = root.findall(".//item")
-            if not items:
-                break
-
-            before = len(offers)
-            for item in items:
-                job = self._parse_rss_item(item)
-                if job and job.unique_key() not in seen:
-                    seen.add(job.unique_key())
-                    offers.append(job)
-                if len(offers) >= max_results:
+        try:
+            while len(offers) < max_results and start <= MAX_RSS_START:
+                params = {"q": query, "l": location, "sort": "date", "start": start}
+                try:
+                    resp = session.get(f"https://{_domain()}/rss", params=params, timeout=15)
+                    if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
+                        # Un 403/429 (blocage IP) doit rester visible dans les logs —
+                        # sinon indiscernable d'un flux légitimement vide.
+                        log_http_failure(self.source_name,
+                                         f"RSS HTTP {resp.status_code} (start={start})")
+                        break
+                except Exception as e:
+                    log_http_failure(self.source_name, f"RSS réseau : {type(e).__name__}")
                     break
 
-            # Aucune offre nouvelle (page identique renvoyée) ou page partielle :
-            # on arrête plutôt que de boucler sur des doublons.
-            if len(offers) == before or len(items) < 10:
-                break
-            start += 10
-            jitter_sleep(config.request_delay)
+                try:
+                    root = SafeET.fromstring(resp.content)
+                except Exception as e:
+                    log_http_failure(self.source_name, f"RSS XML invalide : {type(e).__name__}")
+                    break
+
+                items = root.findall(".//item")
+                if not items:
+                    break
+
+                before = len(offers)
+                for item in items:
+                    job = self._parse_rss_item(item)
+                    if job and job.unique_key() not in seen:
+                        seen.add(job.unique_key())
+                        offers.append(job)
+                    if len(offers) >= max_results:
+                        break
+
+                # Aucune offre nouvelle (page identique renvoyée) ou page partielle :
+                # on arrête plutôt que de boucler sur des doublons.
+                if len(offers) == before or len(items) < 10:
+                    break
+                start += 10
+                jitter_sleep(config.request_delay)
+        finally:
+            # Ferme le pool de connexions (le serveur web vit longtemps ; une
+            # session par scan qui n'est jamais fermée fuit des sockets).
+            try:
+                session.close()
+            except Exception:
+                pass
 
         return offers
 
@@ -192,7 +206,8 @@ class IndeedScraper(BaseScraper):
                 salary=salary,
                 date_posted=date_posted,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "item RSS")
             return None
 
     # ─── Méthode Playwright ───────────────────────────────────────────────────
@@ -237,8 +252,11 @@ class IndeedScraper(BaseScraper):
                     jitter_sleep(config.request_delay)
                     continue
 
-                # Essai 2 : parsing HTML des cartes
-                cards = self._extract_from_html(html)
+                # Essai 2 : parsing HTML des cartes. `start` est un offset côté
+                # serveur : on avance du nombre de cartes SERVIES (raw_count),
+                # pas du nombre parsé avec succès — sinon un faible taux de
+                # parse fait rechevaucher les pages et stoppe la pagination.
+                cards, raw_count = self._extract_from_html(html)
                 if not cards:
                     break
                 for job in cards:
@@ -247,9 +265,9 @@ class IndeedScraper(BaseScraper):
                         offers.append(job)
                     if len(offers) >= max_results:
                         break
-                if len(offers) == before or len(cards) < 10:
+                if len(offers) == before or raw_count < 10:
                     break
-                start += len(cards)
+                start += raw_count
                 jitter_sleep(config.request_delay)
 
         return offers
@@ -275,7 +293,8 @@ class IndeedScraper(BaseScraper):
                 .get("mosaicProviderJobCardsModel", {})
                 .get("results", [])
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "bundle mosaic")
             return []
 
     def _parse_mosaic_item(self, item: dict) -> JobOffer | None:
@@ -304,11 +323,14 @@ class IndeedScraper(BaseScraper):
                 source=self.source_name,
                 salary=salary,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "item mosaic")
             return None
 
-    def _extract_from_html(self, html: str) -> list[JobOffer]:
-        """Fallback : parsing HTML des cartes avec BeautifulSoup."""
+    def _extract_from_html(self, html: str) -> tuple[list[JobOffer], int]:
+        """Fallback : parsing HTML des cartes avec BeautifulSoup.
+        Retourne (offres parsées, nombre de cartes SERVIES par la page) — la
+        pagination avance sur le second (offset serveur), pas sur le premier."""
         soup = BeautifulSoup(html, "html.parser")
         cards = soup.find_all("div", attrs={"data-jk": True})
         offers = []
@@ -340,6 +362,7 @@ class IndeedScraper(BaseScraper):
                     apply_url=url,
                     source=self.source_name,
                 ))
-            except Exception:
+            except Exception as e:
+                log_parse_error(self.source_name, e, "carte HTML")
                 continue
-        return offers
+        return offers, len(cards)

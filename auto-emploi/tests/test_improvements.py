@@ -455,6 +455,9 @@ class TestAvailabilityCheck(unittest.TestCase):
             def __init__(self, code):
                 self.status_code = code
 
+            def close(self):
+                pass
+
         orig_head, orig_get = requests.head, requests.get
         try:
             if raise_exc:
@@ -916,8 +919,9 @@ class TestSaveToEnvModelValidation(unittest.TestCase):
 
 
 class TestLLMTimeout(unittest.TestCase):
-    """Délai LLM par tâche : les analyses (prescore/match) n'ont aucun plafond,
-    les tâches interactives (lettres/relecture) gardent LLM_TIMEOUT (0 = aucun)."""
+    """Délai LLM par tâche : toujours FINI. Les analyses (prescore/match) et
+    LLM_TIMEOUT=0 reçoivent le plafond très large _SLOW_TASK_CEILING — jamais
+    None : un appel suspendu ne doit pas tenir les verrous indéfiniment."""
 
     def setUp(self):
         from config import config
@@ -927,12 +931,12 @@ class TestLLMTimeout(unittest.TestCase):
         from config import config
         config.llm_timeout = self._orig
 
-    def test_analyses_sans_plafond(self):
-        from ai._client import LLMClient
+    def test_analyses_plafond_large_mais_fini(self):
+        from ai._client import LLMClient, _SLOW_TASK_CEILING
         from config import config
         config.llm_timeout = 120
-        self.assertIsNone(LLMClient(task="prescore")._timeout())
-        self.assertIsNone(LLMClient(task="match")._timeout())
+        self.assertEqual(LLMClient(task="prescore")._timeout(), _SLOW_TASK_CEILING)
+        self.assertEqual(LLMClient(task="match")._timeout(), _SLOW_TASK_CEILING)
 
     def test_taches_interactives_bornees(self):
         from ai._client import LLMClient
@@ -941,11 +945,11 @@ class TestLLMTimeout(unittest.TestCase):
         self.assertEqual(LLMClient(task="letter")._timeout(), 90.0)
         self.assertEqual(LLMClient(task="review")._timeout(), 90.0)
 
-    def test_zero_desactive_le_plafond(self):
-        from ai._client import LLMClient
+    def test_zero_donne_le_plafond_large(self):
+        from ai._client import LLMClient, _SLOW_TASK_CEILING
         from config import config
         config.llm_timeout = 0
-        self.assertIsNone(LLMClient(task="letter")._timeout())
+        self.assertEqual(LLMClient(task="letter")._timeout(), _SLOW_TASK_CEILING)
 
     def test_valeur_invalide_retombe_sur_defaut(self):
         from ai._client import LLMClient
@@ -1423,6 +1427,103 @@ class TestGenerationSerialisee(unittest.TestCase):
             self.assertFalse(srv._GEN_LOCK.locked())   # verrou toujours relâché (finally)
         finally:
             srv._get_cv_store = orig
+
+
+class TestTrackerPrune(unittest.TestCase):
+    """Plafond d'entrées du tracker : au-delà, les plus anciennes entrées
+    « seen »/« new » sont évincées — jamais les décisions explicites."""
+
+    def test_evince_les_seen_les_plus_anciens_jamais_les_decisions(self):
+        import tempfile
+        import tracker as tracker_mod
+        from tracker import Tracker
+        from pathlib import Path
+
+        old_cap = tracker_mod._MAX_TRACKER_ENTRIES
+        tracker_mod._MAX_TRACKER_ENTRIES = 5
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                t = Tracker(Path(td) / ".tracker.json")
+                # 4 « seen » anciens + 3 décisions explicites = 7 entrées (> 5)
+                for i in range(4):
+                    t._data["offers"][f"seen{i}"] = {
+                        "status": "seen", "updated": f"2026-01-0{i + 1}T00:00:00",
+                    }
+                for i, st in enumerate(("applied", "favorite", "rejected")):
+                    t._data["offers"][f"kept{i}"] = {
+                        "status": st, "updated": "2026-01-01T00:00:00",
+                    }
+                t._save()
+                offers = t._data["offers"]
+                self.assertEqual(len(offers), 5)
+                # Les décisions explicites sont intactes
+                for i in range(3):
+                    self.assertIn(f"kept{i}", offers)
+                # Les 2 « seen » les plus anciens ont été évincés
+                self.assertNotIn("seen0", offers)
+                self.assertNotIn("seen1", offers)
+                self.assertIn("seen2", offers)
+                self.assertIn("seen3", offers)
+        finally:
+            tracker_mod._MAX_TRACKER_ENTRIES = old_cap
+
+
+class TestFranceTravailCommune(unittest.TestCase):
+    """Le paramètre `commune` de l'API France Travail attend un code INSEE :
+    un nom de ville doit être détecté comme tel (et rejoindre les mots-clés)."""
+
+    def test_regex_insee(self):
+        from job_scrapers.france_travail import _INSEE_RE
+        self.assertTrue(_INSEE_RE.match("35238"))    # Rennes
+        self.assertTrue(_INSEE_RE.match("2A004"))    # Ajaccio (Corse-du-Sud)
+        self.assertTrue(_INSEE_RE.match("2B033"))    # Bastia (Haute-Corse)
+        self.assertFalse(_INSEE_RE.match("Rennes"))
+        self.assertFalse(_INSEE_RE.match("Paris 15"))
+        self.assertFalse(_INSEE_RE.match("353"))
+        self.assertFalse(_INSEE_RE.match("353381"))
+
+
+class TestResultCacheTTL(unittest.TestCase):
+    """Cache de secours des scrapers : clé incluant le pays, TTL, copies."""
+
+    def _offer(self, title="Dev"):
+        from job_scrapers.base import JobOffer
+        return JobOffer(id="x1", title=title, company="ACME", location="Rennes",
+                        description="", url="https://example.com/a", source="Test")
+
+    def test_cle_par_pays_et_copies_defensives(self):
+        from job_scrapers import base as b
+        from config import config
+        old_country = config.country
+        try:
+            config.country = "fr"
+            offer = self._offer()
+            b.cache_results("Test", "dev", "rennes", [offer])
+            hit = b.cached_results("Test", "dev", "rennes")
+            self.assertIsNotNone(hit)
+            # Copie défensive : muter l'offre rendue ne touche pas le cache
+            hit[0].match_score = 9
+            again = b.cached_results("Test", "dev", "rennes")
+            self.assertIsNone(again[0].match_score)
+            # Autre pays → clé différente → pas de résultat
+            config.country = "de"
+            self.assertIsNone(b.cached_results("Test", "dev", "rennes"))
+        finally:
+            config.country = old_country
+
+    def test_ttl_expire(self):
+        from job_scrapers import base as b
+        from config import config
+        old_country = config.country
+        try:
+            config.country = "fr"
+            b.cache_results("TestTTL", "dev", "", [self._offer()])
+            key = b._cache_key("TestTTL", "dev", "")
+            ts, offers = b._RESULT_CACHE[key]
+            b._RESULT_CACHE[key] = (ts - b._CACHE_TTL - 1, offers)  # vieilli artificiellement
+            self.assertIsNone(b.cached_results("TestTTL", "dev", ""))
+        finally:
+            config.country = old_country
 
 
 if __name__ == "__main__":

@@ -16,8 +16,10 @@ Sécurité :
 import base64
 import html as _html
 import json
+import os
 import re
 import secrets
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -141,6 +143,12 @@ class _Job:
 
 _JOBS: dict[str, _Job] = {}
 _JOBS_LOCK = threading.Lock()
+
+# Échecs d'authentification récents (horodatages) : ≥ 10 échecs en 10 s →
+# refus systématique jusqu'à ce que la fenêtre glisse.
+from collections import deque as _deque
+_AUTH_FAILURES: "_deque[float]" = _deque()
+_AUTH_FAIL_LOCK = threading.Lock()
 _SCAN_LOCK = threading.Lock()      # un seul scan à la fois
 _GEN_LOCK = threading.Lock()       # génération (lettres + analyses CV) sérialisée :
                                    # une seule à la fois, jamais en parallèle (économie
@@ -195,8 +203,13 @@ _JOB_RETENTION = {"scan": 6, "letter": 20, "cv": 20, "check": 6}
 _JOB_RUNNING_TTL = 2 * 60 * 60  # 2 h
 
 
-def _register_job(job: _Job) -> None:
+def _register_job(job: _Job, enforce_cap: bool = False) -> bool:
     with _JOBS_LOCK:
+        if enforce_cap:
+            cap = _MAX_CONCURRENT.get(job.kind)
+            if cap and sum(1 for j in _JOBS.values()
+                           if j.kind == job.kind and j.status == "running") >= cap:
+                return False
         _JOBS[job.id] = job
         _LOG.info("job %s créé (%s)", job.id[:8], job.kind)
         now = time.time()
@@ -210,6 +223,7 @@ def _register_job(job: _Job) -> None:
         for old in same_kind[:-keep]:
             if old.status != "running" or (now - old.created) > _JOB_RUNNING_TTL:
                 del _JOBS[old.id]
+    return True
 
 
 def _get_job(job_id: str) -> _Job | None:
@@ -220,19 +234,17 @@ def _get_job(job_id: str) -> _Job | None:
 # Plafond de générations en vol par type (une en cours + les suivantes en file
 # derrière _GEN_LOCK). Les générations s'exécutent l'une après l'autre ; ce
 # plafond borne seulement la profondeur de la file qu'un client peut accumuler
-# en lançant des générations en rafale (threads + mémoire).
-_MAX_CONCURRENT = {"letter": 4, "cv": 4}
+# en lançant des générations en rafale (threads + mémoire). « check » : une
+# seule vérification de disponibilité à la fois (8 requêtes HTTP parallèles
+# chacune — inutile d'en empiler).
+_MAX_CONCURRENT = {"letter": 4, "cv": 4, "check": 1}
 
 
-def _running_count(kind: str) -> int:
-    with _JOBS_LOCK:
-        return sum(1 for j in _JOBS.values()
-                   if j.kind == kind and j.status == "running")
-
-
-def _too_many_running(kind: str) -> bool:
-    cap = _MAX_CONCURRENT.get(kind)
-    return bool(cap) and _running_count(kind) >= cap
+def _register_if_capacity(job: _Job) -> bool:
+    """Vérifie le plafond ET enregistre le job — atomique via _register_job
+    (enforce_cap) : une rafale de requêtes simultanées ne peut pas dépasser le
+    plafond entre la vérification et l'enregistrement (TOCTOU)."""
+    return _register_job(job, enforce_cap=True)
 
 
 # Cap d'offres mises de côté renvoyées au front : déjà triées par score, on
@@ -733,9 +745,15 @@ def _run_letter(job: _Job, scan_job: _Job, index: int, tone: str,
     # en cours (économie de ressources LLM). Le flag `queued` signale au front
     # que la génération est en file d'attente, pas encore démarrée. Sans
     # contention, l'acquisition est immédiate et `queued` repasse à False avant
-    # tout sondage du client.
+    # tout sondage du client. Attente bornée : si le verrou est tenu au-delà
+    # d'une heure (génération réellement bloquée), on abandonne proprement au
+    # lieu de faire grossir une file morte jusqu'au redémarrage.
     job.queued = True
-    _GEN_LOCK.acquire()
+    if not _GEN_LOCK.acquire(timeout=3600):
+        job.queued = False
+        job.error = "File de génération bloquée — réessayez ou redémarrez le serveur."
+        job.status = "error"
+        return
     job.queued = False
     start = time.time()
     try:
@@ -879,6 +897,9 @@ def _check_one(url: str) -> dict:
             resp = requests.get(url, timeout=8, allow_redirects=False,
                                 headers=_CHECK_HEADERS, stream=True)
         code = resp.status_code
+        # stream=True laisse la connexion ouverte tant que le corps n'est pas
+        # consommé : on la ferme explicitement (8 workers × N offres sinon).
+        resp.close()
         if code in (404, 410):
             available = False                 # retirée
         elif 200 <= code < 400:
@@ -937,7 +958,11 @@ def _run_cv_analyze(job: _Job, cv_id: str) -> None:
     # Génération sérialisée derrière _GEN_LOCK (cf. _run_letter) : analyses CV et
     # lettres ne tournent jamais en parallèle.
     job.queued = True
-    _GEN_LOCK.acquire()
+    if not _GEN_LOCK.acquire(timeout=3600):
+        job.queued = False
+        job.error = "File de génération bloquée — réessayez ou redémarrez le serveur."
+        job.status = "error"
+        return
     job.queued = False
     try:
         with _CV_LOCK:
@@ -1259,6 +1284,13 @@ _SETTINGS_KEYS: list[tuple[str, bool]] = [
     ("DEFAULT_EXPERIENCE", False),
 ]
 
+# Invariant : toute clé exposée dans le panneau Réglages doit être écrivable
+# dans .env — sinon _api_settings échouerait en silence (le ValueError de
+# save_to_env y est avalé). Vérifié au chargement du module, pas en prod tardive.
+from config import _ALLOWED_ENV_KEYS as _CFG_ALLOWED
+assert {k for k, _ in _SETTINGS_KEYS} <= _CFG_ALLOWED, \
+    "clé de réglage absente de la liste blanche .env (config._ALLOWED_ENV_KEYS)"
+
 
 def _masked_settings() -> dict:
     out = {}
@@ -1384,8 +1416,21 @@ class _Handler(BaseHTTPRequestHandler):
         return host in ("127.0.0.1", "localhost", "[::1]")
 
     def _auth_ok(self) -> bool:
+        # Verrouillage temporaire après une rafale d'échecs : freine un processus
+        # local qui tenterait de forcer le jeton (défense en profondeur — le
+        # jeton 256 bits est de toute façon hors de portée d'une force brute).
+        now = time.time()
+        with _AUTH_FAIL_LOCK:
+            while _AUTH_FAILURES and now - _AUTH_FAILURES[0] > 10.0:
+                _AUTH_FAILURES.popleft()
+            if len(_AUTH_FAILURES) >= 10:
+                return False
         token = self.headers.get("X-Auth-Token") or ""
-        return secrets.compare_digest(token.encode(), AUTH_TOKEN.encode())
+        ok = secrets.compare_digest(token.encode(), AUTH_TOKEN.encode())
+        if not ok:
+            with _AUTH_FAIL_LOCK:
+                _AUTH_FAILURES.append(now)
+        return ok
 
     def _send(self, status: int, content_type: str, body: bytes,
               download_name: str = "", close: bool = False) -> None:
@@ -1403,7 +1448,14 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
         if download_name:
-            self.send_header("Content-Disposition", f'attachment; filename="{download_name}"')
+            # RFC 5987 (filename*) en plus du filename quoté : encodage sans
+            # ambiguïté quel que soit le contenu (le nom est déjà validé
+            # [A-Za-z0-9 ._-] en amont — ceinture et bretelles).
+            quoted = urllib.parse.quote(download_name)
+            self.send_header(
+                "Content-Disposition",
+                f'attachment; filename="{download_name}"; filename*=UTF-8\'\'{quoted}',
+            )
         if close:
             # Erreur avant lecture du corps : fermer évite qu'un corps non lu
             # soit interprété comme la requête suivante sur la connexion keep-alive.
@@ -1790,7 +1842,8 @@ class _Handler(BaseHTTPRequestHandler):
         # CV de la session : reparsés si les fichiers existent encore (lettres)
         criteria_cv = session.get("criteria", {}).get("cv", "")
         names = [n.strip() for n in criteria_cv.split(",") if n.strip()]
-        available = [n for n in names if n in _list_cv_files()]
+        cv_files = set(_list_cv_files())   # évalué une fois, pas à chaque itération
+        available = [n for n in names if n in cv_files]
         if available:
             try:
                 job.cv_texts = _load_cv_texts(available)
@@ -1844,11 +1897,10 @@ class _Handler(BaseHTTPRequestHandler):
             max_words = max(80, min(1200, int(body.get("max_words", 350))))
         except (TypeError, ValueError):
             max_words = 350
-        if _too_many_running("letter"):
+        job = _Job("letter")
+        if not _register_if_capacity(job):
             self._error("Trop de lettres en file d'attente — patientez qu'une génération se termine.", 429)
             return
-        job = _Job("letter")
-        _register_job(job)
         threading.Thread(target=_run_letter,
                          args=(job, scan_job, index, tone, doc_type, max_words),
                          daemon=True).start()
@@ -1867,7 +1919,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._error("Aucune offre retenue à vérifier.", 400)
             return
         job = _Job("check")
-        _register_job(job)
+        if not _register_if_capacity(job):
+            self._error("Une vérification est déjà en cours — attendez qu'elle se termine.", 429)
+            return
         threading.Thread(target=_run_check, args=(job, scan_job), daemon=True).start()
         self._json({"job_id": job.id})
 
@@ -1920,7 +1974,7 @@ class _Handler(BaseHTTPRequestHandler):
         if target is None or not target.exists():
             self._error("Fichier introuvable", 404)
             return
-        if not str(target.resolve()).startswith(str(letters_dir().resolve())):
+        if target.resolve().parent != letters_dir().resolve():
             self._error("Fichier non trouvé.", 404)
             return
         content = target.read_text(encoding="utf-8", errors="replace")
@@ -1975,7 +2029,19 @@ class _Handler(BaseHTTPRequestHandler):
             + "LETTRE DE MOTIVATION\n" + "-" * 60 + "\n\n"
             + letter
         )
-        txt_path.write_text(new_content, encoding="utf-8")
+        # Écriture atomique : une lettre éditée à la main est le seul exemplaire —
+        # un crash en pleine écriture ne doit pas la détruire.
+        fd, tmp = tempfile.mkstemp(dir=str(txt_path.parent), prefix=".letter_", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            os.replace(tmp, txt_path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
         pdf_name = txt_name[:-4] + ".pdf"
         pdf_path = txt_path.parent / pdf_name
         try:
@@ -1990,6 +2056,9 @@ class _Handler(BaseHTTPRequestHandler):
                     mock_job.company = line[len("Entreprise :"):].strip()
                 elif line.startswith("URL :"):
                     mock_job.url = line[len("URL :"):].strip()
+            # L'URL vient du contenu du fichier : seul http(s) est admis dans le PDF.
+            if not mock_job.url.startswith(("http://", "https://")):
+                mock_job.url = ""
             _CLG("")._save_pdf(pdf_path, mock_job, letter)
         except Exception:
             pass
@@ -2090,7 +2159,6 @@ class _Handler(BaseHTTPRequestHandler):
         if target.name.lower() in EXCLUDED_FILENAMES:
             self._error("Ce nom de fichier est réservé — renommez votre CV.")
             return
-        import tempfile, os
         fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".tmp_cv_")
         try:
             os.write(fd, data)
@@ -2109,14 +2177,17 @@ class _Handler(BaseHTTPRequestHandler):
         with _CV_LOCK:
             entry = _get_cv_store().register(target.name)
         # Analyse IA lancée dès l'import : le profil structuré apparaît dans
-        # « Mes CV » sans action manuelle (ré-analyse possible à tout moment)
+        # « Mes CV » sans action manuelle (ré-analyse possible à tout moment).
+        # File pleine → l'import réussit quand même, l'analyse reste manuelle.
         analyze_job = _Job("cv")
-        _register_job(analyze_job)
-        threading.Thread(target=_run_cv_analyze, args=(analyze_job, entry["id"]), daemon=True).start()
+        analyze_id = ""
+        if _register_if_capacity(analyze_job):
+            threading.Thread(target=_run_cv_analyze, args=(analyze_job, entry["id"]), daemon=True).start()
+            analyze_id = analyze_job.id
         self._json({
             "ok": True, "name": target.name, "cv_files": _list_cv_files(),
             "cv_id": entry.get("id", ""), "label": entry.get("label", ""),
-            "analyze_job_id": analyze_job.id,
+            "analyze_job_id": analyze_id,
         })
 
     def _api_cv_analyze(self):
@@ -2134,11 +2205,10 @@ class _Handler(BaseHTTPRequestHandler):
         if not _cv_path(entry.get("filename", "")).is_file():
             self._error("Le fichier de ce CV n'existe plus.", 404)
             return
-        if _too_many_running("cv"):
+        job = _Job("cv")
+        if not _register_if_capacity(job):
             self._error("Trop d'analyses de CV en file d'attente — patientez qu'une se termine.", 429)
             return
-        job = _Job("cv")
-        _register_job(job)
         threading.Thread(target=_run_cv_analyze, args=(job, entry["id"]), daemon=True).start()
         self._json({"job_id": job.id})
 
@@ -2317,6 +2387,19 @@ def run(port: int = 8765, open_browser: bool = True) -> None:
     # Sonde les serveurs LLM locaux au démarrage (liste les modèles installés,
     # prévient si un modèle configuré manque). Sans gravité en cas d'échec.
     _startup_model_check()
+    # Avertissements précoces plutôt qu'un échec tardif en fin de scan :
+    # clé API absente → scans en scoring local ; output/ non inscriptible →
+    # la sauvegarde échouerait après avoir payé tout le coût du scraping.
+    if config.provider == "anthropic" and not config.anthropic_api_key:
+        print("  ⚠ ANTHROPIC_API_KEY absente : l'analyse IA sera remplacée par le "
+              "scoring local (configurez la clé dans Réglages).")
+    try:
+        probe_fd, probe_path = tempfile.mkstemp(dir=str(Path(config.output_dir)))
+        os.close(probe_fd)
+        os.unlink(probe_path)
+    except OSError as e:
+        print(f"  ⚠ Dossier de sortie non inscriptible ({config.output_dir}) : {e}. "
+              "Les résultats de scan ne pourront pas être sauvegardés.")
     server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"\n  Auto Emploi — interface web : {url}")

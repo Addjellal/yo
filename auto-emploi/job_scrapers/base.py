@@ -1,4 +1,5 @@
 import html as _html
+import logging as _logging
 import random as _random
 import re
 import threading as _threading
@@ -9,6 +10,21 @@ from typing import Callable, Optional
 
 # Garde-fou mémoire : une réponse HTTP plus grosse que ça est suspecte
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+
+_SCRAPER_LOG = _logging.getLogger("job_scrapers")
+
+
+def log_parse_error(source: str, exc: Exception, what: str = "élément") -> None:
+    """Trace (niveau DEBUG) un élément de page/flux impossible à parser.
+    Sans cette trace, un changement de mise en page du site est indiscernable
+    d'une journée sans offres — le scraper renvoie 0 résultat en silence."""
+    _SCRAPER_LOG.debug("[%s] %s ignoré : %s", source, what, type(exc).__name__)
+
+
+def log_http_failure(source: str, detail: str) -> None:
+    """Trace (niveau INFO) un échec HTTP qui interrompt la collecte d'une
+    source (statut non-200, réseau, XML/JSON invalide)."""
+    _SCRAPER_LOG.info("[%s] collecte interrompue : %s", source, detail)
 
 # Caractères de contrôle (sauf \n et \t, conservés dans les descriptions)
 _CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -113,10 +129,15 @@ def extract_sections(description: str) -> dict[str, str]:
 # Délais avant nouvel essai : 2 s, 4 s, 8 s (exponentiel)
 RETRY_DELAYS = (2.0, 4.0, 8.0)
 
-# Dernier résultat réussi par (source, requête, lieu) — secours en mémoire si
-# l'API externe tombe en panne au scan suivant dans la même session.
-_RESULT_CACHE: dict[tuple[str, str, str], list["JobOffer"]] = {}
+# Dernier résultat réussi par (source, pays, requête, lieu) — secours en
+# mémoire si l'API externe tombe en panne au scan suivant dans la même session.
+# Le pays fait partie de la clé (les résultats en dépendent) ; chaque entrée
+# expire (_CACHE_TTL) et le cache est borné (_CACHE_MAX, éviction du plus
+# ancien) — sans quoi il grossirait sans fin dans le serveur web longue durée.
+_RESULT_CACHE: dict[tuple[str, str, str, str], tuple[float, list["JobOffer"]]] = {}
 _CACHE_LOCK = _threading.Lock()
+_CACHE_TTL = 3600.0   # 1 h : un secours plus vieux serait trompeur
+_CACHE_MAX = 50
 
 
 def fetch_with_retry(send: Callable[[], "object"], source: str,
@@ -153,16 +174,36 @@ def jitter_sleep(base: float) -> None:
     time.sleep(max(0.5, base) + _random.uniform(0.0, 1.0))
 
 
+def _cache_key(source: str, query: str, location: str) -> tuple[str, str, str, str]:
+    from config import config
+    return (source, str(getattr(config, "country", "") or ""),
+            query.lower().strip(), location.lower().strip())
+
+
 def cache_results(source: str, query: str, location: str,
                   offers: list["JobOffer"]) -> None:
-    if offers:
-        with _CACHE_LOCK:
-            _RESULT_CACHE[(source, query.lower().strip(), location.lower().strip())] = list(offers)
+    if not offers:
+        return
+    from dataclasses import replace
+    with _CACHE_LOCK:
+        # Copies : le pipeline mute ensuite les offres (match_score, cv_scores…) ;
+        # le cache doit conserver l'état au moment du scrape, pas des références
+        # partagées portant des scores périmés.
+        _RESULT_CACHE[_cache_key(source, query, location)] = (
+            time.time(), [replace(o) for o in offers],
+        )
+        while len(_RESULT_CACHE) > _CACHE_MAX:
+            oldest = min(_RESULT_CACHE, key=lambda k: _RESULT_CACHE[k][0])
+            del _RESULT_CACHE[oldest]
 
 
 def cached_results(source: str, query: str, location: str) -> list["JobOffer"] | None:
+    from dataclasses import replace
     with _CACHE_LOCK:
-        return _RESULT_CACHE.get((source, query.lower().strip(), location.lower().strip()))
+        hit = _RESULT_CACHE.get(_cache_key(source, query, location))
+        if hit is None or time.time() - hit[0] > _CACHE_TTL:
+            return None
+        return [replace(o) for o in hit[1]]
 
 
 def safe_url(value: Optional[str], limit: int = 2000) -> str:

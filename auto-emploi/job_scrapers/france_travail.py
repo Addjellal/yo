@@ -1,7 +1,11 @@
+import re
+import threading
 import time
+
 import requests
 from rich.markup import escape
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
+from .base import (BaseScraper, JobOffer, MAX_RESPONSE_BYTES, fetch_with_retry,
+                   jitter_sleep, log_parse_error)
 from config import config
 from app_utils import console
 
@@ -14,6 +18,17 @@ MAX_RANGE = 1149      # plafond de pagination (≈ 8 pages), aligné sur les aut
 
 
 REGISTER_URL = "https://francetravail.io/produits-et-services/portail-partenaire"
+
+# Jeton OAuth partagé au niveau module : une recherche globale crée un scraper
+# par (requête × lieu) — chaque instance re-demandait son propre jeton, soit
+# N×M appels d'authentification par scan pour un jeton valable ~25 min.
+_TOKEN_LOCK = threading.Lock()
+_TOKEN: str | None = None
+_TOKEN_EXPIRES: float = 0.0
+
+# Le paramètre `commune` de l'API attend un code INSEE (5 chiffres, lettre
+# possible en Corse : 2A/2B), pas un nom de ville.
+_INSEE_RE = re.compile(r"^\d{5}$|^2[AB]\d{3}$", re.IGNORECASE)
 
 
 class FranceTravailScraper(BaseScraper):
@@ -29,36 +44,41 @@ class FranceTravailScraper(BaseScraper):
                 "FRANCE_TRAVAIL_CLIENT_ID et FRANCE_TRAVAIL_CLIENT_SECRET manquants.\n"
                 f"Inscrivez-vous sur {REGISTER_URL}"
             )
-        self._token: str | None = None
-        self._token_expires: float = 0
 
     def _get_token(self) -> str:
-        if self._token and time.time() < self._token_expires - 60:
-            return self._token
+        global _TOKEN, _TOKEN_EXPIRES
+        with _TOKEN_LOCK:
+            if _TOKEN and time.time() < _TOKEN_EXPIRES - 60:
+                return _TOKEN
 
-        resp = requests.post(
-            TOKEN_URL,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": config.france_travail_client_id,
-                "client_secret": config.france_travail_client_secret,
-                "scope": "api_offresdemploiv2 o2dsoffre",
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        token = data.get("access_token")
-        if not token:
-            raise ValueError("réponse d'authentification sans access_token")
-        self._token = token
-        try:
-            expires_in = float(data.get("expires_in") or 1200)
-        except (TypeError, ValueError):
-            expires_in = 1200
-        self._token_expires = time.time() + expires_in
-        return self._token
+            resp = fetch_with_retry(
+                lambda: requests.post(
+                    TOKEN_URL,
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": config.france_travail_client_id,
+                        "client_secret": config.france_travail_client_secret,
+                        "scope": "api_offresdemploiv2 o2dsoffre",
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    timeout=10,
+                ),
+                self.source_name,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not isinstance(data, dict):
+                raise ValueError("réponse d'authentification inattendue (pas un objet JSON)")
+            token = data.get("access_token")
+            if not token:
+                raise ValueError("réponse d'authentification sans access_token")
+            try:
+                expires_in = float(data.get("expires_in") or 1200)
+            except (TypeError, ValueError):
+                expires_in = 1200
+            _TOKEN = token
+            _TOKEN_EXPIRES = time.time() + expires_in
+            return _TOKEN
 
     def search(self, query: str, location: str = "", max_results: int = 50) -> list[JobOffer]:
         if config.country != "fr":
@@ -78,16 +98,30 @@ class FranceTravailScraper(BaseScraper):
                 last = min(start + PAGE_SIZE - 1, MAX_RANGE, start + (target - len(offers)) - 1)
                 params = {"motsCles": query, "range": f"{start}-{last}"}
                 if location:
-                    params["commune"] = location
+                    # `commune` n'accepte qu'un code INSEE ; un nom de ville y
+                    # provoquerait un 400 (toute la source tomberait). Un nom est
+                    # donc joint aux mots-clés — moins précis mais fonctionnel.
+                    if _INSEE_RE.match(location.strip()):
+                        params["commune"] = location.strip()
+                    else:
+                        params["motsCles"] = f"{query} {location}".strip()
 
-                resp = requests.get(SEARCH_URL, params=params, headers=headers, timeout=15)
+                resp = fetch_with_retry(
+                    lambda p=dict(params): requests.get(
+                        SEARCH_URL, params=p, headers=headers, timeout=15,
+                    ),
+                    self.source_name,
+                )
                 if resp.status_code == 204:
                     break
                 resp.raise_for_status()
                 if len(resp.content) > MAX_RESPONSE_BYTES:
                     console.print("[yellow][France Travail] Réponse anormalement volumineuse, ignorée.[/yellow]")
                     break
-                results = resp.json().get("resultats", [])
+                data = resp.json()
+                if not isinstance(data, dict):
+                    break
+                results = data.get("resultats", [])
                 if not results:
                     break
 
@@ -139,5 +173,6 @@ class FranceTravailScraper(BaseScraper):
                 contract_type=item.get("typeContrat"),
                 date_posted=(item.get("dateCreation") or "")[:10] or None,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "item API")
             return None

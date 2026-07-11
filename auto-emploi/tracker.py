@@ -45,6 +45,15 @@ HIDDEN_STATUSES = ("applied", "rejected")  # hidden from future searches by defa
 
 _MAX_TRACKER_BYTES = 50 * 1024 * 1024  # un historique > 50 Mo est forcément corrompu
 
+# Plafond d'entrées : sans lui, le suivi grossit sans fin (chaque offre jamais
+# vue y reste), dégrade chaque sauvegarde (réécriture complète du fichier) et
+# finit par dépasser la limite ci-dessus — que _load interprète alors comme une
+# corruption, effaçant tout l'historique. Au-delà du plafond, on évince les
+# plus anciennes entrées « seen »/« new » uniquement : les décisions explicites
+# (favori, postulé, rejeté) ne sont jamais perdues.
+_MAX_TRACKER_ENTRIES = 20000
+_EVICTABLE_STATUSES = ("seen", "new")
+
 
 class Tracker:
     def __init__(self, store_path: Path):
@@ -72,12 +81,30 @@ class Tracker:
             _LOG.warning("Store JSON corrompu, réinitialisé : %s (sauvegardé en %s)", self.path, bak)
             return {"offers": {}}
 
+    def _prune(self) -> None:
+        """Évince les plus anciennes entrées « seen »/« new » quand le plafond
+        est dépassé. Les statuts choisis par l'utilisateur sont intouchables."""
+        offers = self._data["offers"]
+        excess = len(offers) - _MAX_TRACKER_ENTRIES
+        if excess <= 0:
+            return
+        evictable = sorted(
+            (k for k, e in offers.items()
+             if isinstance(e, dict) and e.get("status", "seen") in _EVICTABLE_STATUSES),
+            key=lambda k: offers[k].get("updated", ""),
+        )
+        for key in evictable[:excess]:
+            del offers[key]
+
     def _save(self) -> None:
         """Écriture atomique : fichier temporaire puis rename — un crash ou un
         Ctrl+C en pleine écriture ne peut pas corrompre l'historique."""
+        self._prune()
+        # JSON compact (pas d'indent) : le fichier est réécrit en entier à chaque
+        # changement de statut — l'indentation gonflait sa taille de ~40 %.
         # Neutralise les surrogates isolés (utf-8 « surrogates not allowed »)
         # avant écriture — un caractère malformé ne doit pas corrompre le suivi.
-        payload = json.dumps(self._data, ensure_ascii=False, indent=2).encode("utf-8", "replace").decode("utf-8")
+        payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".tracker_", suffix=".tmp"
         )

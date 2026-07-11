@@ -8,9 +8,12 @@ Prérequis :
     pip install playwright
     python -m playwright install chromium
 """
+import logging
 import os
 import sys
 import urllib.parse
+
+_LOG = logging.getLogger("job_scrapers.browser")
 
 _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -71,7 +74,10 @@ def fetch_html(url: str, wait: str = "domcontentloaded", extra_ms: int = 1500) -
                 return page.content()
             finally:
                 browser.close()
-    except Exception:
+    except Exception as e:
+        # Sans trace, un crash Chromium répété est indiscernable de 0 résultat.
+        _LOG.info("fetch_html échoué (%s) : %s", type(e).__name__,
+                  urllib.parse.urlparse(url).netloc)
         return None
 
 
@@ -92,7 +98,8 @@ class BrowserSession:
             self._browser = self._pw.chromium.launch(headless=True, args=_launch_args())
             self._page = _new_context(self._browser).new_page()
             return True
-        except Exception:
+        except Exception as e:
+            _LOG.info("lancement Chromium échoué : %s", type(e).__name__)
             return False
 
     @property
@@ -107,13 +114,21 @@ class BrowserSession:
             if extra_ms:
                 self._page.wait_for_timeout(extra_ms)
             return self._page.content()
-        except Exception:
+        except Exception as e:
+            _LOG.info("fetch échoué (%s) : %s", type(e).__name__,
+                      urllib.parse.urlparse(url).netloc)
             return None
 
     def close(self):
+        # Fermeture en deux temps : si browser.close() lève (driver déjà mort),
+        # pw.stop() doit quand même s'exécuter — sinon le processus node du
+        # driver Playwright reste orphelin.
         try:
             if self._browser:
                 self._browser.close()
+        except Exception:
+            pass
+        try:
             if self._pw:
                 self._pw.stop()
         except Exception:

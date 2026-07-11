@@ -1034,6 +1034,25 @@ def _ascii_slug(text: str, limit: int = 30) -> str:
             or "recherche")
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Écriture atomique (tmp + rename) : deux exports simultanés du même
+    fichier, ou un crash en pleine écriture, ne laissent jamais un fichier
+    tronqué à la place du précédent."""
+    import os
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.stem}_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
     from output_paths import offers_scored_dir
     out = offers_scored_dir()
@@ -1061,7 +1080,11 @@ def save_results(offers: list[JobOffer], query: str) -> tuple[Path, Path]:
         for o in offers
     ]
 
-    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Même neutralisation anti-formule que le CSV : certains utilisateurs
+    # importent le JSON dans un tableur.
+    safe_rows = [{k: _csv_safe(v) if isinstance(v, str) else v for k, v in row.items()}
+                 for row in rows]
+    _atomic_write_text(json_path, json.dumps(safe_rows, ensure_ascii=False, indent=2))
 
     with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
@@ -1087,7 +1110,7 @@ def save_raw_offers(offers: list[JobOffer], query: str) -> Path:
         }
         for o in offers
     ]
-    path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(rows, ensure_ascii=False, indent=2))
     return path
 
 
@@ -1106,7 +1129,7 @@ def save_dropped_offers(offers: list[JobOffer], query: str, reason: str) -> Path
         }
         for o in offers
     ]
-    path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_text(path, json.dumps(rows, ensure_ascii=False, indent=2))
     return path
 
 

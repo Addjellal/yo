@@ -10,13 +10,14 @@ scrapers.
 
 Aucune authentification requise.
 """
+import hashlib
 import json
-import time
 import urllib.parse
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
+from .base import (BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep,
+                   log_parse_error)
 from config import config
 from app_utils import console
 
@@ -124,6 +125,10 @@ class TalentScraper(BaseScraper):
                 jitter_sleep(config.request_delay)
         finally:
             browser.close()
+            try:
+                session.close()
+            except Exception:
+                pass
 
         return offers
 
@@ -232,14 +237,14 @@ class TalentScraper(BaseScraper):
                     salary = f"{mn or mx} {cur}"
 
             uid = job_id or f"{title}|{company}"
-            import hashlib
             return JobOffer(
                 id=f"talent_{job_id or int(hashlib.md5(uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
                 title=title, company=company, location=location,
                 description=description, url=url, apply_url=apply_url,
                 source=self.source_name, salary=salary,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "offre RSC")
             return None
 
     def _parse_jsonld(self, soup: BeautifulSoup, base: str) -> list[JobOffer]:
@@ -299,7 +304,6 @@ class TalentScraper(BaseScraper):
             posted = str(item.get("datePosted") or "")[:10] or None
 
             uid = url or f"{title}|{company}"
-            import hashlib
             return JobOffer(
                 id=f"talent_{int(hashlib.md5(uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
                 title=title, company=str(company).strip(), location=loc,
@@ -307,7 +311,8 @@ class TalentScraper(BaseScraper):
                 source=self.source_name, salary=salary,
                 contract_type=contract, date_posted=posted,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "bloc JSON-LD")
             return None
 
     @staticmethod
@@ -372,7 +377,6 @@ class TalentScraper(BaseScraper):
                 if key in seen:
                     continue
                 seen.add(key)
-                import hashlib
                 _uid = href or key
                 offers.append(JobOffer(
                     id=f"talent_{int(hashlib.md5(_uid.encode(), usedforsecurity=False).hexdigest()[:12], 16)}",
@@ -380,6 +384,7 @@ class TalentScraper(BaseScraper):
                     description=description, url=href, apply_url=href,
                     source=self.source_name,
                 ))
-            except Exception:
+            except Exception as e:
+                log_parse_error(self.source_name, e, "carte HTML")
                 continue
         return offers

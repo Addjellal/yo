@@ -159,6 +159,14 @@ class SessionStore:
         # font planter l'encodage utf-8 (« surrogates not allowed ») : on les
         # neutralise avant écriture pour ne jamais corrompre un scan terminé.
         payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
+        # Garde-fou : la limite de taille est vérifiée à la LECTURE (fichier
+        # > 50 Mo = « corrompu » → historique effacé). Pour ne jamais atteindre
+        # ce point, on élague les sessions les plus anciennes AVANT d'écrire un
+        # fichier qui dépasserait 80 % de cette limite.
+        budget = int(0.8 * 50 * 1024 * 1024)
+        while len(payload.encode("utf-8")) > budget and len(self._data.get("sessions", [])) > 1:
+            self._data["sessions"] = self._data["sessions"][1:]
+            payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".sessions_", suffix=".tmp"
         )
@@ -180,7 +188,7 @@ class SessionStore:
     def add_session(self, kind: str, criteria: dict, offers: list[JobOffer],
                     found: int | None = None) -> str:
         now = datetime.now()
-        session_id = now.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+        session_id = now.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(4)
         self._data["sessions"].append({
             "id": session_id,
             "date": now.isoformat(timespec="seconds"),

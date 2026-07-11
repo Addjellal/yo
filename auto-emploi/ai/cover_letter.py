@@ -598,15 +598,6 @@ class CoverLetterGenerator:
         folded = unicodedata.normalize("NFKD", f"{job.title}_{job.company}").encode("ascii", "ignore").decode("ascii")
         safe_name = re.sub(r"[^a-z0-9_-]", "_", folded.lower())[:60].strip("_") or "lettre"
         out_dir = letters_dir().resolve()
-        txt_path = out_dir / f"{safe_name}.txt"
-        pdf_path = out_dir / f"{safe_name}.pdf"
-        # Si un fichier du même nom existe déjà (regénération), on ajoute un
-        # horodatage pour ne pas écraser la lettre précédente.
-        if txt_path.exists():
-            import datetime as _dt
-            stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-            txt_path = out_dir / f"{safe_name}_{stamp}.txt"
-            pdf_path = out_dir / f"{safe_name}_{stamp}.pdf"
 
         email_block = ""
         if result.get("email_subject") or result.get("email_body"):
@@ -621,13 +612,39 @@ class CoverLetterGenerator:
         candidate = self._candidate_block()
         candidate_block = candidate + "\n\n" if candidate else ""
 
-        txt_path.write_text(
+        # L'en-tête est reparsé ligne à ligne par l'édition web : un champ scrapé
+        # contenant un saut de ligne ne doit pas pouvoir y forger de fausses lignes.
+        def _line(v: str) -> str:
+            return str(v or "").replace("\r", " ").replace("\n", " ")
+
+        content = (
             candidate_block
-            + f"Poste : {job.title}\nEntreprise : {job.company}\nSource : {job.source}\nURL : {job.url}\n\n"
+            + f"Poste : {_line(job.title)}\nEntreprise : {_line(job.company)}\n"
+            + f"Source : {_line(job.source)}\nURL : {_line(job.url)}\n\n"
             + "=" * 60 + "\n\n" + email_block + "LETTRE DE MOTIVATION\n" + "-" * 60 + "\n\n"
-            + result["letter"],
-            encoding="utf-8",
+            + result["letter"]
         )
+
+        # Création EXCLUSIVE (open "x") : jamais d'écrasement d'une lettre
+        # existante, même si deux générations de la même offre aboutissent dans
+        # la même seconde (l'horodatage seul ne suffirait pas). En cas de
+        # collision, on suffixe _2, _3…
+        import datetime as _dt
+        candidates = [safe_name]
+        stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        candidates += [f"{safe_name}_{stamp}"] + [f"{safe_name}_{stamp}_{i}" for i in range(2, 20)]
+        txt_path = pdf_path = None
+        for base in candidates:
+            try:
+                with open(out_dir / f"{base}.txt", "x", encoding="utf-8") as f:
+                    f.write(content)
+                txt_path = out_dir / f"{base}.txt"
+                pdf_path = out_dir / f"{base}.pdf"
+                break
+            except FileExistsError:
+                continue
+        if txt_path is None:  # 20 collisions dans la même seconde : impossible en pratique
+            raise OSError("impossible d'allouer un nom de fichier de lettre unique")
         self._save_pdf(pdf_path, job, result["letter"])
         return txt_path, pdf_path
 

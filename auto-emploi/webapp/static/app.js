@@ -695,7 +695,12 @@ function watchCvAnalysis(jobId, name) {
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
-    } catch { return; }
+    } catch {
+      // Erreur réseau : prévenir plutôt que d'abandonner en silence — sinon
+      // l'utilisateur ne saura jamais si l'analyse a abouti ou non.
+      toast(`Suivi de l'analyse de ${name} perdu — vérifiez son état dans Mes CV.`, "err");
+      return;
+    }
     if (job.status === "running") { watchCvAnalysis(jobId, name); return; }
     if (job.status === "error") {
       toast(`Analyse IA de ${name} échouée : ${job.error || "erreur"} — bouton « Ré-analyser » dans Mes CV.`, "err");
@@ -1245,8 +1250,14 @@ function pollScan(gen = POLL_GEN, iter = 0) {
 
 function renderLog(lines) {
   const box = $("#progress-log");
-  while (box.children.length < lines.length) {
-    box.appendChild(el("div", { text: lines[box.children.length] }));
+  if (box.children.length < lines.length) {
+    // Fragment : une seule insertion DOM quel que soit le nombre de nouvelles
+    // lignes (chaque appendChild direct déclencherait un recalcul de style).
+    const frag = document.createDocumentFragment();
+    for (let i = box.children.length; i < lines.length; i++) {
+      frag.appendChild(el("div", { text: lines[i] }));
+    }
+    box.appendChild(frag);
   }
   box.scrollTop = box.scrollHeight;
   updateProgressBar(lines);
@@ -2644,10 +2655,13 @@ function analyzeCv(cvId, btn) {
 }
 
 function pollCvJob(jobId, btn) {
-  setTimeout(async () => {
+  // Capture le CV affiché au lancement : si l'utilisateur ouvre un AUTRE CV
+  // pendant l'analyse, on ne doit pas écraser son panneau à la fin du poll.
+  const watchedId = CVD ? CVD.entry.id : null;
+  const tick = () => setTimeout(async () => {
     // Panneau CV fermé/changé pendant l'analyse : on cesse de sonder pour ne
     // pas rouvrir le détail de force (l'analyse aboutit côté serveur).
-    if (!CVD) return;
+    if (!CVD || CVD.entry.id !== watchedId) return;
     let job;
     try {
       job = await api(`/api/job?id=${encodeURIComponent(jobId)}`);
@@ -2657,18 +2671,22 @@ function pollCvJob(jobId, btn) {
       toast(e.message, "err");
       return;
     }
-    if (job.status === "running") { pollCvJob(jobId, btn); return; }
+    if (job.status === "running") { tick(); return; }
     btn.disabled = false;
-    if (CVD) CVD.progress.hidden = true;
+    if (CVD && CVD.entry.id === watchedId) CVD.progress.hidden = true;
     if (job.status === "error") {
       toast("Analyse échouée : " + (job.error || "erreur"), "err");
       return;
     }
     toast("Profil extrait par l'IA — vos corrections manuelles restent prioritaires.", "ok");
     await refreshCvData();
-    const fresh = CVS.find((c) => c.id === (job.result.cv || {}).id);
-    if (fresh) openCvDetail(fresh);
+    // On ne rouvre le détail que si le panneau montre toujours le CV analysé.
+    if (CVD && CVD.entry.id === watchedId) {
+      const fresh = CVS.find((c) => c.id === (job.result.cv || {}).id);
+      if (fresh) openCvDetail(fresh);
+    }
   }, 900);
+  tick();
 }
 
 async function deleteCv(cv) {

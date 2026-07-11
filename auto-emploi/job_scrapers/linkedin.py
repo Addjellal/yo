@@ -10,10 +10,10 @@ Deux modes :
   peut être restreint.
 """
 import re
-import time
 import urllib.parse
 
-from .base import BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep
+from .base import (BaseScraper, JobOffer, MAX_RESPONSE_BYTES, jitter_sleep,
+                   log_http_failure, log_parse_error)
 from config import config
 
 GUEST_API = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -52,39 +52,47 @@ class LinkedInScraper(BaseScraper):
         start = 0
         default_location = location or COUNTRY_NAMES.get(config.country, "France")
 
-        while len(offers) < max_results and start <= MAX_GUEST_START:
-            params = {
-                "keywords": query,
-                "location": default_location,
-                "start": start,
-                "f_TPR": "r604800",  # offres de moins de 7 jours
-            }
-            try:
-                resp = session.get(GUEST_API, params=params, timeout=15)
-                if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
-                    break
-            except Exception:
-                break
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            cards = soup.find_all("li")
-            if not cards:
-                break
-
-            added = 0
-            for card in cards:
-                job = self._parse_guest_card(card)
-                if job and job.unique_key() not in seen:
-                    seen.add(job.unique_key())
-                    offers.append(job)
-                    added += 1
-                if len(offers) >= max_results:
+        try:
+            while len(offers) < max_results and start <= MAX_GUEST_START:
+                params = {
+                    "keywords": query,
+                    "location": default_location,
+                    "start": start,
+                    "f_TPR": "r604800",  # offres de moins de 7 jours
+                }
+                try:
+                    resp = session.get(GUEST_API, params=params, timeout=15)
+                    if resp.status_code != 200 or len(resp.content) > MAX_RESPONSE_BYTES:
+                        # LinkedIn throttle agressivement l'API invitée (429/999) :
+                        # ce blocage doit être visible dans les logs.
+                        log_http_failure(self.source_name,
+                                         f"invité HTTP {resp.status_code} (start={start})")
+                        break
+                except Exception as e:
+                    log_http_failure(self.source_name, f"invité réseau : {type(e).__name__}")
                     break
 
-            if added == 0:
-                break
-            start += 25
-            jitter_sleep(config.request_delay)
+                soup = BeautifulSoup(resp.text, "html.parser")
+                cards = soup.find_all("li")
+                if not cards:
+                    break
+
+                added = 0
+                for card in cards:
+                    job = self._parse_guest_card(card)
+                    if job and job.unique_key() not in seen:
+                        seen.add(job.unique_key())
+                        offers.append(job)
+                        added += 1
+                    if len(offers) >= max_results:
+                        break
+
+                if added == 0:
+                    break
+                start += 25
+                jitter_sleep(config.request_delay)
+        finally:
+            session.close()
 
         return offers
 
@@ -120,7 +128,8 @@ class LinkedInScraper(BaseScraper):
                 source=self.source_name,
                 date_posted=date_posted,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "carte invité")
             return None
 
     # ─── Mode connecté (Playwright) ──────────────────────────────────────────
@@ -160,21 +169,38 @@ class LinkedInScraper(BaseScraper):
                     accept_downloads=False,
                 )
                 page = context.new_page()
-                self._login(page)
+                if not self._login(page):
+                    # Identifiants refusés, captcha ou 2FA : scraper le DOM
+                    # déconnecté renverrait 0 résultat en silence. On le signale
+                    # et on bascule sur le mode invité (fiable sans compte).
+                    log_http_failure(self.source_name,
+                                     "connexion non aboutie — repli sur le mode invité")
+                    try:
+                        from app_utils import console
+                        console.print(
+                            "[yellow]LinkedIn : connexion non aboutie (captcha, 2FA ou "
+                            "identifiants refusés) — repli sur le mode invité.[/yellow]"
+                        )
+                    except Exception:
+                        pass
+                    return self._search_guest(query, location, max_results)
                 offers = self._scrape_jobs(page, query, location, max_results)
             finally:
                 browser.close()
 
         return offers
 
-    def _login(self, page) -> None:
+    def _login(self, page) -> bool:
+        """Tente la connexion et retourne True SEULEMENT si elle a visiblement
+        abouti (page hors login/checkpoint). Un False déclenche le repli invité
+        chez l'appelant — jamais de scraping d'un DOM déconnecté en silence."""
         page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
 
         # Garde-fou anti-hameçonnage : on ne saisit jamais les identifiants si la
         # page n'est pas réellement sur le domaine LinkedIn (redirect/interstitiel
-        # inattendu). Dans ce cas on tente directement la recherche.
+        # inattendu).
         if not str(page.url or "").startswith(("https://www.linkedin.com/", "https://linkedin.com/")):
-            return
+            return False
 
         # LinkedIn peut afficher : formulaire complet, mot de passe seul (session partielle)
         # ou rien (déjà connecté — redirigé vers /feed ou /jobs).
@@ -191,7 +217,7 @@ class LinkedInScraper(BaseScraper):
 
         if not has_username and not has_password:
             # Déjà connecté : LinkedIn a redirigé avant même d'afficher le login.
-            return
+            return True
 
         # Soumettre uniquement si un champ était présent
         try:
@@ -202,8 +228,11 @@ class LinkedInScraper(BaseScraper):
         try:
             page.wait_for_url("**/feed/**", timeout=10000)
         except Exception:
-            # Captcha, 2FA ou redirect inattendu — on continue prudemment
+            # Captcha, 2FA ou redirect inattendu — on laisse la page se poser
+            # puis on tranche sur l'URL réelle.
             page.wait_for_timeout(3000)
+        current = str(page.url or "")
+        return not any(marker in current for marker in ("/login", "/checkpoint", "/uas/"))
 
     def _scrape_jobs(self, page, query: str, location: str, max_results: int) -> list[JobOffer]:
         offers = []
@@ -223,6 +252,7 @@ class LinkedInScraper(BaseScraper):
             if not cards:
                 break
 
+            before = len(offers)
             for card in cards:
                 job = self._parse_card(card)
                 if job and job.unique_key() not in seen:
@@ -231,7 +261,9 @@ class LinkedInScraper(BaseScraper):
                 if len(offers) >= max_results:
                     break
 
-            if len(cards) < 25:
+            # Même page reservie quel que soit `start` (anti-bot) : aucune offre
+            # nouvelle → on arrête au lieu d'aspirer des doublons page après page.
+            if len(offers) == before or len(cards) < 25:
                 break
             start += 25
             jitter_sleep(config.request_delay)
@@ -268,5 +300,6 @@ class LinkedInScraper(BaseScraper):
                 apply_url=url,
                 source=self.source_name,
             )
-        except Exception:
+        except Exception as e:
+            log_parse_error(self.source_name, e, "carte connectée")
             return None

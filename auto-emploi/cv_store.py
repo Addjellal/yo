@@ -335,17 +335,14 @@ class CVStore:
 
     def sync(self, filenames: list[str]) -> None:
         """Enregistre tous les fichiers CV présents non encore connus
-        (CV déposés à la main dans le dossier, ou utilisés via le CLI)."""
-        changed = False
+        (CV déposés à la main dans le dossier, ou utilisés via le CLI).
+        register() sauvegarde déjà à chaque ajout — pas de _save() redondant ici."""
         for name in filenames:
             if self.get(name) is None:
                 try:
                     self.register(name)
-                    changed = True
                 except ValueError:
                     continue
-        if changed:
-            self._save()
 
     def set_label(self, cv_id: str, label: str) -> bool:
         entry = self.get(cv_id)
