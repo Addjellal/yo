@@ -18,6 +18,7 @@ Schneider.
 | 07 | [Suite Siemens](07-siemens.md) | TIA Portal, S7-1200/1500, LADDER, FBD, SCL, GRAFCET, WinCC, PROFINET | Module 00 |
 | 08 | [Suite Schneider](08-schneider.md) | EcoStruxure Control Expert & Machine Expert, M221/M241/M580, IEC 61131-3, HMI Harmony | Module 00 |
 | 09 | [Parcours & ressources](09-parcours-et-ressources.md) | Plan d'apprentissage sur 12 mois, projets, matériel à acheter, ressources gratuites | — |
+| 10 | [STM32](10-stm32.md) | Le micro professionnel : STM32CubeIDE, HAL, clock tree, timers, DMA, NVIC, accès registres, debug SWD, FreeRTOS | Modules 00-01 (02-03 conseillés) |
 
 ## Comment utiliser ce cours
 

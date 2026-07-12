@@ -48,8 +48,8 @@ ET un projet automate simulé avec HMI.
 
 Choisis UNE voie et creuse (c'est ce qui te rend embauchable) :
 
-- **Firmware** : STM32 + HAL + FreeRTOS (module 06 §5), debug SWD, puis
-  refaire un driver en accès registres.
+- **Firmware** : STM32 + HAL + FreeRTOS (module 10 en entier, appuyé sur le
+  module 06 §5), debug SWD, puis refaire un driver en accès registres.
 - **FPGA** : carte réelle (Tang Nano/Basys 3), VGA ou filtre audio, timing.
 - **Automatisme** : Control Expert + un projet complet avec SFC natif,
   variateur simulé, supervision — et candidature en alternance/stage.

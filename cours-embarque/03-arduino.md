@@ -239,6 +239,7 @@ Quand Arduino te semblera petit :
   C'est l'environnement des offres d'emploi « firmware ».
 - Le chemin : refaire la station météo sur STM32 avec la HAL, puis avec
   **FreeRTOS** (module 06), puis en accès registres direct.
+- Tout cela est détaillé pas à pas dans le **[Module 10 — STM32](10-stm32.md)**.
 
 ---
 
