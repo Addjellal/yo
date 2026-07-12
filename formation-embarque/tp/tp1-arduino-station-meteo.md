@@ -4,6 +4,12 @@
 > non bloquant — capteur, affichage, journalisation, réseau — en appliquant
 > `millis()`, la FSM, I2C, SPI et MQTT. C'est le projet vitrine du début de
 > portfolio.
+>
+> 📋 **Version détaillée** : chaque séance existe en fiche minutée avec code
+> complet, erreurs fréquentes et travail à la maison —
+> [Séance 1](tp1-fiches/seance-1.md) · [Séance 2](tp1-fiches/seance-2.md) ·
+> [Séance 3](tp1-fiches/seance-3.md) · [Séance 4](tp1-fiches/seance-4.md).
+> Cette page reste la vue d'ensemble et la grille de notation.
 
 ## Matériel / alternative simulateur
 

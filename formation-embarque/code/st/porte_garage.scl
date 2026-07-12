@@ -1,0 +1,39 @@
+// porte_garage.scl — GRAFCET implémenté en SCL (corrigé TD 07, exercice 3)
+// Corps d'un FB TIA Portal. Interface :
+//   Input  : front_tc, fdc_haut, fdc_bas, obstacle : Bool
+//   Output : monter, descendre : Bool
+//   Static : etape : Int := 0 ; tempo : TON_TIME (instance de TON)
+//
+// GRAFCET : 0 FERMÉE -> 10 OUVERTURE -> 20 OUVERTE (tempo 30 s)
+//           -> 30 FERMETURE -> 0 ; obstacle/télécommande en fermeture -> 10.
+
+CASE #etape OF
+    0:  // FERMÉE
+        #monter := FALSE; #descendre := FALSE;
+        IF #front_tc THEN #etape := 10; END_IF;
+
+    10: // OUVERTURE
+        #monter := TRUE; #descendre := FALSE;
+        IF #fdc_haut THEN #etape := 20; END_IF;
+
+    20: // OUVERTE : temporisation de fermeture automatique
+        #monter := FALSE; #descendre := FALSE;
+        #tempo(IN := TRUE, PT := T#30s);
+        IF #tempo.Q OR #front_tc THEN
+            #tempo(IN := FALSE);            // réarmer la tempo en la quittant
+            #etape := 30;
+        END_IF;
+
+    30: // FERMETURE
+        #descendre := TRUE; #monter := FALSE;
+        IF #obstacle OR #front_tc THEN
+            #etape := 10;                   // priorité : on ROUVRE
+        ELSIF #fdc_bas THEN
+            #etape := 0;
+        END_IF;
+END_CASE;
+
+// Hors CASE : sécurité absolue, quel que soit l'état
+IF #monter AND #descendre THEN              // ne doit JAMAIS arriver
+    #monter := FALSE; #descendre := FALSE; #etape := 0;
+END_IF;

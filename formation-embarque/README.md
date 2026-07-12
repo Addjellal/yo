@@ -12,7 +12,8 @@ Schneider.
 |---|---|---|
 | **Cours** (11 modules) | `NN-*.md` (racine) | La théorie, les exemples commentés, les concepts |
 | **TD — travaux dirigés** | [`td/`](td/) | Exercices d'application avec **corrigés détaillés et commentés** |
-| **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) |
+| **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) ; le TP 1 existe en [fiches minutées séance par séance](tp/tp1-fiches/seance-1.md) |
+| **Code source des corrigés** | [`code/`](code/) | Les corrigés en **vrais projets compilables et testés** (`make test`) : C, C++, Java, VHDL (GHDL), Arduino, Python/Modbus, SCL/ST |
 | **Évaluations** | [`evaluations/`](evaluations/) | QCM de validation (corrigé) + sujets de projets notés avec barème |
 
 **Volume horaire indicatif** (rythme ~6 h/semaine) :
