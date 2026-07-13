@@ -1,0 +1,4 @@
+# artefacts temporaires de génération
+*.html
+_probe*
+_svgtest*

@@ -115,6 +115,8 @@ uint8_t haut = (octet >> 4) & 0x0F; // extraire les 4 bits de poids fort
 uint16_t mot = ((uint16_t)hi << 8) | lo;  // assembler 2 octets en 16 bits
 ```
 
+![Les quatre opérations de bits : set, clear, toggle, test](figures/bit-ops.svg)
+
 **Apprends ces cinq motifs par cœur** (set, clear, toggle, test, masque).
 Ils servent dans chaque driver, chaque registre, chaque trame.
 
@@ -181,6 +183,8 @@ uint8_t *p = &x;    // p contient l'ADRESSE de x   (& = "adresse de")
 uint8_t v = *p;     // v vaut 42                    (* = "valeur pointée")
 *p = 100;           // x vaut maintenant 100
 ```
+
+![Un pointeur contient l'adresse d'une variable](figures/pointeur.svg)
 
 ### 6.1 Pointeurs et tableaux
 
@@ -422,7 +426,10 @@ Tu viens de faire exactement ce que fait l'IDE Arduino — sans lui.
 
 ## 12. Machine d'états : le patron de conception n°1 de l'embarqué
 
-Presque tout firmware est une machine d'états finis (FSM) :
+Presque tout firmware est une machine d'états finis (FSM) — tu retrouveras ce
+même diagramme en C++, en VHDL et en GRAFCET (modules 02, 04, 07) :
+
+![Diagramme d'états d'un feu tricolore](figures/fsm-feu.svg)
 
 ```c
 typedef enum { REPOS, CHAUFFE, MAINTIEN, ERREUR } Etat;

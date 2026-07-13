@@ -8,6 +8,10 @@
 
 ## Module 00 — Fondamentaux (10 questions)
 
+> Aide-mémoire visuel pour les Q1-Q2 :
+>
+> ![Poids des bits et conversion hexa](../figures/binaire-poids.svg)
+
 **Q1.** `0x3C` vaut en décimal : a) 54 b) 60 c) 66 d) 74
 
 **Q2.** Sur 8 bits en complément à deux, `0xFF` représente :

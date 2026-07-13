@@ -21,6 +21,8 @@ binaire :   1    0    1    1
 poids   :   8    4    2    1      → 8 + 0 + 2 + 1 = 11 en décimal
 ```
 
+![Poids des bits sur un octet et conversion en hexadécimal](figures/binaire-poids.svg)
+
 | Décimal | Binaire (4 bits) | Hexadécimal |
 |---------|------------------|-------------|
 | 0  | 0000 | 0x0 |
@@ -125,6 +127,8 @@ raisonne en « que se passe-t-il à chaque front montant ? ».
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+![Blocs d'un microcontrôleur reliés par le bus](figures/mcu-blocs.svg)
+
 - **CPU** : exécute les instructions (chercher → décoder → exécuter).
 - **Flash** : mémoire non volatile où vit le programme (survit à la coupure).
 - **RAM (SRAM)** : mémoire volatile pour les variables, la pile, le tas.
@@ -201,6 +205,8 @@ Rapport cyclique 25 % :  ▔▁▁▁▔▁▁▁   → LED faible, moteur lent
 Rapport cyclique 75 % :  ▔▔▔▁▔▔▔▁   → LED forte, moteur rapide
 ```
 
+![PWM : le rapport cyclique fixe la puissance moyenne](figures/pwm.svg)
+
 Utilisé pour : luminosité de LED, vitesse de moteur, servo-moteurs (impulsion
 de 1 à 2 ms toutes les 20 ms), génération audio simple.
 
@@ -233,6 +239,8 @@ C'est LE sujet qui revient dans tous les entretiens embarqués.
 - Variantes industrielles : **RS-232** (±12 V, point à point),
   **RS-485** (différentiel, multipoint, base du Modbus RTU — voir module 08).
 
+![Trame UART 8N1 pour le caractère 'A'](figures/uart-trame.svg)
+
 ### 5.2 I2C (Inter-Integrated Circuit)
 
 - 2 fils partagés par tous : **SDA** (données) + **SCL** (horloge), avec
@@ -249,6 +257,8 @@ C'est LE sujet qui revient dans tous les entretiens embarqués.
 - Full duplex, très rapide (dizaines de MHz). Idéal pour cartes SD, écrans
   TFT, mémoires flash.
 - Paramètres : polarité et phase d'horloge (modes 0 à 3).
+
+![Topologies I2C (bus partagé) et SPI (un CS par esclave)](figures/bus-i2c-spi.svg)
 
 ### 5.4 CAN (Controller Area Network)
 
@@ -284,6 +294,8 @@ C'est LE sujet qui revient dans tous les entretiens embarqués.
   fonction spéciale (**ISR**, Interrupt Service Routine), puis reprend où il
   en était.
 
+![Polling contre interruption](figures/polling-interruption.svg)
+
 ### 6.2 Règles d'or des ISR
 
 1. **Courtes** : lever un drapeau, stocker une valeur, sortir. Jamais de
@@ -315,6 +327,8 @@ main.c ──[préprocesseur]──> main.i   (macros et #include expansés)
        ──[objcopy]────────> firmware.bin/.hex (image brute à flasher)
        ──[programmateur]──> la puce  (via USB, ST-Link, JTAG/SWD…)
 ```
+
+![La chaîne de compilation, du source à la puce](figures/toolchain.svg)
 
 - **Cross-compilation** : on compile sur PC (x86) *pour* une autre cible
   (ARM) : `arm-none-eabi-gcc`, `avr-gcc`.

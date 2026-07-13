@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 260" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .src{fill:#dbeafe;stroke:#2563eb;stroke-width:1.8}
+    .pll{fill:#fde68a;stroke:#d97706;stroke-width:2}
+    .bus{fill:#d1fae5;stroke:#0d9488;stroke-width:1.8}
+    .t{fill:#1a2332;font-size:12px;font-weight:600;text-anchor:middle}
+    .f{fill:#0f766e;font-size:11px;text-anchor:middle;font-weight:700}
+    .arr{stroke:#334155;stroke-width:2;fill:none;marker-end:url(#ac)}
+    .lab{fill:#475569;font-size:11px}
+  </style>
+  <defs><marker id="ac" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#334155"/></marker></defs>
+  <text x="20" y="24" class="ttl">Arbre d'horloges STM32 — d'où vient la fréquence de chaque bloc</text>
+
+  <!-- sources -->
+  <rect class="src" x="20" y="55" width="90" height="34" rx="5"/>
+  <text class="t" x="65" y="72">HSI 16 MHz</text><text class="lab" x="30" y="86" font-size="9">interne</text>
+  <rect class="src" x="20" y="105" width="90" height="34" rx="5"/>
+  <text class="t" x="65" y="122">HSE (quartz)</text><text class="lab" x="30" y="136" font-size="9">externe</text>
+
+  <!-- PLL -->
+  <rect class="pll" x="170" y="72" width="110" height="50" rx="6"/>
+  <text class="t" x="225" y="92">PLL</text>
+  <text class="lab" x="225" y="110" text-anchor="middle" font-size="10">× N / M / P</text>
+
+  <!-- SYSCLK -->
+  <rect class="bus" x="330" y="80" width="100" height="34" rx="5"/>
+  <text class="t" x="380" y="97">SYSCLK</text>
+  <text class="f" x="380" y="110">100 MHz</text>
+
+  <!-- AHB / APB -->
+  <rect class="bus" x="480" y="45" width="160" height="30" rx="5"/>
+  <text class="t" x="520" y="65">AHB (HCLK)</text><text class="f" x="612" y="65">100 MHz</text>
+  <rect class="bus" x="480" y="90" width="160" height="30" rx="5"/>
+  <text class="t" x="520" y="110">APB1</text><text class="f" x="600" y="110">≤ 50 MHz</text>
+  <rect class="bus" x="480" y="135" width="160" height="30" rx="5"/>
+  <text class="t" x="520" y="155">APB2</text><text class="f" x="600" y="155">100 MHz</text>
+
+  <!-- arrows -->
+  <line class="arr" x1="110" y1="72" x2="168" y2="88"/>
+  <line class="arr" x1="110" y1="122" x2="168" y2="106"/>
+  <line class="arr" x1="280" y1="97" x2="328" y2="97"/>
+  <line class="arr" x1="430" y1="90" x2="478" y2="60"/>
+  <line class="arr" x1="430" y1="97" x2="478" y2="105"/>
+  <line class="arr" x1="430" y1="104" x2="478" y2="150"/>
+
+  <text x="20" y="205" class="lab">→ Chaque périphérique (GPIO, UART, timer…) est cadencé par SON bus. La fréquence d'un timer</text>
+  <text x="20" y="223" class="lab">dépend de l'APB auquel il est accroché : à connaître pour calculer les prescalers (PSC/ARR).</text>
+  <text x="20" y="245" class="lab" fill="#dc2626">⚠ Bug n°1 : oublier d'activer l'horloge du périphérique (RCC) → il « ne répond pas ».</text>
+</svg>

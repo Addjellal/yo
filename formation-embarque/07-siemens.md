@@ -13,6 +13,9 @@
 1. Un PLC exécute un **cycle** permanent : *lire les entrées → exécuter le
    programme → écrire les sorties* (typiquement 1–10 ms par tour). Retiens :
    les entrées sont figées en **mémoire image** pendant tout le cycle.
+
+![Le cycle automate (scan) en trois temps](figures/plc-cycle.svg)
+
 2. Entrées typiques : capteurs TOR (tout-ou-rien : fins de course, cellules),
    analogiques (4–20 mA, 0–10 V), codeurs.
 3. Sorties typiques : contacteurs, électrovannes, variateurs de vitesse,
@@ -113,6 +116,8 @@ droite, à chaque cycle, de haut en bas.
     ──┤ ├───────┘        (contact de maintien en parallèle du bouton)
 ```
 
+![Barreau LADDER : marche/arrêt avec auto-maintien](figures/ladder-automaintien.svg)
+
 - `┤ ├` contact NO (vrai si bit à 1) ; `┤/├` contact NF (vrai si bit à 0).
 - `( )` bobine : écrit le résultat dans le bit.
 - Lecture : le moteur démarre si `bp_marche` ET PAS `bp_arret` ET PAS
@@ -205,6 +210,8 @@ machine en **étapes** (actions) séparées par des **transitions**
    │30 Remonter│ …puis retour à l'étape 0
    └────────┘
 ```
+
+![Structure d'un GRAFCET : étapes, actions et transitions](figures/grafcet.svg)
 
 Chez Siemens, l'éditeur graphique s'appelle **S7-GRAPH** (option, S7-1500).
 Sans lui, on implémente le GRAFCET en SCL avec un `CASE #etape OF …` (voir

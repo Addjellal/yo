@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 240" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .file{fill:#dbeafe;stroke:#2563eb;stroke-width:1.8}
+    .tool{fill:#fef3c7;stroke:#d97706;stroke-width:1.8}
+    .chip{fill:#d1fae5;stroke:#0d9488;stroke-width:2}
+    .fn{fill:#1e40af;font-size:13px;font-weight:700;text-anchor:middle}
+    .tn{fill:#92400e;font-size:11px;text-anchor:middle}
+    .cap{fill:#475569;font-size:10px;text-anchor:middle}
+    .arr{stroke:#334155;stroke-width:2;fill:none;marker-end:url(#a)}
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#334155"/>
+    </marker>
+  </defs>
+  <text x="20" y="24" class="ttl">Chaîne de compilation : du code source à la puce</text>
+
+  <!-- row of files/tools -->
+  <g transform="translate(0,50)">
+    <rect class="file" x="20"  y="20" width="80" height="42" rx="6"/>
+    <text class="fn" x="60" y="40">main.c</text><text class="cap" x="60" y="55">source</text>
+
+    <rect class="tool" x="120" y="20" width="90" height="42" rx="6"/>
+    <text class="tn" x="165" y="38">compilateur</text><text class="cap" x="165" y="54">.c → .s → .o</text>
+
+    <rect class="file" x="230" y="20" width="80" height="42" rx="6"/>
+    <text class="fn" x="270" y="40">main.o</text><text class="cap" x="270" y="55">objet</text>
+
+    <rect class="tool" x="330" y="20" width="95" height="42" rx="6"/>
+    <text class="tn" x="377" y="38">éditeur liens</text><text class="cap" x="377" y="54">+ script .ld</text>
+
+    <rect class="file" x="445" y="20" width="90" height="42" rx="6"/>
+    <text class="fn" x="490" y="40" font-size="12">firmware</text><text class="cap" x="490" y="55">.elf / .hex</text>
+
+    <rect class="chip" x="555" y="14" width="120" height="54" rx="8"/>
+    <text class="fn" x="615" y="35" fill="#0f766e">la PUCE</text><text class="cap" x="615" y="52">USB/SWD/JTAG</text>
+
+    <!-- arrows -->
+    <line class="arr" x1="100" y1="41" x2="118" y2="41"/>
+    <line class="arr" x1="210" y1="41" x2="228" y2="41"/>
+    <line class="arr" x1="310" y1="41" x2="328" y2="41"/>
+    <line class="arr" x1="425" y1="41" x2="443" y2="41"/>
+    <line class="arr" x1="535" y1="41" x2="553" y2="41"/>
+  </g>
+  <text x="350" y="150" class="cap" font-size="13">Cross-compilation : on compile sur PC (x86) POUR une autre cible (ARM, AVR).</text>
+  <text x="350" y="172" class="cap" font-size="13">arm-none-eabi-gcc · avr-gcc · le programmateur écrit l'image dans la Flash.</text>
+</svg>

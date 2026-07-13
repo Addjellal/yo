@@ -1,0 +1,152 @@
+/* Feuille de style des PDF de la formation embarquée */
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+  @bottom-center { content: counter(page) " / " counter(pages); }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: #1a2332;
+  margin: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---- Titres ---- */
+h1 {
+  font-size: 21pt;
+  color: #0f2544;
+  border-bottom: 3px solid #2563eb;
+  padding-bottom: 6px;
+  margin: 0 0 14px 0;
+  line-height: 1.2;
+}
+h2 {
+  font-size: 15.5pt;
+  color: #1d4ed8;
+  margin: 22px 0 8px 0;
+  padding-left: 10px;
+  border-left: 5px solid #2563eb;
+  break-after: avoid;
+}
+h3 {
+  font-size: 12.5pt;
+  color: #0d9488;
+  margin: 16px 0 6px 0;
+  break-after: avoid;
+}
+h4 { font-size: 11pt; color: #475569; margin: 12px 0 4px 0; }
+
+p { margin: 7px 0; }
+
+/* ---- Liens ---- */
+a { color: #2563eb; text-decoration: none; }
+
+/* ---- Listes ---- */
+ul, ol { margin: 7px 0; padding-left: 22px; }
+li { margin: 3px 0; }
+
+/* ---- Code ---- */
+code {
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+  font-size: 9pt;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #b91c1c;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 8.6pt;
+  line-height: 1.45;
+  break-inside: avoid;
+  margin: 10px 0;
+}
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+/* Pygments (fond sombre) — couleurs de coloration syntaxique */
+.codehilite { background: #0f172a; border-radius: 8px; margin: 10px 0; break-inside: avoid; }
+.codehilite pre { margin: 0; }
+.codehilite .k, .codehilite .kd, .codehilite .kt, .codehilite .kn, .codehilite .kc { color: #93c5fd; font-weight: 600; } /* keywords/types */
+.codehilite .c, .codehilite .c1, .codehilite .cm, .codehilite .cp, .codehilite .cpf { color: #94a3b8; font-style: italic; } /* comments */
+.codehilite .s, .codehilite .s1, .codehilite .s2, .codehilite .sc { color: #86efac; } /* strings */
+.codehilite .mi, .codehilite .mf, .codehilite .mh, .codehilite .il { color: #fdba74; } /* numbers */
+.codehilite .nf, .codehilite .fm { color: #67e8f9; } /* function names */
+.codehilite .o, .codehilite .p { color: #cbd5e1; } /* operators/punct */
+.codehilite .nb, .codehilite .bp { color: #c4b5fd; } /* builtins */
+.codehilite .cp { color: #f9a8d4; } /* preprocessor */
+
+/* ---- Tableaux ---- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  font-size: 9.2pt;
+  break-inside: avoid;
+}
+th {
+  background: #1e3a8a;
+  color: #fff;
+  text-align: left;
+  padding: 6px 9px;
+  font-weight: 600;
+}
+td { padding: 5px 9px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+tr:nth-child(even) td { background: #f8fafc; }
+
+/* ---- Citations / callouts ---- */
+blockquote {
+  margin: 12px 0;
+  padding: 10px 16px;
+  background: #eff6ff;
+  border-left: 5px solid #2563eb;
+  border-radius: 0 6px 6px 0;
+  color: #1e3a5f;
+}
+blockquote p { margin: 4px 0; }
+
+/* ---- Images / figures ---- */
+img {
+  max-width: 100%;
+  display: block;
+  margin: 14px auto;
+  break-inside: avoid;
+}
+figure { margin: 14px 0; break-inside: avoid; text-align: center; }
+figcaption { font-size: 9pt; color: #64748b; font-style: italic; margin-top: 4px; }
+
+hr { border: none; border-top: 2px solid #e2e8f0; margin: 20px 0; }
+
+/* ---- Séparateurs de fichiers (quand plusieurs docs fusionnés) ---- */
+.page-break { break-before: page; }
+
+/* ---- Couverture ---- */
+.cover {
+  break-after: page;
+  text-align: center;
+  padding-top: 60mm;
+}
+.cover .badge {
+  display: inline-block;
+  background: #2563eb;
+  color: #fff;
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 11pt;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+.cover h1 { border: none; font-size: 30pt; color: #0f2544; }
+.cover .sub { font-size: 13pt; color: #475569; margin-top: 10px; }
+.cover .meta { margin-top: 40mm; font-size: 10pt; color: #94a3b8; }
+
+strong { color: #0f2544; }

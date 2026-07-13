@@ -157,6 +157,8 @@ Sur un Modicon, les holding registers correspondent naturellement aux
 C'est pour ça que les échanges HMI/SCADA/supervision Java (module 05 §7.1)
 se câblent si vite sur du Schneider.
 
+![Chaîne automate ↔ supervision via Modbus TCP](figures/modbus-supervision.svg)
+
 ### 5.2 Pièges classiques
 
 - Décalage d'adresse « +1 » (adresse protocole 0 = registre « 40001 » des

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 320" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:14px;font-weight:700}
+    .box{fill:#f8fafc;stroke:#334155;stroke-width:1.8;rx:6}
+    .m{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+    .s{fill:#fef3c7;stroke:#d97706;stroke-width:1.8}
+    .t{fill:#1a2332;font-size:12px;font-weight:600;text-anchor:middle}
+    .w{stroke:#0d9488;stroke-width:2;fill:none}
+    .ws{stroke:#dc2626;stroke-width:2;fill:none}
+    .lab{fill:#475569;font-size:11px}
+    .pull{fill:#dc2626;font-size:11px}
+  </style>
+  <!-- I2C -->
+  <text x="20" y="24" class="ttl">I2C — 2 fils partagés (SDA + SCL), adressage 7 bits</text>
+  <g transform="translate(0,34)">
+    <rect class="box m" x="20" y="10" width="110" height="46"/>
+    <text class="t" x="75" y="30">Maître</text><text class="t" x="75" y="46" font-size="10">(µC)</text>
+    <rect class="box s" x="200" y="10" width="90" height="46"/>
+    <text class="t" x="245" y="30">Capteur</text><text class="t" x="245" y="46" font-size="10">0x68</text>
+    <rect class="box s" x="330" y="10" width="90" height="46"/>
+    <text class="t" x="375" y="30">RTC</text><text class="t" x="375" y="46" font-size="10">0x51</text>
+    <rect class="box s" x="460" y="10" width="90" height="46"/>
+    <text class="t" x="505" y="30">OLED</text><text class="t" x="505" y="46" font-size="10">0x3C</text>
+    <!-- SDA line -->
+    <line class="w" x1="75" y1="72" x2="620" y2="72"/>
+    <text class="lab" x="628" y="76" fill="#0d9488" font-weight="700">SDA</text>
+    <!-- SCL line -->
+    <line class="w" x1="75" y1="92" x2="620" y2="92"/>
+    <text class="lab" x="628" y="96" fill="#0d9488" font-weight="700">SCL</text>
+    <!-- drops -->
+    <line class="w" x1="75" y1="56" x2="75" y2="72"/>
+    <line class="w" x1="245" y1="56" x2="245" y2="72"/>
+    <line class="w" x1="375" y1="56" x2="375" y2="72"/>
+    <line class="w" x1="505" y1="56" x2="505" y2="72"/>
+    <line class="w" x1="245" y1="56" x2="245" y2="92" stroke-dasharray="2 2"/>
+    <!-- pull-ups -->
+    <line class="w" x1="600" y1="72" x2="600" y2="55"/>
+    <line class="w" x1="610" y1="92" x2="610" y2="55"/>
+    <text class="pull" x="596" y="50">↑ pull-ups obligatoires</text>
+  </g>
+
+  <!-- SPI -->
+  <text x="20" y="184" class="ttl">SPI — full duplex, 1 fil CS par esclave (rapide : dizaines de MHz)</text>
+  <g transform="translate(0,194)">
+    <rect class="box m" x="20" y="10" width="110" height="90"/>
+    <text class="t" x="75" y="30">Maître</text>
+    <text class="lab" x="132" y="45">SCK</text>
+    <text class="lab" x="132" y="62">MOSI</text>
+    <text class="lab" x="132" y="79">MISO</text>
+    <text class="lab" x="132" y="96">CS1/CS2</text>
+    <rect class="box s" x="380" y="10" width="100" height="38"/>
+    <text class="t" x="430" y="33">Écran TFT</text>
+    <rect class="box s" x="380" y="62" width="100" height="38"/>
+    <text class="t" x="430" y="85">Carte SD</text>
+    <!-- shared clk/mosi/miso -->
+    <line class="w" x1="130" y1="40" x2="380" y2="26"/>
+    <line class="w" x1="130" y1="55" x2="380" y2="36"/>
+    <line class="w" x1="130" y1="70" x2="380" y2="46"/>
+    <line class="w" x1="130" y1="40" x2="380" y2="78" stroke-dasharray="2 2"/>
+    <!-- dedicated CS -->
+    <line class="ws" x1="130" y1="90" x2="380" y2="18"/>
+    <line class="ws" x1="130" y1="95" x2="380" y2="92"/>
+    <text class="lab" x="250" y="14" fill="#dc2626" font-weight="700">CS dédié à chacun</text>
+  </g>
+</svg>

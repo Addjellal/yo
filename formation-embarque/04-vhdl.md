@@ -85,6 +85,8 @@ Utilise `unsigned`/`signed` (de `numeric_std`) pour tout ce qui compte,
 
 ## 3. Concurrent vs séquentiel : le cœur du VHDL
 
+![Logique combinatoire (sans mémoire) contre séquentielle (registre cadencé)](figures/vhdl-comb-seq.svg)
+
 ### 3.1 Instructions concurrentes (hors process)
 
 Chaque ligne décrit un morceau de circuit **permanent et simultané** —

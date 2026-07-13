@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .h{fill:#1a2332;font-size:13px;font-weight:700;text-anchor:middle}
+    .cpu{fill:#dbeafe;stroke:#2563eb;stroke-width:1.8}
+    .busy{fill:#fee2e2;stroke:#dc2626;stroke-width:1.8}
+    .free{fill:#d1fae5;stroke:#0d9488;stroke-width:1.8}
+    .lab{fill:#475569;font-size:11px;text-anchor:middle}
+    .box{stroke-width:1.8;rx:5}
+  </style>
+  <text x="20" y="24" class="ttl">Les 3 modes de transfert — qui occupe le CPU ?</text>
+
+  <!-- Polling -->
+  <g transform="translate(30,45)">
+    <text class="h" x="90" y="14">Polling (bloquant)</text>
+    <rect class="box busy" x="0" y="25" width="180" height="40" rx="5"/>
+    <text class="lab" x="90" y="48" font-weight="700" fill="#b91c1c">CPU OCCUPÉ à attendre</text>
+    <text class="lab" x="90" y="82">simple, mais gaspille tout le CPU</text>
+  </g>
+
+  <!-- Interrupt -->
+  <g transform="translate(230,45)">
+    <text class="h" x="90" y="14">Interruption</text>
+    <rect class="box free" x="0" y="25" width="140" height="40" rx="5"/>
+    <rect class="box busy" x="140" y="25" width="40" height="40" rx="5"/>
+    <text class="lab" x="70" y="48" fill="#0f766e">CPU libre</text>
+    <text class="lab" x="160" y="48" font-size="9" fill="#b91c1c">ISR</text>
+    <text class="lab" x="90" y="82">libre, sauf une courte ISR à la fin</text>
+  </g>
+
+  <!-- DMA -->
+  <g transform="translate(430,45)">
+    <text class="h" x="90" y="14">DMA</text>
+    <rect class="box free" x="0" y="25" width="180" height="40" rx="5"/>
+    <text class="lab" x="90" y="48" font-weight="700" fill="#0f766e">CPU 100 % LIBRE</text>
+    <text class="lab" x="90" y="82">transfert mémoire↔périph. sans CPU</text>
+  </g>
+
+  <!-- illustration DMA -->
+  <g transform="translate(0,150)">
+    <rect class="cpu box" x="60" y="10" width="90" height="40"/>
+    <text class="h" x="105" y="34">CPU</text>
+    <rect class="free box" x="260" y="10" width="90" height="40"/>
+    <text class="h" x="305" y="30" font-size="12">ADC</text>
+    <rect class="free box" x="460" y="10" width="120" height="40"/>
+    <text class="h" x="520" y="30" font-size="12">tableau[] RAM</text>
+    <!-- DMA arrow bypassing CPU -->
+    <path d="M350,30 C400,30 420,30 458,30" stroke="#0d9488" stroke-width="2.5" fill="none" marker-end="url(#ad)"/>
+    <text class="lab" x="405" y="20" fill="#0f766e" font-weight="700">DMA</text>
+    <text class="lab" x="405" y="70">« ADC circulaire + DMA » : le tableau se remplit tout seul</text>
+  </g>
+  <defs><marker id="ad" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#0d9488"/></marker></defs>
+</svg>

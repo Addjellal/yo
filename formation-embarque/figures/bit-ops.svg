@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 250" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .op{fill:#1e40af;font-size:13px;font-weight:700;font-family:monospace}
+    .cell{fill:#f1f5f9;stroke:#cbd5e1;stroke-width:1.2}
+    .on{fill:#dbeafe;stroke:#2563eb;stroke-width:1.6}
+    .chg{fill:#fde68a;stroke:#d97706;stroke-width:1.8}
+    .b{fill:#1a2332;font-size:14px;font-weight:700;text-anchor:middle}
+    .desc{fill:#475569;font-size:12px}
+  </style>
+  <text x="20" y="24" class="ttl">Les 4 opérations de bits fondamentales (bit 3 ciblé)</text>
+
+  <!-- helper macro: each row draws 8 bits -->
+  <!-- SET -->
+  <g transform="translate(30,45)">
+    <text class="op" x="0" y="18">SET</text>
+    <text class="op" x="0" y="34" font-size="11">r |= (1&lt;&lt;3)</text>
+    <g transform="translate(120,4)">
+      <rect class="cell" x="0" y="0" width="26" height="26"/><rect class="cell" x="28" y="0" width="26" height="26"/><rect class="cell" x="56" y="0" width="26" height="26"/><rect class="cell" x="84" y="0" width="26" height="26"/><rect class="chg" x="112" y="0" width="26" height="26"/><rect class="cell" x="140" y="0" width="26" height="26"/><rect class="cell" x="168" y="0" width="26" height="26"/><rect class="cell" x="196" y="0" width="26" height="26"/>
+      <text class="b" x="13" y="18">0</text><text class="b" x="41" y="18">0</text><text class="b" x="69" y="18">0</text><text class="b" x="97" y="18">0</text><text class="b" x="125" y="18" fill="#b45309">1</text><text class="b" x="153" y="18">0</text><text class="b" x="181" y="18">0</text><text class="b" x="209" y="18">0</text>
+    </g>
+    <text class="desc" x="360" y="22">bit 3 → 1</text>
+  </g>
+  <!-- CLEAR -->
+  <g transform="translate(30,95)">
+    <text class="op" x="0" y="18">CLEAR</text>
+    <text class="op" x="0" y="34" font-size="11">r &amp;= ~(1&lt;&lt;3)</text>
+    <g transform="translate(120,4)">
+      <rect class="on" x="0" y="0" width="26" height="26"/><rect class="on" x="28" y="0" width="26" height="26"/><rect class="on" x="56" y="0" width="26" height="26"/><rect class="on" x="84" y="0" width="26" height="26"/><rect class="chg" x="112" y="0" width="26" height="26"/><rect class="on" x="140" y="0" width="26" height="26"/><rect class="on" x="168" y="0" width="26" height="26"/><rect class="on" x="196" y="0" width="26" height="26"/>
+      <text class="b" x="13" y="18">1</text><text class="b" x="41" y="18">1</text><text class="b" x="69" y="18">1</text><text class="b" x="97" y="18">1</text><text class="b" x="125" y="18" fill="#b45309">0</text><text class="b" x="153" y="18">1</text><text class="b" x="181" y="18">1</text><text class="b" x="209" y="18">1</text>
+    </g>
+    <text class="desc" x="360" y="22">bit 3 → 0</text>
+  </g>
+  <!-- TOGGLE -->
+  <g transform="translate(30,145)">
+    <text class="op" x="0" y="18">TOGGLE</text>
+    <text class="op" x="0" y="34" font-size="11">r ^= (1&lt;&lt;3)</text>
+    <g transform="translate(120,4)">
+      <rect class="cell" x="0" y="0" width="26" height="26"/><rect class="cell" x="28" y="0" width="26" height="26"/><rect class="cell" x="56" y="0" width="26" height="26"/><rect class="cell" x="84" y="0" width="26" height="26"/><rect class="chg" x="112" y="0" width="26" height="26"/><rect class="cell" x="140" y="0" width="26" height="26"/><rect class="cell" x="168" y="0" width="26" height="26"/><rect class="cell" x="196" y="0" width="26" height="26"/>
+      <text class="b" x="13" y="18">0</text><text class="b" x="41" y="18">0</text><text class="b" x="69" y="18">0</text><text class="b" x="97" y="18">0</text><text class="b" x="125" y="18" fill="#b45309">↕</text><text class="b" x="153" y="18">0</text><text class="b" x="181" y="18">0</text><text class="b" x="209" y="18">0</text>
+    </g>
+    <text class="desc" x="360" y="22">bit 3 inversé</text>
+  </g>
+  <!-- TEST -->
+  <g transform="translate(30,195)">
+    <text class="op" x="0" y="18">TEST</text>
+    <text class="op" x="0" y="34" font-size="11">r &amp; (1&lt;&lt;3)</text>
+    <g transform="translate(120,4)">
+      <rect class="cell" x="0" y="0" width="26" height="26"/><rect class="cell" x="28" y="0" width="26" height="26"/><rect class="cell" x="56" y="0" width="26" height="26"/><rect class="cell" x="84" y="0" width="26" height="26"/><rect class="chg" x="112" y="0" width="26" height="26"/><rect class="cell" x="140" y="0" width="26" height="26"/><rect class="cell" x="168" y="0" width="26" height="26"/><rect class="cell" x="196" y="0" width="26" height="26"/>
+      <text class="b" x="13" y="18">?</text><text class="b" x="41" y="18">?</text><text class="b" x="69" y="18">?</text><text class="b" x="97" y="18">?</text><text class="b" x="125" y="18" fill="#b45309">?</text><text class="b" x="153" y="18">?</text><text class="b" x="181" y="18">?</text><text class="b" x="209" y="18">?</text>
+    </g>
+    <text class="desc" x="360" y="22">lit le bit 3 (≠0 si à 1)</text>
+  </g>
+</svg>

@@ -29,6 +29,8 @@ RX  ──┐start┌─b0─┐b1──┐ ...
       ½bit +1bit +1bit    ← instants d'échantillonnage (milieu de bit)
 ```
 
+![Échantillonnage au milieu de chaque bit côté récepteur](../../figures/uart-rx-echantillon.svg)
+
 Pourquoi le milieu et pas le bord ? Aux bords, le signal transitionne
 (temps de montée, désynchronisation résiduelle) : c'est là qu'on se trompe.
 Au milieu, on a la marge maximale de part et d'autre.

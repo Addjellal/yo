@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 240" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .cell{fill:#f8fafc;stroke:#334155;stroke-width:1.8}
+    .var{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+    .ptr{fill:#fef3c7;stroke:#d97706;stroke-width:2}
+    .nm{fill:#1a2332;font-size:13px;font-weight:700;text-anchor:middle}
+    .val{fill:#1a2332;font-size:16px;font-weight:700;text-anchor:middle}
+    .adr{fill:#64748b;font-size:11px;text-anchor:middle;font-family:monospace}
+    .code{fill:#0d9488;font-size:13px;font-family:monospace}
+    .arr{stroke:#d97706;stroke-width:2.5;fill:none;marker-end:url(#ap)}
+  </style>
+  <defs>
+    <marker id="ap" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#d97706"/>
+    </marker>
+  </defs>
+  <text x="20" y="26" class="ttl">Un pointeur contient l'ADRESSE d'une autre variable</text>
+
+  <!-- variable x -->
+  <g transform="translate(60,70)">
+    <rect class="cell var" x="0" y="0" width="120" height="60" rx="6"/>
+    <text class="nm" x="60" y="-10">uint8_t x</text>
+    <text class="val" x="60" y="38">42</text>
+    <text class="adr" x="60" y="80">adresse 0x2000</text>
+  </g>
+
+  <!-- pointer p -->
+  <g transform="translate(360,70)">
+    <rect class="cell ptr" x="0" y="0" width="150" height="60" rx="6"/>
+    <text class="nm" x="75" y="-10">uint8_t *p</text>
+    <text class="val" x="75" y="38" font-family="monospace" font-size="14">0x2000</text>
+    <text class="adr" x="75" y="80">adresse 0x2004</text>
+  </g>
+
+  <!-- arrow p -> x -->
+  <path class="arr" d="M355,95 C300,150 240,150 185,100"/>
+  <text x="270" y="165" class="adr" fill="#d97706">p « pointe vers » x</text>
+
+  <text x="60" y="215" class="code">uint8_t *p = &amp;x;   // p reçoit l'adresse de x</text>
+  <text x="60" y="234" class="code">*p = 100;          // écrit 100 DANS x  (déréférencement)</text>
+</svg>

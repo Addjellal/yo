@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 300" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .green{fill:#dcfce7;stroke:#16a34a;stroke-width:2.5}
+    .orange{fill:#ffedd5;stroke:#ea580c;stroke-width:2.5}
+    .red{fill:#fee2e2;stroke:#dc2626;stroke-width:2.5}
+    .st{fill:#1a2332;font-size:15px;font-weight:700;text-anchor:middle}
+    .cond{fill:#475569;font-size:11px;text-anchor:middle}
+    .arr{stroke:#334155;stroke-width:2;fill:none;marker-end:url(#af)}
+  </style>
+  <defs>
+    <marker id="af" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#334155"/>
+    </marker>
+  </defs>
+  <text x="20" y="24" class="ttl">Machine à états — feu tricolore (le motif récurrent du cours)</text>
+
+  <circle class="green"  cx="120" cy="120" r="52"/>
+  <text class="st" x="120" y="118">VERT</text>
+  <text class="cond" x="120" y="136">5 s</text>
+
+  <circle class="orange" cx="400" cy="120" r="52"/>
+  <text class="st" x="400" y="118">ORANGE</text>
+  <text class="cond" x="400" y="136">1 s</text>
+
+  <circle class="red"    cx="260" cy="240" r="52"/>
+  <text class="st" x="260" y="238">ROUGE</text>
+  <text class="cond" x="260" y="256">5 s</text>
+
+  <!-- vert -> orange -->
+  <path class="arr" d="M172,110 C240,80 330,80 350,105"/>
+  <text class="cond" x="262" y="72">5 s écoulées OU appui piéton (≥1 s)</text>
+  <!-- orange -> rouge -->
+  <path class="arr" d="M390,168 C365,205 335,215 305,222"/>
+  <text class="cond" x="385" y="205">1 s</text>
+  <!-- rouge -> vert -->
+  <path class="arr" d="M212,255 C150,255 105,210 108,172"/>
+  <text class="cond" x="120" y="235">5 s</text>
+</svg>

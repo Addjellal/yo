@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .lbl{fill:#475569;font-size:12px;text-anchor:middle}
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .sig{fill:none;stroke:#2563eb;stroke-width:2.5}
+    .start{fill:#fee2e2;stroke:#dc2626;stroke-width:1.5}
+    .data{fill:#dbeafe;stroke:#2563eb;stroke-width:1.5}
+    .stop{fill:#d1fae5;stroke:#0d9488;stroke-width:1.5}
+    .bitv{fill:#1a2332;font-size:14px;font-weight:700;text-anchor:middle}
+  </style>
+  <text x="20" y="26" class="ttl">Trame UART 8N1 — caractère 'A' = 0x41 = 0100 0001 (LSB d'abord)</text>
+
+  <!-- zones background -->
+  <g transform="translate(40,50)">
+    <rect class="start" x="0"   y="0" width="55" height="90"/>
+    <rect class="data"  x="55"  y="0" width="440" height="90"/>
+    <rect class="stop"  x="495" y="0" width="55" height="90"/>
+
+    <!-- idle line before/after -->
+    <line class="sig" x1="-30" y1="10" x2="0" y2="10"/>
+    <!-- start bit (low) -->
+    <line class="sig" x1="0" y1="10" x2="0" y2="80"/>
+    <line class="sig" x1="0" y1="80" x2="55" y2="80"/>
+    <!-- data bits: A=0100 0001 -> LSB first: 1,0,0,0,0,0,1,0 -->
+    <!-- b0=1 -->
+    <line class="sig" x1="55" y1="80" x2="55" y2="10"/>
+    <line class="sig" x1="55" y1="10" x2="110" y2="10"/>
+    <!-- b1=0 -->
+    <line class="sig" x1="110" y1="10" x2="110" y2="80"/>
+    <line class="sig" x1="110" y1="80" x2="275" y2="80"/>
+    <!-- b2..b5 = 0 (stay low) through x=275 -->
+    <!-- b6=1 -->
+    <line class="sig" x1="275" y1="80" x2="275" y2="10"/>
+    <line class="sig" x1="275" y1="10" x2="330" y2="10"/>
+    <!-- b7=0 -->
+    <line class="sig" x1="330" y1="10" x2="330" y2="80"/>
+    <line class="sig" x1="330" y1="80" x2="495" y2="80"/>
+    <!-- stop bit high -->
+    <line class="sig" x1="495" y1="80" x2="495" y2="10"/>
+    <line class="sig" x1="495" y1="10" x2="580" y2="10"/>
+
+    <!-- bit labels -->
+    <text class="lbl" x="27"  y="110" fill="#dc2626" font-weight="700">START</text>
+    <text class="bitv" x="82"  y="105">1</text>
+    <text class="bitv" x="137" y="105">0</text>
+    <text class="bitv" x="192" y="105">0</text>
+    <text class="bitv" x="247" y="105">0</text>
+    <text class="bitv" x="302" y="105">0</text>
+    <text class="bitv" x="357" y="105">0</text>
+    <text class="bitv" x="412" y="105">1</text>
+    <text class="bitv" x="467" y="105">0</text>
+    <text class="lbl" x="522" y="110" fill="#0d9488" font-weight="700">STOP</text>
+
+    <text class="lbl" x="275" y="128" font-size="11">b0  b1  b2  b3  b4  b5  b6  b7</text>
+    <!-- high/low guide -->
+    <text class="lbl" x="-45" y="14" text-anchor="end" font-size="11">'1'</text>
+    <text class="lbl" x="-45" y="84" text-anchor="end" font-size="11">'0'</text>
+  </g>
+  <text x="40" y="205" class="lbl" text-anchor="start" font-size="12">Repos = état haut · 1 bit de start (bas) · 8 bits de données · 1 bit de stop (haut)</text>
+  <text x="40" y="224" class="lbl" text-anchor="start" font-size="12">À 9600 bauds : 1 bit ≈ 104 µs, trame ≈ 1,04 ms → 960 octets/s max</text>
+</svg>
