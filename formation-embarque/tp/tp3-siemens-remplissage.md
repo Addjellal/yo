@@ -4,6 +4,12 @@
 > règles de l'art** : analyse fonctionnelle → liste d'E/S → GRAFCET → blocs
 > structurés → HMI → recette de test. C'est la démarche qu'on te demandera
 > en bureau d'études, pas seulement « faire marcher ».
+>
+> 📋 **Fiches minutées séance par séance** :
+> [Séance 1 — Analyse](tp3-fiches/seance-1.md) ·
+> [Séance 2 — Programme](tp3-fiches/seance-2.md) ·
+> [Séance 3 — PLCSIM](tp3-fiches/seance-3.md) ·
+> [Séance 4 — HMI](tp3-fiches/seance-4.md).
 
 ## Outils
 

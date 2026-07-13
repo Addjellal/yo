@@ -5,6 +5,11 @@
 > Modbus TCP lue par un client PC (Python ou ton programme Java du module
 > 05). C'est le pont automatisme ↔ informatique.
 
+> 📋 **Fiches minutées séance par séance** :
+> [Séance 1 — Programme M221](tp4-fiches/seance-1.md) ·
+> [Séance 2 — Table Modbus](tp4-fiches/seance-2.md) ·
+> [Séance 3 — Supervision PC](tp4-fiches/seance-3.md).
+
 ## Outils
 
 - **EcoStruxure Machine Expert – Basic** (gratuit) + son simulateur M221.

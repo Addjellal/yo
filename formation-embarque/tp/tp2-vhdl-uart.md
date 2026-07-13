@@ -4,6 +4,11 @@
 > matériel complet — émetteur + récepteur UART avec anti-métastabilité et
 > sur-échantillonnage — en appliquant la méthode professionnelle :
 > spécification → schéma → code → testbench → chronogramme.
+>
+> 📋 **Fiches minutées séance par séance** :
+> [Séance 1](tp2-fiches/seance-1.md) · [Séance 2](tp2-fiches/seance-2.md) ·
+> [Séance 3](tp2-fiches/seance-3.md). Cette page est la vue d'ensemble et la
+> grille de notation.
 
 ## Outils
 

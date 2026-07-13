@@ -4,6 +4,12 @@
 > environnement professionnel — Nucleo, HAL, drivers écrits maison, DMA,
 > puis architecture multi-tâches FreeRTOS. À la fin, tu as le projet
 > « candidature firmware junior » type.
+>
+> 📋 **Fiches minutées séance par séance** :
+> [Séance 1 — Socle](tp5-fiches/seance-1.md) ·
+> [Séance 2 — Driver BME280](tp5-fiches/seance-2.md) ·
+> [Séance 3 — ADC/DMA + console](tp5-fiches/seance-3.md) ·
+> [Séance 4 — FreeRTOS](tp5-fiches/seance-4.md).
 
 ## Matériel
 
