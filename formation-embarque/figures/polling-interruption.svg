@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .h{fill:#1a2332;font-size:13px;font-weight:700}
+    .loop{fill:#dbeafe;stroke:#2563eb;stroke-width:1.8}
+    .isr{fill:#fee2e2;stroke:#dc2626;stroke-width:1.8}
+    .lab{fill:#475569;font-size:11px}
+    .arr{stroke:#334155;stroke-width:1.8;fill:none;marker-end:url(#ai)}
+  </style>
+  <defs><marker id="ai" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#334155"/></marker></defs>
+  <text x="20" y="24" class="ttl">Polling vs Interruption</text>
+
+  <!-- Polling -->
+  <g transform="translate(30,45)">
+    <text class="h" x="0" y="10">Polling — la boucle DEMANDE sans cesse</text>
+    <rect class="loop" x="20" y="25" width="240" height="30" rx="5"/>
+    <text class="lab" x="30" y="45">while(1){ bouton appuyé ? ... }</text>
+    <path class="arr" d="M260,40 C300,40 300,70 260,70"/>
+    <rect class="loop" x="20" y="60" width="240" height="30" rx="5"/>
+    <text class="lab" x="30" y="80">gaspille du CPU, peut rater un événement</text>
+  </g>
+
+  <!-- Interrupt -->
+  <g transform="translate(350,45)">
+    <text class="h" x="0" y="10">Interruption — le matériel PRÉVIENT</text>
+    <rect class="loop" x="20" y="25" width="230" height="60" rx="5"/>
+    <text class="lab" x="30" y="48">programme principal</text>
+    <text class="lab" x="30" y="66">(fait autre chose)</text>
+    <rect class="isr" x="60" y="100" width="150" height="34" rx="5"/>
+    <text class="lab" x="70" y="121" fill="#b91c1c">ISR : courte, un drapeau</text>
+    <path class="arr" d="M135,85 L135,98"/>
+    <path class="arr" d="M175,132 C210,120 210,95 178,86"/>
+    <text class="lab" x="225" y="112">reprend où il en était</text>
+  </g>
+  <text x="30" y="215" class="lab" font-size="12">Règle d'or : une ISR lève un drapeau (volatile !), stocke une valeur, et sort. Jamais de delay(), de printf, d'allocation.</text>
+</svg>

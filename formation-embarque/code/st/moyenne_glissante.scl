@@ -1,0 +1,32 @@
+// moyenne_glissante.scl — FB Siemens SCL (corrigé TD 07, exercice 2)
+// À coller dans le corps d'un FB TIA Portal dont l'interface est :
+//   Input  : nouvelle_mesure : Real ; echantillonner : Bool
+//   Output : moyenne : Real
+//   Static : mesures : Array[0..9] of Real ; index : Int ;
+//            nb_valides : Int ; echant_prec : Bool
+//   Temp   : i : Int ; somme : Real
+//
+// Instancier deux fois = deux DB d'instance = deux "objets" indépendants.
+
+// Détection de front montant : le FB est appelé À CHAQUE CYCLE ;
+// sans front, la même mesure serait stockée des centaines de fois/s.
+IF #echantillonner AND NOT #echant_prec THEN
+    #mesures[#index] := #nouvelle_mesure;
+    #index := (#index + 1) MOD 10;          // tampon circulaire
+    IF #nb_valides < 10 THEN
+        #nb_valides := #nb_valides + 1;     // démarrage progressif
+    END_IF;
+END_IF;
+#echant_prec := #echantillonner;
+
+// Moyenne sur les échantillons réellement présents
+#somme := 0.0;
+FOR #i := 0 TO #nb_valides - 1 DO
+    #somme := #somme + #mesures[#i];
+END_FOR;
+
+IF #nb_valides > 0 THEN
+    #moyenne := #somme / INT_TO_REAL(#nb_valides);
+ELSE
+    #moyenne := 0.0;                        // jamais de division par zéro
+END_IF;

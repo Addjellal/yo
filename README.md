@@ -6,6 +6,7 @@ configuration.
 | Projet | Description |
 |---|---|
 | [`auto-emploi/`](auto-emploi/) | Recherche d'emploi automatisée : interface web locale (`python web.py`), scraping multi-sources, matching IA (Claude Fable 5), lettres de motivation, suivi de candidatures et relances. |
+| [`formation-embarque/`](formation-embarque/) | Formation complète systèmes embarqués & bas niveau : fondamentaux, C, C++, Arduino, VHDL/FPGA, Java, assembleur/Rust/RTOS, automates Siemens (TIA Portal) et Schneider (EcoStruxure), plan d'apprentissage sur 12 mois. |
 
 ## Démarrer un projet
 

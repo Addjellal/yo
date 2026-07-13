@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 220" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .sig{fill:none;stroke:#2563eb;stroke-width:2.5}
+    .samp{stroke:#dc2626;stroke-width:1.5;stroke-dasharray:3 3}
+    .dot{fill:#dc2626}
+    .lab{fill:#475569;font-size:11px;text-anchor:middle}
+    .bit{fill:#1a2332;font-size:12px;font-weight:700;text-anchor:middle}
+  </style>
+  <text x="20" y="24" class="ttl">Récepteur UART — échantillonnage au MILIEU de chaque bit</text>
+
+  <g transform="translate(40,50)">
+    <!-- idle -->
+    <line class="sig" x1="-20" y1="10" x2="20" y2="10"/>
+    <!-- start low -->
+    <line class="sig" x1="20" y1="10" x2="20" y2="70"/>
+    <line class="sig" x1="20" y1="70" x2="100" y2="70"/>
+    <!-- b0 high -->
+    <line class="sig" x1="100" y1="70" x2="100" y2="10"/>
+    <line class="sig" x1="100" y1="10" x2="180" y2="10"/>
+    <!-- b1 low -->
+    <line class="sig" x1="180" y1="10" x2="180" y2="70"/>
+    <line class="sig" x1="180" y1="70" x2="260" y2="70"/>
+    <!-- b2 high -->
+    <line class="sig" x1="260" y1="70" x2="260" y2="10"/>
+    <line class="sig" x1="260" y1="10" x2="340" y2="10"/>
+    <!-- b3 high -->
+    <line class="sig" x1="340" y1="10" x2="420" y2="10"/>
+
+    <!-- sample points: mid of start (x=60), then every 80px -->
+    <g>
+      <line class="samp" x1="60" y1="0" x2="60" y2="95"/>
+      <circle class="dot" cx="60" cy="70" r="4"/>
+      <text class="lab" x="60" y="112" fill="#dc2626">½ bit</text>
+      <text class="lab" x="60" y="126" font-size="9">vérif start</text>
+
+      <line class="samp" x1="140" y1="0" x2="140" y2="95"/>
+      <circle class="dot" cx="140" cy="10" r="4"/>
+      <text class="bit" x="140" y="112">b0=1</text>
+
+      <line class="samp" x1="220" y1="0" x2="220" y2="95"/>
+      <circle class="dot" cx="220" cy="70" r="4"/>
+      <text class="bit" x="220" y="112">b1=0</text>
+
+      <line class="samp" x1="300" y1="0" x2="300" y2="95"/>
+      <circle class="dot" cx="300" cy="10" r="4"/>
+      <text class="bit" x="300" y="112">b2=1</text>
+
+      <line class="samp" x1="380" y1="0" x2="380" y2="95"/>
+      <circle class="dot" cx="380" cy="10" r="4"/>
+      <text class="bit" x="380" y="112">b3=1</text>
+    </g>
+  </g>
+  <text x="40" y="195" class="lab" text-anchor="start" font-size="12">On se resynchronise sur le front du start, on attend ½ bit (revérif = anti-glitch), puis 1 bit entre chaque point.</text>
+  <text x="40" y="213" class="lab" text-anchor="start" font-size="12">Au milieu, le signal est stable → marge maximale contre le désaccord d'horloge entre émetteur et récepteur.</text>
+</svg>

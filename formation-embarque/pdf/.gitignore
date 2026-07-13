@@ -1,0 +1,3 @@
+# Ces PDF sont des livrables de la formation : on les versionne
+# malgré la règle globale *.pdf du dépôt.
+!*.pdf

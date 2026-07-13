@@ -1,0 +1,9 @@
+# artefacts de compilation des corrigés
+*.o
+*.d
+*.class
+*.cf
+*.ghw
+__pycache__/
+c/tests
+cpp/tests
