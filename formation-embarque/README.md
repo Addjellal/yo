@@ -15,6 +15,7 @@ Schneider.
 | **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) ; **chaque TP existe en fiches minutées séance par séance** (`tp/tpN-fiches/`) |
 | **Code source des corrigés** | [`code/`](code/) | Les corrigés en **vrais projets compilables et testés** (`make test`) : C, C++, Java, VHDL (GHDL), Arduino, Python/Modbus, SCL/ST |
 | **Évaluations** | [`evaluations/`](evaluations/) | QCM de validation (corrigé) + sujets de projets notés avec barème |
+| **Guide du formateur** | [`guide-formateur.md`](guide-formateur.md) | Pour **animer** la formation : planning type, matériel par poste, modalités d'évaluation, conseils d'animation, découpage en sessions courtes |
 
 **Volume horaire indicatif** (rythme ~6 h/semaine) :
 
