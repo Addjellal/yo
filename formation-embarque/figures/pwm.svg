@@ -10,7 +10,7 @@
 
   <!-- 25% -->
   <g transform="translate(40,50)">
-    <text class="pct" x="-20" y="20" text-anchor="start">25 %</text>
+    <text class="pct" x="-20" y="20" style="text-anchor:start">25 %</text>
     <!-- square wave 25% duty: high 1/4 of each 80px period -->
     <path class="sig" d="M60,45 L60,5 L80,5 L80,45 L140,45 L140,5 L160,5 L160,45 L220,45 L220,5 L240,5 L240,45 L300,45 L300,5 L320,5 L320,45 L380,45 L380,5 L400,5 L400,45 L460,45"/>
     <line class="avg" x1="60" y1="35" x2="460" y2="35"/>
@@ -20,7 +20,7 @@
 
   <!-- 75% -->
   <g transform="translate(40,140)">
-    <text class="pct" x="-20" y="20" text-anchor="start">75 %</text>
+    <text class="pct" x="-20" y="20" style="text-anchor:start">75 %</text>
     <!-- 75% duty: high 3/4 -->
     <path class="sig" d="M60,45 L60,5 L140,5 L140,45 L160,45 L160,5 L240,5 L240,45 L260,45 L260,5 L340,5 L340,45 L360,45 L360,5 L440,5 L440,45 L460,45"/>
     <line class="avg" x1="60" y1="15" x2="460" y2="15"/>

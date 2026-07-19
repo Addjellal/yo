@@ -1,5 +1,9 @@
 # Formation complète — Systèmes embarqués & programmation bas niveau
 
+> 🚀 **Nouveau ici ?** Commence par le **[Parcours type](parcours-type.md)**
+> (PDF : `pdf/00-COMMENCER-ICI.pdf`) : les 30 premières minutes, la boucle
+> de travail, le plan semaine par semaine et la checklist à imprimer.
+
 Une formation structurée comme un enseignement universitaire/professionnel :
 **cours magistraux** (les modules), **travaux dirigés corrigés** (`td/`),
 **travaux pratiques guidés pas à pas** (`tp/`) et **évaluations** avec barème

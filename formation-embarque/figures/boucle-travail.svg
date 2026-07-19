@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 330" font-family="'Segoe UI',Arial,sans-serif">
+  <style>
+    .ttl{fill:#1a2332;font-size:15px;font-weight:600}
+    .b1{fill:#dbeafe;stroke:#2563eb;stroke-width:2}
+    .b2{fill:#d1fae5;stroke:#0d9488;stroke-width:2}
+    .b3{fill:#fef3c7;stroke:#d97706;stroke-width:2}
+    .b4{fill:#fee2e2;stroke:#dc2626;stroke-width:2}
+    .t{fill:#1a2332;font-size:12.5px;font-weight:700;text-anchor:middle}
+    .s{fill:#475569;font-size:10px;text-anchor:middle}
+    .f{fill:#2563eb;font-size:9.5px;text-anchor:middle;font-family:monospace}
+    .arr{stroke:#334155;stroke-width:2.2;fill:none;marker-end:url(#ab)}
+    .loop{stroke:#dc2626;stroke-width:1.8;fill:none;marker-end:url(#ar);stroke-dasharray:5 3}
+    .lt{fill:#dc2626;font-size:9.5px;text-anchor:middle}
+  </style>
+  <defs>
+    <marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#334155"/></marker>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#dc2626"/></marker>
+  </defs>
+  <text x="20" y="24" class="ttl">La boucle de travail — à répéter pour CHAQUE module</text>
+
+  <!-- Row 1 -->
+  <rect class="b1" x="25"  y="45" width="140" height="62" rx="8"/>
+  <text class="t" x="95" y="68">1. COURS</text>
+  <text class="s" x="95" y="84">lire, puis relire en tapant</text>
+  <text class="f" x="95" y="98">cours/NN-*.md</text>
+
+  <rect class="b2" x="215" y="45" width="140" height="62" rx="8"/>
+  <text class="t" x="285" y="68">2. MINI-TP</text>
+  <text class="s" x="285" y="84">15-30 min sur simulateur</text>
+  <text class="f" x="285" y="98">mini-tp/&lt;thème&gt;/</text>
+
+  <rect class="b1" x="405" y="45" width="140" height="62" rx="8"/>
+  <text class="t" x="475" y="68">3. EXERCICES</text>
+  <text class="s" x="475" y="84">seul, sans le corrigé</text>
+  <text class="f" x="475" y="98">fin de chaque cours</text>
+
+  <!-- Row 2 (right to left) -->
+  <rect class="b1" x="405" y="150" width="140" height="62" rx="8"/>
+  <text class="t" x="475" y="173">4. TD CORRIGÉ</text>
+  <text class="s" x="475" y="189">comparer, comprendre l'écart</text>
+  <text class="f" x="475" y="203">td/td-NN-*.md</text>
+
+  <rect class="b3" x="215" y="150" width="140" height="62" rx="8"/>
+  <text class="t" x="285" y="169">5. TP GUIDÉ</text>
+  <text class="s" x="285" y="184">(modules 03·04·07·08·10)</text>
+  <text class="s" x="285" y="196">fiches séance minutées</text>
+  <text class="f" x="285" y="208">tp/tpN-fiches/</text>
+
+  <rect class="b4" x="25" y="150" width="140" height="62" rx="8"/>
+  <text class="t" x="95" y="169">6. QCM ≥ 80 %</text>
+  <text class="s" x="95" y="184">+ éval pratique (seuil 14/20)</text>
+  <text class="f" x="95" y="198">evaluations/qcm.md</text>
+  <text class="f" x="95" y="208">eval-&lt;thème&gt;.md</text>
+
+  <!-- arrows -->
+  <line class="arr" x1="165" y1="76" x2="213" y2="76"/>
+  <line class="arr" x1="355" y1="76" x2="403" y2="76"/>
+  <path class="arr" d="M545,107 C585,120 585,140 547,158"/>
+  <line class="arr" x1="405" y1="181" x2="357" y2="181"/>
+  <line class="arr" x1="215" y1="181" x2="167" y2="181"/>
+
+  <!-- success arrow to next module -->
+  <path class="arr" d="M95,212 C95,255 95,255 95,262"/>
+  <rect class="b2" x="25" y="265" width="200" height="42" rx="8"/>
+  <text class="t" x="125" y="284">✓ MODULE SUIVANT</text>
+  <text class="s" x="125" y="299">(et un commit Git de tes exos !)</text>
+
+  <!-- failure loop -->
+  <path class="loop" d="M28,170 C4,150 4,94 24,80"/>
+  <text class="lt" x="16" y="150" transform="rotate(-90 16 150)">&lt; 80 % : relire</text>
+
+  <text x="255" y="288" class="s" style="text-anchor:start" font-size="11">Règle d'or : on ne passe JAMAIS au module suivant avec un QCM &lt; 80 %.</text>
+  <text x="255" y="304" class="s" style="text-anchor:start" font-size="11">Mieux vaut 2 modules solides que 5 survolés.</text>
+</svg>

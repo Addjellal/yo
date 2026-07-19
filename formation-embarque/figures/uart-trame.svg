@@ -56,6 +56,6 @@
     <text class="lbl" x="-45" y="14" text-anchor="end" font-size="11">'1'</text>
     <text class="lbl" x="-45" y="84" text-anchor="end" font-size="11">'0'</text>
   </g>
-  <text x="40" y="205" class="lbl" text-anchor="start" font-size="12">Repos = état haut · 1 bit de start (bas) · 8 bits de données · 1 bit de stop (haut)</text>
-  <text x="40" y="224" class="lbl" text-anchor="start" font-size="12">À 9600 bauds : 1 bit ≈ 104 µs, trame ≈ 1,04 ms → 960 octets/s max</text>
+  <text x="40" y="205" class="lbl" style="text-anchor:start" font-size="12">Repos = état haut · 1 bit de start (bas) · 8 bits de données · 1 bit de stop (haut)</text>
+  <text x="40" y="224" class="lbl" style="text-anchor:start" font-size="12">À 9600 bauds : 1 bit ≈ 104 µs, trame ≈ 1,04 ms → 960 octets/s max</text>
 </svg>

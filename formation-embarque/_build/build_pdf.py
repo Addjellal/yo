@@ -156,6 +156,7 @@ TITLES = {
     "10-stm32": "Module 10 — STM32",
     "README": "Guide de la formation",
     "guide-formateur": "Guide du formateur",
+    "parcours-type": "Parcours type — commencer ici",
 }
 
 
@@ -199,6 +200,9 @@ def collect_targets():
     """Liste (source .md, chemin de sortie relatif à pdf/) — un sous-dossier
     par type de document, préfixé d'un chiffre pour l'ordre de lecture."""
     targets = []
+    # Le point d'entrée : à la RACINE de pdf/ pour être vu en premier
+    targets.append((os.path.join(ROOT, "parcours-type.md"),
+                    "00-COMMENCER-ICI.pdf"))
     for md in sorted(glob.glob(os.path.join(ROOT, "cours", "*.md"))):
         targets.append((md, os.path.join("1-cours", stem(md) + ".pdf")))
     for md in sorted(glob.glob(os.path.join(ROOT, "td", "*.md"))):

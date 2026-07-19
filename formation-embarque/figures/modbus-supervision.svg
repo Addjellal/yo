@@ -39,6 +39,6 @@
   <text class="t" x="395" y="100" font-size="11" fill="#2563eb">Modbus TCP</text>
   <text class="lab" x="395" y="126">port 502 · holding registers (FC03/06/16)</text>
 
-  <text x="20" y="205" class="lab" text-anchor="start" font-size="12">La table d'échange (document) donne le SENS de chaque mot : Modbus ne transporte que des entiers 16 bits.</text>
-  <text x="20" y="225" class="lab" text-anchor="start" font-size="12">Zones API→PC et PC→API disjointes. Le PC écrit des demandes ; l'automate valide, borne et décide seul des sorties.</text>
+  <text x="20" y="205" class="lab" style="text-anchor:start" font-size="12">La table d'échange (document) donne le SENS de chaque mot : Modbus ne transporte que des entiers 16 bits.</text>
+  <text x="20" y="225" class="lab" style="text-anchor:start" font-size="12">Zones API→PC et PC→API disjointes. Le PC écrit des demandes ; l'automate valide, borne et décide seul des sorties.</text>
 </svg>

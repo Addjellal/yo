@@ -4,6 +4,10 @@ Versions PDF illustrées de toute la formation, générées depuis les fichiers
 Markdown (couverture, code colorisé, tableaux, schémas SVG). Pour régénérer
 après une modification des sources : `python3 _build/build_pdf.py`.
 
+> 🚀 **Première visite ?** Ouvre **[`00-COMMENCER-ICI.pdf`](00-COMMENCER-ICI.pdf)** :
+> le parcours type (30 premières minutes, boucle de travail illustrée, plan
+> semaine par semaine, checklist à imprimer).
+
 ## Organisation — un dossier par type de document
 
 | Dossier | Contenu | Par où commencer |
