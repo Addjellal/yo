@@ -1,0 +1,24 @@
+// Mini-TP Siemens — corps du FB "Regulation" en SCL (cours 07 §7)
+// Interface : Input mesure, consigne : Real ; Output chauffe : Bool.
+// Complete les 2 trous, puis deroule la recette du README sous PLCSIM.
+//
+// RAPPEL : ce FB est appele A CHAQUE CYCLE automate. La sortie #chauffe
+// conserve sa valeur d'un cycle a l'autre (c'est elle qui porte l'etat) :
+// on ne l'ecrit QUE quand on sort de la bande morte.
+
+// A COMPLETER (1) : si la mesure passe SOUS  consigne - 0.5  -> chauffer
+// IF #mesure < ??? THEN
+//     #chauffe := TRUE;
+// END_IF;
+
+
+
+// A COMPLETER (2) : si la mesure passe AU-DESSUS de  consigne + 0.5
+//                   -> couper le chauffage
+// (utiliser ELSIF a la suite du IF precedent, ou un second IF :
+//  les DEUX conditions ne peuvent jamais etre vraies en meme temps)
+
+
+
+// Entre les deux seuils (la "bande morte") : AUCUNE ecriture de #chauffe
+// -> il garde son etat precedent. C'est CA, l'hysteresis.

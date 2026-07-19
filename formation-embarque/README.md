@@ -11,10 +11,11 @@ Schneider.
 | Élément | Dossier | Rôle |
 |---|---|---|
 | **Cours** (11 modules) | [`cours/`](cours/) | La théorie, les exemples commentés, les concepts |
+| **Mini-TP sur simulateur** | [`mini-tp/`](mini-tp/) | **Programmes à trous** de 15-30 min, testables **sans matériel** sur Wokwi, OnlineGDB, EDA Playground, PLCSIM… — avec tous les **liens des simulateurs** |
 | **TD — travaux dirigés** | [`td/`](td/) | Exercices d'application avec **corrigés détaillés et commentés** |
 | **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) ; **chaque TP existe en fiches minutées séance par séance** (`tp/tpN-fiches/`) |
 | **Code source des corrigés** | [`code/`](code/) | Les corrigés en **vrais projets compilables et testés** (`make test`) : C, C++, Java, VHDL (GHDL), Arduino, Python/Modbus, SCL/ST |
-| **Évaluations** | [`evaluations/`](evaluations/) | QCM de validation (corrigé) + sujets de projets notés avec barème |
+| **Évaluations** | [`evaluations/`](evaluations/) | QCM corrigé, **une épreuve pratique par plateforme** (`eval-*.md` — on n'évalue pas du Siemens comme de l'Arduino !) et projets finaux avec barème |
 | **Guide du formateur** | [`guide-formateur.md`](guide-formateur.md) | Pour **animer** la formation : planning type, matériel par poste, modalités d'évaluation, conseils d'animation, découpage en sessions courtes |
 
 **Volume horaire indicatif** (rythme ~6 h/semaine) :
@@ -36,11 +37,14 @@ Schneider.
 **Méthode de travail conseillée pour chaque module** :
 1. Lire le cours en entier une première fois (sans coder).
 2. Relire en tapant et exécutant chaque exemple.
-3. Faire les exercices du cours **sans regarder** le TD.
-4. Confronter au corrigé du TD (`td/td-NN-*.md`) — comprendre chaque écart.
-5. Faire le TP associé s'il existe.
-6. Valider avec le QCM du module ([`evaluations/qcm.md`](evaluations/qcm.md)) :
-   **≥ 80 % de bonnes réponses avant de passer au module suivant.**
+3. Faire le **mini-TP du thème** sur simulateur ([`mini-tp/`](mini-tp/)) :
+   15-30 min pour valider les concepts clés avant d'aller plus loin.
+4. Faire les exercices du cours **sans regarder** le TD.
+5. Confronter au corrigé du TD (`td/td-NN-*.md`) — comprendre chaque écart.
+6. Faire le TP associé s'il existe.
+7. Valider avec le QCM du module ([`evaluations/qcm.md`](evaluations/qcm.md)) :
+   **≥ 80 %** — puis, pour les thèmes à épreuve, l'**évaluation pratique**
+   de la plateforme (`evaluations/eval-<thème>.md`, seuil 14/20).
 
 ## Les modules
 

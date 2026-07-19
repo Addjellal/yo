@@ -159,11 +159,26 @@ TITLES = {
 }
 
 
+MINI_TP_THEMES = {
+    "c": "C", "cpp": "C++", "arduino": "Arduino", "vhdl": "VHDL",
+    "java": "Java", "siemens": "Siemens (SCL)", "schneider": "Schneider (ST)",
+    "stm32": "STM32",
+}
+
+
 def nice_title(path):
     s = stem(path)
     parent = os.path.basename(os.path.dirname(path))
+    grandparent = os.path.basename(os.path.dirname(os.path.dirname(path)))
     if s == "README" and parent == "code":
         return "Guide du code des corrigés"
+    if s == "README" and parent == "mini-tp":
+        return "Mini-TP — simulateurs et liens"
+    if s == "README" and grandparent == "mini-tp":
+        return "Mini-TP " + MINI_TP_THEMES.get(parent, parent.title())
+    if s.startswith("eval-"):
+        theme = "C / C++" if s == "eval-c-cpp" else s[5:].title()
+        return "Évaluation pratique — " + theme
     if s in TITLES:
         return TITLES[s]
     if s.startswith("td-"):
@@ -188,19 +203,24 @@ def collect_targets():
         targets.append((md, os.path.join("1-cours", stem(md) + ".pdf")))
     for md in sorted(glob.glob(os.path.join(ROOT, "td", "*.md"))):
         targets.append((md, os.path.join("2-td", stem(md) + ".pdf")))
+    targets.append((os.path.join(ROOT, "mini-tp", "README.md"),
+                    os.path.join("3-mini-tp", "simulateurs-et-liens.pdf")))
+    for md in sorted(glob.glob(os.path.join(ROOT, "mini-tp", "*", "README.md"))):
+        theme = os.path.basename(os.path.dirname(md))
+        targets.append((md, os.path.join("3-mini-tp", "mini-tp-%s.pdf" % theme)))
     for md in sorted(glob.glob(os.path.join(ROOT, "tp", "*.md"))):
-        targets.append((md, os.path.join("3-tp", stem(md) + ".pdf")))
+        targets.append((md, os.path.join("4-tp", stem(md) + ".pdf")))
     for md in sorted(glob.glob(os.path.join(ROOT, "tp", "tp*-fiches", "*.md"))):
         tpn = os.path.basename(os.path.dirname(md)).split("-")[0]  # tp1..tp5
-        targets.append((md, os.path.join("3-tp", "%s-%s.pdf" % (tpn, stem(md)))))
+        targets.append((md, os.path.join("4-tp", "%s-%s.pdf" % (tpn, stem(md)))))
     for md in sorted(glob.glob(os.path.join(ROOT, "evaluations", "*.md"))):
-        targets.append((md, os.path.join("4-evaluations", stem(md) + ".pdf")))
+        targets.append((md, os.path.join("5-evaluations", stem(md) + ".pdf")))
     targets.append((os.path.join(ROOT, "README.md"),
-                    os.path.join("5-guides", "guide-de-la-formation.pdf")))
+                    os.path.join("6-guides", "guide-de-la-formation.pdf")))
     targets.append((os.path.join(ROOT, "guide-formateur.md"),
-                    os.path.join("5-guides", "guide-formateur.pdf")))
+                    os.path.join("6-guides", "guide-formateur.pdf")))
     targets.append((os.path.join(ROOT, "code", "README.md"),
-                    os.path.join("5-guides", "guide-du-code.pdf")))
+                    os.path.join("6-guides", "guide-du-code.pdf")))
     return targets
 
 
@@ -212,7 +232,8 @@ def stem(path):
 RECUEILS = [
     ("RECUEIL-cours-complet.pdf", lambda r: r.startswith("1-cours" + os.sep)),
     ("RECUEIL-TD-corriges.pdf",   lambda r: r.startswith("2-td" + os.sep)),
-    ("RECUEIL-TP-complets.pdf",   lambda r: r.startswith("3-tp" + os.sep)),
+    ("RECUEIL-TP-complets.pdf",   lambda r: r.startswith("4-tp" + os.sep)),
+    ("RECUEIL-evaluations.pdf",   lambda r: r.startswith("5-evaluations" + os.sep)),
 ]
 
 
