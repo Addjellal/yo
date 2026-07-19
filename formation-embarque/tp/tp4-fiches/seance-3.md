@@ -95,4 +95,4 @@ côté du TP 3 : ensemble, ils montrent que tu maîtrises la démarche, pas just
 un logiciel.
 
 ➡️ Retour : **[TP 4 (vue d'ensemble)](../tp4-schneider-cuve.md)** ·
-**[Module 10 — STM32](../../10-stm32.md)**
+**[Module 10 — STM32](../../cours/10-stm32.md)**

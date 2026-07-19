@@ -10,7 +10,7 @@ Schneider.
 
 | Élément | Dossier | Rôle |
 |---|---|---|
-| **Cours** (11 modules) | `NN-*.md` (racine) | La théorie, les exemples commentés, les concepts |
+| **Cours** (11 modules) | [`cours/`](cours/) | La théorie, les exemples commentés, les concepts |
 | **TD — travaux dirigés** | [`td/`](td/) | Exercices d'application avec **corrigés détaillés et commentés** |
 | **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) ; **chaque TP existe en fiches minutées séance par séance** (`tp/tpN-fiches/`) |
 | **Code source des corrigés** | [`code/`](code/) | Les corrigés en **vrais projets compilables et testés** (`make test`) : C, C++, Java, VHDL (GHDL), Arduino, Python/Modbus, SCL/ST |
@@ -46,17 +46,17 @@ Schneider.
 
 | # | Cours | Contenu | TD (corrigé) | TP |
 |---|--------|---------|---|---|
-| 00 | [Fondamentaux](00-fondamentaux.md) | Binaire, électronique numérique, architecture CPU, mémoire, GPIO, UART/I2C/SPI/CAN, interruptions, toolchain | [TD 00](td/td-00-fondamentaux.md) | — |
-| 01 | [Langage C](01-langage-c.md) | Le langage roi de l'embarqué : pointeurs, mémoire, opérations bit à bit, `volatile`, accès registres, bare-metal | [TD 01](td/td-01-langage-c.md) | — |
-| 02 | [C++](02-cpp.md) | POO, RAII, templates, C++ moderne appliqué à l'embarqué | [TD 02](td/td-02-cpp.md) | — |
-| 03 | [Arduino](03-arduino.md) | Matériel, IDE, GPIO, PWM, ADC, capteurs, projets progressifs | [TD 03](td/td-03-arduino.md) | [TP 1 — Station météo](tp/tp1-arduino-station-meteo.md) |
-| 04 | [VHDL & FPGA](04-vhdl.md) | Logique programmable, entités, process, machines d'états, testbenchs, Vivado/Quartus/GHDL | [TD 04](td/td-04-vhdl.md) | [TP 2 — UART VHDL](tp/tp2-vhdl-uart.md) |
-| 05 | [Java](05-java.md) | POO complète, où Java sert dans l'industrie (supervision, Android, serveurs) | [TD 05](td/td-05-java.md) | — |
-| 06 | [Autres langages utiles](06-autres-langages.md) | Assembleur ARM, MicroPython, Rust embarqué, Make/CMake, FreeRTOS, Linux embarqué | [TD 06](td/td-06-autres-langages.md) | — |
-| 07 | [Suite Siemens](07-siemens.md) | TIA Portal, S7-1200/1500, LADDER, FBD, SCL, GRAFCET, WinCC, PROFINET | [TD 07](td/td-07-siemens.md) | [TP 3 — Remplissage](tp/tp3-siemens-remplissage.md) |
-| 08 | [Suite Schneider](08-schneider.md) | EcoStruxure Control Expert & Machine Expert, M221/M241/M580, IEC 61131-3, HMI Harmony | [TD 08](td/td-08-schneider.md) | [TP 4 — Cuve + Modbus](tp/tp4-schneider-cuve.md) |
-| 09 | [Parcours & ressources](09-parcours-et-ressources.md) | Plan d'apprentissage sur 12 mois, projets, matériel à acheter, ressources gratuites | — | — |
-| 10 | [STM32](10-stm32.md) | Le micro professionnel : STM32CubeIDE, HAL, clock tree, timers, DMA, NVIC, accès registres, debug SWD, FreeRTOS | [TD 10](td/td-10-stm32.md) | [TP 5 — Météo FreeRTOS](tp/tp5-stm32-freertos.md) |
+| 00 | [Fondamentaux](cours/00-fondamentaux.md) | Binaire, électronique numérique, architecture CPU, mémoire, GPIO, UART/I2C/SPI/CAN, interruptions, toolchain | [TD 00](td/td-00-fondamentaux.md) | — |
+| 01 | [Langage C](cours/01-langage-c.md) | Le langage roi de l'embarqué : pointeurs, mémoire, opérations bit à bit, `volatile`, accès registres, bare-metal | [TD 01](td/td-01-langage-c.md) | — |
+| 02 | [C++](cours/02-cpp.md) | POO, RAII, templates, C++ moderne appliqué à l'embarqué | [TD 02](td/td-02-cpp.md) | — |
+| 03 | [Arduino](cours/03-arduino.md) | Matériel, IDE, GPIO, PWM, ADC, capteurs, projets progressifs | [TD 03](td/td-03-arduino.md) | [TP 1 — Station météo](tp/tp1-arduino-station-meteo.md) |
+| 04 | [VHDL & FPGA](cours/04-vhdl.md) | Logique programmable, entités, process, machines d'états, testbenchs, Vivado/Quartus/GHDL | [TD 04](td/td-04-vhdl.md) | [TP 2 — UART VHDL](tp/tp2-vhdl-uart.md) |
+| 05 | [Java](cours/05-java.md) | POO complète, où Java sert dans l'industrie (supervision, Android, serveurs) | [TD 05](td/td-05-java.md) | — |
+| 06 | [Autres langages utiles](cours/06-autres-langages.md) | Assembleur ARM, MicroPython, Rust embarqué, Make/CMake, FreeRTOS, Linux embarqué | [TD 06](td/td-06-autres-langages.md) | — |
+| 07 | [Suite Siemens](cours/07-siemens.md) | TIA Portal, S7-1200/1500, LADDER, FBD, SCL, GRAFCET, WinCC, PROFINET | [TD 07](td/td-07-siemens.md) | [TP 3 — Remplissage](tp/tp3-siemens-remplissage.md) |
+| 08 | [Suite Schneider](cours/08-schneider.md) | EcoStruxure Control Expert & Machine Expert, M221/M241/M580, IEC 61131-3, HMI Harmony | [TD 08](td/td-08-schneider.md) | [TP 4 — Cuve + Modbus](tp/tp4-schneider-cuve.md) |
+| 09 | [Parcours & ressources](cours/09-parcours-et-ressources.md) | Plan d'apprentissage sur 12 mois, projets, matériel à acheter, ressources gratuites | — | — |
+| 10 | [STM32](cours/10-stm32.md) | Le micro professionnel : STM32CubeIDE, HAL, clock tree, timers, DMA, NVIC, accès registres, debug SWD, FreeRTOS | [TD 10](td/td-10-stm32.md) | [TP 5 — Météo FreeRTOS](tp/tp5-stm32-freertos.md) |
 
 **Évaluations** : [QCM par module (56 questions, corrigé)](evaluations/qcm.md)
 · [Projets finaux notés avec barème /100](evaluations/projets-notes.md)

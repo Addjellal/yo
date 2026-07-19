@@ -137,4 +137,4 @@ FPGA. Le tout est réutilisable : `uart_tx/rx` te resserviront pour envoyer
 les mesures d'un projet FPGA vers un PC.
 
 ➡️ Retour : **[TP 2 (vue d'ensemble)](../tp2-vhdl-uart.md)** ·
-**[Module 05 — Java](../../05-java.md)**
+**[Module 05 — Java](../../cours/05-java.md)**

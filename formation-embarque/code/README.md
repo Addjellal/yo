@@ -12,7 +12,8 @@ compile puis exécute les tests — c'est la façon dont ce code a été validé
 | [`vhdl/`](vhdl/) | TD 04 + TP 2 : `mux4`, `compteur_bcd`, `debounce`, `uart_tx`, **`uart_rx` complet**, testbenchs dont la boucle exhaustive 256/256 | `make test` (GHDL) ; `make ondes` pour GTKWave |
 | [`arduino/`](arduino/) | TD 03 : `chenillard/` et `thermostat/` (sketches complets) | ouvrir dans l'IDE Arduino ou sur wokwi.com |
 | [`python/`](python/) | TP 4 : `supervision.py`, client Modbus TCP complet (mot de vie, journal CSV, commandes) | `pip install pymodbus` puis `python3 supervision.py <ip>` |
-| [`st/`](st/) | TD 07/08 : `moyenne_glissante.scl`, `porte_garage.scl`, `alternance_pompes.st` | à coller dans un FB TIA Portal / Control Expert |
+| [`siemens-scl/`](siemens-scl/) | TD 07 : `moyenne_glissante.scl`, `porte_garage.scl` | à coller dans un FB TIA Portal |
+| [`schneider-st/`](schneider-st/) | TD 08 : `alternance_pompes.st` | à coller dans un DFB Control Expert / FB CODESYS |
 
 ## Comment travailler avec ces corrigés
 
@@ -33,5 +34,5 @@ compile puis exécute les tests — c'est la façon dont ce code a été validé
   `tb_uart_boucle` — **256/256 octets** transmis/reçus sans erreur.
 - `python/` : nécessite un automate (ou simulateur) Modbus pour tourner ;
   la syntaxe est vérifiée.
-- `arduino/`, `st/` : à compiler dans leurs IDE respectifs (IDE Arduino /
+- `arduino/`, `siemens-scl/`, `schneider-st/` : à compiler dans leurs IDE respectifs (IDE Arduino /
   Wokwi, TIA Portal / Control Expert).

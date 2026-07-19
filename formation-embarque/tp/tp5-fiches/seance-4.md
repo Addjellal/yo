@@ -133,4 +133,4 @@ Prochaine étape : un des **[projets d'évaluation finale](../../evaluations/pro
 remplis. Bon courage !
 
 ➡️ Retour : **[TP 5 (vue d'ensemble)](../tp5-stm32-freertos.md)** ·
-**[Parcours & ressources](../../09-parcours-et-ressources.md)**
+**[Parcours & ressources](../../cours/09-parcours-et-ressources.md)**

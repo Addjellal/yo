@@ -97,4 +97,4 @@ sur EcoStruxure. Ce que tu retiens ici (sorties centralisées, sécurité en
 aval, boutons à impulsion, recette écrite) est valable partout.
 
 ➡️ Retour : **[TP 3 (vue d'ensemble)](../tp3-siemens-remplissage.md)** ·
-**[Module 08 — Schneider](../../08-schneider.md)**
+**[Module 08 — Schneider](../../cours/08-schneider.md)**

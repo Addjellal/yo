@@ -159,49 +159,92 @@ TITLES = {
 }
 
 
-def nice_title(rel):
-    stem = os.path.splitext(os.path.basename(rel))[0]
-    if stem in TITLES:
-        return TITLES[stem]
-    if stem.startswith("td-"):
-        return "TD " + stem[3:].replace("-", " ").title()
-    if stem.startswith("tp"):
-        return "TP — " + stem.replace("-", " ")
-    if stem == "qcm":
+def nice_title(path):
+    s = stem(path)
+    parent = os.path.basename(os.path.dirname(path))
+    if s == "README" and parent == "code":
+        return "Guide du code des corrigés"
+    if s in TITLES:
+        return TITLES[s]
+    if s.startswith("td-"):
+        return "TD " + s[3:].replace("-", " ").title()
+    if s.startswith("seance") and parent.endswith("-fiches"):
+        return "%s — %s" % (parent.split("-")[0].upper(),
+                            s.replace("-", " ").title())
+    if s.startswith("tp"):
+        return "TP — " + s.replace("-", " ")
+    if s == "qcm":
         return "QCM de validation"
-    if stem == "projets-notes":
+    if s == "projets-notes":
         return "Projets d'évaluation"
-    if stem == "seance-1" or stem.startswith("seance"):
-        return stem.replace("-", " ").title()
-    return stem.replace("-", " ").title()
+    return s.replace("-", " ").title()
+
+
+def collect_targets():
+    """Liste (source .md, chemin de sortie relatif à pdf/) — un sous-dossier
+    par type de document, préfixé d'un chiffre pour l'ordre de lecture."""
+    targets = []
+    for md in sorted(glob.glob(os.path.join(ROOT, "cours", "*.md"))):
+        targets.append((md, os.path.join("1-cours", stem(md) + ".pdf")))
+    for md in sorted(glob.glob(os.path.join(ROOT, "td", "*.md"))):
+        targets.append((md, os.path.join("2-td", stem(md) + ".pdf")))
+    for md in sorted(glob.glob(os.path.join(ROOT, "tp", "*.md"))):
+        targets.append((md, os.path.join("3-tp", stem(md) + ".pdf")))
+    for md in sorted(glob.glob(os.path.join(ROOT, "tp", "tp*-fiches", "*.md"))):
+        tpn = os.path.basename(os.path.dirname(md)).split("-")[0]  # tp1..tp5
+        targets.append((md, os.path.join("3-tp", "%s-%s.pdf" % (tpn, stem(md)))))
+    for md in sorted(glob.glob(os.path.join(ROOT, "evaluations", "*.md"))):
+        targets.append((md, os.path.join("4-evaluations", stem(md) + ".pdf")))
+    targets.append((os.path.join(ROOT, "README.md"),
+                    os.path.join("5-guides", "guide-de-la-formation.pdf")))
+    targets.append((os.path.join(ROOT, "guide-formateur.md"),
+                    os.path.join("5-guides", "guide-formateur.pdf")))
+    targets.append((os.path.join(ROOT, "code", "README.md"),
+                    os.path.join("5-guides", "guide-du-code.pdf")))
+    return targets
+
+
+def stem(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+# Recueils fusionnés : (nom, prédicat sur le chemin de sortie relatif)
+RECUEILS = [
+    ("RECUEIL-cours-complet.pdf", lambda r: r.startswith("1-cours" + os.sep)),
+    ("RECUEIL-TD-corriges.pdf",   lambda r: r.startswith("2-td" + os.sep)),
+    ("RECUEIL-TP-complets.pdf",   lambda r: r.startswith("3-tp" + os.sep)),
+]
+
+
+def build_recueils(outputs):
+    import shutil
+    if not shutil.which("pdfunite"):
+        print("pdfunite absent : recueils non générés (apt install poppler-utils)")
+        return
+    os.makedirs(os.path.join(PDFDIR, "0-recueils"), exist_ok=True)
+    for nom, pred in RECUEILS:
+        parts = [os.path.join(PDFDIR, r) for r in outputs if pred(r)]
+        dest = os.path.join(PDFDIR, "0-recueils", nom)
+        subprocess.run(["pdfunite"] + parts + [dest], check=True)
+        print("OK  0-recueils/%-40s %6.0f Ko"
+              % (nom, os.path.getsize(dest) / 1024))
 
 
 def main():
-    os.makedirs(PDFDIR, exist_ok=True)
-    # Fichiers à convertir : tous les .md sauf ceux du build
-    targets = []
-    for md in sorted(glob.glob(os.path.join(ROOT, "*.md"))):
-        targets.append(md)
-    for sub in ("td", "evaluations", "tp", "code"):
-        for md in sorted(glob.glob(os.path.join(ROOT, sub, "*.md"))):
-            targets.append(md)
-    for md in sorted(glob.glob(os.path.join(ROOT, "tp", "tp*-fiches", "*.md"))):
-        targets.append(md)
-
-    ok = 0
-    for md in targets:
-        rel = os.path.relpath(md, ROOT)
-        # nom de sortie plat, préfixé par le sous-dossier
-        flat = rel.replace(os.sep, "__").rsplit(".", 1)[0] + ".pdf"
-        out = os.path.join(PDFDIR, flat)
+    ok, outputs = 0, []
+    targets = collect_targets()
+    for md, rel_out in targets:
+        out = os.path.join(PDFDIR, rel_out)
+        os.makedirs(os.path.dirname(out), exist_ok=True)
         try:
-            html = render_html(md, title=nice_title(rel))
+            html = render_html(md, title=nice_title(md))
             html_to_pdf(html, out)
-            size = os.path.getsize(out)
-            print("OK  %-55s %6.0f Ko" % (rel, size / 1024))
+            print("OK  %-55s %6.0f Ko" % (rel_out, os.path.getsize(out) / 1024))
+            outputs.append(rel_out)
             ok += 1
         except Exception as e:  # noqa
-            print("ERR %-55s %s" % (rel, e))
+            print("ERR %-55s %s" % (rel_out, e))
+    build_recueils(outputs)
     print("\n%d/%d PDF générés dans %s" % (ok, len(targets), PDFDIR))
 
 
