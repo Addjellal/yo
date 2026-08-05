@@ -177,9 +177,19 @@ def nice_title(path):
         return "Mini-TP — simulateurs et liens"
     if s == "README" and grandparent == "mini-tp":
         return "Mini-TP " + MINI_TP_THEMES.get(parent, parent.title())
+    if s == "README" and parent == "antiseches":
+        return "Antisèches — sommaire"
+    if parent == "antiseches":
+        return "Antisèche — " + s.replace("-", " ").replace("cpp", "C++").title()
     if s.startswith("eval-"):
         theme = "C / C++" if s == "eval-c-cpp" else s[5:].title()
         return "Évaluation pratique — " + theme
+    if s == "glossaire":
+        return "Glossaire des sigles"
+    if s == "faq-depannage":
+        return "FAQ & dépannage"
+    if s == "suivi-progression":
+        return "Suivi de progression"
     if s in TITLES:
         return TITLES[s]
     if s.startswith("td-"):
@@ -225,6 +235,15 @@ def collect_targets():
                     os.path.join("6-guides", "guide-formateur.pdf")))
     targets.append((os.path.join(ROOT, "code", "README.md"),
                     os.path.join("6-guides", "guide-du-code.pdf")))
+    targets.append((os.path.join(ROOT, "glossaire.md"),
+                    os.path.join("6-guides", "glossaire.pdf")))
+    targets.append((os.path.join(ROOT, "faq-depannage.md"),
+                    os.path.join("6-guides", "faq-depannage.pdf")))
+    targets.append((os.path.join(ROOT, "suivi-progression.md"),
+                    os.path.join("6-guides", "suivi-progression.pdf")))
+    for md in sorted(glob.glob(os.path.join(ROOT, "antiseches", "*.md"))):
+        nom = ("00-sommaire" if stem(md) == "README" else stem(md))
+        targets.append((md, os.path.join("7-antiseches", nom + ".pdf")))
     return targets
 
 
@@ -238,6 +257,7 @@ RECUEILS = [
     ("RECUEIL-TD-corriges.pdf",   lambda r: r.startswith("2-td" + os.sep)),
     ("RECUEIL-TP-complets.pdf",   lambda r: r.startswith("4-tp" + os.sep)),
     ("RECUEIL-evaluations.pdf",   lambda r: r.startswith("5-evaluations" + os.sep)),
+    ("RECUEIL-antiseches.pdf",    lambda r: r.startswith("7-antiseches" + os.sep)),
 ]
 
 

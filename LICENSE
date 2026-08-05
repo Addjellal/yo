@@ -1,0 +1,72 @@
+Licences de ce dépôt
+====================
+
+Ce dépôt contient deux natures de contenu, sous deux licences distinctes.
+
+------------------------------------------------------------------------
+1. LE CODE  —  licence MIT
+------------------------------------------------------------------------
+S'applique à tous les fichiers de programme : .c .h .cpp .hpp .ino .java
+.py .vhd .scl .st, les Makefile, les scripts de _build/, ainsi qu'au
+projet auto-emploi/.
+
+MIT License
+
+Copyright (c) 2026 Addjellal
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------
+2. LE CONTENU PÉDAGOGIQUE  —  CC BY-SA 4.0
+------------------------------------------------------------------------
+S'applique aux cours, TD, TP, évaluations, guides, figures (.svg) et
+PDF générés du dossier formation-embarque/.
+
+Creative Commons Attribution - Partage dans les Mêmes Conditions 4.0
+International (CC BY-SA 4.0)
+
+Vous êtes autorisé à :
+  - Partager : copier et redistribuer le contenu sur tout support ;
+  - Adapter : remixer, transformer et créer à partir du contenu, y compris
+    pour un usage commercial (formation, cours en entreprise…).
+
+Selon les conditions suivantes :
+  - Attribution : créditer la source (nom du dépôt et lien), indiquer si
+    des modifications ont été faites.
+  - Partage dans les Mêmes Conditions : toute adaptation doit être
+    diffusée sous la même licence.
+
+Texte complet : https://creativecommons.org/licenses/by-sa/4.0/legalcode.fr
+Résumé lisible : https://creativecommons.org/licenses/by-sa/4.0/deed.fr
+
+------------------------------------------------------------------------
+3. MARQUES ET LOGICIELS TIERS
+------------------------------------------------------------------------
+Siemens, TIA Portal, SIMATIC, WinCC, PLCSIM, Schneider Electric,
+EcoStruxure, Modicon, Machine Expert, Arduino, STMicroelectronics, STM32,
+CODESYS, Wokwi et les autres noms cités sont des marques de leurs
+propriétaires respectifs. Cette formation est un support pédagogique
+indépendant : elle n'est ni éditée, ni approuvée, ni sponsorisée par ces
+sociétés. Les logiciels concernés restent soumis à leurs propres licences.
+
+Aucune garantie n'est fournie quant à l'exactitude du contenu. Les
+montages électroniques et les programmes d'automatisme sont proposés à
+titre pédagogique : leur mise en œuvre sur une installation réelle relève
+de la responsabilité de l'utilisateur, dans le respect des règles de
+sécurité applicables.

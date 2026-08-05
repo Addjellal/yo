@@ -6,6 +6,10 @@
 > portes logiques et bascules qui fonctionnent toutes **en parallèle, tout
 > le temps**. Oublie la boucle, pense circuit.
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/vhdl/`](../mini-tp/vhdl/README.md) — un compteur à compléter, testbench fourni, sur EDA Playground.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. FPGA : c'est quoi ?

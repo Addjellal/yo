@@ -76,7 +76,7 @@ Toute la logique d'un processeur est faite de portes :
 |-------|-----------|-----------------|
 | NOT (NON)   | `!`, `~` | l'entrée est 0 |
 | AND (ET)    | `&&`, `&` | toutes les entrées sont 1 |
-| OR (OU)     | `\|\|`, `\|` | au moins une entrée est 1 |
+| OR (OU)     | <code>&#124;&#124;</code>, <code>&#124;</code> | au moins une entrée est 1 |
 | XOR (OU exclusif) | `^` | les entrées sont différentes |
 | NAND / NOR  | — | l'inverse de AND / OR |
 

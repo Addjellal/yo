@@ -13,6 +13,10 @@ gcc main.c -o main -Wall -Wextra   # compile avec tous les avertissements
 ./main                              # exécute
 ```
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/c/`](../mini-tp/c/README.md) — deux programmes à trous (bits et machine d'états) sur OnlineGDB.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. Premier programme et structure

@@ -6,6 +6,10 @@
 > (Totally Integrated Automation) : programmation, configuration matérielle,
 > écrans opérateurs et réseau au même endroit.
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/siemens/`](../mini-tp/siemens/README.md) — une hystérésis en SCL avec sa recette PLCSIM.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. Le monde de l'automatisme en 10 points

@@ -9,6 +9,10 @@
 
 Prérequis : module 07 (les concepts d'automatisme n'y sont pas répétés).
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/schneider/`](../mini-tp/schneider/README.md) — un télérupteur M221 — le piège du front vs niveau.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. La galaxie logicielle Schneider (s'y retrouver dans les noms)

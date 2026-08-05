@@ -14,6 +14,10 @@ javac Main.java   # → Main.class (bytecode)
 java Main         # exécuté par la JVM
 ```
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/java/`](../mini-tp/java/README.md) — un décodeur de trame et le piège du byte signé.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. Java vs C/C++ : ce qui change

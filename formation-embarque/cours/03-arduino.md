@@ -5,6 +5,10 @@
 > des modules 00-02 s'y touche du doigt. Le langage est du **C++** avec
 > deux fonctions imposées : `setup()` et `loop()`.
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/arduino/`](../mini-tp/arduino/README.md) — un feu piéton à câbler et coder sur Wokwi.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. Le matériel

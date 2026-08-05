@@ -8,6 +8,10 @@
 Prérequis : module 01 (tout le C reste valable en C++).
 Pratique : `g++ main.cpp -o main -Wall -Wextra -std=c++17`.
 
+
+> 🧪 **Mini-TP associé** (15-30 min, sans matériel) : [`mini-tp/cpp/`](../mini-tp/cpp/README.md) — une classe RAII à écrire, testée automatiquement.
+> À faire **après la première lecture**, avant les exercices.
+
 ---
 
 ## 1. Ce que C++ ajoute immédiatement au C

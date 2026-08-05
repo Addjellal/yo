@@ -20,7 +20,19 @@ Schneider.
 | **TP — travaux pratiques** | [`tp/`](tp/) | Séances guidées pas à pas sur projet réel (matériel ou simulateur) ; **chaque TP existe en fiches minutées séance par séance** (`tp/tpN-fiches/`) |
 | **Code source des corrigés** | [`code/`](code/) | Les corrigés en **vrais projets compilables et testés** (`make test`) : C, C++, Java, VHDL (GHDL), Arduino, Python/Modbus, SCL/ST |
 | **Évaluations** | [`evaluations/`](evaluations/) | QCM corrigé, **une épreuve pratique par plateforme** (`eval-*.md` — on n'évalue pas du Siemens comme de l'Arduino !) et projets finaux avec barème |
+| **Antisèches** | [`antiseches/`](antiseches/) | 7 mémos **à imprimer** : C, C++, VHDL, Arduino/STM32, automates, Git/terminal, conversions |
+| **Glossaire** | [`glossaire.md`](glossaire.md) | Tous les sigles du domaine (+ les « faux amis » qui piègent) |
+| **FAQ & dépannage** | [`faq-depannage.md`](faq-depannage.md) | Les blocages réels, outil par outil, avec leur solution |
+| **Suivi de progression** | [`suivi-progression.md`](suivi-progression.md) | Tableau de bord à imprimer : modules, TP, évaluations, habitudes, portfolio |
 | **Guide du formateur** | [`guide-formateur.md`](guide-formateur.md) | Pour **animer** la formation : planning type, matériel par poste, modalités d'évaluation, conseils d'animation, découpage en sessions courtes |
+
+**Commandes utiles** (depuis ce dossier) :
+
+```bash
+make verif    # vérifie tous les liens des documents
+make test     # compile et exécute tous les corrigés (C, C++, Java, VHDL)
+make pdf      # régénère les PDF        make zip   archive des PDF
+```
 
 **Volume horaire indicatif** (rythme ~6 h/semaine) :
 

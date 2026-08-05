@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 240" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" width="100%" height="100%" fill="#ffffff"/>
   <style>
     .ttl{fill:#1a2332;font-size:15px;font-weight:600}
     .cell{fill:#f8fafc;stroke:#334155;stroke-width:1.8}

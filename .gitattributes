@@ -1,0 +1,29 @@
+# Normalisation des fins de ligne : LF dans le dépôt, natif à la copie
+* text=auto eol=lf
+
+# Fichiers qui doivent garder des CRLF ou rester binaires
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.zip   binary
+*.ghw   binary
+
+# Les Makefiles ne tolèrent pas la conversion d'indentation
+Makefile text eol=lf
+
+# ---- Statistiques de langage GitHub (linguist) ----
+# Les PDF générés : sortie de build, diffs repliés par défaut
+formation-embarque/pdf/**            linguist-generated=true
+# Les figures SVG sont de la documentation, pas du "code SVG"
+formation-embarque/figures/*.svg     linguist-documentation=true
+# Le cours lui-même est de la documentation
+formation-embarque/**/*.md           linguist-documentation=true
+# Les corrigés et exercices comptent comme du vrai code (statistiques justes)
+formation-embarque/code/**           linguist-detectable=true
+formation-embarque/mini-tp/**        linguist-detectable=true
+
+# Types peu ou mal reconnus : on les déclare explicitement
+*.ino  linguist-language=C++
+*.scl  linguist-language=Pascal
+*.st   linguist-language=Pascal
+*.vhd  linguist-language=VHDL
