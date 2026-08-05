@@ -1526,5 +1526,125 @@ class TestResultCacheTTL(unittest.TestCase):
             config.country = old_country
 
 
+class TestAuthPasJamaisVerrouille(unittest.TestCase):
+    """Le freinage anti-rafale ne doit JAMAIS refuser un jeton correct : un
+    onglet resté ouvert après un redémarrage (jeton périmé, sondages en boucle)
+    saturait le compteur et verrouillait l'onglet légitime."""
+
+    def _handler(self, token):
+        import webapp.server as srv
+
+        class _FakeHandler:
+            headers = {"X-Auth-Token": token}
+            _auth_ok = srv._Handler._auth_ok
+
+            def __init__(self):
+                self.headers = {"X-Auth-Token": token}
+
+        return _FakeHandler()
+
+    def test_jeton_correct_accepte_meme_apres_rafale_d_echecs(self):
+        import webapp.server as srv
+
+        srv._AUTH_FAILURES.clear()
+        try:
+            # 30 échecs d'affilée (l'onglet périmé qui sonde en boucle)
+            mauvais = self._handler("jeton-perime")
+            for _ in range(30):
+                self.assertFalse(mauvais._auth_ok())
+            self.assertGreaterEqual(len(srv._AUTH_FAILURES), 10)
+            # L'onglet légitime doit malgré tout passer
+            bon = self._handler(srv.AUTH_TOKEN)
+            self.assertTrue(bon._auth_ok())
+            self.assertTrue(bon._auth_ok())
+        finally:
+            srv._AUTH_FAILURES.clear()
+
+    def test_jeton_vide_refuse(self):
+        import webapp.server as srv
+
+        srv._AUTH_FAILURES.clear()
+        try:
+            self.assertFalse(self._handler("")._auth_ok())
+        finally:
+            srv._AUTH_FAILURES.clear()
+
+
+class TestHistoriqueElagageLineaire(unittest.TestCase):
+    """L'élagage par budget doit être linéaire : une boucle « retirer une
+    session puis ré-encoder tout le store » bloquait la fin de chaque scan."""
+
+    def _store(self, tmpdir, n_sessions, desc_len=2000, n_offers=40):
+        from pathlib import Path
+        from history import SessionStore
+        s = SessionStore(Path(tmpdir) / ".sessions.json")
+        s._data["sessions"] = [
+            {
+                "id": f"s{i}", "date": "2026-01-01T00:00:00", "kind": "scan",
+                "criteria": {}, "found": n_offers,
+                "offers": [{"title": "Dev", "company": "A", "description": "x" * desc_len}
+                           for _ in range(n_offers)],
+            }
+            for i in range(n_sessions)
+        ]
+        return s
+
+    def test_elague_les_plus_anciennes_et_garde_les_recentes(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            s = self._store(td, 40)
+            # Budget volontairement bas pour forcer l'élagage
+            s._prune_to_budget(3 * 1024 * 1024)
+            restantes = s._data["sessions"]
+            self.assertLess(len(restantes), 40)
+            self.assertGreaterEqual(len(restantes), 1)
+            # Ce sont bien les PLUS RÉCENTES qui survivent (la dernière est s39)
+            self.assertEqual(restantes[-1]["id"], "s39")
+            # Et elles se suivent sans trou (on a coupé par le début)
+            ids = [int(x["id"][1:]) for x in restantes]
+            self.assertEqual(ids, list(range(ids[0], 40)))
+
+    def test_ne_touche_a_rien_si_dans_le_budget(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            s = self._store(td, 5, desc_len=100, n_offers=2)
+            s._prune_to_budget(50 * 1024 * 1024)
+            self.assertEqual(len(s._data["sessions"]), 5)
+
+    def test_garde_toujours_au_moins_une_session(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            s = self._store(td, 6)
+            s._prune_to_budget(1)          # budget impossible à tenir
+            self.assertEqual(len(s._data["sessions"]), 1)
+            self.assertEqual(s._data["sessions"][0]["id"], "s5")
+
+    def test_cout_lineaire_pas_quadratique(self):
+        """Élaguer beaucoup de sessions ne doit pas coûter beaucoup plus cher
+        qu'en élaguer peu (la version quadratique explosait)."""
+        import tempfile, time
+        with tempfile.TemporaryDirectory() as td:
+            s = self._store(td, 60)
+            t0 = time.time()
+            s._prune_to_budget(2 * 1024 * 1024)   # retire la grande majorité
+            elapsed = time.time() - t0
+            # Large marge : la version quadratique dépassait la minute ici.
+            self.assertLess(elapsed, 5.0)
+
+
+class TestLinkedInRepliInvite(unittest.TestCase):
+    """Le repli en mode invité doit se faire APRÈS fermeture du navigateur."""
+
+    def test_repli_hors_du_contexte_playwright(self):
+        import inspect
+        from job_scrapers.linkedin import LinkedInScraper
+        src = inspect.getsource(LinkedInScraper._search_logged_in)
+        # Le repli ne doit pas être invoqué à l'intérieur du bloc `with`
+        avant_close, _, apres_close = src.partition("browser.close()")
+        self.assertNotIn("_search_guest", avant_close,
+                         "le repli invité ne doit pas tourner navigateur ouvert")
+        self.assertIn("_search_guest", apres_close)
+
+
 if __name__ == "__main__":
     unittest.main()

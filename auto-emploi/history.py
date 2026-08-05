@@ -154,19 +154,51 @@ class SessionStore:
             _LOG.warning("Store JSON corrompu, réinitialisé : %s (sauvegardé en %s)", self.path, bak)
             return empty
 
+    def _prune_to_budget(self, budget: int) -> None:
+        """Retire les sessions les plus anciennes jusqu'à tenir dans `budget`
+        octets. Coût linéaire : chaque session n'est sérialisée qu'une fois."""
+        sessions = self._data.get("sessions") or []
+        if not sessions:
+            return
+        # Taille du store sans les sessions (lettres, métadonnées) + accolades
+        others = dict(self._data)
+        others["sessions"] = []
+        base = len(json.dumps(others, ensure_ascii=False).encode("utf-8", "replace"))
+        sizes = [
+            len(json.dumps(s, ensure_ascii=False).encode("utf-8", "replace")) + 1
+            for s in sessions
+        ]
+        total = base + sum(sizes)
+        if total <= budget:
+            return
+        # On retire depuis la plus ancienne (index 0) jusqu'à rentrer dans le
+        # budget, en gardant toujours au moins la session la plus récente.
+        drop = 0
+        while drop < len(sessions) - 1 and total > budget:
+            total -= sizes[drop]
+            drop += 1
+        if drop:
+            self._data["sessions"] = sessions[drop:]
+            _LOG.warning(
+                "Historique trop volumineux : %d session(s) ancienne(s) élaguée(s).", drop
+            )
+
     def _save(self) -> None:
         # Les surrogates isolés (\ud800-\udfff) issus de PDF/scraping malformés
         # font planter l'encodage utf-8 (« surrogates not allowed ») : on les
         # neutralise avant écriture pour ne jamais corrompre un scan terminé.
-        payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         # Garde-fou : la limite de taille est vérifiée à la LECTURE (fichier
         # > 50 Mo = « corrompu » → historique effacé). Pour ne jamais atteindre
         # ce point, on élague les sessions les plus anciennes AVANT d'écrire un
         # fichier qui dépasserait 80 % de cette limite.
-        budget = int(0.8 * 50 * 1024 * 1024)
-        while len(payload.encode("utf-8")) > budget and len(self._data.get("sessions", [])) > 1:
-            self._data["sessions"] = self._data["sessions"][1:]
-            payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
+        #
+        # L'élagage mesure CHAQUE session une seule fois (coût linéaire) puis
+        # retire d'un coup le nombre nécessaire. Une boucle « retirer une session
+        # puis ré-encoder tout le store » serait quadratique : sur un historique
+        # volumineux elle bloquait la fin de chaque scan pendant des minutes,
+        # verrou de store tenu.
+        self._prune_to_budget(int(0.8 * 50 * 1024 * 1024))
+        payload = json.dumps(self._data, ensure_ascii=False).encode("utf-8", "replace").decode("utf-8")
         fd, tmp_name = tempfile.mkstemp(
             dir=str(self.path.parent), prefix=".sessions_", suffix=".tmp"
         )

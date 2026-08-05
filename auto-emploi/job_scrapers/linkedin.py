@@ -158,6 +158,7 @@ class LinkedInScraper(BaseScraper):
                 pass
 
         offers = []
+        login_failed = False
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, args=_launch_args())
             # finally : fermeture garantie même si le login ou le scraping lève,
@@ -169,24 +170,30 @@ class LinkedInScraper(BaseScraper):
                     accept_downloads=False,
                 )
                 page = context.new_page()
-                if not self._login(page):
+                if self._login(page):
+                    offers = self._scrape_jobs(page, query, location, max_results)
+                else:
                     # Identifiants refusés, captcha ou 2FA : scraper le DOM
-                    # déconnecté renverrait 0 résultat en silence. On le signale
-                    # et on bascule sur le mode invité (fiable sans compte).
-                    log_http_failure(self.source_name,
-                                     "connexion non aboutie — repli sur le mode invité")
-                    try:
-                        from app_utils import console
-                        console.print(
-                            "[yellow]LinkedIn : connexion non aboutie (captcha, 2FA ou "
-                            "identifiants refusés) — repli sur le mode invité.[/yellow]"
-                        )
-                    except Exception:
-                        pass
-                    return self._search_guest(query, location, max_results)
-                offers = self._scrape_jobs(page, query, location, max_results)
+                    # déconnecté renverrait 0 résultat en silence. On note l'échec
+                    # et on bascule en mode invité APRÈS avoir fermé le navigateur
+                    # (le repli est un simple scrape HTTP : garder Chromium ouvert
+                    # pendant toute sa durée gaspillerait ~200 Mo de RAM).
+                    login_failed = True
             finally:
                 browser.close()
+
+        if login_failed:
+            log_http_failure(self.source_name,
+                             "connexion non aboutie — repli sur le mode invité")
+            try:
+                from app_utils import console
+                console.print(
+                    "[yellow]LinkedIn : connexion non aboutie (captcha, 2FA ou "
+                    "identifiants refusés) — repli sur le mode invité.[/yellow]"
+                )
+            except Exception:
+                pass
+            return self._search_guest(query, location, max_results)
 
         return offers
 

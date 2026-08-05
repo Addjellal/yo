@@ -189,6 +189,10 @@
       <div class="results-toolbar">
         <h2 id="results-count" aria-live="polite">0 offre</h2>
         <div class="toolbar-actions">
+          <input id="results-search" type="search" class="results-search"
+                 placeholder="🔎 Filtrer (titre, entreprise, lieu, description…)"
+                 aria-label="Filtrer les offres affichées"
+                 title="Filtre instantané. Plusieurs mots = tous doivent apparaître. Échap pour effacer.">
           <select id="sort-select" title="Trier">
             <option value="score">Tri : score</option>
             <option value="cv">Tri : meilleur CV</option>
@@ -211,6 +215,10 @@
         </div>
       </div>
       <div id="results-grid" class="results-grid"></div>
+      <p id="results-empty-filter" class="empty-filter" hidden>
+        Aucune offre ne correspond à ce filtre.
+        <button id="btn-clear-search" class="btn-ghost small">Effacer le filtre</button>
+      </p>
     </div>
 
     <!-- Offres analysées mais sous le score minimum : déjà évaluées (aucun

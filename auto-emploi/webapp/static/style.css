@@ -334,7 +334,34 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   margin: 6px 0 14px; flex-wrap: wrap;
 }
 .results-toolbar h2 { font-size: 21px; letter-spacing: -.01em; }
-.toolbar-actions { margin-left: auto; display: flex; gap: 9px; align-items: center; }
+.toolbar-actions { margin-left: auto; display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+
+/* Filtre texte instantané sur les résultats affichés */
+.results-search {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-family: var(--font-body);
+  width: 260px;
+  max-width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+}
+.results-search::placeholder { color: var(--text-soft); }
+.results-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.empty-filter {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 26px 10px;
+  display: flex; gap: 12px; align-items: center; justify-content: center;
+  flex-wrap: wrap;
+}
 .results-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));

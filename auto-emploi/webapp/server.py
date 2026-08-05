@@ -1416,21 +1416,25 @@ class _Handler(BaseHTTPRequestHandler):
         return host in ("127.0.0.1", "localhost", "[::1]")
 
     def _auth_ok(self) -> bool:
-        # Verrouillage temporaire après une rafale d'échecs : freine un processus
-        # local qui tenterait de forcer le jeton (défense en profondeur — le
-        # jeton 256 bits est de toute façon hors de portée d'une force brute).
+        """Le jeton est vérifié EN PREMIER : un jeton correct est toujours accepté.
+        Le freinage anti-rafale ne s'applique qu'aux jetons FAUX — sinon un onglet
+        resté ouvert après un redémarrage du serveur (jeton périmé, sondages en
+        boucle) saturerait le compteur et verrouillerait l'onglet légitime."""
+        token = self.headers.get("X-Auth-Token") or ""
+        if secrets.compare_digest(token.encode(), AUTH_TOKEN.encode()):
+            return True
+        # Jeton faux : on enregistre l'échec. Au-delà de 10 échecs en 10 s, on
+        # ajoute un délai pour freiner une énumération locale (défense en
+        # profondeur — un jeton de 256 bits est de toute façon hors de portée).
         now = time.time()
         with _AUTH_FAIL_LOCK:
             while _AUTH_FAILURES and now - _AUTH_FAILURES[0] > 10.0:
                 _AUTH_FAILURES.popleft()
-            if len(_AUTH_FAILURES) >= 10:
-                return False
-        token = self.headers.get("X-Auth-Token") or ""
-        ok = secrets.compare_digest(token.encode(), AUTH_TOKEN.encode())
-        if not ok:
-            with _AUTH_FAIL_LOCK:
-                _AUTH_FAILURES.append(now)
-        return ok
+            _AUTH_FAILURES.append(now)
+            saturated = len(_AUTH_FAILURES) >= 10
+        if saturated:
+            time.sleep(0.5)
+        return False
 
     def _send(self, status: int, content_type: str, body: bytes,
               download_name: str = "", close: bool = False) -> None:

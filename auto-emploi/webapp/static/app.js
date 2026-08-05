@@ -1308,6 +1308,30 @@ function resetProgressBar() {
 
 $("#sort-select").addEventListener("change", renderResults);
 $("#date-filter").addEventListener("change", applyDateFilter);
+
+// Recherche instantanée dans les résultats affichés (aucun appel serveur).
+const _searchInput = $("#results-search");
+if (_searchInput) {
+  let searchTimer = null;
+  _searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyDateFilter, 120);  // anti-rebond à la frappe
+  });
+  _searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      _searchInput.value = "";
+      clearTimeout(searchTimer);
+      applyDateFilter();
+    }
+  });
+}
+const _clearSearch = $("#btn-clear-search");
+if (_clearSearch) {
+  _clearSearch.addEventListener("click", () => {
+    if (_searchInput) _searchInput.value = "";
+    applyDateFilter();
+  });
+}
 $("#btn-export").addEventListener("click", exportResults);
 $("#btn-notion").addEventListener("click", exportNotion);
 
@@ -1350,20 +1374,36 @@ function dateFilterCutoff() {
   return d.toISOString().slice(0, 10);
 }
 
+// Filtre combiné date + recherche texte. Chaque terme saisi doit être présent
+// (ET logique) dans l'index de la carte : « c embarqué rennes » ne garde que les
+// offres qui mentionnent les trois, quel que soit leur ordre.
 function applyDateFilter() {
   const cutoff = dateFilterCutoff();
+  const input = $("#results-search");
+  const terms = fold(input ? input.value : "").split(/\s+/).filter(Boolean);
   const cards = Array.from(document.querySelectorAll("#results-grid .offer-card"));
   let count = 0;
   for (const card of cards) {
     const dp = card.dataset.datePosted;
     // Offres sans date connue : toujours affichées (on ne pénalise pas les
     // sources qui ne fournissent pas de date).
-    const hide = !!(cutoff && dp && dp < cutoff);
+    let hide = !!(cutoff && dp && dp < cutoff);
+    if (!hide && terms.length) {
+      const hay = card.dataset.search || "";
+      hide = !terms.every((t) => hay.includes(t));
+    }
     card.hidden = hide;
     if (!hide) count++;
   }
+  const total = cards.length;
   const countEl = $("#results-count");
-  if (countEl) countEl.textContent = `${count} offre${count !== 1 ? "s" : ""}`;
+  if (countEl) {
+    countEl.textContent = count === total
+      ? `${count} offre${count !== 1 ? "s" : ""}`
+      : `${count} / ${total} offre${total !== 1 ? "s" : ""}`;
+  }
+  const empty = $("#results-empty-filter");
+  if (empty) empty.hidden = !(total > 0 && count === 0);
 }
 
 // Dernière offre dont on a cliqué « Ouvrir » : marquée jusqu'au choix d'un statut
@@ -1524,6 +1564,14 @@ function offerCard(offer, ctx) {
   ]);
   card.dataset.index = offer.index;       // pour le marquage de disponibilité (#check)
   card.dataset.datePosted = offer.date_posted || "";
+  // Index de recherche calculé UNE FOIS à la création : la recherche texte se
+  // contente ensuite d'un includes() par carte, sans relire le DOM ni
+  // renormaliser les accents à chaque frappe.
+  card.dataset.search = fold([
+    offer.title, offer.company, offer.location, offer.contract, offer.salary,
+    offer.source, offer.best_cv, offer.reasons, offer.strengths, offer.gaps,
+    offer.description,
+  ].filter(Boolean).join(" "));
 
   function applyStatus(status) {
     offer.status = status;
