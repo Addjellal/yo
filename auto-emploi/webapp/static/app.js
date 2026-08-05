@@ -2875,7 +2875,85 @@ function fillColumn(box, entries, actions) {
 
 // ─── Onglet Statistiques ────────────────────────────────────────────────────
 
+// ─── Compétences demandées vs CV (analyse locale, sans IA) ──────────────────
+
+function skillRow(s) {
+  const bar = el("div", { class: "skill-bar" }, [el("i")]);
+  bar.firstChild.style.width = Math.max(2, s.pct) + "%";
+  return el("div", { class: "skill-row" + (s.in_cv ? " has" : " miss") }, [
+    el("span", {
+      class: "skill-name",
+      text: s.name,
+      title: s.in_cv ? "Mentionnée dans votre CV" : "Absente de votre CV",
+    }),
+    bar,
+    el("span", { class: "skill-pct", text: `${s.pct}%` }),
+    el("span", { class: "skill-flag", text: s.in_cv ? "✓" : "✗" }),
+  ]);
+}
+
+async function loadSkills() {
+  const box = $("#skills-body");
+  if (!box) return;
+  box.replaceChildren(el("p", { class: "muted small", text: "Analyse en cours…" }));
+  let data;
+  try {
+    // On analyse en priorité le scan courant (ce que l'utilisateur regarde) ;
+    // le serveur retombe sur l'historique s'il n'y en a pas.
+    const q = SCAN_JOB ? `?job_id=${encodeURIComponent(SCAN_JOB)}` : "";
+    data = await api("/api/skills" + q);
+  } catch (e) {
+    box.replaceChildren(el("p", { class: "muted small", text: "Analyse indisponible : " + e.message }));
+    return;
+  }
+  const scopeEl = $("#skills-scope");
+  if (scopeEl) {
+    scopeEl.textContent = data.analysed_offers
+      ? `${data.analysed_offers} offre${data.analysed_offers > 1 ? "s" : ""} analysée${data.analysed_offers > 1 ? "s" : ""}` +
+        (data.scope === "scan" ? " (recherche en cours)" : " (historique récent)")
+      : "";
+  }
+  if (!data.analysed_offers) {
+    box.replaceChildren(el("p", {
+      class: "muted small",
+      text: "Lancez une recherche : les compétences demandées apparaîtront ici.",
+    }));
+    return;
+  }
+  const cols = [];
+  if (data.missing.length) {
+    cols.push(el("div", { class: "skills-col" }, [
+      el("h4", { text: `À renforcer — absentes de votre CV (${data.missing.length})` }),
+      ...data.missing.slice(0, 12).map(skillRow),
+    ]));
+  }
+  if (data.strengths.length) {
+    cols.push(el("div", { class: "skills-col" }, [
+      el("h4", { text: `Vos atouts — demandés et présents (${data.strengths.length})` }),
+      ...data.strengths.slice(0, 12).map(skillRow),
+    ]));
+  }
+  if (!cols.length) {
+    box.replaceChildren(el("p", {
+      class: "muted small",
+      text: "Aucune compétence du référentiel détectée dans ces offres.",
+    }));
+    return;
+  }
+  box.replaceChildren(...cols);
+  if (!data.cv_known) {
+    box.appendChild(el("p", {
+      class: "muted small",
+      text: "Aucun CV exploitable détecté : tout apparaît comme « absent ». Importez un CV dans « Mes CV ».",
+    }));
+  }
+}
+
+const _skillsBtn = $("#btn-skills-refresh");
+if (_skillsBtn) _skillsBtn.addEventListener("click", loadSkills);
+
 async function loadStats() {
+  loadSkills();   // en parallèle : l'analyse lexicale n'attend pas les stats
   let stats;
   try {
     stats = await api("/api/stats");

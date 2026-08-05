@@ -355,6 +355,30 @@ input[type="range"] { accent-color: var(--accent); padding: 6px 0; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+/* ════════ Compétences demandées vs CV ════════ */
+.skills-card { margin-top: 18px; }
+.skills-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.skills-head h3 { margin: 0; }
+.skills-head .btn-ghost { margin-left: auto; }
+.skills-intro { margin: 6px 0 16px; }
+.skills-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 26px; }
+.skills-col h4 { margin: 0 0 12px; color: var(--text-soft); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.3fr) 2fr auto auto;
+  gap: 10px; align-items: center;
+  padding: 5px 0;
+  font-size: 13.5px;
+}
+.skill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-bar { height: 7px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.skill-bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.skill-row.miss .skill-bar i { background: var(--red); }
+.skill-pct { color: var(--text-soft); font-size: 12.5px; min-width: 34px; text-align: right; }
+.skill-flag { font-size: 12.5px; }
+.skill-row.has .skill-flag { color: var(--green); }
+.skill-row.miss .skill-flag { color: var(--red); }
+
 .empty-filter {
   text-align: center;
   color: var(--text-soft);

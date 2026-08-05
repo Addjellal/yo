@@ -1369,6 +1369,53 @@ def _letter_header_block(content: str) -> str:
     return ""
 
 
+def _skills_payload(job_id: str = "") -> dict:
+    """Compétences les plus demandées par les offres collectées, confrontées au
+    contenu des CV. Aucun appel IA : analyse lexicale en code pur.
+
+    Source des offres : le scan désigné s'il est fourni (le plus pertinent —
+    c'est la recherche que l'utilisateur regarde), sinon les sessions récentes
+    de l'historique pour rester utile même après un redémarrage."""
+    import skills as skills_mod
+
+    texts: list[str] = []
+    scope = "historique"
+    job = _get_job(job_id) if job_id else None
+    if job is not None and job.kind == "scan" and job.offers:
+        scope = "scan"
+        texts = [f"{o.title} {o.description or ''}" for o in job.offers]
+    else:
+        with _STORE_LOCK:
+            store = _get_store()
+            sessions = store.list_sessions()[:10]
+            for summary in sessions:
+                session = store.get_session(summary.get("id", ""))
+                if not session:
+                    continue
+                for o in store.session_offers(session):
+                    texts.append(f"{o.title} {o.description or ''}")
+                if len(texts) >= skills_mod.MAX_OFFERS_ANALYSED:
+                    break
+
+    # Texte des CV enregistrés (non supprimés). parse_cv est mis en cache sur
+    # disque avec invalidation par mtime : pas de re-parsing coûteux ici.
+    cv_chunks: list[str] = []
+    for name in _list_cv_files():
+        try:
+            cv_chunks.append(parse_cv(str(_cv_path(name))))
+        except Exception:
+            continue
+    with _CV_LOCK:
+        for entry in _get_cv_store().list_cvs():
+            overrides = entry.get("overrides") or {}
+            if isinstance(overrides, dict):
+                cv_chunks.extend(str(v) for v in overrides.values() if v)
+
+    payload = skills_mod.analyse(texts, "\n".join(cv_chunks))
+    payload["scope"] = scope
+    return payload
+
+
 def _stats_payload() -> dict:
     tracker = _get_tracker()
     with _TRACKER_LOCK:
@@ -1520,6 +1567,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._api_job(query.get("id", [""])[0])
         elif path == "/api/stats":
             self._json(_stats_payload())
+        elif path == "/api/skills":
+            self._json(_skills_payload(query.get("job_id", [""])[0]))
         elif path == "/api/sessions":
             self._api_sessions()
         elif path == "/api/cvs":

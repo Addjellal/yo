@@ -1646,5 +1646,84 @@ class TestLinkedInRepliInvite(unittest.TestCase):
         self.assertIn("_search_guest", apres_close)
 
 
+class TestAnalyseCompetences(unittest.TestCase):
+    """Analyse lexicale des compétences : précision de l'extraction et
+    confrontation offres/CV. Aucun appel IA."""
+
+    def test_pas_de_faux_positifs_sur_mots_courants(self):
+        from skills import extract_skills
+        # « c », « go », « r »… ne doivent pas surgir de mots français courants
+        self.assertEqual(extract_skills("avec ceci, donc chaque candidat, argot"), set())
+        self.assertEqual(extract_skills("gogo, cargo, encore, second"), set())
+
+    def test_distingue_c_cpp_csharp(self):
+        from skills import extract_skills
+        self.assertEqual(extract_skills("maîtrise du C"), {"C"})
+        self.assertEqual(extract_skills("développement C++"), {"C++"})
+        self.assertEqual(extract_skills("projet C# .NET"), {"C#"})
+        self.assertEqual(extract_skills("C et C++ requis"), {"C", "C++"})
+
+    def test_alias_le_plus_long_gagne(self):
+        from skills import extract_skills
+        # « Linux embarqué » ne doit pas être réduit à un simple mot isolé
+        self.assertIn("Linux embarqué", extract_skills("poste en Linux embarqué / Yocto"))
+
+    def test_insensible_accents_et_casse(self):
+        from skills import extract_skills
+        attendu = {"Cybersécurité", "RTOS / temps réel"}
+        self.assertTrue(attendu <= extract_skills("CYBERSÉCURITÉ, TEMPS RÉEL"))
+        self.assertTrue(attendu <= extract_skills("cybersecurite, temps reel"))
+
+    def test_une_offre_compte_une_fois(self):
+        from skills import analyse
+        # « Python » cité 4 fois dans UNE offre = 1 offre, pas 4
+        r = analyse(["Python Python Python Python"], "")
+        py = next(s for s in r["skills"] if s["name"] == "Python")
+        self.assertEqual(py["count"], 1)
+        self.assertEqual(py["pct"], 100)
+
+    def test_separe_atouts_et_manques(self):
+        from skills import analyse
+        offres = ["Poste en C avec Git et tests unitaires",
+                  "Développement C, tests unitaires exigés"]
+        r = analyse(offres, "Je maîtrise le C et Git.")
+        noms_atouts = {s["name"] for s in r["strengths"]}
+        noms_manques = {s["name"] for s in r["missing"]}
+        self.assertIn("C", noms_atouts)
+        self.assertIn("Git", noms_atouts)
+        self.assertIn("Tests unitaires", noms_manques)
+        self.assertFalse(noms_atouts & noms_manques)   # jamais dans les deux
+        self.assertTrue(r["cv_known"])
+
+    def test_cv_vide_tout_est_manquant(self):
+        from skills import analyse
+        r = analyse(["Poste en C et Python"], "")
+        self.assertFalse(r["cv_known"])
+        self.assertEqual(r["strengths"], [])
+        self.assertTrue(r["missing"])
+
+    def test_aucune_offre_ne_plante_pas(self):
+        from skills import analyse
+        r = analyse([], "CV en C++")
+        self.assertEqual(r["analysed_offers"], 0)
+        self.assertEqual(r["skills"], [])
+        self.assertFalse(r["truncated"])
+
+    def test_borne_le_nombre_d_offres(self):
+        from skills import analyse, MAX_OFFERS_ANALYSED
+        r = analyse(["Poste en C"] * (MAX_OFFERS_ANALYSED + 50), "")
+        self.assertEqual(r["analysed_offers"], MAX_OFFERS_ANALYSED)
+        self.assertTrue(r["truncated"])
+
+    def test_pourcentages_coherents(self):
+        from skills import analyse
+        r = analyse(["Poste en C", "Poste en Python", "Poste en C"], "")
+        for s in r["skills"]:
+            self.assertGreaterEqual(s["pct"], 0)
+            self.assertLessEqual(s["pct"], 100)
+        c = next(s for s in r["skills"] if s["name"] == "C")
+        self.assertEqual((c["count"], c["pct"]), (2, 67))
+
+
 if __name__ == "__main__":
     unittest.main()

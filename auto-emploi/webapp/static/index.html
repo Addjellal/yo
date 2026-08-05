@@ -353,6 +353,21 @@
         <div id="chart-sources" class="hbar-chart"></div>
       </div>
     </div>
+
+    <!-- Compétences demandées par le marché vs contenu du CV (analyse locale,
+         aucun appel IA) -->
+    <div class="card skills-card">
+      <div class="skills-head">
+        <h3>Compétences demandées vs votre CV</h3>
+        <span id="skills-scope" class="muted small"></span>
+        <button id="btn-skills-refresh" class="btn-ghost small">↻ Actualiser</button>
+      </div>
+      <p class="muted small skills-intro">
+        Analyse lexicale des offres déjà collectées, sans appel à l'IA.
+        <strong>En rouge</strong> : ce que le marché réclame et que votre CV ne mentionne pas.
+      </p>
+      <div id="skills-body" class="skills-body"></div>
+    </div>
   </section>
 
   <!-- ════════ Onglet Réglages ════════ -->
