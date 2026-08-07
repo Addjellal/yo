@@ -10,6 +10,15 @@ Une formation structurée comme un enseignement universitaire/professionnel :
 (`evaluations/`). Du transistor jusqu'aux automates industriels Siemens et
 Schneider.
 
+
+## Quel outil pour quel TP ?
+
+Tous les TP ne se font pas dans le même simulateur — et c'est normal, ils
+portent sur cinq technologies différentes.
+[`faisabilite-simulateur.md`](faisabilite-simulateur.md) dit précisément ce
+qui passe dans le simulateur maison, ce qui demande Wokwi, GHDL, PLCSIM ou une
+Nucleo, et pourquoi.
+
 ## Organisation pédagogique
 
 | Élément | Dossier | Rôle |

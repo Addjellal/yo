@@ -83,6 +83,11 @@ add_test(NAME coeur COMMAND tests_coeur)
 add_executable(generer_figures outils/generer_figures.cpp)
 target_link_libraries(generer_figures PRIVATE coeur)
 target_include_directories(generer_figures PRIVATE outils)
+# Les figures sont une table de données : omettre les derniers champs d'un
+# placement est voulu et se lit mieux que « , {} » répété quarante fois.
+if(NOT MSVC)
+  target_compile_options(generer_figures PRIVATE -Wno-missing-field-initializers)
+endif()
 
 # ---------------------------------------------------------------------------
 # Application Qt (facultative : le cœur se compile et se teste sans Qt)

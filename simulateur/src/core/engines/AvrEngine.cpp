@@ -1,5 +1,7 @@
 #include "core/engines/AvrEngine.h"
 
+#include "core/engines/noyau_arduino.h"
+
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -260,19 +262,37 @@ bool AvrEngine::avr_gcc_disponible() {
 bool AvrEngine::compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
                                 std::string* journal) {
-    const std::string base = chemin_elf + ".c";
-    {
-        std::ofstream fichier(base);
-        if (!fichier) {
-            if (journal) *journal = "écriture impossible : " + base;
-            return false;
-        }
-        fichier << source;
+    // Le programme est compilé en C++ avec le noyau Arduino à côté. Les deux
+    // styles cohabitent : un croquis à setup()/loop() prend le main() faible
+    // du noyau, un programme qui définit son propre main() l'emporte.
+    const std::string dossier = chemin_elf.substr(0, chemin_elf.find_last_of('/'));
+    const std::string base = chemin_elf + ".cpp";
+    const std::string entete = dossier + "/Arduino.h";
+    const std::string noyau = dossier + "/noyau_arduino.cpp";
+
+    auto ecrire = [](const std::string& chemin, const std::string& contenu) {
+        std::ofstream fichier(chemin);
+        if (!fichier) return false;
+        fichier << contenu;
+        return true;
+    };
+    if (!ecrire(entete, kArduinoEnTete) || !ecrire(noyau, kArduinoCorps)) {
+        if (journal) *journal = "écriture impossible dans " + dossier;
+        return false;
     }
+    // L'en-tête est inclus d'office : un croquis Arduino ne l'écrit jamais.
+    if (!ecrire(base, "#include \"Arduino.h\"\n#line 1\n" + source)) {
+        if (journal) *journal = "écriture impossible : " + base;
+        return false;
+    }
+
     const std::string journal_fichier = chemin_elf + ".log";
-    std::string commande =
-        "avr-gcc -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu99 -o \"" +
-        chemin_elf + "\" \"" + base + "\" > \"" + journal_fichier + "\" 2>&1";
+    const std::string commande =
+        "avr-g++ -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu++17 "
+        "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
+        "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
+        chemin_elf + "\" \"" + base + "\" \"" + noyau + "\" > \"" +
+        journal_fichier + "\" 2>&1";
     const int code = std::system(commande.c_str());
     if (journal) {
         std::ifstream lecture(journal_fichier);
@@ -281,6 +301,10 @@ bool AvrEngine::compiler_source(const std::string& source,
         *journal = contenu;
     }
     return code == 0;
+}
+
+bool AvrEngine::avr_gpp_disponible() {
+    return std::system("avr-g++ --version > /dev/null 2>&1") == 0;
 }
 
 }  // namespace coeur

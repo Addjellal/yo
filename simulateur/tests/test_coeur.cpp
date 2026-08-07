@@ -925,6 +925,139 @@ static void test_exemplaires_multiples() {
 }
 
 // ---------------------------------------------------------------------------
+// Un vrai croquis Arduino, tel qu'on l'écrit en TP : setup/loop, millis sans
+// delay, machine à états, bouton avec anti-rebond, potentiomètre, PWM et
+// liaison série. C'est le sujet de l'épreuve pratique Arduino de la
+// formation. S'il tourne ici, l'épreuve se passe dans le simulateur.
+static const char* kCroquisTp = R"(
+/* Minuterie d'éclairage.
+   Bouton D2 (pull-up) : allume pour 3 s. Luminosité réglée par A0.
+   LED éclairage sur D9 (PWM), LED témoin sur D8. Aucun delay(). */
+enum Etat { REPOS, ALLUME };
+
+Etat etat = REPOS;
+unsigned long debut = 0, dernier_rebond = 0, dernier_message = 0;
+int precedent = HIGH;
+
+void setup() {
+    pinMode(2, INPUT_PULLUP);
+    pinMode(8, OUTPUT);
+    pinMode(9, OUTPUT);
+    Serial.begin(9600);
+    Serial.println("pret");
+}
+
+void loop() {
+    const unsigned long maintenant = millis();
+
+    /* anti-rebond 20 ms sur le front descendant */
+    const int lu = digitalRead(2);
+    if (lu != precedent && maintenant - dernier_rebond > 20) {
+        dernier_rebond = maintenant;
+        if (lu == LOW) {
+            etat = ALLUME;
+            debut = maintenant;
+            Serial.println("appui");
+        }
+        precedent = lu;
+    }
+
+    switch (etat) {
+        case ALLUME:
+            if (maintenant - debut >= 3000) {
+                etat = REPOS;
+                Serial.println("extinction");
+            } else {
+                analogWrite(9, map(analogRead(A0), 0, 1023, 0, 255));
+                digitalWrite(8, HIGH);
+            }
+            break;
+        case REPOS:
+            analogWrite(9, 0);
+            digitalWrite(8, LOW);
+            break;
+    }
+
+    if (maintenant - dernier_message >= 1000) {
+        dernier_message = maintenant;
+        Serial.print("t=");
+        Serial.println((long)(maintenant / 1000));
+    }
+}
+)";
+
+static void test_croquis_arduino() {
+    std::printf("\n[11] Un croquis Arduino de TP, tel quel\n");
+    if (!coeur::AvrEngine::compile_avec_simavr() ||
+        !coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (moteurs indisponibles — section ignorée)\n");
+        return;
+    }
+
+    const std::string firmware = "/tmp/sim_croquis.elf";
+    std::string journal;
+    const bool compile =
+        coeur::AvrEngine::compiler_source(kCroquisTp, firmware, &journal);
+    verifier(compile, "le croquis compile sans être réécrit", journal);
+    if (!compile) return;
+
+    coeur::AvrEngine mcu;
+    if (!mcu.charger(firmware)) {
+        verifier(false, "chargement du croquis", mcu.erreur());
+        return;
+    }
+
+    std::string serie;
+    mcu.sur_octet_serie([&serie](char octet) { serie += octet; });
+
+    // --- au repos : D8 éteinte, et l'horloge doit tourner
+    mcu.definir_niveau_externe(2, true);          // bouton relâché
+    mcu.definir_tension_adc(0, 2.5);              // potentiomètre à mi-course
+    mcu.avancer(16000000ull * 2);                 // 2 secondes simulées
+
+    verifier(serie.find("pret") != std::string::npos,
+             "setup() s'exécute et Serial fonctionne",
+             "reçu : " + serie.substr(0, 20));
+    verifier(mcu.direction_sortie(8) && mcu.direction_sortie(9),
+             "pinMode(OUTPUT) configure bien les broches");
+    verifier(mcu.pullup_actif(2), "pinMode(INPUT_PULLUP) arme le pull-up");
+    verifier(!mcu.niveau_port(8), "au repos, la LED témoin est éteinte");
+
+    // millis() doit avancer à la bonne vitesse : le programme émet « t=1 »
+    // puis « t=2 ». Une horloge fausse de quelques pour cent se verrait.
+    verifier(serie.find("t=1") != std::string::npos,
+             "millis() avance à la bonne cadence",
+             "reçu : " + serie.substr(0, 40));
+
+    // --- appui : la minuterie démarre
+    serie.clear();
+    mcu.definir_niveau_externe(2, false);         // bouton appuyé
+    mcu.avancer(16000000ull / 10);                // 100 ms
+    verifier(serie.find("appui") != std::string::npos,
+             "l'anti-rebond laisse passer l'appui", "reçu : " + serie);
+    verifier(mcu.niveau_port(8),
+             "la machine à états passe en ALLUME et allume le témoin");
+
+    // --- PWM : la luminosité suit le potentiomètre
+    mcu.definir_niveau_externe(2, true);
+    int fronts_d9 = 0;
+    mcu.sur_changement_broche([&fronts_d9](int broche, bool) {
+        if (broche == 9) ++fronts_d9;
+    });
+    mcu.avancer(16000000ull / 20);                // 50 ms
+    verifier(fronts_d9 > 20,
+             "analogWrite produit une vraie PWM sur D9",
+             std::to_string(fronts_d9) + " fronts en 50 ms");
+
+    // --- la minuterie s'arrête d'elle-même au bout de trois secondes
+    serie.clear();
+    mcu.avancer(16000000ull * 4);
+    verifier(serie.find("extinction") != std::string::npos,
+             "la minuterie de 3 s expire toute seule", "reçu : " + serie);
+    verifier(!mcu.niveau_port(8), "et le témoin s'éteint");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -943,6 +1076,7 @@ int main() {
     test_physique_catalogue();
     test_transitoire();
     test_exemplaires_multiples();
+    test_croquis_arduino();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

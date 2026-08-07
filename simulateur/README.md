@@ -35,8 +35,12 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   transitoire — tension d'un nœud ou courant d'un composant, base de temps de
   2 ms à 5 s, mesures moyenne et crête, gel de l'écran. Les voies se règlent
   seules au premier lancement.
-- **Compilation intégrée** : on écrit le programme C dans l'application,
-  `F5` compile avec `avr-gcc` et charge le résultat.
+- **Croquis Arduino directement** : `pinMode`, `digitalWrite`, `analogRead`,
+  `analogWrite`, `millis`, `Serial`… Un noyau Arduino minimal est embarqué
+  dans l'exécutable et compilé avec le programme — rien à installer. Le code
+  au niveau des registres reste accepté tel quel.
+- **Compilation intégrée** : on écrit le programme dans l'application,
+  `F5` compile avec `avr-g++` et charge le résultat.
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
 - **Enregistrement** du schéma et du programme dans un fichier `.schema.json`,
   **export** de la netlist SPICE.
@@ -63,7 +67,8 @@ Autant le dire tout de suite, pour ne pas donner le change :
   deux cartes ; ce ne l'est pas pour un protocole série entre cartes.
 - Pas de composants **numériques complexes** (74HC595, écran LCD, I²C, SPI vers
   périphériques) : il faudrait un moteur de simulation numérique événementiel
-  en plus des deux existants.
+  en plus des deux existants. Le noyau Arduino n'a donc ni `Wire`, ni `SPI`,
+  ni `Servo`, ni `tone()`, ni bibliothèque tierce.
 - Pas de **routage de circuit imprimé**. L'architecture le prépare — chaque
   composant porte déjà son empreinte et la netlist est un objet de première
   classe — mais le module n'existe pas.
@@ -84,7 +89,7 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 65 tests, sans Qt
+./build/tests_coeur                        # 76 tests, sans Qt
 QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 19 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
@@ -140,6 +145,7 @@ simulateur/
 │   │   │   ├── logique.cpp          portes, ampli op, régulateur
 │   │   │   └── instruments.cpp      voltmètre, ampèremètre
 │   │   └── engines/
+│   │       ├── noyau_arduino.h        le noyau Arduino, embarqué en texte
 │   │       ├── NgspiceEngine.{h,cpp}  netlist → SPICE → tensions et courants
 │   │       └── AvrEngine.{h,cpp}      firmware → cycles → états de broches
 │   └── app/                         ← tout ce qui dépend de Qt
@@ -151,7 +157,7 @@ simulateur/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   └── figures_liste.inc            les montages, décrits en données
 └── tests/
-    ├── test_coeur.cpp                65 tests, sans Qt
+    ├── test_coeur.cpp                76 tests, sans Qt
     └── test_schema.cpp               25 tests, saisie de schéma sans fenêtre
 ```
 
@@ -263,7 +269,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**65 tests du cœur**, sans Qt, en dix sections :
+**76 tests du cœur**, sans Qt, en onze sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -276,6 +282,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 7 | **tout le catalogue** passe dans ngspice |
 | 8 | physique des modèles : diode, CTN, LDR, NON-ET, ampli op, 7805, relais |
 | 9 | **analyse transitoire** : charge d'un RC comparée à la théorie (3,16 V à une constante de temps), reprise d'état entre fenêtres, PWM à 25 % |
+| 11 | **un croquis Arduino de TP**, compilé sans retouche : millis à la bonne cadence, anti-rebond, machine à états, PWM, Serial |
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 
 Et **19 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution

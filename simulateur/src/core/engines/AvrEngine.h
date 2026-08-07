@@ -71,12 +71,15 @@ public:
 
     const std::string& erreur() const { return erreur_; }
 
-    // Compile un sketch Arduino/C en firmware .elf avec avr-gcc.
-    // Renvoie true si avr-gcc est présent et la compilation réussie.
+    // Compile un croquis en firmware .elf. Le noyau Arduino minimal est
+    // écrit à côté et compilé avec : pinMode, digitalWrite, analogRead,
+    // millis, Serial… fonctionnent donc comme sur une vraie carte, sans que
+    // l'utilisateur ait rien à installer.
     static bool compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
                                 std::string* journal);
     static bool avr_gcc_disponible();
+    static bool avr_gpp_disponible();
 
     // --- usage interne (appelé depuis les callbacks C de simavr)
     void _notifier_broche(int broche, bool haut);
