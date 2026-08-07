@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -110,11 +111,20 @@ FenetrePrincipale::FenetrePrincipale() {
                    const std::map<std::string, double>& tensions) {
                 scene_->appliquer_resultats(courants, tensions);
             });
-    connect(moteur_, &MoteurSimulation::octet_serie, this, [this](char octet) {
-        moniteur_serie_->moveCursor(QTextCursor::End);
-        moniteur_serie_->insertPlainText(QString(QChar(octet)));
-        moniteur_serie_->moveCursor(QTextCursor::End);
-    });
+    connect(moteur_, &MoteurSimulation::octet_serie, this,
+            [this](char octet, const QString& carte) {
+                // Avec plusieurs cartes, on préfixe chaque ligne par son
+                // émetteur : sans cela les deux flux seraient indémêlables.
+                static QString derniere;
+                if (moteur_->cartes().size() > 1 && derniere != carte) {
+                    moniteur_serie_->appendPlainText("[" + carte + "] ");
+                    derniere = carte;
+                }
+                moniteur_serie_->moveCursor(QTextCursor::End);
+                moniteur_serie_->insertPlainText(QString(QChar(octet)));
+                moniteur_serie_->moveCursor(QTextCursor::End);
+                if (octet == '\n') derniere.clear();
+            });
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
                 oscilloscope_->ajouter_trame(formes, instant);
@@ -188,6 +198,18 @@ void FenetrePrincipale::construire_docks() {
 
     auto* page_source = new QWidget;
     auto* disposition = new QVBoxLayout(page_source);
+
+    // Sélecteur de carte : chaque carte du schéma a son propre programme.
+    auto* barre_carte = new QHBoxLayout;
+    barre_carte->addWidget(new QLabel("Programme de la carte"));
+    selecteur_carte_ = new QComboBox;
+    selecteur_carte_->setMinimumWidth(120);
+    connect(selecteur_carte_, &QComboBox::currentTextChanged, this,
+            &FenetrePrincipale::changer_carte);
+    barre_carte->addWidget(selecteur_carte_);
+    barre_carte->addStretch(1);
+    disposition->addLayout(barre_carte);
+
     editeur_source_ = new QPlainTextEdit(kSourceExemple);
     QFont fonte("monospace");
     fonte.setStyleHint(QFont::TypeWriter);
@@ -313,6 +335,8 @@ void FenetrePrincipale::construire_actions() {
                         [this] { charger_exemple(Exemple::Transistor); });
     exemples->addAction("PWM sur D9 (à observer à l'oscilloscope)", this,
                         [this] { charger_exemple(Exemple::Pwm); });
+    exemples->addAction("Deux cartes qui communiquent", this,
+                        [this] { charger_exemple(Exemple::DeuxCartes); });
 
     auto* aide = menuBar()->addMenu("&Aide");
     aide->addAction("À &propos", this, [this] {
@@ -368,7 +392,17 @@ void FenetrePrincipale::showEvent(QShowEvent* evenement) {
 }
 
 void FenetrePrincipale::demarrage_automatique() {
-    compiler_source();
+    // Toutes les cartes, pas seulement celle affichée : sinon la seconde
+    // resterait inerte et la vérification ne prouverait rien.
+    const QStringList cartes = moteur_->cartes();
+    if (cartes.size() <= 1) {
+        compiler_source();
+    } else {
+        for (const QString& reference : cartes) {
+            if (selecteur_carte_) selecteur_carte_->setCurrentText(reference);
+            compiler_source();
+        }
+    }
     lancer();
 }
 
@@ -394,6 +428,45 @@ void FenetrePrincipale::circuit_modifie() {
     if (oscilloscope_) oscilloscope_->proposer_signaux(signaux);
 
     moteur_->definir_circuit(std::move(netlist), std::move(broches));
+
+    // Le sélecteur suit les cartes réellement posées sur le schéma.
+    if (!selecteur_carte_) return;
+    const QStringList cartes = moteur_->cartes();
+    QStringList actuelles;
+    for (int k = 0; k < selecteur_carte_->count(); ++k)
+        actuelles << selecteur_carte_->itemText(k);
+    if (actuelles == cartes) return;
+
+    const QString choix = selecteur_carte_->currentText();
+    {
+        const QSignalBlocker silence(selecteur_carte_);
+        selecteur_carte_->clear();
+        selecteur_carte_->addItems(cartes);
+        const int rang = selecteur_carte_->findText(choix);
+        selecteur_carte_->setCurrentIndex(rang >= 0 ? rang : 0);
+    }
+    selecteur_carte_->setEnabled(cartes.size() > 1);
+    changer_carte(selecteur_carte_->currentText());
+}
+
+void FenetrePrincipale::changer_carte(const QString& reference) {
+    if (reference == carte_courante_) return;
+    // Le programme affiché appartient à la carte qu'on quitte : on le range
+    // avant d'afficher celui de la nouvelle.
+    if (!carte_courante_.isEmpty() && editeur_source_)
+        programmes_[carte_courante_] = editeur_source_->toPlainText();
+    carte_courante_ = reference;
+    if (!editeur_source_ || reference.isEmpty()) return;
+
+    auto it = programmes_.find(reference);
+    if (it == programmes_.end()) {
+        // Nouvelle carte : on lui propose le programme d'exemple plutôt
+        // qu'un éditeur vide.
+        programmes_[reference] = QString::fromUtf8(kSourceExemple);
+        it = programmes_.find(reference);
+    }
+    const QSignalBlocker silence(editeur_source_);
+    editeur_source_->setPlainText(it->second);
 }
 
 void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
@@ -649,9 +722,12 @@ void FenetrePrincipale::ouvrir_source_c() {
 
 void FenetrePrincipale::compiler_source() {
     QString compte_rendu;
+    if (!carte_courante_.isEmpty())
+        programmes_[carte_courante_] = editeur_source_->toPlainText();
     const bool ok = moteur_->compiler_et_charger(editeur_source_->toPlainText(),
                                                  dossier_travail(),
-                                                 &compte_rendu);
+                                                 &compte_rendu,
+                                                 carte_courante_);
     if (!compte_rendu.trimmed().isEmpty()) ecrire(compte_rendu.trimmed());
     if (ok) {
         ecrire("Compilation réussie.");
@@ -675,6 +751,10 @@ void FenetrePrincipale::definir_base_temps(double secondes) {
 }
 
 double FenetrePrincipale::vitesse() const { return moteur_->vitesse(); }
+
+QString FenetrePrincipale::mesures_oscilloscope() const {
+    return oscilloscope_ ? oscilloscope_->rapport() : QString();
+}
 
 void FenetrePrincipale::afficher_onglet(int rang) {
     if (onglets_ && rang >= 0 && rang < onglets_->count())
@@ -782,12 +862,55 @@ int main(void) {
 }
 )";
 
+// Deux programmes distincts : c'est le propre du montage à deux cartes.
+const char* kProgrammeEmetteur = R"(/* Carte U1 — émettrice.
+   Elle fait clignoter sa propre LED sur D13 et recopie le même signal sur
+   D7, qui part vers la seconde carte. */
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void) {
+    DDRB |= (1 << PB5);          /* D13 : LED locale */
+    DDRD |= (1 << PD7);          /* D7  : vers la carte U2 */
+    while (1) {
+        PORTB |=  (1 << PB5);
+        PORTD |=  (1 << PD7);
+        _delay_ms(300);
+        PORTB &= ~(1 << PB5);
+        PORTD &= ~(1 << PD7);
+        _delay_ms(300);
+    }
+}
+)";
+
+const char* kProgrammeRecepteur = R"(/* Carte U2 — réceptrice.
+   Elle lit sur D2 le signal envoyé par U1 et le recopie sur sa LED. Les deux
+   LED doivent clignoter ensemble : c'est la preuve que les deux cartes
+   exécutent bien deux programmes différents, dans le même circuit. */
+#include <avr/io.h>
+
+int main(void) {
+    DDRD &= ~(1 << PD2);         /* D2 en entrée, sans pull-up */
+    DDRB |=  (1 << PB5);         /* D13 : LED locale */
+    while (1) {
+        if (PIND & (1 << PD2)) PORTB |=  (1 << PB5);
+        else                   PORTB &= ~(1 << PB5);
+    }
+}
+)";
+
 }  // namespace
 
 void FenetrePrincipale::charger_exemple(Exemple exemple) {
     scene_->tout_effacer();
     chemin_projet_.clear();
 
+    if (exemple == Exemple::DeuxCartes) {
+        charger_exemple_deux_cartes();
+        return;
+    }
+    programmes_.clear();
+    carte_courante_.clear();
     ItemComposant* carte = scene_->ajouter_composant("arduino_uno", QPointF(-320, 0));
     if (!carte) return;
     auto borne_nommee = [carte](const QString& nom) {
@@ -865,6 +988,8 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
                    "créneau, 2 s pour l'enveloppe.");
             break;
         }
+        case Exemple::DeuxCartes:
+            return;   // traité à part, le schéma n'a pas une seule carte
         case Exemple::Transistor: {
             ItemComposant* rb = scene_->ajouter_composant("resistance", QPointF(-140, -50));
             ItemComposant* q = scene_->ajouter_composant("transistor_npn", QPointF(20, -50));
@@ -887,6 +1012,62 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
     circuit_modifie();
     vue_->ajuster();
     ecrire("Compilez le programme (F5) puis lancez la simulation.");
+}
+
+// Deux cartes : le schéma se construit à part, parce qu'il ne repose pas sur
+// la carte unique posée par charger_exemple().
+void FenetrePrincipale::charger_exemple_deux_cartes() {
+    scene_->tout_effacer();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* u1 = scene_->ajouter_composant("arduino_uno", QPointF(-520, 0));
+    ItemComposant* u2 = scene_->ajouter_composant("arduino_uno", QPointF(520, 0));
+    if (!u1 || !u2) return;
+    auto borne_de = [](ItemComposant* carte, const QString& nom) {
+        for (int k = 0; k < carte->nb_bornes(); ++k)
+            if (carte->nom_borne(k) == nom) return k;
+        return 0;
+    };
+
+    // Une LED par carte, plus le fil de liaison D7 -> D2.
+    struct { ItemComposant* carte; double x; } cotes[] = {{u1, -300}, {u2, 300}};
+    for (const auto& cote : cotes) {
+        ItemComposant* led = scene_->ajouter_composant("led", QPointF(cote.x, -230));
+        ItemComposant* r =
+            scene_->ajouter_composant("resistance", QPointF(cote.x, -150));
+        ItemComposant* masse =
+            scene_->ajouter_composant("masse", QPointF(cote.x, -60));
+        if (!led || !r || !masse) return;
+        r->valeurs["ohms"] = 220;
+        scene_->addItem(new ItemFil(cote.carte, borne_de(cote.carte, "D13"), led, 0));
+        scene_->addItem(new ItemFil(led, 1, r, 0));
+        scene_->addItem(new ItemFil(r, 1, masse, 0));
+    }
+    scene_->addItem(new ItemFil(u1, borne_de(u1, "D7"), u2, borne_de(u2, "D2")));
+    // Masse commune : sans elle, deux cartes n'ont aucune référence partagée
+    // et le signal échangé n'aurait pas de sens.
+    ItemComposant* masse_commune =
+        scene_->ajouter_composant("masse", QPointF(0, 300));
+    if (masse_commune) {
+        scene_->addItem(new ItemFil(u1, borne_de(u1, "GND"), masse_commune, 0));
+        scene_->addItem(new ItemFil(u2, borne_de(u2, "GND"), masse_commune, 0));
+    }
+
+    circuit_modifie();
+    programmes_[u1->reference()] = QString::fromUtf8(kProgrammeEmetteur);
+    programmes_[u2->reference()] = QString::fromUtf8(kProgrammeRecepteur);
+    carte_courante_.clear();
+    changer_carte(selecteur_carte_ ? selecteur_carte_->currentText()
+                                   : u1->reference());
+
+    vue_->ajuster();
+    ecrire("Exemple : deux cartes Arduino, deux programmes différents.");
+    ecrire("U1 clignote et envoie son signal sur D7 ; U2 le lit sur D2 et le "
+           "recopie sur sa LED.");
+    ecrire("Compilez chaque carte séparément (sélecteur au-dessus de "
+           "l'éditeur), puis lancez.");
 }
 
 // ---------------------------------------------------------------------------
@@ -914,14 +1095,21 @@ QString FenetrePrincipale::diagnostic() {
                                 QString::fromStdString(borne.noeud));
         rapport += "\n";
     }
-    rapport += "=== Broches de carte ===\n";
-    for (const LiaisonBroche& liaison : moteur_->broches())
-        rapport += QString("  %1 (n°%2) -> nœud %3   sortie=%4 niveau=%5\n")
+    rapport += QString("=== Broches de carte (%1 carte(s)) ===\n")
+                   .arg(moteur_->cartes().size());
+    for (const LiaisonBroche& liaison : moteur_->broches()) {
+        // Chaque carte a ses propres registres : interroger la bonne est
+        // toute la différence entre un diagnostic utile et un mensonge.
+        const QString reference = QString::fromStdString(liaison.carte);
+        const coeur::AvrEngine& mcu = moteur_->mcu(reference);
+        rapport += QString("  %1.%2 (n°%3) -> nœud %4   sortie=%5 niveau=%6\n")
+                       .arg(reference)
                        .arg(QString::fromStdString(liaison.nom))
                        .arg(liaison.numero)
                        .arg(QString::fromStdString(liaison.noeud))
-                       .arg(moteur_->mcu().direction_sortie(liaison.numero))
-                       .arg(moteur_->mcu().niveau_port(liaison.numero));
+                       .arg(mcu.direction_sortie(liaison.numero))
+                       .arg(mcu.niveau_port(liaison.numero));
+    }
     rapport += "=== Source SPICE ===\n" + moteur_->source_spice();
     rapport += "\n=== Tensions relevées ===\n";
     for (const auto& mesure : moteur_->analogique().toutes_tensions())

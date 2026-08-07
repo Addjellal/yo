@@ -22,6 +22,7 @@ struct LiaisonBroche {
     int numero = 0;            // numérotation Arduino : 0..13, A0=14…A5=19
     std::string nom;           // "D13", "A0"
     std::string noeud;         // nœud auquel elle est reliée
+    std::string carte;         // référence de la carte : "U1", "U2"…
 };
 
 class SceneSchema : public QGraphicsScene {

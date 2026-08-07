@@ -40,9 +40,13 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
 - **Enregistrement** du schéma et du programme dans un fichier `.schema.json`,
   **export** de la netlist SPICE.
-- **Cinq exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
-  potentiomètre sur l'ADC, moteur commandé par transistor, et PWM matérielle
-  à observer à l'oscilloscope.
+- **Plusieurs cartes** sur le même schéma : chacune a son propre cœur AVR et
+  son propre programme, choisi dans le sélecteur au-dessus de l'éditeur. Elles
+  partagent le circuit et l'horloge, et peuvent donc se parler par leurs
+  broches.
+- **Six exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
+  potentiomètre sur l'ADC, moteur commandé par transistor, PWM matérielle à
+  observer à l'oscilloscope, et deux cartes qui communiquent.
 
 ## Ce que ça ne fait pas encore
 
@@ -53,15 +57,18 @@ Autant le dire tout de suite, pour ne pas donner le change :
   trame : un circuit dont le comportement dépend de l'énergie stockée dans une
   bobine sur plus de 25 ms sera donc approximé.
 - Ce que le circuit renvoie au microcontrôleur sur une **entrée** est la valeur
-  de fin de trame : il y a jusqu'à 25 ms de retard sur ce chemin-là. Le chemin
-  inverse — le programme qui pilote le circuit — est daté au cycle près.
+  de fin de pas de couplage : jusqu'à 5 ms de retard sur ce chemin-là. Le
+  chemin inverse — le programme qui pilote le circuit — est daté au cycle
+  près. C'est assez fin pour un bouton, un capteur ou un signal échangé entre
+  deux cartes ; ce ne l'est pas pour un protocole série entre cartes.
 - Pas de composants **numériques complexes** (74HC595, écran LCD, I²C, SPI vers
   périphériques) : il faudrait un moteur de simulation numérique événementiel
   en plus des deux existants.
 - Pas de **routage de circuit imprimé**. L'architecture le prépare — chaque
   composant porte déjà son empreinte et la netlist est un objet de première
   classe — mais le module n'existe pas.
-- Un seul microcontrôleur pris en charge : **ATmega328P** (Arduino Uno).
+- Un seul **type** de microcontrôleur pris en charge : ATmega328P (Arduino
+  Uno). On peut en poser plusieurs, mais pas d'autre modèle.
 
 ---
 
@@ -77,8 +84,9 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur      # 58 tests, sans écran
-./build/simulateur       # l'application
+./build/tests_coeur                        # 65 tests, sans Qt
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 19 tests, sans fenêtre
+./build/simulateur                         # l'application
 ```
 
 Les dépendances sont **facultatives** et détectées à la configuration :
@@ -138,8 +146,10 @@ simulateur/
 │       ├── FenetrePrincipale.{h,cpp}
 │       ├── MoteurSimulation.{h,cpp}   couplage des deux moteurs
 │       ├── Oscilloscope.{h,cpp}       quatre voies, tracé min/max
-│       └── schematic/                 scène, vue, composants, fils
-└── tests/test_coeur.cpp             58 tests, sans écran
+│       └── schematic/                 bibliothèque à part, donc testable
+└── tests/
+    ├── test_coeur.cpp                65 tests, sans Qt
+    └── test_schema.cpp               19 tests, saisie de schéma sans fenêtre
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt,
@@ -202,10 +212,18 @@ courant un quart du temps. Le code est dans
 `MoteurSimulation::resoudre_trame` et
 `NgspiceEngine::construire_transitoire`.
 
+**Le pas de couplage.** Le retour du circuit vers le microcontrôleur ne se
+fait pas en continu : il a lieu à la fin de chaque pas de couplage. Ce pas
+vaut 25 ms quand toutes les broches sont en sortie — le programme n'a alors
+rien à relire, et traiter la trame d'un bloc est bien plus rapide. Dès qu'une
+broche est lue (bouton, capteur, autre carte), il passe à 5 ms. On paie donc
+la finesse seulement là où elle sert. Mesuré sur l'exemple à deux cartes, la
+concordance entre les LED des deux cartes passe de 92,2 % à 98,1 %.
+
 **Coût.** Mesuré sur cette machine, avec le pas de calcul par défaut (50 µs,
-soit un échantillon toutes les 50 µs) : environ **4× le temps réel** sur le
-clignotant, **1,25×** sur la PWM matérielle, oscilloscope affiché. Deux
-décisions y sont pour beaucoup :
+soit un échantillon toutes les 50 µs) : environ **3,9× le temps réel** sur le
+clignotant, **1,2×** sur la PWM matérielle, **1,5×** sur les deux cartes,
+oscilloscope affiché. Deux décisions y sont pour beaucoup :
 
 - les broches de carte qui ne sont reliées à rien ne sont pas mises dans le
   circuit — sur une carte à vingt broches dont une seule est câblée, c'était
@@ -225,7 +243,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-58 tests, sans écran, répartis en neuf sections :
+**65 tests du cœur**, sans Qt, en dix sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -238,6 +256,11 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 7 | **tout le catalogue** passe dans ngspice |
 | 8 | physique des modèles : diode, CTN, LDR, NON-ET, ampli op, 7805, relais |
 | 9 | **analyse transitoire** : charge d'un RC comparée à la théorie (3,16 V à une constante de temps), reprise d'état entre fenêtres, PWM à 25 % |
+| 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
+
+Et **19 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
+d'alimentation répétés, et deux cartes sur le même schéma.
 
 L'application se vérifie aussi sans intervention :
 
@@ -246,11 +269,15 @@ L'application se vérifie aussi sans intervention :
 ./build/simulateur --capture image.png 2500          # compile, simule, capture
 ./build/simulateur --exemple 4 --onglet 3 --base 0.005 \
                    --capture pwm.png 6000            # la PWM à l'oscilloscope
+./build/simulateur --exemple 5 --onglet 3 --base 2 \
+                   --capture deux.png 9000           # les deux cartes
 ```
 
 `--onglet` choisit le panneau du bas (0 programme, 1 journal, 2 série,
 3 oscilloscope), `--base` impose la base de temps en secondes. La capture
-imprime aussi la vitesse de simulation atteinte.
+imprime la vitesse atteinte, puis pour chaque voie la moyenne, la crête, le
+rapport cyclique mesuré, et la concordance entre les deux premières voies —
+de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.
 
 ---
 

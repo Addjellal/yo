@@ -45,6 +45,8 @@ public:
     // celui-ci vaut 0 ou 5 V selon l'instant, ce qui n'apprend rien.
     double derniere_valeur(int voie) const;
     void mesurer(int voie, double& moyenne, double& maximum) const;
+    double rapport_cyclique(int voie) const;
+    double concordance(int a, int b) const;
     bool voie_active(int voie) const;
 
 protected:
@@ -93,6 +95,11 @@ public:
     // chercher où sont les réglages.
     void sonder_par_defaut();
     void definir_base_temps(double secondes);
+
+    // Compte rendu chiffré des voies : moyenne, crête, rapport cyclique, et
+    // concordance entre les deux premières voies. Sert à vérifier sans se
+    // fier à l'œil qu'un signal en suit un autre.
+    QString rapport() const;
     bool aucune_voie_active() const;
 
 signals:

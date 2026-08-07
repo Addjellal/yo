@@ -4,9 +4,12 @@
 //
 // Aucun écran nécessaire : ./tests_coeur
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -782,6 +785,146 @@ static void test_transitoire() {
 }
 
 // ---------------------------------------------------------------------------
+// Exemplaires multiples : que se passe-t-il si on pose cinq fois le même
+// composant ? Chaque modèle génère des noms d'éléments et des nœuds internes ;
+// s'ils ne dérivent pas de la référence, deux exemplaires se marchent dessus
+// et SPICE refuse le circuit — ou pire, l'accepte en les confondant.
+static std::vector<std::string> noms_dupliques(const std::string& source) {
+    std::vector<std::string> vus, doubles;
+    std::istringstream flux(source);
+    std::string ligne;
+    while (std::getline(flux, ligne)) {
+        if (ligne.empty()) continue;
+        const char premier = ligne[0];
+        // Seules les lignes d'éléments comptent : pas les directives, pas le
+        // titre du circuit.
+        if (!std::isalpha(static_cast<unsigned char>(premier))) continue;
+        std::string nom = ligne.substr(0, ligne.find(' '));
+        std::transform(nom.begin(), nom.end(), nom.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (std::find(vus.begin(), vus.end(), nom) != vus.end())
+            doubles.push_back(nom);
+        else
+            vus.push_back(nom);
+    }
+    return doubles;
+}
+
+static void test_exemplaires_multiples() {
+    std::printf("\n[10] Cinq exemplaires de chaque composant\n");
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent — section ignorée)\n");
+        return;
+    }
+    constexpr int kExemplaires = 5;
+    int examines = 0, refuses = 0, collisions = 0;
+    std::string liste_refuses, liste_collisions;
+
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele->vers_spice || modele->bornes.empty()) continue;
+        ++examines;
+
+        coeur::Netlist netlist;
+        // Chaîne de cinq exemplaires : la sortie de l'un alimente l'entrée du
+        // suivant, ce qui les met vraiment en relation au lieu de les poser
+        // côte à côte sans interaction.
+        std::string amont = "D13";
+        for (int n = 1; n <= kExemplaires; ++n) {
+            const std::string reference = modele->prefixe + std::to_string(n);
+            auto& instance = netlist.ajouter(reference, modele->type);
+            for (const auto& propriete : modele->proprietes) {
+                if (propriete.genre == coeur::Propriete::Genre::Choix)
+                    instance.textes[propriete.cle] = propriete.defaut_texte;
+                else
+                    instance.valeurs[propriete.cle] = propriete.defaut;
+            }
+            const int dernier = static_cast<int>(modele->bornes.size()) - 1;
+            const std::string aval =
+                (n == kExemplaires) ? std::string("GND") : ("M" + std::to_string(n));
+            for (int k = 0; k <= dernier; ++k) {
+                const std::string& borne = modele->bornes[k].nom;
+                if (k == 0)
+                    netlist.relier(reference, borne, amont);
+                else if (k == dernier)
+                    netlist.relier(reference, borne, aval);
+                else {
+                    const std::string noeud =
+                        "T" + std::to_string(n) + "_" + std::to_string(k);
+                    netlist.relier(reference, borne, noeud);
+                    auto& charge = netlist.ajouter(
+                        "RC" + std::to_string(n) + "_" + std::to_string(k),
+                        "resistance");
+                    charge.valeurs["ohms"] = 1000;
+                    netlist.relier(charge.reference, "1", noeud);
+                    netlist.relier(charge.reference, "2", "GND");
+                }
+            }
+            amont = aval;
+        }
+
+        coeur::NgspiceEngine moteur;
+        const std::string source = moteur.construire(
+            netlist,
+            {{"D13", coeur::BrocheElectrique::Mode::Sortie, 5.0, 25.0}});
+
+        const std::vector<std::string> doubles = noms_dupliques(source);
+        if (!doubles.empty()) {
+            ++collisions;
+            liste_collisions += " " + modele->type + "(" + doubles.front() + ")";
+        }
+        if (!moteur.resoudre() || !moteur.erreurs().empty()) {
+            ++refuses;
+            liste_refuses += " " + modele->type;
+        }
+    }
+
+    verifier(examines >= 25, "tous les modèles simulables ont été mis en série",
+             std::to_string(examines) + " modèles × 5 exemplaires");
+    verifier(collisions == 0,
+             "aucun nom d'élément SPICE en double entre exemplaires",
+             collisions ? ("collisions :" + liste_collisions) : "");
+    verifier(refuses == 0, "ngspice accepte les cinq exemplaires de chaque modèle",
+             refuses ? ("refusés :" + liste_refuses) : "");
+
+    // --- cas concret : dix LED en parallèle sur la même sortie
+    //
+    // C'est l'erreur classique du débutant, et le simulateur doit la montrer :
+    // la sortie ne peut pas fournir dix fois 12 mA, la tension s'effondre.
+    coeur::Netlist grappe;
+    for (int n = 1; n <= 10; ++n) {
+        auto& led = grappe.ajouter("LED" + std::to_string(n), "led");
+        led.textes["couleur"] = "rouge";
+        grappe.relier(led.reference, "A", "D13");
+        grappe.relier(led.reference, "K", "N" + std::to_string(n));
+        auto& r = grappe.ajouter("R" + std::to_string(n), "resistance");
+        r.valeurs["ohms"] = 220;
+        grappe.relier(r.reference, "1", "N" + std::to_string(n));
+        grappe.relier(r.reference, "2", "GND");
+    }
+    coeur::NgspiceEngine dix;
+    dix.construire(grappe,
+                   {{"D13", coeur::BrocheElectrique::Mode::Sortie, 5.0, 25.0}});
+    verifier(dix.resoudre(), "dix LED en parallèle : le circuit est résolu");
+
+    double total = 0;
+    int distinctes = 0;
+    for (int n = 1; n <= 10; ++n) {
+        const double courant = std::fabs(dix.courant("LED" + std::to_string(n)));
+        total += courant;
+        if (courant > 1e-6) ++distinctes;
+    }
+    verifier(distinctes == 10,
+             "les dix LED sont bien dix composants distincts, tous parcourus",
+             std::to_string(distinctes) + " LED alimentées");
+    verifier(total > 0.030,
+             "le courant total est celui des dix branches réunies",
+             f(total * 1000, 1) + " mA au total");
+    verifier(dix.tension("D13") < 4.5,
+             "la sortie s'effondre sous la charge — le défaut est visible",
+             f(dix.tension("D13")) + " V au lieu de 4,68 V pour une seule LED");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -799,6 +942,7 @@ int main() {
     test_catalogue_complet();
     test_physique_catalogue();
     test_transitoire();
+    test_exemplaires_multiples();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

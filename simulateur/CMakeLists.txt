@@ -83,17 +83,27 @@ find_package(Qt6 COMPONENTS Widgets QUIET)
 if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   set(CMAKE_AUTOMOC ON)
   set(CMAKE_AUTORCC ON)
-  add_executable(simulateur WIN32
-    src/main.cpp
-    src/app/FenetrePrincipale.cpp
-    src/app/MoteurSimulation.cpp
-    src/app/Oscilloscope.cpp
+  # La saisie de schéma est une bibliothèque à part : elle est ainsi
+  # testable sans lancer l'application ni ouvrir de fenêtre.
+  add_library(schema STATIC
     src/app/schematic/SceneSchema.cpp
     src/app/schematic/VueSchema.cpp
     src/app/schematic/ItemComposant.cpp
     src/app/schematic/ItemFil.cpp
   )
-  target_link_libraries(simulateur PRIVATE coeur Qt6::Widgets)
+  target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
+
+  add_executable(simulateur WIN32
+    src/main.cpp
+    src/app/FenetrePrincipale.cpp
+    src/app/MoteurSimulation.cpp
+    src/app/Oscilloscope.cpp
+  )
+  target_link_libraries(simulateur PRIVATE schema)
+
+  add_executable(tests_schema tests/test_schema.cpp)
+  target_link_libraries(tests_schema PRIVATE schema)
+  add_test(NAME schema COMMAND tests_schema)
   message(STATUS "Application Qt : activée (Qt ${Qt6_VERSION})")
 else()
   message(STATUS "Application Qt : désactivée (Qt6 introuvable) — le cœur reste compilable")

@@ -10,12 +10,15 @@
 
 #include <QString>
 
+#include <map>
+
 class QAction;
 class QLabel;
 class QPlainTextEdit;
 class QFormLayout;
 class QWidget;
 class QTabWidget;
+class QComboBox;
 
 class ItemComposant;
 class SceneSchema;
@@ -42,8 +45,10 @@ public:
     // Exemples prêts à l'emploi. Chacun pose un schéma complet et le
     // programme qui va avec : c'est la façon la plus courte de montrer ce que
     // l'application sait faire.
-    enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor, Pwm };
+    enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor,
+                         Pwm, DeuxCartes };
     void charger_exemple(Exemple exemple);
+    void charger_exemple_deux_cartes();
     void charger_exemple_clignotant() { charger_exemple(Exemple::Clignotant); }
 
     // Compile le programme affiché puis démarre la simulation. Sert au mode
@@ -56,6 +61,9 @@ public:
 
     // Vitesse de simulation, en multiples du temps réel.
     double vitesse() const;
+
+    // Mesures de l'oscilloscope, en texte (vérification automatique).
+    QString mesures_oscilloscope() const;
 
     // En vérification automatique, aucune boîte de dialogue ne doit bloquer.
     void definir_mode_silencieux(bool silencieux) { silencieux_ = silencieux; }
@@ -89,6 +97,7 @@ private slots:
 
     void afficher_proprietes(ItemComposant* composant);
     void circuit_modifie();
+    void changer_carte(const QString& reference);
 
 private:
     SceneSchema* scene_ = nullptr;
@@ -103,6 +112,10 @@ private:
     QPlainTextEdit* moniteur_serie_ = nullptr;
     Oscilloscope* oscilloscope_ = nullptr;
     QTabWidget* onglets_ = nullptr;
+    QComboBox* selecteur_carte_ = nullptr;
+    // Programme de chaque carte : deux Arduino n'exécutent pas le même.
+    std::map<QString, QString> programmes_;
+    QString carte_courante_;
     QLabel* etiquette_temps_ = nullptr;
     QLabel* etiquette_vitesse_ = nullptr;
     QLabel* etiquette_moteurs_ = nullptr;

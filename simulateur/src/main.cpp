@@ -59,7 +59,8 @@ int main(int argc, char** argv) {
         QTimer::singleShot(attente, &application, [&fenetre, destination] {
             fenetre.grab().save(destination);
             QTextStream(stdout)
-                << "vitesse " << fenetre.vitesse() << " x temps reel" << Qt::endl;
+                << "vitesse " << fenetre.vitesse() << " x temps reel" << Qt::endl
+                << fenetre.mesures_oscilloscope();
             qApp->quit();
         });
     }

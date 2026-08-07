@@ -194,13 +194,31 @@ SceneSchema::calculer_noeuds() const {
         for (int k = 0; k < composant->nb_bornes(); ++k)
             noms[classes.racine(indices[composant][k])] = modele->noeud_impose;
     }
+    // Combien de cartes ? La réponse change le nommage : avec une seule, la
+    // broche D13 donne le nœud « D13 », lisible. Avec deux, ce nom
+    // désignerait le même nœud pour les deux cartes — elles se retrouveraient
+    // court-circuitées, et SPICE recevrait deux fois la même source. On
+    // préfixe donc par la référence de la carte.
+    int nombre_cartes = 0;
+    for (ItemComposant* composant : liste)
+        if (composant->modele() && composant->modele()->carte) ++nombre_cartes;
+
     for (ItemComposant* composant : liste) {
         const coeur::Modele* modele = composant->modele();
         if (!modele || !modele->carte) continue;
+        const std::string prefixe =
+            nombre_cartes > 1 ? composant->reference().toStdString() + "_"
+                              : std::string();
         for (int k = 0; k < composant->nb_bornes(); ++k) {
             const int racine = classes.racine(indices[composant][k]);
             if (noms.count(racine)) continue;
-            noms[racine] = modele->bornes[k].nom;
+            // Les broches d'alimentation restent communes : deux cartes
+            // posées sur le même schéma partagent forcément leur masse.
+            const std::string& borne = modele->bornes[k].nom;
+            const bool alimentation = borne == coeur::Netlist::kMasse ||
+                                      borne == coeur::Netlist::kAlim ||
+                                      borne == "3V3" || borne == "VIN";
+            noms[racine] = alimentation ? borne : prefixe + borne;
         }
     }
     int suivant = 1;
@@ -253,6 +271,21 @@ coeur::Netlist SceneSchema::construire_netlist(
     // et une condition initiale à chaque résolution, pour rien — sur une carte
     // à vingt broches dont une seule est câblée, c'est l'essentiel du coût.
     if (!broches) return netlist;
+
+    // Recensement préalable : combien de broches de carte aboutissent sur
+    // chaque nœud ? Deux cartes reliées directement l'une à l'autre n'ont
+    // aucun composant entre elles, et seraient écartées à tort par le test
+    // « broche en l'air » s'il ne regardait que les composants.
+    std::map<std::string, int> broches_par_noeud;
+    for (ItemComposant* composant : composants()) {
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->carte) continue;
+        const auto& noms = noeuds.at(composant);
+        for (int k = 0; k < composant->nb_bornes(); ++k)
+            if (numero_broche(modele->bornes[k].nom) >= 0 && !noms[k].empty())
+                ++broches_par_noeud[noms[k]];
+    }
+
     for (ItemComposant* composant : composants()) {
         const coeur::Modele* modele = composant->modele();
         if (!modele || !modele->carte) continue;
@@ -261,8 +294,13 @@ coeur::Netlist SceneSchema::construire_netlist(
             const std::string nom = modele->bornes[k].nom;
             const int numero = numero_broche(nom);
             if (numero < 0 || noms[k].empty()) continue;
-            if (netlist.occurrences(noms[k]) == 0) continue;   // broche en l'air
-            broches->push_back({numero, nom, noms[k]});
+            // Une broche compte si elle rejoint un composant, ou si elle
+            // rejoint la broche d'une autre carte.
+            const bool vers_composant = netlist.occurrences(noms[k]) > 0;
+            const bool vers_autre_carte = broches_par_noeud[noms[k]] > 1;
+            if (!vers_composant && !vers_autre_carte) continue;
+            broches->push_back({numero, nom, noms[k],
+                                composant->reference().toStdString()});
         }
     }
     return netlist;

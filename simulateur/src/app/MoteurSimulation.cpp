@@ -11,48 +11,134 @@ namespace {
 
 constexpr int kPeriodeTrame = 25;        // ms entre deux images
 
+// Renvoyé quand on interroge une carte qui n'est pas sur le schéma : évite un
+// pointeur nul dans le code d'affichage et de diagnostic.
+const coeur::AvrEngine& moteur_inerte() {
+    static coeur::AvrEngine unique;
+    return unique;
+}
+
 }  // namespace
 
 MoteurSimulation::MoteurSimulation(QObject* parent) : QObject(parent) {
     minuterie_.setInterval(kPeriodeTrame);
     minuterie_.setTimerType(Qt::PreciseTimer);
     connect(&minuterie_, &QTimer::timeout, this, &MoteurSimulation::trame);
-    brancher_rappels();
 }
 
-void MoteurSimulation::brancher_rappels() {
-    mcu_.sur_changement_broche(
-        [this](int broche, bool haut) { noter_changement(broche, haut); });
-    mcu_.sur_octet_serie([this](char octet) { emit octet_serie(octet); });
+MoteurSimulation::~MoteurSimulation() = default;
+
+// ---------------------------------------------------------------------------
+// Cartes
+// ---------------------------------------------------------------------------
+MoteurSimulation::Carte* MoteurSimulation::carte(const QString& reference) {
+    const QString cible = reference.isEmpty() ? carte_par_defaut() : reference;
+    auto it = cartes_.find(cible);
+    return it == cartes_.end() ? nullptr : it->second.get();
 }
 
-bool MoteurSimulation::charger_firmware(const QString& chemin, QString* erreur) {
-    if (!mcu_.disponible()) {
+const MoteurSimulation::Carte* MoteurSimulation::carte(
+    const QString& reference) const {
+    const QString cible = reference.isEmpty() ? carte_par_defaut() : reference;
+    auto it = cartes_.find(cible);
+    return it == cartes_.end() ? nullptr : it->second.get();
+}
+
+MoteurSimulation::Carte& MoteurSimulation::obtenir_carte(
+    const QString& reference) {
+    auto it = cartes_.find(reference);
+    if (it != cartes_.end()) return *it->second;
+
+    auto nouvelle = std::make_unique<Carte>();
+    nouvelle->reference = reference;
+    nouvelle->mcu = std::make_unique<coeur::AvrEngine>();
+    Carte& resultat = *nouvelle;
+    cartes_[reference] = std::move(nouvelle);
+    if (!ordre_cartes_.contains(reference)) ordre_cartes_ << reference;
+    brancher_rappels(resultat);
+    return resultat;
+}
+
+void MoteurSimulation::brancher_rappels(Carte& cible) {
+    Carte* pointeur = &cible;
+    cible.mcu->sur_changement_broche([this, pointeur](int broche, bool haut) {
+        noter_changement(*pointeur, broche, haut);
+    });
+    const QString reference = cible.reference;
+    cible.mcu->sur_octet_serie([this, reference](char octet) {
+        emit octet_serie(octet, reference);
+    });
+}
+
+QStringList MoteurSimulation::cartes() const { return ordre_cartes_; }
+
+QString MoteurSimulation::carte_par_defaut() const {
+    return ordre_cartes_.isEmpty() ? QString() : ordre_cartes_.first();
+}
+
+bool MoteurSimulation::firmware_charge(const QString& reference) const {
+    const Carte* cible = carte(reference);
+    return cible && cible->firmware_charge;
+}
+
+bool MoteurSimulation::un_firmware_au_moins() const {
+    for (const auto& paire : cartes_)
+        if (paire.second->firmware_charge) return true;
+    return false;
+}
+
+const coeur::AvrEngine& MoteurSimulation::mcu(const QString& reference) const {
+    const Carte* cible = carte(reference);
+    return cible && cible->mcu ? *cible->mcu : moteur_inerte();
+}
+
+double MoteurSimulation::temps_ms() const {
+    // Toutes les cartes avancent du même nombre de cycles : n'importe laquelle
+    // donne l'heure.
+    for (const QString& reference : ordre_cartes_) {
+        const Carte* cible = carte(reference);
+        if (cible && cible->firmware_charge) return cible->mcu->temps_ms();
+    }
+    return 0.0;
+}
+
+// ---------------------------------------------------------------------------
+// Firmwares
+// ---------------------------------------------------------------------------
+bool MoteurSimulation::charger_firmware(const QString& chemin, QString* erreur,
+                                        const QString& reference) {
+    const QString cible =
+        reference.isEmpty() ? carte_par_defaut() : reference;
+    if (cible.isEmpty()) {
+        if (erreur)
+            *erreur =
+                "Aucune carte programmable sur le schéma : posez une carte "
+                "Arduino avant de charger un firmware.";
+        return false;
+    }
+    Carte& c = obtenir_carte(cible);
+    if (!c.mcu->disponible()) {
         if (erreur) *erreur = "simavr n'est pas compilé dans cette version.";
         return false;
     }
-    if (!mcu_.charger(chemin.toStdString())) {
-        if (erreur) *erreur = QString::fromStdString(mcu_.erreur());
-        firmware_charge_ = false;
+    if (!c.mcu->charger(chemin.toStdString())) {
+        if (erreur) *erreur = QString::fromStdString(c.mcu->erreur());
+        c.firmware_charge = false;
         return false;
     }
-    brancher_rappels();
-    firmware_charge_ = true;
-    masque_ = 0;
-    masque_debut_ = 0;
-    cycle_debut_ = 0;
-    instant_trame_ = 0.0;
-    commutations_.clear();
-    etat_.clear();
-    analogique_.oublier_etat();
-    emit journal(QString("Firmware chargé : %1")
-                     .arg(QFileInfo(chemin).fileName()));
+    // `charger` réinitialise le cœur : il faut rebrancher les rappels.
+    brancher_rappels(c);
+    c.firmware_charge = true;
+    remettre_a_zero();
+    emit journal(QString("Firmware chargé sur %1 : %2")
+                     .arg(cible, QFileInfo(chemin).fileName()));
     return true;
 }
 
 bool MoteurSimulation::compiler_et_charger(const QString& source,
                                            const QString& dossier,
-                                           QString* journal_texte) {
+                                           QString* journal_texte,
+                                           const QString& reference) {
     if (!coeur::AvrEngine::avr_gcc_disponible()) {
         if (journal_texte)
             *journal_texte =
@@ -61,32 +147,90 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
                 "l'application.";
         return false;
     }
+    const QString cible = reference.isEmpty() ? carte_par_defaut() : reference;
+    if (cible.isEmpty()) {
+        if (journal_texte)
+            *journal_texte =
+                "Aucune carte programmable sur le schéma : posez une carte "
+                "Arduino avant de compiler.";
+        return false;
+    }
     QDir().mkpath(dossier);
-    const QString cible = QDir(dossier).filePath("firmware.elf");
+    // Un fichier par carte : deux cartes ne doivent pas se disputer le même
+    // binaire.
+    const QString fichier =
+        QDir(dossier).filePath("firmware_" + cible.toLower() + ".elf");
     std::string compte_rendu;
     const bool ok = coeur::AvrEngine::compiler_source(
-        source.toStdString(), cible.toStdString(), &compte_rendu);
+        source.toStdString(), fichier.toStdString(), &compte_rendu);
     if (journal_texte) *journal_texte = QString::fromStdString(compte_rendu);
     if (!ok) return false;
     QString erreur;
-    if (!charger_firmware(cible, &erreur)) {
+    if (!charger_firmware(fichier, &erreur, cible)) {
         if (journal_texte) *journal_texte += "\n" + erreur;
         return false;
     }
     return true;
 }
 
+// ---------------------------------------------------------------------------
 void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
                                        std::vector<LiaisonBroche> broches) {
     netlist_ = std::move(netlist);
     broches_ = std::move(broches);
+
+    // Les cartes du schéma peuvent avoir changé. On crée celles qui
+    // apparaissent, on retire celles qui ont disparu — mais on garde le
+    // firmware déjà chargé sur celles qui restent.
+    QStringList presentes;
+    for (const LiaisonBroche& liaison : broches_) {
+        const QString reference = QString::fromStdString(liaison.carte);
+        if (reference.isEmpty() || presentes.contains(reference)) continue;
+        presentes << reference;
+        obtenir_carte(reference);
+    }
+    for (auto it = cartes_.begin(); it != cartes_.end();) {
+        if (presentes.contains(it->first)) {
+            ++it;
+            continue;
+        }
+        ordre_cartes_.removeAll(it->first);
+        it = cartes_.erase(it);
+    }
+    // Ordre stable : celui des références, pour que « la première carte »
+    // veuille dire quelque chose.
+    ordre_cartes_ = presentes;
+    ordre_cartes_.sort();
+}
+
+void MoteurSimulation::remettre_a_zero() {
+    for (auto& paire : cartes_) {
+        paire.second->masque = 0;
+        paire.second->masque_debut = 0;
+        paire.second->cycle_debut = 0;
+        paire.second->commutations.clear();
+    }
+    instant_trame_ = 0.0;
+    etat_.clear();
+    analogique_.oublier_etat();
 }
 
 void MoteurSimulation::demarrer() {
-    if (!firmware_charge_) {
+    if (cartes_.empty()) {
+        emit journal("Aucune carte programmable sur le schéma.");
+        return;
+    }
+    if (!un_firmware_au_moins()) {
         emit journal("Aucun firmware chargé : rien à exécuter.");
         return;
     }
+    QStringList sans_firmware;
+    for (const QString& reference : ordre_cartes_)
+        if (!firmware_charge(reference)) sans_firmware << reference;
+    if (!sans_firmware.isEmpty())
+        emit journal(QString("Attention : %1 n'a pas de firmware et restera "
+                             "inerte (ses broches sont en entrée).")
+                         .arg(sans_firmware.join(", ")));
     minuterie_.start();
     emit journal("Simulation démarrée.");
 }
@@ -98,27 +242,21 @@ void MoteurSimulation::suspendre() {
 
 void MoteurSimulation::arreter() {
     minuterie_.stop();
-    mcu_.reinitialiser();
-    masque_ = 0;
-    masque_debut_ = 0;
-    cycle_debut_ = 0;
-    instant_trame_ = 0.0;
-    commutations_.clear();
-    etat_.clear();
-    analogique_.oublier_etat();
+    for (auto& paire : cartes_) paire.second->mcu->reinitialiser();
+    remettre_a_zero();
     vitesse_ = 0.0;
-    emit journal("Simulation arrêtée et microcontrôleur réinitialisé.");
+    emit journal("Simulation arrêtée et microcontrôleurs réinitialisés.");
     emit avancement(0.0, 0.0);
 }
 
 // ---------------------------------------------------------------------------
-void MoteurSimulation::noter_changement(int broche, bool haut) {
+void MoteurSimulation::noter_changement(Carte& cible, int broche, bool haut) {
     if (broche < 0 || broche >= 32) return;
     // On garde l'instant exact : c'est lui qui devient un point de la source
     // linéaire par morceaux, donc un front dans la forme d'onde.
-    commutations_.push_back({mcu_.cycle(), broche, haut});
-    if (haut) masque_ |= (1u << broche);
-    else masque_ &= ~(1u << broche);
+    cible.commutations.push_back({cible.mcu->cycle(), broche, haut});
+    if (haut) cible.masque |= (1u << broche);
+    else cible.masque &= ~(1u << broche);
 }
 
 void MoteurSimulation::definir_resolution(double secondes) {
@@ -127,18 +265,29 @@ void MoteurSimulation::definir_resolution(double secondes) {
     pas_ = secondes;
 }
 
-std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
-    uint32_t masque) const {
+std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_au_depart()
+    const {
     std::vector<coeur::BrocheElectrique> resultat;
     resultat.reserve(broches_.size());
     for (const LiaisonBroche& liaison : broches_) {
+        const Carte* cible = carte(QString::fromStdString(liaison.carte));
         coeur::BrocheElectrique broche;
         broche.noeud = liaison.noeud;
-        if (mcu_.direction_sortie(liaison.numero)) {
+        // Une carte sans firmware ne pilote rien : ses broches restent en
+        // entrée haute impédance, ce qui est l'état d'un microcontrôleur au
+        // repos.
+        if (!cible || !cible->firmware_charge) {
+            broche.mode = coeur::BrocheElectrique::Mode::Entree;
+            resultat.push_back(broche);
+            continue;
+        }
+        const coeur::AvrEngine& mcu = *cible->mcu;
+        if (mcu.direction_sortie(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::Sortie;
-            broche.tension = (masque >> liaison.numero) & 1u ? 5.0 : 0.0;
+            broche.tension =
+                (cible->masque_debut >> liaison.numero) & 1u ? 5.0 : 0.0;
             broche.resistance = 25.0;      // résistance de sortie d'un AVR
-        } else if (mcu_.pullup_actif(liaison.numero)) {
+        } else if (mcu.pullup_actif(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::PullUp;
             broche.resistance = 35000.0;   // pull-up interne : 20 à 50 kΩ
         } else {
@@ -150,32 +299,42 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
 }
 
 void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
-    const double duree = static_cast<double>(cycles_ecoules) / mcu_.frequence();
+    const uint32_t frequence =
+        cartes_.empty() ? 16000000 : cartes_.begin()->second->mcu->frequence();
+    const double duree = static_cast<double>(cycles_ecoules) / frequence;
     if (duree <= 0 || netlist_.instances().empty()) {
-        commutations_.clear();
+        for (auto& paire : cartes_) paire.second->commutations.clear();
         return;
     }
 
-    // Les broches partent de leur état en début de trame, puis suivent
-    // l'histoire réellement vécue par le microcontrôleur.
-    const std::vector<coeur::BrocheElectrique> broches =
-        broches_pour(masque_debut_);
+    const std::vector<coeur::BrocheElectrique> broches = broches_au_depart();
 
-    std::map<int, std::string> noeud_de_broche;
+    // Les commutations de toutes les cartes sont fondues dans une seule
+    // analyse : elles partagent le circuit, donc elles partagent la fenêtre.
+    std::map<std::pair<QString, int>, std::string> noeud_de_broche;
     for (const LiaisonBroche& liaison : broches_)
-        noeud_de_broche[liaison.numero] = liaison.noeud;
+        noeud_de_broche[{QString::fromStdString(liaison.carte),
+                         liaison.numero}] = liaison.noeud;
 
     std::vector<coeur::TransitionBroche> transitions;
-    transitions.reserve(commutations_.size());
-    for (const Commutation& commutation : commutations_) {
-        auto it = noeud_de_broche.find(commutation.broche);
-        if (it == noeud_de_broche.end()) continue;
-        const double instant =
-            static_cast<double>(commutation.cycle - cycle_debut_) /
-            mcu_.frequence();
-        transitions.push_back({instant, it->second, commutation.haut ? 5.0 : 0.0});
+    for (auto& paire : cartes_) {
+        Carte& cible = *paire.second;
+        for (const Carte::Commutation& commutation : cible.commutations) {
+            auto it = noeud_de_broche.find({cible.reference, commutation.broche});
+            if (it == noeud_de_broche.end()) continue;
+            const double instant =
+                static_cast<double>(commutation.cycle - cible.cycle_debut) /
+                frequence;
+            transitions.push_back(
+                {instant, it->second, commutation.haut ? 5.0 : 0.0});
+        }
+        cible.commutations.clear();
     }
-    commutations_.clear();
+    std::sort(transitions.begin(), transitions.end(),
+              [](const coeur::TransitionBroche& a,
+                 const coeur::TransitionBroche& b) {
+                  return a.instant < b.instant;
+              });
 
     analogique_.definir_etat_initial(etat_);
     source_spice_ = QString::fromStdString(analogique_.construire_transitoire(
@@ -218,11 +377,13 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     for (const auto& trace : formes.tensions)
         tensions[trace.first] = moyenne(trace.second);
 
-    // Retour du circuit vers le microcontrôleur. Ici, en revanche, c'est la
+    // Retour du circuit vers les microcontrôleurs. Ici, en revanche, c'est la
     // valeur *finale* qui compte : le programme lit un niveau à un instant
     // donné, pas une moyenne.
     for (const LiaisonBroche& liaison : broches_) {
-        if (mcu_.direction_sortie(liaison.numero)) continue;
+        Carte* cible = carte(QString::fromStdString(liaison.carte));
+        if (!cible || !cible->firmware_charge) continue;
+        if (cible->mcu->direction_sortie(liaison.numero)) continue;
         std::string noeud = liaison.noeud;
         std::transform(noeud.begin(), noeud.end(), noeud.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -230,8 +391,8 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
         if (it == formes.tensions.end() || it->second.empty()) continue;
         const double derniere = it->second.back();
         if (liaison.numero >= 14)
-            mcu_.definir_tension_adc(liaison.numero - 14, derniere);
-        mcu_.definir_niveau_externe(liaison.numero, derniere > 2.5);
+            cible->mcu->definir_tension_adc(liaison.numero - 14, derniere);
+        cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
     }
 
     emit resultats(courants, tensions);
@@ -242,9 +403,8 @@ void MoteurSimulation::resoudre_une_fois() {
         emit journal("Le schéma ne contient aucun composant simulable.");
         return;
     }
-    source_spice_ =
-        QString::fromStdString(analogique_.construire(netlist_,
-                                                      broches_pour(masque_)));
+    source_spice_ = QString::fromStdString(
+        analogique_.construire(netlist_, broches_au_depart()));
     if (!analogique_.resoudre()) {
         for (const auto& message : analogique_.erreurs())
             emit journal(QString::fromStdString(message));
@@ -254,23 +414,58 @@ void MoteurSimulation::resoudre_une_fois() {
     emit journal("Analyse au point de repos effectuée.");
 }
 
+// Le pas de couplage ne sert qu'au retour du circuit vers le microcontrôleur.
+// Si toutes les broches sont en sortie, le programme n'a rien à relire : on
+// peut alors traiter la trame entière d'un bloc, et c'est bien plus rapide.
+// Dès qu'une broche est lue — un bouton, un capteur, une autre carte — on
+// resserre le pas pour que la réponse ne traîne pas.
+int MoteurSimulation::pas_couplage_utile() const {
+    constexpr int kLarge = 25;    // aucune lecture : une résolution par image
+    constexpr int kFin = 5;       // lecture en jeu : cinq fois plus réactif
+
+    if (cartes_.size() > 1) return kFin;
+    for (const LiaisonBroche& liaison : broches_) {
+        const Carte* cible = carte(QString::fromStdString(liaison.carte));
+        if (!cible || !cible->firmware_charge) continue;
+        if (!cible->mcu->direction_sortie(liaison.numero)) return kFin;
+    }
+    return kLarge;
+}
+
+uint64_t MoteurSimulation::executer_pas(uint64_t cycles) {
+    // L'état de départ doit être relevé AVANT d'exécuter : les rappels de
+    // simavr vont modifier les masques pendant l'avancement.
+    uint64_t executes = 0;
+    for (auto& paire : cartes_) {
+        Carte& cible = *paire.second;
+        cible.cycle_debut = cible.mcu->cycle();
+        cible.masque_debut = cible.masque;
+        cible.commutations.clear();
+        if (!cible.firmware_charge) continue;
+        // Toutes les cartes reçoivent le même nombre de cycles : c'est ce qui
+        // les garde sur la même horloge.
+        executes = std::max(executes, cible.mcu->avancer(cycles));
+    }
+    resoudre_trame(executes);
+    return executes;
+}
+
 void MoteurSimulation::trame() {
     QElapsedTimer chronometre;
     chronometre.start();
 
-    const uint64_t cycles = static_cast<uint64_t>(mcu_.frequence()) *
-                            kPeriodeTrame / 1000;
-    // L'état de départ doit être relevé AVANT d'exécuter : les rappels de
-    // simavr vont modifier `masque_` pendant l'avancement.
-    cycle_debut_ = mcu_.cycle();
-    masque_debut_ = masque_;
-    commutations_.clear();
+    const uint32_t frequence =
+        cartes_.empty() ? 16000000 : cartes_.begin()->second->mcu->frequence();
+    pas_couplage_ms_ = pas_couplage_utile();
+    const uint64_t cycles_par_pas =
+        static_cast<uint64_t>(frequence) * pas_couplage_ms_ / 1000;
+    const int pas = std::max(1, kPeriodeTrame / std::max(1, pas_couplage_ms_));
 
-    const uint64_t executes = mcu_.avancer(cycles);
-    resoudre_trame(executes);
+    uint64_t executes = 0;
+    for (int k = 0; k < pas; ++k) executes += executer_pas(cycles_par_pas);
 
     const double reel = chronometre.nsecsElapsed() / 1e6;   // ms consommées
-    const double simule = executes * 1000.0 / mcu_.frequence();
+    const double simule = executes * 1000.0 / frequence;
     vitesse_ = reel > 0 ? simule / reel : 0.0;
-    emit avancement(mcu_.temps_ms(), vitesse_);
+    emit avancement(temps_ms(), vitesse_);
 }

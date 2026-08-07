@@ -93,6 +93,48 @@ void TraceOscilloscope::mesurer(int voie, double& moyenne, double& maximum) cons
     if (compte) moyenne = somme / compte;
 }
 
+// Fraction du temps passé au-dessus de la moitié de la crête : le rapport
+// cyclique, mesuré et non déduit.
+double TraceOscilloscope::rapport_cyclique(int voie) const {
+    double moyenne = 0, maximum = 0;
+    mesurer(voie, moyenne, maximum);
+    if (maximum <= 1e-9) return 0.0;
+    const float seuil = static_cast<float>(maximum / 2);
+    const float debut = static_cast<float>(dernier_instant_ - fenetre_);
+    size_t hauts = 0, total = 0;
+    for (size_t k = temps_.size(); k-- > 0;) {
+        if (temps_[k] < debut) break;
+        if (voies_[voie].valeurs[k] > seuil) ++hauts;
+        ++total;
+    }
+    return total ? static_cast<double>(hauts) / total : 0.0;
+}
+
+// Proportion d'instants où les deux voies sont dans le même état logique.
+// Deux signaux identiques donnent 100 %, deux signaux indépendants environ
+// 50 %, deux signaux en opposition 0 %.
+double TraceOscilloscope::concordance(int a, int b) const {
+    if (!voie_active(a) || !voie_active(b)) return 0.0;
+    if (voies_[a].valeurs.size() != temps_.size()) return 0.0;
+    if (voies_[b].valeurs.size() != temps_.size()) return 0.0;
+    double moyenne = 0, crete_a = 0, crete_b = 0;
+    mesurer(a, moyenne, crete_a);
+    mesurer(b, moyenne, crete_b);
+    if (crete_a <= 1e-9 || crete_b <= 1e-9) return 0.0;
+
+    const float seuil_a = static_cast<float>(crete_a / 2);
+    const float seuil_b = static_cast<float>(crete_b / 2);
+    const float debut = static_cast<float>(dernier_instant_ - fenetre_);
+    size_t accord = 0, total = 0;
+    for (size_t k = temps_.size(); k-- > 0;) {
+        if (temps_[k] < debut) break;
+        if ((voies_[a].valeurs[k] > seuil_a) == (voies_[b].valeurs[k] > seuil_b))
+            ++accord;
+        ++total;
+    }
+    return total ? static_cast<double>(accord) / total : 0.0;
+}
+
 const std::vector<double>* TraceOscilloscope::courbe_pour(
     const coeur::Formes& formes, const QString& designation) {
     if (designation.isEmpty()) return nullptr;
@@ -426,4 +468,24 @@ void Oscilloscope::definir_base_temps(double secondes) {
         }
     }
     base_temps_->setCurrentIndex(meilleur);
+}
+
+QString Oscilloscope::rapport() const {
+    QString texte;
+    for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
+        if (!trace_->voie_active(v)) continue;
+        double moyenne = 0, maximum = 0;
+        trace_->mesurer(v, moyenne, maximum);
+        texte += QString("voie %1 (%2) : moyenne %3, crete %4, "
+                         "rapport cyclique %5 %\n")
+                     .arg(v + 1)
+                     .arg(trace_->signal_voie(v))
+                     .arg(moyenne, 0, 'f', 3)
+                     .arg(maximum, 0, 'f', 3)
+                     .arg(trace_->rapport_cyclique(v) * 100, 0, 'f', 1);
+    }
+    if (trace_->voie_active(0) && trace_->voie_active(1))
+        texte += QString("concordance voie 1 / voie 2 : %1 %\n")
+                     .arg(trace_->concordance(0, 1) * 100, 0, 'f', 1);
+    return texte;
 }
