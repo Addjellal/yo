@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 40 994.2 288" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="32" y="40" width="994.2" height="288" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="48" y="66" class="titre">Filtre RC — transformer une PWM en tension continue</text>
+  <polyline points="204,150 257,150 257,120 310,120" class="fil"/>
+  <polyline points="370,120 415,120 415,175 460,175" class="fil"/>
+  <polyline points="460,225 460,270" class="fil"/>
+  <rect x="58" y="112" width="124" height="76" rx="4" class="trait"/>
+  <text x="120" y="132" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="204" y1="150" x2="182" y2="150" class="trait"/><circle cx="204" cy="150" r="2.6" class="marq"/><text x="174" y="154" class="symtxt" text-anchor="end">D9</text>
+  <text x="120" y="103" class="refc" text-anchor="middle">U1</text>
+  <line x1="310" y1="120" x2="322" y2="120" class="trait"/>
+  <polygon points="322,113 358,113 358,127 322,127" class="trait"/>
+  <line x1="358" y1="120" x2="370" y2="120" class="trait"/>
+  <circle cx="310" cy="120" r="2.6" class="marq"/>
+  <circle cx="370" cy="120" r="2.6" class="marq"/>
+  <text x="340" y="104" class="refc" text-anchor="middle">R1</text>
+  <text x="340" y="145" class="valc" text-anchor="middle">10 kΩ</text>
+  <line x1="460" y1="175" x2="460" y2="196" class="trait"/>
+  <line x1="472" y1="196" x2="448" y2="196" class="trait"/>
+  <line x1="472" y1="204" x2="448" y2="204" class="trait"/>
+  <line x1="460" y1="204" x2="460" y2="225" class="trait"/>
+  <circle cx="460" cy="175" r="2.6" class="marq"/>
+  <circle cx="460" cy="225" r="2.6" class="marq"/>
+  <text x="460" y="166" class="refc" text-anchor="middle">C1</text>
+  <text x="482" y="204" class="valc">100 nF</text>
+  <line x1="460" y1="270" x2="460" y2="290" class="trait"/>
+  <line x1="446" y1="290" x2="474" y2="290" class="trait"/>
+  <line x1="451" y1="296" x2="469" y2="296" class="trait"/>
+  <line x1="456" y1="302" x2="464" y2="302" class="trait"/>
+  <circle cx="460" cy="270" r="2.6" class="marq"/>
+  <text x="560" y="118" class="note">Vs</text>
+  <text x="620" y="90" class="note">τ = R × C = 1 ms</text>
+  <text x="620" y="126" class="note">La PWM de l'Arduino bat à</text>
+  <text x="620" y="146" class="note">490 Hz, soit 2 ms de période.</text>
+  <text x="620" y="182" class="note">τ du même ordre que la</text>
+  <text x="620" y="202" class="note">période : il reste de</text>
+  <text x="620" y="222" class="note">l'ondulation. Pour lisser</text>
+  <text x="620" y="242" class="note">vraiment, prenez τ ≥ 10 T.</text>
+</svg>

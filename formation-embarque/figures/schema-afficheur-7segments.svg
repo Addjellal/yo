@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 21 1015.52 317" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="32" y="21" width="1015.52" height="317" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="48" y="47" class="titre">Afficheur 7 segments — une résistance par segment</text>
+  <polyline points="204,140 252,140 252,100 300,100" class="fil"/>
+  <polyline points="204,170 300,170" class="fil"/>
+  <polyline points="204,200 252,200 252,240 300,240" class="fil"/>
+  <polyline points="360,100 400,100 400,140 440,140" class="fil"/>
+  <polyline points="360,170 400,170 400,155 440,155" class="fil"/>
+  <polyline points="360,240 400,240 400,170 440,170" class="fil"/>
+  <polyline points="560,185 590,185 590,280 620,280" class="fil"/>
+  <rect x="58" y="111" width="124" height="118" rx="4" class="trait"/>
+  <text x="120" y="131" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="204" y1="140" x2="182" y2="140" class="trait"/><circle cx="204" cy="140" r="2.6" class="marq"/><text x="174" y="144" class="symtxt" text-anchor="end">D2</text>
+  <line x1="204" y1="170" x2="182" y2="170" class="trait"/><circle cx="204" cy="170" r="2.6" class="marq"/><text x="174" y="174" class="symtxt" text-anchor="end">D3</text>
+  <line x1="204" y1="200" x2="182" y2="200" class="trait"/><circle cx="204" cy="200" r="2.6" class="marq"/><text x="174" y="204" class="symtxt" text-anchor="end">D4</text>
+  <text x="120" y="102" class="refc" text-anchor="middle">U1</text>
+  <line x1="300" y1="100" x2="312" y2="100" class="trait"/>
+  <polygon points="312,93 348,93 348,107 312,107" class="trait"/>
+  <line x1="348" y1="100" x2="360" y2="100" class="trait"/>
+  <circle cx="300" cy="100" r="2.6" class="marq"/>
+  <circle cx="360" cy="100" r="2.6" class="marq"/>
+  <text x="330" y="84" class="refc" text-anchor="middle">R1</text>
+  <text x="330" y="125" class="valc" text-anchor="middle">220 Ω</text>
+  <line x1="300" y1="170" x2="312" y2="170" class="trait"/>
+  <polygon points="312,163 348,163 348,177 312,177" class="trait"/>
+  <line x1="348" y1="170" x2="360" y2="170" class="trait"/>
+  <circle cx="300" cy="170" r="2.6" class="marq"/>
+  <circle cx="360" cy="170" r="2.6" class="marq"/>
+  <text x="330" y="154" class="refc" text-anchor="middle">R2</text>
+  <text x="330" y="195" class="valc" text-anchor="middle">220 Ω</text>
+  <line x1="300" y1="240" x2="312" y2="240" class="trait"/>
+  <polygon points="312,233 348,233 348,247 312,247" class="trait"/>
+  <line x1="348" y1="240" x2="360" y2="240" class="trait"/>
+  <circle cx="300" cy="240" r="2.6" class="marq"/>
+  <circle cx="360" cy="240" r="2.6" class="marq"/>
+  <text x="330" y="224" class="refc" text-anchor="middle">R3</text>
+  <text x="330" y="265" class="valc" text-anchor="middle">220 Ω</text>
+  <polygon points="460,130 540,130 540,240 460,240" class="trait"/>
+  <line x1="476" y1="144" x2="516" y2="144" class="trait"/>
+  <line x1="474" y1="146" x2="474" y2="180" class="trait"/>
+  <line x1="518" y1="146" x2="518" y2="180" class="trait"/>
+  <line x1="474" y1="182" x2="518" y2="182" class="trait"/>
+  <line x1="472" y1="184" x2="472" y2="220" class="trait"/>
+  <line x1="516" y1="184" x2="516" y2="220" class="trait"/>
+  <line x1="472" y1="222" x2="516" y2="222" class="trait"/>
+  <circle cx="526" cy="224" r="3" class="plein"/>
+  <circle cx="440" cy="140" r="2.6" class="marq"/>
+  <circle cx="440" cy="155" r="2.6" class="marq"/>
+  <circle cx="440" cy="170" r="2.6" class="marq"/>
+  <circle cx="440" cy="185" r="2.6" class="marq"/>
+  <circle cx="440" cy="200" r="2.6" class="marq"/>
+  <circle cx="440" cy="215" r="2.6" class="marq"/>
+  <circle cx="440" cy="230" r="2.6" class="marq"/>
+  <circle cx="560" cy="185" r="2.6" class="marq"/>
+  <text x="500" y="121" class="refc" text-anchor="middle">AF1</text>
+  <text x="500" y="258" class="valc" text-anchor="middle">cathode commune</text>
+  <line x1="620" y1="280" x2="620" y2="300" class="trait"/>
+  <line x1="606" y1="300" x2="634" y2="300" class="trait"/>
+  <line x1="611" y1="306" x2="629" y2="306" class="trait"/>
+  <line x1="616" y1="312" x2="624" y2="312" class="trait"/>
+  <circle cx="620" cy="280" r="2.6" class="marq"/>
+  <text x="660" y="96" class="note">Sept segments, sept</text>
+  <text x="660" y="116" class="note">résistances : chacun est</text>
+  <text x="660" y="136" class="note">une LED indépendante.</text>
+  <text x="660" y="172" class="note">Une seule résistance sur le</text>
+  <text x="660" y="192" class="note">commun ne marcherait pas :</text>
+  <text x="660" y="212" class="note">la luminosité changerait</text>
+  <text x="660" y="232" class="note">selon le chiffre affiché.</text>
+  <text x="660" y="268" class="note">(3 segments dessinés sur 7)</text>
+</svg>

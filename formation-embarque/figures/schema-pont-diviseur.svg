@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="180 -16 827.52 404" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="180" y="-16" width="827.52" height="404" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="196" y="10" class="titre">Pont diviseur — mesurer une grandeur, adapter une tension</text>
+  <polyline points="220,60 220,100" class="fil"/>
+  <polyline points="220,160 220,220" class="fil"/>
+  <polyline points="220,280 220,330" class="fil"/>
+  <polyline points="220,160 303,160 303,190 386,190" class="fil"/>
+  <line x1="220" y1="60" x2="220" y2="40" class="trait"/>
+  <line x1="208" y1="40" x2="232" y2="40" class="trait"/>
+  <text x="210" y="34" class="symtxt" style="font-size:10px">+5V</text>
+  <circle cx="220" cy="60" r="2.6" class="marq"/>
+  <line x1="220" y1="100" x2="220" y2="112" class="trait"/>
+  <polygon points="227,112 227,148 213,148 213,112" class="trait"/>
+  <line x1="220" y1="148" x2="220" y2="160" class="trait"/>
+  <circle cx="220" cy="100" r="2.6" class="marq"/>
+  <circle cx="220" cy="160" r="2.6" class="marq"/>
+  <text x="220" y="91" class="refc" text-anchor="middle">R1</text>
+  <text x="237" y="134" class="valc">10 kΩ</text>
+  <line x1="220" y1="220" x2="220" y2="232" class="trait"/>
+  <polygon points="227,232 227,268 213,268 213,232" class="trait"/>
+  <line x1="220" y1="268" x2="220" y2="280" class="trait"/>
+  <circle cx="220" cy="220" r="2.6" class="marq"/>
+  <circle cx="220" cy="280" r="2.6" class="marq"/>
+  <text x="220" y="211" class="refc" text-anchor="middle">R2</text>
+  <text x="237" y="254" class="valc">10 kΩ</text>
+  <line x1="220" y1="330" x2="220" y2="350" class="trait"/>
+  <line x1="206" y1="350" x2="234" y2="350" class="trait"/>
+  <line x1="211" y1="356" x2="229" y2="356" class="trait"/>
+  <line x1="216" y1="362" x2="224" y2="362" class="trait"/>
+  <circle cx="220" cy="330" r="2.6" class="marq"/>
+  <rect x="408" y="152" width="124" height="76" rx="4" class="trait"/>
+  <text x="470" y="172" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="386" y1="190" x2="408" y2="190" class="trait"/><circle cx="386" cy="190" r="2.6" class="marq"/><text x="416" y="194" class="symtxt" text-anchor="start">A0</text>
+  <text x="470" y="143" class="refc" text-anchor="middle">U1</text>
+  <text x="320" y="186" class="note">Vs</text>
+  <text x="620" y="90" class="note">Vs = Ve × R2 / (R1 + R2)</text>
+  <text x="620" y="126" class="note">Ici : 5 × 10 / 20 = 2,5 V</text>
+  <text x="620" y="162" class="note">Remplacez R1 par une LDR</text>
+  <text x="620" y="182" class="note">ou une thermistance : la</text>
+  <text x="620" y="202" class="note">tension devient une mesure.</text>
+  <text x="620" y="238" class="note">analogRead(A0) → 0 à 1023</text>
+</svg>

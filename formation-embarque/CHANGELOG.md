@@ -3,6 +3,20 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Les dates sont celles de la mise à disposition du contenu.
 
+
+## Schémas électriques dans les cours
+
+Dix schémas de montage ajoutés, tous produits à partir du catalogue de
+composants du simulateur (`simulateur/outils/generer_figures`) : la figure du
+cours et le symbole de l'atelier sont donc le même objet.
+
+- **03-arduino** (qui n'avait aucune figure) : LED avec sa résistance série,
+  bouton et pull-up interne, pont diviseur, potentiomètre, commande d'un
+  moteur par transistor avec diode de roue libre, optocoupleur, afficheur
+  7 segments, filtre RC sur une PWM.
+- **00-fondamentaux** : montage minimal d'un régulateur 7805.
+- **10-stm32** : adaptation de niveau 5 V vers 3,3 V.
+
 ## [1.3.0] — Prise en main
 
 ### Ajouté

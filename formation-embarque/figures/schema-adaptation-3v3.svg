@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 40 994.2 328" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="32" y="40" width="994.2" height="328" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="48" y="66" class="titre">Adapter 5 V vers 3,3 V — une entrée STM32 ne tolère pas 5 V</text>
+  <polyline points="204,150 252,150 252,120 300,120" class="fil"/>
+  <polyline points="360,120 405,120 405,190 450,190" class="fil"/>
+  <polyline points="450,250 450,310" class="fil"/>
+  <rect x="58" y="112" width="124" height="76" rx="4" class="trait"/>
+  <text x="120" y="132" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="204" y1="150" x2="182" y2="150" class="trait"/><circle cx="204" cy="150" r="2.6" class="marq"/><text x="174" y="154" class="symtxt" text-anchor="end">D3</text>
+  <text x="120" y="103" class="refc" text-anchor="middle">U1</text>
+  <line x1="300" y1="120" x2="312" y2="120" class="trait"/>
+  <polygon points="312,113 348,113 348,127 312,127" class="trait"/>
+  <line x1="348" y1="120" x2="360" y2="120" class="trait"/>
+  <circle cx="300" cy="120" r="2.6" class="marq"/>
+  <circle cx="360" cy="120" r="2.6" class="marq"/>
+  <text x="330" y="104" class="refc" text-anchor="middle">R1</text>
+  <text x="330" y="145" class="valc" text-anchor="middle">1,8 kΩ</text>
+  <line x1="450" y1="190" x2="450" y2="202" class="trait"/>
+  <polygon points="457,202 457,238 443,238 443,202" class="trait"/>
+  <line x1="450" y1="238" x2="450" y2="250" class="trait"/>
+  <circle cx="450" cy="190" r="2.6" class="marq"/>
+  <circle cx="450" cy="250" r="2.6" class="marq"/>
+  <text x="450" y="181" class="refc" text-anchor="middle">R2</text>
+  <text x="467" y="224" class="valc">3,3 kΩ</text>
+  <line x1="450" y1="310" x2="450" y2="330" class="trait"/>
+  <line x1="436" y1="330" x2="464" y2="330" class="trait"/>
+  <line x1="441" y1="336" x2="459" y2="336" class="trait"/>
+  <line x1="446" y1="342" x2="454" y2="342" class="trait"/>
+  <circle cx="450" cy="310" r="2.6" class="marq"/>
+  <text x="520" y="118" class="note">vers l'entrée 3,3 V</text>
+  <text x="620" y="160" class="note">5 × 3,3 / (1,8 + 3,3) = 3,2 V</text>
+  <text x="620" y="196" class="note">Ce pont ne marche que dans</text>
+  <text x="620" y="216" class="note">ce sens. Pour une liaison</text>
+  <text x="620" y="236" class="note">bidirectionnelle (I²C), il</text>
+  <text x="620" y="256" class="note">faut un vrai adaptateur.</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="144 46 857.86 342" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="144" y="46" width="857.86" height="342" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="160" y="72" class="titre">Potentiomètre sur une entrée analogique</text>
+  <polyline points="200,150 185,150 185,265 170,265" class="fil"/>
+  <polyline points="230,265 215,265 215,330 200,330" class="fil"/>
+  <polyline points="200,225 298,225 298,180 396,180" class="fil"/>
+  <line x1="200" y1="150" x2="200" y2="130" class="trait"/>
+  <line x1="188" y1="130" x2="212" y2="130" class="trait"/>
+  <text x="190" y="124" class="symtxt" style="font-size:10px">+5V</text>
+  <circle cx="200" cy="150" r="2.6" class="marq"/>
+  <line x1="170" y1="265" x2="182" y2="265" class="trait"/>
+  <polygon points="182,258 218,258 218,272 182,272" class="trait"/>
+  <line x1="218" y1="265" x2="230" y2="265" class="trait"/>
+  <line x1="200" y1="225" x2="200" y2="244" class="trait"/>
+  <polygon points="195,244 205,244 200,254" class="plein"/>
+  <circle cx="170" cy="265" r="2.6" class="marq"/>
+  <circle cx="200" cy="225" r="2.6" class="marq"/>
+  <circle cx="230" cy="265" r="2.6" class="marq"/>
+  <text x="200" y="216" class="refc" text-anchor="middle">POT1</text>
+  <text x="200" y="290" class="valc" text-anchor="middle">10 kΩ</text>
+  <line x1="200" y1="330" x2="200" y2="350" class="trait"/>
+  <line x1="186" y1="350" x2="214" y2="350" class="trait"/>
+  <line x1="191" y1="356" x2="209" y2="356" class="trait"/>
+  <line x1="196" y1="362" x2="204" y2="362" class="trait"/>
+  <circle cx="200" cy="330" r="2.6" class="marq"/>
+  <rect x="418" y="142" width="124" height="76" rx="4" class="trait"/>
+  <text x="480" y="162" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="396" y1="180" x2="418" y2="180" class="trait"/><circle cx="396" cy="180" r="2.6" class="marq"/><text x="426" y="184" class="symtxt" text-anchor="start">A0</text>
+  <text x="480" y="133" class="refc" text-anchor="middle">U1</text>
+  <text x="600" y="96" class="note">Le curseur partage la piste</text>
+  <text x="600" y="116" class="note">en deux résistances : c'est</text>
+  <text x="600" y="136" class="note">un pont diviseur réglable.</text>
+  <text x="600" y="176" class="note">Butée basse → 0 V → 0</text>
+  <text x="600" y="196" class="note">Milieu → 2,5 V → 512</text>
+  <text x="600" y="216" class="note">Butée haute → 5 V → 1023</text>
+</svg>

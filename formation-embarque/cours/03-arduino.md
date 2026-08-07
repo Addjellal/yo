@@ -74,6 +74,18 @@ En coulisses, l'environnement fournit un `main()` qui appelle `setup()` puis
 
 ### 3.1 Numérique
 
+Le montage de base d'une sortie : une LED **ne se branche jamais seule**. Elle
+se comporte comme une diode, pas comme une résistance — sans limitation, le
+courant n'est borné que par la résistance interne de la broche.
+
+![Commander une LED : montage et calcul de la résistance série](../figures/schema-led-resistance.svg)
+
+Et le montage de base d'une entrée. Une broche configurée en entrée sans rien
+au bout est **flottante** : elle capte le bruit ambiant et son état change tout
+seul. Le pull-up interne lui donne un niveau de repos.
+
+![Lire un bouton avec le pull-up interne](../figures/schema-bouton-pullup.svg)
+
 ```cpp
 pinMode(7, INPUT_PULLUP);            // bouton entre broche et GND
 bool appuye = (digitalRead(7) == LOW);  // pull-up → LOW = appuyé (logique inversée)
@@ -83,6 +95,17 @@ digitalWrite(13, HIGH);
 ```
 
 ### 3.2 Analogique
+
+Toute mesure analogique repose sur le même montage : le **pont diviseur**. Le
+convertisseur ne sait lire qu'une tension ; le pont transforme une résistance
+variable — donc une grandeur physique — en tension.
+
+![Pont diviseur : la base de toute entrée analogique](../figures/schema-pont-diviseur.svg)
+
+Le potentiomètre est ce même pont, avec un curseur qui déplace le point de
+partage.
+
+![Potentiomètre câblé sur une entrée analogique](../figures/schema-potentiometre.svg)
 
 ```cpp
 int brut = analogRead(A0);                 // 0..1023 pour 0..5 V
@@ -111,6 +134,24 @@ trace les valeurs en courbes.
 ---
 
 ## 4. Capteurs et actionneurs classiques
+
+Une sortie de l'ATmega328P fournit **20 mA** au mieux (40 mA en valeur
+absolue à ne jamais atteindre). Un moteur, un relais ou une lampe en demandent
+dix à cent fois plus : il faut un étage de puissance, et le transistor en
+commutation est le plus simple.
+
+![Commande d'un moteur par transistor, avec diode de roue libre](../figures/schema-transistor-moteur.svg)
+
+Quand la charge est alimentée par une autre source — machine, secteur — on ne
+relie pas les masses. L'optocoupleur transmet l'ordre par la lumière et laisse
+les deux circuits électriquement séparés.
+
+![Optocoupleur : commander une charge sans relier les masses](../figures/schema-optocoupleur.svg)
+
+Côté affichage, un afficheur 7 segments n'est rien d'autre que huit LED dans
+le même boîtier — donc huit résistances.
+
+![Afficheur 7 segments : une résistance par segment](../figures/schema-afficheur-7segments.svg)
 
 ```cpp
 // ---- Potentiomètre → luminosité LED
@@ -142,6 +183,14 @@ Installer une bibliothèque : IDE → Croquis → Inclure une bibliothèque →
 Gérer les bibliothèques. Avec PlatformIO : `lib_deps` dans `platformio.ini`.
 
 ---
+
+### 4.1 Lisser une PWM
+
+`analogWrite()` ne produit pas une tension continue : c'est un créneau dont on
+règle le rapport cyclique. Pour obtenir une vraie tension — piloter un
+amplificateur, produire une consigne — il faut filtrer.
+
+![Filtre RC : transformer une PWM en tension continue](../figures/schema-filtre-rc.svg)
 
 ## 5. LE tournant : programmer sans `delay()`
 

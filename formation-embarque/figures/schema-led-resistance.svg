@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 -21 923.82 229" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="32" y="-21" width="923.82" height="229" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="48" y="5" class="titre">Commander une LED — la résistance n'est pas facultative</text>
+  <polyline points="204,90 259.5,90 259.5,70 315,70" class="fil"/>
+  <polyline points="365,70 440,70" class="fil"/>
+  <polyline points="500,70 540,70 540,150 580,150" class="fil"/>
+  <rect x="58" y="52" width="124" height="76" rx="4" class="trait"/>
+  <text x="120" y="72" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="204" y1="90" x2="182" y2="90" class="trait"/><circle cx="204" cy="90" r="2.6" class="marq"/><text x="174" y="94" class="symtxt" text-anchor="end">D13</text>
+  <text x="120" y="43" class="refc" text-anchor="middle">U1</text>
+  <line x1="315" y1="70" x2="332" y2="70" class="trait"/>
+  <polygon points="332,60 332,80 348,70" class="plein"/>
+  <line x1="348" y1="60" x2="348" y2="80" class="trait"/>
+  <line x1="348" y1="70" x2="365" y2="70" class="trait"/>
+  <line x1="342" y1="58" x2="349" y2="51" class="trait"/>
+  <line x1="346" y1="52" x2="349" y2="51" class="trait"/>
+  <line x1="349" y1="54" x2="349" y2="51" class="trait"/>
+  <line x1="348" y1="62" x2="355" y2="55" class="trait"/>
+  <line x1="352" y1="56" x2="355" y2="55" class="trait"/>
+  <line x1="355" y1="58" x2="355" y2="55" class="trait"/>
+  <circle cx="315" cy="70" r="2.6" class="marq"/>
+  <circle cx="365" cy="70" r="2.6" class="marq"/>
+  <text x="340" y="42" class="refc" text-anchor="middle">LED1</text>
+  <text x="340" y="98" class="valc" text-anchor="middle">rouge</text>
+  <line x1="440" y1="70" x2="452" y2="70" class="trait"/>
+  <polygon points="452,63 488,63 488,77 452,77" class="trait"/>
+  <line x1="488" y1="70" x2="500" y2="70" class="trait"/>
+  <circle cx="440" cy="70" r="2.6" class="marq"/>
+  <circle cx="500" cy="70" r="2.6" class="marq"/>
+  <text x="470" y="54" class="refc" text-anchor="middle">R1</text>
+  <text x="470" y="95" class="valc" text-anchor="middle">220 Ω</text>
+  <line x1="580" y1="150" x2="580" y2="170" class="trait"/>
+  <line x1="566" y1="170" x2="594" y2="170" class="trait"/>
+  <line x1="571" y1="176" x2="589" y2="176" class="trait"/>
+  <line x1="576" y1="182" x2="584" y2="182" class="trait"/>
+  <circle cx="580" cy="150" r="2.6" class="marq"/>
+  <text x="620" y="60" class="note">R = (5 − 2) / 0,012</text>
+  <text x="620" y="80" class="note">  ≈ 250 Ω → 220 Ω</text>
+  <text x="620" y="118" class="note">Sans R1 : ~180 mA,</text>
+  <text x="620" y="138" class="note">la LED et la broche</text>
+  <text x="620" y="158" class="note">sont détruites.</text>
+</svg>

@@ -147,9 +147,12 @@ simulateur/
 │       ├── MoteurSimulation.{h,cpp}   couplage des deux moteurs
 │       ├── Oscilloscope.{h,cpp}       quatre voies, tracé min/max
 │       └── schematic/                 bibliothèque à part, donc testable
+├── outils/
+│   ├── generer_figures.cpp          schémas SVG pour les cours
+│   └── figures_liste.inc            les montages, décrits en données
 └── tests/
     ├── test_coeur.cpp                65 tests, sans Qt
-    └── test_schema.cpp               19 tests, saisie de schéma sans fenêtre
+    └── test_schema.cpp               25 tests, saisie de schéma sans fenêtre
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt,
@@ -185,6 +188,23 @@ toucher : ni l'interface, ni les moteurs, ni la palette.
 Le test `[7]` monte automatiquement **chaque** composant du catalogue dans un
 circuit et vérifie que ngspice l'accepte : un modèle mal écrit est détecté
 avant d'atteindre l'utilisateur.
+
+---
+
+## Les figures du cours viennent d'ici
+
+Les schémas électriques de `formation-embarque/` ne sont pas dessinés à la
+main : ils sont produits à partir du **même catalogue de composants** que
+l'atelier.
+
+```bash
+./build/generer_figures ../formation-embarque/figures
+```
+
+Un montage se décrit en données dans `outils/figures_liste.inc` — des
+placements, des fils, des annotations — et le symbole vient du catalogue.
+Conséquence : ajouter un composant le rend dessinable dans le cours comme dans
+l'application, et il est impossible que les deux divergent.
 
 ---
 

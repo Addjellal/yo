@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 10 920.24 218" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="32" y="10" width="920.24" height="218" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="48" y="36" class="titre">Lire un bouton — le pull-up interne évite l'entrée flottante</text>
+  <polyline points="204,120 325,120" class="fil"/>
+  <polyline points="375,120 422.5,120 422.5,170 470,170" class="fil"/>
+  <rect x="58" y="82" width="124" height="76" rx="4" class="trait"/>
+  <text x="120" y="102" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="204" y1="120" x2="182" y2="120" class="trait"/><circle cx="204" cy="120" r="2.6" class="marq"/><text x="174" y="124" class="symtxt" text-anchor="end">D2</text>
+  <text x="120" y="73" class="refc" text-anchor="middle">U1</text>
+  <line x1="325" y1="120" x2="338" y2="120" class="trait"/>
+  <line x1="362" y1="120" x2="375" y2="120" class="trait"/>
+  <circle cx="338" cy="120" r="2.5" class="plein"/>
+  <circle cx="362" cy="120" r="2.5" class="plein"/>
+  <line x1="336" y1="112" x2="364" y2="112" class="trait"/>
+  <line x1="350" y1="112" x2="350" y2="104" class="trait"/>
+  <polygon points="342,100 358,100 358,104 342,104" class="plein"/>
+  <circle cx="325" cy="120" r="2.6" class="marq"/>
+  <circle cx="375" cy="120" r="2.6" class="marq"/>
+  <text x="350" y="91" class="refc" text-anchor="middle">BP1</text>
+  <text x="350" y="140.5" class="valc" text-anchor="middle">au repos : ouvert</text>
+  <line x1="470" y1="170" x2="470" y2="190" class="trait"/>
+  <line x1="456" y1="190" x2="484" y2="190" class="trait"/>
+  <line x1="461" y1="196" x2="479" y2="196" class="trait"/>
+  <line x1="466" y1="202" x2="474" y2="202" class="trait"/>
+  <circle cx="470" cy="170" r="2.6" class="marq"/>
+  <text x="520" y="60" class="note">pinMode(2, INPUT_PULLUP);</text>
+  <text x="520" y="96" class="note">Relâché → D2 lu à 5 V → HIGH</text>
+  <text x="520" y="116" class="note">Appuyé  → D2 tiré à 0 V → LOW</text>
+  <text x="520" y="152" class="note">La logique est inversée :</text>
+  <text x="520" y="172" class="note">if (digitalRead(2) == LOW)</text>
+  <text x="520" y="192" class="note">  /* le bouton est appuyé */</text>
+</svg>

@@ -338,6 +338,15 @@ main.c ──[préprocesseur]──> main.i   (macros et #include expansés)
 
 ---
 
+
+## Alimenter un montage
+
+Tout ce qui précède suppose une tension stable. Un régulateur linéaire est le
+moyen le plus simple d'en obtenir une, et ses deux condensateurs ne sont pas
+décoratifs.
+
+![Montage minimal d'un régulateur 7805](../figures/schema-alimentation-5v.svg)
+
 ## 8. Ce qu'il faut retenir
 
 - Tout est binaire ; l'hexa est ta langue de lecture.

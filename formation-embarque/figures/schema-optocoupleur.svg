@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 -112 1011.18 390" font-family="'Segoe UI',Arial,sans-serif">
+  <!-- Figure produite par simulateur/outils/generer_figures
+       à partir du catalogue de composants : ne pas modifier à la main. -->
+  <!-- fond explicite : garde la figure lisible en dark mode (GitHub, PDF) -->
+  <rect id="fond" x="12" y="-112" width="1011.18" height="390" fill="#ffffff"/>
+  <style>
+    .titre{fill:#1a2332;font-size:15px;font-weight:600}
+    .trait{fill:none;stroke:#1a2332;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .plein{fill:#1a2332;stroke:#1a2332;stroke-width:2;stroke-linejoin:round}
+    .fil{fill:none;stroke:#334155;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .refc{fill:#1d4ed8;font-size:13px;font-weight:700;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .valc{fill:#475569;font-size:12px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .marq{fill:#334155}
+    .note{fill:#b45309;font-size:12.5px;stroke:#ffffff;stroke-width:3.5;paint-order:stroke}
+    .cadre{fill:#fffbeb;stroke:#f59e0b;stroke-width:1.2}
+    .symtxt{fill:#1a2332;font-size:11px;stroke:#ffffff;stroke-width:3;paint-order:stroke}
+  </style>
+  <text x="28" y="-86" class="titre">Optocoupleur — commander sans relier les masses</text>
+  <polyline points="184,160 217,160 217,130 250,130" class="fil"/>
+  <polyline points="310,130 380,130" class="fil"/>
+  <polyline points="380,170 360,170 360,220 340,220" class="fil"/>
+  <polyline points="570,-40 570,60" class="fil"/>
+  <polyline points="570,120 515,120 515,130 460,130" class="fil"/>
+  <rect x="38" y="122" width="124" height="76" rx="4" class="trait"/>
+  <text x="100" y="142" class="symtxt" text-anchor="middle" style="font-size:12px;font-weight:600">ARDUINO UNO</text>
+  <line x1="184" y1="160" x2="162" y2="160" class="trait"/><circle cx="184" cy="160" r="2.6" class="marq"/><text x="154" y="164" class="symtxt" text-anchor="end">D5</text>
+  <text x="100" y="113" class="refc" text-anchor="middle">U1</text>
+  <line x1="250" y1="130" x2="262" y2="130" class="trait"/>
+  <polygon points="262,123 298,123 298,137 262,137" class="trait"/>
+  <line x1="298" y1="130" x2="310" y2="130" class="trait"/>
+  <circle cx="250" cy="130" r="2.6" class="marq"/>
+  <circle cx="310" cy="130" r="2.6" class="marq"/>
+  <text x="280" y="114" class="refc" text-anchor="middle">R1</text>
+  <text x="280" y="155" class="valc" text-anchor="middle">330 Ω</text>
+  <polygon points="390,115 450,115 450,185 390,185" class="trait"/>
+  <line x1="380" y1="130" x2="402" y2="130" class="trait"/>
+  <line x1="380" y1="170" x2="402" y2="170" class="trait"/>
+  <polygon points="402,142 402,158 414,150" class="plein"/>
+  <line x1="414" y1="142" x2="414" y2="158" class="trait"/>
+  <line x1="402" y1="130" x2="402" y2="142" class="trait"/>
+  <line x1="402" y1="158" x2="402" y2="170" class="trait"/>
+  <line x1="414" y1="130" x2="414" y2="142" class="trait"/>
+  <line x1="414" y1="158" x2="414" y2="170" class="trait"/>
+  <line x1="426" y1="136" x2="426" y2="164" class="trait"/>
+  <line x1="426" y1="144" x2="444" y2="130" class="trait"/>
+  <line x1="426" y1="156" x2="444" y2="170" class="trait"/>
+  <line x1="444" y1="130" x2="460" y2="130" class="trait"/>
+  <line x1="444" y1="170" x2="460" y2="170" class="trait"/>
+  <line x1="420" y1="147" x2="424" y2="147" class="trait"/>
+  <line x1="420" y1="153" x2="424" y2="153" class="trait"/>
+  <circle cx="380" cy="130" r="2.6" class="marq"/>
+  <circle cx="380" cy="170" r="2.6" class="marq"/>
+  <circle cx="460" cy="130" r="2.6" class="marq"/>
+  <circle cx="460" cy="170" r="2.6" class="marq"/>
+  <text x="420" y="106" class="refc" text-anchor="middle">OK1</text>
+  <text x="420" y="203" class="valc" text-anchor="middle">4N25</text>
+  <line x1="340" y1="220" x2="340" y2="240" class="trait"/>
+  <line x1="326" y1="240" x2="354" y2="240" class="trait"/>
+  <line x1="331" y1="246" x2="349" y2="246" class="trait"/>
+  <line x1="336" y1="252" x2="344" y2="252" class="trait"/>
+  <circle cx="340" cy="220" r="2.6" class="marq"/>
+  <line x1="570" y1="60" x2="570" y2="72" class="trait"/>
+  <polygon points="577,72 577,108 563,108 563,72" class="trait"/>
+  <line x1="570" y1="108" x2="570" y2="120" class="trait"/>
+  <circle cx="570" cy="60" r="2.6" class="marq"/>
+  <circle cx="570" cy="120" r="2.6" class="marq"/>
+  <text x="570" y="51" class="refc" text-anchor="middle">R2</text>
+  <text x="587" y="94" class="valc">4,7 kΩ</text>
+  <line x1="570" y1="-40" x2="570" y2="-22" class="trait"/>
+  <line x1="554" y1="-22" x2="586" y2="-22" class="trait"/>
+  <line x1="562" y1="-15" x2="578" y2="-15" class="trait"/>
+  <line x1="554" y1="-8" x2="586" y2="-8" class="trait"/>
+  <line x1="562" y1="-1" x2="578" y2="-1" class="trait"/>
+  <line x1="570" y1="-1" x2="570" y2="20" class="trait"/>
+  <text x="546" y="-26" class="symtxt" style="font-size:11px">+</text>
+  <circle cx="570" cy="-40" r="2.6" class="marq"/>
+  <circle cx="570" cy="20" r="2.6" class="marq"/>
+  <text x="570" y="-49" class="refc" text-anchor="middle">V2</text>
+  <text x="600" y="-14" class="note">24 V</text>
+  <text x="650" y="96" class="note">Deux circuits, deux masses.</text>
+  <text x="650" y="116" class="note">Seule la lumière passe.</text>
+  <text x="650" y="152" class="note">Indispensable dès qu'on</text>
+  <text x="650" y="172" class="note">touche au secteur ou à une</text>
+  <text x="650" y="192" class="note">machine : une erreur de</text>
+  <text x="650" y="212" class="note">câblage ne remonte pas</text>
+  <text x="650" y="232" class="note">jusqu'à la carte.</text>
+</svg>

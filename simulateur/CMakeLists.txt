@@ -77,6 +77,14 @@ target_link_libraries(tests_coeur PRIVATE coeur)
 add_test(NAME coeur COMMAND tests_coeur)
 
 # ---------------------------------------------------------------------------
+# Générateur de figures : dessine les schémas du cours à partir du catalogue.
+# Sans Qt : c'est du SVG écrit directement.
+# ---------------------------------------------------------------------------
+add_executable(generer_figures outils/generer_figures.cpp)
+target_link_libraries(generer_figures PRIVATE coeur)
+target_include_directories(generer_figures PRIVATE outils)
+
+# ---------------------------------------------------------------------------
 # Application Qt (facultative : le cœur se compile et se teste sans Qt)
 # ---------------------------------------------------------------------------
 find_package(Qt6 COMPONENTS Widgets QUIET)
