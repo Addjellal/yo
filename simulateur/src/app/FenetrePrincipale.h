@@ -46,7 +46,7 @@ public:
     // programme qui va avec : c'est la façon la plus courte de montrer ce que
     // l'application sait faire.
     enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor,
-                         Pwm, DeuxCartes };
+                         Pwm, DeuxCartes, Servo, MoteurPuissance };
     void charger_exemple(Exemple exemple);
     void charger_exemple_deux_cartes();
     void charger_exemple_clignotant() { charger_exemple(Exemple::Clignotant); }

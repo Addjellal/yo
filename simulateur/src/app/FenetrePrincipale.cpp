@@ -125,6 +125,9 @@ FenetrePrincipale::FenetrePrincipale() {
                 moniteur_serie_->moveCursor(QTextCursor::End);
                 if (octet == '\n') derniere.clear();
             });
+    connect(moteur_, &MoteurSimulation::etats_composants, this,
+            [this](const std::map<std::string, std::map<std::string, double>>&
+                       etats) { scene_->appliquer_etats(etats); });
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
                 oscilloscope_->ajouter_trame(formes, instant);
@@ -337,6 +340,10 @@ void FenetrePrincipale::construire_actions() {
                         [this] { charger_exemple(Exemple::Pwm); });
     exemples->addAction("Deux cartes qui communiquent", this,
                         [this] { charger_exemple(Exemple::DeuxCartes); });
+    exemples->addAction("Servomoteur balayé", this,
+                        [this] { charger_exemple(Exemple::Servo); });
+    exemples->addAction("Moteur en PWM avec transistor", this,
+                        [this] { charger_exemple(Exemple::MoteurPuissance); });
 
     auto* aide = menuBar()->addMenu("&Aide");
     aide->addAction("À &propos", this, [this] {
@@ -945,6 +952,58 @@ int main(void) {
 }
 )";
 
+const char* kProgrammeServo = R"(/* Balayage d'un servomoteur sur D9.
+   Le servo attend une impulsion toutes les 20 ms : 1 ms pour 0°, 2 ms pour
+   180°. On la fabrique à la main, sans bibliothèque — c'est exactement ce
+   que fait Servo.h, et le voir écrit une fois vaut mieux que l'ignorer. */
+unsigned long dernier_top = 0, dernier_pas = 0;
+int angle = 0, sens = 1;
+
+void setup() {
+    pinMode(9, OUTPUT);
+    Serial.begin(9600);
+}
+
+void loop() {
+    const unsigned long maintenant = millis();
+
+    /* la trame de 20 ms */
+    if (maintenant - dernier_top >= 20) {
+        dernier_top = maintenant;
+        digitalWrite(9, HIGH);
+        delayMicroseconds(1000 + (unsigned int)(angle * 1000L / 180));
+        digitalWrite(9, LOW);
+    }
+
+    /* balayage aller-retour */
+    if (maintenant - dernier_pas >= 40) {
+        dernier_pas = maintenant;
+        angle += sens * 5;
+        if (angle >= 180) { angle = 180; sens = -1; }
+        if (angle <= 0)   { angle = 0;   sens =  1; }
+        Serial.print("angle ");
+        Serial.println((long)angle);
+    }
+}
+)";
+
+const char* kProgrammeMoteur = R"(/* Moteur commandé en PWM, vitesse réglée par le potentiomètre sur A0.
+   Le transistor encaisse le courant, la diode de roue libre encaisse la
+   surtension à la coupure — c'est l'inductance de l'induit qui la produit. */
+void setup() {
+    pinMode(9, OUTPUT);
+    Serial.begin(9600);
+}
+
+void loop() {
+    const int consigne = analogRead(A0) / 4;      /* 0 à 255 */
+    analogWrite(9, consigne);
+    delay(200);
+    Serial.print("consigne ");
+    Serial.println((long)consigne);
+}
+)";
+
 }  // namespace
 
 void FenetrePrincipale::charger_exemple(Exemple exemple) {
@@ -1037,6 +1096,54 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
         }
         case Exemple::DeuxCartes:
             return;   // traité à part, le schéma n'a pas une seule carte
+        case Exemple::Servo: {
+            ItemComposant* servo = scene_->ajouter_composant("servomoteur", QPointF(120, 0));
+            ItemComposant* alim = scene_->ajouter_composant("alim5v", QPointF(20, -140));
+            ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(20, 160));
+            if (!servo || !alim || !masse) return;
+            scene_->addItem(new ItemFil(carte, borne_nommee("D9"), servo, 2));
+            scene_->addItem(new ItemFil(alim, 0, servo, 0));
+            scene_->addItem(new ItemFil(servo, 1, masse, 0));
+            programme = QString::fromUtf8(kProgrammeServo);
+            ecrire("Exemple : servomoteur balayé de 0° à 180° sur D9.");
+            ecrire("L'angle s'affiche sous le composant, décodé de la largeur "
+                   "d'impulsion.");
+            break;
+        }
+        case Exemple::MoteurPuissance: {
+            ItemComposant* alim = scene_->ajouter_composant("alim5v", QPointF(430, -180));
+            ItemComposant* moteur =
+                scene_->ajouter_composant("moteur_cc_dynamique", QPointF(430, -60));
+            ItemComposant* diode = scene_->ajouter_composant("diode", QPointF(580, -60));
+            ItemComposant* rb = scene_->ajouter_composant("resistance", QPointF(250, 60));
+            ItemComposant* q = scene_->ajouter_composant("transistor_npn", QPointF(430, 80));
+            ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(430, 200));
+            ItemComposant* pot = scene_->ajouter_composant("potentiometre", QPointF(-120, 220));
+            ItemComposant* alim2 = scene_->ajouter_composant("alim5v", QPointF(-220, 140));
+            ItemComposant* masse2 = scene_->ajouter_composant("masse", QPointF(-20, 320));
+            if (!alim || !moteur || !diode || !rb || !q || !masse || !pot ||
+                !alim2 || !masse2)
+                return;
+            rb->valeurs["ohms"] = 1000;
+            moteur->setRotation(90);
+            diode->setRotation(90);
+            scene_->addItem(new ItemFil(alim, 0, moteur, 0));
+            scene_->addItem(new ItemFil(moteur, 1, q, 1));
+            scene_->addItem(new ItemFil(alim, 0, diode, 1));
+            scene_->addItem(new ItemFil(diode, 0, q, 1));
+            scene_->addItem(new ItemFil(carte, borne_nommee("D9"), rb, 0));
+            scene_->addItem(new ItemFil(rb, 1, q, 0));
+            scene_->addItem(new ItemFil(q, 2, masse, 0));
+            scene_->addItem(new ItemFil(alim2, 0, pot, 0));
+            scene_->addItem(new ItemFil(pot, 1, carte, borne_nommee("A0")));
+            scene_->addItem(new ItemFil(pot, 2, masse2, 0));
+            programme = QString::fromUtf8(kProgrammeMoteur);
+            ecrire("Exemple : moteur en PWM, vitesse réglée par le potentiomètre.");
+            ecrire("La vitesse atteinte s'affiche sous le moteur. Observez le "
+                   "courant à l'oscilloscope : l'inductance d'induit l'empêche "
+                   "de s'établir d'un coup.");
+            break;
+        }
         case Exemple::Transistor: {
             ItemComposant* rb = scene_->ajouter_composant("resistance", QPointF(-140, -50));
             ItemComposant* q = scene_->ajouter_composant("transistor_npn", QPointF(20, -50));

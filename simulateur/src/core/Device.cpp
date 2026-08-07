@@ -6,6 +6,54 @@
 
 namespace coeur {
 
+// ---------------------------------------------------------------------------
+// Lecture des formes d'onde par les composants à état
+// ---------------------------------------------------------------------------
+double Evolution::moyenne(const std::string& borne) const {
+    const std::vector<double>* courbe = tension ? tension(borne) : nullptr;
+    if (!courbe || courbe->empty()) return 0.0;
+    double somme = 0;
+    for (double valeur : *courbe) somme += valeur;
+    return somme / courbe->size();
+}
+
+double Evolution::rapport_cyclique(const std::string& borne,
+                                   double seuil) const {
+    const std::vector<double>* courbe = tension ? tension(borne) : nullptr;
+    if (!courbe || courbe->empty()) return 0.0;
+    size_t hauts = 0;
+    for (double valeur : *courbe)
+        if (valeur > seuil) ++hauts;
+    return static_cast<double>(hauts) / courbe->size();
+}
+
+double Evolution::largeur_impulsion(const std::string& borne,
+                                    double seuil) const {
+    const std::vector<double>* courbe = tension ? tension(borne) : nullptr;
+    if (!courbe || !temps || courbe->size() != temps->size() ||
+        courbe->size() < 2)
+        return 0.0;
+
+    // On cherche en remontant : la dernière impulsion complète est la plus
+    // fraîche, donc celle que le composant doit suivre. Une impulsion
+    // incomplète en fin de fenêtre est ignorée — sa largeur serait fausse.
+    bool fin_vue = false;
+    double fin = 0;
+    for (size_t k = courbe->size(); k-- > 1;) {
+        const bool haut = (*courbe)[k] > seuil;
+        const bool haut_avant = (*courbe)[k - 1] > seuil;
+        if (!fin_vue) {
+            if (haut_avant && !haut) {          // front descendant
+                fin_vue = true;
+                fin = (*temps)[k];
+            }
+        } else if (!haut_avant && haut) {       // front montant précédent
+            return fin - (*temps)[k];
+        }
+    }
+    return 0.0;
+}
+
 Catalogue& Catalogue::instance() {
     static Catalogue unique;
     return unique;
@@ -50,6 +98,8 @@ void enregistrer_capteurs(Catalogue& catalogue);
 void enregistrer_electromecanique(Catalogue& catalogue);
 void enregistrer_logique(Catalogue& catalogue);
 void enregistrer_instruments(Catalogue& catalogue);
+void enregistrer_actionneurs_dynamiques(Catalogue& catalogue);
+void enregistrer_capteurs_avances(Catalogue& catalogue);
 
 void Catalogue::enregistrer_modeles_standards() {
     enregistrer_base(*this);
@@ -59,6 +109,8 @@ void Catalogue::enregistrer_modeles_standards() {
     enregistrer_electromecanique(*this);
     enregistrer_logique(*this);
     enregistrer_instruments(*this);
+    enregistrer_actionneurs_dynamiques(*this);
+    enregistrer_capteurs_avances(*this);
 }
 
 }  // namespace coeur

@@ -349,8 +349,34 @@ void SceneSchema::appliquer_resultats(
     }
 }
 
+void SceneSchema::appliquer_etats(
+    const std::map<std::string, std::map<std::string, double>>& etats) {
+    for (ItemComposant* composant : composants()) {
+        auto it = etats.find(composant->reference().toStdString());
+        if (it == etats.end()) continue;
+        // Les valeurs reviennent dans le composant : c'est ce qui fait que
+        // l'angle d'un servomoteur survit à la reconstruction de la netlist,
+        // laquelle a lieu à chaque modification du schéma.
+        for (const auto& paire : it->second)
+            composant->valeurs[paire.first] = paire.second;
+
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->lecture) continue;
+        coeur::Instance instance;
+        instance.reference = composant->reference().toStdString();
+        instance.type = modele->type;
+        instance.valeurs = composant->valeurs;
+        instance.textes = composant->textes;
+        composant->definir_mesure(
+            QString::fromStdString(modele->lecture(instance)));
+    }
+}
+
 void SceneSchema::effacer_resultats() {
-    for (ItemComposant* composant : composants()) composant->definir_eclat(0.0);
+    for (ItemComposant* composant : composants()) {
+        composant->definir_eclat(0.0);
+        composant->definir_mesure({});
+    }
     for (ItemFil* fil : fils()) fil->rafraichir();
     update();
 }

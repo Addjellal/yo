@@ -56,6 +56,10 @@ public:
     // Applique les résultats d'une résolution : éclat des LED, tension des fils.
     void appliquer_resultats(const std::map<std::string, double>& courants,
                              const std::map<std::string, double>& tensions);
+    // Reporte sur le schéma l'état interne des composants à mécanique, tel
+    // que le moteur de simulation l'a fait évoluer.
+    void appliquer_etats(
+        const std::map<std::string, std::map<std::string, double>>& etats);
     void effacer_resultats();
 
 signals:

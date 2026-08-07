@@ -52,6 +52,8 @@ add_library(coeur STATIC
   src/core/catalogue/electromecanique.cpp
   src/core/catalogue/logique.cpp
   src/core/catalogue/instruments.cpp
+  src/core/catalogue/actionneurs_dynamiques.cpp
+  src/core/catalogue/capteurs_avances.cpp
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/AvrEngine.cpp
 )

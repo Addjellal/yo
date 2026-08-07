@@ -5,6 +5,8 @@
 #include <QFileInfo>
 
 #include <algorithm>
+
+#include "core/Device.h"
 #include <cmath>
 
 namespace {
@@ -356,6 +358,12 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     etat_ = analogique_.etat_final();
 
     const coeur::Formes& formes = analogique_.formes();
+
+    // Les composants à état lisent ce que le circuit vient de leur faire
+    // subir, et avancent leur mécanique. Un servomoteur mesure son
+    // impulsion, un moteur intègre sa vitesse, un télémètre arme son écho.
+    faire_evoluer(formes, duree);
+
     emit trame_calculee(formes, instant_trame_);
     instant_trame_ += duree;
 
@@ -401,6 +409,42 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     }
 
     emit resultats(courants, tensions);
+}
+
+// Donne à chaque composant à état les formes d'onde de ses propres bornes.
+void MoteurSimulation::faire_evoluer(const coeur::Formes& formes,
+                                     double duree) {
+    auto minuscules = [](std::string texte) {
+        std::transform(texte.begin(), texte.end(), texte.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        return texte;
+    };
+
+    std::map<std::string, std::map<std::string, double>> etats;
+    for (coeur::Instance& instance : netlist_.instances()) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        if (!modele || !modele->evoluer) continue;
+
+        coeur::Evolution evolution;
+        evolution.duree = duree;
+        evolution.temps = &formes.temps;
+        evolution.tension = [&](const std::string& borne)
+            -> const std::vector<double>* {
+            const coeur::Borne* b = instance.borne(borne);
+            if (!b || b->noeud.empty()) return nullptr;
+            if (b->noeud == coeur::Netlist::kMasse) return nullptr;
+            auto it = formes.tensions.find(minuscules(b->noeud));
+            return it == formes.tensions.end() ? nullptr : &it->second;
+        };
+        evolution.courant = [&]() -> const std::vector<double>* {
+            auto it = formes.courants.find(minuscules(instance.reference));
+            return it == formes.courants.end() ? nullptr : &it->second;
+        };
+        modele->evoluer(instance, evolution);
+        etats[instance.reference] = instance.valeurs;
+    }
+    if (!etats.empty()) emit etats_composants(etats);
 }
 
 void MoteurSimulation::resoudre_une_fois() {

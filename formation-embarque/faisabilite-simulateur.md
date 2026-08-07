@@ -19,6 +19,10 @@ d'une liste de composants.
 | Mini-TP Arduino | ✅ entièrement | — |
 | **TP 1** — Station météo, séance 1 | ✅ le socle non bloquant | — |
 | TP 1 — séances 2 à 4 | ❌ DHT22, écran OLED, carte SD, ESP32 | [Wokwi](https://wokwi.com) |
+| Montages à **servomoteur** | ✅ angle décodé de l'impulsion | — |
+| Montages à **moteur** (CC, pas à pas, asynchrone) | ✅ avec inductance et inertie | — |
+| Montages à **capteur analogique** (accéléromètre, gaz, sol, pH, courant) | ✅ | — |
+| **Télémètre à ultrasons**, **codeur incrémental** | ✅ signal daté | — |
 | **TP 2** — UART en VHDL | ❌ hors sujet | GHDL + GTKWave |
 | **TP 3** — Remplissage Siemens | ❌ hors sujet | TIA Portal + PLCSIM |
 | **TP 4** — Cuve Schneider | ❌ hors sujet | EcoStruxure + simulateur M221 |
@@ -56,7 +60,25 @@ compilé **sans modification** et exécuté. Ce qui a été contrôlé :
 
 C'est la section `[11]` de `simulateur/tests/test_coeur.cpp`.
 
-### Ce que le noyau couvre
+### Ce que le catalogue couvre désormais
+
+52 composants, dont sept à mécanique interne — servomoteur, moteur à courant
+continu, moteur pas à pas, moteur asynchrone triphasé, télémètre à ultrasons,
+codeur incrémental, capteur de courant. Ils ont un état qui avance dans le
+temps, pas seulement une impédance, et leur grandeur s'affiche sous le symbole
+pendant la simulation.
+
+Les machines portent leur **inductance interne** : l'induit d'un moteur est R
+en série avec L. C'est vérifié contre la théorie — le courant atteint 63 % de
+sa valeur finale après une constante de temps L/R, et il est encore nul à
+l'instant de la fermeture.
+
+Ce qui reste hors de portée : tout ce qui passe par un **protocole numérique**
+(DHT22 en une-fil, écrans I²C, cartes SD en SPI). Ce n'est pas une question de
+composants mais de moteur : il faudrait une simulation numérique événementielle
+en plus des deux existantes.
+
+### Ce que le noyau Arduino couvre
 
 `pinMode` · `digitalWrite` · `digitalRead` · `analogRead` · `analogWrite` ·
 `millis` · `micros` · `delay` · `delayMicroseconds` · `map` · `constrain` ·

@@ -49,10 +49,16 @@ public:
     // Texte affiché sous la référence (« 220 Ω », « rouge »…).
     QString etiquette() const;
 
+    // Grandeur mesurée pendant la simulation (« 90° », « 1450 tr/min ») :
+    // un composant à mécanique n'a d'intérêt que si on voit où il en est.
+    void definir_mesure(const QString& mesure);
+    const QString& mesure() const { return mesure_; }
+
 private:
     const coeur::Modele* modele_ = nullptr;
     QString reference_;
     double eclat_ = 0.0;
+    QString mesure_;
     QRectF cadre_;
 
     void recalculer_cadre();

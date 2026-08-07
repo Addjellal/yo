@@ -103,6 +103,7 @@ void enregistrer_base(Catalogue& catalogue) {
         Modele m;
         m.type = "pile";
         m.libelle = "Source de tension";
+        m.generateur = true;
         m.categorie = "Alimentation";
         m.prefixe = "V";
         m.bornes = {{"+", {0, -30}, ""}, {"-", {0, 30}, ""}};

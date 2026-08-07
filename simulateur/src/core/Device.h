@@ -74,6 +74,35 @@ struct Propriete {
     std::string unite;
 };
 
+// --- évolution d'un composant à état ---------------------------------------
+//
+// Un servomoteur, un moteur ou un capteur à échos ne se décrivent pas par une
+// équation électrique : ils ont une mécanique interne qui avance dans le
+// temps. Après chaque fenêtre de calcul, on leur donne à lire *ce que le
+// circuit leur a fait subir* — les formes d'onde de leurs bornes — et ils
+// mettent à jour leur état.
+//
+// C'est ce qui referme la boucle : l'état sert à produire le circuit de la
+// fenêtre suivante, où le composant redevient une source ou une charge.
+struct Evolution {
+    double duree = 0.0;                      // durée de la fenêtre, en secondes
+    const std::vector<double>* temps = nullptr;
+
+    // Tension d'une borne au fil de la fenêtre. Nul si la borne n'est pas
+    // connectée ou si le nœud n'a pas été relevé.
+    std::function<const std::vector<double>*(const std::string& borne)> tension;
+    // Courant traversant ce composant, quand la question a un sens.
+    std::function<const std::vector<double>*()> courant;
+
+    // Raccourcis courants, calculés à la demande.
+    double moyenne(const std::string& borne) const;
+    // Largeur de la dernière impulsion haute complète, en secondes. C'est ce
+    // que décode un servomoteur. Renvoie 0 s'il n'y en a pas.
+    double largeur_impulsion(const std::string& borne, double seuil = 2.5) const;
+    // Proportion du temps passé au-dessus du seuil.
+    double rapport_cyclique(const std::string& borne, double seuil = 2.5) const;
+};
+
 // --- modèle de composant --------------------------------------------------
 struct Modele {
     std::string type;                   // identifiant interne : "resistance"
@@ -99,12 +128,32 @@ struct Modele {
     // ("GND", "5V"). Ne produit aucune ligne SPICE.
     std::string noeud_impose;
 
+    // Générateur : le composant impose une tension au lieu de la subir. En
+    // mettre deux en série ou les court-circuiter n'a pas de sens physique,
+    // et les bancs d'essai automatiques doivent le savoir.
+    bool generateur = false;
+
     // Génère les lignes SPICE de ce composant. `noeud` traduit un nom de
     // borne en nom de nœud SPICE. Renvoyer plusieurs lignes est autorisé
     // (un potentiomètre = deux résistances, une LED = diode + modèle…).
     std::function<std::vector<std::string>(
         const Instance&, const std::function<std::string(const std::string&)>&)>
         vers_spice;
+
+    // Variante appelée en analyse transitoire, quand le composant doit
+    // produire une source qui dépend du temps — l'écho d'un télémètre, les
+    // voies d'un codeur. `duree` est la longueur de la fenêtre.
+    std::function<std::vector<std::string>(
+        const Instance&, const std::function<std::string(const std::string&)>&,
+        double duree)>
+        vers_spice_transitoire;
+
+    // Fait avancer l'état interne. Appelé après chaque résolution.
+    std::function<void(Instance&, const Evolution&)> evoluer;
+
+    // Grandeur à afficher sur le schéma pendant la simulation (« 90° »,
+    // « 1450 tr/min »). Vide si le composant n'a rien à montrer.
+    std::function<std::string(const Instance&)> lecture;
 
     // Directives .model / sous-circuits à émettre une seule fois.
     std::vector<std::string> directives;

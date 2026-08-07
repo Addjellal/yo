@@ -115,8 +115,11 @@ private:
 
     // Partie commune aux deux analyses : composants, directives, fuites.
     // `sources_broches` décrit les broches, en continu ou par morceaux.
+    // `duree_fenetre` vaut 0 au point de repos ; en transitoire, elle permet
+    // aux composants à état d'émettre une source datée.
     void emettre_corps(const Netlist& netlist,
-                       const std::vector<std::string>& sources_broches);
+                       const std::vector<std::string>& sources_broches,
+                       double duree_fenetre);
     // Charge `lignes_` dans ngspice et exécute. Renvoie le nom du tracé.
     std::string executer();
 };

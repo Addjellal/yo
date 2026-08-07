@@ -68,7 +68,8 @@ bool NgspiceEngine::compile_avec_ngspice() {
 // Construction du fichier SPICE
 // ---------------------------------------------------------------------------
 void NgspiceEngine::emettre_corps(
-    const Netlist& netlist, const std::vector<std::string>& sources_broches) {
+    const Netlist& netlist, const std::vector<std::string>& sources_broches,
+    double duree_fenetre) {
     lignes_.clear();
     lignes_.push_back("circuit simulateur embarque");
 
@@ -92,8 +93,14 @@ void NgspiceEngine::emettre_corps(
             return borne->noeud;
         };
 
-        for (const auto& ligne : modele->vers_spice(instance, noeud_de))
-            lignes_.push_back(ligne);
+        // Un composant qui produit un signal daté — l'écho d'un télémètre,
+        // les voies d'un codeur — a besoin de connaître la fenêtre.
+        const std::vector<std::string> emises =
+            (duree_fenetre > 0 && modele->vers_spice_transitoire)
+                ? modele->vers_spice_transitoire(instance, noeud_de,
+                                                 duree_fenetre)
+                : modele->vers_spice(instance, noeud_de);
+        for (const auto& ligne : emises) lignes_.push_back(ligne);
         for (const auto& directive : modele->directives)
             if (std::find(directives.begin(), directives.end(), directive)
                 == directives.end())
@@ -174,7 +181,7 @@ std::string NgspiceEngine::construire(
         }
     }
 
-    emettre_corps(netlist, sources);
+    emettre_corps(netlist, sources, 0.0);
     lignes_.push_back(".op");
     lignes_.push_back(".end");
 
@@ -249,7 +256,7 @@ std::string NgspiceEngine::construire_transitoire(
         sources.push_back(r.str());
     }
 
-    emettre_corps(netlist, sources);
+    emettre_corps(netlist, sources, duree);
 
     // Conditions initiales : sans elles, chaque fenêtre repartirait d'un
     // circuit déchargé et aucun condensateur ne se chargerait jamais.

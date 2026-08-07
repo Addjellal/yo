@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -444,8 +445,17 @@ static void test_catalogue_complet() {
             const std::string& borne = modele->bornes[k].nom;
             if (k == 0)
                 netlist.relier("X1", borne, "D13");
-            else if (k == dernier)
-                netlist.relier("X1", borne, "GND");
+            else if (k == dernier) {
+                // Pas de liaison directe à la masse : un composant qui est
+                // lui-même une source (l'alimentation triphasée) s'y
+                // court-circuiterait, et le banc accuserait le modèle d'un
+                // défaut de câblage.
+                netlist.relier("X1", borne, "FIN");
+                auto& retour = netlist.ajouter("RFIN", "resistance");
+                retour.valeurs["ohms"] = 1000;
+                netlist.relier("RFIN", "1", "FIN");
+                netlist.relier("RFIN", "2", "GND");
+            }
             else {
                 const std::string noeud = "T" + std::to_string(k);
                 netlist.relier("X1", borne, noeud);
@@ -827,7 +837,10 @@ static void test_exemplaires_multiples() {
         coeur::Netlist netlist;
         // Chaîne de cinq exemplaires : la sortie de l'un alimente l'entrée du
         // suivant, ce qui les met vraiment en relation au lieu de les poser
-        // côte à côte sans interaction.
+        // côte à côte sans interaction. Les générateurs font exception : les
+        // mettre en série reviendrait à opposer cinq sources, un montage que
+        // SPICE refuse à juste titre et qui ne dit rien du modèle.
+        const bool en_chaine = !modele->generateur;
         std::string amont = "D13";
         for (int n = 1; n <= kExemplaires; ++n) {
             const std::string reference = modele->prefixe + std::to_string(n);
@@ -840,11 +853,14 @@ static void test_exemplaires_multiples() {
             }
             const int dernier = static_cast<int>(modele->bornes.size()) - 1;
             const std::string aval =
-                (n == kExemplaires) ? std::string("GND") : ("M" + std::to_string(n));
+                !en_chaine ? ("FIN" + std::to_string(n))
+                           : (n == kExemplaires ? std::string("FIN")
+                                                : ("M" + std::to_string(n)));
             for (int k = 0; k <= dernier; ++k) {
                 const std::string& borne = modele->bornes[k].nom;
                 if (k == 0)
-                    netlist.relier(reference, borne, amont);
+                    netlist.relier(reference, borne,
+                                   en_chaine ? amont : ("G" + std::to_string(n)));
                 else if (k == dernier)
                     netlist.relier(reference, borne, aval);
                 else {
@@ -859,7 +875,26 @@ static void test_exemplaires_multiples() {
                     netlist.relier(charge.reference, "2", "GND");
                 }
             }
+            if (!en_chaine) {
+                // Chaque générateur débite dans sa propre charge.
+                auto& charge = netlist.ajouter("RG" + std::to_string(n),
+                                               "resistance");
+                charge.valeurs["ohms"] = 1000;
+                netlist.relier(charge.reference, "1", "G" + std::to_string(n));
+                netlist.relier(charge.reference, "2", "FIN" + std::to_string(n));
+                auto& retour = netlist.ajouter("RR" + std::to_string(n),
+                                               "resistance");
+                retour.valeurs["ohms"] = 1000;
+                netlist.relier(retour.reference, "1", "FIN" + std::to_string(n));
+                netlist.relier(retour.reference, "2", "GND");
+            }
             amont = aval;
+        }
+        {   // retour à la masse par une charge, jamais en direct
+            auto& retour = netlist.ajouter("RFIN", "resistance");
+            retour.valeurs["ohms"] = 1000;
+            netlist.relier("RFIN", "1", "FIN");
+            netlist.relier("RFIN", "2", "GND");
         }
 
         coeur::NgspiceEngine moteur;
@@ -1058,6 +1093,387 @@ static void test_croquis_arduino() {
 }
 
 // ---------------------------------------------------------------------------
+// Composants à état : un servomoteur, un moteur, un codeur ne se jugent pas
+// sur leur impédance mais sur leur mécanique. On les alimente et on regarde
+// où ils en sont.
+//
+// Le circuit n'est pas résolu ici : on éprouve directement le crochet
+// `evoluer`, en lui fournissant les formes d'onde qu'il aurait reçues. Cela
+// isole la mécanique de la convergence de SPICE.
+static coeur::Evolution fenetre_avec(
+    const std::map<std::string, std::vector<double>>& courbes,
+    const std::vector<double>& temps, double duree) {
+    coeur::Evolution evolution;
+    evolution.duree = duree;
+    evolution.temps = &temps;
+    evolution.tension = [&courbes](const std::string& borne)
+        -> const std::vector<double>* {
+        auto it = courbes.find(borne);
+        return it == courbes.end() ? nullptr : &it->second;
+    };
+    return evolution;
+}
+
+// Fabrique un créneau : `largeur` secondes à 5 V, répété toutes les
+// `periode`, échantillonné sur `duree`.
+static std::pair<std::vector<double>, std::vector<double>> creneau(
+    double largeur, double periode, double duree, double pas = 20e-6) {
+    std::vector<double> temps, valeurs;
+    // Le créneau démarre après un court palier bas : une impulsion qui
+    // commencerait à l'instant zéro serait incomplète, et une mesure de
+    // largeur sur une impulsion tronquée n'aurait pas de sens.
+    const double retard = periode / 4;
+    for (double t = 0; t <= duree; t += pas) {
+        temps.push_back(t);
+        const double phase = t < retard ? -1.0 : std::fmod(t - retard, periode);
+        valeurs.push_back(phase >= 0 && phase < largeur ? 5.0 : 0.0);
+    }
+    return {temps, valeurs};
+}
+
+static void test_composants_a_etat() {
+    std::printf("\n[12] Composants à mécanique interne\n");
+    const coeur::Catalogue& catalogue = coeur::Catalogue::instance();
+
+    // --- servomoteur : une impulsion de 1,5 ms doit donner 90°
+    {
+        const coeur::Modele* modele = catalogue.modele("servomoteur");
+        verifier(modele && modele->evoluer, "le servomoteur a une mécanique");
+        if (!modele || !modele->evoluer) return;
+
+        coeur::Netlist netlist;
+        auto& servo = netlist.ajouter("SRV1", "servomoteur");
+        servo.valeurs["angle"] = 0;
+        servo.valeurs["vitesse"] = 100000;      // instantané, pour ce test
+
+        auto [temps, valeurs] = creneau(1.5e-3, 20e-3, 60e-3);
+        std::map<std::string, std::vector<double>> courbes{{"SIG", valeurs}};
+        modele->evoluer(servo, fenetre_avec(courbes, temps, 60e-3));
+        verifier(presque(servo.valeur("angle", -1), 90, 2),
+                 "impulsion de 1,5 ms -> 90°",
+                 f(servo.valeur("angle", -1), 1) + " °");
+
+        auto [t2, v2] = creneau(1.0e-3, 20e-3, 60e-3);
+        courbes["SIG"] = v2;
+        modele->evoluer(servo, fenetre_avec(courbes, t2, 60e-3));
+        verifier(presque(servo.valeur("angle", -1), 0, 2),
+                 "impulsion de 1 ms -> 0°", f(servo.valeur("angle", -1), 1) + " °");
+
+        auto [t3, v3] = creneau(2.0e-3, 20e-3, 60e-3);
+        courbes["SIG"] = v3;
+        modele->evoluer(servo, fenetre_avec(courbes, t3, 60e-3));
+        verifier(presque(servo.valeur("angle", -1), 180, 2),
+                 "impulsion de 2 ms -> 180°",
+                 f(servo.valeur("angle", -1), 1) + " °");
+
+        // La vitesse est bornée : le palonnier ne se téléporte pas.
+        servo.valeurs["angle"] = 0;
+        servo.valeurs["vitesse"] = 60;          // 60 °/s
+        courbes["SIG"] = v3;                    // consigne 180°
+        modele->evoluer(servo, fenetre_avec(courbes, t3, 0.1));   // 100 ms
+        verifier(presque(servo.valeur("angle", -1), 6, 1),
+                 "le palonnier tourne à vitesse bornée, il ne saute pas",
+                 f(servo.valeur("angle", -1), 1) + " ° après 100 ms à 60 °/s");
+    }
+
+    // --- moteur à courant continu : montée en vitesse avec inertie
+    {
+        const coeur::Modele* modele = catalogue.modele("moteur_cc_dynamique");
+        coeur::Netlist netlist;
+        auto& moteur = netlist.ajouter("M1", "moteur_cc_dynamique");
+        moteur.valeurs["k"] = 900;              // tr/min pour 12 V
+        moteur.valeurs["inertie"] = 0.25;
+
+        std::vector<double> temps{0, 0.05}, hautes{12, 12}, basses{0, 0};
+        std::map<std::string, std::vector<double>> courbes{{"+", hautes},
+                                                           {"-", basses}};
+        // Après une constante de temps, on doit être à 63 % du régime.
+        for (int k = 0; k < 5; ++k)                       // 5 x 50 ms = 250 ms
+            modele->evoluer(moteur, fenetre_avec(courbes, temps, 0.05));
+        const double apres_tau = moteur.valeur("tr_min", 0);
+        verifier(presque(apres_tau, 900 * 0.632, 40),
+                 "moteur CC : 63 % du régime après une constante de temps",
+                 f(apres_tau, 0) + " tr/min (théorie : 569)");
+
+        for (int k = 0; k < 40; ++k)
+            modele->evoluer(moteur, fenetre_avec(courbes, temps, 0.05));
+        verifier(presque(moteur.valeur("tr_min", 0), 900, 20),
+                 "et il atteint son régime établi",
+                 f(moteur.valeur("tr_min", 0), 0) + " tr/min");
+
+        // Coupure : il ralentit, il ne s'arrête pas net.
+        courbes["+"] = basses;
+        modele->evoluer(moteur, fenetre_avec(courbes, temps, 0.05));
+        const double apres_coupure = moteur.valeur("tr_min", 0);
+        verifier(apres_coupure > 100 && apres_coupure < 900,
+                 "à la coupure il ralentit par inertie, sans s'arrêter net",
+                 f(apres_coupure, 0) + " tr/min");
+    }
+
+    // --- l'inductance d'induit : le courant ne s'établit pas d'un coup
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        coeur::Netlist netlist;
+        auto& moteur = netlist.ajouter("M1", "moteur_cc_dynamique");
+        moteur.valeurs["resistance"] = 8;
+        moteur.valeurs["inductance"] = 5e-3;      // tau = L/R = 0,625 ms
+        moteur.valeurs["tr_min"] = 0;             // rotor bloqué : pas de fcem
+        netlist.relier("M1", "+", "D9");
+        netlist.relier("M1", "-", "GND");
+
+        coeur::NgspiceEngine analogique;
+        analogique.oublier_etat();
+        // Échelon franc à 1 ms : la broche part de 0 V. Sans cela ngspice
+        // calculerait d'abord le point de repos — où une bobine est un simple
+        // court-circuit — et le courant serait déjà établi à l'instant zéro.
+        const double instant_fermeture = 1e-3;
+        analogique.construire_transitoire(
+            netlist, {{"D9", coeur::BrocheElectrique::Mode::Sortie, 0.0, 0.1}},
+            {{instant_fermeture, "D9", 12.0}}, 6e-3, 5e-6);
+        const bool resolu = analogique.resoudre_transitoire();
+        verifier(resolu, "moteur avec inductance : le transitoire est calculé");
+
+        if (resolu) {
+            const coeur::Formes& formes = analogique.formes();
+            auto it = formes.courants.find("m1");
+            verifier(it != formes.courants.end(),
+                     "le courant d'induit est relevé");
+            if (it != formes.courants.end()) {
+                auto courant_a = [&](double instant) {
+                    for (size_t k = 0; k < formes.temps.size(); ++k)
+                        if (formes.temps[k] >= instant)
+                            return std::fabs(it->second[k]);
+                    return std::fabs(it->second.back());
+                };
+                // Établissement en L/R : i(t) = I∞ (1 − e^(−t/τ)), I∞ = 12/8.
+                const double a_tau = courant_a(instant_fermeture + 0.625e-3);
+                const double etabli = courant_a(5e-3);
+                verifier(presque(etabli, 1.5, 0.1),
+                         "régime établi : I = U / R = 1,5 A",
+                         f(etabli, 3) + " A");
+                verifier(presque(a_tau, 1.5 * 0.632, 0.15),
+                         "à une constante de temps L/R : 63 % du courant final",
+                         f(a_tau, 3) + " A (théorie : 0,948)");
+                verifier(courant_a(instant_fermeture) < 0.2,
+                         "à l'instant de la fermeture, le courant est encore nul",
+                         f(courant_a(instant_fermeture), 3) + " A");
+                // Sans inductance, le courant serait immédiat : c'est la
+                // différence que doit faire le paramètre.
+                verifier(courant_a(instant_fermeture + 2e-3) >
+                             courant_a(instant_fermeture + 0.2e-3) * 1.5,
+                         "le courant monte progressivement, il ne saute pas",
+                         f(courant_a(instant_fermeture + 0.2e-3), 3) + " A puis " +
+                             f(courant_a(instant_fermeture + 2e-3), 3) + " A");
+            }
+        }
+    }
+
+    // --- moteur asynchrone : vitesse de synchronisme et glissement
+    {
+        const coeur::Modele* modele = catalogue.modele("moteur_asynchrone");
+        coeur::Netlist netlist;
+        auto& mas = netlist.ajouter("MAS1", "moteur_asynchrone");
+        mas.valeurs["poles"] = 2;               // 2 paires -> Ns = 1500 tr/min
+        mas.valeurs["frequence"] = 50;
+        mas.valeurs["glissement"] = 4;
+        mas.valeurs["demarrage"] = 0.5;
+
+        std::vector<double> temps{0, 0.05}, phase{230, 230}, zero{0, 0};
+        std::map<std::string, std::vector<double>> courbes{
+            {"U", phase}, {"V", phase}, {"W", phase}};
+        for (int k = 0; k < 60; ++k)            // 3 secondes
+            modele->evoluer(mas, fenetre_avec(courbes, temps, 0.05));
+
+        verifier(presque(mas.valeur("synchrone", 0), 1500, 1),
+                 "synchronisme : Ns = 60 f / p = 1500 tr/min",
+                 f(mas.valeur("synchrone", 0), 0) + " tr/min");
+        verifier(presque(mas.valeur("tr_min", 0), 1440, 15),
+                 "en charge, il tourne 4 % sous le synchronisme",
+                 f(mas.valeur("tr_min", 0), 0) + " tr/min (attendu 1440)");
+
+        // À 25 Hz — un variateur de vitesse — le synchronisme est divisé par 2.
+        mas.valeurs["frequence"] = 25;
+        for (int k = 0; k < 60; ++k)
+            modele->evoluer(mas, fenetre_avec(courbes, temps, 0.05));
+        verifier(presque(mas.valeur("tr_min", 0), 720, 15),
+                 "à 25 Hz (variateur), la vitesse est divisée par deux",
+                 f(mas.valeur("tr_min", 0), 0) + " tr/min");
+
+        // Hors tension, il s'arrête.
+        courbes["U"] = zero; courbes["V"] = zero; courbes["W"] = zero;
+        for (int k = 0; k < 100; ++k)
+            modele->evoluer(mas, fenetre_avec(courbes, temps, 0.05));
+        verifier(mas.valeur("tr_min", 0) < 20, "hors tension, il s'arrête",
+                 f(mas.valeur("tr_min", 0), 1) + " tr/min");
+    }
+
+    // --- accéléromètre : la pesanteur doit se lire sur Z au repos
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        coeur::Netlist netlist;
+        auto& acc = netlist.ajouter("ACC1", "accelerometre");
+        acc.valeurs["ax"] = 0;
+        acc.valeurs["ay"] = 0;
+        acc.valeurs["az"] = 1;                  // au repos, 1 g vers le haut
+        netlist.relier("ACC1", "V+", "5V");
+        netlist.relier("ACC1", "GND", "GND");
+        netlist.relier("ACC1", "X", "NX");
+        netlist.relier("ACC1", "Y", "NY");
+        netlist.relier("ACC1", "Z", "NZ");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire(netlist, {});
+        verifier(moteur.resoudre(), "accéléromètre : le circuit est résolu");
+        verifier(presque(moteur.tension("NX"), 1.65, 0.05),
+                 "axe X au repos : mi-alimentation (1,65 V)",
+                 f(moteur.tension("NX")) + " V");
+        verifier(presque(moteur.tension("NZ"), 1.98, 0.05),
+                 "axe Z : 1,65 V + 1 g × 0,33 V/g = 1,98 V — la pesanteur",
+                 f(moteur.tension("NZ")) + " V");
+
+        acc.valeurs["ax"] = -2;
+        moteur.construire(netlist, {});
+        moteur.resoudre();
+        verifier(presque(moteur.tension("NX"), 0.99, 0.05),
+                 "−2 g sur X : 1,65 − 0,66 = 0,99 V",
+                 f(moteur.tension("NX")) + " V");
+    }
+
+    // --- télémètre à ultrasons : la largeur d'écho est la distance
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        const coeur::Modele* modele = catalogue.modele("telemetre_ultrason");
+        verifier(modele && modele->vers_spice_transitoire,
+                 "le télémètre produit un signal daté");
+
+        coeur::Netlist netlist;
+        auto& us = netlist.ajouter("US1", "telemetre_ultrason");
+        us.valeurs["distance"] = 100;           // 1 m -> écho de 5,8 ms
+        netlist.relier("US1", "V+", "5V");
+        netlist.relier("US1", "GND", "GND");
+        netlist.relier("US1", "TRIG", "D7");
+        netlist.relier("US1", "ECHO", "D6");
+
+        // Impulsion de déclenchement de 10 µs sur TRIG.
+        auto [temps, valeurs] = creneau(10e-6, 30e-3, 30e-3, 2e-6);
+        std::map<std::string, std::vector<double>> courbes{{"TRIG", valeurs}};
+        modele->evoluer(us, fenetre_avec(courbes, temps, 30e-3));
+        verifier(us.valeur("_echo_debut", -1) >= 0,
+                 "une impulsion de 10 µs sur TRIG arme l'écho");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_transitoire(
+            netlist, {{"D7", coeur::BrocheElectrique::Mode::Entree, 0, 0},
+                      {"D6", coeur::BrocheElectrique::Mode::Entree, 0, 0}},
+            {}, 20e-3, 50e-6);
+        verifier(moteur.resoudre_transitoire(),
+                 "le circuit avec écho est résolu");
+
+        // Mesure de la largeur d'impulsion sur ECHO, comme le ferait pulseIn.
+        const auto& formes = moteur.formes();
+        auto it = formes.tensions.find("d6");
+        double largeur = 0;
+        if (it != formes.tensions.end()) {
+            double debut = -1;
+            for (size_t k = 1; k < formes.temps.size(); ++k) {
+                const bool haut = it->second[k] > 2.5;
+                const bool avant = it->second[k - 1] > 2.5;
+                if (!avant && haut) debut = formes.temps[k];
+                if (avant && !haut && debut >= 0) {
+                    largeur = formes.temps[k] - debut;
+                    break;
+                }
+            }
+        }
+        verifier(presque(largeur, 5.8e-3, 0.3e-3),
+                 "1 m -> écho de 5,8 ms (58 µs par centimètre)",
+                 f(largeur * 1000, 2) + " ms");
+    }
+
+    // --- codeur incrémental : la fréquence des voies suit la vitesse
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        coeur::Netlist netlist;
+        auto& cod = netlist.ajouter("COD1", "codeur_incremental");
+        cod.valeurs["tr_min"] = 300;            // 300 tr/min
+        cod.valeurs["impulsions"] = 20;         // -> 100 Hz
+        netlist.relier("COD1", "V+", "5V");
+        netlist.relier("COD1", "GND", "GND");
+        netlist.relier("COD1", "A", "NA");
+        netlist.relier("COD1", "B", "NB");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_transitoire(netlist, {}, {}, 50e-3, 100e-6);
+        verifier(moteur.resoudre_transitoire(), "codeur : le circuit est résolu");
+
+        const auto& formes = moteur.formes();
+        auto it = formes.tensions.find("na");
+        int fronts = 0;
+        if (it != formes.tensions.end())
+            for (size_t k = 1; k < it->second.size(); ++k)
+                if (it->second[k - 1] <= 2.5 && it->second[k] > 2.5) ++fronts;
+        verifier(fronts >= 4 && fronts <= 6,
+                 "300 tr/min × 20 impulsions = 100 Hz, soit 5 fronts en 50 ms",
+                 std::to_string(fronts) + " fronts montants");
+    }
+
+    // --- tout le nouveau catalogue passe dans ngspice
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        const char* nouveaux[] = {
+            "servomoteur", "moteur_cc_dynamique", "moteur_pas_a_pas",
+            "moteur_asynchrone", "alim_triphasee", "accelerometre",
+            "telemetre_ultrason", "codeur_incremental", "capteur_courant",
+            "capteur_gaz", "capteur_humidite_sol", "capteur_lumiere",
+            "capteur_pression", "capteur_ph"};
+        int refuses = 0;
+        std::string liste;
+        for (const char* type : nouveaux) {
+            const coeur::Modele* modele = catalogue.modele(type);
+            if (!modele || !modele->vers_spice) {
+                ++refuses;
+                liste += std::string(" ") + type + "(absent)";
+                continue;
+            }
+            coeur::Netlist netlist;
+            auto& instance = netlist.ajouter("X1", type);
+            for (const auto& propriete : modele->proprietes) {
+                if (propriete.genre == coeur::Propriete::Genre::Choix)
+                    instance.textes[propriete.cle] = propriete.defaut_texte;
+                else
+                    instance.valeurs[propriete.cle] = propriete.defaut;
+            }
+            const int dernier = static_cast<int>(modele->bornes.size()) - 1;
+            for (int k = 0; k <= dernier; ++k) {
+                const std::string& borne = modele->bornes[k].nom;
+                netlist.relier("X1", borne,
+                               k == 0 ? "D13"
+                                      : (k == dernier ? "FIN"
+                                                      : "T" + std::to_string(k)));
+                if (k != 0 && k != dernier) {
+                    auto& charge =
+                        netlist.ajouter("RT" + std::to_string(k), "resistance");
+                    charge.valeurs["ohms"] = 10000;
+                    netlist.relier(charge.reference, "1", "T" + std::to_string(k));
+                    netlist.relier(charge.reference, "2", "GND");
+                }
+            }
+            {
+                auto& retour = netlist.ajouter("RFIN", "resistance");
+                retour.valeurs["ohms"] = 1000;
+                netlist.relier("RFIN", "1", "FIN");
+                netlist.relier("RFIN", "2", "GND");
+            }
+            coeur::NgspiceEngine moteur;
+            moteur.construire(
+                netlist,
+                {{"D13", coeur::BrocheElectrique::Mode::Sortie, 5.0, 25.0}});
+            if (!moteur.resoudre() || !moteur.erreurs().empty()) {
+                ++refuses;
+                liste += std::string(" ") + type;
+            }
+        }
+        verifier(refuses == 0, "les 14 nouveaux modèles sont acceptés par ngspice",
+                 refuses ? ("refusés :" + liste) : "");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -1077,6 +1493,7 @@ int main() {
     test_transitoire();
     test_exemplaires_multiples();
     test_croquis_arduino();
+    test_composants_a_etat();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

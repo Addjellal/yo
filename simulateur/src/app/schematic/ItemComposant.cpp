@@ -75,7 +75,8 @@ void ItemComposant::recalculer_cadre() {
     }
     if (boite.isNull()) boite = QRectF(-30, -20, 60, 40);
     // marge pour la référence au-dessus et l'étiquette en dessous
-    cadre_ = boite.adjusted(-8, -22, 8, 26);
+    // marge basse plus large : la valeur, puis la mesure en simulation
+    cadre_ = boite.adjusted(-8, -22, 8, 42);
 }
 
 QRectF ItemComposant::boundingRect() const { return cadre_; }
@@ -116,6 +117,12 @@ void ItemComposant::definir_eclat(double eclat) {
     eclat = std::max(0.0, std::min(1.0, eclat));
     if (std::fabs(eclat - eclat_) < 0.01) return;
     eclat_ = eclat;
+    update();
+}
+
+void ItemComposant::definir_mesure(const QString& mesure) {
+    if (mesure_ == mesure) return;
+    mesure_ = mesure;
     update();
 }
 
@@ -248,5 +255,12 @@ void ItemComposant::paint(QPainter* peintre,
     peintre->setPen(QPen(QColor(70, 70, 70), 1));
     peintre->drawText(QRectF(-70, cadre_.bottom() - 18, 140, 16),
                       Qt::AlignHCenter | Qt::AlignVCenter, etiquette());
+    if (!mesure_.isEmpty()) {
+        police.setBold(true);
+        peintre->setFont(police);
+        peintre->setPen(QPen(QColor(180, 83, 9), 1));
+        peintre->drawText(QRectF(-90, cadre_.bottom() - 2, 180, 16),
+                          Qt::AlignHCenter | Qt::AlignVCenter, mesure_);
+    }
     peintre->restore();
 }

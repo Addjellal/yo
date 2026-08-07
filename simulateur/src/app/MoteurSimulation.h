@@ -99,6 +99,9 @@ signals:
     void trame_calculee(const coeur::Formes& formes, double instant_debut);
     // Octet émis sur l'UART, avec la carte qui l'a envoyé.
     void octet_serie(char octet, const QString& carte);
+    // État interne des composants à mécanique, après évolution.
+    void etats_composants(
+        const std::map<std::string, std::map<std::string, double>>& etats);
     void journal(const QString& message);
     void avancement(double temps_ms, double vitesse);
 
@@ -154,6 +157,8 @@ private:
     // transitoire) ou état courant (analyse au point de repos).
     std::vector<coeur::BrocheElectrique> broches_pour(bool au_depart) const;
     void resoudre_trame(uint64_t cycles_ecoules);
+    // Fait avancer la mécanique des composants à état.
+    void faire_evoluer(const coeur::Formes& formes, double duree);
     // Un pas de couplage complet : exécution puis résolution.
     uint64_t executer_pas(uint64_t cycles);
     // Pas de couplage réellement nécessaire pour ce schéma.

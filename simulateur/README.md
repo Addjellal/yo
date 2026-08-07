@@ -23,12 +23,23 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 
 - **Saisie de schéma** : palette par famille, glisser-déposer, fils en équerre,
   rotation, grille magnétique, zoom à la molette.
-- **Catalogue de 38 composants** (34 simulables, 9 familles), tous vérifiés
-  par les tests :
-  passifs, diodes et Zener, transistors NPN/PNP, MOSFET, optocoupleur,
-  afficheur 7 segments, relais, moteur, portes logiques, amplificateur
-  opérationnel, régulateur 7805, capteurs (LDR, thermistance CTN, LM35),
-  instruments de mesure.
+- **Catalogue de 52 composants** (48 simulables, 9 familles), tous vérifiés
+  par les tests : passifs, diodes et Zener, transistors NPN/PNP, MOSFET,
+  optocoupleur, afficheur 7 segments, relais, portes logiques, amplificateur
+  opérationnel, régulateur 7805, instruments de mesure.
+- **Sept composants à mécanique interne**, qui ont une position et une vitesse
+  et pas seulement une impédance : servomoteur (décode la largeur
+  d'impulsion), moteur à courant continu, moteur pas à pas, moteur asynchrone
+  triphasé, télémètre à ultrasons, codeur incrémental, capteur de courant.
+  Leur grandeur s'affiche sous le symbole pendant la simulation — l'angle du
+  servo, les tours par minute du moteur.
+- **Machines avec leur inductance interne** : l'induit d'un moteur est R en
+  série avec L, chaque phase d'un pas à pas ou d'un asynchrone aussi. C'est
+  cette inductance qui empêche le courant de s'établir d'un coup, produit la
+  surtension à la coupure et rend la diode de roue libre nécessaire.
+- **Capteurs analogiques** : accéléromètre 3 axes ADXL335, LDR, thermistance
+  CTN, LM35, gaz MQ-2, humidité du sol, pression, pH, capteur de courant
+  ACS712.
 - **Simulation couplée** : la LED s'allume avec l'éclat correspondant au
   courant réellement calculé, chaque fil affiche sa tension moyenne.
 - **Oscilloscope quatre voies** : formes d'onde réelles issues de l'analyse
@@ -48,9 +59,10 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   son propre programme, choisi dans le sélecteur au-dessus de l'éditeur. Elles
   partagent le circuit et l'horloge, et peuvent donc se parler par leurs
   broches.
-- **Six exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
+- **Huit exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
   potentiomètre sur l'ADC, moteur commandé par transistor, PWM matérielle à
-  observer à l'oscilloscope, et deux cartes qui communiquent.
+  observer à l'oscilloscope, deux cartes qui communiquent, servomoteur balayé,
+  et moteur en PWM commandé par transistor.
 
 ## Ce que ça ne fait pas encore
 
@@ -65,6 +77,10 @@ Autant le dire tout de suite, pour ne pas donner le change :
   chemin inverse — le programme qui pilote le circuit — est daté au cycle
   près. C'est assez fin pour un bouton, un capteur ou un signal échangé entre
   deux cartes ; ce ne l'est pas pour un protocole série entre cartes.
+- Les composants à mécanique avancent **une fois par pas de couplage** (5 à
+  25 ms). C'est largement assez pour un servomoteur ou un moteur, dont les
+  constantes de temps sont bien plus longues ; ce ne le serait pas pour une
+  mécanique rapide.
 - Pas de composants **numériques complexes** (74HC595, écran LCD, I²C, SPI vers
   périphériques) : il faudrait un moteur de simulation numérique événementiel
   en plus des deux existants. Le noyau Arduino n'a donc ni `Wire`, ni `SPI`,
@@ -89,7 +105,7 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 76 tests, sans Qt
+./build/tests_coeur                        # 105 tests, sans Qt
 QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 19 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
@@ -143,7 +159,9 @@ simulateur/
 │   │   │   ├── capteurs.cpp         boutons, potentiomètres, LDR, CTN…
 │   │   │   ├── electromecanique.cpp relais, moteur, buzzer, haut-parleur
 │   │   │   ├── logique.cpp          portes, ampli op, régulateur
-│   │   │   └── instruments.cpp      voltmètre, ampèremètre
+│   │   │   ├── instruments.cpp      voltmètre, ampèremètre
+│   │   │   ├── actionneurs_dynamiques.cpp  servo, moteurs, triphasé
+│   │   │   └── capteurs_avances.cpp        accéléromètre, télémètre, codeur
 │   │   └── engines/
 │   │       ├── noyau_arduino.h        le noyau Arduino, embarqué en texte
 │   │       ├── NgspiceEngine.{h,cpp}  netlist → SPICE → tensions et courants
@@ -157,7 +175,7 @@ simulateur/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   └── figures_liste.inc            les montages, décrits en données
 └── tests/
-    ├── test_coeur.cpp                76 tests, sans Qt
+    ├── test_coeur.cpp                105 tests, sans Qt
     └── test_schema.cpp               25 tests, saisie de schéma sans fenêtre
 ```
 
@@ -211,6 +229,35 @@ Un montage se décrit en données dans `outils/figures_liste.inc` — des
 placements, des fils, des annotations — et le symbole vient du catalogue.
 Conséquence : ajouter un composant le rend dessinable dans le cours comme dans
 l'application, et il est impossible que les deux divergent.
+
+---
+
+## Un composant peut avoir une mécanique
+
+Une résistance se décrit par une équation. Un servomoteur, non : il a un angle,
+et cet angle dépend de ce que le circuit lui a envoyé *pendant un certain
+temps*. Le catalogue prévoit donc un second crochet, à côté de `vers_spice` :
+
+```cpp
+m.evoluer = [](Instance& i, const Evolution& evolution) {
+    const double largeur = evolution.largeur_impulsion("SIG");   // en secondes
+    ...
+    i.valeurs["angle"] = ...;
+};
+m.lecture = [](const Instance& i) { return arrondi(i.valeur("angle"), 0) + " °"; };
+```
+
+Après chaque fenêtre de calcul, le composant reçoit **les formes d'onde de ses
+propres bornes** — celles que ngspice vient de produire — et met à jour son
+état. Cet état sert ensuite à construire le circuit de la fenêtre suivante,
+où le composant redevient une source ou une charge. La boucle est fermée.
+
+Trois raccourcis couvrent l'essentiel : `largeur_impulsion` (ce que décode un
+servo), `moyenne` (ce que voit un moteur), `rapport_cyclique`.
+
+Et pour les capteurs qui *répondent* par un signal daté — l'écho d'un
+télémètre, les voies d'un codeur — `vers_spice_transitoire` reçoit la durée de
+la fenêtre et émet une source linéaire par morceaux.
 
 ---
 
@@ -269,7 +316,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**76 tests du cœur**, sans Qt, en onze sections :
+**105 tests du cœur**, sans Qt, en douze sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -282,6 +329,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 7 | **tout le catalogue** passe dans ngspice |
 | 8 | physique des modèles : diode, CTN, LDR, NON-ET, ampli op, 7805, relais |
 | 9 | **analyse transitoire** : charge d'un RC comparée à la théorie (3,16 V à une constante de temps), reprise d'état entre fenêtres, PWM à 25 % |
+| 12 | **composants à mécanique** : servo à 1,5 ms → 90°, moteur à 63 % après une constante de temps, asynchrone à 1440 tr/min pour 4 % de glissement, courant d'induit qui suit la loi L/R, écho de 5,8 ms pour 1 m |
 | 11 | **un croquis Arduino de TP**, compilé sans retouche : millis à la bonne cadence, anti-rebond, machine à états, PWM, Serial |
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 
