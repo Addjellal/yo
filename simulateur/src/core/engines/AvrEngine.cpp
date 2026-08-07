@@ -1,0 +1,281 @@
+#include "core/engines/AvrEngine.h"
+
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+
+#ifdef AVEC_SIMAVR
+#include <simavr/avr_adc.h>
+#include <simavr/avr_ioport.h>
+#include <simavr/avr_uart.h>
+#include <simavr/sim_avr.h>
+#include <simavr/sim_elf.h>
+#include <simavr/sim_hex.h>
+#endif
+
+namespace coeur {
+
+// Correspondance broche Arduino -> (port, bit) sur un ATmega328P
+namespace {
+struct BrocheAvr {
+    char port;
+    int bit;
+};
+
+BrocheAvr broche_avr(int broche) {
+    if (broche <= 7) return {'D', broche};          // D0..D7  -> PORTD
+    if (broche <= 13) return {'B', broche - 8};     // D8..D13 -> PORTB
+    return {'C', broche - 14};                      // A0..A5  -> PORTC
+}
+
+// Adresses en espace données de l'ATmega328P (adresse E/S + 0x20).
+uint16_t adresse_ddr(char port) {
+    switch (port) {
+        case 'B': return 0x24;
+        case 'C': return 0x27;
+        default:  return 0x2A;   // D
+    }
+}
+uint16_t adresse_port(char port) { return adresse_ddr(port) + 1; }
+}  // namespace
+
+#ifdef AVEC_SIMAVR
+
+// Contexte passé aux rappels C de simavr : le moteur et la broche concernée.
+// On ne détourne surtout pas le champ `irq` de simavr, qui lui sert à
+// identifier le bit du port en interne.
+struct ContexteBroche {
+    AvrEngine* moteur = nullptr;
+    int broche = 0;
+};
+
+struct AvrEngine::Impl {
+    avr_t* avr = nullptr;
+    elf_firmware_t firmware = {};
+    AvrEngine* proprietaire = nullptr;
+    std::array<ContexteBroche, 20> contextes = {};
+};
+
+namespace {
+
+void rappel_port(struct avr_irq_t*, uint32_t valeur, void* param) {
+    auto* contexte = static_cast<ContexteBroche*>(param);
+    contexte->moteur->_notifier_broche(contexte->broche, valeur != 0);
+}
+
+void rappel_uart(struct avr_irq_t*, uint32_t valeur, void* param) {
+    static_cast<AvrEngine*>(param)->_notifier_serie(static_cast<char>(valeur));
+}
+
+}  // namespace
+
+AvrEngine::AvrEngine() : impl_(new Impl) { impl_->proprietaire = this; }
+
+AvrEngine::~AvrEngine() {
+    if (impl_ && impl_->avr) avr_terminate(impl_->avr);
+    delete impl_;
+}
+
+bool AvrEngine::compile_avec_simavr() { return true; }
+bool AvrEngine::disponible() const { return true; }
+
+bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
+                        uint32_t frequence) {
+    erreur_.clear();
+    frequence_ = frequence;
+    cycle_ = 0;
+    etat_broches_.clear();
+    sortie_broches_.clear();
+
+    if (impl_->avr) {
+        avr_terminate(impl_->avr);
+        impl_->avr = nullptr;
+    }
+
+    elf_firmware_t firmware = {};
+    if (elf_read_firmware(chemin.c_str(), &firmware) != 0) {
+        erreur_ = "impossible de lire le firmware : " + chemin;
+        return false;
+    }
+    if (firmware.frequency == 0) firmware.frequency = frequence;
+
+    avr_t* avr = avr_make_mcu_by_name(mcu.c_str());
+    if (!avr) {
+        erreur_ = "microcontrôleur inconnu de simavr : " + mcu;
+        return false;
+    }
+    avr_init(avr);
+    avr->frequency = frequence;
+    avr_load_firmware(avr, &firmware);
+    impl_->avr = avr;
+    impl_->firmware = firmware;
+
+    // Écoute des 20 broches Arduino
+    for (int broche = 0; broche <= 19; ++broche) {
+        BrocheAvr cible = broche_avr(broche);
+        avr_irq_t* irq = avr_io_getirq(
+            avr, AVR_IOCTL_IOPORT_GETIRQ(cible.port), cible.bit);
+        if (!irq) continue;
+        impl_->contextes[broche] = {this, broche};
+        avr_irq_register_notify(irq, rappel_port, &impl_->contextes[broche]);
+    }
+    // Écoute de l'UART (ce que le programme envoie sur Serial)
+    if (avr_irq_t* uart = avr_io_getirq(avr, AVR_IOCTL_UART_GETIRQ('0'),
+                                        UART_IRQ_OUTPUT))
+        avr_irq_register_notify(uart, rappel_uart, this);
+    // Débranche le contrôle de flux, sinon simavr suspend l'UART
+    uint32_t drapeau = 0;
+    avr_ioctl(avr, AVR_IOCTL_UART_GET_FLAGS('0'), &drapeau);
+    drapeau &= ~AVR_UART_FLAG_STDIO;
+    avr_ioctl(avr, AVR_IOCTL_UART_SET_FLAGS('0'), &drapeau);
+    return true;
+}
+
+uint64_t AvrEngine::avancer(uint64_t cycles) {
+    if (!impl_->avr) return 0;
+    const uint64_t depart = impl_->avr->cycle;
+    const uint64_t but = depart + cycles;
+    while (impl_->avr->cycle < but) {
+        int etat = avr_run(impl_->avr);
+        if (etat == cpu_Done || etat == cpu_Crashed) break;
+    }
+    cycle_ = impl_->avr->cycle;
+    return cycle_ - depart;
+}
+
+void AvrEngine::reinitialiser() {
+    if (impl_->avr) {
+        avr_reset(impl_->avr);
+        cycle_ = 0;
+    }
+}
+
+void AvrEngine::definir_tension_adc(int canal, double volts) {
+    if (!impl_->avr) return;
+    if (volts < 0) volts = 0;
+    if (volts > 5) volts = 5;
+    avr_irq_t* irq = avr_io_getirq(impl_->avr, AVR_IOCTL_ADC_GETIRQ,
+                                   ADC_IRQ_ADC0 + canal);
+    if (irq) avr_raise_irq(irq, static_cast<uint32_t>(volts * 1000.0));
+}
+
+void AvrEngine::envoyer_octet_serie(uint8_t octet) {
+    if (!impl_->avr) return;
+    if (avr_irq_t* irq = avr_io_getirq(impl_->avr, AVR_IOCTL_UART_GETIRQ('0'),
+                                        UART_IRQ_INPUT))
+        avr_raise_irq(irq, octet);
+}
+
+uint8_t AvrEngine::registre(uint16_t adresse) const {
+    if (!impl_->avr || adresse >= impl_->avr->ramend) return 0;
+    return impl_->avr->data[adresse];
+}
+
+void AvrEngine::definir_niveau_externe(int broche, bool haut) {
+    if (!impl_->avr) return;
+    const BrocheAvr cible = broche_avr(broche);
+    avr_irq_t* irq = avr_io_getirq(impl_->avr,
+                                   AVR_IOCTL_IOPORT_GETIRQ(cible.port),
+                                   cible.bit);
+    if (!irq) return;
+    injection_ = true;                    // ne pas se notifier soi-même
+    avr_raise_irq(irq, haut ? 1 : 0);
+    injection_ = false;
+}
+
+#else   // ------------------------------------------------ sans simavr
+
+struct AvrEngine::Impl {};
+
+AvrEngine::AvrEngine() : impl_(nullptr) {}
+AvrEngine::~AvrEngine() = default;
+bool AvrEngine::compile_avec_simavr() { return false; }
+bool AvrEngine::disponible() const { return false; }
+
+bool AvrEngine::charger(const std::string&, const std::string&, uint32_t) {
+    erreur_ = "simavr n'est pas compilé dans cette version";
+    return false;
+}
+uint64_t AvrEngine::avancer(uint64_t) { return 0; }
+void AvrEngine::reinitialiser() {}
+void AvrEngine::definir_tension_adc(int, double) {}
+void AvrEngine::envoyer_octet_serie(uint8_t) {}
+uint8_t AvrEngine::registre(uint16_t) const { return 0; }
+void AvrEngine::definir_niveau_externe(int, bool) {}
+
+#endif
+
+bool AvrEngine::direction_sortie(int broche) const {
+    const BrocheAvr cible = broche_avr(broche);
+    return (registre(adresse_ddr(cible.port)) >> cible.bit) & 1;
+}
+
+bool AvrEngine::niveau_port(int broche) const {
+    const BrocheAvr cible = broche_avr(broche);
+    return (registre(adresse_port(cible.port)) >> cible.bit) & 1;
+}
+
+bool AvrEngine::pullup_actif(int broche) const {
+    return !direction_sortie(broche) && niveau_port(broche);
+}
+
+double AvrEngine::temps_ms() const {
+    return frequence_ ? (cycle_ * 1000.0 / frequence_) : 0.0;
+}
+
+bool AvrEngine::broche_haute(int broche) const {
+    auto it = etat_broches_.find(broche);
+    return it != etat_broches_.end() && it->second;
+}
+
+bool AvrEngine::broche_en_sortie(int broche) const {
+    auto it = sortie_broches_.find(broche);
+    return it != sortie_broches_.end() && it->second;
+}
+
+void AvrEngine::_notifier_broche(int broche, bool haut) {
+    if (injection_) return;           // c'est nous qui venons d'écrire
+    etat_broches_[broche] = haut;
+    sortie_broches_[broche] = true;   // une notification implique un pilotage
+    if (rappel_broche_) rappel_broche_(broche, haut);
+}
+
+void AvrEngine::_notifier_serie(char octet) {
+    if (rappel_serie_) rappel_serie_(octet);
+}
+
+// ---------------------------------------------------------------------------
+// Compilation d'un sketch avec avr-gcc
+// ---------------------------------------------------------------------------
+bool AvrEngine::avr_gcc_disponible() {
+    return std::system("avr-gcc --version > /dev/null 2>&1") == 0;
+}
+
+bool AvrEngine::compiler_source(const std::string& source,
+                                const std::string& chemin_elf,
+                                std::string* journal) {
+    const std::string base = chemin_elf + ".c";
+    {
+        std::ofstream fichier(base);
+        if (!fichier) {
+            if (journal) *journal = "écriture impossible : " + base;
+            return false;
+        }
+        fichier << source;
+    }
+    const std::string journal_fichier = chemin_elf + ".log";
+    std::string commande =
+        "avr-gcc -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu99 -o \"" +
+        chemin_elf + "\" \"" + base + "\" > \"" + journal_fichier + "\" 2>&1";
+    const int code = std::system(commande.c_str());
+    if (journal) {
+        std::ifstream lecture(journal_fichier);
+        std::string contenu((std::istreambuf_iterator<char>(lecture)),
+                            std::istreambuf_iterator<char>());
+        *journal = contenu;
+    }
+    return code == 0;
+}
+
+}  // namespace coeur

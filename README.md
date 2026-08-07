@@ -7,6 +7,7 @@ sorties à l'intérieur de son dossier.
 | Projet | Description | Démarrer |
 |---|---|---|
 | 🎓 [`formation-embarque/`](formation-embarque/) | **Formation complète systèmes embarqués & bas niveau** : 11 modules de cours, 10 TD corrigés, 5 TP guidés (18 fiches de séance), mini-TP sur simulateur, évaluations, ~190 h. Du binaire aux automates Siemens/Schneider, en passant par C, C++, Arduino, VHDL/FPGA, Java et STM32. | [Commencer ici](formation-embarque/parcours-type.md) |
+| 🔌 [`simulateur/`](simulateur/) | **Simulateur électronique façon Proteus** : saisie de schéma, 38 composants, simulation analogique par ngspice et exécution du **vrai firmware** compilé par avr-gcc sur un ATmega328P émulé (simavr). Application de bureau en C++/Qt. | [README](simulateur/) |
 | 💼 [`auto-emploi/`](auto-emploi/) | Recherche d'emploi automatisée : interface web locale, scraping multi-sources, matching IA, lettres de motivation, suivi de candidatures et relances. | [README](auto-emploi/) |
 
 ---
