@@ -34,7 +34,11 @@ public:
 
     void reinitialiser();
 
-    uint64_t cycle() const { return cycle_; }
+    // Compteur de cycles, lu en direct dans le cœur émulé. C'est important :
+    // les rappels de broche sont appelés *pendant* avancer(), et doivent
+    // pouvoir dater leur commutation à l'instant où elle se produit — pas à
+    // la fin de la tranche d'exécution.
+    uint64_t cycle() const;
     double temps_ms() const;
     uint32_t frequence() const { return frequence_; }
 

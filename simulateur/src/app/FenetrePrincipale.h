@@ -15,11 +15,13 @@ class QLabel;
 class QPlainTextEdit;
 class QFormLayout;
 class QWidget;
+class QTabWidget;
 
 class ItemComposant;
 class SceneSchema;
 class VueSchema;
 class MoteurSimulation;
+class Oscilloscope;
 
 // Palette : arbre catégorie -> composants, avec glisser-déposer vers le schéma.
 class PaletteComposants : public QTreeWidget {
@@ -40,7 +42,7 @@ public:
     // Exemples prêts à l'emploi. Chacun pose un schéma complet et le
     // programme qui va avec : c'est la façon la plus courte de montrer ce que
     // l'application sait faire.
-    enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor };
+    enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor, Pwm };
     void charger_exemple(Exemple exemple);
     void charger_exemple_clignotant() { charger_exemple(Exemple::Clignotant); }
 
@@ -52,8 +54,17 @@ public:
     // résultats. Sert au mode « --diagnostic » et au signalement d'anomalie.
     QString diagnostic();
 
+    // Vitesse de simulation, en multiples du temps réel.
+    double vitesse() const;
+
     // En vérification automatique, aucune boîte de dialogue ne doit bloquer.
     void definir_mode_silencieux(bool silencieux) { silencieux_ = silencieux; }
+
+    // Choisit l'onglet du bas (programme, journal, série, oscilloscope).
+    void afficher_onglet(int rang);
+
+    // Base de temps de l'oscilloscope, en secondes (vérification).
+    void definir_base_temps(double secondes);
 
     SceneSchema* scene() const { return scene_; }
     VueSchema* vue() const { return vue_; }
@@ -90,6 +101,8 @@ private:
     QPlainTextEdit* editeur_source_ = nullptr;
     QPlainTextEdit* console_ = nullptr;
     QPlainTextEdit* moniteur_serie_ = nullptr;
+    Oscilloscope* oscilloscope_ = nullptr;
+    QTabWidget* onglets_ = nullptr;
     QLabel* etiquette_temps_ = nullptr;
     QLabel* etiquette_vitesse_ = nullptr;
     QLabel* etiquette_moteurs_ = nullptr;

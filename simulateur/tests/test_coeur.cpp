@@ -653,6 +653,135 @@ static void test_physique_catalogue() {
 }
 
 // ---------------------------------------------------------------------------
+// Analyse transitoire : ce qui rend l'oscilloscope possible. On ne vérifie pas
+// seulement qu'une courbe sort, mais qu'elle a la bonne forme et les bonnes
+// valeurs — comparées à la théorie du circuit RC.
+static void test_transitoire() {
+    std::printf("\n[9] Analyse transitoire (formes d'onde)\n");
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent — section ignorée)\n");
+        return;
+    }
+
+    // Filtre RC : 10 kΩ + 100 nF, constante de temps 1 ms.
+    coeur::Netlist netlist;
+    auto& r = netlist.ajouter("R1", "resistance");
+    r.valeurs["ohms"] = 10000;
+    netlist.relier("R1", "1", "D3");
+    netlist.relier("R1", "2", "NS");
+    auto& c = netlist.ajouter("C1", "condensateur");
+    c.valeurs["farads"] = 100e-9;
+    netlist.relier("C1", "1", "NS");
+    netlist.relier("C1", "2", "GND");
+
+    coeur::NgspiceEngine moteur;
+    std::vector<coeur::BrocheElectrique> broches = {
+        {"D3", coeur::BrocheElectrique::Mode::Sortie, 0.0, 25.0}};
+
+    // Échelon à t = 0 : le condensateur se charge pendant 5 ms.
+    std::vector<coeur::TransitionBroche> transitions = {{0.0, "D3", 5.0}};
+    moteur.oublier_etat();
+    moteur.definir_etat_initial({{"ns", 0.0}});
+    moteur.construire_transitoire(netlist, broches, transitions, 5e-3, 10e-6);
+    const bool ok = moteur.resoudre_transitoire();
+    verifier(ok, "l'analyse transitoire aboutit",
+             moteur.erreurs().empty() ? "" : moteur.erreurs().front());
+    if (!ok) return;
+
+    const coeur::Formes& formes = moteur.formes();
+    verifier(formes.temps.size() > 100, "la forme d'onde contient assez de points",
+             std::to_string(formes.temps.size()) + " points");
+    verifier(presque(formes.temps.back(), 5e-3, 1e-4),
+             "la fenêtre couvre bien la durée demandée",
+             f(formes.temps.back() * 1000, 3) + " ms");
+
+    // Relève la tension à un instant donné, par recherche dans la courbe.
+    auto tension_a = [&formes](double instant) {
+        auto it = formes.tensions.find("ns");
+        if (it == formes.tensions.end()) return -1.0;
+        for (size_t k = 0; k < formes.temps.size(); ++k)
+            if (formes.temps[k] >= instant) return it->second[k];
+        return it->second.back();
+    };
+
+    // Charge d'un RC : v(t) = V·(1 − e^(−t/τ)), avec τ = RC = 1 ms.
+    const double a_1tau = tension_a(1e-3);      // attendu 5·(1−e⁻¹) = 3,161 V
+    const double a_3tau = tension_a(3e-3);      // attendu 5·(1−e⁻³) = 4,751 V
+    verifier(presque(a_1tau, 3.16, 0.15),
+             "charge du RC à une constante de temps (théorie : 3,16 V)",
+             f(a_1tau) + " V");
+    verifier(presque(a_3tau, 4.75, 0.15),
+             "charge du RC à trois constantes de temps (théorie : 4,75 V)",
+             f(a_3tau) + " V");
+    verifier(tension_a(0.0) < 0.2, "la courbe part bien de zéro",
+             f(tension_a(0.0)) + " V");
+
+    // L'état final doit permettre d'enchaîner la fenêtre suivante sans que le
+    // condensateur ne se redécharge tout seul.
+    const double final_1 = moteur.etat_final().at("ns");
+    moteur.definir_etat_initial(moteur.etat_final());
+    moteur.construire_transitoire(netlist, broches, {}, 1e-3, 10e-6);
+    moteur.resoudre_transitoire();
+    const double debut_2 = moteur.formes().tensions.at("ns").front();
+    verifier(presque(debut_2, final_1, 0.05),
+             "l'état se transmet d'une fenêtre à la suivante",
+             "fin " + f(final_1) + " V -> début " + f(debut_2) + " V");
+
+    // --- PWM : c'est le cas qui piège une moyenne naïve des tensions.
+    // Rapport cyclique 25 % à 1 kHz sur une LED : elle doit conduire pendant
+    // le quart du temps, pas rester éteinte sous une tension moyenne.
+    coeur::Netlist circuit_led;
+    auto& led = circuit_led.ajouter("LED1", "led");
+    led.textes["couleur"] = "rouge";
+    circuit_led.relier("LED1", "A", "D5");
+    circuit_led.relier("LED1", "K", "NL");
+    auto& rs = circuit_led.ajouter("R1", "resistance");
+    rs.valeurs["ohms"] = 220;
+    circuit_led.relier("R1", "1", "NL");
+    circuit_led.relier("R1", "2", "GND");
+
+    std::vector<coeur::TransitionBroche> pwm;
+    for (int periode = 0; periode < 20; ++periode) {       // 20 ms à 1 kHz
+        const double t0 = periode * 1e-3;
+        pwm.push_back({t0, "D5", 5.0});
+        pwm.push_back({t0 + 0.25e-3, "D5", 0.0});          // 25 % de rapport
+    }
+    coeur::NgspiceEngine moteur_pwm;
+    moteur_pwm.oublier_etat();
+    moteur_pwm.construire_transitoire(
+        circuit_led, {{"D5", coeur::BrocheElectrique::Mode::Sortie, 0.0, 25.0}},
+        pwm, 20e-3, 10e-6);
+    verifier(moteur_pwm.resoudre_transitoire(), "PWM : analyse transitoire menée");
+
+    const auto& courbe = moteur_pwm.formes();
+    auto it = courbe.courants.find("led1");
+    verifier(it != courbe.courants.end(), "PWM : le courant de la LED est relevé");
+    if (it == courbe.courants.end()) return;
+
+    double maximum = 0, somme = 0;
+    int au_dessus = 0;
+    for (double valeur : it->second) {
+        const double courant = std::fabs(valeur);
+        maximum = std::max(maximum, courant);
+        somme += courant;
+        if (courant > 0.005) ++au_dessus;
+    }
+    const double moyenne = somme / it->second.size();
+    const double proportion =
+        static_cast<double>(au_dessus) / it->second.size();
+
+    verifier(maximum > 0.010,
+             "PWM : la LED reçoit bien le plein courant pendant l'impulsion",
+             f(maximum * 1000, 1) + " mA de crête");
+    verifier(presque(proportion, 0.25, 0.08),
+             "PWM : elle conduit environ un quart du temps",
+             f(proportion * 100, 0) + " % du temps");
+    verifier(moyenne > 0.002 && moyenne < 0.006,
+             "PWM : le courant moyen vaut environ le quart du courant de crête",
+             f(moyenne * 1000, 2) + " mA");
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -669,6 +798,7 @@ int main() {
     test_adc();
     test_catalogue_complet();
     test_physique_catalogue();
+    test_transitoire();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

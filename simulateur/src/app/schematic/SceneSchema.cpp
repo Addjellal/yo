@@ -231,30 +231,39 @@ coeur::Netlist SceneSchema::construire_netlist(
     const auto noeuds = calculer_noeuds();
     if (broches) broches->clear();
 
+    // Premier temps : les composants. Ils déterminent quels nœuds existent
+    // réellement.
     for (ItemComposant* composant : composants()) {
         const coeur::Modele* modele = composant->modele();
-        if (!modele) continue;
-        const auto& noms = noeuds.at(composant);
-
-        if (modele->carte) {
-            if (!broches) continue;
-            for (int k = 0; k < composant->nb_bornes(); ++k) {
-                const std::string nom = modele->bornes[k].nom;
-                const int numero = numero_broche(nom);
-                if (numero < 0 || noms[k].empty()) continue;
-                broches->push_back({numero, nom, noms[k]});
-            }
-            continue;
-        }
+        if (!modele || modele->carte) continue;
         if (!modele->noeud_impose.empty()) continue;   // symbole d'alimentation
         if (!modele->vers_spice) continue;             // décoratif
 
+        const auto& noms = noeuds.at(composant);
         auto& instance = netlist.ajouter(composant->reference().toStdString(),
                                          modele->type);
         instance.valeurs = composant->valeurs;
         instance.textes = composant->textes;
         for (int k = 0; k < composant->nb_bornes(); ++k)
             netlist.relier(instance.reference, modele->bornes[k].nom, noms[k]);
+    }
+
+    // Second temps : les broches de carte, et seulement celles qui aboutissent
+    // quelque part. Une broche en l'air ajouterait une source, une résistance
+    // et une condition initiale à chaque résolution, pour rien — sur une carte
+    // à vingt broches dont une seule est câblée, c'est l'essentiel du coût.
+    if (!broches) return netlist;
+    for (ItemComposant* composant : composants()) {
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->carte) continue;
+        const auto& noms = noeuds.at(composant);
+        for (int k = 0; k < composant->nb_bornes(); ++k) {
+            const std::string nom = modele->bornes[k].nom;
+            const int numero = numero_broche(nom);
+            if (numero < 0 || noms[k].empty()) continue;
+            if (netlist.occurrences(noms[k]) == 0) continue;   // broche en l'air
+            broches->push_back({numero, nom, noms[k]});
+        }
     }
     return netlist;
 }

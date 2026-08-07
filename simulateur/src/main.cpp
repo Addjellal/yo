@@ -32,7 +32,18 @@ int main(int argc, char** argv) {
         fenetre.charger_exemple(
             static_cast<FenetrePrincipale::Exemple>(numero));
     }
+    // « --base N » impose la base de temps de l'oscilloscope, en secondes.
+    const int base = arguments.indexOf("--base");
+
+    // « --onglet N » choisit le panneau du bas : 0 programme, 1 journal,
+    // 2 moniteur série, 3 oscilloscope.
+    const int onglet = arguments.indexOf("--onglet");
+    if (onglet >= 0 && onglet + 1 < arguments.size())
+        fenetre.afficher_onglet(arguments.at(onglet + 1).toInt());
+
     fenetre.show();
+    if (base >= 0 && base + 1 < arguments.size())
+        fenetre.definir_base_temps(arguments.at(base + 1).toDouble());
 
     // Vérification automatique : « --capture fichier.png [millisecondes] »
     // ouvre l'application, laisse tourner la simulation, enregistre une image
@@ -47,6 +58,8 @@ int main(int argc, char** argv) {
         });
         QTimer::singleShot(attente, &application, [&fenetre, destination] {
             fenetre.grab().save(destination);
+            QTextStream(stdout)
+                << "vitesse " << fenetre.vitesse() << " x temps reel" << Qt::endl;
             qApp->quit();
         });
     }

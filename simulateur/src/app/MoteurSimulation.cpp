@@ -10,7 +10,6 @@
 namespace {
 
 constexpr int kPeriodeTrame = 25;        // ms entre deux images
-constexpr size_t kEtatsMax = 8;          // résolutions par trame, au plus
 
 }  // namespace
 
@@ -40,8 +39,12 @@ bool MoteurSimulation::charger_firmware(const QString& chemin, QString* erreur) 
     brancher_rappels();
     firmware_charge_ = true;
     masque_ = 0;
-    cycle_repere_ = 0;
-    occupation_.clear();
+    masque_debut_ = 0;
+    cycle_debut_ = 0;
+    instant_trame_ = 0.0;
+    commutations_.clear();
+    etat_.clear();
+    analogique_.oublier_etat();
     emit journal(QString("Firmware chargé : %1")
                      .arg(QFileInfo(chemin).fileName()));
     return true;
@@ -84,8 +87,6 @@ void MoteurSimulation::demarrer() {
         emit journal("Aucun firmware chargé : rien à exécuter.");
         return;
     }
-    cycle_repere_ = mcu_.cycle();
-    occupation_.clear();
     minuterie_.start();
     emit journal("Simulation démarrée.");
 }
@@ -99,8 +100,12 @@ void MoteurSimulation::arreter() {
     minuterie_.stop();
     mcu_.reinitialiser();
     masque_ = 0;
-    cycle_repere_ = 0;
-    occupation_.clear();
+    masque_debut_ = 0;
+    cycle_debut_ = 0;
+    instant_trame_ = 0.0;
+    commutations_.clear();
+    etat_.clear();
+    analogique_.oublier_etat();
     vitesse_ = 0.0;
     emit journal("Simulation arrêtée et microcontrôleur réinitialisé.");
     emit avancement(0.0, 0.0);
@@ -108,16 +113,18 @@ void MoteurSimulation::arreter() {
 
 // ---------------------------------------------------------------------------
 void MoteurSimulation::noter_changement(int broche, bool haut) {
-    // Combien de temps la configuration précédente a-t-elle duré ?
-    const uint64_t maintenant = mcu_.cycle();
-    if (maintenant > cycle_repere_)
-        occupation_[masque_] += maintenant - cycle_repere_;
-    cycle_repere_ = maintenant;
+    if (broche < 0 || broche >= 32) return;
+    // On garde l'instant exact : c'est lui qui devient un point de la source
+    // linéaire par morceaux, donc un front dans la forme d'onde.
+    commutations_.push_back({mcu_.cycle(), broche, haut});
+    if (haut) masque_ |= (1u << broche);
+    else masque_ &= ~(1u << broche);
+}
 
-    if (broche >= 0 && broche < 32) {
-        if (haut) masque_ |= (1u << broche);
-        else masque_ &= ~(1u << broche);
-    }
+void MoteurSimulation::definir_resolution(double secondes) {
+    if (secondes < 1e-6) secondes = 1e-6;      // 1 µs : plancher raisonnable
+    if (secondes > 1e-3) secondes = 1e-3;
+    pas_ = secondes;
 }
 
 std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
@@ -143,60 +150,88 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
 }
 
 void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
-    // Ferme la dernière configuration de la trame.
-    const uint64_t maintenant = mcu_.cycle();
-    if (maintenant > cycle_repere_)
-        occupation_[masque_] += maintenant - cycle_repere_;
-    cycle_repere_ = maintenant;
-    if (occupation_.empty()) occupation_[masque_] = cycles_ecoules;
-
-    // On ne garde que les configurations les plus occupées : au-delà, leur
-    // contribution est négligeable et le coût de résolution ne l'est pas.
-    std::vector<std::pair<uint32_t, uint64_t>> etats(occupation_.begin(),
-                                                     occupation_.end());
-    std::sort(etats.begin(), etats.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
-    if (etats.size() > kEtatsMax) etats.resize(kEtatsMax);
-
-    uint64_t total = 0;
-    for (const auto& etat : etats) total += etat.second;
-    occupation_.clear();
-    if (total == 0 || netlist_.instances().empty()) return;
-
-    std::map<std::string, double> courants;
-    std::map<std::string, double> tensions;
-    bool premier = true;
-    for (const auto& etat : etats) {
-        const double poids = static_cast<double>(etat.second) / total;
-        const std::string source =
-            analogique_.construire(netlist_, broches_pour(etat.first));
-        if (premier) {
-            source_spice_ = QString::fromStdString(source);
-            premier = false;
-        }
-        if (!analogique_.resoudre()) {
-            for (const auto& message : analogique_.erreurs())
-                emit journal(QString::fromStdString(message));
-            return;
-        }
-        for (const auto& mesure : analogique_.tous_courants())
-            courants[mesure.first] += mesure.second * poids;
-        for (const auto& mesure : analogique_.toutes_tensions())
-            tensions[mesure.first] += mesure.second * poids;
+    const double duree = static_cast<double>(cycles_ecoules) / mcu_.frequence();
+    if (duree <= 0 || netlist_.instances().empty()) {
+        commutations_.clear();
+        return;
     }
 
-    // Retour du circuit vers le microcontrôleur : c'est ce qui rend la boucle
-    // complète. Sans cela, un bouton ou un capteur ne serait jamais lu.
+    // Les broches partent de leur état en début de trame, puis suivent
+    // l'histoire réellement vécue par le microcontrôleur.
+    const std::vector<coeur::BrocheElectrique> broches =
+        broches_pour(masque_debut_);
+
+    std::map<int, std::string> noeud_de_broche;
+    for (const LiaisonBroche& liaison : broches_)
+        noeud_de_broche[liaison.numero] = liaison.noeud;
+
+    std::vector<coeur::TransitionBroche> transitions;
+    transitions.reserve(commutations_.size());
+    for (const Commutation& commutation : commutations_) {
+        auto it = noeud_de_broche.find(commutation.broche);
+        if (it == noeud_de_broche.end()) continue;
+        const double instant =
+            static_cast<double>(commutation.cycle - cycle_debut_) /
+            mcu_.frequence();
+        transitions.push_back({instant, it->second, commutation.haut ? 5.0 : 0.0});
+    }
+    commutations_.clear();
+
+    analogique_.definir_etat_initial(etat_);
+    source_spice_ = QString::fromStdString(analogique_.construire_transitoire(
+        netlist_, broches, transitions, duree, pas_));
+    if (!analogique_.resoudre_transitoire()) {
+        for (const auto& message : analogique_.erreurs())
+            emit journal(QString::fromStdString(message));
+        // Repartir d'un état propre plutôt que d'insister avec des conditions
+        // initiales qui pourraient être la cause de la non-convergence.
+        etat_.clear();
+        analogique_.oublier_etat();
+        return;
+    }
+    etat_ = analogique_.etat_final();
+
+    const coeur::Formes& formes = analogique_.formes();
+    emit trame_calculee(formes, instant_trame_);
+    instant_trame_ += duree;
+
+    // Ce qu'on affiche sur le schéma est la valeur moyenne sur la trame :
+    // c'est ce qu'indiquerait un multimètre, et c'est stable à l'œil. Le
+    // détail instantané, lui, est dans l'oscilloscope.
+    auto moyenne = [](const std::vector<double>& courbe) {
+        if (courbe.empty()) return 0.0;
+        double somme = 0;
+        for (double valeur : courbe) somme += valeur;
+        return somme / courbe.size();
+    };
+    auto moyenne_absolue = [](const std::vector<double>& courbe) {
+        if (courbe.empty()) return 0.0;
+        double somme = 0;
+        for (double valeur : courbe) somme += std::fabs(valeur);
+        return somme / courbe.size();
+    };
+
+    std::map<std::string, double> courants;
+    for (const auto& trace : formes.courants)
+        courants[trace.first] = moyenne_absolue(trace.second);
+    std::map<std::string, double> tensions;
+    for (const auto& trace : formes.tensions)
+        tensions[trace.first] = moyenne(trace.second);
+
+    // Retour du circuit vers le microcontrôleur. Ici, en revanche, c'est la
+    // valeur *finale* qui compte : le programme lit un niveau à un instant
+    // donné, pas une moyenne.
     for (const LiaisonBroche& liaison : broches_) {
+        if (mcu_.direction_sortie(liaison.numero)) continue;
         std::string noeud = liaison.noeud;
         std::transform(noeud.begin(), noeud.end(), noeud.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-        auto it = tensions.find(noeud);
-        if (it == tensions.end()) continue;
-        if (mcu_.direction_sortie(liaison.numero)) continue;
+        auto it = formes.tensions.find(noeud);
+        if (it == formes.tensions.end() || it->second.empty()) continue;
+        const double derniere = it->second.back();
         if (liaison.numero >= 14)
-            mcu_.definir_tension_adc(liaison.numero - 14, it->second);
-        mcu_.definir_niveau_externe(liaison.numero, it->second > 2.5);
+            mcu_.definir_tension_adc(liaison.numero - 14, derniere);
+        mcu_.definir_niveau_externe(liaison.numero, derniere > 2.5);
     }
 
     emit resultats(courants, tensions);
@@ -225,6 +260,12 @@ void MoteurSimulation::trame() {
 
     const uint64_t cycles = static_cast<uint64_t>(mcu_.frequence()) *
                             kPeriodeTrame / 1000;
+    // L'état de départ doit être relevé AVANT d'exécuter : les rappels de
+    // simavr vont modifier `masque_` pendant l'avancement.
+    cycle_debut_ = mcu_.cycle();
+    masque_debut_ = masque_;
+    commutations_.clear();
+
     const uint64_t executes = mcu_.avancer(cycles);
     resoudre_trame(executes);
 

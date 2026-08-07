@@ -31,6 +31,7 @@
 #include <map>
 
 #include "app/MoteurSimulation.h"
+#include "app/Oscilloscope.h"
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
 #include "app/schematic/SceneSchema.h"
@@ -114,6 +115,10 @@ FenetrePrincipale::FenetrePrincipale() {
         moniteur_serie_->insertPlainText(QString(QChar(octet)));
         moniteur_serie_->moveCursor(QTextCursor::End);
     });
+    connect(moteur_, &MoteurSimulation::trame_calculee, this,
+            [this](const coeur::Formes& formes, double instant) {
+                oscilloscope_->ajouter_trame(formes, instant);
+            });
     connect(moteur_, &MoteurSimulation::avancement, this,
             [this](double temps, double vitesse) {
                 etiquette_temps_->setText(
@@ -179,6 +184,7 @@ void FenetrePrincipale::construire_docks() {
 
     // --- programme et console, en onglets
     auto* onglets = new QTabWidget(this);
+    onglets_ = onglets;
 
     auto* page_source = new QWidget;
     auto* disposition = new QVBoxLayout(page_source);
@@ -202,6 +208,11 @@ void FenetrePrincipale::construire_docks() {
     moniteur_serie_->setReadOnly(true);
     moniteur_serie_->setFont(fonte);
     onglets->addTab(moniteur_serie_, "Moniteur série");
+
+    oscilloscope_ = new Oscilloscope;
+    onglets->addTab(oscilloscope_, "Oscilloscope");
+    connect(oscilloscope_, &Oscilloscope::resolution_souhaitee, this,
+            [this](double secondes) { moteur_->definir_resolution(secondes); });
 
     auto* dock_bas = new QDockWidget("Programme et journaux", this);
     dock_bas->setObjectName("dock_bas");
@@ -300,6 +311,8 @@ void FenetrePrincipale::construire_actions() {
                         [this] { charger_exemple(Exemple::PotentiometreLed); });
     exemples->addAction("Moteur commandé par transistor", this,
                         [this] { charger_exemple(Exemple::Transistor); });
+    exemples->addAction("PWM sur D9 (à observer à l'oscilloscope)", this,
+                        [this] { charger_exemple(Exemple::Pwm); });
 
     auto* aide = menuBar()->addMenu("&Aide");
     aide->addAction("À &propos", this, [this] {
@@ -368,6 +381,18 @@ QString FenetrePrincipale::dossier_travail() const {
 void FenetrePrincipale::circuit_modifie() {
     std::vector<LiaisonBroche> broches;
     coeur::Netlist netlist = scene_->construire_netlist(&broches);
+
+    // Signaux observables : la tension de chaque nœud, et le courant de
+    // chaque composant. L'oscilloscope suit donc le schéma sans réglage.
+    QStringList signaux;
+    for (const std::string& noeud : netlist.noeuds())
+        if (!noeud.empty()) signaux << QString::fromStdString(noeud);
+    for (const coeur::Instance& instance : netlist.instances())
+        signaux << QString("I(%1)").arg(
+            QString::fromStdString(instance.reference));
+    signaux.sort();
+    if (oscilloscope_) oscilloscope_->proposer_signaux(signaux);
+
     moteur_->definir_circuit(std::move(netlist), std::move(broches));
 }
 
@@ -641,7 +666,19 @@ void FenetrePrincipale::compiler_source() {
 // ---------------------------------------------------------------------------
 void FenetrePrincipale::lancer() {
     circuit_modifie();
+    if (oscilloscope_) oscilloscope_->sonder_par_defaut();
     moteur_->demarrer();
+}
+
+void FenetrePrincipale::definir_base_temps(double secondes) {
+    if (oscilloscope_) oscilloscope_->definir_base_temps(secondes);
+}
+
+double FenetrePrincipale::vitesse() const { return moteur_->vitesse(); }
+
+void FenetrePrincipale::afficher_onglet(int rang) {
+    if (onglets_ && rang >= 0 && rang < onglets_->count())
+        onglets_->setCurrentIndex(rang);
 }
 
 void FenetrePrincipale::suspendre() { moteur_->suspendre(); }
@@ -649,6 +686,7 @@ void FenetrePrincipale::suspendre() { moteur_->suspendre(); }
 void FenetrePrincipale::arreter() {
     moteur_->arreter();
     scene_->effacer_resultats();
+    if (oscilloscope_) oscilloscope_->vider();
 }
 
 void FenetrePrincipale::analyser_point_repos() {
@@ -714,6 +752,32 @@ int main(void) {
         _delay_ms(800);
         PORTB &= ~(1 << PB1);
         _delay_ms(800);
+    }
+}
+)";
+
+const char* kProgrammePwm = R"(/* PWM matérielle sur D9, à environ 490 Hz.
+   Le rapport cyclique monte puis redescend : la LED respire. Ouvrez
+   l'oscilloscope et réglez la base de temps sur 5 ms pour voir le créneau,
+   puis sur 2 s pour voir l'enveloppe. */
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void) {
+    DDRB |= (1 << PB1);              /* D9 = OC1A, en sortie */
+    /* PWM rapide 8 bits, sortie non inversée, horloge divisee par 64 */
+    TCCR1A = (1 << COM1A1) | (1 << WGM10);
+    TCCR1B = (1 << WGM12) | (1 << CS11) | (1 << CS10);
+
+    while (1) {
+        for (int rapport = 0; rapport < 255; rapport += 5) {
+            OCR1A = rapport;
+            _delay_ms(15);
+        }
+        for (int rapport = 255; rapport > 0; rapport -= 5) {
+            OCR1A = rapport;
+            _delay_ms(15);
+        }
     }
 }
 )";
@@ -784,6 +848,21 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             editeur_source_->setPlainText(kProgrammePotentiometre);
             ecrire("Exemple : potentiomètre sur A0, LED sur D13 au-delà de 50 %.");
             ecrire("Sélectionnez POT1 et déplacez le curseur pendant la simulation.");
+            break;
+        }
+        case Exemple::Pwm: {
+            ItemComposant* led = scene_->ajouter_composant("led", QPointF(60, -30));
+            ItemComposant* r = scene_->ajouter_composant("resistance", QPointF(190, -30));
+            ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(300, 60));
+            if (!led || !r || !masse) return;
+            r->valeurs["ohms"] = 220;
+            scene_->addItem(new ItemFil(carte, borne_nommee("D9"), led, 0));
+            scene_->addItem(new ItemFil(led, 1, r, 0));
+            scene_->addItem(new ItemFil(r, 1, masse, 0));
+            editeur_source_->setPlainText(kProgrammePwm);
+            ecrire("Exemple : PWM matérielle sur D9, rapport cyclique variable.");
+            ecrire("Ouvrez l'onglet Oscilloscope : base de temps 5 ms pour le "
+                   "créneau, 2 s pour l'enveloppe.");
             break;
         }
         case Exemple::Transistor: {

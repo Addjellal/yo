@@ -30,21 +30,31 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   opérationnel, régulateur 7805, capteurs (LDR, thermistance CTN, LM35),
   instruments de mesure.
 - **Simulation couplée** : la LED s'allume avec l'éclat correspondant au
-  courant réellement calculé, chaque fil affiche sa tension.
+  courant réellement calculé, chaque fil affiche sa tension moyenne.
+- **Oscilloscope quatre voies** : formes d'onde réelles issues de l'analyse
+  transitoire — tension d'un nœud ou courant d'un composant, base de temps de
+  2 ms à 5 s, mesures moyenne et crête, gel de l'écran. Les voies se règlent
+  seules au premier lancement.
 - **Compilation intégrée** : on écrit le programme C dans l'application,
   `F5` compile avec `avr-gcc` et charge le résultat.
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
 - **Enregistrement** du schéma et du programme dans un fichier `.schema.json`,
   **export** de la netlist SPICE.
-- **Quatre exemples** dans le menu *Exemples*, du clignotant au moteur commandé
-  par transistor.
+- **Cinq exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
+  potentiomètre sur l'ADC, moteur commandé par transistor, et PWM matérielle
+  à observer à l'oscilloscope.
 
 ## Ce que ça ne fait pas encore
 
 Autant le dire tout de suite, pour ne pas donner le change :
 
-- Pas d'analyse **transitoire** ni d'oscilloscope : la résolution se fait au
-  point de repos, image par image (voir « Comment le temps est géré »).
+- L'état électrique se transmet d'une fenêtre à la suivante par les **tensions
+  de nœud** (`.ic`). Les courants d'inductance, eux, repartent de zéro à chaque
+  trame : un circuit dont le comportement dépend de l'énergie stockée dans une
+  bobine sur plus de 25 ms sera donc approximé.
+- Ce que le circuit renvoie au microcontrôleur sur une **entrée** est la valeur
+  de fin de trame : il y a jusqu'à 25 ms de retard sur ce chemin-là. Le chemin
+  inverse — le programme qui pilote le circuit — est daté au cycle près.
 - Pas de composants **numériques complexes** (74HC595, écran LCD, I²C, SPI vers
   périphériques) : il faudrait un moteur de simulation numérique événementiel
   en plus des deux existants.
@@ -67,7 +77,7 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur      # 46 tests, sans écran
+./build/tests_coeur      # 58 tests, sans écran
 ./build/simulateur       # l'application
 ```
 
@@ -127,8 +137,9 @@ simulateur/
 │   └── app/                         ← tout ce qui dépend de Qt
 │       ├── FenetrePrincipale.{h,cpp}
 │       ├── MoteurSimulation.{h,cpp}   couplage des deux moteurs
+│       ├── Oscilloscope.{h,cpp}       quatre voies, tracé min/max
 │       └── schematic/                 scène, vue, composants, fils
-└── tests/test_coeur.cpp             46 tests, sans écran
+└── tests/test_coeur.cpp             58 tests, sans écran
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt,
@@ -169,20 +180,42 @@ avant d'atteindre l'utilisateur.
 
 ## Comment le temps est géré
 
-C'est le point qui décide de la justesse d'un simulateur mixte.
+C'est le point qui décide de la justesse d'un simulateur mixte — et c'est lui
+qui rend l'oscilloscope possible.
 
 Le microcontrôleur change d'état des milliers de fois par seconde ; une PWM à
-490 Hz commute presque mille fois. Résoudre le circuit à chaque commutation
-serait exact mais hors de portée en temps réel.
+490 Hz commute presque mille fois. On ne peut pas lancer une analyse
+transitoire de 25 ms d'un seul bloc, puisque le programme modifie le circuit
+pendant ce temps-là.
 
-À chaque image (25 ms), l'application note **combien de temps** le
-microcontrôleur a passé dans chaque configuration de broches, puis ne résout
-**qu'une fois par configuration distincte** en pondérant par la durée.
+La sortie tient dans une observation : **simavr date chaque commutation au
+cycle d'horloge près**. À chaque image, on transcrit donc cette histoire en
+sources SPICE linéaires par morceaux (`PWL`), et ngspice calcule le
+transitoire complet de la fenêtre. Le circuit n'est jamais figé : les
+condensateurs se chargent, les fronts existent, et la courbe qui en sort est
+celle du circuit réel. L'état se transmet d'une fenêtre à la suivante par les
+conditions initiales (`.ic`).
 
 Ce détail compte : moyenner les *tensions* d'une PWM à 25 % donnerait 1,25 V
-sur la LED, donc une LED éteinte — alors qu'en réalité elle reçoit le plein
-courant un quart du temps et brille au quart de son éclat. Le code est dans
-`MoteurSimulation::resoudre_trame`.
+sur une LED, donc une LED éteinte — alors qu'en réalité elle reçoit le plein
+courant un quart du temps. Le code est dans
+`MoteurSimulation::resoudre_trame` et
+`NgspiceEngine::construire_transitoire`.
+
+**Coût.** Mesuré sur cette machine, avec le pas de calcul par défaut (50 µs,
+soit un échantillon toutes les 50 µs) : environ **4× le temps réel** sur le
+clignotant, **1,25×** sur la PWM matérielle, oscilloscope affiché. Deux
+décisions y sont pour beaucoup :
+
+- les broches de carte qui ne sont reliées à rien ne sont pas mises dans le
+  circuit — sur une carte à vingt broches dont une seule est câblée, c'était
+  l'essentiel du coût ;
+- l'oscilloscope trace par colonne de pixels, en relevant le minimum et le
+  maximum de chacune. Un créneau garde ses fronts même quand la fenêtre
+  contient cent fois plus de points que l'écran n'a de pixels.
+
+Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
+5 µs.
 
 ---
 
@@ -192,7 +225,7 @@ courant un quart du temps et brille au quart de son éclat. Le code est dans
 ./build/tests_coeur
 ```
 
-46 tests, sans écran, répartis en huit sections :
+58 tests, sans écran, répartis en neuf sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -204,13 +237,20 @@ courant un quart du temps et brille au quart de son éclat. Le code est dans
 | 6 | conversion analogique-numérique |
 | 7 | **tout le catalogue** passe dans ngspice |
 | 8 | physique des modèles : diode, CTN, LDR, NON-ET, ampli op, 7805, relais |
+| 9 | **analyse transitoire** : charge d'un RC comparée à la théorie (3,16 V à une constante de temps), reprise d'état entre fenêtres, PWM à 25 % |
 
 L'application se vérifie aussi sans intervention :
 
 ```bash
-./build/simulateur --exemple 2 --diagnostic     # netlist, SPICE, tensions
-./build/simulateur --capture image.png 2500     # compile, simule, capture
+./build/simulateur --exemple 2 --diagnostic          # netlist, SPICE, tensions
+./build/simulateur --capture image.png 2500          # compile, simule, capture
+./build/simulateur --exemple 4 --onglet 3 --base 0.005 \
+                   --capture pwm.png 6000            # la PWM à l'oscilloscope
 ```
+
+`--onglet` choisit le panneau du bas (0 programme, 1 journal, 2 série,
+3 oscilloscope), `--base` impose la base de temps en secondes. La capture
+imprime aussi la vitesse de simulation atteinte.
 
 ---
 

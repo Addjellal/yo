@@ -167,6 +167,10 @@ void AvrEngine::envoyer_octet_serie(uint8_t octet) {
         avr_raise_irq(irq, octet);
 }
 
+uint64_t AvrEngine::cycle() const {
+    return impl_->avr ? impl_->avr->cycle : cycle_;
+}
+
 uint8_t AvrEngine::registre(uint16_t adresse) const {
     if (!impl_->avr || adresse >= impl_->avr->ramend) return 0;
     return impl_->avr->data[adresse];
@@ -201,6 +205,7 @@ uint64_t AvrEngine::avancer(uint64_t) { return 0; }
 void AvrEngine::reinitialiser() {}
 void AvrEngine::definir_tension_adc(int, double) {}
 void AvrEngine::envoyer_octet_serie(uint8_t) {}
+uint64_t AvrEngine::cycle() const { return cycle_; }
 uint8_t AvrEngine::registre(uint16_t) const { return 0; }
 void AvrEngine::definir_niveau_externe(int, bool) {}
 

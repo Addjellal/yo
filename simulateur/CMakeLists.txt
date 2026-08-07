@@ -87,6 +87,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/main.cpp
     src/app/FenetrePrincipale.cpp
     src/app/MoteurSimulation.cpp
+    src/app/Oscilloscope.cpp
     src/app/schematic/SceneSchema.cpp
     src/app/schematic/VueSchema.cpp
     src/app/schematic/ItemComposant.cpp

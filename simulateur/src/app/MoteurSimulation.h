@@ -5,13 +5,16 @@
 // presque mille fois), alors qu'il est inutile — et hors de portée — de
 // résoudre le circuit aussi souvent.
 //
-// La solution retenue est celle des simulateurs mixtes : pendant une trame
-// d'affichage, on note *combien de temps* le microcontrôleur a passé dans
-// chaque configuration de broches ; en fin de trame on ne résout qu'une fois
-// par configuration distincte, et on pondère les résultats par leur durée.
-// Une LED en PWM à 25 % reçoit ainsi le courant de la pleine conduction
-// pendant un quart du temps — ce qui est la réalité physique — au lieu de la
-// moyenne des tensions, qui l'éteindrait à tort.
+// La solution retenue est celle des simulateurs mixtes. simavr date chaque
+// commutation au cycle d'horloge près ; on transcrit cette histoire en
+// sources SPICE linéaires par morceaux, et ngspice calcule le transitoire de
+// toute la trame d'un coup. Le circuit n'est donc jamais figé : les
+// condensateurs se chargent, les fronts existent, et une forme d'onde
+// exploitable en sort — c'est ce qui rend l'oscilloscope possible.
+//
+// L'état électrique se transmet d'une fenêtre à la suivante par les
+// conditions initiales, sans quoi chaque trame repartirait d'un circuit
+// déchargé.
 #pragma once
 
 #include <QObject>
@@ -48,6 +51,10 @@ public:
     bool firmware_charge() const { return firmware_charge_; }
 
     double temps_ms() const { return mcu_.temps_ms(); }
+    // Pas d'échantillonnage de l'analyse transitoire, en secondes. Plus il est
+    // fin, plus l'oscilloscope est précis et plus la simulation coûte cher.
+    void definir_resolution(double secondes);
+    double resolution() const { return pas_; }
     double vitesse() const { return vitesse_; }
     const QString& source_spice() const { return source_spice_; }
     const coeur::Netlist& netlist() const { return netlist_; }
@@ -62,6 +69,9 @@ public:
 signals:
     void resultats(const std::map<std::string, double>& courants,
                    const std::map<std::string, double>& tensions);
+    // Formes d'onde de la trame qui vient d'être calculée, avec l'instant de
+    // son début en secondes de temps simulé.
+    void trame_calculee(const coeur::Formes& formes, double instant_debut);
     void octet_serie(char octet);
     void journal(const QString& message);
     void avancement(double temps_ms, double vitesse);
@@ -80,10 +90,19 @@ private:
     double vitesse_ = 0.0;
     QString source_spice_;
 
-    // Occupation temporelle de chaque configuration de broches, sur la trame.
-    std::map<uint32_t, uint64_t> occupation_;
-    uint32_t masque_ = 0;
-    uint64_t cycle_repere_ = 0;
+    // Histoire des commutations de la trame en cours, datée au cycle près.
+    struct Commutation {
+        uint64_t cycle = 0;
+        int broche = 0;
+        bool haut = false;
+    };
+    std::vector<Commutation> commutations_;
+    uint32_t masque_ = 0;          // état courant des broches
+    uint32_t masque_debut_ = 0;    // état au début de la trame
+    uint64_t cycle_debut_ = 0;
+    double pas_ = 50e-6;           // résolution de l'analyse transitoire
+    double instant_trame_ = 0.0;   // horloge absolue, pour l'oscilloscope
+    std::map<std::string, double> etat_;   // tensions reprises d'une trame à l'autre
 
     void brancher_rappels();
     void noter_changement(int broche, bool haut);
