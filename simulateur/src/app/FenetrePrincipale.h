@@ -74,6 +74,11 @@ public:
     // Base de temps de l'oscilloscope, en secondes (vérification).
     void definir_base_temps(double secondes);
 
+    // Entrée/sortie séparées des boîtes de dialogue : la lecture et
+    // l'écriture d'un projet sont ainsi vérifiables sans interface.
+    bool enregistrer_vers(const QString& chemin);
+    bool ouvrir_depuis(const QString& chemin);
+
     SceneSchema* scene() const { return scene_; }
     VueSchema* vue() const { return vue_; }
 
@@ -100,6 +105,10 @@ private slots:
     void changer_carte(const QString& reference);
 
 private:
+    // Aligne le sélecteur sur les cartes du schéma et garantit que
+    // `carte_courante_` désigne toujours une carte existante.
+    void synchroniser_cartes(const QStringList& cartes);
+
     SceneSchema* scene_ = nullptr;
     VueSchema* vue_ = nullptr;
     MoteurSimulation* moteur_ = nullptr;

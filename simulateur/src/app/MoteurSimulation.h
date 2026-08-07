@@ -62,8 +62,11 @@ public:
     // Au moins une carte a un firmware.
     bool un_firmware_au_moins() const;
 
+    // `cartes` énumère les cartes posées sur le schéma, câblées ou non :
+    // c'est elle qui fait foi, pas les broches reliées.
     void definir_circuit(coeur::Netlist netlist,
-                         std::vector<LiaisonBroche> broches);
+                         std::vector<LiaisonBroche> broches,
+                         const QStringList& cartes);
 
     void demarrer();
     void suspendre();
@@ -147,7 +150,9 @@ private:
     void noter_changement(Carte& carte, int broche, bool haut);
     void remettre_a_zero();
 
-    std::vector<coeur::BrocheElectrique> broches_au_depart() const;
+    // `au_depart` : état des broches au début du pas de couplage (analyse
+    // transitoire) ou état courant (analyse au point de repos).
+    std::vector<coeur::BrocheElectrique> broches_pour(bool au_depart) const;
     void resoudre_trame(uint64_t cycles_ecoules);
     // Un pas de couplage complet : exécution puis résolution.
     uint64_t executer_pas(uint64_t cycles);

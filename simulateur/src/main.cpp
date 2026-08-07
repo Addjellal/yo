@@ -64,6 +64,30 @@ int main(int argc, char** argv) {
             qApp->quit();
         });
     }
+    // « --aller-retour fichier » : enregistre le projet courant, le rouvre,
+    // et imprime ce qui a survécu. Vérifie l'entrée/sortie sans interface.
+    const int aller = arguments.indexOf("--aller-retour");
+    if (aller >= 0 && aller + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const QString chemin = arguments.at(aller + 1);
+        QTimer::singleShot(200, &fenetre, [&fenetre, chemin] {
+            QTextStream sortie(stdout);
+            sortie << "--- avant ---" << Qt::endl << fenetre.diagnostic();
+            if (!fenetre.enregistrer_vers(chemin)) {
+                sortie << "ECHEC enregistrement" << Qt::endl;
+                qApp->quit();
+                return;
+            }
+            if (!fenetre.ouvrir_depuis(chemin)) {
+                sortie << "ECHEC ouverture" << Qt::endl;
+                qApp->quit();
+                return;
+            }
+            sortie << "--- apres ---" << Qt::endl << fenetre.diagnostic();
+            qApp->quit();
+        });
+    }
+
     // « --diagnostic » : compile, exécute une seconde, imprime l'état
     // complet du couplage puis quitte. Vérification sans écran.
     if (arguments.contains("--diagnostic")) {

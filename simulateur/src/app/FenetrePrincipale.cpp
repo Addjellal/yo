@@ -427,26 +427,34 @@ void FenetrePrincipale::circuit_modifie() {
     signaux.sort();
     if (oscilloscope_) oscilloscope_->proposer_signaux(signaux);
 
-    moteur_->definir_circuit(std::move(netlist), std::move(broches));
+    const QStringList cartes = scene_->cartes_presentes();
+    moteur_->definir_circuit(std::move(netlist), std::move(broches), cartes);
+    synchroniser_cartes(cartes);
+}
 
-    // Le sélecteur suit les cartes réellement posées sur le schéma.
+// Le sélecteur suit les cartes réellement posées. Cette méthode doit toujours
+// laisser `carte_courante_` sur une carte existante : si elle restait vide, le
+// programme affiché ne serait rattaché à personne et le prochain changement
+// l'écraserait sans l'avoir rangé.
+void FenetrePrincipale::synchroniser_cartes(const QStringList& cartes) {
     if (!selecteur_carte_) return;
-    const QStringList cartes = moteur_->cartes();
+
     QStringList actuelles;
     for (int k = 0; k < selecteur_carte_->count(); ++k)
         actuelles << selecteur_carte_->itemText(k);
-    if (actuelles == cartes) return;
 
-    const QString choix = selecteur_carte_->currentText();
-    {
+    if (actuelles != cartes) {
+        const QString choix = selecteur_carte_->currentText();
         const QSignalBlocker silence(selecteur_carte_);
         selecteur_carte_->clear();
         selecteur_carte_->addItems(cartes);
         const int rang = selecteur_carte_->findText(choix);
         selecteur_carte_->setCurrentIndex(rang >= 0 ? rang : 0);
+        selecteur_carte_->setEnabled(cartes.size() > 1);
     }
-    selecteur_carte_->setEnabled(cartes.size() > 1);
-    changer_carte(selecteur_carte_->currentText());
+
+    const QString voulue = selecteur_carte_->currentText();
+    if (voulue != carte_courante_) changer_carte(voulue);
 }
 
 void FenetrePrincipale::changer_carte(const QString& reference) {
@@ -561,6 +569,8 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
 void FenetrePrincipale::nouveau_projet() {
     scene_->tout_effacer();
     chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
     circuit_modifie();
     ecrire("Nouveau schéma.");
 }
@@ -570,6 +580,10 @@ void FenetrePrincipale::enregistrer_projet() {
         this, "Enregistrer le schéma", chemin_projet_,
         "Schéma (*.schema.json);;Tous les fichiers (*)");
     if (chemin.isEmpty()) return;
+    enregistrer_vers(chemin);
+}
+
+bool FenetrePrincipale::enregistrer_vers(const QString& chemin) {
 
     QJsonArray composants;
     std::map<const ItemComposant*, int> index;
@@ -610,16 +624,24 @@ void FenetrePrincipale::enregistrer_projet() {
     racine["version"] = 1;
     racine["composants"] = composants;
     racine["fils"] = fils;
-    racine["programme"] = editeur_source_->toPlainText();
+    // Un programme par carte : n'en garder qu'un perdrait celui des autres.
+    if (!carte_courante_.isEmpty())
+        programmes_[carte_courante_] = editeur_source_->toPlainText();
+    QJsonObject programmes;
+    for (const auto& paire : programmes_)
+        programmes[paire.first] = paire.second;
+    racine["programmes"] = programmes;
+    racine["programme"] = editeur_source_->toPlainText();   // anciens fichiers
 
     QFile fichier(chemin);
     if (!fichier.open(QIODevice::WriteOnly)) {
         avertir("Enregistrement", "Impossible d'écrire " + chemin);
-        return;
+        return false;
     }
     fichier.write(QJsonDocument(racine).toJson(QJsonDocument::Indented));
     chemin_projet_ = chemin;
     ecrire("Schéma enregistré : " + chemin);
+    return true;
 }
 
 void FenetrePrincipale::ouvrir_projet() {
@@ -627,10 +649,14 @@ void FenetrePrincipale::ouvrir_projet() {
         this, "Ouvrir un schéma", QString(),
         "Schéma (*.schema.json *.json);;Tous les fichiers (*)");
     if (chemin.isEmpty()) return;
+    ouvrir_depuis(chemin);
+}
+
+bool FenetrePrincipale::ouvrir_depuis(const QString& chemin) {
     QFile fichier(chemin);
     if (!fichier.open(QIODevice::ReadOnly)) {
         avertir("Ouverture", "Impossible de lire " + chemin);
-        return;
+        return false;
     }
     const QJsonObject racine =
         QJsonDocument::fromJson(fichier.readAll()).object();
@@ -667,13 +693,33 @@ void FenetrePrincipale::ouvrir_projet() {
         scene_->addItem(new ItemFil(ajoutes[a], objet["borne_a"].toInt(),
                                     ajoutes[b], objet["borne_b"].toInt()));
     }
-    if (racine.contains("programme"))
-        editeur_source_->setPlainText(racine["programme"].toString());
+    // Les programmes de l'ancien projet ne doivent pas déborder sur le
+    // nouveau : on repart d'une table vide.
+    programmes_.clear();
+    carte_courante_.clear();
+    const QJsonObject programmes = racine["programmes"].toObject();
+    for (auto it = programmes.begin(); it != programmes.end(); ++it)
+        programmes_[it.key()] = it.value().toString();
+    if (programmes_.empty() && racine.contains("programme")) {
+        // Fichier d'une version antérieure : un seul programme, pour la
+        // première carte.
+        const QStringList cartes = scene_->cartes_presentes();
+        if (!cartes.isEmpty())
+            programmes_[cartes.first()] = racine["programme"].toString();
+    }
 
     chemin_projet_ = chemin;
     circuit_modifie();
+    // Après recensement des cartes, on réaffiche le programme de celle qui est
+    // sélectionnée : `changer_carte` a pu s'exécuter avant le chargement de
+    // `programmes_`.
+    const QString affichee = carte_courante_;
+    carte_courante_.clear();
+    changer_carte(affichee.isEmpty() ? scene_->cartes_presentes().value(0)
+                                     : affichee);
     vue_->ajuster();
     ecrire("Schéma ouvert : " + chemin);
+    return true;
 }
 
 void FenetrePrincipale::exporter_netlist_spice() {
@@ -913,6 +959,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
     carte_courante_.clear();
     ItemComposant* carte = scene_->ajouter_composant("arduino_uno", QPointF(-320, 0));
     if (!carte) return;
+    QString programme;
     auto borne_nommee = [carte](const QString& nom) {
         for (int k = 0; k < carte->nb_bornes(); ++k)
             if (carte->nom_borne(k) == nom) return k;
@@ -929,7 +976,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D13"), led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
-            editeur_source_->setPlainText(kSourceExemple);
+            programme = QString::fromUtf8(kSourceExemple);
             ecrire("Exemple : clignotant sur D13 (LED rouge + 220 Ω).");
             break;
         }
@@ -946,7 +993,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(r, 1, masse, 0));
             scene_->addItem(new ItemFil(carte, borne_nommee("D2"), bouton, 0));
             scene_->addItem(new ItemFil(bouton, 1, masse2, 0));
-            editeur_source_->setPlainText(kProgrammeBouton);
+            programme = QString::fromUtf8(kProgrammeBouton);
             ecrire("Exemple : bouton sur D2 avec pull-up interne, LED sur D13.");
             ecrire("Sélectionnez BP1 et mettez « Appuyé » à 1 pendant la simulation.");
             break;
@@ -968,7 +1015,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(pot, 0, alim, 0));       // A -> +5 V
             scene_->addItem(new ItemFil(pot, 1, carte, borne_nommee("A0")));
             scene_->addItem(new ItemFil(pot, 2, masse2, 0));     // B -> masse
-            editeur_source_->setPlainText(kProgrammePotentiometre);
+            programme = QString::fromUtf8(kProgrammePotentiometre);
             ecrire("Exemple : potentiomètre sur A0, LED sur D13 au-delà de 50 %.");
             ecrire("Sélectionnez POT1 et déplacez le curseur pendant la simulation.");
             break;
@@ -982,7 +1029,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D9"), led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
-            editeur_source_->setPlainText(kProgrammePwm);
+            programme = QString::fromUtf8(kProgrammePwm);
             ecrire("Exemple : PWM matérielle sur D9, rapport cyclique variable.");
             ecrire("Ouvrez l'onglet Oscilloscope : base de temps 5 ms pour le "
                    "créneau, 2 s pour l'enveloppe.");
@@ -1003,13 +1050,22 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(q, 1, moteur, 1));       // collecteur
             scene_->addItem(new ItemFil(moteur, 0, alim, 0));    // moteur -> +5 V
             scene_->addItem(new ItemFil(q, 2, masse, 0));        // émetteur
-            editeur_source_->setPlainText(kProgrammeTransistor);
+            programme = QString::fromUtf8(kProgrammeTransistor);
             ecrire("Exemple : moteur commandé par transistor NPN sur D9.");
             break;
         }
     }
 
+    // L'ordre compte. `circuit_modifie` recense la carte et remplit le
+    // sélecteur ; le programme doit être rangé dans `programmes_` avant qu'on
+    // demande son affichage, sinon c'est le programme par défaut qui
+    // s'imposerait — y compris plus tard, quand le signal différé de la scène
+    // relancera la synchronisation.
     circuit_modifie();
+    programmes_[carte->reference()] = programme;
+    carte_courante_.clear();
+    changer_carte(carte->reference());
+
     vue_->ajuster();
     ecrire("Compilez le programme (F5) puis lancez la simulation.");
 }
@@ -1058,9 +1114,11 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
     circuit_modifie();
     programmes_[u1->reference()] = QString::fromUtf8(kProgrammeEmetteur);
     programmes_[u2->reference()] = QString::fromUtf8(kProgrammeRecepteur);
+    // Les programmes viennent d'être posés : on réaffiche celui de la carte
+    // sélectionnée pour que l'éditeur montre le bon.
+    const QString affichee = carte_courante_;
     carte_courante_.clear();
-    changer_carte(selecteur_carte_ ? selecteur_carte_->currentText()
-                                   : u1->reference());
+    changer_carte(affichee.isEmpty() ? u1->reference() : affichee);
 
     vue_->ajuster();
     ecrire("Exemple : deux cartes Arduino, deux programmes différents.");
@@ -1074,6 +1132,13 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
 QString FenetrePrincipale::diagnostic() {
     circuit_modifie();
     QString rapport;
+    rapport += QString("=== Carte courante : %1 ===\n")
+                   .arg(carte_courante_.isEmpty() ? "(aucune)" : carte_courante_);
+    rapport += "programme affiché : " +
+               editeur_source_->toPlainText().split('\n').value(0) + "\n";
+    for (const auto& paire : programmes_)
+        rapport += QString("  %1 -> %2\n")
+                       .arg(paire.first, paire.second.split('\n').value(0));
     rapport += "=== Composants du schéma ===\n";
     for (ItemComposant* item : scene_->composants()) {
         rapport += QString("  %1 (%2)")

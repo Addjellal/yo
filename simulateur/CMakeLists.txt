@@ -104,6 +104,10 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   add_executable(tests_schema tests/test_schema.cpp)
   target_link_libraries(tests_schema PRIVATE schema)
   add_test(NAME schema COMMAND tests_schema)
+  # Sans écran, Qt tente le greffon xcb et abandonne : ctest doit lui imposer
+  # le rendu hors écran.
+  set_tests_properties(schema PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
   message(STATUS "Application Qt : activée (Qt ${Qt6_VERSION})")
 else()
   message(STATUS "Application Qt : désactivée (Qt6 introuvable) — le cœur reste compilable")

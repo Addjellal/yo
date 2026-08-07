@@ -129,7 +129,14 @@ bool MoteurSimulation::charger_firmware(const QString& chemin, QString* erreur,
     // `charger` réinitialise le cœur : il faut rebrancher les rappels.
     brancher_rappels(c);
     c.firmware_charge = true;
-    remettre_a_zero();
+    // Seule cette carte repart de zéro. Effacer les masques des autres les
+    // ferait paraître à 0 V jusqu'à leur prochaine écriture sur un port —
+    // soit, dans l'exemple à deux cartes, jusqu'à 300 ms de LED éteinte à
+    // tort.
+    c.masque = 0;
+    c.masque_debut = 0;
+    c.cycle_debut = 0;
+    c.commutations.clear();
     emit journal(QString("Firmware chargé sur %1 : %2")
                      .arg(cible, QFileInfo(chemin).fileName()));
     return true;
@@ -175,31 +182,26 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
 
 // ---------------------------------------------------------------------------
 void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
-                                       std::vector<LiaisonBroche> broches) {
+                                       std::vector<LiaisonBroche> broches,
+                                       const QStringList& cartes) {
     netlist_ = std::move(netlist);
     broches_ = std::move(broches);
 
     // Les cartes du schéma peuvent avoir changé. On crée celles qui
     // apparaissent, on retire celles qui ont disparu — mais on garde le
     // firmware déjà chargé sur celles qui restent.
-    QStringList presentes;
-    for (const LiaisonBroche& liaison : broches_) {
-        const QString reference = QString::fromStdString(liaison.carte);
-        if (reference.isEmpty() || presentes.contains(reference)) continue;
-        presentes << reference;
-        obtenir_carte(reference);
-    }
+    for (const QString& reference : cartes)
+        if (!reference.isEmpty()) obtenir_carte(reference);
     for (auto it = cartes_.begin(); it != cartes_.end();) {
-        if (presentes.contains(it->first)) {
+        if (cartes.contains(it->first)) {
             ++it;
             continue;
         }
-        ordre_cartes_.removeAll(it->first);
         it = cartes_.erase(it);
     }
     // Ordre stable : celui des références, pour que « la première carte »
     // veuille dire quelque chose.
-    ordre_cartes_ = presentes;
+    ordre_cartes_ = cartes;
     ordre_cartes_.sort();
 }
 
@@ -265,8 +267,8 @@ void MoteurSimulation::definir_resolution(double secondes) {
     pas_ = secondes;
 }
 
-std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_au_depart()
-    const {
+std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
+    bool au_depart) const {
     std::vector<coeur::BrocheElectrique> resultat;
     resultat.reserve(broches_.size());
     for (const LiaisonBroche& liaison : broches_) {
@@ -284,8 +286,9 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_au_depart()
         const coeur::AvrEngine& mcu = *cible->mcu;
         if (mcu.direction_sortie(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::Sortie;
-            broche.tension =
-                (cible->masque_debut >> liaison.numero) & 1u ? 5.0 : 0.0;
+            const uint32_t masque =
+                au_depart ? cible->masque_debut : cible->masque;
+            broche.tension = (masque >> liaison.numero) & 1u ? 5.0 : 0.0;
             broche.resistance = 25.0;      // résistance de sortie d'un AVR
         } else if (mcu.pullup_actif(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::PullUp;
@@ -302,12 +305,14 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     const uint32_t frequence =
         cartes_.empty() ? 16000000 : cartes_.begin()->second->mcu->frequence();
     const double duree = static_cast<double>(cycles_ecoules) / frequence;
-    if (duree <= 0 || netlist_.instances().empty()) {
+    // Un circuit sans composant reste simulable dès qu'il porte des broches :
+    // c'est le cas de deux cartes reliées directement l'une à l'autre.
+    if (duree <= 0 || (netlist_.instances().empty() && broches_.empty())) {
         for (auto& paire : cartes_) paire.second->commutations.clear();
         return;
     }
 
-    const std::vector<coeur::BrocheElectrique> broches = broches_au_depart();
+    const std::vector<coeur::BrocheElectrique> broches = broches_pour(true);
 
     // Les commutations de toutes les cartes sont fondues dans une seule
     // analyse : elles partagent le circuit, donc elles partagent la fenêtre.
@@ -404,7 +409,9 @@ void MoteurSimulation::resoudre_une_fois() {
         return;
     }
     source_spice_ = QString::fromStdString(
-        analogique_.construire(netlist_, broches_au_depart()));
+        // Point de repos : c'est l'état actuel qui compte, pas celui du
+        // début du dernier pas de couplage.
+        analogique_.construire(netlist_, broches_pour(false)));
     if (!analogique_.resoudre()) {
         for (const auto& message : analogique_.erreurs())
             emit journal(QString::fromStdString(message));

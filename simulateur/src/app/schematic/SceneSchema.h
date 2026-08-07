@@ -7,6 +7,7 @@
 
 #include <QGraphicsScene>
 #include <QString>
+#include <QStringList>
 
 #include <map>
 #include <string>
@@ -44,6 +45,11 @@ public:
     coeur::Netlist construire_netlist(std::vector<LiaisonBroche>* broches) const;
 
     // Nom du nœud rattaché à une borne (après construction de la netlist).
+    // Références des cartes programmables posées, câblées ou non. La liste
+    // des broches ne suffit pas : une carte seule sur un schéma vide n'a
+    // aucune broche reliée, et resterait pourtant à programmer.
+    QStringList cartes_presentes() const;
+
     std::vector<ItemComposant*> composants() const;
     std::vector<ItemFil*> fils() const;
 

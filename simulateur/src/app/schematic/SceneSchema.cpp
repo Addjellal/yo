@@ -113,6 +113,15 @@ std::vector<ItemComposant*> SceneSchema::composants() const {
     return resultat;
 }
 
+QStringList SceneSchema::cartes_presentes() const {
+    QStringList resultat;
+    for (ItemComposant* composant : composants())
+        if (composant->modele() && composant->modele()->carte)
+            resultat << composant->reference();
+    resultat.sort();
+    return resultat;
+}
+
 std::vector<ItemFil*> SceneSchema::fils() const {
     std::vector<ItemFil*> resultat;
     for (QGraphicsItem* item : items())

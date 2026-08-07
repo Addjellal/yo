@@ -276,6 +276,43 @@ static void test_deux_cartes() {
 }
 
 // ---------------------------------------------------------------------------
+static void test_cartes_non_cablees() {
+    std::printf("\n[5] Cartes posées mais pas encore câblées\n");
+    SceneSchema scene;
+
+    // Une carte seule sur un schéma vide n'a aucune broche reliée. Elle doit
+    // pourtant être reconnue : sinon elle serait impossible à programmer, et
+    // c'est exactement l'état d'un schéma qu'on commence.
+    ItemComposant* carte = scene.ajouter_composant("arduino_uno", QPointF(0, 0));
+    verifier(carte != nullptr, "la carte est posée");
+    verifier(scene.cartes_presentes().size() == 1,
+             "une carte non câblée est tout de même recensée",
+             std::to_string(scene.cartes_presentes().size()) + " carte(s)");
+
+    std::vector<LiaisonBroche> broches;
+    coeur::Netlist netlist = scene.construire_netlist(&broches);
+    verifier(broches.empty(),
+             "et elle ne déclare aucune broche, puisqu'aucune n'est reliée",
+             std::to_string(broches.size()) + " broche(s)");
+    verifier(netlist.instances().empty(), "la netlist est vide, sans erreur");
+
+    // Trois cartes, dont deux sans le moindre fil.
+    scene.ajouter_composant("arduino_uno", QPointF(400, 0));
+    scene.ajouter_composant("arduino_uno", QPointF(800, 0));
+    verifier(scene.cartes_presentes().size() == 3,
+             "trois cartes posées, trois cartes recensées",
+             std::to_string(scene.cartes_presentes().size()) + " cartes");
+
+    // Après suppression, la carte ne doit plus figurer dans le recensement.
+    for (ItemComposant* item : scene.composants())
+        if (item->reference() == carte->reference()) item->setSelected(true);
+    scene.supprimer_selection();
+    verifier(scene.cartes_presentes().size() == 2,
+             "une carte supprimée disparaît du recensement",
+             std::to_string(scene.cartes_presentes().size()) + " cartes");
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -286,6 +323,7 @@ int main(int argc, char** argv) {
     test_dix_led();
     test_masses_multiples();
     test_deux_cartes();
+    test_cartes_non_cablees();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {
