@@ -1,5 +1,6 @@
 #include "core/engines/AvrEngine.h"
 
+#include "core/engines/CoeurAvr.h"
 #include "core/engines/noyau_arduino.h"
 
 #include <array>
@@ -53,7 +54,8 @@ struct ContexteBroche {
 };
 
 struct AvrEngine::Impl {
-    avr_t* avr = nullptr;
+    CoeurAvr coeur;                       // le cœur écrit ici
+    avr_t* avr = nullptr;                 // simavr, si on le préfère
     elf_firmware_t firmware = {};
     AvrEngine* proprietaire = nullptr;
     std::array<ContexteBroche, 20> contextes = {};
@@ -80,10 +82,9 @@ AvrEngine::~AvrEngine() {
 }
 
 bool AvrEngine::compile_avec_simavr() { return true; }
-bool AvrEngine::disponible() const { return true; }
 
-bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
-                        uint32_t frequence) {
+bool AvrEngine::charger_simavr(const std::string& chemin,
+                               const std::string& mcu, uint32_t frequence) {
     erreur_.clear();
     frequence_ = frequence;
     cycle_ = 0;
@@ -134,7 +135,7 @@ bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
     return true;
 }
 
-uint64_t AvrEngine::avancer(uint64_t cycles) {
+uint64_t AvrEngine::avancer_simavr(uint64_t cycles) {
     if (!impl_->avr) return 0;
     const uint64_t depart = impl_->avr->cycle;
     const uint64_t but = depart + cycles;
@@ -146,14 +147,14 @@ uint64_t AvrEngine::avancer(uint64_t cycles) {
     return cycle_ - depart;
 }
 
-void AvrEngine::reinitialiser() {
+void AvrEngine::reinitialiser_simavr() {
     if (impl_->avr) {
         avr_reset(impl_->avr);
         cycle_ = 0;
     }
 }
 
-void AvrEngine::definir_tension_adc(int canal, double volts) {
+void AvrEngine::adc_simavr(int canal, double volts) {
     if (!impl_->avr) return;
     if (volts < 0) volts = 0;
     if (volts > 5) volts = 5;
@@ -162,23 +163,23 @@ void AvrEngine::definir_tension_adc(int canal, double volts) {
     if (irq) avr_raise_irq(irq, static_cast<uint32_t>(volts * 1000.0));
 }
 
-void AvrEngine::envoyer_octet_serie(uint8_t octet) {
+void AvrEngine::serie_simavr(uint8_t octet) {
     if (!impl_->avr) return;
     if (avr_irq_t* irq = avr_io_getirq(impl_->avr, AVR_IOCTL_UART_GETIRQ('0'),
                                         UART_IRQ_INPUT))
         avr_raise_irq(irq, octet);
 }
 
-uint64_t AvrEngine::cycle() const {
+uint64_t AvrEngine::cycle_simavr() const {
     return impl_->avr ? impl_->avr->cycle : cycle_;
 }
 
-uint8_t AvrEngine::registre(uint16_t adresse) const {
+uint8_t AvrEngine::registre_simavr(uint16_t adresse) const {
     if (!impl_->avr || adresse >= impl_->avr->ramend) return 0;
     return impl_->avr->data[adresse];
 }
 
-void AvrEngine::definir_niveau_externe(int broche, bool haut) {
+void AvrEngine::niveau_simavr(int broche, bool haut) {
     if (!impl_->avr) return;
     const BrocheAvr cible = broche_avr(broche);
     avr_irq_t* irq = avr_io_getirq(impl_->avr,
@@ -192,26 +193,114 @@ void AvrEngine::definir_niveau_externe(int broche, bool haut) {
 
 #else   // ------------------------------------------------ sans simavr
 
-struct AvrEngine::Impl {};
+struct AvrEngine::Impl {
+    CoeurAvr coeur;
+};
 
-AvrEngine::AvrEngine() : impl_(nullptr) {}
-AvrEngine::~AvrEngine() = default;
+AvrEngine::AvrEngine() : impl_(new Impl) {}
+AvrEngine::~AvrEngine() { delete impl_; }
 bool AvrEngine::compile_avec_simavr() { return false; }
-bool AvrEngine::disponible() const { return false; }
 
-bool AvrEngine::charger(const std::string&, const std::string&, uint32_t) {
-    erreur_ = "simavr n'est pas compilé dans cette version";
+bool AvrEngine::charger_simavr(const std::string&, const std::string&, uint32_t) {
     return false;
 }
-uint64_t AvrEngine::avancer(uint64_t) { return 0; }
-void AvrEngine::reinitialiser() {}
-void AvrEngine::definir_tension_adc(int, double) {}
-void AvrEngine::envoyer_octet_serie(uint8_t) {}
-uint64_t AvrEngine::cycle() const { return cycle_; }
-uint8_t AvrEngine::registre(uint16_t) const { return 0; }
-void AvrEngine::definir_niveau_externe(int, bool) {}
+uint64_t AvrEngine::avancer_simavr(uint64_t) { return 0; }
+void AvrEngine::reinitialiser_simavr() {}
+void AvrEngine::adc_simavr(int, double) {}
+void AvrEngine::serie_simavr(uint8_t) {}
+uint64_t AvrEngine::cycle_simavr() const { return cycle_; }
+uint8_t AvrEngine::registre_simavr(uint16_t) const { return 0; }
+void AvrEngine::niveau_simavr(int, bool) {}
 
 #endif
+
+// ---------------------------------------------------------------------------
+// Façade : le cœur intégré par défaut, simavr sur demande
+// ---------------------------------------------------------------------------
+bool AvrEngine::disponible() const { return true; }
+bool AvrEngine::utilise_simavr() const {
+    return prefere_simavr_ && compile_avec_simavr();
+}
+
+bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
+                        uint32_t frequence) {
+    erreur_.clear();
+    frequence_ = frequence;
+    cycle_ = 0;
+    etat_broches_.clear();
+    sortie_broches_.clear();
+    if (utilise_simavr()) return charger_simavr(chemin, mcu, frequence);
+
+    impl_->coeur.definir_frequence(frequence);
+    // Le cœur prévient à chaque changement de niveau ; on retraduit le port
+    // et le bit en numéro de broche Arduino.
+    impl_->coeur.sur_broche = [this](char port, int bit, bool haut) {
+        int broche = -1;
+        if (port == 'D' && bit <= 7) broche = bit;
+        else if (port == 'B' && bit <= 5) broche = 8 + bit;
+        else if (port == 'C' && bit <= 5) broche = 14 + bit;
+        if (broche >= 0) _notifier_broche(broche, haut);
+    };
+    impl_->coeur.sur_serie = [this](uint8_t octet) {
+        _notifier_serie(static_cast<char>(octet));
+    };
+    std::string message;
+    if (!impl_->coeur.charger(chemin, &message)) {
+        erreur_ = message;
+        return false;
+    }
+    return true;
+}
+
+uint64_t AvrEngine::avancer(uint64_t cycles) {
+    if (utilise_simavr()) return avancer_simavr(cycles);
+    const uint64_t executes = impl_->coeur.executer(cycles);
+    cycle_ = impl_->coeur.cycles();
+    return executes;
+}
+
+void AvrEngine::reinitialiser() {
+    if (utilise_simavr()) {
+        reinitialiser_simavr();
+        return;
+    }
+    impl_->coeur.reinitialiser();
+    cycle_ = 0;
+}
+
+void AvrEngine::definir_tension_adc(int canal, double volts) {
+    if (utilise_simavr()) {
+        adc_simavr(canal, volts);
+        return;
+    }
+    impl_->coeur.tension_adc(canal, volts);
+}
+
+void AvrEngine::envoyer_octet_serie(uint8_t octet) {
+    if (utilise_simavr()) {
+        serie_simavr(octet);
+        return;
+    }
+    impl_->coeur.recevoir_serie(octet);
+}
+
+uint64_t AvrEngine::cycle() const {
+    return utilise_simavr() ? cycle_simavr() : impl_->coeur.cycles();
+}
+
+uint8_t AvrEngine::registre(uint16_t adresse) const {
+    return utilise_simavr() ? registre_simavr(adresse)
+                            : impl_->coeur.lire_donnee(adresse);
+}
+
+void AvrEngine::definir_niveau_externe(int broche, bool haut) {
+    if (utilise_simavr()) {
+        niveau_simavr(broche, haut);
+        return;
+    }
+    const BrocheAvr cible = broche_avr(broche);
+    impl_->coeur.broche_externe(cible.port, cible.bit, haut);
+}
 
 bool AvrEngine::direction_sortie(int broche) const {
     const BrocheAvr cible = broche_avr(broche);

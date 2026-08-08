@@ -26,7 +26,13 @@ endif()
 #   ngspice -> second moteur analogique, celui de référence. Utile pour
 #              comparer : les tests font tourner les deux sur les mêmes
 #              circuits quand il est là.
-#   simavr  -> exécution du VRAI firmware compilé (avec avr-gcc).
+#   simavr  -> second cœur AVR, celui de référence. Le cœur ATmega328P est
+#              lui aussi écrit dans ce projet (CoeurAvr.cpp) ; simavr ne sert
+#              qu'à le confronter dans les tests.
+#
+# Pour écrire un programme AVR depuis l'application, il faut `avr-gcc` dans le
+# PATH — un compilateur C ne s'embarque pas. Sans lui, on charge un .elf déjà
+# compilé, et tout le reste fonctionne.
 # ---------------------------------------------------------------------------
 # Sous Windows, ngspice se télécharge en archive plutôt qu'il ne s'installe.
 # « -DNGSPICE_ROOT=C:/Spice64_dll » suffit alors : les sous-dossiers de la
@@ -73,7 +79,8 @@ endif()
 
 message(STATUS "Moteur analogique : solveur intégré (toujours actif)")
 message(STATUS "Second moteur ngspice   : ${MOTEUR_NGSPICE} (facultatif)")
-message(STATUS "Moteur AVR simavr        : ${MOTEUR_SIMAVR}")
+message(STATUS "Cœur AVR          : cœur intégré (toujours actif)")
+message(STATUS "Second cœur simavr      : ${MOTEUR_SIMAVR} (facultatif)")
 
 # ngspice n'est plus nécessaire : le solveur intégré calcule tout. Sa
 # présence n'ajoute qu'un point de comparaison, et les tests s'en servent.
@@ -85,9 +92,8 @@ if(NOT MOTEUR_NGSPICE)
 endif()
 if(NOT MOTEUR_SIMAVR)
   message(STATUS
-    "simavr introuvable : les programmes ne seront pas exécutés. "
-    "Toute la partie analogique fonctionne quand même "
-    "(Debian/Ubuntu : libsimavr-dev libelf-dev).")
+    "simavr absent : le cœur AVR intégré exécute le firmware. Installer "
+    "simavr n'apporterait qu'un second cœur pour comparer.")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -111,6 +117,7 @@ add_library(coeur STATIC
   src/core/engines/SolveurIntegre.cpp
   src/core/engines/ExpressionSpice.cpp
   src/core/engines/NgspiceEngine.cpp
+  src/core/engines/CoeurAvr.cpp
   src/core/engines/AvrEngine.cpp
   src/core/engines/MoteurNumerique.cpp
   src/core/analysis/Analyses.cpp

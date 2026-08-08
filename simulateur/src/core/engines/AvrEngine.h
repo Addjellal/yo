@@ -1,9 +1,13 @@
-// Moteur microcontrôleur : enveloppe autour de simavr.
+// Moteur microcontrôleur.
 //
 // C'est ici que se joue le réalisme « Proteus » : on n'interprète pas le
 // programme, on **exécute le vrai firmware** compilé par avr-gcc, cycle par
-// cycle, sur un cœur ATmega328P émulé. Les timers, l'UART, l'ADC et les
-// interruptions sont ceux de la puce, pas une approximation.
+// cycle, sur un cœur ATmega328P émulé.
+//
+// Deux cœurs derrière la même façade, comme pour l'analogique : celui écrit
+// dans ce projet (`CoeurAvr`), qui sert par défaut et ne demande rien à
+// installer, et **simavr** quand il a été trouvé à la compilation. Les tests
+// font tourner les deux sur le même firmware et comparent.
 #pragma once
 
 #include <cstdint>
@@ -22,7 +26,13 @@ public:
     AvrEngine& operator=(const AvrEngine&) = delete;
 
     static bool compile_avec_simavr();
+    // Toujours disponible : sans simavr, le cœur intégré prend le relais.
     bool disponible() const;
+    bool utilise_simavr() const;
+    void preferer_simavr(bool oui) { prefere_simavr_ = oui; }
+    const char* nom_du_coeur() const {
+        return utilise_simavr() ? "simavr" : "cœur intégré";
+    }
 
     // Charge un firmware .elf (ou .hex) et prépare le cœur.
     bool charger(const std::string& chemin_firmware,
@@ -86,8 +96,20 @@ public:
     void _notifier_serie(char octet);
 
 private:
+    // Chemin simavr, compilé seulement quand la bibliothèque est là.
+    bool charger_simavr(const std::string& chemin, const std::string& mcu,
+                        uint32_t frequence);
+    uint64_t avancer_simavr(uint64_t cycles);
+    void reinitialiser_simavr();
+    void adc_simavr(int canal, double volts);
+    void serie_simavr(uint8_t octet);
+    uint64_t cycle_simavr() const;
+    uint8_t registre_simavr(uint16_t adresse) const;
+    void niveau_simavr(int broche, bool haut);
+
     struct Impl;
     Impl* impl_ = nullptr;
+    bool prefere_simavr_ = false;
     uint64_t cycle_ = 0;
     uint32_t frequence_ = 16000000;
     std::string erreur_;

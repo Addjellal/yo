@@ -209,11 +209,7 @@ int main(void) {
 static std::string g_firmware;
 
 static void test_simavr() {
-    std::printf("\n[3] Moteur microcontrôleur (simavr + avr-gcc)\n");
-    if (!coeur::AvrEngine::compile_avec_simavr()) {
-        std::printf("  (simavr absent — section ignorée)\n");
-        return;
-    }
+    std::printf("\n[3] Moteur microcontrôleur (cœur intégré + avr-gcc)\n");
     if (!coeur::AvrEngine::avr_gcc_disponible()) {
         std::printf("  (avr-gcc absent — section ignorée)\n");
         return;
@@ -227,7 +223,7 @@ static void test_simavr() {
     if (!compile) return;
 
     coeur::AvrEngine mcu;
-    verifier(mcu.charger(g_firmware), "chargement du .elf dans simavr",
+    verifier(mcu.charger(g_firmware), "chargement du .elf dans le cœur",
              mcu.erreur());
 
     int basculements = 0;
@@ -249,8 +245,7 @@ static void test_simavr() {
 // courant réel dans la LED. C'est le principe même de Proteus.
 static void test_couplage() {
     std::printf("\n[4] Couplage firmware <-> circuit analogique\n");
-    if (!coeur::AvrEngine::compile_avec_simavr() ||
-        !coeur::AvrEngine::avr_gcc_disponible() || g_firmware.empty()) {
+    if (!coeur::AvrEngine::avr_gcc_disponible() || g_firmware.empty()) {
         std::printf("  (moteurs indisponibles — section ignorée)\n");
         return;
     }
@@ -320,8 +315,7 @@ int main(void) {
 
 static void test_couplage_inverse() {
     std::printf("\n[5] Couplage circuit -> firmware (lecture d'une entrée)\n");
-    if (!coeur::AvrEngine::compile_avec_simavr() ||
-        !coeur::AvrEngine::avr_gcc_disponible()) {
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
         std::printf("  (moteurs indisponibles — section ignorée)\n");
         return;
     }
@@ -384,8 +378,7 @@ int main(void) {
 
 static void test_adc() {
     std::printf("\n[6] Conversion analogique-numérique\n");
-    if (!coeur::AvrEngine::compile_avec_simavr() ||
-        !coeur::AvrEngine::avr_gcc_disponible()) {
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
         std::printf("  (moteurs indisponibles — section ignorée)\n");
         return;
     }
@@ -1008,9 +1001,8 @@ void loop() {
 
 static void test_croquis_arduino() {
     std::printf("\n[11] Un croquis Arduino de TP, tel quel\n");
-    if (!coeur::AvrEngine::compile_avec_simavr() ||
-        !coeur::AvrEngine::avr_gpp_disponible()) {
-        std::printf("  (moteurs indisponibles — section ignorée)\n");
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
         return;
     }
 
@@ -2241,6 +2233,78 @@ static void test_solveur_integre() {
 }
 
 // ---------------------------------------------------------------------------
+// [22] Le cœur AVR intégré confronté à simavr
+//
+// Même firmware, les deux cœurs, et comparaison des instants où les broches
+// commutent. C'est ce qui distingue « ça a l'air de marcher » de « c'est le
+// même microcontrôleur ».
+// ---------------------------------------------------------------------------
+static void test_coeur_avr() {
+    std::printf("\n[22] Cœur AVR intégré confronté à simavr\n");
+
+    if (!coeur::AvrEngine::compile_avec_simavr()) {
+        std::printf("  (simavr absent : comparaison impossible, le cœur "
+                    "intégré reste vérifié par les sections 3 à 6 et 11)\n");
+        return;
+    }
+    if (g_firmware.empty()) {
+        std::printf("  (aucun firmware compilé — section ignorée)\n");
+        return;
+    }
+
+    struct Commutation {
+        uint64_t cycle;
+        int broche;
+        bool haut;
+    };
+    std::vector<Commutation> releves[2];
+    uint64_t horloges[2] = {0, 0};
+
+    for (int avec_simavr = 0; avec_simavr < 2; ++avec_simavr) {
+        coeur::AvrEngine mcu;
+        mcu.preferer_simavr(avec_simavr == 1);
+        if (!mcu.charger(g_firmware)) {
+            std::printf("  (chargement impossible : %s)\n", mcu.erreur().c_str());
+            return;
+        }
+        mcu.sur_changement_broche([&](int broche, bool haut) {
+            releves[avec_simavr].push_back({mcu.cycle(), broche, haut});
+        });
+        mcu.avancer(4000000);          // 250 ms simulées
+        horloges[avec_simavr] = mcu.cycle();
+    }
+
+    verifier(!releves[0].empty() && !releves[1].empty(),
+             "les deux cœurs exécutent le firmware");
+    verifier(releves[0].size() == releves[1].size(),
+             "même nombre de commutations de broche",
+             std::to_string(releves[0].size()) + " contre "
+                 + std::to_string(releves[1].size()));
+    verifier(horloges[0] >= 4000000 && horloges[1] >= 4000000,
+             "les deux comptent bien quatre millions de cycles");
+
+    if (releves[0].size() != releves[1].size()) return;
+
+    uint64_t ecart_maximal = 0;
+    bool memes_broches = true;
+    for (size_t k = 0; k < releves[0].size(); ++k) {
+        if (releves[0][k].broche != releves[1][k].broche
+            || releves[0][k].haut != releves[1][k].haut)
+            memes_broches = false;
+        const uint64_t a = releves[0][k].cycle, b = releves[1][k].cycle;
+        ecart_maximal = std::max(ecart_maximal, a > b ? a - b : b - a);
+    }
+    verifier(memes_broches, "mêmes broches, mêmes sens de commutation");
+    // Le firmware d'essai bascule D13 toutes les 500 ms de temps simulé, par
+    // une boucle d'attente : mille cycles d'écart sur huit millions, c'est
+    // trois dix-millièmes.
+    verifier(ecart_maximal < 20000,
+             "mêmes instants de commutation que simavr",
+             std::to_string(ecart_maximal) + " cycles d'écart au pire, sur "
+                 + std::to_string(horloges[0]));
+}
+
+// ---------------------------------------------------------------------------
 // [17] Balayage en température et analyse de bruit : deux analyses que
 // ngspice sait faire et qu'il fallait seulement savoir lui demander.
 // ---------------------------------------------------------------------------
@@ -2737,8 +2801,8 @@ int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
     std::printf("============================================================\n");
-    std::printf("moteur analogique : solveur intégré   |   ngspice pour "
-                "comparaison : %s   |   simavr : %s\n",
+    std::printf("moteurs : solveur analogique et cœur AVR intégrés   |   "
+                "ngspice : %s   |   simavr : %s (comparaison)\n",
                 coeur::NgspiceEngine::compile_avec_ngspice() ? "oui" : "non",
                 coeur::AvrEngine::compile_avec_simavr() ? "oui" : "non");
 
@@ -2760,6 +2824,7 @@ int main() {
     test_multimetres();
     test_temperature_et_bruit();
     test_solveur_integre();
+    test_coeur_avr();
     test_campagnes();
     test_numerique();
     test_pcb();

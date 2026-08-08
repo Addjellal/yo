@@ -15,15 +15,18 @@ Qt 6 suffisent donc à construire et à faire tourner l'ensemble.
 
 | Moteur | Rôle | D'où il vient |
 |---|---|---|
-| **solveur intégré** | simulation analogique : diodes, transistors, MOSFET, amplificateurs | écrit ici, `src/core/engines/SolveurIntegre.cpp` |
-| [**ngspice**](https://ngspice.sourceforge.io/) | *facultatif* : second moteur, celui de référence | KiCad — sert ici à contrôler le premier |
-| [**simavr**](https://github.com/buserror/simavr) | *facultatif* : exécution cycle par cycle d'un ATmega328P réel | simulateurs AVR |
+| **solveur analogique intégré** | diodes, transistors, MOSFET, amplificateurs, transitoire, Bode, bruit | écrit ici, `src/core/engines/SolveurIntegre.cpp` |
+| **cœur ATmega328P intégré** | exécution cycle par cycle du vrai firmware | écrit ici, `src/core/engines/CoeurAvr.cpp` |
+| [**ngspice**](https://ngspice.sourceforge.io/) | *facultatif* : moteur analogique de référence | KiCad — sert ici à contrôler le premier |
+| [**simavr**](https://github.com/buserror/simavr) | *facultatif* : cœur AVR de référence | simulateurs AVR — même rôle de juge |
 
-Quand ngspice est présent, les tests font tourner **les deux moteurs sur les
-mêmes circuits et comparent** : mêmes tensions à 20 mV près sur un montage à
-diode et transistor, même forme d'onde à 20 mV près sur un transitoire, même
-fréquence de coupure à 2 % près. C'est ainsi que le solveur intégré se
-justifie — pas sur parole.
+Quand ngspice et simavr sont présents, les tests font tourner **les deux
+moteurs sur les mêmes circuits, les deux cœurs sur le même firmware, et
+comparent** : mêmes tensions à 20 mV près sur un montage à diode et
+transistor, même forme d'onde à 20 mV près sur un transitoire, même fréquence
+de coupure à 2 % près, et les mêmes commutations de broche aux mêmes cycles
+d'horloge. C'est ainsi que les moteurs intégrés se justifient — pas sur
+parole.
 
 Le firmware, lui, n'est **pas interprété** : il est compilé par `avr-gcc`,
 chargé dans un cœur AVR émulé, et ses écritures sur les ports pilotent
@@ -185,27 +188,24 @@ Autant le dire tout de suite, pour ne pas donner le change :
 ### De quoi a-t-on vraiment besoin ?
 
 **Un compilateur C++17 et Qt 6.** C'est tout ce qu'il faut pour construire le
-projet et simuler un circuit : le solveur analogique fait partie des sources.
-Aucune bibliothèque de simulation à télécharger, aucune DLL à poser à côté de
-l'exécutable.
+projet, simuler un circuit **et exécuter un firmware** : le solveur analogique
+et le cœur ATmega328P font partie des sources. Aucune bibliothèque de
+simulation à télécharger, aucune DLL à poser à côté de l'exécutable.
 
 Le reste est facultatif et n'ajoute que ce qui est écrit en face :
 
 | Ce qu'on installe | Ce que ça ajoute |
 |---|---|
-| **Qt 6 seul** | **tout le circuit** : tensions, courants, LED qui s'allument, oscilloscope, multimètres, balayage continu, Bode, spectre, bruit, Monte-Carlo, circuit imprimé et documents. |
-| *+ ngspice* | un **second moteur** analogique. N'apporte rien de plus à l'usage : il sert à confronter le solveur intégré à la référence dans les tests. |
-| *+ simavr* | exécuter un vrai firmware AVR (`.elf`, `.hex`) sur l'ATmega328P. |
-| *+ avr-gcc* | écrire et compiler le programme *dans* l'application (`F5`). Sans lui, on charge un `.elf` produit par l'IDE Arduino. |
+| **Qt 6 seul** | **tout** : tensions, courants, LED qui s'allument, oscilloscope, multimètres, Bode, spectre, bruit, Monte-Carlo, circuit imprimé, documents — et l'exécution d'un firmware `.elf` ou `.hex` sur l'ATmega328P. |
+| **+ avr-gcc** | écrire et compiler le programme *dans* l'application (`F5`). Sans lui, on charge un `.elf` produit ailleurs (IDE Arduino). |
+| *+ ngspice* | un **second moteur** analogique. N'apporte rien à l'usage : il sert à confronter le solveur intégré à la référence dans les tests. |
+| *+ simavr* | un **second cœur** AVR, pour la même raison. |
 
-La barre d'état indique en permanence quel moteur analogique tourne
-(`analogique (intégré)` ou `analogique (intégré + ngspice)`), et si simavr et
-avr-gcc ont été trouvés.
+La barre d'état indique en permanence quels moteurs tournent.
 
-Une remarque honnête sur les deux dernières lignes : **`avr-gcc` ne peut pas
-être embarqué** — c'est un compilateur C complet. Sans lui, tout
-l'électronique fonctionne, mais on ne peut pas écrire un programme AVR depuis
-l'application.
+Une remarque honnête : **`avr-gcc` ne peut pas être embarqué** — c'est un
+compilateur C complet, et c'est la seule chose qui reste à installer si l'on
+veut écrire un programme AVR depuis l'application.
 
 ### Linux (Debian, Ubuntu)
 
@@ -213,13 +213,16 @@ l'application.
 # Le strict nécessaire :
 sudo apt install build-essential cmake qt6-base-dev
 
-# Facultatif : firmware AVR, et ngspice comme moteur de comparaison.
-sudo apt install gcc-avr avr-libc libsimavr-dev libelf-dev libngspice0-dev
+# Pour compiler un programme AVR depuis l'application :
+sudo apt install gcc-avr avr-libc
+
+# Facultatif : les moteurs de référence, pour les tests de comparaison.
+sudo apt install libngspice0-dev libsimavr-dev libelf-dev
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 245 tests, sans Qt
+./build/tests_coeur                        # 250 tests, sans Qt
 QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 90 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
@@ -291,14 +294,10 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
                       mingw-w64-ucrt-x86_64-avr-libc
    ```
 
-   **simavr n'existe pas en paquet MSYS2** — l'ancienne version de cette page
-   l'affirmait, c'était faux. Il faut le compiler depuis les sources
-   (`pacman -S mingw-w64-ucrt-x86_64-libelf git make`, puis
-   `git clone https://github.com/buserror/simavr` et `make` en suivant son
-   `README.mingw`). Le dépôt garde des rugosités connues sur cette
-   plate-forme ; je ne peux pas vérifier cette étape d'ici. Sans simavr, tout
-   le reste marche : c'est un simulateur analogique complet, sans l'exécution
-   du firmware.
+   Et c'est tout : **simavr n'est plus nécessaire** (il n'existe d'ailleurs
+   en paquet MSYS2 sous aucune forme — l'ancienne version de cette page
+   l'affirmait, c'était faux). Le cœur ATmega328P est dans les sources du
+   projet.
 
    **`avrtest` ne remplace pas simavr.** C'est le simulateur de la suite de
    tests d'avr-gcc : un exécutable autonome qui exécute un `.elf` et imprime
@@ -444,7 +443,7 @@ simulateur/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   └── figures_liste.inc            les montages, décrits en données
 └── tests/
-    ├── test_coeur.cpp                245 tests, sans Qt
+    ├── test_coeur.cpp                250 tests, sans Qt
     └── test_schema.cpp               90 tests, saisie de schéma sans fenêtre
 ```
 
@@ -587,7 +586,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**245 tests du cœur**, sans Qt, en vingt et une sections :
+**250 tests du cœur**, sans Qt, en vingt-deux sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -605,6 +604,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 22 | **cœur AVR intégré confronté à simavr** : même firmware, mêmes commutations de broche, aux mêmes cycles d'horloge |
 | 21 | **solveur intégré confronté à ngspice** : mêmes tensions à 20 mV près sur un montage diode + transistor, même forme d'onde à 20 mV près sur un transitoire, même fréquence de coupure à 2 % près |
 | 20 | **circuit imprimé** : placement depuis la netlist, chevelu, règles de fabrication (isolation, largeur, débordement), Gerber et Excellon conformes, cotes des empreintes (DIP à 7,62 mm, résistance à 10,16 mm, broche 1 carrée), brochage réel de l'Uno, transfert schéma → carte qui préserve placement et pistes |
 | 19 | **moteur numérique** : un octet décalé à 1 MHz dans un 74HC595, verrouillé, et ses sorties devenues un circuit analogique valable |

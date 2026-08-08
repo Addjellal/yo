@@ -660,8 +660,9 @@ void FenetrePrincipale::construire_actions() {
             "<p>Moteur analogique : <b>solveur intégré</b> — analyse nodale "
             "modifiée, Newton, trapèzes ; rien à installer. <b>ngspice</b> "
             "peut le doubler pour comparaison.<br>"
-            "Moteur microcontrôleur : <b>simavr</b> — exécution cycle par "
-            "cycle d'un ATmega328P.</p>"
+            "Moteur microcontrôleur : <b>cœur ATmega328P intégré</b> — le "
+            "vrai firmware compilé, exécuté instruction par instruction. "
+            "<b>simavr</b> peut le doubler pour comparaison.</p>"
             "<p>Raccourcis : <b>R</b> pivote la sélection, <b>Suppr</b> "
             "l'efface, la molette zoome.</p>");
     });
@@ -688,13 +689,15 @@ void FenetrePrincipale::construire_barre_etat() {
     etiquette_moteurs_->setText(
         pastille(true, spice ? "analogique (intégré + ngspice)"
                              : "analogique (intégré)")
-        + "   " + pastille(avr, "simavr") + "   " + pastille(gcc, "avr-gcc"));
+        + "   " + pastille(true, avr ? "AVR (intégré + simavr)" : "AVR (intégré)")
+        + "   " + pastille(gcc, "avr-gcc"));
     etiquette_moteurs_->setToolTip(
         QString("Moteur analogique : solveur intégré — rien à installer.\n"
-                "ngspice : %1 — moteur de référence, utilisable pour "
-                "comparaison.\n"
-                "simavr : %2 — exécution du firmware.\n"
-                "avr-gcc : %3 — compilation depuis l'application.")
+                "Cœur ATmega328P : intégré — rien à installer non plus.\n"
+                "ngspice : %1, simavr : %2 — moteurs de référence, utilisés "
+                "pour comparer dans les tests.\n"
+                "avr-gcc : %3 — nécessaire pour compiler un programme depuis "
+                "l'application.")
             .arg(spice ? "présent" : "absent",
                  avr ? "présent" : "absent", gcc ? "présent" : "absent"));
 
@@ -706,10 +709,7 @@ void FenetrePrincipale::construire_barre_etat() {
     refleter_etat();
 
     // Le moteur analogique est toujours là ; seul le firmware peut manquer.
-    if (!avr)
-        ecrire("simavr n'est pas là : les programmes ne seront pas exécutés. "
-               "La partie analogique, elle, fonctionne entièrement.");
-    else if (!coeur::AvrEngine::avr_gcc_disponible())
+    if (!coeur::AvrEngine::avr_gcc_disponible())
         ecrire("avr-gcc est introuvable dans le PATH : le bouton « Compiler » "
                "ne fonctionnera pas. On peut malgré tout charger un .elf déjà "
                "compilé (Simulation → Charger un firmware).");

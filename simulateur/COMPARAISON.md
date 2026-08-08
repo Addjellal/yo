@@ -3,9 +3,11 @@
 Ce document répond à une question simple : **par rapport à ce qui existe, que
 sait faire ce simulateur, et que ne sait-il pas faire ?**
 
-Depuis peu, le moteur analogique est **écrit dans ce projet** : plus de
-ngspice à installer, plus de DLL à trouver. Quand ngspice est présent, il sert
-de juge — les tests font tourner les deux sur les mêmes circuits et comparent.
+Depuis peu, **les deux moteurs sont écrits dans ce projet** : le solveur
+analogique et le cœur ATmega328P. Plus de ngspice à installer, plus de simavr
+à compiler soi-même. Quand ces deux-là sont présents, ils servent de juges —
+les tests les font tourner sur les mêmes circuits et le même firmware, et
+comparent.
 
 Les références retenues sont celles qu'on utilise vraiment : **Proteus** (VSM,
 la simulation de microcontrôleur avec le circuit autour), **Multisim**
@@ -44,7 +46,7 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | **Balayage continu** (`.dc`, source ou résistance) | LTspice, Multisim | ✅ |
 | **Réponse en fréquence** (`.ac`, Bode gain + phase) | LTspice, Multisim | ✅ |
 | **Spectre et distorsion harmonique** | Multisim, LTspice (FFT) | ✅ calculé ici même, vérifié contre la théorie |
-| Exécution du **vrai firmware** compilé | Proteus VSM, Wokwi | ✅ simavr, ATmega328P |
+| Exécution du **vrai firmware** compilé | Proteus VSM, Wokwi | ✅ cœur ATmega328P écrit ici, rien à installer |
 | Circuit **et** microcontrôleur couplés au cycle | Proteus VSM | ✅ |
 | Plusieurs cartes sur le même schéma | Proteus | ✅ |
 | Montage sans microcontrôleur | LTspice, Multisim | ✅ |
@@ -127,7 +129,7 @@ la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur d'analyse nodale, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 245 tests du
+C'est aussi un projet dont **chaque affirmation est vérifiée** : 250 tests du
 cœur et 90 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
