@@ -151,9 +151,9 @@ private:
     QLabel* etiquette_temps_ = nullptr;
     QLabel* etiquette_vitesse_ = nullptr;
     QLabel* etiquette_moteurs_ = nullptr;
+    QLabel* etiquette_etat_ = nullptr;
 
-    QAction* action_lancer_ = nullptr;
-    QAction* action_pause_ = nullptr;
+    QAction* action_marche_ = nullptr;    // lance, met en pause, reprend
     QAction* action_arreter_ = nullptr;
 
     ItemComposant* selection_ = nullptr;
@@ -169,6 +169,9 @@ private:
     void construire_docks();
     void construire_actions();
     void construire_barre_etat();
+    // Aligne les commandes et la barre d'état sur l'état de la simulation :
+    // un bouton doit toujours annoncer ce qu'il va faire.
+    void refleter_etat();
 
     void ecrire(const QString& message);
     QString dossier_travail() const;

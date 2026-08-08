@@ -205,7 +205,17 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     }
     peintre.setPen(QPen(kGrilleAxe, 1.0));
     peintre.drawRect(zone);
-    const double y_zero = zone.bottom();
+
+    // Où placer le zéro ? En bas tant que tout reste positif — c'est le cas
+    // d'une sortie logique ou d'une PWM, et on gagne toute la hauteur. Dès
+    // qu'un signal descend sous zéro, on le remonte au milieu : sinon la
+    // moitié d'une sinusoïde serait purement et simplement invisible.
+    bool bipolaire = false;
+    for (int v = 0; v < kVoies; ++v)
+        for (float valeur : voies_[v].valeurs)
+            if (valeur < -0.05f) { bipolaire = true; break; }
+    const double y_zero =
+        bipolaire ? zone.top() + zone.height() / 2.0 : zone.bottom();
 
     // --- axes chiffrés
     QFont police = peintre.font();
@@ -214,9 +224,20 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     peintre.setPen(QPen(QColor(150, 165, 178), 1));
     for (int k = 0; k <= 8; k += 2) {
         const double y = zone.bottom() - zone.height() * k / 8.0;
+        // La graduation se lit à partir du zéro, où qu'il soit placé.
+        const double valeur =
+            (y_zero - y) / (zone.height() / 8.0) * volts_par_division_;
         peintre.drawText(QRectF(0, y - 8, 42, 16),
                          Qt::AlignRight | Qt::AlignVCenter,
-                         QString("%1 V").arg(k * volts_par_division_, 0, 'g', 3));
+                         QString("%1 V").arg(valeur, 0, 'g', 3));
+    }
+    // Trait du zéro, plus marqué : sans lui on ne sait plus où est la
+    // référence quand elle n'est plus en bas de l'écran.
+    if (bipolaire) {
+        peintre.setPen(QPen(kGrilleAxe, 1.2));
+        peintre.drawLine(QPointF(zone.left(), y_zero),
+                         QPointF(zone.right(), y_zero));
+        peintre.setPen(QPen(QColor(150, 165, 178), 1));
     }
     const double debut = dernier_instant_ - fenetre_;
     for (int k = 0; k <= 10; k += 5) {
@@ -311,10 +332,11 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
         auto* selecteur = new QComboBox;
         selecteur->addItem("— aucun —", QString());
         selecteur->setMinimumWidth(140);
-        connect(selecteur, &QComboBox::currentTextChanged, this,
-                [this, v](const QString& texte) {
-                    trace_->definir_signal(v, texte.startsWith("—") ? QString()
-                                                                    : texte);
+        // Le texte affiché explique le signal, la donnée porte son nom :
+        // « R1_2 — C1.1 · R1.2 » à l'écran, « R1_2 » pour la courbe.
+        connect(selecteur, &QComboBox::currentIndexChanged, this,
+                [this, v, selecteur](int) {
+                    trace_->definir_signal(v, selecteur->currentData().toString());
                     rafraichir_mesures();
                 });
         auto* mesure = new QLabel("—");
@@ -398,21 +420,29 @@ void Oscilloscope::rafraichir_mesures() {
     }
 }
 
-void Oscilloscope::proposer_signaux(const QStringList& signaux) {
-    if (signaux == signaux_) return;
+void Oscilloscope::proposer_signaux(const QStringList& signaux,
+                                    const std::map<QString, QString>& libelles) {
+    if (signaux == signaux_ && libelles == libelles_) return;
     signaux_ = signaux;
+    libelles_ = libelles;
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
         QComboBox* selecteur = selecteurs_[v];
-        const QString choix = selecteur->currentText();
+        const QString choix = selecteur->currentData().toString();
         {
             const QSignalBlocker silence(selecteur);
             selecteur->clear();
             selecteur->addItem("— aucun —", QString());
-            selecteur->addItems(signaux_);
-            const int rang = selecteur->findText(choix);
+            for (const QString& signal : signaux_) {
+                auto it = libelles_.find(signal);
+                selecteur->addItem(it == libelles_.end()
+                                       ? signal
+                                       : signal + "  —  " + it->second,
+                                   signal);
+            }
+            const int rang = selecteur->findData(choix);
             selecteur->setCurrentIndex(rang >= 0 ? rang : 0);
         }
-        if (selecteur->currentIndex() == 0) trace_->definir_signal(v, QString());
+        trace_->definir_signal(v, selecteur->currentData().toString());
     }
 }
 
@@ -430,7 +460,7 @@ void Oscilloscope::sonder(const QString& designation) {
         cible = prochaine_voie_;
         prochaine_voie_ = (prochaine_voie_ + 1) % TraceOscilloscope::kVoies;
     }
-    const int rang = selecteurs_[cible]->findText(designation);
+    const int rang = selecteurs_[cible]->findData(designation);
     if (rang >= 0) selecteurs_[cible]->setCurrentIndex(rang);
 }
 

@@ -488,6 +488,68 @@ static void test_cablage_souris() {
 }
 
 // ---------------------------------------------------------------------------
+// [8] Nommage des nœuds et instruments de mesure : un nœud doit dire ce qu'il
+// relie, et un instrument afficher ce qu'il lit.
+// ---------------------------------------------------------------------------
+static void test_noeuds_et_instruments() {
+    std::printf("\n[8] Nœuds nommés et instruments\n");
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(200, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(400, 200));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    scene.addItem(new ItemFil(r2, 1, masse, 0));
+
+    const auto description = scene.description_noeuds();
+    bool nom_parlant = false;
+    for (const auto& paire : description)
+        if (paire.first.startsWith("R1_") || paire.first.startsWith("R2_"))
+            nom_parlant = true;
+    verifier(nom_parlant,
+             "un nœud sans nom imposé prend celui d'une borne (R1_2), pas N1");
+    bool aucun_n = true;
+    for (const auto& paire : description)
+        if (paire.first == "N1" || paire.first == "N2") aucun_n = false;
+    verifier(aucun_n, "plus de nœuds « N1 », « N2 » sans signification");
+
+    bool decrit = false;
+    for (const auto& paire : description)
+        if (paire.second.contains("R1.2") && paire.second.contains("R2.1"))
+            decrit = true;
+    verifier(decrit, "chaque nœud dit quelles bornes il relie",
+             description.empty() ? "" : description.begin()->second.toStdString());
+
+    // --- voltmètre : il doit afficher la différence de potentiel lue
+    {
+        SceneSchema mesure;
+        ItemComposant* vm = mesure.ajouter_composant("voltmetre", QPointF(0, 0));
+        ItemComposant* pile = mesure.ajouter_composant("pile", QPointF(-200, 0));
+        ItemComposant* gnd = mesure.ajouter_composant("masse", QPointF(200, 200));
+        mesure.addItem(new ItemFil(pile, 0, vm, 0));
+        mesure.addItem(new ItemFil(vm, 1, gnd, 0));
+        const auto noeuds = mesure.description_noeuds();
+        std::string nom_plus;
+        for (const auto& paire : noeuds)
+            if (paire.second.contains("VM1.+")) nom_plus = paire.first.toLower().toStdString();
+        verifier(!nom_plus.empty(), "le nœud du voltmètre est identifiable");
+        mesure.appliquer_resultats({}, {{nom_plus, 9.0}, {"gnd", 0.0}});
+        verifier(vm->mesure() == "9.00 V",
+                 "le voltmètre affiche la tension mesurée",
+                 vm->mesure().toStdString());
+    }
+
+    // --- ampèremètre : il affiche le courant qui le traverse
+    {
+        SceneSchema mesure;
+        ItemComposant* am = mesure.ajouter_composant("amperemetre", QPointF(0, 0));
+        mesure.appliquer_resultats({{"am1", 0.0128}}, {});
+        verifier(am->mesure() == "12.80 mA",
+                 "l'ampèremètre affiche le courant, avec son préfixe",
+                 am->mesure().toStdString());
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -501,6 +563,7 @@ int main(int argc, char** argv) {
     test_cartes_non_cablees();
     test_panneau_analyses();
     test_cablage_souris();
+    test_noeuds_et_instruments();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

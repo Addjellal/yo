@@ -230,12 +230,24 @@ SceneSchema::calculer_noeuds() const {
             noms[racine] = alimentation ? borne : prefixe + borne;
         }
     }
-    int suivant = 1;
-    for (ItemFil* fil : fils()) {
-        auto a = indices.find(fil->depart());
-        if (a == indices.end()) continue;
-        const int racine = classes.racine(a->second[fil->borne_depart()]);
-        if (!noms.count(racine)) noms[racine] = "N" + std::to_string(suivant++);
+    // Les nœuds restants portent le nom de la première borne qui les touche,
+    // dans l'ordre des références : « R1_2 » plutôt que « N3 ». C'est ce que
+    // fait KiCad, et pour la même raison — « N3 » n'apprend rien à personne,
+    // alors qu'un nom tiré du montage se retrouve sur le schéma.
+    for (ItemComposant* composant : liste) {
+        for (int k = 0; k < composant->nb_bornes(); ++k) {
+            const int racine = classes.racine(indices[composant][k]);
+            if (noms.count(racine)) continue;
+            // Une borne en l'air n'est pas un nœud : elle n'est reliée à rien.
+            bool cablee = false;
+            for (ItemFil* fil : fils())
+                if ((fil->depart() == composant && fil->borne_depart() == k) ||
+                    (fil->arrivee() == composant && fil->borne_arrivee() == k))
+                    cablee = true;
+            if (!cablee) continue;
+            noms[racine] = composant->reference().toStdString() + "_"
+                           + composant->nom_borne(k).toStdString();
+        }
     }
 
     std::map<const ItemComposant*, std::vector<std::string>> resultat;
@@ -337,6 +349,44 @@ void SceneSchema::appliquer_resultats(
     }
 
     const auto noeuds = calculer_noeuds();
+
+    // Instruments : ils lisent le circuit résolu et affichent leur mesure sous
+    // leur symbole, comme le ferait un appareil posé sur la paillasse.
+    for (ItemComposant* composant : composants()) {
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->mesure_instrument) continue;
+        auto it = noeuds.find(composant);
+        if (it == noeuds.end()) continue;
+
+        auto tension_de = [&](const std::string& nom_borne) {
+            for (int k = 0; k < composant->nb_bornes(); ++k) {
+                if (composant->nom_borne(k).toStdString() != nom_borne) continue;
+                if (k >= static_cast<int>(it->second.size())) return 0.0;
+                std::string noeud = it->second[k];
+                std::transform(noeud.begin(), noeud.end(), noeud.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+                auto mesure = tensions.find(noeud);
+                return mesure == tensions.end() ? 0.0 : mesure->second;
+            }
+            return 0.0;
+        };
+        std::string reference = composant->reference().toStdString();
+        std::transform(reference.begin(), reference.end(), reference.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        auto courant = courants.find(reference);
+        const coeur::Instance* instance = nullptr;
+        coeur::Instance provisoire;
+        provisoire.reference = composant->reference().toStdString();
+        provisoire.type = modele->type;
+        for (const auto& paire : composant->valeurs)
+            provisoire.valeurs[paire.first] = paire.second;
+        instance = &provisoire;
+        composant->definir_mesure(QString::fromStdString(
+            modele->mesure_instrument(
+                *instance, tension_de,
+                courant == courants.end() ? 0.0 : courant->second)));
+    }
+
     for (ItemFil* fil : fils()) {
         auto it = noeuds.find(fil->depart());
         if (it == noeuds.end()) continue;
@@ -347,6 +397,27 @@ void SceneSchema::appliquer_resultats(
         auto mesure = tensions.find(noeud);
         if (mesure != tensions.end()) fil->definir_tension(mesure->second);
     }
+}
+
+std::map<QString, QString> SceneSchema::description_noeuds() const {
+    const auto noeuds = calculer_noeuds();
+    std::map<QString, QStringList> bornes_par_noeud;
+    for (ItemComposant* composant : composants()) {
+        auto it = noeuds.find(composant);
+        if (it == noeuds.end()) continue;
+        for (int k = 0; k < composant->nb_bornes()
+                        && k < static_cast<int>(it->second.size()); ++k) {
+            if (it->second[k].empty()) continue;
+            bornes_par_noeud[QString::fromStdString(it->second[k])]
+                << composant->reference() + "." + composant->nom_borne(k);
+        }
+    }
+    std::map<QString, QString> resultat;
+    for (auto& paire : bornes_par_noeud) {
+        paire.second.sort();
+        resultat[paire.first] = paire.second.join(" · ");
+    }
+    return resultat;
 }
 
 void SceneSchema::appliquer_etats(

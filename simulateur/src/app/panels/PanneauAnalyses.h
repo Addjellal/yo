@@ -12,6 +12,8 @@
 #pragma once
 
 #include <QStringList>
+
+#include <map>
 #include <QVector>
 #include <QWidget>
 
@@ -72,7 +74,9 @@ public:
     explicit PanneauAnalyses(QWidget* parent = nullptr);
 
     // Listes tenues à jour par la fenêtre quand le schéma change.
-    void proposer_signaux(const QStringList& signaux);
+    // `libelles` donne le sens de chaque signal (« R1_2 » -> « C1.1 · R1.2 »).
+    void proposer_signaux(const QStringList& signaux,
+                          const std::map<QString, QString>& libelles = {});
     void proposer_sources(const QStringList& sources);
 
     // `reference` : nœud pris pour entrée du diagramme de Bode (le gain est

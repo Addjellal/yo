@@ -11,6 +11,7 @@
 
 #include <array>
 #include <deque>
+#include <map>
 
 #include "core/engines/NgspiceEngine.h"
 
@@ -85,7 +86,10 @@ public:
     void vider();
 
     // Met à jour la liste des signaux proposés, en conservant les choix faits.
-    void proposer_signaux(const QStringList& signaux);
+    // `libelles` dit ce que désigne chaque signal — un nom de nœud seul ne
+    // veut rien dire pour qui vient de dessiner le montage.
+    void proposer_signaux(const QStringList& signaux,
+                          const std::map<QString, QString>& libelles = {});
 
     // Voie affectée automatiquement quand on clique un fil du schéma.
     void sonder(const QString& designation);
@@ -113,6 +117,7 @@ private:
     std::array<QLabel*, TraceOscilloscope::kVoies> mesures_ = {};
     QComboBox* base_temps_ = nullptr;
     QStringList signaux_;
+    std::map<QString, QString> libelles_;
     int prochaine_voie_ = 0;
 
     void rafraichir_mesures();

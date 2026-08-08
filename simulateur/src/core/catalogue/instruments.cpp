@@ -8,9 +8,36 @@
 #include <vector>
 
 #include "core/Netlist.h"
+#include <cmath>
+#include <sstream>
+
 #include "core/catalogue/Traits.h"
 
 namespace coeur {
+
+namespace {
+
+// Mise en forme d'une mesure avec son préfixe : « 4.72 V », « 12.8 mA ».
+// Un instrument qui afficherait « 0.0128 A » ne serait pas lisible.
+std::string format_mesure(double valeur, const std::string& unite) {
+    const double absolue = std::fabs(valeur);
+    double reduite = valeur;
+    std::string prefixe;
+    if (absolue >= 1e6) { reduite = valeur / 1e6; prefixe = "M"; }
+    else if (absolue >= 1e3) { reduite = valeur / 1e3; prefixe = "k"; }
+    else if (absolue < 1e-9) { reduite = 0; }
+    else if (absolue < 1e-6) { reduite = valeur * 1e9; prefixe = "n"; }
+    else if (absolue < 1e-3) { reduite = valeur * 1e6; prefixe = "µ"; }
+    else if (absolue < 1.0)  { reduite = valeur * 1e3; prefixe = "m"; }
+
+    std::ostringstream flux;
+    flux.setf(std::ios::fixed);
+    flux.precision(std::fabs(reduite) >= 100 ? 0 : 2);
+    flux << reduite << " " << prefixe << unite;
+    return flux.str();
+}
+
+}  // namespace
 
 void enregistrer_instruments(Catalogue& catalogue) {
     using G = Propriete::Genre;
@@ -36,6 +63,9 @@ void enregistrer_instruments(Catalogue& catalogue) {
                 "R" + i.reference + " " + noeud("+") + " " + noeud("-") + " "
                 + nombre(i.valeur("impedance", 1e7))};
         };
+        m.mesure_instrument = [](const Instance&, const auto& tension, double) {
+            return format_mesure(tension("+") - tension("-"), "V");
+        };
         enregistrer(std::move(m));
     }
     {   // ------------------------------------------------------- ampèremètre
@@ -54,6 +84,28 @@ void enregistrer_instruments(Catalogue& catalogue) {
             return std::vector<std::string>{
                 "R" + i.reference + " " + noeud("+") + " " + noeud("-") + " "
                 + nombre(i.valeur("shunt", 0.01))};
+        };
+        m.mesure_instrument = [](const Instance&, const auto&, double courant) {
+            return format_mesure(courant, "A");
+        };
+        enregistrer(std::move(m));
+    }
+    {   // -------------------------------------------------- sonde de tension
+        // Une sonde n'est pas un composant : elle ne charge pas le circuit et
+        // n'émet aucune ligne SPICE. C'est le seul « instrument » qu'on peut
+        // greffer n'importe où sans changer le montage — un oscilloscope posé
+        // sur le schéma, lui, n'aurait pas de sens électrique.
+        Modele m;
+        m.type = "sonde_tension";
+        m.libelle = "Sonde de tension";
+        m.categorie = "Instruments";
+        m.prefixe = "SND";
+        m.bornes = {{"1", {0, 22}, ""}};
+        m.symbole = {ligne(0, 22, 0, 6), poly({{-7, 6}, {7, 6}, {0, -4}}, false),
+                     cercle(0, -12, 9), texte(-4, -8, "V", 11)};
+        m.empreinte = {"", {}, 0, 0};
+        m.mesure_instrument = [](const Instance&, const auto& tension, double) {
+            return format_mesure(tension("1"), "V");
         };
         enregistrer(std::move(m));
     }

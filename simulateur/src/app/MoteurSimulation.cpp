@@ -220,6 +220,15 @@ void MoteurSimulation::remettre_a_zero() {
 }
 
 void MoteurSimulation::demarrer() {
+    // Reprise après une pause : rien à réamorcer, l'état est intact.
+    if (etat_simulation_ == Etat::EnPause) {
+        minuterie_.start();
+        etat_simulation_ = Etat::EnMarche;
+        emit etat_change(etat_simulation_);
+        emit journal("Simulation reprise.");
+        return;
+    }
+
     // Sans moteur analogique, une simulation ne calculerait rien et se
     // contenterait de répéter la même erreur à chaque image. Mieux vaut
     // refuser une fois, en disant quoi installer.
@@ -242,6 +251,8 @@ void MoteurSimulation::demarrer() {
             return;
         }
         minuterie_.start();
+        etat_simulation_ = Etat::EnMarche;
+        emit etat_change(etat_simulation_);
         emit journal("Simulation analogique démarrée (aucune carte sur le "
                      "schéma).");
         return;
@@ -258,20 +269,29 @@ void MoteurSimulation::demarrer() {
                              "inerte (ses broches sont en entrée).")
                          .arg(sans_firmware.join(", ")));
     minuterie_.start();
+    etat_simulation_ = Etat::EnMarche;
+    emit etat_change(etat_simulation_);
     emit journal("Simulation démarrée.");
 }
 
 void MoteurSimulation::suspendre() {
+    if (etat_simulation_ != Etat::EnMarche) return;
     minuterie_.stop();
-    emit journal("Simulation suspendue.");
+    etat_simulation_ = Etat::EnPause;
+    emit etat_change(etat_simulation_);
+    emit journal("Simulation en pause — l'état du circuit est conservé.");
 }
 
 void MoteurSimulation::arreter() {
+    const bool tournait = etat_simulation_ != Etat::Arrete;
     minuterie_.stop();
     for (auto& paire : cartes_) paire.second->mcu->reinitialiser();
     remettre_a_zero();
     vitesse_ = 0.0;
-    emit journal("Simulation arrêtée et microcontrôleurs réinitialisés.");
+    etat_simulation_ = Etat::Arrete;
+    emit etat_change(etat_simulation_);
+    if (tournait)
+        emit journal("Simulation arrêtée et microcontrôleurs réinitialisés.");
     emit avancement(0.0, 0.0);
 }
 

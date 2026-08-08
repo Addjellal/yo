@@ -406,8 +406,9 @@ void PanneauAnalyses::construire() {
     disposition->addWidget(resume_widget_);
 }
 
-void PanneauAnalyses::proposer_signaux(const QStringList& signaux) {
-    const QString choisi = signal_->currentText();
+void PanneauAnalyses::proposer_signaux(
+    const QStringList& signaux, const std::map<QString, QString>& libelles) {
+    const QString choisi = signal_->currentData().toString();
     // Les rails d'alimentation sont constants : proposer « 5V » comme signal
     // par défaut n'aurait aucun sens pour un spectre.
     static const QStringList rails = {"GND", "5V", "3V3", "VIN"};
@@ -419,11 +420,18 @@ void PanneauAnalyses::proposer_signaux(const QStringList& signaux) {
         (signal.startsWith("I(") ? courants : tensions) << signal;
     }
     const QStringList utiles = tensions + courants;
+
     signal_->clear();
-    signal_->addItems(utiles);
-    if (signal_choisi_ && utiles.contains(choisi))
-        signal_->setCurrentText(choisi);
-    else if (!utiles.isEmpty())
+    for (const QString& signal : utiles) {
+        auto it = libelles.find(signal);
+        signal_->addItem(
+            it == libelles.end() ? signal : signal + "  —  " + it->second,
+            signal);
+    }
+    const int rang = signal_->findData(choisi);
+    if (signal_choisi_ && rang >= 0)
+        signal_->setCurrentIndex(rang);
+    else if (signal_->count())
         signal_->setCurrentIndex(0);
 }
 
@@ -492,11 +500,12 @@ void PanneauAnalyses::lancer() {
             break;
         }
         default:
-            if (signal_->currentText().isEmpty()) {
+            if (signal_->currentData().toString().isEmpty()) {
                 signaler("Aucun signal relevé : lancez d'abord la simulation.");
                 return;
             }
-            emit spectre_demande(signal_->currentText(), harmoniques_->value());
+            emit spectre_demande(signal_->currentData().toString(),
+                                 harmoniques_->value());
             break;
     }
 }

@@ -42,6 +42,16 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   ACS712.
 - **Simulation couplée** : la LED s'allume avec l'éclat correspondant au
   courant réellement calculé, chaque fil affiche sa tension moyenne.
+- **Instruments posés dans le circuit** : voltmètre et ampèremètre affichent
+  leur mesure sous leur symbole pendant la simulation, et ils sont modélisés
+  (10 MΩ, 0,01 Ω) — ils chargent donc le montage, très peu mais réellement.
+  Une sonde de tension, elle, ne charge rien : c'est le seul instrument qu'on
+  peut greffer n'importe où sans changer le circuit.
+- **Nœuds nommés par ce qu'ils relient** : « R1_2 » plutôt que « N3 », comme
+  dans KiCad, et chaque liste de signaux dit ce que désigne le nom.
+- **Commande unique** façon atelier de calcul : le même bouton lance, met en
+  pause et reprend (F9) ; un second arrête et remet les microcontrôleurs à
+  zéro. La barre d'état dit en permanence où en est la simulation.
 - **Oscilloscope quatre voies** : formes d'onde réelles issues de l'analyse
   transitoire — tension d'un nœud ou courant d'un composant, base de temps de
   2 ms à 5 s, mesures moyenne et crête, gel de l'écran. Les voies se règlent

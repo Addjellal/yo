@@ -51,6 +51,10 @@ public:
     // aucune broche reliée, et resterait pourtant à programmer.
     QStringList cartes_presentes() const;
 
+    // Ce que relie chaque nœud : « R1_2 » -> « C1.1 · R1.2 ». Sert à ne
+    // jamais proposer un nom de nœud sans dire ce qu'il désigne.
+    std::map<QString, QString> description_noeuds() const;
+
     std::vector<ItemComposant*> composants() const;
     std::vector<ItemFil*> fils() const;
 

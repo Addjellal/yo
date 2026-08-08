@@ -155,6 +155,15 @@ struct Modele {
     // « 1450 tr/min »). Vide si le composant n'a rien à montrer.
     std::function<std::string(const Instance&)> lecture;
 
+    // Instrument de mesure : ce qu'il affiche ne vient pas d'un état interne
+    // mais du circuit résolu. `tension(borne)` donne le potentiel d'une de
+    // ses bornes, `courant` ce qui le traverse. C'est ce qui distingue un
+    // voltmètre d'un servomoteur : l'un lit, l'autre se souvient.
+    std::function<std::string(
+        const Instance&, const std::function<double(const std::string&)>& tension,
+        double courant)>
+        mesure_instrument;
+
     // Directives .model / sous-circuits à émettre une seule fois.
     std::vector<std::string> directives;
 };

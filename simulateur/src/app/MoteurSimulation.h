@@ -68,10 +68,16 @@ public:
                          std::vector<LiaisonBroche> broches,
                          const QStringList& cartes);
 
-    void demarrer();
+    // État de la simulation, au sens où l'entend un atelier de calcul : on
+    // lance, on met en pause, on reprend, on arrête. « Arrêté » remet les
+    // microcontrôleurs à zéro ; « en pause » garde tout en place.
+    enum class Etat { Arrete, EnMarche, EnPause };
+
+    void demarrer();      // lance, ou reprend après une pause
     void suspendre();
     void arreter();
-    bool en_marche() const { return minuterie_.isActive(); }
+    Etat etat() const { return etat_simulation_; }
+    bool en_marche() const { return etat_simulation_ == Etat::EnMarche; }
 
     double temps_ms() const;
     // Pas d'échantillonnage de l'analyse transitoire, en secondes. Plus il est
@@ -110,6 +116,8 @@ signals:
         const std::map<std::string, std::map<std::string, double>>& etats);
     void journal(const QString& message);
     void avancement(double temps_ms, double vitesse);
+    // Changement d'état : c'est ce qui pilote l'apparence des commandes.
+    void etat_change(Etat etat);
 
 private slots:
     void trame();
@@ -151,6 +159,7 @@ private:
     double pas_ = 50e-6;            // résolution de l'analyse transitoire
     double instant_trame_ = 0.0;    // horloge absolue, pour l'oscilloscope
     std::map<std::string, double> etat_;   // tensions reprises d'une trame à l'autre
+    Etat etat_simulation_ = Etat::Arrete;  // marche, pause, arrêt
 
     Carte* carte(const QString& reference);
     const Carte* carte(const QString& reference) const;

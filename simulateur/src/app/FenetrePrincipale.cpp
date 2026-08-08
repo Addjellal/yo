@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
@@ -113,6 +114,8 @@ FenetrePrincipale::FenetrePrincipale() {
 
     connect(moteur_, &MoteurSimulation::journal, this,
             &FenetrePrincipale::ecrire);
+    connect(moteur_, &MoteurSimulation::etat_change, this,
+            [this](MoteurSimulation::Etat) { refleter_etat(); });
     connect(moteur_, &MoteurSimulation::resultats, this,
             [this](const std::map<std::string, double>& courants,
                    const std::map<std::string, double>& tensions) {
@@ -187,8 +190,38 @@ void FenetrePrincipale::construire_palette() {
                 circuit_modifie();
             });
 
+    // Cinquante-trois composants, c'est trop pour être parcouru à l'œil : un
+    // champ de recherche filtre l'arbre à la frappe et ouvre ce qui reste.
+    auto* contenu = new QWidget;
+    auto* colonne = new QVBoxLayout(contenu);
+    colonne->setContentsMargins(4, 4, 4, 4);
+    auto* recherche = new QLineEdit;
+    recherche->setPlaceholderText("Rechercher un composant…");
+    recherche->setClearButtonEnabled(true);
+    colonne->addWidget(recherche);
+    colonne->addWidget(palette_, 1);
+    connect(recherche, &QLineEdit::textChanged, this,
+            [this](const QString& filtre) {
+                for (int c = 0; c < palette_->topLevelItemCount(); ++c) {
+                    QTreeWidgetItem* categorie = palette_->topLevelItem(c);
+                    int visibles = 0;
+                    for (int k = 0; k < categorie->childCount(); ++k) {
+                        QTreeWidgetItem* feuille = categorie->child(k);
+                        const bool garde =
+                            filtre.isEmpty()
+                            || feuille->text(0).contains(filtre, Qt::CaseInsensitive)
+                            || categorie->text(0).contains(filtre,
+                                                           Qt::CaseInsensitive);
+                        feuille->setHidden(!garde);
+                        if (garde) ++visibles;
+                    }
+                    categorie->setHidden(visibles == 0);
+                    if (visibles) categorie->setExpanded(true);
+                }
+            });
+
     auto* dock = new QDockWidget("Composants", this);
-    dock->setWidget(palette_);
+    dock->setWidget(contenu);
     dock->setObjectName("dock_palette");
     addDockWidget(Qt::LeftDockWidgetArea, dock);
 }
@@ -350,14 +383,27 @@ void FenetrePrincipale::construire_actions() {
     auto* barre = addToolBar("Principal");
     barre->setObjectName("barre_principale");
     barre->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    barre->setMovable(false);
+    // Un peu d'air autour des commandes : une barre d'outils compacte se lit
+    // mal, et les deux boutons qui comptent doivent sauter aux yeux.
+    barre->setStyleSheet(
+        "QToolBar { spacing: 4px; padding: 3px; }"
+        "QToolButton { padding: 4px 10px; border-radius: 4px; }"
+        "QToolButton:hover { background: #e6eef5; }"
+        "QToolButton:checked { background: #d7e6f5; }");
 
     auto* selection = barre->addAction("Sélection");
     selection->setCheckable(true);
     selection->setChecked(true);
+    selection->setToolTip("Déplacer et régler les composants. Cliquer une "
+                          "borne tire quand même un fil.");
     auto* fil = barre->addAction("Fil");
     fil->setCheckable(true);
+    fil->setToolTip("Ne faire que câbler : les composants ne bougent plus par "
+                    "mégarde.");
     auto* gomme = barre->addAction("Supprimer");
     gomme->setCheckable(true);
+    gomme->setToolTip("Cliquer un composant ou un fil pour l'effacer.");
     auto* groupe = new QActionGroup(this);
     groupe->addAction(selection);
     groupe->addAction(fil);
@@ -387,17 +433,23 @@ void FenetrePrincipale::construire_actions() {
                           &FenetrePrincipale::compiler_source);
     simulation->addSeparator();
 
-    action_lancer_ = barre->addAction("Lancer");
-    connect(action_lancer_, &QAction::triggered, this,
-            &FenetrePrincipale::lancer);
-    action_pause_ = barre->addAction("Pause");
-    connect(action_pause_, &QAction::triggered, this,
-            &FenetrePrincipale::suspendre);
-    action_arreter_ = barre->addAction("Arrêter");
+    // Commande unique, comme dans un atelier de calcul : le même bouton lance,
+    // met en pause et reprend. Un second bouton arrête et remet à zéro. Deux
+    // boutons au lieu de trois, et leur libellé dit toujours ce qui va se
+    // passer si on clique.
+    action_marche_ = barre->addAction("▶  Lancer");
+    action_marche_->setShortcut(QKeySequence(Qt::Key_F9));
+    connect(action_marche_, &QAction::triggered, this, [this] {
+        if (moteur_->etat() == MoteurSimulation::Etat::EnMarche)
+            suspendre();
+        else
+            lancer();
+    });
+    action_arreter_ = barre->addAction("■  Arrêter");
+    action_arreter_->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F5));
     connect(action_arreter_, &QAction::triggered, this,
             &FenetrePrincipale::arreter);
-    simulation->addAction(action_lancer_);
-    simulation->addAction(action_pause_);
+    simulation->addAction(action_marche_);
     simulation->addAction(action_arreter_);
     simulation->addSeparator();
     simulation->addAction("Analyse au point de &repos", this,
@@ -476,19 +528,36 @@ void FenetrePrincipale::construire_actions() {
 
 void FenetrePrincipale::construire_barre_etat() {
     etiquette_moteurs_ = new QLabel;
+    etiquette_etat_ = new QLabel;
     etiquette_temps_ = new QLabel("Temps simulé : 0,000 s");
     etiquette_vitesse_ = new QLabel("Vitesse : —");
 
     const bool spice = coeur::NgspiceEngine::compile_avec_ngspice();
     const bool avr = coeur::AvrEngine::compile_avec_simavr();
-    etiquette_moteurs_->setText(
-        QString("ngspice : %1   |   simavr : %2   |   avr-gcc : %3")
-            .arg(spice ? "actif" : "absent", avr ? "actif" : "absent",
-                 coeur::AvrEngine::avr_gcc_disponible() ? "trouvé" : "absent"));
+    const bool gcc = coeur::AvrEngine::avr_gcc_disponible();
+    // Une pastille par moteur : verte s'il est là, grise sinon. Le détail —
+    // à quoi il sert, ce qu'il manque — passe en infobulle plutôt que
+    // d'encombrer la barre en permanence.
+    auto pastille = [](bool present, const QString& nom) {
+        return QString("<span style='color:%1'>●</span> %2")
+            .arg(present ? "#2e9e44" : "#b0b0b0", nom);
+    };
+    etiquette_moteurs_->setText(pastille(spice, "ngspice") + "   "
+                                + pastille(avr, "simavr") + "   "
+                                + pastille(gcc, "avr-gcc"));
+    etiquette_moteurs_->setToolTip(
+        QString("ngspice : %1 — calcul des tensions et des courants\n"
+                "simavr : %2 — exécution du firmware\n"
+                "avr-gcc : %3 — compilation depuis l'application")
+            .arg(spice ? "présent" : "absent",
+                 avr ? "présent" : "absent", gcc ? "présent" : "absent"));
 
+    statusBar()->addWidget(etiquette_etat_);
+    statusBar()->addWidget(new QLabel("  "));
     statusBar()->addWidget(etiquette_moteurs_);
     statusBar()->addPermanentWidget(etiquette_temps_);
     statusBar()->addPermanentWidget(etiquette_vitesse_);
+    refleter_etat();
 
     // Une ligne d'état ne suffit pas : sans ngspice, l'application se lance,
     // le schéma se dessine, et rien ne se passe quand on simule. Il faut le
@@ -506,6 +575,35 @@ void FenetrePrincipale::construire_barre_etat() {
         ecrire("avr-gcc est introuvable dans le PATH : le bouton « Compiler » "
                "ne fonctionnera pas. On peut malgré tout charger un .elf déjà "
                "compilé (Simulation → Charger un firmware).");
+}
+
+// Le libellé du bouton dit ce qui va se passer, la pastille dit où on en est.
+void FenetrePrincipale::refleter_etat() {
+    const MoteurSimulation::Etat etat = moteur_->etat();
+    const bool marche = etat == MoteurSimulation::Etat::EnMarche;
+    const bool pause = etat == MoteurSimulation::Etat::EnPause;
+
+    if (action_marche_) {
+        action_marche_->setText(marche  ? "❚❚  Pause"
+                                : pause ? "▶  Reprendre"
+                                        : "▶  Lancer");
+        action_marche_->setToolTip(
+            marche ? "Suspendre la simulation sans rien perdre (F9)"
+                   : "Lancer la simulation du circuit et du programme (F9)");
+    }
+    if (action_arreter_) {
+        action_arreter_->setEnabled(marche || pause);
+        action_arreter_->setToolTip(
+            "Arrêter et remettre les microcontrôleurs à zéro (Maj+F5)");
+    }
+    if (etiquette_etat_) {
+        const QString couleur = marche ? "#2e9e44" : pause ? "#d08a1e" : "#8a8a8a";
+        const QString texte = marche ? "en marche" : pause ? "en pause" : "arrêté";
+        etiquette_etat_->setText(
+            QString("<span style='color:%1'>●</span> <b>%2</b>")
+                .arg(couleur, texte));
+    }
+    if (!marche && etiquette_vitesse_) etiquette_vitesse_->setText("Vitesse : —");
 }
 
 // ---------------------------------------------------------------------------
@@ -569,7 +667,25 @@ void FenetrePrincipale::circuit_modifie() {
         signaux << QString("I(%1)").arg(
             QString::fromStdString(instance.reference));
     signaux.sort();
-    if (oscilloscope_) oscilloscope_->proposer_signaux(signaux);
+
+    // Un nom de nœud ne dit rien tout seul : on lui joint ce qu'il relie, et
+    // un courant dit dans quel composant il circule.
+    std::map<QString, QString> libelles = scene_->description_noeuds();
+    for (const coeur::Instance& instance : netlist.instances()) {
+        const QString reference = QString::fromStdString(instance.reference);
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        libelles[QString("I(%1)").arg(reference)] =
+            QString("courant dans %1%2")
+                .arg(reference,
+                     modele ? " (" + QString::fromStdString(modele->libelle) + ")"
+                            : QString());
+    }
+    libelles["GND"] = "masse, 0 V";
+    libelles["5V"] = "alimentation 5 V";
+    libelles["3V3"] = "alimentation 3,3 V";
+
+    if (oscilloscope_) oscilloscope_->proposer_signaux(signaux, libelles);
 
     // Grandeurs balayables : les sources imposent une tension, les résistances
     // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
@@ -589,7 +705,7 @@ void FenetrePrincipale::circuit_modifie() {
                     QString::fromStdString(instance.reference));
         }
         analyses_->proposer_sources(generateurs + resistances);
-        analyses_->proposer_signaux(signaux);
+        analyses_->proposer_signaux(signaux, libelles);
     }
 
     const QStringList cartes = scene_->cartes_presentes();
@@ -1581,10 +1697,21 @@ void FenetrePrincipale::charger_exemple_filtre() {
     gbf->textes["forme"] = "sinus";
     c->setRotation(90);
 
-    scene_->addItem(new ItemFil(gbf, 0, r, 0));      // + -> R
+    // Deux instruments posés dans le circuit, comme sur une paillasse :
+    // l'ampèremètre en série, le voltmètre en parallèle sur le condensateur.
+    // Ils sont modélisés (0,01 Ω et 10 MΩ), donc ils chargent le montage —
+    // très peu, mais réellement.
+    ItemComposant* am = scene_->ajouter_composant("amperemetre", QPointF(-150, -120));
+    ItemComposant* vm = scene_->ajouter_composant("voltmetre", QPointF(200, 0));
+    if (!am || !vm) return;
+
+    scene_->addItem(new ItemFil(gbf, 0, am, 0));     // + -> ampèremètre
+    scene_->addItem(new ItemFil(am, 1, r, 0));       // ampèremètre -> R
     scene_->addItem(new ItemFil(r, 1, c, 0));        // R -> C
     scene_->addItem(new ItemFil(c, 1, masse, 0));    // C -> masse
     scene_->addItem(new ItemFil(gbf, 1, masse, 0));  // - -> masse
+    scene_->addItem(new ItemFil(c, 0, vm, 0));       // voltmètre sur C
+    scene_->addItem(new ItemFil(vm, 1, masse, 0));
 
     circuit_modifie();
     vue_->ajuster();
@@ -1594,6 +1721,8 @@ void FenetrePrincipale::charger_exemple_filtre() {
            "1/(2·pi·R·C) = 1591 Hz, avec −20 dB par décade et −45° à la "
            "coupure.");
     ecrire("Le balayage continu et le spectre s'y lancent de la même façon.");
+    ecrire("AM1 et VM1 affichent leur mesure sous leur symbole dès que la "
+           "simulation tourne.");
 }
 
 // ---------------------------------------------------------------------------
