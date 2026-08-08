@@ -2099,6 +2099,96 @@ static void test_multimetres() {
 }
 
 // ---------------------------------------------------------------------------
+// [17] Balayage en température et analyse de bruit : deux analyses que
+// ngspice sait faire et qu'il fallait seulement savoir lui demander.
+// ---------------------------------------------------------------------------
+static void test_temperature_et_bruit() {
+    std::printf("\n[17] Température et bruit\n");
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent — section ignorée)\n");
+        return;
+    }
+
+    // --- une thermistance CTN doit voir sa tension varier avec la
+    // température : c'est la vérification qui a du sens ici.
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 5;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 10000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "MID");
+        auto& d = netlist.ajouter("D1", "diode");
+        netlist.relier("D1", "A", "MID");
+        netlist.relier("D1", "K", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".dc TEMP -20 100 20");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        verifier(ok && balayage.abscisse.size() == 7,
+                 "balayage en température : sept points de -20 à 100 °C",
+                 std::to_string(balayage.abscisse.size()));
+        const coeur::Courbe* mid = balayage.courbe("mid");
+        if (mid && mid->valeurs.size() == 7) {
+            // La tension de seuil d'une diode baisse d'environ 2 mV par degré :
+            // sur 120 °C, la chute doit être nettement visible.
+            const double froid = mid->valeurs.front(), chaud = mid->valeurs.back();
+            verifier(chaud < froid - 0.15,
+                     "la tension de seuil d'une diode baisse avec la chaleur",
+                     f(froid) + " V à -20 °C, " + f(chaud) + " V à 100 °C");
+        } else {
+            verifier(false, "balayage en température : la sortie est relevée");
+        }
+    }
+
+    // --- bruit d'une résistance : la théorie donne 4kTR, soit 12,9 nV/√Hz
+    // pour 10 kΩ à 27 °C.
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "sinus";
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 10000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "SORTIE");
+        auto& c = netlist.ajouter("C1", "condensateur");
+        c.valeurs["farads"] = 1e-9;
+        netlist.relier("C1", "1", "SORTIE");
+        netlist.relier("C1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {},
+                                  ".noise V(SORTIE) VGBF1 dec 10 10 1meg");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        verifier(ok && balayage.logarithmique,
+                 "l'analyse de bruit produit bien un spectre en fréquence");
+        const coeur::Courbe* sortie = balayage.courbe("onoise_spectrum");
+        verifier(sortie != nullptr,
+                 "le spectre de bruit en sortie est retrouvé, malgré le tracé "
+                 "des totaux que ngspice laisse courant");
+        if (sortie && !sortie->valeurs.empty()) {
+            // 4kTR = 1,66e-16 V²/Hz pour 10 kΩ : 12,9 nV/√Hz en basse
+            // fréquence, là où le condensateur n'agit pas encore.
+            const double densite = sortie->valeurs.front();
+            verifier(presque(densite, 12.9e-9, 1.5e-9),
+                     "bruit thermique d'une résistance de 10 kΩ : 4kTR",
+                     std::to_string(densite * 1e9) + " nV/√Hz");
+            // Le filtre coupe : le bruit doit décroître avec la fréquence.
+            verifier(sortie->valeurs.back() < densite / 10,
+                     "et le filtre RC coupe ce bruit en haute fréquence");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2123,6 +2213,7 @@ int main() {
     test_documents();
     test_balayages();
     test_multimetres();
+    test_temperature_et_bruit();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

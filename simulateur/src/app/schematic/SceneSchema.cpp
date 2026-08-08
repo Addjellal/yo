@@ -9,6 +9,7 @@
 #include <QPainter>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #include "app/schematic/ItemComposant.h"
@@ -33,6 +34,20 @@ int numero_broche(const std::string& nom) {
     if (nom[0] == 'D' && valeur >= 0 && valeur <= 13) return valeur;
     if (nom[0] == 'A' && valeur >= 0 && valeur <= 5) return 14 + valeur;
     return -1;
+}
+
+// Nom de nœud utilisable partout : SPICE accepte « AM1_+ » comme nom de nœud,
+// mais pas dans une expression « V(AM1_+) » — le « + » y est un opérateur. On
+// traduit donc les signes des bornes, une fois pour toutes.
+std::string assainir_noeud(const std::string& brut) {
+    std::string propre;
+    for (char c : brut) {
+        if (std::isalnum(static_cast<unsigned char>(c))) propre += c;
+        else if (c == '+') propre += 'P';
+        else if (c == '-') propre += 'N';
+        else propre += '_';
+    }
+    return propre;
 }
 
 // Union-find : deux bornes reliées par un fil appartiennent au même nœud.
@@ -261,8 +276,9 @@ SceneSchema::calculer_noeuds() const {
                     (fil->arrivee() == composant && fil->borne_arrivee() == k))
                     cablee = true;
             if (!cablee) continue;
-            noms[racine] = composant->reference().toStdString() + "_"
-                           + composant->nom_borne(k).toStdString();
+            noms[racine] =
+                assainir_noeud(composant->reference().toStdString() + "_"
+                               + composant->nom_borne(k).toStdString());
         }
     }
 

@@ -312,6 +312,7 @@ void PanneauAnalyses::construire() {
     type_->addItem("Balayage continu (.dc)");
     type_->addItem("Réponse en fréquence (.ac)");
     type_->addItem("Spectre du dernier relevé (FFT)");
+    type_->addItem("Bruit (.noise)");
     barre->addWidget(type_);
 
     reglages_ = new QStackedWidget;
@@ -367,6 +368,33 @@ void PanneauAnalyses::construire() {
         points_->setRange(2, 200);
         points_->setValue(20);
         ligne->addWidget(points_);
+        reglages_->addWidget(page);
+    }
+    {   // --- bruit (page ajoutée après le spectre, cf. ordre du sélecteur)
+        auto* page = new QWidget;
+        auto* ligne = new QHBoxLayout(page);
+        ligne->setContentsMargins(0, 0, 0, 0);
+        ligne->addWidget(new QLabel("Sortie"));
+        sortie_bruit_ = new QComboBox;
+        sortie_bruit_->setMinimumWidth(110);
+        ligne->addWidget(sortie_bruit_);
+        ligne->addWidget(new QLabel("source"));
+        source_bruit_ = new QComboBox;
+        source_bruit_->setMinimumWidth(90);
+        ligne->addWidget(source_bruit_);
+        ligne->addWidget(new QLabel("de"));
+        f_debut_bruit_ = new QDoubleSpinBox;
+        f_debut_bruit_->setRange(0.01, 1e9);
+        f_debut_bruit_->setDecimals(2);
+        f_debut_bruit_->setValue(10);
+        ligne->addWidget(f_debut_bruit_);
+        ligne->addWidget(new QLabel("Hz à"));
+        f_fin_bruit_ = new QDoubleSpinBox;
+        f_fin_bruit_->setRange(1, 1e9);
+        f_fin_bruit_->setDecimals(0);
+        f_fin_bruit_->setValue(1e6);
+        ligne->addWidget(f_fin_bruit_);
+        ligne->addWidget(new QLabel("Hz"));
         reglages_->addWidget(page);
     }
     {   // --- spectre
@@ -428,6 +456,19 @@ void PanneauAnalyses::proposer_signaux(
             it == libelles.end() ? signal : signal + "  —  " + it->second,
             signal);
     }
+    if (sortie_bruit_) {
+        const QString choix = sortie_bruit_->currentData().toString();
+        sortie_bruit_->clear();
+        for (const QString& signal : tensions) {
+            auto it = libelles.find(signal);
+            sortie_bruit_->addItem(
+                it == libelles.end() ? signal : signal + "  —  " + it->second,
+                signal);
+        }
+        const int garde = sortie_bruit_->findData(choix);
+        if (garde >= 0) sortie_bruit_->setCurrentIndex(garde);
+    }
+
     const int rang = signal_->findData(choisi);
     if (signal_choisi_ && rang >= 0)
         signal_->setCurrentIndex(rang);
@@ -447,6 +488,16 @@ void PanneauAnalyses::proposer_sources(const QStringList& sources) {
     else if (!sources.isEmpty())
         source_->setCurrentIndex(0);
     adapter_bornes(source_->currentText());
+
+    if (source_bruit_) {
+        // Le bruit se rapporte à une source de tension : les résistances
+        // balayables n'ont pas leur place ici.
+        const QString choix = source_bruit_->currentText();
+        source_bruit_->clear();
+        for (const QString& nom : sources)
+            if (nom.startsWith('V')) source_bruit_->addItem(nom);
+        if (sources.contains(choix)) source_bruit_->setCurrentText(choix);
+    }
 }
 
 // Balayer une tension et balayer une résistance n'ont pas les mêmes ordres de
@@ -454,6 +505,19 @@ void PanneauAnalyses::proposer_sources(const QStringList& sources) {
 // singulier dès le premier point. Les bornes suivent donc la grandeur choisie.
 void PanneauAnalyses::adapter_bornes(const QString& grandeur) {
     if (!debut_ || !fin_ || !pas_) return;
+    if (grandeur == "TEMP") {          // balayage en température
+        debut_->setRange(-273, 500);
+        fin_->setRange(-273, 500);
+        pas_->setRange(0.1, 100);
+        debut_->setSuffix(" °C");
+        fin_->setSuffix(" °C");
+        pas_->setSuffix(" °C");
+        pas_->setDecimals(1);
+        debut_->setValue(-20);
+        fin_->setValue(85);
+        pas_->setValue(5);
+        return;
+    }
     const bool resistance = grandeur.startsWith('R');
     debut_->setRange(resistance ? 1.0 : -1000.0, 1e6);
     fin_->setRange(resistance ? 1.0 : -1000.0, 1e6);
@@ -497,6 +561,23 @@ void PanneauAnalyses::lancer() {
                                           .arg(f_fin_->value());
             derniere_directive_ = directive;
             emit balayage_demande(directive, true);
+            break;
+        }
+        case 3: {
+            if (sortie_bruit_->currentText().isEmpty()
+                || source_bruit_->currentText().isEmpty()) {
+                signaler("Le bruit se calcule entre une source et une sortie : "
+                         "il faut les deux sur le schéma.");
+                return;
+            }
+            const QString directive =
+                QString(".noise V(%1) %2 dec 20 %3 %4")
+                    .arg(sortie_bruit_->currentData().toString(),
+                         source_bruit_->currentText())
+                    .arg(f_debut_bruit_->value())
+                    .arg(f_fin_bruit_->value());
+            derniere_directive_ = directive;
+            emit balayage_demande(directive, false);
             break;
         }
         default:
@@ -580,7 +661,7 @@ void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
         }
         trace_->definir_axes(QString::fromStdString(balayage.grandeur),
                              "Valeur", "");
-        trace_->definir(series, false, false);
+        trace_->definir(series, balayage.logarithmique, false);
     }
 
     resume_ = QString("%1 : %2 points, %3 courbes\n")

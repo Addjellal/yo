@@ -119,6 +119,11 @@ private:
     // Spectre
     QComboBox* signal_ = nullptr;
     QSpinBox* harmoniques_ = nullptr;
+    // Bruit
+    QComboBox* sortie_bruit_ = nullptr;
+    QComboBox* source_bruit_ = nullptr;
+    QDoubleSpinBox* f_debut_bruit_ = nullptr;
+    QDoubleSpinBox* f_fin_bruit_ = nullptr;
 
     QString resume_;
     QString derniere_directive_;

@@ -468,7 +468,35 @@ bool NgspiceEngine::resoudre_analyse() {
     const std::string trace = executer();
     if (trace.empty()) return false;
 
-    char** vecteurs = ngSpice_AllVecs(const_cast<char*>(trace.c_str()));
+    // Certaines analyses produisent PLUSIEURS tracés — « .noise » en donne
+    // deux : le spectre, puis les totaux intégrés, et c'est ce dernier que
+    // ngspice laisse courant. On cherche donc, parmi les tracés disponibles,
+    // celui qui porte une abscisse exploitable.
+    std::string trace_utile = trace;
+    auto porte_une_abscisse = [](const std::string& nom_trace) {
+        char** liste = ngSpice_AllVecs(const_cast<char*>(nom_trace.c_str()));
+        for (int k = 0; liste && liste[k]; ++k) {
+            const std::string cle = minuscules(liste[k]);
+            const std::string suffixe = "-sweep";
+            if (cle == "frequency"
+                || (cle.size() > suffixe.size()
+                    && cle.compare(cle.size() - suffixe.size(), suffixe.size(),
+                                   suffixe) == 0))
+                return true;
+        }
+        return false;
+    };
+    if (!porte_une_abscisse(trace_utile)) {
+        if (char** noms_traces = ngSpice_AllPlots()) {
+            for (int k = 0; noms_traces[k]; ++k)
+                if (porte_une_abscisse(noms_traces[k])) {
+                    trace_utile = noms_traces[k];
+                    break;
+                }
+        }
+    }
+
+    char** vecteurs = ngSpice_AllVecs(const_cast<char*>(trace_utile.c_str()));
     if (!vecteurs) {
         erreurs_.push_back("le balayage n'a produit aucun vecteur");
         return false;
@@ -498,7 +526,7 @@ bool NgspiceEngine::resoudre_analyse() {
     }
 
     std::vector<double> reel, imaginaire;
-    copier_complexe(trace, abscisse, reel, imaginaire);
+    copier_complexe(trace_utile, abscisse, reel, imaginaire);
     balayage_.abscisse = reel;               // l'abscisse est toujours réelle
     if (balayage_.abscisse.empty()) {
         erreurs_.push_back("abscisse de balayage vide");
@@ -529,13 +557,19 @@ bool NgspiceEngine::resoudre_analyse() {
         if (nom.rfind("rfuite", 0) == 0) continue;
 
         std::vector<double> partie_reelle, partie_imaginaire;
-        copier_complexe(trace, brut, partie_reelle, partie_imaginaire);
+        copier_complexe(trace_utile, brut, partie_reelle, partie_imaginaire);
         if (partie_reelle.empty()) continue;
 
         Courbe courbe;
+        // Dans un tracé de bruit, les vecteurs nommés d'après un composant ne
+        // sont pas des courants mais sa contribution au bruit : les appeler
+        // « I(r1) » induirait en erreur.
+        const bool bruit = minuscules(trace_utile).rfind("noise", 0) == 0;
+        const std::string reference = nom.size() > 1 ? nom.substr(1) : nom;
         courbe.nom = (genre == Genre::Tension)
                          ? nom
-                         : "I(" + (nom.size() > 1 ? nom.substr(1) : nom) + ")";
+                         : (bruit ? "bruit(" + reference + ")"
+                                  : "I(" + reference + ")");
         if (partie_imaginaire.empty()) {
             courbe.valeurs = std::move(partie_reelle);
         } else {

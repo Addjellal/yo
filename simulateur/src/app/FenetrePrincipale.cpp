@@ -898,7 +898,11 @@ void FenetrePrincipale::circuit_modifie() {
                 resistances << QString("R%1").arg(
                     QString::fromStdString(instance.reference));
         }
-        analyses_->proposer_sources(generateurs + resistances);
+        // La température est balayable comme une source : ngspice la traite
+        // de la même façon, et c'est le moyen de voir dériver une CTN ou un
+        // transistor.
+        analyses_->proposer_sources(generateurs + resistances
+                                    + QStringList{"TEMP"});
         analyses_->proposer_signaux(signaux, libelles);
     }
 
