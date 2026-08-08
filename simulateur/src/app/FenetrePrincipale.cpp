@@ -559,6 +559,8 @@ void FenetrePrincipale::construire_actions() {
                         [this] { charger_exemple(Exemple::DeuxCartes); });
     exemples->addAction("Servomoteur balayé", this,
                         [this] { charger_exemple(Exemple::Servo); });
+    exemples->addAction("Chenillard sur registre 74HC595 (moteur numérique)",
+                        this, [this] { charger_exemple(Exemple::Registre); });
     exemples->addAction("Filtre RC (analyses : Bode, balayage, spectre)", this,
                         [this] { charger_exemple(Exemple::FiltreRC); });
     exemples->addAction("Moteur en PWM avec transistor", this,
@@ -1603,6 +1605,39 @@ void loop() {
 }
 )";
 
+const char* kProgrammeRegistre = R"(/* Chenillard sur un 74HC595 : trois broches pour huit LED.
+   Le registre décale un bit à chaque coup d'horloge, et ne
+   recopie sur ses sorties qu'au front de verrouillage. */
+const int DONNEE = 11;      /* SER   */
+const int HORLOGE = 13;     /* SRCLK */
+const int VERROU = 10;      /* RCLK  */
+
+void setup() {
+    pinMode(DONNEE, OUTPUT);
+    pinMode(HORLOGE, OUTPUT);
+    pinMode(VERROU, OUTPUT);
+}
+
+/* Un octet, bit de poids fort en tête — c'est ce que fait shiftOut(). */
+void envoyer(unsigned char valeur) {
+    digitalWrite(VERROU, LOW);
+    for (int bit = 7; bit >= 0; bit--) {
+        digitalWrite(HORLOGE, LOW);
+        digitalWrite(DONNEE, (valeur >> bit) & 1);
+        digitalWrite(HORLOGE, HIGH);
+    }
+    digitalWrite(VERROU, HIGH);   /* les huit sorties basculent ici */
+}
+
+void loop() {
+    static unsigned char motif = 1;
+    envoyer(motif);
+    motif = motif << 1;
+    if (motif == 0) motif = 1;
+    delay(150);
+}
+)";
+
 }  // namespace
 
 void FenetrePrincipale::charger_exemple(Exemple exemple) {
@@ -1616,6 +1651,10 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
     }
     if (exemple == Exemple::FiltreRC) {
         charger_exemple_filtre();
+        return;
+    }
+    if (exemple == Exemple::Registre) {
+        charger_exemple_registre();
         return;
     }
     programmes_.clear();
@@ -1700,6 +1739,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
         }
         case Exemple::DeuxCartes:
         case Exemple::FiltreRC:
+        case Exemple::Registre:
             return;   // traités à part : ces schémas n'ont pas une seule carte
         case Exemple::Servo: {
             ItemComposant* servo = scene_->ajouter_composant("servomoteur", QPointF(120, 0));
@@ -1894,6 +1934,63 @@ void FenetrePrincipale::charger_exemple_filtre() {
     ecrire("Le balayage continu et le spectre s'y lancent de la même façon.");
     ecrire("AM1 et VM1 affichent leur mesure sous leur symbole dès que la "
            "simulation tourne.");
+}
+
+// Chenillard sur registre à décalage : le montage qui montre le troisième
+// moteur à l'œuvre. L'horloge tourne à quelques centaines de kilohertz —
+// aucune analyse analogique ne la suivrait, et pourtant les huit LED
+// s'allument au bon moment.
+void FenetrePrincipale::charger_exemple_registre() {
+    scene_->tout_effacer();
+    scene_->oublier_historique();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* carte = scene_->ajouter_composant("arduino_uno", QPointF(-560, 0));
+    ItemComposant* ic = scene_->ajouter_composant("registre_74hc595", QPointF(-150, 0));
+    ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(-300, 400));
+    if (!carte || !ic || !masse) return;
+    auto borne_de = [carte](const QString& nom) {
+        for (int k = 0; k < carte->nb_bornes(); ++k)
+            if (carte->nom_borne(k) == nom) return k;
+        return 0;
+    };
+    auto borne_ic = [ic](const QString& nom) {
+        for (int k = 0; k < ic->nb_bornes(); ++k)
+            if (ic->nom_borne(k) == nom) return k;
+        return 0;
+    };
+
+    scene_->addItem(new ItemFil(carte, borne_de("D11"), ic, borne_ic("SER")));
+    scene_->addItem(new ItemFil(carte, borne_de("D13"), ic, borne_ic("SRCLK")));
+    scene_->addItem(new ItemFil(carte, borne_de("D10"), ic, borne_ic("RCLK")));
+    scene_->addItem(new ItemFil(carte, borne_de("GND"), masse, 0));
+
+    // Les LED sont espacées plus largement que les broches du boîtier : à
+    // 26 points, leurs symboles se chevauchaient et l'octet devenait
+    // illisible.
+    for (int k = 0; k < 8; ++k) {
+        const double y = -245 + k * 70.0;
+        ItemComposant* led = scene_->ajouter_composant("led", QPointF(90, y));
+        ItemComposant* r = scene_->ajouter_composant("resistance", QPointF(260, y));
+        if (!led || !r) return;
+        r->valeurs["ohms"] = 470;
+        scene_->addItem(new ItemFil(ic, borne_ic("Q" + QString::number(k)), led, 0));
+        scene_->addItem(new ItemFil(led, 1, r, 0));
+        scene_->addItem(new ItemFil(r, 1, masse, 0));
+    }
+
+    circuit_modifie();
+    programmes_[carte->reference()] = QString::fromUtf8(kProgrammeRegistre);
+    const QString affichee = carte_courante_;
+    carte_courante_.clear();
+    changer_carte(affichee.isEmpty() ? carte->reference() : affichee);
+    vue_->ajuster();
+    ecrire("Exemple : chenillard sur un 74HC595 — trois broches, huit LED.");
+    ecrire("L'horloge tourne à des centaines de kilohertz : c'est le moteur "
+           "numérique événementiel qui la traite, pas l'analogique.");
+    ecrire("Le registre affiche son contenu sous son symbole, en binaire.");
 }
 
 // ---------------------------------------------------------------------------

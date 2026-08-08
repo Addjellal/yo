@@ -29,6 +29,12 @@ struct Instance {
     std::map<std::string, double> valeurs;        // ohms, position…
     std::map<std::string, std::string> textes;    // couleur, modèle SPICE…
 
+    // Formes d'onde imposées par un composant numérique à ses sorties, sur la
+    // fenêtre de calcul : liste de (instant, tension). Elles deviennent des
+    // sources linéaires par morceaux dans la netlist SPICE. Vide pour tout
+    // composant qui n'est pas piloté par des événements.
+    std::map<std::string, std::vector<std::pair<double, double>>> ondes;
+
     const Borne* borne(const std::string& nom) const;
     double valeur(const std::string& cle, double defaut = 0.0) const;
     std::string texte(const std::string& cle,

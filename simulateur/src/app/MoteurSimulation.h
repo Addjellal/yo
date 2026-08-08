@@ -37,6 +37,7 @@
 #include "app/schematic/SceneSchema.h"
 #include "core/Netlist.h"
 #include "core/engines/AvrEngine.h"
+#include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 
 class MoteurSimulation : public QObject {
@@ -141,6 +142,9 @@ private:
     };
 
     coeur::NgspiceEngine analogique_;
+    // Troisième moteur : il propage les fronts dans les composants
+    // numériques avant que le circuit analogique ne soit résolu.
+    coeur::MoteurNumerique numerique_;
     coeur::Netlist netlist_;
     std::vector<LiaisonBroche> broches_;
     QTimer minuterie_;

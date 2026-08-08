@@ -100,8 +100,10 @@ add_library(coeur STATIC
   src/core/catalogue/actionneurs_dynamiques.cpp
   src/core/catalogue/capteurs_avances.cpp
   src/core/catalogue/sources.cpp
+  src/core/catalogue/numerique.cpp
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/AvrEngine.cpp
+  src/core/engines/MoteurNumerique.cpp
   src/core/analysis/Analyses.cpp
   src/core/analysis/Campagne.cpp
   src/core/export/Documents.cpp

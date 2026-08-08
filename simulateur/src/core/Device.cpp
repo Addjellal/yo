@@ -59,6 +59,18 @@ Catalogue& Catalogue::instance() {
     return unique;
 }
 
+bool EntreesNumeriques::niveau_a(const std::string& borne,
+                                 double instant) const {
+    auto depart = niveaux.find(borne);
+    bool niveau = depart != niveaux.end() && depart->second;
+    for (const EvenementNumerique& evenement : evenements) {
+        if (evenement.borne != borne) continue;
+        if (evenement.instant > instant) break;
+        niveau = evenement.haut;
+    }
+    return niveau;
+}
+
 void Catalogue::enregistrer(Modele modele) {
     modeles_[modele.type] = std::move(modele);
 }
@@ -101,6 +113,7 @@ void enregistrer_instruments(Catalogue& catalogue);
 void enregistrer_actionneurs_dynamiques(Catalogue& catalogue);
 void enregistrer_capteurs_avances(Catalogue& catalogue);
 void enregistrer_sources(Catalogue& catalogue);
+void enregistrer_numerique(Catalogue& catalogue);
 
 void Catalogue::enregistrer_modeles_standards() {
     enregistrer_base(*this);
@@ -113,6 +126,7 @@ void Catalogue::enregistrer_modeles_standards() {
     enregistrer_instruments(*this);
     enregistrer_actionneurs_dynamiques(*this);
     enregistrer_capteurs_avances(*this);
+    enregistrer_numerique(*this);
 }
 
 }  // namespace coeur

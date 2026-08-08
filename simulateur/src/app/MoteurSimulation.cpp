@@ -385,6 +385,29 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
                   return a.instant < b.instant;
               });
 
+    // Les composants numériques réagissent AVANT la résolution analogique :
+    // leurs sorties deviennent des sources de la fenêtre qui suit.
+    if (coeur::MoteurNumerique::circuit_numerique(netlist_)) {
+        std::vector<coeur::FrontNoeud> fronts;
+        fronts.reserve(transitions.size());
+        for (const coeur::TransitionBroche& transition : transitions)
+            fronts.push_back({transition.instant, transition.noeud,
+                              transition.tension > 2.5});
+        numerique_.propager(netlist_, fronts, etat_, duree);
+
+        // L'état d'un registre vit dans son instance, et la netlist est
+        // reconstruite à chaque modification du schéma : sans ce renvoi vers
+        // les composants posés, le registre se réinitialiserait sans cesse.
+        std::map<std::string, std::map<std::string, double>> etats;
+        for (const coeur::Instance& instance : netlist_.instances()) {
+            const coeur::Modele* modele =
+                coeur::Catalogue::instance().modele(instance.type);
+            if (!modele || !modele->reagir) continue;
+            etats[instance.reference] = instance.valeurs;
+        }
+        if (!etats.empty()) emit etats_composants(etats);
+    }
+
     analogique_.definir_etat_initial(etat_);
     source_spice_ = QString::fromStdString(analogique_.construire_transitoire(
         netlist_, broches, transitions, duree, pas_));

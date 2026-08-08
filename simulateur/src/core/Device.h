@@ -103,6 +103,34 @@ struct Evolution {
     double rapport_cyclique(const std::string& borne, double seuil = 2.5) const;
 };
 
+// --- composants numériques -------------------------------------------------
+//
+// Un 74HC595 ne se décrit pas par une équation : il réagit à des fronts. Le
+// modéliser en analogique demanderait un pas de calcul si fin que la
+// simulation deviendrait inutilisable — alors que ses entrées, elles, sont
+// déjà datées au cycle d'horloge près par le microcontrôleur.
+//
+// D'où ce troisième moteur : on lui donne les événements de la fenêtre, il
+// rend ceux de ses sorties, et ceux-ci redeviennent des sources linéaires par
+// morceaux dans le même circuit analogique. Rien n'est approximé au passage —
+// une horloge à 4 MHz est traitée aussi exactement qu'une à 1 Hz.
+struct EvenementNumerique {
+    double instant = 0;        // en secondes, depuis le début de la fenêtre
+    std::string borne;
+    bool haut = false;
+};
+
+struct EntreesNumeriques {
+    double duree = 0;
+    // Niveau de chaque borne au début de la fenêtre.
+    std::map<std::string, bool> niveaux;
+    // Événements des entrées, triés par instant.
+    std::vector<EvenementNumerique> evenements;
+
+    // Niveau d'une borne à un instant donné, événements compris.
+    bool niveau_a(const std::string& borne, double instant) const;
+};
+
 // --- modèle de composant --------------------------------------------------
 struct Modele {
     std::string type;                   // identifiant interne : "resistance"
@@ -156,6 +184,17 @@ struct Modele {
 
     // Fait avancer l'état interne. Appelé après chaque résolution.
     std::function<void(Instance&, const Evolution&)> evoluer;
+
+    // Composant numérique : réagit aux fronts de ses entrées et produit ceux
+    // de ses sorties. L'état interne vit dans l'instance.
+    std::function<std::vector<EvenementNumerique>(Instance&,
+                                                  const EntreesNumeriques&)>
+        reagir;
+    // Bornes qui sont des sorties pilotées par `reagir` : elles deviennent des
+    // sources dans le circuit, et ne doivent donc pas être lues comme des
+    // entrées.
+    std::vector<std::string> sorties_numeriques;
+    double impedance_sortie = 100.0;    // ohms, résistance série des sorties
 
     // Grandeur à afficher sur le schéma pendant la simulation (« 90° »,
     // « 1450 tr/min »). Vide si le composant n'a rien à montrer.

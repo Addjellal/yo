@@ -19,6 +19,7 @@
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
 #include "core/engines/AvrEngine.h"
+#include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 #include "core/export/Documents.h"
 
@@ -2287,6 +2288,109 @@ static void test_campagnes() {
 }
 
 // ---------------------------------------------------------------------------
+// [19] Moteur numérique événementiel : un 74HC595 cadencé à pleine vitesse.
+// C'est ce que l'analogique seul ne saurait pas faire — il faudrait un pas de
+// calcul de l'ordre de la nanoseconde.
+// ---------------------------------------------------------------------------
+static void test_numerique() {
+    std::printf("\n[19] Moteur numérique : registre à décalage 74HC595\n");
+    const coeur::Modele* modele =
+        coeur::Catalogue::instance().modele("registre_74hc595");
+    verifier(modele && modele->reagir, "le 74HC595 est au catalogue");
+    if (!modele || !modele->reagir) return;
+
+    coeur::Netlist netlist;
+    coeur::Instance& registre = netlist.ajouter("IC1", "registre_74hc595");
+    netlist.relier("IC1", "SER", "D11");
+    netlist.relier("IC1", "SRCLK", "D13");
+    netlist.relier("IC1", "RCLK", "D10");
+    for (int k = 0; k < 8; ++k)
+        netlist.relier("IC1", "Q" + std::to_string(k),
+                       "SORTIE" + std::to_string(k));
+
+    // --- on décale l'octet 0b10110010, puis on verrouille.
+    const int motif = 0b10110010;
+    std::vector<coeur::FrontNoeud> fronts;
+    double instant = 1e-6;
+    for (int bit = 7; bit >= 0; --bit) {
+        const bool serie = (motif >> bit) & 1;
+        fronts.push_back({instant, "D11", serie});          // donnée
+        fronts.push_back({instant + 1e-7, "D13", true});    // front d'horloge
+        fronts.push_back({instant + 2e-7, "D13", false});
+        instant += 1e-6;    // 1 MHz : hors de portée de l'analogique seul
+    }
+    fronts.push_back({instant, "D10", true});               // verrouillage
+    fronts.push_back({instant + 1e-7, "D10", false});
+
+    coeur::MoteurNumerique moteur;
+    const int traites = moteur.propager(netlist, fronts, {}, 25e-3);
+    verifier(traites == 1, "le moteur a vu le composant numérique",
+             std::to_string(traites));
+
+    const coeur::Instance* apres = netlist.trouver("IC1");
+    verifier(apres && static_cast<int>(apres->valeur("_verrou", 0)) == motif,
+             "l'octet décalé bit à bit se retrouve dans le verrou",
+             apres ? std::to_string(static_cast<int>(apres->valeur("_verrou", 0)))
+                   : "");
+
+    // --- chaque sortie porte le bon bit, et son onde le dit
+    int justes = 0;
+    for (int bit = 0; bit < 8; ++bit) {
+        const bool attendu = (motif >> bit) & 1;
+        const double niveau =
+            apres->valeur("_niveau_Q" + std::to_string(bit), 0.0);
+        if ((niveau > 0.5) == attendu) ++justes;
+    }
+    verifier(justes == 8, "les huit sorties portent les huit bons bits",
+             std::to_string(justes) + "/8");
+
+    auto onde = apres->ondes.find("Q7");
+    verifier(onde != apres->ondes.end() && onde->second.size() >= 2,
+             "la sortie produit une forme d'onde datée, pas un simple niveau");
+    if (onde != apres->ondes.end() && onde->second.size() >= 2) {
+        // Q7 vaut 1 dans le motif : son front doit tomber au verrouillage.
+        double front = 0;
+        for (const auto& point : onde->second)
+            if (point.second > 2.5) { front = point.first; break; }
+        verifier(presque(front, instant, 2e-6),
+                 "et ce front tombe à l'instant du verrouillage",
+                 f(front * 1e6, 2) + " µs contre " + f(instant * 1e6, 2));
+    }
+
+    // --- l'état survit d'une fenêtre à l'autre : on décale un seul bit de
+    // plus, sans verrouiller. Le verrou ne doit pas bouger.
+    coeur::Instance* suivant = netlist.trouver("IC1");
+    std::vector<coeur::FrontNoeud> encore = {
+        {1e-6, "D11", true}, {1.1e-6, "D13", true}, {1.2e-6, "D13", false}};
+    moteur.propager(netlist, encore, {}, 25e-3);
+    verifier(static_cast<int>(suivant->valeur("_verrou", 0)) == motif,
+             "sans front de verrouillage, les sorties ne bougent pas");
+    verifier(static_cast<int>(suivant->valeur("_registre", 0))
+                 == (((motif << 1) | 1) & 0xFF),
+             "mais le registre interne, lui, a bien décalé",
+             std::to_string(static_cast<int>(suivant->valeur("_registre", 0))));
+
+    // --- le circuit produit doit être accepté par ngspice
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        netlist.relier("IC1", "GND", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "SORTIE0");
+        netlist.relier("R1", "2", "GND");
+
+        coeur::NgspiceEngine analogique;
+        analogique.construire_transitoire(netlist, {}, {}, 1e-3, 1e-5);
+        const bool ok = analogique.resoudre_transitoire();
+        verifier(ok, "les sorties numériques deviennent un circuit valable");
+        // Q0 vaut 0 dans le motif décalé : la sortie doit être basse.
+        if (ok)
+            verifier(analogique.tension("sortie0") < 0.5,
+                     "et la tension de sortie suit le bit qu'elle porte",
+                     f(analogique.tension("sortie0")) + " V");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2313,6 +2417,7 @@ int main() {
     test_multimetres();
     test_temperature_et_bruit();
     test_campagnes();
+    test_numerique();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

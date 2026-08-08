@@ -52,12 +52,16 @@ public:
     // programme qui va avec : c'est la façon la plus courte de montrer ce que
     // l'application sait faire.
     enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor,
-                         Pwm, DeuxCartes, Servo, MoteurPuissance, FiltreRC };
+                         Pwm, DeuxCartes, Servo, MoteurPuissance, FiltreRC,
+                         Registre };
     void charger_exemple(Exemple exemple);
     void charger_exemple_deux_cartes();
     // Montage purement analogique : c'est celui sur lequel les analyses
     // paramétriques prennent tout leur sens (Bode, balayage, spectre).
     void charger_exemple_filtre();
+    // Chenillard sur registre à décalage : la démonstration du moteur
+    // numérique événementiel.
+    void charger_exemple_registre();
     void charger_exemple_clignotant() { charger_exemple(Exemple::Clignotant); }
 
     // Compile le programme affiché puis démarre la simulation. Sert au mode
