@@ -4,16 +4,30 @@ Une application de bureau — un exécutable, pas une page web — pour dessiner
 schéma électronique, y poser une carte Arduino, et **exécuter le vrai firmware
 compilé** pendant que le circuit analogique est résolu autour de lui.
 
-C'est le principe de Proteus VSM, construit sur deux moteurs libres éprouvés :
+C'est le principe de Proteus VSM.
 
-| Moteur | Rôle | Utilisé aussi par |
+**Rien à télécharger pour simuler.** Le solveur analogique est écrit dans ce
+projet : analyse nodale modifiée, méthode de Newton pour les composants non
+linéaires, intégration par la règle des trapèzes avec arrêt sur chaque front
+des sources. Il fait le point de repos, le transitoire, `.dc`, `.ac` et le
+bruit, sur les mêmes fichiers de circuit que SPICE. Un compilateur C++17 et
+Qt 6 suffisent donc à construire et à faire tourner l'ensemble.
+
+| Moteur | Rôle | D'où il vient |
 |---|---|---|
-| [**ngspice**](https://ngspice.sourceforge.io/) | simulation analogique : diodes, transistors, MOSFET, amplificateurs | KiCad |
-| [**simavr**](https://github.com/buserror/simavr) | exécution cycle par cycle d'un ATmega328P réel | simulateurs AVR, tests d'intégration |
+| **solveur intégré** | simulation analogique : diodes, transistors, MOSFET, amplificateurs | écrit ici, `src/core/engines/SolveurIntegre.cpp` |
+| [**ngspice**](https://ngspice.sourceforge.io/) | *facultatif* : second moteur, celui de référence | KiCad — sert ici à contrôler le premier |
+| [**simavr**](https://github.com/buserror/simavr) | *facultatif* : exécution cycle par cycle d'un ATmega328P réel | simulateurs AVR |
 
-Le firmware n'est **pas interprété** : il est compilé par `avr-gcc`, chargé
-dans un cœur AVR émulé, et ses écritures sur les ports pilotent réellement les
-tensions du circuit. Inversement, les tensions calculées par ngspice
+Quand ngspice est présent, les tests font tourner **les deux moteurs sur les
+mêmes circuits et comparent** : mêmes tensions à 20 mV près sur un montage à
+diode et transistor, même forme d'onde à 20 mV près sur un transitoire, même
+fréquence de coupure à 2 % près. C'est ainsi que le solveur intégré se
+justifie — pas sur parole.
+
+Le firmware, lui, n'est **pas interprété** : il est compilé par `avr-gcc`,
+chargé dans un cœur AVR émulé, et ses écritures sur les ports pilotent
+réellement les tensions du circuit. Inversement, les tensions calculées
 remontent dans le convertisseur analogique-numérique et sur les broches
 d'entrée. Les deux sens sont testés (voir plus bas).
 
@@ -156,8 +170,11 @@ Autant le dire tout de suite, pour ne pas donner le change :
   reste manuel, sur deux couches.
 - Pas d'**annulation** (`Ctrl+Z`), pas de copier-coller, pas de schéma sur
   plusieurs feuilles, pas d'étiquettes de nœud ni de bus.
-- Pas d'**analyse de Monte-Carlo**, de balayage en température ni d'analyse du
-  bruit : ngspice sait les faire, l'interface ne les propose pas encore.
+- Le **modèle de transistor bipolaire** du solveur intégré est un Ebers-Moll
+  avec effet Early, plus simple que le Gummel-Poon de ngspice : l'écart
+  mesuré est de vingt millivolts sur un montage à diode et transistor. Les
+  capacités de jonction ne sont pas modélisées non plus — sans effet aux
+  fréquences des montages traités ici, mais c'est une limite réelle.
 - Un seul **type** de microcontrôleur pris en charge : ATmega328P (Arduino
   Uno). On peut en poser plusieurs, mais pas d'autre modèle.
 
@@ -167,40 +184,51 @@ Autant le dire tout de suite, pour ne pas donner le change :
 
 ### De quoi a-t-on vraiment besoin ?
 
-Toutes les dépendances sont détectées à la configuration et le projet se
-compile sans elles — mais ce qu'on obtient n'est alors pas le même logiciel.
-Voici exactement ce que chacune apporte, pour n'installer que ce qu'on veut.
+**Un compilateur C++17 et Qt 6.** C'est tout ce qu'il faut pour construire le
+projet et simuler un circuit : le solveur analogique fait partie des sources.
+Aucune bibliothèque de simulation à télécharger, aucune DLL à poser à côté de
+l'exécutable.
 
-| Ce qu'on installe | Ce qu'on peut faire |
+Le reste est facultatif et n'ajoute que ce qui est écrit en face :
+
+| Ce qu'on installe | Ce que ça ajoute |
 |---|---|
-| **Qt 6 seul** | dessiner le schéma, régler les composants, enregistrer, et produire les documents : nomenclature, contrôle des règles, netlist KiCad, schéma PDF/PNG. **Aucune tension n'est calculée.** |
-| **+ ngspice** | tout l'électrique : tensions, courants, LED qui s'allument, oscilloscope, balayage continu, Bode, spectre. C'est **la seule dépendance vraiment indispensable** pour que le mot « simulateur » ait un sens. |
-| **+ simavr** | exécuter un vrai firmware AVR (`.elf`, `.hex`) sur l'ATmega328P. |
-| **+ avr-gcc** | écrire et compiler le programme *dans* l'application (`F5`). Sans lui, on charge un `.elf` produit par l'IDE Arduino. |
+| **Qt 6 seul** | **tout le circuit** : tensions, courants, LED qui s'allument, oscilloscope, multimètres, balayage continu, Bode, spectre, bruit, Monte-Carlo, circuit imprimé et documents. |
+| *+ ngspice* | un **second moteur** analogique. N'apporte rien de plus à l'usage : il sert à confronter le solveur intégré à la référence dans les tests. |
+| *+ simavr* | exécuter un vrai firmware AVR (`.elf`, `.hex`) sur l'ATmega328P. |
+| *+ avr-gcc* | écrire et compiler le programme *dans* l'application (`F5`). Sans lui, on charge un `.elf` produit par l'IDE Arduino. |
 
-La barre d'état l'indique en permanence (`ngspice : actif | simavr : actif |
-avr-gcc : trouvé`) et le journal explique au démarrage ce qui manque et quoi
-installer.
+La barre d'état indique en permanence quel moteur analogique tourne
+(`analogique (intégré)` ou `analogique (intégré + ngspice)`), et si simavr et
+avr-gcc ont été trouvés.
+
+Une remarque honnête sur les deux dernières lignes : **`avr-gcc` ne peut pas
+être embarqué** — c'est un compilateur C complet. Sans lui, tout
+l'électronique fonctionne, mais on ne peut pas écrire un programme AVR depuis
+l'application.
 
 ### Linux (Debian, Ubuntu)
 
 ```bash
-sudo apt install build-essential cmake qt6-base-dev \
-                 libngspice0-dev libsimavr-dev libelf-dev \
-                 gcc-avr avr-libc
+# Le strict nécessaire :
+sudo apt install build-essential cmake qt6-base-dev
+
+# Facultatif : firmware AVR, et ngspice comme moteur de comparaison.
+sudo apt install gcc-avr avr-libc libsimavr-dev libelf-dev libngspice0-dev
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 239 tests, sans Qt
+./build/tests_coeur                        # 245 tests, sans Qt
 QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 90 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
 ### Windows 11
 
-Le plus court chemin est **MSYS2**, qui fournit Qt 6 et ngspice par paquets :
-pas de zip à décompresser, pas de chemin à donner à CMake. (Cette machine est
+Il n'y a plus qu'une chose à trouver : **Qt 6**. Le plus court chemin est
+**MSYS2**, qui le fournit en paquet — pas de zip à décompresser, pas de chemin
+à donner à CMake. (Cette machine est
 sous Linux : ces commandes viennent des paquets MSYS2 réellement publiés, mais
 je n'ai pas pu exécuter la compilation moi-même. Si quelque chose accroche,
 le message d'erreur exact est ce qui permettra de corriger cette page.)
@@ -213,16 +241,11 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    **« MSYS2 UCRT64 »** — pas « MSYS2 MSYS », c'est l'erreur classique : les
    paquets `mingw-w64-ucrt-x86_64-…` n'y sont pas visibles.
 
-2. Le nécessaire (schéma + toute la simulation électrique) :
+2. Le nécessaire — et c'est tout (schéma + toute la simulation électrique) :
 
    ```bash
    pacman -Syu                       # puis rouvrir le terminal si demandé
-   pacman -S --needed \
-     mingw-w64-ucrt-x86_64-gcc \
-     mingw-w64-ucrt-x86_64-cmake \
-     mingw-w64-ucrt-x86_64-ninja \
-     mingw-w64-ucrt-x86_64-qt6-base \
-     mingw-w64-ucrt-x86_64-ngspice
+   pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-qt6-base
    ```
 
 3. Compiler et lancer :
@@ -234,25 +257,11 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    ./build/simulateur.exe
    ```
 
-   Lancer depuis le terminal UCRT64 : les DLL de Qt et de ngspice y sont déjà
-   dans le `PATH`. Pour un double-clic depuis l'explorateur, il faudra copier
-   les DLL à côté de l'exécutable (`windeployqt` s'en charge pour Qt, et
-   `libngspice-0.dll` est dans `C:\msys64\ucrt64\bin`).
+   Lancer depuis le terminal UCRT64 : les DLL de Qt y sont déjà dans le
+   `PATH`. Pour un double-clic depuis l'explorateur, `windeployqt` copie
+   celles de Qt à côté de l'exécutable. Il n'y a aucune autre DLL à déposer.
 
-4. Lancer l'application. Les deux DLL de ngspice doivent être à côté de
-   l'exécutable, et Qt dans le `PATH` :
-
-   ```powershell
-   Copy-Item C:\Spice64_dll\dll-vs\ngspice.dll build\
-   Copy-Item C:\Spice64_dll\dll-vs\libomp140.x86_64.dll build\
-   $env:PATH = "C:\Qt\6.11.1\mingw_64\bin;" + $env:PATH
-   .\build\simulateur.exe
-   ```
-
-   Si ngspice se plaint de ne pas trouver son fichier d'initialisation,
-   désignez-lui son dossier : `$env:SPICE_LIB_DIR = "C:\Spice64_dll\share\ngspice"`.
-
-   Pour vérifier que tout fonctionne : *Exemples → Filtre RC*, puis onglet
+4. Pour vérifier que tout fonctionne : *Exemples → Filtre RC*, puis onglet
    *Analyses → Réponse en fréquence → Lancer*. La coupure annoncée sous la
    courbe doit tomber vers 1591 Hz.
 
@@ -273,7 +282,7 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
 
    Une seule chose annule tout : **effacer le dossier `build`**. Ne le faites
    que pour changer de compilateur ou de chemin — il faut alors reprendre la
-   commande `cmake` complète, puis `windeployqt` et les DLL de ngspice.
+   commande `cmake` complète, puis `windeployqt`.
 
 6. Pour la partie Arduino, en plus :
 
@@ -297,7 +306,11 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    changements d'état des broches ni d'injecter une tension sur une entrée —
    c'est précisément ce dont le couplage avec le circuit a besoin.
 
-#### Attention au fichier ngspice à télécharger
+#### Annexe : ajouter ngspice (facultatif)
+
+Rien de ce qui suit n'est nécessaire. Le solveur intégré calcule tout. On
+n'installe ngspice que pour disposer du **second moteur** et faire tourner les
+tests de comparaison ; à l'usage, l'application se comporte de la même façon.
 
 Sur SourceForge, deux archives se ressemblent et une seule convient — j'ai
 ouvert les deux pour en avoir le cœur net :
@@ -328,19 +341,15 @@ doivent être trouvables : le plus simple est de les copier près de
 
 Inutile de le réinstaller. Deux cas, selon le compilateur choisi avec Qt.
 
-**Qt MinGW** — l'interface de ngspice est en **C**, pas en C++ : sa DLL se
-mélange sans problème d'ABI avec un autre compilateur. On peut donc prendre
-soit la DLL officielle (`-DNGSPICE_ROOT=C:/Spice64_dll`, l'éditeur de liens de
-MinGW s'attache directement à un `.dll`), soit le paquet MSYS2 :
+**Qt MinGW** :
 
 ```powershell
-cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 cmake --build build
 ```
 
 Ajoutez `C:\Qt\6.11.1\mingw_64\bin` au `PATH` avant de lancer l'exécutable,
-et copiez `ngspice.dll` et `libomp140.x86_64.dll` à côté de `simulateur.exe` :
-sinon Windows ne trouvera pas les DLL et l'application ne démarrera pas.
+ou lancez `windeployqt` sur `simulateur.exe`. Il n'y a rien d'autre à copier.
 
 **Le compilateur doit être celui de Qt.** Qt livre le sien dans
 `C:\Qt\Tools\mingw*\bin` ; c'est celui avec lequel les bibliothèques Qt que
@@ -359,7 +368,7 @@ convaincre ; il faut le compilateur d'origine :
 ```powershell
 dir C:\Qt\Tools          # repérer le mingwXXXX_64 installé
 Remove-Item -Recurse -Force build
-cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER="C:/Qt/Tools/mingw1310_64/bin/g++.exe" -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER="C:/Qt/Tools/mingw1310_64/bin/g++.exe" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 cmake --build build
 ```
 
@@ -373,14 +382,13 @@ alors plus dans l'édition de liens et tout se lie, au prix d'une fenêtre de
 console qui reste ouverte derrière l'application.
 
 ```powershell
-cmake -S . -B build -DFENETRE_WIN32=OFF -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake -S . -B build -DFENETRE_WIN32=OFF -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 ```
 
-**Qt MSVC** — l'archive `ngspice-46_dll_64.7z` contient déjà la bibliothèque
-d'import Microsoft (`lib/lib-vs/ngspice.lib`) : rien à fabriquer.
+**Qt MSVC** :
 
 ```powershell
-cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
+cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
 cmake --build build --config Release
 ```
 
@@ -416,7 +424,11 @@ simulateur/
 │   │   │   └── Pcb.{h,cpp}            placement, chevelu, DRC, Gerber, Excellon
 │   │   └── engines/
 │   │       ├── noyau_arduino.h        le noyau Arduino, embarqué en texte
-│   │       ├── NgspiceEngine.{h,cpp}  netlist → SPICE → tensions et courants
+│   │       ├── SolveurIntegre.{h,cpp} le solveur analogique du projet (MNA,
+│   │       │                          Newton, trapèzes) — aucune dépendance
+│   │       ├── ExpressionSpice.{h,cpp} expressions des sources « B »
+│   │       ├── NgspiceEngine.{h,cpp}  façade : construit le circuit, choisit
+│   │       │                          le solveur intégré ou ngspice
 │   │       ├── MoteurNumerique.{h,cpp} fronts datés → événements → sources
 │   │       └── AvrEngine.{h,cpp}      firmware → cycles → états de broches
 │   └── app/                         ← tout ce qui dépend de Qt
@@ -432,7 +444,7 @@ simulateur/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   └── figures_liste.inc            les montages, décrits en données
 └── tests/
-    ├── test_coeur.cpp                239 tests, sans Qt
+    ├── test_coeur.cpp                245 tests, sans Qt
     └── test_schema.cpp               90 tests, saisie de schéma sans fenêtre
 ```
 
@@ -575,17 +587,17 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**239 tests du cœur**, sans Qt, en vingt sections :
+**245 tests du cœur**, sans Qt, en vingt et une sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
 | 1 | netlist et catalogue |
-| 2 | ngspice : LED, surintensité, potentiomètre, pull-up, transistor |
+| 2 | moteur analogique : LED, surintensité, potentiomètre, pull-up, transistor |
 | 3 | simavr : compilation par `avr-gcc`, exécution, horloge au cycle près |
 | 4 | **couplage firmware → circuit** : le programme allume la LED, 12,8 mA mesurés |
 | 5 | **couplage circuit → firmware** : un niveau imposé est lu par le programme |
 | 6 | conversion analogique-numérique |
-| 7 | **tout le catalogue** passe dans ngspice |
+| 7 | **tout le catalogue** passe dans le moteur analogique |
 | 8 | physique des modèles : diode, CTN, LDR, NON-ET, ampli op, 7805, relais |
 | 9 | **analyse transitoire** : charge d'un RC comparée à la théorie (3,16 V à une constante de temps), reprise d'état entre fenêtres, PWM à 25 % |
 | 12 | **composants à mécanique** : servo à 1,5 ms → 90°, moteur à 63 % après une constante de temps, asynchrone à 1440 tr/min pour 4 % de glissement, courant d'induit qui suit la loi L/R, écho de 5,8 ms pour 1 m |
@@ -593,12 +605,13 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 21 | **solveur intégré confronté à ngspice** : mêmes tensions à 20 mV près sur un montage diode + transistor, même forme d'onde à 20 mV près sur un transitoire, même fréquence de coupure à 2 % près |
 | 20 | **circuit imprimé** : placement depuis la netlist, chevelu, règles de fabrication (isolation, largeur, débordement), Gerber et Excellon conformes, cotes des empreintes (DIP à 7,62 mm, résistance à 10,16 mm, broche 1 carrée), brochage réel de l'Uno, transfert schéma → carte qui préserve placement et pistes |
 | 19 | **moteur numérique** : un octet décalé à 1 MHz dans un 74HC595, verrouillé, et ses sorties devenues un circuit analogique valable |
 | 18 | **campagnes** : trois coupures d'un RC confrontées à 1/(2·pi·R·C), et un pont diviseur à ±5 % dont la dispersion reste dans la tolérance |
 | 17 | **température et bruit** : la tension de seuil d'une diode qui baisse avec la chaleur, et le bruit thermique d'une résistance de 10 kΩ confronté à 4kTR (12,9 nV/√Hz) |
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
-| 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
+| 15 | **balayages** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
 Et **90 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles

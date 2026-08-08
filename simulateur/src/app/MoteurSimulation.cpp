@@ -229,19 +229,6 @@ void MoteurSimulation::demarrer() {
         return;
     }
 
-    // Sans moteur analogique, une simulation ne calculerait rien et se
-    // contenterait de répéter la même erreur à chaque image. Mieux vaut
-    // refuser une fois, en disant quoi installer.
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        emit journal("Cette version a été compilée sans ngspice : aucune "
-                     "tension ne peut être calculée. Installez ngspice "
-                     "(Debian/Ubuntu : libngspice0-dev ; MSYS2 : "
-                     "mingw-w64-ucrt-x86_64-ngspice) puis reconfigurez avec "
-                     "cmake. Le schéma, la nomenclature, le contrôle des "
-                     "règles et les exports restent utilisables.");
-        return;
-    }
-
     // Un montage sans carte reste un circuit : générateur, filtre, redresseur
     // se simulent très bien sans microcontrôleur, et c'est ce que fait
     // n'importe quel simulateur analogique.

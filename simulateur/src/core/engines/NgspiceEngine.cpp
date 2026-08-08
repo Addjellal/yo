@@ -1,5 +1,7 @@
 #include "core/engines/NgspiceEngine.h"
 
+#include "core/engines/SolveurIntegre.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -424,6 +426,20 @@ bool NgspiceEngine::resoudre() {
     erreurs_.clear();
     tensions_.clear();
     courants_.clear();
+    if (!utilise_ngspice()) {
+        SolveurIntegre solveur;
+        if (!solveur.charger(source_)) {
+            erreurs_ = solveur.erreurs();
+            return false;
+        }
+        if (!solveur.point_repos()) {
+            erreurs_ = solveur.erreurs();
+            return false;
+        }
+        tensions_ = solveur.tensions();
+        courants_ = solveur.courants();
+        return true;
+    }
 #ifndef AVEC_NGSPICE
     erreurs_.push_back("ngspice n'est pas compilé dans cette version");
     return false;
@@ -461,6 +477,14 @@ bool NgspiceEngine::resoudre() {
 bool NgspiceEngine::resoudre_analyse() {
     erreurs_.clear();
     balayage_.vider();
+    if (!utilise_ngspice()) {
+        SolveurIntegre solveur;
+        if (!solveur.charger(source_) || !solveur.analyse(balayage_)) {
+            erreurs_ = solveur.erreurs();
+            return false;
+        }
+        return !balayage_.courbes.empty();
+    }
 #ifndef AVEC_NGSPICE
     erreurs_.push_back("ngspice n'est pas compilé dans cette version");
     return false;
@@ -597,6 +621,18 @@ bool NgspiceEngine::resoudre_transitoire() {
     formes_.vider();
     tensions_.clear();
     courants_.clear();
+    if (!utilise_ngspice()) {
+        SolveurIntegre solveur;
+        if (!solveur.charger(source_) || !solveur.transitoire(formes_)) {
+            erreurs_ = solveur.erreurs();
+            return false;
+        }
+        tensions_ = solveur.tensions();
+        courants_ = solveur.courants();
+        etat_final_ = tensions_;
+        etat_final_.erase("0");
+        return true;
+    }
 #ifndef AVEC_NGSPICE
     erreurs_.push_back("ngspice n'est pas compilé dans cette version");
     return false;

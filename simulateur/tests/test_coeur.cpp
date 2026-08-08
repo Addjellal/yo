@@ -77,11 +77,7 @@ static void test_netlist() {
 
 // ---------------------------------------------------------------------------
 static void test_ngspice() {
-    std::printf("\n[2] Moteur analogique (ngspice)\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
+    std::printf("\n[2] Moteur analogique\n");
 
     // --- LED rouge + résistance 220 Ω pilotée par une sortie à 5 V
     coeur::Netlist netlist;
@@ -253,8 +249,7 @@ static void test_simavr() {
 // courant réel dans la LED. C'est le principe même de Proteus.
 static void test_couplage() {
     std::printf("\n[4] Couplage firmware <-> circuit analogique\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice() ||
-        !coeur::AvrEngine::compile_avec_simavr() ||
+    if (!coeur::AvrEngine::compile_avec_simavr() ||
         !coeur::AvrEngine::avr_gcc_disponible() || g_firmware.empty()) {
         std::printf("  (moteurs indisponibles — section ignorée)\n");
         return;
@@ -424,10 +419,6 @@ static void test_adc() {
 // ne se manifesterait qu'au moment où l'utilisateur le pose sur son schéma.
 static void test_catalogue_complet() {
     std::printf("\n[7] Le catalogue entier passe dans ngspice\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
     int examines = 0, refuses = 0;
     std::string liste_refuses;
 
@@ -495,10 +486,6 @@ static void test_catalogue_complet() {
 // pas simuler juste : chaque composant doit faire ce que promet sa fiche.
 static void test_physique_catalogue() {
     std::printf("\n[8] Comportement physique des modèles\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
     coeur::NgspiceEngine moteur;
 
     auto resistance_entre = [&](coeur::Netlist& netlist, const char* type,
@@ -677,10 +664,6 @@ static void test_physique_catalogue() {
 // valeurs — comparées à la théorie du circuit RC.
 static void test_transitoire() {
     std::printf("\n[9] Analyse transitoire (formes d'onde)\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
 
     // Filtre RC : 10 kΩ + 100 nF, constante de temps 1 ms.
     coeur::Netlist netlist;
@@ -828,10 +811,6 @@ static std::vector<std::string> noms_dupliques(const std::string& source) {
 
 static void test_exemplaires_multiples() {
     std::printf("\n[10] Cinq exemplaires de chaque composant\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
     constexpr int kExemplaires = 5;
     int examines = 0, refuses = 0, collisions = 0;
     std::string liste_refuses, liste_collisions;
@@ -1217,7 +1196,7 @@ static void test_composants_a_etat() {
     }
 
     // --- l'inductance d'induit : le courant ne s'établit pas d'un coup
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         coeur::Netlist netlist;
         auto& moteur = netlist.ajouter("M1", "moteur_cc_dynamique");
         moteur.valeurs["resistance"] = 8;
@@ -1313,7 +1292,7 @@ static void test_composants_a_etat() {
     }
 
     // --- accéléromètre : la pesanteur doit se lire sur Z au repos
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         coeur::Netlist netlist;
         auto& acc = netlist.ajouter("ACC1", "accelerometre");
         acc.valeurs["ax"] = 0;
@@ -1344,7 +1323,7 @@ static void test_composants_a_etat() {
     }
 
     // --- télémètre à ultrasons : la largeur d'écho est la distance
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         const coeur::Modele* modele = catalogue.modele("telemetre_ultrason");
         verifier(modele && modele->vers_spice_transitoire,
                  "le télémètre produit un signal daté");
@@ -1394,7 +1373,7 @@ static void test_composants_a_etat() {
     }
 
     // --- codeur incrémental : la fréquence des voies suit la vitesse
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         coeur::Netlist netlist;
         auto& cod = netlist.ajouter("COD1", "codeur_incremental");
         cod.valeurs["tr_min"] = 300;            // 300 tr/min
@@ -1420,7 +1399,7 @@ static void test_composants_a_etat() {
     }
 
     // --- tout le nouveau catalogue passe dans ngspice
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         const char* nouveaux[] = {
             "servomoteur", "moteur_cc_dynamique", "moteur_pas_a_pas",
             "moteur_asynchrone", "alim_triphasee", "accelerometre",
@@ -1808,10 +1787,6 @@ static void test_documents() {
 // ---------------------------------------------------------------------------
 static void test_balayages() {
     std::printf("\n[15] Balayage continu et réponse en fréquence\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
 
     // --- pont diviseur : la sortie doit valoir le tiers de l'entrée
     {
@@ -2088,7 +2063,7 @@ static void test_multimetres() {
         r.valeurs["ohms"] = 4700;
         netlist.relier("R1", "1", "A");
         netlist.relier("R1", "2", "GND");
-        if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        {
             coeur::NgspiceEngine moteur;
             moteur.construire(netlist, {});
             moteur.resoudre();
@@ -2103,15 +2078,174 @@ static void test_multimetres() {
 }
 
 // ---------------------------------------------------------------------------
+// [21] Le solveur intégré confronté à ngspice
+//
+// C'est le test qui compte le plus pour l'indépendance du projet : le même
+// circuit, le même fichier SPICE, les deux moteurs, et la comparaison des
+// résultats. Quand ngspice n'est pas là, le test s'annonce comme non
+// exécutable plutôt que de se déclarer réussi.
+// ---------------------------------------------------------------------------
+static void test_solveur_integre() {
+    std::printf("\n[21] Solveur intégré confronté à ngspice\n");
+
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent : comparaison impossible, le solveur "
+                    "intégré reste vérifié contre la théorie)\n");
+        return;
+    }
+
+    // --- point de repos : pont diviseur, LED, transistor
+    {
+        coeur::Netlist netlist;
+        auto& r1 = netlist.ajouter("R1", "resistance");
+        r1.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "D13");
+        netlist.relier("R1", "2", "MILIEU");
+        auto& led = netlist.ajouter("LED1", "led");
+        led.textes["couleur"] = "rouge";
+        netlist.relier("LED1", "A", "MILIEU");
+        netlist.relier("LED1", "K", "GND");
+        netlist.ajouter("Q1", "transistor_npn");
+        netlist.relier("Q1", "C", "D13");
+        netlist.relier("Q1", "B", "MILIEU");
+        netlist.relier("Q1", "E", "GND");
+
+        const std::vector<coeur::BrocheElectrique> broches = {
+            {"D13", coeur::BrocheElectrique::Mode::Sortie, 5.0, 25.0}};
+
+        std::map<std::string, double> integre, reference;
+        for (int moteur_ngspice = 0; moteur_ngspice < 2; ++moteur_ngspice) {
+            coeur::NgspiceEngine moteur;
+            moteur.preferer_ngspice(moteur_ngspice == 1);
+            moteur.construire(netlist, broches);
+            if (!moteur.resoudre()) continue;
+            (moteur_ngspice ? reference : integre) = moteur.toutes_tensions();
+        }
+        verifier(!integre.empty() && !reference.empty(),
+                 "les deux moteurs résolvent le même point de repos");
+
+        double ecart_maximal = 0;
+        std::string pire;
+        for (const auto& tension : reference) {
+            auto it = integre.find(tension.first);
+            if (it == integre.end()) continue;
+            const double ecart = std::fabs(it->second - tension.second);
+            if (ecart > ecart_maximal) {
+                ecart_maximal = ecart;
+                pire = tension.first;
+            }
+        }
+        // Vingt millivolts sur cinq volts : le modèle de transistor employé
+        // ici est un Ebers-Moll avec effet Early, plus simple que le
+        // Gummel-Poon de ngspice. L'écart est là, il est borné, et il est dit.
+        verifier(ecart_maximal < 20e-3,
+                 "mêmes tensions que ngspice à 20 mV près (diode + transistor)",
+                 pire + " : " + f(ecart_maximal * 1000, 3) + " mV");
+    }
+
+    // --- transitoire : charge d'un RC, comparée point par point
+    {
+        coeur::Netlist netlist;
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "D13");
+        netlist.relier("R1", "2", "SORTIE");
+        auto& c = netlist.ajouter("C1", "condensateur");
+        c.valeurs["farads"] = 100e-9;
+        netlist.relier("C1", "1", "SORTIE");
+        netlist.relier("C1", "2", "GND");
+
+        std::vector<double> temps[2];
+        std::vector<double> sortie[2];
+        for (int moteur_ngspice = 0; moteur_ngspice < 2; ++moteur_ngspice) {
+            coeur::NgspiceEngine moteur;
+            moteur.preferer_ngspice(moteur_ngspice == 1);
+            moteur.oublier_etat();
+            moteur.construire_transitoire(
+                netlist,
+                {{"D13", coeur::BrocheElectrique::Mode::Sortie, 5.0, 25.0}}, {},
+                1e-3, 2e-6);
+            if (!moteur.resoudre_transitoire()) continue;
+            temps[moteur_ngspice] = moteur.formes().temps;
+            auto it = moteur.formes().tensions.find("sortie");
+            if (it != moteur.formes().tensions.end())
+                sortie[moteur_ngspice] = it->second;
+        }
+        verifier(!sortie[0].empty() && !sortie[1].empty(),
+                 "les deux moteurs calculent le même transitoire");
+
+        // Les deux moteurs ne posent pas leurs points aux mêmes instants :
+        // on interpole celui de référence là où le nôtre a calculé.
+        auto valeur_a = [](const std::vector<double>& t,
+                           const std::vector<double>& v, double instant) {
+            if (t.empty()) return 0.0;
+            for (size_t k = 1; k < t.size(); ++k) {
+                if (t[k] < instant) continue;
+                const double largeur = t[k] - t[k - 1];
+                if (largeur <= 0) return v[k];
+                return v[k - 1]
+                       + (v[k] - v[k - 1]) * (instant - t[k - 1]) / largeur;
+            }
+            return v.back();
+        };
+        double ecart_maximal = 0;
+        double instant_pire = 0;
+        for (size_t k = 0; k < temps[0].size(); ++k) {
+            const double attendu = valeur_a(temps[1], sortie[1], temps[0][k]);
+            const double ecart = std::fabs(sortie[0][k] - attendu);
+            if (ecart > ecart_maximal) {
+                ecart_maximal = ecart;
+                instant_pire = temps[0][k];
+            }
+        }
+        verifier(ecart_maximal < 0.02,
+                 "même forme d'onde que ngspice à 20 mV près",
+                 f(ecart_maximal * 1000, 2) + " mV au pire, à "
+                     + f(instant_pire * 1e6, 1) + " µs");
+    }
+
+    // --- réponse en fréquence : la coupure doit tomber au même endroit
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.valeurs["amplitude"] = 1;
+        source.valeurs["frequence"] = 1000;
+        netlist.relier("GBF1", "+", "ENTREE");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "ENTREE");
+        netlist.relier("R1", "2", "SORTIE");
+        auto& c = netlist.ajouter("C1", "condensateur");
+        c.valeurs["farads"] = 100e-9;
+        netlist.relier("C1", "1", "SORTIE");
+        netlist.relier("C1", "2", "GND");
+
+        double coupures[2] = {0, 0};
+        for (int moteur_ngspice = 0; moteur_ngspice < 2; ++moteur_ngspice) {
+            coeur::NgspiceEngine moteur;
+            moteur.preferer_ngspice(moteur_ngspice == 1);
+            moteur.construire_analyse(netlist, {}, ".ac dec 40 10 1meg");
+            if (!moteur.resoudre_analyse()) continue;
+            const coeur::Balayage& balayage = moteur.balayage();
+            if (const coeur::Courbe* sortie = balayage.courbe("sortie"))
+                coupures[moteur_ngspice] =
+                    coeur::frequence_coupure(balayage, *sortie);
+        }
+        verifier(coupures[0] > 0 && coupures[1] > 0,
+                 "les deux moteurs relèvent la réponse en fréquence");
+        verifier(presque(coupures[0], coupures[1], coupures[1] * 0.02),
+                 "même fréquence de coupure que ngspice, à 2 % près",
+                 f(coupures[0], 1) + " Hz contre " + f(coupures[1], 1) + " Hz");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // [17] Balayage en température et analyse de bruit : deux analyses que
 // ngspice sait faire et qu'il fallait seulement savoir lui demander.
 // ---------------------------------------------------------------------------
 static void test_temperature_et_bruit() {
     std::printf("\n[17] Température et bruit\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
 
     // --- une thermistance CTN doit voir sa tension varier avec la
     // température : c'est la vérification qui a du sens ici.
@@ -2214,10 +2348,6 @@ static coeur::Netlist filtre_rc(double ohms, double farads) {
 
 static void test_campagnes() {
     std::printf("\n[18] Balayage paramétrique et Monte-Carlo\n");
-    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
-        std::printf("  (ngspice absent — section ignorée)\n");
-        return;
-    }
 
     // --- .step : la coupure d'un RC doit se déplacer comme 1/R
     {
@@ -2373,7 +2503,7 @@ static void test_numerique() {
              std::to_string(static_cast<int>(suivant->valeur("_registre", 0))));
 
     // --- le circuit produit doit être accepté par ngspice
-    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+    {
         netlist.relier("IC1", "GND", "GND");
         auto& r = netlist.ajouter("R1", "resistance");
         r.valeurs["ohms"] = 1000;
@@ -2607,7 +2737,8 @@ int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
     std::printf("============================================================\n");
-    std::printf("ngspice compilé : %s   |   simavr compilé : %s\n",
+    std::printf("moteur analogique : solveur intégré   |   ngspice pour "
+                "comparaison : %s   |   simavr : %s\n",
                 coeur::NgspiceEngine::compile_avec_ngspice() ? "oui" : "non",
                 coeur::AvrEngine::compile_avec_simavr() ? "oui" : "non");
 
@@ -2628,6 +2759,7 @@ int main() {
     test_balayages();
     test_multimetres();
     test_temperature_et_bruit();
+    test_solveur_integre();
     test_campagnes();
     test_numerique();
     test_pcb();

@@ -674,6 +674,8 @@ void FenetrePrincipale::construire_barre_etat() {
     const bool spice = coeur::NgspiceEngine::compile_avec_ngspice();
     const bool avr = coeur::AvrEngine::compile_avec_simavr();
     const bool gcc = coeur::AvrEngine::avr_gcc_disponible();
+    // Le moteur analogique est toujours là : ou bien c'est le solveur
+    // intégré, ou bien ngspice quand il a été trouvé à la compilation.
     // Une pastille par moteur : verte s'il est là, grise sinon. Le détail —
     // à quoi il sert, ce qu'il manque — passe en infobulle plutôt que
     // d'encombrer la barre en permanence.
@@ -681,13 +683,16 @@ void FenetrePrincipale::construire_barre_etat() {
         return QString("<span style='color:%1'>●</span> %2")
             .arg(present ? "#2e9e44" : "#b0b0b0", nom);
     };
-    etiquette_moteurs_->setText(pastille(spice, "ngspice") + "   "
-                                + pastille(avr, "simavr") + "   "
-                                + pastille(gcc, "avr-gcc"));
+    etiquette_moteurs_->setText(
+        pastille(true, spice ? "analogique (intégré + ngspice)"
+                             : "analogique (intégré)")
+        + "   " + pastille(avr, "simavr") + "   " + pastille(gcc, "avr-gcc"));
     etiquette_moteurs_->setToolTip(
-        QString("ngspice : %1 — calcul des tensions et des courants\n"
-                "simavr : %2 — exécution du firmware\n"
-                "avr-gcc : %3 — compilation depuis l'application")
+        QString("Moteur analogique : solveur intégré — rien à installer.\n"
+                "ngspice : %1 — moteur de référence, utilisable pour "
+                "comparaison.\n"
+                "simavr : %2 — exécution du firmware.\n"
+                "avr-gcc : %3 — compilation depuis l'application.")
             .arg(spice ? "présent" : "absent",
                  avr ? "présent" : "absent", gcc ? "présent" : "absent"));
 

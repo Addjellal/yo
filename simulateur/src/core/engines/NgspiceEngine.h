@@ -1,8 +1,14 @@
-// Moteur analogique : enveloppe autour de la bibliothèque partagée ngspice.
+// Moteur analogique.
 //
-// ngspice est le moteur SPICE libre de référence — c'est celui qu'embarque
-// KiCad. Il apporte la vraie simulation analogique : diodes, transistors,
-// amplificateurs, condensateurs, régime transitoire.
+// Deux solveurs derrière la même façade, et le même fichier de circuit pour
+// les deux :
+//   * le SOLVEUR INTÉGRÉ, écrit dans ce projet — c'est celui qui sert par
+//     défaut, et il ne demande rien à installer ;
+//   * ngspice, le moteur SPICE libre de référence (celui qu'embarque KiCad),
+//     utilisé s'il a été trouvé à la compilation ET réclamé explicitement.
+//
+// Avoir les deux n'est pas un luxe : c'est ce qui permet de confronter le
+// solveur intégré à une référence sur les mêmes circuits, dans les tests.
 //
 // Contrainte de la bibliothèque : ngspice conserve un état global, il ne peut
 // donc y avoir qu'un seul circuit chargé par processus. Cette classe encadre
@@ -55,7 +61,17 @@ public:
     ~NgspiceEngine();
 
     static bool compile_avec_ngspice();
-    bool disponible() const { return disponible_; }
+    // Le moteur est toujours disponible : sans ngspice, le solveur intégré
+    // prend le relais.
+    bool disponible() const { return true; }
+    // Vrai si c'est ngspice qui calcule.
+    bool utilise_ngspice() const { return disponible_ && prefere_ngspice_; }
+    // Choisit le solveur. Sert aux tests, qui font tourner les deux sur le
+    // même circuit et comparent.
+    void preferer_ngspice(bool oui) { prefere_ngspice_ = oui; }
+    const char* nom_du_solveur() const {
+        return utilise_ngspice() ? "ngspice" : "solveur intégré";
+    }
 
     // Construit le fichier SPICE à partir de la netlist et des broches.
     // Renvoie le texte généré (utile pour l'afficher et pour les tests).
@@ -118,7 +134,8 @@ public:
     const std::string& source() const { return source_; }
 
 private:
-    bool disponible_ = false;
+    bool disponible_ = false;      // ngspice présent à l'exécution
+    bool prefere_ngspice_ = false;
     std::string source_;
     std::vector<std::string> lignes_;
     std::vector<std::string> erreurs_;

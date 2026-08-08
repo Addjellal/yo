@@ -3,6 +3,10 @@
 Ce document répond à une question simple : **par rapport à ce qui existe, que
 sait faire ce simulateur, et que ne sait-il pas faire ?**
 
+Depuis peu, le moteur analogique est **écrit dans ce projet** : plus de
+ngspice à installer, plus de DLL à trouver. Quand ngspice est présent, il sert
+de juge — les tests font tourner les deux sur les mêmes circuits et comparent.
+
 Les références retenues sont celles qu'on utilise vraiment : **Proteus** (VSM,
 la simulation de microcontrôleur avec le circuit autour), **Multisim**
 (l'atelier d'analyse avec ses instruments virtuels), **LTspice** (la référence
@@ -34,6 +38,7 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 
 | Fonction | Chez les autres | Ici |
 |---|---|---|
+| **Moteur analogique sans rien à installer** | aucun (tous s'appuient sur un moteur séparé) | ✅ solveur MNA + Newton + trapèzes, écrit ici |
 | Point de repos (`.op`) | tous | ✅ |
 | Analyse transitoire (`.tran`) | tous | ✅ |
 | **Balayage continu** (`.dc`, source ou résistance) | LTspice, Multisim | ✅ |
@@ -120,9 +125,9 @@ Wokwi et Tinkercad ne font pas : il **montre l'électricité**. Le courant réel
 dans une LED, l'effondrement d'une sortie surchargée par dix LED en parallèle,
 la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
-solveur SPICE, pas d'une animation.
+solveur d'analyse nodale, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 239 tests du
+C'est aussi un projet dont **chaque affirmation est vérifiée** : 245 tests du
 cœur et 90 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour

@@ -15,10 +15,18 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# Dépendances optionnelles : l'application fonctionne sans elles (moteurs
-# internes), et gagne le réalisme « Proteus » quand elles sont présentes.
-#   ngspice -> simulation analogique complète (transistors, AOP, transitoire)
-#   simavr  -> exécution du VRAI firmware compilé par avr-gcc
+# Dépendances.
+#
+# OBLIGATOIRE : un compilateur C++17, et Qt 6 pour l'interface. Rien d'autre.
+# Le solveur analogique est écrit dans ce projet (src/core/engines/
+# SolveurIntegre.cpp) : il n'y a aucune bibliothèque de simulation à
+# télécharger, aucune DLL à poser à côté de l'exécutable.
+#
+# FACULTATIF, et seulement pour ce qui suit :
+#   ngspice -> second moteur analogique, celui de référence. Utile pour
+#              comparer : les tests font tourner les deux sur les mêmes
+#              circuits quand il est là.
+#   simavr  -> exécution du VRAI firmware compilé (avec avr-gcc).
 # ---------------------------------------------------------------------------
 # Sous Windows, ngspice se télécharge en archive plutôt qu'il ne s'installe.
 # « -DNGSPICE_ROOT=C:/Spice64_dll » suffit alors : les sous-dossiers de la
@@ -63,18 +71,17 @@ if(SIMAVR_INCLUDE_DIR AND SIMAVR_LIBRARY AND ELF_LIBRARY)
   set(MOTEUR_SIMAVR ON)
 endif()
 
-message(STATUS "Moteur analogique ngspice : ${MOTEUR_NGSPICE}")
+message(STATUS "Moteur analogique : solveur intégré (toujours actif)")
+message(STATUS "Second moteur ngspice   : ${MOTEUR_NGSPICE} (facultatif)")
 message(STATUS "Moteur AVR simavr        : ${MOTEUR_SIMAVR}")
 
-# Sans ngspice, l'application se lance mais ne calcule rien : autant le dire
-# à la configuration plutôt que de laisser chercher.
+# ngspice n'est plus nécessaire : le solveur intégré calcule tout. Sa
+# présence n'ajoute qu'un point de comparaison, et les tests s'en servent.
 if(NOT MOTEUR_NGSPICE)
-  message(WARNING
-    "ngspice est introuvable : aucune tension ne sera calculée "
-    "(pas d'oscilloscope, pas d'analyses). C'est la SEULE dépendance "
-    "vraiment indispensable.\n"
-    "  Debian/Ubuntu : sudo apt install libngspice0-dev\n"
-    "  MSYS2 (UCRT64) : pacman -S mingw-w64-ucrt-x86_64-ngspice")
+  message(STATUS
+    "ngspice absent : le solveur intégré calcule tout (point de repos, "
+    "transitoire, .dc, .ac, bruit). Installer ngspice n'apporterait qu'un "
+    "second moteur pour comparer.")
 endif()
 if(NOT MOTEUR_SIMAVR)
   message(STATUS
@@ -101,6 +108,8 @@ add_library(coeur STATIC
   src/core/catalogue/capteurs_avances.cpp
   src/core/catalogue/sources.cpp
   src/core/catalogue/numerique.cpp
+  src/core/engines/SolveurIntegre.cpp
+  src/core/engines/ExpressionSpice.cpp
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/AvrEngine.cpp
   src/core/engines/MoteurNumerique.cpp
