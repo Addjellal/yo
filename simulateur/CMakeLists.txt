@@ -157,13 +157,25 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
-  add_executable(simulateur WIN32
+  add_executable(simulateur
     src/main.cpp
     src/app/FenetrePrincipale.cpp
     src/app/MoteurSimulation.cpp
     src/app/Oscilloscope.cpp
   )
   target_link_libraries(simulateur PRIVATE schema)
+
+  # Sous Windows, une application graphique se construit « WIN32 » pour ne pas
+  # traîner une console derrière elle. C'est aussi ce qui fait entrer
+  # Qt6::EntryPoint dans l'édition de liens — et cette bibliothèque-là vient
+  # telle quelle de chez Qt : elle n'accepte que le compilateur avec lequel Qt
+  # a été construit (sinon « undefined reference to __imp___argc »).
+  # « -DFENETRE_WIN32=OFF » permet donc de compiler malgré tout avec un autre
+  # MinGW, au prix d'une console qui reste ouverte : dépannage, pas remède.
+  option(FENETRE_WIN32 "Application fenêtrée sans console (Windows)" ON)
+  if(WIN32 AND FENETRE_WIN32)
+    set_target_properties(simulateur PROPERTIES WIN32_EXECUTABLE ON)
+  endif()
 
   add_executable(tests_schema tests/test_schema.cpp)
   target_link_libraries(tests_schema PRIVATE schema)

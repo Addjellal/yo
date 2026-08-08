@@ -263,12 +263,39 @@ Ajoutez `C:\Qt\6.11.1\mingw_64\bin` au `PATH` avant de lancer l'exécutable,
 et copiez `ngspice.dll` et `libomp140.x86_64.dll` à côté de `simulateur.exe` :
 sinon Windows ne trouvera pas les DLL et l'application ne démarrera pas.
 
-Un mot sur le compilateur : Qt livre le sien dans `C:\Qt\Tools\mingw*\bin`.
-C'est celui avec lequel votre Qt a été construit, donc celui qui évite toute
-mauvaise surprise à l'édition de liens. Un autre MinGW (WinLibs, w64devkit)
-fonctionne généralement, mais si vous voyez des erreurs de symboles C++
-introuvables au moment de lier, mettez celui de Qt en tête du `PATH` et
-recommencez dans un dossier `build` vide.
+**Le compilateur doit être celui de Qt.** Qt livre le sien dans
+`C:\Qt\Tools\mingw*\bin` ; c'est celui avec lequel les bibliothèques Qt que
+vous avez téléchargées ont été construites. Un autre MinGW (WinLibs,
+w64devkit) compile bien tout le projet, mais **échoue à l'édition de liens** :
+
+```
+libQt6EntryPoint.a(qtentrypoint_win.cpp.obj): undefined reference to `__imp___argc'
+```
+
+`Qt6EntryPoint` est une bibliothèque **statique** livrée par Qt : elle contient
+du code déjà compilé, qui réclame des symboles que les mingw-w64 récents ne
+fournissent plus sous cette forme. Aucun réglage du projet ne peut la
+convaincre ; il faut le compilateur d'origine :
+
+```powershell
+dir C:\Qt\Tools          # repérer le mingwXXXX_64 installé
+Remove-Item -Recurse -Force build
+cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER="C:/Qt/Tools/mingw1310_64/bin/gcc.exe" -DCMAKE_CXX_COMPILER="C:/Qt/Tools/mingw1310_64/bin/g++.exe" -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake --build build
+```
+
+(Ajustez `mingw1310_64` au dossier réellement présent. S'il n'y en a aucun,
+ouvrez le *Qt Maintenance Tool* et cochez *Developer and Designer Tools →
+MinGW 64-bit* : c'est un téléchargement, pas une réinstallation de Qt.)
+
+**Dépannage, si vous voulez voir tourner l'application tout de suite** avec le
+compilateur que vous avez déjà : `-DFENETRE_WIN32=OFF`. Qt6EntryPoint n'entre
+alors plus dans l'édition de liens et tout se lie, au prix d'une fenêtre de
+console qui reste ouverte derrière l'application.
+
+```powershell
+cmake -S . -B build -DFENETRE_WIN32=OFF -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+```
 
 **Qt MSVC** — l'archive `ngspice-46_dll_64.7z` contient déjà la bibliothèque
 d'import Microsoft (`lib/lib-vs/ngspice.lib`) : rien à fabriquer.
