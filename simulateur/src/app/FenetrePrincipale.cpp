@@ -16,6 +16,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
@@ -38,6 +39,7 @@
 
 #include "app/MoteurSimulation.h"
 #include "app/Oscilloscope.h"
+#include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "core/analysis/Analyses.h"
 #include "core/export/Documents.h"
@@ -104,6 +106,12 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(scene_, &SceneSchema::selection_composant, this,
             &FenetrePrincipale::afficher_proprietes);
     connect(scene_, &SceneSchema::journal, this, &FenetrePrincipale::ecrire);
+    connect(scene_, &SceneSchema::double_clic_composant, this,
+            &FenetrePrincipale::ouvrir_fenetre_instrument);
+    connect(scene_, &SceneSchema::menu_demande, this,
+            [this](ItemComposant* composant, const QPoint& ecran) {
+                menu_contextuel(composant, ecran);
+            });
     connect(scene_, &SceneSchema::changed, this,
             [this](const QList<QRectF>&) { circuit_modifie(); });
     connect(vue_, &VueSchema::composant_depose, this,
@@ -511,6 +519,21 @@ void FenetrePrincipale::construire_actions() {
     exemples->addAction("Moteur en PWM avec transistor", this,
                         [this] { charger_exemple(Exemple::MoteurPuissance); });
 
+    // Fenêtres : c'est l'utilisateur qui sort un panneau de mesure, jamais
+    // l'application. Le raccourci le remet aussi bien qu'il le sort.
+    auto* fenetres = menuBar()->addMenu("Fe&nêtres");
+    fenetres->addAction("Oscilloscope dans sa propre fenêtre",
+                        QKeySequence(Qt::CTRL | Qt::Key_1), this,
+                        [this] { basculer_fenetre(oscilloscope_); });
+    fenetres->addAction("Analyses dans leur propre fenêtre",
+                        QKeySequence(Qt::CTRL | Qt::Key_2), this,
+                        [this] { basculer_fenetre(analyses_); });
+    fenetres->addSeparator();
+    fenetres->addAction("Fermer toutes les fenêtres de mesure", this, [this] {
+        while (!fenetres_instruments_.empty())
+            fenetres_instruments_.front()->close();
+    });
+
     auto* aide = menuBar()->addMenu("&Aide");
     aide->addAction("À &propos", this, [this] {
         QMessageBox::about(
@@ -604,6 +627,137 @@ void FenetrePrincipale::refleter_etat() {
                 .arg(couleur, texte));
     }
     if (!marche && etiquette_vitesse_) etiquette_vitesse_->setText("Vitesse : —");
+}
+
+// ---------------------------------------------------------------------------
+// Fenêtres de mesure
+// ---------------------------------------------------------------------------
+void FenetrePrincipale::basculer_fenetre(QWidget* panneau) {
+    if (!panneau || !onglets_) return;
+
+    auto detache = detaches_.find(panneau);
+    if (detache != detaches_.end()) {   // il est dehors : on le rentre
+        const PanneauDetache place = detache->second;
+        detaches_.erase(detache);
+        panneau->removeEventFilter(this);
+        panneau->setWindowFlags(Qt::Widget);
+        onglets_->insertTab(std::min(place.rang, onglets_->count()), panneau,
+                            place.titre);
+        onglets_->setCurrentWidget(panneau);
+        return;
+    }
+
+    const int rang = onglets_->indexOf(panneau);
+    if (rang < 0) return;
+    const QString titre = onglets_->tabText(rang);
+    onglets_->removeTab(rang);
+    detaches_[panneau] = {titre, rang};
+    panneau->setParent(nullptr);
+    panneau->setWindowFlags(Qt::Window);
+    panneau->setWindowTitle(titre + " — simulateur");
+    panneau->resize(940, 520);
+    panneau->installEventFilter(this);
+    panneau->show();
+    panneau->raise();
+}
+
+bool FenetrePrincipale::eventFilter(QObject* objet, QEvent* evenement) {
+    // Fermer la fenêtre détachée la remet dans les onglets : le panneau n'est
+    // jamais perdu, et rien ne se rouvre tout seul au démarrage.
+    if (evenement->type() == QEvent::Close) {
+        auto* panneau = qobject_cast<QWidget*>(objet);
+        if (panneau && detaches_.count(panneau)) {
+            basculer_fenetre(panneau);
+            evenement->ignore();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(objet, evenement);
+}
+
+void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
+    if (!composant || !composant->modele()) return;
+    if (!composant->modele()->mesure_instrument) {
+        // Pas un instrument : le double-clic sert alors à régler le composant.
+        afficher_proprietes(composant);
+        return;
+    }
+
+    // Une seule fenêtre par appareil : un second double-clic la ramène devant.
+    for (FenetreInstrument* fenetre : fenetres_instruments_) {
+        if (fenetre->composant() != composant) continue;
+        fenetre->show();
+        fenetre->raise();
+        fenetre->activateWindow();
+        return;
+    }
+
+    auto* fenetre = new FenetreInstrument(
+        composant,
+        [this](ItemComposant* cible) {
+            for (ItemComposant* pose : scene_->composants())
+                if (pose == cible) return true;
+            return false;
+        },
+        [this](ItemComposant* cible) -> QString {
+            const coeur::Modele* modele = cible->modele();
+            if (modele && modele->type == "amperemetre")
+                return QString("I(%1)").arg(cible->reference());
+            // Voltmètre ou sonde : c'est le potentiel de sa première borne.
+            return scene_->noeud_de(cible, 0);
+        },
+        this);
+    connect(fenetre, &FenetreInstrument::sonde_demandee, this,
+            [this](const QString& designation) {
+                if (!oscilloscope_) return;
+                oscilloscope_->sonder(designation);
+                if (!detaches_.count(oscilloscope_))
+                    onglets_->setCurrentWidget(oscilloscope_);
+                ecrire("Suivi à l'oscilloscope : " + designation);
+            });
+    connect(fenetre, &QObject::destroyed, this, [this, fenetre] {
+        fenetres_instruments_.erase(
+            std::remove(fenetres_instruments_.begin(),
+                        fenetres_instruments_.end(), fenetre),
+            fenetres_instruments_.end());
+    });
+    fenetre->setAttribute(Qt::WA_DeleteOnClose);
+    fenetres_instruments_.push_back(fenetre);
+    fenetre->show();
+}
+
+void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
+                                        const QPoint& ecran) {
+    QMenu menu(this);
+    if (composant) {
+        const coeur::Modele* modele = composant->modele();
+        menu.addAction(composant->reference() + " — "
+                       + (modele ? QString::fromStdString(modele->libelle)
+                                 : QString()))
+            ->setEnabled(false);
+        menu.addSeparator();
+        if (modele && modele->mesure_instrument)
+            menu.addAction("Ouvrir la fenêtre de mesure", this,
+                           [this, composant] {
+                               ouvrir_fenetre_instrument(composant);
+                           });
+        menu.addAction("Propriétés", this,
+                       [this, composant] { afficher_proprietes(composant); });
+        menu.addAction("Pivoter de 90°", this, [this, composant] {
+            composant->tourner();
+            circuit_modifie();
+        });
+        menu.addSeparator();
+        menu.addAction("Supprimer", this, [this] {
+            scene_->supprimer_selection();
+            circuit_modifie();
+        });
+    } else {
+        menu.addAction("Ajuster la vue", this, [this] { vue_->ajuster(); });
+        menu.addAction("Analyse au point de repos", this,
+                       &FenetrePrincipale::analyser_point_repos);
+    }
+    menu.exec(ecran);
 }
 
 // ---------------------------------------------------------------------------

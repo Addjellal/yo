@@ -8,6 +8,7 @@
 //   QT_QPA_PLATFORM=offscreen ./tests_schema
 
 #include <QApplication>
+#include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QPointF>
 
@@ -20,6 +21,7 @@
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
+#include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "app/schematic/SceneSchema.h"
 #include "core/Device.h"
@@ -550,6 +552,75 @@ static void test_noeuds_et_instruments() {
 }
 
 // ---------------------------------------------------------------------------
+// [9] Clic droit, double-clic, fenêtre d'instrument.
+// ---------------------------------------------------------------------------
+static void test_interactions() {
+    std::printf("\n[9] Clic droit, double-clic, fenêtre de mesure\n");
+    SceneSchema scene;
+    ItemComposant* vm = scene.ajouter_composant("voltmetre", QPointF(0, 0));
+
+    int doubles = 0, menus = 0;
+    ItemComposant* recu = nullptr;
+    QObject::connect(&scene, &SceneSchema::double_clic_composant,
+                     [&](ItemComposant* c) { ++doubles; recu = c; });
+    QObject::connect(&scene, &SceneSchema::menu_demande,
+                     [&](ItemComposant*, const QPoint&) { ++menus; });
+
+    QGraphicsSceneMouseEvent deux(QEvent::GraphicsSceneMouseDoubleClick);
+    deux.setScenePos(vm->pos());
+    deux.setButton(Qt::LeftButton);
+    QApplication::sendEvent(&scene, &deux);
+    verifier(doubles == 1 && recu == vm,
+             "un double-clic gauche désigne le composant visé",
+             std::to_string(doubles));
+
+    QGraphicsSceneContextMenuEvent droit(QEvent::GraphicsSceneContextMenu);
+    droit.setScenePos(vm->pos());
+    QApplication::sendEvent(&scene, &droit);
+    verifier(menus == 1, "le clic droit demande le menu des options",
+             std::to_string(menus));
+    verifier(scene.fils().empty(),
+             "le clic droit ne tire aucun fil, même sur une borne");
+
+    // Un clic droit alors qu'un fil est en attente doit l'abandonner.
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(200, 0));
+    QGraphicsSceneMouseEvent appui(QEvent::GraphicsSceneMousePress);
+    appui.setScenePos(r->position_borne(0));
+    appui.setButton(Qt::LeftButton);
+    appui.setButtons(Qt::LeftButton);
+    QApplication::sendEvent(&scene, &appui);
+    QGraphicsSceneMouseEvent relache(QEvent::GraphicsSceneMouseRelease);
+    relache.setScenePos(r->position_borne(0));
+    relache.setButton(Qt::LeftButton);
+    QApplication::sendEvent(&scene, &relache);
+    QGraphicsSceneContextMenuEvent droit2(QEvent::GraphicsSceneContextMenu);
+    droit2.setScenePos(r->position_borne(1));
+    QApplication::sendEvent(&scene, &droit2);
+    QGraphicsSceneMouseEvent apres(QEvent::GraphicsSceneMousePress);
+    apres.setScenePos(vm->position_borne(0));
+    apres.setButton(Qt::LeftButton);
+    apres.setButtons(Qt::LeftButton);
+    QApplication::sendEvent(&scene, &apres);
+    verifier(scene.fils().empty(),
+             "un clic droit abandonne le fil laissé en attente");
+
+    // --- la fenêtre d'un instrument montre sa mesure, et se ferme si le
+    // composant disparaît du schéma.
+    {
+        vm->definir_mesure("4.72 V");
+        bool present = true;
+        FenetreInstrument fenetre(
+            vm, [&present](ItemComposant*) { return present; },
+            [](ItemComposant*) { return QString("VM1_+"); });
+        fenetre.show();
+        verifier(fenetre.windowTitle().contains("VM1"),
+                 "la fenêtre porte la référence de l'appareil",
+                 fenetre.windowTitle().toStdString());
+        verifier(fenetre.isVisible(), "la fenêtre s'ouvre");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -564,6 +635,7 @@ int main(int argc, char** argv) {
     test_panneau_analyses();
     test_cablage_souris();
     test_noeuds_et_instruments();
+    test_interactions();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

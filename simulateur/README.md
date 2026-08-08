@@ -43,7 +43,9 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Simulation couplée** : la LED s'allume avec l'éclat correspondant au
   courant réellement calculé, chaque fil affiche sa tension moyenne.
 - **Instruments posés dans le circuit** : voltmètre et ampèremètre affichent
-  leur mesure sous leur symbole pendant la simulation, et ils sont modélisés
+  leur mesure sous leur symbole pendant la simulation, et **double-cliquer un
+  appareil ouvre sa propre fenêtre** — valeur en grand, minimum, moyenne,
+  maximum, et un bouton pour suivre ce point à l'oscilloscope, et ils sont modélisés
   (10 MΩ, 0,01 Ω) — ils chargent donc le montage, très peu mais réellement.
   Une sonde de tension, elle, ne charge rien : c'est le seul instrument qu'on
   peut greffer n'importe où sans changer le circuit.
@@ -587,6 +589,12 @@ de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.
 | `R` | pivoter la sélection de 90° |
 | `Suppr` | supprimer la sélection |
 | molette | zoomer |
+| clic gauche sur une borne | tirer un fil (glisser, ou cliquer puis cliquer) |
+| clic gauche sur un composant | le sélectionner |
+| double-clic sur un instrument | ouvrir sa fenêtre de mesure |
+| clic droit | menu des options du composant |
+| `F9` | lancer, mettre en pause, reprendre |
+| `Ctrl+1` / `Ctrl+2` | sortir l'oscilloscope ou les analyses dans leur fenêtre |
 | `F5` | compiler le programme et le charger |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | nouveau, ouvrir, enregistrer |
 

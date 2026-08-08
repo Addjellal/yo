@@ -1,6 +1,7 @@
 #include "app/schematic/SceneSchema.h"
 
 #include <QGraphicsLineItem>
+#include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsView>
 #include <QKeyEvent>
@@ -399,6 +400,15 @@ void SceneSchema::appliquer_resultats(
     }
 }
 
+QString SceneSchema::noeud_de(const ItemComposant* composant, int borne) const {
+    const auto noeuds = calculer_noeuds();
+    auto it = noeuds.find(composant);
+    if (it == noeuds.end() || borne < 0
+        || borne >= static_cast<int>(it->second.size()))
+        return {};
+    return QString::fromStdString(it->second[borne]);
+}
+
 std::map<QString, QString> SceneSchema::description_noeuds() const {
     const auto noeuds = calculer_noeuds();
     std::map<QString, QStringList> bornes_par_noeud;
@@ -593,6 +603,42 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
     for (QGraphicsItem* item : selectedItems())
         if (item->type() == ItemComposant::Type) item->setPos(aligner(item->pos()));
     for (ItemFil* fil : fils()) fil->rafraichir();
+}
+
+// Composant sous un point, quelle que soit la partie touchée.
+static ItemComposant* composant_sous(QGraphicsScene* scene, const QPointF& point) {
+    for (QGraphicsItem* item : scene->items(point))
+        if (item->type() == ItemComposant::Type)
+            return static_cast<ItemComposant*>(item);
+    return nullptr;
+}
+
+void SceneSchema::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) {
+    if (evenement->button() == Qt::LeftButton) {
+        // Un double-clic ne doit pas laisser un fil à moitié tiré derrière lui.
+        abandonner_fil();
+        if (ItemComposant* composant = composant_sous(this,
+                                                      evenement->scenePos())) {
+            emit selection_composant(composant);
+            emit double_clic_composant(composant);
+            return;
+        }
+    }
+    QGraphicsScene::mouseDoubleClickEvent(evenement);
+}
+
+void SceneSchema::contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) {
+    // Le clic droit ouvre les options et ne touche à rien d'autre : il
+    // n'entame pas de fil, il ne déplace rien.
+    abandonner_fil();
+    ItemComposant* composant = composant_sous(this, evenement->scenePos());
+    if (composant) {
+        clearSelection();
+        composant->setSelected(true);
+        emit selection_composant(composant);
+    }
+    emit menu_demande(composant, evenement->screenPos());
+    evenement->accept();
 }
 
 void SceneSchema::keyPressEvent(QKeyEvent* evenement) {

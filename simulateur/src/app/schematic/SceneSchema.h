@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QGraphicsScene>
+#include <QPoint>
 #include <QPointF>
 #include <QString>
 #include <QStringList>
@@ -55,6 +56,9 @@ public:
     // jamais proposer un nom de nœud sans dire ce qu'il désigne.
     std::map<QString, QString> description_noeuds() const;
 
+    // Nom du nœud auquel est rattachée une borne. Vide si elle est en l'air.
+    QString noeud_de(const ItemComposant* composant, int borne) const;
+
     std::vector<ItemComposant*> composants() const;
     std::vector<ItemFil*> fils() const;
 
@@ -70,12 +74,20 @@ public:
 signals:
     void selection_composant(ItemComposant* composant);
     void journal(const QString& message);
+    // Double-clic sur un composant : ouvrir ce qu'il a de plus utile à
+    // montrer — la fenêtre de mesure d'un instrument, par exemple.
+    void double_clic_composant(ItemComposant* composant);
+    // Clic droit : la fenêtre principale construit le menu, la scène ne
+    // connaît pas les actions de l'application.
+    void menu_demande(ItemComposant* composant, const QPoint& ecran);
 
 protected:
     void drawBackground(QPainter* peintre, const QRectF& zone) override;
     void mousePressEvent(QGraphicsSceneMouseEvent* evenement) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) override;
     void mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) override;
     void keyPressEvent(QKeyEvent* evenement) override;
 
 private:

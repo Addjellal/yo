@@ -8,9 +8,11 @@
 #include <QMainWindow>
 #include <QTreeWidget>
 
+#include <QPoint>
 #include <QString>
 
 #include <map>
+#include <vector>
 
 #include "core/engines/NgspiceEngine.h"
 
@@ -28,6 +30,7 @@ class VueSchema;
 class MoteurSimulation;
 class Oscilloscope;
 class PanneauAnalyses;
+class FenetreInstrument;
 
 // Palette : arbre catégorie -> composants, avec glisser-déposer vers le schéma.
 class PaletteComposants : public QTreeWidget {
@@ -101,8 +104,19 @@ public:
     SceneSchema* scene() const { return scene_; }
     VueSchema* vue() const { return vue_; }
 
+    // Détache un panneau de mesure dans sa propre fenêtre, ou le remet dans
+    // les onglets s'il en sort déjà. C'est l'utilisateur qui décide, par le
+    // menu « Fenêtres » : rien ne s'ouvre tout seul.
+    void basculer_fenetre(QWidget* panneau);
+    Oscilloscope* oscilloscope() const { return oscilloscope_; }
+    PanneauAnalyses* analyses() const { return analyses_; }
+
+    // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
+    void ouvrir_fenetre_instrument(ItemComposant* composant);
+
 protected:
     void showEvent(QShowEvent* evenement) override;
+    bool eventFilter(QObject* objet, QEvent* evenement) override;
 
 private slots:
     void nouveau_projet();
@@ -144,6 +158,11 @@ private:
     // mesures, comme un oscilloscope analyse ce qu'il vient d'acquérir.
     coeur::Formes dernieres_formes_;
     QTabWidget* onglets_ = nullptr;
+    // Panneaux sortis dans leur propre fenêtre : titre et rang d'origine,
+    // pour savoir où les remettre à la fermeture.
+    struct PanneauDetache { QString titre; int rang = 0; };
+    std::map<QWidget*, PanneauDetache> detaches_;
+    std::vector<FenetreInstrument*> fenetres_instruments_;
     QComboBox* selecteur_carte_ = nullptr;
     // Programme de chaque carte : deux Arduino n'exécutent pas le même.
     std::map<QString, QString> programmes_;
@@ -172,6 +191,10 @@ private:
     // Aligne les commandes et la barre d'état sur l'état de la simulation :
     // un bouton doit toujours annoncer ce qu'il va faire.
     void refleter_etat();
+
+    // Menu du clic droit, construit ici : la scène ne connaît pas les
+    // actions de l'application.
+    void menu_contextuel(ItemComposant* composant, const QPoint& ecran);
 
     void ecrire(const QString& message);
     QString dossier_travail() const;

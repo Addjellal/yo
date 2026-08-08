@@ -154,6 +154,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/app/schematic/ItemComposant.cpp
     src/app/schematic/ItemFil.cpp
     src/app/panels/PanneauAnalyses.cpp
+    src/app/panels/FenetreInstrument.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
