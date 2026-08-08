@@ -62,7 +62,7 @@ C'est la section `[11]` de `simulateur/tests/test_coeur.cpp`.
 
 ### Ce que le catalogue couvre désormais
 
-52 composants, dont sept à mécanique interne — servomoteur, moteur à courant
+53 composants, dont sept à mécanique interne — servomoteur, moteur à courant
 continu, moteur pas à pas, moteur asynchrone triphasé, télémètre à ultrasons,
 codeur incrémental, capteur de courant. Ils ont un état qui avance dans le
 temps, pas seulement une impédance, et leur grandeur s'affiche sous le symbole
@@ -72,6 +72,23 @@ Les machines portent leur **inductance interne** : l'induit d'un moteur est R
 en série avec L. C'est vérifié contre la théorie — le courant atteint 63 % de
 sa valeur finale après une constante de temps L/R, et il est encore nul à
 l'instant de la fermeture.
+
+### Ce que les analyses apportent au cours
+
+Le simulateur ne se contente plus d'afficher des formes d'onde : il trace une
+**caractéristique de transfert** (balayage continu), un **diagramme de Bode**
+(gain et phase en fonction de la fréquence, avec la coupure à −3 dB lue
+automatiquement) et le **spectre** d'un signal avec son taux de distorsion.
+
+C'est exactement ce que demandent les séances d'électronique analogique du
+cours : vérifier qu'un filtre RC coupe bien à 1/(2·π·R·C), voir la pente de
+−20 dB par décade, constater qu'un signal carré contient les harmoniques
+impaires. Un montage sans carte Arduino se simule d'ailleurs très bien : un
+filtre, un pont diviseur ou un redresseur n'ont pas besoin de microcontrôleur.
+
+Il produit aussi les documents qu'on attend d'un projet : nomenclature,
+rapport de contrôle des règles électriques, netlist au format KiCad, relevés
+en CSV et schéma en PDF.
 
 Ce qui reste hors de portée : tout ce qui passe par un **protocole numérique**
 (DHT22 en une-fil, écrans I²C, cartes SD en SPI). Ce n'est pas une question de

@@ -31,8 +31,15 @@
 
 #include <map>
 
+#include <QImage>
+#include <QPageSize>
+#include <QPdfWriter>
+
 #include "app/MoteurSimulation.h"
 #include "app/Oscilloscope.h"
+#include "app/panels/PanneauAnalyses.h"
+#include "core/analysis/Analyses.h"
+#include "core/export/Documents.h"
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
 #include "app/schematic/SceneSchema.h"
@@ -131,6 +138,7 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
                 oscilloscope_->ajouter_trame(formes, instant);
+                dernieres_formes_ = formes;
             });
     connect(moteur_, &MoteurSimulation::avancement, this,
             [this](double temps, double vitesse) {
@@ -239,6 +247,60 @@ void FenetrePrincipale::construire_docks() {
     connect(oscilloscope_, &Oscilloscope::resolution_souhaitee, this,
             [this](double secondes) { moteur_->definir_resolution(secondes); });
 
+    analyses_ = new PanneauAnalyses;
+    onglets->addTab(analyses_, "Analyses");
+    connect(analyses_, &PanneauAnalyses::balayage_demande, this,
+            [this](const QString& directive, bool bode) {
+                circuit_modifie();
+                QString erreur;
+                if (!moteur_->executer_balayage(directive, &erreur)) {
+                    analyses_->signaler(erreur);
+                    return;
+                }
+                // Le gain d'un Bode n'a de sens que rapporté à l'entrée : on
+                // désigne d'office le nœud attaqué par le générateur.
+                QString reference;
+                for (const coeur::Instance& instance :
+                     moteur_->netlist().instances()) {
+                    const coeur::Modele* modele =
+                        coeur::Catalogue::instance().modele(instance.type);
+                    if (!modele || !modele->generateur) continue;
+                    if (const coeur::Borne* borne = instance.borne("+")) {
+                        reference = QString::fromStdString(borne->noeud);
+                        break;
+                    }
+                }
+                analyses_->afficher_balayage(moteur_->balayage(), bode,
+                                             reference);
+            });
+    connect(analyses_, &PanneauAnalyses::spectre_demande, this,
+            [this](const QString& signal, int harmoniques) {
+                const std::vector<double>* courbe = nullptr;
+                const std::string nom = signal.toLower().toStdString();
+                auto tension = dernieres_formes_.tensions.find(nom);
+                if (tension != dernieres_formes_.tensions.end())
+                    courbe = &tension->second;
+                if (!courbe && signal.startsWith("I(")) {
+                    const std::string reference =
+                        signal.mid(2, signal.size() - 3).toLower().toStdString();
+                    auto courant = dernieres_formes_.courants.find(reference);
+                    if (courant != dernieres_formes_.courants.end())
+                        courbe = &courant->second;
+                }
+                if (!courbe || courbe->empty()) {
+                    analyses_->signaler(
+                        "Aucun relevé pour « " + signal
+                        + " » : lancez la simulation, puis relancez l'analyse.");
+                    return;
+                }
+                analyses_->afficher_spectre(
+                    coeur::analyser_spectre(dernieres_formes_.temps, *courbe,
+                                            harmoniques),
+                    signal);
+                analyses_->afficher_mesures(
+                    coeur::mesurer(dernieres_formes_.temps, *courbe), signal);
+            });
+
     auto* dock_bas = new QDockWidget("Programme et journaux", this);
     dock_bas->setObjectName("dock_bas");
     dock_bas->setWidget(onglets);
@@ -255,8 +317,22 @@ void FenetrePrincipale::construire_actions() {
     fichier->addAction("&Enregistrer sous…", QKeySequence::Save, this,
                        &FenetrePrincipale::enregistrer_projet);
     fichier->addSeparator();
-    fichier->addAction("Exporter la &netlist SPICE…", this,
+    // Les documents que produit un atelier complet : la nomenclature part chez
+    // le fournisseur, la netlist KiCad chez le routeur, les courbes dans un
+    // tableur, le schéma dans le compte rendu.
+    auto* exports = fichier->addMenu("E&xporter");
+    exports->addAction("Netlist &SPICE…", this,
                        &FenetrePrincipale::exporter_netlist_spice);
+    exports->addAction("Netlist &KiCad (vers le routage)…", this,
+                       [this] { exporter_netlist_kicad(); });
+    exports->addAction("&Nomenclature (CSV)…", this,
+                       [this] { exporter_nomenclature(); });
+    exports->addAction("&Relevés de l'analyse (CSV)…", this,
+                       [this] { exporter_courbes(); });
+    exports->addAction("Schéma en &image ou PDF…", this,
+                       [this] { exporter_schema(); });
+    exports->addAction("Rapport de &contrôle des règles…", this,
+                       [this] { exporter_regles(); });
     fichier->addSeparator();
     fichier->addAction("&Quitter", QKeySequence::Quit, this, &QWidget::close);
 
@@ -327,6 +403,42 @@ void FenetrePrincipale::construire_actions() {
     simulation->addAction("Analyse au point de &repos", this,
                           &FenetrePrincipale::analyser_point_repos);
 
+    // Menu d'analyses, comme dans les ateliers de simulation : chaque entrée
+    // ouvre l'onglet et lance l'analyse correspondante.
+    auto* analyse = menuBar()->addMenu("&Analyse");
+    analyse->addAction("&Balayage continu (.dc)", this,
+                       [this] { lancer_analyse(0); });
+    analyse->addAction("&Réponse en fréquence (Bode, .ac)", this,
+                       [this] { lancer_analyse(1); });
+    analyse->addAction("&Spectre et distorsion (FFT)", this,
+                       [this] { lancer_analyse(2); });
+    analyse->addSeparator();
+    analyse->addAction("&Contrôler les règles électriques (ERC)", this, [this] {
+        circuit_modifie();
+        const QString rapport =
+            QString::fromStdString(coeur::rapport_regles(moteur_->netlist()));
+        ecrire(rapport);
+        onglets_->setCurrentIndex(1);            // onglet « Journal »
+        if (!silencieux_)
+            QMessageBox::information(this, "Contrôle des règles", rapport);
+    });
+    analyse->addAction("&Nomenclature du montage", this, [this] {
+        circuit_modifie();
+        QString texte = "Nomenclature :\n";
+        for (const auto& ligne : coeur::nomenclature(moteur_->netlist())) {
+            QStringList references;
+            for (const auto& reference : ligne.references)
+                references << QString::fromStdString(reference);
+            texte += QString("  %1 × %2 %3 [%4]\n")
+                         .arg(ligne.quantite())
+                         .arg(QString::fromStdString(ligne.designation))
+                         .arg(QString::fromStdString(ligne.valeur))
+                         .arg(references.join(' '));
+        }
+        ecrire(texte);
+        onglets_->setCurrentIndex(1);
+    });
+
     auto* exemples = menuBar()->addMenu("E&xemples");
     exemples->addAction("Clignotant sur D13", this,
                         [this] { charger_exemple(Exemple::Clignotant); });
@@ -342,6 +454,8 @@ void FenetrePrincipale::construire_actions() {
                         [this] { charger_exemple(Exemple::DeuxCartes); });
     exemples->addAction("Servomoteur balayé", this,
                         [this] { charger_exemple(Exemple::Servo); });
+    exemples->addAction("Filtre RC (analyses : Bode, balayage, spectre)", this,
+                        [this] { charger_exemple(Exemple::FiltreRC); });
     exemples->addAction("Moteur en PWM avec transistor", this,
                         [this] { charger_exemple(Exemple::MoteurPuissance); });
 
@@ -402,6 +516,12 @@ void FenetrePrincipale::demarrage_automatique() {
     // Toutes les cartes, pas seulement celle affichée : sinon la seconde
     // resterait inerte et la vérification ne prouverait rien.
     const QStringList cartes = moteur_->cartes();
+    if (cartes.isEmpty()) {
+        // Montage purement analogique : il n'y a rien à compiler, seulement à
+        // simuler.
+        lancer();
+        return;
+    }
     if (cartes.size() <= 1) {
         compiler_source();
     } else {
@@ -433,6 +553,27 @@ void FenetrePrincipale::circuit_modifie() {
             QString::fromStdString(instance.reference));
     signaux.sort();
     if (oscilloscope_) oscilloscope_->proposer_signaux(signaux);
+
+    // Grandeurs balayables : les sources imposent une tension, les résistances
+    // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
+    // le nom donné ici est celui du composant dans la netlist.
+    if (analyses_) {
+        // Les sources d'abord : c'est ce qu'on balaie neuf fois sur dix.
+        QStringList generateurs, resistances;
+        for (const coeur::Instance& instance : netlist.instances()) {
+            const coeur::Modele* modele =
+                coeur::Catalogue::instance().modele(instance.type);
+            if (!modele) continue;
+            if (modele->generateur)
+                generateurs << QString("V%1").arg(
+                    QString::fromStdString(instance.reference));
+            else if (instance.type == "resistance")
+                resistances << QString("R%1").arg(
+                    QString::fromStdString(instance.reference));
+        }
+        analyses_->proposer_sources(generateurs + resistances);
+        analyses_->proposer_signaux(signaux);
+    }
 
     const QStringList cartes = scene_->cartes_presentes();
     moteur_->definir_circuit(std::move(netlist), std::move(broches), cartes);
@@ -828,6 +969,167 @@ void FenetrePrincipale::analyser_point_repos() {
 }
 
 // ---------------------------------------------------------------------------
+// Analyses paramétriques et documents
+// ---------------------------------------------------------------------------
+void FenetrePrincipale::lancer_analyse(int rang) {
+    if (!analyses_) return;
+    circuit_modifie();
+    // L'onglet doit être visible : une analyse dont le résultat reste caché
+    // derrière un autre onglet passerait pour une commande sans effet.
+    onglets_->setCurrentWidget(analyses_);
+    analyses_->choisir_analyse(rang);
+    analyses_->lancer();
+}
+
+QString FenetrePrincipale::resume_analyse() const {
+    return analyses_ ? analyses_->resume() : QString();
+}
+
+// Fabrique commune aux exports : demande un chemin si besoin, écrit, journalise.
+namespace {
+bool ecrire_fichier(const QString& chemin, const QByteArray& contenu) {
+    QFile fichier(chemin);
+    if (!fichier.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+    fichier.write(contenu);
+    return true;
+}
+}  // namespace
+
+bool FenetrePrincipale::exporter_nomenclature(const QString& chemin_demande) {
+    circuit_modifie();
+    if (moteur_->netlist().instances().empty()) {
+        avertir("Nomenclature", "Le schéma est vide.");
+        return false;
+    }
+    QString chemin = chemin_demande;
+    if (chemin.isEmpty())
+        chemin = QFileDialog::getSaveFileName(
+            this, "Exporter la nomenclature", "nomenclature.csv",
+            "Tableur (*.csv);;Tous les fichiers (*)");
+    if (chemin.isEmpty()) return false;
+    const std::string csv = coeur::nomenclature_csv(moteur_->netlist());
+    if (!ecrire_fichier(chemin, QByteArray::fromStdString(csv))) {
+        avertir("Export", "Impossible d'écrire " + chemin);
+        return false;
+    }
+    ecrire("Nomenclature exportée : " + chemin);
+    return true;
+}
+
+bool FenetrePrincipale::exporter_regles(const QString& chemin_demande) {
+    circuit_modifie();
+    QString chemin = chemin_demande;
+    if (chemin.isEmpty())
+        chemin = QFileDialog::getSaveFileName(
+            this, "Enregistrer le rapport de contrôle", "controle-regles.txt",
+            "Texte (*.txt);;Tous les fichiers (*)");
+    if (chemin.isEmpty()) return false;
+    const std::string rapport = coeur::rapport_regles(moteur_->netlist());
+    if (!ecrire_fichier(chemin, QByteArray::fromStdString(rapport))) {
+        avertir("Export", "Impossible d'écrire " + chemin);
+        return false;
+    }
+    ecrire("Rapport de contrôle enregistré : " + chemin);
+    return true;
+}
+
+bool FenetrePrincipale::exporter_netlist_kicad(const QString& chemin_demande) {
+    circuit_modifie();
+    if (moteur_->netlist().instances().empty()) {
+        avertir("Netlist", "Le schéma est vide.");
+        return false;
+    }
+    QString chemin = chemin_demande;
+    if (chemin.isEmpty())
+        chemin = QFileDialog::getSaveFileName(
+            this, "Exporter la netlist KiCad", "circuit.net",
+            "Netlist KiCad (*.net);;Tous les fichiers (*)");
+    if (chemin.isEmpty()) return false;
+    const std::string texte = coeur::netlist_kicad(moteur_->netlist());
+    if (!ecrire_fichier(chemin, QByteArray::fromStdString(texte))) {
+        avertir("Export", "Impossible d'écrire " + chemin);
+        return false;
+    }
+    ecrire("Netlist KiCad exportée : " + chemin);
+    return true;
+}
+
+bool FenetrePrincipale::exporter_courbes(const QString& chemin_demande) {
+    // Priorité au dernier balayage : c'est lui qu'on vient de regarder. À
+    // défaut, les formes d'onde de la dernière trame.
+    QString contenu = analyses_ ? analyses_->csv() : QString();
+    if (contenu.isEmpty() && !dernieres_formes_.vide())
+        contenu = QString::fromStdString(coeur::courbes_csv(dernieres_formes_));
+    if (contenu.isEmpty()) {
+        avertir("Relevés", "Aucun relevé à exporter : lancez une simulation ou "
+                           "une analyse.");
+        return false;
+    }
+    QString chemin = chemin_demande;
+    if (chemin.isEmpty())
+        chemin = QFileDialog::getSaveFileName(
+            this, "Exporter les relevés", "releves.csv",
+            "Tableur (*.csv);;Tous les fichiers (*)");
+    if (chemin.isEmpty()) return false;
+    if (!ecrire_fichier(chemin, contenu.toUtf8())) {
+        avertir("Export", "Impossible d'écrire " + chemin);
+        return false;
+    }
+    ecrire("Relevés exportés : " + chemin);
+    return true;
+}
+
+bool FenetrePrincipale::exporter_schema(const QString& chemin_demande) {
+    QString chemin = chemin_demande;
+    if (chemin.isEmpty())
+        chemin = QFileDialog::getSaveFileName(
+            this, "Exporter le schéma", "schema.pdf",
+            "Document PDF (*.pdf);;Image PNG (*.png);;Tous les fichiers (*)");
+    if (chemin.isEmpty()) return false;
+
+    QRectF zone = scene_->itemsBoundingRect().adjusted(-20, -20, 20, 20);
+    if (zone.isEmpty()) {
+        avertir("Export", "Le schéma est vide.");
+        return false;
+    }
+
+    if (chemin.endsWith(".pdf", Qt::CaseInsensitive)) {
+        // Le PDF est vectoriel : le schéma reste net à n'importe quel zoom,
+        // ce qu'attend un compte rendu ou une planche de TP.
+        QPdfWriter ecrivain(chemin);
+        ecrivain.setPageSize(QPageSize(QPageSize::A4));
+        ecrivain.setPageOrientation(zone.width() > zone.height()
+                                        ? QPageLayout::Landscape
+                                        : QPageLayout::Portrait);
+        ecrivain.setTitle("Schéma — simulateur embarqué");
+        QPainter peintre(&ecrivain);
+        if (!peintre.isActive()) {
+            avertir("Export", "Impossible d'écrire " + chemin);
+            return false;
+        }
+        scene_->render(&peintre, QRectF(), zone, Qt::KeepAspectRatio);
+    } else {
+        const double echelle =
+            std::min(4.0, 2000.0 / std::max(zone.width(), zone.height()));
+        QImage image(static_cast<int>(zone.width() * echelle),
+                     static_cast<int>(zone.height() * echelle),
+                     QImage::Format_ARGB32);
+        image.fill(Qt::white);
+        QPainter peintre(&image);
+        peintre.setRenderHint(QPainter::Antialiasing, true);
+        scene_->render(&peintre, QRectF(image.rect()), zone,
+                       Qt::KeepAspectRatio);
+        peintre.end();
+        if (!image.save(chemin)) {
+            avertir("Export", "Impossible d'écrire " + chemin);
+            return false;
+        }
+    }
+    ecrire("Schéma exporté : " + chemin);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Exemples
 // ---------------------------------------------------------------------------
 namespace {
@@ -1014,6 +1316,10 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
         charger_exemple_deux_cartes();
         return;
     }
+    if (exemple == Exemple::FiltreRC) {
+        charger_exemple_filtre();
+        return;
+    }
     programmes_.clear();
     carte_courante_.clear();
     ItemComposant* carte = scene_->ajouter_composant("arduino_uno", QPointF(-320, 0));
@@ -1095,7 +1401,8 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             break;
         }
         case Exemple::DeuxCartes:
-            return;   // traité à part, le schéma n'a pas une seule carte
+        case Exemple::FiltreRC:
+            return;   // traités à part : ces schémas n'ont pas une seule carte
         case Exemple::Servo: {
             ItemComposant* servo = scene_->ajouter_composant("servomoteur", QPointF(120, 0));
             ItemComposant* alim = scene_->ajouter_composant("alim5v", QPointF(20, -140));
@@ -1233,6 +1540,43 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
            "recopie sur sa LED.");
     ecrire("Compilez chaque carte séparément (sélecteur au-dessus de "
            "l'éditeur), puis lancez.");
+}
+
+// Filtre RC : le montage de référence pour les analyses. Sa coupure vaut
+// 1/(2 pi R C), soit 1591 Hz ici — une valeur qu'on peut confronter au
+// diagramme de Bode que trace le simulateur.
+void FenetrePrincipale::charger_exemple_filtre() {
+    scene_->tout_effacer();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* gbf = scene_->ajouter_composant("generateur_signal",
+                                                   QPointF(-260, 0));
+    ItemComposant* r = scene_->ajouter_composant("resistance", QPointF(-80, -120));
+    ItemComposant* c = scene_->ajouter_composant("condensateur", QPointF(60, 0));
+    ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(-100, 160));
+    if (!gbf || !r || !c || !masse) return;
+    r->valeurs["ohms"] = 1000;
+    c->valeurs["farads"] = 1e-7;
+    gbf->valeurs["amplitude"] = 1;
+    gbf->valeurs["frequence"] = 1000;
+    gbf->textes["forme"] = "sinus";
+    c->setRotation(90);
+
+    scene_->addItem(new ItemFil(gbf, 0, r, 0));      // + -> R
+    scene_->addItem(new ItemFil(r, 1, c, 0));        // R -> C
+    scene_->addItem(new ItemFil(c, 1, masse, 0));    // C -> masse
+    scene_->addItem(new ItemFil(gbf, 1, masse, 0));  // - -> masse
+
+    circuit_modifie();
+    vue_->ajuster();
+    ecrire("Exemple : filtre passe-bas RC (1 kΩ, 100 nF), attaqué par un "
+           "générateur de signaux.");
+    ecrire("Onglet « Analyses » : la réponse en fréquence doit couper à "
+           "1/(2·pi·R·C) = 1591 Hz, avec −20 dB par décade et −45° à la "
+           "coupure.");
+    ecrire("Le balayage continu et le spectre s'y lancent de la même façon.");
 }
 
 // ---------------------------------------------------------------------------

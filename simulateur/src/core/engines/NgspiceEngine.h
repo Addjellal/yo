@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "core/Netlist.h"
+#include "core/analysis/Analyses.h"
 
 namespace coeur {
 
@@ -69,8 +70,22 @@ public:
         const std::vector<TransitionBroche>& transitions, double duree,
         double pas);
 
+    // Analyse paramétrique : le circuit est celui du point de repos, seule la
+    // directive change. « .dc V1 0 5 0.1 » trace une caractéristique de
+    // transfert, « .ac dec 20 10 1meg » un diagramme de Bode. C'est ce que
+    // font les commandes du même nom dans LTspice ou Multisim.
+    std::string construire_analyse(const Netlist& netlist,
+                                   const std::vector<BrocheElectrique>& broches,
+                                   const std::string& directive);
+
     // Charge le circuit dans ngspice et lance une analyse au point de repos.
     bool resoudre();
+
+    // Exécute l'analyse préparée par `construire_analyse` et range le résultat
+    // dans `balayage()`. L'abscisse est reconnue au nom que ngspice lui donne
+    // (« v-sweep », « res-sweep », « temp-sweep », « frequency »).
+    bool resoudre_analyse();
+    const Balayage& balayage() const { return balayage_; }
 
     // Lance l'analyse transitoire préparée par `construire_transitoire`.
     bool resoudre_transitoire();
@@ -110,8 +125,13 @@ private:
     std::map<std::string, double> tensions_;
     std::map<std::string, double> courants_;
     Formes formes_;
+    Balayage balayage_;
     std::map<std::string, double> etat_initial_;
     std::map<std::string, double> etat_final_;
+
+    // Broches vues comme des sources continues (point de repos, balayage).
+    std::vector<std::string> sources_continues(
+        const std::vector<BrocheElectrique>& broches) const;
 
     // Partie commune aux deux analyses : composants, directives, fuites.
     // `sources_broches` décrit les broches, en continu ou par morceaux.

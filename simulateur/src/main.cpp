@@ -1,5 +1,6 @@
 // Point d'entrée de l'application.
 #include <QApplication>
+#include <QFileInfo>
 #include <QFont>
 #include <QPixmap>
 #include <QStringList>
@@ -48,7 +49,8 @@ int main(int argc, char** argv) {
     // Vérification automatique : « --capture fichier.png [millisecondes] »
     // ouvre l'application, laisse tourner la simulation, enregistre une image
     // puis quitte. Sert de test de bout en bout sans intervention humaine.
-    if (position >= 0 && position + 1 < arguments.size()) {
+    const bool analyse_demandee = arguments.contains("--analyse");
+    if (position >= 0 && position + 1 < arguments.size() && !analyse_demandee) {
         const QString destination = arguments.at(position + 1);
         const int attente = position + 2 < arguments.size()
                                 ? arguments.at(position + 2).toInt()
@@ -64,6 +66,68 @@ int main(int argc, char** argv) {
             qApp->quit();
         });
     }
+    // « --analyse N [attente_ms] » : lance l'analyse N (0 balayage continu,
+    // 1 réponse en fréquence, 2 spectre) et imprime son compte rendu chiffré.
+    // Le spectre porte sur ce qui vient d'être simulé : la simulation doit
+    // donc tourner d'abord.
+    const int analyse = arguments.indexOf("--analyse");
+    if (analyse >= 0 && analyse + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const int numero = arguments.at(analyse + 1).toInt();
+        const int attente = analyse + 2 < arguments.size()
+                                ? arguments.at(analyse + 2).toInt()
+                                : 600;
+        if (numero == 2)
+            QTimer::singleShot(200, &fenetre,
+                               [&fenetre] { fenetre.demarrage_automatique(); });
+        // « --capture » peut accompagner « --analyse » : l'image est alors
+        // prise une fois la courbe tracée, ce qui la rend vérifiable à l'œil
+        // autant qu'au chiffre.
+        const QString image = (position >= 0 && position + 1 < arguments.size())
+                                  ? arguments.at(position + 1)
+                                  : QString();
+        QTimer::singleShot(attente, &application, [&fenetre, numero, image] {
+            fenetre.lancer_analyse(numero);
+            QTextStream(stdout) << fenetre.resume_analyse() << Qt::endl;
+            if (!image.isEmpty())
+                QTimer::singleShot(200, qApp, [&fenetre, image] {
+                    fenetre.grab().save(image);
+                    qApp->quit();
+                });
+            else
+                qApp->quit();
+        });
+    }
+
+    // « --documents dossier » : produit tous les documents du projet et
+    // imprime leur taille. Vérifie d'un coup nomenclature, contrôle des
+    // règles, netlist KiCad, relevés et sortie graphique.
+    const int documents = arguments.indexOf("--documents");
+    if (documents >= 0 && documents + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const QString dossier = arguments.at(documents + 1);
+        QTimer::singleShot(300, &application, [&fenetre, dossier] {
+            QTextStream sortie(stdout);
+            const struct { const char* nom; bool (FenetrePrincipale::*action)(const QString&); }
+                travaux[] = {
+                    {"nomenclature.csv", &FenetrePrincipale::exporter_nomenclature},
+                    {"controle-regles.txt", &FenetrePrincipale::exporter_regles},
+                    {"circuit.net", &FenetrePrincipale::exporter_netlist_kicad},
+                    {"schema.pdf", &FenetrePrincipale::exporter_schema},
+                    {"schema.png", &FenetrePrincipale::exporter_schema}};
+            for (const auto& travail : travaux) {
+                const QString chemin = dossier + "/" + travail.nom;
+                const bool ok = (fenetre.*travail.action)(chemin);
+                sortie << travail.nom << " : "
+                       << (ok ? QString::number(QFileInfo(chemin).size())
+                                    + " octets"
+                              : QString("ECHEC"))
+                       << Qt::endl;
+            }
+            qApp->quit();
+        });
+    }
+
     // « --aller-retour fichier » : enregistre le projet courant, le rouvre,
     // et imprime ce qui a survécu. Vérifie l'entrée/sortie sans interface.
     const int aller = arguments.indexOf("--aller-retour");

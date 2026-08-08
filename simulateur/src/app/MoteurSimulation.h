@@ -91,6 +91,12 @@ public:
     // repos », utile pour vérifier un montage purement analogique.
     void resoudre_une_fois();
 
+    // Balayage paramétrique (« .dc », « .ac »). Le firmware n'intervient pas :
+    // les broches sont figées dans leur état courant, comme le fait un atelier
+    // de simulation analogique.
+    bool executer_balayage(const QString& directive, QString* erreur);
+    const coeur::Balayage& balayage() const { return analogique_.balayage(); }
+
 signals:
     void resultats(const std::map<std::string, double>& courants,
                    const std::map<std::string, double>& tensions);

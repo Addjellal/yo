@@ -23,7 +23,7 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 
 - **Saisie de schéma** : palette par famille, glisser-déposer, fils en équerre,
   rotation, grille magnétique, zoom à la molette.
-- **Catalogue de 52 composants** (48 simulables, 9 familles), tous vérifiés
+- **Catalogue de 53 composants** (49 simulables, 9 familles), tous vérifiés
   par les tests : passifs, diodes et Zener, transistors NPN/PNP, MOSFET,
   optocoupleur, afficheur 7 segments, relais, portes logiques, amplificateur
   opérationnel, régulateur 7805, instruments de mesure.
@@ -53,16 +53,39 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Compilation intégrée** : on écrit le programme dans l'application,
   `F5` compile avec `avr-g++` et charge le résultat.
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
+- **Trois analyses paramétriques**, comme dans un atelier de simulation :
+  *balayage continu* (`.dc` — caractéristique de transfert, d'une source ou
+  d'une résistance), *réponse en fréquence* (`.ac` — diagramme de Bode, gain
+  en décibels et phase, avec lecture automatique de la coupure à −3 dB), et
+  *spectre* du dernier relevé (raies harmoniques et taux de distorsion). Les
+  courbes s'affichent dans l'onglet **Analyses**, avec axes, légende et
+  curseur de lecture.
+- **Générateur de signaux** (sinus, carré, triangle, continu) : c'est lui qui
+  rend ces analyses possibles, et il porte les trois descriptions que SPICE
+  attend — valeur continue, amplitude alternative, forme d'onde.
+- **Mesures d'oscilloscope** sur un signal : minimum, maximum, moyenne, valeur
+  efficace, fréquence, rapport cyclique, temps de montée 10–90 %, dépassement.
+- **Simulation purement analogique** : un montage sans aucune carte se simule
+  quand même — un filtre, un redresseur, un générateur n'ont pas besoin de
+  microcontrôleur.
+- **Documents produits** : nomenclature (BOM) en CSV avec regroupement des
+  composants identiques, **contrôle des règles électriques** (ERC) façon
+  KiCad, netlist au **format KiCad** lisible par un logiciel de routage,
+  relevés de courbes en CSV, et export du schéma en **PDF vectoriel** ou en
+  PNG.
 - **Enregistrement** du schéma et du programme dans un fichier `.schema.json`,
   **export** de la netlist SPICE.
 - **Plusieurs cartes** sur le même schéma : chacune a son propre cœur AVR et
   son propre programme, choisi dans le sélecteur au-dessus de l'éditeur. Elles
   partagent le circuit et l'horloge, et peuvent donc se parler par leurs
   broches.
-- **Huit exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
+- **Neuf exemples** dans le menu *Exemples* : clignotant, bouton avec pull-up,
   potentiomètre sur l'ADC, moteur commandé par transistor, PWM matérielle à
   observer à l'oscilloscope, deux cartes qui communiquent, servomoteur balayé,
-  et moteur en PWM commandé par transistor.
+  moteur en PWM commandé par transistor, et filtre RC pour les analyses.
+
+Ce que le projet couvre, comparé à Proteus, Multisim, LTspice et KiCad, est
+détaillé — sans complaisance — dans [COMPARAISON.md](COMPARAISON.md).
 
 ## Ce que ça ne fait pas encore
 
@@ -86,8 +109,12 @@ Autant le dire tout de suite, pour ne pas donner le change :
   en plus des deux existants. Le noyau Arduino n'a donc ni `Wire`, ni `SPI`,
   ni `Servo`, ni `tone()`, ni bibliothèque tierce.
 - Pas de **routage de circuit imprimé**. L'architecture le prépare — chaque
-  composant porte déjà son empreinte et la netlist est un objet de première
-  classe — mais le module n'existe pas.
+  composant porte déjà son empreinte, la netlist est un objet de première
+  classe, et son export au format KiCad existe — mais le module n'existe pas.
+- Pas d'**annulation** (`Ctrl+Z`), pas de copier-coller, pas de schéma sur
+  plusieurs feuilles, pas d'étiquettes de nœud ni de bus.
+- Pas d'**analyse de Monte-Carlo**, de balayage en température ni d'analyse du
+  bruit : ngspice sait les faire, l'interface ne les propose pas encore.
 - Un seul **type** de microcontrôleur pris en charge : ATmega328P (Arduino
   Uno). On peut en poser plusieurs, mais pas d'autre modèle.
 
@@ -316,7 +343,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**105 tests du cœur**, sans Qt, en douze sections :
+**171 tests du cœur**, sans Qt, en quinze sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -332,10 +359,14 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 12 | **composants à mécanique** : servo à 1,5 ms → 90°, moteur à 63 % après une constante de temps, asynchrone à 1440 tr/min pour 4 % de glissement, courant d'induit qui suit la loi L/R, écho de 5,8 ms pour 1 m |
 | 11 | **un croquis Arduino de TP**, compilé sans retouche : millis à la bonne cadence, anti-rebond, machine à états, PWM, Serial |
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
+| 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
+| 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **19 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **33 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
-d'alimentation répétés, et deux cartes sur le même schéma.
+d'alimentation répétés, deux cartes sur le même schéma, et le panneau
+d'analyses (Bode, spectre, exports CSV).
 
 L'application se vérifie aussi sans intervention :
 
@@ -346,10 +377,16 @@ L'application se vérifie aussi sans intervention :
                    --capture pwm.png 6000            # la PWM à l'oscilloscope
 ./build/simulateur --exemple 5 --onglet 3 --base 2 \
                    --capture deux.png 9000           # les deux cartes
+./build/simulateur --exemple 8 --analyse 1           # Bode du filtre RC
+./build/simulateur --exemple 8 --analyse 2 2500      # spectre du signal simulé
+./build/simulateur --exemple 8 --documents /tmp/doc  # BOM, ERC, KiCad, PDF, PNG
 ```
 
 `--onglet` choisit le panneau du bas (0 programme, 1 journal, 2 série,
-3 oscilloscope), `--base` impose la base de temps en secondes. La capture
+3 oscilloscope, 4 analyses), `--base` impose la base de temps en secondes.
+`--analyse N` lance l'analyse *N* (0 balayage continu, 1 réponse en fréquence,
+2 spectre) et imprime son résultat chiffré ; `--documents` produit tous les
+documents du projet et donne la taille de chacun. La capture
 imprime la vitesse atteinte, puis pour chaque voie la moyenne, la crête, le
 rapport cyclique mesuré, et la concordance entre les deux premières voies —
 de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.

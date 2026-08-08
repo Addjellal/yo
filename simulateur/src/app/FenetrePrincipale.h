@@ -12,6 +12,8 @@
 
 #include <map>
 
+#include "core/engines/NgspiceEngine.h"
+
 class QAction;
 class QLabel;
 class QPlainTextEdit;
@@ -25,6 +27,7 @@ class SceneSchema;
 class VueSchema;
 class MoteurSimulation;
 class Oscilloscope;
+class PanneauAnalyses;
 
 // Palette : arbre catégorie -> composants, avec glisser-déposer vers le schéma.
 class PaletteComposants : public QTreeWidget {
@@ -46,9 +49,12 @@ public:
     // programme qui va avec : c'est la façon la plus courte de montrer ce que
     // l'application sait faire.
     enum class Exemple { Clignotant, BoutonLed, PotentiometreLed, Transistor,
-                         Pwm, DeuxCartes, Servo, MoteurPuissance };
+                         Pwm, DeuxCartes, Servo, MoteurPuissance, FiltreRC };
     void charger_exemple(Exemple exemple);
     void charger_exemple_deux_cartes();
+    // Montage purement analogique : c'est celui sur lequel les analyses
+    // paramétriques prennent tout leur sens (Bode, balayage, spectre).
+    void charger_exemple_filtre();
     void charger_exemple_clignotant() { charger_exemple(Exemple::Clignotant); }
 
     // Compile le programme affiché puis démarre la simulation. Sert au mode
@@ -64,6 +70,19 @@ public:
 
     // Mesures de l'oscilloscope, en texte (vérification automatique).
     QString mesures_oscilloscope() const;
+
+    // Analyses paramétriques. `rang` : 0 balayage continu, 1 réponse en
+    // fréquence, 2 spectre. Le compte rendu textuel sert à la vérification
+    // automatique (« --analyse »).
+    void lancer_analyse(int rang);
+    QString resume_analyse() const;
+
+    // Documents produits par le projet. Chemin vide = boîte de dialogue.
+    bool exporter_nomenclature(const QString& chemin = {});
+    bool exporter_regles(const QString& chemin = {});
+    bool exporter_netlist_kicad(const QString& chemin = {});
+    bool exporter_courbes(const QString& chemin = {});
+    bool exporter_schema(const QString& chemin = {});
 
     // En vérification automatique, aucune boîte de dialogue ne doit bloquer.
     void definir_mode_silencieux(bool silencieux) { silencieux_ = silencieux; }
@@ -120,6 +139,10 @@ private:
     QPlainTextEdit* console_ = nullptr;
     QPlainTextEdit* moniteur_serie_ = nullptr;
     Oscilloscope* oscilloscope_ = nullptr;
+    PanneauAnalyses* analyses_ = nullptr;
+    // Dernière trame calculée : c'est sur elle que porte le spectre et les
+    // mesures, comme un oscilloscope analyse ce qu'il vient d'acquérir.
+    coeur::Formes dernieres_formes_;
     QTabWidget* onglets_ = nullptr;
     QComboBox* selecteur_carte_ = nullptr;
     // Programme de chaque carte : deux Arduino n'exécutent pas le même.

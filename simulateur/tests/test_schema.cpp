@@ -11,6 +11,7 @@
 #include <QPointF>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <set>
 #include <string>
@@ -18,6 +19,7 @@
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
+#include "app/panels/PanneauAnalyses.h"
 #include "app/schematic/SceneSchema.h"
 #include "core/Device.h"
 
@@ -313,6 +315,76 @@ static void test_cartes_non_cablees() {
 }
 
 // ---------------------------------------------------------------------------
+// [6] Panneau d'analyses : il doit traduire fidèlement un résultat de calcul
+// en courbes et en compte rendu. Vérifié sans écran, sur des données dont on
+// connaît la réponse.
+// ---------------------------------------------------------------------------
+static void test_panneau_analyses() {
+    std::printf("\n[6] Panneau d'analyses\n");
+    PanneauAnalyses panneau;
+
+    // --- diagramme de Bode d'un passe-bas théorique coupant à 1 kHz
+    {
+        coeur::Balayage bode;
+        bode.logarithmique = true;
+        bode.grandeur = "Fréquence";
+        coeur::Courbe entree, sortie;
+        entree.nom = "in";
+        sortie.nom = "out";
+        for (int k = 0; k <= 50; ++k) {
+            const double frequence = std::pow(10.0, 1.0 + k / 10.0);
+            const double x = frequence / 1000.0;
+            bode.abscisse.push_back(frequence);
+            entree.valeurs.push_back(1.0);
+            entree.phases.push_back(0.0);
+            sortie.valeurs.push_back(1.0 / std::sqrt(1 + x * x));
+            sortie.phases.push_back(-std::atan(x) * 180 / 3.14159265358979);
+        }
+        bode.courbes.push_back(entree);
+        bode.courbes.push_back(sortie);
+        panneau.afficher_balayage(bode, true, "in");
+        const QString resume = panneau.resume();
+        verifier(resume.contains("out"), "Bode : la sortie figure au compte rendu",
+                 resume.toStdString());
+        verifier(resume.contains("coupure"), "Bode : la coupure est annoncée",
+                 resume.toStdString());
+        // gain et phase : deux courbes par signal, l'entrée servant de
+        // référence n'est pas retracée
+        verifier(resume.contains("2 courbes"),
+                 "Bode : gain et phase, la référence n'est pas retracée",
+                 resume.toStdString());
+        verifier(panneau.csv().startsWith("Fréquence;"),
+                 "Bode : export CSV du balayage",
+                 panneau.csv().left(30).toStdString());
+    }
+
+    // --- spectre : les raies et la distorsion doivent apparaître en clair
+    {
+        coeur::Spectre spectre;
+        spectre.valide = true;
+        spectre.fondamentale = 1000;
+        spectre.thd = 42.88;
+        spectre.efficace = 2.5;
+        spectre.raies = {{1, 1000, 3.183, 100.0}, {3, 3000, 1.061, 33.3}};
+        panneau.afficher_spectre(spectre, "N1");
+        const QString resume = panneau.resume();
+        verifier(resume.contains("42.88"), "spectre : la distorsion est affichée",
+                 resume.toStdString());
+        verifier(resume.contains("H3"), "spectre : les rangs sont détaillés");
+        verifier(panneau.csv().startsWith("rang;frequence"),
+                 "spectre : export CSV des raies");
+    }
+
+    // --- un résultat vide ne doit pas passer pour un résultat
+    {
+        panneau.afficher_balayage(coeur::Balayage{}, false);
+        verifier(panneau.resume().contains("aucun point"),
+                 "balayage vide : le panneau le dit au lieu d'afficher du vide",
+                 panneau.resume().toStdString());
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -324,6 +396,7 @@ int main(int argc, char** argv) {
     test_masses_multiples();
     test_deux_cartes();
     test_cartes_non_cablees();
+    test_panneau_analyses();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

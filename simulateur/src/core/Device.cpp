@@ -100,9 +100,11 @@ void enregistrer_logique(Catalogue& catalogue);
 void enregistrer_instruments(Catalogue& catalogue);
 void enregistrer_actionneurs_dynamiques(Catalogue& catalogue);
 void enregistrer_capteurs_avances(Catalogue& catalogue);
+void enregistrer_sources(Catalogue& catalogue);
 
 void Catalogue::enregistrer_modeles_standards() {
     enregistrer_base(*this);
+    enregistrer_sources(*this);
     enregistrer_cartes(*this);
     enregistrer_semiconducteurs(*this);
     enregistrer_capteurs(*this);

@@ -220,8 +220,17 @@ void MoteurSimulation::remettre_a_zero() {
 }
 
 void MoteurSimulation::demarrer() {
+    // Un montage sans carte reste un circuit : générateur, filtre, redresseur
+    // se simulent très bien sans microcontrôleur, et c'est ce que fait
+    // n'importe quel simulateur analogique.
     if (cartes_.empty()) {
-        emit journal("Aucune carte programmable sur le schéma.");
+        if (netlist_.instances().empty()) {
+            emit journal("Le schéma ne contient aucun composant.");
+            return;
+        }
+        minuterie_.start();
+        emit journal("Simulation analogique démarrée (aucune carte sur le "
+                     "schéma).");
         return;
     }
     if (!un_firmware_au_moins()) {
@@ -465,6 +474,34 @@ void MoteurSimulation::resoudre_une_fois() {
     emit journal("Analyse au point de repos effectuée.");
 }
 
+bool MoteurSimulation::executer_balayage(const QString& directive,
+                                         QString* erreur) {
+    if (netlist_.instances().empty()) {
+        if (erreur) *erreur = "Le schéma ne contient aucun composant.";
+        return false;
+    }
+    source_spice_ = QString::fromStdString(analogique_.construire_analyse(
+        netlist_, broches_pour(false), directive.toStdString()));
+    if (!analogique_.resoudre_analyse()) {
+        QString messages;
+        for (const auto& message : analogique_.erreurs()) {
+            emit journal(QString::fromStdString(message));
+            if (!messages.isEmpty()) messages += "\n";
+            messages += QString::fromStdString(message);
+        }
+        // La directive fait partie du diagnostic : c'est elle qu'on relit
+        // quand ngspice refuse l'analyse.
+        if (erreur)
+            *erreur = "« " + directive + " » : "
+                      + (messages.isEmpty() ? "aucun résultat" : messages);
+        return false;
+    }
+    emit journal("Analyse « " + directive + " » effectuée : "
+                 + QString::number(analogique_.balayage().abscisse.size())
+                 + " points.");
+    return true;
+}
+
 // Le pas de couplage ne sert qu'au retour du circuit vers le microcontrôleur.
 // Si toutes les broches sont en sortie, le programme n'a rien à relire : on
 // peut alors traiter la trame entière d'un bloc, et c'est bien plus rapide.
@@ -497,6 +534,10 @@ uint64_t MoteurSimulation::executer_pas(uint64_t cycles) {
         // les garde sur la même horloge.
         executes = std::max(executes, cible.mcu->avancer(cycles));
     }
+    // Un montage purement analogique — un filtre, un générateur de signaux —
+    // n'a aucune carte pour donner le tempo. Le temps doit tout de même
+    // avancer, sinon le circuit resterait figé et l'oscilloscope vide.
+    if (executes == 0) executes = cycles;
     resoudre_trame(executes);
     return executes;
 }

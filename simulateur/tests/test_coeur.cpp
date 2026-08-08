@@ -16,8 +16,10 @@
 
 #include "core/Device.h"
 #include "core/Netlist.h"
+#include "core/analysis/Analyses.h"
 #include "core/engines/AvrEngine.h"
 #include "core/engines/NgspiceEngine.h"
+#include "core/export/Documents.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;
@@ -1474,6 +1476,507 @@ static void test_composants_a_etat() {
 }
 
 // ---------------------------------------------------------------------------
+// [13] Mesures, spectre et distorsion. Ces calculs sont vérifiés contre des
+// signaux dont la théorie donne le résultat exact : une sinusoïde n'a pas
+// d'harmoniques, un carré parfait a un taux de distorsion de 48,3 %, son
+// harmonique 3 vaut le tiers du fondamental. Aucun besoin de ngspice.
+// ---------------------------------------------------------------------------
+static void test_analyses() {
+    std::printf("\n[13] Mesures, spectre et distorsion\n");
+    const double pi = 3.14159265358979323846;
+
+    // --- sinusoïde pure : 1 kHz, 2 V crête, décalée de 1 V
+    {
+        std::vector<double> t, v;
+        const int points = 4000;
+        for (int k = 0; k < points; ++k) {
+            const double instant = k * 5e-3 / points;   // 5 périodes
+            t.push_back(instant);
+            v.push_back(1.0 + 2.0 * std::sin(2 * pi * 1000 * instant));
+        }
+        const coeur::Mesures m = coeur::mesurer(t, v);
+        verifier(m.valide, "mesures : signal accepté");
+        verifier(presque(m.moyenne, 1.0, 0.05),
+                 "mesures : composante continue", f(m.moyenne));
+        verifier(presque(m.efficace, std::sqrt(1.0 + 2.0), 0.05),
+                 "mesures : valeur efficace", f(m.efficace));
+        verifier(presque(m.crete_a_crete, 4.0, 0.02), "mesures : crête à crête",
+                 f(m.crete_a_crete));
+        verifier(presque(m.frequence, 1000.0, 5.0), "mesures : fréquence",
+                 f(m.frequence, 1));
+        verifier(presque(m.rapport_cyclique, 50.0, 2.0),
+                 "mesures : rapport cyclique d'une sinusoïde",
+                 f(m.rapport_cyclique, 1));
+
+        const coeur::Spectre s = coeur::analyser_spectre(t, v);
+        verifier(s.valide, "spectre : analyse aboutie");
+        verifier(presque(s.fondamentale, 1000.0, 5.0), "spectre : fondamentale",
+                 f(s.fondamentale, 1));
+        verifier(!s.raies.empty() && presque(s.raies[0].amplitude, 2.0, 0.05),
+                 "spectre : amplitude du fondamental",
+                 s.raies.empty() ? "" : f(s.raies[0].amplitude));
+        verifier(presque(s.continu, 1.0, 0.02), "spectre : composante continue",
+                 f(s.continu));
+        verifier(s.thd < 1.0, "spectre : une sinusoïde n'a pas d'harmoniques",
+                 f(s.thd, 2) + " %");
+    }
+
+    // --- carré parfait : la théorie donne A1 = 4A/pi, A3 = A1/3, THD = 48,3 %
+    {
+        std::vector<double> t, v;
+        const int points = 20000;
+        for (int k = 0; k < points; ++k) {
+            const double instant = k * 10e-3 / points;   // 10 périodes de 1 ms
+            t.push_back(instant);
+            const double phase = std::fmod(instant, 1e-3) / 1e-3;
+            v.push_back(phase < 0.5 ? 5.0 : 0.0);
+        }
+        const coeur::Mesures m = coeur::mesurer(t, v);
+        verifier(presque(m.frequence, 1000.0, 5.0), "carré : fréquence",
+                 f(m.frequence, 1));
+        verifier(presque(m.rapport_cyclique, 50.0, 1.0),
+                 "carré : rapport cyclique", f(m.rapport_cyclique, 1));
+        verifier(presque(m.moyenne, 2.5, 0.05), "carré : valeur moyenne",
+                 f(m.moyenne));
+
+        const coeur::Spectre s = coeur::analyser_spectre(t, v, 9);
+        const double attendu = 4.0 * 2.5 / pi;
+        verifier(s.valide && presque(s.raies[0].amplitude, attendu, 0.05),
+                 "carré : fondamental à 4A/pi",
+                 s.raies.empty() ? "" : f(s.raies[0].amplitude));
+        verifier(s.raies.size() > 2
+                     && presque(s.raies[2].amplitude, attendu / 3.0, 0.05),
+                 "carré : harmonique 3 au tiers du fondamental",
+                 s.raies.size() > 2 ? f(s.raies[2].amplitude) : "");
+        verifier(s.raies.size() > 1 && s.raies[1].amplitude < 0.05,
+                 "carré : pas d'harmonique paire",
+                 s.raies.size() > 1 ? f(s.raies[1].amplitude) : "");
+        // Tronqué au rang 9, le calcul doit donner 42,88 % — c'est la valeur
+        // exacte de sqrt(1/9+1/25+1/49+1/81). Ce n'est qu'en poussant les
+        // rangs qu'on retrouve les 48,3 % du carré parfait : les deux
+        // vérifications ensemble prouvent que rien n'est approché au hasard.
+        verifier(presque(s.thd, 42.88, 0.5),
+                 "carré : distorsion tronquée au rang 9", f(s.thd, 2) + " %");
+        const coeur::Spectre complet = coeur::analyser_spectre(t, v, 99);
+        verifier(presque(complet.thd, 48.3, 1.0),
+                 "carré : distorsion de 48,3 % avec tous les rangs",
+                 f(complet.thd, 2) + " %");
+    }
+
+    // --- rapport cyclique de 25 % : ce que doit lire une mesure de PWM
+    {
+        std::vector<double> t, v;
+        const int points = 20000;
+        for (int k = 0; k < points; ++k) {
+            const double instant = k * 10e-3 / points;
+            t.push_back(instant);
+            v.push_back(std::fmod(instant, 1e-3) / 1e-3 < 0.25 ? 5.0 : 0.0);
+        }
+        const coeur::Mesures m = coeur::mesurer(t, v);
+        verifier(presque(m.rapport_cyclique, 25.0, 1.0),
+                 "PWM : rapport cyclique de 25 %", f(m.rapport_cyclique, 1));
+        verifier(presque(m.moyenne, 1.25, 0.05), "PWM : valeur moyenne",
+                 f(m.moyenne));
+    }
+
+    // --- gain et fréquence de coupure lus sur un diagramme de Bode théorique
+    {
+        coeur::Balayage bode;
+        bode.logarithmique = true;
+        coeur::Courbe sortie;
+        sortie.nom = "out";
+        for (int k = 0; k <= 60; ++k) {
+            const double frequence = std::pow(10.0, 1.0 + k / 10.0);  // 10 Hz→10 MHz
+            bode.abscisse.push_back(frequence);
+            // passe-bas du premier ordre, coupure à 1 kHz
+            const double x = frequence / 1000.0;
+            sortie.valeurs.push_back(1.0 / std::sqrt(1 + x * x));
+            sortie.phases.push_back(-std::atan(x) * 180 / pi);
+        }
+        bode.courbes.push_back(sortie);
+        const double coupure = coeur::frequence_coupure(bode, bode.courbes[0]);
+        verifier(presque(coupure, 1000.0, 30.0),
+                 "Bode : coupure à -3 dB retrouvée", f(coupure, 1) + " Hz");
+        verifier(presque(coeur::gain_maximal(bode.courbes[0]), 0.0, 0.1),
+                 "Bode : gain maximal de 0 dB");
+        const std::vector<double> gains =
+            coeur::gain_decibels(bode.courbes[0]);
+        verifier(gains.size() == bode.abscisse.size()
+                     && gains.back() < -70.0,
+                 "Bode : la pente descend bien de 20 dB par décade",
+                 gains.empty() ? "" : f(gains.back(), 1) + " dB");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// [14] Documents produits : nomenclature, contrôle des règles, exports.
+// ---------------------------------------------------------------------------
+static void test_documents() {
+    std::printf("\n[14] Nomenclature, règles électriques et exports\n");
+
+    coeur::Netlist netlist;
+    auto& carte = netlist.ajouter("U1", "arduino_uno");
+    (void)carte;
+    netlist.relier("U1", "D13", "N1");
+    netlist.relier("U1", "GND", "GND");
+    auto& r1 = netlist.ajouter("R1", "resistance");
+    r1.valeurs["ohms"] = 220;
+    netlist.relier("R1", "1", "N1");
+    netlist.relier("R1", "2", "N2");
+    auto& r2 = netlist.ajouter("R2", "resistance");
+    r2.valeurs["ohms"] = 220;
+    netlist.relier("R2", "1", "N1");
+    netlist.relier("R2", "2", "N3");
+    auto& r3 = netlist.ajouter("R3", "resistance");
+    r3.valeurs["ohms"] = 4700;
+    netlist.relier("R3", "1", "N3");
+    netlist.relier("R3", "2", "GND");
+    netlist.ajouter("LED1", "led");
+    netlist.relier("LED1", "A", "N2");
+    netlist.relier("LED1", "K", "GND");
+
+    // --- nomenclature
+    {
+        const auto lignes = coeur::nomenclature(netlist);
+        int quantite_220 = 0, lignes_resistance = 0;
+        for (const auto& ligne : lignes) {
+            if (ligne.type != "resistance") continue;
+            ++lignes_resistance;
+            if (ligne.valeur.find("220") != std::string::npos)
+                quantite_220 = ligne.quantite();
+        }
+        verifier(lignes_resistance == 2,
+                 "nomenclature : deux valeurs distinctes de résistance",
+                 std::to_string(lignes_resistance));
+        verifier(quantite_220 == 2,
+                 "nomenclature : les deux 220 Ω sont regroupées",
+                 std::to_string(quantite_220));
+        bool carte_listee = false, masse_listee = false;
+        for (const auto& ligne : lignes) {
+            if (ligne.type == "arduino_uno") carte_listee = true;
+            if (ligne.type == "masse") masse_listee = true;
+        }
+        verifier(carte_listee, "nomenclature : la carte figure au tableau");
+        verifier(!masse_listee, "nomenclature : les symboles ne s'achètent pas");
+
+        verifier(coeur::format_ingenieur(4700, "Ω") == "4.7 kΩ",
+                 "nomenclature : préfixes d'ingénieur",
+                 coeur::format_ingenieur(4700, "Ω"));
+        verifier(coeur::format_ingenieur(1e-7, "F") == "100 nF",
+                 "nomenclature : 100 nF et non 1e-07 F",
+                 coeur::format_ingenieur(1e-7, "F"));
+
+        const std::string csv = coeur::nomenclature_csv(netlist);
+        verifier(csv.find("Quantite;Designation") == 0,
+                 "nomenclature : en-tête CSV");
+        verifier(csv.find("R1 R2") != std::string::npos,
+                 "nomenclature : références regroupées dans le CSV");
+    }
+
+    // --- contrôle des règles : ce circuit est propre
+    {
+        const auto anomalies = coeur::controler_regles(netlist);
+        int erreurs = 0;
+        std::string liste;
+        for (const auto& anomalie : anomalies)
+            if (anomalie.gravite == coeur::Anomalie::Gravite::Erreur) {
+                ++erreurs;
+                liste += " " + anomalie.reference + ":" + anomalie.message;
+            }
+        verifier(erreurs == 0, "ERC : un montage correct ne lève aucune erreur",
+                 liste);
+        bool led_signalee = false;
+        for (const auto& anomalie : anomalies)
+            if (anomalie.reference == "LED1") led_signalee = true;
+        verifier(!led_signalee,
+                 "ERC : la LED protégée par R1 n'est pas signalée");
+    }
+
+    // --- contrôle des règles : les fautes classiques sont attrapées
+    {
+        coeur::Netlist fautif;
+        fautif.ajouter("LED1", "led");           // LED sans résistance
+        fautif.relier("LED1", "A", "5V");
+        fautif.relier("LED1", "K", "GND");
+        auto& r = fautif.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        fautif.relier("R1", "1", "N9");          // borne 2 en l'air
+        auto& carte2 = fautif.ajouter("U1", "arduino_uno");
+        (void)carte2;
+        fautif.relier("U1", "D2", "GND");        // sortie sur la masse
+        auto& pile1 = fautif.ajouter("V1", "pile");
+        pile1.valeurs["volts"] = 9;
+        fautif.relier("V1", "+", "N5");
+        fautif.relier("V1", "-", "GND");
+        auto& pile2 = fautif.ajouter("V2", "pile");
+        pile2.valeurs["volts"] = 5;
+        fautif.relier("V2", "+", "N5");
+        fautif.relier("V2", "-", "GND");
+
+        const auto anomalies = coeur::controler_regles(fautif);
+        auto contient = [&anomalies](const std::string& reference,
+                                     const std::string& fragment) {
+            for (const auto& anomalie : anomalies)
+                if (anomalie.reference == reference
+                    && anomalie.message.find(fragment) != std::string::npos)
+                    return true;
+            return false;
+        };
+        verifier(contient("LED1", "résistance série"),
+                 "ERC : LED sans résistance de limitation");
+        verifier(contient("R1", "non connectée"), "ERC : borne en l'air");
+        verifier(contient("U1", "directement"),
+                 "ERC : sortie du microcontrôleur sur une alimentation");
+        verifier(contient("V1", "parallèle"),
+                 "ERC : deux sources en parallèle");
+        verifier(anomalies.front().gravite == coeur::Anomalie::Gravite::Erreur,
+                 "ERC : les erreurs viennent en tête du rapport");
+
+        coeur::Netlist sans_masse;
+        auto& seule = sans_masse.ajouter("R1", "resistance");
+        seule.valeurs["ohms"] = 100;
+        sans_masse.relier("R1", "1", "N1");
+        sans_masse.relier("R1", "2", "N2");
+        bool signalee = false;
+        for (const auto& anomalie : coeur::controler_regles(sans_masse))
+            if (anomalie.message.find("aucune masse") != std::string::npos)
+                signalee = true;
+        verifier(signalee, "ERC : absence de masse détectée");
+
+        const std::string rapport = coeur::rapport_regles(fautif);
+        verifier(rapport.find("[ERREUR]") != std::string::npos,
+                 "ERC : le rapport est lisible tel quel");
+    }
+
+    // --- export netlist KiCad
+    {
+        const std::string kicad = coeur::netlist_kicad(netlist);
+        verifier(kicad.find("(export (version D)") == 0,
+                 "KiCad : en-tête du format");
+        verifier(kicad.find("(comp (ref \"R1\")") != std::string::npos,
+                 "KiCad : composant exporté");
+        verifier(kicad.find("(footprint \"R_AXIAL_0207\")") != std::string::npos,
+                 "KiCad : empreinte exportée — la porte vers le routage");
+        verifier(kicad.find("(net (code 1)") != std::string::npos
+                     && kicad.find("(node (ref \"LED1\") (pin \"A\"))")
+                            != std::string::npos,
+                 "KiCad : nœuds et bornes exportés");
+        // parenthèses équilibrées : un fichier mal formé serait refusé
+        int solde = 0;
+        for (char c : kicad) {
+            if (c == '(') ++solde;
+            if (c == ')') --solde;
+        }
+        verifier(solde == 0, "KiCad : parenthèses équilibrées",
+                 std::to_string(solde));
+    }
+
+    // --- export des courbes
+    {
+        coeur::Formes formes;
+        formes.temps = {0.0, 1e-3, 2e-3};
+        formes.tensions["n1"] = {0.0, 5.0, 5.0};
+        formes.courants["r1"] = {0.0, 0.02, 0.02};
+        const std::string csv = coeur::courbes_csv(formes);
+        verifier(csv.find("temps;V(n1);I(r1)") == 0,
+                 "courbes : en-tête CSV", csv.substr(0, 30));
+        verifier(std::count(csv.begin(), csv.end(), '\n') == 4,
+                 "courbes : une ligne par point");
+
+        coeur::Balayage bode;
+        bode.grandeur = "Fréquence";
+        bode.abscisse = {10, 100};
+        coeur::Courbe c;
+        c.nom = "out";
+        c.valeurs = {1.0, 0.7};
+        c.phases = {0.0, -45.0};
+        bode.courbes.push_back(c);
+        const std::string csv_bode = coeur::balayage_csv(bode);
+        verifier(csv_bode.find("Fréquence;out;phase(out)") == 0,
+                 "balayage : module et phase en colonnes",
+                 csv_bode.substr(0, 40));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// [15] Balayages exécutés par ngspice : caractéristique de transfert et
+// diagramme de Bode. Chaque résultat est confronté à la théorie.
+// ---------------------------------------------------------------------------
+static void test_balayages() {
+    std::printf("\n[15] Balayage continu et réponse en fréquence\n");
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent — section ignorée)\n");
+        return;
+    }
+
+    // --- pont diviseur : la sortie doit valoir le tiers de l'entrée
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 0;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r1 = netlist.ajouter("R1", "resistance");
+        r1.valeurs["ohms"] = 2000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "MID");
+        auto& r2 = netlist.ajouter("R2", "resistance");
+        r2.valeurs["ohms"] = 1000;
+        netlist.relier("R2", "1", "MID");
+        netlist.relier("R2", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".dc VGBF1 0 5 0.5");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        verifier(ok && balayage.abscisse.size() == 11,
+                 "balayage continu : onze points de 0 à 5 V",
+                 std::to_string(balayage.abscisse.size()));
+        const coeur::Courbe* mid = balayage.courbe("mid");
+        verifier(mid != nullptr, "balayage continu : la sortie est relevée");
+        if (mid && mid->valeurs.size() == 11) {
+            verifier(presque(mid->valeurs.front(), 0.0, 1e-6),
+                     "balayage continu : 0 V en entrée donne 0 V",
+                     f(mid->valeurs.front()));
+            verifier(presque(mid->valeurs.back(), 5.0 / 3.0, 1e-3),
+                     "balayage continu : 5 V donne bien V/3",
+                     f(mid->valeurs.back()));
+            verifier(!mid->complexe(),
+                     "balayage continu : résultat réel, sans phase");
+        }
+    }
+
+    // --- filtre RC : coupure théorique 1/(2 pi R C) = 1591,5 Hz
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "sinus";
+        source.valeurs["amplitude"] = 1;
+        source.valeurs["frequence"] = 1000;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "OUT");
+        auto& c = netlist.ajouter("C1", "condensateur");
+        c.valeurs["farads"] = 1e-7;
+        netlist.relier("C1", "1", "OUT");
+        netlist.relier("C1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".ac dec 40 10 1meg");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        verifier(ok && balayage.logarithmique,
+                 "réponse en fréquence : abscisse logarithmique reconnue");
+        const coeur::Courbe* sortie = balayage.courbe("out");
+        const coeur::Courbe* entree = balayage.courbe("in");
+        verifier(sortie && sortie->complexe(),
+                 "réponse en fréquence : module et phase relevés");
+        if (sortie && entree) {
+            const double coupure =
+                coeur::frequence_coupure(balayage, *sortie, entree);
+            verifier(presque(coupure, 1591.5, 40.0),
+                     "réponse en fréquence : coupure à 1/(2 pi RC)",
+                     f(coupure, 1) + " Hz");
+            const std::vector<double> gains =
+                coeur::gain_decibels(*sortie, entree);
+            verifier(presque(gains.front(), 0.0, 0.2),
+                     "réponse en fréquence : gain unité dans la bande passante",
+                     f(gains.front(), 2) + " dB");
+            // une décade au-dessus de la coupure : -20 dB, à 1 dB près
+            double gain_16k = 0;
+            for (size_t k = 0; k < balayage.abscisse.size(); ++k)
+                if (balayage.abscisse[k] >= 15915.0) { gain_16k = gains[k]; break; }
+            verifier(presque(gain_16k, -20.0, 1.0),
+                     "réponse en fréquence : -20 dB par décade",
+                     f(gain_16k, 2) + " dB");
+            // phase de -45° à la coupure
+            double phase_coupure = 0;
+            for (size_t k = 0; k < balayage.abscisse.size(); ++k)
+                if (balayage.abscisse[k] >= 1591.5) {
+                    phase_coupure = sortie->phases[k] - entree->phases[k];
+                    break;
+                }
+            verifier(presque(phase_coupure, -45.0, 3.0),
+                     "réponse en fréquence : -45° à la coupure",
+                     f(phase_coupure, 1) + "°");
+        }
+    }
+
+    // --- balayage d'une résistance : ce que fait « .dc R1 » dans LTspice
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 6;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r1 = netlist.ajouter("R1", "resistance");
+        r1.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "MID");
+        auto& r2 = netlist.ajouter("R2", "resistance");
+        r2.valeurs["ohms"] = 1000;
+        netlist.relier("R2", "1", "MID");
+        netlist.relier("R2", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".dc RR2 1k 3k 1k");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Courbe* mid = moteur.balayage().courbe("mid");
+        verifier(ok && mid && mid->valeurs.size() == 3,
+                 "balayage d'une résistance : trois points");
+        if (mid && mid->valeurs.size() == 3) {
+            verifier(presque(mid->valeurs[0], 3.0, 1e-3)
+                         && presque(mid->valeurs[2], 4.5, 1e-3),
+                     "balayage d'une résistance : 3 V puis 4,5 V",
+                     f(mid->valeurs[0]) + " / " + f(mid->valeurs[2]));
+        }
+    }
+
+    // --- spectre d'un signal réellement simulé : sinusoïde écrêtée
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "carre";
+        source.valeurs["amplitude"] = 2.5;
+        source.valeurs["offset"] = 2.5;
+        source.valeurs["frequence"] = 1000;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_transitoire(netlist, {}, {}, 5e-3, 2e-6);
+        const bool ok = moteur.resoudre_transitoire();
+        const auto& formes = moteur.formes();
+        auto it = formes.tensions.find("in");
+        verifier(ok && it != formes.tensions.end(),
+                 "générateur : la forme carrée est bien produite");
+        if (it != formes.tensions.end()) {
+            const coeur::Mesures m = coeur::mesurer(formes.temps, it->second);
+            verifier(presque(m.frequence, 1000.0, 20.0),
+                     "générateur : 1 kHz mesuré sur la sortie",
+                     f(m.frequence, 1) + " Hz");
+            verifier(presque(m.crete_a_crete, 5.0, 0.1),
+                     "générateur : 5 V crête à crête", f(m.crete_a_crete));
+            const coeur::Spectre s =
+                coeur::analyser_spectre(formes.temps, it->second, 9);
+            verifier(s.valide && presque(s.thd, 42.88, 2.0),
+                     "générateur : distorsion du carré retrouvée sur le signal "
+                     "simulé",
+                     f(s.thd, 2) + " %");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -1494,6 +1997,9 @@ int main() {
     test_exemplaires_multiples();
     test_croquis_arduino();
     test_composants_a_etat();
+    test_analyses();
+    test_documents();
+    test_balayages();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

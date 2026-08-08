@@ -133,11 +133,19 @@ void NgspiceEngine::emettre_corps(
     // conserve que les tensions de nœuds.
     std::ostringstream sauvegardes;
     sauvegardes << ".save all";
-    for (const auto& ligne : lignes_) {
-        if (ligne.empty()) continue;
+    for (size_t rang = 0; rang < lignes_.size(); ++rang) {
+        const std::string& ligne = lignes_[rang];
+        // La première ligne est le titre du circuit, pas un composant. Elle
+        // commence par « circuit » : la prendre pour un condensateur ferait
+        // demander le courant d'un composant inexistant, ce que ngspice ne
+        // pardonne pas.
+        if (rang == 0 || ligne.empty()) continue;
         const char premier = static_cast<char>(std::tolower(ligne[0]));
         const std::string nom = ligne.substr(0, ligne.find(' '));
-        if (premier == 'r')
+        // Courant de branche de chaque composant qui en expose un. Sans ces
+        // demandes explicites, seules les tensions de nœuds seraient
+        // conservées, et l'oscilloscope ne pourrait pas suivre un courant.
+        if (premier == 'r' || premier == 'c' || premier == 'l')
             sauvegardes << " @" << minuscules(nom) << "[i]";
         else if (premier == 'd')
             sauvegardes << " @" << minuscules(nom) << "[id]";
@@ -145,9 +153,9 @@ void NgspiceEngine::emettre_corps(
     lignes_.push_back(sauvegardes.str());
 }
 
-std::string NgspiceEngine::construire(
-    const Netlist& netlist, const std::vector<BrocheElectrique>& broches) {
-    // Broches du microcontrôleur : source de Thévenin ou pull-up
+// Broches du microcontrôleur : source de Thévenin ou pull-up.
+std::vector<std::string> NgspiceEngine::sources_continues(
+    const std::vector<BrocheElectrique>& broches) const {
     std::vector<std::string> sources;
     for (const auto& broche : broches) {
         const std::string interne = broche.noeud + "_src";
@@ -180,9 +188,26 @@ std::string NgspiceEngine::construire(
                 break;
         }
     }
+    return sources;
+}
 
-    emettre_corps(netlist, sources, 0.0);
+std::string NgspiceEngine::construire(
+    const Netlist& netlist, const std::vector<BrocheElectrique>& broches) {
+    emettre_corps(netlist, sources_continues(broches), 0.0);
     lignes_.push_back(".op");
+    lignes_.push_back(".end");
+
+    std::ostringstream flux;
+    for (const auto& ligne : lignes_) flux << ligne << "\n";
+    source_ = flux.str();
+    return source_;
+}
+
+std::string NgspiceEngine::construire_analyse(
+    const Netlist& netlist, const std::vector<BrocheElectrique>& broches,
+    const std::string& directive) {
+    emettre_corps(netlist, sources_continues(broches), 0.0);
+    lignes_.push_back(directive);
     lignes_.push_back(".end");
 
     std::ostringstream flux;
@@ -336,6 +361,29 @@ std::vector<double> copier_vecteur(const std::string& trace,
     return copie;
 }
 
+// Même précaution pour un vecteur qui peut être complexe : en analyse
+// alternative, ngspice range les résultats dans `v_compdata` et laisse
+// `v_realdata` nul. L'imaginaire reste vide pour un vecteur réel.
+void copier_complexe(const std::string& trace, const std::string& nom,
+                     std::vector<double>& reel, std::vector<double>& imaginaire) {
+    reel.clear();
+    imaginaire.clear();
+    const std::string complet = trace + "." + nom;
+    pvector_info info = ngGet_Vec_Info(const_cast<char*>(complet.c_str()));
+    if (!info || info->v_length <= 0) return;
+    const int taille = info->v_length;
+    if (info->v_compdata) {
+        reel.reserve(taille);
+        imaginaire.reserve(taille);
+        for (int k = 0; k < taille; ++k) {
+            reel.push_back(info->v_compdata[k].cx_real);
+            imaginaire.push_back(info->v_compdata[k].cx_imag);
+        }
+    } else if (info->v_realdata) {
+        reel.assign(info->v_realdata, info->v_realdata + taille);
+    }
+}
+
 // Classe un nom de vecteur ngspice : courant de composant, courant de source,
 // ou tension de nœud. Renvoie false si le vecteur doit être ignoré.
 enum class Genre { CourantComposant, CourantSource, Tension };
@@ -404,6 +452,106 @@ bool NgspiceEngine::resoudre() {
     tensions_[minuscules(Netlist::kMasse)] = 0.0;
     tensions_["0"] = 0.0;
     return true;
+#endif
+}
+
+bool NgspiceEngine::resoudre_analyse() {
+    erreurs_.clear();
+    balayage_.vider();
+#ifndef AVEC_NGSPICE
+    erreurs_.push_back("ngspice n'est pas compilé dans cette version");
+    return false;
+#else
+    const std::string trace = executer();
+    if (trace.empty()) return false;
+
+    char** vecteurs = ngSpice_AllVecs(const_cast<char*>(trace.c_str()));
+    if (!vecteurs) {
+        erreurs_.push_back("le balayage n'a produit aucun vecteur");
+        return false;
+    }
+
+    // Le nom de l'abscisse dépend de ce qui est balayé : ngspice l'appelle
+    // « v-sweep » pour une source, « res-sweep » pour une résistance,
+    // « temp-sweep » pour la température, « frequency » en alternatif.
+    std::string abscisse;
+    for (int k = 0; vecteurs[k]; ++k) {
+        const std::string cle = minuscules(vecteurs[k]);
+        const std::string suffixe = "-sweep";
+        if (cle == "frequency" ||
+            (cle.size() > suffixe.size() &&
+             cle.compare(cle.size() - suffixe.size(), suffixe.size(), suffixe)
+                 == 0)) {
+            abscisse = vecteurs[k];
+            balayage_.logarithmique = (cle == "frequency");
+            balayage_.unite = balayage_.logarithmique ? "Hz" : "";
+            balayage_.grandeur = balayage_.logarithmique ? "Fréquence" : cle;
+            break;
+        }
+    }
+    if (abscisse.empty()) {
+        erreurs_.push_back("aucune abscisse de balayage dans le résultat");
+        return false;
+    }
+
+    std::vector<double> reel, imaginaire;
+    copier_complexe(trace, abscisse, reel, imaginaire);
+    balayage_.abscisse = reel;               // l'abscisse est toujours réelle
+    if (balayage_.abscisse.empty()) {
+        erreurs_.push_back("abscisse de balayage vide");
+        return false;
+    }
+
+    for (int k = 0; vecteurs[k]; ++k) {
+        const std::string brut = vecteurs[k];
+        if (brut == abscisse) continue;
+        const std::string cle = minuscules(brut);
+        // Les nœuds internes (source de broche, borne en l'air) n'ont pas de
+        // sens pour l'utilisateur : ils encombreraient la légende.
+        if (cle.find("_src") != std::string::npos ||
+            cle.find("_nc_") != std::string::npos)
+            continue;
+        Genre genre;
+        std::string nom;
+        if (!classer(cle, genre, nom)) continue;
+        // Les rails d'alimentation que nous ajoutons nous-mêmes sont
+        // constants : dans un balayage ils n'apporteraient qu'une ligne plate
+        // de plus et masqueraient les courbes utiles. Le nom est comparé après
+        // classement, car ngspice enveloppe « 5V » en « v(5v) ».
+        if (nom == "5v" || nom == "3v3" || nom == "valim" || nom == "valim33")
+            continue;
+        // Les résistances de fuite n'appartiennent pas au montage : elles ne
+        // sont là que pour donner un chemin vers la masse à un schéma en cours
+        // de saisie.
+        if (nom.rfind("rfuite", 0) == 0) continue;
+
+        std::vector<double> partie_reelle, partie_imaginaire;
+        copier_complexe(trace, brut, partie_reelle, partie_imaginaire);
+        if (partie_reelle.empty()) continue;
+
+        Courbe courbe;
+        courbe.nom = (genre == Genre::Tension)
+                         ? nom
+                         : "I(" + (nom.size() > 1 ? nom.substr(1) : nom) + ")";
+        if (partie_imaginaire.empty()) {
+            courbe.valeurs = std::move(partie_reelle);
+        } else {
+            courbe.valeurs.reserve(partie_reelle.size());
+            courbe.phases.reserve(partie_reelle.size());
+            for (size_t j = 0; j < partie_reelle.size(); ++j) {
+                courbe.valeurs.push_back(
+                    std::hypot(partie_reelle[j], partie_imaginaire[j]));
+                courbe.phases.push_back(std::atan2(partie_imaginaire[j],
+                                                   partie_reelle[j])
+                                        * 180.0 / 3.14159265358979323846);
+            }
+        }
+        balayage_.courbes.push_back(std::move(courbe));
+    }
+
+    std::sort(balayage_.courbes.begin(), balayage_.courbes.end(),
+              [](const Courbe& a, const Courbe& b) { return a.nom < b.nom; });
+    return !balayage_.courbes.empty();
 #endif
 }
 

@@ -54,8 +54,11 @@ add_library(coeur STATIC
   src/core/catalogue/instruments.cpp
   src/core/catalogue/actionneurs_dynamiques.cpp
   src/core/catalogue/capteurs_avances.cpp
+  src/core/catalogue/sources.cpp
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/AvrEngine.cpp
+  src/core/analysis/Analyses.cpp
+  src/core/export/Documents.cpp
 )
 target_include_directories(coeur PUBLIC src)
 
@@ -105,6 +108,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/app/schematic/VueSchema.cpp
     src/app/schematic/ItemComposant.cpp
     src/app/schematic/ItemFil.cpp
+    src/app/panels/PanneauAnalyses.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
