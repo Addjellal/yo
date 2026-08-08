@@ -128,6 +128,12 @@ struct Modele {
     // ("GND", "5V"). Ne produit aucune ligne SPICE.
     std::string noeud_impose;
 
+    // Étiquette de nœud : le nom vient d'une propriété de l'instance, pas du
+    // modèle. Deux étiquettes portant le même nom désignent le même nœud —
+    // c'est ce qui permet de relier deux points sans tirer de fil à travers
+    // toute la feuille.
+    std::string noeud_depuis_texte;
+
     // Générateur : le composant impose une tension au lieu de la subir. En
     // mettre deux en série ou les court-circuiter n'a pas de sens physique,
     // et les bancs d'essai automatiques doivent le savoir.

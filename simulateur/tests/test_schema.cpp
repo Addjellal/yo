@@ -703,6 +703,130 @@ static void test_declenchement() {
 }
 
 // ---------------------------------------------------------------------------
+// [11] Étiquettes de nœud : deux étiquettes de même nom relient deux points
+// sans qu'un fil traverse la feuille.
+// ---------------------------------------------------------------------------
+static void test_etiquettes() {
+    std::printf("\n[11] Étiquettes de nœud\n");
+    SceneSchema scene;
+
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(600, 0));
+    ItemComposant* e1 = scene.ajouter_composant("etiquette", QPointF(120, 0));
+    ItemComposant* e2 = scene.ajouter_composant("etiquette", QPointF(480, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(300, 200));
+    e1->textes["nom"] = "SIG";
+    e2->textes["nom"] = "SIG";
+    scene.addItem(new ItemFil(r1, 1, e1, 0));
+    scene.addItem(new ItemFil(r2, 0, e2, 0));
+    scene.addItem(new ItemFil(r1, 0, masse, 0));
+
+    coeur::Netlist netlist = scene.construire_netlist(nullptr);
+    const coeur::Instance* a = netlist.trouver("R1");
+    const coeur::Instance* b = netlist.trouver("R2");
+    verifier(a && b && a->borne("2") && b->borne("1")
+                 && a->borne("2")->noeud == "SIG"
+                 && b->borne("1")->noeud == "SIG",
+             "deux étiquettes de même nom donnent le même nœud",
+             a && a->borne("2") ? a->borne("2")->noeud : "");
+
+    verifier(netlist.trouver("NET1") == nullptr,
+             "une étiquette n'est pas un composant de la netlist");
+
+    // Noms différents : les nœuds doivent rester séparés.
+    e2->textes["nom"] = "CLK";
+    netlist = scene.construire_netlist(nullptr);
+    a = netlist.trouver("R1");
+    b = netlist.trouver("R2");
+    verifier(a && b && a->borne("2")->noeud != b->borne("1")->noeud,
+             "deux noms différents restent deux nœuds",
+             a->borne("2")->noeud + " / " + b->borne("1")->noeud);
+}
+
+// ---------------------------------------------------------------------------
+// [12] Annulation, rétablissement, presse-papiers.
+// ---------------------------------------------------------------------------
+static void test_annulation() {
+    std::printf("\n[12] Annulation et presse-papiers\n");
+    SceneSchema scene;
+
+    verifier(!scene.peut_annuler(), "rien à annuler sur un schéma neuf");
+
+    scene.memoriser();
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    r1->valeurs["ohms"] = 470;
+    scene.memoriser();
+    ItemComposant* led = scene.ajouter_composant("led", QPointF(200, 0));
+    scene.addItem(new ItemFil(r1, 1, led, 0));
+    verifier(scene.composants().size() == 2 && scene.fils().size() == 1,
+             "deux composants et un fil posés");
+
+    verifier(scene.annuler(), "l'annulation aboutit");
+    verifier(scene.composants().size() == 1 && scene.fils().empty(),
+             "l'annulation retire le composant ET son fil",
+             std::to_string(scene.composants().size()) + " composant(s)");
+    verifier(scene.composants().front()->valeurs["ohms"] == 470,
+             "les valeurs réglées sont restituées telles quelles",
+             std::to_string(scene.composants().front()->valeurs["ohms"]));
+
+    verifier(scene.retablir(), "le rétablissement aboutit");
+    verifier(scene.composants().size() == 2 && scene.fils().size() == 1,
+             "le rétablissement remet tout, fil compris");
+
+    verifier(scene.annuler() && scene.annuler(),
+             "on remonte plusieurs coups en arrière");
+    verifier(scene.composants().empty(), "retour au schéma vide",
+             std::to_string(scene.composants().size()) + " composant(s)");
+    verifier(!scene.peut_annuler(), "et la pile est vide au bout");
+
+    // --- copier / coller : références neuves, fils recopiés
+    {
+        SceneSchema atelier;
+        ItemComposant* a = atelier.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = atelier.ajouter_composant("led", QPointF(150, 0));
+        atelier.addItem(new ItemFil(a, 1, b, 0));
+        a->setSelected(true);
+        b->setSelected(true);
+        atelier.copier_selection();
+        verifier(atelier.presse_papiers_rempli(), "la sélection est copiée");
+        verifier(atelier.coller(), "le collage aboutit");
+        verifier(atelier.composants().size() == 4,
+                 "quatre composants après collage",
+                 std::to_string(atelier.composants().size()));
+        verifier(atelier.fils().size() == 2,
+                 "le fil interne à la sélection est recopié",
+                 std::to_string(atelier.fils().size()));
+        std::set<QString> references;
+        for (ItemComposant* item : atelier.composants())
+            references.insert(item->reference());
+        verifier(references.size() == 4,
+                 "les copies ont des références neuves",
+                 std::to_string(references.size()));
+        bool decale = true;
+        for (ItemComposant* item : atelier.composants())
+            if (item->reference() == "R2" && item->pos() == a->pos())
+                decale = false;
+        verifier(decale, "la copie ne se superpose pas à l'original");
+        verifier(atelier.annuler() && atelier.composants().size() == 2,
+                 "un collage s'annule comme le reste");
+    }
+
+    // --- un fil qui sort de la sélection n'est pas copié
+    {
+        SceneSchema atelier;
+        ItemComposant* a = atelier.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = atelier.ajouter_composant("led", QPointF(150, 0));
+        atelier.addItem(new ItemFil(a, 1, b, 0));
+        a->setSelected(true);            // b n'est pas sélectionné
+        atelier.copier_selection();
+        atelier.coller();
+        verifier(atelier.fils().size() == 1,
+                 "un fil à moitié sélectionné n'est pas recopié",
+                 std::to_string(atelier.fils().size()));
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -719,6 +843,8 @@ int main(int argc, char** argv) {
     test_noeuds_et_instruments();
     test_interactions();
     test_declenchement();
+    test_etiquettes();
+    test_annulation();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

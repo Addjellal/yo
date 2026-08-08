@@ -172,6 +172,8 @@ private:
     QLabel* etiquette_moteurs_ = nullptr;
     QLabel* etiquette_etat_ = nullptr;
 
+    QAction* action_annuler_ = nullptr;
+    QAction* action_retablir_ = nullptr;
     QAction* action_marche_ = nullptr;    // lance, met en pause, reprend
     QAction* action_arreter_ = nullptr;
 

@@ -1,6 +1,7 @@
 #include "app/schematic/SceneSchema.h"
 
 #include <QGraphicsLineItem>
+#include <QJsonArray>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsView>
@@ -200,9 +201,23 @@ SceneSchema::calculer_noeuds() const {
     std::map<int, std::string> noms;
     for (ItemComposant* composant : liste) {
         const coeur::Modele* modele = composant->modele();
-        if (!modele || modele->noeud_impose.empty()) continue;
+        if (!modele) continue;
+        std::string impose = modele->noeud_impose;
+        // Étiquette : le nom est celui que l'utilisateur a choisi. Deux
+        // étiquettes de même nom donnent le même nœud, sans fil entre elles —
+        // c'est tout l'intérêt.
+        if (impose.empty() && !modele->noeud_depuis_texte.empty()) {
+            auto texte = composant->textes.find(modele->noeud_depuis_texte);
+            if (texte != composant->textes.end() && !texte->second.empty())
+                impose = texte->second;
+            else
+                for (const coeur::Propriete& propriete : modele->proprietes)
+                    if (propriete.cle == modele->noeud_depuis_texte)
+                        impose = propriete.defaut_texte;
+        }
+        if (impose.empty()) continue;
         for (int k = 0; k < composant->nb_bornes(); ++k)
-            noms[classes.racine(indices[composant][k])] = modele->noeud_impose;
+            noms[classes.racine(indices[composant][k])] = impose;
     }
     // Combien de cartes ? La réponse change le nommage : avec une seule, la
     // broche D13 donne le nœud « D13 », lisible. Avec deux, ce nom
@@ -567,6 +582,9 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
             return;
         }
         if (outil_ == Outil::Fil) return;   // l'outil fil ne fait que ça
+        // Un déplacement commence peut-être : on garde l'état d'avant pour
+        // pouvoir l'annuler, et on ne l'empilera qu'en cas de vrai changement.
+        etat_avant_geste_ = vers_json();
     }
     if (outil_ == Outil::Suppression && evenement->button() == Qt::LeftButton) {
         clearSelection();
@@ -630,6 +648,12 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
     for (QGraphicsItem* item : selectedItems())
         if (item->type() == ItemComposant::Type) item->setPos(aligner(item->pos()));
     for (ItemFil* fil : fils()) fil->rafraichir();
+
+    // Quelque chose a-t-il bougé ? Si oui, le geste devient annulable.
+    if (!etat_avant_geste_.isEmpty()) {
+        if (etat_avant_geste_ != vers_json()) empiler(etat_avant_geste_);
+        etat_avant_geste_ = QJsonObject();
+    }
 }
 
 // Composant sous un point, quelle que soit la partie touchée.
@@ -685,4 +709,162 @@ void SceneSchema::keyPressEvent(QKeyEvent* evenement) {
         return;
     }
     QGraphicsScene::keyPressEvent(evenement);
+}
+
+// ---------------------------------------------------------------------------
+// Sérialisation, annulation, presse-papiers
+//
+// Les trois reposent sur la même idée : un schéma sait s'écrire en JSON et se
+// relire. Annuler, c'est relire l'état précédent ; coller, c'est relire un
+// extrait. Rien à réécrire quand une commande nouvelle apparaît.
+// ---------------------------------------------------------------------------
+QJsonObject SceneSchema::vers_json(bool selection_seule) const {
+    QJsonArray tableau_composants;
+    std::map<const ItemComposant*, int> index;
+    int rang = 0;
+    for (ItemComposant* item : composants()) {
+        if (selection_seule && !item->isSelected()) continue;
+        index[item] = rang++;
+        QJsonObject objet;
+        objet["type"] = QString::fromStdString(item->modele()->type);
+        objet["reference"] = item->reference();
+        objet["x"] = item->pos().x();
+        objet["y"] = item->pos().y();
+        objet["rotation"] = item->rotation();
+        QJsonObject valeurs;
+        for (const auto& paire : item->valeurs)
+            valeurs[QString::fromStdString(paire.first)] = paire.second;
+        objet["valeurs"] = valeurs;
+        QJsonObject textes;
+        for (const auto& paire : item->textes)
+            textes[QString::fromStdString(paire.first)] =
+                QString::fromStdString(paire.second);
+        objet["textes"] = textes;
+        tableau_composants.append(objet);
+    }
+
+    QJsonArray tableau_fils;
+    for (ItemFil* fil : fils()) {
+        // Un fil dont une extrémité sort de la sélection n'a nulle part où
+        // aller : on ne le copie pas.
+        if (!index.count(fil->depart()) || !index.count(fil->arrivee())) continue;
+        QJsonObject objet;
+        objet["a"] = index[fil->depart()];
+        objet["borne_a"] = fil->borne_depart();
+        objet["b"] = index[fil->arrivee()];
+        objet["borne_b"] = fil->borne_arrivee();
+        tableau_fils.append(objet);
+    }
+
+    QJsonObject racine;
+    racine["format"] = "simulateur-embarque/schema";
+    racine["version"] = 1;
+    racine["composants"] = tableau_composants;
+    racine["fils"] = tableau_fils;
+    return racine;
+}
+
+std::vector<ItemComposant*> SceneSchema::depuis_json(const QJsonObject& racine,
+                                                     bool remplacer,
+                                                     const QPointF& decalage) {
+    if (remplacer) tout_effacer();
+
+    std::vector<ItemComposant*> ajoutes;
+    for (const QJsonValue& valeur : racine["composants"].toArray()) {
+        const QJsonObject objet = valeur.toObject();
+        ItemComposant* item = ajouter_composant(
+            objet["type"].toString(),
+            QPointF(objet["x"].toDouble(), objet["y"].toDouble()) + decalage);
+        if (!item) {
+            ajoutes.push_back(nullptr);
+            continue;
+        }
+        // En remplacement, la référence enregistrée fait foi. En collage, il
+        // faut au contraire une référence neuve : deux R3 se battraient.
+        if (remplacer) item->definir_reference(objet["reference"].toString());
+        item->setRotation(objet["rotation"].toDouble());
+        const QJsonObject valeurs = objet["valeurs"].toObject();
+        for (auto it = valeurs.begin(); it != valeurs.end(); ++it)
+            item->valeurs[it.key().toStdString()] = it.value().toDouble();
+        const QJsonObject textes = objet["textes"].toObject();
+        for (auto it = textes.begin(); it != textes.end(); ++it)
+            item->textes[it.key().toStdString()] =
+                it.value().toString().toStdString();
+        ajoutes.push_back(item);
+    }
+    for (const QJsonValue& valeur : racine["fils"].toArray()) {
+        const QJsonObject objet = valeur.toObject();
+        const int a = objet["a"].toInt(), b = objet["b"].toInt();
+        if (a < 0 || b < 0 || a >= static_cast<int>(ajoutes.size())
+            || b >= static_cast<int>(ajoutes.size()))
+            continue;
+        if (!ajoutes[a] || !ajoutes[b]) continue;
+        addItem(new ItemFil(ajoutes[a], objet["borne_a"].toInt(), ajoutes[b],
+                            objet["borne_b"].toInt()));
+    }
+    return ajoutes;
+}
+
+void SceneSchema::empiler(QJsonObject etat) {
+    pile_annulation_.push_back(std::move(etat));
+    if (static_cast<int>(pile_annulation_.size()) > kProfondeurAnnulation)
+        pile_annulation_.erase(pile_annulation_.begin());
+    pile_retablissement_.clear();
+}
+
+void SceneSchema::memoriser() {
+    pile_annulation_.push_back(vers_json());
+    if (static_cast<int>(pile_annulation_.size()) > kProfondeurAnnulation)
+        pile_annulation_.erase(pile_annulation_.begin());
+    // Une nouvelle action rend caduc tout ce qui avait été annulé : c'est le
+    // comportement attendu partout ailleurs.
+    pile_retablissement_.clear();
+}
+
+bool SceneSchema::annuler() {
+    if (pile_annulation_.empty()) return false;
+    pile_retablissement_.push_back(vers_json());
+    const QJsonObject precedent = pile_annulation_.back();
+    pile_annulation_.pop_back();
+    depuis_json(precedent);
+    emit journal("Annulé.");
+    return true;
+}
+
+bool SceneSchema::retablir() {
+    if (pile_retablissement_.empty()) return false;
+    pile_annulation_.push_back(vers_json());
+    const QJsonObject suivant = pile_retablissement_.back();
+    pile_retablissement_.pop_back();
+    depuis_json(suivant);
+    emit journal("Rétabli.");
+    return true;
+}
+
+void SceneSchema::copier_selection() {
+    const QJsonObject extrait = vers_json(true);
+    if (extrait["composants"].toArray().isEmpty()) return;
+    presse_papiers_ = extrait;
+    emit journal(QString("Copié : %1 composant(s).")
+                     .arg(extrait["composants"].toArray().size()));
+}
+
+bool SceneSchema::coller() {
+    if (presse_papiers_.isEmpty()) return false;
+    memoriser();
+    clearSelection();
+    // Décalage d'une maille : le collage doit se voir, pas se superposer.
+    const std::vector<ItemComposant*> ajoutes =
+        depuis_json(presse_papiers_, false, QPointF(kPas * 4, kPas * 4));
+    for (ItemComposant* item : ajoutes)
+        if (item) item->setSelected(true);
+    emit journal(QString("Collé : %1 composant(s).").arg(ajoutes.size()));
+    return !ajoutes.empty();
+}
+
+void SceneSchema::dupliquer_selection() {
+    const QJsonObject garde = presse_papiers_;
+    copier_selection();
+    coller();
+    presse_papiers_ = garde.isEmpty() ? presse_papiers_ : garde;
 }

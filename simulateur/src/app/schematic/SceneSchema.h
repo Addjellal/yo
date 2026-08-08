@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QGraphicsScene>
+#include <QJsonObject>
 #include <QPoint>
 #include <QPointF>
 #include <QString>
@@ -43,6 +44,33 @@ public:
     ItemComposant* ajouter_composant(const QString& type, const QPointF& position);
     void supprimer_selection();
     void tout_effacer();
+
+    // --- sérialisation ------------------------------------------------------
+    // Le schéma sait s'écrire et se relire. C'est ce qui sert à
+    // l'enregistrement, mais aussi à l'annulation (une pile d'états) et au
+    // presse-papiers (un extrait d'état) : trois usages, une seule mécanique.
+    QJsonObject vers_json(bool selection_seule = false) const;
+    // `decalage` déplace ce qui est relu — utile pour un collage qui ne doit
+    // pas se superposer à l'original. Renvoie les composants créés.
+    std::vector<ItemComposant*> depuis_json(const QJsonObject& racine,
+                                            bool remplacer = true,
+                                            const QPointF& decalage = {});
+
+    // --- annulation ---------------------------------------------------------
+    // À appeler AVANT une modification : l'état courant est empilé.
+    void memoriser();
+    // Empile un état précis (celui d'avant un geste déjà commencé).
+    void empiler(QJsonObject etat);
+    bool annuler();
+    bool retablir();
+    bool peut_annuler() const { return !pile_annulation_.empty(); }
+    bool peut_retablir() const { return !pile_retablissement_.empty(); }
+
+    // --- presse-papiers -----------------------------------------------------
+    void copier_selection();
+    bool coller();
+    void dupliquer_selection();
+    bool presse_papiers_rempli() const { return !presse_papiers_.isEmpty(); }
 
     // Construit la netlist du schéma et la liste des broches de carte.
     coeur::Netlist construire_netlist(std::vector<LiaisonBroche>* broches) const;
@@ -104,6 +132,17 @@ private:
     bool fil_en_attente_ = false;
     QPointF point_appui_;
     std::map<std::string, int> compteurs_;   // par préfixe : R1, R2…
+
+    // Annulation : des états complets du schéma. Un schéma pèse quelques
+    // kilo-octets, en garder cinquante ne coûte rien et évite d'inventer un
+    // journal d'opérations que chaque nouvelle commande faudrait enrichir.
+    std::vector<QJsonObject> pile_annulation_;
+    std::vector<QJsonObject> pile_retablissement_;
+    QJsonObject presse_papiers_;
+    // État d'avant le geste en cours : un déplacement à la souris doit
+    // pouvoir s'annuler, et on ne connaît son résultat qu'au relâchement.
+    QJsonObject etat_avant_geste_;
+    static constexpr int kProfondeurAnnulation = 50;
 
     // Recherche la borne sous le curseur, tous composants confondus.
     std::pair<ItemComposant*, int> borne_sous(const QPointF& point) const;

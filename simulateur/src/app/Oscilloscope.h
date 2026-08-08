@@ -59,6 +59,22 @@ public:
     double niveau_declenchement() const { return niveau_declenchement_; }
     bool niveau_automatique() const { return niveau_automatique_; }
 
+    // --- réglages par voie ---------------------------------------------------
+    // Décalage vertical : deux signaux superposés se distinguent mal ; on les
+    // écarte comme on tourne le bouton « position » d'un appareil.
+    void definir_decalage(int voie, double volts);
+    double decalage(int voie) const;
+    // Couplage alternatif : la composante continue est retirée à l'affichage,
+    // ce qui permet de voir une ondulation de 50 mV posée sur 5 V.
+    void definir_couplage_alternatif(int voie, bool alternatif);
+    bool couplage_alternatif(int voie) const;
+
+    // Mode XY : la voie 1 en abscisse, la voie 2 en ordonnée, le temps
+    // disparaît. C'est la figure de Lissajous — déphasage et non-linéarité s'y
+    // lisent d'un coup d'œil.
+    void definir_mode_xy(bool xy);
+    bool mode_xy() const { return mode_xy_; }
+
     // --- curseurs -----------------------------------------------------------
     // Curseur A suit la souris, curseur B se pose au clic. L'écart des deux
     // donne un temps, une tension et une fréquence.
@@ -94,6 +110,8 @@ private:
     struct Voie {
         QString designation;              // "d13" ou "I(LED1)"
         std::deque<float> valeurs;
+        double decalage = 0.0;            // volts, à l'affichage seulement
+        bool alternatif = false;          // couplage : continu retiré
     };
 
     std::array<Voie, kVoies> voies_;
@@ -114,11 +132,19 @@ private:
     bool declenche_ = false;
     double debut_affiche_ = 0.0;      // début de la fenêtre réellement tracée
 
+    bool mode_xy_ = false;
     double curseur_a_ = -1.0;         // en secondes, -1 = aucun
     double curseur_b_ = -1.0;
 
     // Instant du dernier front trouvé dans le tampon, ou -1.
     double chercher_front() const;
+    // Valeur telle qu'elle doit être TRACÉE : couplage et décalage appliqués.
+    double valeur_affichee(int voie, size_t rang, double continu) const;
+    // Composante continue d'une voie sur la fenêtre visible.
+    double continu_voie(int voie, double debut) const;
+    // Tracé en mode XY, séparé : il ne partage rien avec le tracé temporel.
+    void tracer_xy(QPainter& peintre, const QRectF& zone, double debut,
+                   double echelle_y, double y_zero) const;
 
     // Mémoire circulaire : au-delà, les points les plus anciens sont oubliés.
     static constexpr double kMemoire = 5.0;   // secondes conservées

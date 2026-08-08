@@ -116,6 +116,7 @@ FenetrePrincipale::FenetrePrincipale() {
             [this](const QList<QRectF>&) { circuit_modifie(); });
     connect(vue_, &VueSchema::composant_depose, this,
             [this](const QString& type, const QPointF& position) {
+                scene_->memoriser();
                 scene_->ajouter_composant(type, position);
                 circuit_modifie();
             });
@@ -198,6 +199,7 @@ void FenetrePrincipale::construire_palette() {
             [this](QTreeWidgetItem* item, int) {
                 const QString type = item->data(0, Qt::UserRole).toString();
                 if (type.isEmpty()) return;
+                scene_->memoriser();
                 scene_->ajouter_composant(
                     type, vue_->mapToScene(vue_->viewport()->rect().center()));
                 circuit_modifie();
@@ -383,9 +385,37 @@ void FenetrePrincipale::construire_actions() {
     fichier->addAction("&Quitter", QKeySequence::Quit, this, &QWidget::close);
 
     auto* edition = menuBar()->addMenu("&Édition");
+    action_annuler_ = edition->addAction("&Annuler", QKeySequence::Undo, this,
+                                         [this] {
+                                             scene_->annuler();
+                                             circuit_modifie();
+                                         });
+    action_retablir_ = edition->addAction("&Rétablir", QKeySequence::Redo, this,
+                                          [this] {
+                                              scene_->retablir();
+                                              circuit_modifie();
+                                          });
+    edition->addSeparator();
+    edition->addAction("&Copier", QKeySequence::Copy, this,
+                       [this] { scene_->copier_selection(); });
+    edition->addAction("Co&ller", QKeySequence::Paste, this, [this] {
+        scene_->coller();
+        circuit_modifie();
+    });
+    edition->addAction("&Dupliquer", QKeySequence(Qt::CTRL | Qt::Key_D), this,
+                       [this] {
+                           scene_->dupliquer_selection();
+                           circuit_modifie();
+                       });
+    edition->addSeparator();
     edition->addAction("&Supprimer la sélection", QKeySequence::Delete, this,
-                       [this] { scene_->supprimer_selection(); });
+                       [this] {
+                           scene_->memoriser();
+                           scene_->supprimer_selection();
+                           circuit_modifie();
+                       });
     edition->addAction("&Pivoter (R)", QKeySequence(Qt::Key_R), this, [this] {
+        scene_->memoriser();
         for (QGraphicsItem* item : scene_->selectedItems())
             if (item->type() == ItemComposant::Type)
                 static_cast<ItemComposant*>(item)->tourner();
@@ -749,11 +779,13 @@ void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
         menu.addAction("Propriétés", this,
                        [this, composant] { afficher_proprietes(composant); });
         menu.addAction("Pivoter de 90°", this, [this, composant] {
+            scene_->memoriser();
             composant->tourner();
             circuit_modifie();
         });
         menu.addSeparator();
         menu.addAction("Supprimer", this, [this] {
+            scene_->memoriser();
             scene_->supprimer_selection();
             circuit_modifie();
         });
@@ -849,6 +881,9 @@ void FenetrePrincipale::circuit_modifie() {
     // Grandeurs balayables : les sources imposent une tension, les résistances
     // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
     // le nom donné ici est celui du composant dans la netlist.
+    if (action_annuler_) action_annuler_->setEnabled(scene_->peut_annuler());
+    if (action_retablir_) action_retablir_->setEnabled(scene_->peut_retablir());
+
     if (analyses_) {
         // Les sources d'abord : c'est ce qu'on balaie neuf fois sur dix.
         QStringList generateurs, resistances;
@@ -1024,52 +1059,13 @@ void FenetrePrincipale::enregistrer_projet() {
 }
 
 bool FenetrePrincipale::enregistrer_vers(const QString& chemin) {
-
-    QJsonArray composants;
-    std::map<const ItemComposant*, int> index;
-    int k = 0;
-    for (ItemComposant* item : scene_->composants()) {
-        index[item] = k++;
-        QJsonObject objet;
-        objet["type"] = QString::fromStdString(item->modele()->type);
-        objet["reference"] = item->reference();
-        objet["x"] = item->pos().x();
-        objet["y"] = item->pos().y();
-        objet["rotation"] = item->rotation();
-        QJsonObject valeurs;
-        for (const auto& paire : item->valeurs)
-            valeurs[QString::fromStdString(paire.first)] = paire.second;
-        objet["valeurs"] = valeurs;
-        QJsonObject textes;
-        for (const auto& paire : item->textes)
-            textes[QString::fromStdString(paire.first)] =
-                QString::fromStdString(paire.second);
-        objet["textes"] = textes;
-        composants.append(objet);
-    }
-
-    QJsonArray fils;
-    for (ItemFil* fil : scene_->fils()) {
-        if (!index.count(fil->depart()) || !index.count(fil->arrivee())) continue;
-        QJsonObject objet;
-        objet["a"] = index[fil->depart()];
-        objet["borne_a"] = fil->borne_depart();
-        objet["b"] = index[fil->arrivee()];
-        objet["borne_b"] = fil->borne_arrivee();
-        fils.append(objet);
-    }
-
-    QJsonObject racine;
-    racine["format"] = "simulateur-embarque/schema";
-    racine["version"] = 1;
-    racine["composants"] = composants;
-    racine["fils"] = fils;
-    // Un programme par carte : n'en garder qu'un perdrait celui des autres.
+    // Le schéma sait s'écrire lui-même : la fenêtre n'ajoute que ce qu'elle
+    // est seule à connaître, les programmes de chaque carte.
+    QJsonObject racine = scene_->vers_json();
     if (!carte_courante_.isEmpty())
         programmes_[carte_courante_] = editeur_source_->toPlainText();
     QJsonObject programmes;
-    for (const auto& paire : programmes_)
-        programmes[paire.first] = paire.second;
+    for (const auto& paire : programmes_) programmes[paire.first] = paire.second;
     racine["programmes"] = programmes;
     racine["programme"] = editeur_source_->toPlainText();   // anciens fichiers
 
@@ -1100,39 +1096,8 @@ bool FenetrePrincipale::ouvrir_depuis(const QString& chemin) {
     }
     const QJsonObject racine =
         QJsonDocument::fromJson(fichier.readAll()).object();
+    scene_->depuis_json(racine);
 
-    scene_->tout_effacer();
-    std::vector<ItemComposant*> ajoutes;
-    for (const QJsonValue& valeur : racine["composants"].toArray()) {
-        const QJsonObject objet = valeur.toObject();
-        ItemComposant* item = scene_->ajouter_composant(
-            objet["type"].toString(),
-            QPointF(objet["x"].toDouble(), objet["y"].toDouble()));
-        if (!item) {
-            ajoutes.push_back(nullptr);
-            continue;
-        }
-        item->definir_reference(objet["reference"].toString());
-        item->setRotation(objet["rotation"].toDouble());
-        const QJsonObject valeurs = objet["valeurs"].toObject();
-        for (auto it = valeurs.begin(); it != valeurs.end(); ++it)
-            item->valeurs[it.key().toStdString()] = it.value().toDouble();
-        const QJsonObject textes = objet["textes"].toObject();
-        for (auto it = textes.begin(); it != textes.end(); ++it)
-            item->textes[it.key().toStdString()] =
-                it.value().toString().toStdString();
-        ajoutes.push_back(item);
-    }
-    for (const QJsonValue& valeur : racine["fils"].toArray()) {
-        const QJsonObject objet = valeur.toObject();
-        const int a = objet["a"].toInt(), b = objet["b"].toInt();
-        if (a < 0 || b < 0 || a >= static_cast<int>(ajoutes.size()) ||
-            b >= static_cast<int>(ajoutes.size()))
-            continue;
-        if (!ajoutes[a] || !ajoutes[b]) continue;
-        scene_->addItem(new ItemFil(ajoutes[a], objet["borne_a"].toInt(),
-                                    ajoutes[b], objet["borne_b"].toInt()));
-    }
     // Les programmes de l'ancien projet ne doivent pas déborder sur le
     // nouveau : on repart d'une table vide.
     programmes_.clear();

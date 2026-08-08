@@ -121,6 +121,22 @@ void enregistrer_base(Catalogue& catalogue) {
         };
         enregistrer(std::move(m));
     }
+    {   // ------------------------------------------------- étiquette de nœud
+        Modele m;
+        m.type = "etiquette";
+        m.libelle = "Étiquette de nœud";
+        m.categorie = "Alimentation";
+        m.prefixe = "NET";
+        m.bornes = {{"1", {-30, 0}, ""}};
+        m.proprietes = {{"nom", "Nom du nœud", G::Choix, 0, 0, 0, "A",
+                         {"A", "B", "C", "D", "E", "F", "SIG", "CLK", "DATA",
+                          "IN", "OUT"}, ""}};
+        m.noeud_depuis_texte = "nom";
+        m.symbole = {ligne(-30, 0, -14, 0),
+                     poly({{-14, -9}, {20, -9}, {28, 0}, {20, 9}, {-14, 9}},
+                          false)};
+        enregistrer(std::move(m));
+    }
     {   // -------------------------------------------------- alimentation 3,3 V
         Modele m;
         m.type = "alim3v3";

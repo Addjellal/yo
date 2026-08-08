@@ -288,8 +288,14 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     const int largeur = std::max(1, static_cast<int>(zone.width()));
     const double echelle_y = zone.height() / (8.0 * volts_par_division_);
 
+    if (mode_xy_) {
+        tracer_xy(peintre, zone, debut, echelle_y, y_zero);
+        return;
+    }
+
     for (int v = 0; v < kVoies; ++v) {
         if (!voie_active(v) || voies_[v].valeurs.size() != temps_.size()) continue;
+        const double continu = continu_voie(v, debut);
 
         std::vector<float> minima(largeur, std::numeric_limits<float>::max());
         std::vector<float> maxima(largeur, std::numeric_limits<float>::lowest());
@@ -300,7 +306,8 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
             if (position < 0.0 || position > 1.0) continue;
             const int colonne = std::min(
                 largeur - 1, static_cast<int>(position * (largeur - 1)));
-            const float valeur = voies_[v].valeurs[k];
+            const float valeur =
+                static_cast<float>(valeur_affichee(v, k, continu));
             minima[colonne] = std::min(minima[colonne], valeur);
             maxima[colonne] = std::max(maxima[colonne], valeur);
             quelque_chose = true;
@@ -473,6 +480,49 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     connect(front, &QComboBox::currentIndexChanged, this,
             [this](int rang) { trace_->definir_front_montant(rang == 0); });
 
+    // --- réglages d'une voie à la fois : couplage, décalage, et le mode XY.
+    // Quatre jeux de boutons prendraient toute la place ; on désigne la voie.
+    auto* voie_reglee = new QComboBox;
+    for (int v = 0; v < TraceOscilloscope::kVoies; ++v)
+        voie_reglee->addItem(QString("Voie %1").arg(v + 1));
+    auto* couplage = new QComboBox;
+    couplage->addItem("Couplage continu");
+    couplage->addItem("Couplage alternatif");
+    auto* decalage = new QDoubleSpinBox;
+    decalage->setRange(-100, 100);
+    decalage->setDecimals(2);
+    decalage->setSingleStep(0.5);
+    decalage->setSuffix(" V de décalage");
+    auto* xy = new QCheckBox("Mode XY");
+    xy->setToolTip("Voie 1 en abscisse, voie 2 en ordonnée : la figure de "
+                   "Lissajous montre le déphasage d'un coup d'œil.");
+
+    connect(voie_reglee, &QComboBox::currentIndexChanged, this,
+            [this, couplage, decalage](int voie) {
+                const QSignalBlocker s1(couplage);
+                const QSignalBlocker s2(decalage);
+                couplage->setCurrentIndex(
+                    trace_->couplage_alternatif(voie) ? 1 : 0);
+                decalage->setValue(trace_->decalage(voie));
+            });
+    connect(couplage, &QComboBox::currentIndexChanged, this,
+            [this, voie_reglee](int rang) {
+                trace_->definir_couplage_alternatif(voie_reglee->currentIndex(),
+                                                    rang == 1);
+            });
+    connect(decalage, &QDoubleSpinBox::valueChanged, this,
+            [this, voie_reglee](double volts) {
+                trace_->definir_decalage(voie_reglee->currentIndex(), volts);
+            });
+    connect(xy, &QCheckBox::toggled, this,
+            [this](bool coche) { trace_->definir_mode_xy(coche); });
+
+    reglages->addWidget(voie_reglee, 3, 1);
+    reglages->addWidget(couplage, 3, 3);
+    reglages->addWidget(decalage, 3, 4);
+    reglages->addWidget(xy, 3, 6);
+    reglages->addWidget(new QLabel("Réglage d'une voie"), 3, 0);
+
     niveau_ = niveau;
     reglages->addWidget(new QLabel("Déclenchement"), 2, 0);
     reglages->addWidget(mode, 2, 1);
@@ -497,6 +547,93 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
                                          "courbe, cliquez pour poser le repère.")
                                : lecture);
     });
+}
+
+void TraceOscilloscope::definir_decalage(int voie, double volts) {
+    if (voie < 0 || voie >= kVoies) return;
+    voies_[voie].decalage = volts;
+    update();
+}
+
+double TraceOscilloscope::decalage(int voie) const {
+    return (voie < 0 || voie >= kVoies) ? 0.0 : voies_[voie].decalage;
+}
+
+void TraceOscilloscope::definir_couplage_alternatif(int voie, bool alternatif) {
+    if (voie < 0 || voie >= kVoies) return;
+    voies_[voie].alternatif = alternatif;
+    update();
+}
+
+bool TraceOscilloscope::couplage_alternatif(int voie) const {
+    return (voie >= 0 && voie < kVoies) && voies_[voie].alternatif;
+}
+
+void TraceOscilloscope::definir_mode_xy(bool xy) {
+    mode_xy_ = xy;
+    update();
+}
+
+// Composante continue d'une voie sur la fenêtre affichée. C'est elle que le
+// couplage alternatif retire — exactement ce que fait le condensateur de
+// liaison à l'entrée d'un appareil.
+double TraceOscilloscope::continu_voie(int voie, double debut) const {
+    const Voie& cible = voies_[voie];
+    if (cible.valeurs.size() != temps_.size() || temps_.empty()) return 0.0;
+    double somme = 0;
+    int compte = 0;
+    for (size_t k = 0; k < temps_.size(); ++k) {
+        if (temps_[k] < debut || temps_[k] > debut + fenetre_) continue;
+        somme += cible.valeurs[k];
+        ++compte;
+    }
+    return compte ? somme / compte : 0.0;
+}
+
+double TraceOscilloscope::valeur_affichee(int voie, size_t rang,
+                                          double continu) const {
+    const Voie& cible = voies_[voie];
+    if (rang >= cible.valeurs.size()) return 0.0;
+    return cible.valeurs[rang] - (cible.alternatif ? continu : 0.0)
+           + cible.decalage;
+}
+
+// Mode XY : chaque point est (voie 1, voie 2). Aucune décimation par colonne
+// ici — la courbe n'est pas une fonction du temps, elle peut revenir sur
+// elle-même.
+void TraceOscilloscope::tracer_xy(QPainter& peintre, const QRectF& zone,
+                                  double debut, double echelle_y,
+                                  double y_zero) const {
+    if (!voie_active(0) || !voie_active(1)) {
+        peintre.setPen(QPen(QColor(120, 135, 148), 1));
+        peintre.drawText(zone, Qt::AlignCenter,
+                         "Mode XY : choisissez un signal sur les voies 1 et 2.");
+        return;
+    }
+    const double continu_x = continu_voie(0, debut);
+    const double continu_y = continu_voie(1, debut);
+    const double x_zero = zone.left() + zone.width() / 2.0;
+
+    QPainterPath chemin;
+    bool commence = false;
+    for (size_t k = 0; k < temps_.size(); ++k) {
+        if (temps_[k] < debut || temps_[k] > debut + fenetre_) continue;
+        const double x = x_zero + valeur_affichee(0, k, continu_x) * echelle_y;
+        const double y = y_zero - valeur_affichee(1, k, continu_y) * echelle_y;
+        if (!commence) {
+            chemin.moveTo(x, y);
+            commence = true;
+        } else {
+            chemin.lineTo(x, y);
+        }
+    }
+    peintre.setClipRect(zone);
+    peintre.setPen(QPen(kCouleurs[1], 1.4));
+    peintre.drawPath(chemin);
+    peintre.setClipping(false);
+    peintre.setPen(QColor(150, 165, 178));
+    peintre.drawText(QRectF(zone.left() + 4, zone.bottom() - 16, 200, 14),
+                     Qt::AlignLeft, "X : voie 1     Y : voie 2");
 }
 
 void TraceOscilloscope::definir_declenchement(Declenchement mode) {
