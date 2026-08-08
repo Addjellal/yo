@@ -248,6 +248,10 @@ void FenetrePrincipale::construire_palette() {
                 }
             });
 
+    // Assez large pour lire un nom de composant : en dessous, la palette
+    // n'affiche que « Té », « Th », « Ali » — autant dire rien.
+    contenu->setMinimumWidth(150);
+
     auto* dock = new QDockWidget("Composants", this);
     dock->setWidget(contenu);
     dock->setObjectName("dock_palette");
@@ -288,6 +292,9 @@ void FenetrePrincipale::construire_docks() {
     QFont fonte("monospace");
     fonte.setStyleHint(QFont::TypeWriter);
     editeur_source_->setFont(fonte);
+    // Quatre lignes de code au minimum : au-delà, c'est la hauteur du panneau
+    // du bas qui décide, et c'est l'utilisateur qui décide de celle-là.
+    editeur_source_->setMinimumHeight(70);
     disposition->addWidget(editeur_source_);
     auto* bouton = new QPushButton("Compiler avec avr-gcc et charger");
     connect(bouton, &QPushButton::clicked, this,
@@ -298,11 +305,13 @@ void FenetrePrincipale::construire_docks() {
     console_ = new QPlainTextEdit;
     console_->setReadOnly(true);
     console_->setFont(fonte);
+    console_->setMinimumHeight(70);
     onglets->addTab(console_, "Journal");
 
     moniteur_serie_ = new QPlainTextEdit;
     moniteur_serie_->setReadOnly(true);
     moniteur_serie_->setFont(fonte);
+    moniteur_serie_->setMinimumHeight(70);
     onglets->addTab(moniteur_serie_, "Moniteur série");
 
     oscilloscope_ = new Oscilloscope;
@@ -387,6 +396,20 @@ void FenetrePrincipale::construire_docks() {
     addDockWidget(Qt::BottomDockWidgetArea, dock_bas);
     docks_schema_.push_back(dock_bas);
     resizeDocks({dock_bas}, {300}, Qt::Vertical);
+
+    // Largeurs de départ des panneaux latéraux. Sans cela, Qt les répartit au
+    // jugé et la palette s'ouvrait amputée.
+    resizeDocks({docks_schema_.front(), dock_proprietes}, {250, 260},
+                Qt::Horizontal);
+
+    // Les poignées de redimensionnement font 4 pixels par défaut, et se
+    // retrouvent collées aux barres de défilement du schéma et de la palette :
+    // on visait la poignée, on attrapait la barre, et la page glissait au lieu
+    // de se redimensionner. Sept pixels, teintés au survol, se visent.
+    setStyleSheet(
+        "QMainWindow::separator { background: #c8ccc8; width: 7px; "
+        "height: 7px; }"
+        "QMainWindow::separator:hover { background: #6f9f6f; }");
 }
 
 void FenetrePrincipale::construire_actions() {

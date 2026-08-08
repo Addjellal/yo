@@ -30,6 +30,15 @@ public:
     void paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,
                QWidget* widget) override;
 
+protected:
+    // Prévient les fils accrochés à ce composant qu'il va bouger, puis qu'il
+    // a bougé. Sans le premier avertissement, Qt n'efface pas leur ancien
+    // tracé et l'écran garde des traînées.
+    QVariant itemChange(GraphicsItemChange changement,
+                        const QVariant& valeur) override;
+
+public:
+
     const coeur::Modele* modele() const { return modele_; }
     const QString& reference() const { return reference_; }
     void definir_reference(QString reference);

@@ -12,6 +12,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QImage>
 #include <QPainter>
+#include <QScrollArea>
 #include <QKeyEvent>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -1435,6 +1436,38 @@ static void test_pas_de_trainee() {
              std::to_string(modeles) + " modèles × 4 orientations");
     verifier(fautifs == 0, "aucun composant ne peint hors de son cadre", liste);
 
+    // --- un fil doit quitter l'ancien emplacement dans l'index de la scène
+    //
+    // C'est la traînée qu'on voyait en déplaçant un composant : le fil se
+    // redessinait au bon endroit, mais Qt continuait de croire qu'il occupait
+    // l'ancien — donc n'effaçait jamais ce qu'il y avait peint.
+    {
+        SceneSchema atelier;
+        // Une vue attachée, sinon Qt n'indexe pas la scène et recalcule les
+        // cadres à chaque interrogation : le défaut ne se voit plus.
+        VueSchema vue;
+        vue.setScene(&atelier);
+        vue.resize(900, 700);
+        vue.show();
+        ItemComposant* a = atelier.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = atelier.ajouter_composant("led", QPointF(200, 0));
+        atelier.addItem(new ItemFil(a, 1, b, 0));
+        QCoreApplication::processEvents();
+
+        const QRectF ancienne = atelier.fils().front()->sceneBoundingRect();
+        // Les deux extrémités s'en vont : la bande d'origine doit se vider
+        // complètement.
+        a->setPos(QPointF(0, 900));
+        b->setPos(QPointF(200, 900));
+        QCoreApplication::processEvents();
+
+        bool encore_la = false;
+        for (QGraphicsItem* item : atelier.items(ancienne))
+            if (item->type() == ItemFil::Type) encore_la = true;
+        verifier(!encore_la,
+                 "un fil déplacé ne reste pas inscrit à son ancienne place");
+    }
+
     // --- même chose pour un fil, avec sa tension affichée
     {
         SceneSchema atelier;
@@ -1449,6 +1482,58 @@ static void test_pas_de_trainee() {
                  std::to_string(debordement(fil, 0.0)) + " px");
         atelier.addItem(fil);
     }
+}
+
+// Un panneau qui exige une largeur énorme la fait exiger par la fenêtre
+// entière : tous les séparateurs se retrouvent alors collés à leur butée, plus
+// aucun panneau ne peut être étiré, et la palette s'ouvre amputée. C'est
+// exactement ce qui était arrivé — l'oscilloscope réclamait 1738 pixels, la
+// fenêtre 1742, et sur un écran de 1920 il ne restait rien à distribuer.
+//
+// Ce test mesure ce que chaque panneau réclame. Il a des dents : sans les
+// barres défilantes, il échoue.
+static void test_panneaux_retrecissables() {
+    std::printf("\n-- les panneaux acceptent d'être rétrécis --\n");
+
+    // Une fenêtre de 1280 × 800 est un ordinateur portable ordinaire ; il faut
+    // qu'il reste de la marge pour les trois panneaux latéraux et du bas.
+    constexpr int kLargeurMax = 500;
+    constexpr int kHauteurMax = 400;
+
+    Oscilloscope oscilloscope;
+    const QSize oscillo = oscilloscope.minimumSizeHint();
+    verifier(oscillo.width() <= kLargeurMax && oscillo.height() <= kHauteurMax,
+             "l'oscilloscope n'impose pas sa largeur à la fenêtre",
+             std::to_string(oscillo.width()) + "x"
+                 + std::to_string(oscillo.height()));
+
+    PanneauAnalyses analyses;
+    const QSize mesure = analyses.minimumSizeHint();
+    verifier(mesure.width() <= kLargeurMax && mesure.height() <= kHauteurMax,
+             "le panneau d'analyses n'impose pas sa largeur à la fenêtre",
+             std::to_string(mesure.width()) + "x"
+                 + std::to_string(mesure.height()));
+
+    PanneauPcb pcb;
+    const QSize carte = pcb.minimumSizeHint();
+    verifier(carte.width() <= kLargeurMax && carte.height() <= kHauteurMax,
+             "la page du circuit imprimé n'impose pas sa largeur au schéma",
+             std::to_string(carte.width()) + "x"
+                 + std::to_string(carte.height()));
+
+    // Rétrécir ne doit rien rendre inatteignable : ce qui dépasse défile.
+    oscilloscope.resize(420, 300);
+    oscilloscope.show();
+    QApplication::processEvents();
+    int defilables = 0;
+    for (QScrollArea* zone : oscilloscope.findChildren<QScrollArea*>())
+        if (zone->widget()
+            && zone->widget()->sizeHint().width() > zone->viewport()->width())
+            ++defilables;
+    verifier(defilables > 0,
+             "les réglages trop larges deviennent défilants, pas coupés",
+             std::to_string(defilables) + " zone(s) défilante(s)");
+    oscilloscope.hide();
 }
 
 // ---------------------------------------------------------------------------
@@ -1474,6 +1559,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pas_de_trainee();
+    test_panneaux_retrecissables();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

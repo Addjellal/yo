@@ -1,5 +1,7 @@
 #include "app/panels/PanneauAnalyses.h"
 
+#include "app/BarreDefilante.h"
+
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QEvent>
@@ -75,7 +77,7 @@ const coeur::Courbe* courbe_parlante(const coeur::Balayage& balayage,
 // Zone de tracé
 // ---------------------------------------------------------------------------
 TraceCourbes::TraceCourbes(QWidget* parent) : QWidget(parent) {
-    setMinimumHeight(240);
+    setMinimumHeight(120);
     setMouseTracking(true);
     setAutoFillBackground(true);
 }
@@ -505,7 +507,9 @@ void PanneauAnalyses::construire() {
     barre->addWidget(lancer);
     connect(type_, &QComboBox::currentIndexChanged, reglages_,
             &QStackedWidget::setCurrentIndex);
-    disposition->addLayout(barre);
+    // Défilante : les réglages d'une analyse forment une longue rangée, et
+    // sans cela c'est elle qui fixait la largeur minimale de la fenêtre.
+    disposition->addWidget(ihm::barre_defilante(barre));
 
     trace_ = new TraceCourbes;
     disposition->addWidget(trace_, 1);

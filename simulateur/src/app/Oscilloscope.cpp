@@ -1,5 +1,7 @@
 #include "app/Oscilloscope.h"
 
+#include "app/BarreDefilante.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -37,7 +39,9 @@ TraceOscilloscope::TraceOscilloscope(QWidget* parent) : QWidget(parent) {
     // Sans suivi de la souris, le curseur ne bougerait qu'en gardant le
     // bouton enfoncé — ce n'est pas ainsi qu'on lit une courbe.
     setMouseTracking(true);
-    setMinimumHeight(200);
+    // Assez pour lire une courbe, pas assez pour interdire de rétrécir le
+    // panneau : au-delà, c'est l'utilisateur qui décide de la hauteur.
+    setMinimumHeight(110);
     setAutoFillBackground(false);
 }
 
@@ -529,7 +533,10 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     reglages->addWidget(source, 2, 3);
     reglages->addWidget(niveau, 2, 4);
     reglages->addWidget(front, 2, 6);
-    disposition->addLayout(reglages);
+    // Quatre rangées de sept colonnes : mises telles quelles, elles exigeaient
+    // 1738 pixels de large pour toute la fenêtre, et plus aucun panneau ne
+    // pouvait être redimensionné. Défilantes, elles n'exigent plus rien.
+    disposition->addWidget(ihm::barre_defilante(reglages));
 
     // Lecture des curseurs, sous la courbe : la souris suit, un clic pose le
     // repère, et l'écart des deux donne temps, tension et fréquence.
@@ -539,6 +546,10 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     fonte.setStyleHint(QFont::TypeWriter);
     curseurs_->setFont(fonte);
     curseurs_->setStyleSheet("color: #444;");
+    // Le texte d'une étiquette fixe sa largeur minimale : cette phrase-là, en
+    // chasse fixe, réclamait à elle seule 528 pixels pour toute la fenêtre.
+    // Elle accepte donc d'être tronquée plutôt que d'imposer sa mesure.
+    curseurs_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     disposition->addWidget(curseurs_);
     connect(trace_, &TraceOscilloscope::curseurs_changes, this, [this] {
         const QString lecture = trace_->lecture_curseurs();

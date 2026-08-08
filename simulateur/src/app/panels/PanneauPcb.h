@@ -129,6 +129,11 @@ private:
     QDoubleSpinBox* largeur_ = nullptr;
     QPlainTextEdit* rapport_ = nullptr;
     QCheckBox* chevelu_ = nullptr;
+    // Grisés tant qu'il n'y a rien à défaire : un bouton sans objet doit le
+    // dire, sinon on le croit cassé.
+    class QPushButton* defaire_ = nullptr;
+    class QPushButton* effacer_ = nullptr;
+    void refleter_pistes();
 
     void exporter();
 };

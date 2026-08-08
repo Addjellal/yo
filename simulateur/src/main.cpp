@@ -1,6 +1,7 @@
 // Point d'entrée de l'application.
 #include <QApplication>
 #include <QDir>
+#include <QDockWidget>
 #include <QFileInfo>
 #include <QFont>
 #include <QPixmap>
@@ -52,6 +53,36 @@ int main(int argc, char** argv) {
     fenetre.show();
     if (base >= 0 && base + 1 < arguments.size())
         fenetre.definir_base_temps(arguments.at(base + 1).toDouble());
+
+    // « --tailles » : imprime ce que chaque panneau exige comme place, puis
+    // quitte. Quand un panneau ne peut plus être étiré, la cause est toujours
+    // là — un widget qui réclame plus que l'écran fige tous les séparateurs à
+    // leur butée, et l'on croit le redimensionnement cassé.
+    if (arguments.contains("--tailles")) {
+        fenetre.resize(1920, 1080);
+        QTimer::singleShot(400, &fenetre, [&fenetre] {
+            QTextStream sortie(stdout);
+            auto ligne = [&sortie](const QString& nom, QWidget* widget) {
+                sortie << nom << " taille=" << widget->width() << "x"
+                       << widget->height()
+                       << " minimum=" << widget->minimumSizeHint().width() << "x"
+                       << widget->minimumSizeHint().height() << Qt::endl;
+            };
+            sortie << "-- ce qui réclame le plus de place --" << Qt::endl;
+            for (QWidget* widget : fenetre.findChildren<QWidget*>())
+                if (widget->minimumSizeHint().width() > 400
+                    || widget->minimumSizeHint().height() > 300)
+                    ligne(QString(widget->metaObject()->className()) + " "
+                              + widget->objectName(),
+                          widget);
+            sortie << "-- l'ensemble --" << Qt::endl;
+            ligne("fenetre", &fenetre);
+            ligne("centre ", fenetre.centralWidget());
+            for (QDockWidget* dock : fenetre.findChildren<QDockWidget*>())
+                ligne("dock " + dock->windowTitle(), dock);
+            qApp->quit();
+        });
+    }
 
     // Vérification automatique : « --capture fichier.png [millisecondes] »
     // ouvre l'application, laisse tourner la simulation, enregistre une image
@@ -228,11 +259,17 @@ int main(int argc, char** argv) {
         plus_tard([photographier] { photographier("schema"); });
         plus_tard([&fenetre] { fenetre.demarrage_automatique(); });
         plus_tard([photographier] { photographier("en-marche"); });
-        plus_tard([&fenetre] {
+        // « --gestes dossier [REF] » : la référence à effacer en pleine
+        // simulation. Par défaut R1 ; « U1 » efface la carte elle-même.
+        const QString cible = (gestes + 2 < arguments.size()
+                               && !arguments.at(gestes + 2).startsWith("--"))
+                                  ? arguments.at(gestes + 2)
+                                  : QString("R1");
+        plus_tard([&fenetre, cible] {
             // On efface un composant en pleine simulation, comme on le ferait
             // sans y penser.
             for (ItemComposant* composant : fenetre.scene()->composants())
-                if (composant->reference() == "R1") composant->setSelected(true);
+                if (composant->reference() == cible) composant->setSelected(true);
             fenetre.scene()->memoriser();
             fenetre.scene()->supprimer_selection();
         });

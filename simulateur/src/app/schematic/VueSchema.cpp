@@ -9,7 +9,14 @@ VueSchema::VueSchema(QWidget* parent) : QGraphicsView(parent) {
     setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
     setDragMode(QGraphicsView::RubberBandDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-    setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
+    // Rafraîchissement complet, et non « intelligent ». Le mode intelligent
+    // ne repeint que ce qu'on lui déclare abîmé : la moindre imprécision dans
+    // le cadre d'un objet — ou un fil dont le tracé change sans qu'on l'ait
+    // annoncé assez tôt — laisse alors des traînées à l'écran quand on
+    // déplace un composant. La scène compte quelques dizaines d'objets et se
+    // repeint déjà entièrement à chaque image pendant la simulation : la
+    // dépense est sans commune mesure avec la gêne.
+    setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     setAcceptDrops(true);
 }
 

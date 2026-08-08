@@ -1,5 +1,7 @@
 #include "app/panels/PanneauPcb.h"
 
+#include "app/BarreDefilante.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -54,7 +56,7 @@ double accrocher(double valeur) {
 // Vue
 // ---------------------------------------------------------------------------
 VuePcb::VuePcb(QWidget* parent) : QWidget(parent) {
-    setMinimumHeight(320);
+    setMinimumHeight(150);
     setMouseTracking(true);
     setCursor(Qt::CrossCursor);
     setFocusPolicy(Qt::StrongFocus);
@@ -369,6 +371,29 @@ void VuePcb::paintEvent(QPaintEvent*) {
         peintre.drawText(rect(), Qt::AlignCenter,
                          "Aucune carte.\nUtilisez « Transférer le schéma vers "
                          "la carte » (F8).");
+    } else if (carte_.pistes.empty()) {
+        // Tant qu'aucune piste n'existe, « Défaire » et « Tout dérouter » n'ont
+        // rien à faire — ils sont d'ailleurs grisés. Ce qui manque alors, c'est
+        // de savoir comment on en trace une : ce n'est écrit nulle part
+        // ailleurs, et personne ne devine qu'il faut cliquer deux pastilles.
+        QFont fonte("sans");
+        fonte.setPixelSize(13);
+        peintre.setFont(fonte);
+        const QString aide =
+            "Les traits fins sont le chevelu : ce qu'il reste à relier.\n"
+            "Cliquez une pastille, puis l'autre bout du trait, pour tirer "
+            "la piste.";
+        // Le texte tombe sur le vernis vert comme sur le fond sombre : sans
+        // fond à lui, il serait illisible une fois sur deux.
+        QRectF cadre = peintre.boundingRect(
+            QRectF(rect()), Qt::AlignHCenter | Qt::AlignBottom, aide);
+        cadre.adjust(-10, -6, 10, 6);
+        cadre.translate(0, -12);
+        peintre.setPen(Qt::NoPen);
+        peintre.setBrush(QColor(18, 24, 20, 205));
+        peintre.drawRoundedRect(cadre, 5, 5);
+        peintre.setPen(QColor("#cfe0d4"));
+        peintre.drawText(cadre, Qt::AlignCenter, aide);
     }
 }
 
@@ -531,28 +556,47 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     couche_->addItem("Dessous (bleu)");
     barre->addWidget(couche_);
 
-    barre->addWidget(new QLabel("Largeur"));
+    auto* titre_largeur = new QLabel("Largeur");
+    barre->addWidget(titre_largeur);
     largeur_ = new QDoubleSpinBox;
     largeur_->setRange(0.1, 5.0);
     largeur_->setSingleStep(0.1);
     largeur_->setValue(0.4);
     largeur_->setSuffix(" mm");
+    const QString explication_largeur =
+        "Largeur du cuivre des PROCHAINES pistes tracées.\n"
+        "Les pistes déjà posées gardent la leur.\n"
+        "0,4 mm passe environ 1 A ; en dessous de 0,15 mm, le contrôle de "
+        "fabrication refuse.";
+    largeur_->setToolTip(explication_largeur);
+    titre_largeur->setToolTip(explication_largeur);
     barre->addWidget(largeur_);
 
     chevelu_ = new QCheckBox("Chevelu");
     chevelu_->setChecked(true);
     barre->addWidget(chevelu_);
 
-    auto* defaire = new QPushButton("Défaire la piste");
-    auto* effacer = new QPushButton("Tout dérouter");
+    defaire_ = new QPushButton("Défaire la piste");
+    defaire_->setToolTip("Retire la dernière piste tracée. Raccourci : "
+                         "Retour arrière.");
+    effacer_ = new QPushButton("Tout dérouter");
+    effacer_->setToolTip("Retire toutes les pistes et repart du chevelu. Le "
+                         "placement des composants, lui, est conservé.");
     auto* regles = new QPushButton("Contrôler (DRC)");
+    regles->setToolTip("Vérifie isolation, largeur minimale et débordement du "
+                       "contour, comme le ferait le fabricant.");
     auto* exporter = new QPushButton("Exporter la fabrication…");
-    barre->addWidget(defaire);
-    barre->addWidget(effacer);
+    exporter->setToolTip("Écrit les fichiers Gerber (cuivre, sérigraphie, "
+                         "contour) et le fichier de perçage Excellon.");
+    barre->addWidget(defaire_);
+    barre->addWidget(effacer_);
     barre->addStretch(1);
     barre->addWidget(regles);
     barre->addWidget(exporter);
-    colonne->addLayout(barre);
+    // Défilante : dix commandes en ligne exigeaient 1271 pixels, et la page
+    // du circuit imprimé imposait cette largeur au schéma lui-même — les deux
+    // pages étant empilées, leurs minimums s'additionnent à celui des docks.
+    colonne->addWidget(ihm::barre_defilante(barre));
 
     vue_ = new VuePcb;
     colonne->addWidget(vue_, 1);
@@ -581,6 +625,7 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     rapport_ = new QPlainTextEdit;
     rapport_->setReadOnly(true);
     rapport_->setFont(fonte);
+    rapport_->setMinimumHeight(48);
     rapport_->setMaximumHeight(110);
     rapport_->setPlaceholderText(
         "Compte rendu du transfert schéma → carte et du contrôle des règles.");
@@ -595,12 +640,15 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     connect(largeur_, &QDoubleSpinBox::valueChanged, vue_,
             &VuePcb::definir_largeur_piste);
     connect(chevelu_, &QCheckBox::toggled, vue_, &VuePcb::afficher_chevelu);
-    connect(defaire, &QPushButton::clicked, vue_, &VuePcb::defaire_piste);
-    connect(effacer, &QPushButton::clicked, vue_, &VuePcb::effacer_pistes);
+    connect(defaire_, &QPushButton::clicked, vue_, &VuePcb::defaire_piste);
+    connect(effacer_, &QPushButton::clicked, vue_, &VuePcb::effacer_pistes);
     connect(regles, &QPushButton::clicked, this, &PanneauPcb::controler);
     connect(exporter, &QPushButton::clicked, this, &PanneauPcb::exporter);
-    connect(vue_, &VuePcb::etat_change, this,
-            [this](const QString& resume) { etat_->setText(resume); });
+    connect(vue_, &VuePcb::etat_change, this, [this](const QString& resume) {
+        etat_->setText(resume);
+        refleter_pistes();
+    });
+    refleter_pistes();
     connect(vue_, &VuePcb::survol, this,
             [this](const QString& texte) { survol_->setText(texte); });
 }
@@ -678,6 +726,12 @@ QString PanneauPcb::construire_depuis(const coeur::Netlist& netlist) {
     const QString texte = compte_rendu.join("\n");
     afficher_rapport(texte);
     return texte;
+}
+
+void PanneauPcb::refleter_pistes() {
+    const bool des_pistes = vue_ && !vue_->carte().pistes.empty();
+    if (defaire_) defaire_->setEnabled(des_pistes);
+    if (effacer_) effacer_->setEnabled(des_pistes);
 }
 
 QString PanneauPcb::resume() const { return etat_->text(); }

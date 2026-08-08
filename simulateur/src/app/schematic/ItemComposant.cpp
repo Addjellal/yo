@@ -1,5 +1,9 @@
 #include "app/schematic/ItemComposant.h"
 
+#include <QGraphicsScene>
+
+#include "app/schematic/ItemFil.h"
+
 #include <QFont>
 #include <QPainter>
 #include <QPolygonF>
@@ -93,6 +97,28 @@ void ItemComposant::recalculer_cadre() {
 }
 
 QRectF ItemComposant::boundingRect() const { return cadre_peint_; }
+
+QVariant ItemComposant::itemChange(GraphicsItemChange changement,
+                                   const QVariant& valeur) {
+    // Le tracé d'un fil se calcule à partir de la position de ses deux
+    // composants : il change donc en même temps que celui-ci, sans que Qt en
+    // sache rien. Il faut le lui dire AVANT le déplacement — pour qu'il
+    // efface l'ancien tracé — et APRÈS — pour qu'il peigne le nouveau.
+    const bool geometrie = changement == ItemPositionChange
+                           || changement == ItemPositionHasChanged
+                           || changement == ItemRotationChange
+                           || changement == ItemRotationHasChanged
+                           || changement == ItemTransformChange
+                           || changement == ItemTransformHasChanged;
+    if (geometrie && scene()) {
+        for (QGraphicsItem* item : scene()->items()) {
+            if (item->type() != ItemFil::Type) continue;
+            auto* fil = static_cast<ItemFil*>(item);
+            if (fil->touche(this)) fil->rafraichir();
+        }
+    }
+    return QGraphicsItem::itemChange(changement, valeur);
+}
 
 QPainterPath ItemComposant::shape() const {
     // Ce qui répond au clic reste le symbole et ses étiquettes proches : un
