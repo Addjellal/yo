@@ -45,9 +45,11 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | Montage sans microcontrôleur | LTspice, Multisim | ✅ |
 | Analyse de bruit | LTspice, Multisim | ✅ vérifiée contre 4kTR |
 | Balayage en température | LTspice, Multisim | ✅ |
-| Monte-Carlo, analyse de sensibilité | Multisim | ❌ |
-| Analyse paramétrique multi-passes (`.step`) | LTspice | ❌ |
-| Périphériques numériques (I²C, SPI, LCD, 74HC) | Proteus, Wokwi | ❌ demanderait un troisième moteur, événementiel |
+| Monte-Carlo (tolérances, dispersion) | Multisim | ✅ tirage reproductible |
+| Analyse de sensibilité | Multisim | ❌ |
+| Analyse paramétrique multi-passes (`.step`) | LTspice | ✅ courbes superposées |
+| Circuits numériques pilotés par fronts (74HC595) | Proteus, Wokwi | ✅ troisième moteur, événementiel |
+| Périphériques à protocole (I²C, SPI, LCD) | Proteus, Wokwi | ❌ le moteur existe, les modèles restent à écrire |
 | Autre cœur que l'AVR (STM32, PIC) | Proteus | ❌ |
 
 ## 3. Instruments
@@ -90,12 +92,16 @@ série, broche de microcontrôleur reliée directement à une alimentation.
 |---|---|---|
 | Empreinte attachée à chaque composant | KiCad | ✅ le champ existe et est rempli |
 | Netlist exportable vers un routeur | KiCad | ✅ |
-| Placement, routage, plans de masse, DRC, 3D | KiCad, Altium | ❌ |
+| Placement des empreintes à la souris | KiCad, Altium | ✅ |
+| Chevelu (liaisons restant à router) | KiCad, Altium | ✅ |
+| Routage manuel, deux couches | KiCad, Altium | ✅ |
+| Contrôle des règles de fabrication (DRC) | KiCad, Altium | ✅ isolation, largeur, débordement |
+| **Fichiers Gerber et Excellon** | KiCad | ✅ RS-274X et Excellon métrique |
+| Auto-routeur, plans de masse, vias, vue 3D | KiCad, Altium | ❌ |
 
-C'est la seule grande brique entièrement absente. L'architecture la prépare
-depuis le premier jour — symbole et empreinte sont deux champs distincts du
-modèle, et la netlist est un objet de première classe — mais le module n'est
-pas écrit.
+La brique existe désormais. Ce qui manque encore est du confort de routage —
+auto-routeur, plans de masse, vias — pas la chaîne elle-même : d'un schéma on
+tire aujourd'hui des fichiers qu'un fabricant accepte.
 
 ---
 
@@ -108,7 +114,7 @@ la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur SPICE, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 186 tests du
+C'est aussi un projet dont **chaque affirmation est vérifiée** : 224 tests du
 cœur et 81 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
@@ -118,12 +124,12 @@ un signal carré.
 
 ## Ordre de priorité si le projet continue
 
-1. **Module PCB.** La brique la plus lourde, mais celle dont la place est déjà
-   faite.
-2. **Moteur numérique événementiel.** Il débloquerait d'un coup l'I²C, le SPI,
-   les écrans et les circuits logiques complexes — c'est-à-dire la moitié des
-   montages de TP encore renvoyés vers Wokwi.
-3. **Analyses restantes** : `.step` (balayage paramétrique à passes
-   multiples) et Monte-Carlo. Le bruit et la température, eux, sont faits.
-4. **Bus et feuilles multiples**, pour les schémas qui ne tiennent plus sur
+1. **Modèles de périphériques à protocole** — écran I²C, carte SD en SPI,
+   DHT22 en une-fil. Le moteur événementiel qui leur manquait existe
+   maintenant ; ce sont les modèles qui restent à écrire, un par composant.
+2. **Confort de routage** : auto-routeur, plans de masse, vias, empreintes
+   dessinées pour chaque composant du catalogue plutôt que déduites.
+3. **Bus et feuilles multiples**, pour les schémas qui ne tiennent plus sur
    une page.
+4. **Autre cœur que l'AVR** (STM32) : un second émulateur et toute la couche
+   périphérique. C'est un projet en soi.

@@ -107,6 +107,7 @@ add_library(coeur STATIC
   src/core/analysis/Analyses.cpp
   src/core/analysis/Campagne.cpp
   src/core/export/Documents.cpp
+  src/core/pcb/Pcb.cpp
 )
 target_include_directories(coeur PUBLIC src)
 
@@ -158,6 +159,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/app/schematic/ItemFil.cpp
     src/app/panels/PanneauAnalyses.cpp
     src/app/panels/FenetreInstrument.cpp
+    src/app/panels/PanneauPcb.cpp
     src/app/Oscilloscope.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)

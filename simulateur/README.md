@@ -23,7 +23,7 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 
 - **Saisie de schéma** : palette par famille, glisser-déposer, fils en équerre,
   rotation, grille magnétique, zoom à la molette.
-- **Catalogue de 56 composants** (50 simulables, 9 familles), tous vérifiés
+- **Catalogue de 57 composants** (51 simulables, 10 familles), tous vérifiés
   par les tests : passifs, diodes et Zener, transistors NPN/PNP, MOSFET,
   optocoupleur, afficheur 7 segments, relais, portes logiques, amplificateur
   opérationnel, régulateur 7805, instruments de mesure.
@@ -75,13 +75,24 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Compilation intégrée** : on écrit le programme dans l'application,
   `F5` compile avec `avr-g++` et charge le résultat.
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
-- **Trois analyses paramétriques**, comme dans un atelier de simulation :
+- **Module de circuit imprimé** : la carte se construit depuis la netlist —
+  mêmes composants, mêmes nets, aucune ressaisie. Empreintes placées à la
+  souris, chevelu qui montre ce qu'il reste à relier, pistes tirées d'une
+  pastille à l'autre sur deux couches, contrôle des règles de fabrication, et
+  export **Gerber RS-274X** + **Excellon**. Le routage reste manuel.
+- **Moteur numérique événementiel**, le troisième : un 74HC595 cadencé à
+  plusieurs centaines de kilohertz réagit aux fronts datés du
+  microcontrôleur, et ses sorties redeviennent des sources du circuit
+  analogique. Ni l'un ni l'autre des deux mondes n'est dégradé au passage.
+- **Six analyses paramétriques**, comme dans un atelier de simulation :
   *balayage continu* (`.dc` — caractéristique de transfert, d'une source ou
   d'une résistance), *réponse en fréquence* (`.ac` — diagramme de Bode, gain
   en décibels et phase, avec lecture automatique de la coupure à −3 dB), et
-  *spectre* du dernier relevé (raies harmoniques et taux de distorsion). Les
-  courbes s'affichent dans l'onglet **Analyses**, avec axes, légende et
-  curseur de lecture.
+  *spectre* du dernier relevé (raies harmoniques et taux de distorsion),
+  *bruit* (`.noise`, vérifié contre 4kTR), *balayage paramétrique* (`.step`,
+  courbes superposées) et *Monte-Carlo* (tirage des valeurs dans leur
+  tolérance, avec la dispersion obtenue). Les courbes s'affichent dans
+  l'onglet **Analyses**, avec axes, légende et curseur de lecture.
 - **Générateur de signaux** (sinus, carré, triangle, continu) : c'est lui qui
   rend ces analyses possibles, et il porte les trois descriptions que SPICE
   attend — valeur continue, amplitude alternative, forme d'onde.
@@ -171,7 +182,7 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 186 tests, sans Qt
+./build/tests_coeur                        # 224 tests, sans Qt
 QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 81 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
@@ -542,7 +553,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**186 tests du cœur**, sans Qt, en dix-sept sections :
+**224 tests du cœur**, sans Qt, en vingt sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -560,6 +571,9 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 20 | **circuit imprimé** : placement depuis la netlist, chevelu, règles de fabrication (isolation, largeur, débordement), Gerber et Excellon conformes |
+| 19 | **moteur numérique** : un octet décalé à 1 MHz dans un 74HC595, verrouillé, et ses sorties devenues un circuit analogique valable |
+| 18 | **campagnes** : trois coupures d'un RC confrontées à 1/(2·pi·R·C), et un pont diviseur à ±5 % dont la dispersion reste dans la tolérance |
 | 17 | **température et bruit** : la tension de seuil d'une diode qui baisse avec la chaleur, et le bruit thermique d'une résistance de 10 kΩ confronté à 4kTR (12,9 nV/√Hz) |
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
@@ -583,6 +597,7 @@ L'application se vérifie aussi sans intervention :
 ./build/simulateur --exemple 8 --analyse 1           # Bode du filtre RC
 ./build/simulateur --exemple 8 --analyse 2 2500      # spectre du signal simulé
 ./build/simulateur --exemple 8 --documents /tmp/doc  # BOM, ERC, KiCad, PDF, PNG
+./build/simulateur --exemple 9 --pcb /tmp/carte      # carte, routage, Gerber
 ```
 
 `--onglet` choisit le panneau du bas (0 programme, 1 journal, 2 série,

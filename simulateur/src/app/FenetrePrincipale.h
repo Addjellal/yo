@@ -31,6 +31,7 @@ class MoteurSimulation;
 class Oscilloscope;
 class PanneauAnalyses;
 class FenetreInstrument;
+class PanneauPcb;
 
 // Palette : arbre catégorie -> composants, avec glisser-déposer vers le schéma.
 class PaletteComposants : public QTreeWidget {
@@ -114,6 +115,9 @@ public:
     void basculer_fenetre(QWidget* panneau);
     Oscilloscope* oscilloscope() const { return oscilloscope_; }
     PanneauAnalyses* analyses() const { return analyses_; }
+    PanneauPcb* pcb() const { return pcb_; }
+    // Construit la carte depuis le schéma courant et montre l'onglet.
+    void ouvrir_pcb();
 
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
@@ -158,6 +162,7 @@ private:
     QPlainTextEdit* moniteur_serie_ = nullptr;
     Oscilloscope* oscilloscope_ = nullptr;
     PanneauAnalyses* analyses_ = nullptr;
+    PanneauPcb* pcb_ = nullptr;
     // Dernière trame calculée : c'est sur elle que porte le spectre et les
     // mesures, comme un oscilloscope analyse ce qu'il vient d'acquérir.
     coeur::Formes dernieres_formes_;

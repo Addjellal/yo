@@ -41,6 +41,7 @@
 #include "app/Oscilloscope.h"
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
+#include "app/panels/PanneauPcb.h"
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
 #include "core/export/Documents.h"
@@ -298,6 +299,10 @@ void FenetrePrincipale::construire_docks() {
 
     analyses_ = new PanneauAnalyses;
     onglets->addTab(analyses_, "Analyses");
+
+    pcb_ = new PanneauPcb;
+    onglets->addTab(pcb_, "Circuit imprimé");
+    connect(pcb_, &PanneauPcb::journal, this, &FenetrePrincipale::ecrire);
     connect(analyses_, &PanneauAnalyses::balayage_demande, this,
             [this](const QString& directive, bool bode) {
                 circuit_modifie();
@@ -581,6 +586,30 @@ void FenetrePrincipale::construire_actions() {
             fenetres_instruments_.front()->close();
     });
 
+    // Le circuit imprimé consomme la netlist du schéma : même composants,
+    // mêmes nets, aucune ressaisie.
+    auto* pcb = menuBar()->addMenu("&Carte");
+    pcb->addAction("&Générer la carte depuis le schéma", this,
+                   &FenetrePrincipale::ouvrir_pcb);
+    pcb->addAction("&Contrôler les règles de fabrication", this, [this] {
+        if (!pcb_) return;
+        const auto anomalies = pcb_->vue()->carte().controler();
+        if (anomalies.empty()) {
+            ecrire("Règles de fabrication : aucune anomalie.");
+        } else {
+            QString rapport =
+                QString("Règles de fabrication : %1 anomalie(s)\n")
+                    .arg(anomalies.size());
+            for (const auto& anomalie : anomalies)
+                rapport += QString("  %1 (en %2 ; %3 mm)\n")
+                               .arg(QString::fromStdString(anomalie.message))
+                               .arg(anomalie.x, 0, 'f', 1)
+                               .arg(anomalie.y, 0, 'f', 1);
+            ecrire(rapport);
+        }
+        onglets_->setCurrentIndex(1);
+    });
+
     auto* aide = menuBar()->addMenu("&Aide");
     aide->addAction("À &propos", this, [this] {
         QMessageBox::about(
@@ -674,6 +703,17 @@ void FenetrePrincipale::refleter_etat() {
                 .arg(couleur, texte));
     }
     if (!marche && etiquette_vitesse_) etiquette_vitesse_->setText("Vitesse : —");
+}
+
+void FenetrePrincipale::ouvrir_pcb() {
+    if (!pcb_) return;
+    circuit_modifie();
+    pcb_->construire_depuis(moteur_->netlist());
+    onglets_->setCurrentWidget(pcb_);
+    ecrire("Carte générée depuis le schéma : placez les empreintes à la "
+           "souris, puis tirez les pistes d'une pastille à l'autre.");
+    ecrire("Une piste ne se tire qu'entre pastilles d'un même net — le "
+           "chevelu en pointillés montre ce qu'il reste à relier.");
 }
 
 // ---------------------------------------------------------------------------

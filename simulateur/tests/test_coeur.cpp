@@ -22,6 +22,7 @@
 #include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 #include "core/export/Documents.h"
+#include "core/pcb/Pcb.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;
@@ -2391,6 +2392,136 @@ static void test_numerique() {
 }
 
 // ---------------------------------------------------------------------------
+// [20] Module de circuit imprimé : placement, chevelu, règles, fabrication.
+// ---------------------------------------------------------------------------
+static void test_pcb() {
+    std::printf("\n[20] Circuit imprimé\n");
+
+    coeur::Netlist netlist;
+    auto& r1 = netlist.ajouter("R1", "resistance");
+    r1.valeurs["ohms"] = 220;
+    netlist.relier("R1", "1", "ENTREE");
+    netlist.relier("R1", "2", "MILIEU");
+    netlist.ajouter("LED1", "led");
+    netlist.relier("LED1", "A", "MILIEU");
+    netlist.relier("LED1", "K", "GND");
+    auto& masse = netlist.ajouter("GND1", "masse");
+    (void)masse;
+    netlist.relier("GND1", "1", "GND");
+
+    coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+    verifier(carte.composants.size() == 2,
+             "les symboles d'alimentation ne vont pas sur la carte",
+             std::to_string(carte.composants.size()) + " composants");
+
+    const std::vector<coeur::PastillePosee> pastilles = carte.pastilles();
+    verifier(pastilles.size() == 4, "quatre pastilles placées",
+             std::to_string(pastilles.size()));
+    int avec_net = 0;
+    for (const auto& pastille : pastilles)
+        if (!pastille.net.empty()) ++avec_net;
+    verifier(avec_net == 4, "chaque pastille connaît son net",
+             std::to_string(avec_net));
+
+    // --- chevelu : le net MILIEU relie deux pastilles, il doit apparaître
+    std::vector<coeur::CartePcb::Liaison> liaisons = carte.chevelu();
+    bool milieu_present = false;
+    for (const auto& liaison : liaisons)
+        if (liaison.net == "MILIEU") milieu_present = true;
+    verifier(milieu_present, "le chevelu montre la liaison à router");
+    verifier(!liaisons.empty() && !liaisons.front().routee,
+             "et elle n'est pas encore routée");
+
+    // --- on la route : la liaison doit disparaître du travail restant
+    for (const auto& liaison : liaisons) {
+        if (liaison.net != "MILIEU") continue;
+        carte.pistes.push_back({"MILIEU", liaison.x1, liaison.y1, liaison.x2,
+                                liaison.y2, 0.4, 0});
+    }
+    liaisons = carte.chevelu();
+    bool milieu_route = false;
+    for (const auto& liaison : liaisons)
+        if (liaison.net == "MILIEU" && liaison.routee) milieu_route = true;
+    verifier(milieu_route, "une fois la piste tirée, la liaison est routée");
+
+    // --- règles de fabrication
+    {
+        coeur::CartePcb essai = carte;
+        verifier(essai.controler().empty(),
+                 "une carte correcte ne lève aucune anomalie");
+
+        essai.pistes.push_back({"AUTRE", essai.pistes[0].x1,
+                                essai.pistes[0].y1 + 0.05,
+                                essai.pistes[0].x2, essai.pistes[0].y2 + 0.05,
+                                0.4, 0});
+        bool isolation = false;
+        for (const auto& anomalie : essai.controler())
+            if (anomalie.message.find("isolation") != std::string::npos)
+                isolation = true;
+        verifier(isolation,
+                 "deux nets à cinquante microns l'un de l'autre sont refusés");
+
+        coeur::CartePcb fine = carte;
+        fine.pistes.push_back({"MILIEU", 5, 5, 20, 5, 0.05, 0});
+        bool trop_fine = false;
+        for (const auto& anomalie : fine.controler())
+            if (anomalie.message.find("trop fine") != std::string::npos)
+                trop_fine = true;
+        verifier(trop_fine, "une piste de 50 µm est refusée");
+
+        coeur::CartePcb dehors = carte;
+        dehors.pistes.push_back({"MILIEU", 5, 5, 500, 5, 0.4, 0});
+        bool hors = false;
+        for (const auto& anomalie : dehors.controler())
+            if (anomalie.message.find("hors du contour") != std::string::npos)
+                hors = true;
+        verifier(hors, "une piste qui sort de la carte est refusée");
+    }
+
+    // --- fichiers de fabrication
+    {
+        const std::string cuivre = carte.gerber(0);
+        verifier(cuivre.find("%FSLAX46Y46*%") != std::string::npos
+                     && cuivre.find("%MOMM*%") != std::string::npos,
+                 "Gerber : format et unités déclarés");
+        verifier(cuivre.find("%ADD10C,") != std::string::npos,
+                 "Gerber : au moins une ouverture définie");
+        verifier(cuivre.find("D03*") != std::string::npos,
+                 "Gerber : les pastilles sont flashées");
+        verifier(cuivre.find("D01*") != std::string::npos,
+                 "Gerber : la piste est tracée");
+        verifier(cuivre.rfind("M02*") != std::string::npos,
+                 "Gerber : fin de fichier");
+
+        const std::string percages = carte.excellon();
+        verifier(percages.rfind("M48", 0) == 0
+                     && percages.find("METRIC") != std::string::npos,
+                 "Excellon : en-tête conforme");
+        verifier(percages.find("T1C0.800") != std::string::npos,
+                 "Excellon : l'outil de 0,8 mm est déclaré");
+        verifier(percages.find("M30") != std::string::npos,
+                 "Excellon : fin de programme");
+        // Quatre pastilles traversantes, donc quatre perçages.
+        int coordonnees = 0;
+        size_t position = percages.find("T1\n");
+        while ((position = percages.find("X", position + 1)) != std::string::npos)
+            ++coordonnees;
+        verifier(coordonnees == 4, "Excellon : un perçage par pastille",
+                 std::to_string(coordonnees));
+    }
+
+    // --- déplacement : les pastilles suivent le composant
+    {
+        const double avant = carte.pastilles().front().x;
+        carte.deplacer("R1", 50, 40);
+        const double apres = carte.pastilles().front().x;
+        verifier(std::fabs(apres - avant) > 1.0,
+                 "déplacer un composant déplace ses pastilles",
+                 f(avant) + " -> " + f(apres));
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2418,6 +2549,7 @@ int main() {
     test_temperature_et_bruit();
     test_campagnes();
     test_numerique();
+    test_pcb();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

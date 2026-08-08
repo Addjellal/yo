@@ -9,6 +9,7 @@
 #include <QTimer>
 
 #include "app/FenetrePrincipale.h"
+#include "app/panels/PanneauPcb.h"
 
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
@@ -50,7 +51,8 @@ int main(int argc, char** argv) {
     // Vérification automatique : « --capture fichier.png [millisecondes] »
     // ouvre l'application, laisse tourner la simulation, enregistre une image
     // puis quitte. Sert de test de bout en bout sans intervention humaine.
-    const bool analyse_demandee = arguments.contains("--analyse");
+    const bool analyse_demandee =
+        arguments.contains("--analyse") || arguments.contains("--pcb");
     if (position >= 0 && position + 1 < arguments.size() && !analyse_demandee) {
         const QString destination = arguments.at(position + 1);
         const int attente = position + 2 < arguments.size()
@@ -126,6 +128,55 @@ int main(int argc, char** argv) {
                                     + " octets"
                               : QString("ECHEC"))
                        << Qt::endl;
+            }
+            qApp->quit();
+        });
+    }
+
+    // « --pcb dossier » : génère la carte depuis le schéma, en route ce qui
+    // peut l'être automatiquement pour la vérification, et écrit les fichiers
+    // de fabrication. Imprime l'état de la carte et la taille des fichiers.
+    const int pcb = arguments.indexOf("--pcb");
+    if (pcb >= 0 && pcb + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const QString dossier = arguments.at(pcb + 1);
+        QDir().mkpath(dossier);
+        QTimer::singleShot(300, &application, [&fenetre, dossier] {
+            QTextStream sortie(stdout);
+            fenetre.ouvrir_pcb();
+            sortie << fenetre.pcb()->resume() << Qt::endl;
+            // Toutes les liaisons routées d'un trait : la vérification porte
+            // sur la chaîne complète, pas sur l'adresse du routeur.
+            coeur::CartePcb& carte = fenetre.pcb()->vue()->carte();
+            for (const auto& liaison : carte.chevelu())
+                if (!liaison.routee)
+                    carte.pistes.push_back({liaison.net, liaison.x1, liaison.y1,
+                                            liaison.x2, liaison.y2, 0.4, 0});
+            // Reposer la carte fait recalculer l'état affiché : sans cela le
+            // panneau annoncerait encore « 0 piste ».
+            fenetre.pcb()->vue()->definir_carte(carte);
+            int restantes = 0;
+            for (const auto& liaison :
+                 fenetre.pcb()->vue()->carte().chevelu())
+                if (!liaison.routee) ++restantes;
+            sortie << "liaisons restantes apres routage : " << restantes
+                   << Qt::endl;
+            for (const QString& nom :
+                 fenetre.pcb()->exporter_vers(dossier + "/carte"))
+                sortie << nom << " : "
+                       << QFileInfo(dossier + "/" + nom).size() << " octets"
+                       << Qt::endl;
+            // « --capture » peut accompagner « --pcb » : l'image montre la
+            // carte routée, ce que les tailles de fichiers ne disent pas.
+            const QStringList arguments = qApp->arguments();
+            const int rang_image = arguments.indexOf("--capture");
+            if (rang_image >= 0 && rang_image + 1 < arguments.size()) {
+                const QString image = arguments.at(rang_image + 1);
+                QTimer::singleShot(200, qApp, [&fenetre, image] {
+                    fenetre.grab().save(image);
+                    qApp->quit();
+                });
+                return;
             }
             qApp->quit();
         });
