@@ -196,7 +196,24 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    les DLL à côté de l'exécutable (`windeployqt` s'en charge pour Qt, et
    `libngspice-0.dll` est dans `C:\msys64\ucrt64\bin`).
 
-4. Pour la partie Arduino, en plus :
+4. Lancer l'application. Les deux DLL de ngspice doivent être à côté de
+   l'exécutable, et Qt dans le `PATH` :
+
+   ```powershell
+   Copy-Item C:\Spice64_dll\dll-vs\ngspice.dll build\
+   Copy-Item C:\Spice64_dll\dll-vs\libomp140.x86_64.dll build\
+   $env:PATH = "C:\Qt\6.11.1\mingw_64\bin;" + $env:PATH
+   .\build\simulateur.exe
+   ```
+
+   Si ngspice se plaint de ne pas trouver son fichier d'initialisation,
+   désignez-lui son dossier : `$env:SPICE_LIB_DIR = "C:\Spice64_dll\share\ngspice"`.
+
+   Pour vérifier que tout fonctionne : *Exemples → Filtre RC*, puis onglet
+   *Analyses → Réponse en fréquence → Lancer*. La coupure annoncée sous la
+   courbe doit tomber vers 1591 Hz.
+
+5. Pour la partie Arduino, en plus :
 
    ```bash
    pacman -S --needed mingw-w64-ucrt-x86_64-avr-gcc \
@@ -280,7 +297,7 @@ convaincre ; il faut le compilateur d'origine :
 ```powershell
 dir C:\Qt\Tools          # repérer le mingwXXXX_64 installé
 Remove-Item -Recurse -Force build
-cmake -S . -B build -G Ninja -DCMAKE_C_COMPILER="C:/Qt/Tools/mingw1310_64/bin/gcc.exe" -DCMAKE_CXX_COMPILER="C:/Qt/Tools/mingw1310_64/bin/g++.exe" -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER="C:/Qt/Tools/mingw1310_64/bin/g++.exe" -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 cmake --build build
 ```
 
