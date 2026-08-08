@@ -16,9 +16,12 @@ namespace coeur {
 
 namespace {
 
+#ifdef AVEC_NGSPICE
+// Les rappels de ngspice ne reçoivent pas de contexte : la liste d'erreurs
+// passe donc par une variable de fichier. Sans ngspice, elle n'aurait aucun
+// usage et le compilateur le signalerait.
 std::vector<std::string>* g_erreurs = nullptr;
 
-#ifdef AVEC_NGSPICE
 int cb_sortie(char* message, int, void*) {
     if (message && g_erreurs) {
         std::string texte(message);

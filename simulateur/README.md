@@ -233,9 +233,13 @@ La description SourceForge de la bonne archive dit « shared ngspice dll,
 dossier qu'on désigne à CMake :
 
 ```powershell
-cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" ^
-      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 ```
+
+Sur une seule ligne : dans PowerShell, la continuation de ligne est l'accent
+grave `` ` ``, pas le `^` de l'invite de commandes. Un `^` en fin de ligne y
+est pris pour un argument, et la ligne suivante pour une commande à part —
+CMake se configure alors sans ce qu'on croyait lui donner.
 
 Au lancement, `ngspice.dll` **et** `libomp140.x86_64.dll` (livrée à côté)
 doivent être trouvables : le plus simple est de les copier près de
@@ -251,21 +255,26 @@ soit la DLL officielle (`-DNGSPICE_ROOT=C:/Spice64_dll`, l'éditeur de liens de
 MinGW s'attache directement à un `.dll`), soit le paquet MSYS2 :
 
 ```powershell
-:: dans MSYS2 : pacman -S mingw-w64-ucrt-x86_64-ngspice
-cmake -S . -B build -G "MinGW Makefiles" ^
-      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64;C:/msys64/ucrt64"
+cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
 cmake --build build
 ```
 
-Ajoutez `C:\Qt\6.11.1\mingw_64\bin` et `C:\msys64\ucrt64\bin` au `PATH`
-avant de lancer l'exécutable, sinon Windows ne trouvera pas les DLL.
+Ajoutez `C:\Qt\6.11.1\mingw_64\bin` au `PATH` avant de lancer l'exécutable,
+et copiez `ngspice.dll` et `libomp140.x86_64.dll` à côté de `simulateur.exe` :
+sinon Windows ne trouvera pas les DLL et l'application ne démarrera pas.
+
+Un mot sur le compilateur : Qt livre le sien dans `C:\Qt\Tools\mingw*\bin`.
+C'est celui avec lequel votre Qt a été construit, donc celui qui évite toute
+mauvaise surprise à l'édition de liens. Un autre MinGW (WinLibs, w64devkit)
+fonctionne généralement, mais si vous voyez des erreurs de symboles C++
+introuvables au moment de lier, mettez celui de Qt en tête du `PATH` et
+recommencez dans un dossier `build` vide.
 
 **Qt MSVC** — l'archive `ngspice-46_dll_64.7z` contient déjà la bibliothèque
 d'import Microsoft (`lib/lib-vs/ngspice.lib`) : rien à fabriquer.
 
 ```powershell
-cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" ^
-      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
+cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
 cmake --build build --config Release
 ```
 

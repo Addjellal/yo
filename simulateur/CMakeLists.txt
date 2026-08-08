@@ -30,12 +30,26 @@ find_path(NGSPICE_INCLUDE_DIR ngspice/sharedspice.h
 # L'ordre compte : bibliothèque d'import Visual Studio si elle est là, sinon
 # la DLL elle-même — l'éditeur de liens de MinGW sait s'y attacher directement.
 find_library(NGSPICE_LIBRARY
-             NAMES ngspice ngspice.lib ngspice.dll libngspice-0.dll
+             NAMES ngspice
              HINTS ${NGSPICE_ROOT}
                    ${NGSPICE_ROOT}/lib/lib-vs
                    ${NGSPICE_ROOT}/lib
                    ${NGSPICE_ROOT}/dll-vs
                    ${NGSPICE_ROOT}/bin)
+
+# La distribution Windows officielle ne livre ni « libngspice.dll.a » ni
+# « ngspice.a » : find_library, qui raisonne par préfixe et suffixe, passe donc
+# à côté. On désigne alors le fichier par son nom exact — l'éditeur de liens
+# de MinGW comme celui de Visual Studio savent s'attacher à l'un ou à l'autre.
+if(NOT NGSPICE_LIBRARY)
+  find_file(NGSPICE_LIBRARY
+            NAMES ngspice.lib ngspice.dll libngspice-0.dll
+            HINTS ${NGSPICE_ROOT}
+                  ${NGSPICE_ROOT}/lib/lib-vs
+                  ${NGSPICE_ROOT}/dll-vs
+                  ${NGSPICE_ROOT}/bin
+            NO_DEFAULT_PATH)
+endif()
 find_path(SIMAVR_INCLUDE_DIR simavr/sim_avr.h)
 find_library(SIMAVR_LIBRARY NAMES simavr)
 find_library(ELF_LIBRARY NAMES elf)
