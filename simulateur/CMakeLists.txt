@@ -68,13 +68,23 @@ find_path(SIMAVR_INCLUDE_DIR simavr/sim_avr.h)
 find_library(SIMAVR_LIBRARY NAMES simavr)
 find_library(ELF_LIBRARY NAMES elf)
 
+# Un paquet portable ne doit rien traîner d'autre que lui-même : cette
+# option ignore ngspice et simavr même s'ils sont installés sur la machine de
+# compilation, pour que l'exécutable produit ne dépende que de Qt.
+option(SIM_AUTONOME "Ignorer ngspice et simavr (paquet portable)" OFF)
+
 set(MOTEUR_NGSPICE OFF)
-if(NGSPICE_INCLUDE_DIR AND NGSPICE_LIBRARY)
+if(NGSPICE_INCLUDE_DIR AND NGSPICE_LIBRARY AND NOT SIM_AUTONOME)
   set(MOTEUR_NGSPICE ON)
 endif()
 set(MOTEUR_SIMAVR OFF)
-if(SIMAVR_INCLUDE_DIR AND SIMAVR_LIBRARY AND ELF_LIBRARY)
+if(SIMAVR_INCLUDE_DIR AND SIMAVR_LIBRARY AND ELF_LIBRARY AND NOT SIM_AUTONOME)
   set(MOTEUR_SIMAVR ON)
+endif()
+if(SIM_AUTONOME)
+  message(STATUS
+    "SIM_AUTONOME : ngspice et simavr sont ignorés — l'exécutable ne "
+    "dépendra que de Qt.")
 endif()
 
 message(STATUS "Moteur analogique : solveur intégré (toujours actif)")
@@ -208,6 +218,69 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   set_tests_properties(schema PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
   message(STATUS "Application Qt : activée (Qt ${Qt6_VERSION})")
+
+  # -------------------------------------------------------------------------
+  # Paquet portable : un dossier qu'on décompresse et qu'on lance.
+  #
+  #   cmake --build build --target paquet
+  #
+  # Rien n'est installé sur la machine d'accueil : Qt voyage avec
+  # l'application, et les moteurs de simulation sont déjà dans l'exécutable.
+  # -------------------------------------------------------------------------
+  install(TARGETS simulateur RUNTIME DESTINATION . BUNDLE DESTINATION .)
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/COMPARAISON.md"
+          DESTINATION documentation)
+
+  # Le mot d'accueil du paquet : ce qu'il contient, comment on le lance, et
+  # la seule chose qui reste à installer si l'on veut écrire du C.
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/outils/LISEZ-MOI.txt.in"
+                 "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" @ONLY)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" DESTINATION .)
+
+  # windeployqt vit à côté de qmake ; le dossier des greffons se demande à Qt.
+  get_target_property(QT_QMAKE Qt6::qmake IMPORTED_LOCATION)
+  get_filename_component(QT_DOSSIER_BIN "${QT_QMAKE}" DIRECTORY)
+  find_program(SIM_WINDEPLOYQT NAMES windeployqt windeployqt6
+               HINTS "${QT_DOSSIER_BIN}")
+  execute_process(COMMAND "${QT_QMAKE}" -query QT_INSTALL_PLUGINS
+                  OUTPUT_VARIABLE SIM_QT_PLUGINS
+                  OUTPUT_STRIP_TRAILING_WHITESPACE
+                  ERROR_QUIET)
+
+  install(CODE "set(SIM_EXECUTABLE \"$<TARGET_FILE:simulateur>\")")
+  install(CODE "set(SIM_WINDEPLOYQT \"${SIM_WINDEPLOYQT}\")")
+  install(CODE "set(SIM_QT_PLUGINS \"${SIM_QT_PLUGINS}\")")
+  install(SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/outils/paquet.cmake")
+
+  set(CPACK_PACKAGE_NAME "simulateur-embarque")
+  set(CPACK_PACKAGE_VENDOR "Formation embarquée")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+      "Schéma, simulation analogique et exécution de firmware AVR")
+  set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "simulateur-embarque")
+  set(CPACK_VERBATIM_VARIABLES ON)
+  # Une archive, pas un installateur : le paquet doit pouvoir vivre sur une
+  # clé USB et tourner sans droits d'administration.
+  if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_SYSTEM_NAME "windows-x64")
+  elseif(APPLE)
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_SYSTEM_NAME "macos")
+  else()
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_SYSTEM_NAME "linux-x64")
+  endif()
+  set(CPACK_PACKAGE_FILE_NAME
+      "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}")
+  include(CPack)
+
+  add_custom_target(paquet
+    COMMAND "${CMAKE_CPACK_COMMAND}" --config "${CMAKE_BINARY_DIR}/CPackConfig.cmake"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    DEPENDS simulateur
+    COMMENT "Fabrication du paquet portable")
 else()
   message(STATUS "Application Qt : désactivée (Qt6 introuvable) — le cœur reste compilable")
 endif()

@@ -395,6 +395,55 @@ C'est faisable, mais c'est trois fois plus de manipulations que MSYS2.
 
 ---
 
+## Un paquet portable
+
+Le projet sait produire une archive qui contient tout : l'exécutable, Qt, et
+rien à installer sur la machine d'accueil. Elle se décompresse où l'on veut —
+y compris sur une clé USB — et se lance par un double-clic.
+
+```powershell
+# Windows
+.\outils\paquet.ps1                     # ou : .\outils\paquet.ps1 -Qt "C:\Qt\6.11.1\mingw_64"
+```
+
+```bash
+# Linux
+./outils/paquet.sh
+```
+
+Le résultat s'appelle `simulateur-embarque-<version>-windows-x64.zip` ou
+`…-linux-x64.tar.gz`, dans `build-paquet/`. Il contient l'exécutable, les
+bibliothèques de Qt, les greffons de plate-forme, la documentation et un
+`LISEZ-MOI.txt`.
+
+Deux détails qui font que ça marche :
+
+* **`-DSIM_AUTONOME=ON`**, posé par les deux scripts, fait ignorer ngspice et
+  simavr même s'ils sont installés sur la machine de compilation. Le paquet ne
+  dépend alors que de Qt : les moteurs de simulation sont dans l'exécutable.
+* Le déploiement de Qt est confié à **`windeployqt`** sous Windows (il sait
+  exactement quelles DLL et quels greffons emporter, y compris la
+  bibliothèque d'exécution de MinGW), et sous Linux à
+  `file(GET_RUNTIME_DEPENDENCIES)` qui résout les bibliothèques partagées, en
+  écartant celles qui doivent venir du système (la bibliothèque C, le
+  chargeur, les pilotes graphiques). Un lanceur `simulateur.sh` désigne le
+  dossier `lib`.
+
+Ce que je peux affirmer et ce que je ne peux pas : **le paquet Linux est
+vérifié ici** — 36 Mo compressés, décompressé dans un dossier neuf, lancé
+avec un environnement vidé (`env -i`), il charge bien Qt depuis son propre
+`lib/`, compile le croquis, exécute le firmware et simule le circuit (D13 à
+49,8 % de rapport cyclique, 4,68 V de crête). **Le paquet Windows est écrit
+mais n'a pas pu être exécuté d'ici** : cette machine est sous Linux. La
+mécanique est celle que Qt documente pour ce cas ; si quelque chose accroche,
+le message exact permettra de corriger.
+
+Pour aller au bout, un **installateur** (NSIS via CPack) se rajoute sur la
+même base — mais une archive portable, elle, ne demande aucun droit
+d'administration.
+
+---
+
 ## Organisation du code
 
 ```
@@ -441,7 +490,10 @@ simulateur/
 │       └── schematic/                 bibliothèque à part, donc testable
 ├── outils/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
-│   └── figures_liste.inc            les montages, décrits en données
+│   ├── figures_liste.inc            les montages, décrits en données
+│   ├── paquet.cmake                 déploiement du paquet portable
+│   ├── paquet.ps1 / paquet.sh       « faites-moi une archive qui marche »
+│   └── LISEZ-MOI.txt.in             mot d'accueil livré dans le paquet
 └── tests/
     ├── test_coeur.cpp                250 tests, sans Qt
     └── test_schema.cpp               90 tests, saisie de schéma sans fenêtre
