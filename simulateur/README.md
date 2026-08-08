@@ -213,7 +213,26 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    *Analyses → Réponse en fréquence → Lancer*. La coupure annoncée sous la
    courbe doit tomber vers 1591 Hz.
 
-5. Pour la partie Arduino, en plus :
+5. **Au quotidien, ensuite.** Rien de tout cela n'est à refaire : le dossier
+   `build` garde en mémoire le compilateur et les chemins donnés à CMake, et
+   les DLL déposées à côté de l'exécutable y restent. Après chaque
+   modification récupérée :
+
+   ```powershell
+   git pull
+   cmake --build build
+   .\build\simulateur.exe
+   ```
+
+   Ninja ne recompile que ce qui a changé, et relance CMake tout seul si la
+   recette de compilation a été modifiée. Le script `.\outils\maj.ps1` fait
+   les trois d'un coup.
+
+   Une seule chose annule tout : **effacer le dossier `build`**. Ne le faites
+   que pour changer de compilateur ou de chemin — il faut alors reprendre la
+   commande `cmake` complète, puis `windeployqt` et les DLL de ngspice.
+
+6. Pour la partie Arduino, en plus :
 
    ```bash
    pacman -S --needed mingw-w64-ucrt-x86_64-avr-gcc \
