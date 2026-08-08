@@ -331,7 +331,8 @@ coeur::Netlist SceneSchema::construire_netlist(
 // ---------------------------------------------------------------------------
 void SceneSchema::appliquer_resultats(
     const std::map<std::string, double>& courants,
-    const std::map<std::string, double>& tensions) {
+    const std::map<std::string, double>& tensions,
+    const coeur::Formes* formes) {
     for (ItemComposant* composant : composants()) {
         const coeur::Modele* modele = composant->modele();
         if (!modele || !modele->lumineux) continue;
@@ -375,17 +376,43 @@ void SceneSchema::appliquer_resultats(
         std::transform(reference.begin(), reference.end(), reference.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         auto courant = courants.find(reference);
-        const coeur::Instance* instance = nullptr;
+
         coeur::Instance provisoire;
         provisoire.reference = composant->reference().toStdString();
         provisoire.type = modele->type;
         for (const auto& paire : composant->valeurs)
             provisoire.valeurs[paire.first] = paire.second;
-        instance = &provisoire;
-        composant->definir_mesure(QString::fromStdString(
-            modele->mesure_instrument(
-                *instance, tension_de,
-                courant == courants.end() ? 0.0 : courant->second)));
+        // Les textes portent la position de l'appareil (continu, alternatif) :
+        // les oublier reviendrait à ignorer le réglage de l'utilisateur.
+        for (const auto& paire : composant->textes)
+            provisoire.textes[paire.first] = paire.second;
+
+        coeur::Modele::Lecture lecture;
+        lecture.tension = tension_de;
+        lecture.courant = courant == courants.end() ? 0.0 : courant->second;
+        if (formes && !formes->vide()) {
+            lecture.temps = &formes->temps;
+            auto onde = formes->courants.find(reference);
+            if (onde != formes->courants.end())
+                lecture.forme_courant = &onde->second;
+            lecture.forme_tension =
+                [&](const std::string& nom_borne) -> const std::vector<double>* {
+                for (int k = 0; k < composant->nb_bornes(); ++k) {
+                    if (composant->nom_borne(k).toStdString() != nom_borne)
+                        continue;
+                    if (k >= static_cast<int>(it->second.size())) return nullptr;
+                    std::string noeud = it->second[k];
+                    std::transform(noeud.begin(), noeud.end(), noeud.begin(),
+                                   [](unsigned char c) { return std::tolower(c); });
+                    auto trouve = formes->tensions.find(noeud);
+                    return trouve == formes->tensions.end() ? nullptr
+                                                            : &trouve->second;
+                }
+                return nullptr;
+            };
+        }
+        composant->definir_mesure(
+            QString::fromStdString(modele->mesure_instrument(provisoire, lecture)));
     }
 
     for (ItemFil* fil : fils()) {

@@ -156,13 +156,22 @@ struct Modele {
     std::function<std::string(const Instance&)> lecture;
 
     // Instrument de mesure : ce qu'il affiche ne vient pas d'un état interne
-    // mais du circuit résolu. `tension(borne)` donne le potentiel d'une de
-    // ses bornes, `courant` ce qui le traverse. C'est ce qui distingue un
-    // voltmètre d'un servomoteur : l'un lit, l'autre se souvient.
-    std::function<std::string(
-        const Instance&, const std::function<double(const std::string&)>& tension,
-        double courant)>
-        mesure_instrument;
+    // mais du circuit résolu. C'est ce qui distingue un voltmètre d'un
+    // servomoteur : l'un lit, l'autre se souvient.
+    //
+    // Un multimètre réel ne montre pas la valeur instantanée : en continu il
+    // affiche la moyenne, en alternatif la valeur efficace de la partie
+    // variable. Il lui faut donc l'histoire de la dernière fenêtre, pas
+    // seulement le dernier point — d'où les formes d'onde.
+    struct Lecture {
+        std::function<double(const std::string& borne)> tension;   // instantané
+        double courant = 0;                                        // instantané
+        const std::vector<double>* temps = nullptr;                // peut être nul
+        std::function<const std::vector<double>*(const std::string& borne)>
+            forme_tension;
+        const std::vector<double>* forme_courant = nullptr;
+    };
+    std::function<std::string(const Instance&, const Lecture&)> mesure_instrument;
 
     // Directives .model / sous-circuits à émettre une seule fois.
     std::vector<std::string> directives;

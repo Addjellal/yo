@@ -1977,6 +1977,128 @@ static void test_balayages() {
 }
 
 // ---------------------------------------------------------------------------
+// [16] Multimètres : ce qu'affiche un appareil selon sa position. En continu
+// la moyenne, en alternatif la valeur efficace de la partie variable — c'est
+// ce que font les multimètres virtuels de Multisim et de Proteus, et ce que
+// fait un appareil réel.
+// ---------------------------------------------------------------------------
+static void test_multimetres() {
+    std::printf("\n[16] Multimètres : positions continu et alternatif\n");
+    const coeur::Catalogue& catalogue = coeur::Catalogue::instance();
+    const double pi = 3.14159265358979323846;
+
+    // Sinusoïde de 5 V crête, décalée de 2 V : moyenne 2 V, efficace 3,536 V.
+    std::vector<double> temps, onde;
+    for (int k = 0; k <= 10000; ++k) {
+        const double t = k * 10e-3 / 10000;
+        temps.push_back(t);
+        onde.push_back(2.0 + 5.0 * std::sin(2 * pi * 1000 * t));
+    }
+    std::vector<double> zero(onde.size(), 0.0);
+
+    {   // --- voltmètre
+        const coeur::Modele* modele = catalogue.modele("voltmetre");
+        verifier(modele && modele->mesure_instrument,
+                 "le voltmètre sait lire une forme d'onde");
+        if (!modele || !modele->mesure_instrument) return;
+
+        coeur::Modele::Lecture lecture;
+        lecture.temps = &temps;
+        lecture.tension = [](const std::string&) { return 0.0; };
+        lecture.forme_tension =
+            [&](const std::string& borne) -> const std::vector<double>* {
+            return borne == "+" ? &onde : &zero;
+        };
+
+        coeur::Instance continu;
+        continu.reference = "VM1";
+        continu.type = "voltmetre";
+        continu.textes["mode"] = "continu";
+        const std::string lu_continu = modele->mesure_instrument(continu, lecture);
+        verifier(lu_continu == "2.00 V",
+                 "position continu : la valeur moyenne", lu_continu);
+
+        coeur::Instance alternatif = continu;
+        alternatif.textes["mode"] = "alternatif";
+        const std::string lu_ac = modele->mesure_instrument(alternatif, lecture);
+        verifier(lu_ac == "3.54 V ~",
+                 "position alternatif : la valeur efficace, hors composante "
+                 "continue",
+                 lu_ac);
+
+        // Sans forme d'onde — analyse au point de repos — l'appareil retombe
+        // sur la valeur instantanée plutôt que d'afficher n'importe quoi.
+        coeur::Modele::Lecture ponctuelle;
+        ponctuelle.tension = [](const std::string& borne) {
+            return borne == "+" ? 4.5 : 0.0;
+        };
+        const std::string lu_point =
+            modele->mesure_instrument(continu, ponctuelle);
+        verifier(lu_point == "4.50 V",
+                 "sans relevé transitoire, la valeur instantanée", lu_point);
+    }
+
+    {   // --- ampèremètre
+        const coeur::Modele* modele = catalogue.modele("amperemetre");
+        std::vector<double> courant;
+        for (double valeur : onde) courant.push_back(valeur / 1000.0);
+        coeur::Modele::Lecture lecture;
+        lecture.temps = &temps;
+        lecture.forme_courant = &courant;
+
+        coeur::Instance i;
+        i.reference = "AM1";
+        i.type = "amperemetre";
+        i.textes["mode"] = "continu";
+        const std::string continu = modele->mesure_instrument(i, lecture);
+        verifier(continu == "2.00 mA", "ampèremètre en continu : la moyenne",
+                 continu);
+        i.textes["mode"] = "alternatif";
+        const std::string alternatif = modele->mesure_instrument(i, lecture);
+        verifier(alternatif == "3.54 mA ~",
+                 "ampèremètre en alternatif : la valeur efficace", alternatif);
+    }
+
+    {   // --- ohmmètre : il injecte un courant connu et lit la tension
+        const coeur::Modele* modele = catalogue.modele("ohmmetre");
+        verifier(modele != nullptr, "l'ohmmètre est au catalogue");
+        if (!modele) return;
+        coeur::Modele::Lecture lecture;
+        lecture.tension = [](const std::string& borne) {
+            return borne == "-" ? 1.0 : 0.0;    // 1 V pour 1 mA
+        };
+        coeur::Instance i;
+        i.reference = "OM1";
+        i.type = "ohmmetre";
+        i.valeurs["courant"] = 1e-3;
+        const std::string lu = modele->mesure_instrument(i, lecture);
+        verifier(lu == "1.00 kΩ", "1 V sous 1 mA se lit 1 kΩ", lu);
+
+        // Et il doit produire une vraie source de courant dans le circuit.
+        coeur::Netlist netlist;
+        auto& instance = netlist.ajouter("OM1", "ohmmetre");
+        instance.valeurs["courant"] = 1e-3;
+        netlist.relier("OM1", "+", "A");
+        netlist.relier("OM1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 4700;
+        netlist.relier("R1", "1", "A");
+        netlist.relier("R1", "2", "GND");
+        if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+            coeur::NgspiceEngine moteur;
+            moteur.construire(netlist, {});
+            moteur.resoudre();
+            // 1 mA dans 4,7 kΩ : la borne « - » est à la masse, « + » est
+            // tirée à -4,7 V par la source, ce qui se relit bien en 4,7 kΩ.
+            const double u = std::fabs(moteur.tension("A"));
+            verifier(presque(u, 4.7, 0.05),
+                     "l'ohmmètre injecte réellement son courant d'essai",
+                     f(u) + " V");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2000,6 +2122,7 @@ int main() {
     test_analyses();
     test_documents();
     test_balayages();
+    test_multimetres();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

@@ -42,10 +42,16 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   ACS712.
 - **Simulation couplée** : la LED s'allume avec l'éclat correspondant au
   courant réellement calculé, chaque fil affiche sa tension moyenne.
-- **Instruments posés dans le circuit** : voltmètre et ampèremètre affichent
-  leur mesure sous leur symbole pendant la simulation, et **double-cliquer un
-  appareil ouvre sa propre fenêtre** — valeur en grand, minimum, moyenne,
-  maximum, et un bouton pour suivre ce point à l'oscilloscope, et ils sont modélisés
+- **Multimètres, comme dans Multisim et Proteus** : le voltmètre et
+  l'ampèremètre ont une **position continu / alternatif**. En continu ils
+  affichent la valeur moyenne, en alternatif la valeur efficace de la partie
+  variable — pas la valeur instantanée, qui ne veut rien dire sur un signal.
+  S'ajoute un **ohmmètre**, qui injecte un courant d'essai connu et lit la
+  tension, comme le fait un vrai appareil en position Ω (et comme lui, il ne
+  mesure juste que hors circuit). Les trois affichent leur mesure sous leur
+  symbole, et **double-cliquer un appareil ouvre sa propre fenêtre** — valeur
+  en grand, commutateur de position, minimum, moyenne, maximum, et un bouton
+  pour suivre ce point à l'oscilloscope, et ils sont modélisés
   (10 MΩ, 0,01 Ω) — ils chargent donc le montage, très peu mais réellement.
   Une sonde de tension, elle, ne charge rien : c'est le seul instrument qu'on
   peut greffer n'importe où sans changer le circuit.
@@ -532,7 +538,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**171 tests du cœur**, sans Qt, en quinze sections :
+**180 tests du cœur**, sans Qt, en seize sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -550,9 +556,10 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **33 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **52 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, et le panneau
 d'analyses (Bode, spectre, exports CSV).

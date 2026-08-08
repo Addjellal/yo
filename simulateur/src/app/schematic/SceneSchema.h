@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/Netlist.h"
+#include "core/engines/NgspiceEngine.h"
 
 class ItemComposant;
 class ItemFil;
@@ -63,8 +64,12 @@ public:
     std::vector<ItemFil*> fils() const;
 
     // Applique les résultats d'une résolution : éclat des LED, tension des fils.
+    // `formes` est facultatif : sans lui, les instruments affichent la valeur
+    // instantanée ; avec lui, ils font ce que fait un multimètre — moyenne en
+    // continu, valeur efficace en alternatif.
     void appliquer_resultats(const std::map<std::string, double>& courants,
-                             const std::map<std::string, double>& tensions);
+                             const std::map<std::string, double>& tensions,
+                             const coeur::Formes* formes = nullptr);
     // Reporte sur le schéma l'état interne des composants à mécanique, tel
     // que le moteur de simulation l'a fait évoluer.
     void appliquer_etats(

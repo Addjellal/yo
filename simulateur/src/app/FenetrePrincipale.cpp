@@ -127,7 +127,12 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &MoteurSimulation::resultats, this,
             [this](const std::map<std::string, double>& courants,
                    const std::map<std::string, double>& tensions) {
-                scene_->appliquer_resultats(courants, tensions);
+                // Les formes d'onde de la dernière trame accompagnent les
+                // valeurs instantanées : sans elles, un multimètre ne pourrait
+                // afficher ni moyenne ni valeur efficace.
+                scene_->appliquer_resultats(
+                    courants, tensions,
+                    dernieres_formes_.vide() ? nullptr : &dernieres_formes_);
             });
     connect(moteur_, &MoteurSimulation::octet_serie, this,
             [this](char octet, const QString& carte) {

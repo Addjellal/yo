@@ -1,6 +1,8 @@
 #include "app/panels/FenetreInstrument.h"
 
+#include <QComboBox>
 #include <QFont>
+#include <QHBoxLayout>
 #include <QMap>
 #include <QLabel>
 #include <QPushButton>
@@ -61,7 +63,7 @@ FenetreInstrument::FenetreInstrument(
     setWindowTitle(composant_->reference() + " — "
                    + (modele ? QString::fromStdString(modele->libelle)
                              : QString("instrument")));
-    resize(300, 190);
+    resize(320, 230);
 
     auto* colonne = new QVBoxLayout(this);
     colonne->setContentsMargins(14, 12, 14, 12);
@@ -84,6 +86,35 @@ FenetreInstrument::FenetreInstrument(
     extremes_->setAlignment(Qt::AlignCenter);
     extremes_->setStyleSheet("color: #555;");
     colonne->addWidget(extremes_);
+
+    // Sélecteur de position, quand l'appareil en a un : c'est le commutateur
+    // d'un multimètre, à la même place que sur la face avant d'un vrai.
+    if (modele) {
+        for (const coeur::Propriete& propriete : modele->proprietes) {
+            if (propriete.genre != coeur::Propriete::Genre::Choix) continue;
+            auto* ligne = new QHBoxLayout;
+            ligne->addWidget(new QLabel(
+                QString::fromStdString(propriete.libelle) + " :"));
+            auto* position = new QComboBox;
+            for (const std::string& choix : propriete.choix)
+                position->addItem(QString::fromStdString(choix));
+            const auto actuel = composant_->textes.find(propriete.cle);
+            position->setCurrentText(QString::fromStdString(
+                actuel == composant_->textes.end() ? propriete.defaut_texte
+                                                   : actuel->second));
+            const std::string cle = propriete.cle;
+            connect(position, &QComboBox::currentTextChanged, this,
+                    [this, cle](const QString& valeur) {
+                        composant_->textes[cle] = valeur.toStdString();
+                        premiere_ = true;      // les extrêmes changent de sens
+                        somme_ = 0;
+                        compte_ = 0;
+                    });
+            ligne->addWidget(position, 1);
+            colonne->addLayout(ligne);
+            break;
+        }
+    }
 
     auto* sonder = new QPushButton("Suivre à l'oscilloscope");
     connect(sonder, &QPushButton::clicked, this, [this] {
