@@ -43,6 +43,32 @@ QString abrege(double valeur, const QString& unite = {}) {
     return unite.isEmpty() ? texte : texte + " " + unite;
 }
 
+// Dans une campagne, une seule courbe par passe peut être superposée : on
+// retient celle qui BOUGE le plus d'un bout à l'autre du balayage. C'est
+// celle qui porte l'information — l'entrée, elle, reste plate par
+// construction.
+const coeur::Courbe* courbe_parlante(const coeur::Balayage& balayage,
+                                     const coeur::Courbe* reference) {
+    const coeur::Courbe* meilleure = nullptr;
+    double plus_grande_variation = -1;
+    for (const coeur::Courbe& courbe : balayage.courbes) {
+        if (&courbe == reference) continue;
+        if (courbe.nom.rfind("I(", 0) == 0) continue;
+        if (courbe.valeurs.size() < 2) continue;
+        double mini = courbe.valeurs.front(), maxi = courbe.valeurs.front();
+        for (double valeur : courbe.valeurs) {
+            mini = std::min(mini, valeur);
+            maxi = std::max(maxi, valeur);
+        }
+        const double variation =
+            std::fabs(maxi) > 1e-15 ? (maxi - mini) / std::fabs(maxi) : 0.0;
+        if (variation <= plus_grande_variation) continue;
+        plus_grande_variation = variation;
+        meilleure = &courbe;
+    }
+    return meilleure;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -313,6 +339,8 @@ void PanneauAnalyses::construire() {
     type_->addItem("Réponse en fréquence (.ac)");
     type_->addItem("Spectre du dernier relevé (FFT)");
     type_->addItem("Bruit (.noise)");
+    type_->addItem("Balayage paramétrique (.step)");
+    type_->addItem("Monte-Carlo (tolérances)");
     barre->addWidget(type_);
 
     reglages_ = new QStackedWidget;
@@ -414,6 +442,62 @@ void PanneauAnalyses::construire() {
         ligne->addWidget(harmoniques_);
         reglages_->addWidget(page);
     }
+    {   // --- balayage paramétrique
+        auto* page = new QWidget;
+        auto* ligne = new QHBoxLayout(page);
+        ligne->setContentsMargins(0, 0, 0, 0);
+        composant_pas_ = new QComboBox;
+        composant_pas_->setMinimumWidth(90);
+        ligne->addWidget(composant_pas_);
+        ligne->addWidget(new QLabel("de"));
+        pas_debut_ = new QDoubleSpinBox;
+        pas_debut_->setRange(1e-12, 1e9);
+        pas_debut_->setDecimals(3);
+        pas_debut_->setValue(500);
+        ligne->addWidget(pas_debut_);
+        ligne->addWidget(new QLabel("à"));
+        pas_fin_ = new QDoubleSpinBox;
+        pas_fin_->setRange(1e-12, 1e9);
+        pas_fin_->setDecimals(3);
+        pas_fin_->setValue(4000);
+        ligne->addWidget(pas_fin_);
+        ligne->addWidget(new QLabel("en"));
+        pas_nombre_ = new QSpinBox;
+        pas_nombre_->setRange(2, 20);
+        pas_nombre_->setValue(4);
+        pas_nombre_->setSuffix(" valeurs");
+        ligne->addWidget(pas_nombre_);
+        analyse_repetee_ = new QComboBox;
+        analyse_repetee_->addItem("réponse en fréquence");
+        analyse_repetee_->addItem("balayage continu");
+        ligne->addWidget(analyse_repetee_);
+        reglages_->addWidget(page);
+    }
+    {   // --- Monte-Carlo
+        auto* page = new QWidget;
+        auto* ligne = new QHBoxLayout(page);
+        ligne->setContentsMargins(0, 0, 0, 0);
+        ligne->addWidget(new QLabel("Tolérance"));
+        tolerance_ = new QDoubleSpinBox;
+        tolerance_->setRange(0.1, 50);
+        tolerance_->setDecimals(1);
+        tolerance_->setValue(5);
+        tolerance_->setSuffix(" %");
+        ligne->addWidget(tolerance_);
+        ligne->addWidget(new QLabel("sur"));
+        tirages_ = new QSpinBox;
+        tirages_->setRange(2, 200);
+        tirages_->setValue(20);
+        tirages_->setSuffix(" tirages");
+        ligne->addWidget(tirages_);
+        analyse_repetee_mc_ = new QComboBox;
+        analyse_repetee_mc_->addItem("réponse en fréquence");
+        analyse_repetee_mc_->addItem("balayage continu");
+        ligne->addWidget(analyse_repetee_mc_);
+        ligne->addStretch(1);
+        reglages_->addWidget(page);
+    }
+
     barre->addWidget(reglages_, 1);
 
     auto* lancer = new QPushButton("Lancer l'analyse");
@@ -580,6 +664,43 @@ void PanneauAnalyses::lancer() {
             emit balayage_demande(directive, false);
             break;
         }
+        case 4: {
+            if (composant_pas_->currentText().isEmpty()) {
+                signaler("Aucun composant à faire varier : posez une "
+                         "résistance, un condensateur ou une bobine.");
+                return;
+            }
+            const QStringList morceaux =
+                composant_pas_->currentData().toString().split('.');
+            if (morceaux.size() != 2) return;
+            QVector<double> valeurs;
+            const int nombre = pas_nombre_->value();
+            for (int k = 0; k < nombre; ++k)
+                valeurs.append(pas_debut_->value()
+                               + (pas_fin_->value() - pas_debut_->value()) * k
+                                     / (nombre - 1));
+            bool bode = true;
+            const QString directive = directive_repetee(analyse_repetee_, bode);
+            derniere_directive_ = QString("%1 sur %2 valeurs de %3")
+                                      .arg(directive)
+                                      .arg(nombre)
+                                      .arg(morceaux[0]);
+            emit campagne_demandee(morceaux[0], morceaux[1], valeurs, directive,
+                                   bode);
+            break;
+        }
+        case 5: {
+            bool bode = true;
+            const QString directive =
+                directive_repetee(analyse_repetee_mc_, bode);
+            derniere_directive_ = QString("%1, %2 tirages à ±%3 %")
+                                      .arg(directive)
+                                      .arg(tirages_->value())
+                                      .arg(tolerance_->value());
+            emit monte_carlo_demande(tolerance_->value(), tirages_->value(),
+                                     directive, bode);
+            break;
+        }
         default:
             if (signal_->currentData().toString().isEmpty()) {
                 signaler("Aucun signal relevé : lancez d'abord la simulation.");
@@ -669,6 +790,101 @@ void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
                   .arg(balayage.abscisse.size())
                   .arg(series.size())
               + texte;
+    resume_widget_->setText(resume_.trimmed());
+}
+
+QString PanneauAnalyses::directive_repetee(QComboBox* choix, bool& bode) const {
+    bode = !choix || choix->currentIndex() == 0;
+    if (bode)
+        return QString(".ac dec %1 %2 %3")
+            .arg(points_->value())
+            .arg(f_debut_->value())
+            .arg(f_fin_->value());
+    return QString(".dc %1 %2 %3 %4")
+        .arg(source_->currentText())
+        .arg(debut_->value())
+        .arg(fin_->value())
+        .arg(pas_->value() > 0 ? pas_->value() : 0.1);
+}
+
+void PanneauAnalyses::proposer_composants(const QStringList& composants) {
+    if (!composant_pas_) return;
+    const QString choix = composant_pas_->currentData().toString();
+    composant_pas_->clear();
+    for (const QString& entree : composants) {
+        // « R1.ohms » à l'intérieur, « R1 » à l'écran.
+        composant_pas_->addItem(entree.section('.', 0, 0), entree);
+    }
+    const int garde = composant_pas_->findData(choix);
+    if (garde >= 0) composant_pas_->setCurrentIndex(garde);
+}
+
+void PanneauAnalyses::afficher_campagne(const coeur::Campagne& campagne,
+                                        bool bode, const QString& reference) {
+    derniere_campagne_ = campagne;
+    dernier_balayage_.vider();
+    dernier_spectre_ = {};
+    if (campagne.vide()) {
+        QString message = "La campagne n'a produit aucune passe.";
+        for (const std::string& erreur : campagne.erreurs)
+            message += "\n" + QString::fromStdString(erreur);
+        signaler(message);
+        return;
+    }
+
+    // Une courbe par passe : c'est la superposition qui fait tout l'intérêt,
+    // on ne garde donc qu'un signal — la sortie, ou la première courbe utile.
+    QVector<TraceCourbes::Serie> series;
+    const std::string entree = reference.toLower().toStdString();
+    for (const coeur::Passe& passe : campagne.passes) {
+        const coeur::Courbe* reference_courbe = passe.balayage.courbe(entree);
+        const coeur::Courbe* tracee =
+            courbe_parlante(passe.balayage, reference_courbe);
+        if (!tracee) continue;
+
+        TraceCourbes::Serie serie;
+        serie.nom = QString::fromStdString(passe.etiquette) + "  ("
+                    + QString::fromStdString(tracee->nom) + ")";
+        const std::vector<double> gains =
+            bode ? coeur::gain_decibels(*tracee, reference_courbe)
+                 : tracee->valeurs;
+        for (size_t k = 0; k < passe.balayage.abscisse.size() && k < gains.size();
+             ++k)
+            serie.points.append(QPointF(passe.balayage.abscisse[k], gains[k]));
+        series.append(serie);
+    }
+
+    trace_->definir_axes(bode ? "Fréquence (Hz)" : "Grandeur balayée",
+                         bode ? "Gain (dB)" : "Valeur", "");
+    trace_->definir(series, bode, false);
+
+    resume_ = QString("%1 : %2 passes\n")
+                  .arg(derniere_directive_)
+                  .arg(campagne.passes.size());
+    // Dispersion au milieu du domaine : c'est le chiffre qu'on cherche dans
+    // un Monte-Carlo — de combien le montage peut-il s'écarter ?
+    if (!campagne.passes.empty() && !series.isEmpty()) {
+        const std::vector<double>& abscisses = campagne.passes.front().balayage.abscisse;
+        if (!abscisses.empty()) {
+            const double milieu = abscisses[abscisses.size() / 2];
+            const coeur::Courbe* premiere = courbe_parlante(
+                campagne.passes.front().balayage,
+                campagne.passes.front().balayage.courbe(entree));
+            if (premiere) {
+                const coeur::Dispersion d =
+                    coeur::disperser(campagne, premiere->nom, milieu);
+                if (d.valide)
+                    resume_ += QString("à %1 : de %2 à %3 (moyenne %4, écart-type "
+                                       "%5) sur %6 passes\n")
+                                   .arg(milieu, 0, 'g', 4)
+                                   .arg(d.mini, 0, 'g', 4)
+                                   .arg(d.maxi, 0, 'g', 4)
+                                   .arg(d.moyenne, 0, 'g', 4)
+                                   .arg(d.ecart_type, 0, 'g', 3)
+                                   .arg(d.passes);
+            }
+        }
+    }
     resume_widget_->setText(resume_.trimmed());
 }
 

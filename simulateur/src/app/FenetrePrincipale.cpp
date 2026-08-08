@@ -42,6 +42,7 @@
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "core/analysis/Analyses.h"
+#include "core/analysis/Campagne.h"
 #include "core/export/Documents.h"
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
@@ -305,21 +306,30 @@ void FenetrePrincipale::construire_docks() {
                     analyses_->signaler(erreur);
                     return;
                 }
-                // Le gain d'un Bode n'a de sens que rapporté à l'entrée : on
-                // désigne d'office le nœud attaqué par le générateur.
-                QString reference;
-                for (const coeur::Instance& instance :
-                     moteur_->netlist().instances()) {
-                    const coeur::Modele* modele =
-                        coeur::Catalogue::instance().modele(instance.type);
-                    if (!modele || !modele->generateur) continue;
-                    if (const coeur::Borne* borne = instance.borne("+")) {
-                        reference = QString::fromStdString(borne->noeud);
-                        break;
-                    }
-                }
                 analyses_->afficher_balayage(moteur_->balayage(), bode,
-                                             reference);
+                                             noeud_generateur());
+            });
+    connect(analyses_, &PanneauAnalyses::campagne_demandee, this,
+            [this](const QString& reference, const QString& propriete,
+                   const QVector<double>& valeurs, const QString& directive,
+                   bool bode) {
+                circuit_modifie();
+                std::vector<double> liste(valeurs.begin(), valeurs.end());
+                const coeur::Campagne campagne = coeur::balayer_parametre(
+                    moteur_->netlist(), {}, reference.toStdString(),
+                    propriete.toStdString(), liste, directive.toStdString());
+                analyses_->afficher_campagne(campagne, bode,
+                                             noeud_generateur());
+            });
+    connect(analyses_, &PanneauAnalyses::monte_carlo_demande, this,
+            [this](double tolerance, int tirages, const QString& directive,
+                   bool bode) {
+                circuit_modifie();
+                const coeur::Campagne campagne = coeur::monte_carlo(
+                    moteur_->netlist(), {}, tolerance, tirages,
+                    directive.toStdString());
+                analyses_->afficher_campagne(campagne, bode,
+                                             noeud_generateur());
             });
     connect(analyses_, &PanneauAnalyses::spectre_demande, this,
             [this](const QString& signal, int harmoniques) {
@@ -903,6 +913,17 @@ void FenetrePrincipale::circuit_modifie() {
         // transistor.
         analyses_->proposer_sources(generateurs + resistances
                                     + QStringList{"TEMP"});
+
+        // Composants dont une valeur se prête au balayage paramétrique.
+        QStringList balayables;
+        for (const coeur::Instance& instance : netlist.instances()) {
+            std::string propriete;
+            if (!coeur::valeur_tolerancee(instance.type, propriete)) continue;
+            balayables << QString("%1.%2")
+                              .arg(QString::fromStdString(instance.reference),
+                                   QString::fromStdString(propriete));
+        }
+        analyses_->proposer_composants(balayables);
         analyses_->proposer_signaux(signaux, libelles);
     }
 
@@ -1242,6 +1263,19 @@ void FenetrePrincipale::lancer_analyse(int rang) {
     onglets_->setCurrentWidget(analyses_);
     analyses_->choisir_analyse(rang);
     analyses_->lancer();
+}
+
+// Le gain d'un Bode n'a de sens que rapporté à l'entrée : c'est le nœud
+// attaqué par le générateur, et il sert aussi de référence aux campagnes.
+QString FenetrePrincipale::noeud_generateur() const {
+    for (const coeur::Instance& instance : moteur_->netlist().instances()) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        if (!modele || !modele->generateur) continue;
+        if (const coeur::Borne* borne = instance.borne("+"))
+            return QString::fromStdString(borne->noeud);
+    }
+    return {};
 }
 
 QString FenetrePrincipale::resume_analyse() const {

@@ -103,6 +103,7 @@ add_library(coeur STATIC
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/AvrEngine.cpp
   src/core/analysis/Analyses.cpp
+  src/core/analysis/Campagne.cpp
   src/core/export/Documents.cpp
 )
 target_include_directories(coeur PUBLIC src)

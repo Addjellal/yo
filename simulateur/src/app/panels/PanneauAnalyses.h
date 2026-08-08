@@ -18,6 +18,7 @@
 #include <QWidget>
 
 #include "core/analysis/Analyses.h"
+#include "core/analysis/Campagne.h"
 
 class QComboBox;
 class QDoubleSpinBox;
@@ -84,6 +85,9 @@ public:
     void afficher_balayage(const coeur::Balayage& balayage, bool bode,
                            const QString& reference = {});
     void afficher_spectre(const coeur::Spectre& spectre, const QString& signal);
+    // Campagne : une courbe par passe, superposées. `bode` trace des décibels.
+    void afficher_campagne(const coeur::Campagne& campagne, bool bode,
+                           const QString& reference = {});
     void afficher_mesures(const coeur::Mesures& mesures, const QString& signal);
     void signaler(const QString& message);
 
@@ -97,8 +101,18 @@ public:
     QString resume() const { return resume_; }
     QString csv() const;
 
+    // Composants dont une valeur peut être balayée (R, C, L).
+    void proposer_composants(const QStringList& composants);
+
 signals:
     void balayage_demande(const QString& directive, bool bode);
+    // « .step » : refaire `directive` pour chaque valeur du composant.
+    void campagne_demandee(const QString& reference, const QString& propriete,
+                           const QVector<double>& valeurs,
+                           const QString& directive, bool bode);
+    // Monte-Carlo : tirer les valeurs dans leur tolérance, `tirages` fois.
+    void monte_carlo_demande(double tolerance, int tirages,
+                             const QString& directive, bool bode);
     void spectre_demande(const QString& signal, int harmoniques);
 
 private:
@@ -119,6 +133,15 @@ private:
     // Spectre
     QComboBox* signal_ = nullptr;
     QSpinBox* harmoniques_ = nullptr;
+    // Balayage paramétrique et Monte-Carlo
+    QComboBox* composant_pas_ = nullptr;
+    QDoubleSpinBox* pas_debut_ = nullptr;
+    QDoubleSpinBox* pas_fin_ = nullptr;
+    QSpinBox* pas_nombre_ = nullptr;
+    QComboBox* analyse_repetee_ = nullptr;
+    QDoubleSpinBox* tolerance_ = nullptr;
+    QSpinBox* tirages_ = nullptr;
+    QComboBox* analyse_repetee_mc_ = nullptr;
     // Bruit
     QComboBox* sortie_bruit_ = nullptr;
     QComboBox* source_bruit_ = nullptr;
@@ -132,9 +155,12 @@ private:
     bool source_choisie_ = false;
     bool signal_choisi_ = false;
     coeur::Balayage dernier_balayage_;
+    coeur::Campagne derniere_campagne_;
     coeur::Spectre dernier_spectre_;
 
     void construire();
     // Bornes et unités du balayage continu, ajustées à la grandeur choisie.
     void adapter_bornes(const QString& grandeur);
+    // Directive de l'analyse à répéter dans une campagne.
+    QString directive_repetee(QComboBox* choix, bool& bode) const;
 };

@@ -198,6 +198,9 @@ private:
     // actions de l'application.
     void menu_contextuel(ItemComposant* composant, const QPoint& ecran);
 
+    // Nœud attaqué par le générateur : référence des gains et des campagnes.
+    QString noeud_generateur() const;
+
     void ecrire(const QString& message);
     QString dossier_travail() const;
 };

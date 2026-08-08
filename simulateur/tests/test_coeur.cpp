@@ -17,6 +17,7 @@
 #include "core/Device.h"
 #include "core/Netlist.h"
 #include "core/analysis/Analyses.h"
+#include "core/analysis/Campagne.h"
 #include "core/engines/AvrEngine.h"
 #include "core/engines/NgspiceEngine.h"
 #include "core/export/Documents.h"
@@ -2189,6 +2190,103 @@ static void test_temperature_et_bruit() {
 }
 
 // ---------------------------------------------------------------------------
+// [18] Campagnes : balayage paramétrique et Monte-Carlo.
+// ---------------------------------------------------------------------------
+static coeur::Netlist filtre_rc(double ohms, double farads) {
+    coeur::Netlist netlist;
+    auto& source = netlist.ajouter("GBF1", "generateur_signal");
+    source.textes["forme"] = "sinus";
+    netlist.relier("GBF1", "+", "IN");
+    netlist.relier("GBF1", "-", "GND");
+    auto& r = netlist.ajouter("R1", "resistance");
+    r.valeurs["ohms"] = ohms;
+    netlist.relier("R1", "1", "IN");
+    netlist.relier("R1", "2", "OUT");
+    auto& c = netlist.ajouter("C1", "condensateur");
+    c.valeurs["farads"] = farads;
+    netlist.relier("C1", "1", "OUT");
+    netlist.relier("C1", "2", "GND");
+    return netlist;
+}
+
+static void test_campagnes() {
+    std::printf("\n[18] Balayage paramétrique et Monte-Carlo\n");
+    if (!coeur::NgspiceEngine::compile_avec_ngspice()) {
+        std::printf("  (ngspice absent — section ignorée)\n");
+        return;
+    }
+
+    // --- .step : la coupure d'un RC doit se déplacer comme 1/R
+    {
+        const coeur::Netlist netlist = filtre_rc(1000, 1e-7);
+        const coeur::Campagne campagne = coeur::balayer_parametre(
+            netlist, {}, "R1", "ohms", {500, 1000, 2000},
+            ".ac dec 40 10 1meg");
+        verifier(campagne.passes.size() == 3,
+                 "balayage paramétrique : trois passes",
+                 std::to_string(campagne.passes.size()));
+        if (campagne.passes.size() == 3) {
+            std::vector<double> coupures;
+            for (const coeur::Passe& passe : campagne.passes) {
+                const coeur::Courbe* sortie = passe.balayage.courbe("out");
+                const coeur::Courbe* entree = passe.balayage.courbe("in");
+                coupures.push_back(sortie ? coeur::frequence_coupure(
+                                       passe.balayage, *sortie, entree)
+                                          : 0.0);
+            }
+            // 1/(2 pi R C) : 3183 Hz, 1592 Hz, 796 Hz.
+            verifier(presque(coupures[0], 3183, 80) && presque(coupures[1], 1592, 40)
+                         && presque(coupures[2], 796, 20),
+                     "chaque passe coupe là où la théorie l'annonce",
+                     f(coupures[0], 0) + " / " + f(coupures[1], 0) + " / "
+                         + f(coupures[2], 0) + " Hz");
+            verifier(coupures[0] > coupures[1] && coupures[1] > coupures[2],
+                     "doubler la résistance divise la coupure par deux");
+        }
+    }
+
+    // --- Monte-Carlo : la dispersion doit rester dans la tolérance
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 10;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r1 = netlist.ajouter("R1", "resistance");
+        r1.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "MID");
+        auto& r2 = netlist.ajouter("R2", "resistance");
+        r2.valeurs["ohms"] = 1000;
+        netlist.relier("R2", "1", "MID");
+        netlist.relier("R2", "2", "GND");
+
+        const coeur::Campagne campagne =
+            coeur::monte_carlo(netlist, {}, 5.0, 30, ".dc VGBF1 10 10 1", 7);
+        verifier(campagne.passes.size() == 30, "Monte-Carlo : trente tirages",
+                 std::to_string(campagne.passes.size()));
+        const coeur::Dispersion d = coeur::disperser(campagne, "mid", 10.0);
+        verifier(d.valide && presque(d.moyenne, 5.0, 0.1),
+                 "un pont diviseur reste centré sur 5 V", f(d.moyenne));
+        // Deux résistances à ±5 % font au pire 5 × (1,05/(1,05+0,95)) = 5,25 V.
+        verifier(d.maxi <= 5.30 && d.mini >= 4.70,
+                 "la dispersion reste dans ce que la tolérance autorise",
+                 f(d.mini) + " à " + f(d.maxi) + " V");
+        verifier(d.ecart_type > 0.01,
+                 "et les tirages ne sont pas tous identiques",
+                 f(d.ecart_type, 4));
+
+        // Reproductibilité : même graine, mêmes résultats.
+        const coeur::Campagne bis =
+            coeur::monte_carlo(netlist, {}, 5.0, 30, ".dc VGBF1 10 10 1", 7);
+        const coeur::Dispersion e = coeur::disperser(bis, "mid", 10.0);
+        verifier(presque(d.ecart_type, e.ecart_type, 1e-12),
+                 "à graine égale, le tirage se refait à l'identique");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2214,6 +2312,7 @@ int main() {
     test_balayages();
     test_multimetres();
     test_temperature_et_bruit();
+    test_campagnes();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {
