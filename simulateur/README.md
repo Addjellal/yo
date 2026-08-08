@@ -162,6 +162,10 @@ sous Linux : ces commandes viennent des paquets MSYS2 réellement publiés, mais
 je n'ai pas pu exécuter la compilation moi-même. Si quelque chose accroche,
 le message d'erreur exact est ce qui permettra de corriger cette page.)
 
+Qt 6.11 convient : le projet ne demande que `Qt6::Widgets` et des interfaces
+stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraphe
+« Si Qt est déjà installé » plus bas.
+
 1. Installer [MSYS2](https://www.msys2.org/), puis ouvrir le raccourci
    **« MSYS2 UCRT64 »** — pas « MSYS2 MSYS », c'est l'erreur classique : les
    paquets `mingw-w64-ucrt-x86_64-…` n'y sont pas visibles.
@@ -206,13 +210,31 @@ le message d'erreur exact est ce qui permettra de corriger cette page.)
    n'est pas vérifiée. Sans simavr, tout le reste marche : c'est un simulateur
    analogique complet, sans l'exécution du firmware.
 
-Si vous préférez le Qt officiel (installateur qt.io) et Visual Studio, il faut
-alors récupérer ngspice à part
-(`ngspice-XX_dll_64.zip` sur [SourceForge](https://sourceforge.net/projects/ngspice/files/)),
-poser ses en-têtes et sa bibliothèque quelque part, et l'indiquer à CMake :
+#### Si Qt est déjà installé par l'installateur officiel (qt.io)
+
+Inutile de le réinstaller. Deux cas, selon le compilateur choisi avec Qt.
+
+**Qt MinGW** — c'est le plus simple : ngspice s'emprunte à MSYS2 et se donne à
+CMake. L'interface de ngspice est en **C**, pas en C++ : mélanger sa DLL avec
+un autre compilateur ne pose donc pas de problème d'ABI.
 
 ```powershell
-cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.7.0/msvc2019_64;C:/ngspice"
+:: dans MSYS2 : pacman -S mingw-w64-ucrt-x86_64-ngspice
+cmake -S . -B build -G "MinGW Makefiles" ^
+      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64;C:/msys64/ucrt64"
+cmake --build build
+```
+
+Ajoutez `C:\Qt\6.11.1\mingw_64\bin` et `C:\msys64\ucrt64\bin` au `PATH`
+avant de lancer l'exécutable, sinon Windows ne trouvera pas les DLL.
+
+**Qt MSVC** — il faut alors une bibliothèque d'import Microsoft pour ngspice :
+prendre `ngspice-XX_dll_64.zip` sur
+[SourceForge](https://sourceforge.net/projects/ngspice/files/), et produire le
+`.lib` depuis le `.def` fourni (`lib /def:ngspice.def /machine:x64`).
+
+```powershell
+cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64;C:/ngspice"
 cmake --build build --config Release
 ```
 
