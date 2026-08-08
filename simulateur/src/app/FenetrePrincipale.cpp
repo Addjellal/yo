@@ -24,6 +24,7 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTabWidget>
@@ -96,7 +97,17 @@ FenetrePrincipale::FenetrePrincipale() {
     scene_ = new SceneSchema(this);
     vue_ = new VueSchema(this);
     vue_->setScene(scene_);
-    setCentralWidget(vue_);
+
+    // Deux pages, comme partout ailleurs : la saisie du schéma d'un côté, le
+    // circuit imprimé de l'autre. Chez KiCad ce sont deux applications
+    // (Eeschema et Pcbnew), chez Proteus deux fenêtres (ISIS et ARES) ; la
+    // frontière est la même, et on ne la franchit qu'en demandant le
+    // transfert du schéma vers la carte.
+    pcb_ = new PanneauPcb;
+    pages_ = new QStackedWidget(this);
+    pages_->addWidget(vue_);
+    pages_->addWidget(pcb_);
+    setCentralWidget(pages_);
 
     moteur_ = new MoteurSimulation(this);
 
@@ -241,6 +252,7 @@ void FenetrePrincipale::construire_palette() {
     dock->setWidget(contenu);
     dock->setObjectName("dock_palette");
     addDockWidget(Qt::LeftDockWidgetArea, dock);
+    docks_schema_.push_back(dock);
 }
 
 void FenetrePrincipale::construire_docks() {
@@ -252,6 +264,7 @@ void FenetrePrincipale::construire_docks() {
     dock_proprietes->setObjectName("dock_proprietes");
     dock_proprietes->setWidget(panneau_proprietes_);
     addDockWidget(Qt::RightDockWidgetArea, dock_proprietes);
+    docks_schema_.push_back(dock_proprietes);
 
     // --- programme et console, en onglets
     auto* onglets = new QTabWidget(this);
@@ -300,9 +313,13 @@ void FenetrePrincipale::construire_docks() {
     analyses_ = new PanneauAnalyses;
     onglets->addTab(analyses_, "Analyses");
 
-    pcb_ = new PanneauPcb;
-    onglets->addTab(pcb_, "Circuit imprimé");
+    // La page « circuit imprimé » n'est pas un onglet du bas : elle occupe
+    // toute la fenêtre quand on y va, et se commande depuis sa propre barre.
     connect(pcb_, &PanneauPcb::journal, this, &FenetrePrincipale::ecrire);
+    connect(pcb_, &PanneauPcb::mise_a_jour_demandee, this,
+            &FenetrePrincipale::ouvrir_pcb);
+    connect(pcb_, &PanneauPcb::retour_schema_demande, this,
+            [this] { afficher_page(0); });
     connect(analyses_, &PanneauAnalyses::balayage_demande, this,
             [this](const QString& directive, bool bode) {
                 circuit_modifie();
@@ -368,6 +385,7 @@ void FenetrePrincipale::construire_docks() {
     dock_bas->setObjectName("dock_bas");
     dock_bas->setWidget(onglets);
     addDockWidget(Qt::BottomDockWidgetArea, dock_bas);
+    docks_schema_.push_back(dock_bas);
     resizeDocks({dock_bas}, {300}, Qt::Vertical);
 }
 
@@ -438,6 +456,34 @@ void FenetrePrincipale::construire_actions() {
     });
 
     auto* outils = menuBar()->addMenu("&Outils");
+    // Sélecteur de page, dans sa propre barre : c'est la seule commande qui
+    // survit au changement de page, puisque c'est elle qui en change.
+    auto* barre_pages = addToolBar("Pages");
+    barre_pages->setObjectName("barre_pages");
+    barre_pages->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    barre_pages->setMovable(false);
+    barre_pages->setStyleSheet(
+        "QToolBar { spacing: 4px; padding: 3px; }"
+        "QToolButton { padding: 4px 12px; border-radius: 4px; }"
+        "QToolButton:hover { background: #e6eef5; }"
+        "QToolButton:checked { background: #cfe0f2; font-weight: bold; }");
+
+    action_page_schema_ = barre_pages->addAction("Schéma");
+    action_page_schema_->setCheckable(true);
+    action_page_schema_->setChecked(true);
+    action_page_schema_->setShortcut(QKeySequence(Qt::ALT | Qt::Key_1));
+    action_page_schema_->setToolTip("Page de saisie du schéma (Alt+1)");
+    action_page_pcb_ = barre_pages->addAction("Circuit imprimé");
+    action_page_pcb_->setCheckable(true);
+    action_page_pcb_->setShortcut(QKeySequence(Qt::ALT | Qt::Key_2));
+    action_page_pcb_->setToolTip("Page de routage de la carte (Alt+2)");
+    auto* groupe_pages = new QActionGroup(this);
+    groupe_pages->addAction(action_page_schema_);
+    groupe_pages->addAction(action_page_pcb_);
+    connect(action_page_schema_, &QAction::triggered, this,
+            [this] { afficher_page(0); });
+    connect(action_page_pcb_, &QAction::triggered, this,
+            [this] { afficher_page(1); });
     auto* barre = addToolBar("Principal");
     barre->setObjectName("barre_principale");
     barre->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -449,6 +495,8 @@ void FenetrePrincipale::construire_actions() {
         "QToolButton { padding: 4px 10px; border-radius: 4px; }"
         "QToolButton:hover { background: #e6eef5; }"
         "QToolButton:checked { background: #d7e6f5; }");
+
+    barre_schema_ = barre;
 
     auto* selection = barre->addAction("Sélection");
     selection->setCheckable(true);
@@ -589,25 +637,17 @@ void FenetrePrincipale::construire_actions() {
     // Le circuit imprimé consomme la netlist du schéma : même composants,
     // mêmes nets, aucune ressaisie.
     auto* pcb = menuBar()->addMenu("&Carte");
-    pcb->addAction("&Générer la carte depuis le schéma", this,
+    pcb->addAction("&Transférer le schéma vers la carte",
+                   QKeySequence(Qt::Key_F8), this,
                    &FenetrePrincipale::ouvrir_pcb);
+    pcb->addSeparator();
+    pcb->addAction(action_page_schema_);
+    pcb->addAction(action_page_pcb_);
+    pcb->addSeparator();
     pcb->addAction("&Contrôler les règles de fabrication", this, [this] {
         if (!pcb_) return;
-        const auto anomalies = pcb_->vue()->carte().controler();
-        if (anomalies.empty()) {
-            ecrire("Règles de fabrication : aucune anomalie.");
-        } else {
-            QString rapport =
-                QString("Règles de fabrication : %1 anomalie(s)\n")
-                    .arg(anomalies.size());
-            for (const auto& anomalie : anomalies)
-                rapport += QString("  %1 (en %2 ; %3 mm)\n")
-                               .arg(QString::fromStdString(anomalie.message))
-                               .arg(anomalie.x, 0, 'f', 1)
-                               .arg(anomalie.y, 0, 'f', 1);
-            ecrire(rapport);
-        }
-        onglets_->setCurrentIndex(1);
+        afficher_page(1);
+        pcb_->controler();
     });
 
     auto* aide = menuBar()->addMenu("&Aide");
@@ -708,12 +748,41 @@ void FenetrePrincipale::refleter_etat() {
 void FenetrePrincipale::ouvrir_pcb() {
     if (!pcb_) return;
     circuit_modifie();
-    pcb_->construire_depuis(moteur_->netlist());
-    onglets_->setCurrentWidget(pcb_);
-    ecrire("Carte générée depuis le schéma : placez les empreintes à la "
-           "souris, puis tirez les pistes d'une pastille à l'autre.");
-    ecrire("Une piste ne se tire qu'entre pastilles d'un même net — le "
-           "chevelu en pointillés montre ce qu'il reste à relier.");
+    // La netlist de la carte inclut les cartes programmables, que la
+    // simulation, elle, confie à l'émulateur.
+    const QString rapport = pcb_->construire_depuis(scene_->netlist_pcb());
+    const bool premier = !carte_transferee_;
+    carte_transferee_ = true;
+    afficher_page(1);
+    ecrire(rapport);
+    if (premier) {
+        ecrire("Le câblage se refait ici : le schéma dit QUI doit être relié "
+               "à qui — c'est le chevelu —, les pistes disent COMMENT.");
+        ecrire("Placez les empreintes à la souris (R les fait tourner), puis "
+               "tirez les pistes d'une pastille à l'autre.");
+    }
+}
+
+void FenetrePrincipale::afficher_page(int page) {
+    if (!pages_) return;
+    page = page > 0 ? 1 : 0;
+    pages_->setCurrentIndex(page);
+    // Les outils du schéma n'ont rien à faire sur la carte : la palette de
+    // composants, les propriétés et le journal appartiennent à la saisie.
+    for (QDockWidget* dock : docks_schema_) dock->setVisible(page == 0);
+    if (barre_schema_) barre_schema_->setVisible(page == 0);
+    if (action_page_schema_) action_page_schema_->setChecked(page == 0);
+    if (action_page_pcb_) action_page_pcb_->setChecked(page == 1);
+    setWindowTitle(page == 0
+                       ? "Simulateur embarqué — schéma et exécution du firmware"
+                       : "Simulateur embarqué — circuit imprimé");
+    if (page == 1 && !carte_transferee_)
+        ecrire("La carte est vide : lancez « Carte ▸ Transférer le schéma vers "
+               "la carte » (F8).");
+}
+
+int FenetrePrincipale::page_courante() const {
+    return pages_ ? pages_->currentIndex() : 0;
 }
 
 // ---------------------------------------------------------------------------

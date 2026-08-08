@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "core/Device.h"
 #include "core/Netlist.h"
 
 namespace coeur {
@@ -30,6 +31,14 @@ struct PastillePosee {
     double x = 0, y = 0;
     double diametre = 1.6;
     double percage = 0.8;     // 0 = montage en surface
+    Pastille::Forme forme = Pastille::Forme::Ronde;
+    double hauteur = 0;       // 0 : pastille de côté `diametre`
+    int numero = 0;           // numéro physique de broche
+    double rotation = 0;      // orientation héritée du composant, en degrés
+
+    // Trou de fixation : il se perce mais ne se soude pas. Ni cuivre, ni net,
+    // ni point de départ pour une piste.
+    bool mecanique() const { return numero == 0 && borne.empty(); }
 };
 
 // Un composant placé : son empreinte, sa position, son orientation.
@@ -41,6 +50,7 @@ struct ComposantPose {
     double rotation = 0;      // en degrés, multiples de 90 en pratique
     double largeur = 0, hauteur = 0;
     std::vector<PastillePosee> pastilles;   // relatives, avant placement
+    std::vector<TraitEmpreinte> serigraphie;   // idem : relative au centre
 };
 
 // Une piste de cuivre, d'un point à un autre, sur une couche.
@@ -85,6 +95,8 @@ public:
     std::string gerber(int couche) const;
     // Contour de la carte, couche mécanique.
     std::string gerber_contour() const;
+    // Sérigraphie de la face composants : les contours blancs et les repères.
+    std::string gerber_serigraphie() const;
     // Perçages, format Excellon.
     std::string excellon() const;
 
@@ -100,6 +112,13 @@ public:
     // extrémités, de proche en proche.
     bool reliees(double x1, double y1, double x2, double y2,
                  const std::string& net) const;
+
+    // Ajuste le contour au placement : une carte se découpe à la taille de ce
+    // qu'elle porte, avec une marge de garde.
+    void ajuster_contour(double marge = 5.0);
 };
+
+// Sérigraphie d'un composant, placée et tournée.
+std::vector<TraitEmpreinte> serigraphie_absolue(const ComposantPose& pose);
 
 }  // namespace coeur

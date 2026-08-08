@@ -8,43 +8,13 @@
 #include <sstream>
 
 #include "core/Device.h"
+#include "core/pcb/Empreintes.h"
 
 namespace coeur {
 
 namespace {
 
-constexpr double kPas = 2.54;    // pas standard, en millimètres
-
-// Empreinte de secours pour un composant qui n'en déclare pas : une rangée de
-// pastilles au pas de 2,54 mm. Mieux vaut une empreinte approximative qu'un
-// composant absent de la carte — on la corrige ensuite dans le catalogue.
-Empreinte empreinte_par_defaut(const Modele& modele) {
-    Empreinte secours;
-    secours.nom = "GENERIQUE_" + std::to_string(modele.bornes.size());
-    const int nombre = static_cast<int>(modele.bornes.size());
-    if (nombre <= 0) return secours;
-    if (nombre <= 3) {
-        for (int k = 0; k < nombre; ++k)
-            secours.pastilles.push_back(
-                {modele.bornes[k].nom, (k - (nombre - 1) / 2.0) * kPas, 0.0,
-                 1.6, 0.8});
-        secours.largeur = nombre * kPas;
-        secours.hauteur = 2.5;
-        return secours;
-    }
-    // Au-delà, un boîtier à deux rangées, comme un DIP.
-    const int par_rangee = (nombre + 1) / 2;
-    for (int k = 0; k < nombre; ++k) {
-        const int rangee = k < par_rangee ? 0 : 1;
-        const int position = rangee == 0 ? k : k - par_rangee;
-        secours.pastilles.push_back({modele.bornes[k].nom,
-                                     (position - (par_rangee - 1) / 2.0) * kPas,
-                                     rangee == 0 ? -3.81 : 3.81, 1.6, 0.8});
-    }
-    secours.largeur = par_rangee * kPas;
-    secours.hauteur = 7.62 + 2.0;
-    return secours;
-}
+constexpr double kPi = 3.14159265358979323846;
 
 double distance_point_segment(double px, double py, double x1, double y1,
                               double x2, double y2) {
@@ -79,21 +49,20 @@ std::string coordonnee(double millimetres) {
 
 CartePcb CartePcb::depuis_netlist(const Netlist& netlist) {
     CartePcb carte;
-    double x = 12.0, y = 12.0;
+    double x = 6.0, y = 6.0;
     double hauteur_rangee = 0;
 
     for (const Instance& instance : netlist.instances()) {
         const Modele* modele = Catalogue::instance().modele(instance.type);
         if (!modele) continue;
-        // Masse et symboles d'alimentation n'existent pas sur une carte.
-        if (!modele->noeud_impose.empty()) continue;
+        // Masse, symboles d'alimentation, voltmètres, sondes : rien de tout
+        // cela n'a d'existence physique sur une carte.
+        if (!empreintes::physique(*modele)) continue;
 
-        const Empreinte& source = modele->empreinte.pastilles.empty()
-                                      ? empreinte_par_defaut(*modele)
-                                      : modele->empreinte;
-        // `empreinte_par_defaut` renvoie un temporaire : on le recopie avant
-        // que la référence ne meure.
-        const Empreinte empreinte = source;
+        // L'empreinte vient de la bibliothèque, pas d'une rangée de trous
+        // déduite du nombre de bornes : c'est ce qui fait la différence entre
+        // une carte et un croquis.
+        const Empreinte empreinte = empreintes::resoudre(*modele);
 
         ComposantPose pose;
         pose.reference = instance.reference;
@@ -101,6 +70,7 @@ CartePcb CartePcb::depuis_netlist(const Netlist& netlist) {
         pose.empreinte = empreinte.nom;
         pose.largeur = empreinte.largeur > 0 ? empreinte.largeur : 5.0;
         pose.hauteur = empreinte.hauteur > 0 ? empreinte.hauteur : 5.0;
+        pose.serigraphie = empreinte.serigraphie;
 
         for (const Pastille& pastille : empreinte.pastilles) {
             PastillePosee posee;
@@ -110,6 +80,9 @@ CartePcb CartePcb::depuis_netlist(const Netlist& netlist) {
             posee.y = pastille.y;
             posee.diametre = pastille.diametre;
             posee.percage = pastille.percage;
+            posee.forme = pastille.forme;
+            posee.hauteur = pastille.hauteur;
+            posee.numero = pastille.numero;
             if (const Borne* borne = instance.borne(pastille.nom))
                 posee.net = borne->noeud;
             pose.pastilles.push_back(posee);
@@ -117,21 +90,70 @@ CartePcb CartePcb::depuis_netlist(const Netlist& netlist) {
 
         // Placement en grille : un point de départ, pas une proposition de
         // routage. On repasse dessus à la main.
-        if (x + pose.largeur > carte.largeur - 10.0) {
-            x = 12.0;
-            y += hauteur_rangee + 8.0;
+        if (x > 6.0 && x + pose.largeur > carte.largeur - 6.0) {
+            x = 6.0;
+            y += hauteur_rangee + 6.0;
             hauteur_rangee = 0;
         }
         pose.x = x + pose.largeur / 2;
         pose.y = y + pose.hauteur / 2;
-        x += pose.largeur + 8.0;
+        x += pose.largeur + 6.0;
         hauteur_rangee = std::max(hauteur_rangee, pose.hauteur);
 
         carte.composants.push_back(std::move(pose));
     }
-    if (y + hauteur_rangee + 12.0 > carte.hauteur)
-        carte.hauteur = y + hauteur_rangee + 12.0;
+    carte.ajuster_contour(6.0);
     return carte;
+}
+
+void CartePcb::ajuster_contour(double marge) {
+    double droite = 0, bas = 0;
+    for (const ComposantPose& pose : composants) {
+        droite = std::max(droite, pose.x + pose.largeur / 2);
+        bas = std::max(bas, pose.y + pose.hauteur / 2);
+    }
+    for (const PastillePosee& pastille : pastilles()) {
+        droite = std::max(droite, pastille.x + pastille.diametre / 2);
+        bas = std::max(bas, pastille.y + pastille.diametre / 2);
+    }
+    // Les pistes comptent aussi : rétrécir la carte sous une piste déjà tirée
+    // la mettrait hors contour sans prévenir.
+    for (const Piste& piste : pistes) {
+        droite = std::max(droite, std::max(piste.x1, piste.x2) + piste.largeur);
+        bas = std::max(bas, std::max(piste.y1, piste.y2) + piste.largeur);
+    }
+    // Une carte se découpe à la taille de ce qu'elle porte : le prix d'un
+    // circuit imprimé se compte au centimètre carré.
+    largeur = std::max(30.0, droite + marge);
+    hauteur = std::max(20.0, bas + marge);
+}
+
+std::vector<TraitEmpreinte> serigraphie_absolue(const ComposantPose& pose) {
+    const double angle = pose.rotation * kPi / 180.0;
+    const double cosinus = std::cos(angle), sinus = std::sin(angle);
+    auto placer = [&](double x, double y) {
+        return std::make_pair(pose.x + x * cosinus - y * sinus,
+                              pose.y + x * sinus + y * cosinus);
+    };
+
+    std::vector<TraitEmpreinte> traits;
+    for (const TraitEmpreinte& trait : pose.serigraphie) {
+        TraitEmpreinte place = trait;
+        if (trait.genre == TraitEmpreinte::Genre::Cercle) {
+            const auto centre = placer(trait.x1, trait.y1);
+            place.x1 = centre.first;
+            place.y1 = centre.second;
+        } else {
+            const auto debut = placer(trait.x1, trait.y1);
+            const auto fin = placer(trait.x2, trait.y2);
+            place.x1 = debut.first;
+            place.y1 = debut.second;
+            place.x2 = fin.first;
+            place.y2 = fin.second;
+        }
+        traits.push_back(place);
+    }
+    return traits;
 }
 
 ComposantPose* CartePcb::trouver(const std::string& reference) {
@@ -150,12 +172,13 @@ void CartePcb::deplacer(const std::string& reference, double x, double y) {
 std::vector<PastillePosee> CartePcb::pastilles() const {
     std::vector<PastillePosee> resultat;
     for (const ComposantPose& pose : composants) {
-        const double angle = pose.rotation * 3.14159265358979323846 / 180.0;
+        const double angle = pose.rotation * kPi / 180.0;
         const double cosinus = std::cos(angle), sinus = std::sin(angle);
         for (const PastillePosee& pastille : pose.pastilles) {
             PastillePosee absolue = pastille;
             absolue.x = pose.x + pastille.x * cosinus - pastille.y * sinus;
             absolue.y = pose.y + pastille.x * sinus + pastille.y * cosinus;
+            absolue.rotation = pose.rotation;
             resultat.push_back(absolue);
         }
     }
@@ -278,6 +301,9 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
         for (size_t b = a + 1; b < toutes.size(); ++b) {
             if (toutes[a].net == toutes[b].net && !toutes[a].net.empty())
                 continue;
+            // Deux pastilles d'un même boîtier sont à leur écartement normalisé
+            // : c'est l'affaire de l'empreinte, pas du contrôle de la carte.
+            if (toutes[a].composant == toutes[b].composant) continue;
             const double marge =
                 std::hypot(toutes[a].x - toutes[b].x, toutes[a].y - toutes[b].y)
                 - (toutes[a].diametre + toutes[b].diametre) / 2;
@@ -303,34 +329,58 @@ std::string CartePcb::gerber(int couche) const {
     flux << "%MOMM*%\n";              // millimètres
     flux << "%LP D*%\n";
 
-    // Une ouverture par diamètre de pastille, une par largeur de piste.
-    std::vector<double> ouvertures;
-    auto rang_ouverture = [&ouvertures](double taille) {
+    // Une ouverture par forme et par taille. Le Gerber ne connaît que trois
+    // formes utiles ici : C ronde, R rectangulaire, O oblongue.
+    struct Ouverture {
+        char forme = 'C';
+        double largeur = 0, hauteur = 0;
+    };
+    std::vector<Ouverture> ouvertures;
+    auto rang_ouverture = [&ouvertures](char forme, double largeur,
+                                        double hauteur) {
         for (size_t k = 0; k < ouvertures.size(); ++k)
-            if (std::fabs(ouvertures[k] - taille) < 1e-9)
+            if (ouvertures[k].forme == forme
+                && std::fabs(ouvertures[k].largeur - largeur) < 1e-9
+                && std::fabs(ouvertures[k].hauteur - hauteur) < 1e-9)
                 return static_cast<int>(k) + 10;
-        ouvertures.push_back(taille);
+        ouvertures.push_back({forme, largeur, hauteur});
         return static_cast<int>(ouvertures.size()) + 9;
     };
     std::ostringstream corps;
     // Pastilles : elles existent sur les deux faces d'un trou traversant.
     for (const PastillePosee& pastille : pastilles()) {
-        const int rang = rang_ouverture(pastille.diametre);
+        if (pastille.mecanique()) continue;   // un trou de fixation n'est pas du cuivre
+        double largeur_pastille = pastille.diametre;
+        double hauteur_pastille =
+            pastille.hauteur > 0 ? pastille.hauteur : pastille.diametre;
+        // Une empreinte tournée d'un quart de tour échange les deux côtés.
+        const int quart = static_cast<int>(std::llround(pastille.rotation / 90.0)) & 3;
+        if (quart % 2) std::swap(largeur_pastille, hauteur_pastille);
+        char forme = 'C';
+        if (pastille.forme == Pastille::Forme::Rectangulaire) forme = 'R';
+        if (pastille.forme == Pastille::Forme::Oblongue) forme = 'O';
+        const int rang =
+            rang_ouverture(forme, largeur_pastille, hauteur_pastille);
         corps << "D" << rang << "*\n";
         corps << "X" << coordonnee(pastille.x) << "Y" << coordonnee(pastille.y)
               << "D03*\n";
     }
     for (const Piste& piste : pistes) {
         if (piste.couche != couche) continue;
-        const int rang = rang_ouverture(piste.largeur);
+        const int rang = rang_ouverture('C', piste.largeur, piste.largeur);
         corps << "D" << rang << "*\n";
         corps << "X" << coordonnee(piste.x1) << "Y" << coordonnee(piste.y1)
               << "D02*\n";
         corps << "X" << coordonnee(piste.x2) << "Y" << coordonnee(piste.y2)
               << "D01*\n";
     }
-    for (size_t k = 0; k < ouvertures.size(); ++k)
-        flux << "%ADD" << (k + 10) << "C," << ouvertures[k] << "*%\n";
+    for (size_t k = 0; k < ouvertures.size(); ++k) {
+        flux << "%ADD" << (k + 10) << ouvertures[k].forme << ","
+             << ouvertures[k].largeur;
+        if (ouvertures[k].forme != 'C')
+            flux << "X" << ouvertures[k].hauteur;
+        flux << "*%\n";
+    }
     flux << "G01*\n" << corps.str() << "M02*\n";
     return flux.str();
 }
@@ -347,6 +397,51 @@ std::string CartePcb::gerber_contour() const {
     for (int k = 1; k < 5; ++k)
         flux << "X" << coordonnee(points[k][0]) << "Y"
              << coordonnee(points[k][1]) << "D01*\n";
+    flux << "M02*\n";
+    return flux.str();
+}
+
+std::string CartePcb::gerber_serigraphie() const {
+    std::ostringstream flux;
+    flux << "G04 Simulateur embarque - serigraphie dessus*\n";
+    flux << "%FSLAX46Y46*%\n%MOMM*%\n%LP D*%\n";
+    flux << "%ADD10C,0.150000*%\nD10*\nG01*\n";
+
+    auto tracer = [&flux](double x1, double y1, double x2, double y2) {
+        flux << "X" << coordonnee(x1) << "Y" << coordonnee(y1) << "D02*\n";
+        flux << "X" << coordonnee(x2) << "Y" << coordonnee(y2) << "D01*\n";
+    };
+
+    for (const ComposantPose& pose : composants) {
+        for (const TraitEmpreinte& trait : serigraphie_absolue(pose)) {
+            switch (trait.genre) {
+                case TraitEmpreinte::Genre::Ligne:
+                    tracer(trait.x1, trait.y1, trait.x2, trait.y2);
+                    break;
+                case TraitEmpreinte::Genre::Rect:
+                    tracer(trait.x1, trait.y1, trait.x2, trait.y1);
+                    tracer(trait.x2, trait.y1, trait.x2, trait.y2);
+                    tracer(trait.x2, trait.y2, trait.x1, trait.y2);
+                    tracer(trait.x1, trait.y2, trait.x1, trait.y1);
+                    break;
+                case TraitEmpreinte::Genre::Cercle: {
+                    // Un cercle approché par vingt-quatre cordes : le rendu du
+                    // fabricant est le même, et le fichier reste lisible.
+                    constexpr int kCotes = 24;
+                    const double rayon = trait.x2;
+                    for (int k = 0; k < kCotes; ++k) {
+                        const double a = 2 * kPi * k / kCotes;
+                        const double b = 2 * kPi * (k + 1) / kCotes;
+                        tracer(trait.x1 + rayon * std::cos(a),
+                               trait.y1 + rayon * std::sin(a),
+                               trait.x1 + rayon * std::cos(b),
+                               trait.y1 + rayon * std::sin(b));
+                    }
+                    break;
+                }
+            }
+        }
+    }
     flux << "M02*\n";
     return flux.str();
 }

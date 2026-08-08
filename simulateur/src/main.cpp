@@ -144,6 +144,8 @@ int main(int argc, char** argv) {
         QTimer::singleShot(300, &application, [&fenetre, dossier] {
             QTextStream sortie(stdout);
             fenetre.ouvrir_pcb();
+            sortie << "page affichee : " << fenetre.page_courante() << Qt::endl;
+            sortie << fenetre.pcb()->rapport() << Qt::endl;
             sortie << fenetre.pcb()->resume() << Qt::endl;
             // Toutes les liaisons routées d'un trait : la vérification porte
             // sur la chaîne complète, pas sur l'adresse du routeur.
@@ -161,6 +163,13 @@ int main(int argc, char** argv) {
                 if (!liaison.routee) ++restantes;
             sortie << "liaisons restantes apres routage : " << restantes
                    << Qt::endl;
+            // Second transfert : il ne doit rien casser. C'est la promesse
+            // d'un « mettre à jour depuis le schéma » — le placement et le
+            // routage déjà faits survivent.
+            fenetre.ouvrir_pcb();
+            sortie << "--- second transfert ---" << Qt::endl
+                   << fenetre.pcb()->rapport() << Qt::endl
+                   << fenetre.pcb()->resume() << Qt::endl;
             for (const QString& nom :
                  fenetre.pcb()->exporter_vers(dossier + "/carte"))
                 sortie << nom << " : "

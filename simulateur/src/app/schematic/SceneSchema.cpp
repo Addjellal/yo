@@ -363,6 +363,29 @@ coeur::Netlist SceneSchema::construire_netlist(
     return netlist;
 }
 
+coeur::Netlist SceneSchema::netlist_pcb() const {
+    coeur::Netlist netlist = construire_netlist(nullptr);
+    const auto noeuds = calculer_noeuds();
+
+    // Une carte programmable ne va pas dans SPICE — elle est émulée — mais
+    // elle occupe une place et des connecteurs sur le circuit imprimé. Sans
+    // elle, la carte routée n'aurait plus rien pour recevoir les fils.
+    for (ItemComposant* composant : composants()) {
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->carte) continue;
+        const std::string reference = composant->reference().toStdString();
+        netlist.ajouter(reference, modele->type);
+        const auto& noms = noeuds.at(composant);
+        for (int k = 0; k < composant->nb_bornes()
+                        && k < static_cast<int>(modele->bornes.size());
+             ++k) {
+            if (noms[k].empty()) continue;
+            netlist.relier(reference, modele->bornes[k].nom, noms[k]);
+        }
+    }
+    return netlist;
+}
+
 // ---------------------------------------------------------------------------
 void SceneSchema::appliquer_resultats(
     const std::map<std::string, double>& courants,

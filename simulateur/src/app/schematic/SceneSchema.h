@@ -78,6 +78,12 @@ public:
     // Construit la netlist du schéma et la liste des broches de carte.
     coeur::Netlist construire_netlist(std::vector<LiaisonBroche>* broches) const;
 
+    // Netlist destinée au circuit imprimé. Elle diffère sur un point : les
+    // cartes programmables en font partie. La simulation les confie à
+    // l'émulateur et les tient hors de SPICE, mais sur une carte elles
+    // existent bel et bien — ce sont leurs connecteurs qu'on y soude.
+    coeur::Netlist netlist_pcb() const;
+
     // Nom du nœud rattaché à une borne (après construction de la netlist).
     // Références des cartes programmables posées, câblées ou non. La liste
     // des broches ne suffit pas : une carte seule sur un schéma vide n'a

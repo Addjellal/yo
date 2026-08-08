@@ -24,6 +24,7 @@
 #include "app/Oscilloscope.h"
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
+#include "app/panels/PanneauPcb.h"
 #include "app/schematic/SceneSchema.h"
 #include "core/Device.h"
 
@@ -841,6 +842,69 @@ static void test_annulation() {
 }
 
 // ---------------------------------------------------------------------------
+// Transfert du schéma vers la carte : ce que promet un « mettre à jour »
+// ---------------------------------------------------------------------------
+static void test_transfert_pcb() {
+    std::printf("\n-- transfert du schéma vers le circuit imprimé --\n");
+
+    SceneSchema atelier;
+    ItemComposant* r = atelier.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* led = atelier.ajouter_composant("led", QPointF(150, 0));
+    ItemComposant* masse = atelier.ajouter_composant("masse", QPointF(300, 0));
+    atelier.addItem(new ItemFil(r, 1, led, 0));
+    atelier.addItem(new ItemFil(led, 1, masse, 0));
+
+    PanneauPcb panneau;
+    const QString premier = panneau.construire_depuis(atelier.construire_netlist(nullptr));
+    verifier(premier.contains("ajoutés") && premier.contains("R1")
+                 && premier.contains("LED1"),
+             "le premier transfert annonce les composants ajoutés");
+    verifier(panneau.vue()->carte().composants.size() == 2,
+             "la masse n'est pas une pièce de la carte",
+             std::to_string(panneau.vue()->carte().composants.size()));
+
+    // Placement à la main, puis une piste : c'est ce travail qui doit
+    // survivre au transfert suivant.
+    panneau.vue()->carte().deplacer("R1", 40, 30);
+    const auto liaisons = panneau.vue()->carte().chevelu();
+    verifier(!liaisons.empty(), "le chevelu montre ce qu'il reste à relier");
+    panneau.vue()->carte().pistes.push_back({liaisons.front().net,
+                                             liaisons.front().x1,
+                                             liaisons.front().y1,
+                                             liaisons.front().x2,
+                                             liaisons.front().y2, 0.4, 0});
+
+    const QString second = panneau.construire_depuis(atelier.construire_netlist(nullptr));
+    verifier(second.contains("déjà à jour"),
+             "un second transfert sans changement ne touche à rien", 
+             second.toStdString());
+    const coeur::ComposantPose* pose = nullptr;
+    for (const auto& candidat : panneau.vue()->carte().composants)
+        if (candidat.reference == "R1") pose = &candidat;
+    verifier(pose && std::fabs(pose->x - 40) < 1e-6
+                 && std::fabs(pose->y - 30) < 1e-6,
+             "le placement fait à la main survit au transfert");
+    verifier(panneau.vue()->carte().pistes.size() == 1,
+             "la piste déjà tirée survit au transfert",
+             std::to_string(panneau.vue()->carte().pistes.size()));
+
+    // On retire la LED du schéma : le transfert doit l'ôter de la carte, et
+    // abandonner les pistes dont le net n'existe plus.
+    atelier.removeItem(led);
+    delete led;
+    const QString troisieme = panneau.construire_depuis(atelier.construire_netlist(nullptr));
+    verifier(troisieme.contains("retirés") && troisieme.contains("LED1"),
+             "retirer un composant du schéma le retire de la carte",
+             troisieme.toStdString());
+    verifier(panneau.vue()->carte().composants.size() == 1,
+             "il ne reste que la résistance",
+             std::to_string(panneau.vue()->carte().composants.size()));
+    verifier(panneau.vue()->carte().pistes.empty(),
+             "et la piste de son net a été abandonnée",
+             std::to_string(panneau.vue()->carte().pistes.size()));
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -859,6 +923,7 @@ int main(int argc, char** argv) {
     test_declenchement();
     test_etiquettes();
     test_annulation();
+    test_transfert_pcb();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

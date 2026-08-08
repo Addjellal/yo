@@ -75,11 +75,22 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Compilation intégrée** : on écrit le programme dans l'application,
   `F5` compile avec `avr-g++` et charge le résultat.
 - **Moniteur série** : ce que le programme envoie sur l'UART s'affiche.
-- **Module de circuit imprimé** : la carte se construit depuis la netlist —
-  mêmes composants, mêmes nets, aucune ressaisie. Empreintes placées à la
-  souris, chevelu qui montre ce qu'il reste à relier, pistes tirées d'une
-  pastille à l'autre sur deux couches, contrôle des règles de fabrication, et
-  export **Gerber RS-274X** + **Excellon**. Le routage reste manuel.
+- **Circuit imprimé, sur sa propre page** : comme Pcbnew est séparé
+  d'Eeschema chez KiCad et ARES d'ISIS chez Proteus, la carte n'est pas un
+  onglet du schéma. On y va par **« Transférer le schéma vers la carte »**
+  (`F8`), qui apporte les composants et les nets, dit ce qui a changé
+  (ajoutés, retirés, empreintes modifiées, pistes abandonnées) et **conserve
+  le placement et le routage déjà faits**. Le câblage, lui, se refait
+  entièrement : le schéma dit *qui* doit être relié à qui — le chevelu —, les
+  pistes disent *comment*.
+  Les empreintes viennent d'une bibliothèque aux cotes normalisées : DIP à
+  deux rangées de 7,62 mm avec broche 1 carrée et détrompeur, résistance
+  axiale à 10,16 mm, TO-92, TO-220, LED à méplat, boîtier CMS, bornier à vis
+  pour ce qui ne se soude pas (moteur, haut-parleur, pile), et le contour
+  réel de l'Arduino Uno avec ses quatre connecteurs et ses trous de fixation.
+  Placement à la souris avec accrochage au quart de pas, rotation, routage
+  deux couches, contrôle des règles de fabrication, et export **Gerber
+  RS-274X** (cuivre, sérigraphie, contour) + **Excellon**.
 - **Moteur numérique événementiel**, le troisième : un 74HC595 cadencé à
   plusieurs centaines de kilohertz réagit aux fronts datés du
   microcontrôleur, et ses sorties redeviennent des sources du circuit
@@ -141,9 +152,8 @@ Autant le dire tout de suite, pour ne pas donner le change :
   périphériques) : il faudrait un moteur de simulation numérique événementiel
   en plus des deux existants. Le noyau Arduino n'a donc ni `Wire`, ni `SPI`,
   ni `Servo`, ni `tone()`, ni bibliothèque tierce.
-- Pas de **routage de circuit imprimé**. L'architecture le prépare — chaque
-  composant porte déjà son empreinte, la netlist est un objet de première
-  classe, et son export au format KiCad existe — mais le module n'existe pas.
+- Pas d'**auto-routeur**, de plans de masse ni de vias : le tracé des pistes
+  reste manuel, sur deux couches.
 - Pas d'**annulation** (`Ctrl+Z`), pas de copier-coller, pas de schéma sur
   plusieurs feuilles, pas d'étiquettes de nœud ni de bus.
 - Pas d'**analyse de Monte-Carlo**, de balayage en température ni d'analyse du
@@ -182,8 +192,8 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 224 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 81 tests, sans fenêtre
+./build/tests_coeur                        # 239 tests, sans Qt
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 90 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
@@ -399,26 +409,38 @@ simulateur/
 │   │   │   ├── instruments.cpp      voltmètre, ampèremètre
 │   │   │   ├── actionneurs_dynamiques.cpp  servo, moteurs, triphasé
 │   │   │   └── capteurs_avances.cpp        accéléromètre, télémètre, codeur
+│   │   ├── analysis/                  balayages, mesures, spectre, campagnes
+│   │   ├── export/                    nomenclature, ERC, netlist KiCad
+│   │   ├── pcb/
+│   │   │   ├── Empreintes.{h,cpp}     bibliothèque de boîtiers aux cotes réelles
+│   │   │   └── Pcb.{h,cpp}            placement, chevelu, DRC, Gerber, Excellon
 │   │   └── engines/
 │   │       ├── noyau_arduino.h        le noyau Arduino, embarqué en texte
 │   │       ├── NgspiceEngine.{h,cpp}  netlist → SPICE → tensions et courants
+│   │       ├── MoteurNumerique.{h,cpp} fronts datés → événements → sources
 │   │       └── AvrEngine.{h,cpp}      firmware → cycles → états de broches
 │   └── app/                         ← tout ce qui dépend de Qt
-│       ├── FenetrePrincipale.{h,cpp}
-│       ├── MoteurSimulation.{h,cpp}   couplage des deux moteurs
+│       ├── FenetrePrincipale.{h,cpp}  les deux pages : schéma et carte
+│       ├── MoteurSimulation.{h,cpp}   couplage des moteurs
 │       ├── Oscilloscope.{h,cpp}       quatre voies, tracé min/max
+│       ├── panels/
+│       │   ├── PanneauAnalyses.{h,cpp}  les six analyses
+│       │   ├── PanneauPcb.{h,cpp}       la page circuit imprimé
+│       │   └── FenetreInstrument.{h,cpp}
 │       └── schematic/                 bibliothèque à part, donc testable
 ├── outils/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   └── figures_liste.inc            les montages, décrits en données
 └── tests/
-    ├── test_coeur.cpp                105 tests, sans Qt
-    └── test_schema.cpp               25 tests, saisie de schéma sans fenêtre
+    ├── test_coeur.cpp                239 tests, sans Qt
+    └── test_schema.cpp               90 tests, saisie de schéma sans fenêtre
 ```
 
-La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt,
-se teste sans écran, et c'est lui que réutilisera le futur module de circuit
-imprimé.
+La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
+et se teste sans écran. Le module de circuit imprimé en est la démonstration —
+placement, chevelu, règles de fabrication et fichiers Gerber sont calculés
+dans `core/pcb`, sans une ligne d'interface, et vérifiés sans ouvrir de
+fenêtre.
 
 ### Ajouter un composant
 
@@ -436,7 +458,7 @@ toucher : ni l'interface, ni les moteurs, ni la palette.
     m.proprietes = {{"ohms", "Valeur", G::Nombre, 220, 0, 0, "", {}, "Ω"}};
     m.symbole = {ligne(-30, 0, -18, 0), rect(-18, -7, 18, 7),
                  ligne(18, 0, 30, 0)};                    // le dessin, en données
-    m.empreinte = {"R_AXIAL_0207", {...}, 12.0, 3.0};     // pour le futur PCB
+    m.empreinte = {"R_AXIAL_0207", {}, 12.0, 3.0};        // le nom du boîtier suffit
     m.vers_spice = [](const Instance& i, const auto& noeud) {
         return std::vector<std::string>{
             "R" + i.reference + " " + noeud("1") + " " + noeud("2") + " "
@@ -553,7 +575,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**224 tests du cœur**, sans Qt, en vingt sections :
+**239 tests du cœur**, sans Qt, en vingt sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -571,19 +593,21 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
-| 20 | **circuit imprimé** : placement depuis la netlist, chevelu, règles de fabrication (isolation, largeur, débordement), Gerber et Excellon conformes |
+| 20 | **circuit imprimé** : placement depuis la netlist, chevelu, règles de fabrication (isolation, largeur, débordement), Gerber et Excellon conformes, cotes des empreintes (DIP à 7,62 mm, résistance à 10,16 mm, broche 1 carrée), brochage réel de l'Uno, transfert schéma → carte qui préserve placement et pistes |
 | 19 | **moteur numérique** : un octet décalé à 1 MHz dans un 74HC595, verrouillé, et ses sorties devenues un circuit analogique valable |
 | 18 | **campagnes** : trois coupures d'un RC confrontées à 1/(2·pi·R·C), et un pont diviseur à ±5 % dont la dispersion reste dans la tolérance |
 | 17 | **température et bruit** : la tension de seuil d'une diode qui baisse avec la chaleur, et le bruit thermique d'une résistance de 10 kΩ confronté à 4kTR (12,9 nV/√Hz) |
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **81 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **90 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, le panneau
 d'analyses (Bode, spectre, exports CSV), le câblage à la souris, le
-déclenchement de l'oscilloscope, les étiquettes de nœud, l'annulation et le
-presse-papiers.
+déclenchement de l'oscilloscope, les étiquettes de nœud, l'annulation, le
+presse-papiers, et le transfert du schéma vers la carte — un second transfert
+ne touche à rien, retirer un composant du schéma le retire de la carte et
+abandonne les pistes de son net.
 
 L'application se vérifie aussi sans intervention :
 
@@ -625,7 +649,15 @@ de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.
 | souris sur la courbe | curseur de lecture ; un clic pose le repère |
 | `F9` | lancer, mettre en pause, reprendre |
 | `Ctrl+1` / `Ctrl+2` | sortir l'oscilloscope ou les analyses dans leur fenêtre |
+| `Alt+1` / `Alt+2` | page schéma / page circuit imprimé |
+| `F8` | transférer le schéma vers la carte |
 | `F5` | compiler le programme et le charger |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | nouveau, ouvrir, enregistrer |
 
 Pour tirer un fil : outil **Fil**, puis cliquer d'une borne à l'autre.
+
+Sur la page **circuit imprimé** : molette pour zoomer, clic milieu pour
+déplacer la vue, `R` fait tourner l'empreinte sous le curseur, `Échap` annule
+le tracé en cours, `Retour arrière` défait la dernière piste. Une piste ne se
+tire qu'entre deux pastilles d'un même net — relier deux nets différents
+serait un court-circuit, pas un oubli.

@@ -22,6 +22,7 @@
 #include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 #include "core/export/Documents.h"
+#include "core/pcb/Empreintes.h"
 #include "core/pcb/Pcb.h"
 
 static int g_ok = 0;
@@ -2484,8 +2485,21 @@ static void test_pcb() {
         verifier(cuivre.find("%FSLAX46Y46*%") != std::string::npos
                      && cuivre.find("%MOMM*%") != std::string::npos,
                  "Gerber : format et unités déclarés");
-        verifier(cuivre.find("%ADD10C,") != std::string::npos,
+        verifier(cuivre.find("%ADD10") != std::string::npos,
                  "Gerber : au moins une ouverture définie");
+        // La broche 1 est carrée sur toutes les empreintes : le Gerber doit
+        // donc déclarer une ouverture rectangulaire, avec ses deux côtés.
+        verifier(cuivre.find("R,") != std::string::npos
+                     && cuivre.find("X", cuivre.find("R,")) != std::string::npos,
+                 "Gerber : ouverture rectangulaire pour la broche 1");
+        verifier(cuivre.find("C,") != std::string::npos,
+                 "Gerber : ouverture ronde pour les autres pastilles");
+
+        const std::string serigraphie = carte.gerber_serigraphie();
+        verifier(serigraphie.find("%MOMM*%") != std::string::npos
+                     && serigraphie.find("D01*") != std::string::npos
+                     && serigraphie.rfind("M02*") != std::string::npos,
+                 "Gerber : la sérigraphie est un fichier valide et non vide");
         verifier(cuivre.find("D03*") != std::string::npos,
                  "Gerber : les pastilles sont flashées");
         verifier(cuivre.find("D01*") != std::string::npos,
@@ -2508,6 +2522,73 @@ static void test_pcb() {
             ++coordonnees;
         verifier(coordonnees == 4, "Excellon : un perçage par pastille",
                  std::to_string(coordonnees));
+    }
+
+    // --- empreintes : les cotes normalisées des boîtiers
+    {
+        using namespace coeur::empreintes;
+
+        const coeur::Empreinte boitier = dip(16);
+        verifier(boitier.pastilles.size() == 16, "DIP-16 : seize broches",
+                 std::to_string(boitier.pastilles.size()));
+        // Deux rangées écartées de 7,62 mm, pas de 2,54 mm : les cotes du
+        // boîtier réel, celles que le composant impose au perçage.
+        double haut = 0, bas = 0;
+        for (const coeur::Pastille& pastille : boitier.pastilles) {
+            haut = std::min(haut, pastille.y);
+            bas = std::max(bas, pastille.y);
+        }
+        verifier(std::fabs((bas - haut) - 7.62) < 1e-6,
+                 "DIP-16 : rangées écartées de 7,62 mm", f(bas - haut));
+        const coeur::Pastille* une = &boitier.pastilles[0];
+        const coeur::Pastille* deux = &boitier.pastilles[1];
+        verifier(std::fabs((deux->x - une->x) - 2.54) < 1e-6,
+                 "DIP-16 : pas de 2,54 mm", f(deux->x - une->x));
+        verifier(une->numero == 1
+                     && une->forme == coeur::Pastille::Forme::Rectangulaire,
+                 "DIP-16 : la broche 1 est carrée");
+        verifier(deux->forme == coeur::Pastille::Forme::Ronde,
+                 "DIP-16 : les autres sont rondes");
+        verifier(!boitier.serigraphie.empty(),
+                 "DIP-16 : le corps est sérigraphié");
+        // La broche 16 fait face à la broche 1 : c'est la numérotation en U.
+        const coeur::Pastille& seize = boitier.pastilles.back();
+        verifier(seize.numero == 16 && std::fabs(seize.x - une->x) < 1e-6
+                     && std::fabs(seize.y + une->y) < 1e-6,
+                 "DIP-16 : la broche 16 fait face à la broche 1");
+
+        const coeur::Empreinte resistance =
+            resoudre(*coeur::Catalogue::instance().modele("resistance"));
+        verifier(resistance.pastilles.size() == 2
+                     && std::fabs(std::fabs(resistance.pastilles[1].x
+                                            - resistance.pastilles[0].x)
+                                  - 10.16)
+                            < 1e-6,
+                 "résistance : trous à 10,16 mm, le pas d'un boîtier 0207");
+
+        // Carte Arduino : les broches portent leur vrai nom, et les quatre
+        // trous de fixation ne sont pas des broches.
+        const coeur::Empreinte uno =
+            resoudre(*coeur::Catalogue::instance().modele("arduino_uno"));
+        int nommees = 0, fixations = 0;
+        bool d13 = false, a0 = false;
+        for (const coeur::Pastille& pastille : uno.pastilles) {
+            if (pastille.numero == 0 && pastille.nom.empty()) ++fixations;
+            if (!pastille.nom.empty()) ++nommees;
+            if (pastille.nom == "D13") d13 = true;
+            if (pastille.nom == "A0") a0 = true;
+        }
+        verifier(fixations == 4, "Uno : quatre trous de fixation",
+                 std::to_string(fixations));
+        verifier(d13 && a0 && nommees >= 28,
+                 "Uno : les connecteurs portent le brochage réel",
+                 std::to_string(nommees) + " broches nommées");
+
+        // Un voltmètre est un instrument de mesure, pas une pièce à souder.
+        verifier(!physique(*coeur::Catalogue::instance().modele("voltmetre")),
+                 "un voltmètre ne va pas sur la carte");
+        verifier(physique(*coeur::Catalogue::instance().modele("resistance")),
+                 "une résistance, si");
     }
 
     // --- déplacement : les pastilles suivent le composant

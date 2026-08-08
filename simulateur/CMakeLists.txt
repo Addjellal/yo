@@ -108,6 +108,7 @@ add_library(coeur STATIC
   src/core/analysis/Campagne.cpp
   src/core/export/Documents.cpp
   src/core/pcb/Pcb.cpp
+  src/core/pcb/Empreintes.cpp
 )
 target_include_directories(coeur PUBLIC src)
 

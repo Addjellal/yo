@@ -4,8 +4,9 @@
 // DEUX représentations distinctes, dès maintenant.
 //   * le SYMBOLE   : ce qu'on dessine sur le schéma (et ses bornes) ;
 //   * l'EMPREINTE  : ce qu'on posera sur le circuit imprimé (pastilles).
-// Le futur module PCB n'aura donc rien à casser : la place est déjà prévue,
-// et la netlist fait le lien entre les deux (comme dans KiCad).
+// Le module PCB consomme cette préparation : la netlist fait le lien entre
+// les deux (comme dans KiCad), et le nom de l'empreinte déclaré ici désigne
+// un gabarit de la bibliothèque `core/pcb/Empreintes`.
 //
 // Ajouter un composant = décrire un Modele et l'enregistrer. Rien d'autre.
 #pragma once
@@ -46,19 +47,52 @@ struct TraitSymbole {
     bool rempli = false;
 };
 
-// Empreinte : réservée au module PCB. Vide pour l'instant sur la plupart
-// des modèles, mais le champ existe pour ne pas avoir à tout reprendre.
+// Empreinte : ce qu'on pose sur le circuit imprimé. Le modèle nomme son
+// boîtier ; la bibliothèque d'empreintes le dessine aux cotes normalisées.
 struct Pastille {
     std::string nom;          // doit correspondre au nom d'une borne
     double x = 0, y = 0;      // en millimètres
     double diametre = 1.6;
     double percage = 0.8;     // 0 = composant monté en surface
+
+    // Ce qui suit distingue une empreinte crédible d'une rangée de ronds.
+    // Sur une vraie carte, la broche 1 est carrée — c'est le repère qu'on
+    // cherche des yeux quand on soude —, une pastille de connecteur est
+    // souvent oblongue, et le numéro de broche est sérigraphié.
+    enum class Forme { Ronde, Rectangulaire, Oblongue };
+    Forme forme = Forme::Ronde;
+    double hauteur = 0;       // 0 : pastille de côté `diametre`
+    int numero = 0;           // numéro physique ; 0 = non numérotée
+
+    Pastille() = default;
+    Pastille(std::string nom_, double x_, double y_, double diametre_,
+             double percage_)
+        : nom(std::move(nom_)), x(x_), y(y_), diametre(diametre_),
+          percage(percage_) {}
+};
+
+// Trait de sérigraphie : le dessin blanc imprimé sur le vernis, qui montre
+// où pose le corps du composant. En millimètres, relatif au centre.
+struct TraitEmpreinte {
+    enum class Genre { Ligne, Cercle, Rect };
+    Genre genre = Genre::Ligne;
+    double x1 = 0, y1 = 0;    // Cercle : centre
+    double x2 = 0, y2 = 0;    // Cercle : x2 = rayon
 };
 
 struct Empreinte {
     std::string nom;                    // "R_AXIAL_0207", "LED_5MM"…
     std::vector<Pastille> pastilles;
     double largeur = 0, hauteur = 0;    // encombrement, en millimètres
+    std::vector<TraitEmpreinte> serigraphie;
+
+    Empreinte() = default;
+    Empreinte(std::string nom_, std::vector<Pastille> pastilles_,
+              double largeur_, double hauteur_,
+              std::vector<TraitEmpreinte> serigraphie_ = {})
+        : nom(std::move(nom_)), pastilles(std::move(pastilles_)),
+          largeur(largeur_), hauteur(hauteur_),
+          serigraphie(std::move(serigraphie_)) {}
 };
 
 // --- description d'une propriété réglable ---------------------------------
@@ -140,7 +174,7 @@ struct Modele {
     std::vector<BorneSymbole> bornes;
     std::vector<Propriete> proprietes;
     std::vector<TraitSymbole> symbole;  // tracé ; si vide, un cadre est dessiné
-    Empreinte empreinte;                // pour le futur module PCB
+    Empreinte empreinte;                // nom du boîtier, pour la carte
 
     // Composant qui s'allume : l'interface teinte son corps selon le courant
     // calculé par ngspice (LED, lampe, afficheur…).

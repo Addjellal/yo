@@ -23,6 +23,9 @@ class QFormLayout;
 class QWidget;
 class QTabWidget;
 class QComboBox;
+class QStackedWidget;
+class QDockWidget;
+class QToolBar;
 
 class ItemComposant;
 class SceneSchema;
@@ -116,8 +119,14 @@ public:
     Oscilloscope* oscilloscope() const { return oscilloscope_; }
     PanneauAnalyses* analyses() const { return analyses_; }
     PanneauPcb* pcb() const { return pcb_; }
-    // Construit la carte depuis le schéma courant et montre l'onglet.
+    // Transfère le schéma vers la carte et bascule sur la page « circuit
+    // imprimé ». C'est l'équivalent du « Update PCB from Schematic » de
+    // KiCad ou du « Netlist to ARES » de Proteus : une étape demandée, pas un
+    // effet de bord de la saisie.
     void ouvrir_pcb();
+    // Bascule entre les deux pages : 0 le schéma, 1 le circuit imprimé.
+    void afficher_page(int page);
+    int page_courante() const;
 
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
@@ -167,6 +176,15 @@ private:
     // mesures, comme un oscilloscope analyse ce qu'il vient d'acquérir.
     coeur::Formes dernieres_formes_;
     QTabWidget* onglets_ = nullptr;
+    // Les deux pages de l'application : saisie du schéma, puis carte. Les
+    // outils du schéma (palette, propriétés, onglets du bas) n'ont rien à
+    // faire sur la carte, et disparaissent avec elle.
+    QStackedWidget* pages_ = nullptr;
+    QToolBar* barre_schema_ = nullptr;
+    QAction* action_page_schema_ = nullptr;
+    QAction* action_page_pcb_ = nullptr;
+    std::vector<QDockWidget*> docks_schema_;
+    bool carte_transferee_ = false;
     // Panneaux sortis dans leur propre fenêtre : titre et rang d'origine,
     // pour savoir où les remettre à la fermeture.
     struct PanneauDetache { QString titre; int rang = 0; };

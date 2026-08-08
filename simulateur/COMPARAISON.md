@@ -79,7 +79,7 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | **Netlist au format KiCad** (vers le routage) | KiCad | ✅ |
 | Relevés de courbes en CSV | LTspice | ✅ |
 | Schéma en PDF vectoriel / PNG | tous | ✅ |
-| Fichiers Gerber, perçage, placement | KiCad | ❌ (pas de module PCB) |
+| Fichiers Gerber, perçage, placement | KiCad | ✅ cuivre, sérigraphie, contour, Excellon |
 
 Les règles vérifiées par l'ERC : absence de masse, référence en double, borne
 non connectée, nœud ne reliant qu'une borne, source court-circuitée, deux
@@ -90,18 +90,26 @@ série, broche de microcontrôleur reliée directement à une alimentation.
 
 | Fonction | Chez les autres | Ici |
 |---|---|---|
-| Empreinte attachée à chaque composant | KiCad | ✅ le champ existe et est rempli |
+| **Page séparée du schéma** | KiCad (Pcbnew), Proteus (ARES), Altium | ✅ page à part entière, pas un onglet |
+| **Transfert explicite schéma → carte** | KiCad « Update PCB from Schematic », Proteus « Netlist to ARES » | ✅ `F8`, avec compte rendu |
+| Mise à jour qui préserve placement et pistes | KiCad, Altium | ✅ vérifié par test |
+| Empreinte attachée à chaque composant | KiCad | ✅ bibliothèque aux cotes normalisées |
+| Bibliothèque d'empreintes (DIP, axial, radial, TO, CMS, bornier) | KiCad | ✅ dessinées, pas déduites |
+| Brochage réel d'une carte (Arduino Uno) | Proteus, KiCad | ✅ quatre connecteurs, trous de fixation |
+| Sérigraphie, broche 1 repérée, détrompeur | tous | ✅ |
 | Netlist exportable vers un routeur | KiCad | ✅ |
-| Placement des empreintes à la souris | KiCad, Altium | ✅ |
+| Placement des empreintes à la souris | KiCad, Altium | ✅ accrochage au quart de pas, rotation |
 | Chevelu (liaisons restant à router) | KiCad, Altium | ✅ |
 | Routage manuel, deux couches | KiCad, Altium | ✅ |
 | Contrôle des règles de fabrication (DRC) | KiCad, Altium | ✅ isolation, largeur, débordement |
-| **Fichiers Gerber et Excellon** | KiCad | ✅ RS-274X et Excellon métrique |
+| **Fichiers Gerber et Excellon** | KiCad | ✅ cuivre, sérigraphie, contour, perçages |
 | Auto-routeur, plans de masse, vias, vue 3D | KiCad, Altium | ❌ |
 
-La brique existe désormais. Ce qui manque encore est du confort de routage —
-auto-routeur, plans de masse, vias — pas la chaîne elle-même : d'un schéma on
-tire aujourd'hui des fichiers qu'un fabricant accepte.
+La chaîne complète existe désormais, et elle est organisée comme ailleurs :
+**deux pages, un transfert explicite entre elles**. Le schéma dit qui doit
+être relié à qui, la carte dit comment — et le câblage s'y refait entièrement,
+comme dans tout atelier. Ce qui manque encore est du confort de routage —
+auto-routeur, plans de masse, vias.
 
 ---
 
@@ -114,8 +122,8 @@ la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur SPICE, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 224 tests du
-cœur et 81 tests de saisie, dont beaucoup comparent le résultat à une valeur
+C'est aussi un projet dont **chaque affirmation est vérifiée** : 239 tests du
+cœur et 90 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
 un signal carré.
@@ -127,8 +135,8 @@ un signal carré.
 1. **Modèles de périphériques à protocole** — écran I²C, carte SD en SPI,
    DHT22 en une-fil. Le moteur événementiel qui leur manquait existe
    maintenant ; ce sont les modèles qui restent à écrire, un par composant.
-2. **Confort de routage** : auto-routeur, plans de masse, vias, empreintes
-   dessinées pour chaque composant du catalogue plutôt que déduites.
+2. **Confort de routage** : auto-routeur, plans de masse, vias, et pistes en
+   équerre plutôt qu'en diagonale.
 3. **Bus et feuilles multiples**, pour les schémas qui ne tiennent plus sur
    une page.
 4. **Autre cœur que l'AVR** (STM32) : un second émulateur et toute la couche
