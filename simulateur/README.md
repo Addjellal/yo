@@ -60,7 +60,11 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 - **Commande unique** façon atelier de calcul : le même bouton lance, met en
   pause et reprend (F9) ; un second arrête et remet les microcontrôleurs à
   zéro. La barre d'état dit en permanence où en est la simulation.
-- **Oscilloscope quatre voies** : formes d'onde réelles issues de l'analyse
+- **Oscilloscope quatre voies avec déclenchement et curseurs** : mode auto,
+  normal ou sans, voie et front au choix, niveau réglable — ou automatique,
+  calé sur le milieu du signal. Le front se place au cinquième de l'écran,
+  laissant voir ce qui l'a précédé. Deux curseurs donnent Δt, ΔV et la
+  fréquence correspondante. Formes d'onde réelles issues de l'analyse
   transitoire — tension d'un nœud ou courant d'un composant, base de temps de
   2 ms à 5 s, mesures moyenne et crête, gel de l'écran. Les voies se règlent
   seules au premier lancement.
@@ -559,7 +563,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **52 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **59 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, et le panneau
 d'analyses (Bode, spectre, exports CSV).
@@ -600,6 +604,7 @@ de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.
 | clic gauche sur un composant | le sélectionner |
 | double-clic sur un instrument | ouvrir sa fenêtre de mesure |
 | clic droit | menu des options du composant |
+| souris sur la courbe | curseur de lecture ; un clic pose le repère |
 | `F9` | lancer, mettre en pause, reprendre |
 | `Ctrl+1` / `Ctrl+2` | sortir l'oscilloscope ou les analyses dans leur fenêtre |
 | `F5` | compiler le programme et le charger |

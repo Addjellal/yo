@@ -59,8 +59,9 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | Voltmètre, ampèremètre posés sur le schéma | Proteus | ✅ |
 | Multimètre à positions continu / alternatif (moyenne / valeur efficace) | Multisim, Proteus | ✅ |
 | Ohmmètre à courant d'essai | Multisim | ✅ |
-| Déclenchement de l'oscilloscope (front, niveau) | Multisim, Proteus | ❌ |
-| Curseurs de mesure sur la courbe, mode XY | Multisim | ❌ |
+| Déclenchement de l'oscilloscope (front, niveau, auto/normal) | Multisim, Proteus | ✅ avec niveau automatique et pré-déclenchement |
+| Curseurs de mesure sur la courbe (Δt, ΔV, fréquence) | Multisim | ✅ |
+| Mode XY (Lissajous), décalage vertical par voie, couplage AC | Multisim | ❌ |
 | Analyseur logique, terminal I²C/SPI | Proteus | ❌ |
 
 ## 4. Documents produits
@@ -105,7 +106,7 @@ freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur SPICE, pas d'une animation.
 
 C'est aussi un projet dont **chaque affirmation est vérifiée** : 180 tests du
-cœur et 52 tests de saisie, dont beaucoup comparent le résultat à une valeur
+cœur et 59 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
 un signal carré.

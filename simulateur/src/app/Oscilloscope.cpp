@@ -2,8 +2,10 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QVBoxLayout>
@@ -32,6 +34,9 @@ const double kFenetres[] = {0.002, 0.005, 0.01, 0.02, 0.05, 0.1,
 
 // ---------------------------------------------------------------------------
 TraceOscilloscope::TraceOscilloscope(QWidget* parent) : QWidget(parent) {
+    // Sans suivi de la souris, le curseur ne bougerait qu'en gardant le
+    // bouton enfoncé — ce n'est pas ainsi qu'on lit une courbe.
+    setMouseTracking(true);
     setMinimumHeight(200);
     setAutoFillBackground(false);
 }
@@ -239,7 +244,23 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
                          QPointF(zone.right(), y_zero));
         peintre.setPen(QPen(QColor(150, 165, 178), 1));
     }
-    const double debut = dernier_instant_ - fenetre_;
+    // Fenêtre réellement tracée. En déclenchement, elle se cale sur le front
+    // trouvé, avec un cinquième d'écran avant lui : on voit ainsi ce qui a
+    // précédé l'événement, comme le pré-déclenchement d'un appareil réel.
+    double debut = dernier_instant_ - fenetre_;
+    declenche_ = false;
+    if (declenchement_ != Declenchement::Aucun) {
+        const double front = chercher_front();
+        if (front >= 0) {
+            debut = front - 0.2 * fenetre_;
+            declenche_ = true;
+        } else if (declenchement_ == Declenchement::Normal
+                   && debut_affiche_ > 0) {
+            debut = debut_affiche_;      // rien de neuf : on garde l'image
+        }
+    }
+    debut_affiche_ = debut;
+
     for (int k = 0; k <= 10; k += 5) {
         const double x = zone.left() + zone.width() * k / 10.0;
         const double instant = debut + fenetre_ * k / 10.0;
@@ -311,6 +332,36 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
         peintre.drawPath(chemin);
         peintre.setClipping(false);
     }
+
+    // --- repère du niveau de déclenchement
+    if (declenchement_ != Declenchement::Aucun && voie_active(voie_declenchement_)) {
+        const double y = y_zero - niveau_declenchement_ * echelle_y;
+        if (y > zone.top() && y < zone.bottom()) {
+            peintre.setPen(QPen(kCouleurs[voie_declenchement_], 1.0,
+                                Qt::DashDotLine));
+            peintre.drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
+            peintre.drawText(QRectF(zone.right() - 40, y - 14, 38, 14),
+                             Qt::AlignRight, declenche_ ? "TRIG" : "?");
+        }
+        if (declenche_) {   // marque du front, à un cinquième de l'écran
+            const double x = zone.left() + zone.width() * 0.2;
+            peintre.setPen(QPen(QColor(200, 210, 220), 1.0, Qt::DotLine));
+            peintre.drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
+        }
+    }
+
+    // --- curseurs
+    auto tracer_curseur = [&](double instant, const QColor& couleur,
+                              const QString& etiquette) {
+        if (instant < debut || instant > debut + fenetre_) return;
+        const double x = zone.left() + (instant - debut) / fenetre_ * zone.width();
+        peintre.setPen(QPen(couleur, 1.0, Qt::DashLine));
+        peintre.drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
+        peintre.drawText(QRectF(x + 3, zone.top() + 2, 20, 14), Qt::AlignLeft,
+                         etiquette);
+    };
+    tracer_curseur(curseur_b_, QColor(120, 200, 255), "B");
+    tracer_curseur(curseur_a_, QColor(255, 255, 255), "A");
 }
 
 // ---------------------------------------------------------------------------
@@ -387,7 +438,197 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     reglages->addWidget(echelle, 1, 4);
     reglages->addWidget(gel, 1, 6);
     reglages->setColumnStretch(11, 1);
+
+    // --- déclenchement : la rangée qui manquait pour que l'image tienne en
+    // place. Mêmes réglages que sur un appareil : mode, voie, niveau, front.
+    auto* mode = new QComboBox;
+    mode->addItem("Auto", static_cast<int>(TraceOscilloscope::Declenchement::Auto));
+    mode->addItem("Normal",
+                  static_cast<int>(TraceOscilloscope::Declenchement::Normal));
+    mode->addItem("Sans", static_cast<int>(TraceOscilloscope::Declenchement::Aucun));
+    connect(mode, &QComboBox::currentIndexChanged, this, [this, mode](int) {
+        trace_->definir_declenchement(
+            static_cast<TraceOscilloscope::Declenchement>(
+                mode->currentData().toInt()));
+    });
+
+    auto* source = new QComboBox;
+    for (int v = 0; v < TraceOscilloscope::kVoies; ++v)
+        source->addItem(QString("Voie %1").arg(v + 1));
+    connect(source, &QComboBox::currentIndexChanged, this,
+            [this](int rang) { trace_->definir_voie_declenchement(rang); });
+
+    auto* niveau = new QDoubleSpinBox;
+    niveau->setRange(-100, 100);
+    niveau->setDecimals(2);
+    niveau->setSingleStep(0.1);
+    niveau->setValue(2.5);
+    niveau->setSuffix(" V");
+    connect(niveau, &QDoubleSpinBox::valueChanged, this,
+            [this](double volts) { trace_->definir_niveau_declenchement(volts); });
+
+    auto* front = new QComboBox;
+    front->addItem("Front ↑");
+    front->addItem("Front ↓");
+    connect(front, &QComboBox::currentIndexChanged, this,
+            [this](int rang) { trace_->definir_front_montant(rang == 0); });
+
+    niveau_ = niveau;
+    reglages->addWidget(new QLabel("Déclenchement"), 2, 0);
+    reglages->addWidget(mode, 2, 1);
+    reglages->addWidget(source, 2, 3);
+    reglages->addWidget(niveau, 2, 4);
+    reglages->addWidget(front, 2, 6);
     disposition->addLayout(reglages);
+
+    // Lecture des curseurs, sous la courbe : la souris suit, un clic pose le
+    // repère, et l'écart des deux donne temps, tension et fréquence.
+    curseurs_ = new QLabel("Curseurs : passez la souris sur la courbe, "
+                           "cliquez pour poser le repère.");
+    QFont fonte("monospace");
+    fonte.setStyleHint(QFont::TypeWriter);
+    curseurs_->setFont(fonte);
+    curseurs_->setStyleSheet("color: #444;");
+    disposition->addWidget(curseurs_);
+    connect(trace_, &TraceOscilloscope::curseurs_changes, this, [this] {
+        const QString lecture = trace_->lecture_curseurs();
+        curseurs_->setText(lecture.isEmpty()
+                               ? QString("Curseurs : passez la souris sur la "
+                                         "courbe, cliquez pour poser le repère.")
+                               : lecture);
+    });
+}
+
+void TraceOscilloscope::definir_declenchement(Declenchement mode) {
+    declenchement_ = mode;
+    update();
+}
+
+void TraceOscilloscope::definir_voie_declenchement(int voie) {
+    voie_declenchement_ = std::clamp(voie, 0, kVoies - 1);
+    update();
+}
+
+void TraceOscilloscope::definir_niveau_declenchement(double volts) {
+    niveau_declenchement_ = volts;
+    niveau_automatique_ = false;
+    update();
+}
+
+void TraceOscilloscope::definir_front_montant(bool montant) {
+    front_montant_ = montant;
+    update();
+}
+
+// Dernier front qui satisfait la condition, cherché en remontant le temps.
+// On s'arrête avant la fin du tampon pour qu'il reste de quoi remplir la
+// partie droite de l'écran : sinon l'image sauterait à chaque trame.
+double TraceOscilloscope::chercher_front() const {
+    const Voie& source = voies_[voie_declenchement_];
+    if (source.valeurs.size() != temps_.size() || temps_.size() < 3) return -1;
+
+    // Niveau automatique : le milieu de ce que fait le signal. C'est ce que
+    // propose la touche « auto set » d'un appareil, et cela évite de chercher
+    // un front à 2,5 V dans une sinusoïde qui n'y monte jamais.
+    if (niveau_automatique_) {
+        float mini = source.valeurs.front(), maxi = source.valeurs.front();
+        for (float valeur : source.valeurs) {
+            mini = std::min(mini, valeur);
+            maxi = std::max(maxi, valeur);
+        }
+        if (maxi - mini < 1e-6f) return -1;         // signal plat
+        niveau_declenchement_ = 0.5 * (mini + maxi);
+    }
+
+    const double marge = 0.8 * fenetre_;    // après le front, à afficher
+    const double limite = dernier_instant_ - marge;
+    for (size_t k = temps_.size() - 1; k > 0; --k) {
+        if (temps_[k] > limite) continue;
+        const double avant = source.valeurs[k - 1];
+        const double apres = source.valeurs[k];
+        const bool passe = front_montant_
+                               ? (avant < niveau_declenchement_
+                                  && apres >= niveau_declenchement_)
+                               : (avant > niveau_declenchement_
+                                  && apres <= niveau_declenchement_);
+        if (!passe) continue;
+        // Instant exact du franchissement, entre deux échantillons.
+        const double ecart = apres - avant;
+        const double part =
+            std::fabs(ecart) < 1e-12 ? 0.0
+                                     : (niveau_declenchement_ - avant) / ecart;
+        return temps_[k - 1] + part * (temps_[k] - temps_[k - 1]);
+    }
+    return -1;
+}
+
+double TraceOscilloscope::valeur_a(int voie, double instant) const {
+    if (voie < 0 || voie >= kVoies) return 0.0;
+    const Voie& cible = voies_[voie];
+    if (cible.valeurs.size() != temps_.size() || temps_.empty()) return 0.0;
+    if (instant <= temps_.front()) return cible.valeurs.front();
+    if (instant >= temps_.back()) return cible.valeurs.back();
+    for (size_t k = 1; k < temps_.size(); ++k) {
+        if (temps_[k] < instant) continue;
+        const double t0 = temps_[k - 1], t1 = temps_[k];
+        if (t1 <= t0) return cible.valeurs[k];
+        const double part = (instant - t0) / (t1 - t0);
+        return cible.valeurs[k - 1]
+               + part * (cible.valeurs[k] - cible.valeurs[k - 1]);
+    }
+    return cible.valeurs.back();
+}
+
+QString TraceOscilloscope::lecture_curseurs() const {
+    if (curseur_a_ < 0) return {};
+    QString texte = QString("A : t = %1 s").arg(curseur_a_, 0, 'f', 5);
+    for (int v = 0; v < kVoies; ++v) {
+        if (!voie_active(v)) continue;
+        texte += QString("   V%1 = %2 V")
+                     .arg(v + 1)
+                     .arg(valeur_a(v, curseur_a_), 0, 'f', 3);
+    }
+    if (curseur_b_ >= 0) {
+        const double dt = curseur_a_ - curseur_b_;
+        texte += QString("      Δt = %1 ms").arg(dt * 1000.0, 0, 'f', 3);
+        if (std::fabs(dt) > 1e-9)
+            texte += QString("  (%1 Hz)").arg(1.0 / std::fabs(dt), 0, 'f', 1);
+        for (int v = 0; v < kVoies; ++v) {
+            if (!voie_active(v)) continue;
+            texte += QString("   ΔV%1 = %2 V")
+                         .arg(v + 1)
+                         .arg(valeur_a(v, curseur_a_) - valeur_a(v, curseur_b_),
+                              0, 'f', 3);
+        }
+    }
+    return texte;
+}
+
+void TraceOscilloscope::mouseMoveEvent(QMouseEvent* evenement) {
+    const QRectF zone = rect().adjusted(46, 8, -8, -22);
+    if (zone.width() <= 0) return;
+    const double part = (evenement->position().x() - zone.left()) / zone.width();
+    curseur_a_ = (part < 0 || part > 1) ? -1.0 : debut_affiche_ + part * fenetre_;
+    emit curseurs_changes();
+    update();
+}
+
+void TraceOscilloscope::mousePressEvent(QMouseEvent* evenement) {
+    // Poser le curseur de référence, ou l'enlever si on reclique au même
+    // endroit : deux gestes, aucun bouton supplémentaire.
+    mouseMoveEvent(evenement);
+    curseur_b_ = (curseur_b_ >= 0 && std::fabs(curseur_b_ - curseur_a_)
+                                         < fenetre_ / 100.0)
+                     ? -1.0
+                     : curseur_a_;
+    emit curseurs_changes();
+    update();
+}
+
+void TraceOscilloscope::leaveEvent(QEvent*) {
+    curseur_a_ = -1.0;
+    emit curseurs_changes();
+    update();
 }
 
 void Oscilloscope::ajouter_trame(const coeur::Formes& formes,
@@ -399,6 +640,13 @@ void Oscilloscope::ajouter_trame(const coeur::Formes& formes,
 void Oscilloscope::vider() { trace_->vider(); }
 
 void Oscilloscope::rafraichir_mesures() {
+    // Niveau automatique : la case le montre, sans passer pour un réglage
+    // manuel — sinon le premier rafraîchissement figerait le niveau.
+    if (niveau_ && trace_->niveau_automatique()) {
+        const QSignalBlocker silence(niveau_);
+        niveau_->setValue(trace_->niveau_declenchement());
+    }
+
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
         if (!trace_->voie_active(v)) {
             mesures_[v]->setText("—");

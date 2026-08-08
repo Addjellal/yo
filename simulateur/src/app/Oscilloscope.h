@@ -11,11 +11,14 @@
 
 #include <array>
 #include <deque>
+
+class QMouseEvent;
 #include <map>
 
 #include "core/engines/NgspiceEngine.h"
 
 class QComboBox;
+class QDoubleSpinBox;
 class QCheckBox;
 class QSlider;
 class QLabel;
@@ -41,6 +44,33 @@ public:
     void definir_echelle(double volts_par_division);
     void definir_gel(bool gele) { gele_ = gele; }
 
+    // --- déclenchement ------------------------------------------------------
+    // Sans lui, l'écran affiche « l'instant présent » et un signal dont la
+    // période ne tombe pas juste défile sans arrêt. Avec lui, l'image se cale
+    // sur un front : c'est ce qui rend une forme d'onde lisible.
+    enum class Declenchement { Aucun, Auto, Normal };
+    void definir_declenchement(Declenchement mode);
+    void definir_voie_declenchement(int voie);
+    void definir_niveau_declenchement(double volts);
+    void definir_front_montant(bool montant);
+    // Vrai si un front a été trouvé au dernier tracé : l'interface le dit,
+    // comme la diode « TRIG » d'un appareil.
+    bool declenche() const { return declenche_; }
+    double niveau_declenchement() const { return niveau_declenchement_; }
+    bool niveau_automatique() const { return niveau_automatique_; }
+
+    // --- curseurs -----------------------------------------------------------
+    // Curseur A suit la souris, curseur B se pose au clic. L'écart des deux
+    // donne un temps, une tension et une fréquence.
+    QString lecture_curseurs() const;
+
+    // Début de la fenêtre réellement tracée : elle se déplace avec le
+    // déclenchement. Sert au tracé, à la lecture des curseurs, et à vérifier
+    // sans écran que l'image se cale bien sur le front.
+    double debut_fenetre() const { return debut_affiche_; }
+    // Valeur d'une voie à un instant, par interpolation.
+    double valeur_a(int voie, double instant) const;
+
     // Mesures affichées à côté de chaque voie. La moyenne sur la fenêtre
     // visible est plus parlante que le dernier échantillon : sur une PWM,
     // celui-ci vaut 0 ou 5 V selon l'instant, ce qui n'apprend rien.
@@ -50,8 +80,15 @@ public:
     double concordance(int a, int b) const;
     bool voie_active(int voie) const;
 
+signals:
+    // Les curseurs ont bougé : le panneau met sa lecture à jour.
+    void curseurs_changes();
+
 protected:
     void paintEvent(QPaintEvent* evenement) override;
+    void mouseMoveEvent(QMouseEvent* evenement) override;
+    void mousePressEvent(QMouseEvent* evenement) override;
+    void leaveEvent(QEvent* evenement) override;
 
 private:
     struct Voie {
@@ -65,6 +102,23 @@ private:
     double volts_par_division_ = 1.0;
     bool gele_ = false;
     double dernier_instant_ = 0.0;
+
+    Declenchement declenchement_ = Declenchement::Auto;
+    int voie_declenchement_ = 0;
+    mutable double niveau_declenchement_ = 2.5;
+    bool front_montant_ = true;
+    // Tant que l'utilisateur n'a pas fixé de niveau, on prend le milieu du
+    // signal : 2,5 V conviendrait à une sortie logique et jamais à une
+    // sinusoïde centrée sur zéro.
+    bool niveau_automatique_ = true;
+    bool declenche_ = false;
+    double debut_affiche_ = 0.0;      // début de la fenêtre réellement tracée
+
+    double curseur_a_ = -1.0;         // en secondes, -1 = aucun
+    double curseur_b_ = -1.0;
+
+    // Instant du dernier front trouvé dans le tampon, ou -1.
+    double chercher_front() const;
 
     // Mémoire circulaire : au-delà, les points les plus anciens sont oubliés.
     static constexpr double kMemoire = 5.0;   // secondes conservées
@@ -116,6 +170,9 @@ private:
     std::array<QComboBox*, TraceOscilloscope::kVoies> selecteurs_ = {};
     std::array<QLabel*, TraceOscilloscope::kVoies> mesures_ = {};
     QComboBox* base_temps_ = nullptr;
+    QDoubleSpinBox* niveau_ = nullptr;
+    QLabel* curseurs_ = nullptr;
+    QLabel* etat_declenchement_ = nullptr;
     QStringList signaux_;
     std::map<QString, QString> libelles_;
     int prochaine_voie_ = 0;

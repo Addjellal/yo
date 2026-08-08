@@ -21,6 +21,7 @@
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
+#include "app/Oscilloscope.h"
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "app/schematic/SceneSchema.h"
@@ -38,6 +39,16 @@ static void verifier(bool condition, const std::string& titre,
         g_echecs.push_back(titre);
         std::printf("  ECHEC %s   %s\n", titre.c_str(), detail.c_str());
     }
+}
+
+static bool presque(double a, double b, double tolerance) {
+    return std::fabs(a - b) <= tolerance;
+}
+
+static std::string f(double v, int decimales = 3) {
+    char tampon[64];
+    std::snprintf(tampon, sizeof tampon, "%.*f", decimales, v);
+    return tampon;
 }
 
 // Indice de la borne portant un nom donné.
@@ -621,6 +632,77 @@ static void test_interactions() {
 }
 
 // ---------------------------------------------------------------------------
+// [10] Oscilloscope : déclenchement et curseurs. Sans écran — le rendu est
+// forcé par un « grab » hors écran, ce qui suffit à calculer la fenêtre.
+// ---------------------------------------------------------------------------
+static void test_declenchement() {
+    std::printf("\n[10] Déclenchement et curseurs\n");
+    const double pi = 3.14159265358979323846;
+
+    TraceOscilloscope trace;
+    trace.resize(800, 300);
+    trace.definir_signal(0, "sinus");
+    trace.definir_fenetre(0.005);          // 5 ms à l'écran
+
+    // 200 ms de sinusoïde à 1 kHz, livrées par trames comme le fait le moteur.
+    for (int trame = 0; trame < 8; ++trame) {
+        coeur::Formes formes;
+        const double debut = trame * 0.025;
+        for (int k = 0; k <= 500; ++k) {
+            const double t = k * 0.025 / 500;
+            formes.temps.push_back(t);
+            formes.tensions["sinus"].push_back(
+                2.5 + 2.5 * std::sin(2 * pi * 1000 * (debut + t)));
+        }
+        trace.ajouter(formes, debut);
+    }
+
+    // --- sans déclenchement : la fenêtre colle à l'instant présent
+    trace.definir_declenchement(TraceOscilloscope::Declenchement::Aucun);
+    trace.grab();
+    const double libre = trace.debut_fenetre();
+    verifier(!trace.declenche(), "sans déclenchement, aucun front n'est cherché");
+
+    // --- avec déclenchement : le front se retrouve au cinquième de l'écran
+    trace.definir_voie_declenchement(0);
+    trace.definir_niveau_declenchement(2.5);
+    trace.definir_front_montant(true);
+    trace.definir_declenchement(TraceOscilloscope::Declenchement::Auto);
+    trace.grab();
+    verifier(trace.declenche(), "un front est trouvé dans le signal");
+    const double declenche = trace.debut_fenetre();
+    verifier(std::fabs(declenche - libre) > 1e-9,
+             "la fenêtre s'est déplacée pour se caler sur le front");
+
+    const double instant_front = declenche + 0.2 * trace.fenetre();
+    const double au_front = trace.valeur_a(0, instant_front);
+    verifier(presque(au_front, 2.5, 0.05),
+             "au cinquième de l'écran, le signal est au niveau de "
+             "déclenchement",
+             f(au_front) + " V");
+    const double avant = trace.valeur_a(0, instant_front - 0.05e-3);
+    const double apres = trace.valeur_a(0, instant_front + 0.05e-3);
+    verifier(avant < 2.5 && apres > 2.5,
+             "et il s'agit bien d'un front montant",
+             f(avant) + " -> " + f(apres));
+
+    // --- front descendant : le signal doit décroître au même endroit
+    trace.definir_front_montant(false);
+    trace.grab();
+    const double repere = trace.debut_fenetre() + 0.2 * trace.fenetre();
+    verifier(trace.valeur_a(0, repere - 0.05e-3) > 2.5
+                 && trace.valeur_a(0, repere + 0.05e-3) < 2.5,
+             "front descendant : le signal décroît au repère");
+
+    // --- niveau hors de portée : plus de front, l'image ne ment pas
+    trace.definir_front_montant(true);
+    trace.definir_niveau_declenchement(12.0);
+    trace.grab();
+    verifier(!trace.declenche(),
+             "un niveau que le signal n'atteint jamais ne déclenche pas");
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -636,6 +718,7 @@ int main(int argc, char** argv) {
     test_cablage_souris();
     test_noeuds_et_instruments();
     test_interactions();
+    test_declenchement();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

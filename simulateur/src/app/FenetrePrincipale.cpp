@@ -1863,6 +1863,10 @@ void FenetrePrincipale::charger_exemple_filtre() {
     ItemComposant* am = scene_->ajouter_composant("amperemetre", QPointF(-150, -120));
     ItemComposant* vm = scene_->ajouter_composant("voltmetre", QPointF(200, 0));
     if (!am || !vm) return;
+    // Montage alternatif : les appareils sont mis en position alternatif,
+    // sinon ils afficheraient la moyenne d'une sinusoïde — c'est-à-dire zéro.
+    am->textes["mode"] = "alternatif";
+    vm->textes["mode"] = "alternatif";
 
     scene_->addItem(new ItemFil(gbf, 0, am, 0));     // + -> ampèremètre
     scene_->addItem(new ItemFil(am, 1, r, 0));       // ampèremètre -> R
