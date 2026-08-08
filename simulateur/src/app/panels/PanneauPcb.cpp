@@ -566,9 +566,16 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
                          "tourner · Échap : annuler le tracé");
     survol_->setFont(fonte);
     survol_->setStyleSheet("color:#7f8f7f");
-    pied->addWidget(etat_);
-    pied->addStretch(1);
-    pied->addWidget(survol_);
+    // Ces deux étiquettes changent de texte à chaque geste ; sans cela, leur
+    // largeur imposerait une largeur minimale à toute la page — et, la page
+    // étant empilée avec le schéma, la palette du schéma se retrouvait
+    // rétrécie au retour.
+    for (QLabel* etiquette : {etat_, survol_})
+        etiquette->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    // Les deux étiquettes se partagent la ligne et acceptent d'être
+    // rétrécies : c'est ce qui les empêche d'imposer une largeur au reste.
+    pied->addWidget(etat_, 3);
+    pied->addWidget(survol_, 2, Qt::AlignRight);
     colonne->addLayout(pied);
 
     rapport_ = new QPlainTextEdit;

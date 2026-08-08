@@ -765,10 +765,43 @@ void FenetrePrincipale::ouvrir_pcb() {
 void FenetrePrincipale::afficher_page(int page) {
     if (!pages_) return;
     page = page > 0 ? 1 : 0;
+    // Masquer un panneau puis le remontrer lui fait perdre sa taille : la
+    // palette revenait amputée, les noms de composants coupés. On note donc
+    // les tailles avant de partir, et on les repose au retour.
+    if (page == 1 && pages_->currentIndex() == 0) {
+        tailles_docks_.clear();
+        for (QDockWidget* dock : docks_schema_)
+            tailles_docks_.push_back(
+                dockWidgetArea(dock) == Qt::BottomDockWidgetArea
+                    ? dock->height()
+                    : dock->width());
+    }
     pages_->setCurrentIndex(page);
     // Les outils du schéma n'ont rien à faire sur la carte : la palette de
     // composants, les propriétés et le journal appartiennent à la saisie.
     for (QDockWidget* dock : docks_schema_) dock->setVisible(page == 0);
+    if (page == 0 && tailles_docks_.size() == docks_schema_.size()) {
+        // Après le retour à l'affichage, pas avant : Qt doit avoir refait sa
+        // mise en page pour qu'un redimensionnement de panneau prenne effet.
+        QTimer::singleShot(0, this, [this] {
+            if (tailles_docks_.size() != docks_schema_.size()) return;
+            QList<QDockWidget*> horizontaux, verticaux;
+            QList<int> largeurs, hauteurs;
+            for (size_t k = 0; k < docks_schema_.size(); ++k) {
+                if (dockWidgetArea(docks_schema_[k]) == Qt::BottomDockWidgetArea) {
+                    verticaux << docks_schema_[k];
+                    hauteurs << tailles_docks_[k];
+                } else {
+                    horizontaux << docks_schema_[k];
+                    largeurs << tailles_docks_[k];
+                }
+            }
+            if (!horizontaux.isEmpty())
+                resizeDocks(horizontaux, largeurs, Qt::Horizontal);
+            if (!verticaux.isEmpty())
+                resizeDocks(verticaux, hauteurs, Qt::Vertical);
+        });
+    }
     if (barre_schema_) barre_schema_->setVisible(page == 0);
     if (action_page_schema_) action_page_schema_->setChecked(page == 0);
     if (action_page_pcb_) action_page_pcb_->setChecked(page == 1);

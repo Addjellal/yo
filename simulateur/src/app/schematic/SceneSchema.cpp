@@ -146,20 +146,44 @@ std::vector<ItemFil*> SceneSchema::fils() const {
 void SceneSchema::supprimer_selection() {
     // On retire d'abord les fils : supprimer un composant sans ses fils
     // laisserait des pointeurs pendants.
-    std::vector<QGraphicsItem*> a_supprimer;
+    //
+    // L'ensemble n'est pas un luxe : un fil tendu entre deux composants tous
+    // deux sélectionnés serait sinon désigné deux fois, et détruit deux fois.
+    std::set<QGraphicsItem*> a_supprimer;
     for (QGraphicsItem* item : selectedItems()) {
         if (item->type() == ItemComposant::Type) {
             auto* composant = static_cast<ItemComposant*>(item);
             for (ItemFil* fil : fils())
-                if (fil->touche(composant)) a_supprimer.push_back(fil);
+                if (fil->touche(composant)) a_supprimer.insert(fil);
         }
-        a_supprimer.push_back(item);
+        a_supprimer.insert(item);
     }
+    // Un fil en cours de tracé peut partir d'un composant qu'on efface : le
+    // laisser en attente, c'est garder un pointeur vers un objet détruit.
+    if (fil_depart_ && a_supprimer.count(fil_depart_)) abandonner_fil();
+
+    // L'ordre compte, et il coûte cher à ignorer : retirer un composant fait
+    // recalculer par Qt le cadre des objets voisins, donc celui des fils qui
+    // s'y accrochent — lesquels demandent alors la position d'une borne d'un
+    // composant qui n'est plus dans la scène. Les fils partent donc les
+    // premiers, tous, avant qu'aucun composant ne bouge.
+    //
+    // Le tri se fait AVANT la moindre destruction : une fois un objet détruit,
+    // même lui demander son type est déjà trop tard.
+    std::vector<QGraphicsItem*> fils_a_couper, objets_a_retirer;
     for (QGraphicsItem* item : a_supprimer) {
-        if (item->scene() == this) {
-            removeItem(item);
-            delete item;
-        }
+        if (item->type() == ItemFil::Type)
+            fils_a_couper.push_back(item);
+        else
+            objets_a_retirer.push_back(item);
+    }
+    for (QGraphicsItem* item : fils_a_couper) {
+        removeItem(item);
+        delete item;
+    }
+    for (QGraphicsItem* item : objets_a_retirer) {
+        removeItem(item);
+        delete item;
     }
     emit selection_composant(nullptr);
 }
@@ -642,6 +666,8 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     if (outil_ == Outil::Suppression && evenement->button() == Qt::LeftButton) {
         clearSelection();
         if (QGraphicsItem* item = itemAt(point, QTransform())) {
+            // La gomme s'annule comme le reste : on garde l'état d'avant.
+            memoriser();
             item->setSelected(true);
             supprimer_selection();
         }
@@ -743,10 +769,13 @@ void SceneSchema::keyPressEvent(QKeyEvent* evenement) {
         return;
     }
     if (evenement->key() == Qt::Key_Delete) {
+        if (!selectedItems().isEmpty()) memoriser();
         supprimer_selection();
         return;
     }
     if (evenement->key() == Qt::Key_R) {
+        if (selectedItems().isEmpty()) return;
+        memoriser();
         for (QGraphicsItem* item : selectedItems())
             if (item->type() == ItemComposant::Type)
                 static_cast<ItemComposant*>(item)->tourner();

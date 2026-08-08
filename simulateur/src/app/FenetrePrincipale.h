@@ -128,6 +128,9 @@ public:
     void afficher_page(int page);
     int page_courante() const;
 
+    // Arrêt de la simulation, accessible au mode de vérification « --gestes ».
+    void arreter_simulation() { arreter(); }
+
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
 
@@ -184,6 +187,9 @@ private:
     QAction* action_page_schema_ = nullptr;
     QAction* action_page_pcb_ = nullptr;
     std::vector<QDockWidget*> docks_schema_;
+    // Tailles des panneaux du schéma, mises de côté le temps d'aller sur la
+    // carte : sans elles, la palette revient rétrécie.
+    std::vector<int> tailles_docks_;
     bool carte_transferee_ = false;
     // Panneaux sortis dans leur propre fenêtre : titre et rang d'origine,
     // pour savoir où les remettre à la fermeture.

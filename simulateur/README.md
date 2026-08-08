@@ -223,7 +223,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
 ./build/tests_coeur                        # 250 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 90 tests, sans fenêtre
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 134 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
@@ -496,7 +496,7 @@ simulateur/
 │   └── LISEZ-MOI.txt.in             mot d'accueil livré dans le paquet
 └── tests/
     ├── test_coeur.cpp                250 tests, sans Qt
-    └── test_schema.cpp               90 tests, saisie de schéma sans fenêtre
+    └── test_schema.cpp               134 tests, saisie de schéma sans fenêtre
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
@@ -665,7 +665,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **90 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **134 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, le panneau
 d'analyses (Bode, spectre, exports CSV), le câblage à la souris, le
@@ -673,6 +673,16 @@ déclenchement de l'oscilloscope, les étiquettes de nœud, l'annulation, le
 presse-papiers, et le transfert du schéma vers la carte — un second transfert
 ne touche à rien, retirer un composant du schéma le retire de la carte et
 abandonne les pistes de son net.
+
+Une section entière porte sur les **gestes d'un utilisateur ordinaire**, et
+elle est née d'un audit qui a trouvé de quoi la remplir : effacer deux
+composants reliés entre eux, effacer celui du milieu d'une chaîne, effacer
+sous une vue ouverte, effacer pendant qu'un fil est en cours de tracé,
+effacer **pendant que la simulation tourne**, déplacer, superposer, tourner,
+câbler deux fois la même paire, annuler, rétablir. Après chaque geste, trois
+invariants sont vérifiés : aucun fil ne désigne un composant disparu, la
+scène ne contient rien d'autre que des composants et des fils, et le moteur
+analogique accepte encore le circuit.
 
 L'application se vérifie aussi sans intervention :
 
@@ -693,7 +703,11 @@ L'application se vérifie aussi sans intervention :
 3 oscilloscope, 4 analyses), `--base` impose la base de temps en secondes.
 `--analyse N` lance l'analyse *N* (0 balayage continu, 1 réponse en fréquence,
 2 spectre) et imprime son résultat chiffré ; `--documents` produit tous les
-documents du projet et donne la taille de chacun. La capture
+documents du projet et donne la taille de chacun. `--gestes dossier` joue une
+séance d'utilisateur — lancer, effacer un composant en pleine simulation,
+arrêter, annuler, passer au circuit imprimé et revenir — en photographiant
+chaque étape : c'est la vérification des artefacts, celle qu'aucun chiffre ne
+montre. La capture
 imprime la vitesse atteinte, puis pour chaque voie la moyenne, la crête, le
 rapport cyclique mesuré, et la concordance entre les deux premières voies —
 de quoi vérifier qu'un signal en suit un autre sans se fier à l'œil.

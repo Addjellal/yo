@@ -10,6 +10,11 @@
 
 #include "app/FenetrePrincipale.h"
 #include "app/panels/PanneauPcb.h"
+#include "app/schematic/ItemComposant.h"
+#include "app/schematic/SceneSchema.h"
+
+#include <functional>
+#include <memory>
 
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
@@ -189,6 +194,58 @@ int main(int argc, char** argv) {
             }
             qApp->quit();
         });
+    }
+
+    // « --gestes dossier » : joue une séance d'utilisateur — lancer, effacer
+    // un composant en pleine simulation, arrêter, annuler, passer au circuit
+    // imprimé et revenir — en enregistrant une image à chaque étape. C'est la
+    // vérification des artefacts : ce qu'aucun test chiffré ne montre.
+    const int gestes = arguments.indexOf("--gestes");
+    if (gestes >= 0 && gestes + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const QString dossier = arguments.at(gestes + 1);
+        QDir().mkpath(dossier);
+        // Les états de la séance vivent aussi longtemps que l'application :
+        // les minuteries s'exécutent bien après la fin de ce bloc.
+        auto etape = std::make_shared<int>(0);
+        auto photographier = [&fenetre, dossier, etape](const QString& nom) {
+            const QString chemin = QString("%1/%2-%3.png")
+                                       .arg(dossier)
+                                       .arg((*etape)++, 2, 10, QChar('0'))
+                                       .arg(nom);
+            fenetre.grab().save(chemin);
+            QTextStream(stdout) << chemin << Qt::endl;
+        };
+        int retard = 200;
+        auto plus_tard = [&retard, &fenetre](std::function<void()> action) {
+            QTimer::singleShot(retard, &fenetre, action);
+            retard += 700;
+        };
+
+        // Les actions différées capturent par valeur : elles s'exécutent
+        // longtemps après la fin de ce bloc, et une référence à une variable
+        // locale ne vaudrait plus rien.
+        plus_tard([photographier] { photographier("schema"); });
+        plus_tard([&fenetre] { fenetre.demarrage_automatique(); });
+        plus_tard([photographier] { photographier("en-marche"); });
+        plus_tard([&fenetre] {
+            // On efface un composant en pleine simulation, comme on le ferait
+            // sans y penser.
+            for (ItemComposant* composant : fenetre.scene()->composants())
+                if (composant->reference() == "R1") composant->setSelected(true);
+            fenetre.scene()->memoriser();
+            fenetre.scene()->supprimer_selection();
+        });
+        plus_tard([photographier] { photographier("apres-suppression"); });
+        plus_tard([&fenetre] { fenetre.arreter_simulation(); });
+        plus_tard([photographier] { photographier("arrete"); });
+        plus_tard([&fenetre] { fenetre.scene()->annuler(); });
+        plus_tard([photographier] { photographier("annule"); });
+        plus_tard([&fenetre] { fenetre.ouvrir_pcb(); });
+        plus_tard([photographier] { photographier("circuit-imprime"); });
+        plus_tard([&fenetre] { fenetre.afficher_page(0); });
+        plus_tard([photographier] { photographier("retour-schema"); });
+        plus_tard([] { qApp->quit(); });
     }
 
     // « --aller-retour fichier » : enregistre le projet courant, le rouvre,

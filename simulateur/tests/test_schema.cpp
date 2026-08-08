@@ -10,6 +10,9 @@
 #include <QApplication>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
+#include <QKeyEvent>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QPointF>
 
 #include <algorithm>
@@ -25,7 +28,10 @@
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "app/panels/PanneauPcb.h"
+#include "core/engines/NgspiceEngine.h"
+#include "app/MoteurSimulation.h"
 #include "app/schematic/SceneSchema.h"
+#include "app/schematic/VueSchema.h"
 #include "core/Device.h"
 
 static int g_ok = 0;
@@ -905,6 +911,457 @@ static void test_transfert_pcb() {
 }
 
 // ---------------------------------------------------------------------------
+// Gestes d'un utilisateur ordinaire : poser, déplacer, tourner, effacer
+//
+// Ce que fait vraiment quelqu'un devant l'application, dans le désordre, et
+// ce qui doit rester vrai après : pas de fil qui pointe dans le vide, pas de
+// nœud fantôme, pas d'objet oublié dans la scène, et chaque geste annulable.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Rien d'autre que des composants et des fils ne doit traîner dans la scène :
+// un trait provisoire resté en place serait un artefact visible à l'écran.
+bool scene_propre(SceneSchema& scene) {
+    for (QGraphicsItem* item : scene.items())
+        if (item->type() != ItemComposant::Type && item->type() != ItemFil::Type)
+            return false;
+    return true;
+}
+
+// Tous les fils désignent-ils des composants encore présents, et des bornes
+// qui existent ?
+bool fils_coherents(SceneSchema& scene) {
+    std::set<const ItemComposant*> vivants;
+    for (ItemComposant* composant : scene.composants()) vivants.insert(composant);
+    for (ItemFil* fil : scene.fils()) {
+        if (!vivants.count(fil->depart()) || !vivants.count(fil->arrivee()))
+            return false;
+        if (fil->borne_depart() < 0
+            || fil->borne_depart() >= fil->depart()->nb_bornes())
+            return false;
+        if (fil->borne_arrivee() < 0
+            || fil->borne_arrivee() >= fil->arrivee()->nb_bornes())
+            return false;
+    }
+    return true;
+}
+
+// Une netlist saine, c'est-à-dire : des références uniques, et un circuit que
+// le moteur analogique accepte et résout. Une borne en l'air est normale — le
+// moteur lui invente un nœud de cent mégohms —, ce qui ne doit pas l'être,
+// c'est un circuit qui refuse de se calculer.
+bool netlist_saine(SceneSchema& scene) {
+    const coeur::Netlist netlist = scene.construire_netlist(nullptr);
+    std::set<std::string> references;
+    for (const coeur::Instance& instance : netlist.instances()) {
+        if (instance.reference.empty()) return false;
+        if (!references.insert(instance.reference).second) return false;
+    }
+    if (netlist.instances().empty()) return true;
+    coeur::NgspiceEngine moteur;
+    moteur.construire(netlist, {});
+    return moteur.resoudre() && moteur.erreurs().empty();
+}
+
+// Nœuds réellement nommés : les bornes en l'air en sont exclues.
+std::set<std::string> noeuds_de(SceneSchema& scene) {
+    // La netlist est gardée dans une variable : parcourir directement
+    // « construire_netlist(...).instances() » lirait dans un objet déjà
+    // détruit.
+    const coeur::Netlist netlist = scene.construire_netlist(nullptr);
+    std::set<std::string> noeuds;
+    for (const coeur::Instance& instance : netlist.instances())
+        for (const coeur::Borne& borne : instance.bornes)
+            if (!borne.noeud.empty()) noeuds.insert(borne.noeud);
+    return noeuds;
+}
+
+}  // namespace
+
+static void test_gestes_utilisateur() {
+    std::printf("\n-- gestes d'un utilisateur ordinaire --\n");
+
+    // --- effacer deux composants reliés entre eux
+    //
+    // Le fil appartient aux deux : désigné deux fois, il était détruit deux
+    // fois. L'application s'arrêtait net sur un « Ctrl+A puis Suppr ».
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(150, 0));
+        scene.addItem(new ItemFil(r, 1, led, 0));
+        r->setSelected(true);
+        led->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene.composants().empty() && scene.fils().empty(),
+                 "effacer deux composants reliés n'en laisse aucun");
+        verifier(scene_propre(scene), "et rien ne traîne dans la scène");
+    }
+
+    // --- effacer avec une vue attachée, comme dans l'application
+    //
+    // Sans vue, Qt n'indexe pas la scène de la même façon : retirer un
+    // composant ne fait alors recalculer le cadre d'aucun voisin. Avec une
+    // vue, si — et c'est là que l'application s'arrêtait net, en demandant la
+    // position d'une borne d'un composant déjà retiré.
+    {
+        SceneSchema scene;
+        VueSchema vue;
+        vue.setScene(&scene);
+        vue.resize(800, 600);
+        vue.show();
+        std::vector<ItemComposant*> poses;
+        for (int k = 0; k < 5; ++k)
+            poses.push_back(scene.ajouter_composant(
+                k % 2 ? "resistance" : "led", QPointF(k * 140, 0)));
+        for (size_t k = 0; k + 1 < poses.size(); ++k)
+            scene.addItem(new ItemFil(poses[k], 1, poses[k + 1], 0));
+        QCoreApplication::processEvents();
+
+        poses[2]->setSelected(true);
+        scene.supprimer_selection();
+        QCoreApplication::processEvents();
+        verifier(scene.composants().size() == 4 && scene.fils().size() == 2,
+                 "effacer sous une vue ouverte ne fait pas tomber la scène",
+                 std::to_string(scene.composants().size()) + " composants, "
+                     + std::to_string(scene.fils().size()) + " fils");
+        for (QGraphicsItem* item : scene.items()) item->setSelected(true);
+        scene.supprimer_selection();
+        QCoreApplication::processEvents();
+        verifier(scene.items().isEmpty(), "et tout effacer non plus");
+    }
+
+    // --- effacer tout un montage d'un coup, comme le fait « Ctrl+A, Suppr »
+    {
+        SceneSchema scene;
+        std::vector<ItemComposant*> poses;
+        for (int k = 0; k < 6; ++k)
+            poses.push_back(scene.ajouter_composant(
+                k % 2 ? "resistance" : "led", QPointF(k * 120, 0)));
+        for (size_t k = 0; k + 1 < poses.size(); ++k)
+            scene.addItem(new ItemFil(poses[k], 1, poses[k + 1], 0));
+        for (QGraphicsItem* item : scene.items()) item->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene.items().isEmpty(),
+                 "effacer une chaîne entière ne laisse rien",
+                 std::to_string(scene.items().size()) + " objets restants");
+    }
+
+    // --- effacer un seul composant au milieu d'une chaîne
+    {
+        SceneSchema scene;
+        ItemComposant* a = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = scene.ajouter_composant("led", QPointF(150, 0));
+        ItemComposant* c = scene.ajouter_composant("resistance", QPointF(300, 0));
+        scene.addItem(new ItemFil(a, 1, b, 0));
+        scene.addItem(new ItemFil(b, 1, c, 0));
+        b->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene.composants().size() == 2 && scene.fils().empty(),
+                 "effacer le composant du milieu emporte ses deux fils",
+                 std::to_string(scene.fils().size()) + " fil(s) restant(s)");
+        verifier(fils_coherents(scene) && netlist_saine(scene),
+                 "et ce qui reste est cohérent");
+    }
+
+    // --- effacer un fil seul : les composants restent
+    {
+        SceneSchema scene;
+        ItemComposant* a = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = scene.ajouter_composant("led", QPointF(150, 0));
+        ItemFil* fil = new ItemFil(a, 1, b, 0);
+        scene.addItem(fil);
+        fil->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene.composants().size() == 2 && scene.fils().empty(),
+                 "effacer un fil laisse les composants en place");
+        verifier(noeuds_de(scene).empty(),
+                 "et les deux composants ne partagent plus de nœud",
+                 std::to_string(noeuds_de(scene).size()) + " nœud(s)");
+    }
+
+    // --- la gomme, au clic, et son annulation
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        scene.ajouter_composant("led", QPointF(200, 0));
+        scene.oublier_historique();
+        scene.definir_outil(SceneSchema::Outil::Suppression);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, r->pos());
+        verifier(scene.composants().size() == 1,
+                 "la gomme efface le composant visé",
+                 std::to_string(scene.composants().size()));
+        verifier(scene.peut_annuler() && scene.annuler()
+                     && scene.composants().size() == 2,
+                 "et le coup de gomme s'annule");
+        scene.definir_outil(SceneSchema::Outil::Selection);
+    }
+
+    // --- effacer pendant qu'un fil est en cours de tracé
+    //
+    // Le fil en attente garde un pointeur sur son composant de départ : si
+    // celui-ci disparaît, le clic suivant travaillerait sur un objet détruit.
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(200, 0));
+        const QPointF borne = r->position_borne(1);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, borne);
+        r->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene_propre(scene),
+                 "effacer le départ d'un fil en cours ne laisse pas de trait");
+        // Le clic suivant ne doit ni planter ni fabriquer un fil.
+        envoyer(scene, QEvent::GraphicsSceneMousePress, led->position_borne(0));
+        envoyer(scene, QEvent::GraphicsSceneMousePress, led->position_borne(1));
+        verifier(fils_coherents(scene),
+                 "et le câblage repart proprement ensuite");
+    }
+
+    // --- déplacer un composant câblé : les fils suivent
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(200, 0));
+        scene.addItem(new ItemFil(r, 1, led, 0));
+        const coeur::Netlist avant = scene.construire_netlist(nullptr);
+
+        r->setPos(QPointF(0, 300));
+        for (ItemFil* fil : scene.fils()) fil->rafraichir();
+        // Le fil se redessine entre les deux bornes : son cadre doit donc
+        // englober la borne qui vient de bouger.
+        const QPointF depart = r->position_borne(1);
+        const QRectF cadre =
+            scene.fils().front()->boundingRect().adjusted(-2, -2, 2, 2);
+        verifier(cadre.contains(depart), "le fil suit le composant déplacé",
+                 f(depart.x()) + " ; " + f(depart.y()));
+
+        const coeur::Netlist apres = scene.construire_netlist(nullptr);
+        verifier(avant.instances().size() == apres.instances().size(),
+                 "et le déplacement ne change pas la netlist");
+        verifier(netlist_saine(scene), "la netlist reste saine après déplacement");
+    }
+
+    // --- superposer deux composants ne les relie pas
+    {
+        SceneSchema scene;
+        ItemComposant* a = scene.ajouter_composant("resistance", QPointF(0, 0));
+        scene.ajouter_composant("resistance", QPointF(400, 0));
+        a->setPos(QPointF(400, 0));                 // pile sur l'autre
+        verifier(noeuds_de(scene).empty(),
+                 "deux composants superposés ne se relient pas tout seuls",
+                 std::to_string(noeuds_de(scene).size()) + " nœud(s)");
+    }
+
+    // --- tourner un composant câblé
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(200, 0));
+        scene.addItem(new ItemFil(r, 1, led, 0));
+        const QString noeud_avant = scene.noeud_de(r, 1);
+        r->setSelected(true);
+        scene.oublier_historique();
+        QKeyEvent touche(QEvent::KeyPress, Qt::Key_R, Qt::NoModifier);
+        QApplication::sendEvent(&scene, &touche);
+        verifier(fils_coherents(scene), "un composant tourné garde ses fils");
+        verifier(scene.noeud_de(r, 1) == noeud_avant,
+                 "et le nœud ne change pas de nom");
+        verifier(scene.peut_annuler(), "la rotation au clavier s'annule aussi");
+    }
+
+    // --- câbler deux fois la même paire de bornes
+    {
+        SceneSchema scene;
+        ItemComposant* a = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = scene.ajouter_composant("led", QPointF(200, 0));
+        for (int essai = 0; essai < 2; ++essai) {
+            envoyer(scene, QEvent::GraphicsSceneMousePress, a->position_borne(1));
+            envoyer(scene, QEvent::GraphicsSceneMouseRelease, a->position_borne(1));
+            envoyer(scene, QEvent::GraphicsSceneMouseMove, b->position_borne(0));
+            envoyer(scene, QEvent::GraphicsSceneMousePress, b->position_borne(0));
+        }
+        verifier(netlist_saine(scene) && scene_propre(scene),
+                 "câbler deux fois la même paire ne casse rien",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- annuler après une suppression rend le montage entier
+    {
+        SceneSchema scene;
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(200, 0));
+        scene.addItem(new ItemFil(r, 1, led, 0));
+        scene.oublier_historique();
+        scene.memoriser();
+        r->setSelected(true);
+        led->setSelected(true);
+        scene.supprimer_selection();
+        verifier(scene.items().isEmpty(), "tout est effacé");
+        verifier(scene.annuler(), "l'annulation aboutit");
+        verifier(scene.composants().size() == 2 && scene.fils().size() == 1,
+                 "le montage revient, fil compris",
+                 std::to_string(scene.composants().size()) + " composants, "
+                     + std::to_string(scene.fils().size()) + " fils");
+        verifier(fils_coherents(scene) && netlist_saine(scene),
+                 "et il est cohérent après retour");
+    }
+
+    // --- poser, effacer, reposer : les références ne se marchent pas dessus
+    {
+        SceneSchema scene;
+        scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* deux = scene.ajouter_composant("resistance", QPointF(200, 0));
+        deux->setSelected(true);
+        scene.supprimer_selection();
+        ItemComposant* trois = scene.ajouter_composant("resistance", QPointF(400, 0));
+        std::set<QString> references;
+        for (ItemComposant* composant : scene.composants())
+            references.insert(composant->reference());
+        verifier(references.size() == scene.composants().size(),
+                 "aucune référence en double après suppression puis ajout",
+                 trois->reference().toStdString());
+    }
+
+    // --- un montage complet malmené : on efface, on annule, on rétablit
+    {
+        SceneSchema scene;
+        ItemComposant* carte = scene.ajouter_composant("arduino_uno", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(300, 0));
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(500, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(700, 0));
+        scene.addItem(new ItemFil(carte, 13, led, 0));
+        scene.addItem(new ItemFil(led, 1, r, 0));
+        scene.addItem(new ItemFil(r, 1, masse, 0));
+        scene.oublier_historique();
+
+        for (int tour = 0; tour < 3; ++tour) {
+            scene.memoriser();
+            led->setSelected(true);
+            scene.supprimer_selection();
+            verifier(fils_coherents(scene) && netlist_saine(scene)
+                         && scene_propre(scene),
+                     "après suppression, tout se tient (tour "
+                         + std::to_string(tour + 1) + ")");
+            verifier(scene.annuler(), "annulation du tour "
+                                          + std::to_string(tour + 1));
+            // Les objets ont été recréés : on retrouve la LED par sa référence.
+            led = nullptr;
+            for (ItemComposant* composant : scene.composants())
+                if (composant->reference() == "LED1") led = composant;
+            verifier(led != nullptr, "la LED est bien revenue");
+            if (!led) break;
+        }
+        verifier(scene.composants().size() == 4 && scene.fils().size() == 3,
+                 "le montage est intact après trois allers-retours",
+                 std::to_string(scene.composants().size()) + " composants, "
+                     + std::to_string(scene.fils().size()) + " fils");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Modifier le schéma pendant que ça tourne
+//
+// C'est le geste qu'on fait sans y penser : la simulation avance, on efface
+// un composant, on en déplace un autre, on relance. Rien de tout cela ne doit
+// laisser le moteur en travers.
+// ---------------------------------------------------------------------------
+static void test_modification_en_marche() {
+    std::printf("\n-- modifier le schéma pendant la simulation --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(250, 0));
+    ItemComposant* led = scene.ajouter_composant("led", QPointF(500, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(750, 0));
+    scene.addItem(new ItemFil(pile, 0, r, 0));
+    scene.addItem(new ItemFil(r, 1, led, 0));
+    scene.addItem(new ItemFil(led, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    MoteurSimulation moteur;
+    auto pousser = [&] {
+        std::vector<LiaisonBroche> broches;
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_presentes());
+    };
+    // La simulation avance sur un minuteur : pour la laisser tourner sans
+    // ouvrir de fenêtre, on fait tourner la boucle d'événements un moment.
+    auto tourner = [](int millisecondes) {
+        QElapsedTimer chrono;
+        chrono.start();
+        while (chrono.elapsed() < millisecondes)
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    };
+    pousser();
+    moteur.demarrer();
+    verifier(moteur.etat() == MoteurSimulation::Etat::EnMarche,
+             "un montage sans carte démarre");
+
+    tourner(120);
+    const double tension_avant = moteur.analogique().tension("LED1_A");
+    verifier(std::fabs(tension_avant) > 0.5,
+             "le circuit est bien alimenté avant modification",
+             f(tension_avant) + " V");
+
+    // --- on efface la LED en pleine simulation
+    led->setSelected(true);
+    scene.supprimer_selection();
+    pousser();
+    tourner(80);
+    verifier(moteur.etat() == MoteurSimulation::Etat::EnMarche,
+             "effacer un composant en marche n'arrête pas la simulation");
+    verifier(scene.fils().size() == 2,
+             "les fils de la LED sont partis avec elle",
+             std::to_string(scene.fils().size()) + " fil(s)");
+
+    // --- on déplace ce qui reste, toujours en marche
+    r->setPos(QPointF(250, 400));
+    for (ItemFil* fil : scene.fils()) fil->rafraichir();
+    pousser();
+    tourner(80);
+    verifier(moteur.etat() == MoteurSimulation::Etat::EnMarche,
+             "déplacer un composant en marche non plus");
+
+    // --- on efface tout : le moteur doit encaisser un circuit vide
+    for (QGraphicsItem* item : scene.items()) item->setSelected(true);
+    scene.supprimer_selection();
+    pousser();
+    tourner(80);
+    verifier(scene.items().isEmpty(), "le schéma est vide");
+
+    // --- et on rebâtit derrière
+    ItemComposant* pile2 = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(250, 0));
+    ItemComposant* masse2 = scene.ajouter_composant("masse", QPointF(500, 0));
+    scene.addItem(new ItemFil(pile2, 0, r2, 0));
+    scene.addItem(new ItemFil(r2, 1, masse2, 0));
+    scene.addItem(new ItemFil(pile2, 1, masse2, 0));
+    pousser();
+    tourner(150);
+    // Les références repartent de là où elles s'étaient arrêtées : on cherche
+    // donc la tension par le nœud que la netlist annonce, pas par un nom
+    // deviné.
+    double tension_apres = 0;
+    std::string noeud_teste;
+    for (const coeur::Instance& instance : moteur.netlist().instances())
+        for (const coeur::Borne& borne : instance.bornes)
+            if (!borne.noeud.empty()
+                && std::fabs(moteur.analogique().tension(borne.noeud))
+                       > std::fabs(tension_apres)) {
+                tension_apres = moteur.analogique().tension(borne.noeud);
+                noeud_teste = borne.noeud;
+            }
+    verifier(std::fabs(tension_apres) > 0.5,
+             "un montage rebâti en marche est calculé aussitôt",
+             noeud_teste + " = " + f(tension_apres) + " V");
+
+    moteur.arreter();
+    verifier(moteur.etat() == MoteurSimulation::Etat::Arrete,
+             "et l'arrêt se passe bien");
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -924,6 +1381,8 @@ int main(int argc, char** argv) {
     test_etiquettes();
     test_annulation();
     test_transfert_pcb();
+    test_gestes_utilisateur();
+    test_modification_en_marche();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

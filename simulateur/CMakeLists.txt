@@ -188,13 +188,16 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/app/panels/FenetreInstrument.cpp
     src/app/panels/PanneauPcb.cpp
     src/app/Oscilloscope.cpp
+    # Le couplage des moteurs ne dépend pas de la fenêtre : le mettre ici le
+    # rend testable sans ouvrir l'application, et c'est là que se jouent les
+    # gestes risqués (effacer un composant pendant que ça tourne).
+    src/app/MoteurSimulation.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
   add_executable(simulateur
     src/main.cpp
     src/app/FenetrePrincipale.cpp
-    src/app/MoteurSimulation.cpp
   )
   target_link_libraries(simulateur PRIVATE schema)
 
