@@ -77,9 +77,30 @@ void ItemComposant::recalculer_cadre() {
     // marge pour la référence au-dessus et l'étiquette en dessous
     // marge basse plus large : la valeur, puis la mesure en simulation
     cadre_ = boite.adjusted(-8, -22, 8, 42);
+
+    // Le cadre de dessin, lui, doit couvrir TOUT ce que `paint` touche, sans
+    // quoi Qt ne réefface pas ce qu'il a peint : en déplaçant le composant on
+    // laissait derrière soi une traînée de références et de mesures.
+    //
+    // Les textes sont tracés dans le repère non tourné (paint annule la
+    // rotation) : sur un composant pivoté, ils sortent donc par un autre côté.
+    // Comme les rotations sont des quarts de tour, il suffit d'ajouter au
+    // cadre sa propre version transposée.
+    const QRectF textes(-90, cadre_.top() - 4, 180, cadre_.height() + 20);
+    const QRectF transpose(textes.top(), textes.left(), textes.height(),
+                           textes.width());
+    cadre_peint_ = cadre_ | textes | transpose;
 }
 
-QRectF ItemComposant::boundingRect() const { return cadre_; }
+QRectF ItemComposant::boundingRect() const { return cadre_peint_; }
+
+QPainterPath ItemComposant::shape() const {
+    // Ce qui répond au clic reste le symbole et ses étiquettes proches : un
+    // cadre de dessin élargi ne doit pas rendre la sélection approximative.
+    QPainterPath forme;
+    forme.addRect(cadre_);
+    return forme;
+}
 
 int ItemComposant::nb_bornes() const {
     return modele_ ? static_cast<int>(modele_->bornes.size()) : 0;

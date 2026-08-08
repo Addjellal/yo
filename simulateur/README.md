@@ -223,7 +223,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
 ./build/tests_coeur                        # 250 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 134 tests, sans fenêtre
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 137 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
@@ -496,7 +496,7 @@ simulateur/
 │   └── LISEZ-MOI.txt.in             mot d'accueil livré dans le paquet
 └── tests/
     ├── test_coeur.cpp                250 tests, sans Qt
-    └── test_schema.cpp               134 tests, saisie de schéma sans fenêtre
+    └── test_schema.cpp               137 tests, saisie de schéma sans fenêtre
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
@@ -665,7 +665,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **134 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **137 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, le panneau
 d'analyses (Bode, spectre, exports CSV), le câblage à la souris, le
@@ -674,7 +674,14 @@ presse-papiers, et le transfert du schéma vers la carte — un second transfert
 ne touche à rien, retirer un composant du schéma le retire de la carte et
 abandonne les pistes de son net.
 
-Une section entière porte sur les **gestes d'un utilisateur ordinaire**, et
+Une section vérifie qu'**aucun composant ne peint hors du cadre qu'il
+déclare** : Qt n'efface que l'intérieur de ce cadre, et tout ce qui dépasse
+reste imprimé à l'écran quand l'objet bouge — c'est la traînée d'étiquettes
+qu'on voyait en déplaçant un composant. Le test est photographique : chaque
+modèle du catalogue est peint seul sur fond blanc, dans les quatre
+orientations, et l'on compte les pixels salis au-delà du cadre.
+
+Une autre porte sur les **gestes d'un utilisateur ordinaire**, et
 elle est née d'un audit qui a trouvé de quoi la remplir : effacer deux
 composants reliés entre eux, effacer celui du milieu d'une chaîne, effacer
 sous une vue ouverte, effacer pendant qu'un fil est en cours de tracé,

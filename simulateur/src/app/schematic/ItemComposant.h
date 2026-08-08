@@ -23,6 +23,10 @@ public:
 
     int type() const override { return Type; }
     QRectF boundingRect() const override;
+    // La zone qui répond au clic n'est pas celle qu'on repeint : le cadre
+    // de dessin doit couvrir jusqu'aux textes, la forme cliquable doit
+    // rester serrée sur le symbole.
+    QPainterPath shape() const override;
     void paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,
                QWidget* widget) override;
 
@@ -59,7 +63,8 @@ private:
     QString reference_;
     double eclat_ = 0.0;
     QString mesure_;
-    QRectF cadre_;
+    QRectF cadre_;          // zone cliquable
+    QRectF cadre_peint_;    // tout ce que paint() peut toucher
 
     void recalculer_cadre();
 };

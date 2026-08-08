@@ -10,6 +10,8 @@
 #include <QApplication>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
+#include <QImage>
+#include <QPainter>
 #include <QKeyEvent>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -1362,6 +1364,94 @@ static void test_modification_en_marche() {
 }
 
 // ---------------------------------------------------------------------------
+// Traînées à l'écran : ce qu'on peint doit tenir dans ce qu'on déclare
+//
+// Qt n'efface qu'à l'intérieur du cadre annoncé par `boundingRect`. Tout ce
+// qui est peint dehors reste imprimé sur l'écran quand l'objet bouge — c'est
+// la traînée d'étiquettes qu'on voyait en déplaçant un composant.
+//
+// Le test est photographique : on peint l'objet sur fond blanc, et on regarde
+// s'il a sali quoi que ce soit hors de son cadre.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Pixels peints hors du cadre déclaré, pour un objet seul sur fond blanc.
+int debordement(QGraphicsItem* item, double rotation) {
+    QGraphicsScene scene;
+    scene.setBackgroundBrush(Qt::white);
+    item->setRotation(rotation);
+    scene.addItem(item);
+
+    constexpr int kMarge = 120;
+    const QRectF cadre = item->boundingRect();
+    const QRectF zone = cadre.adjusted(-kMarge, -kMarge, kMarge, kMarge);
+    QImage image(static_cast<int>(zone.width()), static_cast<int>(zone.height()),
+                 QImage::Format_RGB32);
+    image.fill(Qt::white);
+    {
+        QPainter peintre(&image);
+        scene.render(&peintre, QRectF(image.rect()), zone);
+    }
+
+    // Le cadre, ramené aux coordonnées de l'image, avec un pixel de tolérance
+    // pour l'anticrénelage des bords.
+    const QRectF interne = cadre.translated(-zone.topLeft()).adjusted(-2, -2, 2, 2);
+    int taches = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x) {
+            if (interne.contains(x, y)) continue;
+            if (image.pixel(x, y) != qRgb(255, 255, 255)) ++taches;
+        }
+    scene.removeItem(item);
+    return taches;
+}
+
+}  // namespace
+
+static void test_pas_de_trainee() {
+    std::printf("\n-- rien n'est peint hors du cadre déclaré --\n");
+
+    int modeles = 0, fautifs = 0;
+    std::string liste;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele) continue;
+        const std::string& type = modele->type;
+        ++modeles;
+        // Le pire cas : une mesure affichée, une étiquette, et le composant
+        // tourné d'un quart de tour — les textes sortent alors par le côté.
+        for (double rotation : {0.0, 90.0, 180.0, 270.0}) {
+            auto* item = new ItemComposant(modele, "REF12");
+            item->definir_mesure("1234,5 tr/min");
+            const int taches = debordement(item, rotation);
+            if (taches > 0 && fautifs < 6) {
+                liste += " " + type + "(" + std::to_string(static_cast<int>(rotation))
+                         + "°:" + std::to_string(taches) + "px)";
+            }
+            if (taches > 0) ++fautifs;
+            delete item;
+        }
+    }
+    verifier(modeles > 25, "tout le catalogue est passé au crible",
+             std::to_string(modeles) + " modèles × 4 orientations");
+    verifier(fautifs == 0, "aucun composant ne peint hors de son cadre", liste);
+
+    // --- même chose pour un fil, avec sa tension affichée
+    {
+        SceneSchema atelier;
+        ItemComposant* a = atelier.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* b = atelier.ajouter_composant("led", QPointF(60, 0));
+        auto* fil = new ItemFil(a, 1, b, 0);
+        atelier.addItem(fil);
+        fil->definir_tension(-12.345);
+        atelier.removeItem(fil);
+        verifier(debordement(fil, 0.0) == 0,
+                 "un fil non plus, tension affichée comprise",
+                 std::to_string(debordement(fil, 0.0)) + " px");
+        atelier.addItem(fil);
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -1383,6 +1473,7 @@ int main(int argc, char** argv) {
     test_transfert_pcb();
     test_gestes_utilisateur();
     test_modification_en_marche();
+    test_pas_de_trainee();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

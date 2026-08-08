@@ -33,7 +33,10 @@ QPainterPath ItemFil::trace() const {
 }
 
 QRectF ItemFil::boundingRect() const {
-    return trace().boundingRect().adjusted(-14, -18, 14, 14);
+    // La tension s'écrit au milieu du fil, dans une boîte de quatre-vingts
+    // pixels : le cadre doit la contenir, sinon elle reste imprimée à l'écran
+    // quand le fil bouge.
+    return trace().boundingRect().adjusted(-42, -20, 42, 16);
 }
 
 QPainterPath ItemFil::shape() const {
