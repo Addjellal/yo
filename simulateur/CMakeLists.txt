@@ -38,6 +38,23 @@ endif()
 message(STATUS "Moteur analogique ngspice : ${MOTEUR_NGSPICE}")
 message(STATUS "Moteur AVR simavr        : ${MOTEUR_SIMAVR}")
 
+# Sans ngspice, l'application se lance mais ne calcule rien : autant le dire
+# à la configuration plutôt que de laisser chercher.
+if(NOT MOTEUR_NGSPICE)
+  message(WARNING
+    "ngspice est introuvable : aucune tension ne sera calculée "
+    "(pas d'oscilloscope, pas d'analyses). C'est la SEULE dépendance "
+    "vraiment indispensable.\n"
+    "  Debian/Ubuntu : sudo apt install libngspice0-dev\n"
+    "  MSYS2 (UCRT64) : pacman -S mingw-w64-ucrt-x86_64-ngspice")
+endif()
+if(NOT MOTEUR_SIMAVR)
+  message(STATUS
+    "simavr introuvable : les programmes ne seront pas exécutés. "
+    "Toute la partie analogique fonctionne quand même "
+    "(Debian/Ubuntu : libsimavr-dev libelf-dev).")
+endif()
+
 # ---------------------------------------------------------------------------
 # Bibliothèque « cœur » : aucune dépendance à l'interface graphique, donc
 # testable sans écran et réutilisable par le futur module PCB.

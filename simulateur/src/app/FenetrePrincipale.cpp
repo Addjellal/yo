@@ -489,6 +489,23 @@ void FenetrePrincipale::construire_barre_etat() {
     statusBar()->addWidget(etiquette_moteurs_);
     statusBar()->addPermanentWidget(etiquette_temps_);
     statusBar()->addPermanentWidget(etiquette_vitesse_);
+
+    // Une ligne d'état ne suffit pas : sans ngspice, l'application se lance,
+    // le schéma se dessine, et rien ne se passe quand on simule. Il faut le
+    // dire en clair, et dire quoi installer.
+    if (!spice)
+        ecrire("ngspice n'est pas là : le schéma se dessine et s'exporte, mais "
+               "aucune tension ne sera calculée (ni oscilloscope, ni analyses). "
+               "Debian/Ubuntu : « libngspice0-dev ». MSYS2/Windows : "
+               "« mingw-w64-ucrt-x86_64-ngspice ». Puis reconfigurer avec "
+               "cmake.");
+    if (!avr)
+        ecrire("simavr n'est pas là : les programmes ne seront pas exécutés. "
+               "La partie analogique, elle, fonctionne entièrement.");
+    else if (!coeur::AvrEngine::avr_gcc_disponible())
+        ecrire("avr-gcc est introuvable dans le PATH : le bouton « Compiler » "
+               "ne fonctionnera pas. On peut malgré tout charger un .elf déjà "
+               "compilé (Simulation → Charger un firmware).");
 }
 
 // ---------------------------------------------------------------------------

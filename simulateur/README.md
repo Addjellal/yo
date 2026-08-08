@@ -122,6 +122,23 @@ Autant le dire tout de suite, pour ne pas donner le change :
 
 ## Construire et lancer
 
+### De quoi a-t-on vraiment besoin ?
+
+Toutes les dépendances sont détectées à la configuration et le projet se
+compile sans elles — mais ce qu'on obtient n'est alors pas le même logiciel.
+Voici exactement ce que chacune apporte, pour n'installer que ce qu'on veut.
+
+| Ce qu'on installe | Ce qu'on peut faire |
+|---|---|
+| **Qt 6 seul** | dessiner le schéma, régler les composants, enregistrer, et produire les documents : nomenclature, contrôle des règles, netlist KiCad, schéma PDF/PNG. **Aucune tension n'est calculée.** |
+| **+ ngspice** | tout l'électrique : tensions, courants, LED qui s'allument, oscilloscope, balayage continu, Bode, spectre. C'est **la seule dépendance vraiment indispensable** pour que le mot « simulateur » ait un sens. |
+| **+ simavr** | exécuter un vrai firmware AVR (`.elf`, `.hex`) sur l'ATmega328P. |
+| **+ avr-gcc** | écrire et compiler le programme *dans* l'application (`F5`). Sans lui, on charge un `.elf` produit par l'IDE Arduino. |
+
+La barre d'état l'indique en permanence (`ngspice : actif | simavr : actif |
+avr-gcc : trouvé`) et le journal explique au démarrage ce qui manque et quoi
+installer.
+
 ### Linux (Debian, Ubuntu)
 
 ```bash
@@ -132,39 +149,74 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 105 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 19 tests, sans fenêtre
+./build/tests_coeur                        # 171 tests, sans Qt
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 33 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
-Les dépendances sont **facultatives** et détectées à la configuration :
-sans `libngspice`, sans `libsimavr` ou sans Qt, ce qui reste se compile
-quand même. La barre d'état indique en permanence quels moteurs sont actifs.
+### Windows 11
 
-### Windows
+Le plus court chemin est **MSYS2**, qui fournit Qt 6 et ngspice par paquets :
+pas de zip à décompresser, pas de chemin à donner à CMake. (Cette machine est
+sous Linux : ces commandes viennent des paquets MSYS2 réellement publiés, mais
+je n'ai pas pu exécuter la compilation moi-même. Si quelque chose accroche,
+le message d'erreur exact est ce qui permettra de corriger cette page.)
 
-Je n'ai pas pu produire ni tester un `.exe` Windows : cette machine est sous
-Linux et il n'y a pas de Qt Windows disponible pour une compilation croisée.
-La marche à suivre est celle-ci, mais **elle n'est pas vérifiée** :
+1. Installer [MSYS2](https://www.msys2.org/), puis ouvrir le raccourci
+   **« MSYS2 UCRT64 »** — pas « MSYS2 MSYS », c'est l'erreur classique : les
+   paquets `mingw-w64-ucrt-x86_64-…` n'y sont pas visibles.
 
-1. Installer [Qt 6](https://www.qt.io/download-qt-installer) (composant
-   *MSVC 2019 64-bit* ou *MinGW*), CMake et Visual Studio Build Tools.
-2. Récupérer ngspice en bibliothèque partagée
-   (`ngspice-XX_dll_64.zip` sur [SourceForge](https://sourceforge.net/projects/ngspice/files/))
-   et placer `ngspice.dll` à côté de l'exécutable.
-3. Pour simavr, compiler depuis les sources ou utiliser MSYS2
-   (`pacman -S mingw-w64-x86_64-simavr`).
-4. Pour `avr-gcc`, installer [WinAVR](https://winavr.sourceforge.net/) ou la
-   chaîne d'Arduino IDE, et l'ajouter au `PATH`.
+2. Le nécessaire (schéma + toute la simulation électrique) :
+
+   ```bash
+   pacman -Syu                       # puis rouvrir le terminal si demandé
+   pacman -S --needed \
+     mingw-w64-ucrt-x86_64-gcc \
+     mingw-w64-ucrt-x86_64-cmake \
+     mingw-w64-ucrt-x86_64-ninja \
+     mingw-w64-ucrt-x86_64-qt6-base \
+     mingw-w64-ucrt-x86_64-ngspice
+   ```
+
+3. Compiler et lancer :
+
+   ```bash
+   cd /c/chemin/vers/simulateur
+   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+   cmake --build build
+   ./build/simulateur.exe
+   ```
+
+   Lancer depuis le terminal UCRT64 : les DLL de Qt et de ngspice y sont déjà
+   dans le `PATH`. Pour un double-clic depuis l'explorateur, il faudra copier
+   les DLL à côté de l'exécutable (`windeployqt` s'en charge pour Qt, et
+   `libngspice-0.dll` est dans `C:\msys64\ucrt64\bin`).
+
+4. Pour la partie Arduino, en plus :
+
+   ```bash
+   pacman -S --needed mingw-w64-ucrt-x86_64-avr-gcc \
+                      mingw-w64-ucrt-x86_64-avr-libc
+   ```
+
+   **simavr n'existe pas en paquet MSYS2** — l'ancienne version de cette page
+   l'affirmait, c'était faux. Il faut le compiler depuis les sources
+   (`pacman -S mingw-w64-ucrt-x86_64-libelf git make`, puis
+   `git clone https://github.com/buserror/simavr` et `make`), et cette étape
+   n'est pas vérifiée. Sans simavr, tout le reste marche : c'est un simulateur
+   analogique complet, sans l'exécution du firmware.
+
+Si vous préférez le Qt officiel (installateur qt.io) et Visual Studio, il faut
+alors récupérer ngspice à part
+(`ngspice-XX_dll_64.zip` sur [SourceForge](https://sourceforge.net/projects/ngspice/files/)),
+poser ses en-têtes et sa bibliothèque quelque part, et l'indiquer à CMake :
 
 ```powershell
-cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.6.0/msvc2019_64"
+cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.7.0/msvc2019_64;C:/ngspice"
 cmake --build build --config Release
 ```
 
-Sans `avr-gcc`, l'application reste utilisable : elle charge directement un
-`.elf` ou un `.hex` produit par l'IDE Arduino
-(*Croquis → Exporter les binaires compilés*).
+C'est faisable, mais c'est trois fois plus de manipulations que MSYS2.
 
 ---
 
