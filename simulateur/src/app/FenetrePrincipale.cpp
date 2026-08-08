@@ -657,7 +657,9 @@ void FenetrePrincipale::construire_actions() {
             "<h3>Simulateur embarqué</h3>"
             "<p>Saisie de schéma, simulation analogique et exécution du vrai "
             "firmware compilé, dans une seule application.</p>"
-            "<p>Moteur analogique : <b>ngspice</b> — celui de KiCad.<br>"
+            "<p>Moteur analogique : <b>solveur intégré</b> — analyse nodale "
+            "modifiée, Newton, trapèzes ; rien à installer. <b>ngspice</b> "
+            "peut le doubler pour comparaison.<br>"
             "Moteur microcontrôleur : <b>simavr</b> — exécution cycle par "
             "cycle d'un ATmega328P.</p>"
             "<p>Raccourcis : <b>R</b> pivote la sélection, <b>Suppr</b> "
@@ -703,15 +705,7 @@ void FenetrePrincipale::construire_barre_etat() {
     statusBar()->addPermanentWidget(etiquette_vitesse_);
     refleter_etat();
 
-    // Une ligne d'état ne suffit pas : sans ngspice, l'application se lance,
-    // le schéma se dessine, et rien ne se passe quand on simule. Il faut le
-    // dire en clair, et dire quoi installer.
-    if (!spice)
-        ecrire("ngspice n'est pas là : le schéma se dessine et s'exporte, mais "
-               "aucune tension ne sera calculée (ni oscilloscope, ni analyses). "
-               "Debian/Ubuntu : « libngspice0-dev ». MSYS2/Windows : "
-               "« mingw-w64-ucrt-x86_64-ngspice ». Puis reconfigurer avec "
-               "cmake.");
+    // Le moteur analogique est toujours là ; seul le firmware peut manquer.
     if (!avr)
         ecrire("simavr n'est pas là : les programmes ne seront pas exécutés. "
                "La partie analogique, elle, fonctionne entièrement.");
