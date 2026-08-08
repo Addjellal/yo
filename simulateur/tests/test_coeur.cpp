@@ -2301,7 +2301,7 @@ static void test_numerique() {
     if (!modele || !modele->reagir) return;
 
     coeur::Netlist netlist;
-    coeur::Instance& registre = netlist.ajouter("IC1", "registre_74hc595");
+    netlist.ajouter("IC1", "registre_74hc595");
     netlist.relier("IC1", "SER", "D11");
     netlist.relier("IC1", "SRCLK", "D13");
     netlist.relier("IC1", "RCLK", "D10");
