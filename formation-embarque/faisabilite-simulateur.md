@@ -62,7 +62,7 @@ C'est la section `[11]` de `simulateur/tests/test_coeur.cpp`.
 
 ### Ce que le catalogue couvre désormais
 
-53 composants, dont sept à mécanique interne — servomoteur, moteur à courant
+56 composants, dont sept à mécanique interne — servomoteur, moteur à courant
 continu, moteur pas à pas, moteur asynchrone triphasé, télémètre à ultrasons,
 codeur incrémental, capteur de courant. Ils ont un état qui avance dans le
 temps, pas seulement une impédance, et leur grandeur s'affiche sous le symbole

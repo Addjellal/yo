@@ -64,6 +64,9 @@ public:
     bool annuler();
     bool retablir();
     bool peut_annuler() const { return !pile_annulation_.empty(); }
+    // Ouvrir un projet ou en commencer un neuf efface l'histoire : annuler
+    // ramènerait sinon le schéma précédent, ce que personne n'attend.
+    void oublier_historique();
     bool peut_retablir() const { return !pile_retablissement_.empty(); }
 
     // --- presse-papiers -----------------------------------------------------

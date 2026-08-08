@@ -253,8 +253,12 @@ void ItemComposant::paint(QPainter* peintre,
     police.setBold(false);
     peintre->setFont(police);
     peintre->setPen(QPen(QColor(70, 70, 70), 1));
-    peintre->drawText(QRectF(-70, cadre_.bottom() - 18, 140, 16),
-                      Qt::AlignHCenter | Qt::AlignVCenter, etiquette());
+    // L'étiquette est le réglage du composant, la mesure est ce qu'il fait.
+    // Sur un servomoteur, l'angle est les deux à la fois : l'afficher deux
+    // fois n'apprend rien et fait douter de ce qu'on lit.
+    if (etiquette() != mesure_)
+        peintre->drawText(QRectF(-70, cadre_.bottom() - 18, 140, 16),
+                          Qt::AlignHCenter | Qt::AlignVCenter, etiquette());
     if (!mesure_.isEmpty()) {
         police.setBold(true);
         peintre->setFont(police);

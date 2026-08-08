@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <set>
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
@@ -265,17 +266,20 @@ SceneSchema::calculer_noeuds() const {
     // dans l'ordre des références : « R1_2 » plutôt que « N3 ». C'est ce que
     // fait KiCad, et pour la même raison — « N3 » n'apprend rien à personne,
     // alors qu'un nom tiré du montage se retrouve sur le schéma.
+    // Bornes réellement câblées, relevées en une seule passe sur les fils :
+    // les chercher borne par borne coûterait le produit des deux nombres, et
+    // cette fonction est appelée à chaque image.
+    std::set<std::pair<const ItemComposant*, int>> cablees;
+    for (ItemFil* fil : fils()) {
+        cablees.emplace(fil->depart(), fil->borne_depart());
+        cablees.emplace(fil->arrivee(), fil->borne_arrivee());
+    }
     for (ItemComposant* composant : liste) {
         for (int k = 0; k < composant->nb_bornes(); ++k) {
             const int racine = classes.racine(indices[composant][k]);
             if (noms.count(racine)) continue;
             // Une borne en l'air n'est pas un nœud : elle n'est reliée à rien.
-            bool cablee = false;
-            for (ItemFil* fil : fils())
-                if ((fil->depart() == composant && fil->borne_depart() == k) ||
-                    (fil->arrivee() == composant && fil->borne_arrivee() == k))
-                    cablee = true;
-            if (!cablee) continue;
+            if (!cablees.count({composant, k})) continue;
             noms[racine] =
                 assainir_noeud(composant->reference().toStdString() + "_"
                                + composant->nom_borne(k).toStdString());
@@ -578,6 +582,14 @@ void SceneSchema::abandonner_fil() {
     fil_en_attente_ = false;
 }
 
+// Composant sous un point, quelle que soit la partie touchée.
+static ItemComposant* composant_sous(QGraphicsScene* scene, const QPointF& point) {
+    for (QGraphicsItem* item : scene->items(point))
+        if (item->type() == ItemComposant::Type)
+            return static_cast<ItemComposant*>(item);
+    return nullptr;
+}
+
 void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     const QPointF point = evenement->scenePos();
 
@@ -600,7 +612,9 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
         if (outil_ == Outil::Fil) return;   // l'outil fil ne fait que ça
         // Un déplacement commence peut-être : on garde l'état d'avant pour
         // pouvoir l'annuler, et on ne l'empilera qu'en cas de vrai changement.
-        etat_avant_geste_ = vers_json();
+        // Seulement si le clic porte sur un composant : sérialiser la scène à
+        // chaque clic dans le vide serait du travail pour rien.
+        if (composant_sous(this, point)) etat_avant_geste_ = vers_json();
     }
     if (outil_ == Outil::Suppression && evenement->button() == Qt::LeftButton) {
         clearSelection();
@@ -670,14 +684,6 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
         if (etat_avant_geste_ != vers_json()) empiler(etat_avant_geste_);
         etat_avant_geste_ = QJsonObject();
     }
-}
-
-// Composant sous un point, quelle que soit la partie touchée.
-static ItemComposant* composant_sous(QGraphicsScene* scene, const QPointF& point) {
-    for (QGraphicsItem* item : scene->items(point))
-        if (item->type() == ItemComposant::Type)
-            return static_cast<ItemComposant*>(item);
-    return nullptr;
 }
 
 void SceneSchema::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) {
@@ -835,6 +841,12 @@ void SceneSchema::memoriser() {
     // Une nouvelle action rend caduc tout ce qui avait été annulé : c'est le
     // comportement attendu partout ailleurs.
     pile_retablissement_.clear();
+}
+
+void SceneSchema::oublier_historique() {
+    pile_annulation_.clear();
+    pile_retablissement_.clear();
+    etat_avant_geste_ = QJsonObject();
 }
 
 bool SceneSchema::annuler() {

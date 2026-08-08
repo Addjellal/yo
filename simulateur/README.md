@@ -23,7 +23,7 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 
 - **Saisie de schéma** : palette par famille, glisser-déposer, fils en équerre,
   rotation, grille magnétique, zoom à la molette.
-- **Catalogue de 53 composants** (49 simulables, 9 familles), tous vérifiés
+- **Catalogue de 56 composants** (50 simulables, 9 familles), tous vérifiés
   par les tests : passifs, diodes et Zener, transistors NPN/PNP, MOSFET,
   optocoupleur, afficheur 7 segments, relais, portes logiques, amplificateur
   opérationnel, régulateur 7805, instruments de mesure.
@@ -171,8 +171,8 @@ sudo apt install build-essential cmake qt6-base-dev \
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 171 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 33 tests, sans fenêtre
+./build/tests_coeur                        # 186 tests, sans Qt
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 81 tests, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
@@ -542,7 +542,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**180 tests du cœur**, sans Qt, en seize sections :
+**186 tests du cœur**, sans Qt, en dix-sept sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -560,13 +560,16 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 10 | **exemplaires multiples** : cinq de chaque modèle en série, aucun nom d'élément SPICE en double ; dix LED en parallèle qui font s'effondrer la sortie |
 | 13 | **mesures et spectre**, confrontés à la théorie : une sinusoïde n'a pas d'harmoniques, un carré a un fondamental à 4A/π, une harmonique 3 au tiers, aucune harmonique paire, et 48,3 % de distorsion |
 | 14 | **nomenclature, ERC et exports** : regroupement des composants identiques, LED sans résistance série, borne en l'air, sortie sur une alimentation, deux sources en parallèle, netlist KiCad aux parenthèses équilibrées |
+| 17 | **température et bruit** : la tension de seuil d'une diode qui baisse avec la chaleur, et le bruit thermique d'une résistance de 10 kΩ confronté à 4kTR (12,9 nV/√Hz) |
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages ngspice** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **59 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **81 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
-d'alimentation répétés, deux cartes sur le même schéma, et le panneau
-d'analyses (Bode, spectre, exports CSV).
+d'alimentation répétés, deux cartes sur le même schéma, le panneau
+d'analyses (Bode, spectre, exports CSV), le câblage à la souris, le
+déclenchement de l'oscilloscope, les étiquettes de nœud, l'annulation et le
+presse-papiers.
 
 L'application se vérifie aussi sans intervention :
 

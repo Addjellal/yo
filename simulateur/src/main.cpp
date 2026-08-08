@@ -1,5 +1,6 @@
 // Point d'entrée de l'application.
 #include <QApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QFont>
 #include <QPixmap>
@@ -26,7 +27,7 @@ int main(int argc, char** argv) {
     fenetre.definir_mode_silencieux(position >= 0 ||
                                     arguments.contains("--diagnostic"));
 
-    // « --exemple N » choisit le montage d'exemple à charger (0 à 3).
+    // « --exemple N » choisit le montage d'exemple à charger (0 à 8).
     const int rang = arguments.indexOf("--exemple");
     if (rang >= 0 && rang + 1 < arguments.size()) {
         const int numero = arguments.at(rang + 1).toInt();
@@ -67,7 +68,8 @@ int main(int argc, char** argv) {
         });
     }
     // « --analyse N [attente_ms] » : lance l'analyse N (0 balayage continu,
-    // 1 réponse en fréquence, 2 spectre) et imprime son compte rendu chiffré.
+    // 1 réponse en fréquence, 2 spectre, 3 bruit) et imprime son compte rendu
+    // chiffré.
     // Le spectre porte sur ce qui vient d'être simulé : la simulation doit
     // donc tourner d'abord.
     const int analyse = arguments.indexOf("--analyse");
@@ -106,6 +108,7 @@ int main(int argc, char** argv) {
     if (documents >= 0 && documents + 1 < arguments.size()) {
         fenetre.definir_mode_silencieux(true);
         const QString dossier = arguments.at(documents + 1);
+        QDir().mkpath(dossier);      // le dossier de sortie peut ne pas exister
         QTimer::singleShot(300, &application, [&fenetre, dossier] {
             QTextStream sortie(stdout);
             const struct { const char* nom; bool (FenetrePrincipale::*action)(const QString&); }

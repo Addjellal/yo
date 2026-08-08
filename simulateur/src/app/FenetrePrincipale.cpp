@@ -1047,6 +1047,7 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
 // ---------------------------------------------------------------------------
 void FenetrePrincipale::nouveau_projet() {
     scene_->tout_effacer();
+    scene_->oublier_historique();
     chemin_projet_.clear();
     programmes_.clear();
     carte_courante_.clear();
@@ -1101,6 +1102,7 @@ bool FenetrePrincipale::ouvrir_depuis(const QString& chemin) {
     const QJsonObject racine =
         QJsonDocument::fromJson(fichier.readAll()).object();
     scene_->depuis_json(racine);
+    scene_->oublier_historique();
 
     // Les programmes de l'ancien projet ne doivent pas déborder sur le
     // nouveau : on repart d'une table vide.
@@ -1571,6 +1573,7 @@ void loop() {
 
 void FenetrePrincipale::charger_exemple(Exemple exemple) {
     scene_->tout_effacer();
+    scene_->oublier_historique();
     chemin_projet_.clear();
 
     if (exemple == Exemple::DeuxCartes) {
@@ -1749,6 +1752,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
 // la carte unique posée par charger_exemple().
 void FenetrePrincipale::charger_exemple_deux_cartes() {
     scene_->tout_effacer();
+    scene_->oublier_historique();
     chemin_projet_.clear();
     programmes_.clear();
     carte_courante_.clear();
@@ -1808,6 +1812,7 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
 // diagramme de Bode que trace le simulateur.
 void FenetrePrincipale::charger_exemple_filtre() {
     scene_->tout_effacer();
+    scene_->oublier_historique();
     chemin_projet_.clear();
     programmes_.clear();
     carte_courante_.clear();

@@ -811,6 +811,20 @@ static void test_annulation() {
                  "un collage s'annule comme le reste");
     }
 
+    // --- ouvrir un projet efface l'histoire : annuler ne doit pas ramener
+    // le schéma précédent, ce que personne n'attend.
+    {
+        SceneSchema atelier;
+        atelier.ajouter_composant("resistance", QPointF(0, 0));
+        atelier.memoriser();
+        atelier.ajouter_composant("led", QPointF(100, 0));
+        const QJsonObject autre_projet = atelier.vers_json();
+        atelier.depuis_json(autre_projet);
+        atelier.oublier_historique();
+        verifier(!atelier.peut_annuler() && !atelier.peut_retablir(),
+                 "ouvrir un projet repart d'une histoire vierge");
+    }
+
     // --- un fil qui sort de la sélection n'est pas copié
     {
         SceneSchema atelier;

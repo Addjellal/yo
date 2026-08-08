@@ -2122,7 +2122,7 @@ static void test_temperature_et_bruit() {
         r.valeurs["ohms"] = 10000;
         netlist.relier("R1", "1", "IN");
         netlist.relier("R1", "2", "MID");
-        auto& d = netlist.ajouter("D1", "diode");
+        netlist.ajouter("D1", "diode");
         netlist.relier("D1", "A", "MID");
         netlist.relier("D1", "K", "GND");
 

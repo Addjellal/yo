@@ -24,8 +24,9 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | Symboles décrits en données (pas en code) | KiCad | ✅ |
 | Propriétés éditables par composant | tous | ✅ |
 | Sonde sur un fil vers l'oscilloscope | Proteus | ✅ |
-| Annuler / rétablir, copier-coller | tous | ❌ |
-| Étiquettes de nœud, bus, feuilles multiples | KiCad, Altium | ❌ |
+| Annuler / rétablir, copier-coller, dupliquer | tous | ✅ 50 états, y compris les déplacements |
+| Étiquettes de nœud | KiCad, Altium | ✅ |
+| Bus, feuilles multiples | KiCad, Altium | ❌ |
 | Alignement, duplication en série | tous | ❌ |
 | Éditeur de symboles dans l'interface | KiCad | ❌ (le catalogue s'écrit en C++, un bloc par composant) |
 
@@ -42,7 +43,9 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | Circuit **et** microcontrôleur couplés au cycle | Proteus VSM | ✅ |
 | Plusieurs cartes sur le même schéma | Proteus | ✅ |
 | Montage sans microcontrôleur | LTspice, Multisim | ✅ |
-| Analyse de bruit, Monte-Carlo, température | LTspice, Multisim | ❌ (ngspice sait ; l'interface ne le propose pas) |
+| Analyse de bruit | LTspice, Multisim | ✅ vérifiée contre 4kTR |
+| Balayage en température | LTspice, Multisim | ✅ |
+| Monte-Carlo, analyse de sensibilité | Multisim | ❌ |
 | Analyse paramétrique multi-passes (`.step`) | LTspice | ❌ |
 | Périphériques numériques (I²C, SPI, LCD, 74HC) | Proteus, Wokwi | ❌ demanderait un troisième moteur, événementiel |
 | Autre cœur que l'AVR (STM32, PIC) | Proteus | ❌ |
@@ -61,7 +64,7 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 | Ohmmètre à courant d'essai | Multisim | ✅ |
 | Déclenchement de l'oscilloscope (front, niveau, auto/normal) | Multisim, Proteus | ✅ avec niveau automatique et pré-déclenchement |
 | Curseurs de mesure sur la courbe (Δt, ΔV, fréquence) | Multisim | ✅ |
-| Mode XY (Lissajous), décalage vertical par voie, couplage AC | Multisim | ❌ |
+| Mode XY (Lissajous), décalage vertical par voie, couplage alternatif | Multisim | ✅ |
 | Analyseur logique, terminal I²C/SPI | Proteus | ❌ |
 
 ## 4. Documents produits
@@ -70,7 +73,7 @@ capture ; rien n'y est annoncé sur la foi d'un catalogue.
 |---|---|---|
 | Netlist SPICE | LTspice, Multisim | ✅ |
 | **Nomenclature (BOM)** groupée, en CSV | KiCad, Altium | ✅ |
-| **Contrôle des règles électriques (ERC)** | KiCad, Altium | ✅ 8 règles |
+| **Contrôle des règles électriques (ERC)** | KiCad, Altium | ✅ 10 règles |
 | **Netlist au format KiCad** (vers le routage) | KiCad | ✅ |
 | Relevés de courbes en CSV | LTspice | ✅ |
 | Schéma en PDF vectoriel / PNG | tous | ✅ |
@@ -105,8 +108,8 @@ la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur SPICE, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 180 tests du
-cœur et 59 tests de saisie, dont beaucoup comparent le résultat à une valeur
+C'est aussi un projet dont **chaque affirmation est vérifiée** : 186 tests du
+cœur et 81 tests de saisie, dont beaucoup comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
 un signal carré.
@@ -115,14 +118,12 @@ un signal carré.
 
 ## Ordre de priorité si le projet continue
 
-1. **Annuler / rétablir et copier-coller.** C'est ce qui manque le plus vite
-   quand on dessine, et cela ne dépend d'aucun moteur.
-2. **Étiquettes de nœud.** Un schéma un peu grand devient illisible sans
-   elles.
-3. **Module PCB.** La brique la plus lourde, mais celle dont la place est déjà
+1. **Module PCB.** La brique la plus lourde, mais celle dont la place est déjà
    faite.
-4. **Moteur numérique événementiel.** Il débloquerait d'un coup l'I²C, le SPI,
+2. **Moteur numérique événementiel.** Il débloquerait d'un coup l'I²C, le SPI,
    les écrans et les circuits logiques complexes — c'est-à-dire la moitié des
    montages de TP encore renvoyés vers Wokwi.
-5. **Analyses restantes** (`.step`, bruit, température, Monte-Carlo) : ngspice
-   les sait déjà faire, il n'y manque que la boîte de dialogue et le tracé.
+3. **Analyses restantes** : `.step` (balayage paramétrique à passes
+   multiples) et Monte-Carlo. Le bruit et la température, eux, sont faits.
+4. **Bus et feuilles multiples**, pour les schémas qui ne tiennent plus sur
+   une page.
