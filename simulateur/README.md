@@ -282,7 +282,8 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
 
    Ninja ne recompile que ce qui a changé, et relance CMake tout seul si la
    recette de compilation a été modifiée. Le script `.\outils\maj.ps1` fait
-   les trois d'un coup.
+   les trois d'un coup — et `.\outils\maj.ps1 -Paquet` refait en plus
+   l'archive portable.
 
    Une seule chose annule tout : **effacer le dossier `build`**. Ne le faites
    que pour changer de compilateur ou de chemin — il faut alors reprendre la
