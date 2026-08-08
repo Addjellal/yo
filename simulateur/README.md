@@ -206,17 +206,49 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    **simavr n'existe pas en paquet MSYS2** — l'ancienne version de cette page
    l'affirmait, c'était faux. Il faut le compiler depuis les sources
    (`pacman -S mingw-w64-ucrt-x86_64-libelf git make`, puis
-   `git clone https://github.com/buserror/simavr` et `make`), et cette étape
-   n'est pas vérifiée. Sans simavr, tout le reste marche : c'est un simulateur
-   analogique complet, sans l'exécution du firmware.
+   `git clone https://github.com/buserror/simavr` et `make` en suivant son
+   `README.mingw`). Le dépôt garde des rugosités connues sur cette
+   plate-forme ; je ne peux pas vérifier cette étape d'ici. Sans simavr, tout
+   le reste marche : c'est un simulateur analogique complet, sans l'exécution
+   du firmware.
+
+   **`avrtest` ne remplace pas simavr.** C'est le simulateur de la suite de
+   tests d'avr-gcc : un exécutable autonome qui exécute un `.elf` et imprime
+   un résultat. Il n'expose aucune bibliothèque, donc aucun moyen de dater les
+   changements d'état des broches ni d'injecter une tension sur une entrée —
+   c'est précisément ce dont le couplage avec le circuit a besoin.
+
+#### Attention au fichier ngspice à télécharger
+
+Sur SourceForge, deux archives se ressemblent et une seule convient — j'ai
+ouvert les deux pour en avoir le cœur net :
+
+| Archive | Contenu | Utilisable ici |
+|---|---|---|
+| `ngspice-46_64.7z` (10,7 Mo) | `bin/ngspice.exe`, l'application autonome | ❌ ni DLL ni en-tête : rien à quoi se lier |
+| **`ngspice-46_dll_64.7z`** (4,4 Mo) | `include/ngspice/sharedspice.h`, `dll-vs/ngspice.dll`, `lib/lib-vs/ngspice.lib` | ✅ c'est celle-ci |
+
+La description SourceForge de la bonne archive dit « shared ngspice dll,
+64 bit (VS) ». Décompressée, elle donne un dossier `Spice64_dll` ; c'est ce
+dossier qu'on désigne à CMake :
+
+```powershell
+cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" ^
+      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+```
+
+Au lancement, `ngspice.dll` **et** `libomp140.x86_64.dll` (livrée à côté)
+doivent être trouvables : le plus simple est de les copier près de
+`simulateur.exe`.
 
 #### Si Qt est déjà installé par l'installateur officiel (qt.io)
 
 Inutile de le réinstaller. Deux cas, selon le compilateur choisi avec Qt.
 
-**Qt MinGW** — c'est le plus simple : ngspice s'emprunte à MSYS2 et se donne à
-CMake. L'interface de ngspice est en **C**, pas en C++ : mélanger sa DLL avec
-un autre compilateur ne pose donc pas de problème d'ABI.
+**Qt MinGW** — l'interface de ngspice est en **C**, pas en C++ : sa DLL se
+mélange sans problème d'ABI avec un autre compilateur. On peut donc prendre
+soit la DLL officielle (`-DNGSPICE_ROOT=C:/Spice64_dll`, l'éditeur de liens de
+MinGW s'attache directement à un `.dll`), soit le paquet MSYS2 :
 
 ```powershell
 :: dans MSYS2 : pacman -S mingw-w64-ucrt-x86_64-ngspice
@@ -228,13 +260,12 @@ cmake --build build
 Ajoutez `C:\Qt\6.11.1\mingw_64\bin` et `C:\msys64\ucrt64\bin` au `PATH`
 avant de lancer l'exécutable, sinon Windows ne trouvera pas les DLL.
 
-**Qt MSVC** — il faut alors une bibliothèque d'import Microsoft pour ngspice :
-prendre `ngspice-XX_dll_64.zip` sur
-[SourceForge](https://sourceforge.net/projects/ngspice/files/), et produire le
-`.lib` depuis le `.def` fourni (`lib /def:ngspice.def /machine:x64`).
+**Qt MSVC** — l'archive `ngspice-46_dll_64.7z` contient déjà la bibliothèque
+d'import Microsoft (`lib/lib-vs/ngspice.lib`) : rien à fabriquer.
 
 ```powershell
-cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64;C:/ngspice"
+cmake -S . -B build -DNGSPICE_ROOT="C:/Spice64_dll" ^
+      -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/msvc2022_64"
 cmake --build build --config Release
 ```
 

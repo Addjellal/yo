@@ -20,8 +20,22 @@ endif()
 #   ngspice -> simulation analogique complète (transistors, AOP, transitoire)
 #   simavr  -> exécution du VRAI firmware compilé par avr-gcc
 # ---------------------------------------------------------------------------
-find_path(NGSPICE_INCLUDE_DIR ngspice/sharedspice.h)
-find_library(NGSPICE_LIBRARY NAMES ngspice)
+# Sous Windows, ngspice se télécharge en archive plutôt qu'il ne s'installe.
+# « -DNGSPICE_ROOT=C:/Spice64_dll » suffit alors : les sous-dossiers de la
+# distribution officielle sont connus ici, il n'y a pas à désigner le fichier.
+set(NGSPICE_ROOT "" CACHE PATH
+    "Dossier de ngspice décompressé (celui qui contient include/ et dll-vs/)")
+find_path(NGSPICE_INCLUDE_DIR ngspice/sharedspice.h
+          HINTS ${NGSPICE_ROOT} ${NGSPICE_ROOT}/include)
+# L'ordre compte : bibliothèque d'import Visual Studio si elle est là, sinon
+# la DLL elle-même — l'éditeur de liens de MinGW sait s'y attacher directement.
+find_library(NGSPICE_LIBRARY
+             NAMES ngspice ngspice.lib ngspice.dll libngspice-0.dll
+             HINTS ${NGSPICE_ROOT}
+                   ${NGSPICE_ROOT}/lib/lib-vs
+                   ${NGSPICE_ROOT}/lib
+                   ${NGSPICE_ROOT}/dll-vs
+                   ${NGSPICE_ROOT}/bin)
 find_path(SIMAVR_INCLUDE_DIR simavr/sim_avr.h)
 find_library(SIMAVR_LIBRARY NAMES simavr)
 find_library(ELF_LIBRARY NAMES elf)
