@@ -8,6 +8,7 @@
 //   QT_QPA_PLATFORM=offscreen ./tests_schema
 
 #include <QApplication>
+#include <QGraphicsSceneMouseEvent>
 #include <QPointF>
 
 #include <algorithm>
@@ -385,6 +386,108 @@ static void test_panneau_analyses() {
 }
 
 // ---------------------------------------------------------------------------
+// [7] Câblage à la souris : cliquer une borne doit suffire à tirer un fil,
+// sans passer par l'outil. Les événements sont envoyés à la scène comme le
+// ferait la vue, donc sans ouvrir de fenêtre.
+// ---------------------------------------------------------------------------
+namespace {
+
+void envoyer(SceneSchema& scene, QEvent::Type type, const QPointF& point,
+             Qt::MouseButton bouton = Qt::LeftButton) {
+    QGraphicsSceneMouseEvent evenement(type);
+    evenement.setScenePos(point);
+    evenement.setPos(point);
+    evenement.setButton(bouton);
+    evenement.setButtons(type == QEvent::GraphicsSceneMouseRelease
+                             ? Qt::NoButton
+                             : bouton);
+    QApplication::sendEvent(&scene, &evenement);
+}
+
+}  // namespace
+
+static void test_cablage_souris() {
+    std::printf("\n[7] Câblage à la souris\n");
+
+    // --- glisser d'une borne à l'autre, outil Sélection
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(200, 0));
+        const QPointF depart = r1->position_borne(1);
+        const QPointF arrivee = r2->position_borne(0);
+
+        envoyer(scene, QEvent::GraphicsSceneMousePress, depart);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, arrivee);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, arrivee);
+        verifier(scene.fils().size() == 1,
+                 "glisser d'une borne à l'autre crée un fil, outil Sélection",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- clic, puis clic : le fil reste accroché entre les deux
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(200, 0));
+        const QPointF depart = r1->position_borne(1);
+        const QPointF arrivee = r2->position_borne(0);
+
+        envoyer(scene, QEvent::GraphicsSceneMousePress, depart);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, depart);
+        verifier(scene.fils().empty(),
+                 "un simple clic ne crée pas encore de fil");
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, arrivee);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, arrivee);
+        verifier(scene.fils().size() == 1,
+                 "le second clic referme le fil",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- cliquer ailleurs qu'une borne ne fabrique rien, et ne casse rien
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        const QPointF depart = r1->position_borne(0);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, depart);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, depart);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, QPointF(600, 600));
+        verifier(scene.fils().empty(),
+                 "un clic dans le vide abandonne le fil en cours");
+
+        // et l'on peut recommencer aussitôt
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 0));
+        envoyer(scene, QEvent::GraphicsSceneMousePress, r1->position_borne(1));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, r2->position_borne(0));
+        verifier(scene.fils().size() == 1,
+                 "après un abandon, le câblage repart normalement",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- une borne sur elle-même ne crée pas de fil
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        const QPointF borne = r1->position_borne(0);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, borne);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, borne + QPointF(20, 20));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, borne);
+        verifier(scene.fils().empty(),
+                 "une borne reliée à elle-même est refusée");
+    }
+
+    // --- cliquer le corps d'un composant le sélectionne, sans tirer de fil
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        envoyer(scene, QEvent::GraphicsSceneMousePress, r1->pos());
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, r1->pos());
+        verifier(scene.fils().empty(),
+                 "cliquer le corps ne déclenche pas de câblage");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -397,6 +500,7 @@ int main(int argc, char** argv) {
     test_deux_cartes();
     test_cartes_non_cablees();
     test_panneau_analyses();
+    test_cablage_souris();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

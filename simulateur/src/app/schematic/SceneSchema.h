@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QGraphicsScene>
+#include <QPointF>
 #include <QString>
 #include <QStringList>
 
@@ -78,10 +79,18 @@ private:
     ItemComposant* fil_depart_ = nullptr;
     int fil_borne_ = -1;
     QGraphicsLineItem* fil_provisoire_ = nullptr;
+    // Fil accroché au curseur entre deux clics (câblage en deux temps).
+    bool fil_en_attente_ = false;
+    QPointF point_appui_;
     std::map<std::string, int> compteurs_;   // par préfixe : R1, R2…
 
     // Recherche la borne sous le curseur, tous composants confondus.
     std::pair<ItemComposant*, int> borne_sous(const QPointF& point) const;
+
+    // Cycle de vie d'un fil en cours de tracé.
+    void commencer_fil(ItemComposant* composant, int borne, const QPointF& point);
+    bool terminer_fil(const QPointF& point);   // vrai si un fil a été créé
+    void abandonner_fil();
 
     // Association (composant, borne) -> nom de nœud, calculée par les fils.
     std::map<const ItemComposant*, std::vector<std::string>> calculer_noeuds() const;

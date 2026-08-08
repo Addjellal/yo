@@ -2,6 +2,7 @@
 
 #include <QGraphicsLineItem>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsView>
 #include <QKeyEvent>
 #include <QPainter>
 
@@ -62,13 +63,7 @@ SceneSchema::SceneSchema(QObject* parent) : QGraphicsScene(parent) {
 
 void SceneSchema::definir_outil(Outil outil) {
     outil_ = outil;
-    if (fil_provisoire_) {
-        removeItem(fil_provisoire_);
-        delete fil_provisoire_;
-        fil_provisoire_ = nullptr;
-    }
-    fil_depart_ = nullptr;
-    fil_borne_ = -1;
+    abandonner_fil();
 }
 
 QString SceneSchema::prochaine_reference(const std::string& prefixe) {
@@ -152,10 +147,15 @@ void SceneSchema::supprimer_selection() {
 }
 
 void SceneSchema::tout_effacer() {
-    clear();
+    clear();                     // détruit déjà le trait provisoire
     compteurs_.clear();
+    // Les pointeurs sont remis à zéro sans passer par abandonner_fil() : les
+    // objets viennent d'être détruits par clear(). Un fil resté « en attente »
+    // désignerait sinon un composant qui n'existe plus.
     fil_depart_ = nullptr;
     fil_provisoire_ = nullptr;
+    fil_borne_ = -1;
+    fil_en_attente_ = false;
     emit selection_composant(nullptr);
 }
 
@@ -399,20 +399,66 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
         peintre->drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
 }
 
+// Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
+// curseur.
+void SceneSchema::commencer_fil(ItemComposant* composant, int borne,
+                                const QPointF& point) {
+    fil_depart_ = composant;
+    fil_borne_ = borne;
+    fil_en_attente_ = false;
+    point_appui_ = point;
+    fil_provisoire_ = addLine(QLineF(composant->position_borne(borne), point),
+                              QPen(QColor(0, 120, 215), 1.5, Qt::DashLine));
+}
+
+// Referme le fil sur une borne d'arrivée, si elle est valable.
+bool SceneSchema::terminer_fil(const QPointF& point) {
+    auto [composant, borne] = borne_sous(point);
+    const bool valable =
+        composant && !(composant == fil_depart_ && borne == fil_borne_);
+    if (valable) {
+        addItem(new ItemFil(fil_depart_, fil_borne_, composant, borne));
+        emit journal(QString("Fil : %1.%2 — %3.%4")
+                         .arg(fil_depart_->reference(),
+                              fil_depart_->nom_borne(fil_borne_),
+                              composant->reference(),
+                              composant->nom_borne(borne)));
+    }
+    abandonner_fil();
+    return valable;
+}
+
+void SceneSchema::abandonner_fil() {
+    if (fil_provisoire_) {
+        removeItem(fil_provisoire_);
+        delete fil_provisoire_;
+        fil_provisoire_ = nullptr;
+    }
+    fil_depart_ = nullptr;
+    fil_borne_ = -1;
+    fil_en_attente_ = false;
+}
+
 void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     const QPointF point = evenement->scenePos();
 
-    if (outil_ == Outil::Fil && evenement->button() == Qt::LeftButton) {
+    if (evenement->button() == Qt::LeftButton && outil_ != Outil::Suppression) {
+        // Fil laissé en attente par un premier clic : ce clic-ci le referme,
+        // ou l'abandonne s'il tombe à côté d'une borne.
+        if (fil_en_attente_ && fil_depart_) {
+            if (!terminer_fil(point)) abandonner_fil();
+            return;
+        }
+
+        // Cliquer une borne suffit à tirer un fil : c'est ce que font les
+        // ateliers de saisie de schéma, et cela évite d'aller chercher un
+        // outil pour l'opération la plus fréquente du dessin.
         auto [composant, borne] = borne_sous(point);
         if (composant) {
-            fil_depart_ = composant;
-            fil_borne_ = borne;
-            fil_provisoire_ = addLine(QLineF(composant->position_borne(borne),
-                                             point),
-                                      QPen(QColor(0, 120, 215), 1.5,
-                                           Qt::DashLine));
+            commencer_fil(composant, borne, point);
+            return;
         }
-        return;
+        if (outil_ == Outil::Fil) return;   // l'outil fil ne fait que ça
     }
     if (outil_ == Outil::Suppression && evenement->button() == Qt::LeftButton) {
         clearSelection();
@@ -440,28 +486,35 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
                    evenement->scenePos()));
         return;
     }
+
+    // Le curseur change au-dessus d'une borne : sans ce signe, rien ne dirait
+    // qu'un clic va tirer un fil plutôt que déplacer le composant.
+    if (outil_ != Outil::Suppression) {
+        const bool sur_borne = borne_sous(evenement->scenePos()).first != nullptr;
+        for (QGraphicsView* vue : views())
+            vue->setCursor(sur_borne ? Qt::CrossCursor : Qt::ArrowCursor);
+    }
+
     QGraphicsScene::mouseMoveEvent(evenement);
     // Un composant déplacé entraîne le retracé de ses fils.
     for (ItemFil* fil : fils()) fil->rafraichir();
 }
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
-    if (fil_provisoire_ && fil_depart_) {
-        removeItem(fil_provisoire_);
-        delete fil_provisoire_;
-        fil_provisoire_ = nullptr;
+    if (fil_provisoire_ && fil_depart_ && !fil_en_attente_) {
+        const QPointF point = evenement->scenePos();
+        if (terminer_fil(point)) return;
 
-        auto [composant, borne] = borne_sous(evenement->scenePos());
-        if (composant && !(composant == fil_depart_ && borne == fil_borne_)) {
-            addItem(new ItemFil(fil_depart_, fil_borne_, composant, borne));
-            emit journal(QString("Fil : %1.%2 — %3.%4")
-                             .arg(fil_depart_->reference(),
-                                  fil_depart_->nom_borne(fil_borne_),
-                                  composant->reference(),
-                                  composant->nom_borne(borne)));
+        // Relâché sans avoir bougé : c'était un clic, pas un glissement. Le
+        // fil reste alors accroché au curseur jusqu'au clic suivant — les
+        // deux façons de câbler cohabitent ainsi sans se gêner.
+        if (QLineF(point_appui_, point).length() < 6.0) {
+            auto [composant, borne] = borne_sous(point_appui_);
+            if (composant) {
+                commencer_fil(composant, borne, point);
+                fil_en_attente_ = true;
+            }
         }
-        fil_depart_ = nullptr;
-        fil_borne_ = -1;
         return;
     }
     QGraphicsScene::mouseReleaseEvent(evenement);
@@ -472,6 +525,10 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::keyPressEvent(QKeyEvent* evenement) {
+    if (evenement->key() == Qt::Key_Escape) {
+        abandonner_fil();
+        return;
+    }
     if (evenement->key() == Qt::Key_Delete) {
         supprimer_selection();
         return;
