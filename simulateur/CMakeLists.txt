@@ -213,6 +213,33 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     set_target_properties(simulateur PROPERTIES WIN32_EXECUTABLE ON)
   endif()
 
+  # windeployqt vit à côté de qmake ; le dossier des greffons se demande à Qt.
+  get_target_property(QT_QMAKE Qt6::qmake IMPORTED_LOCATION)
+  get_filename_component(QT_DOSSIER_BIN "${QT_QMAKE}" DIRECTORY)
+  find_program(SIM_WINDEPLOYQT NAMES windeployqt windeployqt6
+               HINTS "${QT_DOSSIER_BIN}")
+  execute_process(COMMAND "${QT_QMAKE}" -query QT_INSTALL_PLUGINS
+                  OUTPUT_VARIABLE SIM_QT_PLUGINS
+                  OUTPUT_STRIP_TRAILING_WHITESPACE
+                  ERROR_QUIET)
+
+  # Sous Windows, on dépose les DLL de Qt à côté de l'exécutable dès la
+  # compilation. Sans cela, le fichier produit dans le dossier de
+  # construction refuse de démarrer — il va chercher Qt dans le PATH, y
+  # trouve une autre version, et se plaint d'un point d'entrée introuvable.
+  # Un exécutable qui existe doit se lancer : c'est le minimum.
+  if(WIN32 AND SIM_WINDEPLOYQT)
+    add_custom_command(TARGET simulateur POST_BUILD
+      COMMAND "${SIM_WINDEPLOYQT}" --release --no-translations
+              --no-system-d3d-compiler --no-opengl-sw --compiler-runtime
+              "$<TARGET_FILE:simulateur>"
+      COMMENT "Dépôt des DLL de Qt à côté de l'exécutable")
+  elseif(WIN32)
+    message(WARNING
+      "windeployqt introuvable : l'exécutable produit ne démarrera que si "
+      "le dossier bin de Qt est dans le PATH.")
+  endif()
+
   add_executable(tests_schema tests/test_schema.cpp)
   target_link_libraries(tests_schema PRIVATE schema)
   add_test(NAME schema COMMAND tests_schema)
@@ -240,16 +267,6 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/outils/LISEZ-MOI.txt.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" @ONLY)
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" DESTINATION .)
-
-  # windeployqt vit à côté de qmake ; le dossier des greffons se demande à Qt.
-  get_target_property(QT_QMAKE Qt6::qmake IMPORTED_LOCATION)
-  get_filename_component(QT_DOSSIER_BIN "${QT_QMAKE}" DIRECTORY)
-  find_program(SIM_WINDEPLOYQT NAMES windeployqt windeployqt6
-               HINTS "${QT_DOSSIER_BIN}")
-  execute_process(COMMAND "${QT_QMAKE}" -query QT_INSTALL_PLUGINS
-                  OUTPUT_VARIABLE SIM_QT_PLUGINS
-                  OUTPUT_STRIP_TRAILING_WHITESPACE
-                  ERROR_QUIET)
 
   install(CODE "set(SIM_EXECUTABLE \"$<TARGET_FILE:simulateur>\")")
   install(CODE "set(SIM_WINDEPLOYQT \"${SIM_WINDEPLOYQT}\")")

@@ -260,9 +260,10 @@ stables depuis Qt 6.3. Si Qt est déjà installé chez vous, sautez au paragraph
    ./build/simulateur.exe
    ```
 
-   Lancer depuis le terminal UCRT64 : les DLL de Qt y sont déjà dans le
-   `PATH`. Pour un double-clic depuis l'explorateur, `windeployqt` copie
-   celles de Qt à côté de l'exécutable. Il n'y a aucune autre DLL à déposer.
+   Sous Windows, les DLL de Qt sont déposées automatiquement à côté de
+   l'exécutable à la fin de chaque compilation (`windeployqt`, livré avec
+   Qt). L'exécutable produit démarre donc au double-clic, sans rien dans le
+   `PATH`.
 
 4. Pour vérifier que tout fonctionne : *Exemples → Filtre RC*, puis onglet
    *Analyses → Réponse en fréquence → Lancer*. La coupure annoncée sous la
