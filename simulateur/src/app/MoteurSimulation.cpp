@@ -210,6 +210,17 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
                                            const QString& dossier,
                                            QString* journal_texte,
                                            const QString& reference) {
+    const Carte* cible = carte(reference);
+    const std::string mcu = cible ? cible->puce : "atmega328p";
+    return compiler_et_charger(
+        coeur::Programme{{coeur::nom_principal(mcu), source.toStdString()}},
+        dossier, journal_texte, reference);
+}
+
+bool MoteurSimulation::compiler_et_charger(const coeur::Programme& fichiers,
+                                           const QString& dossier,
+                                           QString* journal_texte,
+                                           const QString& reference) {
     const QString cible = reference.isEmpty() ? carte_par_defaut() : reference;
     if (cible.isEmpty()) {
         if (journal_texte)
@@ -244,7 +255,7 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
     const Carte& carte_cible = puce_cible;
     // La chaîne qui convient à la puce : avr-g++ pour un ATmega, un
     // compilateur ARM pour un Cortex-M.
-    const bool ok = coeur::compiler_pour(carte_cible.puce, source.toStdString(),
+    const bool ok = coeur::compiler_pour(carte_cible.puce, fichiers,
                                          fichier.toStdString(),
                                          carte_cible.horloge, &compte_rendu);
     if (journal_texte) *journal_texte = QString::fromStdString(compte_rendu);

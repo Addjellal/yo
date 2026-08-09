@@ -42,6 +42,23 @@ int main(int argc, char** argv) {
         fenetre.charger_exemple(
             static_cast<FenetrePrincipale::Exemple>(numero));
     }
+    // « --projet fichier » ouvre un projet enregistré. Sert au dépannage et à
+    // vérifier qu'un fichier d'une version antérieure se relit encore.
+    const int projet = arguments.indexOf("--projet");
+    if (projet >= 0 && projet + 1 < arguments.size())
+        fenetre.ouvrir_depuis(arguments.at(projet + 1));
+
+    // « --enregistrer fichier » écrit le projet puis quitte. Avec « --projet »,
+    // cela fait un aller-retour complet : c'est ainsi qu'on vérifie qu'un
+    // projet enregistré se relit à l'identique, programmes compris.
+    const int enregistrer = arguments.indexOf("--enregistrer");
+    if (enregistrer >= 0 && enregistrer + 1 < arguments.size()) {
+        fenetre.definir_mode_silencieux(true);
+        const bool ok = fenetre.enregistrer_vers(arguments.at(enregistrer + 1));
+        QTextStream(stdout) << fenetre.diagnostic() << Qt::endl;
+        return ok ? 0 : 1;
+    }
+
     // « --base N » impose la base de temps de l'oscilloscope, en secondes.
     const int base = arguments.indexOf("--base");
 

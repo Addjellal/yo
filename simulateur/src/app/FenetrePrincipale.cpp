@@ -22,6 +22,9 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
+#include <QInputDialog>
+#include <QTabBar>
+#include <QToolButton>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
@@ -279,6 +282,38 @@ void FenetrePrincipale::construire_docks() {
     barre_carte->addWidget(selecteur_carte_);
     barre_carte->addStretch(1);
     disposition->addLayout(barre_carte);
+
+    // Les fichiers du programme. La barre reste cachée tant qu'il n'y en a
+    // qu'un — le cas courant —, et apparaît dès qu'on en ajoute.
+    {
+        auto* ligne = new QHBoxLayout;
+        ligne->setContentsMargins(0, 0, 0, 0);
+        onglets_fichiers_ = new QTabBar;
+        onglets_fichiers_->setExpanding(false);
+        onglets_fichiers_->setDrawBase(false);
+        onglets_fichiers_->setVisible(false);
+        connect(onglets_fichiers_, &QTabBar::currentChanged, this,
+                [this](int rang) { afficher_fichier(rang); });
+        ligne->addWidget(onglets_fichiers_);
+        auto* ajouter = new QToolButton;
+        ajouter->setText("+");
+        ajouter->setToolTip(
+            "Ajouter un fichier au programme de cette carte.\n"
+            "« .h » pour des déclarations, « .cpp » pour du code compilé à "
+            "part,\n« .ino » pour un onglet de croquis fondu avec le "
+            "principal.");
+        connect(ajouter, &QToolButton::clicked, this,
+                &FenetrePrincipale::ajouter_fichier);
+        ligne->addWidget(ajouter);
+        auto* retirer = new QToolButton;
+        retirer->setText("−");
+        retirer->setToolTip("Retirer le fichier affiché (jamais le principal).");
+        connect(retirer, &QToolButton::clicked, this,
+                [this] { retirer_fichier(fichier_courant_); });
+        ligne->addWidget(retirer);
+        ligne->addStretch(1);
+        disposition->addLayout(ligne);
+    }
 
     editeur_source_ = new QPlainTextEdit(coeur::kSourceExemple);
     QFont fonte("monospace");
@@ -1178,25 +1213,157 @@ QString FenetrePrincipale::programme_par_defaut(const QString& reference) const 
     return QString::fromUtf8(coeur::kSourceExemple);
 }
 
+// ---------------------------------------------------------------------------
+// Les fichiers d'un programme
+//
+// Un croquis d'une page tient dans un seul fichier, et c'est le cas courant.
+// Dès qu'il grossit, on veut sortir les fonctions communes — et les partager
+// entre plusieurs cartes. Les onglets au-dessus de l'éditeur servent à cela.
+//
+// Les règles sont celles de l'IDE Arduino, rappelées ici parce qu'elles ne
+// vont pas de soi : un « .h » est déposé à côté et jamais compilé seul ; un
+// « .cpp » est une unité de compilation à part ; un « .ino » est FONDU avec
+// le croquis principal, ce qui lui évite d'avoir à déclarer quoi que ce soit.
+// ---------------------------------------------------------------------------
+coeur::Programme& FenetrePrincipale::programme_de(const QString& carte) {
+    auto it = programmes_.find(carte);
+    if (it == programmes_.end()) {
+        // Nouvelle carte : on lui propose le programme d'exemple plutôt qu'un
+        // éditeur vide — et celui de SON contrôleur. Une carte Arduino reçoit
+        // un croquis, un microcontrôleur nu reçoit du C sur registres.
+        // Le nom du fichier principal suit la puce : « .ino » pour une carte
+        // qui reçoit le noyau Arduino, « .c » pour une puce nue.
+        std::string mcu = "atmega328p";
+        for (ItemComposant* composant : scene_->composants())
+            if (composant->reference() == carte && composant->modele()
+                && !composant->modele()->mcu.empty()) {
+                mcu = composant->modele()->mcu;
+                break;
+            }
+        programmes_[carte] = coeur::Programme{
+            {coeur::nom_principal(mcu),
+             programme_par_defaut(carte).toStdString()}};
+        it = programmes_.find(carte);
+    }
+    if (it->second.empty())
+        it->second.push_back({"principal.ino", std::string()});
+    return it->second;
+}
+
+void FenetrePrincipale::ranger_editeur() {
+    if (carte_courante_.isEmpty() || !editeur_source_) return;
+    coeur::Programme& programme = programme_de(carte_courante_);
+    const int rang =
+        std::min<int>(std::max(fichier_courant_, 0),
+                      static_cast<int>(programme.size()) - 1);
+    programme[rang].contenu = editeur_source_->toPlainText().toStdString();
+}
+
+void FenetrePrincipale::afficher_fichier(int rang) {
+    if (carte_courante_.isEmpty() || !editeur_source_) return;
+    coeur::Programme& programme = programme_de(carte_courante_);
+    if (rang < 0 || rang >= static_cast<int>(programme.size())) return;
+    if (rang != fichier_courant_) ranger_editeur();
+    fichier_courant_ = rang;
+    const QSignalBlocker silence(editeur_source_);
+    editeur_source_->setPlainText(
+        QString::fromStdString(programme[rang].contenu));
+}
+
+void FenetrePrincipale::rafraichir_onglets_fichiers() {
+    if (!onglets_fichiers_) return;
+    const QSignalBlocker silence(onglets_fichiers_);
+    while (onglets_fichiers_->count() > 0) onglets_fichiers_->removeTab(0);
+    if (carte_courante_.isEmpty()) return;
+    const coeur::Programme& programme = programme_de(carte_courante_);
+    for (size_t rang = 0; rang < programme.size(); ++rang)
+        onglets_fichiers_->addTab(
+            QString::fromStdString(programme[rang].nom));
+    if (fichier_courant_ >= static_cast<int>(programme.size()))
+        fichier_courant_ = 0;
+    onglets_fichiers_->setCurrentIndex(fichier_courant_);
+    // Un programme d'un seul fichier n'a pas besoin d'une barre d'onglets :
+    // elle n'apprendrait rien et volerait de la hauteur à l'éditeur.
+    onglets_fichiers_->setVisible(programme.size() > 1);
+}
+
+void FenetrePrincipale::ajouter_fichier() {
+    if (carte_courante_.isEmpty()) return;
+    bool valide = false;
+    const QString nom =
+        QInputDialog::getText(
+            this, "Nouveau fichier",
+            "Nom du fichier :\n"
+            "  « .h »   déclarations, inclus par les autres\n"
+            "  « .cpp » code compilé à part\n"
+            "  « .ino » onglet de croquis, fondu avec le principal",
+            QLineEdit::Normal, "mesure.h", &valide)
+            .trimmed();
+    if (!valide || nom.isEmpty()) return;
+    if (nom.contains('/') || nom.contains('\\')) {
+        avertir("Nouveau fichier",
+                "Un nom simple est attendu, sans dossier : « mesure.h ».");
+        return;
+    }
+    if (!nom.contains('.')) {
+        avertir("Nouveau fichier",
+                "Il faut une extension : « .h », « .cpp » ou « .ino ». "
+                "C'est elle qui décide comment le fichier est compilé.");
+        return;
+    }
+    ranger_editeur();
+    coeur::Programme& programme = programme_de(carte_courante_);
+    for (const coeur::Fichier& fichier : programme)
+        if (QString::fromStdString(fichier.nom) == nom) {
+            avertir("Nouveau fichier", "« " + nom + " » existe déjà.");
+            return;
+        }
+    // Un en-tête neuf reçoit sa garde : l'oublier est l'erreur classique, et
+    // elle ne se voit qu'à l'édition de liens.
+    const std::string amorce =
+        nom.endsWith(".h") || nom.endsWith(".hpp")
+            ? "#pragma once\n\n"
+            : "";
+    programme.push_back({nom.toStdString(), amorce});
+    rafraichir_onglets_fichiers();
+    afficher_fichier(static_cast<int>(programme.size()) - 1);
+    onglets_fichiers_->setCurrentIndex(fichier_courant_);
+    ecrire("Fichier ajouté au programme de " + carte_courante_ + " : " + nom);
+}
+
+void FenetrePrincipale::retirer_fichier(int rang) {
+    if (carte_courante_.isEmpty()) return;
+    coeur::Programme& programme = programme_de(carte_courante_);
+    if (rang <= 0 || rang >= static_cast<int>(programme.size())) {
+        // Le principal ne se retire pas : c'est lui qui porte setup() et
+        // loop(), et un programme sans lui n'existe pas.
+        avertir("Retirer un fichier",
+                "Le fichier principal ne peut pas être retiré.");
+        return;
+    }
+    const QString nom = QString::fromStdString(programme[rang].nom);
+    const auto reponse = QMessageBox::question(
+        this, "Retirer un fichier",
+        "Retirer « " + nom + " » du programme de " + carte_courante_
+            + " ?\nSon contenu sera perdu.");
+    if (reponse != QMessageBox::Yes) return;
+    programme.erase(programme.begin() + rang);
+    fichier_courant_ = 0;
+    rafraichir_onglets_fichiers();
+    afficher_fichier(0);
+    ecrire("Fichier retiré : " + nom);
+}
+
 void FenetrePrincipale::changer_carte(const QString& reference) {
     if (reference == carte_courante_) return;
     // Le programme affiché appartient à la carte qu'on quitte : on le range
     // avant d'afficher celui de la nouvelle.
-    if (!carte_courante_.isEmpty() && editeur_source_)
-        programmes_[carte_courante_] = editeur_source_->toPlainText();
+    ranger_editeur();
     carte_courante_ = reference;
+    fichier_courant_ = 0;
     if (!editeur_source_ || reference.isEmpty()) return;
-
-    auto it = programmes_.find(reference);
-    if (it == programmes_.end()) {
-        // Nouvelle carte : on lui propose le programme d'exemple plutôt
-        // qu'un éditeur vide — et celui de SON contrôleur. Une carte Arduino
-        // reçoit un croquis, un microcontrôleur nu reçoit du C sur registres.
-        programmes_[reference] = programme_par_defaut(reference);
-        it = programmes_.find(reference);
-    }
-    const QSignalBlocker silence(editeur_source_);
-    editeur_source_->setPlainText(it->second);
+    rafraichir_onglets_fichiers();
+    afficher_fichier(0);
     refleter_langage(reference);
 }
 
@@ -1327,10 +1494,21 @@ bool FenetrePrincipale::enregistrer_vers(const QString& chemin) {
     // Le schéma sait s'écrire lui-même : la fenêtre n'ajoute que ce qu'elle
     // est seule à connaître, les programmes de chaque carte.
     QJsonObject racine = scene_->vers_json();
-    if (!carte_courante_.isEmpty())
-        programmes_[carte_courante_] = editeur_source_->toPlainText();
+    ranger_editeur();
+    // Chaque carte a ses fichiers, dans l'ordre — le premier est le principal,
+    // et cet ordre doit survivre à l'enregistrement. Un objet JSON ne garantit
+    // pas l'ordre de ses clés : c'est donc un tableau.
     QJsonObject programmes;
-    for (const auto& paire : programmes_) programmes[paire.first] = paire.second;
+    for (const auto& paire : programmes_) {
+        QJsonArray fichiers;
+        for (const coeur::Fichier& fichier : paire.second) {
+            QJsonObject entree;
+            entree["nom"] = QString::fromStdString(fichier.nom);
+            entree["contenu"] = QString::fromStdString(fichier.contenu);
+            fichiers.append(entree);
+        }
+        programmes[paire.first] = fichiers;
+    }
     racine["programmes"] = programmes;
     racine["programme"] = editeur_source_->toPlainText();   // anciens fichiers
 
@@ -1369,14 +1547,30 @@ bool FenetrePrincipale::ouvrir_depuis(const QString& chemin) {
     programmes_.clear();
     carte_courante_.clear();
     const QJsonObject programmes = racine["programmes"].toObject();
-    for (auto it = programmes.begin(); it != programmes.end(); ++it)
-        programmes_[it.key()] = it.value().toString();
+    for (auto it = programmes.begin(); it != programmes.end(); ++it) {
+        coeur::Programme programme;
+        if (it.value().isArray()) {
+            for (const QJsonValue& valeur : it.value().toArray()) {
+                const QJsonObject entree = valeur.toObject();
+                programme.push_back(
+                    {entree["nom"].toString().toStdString(),
+                     entree["contenu"].toString().toStdString()});
+            }
+        } else {
+            // Projet d'une version antérieure : le programme était une seule
+            // chaîne. On le reprend tel quel, sous un nom de principal.
+            programme.push_back({"principal.ino",
+                                 it.value().toString().toStdString()});
+        }
+        if (!programme.empty()) programmes_[it.key()] = std::move(programme);
+    }
     if (programmes_.empty() && racine.contains("programme")) {
-        // Fichier d'une version antérieure : un seul programme, pour la
-        // première carte.
+        // Fichier plus ancien encore : un seul programme, pour la première
+        // carte, et pas même de table.
         const QStringList cartes = scene_->cartes_presentes();
         if (!cartes.isEmpty())
-            programmes_[cartes.first()] = racine["programme"].toString();
+            programmes_[cartes.first()] = coeur::Programme{
+                {"principal.ino", racine["programme"].toString().toStdString()}};
     }
 
     chemin_projet_ = chemin;
@@ -1434,17 +1628,19 @@ void FenetrePrincipale::ouvrir_source_c() {
         return;
     }
     editeur_source_->setPlainText(QString::fromUtf8(fichier.readAll()));
+    ranger_editeur();
     ecrire("Programme ouvert : " + chemin);
 }
 
 void FenetrePrincipale::compiler_source() {
     QString compte_rendu;
-    if (!carte_courante_.isEmpty())
-        programmes_[carte_courante_] = editeur_source_->toPlainText();
-    const bool ok = moteur_->compiler_et_charger(editeur_source_->toPlainText(),
-                                                 dossier_travail(),
-                                                 &compte_rendu,
-                                                 carte_courante_);
+    ranger_editeur();
+    const bool ok = moteur_->compiler_et_charger(
+        carte_courante_.isEmpty()
+            ? coeur::Programme{{"principal.ino",
+                                editeur_source_->toPlainText().toStdString()}}
+            : programme_de(carte_courante_),
+        dossier_travail(), &compte_rendu, carte_courante_);
     if (!compte_rendu.trimmed().isEmpty()) ecrire(compte_rendu.trimmed());
     if (ok) {
         ecrire("Compilation réussie.");
@@ -1868,7 +2064,8 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
     // s'imposerait — y compris plus tard, quand le signal différé de la scène
     // relancera la synchronisation.
     circuit_modifie();
-    programmes_[carte->reference()] = programme;
+    programmes_[carte->reference()] =
+        coeur::Programme{{"principal.ino", programme.toStdString()}};
     carte_courante_.clear();
     changer_carte(carte->reference());
 
@@ -1919,8 +2116,10 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
     }
 
     circuit_modifie();
-    programmes_[u1->reference()] = QString::fromUtf8(coeur::kProgrammeEmetteur);
-    programmes_[u2->reference()] = QString::fromUtf8(coeur::kProgrammeRecepteur);
+    programmes_[u1->reference()] =
+        coeur::Programme{{"principal.ino", coeur::kProgrammeEmetteur}};
+    programmes_[u2->reference()] =
+        coeur::Programme{{"principal.ino", coeur::kProgrammeRecepteur}};
     // Les programmes viennent d'être posés : on réaffiche celui de la carte
     // sélectionnée pour que l'éditeur montre le bon.
     const QString affichee = carte_courante_;
@@ -2036,7 +2235,8 @@ void FenetrePrincipale::charger_exemple_registre() {
     }
 
     circuit_modifie();
-    programmes_[carte->reference()] = QString::fromUtf8(coeur::kProgrammeRegistre);
+    programmes_[carte->reference()] =
+        coeur::Programme{{"principal.ino", coeur::kProgrammeRegistre}};
     const QString affichee = carte_courante_;
     carte_courante_.clear();
     changer_carte(affichee.isEmpty() ? carte->reference() : affichee);
@@ -2056,8 +2256,13 @@ QString FenetrePrincipale::diagnostic() {
     rapport += "programme affiché : " +
                editeur_source_->toPlainText().split('\n').value(0) + "\n";
     for (const auto& paire : programmes_)
-        rapport += QString("  %1 -> %2\n")
-                       .arg(paire.first, paire.second.split('\n').value(0));
+        for (const coeur::Fichier& fichier : paire.second)
+            rapport += QString("  %1 / %2 -> %3\n")
+                           .arg(paire.first,
+                                QString::fromStdString(fichier.nom),
+                                QString::fromStdString(fichier.contenu)
+                                    .split('\n')
+                                    .value(0));
     rapport += "=== Composants du schéma ===\n";
     for (ItemComposant* item : scene_->composants()) {
         rapport += QString("  %1 (%2)")

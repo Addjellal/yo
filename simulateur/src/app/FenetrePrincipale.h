@@ -5,6 +5,8 @@
 // journal et console série en bas.
 #pragma once
 
+#include "core/engines/Microcontroleur.h"
+
 #include <QMainWindow>
 #include <QTreeWidget>
 
@@ -23,6 +25,7 @@ class QFormLayout;
 class QWidget;
 class QTabWidget;
 class QComboBox;
+class QTabBar;
 class QStackedWidget;
 class QDockWidget;
 class QToolBar;
@@ -212,7 +215,22 @@ private:
     std::vector<FenetreInstrument*> fenetres_instruments_;
     QComboBox* selecteur_carte_ = nullptr;
     // Programme de chaque carte : deux Arduino n'exécutent pas le même.
-    std::map<QString, QString> programmes_;
+    // Un programme par carte, et un programme est une liste de fichiers dont
+    // le premier est le principal. L'onglet affiché est `fichier_courant_`.
+    std::map<QString, coeur::Programme> programmes_;
+    int fichier_courant_ = 0;
+    QTabBar* onglets_fichiers_ = nullptr;
+
+    // Le programme de cette carte, créé avec son exemple s'il n'existe pas.
+    coeur::Programme& programme_de(const QString& carte);
+    // Range le texte affiché dans le fichier auquel il appartient. À appeler
+    // avant tout ce qui lit `programmes_` — sinon la dernière frappe est
+    // perdue.
+    void ranger_editeur();
+    void afficher_fichier(int rang);
+    void rafraichir_onglets_fichiers();
+    void ajouter_fichier();
+    void retirer_fichier(int rang);
     QString carte_courante_;
     QLabel* etiquette_temps_ = nullptr;
     QLabel* etiquette_vitesse_ = nullptr;

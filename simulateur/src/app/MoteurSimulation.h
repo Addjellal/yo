@@ -55,6 +55,10 @@ public:
                           const QString& carte = {});
     bool compiler_et_charger(const QString& source, const QString& dossier,
                              QString* journal, const QString& carte = {});
+    // Programme en plusieurs fichiers.
+    bool compiler_et_charger(const coeur::Programme& fichiers,
+                             const QString& dossier, QString* journal,
+                             const QString& carte = {});
 
     // Cartes présentes sur le schéma, dans l'ordre des références.
     QStringList cartes() const;
