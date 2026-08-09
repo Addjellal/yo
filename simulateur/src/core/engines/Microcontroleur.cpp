@@ -8,6 +8,7 @@
 
 #include "core/engines/AvrEngine.h"
 #include "core/engines/CortexEngine.h"
+#include "core/engines/XtensaEngine.h"
 
 namespace coeur {
 
@@ -20,6 +21,7 @@ std::unique_ptr<Microcontroleur> fabriquer(int rang) {
     switch (rang) {
         case 0: return std::make_unique<AvrEngine>();
         case 1: return std::make_unique<CortexEngine>();
+        case 2: return std::make_unique<XtensaEngine>();
         default: return nullptr;
     }
 }
@@ -41,6 +43,10 @@ bool est_arm(const std::string& mcu) {
     CortexEngine cortex;
     return cortex.reconnait(mcu);
 }
+bool est_xtensa(const std::string& mcu) {
+    XtensaEngine xtensa;
+    return xtensa.reconnait(mcu);
+}
 }  // namespace
 
 bool compiler_pour(const std::string& mcu, const std::string& source,
@@ -48,11 +54,27 @@ bool compiler_pour(const std::string& mcu, const std::string& source,
                    std::string* journal) {
     if (est_arm(mcu))
         return CortexEngine::compiler_source(source, chemin_elf, journal, mcu);
+    if (est_xtensa(mcu)) {
+        // Aucune chaîne Xtensa n'est embarquée, et l'ESP-IDF ne se met pas
+        // dans une archive portable. Le dire franchement vaut mieux que de
+        // lancer avr-g++ sur du code ESP32 et de laisser l'utilisateur
+        // déchiffrer son message.
+        if (journal)
+            *journal =
+                "Le simulateur exécute l'ESP32, mais ne sait pas le "
+                "compiler.\n"
+                "La chaîne Xtensa (ESP-IDF) pèse plusieurs centaines de "
+                "mégaoctets : elle n'est pas embarquée.\n"
+                "Chargez un fichier .elf déjà compilé — tout le reste "
+                "fonctionne alors normalement.";
+        return false;
+    }
     return AvrEngine::compiler_source(source, chemin_elf, journal, mcu, horloge);
 }
 
 bool chaine_disponible_pour(const std::string& mcu) {
     if (est_arm(mcu)) return CortexEngine::chaine_disponible();
+    if (est_xtensa(mcu)) return false;     // rien à embarquer pour celle-là
     return AvrEngine::avr_gpp_disponible();
 }
 
@@ -60,7 +82,7 @@ std::string puces_connues() {
     // Les noms sont ceux qu'attend le compilateur : c'est ainsi que
     // l'utilisateur les rencontrera dans un message d'erreur.
     static const char* noms[] = {"atmega328p", "atmega2560", "attiny85",
-                                 "rp2040", "stm32f103"};
+                                 "rp2040", "stm32f103", "esp32"};
     std::string liste;
     for (const char* nom : noms) {
         if (!liste.empty()) liste += ", ";

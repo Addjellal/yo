@@ -403,6 +403,58 @@ void enregistrer_cartes(Catalogue& catalogue) {
             m.broches_mcu["PC" + std::to_string(c)] = 32 + c;
         enregistrer(std::move(m));
     }
+
+    {   // -------------------------------------------------- ESP32 DevKit
+        // Un Xtensa LX6 : la troisième architecture, et la plus étrangère.
+        // Instructions de trois octets, fenêtre de registres, constantes
+        // rangées dans un bassin littéral. Le cœur l'exécute ; la chaîne de
+        // compilation, elle, n'est pas embarquée — voir le programme.
+        Modele m;
+        m.type = "esp32";
+        m.libelle = "Carte ESP32 DevKit";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#3a3f4a";
+
+        const double pas = 20;
+        const double premier = -(19 - 1) * pas / 2;
+        // Les broches réellement utilisables en entrée-sortie de la carte.
+        const int gauche[] = {36, 39, 34, 35, 32, 33, 25, 26, 27,
+                              14, 12, 13, 9, 10, 11};
+        const int droite[] = {23, 22, 1, 3, 21, 19, 18, 5, 17,
+                              16, 4, 0, 2, 15, 8};
+        for (int k = 0; k < 15; ++k) {
+            const double y = premier + k * pas;
+            m.bornes.push_back({"GPIO" + std::to_string(gauche[k]), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(
+                texte(-66, y + 4, "IO" + std::to_string(gauche[k]), 10));
+            m.bornes.push_back({"GPIO" + std::to_string(droite[k]), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(
+                texte(34, y + 4, "IO" + std::to_string(droite[k]), 10));
+        }
+        const char* alimentation[] = {"3V3", "GND", "VIN", "EN"};
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier + (15 + k) * pas;
+            m.bornes.push_back({alimentation[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-66, y + 4, alimentation[k], 10));
+        }
+        const double demi = (19 - 1) * pas / 2 + 30;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
+        m.symbole.push_back(texte(-30, premier - 16, "ESP32", 12));
+        m.empreinte = {"ESP32_DEVKIT", {}, 52.0, 28.0};
+        m.mcu = "esp32";
+        m.horloge = 240000000;
+        m.langage = "C (registres)";
+        m.programme_exemple = kProgrammeEsp32;
+        // GPIOn est le bit n du bloc GPIO : rien à traduire.
+        for (int g = 0; g <= 39; ++g)
+            m.broches_mcu["GPIO" + std::to_string(g)] = g;
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

@@ -129,6 +129,8 @@ add_library(coeur STATIC
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/CoeurAvr.cpp
   src/core/engines/CoeurCortexM.cpp
+  src/core/engines/CoeurXtensa.cpp
+  src/core/engines/XtensaEngine.cpp
   src/core/engines/CortexEngine.cpp
   src/core/engines/AvrEngine.cpp
   src/core/engines/Microcontroleur.cpp

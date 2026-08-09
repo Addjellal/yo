@@ -23,6 +23,7 @@
 
 #include "core/engines/AvrEngine.h"
 #include "core/engines/CortexEngine.h"
+#include "core/engines/CoeurXtensa.h"
 #include "core/engines/Microcontroleur.h"
 #include "core/engines/ProgrammesExemples.h"
 #include "core/engines/MoteurNumerique.h"
@@ -3335,6 +3336,90 @@ static void test_cartes_arm() {
                  + moteur_de("6502"));
 }
 
+
+// L'ESP32 : un cœur Xtensa, vérifié contre un assembleur indépendant.
+//
+// Le point de méthode est ici plus important que le résultat. Écrire les
+// octets d'un programme d'essai à la main, avec MA lecture de l'encodage,
+// puis les donner à MON décodeur, ne prouverait rien : les deux partageraient
+// la même erreur. Le banc assemble donc le programme avec « llvm-mc », qui
+// n'a rien à voir avec ce projet, et n'exécute que ce que cet assembleur a
+// produit.
+//
+// Cette confrontation a payé : elle a montré que MOVI, ADDI, RET et les
+// quartets d'opération de ADD étaient tous décodés de travers dans la
+// première version.
+static void test_esp32() {
+    std::printf("\n[31] ESP32 : cœur Xtensa\n");
+    if (std::system("llvm-mc --version > /dev/null 2>&1") != 0) {
+        std::printf("  (llvm-mc absent — section ignorée)\n");
+        return;
+    }
+
+    // Clignotant sur GPIO2, la LED des cartes DevKit. Le bassin littéral
+    // vient en tête : c'est de là que L32R tire les adresses.
+    const char* kSource =
+        "\t.text\n\t.align 4\n"
+        ".Lpool:\n"
+        "\t.long 0x3ff44004\n"        // GPIO_OUT_REG
+        "\t.long 0x3ff44020\n"        // GPIO_ENABLE_REG
+        "\t.long 0x00000004\n"        // GPIO2
+        "debut:\n"
+        "\tl32r a2, .Lpool\n"
+        "\tl32r a3, .Lpool+4\n"
+        "\tl32r a4, .Lpool+8\n"
+        "\ts32i a4, a3, 0\n"          // la broche devient une sortie
+        "boucle:\n"
+        "\tl32i a5, a2, 0\n"
+        "\txor a5, a5, a4\n"
+        "\ts32i a5, a2, 0\n"          // et bascule
+        "\tmovi a6, 200\n"
+        "attente:\n"
+        "\taddi a6, a6, -1\n"
+        "\tbnez a6, attente\n"
+        "\tj boucle\n";
+    {
+        std::ofstream fichier("/tmp/sim_esp32.s");
+        fichier << kSource;
+    }
+    const int assemble = std::system(
+        "llvm-mc -arch=xtensa -filetype=obj -o /tmp/sim_esp32.o "
+        "/tmp/sim_esp32.s > /tmp/sim_esp32.log 2>&1 && "
+        "llvm-objcopy -O binary --only-section=.text /tmp/sim_esp32.o "
+        "/tmp/sim_esp32.bin >> /tmp/sim_esp32.log 2>&1");
+    verifier(assemble == 0, "llvm-mc assemble le programme Xtensa",
+             "/tmp/sim_esp32.bin");
+    if (assemble != 0) return;
+
+    std::ifstream binaire("/tmp/sim_esp32.bin", std::ios::binary);
+    std::vector<uint8_t> octets((std::istreambuf_iterator<char>(binaire)),
+                                std::istreambuf_iterator<char>());
+    verifier(octets.size() > 20, "le binaire produit n'est pas vide",
+             std::to_string(octets.size()) + " octets");
+    if (octets.size() < 20) return;
+
+    coeur::CoeurXtensa puce(coeur::profil_esp32());
+    puce.charger_octets(0x400D0000, octets);
+    // Le programme commence après le bassin littéral : douze octets.
+    puce.definir_point_entree(0x400D0000 + 12);
+
+    int basculements = 0;
+    bool dernier = false;
+    puce.sur_broche = [&](int broche, bool haut) {
+        if (broche != 2) return;
+        if (basculements == 0 || haut != dernier) ++basculements;
+        dernier = haut;
+    };
+    puce.executer(200000);
+
+    verifier(basculements > 20,
+             "GPIO2 bascule : le cœur Xtensa exécute pour de vrai",
+             std::to_string(basculements) + " basculements");
+    verifier(puce.broche_en_sortie(2),
+             "la broche a bien été mise en sortie par le programme",
+             puce.broche_haute(2) ? "haute" : "basse");
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3371,6 +3456,7 @@ int main() {
     test_attiny85();
     test_atmega2560();
     test_cartes_arm();
+    test_esp32();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

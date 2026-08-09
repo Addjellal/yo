@@ -520,6 +520,8 @@ Empreinte gabarit(const Modele& modele) {
     if (nom == "ARDUINO_MEGA") return arduino_mega();
     if (nom == "ARDUINO_NANO") return arduino_nano();
     // Pi Pico : 51 x 21 mm, deux rangées de vingt au pas de 2,54 mm.
+    if (nom == "ESP32_DEVKIT")
+        return carte_barrettes("ESP32_DEVKIT", 52.0, 28.0, 25.4, {}, {});
     if (nom == "PI_PICO")
         return carte_barrettes("PI_PICO", 51.0, 21.0, 17.78, {}, {});
     // Blue Pill : 53 x 22,9 mm, deux rangées de vingt.

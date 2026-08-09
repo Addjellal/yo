@@ -323,6 +323,30 @@ void _start(void) {
 }
 )";
 
+// ESP32. Ce programme n'est pas compilable depuis l'application : aucune
+// chaîne Xtensa n'est embarquée, et l'ESP-IDF ne se met pas dans une archive
+// portable. Il est là pour montrer ce que la puce attend — et un .elf déjà
+// compilé se charge sans rien installer.
+inline const char* kProgrammeEsp32 = R"(/* ESP32 : clignotant sur GPIO2, la LED des cartes DevKit.
+   Le bloc GPIO se pilote par trois registres : ENABLE met la broche en
+   sortie, OUT porte son niveau, et l'on bascule par un ou exclusif.
+
+   ATTENTION : cette carte n'est pas compilable depuis l'application. Le
+   simulateur embarque son cœur Xtensa, pas la chaîne ESP-IDF. Chargez un
+   fichier .elf déjà compilé (Fichier ▸ Charger un firmware). */
+#define GPIO_OUT    (*(volatile unsigned*)0x3ff44004)
+#define GPIO_ENABLE (*(volatile unsigned*)0x3ff44020)
+#define LED         (1u << 2)
+
+void app_main(void) {
+    GPIO_ENABLE = LED;
+    for (;;) {
+        GPIO_OUT ^= LED;
+        for (volatile int i = 0; i < 400000; i++) { }
+    }
+}
+)";
+
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
     const char* nom;
