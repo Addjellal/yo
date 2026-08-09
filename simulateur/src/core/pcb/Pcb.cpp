@@ -281,6 +281,29 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
                                  piste.y1});
     }
 
+    // Un trou mécanique qui traverse du cuivre. Un trou de fixation fait
+    // souvent trois millimètres, une pastille en fait deux : le foret emporte
+    // la pastille et la liaison avec elle. Rien ne le signale à l'écran — le
+    // cuivre et le perçage sont dans deux fichiers différents, et c'est en
+    // les superposant que le fabricant le découvre, ou pire, l'atelier.
+    {
+        const std::vector<PastillePosee> toutes = pastilles();
+        for (const PastillePosee& trou : toutes) {
+            if (!trou.mecanique() || trou.percage <= 0) continue;
+            for (const PastillePosee& cuivre : toutes) {
+                if (cuivre.mecanique()) continue;
+                const double ecart = std::hypot(cuivre.x - trou.x,
+                                                cuivre.y - trou.y);
+                // Le foret mord la pastille dès qu'il entame son cuivre.
+                if (ecart >= trou.percage / 2 + cuivre.diametre / 2) continue;
+                anomalies.push_back(
+                    {"trou de fixation dans la pastille " + cuivre.composant
+                         + "." + cuivre.borne + " : le perçage l'emporterait",
+                     trou.x, trou.y});
+            }
+        }
+    }
+
     // Deux cuivres de nets différents trop proches : c'est le défaut que la
     // fabrication ne pardonne pas.
     for (size_t a = 0; a < pistes.size(); ++a) {
@@ -327,7 +350,7 @@ std::string CartePcb::gerber(int couche) const {
          << (couche == 0 ? "dessus" : "dessous") << "*\n";
     flux << "%FSLAX46Y46*%\n";        // format 4.6
     flux << "%MOMM*%\n";              // millimètres
-    flux << "%LP D*%\n";
+    flux << "%LPD*%\n";
 
     // Une ouverture par forme et par taille. Le Gerber ne connaît que trois
     // formes utiles ici : C ronde, R rectangulaire, O oblongue.
@@ -388,7 +411,7 @@ std::string CartePcb::gerber(int couche) const {
 std::string CartePcb::gerber_contour() const {
     std::ostringstream flux;
     flux << "G04 Simulateur embarque - contour*\n";
-    flux << "%FSLAX46Y46*%\n%MOMM*%\n%LP D*%\n";
+    flux << "%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n";
     flux << "%ADD10C,0.150000*%\nD10*\nG01*\n";
     const double points[5][2] = {{0, 0}, {largeur, 0}, {largeur, hauteur},
                                  {0, hauteur}, {0, 0}};
@@ -404,7 +427,7 @@ std::string CartePcb::gerber_contour() const {
 std::string CartePcb::gerber_serigraphie() const {
     std::ostringstream flux;
     flux << "G04 Simulateur embarque - serigraphie dessus*\n";
-    flux << "%FSLAX46Y46*%\n%MOMM*%\n%LP D*%\n";
+    flux << "%FSLAX46Y46*%\n%MOMM*%\n%LPD*%\n";
     flux << "%ADD10C,0.150000*%\nD10*\nG01*\n";
 
     auto tracer = [&flux](double x1, double y1, double x2, double y2) {

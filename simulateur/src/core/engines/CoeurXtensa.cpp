@@ -7,6 +7,20 @@
 
 namespace coeur {
 
+namespace {
+// Extension de signe d'un champ de `bits` bits.
+//
+// Écrire « (x << 21) >> 21 » est le raccourci habituel, et c'est un
+// comportement INDÉFINI dès que le décalage déborde du type signé : le
+// compilateur a le droit d'en faire ce qu'il veut. On décale donc dans un
+// type non signé, où le débordement est défini, et l'on convertit ensuite.
+inline int32_t etendre_signe(uint32_t valeur, int bits) {
+    const uint32_t masque = 1u << (bits - 1);
+    valeur &= (bits >= 32) ? 0xFFFFFFFFu : ((1u << bits) - 1u);
+    return static_cast<int32_t>((valeur ^ masque) - masque);
+}
+}  // namespace
+
 // Adresses confrontées à l'en-tête officiel d'Espressif
 // (esp-idf, components/soc/esp32/register/soc/gpio_reg.h) et à soc.h :
 //   DR_REG_GPIO_BASE  0x3FF4 4000
@@ -375,8 +389,8 @@ int CoeurXtensa::instruction_seule(const uint32_t depart) {
                     return 1;                                        // S8I
                 case 0x06: ecrire32(a_[s] + (b2 << 2), a_[t]); return 1;  // S32I
                 case 0x0A: {                                         // MOVI
-                    int32_t valeur = static_cast<int32_t>((s << 8) | b2);
-                    valeur = (valeur << 20) >> 20;                   // douze bits
+                    const int32_t valeur =
+                        etendre_signe((s << 8) | b2, 12);
                     a_[t] = static_cast<uint32_t>(valeur);
                     return 1;
                 }
@@ -390,17 +404,16 @@ int CoeurXtensa::instruction_seule(const uint32_t depart) {
         case 0x06: {
             const int sous = t & 0x03;
             if (sous == 0x00) {                                      // J
-                int32_t decalage = static_cast<int32_t>(
+                const int32_t decalage = etendre_signe(
                     (static_cast<uint32_t>(b2) << 10)
-                    | (static_cast<uint32_t>(b1) << 2) | ((t >> 2) & 3));
-                decalage = (decalage << 14) >> 14;                   // dix-huit
+                        | (static_cast<uint32_t>(b1) << 2) | ((t >> 2) & 3),
+                    18);
                 pc_ = static_cast<uint32_t>(depart + 4 + decalage);
                 return 3;      // saut pris : le pipeline se recharge
             }
             if (sous == 0x01) {                                      // BEQZ…
-                int32_t decalage = static_cast<int32_t>(
-                    (static_cast<uint32_t>(b2) << 4) | ((b1 >> 4) & 0x0F));
-                decalage = (decalage << 20) >> 20;                   // douze
+                const int32_t decalage = etendre_signe(
+                    (static_cast<uint32_t>(b2) << 4) | ((b1 >> 4) & 0x0F), 12);
                 const int genre = (t >> 2) & 3;
                 bool prendre = false;
                 switch (genre) {

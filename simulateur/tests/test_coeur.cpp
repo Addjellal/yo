@@ -3887,6 +3887,81 @@ static void test_temps_xtensa() {
              std::to_string(pris) + " contre " + std::to_string(jamais));
 }
 
+
+// Audit de fabrication : ce que le fabricant recevra.
+//
+// Les trois contrôles qui suivent viennent d'un audit, et chacun a trouvé un
+// défaut réel. Ils restent ici pour que ces défauts ne reviennent pas :
+// aucun ne se voit à l'écran, tous se découvrent en atelier.
+static void test_fabrication() {
+    std::printf("\n[37] Ce que le fabricant recevra\n");
+
+    coeur::Netlist netlist;
+    netlist.ajouter("U1", "arduino_uno");
+    netlist.relier("U1", "D13", "D13");
+    netlist.relier("U1", "GND", "GND");
+    auto& r1 = netlist.ajouter("R1", "resistance");
+    r1.valeurs["ohms"] = 220;
+    netlist.relier("R1", "1", "D13");
+    netlist.relier("R1", "2", "ANODE");
+    netlist.ajouter("LED1", "led");
+    netlist.relier("LED1", "A", "ANODE");
+    netlist.relier("LED1", "K", "GND");
+    coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+    carte.ajuster_contour();
+    coeur::router(carte);
+
+    // 1. La syntaxe du Gerber. « %LP D*% » avec une espace n'est pas la
+    //    commande de polarité : la spécification Ucamco écrit « %LPD*% », et
+    //    un logiciel de fabrication strict refuse le fichier.
+    const std::string dessus = carte.gerber(0);
+    verifier(dessus.find("%LPD*%") != std::string::npos
+                 && dessus.find("%LP ") == std::string::npos,
+             "la commande de polarité s'écrit sans espace",
+             dessus.find("%LP ") == std::string::npos ? "%LPD*%" : "espace !");
+
+    // 2. Chaque fichier se termine par sa marque de fin. Un Gerber sans M02
+    //    ou un Excellon sans M30 est tronqué aux yeux du fabricant.
+    auto finit_par = [](const std::string& texte, const std::string& marque) {
+        std::string coupe = texte;
+        while (!coupe.empty() && (coupe.back() == '\n' || coupe.back() == '\r'))
+            coupe.pop_back();
+        return coupe.size() >= marque.size()
+               && coupe.compare(coupe.size() - marque.size(), marque.size(),
+                                marque) == 0;
+    };
+    verifier(finit_par(carte.gerber(0), "M02*")
+                 && finit_par(carte.gerber(1), "M02*")
+                 && finit_par(carte.gerber_contour(), "M02*")
+                 && finit_par(carte.gerber_serigraphie(), "M02*")
+                 && finit_par(carte.excellon(), "M30"),
+             "tous les fichiers portent leur marque de fin", "M02 et M30");
+
+    // 3. Le contrôle le plus grave, et le moins visible : un trou de fixation
+    //    qui traverse une pastille. Le cuivre et le perçage vivent dans deux
+    //    fichiers différents ; c'est en les superposant qu'on le découvre.
+    //    Toutes les empreintes du catalogue y passent.
+    int fautives = 0;
+    std::string liste;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele || !coeur::empreintes::physique(*modele)) continue;
+        coeur::Netlist seule;
+        seule.ajouter("U1", modele->type);
+        coeur::CartePcb essai = coeur::CartePcb::depuis_netlist(seule);
+        essai.ajuster_contour();
+        for (const auto& anomalie : essai.controler()) {
+            if (anomalie.message.find("trou de fixation") == std::string::npos)
+                continue;
+            ++fautives;
+            liste += modele->type + " ";
+            break;
+        }
+    }
+    verifier(fautives == 0,
+             "aucun perçage mécanique ne traverse une pastille",
+             fautives == 0 ? std::string("tout le catalogue") : liste);
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3929,6 +4004,7 @@ int main() {
     test_tirage_vers_la_bonne_alimentation();
     test_cycles_exacts_arm();
     test_temps_xtensa();
+    test_fabrication();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

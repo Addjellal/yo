@@ -27,6 +27,20 @@ uint32_t rotation_droite(uint32_t valeur, int rang) {
 
 }  // namespace
 
+namespace {
+// Extension de signe d'un champ de `bits` bits.
+//
+// Écrire « (x << 21) >> 21 » est le raccourci habituel, et c'est un
+// comportement INDÉFINI dès que le décalage déborde du type signé : le
+// compilateur a le droit d'en faire ce qu'il veut. On décale donc dans un
+// type non signé, où le débordement est défini, et l'on convertit ensuite.
+inline int32_t etendre_signe(uint32_t valeur, int bits) {
+    const uint32_t masque = 1u << (bits - 1);
+    valeur &= (bits >= 32) ? 0xFFFFFFFFu : ((1u << bits) - 1u);
+    return static_cast<int32_t>((valeur ^ masque) - masque);
+}
+}  // namespace
+
 // ---------------------------------------------------------------------------
 // Les puces
 // ---------------------------------------------------------------------------
@@ -1003,7 +1017,7 @@ int CoeurCortexM::instruction() {
 
     // --- 11100 : branchement inconditionnel
     if ((code & 0xF800) == 0xE000) {
-        int32_t decalage = static_cast<int32_t>(code << 21) >> 21;   // 11 bits
+        const int32_t decalage = etendre_signe(code, 11);
         brancher(static_cast<uint32_t>(r_[15] + 2 + decalage * 2));
         return 3;
     }
@@ -1068,9 +1082,8 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         const uint32_t bas = second & 0x7FF;
         const uint32_t i1 = (~(j1 ^ s)) & 1;
         const uint32_t i2 = (~(j2 ^ s)) & 1;
-        int32_t decalage = static_cast<int32_t>(
-            (s << 24) | (i1 << 23) | (i2 << 22) | (haut << 12) | (bas << 1));
-        decalage = (decalage << 7) >> 7;                 // extension du signe
+        const int32_t decalage = etendre_signe(
+            (s << 24) | (i1 << 23) | (i2 << 22) | (haut << 12) | (bas << 1), 25);
         r_[14] = r_[15] | 1;
         brancher(static_cast<uint32_t>(r_[15] + decalage));
         return 4;
@@ -1158,10 +1171,10 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         const uint32_t j2 = (second >> 11) & 1;
         const uint32_t i1 = (~(j1 ^ s)) & 1;
         const uint32_t i2 = (~(j2 ^ s)) & 1;
-        int32_t decalage = static_cast<int32_t>(
+        const int32_t decalage = etendre_signe(
             (s << 24) | (i1 << 23) | (i2 << 22) | ((premier & 0x3FF) << 12)
-            | ((second & 0x7FF) << 1));
-        decalage = (decalage << 7) >> 7;
+                | ((second & 0x7FF) << 1),
+            25);
         brancher(static_cast<uint32_t>(r_[15] + decalage));
         return 4;
     }
@@ -1170,10 +1183,11 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         if (cond >= 0x0E) return 2;                      // MSR/MRS, sans effet
         if (!condition(cond)) return 1;
         const uint32_t s = (premier >> 10) & 1;
-        int32_t decalage = static_cast<int32_t>(
-            (s << 20) | (((second >> 11) & 1) << 19) | (((second >> 13) & 1) << 18)
-            | ((premier & 0x3F) << 12) | ((second & 0x7FF) << 1));
-        decalage = (decalage << 11) >> 11;
+        const int32_t decalage = etendre_signe(
+            (s << 20) | (((second >> 11) & 1) << 19)
+                | (((second >> 13) & 1) << 18) | ((premier & 0x3F) << 12)
+                | ((second & 0x7FF) << 1),
+            21);
         brancher(static_cast<uint32_t>(r_[15] + decalage));
         return 4;
     }

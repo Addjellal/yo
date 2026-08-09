@@ -9,6 +9,15 @@ namespace coeur {
 
 namespace {
 
+// Extension de signe sûre : décaler dans un type signé jusqu'au débordement
+// est un comportement indéfini, et le compilateur a le droit d'en faire ce
+// qu'il veut.
+inline int32_t etendre_signe_avr(uint32_t valeur, int bits) {
+    const uint32_t masque = 1u << (bits - 1);
+    valeur &= (1u << bits) - 1u;
+    return static_cast<int32_t>((valeur ^ masque) - masque);
+}
+
 // Drapeaux du registre d'état.
 enum { kC = 0, kZ = 1, kN = 2, kV = 3, kS = 4, kH = 5, kT = 6, kI = 7 };
 
@@ -1308,12 +1317,14 @@ int CoeurAvr::instruction() {
         }
 
         case 0xC000: {                                          // RJMP
-            int16_t decalage = static_cast<int16_t>(code << 4) >> 4;
+            const int16_t decalage =
+                static_cast<int16_t>(etendre_signe_avr(code, 12));
             pc_ = static_cast<uint32_t>(pc_ + decalage);
             return 2;
         }
         case 0xD000: {                                          // RCALL
-            int16_t decalage = static_cast<int16_t>(code << 4) >> 4;
+            const int16_t decalage =
+                static_cast<int16_t>(etendre_signe_avr(code, 12));
             empiler_retour(pc_);
             pc_ = static_cast<uint32_t>(pc_ + decalage);
             return 3;

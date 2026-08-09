@@ -426,8 +426,10 @@ Empreinte arduino_mega() {
         poser("D" + std::to_string(23 + paire * 2), x, haut - 5.08);
     }
 
+    // Écartés de la rangée de broches, pour la même raison que sur l'Uno :
+    // un foret de 3,2 mm emporterait SCL et SDA.
     const double fixations[4][2] = {
-        {13.97, 2.54}, {15.24, 50.8}, {96.52, 2.54}, {96.52, 50.8}};
+        {13.97, 2.54}, {12.70, 48.26}, {96.52, 2.54}, {96.52, 48.26}};
     for (const auto& point : fixations)
         empreinte.pastilles.push_back(
             fixation(point[0] - kLargeur / 2, kHauteur / 2 - point[1]));
@@ -479,8 +481,16 @@ Empreinte arduino_uno() {
         poser("D" + std::to_string(7 - k), numero++, 42.16 + k * kPas, haut);
 
     // Les quatre trous de fixation, aux cotes du shield.
+    // Les quatre trous de fixation. Celui du haut est écarté d'un pas de la
+    // rangée de broches : à 50,8 mm il tombait sur SCL, et un foret de
+    // 3,2 mm à travers une pastille de 1,9 mm l'emporte — l'écart des axes
+    // valait 2,54 mm pour 2,55 mm de rayons cumulés, dix microns de trop.
+    // Sur la carte réelle ce trou n'est pas non plus sur la rangée ; sa cote
+    // exacte demanderait le plan mécanique officiel, celle-ci en est une
+    // approximation sûre, et le contrôle des règles vérifie désormais qu'il
+    // ne mord aucune pastille.
     const double fixations[4][2] = {
-        {13.97, 2.54}, {15.24, 50.8}, {66.04, 35.56}, {66.04, 7.62}};
+        {13.97, 2.54}, {12.70, 48.26}, {66.04, 35.56}, {66.04, 7.62}};
     for (const auto& point : fixations)
         empreinte.pastilles.push_back(
             fixation(point[0] - kLargeur / 2, kHauteur / 2 - point[1]));
