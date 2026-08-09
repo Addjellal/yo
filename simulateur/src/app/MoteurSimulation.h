@@ -145,6 +145,7 @@ private:
         // AVR, trois volts trois sur un Pico, un STM32 ou un ESP32.
         double tension_logique = 5.0;
         double resistance_sortie = 25.0;
+        double resistance_tirage = 35000.0;
         bool firmware_charge = false;
         uint32_t masque = 0;         // état courant des broches
         uint32_t masque_debut = 0;   // état au début de la trame

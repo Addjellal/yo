@@ -339,6 +339,7 @@ void enregistrer_cartes(Catalogue& catalogue) {
         // un composant en 5 V.
         m.tension_logique = 3.3;
         m.resistance_sortie = 40.0;
+        m.resistance_tirage = 55000.0;
         m.mcu = "rp2040";
         m.horloge = 125000000;
         m.langage = "C (registres)";
@@ -399,6 +400,7 @@ void enregistrer_cartes(Catalogue& catalogue) {
         // un composant en 5 V.
         m.tension_logique = 3.3;
         m.resistance_sortie = 40.0;
+        m.resistance_tirage = 40000.0;
         m.mcu = "stm32f103";
         m.horloge = 72000000;
         m.langage = "C (registres)";

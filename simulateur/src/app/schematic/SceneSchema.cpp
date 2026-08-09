@@ -177,6 +177,7 @@ std::vector<CartePosee> SceneSchema::cartes_posees() const {
         posee.horloge = modele->horloge ? modele->horloge : 16000000;
         posee.tension_logique = modele->tension_logique;
         posee.resistance_sortie = modele->resistance_sortie;
+        posee.resistance_tirage = modele->resistance_tirage;
         resultat.push_back(posee);
     }
     std::sort(resultat.begin(), resultat.end(),

@@ -99,17 +99,22 @@ bool CortexEngine::niveau_port(int broche) const {
     return coeur_->broche_haute(broche);
 }
 
-bool CortexEngine::pullup_actif(int) const {
-    // Les tirages internes d'un Cortex-M se règlent dans le bloc de contrôle
-    // des broches, que ce cœur ne modélise pas encore. Les annoncer inactifs
-    // est le seul choix honnête : mieux vaut une entrée flottante qu'un
-    // tirage imaginaire qui fausserait le circuit.
-    return false;
+bool CortexEngine::pullup_actif(int broche) const {
+    // Le tirage interne est armé par le firmware : sur un RP2040 dans le bloc
+    // des broches, sur un STM32 dans les quartets de configuration. Sans lui,
+    // un bouton câblé à la masse laisserait une entrée flottante.
+    return !coeur_->broche_en_sortie(broche)
+           && coeur_->broche_tiree_haut(broche);
 }
 
 int CortexEngine::canal_adc(int broche) const {
     // RP2040 : les entrées analogiques sont GP26 à GP29.
     if (mcu_ == "rp2040") return broche >= 26 && broche <= 29 ? broche - 26 : -1;
+    // STM32F103 : ADC1 lit PA0 à PA7 sur ses voies 0 à 7, puis PB0 et PB1.
+    if (mcu_ == "stm32f103") {
+        if (broche >= 0 && broche <= 7) return broche;          // PA0..PA7
+        if (broche >= 16 && broche <= 17) return broche - 16 + 8;  // PB0, PB1
+    }
     return -1;
 }
 
@@ -117,9 +122,8 @@ void CortexEngine::definir_niveau_externe(int broche, bool haut) {
     coeur_->broche_externe(broche, haut);
 }
 
-void CortexEngine::definir_tension_adc(int, double) {
-    // Le convertisseur du RP2040 n'est pas encore modélisé : ne rien faire
-    // vaut mieux que rendre une valeur inventée.
+void CortexEngine::definir_tension_adc(int voie, double volts) {
+    coeur_->tension_adc(voie, volts);
 }
 
 void CortexEngine::envoyer_octet_serie(uint8_t) {}

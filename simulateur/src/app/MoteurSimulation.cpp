@@ -226,6 +226,7 @@ void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
         carte.horloge = posee.horloge;
         carte.tension_logique = posee.tension_logique;
         carte.resistance_sortie = posee.resistance_sortie;
+        carte.resistance_tirage = posee.resistance_tirage;
     }
 }
 
@@ -372,7 +373,11 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
             broche.resistance = cible->resistance_sortie;
         } else if (mcu.pullup_actif(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::PullUp;
-            broche.resistance = 35000.0;   // pull-up interne : 20 à 50 kΩ
+            // Le tirage remonte vers l'alimentation DE LA CARTE : 5 V sur un
+            // AVR, 3,3 V sur un Pico. La confondre avec le rail du schéma
+            // ferait remonter une entrée de Pico à 5 V.
+            broche.tension = cible->tension_logique;
+            broche.resistance = cible->resistance_tirage;
         } else {
             broche.mode = coeur::BrocheElectrique::Mode::Entree;
         }

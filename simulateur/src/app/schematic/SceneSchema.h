@@ -42,6 +42,7 @@ struct CartePosee {
     uint32_t horloge = 16000000;
     double tension_logique = 5.0;
     double resistance_sortie = 25.0;
+    double resistance_tirage = 35000.0;
 };
 
 class SceneSchema : public QGraphicsScene {

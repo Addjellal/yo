@@ -72,6 +72,34 @@ struct ProfilPort {
     int nb_broches = 32;
 };
 
+// Le bloc de contrôle des broches : c'est là que vivent les tirages internes.
+// Sans eux, un bouton câblé à la masse laisse une entrée flottante, et le
+// simulateur montre un niveau qui n'a aucun sens — le pire des deux mondes,
+// puisqu'il a l'air de fonctionner.
+struct ProfilTirages {
+    uint32_t base = 0;              // 0 : bloc absent
+    uint32_t premier = 0;           // décalage du registre de la broche 0
+    uint32_t pas = 4;               // écart entre deux broches
+    int bit_haut = 3;               // bit du tirage vers le haut
+    int bit_bas = 2;
+};
+
+// Le convertisseur analogique-numérique, réduit à ce qu'un programme en fait :
+// choisir une voie, lancer une conversion, lire le résultat.
+struct ProfilAdc {
+    uint32_t base = 0;              // 0 : convertisseur absent
+    uint32_t controle = 0;          // décalage du registre de commande
+    uint32_t resultat = 0;
+    uint32_t selection = 0;         // registre du sélecteur de voie
+    int bit_demarrer = 2;
+    int bit_pret = 8;
+    int decalage_voie = 12;         // position du sélecteur dans son registre
+    uint32_t masque_voie = 0x7;
+    int bits = 12;                  // résolution
+    double reference = 3.3;         // pleine échelle, en volts
+    int voies = 4;
+};
+
 struct ProfilCortex {
     const char* nom = "rp2040";
     // Jeu d'instructions : 6 pour ARMv6-M (Cortex-M0+), 7 pour ARMv7-M.
@@ -83,6 +111,8 @@ struct ProfilCortex {
     // Où le processeur va chercher sa pile et son point d'entrée au réveil.
     uint32_t table_vecteurs = 0x00000000;
     uint32_t frequence = 125000000;
+    ProfilTirages tirages;
+    ProfilAdc adc;
 };
 
 const ProfilCortex& profil_rp2040();
@@ -108,6 +138,12 @@ public:
 
     // Niveau imposé de l'extérieur sur une broche configurée en entrée.
     void broche_externe(int broche, bool haut);
+    // Le firmware a-t-il armé le tirage interne de cette broche ? Le circuit
+    // en a besoin : c'est une résistance de plusieurs dizaines de kilohms
+    // vers l'alimentation, et elle change le point de fonctionnement.
+    bool broche_tiree_haut(int broche) const;
+    // Tension présentée à une voie du convertisseur.
+    void tension_adc(int voie, double volts);
     // État d'une broche, vu du circuit.
     bool broche_en_sortie(int broche) const;
     bool broche_haute(int broche) const;
@@ -152,6 +188,13 @@ private:
 
     // SysTick : le compteur décroissant que toute temporisation emploie.
     uint32_t systick_charge_ = 0, systick_valeur_ = 0, systick_controle_ = 0;
+
+    // Le bloc de contrôle des broches, tel que le firmware l'a écrit.
+    std::vector<uint32_t> tirages_;
+    // Le convertisseur : ce qu'on lui présente, et où il en est.
+    std::vector<uint16_t> adc_;
+    uint32_t adc_controle_ = 0;
+    uint32_t adc_selection_ = 0;
 
     uint32_t lire32(uint32_t adresse) const;
     uint16_t lire16(uint32_t adresse) const;

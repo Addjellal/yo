@@ -177,11 +177,17 @@ std::vector<std::string> NgspiceEngine::sources_continues(
                 break;
             }
             case BrocheElectrique::Mode::PullUp: {
-                // pull-up interne de l'AVR : 20 kΩ à 50 kΩ selon la puce
-                std::ostringstream r;
-                r << "R" << broche.noeud << " " << Netlist::kAlim << " "
+                // Le tirage interne : une résistance vers l'alimentation de
+                // LA PUCE. Le rail est donné par la broche — 5 V sur un AVR,
+                // 3,3 V sur un Pico ou un STM32 — et non pris au nœud commun
+                // du schéma, qui n'a aucune raison d'être le bon.
+                std::ostringstream v, r;
+                v << "V" << broche.noeud << "_pu " << broche.noeud << "_pu 0 "
+                  << (broche.tension > 0.1 ? broche.tension : 5.0);
+                r << "R" << broche.noeud << " " << broche.noeud << "_pu "
                   << broche.noeud << " "
                   << (broche.resistance > 1.0 ? broche.resistance : 20000.0);
+                sources.push_back(v.str());
                 sources.push_back(r.str());
                 break;
             }
@@ -238,10 +244,13 @@ std::string NgspiceEngine::construire_transitoire(
     std::vector<std::string> sources;
     for (const auto& broche : broches) {
         if (broche.mode == BrocheElectrique::Mode::PullUp) {
-            std::ostringstream r;
-            r << "R" << broche.noeud << " " << Netlist::kAlim << " "
+            std::ostringstream v, r;
+            v << "V" << broche.noeud << "_pu " << broche.noeud << "_pu 0 "
+              << (broche.tension > 0.1 ? broche.tension : 5.0);
+            r << "R" << broche.noeud << " " << broche.noeud << "_pu "
               << broche.noeud << " "
               << (broche.resistance > 1.0 ? broche.resistance : 20000.0);
+            sources.push_back(v.str());
             sources.push_back(r.str());
             continue;
         }

@@ -3496,6 +3496,172 @@ static void test_routage_automatique() {
              std::to_string(carte.pistes.size()) + " pistes");
 }
 
+
+// Les tirages internes et le convertisseur des cartes ARM.
+//
+// Deux manques signalés dans le compte rendu précédent, et deux manques qui
+// se voient à l'usage : sans tirage, un bouton câblé à la masse laisse une
+// entrée flottante — le simulateur montre alors un niveau qui ne veut rien
+// dire, ce qui est pire qu'un refus ; sans convertisseur, un potentiomètre
+// ne sert à rien.
+static void test_tirages_et_adc_arm() {
+    std::printf("\n[33] Cortex-M : tirages internes et convertisseur\n");
+    if (!coeur::CortexEngine::chaine_disponible()) {
+        std::printf("  (aucun compilateur ARM — section ignorée)\n");
+        return;
+    }
+
+    // --- le tirage interne, armé par le firmware sur GP15
+    const char* kBouton = R"(
+#define PADS_BANK0   0x4001c000u
+#define PAD_GP15     (*(volatile unsigned*)(PADS_BANK0 + 0x04 + 15*4))
+#define SIO_BASE     0xd0000000u
+#define GPIO_OE_CLR  (*(volatile unsigned*)(SIO_BASE + 0x028))
+#define GPIO_OE_SET  (*(volatile unsigned*)(SIO_BASE + 0x024))
+#define GPIO_OUT_SET (*(volatile unsigned*)(SIO_BASE + 0x014))
+#define GPIO_IN      (*(volatile unsigned*)(SIO_BASE + 0x004))
+
+void _start(void) {
+    GPIO_OE_CLR = 1u << 15;          /* GP15 en entrée */
+    PAD_GP15 = (1u << 3);            /* tirage vers le haut */
+    GPIO_OE_SET = 1u << 25;          /* GP25 en sortie : le témoin */
+    for (;;) {
+        /* Le témoin recopie l'entrée : c'est ainsi qu'on l'observe. */
+        if (GPIO_IN & (1u << 15)) GPIO_OUT_SET = 1u << 25;
+        else                      *(volatile unsigned*)(SIO_BASE + 0x018) = 1u << 25;
+    }
+}
+)";
+    const std::string firmware = "/tmp/sim_pico_bouton.elf";
+    std::string journal;
+    if (!coeur::CortexEngine::compiler_source(kBouton, firmware, &journal,
+                                              "rp2040")) {
+        verifier(false, "le programme du bouton compile", journal);
+        return;
+    }
+    coeur::CortexEngine pico;
+    pico.charger(firmware, "rp2040", 125000000);
+    pico.avancer(200000);
+    verifier(pico.pullup_actif(15),
+             "le tirage interne de GP15 est vu par le circuit",
+             pico.pullup_actif(15) ? "armé" : "absent");
+    verifier(!pico.pullup_actif(25),
+             "une broche en sortie n'a pas de tirage à annoncer", "GP25");
+
+    // Le tirage bas armé en même temps annule le haut : deux tirages opposés
+    // ne tirent nulle part, et l'annoncer serait faux.
+    const char* kDeuxTirages = R"(
+#define PAD_GP15 (*(volatile unsigned*)(0x4001c000u + 0x04 + 15*4))
+void _start(void) { PAD_GP15 = (1u << 3) | (1u << 2); for (;;) { } }
+)";
+    const std::string autre = "/tmp/sim_pico_tirages.elf";
+    if (coeur::CortexEngine::compiler_source(kDeuxTirages, autre, &journal,
+                                             "rp2040")) {
+        coeur::CortexEngine deux;
+        deux.charger(autre, "rp2040", 125000000);
+        deux.avancer(50000);
+        verifier(!deux.pullup_actif(15),
+                 "haut et bas armés ensemble ne tirent nulle part", "GP15");
+    }
+
+    // --- le convertisseur : une tension présentée, une valeur lue
+    const char* kMesure = R"(
+#define ADC_BASE   0x4004c000u
+#define ADC_CS     (*(volatile unsigned*)(ADC_BASE + 0x00))
+#define ADC_RESULT (*(volatile unsigned*)(ADC_BASE + 0x04))
+#define SIO_BASE   0xd0000000u
+#define GPIO_OE_SET  (*(volatile unsigned*)(SIO_BASE + 0x024))
+#define GPIO_OUT_SET (*(volatile unsigned*)(SIO_BASE + 0x014))
+#define GPIO_OUT_CLR (*(volatile unsigned*)(SIO_BASE + 0x018))
+
+void _start(void) {
+    GPIO_OE_SET = 1u << 25;
+    ADC_CS = 1u;                         /* convertisseur en marche */
+    for (;;) {
+        ADC_CS = 1u | (0u << 12) | (1u << 2);   /* voie 0, une conversion */
+        /* Au-delà de la moitié de l'échelle, le témoin s'allume. */
+        if (ADC_RESULT > 2048) GPIO_OUT_SET = 1u << 25;
+        else                   GPIO_OUT_CLR = 1u << 25;
+    }
+}
+)";
+    const std::string mesure = "/tmp/sim_pico_adc.elf";
+    if (!coeur::CortexEngine::compiler_source(kMesure, mesure, &journal,
+                                              "rp2040")) {
+        verifier(false, "le programme de mesure compile", journal);
+        return;
+    }
+
+    // GP26 est la voie 0 : c'est la carte qui le dit, pas le test.
+    coeur::CortexEngine convertisseur;
+    convertisseur.charger(mesure, "rp2040", 125000000);
+    verifier(convertisseur.canal_adc(26) == 0 && convertisseur.canal_adc(15) < 0,
+             "GP26 est la voie 0 du convertisseur, GP15 n'en est pas une",
+             std::to_string(convertisseur.canal_adc(26)));
+
+    convertisseur.definir_tension_adc(0, 0.5);      // bien en dessous du seuil
+    convertisseur.avancer(200000);
+    const bool bas = convertisseur.niveau_port(25);
+    convertisseur.definir_tension_adc(0, 3.0);      // bien au-dessus
+    convertisseur.avancer(200000);
+    const bool haut = convertisseur.niveau_port(25);
+    verifier(!bas && haut,
+             "0,5 V puis 3,0 V : le programme voit la différence",
+             std::string(bas ? "haut" : "bas") + " puis "
+                 + (haut ? "haut" : "bas"));
+
+    // La pleine échelle est 3,3 V et non 5 : une lecture de potentiomètre
+    // s'en trouve changée de moitié.
+    convertisseur.definir_tension_adc(0, 3.3);
+    convertisseur.avancer(50000);
+    verifier(convertisseur.niveau_port(25),
+             "3,3 V est la pleine échelle d'un Pico", "témoin allumé");
+}
+
+
+// Le tirage interne remonte vers l'alimentation DE LA PUCE.
+//
+// C'est le genre de détail qui ne se voit pas : un bouton relié à la masse
+// fonctionne dans les deux cas, et l'on ne s'aperçoit de rien. Mais une
+// entrée de Pico remontée à 5 V est un mensonge — la puce n'y survivrait pas
+// —, et surtout tout diviseur ou tout capteur branché dessus donnerait une
+// valeur fausse.
+static void test_tirage_vers_la_bonne_alimentation() {
+    std::printf("\n[34] Le tirage interne suit l'alimentation de la carte\n");
+
+    // Un bouton ouvert : rien d'autre que le tirage ne fixe le nœud, et sa
+    // tension est donc exactement celle du rail de la puce.
+    struct Cas { const char* nom; double volts; double resistance; };
+    const Cas cas[] = {{"AVR à 5 V", 5.0, 35000.0},
+                       {"Pico à 3,3 V", 3.3, 55000.0}};
+
+    for (const Cas& essai : cas) {
+        coeur::Netlist netlist;
+        // Une résistance de forte valeur vers la masse : le bouton relâché,
+        // avec sa fuite. Le tirage l'emporte largement, mais le nœud existe.
+        auto& fuite = netlist.ajouter("RF", "resistance");
+        fuite.valeurs["ohms"] = 10e6;
+        netlist.relier("RF", "1", "ENTREE");
+        netlist.relier("RF", "2", "GND");
+
+        coeur::BrocheElectrique broche;
+        broche.noeud = "ENTREE";
+        broche.mode = coeur::BrocheElectrique::Mode::PullUp;
+        broche.tension = essai.volts;
+        broche.resistance = essai.resistance;
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire(netlist, {broche});
+        const bool resolu = moteur.resoudre();
+        const double mesure = moteur.tension("ENTREE");
+        // Le diviseur tirage / fuite : la chute est d'un demi-pour-cent, on
+        // exige donc mieux que 2 % pour distinguer 3,3 V de 5 V sans ambiguïté.
+        verifier(resolu && std::fabs(mesure - essai.volts) < essai.volts * 0.02,
+                 std::string("entrée tirée d'une carte ") + essai.nom,
+                 f(mesure) + " V pour " + f(essai.volts) + " attendus");
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3534,6 +3700,8 @@ int main() {
     test_cartes_arm();
     test_esp32();
     test_routage_automatique();
+    test_tirages_et_adc_arm();
+    test_tirage_vers_la_bonne_alimentation();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

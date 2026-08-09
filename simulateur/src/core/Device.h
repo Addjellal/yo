@@ -199,6 +199,10 @@ struct Modele {
     double tension_logique = 5.0;
     // Résistance de sortie d'une broche, en ohms.
     double resistance_sortie = 25.0;
+    // Résistance du tirage interne, en ohms : 20 à 50 kΩ sur un AVR, plutôt
+    // 55 kΩ sur un RP2040, 40 kΩ sur un STM32. Elle décide du courant qu'un
+    // bouton devra encaisser, et de la vitesse de remontée d'une entrée.
+    double resistance_tirage = 35000.0;
     // Correspondance entre le nom d'une borne et le numéro de broche interne,
     // quand elle ne se déduit pas du nom. « PB1 » vaut 9 sur un ATmega328P et
     // 1 sur un ATtiny85 : ce sont deux puces, et le même nom y désigne deux

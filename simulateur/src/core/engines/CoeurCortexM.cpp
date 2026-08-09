@@ -61,6 +61,26 @@ const ProfilCortex& profil_rp2040() {
         p.ports = {sio};
         p.systick = 0xE000E010;
         p.table_vecteurs = 0x10000000;
+        // PADS_BANK0 : un registre par broche, tirage haut au bit 3, bas au
+        // bit 2. C'est par là qu'un bouton devient utilisable.
+        p.tirages.base = 0x4001C000;
+        p.tirages.premier = 0x04;
+        p.tirages.pas = 0x04;
+        p.tirages.bit_haut = 3;
+        p.tirages.bit_bas = 2;
+        // Le convertisseur : quatre voies, douze bits, pleine échelle à
+        // 3,3 V — et non 5, ce qui change toute lecture de potentiomètre.
+        p.adc.base = 0x4004C000;
+        p.adc.controle = 0x00;
+        p.adc.resultat = 0x04;
+        p.adc.selection = 0x00;        // AINSEL vit dans le registre de commande
+        p.adc.bit_demarrer = 2;        // START_ONCE
+        p.adc.bit_pret = 8;            // READY
+        p.adc.decalage_voie = 12;
+        p.adc.masque_voie = 0x7;
+        p.adc.bits = 12;
+        p.adc.reference = 3.3;
+        p.adc.voies = 4;
         return p;
     }();
     return profil;
@@ -98,6 +118,21 @@ const ProfilCortex& profil_stm32f103() {
         }
         p.systick = 0xE000E010;
         p.table_vecteurs = 0x08000000;
+        // Sur cette famille, le tirage n'a pas de bloc à lui : il se déclare
+        // dans les quartets de configuration (mode d'entrée « tiré »), et
+        // c'est ODR qui dit vers le haut ou vers le bas. C'est traité à part.
+        // Le convertisseur ADC1 : douze bits, pleine échelle à 3,3 V.
+        p.adc.base = 0x40012400;
+        p.adc.controle = 0x08;         // CR2 : ADON, puis SWSTART
+        p.adc.resultat = 0x4C;         // DR
+        p.adc.selection = 0x34;        // SQR3 : la voie de la première mesure
+        p.adc.bit_demarrer = 22;       // SWSTART
+        p.adc.bit_pret = 1;            // EOC, dans SR — approché ici par CR2
+        p.adc.decalage_voie = 0;
+        p.adc.masque_voie = 0x1F;
+        p.adc.bits = 12;
+        p.adc.reference = 3.3;
+        p.adc.voies = 16;
         return p;
     }();
     return profil;
@@ -126,6 +161,9 @@ void CoeurCortexM::definir_profil(const ProfilCortex& profil) {
         memoire_.push_back(std::move(bloc));
     }
     ports_.assign(p_.ports.size(), EtatPort{});
+    tirages_.assign(64, 0);
+    adc_.assign(32, 0);
+    adc_controle_ = adc_selection_ = 0;
     reinitialiser();
 }
 
@@ -225,6 +263,38 @@ bool CoeurCortexM::lire_peripherique(uint32_t adresse, uint32_t* valeur) const {
         *valeur = 0;
         return true;
     }
+    if (p_.tirages.base && adresse >= p_.tirages.base
+        && adresse < p_.tirages.base + 0x200) {
+        const uint32_t decalage = adresse - p_.tirages.base;
+        if (decalage >= p_.tirages.premier) {
+            const uint32_t broche = (decalage - p_.tirages.premier) / p_.tirages.pas;
+            *valeur = broche < tirages_.size() ? tirages_[broche] : 0;
+            return true;
+        }
+        *valeur = 0;
+        return true;
+    }
+    if (p_.adc.base && adresse >= p_.adc.base && adresse < p_.adc.base + 0x100) {
+        const uint32_t decalage = adresse - p_.adc.base;
+        if (decalage == p_.adc.resultat) {
+            const uint32_t voie =
+                (adc_selection_ >> p_.adc.decalage_voie) & p_.adc.masque_voie;
+            *valeur = voie < adc_.size() ? adc_[voie] : 0;
+            return true;
+        }
+        if (decalage == p_.adc.controle) {
+            // La conversion est instantanée ici : le drapeau « prêt » est
+            // toujours levé, et le bit de démarrage retombe aussitôt. Un
+            // programme qui attend la fin ne boucle donc pas sans fin.
+            *valeur = (adc_controle_ & ~(1u << p_.adc.bit_demarrer))
+                      | (1u << p_.adc.bit_pret);
+            return true;
+        }
+        if (decalage == p_.adc.selection) { *valeur = adc_selection_; return true; }
+        // SR d'un STM32 : le programme y guette EOC, qui est toujours prêt.
+        *valeur = 0xFFFFFFFFu;
+        return true;
+    }
     if (p_.systick && adresse >= p_.systick && adresse < p_.systick + 0x10) {
         switch (adresse - p_.systick) {
             case 0x0: *valeur = systick_controle_; return true;
@@ -269,6 +339,21 @@ bool CoeurCortexM::ecrire_peripherique(uint32_t adresse, uint32_t valeur) {
         else if (decalage == port.direction_effacer) etat.direction &= ~valeur;
         else return true;                  // registre non modélisé : sans effet
         rafraichir_sorties();
+        return true;
+    }
+    if (p_.tirages.base && adresse >= p_.tirages.base
+        && adresse < p_.tirages.base + 0x200) {
+        const uint32_t decalage = adresse - p_.tirages.base;
+        if (decalage >= p_.tirages.premier) {
+            const uint32_t broche = (decalage - p_.tirages.premier) / p_.tirages.pas;
+            if (broche < tirages_.size()) tirages_[broche] = valeur;
+        }
+        return true;
+    }
+    if (p_.adc.base && adresse >= p_.adc.base && adresse < p_.adc.base + 0x100) {
+        const uint32_t decalage = adresse - p_.adc.base;
+        if (decalage == p_.adc.controle) adc_controle_ = valeur;
+        if (decalage == p_.adc.selection) adc_selection_ = valeur;
         return true;
     }
     if (p_.systick && adresse >= p_.systick && adresse < p_.systick + 0x10) {
@@ -323,6 +408,44 @@ void CoeurCortexM::broche_externe(int broche, bool haut) {
         else ports_[rang].entree &= ~masque;
         return;
     }
+}
+
+bool CoeurCortexM::broche_tiree_haut(int broche) const {
+    // Deux mécaniques, selon la famille.
+    if (p_.tirages.base) {
+        // Un registre par broche : le bit de tirage haut, et pas de tirage
+        // bas concurrent — les deux armés à la fois ne tirent nulle part.
+        if (broche < 0 || broche >= static_cast<int>(tirages_.size()))
+            return false;
+        const uint32_t controle = tirages_[broche];
+        const bool haut = (controle >> p_.tirages.bit_haut) & 1;
+        const bool bas = (controle >> p_.tirages.bit_bas) & 1;
+        return haut && !bas;
+    }
+    // Familles à quartets : la broche doit être en entrée « tirée » — mode
+    // nul, configuration 10 — et c'est alors ODR qui choisit le sens.
+    for (size_t rang = 0; rang < p_.ports.size(); ++rang) {
+        const ProfilPort& port = p_.ports[rang];
+        if (!port.direction_par_quartets) continue;
+        if (broche < port.premiere_broche
+            || broche >= port.premiere_broche + port.nb_broches)
+            continue;
+        const int bit = broche - port.premiere_broche;
+        const uint32_t config = bit < 8 ? ports_[rang].config_basse
+                                        : ports_[rang].config_haute;
+        const int quartet = (config >> ((bit % 8) * 4)) & 0x0F;
+        const bool entree_tiree = (quartet & 0x3) == 0 && (quartet >> 2) == 2;
+        return entree_tiree && ((ports_[rang].sortie >> bit) & 1);
+    }
+    return false;
+}
+
+void CoeurCortexM::tension_adc(int voie, double volts) {
+    if (voie < 0 || voie >= static_cast<int>(adc_.size())) return;
+    if (p_.adc.base == 0) return;
+    const double pleine = (1u << p_.adc.bits) - 1;
+    const double borne = std::max(0.0, std::min(p_.adc.reference, volts));
+    adc_[voie] = static_cast<uint16_t>(borne / p_.adc.reference * pleine + 0.5);
 }
 
 bool CoeurCortexM::broche_en_sortie(int broche) const {
