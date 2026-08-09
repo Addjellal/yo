@@ -53,6 +53,15 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.empreinte = {"ARDUINO_UNO", {}, 68.6, 53.4};
         m.mcu = "atmega328p";
         m.horloge = 16000000;
+        // Ce que la vraie carte accepte, et ce que le simulateur en fait.
+        m.note_langage =
+            "Croquis Arduino (C++), C ou C++ nu avec avr-gcc et avr-libc, "
+            "assembleur AVR, Rust par avr-hal. Pas de MicroPython : les 2 Ko "
+            "de mémoire vive de l'ATmega328P n'accueillent aucun portage.\n"
+            "Ici : croquis compilé par avr-g++, avec un noyau qui fournit "
+            "pinMode, digitalWrite, analogRead, analogWrite, delay, millis, "
+            "micros et Serial. Un programme qui définit son propre main() "
+            "l'emporte sur le noyau : le C sur registres marche aussi.";
         // Une carte Arduino se programme en croquis : c'est ce que voit
         // n'importe qui ouvrant l'IDE officiel, et c'est ce que doit trouver
         // celui qui double-clique dessus ici.
@@ -103,6 +112,12 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.empreinte = {"ARDUINO_NANO", {}, 43.2, 18.0};
         m.mcu = "atmega328p";
         m.horloge = 16000000;
+        m.note_langage =
+            "Mêmes langages que l'Uno — c'est le même ATmega328P au même "
+            "quartz. Attention à ne pas la confondre avec la Nano Every, qui "
+            "porte un ATmega4809 : ce n'est pas la même puce, et elle n'est "
+            "pas modélisée ici.\n"
+            "Ici : croquis Arduino compilé par avr-g++.";
         m.programme_exemple = kSourceExemple;
         enregistrer(std::move(m));
     }
@@ -145,6 +160,12 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.empreinte = {"ARDUINO_PRO_MINI", {}, 33.0, 18.0};
         m.mcu = "atmega328p";
         m.horloge = 16000000;
+        m.note_langage =
+            "Mêmes langages que l'Uno. ATTENTION, cette carte existe en DEUX "
+            "versions : 5 V à 16 MHz et 3,3 V à 8 MHz. Celle qui est modélisée "
+            "ici est la 5 V / 16 MHz ; une temporisation écrite pour l'une "
+            "dure deux fois trop longtemps sur l'autre.\n"
+            "Ici : croquis Arduino compilé par avr-g++.";
         m.programme_exemple = kSourceExemple;
         enregistrer(std::move(m));
     }
@@ -192,6 +213,13 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.empreinte = {"DIP-28", {}, 35.6, 7.62};
         m.mcu = "atmega328p";
         m.horloge = 16000000;
+        m.note_langage =
+            "Puce nue : C ou C++ avec avr-gcc et avr-libc, ou assembleur AVR. "
+            "Un croquis Arduino ne devient possible qu'après avoir gravé un "
+            "amorceur et posé un quartz — sans cela il n'y a ni noyau ni "
+            "numérotation D0..D13, et la broche s'appelle PB5.\n"
+            "Ici : C sur registres compilé par avr-g++, avec avr/io.h et "
+            "util/delay.h. Pas de noyau Arduino.";
         m.langage = "C (registres)";
         m.programme_exemple = kProgrammeRegistresNu;
         enregistrer(std::move(m));
@@ -232,6 +260,15 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.mcu = "attiny85";
         // Quartz interne : 8 MHz d'origine, et non 16 comme un Arduino.
         m.horloge = 8000000;
+        m.note_langage =
+            "C avec avr-gcc, assembleur AVR, ou croquis Arduino par le noyau "
+            "tiers ATTinyCore. Pas d'UART matériel sur cette puce : Serial "
+            "n'existe qu'en version logicielle, bit par bit.\n"
+            "ATTENTION à l'horloge : sortie d'usine, la puce tourne à 1 MHz — "
+            "son oscillateur interne fait 8 MHz mais la fusible CKDIV8 le "
+            "divise par huit. Les 8 MHz simulés ici supposent cette fusible "
+            "effacée, ce que fait tout le monde, mais qu'il faut faire.\n"
+            "Ici : C sur registres compilé par avr-g++.";
         m.langage = "C (registres)";
         m.programme_exemple = kProgrammeAttiny;
         // Sur cette puce, PB1 EST la broche 1. Sur un ATmega328P, PB1 est la
@@ -287,6 +324,12 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.empreinte = {"ARDUINO_MEGA", {}, 101.6, 53.3};
         m.mcu = "atmega2560";
         m.horloge = 16000000;
+        m.note_langage =
+            "Mêmes langages que l'Uno, sur un ATmega2560 : quatre UART, seize "
+            "entrées analogiques, 256 Ko de mémoire de programme. Cette "
+            "taille change la machine — les adresses de retour y tiennent sur "
+            "trois octets, contre deux sur un 328P.\n"
+            "Ici : croquis Arduino compilé par avr-g++.";
         m.programme_exemple = kSourceExemple;
         // La numérotation Arduino du Mega : D0..D53 valent 0..53, et A0
         // commence à 54 — ce n'est pas 14 comme sur un Uno.
@@ -342,6 +385,19 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.resistance_tirage = 55000.0;
         m.mcu = "rp2040";
         m.horloge = 125000000;
+        m.note_langage =
+            "C et C++ avec le SDK officiel (pico-sdk), MicroPython, "
+            "CircuitPython, croquis Arduino par le noyau arduino-pico ou le "
+            "noyau Mbed officiel, et l'assembleur PIO pour les machines "
+            "d'états d'entrée-sortie.\n"
+            "Ici : C nu sur registres, compilé par arm-none-eabi-gcc ou par "
+            "clang. Ni SDK, ni MicroPython, ni PIO — un programme écrit pour "
+            "le pico-sdk ne se compile pas ici.\n"
+            "ATTENTION à l'horloge : au réveil, un RP2040 tourne sur son "
+            "oscillateur en anneau, autour de 6 MHz ; les 125 MHz ne "
+            "s'établissent qu'une fois les boucles à verrouillage de phase "
+            "réglées, ce que fait clocks_init() du SDK. Le simulateur part "
+            "directement à 125 MHz.";
         m.langage = "C (registres)";
         m.programme_exemple = kProgrammePico;
         // GP0 est la broche 0 : la numérotation du fabricant est déjà celle
@@ -403,6 +459,16 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.resistance_tirage = 40000.0;
         m.mcu = "stm32f103";
         m.horloge = 72000000;
+        m.note_langage =
+            "C et C++ sur CMSIS, sur la bibliothèque HAL ou sur la couche LL "
+            "de STMicroelectronics, croquis Arduino par le noyau STM32duino, "
+            "MicroPython, et Rust par stm32-rs.\n"
+            "Ici : C nu sur registres, compilé par arm-none-eabi-gcc ou par "
+            "clang. Ni HAL ni CubeMX.\n"
+            "ATTENTION à l'horloge : au réveil, la puce tourne sur son "
+            "oscillateur interne à 8 MHz ; les 72 MHz demandent d'allumer le "
+            "quartz externe et de régler la boucle à verrouillage de phase. "
+            "Le simulateur part directement à 72 MHz.";
         m.langage = "C (registres)";
         m.programme_exemple = kProgrammeStm32;
         // Numérotation interne : port A de 0 à 15, port B de 16 à 31, port C
@@ -465,6 +531,16 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.resistance_sortie = 40.0;
         m.mcu = "esp32";
         m.horloge = 240000000;
+        m.note_langage =
+            "ESP-IDF en C (le cadre officiel d'Espressif, avec FreeRTOS), "
+            "croquis Arduino par le noyau arduino-esp32, MicroPython, "
+            "CircuitPython, Rust par esp-rs.\n"
+            "Ici : C nu pilotant les registres GPIO, et RIEN de plus. Ni "
+            "ESP-IDF, ni FreeRTOS, ni radio, ni convertisseur "
+            "analogique-numérique — un croquis Arduino-ESP32 complet ne "
+            "tourne pas. La compilation exige la chaîne Xtensa, installée par "
+            "outils/chaines ; sans elle, un fichier .elf déjà compilé se "
+            "charge tel quel.";
         m.langage = "C (registres)";
         m.programme_exemple = kProgrammeEsp32;
         // GPIOn est le bit n du bloc GPIO : rien à traduire.

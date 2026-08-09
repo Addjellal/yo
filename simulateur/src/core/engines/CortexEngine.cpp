@@ -228,8 +228,22 @@ bool CortexEngine::compiler_projet(const Programme& fichiers,
 
     const std::string journal_fichier = chemin_elf + ".log";
     std::string commande = outil.commande;
-    if (outil.clang) commande += " --target=" + cible;
-    else commande += " -mcpu=" + cpu + " -mthumb";
+    if (outil.clang) {
+        commande += " --target=" + cible;
+    } else {
+        commande += " -mcpu=" + cpu + " -mthumb";
+        // Syntaxe unifiée pour l'assembleur en ligne. Sans cela, GCC laisse
+        // l'assembleur en syntaxe « divisée », héritée de l'ARM 32 bits, et
+        // refuse des instructions Thumb parfaitement légales :
+        //
+        //     Error: instruction not supported in Thumb16 mode -- `subs r0,#1'
+        //
+        // C'est la forme que tout le monde écrit, celle des manuels ARM
+        // depuis quinze ans. clang, lui, est déjà unifié et ne connaît même
+        // pas l'option — d'où le fait que le défaut soit resté invisible tant
+        // que seul clang était installé sur la machine d'essai.
+        commande += " -masm-syntax-unified";
+    }
     commande += " -nostdlib -ffreestanding -Os -I \"" + dossier
                 + "\" -Wl,-e,_start -Wl,-Ttext=" + adresse + " -o \""
                 + chemin_elf + "\"" + a_compiler + " > \"" + journal_fichier

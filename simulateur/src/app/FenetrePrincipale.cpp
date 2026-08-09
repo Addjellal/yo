@@ -1373,14 +1373,29 @@ void FenetrePrincipale::changer_carte(const QString& reference) {
 void FenetrePrincipale::refleter_langage(const QString& reference) {
     if (!onglets_) return;
     QString langage = "Arduino";
+    QString note;
     for (ItemComposant* composant : scene_->composants()) {
         if (composant->reference() != reference) continue;
         const coeur::Modele* modele = composant->modele();
         if (modele && !modele->langage.empty())
             langage = QString::fromStdString(modele->langage);
+        if (modele) note = QString::fromStdString(modele->note_langage);
         break;
     }
     onglets_->setTabText(0, "Programme (" + langage + ")");
+    // Le titre de l'onglet ne tient que deux mots. Ce qui compte vraiment —
+    // quels langages la vraie carte accepte, lequel le simulateur sait
+    // compiler, et où les deux divergent — vit dans l'infobulle, et passe une
+    // fois par le journal quand on choisit la carte. Une divergence tue
+    // (« pourquoi ma temporisation dure deux fois trop ? ») ne doit pas
+    // attendre qu'on survole un onglet.
+    onglets_->setTabToolTip(0, note);
+    if (!note.isEmpty() && note != derniere_note_langage_) {
+        derniere_note_langage_ = note;
+        ecrire(reference + " — " + langage + " :");
+        for (const QString& ligne : note.split('\n'))
+            if (!ligne.trimmed().isEmpty()) ecrire("   " + ligne.trimmed());
+    }
 }
 
 void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {

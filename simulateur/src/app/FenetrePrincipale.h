@@ -219,6 +219,9 @@ private:
     // le premier est le principal. L'onglet affiché est `fichier_courant_`.
     std::map<QString, coeur::Programme> programmes_;
     int fichier_courant_ = 0;
+    // Dernière note de langage écrite au journal : ne pas la répéter à chaque
+    // recensement des cartes, qui a lieu à chaque modification du schéma.
+    QString derniere_note_langage_;
     QTabBar* onglets_fichiers_ = nullptr;
 
     // Le programme de cette carte, créé avec son exemple s'il n'existe pas.

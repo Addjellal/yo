@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <complex>
+#include <cstring>
 #include <cstdlib>
 #include <functional>
 #include <map>
@@ -3689,34 +3690,46 @@ static void test_cycles_exacts_arm() {
         const char* corps;      // la séquence, en assembleur
         long long attendu;      // calculé à la main sur la table ARM
         const char* calcul;     // le calcul, écrit pour être relu
+        // Coût d'UN tour de boucle, et deux nombres de tours. La mesure
+        // retenue est la DIFFÉRENCE entre les deux, car elle seule ne dépend
+        // que de la puce : tout ce que le compilateur ajoute autour de la
+        // séquence — charger le masque de la broche, le recharger après le
+        // bloc d'assembleur — est identique dans les deux firmwares et
+        // s'annule. Sans cela on mesure aussi le compilateur, et l'on obtient
+        // deux cycles de plus avec arm-none-eabi-gcc qu'avec clang.
+        long long par_tour;
+        int tours_longs;
+        int tours_courts;
     };
 
     // La broche témoin encadre la mesure : on lit le compteur de cycles au
     // premier basculement et au second, et l'écart est la séquence, seule.
     const Cas cas[] = {
         {"boucle de décrément",
-         "movs r0, #100\n"
+         "movs r0, #@N@\n"
          "1: subs r0, #1\n"
          "bne 1b\n",
          // subs 1 + bne 3 (pris) = 4 par tour, sauf le dernier : 1 + 1 = 2.
          // 99 tours à 4, un tour à 2 : 398. Plus le movs initial : 399.
          399,
-         "99x(1+3) + (1+1) + 1"},
+         "99x(1+3) + (1+1) + 1",
+         4, 100, 50},
         {"cent additions de registres",
          "movs r0, #0\n"
          "movs r1, #1\n"
-         "movs r2, #100\n"
+         "movs r2, #@N@\n"
          "2: adds r0, r0, r1\n"
          "subs r2, #1\n"
          "bne 2b\n",
          // adds 1 + subs 1 + bne 3 = 5 par tour, dernier tour 3.
          // 99x5 + 3 + 3 movs = 501.
          501,
-         "99x(1+1+3) + (1+1+1) + 3"},
+         "99x(1+1+3) + (1+1+1) + 3",
+         5, 100, 50},
         {"multiplications",
          "movs r0, #10\n"
          "movs r1, #7\n"
-         "movs r2, #50\n"
+         "movs r2, #@N@\n"
          "3: muls r0, r1, r0\n"
          "subs r2, #1\n"
          "bne 3b\n",
@@ -3724,67 +3737,106 @@ static void test_cycles_exacts_arm() {
          // vérifie, un multiplieur lent donnerait trente-deux fois plus.
          // 49x(1+1+3) + (1+1+1) + 3 = 251.
          251,
-         "49x(1+1+3) + 3 + 3"}};
+         "49x(1+1+3) + 3 + 3",
+         5, 50, 25}};
 
     for (const Cas& essai : cas) {
-        // Le programme : allumer GP25, exécuter la séquence, éteindre GP25.
-        std::string source =
-            "#define SIO 0xd0000000u\n"
-            "#define OE_SET  (*(volatile unsigned*)(SIO + 0x024))\n"
-            "#define OUT_SET (*(volatile unsigned*)(SIO + 0x014))\n"
-            "#define OUT_CLR (*(volatile unsigned*)(SIO + 0x018))\n"
-            "void _start(void) {\n"
-            "    OE_SET = 1u << 25;\n"
-            "    OUT_SET = 1u << 25;\n"
-            "    __asm__ volatile(\"";
-        // Les sauts de ligne doivent arriver ÉCHAPPÉS dans le fichier C : un
-        // vrai retour à la ligne au milieu d'une chaîne ne compile pas.
-        for (const char* lettre = essai.corps; *lettre; ++lettre) {
-            if (*lettre == '\n') source += "\\n";
-            else source += *lettre;
-        }
-        source += "\" ::: \"r0\", \"r1\", \"r2\", \"cc\");\n"
+        // Le même programme est compilé DEUX fois, avec deux nombres de
+        // tours. Ce qu'on retient est l'écart entre les deux mesures : le
+        // cadre que le compilateur pose autour de la séquence y est identique
+        // et s'annule exactement. Sans cette précaution le résultat dépend du
+        // compilateur — arm-none-eabi-gcc recharge le masque de la broche là
+        // où clang le garde en registre, et cela fait deux cycles.
+        auto mesurer = [&](int tours, long long* resultat) {
+            std::string corps;
+            for (const char* lettre = essai.corps; *lettre; ++lettre) {
+                if (*lettre == '@' && std::strncmp(lettre, "@N@", 3) == 0) {
+                    corps += std::to_string(tours);
+                    lettre += 2;
+                } else if (*lettre == '\n') {
+                    corps += "\\n";
+                } else {
+                    corps += *lettre;
+                }
+            }
+            const std::string source =
+                "#define SIO 0xd0000000u\n"
+                "#define OE_SET  (*(volatile unsigned*)(SIO + 0x024))\n"
+                "#define OUT_SET (*(volatile unsigned*)(SIO + 0x014))\n"
+                "#define OUT_CLR (*(volatile unsigned*)(SIO + 0x018))\n"
+                "void _start(void) {\n"
+                "    OE_SET = 1u << 25;\n"
+                "    OUT_SET = 1u << 25;\n"
+                "    __asm__ volatile(\"" + corps
+                + "\" ::: \"r0\", \"r1\", \"r2\", \"cc\");\n"
                   "    OUT_CLR = 1u << 25;\n"
                   "    for (;;) { }\n"
                   "}\n";
 
-        const std::string firmware =
-            std::string("/tmp/sim_cycles_") + std::to_string(essai.attendu)
-            + ".elf";
-        std::string journal;
-        if (!coeur::CortexEngine::compiler_source(source, firmware, &journal,
-                                                  "rp2040")) {
-            verifier(false, std::string(essai.nom) + " : compile", journal);
-            continue;
-        }
+            const std::string firmware = std::string("/tmp/sim_cycles_")
+                                         + std::to_string(essai.attendu) + "_"
+                                         + std::to_string(tours) + ".elf";
+            std::string journal;
+            if (!coeur::CortexEngine::compiler_source(source, firmware,
+                                                      &journal, "rp2040")) {
+                verifier(false, std::string(essai.nom) + " : compile", journal);
+                return false;
+            }
+            coeur::CortexEngine puce;
+            puce.charger(firmware, "rp2040", 125000000);
+            long long debut = -1, fin = -1;
+            puce.sur_changement_broche([&](int broche, bool haut) {
+                if (broche != 25) return;
+                // La broche annonce d'abord son passage en sortie, au niveau
+                // bas : ce n'est pas encore le départ. On n'écoute la
+                // retombée qu'après avoir vu la montée.
+                if (haut && debut < 0)
+                    debut = static_cast<long long>(puce.cycle());
+                else if (!haut && debut >= 0 && fin < 0)
+                    fin = static_cast<long long>(puce.cycle());
+            });
+            puce.avancer(200000);
+            if (debut < 0 || fin < 0) {
+                verifier(false, std::string(essai.nom) + " : la broche encadre "
+                                                         "la séquence");
+                return false;
+            }
+            *resultat = fin - debut;
+            return true;
+        };
 
-        coeur::CortexEngine puce;
-        puce.charger(firmware, "rp2040", 125000000);
-        long long debut = -1, fin = -1;
-        puce.sur_changement_broche([&](int broche, bool haut) {
-            if (broche != 25) return;
-            // La broche annonce d'abord son passage en sortie, au niveau
-            // bas : ce n'est pas encore le départ. On n'écoute la retombée
-            // qu'après avoir vu la montée.
-            if (haut && debut < 0) debut = static_cast<long long>(puce.cycle());
-            else if (!haut && debut >= 0 && fin < 0)
-                fin = static_cast<long long>(puce.cycle());
-        });
-        puce.avancer(200000);
+        long long longue = 0, courte = 0;
+        if (!mesurer(essai.tours_longs, &longue)) continue;
+        if (!mesurer(essai.tours_courts, &courte)) continue;
 
-        // La broche est annoncée APRÈS que le rangement qui la commande se
-        // soit exécuté : le STR de fermeture, deux cycles, tombe donc dans la
-        // fenêtre. On l'ôte, et l'on exige alors l'égalité stricte — pas une
-        // tolérance. C'est toute la différence entre « à peu près juste » et
-        // « juste, et l'on sait pourquoi ».
-        constexpr long long kRangementFermant = 2;
-        const long long mesure = fin - debut - kRangementFermant;
-        std::printf("     %-28s attendu %4lld, mesuré %4lld\n", essai.nom,
-                    essai.attendu, mesure);
-        verifier(mesure == essai.attendu,
+        // 1. La mesure DIFFÉRENTIELLE, celle qui ne dépend que de la puce.
+        const long long ecart = longue - courte;
+        const long long attendu_ecart =
+            essai.par_tour * (essai.tours_longs - essai.tours_courts);
+        std::printf("     %-28s %d tours - %d tours = %lld cycles (attendu "
+                    "%lld)\n",
+                    essai.nom, essai.tours_longs, essai.tours_courts, ecart,
+                    attendu_ecart);
+        verifier(ecart == attendu_ecart,
+                 std::string(essai.nom) + " : "
+                     + std::to_string(essai.tours_longs - essai.tours_courts)
+                     + " tours de plus coûtent exactement "
+                     + std::to_string(attendu_ecart) + " cycles",
+                 "mesuré " + std::to_string(ecart));
+
+        // 2. La séquence entière, cadre du compilateur compris. Le rangement
+        //    de fermeture tombe dans la fenêtre — la broche n'est annoncée
+        //    qu'une fois le STR exécuté —, et selon le compilateur le masque
+        //    de la broche est rechargé ou non. On tolère donc ces quelques
+        //    cycles de cadre, et rien de plus : le compte exact est celui
+        //    du point 1.
+        constexpr long long kCadreMaximal = 4;
+        const long long brut = longue - 2;
+        verifier(brut >= essai.attendu && brut <= essai.attendu + kCadreMaximal,
                  std::string(essai.nom) + " : " + essai.calcul + " = "
-                     + std::to_string(essai.attendu) + " cycles, au cycle près",
-                 "mesuré " + std::to_string(mesure));
+                     + std::to_string(essai.attendu) + " cycles, au cadre du "
+                     "compilateur près",
+                 "mesuré " + std::to_string(brut));
     }
 }
 
@@ -4593,6 +4645,80 @@ static void test_programme_multifichier() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// [40] Ce qu'on annonce à l'utilisateur sur chaque carte
+//
+// Une carte ne se programme pas dans le même langage qu'une autre, et surtout
+// le simulateur n'accepte pas tout ce que la vraie carte accepte. Taire cet
+// écart, c'est laisser quelqu'un chercher une heure pourquoi son croquis
+// Arduino-ESP32 ne compile pas.
+//
+// Trois écarts d'horloge sont vérifiés nommément, parce qu'ils font perdre du
+// temps et qu'ils ne se devinent pas :
+//   * l'ATtiny85 sort d'usine à 1 MHz, pas à 8 — la fusible CKDIV8 divise son
+//     oscillateur par huit ;
+//   * un RP2040 démarre sur son oscillateur en anneau, autour de 6 MHz, et
+//     n'atteint 125 MHz qu'une fois ses boucles à verrouillage de phase
+//     réglées ;
+//   * un STM32F103 démarre à 8 MHz sur son oscillateur interne, et n'atteint
+//     72 MHz qu'avec son quartz externe et sa PLL.
+// Le simulateur part de la fréquence nominale dans les trois cas : c'est un
+// choix, il doit être écrit quelque part.
+// ---------------------------------------------------------------------------
+static void test_notes_de_langage() {
+    std::printf("\n[40] Ce qui est annonce sur le langage de chaque carte\n");
+
+    int cartes = 0, sans_note = 0;
+    std::string manquantes;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele || !modele->carte) continue;
+        ++cartes;
+        if (modele->note_langage.empty()) {
+            ++sans_note;
+            manquantes += modele->type + " ";
+        }
+    }
+    verifier(cartes >= 9 && sans_note == 0,
+             "chaque carte dit dans quel langage elle se programme",
+             sans_note == 0 ? std::to_string(cartes) + " cartes" : manquantes);
+
+    auto note = [](const std::string& type) {
+        const coeur::Modele* modele = coeur::Catalogue::instance().modele(type);
+        return modele ? modele->note_langage : std::string();
+    };
+    auto contient = [](const std::string& texte, const std::string& morceau) {
+        return texte.find(morceau) != std::string::npos;
+    };
+
+    verifier(contient(note("attiny85"), "1 MHz")
+                 && contient(note("attiny85"), "CKDIV8"),
+             "l'ATtiny85 previent qu'il sort d'usine a 1 MHz", "CKDIV8 cite");
+    verifier(contient(note("pi_pico"), "6 MHz")
+                 && contient(note("pi_pico"), "125 MHz"),
+             "le Pico previent qu'il ne demarre pas a 125 MHz",
+             "oscillateur en anneau cite");
+    verifier(contient(note("stm32f103"), "8 MHz")
+                 && contient(note("stm32f103"), "72 MHz"),
+             "le STM32 previent qu'il ne demarre pas a 72 MHz",
+             "quartz et PLL cites");
+    verifier(contient(note("arduino_pro_mini"), "8 MHz"),
+             "la Pro Mini previent qu'elle existe en deux versions",
+             "5 V/16 MHz et 3,3 V/8 MHz");
+    verifier(contient(note("esp32"), "ESP-IDF")
+                 && contient(note("esp32"), "ne tourne pas"),
+             "l'ESP32 dit franchement qu'un croquis complet ne tourne pas");
+    verifier(contient(note("arduino_nano"), "Nano Every"),
+             "la Nano met en garde contre la Nano Every, autre puce");
+
+    // Le langage court, celui de l'onglet, doit rester court : c'est un titre.
+    int trop_longs = 0;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous())
+        if (modele && modele->carte && modele->langage.size() > 20) ++trop_longs;
+    verifier(trop_longs == 0, "le nom du langage tient dans un titre d'onglet",
+             std::to_string(trop_longs) + " trop long(s)");
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -4637,6 +4763,7 @@ int main() {
     test_temps_xtensa();
     test_fabrication();
     test_bobines();
+    test_notes_de_langage();
     test_programme_multifichier();
 
     std::printf("\n============================================================\n");

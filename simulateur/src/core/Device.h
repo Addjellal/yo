@@ -218,6 +218,11 @@ struct Modele {
     // nue. Deux mots qui évitent de chercher pourquoi digitalWrite n'existe
     // pas là où il n'a rien à faire.
     std::string langage = "Arduino";
+    // Ce qu'il faut savoir avant d'écrire pour cette carte : les langages que
+    // la vraie carte accepte, celui que le simulateur sait compiler, et les
+    // écarts entre les deux. Affiché en infobulle sur l'onglet du programme
+    // et rappelé dans le journal quand on choisit la carte.
+    std::string note_langage;
 
     // Symbole d'alimentation : impose le nom du nœud auquel il est relié
     // ("GND", "5V"). Ne produit aucune ligne SPICE.
