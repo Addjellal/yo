@@ -7,6 +7,11 @@
 
 namespace coeur {
 
+// Adresses confrontées à l'en-tête officiel d'Espressif
+// (esp-idf, components/soc/esp32/register/soc/gpio_reg.h) et à soc.h :
+//   DR_REG_GPIO_BASE  0x3FF4 4000
+//   OUT 0x04, OUT_W1TS 0x08, OUT_W1TC 0x0C
+//   ENABLE 0x20, ENABLE_W1TS 0x24, ENABLE_W1TC 0x28, IN 0x3C
 const ProfilXtensa& profil_esp32() {
     static const ProfilXtensa profil = [] {
         ProfilXtensa p;

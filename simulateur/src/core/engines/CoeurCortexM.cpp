@@ -30,6 +30,15 @@ uint32_t rotation_droite(uint32_t valeur, int rang) {
 // ---------------------------------------------------------------------------
 // Les puces
 // ---------------------------------------------------------------------------
+// Les adresses qui suivent ont été confrontées aux sources officielles, et
+// non écrites de mémoire — un simulateur dont les périphériques sont à la
+// mauvaise adresse exécute parfaitement un firmware qui ne pilote rien, et
+// aucun test écrit par la même main ne le révèle.
+//
+//   RP2040, bases              fiche technique Raspberry Pi (memory map)
+//   SIO, décalages             pico-sdk, hardware/regs/sio.h
+//   PADS_BANK0, PUE et PDE     pico-sdk, hardware/regs/pads_bank0.h
+//   ADC, CS et RESULT          pico-sdk, hardware/regs/adc.h
 const ProfilCortex& profil_rp2040() {
     static const ProfilCortex profil = [] {
         ProfilCortex p;
@@ -86,6 +95,16 @@ const ProfilCortex& profil_rp2040() {
     return profil;
 }
 
+// STM32F103, confronté au manuel de référence RM0008 de STMicroelectronics
+// et à l'en-tête CMSIS officiel stm32f103xb.h :
+//   GPIOA = APB2 (0x4001 0000) + 0x0800, un port tous les 0x400
+//   CRL 0x00, CRH 0x04, IDR 0x08, ODR 0x0C, BSRR 0x10, BRR 0x14
+//   ADC1 = APB2 + 0x2400 ; CR2 0x08, SQR3 0x34, DR 0x4C ; SWSTART au bit 22
+//
+// Simplification assumée : le manuel précise que SWSTART ne lance une
+// conversion que si EXTSEL vaut 0b111. Le modèle convertit dès qu'on lit le
+// résultat, et annonce la conversion toujours terminée — un programme qui
+// attend EOC ne boucle donc pas sans fin.
 const ProfilCortex& profil_stm32f103() {
     static const ProfilCortex profil = [] {
         ProfilCortex p;
