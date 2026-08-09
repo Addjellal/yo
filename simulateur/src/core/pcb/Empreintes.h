@@ -47,6 +47,8 @@ Empreinte module(const std::string& nom, double largeur, double hauteur,
                  int broches);
 // Carte Arduino Uno : contour réel, quatre connecteurs, quatre fixations.
 Empreinte arduino_uno();
+// Carte Arduino Mega 2560 : contour réel et double rangée du bout.
+Empreinte arduino_mega();
 // Arduino Nano : deux rangées de 15 broches écartées de 0,6 pouce.
 Empreinte arduino_nano();
 // Arduino Pro Mini : la même en plus court, sans prise USB.

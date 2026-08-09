@@ -60,6 +60,7 @@ const ProfilAvr& profil_atmega328p() {
         ProfilAvr p;
         p.nom = "atmega328p";
         p.fin_ram = 0x08FF;                // 2 Ko de SRAM
+        p.flash_mots = 16384;              // 32 Ko de programme
         p.mots_par_vecteur = 2;            // vecteurs en JMP
         p.nb_ports = 3;
         p.pin[0] = 0x23; p.ddr[0] = 0x24; p.port[0] = 0x25;   // B
@@ -109,6 +110,7 @@ const ProfilAvr& profil_attiny85() {
         ProfilAvr p;
         p.nom = "attiny85";
         p.fin_ram = 0x025F;                // 512 octets de SRAM
+        p.flash_mots = 4096;               // 8 Ko de programme
         // Huit kilo-octets de programme : le tableau de vecteurs tient en
         // RJMP, un mot par vecteur. Se tromper là-dessus enverrait chaque
         // interruption au milieu du code voisin.
@@ -151,6 +153,110 @@ const ProfilAvr& profil_attiny85() {
         t1.port_b = 0; t1.bit_b = 4;        // OC1B -> PB4
 
         p.compteurs[2].present = false;     // il n'y a pas de compteur 2
+        p.nb_compteurs = 2;
+        return p;
+    }();
+    return profil;
+}
+
+const ProfilAvr& profil_atmega2560() {
+    static const ProfilAvr profil = [] {
+        ProfilAvr p;
+        p.nom = "atmega2560";
+        p.fin_ram = 0x21FF;                // 8 Ko de SRAM
+        p.flash_mots = 131072;             // 256 Ko de programme
+        p.mots_par_vecteur = 2;            // vecteurs en JMP
+        // 256 Ko de programme : le compteur d'instructions dépasse seize bits,
+        // et les adresses de retour occupent trois octets sur la pile. C'est
+        // la différence de fond avec un ATmega328P — en dépiler deux ferait
+        // revenir n'importe où au premier retour de fonction.
+        p.octets_adresse_retour = 3;
+        p.rampz = 0x5B;
+        p.eind = 0x5C;
+
+        // Onze ports. A, B, C, D, E, F, G sont dans l'espace d'E/S ordinaire ;
+        // H, J, K, L sont dans l'espace étendu, au-delà de 0x100.
+        const struct { char lettre; uint16_t pin; } ports[] = {
+            {'A', 0x20}, {'B', 0x23}, {'C', 0x26}, {'D', 0x29}, {'E', 0x2C},
+            {'F', 0x2F}, {'G', 0x32}, {'H', 0x100}, {'J', 0x103},
+            {'K', 0x106}, {'L', 0x109}};
+        p.nb_ports = 11;
+        for (int rang = 0; rang < 11; ++rang) {
+            p.lettre[rang] = ports[rang].lettre;
+            p.pin[rang] = ports[rang].pin;
+            p.ddr[rang] = static_cast<uint16_t>(ports[rang].pin + 1);
+            p.port[rang] = static_cast<uint16_t>(ports[rang].pin + 2);
+        }
+
+        p.spl = 0x5D; p.sph = 0x5E; p.sreg = 0x5F;
+        p.adcl = 0x78; p.adch = 0x79; p.adcsra = 0x7A; p.admux = 0x7C;
+        // Seize voies : les huit dernières demandent MUX5, qui vit dans
+        // ADCSRB. Sans ce bit, A8 rendrait la tension de A0 sans rien dire.
+        p.adcsrb = 0x7B;
+        p.mux5 = true;
+        p.canaux_adc = 16;
+        p.ucsra = 0xC0; p.ucsrb = 0xC1; p.udr = 0xC6;   // UART 0
+        p.vecteur_usart_rx = 25;
+
+        p.nb_compteurs = 6;
+        // Compteur 0 : huit bits, OC0A sur PB7, OC0B sur PG5.
+        ProfilAvr::ProfilCompteur& t0 = p.compteurs[0];
+        t0.present = true;
+        t0.controle_a = 0x44; t0.controle_b = 0x45; t0.compte = 0x46;
+        t0.compare_a = 0x47; t0.compare_b = 0x48;
+        t0.drapeaux = 0x35; t0.masques = 0x6E;
+        t0.vecteur_compa = 21; t0.vecteur_compb = 22; t0.vecteur_ovf = 23;
+        t0.port_a = 1; t0.bit_a = 7;        // PB7 = D13
+        t0.port_b = 6; t0.bit_b = 5;        // PG5 = D4
+
+        // Compteur 1 : seize bits, OC1A/B/C sur PB5, PB6, PB7.
+        ProfilAvr::ProfilCompteur& t1 = p.compteurs[1];
+        t1.present = true;
+        t1.controle_a = 0x80; t1.controle_b = 0x81;
+        t1.compte = 0x84; t1.compte_haut = 0x85;
+        t1.compare_a = 0x88; t1.compare_b = 0x8A;
+        t1.drapeaux = 0x36; t1.masques = 0x6F;
+        t1.vecteur_compa = 17; t1.vecteur_compb = 18; t1.vecteur_ovf = 20;
+        t1.port_a = 1; t1.bit_a = 5;        // PB5 = D11
+        t1.port_b = 1; t1.bit_b = 6;        // PB6 = D12
+
+        // Compteur 2 : huit bits, OC2A sur PB4, OC2B sur PH6.
+        ProfilAvr::ProfilCompteur& t2 = p.compteurs[2];
+        t2.present = true;
+        t2.controle_a = 0xB0; t2.controle_b = 0xB1; t2.compte = 0xB2;
+        t2.compare_a = 0xB3; t2.compare_b = 0xB4;
+        t2.drapeaux = 0x37; t2.masques = 0x70;
+        t2.vecteur_compa = 14; t2.vecteur_compb = 15; t2.vecteur_ovf = 16;
+        t2.prediviseur = 1;
+        t2.port_a = 1; t2.bit_a = 4;        // PB4 = D10
+        t2.port_b = 7; t2.bit_b = 6;        // PH6 = D9
+
+        // Compteurs 3, 4 et 5 : seize bits, dans l'espace étendu.
+        const struct {
+            uint16_t base, drapeaux, masques;
+            int compa, compb, ovf;
+            int port_a, bit_a, port_b, bit_b;
+        } grands[] = {
+            {0x90, 0x38, 0x71, 32, 33, 35, 4, 3, 4, 4},   // T3 : OC3A PE3 (D5)
+            {0xA0, 0x39, 0x72, 45, 46, 48, 7, 3, 7, 4},   // T4 : OC4A PH3 (D6)
+            {0x120, 0x3A, 0x73, 49, 50, 52, 9, 0, 9, 1}}; // T5 : OC5A PL3…
+        for (int k = 0; k < 3; ++k) {
+            ProfilAvr::ProfilCompteur& grand = p.compteurs[3 + k];
+            grand.present = true;
+            grand.controle_a = grands[k].base;
+            grand.controle_b = static_cast<uint16_t>(grands[k].base + 1);
+            grand.compte = static_cast<uint16_t>(grands[k].base + 4);
+            grand.compte_haut = static_cast<uint16_t>(grands[k].base + 5);
+            grand.compare_a = static_cast<uint16_t>(grands[k].base + 8);
+            grand.compare_b = static_cast<uint16_t>(grands[k].base + 10);
+            grand.drapeaux = grands[k].drapeaux;
+            grand.masques = grands[k].masques;
+            grand.vecteur_compa = grands[k].compa;
+            grand.vecteur_compb = grands[k].compb;
+            grand.vecteur_ovf = grands[k].ovf;
+            grand.port_a = grands[k].port_a; grand.bit_a = grands[k].bit_a;
+            grand.port_b = grands[k].port_b; grand.bit_b = grands[k].bit_b;
+        }
         return p;
     }();
     return profil;
@@ -159,6 +265,7 @@ const ProfilAvr& profil_attiny85() {
 const ProfilAvr* profil_par_nom(const std::string& nom) {
     if (nom == "atmega328p" || nom.empty()) return &profil_atmega328p();
     if (nom == "attiny85") return &profil_attiny85();
+    if (nom == "atmega2560") return &profil_atmega2560();
     return nullptr;
 }
 
@@ -190,13 +297,19 @@ bool CoeurAvr::charger(const std::string& chemin, std::string* erreur) {
         return false;
     }
 
-    std::vector<uint8_t> image(32768, 0xFF);
+    // L'image reçoit la flash de la puce. Elle grandit si un segment se pose
+    // plus loin : un code placé haut — ce que fait un Mega dès qu'il dépasse
+    // 128 Ko — était jusqu'ici silencieusement tronqué, et le programme
+    // sautait dans le vide au premier appel qui s'y rendait.
+    std::vector<uint8_t> image(static_cast<size_t>(p_.flash_mots) * 2, 0xFF);
     size_t taille_utile = 0;
 
-    auto deposer = [&image, &taille_utile](size_t adresse, const unsigned char* source,
+    auto deposer = [&image, &taille_utile](size_t adresse,
+                                           const unsigned char* source,
                                            size_t longueur) {
-        for (size_t k = 0; k < longueur && adresse + k < image.size(); ++k)
-            image[adresse + k] = source[k];
+        if (adresse + longueur > image.size())
+            image.resize(adresse + longueur, 0xFF);
+        for (size_t k = 0; k < longueur; ++k) image[adresse + k] = source[k];
         taille_utile = std::max(taille_utile, adresse + longueur);
     };
 
@@ -259,7 +372,11 @@ bool CoeurAvr::charger(const std::string& chemin, std::string* erreur) {
         if (erreur) *erreur = "aucun code trouvé dans " + chemin;
         return false;
     }
-    flash_.assign(16384, 0xFFFF);
+    // La flash de la puce, et jamais moins que ce que le fichier contient :
+    // un firmware plus gros que la puce est une erreur du programmeur, pas
+    // une raison de l'exécuter à moitié.
+    const size_t mots_image = (image.size() + 1) / 2;
+    flash_.assign(std::max<size_t>(p_.flash_mots, mots_image), 0xFFFF);
     for (size_t k = 0; k + 1 < image.size(); k += 2)
         flash_[k / 2] = static_cast<uint16_t>(image[k])
                         | (static_cast<uint16_t>(image[k + 1]) << 8);
@@ -274,9 +391,9 @@ void CoeurAvr::reinitialiser() {
     endormi_ = false;
     adc_restant_ = 0;
     serie_disponible_ = false;
-    t0_ = t1_ = t2_ = Compteur{};
+    for (Compteur& compteur : compteurs_) compteur = Compteur{};
     sortie_valide_ = false;
-    for (int port = 0; port < 3; ++port) {
+    for (int port = 0; port < ProfilAvr::kMaxPorts; ++port) {
         sortie_connue_[port] = 0;
         direction_connue_[port] = 0;
     }
@@ -303,6 +420,25 @@ void CoeurAvr::empiler(uint8_t valeur) {
     const uint16_t sommet = pile();
     if (sommet <= p_.fin_ram) donnees_[sommet] = valeur;
     poser_pile(static_cast<uint16_t>(sommet - 1));
+}
+
+// Une adresse de retour : deux octets sur la plupart des AVR, trois sur les
+// puces de plus de 128 Ko de programme. L'ordre est celui du matériel —
+// l'octet de poids fort est empilé en dernier, donc dépilé en premier.
+void CoeurAvr::empiler_retour(uint32_t adresse) {
+    empiler(static_cast<uint8_t>(adresse & 0xFF));
+    empiler(static_cast<uint8_t>((adresse >> 8) & 0xFF));
+    if (p_.octets_adresse_retour >= 3)
+        empiler(static_cast<uint8_t>((adresse >> 16) & 0xFF));
+}
+
+uint32_t CoeurAvr::depiler_retour() {
+    uint32_t adresse = 0;
+    if (p_.octets_adresse_retour >= 3)
+        adresse = static_cast<uint32_t>(depiler()) << 16;
+    adresse |= static_cast<uint32_t>(depiler()) << 8;
+    adresse |= depiler();
+    return adresse;
 }
 
 uint8_t CoeurAvr::depiler() {
@@ -367,7 +503,8 @@ void CoeurAvr::ecrire(uint16_t adresse, uint8_t valeur) {
     }
     // Un drapeau d'interruption s'efface en y écrivant un « 1 ». Sur les
     // petites puces, les deux compteurs partagent le même registre.
-    for (const ProfilAvr::ProfilCompteur& compteur : p_.compteurs) {
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
+        const ProfilAvr::ProfilCompteur& compteur = p_.compteurs[numero];
         if (!compteur.present || compteur.drapeaux != adresse) continue;
         donnees_[adresse] &= static_cast<uint8_t>(~valeur);
         return;
@@ -393,7 +530,8 @@ void CoeurAvr::ecrire(uint16_t adresse, uint8_t valeur) {
 bool CoeurAvr::touche_les_sorties(uint16_t adresse) const {
     for (int rang = 0; rang < p_.nb_ports; ++rang)
         if (adresse == p_.port[rang] || adresse == p_.ddr[rang]) return true;
-    for (const ProfilAvr::ProfilCompteur& compteur : p_.compteurs) {
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
+        const ProfilAvr::ProfilCompteur& compteur = p_.compteurs[numero];
         if (!compteur.present) continue;
         if (adresse == compteur.controle_a || adresse == compteur.controle_b
             || adresse == compteur.compare_a || adresse == compteur.compare_b
@@ -404,7 +542,10 @@ bool CoeurAvr::touche_les_sorties(uint16_t adresse) const {
 }
 
 void CoeurAvr::demarrer_conversion() {
-    const int canal = donnees_[p_.admux] & 0x0F;
+    int canal = donnees_[p_.admux] & 0x0F;
+    if (p_.mux5 && p_.adcsrb != ProfilAvr::kAbsent
+        && (donnees_[p_.adcsrb] & 0x08))
+        canal |= 0x08;
     const uint16_t mesure = canal < p_.canaux_adc ? adc_[canal] : 0;
     donnees_[p_.adcl] = static_cast<uint8_t>(mesure & 0xFF);
     donnees_[p_.adch] = static_cast<uint8_t>(mesure >> 8);
@@ -414,9 +555,15 @@ void CoeurAvr::demarrer_conversion() {
     adc_restant_ = 13 * diviseur;
 }
 
+int CoeurAvr::rang_du_port(char lettre) const {
+    for (int rang = 0; rang < p_.nb_ports; ++rang)
+        if (p_.lettre[rang] == lettre) return rang;
+    return -1;
+}
+
 void CoeurAvr::broche_externe(char port, int bit, bool haut) {
-    const int rang = port == 'B' ? 0 : (port == 'C' ? 1 : 2);
-    if (bit < 0 || bit > 7 || rang >= p_.nb_ports) return;
+    const int rang = rang_du_port(port);
+    if (bit < 0 || bit > 7 || rang < 0) return;
     if (haut)
         entree_[rang] |= static_cast<uint8_t>(1 << bit);
     else
@@ -424,7 +571,7 @@ void CoeurAvr::broche_externe(char port, int bit, bool haut) {
 }
 
 void CoeurAvr::tension_adc(int canal, double volts) {
-    if (canal < 0 || canal > 7) return;
+    if (canal < 0 || canal >= p_.canaux_adc || canal >= 16) return;
     volts = std::max(0.0, std::min(5.0, volts));
     adc_[canal] = static_cast<uint16_t>(volts / 5.0 * 1023.0 + 0.5);
 }
@@ -442,8 +589,8 @@ void CoeurAvr::recevoir_serie(uint8_t octet) {
 void CoeurAvr::rafraichir_sorties() {
     // Borné explicitement : le compilateur ne peut pas déduire seul que le
     // profil ne décrit jamais plus de trois ports.
-    const int ports = std::min(p_.nb_ports, 3);
-    uint8_t niveaux[3] = {0, 0, 0};
+    const int ports = std::min(p_.nb_ports, ProfilAvr::kMaxPorts);
+    uint8_t niveaux[ProfilAvr::kMaxPorts] = {};
     for (int rang = 0; rang < ports; ++rang)
         niveaux[rang] = static_cast<uint8_t>(donnees_[p_.port[rang]]
                                              & donnees_[p_.ddr[rang]]);
@@ -458,11 +605,10 @@ void CoeurAvr::rafraichir_sorties() {
         else
             niveaux[port] &= static_cast<uint8_t>(~(1 << bit));
     };
-    const Compteur* etats[3] = {&t0_, &t1_, &t2_};
-    for (int numero = 0; numero < 3; ++numero) {
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
         const ProfilAvr::ProfilCompteur& profil = p_.compteurs[numero];
         if (!profil.present) continue;
-        const uint8_t compte = static_cast<uint8_t>(etats[numero]->compte);
+        const uint8_t compte = static_cast<uint8_t>(compteurs_[numero].compte);
         // Le compteur 1 de l'ATtiny arme sa PWM par un bit à lui (PWM1A et
         // PWM1B dans TCCR1 et GTCCR), pas par les bits WGM des autres.
         const bool arme = profil.prediviseur == 2
@@ -491,8 +637,7 @@ void CoeurAvr::rafraichir_sorties() {
         for (int bit = 0; bit < 8; ++bit) {
             if (!(change & (1 << bit))) continue;
             if (!(direction & (1 << bit))) continue;
-            sur_broche(static_cast<char>('B' + rang), bit,
-                       (niveaux[rang] >> bit) & 1);
+            sur_broche(p_.lettre[rang], bit, (niveaux[rang] >> bit) & 1);
         }
     }
     sortie_valide_ = true;
@@ -555,9 +700,8 @@ void CoeurAvr::avancer_compteur(Compteur& compteur, int cycles, int numero) {
 }
 
 void CoeurAvr::avancer_peripheriques(int cycles) {
-    avancer_compteur(t0_, cycles, 0);
-    avancer_compteur(t1_, cycles, 1);
-    avancer_compteur(t2_, cycles, 2);
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero)
+        avancer_compteur(compteurs_[numero], cycles, numero);
     if (adc_restant_ > 0) {
         adc_restant_ -= cycles;
         if (adc_restant_ <= 0) {
@@ -573,8 +717,7 @@ void CoeurAvr::avancer_peripheriques(int cycles) {
 // Interruptions
 // ---------------------------------------------------------------------------
 void CoeurAvr::declencher(int vecteur) {
-    empiler(static_cast<uint8_t>(pc_ & 0xFF));
-    empiler(static_cast<uint8_t>((pc_ >> 8) & 0xFF));
+    empiler_retour(pc_);
     poser_drapeau(kI, false);
     pc_ = static_cast<uint32_t>(vecteur) * p_.mots_par_vecteur;
     cycles_ += 4;
@@ -589,7 +732,7 @@ void CoeurAvr::declencher(int vecteur) {
 // puce.
 void CoeurAvr::ranger_interruptions() {
     sources_.clear();
-    for (int numero = 0; numero < 3; ++numero) {
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
         const ProfilAvr::ProfilCompteur& profil = p_.compteurs[numero];
         if (!profil.present) continue;
         sources_.push_back({profil.drapeaux, profil.masques, profil.bit_ocfa,
@@ -859,15 +1002,32 @@ int CoeurAvr::instruction() {
                         return 2;
                     }
                     case 0x4:                                   // LPM Rd, Z
-                    case 0x5: {                                 // LPM Rd, Z+
+                    case 0x5:                                   // LPM Rd, Z+
+                    case 0x6:                                   // ELPM Rd, Z
+                    case 0x7: {                                 // ELPM Rd, Z+
+                        // ELPM prolonge l'adresse par RAMPZ : c'est ainsi
+                        // qu'on lit la moitié haute de la flash d'une grosse
+                        // puce, et avr-gcc s'en sert dès que les données
+                        // constantes dépassent 64 Ko.
+                        const int forme = code & 0x000F;
+                        const bool etendu = forme >= 0x6;
                         const uint16_t z = lire_paire(30);
-                        const uint16_t mot = (z / 2) < flash_.size()
-                                                 ? flash_[z / 2]
-                                                 : 0xFFFF;
-                        poser_reg(rang, static_cast<uint8_t>((z & 1) ? (mot >> 8)
-                                                                    : mot));
-                        if ((code & 0x000F) == 0x5)
-                            poser_paire(30, static_cast<uint16_t>(z + 1));
+                        uint32_t adresse = z;
+                        if (etendu && p_.rampz != ProfilAvr::kAbsent)
+                            adresse |= static_cast<uint32_t>(donnees_[p_.rampz])
+                                       << 16;
+                        const uint32_t mot_rang = adresse / 2;
+                        const uint16_t mot =
+                            mot_rang < flash_.size() ? flash_[mot_rang] : 0xFFFF;
+                        poser_reg(rang, static_cast<uint8_t>(
+                                            (adresse & 1) ? (mot >> 8) : mot));
+                        if (forme == 0x5 || forme == 0x7) {
+                            const uint32_t suivante = adresse + 1;
+                            poser_paire(30, static_cast<uint16_t>(suivante));
+                            if (etendu && p_.rampz != ProfilAvr::kAbsent)
+                                donnees_[p_.rampz] =
+                                    static_cast<uint8_t>(suivante >> 16);
+                        }
                         return 3;
                     }
                     case 0x9: {                                 // LD Rd, Y+
@@ -1034,18 +1194,22 @@ int CoeurAvr::instruction() {
             }
             if (code == 0x9409 || code == 0x9419) {             // IJMP / EIJMP
                 pc_ = lire_paire(30);
+                if (code == 0x9419 && p_.eind != ProfilAvr::kAbsent)
+                    pc_ |= static_cast<uint32_t>(donnees_[p_.eind]) << 16;
                 return 2;
             }
-            if (code == 0x9509 || code == 0x9519) {             // ICALL
-                empiler(static_cast<uint8_t>(pc_ & 0xFF));
-                empiler(static_cast<uint8_t>((pc_ >> 8) & 0xFF));
+            if (code == 0x9509 || code == 0x9519) {             // ICALL/EICALL
+                empiler_retour(pc_);
                 pc_ = lire_paire(30);
+                // EICALL ajoute les bits hauts que porte EIND : sans eux, un
+                // appel indirect vers la moitié haute de la flash reviendrait
+                // dans la moitié basse.
+                if (code == 0x9519 && p_.eind != ProfilAvr::kAbsent)
+                    pc_ |= static_cast<uint32_t>(donnees_[p_.eind]) << 16;
                 return 3;
             }
             if (code == 0x9508 || code == 0x9518) {             // RET / RETI
-                const uint8_t haut = depiler();
-                const uint8_t bas = depiler();
-                pc_ = (static_cast<uint32_t>(haut) << 8) | bas;
+                pc_ = depiler_retour();
                 if (code == 0x9518) poser_drapeau(kI, true);
                 return 4;
             }
@@ -1067,8 +1231,7 @@ int CoeurAvr::instruction() {
             if ((code & 0xFE0E) == 0x940E) {                    // CALL
                 const uint32_t haut = ((code >> 3) & 0x3E) | (code & 0x01);
                 const uint16_t bas = flash_[pc_++];
-                empiler(static_cast<uint8_t>(pc_ & 0xFF));
-                empiler(static_cast<uint8_t>((pc_ >> 8) & 0xFF));
+                empiler_retour(pc_);
                 pc_ = (haut << 16) | bas;
                 return 4;
             }
@@ -1151,8 +1314,7 @@ int CoeurAvr::instruction() {
         }
         case 0xD000: {                                          // RCALL
             int16_t decalage = static_cast<int16_t>(code << 4) >> 4;
-            empiler(static_cast<uint8_t>(pc_ & 0xFF));
-            empiler(static_cast<uint8_t>((pc_ >> 8) & 0xFF));
+            empiler_retour(pc_);
             pc_ = static_cast<uint32_t>(pc_ + decalage);
             return 3;
         }

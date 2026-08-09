@@ -241,6 +241,59 @@ void enregistrer_cartes(Catalogue& catalogue) {
             m.broches_mcu["PB" + std::to_string(bit)] = bit;
         enregistrer(std::move(m));
     }
+
+    {   // -------------------------------------------------- Arduino Mega 2560
+        // Cinquante-quatre entrées-sorties et seize entrées analogiques : la
+        // carte qu'on prend quand l'Uno n'a plus assez de broches. Sa puce,
+        // l'ATmega2560, n'est pas une grosse ATmega328P — son programme
+        // dépasse 128 Ko, donc ses adresses de retour occupent trois octets,
+        // et son brochage n'a rien de régulier : D0 est sur le port E, D22
+        // sur le port A, D42 sur le port L.
+        Modele m;
+        m.type = "arduino_mega";
+        m.libelle = "Carte Arduino Mega 2560";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#1a7f8c";
+
+        const double pas = 16;
+        // Cinquante-quatre broches à droite, vingt à gauche : chaque colonne
+        // est centrée sur elle-même.
+        const double premier_d = -(54 - 1) * pas / 2;
+        for (int d = 0; d <= 53; ++d) {
+            const double y = premier_d + (53 - d) * pas;
+            m.bornes.push_back({"D" + std::to_string(d), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(26, y + 4, "D" + std::to_string(d), 10));
+        }
+        const char* gauche[] = {"5V", "3V3", "GND", "VIN"};
+        const double premier_g = -(20 - 1) * pas / 2;
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier_g + k * pas;
+            m.bornes.push_back({gauche[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-64, y + 4, gauche[k], 10));
+        }
+        for (int a = 0; a <= 15; ++a) {
+            const double y = premier_g + (4 + a) * pas;
+            m.bornes.push_back({"A" + std::to_string(a), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-64, y + 4, "A" + std::to_string(a), 10));
+        }
+        const double demi = (54 - 1) * pas / 2 + 30;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
+        m.symbole.push_back(texte(-46, premier_d - 16, "ARDUINO MEGA 2560", 11));
+        m.empreinte = {"ARDUINO_MEGA", {}, 101.6, 53.3};
+        m.mcu = "atmega2560";
+        m.horloge = 16000000;
+        m.programme_exemple = kSourceExemple;
+        // La numérotation Arduino du Mega : D0..D53 valent 0..53, et A0
+        // commence à 54 — ce n'est pas 14 comme sur un Uno.
+        for (int a = 0; a <= 15; ++a)
+            m.broches_mcu["A" + std::to_string(a)] = 54 + a;
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

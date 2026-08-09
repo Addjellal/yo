@@ -62,7 +62,11 @@ public:
     bool direction_sortie(int broche) const;   // DDRx
     bool niveau_port(int broche) const;        // PORTx (ou pull-up si entrée)
     bool pullup_actif(int broche) const;
-    // Nom du microcontrôleur chargé (« atmega328p », « attiny85 »).
+    // La voie du convertisseur derrière une broche, ou -1 si elle n'en a pas.
+    // C'est la puce qui décide : A0 est la broche 14 d'un Uno et la 54 d'un
+    // Mega.
+    int canal_adc(int broche) const;
+    // Nom du microcontrôleur chargé (« atmega328p », « attiny85 »…).
     const std::string& mcu() const { return mcu_; }       // entrée + PORTx à 1
 
     // Impose au microcontrôleur le niveau que le circuit applique sur une

@@ -473,13 +473,14 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
         auto it = formes.tensions.find(noeud);
         if (it == formes.tensions.end() || it->second.empty()) continue;
         const double derniere = it->second.back();
-        if (liaison.numero >= 14)
-            cible->mcu->definir_tension_adc(liaison.numero - 14, derniere);
-        // A6 et A7 du Nano n'ont pas d'étage numérique : elles n'entrent que
-        // dans le convertisseur. Leur imposer un niveau de port écrirait dans
-        // des bits qui n'existent pas sur la puce.
-        if (liaison.numero < 20)
-            cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
+        // C'est la puce qui dit si une broche entre dans le convertisseur, et
+        // sur quelle voie : A0 est la broche 14 d'un Uno et la 54 d'un Mega.
+        const int canal = cible->mcu->canal_adc(liaison.numero);
+        if (canal >= 0) cible->mcu->definir_tension_adc(canal, derniere);
+        // Les broches sans étage numérique — A6 et A7 d'un Nano — ignorent
+        // le niveau qu'on leur impose : le moteur le sait, on peut appeler
+        // sans distinguer.
+        cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
     }
 
     emit resultats(courants, tensions);

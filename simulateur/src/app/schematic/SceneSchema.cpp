@@ -52,7 +52,9 @@ int numero_broche(const std::string& nom) {
     const std::string chiffres = nom.substr(1);
     if (chiffres.find_first_not_of("0123456789") != std::string::npos) return -1;
     const int valeur = std::stoi(chiffres);
-    if (nom[0] == 'D' && valeur >= 0 && valeur <= 13) return valeur;
+    // Jusqu'à D53 : c'est ce que porte un Mega. Une carte qui n'a pas ces
+    // broches ne les déclare simplement pas.
+    if (nom[0] == 'D' && valeur >= 0 && valeur <= 53) return valeur;
     if (nom[0] == 'A' && valeur >= 0 && valeur <= 7) return 14 + valeur;
     return -1;
 }

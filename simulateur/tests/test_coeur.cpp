@@ -19,6 +19,7 @@
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
 #include <fstream>
+#include <set>
 
 #include "core/engines/AvrEngine.h"
 #include "core/engines/ProgrammesExemples.h"
@@ -2983,8 +2984,10 @@ int main(void) {
         if (broche == 1) ++basculements;      // PB1
     });
     mcu.avancer(8000000);                      // une seconde à 8 MHz
-    verifier(basculements >= 4,
-             "PB1 clignote : cinq allumages par seconde attendus",
+    // 100 ms allumée, 100 ms éteinte : période de 200 ms, donc dix
+    // basculements par seconde. Fourchette serrée, pour la même raison.
+    verifier(basculements >= 9 && basculements <= 11,
+             "PB1 clignote dix fois par seconde, au cycle près",
              std::to_string(basculements) + " basculement(s)");
 
     // --- l'interruption de débordement du compteur 0
@@ -3037,6 +3040,207 @@ int main(void) {
              std::to_string(bascules_pb3) + " basculements (≈390 attendus)");
 }
 
+
+// L'ATmega2560 : la puce où le cœur lui-même change de forme.
+//
+// L'ATtiny demandait une autre carte de registres ; le Mega demande autre
+// chose : son programme dépasse 128 Ko, donc son compteur d'instructions
+// dépasse seize bits, donc ses adresses de retour occupent TROIS octets sur
+// la pile. En dépiler deux ne provoque aucune erreur visible — le programme
+// revient simplement ailleurs, au premier retour de fonction. C'est pourquoi
+// ce test appelle des fonctions imbriquées : sans cela, un clignotant écrit
+// tout entier dans main() passerait sans rien prouver.
+static void test_atmega2560() {
+    std::printf("\n[29] ATmega2560 : adresses de retour sur trois octets\n");
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
+        std::printf("  (avr-gcc absent — section ignorée)\n");
+        return;
+    }
+
+    const char* kProgramme = R"(
+#include <avr/io.h>
+#include <util/delay.h>
+
+/* Trois appels imbriqués, que le compilateur ne peut pas aplatir : chaque
+   retour dépile une adresse, et c'est là que tout se joue. */
+__attribute__((noinline)) static void allumer(void) { PORTB |=  (1 << PB7); }
+__attribute__((noinline)) static void eteindre(void) { PORTB &= ~(1 << PB7); }
+__attribute__((noinline)) static void battre(void) {
+    allumer();
+    _delay_ms(50);
+    eteindre();
+    _delay_ms(50);
+}
+
+int main(void) {
+    DDRB |= (1 << PB7);          /* PB7 = D13 sur une carte Mega */
+    while (1) battre();
+}
+)";
+    const std::string source = "/tmp/sim_m2560.cpp";
+    const std::string firmware = "/tmp/sim_m2560.elf";
+    {
+        std::ofstream fichier(source);
+        fichier << kProgramme;
+    }
+    std::string journal;
+    const bool compile = coeur::AvrEngine::compiler_source(
+        kProgramme, firmware, &journal, "atmega2560", 16000000);
+    verifier(compile, "avr-g++ compile pour atmega2560", journal);
+    if (!compile) return;
+
+    coeur::AvrEngine mcu;
+    verifier(mcu.charger(firmware, "atmega2560", 16000000),
+             "le firmware Mega se charge dans le cœur", mcu.erreur());
+
+    int basculements = 0;
+    mcu.sur_changement_broche([&](int broche, bool) {
+        if (broche == 13) ++basculements;    // D13, soit PB7
+    });
+    mcu.avancer(16000000);                    // une seconde
+    // 50 ms allumée puis 50 ms éteinte : la période fait 100 ms, et chaque
+    // période compte deux basculements — vingt par seconde, donc, et non dix.
+    // La fourchette est serrée exprès : c'est elle qui prouve que le temps
+    // est compté au cycle près et pas seulement que la broche bouge.
+    verifier(basculements >= 19 && basculements <= 21,
+             "D13 bat à travers trois appels imbriqués",
+             std::to_string(basculements) + " basculements (20 attendus)");
+
+    // La preuve de l'adresse sur trois octets.
+    //
+    // Tant que tout le programme tient sous 64 Ko de mots, l'octet haut d'une
+    // adresse de retour vaut zéro : en empiler deux ou trois revient au même,
+    // et aucun test ne peut faire la différence. Il faut donc placer du code
+    // AU-DELÀ, et l'y faire s'appeler lui-même : l'adresse de retour dépasse
+    // alors seize bits. Avec deux octets, RET revient à l'adresse tronquée —
+    // en plein dans le tableau des vecteurs — et le programme part à la
+    // dérive sans le moindre message.
+    {
+        const char* kHaut = R"(
+#include <avr/io.h>
+
+__attribute__((noinline, section(".text_haut"))) void feuille(void) {
+    PORTB ^= (1 << PB7);
+}
+__attribute__((noinline, section(".text_haut"))) void branche(void) {
+    feuille();
+    feuille();
+}
+int main(void) {
+    DDRB |= (1 << PB7);
+    while (1) branche();
+}
+)";
+        const std::string source = "/tmp/sim_m2560_haut.c";
+        const std::string binaire = "/tmp/sim_m2560_haut.elf";
+        {
+            std::ofstream fichier(source);
+            fichier << kHaut;
+        }
+        // Le code est posé à l'octet 0x20000, soit le mot 0x10000 : au-delà
+        // de ce qu'une adresse de seize bits peut décrire.
+        const std::string commande =
+            "avr-gcc -mmcu=atmega2560 -DF_CPU=16000000UL -Os "
+            "-Wl,--section-start=.text_haut=0x20000 -o \"" + binaire
+            + "\" \"" + source + "\" > /tmp/sim_m2560_haut.log 2>&1";
+        if (std::system(commande.c_str()) != 0) {
+            verifier(false, "le programme placé haut compile", "avr-gcc");
+        } else {
+            coeur::AvrEngine loin;
+            loin.charger(binaire, "atmega2560", 16000000);
+            int bascules = 0;
+            loin.sur_changement_broche([&](int broche, bool) {
+                if (broche == 13) ++bascules;
+            });
+            loin.avancer(200000);
+            // Chaque tour de boucle bascule deux fois. Si le retour était
+            // tronqué, le compte s'arrêterait presque aussitôt.
+            verifier(bascules > 10000,
+                     "un appel au-delà du mot 0x10000 revient au bon endroit",
+                     std::to_string(bascules) + " basculements");
+        }
+    }
+
+    // Un croquis Arduino sur le Mega. Deux tables doivent s'accorder : celle
+    // du noyau, qui traduit digitalWrite(42) en un bit du port L, et celle du
+    // moteur, qui retraduit ce bit en broche 42. Si l'une des deux se trompe,
+    // le croquis pilote une broche et le simulateur en montre une autre.
+    {
+        const char* kCroquis = R"(
+void setup() {
+    pinMode(13, OUTPUT);
+    pinMode(42, OUTPUT);
+    pinMode(22, OUTPUT);
+}
+
+void loop() {
+    digitalWrite(13, HIGH);
+    digitalWrite(42, HIGH);
+    digitalWrite(22, HIGH);
+    delay(10);
+    digitalWrite(13, LOW);
+    digitalWrite(42, LOW);
+    digitalWrite(22, LOW);
+    delay(10);
+}
+)";
+        const std::string croquis = "/tmp/sim_mega_croquis.elf";
+        if (!coeur::AvrEngine::compiler_source(kCroquis, croquis, &journal,
+                                               "atmega2560", 16000000)) {
+            verifier(false, "un croquis Arduino compile pour le Mega", journal);
+        } else {
+            coeur::AvrEngine carte;
+            carte.charger(croquis, "atmega2560", 16000000);
+            std::map<int, int> comptes;
+            carte.sur_changement_broche(
+                [&](int broche, bool) { ++comptes[broche]; });
+            carte.avancer(16000000);       // une seconde
+            // 10 ms haut, 10 ms bas : cinquante périodes, cent basculements.
+            const bool trois = comptes[13] > 90 && comptes[42] > 90
+                               && comptes[22] > 90;
+            verifier(trois,
+                     "digitalWrite(13), (42) et (22) pilotent les bonnes broches",
+                     "D13 " + std::to_string(comptes[13]) + ", D42 "
+                         + std::to_string(comptes[42]) + ", D22 "
+                         + std::to_string(comptes[22]));
+        }
+    }
+
+    // Le brochage du Mega n'a rien de régulier : D13 est sur le port B, mais
+    // D22 est sur le port A et D42 sur le port L. Une erreur de table ferait
+    // piloter une autre broche sans jamais le dire.
+    const char* kPorts = R"(
+#include <avr/io.h>
+
+int main(void) {
+    DDRA |= (1 << PA0);          /* D22 */
+    DDRL |= (1 << PL7);          /* D42 */
+    DDRG |= (1 << PG5);          /* D4  */
+    while (1) {
+        PORTA ^= (1 << PA0);
+        PORTL ^= (1 << PL7);
+        PORTG ^= (1 << PG5);
+    }
+}
+)";
+    const std::string autre = "/tmp/sim_m2560_ports.elf";
+    if (!coeur::AvrEngine::compiler_source(kPorts, autre, &journal,
+                                           "atmega2560", 16000000)) {
+        verifier(false, "le programme des ports compile", journal);
+        return;
+    }
+    coeur::AvrEngine second;
+    second.charger(autre, "atmega2560", 16000000);
+    std::set<int> vues;
+    second.sur_changement_broche([&](int broche, bool) { vues.insert(broche); });
+    second.avancer(200000);
+    const bool attendues = vues.count(22) && vues.count(42) && vues.count(4);
+    std::string liste;
+    for (int broche : vues) liste += std::to_string(broche) + " ";
+    verifier(attendues, "PA0, PL7 et PG5 sont bien D22, D42 et D4",
+             "broches vues : " + liste);
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3071,6 +3275,7 @@ int main() {
     test_exemples_compilent();
     test_cartes_qui_tournent();
     test_attiny85();
+    test_atmega2560();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

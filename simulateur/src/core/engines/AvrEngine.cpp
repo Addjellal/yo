@@ -26,26 +26,95 @@ struct BrocheAvr {
     int bit;
 };
 
-// Sur l'ATmega328P, la numérotation Arduino traverse trois ports. Sur
-// l'ATtiny85, il n'y a qu'un port : la broche 0 est PB0, et ainsi de suite.
-BrocheAvr broche_avr(int broche, bool attiny = false) {
-    if (attiny) return {'B', broche & 7};
-    if (broche <= 7) return {'D', broche};          // D0..D7  -> PORTD
-    if (broche <= 13) return {'B', broche - 8};     // D8..D13 -> PORTB
-    return {'C', broche - 14};                      // A0..A5  -> PORTC
+// Le brochage : quel port et quel bit se cachent derrière le numéro d'une
+// broche. C'est ce que le fabricant de la carte a câblé, et cela n'a rien de
+// régulier — sur un Mega, D0 est sur le port E, D22 sur le port A, et D53 sur
+// le port B. Une table est donc la seule description honnête.
+//
+// Un `bit` négatif marque une broche sans étage numérique : A6 et A7 d'un
+// Nano n'entrent que dans le convertisseur.
+const std::vector<BrocheAvr>& table_broches(const std::string& mcu) {
+    static const std::vector<BrocheAvr> atmega328p = [] {
+        std::vector<BrocheAvr> table;
+        for (int d = 0; d <= 7; ++d) table.push_back({'D', d});      // D0..D7
+        for (int d = 0; d <= 5; ++d) table.push_back({'B', d});      // D8..D13
+        for (int a = 0; a <= 5; ++a) table.push_back({'C', a});      // A0..A5
+        table.push_back({'C', -1});                                  // A6
+        table.push_back({'C', -1});                                  // A7
+        return table;
+    }();
+    static const std::vector<BrocheAvr> attiny85 = [] {
+        std::vector<BrocheAvr> table;
+        for (int b = 0; b <= 5; ++b) table.push_back({'B', b});      // PB0..PB5
+        return table;
+    }();
+    static const std::vector<BrocheAvr> atmega2560 = [] {
+        // Brochage de la carte Mega 2560, tel qu'il est sérigraphié dessus.
+        static const char* ports =
+            "EEEEGEHH" "HHBBBB"                 // D0..D13
+            "JJHHDDDD"                          // D14..D21
+            "AAAAAAAA"                          // D22..D29
+            "CCCCCCCC"                          // D30..D37
+            "DGGG"                              // D38..D41
+            "LLLLLLLL"                          // D42..D49
+            "BBBB";                             // D50..D53
+        static const int bits[] = {
+            0, 1, 4, 5, 5, 3, 3, 4,             // D0..D7
+            5, 6, 4, 5, 6, 7,                   // D8..D13
+            1, 0, 1, 0, 3, 2, 1, 0,             // D14..D21
+            0, 1, 2, 3, 4, 5, 6, 7,             // D22..D29
+            7, 6, 5, 4, 3, 2, 1, 0,             // D30..D37
+            7, 2, 1, 0,                         // D38..D41
+            7, 6, 5, 4, 3, 2, 1, 0,             // D42..D49
+            3, 2, 1, 0};                        // D50..D53
+        std::vector<BrocheAvr> table;
+        for (int d = 0; d < 54; ++d) table.push_back({ports[d], bits[d]});
+        for (int a = 0; a <= 7; ++a) table.push_back({'F', a});      // A0..A7
+        for (int a = 0; a <= 7; ++a) table.push_back({'K', a});      // A8..A15
+        return table;
+    }();
+
+    if (mcu == "attiny85") return attiny85;
+    if (mcu == "atmega2560") return atmega2560;
+    return atmega328p;
+}
+
+BrocheAvr broche_de(const std::string& mcu, int numero) {
+    const std::vector<BrocheAvr>& table = table_broches(mcu);
+    if (numero < 0 || numero >= static_cast<int>(table.size()))
+        return {'B', -1};
+    return table[numero];
+}
+
+// La voie du convertisseur derrière une broche, ou -1 si elle n'en a pas.
+int canal_adc_de(const std::string& mcu, int numero) {
+    if (mcu == "attiny85") {
+        // Sur cette puce, les entrées analogiques sont des broches ordinaires :
+        // PB5 est ADC0, PB2 est ADC1, PB4 est ADC2, PB3 est ADC3.
+        switch (numero) {
+            case 5: return 0;
+            case 2: return 1;
+            case 4: return 2;
+            case 3: return 3;
+            default: return -1;
+        }
+    }
+    if (mcu == "atmega2560") return numero >= 54 && numero <= 69 ? numero - 54
+                                                                 : -1;
+    return numero >= 14 && numero <= 21 ? numero - 14 : -1;
 }
 
 // Adresses en espace données de l'ATmega328P (adresse E/S + 0x20).
-uint16_t adresse_ddr(char port, bool attiny = false) {
-    if (attiny) return 0x37;     // DDRB de l'ATtiny85 : le seul port
-    switch (port) {
-        case 'B': return 0x24;
-        case 'C': return 0x27;
-        default:  return 0x2A;   // D
-    }
+// L'adresse du registre de direction d'un port, telle que la puce la déclare.
+uint16_t adresse_ddr(const std::string& mcu, char port) {
+    const ProfilAvr* profil = profil_par_nom(mcu);
+    if (!profil) return 0x24;
+    for (int rang = 0; rang < profil->nb_ports; ++rang)
+        if (profil->lettre[rang] == port) return profil->ddr[rang];
+    return 0x24;
 }
-uint16_t adresse_port(char port, bool attiny = false) {
-    return adresse_ddr(port, attiny) + 1;
+uint16_t adresse_port(const std::string& mcu, char port) {
+    return static_cast<uint16_t>(adresse_ddr(mcu, port) + 1);
 }
 }  // namespace
 
@@ -120,9 +189,11 @@ bool AvrEngine::charger_simavr(const std::string& chemin,
     impl_->avr = avr;
     impl_->firmware = firmware;
 
-    // Écoute des 20 broches Arduino
-    for (int broche = 0; broche <= 19; ++broche) {
-        BrocheAvr cible = broche_avr(broche);
+    // Écoute des broches de la puce
+    for (int broche = 0;
+         broche < static_cast<int>(table_broches(mcu).size()); ++broche) {
+        BrocheAvr cible = broche_de(mcu, broche);
+        if (cible.bit < 0) continue;
         avr_irq_t* irq = avr_io_getirq(
             avr, AVR_IOCTL_IOPORT_GETIRQ(cible.port), cible.bit);
         if (!irq) continue;
@@ -187,7 +258,8 @@ uint8_t AvrEngine::registre_simavr(uint16_t adresse) const {
 
 void AvrEngine::niveau_simavr(int broche, bool haut) {
     if (!impl_->avr) return;
-    const BrocheAvr cible = broche_avr(broche);
+    const BrocheAvr cible = broche_de(mcu_, broche);
+    if (cible.bit < 0) return;
     avr_irq_t* irq = avr_io_getirq(impl_->avr,
                                    AVR_IOCTL_IOPORT_GETIRQ(cible.port),
                                    cible.bit);
@@ -249,23 +321,20 @@ bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
     }
     impl_->coeur.definir_profil(*profil);
     mcu_ = mcu;
-    const bool attiny = mcu == "attiny85";
 
     impl_->coeur.definir_frequence(frequence);
     // Le cœur prévient à chaque changement de niveau ; on retraduit le port
     // et le bit en numéro de broche.
-    impl_->coeur.sur_broche = [this, attiny](char port, int bit, bool haut) {
-        int broche = -1;
-        if (attiny) {
-            if (port == 'B' && bit <= 5) broche = bit;
-        } else if (port == 'D' && bit <= 7) {
-            broche = bit;
-        } else if (port == 'B' && bit <= 5) {
-            broche = 8 + bit;
-        } else if (port == 'C' && bit <= 5) {
-            broche = 14 + bit;
+    // Le chemin inverse : le cœur annonce un port et un bit, il faut en
+    // retrouver le numéro de broche. La table sert dans les deux sens.
+    const std::vector<BrocheAvr>& brochage = table_broches(mcu);
+    impl_->coeur.sur_broche = [this, &brochage](char port, int bit, bool haut) {
+        for (size_t numero = 0; numero < brochage.size(); ++numero) {
+            if (brochage[numero].port != port || brochage[numero].bit != bit)
+                continue;
+            _notifier_broche(static_cast<int>(numero), haut);
+            return;
         }
-        if (broche >= 0) _notifier_broche(broche, haut);
     };
     impl_->coeur.sur_serie = [this](uint8_t octet) {
         _notifier_serie(static_cast<char>(octet));
@@ -324,25 +393,29 @@ void AvrEngine::definir_niveau_externe(int broche, bool haut) {
         niveau_simavr(broche, haut);
         return;
     }
-    const BrocheAvr cible = broche_avr(broche, mcu_ == "attiny85");
+    const BrocheAvr cible = broche_de(mcu_, broche);
+    // Une broche sans étage numérique ne reçoit pas de niveau : elle n'entre
+    // que dans le convertisseur.
+    if (cible.bit < 0) return;
     impl_->coeur.broche_externe(cible.port, cible.bit, haut);
 }
 
 bool AvrEngine::direction_sortie(int broche) const {
-    // A6 et A7 (20, 21) n'existent que sur le Nano et la Pro Mini, et
-    // seulement comme entrées de convertisseur : elles n'ont ni bit de
-    // direction ni bascule de sortie. Toujours en entrée, donc.
-    if (broche >= 20) return false;
-    const bool attiny = mcu_ == "attiny85";
-    const BrocheAvr cible = broche_avr(broche, attiny);
-    return (registre(adresse_ddr(cible.port, attiny)) >> cible.bit) & 1;
+    // Une broche sans étage numérique — A6 et A7 d'un Nano — n'a ni bit de
+    // direction ni bascule de sortie : toujours en entrée.
+    const BrocheAvr cible = broche_de(mcu_, broche);
+    if (cible.bit < 0) return false;
+    return (registre(adresse_ddr(mcu_, cible.port)) >> cible.bit) & 1;
 }
 
 bool AvrEngine::niveau_port(int broche) const {
-    if (broche >= 20) return false;
-    const bool attiny = mcu_ == "attiny85";
-    const BrocheAvr cible = broche_avr(broche, attiny);
-    return (registre(adresse_port(cible.port, attiny)) >> cible.bit) & 1;
+    const BrocheAvr cible = broche_de(mcu_, broche);
+    if (cible.bit < 0) return false;
+    return (registre(adresse_port(mcu_, cible.port)) >> cible.bit) & 1;
+}
+
+int AvrEngine::canal_adc(int broche) const {
+    return canal_adc_de(mcu_, broche);
 }
 
 bool AvrEngine::pullup_actif(int broche) const {
@@ -402,7 +475,7 @@ bool AvrEngine::compiler_source(const std::string& source,
     // Le noyau Arduino est écrit pour l'ATmega328P : ses registres, son
     // UART, ses trois ports. Sur une autre puce il ne compilerait pas, et
     // faire semblant produirait une erreur incompréhensible à l'utilisateur.
-    const bool avec_noyau = mcu == "atmega328p";
+    const bool avec_noyau = mcu == "atmega328p" || mcu == "atmega2560";
     if (avec_noyau
         && (!ecrire(entete, kArduinoEnTete) || !ecrire(noyau, kArduinoCorps))) {
         if (journal) *journal = "écriture impossible dans " + dossier;

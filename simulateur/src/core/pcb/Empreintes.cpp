@@ -377,6 +377,69 @@ Empreinte arduino_pro_mini() {
     return empreinte;
 }
 
+// Carte Arduino Mega 2560 : 101,6 × 53,3 mm. Les connecteurs du bas et du
+// haut sont ceux de l'Uno, aux mêmes cotes — c'est ce qui permet d'y poser un
+// shield —, prolongés par les entrées analogiques supplémentaires ; la double
+// rangée de trente-six broches du bout est propre au Mega.
+Empreinte arduino_mega() {
+    constexpr double kLargeur = 101.6, kHauteur = 53.3;
+    Empreinte empreinte;
+    empreinte.nom = "ARDUINO_MEGA";
+    empreinte.largeur = kLargeur;
+    empreinte.hauteur = kHauteur;
+
+    int numero = 1;
+    auto poser = [&](const std::string& nom, double x, double y) {
+        Pastille pastille = trou(numero++, x - kLargeur / 2, kHauteur / 2 - y,
+                                 1.9, 1.0);
+        pastille.nom = nom;
+        empreinte.pastilles.push_back(pastille);
+    };
+
+    const double bas = 2.54, haut = 50.8;
+    // Bord du bas : alimentation, puis A0..A7 — les positions de l'Uno.
+    const char* alimentation[] = {"NC", "IOREF", "RESET", "3V3",
+                                  "5V", "GND", "GND", "VIN"};
+    for (int k = 0; k < 8; ++k)
+        poser(alimentation[k], 17.78 + k * kPas, bas);
+    for (int k = 0; k <= 7; ++k)
+        poser("A" + std::to_string(k), 43.18 + k * kPas, bas);
+    // A8..A15 : le prolongement propre au Mega.
+    for (int k = 8; k <= 15; ++k)
+        poser("A" + std::to_string(k), 43.18 + k * kPas, bas);
+
+    // Bord du haut : D8..D13 puis D0..D7, comme sur l'Uno, avec son décalage.
+    const char* numeriques[] = {"SCL", "SDA", "AREF", "GND", "D13",
+                                "D12", "D11", "D10", "D9", "D8"};
+    for (int k = 0; k < 10; ++k)
+        poser(numeriques[k], 15.24 + k * kPas, haut);
+    for (int k = 0; k < 8; ++k)
+        poser("D" + std::to_string(7 - k), 42.16 + k * kPas, haut);
+    // D14..D21, à la suite.
+    for (int k = 0; k < 8; ++k)
+        poser("D" + std::to_string(14 + k), 66.04 + k * kPas, haut);
+
+    // La double rangée du bout : D22 à D53, deux par deux.
+    for (int paire = 0; paire < 16; ++paire) {
+        const double x = 88.9 - paire * kPas;
+        poser("D" + std::to_string(22 + paire * 2), x, haut - 2.54);
+        poser("D" + std::to_string(23 + paire * 2), x, haut - 5.08);
+    }
+
+    const double fixations[4][2] = {
+        {13.97, 2.54}, {15.24, 50.8}, {96.52, 2.54}, {96.52, 50.8}};
+    for (const auto& point : fixations)
+        empreinte.pastilles.push_back(
+            fixation(point[0] - kLargeur / 2, kHauteur / 2 - point[1]));
+
+    empreinte.serigraphie.push_back(rectangle(-kLargeur / 2, -kHauteur / 2,
+                                              kLargeur / 2, kHauteur / 2));
+    empreinte.serigraphie.push_back(
+        rectangle(-kLargeur / 2 - 1.5, -kHauteur / 2 + 4.0,
+                  -kLargeur / 2 + 10.0, -kHauteur / 2 + 15.0));
+    return empreinte;
+}
+
 Empreinte arduino_uno() {
     // Contour et connecteurs de la carte Uno : 68,6 × 53,4 mm, quatre
     // barrettes au pas de 2,54 mm — avec, entre D7 et D8, le décalage de
@@ -454,6 +517,7 @@ Empreinte gabarit(const Modele& modele) {
     const size_t bornes = modele.bornes.size();
 
     if (nom == "ARDUINO_UNO") return arduino_uno();
+    if (nom == "ARDUINO_MEGA") return arduino_mega();
     if (nom == "ARDUINO_NANO") return arduino_nano();
     if (nom == "ATTINY_DIP8") return dip(8);
     if (nom == "ARDUINO_PRO_MINI") return arduino_pro_mini();

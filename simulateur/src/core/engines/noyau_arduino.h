@@ -31,16 +31,34 @@ inline const char* kArduinoEnTete = R"ARD(
 #define INPUT        0
 #define OUTPUT       1
 #define INPUT_PULLUP 2
-#define A0 14
-#define A1 15
-#define A2 16
-#define A3 17
-#define A4 18
-#define A5 19
-/* A6 et A7 n'existent que sur le Nano et la Pro Mini : entrées de
-   convertisseur seulement, sans étage numérique. */
-#define A6 20
-#define A7 21
+/* A0 vaut 14 sur un Uno et 54 sur un Mega : ce n'est pas un décalage
+   arbitraire, c'est que le Mega a cinquante-quatre broches numériques
+   avant lui. */
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+#define kPremiereAnalogique 54
+#else
+#define kPremiereAnalogique 14
+#endif
+#define A0 (kPremiereAnalogique + 0)
+#define A1 (kPremiereAnalogique + 1)
+#define A2 (kPremiereAnalogique + 2)
+#define A3 (kPremiereAnalogique + 3)
+#define A4 (kPremiereAnalogique + 4)
+#define A5 (kPremiereAnalogique + 5)
+/* A6 et A7 existent sur le Nano et la Pro Mini comme entrées de
+   convertisseur, et sur le Mega comme entrées ordinaires. */
+#define A6 (kPremiereAnalogique + 6)
+#define A7 (kPremiereAnalogique + 7)
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+#define A8  62
+#define A9  63
+#define A10 64
+#define A11 65
+#define A12 66
+#define A13 67
+#define A14 68
+#define A15 69
+#endif
 #define PI 3.1415926535897932384626433832795
 #define DEC 10
 #define HEX 16
@@ -117,7 +135,96 @@ void loop(void);
 inline const char* kArduinoCorps = R"ARD(
 #include "Arduino.h"
 
-// --- correspondance broche Arduino -> port et bit sur un ATmega328P --------
+// --- correspondance broche Arduino -> port et bit ---------------------------
+//
+// Sur un ATmega328P elle est presque régulière : trois ports d'affilée. Sur un
+// Mega elle ne l'est pas du tout — D0 est sur le port E, D22 sur le port A,
+// D42 sur le port L. C'est le fabricant de la carte qui en a décidé ainsi ;
+// une table est la seule description honnête, et elle vit en flash pour ne
+// pas manger les huit kilo-octets de mémoire vive.
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+
+#include <avr/pgmspace.h>
+
+static const uint8_t kPortDeBroche[] PROGMEM = {
+    'E','E','E','E','G','E','H','H', 'H','H','B','B','B','B',      /* D0..D13 */
+    'J','J','H','H','D','D','D','D',                               /* D14..D21 */
+    'A','A','A','A','A','A','A','A',                               /* D22..D29 */
+    'C','C','C','C','C','C','C','C',                               /* D30..D37 */
+    'D','G','G','G',                                               /* D38..D41 */
+    'L','L','L','L','L','L','L','L',                               /* D42..D49 */
+    'B','B','B','B',                                               /* D50..D53 */
+    'F','F','F','F','F','F','F','F',                               /* A0..A7   */
+    'K','K','K','K','K','K','K','K'};                              /* A8..A15  */
+static const uint8_t kBitDeBroche[] PROGMEM = {
+    0,1,4,5,5,3,3,4, 5,6,4,5,6,7,
+    1,0,1,0,3,2,1,0,
+    0,1,2,3,4,5,6,7,
+    7,6,5,4,3,2,1,0,
+    7,2,1,0,
+    7,6,5,4,3,2,1,0,
+    3,2,1,0,
+    0,1,2,3,4,5,6,7,
+    0,1,2,3,4,5,6,7};
+
+static inline uint8_t lettre_de(uint8_t broche) {
+    if (broche >= sizeof(kPortDeBroche)) return 'B';
+    return pgm_read_byte(&kPortDeBroche[broche]);
+}
+static inline volatile uint8_t* registre_port(uint8_t broche) {
+    switch (lettre_de(broche)) {
+        case 'A': return &PORTA;
+        case 'B': return &PORTB;
+        case 'C': return &PORTC;
+        case 'D': return &PORTD;
+        case 'E': return &PORTE;
+        case 'F': return &PORTF;
+        case 'G': return &PORTG;
+        case 'H': return &PORTH;
+        case 'J': return &PORTJ;
+        case 'K': return &PORTK;
+        default:  return &PORTL;
+    }
+}
+static inline volatile uint8_t* registre_ddr(uint8_t broche) {
+    switch (lettre_de(broche)) {
+        case 'A': return &DDRA;
+        case 'B': return &DDRB;
+        case 'C': return &DDRC;
+        case 'D': return &DDRD;
+        case 'E': return &DDRE;
+        case 'F': return &DDRF;
+        case 'G': return &DDRG;
+        case 'H': return &DDRH;
+        case 'J': return &DDRJ;
+        case 'K': return &DDRK;
+        default:  return &DDRL;
+    }
+}
+static inline volatile uint8_t* registre_pin(uint8_t broche) {
+    switch (lettre_de(broche)) {
+        case 'A': return &PINA;
+        case 'B': return &PINB;
+        case 'C': return &PINC;
+        case 'D': return &PIND;
+        case 'E': return &PINE;
+        case 'F': return &PINF;
+        case 'G': return &PING;
+        case 'H': return &PINH;
+        case 'J': return &PINJ;
+        case 'K': return &PINK;
+        default:  return &PINL;
+    }
+}
+static inline uint8_t bit_de(uint8_t broche) {
+    if (broche >= sizeof(kBitDeBroche)) return 0;
+    return pgm_read_byte(&kBitDeBroche[broche]);
+}
+/* La dernière broche de la carte : au-delà, il n'y a rien à piloter. */
+#define kDerniereBroche 69
+
+#else
+
 static inline volatile uint8_t* registre_port(uint8_t broche) {
     if (broche < 8)  return &PORTD;
     if (broche < 14) return &PORTB;
@@ -138,6 +245,10 @@ static inline uint8_t bit_de(uint8_t broche) {
     if (broche < 14) return broche - 8;
     return broche - 14;
 }
+/* Vingt-deux broches sur un Uno : D0..D13 puis A0..A7. */
+#define kDerniereBroche 21
+
+#endif
 
 // --- horloge : Timer0 en débordement, comme le vrai noyau Arduino ---------
 //
@@ -210,7 +321,7 @@ void delayMicroseconds(unsigned int us) {
 
 // --- entrées et sorties tout ou rien -------------------------------------
 void pinMode(uint8_t broche, uint8_t mode) {
-    if (broche > 19) return;
+    if (broche > kDerniereBroche) return;
     volatile uint8_t* ddr = registre_ddr(broche);
     volatile uint8_t* port = registre_port(broche);
     const uint8_t masque = 1 << bit_de(broche);
@@ -224,7 +335,7 @@ void pinMode(uint8_t broche, uint8_t mode) {
 }
 
 void digitalWrite(uint8_t broche, uint8_t valeur) {
-    if (broche > 19) return;
+    if (broche > kDerniereBroche) return;
     volatile uint8_t* port = registre_port(broche);
     const uint8_t masque = 1 << bit_de(broche);
     if (valeur) *port |= masque;
@@ -232,15 +343,25 @@ void digitalWrite(uint8_t broche, uint8_t valeur) {
 }
 
 int digitalRead(uint8_t broche) {
-    if (broche > 19) return LOW;
+    if (broche > kDerniereBroche) return LOW;
     return (*registre_pin(broche) & (1 << bit_de(broche))) ? HIGH : LOW;
 }
 
 // --- conversion analogique ------------------------------------------------
 int analogRead(uint8_t broche) {
-    const uint8_t canal = (broche >= 14) ? (broche - 14) : broche;
+    const uint8_t canal = (broche >= kPremiereAnalogique)
+                              ? (broche - kPremiereAnalogique)
+                              : broche;
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__)
+    if (canal > 15) return 0;
+    /* Les voies 8 à 15 se choisissent avec MUX5, qui vit dans ADCSRB : sans
+       lui, A8 rendrait la tension de A0 sans le dire. */
+    if (canal >= 8) ADCSRB |= (1 << MUX5);
+    else            ADCSRB &= ~(1 << MUX5);
+#else
     if (canal > 7) return 0;
-    ADMUX = (1 << REFS0) | (canal & 0x0F);            // référence AVcc
+#endif
+    ADMUX = (1 << REFS0) | (canal & 0x07);            // référence AVcc
     ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
     ADCSRA |= (1 << ADSC);
     while (ADCSRA & (1 << ADSC)) { }

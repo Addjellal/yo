@@ -1555,6 +1555,7 @@ static void test_famille_328p() {
     const Cas cas[] = {{"arduino_uno", "D13", 13},
                        {"arduino_nano", "D13", 13},
                        {"arduino_pro_mini", "D13", 13},
+                       {"arduino_mega", "D13", 13},
                        {"atmega328p", "PB5", 13}};
 
     for (const Cas& essai : cas) {
@@ -1622,6 +1623,35 @@ static void test_famille_328p() {
             verifier(numero == attendu.numero,
                      std::string("PB1 de ") + attendu.type + " est la broche "
                          + std::to_string(attendu.numero),
+                     "reçu " + std::to_string(numero));
+        }
+    }
+
+    // A0 n'est pas au même numéro selon la carte : 14 sur un Uno, 54 sur un
+    // Mega, qui a cinquante-quatre broches numériques avant lui. Confondre
+    // les deux ferait lire la mauvaise entrée du convertisseur.
+    {
+        struct Attendu { const char* type; const char* borne; int numero; };
+        const Attendu attendus[] = {{"arduino_uno", "A0", 14},
+                                    {"arduino_mega", "A0", 54},
+                                    {"arduino_mega", "A15", 69},
+                                    {"arduino_mega", "D42", 42}};
+        for (const Attendu& attendu : attendus) {
+            SceneSchema scene;
+            ItemComposant* carte =
+                scene.ajouter_composant(attendu.type, QPointF(0, 0));
+            ItemComposant* pot =
+                scene.ajouter_composant("potentiometre", QPointF(600, 0));
+            if (!carte) continue;
+            scene.addItem(new ItemFil(carte, borne(carte, attendu.borne), pot, 1));
+            std::vector<LiaisonBroche> broches;
+            const coeur::Netlist netlist = scene.construire_netlist(&broches);
+            int numero = -1;
+            for (const LiaisonBroche& liaison : broches)
+                if (liaison.nom == attendu.borne) numero = liaison.numero;
+            verifier(numero == attendu.numero,
+                     std::string(attendu.borne) + " de " + attendu.type
+                         + " est la broche " + std::to_string(attendu.numero),
                      "reçu " + std::to_string(numero));
         }
     }
