@@ -40,6 +40,8 @@ struct CartePosee {
     QString reference;
     std::string mcu = "atmega328p";
     uint32_t horloge = 16000000;
+    double tension_logique = 5.0;
+    double resistance_sortie = 25.0;
 };
 
 class SceneSchema : public QGraphicsScene {

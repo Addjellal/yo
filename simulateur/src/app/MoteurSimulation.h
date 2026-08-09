@@ -141,6 +141,10 @@ private:
         // l'exécution.
         std::string puce = "atmega328p";
         uint32_t horloge = 16000000;
+        // La tension d'un niveau haut de CETTE carte : cinq volts sur un
+        // AVR, trois volts trois sur un Pico, un STM32 ou un ESP32.
+        double tension_logique = 5.0;
+        double resistance_sortie = 25.0;
         bool firmware_charge = false;
         uint32_t masque = 0;         // état courant des broches
         uint32_t masque_debut = 0;   // état au début de la trame

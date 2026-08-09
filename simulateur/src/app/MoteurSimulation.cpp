@@ -224,6 +224,8 @@ void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
         }
         carte.puce = posee.mcu;
         carte.horloge = posee.horloge;
+        carte.tension_logique = posee.tension_logique;
+        carte.resistance_sortie = posee.resistance_sortie;
     }
 }
 
@@ -363,8 +365,11 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
             broche.mode = coeur::BrocheElectrique::Mode::Sortie;
             const uint32_t masque =
                 au_depart ? cible->masque_debut : cible->masque;
-            broche.tension = (masque >> liaison.numero) & 1u ? 5.0 : 0.0;
-            broche.resistance = 25.0;      // résistance de sortie d'un AVR
+            // La tension vient de la carte : imposer cinq volts à un Pico
+            // ferait passer dans une LED presque le double du courant réel.
+            broche.tension =
+                (masque >> liaison.numero) & 1u ? cible->tension_logique : 0.0;
+            broche.resistance = cible->resistance_sortie;
         } else if (mcu.pullup_actif(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::PullUp;
             broche.resistance = 35000.0;   // pull-up interne : 20 à 50 kΩ
@@ -406,7 +411,8 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
                 static_cast<double>(commutation.cycle - cible.cycle_debut) /
                 frequence;
             transitions.push_back(
-                {instant, it->second, commutation.haut ? 5.0 : 0.0});
+                {instant, it->second,
+                 commutation.haut ? cible.tension_logique : 0.0});
         }
         cible.commutations.clear();
     }

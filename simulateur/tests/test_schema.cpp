@@ -1673,6 +1673,28 @@ static void test_famille_328p() {
                  std::to_string(posees.size()) + " carte(s)");
     }
 
+    // La tension logique n'est pas la même partout : cinq volts sur un AVR,
+    // trois volts trois sur tout ce qui est moderne. Imposer cinq volts à un
+    // Pico ferait passer dans une LED presque le double du courant réel — et
+    // rien, à l'écran, ne le dirait.
+    {
+        struct Attendu { const char* type; double volts; };
+        const Attendu attendus[] = {{"arduino_uno", 5.0}, {"attiny85", 5.0},
+                                    {"pi_pico", 3.3}, {"stm32f103", 3.3},
+                                    {"esp32", 3.3}};
+        for (const Attendu& attendu : attendus) {
+            const coeur::Modele* modele =
+                coeur::Catalogue::instance().modele(attendu.type);
+            verifier(modele
+                         && std::fabs(modele->tension_logique - attendu.volts)
+                                < 0.01,
+                     std::string(attendu.type) + " sort "
+                         + (attendu.volts > 4 ? "5 V" : "3,3 V"),
+                     modele ? std::to_string(modele->tension_logique)
+                            : std::string("modèle introuvable"));
+        }
+    }
+
     // Et chacune doit avoir une empreinte réelle : une carte sans empreinte
     // ne pourrait pas partir au routage.
     for (const Cas& essai : cas) {

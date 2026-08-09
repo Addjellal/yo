@@ -192,6 +192,13 @@ struct Modele {
     std::string mcu;
     // Fréquence d'horloge, en hertz : le quartz de la carte.
     uint32_t horloge = 16000000;
+    // Tension d'un niveau haut sur ses broches. Cinq volts sur un AVR, trois
+    // volts trois sur tout ce qui est moderne. Ce n'est pas un détail : c'est
+    // elle qui fixe le courant dans une LED, le seuil d'une entrée, et la
+    // nécessité — ou non — d'un adaptateur de niveau.
+    double tension_logique = 5.0;
+    // Résistance de sortie d'une broche, en ohms.
+    double resistance_sortie = 25.0;
     // Correspondance entre le nom d'une borne et le numéro de broche interne,
     // quand elle ne se déduit pas du nom. « PB1 » vaut 9 sur un ATmega328P et
     // 1 sur un ATtiny85 : ce sont deux puces, et le même nom y désigne deux

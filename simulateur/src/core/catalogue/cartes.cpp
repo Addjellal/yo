@@ -334,6 +334,11 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
         m.symbole.push_back(texte(-34, premier - 16, "PI PICO", 12));
         m.empreinte = {"PI_PICO", {}, 51.0, 21.0};
+        // Trois volts trois, et non cinq : c'est ce qui fixe le courant dans
+        // une LED, et ce qui rend un adaptateur de niveau nécessaire devant
+        // un composant en 5 V.
+        m.tension_logique = 3.3;
+        m.resistance_sortie = 40.0;
         m.mcu = "rp2040";
         m.horloge = 125000000;
         m.langage = "C (registres)";
@@ -389,6 +394,11 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
         m.symbole.push_back(texte(-40, premier - 16, "STM32F103", 12));
         m.empreinte = {"BLUE_PILL", {}, 53.0, 22.9};
+        // Trois volts trois, et non cinq : c'est ce qui fixe le courant dans
+        // une LED, et ce qui rend un adaptateur de niveau nécessaire devant
+        // un composant en 5 V.
+        m.tension_logique = 3.3;
+        m.resistance_sortie = 40.0;
         m.mcu = "stm32f103";
         m.horloge = 72000000;
         m.langage = "C (registres)";
@@ -446,6 +456,11 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
         m.symbole.push_back(texte(-30, premier - 16, "ESP32", 12));
         m.empreinte = {"ESP32_DEVKIT", {}, 52.0, 28.0};
+        // Trois volts trois, et non cinq : c'est ce qui fixe le courant dans
+        // une LED, et ce qui rend un adaptateur de niveau nécessaire devant
+        // un composant en 5 V.
+        m.tension_logique = 3.3;
+        m.resistance_sortie = 40.0;
         m.mcu = "esp32";
         m.horloge = 240000000;
         m.langage = "C (registres)";
