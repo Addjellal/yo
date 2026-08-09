@@ -11,6 +11,7 @@
 // Ajouter un composant = décrire un Modele et l'enregistrer. Rien d'autre.
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
@@ -185,6 +186,22 @@ struct Modele {
     // Carte programmable : ses bornes ne sont pas des composants SPICE, ce
     // sont les broches du microcontrôleur pilotées par le firmware.
     bool carte = false;
+
+    // Microcontrôleur porté par la carte, tel que l'attend avr-gcc :
+    // « atmega328p ». C'est lui qui décide du jeu d'instructions compilé.
+    std::string mcu;
+    // Fréquence d'horloge, en hertz : le quartz de la carte.
+    uint32_t horloge = 16000000;
+    // Le programme proposé quand on pose la carte. Une carte Arduino reçoit
+    // un croquis (setup / loop, pinMode, digitalWrite) ; un microcontrôleur
+    // nu reçoit du C sur registres, parce que c'est ainsi qu'on le programme
+    // réellement. Le style suit le contrôleur, il n'est pas imposé d'en haut.
+    std::string programme_exemple;
+    // Ce qui s'écrit dans l'éditeur pour cette carte, tel qu'affiché sur
+    // l'onglet : « Arduino » pour un croquis, « C (registres) » pour une puce
+    // nue. Deux mots qui évitent de chercher pourquoi digitalWrite n'existe
+    // pas là où il n'a rien à faire.
+    std::string langage = "Arduino";
 
     // Symbole d'alimentation : impose le nom du nœud auquel il est relié
     // ("GND", "5V"). Ne produit aucune ligne SPICE.

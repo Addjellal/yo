@@ -19,6 +19,7 @@
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
 #include "core/engines/AvrEngine.h"
+#include "core/engines/ProgrammesExemples.h"
 #include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 #include "core/export/Documents.h"
@@ -194,6 +195,7 @@ static void test_ngspice() {
 // ---------------------------------------------------------------------------
 static const char* kBlink = R"(
 #include <avr/io.h>
+
 int main(void) {
     DDRB |= (1 << 5);            /* D13 en sortie */
     while (1) {
@@ -2797,6 +2799,54 @@ static void test_pcb() {
 }
 
 // ---------------------------------------------------------------------------
+// Chaque exemple proposé par l'application est compilé pour de bon. Un
+// exemple qui ne compile pas est pire que pas d'exemple : l'élève cherche
+// l'erreur chez lui. Ce test a des dents — il touche à de vraies sources,
+// pas à leur description.
+static void test_exemples_compilent() {
+    std::printf("\n[26] Les programmes d'exemple compilent tous\n");
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    int compiles = 0, croquis = 0;
+    std::string echecs;
+    for (const coeur::ProgrammeExemple& exemple : coeur::tous_les_programmes()) {
+        const std::string firmware =
+            std::string("/tmp/sim_exemple_") + exemple.nom + ".elf";
+        std::string journal;
+        if (coeur::AvrEngine::compiler_source(exemple.source, firmware,
+                                              &journal)) {
+            ++compiles;
+        } else {
+            echecs += std::string(exemple.nom) + " : " + journal + "\n";
+        }
+        // Un croquis se reconnaît à ses deux fonctions obligatoires.
+        const std::string source = exemple.source;
+        if (source.find("void setup(") != std::string::npos
+            && source.find("void loop(") != std::string::npos)
+            ++croquis;
+    }
+
+    const int total = static_cast<int>(coeur::tous_les_programmes().size());
+    verifier(compiles == total, "tous les exemples passent avr-g++",
+             std::to_string(compiles) + "/" + std::to_string(total)
+                 + (echecs.empty() ? "" : "\n" + echecs));
+    // Ce sont des cartes Arduino : ce qui s'écrit dessus est un croquis, pas
+    // du C sur registres.
+    verifier(croquis == total,
+             "tous sont des croquis Arduino (setup + loop)",
+             std::to_string(croquis) + "/" + std::to_string(total));
+
+    // Et le croquis que porte le modèle de carte est bien celui-là.
+    const coeur::Modele* uno = coeur::Catalogue::instance().modele("arduino_uno");
+    verifier(uno && uno->carte && !uno->programme_exemple.empty()
+                 && uno->mcu == "atmega328p",
+             "la carte Arduino Uno porte son contrôleur et son croquis",
+             uno ? uno->mcu : std::string("carte introuvable"));
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -2828,6 +2878,7 @@ int main() {
     test_campagnes();
     test_numerique();
     test_pcb();
+    test_exemples_compilent();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

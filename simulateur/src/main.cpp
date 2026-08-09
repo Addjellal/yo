@@ -4,6 +4,7 @@
 #include <QDockWidget>
 #include <QFileInfo>
 #include <QFont>
+#include <QGraphicsSceneMouseEvent>
 #include <QPixmap>
 #include <QStringList>
 #include <QTextStream>
@@ -257,6 +258,29 @@ int main(int argc, char** argv) {
         // longtemps après la fin de ce bloc, et une référence à une variable
         // locale ne vaudrait plus rien.
         plus_tard([photographier] { photographier("schema"); });
+        // Double-clic sur la carte : c'est ainsi qu'on ouvre son programme,
+        // comme on ouvre le code d'un microcontrôleur ailleurs. On passe par
+        // la scène, donc par le vrai chemin de la souris.
+        plus_tard([&fenetre] {
+            for (ItemComposant* composant : fenetre.scene()->composants()) {
+                if (!composant->modele() || !composant->modele()->carte) continue;
+                QGraphicsSceneMouseEvent deux(
+                    QEvent::GraphicsSceneMouseDoubleClick);
+                deux.setScenePos(composant->pos());
+                deux.setButton(Qt::LeftButton);
+                QApplication::sendEvent(fenetre.scene(), &deux);
+                break;
+            }
+            QTextStream(stdout)
+                << "double-clic carte -> onglet « "
+                << fenetre.titre_onglet_courant() << " » ("
+                << fenetre.onglet_courant() << "), carte "
+                << fenetre.carte_affichee() << ", croquis "
+                << (fenetre.programme_affiche().contains("void loop(") ? "oui"
+                                                                       : "non")
+                << Qt::endl;
+        });
+        plus_tard([photographier] { photographier("programme-de-la-carte"); });
         plus_tard([&fenetre] { fenetre.demarrage_automatique(); });
         plus_tard([photographier] { photographier("en-marche"); });
         // « --gestes dossier [REF] » : la référence à effacer en pleine

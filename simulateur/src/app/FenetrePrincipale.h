@@ -100,6 +100,14 @@ public:
 
     // Choisit l'onglet du bas (programme, journal, série, oscilloscope).
     void afficher_onglet(int rang);
+    // Onglet du bas affiché, et son intitulé : la vérification automatique
+    // doit pouvoir constater qu'un double-clic sur une carte a bien amené le
+    // programme sous les yeux.
+    int onglet_courant() const;
+    QString titre_onglet_courant() const;
+    // Programme actuellement à l'écran, et carte à qui il appartient.
+    QString programme_affiche() const;
+    QString carte_affichee() const { return carte_courante_; }
 
     // Base de temps de l'oscilloscope, en secondes (vérification).
     void definir_base_temps(double secondes);
@@ -133,6 +141,9 @@ public:
 
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
+    // Amène le programme de cette carte sous les yeux : onglet « Programme »,
+    // carte sélectionnée, curseur dans l'éditeur.
+    void ouvrir_programme(ItemComposant* carte);
 
 protected:
     void showEvent(QShowEvent* evenement) override;
@@ -156,6 +167,9 @@ private slots:
     void afficher_proprietes(ItemComposant* composant);
     void circuit_modifie();
     void changer_carte(const QString& reference);
+    // Le programme d'exemple de cette carte : celui de son contrôleur.
+    QString programme_par_defaut(const QString& reference) const;
+    void refleter_langage(const QString& reference);
 
 private:
     // Aligne le sélecteur sur les cartes du schéma et garantit que

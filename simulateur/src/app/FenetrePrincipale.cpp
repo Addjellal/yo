@@ -1,5 +1,7 @@
 #include "app/FenetrePrincipale.h"
 
+#include "core/engines/ProgrammesExemples.h"
+
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
@@ -54,20 +56,8 @@
 
 namespace {
 
-const char* kSourceExemple = R"(/* Clignotant : la LED sur D13 s'allume une demi-seconde sur deux. */
-#include <avr/io.h>
-#include <util/delay.h>
-
-int main(void) {
-    DDRB |= (1 << PB5);              /* D13 en sortie */
-    while (1) {
-        PORTB |= (1 << PB5);         /* allumée */
-        _delay_ms(500);
-        PORTB &= ~(1 << PB5);        /* éteinte */
-        _delay_ms(500);
-    }
-}
-)";
+// Repli : le programme proposé quand le modèle de carte n'en porte pas.
+// Les cartes du catalogue portent le leur — voir catalogue/cartes.cpp.
 
 }  // namespace
 
@@ -288,7 +278,7 @@ void FenetrePrincipale::construire_docks() {
     barre_carte->addStretch(1);
     disposition->addLayout(barre_carte);
 
-    editeur_source_ = new QPlainTextEdit(kSourceExemple);
+    editeur_source_ = new QPlainTextEdit(coeur::kSourceExemple);
     QFont fonte("monospace");
     fonte.setStyleHint(QFont::TypeWriter);
     editeur_source_->setFont(fonte);
@@ -300,7 +290,7 @@ void FenetrePrincipale::construire_docks() {
     connect(bouton, &QPushButton::clicked, this,
             &FenetrePrincipale::compiler_source);
     disposition->addWidget(bouton);
-    onglets->addTab(page_source, "Programme (C)");
+    onglets->addTab(page_source, "Programme (Arduino)");
 
     console_ = new QPlainTextEdit;
     console_->setReadOnly(true);
@@ -886,8 +876,42 @@ bool FenetrePrincipale::eventFilter(QObject* objet, QEvent* evenement) {
     return QMainWindow::eventFilter(objet, evenement);
 }
 
+void FenetrePrincipale::ouvrir_programme(ItemComposant* carte) {
+    if (!carte || !onglets_ || !editeur_source_) return;
+    const QString reference = carte->reference();
+
+    // Le sélecteur ne connaît que les cartes que le moteur a vues : une carte
+    // tout juste posée n'y est pas encore. On rafraîchit d'abord.
+    if (selecteur_carte_ && selecteur_carte_->findText(reference) < 0)
+        synchroniser_cartes(moteur_->cartes());
+    if (selecteur_carte_ && selecteur_carte_->findText(reference) >= 0)
+        selecteur_carte_->setCurrentText(reference);
+
+    // Le panneau du bas peut avoir été replié : l'onglet ne servirait à rien
+    // s'il restait caché.
+    for (QDockWidget* dock : docks_schema_)
+        if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
+            dock->setVisible(true);
+
+    afficher_page(0);
+    onglets_->setCurrentIndex(0);
+    editeur_source_->setFocus();
+    // La sélection accompagne le geste : les propriétés de la carte restent
+    // visibles à droite pendant qu'on écrit son programme.
+    afficher_proprietes(carte);
+    ecrire("Programme de " + reference + " : à vous.");
+}
+
 void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
     if (!composant || !composant->modele()) return;
+    // Une carte programmable, c'est d'abord un programme : double-cliquer
+    // dessus ouvre le sien, comme on ouvre le code d'un microcontrôleur dans
+    // Proteus ou dans Wokwi. Régler ses propriétés vient après, dans le
+    // panneau de droite.
+    if (composant->modele()->carte) {
+        ouvrir_programme(composant);
+        return;
+    }
     if (!composant->modele()->mesure_instrument) {
         // Pas un instrument : le double-clic sert alors à régler le composant.
         afficher_proprietes(composant);
@@ -1123,6 +1147,20 @@ void FenetrePrincipale::synchroniser_cartes(const QStringList& cartes) {
     if (voulue != carte_courante_) changer_carte(voulue);
 }
 
+// Le programme proposé à une carte qu'on vient de poser. Il vient du modèle,
+// donc du contrôleur : ajouter demain une carte à ATtiny ou un ATmega nu
+// n'oblige à toucher ni cette fenêtre ni l'éditeur.
+QString FenetrePrincipale::programme_par_defaut(const QString& reference) const {
+    for (ItemComposant* composant : scene_->composants()) {
+        if (composant->reference() != reference) continue;
+        const coeur::Modele* modele = composant->modele();
+        if (modele && !modele->programme_exemple.empty())
+            return QString::fromStdString(modele->programme_exemple);
+        break;
+    }
+    return QString::fromUtf8(coeur::kSourceExemple);
+}
+
 void FenetrePrincipale::changer_carte(const QString& reference) {
     if (reference == carte_courante_) return;
     // Le programme affiché appartient à la carte qu'on quitte : on le range
@@ -1135,12 +1173,30 @@ void FenetrePrincipale::changer_carte(const QString& reference) {
     auto it = programmes_.find(reference);
     if (it == programmes_.end()) {
         // Nouvelle carte : on lui propose le programme d'exemple plutôt
-        // qu'un éditeur vide.
-        programmes_[reference] = QString::fromUtf8(kSourceExemple);
+        // qu'un éditeur vide — et celui de SON contrôleur. Une carte Arduino
+        // reçoit un croquis, un microcontrôleur nu reçoit du C sur registres.
+        programmes_[reference] = programme_par_defaut(reference);
         it = programmes_.find(reference);
     }
     const QSignalBlocker silence(editeur_source_);
     editeur_source_->setPlainText(it->second);
+    refleter_langage(reference);
+}
+
+// L'onglet annonce dans quel langage on écrit pour la carte affichée. Une
+// carte Arduino attend un croquis, un microcontrôleur nu attend du C sur
+// registres : le dire évite de chercher pourquoi digitalWrite manque.
+void FenetrePrincipale::refleter_langage(const QString& reference) {
+    if (!onglets_) return;
+    QString langage = "Arduino";
+    for (ItemComposant* composant : scene_->composants()) {
+        if (composant->reference() != reference) continue;
+        const coeur::Modele* modele = composant->modele();
+        if (modele && !modele->langage.empty())
+            langage = QString::fromStdString(modele->langage);
+        break;
+    }
+    onglets_->setTabText(0, "Programme (" + langage + ")");
 }
 
 void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
@@ -1405,6 +1461,18 @@ void FenetrePrincipale::afficher_onglet(int rang) {
         onglets_->setCurrentIndex(rang);
 }
 
+int FenetrePrincipale::onglet_courant() const {
+    return onglets_ ? onglets_->currentIndex() : -1;
+}
+
+QString FenetrePrincipale::titre_onglet_courant() const {
+    return onglets_ ? onglets_->tabText(onglets_->currentIndex()) : QString();
+}
+
+QString FenetrePrincipale::programme_affiche() const {
+    return editeur_source_ ? editeur_source_->toPlainText() : QString();
+}
+
 void FenetrePrincipale::suspendre() { moteur_->suspendre(); }
 
 void FenetrePrincipale::arreter() {
@@ -1597,210 +1665,15 @@ bool FenetrePrincipale::exporter_schema(const QString& chemin_demande) {
 // ---------------------------------------------------------------------------
 namespace {
 
-const char* kProgrammeBouton = R"(/* Bouton sur D2, LED sur D13.
-   Le bouton relie D2 à la masse ; le pull-up interne maintient D2 à 5 V
-   quand il est relâché. La logique est donc inversée. */
-#include <avr/io.h>
 
-int main(void) {
-    DDRD  &= ~(1 << PD2);        /* D2 en entrée   */
-    PORTD |=  (1 << PD2);        /* pull-up interne */
-    DDRB  |=  (1 << PB5);        /* D13 en sortie  */
-    while (1) {
-        if (PIND & (1 << PD2)) PORTB &= ~(1 << PB5);   /* relâché -> éteinte */
-        else                   PORTB |=  (1 << PB5);   /* appuyé  -> allumée */
-    }
-}
-)";
 
-const char* kProgrammePotentiometre = R"(/* Potentiomètre sur A0, LED sur D13.
-   La LED s'allume au-delà de la moitié de la course. Faites glisser le
-   curseur du potentiomètre pendant la simulation : la conversion est faite
-   par le vrai convertisseur de l'ATmega328P. */
-#include <avr/io.h>
 
-static uint16_t lire_adc(uint8_t canal) {
-    ADMUX  = (1 << REFS0) | (canal & 0x0F);
-    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-    ADCSRA |= (1 << ADSC);
-    while (ADCSRA & (1 << ADSC)) { }
-    return ADC;
-}
-
-int main(void) {
-    DDRB |= (1 << PB5);
-    while (1) {
-        if (lire_adc(0) > 512) PORTB |=  (1 << PB5);
-        else                   PORTB &= ~(1 << PB5);
-    }
-}
-)";
-
-const char* kProgrammeTransistor = R"(/* Commande d'un moteur par transistor, sur D9.
-   Une sortie de microcontrôleur ne fournit que quelques dizaines de
-   milliampères : le transistor sert d'interrupteur commandé. Observez le
-   courant réellement calculé dans le moteur. */
-#include <avr/io.h>
-#include <util/delay.h>
-
-int main(void) {
-    DDRB |= (1 << PB1);          /* D9 en sortie */
-    while (1) {
-        PORTB |= (1 << PB1);
-        _delay_ms(800);
-        PORTB &= ~(1 << PB1);
-        _delay_ms(800);
-    }
-}
-)";
-
-const char* kProgrammePwm = R"(/* PWM matérielle sur D9, à environ 490 Hz.
-   Le rapport cyclique monte puis redescend : la LED respire. Ouvrez
-   l'oscilloscope et réglez la base de temps sur 5 ms pour voir le créneau,
-   puis sur 2 s pour voir l'enveloppe. */
-#include <avr/io.h>
-#include <util/delay.h>
-
-int main(void) {
-    DDRB |= (1 << PB1);              /* D9 = OC1A, en sortie */
-    /* PWM rapide 8 bits, sortie non inversée, horloge divisee par 64 */
-    TCCR1A = (1 << COM1A1) | (1 << WGM10);
-    TCCR1B = (1 << WGM12) | (1 << CS11) | (1 << CS10);
-
-    while (1) {
-        for (int rapport = 0; rapport < 255; rapport += 5) {
-            OCR1A = rapport;
-            _delay_ms(15);
-        }
-        for (int rapport = 255; rapport > 0; rapport -= 5) {
-            OCR1A = rapport;
-            _delay_ms(15);
-        }
-    }
-}
-)";
 
 // Deux programmes distincts : c'est le propre du montage à deux cartes.
-const char* kProgrammeEmetteur = R"(/* Carte U1 — émettrice.
-   Elle fait clignoter sa propre LED sur D13 et recopie le même signal sur
-   D7, qui part vers la seconde carte. */
-#include <avr/io.h>
-#include <util/delay.h>
 
-int main(void) {
-    DDRB |= (1 << PB5);          /* D13 : LED locale */
-    DDRD |= (1 << PD7);          /* D7  : vers la carte U2 */
-    while (1) {
-        PORTB |=  (1 << PB5);
-        PORTD |=  (1 << PD7);
-        _delay_ms(300);
-        PORTB &= ~(1 << PB5);
-        PORTD &= ~(1 << PD7);
-        _delay_ms(300);
-    }
-}
-)";
 
-const char* kProgrammeRecepteur = R"(/* Carte U2 — réceptrice.
-   Elle lit sur D2 le signal envoyé par U1 et le recopie sur sa LED. Les deux
-   LED doivent clignoter ensemble : c'est la preuve que les deux cartes
-   exécutent bien deux programmes différents, dans le même circuit. */
-#include <avr/io.h>
 
-int main(void) {
-    DDRD &= ~(1 << PD2);         /* D2 en entrée, sans pull-up */
-    DDRB |=  (1 << PB5);         /* D13 : LED locale */
-    while (1) {
-        if (PIND & (1 << PD2)) PORTB |=  (1 << PB5);
-        else                   PORTB &= ~(1 << PB5);
-    }
-}
-)";
 
-const char* kProgrammeServo = R"(/* Balayage d'un servomoteur sur D9.
-   Le servo attend une impulsion toutes les 20 ms : 1 ms pour 0°, 2 ms pour
-   180°. On la fabrique à la main, sans bibliothèque — c'est exactement ce
-   que fait Servo.h, et le voir écrit une fois vaut mieux que l'ignorer. */
-unsigned long dernier_top = 0, dernier_pas = 0;
-int angle = 0, sens = 1;
-
-void setup() {
-    pinMode(9, OUTPUT);
-    Serial.begin(9600);
-}
-
-void loop() {
-    const unsigned long maintenant = millis();
-
-    /* la trame de 20 ms */
-    if (maintenant - dernier_top >= 20) {
-        dernier_top = maintenant;
-        digitalWrite(9, HIGH);
-        delayMicroseconds(1000 + (unsigned int)(angle * 1000L / 180));
-        digitalWrite(9, LOW);
-    }
-
-    /* balayage aller-retour */
-    if (maintenant - dernier_pas >= 40) {
-        dernier_pas = maintenant;
-        angle += sens * 5;
-        if (angle >= 180) { angle = 180; sens = -1; }
-        if (angle <= 0)   { angle = 0;   sens =  1; }
-        Serial.print("angle ");
-        Serial.println((long)angle);
-    }
-}
-)";
-
-const char* kProgrammeMoteur = R"(/* Moteur commandé en PWM, vitesse réglée par le potentiomètre sur A0.
-   Le transistor encaisse le courant, la diode de roue libre encaisse la
-   surtension à la coupure — c'est l'inductance de l'induit qui la produit. */
-void setup() {
-    pinMode(9, OUTPUT);
-    Serial.begin(9600);
-}
-
-void loop() {
-    const int consigne = analogRead(A0) / 4;      /* 0 à 255 */
-    analogWrite(9, consigne);
-    delay(200);
-    Serial.print("consigne ");
-    Serial.println((long)consigne);
-}
-)";
-
-const char* kProgrammeRegistre = R"(/* Chenillard sur un 74HC595 : trois broches pour huit LED.
-   Le registre décale un bit à chaque coup d'horloge, et ne
-   recopie sur ses sorties qu'au front de verrouillage. */
-const int DONNEE = 11;      /* SER   */
-const int HORLOGE = 13;     /* SRCLK */
-const int VERROU = 10;      /* RCLK  */
-
-void setup() {
-    pinMode(DONNEE, OUTPUT);
-    pinMode(HORLOGE, OUTPUT);
-    pinMode(VERROU, OUTPUT);
-}
-
-/* Un octet, bit de poids fort en tête — c'est ce que fait shiftOut(). */
-void envoyer(unsigned char valeur) {
-    digitalWrite(VERROU, LOW);
-    for (int bit = 7; bit >= 0; bit--) {
-        digitalWrite(HORLOGE, LOW);
-        digitalWrite(DONNEE, (valeur >> bit) & 1);
-        digitalWrite(HORLOGE, HIGH);
-    }
-    digitalWrite(VERROU, HIGH);   /* les huit sorties basculent ici */
-}
-
-void loop() {
-    static unsigned char motif = 1;
-    envoyer(motif);
-    motif = motif << 1;
-    if (motif == 0) motif = 1;
-    delay(150);
-}
-)";
 
 }  // namespace
 
@@ -1842,7 +1715,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D13"), led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
-            programme = QString::fromUtf8(kSourceExemple);
+            programme = QString::fromUtf8(coeur::kSourceExemple);
             ecrire("Exemple : clignotant sur D13 (LED rouge + 220 Ω).");
             break;
         }
@@ -1859,7 +1732,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(r, 1, masse, 0));
             scene_->addItem(new ItemFil(carte, borne_nommee("D2"), bouton, 0));
             scene_->addItem(new ItemFil(bouton, 1, masse2, 0));
-            programme = QString::fromUtf8(kProgrammeBouton);
+            programme = QString::fromUtf8(coeur::kProgrammeBouton);
             ecrire("Exemple : bouton sur D2 avec pull-up interne, LED sur D13.");
             ecrire("Sélectionnez BP1 et mettez « Appuyé » à 1 pendant la simulation.");
             break;
@@ -1881,7 +1754,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(pot, 0, alim, 0));       // A -> +5 V
             scene_->addItem(new ItemFil(pot, 1, carte, borne_nommee("A0")));
             scene_->addItem(new ItemFil(pot, 2, masse2, 0));     // B -> masse
-            programme = QString::fromUtf8(kProgrammePotentiometre);
+            programme = QString::fromUtf8(coeur::kProgrammePotentiometre);
             ecrire("Exemple : potentiomètre sur A0, LED sur D13 au-delà de 50 %.");
             ecrire("Sélectionnez POT1 et déplacez le curseur pendant la simulation.");
             break;
@@ -1895,7 +1768,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D9"), led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
-            programme = QString::fromUtf8(kProgrammePwm);
+            programme = QString::fromUtf8(coeur::kProgrammePwm);
             ecrire("Exemple : PWM matérielle sur D9, rapport cyclique variable.");
             ecrire("Ouvrez l'onglet Oscilloscope : base de temps 5 ms pour le "
                    "créneau, 2 s pour l'enveloppe.");
@@ -1913,7 +1786,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D9"), servo, 2));
             scene_->addItem(new ItemFil(alim, 0, servo, 0));
             scene_->addItem(new ItemFil(servo, 1, masse, 0));
-            programme = QString::fromUtf8(kProgrammeServo);
+            programme = QString::fromUtf8(coeur::kProgrammeServo);
             ecrire("Exemple : servomoteur balayé de 0° à 180° sur D9.");
             ecrire("L'angle s'affiche sous le composant, décodé de la largeur "
                    "d'impulsion.");
@@ -1946,7 +1819,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(alim2, 0, pot, 0));
             scene_->addItem(new ItemFil(pot, 1, carte, borne_nommee("A0")));
             scene_->addItem(new ItemFil(pot, 2, masse2, 0));
-            programme = QString::fromUtf8(kProgrammeMoteur);
+            programme = QString::fromUtf8(coeur::kProgrammeMoteur);
             ecrire("Exemple : moteur en PWM, vitesse réglée par le potentiomètre.");
             ecrire("La vitesse atteinte s'affiche sous le moteur. Observez le "
                    "courant à l'oscilloscope : l'inductance d'induit l'empêche "
@@ -1966,7 +1839,7 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(q, 1, moteur, 1));       // collecteur
             scene_->addItem(new ItemFil(moteur, 0, alim, 0));    // moteur -> +5 V
             scene_->addItem(new ItemFil(q, 2, masse, 0));        // émetteur
-            programme = QString::fromUtf8(kProgrammeTransistor);
+            programme = QString::fromUtf8(coeur::kProgrammeTransistor);
             ecrire("Exemple : moteur commandé par transistor NPN sur D9.");
             break;
         }
@@ -2029,8 +1902,8 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
     }
 
     circuit_modifie();
-    programmes_[u1->reference()] = QString::fromUtf8(kProgrammeEmetteur);
-    programmes_[u2->reference()] = QString::fromUtf8(kProgrammeRecepteur);
+    programmes_[u1->reference()] = QString::fromUtf8(coeur::kProgrammeEmetteur);
+    programmes_[u2->reference()] = QString::fromUtf8(coeur::kProgrammeRecepteur);
     // Les programmes viennent d'être posés : on réaffiche celui de la carte
     // sélectionnée pour que l'éditeur montre le bon.
     const QString affichee = carte_courante_;
@@ -2146,7 +2019,7 @@ void FenetrePrincipale::charger_exemple_registre() {
     }
 
     circuit_modifie();
-    programmes_[carte->reference()] = QString::fromUtf8(kProgrammeRegistre);
+    programmes_[carte->reference()] = QString::fromUtf8(coeur::kProgrammeRegistre);
     const QString affichee = carte_courante_;
     carte_courante_.clear();
     changer_carte(affichee.isEmpty() ? carte->reference() : affichee);

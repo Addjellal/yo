@@ -5,6 +5,7 @@
 // moteurs n'ont à être modifiés.
 #include "core/catalogue/Traits.h"
 #include "core/Netlist.h"
+#include "core/engines/ProgrammesExemples.h"
 
 namespace coeur {
 
@@ -50,6 +51,14 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
         m.symbole.push_back(texte(-40, premier - 18, "ARDUINO UNO", 12));
         m.empreinte = {"ARDUINO_UNO", {}, 68.6, 53.4};
+        m.mcu = "atmega328p";
+        m.horloge = 16000000;
+        // Une carte Arduino se programme en croquis : c'est ce que voit
+        // n'importe qui ouvrant l'IDE officiel, et c'est ce que doit trouver
+        // celui qui double-clique dessus ici.
+        // Le croquis vient du recueil commun : un seul endroit à corriger,
+        // et le test qui compile tous les exemples le couvre déjà.
+        m.programme_exemple = kSourceExemple;
         enregistrer(std::move(m));
     }
 }
