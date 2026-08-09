@@ -246,11 +246,18 @@ bool MoteurSimulation::compiler_et_charger(const coeur::Programme& fichiers,
                   "installer.";
         return false;
     }
-    QDir().mkpath(dossier);
-    // Un fichier par carte : deux cartes ne doivent pas se disputer le même
-    // binaire.
-    const QString fichier =
-        QDir(dossier).filePath("firmware_" + cible.toLower() + ".elf");
+    // UN DOSSIER PAR CARTE, et vidé avant chaque compilation.
+    //
+    // Les deux comptent. Un dossier commun mettrait les fichiers annexes de
+    // toutes les cartes dans le même chemin d'inclusion : U2 pourrait alors
+    // inclure « mesure.h » écrit pour U1, et cela compilerait sans un mot.
+    // Et sans le vidage, un fichier retiré du programme resterait sur le
+    // disque et continuerait de satisfaire son #include — le programme
+    // marcherait encore, jusqu'à ce qu'on le compile ailleurs.
+    const QString atelier = QDir(dossier).filePath("carte_" + cible.toLower());
+    QDir(atelier).removeRecursively();
+    QDir().mkpath(atelier);
+    const QString fichier = QDir(atelier).filePath("firmware.elf");
     std::string compte_rendu;
     const Carte& carte_cible = puce_cible;
     // La chaîne qui convient à la puce : avr-g++ pour un ATmega, un

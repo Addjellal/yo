@@ -1,6 +1,10 @@
 #include "core/engines/Chaines.h"
 
 #include <cstdlib>
+
+#include "core/engines/AvrEngine.h"
+#include "core/engines/CortexEngine.h"
+#include "core/engines/XtensaEngine.h"
 #include <fstream>
 #include <vector>
 
@@ -82,26 +86,45 @@ std::string outil(const std::string& famille, const std::string& nom) {
 }
 
 std::string etat() {
-    struct Attendu {
-        const char* famille;
-        const char* outil;
+    // Ce que chaque famille sait compiler N'EST PAS la présence d'un outil
+    // précis : le Cortex-M se compile aussi bien avec clang, qui est déjà là
+    // sur beaucoup de machines. Interroger le nom d'un exécutable a fait
+    // annoncer « ARM absent » à des utilisateurs dont la chaîne fonctionnait,
+    // et les a envoyés installer ce dont ils n'avaient pas besoin.
+    //
+    // La question est donc posée aux moteurs eux-mêmes, qui sont seuls à
+    // savoir avec quoi ils compilent — et la réponse dit LEQUEL a été trouvé.
+    struct Famille {
         const char* description;
+        bool disponible;
+        std::string trouve;
+        const char* remede;
     };
-    static const Attendu attendus[] = {
-        {"avr", "avr-g++", "AVR (Arduino, ATtiny)"},
-        {"arm", "arm-none-eabi-gcc", "ARM (Pi Pico, STM32)"},
-        {"xtensa", "xtensa-esp32-elf-gcc", "Xtensa (ESP32)"}};
+    const Famille familles[] = {
+        {"AVR (Arduino, ATtiny)", AvrEngine::avr_gpp_disponible(),
+         outil("avr", "avr-g++"),
+         "installez gcc-avr et avr-libc, ou lancez outils/chaines"},
+        {"ARM (Pi Pico, STM32)", CortexEngine::chaine_disponible(),
+         CortexEngine::chaine_trouvee(),
+         "installez arm-none-eabi-gcc ou clang, ou lancez outils/chaines"},
+        {"Xtensa (ESP32)", XtensaEngine::chaine_disponible(),
+         XtensaEngine::chaine_trouvee(),
+         "lancez outils/chaines -Xtensa"}};
 
     std::string compte_rendu;
-    for (const Attendu& attendu : attendus) {
-        const std::string chemin = outil(attendu.famille, attendu.outil);
-        compte_rendu += std::string(attendu.description) + " : ";
-        if (chemin.empty()) {
-            compte_rendu += "absent — lancez outils/chaines pour l'installer";
-        } else if (chemin == attendu.outil) {
-            compte_rendu += "trouvé dans le PATH";
+    for (const Famille& famille : familles) {
+        compte_rendu += std::string(famille.description) + " : ";
+        if (!famille.disponible) {
+            compte_rendu += std::string("absent — ") + famille.remede;
         } else {
-            compte_rendu += "embarqué dans le paquet";
+            // Un chemin absolu veut dire que la chaîne voyage avec le paquet ;
+            // un nom nu, qu'elle vient de la machine.
+            const bool embarquee =
+                famille.trouve.find('/') != std::string::npos
+                || famille.trouve.find('\\') != std::string::npos;
+            compte_rendu += (embarquee ? "embarqué dans le paquet ("
+                                       : "trouvé dans le PATH (")
+                            + famille.trouve + ")";
         }
         compte_rendu += "\n";
     }

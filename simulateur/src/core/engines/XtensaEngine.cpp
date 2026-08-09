@@ -69,6 +69,10 @@ bool XtensaEngine::chaine_disponible() {
     return !chaines::outil("xtensa", "xtensa-esp32-elf-gcc").empty();
 }
 
+std::string XtensaEngine::chaine_trouvee() {
+    return chaines::outil("xtensa", "xtensa-esp32-elf-gcc");
+}
+
 namespace {
 
 // Dépose chaque fichier du programme à côté du .elf et rend, dans `a_compiler`,

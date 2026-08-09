@@ -1875,6 +1875,93 @@ static void test_analyseur_impedance() {
     std::printf("\n");
 }
 
+
+// ---------------------------------------------------------------------------
+// Chaque carte compile SON programme, et seulement le sien
+//
+// Le piège est discret : deux cartes sur le même schéma, chacune avec ses
+// fichiers annexes. Si les deux compilent dans le même dossier, celui de U1
+// se retrouve dans le chemin d'inclusion de U2 — et « #include "mesure.h" »
+// depuis U2 attrape le fichier de U1 sans que rien ne le signale. Le second
+// piège est le fichier qu'on RETIRE d'un programme : s'il reste sur le
+// disque, il continue de satisfaire son inclusion, et le programme compile
+// encore alors qu'il ne le devrait plus.
+// ---------------------------------------------------------------------------
+static void test_programmes_par_carte() {
+    std::printf("\n-- chaque carte compile son propre programme --\n");
+
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    coeur::Netlist netlist;
+    std::vector<LiaisonBroche> broches = {{13, "D13", "L1", "U1"},
+                                          {13, "D13", "L2", "U2"}};
+    std::vector<CartePosee> cartes = {
+        {"U1", "atmega328p", 16000000, 5.0, 25.0, 35000.0},
+        {"U2", "atmega328p", 16000000, 5.0, 25.0, 35000.0}};
+
+    MoteurSimulation moteur;
+    moteur.definir_circuit(netlist, broches, cartes);
+    const QString atelier = QDir::tempPath() + "/essai_deux_cartes";
+    QDir(atelier).removeRecursively();
+
+    // U1 déclare « mesure.h » avec une constante à elle.
+    const coeur::Programme pour_u1 = {
+        {"principal.ino",
+         "#include \"mesure.h\"\n"
+         "void setup() { pinMode(13, OUTPUT); }\n"
+         "void loop() { digitalWrite(13, HIGH); delay(CADENCE);\n"
+         "              digitalWrite(13, LOW);  delay(CADENCE); }\n"},
+        {"mesure.h", "#pragma once\n#define CADENCE 100\n"}};
+    QString journal;
+    verifier(moteur.compiler_et_charger(pour_u1, atelier, &journal, "U1"),
+             "U1 compile son programme à deux fichiers",
+             journal.trimmed().toStdString());
+
+    // U2 n'a PAS de « mesure.h ». Si le dossier était partagé, celui de U1
+    // serait encore là et U2 compilerait — ce qui serait le défaut.
+    const coeur::Programme pour_u2 = {
+        {"principal.ino",
+         "#include \"mesure.h\"\n"
+         "void setup() { pinMode(13, OUTPUT); }\n"
+         "void loop() { digitalWrite(13, HIGH); delay(CADENCE); }\n"}};
+    QString journal_u2;
+    const bool u2_compile =
+        moteur.compiler_et_charger(pour_u2, atelier, &journal_u2, "U2");
+    verifier(!u2_compile
+                 && journal_u2.contains("mesure.h"),
+             "U2 ne voit PAS le fichier de U1 : son inclusion échoue",
+             u2_compile ? std::string("elle a compilé — les dossiers sont "
+                                      "partagés")
+                        : journal_u2.trimmed().left(70).toStdString());
+
+    // U2 avec son propre « mesure.h » : cette fois cela doit passer.
+    const coeur::Programme complet_u2 = {
+        pour_u2.front(), {"mesure.h", "#pragma once\n#define CADENCE 250\n"}};
+    verifier(moteur.compiler_et_charger(complet_u2, atelier, &journal_u2, "U2"),
+             "U2 compile avec SON propre fichier",
+             journal_u2.trimmed().toStdString());
+
+    // Et le fichier retiré ne doit pas survivre : on recompile U2 sans lui.
+    QString journal_apres;
+    const bool encore =
+        moteur.compiler_et_charger(pour_u2, atelier, &journal_apres, "U2");
+    verifier(!encore,
+             "un fichier retiré du programme ne traîne pas sur le disque",
+             encore ? std::string("il a survécu au vidage")
+                    : journal_apres.trimmed().left(60).toStdString());
+
+    // Les deux binaires existent, chacun chez soi. U2 est recompilé d'abord :
+    // l'essai précédent devait échouer, et un échec ne laisse pas de binaire.
+    moteur.compiler_et_charger(complet_u2, atelier, &journal_u2, "U2");
+    verifier(QFile::exists(atelier + "/carte_u1/firmware.elf")
+                 && QFile::exists(atelier + "/carte_u2/firmware.elf"),
+             "chaque carte a son propre dossier de compilation",
+             "carte_u1/ et carte_u2/");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -1900,6 +1987,7 @@ int main(int argc, char** argv) {
     test_panneaux_retrecissables();
     test_famille_328p();
     test_analyseur_impedance();
+    test_programmes_par_carte();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

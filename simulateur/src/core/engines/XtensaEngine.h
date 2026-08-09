@@ -61,6 +61,8 @@ public:
                                 const std::string& chemin_elf,
                                 std::string* journal);
     static bool chaine_disponible();
+    // Le compilateur effectivement trouvé, pour le dire à l'utilisateur.
+    static std::string chaine_trouvee();
 
 private:
     std::unique_ptr<CoeurXtensa> coeur_;
