@@ -232,10 +232,10 @@ bool CoeurXtensa::charger(const std::string& chemin, std::string* erreur) {
 uint64_t CoeurXtensa::executer(uint64_t cycles) {
     const uint64_t debut = cycles_;
     while (cycles_ - debut < cycles) {
-        if (arrete_) {
-            cycles_ += 1;
-            continue;
-        }
+        // Une machine arrêtée ne consomme plus rien : continuer à compter
+        // rendrait toute mesure de durée impossible, puisque le compteur
+        // finirait toujours par atteindre le budget demandé.
+        if (arrete_) break;
         cycles_ += instruction();
     }
     rafraichir_sorties();
@@ -244,6 +244,26 @@ uint64_t CoeurXtensa::executer(uint64_t cycles) {
 
 int CoeurXtensa::instruction() {
     const uint32_t depart = pc_;
+    // Le verrouillage de charge : si l'instruction qui vient lit le registre
+    // qu'un chargement n'a pas fini de remplir, le processeur l'attend. C'est
+    // ce qui distingue une boucle de recopie mémoire d'une boucle de calcul,
+    // et l'ignorer les rend indiscernables.
+    int attente = 0;
+    if (attente_charge_ > 0 && registre_charge_ >= 0) {
+        const uint8_t suivant0 = lire8(depart);
+        const uint8_t suivant1 = lire8(depart + 1);
+        const int lit_s = suivant1 & 0x0F;
+        const int lit_t = (suivant0 >> 4) & 0x0F;
+        if (lit_s == registre_charge_ || lit_t == registre_charge_)
+            attente = attente_charge_;
+    }
+    attente_charge_ = 0;
+    registre_charge_ = -1;
+    const int cout = instruction_seule(depart);
+    return cout + attente;
+}
+
+int CoeurXtensa::instruction_seule(const uint32_t depart) {
     const uint8_t b0 = lire8(depart);
     const int op0 = b0 & 0x0F;
 
@@ -328,17 +348,27 @@ int CoeurXtensa::instruction() {
             const uint32_t source = ((depart + 3) & ~3u)
                                     - ((0x10000u - brut) << 2);
             a_[t] = lire32(source);
-            return 2;
+            registre_charge_ = t;
+            attente_charge_ = 1;
+            return 1;
         }
         case 0x02: {
             // Format RRI8 : `r` choisit l'opération, `b2` porte huit bits.
             const int32_t signe = static_cast<int8_t>(b2);
             switch (r) {
-                case 0x00: a_[t] = lire8(a_[s] + b2); return 2;      // L8UI
-                case 0x02: a_[t] = lire32(a_[s] + (b2 << 2)); return 2;  // L32I
+                case 0x00:                                           // L8UI
+                    a_[t] = lire8(a_[s] + b2);
+                    registre_charge_ = t;
+                    attente_charge_ = 1;
+                    return 1;
+                case 0x02:                                           // L32I
+                    a_[t] = lire32(a_[s] + (b2 << 2));
+                    registre_charge_ = t;
+                    attente_charge_ = 1;
+                    return 1;
                 case 0x04: ecrire8(a_[s] + b2, static_cast<uint8_t>(a_[t]));
-                    return 2;                                        // S8I
-                case 0x06: ecrire32(a_[s] + (b2 << 2), a_[t]); return 2;  // S32I
+                    return 1;                                        // S8I
+                case 0x06: ecrire32(a_[s] + (b2 << 2), a_[t]); return 1;  // S32I
                 case 0x0A: {                                         // MOVI
                     int32_t valeur = static_cast<int32_t>((s << 8) | b2);
                     valeur = (valeur << 20) >> 20;                   // douze bits
@@ -349,7 +379,7 @@ int CoeurXtensa::instruction() {
                     return 1;                                        // ADDI
                 case 0x0D: a_[t] = a_[s] + (static_cast<uint32_t>(signe) << 8);
                     return 1;                                        // ADDMI
-                default: return 2;
+                default: return 1;
             }
         }
         case 0x06: {
@@ -360,7 +390,7 @@ int CoeurXtensa::instruction() {
                     | (static_cast<uint32_t>(b1) << 2) | ((t >> 2) & 3));
                 decalage = (decalage << 14) >> 14;                   // dix-huit
                 pc_ = static_cast<uint32_t>(depart + 4 + decalage);
-                return 2;
+                return 3;      // saut pris : le pipeline se recharge
             }
             if (sous == 0x01) {                                      // BEQZ…
                 int32_t decalage = static_cast<int32_t>(
@@ -375,9 +405,9 @@ int CoeurXtensa::instruction() {
                     default: prendre = static_cast<int32_t>(a_[s]) >= 0; break;
                 }
                 if (prendre) pc_ = static_cast<uint32_t>(depart + 4 + decalage);
-                return 2;
+                return prendre ? 3 : 1;
             }
-            return 2;
+            return 1;
         }
         case 0x07: {                                                 // BEQ, BNE…
             const int32_t decalage = static_cast<int8_t>(b2);
@@ -394,7 +424,7 @@ int CoeurXtensa::instruction() {
                 default: break;
             }
             if (prendre) pc_ = static_cast<uint32_t>(depart + 4 + decalage);
-            return 2;
+            return prendre ? 3 : 1;
         }
         default: return 1;
     }

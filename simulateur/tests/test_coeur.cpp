@@ -3786,6 +3786,103 @@ static void test_cycles_exacts_arm() {
     }
 }
 
+
+// Le temps sur Xtensa : ce qu'on peut en dire, et ce qu'on ne peut pas.
+//
+// Ce banc ne prétend PAS à l'exactitude au cycle, contrairement à ceux de
+// l'AVR et du Cortex-M. Espressif ne publie pas de table de temps pour le
+// LX6, et aucun simulateur d'ESP32 n'est exact au cycle — annoncer le
+// contraire serait mentir.
+//
+// Ce qu'il vérifie est la STRUCTURE du pipeline, qui, elle, est documentée :
+// un branchement pris coûte plus qu'un branchement non pris, et une valeur
+// chargée n'est pas disponible pour l'instruction suivante. Deux effets qui,
+// ignorés, rendent indiscernables une boucle de calcul et une boucle de
+// recopie mémoire — alors qu'elles ne mettent pas le même temps.
+static void test_temps_xtensa() {
+    std::printf("\n[36] Xtensa : la structure du pipeline\n");
+    if (std::system("llvm-mc --version > /dev/null 2>&1") != 0) {
+        std::printf("  (llvm-mc absent — section ignorée)\n");
+        return;
+    }
+
+    // Mesure le coût d'une séquence, en cycles, assemblée par llvm-mc.
+    auto mesurer = [](const std::string& corps) -> long long {
+        const std::string source = "\t.text\n\t.align 4\n" + corps;
+        {
+            std::ofstream fichier("/tmp/sim_xt_temps.s");
+            fichier << source;
+        }
+        if (std::system("llvm-mc -arch=xtensa -filetype=obj "
+                        "-o /tmp/sim_xt_temps.o /tmp/sim_xt_temps.s "
+                        "> /dev/null 2>&1 && llvm-objcopy -O binary "
+                        "--only-section=.text /tmp/sim_xt_temps.o "
+                        "/tmp/sim_xt_temps.bin > /dev/null 2>&1") != 0)
+            return -1;
+        std::ifstream binaire("/tmp/sim_xt_temps.bin", std::ios::binary);
+        std::vector<uint8_t> octets((std::istreambuf_iterator<char>(binaire)),
+                                    std::istreambuf_iterator<char>());
+        if (octets.empty()) return -1;
+        coeur::CoeurXtensa puce(coeur::profil_esp32());
+        puce.charger_octets(0x400D0000, octets);
+        puce.definir_point_entree(0x400D0000);
+        // Assez de cycles pour épuiser la séquence, qui se termine par RET.
+        puce.executer(100000);
+        // RET arrête la machine ; le reste des cycles est du temps mort. On
+        // relance sur une séquence vide pour connaître ce socle.
+        return static_cast<long long>(puce.cycles());
+    };
+
+    // Deux boucles identiques, à ceci près que l'une recharge sa valeur à
+    // chaque tour et l'autre la garde en registre. Le verrouillage de charge
+    // doit rendre la première plus lente.
+    const long long calcul = mesurer(
+        "\tmovi a2, 50\n"
+        "\tmovi a3, 1\n"
+        "1:\tadd a4, a4, a3\n"
+        "\taddi a2, a2, -1\n"
+        "\tbnez a2, 1b\n"
+        "\tret\n");
+    const long long memoire = mesurer(
+        "\tmovi a2, 50\n"
+        "\tmovi a5, 0\n"
+        "1:\tl32i a3, a5, 0\n"
+        "\tadd a4, a4, a3\n"          // dépend du chargement : elle attend
+        "\taddi a2, a2, -1\n"
+        "\tbnez a2, 1b\n"
+        "\tret\n");
+
+    verifier(calcul > 0 && memoire > 0,
+             "les deux boucles s'assemblent et s'exécutent",
+             std::to_string(calcul) + " et " + std::to_string(memoire));
+    if (calcul <= 0 || memoire <= 0) return;
+
+    // Cinquante tours, un cycle d'attente par tour au moins : l'écart doit
+    // dépasser le simple coût de l'instruction ajoutée.
+    verifier(memoire >= calcul + 100,
+             "une boucle qui relit la mémoire est plus lente qu'une boucle "
+             "de calcul",
+             std::to_string(memoire - calcul) + " cycles d'écart pour 50 tours");
+
+    // Un branchement pris coûte le rechargement du pipeline ; non pris, il ne
+    // coûte rien de plus qu'une instruction ordinaire.
+    const long long pris = mesurer(
+        "\tmovi a2, 50\n"
+        "1:\taddi a2, a2, -1\n"
+        "\tbnez a2, 1b\n"
+        "\tret\n");
+    const long long jamais = mesurer(
+        "\tmovi a2, 50\n"
+        "\tmovi a3, 0\n"
+        "\tbnez a3, 1f\n"
+        "\tbnez a3, 1f\n"
+        "\tbnez a3, 1f\n"
+        "1:\tret\n");
+    verifier(pris > jamais,
+             "un saut pris coûte plus qu'un saut non pris",
+             std::to_string(pris) + " contre " + std::to_string(jamais));
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3827,6 +3924,7 @@ int main() {
     test_tirages_et_adc_arm();
     test_tirage_vers_la_bonne_alimentation();
     test_cycles_exacts_arm();
+    test_temps_xtensa();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

@@ -13,6 +13,24 @@
 //     L32R avec un décalage négatif. Un émulateur qui ignore cela ne charge
 //     jamais la bonne adresse de périphérique.
 //
+// LE TEMPS, et ce qu'on peut honnêtement en dire. Contrairement à ARM, qui
+// publie le coût de chaque instruction, Espressif ne donne pas de table pour
+// le LX6. Ce qui est modélisé est donc la STRUCTURE documentée du pipeline à
+// cinq étages, et non des chiffres relevés :
+//
+//   * une instruction ordinaire s'émet en un cycle ;
+//   * un branchement pris recharge le pipeline — deux cycles de plus ;
+//   * un chargement met deux cycles à rendre son résultat : l'instruction qui
+//     suit ATTEND si elle a besoin du registre chargé, et ne paie rien
+//     sinon. C'est le verrouillage de charge, et l'ignorer donne des boucles
+//     de recopie mémoire trop rapides.
+//
+// À la différence du cœur AVR (exact, confronté à simavr) et du cœur Cortex-M
+// (exact, confronté aux tables d'ARM), CE CŒUR N'EST PAS EXACT AU CYCLE. Il
+// ne le sera pas tant qu'une table de référence n'existera pas : aucun
+// simulateur d'ESP32 ne l'est, pour la même raison. Le dire vaut mieux que de
+// laisser croire à une précision qu'on n'a pas.
+//
 // Ce qui est modélisé : le jeu d'instructions courant — celui que produit un
 // compilateur pour du code qui pilote des registres —, la mémoire, et le
 // bloc GPIO de l'ESP32.
@@ -97,6 +115,10 @@ private:
     uint32_t frequence_ = 240000000;
     bool charge_ = false;
     bool arrete_ = false;
+    // Verrouillage de charge : le registre qu'un chargement vient de viser,
+    // et le nombre de cycles avant que sa valeur soit disponible.
+    int registre_charge_ = -1;
+    int attente_charge_ = 0;
 
     uint32_t gpio_sortie_ = 0, gpio_direction_ = 0, gpio_entree_ = 0;
     uint32_t gpio_connue_ = 0, gpio_connue_direction_ = 0;
@@ -113,6 +135,8 @@ private:
     void rafraichir_sorties();
 
     int instruction();
+    // Le coût d'émission seul, sans le verrouillage de charge.
+    int instruction_seule(uint32_t depart);
 };
 
 }  // namespace coeur
