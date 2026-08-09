@@ -1,5 +1,7 @@
 #include "app/FenetrePrincipale.h"
 
+#include "core/engines/Chaines.h"
+#include "core/engines/Microcontroleur.h"
 #include "core/engines/ProgrammesExemples.h"
 
 #include <QAction>
@@ -703,16 +705,22 @@ void FenetrePrincipale::construire_barre_etat() {
         pastille(true, spice ? "analogique (intégré + ngspice)"
                              : "analogique (intégré)")
         + "   " + pastille(true, avr ? "AVR (intégré + simavr)" : "AVR (intégré)")
-        + "   " + pastille(gcc, "avr-gcc"));
+        // Les moteurs d'abord — ce qui exécute —, les compilateurs ensuite.
+        // Sans ce mot, « AVR » apparaîtrait deux fois et désignerait deux
+        // choses différentes.
+        + "    compilateurs : " + pastille(gcc, "AVR")
+        + " " + pastille(coeur::chaine_disponible_pour("rp2040"), "ARM")
+        + " " + pastille(coeur::chaine_disponible_pour("esp32"), "Xtensa"));
     etiquette_moteurs_->setToolTip(
-        QString("Moteur analogique : solveur intégré — rien à installer.\n"
-                "Cœur ATmega328P : intégré — rien à installer non plus.\n"
+        QString("Moteurs d'exécution — tous intégrés, rien à installer :\n"
+                "  analogique, AVR, Cortex-M, Xtensa.\n"
                 "ngspice : %1, simavr : %2 — moteurs de référence, utilisés "
-                "pour comparer dans les tests.\n"
-                "avr-gcc : %3 — nécessaire pour compiler un programme depuis "
-                "l'application.")
-            .arg(spice ? "présent" : "absent",
-                 avr ? "présent" : "absent", gcc ? "présent" : "absent"));
+                "pour comparer dans les tests.\n\n"
+                "Compilateurs — nécessaires seulement pour compiler depuis "
+                "l'application ; un .elf déjà compilé se charge sans eux :\n%3"
+                "\nLancez outils/chaines pour les emporter dans le paquet.")
+            .arg(spice ? "présent" : "absent", avr ? "présent" : "absent",
+                 QString::fromStdString(coeur::chaines::etat())));
 
     statusBar()->addWidget(etiquette_etat_);
     statusBar()->addWidget(new QLabel("  "));
@@ -722,10 +730,16 @@ void FenetrePrincipale::construire_barre_etat() {
     refleter_etat();
 
     // Le moteur analogique est toujours là ; seul le firmware peut manquer.
-    if (!coeur::AvrEngine::avr_gcc_disponible())
-        ecrire("avr-gcc est introuvable dans le PATH : le bouton « Compiler » "
-               "ne fonctionnera pas. On peut malgré tout charger un .elf déjà "
-               "compilé (Simulation → Charger un firmware).");
+    // Les compilateurs manquants se disent une fois, au démarrage : c'est
+    // là que la question se pose, pas au milieu d'une compilation qui échoue.
+    if (!coeur::AvrEngine::avr_gcc_disponible()
+        || !coeur::chaine_disponible_pour("rp2040")) {
+        ecrire("Compilateurs disponibles :\n"
+               + QString::fromStdString(coeur::chaines::etat())
+               + "Ce qui manque n'empêche que la compilation depuis "
+                 "l'application : un .elf déjà compilé se charge toujours "
+                 "(Simulation → Charger un firmware).");
+    }
 }
 
 // Le libellé du bouton dit ce qui va se passer, la pastille dit où on en est.

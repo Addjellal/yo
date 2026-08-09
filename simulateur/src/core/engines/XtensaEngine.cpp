@@ -1,5 +1,11 @@
 #include "core/engines/XtensaEngine.h"
 
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
+
+#include "core/engines/Chaines.h"
+
 namespace coeur {
 
 XtensaEngine::XtensaEngine()
@@ -57,6 +63,57 @@ bool XtensaEngine::niveau_port(int broche) const {
 
 void XtensaEngine::definir_niveau_externe(int broche, bool haut) {
     coeur_->broche_externe(broche, haut);
+}
+
+bool XtensaEngine::chaine_disponible() {
+    return !chaines::outil("xtensa", "xtensa-esp32-elf-gcc").empty();
+}
+
+bool XtensaEngine::compiler_source(const std::string& source,
+                                   const std::string& chemin_elf,
+                                   std::string* journal) {
+    const std::string compilateur =
+        chaines::outil("xtensa", "xtensa-esp32-elf-gcc");
+    if (compilateur.empty()) {
+        if (journal)
+            *journal =
+                "Aucun compilateur Xtensa trouvé.\n"
+                "Lancez « outils/chaines.ps1 -Xtensa » (ou chaines.sh) pour "
+                "l'installer à côté de l'exécutable — le paquet devient alors "
+                "autosuffisant pour l'ESP32.\n"
+                "Un fichier .elf déjà compilé se charge sans rien installer.";
+        return false;
+    }
+
+    const std::string base = chemin_elf + ".c";
+    {
+        std::ofstream fichier(base);
+        if (!fichier) {
+            if (journal) *journal = "écriture impossible : " + base;
+            return false;
+        }
+        // Le programme d'exemple nomme sa fonction app_main, comme l'ESP-IDF.
+        // Sans l'IDF, c'est elle qui devient le point d'entrée.
+        fichier << source << "\n"
+                << "void _start(void) { app_main(); for (;;) { } }\n";
+    }
+
+    // Sans ESP-IDF ni FreeRTOS : du nu, lié là où l'ESP32 exécute sa mémoire
+    // interne. C'est ce que le cœur sait faire tourner, et rien de plus.
+    const std::string journal_fichier = chemin_elf + ".log";
+    const std::string commande =
+        compilateur
+        + " -mlongcalls -nostdlib -ffreestanding -Os -Wl,-e,_start"
+          " -Wl,-Ttext=0x400D0000 -o \"" + chemin_elf + "\" \"" + base
+        + "\" > \"" + journal_fichier + "\" 2>&1";
+    const int code = std::system(commande.c_str());
+    if (journal) {
+        std::ifstream lecture(journal_fichier);
+        std::stringstream tampon;
+        tampon << lecture.rdbuf();
+        *journal = tampon.str();
+    }
+    return code == 0;
 }
 
 }  // namespace coeur

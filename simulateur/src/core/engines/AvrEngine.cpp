@@ -2,6 +2,7 @@
 
 #include "core/engines/CoeurAvr.h"
 #include "core/engines/noyau_arduino.h"
+#include "core/engines/Chaines.h"
 
 #include <array>
 #include <cstdio>
@@ -455,7 +456,7 @@ void AvrEngine::_notifier_serie(char octet) {
 // Compilation d'un sketch avec avr-gcc
 // ---------------------------------------------------------------------------
 bool AvrEngine::avr_gcc_disponible() {
-    return std::system("avr-gcc --version > /dev/null 2>&1") == 0;
+    return !chaines::outil("avr", "avr-gcc").empty();
 }
 
 bool AvrEngine::compiler_source(const std::string& source,
@@ -495,7 +496,8 @@ bool AvrEngine::compiler_source(const std::string& source,
 
     const std::string journal_fichier = chemin_elf + ".log";
     const std::string commande =
-        "avr-g++ -mmcu=" + mcu + " -DF_CPU=" + std::to_string(frequence)
+        chaines::outil("avr", "avr-g++") + " -mmcu=" + mcu + " -DF_CPU="
+        + std::to_string(frequence)
         + "UL -Os -std=gnu++17 "
           "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
           "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
@@ -513,7 +515,7 @@ bool AvrEngine::compiler_source(const std::string& source,
 }
 
 bool AvrEngine::avr_gpp_disponible() {
-    return std::system("avr-g++ --version > /dev/null 2>&1") == 0;
+    return !chaines::outil("avr", "avr-g++").empty();
 }
 
 }  // namespace coeur

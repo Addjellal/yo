@@ -1,5 +1,7 @@
 #include "core/engines/CortexEngine.h"
 
+#include "core/engines/Chaines.h"
+
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -16,24 +18,21 @@ struct Chaine {
     bool clang = false;
 };
 
-bool commande_existe(const std::string& outil) {
-#ifdef _WIN32
-    const std::string essai = "where " + outil + " > NUL 2>&1";
-#else
-    const std::string essai = "command -v " + outil + " > /dev/null 2>&1";
-#endif
-    return std::system(essai.c_str()) == 0;
-}
-
 Chaine chaine() {
     static const Chaine trouvee = [] {
         Chaine resultat;
-        if (commande_existe("arm-none-eabi-gcc")) {
-            resultat.commande = "arm-none-eabi-gcc";
-        } else if (commande_existe("clang")) {
-            // clang sait produire du Thumb sans chaîne croisée séparée, à
-            // condition de ne demander aucune bibliothèque standard.
-            resultat.commande = "clang";
+        // D'abord celle du paquet, ensuite celle de la machine : c'est ce que
+        // fait `chaines::outil`.
+        const std::string arm = chaines::outil("arm", "arm-none-eabi-gcc");
+        if (!arm.empty()) {
+            resultat.commande = arm;
+            return resultat;
+        }
+        // clang sait produire du Thumb sans chaîne croisée séparée, à
+        // condition de ne demander aucune bibliothèque standard.
+        const std::string clang = chaines::outil("arm", "clang");
+        if (!clang.empty()) {
+            resultat.commande = clang;
             resultat.clang = true;
         }
         return resultat;

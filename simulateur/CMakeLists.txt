@@ -133,6 +133,7 @@ add_library(coeur STATIC
   src/core/engines/XtensaEngine.cpp
   src/core/engines/CortexEngine.cpp
   src/core/engines/AvrEngine.cpp
+  src/core/engines/Chaines.cpp
   src/core/engines/Microcontroleur.cpp
   src/core/engines/MoteurNumerique.cpp
   src/core/analysis/Analyses.cpp
@@ -308,4 +309,26 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     COMMENT "Fabrication du paquet portable")
 else()
   message(STATUS "Application Qt : désactivée (Qt6 introuvable) — le cœur reste compilable")
+endif()
+
+# ---------------------------------------------------------------------------
+# Les chaînes de compilation emportées par le paquet.
+#
+# Elles ne sont pas dans le dépôt — plusieurs centaines de mégaoctets n'ont
+# rien à faire dans un historique de code. Le script outils/chaines les pose
+# dans « <build>/chaines », et ce bloc les emporte dans l'archive si elles y
+# sont. Le paquet devient alors autosuffisant : plus rien à installer sur la
+# machine qui le reçoit.
+# ---------------------------------------------------------------------------
+if(EXISTS "${CMAKE_BINARY_DIR}/chaines")
+  install(DIRECTORY "${CMAKE_BINARY_DIR}/chaines"
+          DESTINATION .
+          USE_SOURCE_PERMISSIONS)
+  message(STATUS
+    "Chaînes de compilation trouvées : elles seront emportées par le paquet.")
+else()
+  message(STATUS
+    "Aucune chaîne dans ${CMAKE_BINARY_DIR}/chaines : le paquet dépendra de "
+    "ce qui est installé sur la machine. Lancez outils/chaines pour le rendre "
+    "autosuffisant.")
 endif()

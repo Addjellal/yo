@@ -49,6 +49,13 @@ public:
         rappel_serie_ = std::move(rappel);
     }
 
+    // Compile un programme pour l'ESP32, avec la chaîne Xtensa si le paquet
+    // l'emporte ou si la machine en a une. Sans elle, échoue en le disant.
+    static bool compiler_source(const std::string& source,
+                                const std::string& chemin_elf,
+                                std::string* journal);
+    static bool chaine_disponible();
+
 private:
     std::unique_ptr<CoeurXtensa> coeur_;
     std::string erreur_;

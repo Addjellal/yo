@@ -54,27 +54,14 @@ bool compiler_pour(const std::string& mcu, const std::string& source,
                    std::string* journal) {
     if (est_arm(mcu))
         return CortexEngine::compiler_source(source, chemin_elf, journal, mcu);
-    if (est_xtensa(mcu)) {
-        // Aucune chaîne Xtensa n'est embarquée, et l'ESP-IDF ne se met pas
-        // dans une archive portable. Le dire franchement vaut mieux que de
-        // lancer avr-g++ sur du code ESP32 et de laisser l'utilisateur
-        // déchiffrer son message.
-        if (journal)
-            *journal =
-                "Le simulateur exécute l'ESP32, mais ne sait pas le "
-                "compiler.\n"
-                "La chaîne Xtensa (ESP-IDF) pèse plusieurs centaines de "
-                "mégaoctets : elle n'est pas embarquée.\n"
-                "Chargez un fichier .elf déjà compilé — tout le reste "
-                "fonctionne alors normalement.";
-        return false;
-    }
+    if (est_xtensa(mcu))
+        return XtensaEngine::compiler_source(source, chemin_elf, journal);
     return AvrEngine::compiler_source(source, chemin_elf, journal, mcu, horloge);
 }
 
 bool chaine_disponible_pour(const std::string& mcu) {
     if (est_arm(mcu)) return CortexEngine::chaine_disponible();
-    if (est_xtensa(mcu)) return false;     // rien à embarquer pour celle-là
+    if (est_xtensa(mcu)) return XtensaEngine::chaine_disponible();
     return AvrEngine::avr_gpp_disponible();
 }
 
