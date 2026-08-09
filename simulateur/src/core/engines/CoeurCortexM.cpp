@@ -772,7 +772,7 @@ int CoeurCortexM::instruction() {
             default: resultat = ~r_[rm]; r_[rd] = resultat; break;            // MVN
         }
         poser_drapeaux_logiques(resultat);
-        return operation == 0xD ? 2 : 1;
+        return 1;      // MULS compris : ces cœurs ont un multiplieur rapide
     }
 
     // --- 010001 : opérations sur registres hauts, et branchement indirect
@@ -783,21 +783,23 @@ int CoeurCortexM::instruction() {
         const uint32_t valeur = rm == 15 ? pc_lu : r_[rm];
         switch (operation) {
             case 0:                                          // ADD (sans drapeau)
-                if (rd == 15) { brancher(r_[15] + valeur); return 2; }
+                // Écrire dans r15 est un branchement : le pipeline se
+                // recharge, et cela coûte deux cycles de plus.
+                if (rd == 15) { brancher(r_[15] + valeur); return 3; }
                 r_[rd] += valeur;
                 return 1;
             case 1:                                          // CMP
                 poser_drapeaux_soustraction(rd == 15 ? pc_lu : r_[rd], valeur);
                 return 1;
             case 2:                                          // MOV
-                if (rd == 15) { brancher(valeur); return 2; }
+                if (rd == 15) { brancher(valeur); return 3; }
                 r_[rd] = valeur;
                 return 1;
             default: {                                       // BX / BLX
                 const bool avec_lien = (code >> 7) & 1;
                 if (avec_lien) r_[14] = r_[15] | 1;
                 brancher(valeur);
-                return 2;
+                return 3;      // branchement : rechargement du pipeline
             }
         }
     }
@@ -910,7 +912,8 @@ int CoeurCortexM::instruction() {
                 ++nombre;
                 r_[13] = sommet;
                 brancher(retour);
-                return 3 + nombre;
+                // 1 + N pour les registres, plus trois pour le pipeline.
+                return 4 + nombre;
             }
             r_[13] = sommet;
             return 1 + nombre;
@@ -1216,11 +1219,12 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         const int rm = second & 0x0F;
         const int ra = (second >> 12) & 0x0F;
         if (((second >> 4) & 0x0F) == 0) {
-            r_[rd2] = ra == 15 ? r_[rn1] * r_[rm]         // MUL
-                               : r_[ra] + r_[rn1] * r_[rm];  // MLA
-        } else {
-            r_[rd2] = r_[ra] - r_[rn1] * r_[rm];          // MLS
+            const bool simple = ra == 15;
+            r_[rd2] = simple ? r_[rn1] * r_[rm]           // MUL
+                             : r_[ra] + r_[rn1] * r_[rm];  // MLA
+            return simple ? 1 : 2;
         }
+        r_[rd2] = r_[ra] - r_[rn1] * r_[rm];              // MLS
         return 2;
     }
     if ((premier & 0xFFF0) == 0xFB90 || (premier & 0xFFF0) == 0xFBB0) {
@@ -1234,7 +1238,18 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         } else {
             r_[rd2] = r_[rn1] / r_[rm];
         }
-        return 12;
+        // Le diviseur du Cortex-M3 s'arrête dès que le reste est épuisé :
+        // de 2 à 12 cycles, selon l'écart des opérandes. C'est la seule
+        // instruction de ces cœurs dont le coût dépende des données, et la
+        // règle est celle que donne ARM.
+        auto zeros_en_tete = [](uint32_t valeur) {
+            int compte = 0;
+            for (int bit = 31; bit >= 0 && !((valeur >> bit) & 1); --bit) ++compte;
+            return compte;
+        };
+        const int ecart =
+            zeros_en_tete(r_[rm]) - zeros_en_tete(r_[rn1]);
+        return std::max(2, std::min(12, 2 + ecart));
     }
 
     // --- chargements et rangements simples

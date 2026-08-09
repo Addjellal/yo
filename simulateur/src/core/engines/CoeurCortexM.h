@@ -18,6 +18,21 @@
 //     trente-deux bits. D'où l'ordre dans lequel ces deux familles ont été
 //     écrites : la seconde ne fait qu'ajouter des formes à la première.
 //
+// LE TEMPS. Les comptes de cycles sont ceux des tables publiées par ARM, et
+// le banc d'essai les vérifie sur des séquences dont le coût se calcule à la
+// main. Sur un Cortex-M0+, dont le pipeline est entièrement déterministe,
+// c'est exact au cycle près.
+//
+// Deux réserves, qu'aucun simulateur ne lève :
+//
+//   * le Cortex-M3 spécule sur ses branchements — ARM annonce 2 à 4 cycles
+//     pour un saut pris, selon ce que l'unité de préchargement a deviné. Le
+//     modèle prend le cas nominal ;
+//   * la mémoire est supposée sans temps d'attente. Un vrai RP2040 exécutant
+//     depuis sa flash à travers son cache XIP est parfois plus lent, selon
+//     que la ligne est présente ou non. Les simulateurs professionnels font
+//     la même hypothèse — c'est celle du cœur, pas de la carte.
+//
 // Ce qui est modélisé du matériel autour : la mémoire (flash et SRAM), le
 // compteur SysTick — celui dont se sert toute temporisation —, les ports
 // d'entrée-sortie de la puce, et le vecteur d'interruptions. Les

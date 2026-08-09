@@ -3662,6 +3662,130 @@ static void test_tirage_vers_la_bonne_alimentation() {
     }
 }
 
+
+// Le temps, compté au cycle près.
+//
+// Le piège est ici de se vérifier soi-même. Compter les cycles avec mon
+// propre décodeur et comparer au résultat de mon propre décodeur ne prouve
+// rien. La référence employée est donc EXTÉRIEURE : les tables de temps
+// publiées par ARM, dont le coût de chaque instruction se lit, et dont le
+// coût d'une boucle se calcule à la main — sur du papier, avant de lancer
+// quoi que ce soit.
+//
+// Les séquences sont écrites en assembleur dans le programme lui-même : un
+// compilateur est libre de réorganiser du C, et l'on ne saurait plus ce qui
+// s'exécute.
+static void test_cycles_exacts_arm() {
+    std::printf("\n[35] Cortex-M : le temps compté au cycle près\n");
+    if (!coeur::CortexEngine::chaine_disponible()) {
+        std::printf("  (aucun compilateur ARM — section ignorée)\n");
+        return;
+    }
+
+    struct Cas {
+        const char* nom;
+        const char* corps;      // la séquence, en assembleur
+        long long attendu;      // calculé à la main sur la table ARM
+        const char* calcul;     // le calcul, écrit pour être relu
+    };
+
+    // La broche témoin encadre la mesure : on lit le compteur de cycles au
+    // premier basculement et au second, et l'écart est la séquence, seule.
+    const Cas cas[] = {
+        {"boucle de décrément",
+         "movs r0, #100\n"
+         "1: subs r0, #1\n"
+         "bne 1b\n",
+         // subs 1 + bne 3 (pris) = 4 par tour, sauf le dernier : 1 + 1 = 2.
+         // 99 tours à 4, un tour à 2 : 398. Plus le movs initial : 399.
+         399,
+         "99x(1+3) + (1+1) + 1"},
+        {"cent additions de registres",
+         "movs r0, #0\n"
+         "movs r1, #1\n"
+         "movs r2, #100\n"
+         "2: adds r0, r0, r1\n"
+         "subs r2, #1\n"
+         "bne 2b\n",
+         // adds 1 + subs 1 + bne 3 = 5 par tour, dernier tour 3.
+         // 99x5 + 3 + 3 movs = 501.
+         501,
+         "99x(1+1+3) + (1+1+1) + 3"},
+        {"multiplications",
+         "movs r0, #10\n"
+         "movs r1, #7\n"
+         "movs r2, #50\n"
+         "3: muls r0, r1, r0\n"
+         "subs r2, #1\n"
+         "bne 3b\n",
+         // muls vaut UN cycle sur ces cœurs — c'est le point que ce cas
+         // vérifie, un multiplieur lent donnerait trente-deux fois plus.
+         // 49x(1+1+3) + (1+1+1) + 3 = 251.
+         251,
+         "49x(1+1+3) + 3 + 3"}};
+
+    for (const Cas& essai : cas) {
+        // Le programme : allumer GP25, exécuter la séquence, éteindre GP25.
+        std::string source =
+            "#define SIO 0xd0000000u\n"
+            "#define OE_SET  (*(volatile unsigned*)(SIO + 0x024))\n"
+            "#define OUT_SET (*(volatile unsigned*)(SIO + 0x014))\n"
+            "#define OUT_CLR (*(volatile unsigned*)(SIO + 0x018))\n"
+            "void _start(void) {\n"
+            "    OE_SET = 1u << 25;\n"
+            "    OUT_SET = 1u << 25;\n"
+            "    __asm__ volatile(\"";
+        // Les sauts de ligne doivent arriver ÉCHAPPÉS dans le fichier C : un
+        // vrai retour à la ligne au milieu d'une chaîne ne compile pas.
+        for (const char* lettre = essai.corps; *lettre; ++lettre) {
+            if (*lettre == '\n') source += "\\n";
+            else source += *lettre;
+        }
+        source += "\" ::: \"r0\", \"r1\", \"r2\", \"cc\");\n"
+                  "    OUT_CLR = 1u << 25;\n"
+                  "    for (;;) { }\n"
+                  "}\n";
+
+        const std::string firmware =
+            std::string("/tmp/sim_cycles_") + std::to_string(essai.attendu)
+            + ".elf";
+        std::string journal;
+        if (!coeur::CortexEngine::compiler_source(source, firmware, &journal,
+                                                  "rp2040")) {
+            verifier(false, std::string(essai.nom) + " : compile", journal);
+            continue;
+        }
+
+        coeur::CortexEngine puce;
+        puce.charger(firmware, "rp2040", 125000000);
+        long long debut = -1, fin = -1;
+        puce.sur_changement_broche([&](int broche, bool haut) {
+            if (broche != 25) return;
+            // La broche annonce d'abord son passage en sortie, au niveau
+            // bas : ce n'est pas encore le départ. On n'écoute la retombée
+            // qu'après avoir vu la montée.
+            if (haut && debut < 0) debut = static_cast<long long>(puce.cycle());
+            else if (!haut && debut >= 0 && fin < 0)
+                fin = static_cast<long long>(puce.cycle());
+        });
+        puce.avancer(200000);
+
+        // La broche est annoncée APRÈS que le rangement qui la commande se
+        // soit exécuté : le STR de fermeture, deux cycles, tombe donc dans la
+        // fenêtre. On l'ôte, et l'on exige alors l'égalité stricte — pas une
+        // tolérance. C'est toute la différence entre « à peu près juste » et
+        // « juste, et l'on sait pourquoi ».
+        constexpr long long kRangementFermant = 2;
+        const long long mesure = fin - debut - kRangementFermant;
+        std::printf("     %-28s attendu %4lld, mesuré %4lld\n", essai.nom,
+                    essai.attendu, mesure);
+        verifier(mesure == essai.attendu,
+                 std::string(essai.nom) + " : " + essai.calcul + " = "
+                     + std::to_string(essai.attendu) + " cycles, au cycle près",
+                 "mesuré " + std::to_string(mesure));
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3702,6 +3826,7 @@ int main() {
     test_routage_automatique();
     test_tirages_et_adc_arm();
     test_tirage_vers_la_bonne_alimentation();
+    test_cycles_exacts_arm();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {
