@@ -6,6 +6,8 @@
 #pragma once
 
 #include <QGraphicsScene>
+
+#include <cstdint>
 #include <QJsonObject>
 #include <QPoint>
 #include <QPointF>
@@ -28,6 +30,16 @@ struct LiaisonBroche {
     std::string nom;           // "D13", "A0"
     std::string noeud;         // nœud auquel elle est reliée
     std::string carte;         // référence de la carte : "U1", "U2"…
+};
+
+// Une carte programmable posée sur le schéma, avec ce qu'il faut pour la
+// faire tourner : quelle puce, à quelle vitesse. Deux cartes du même schéma
+// peuvent porter deux puces différentes — un Arduino et un ATtiny — et
+// chacune doit être compilée et exécutée pour la sienne.
+struct CartePosee {
+    QString reference;
+    std::string mcu = "atmega328p";
+    uint32_t horloge = 16000000;
 };
 
 class SceneSchema : public QGraphicsScene {
@@ -89,6 +101,8 @@ public:
     // des broches ne suffit pas : une carte seule sur un schéma vide n'a
     // aucune broche reliée, et resterait pourtant à programmer.
     QStringList cartes_presentes() const;
+    // Les mêmes, avec leur puce et leur horloge.
+    std::vector<CartePosee> cartes_posees() const;
 
     // Ce que relie chaque nœud : « R1_2 » -> « C1.1 · R1.2 ». Sert à ne
     // jamais proposer un nom de nœud sans dire ce qu'il désigne.

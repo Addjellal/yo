@@ -123,7 +123,7 @@ bool MoteurSimulation::charger_firmware(const QString& chemin, QString* erreur,
         if (erreur) *erreur = "simavr n'est pas compilé dans cette version.";
         return false;
     }
-    if (!c.mcu->charger(chemin.toStdString())) {
+    if (!c.mcu->charger(chemin.toStdString(), c.puce, c.horloge)) {
         if (erreur) *erreur = QString::fromStdString(c.mcu->erreur());
         c.firmware_charge = false;
         return false;
@@ -170,8 +170,10 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
     const QString fichier =
         QDir(dossier).filePath("firmware_" + cible.toLower() + ".elf");
     std::string compte_rendu;
+    const Carte& carte_cible = obtenir_carte(cible);
     const bool ok = coeur::AvrEngine::compiler_source(
-        source.toStdString(), fichier.toStdString(), &compte_rendu);
+        source.toStdString(), fichier.toStdString(), &compte_rendu,
+        carte_cible.puce, carte_cible.horloge);
     if (journal_texte) *journal_texte = QString::fromStdString(compte_rendu);
     if (!ok) return false;
     QString erreur;
@@ -183,6 +185,22 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
 }
 
 // ---------------------------------------------------------------------------
+void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
+                                       std::vector<LiaisonBroche> broches,
+                                       const std::vector<CartePosee>& cartes) {
+    QStringList references;
+    for (const CartePosee& posee : cartes) references << posee.reference;
+    definir_circuit(std::move(netlist), std::move(broches), references);
+    // Chaque carte apprend sa puce : la compilation et l'exécution en
+    // dépendent, et une carte qui l'ignorerait serait traitée en Arduino.
+    for (const CartePosee& posee : cartes) {
+        auto it = cartes_.find(posee.reference);
+        if (it == cartes_.end()) continue;
+        it->second->puce = posee.mcu;
+        it->second->horloge = posee.horloge;
+    }
+}
+
 void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
                                        std::vector<LiaisonBroche> broches,
                                        const QStringList& cartes) {

@@ -23,9 +23,75 @@
 
 namespace coeur {
 
+
+// Description d'une puce.
+//
+// Le cœur exécute le même jeu d'instructions pour toute la famille AVR 8
+// bits ; ce qui change d'une puce à l'autre est la carte de ses registres,
+// la taille de sa mémoire, et la façon dont son tableau de vecteurs est
+// disposé. Tout cela est décrit ici, en données, plutôt que gravé dans le
+// code — c'est ce qui permet d'ajouter une puce sans toucher à l'exécution.
+struct ProfilAvr {
+    // Un registre absent de la puce porte cette adresse : toute lecture ou
+    // écriture le concernant est alors sans effet.
+    static constexpr uint16_t kAbsent = 0xFFFF;
+
+    const char* nom = "atmega328p";
+    uint16_t fin_ram = 0x08FF;
+    // Les vecteurs d'interruption occupent deux mots sur les grosses puces
+    // (JMP) et un seul sur les petites (RJMP).
+    int mots_par_vecteur = 2;
+
+    int nb_ports = 3;                       // 0 = B, 1 = C, 2 = D
+    uint16_t pin[3] = {0x23, 0x26, 0x29};
+    uint16_t ddr[3] = {0x24, 0x27, 0x2A};
+    uint16_t port[3] = {0x25, 0x28, 0x2B};
+
+    uint16_t spl = 0x5D, sph = 0x5E, sreg = 0x5F;
+
+    uint16_t adcl = 0x78, adch = 0x79, adcsra = 0x7A, admux = 0x7C;
+    int canaux_adc = 8;
+
+    // Liaison série : absente sur les puces qui n'en ont pas.
+    uint16_t ucsra = 0xC0, ucsrb = 0xC1, udr = 0xC6;
+    int vecteur_usart_rx = 18;
+
+    // Un compteur, avec ses registres, ses drapeaux et sa sortie de
+    // comparaison. `present` distingue un compteur absent d'un compteur à
+    // l'arrêt.
+    struct ProfilCompteur {
+        bool present = false;
+        uint16_t controle_a = kAbsent, controle_b = kAbsent;
+        uint16_t compte = kAbsent, compte_haut = kAbsent;
+        uint16_t compare_a = kAbsent, compare_b = kAbsent, sommet = kAbsent;
+        uint16_t drapeaux = kAbsent, masques = kAbsent;
+        // Positions des drapeaux dans TIFR — et, aux mêmes places, des
+        // autorisations dans TIMSK.
+        uint8_t bit_tov = 0x01, bit_ocfa = 0x02, bit_ocfb = 0x04;
+        int vecteur_ovf = 0, vecteur_compa = 0, vecteur_compb = 0;
+        // Prédiviseur : 0 le tableau ordinaire, 1 celui du compteur 2 de
+        // l'ATmega, 2 celui sur quatre bits du compteur 1 de l'ATtiny.
+        int prediviseur = 0;
+        // Sorties de comparaison : où aboutissent OCxA et OCxB.
+        int port_a = -1, bit_a = 0, port_b = -1, bit_b = 0;
+    };
+    ProfilCompteur compteurs[3];
+};
+
+// Les puces connues. `profil_par_nom` rend nullptr pour une puce inconnue.
+const ProfilAvr& profil_atmega328p();
+const ProfilAvr& profil_attiny85();
+const ProfilAvr* profil_par_nom(const std::string& nom);
+
 class CoeurAvr {
 public:
     CoeurAvr();
+    explicit CoeurAvr(const ProfilAvr& profil);
+
+    // Change de puce. Remet tout à zéro : la mémoire n'a pas la même taille
+    // et les registres ne sont pas aux mêmes adresses.
+    void definir_profil(const ProfilAvr& profil);
+    const ProfilAvr& profil() const { return p_; }
 
     // Charge un firmware ELF ou Intel HEX. `erreur` est renseigné en cas
     // d'échec.
@@ -55,6 +121,8 @@ public:
     bool charge() const { return !flash_.empty(); }
 
 private:
+    ProfilAvr p_;
+
     // --- mémoire
     std::vector<uint16_t> flash_;          // en mots de 16 bits
     std::vector<uint8_t> donnees_;         // 0x0000..0x08FF
@@ -114,12 +182,22 @@ private:
     int instruction();                     // exécute une instruction, rend ses cycles
     void avancer_peripheriques(int cycles);
     void avancer_compteur(Compteur& compteur, int cycles, int numero);
+    // Une source d'interruption : son drapeau, son autorisation, son vecteur.
+    struct Source {
+        uint16_t drapeaux, masques;
+        uint8_t bit;
+        int vecteur;
+    };
+    std::vector<Source> sources_;          // rangées par priorité
+    void ranger_interruptions();
     bool servir_interruption();
     void declencher(int vecteur);
 
     // --- entrées/sorties
     void rafraichir_sorties();
     uint8_t niveau_broches(int port) const;
+    int port_de_pin(uint16_t adresse) const;
+    bool touche_les_sorties(uint16_t adresse) const;
     void demarrer_conversion();
 };
 

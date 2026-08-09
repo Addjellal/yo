@@ -261,6 +261,28 @@ int main(void) {
 }
 )";
 
+// L'ATtiny85 n'a ni carte ni noyau Arduino embarqué ici : son programme est
+// du C sur registres, et son quartz interne tourne à 8 MHz — deux fois moins
+// vite qu'un Arduino. Une temporisation écrite pour l'un serait deux fois
+// trop longue sur l'autre : c'est F_CPU qui fait la différence, et c'est la
+// carte qui le dit.
+inline const char* kProgrammeAttiny = R"(/* ATtiny85 : clignotant sur PB1 (broche 6 du boîtier).
+   Huit broches en tout, dont deux pour l'alimentation : c'est la puce des
+   montages qui n'ont besoin de rien d'autre. */
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void) {
+    DDRB |= (1 << PB1);              /* PB1 en sortie */
+    while (1) {
+        PORTB |= (1 << PB1);
+        _delay_ms(500);
+        PORTB &= ~(1 << PB1);
+        _delay_ms(500);
+    }
+}
+)";
+
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
     const char* nom;
@@ -280,6 +302,7 @@ inline std::vector<ProgrammeExemple> tous_les_programmes() {
         {"kProgrammeMoteur", kProgrammeMoteur},
         {"kProgrammeRegistre", kProgrammeRegistre},
         {"kProgrammeRegistresNu", kProgrammeRegistresNu},
+        {"kProgrammeAttiny", kProgrammeAttiny},
     };
 }
 

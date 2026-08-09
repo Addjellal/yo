@@ -68,6 +68,12 @@ public:
     void definir_circuit(coeur::Netlist netlist,
                          std::vector<LiaisonBroche> broches,
                          const QStringList& cartes);
+    // Variante qui dit aussi quelle puce porte chaque carte : c'est elle que
+    // l'application emploie, car un ATtiny et un Arduino ne se compilent ni
+    // ne s'exécutent de la même façon.
+    void definir_circuit(coeur::Netlist netlist,
+                         std::vector<LiaisonBroche> broches,
+                         const std::vector<CartePosee>& cartes);
 
     // État de la simulation, au sens où l'entend un atelier de calcul : on
     // lance, on met en pause, on reprend, on arrête. « Arrêté » remet les
@@ -128,6 +134,10 @@ private:
     struct Carte {
         QString reference;
         std::unique_ptr<coeur::AvrEngine> mcu;
+        // La puce de cette carte : elle décide de la compilation comme de
+        // l'exécution.
+        std::string puce = "atmega328p";
+        uint32_t horloge = 16000000;
         bool firmware_charge = false;
         uint32_t masque = 0;         // état courant des broches
         uint32_t masque_debut = 0;   // état au début de la trame

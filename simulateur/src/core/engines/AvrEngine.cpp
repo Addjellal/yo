@@ -26,21 +26,27 @@ struct BrocheAvr {
     int bit;
 };
 
-BrocheAvr broche_avr(int broche) {
+// Sur l'ATmega328P, la numérotation Arduino traverse trois ports. Sur
+// l'ATtiny85, il n'y a qu'un port : la broche 0 est PB0, et ainsi de suite.
+BrocheAvr broche_avr(int broche, bool attiny = false) {
+    if (attiny) return {'B', broche & 7};
     if (broche <= 7) return {'D', broche};          // D0..D7  -> PORTD
     if (broche <= 13) return {'B', broche - 8};     // D8..D13 -> PORTB
     return {'C', broche - 14};                      // A0..A5  -> PORTC
 }
 
 // Adresses en espace données de l'ATmega328P (adresse E/S + 0x20).
-uint16_t adresse_ddr(char port) {
+uint16_t adresse_ddr(char port, bool attiny = false) {
+    if (attiny) return 0x37;     // DDRB de l'ATtiny85 : le seul port
     switch (port) {
         case 'B': return 0x24;
         case 'C': return 0x27;
         default:  return 0x2A;   // D
     }
 }
-uint16_t adresse_port(char port) { return adresse_ddr(port) + 1; }
+uint16_t adresse_port(char port, bool attiny = false) {
+    return adresse_ddr(port, attiny) + 1;
+}
 }  // namespace
 
 #ifdef AVEC_SIMAVR
@@ -231,14 +237,34 @@ bool AvrEngine::charger(const std::string& chemin, const std::string& mcu,
     sortie_broches_.clear();
     if (utilise_simavr()) return charger_simavr(chemin, mcu, frequence);
 
+    // La puce décide de la carte des registres, de la taille de la mémoire
+    // et de la largeur des vecteurs. Une puce inconnue est un échec franc :
+    // l'exécuter avec le profil d'une autre donnerait des résultats faux
+    // sans jamais le dire.
+    const ProfilAvr* profil = profil_par_nom(mcu);
+    if (!profil) {
+        erreur_ = "microcontrôleur inconnu du cœur intégré : " + mcu
+                  + " (connus : atmega328p, attiny85)";
+        return false;
+    }
+    impl_->coeur.definir_profil(*profil);
+    mcu_ = mcu;
+    const bool attiny = mcu == "attiny85";
+
     impl_->coeur.definir_frequence(frequence);
     // Le cœur prévient à chaque changement de niveau ; on retraduit le port
-    // et le bit en numéro de broche Arduino.
-    impl_->coeur.sur_broche = [this](char port, int bit, bool haut) {
+    // et le bit en numéro de broche.
+    impl_->coeur.sur_broche = [this, attiny](char port, int bit, bool haut) {
         int broche = -1;
-        if (port == 'D' && bit <= 7) broche = bit;
-        else if (port == 'B' && bit <= 5) broche = 8 + bit;
-        else if (port == 'C' && bit <= 5) broche = 14 + bit;
+        if (attiny) {
+            if (port == 'B' && bit <= 5) broche = bit;
+        } else if (port == 'D' && bit <= 7) {
+            broche = bit;
+        } else if (port == 'B' && bit <= 5) {
+            broche = 8 + bit;
+        } else if (port == 'C' && bit <= 5) {
+            broche = 14 + bit;
+        }
         if (broche >= 0) _notifier_broche(broche, haut);
     };
     impl_->coeur.sur_serie = [this](uint8_t octet) {
@@ -298,7 +324,7 @@ void AvrEngine::definir_niveau_externe(int broche, bool haut) {
         niveau_simavr(broche, haut);
         return;
     }
-    const BrocheAvr cible = broche_avr(broche);
+    const BrocheAvr cible = broche_avr(broche, mcu_ == "attiny85");
     impl_->coeur.broche_externe(cible.port, cible.bit, haut);
 }
 
@@ -307,14 +333,16 @@ bool AvrEngine::direction_sortie(int broche) const {
     // seulement comme entrées de convertisseur : elles n'ont ni bit de
     // direction ni bascule de sortie. Toujours en entrée, donc.
     if (broche >= 20) return false;
-    const BrocheAvr cible = broche_avr(broche);
-    return (registre(adresse_ddr(cible.port)) >> cible.bit) & 1;
+    const bool attiny = mcu_ == "attiny85";
+    const BrocheAvr cible = broche_avr(broche, attiny);
+    return (registre(adresse_ddr(cible.port, attiny)) >> cible.bit) & 1;
 }
 
 bool AvrEngine::niveau_port(int broche) const {
     if (broche >= 20) return false;
-    const BrocheAvr cible = broche_avr(broche);
-    return (registre(adresse_port(cible.port)) >> cible.bit) & 1;
+    const bool attiny = mcu_ == "attiny85";
+    const BrocheAvr cible = broche_avr(broche, attiny);
+    return (registre(adresse_port(cible.port, attiny)) >> cible.bit) & 1;
 }
 
 bool AvrEngine::pullup_actif(int broche) const {
@@ -355,7 +383,8 @@ bool AvrEngine::avr_gcc_disponible() {
 
 bool AvrEngine::compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
-                                std::string* journal) {
+                                std::string* journal, const std::string& mcu,
+                                uint32_t frequence) {
     // Le programme est compilé en C++ avec le noyau Arduino à côté. Les deux
     // styles cohabitent : un croquis à setup()/loop() prend le main() faible
     // du noyau, un programme qui définit son propre main() l'emporte.
@@ -370,22 +399,31 @@ bool AvrEngine::compiler_source(const std::string& source,
         fichier << contenu;
         return true;
     };
-    if (!ecrire(entete, kArduinoEnTete) || !ecrire(noyau, kArduinoCorps)) {
+    // Le noyau Arduino est écrit pour l'ATmega328P : ses registres, son
+    // UART, ses trois ports. Sur une autre puce il ne compilerait pas, et
+    // faire semblant produirait une erreur incompréhensible à l'utilisateur.
+    const bool avec_noyau = mcu == "atmega328p";
+    if (avec_noyau
+        && (!ecrire(entete, kArduinoEnTete) || !ecrire(noyau, kArduinoCorps))) {
         if (journal) *journal = "écriture impossible dans " + dossier;
         return false;
     }
     // L'en-tête est inclus d'office : un croquis Arduino ne l'écrit jamais.
-    if (!ecrire(base, "#include \"Arduino.h\"\n#line 1\n" + source)) {
+    const std::string contenu =
+        avec_noyau ? "#include \"Arduino.h\"\n#line 1\n" + source : source;
+    if (!ecrire(base, contenu)) {
         if (journal) *journal = "écriture impossible : " + base;
         return false;
     }
 
     const std::string journal_fichier = chemin_elf + ".log";
     const std::string commande =
-        "avr-g++ -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu++17 "
-        "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
-        "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
-        chemin_elf + "\" \"" + base + "\" \"" + noyau + "\" > \"" +
+        "avr-g++ -mmcu=" + mcu + " -DF_CPU=" + std::to_string(frequence)
+        + "UL -Os -std=gnu++17 "
+          "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
+          "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
+        chemin_elf + "\" \"" + base + "\""
+        + (avec_noyau ? " \"" + noyau + "\"" : "") + " > \"" +
         journal_fichier + "\" 2>&1";
     const int code = std::system(commande.c_str());
     if (journal) {

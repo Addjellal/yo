@@ -57,6 +57,15 @@ int numero_broche(const std::string& nom) {
     return -1;
 }
 
+// Le numéro interne d'une borne de carte. Le modèle a le dernier mot : la
+// même étiquette « PB1 » désigne la broche 9 d'un ATmega328P et la broche 1
+// d'un ATtiny85, et aucune règle de nommage ne peut deviner laquelle.
+int numero_de_borne(const coeur::Modele& modele, const std::string& nom) {
+    auto propre = modele.broches_mcu.find(nom);
+    if (propre != modele.broches_mcu.end()) return propre->second;
+    return numero_broche(nom);
+}
+
 // Nom de nœud utilisable partout : SPICE accepte « AM1_+ » comme nom de nœud,
 // mais pas dans une expression « V(AM1_+) » — le « + » y est un opérateur. On
 // traduit donc les signes des bornes, une fois pour toutes.
@@ -152,6 +161,24 @@ QStringList SceneSchema::cartes_presentes() const {
         if (composant->modele() && composant->modele()->carte)
             resultat << composant->reference();
     resultat.sort();
+    return resultat;
+}
+
+std::vector<CartePosee> SceneSchema::cartes_posees() const {
+    std::vector<CartePosee> resultat;
+    for (ItemComposant* composant : composants()) {
+        const coeur::Modele* modele = composant->modele();
+        if (!modele || !modele->carte) continue;
+        CartePosee posee;
+        posee.reference = composant->reference();
+        posee.mcu = modele->mcu.empty() ? "atmega328p" : modele->mcu;
+        posee.horloge = modele->horloge ? modele->horloge : 16000000;
+        resultat.push_back(posee);
+    }
+    std::sort(resultat.begin(), resultat.end(),
+              [](const CartePosee& a, const CartePosee& b) {
+                  return a.reference < b.reference;
+              });
     return resultat;
 }
 
@@ -383,7 +410,8 @@ coeur::Netlist SceneSchema::construire_netlist(
         if (!modele || !modele->carte) continue;
         const auto& noms = noeuds.at(composant);
         for (int k = 0; k < composant->nb_bornes(); ++k)
-            if (numero_broche(modele->bornes[k].nom) >= 0 && !noms[k].empty())
+            if (numero_de_borne(*modele, modele->bornes[k].nom) >= 0
+                && !noms[k].empty())
                 ++broches_par_noeud[noms[k]];
     }
 
@@ -393,7 +421,7 @@ coeur::Netlist SceneSchema::construire_netlist(
         const auto& noms = noeuds.at(composant);
         for (int k = 0; k < composant->nb_bornes(); ++k) {
             const std::string nom = modele->bornes[k].nom;
-            const int numero = numero_broche(nom);
+            const int numero = numero_de_borne(*modele, nom);
             if (numero < 0 || noms[k].empty()) continue;
             // Une broche compte si elle rejoint un composant, ou si elle
             // rejoint la broche d'une autre carte.

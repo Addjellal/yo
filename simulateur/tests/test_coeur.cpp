@@ -18,6 +18,8 @@
 #include "core/Netlist.h"
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
+#include <fstream>
+
 #include "core/engines/AvrEngine.h"
 #include "core/engines/ProgrammesExemples.h"
 #include "core/engines/MoteurNumerique.h"
@@ -2816,8 +2818,15 @@ static void test_exemples_compilent() {
         const std::string firmware =
             std::string("/tmp/sim_exemple_") + exemple.nom + ".elf";
         std::string journal;
-        if (coeur::AvrEngine::compiler_source(exemple.source, firmware,
-                                              &journal)) {
+        // Le programme de l'ATtiny se compile pour l'ATtiny : le compiler
+        // pour un ATmega passerait, et produirait un binaire qui ne tournerait
+        // sur rien.
+        const bool pour_attiny =
+            std::string(exemple.nom) == "kProgrammeAttiny";
+        if (coeur::AvrEngine::compiler_source(
+                exemple.source, firmware, &journal,
+                pour_attiny ? "attiny85" : "atmega328p",
+                pour_attiny ? 8000000 : 16000000)) {
             ++compiles;
         } else {
             echecs += std::string(exemple.nom) + " : " + journal + "\n";
@@ -2833,15 +2842,20 @@ static void test_exemples_compilent() {
     verifier(compiles == total, "tous les exemples passent avr-g++",
              std::to_string(compiles) + "/" + std::to_string(total)
                  + (echecs.empty() ? "" : "\n" + echecs));
-    // Tous sont des croquis sauf un : celui de la puce nue, qui n'a pas de
-    // carte pour lui fournir un noyau et s'écrit donc sur les registres.
-    verifier(croquis == total - 1,
+    // Deux exceptions, et deux seulement : les puces nues. Sans carte autour
+    // il n'y a pas de noyau Arduino, et le C sur registres est la façon
+    // normale de les programmer.
+    verifier(croquis == total - 2,
              "les programmes de carte sont des croquis (setup + loop)",
              std::to_string(croquis) + "/" + std::to_string(total));
-    const std::string nu = coeur::kProgrammeRegistresNu;
-    verifier(nu.find("DDRB") != std::string::npos
-                 && nu.find("void loop(") == std::string::npos,
-             "celui de la puce nue est du C sur registres", "DDRB, pas de loop");
+    for (const char* nu : {coeur::kProgrammeRegistresNu,
+                           coeur::kProgrammeAttiny}) {
+        const std::string source = nu;
+        verifier(source.find("DDRB") != std::string::npos
+                     && source.find("void loop(") == std::string::npos,
+                 "un programme de puce nue est du C sur registres",
+                 "DDRB, pas de loop");
+    }
 
     // Chaque carte du catalogue porte son contrôleur, son horloge et son
     // programme — c'est ce qui rend le style dépendant du matériel et non
@@ -2885,7 +2899,8 @@ static void test_cartes_qui_tournent() {
         const std::string firmware = "/tmp/sim_carte_" + modele->type + ".elf";
         std::string journal;
         if (!coeur::AvrEngine::compiler_source(modele->programme_exemple,
-                                               firmware, &journal)) {
+                                               firmware, &journal, modele->mcu,
+                                               modele->horloge)) {
             verifier(false, modele->type + " : son programme compile", journal);
             continue;
         }
@@ -2898,17 +2913,128 @@ static void test_cartes_qui_tournent() {
             continue;
         }
 
+        // Où regarder : D13 (donc PB5) sur les cartes ATmega, PB1 sur
+        // l'ATtiny, dont le programme d'exemple s'y adresse.
+        const int attendue = modele->mcu == "attiny85" ? 1 : 13;
         int basculements = 0;
         mcu.sur_changement_broche([&](int broche, bool) {
-            if (broche == 13) ++basculements;   // D13 sur une carte, PB5 sur la puce
+            if (broche == attendue) ++basculements;
         });
         // Deux secondes simulées : le clignotant en fait quatre.
         mcu.avancer(static_cast<uint64_t>(modele->horloge) * 2);
 
         verifier(basculements >= 3,
-                 modele->type + " : la broche 13 bascule pour de vrai",
+                 modele->type + " : sa broche bascule pour de vrai",
                  std::to_string(basculements) + " basculement(s) en 2 s");
     }
+}
+
+
+// L'ATtiny85 : une autre puce, pas une autre machine.
+//
+// Le jeu d'instructions est le même — celui de l'ATtiny est un sous-ensemble
+// de l'AVR5 —, mais rien d'autre ne l'est : un seul port, la moitié moins de
+// mémoire, des registres à d'autres adresses, et surtout un tableau de
+// vecteurs à un mot par entrée au lieu de deux. Se tromper sur ce dernier
+// point n'empêche pas d'exécuter : cela envoie chaque interruption au milieu
+// du code voisin, et le programme part à la dérive sans rien dire. C'est
+// pourquoi ce test regarde aussi ce que fait une interruption.
+static void test_attiny85() {
+    std::printf("\n[28] ATtiny85 : une autre puce sur le même cœur\n");
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
+        std::printf("  (avr-gcc absent — section ignorée)\n");
+        return;
+    }
+
+    // --- clignotant sur PB1, en C sur registres
+    const char* kClignotant = R"(
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void) {
+    DDRB |= (1 << PB1);
+    while (1) {
+        PORTB |= (1 << PB1);
+        _delay_ms(100);
+        PORTB &= ~(1 << PB1);
+        _delay_ms(100);
+    }
+}
+)";
+    const std::string source = "/tmp/sim_t85.c";
+    const std::string firmware = "/tmp/sim_t85.elf";
+    {
+        std::ofstream fichier(source);
+        fichier << kClignotant;
+    }
+    const std::string commande =
+        "avr-gcc -mmcu=attiny85 -DF_CPU=8000000UL -Os -o \"" + firmware
+        + "\" \"" + source + "\" > /tmp/sim_t85.log 2>&1";
+    const bool compile = std::system(commande.c_str()) == 0;
+    verifier(compile, "avr-gcc compile pour attiny85", firmware);
+    if (!compile) return;
+
+    coeur::AvrEngine mcu;
+    verifier(mcu.charger(firmware, "attiny85", 8000000),
+             "le firmware ATtiny85 se charge dans le cœur", mcu.erreur());
+
+    int basculements = 0;
+    mcu.sur_changement_broche([&](int broche, bool) {
+        if (broche == 1) ++basculements;      // PB1
+    });
+    mcu.avancer(8000000);                      // une seconde à 8 MHz
+    verifier(basculements >= 4,
+             "PB1 clignote : cinq allumages par seconde attendus",
+             std::to_string(basculements) + " basculement(s)");
+
+    // --- l'interruption de débordement du compteur 0
+    //
+    // Elle vit au vecteur 5 sur cette puce, à un mot par vecteur. Avec la
+    // géométrie de l'ATmega, le processeur sauterait à l'adresse 10 : ailleurs
+    // dans le code, et le compteur ne serait jamais incrémenté.
+    const char* kInterruption = R"(
+#include <avr/io.h>
+#include <avr/interrupt.h>
+
+volatile unsigned char tours = 0;
+
+ISR(TIM0_OVF_vect) {
+    ++tours;
+    if (tours >= 10) {          /* un signe visible de l'extérieur */
+        PORTB ^= (1 << PB3);
+        tours = 0;
+    }
+}
+
+int main(void) {
+    DDRB |= (1 << PB3);
+    TCCR0B = (1 << CS01);       /* horloge / 8 */
+    TIMSK  = (1 << TOIE0);      /* débordement autorisé */
+    sei();
+    while (1) { }
+}
+)";
+    {
+        std::ofstream fichier(source);
+        fichier << kInterruption;
+    }
+    if (std::system(commande.c_str()) != 0) {
+        verifier(false, "le programme à interruption compile", "avr-gcc");
+        return;
+    }
+
+    coeur::AvrEngine second;
+    second.charger(firmware, "attiny85", 8000000);
+    int bascules_pb3 = 0;
+    second.sur_changement_broche([&](int broche, bool) {
+        if (broche == 3) ++bascules_pb3;
+    });
+    second.avancer(8000000);
+    // 8 MHz / 8 / 256 = 3906 débordements par seconde, un basculement tous
+    // les dix : environ 390.
+    verifier(bascules_pb3 > 300 && bascules_pb3 < 500,
+             "l'interruption du compteur 0 est servie au bon vecteur",
+             std::to_string(bascules_pb3) + " basculements (≈390 attendus)");
 }
 
 int main() {
@@ -2944,6 +3070,7 @@ int main() {
     test_pcb();
     test_exemples_compilent();
     test_cartes_qui_tournent();
+    test_attiny85();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

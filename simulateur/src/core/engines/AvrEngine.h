@@ -61,7 +61,9 @@ public:
     uint8_t registre(uint16_t adresse) const;
     bool direction_sortie(int broche) const;   // DDRx
     bool niveau_port(int broche) const;        // PORTx (ou pull-up si entrée)
-    bool pullup_actif(int broche) const;       // entrée + PORTx à 1
+    bool pullup_actif(int broche) const;
+    // Nom du microcontrôleur chargé (« atmega328p », « attiny85 »).
+    const std::string& mcu() const { return mcu_; }       // entrée + PORTx à 1
 
     // Impose au microcontrôleur le niveau que le circuit applique sur une
     // broche configurée en entrée (c'est le retour du monde analogique).
@@ -81,13 +83,19 @@ public:
 
     const std::string& erreur() const { return erreur_; }
 
-    // Compile un croquis en firmware .elf. Le noyau Arduino minimal est
-    // écrit à côté et compilé avec : pinMode, digitalWrite, analogRead,
-    // millis, Serial… fonctionnent donc comme sur une vraie carte, sans que
-    // l'utilisateur ait rien à installer.
+    // Compile un croquis en firmware .elf, pour la puce et l'horloge de la
+    // carte. Sur un ATmega328P, le noyau Arduino minimal est écrit à côté et
+    // compilé avec : pinMode, digitalWrite, analogRead, millis, Serial…
+    // fonctionnent donc comme sur une vraie carte, sans rien à installer.
+    //
+    // Les autres puces n'ont pas de noyau : un ATtiny85 n'a ni UART ni la
+    // même carte de registres, et le noyau ne s'y compilerait même pas. Son
+    // programme s'écrit sur les registres, et c'est compilé tel quel.
     static bool compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
-                                std::string* journal);
+                                std::string* journal,
+                                const std::string& mcu = "atmega328p",
+                                uint32_t frequence = 16000000);
     static bool avr_gcc_disponible();
     static bool avr_gpp_disponible();
 
@@ -112,6 +120,8 @@ private:
     bool prefere_simavr_ = false;
     uint64_t cycle_ = 0;
     uint32_t frequence_ = 16000000;
+    // La puce chargée : elle décide de la traduction broche -> port.
+    std::string mcu_ = "atmega328p";
     std::string erreur_;
     std::function<void(int, bool)> rappel_broche_;
     std::function<void(char)> rappel_serie_;

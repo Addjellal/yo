@@ -196,6 +196,51 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.programme_exemple = kProgrammeRegistresNu;
         enregistrer(std::move(m));
     }
+
+    {   // ------------------------------------------------------- ATtiny85
+        // Huit broches, dont deux d'alimentation : six entrées-sorties, un
+        // seul port. C'est la puce des montages minuscules — celle que
+        // Tinkercad propose à côté de l'Arduino —, et son cœur est le même
+        // AVR, en plus petit.
+        Modele m;
+        m.type = "attiny85";
+        m.libelle = "ATtiny85 (DIP-8)";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#3a3a3a";
+
+        const double pas = 24;
+        // Brochage du boîtier : PB5 (reset) en haut à gauche, VCC en haut à
+        // droite, comme sur la puce réelle.
+        const char* a_gauche[] = {"PB5", "PB3", "PB4", "GND"};
+        const char* a_droite[] = {"VCC", "PB2", "PB1", "PB0"};
+        const double premier = -(4 - 1) * pas / 2;
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier + k * pas;
+            m.bornes.push_back({a_gauche[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 5, a_gauche[k], 12));
+            m.bornes.push_back({a_droite[k], {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(34, y + 5, a_droite[k], 12));
+        }
+        const double demi = 70;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
+        m.symbole.push_back(texte(-36, premier - 20, "ATtiny85", 12));
+        m.empreinte = {"ATTINY_DIP8", {}, 9.8, 7.62};
+        m.mcu = "attiny85";
+        // Quartz interne : 8 MHz d'origine, et non 16 comme un Arduino.
+        m.horloge = 8000000;
+        m.langage = "C (registres)";
+        m.programme_exemple = kProgrammeAttiny;
+        // Sur cette puce, PB1 EST la broche 1. Sur un ATmega328P, PB1 est la
+        // broche 9. Le même nom, deux puces, deux broches : seule la carte
+        // peut trancher, et c'est ce que dit cette table.
+        for (int bit = 0; bit <= 5; ++bit)
+            m.broches_mcu["PB" + std::to_string(bit)] = bit;
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

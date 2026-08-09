@@ -192,6 +192,11 @@ struct Modele {
     std::string mcu;
     // Fréquence d'horloge, en hertz : le quartz de la carte.
     uint32_t horloge = 16000000;
+    // Correspondance entre le nom d'une borne et le numéro de broche interne,
+    // quand elle ne se déduit pas du nom. « PB1 » vaut 9 sur un ATmega328P et
+    // 1 sur un ATtiny85 : ce sont deux puces, et le même nom y désigne deux
+    // broches différentes. Le modèle est le seul à pouvoir trancher.
+    std::map<std::string, int> broches_mcu;
     // Le programme proposé quand on pose la carte. Une carte Arduino reçoit
     // un croquis (setup / loop, pinMode, digitalWrite) ; un microcontrôleur
     // nu reçoit du C sur registres, parce que c'est ainsi qu'on le programme

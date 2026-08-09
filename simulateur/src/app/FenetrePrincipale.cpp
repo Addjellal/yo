@@ -1118,7 +1118,10 @@ void FenetrePrincipale::circuit_modifie() {
     }
 
     const QStringList cartes = scene_->cartes_presentes();
-    moteur_->definir_circuit(std::move(netlist), std::move(broches), cartes);
+    // La variante avec les puces : sur ce schéma peuvent cohabiter un Arduino
+    // et un ATtiny, et chacun doit être compilé et exécuté pour le sien.
+    moteur_->definir_circuit(std::move(netlist), std::move(broches),
+                             scene_->cartes_posees());
     synchroniser_cartes(cartes);
 }
 

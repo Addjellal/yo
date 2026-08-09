@@ -455,6 +455,7 @@ Empreinte gabarit(const Modele& modele) {
 
     if (nom == "ARDUINO_UNO") return arduino_uno();
     if (nom == "ARDUINO_NANO") return arduino_nano();
+    if (nom == "ATTINY_DIP8") return dip(8);
     if (nom == "ARDUINO_PRO_MINI") return arduino_pro_mini();
     if (commence_par(nom, "SOIC")) {
         const int broches = std::max(nombre_dans(nom), pair_au_moins(bornes));

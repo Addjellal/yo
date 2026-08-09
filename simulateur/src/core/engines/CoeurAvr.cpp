@@ -9,33 +9,6 @@ namespace coeur {
 
 namespace {
 
-// --- espace données de l'ATmega328P ---------------------------------------
-constexpr uint16_t kPinB = 0x23, kDdrB = 0x24, kPortB = 0x25;
-constexpr uint16_t kPinC = 0x26, kDdrC = 0x27, kPortC = 0x28;
-constexpr uint16_t kPinD = 0x29, kDdrD = 0x2A, kPortD = 0x2B;
-constexpr uint16_t kTifr0 = 0x35, kTifr1 = 0x36, kTifr2 = 0x37;
-constexpr uint16_t kSpl = 0x5D, kSph = 0x5E, kSreg = 0x5F;
-constexpr uint16_t kTccr0A = 0x44, kTccr0B = 0x45, kTcnt0 = 0x46;
-constexpr uint16_t kOcr0A = 0x47, kOcr0B = 0x48;
-constexpr uint16_t kTimsk0 = 0x6E, kTimsk1 = 0x6F, kTimsk2 = 0x70;
-constexpr uint16_t kAdcl = 0x78, kAdch = 0x79, kAdcsra = 0x7A, kAdmux = 0x7C;
-constexpr uint16_t kTccr1A = 0x80, kTccr1B = 0x81;
-constexpr uint16_t kTcnt1L = 0x84, kTcnt1H = 0x85;
-constexpr uint16_t kIcr1L = 0x86, kIcr1H = 0x87;
-constexpr uint16_t kOcr1AL = 0x88, kOcr1AH = 0x89;
-constexpr uint16_t kOcr1BL = 0x8A, kOcr1BH = 0x8B;
-constexpr uint16_t kTccr2A = 0xB0, kTccr2B = 0xB1, kTcnt2 = 0xB2;
-constexpr uint16_t kOcr2A = 0xB3, kOcr2B = 0xB4;
-constexpr uint16_t kUcsr0A = 0xC0, kUcsr0B = 0xC1, kUdr0 = 0xC6;
-
-constexpr uint16_t kFinRam = 0x08FF;
-
-// Numéros de vecteur d'interruption (l'adresse vaut le numéro × 2 mots).
-constexpr int kVecteurT2CompA = 7, kVecteurT2CompB = 8, kVecteurT2Ovf = 9;
-constexpr int kVecteurT1CompA = 11, kVecteurT1CompB = 12, kVecteurT1Ovf = 13;
-constexpr int kVecteurT0CompA = 14, kVecteurT0CompB = 15, kVecteurT0Ovf = 16;
-constexpr int kVecteurUsartRx = 18;
-
 // Drapeaux du registre d'état.
 enum { kC = 0, kZ = 1, kN = 2, kV = 3, kS = 4, kH = 5, kT = 6, kI = 7 };
 
@@ -78,7 +51,128 @@ uint16_t lire16(const unsigned char* octets) {
 
 }  // namespace
 
-CoeurAvr::CoeurAvr() { donnees_.assign(kFinRam + 1, 0); }
+
+// ---------------------------------------------------------------------------
+// Les puces
+// ---------------------------------------------------------------------------
+const ProfilAvr& profil_atmega328p() {
+    static const ProfilAvr profil = [] {
+        ProfilAvr p;
+        p.nom = "atmega328p";
+        p.fin_ram = 0x08FF;                // 2 Ko de SRAM
+        p.mots_par_vecteur = 2;            // vecteurs en JMP
+        p.nb_ports = 3;
+        p.pin[0] = 0x23; p.ddr[0] = 0x24; p.port[0] = 0x25;   // B
+        p.pin[1] = 0x26; p.ddr[1] = 0x27; p.port[1] = 0x28;   // C
+        p.pin[2] = 0x29; p.ddr[2] = 0x2A; p.port[2] = 0x2B;   // D
+        p.spl = 0x5D; p.sph = 0x5E; p.sreg = 0x5F;
+        p.adcl = 0x78; p.adch = 0x79; p.adcsra = 0x7A; p.admux = 0x7C;
+        p.canaux_adc = 8;
+        p.ucsra = 0xC0; p.ucsrb = 0xC1; p.udr = 0xC6;
+        p.vecteur_usart_rx = 18;
+
+        ProfilAvr::ProfilCompteur& t0 = p.compteurs[0];
+        t0.present = true;
+        t0.controle_a = 0x44; t0.controle_b = 0x45; t0.compte = 0x46;
+        t0.compare_a = 0x47; t0.compare_b = 0x48;
+        t0.drapeaux = 0x35; t0.masques = 0x6E;
+        t0.vecteur_compa = 14; t0.vecteur_compb = 15; t0.vecteur_ovf = 16;
+        t0.port_a = 2; t0.bit_a = 6;        // OC0A -> PD6
+        t0.port_b = 2; t0.bit_b = 5;        // OC0B -> PD5
+
+        ProfilAvr::ProfilCompteur& t1 = p.compteurs[1];
+        t1.present = true;
+        t1.controle_a = 0x80; t1.controle_b = 0x81;
+        t1.compte = 0x84; t1.compte_haut = 0x85;
+        t1.compare_a = 0x88; t1.compare_b = 0x8A;
+        t1.drapeaux = 0x36; t1.masques = 0x6F;
+        t1.vecteur_compa = 11; t1.vecteur_compb = 12; t1.vecteur_ovf = 13;
+        t1.port_a = 0; t1.bit_a = 1;        // OC1A -> PB1
+        t1.port_b = 0; t1.bit_b = 2;        // OC1B -> PB2
+
+        ProfilAvr::ProfilCompteur& t2 = p.compteurs[2];
+        t2.present = true;
+        t2.controle_a = 0xB0; t2.controle_b = 0xB1; t2.compte = 0xB2;
+        t2.compare_a = 0xB3; t2.compare_b = 0xB4;
+        t2.drapeaux = 0x37; t2.masques = 0x70;
+        t2.vecteur_compa = 7; t2.vecteur_compb = 8; t2.vecteur_ovf = 9;
+        t2.prediviseur = 1;                // son tableau à lui
+        t2.port_a = 0; t2.bit_a = 3;        // OC2A -> PB3
+        t2.port_b = 2; t2.bit_b = 3;        // OC2B -> PD3
+        return p;
+    }();
+    return profil;
+}
+
+const ProfilAvr& profil_attiny85() {
+    static const ProfilAvr profil = [] {
+        ProfilAvr p;
+        p.nom = "attiny85";
+        p.fin_ram = 0x025F;                // 512 octets de SRAM
+        // Huit kilo-octets de programme : le tableau de vecteurs tient en
+        // RJMP, un mot par vecteur. Se tromper là-dessus enverrait chaque
+        // interruption au milieu du code voisin.
+        p.mots_par_vecteur = 1;
+        p.nb_ports = 1;                    // un seul port, B
+        p.pin[0] = 0x36; p.ddr[0] = 0x37; p.port[0] = 0x38;
+        p.pin[1] = p.ddr[1] = p.port[1] = ProfilAvr::kAbsent;
+        p.pin[2] = p.ddr[2] = p.port[2] = ProfilAvr::kAbsent;
+        p.spl = 0x5D; p.sph = 0x5E; p.sreg = 0x5F;
+        p.adcl = 0x24; p.adch = 0x25; p.adcsra = 0x26; p.admux = 0x27;
+        p.canaux_adc = 4;                  // ADC0..ADC3
+        // Pas d'UART : cette puce n'en a pas. Serial.print n'y compile même
+        // pas — il ne faut donc surtout pas faire semblant.
+        p.ucsra = p.ucsrb = p.udr = ProfilAvr::kAbsent;
+        p.vecteur_usart_rx = -1;
+
+        // TIMSK et TIFR sont uniques et partagés par les deux compteurs ;
+        // seules les positions des bits les distinguent.
+        ProfilAvr::ProfilCompteur& t0 = p.compteurs[0];
+        t0.present = true;
+        t0.controle_a = 0x4A; t0.controle_b = 0x53; t0.compte = 0x52;
+        t0.compare_a = 0x49; t0.compare_b = 0x48;
+        t0.drapeaux = 0x58; t0.masques = 0x59;
+        t0.bit_tov = 0x02; t0.bit_ocfa = 0x10; t0.bit_ocfb = 0x08;
+        t0.vecteur_ovf = 5; t0.vecteur_compa = 10; t0.vecteur_compb = 11;
+        t0.port_a = 0; t0.bit_a = 0;        // OC0A -> PB0
+        t0.port_b = 0; t0.bit_b = 1;        // OC0B -> PB1
+
+        ProfilAvr::ProfilCompteur& t1 = p.compteurs[1];
+        t1.present = true;
+        // Le compteur 1 de l'ATtiny n'a qu'un registre de commande, un
+        // prédiviseur sur quatre bits, et son sommet dans OCR1C.
+        t1.controle_a = 0x50; t1.controle_b = 0x50; t1.compte = 0x4F;
+        t1.compare_a = 0x4E; t1.compare_b = 0x4C; t1.sommet = 0x4D;
+        t1.drapeaux = 0x58; t1.masques = 0x59;
+        t1.bit_tov = 0x04; t1.bit_ocfa = 0x40; t1.bit_ocfb = 0x20;
+        t1.vecteur_compa = 3; t1.vecteur_ovf = 4; t1.vecteur_compb = 9;
+        t1.prediviseur = 2;
+        t1.port_a = 0; t1.bit_a = 1;        // OC1A -> PB1
+        t1.port_b = 0; t1.bit_b = 4;        // OC1B -> PB4
+
+        p.compteurs[2].present = false;     // il n'y a pas de compteur 2
+        return p;
+    }();
+    return profil;
+}
+
+const ProfilAvr* profil_par_nom(const std::string& nom) {
+    if (nom == "atmega328p" || nom.empty()) return &profil_atmega328p();
+    if (nom == "attiny85") return &profil_attiny85();
+    return nullptr;
+}
+
+CoeurAvr::CoeurAvr() : CoeurAvr(profil_atmega328p()) {}
+
+CoeurAvr::CoeurAvr(const ProfilAvr& profil) { definir_profil(profil); }
+
+void CoeurAvr::definir_profil(const ProfilAvr& profil) {
+    p_ = profil;
+    donnees_.assign(p_.fin_ram + 1, 0);
+    flash_.clear();
+    ranger_interruptions();
+    reinitialiser();
+}
 
 // ---------------------------------------------------------------------------
 // Chargement du firmware
@@ -186,129 +280,143 @@ void CoeurAvr::reinitialiser() {
         sortie_connue_[port] = 0;
         direction_connue_[port] = 0;
     }
-    poser_pile(kFinRam);
+    poser_pile(p_.fin_ram);
     // L'UART annonce son registre d'émission libre dès le départ, comme la
-    // puce au sortir d'un reset.
-    donnees_[kUcsr0A] = 0x20;              // UDRE0
+    // puce au sortir d'un reset. Les puces qui n'en ont pas s'en passent.
+    if (p_.ucsra != ProfilAvr::kAbsent) donnees_[p_.ucsra] = 0x20;   // UDRE0
 }
 
 // ---------------------------------------------------------------------------
 // Mémoire et périphériques
 // ---------------------------------------------------------------------------
 uint16_t CoeurAvr::pile() const {
-    return static_cast<uint16_t>(donnees_[kSpl])
-           | (static_cast<uint16_t>(donnees_[kSph]) << 8);
+    return static_cast<uint16_t>(donnees_[p_.spl])
+           | (static_cast<uint16_t>(donnees_[p_.sph]) << 8);
 }
 
 void CoeurAvr::poser_pile(uint16_t valeur) {
-    donnees_[kSpl] = static_cast<uint8_t>(valeur);
-    donnees_[kSph] = static_cast<uint8_t>(valeur >> 8);
+    donnees_[p_.spl] = static_cast<uint8_t>(valeur);
+    donnees_[p_.sph] = static_cast<uint8_t>(valeur >> 8);
 }
 
 void CoeurAvr::empiler(uint8_t valeur) {
     const uint16_t sommet = pile();
-    if (sommet <= kFinRam) donnees_[sommet] = valeur;
+    if (sommet <= p_.fin_ram) donnees_[sommet] = valeur;
     poser_pile(static_cast<uint16_t>(sommet - 1));
 }
 
 uint8_t CoeurAvr::depiler() {
     const uint16_t sommet = static_cast<uint16_t>(pile() + 1);
     poser_pile(sommet);
-    return sommet <= kFinRam ? donnees_[sommet] : 0;
+    return sommet <= p_.fin_ram ? donnees_[sommet] : 0;
 }
 
 void CoeurAvr::poser_drapeau(int bit, bool actif) {
     if (actif)
-        donnees_[kSreg] |= static_cast<uint8_t>(1 << bit);
+        donnees_[p_.sreg] |= static_cast<uint8_t>(1 << bit);
     else
-        donnees_[kSreg] &= static_cast<uint8_t>(~(1 << bit));
+        donnees_[p_.sreg] &= static_cast<uint8_t>(~(1 << bit));
 }
 
 uint8_t CoeurAvr::niveau_broches(int port) const {
     // Ce que lit PINx : le niveau imposé de l'extérieur pour les entrées, la
     // valeur du registre de sortie pour les broches pilotées.
-    static const uint16_t ddr[3] = {kDdrB, kDdrC, kDdrD};
-    static const uint16_t sortie[3] = {kPortB, kPortC, kPortD};
-    const uint8_t direction = donnees_[ddr[port]];
-    return static_cast<uint8_t>((donnees_[sortie[port]] & direction)
+    if (port < 0 || port >= p_.nb_ports) return 0;
+    const uint8_t direction = donnees_[p_.ddr[port]];
+    return static_cast<uint8_t>((donnees_[p_.port[port]] & direction)
                                 | (entree_[port] & ~direction));
 }
 
+// Le port dont voici le registre PINx, ou -1.
+int CoeurAvr::port_de_pin(uint16_t adresse) const {
+    for (int rang = 0; rang < p_.nb_ports; ++rang)
+        if (p_.pin[rang] == adresse) return rang;
+    return -1;
+}
+
 uint8_t CoeurAvr::lire_donnee(uint16_t adresse) const {
-    if (adresse > kFinRam) return 0;
-    switch (adresse) {
-        case kPinB: return niveau_broches(0);
-        case kPinC: return niveau_broches(1);
-        case kPinD: return niveau_broches(2);
-        default: return donnees_[adresse];
-    }
+    if (adresse > p_.fin_ram) return 0;
+    const int port = port_de_pin(adresse);
+    if (port >= 0) return niveau_broches(port);
+    return donnees_[adresse];
 }
 
 uint8_t CoeurAvr::lire(uint16_t adresse) {
-    if (adresse > kFinRam) return 0;
-    switch (adresse) {
-        case kPinB: return niveau_broches(0);
-        case kPinC: return niveau_broches(1);
-        case kPinD: return niveau_broches(2);
-        case kUdr0: {
-            const uint8_t octet_recu = serie_recue_;
-            serie_disponible_ = false;
-            donnees_[kUcsr0A] &= static_cast<uint8_t>(~0x80);   // RXC0
-            return octet_recu;
-        }
-        default: return donnees_[adresse];
+    if (adresse > p_.fin_ram) return 0;
+    const int port = port_de_pin(adresse);
+    if (port >= 0) return niveau_broches(port);
+    if (adresse == p_.udr) {
+        const uint8_t octet_recu = serie_recue_;
+        serie_disponible_ = false;
+        donnees_[p_.ucsra] &= static_cast<uint8_t>(~0x80);   // RXC0
+        return octet_recu;
     }
+    return donnees_[adresse];
 }
 
 void CoeurAvr::ecrire(uint16_t adresse, uint8_t valeur) {
-    if (adresse > kFinRam) return;
-    switch (adresse) {
-        // Écrire dans PINx bascule les bits correspondants de PORTx : c'est
-        // le raccourci des AVR récents, et avr-gcc s'en sert.
-        case kPinB: donnees_[kPortB] ^= valeur; rafraichir_sorties(); return;
-        case kPinC: donnees_[kPortC] ^= valeur; rafraichir_sorties(); return;
-        case kPinD: donnees_[kPortD] ^= valeur; rafraichir_sorties(); return;
-        case kTifr0:
-        case kTifr1:
-        case kTifr2:
-            // Un drapeau d'interruption s'efface en y écrivant un « 1 ».
-            donnees_[adresse] &= static_cast<uint8_t>(~valeur);
-            return;
-        case kUdr0:
-            donnees_[adresse] = valeur;
-            if (sur_serie) sur_serie(valeur);
-            donnees_[kUcsr0A] |= 0x60;      // UDRE0 et TXC0
-            return;
-        case kAdcsra:
-            donnees_[adresse] = valeur;
-            if ((valeur & 0x40) && (valeur & 0x80)) demarrer_conversion();
-            return;
-        default: break;
-    }
-    donnees_[adresse] = valeur;
-    if (adresse == kPortB || adresse == kDdrB || adresse == kPortC
-        || adresse == kDdrC || adresse == kPortD || adresse == kDdrD
-        || adresse == kTccr0A || adresse == kTccr0B || adresse == kOcr0A
-        || adresse == kOcr0B || adresse == kTccr1A || adresse == kTccr1B
-        || adresse == kTccr2A || adresse == kTccr2B || adresse == kOcr2A
-        || adresse == kOcr2B)
+    if (adresse > p_.fin_ram) return;
+
+    // Écrire dans PINx bascule les bits correspondants de PORTx : c'est le
+    // raccourci des AVR récents, et avr-gcc s'en sert.
+    const int port = port_de_pin(adresse);
+    if (port >= 0) {
+        donnees_[p_.port[port]] ^= valeur;
         rafraichir_sorties();
+        return;
+    }
+    // Un drapeau d'interruption s'efface en y écrivant un « 1 ». Sur les
+    // petites puces, les deux compteurs partagent le même registre.
+    for (const ProfilAvr::ProfilCompteur& compteur : p_.compteurs) {
+        if (!compteur.present || compteur.drapeaux != adresse) continue;
+        donnees_[adresse] &= static_cast<uint8_t>(~valeur);
+        return;
+    }
+    if (adresse == p_.udr) {
+        donnees_[adresse] = valeur;
+        if (sur_serie) sur_serie(valeur);
+        donnees_[p_.ucsra] |= 0x60;          // UDRE0 et TXC0
+        return;
+    }
+    if (adresse == p_.adcsra) {
+        donnees_[adresse] = valeur;
+        if ((valeur & 0x40) && (valeur & 0x80)) demarrer_conversion();
+        return;
+    }
+
+    donnees_[adresse] = valeur;
+    if (touche_les_sorties(adresse)) rafraichir_sorties();
+}
+
+// Une écriture qui peut changer ce que le circuit voit : registre de port, de
+// direction, ou l'un des registres qui commandent une sortie de comparaison.
+bool CoeurAvr::touche_les_sorties(uint16_t adresse) const {
+    for (int rang = 0; rang < p_.nb_ports; ++rang)
+        if (adresse == p_.port[rang] || adresse == p_.ddr[rang]) return true;
+    for (const ProfilAvr::ProfilCompteur& compteur : p_.compteurs) {
+        if (!compteur.present) continue;
+        if (adresse == compteur.controle_a || adresse == compteur.controle_b
+            || adresse == compteur.compare_a || adresse == compteur.compare_b
+            || adresse == compteur.sommet)
+            return true;
+    }
+    return false;
 }
 
 void CoeurAvr::demarrer_conversion() {
-    const int canal = donnees_[kAdmux] & 0x0F;
-    const uint16_t mesure = canal < 8 ? adc_[canal] : 0;
-    donnees_[kAdcl] = static_cast<uint8_t>(mesure & 0xFF);
-    donnees_[kAdch] = static_cast<uint8_t>(mesure >> 8);
+    const int canal = donnees_[p_.admux] & 0x0F;
+    const uint16_t mesure = canal < p_.canaux_adc ? adc_[canal] : 0;
+    donnees_[p_.adcl] = static_cast<uint8_t>(mesure & 0xFF);
+    donnees_[p_.adch] = static_cast<uint8_t>(mesure >> 8);
     // Une conversion dure treize périodes du convertisseur ; le programme
     // attend que ADSC retombe, il faut donc que cela prenne du temps.
-    const int diviseur = 1 << std::max<int>(1, donnees_[kAdcsra] & 7);
+    const int diviseur = 1 << std::max<int>(1, donnees_[p_.adcsra] & 7);
     adc_restant_ = 13 * diviseur;
 }
 
 void CoeurAvr::broche_externe(char port, int bit, bool haut) {
     const int rang = port == 'B' ? 0 : (port == 'C' ? 1 : 2);
-    if (bit < 0 || bit > 7) return;
+    if (bit < 0 || bit > 7 || rang >= p_.nb_ports) return;
     if (haut)
         entree_[rang] |= static_cast<uint8_t>(1 << bit);
     else
@@ -322,69 +430,69 @@ void CoeurAvr::tension_adc(int canal, double volts) {
 }
 
 void CoeurAvr::recevoir_serie(uint8_t octet) {
+    if (p_.ucsra == ProfilAvr::kAbsent) return;   // pas d'UART sur cette puce
     serie_recue_ = octet;
     serie_disponible_ = true;
-    donnees_[kUcsr0A] |= 0x80;             // RXC0
+    donnees_[p_.ucsra] |= 0x80;             // RXC0
 }
 
 // ---------------------------------------------------------------------------
 // Sorties : ce que le circuit voit
 // ---------------------------------------------------------------------------
 void CoeurAvr::rafraichir_sorties() {
-    static const uint16_t ddr[3] = {kDdrB, kDdrC, kDdrD};
-    static const uint16_t sortie[3] = {kPortB, kPortC, kPortD};
-
-    uint8_t niveaux[3];
-    for (int port = 0; port < 3; ++port)
-        niveaux[port] = static_cast<uint8_t>(donnees_[sortie[port]]
-                                             & donnees_[ddr[port]]);
+    // Borné explicitement : le compilateur ne peut pas déduire seul que le
+    // profil ne décrit jamais plus de trois ports.
+    const int ports = std::min(p_.nb_ports, 3);
+    uint8_t niveaux[3] = {0, 0, 0};
+    for (int rang = 0; rang < ports; ++rang)
+        niveaux[rang] = static_cast<uint8_t>(donnees_[p_.port[rang]]
+                                             & donnees_[p_.ddr[rang]]);
 
     // Les sorties de comparaison prennent la main sur le registre de port
     // quand le mode PWM est armé : c'est ce que fait `analogWrite`.
     auto pwm = [&](int port, int bit, bool actif, bool niveau) {
-        if (!actif) return;
-        if (!(donnees_[ddr[port]] & (1 << bit))) return;
+        if (!actif || port < 0 || port >= p_.nb_ports) return;
+        if (!(donnees_[p_.ddr[port]] & (1 << bit))) return;
         if (niveau)
             niveaux[port] |= static_cast<uint8_t>(1 << bit);
         else
             niveaux[port] &= static_cast<uint8_t>(~(1 << bit));
     };
-    const bool t0_pwm = (donnees_[kTccr0A] & 0x03) != 0;   // WGM00/WGM01
-    const uint8_t compte0 = static_cast<uint8_t>(t0_.compte);
-    pwm(2, 6, t0_pwm && (donnees_[kTccr0A] & 0x80),
-        compte0 < donnees_[kOcr0A]);                       // OC0A -> PD6
-    pwm(2, 5, t0_pwm && (donnees_[kTccr0A] & 0x20),
-        compte0 < donnees_[kOcr0B]);                       // OC0B -> PD5
-    const bool t1_pwm = (donnees_[kTccr1A] & 0x03) != 0;
-    const uint8_t compte1 = static_cast<uint8_t>(t1_.compte);
-    pwm(0, 1, t1_pwm && (donnees_[kTccr1A] & 0x80),
-        compte1 < donnees_[kOcr1AL]);                      // OC1A -> PB1
-    pwm(0, 2, t1_pwm && (donnees_[kTccr1A] & 0x20),
-        compte1 < donnees_[kOcr1BL]);                      // OC1B -> PB2
-    const bool t2_pwm = (donnees_[kTccr2A] & 0x03) != 0;
-    const uint8_t compte2 = static_cast<uint8_t>(t2_.compte);
-    pwm(0, 3, t2_pwm && (donnees_[kTccr2A] & 0x80),
-        compte2 < donnees_[kOcr2A]);                       // OC2A -> PB3
-    pwm(2, 3, t2_pwm && (donnees_[kTccr2A] & 0x20),
-        compte2 < donnees_[kOcr2B]);                       // OC2B -> PD3
+    const Compteur* etats[3] = {&t0_, &t1_, &t2_};
+    for (int numero = 0; numero < 3; ++numero) {
+        const ProfilAvr::ProfilCompteur& profil = p_.compteurs[numero];
+        if (!profil.present) continue;
+        const uint8_t compte = static_cast<uint8_t>(etats[numero]->compte);
+        // Le compteur 1 de l'ATtiny arme sa PWM par un bit à lui (PWM1A et
+        // PWM1B dans TCCR1 et GTCCR), pas par les bits WGM des autres.
+        const bool arme = profil.prediviseur == 2
+                              ? true
+                              : (donnees_[profil.controle_a] & 0x03) != 0;
+        pwm(profil.port_a, profil.bit_a,
+            arme && (donnees_[profil.controle_a] & 0x80),
+            compte < donnees_[profil.compare_a]);
+        pwm(profil.port_b, profil.bit_b,
+            arme && (donnees_[profil.controle_a] & 0x20),
+            compte < donnees_[profil.compare_b]);
+    }
 
-    for (int port = 0; port < 3; ++port) {
+    for (int rang = 0; rang < ports; ++rang) {
         // Une broche qui devient une sortie annonce son niveau, même s'il
         // n'a pas changé : jusque-là elle ne pilotait rien, et le circuit
         // doit l'apprendre.
-        const uint8_t direction = donnees_[ddr[port]];
+        const uint8_t direction = donnees_[p_.ddr[rang]];
         const uint8_t change = static_cast<uint8_t>(
-            sortie_valide_ ? ((niveaux[port] ^ sortie_connue_[port])
-                              | (direction & ~direction_connue_[port]))
+            sortie_valide_ ? ((niveaux[rang] ^ sortie_connue_[rang])
+                              | (direction & ~direction_connue_[rang]))
                            : 0xFF);
-        sortie_connue_[port] = niveaux[port];
-        direction_connue_[port] = direction;
+        sortie_connue_[rang] = niveaux[rang];
+        direction_connue_[rang] = direction;
         if (!sur_broche) continue;
         for (int bit = 0; bit < 8; ++bit) {
             if (!(change & (1 << bit))) continue;
-            if (!(donnees_[ddr[port]] & (1 << bit))) continue;
-            sur_broche(port == 0 ? 'B' : (port == 1 ? 'C' : 'D'), bit,
-                       (niveaux[port] >> bit) & 1);
+            if (!(direction & (1 << bit))) continue;
+            sur_broche(static_cast<char>('B' + rang), bit,
+                       (niveaux[rang] >> bit) & 1);
         }
     }
     sortie_valide_ = true;
@@ -394,29 +502,37 @@ void CoeurAvr::rafraichir_sorties() {
 // Compteurs
 // ---------------------------------------------------------------------------
 void CoeurAvr::avancer_compteur(Compteur& compteur, int cycles, int numero) {
-    const uint16_t registre_controle = numero == 0 ? kTccr0B
-                                                   : (numero == 1 ? kTccr1B : kTccr2B);
-    const uint8_t selection = donnees_[registre_controle] & 0x07;
-    const int diviseur = numero == 2 ? diviseur_t2(selection)
-                                     : diviseur_de(selection);
+    const ProfilAvr::ProfilCompteur& profil = p_.compteurs[numero];
+    if (!profil.present) return;
+
+    // Le prédiviseur : trois tableaux différents selon la puce et le
+    // compteur, et c'est le profil qui dit lequel.
+    int diviseur = 0;
+    if (profil.prediviseur == 2) {
+        // Compteur 1 de l'ATtiny : quatre bits, de /1 à /16384.
+        const uint8_t selection = donnees_[profil.controle_b] & 0x0F;
+        diviseur = selection == 0 ? 0 : (1 << (selection - 1));
+    } else {
+        const uint8_t selection = donnees_[profil.controle_b] & 0x07;
+        diviseur = profil.prediviseur == 1 ? diviseur_t2(selection)
+                                           : diviseur_de(selection);
+    }
     compteur.diviseur = diviseur;
     if (diviseur == 0) return;
 
-    const uint16_t drapeaux = numero == 0 ? kTifr0 : (numero == 1 ? kTifr1 : kTifr2);
-    const uint16_t masques = numero == 0 ? kTimsk0 : (numero == 1 ? kTimsk1 : kTimsk2);
-    const uint16_t compare_a = numero == 0 ? kOcr0A
-                                           : (numero == 1 ? kOcr1AL : kOcr2A);
-    const uint16_t compare_b = numero == 0 ? kOcr0B
-                                           : (numero == 1 ? kOcr1BL : kOcr2B);
-    const uint16_t compte_bas = numero == 0 ? kTcnt0
-                                            : (numero == 1 ? kTcnt1L : kTcnt2);
-    // Mode de génération : WGM10/WGM01 disent si le sommet est 0xFF.
-    const uint16_t controle_a = numero == 0 ? kTccr0A
-                                            : (numero == 1 ? kTccr1A : kTccr2A);
-    const bool ctc = numero == 1
-                         ? ((donnees_[kTccr1B] & 0x08) && !(donnees_[kTccr1A] & 0x01))
-                         : ((donnees_[controle_a] & 0x03) == 0x02);
-    const uint16_t sommet = ctc ? donnees_[compare_a] : 0xFF;
+    // Le sommet du comptage : un registre à part sur l'ATtiny, la valeur de
+    // comparaison en mode CTC ailleurs, 0xFF sinon.
+    bool ctc = false;
+    if (profil.sommet == ProfilAvr::kAbsent) {
+        ctc = numero == 1 && profil.prediviseur == 0
+                  ? ((donnees_[profil.controle_b] & 0x08)
+                     && !(donnees_[profil.controle_a] & 0x01))
+                  : ((donnees_[profil.controle_a] & 0x03) == 0x02);
+    }
+    const uint16_t sommet =
+        profil.sommet != ProfilAvr::kAbsent
+            ? donnees_[profil.sommet]
+            : (ctc ? donnees_[profil.compare_a] : 0xFF);
 
     compteur.reste += cycles;
     while (compteur.reste >= diviseur) {
@@ -425,15 +541,17 @@ void CoeurAvr::avancer_compteur(Compteur& compteur, int cycles, int numero) {
         uint16_t apres = static_cast<uint16_t>(avant + 1);
         if (apres > sommet) {
             apres = 0;
-            if (!ctc) donnees_[drapeaux] |= 0x01;         // TOV
+            if (!ctc) donnees_[profil.drapeaux] |= profil.bit_tov;
         }
         compteur.compte = apres;
-        if (avant == donnees_[compare_a]) donnees_[drapeaux] |= 0x02;   // OCFA
-        if (avant == donnees_[compare_b]) donnees_[drapeaux] |= 0x04;   // OCFB
+        if (avant == donnees_[profil.compare_a])
+            donnees_[profil.drapeaux] |= profil.bit_ocfa;
+        if (avant == donnees_[profil.compare_b])
+            donnees_[profil.drapeaux] |= profil.bit_ocfb;
     }
-    donnees_[compte_bas] = static_cast<uint8_t>(compteur.compte);
-    if (numero == 1) donnees_[kTcnt1H] = static_cast<uint8_t>(compteur.compte >> 8);
-    (void)masques;
+    donnees_[profil.compte] = static_cast<uint8_t>(compteur.compte);
+    if (profil.compte_haut != ProfilAvr::kAbsent)
+        donnees_[profil.compte_haut] = static_cast<uint8_t>(compteur.compte >> 8);
 }
 
 void CoeurAvr::avancer_peripheriques(int cycles) {
@@ -444,8 +562,8 @@ void CoeurAvr::avancer_peripheriques(int cycles) {
         adc_restant_ -= cycles;
         if (adc_restant_ <= 0) {
             adc_restant_ = 0;
-            donnees_[kAdcsra] &= static_cast<uint8_t>(~0x40);   // ADSC retombe
-            donnees_[kAdcsra] |= 0x10;                          // ADIF
+            donnees_[p_.adcsra] &= static_cast<uint8_t>(~0x40);   // ADSC retombe
+            donnees_[p_.adcsra] |= 0x10;                          // ADIF
         }
     }
     rafraichir_sorties();
@@ -458,31 +576,40 @@ void CoeurAvr::declencher(int vecteur) {
     empiler(static_cast<uint8_t>(pc_ & 0xFF));
     empiler(static_cast<uint8_t>((pc_ >> 8) & 0xFF));
     poser_drapeau(kI, false);
-    pc_ = static_cast<uint32_t>(vecteur) * 2;
+    pc_ = static_cast<uint32_t>(vecteur) * p_.mots_par_vecteur;
     cycles_ += 4;
     endormi_ = false;
 }
 
+// Les sources d'interruption d'une puce, rangées par priorité — le vecteur
+// le plus bas d'abord. L'ordre n'est pas le même d'une puce à l'autre : sur
+// l'ATtiny le compteur 1 passe avant le compteur 0, sur l'ATmega c'est
+// l'inverse. On les trie donc par numéro de vecteur, une fois pour toutes,
+// au lieu de les écrire à la main dans un ordre qui ne vaudrait que pour une
+// puce.
+void CoeurAvr::ranger_interruptions() {
+    sources_.clear();
+    for (int numero = 0; numero < 3; ++numero) {
+        const ProfilAvr::ProfilCompteur& profil = p_.compteurs[numero];
+        if (!profil.present) continue;
+        sources_.push_back({profil.drapeaux, profil.masques, profil.bit_ocfa,
+                            profil.vecteur_compa});
+        sources_.push_back({profil.drapeaux, profil.masques, profil.bit_ocfb,
+                            profil.vecteur_compb});
+        sources_.push_back({profil.drapeaux, profil.masques, profil.bit_tov,
+                            profil.vecteur_ovf});
+    }
+    std::sort(sources_.begin(), sources_.end(),
+              [](const Source& a, const Source& b) {
+                  return a.vecteur < b.vecteur;
+              });
+}
+
 bool CoeurAvr::servir_interruption() {
     if (!drapeau(kI)) return false;
-    struct Source {
-        uint16_t drapeaux, masques;
-        uint8_t bit;
-        int vecteur;
-    };
-    // L'ordre est celui des priorités : le vecteur le plus bas d'abord.
-    static const Source sources[] = {
-        {kTifr2, kTimsk2, 0x02, kVecteurT2CompA},
-        {kTifr2, kTimsk2, 0x04, kVecteurT2CompB},
-        {kTifr2, kTimsk2, 0x01, kVecteurT2Ovf},
-        {kTifr1, kTimsk1, 0x02, kVecteurT1CompA},
-        {kTifr1, kTimsk1, 0x04, kVecteurT1CompB},
-        {kTifr1, kTimsk1, 0x01, kVecteurT1Ovf},
-        {kTifr0, kTimsk0, 0x02, kVecteurT0CompA},
-        {kTifr0, kTimsk0, 0x04, kVecteurT0CompB},
-        {kTifr0, kTimsk0, 0x01, kVecteurT0Ovf},
-    };
-    for (const Source& source : sources) {
+
+    for (const Source& source : sources_) {
+        if (source.vecteur <= 0) continue;
         if (!(donnees_[source.drapeaux] & source.bit)) continue;
         if (!(donnees_[source.masques] & source.bit)) continue;
         donnees_[source.drapeaux] &= static_cast<uint8_t>(~source.bit);
@@ -490,8 +617,10 @@ bool CoeurAvr::servir_interruption() {
         return true;
     }
     // Réception série : le drapeau vit dans UCSR0A, l'autorisation dans B.
-    if ((donnees_[kUcsr0A] & 0x80) && (donnees_[kUcsr0B] & 0x80)) {
-        declencher(kVecteurUsartRx);
+    // Les puces sans UART n'ont ni l'un ni l'autre.
+    if (p_.udr != ProfilAvr::kAbsent && (donnees_[p_.ucsra] & 0x80)
+        && (donnees_[p_.ucsrb] & 0x80)) {
+        declencher(p_.vecteur_usart_rx);
         return true;
     }
     return false;

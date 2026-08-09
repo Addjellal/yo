@@ -1600,6 +1600,49 @@ static void test_famille_328p() {
                  "numéro " + std::to_string(numero));
     }
 
+    // Le même nom, deux puces, deux broches. « PB1 » vaut 9 sur un ATmega328P
+    // — c'est D9 — et 1 sur un ATtiny85. Confondre les deux ferait piloter la
+    // mauvaise broche sans le moindre message d'erreur : c'est le genre de
+    // faute qu'on cherche pendant une soirée.
+    {
+        struct Attendu { const char* type; int numero; };
+        const Attendu attendus[] = {{"atmega328p", 9}, {"attiny85", 1}};
+        for (const Attendu& attendu : attendus) {
+            SceneSchema scene;
+            ItemComposant* puce =
+                scene.ajouter_composant(attendu.type, QPointF(0, 0));
+            ItemComposant* led = scene.ajouter_composant("led", QPointF(400, 0));
+            if (!puce) continue;
+            scene.addItem(new ItemFil(puce, borne(puce, "PB1"), led, 0));
+            std::vector<LiaisonBroche> broches;
+            const coeur::Netlist netlist = scene.construire_netlist(&broches);
+            int numero = -1;
+            for (const LiaisonBroche& liaison : broches)
+                if (liaison.nom == "PB1") numero = liaison.numero;
+            verifier(numero == attendu.numero,
+                     std::string("PB1 de ") + attendu.type + " est la broche "
+                         + std::to_string(attendu.numero),
+                     "reçu " + std::to_string(numero));
+        }
+    }
+
+    // Chaque carte doit dire quelle puce elle porte et à quelle vitesse : la
+    // compilation comme l'exécution en dépendent.
+    {
+        SceneSchema scene;
+        scene.ajouter_composant("attiny85", QPointF(0, 0));
+        scene.ajouter_composant("arduino_uno", QPointF(600, 0));
+        const std::vector<CartePosee> posees = scene.cartes_posees();
+        bool tiny = false, uno = false;
+        for (const CartePosee& posee : posees) {
+            if (posee.mcu == "attiny85" && posee.horloge == 8000000) tiny = true;
+            if (posee.mcu == "atmega328p" && posee.horloge == 16000000) uno = true;
+        }
+        verifier(posees.size() == 2 && tiny && uno,
+                 "deux puces différentes cohabitent, chacune avec son horloge",
+                 std::to_string(posees.size()) + " carte(s)");
+    }
+
     // Et chacune doit avoir une empreinte réelle : une carte sans empreinte
     // ne pourrait pas partir au routage.
     for (const Cas& essai : cas) {
