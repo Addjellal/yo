@@ -4464,6 +4464,135 @@ static void test_bobines() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// [39] Un programme en plusieurs fichiers
+//
+// Ce que fait n'importe qui dès qu'un croquis dépasse une page : sortir les
+// fonctions communes dans un fichier à côté. Trois formes cohabitent, et les
+// trois sont vérifiées ici parce qu'elles ne se compilent pas de la même
+// façon :
+//
+//   * un « .h » inclus par le principal — simple dépôt, jamais compilé seul ;
+//   * un « .cpp » — unité de compilation à part, liée avec le reste ;
+//   * un second « .ino » — PAS une unité de compilation : les onglets de
+//     croquis sont fondus en un seul fichier, comme le fait l'IDE Arduino.
+//     C'est ce qui permet à un onglet d'appeler la fonction d'un autre sans
+//     rien déclarer.
+// ---------------------------------------------------------------------------
+static void test_programme_multifichier() {
+    std::printf("\n[39] Un programme réparti sur plusieurs fichiers\n");
+
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    auto executer = [](const coeur::Programme& programme, int broche_temoin,
+                       const std::string& titre) {
+        const std::string elf = "/tmp/sim_multi.elf";
+        std::string journal;
+        if (!coeur::compiler_pour("atmega328p", programme, elf, 16000000,
+                                  &journal)) {
+            verifier(false, titre + " : compile", journal);
+            return;
+        }
+        coeur::AvrEngine mcu;
+        if (!mcu.charger(elf, "atmega328p", 16000000)) {
+            verifier(false, titre + " : se charge", mcu.erreur());
+            return;
+        }
+        int basculements = 0;
+        mcu.sur_changement_broche([&](int broche, bool) {
+            if (broche == broche_temoin) ++basculements;
+        });
+        mcu.avancer(16000000);            // une seconde
+        verifier(basculements >= 3, titre,
+                 std::to_string(basculements) + " basculement(s) en 1 s");
+    };
+
+    // --- 1. un en-tête à côté du croquis
+    executer({{"principal.ino",
+               "#include \"clignotant.h\"\n"
+               "void setup() { pinMode(13, OUTPUT); }\n"
+               "void loop() { battre(13, 100); }\n"},
+              {"clignotant.h",
+               "#pragma once\n"
+               "inline void battre(int broche, int duree) {\n"
+               "    digitalWrite(broche, HIGH); delay(duree);\n"
+               "    digitalWrite(broche, LOW);  delay(duree);\n"
+               "}\n"}},
+             13, "un « .h » posé à côté du croquis");
+
+    // --- 2. un vrai module séparé : déclaration dans le .h, code dans le .cpp
+    executer({{"principal.ino",
+               "#include \"mesure.h\"\n"
+               "void setup() { pinMode(13, OUTPUT); }\n"
+               "void loop() { battre(13, 100); }\n"},
+              {"mesure.h", "#pragma once\nvoid battre(int broche, int duree);\n"},
+              {"mesure.cpp",
+               "#include \"Arduino.h\"\n"
+               "#include \"mesure.h\"\n"
+               "void battre(int broche, int duree) {\n"
+               "    digitalWrite(broche, HIGH); delay(duree);\n"
+               "    digitalWrite(broche, LOW);  delay(duree);\n"
+               "}\n"}},
+             13, "un module « .h » + « .cpp » compilé à part");
+
+    // --- 3. un second onglet « .ino », sans aucune déclaration
+    //     C'est le cas qui distingue une vraie fusion d'une compilation
+    //     séparée : rien n'est déclaré nulle part, et pourtant cela doit
+    //     marcher — sinon le lien échouerait sur « battre » inconnu.
+    executer({{"principal.ino",
+               "void setup() { pinMode(13, OUTPUT); }\n"
+               "void loop() { battre(13, 100); }\n"},
+              {"outils.ino",
+               "void battre(int broche, int duree) {\n"
+               "    digitalWrite(broche, HIGH); delay(duree);\n"
+               "    digitalWrite(broche, LOW);  delay(duree);\n"
+               "}\n"}},
+             13, "un second onglet « .ino », fondu avec le principal");
+
+    // --- ce qui doit être REFUSÉ, et proprement
+    {
+        std::string journal;
+        const bool ok = coeur::compiler_pour(
+            "atmega328p", coeur::Programme{{"seul.h", "#pragma once\n"}},
+            "/tmp/sim_multi_vide.elf", 16000000, &journal);
+        verifier(!ok && journal.find("aucun fichier de code") != std::string::npos,
+                 "un programme fait d'un seul « .h » est refusé avec un motif",
+                 journal.substr(0, 60));
+    }
+    {
+        std::string journal;
+        const bool ok = coeur::compiler_pour(
+            "atmega328p",
+            coeur::Programme{{"principal.ino", "void setup(){} void loop(){}\n"},
+                             {"../evasion.h", "\n"}},
+            "/tmp/sim_multi_chemin.elf", 16000000, &journal);
+        verifier(!ok && journal.find("refusé") != std::string::npos,
+                 "un nom de fichier avec un chemin est refusé",
+                 journal.substr(0, 60));
+    }
+
+    // --- l'erreur du compilateur doit désigner le BON onglet
+    //     Sans les « #line », une faute dans le second onglet serait signalée
+    //     à une ligne du fichier fondu, que l'utilisateur n'a jamais vu.
+    {
+        std::string journal;
+        coeur::compiler_pour(
+            "atmega328p",
+            coeur::Programme{{"principal.ino", "void setup(){} void loop(){}\n"},
+                             {"outils.ino", "void casse() { cette_ligne_est_fausse; }\n"}},
+            "/tmp/sim_multi_faute.elf", 16000000, &journal);
+        verifier(journal.find("outils.ino") != std::string::npos,
+                 "une faute dans un onglet annexe est signalée dans CET onglet",
+                 journal.find("outils.ino") != std::string::npos
+                     ? std::string("outils.ino cité")
+                     : journal.substr(0, 80));
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -4508,6 +4637,7 @@ int main() {
     test_temps_xtensa();
     test_fabrication();
     test_bobines();
+    test_programme_multifichier();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

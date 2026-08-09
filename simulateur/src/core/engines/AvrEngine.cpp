@@ -471,11 +471,22 @@ bool AvrEngine::compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
                                 std::string* journal, const std::string& mcu,
                                 uint32_t frequence) {
+    return compiler_projet(Programme{{nom_principal(mcu), source}}, chemin_elf,
+                           journal, mcu, frequence);
+}
+
+bool AvrEngine::compiler_projet(const Programme& fichiers,
+                                const std::string& chemin_elf,
+                                std::string* journal, const std::string& mcu,
+                                uint32_t frequence) {
     // Le programme est compilé en C++ avec le noyau Arduino à côté. Les deux
     // styles cohabitent : un croquis à setup()/loop() prend le main() faible
     // du noyau, un programme qui définit son propre main() l'emporte.
+    if (fichiers.empty()) {
+        if (journal) *journal = "programme vide : rien à compiler";
+        return false;
+    }
     const std::string dossier = chemin_elf.substr(0, chemin_elf.find_last_of('/'));
-    const std::string base = chemin_elf + ".cpp";
     const std::string entete = dossier + "/Arduino.h";
     const std::string noyau = dossier + "/noyau_arduino.cpp";
 
@@ -494,11 +505,48 @@ bool AvrEngine::compiler_source(const std::string& source,
         if (journal) *journal = "écriture impossible dans " + dossier;
         return false;
     }
-    // L'en-tête est inclus d'office : un croquis Arduino ne l'écrit jamais.
-    const std::string contenu =
-        avec_noyau ? "#include \"Arduino.h\"\n#line 1\n" + source : source;
-    if (!ecrire(base, contenu)) {
-        if (journal) *journal = "écriture impossible : " + base;
+
+    // Chaque fichier est déposé sous son propre nom : c'est ce qui fait qu'un
+    // « #include "mesure.h" » trouve son fichier.
+    std::string a_compiler;
+    for (const Fichier& fichier : fichiers) {
+        if (fichier.nom.empty() || fichier.nom.find('/') != std::string::npos
+            || fichier.nom.find('\\') != std::string::npos) {
+            if (journal)
+                *journal = "nom de fichier refusé : « " + fichier.nom
+                           + " » — un nom simple, sans dossier, est attendu";
+            return false;
+        }
+        if (!ecrire(dossier + "/" + fichier.nom, fichier.contenu)) {
+            if (journal) *journal = "écriture impossible : " + fichier.nom;
+            return false;
+        }
+        // Un « .c » ou un « .cpp » est une unité de compilation à part
+        // entière, comme partout ailleurs ; un « .ino » n'en est pas une, et
+        // part dans la fusion ci-dessous.
+        if (fichier_a_compiler(fichier.nom))
+            a_compiler += " \"" + dossier + "/" + fichier.nom + "\"";
+    }
+
+    // Les onglets de croquis, fondus en une seule unité. C'est ce que fait
+    // l'IDE Arduino, et c'est ce qui permet à un « .ino » de ne rien déclarer.
+    const std::string croquis = fusionner_croquis(fichiers);
+    if (!croquis.empty()) {
+        const std::string fondu = chemin_elf + ".cpp";
+        // L'en-tête du noyau est inclus d'office : un croquis ne l'écrit
+        // jamais. Il précède les « #line », qui rendent ensuite la
+        // numérotation à chaque onglet.
+        if (!ecrire(fondu, avec_noyau ? "#include \"Arduino.h\"\n" + croquis
+                                      : croquis)) {
+            if (journal) *journal = "écriture impossible : " + fondu;
+            return false;
+        }
+        a_compiler += " \"" + fondu + "\"";
+    }
+    if (a_compiler.empty()) {
+        if (journal)
+            *journal = "aucun fichier de code dans ce programme : un « .h » "
+                       "seul ne se compile pas";
         return false;
     }
 
@@ -509,7 +557,7 @@ bool AvrEngine::compiler_source(const std::string& source,
         + "UL -Os -std=gnu++17 "
           "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
           "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
-        chemin_elf + "\" \"" + base + "\""
+        chemin_elf + "\"" + a_compiler
         + (avec_noyau ? " \"" + noyau + "\"" : "") + " > \"" +
         journal_fichier + "\" 2>&1";
     const int code = std::system(commande.c_str());

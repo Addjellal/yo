@@ -56,6 +56,10 @@ public:
     static bool compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
                                 std::string* journal, const std::string& mcu);
+    static bool compiler_projet(const Programme& fichiers,
+                                const std::string& chemin_elf,
+                                std::string* journal,
+                                const std::string& mcu = "rp2040");
     // Y a-t-il de quoi compiler pour ARM sur cette machine ?
     static bool chaine_disponible();
     // Le nom de la chaîne trouvée, pour le dire à l'utilisateur.

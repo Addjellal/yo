@@ -106,6 +106,14 @@ public:
                                 std::string* journal,
                                 const std::string& mcu = "atmega328p",
                                 uint32_t frequence = 16000000);
+    // Programme en plusieurs fichiers : tous sont déposés côte à côte, ceux
+    // qui portent du code sont compilés, et le dossier est dans le chemin
+    // d'inclusion.
+    static bool compiler_projet(const Programme& fichiers,
+                                const std::string& chemin_elf,
+                                std::string* journal,
+                                const std::string& mcu = "atmega328p",
+                                uint32_t frequence = 16000000);
     static bool avr_gcc_disponible();
     static bool avr_gpp_disponible();
 

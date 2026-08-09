@@ -137,7 +137,66 @@ bool CortexEngine::chaine_disponible() { return !chaine().commande.empty(); }
 
 std::string CortexEngine::chaine_trouvee() { return chaine().commande; }
 
+namespace {
+
+// Dépose chaque fichier du programme à côté du .elf et rend, dans `a_compiler`,
+// la liste de ceux que le compilateur doit voir. Rend false — et dit pourquoi —
+// si un nom est refusé ou si rien ne porte de code.
+bool deposer_fichiers(const Programme& fichiers, const std::string& dossier,
+                      std::string* a_compiler, std::string* journal) {
+    a_compiler->clear();
+    for (const Fichier& fichier : fichiers) {
+        if (fichier.nom.empty() || fichier.nom.find('/') != std::string::npos
+            || fichier.nom.find('\\') != std::string::npos) {
+            if (journal)
+                *journal = "nom de fichier refusé : « " + fichier.nom
+                           + " » — un nom simple, sans dossier, est attendu";
+            return false;
+        }
+        const std::string chemin = dossier + "/" + fichier.nom;
+        std::ofstream sortie(chemin);
+        if (!sortie) {
+            if (journal) *journal = "écriture impossible : " + chemin;
+            return false;
+        }
+        sortie << fichier.contenu;
+        sortie.close();
+        if (fichier_a_compiler(fichier.nom)) *a_compiler += " \"" + chemin + "\"";
+    }
+    // Les onglets de croquis sont fondus en une seule unité, comme du côté
+    // AVR : la règle du « .ino » ne change pas avec l'architecture.
+    const std::string croquis = fusionner_croquis(fichiers);
+    if (!croquis.empty()) {
+        const std::string fondu = dossier + "/croquis_fondu.c";
+        std::ofstream sortie(fondu);
+        if (!sortie) {
+            if (journal) *journal = "écriture impossible : " + fondu;
+            return false;
+        }
+        sortie << croquis;
+        sortie.close();
+        *a_compiler += " \"" + fondu + "\"";
+    }
+    if (a_compiler->empty()) {
+        if (journal)
+            *journal = "aucun fichier de code dans ce programme : un « .h » "
+                       "seul ne se compile pas";
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
+
 bool CortexEngine::compiler_source(const std::string& source,
+                                   const std::string& chemin_elf,
+                                   std::string* journal,
+                                   const std::string& mcu) {
+    return compiler_projet(Programme{{nom_principal(mcu), source}}, chemin_elf,
+                           journal, mcu);
+}
+
+bool CortexEngine::compiler_projet(const Programme& fichiers,
                                    const std::string& chemin_elf,
                                    std::string* journal,
                                    const std::string& mcu) {
@@ -155,15 +214,9 @@ bool CortexEngine::compiler_source(const std::string& source,
         return false;
     }
 
-    const std::string base = chemin_elf + ".c";
-    {
-        std::ofstream fichier(base);
-        if (!fichier) {
-            if (journal) *journal = "écriture impossible : " + base;
-            return false;
-        }
-        fichier << source;
-    }
+    const std::string dossier = chemin_elf.substr(0, chemin_elf.find_last_of('/'));
+    std::string a_compiler;
+    if (!deposer_fichiers(fichiers, dossier, &a_compiler, journal)) return false;
 
     // Le programme est lié à l'adresse où la puce va le chercher, et sans
     // bibliothèque standard : c'est du nu, et c'est ce qui permet de s'en
@@ -177,9 +230,10 @@ bool CortexEngine::compiler_source(const std::string& source,
     std::string commande = outil.commande;
     if (outil.clang) commande += " --target=" + cible;
     else commande += " -mcpu=" + cpu + " -mthumb";
-    commande += " -nostdlib -ffreestanding -Os -Wl,-e,_start -Wl,-Ttext="
-                + adresse + " -o \"" + chemin_elf + "\" \"" + base + "\" > \""
-                + journal_fichier + "\" 2>&1";
+    commande += " -nostdlib -ffreestanding -Os -I \"" + dossier
+                + "\" -Wl,-e,_start -Wl,-Ttext=" + adresse + " -o \""
+                + chemin_elf + "\"" + a_compiler + " > \"" + journal_fichier
+                + "\" 2>&1";
 
     const int code = std::system(commande.c_str());
     if (journal) {

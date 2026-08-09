@@ -57,6 +57,9 @@ public:
     static bool compiler_source(const std::string& source,
                                 const std::string& chemin_elf,
                                 std::string* journal);
+    static bool compiler_projet(const Programme& fichiers,
+                                const std::string& chemin_elf,
+                                std::string* journal);
     static bool chaine_disponible();
 
 private:

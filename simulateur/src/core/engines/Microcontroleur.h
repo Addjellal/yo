@@ -29,6 +29,7 @@
 #include <memory>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace coeur {
 
@@ -90,6 +91,57 @@ public:
     virtual void sur_octet_serie(std::function<void(char)> rappel) = 0;
 };
 
+// ---------------------------------------------------------------------------
+// Un programme tel qu'on l'écrit : plusieurs fichiers.
+//
+// Un croquis qui tient en une page se passe de tout cela. Dès qu'il grossit,
+// non : on veut sortir les fonctions communes, et les partager entre
+// plusieurs programmes. C'est ce que fait tout le monde dans l'IDE Arduino
+// avec un « .h » posé à côté du croquis.
+//
+// Les règles sont celles d'un projet Arduino, et pas d'autres :
+//
+//   * le PREMIER fichier est le principal. C'est lui qui reçoit l'en-tête du
+//     noyau, c'est lui qui porte setup() et loop() ;
+//   * un fichier d'en-tête (« .h », « .hpp ») est déposé à côté mais n'est
+//     pas compilé pour lui-même : il n'existe qu'à travers ceux qui
+//     l'incluent ;
+//   * un fichier de code (« .c », « .cpp », « .ino ») est compilé et lié ;
+//   * tous vivent dans le même dossier, qui est dans le chemin d'inclusion :
+//     « #include "mesure.h" » trouve donc « mesure.h » sans rien régler.
+struct Fichier {
+    std::string nom;          // « principal.ino », « mesure.h »
+    std::string contenu;
+};
+using Programme = std::vector<Fichier>;
+
+// Le fichier est-il une unité de compilation à part (« .c », « .cpp ») ?
+// Un « .ino » n'en est PAS une : voir `fusionner_croquis`.
+bool fichier_a_compiler(const std::string& nom);
+// Le fichier est-il un onglet de croquis (« .ino ») ?
+bool fichier_croquis(const std::string& nom);
+
+// Fusionne les onglets de croquis en une seule unité de compilation, comme le
+// fait l'IDE Arduino — et pour la même raison : un « .ino » n'est pas du C++
+// autonome. Il n'a ni inclusion ni prototype, et ses fonctions sont censées
+// se voir les unes les autres sans qu'on ait rien déclaré.
+//
+// UNE DIFFÉRENCE avec l'IDE, et elle est délibérée. L'IDE met le croquis
+// principal en tête puis fabrique les prototypes des fonctions qui suivent,
+// par une analyse syntaxique approximative qui se trompe sur les modèles, les
+// références et les types composés. Ici les onglets annexes passent AVANT le
+// principal : tout ce qu'ils définissent est visible du principal sans qu'on
+// ait à deviner quoi que ce soit. Le cas qui cesse de marcher — un onglet
+// annexe appelant une fonction du principal — produit une erreur claire du
+// compilateur, et non un prototype faux.
+//
+// Chaque morceau est précédé d'un « #line » qui porte son nom : une erreur
+// désigne donc le bon onglet et la bonne ligne.
+std::string fusionner_croquis(const Programme& fichiers);
+// Nom du fichier principal selon la puce : un croquis pour une carte
+// Arduino, du C sur registres pour une puce nue.
+std::string nom_principal(const std::string& mcu);
+
 // Fabrique le moteur capable d'exécuter cette puce, ou nullptr si aucune
 // architecture connue ne la reconnaît. C'est le seul endroit à compléter pour
 // qu'une nouvelle famille devienne exécutable partout dans l'application.
@@ -103,6 +155,10 @@ std::string puces_connues();
 // le pendant de `creer_microcontroleur` : exécuter et compiler doivent suivre
 // la même architecture, sans quoi l'un des deux se trompe de machine.
 bool compiler_pour(const std::string& mcu, const std::string& source,
+                   const std::string& chemin_elf, uint32_t horloge,
+                   std::string* journal);
+// Même chose pour un programme en plusieurs fichiers.
+bool compiler_pour(const std::string& mcu, const Programme& fichiers,
                    const std::string& chemin_elf, uint32_t horloge,
                    std::string* journal);
 // Y a-t-il de quoi compiler pour cette puce sur cette machine ?
