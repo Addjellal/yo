@@ -37,6 +37,7 @@
 #include "app/schematic/SceneSchema.h"
 #include "core/Netlist.h"
 #include "core/engines/AvrEngine.h"
+#include "core/engines/Microcontroleur.h"
 #include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
 
@@ -98,7 +99,7 @@ public:
     const coeur::NgspiceEngine& analogique() const { return analogique_; }
     // Cœur AVR d'une carte, pour le diagnostic. Jamais nul : renvoie un moteur
     // inerte si la carte n'existe pas.
-    const coeur::AvrEngine& mcu(const QString& carte = {}) const;
+    const coeur::Microcontroleur& mcu(const QString& carte = {}) const;
 
     // Résout le circuit une seule fois, sans firmware : « analyse au point de
     // repos », utile pour vérifier un montage purement analogique.
@@ -133,7 +134,9 @@ private:
     // Une carte programmable du schéma : son cœur, son firmware, son histoire.
     struct Carte {
         QString reference;
-        std::unique_ptr<coeur::AvrEngine> mcu;
+        // Le moteur qui exécute cette carte : un cœur AVR, un Cortex-M…
+        // C'est la puce du modèle qui le choisit.
+        std::unique_ptr<coeur::Microcontroleur> mcu;
         // La puce de cette carte : elle décide de la compilation comme de
         // l'exécution.
         std::string puce = "atmega328p";

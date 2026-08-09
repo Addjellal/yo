@@ -2071,7 +2071,7 @@ QString FenetrePrincipale::diagnostic() {
         // Chaque carte a ses propres registres : interroger la bonne est
         // toute la différence entre un diagnostic utile et un mensonge.
         const QString reference = QString::fromStdString(liaison.carte);
-        const coeur::AvrEngine& mcu = moteur_->mcu(reference);
+        const coeur::Microcontroleur& mcu = moteur_->mcu(reference);
         rapport += QString("  %1.%2 (n°%3) -> nœud %4   sortie=%5 niveau=%6\n")
                        .arg(reference)
                        .arg(QString::fromStdString(liaison.nom))

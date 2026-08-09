@@ -15,7 +15,7 @@ constexpr int kPeriodeTrame = 25;        // ms entre deux images
 
 // Renvoyé quand on interroge une carte qui n'est pas sur le schéma : évite un
 // pointeur nul dans le code d'affichage et de diagnostic.
-const coeur::AvrEngine& moteur_inerte() {
+const coeur::Microcontroleur& moteur_inerte() {
     static coeur::AvrEngine unique;
     return unique;
 }
@@ -53,6 +53,8 @@ MoteurSimulation::Carte& MoteurSimulation::obtenir_carte(
 
     auto nouvelle = std::make_unique<Carte>();
     nouvelle->reference = reference;
+    // Le moteur par défaut ; la puce du modèle le remplacera si elle demande
+    // une autre architecture.
     nouvelle->mcu = std::make_unique<coeur::AvrEngine>();
     Carte& resultat = *nouvelle;
     cartes_[reference] = std::move(nouvelle);
@@ -89,7 +91,8 @@ bool MoteurSimulation::un_firmware_au_moins() const {
     return false;
 }
 
-const coeur::AvrEngine& MoteurSimulation::mcu(const QString& reference) const {
+const coeur::Microcontroleur& MoteurSimulation::mcu(
+    const QString& reference) const {
     const Carte* cible = carte(reference);
     return cible && cible->mcu ? *cible->mcu : moteur_inerte();
 }
@@ -196,8 +199,20 @@ void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
     for (const CartePosee& posee : cartes) {
         auto it = cartes_.find(posee.reference);
         if (it == cartes_.end()) continue;
-        it->second->puce = posee.mcu;
-        it->second->horloge = posee.horloge;
+        Carte& carte = *it->second;
+        // Changer de puce peut vouloir dire changer d'architecture : on ne
+        // garde le moteur en place que s'il reconnaît la nouvelle.
+        if (!carte.mcu || !carte.mcu->reconnait(posee.mcu)) {
+            std::unique_ptr<coeur::Microcontroleur> autre =
+                coeur::creer_microcontroleur(posee.mcu);
+            if (autre) {
+                carte.mcu = std::move(autre);
+                carte.firmware_charge = false;
+                brancher_rappels(carte);
+            }
+        }
+        carte.puce = posee.mcu;
+        carte.horloge = posee.horloge;
     }
 }
 
@@ -332,7 +347,7 @@ std::vector<coeur::BrocheElectrique> MoteurSimulation::broches_pour(
             resultat.push_back(broche);
             continue;
         }
-        const coeur::AvrEngine& mcu = *cible->mcu;
+        const coeur::Microcontroleur& mcu = *cible->mcu;
         if (mcu.direction_sortie(liaison.numero)) {
             broche.mode = coeur::BrocheElectrique::Mode::Sortie;
             const uint32_t masque =

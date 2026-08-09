@@ -129,6 +129,7 @@ add_library(coeur STATIC
   src/core/engines/NgspiceEngine.cpp
   src/core/engines/CoeurAvr.cpp
   src/core/engines/AvrEngine.cpp
+  src/core/engines/Microcontroleur.cpp
   src/core/engines/MoteurNumerique.cpp
   src/core/analysis/Analyses.cpp
   src/core/analysis/Campagne.cpp

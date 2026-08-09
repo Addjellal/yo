@@ -296,6 +296,10 @@ void AvrEngine::niveau_simavr(int, bool) {}
 // Façade : le cœur intégré par défaut, simavr sur demande
 // ---------------------------------------------------------------------------
 bool AvrEngine::disponible() const { return true; }
+
+bool AvrEngine::reconnait(const std::string& mcu) const {
+    return profil_par_nom(mcu) != nullptr;
+}
 bool AvrEngine::utilise_simavr() const {
     return prefere_simavr_ && compile_avec_simavr();
 }
