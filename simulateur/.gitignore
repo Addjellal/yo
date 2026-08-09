@@ -1,3 +1,8 @@
-build/
+# Tout dossier de compilation, quel que soit son suffixe.
+#
+# La règle était « build/ » et « build-paquet/ », nommés un par un — et le
+# jour où un dossier « build-asan/ » est apparu pour un audit, ses 267
+# fichiers sont partis dans le dépôt. Une règle qui énumère les cas connus
+# finit toujours par en manquer un.
+build*/
 *.user
-build-paquet/
