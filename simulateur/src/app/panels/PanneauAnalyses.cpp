@@ -2,6 +2,7 @@
 
 #include "app/BarreDefilante.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QEvent>
@@ -398,6 +399,22 @@ void PanneauAnalyses::construire() {
         points_->setRange(2, 200);
         points_->setValue(20);
         ligne->addWidget(points_);
+        // Le spectre du courant. Il ne se lit pas sur la même échelle qu'un
+        // gain de tension : un courant n'a pas de référence naturelle, on le
+        // rapporte donc à l'ampère — c'est ce que font LTspice et Proteus, et
+        // c'est ce que veut dire « dBA » dans la légende.
+        courants_ = new QCheckBox("courants (dBA)");
+        courants_->setChecked(true);
+        courants_->setToolTip(
+            "Superpose le spectre du courant de chaque composant, en décibels "
+            "rapportés à 1 A.\nC'est là que se voit la résonance d'un RLC "
+            "série : la tension de sortie ne fait que passer, le courant, lui,\n"
+            "culmine à V/R.");
+        connect(courants_, &QCheckBox::toggled, this, [this](bool) {
+            if (!dernier_balayage_.vide())
+                afficher_balayage(dernier_balayage_, true, derniere_reference_);
+        });
+        ligne->addWidget(courants_);
         reglages_->addWidget(page);
     }
     {   // --- bruit (page ajoutée après le spectre, cf. ordre du sélecteur)
@@ -719,6 +736,7 @@ void PanneauAnalyses::lancer() {
 void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
                                         bool bode, const QString& reference) {
     dernier_balayage_ = balayage;
+    derniere_reference_ = reference;
     dernier_spectre_ = {};
     if (balayage.vide()) {
         signaler("L'analyse n'a produit aucun point.");
@@ -733,16 +751,27 @@ void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
         const coeur::Courbe* entree =
             balayage.courbe(reference.isEmpty() ? "in"
                                                 : reference.toLower().toStdString());
+        const bool avec_courants = !courants_ || courants_->isChecked();
         for (const coeur::Courbe& courbe : balayage.courbes) {
             if (!courbe.complexe()) continue;
             if (entree && &courbe == entree) continue;
-            // Les courants ne se lisent pas en décibels de tension : on les
-            // laisse au balayage continu et au CSV.
-            if (courbe.nom.rfind("I(", 0) == 0) continue;
-            const std::vector<double> gains =
-                coeur::gain_decibels(courbe, entree);
+            // Un courant n'est pas un gain : le rapporter à la tension
+            // d'entrée donnerait des décibels de siemens, que personne ne
+            // lit. On le rapporte à l'ampère, comme le font LTspice et
+            // Proteus, et la légende le dit — « dBA », pas « dB ».
+            const bool est_courant = courbe.nom.rfind("I(", 0) == 0;
+            if (est_courant && !avec_courants) continue;
+            std::vector<double> gains;
+            if (est_courant) {
+                gains.reserve(courbe.valeurs.size());
+                for (double module : courbe.valeurs)
+                    gains.push_back(20.0 * std::log10(std::max(module, 1e-18)));
+            } else {
+                gains = coeur::gain_decibels(courbe, entree);
+            }
             TraceCourbes::Serie gain;
-            gain.nom = QString::fromStdString(courbe.nom) + " (dB)";
+            gain.nom = QString::fromStdString(courbe.nom)
+                       + (est_courant ? " (dBA)" : " (dB)");
             TraceCourbes::Serie phase;
             phase.nom = QString::fromStdString(courbe.nom) + " (°)";
             phase.axe_droit = true;
@@ -756,6 +785,21 @@ void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
             series.append(gain);
             series.append(phase);
 
+            if (est_courant) {
+                // Pour un courant, ce qui compte n'est pas une coupure mais
+                // l'endroit où il culmine : c'est là que le montage consomme,
+                // et dans un RLC série c'est la résonance.
+                size_t crete = 0;
+                for (size_t k = 1; k < courbe.valeurs.size(); ++k)
+                    if (courbe.valeurs[k] > courbe.valeurs[crete]) crete = k;
+                if (crete < balayage.abscisse.size())
+                    texte += QString("%1 : maximum %2 à %3\n")
+                                 .arg(QString::fromStdString(courbe.nom))
+                                 .arg(abrege(courbe.valeurs[crete], "A"))
+                                 .arg(abrege(balayage.abscisse[crete], "Hz"));
+                continue;
+            }
+
             const double coupure =
                 coeur::frequence_coupure(balayage, courbe, entree);
             texte += QString("%1 : gain max %2 dB")
@@ -766,7 +810,10 @@ void PanneauAnalyses::afficher_balayage(const coeur::Balayage& balayage,
                              .arg(coupure, 0, 'f', 1);
             texte += "\n";
         }
-        trace_->definir_axes("Fréquence (Hz)", "Gain (dB)", "Phase (°)");
+        trace_->definir_axes(
+            "Fréquence (Hz)",
+            avec_courants ? "Gain (dB) · courant (dBA)" : "Gain (dB)",
+            "Phase (°)");
         trace_->definir(series, true, false);
     } else {
         for (const coeur::Courbe& courbe : balayage.courbes) {

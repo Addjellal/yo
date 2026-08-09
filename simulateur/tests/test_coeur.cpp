@@ -8,7 +8,9 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <complex>
 #include <cstdlib>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <string>
@@ -3962,6 +3964,506 @@ static void test_fabrication() {
              fautives == 0 ? std::string("tout le catalogue") : liste);
 }
 
+// ---------------------------------------------------------------------------
+// [38] Bobines : RL et RLC, en tension ET en courant
+//
+// Le condensateur était vérifié depuis longtemps ; la bobine ne l'était pas.
+// C'est pourtant elle qui met le solveur à l'épreuve : elle ajoute une
+// inconnue de courant à la matrice, et son impédance croît avec la fréquence
+// là où celle du condensateur décroît. Une erreur de signe sur jωL donne un
+// circuit qui a l'air de marcher — il filtre — mais dans le mauvais sens.
+//
+// La vérification ne se contente pas de relever la coupure : elle confronte
+// TOUTE la courbe à la formule fermée, module et phase. Un seul point juste
+// peut être un hasard ; quarante points justes sur trois décades, non.
+//
+// Et l'on relève le courant autant que la tension. Dans un RLC série c'est
+// même le courant qui porte l'information : la résonance y est un maximum
+// franc, alors que la tension de sortie, selon la borne où on la prend,
+// montre un passe-bas, un passe-haut ou un passe-bande.
+// ---------------------------------------------------------------------------
+static void test_bobines() {
+    std::printf("\n[38] Bobines : RL et RLC, en tension et en courant\n");
+
+    using Complexe = std::complex<double>;
+    const double kPi = 3.14159265358979323846;
+
+    // Monte un montage série : la source, puis les composants dans l'ordre,
+    // le dernier nœud étant la masse. Rend le nom des nœuds intermédiaires.
+    auto brancher_source = [](coeur::Netlist& netlist, const char* noeud) {
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "sinus";
+        source.valeurs["amplitude"] = 1;
+        source.valeurs["frequence"] = 1000;
+        netlist.relier("GBF1", "+", noeud);
+        netlist.relier("GBF1", "-", "GND");
+    };
+
+    // Confronte une courbe complexe à une fonction de transfert analytique.
+    // Rend l'écart maximal sur le module (en relatif) et sur la phase (en
+    // degrés), et l'endroit où il est atteint.
+    // `plancher` écarte les points où la grandeur attendue est nulle par
+    // construction : à la résonance exacte d'un bouchon L//C, la théorie dit
+    // « zéro » et le solveur rend ses fuites numériques. Comparer les deux en
+    // relatif n'a pas de sens — ce n'est pas un écart de modèle, c'est une
+    // division par zéro déguisée.
+    auto confronter = [&](const coeur::Balayage& balayage,
+                          const coeur::Courbe& courbe,
+                          const std::function<Complexe(double)>& attendu,
+                          double* ecart_module, double* ecart_phase,
+                          double* frequence_pire, double plancher = 0.0) {
+        *ecart_module = 0;
+        *ecart_phase = 0;
+        *frequence_pire = 0;
+        for (size_t k = 0; k < balayage.abscisse.size(); ++k) {
+            const Complexe theorique = attendu(balayage.abscisse[k]);
+            const double module = std::abs(theorique);
+            if (module < plancher) continue;
+            const double phase = std::arg(theorique) * 180.0 / kPi;
+            const double relatif =
+                std::fabs(courbe.valeurs[k] - module) / std::max(module, 1e-12);
+            double delta_phase = std::fabs(courbe.phases[k] - phase);
+            while (delta_phase > 180.0) delta_phase = std::fabs(delta_phase - 360.0);
+            if (relatif > *ecart_module) {
+                *ecart_module = relatif;
+                *frequence_pire = balayage.abscisse[k];
+            }
+            if (delta_phase > *ecart_phase) *ecart_phase = delta_phase;
+        }
+    };
+
+    // --- filtre RL passe-bas : source -> L -> MID -> R -> masse -------------
+    // La sortie est prise aux bornes de R. Coupure théorique R/(2 pi L).
+    {
+        const double r = 1000.0, l = 10e-3;
+        const double coupure_theorique = r / (2 * kPi * l);   // 15915,49 Hz
+
+        coeur::Netlist netlist;
+        brancher_source(netlist, "IN");
+        auto& bobine = netlist.ajouter("L1", "inductance");
+        bobine.valeurs["henrys"] = l;
+        netlist.relier("L1", "1", "IN");
+        netlist.relier("L1", "2", "MID");
+        auto& resistance = netlist.ajouter("R1", "resistance");
+        resistance.valeurs["ohms"] = r;
+        netlist.relier("R1", "1", "MID");
+        netlist.relier("R1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".ac dec 40 100 10meg");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        const coeur::Courbe* sortie = balayage.courbe("mid");
+        const coeur::Courbe* entree = balayage.courbe("in");
+        verifier(ok && sortie && sortie->complexe() && entree,
+                 "RL passe-bas : la réponse est relevée");
+        if (!ok || !sortie || !entree) return;
+
+        double ecart_module = 0, ecart_phase = 0, pire = 0;
+        confronter(balayage, *sortie,
+                   [&](double frequence) {
+                       const Complexe z(r, 2 * kPi * frequence * l);
+                       return Complexe(r, 0) / z;
+                   },
+                   &ecart_module, &ecart_phase, &pire);
+        verifier(ecart_module < 0.005,
+                 "RL passe-bas : module conforme à R/(R+jωL) sur cinq décades",
+                 f(ecart_module * 100, 3) + " % au pire, à " + f(pire, 0) + " Hz");
+        verifier(ecart_phase < 0.3,
+                 "RL passe-bas : phase conforme sur cinq décades",
+                 f(ecart_phase, 3) + "° au pire");
+
+        const double coupure = coeur::frequence_coupure(balayage, *sortie, entree);
+        verifier(presque(coupure, coupure_theorique, coupure_theorique * 0.02),
+                 "RL passe-bas : coupure à R/(2 pi L)",
+                 f(coupure, 1) + " Hz contre " + f(coupure_theorique, 1)
+                     + " Hz attendus");
+
+        // --- le courant. Dans un montage série il est le même partout : si
+        //     le solveur rendait deux valeurs différentes pour I(l1) et
+        //     I(r1), c'est la loi des nœuds qui serait violée.
+        const coeur::Courbe* i_bobine = balayage.courbe("I(l1)");
+        const coeur::Courbe* i_resistance = balayage.courbe("I(r1)");
+        verifier(i_bobine && i_resistance && i_bobine->complexe(),
+                 "RL passe-bas : le courant est relevé, module et phase");
+        if (i_bobine && i_resistance) {
+            double ecart_serie = 0;
+            for (size_t k = 0; k < i_bobine->valeurs.size(); ++k)
+                ecart_serie = std::max(
+                    ecart_serie,
+                    std::fabs(i_bobine->valeurs[k] - i_resistance->valeurs[k])
+                        / std::max(i_bobine->valeurs[k], 1e-15));
+            verifier(ecart_serie < 1e-6,
+                     "RL passe-bas : même courant dans la bobine et la "
+                     "résistance",
+                     f(ecart_serie * 100, 9) + " % d'écart");
+
+            confronter(balayage, *i_bobine,
+                       [&](double frequence) {
+                           return Complexe(1, 0)
+                                  / Complexe(r, 2 * kPi * frequence * l);
+                       },
+                       &ecart_module, &ecart_phase, &pire);
+            verifier(ecart_module < 0.005,
+                     "RL passe-bas : courant conforme à V/(R+jωL)",
+                     f(ecart_module * 100, 3) + " % au pire");
+            // À basse fréquence la bobine est un fil : le courant vaut V/R.
+            // À 100 Hz elle n'est pas tout à fait un fil — 6,3 Ω contre
+            // 1000 — d'où le millipour-cent de marge.
+            verifier(presque(i_bobine->valeurs.front(), 1.0 / r, 1e-5),
+                     "RL passe-bas : 1 mA à basse fréquence, la bobine est un "
+                     "fil",
+                     f(i_bobine->valeurs.front() * 1000, 4) + " mA");
+            // Une décade au-dessus de la coupure, l'impédance de la bobine
+            // domine : le courant a été divisé par dix. L'attendu est calculé
+            // à la fréquence du point RELEVÉ, et non à la décade ronde : la
+            // grille logarithmique ne tombe pas dessus, et comparer à la
+            // décade ronde ferait échouer un résultat pourtant exact.
+            size_t rang_decade = 0;
+            for (size_t k = 0; k < balayage.abscisse.size(); ++k)
+                if (balayage.abscisse[k] >= 10 * coupure_theorique) {
+                    rang_decade = k;
+                    break;
+                }
+            const double f_decade = balayage.abscisse[rang_decade];
+            const double attendu_decade =
+                1.0 / std::abs(Complexe(r, 2 * kPi * f_decade * l));
+            verifier(rang_decade > 0
+                         && presque(i_bobine->valeurs[rang_decade],
+                                    attendu_decade, attendu_decade * 0.005)
+                         && attendu_decade < 1.05e-4,
+                     "RL passe-bas : -20 dB par décade sur le courant",
+                     f(i_bobine->valeurs[rang_decade] * 1e6, 2) + " µA à "
+                         + f(f_decade / 1000, 2) + " kHz");
+        }
+    }
+
+    // --- filtre RL passe-haut : source -> R -> MID -> L -> masse -----------
+    // Même coupure, mais la sortie monte au lieu de descendre. C'est ce qui
+    // distingue une bobine correctement modélisée d'un condensateur déguisé.
+    {
+        const double r = 1000.0, l = 10e-3;
+        const double coupure_theorique = r / (2 * kPi * l);
+
+        coeur::Netlist netlist;
+        brancher_source(netlist, "IN");
+        auto& resistance = netlist.ajouter("R1", "resistance");
+        resistance.valeurs["ohms"] = r;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "MID");
+        auto& bobine = netlist.ajouter("L1", "inductance");
+        bobine.valeurs["henrys"] = l;
+        netlist.relier("L1", "1", "MID");
+        netlist.relier("L1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(netlist, {}, ".ac dec 40 100 10meg");
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        const coeur::Courbe* sortie = balayage.courbe("mid");
+        verifier(ok && sortie && sortie->complexe(),
+                 "RL passe-haut : la réponse est relevée");
+        if (!ok || !sortie) return;
+
+        double ecart_module = 0, ecart_phase = 0, pire = 0;
+        confronter(balayage, *sortie,
+                   [&](double frequence) {
+                       const Complexe jwl(0, 2 * kPi * frequence * l);
+                       return jwl / (Complexe(r, 0) + jwl);
+                   },
+                   &ecart_module, &ecart_phase, &pire);
+        verifier(ecart_module < 0.005,
+                 "RL passe-haut : module conforme à jωL/(R+jωL)",
+                 f(ecart_module * 100, 3) + " % au pire");
+        verifier(ecart_phase < 0.3, "RL passe-haut : phase conforme",
+                 f(ecart_phase, 3) + "° au pire");
+
+        // Le sens du filtrage : le gain doit CROÎTRE avec la fréquence.
+        verifier(sortie->valeurs.back() > sortie->valeurs.front() * 100,
+                 "RL passe-haut : la bobine bloque le bas, pas le haut",
+                 f(sortie->valeurs.front(), 5) + " puis "
+                     + f(sortie->valeurs.back(), 5));
+        // +45° à la coupure, contre -45° pour le passe-bas.
+        double phase_coupure = 0;
+        for (size_t k = 0; k < balayage.abscisse.size(); ++k)
+            if (balayage.abscisse[k] >= coupure_theorique) {
+                phase_coupure = sortie->phases[k];
+                break;
+            }
+        verifier(presque(phase_coupure, 45.0, 3.0),
+                 "RL passe-haut : +45° à la coupure",
+                 f(phase_coupure, 2) + "°");
+    }
+
+    // --- RLC série : la résonance ------------------------------------------
+    // source -> R -> A -> L -> B -> C -> masse.
+    // f0 = 1/(2 pi racine(LC)), Q = racine(L/C)/R.
+    // À la résonance les deux réactances s'annulent : il ne reste que R, le
+    // courant est maximal, et la tension aux bornes de C vaut Q fois celle
+    // d'entrée. Cette surtension est le phénomène que le solveur doit rendre.
+    {
+        const double r = 100.0, l = 10e-3, c = 100e-9;
+        const double f0 = 1.0 / (2 * kPi * std::sqrt(l * c));      // 5032,92 Hz
+        const double q = std::sqrt(l / c) / r;                     // 3,1623
+
+        coeur::Netlist netlist;
+        brancher_source(netlist, "IN");
+        auto& resistance = netlist.ajouter("R1", "resistance");
+        resistance.valeurs["ohms"] = r;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "A");
+        auto& bobine = netlist.ajouter("L1", "inductance");
+        bobine.valeurs["henrys"] = l;
+        netlist.relier("L1", "1", "A");
+        netlist.relier("L1", "2", "B");
+        auto& condensateur = netlist.ajouter("C1", "condensateur");
+        condensateur.valeurs["farads"] = c;
+        netlist.relier("C1", "1", "B");
+        netlist.relier("C1", "2", "GND");
+
+        // Le balayage part d'une décade EN DESSOUS de f0, à deux cents points
+        // par décade : la résonance tombe alors exactement sur le point de
+        // rang 200. Sans cette précaution la grille passe à côté du pic — et
+        // sur un montage à Q élevé, « à côté » veut dire plusieurs pour cent.
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(
+            netlist, {}, ".ac dec 200 " + f(f0 / 10, 6) + " " + f(f0 * 10, 6));
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        const coeur::Courbe* courant = balayage.courbe("I(r1)");
+        const coeur::Courbe* aux_bornes_c = balayage.courbe("b");
+        verifier(ok && courant && courant->complexe() && aux_bornes_c,
+                 "RLC série : courant et tensions relevés");
+        if (!ok || !courant || !aux_bornes_c) return;
+
+        // L'impédance série exacte, à laquelle tout est confronté.
+        auto impedance = [&](double frequence) {
+            const double omega = 2 * kPi * frequence;
+            return Complexe(r, omega * l - 1.0 / (omega * c));
+        };
+
+        double ecart_module = 0, ecart_phase = 0, pire = 0;
+        confronter(balayage, *courant,
+                   [&](double frequence) {
+                       return Complexe(1, 0) / impedance(frequence);
+                   },
+                   &ecart_module, &ecart_phase, &pire);
+        verifier(ecart_module < 0.005,
+                 "RLC série : courant conforme à V/Z sur deux décades",
+                 f(ecart_module * 100, 3) + " % au pire, à " + f(pire, 0) + " Hz");
+        verifier(ecart_phase < 0.3, "RLC série : phase du courant conforme",
+                 f(ecart_phase, 3) + "° au pire");
+
+        confronter(balayage, *aux_bornes_c,
+                   [&](double frequence) {
+                       const double omega = 2 * kPi * frequence;
+                       return Complexe(0, -1.0 / (omega * c))
+                              / impedance(frequence);
+                   },
+                   &ecart_module, &ecart_phase, &pire);
+        verifier(ecart_module < 0.005,
+                 "RLC série : tension aux bornes de C conforme",
+                 f(ecart_module * 100, 3) + " % au pire");
+
+        // Le maximum de courant, relevé sur la courbe : il doit tomber sur f0
+        // et valoir V/R, puisque à la résonance il ne reste que R.
+        size_t rang_max = 0;
+        for (size_t k = 1; k < courant->valeurs.size(); ++k)
+            if (courant->valeurs[k] > courant->valeurs[rang_max]) rang_max = k;
+        const double f_pic = balayage.abscisse[rang_max];
+        verifier(presque(f_pic, f0, f0 * 0.01),
+                 "RLC série : le courant culmine à 1/(2 pi racine(LC))",
+                 f(f_pic, 1) + " Hz contre " + f(f0, 1) + " Hz attendus");
+        verifier(presque(courant->valeurs[rang_max], 1.0 / r, 0.01 / r),
+                 "RLC série : à la résonance il ne reste que R",
+                 f(courant->valeurs[rang_max] * 1000, 3) + " mA contre "
+                     + f(1000.0 / r, 3) + " mA");
+        verifier(presque(courant->phases[rang_max], 0.0, 0.05),
+                 "RLC série : courant en phase avec la source à la résonance",
+                 f(courant->phases[rang_max], 4) + "°");
+        // En dessous de f0 le condensateur domine : le courant est en avance.
+        // Au-dessus, la bobine domine : il est en retard. Un signe inversé sur
+        // jωL échangerait les deux, sans rien changer aux modules.
+        verifier(courant->phases.front() > 60.0 && courant->phases.back() < -60.0,
+                 "RLC série : capacitif en dessous, inductif au-dessus",
+                 f(courant->phases.front(), 1) + "° puis "
+                     + f(courant->phases.back(), 1) + "°");
+
+        // La surtension aux bornes du condensateur. Attention au piège : son
+        // maximum ne vaut PAS Q, et il ne tombe pas sur f0. Il vaut
+        // Q/racine(1 - 1/(4Q²)), un peu en dessous de f0 — la tension aux
+        // bornes de C est le produit d'un terme qui monte par un terme qui
+        // descend, et le produit culmine avant la résonance. Écrire « Q » ici
+        // serait faux de 1,2 % sur ce montage, et bien davantage à Q faible.
+        double crete_c = 0;
+        for (double v : aux_bornes_c->valeurs) crete_c = std::max(crete_c, v);
+        const double crete_theorique = q / std::sqrt(1.0 - 1.0 / (4 * q * q));
+        verifier(presque(crete_c, crete_theorique, crete_theorique * 0.002)
+                     && crete_c > 1.0,
+                 "RLC série : surtension aux bornes du condensateur",
+                 f(crete_c, 4) + " V pour 1 V d'entrée, contre "
+                     + f(crete_theorique, 4) + " attendus (Q = " + f(q, 4) + ")");
+
+        // La bande passante à -3 dB vaut f0/Q. Les deux fronts sont trouvés
+        // par interpolation entre les points qui les encadrent : les prendre
+        // au point de grille le plus proche gonflerait la bande d'une maille
+        // de chaque côté, soit 7 % ici.
+        auto croisement = [&](size_t depart, int sens, double seuil) {
+            for (size_t k = depart;
+                 sens > 0 ? k + 1 < courant->valeurs.size() : k > 0; k += sens) {
+                const size_t suivant = k + sens;
+                const double a = courant->valeurs[k], b = courant->valeurs[suivant];
+                if ((a - seuil) * (b - seuil) > 0) continue;
+                const double part = (seuil - a) / (b - a);
+                return balayage.abscisse[k]
+                       * std::pow(balayage.abscisse[suivant] / balayage.abscisse[k],
+                                  part);
+            }
+            return 0.0;
+        };
+        const double seuil = courant->valeurs[rang_max] / std::sqrt(2.0);
+        const double basse = croisement(rang_max, -1, seuil);
+        const double haute = croisement(rang_max, +1, seuil);
+        const double bande = haute - basse;
+        verifier(basse > 0 && haute > 0
+                     && presque(bande, f0 / q, f0 / q * 0.005),
+                 "RLC série : bande passante f0/Q",
+                 f(bande, 1) + " Hz entre " + f(basse, 1) + " et " + f(haute, 1)
+                     + " Hz, contre " + f(f0 / q, 1) + " Hz attendus");
+        // Et les deux fronts encadrent f0 en moyenne géométrique : c'est la
+        // signature d'un passe-bande, non d'un pic dissymétrique.
+        verifier(presque(std::sqrt(basse * haute), f0, f0 * 0.001),
+                 "RLC série : f0 est la moyenne géométrique des deux fronts",
+                 f(std::sqrt(basse * haute), 1) + " Hz");
+    }
+
+    // --- RLC parallèle : l'anti-résonance ----------------------------------
+    // source -> R -> SORTIE, et sur SORTIE un bouchon L // C vers la masse.
+    // Le bouchon devient une impédance infinie à f0 : la tension y est
+    // maximale et le courant tiré à la source minimal. C'est l'inverse exact
+    // du montage précédent, et le vérifier interdit une confusion de signe.
+    {
+        const double r = 10000.0, l = 10e-3, c = 100e-9;
+        const double f0 = 1.0 / (2 * kPi * std::sqrt(l * c));
+
+        coeur::Netlist netlist;
+        brancher_source(netlist, "IN");
+        auto& resistance = netlist.ajouter("R1", "resistance");
+        resistance.valeurs["ohms"] = r;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "SORTIE");
+        auto& bobine = netlist.ajouter("L1", "inductance");
+        bobine.valeurs["henrys"] = l;
+        netlist.relier("L1", "1", "SORTIE");
+        netlist.relier("L1", "2", "GND");
+        auto& condensateur = netlist.ajouter("C1", "condensateur");
+        condensateur.valeurs["farads"] = c;
+        netlist.relier("C1", "1", "SORTIE");
+        netlist.relier("C1", "2", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_analyse(
+            netlist, {}, ".ac dec 200 " + f(f0 / 10, 6) + " " + f(f0 * 10, 6));
+        const bool ok = moteur.resoudre_analyse();
+        const coeur::Balayage& balayage = moteur.balayage();
+        const coeur::Courbe* sortie = balayage.courbe("sortie");
+        const coeur::Courbe* courant = balayage.courbe("I(r1)");
+        verifier(ok && sortie && courant,
+                 "RLC parallèle : tension et courant relevés");
+        if (!ok || !sortie || !courant) return;
+
+        size_t rang_max = 0, rang_min = 0;
+        for (size_t k = 1; k < sortie->valeurs.size(); ++k) {
+            if (sortie->valeurs[k] > sortie->valeurs[rang_max]) rang_max = k;
+            if (courant->valeurs[k] < courant->valeurs[rang_min]) rang_min = k;
+        }
+        verifier(presque(balayage.abscisse[rang_max], f0, f0 * 0.001),
+                 "RLC parallèle : la tension culmine à f0",
+                 f(balayage.abscisse[rang_max], 1) + " Hz contre " + f(f0, 1)
+                     + " Hz");
+        verifier(rang_min == rang_max,
+                 "RLC parallèle : le courant est minimal là où la tension est "
+                 "maximale",
+                 "même point du balayage");
+
+        // Toute la courbe est confrontée à la formule fermée : la source
+        // alimente R en série avec le bouchon L//C.
+        double ecart_module = 0, ecart_phase = 0, pire = 0;
+        auto impedance_totale = [&](double frequence) {
+            const double omega = 2 * kPi * frequence;
+            const Complexe y(0, omega * c - 1.0 / (omega * l));
+            const Complexe z_bouchon =
+                std::abs(y) < 1e-15 ? Complexe(1e18, 0) : Complexe(1, 0) / y;
+            return Complexe(r, 0) + z_bouchon;
+        };
+        confronter(balayage, *courant,
+                   [&](double frequence) {
+                       return Complexe(1, 0) / impedance_totale(frequence);
+                   },
+                   &ecart_module, &ecart_phase, &pire, 1e-12);
+        verifier(ecart_module < 0.005,
+                 "RLC parallèle : courant conforme à V/(R + L//C)",
+                 f(ecart_module * 100, 3) + " % au pire, à " + f(pire, 0) + " Hz");
+
+        // Le bouchon idéal ne consomme rien à f0 : à la résonance exacte, le
+        // courant tiré ne tient plus qu'aux fuites numériques du solveur. Il
+        // doit s'effondrer de plusieurs décades.
+        double courant_maximal = 0;
+        for (double i : courant->valeurs) courant_maximal = std::max(courant_maximal, i);
+        verifier(courant->valeurs[rang_min] < courant_maximal / 1000.0,
+                 "RLC parallèle : le bouchon coupe le courant à f0",
+                 f(courant->valeurs[rang_min] * 1e9, 3) + " nA contre "
+                     + f(courant_maximal * 1e6, 1) + " µA hors résonance");
+    }
+
+    // --- confrontation à ngspice, si la bibliothèque est là ----------------
+    if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+        const double l = 10e-3, c = 100e-9, r = 100.0;
+        coeur::Netlist netlist;
+        brancher_source(netlist, "IN");
+        auto& resistance = netlist.ajouter("R1", "resistance");
+        resistance.valeurs["ohms"] = r;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "A");
+        auto& bobine = netlist.ajouter("L1", "inductance");
+        bobine.valeurs["henrys"] = l;
+        netlist.relier("L1", "1", "A");
+        netlist.relier("L1", "2", "B");
+        auto& condensateur = netlist.ajouter("C1", "condensateur");
+        condensateur.valeurs["farads"] = c;
+        netlist.relier("C1", "1", "B");
+        netlist.relier("C1", "2", "GND");
+
+        double cretes[2] = {0, 0};
+        double frequences[2] = {0, 0};
+        for (int avec_ngspice = 0; avec_ngspice < 2; ++avec_ngspice) {
+            coeur::NgspiceEngine moteur;
+            moteur.preferer_ngspice(avec_ngspice == 1);
+            moteur.construire_analyse(netlist, {}, ".ac dec 200 500 50k");
+            if (!moteur.resoudre_analyse()) continue;
+            const coeur::Balayage& balayage = moteur.balayage();
+            const coeur::Courbe* tension = balayage.courbe("b");
+            if (!tension) continue;
+            for (size_t k = 0; k < tension->valeurs.size(); ++k)
+                if (tension->valeurs[k] > cretes[avec_ngspice]) {
+                    cretes[avec_ngspice] = tension->valeurs[k];
+                    frequences[avec_ngspice] = balayage.abscisse[k];
+                }
+        }
+        verifier(cretes[0] > 0 && cretes[1] > 0,
+                 "RLC : les deux moteurs relèvent la surtension");
+        verifier(presque(cretes[0], cretes[1], cretes[1] * 0.01),
+                 "RLC : même surtension que ngspice, à 1 % près",
+                 f(cretes[0], 4) + " V contre " + f(cretes[1], 4) + " V");
+        verifier(presque(frequences[0], frequences[1], frequences[1] * 0.01),
+                 "RLC : même fréquence de résonance que ngspice",
+                 f(frequences[0], 1) + " Hz contre " + f(frequences[1], 1) + " Hz");
+    } else {
+        std::printf("  (ngspice absent : la confrontation externe est "
+                    "remplacée par les formules fermées ci-dessus)\n");
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -4005,6 +4507,7 @@ int main() {
     test_cycles_exacts_arm();
     test_temps_xtensa();
     test_fabrication();
+    test_bobines();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

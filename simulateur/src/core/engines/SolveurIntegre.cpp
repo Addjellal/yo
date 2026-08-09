@@ -382,6 +382,14 @@ struct SolveurIntegre::Impl {
     // Analyse alternative autour du point de fonctionnement courant.
     bool resoudre_alternatif(double frequence, std::vector<std::complex<double>>& x,
                              int injection_a = -2, int injection_b = -2);
+    // Courant complexe traversant chaque élément, déduit de la solution
+    // alternative. Sans cela une réponse en fréquence ne montre que des
+    // tensions, et l'on ne peut ni lire l'impédance d'un montage ni voir le
+    // pic de courant d'un RLC série — qui est justement là où le montage
+    // consomme.
+    void courants_alternatifs(
+        const std::vector<std::complex<double>>& x, double frequence,
+        std::vector<std::pair<std::string, std::complex<double>>>* sortie) const;
 };
 
 // ---------------------------------------------------------------------------
@@ -1046,6 +1054,68 @@ bool SolveurIntegre::Impl::resoudre_alternatif(
 }
 
 // ---------------------------------------------------------------------------
+// Courants alternatifs
+//
+// La solution alternative donne les tensions de nœuds et les courants des
+// branches explicites (L, V, B). Les autres se déduisent de la loi du
+// composant, avec la même admittance que celle empilée plus haut : c'est la
+// seule façon d'être cohérent avec la matrice qui vient d'être résolue.
+//
+// Les transistors sont laissés de côté : leur courant petit signal se répartit
+// sur trois bornes, et « I(q1) » ne désignerait rien de précis.
+// ---------------------------------------------------------------------------
+void SolveurIntegre::Impl::courants_alternatifs(
+    const std::vector<std::complex<double>>& x, double frequence,
+    std::vector<std::pair<std::string, std::complex<double>>>* sortie) const {
+    using Complexe = std::complex<double>;
+    const double omega = 2 * kPi * frequence;
+    auto potentiel = [&](int noeud) {
+        return noeud >= 0 && noeud < static_cast<int>(x.size()) ? x[noeud]
+                                                                : Complexe(0, 0);
+    };
+    auto branche = [&](int rang) {
+        return rang >= 0 && rang < static_cast<int>(x.size()) ? x[rang]
+                                                              : Complexe(0, 0);
+    };
+    for (const Element& element : elements) {
+        const Complexe u = potentiel(element.a) - potentiel(element.b);
+        Complexe courant(0, 0);
+        switch (element.genre) {
+            case 'R':
+                courant = u / std::max(element.valeur, 1e-9);
+                break;
+            case 'C':
+                courant = Complexe(0, omega * element.valeur) * u;
+                break;
+            case 'L':
+            case 'V':
+            case 'B':
+                courant = branche(element.branche);
+                break;
+            case 'I':
+                courant = Complexe(element.source.alternatif, 0);
+                break;
+            case 'D': {
+                // La diode est vue par sa conductance au point de repos ; la
+                // résistance série, quand le modèle en donne une, est déjà
+                // dans le nœud interne.
+                const int anode =
+                    element.interne1 >= 0 ? element.interne1 : element.a;
+                courant = Complexe(element.gd, 0)
+                          * (potentiel(anode) - potentiel(element.b));
+                break;
+            }
+            default:
+                continue;
+        }
+        // Le nom rendu est celui de l'élément, pas encore « I(...) » : c'est
+        // l'appelant qui filtre ce qui appartient au montage, et il a besoin
+        // du nom brut pour cela.
+        sortie->emplace_back(element.nom, courant);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Interface publique
 // ---------------------------------------------------------------------------
 SolveurIntegre::SolveurIntegre() : impl_(new Impl) {}
@@ -1704,6 +1774,18 @@ bool SolveurIntegre::analyse(Balayage& balayage) {
                 if (!grandeur_utile(nom)) continue;
                 releves[nom].first.push_back(std::abs(x[k]));
                 releves[nom].second.push_back(std::arg(x[k]) * 180.0 / kPi);
+            }
+            std::vector<std::pair<std::string, std::complex<double>>> courants;
+            impl_->courants_alternatifs(x, frequence, &courants);
+            for (const auto& courant : courants) {
+                if (!grandeur_utile(courant.first)) continue;
+                const std::string reference =
+                    courant.first.size() > 1 ? courant.first.substr(1)
+                                             : courant.first;
+                const std::string nom = "I(" + reference + ")";
+                releves[nom].first.push_back(std::abs(courant.second));
+                releves[nom].second.push_back(std::arg(courant.second) * 180.0
+                                              / kPi);
             }
         }
         for (auto& releve : releves) {

@@ -20,6 +20,7 @@
 #include "core/analysis/Analyses.h"
 #include "core/analysis/Campagne.h"
 
+class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QSpinBox;
@@ -130,6 +131,8 @@ private:
     QDoubleSpinBox* f_debut_ = nullptr;
     QDoubleSpinBox* f_fin_ = nullptr;
     QSpinBox* points_ = nullptr;
+    // Superposer le spectre des courants au diagramme de Bode.
+    QCheckBox* courants_ = nullptr;
     // Spectre
     QComboBox* signal_ = nullptr;
     QSpinBox* harmoniques_ = nullptr;
@@ -154,6 +157,9 @@ private:
     // ne l'a pas fait, la sélection suit le schéma.
     bool source_choisie_ = false;
     bool signal_choisi_ = false;
+    // Nœud pris pour référence au dernier affichage : il faut le retenir pour
+    // pouvoir redessiner quand on coche ou décoche les courants.
+    QString derniere_reference_;
     coeur::Balayage dernier_balayage_;
     coeur::Campagne derniere_campagne_;
     coeur::Spectre dernier_spectre_;
