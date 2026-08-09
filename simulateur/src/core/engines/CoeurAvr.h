@@ -140,6 +140,12 @@ public:
     // Octet reçu sur la liaison série.
     void recevoir_serie(uint8_t octet);
 
+    // Source datée : appelée à l'instant précis d'une conversion, avec le
+    // compteur de cycles de la puce. Rend la tension en volts, ou une valeur
+    // négative si l'appelant n'a rien pour cet instant — auquel cas c'est
+    // `tension_adc` qui fait foi, comme avant.
+    std::function<double(int canal, uint64_t cycle)> source_adc;
+
     // Notifications : niveau de sortie d'une broche, octet émis sur l'UART.
     std::function<void(char port, int bit, bool haut)> sur_broche;
     std::function<void(uint8_t)> sur_serie;

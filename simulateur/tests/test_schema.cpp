@@ -33,6 +33,8 @@
 #include "app/panels/PanneauPcb.h"
 #include "core/engines/NgspiceEngine.h"
 #include "app/MoteurSimulation.h"
+#include "core/engines/ProgrammesExemples.h"
+#include <QDir>
 #include "app/schematic/SceneSchema.h"
 #include "app/schematic/VueSchema.h"
 #include "core/Device.h"
@@ -1713,6 +1715,166 @@ static void test_famille_328p() {
 
 
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// L'analyseur d'impédance embarqué
+//
+// C'est le test qui met à l'épreuve tout le couplage d'un bout à l'autre : un
+// vrai firmware, compilé par avr-g++, qui excite un RLC, l'échantillonne par
+// son convertisseur, en fait une transformée de Fourier et publie le résultat
+// sur sa liaison série. On relit ce qu'il a écrit, et l'on vérifie qu'il a
+// trouvé la résonance là où la théorie la met.
+//
+// Ce test n'aurait rien donné avant que le convertisseur sache DATER ses
+// mesures : la fenêtre de couplage figeant la tension pendant cinq
+// millisecondes, le firmware relisait treize fois la même valeur et son
+// spectre était plat.
+// ---------------------------------------------------------------------------
+static void test_analyseur_impedance() {
+    std::printf("\n-- analyseur d'impédance embarqué --\n");
+
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    // Le montage : D8 attaque L en série avec C et le shunt. Deux diviseurs à
+    // trois résistances ramènent les points de mesure autour de 5/3 V, ce qui
+    // évite d'écrêter les alternances négatives.
+    const double kL = 1.0, kC = 220e-9, kShunt = 470.0;
+    const double f0 = 1.0 / (2 * 3.14159265358979323846 * std::sqrt(kL * kC));
+
+    coeur::Netlist netlist;
+    auto& l = netlist.ajouter("L1", "inductance");
+    l.valeurs["henrys"] = kL;
+    netlist.relier("L1", "1", "EXC");
+    netlist.relier("L1", "2", "M");
+    auto& c = netlist.ajouter("C1", "condensateur");
+    c.valeurs["farads"] = kC;
+    netlist.relier("C1", "1", "M");
+    netlist.relier("C1", "2", "SHUNT");
+    auto& rs = netlist.ajouter("R1", "resistance");
+    rs.valeurs["ohms"] = kShunt;
+    netlist.relier("R1", "1", "SHUNT");
+    netlist.relier("R1", "2", "GND");
+    netlist.ajouter("V5", "alim5v");
+    netlist.relier("V5", "1", "VCC");
+
+    // Les deux fronts de mesure, identiques : trois résistances de 22 kΩ.
+    auto diviseur = [&netlist](const char* source, const char* sortie,
+                               const char* r1, const char* r2, const char* r3) {
+        auto& a = netlist.ajouter(r1, "resistance");
+        a.valeurs["ohms"] = 22000;
+        netlist.relier(r1, "1", source);
+        netlist.relier(r1, "2", sortie);
+        auto& b = netlist.ajouter(r2, "resistance");
+        b.valeurs["ohms"] = 22000;
+        netlist.relier(r2, "1", sortie);
+        netlist.relier(r2, "2", "VCC");
+        auto& d = netlist.ajouter(r3, "resistance");
+        d.valeurs["ohms"] = 22000;
+        netlist.relier(r3, "1", sortie);
+        netlist.relier(r3, "2", "GND");
+    };
+    diviseur("SHUNT", "MES_I", "R2", "R3", "R4");
+    diviseur("EXC", "MES_U", "R5", "R6", "R7");
+
+    std::vector<LiaisonBroche> broches = {
+        {8, "D8", "EXC", "U1"},        // excitation
+        {14, "A0", "MES_I", "U1"},     // image du courant
+        {15, "A1", "MES_U", "U1"}};    // image de l'excitation
+    std::vector<CartePosee> cartes = {{"U1", "atmega328p", 16000000, 5.0, 25.0,
+                                       35000.0}};
+
+    MoteurSimulation moteur;
+    moteur.definir_circuit(netlist, broches, cartes);
+
+    QString journal;
+    if (!moteur.compiler_et_charger(QString::fromUtf8(coeur::kAnalyseurArduino),
+                                    QDir::tempPath(), &journal, "U1")) {
+        verifier(false, "l'analyseur compile et se charge",
+                 journal.toStdString());
+        return;
+    }
+    verifier(true, "l'analyseur compile et se charge");
+
+    QString sortie;
+    QObject::connect(&moteur, &MoteurSimulation::octet_serie,
+                     [&sortie](char octet, const QString&) { sortie += octet; });
+
+    // Un balayage complet dure environ un demi-seconde simulée ; on en laisse
+    // passer largement plus, le temps que la première ligne sorte de l'UART.
+    moteur.avancer_simule(4.5);
+
+    // Ce que le firmware a écrit : « f  U  I  |Z| » par ligne.
+    struct Point { long f = 0, u = 0, i = 0, z = 0; };
+    std::vector<Point> points;
+    for (const QString& ligne : sortie.split('\n')) {
+        const QStringList mots = ligne.simplified().split(' ');
+        if (mots.size() != 4) continue;
+        bool ok1 = false, ok2 = false, ok3 = false, ok4 = false;
+        Point p;
+        p.f = mots[0].toLong(&ok1);
+        p.u = mots[1].toLong(&ok2);
+        p.i = mots[2].toLong(&ok3);
+        p.z = mots[3].toLong(&ok4);
+        if (ok1 && ok2 && ok3 && ok4 && p.f > 0) points.push_back(p);
+    }
+
+    verifier(points.size() >= 9,
+             "l'analyseur publie son balayage sur la liaison série",
+             std::to_string(points.size()) + " point(s) relevé(s)");
+    if (points.size() < 9) {
+        std::printf("     sortie brute : %s\n",
+                    sortie.left(300).toStdString().c_str());
+        return;
+    }
+
+    // Le courant doit culminer à la résonance, et l'impédance y être minimale.
+    size_t rang_i = 0, rang_z = 0;
+    for (size_t k = 1; k < 9; ++k) {
+        if (points[k].i > points[rang_i].i) rang_i = k;
+        if (points[k].z < points[rang_z].z) rang_z = k;
+    }
+    verifier(std::fabs(points[rang_z].f - f0) < 0.12 * f0,
+             "l'impédance mesurée est minimale à la résonance",
+             std::to_string(points[rang_z].f) + " Hz contre " + f(f0, 0)
+                 + " Hz attendus");
+    // Le minimum d'impédance et le maximum de courant doivent tomber au même
+    // point du balayage, ou sur deux points voisins : la mesure a la
+    // résolution de son pas, pas davantage.
+    const long ecart = std::labs(static_cast<long>(rang_z)
+                                 - static_cast<long>(rang_i));
+    verifier(ecart <= 1,
+             "le courant culmine au même point, ou au point voisin",
+             std::to_string(points[rang_z].f) + " Hz contre "
+                 + std::to_string(points[rang_i].f) + " Hz");
+
+    // À la résonance il ne reste que les résistances : le shunt, la sortie du
+    // microcontrôleur et les diviseurs. L'ordre de grandeur doit être le bon.
+    verifier(points[rang_z].z > 200 && points[rang_z].z < 1200,
+             "l'impédance à la résonance vaut quelques centaines d'ohms",
+             std::to_string(points[rang_z].z) + " Ω");
+    // Et loin de la résonance, elle est bien plus grande : c'est le condensateur
+    // en dessous, la bobine au-dessus.
+    verifier(points[0].z > points[rang_z].z * 3
+                 && points[8].z > points[rang_z].z * 3,
+             "l'impédance remonte de part et d'autre",
+             std::to_string(points[0].z) + " Ω à " + std::to_string(points[0].f)
+                 + " Hz, " + std::to_string(points[8].z) + " Ω à "
+                 + std::to_string(points[8].f) + " Hz");
+    // La tension relevée n'est pas nulle : sans elle l'impédance ne voudrait
+    // rien dire, et un convertisseur muet passerait inaperçu.
+    verifier(points[rang_i].u > 100,
+             "la tension aux bornes du montage est relevée elle aussi",
+             std::to_string(points[rang_i].u) + " mV");
+
+    std::printf("     relevé de la carte : ");
+    for (size_t k = 0; k < 9; ++k)
+        std::printf("%ld Hz:%ld Ω  ", points[k].f, points[k].z);
+    std::printf("\n");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -1737,6 +1899,7 @@ int main(int argc, char** argv) {
     test_pas_de_trainee();
     test_panneaux_retrecissables();
     test_famille_328p();
+    test_analyseur_impedance();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

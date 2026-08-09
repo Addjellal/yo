@@ -101,6 +101,12 @@ public:
     // inerte si la carte n'existe pas.
     const coeur::Microcontroleur& mcu(const QString& carte = {}) const;
 
+    // Avance la simulation d'une durée donnée de temps SIMULÉ, sans passer
+    // par le minuteur. C'est ce qui rend le couplage vérifiable : un banc
+    // d'essai ne peut pas attendre que l'horloge de la machine veuille bien
+    // avancer, et le mode « --analyse » n'ouvre pas de fenêtre.
+    void avancer_simule(double secondes);
+
     // Résout le circuit une seule fois, sans firmware : « analyse au point de
     // repos », utile pour vérifier un montage purement analogique.
     void resoudre_une_fois();
@@ -179,6 +185,12 @@ private:
     double vitesse_ = 0.0;
     QString source_spice_;
     double pas_ = 50e-6;            // résolution de l'analyse transitoire
+
+    // Formes d'onde de la fenêtre précédente, pour les nœuds qui entrent dans
+    // un convertisseur : c'est ce que la puce relit à l'instant exact de sa
+    // conversion, au lieu de la seule valeur de fin de fenêtre.
+    std::vector<double> onde_temps_;
+    std::map<std::string, std::vector<double>> ondes_adc_;
     double instant_trame_ = 0.0;    // horloge absolue, pour l'oscilloscope
     std::map<std::string, double> etat_;   // tensions reprises d'une trame à l'autre
     Etat etat_simulation_ = Etat::Arrete;  // marche, pause, arrêt
@@ -187,6 +199,9 @@ private:
     const Carte* carte(const QString& reference) const;
     Carte& obtenir_carte(const QString& reference);
     void brancher_rappels(Carte& carte);
+    // Tension vue par une voie du convertisseur à l'instant `cycle` du cœur.
+    double tension_adc_datee(const Carte& carte, int canal,
+                             uint64_t cycle) const;
     void noter_changement(Carte& carte, int broche, bool haut);
     void remettre_a_zero();
 

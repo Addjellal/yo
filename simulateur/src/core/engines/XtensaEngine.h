@@ -40,6 +40,9 @@ public:
 
     void definir_niveau_externe(int broche, bool haut) override;
     void definir_tension_adc(int, double) override {}
+    // Le bloc de conversion de l'ESP32 n'est pas modélisé : rien à dater.
+    void definir_source_adc(
+        std::function<double(int, uint64_t)>) override {}
     void envoyer_octet_serie(uint8_t) override {}
 
     void sur_changement_broche(std::function<void(int, bool)> rappel) override {

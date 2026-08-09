@@ -312,6 +312,21 @@ bool CoeurCortexM::lire_peripherique(uint32_t adresse, uint32_t* valeur) const {
         if (decalage == p_.adc.resultat) {
             const uint32_t voie =
                 (adc_selection_ >> p_.adc.decalage_voie) & p_.adc.masque_voie;
+            // La tension est demandée à l'instant de la lecture, et non au
+            // bord de la fenêtre de couplage : sans cela un programme qui
+            // échantillonne un signal alternatif relit sans fin la même
+            // valeur.
+            if (source_adc && voie < adc_.size()) {
+                const double volts = source_adc(static_cast<int>(voie), cycles_);
+                if (volts >= 0.0) {
+                    const double pleine = (1u << p_.adc.bits) - 1;
+                    const double borne =
+                        std::max(0.0, std::min(p_.adc.reference, volts));
+                    *valeur = static_cast<uint32_t>(
+                        borne / p_.adc.reference * pleine + 0.5);
+                    return true;
+                }
+            }
             *valeur = voie < adc_.size() ? adc_[voie] : 0;
             return true;
         }

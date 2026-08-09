@@ -79,6 +79,8 @@ public:
 
     // Impose la tension lue par l'ADC sur une entrée analogique (0..5 V).
     void definir_tension_adc(int canal, double volts) override;
+    void definir_source_adc(
+        std::function<double(int canal, uint64_t cycle)> source) override;
 
     // Notifications
     void sur_changement_broche(std::function<void(int, bool)> rappel) override {

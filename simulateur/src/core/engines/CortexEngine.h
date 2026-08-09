@@ -39,6 +39,8 @@ public:
 
     void definir_niveau_externe(int broche, bool haut) override;
     void definir_tension_adc(int canal, double volts) override;
+    void definir_source_adc(
+        std::function<double(int canal, uint64_t cycle)> source) override;
     void envoyer_octet_serie(uint8_t octet) override;
 
     void sur_changement_broche(std::function<void(int, bool)> rappel) override {

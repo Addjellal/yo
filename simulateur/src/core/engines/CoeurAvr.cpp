@@ -555,6 +555,13 @@ void CoeurAvr::demarrer_conversion() {
     if (p_.mux5 && p_.adcsrb != ProfilAvr::kAbsent
         && (donnees_[p_.adcsrb] & 0x08))
         canal |= 0x08;
+    // La tension est demandée MAINTENANT, pas au bord de la fenêtre de
+    // couplage : c'est ce qui permet à un programme d'échantillonner un
+    // signal alternatif et d'en tirer quelque chose.
+    if (source_adc && canal < p_.canaux_adc && canal < 16) {
+        const double volts = source_adc(canal, cycles_);
+        if (volts >= 0.0) tension_adc(canal, volts);
+    }
     const uint16_t mesure = canal < p_.canaux_adc ? adc_[canal] : 0;
     donnees_[p_.adcl] = static_cast<uint8_t>(mesure & 0xFF);
     donnees_[p_.adch] = static_cast<uint8_t>(mesure >> 8);

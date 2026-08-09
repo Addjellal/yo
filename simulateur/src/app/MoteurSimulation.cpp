@@ -72,6 +72,65 @@ void MoteurSimulation::brancher_rappels(Carte& cible) {
     cible.mcu->sur_octet_serie([this, reference](char octet) {
         emit octet_serie(octet, reference);
     });
+    // Le convertisseur ne prend plus sa valeur au bord de la fenêtre mais à
+    // l'instant même de la conversion, dans la forme d'onde déjà calculée.
+    cible.mcu->definir_source_adc([this, pointeur](int canal, uint64_t cycle) {
+        return tension_adc_datee(*pointeur, canal, cycle);
+    });
+}
+
+// Tension présentée à une voie du convertisseur à l'instant `cycle` du cœur.
+//
+// La forme d'onde consultée est celle de la fenêtre PRÉCÉDENTE : celle de la
+// fenêtre en cours n'existe pas encore, puisque le circuit n'est résolu
+// qu'après que le firmware a tourné. C'est un retard d'une fenêtre, et il est
+// sans conséquence sur ce qui nous occupe : sur un régime périodique établi,
+// un retard pur laisse le spectre d'amplitude inchangé.
+//
+// Rend -1 quand il n'y a rien à lire — première fenêtre, nœud non relevé — et
+// la puce garde alors la valeur que le couplage lui a laissée.
+double MoteurSimulation::tension_adc_datee(const Carte& cible, int canal,
+                                           uint64_t cycle) const {
+    if (onde_temps_.size() < 2 || !cible.mcu) return -1.0;
+
+    // Quelle broche de cette carte porte cette voie, et sur quel nœud ?
+    const std::string* noeud = nullptr;
+    for (const LiaisonBroche& liaison : broches_) {
+        if (QString::fromStdString(liaison.carte) != cible.reference) continue;
+        if (cible.mcu->canal_adc(liaison.numero) != canal) continue;
+        noeud = &liaison.noeud;
+        break;
+    }
+    if (!noeud) return -1.0;
+    std::string minuscule = *noeud;
+    std::transform(minuscule.begin(), minuscule.end(), minuscule.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    auto onde = ondes_adc_.find(minuscule);
+    if (onde == ondes_adc_.end() || onde->second.size() != onde_temps_.size())
+        return -1.0;
+
+    const uint32_t frequence = cible.mcu->frequence();
+    if (frequence == 0) return -1.0;
+    const uint64_t depuis =
+        cycle > cible.cycle_debut ? cycle - cible.cycle_debut : 0;
+    double instant = static_cast<double>(depuis) / frequence;
+    const double duree = onde_temps_.back() - onde_temps_.front();
+    // Une fenêtre plus longue que la précédente n'a rien d'anormal : on lit
+    // alors la fin de celle qu'on a.
+    if (instant > duree) instant = duree;
+    instant += onde_temps_.front();
+
+    // Interpolation linéaire entre les deux points qui encadrent l'instant.
+    const auto borne = std::lower_bound(onde_temps_.begin(), onde_temps_.end(),
+                                        instant);
+    if (borne == onde_temps_.begin()) return onde->second.front();
+    if (borne == onde_temps_.end()) return onde->second.back();
+    const size_t rang = static_cast<size_t>(borne - onde_temps_.begin());
+    const double t0 = onde_temps_[rang - 1], t1 = onde_temps_[rang];
+    if (t1 - t0 < 1e-15) return onde->second[rang];
+    const double part = (instant - t0) / (t1 - t0);
+    return onde->second[rang - 1]
+           + part * (onde->second[rang] - onde->second[rang - 1]);
 }
 
 QStringList MoteurSimulation::cartes() const { return ordre_cartes_; }
@@ -497,6 +556,24 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     for (const auto& trace : formes.tensions)
         tensions[trace.first] = moyenne(trace.second);
 
+    // On retient la forme d'onde des nœuds qui entrent dans un convertisseur.
+    // C'est elle que la puce relira, à l'instant de sa conversion, pendant la
+    // fenêtre suivante. Seuls ces nœuds-là sont gardés : le reste ne servirait
+    // à rien et coûterait de la mémoire à chaque image.
+    onde_temps_ = formes.temps;
+    ondes_adc_.clear();
+    for (const LiaisonBroche& liaison : broches_) {
+        const Carte* source = carte(QString::fromStdString(liaison.carte));
+        if (!source || !source->mcu) continue;
+        if (source->mcu->canal_adc(liaison.numero) < 0) continue;
+        std::string noeud = liaison.noeud;
+        std::transform(noeud.begin(), noeud.end(), noeud.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ondes_adc_.count(noeud)) continue;
+        auto trace = formes.tensions.find(noeud);
+        if (trace != formes.tensions.end()) ondes_adc_[noeud] = trace->second;
+    }
+
     // Retour du circuit vers les microcontrôleurs. Ici, en revanche, c'est la
     // valeur *finale* qui compte : le programme lit un niveau à un instant
     // donné, pas une moyenne.
@@ -643,6 +720,19 @@ uint64_t MoteurSimulation::executer_pas(uint64_t cycles) {
     if (executes == 0) executes = cycles;
     resoudre_trame(executes);
     return executes;
+}
+
+void MoteurSimulation::avancer_simule(double secondes) {
+    if (secondes <= 0) return;
+    const uint32_t frequence =
+        cartes_.empty() ? 16000000 : cartes_.begin()->second->mcu->frequence();
+    pas_couplage_ms_ = pas_couplage_utile();
+    const uint64_t cycles_par_pas =
+        static_cast<uint64_t>(frequence) * pas_couplage_ms_ / 1000;
+    if (cycles_par_pas == 0) return;
+    const uint64_t total = static_cast<uint64_t>(secondes * frequence);
+    for (uint64_t faits = 0; faits < total;)
+        faits += std::max<uint64_t>(1, executer_pas(cycles_par_pas));
 }
 
 void MoteurSimulation::trame() {

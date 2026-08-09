@@ -163,6 +163,11 @@ public:
     bool broche_en_sortie(int broche) const;
     bool broche_haute(int broche) const;
 
+    // Source datée pour le convertisseur : appelée au moment où le firmware
+    // lit le registre de résultat, avec le compteur de cycles du cœur. Rend
+    // les volts, ou une valeur négative pour dire « rien à cet instant ».
+    std::function<double(int voie, uint64_t cycle)> source_adc;
+
     std::function<void(int broche, bool haut)> sur_broche;
     // Ce que le firmware écrit sur sa liaison série, quand elle est modélisée.
     std::function<void(uint8_t)> sur_serie;

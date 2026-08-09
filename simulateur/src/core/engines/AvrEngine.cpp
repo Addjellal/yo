@@ -376,6 +376,14 @@ void AvrEngine::definir_tension_adc(int canal, double volts) {
     impl_->coeur.tension_adc(canal, volts);
 }
 
+// La source datée n'existe que pour le cœur intégré. simavr, lui, ne rend la
+// main qu'entre deux pas : c'est un choix assumé, et l'application n'emploie
+// simavr que pour la confrontation, jamais pour le couplage.
+void AvrEngine::definir_source_adc(
+    std::function<double(int canal, uint64_t cycle)> source) {
+    impl_->coeur.source_adc = std::move(source);
+}
+
 void AvrEngine::envoyer_octet_serie(uint8_t octet) {
     if (utilise_simavr()) {
         serie_simavr(octet);

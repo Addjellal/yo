@@ -126,6 +126,11 @@ void CortexEngine::definir_tension_adc(int voie, double volts) {
     coeur_->tension_adc(voie, volts);
 }
 
+void CortexEngine::definir_source_adc(
+    std::function<double(int canal, uint64_t cycle)> source) {
+    coeur_->source_adc = std::move(source);
+}
+
 void CortexEngine::envoyer_octet_serie(uint8_t) {}
 
 bool CortexEngine::chaine_disponible() { return !chaine().commande.empty(); }

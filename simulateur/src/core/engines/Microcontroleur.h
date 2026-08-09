@@ -65,6 +65,24 @@ public:
     // --- ce que le circuit impose à la puce
     virtual void definir_niveau_externe(int broche, bool haut) = 0;
     virtual void definir_tension_adc(int canal, double volts) = 0;
+    // Source de tension DATÉE pour le convertisseur.
+    //
+    // `definir_tension_adc` fige une valeur pour toute une fenêtre de
+    // couplage — cinq millisecondes. Un programme qui échantillonne plus vite
+    // que deux cents fois par seconde relit alors treize fois la même mesure,
+    // et toute analyse embarquée d'un signal alternatif est fausse sans que
+    // rien ne le signale.
+    //
+    // Avec cette source, la puce demande la tension AU MOMENT où elle
+    // convertit, en donnant son propre compteur de cycles. Le couplage y
+    // répond en relisant la forme d'onde déjà calculée, ce qui introduit un
+    // retard d'une fenêtre : sur un régime périodique établi, un retard pur
+    // ne change pas le spectre d'amplitude, seulement la phase.
+    //
+    // Rendre une valeur négative veut dire « je n'ai rien pour cet instant » :
+    // la puce garde alors ce que `definir_tension_adc` lui a laissé.
+    virtual void definir_source_adc(
+        std::function<double(int canal, uint64_t cycle)> source) = 0;
     virtual void envoyer_octet_serie(uint8_t octet) = 0;
 
     // --- notifications

@@ -347,6 +347,165 @@ void app_main(void) {
 }
 )";
 
+// ---------------------------------------------------------------------------
+// Analyseur d'impédance embarqué
+//
+// C'est le projet le plus ambitieux du lot, et le seul où la carte MESURE le
+// circuit analogique au lieu de simplement l'allumer. Elle excite un RLC
+// série, échantillonne sa réponse, et en tire un spectre — en tension et en
+// courant.
+//
+// Le principe est celui d'un analyseur de réseau, réduit à ce qu'un
+// microcontrôleur sait faire :
+//
+//   1. une broche produit un créneau à la fréquence voulue ;
+//   2. le convertisseur échantillonne huit fois par période, EN PHASE avec
+//      ce créneau — c'est la boucle elle-même qui produit les deux ;
+//   3. une transformée de Fourier discrète à huit points, raie 1, extrait
+//      l'amplitude ET la phase de la fondamentale.
+//
+// Le point 3 n'est pas un raffinement : c'est ce qui rend la mesure juste.
+// Un créneau contient ses harmoniques impaires, et à 150 Hz l'harmonique 3
+// tombe à 450 Hz, tout près de la résonance — le courant réel y est alors
+// autant harmonique 3 que fondamental. Un détecteur de crête mesurerait ce
+// mélange et rendrait n'importe quoi. La raie 1 d'une TFD à huit points, elle,
+// est orthogonale aux harmoniques 3, 5 et 7 : elles s'annulent exactement.
+//
+// Avoir la PHASE permet de soustraire deux tensions comme des vecteurs, donc
+// de remonter à l'impédance complexe du montage. Sans elle, on ne saurait
+// rien faire de deux amplitudes.
+// ---------------------------------------------------------------------------
+inline const char* kAnalyseurArduino = R"SRC(/* Analyseur d'impédance : la carte mesure le RLC qu'on lui branche.
+
+   Montage (voir le schéma chargé avec cet exemple) :
+
+     D8 --[ L1 1 H ]-- M --[ C1 220 nF ]-- S --[ R1 470 ]-- GND
+
+   S est l'image du courant : R1 est un shunt, et la tension a ses bornes
+   vaut 470 fois le courant. Chacun des deux points mesures passe par un
+   diviseur a trois resistances egales (vers +5 V, vers la masse, vers le
+   point) qui ramene le signal au tiers autour du milieu de l'alimentation :
+   sans lui les alternances negatives seraient ecretees, et la mesure fausse.
+
+   ATTENTION au condensateur : a la resonance la tension a ses bornes vaut Q
+   fois celle d'attaque, soit une quinzaine de volts pour cinq volts en
+   entree. Aucune broche n'y touche, mais un condensateur reel doit tenir
+   cette tension.
+
+   Resonance attendue : 1/(2*pi*racine(L*C)) = 339 Hz. */
+
+#include <math.h>
+
+const int EXC = 8;              /* la broche qui excite le montage */
+const int VOIE_EXC = A1;        /* image de cette meme broche */
+const int VOIE_SHUNT = A0;      /* image de la tension aux bornes du shunt */
+const long SHUNT = 470;         /* ohms */
+
+const int N = 8;                /* echantillons par periode */
+const int PERIODES = 16;        /* periodes moyennees a chaque frequence */
+
+const int FREQUENCES[] = {150, 210, 260, 300, 339, 390, 455, 590, 810};
+const int NB_FREQUENCES = 9;
+
+/* Poids de la raie 1 d'une TFD a huit points, en virgule fixe sur 256.
+   181 vaut 256*racine(2)/2. Leur somme est nulle : la composante continue
+   est rejetee sans qu'on ait a la retrancher. */
+const int COS8[8] = {256, 181, 0, -181, -256, -181, 0, 181};
+const int SIN8[8] = {0, 181, 256, 181, 0, -181, -256, -181};
+
+/* Excite a la frequence f et releve une voie. Rend la raie 1, partie reelle
+   et partie imaginaire, en unites brutes (points de conversion x 256).
+   Le creneau est produit par cette boucle : l'echantillonnage lui est donc
+   coherent par construction, sans horloge ni interruption. */
+void mesurer(int voie, long f, long* re, long* im) {
+    const unsigned long pas = 1000000UL / (f * N);   /* microsecondes */
+    unsigned long instant = micros();
+    *re = 0;
+    *im = 0;
+
+    /* Chauffe : on excite sans rien compter pendant une vingtaine de
+       millisecondes. Deux raisons, et les deux comptent.
+
+       La premiere est physique : un circuit resonant met Q/(pi*f0) a
+       s'etablir, quelques millisecondes ici. Mesurer avant, c'est mesurer un
+       transitoire.
+
+       La seconde tient au simulateur : le convertisseur lit la forme d'onde
+       de la fenetre de couplage precedente, soit cinq millisecondes plus tot.
+       Sans chauffe, les premiers echantillons d'un balayage a 800 Hz
+       porteraient encore la frequence precedente. */
+    const int CHAUFFE = (int)((f * 40L) / 1000L) + 2;
+    for (int p = 0; p < CHAUFFE; p++) {
+        for (int k = 0; k < N; k++) {
+            while ((long)(micros() - instant) < 0) { }
+            digitalWrite(EXC, k < N / 2 ? HIGH : LOW);
+            instant += pas;
+        }
+    }
+
+    for (int p = 0; p < PERIODES; p++) {
+        for (int k = 0; k < N; k++) {
+            while ((long)(micros() - instant) < 0) { }
+            digitalWrite(EXC, k < N / 2 ? HIGH : LOW);
+            const long v = analogRead(voie);
+            *re += v * (long)COS8[k];
+            *im -= v * (long)SIN8[k];
+            instant += pas;
+        }
+    }
+}
+
+void setup() {
+    pinMode(EXC, OUTPUT);
+    Serial.begin(9600);
+    Serial.println("f(Hz)  U(mV)  I(uA)  |Z|(ohm)");
+}
+
+void loop() {
+    for (int rang = 0; rang < NB_FREQUENCES; rang++) {
+        const long f = FREQUENCES[rang];
+
+        /* Deux passes : une par voie. Le convertisseur ne sait convertir
+           qu'une voie a la fois, et deux conversions ne tiendraient pas dans
+           un intervalle d'echantillonnage a 800 Hz. Les deux passes partagent
+           la meme reference de phase, puisque le creneau est refait a
+           l'identique. */
+        long re_exc, im_exc, re_shunt, im_shunt;
+        mesurer(VOIE_EXC, f, &re_exc, &im_exc);
+        mesurer(VOIE_SHUNT, f, &re_shunt, &im_shunt);
+        digitalWrite(EXC, LOW);
+
+        /* Des unites brutes aux volts. Le facteur 3 defait le diviseur ;
+           2/(256*N*PERIODES) est le passage d'une somme ponderee a une
+           amplitude ; 5/1023 est le pas du convertisseur. */
+        const float echelle = 3.0 * 2.0 * 5.0 / (256.0 * N * PERIODES * 1023.0);
+        const float ure = re_exc * echelle,   uim = im_exc * echelle;
+        const float sre = re_shunt * echelle, sim = im_shunt * echelle;
+
+        /* Le courant, par la loi d'Ohm dans le shunt. */
+        const float i = sqrtf(sre * sre + sim * sim) / SHUNT;
+
+        /* La tension appliquee au montage. La branche L-C-shunt va de la
+           broche a la masse : la tension a ses bornes est donc celle du noeud
+           d'excitation, et rien d'autre. On la mesure au lieu de la supposer,
+           car la broche n'est pas une source parfaite — sa resistance interne
+           fait chuter la tension la ou le montage tire du courant, et cette
+           chute fait partie du spectre. */
+        const float u = sqrtf(ure * ure + uim * uim);
+
+        Serial.print(f);
+        Serial.print("  ");
+        Serial.print((long)(u * 1000.0));
+        Serial.print("  ");
+        Serial.print((long)(i * 1000000.0));
+        Serial.print("  ");
+        Serial.println(i > 1e-7 ? (long)(u / i) : 999999L);
+    }
+    Serial.println("--- balayage termine ---");
+    delay(1000);
+}
+)SRC";
+
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
     const char* nom;
@@ -369,6 +528,7 @@ inline std::vector<ProgrammeExemple> tous_les_programmes() {
         {"kProgrammeRecepteur", kProgrammeRecepteur},
         {"kProgrammeServo", kProgrammeServo},
         {"kProgrammeMoteur", kProgrammeMoteur},
+        {"kAnalyseurArduino", kAnalyseurArduino},
         {"kProgrammeRegistre", kProgrammeRegistre},
         {"kProgrammeRegistresNu", kProgrammeRegistresNu},
         {"kProgrammeAttiny", kProgrammeAttiny, "attiny85", 8000000},
