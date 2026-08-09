@@ -13,23 +13,40 @@
 //     L32R avec un décalage négatif. Un émulateur qui ignore cela ne charge
 //     jamais la bonne adresse de périphérique.
 //
-// LE TEMPS, et ce qu'on peut honnêtement en dire. Contrairement à ARM, qui
-// publie le coût de chaque instruction, Espressif ne donne pas de table pour
-// le LX6. Ce qui est modélisé est donc la STRUCTURE documentée du pipeline à
-// cinq étages, et non des chiffres relevés :
+// LE TEMPS, et ce qu'on peut honnêtement en dire.
+//
+// Contrairement à ARM, qui publie le coût de chaque instruction, le coût des
+// instructions du LX6 n'est PAS publiquement documenté. Ce qui a été vérifié
+// avant d'écrire ces lignes :
+//
+//   * la fiche technique de l'ESP32 (Espressif) décrit « a 7-stage pipeline
+//     to support the clock frequency of up to 240 MHz » et ne donne aucun
+//     nombre de cycles par instruction ;
+//   * le manuel de l'architecture (Cadence/Tensilica) décrit les
+//     verrouillages et les effets de pipeline de façon qualitative ; les
+//     tables de temps vivent dans le Data Book du cœur, sous accord de
+//     confidentialité.
+//
+// Ce qui est modélisé ici est donc la MÉCANIQUE, pas des chiffres relevés :
 //
 //   * une instruction ordinaire s'émet en un cycle ;
-//   * un branchement pris recharge le pipeline — deux cycles de plus ;
-//   * un chargement met deux cycles à rendre son résultat : l'instruction qui
-//     suit ATTEND si elle a besoin du registre chargé, et ne paie rien
-//     sinon. C'est le verrouillage de charge, et l'ignorer donne des boucles
-//     de recopie mémoire trop rapides.
+//   * un branchement pris recharge le pipeline. Le modèle facture deux
+//     cycles de plus. ATTENTION : sur un pipeline de sept étages, la
+//     pénalité réelle est vraisemblablement plus lourde — ce nombre est un
+//     choix, pas une mesure ;
+//   * un chargement met un cycle de plus à rendre son résultat : l'instruction
+//     qui suit ATTEND si elle a besoin du registre chargé, et ne paie rien
+//     sinon. C'est le verrouillage de charge, et l'ignorer rendrait une
+//     boucle de recopie mémoire aussi rapide qu'une boucle de calcul.
 //
 // À la différence du cœur AVR (exact, confronté à simavr) et du cœur Cortex-M
-// (exact, confronté aux tables d'ARM), CE CŒUR N'EST PAS EXACT AU CYCLE. Il
-// ne le sera pas tant qu'une table de référence n'existera pas : aucun
-// simulateur d'ESP32 ne l'est, pour la même raison. Le dire vaut mieux que de
-// laisser croire à une précision qu'on n'a pas.
+// (exact, confronté aux tables publiées par ARM), CE CŒUR N'EST PAS EXACT AU
+// CYCLE, et ne peut pas l'être à partir de sources publiques. Les durées
+// qu'il rend sont du bon ordre de grandeur, et les rapports entre deux
+// boucles sont respectés ; les valeurs absolues ne le sont pas.
+//
+// Pour l'obtenir, il faudrait chronométrer les séquences sur une vraie carte
+// avec son compteur CCOUNT, et bâtir la table à partir des mesures.
 //
 // Ce qui est modélisé : le jeu d'instructions courant — celui que produit un
 // compilateur pour du code qui pilote des registres —, la mémoire, et le

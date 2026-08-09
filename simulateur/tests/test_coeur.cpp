@@ -3794,7 +3794,11 @@ static void test_cycles_exacts_arm() {
 // LX6, et aucun simulateur d'ESP32 n'est exact au cycle — annoncer le
 // contraire serait mentir.
 //
-// Ce qu'il vérifie est la STRUCTURE du pipeline, qui, elle, est documentée :
+// Vérifié avant d'écrire ce banc : la fiche technique de l'ESP32 annonce un
+// pipeline de sept étages sans donner un seul nombre de cycles, et les tables
+// de temps du cœur sont sous accord de confidentialité chez Cadence.
+//
+// Ce qu'il vérifie est donc la MÉCANIQUE du pipeline, non ses chiffres :
 // un branchement pris coûte plus qu'un branchement non pris, et une valeur
 // chargée n'est pas disponible pour l'instruction suivante. Deux effets qui,
 // ignorés, rendent indiscernables une boucle de calcul et une boucle de
