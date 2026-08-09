@@ -31,6 +31,7 @@
 #include "core/export/Documents.h"
 #include "core/pcb/Empreintes.h"
 #include "core/pcb/Pcb.h"
+#include "core/pcb/Routeur.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;
@@ -3420,6 +3421,81 @@ static void test_esp32() {
              puce.broche_haute(2) ? "haute" : "basse");
 }
 
+
+// Le routage automatique.
+//
+// Un auto-routeur qui pose des pistes n'a rien prouvé : ce qui compte est
+// qu'elles soient FABRICABLES. Le test route donc une vraie carte, puis
+// repasse le contrôle des règles — celui-là même qui simule le regard du
+// fabricant. Zéro anomalie, ou le routeur ne vaut rien.
+static void test_routage_automatique() {
+    std::printf("\n[32] Routage automatique du circuit imprimé\n");
+
+    // Un montage réel : une carte Arduino, une LED, sa résistance, la masse.
+    coeur::Netlist netlist;
+    netlist.ajouter("U1", "arduino_uno");
+    netlist.relier("U1", "D13", "D13");
+    netlist.relier("U1", "GND", "GND");
+    auto& r1 = netlist.ajouter("R1", "resistance");
+    r1.valeurs["ohms"] = 220;
+    netlist.relier("R1", "1", "D13");
+    netlist.relier("R1", "2", "ANODE");
+    netlist.ajouter("LED1", "led");
+    netlist.relier("LED1", "A", "ANODE");
+    netlist.relier("LED1", "K", "GND");
+
+    coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+    carte.ajuster_contour();
+
+    int a_router = 0;
+    for (const coeur::CartePcb::Liaison& liaison : carte.chevelu())
+        if (!liaison.routee) ++a_router;
+    verifier(a_router > 0, "la carte a bien des liaisons à router",
+             std::to_string(a_router) + " liaisons");
+
+    const coeur::CompteRenduRoutage rendu = coeur::router(carte);
+    std::printf("  %s\n", rendu.resume().c_str());
+
+    verifier(rendu.routees == rendu.liaisons,
+             "toutes les liaisons sont routées",
+             std::to_string(rendu.routees) + "/" + std::to_string(rendu.liaisons));
+
+    // Le chevelu doit avoir disparu : chaque liaison est désormais reliée par
+    // du cuivre, et c'est la carte elle-même qui le dit.
+    int restantes = 0;
+    for (const coeur::CartePcb::Liaison& liaison : carte.chevelu())
+        if (!liaison.routee) ++restantes;
+    verifier(restantes == 0, "le chevelu est vide après routage",
+             std::to_string(restantes) + " liaison(s) restante(s)");
+
+    // Et surtout : la carte passe le contrôle de fabrication.
+    const std::vector<coeur::CartePcb::AnomaliePcb> anomalies = carte.controler();
+    std::string premieres;
+    for (size_t k = 0; k < anomalies.size() && k < 3; ++k)
+        premieres += anomalies[k].message + " ; ";
+    verifier(anomalies.empty(),
+             "la carte routée passe le contrôle des règles",
+             std::to_string(anomalies.size()) + " anomalie(s) " + premieres);
+
+    // Un routeur qui efface le travail déjà fait serait inutilisable : on
+    // route, on ajoute une piste à la main, on re-route, et elle doit être
+    // encore là.
+    const size_t avant = carte.pistes.size();
+    coeur::Piste manuelle;
+    manuelle.net = "gnd";
+    manuelle.x1 = 1.0; manuelle.y1 = 1.0;
+    manuelle.x2 = 1.0; manuelle.y2 = 4.0;
+    manuelle.largeur = 0.8;                 // une largeur qu'on reconnaîtra
+    carte.pistes.push_back(manuelle);
+    coeur::router(carte);
+    bool gardee = false;
+    for (const coeur::Piste& piste : carte.pistes)
+        if (std::abs(piste.largeur - 0.8) < 1e-9) gardee = true;
+    verifier(gardee && carte.pistes.size() > avant,
+             "les pistes tracées à la main sont conservées",
+             std::to_string(carte.pistes.size()) + " pistes");
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3457,6 +3533,7 @@ int main() {
     test_atmega2560();
     test_cartes_arm();
     test_esp32();
+    test_routage_automatique();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

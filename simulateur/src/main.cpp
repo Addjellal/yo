@@ -184,16 +184,12 @@ int main(int argc, char** argv) {
             sortie << "page affichee : " << fenetre.page_courante() << Qt::endl;
             sortie << fenetre.pcb()->rapport() << Qt::endl;
             sortie << fenetre.pcb()->resume() << Qt::endl;
-            // Toutes les liaisons routées d'un trait : la vérification porte
-            // sur la chaîne complète, pas sur l'adresse du routeur.
-            coeur::CartePcb& carte = fenetre.pcb()->vue()->carte();
-            for (const auto& liaison : carte.chevelu())
-                if (!liaison.routee)
-                    carte.pistes.push_back({liaison.net, liaison.x1, liaison.y1,
-                                            liaison.x2, liaison.y2, 0.4, 0});
-            // Reposer la carte fait recalculer l'état affiché : sans cela le
-            // panneau annoncerait encore « 0 piste ».
-            fenetre.pcb()->vue()->definir_carte(carte);
+            // Le vrai routeur, par le vrai bouton : la vérification porte sur
+            // la chaîne complète, et non sur des lignes droites posées de
+            // force qui ne prouveraient rien de fabricable.
+            fenetre.pcb()->router_tout();
+            const coeur::CartePcb& carte = fenetre.pcb()->vue()->carte();
+            (void)carte;
             int restantes = 0;
             for (const auto& liaison :
                  fenetre.pcb()->vue()->carte().chevelu())
@@ -304,6 +300,10 @@ int main(int argc, char** argv) {
         plus_tard([photographier] { photographier("annule"); });
         plus_tard([&fenetre] { fenetre.ouvrir_pcb(); });
         plus_tard([photographier] { photographier("circuit-imprime"); });
+        // Le routage automatique, vu à l'œil : un compte rendu chiffré ne dit
+        // pas si les pistes sont lisibles.
+        plus_tard([&fenetre] { fenetre.pcb()->router_tout(); });
+        plus_tard([photographier] { photographier("circuit-route"); });
         plus_tard([&fenetre] { fenetre.afficher_page(0); });
         plus_tard([photographier] { photographier("retour-schema"); });
         plus_tard([] { qApp->quit(); });

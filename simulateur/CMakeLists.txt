@@ -141,6 +141,7 @@ add_library(coeur STATIC
   src/core/export/Documents.cpp
   src/core/pcb/Pcb.cpp
   src/core/pcb/Empreintes.cpp
+  src/core/pcb/Routeur.cpp
 )
 target_include_directories(coeur PUBLIC src)
 

@@ -1,7 +1,10 @@
 #include "app/panels/PanneauPcb.h"
 
+#include "core/pcb/Routeur.h"
+
 #include "app/BarreDefilante.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -582,6 +585,13 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     effacer_ = new QPushButton("Tout dérouter");
     effacer_->setToolTip("Retire toutes les pistes et repart du chevelu. Le "
                          "placement des composants, lui, est conservé.");
+    auto* auto_router = new QPushButton("Router automatiquement");
+    auto_router->setToolTip(
+        "Trace les pistes qui manquent, en contournant le cuivre déjà posé.\n"
+        "Les pistes tirées à la main sont conservées : on route d'abord ce "
+        "qui compte — masses, puissance —, la machine fait le reste.\n"
+        "Le compte rendu dit ce qu'elle n'a pas su relier.");
+
     auto* regles = new QPushButton("Contrôler (DRC)");
     regles->setToolTip("Vérifie isolation, largeur minimale et débordement du "
                        "contour, comme le ferait le fabricant.");
@@ -590,6 +600,7 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
                          "contour) et le fichier de perçage Excellon.");
     barre->addWidget(defaire_);
     barre->addWidget(effacer_);
+    barre->addWidget(auto_router);
     barre->addStretch(1);
     barre->addWidget(regles);
     barre->addWidget(exporter);
@@ -642,6 +653,7 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     connect(chevelu_, &QCheckBox::toggled, vue_, &VuePcb::afficher_chevelu);
     connect(defaire_, &QPushButton::clicked, vue_, &VuePcb::defaire_piste);
     connect(effacer_, &QPushButton::clicked, vue_, &VuePcb::effacer_pistes);
+    connect(auto_router, &QPushButton::clicked, this, &PanneauPcb::router_tout);
     connect(regles, &QPushButton::clicked, this, &PanneauPcb::controler);
     connect(exporter, &QPushButton::clicked, this, &PanneauPcb::exporter);
     connect(vue_, &VuePcb::etat_change, this, [this](const QString& resume) {
@@ -651,6 +663,32 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     refleter_pistes();
     connect(vue_, &VuePcb::survol, this,
             [this](const QString& texte) { survol_->setText(texte); });
+}
+
+// Le routage automatique, tel qu'on s'en sert vraiment : il complète le
+// travail au lieu de le remplacer, et il rend des comptes. Un routeur qui
+// dirait seulement « terminé » laisserait l'utilisateur chercher lui-même ce
+// qui manque.
+void PanneauPcb::router_tout() {
+    if (!vue_) return;
+    if (vue_->carte().composants.empty()) {
+        afficher_rapport("Aucune carte : transférez d'abord le schéma.");
+        return;
+    }
+    coeur::ReglagesRoutage reglages;
+    reglages.largeur = largeur_ ? largeur_->value() : 0.4;
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const coeur::CompteRenduRoutage rendu =
+        coeur::router(vue_->carte(), reglages);
+    QApplication::restoreOverrideCursor();
+
+    vue_->definir_carte(vue_->carte());     // recadre et rafraîchit l'affichage
+    refleter_pistes();
+    const QString compte_rendu =
+        "Routage automatique — " + QString::fromStdString(rendu.resume());
+    afficher_rapport(compte_rendu);
+    emit journal(compte_rendu);
 }
 
 QString PanneauPcb::construire_depuis(const coeur::Netlist& netlist) {

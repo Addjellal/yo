@@ -10,9 +10,10 @@
 // produire les fichiers que réclame un fabricant — Gerber pour le cuivre,
 // Excellon pour les perçages.
 //
-// Ce qu'il ne fait pas : router tout seul. Le tracé reste manuel, comme dans
-// tout atelier sérieux où l'auto-routeur sert de point de départ, pas de
-// livraison.
+// Le routage automatique vit à côté, dans Routeur.h. Il complète le tracé
+// manuel au lieu de le remplacer : on route à la main ce qui compte — masses,
+// puissance, signaux rapides —, la machine fait le reste. C'est ainsi qu'on
+// s'en sert dans ARES comme dans KiCad.
 #pragma once
 
 #include <string>

@@ -113,6 +113,9 @@ public:
     QString rapport() const;
     // Contrôle des règles de fabrication, et compte rendu dans la page.
     void controler();
+    // Trace automatiquement les pistes qui manquent, en conservant celles
+    // qui ont été tirées à la main.
+    void router_tout();
     // Écriture des fichiers de fabrication sans boîte de dialogue.
     QStringList exporter_vers(const QString& base);
 
