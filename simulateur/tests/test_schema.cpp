@@ -36,6 +36,7 @@
 #include "app/schematic/SceneSchema.h"
 #include "app/schematic/VueSchema.h"
 #include "core/Device.h"
+#include "core/pcb/Empreintes.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;
@@ -1536,6 +1537,86 @@ static void test_panneaux_retrecissables() {
     oscilloscope.hide();
 }
 
+
+// Les cartes de la famille ATmega328P : Nano, Pro Mini, et la puce nue. Elles
+// portent le même contrôleur que l'Uno — le cœur qui exécute le firmware ne
+// doit voir aucune différence. Ce qui change est le nom des broches, et c'est
+// précisément ce que ce test vérifie : PB5 et D13 doivent aboutir à la même
+// broche interne, sans quoi un programme écrit pour la puce nue piloterait
+// autre chose que ce qu'il croit.
+static void test_famille_328p() {
+    std::printf("\n-- Nano, Pro Mini et ATmega328P nu --\n");
+
+    struct Cas {
+        const char* type;
+        const char* broche;      // la borne où l'on branche la LED
+        int attendu;             // le numéro interne qu'elle doit recevoir
+    };
+    const Cas cas[] = {{"arduino_uno", "D13", 13},
+                       {"arduino_nano", "D13", 13},
+                       {"arduino_pro_mini", "D13", 13},
+                       {"atmega328p", "PB5", 13}};
+
+    for (const Cas& essai : cas) {
+        SceneSchema scene;
+        ItemComposant* carte = scene.ajouter_composant(essai.type, QPointF(-400, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(0, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(300, 200));
+        if (!carte) {
+            verifier(false, std::string("la carte « ") + essai.type
+                                + " » existe au catalogue", "absente");
+            continue;
+        }
+        scene.addItem(new ItemFil(carte, borne(carte, essai.broche), led, 0));
+        scene.addItem(new ItemFil(led, 1, masse, 0));
+
+        std::vector<LiaisonBroche> broches;
+        const coeur::Netlist netlist = scene.construire_netlist(&broches);
+
+        int trouve = -1;
+        for (const LiaisonBroche& liaison : broches)
+            if (liaison.nom == essai.broche) trouve = liaison.numero;
+        verifier(trouve == essai.attendu,
+                 std::string(essai.type) + " : " + essai.broche
+                     + " est bien la broche interne "
+                     + std::to_string(essai.attendu),
+                 "reçu " + std::to_string(trouve));
+    }
+
+    // A7 n'existe que sur le Nano et la Pro Mini, et seulement comme entrée
+    // de convertisseur : elle doit recevoir un numéro, sinon analogRead(A7)
+    // ne lirait rien.
+    {
+        SceneSchema scene;
+        ItemComposant* nano = scene.ajouter_composant("arduino_nano", QPointF(0, 0));
+        ItemComposant* pot = scene.ajouter_composant("potentiometre", QPointF(400, 0));
+        scene.addItem(new ItemFil(nano, borne(nano, "A7"), pot, 1));
+        std::vector<LiaisonBroche> broches;
+        const coeur::Netlist netlist = scene.construire_netlist(&broches);
+        int numero = -1;
+        for (const LiaisonBroche& liaison : broches)
+            if (liaison.nom == "A7") numero = liaison.numero;
+        verifier(numero == 21, "A7 du Nano est une entrée de convertisseur",
+                 "numéro " + std::to_string(numero));
+    }
+
+    // Et chacune doit avoir une empreinte réelle : une carte sans empreinte
+    // ne pourrait pas partir au routage.
+    for (const Cas& essai : cas) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(essai.type);
+        if (!modele) continue;
+        const coeur::Empreinte empreinte = coeur::empreintes::resoudre(*modele);
+        const size_t bornes = modele->bornes.size();
+        verifier(empreinte.pastilles.size() >= bornes && empreinte.largeur > 5,
+                 std::string(essai.type) + " a une empreinte à ses cotes",
+                 std::to_string(empreinte.pastilles.size()) + " pastilles, "
+                     + std::to_string(static_cast<int>(empreinte.largeur))
+                     + " mm");
+    }
+}
+
+
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
@@ -1560,6 +1641,7 @@ int main(int argc, char** argv) {
     test_modification_en_marche();
     test_pas_de_trainee();
     test_panneaux_retrecissables();
+    test_famille_328p();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

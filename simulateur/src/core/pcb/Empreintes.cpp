@@ -300,6 +300,83 @@ Empreinte module(const std::string& nom, double largeur, double hauteur,
     return empreinte;
 }
 
+// Carte double rangée sur barrettes : Nano et Pro Mini se dessinent de la
+// même façon — un contour, deux rangées de broches au pas de 2,54 mm, la
+// broche 1 carrée. Seules changent les cotes et la liste des noms.
+static Empreinte carte_barrettes(const std::string& nom, double largeur,
+                                 double hauteur, double ecart_rangees,
+                                 const std::vector<std::string>& gauche,
+                                 const std::vector<std::string>& droite) {
+    Empreinte empreinte;
+    empreinte.nom = nom;
+    empreinte.largeur = largeur;
+    empreinte.hauteur = hauteur;
+
+    int numero = 1;
+    // Les broches courent le long des deux grands bords, centrées.
+    auto rangee = [&](const std::vector<std::string>& noms, double y) {
+        const double debut = -(static_cast<int>(noms.size()) - 1) * kPas / 2;
+        for (size_t k = 0; k < noms.size(); ++k) {
+            Pastille pastille = trou(numero++, debut + k * kPas, y, 1.8, 1.0);
+            pastille.nom = noms[k];
+            empreinte.pastilles.push_back(pastille);
+        }
+    };
+    rangee(gauche, -ecart_rangees / 2);
+    rangee(droite, ecart_rangees / 2);
+
+    empreinte.serigraphie.push_back(
+        rectangle(-largeur / 2, -hauteur / 2, largeur / 2, hauteur / 2));
+    // La prise USB dépasse d'un bout : c'est ce qui donne son sens au montage.
+    empreinte.serigraphie.push_back(rectangle(-largeur / 2 - 1.0, -3.5,
+                                              -largeur / 2 + 6.0, 3.5));
+    return empreinte;
+}
+
+// Arduino Nano : 43,2 × 18,0 mm, deux rangées de 15 broches écartées de
+// 15,24 mm (0,6 pouce) — il enjambe donc le sillon d'une plaque d'essai,
+// ce que l'Uno ne sait pas faire.
+Empreinte arduino_nano() {
+    return carte_barrettes(
+        "ARDUINO_NANO", 43.2, 18.0, 15.24,
+        {"D12", "D11", "D10", "D9", "D8", "D7", "D6", "D5", "D4", "D3", "D2",
+         "GND", "RESET", "D0", "D1"},
+        {"D13", "3V3", "AREF", "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+         "5V", "RESET", "GND", "VIN"});
+}
+
+// Arduino Pro Mini : 33,0 × 18,0 mm, mêmes deux rangées de 12 broches, plus
+// les six broches de programmation sur un bout. Pas de prise USB : c'est ce
+// qui la rend si petite, et ce qui oblige à un convertisseur pour la charger.
+Empreinte arduino_pro_mini() {
+    // Deux rangées de douze le long des grands bords — le brochage réel, TX
+    // et RX en tête —, puis quatre pastilles à l'intérieur de la carte : A4 et
+    // A5 au milieu, A6 et A7 près du bout. C'est ce qui distingue la Pro Mini
+    // d'une simple barrette : quatre de ses entrées ne sont pas sur le bord,
+    // et il faut le savoir avant de router.
+    Empreinte empreinte = carte_barrettes(
+        "ARDUINO_PRO_MINI", 33.0, 18.0, 15.24,
+        {"D1", "D0", "RST", "GND", "D2", "D3", "D4", "D5", "D6", "D7", "D8",
+         "D9"},
+        {"RAW", "GND", "RST2", "VCC", "A3", "A2", "A1", "A0", "D13", "D12",
+         "D11", "D10"});
+
+    int numero = static_cast<int>(empreinte.pastilles.size()) + 1;
+    const struct { const char* nom; double x, y; } interieures[] = {
+        {"A4", -1.27, -2.54}, {"A5", -1.27, 2.54},
+        {"A6", 12.7, -2.54},  {"A7", 12.7, 2.54}};
+    for (const auto& point : interieures) {
+        Pastille pastille = trou(numero++, point.x, point.y, 1.8, 1.0);
+        pastille.nom = point.nom;
+        empreinte.pastilles.push_back(pastille);
+    }
+
+    // Le connecteur de programmation, en bout de carte : six broches, et sans
+    // lui la Pro Mini ne peut pas être chargée du tout.
+    empreinte.serigraphie.push_back(rectangle(-16.5, -8.0, -11.5, 8.0));
+    return empreinte;
+}
+
 Empreinte arduino_uno() {
     // Contour et connecteurs de la carte Uno : 68,6 × 53,4 mm, quatre
     // barrettes au pas de 2,54 mm — avec, entre D7 et D8, le décalage de
@@ -377,6 +454,8 @@ Empreinte gabarit(const Modele& modele) {
     const size_t bornes = modele.bornes.size();
 
     if (nom == "ARDUINO_UNO") return arduino_uno();
+    if (nom == "ARDUINO_NANO") return arduino_nano();
+    if (nom == "ARDUINO_PRO_MINI") return arduino_pro_mini();
     if (commence_par(nom, "SOIC")) {
         const int broches = std::max(nombre_dans(nom), pair_au_moins(bornes));
         return boitier_cms("SOIC-" + std::to_string(broches), broches, 1.27,

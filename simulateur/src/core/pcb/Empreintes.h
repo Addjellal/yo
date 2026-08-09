@@ -15,6 +15,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "core/Device.h"
 
@@ -46,6 +47,10 @@ Empreinte module(const std::string& nom, double largeur, double hauteur,
                  int broches);
 // Carte Arduino Uno : contour réel, quatre connecteurs, quatre fixations.
 Empreinte arduino_uno();
+// Arduino Nano : deux rangées de 15 broches écartées de 0,6 pouce.
+Empreinte arduino_nano();
+// Arduino Pro Mini : la même en plus court, sans prise USB.
+Empreinte arduino_pro_mini();
 
 // --- attribution ---------------------------------------------------------
 // Empreinte complète d'un modèle : gabarit reconnu par son nom, pastilles

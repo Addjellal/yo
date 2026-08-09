@@ -37,6 +37,10 @@ inline const char* kArduinoEnTete = R"ARD(
 #define A3 17
 #define A4 18
 #define A5 19
+/* A6 et A7 n'existent que sur le Nano et la Pro Mini : entrées de
+   convertisseur seulement, sans étage numérique. */
+#define A6 20
+#define A7 21
 #define PI 3.1415926535897932384626433832795
 #define DEC 10
 #define HEX 16

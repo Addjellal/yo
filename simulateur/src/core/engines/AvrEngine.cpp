@@ -303,11 +303,16 @@ void AvrEngine::definir_niveau_externe(int broche, bool haut) {
 }
 
 bool AvrEngine::direction_sortie(int broche) const {
+    // A6 et A7 (20, 21) n'existent que sur le Nano et la Pro Mini, et
+    // seulement comme entrées de convertisseur : elles n'ont ni bit de
+    // direction ni bascule de sortie. Toujours en entrée, donc.
+    if (broche >= 20) return false;
     const BrocheAvr cible = broche_avr(broche);
     return (registre(adresse_ddr(cible.port)) >> cible.bit) & 1;
 }
 
 bool AvrEngine::niveau_port(int broche) const {
+    if (broche >= 20) return false;
     const BrocheAvr cible = broche_avr(broche);
     return (registre(adresse_port(cible.port)) >> cible.bit) & 1;
 }

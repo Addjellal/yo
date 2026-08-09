@@ -457,7 +457,11 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
         const double derniere = it->second.back();
         if (liaison.numero >= 14)
             cible->mcu->definir_tension_adc(liaison.numero - 14, derniere);
-        cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
+        // A6 et A7 du Nano n'ont pas d'étage numérique : elles n'entrent que
+        // dans le convertisseur. Leur imposer un niveau de port écrirait dans
+        // des bits qui n'existent pas sur la puce.
+        if (liaison.numero < 20)
+            cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
     }
 
     emit resultats(courants, tensions);

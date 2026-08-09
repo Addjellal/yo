@@ -2833,18 +2833,82 @@ static void test_exemples_compilent() {
     verifier(compiles == total, "tous les exemples passent avr-g++",
              std::to_string(compiles) + "/" + std::to_string(total)
                  + (echecs.empty() ? "" : "\n" + echecs));
-    // Ce sont des cartes Arduino : ce qui s'écrit dessus est un croquis, pas
-    // du C sur registres.
-    verifier(croquis == total,
-             "tous sont des croquis Arduino (setup + loop)",
+    // Tous sont des croquis sauf un : celui de la puce nue, qui n'a pas de
+    // carte pour lui fournir un noyau et s'écrit donc sur les registres.
+    verifier(croquis == total - 1,
+             "les programmes de carte sont des croquis (setup + loop)",
              std::to_string(croquis) + "/" + std::to_string(total));
+    const std::string nu = coeur::kProgrammeRegistresNu;
+    verifier(nu.find("DDRB") != std::string::npos
+                 && nu.find("void loop(") == std::string::npos,
+             "celui de la puce nue est du C sur registres", "DDRB, pas de loop");
 
-    // Et le croquis que porte le modèle de carte est bien celui-là.
-    const coeur::Modele* uno = coeur::Catalogue::instance().modele("arduino_uno");
-    verifier(uno && uno->carte && !uno->programme_exemple.empty()
-                 && uno->mcu == "atmega328p",
-             "la carte Arduino Uno porte son contrôleur et son croquis",
-             uno ? uno->mcu : std::string("carte introuvable"));
+    // Chaque carte du catalogue porte son contrôleur, son horloge et son
+    // programme — c'est ce qui rend le style dépendant du matériel et non
+    // de la fenêtre.
+    int cartes = 0;
+    std::string manquantes;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele || !modele->carte) continue;
+        ++cartes;
+        if (modele->mcu.empty() || modele->programme_exemple.empty()
+            || modele->horloge == 0)
+            manquantes += modele->type + " ";
+    }
+    verifier(cartes >= 4 && manquantes.empty(),
+             "toutes les cartes portent contrôleur, horloge et programme",
+             std::to_string(cartes) + " cartes " + manquantes);
+
+    const coeur::Modele* puce = coeur::Catalogue::instance().modele("atmega328p");
+    verifier(puce && puce->langage == "C (registres)",
+             "la puce nue annonce son langage, la carte annonce le sien",
+             puce ? puce->langage : std::string("modèle introuvable"));
+}
+
+
+// La preuve par l'exécution : le programme que porte chaque carte est
+// compilé pour de bon, chargé dans le cœur, et l'on regarde la broche 13
+// basculer. Nano, Pro Mini et puce nue portent le même ATmega328P : le cœur
+// ne doit voir aucune différence entre eux — et c'est bien ce qu'on exige
+// ici, car un croquis et un programme sur registres doivent produire le même
+// clignotement.
+static void test_cartes_qui_tournent() {
+    std::printf("\n[27] Chaque carte exécute vraiment son programme\n");
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (!modele || !modele->carte) continue;
+
+        const std::string firmware = "/tmp/sim_carte_" + modele->type + ".elf";
+        std::string journal;
+        if (!coeur::AvrEngine::compiler_source(modele->programme_exemple,
+                                               firmware, &journal)) {
+            verifier(false, modele->type + " : son programme compile", journal);
+            continue;
+        }
+
+        coeur::AvrEngine mcu;
+        // La carte dit son contrôleur et son quartz : c'est elle qui décide,
+        // pas une constante enfouie dans le moteur.
+        if (!mcu.charger(firmware, modele->mcu, modele->horloge)) {
+            verifier(false, modele->type + " : firmware chargé", mcu.erreur());
+            continue;
+        }
+
+        int basculements = 0;
+        mcu.sur_changement_broche([&](int broche, bool) {
+            if (broche == 13) ++basculements;   // D13 sur une carte, PB5 sur la puce
+        });
+        // Deux secondes simulées : le clignotant en fait quatre.
+        mcu.avancer(static_cast<uint64_t>(modele->horloge) * 2);
+
+        verifier(basculements >= 3,
+                 modele->type + " : la broche 13 bascule pour de vrai",
+                 std::to_string(basculements) + " basculement(s) en 2 s");
+    }
 }
 
 int main() {
@@ -2879,6 +2943,7 @@ int main() {
     test_numerique();
     test_pcb();
     test_exemples_compilent();
+    test_cartes_qui_tournent();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

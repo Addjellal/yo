@@ -27,13 +27,33 @@ QPointF aligner(const QPointF& point) {
 }
 
 // Numérotation Arduino d'un nom de broche : "D13" -> 13, "A0" -> 14.
+//
+// Les noms de port de l'ATmega328P y entrent aussi — "PB5" -> 13 — parce que
+// c'est la même broche désignée deux fois : une carte Arduino l'appelle D13,
+// la puce nue l'appelle PB5. Une seule numérotation interne suffit donc pour
+// les deux, et tout ce qui suit (le cœur, le couplage électrique, l'ADC) ne
+// connaît que celle-là.
+//
+// A6 et A7 n'existent que sur le Nano et la Pro Mini : ce sont deux entrées
+// de convertisseur sans étage numérique. Elles reçoivent donc les numéros 20
+// et 21, que le couplage traite en analogique pur.
 int numero_broche(const std::string& nom) {
     if (nom.size() < 2) return -1;
+
+    // "PB5", "PC0", "PD7" : la désignation du fabricant.
+    if (nom.size() == 3 && nom[0] == 'P' && nom[2] >= '0' && nom[2] <= '7') {
+        const int bit = nom[2] - '0';
+        if (nom[1] == 'D') return bit;                       // PD0..PD7 -> 0..7
+        if (nom[1] == 'B' && bit <= 5) return 8 + bit;        // PB0..PB5 -> 8..13
+        if (nom[1] == 'C' && bit <= 5) return 14 + bit;       // PC0..PC5 -> A0..A5
+        return -1;
+    }
+
     const std::string chiffres = nom.substr(1);
     if (chiffres.find_first_not_of("0123456789") != std::string::npos) return -1;
     const int valeur = std::stoi(chiffres);
     if (nom[0] == 'D' && valeur >= 0 && valeur <= 13) return valeur;
-    if (nom[0] == 'A' && valeur >= 0 && valeur <= 5) return 14 + valeur;
+    if (nom[0] == 'A' && valeur >= 0 && valeur <= 7) return 14 + valeur;
     return -1;
 }
 

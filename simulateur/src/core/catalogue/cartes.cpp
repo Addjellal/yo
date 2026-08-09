@@ -61,6 +61,141 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.programme_exemple = kSourceExemple;
         enregistrer(std::move(m));
     }
+
+    {   // -------------------------------------------------------- Arduino Nano
+        // Même puce que l'Uno, même horloge, même programme : ce qui change
+        // est le format et deux entrées analogiques de plus. Le cœur qui
+        // exécute le firmware ne voit aucune différence — et c'est vrai du
+        // vrai matériel, pas seulement d'ici.
+        Modele m;
+        m.type = "arduino_nano";
+        m.libelle = "Carte Arduino Nano";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#1a7f8c";
+
+        const double pas = 20;
+        const double premier = -130;
+        for (int d = 0; d <= 13; ++d) {
+            const double y = premier + (13 - d) * pas;
+            m.bornes.push_back({"D" + std::to_string(d), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(30, y + 4, "D" + std::to_string(d), 11));
+        }
+        const char* gauche[] = {"5V", "3V3", "GND", "VIN"};
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier + k * pas;
+            m.bornes.push_back({gauche[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, gauche[k], 11));
+        }
+        // A0 à A7 : les deux dernières ne servent qu'au convertisseur.
+        for (int a = 0; a <= 7; ++a) {
+            const double y = premier + (4 + a) * pas + 10;
+            m.bornes.push_back({"A" + std::to_string(a), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, "A" + std::to_string(a), 11));
+        }
+        const double demi_nano = 170;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi_nano, 70, demi_nano));
+        m.symbole.push_back(texte(-42, premier - 18, "ARDUINO NANO", 12));
+        m.empreinte = {"ARDUINO_NANO", {}, 43.2, 18.0};
+        m.mcu = "atmega328p";
+        m.horloge = 16000000;
+        m.programme_exemple = kSourceExemple;
+        enregistrer(std::move(m));
+    }
+
+    {   // ---------------------------------------------------- Arduino Pro Mini
+        Modele m;
+        m.type = "arduino_pro_mini";
+        m.libelle = "Carte Arduino Pro Mini";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#20707f";
+
+        const double pas = 20;
+        const double premier = -130;
+        for (int d = 0; d <= 13; ++d) {
+            const double y = premier + (13 - d) * pas;
+            m.bornes.push_back({"D" + std::to_string(d), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(30, y + 4, "D" + std::to_string(d), 11));
+        }
+        // Pas de prise USB, donc pas de régulateur 5 V d'origine : la carte
+        // reçoit sa tension par RAW, et VCC est déjà régulée.
+        const char* gauche[] = {"VCC", "GND", "RAW"};
+        for (int k = 0; k < 3; ++k) {
+            const double y = premier + k * pas;
+            m.bornes.push_back({gauche[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, gauche[k], 11));
+        }
+        for (int a = 0; a <= 7; ++a) {
+            const double y = premier + (3 + a) * pas + 10;
+            m.bornes.push_back({"A" + std::to_string(a), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, "A" + std::to_string(a), 11));
+        }
+        const double demi_mini = 170;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi_mini, 70, demi_mini));
+        m.symbole.push_back(texte(-48, premier - 18, "ARDUINO PRO MINI", 11));
+        m.empreinte = {"ARDUINO_PRO_MINI", {}, 33.0, 18.0};
+        m.mcu = "atmega328p";
+        m.horloge = 16000000;
+        m.programme_exemple = kSourceExemple;
+        enregistrer(std::move(m));
+    }
+
+    {   // -------------------------------------------- ATmega328P nu (DIP-28)
+        // La puce seule, sans carte autour : c'est ce qu'on soude sur son
+        // propre circuit imprimé quand le prototype est fini. Les broches
+        // portent alors le nom du fabricant, PB5 et non D13, et le programme
+        // s'écrit sur les registres — parce que c'est ainsi qu'on programme
+        // une puce nue, et non par déférence pour la tradition.
+        Modele m;
+        m.type = "atmega328p";
+        m.libelle = "ATmega328P nu (DIP-28)";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#3a3a3a";
+
+        const double pas = 20;
+        // Chaque colonne est centrée sur elle-même : dix broches à gauche,
+        // douze à droite. Les compter depuis un même premier point mettrait
+        // le boîtier de travers et ferait déborder le dessin de son cadre.
+        const char* a_gauche[] = {"PD0", "PD1", "PD2", "PD3", "PD4",
+                                  "PD5", "PD6", "PD7", "VCC", "GND"};
+        const double premier_gauche = -(10 - 1) * pas / 2;
+        for (int k = 0; k < 10; ++k) {
+            const double y = premier_gauche + k * pas;
+            m.bornes.push_back({a_gauche[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, a_gauche[k], 11));
+        }
+        // Colonne de droite : PB0..PB5 puis PC0..PC5.
+        const char* a_droite[] = {"PB0", "PB1", "PB2", "PB3", "PB4", "PB5",
+                                  "PC0", "PC1", "PC2", "PC3", "PC4", "PC5"};
+        const double premier_droite = -(12 - 1) * pas / 2;
+        for (int k = 0; k < 12; ++k) {
+            const double y = premier_droite + k * pas;
+            m.bornes.push_back({a_droite[k], {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(34, y + 4, a_droite[k], 11));
+        }
+        const double demi_puce = 150;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi_puce, 70, demi_puce));
+        m.symbole.push_back(texte(-40, premier_droite - 18, "ATmega328P", 12));
+        m.empreinte = {"DIP-28", {}, 35.6, 7.62};
+        m.mcu = "atmega328p";
+        m.horloge = 16000000;
+        m.langage = "C (registres)";
+        m.programme_exemple = kProgrammeRegistresNu;
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

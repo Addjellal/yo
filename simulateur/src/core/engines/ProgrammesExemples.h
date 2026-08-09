@@ -240,6 +240,27 @@ void loop() {
 }
 )";
 
+// Une puce nue se programme sur ses registres : il n'y a pas de carte pour
+// fournir un noyau, pas de numérotation Arduino, et la broche s'appelle PB5.
+// Le style suit le matériel — ce croquis-là n'aurait aucun sens ici.
+inline const char* kProgrammeRegistresNu = R"(/* ATmega328P nu : clignotant sur PB5.
+   Pas de carte autour, donc pas de setup() ni de loop() : on écrit
+   directement dans les registres, comme sur n'importe quel microcontrôleur
+   posé sur son propre circuit. */
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void) {
+    DDRB |= (1 << PB5);              /* PB5 en sortie */
+    while (1) {
+        PORTB |= (1 << PB5);         /* allumée */
+        _delay_ms(500);
+        PORTB &= ~(1 << PB5);        /* éteinte */
+        _delay_ms(500);
+    }
+}
+)";
+
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
     const char* nom;
@@ -258,6 +279,7 @@ inline std::vector<ProgrammeExemple> tous_les_programmes() {
         {"kProgrammeServo", kProgrammeServo},
         {"kProgrammeMoteur", kProgrammeMoteur},
         {"kProgrammeRegistre", kProgrammeRegistre},
+        {"kProgrammeRegistresNu", kProgrammeRegistresNu},
     };
 }
 
