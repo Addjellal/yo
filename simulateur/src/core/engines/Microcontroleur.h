@@ -80,4 +80,14 @@ std::unique_ptr<Microcontroleur> creer_microcontroleur(const std::string& mcu);
 // La liste des puces exécutables, pour les messages d'erreur et les tests.
 std::string puces_connues();
 
+// Compile un programme pour cette puce, avec la chaîne qui lui convient : le
+// compilateur AVR pour un ATmega, le compilateur ARM pour un Cortex-M. C'est
+// le pendant de `creer_microcontroleur` : exécuter et compiler doivent suivre
+// la même architecture, sans quoi l'un des deux se trompe de machine.
+bool compiler_pour(const std::string& mcu, const std::string& source,
+                   const std::string& chemin_elf, uint32_t horloge,
+                   std::string* journal);
+// Y a-t-il de quoi compiler pour cette puce sur cette machine ?
+bool chaine_disponible_pour(const std::string& mcu);
+
 }  // namespace coeur

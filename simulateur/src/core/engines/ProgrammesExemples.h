@@ -11,6 +11,7 @@
 // où il est la façon normale de programmer.
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -283,10 +284,54 @@ int main(void) {
 }
 )";
 
+// Raspberry Pi Pico. Pas de croquis Arduino ici : la carte se programme en C
+// sur ses registres, et son bloc SIO est ce qui la rend si particulière —
+// une écriture, un cycle, sans passer par le bus des périphériques.
+inline const char* kProgrammePico = R"(/* Pi Pico : clignotant sur GP25, la LED de la carte.
+   Le bloc SIO pilote les broches directement. GPIO_OE_SET met la broche en
+   sortie, GPIO_OUT_XOR l'inverse — écrire dans ces registres n'agit que sur
+   les bits à 1, ce qui évite de relire la valeur précédente. */
+#define SIO_BASE     0xd0000000u
+#define GPIO_OUT_XOR (*(volatile unsigned*)(SIO_BASE + 0x01c))
+#define GPIO_OE_SET  (*(volatile unsigned*)(SIO_BASE + 0x024))
+#define LED          (1u << 25)
+
+void _start(void) {
+    GPIO_OE_SET = LED;
+    for (;;) {
+        GPIO_OUT_XOR = LED;
+        for (volatile int i = 0; i < 400000; i++) { }
+    }
+}
+)";
+
+// STM32F103. Les registres ne se pilotent pas de la même façon : la direction
+// se règle par nibbles dans CRL, et BSRR pose ou efface sans lecture.
+inline const char* kProgrammeStm32 = R"(/* STM32F103 : clignotant sur PC13, la LED des cartes « Blue Pill ».
+   CRH décrit la configuration des broches 8 à 15, quatre bits chacune ;
+   BSRR pose un bit par sa moitié basse et l'efface par sa moitié haute. */
+#define GPIOC    0x40011000u
+#define GPIOC_CRH (*(volatile unsigned*)(GPIOC + 0x04))
+#define GPIOC_ODR (*(volatile unsigned*)(GPIOC + 0x0c))
+
+void _start(void) {
+    GPIOC_CRH = 0x00300000u;      /* PC13 en sortie, 50 MHz */
+    for (;;) {
+        GPIOC_ODR ^= (1u << 13);
+        for (volatile int i = 0; i < 200000; i++) { }
+    }
+}
+)";
+
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
     const char* nom;
     const char* source;
+    // La puce pour laquelle ce programme est écrit : c'est elle qui décide de
+    // la chaîne de compilation. Un programme ARM passé à avr-g++ échoue, et
+    // l'inverse aussi.
+    const char* mcu = "atmega328p";
+    uint32_t horloge = 16000000;
 };
 
 inline std::vector<ProgrammeExemple> tous_les_programmes() {
@@ -302,7 +347,9 @@ inline std::vector<ProgrammeExemple> tous_les_programmes() {
         {"kProgrammeMoteur", kProgrammeMoteur},
         {"kProgrammeRegistre", kProgrammeRegistre},
         {"kProgrammeRegistresNu", kProgrammeRegistresNu},
-        {"kProgrammeAttiny", kProgrammeAttiny},
+        {"kProgrammeAttiny", kProgrammeAttiny, "attiny85", 8000000},
+        {"kProgrammePico", kProgrammePico, "rp2040", 125000000},
+        {"kProgrammeStm32", kProgrammeStm32, "stm32f103", 72000000},
     };
 }
 

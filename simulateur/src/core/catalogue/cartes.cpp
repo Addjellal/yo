@@ -294,6 +294,115 @@ void enregistrer_cartes(Catalogue& catalogue) {
             m.broches_mcu["A" + std::to_string(a)] = 54 + a;
         enregistrer(std::move(m));
     }
+
+    {   // ------------------------------------------------- Raspberry Pi Pico
+        // Un Cortex-M0+ à 125 MHz : ni le même jeu d'instructions, ni la même
+        // façon de piloter ses broches qu'un AVR. Le simulateur l'exécute avec
+        // son cœur ARM, et le brochage GP0..GP28 lui est propre.
+        Modele m;
+        m.type = "pi_pico";
+        m.libelle = "Carte Raspberry Pi Pico";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#2f3a4a";
+
+        const double pas = 20;
+        // Vingt broches par côté, comme sur la carte : GP0 à GP15 d'un côté,
+        // GP16 à GP28 et les alimentations de l'autre.
+        const double premier = -(20 - 1) * pas / 2;
+        for (int g = 0; g <= 15; ++g) {
+            const double y = premier + g * pas;
+            m.bornes.push_back({"GP" + std::to_string(g), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, "GP" + std::to_string(g), 11));
+        }
+        const char* alimentation[] = {"GND", "3V3", "VSYS", "VBUS"};
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier + (16 + k) * pas;
+            m.bornes.push_back({alimentation[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, alimentation[k], 11));
+        }
+        for (int g = 16; g <= 28; ++g) {
+            const double y = premier + (g - 16) * pas;
+            m.bornes.push_back({"GP" + std::to_string(g), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(26, y + 4, "GP" + std::to_string(g), 11));
+        }
+        const double demi = (20 - 1) * pas / 2 + 30;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
+        m.symbole.push_back(texte(-34, premier - 16, "PI PICO", 12));
+        m.empreinte = {"PI_PICO", {}, 51.0, 21.0};
+        m.mcu = "rp2040";
+        m.horloge = 125000000;
+        m.langage = "C (registres)";
+        m.programme_exemple = kProgrammePico;
+        // GP0 est la broche 0 : la numérotation du fabricant est déjà celle
+        // du cœur, il n'y a rien à traduire.
+        for (int g = 0; g <= 28; ++g)
+            m.broches_mcu["GP" + std::to_string(g)] = g;
+        enregistrer(std::move(m));
+    }
+
+    {   // ------------------------------------------- STM32F103 « Blue Pill »
+        // Un Cortex-M3 : le même cœur que le Pico, avec les instructions de
+        // trente-deux bits en plus. C'est pourquoi il vient après lui.
+        Modele m;
+        m.type = "stm32f103";
+        m.libelle = "Carte STM32F103 (Blue Pill)";
+        m.categorie = "Cartes";
+        m.prefixe = "U";
+        m.carte = true;
+        m.couleur_corps = "#2a4a6a";
+
+        const double pas = 20;
+        const double premier = -(20 - 1) * pas / 2;
+        // Port A à gauche, port B et port C à droite : le brochage de la
+        // carte, où PC13 porte la LED.
+        for (int a = 0; a <= 15; ++a) {
+            const double y = premier + a * pas;
+            m.bornes.push_back({"PA" + std::to_string(a), {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, "PA" + std::to_string(a), 11));
+        }
+        const char* alimentation[] = {"GND", "3V3", "5V", "VBAT"};
+        for (int k = 0; k < 4; ++k) {
+            const double y = premier + (16 + k) * pas;
+            m.bornes.push_back({alimentation[k], {-90, y}, ""});
+            m.symbole.push_back(ligne(-90, y, -70, y));
+            m.symbole.push_back(texte(-62, y + 4, alimentation[k], 11));
+        }
+        for (int b = 0; b <= 15; ++b) {
+            const double y = premier + b * pas;
+            m.bornes.push_back({"PB" + std::to_string(b), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(26, y + 4, "PB" + std::to_string(b), 11));
+        }
+        for (int c = 13; c <= 15; ++c) {
+            const double y = premier + (16 + c - 13) * pas;
+            m.bornes.push_back({"PC" + std::to_string(c), {90, y}, ""});
+            m.symbole.push_back(ligne(70, y, 90, y));
+            m.symbole.push_back(texte(26, y + 4, "PC" + std::to_string(c), 11));
+        }
+        const double demi = (20 - 1) * pas / 2 + 30;
+        m.symbole.insert(m.symbole.begin(), rect(-70, -demi, 70, demi));
+        m.symbole.push_back(texte(-40, premier - 16, "STM32F103", 12));
+        m.empreinte = {"BLUE_PILL", {}, 53.0, 22.9};
+        m.mcu = "stm32f103";
+        m.horloge = 72000000;
+        m.langage = "C (registres)";
+        m.programme_exemple = kProgrammeStm32;
+        // Numérotation interne : port A de 0 à 15, port B de 16 à 31, port C
+        // de 32 à 47 — c'est ainsi que le cœur les range.
+        for (int a = 0; a <= 15; ++a)
+            m.broches_mcu["PA" + std::to_string(a)] = a;
+        for (int b = 0; b <= 15; ++b)
+            m.broches_mcu["PB" + std::to_string(b)] = 16 + b;
+        for (int c = 0; c <= 15; ++c)
+            m.broches_mcu["PC" + std::to_string(c)] = 32 + c;
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

@@ -519,6 +519,12 @@ Empreinte gabarit(const Modele& modele) {
     if (nom == "ARDUINO_UNO") return arduino_uno();
     if (nom == "ARDUINO_MEGA") return arduino_mega();
     if (nom == "ARDUINO_NANO") return arduino_nano();
+    // Pi Pico : 51 x 21 mm, deux rangées de vingt au pas de 2,54 mm.
+    if (nom == "PI_PICO")
+        return carte_barrettes("PI_PICO", 51.0, 21.0, 17.78, {}, {});
+    // Blue Pill : 53 x 22,9 mm, deux rangées de vingt.
+    if (nom == "BLUE_PILL")
+        return carte_barrettes("BLUE_PILL", 53.0, 22.9, 17.78, {}, {});
     if (nom == "ATTINY_DIP8") return dip(8);
     if (nom == "ARDUINO_PRO_MINI") return arduino_pro_mini();
     if (commence_par(nom, "SOIC")) {

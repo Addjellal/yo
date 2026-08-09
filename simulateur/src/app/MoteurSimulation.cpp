@@ -151,14 +151,6 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
                                            const QString& dossier,
                                            QString* journal_texte,
                                            const QString& reference) {
-    if (!coeur::AvrEngine::avr_gcc_disponible()) {
-        if (journal_texte)
-            *journal_texte =
-                "avr-gcc est introuvable. Installez la chaîne de compilation "
-                "AVR (paquet gcc-avr et avr-libc) pour compiler depuis "
-                "l'application.";
-        return false;
-    }
     const QString cible = reference.isEmpty() ? carte_par_defaut() : reference;
     if (cible.isEmpty()) {
         if (journal_texte)
@@ -167,16 +159,35 @@ bool MoteurSimulation::compiler_et_charger(const QString& source,
                 "Arduino avant de compiler.";
         return false;
     }
+    // La chaîne de compilation dépend de la puce, et le message qui manque
+    // aussi : dire « installez avr-gcc » devant une carte ARM n'aiderait
+    // personne.
+    const Carte& puce_cible = obtenir_carte(cible);
+    if (!coeur::chaine_disponible_pour(puce_cible.puce)) {
+        if (journal_texte)
+            *journal_texte =
+                QString("Aucun compilateur trouvé pour %1.\n")
+                    .arg(QString::fromStdString(puce_cible.puce))
+                + (puce_cible.puce.rfind("at", 0) == 0
+                       ? "Installez la chaîne AVR (paquets gcc-avr et "
+                         "avr-libc)."
+                       : "Installez « arm-none-eabi-gcc » ou « clang ».")
+                + "\nUn fichier .elf déjà compilé peut être chargé sans rien "
+                  "installer.";
+        return false;
+    }
     QDir().mkpath(dossier);
     // Un fichier par carte : deux cartes ne doivent pas se disputer le même
     // binaire.
     const QString fichier =
         QDir(dossier).filePath("firmware_" + cible.toLower() + ".elf");
     std::string compte_rendu;
-    const Carte& carte_cible = obtenir_carte(cible);
-    const bool ok = coeur::AvrEngine::compiler_source(
-        source.toStdString(), fichier.toStdString(), &compte_rendu,
-        carte_cible.puce, carte_cible.horloge);
+    const Carte& carte_cible = puce_cible;
+    // La chaîne qui convient à la puce : avr-g++ pour un ATmega, un
+    // compilateur ARM pour un Cortex-M.
+    const bool ok = coeur::compiler_pour(carte_cible.puce, source.toStdString(),
+                                         fichier.toStdString(),
+                                         carte_cible.horloge, &compte_rendu);
     if (journal_texte) *journal_texte = QString::fromStdString(compte_rendu);
     if (!ok) return false;
     QString erreur;

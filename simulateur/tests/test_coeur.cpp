@@ -22,6 +22,8 @@
 #include <set>
 
 #include "core/engines/AvrEngine.h"
+#include "core/engines/CortexEngine.h"
+#include "core/engines/Microcontroleur.h"
 #include "core/engines/ProgrammesExemples.h"
 #include "core/engines/MoteurNumerique.h"
 #include "core/engines/NgspiceEngine.h"
@@ -2813,21 +2815,22 @@ static void test_exemples_compilent() {
         return;
     }
 
-    int compiles = 0, croquis = 0;
-    std::string echecs;
+    int compiles = 0, croquis = 0, compilables = 0;
+    std::string echecs, ignores;
     for (const coeur::ProgrammeExemple& exemple : coeur::tous_les_programmes()) {
         const std::string firmware =
             std::string("/tmp/sim_exemple_") + exemple.nom + ".elf";
         std::string journal;
-        // Le programme de l'ATtiny se compile pour l'ATtiny : le compiler
-        // pour un ATmega passerait, et produirait un binaire qui ne tournerait
+        // Chaque programme est compilé pour SA puce : le compiler pour une
+        // autre passerait parfois, et produirait un binaire qui ne tournerait
         // sur rien.
-        const bool pour_attiny =
-            std::string(exemple.nom) == "kProgrammeAttiny";
-        if (coeur::AvrEngine::compiler_source(
-                exemple.source, firmware, &journal,
-                pour_attiny ? "attiny85" : "atmega328p",
-                pour_attiny ? 8000000 : 16000000)) {
+        if (!coeur::chaine_disponible_pour(exemple.mcu)) {
+            ignores += std::string(exemple.nom) + " ";
+            continue;
+        }
+        ++compilables;
+        if (coeur::compiler_pour(exemple.mcu, exemple.source, firmware,
+                                 exemple.horloge, &journal)) {
             ++compiles;
         } else {
             echecs += std::string(exemple.nom) + " : " + journal + "\n";
@@ -2840,13 +2843,16 @@ static void test_exemples_compilent() {
     }
 
     const int total = static_cast<int>(coeur::tous_les_programmes().size());
-    verifier(compiles == total, "tous les exemples passent avr-g++",
-             std::to_string(compiles) + "/" + std::to_string(total)
+    verifier(compiles == compilables,
+             "tous les exemples compilent, chacun pour sa puce",
+             std::to_string(compiles) + "/" + std::to_string(compilables)
+                 + " compilés sur " + std::to_string(total)
+                 + (ignores.empty() ? "" : ", sans chaîne : " + ignores)
                  + (echecs.empty() ? "" : "\n" + echecs));
-    // Deux exceptions, et deux seulement : les puces nues. Sans carte autour
-    // il n'y a pas de noyau Arduino, et le C sur registres est la façon
-    // normale de les programmer.
-    verifier(croquis == total - 2,
+    // Quatre exceptions : les puces nues et les cartes ARM. Sans noyau
+    // Arduino pour elles, le C sur registres est la façon normale de les
+    // programmer.
+    verifier(croquis == total - 4,
              "les programmes de carte sont des croquis (setup + loop)",
              std::to_string(croquis) + "/" + std::to_string(total));
     for (const char* nu : {coeur::kProgrammeRegistresNu,
@@ -2897,18 +2903,27 @@ static void test_cartes_qui_tournent() {
     for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
         if (!modele || !modele->carte) continue;
 
+        // La chaîne suit la puce : avr-g++ pour un AVR, ARM pour un Cortex-M.
+        if (!coeur::chaine_disponible_pour(modele->mcu)) continue;
         const std::string firmware = "/tmp/sim_carte_" + modele->type + ".elf";
         std::string journal;
-        if (!coeur::AvrEngine::compiler_source(modele->programme_exemple,
-                                               firmware, &journal, modele->mcu,
-                                               modele->horloge)) {
+        if (!coeur::compiler_pour(modele->mcu, modele->programme_exemple,
+                                  firmware, modele->horloge, &journal)) {
             verifier(false, modele->type + " : son programme compile", journal);
             continue;
         }
 
-        coeur::AvrEngine mcu;
         // La carte dit son contrôleur et son quartz : c'est elle qui décide,
-        // pas une constante enfouie dans le moteur.
+        // pas une constante enfouie dans le moteur. Et c'est la fabrique qui
+        // choisit la machine qui l'exécutera.
+        std::unique_ptr<coeur::Microcontroleur> puce =
+            coeur::creer_microcontroleur(modele->mcu);
+        if (!puce) {
+            verifier(false, modele->type + " : une machine sait l'exécuter",
+                     modele->mcu);
+            continue;
+        }
+        coeur::Microcontroleur& mcu = *puce;
         if (!mcu.charger(firmware, modele->mcu, modele->horloge)) {
             verifier(false, modele->type + " : firmware chargé", mcu.erreur());
             continue;
@@ -2916,7 +2931,11 @@ static void test_cartes_qui_tournent() {
 
         // Où regarder : D13 (donc PB5) sur les cartes ATmega, PB1 sur
         // l'ATtiny, dont le programme d'exemple s'y adresse.
-        const int attendue = modele->mcu == "attiny85" ? 1 : 13;
+        // Où regarder : chaque carte a sa broche témoin.
+        int attendue = 13;
+        if (modele->mcu == "attiny85") attendue = 1;
+        else if (modele->type == "pi_pico") attendue = 25;
+        else if (modele->type == "stm32f103") attendue = 45;   // PC13
         int basculements = 0;
         mcu.sur_changement_broche([&](int broche, bool) {
             if (broche == attendue) ++basculements;
@@ -3241,6 +3260,81 @@ int main(void) {
              "broches vues : " + liste);
 }
 
+
+// Les cartes ARM : Pi Pico (Cortex-M0+) et STM32F103 (Cortex-M3).
+//
+// Rien du cœur AVR n'est réutilisé ici. Ce test compile pour de bon, avec la
+// chaîne ARM trouvée sur la machine, le programme d'exemple que porte chaque
+// carte, puis l'exécute et regarde la broche bouger. C'est la seule preuve
+// qui vaille : un décodeur d'instructions qui se trompe sur une seule forme
+// n'échoue pas, il part à la dérive.
+static void test_cartes_arm() {
+    std::printf("\n[30] Cortex-M : Pi Pico et STM32\n");
+    if (!coeur::CortexEngine::chaine_disponible()) {
+        std::printf("  (aucun compilateur ARM — section ignorée)\n");
+        return;
+    }
+    std::printf("  chaîne trouvée : %s\n",
+                coeur::CortexEngine::chaine_trouvee().c_str());
+
+    struct Cas { const char* type; int broche; };
+    const Cas cas[] = {{"pi_pico", 25}, {"stm32f103", 45}};   // GP25, PC13
+
+    for (const Cas& essai : cas) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(essai.type);
+        if (!modele) {
+            verifier(false, std::string(essai.type) + " est au catalogue",
+                     "absent");
+            continue;
+        }
+
+        const std::string firmware =
+            std::string("/tmp/sim_arm_") + essai.type + ".elf";
+        std::string journal;
+        if (!coeur::CortexEngine::compiler_source(modele->programme_exemple,
+                                                  firmware, &journal,
+                                                  modele->mcu)) {
+            verifier(false, std::string(essai.type) + " : son programme compile",
+                     journal);
+            continue;
+        }
+
+        coeur::CortexEngine puce;
+        if (!puce.charger(firmware, modele->mcu, modele->horloge)) {
+            verifier(false, std::string(essai.type) + " : firmware chargé",
+                     puce.erreur());
+            continue;
+        }
+
+        int basculements = 0;
+        puce.sur_changement_broche([&](int broche, bool) {
+            if (broche == essai.broche) ++basculements;
+        });
+        // Une seconde simulée à l'horloge de la carte.
+        puce.avancer(modele->horloge);
+        verifier(basculements >= 2,
+                 std::string(essai.type) + " : sa LED clignote pour de vrai",
+                 std::to_string(basculements) + " basculements en 1 s");
+    }
+
+    // Une carte ARM ne doit pas être confiée au moteur AVR, et réciproquement :
+    // c'est la fabrique qui tranche, et s'y tromper donnerait un firmware
+    // exécuté par la mauvaise machine.
+    auto moteur_de = [](const char* mcu) {
+        std::unique_ptr<coeur::Microcontroleur> moteur =
+            coeur::creer_microcontroleur(mcu);
+        return moteur ? std::string(moteur->nom_du_coeur()) : std::string("aucun");
+    };
+    verifier(moteur_de("atmega328p").find("intégré") != std::string::npos
+                 && moteur_de("rp2040") == "Cortex-M intégré"
+                 && moteur_de("stm32f103") == "Cortex-M intégré"
+                 && moteur_de("6502") == "aucun",
+             "chaque puce est confiée au bon moteur",
+             moteur_de("atmega328p") + " / " + moteur_de("rp2040") + " / "
+                 + moteur_de("6502"));
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -3276,6 +3370,7 @@ int main() {
     test_cartes_qui_tournent();
     test_attiny85();
     test_atmega2560();
+    test_cartes_arm();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {
