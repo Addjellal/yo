@@ -1213,6 +1213,40 @@ uint32_t immediat_etendu(uint32_t douze_bits, bool* retenue) {
     return resultat;
 }
 
+// Décalage dont le RANG VIENT D'UN REGISTRE.
+//
+// Il ne suit pas la même convention que la forme immédiate, et confondre les
+// deux est l'erreur classique :
+//
+//   * en immédiat, « LSR #0 » n'existe pas et l'encodage zéro signifie 32 —
+//     le résultat est donc nul. Idem pour ASR ;
+//   * par registre, un rang de zéro signifie ZÉRO : la valeur ne bouge pas.
+//
+// Le second cas n'a rien d'exotique : « v >> i » dans une boucle où i finit à
+// zéro le produit à chaque tour. Traiter ce zéro comme 32 rendait nul le
+// dernier quartet de tout affichage hexadécimal écrit ainsi.
+//
+// Le rang vient d'un registre : il peut valoir jusqu'à 255. Décaler un
+// entier de 32 bits de plus de 31 rangs est un comportement INDÉFINI en C++,
+// et les cas au-delà sont donc traités à part plutôt que laissés au hasard.
+uint32_t decaler_registre(uint32_t valeur, int type, int rang) {
+    switch (type) {
+        case 0: return rang >= 32 ? 0u : (valeur << rang);                // LSL
+        case 1: return rang >= 32 ? 0u : (valeur >> rang);                // LSR
+        case 2: {                                                         // ASR
+            const int32_t signe = static_cast<int32_t>(valeur);
+            return static_cast<uint32_t>(signe >> (rang >= 32 ? 31 : rang));
+        }
+        default: {                                                        // ROR
+            const int tour = rang & 31;
+            if (!tour) return valeur;
+            return (valeur >> tour) | (valeur << (32 - tour));
+        }
+    }
+}
+
+// Décalage dont le rang est ÉCRIT DANS L'INSTRUCTION. Voir ci-dessus : ici un
+// rang nul veut dire trente-deux pour LSR et ASR.
 uint32_t decaler(uint32_t valeur, int type, int rang) {
     switch (type) {
         case 0: return rang ? (valeur << rang) : valeur;                  // LSL
@@ -1388,7 +1422,7 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
         || (premier & 0xFF80) == 0xFA40 || (premier & 0xFF80) == 0xFA60) {
         const int type = (premier >> 5) & 3;
         const int rm = second & 0x0F;
-        r_[rd2] = decaler(r_[rn1], type, r_[rm] & 0xFF);
+        r_[rd2] = decaler_registre(r_[rn1], type, r_[rm] & 0xFF);
         if ((premier >> 4) & 1) poser_drapeaux_logiques(r_[rd2]);
         return 1;
     }

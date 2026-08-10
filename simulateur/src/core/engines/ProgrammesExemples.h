@@ -824,11 +824,11 @@ inline Programme programme_analyseur(const std::string& mcu) {
         principal = kAnalyseurArduino;
     else if (mcu == "rp2040")
         principal = kAnalyseurPico;
-    // STM32 : le programme existe plus bas et se compile, mais il se BLOQUE
-    // dans sa première mesure. Le Pico, lui, achève son balayage depuis que
-    // la retenue d'ADC/SBC est corrigée — le STM32 a donc autre chose, non
-    // identifié. Le proposer dans cet état ferait perdre plus de temps qu'une
-    // absence.
+    // STM32 : le programme se compile et démarre, mais se bloque dans sa
+    // PREMIÈRE mesure. Deux défauts du cœur ont déjà été trouvés en le
+    // poursuivant — la retenue d'ADC/SBC et le décalage par registre de rang
+    // nul — et le Pico en est sorti guéri ; le STM32 a donc encore autre
+    // chose, non identifié. Pas proposé tant qu'il n'achève pas un balayage.
     if (!principal) return {};
     return Programme{{nom_principal(mcu), principal},
                      {"analyseur.h", kAnalyseurCommun}};

@@ -4909,6 +4909,54 @@ static void test_serie_et_sauts_arm() {
         }
     }
 
+
+    // --- Décalage dont le rang vient d'un REGISTRE -------------------------
+    //
+    // La forme immédiate et la forme par registre ne suivent pas la même
+    // convention, et les confondre est l'erreur classique : en immédiat,
+    // « LSR #0 » n'existe pas et l'encodage zéro signifie TRENTE-DEUX, donc
+    // résultat nul ; par registre, un rang de zéro signifie zéro et la valeur
+    // ne bouge pas.
+    //
+    // Les deux passaient par la même fonction. Conséquence : « v >> i » dans
+    // une boucle où i finit à zéro — la façon dont tout le monde écrit un
+    // affichage hexadécimal — perdait son dernier quartet.
+    {
+        const std::string source =
+            "#define SR (*(volatile unsigned*)0x40013800u)\n"
+            "#define DR (*(volatile unsigned*)0x40013804u)\n"
+            "static void put(char c){ while(!(SR&(1u<<7))){} DR=(unsigned)c; }\n"
+            "volatile unsigned v = 0x0123abcdu;\n"
+            "volatile int zero = 0;\n"
+            "void _start(void) {\n"
+            "    int i;\n"
+            // Le quartet de poids faible, obtenu par un décalage de rang nul
+            // pris dans un registre.
+            "    unsigned d = (v >> zero) & 0xfu;\n"
+            "    put(d < 10u ? (char)('0' + d) : (char)('a' + d - 10u));\n"
+            // Et la boucle entière, qui est le cas réel.
+            "    for (i = 28; i >= 0; i -= 4) {\n"
+            "        unsigned q = (v >> i) & 0xfu;\n"
+            "        put(q < 10u ? (char)('0' + q) : (char)('a' + q - 10u));\n"
+            "    }\n"
+            "    for (;;) { }\n"
+            "}\n";
+        std::string journal;
+        if (coeur::CortexEngine::compiler_source(source, "/tmp/sim_decalage.elf",
+                                                 &journal, "stm32f103")) {
+            coeur::CortexEngine puce;
+            std::string recu;
+            puce.sur_octet_serie([&](char octet) { recu += octet; });
+            puce.charger("/tmp/sim_decalage.elf", "stm32f103", 72000000);
+            puce.avancer(2000000);
+            verifier(recu == "d0123abcd",
+                     "décalage de rang nul par registre : la valeur ne bouge pas",
+                     "« " + recu + " » contre « d0123abcd » attendu");
+        } else {
+            verifier(false, "l'essai de décalage compile", journal);
+        }
+    }
+
     // Le bloc IT, pris à part et sans ambiguïté : quatre instructions dans un
     // seul bloc, dont deux doivent s'exécuter et deux être sautées. Et une
     // vérification que les drapeaux ne bougent pas — « addne » emploie
