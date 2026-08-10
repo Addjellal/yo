@@ -238,9 +238,20 @@ masquait tous :
    8.2.2, paquet `qemu-system-arm`). Voici ce qu'il a fallu trouver, pour ne
    pas le rechercher :
 
-   - QEMU n'a pas de machine STM32 ni RP2040, mais ce n'est pas nécessaire :
-     `mps2-an385` donne un Cortex-M3 générique et `microbit` un Cortex-M0.
-     C'est le CŒUR qu'on compare, pas les périphériques ;
+   - QEMU A des machines STM32, contrairement à ce que laisse croire la page
+     générique de la documentation : `stm32vldiscovery` (STM32F100,
+     Cortex-M3), `netduino2` (STM32F205), `netduinoplus2` et
+     `olimex-stm32-h405` (Cortex-M4). Le F100 partage sa carte de registres
+     avec le F103 que je modélise — USART1 à 0x40013800, GPIO à 0x40010800,
+     SysTick. C'est donc un oracle qui couvre AUSSI les périphériques, et pas
+     seulement le cœur. Pour le RP2040 il n'y a rien ; `microbit` donne un
+     Cortex-M0 générique et `mps2-an385` un Cortex-M3 générique, ce qui suffit
+     pour comparer le cœur.
+
+     Premier essai d'un firmware STM32 réel sous `stm32vldiscovery` : aucune
+     sortie série. NON DIAGNOSTIQUÉ. Pistes : le routage de `-serial`, la
+     validation d'horloge dans RCC, ou une différence d'USART entre F100 et
+     F103 ;
    - il faut une TABLE DE VECTEURS, sans quoi la machine part en HardFault
      immédiat (« Lockup: can't escalate 3 to HardFault »). Un Cortex-M lit sa
      pile initiale à l'adresse 0 et son point d'entrée à 4 :
