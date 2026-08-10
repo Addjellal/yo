@@ -104,6 +104,14 @@ const ProfilCortex& profil_rp2040() {
         p.adc.bits = 12;
         p.adc.reference = 3.3;
         p.adc.voies = 4;
+        // UART0, un PL011 : registre de données à 0x000, registre de
+        // drapeaux à 0x018, dont le bit 5 dit « file d'émission pleine ».
+        // Le programme attend donc que ce bit soit à ZÉRO.
+        p.serie.base = 0x40034000;
+        p.serie.donnee = 0x000;
+        p.serie.etat = 0x018;
+        p.serie.bit_pret = 5;
+        p.serie.pret_quand_bit_haut = false;
         return p;
     }();
     return profil;
@@ -166,6 +174,14 @@ const ProfilCortex& profil_stm32f103() {
         p.adc.bits = 12;
         p.adc.reference = 3.3;
         p.adc.voies = 16;
+        // USART1, sur le bus rapide APB2 : état à 0x00, données à 0x04. Le
+        // bit 7 de l'état, TXE, dit « registre d'émission vide » — c'est la
+        // convention inverse de celle du PL011.
+        p.serie.base = 0x40013800;
+        p.serie.donnee = 0x04;
+        p.serie.etat = 0x00;
+        p.serie.bit_pret = 7;
+        p.serie.pret_quand_bit_haut = true;
         return p;
     }();
     return profil;
@@ -197,6 +213,7 @@ void CoeurCortexM::definir_profil(const ProfilCortex& profil) {
     tirages_.assign(64, 0);
     adc_.assign(32, 0);
     adc_controle_ = adc_selection_ = 0;
+    it_ = 0;
     reinitialiser();
 }
 
@@ -307,6 +324,24 @@ bool CoeurCortexM::lire_peripherique(uint32_t adresse, uint32_t* valeur) const {
         *valeur = 0;
         return true;
     }
+    if (p_.serie.base && adresse >= p_.serie.base
+        && adresse < p_.serie.base + 0x100) {
+        const uint32_t decalage = adresse - p_.serie.base;
+        if (decalage == p_.serie.etat) {
+            // L'émission est instantanée ici : le drapeau annonce toujours
+            // « prêt », dans le sens qu'attend cette puce. Une boucle
+            // d'attente ne tourne donc jamais indéfiniment.
+            *valeur = p_.serie.pret_quand_bit_haut
+                          ? (1u << p_.serie.bit_pret)
+                          : 0u;
+            // Un USART STMicroelectronics fait aussi guetter TC (bit 6) :
+            // « transmission achevée ». Elle l'est.
+            if (p_.serie.pret_quand_bit_haut) *valeur |= (1u << 6);
+            return true;
+        }
+        *valeur = 0;
+        return true;
+    }
     if (p_.adc.base && adresse >= p_.adc.base && adresse < p_.adc.base + 0x100) {
         const uint32_t decalage = adresse - p_.adc.base;
         if (decalage == p_.adc.resultat) {
@@ -355,6 +390,16 @@ bool CoeurCortexM::lire_peripherique(uint32_t adresse, uint32_t* valeur) const {
 }
 
 bool CoeurCortexM::ecrire_peripherique(uint32_t adresse, uint32_t valeur) {
+    if (p_.serie.base && adresse >= p_.serie.base
+        && adresse < p_.serie.base + 0x100) {
+        // Un octet déposé dans le registre de données part aussitôt. Les
+        // autres registres — vitesse, format, validation — sont acceptés sans
+        // effet : les régler ne change rien à un simulateur, et refuser
+        // l'écriture ferait échouer tout code d'initialisation honnête.
+        if (adresse - p_.serie.base == p_.serie.donnee && sur_serie)
+            sur_serie(static_cast<uint8_t>(valeur & 0xFF));
+        return true;
+    }
     for (size_t rang = 0; rang < p_.ports.size(); ++rang) {
         const ProfilPort& port = p_.ports[rang];
         EtatPort& etat = ports_[rang];
@@ -686,6 +731,56 @@ int CoeurCortexM::instruction() {
     const uint32_t adresse = r_[15];
     const uint16_t code = lire16(adresse);
     r_[15] = adresse + 2;
+
+    // --- BLOC IT (« if-then »), propre à l'ARMv7-M
+    //
+    // C'est LA particularité du Thumb-2, et gcc s'en sert à chaque expression
+    // conditionnelle dès qu'on compile pour un Cortex-M3 :
+    //
+    //     it   ne
+    //     addne r2, r2, r3
+    //
+    // L'instruction qui suit ne s'exécute que si la condition tient. Ne pas
+    // gérer cela ne fait pas planter le programme : l'addition a lieu TOUJOURS,
+    // et le résultat est faux en silence. C'est ainsi qu'une somme de vingt
+    // termes rendait 210 au lieu de 147.
+    //
+    // Deux points faciles à manquer :
+    //   * une instruction sautée doit tout de même être ENJAMBÉE, et elle peut
+    //     faire quatre octets ;
+    //   * une instruction exécutée dans un bloc IT NE MET PAS À JOUR les
+    //     drapeaux, même quand son encodage est celui de la forme « S ».
+    //     « addne r2, r2, r3 » emploie l'encodage de ADDS. On sauve donc les
+    //     drapeaux et on les remet en place après.
+    bool dans_bloc_it = false;
+    bool executer = true;
+    if (it_ != 0) {
+        dans_bloc_it = true;
+        executer = condition((it_ >> 4) & 0x0F);
+        // ITAdvance : les cinq bits bas glissent ; le bloc se ferme quand il
+        // ne reste plus de motif.
+        if ((it_ & 0x07) == 0) it_ = 0;
+        else it_ = static_cast<uint8_t>((it_ & 0xE0) | ((it_ << 1) & 0x1F));
+    }
+    if (dans_bloc_it && !executer) {
+        // Sautée : il faut quand même savoir si elle occupait deux ou quatre
+        // octets, sans quoi le décodage repartirait au milieu.
+        const int tete = code >> 11;
+        if (tete == 0x1D || tete == 0x1E || tete == 0x1F) r_[15] += 2;
+        return 1;
+    }
+    const bool n_avant = n_, z_avant = z_, c_avant = c_, v_avant = v_;
+    struct RemettreDrapeaux {
+        CoeurCortexM* coeur;
+        bool actif, n, z, c, v;
+        ~RemettreDrapeaux() {
+            if (!actif) return;
+            coeur->n_ = n;
+            coeur->z_ = z;
+            coeur->c_ = c;
+            coeur->v_ = v;
+        }
+    } garde{this, dans_bloc_it, n_avant, z_avant, c_avant, v_avant};
     // La valeur lue dans r15 est l'adresse de l'instruction plus quatre :
     // héritage du pipeline des premiers ARM, et toute adresse calculée
     // relativement au programme en dépend.
@@ -923,6 +1018,39 @@ int CoeurCortexM::instruction() {
 
     // --- 1011 : divers (pile, extensions, hints)
     if ((code & 0xF000) == 0xB000) {
+        // CBZ et CBNZ : « compare à zéro et saute ». Propres à l'ARMv7-M —
+        // un Cortex-M0+ ne les connaît pas —, et émises SANS CESSE par gcc
+        // dès qu'on compile en -Os pour un Cortex-M3 : tout « if (p) » en
+        // devient une.
+        //
+        // Les ignorer ne fait pas échouer le programme, ce qui est bien pire :
+        // il part à la dérive en silence. Un firmware STM32 compilé par gcc
+        // n'exécutait donc rien de sensé, et rien ne le disait.
+        //
+        // Encodage T1 : 1011 op 0 i 1 imm5 Rn, le déplacement étant toujours
+        // vers l'avant — d'où l'absence de signe.
+        // IT : 1011 1111 firstcond mask, avec mask non nul — un masque nul
+        // est un « hint » (NOP, WFI…), qu'on laisse passer sans effet.
+        if (p_.architecture >= 7 && (code & 0xFF00) == 0xBF00
+            && (code & 0x0F) != 0) {
+            it_ = static_cast<uint8_t>(code & 0xFF);
+            return 1;
+        }
+        if (p_.architecture >= 7 && (code & 0xF500) == 0xB100) {
+            const int rn = code & 0x7;
+            const uint32_t deplacement =
+                (((code >> 9) & 1) << 6) | (((code >> 3) & 0x1F) << 1);
+            const bool saute_si_non_nul = (code >> 11) & 1;
+            const bool nul = r_[rn] == 0;
+            if (nul != saute_si_non_nul) {
+                // r_[15] pointe déjà l'instruction suivante ; l'ARM compte
+                // ses déplacements depuis PC+4, d'où les deux octets de plus
+                // — même convention que le branchement conditionnel.
+                brancher(r_[15] + 2 + deplacement);
+                return 3;    // branchement pris : rechargement du pipeline
+            }
+            return 1;
+        }
         if ((code & 0xFF00) == 0xB000) {                 // ADD/SUB SP, #imm
             const uint32_t decalage = (code & 0x7F) * 4;
             if ((code >> 7) & 1) r_[13] -= decalage;

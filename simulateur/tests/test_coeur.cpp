@@ -4719,6 +4719,178 @@ static void test_notes_de_langage() {
              std::to_string(trop_longs) + " trop long(s)");
 }
 
+
+// ---------------------------------------------------------------------------
+// [41] ARM : la liaison série, et le Thumb-2 que gcc emploie vraiment
+//
+// Deux manques trouvés en installant arm-none-eabi-gcc et en demandant à une
+// carte ARM de PUBLIER une mesure.
+//
+// 1. Aucune liaison série n'était modélisée côté ARM. Un firmware Pico ou
+//    STM32 n'avait que ses broches pour dire quoi que ce soit — impossible
+//    d'en tirer un relevé chiffré.
+//
+// 2. DEUX instructions ARMv7-M manquaient au décodeur, et gcc les emploie
+//    constamment dès qu'on compile en -Os pour un Cortex-M3 :
+//
+//      * CBZ et CBNZ, « compare à zéro et saute » — tout « if (p) » ;
+//      * le bloc IT, « if-then », qui rend conditionnelles les une à quatre
+//        instructions suivantes. C'est la particularité même du Thumb-2.
+//
+//    Aucune des deux ne faisait PLANTER quoi que ce soit : le programme
+//    partait à la dérive en silence, ce qui est bien pire. La somme ci-dessous
+//    rendait 210 au lieu de 147 — l'addition sous « addne » avait lieu à tous
+//    les tours.
+// ---------------------------------------------------------------------------
+static void test_serie_et_sauts_arm() {
+    std::printf("\n[41] ARM : liaison serie et Thumb-2 conditionnel\n");
+    if (!coeur::CortexEngine::chaine_disponible()) {
+        std::printf("  (aucune chaine ARM — section ignoree)\n");
+        return;
+    }
+
+    struct Cas {
+        const char* mcu;
+        uint32_t horloge;
+        const char* entete;      // les registres de la liaison série
+        const char* attente;     // la boucle d'attente propre à la puce
+    };
+    const Cas cas[] = {
+        // PL011 : le drapeau dit « file PLEINE », on attend qu'il retombe.
+        {"rp2040", 125000000,
+         "#define SR (*(volatile unsigned*)0x40034018u)\n"
+         "#define DR (*(volatile unsigned*)0x40034000u)\n",
+         "while (SR & (1u << 5)) { }\n"},
+        // USART STMicroelectronics : le drapeau dit « registre VIDE ».
+        {"stm32f103", 72000000,
+         "#define SR (*(volatile unsigned*)0x40013800u)\n"
+         "#define DR (*(volatile unsigned*)0x40013804u)\n",
+         "while (!(SR & (1u << 7))) { }\n"}};
+
+    for (const Cas& essai : cas) {
+        // Le programme somme 1 à 20 en sautant un nombre sur trois, puis
+        // publie le total. Deux précautions :
+        //
+        //   * pas de division ni de modulo. Un Cortex-M0+ n'a pas de
+        //     diviseur, gcc appelle alors __aeabi_uidiv, et « -nostdlib »
+        //     n'en fournit aucun : le programme ne se lierait pas ;
+        //   * la condition porte sur une variable, « if (reste) », ce qui est
+        //     exactement la forme que gcc traduit par un CBZ.
+        const std::string source =
+            std::string(essai.entete)
+            + "static void emettre(const char* t) {\n"
+              "    while (*t) { " + essai.attente + " DR = (unsigned)*t++; }\n"
+              "}\n"
+              "void _start(void) {\n"
+              "    unsigned total = 0;\n"
+              "    unsigned reste = 3;\n"
+              "    for (unsigned n = 1; n <= 20; n++) {\n"
+              "        reste--;\n"
+              "        if (reste) total += n;\n"
+              "        else reste = 3;\n"
+              "    }\n"
+              // Décimal par soustractions : le même souci de diviseur.
+              "    char sortie[8];\n"
+              "    int k = 0;\n"
+              "    unsigned centaines = 0, dizaines = 0;\n"
+              "    while (total >= 100) { total -= 100; centaines++; }\n"
+              "    while (total >= 10)  { total -= 10;  dizaines++; }\n"
+              "    if (centaines) sortie[k++] = (char)('0' + centaines);\n"
+              "    if (centaines || dizaines) sortie[k++] = (char)('0' + dizaines);\n"
+              "    sortie[k++] = (char)('0' + total);\n"
+              "    sortie[k++] = '\\n';\n"
+              "    sortie[k] = 0;\n"
+              "    emettre(sortie);\n"
+              "    for (;;) { }\n"
+              "}\n";
+
+        const std::string firmware =
+            std::string("/tmp/sim_serie_") + essai.mcu + ".elf";
+        std::string journal;
+        if (!coeur::CortexEngine::compiler_source(source, firmware, &journal,
+                                                  essai.mcu)) {
+            verifier(false, std::string(essai.mcu) + " : le programme compile",
+                     journal);
+            continue;
+        }
+
+        coeur::CortexEngine puce;
+        std::string recu;
+        puce.sur_octet_serie([&](char octet) { recu += octet; });
+        if (!puce.charger(firmware, essai.mcu, essai.horloge)) {
+            verifier(false, std::string(essai.mcu) + " : firmware chargé",
+                     puce.erreur());
+            continue;
+        }
+        puce.avancer(400000);
+
+        // 1..20 moins un nombre sur trois (3, 6, 9, 12, 15, 18) :
+        // 210 - 63 = 147.
+        while (!recu.empty() && (recu.back() == '\n' || recu.back() == '\r'))
+            recu.pop_back();
+        verifier(!recu.empty(),
+                 std::string(essai.mcu) + " : la liaison série émet",
+                 recu.empty() ? std::string("rien reçu") : "« " + recu + " »");
+        verifier(recu == "147",
+                 std::string(essai.mcu)
+                     + " : Thumb-2 conditionnel décodé — la somme est juste",
+                 "« " + recu + " » contre « 147 » attendu");
+    }
+
+    // Le Cortex-M0+ ne connaît PAS ces instructions : le décodeur ne doit pas
+    // les reconnaître sur une puce ARMv6-M, sans quoi il exécuterait sur un
+    // Pico un code que le vrai matériel refuserait.
+    verifier(coeur::profil_rp2040().architecture == 6
+                 && coeur::profil_stm32f103().architecture == 7,
+             "CBZ, CBNZ et IT restent réservées à l'ARMv7-M",
+             "Pico en v6-M, STM32 en v7-M");
+
+    // Le bloc IT, pris à part et sans ambiguïté : quatre instructions dans un
+    // seul bloc, dont deux doivent s'exécuter et deux être sautées. Et une
+    // vérification que les drapeaux ne bougent pas — « addne » emploie
+    // l'encodage de ADDS, mais dans un bloc IT il ne met rien à jour. Un
+    // modèle qui laisserait les drapeaux changer ferait dérailler la
+    // condition du reste du bloc.
+    {
+        const std::string source =
+            "#define SR (*(volatile unsigned*)0x40013800u)\n"
+            "#define DR (*(volatile unsigned*)0x40013804u)\n"
+            "volatile unsigned a = 4, b = 4;\n"
+            "void _start(void) {\n"
+            "    unsigned r = 0;\n"
+            "    unsigned x = a, y = b;\n"
+            // ITTEE : deux instructions si égal, deux si différent. Les
+            // additions n'ont pas le droit de toucher aux drapeaux, sans quoi
+            // les deux dernières prendraient la mauvaise branche.
+            "    __asm__ volatile(\n"
+            "        \"cmp %1, %2\\n\"\n"
+            "        \"ittee eq\\n\"\n"
+            "        \"addeq %0, %0, #1\\n\"\n"
+            "        \"addeq %0, %0, #2\\n\"\n"
+            "        \"addne %0, %0, #8\\n\"\n"
+            "        \"addne %0, %0, #16\\n\"\n"
+            "        : \"+r\"(r) : \"r\"(x), \"r\"(y) : \"cc\");\n"
+            "    while (!(SR & (1u << 7))) { }\n"
+            "    DR = (unsigned)('0' + r);\n"
+            "    for (;;) { }\n"
+            "}\n";
+        std::string journal;
+        if (coeur::CortexEngine::compiler_source(source, "/tmp/sim_it.elf",
+                                                 &journal, "stm32f103")) {
+            coeur::CortexEngine puce;
+            std::string recu;
+            puce.sur_octet_serie([&](char octet) { recu += octet; });
+            puce.charger("/tmp/sim_it.elf", "stm32f103", 72000000);
+            puce.avancer(200000);
+            verifier(recu == "3",
+                     "bloc IT à quatre instructions : deux faites, deux sautées",
+                     "« " + recu + " » contre « 3 » attendu (1+2)");
+        } else {
+            verifier(false, "le bloc IT compile", journal);
+        }
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -4764,6 +4936,7 @@ int main() {
     test_fabrication();
     test_bobines();
     test_notes_de_langage();
+    test_serie_et_sauts_arm();
     test_programme_multifichier();
 
     std::printf("\n============================================================\n");

@@ -115,6 +115,25 @@ struct ProfilAdc {
     int voies = 4;
 };
 
+// La liaison série, réduite à ce qu'un programme en fait : attendre que le
+// registre d'émission soit libre, puis y déposer un octet.
+//
+// Sans elle, un firmware ARM ne peut RIEN publier — il n'a que ses broches.
+// C'est ce qui empêchait un Pico ou un STM32 de rendre une mesure autrement
+// qu'en clignotant.
+struct ProfilSerie {
+    uint32_t base = 0;              // 0 : pas de liaison série modélisée
+    uint32_t donnee = 0;            // décalage du registre d'émission
+    uint32_t etat = 0;              // décalage du registre d'état
+    // Le bit que le programme guette avant d'écrire. Deux conventions
+    // opposées cohabitent, et les confondre bloque le firmware dans sa
+    // boucle d'attente : sur un PL011 (RP2040) le bit dit « file PLEINE » et
+    // doit valoir 0 ; sur un USART STMicroelectronics il dit « registre
+    // VIDE » et doit valoir 1.
+    int bit_pret = 7;
+    bool pret_quand_bit_haut = true;
+};
+
 struct ProfilCortex {
     const char* nom = "rp2040";
     // Jeu d'instructions : 6 pour ARMv6-M (Cortex-M0+), 7 pour ARMv7-M.
@@ -128,6 +147,7 @@ struct ProfilCortex {
     uint32_t frequence = 125000000;
     ProfilTirages tirages;
     ProfilAdc adc;
+    ProfilSerie serie;
 };
 
 const ProfilCortex& profil_rp2040();
@@ -192,6 +212,8 @@ private:
     uint64_t cycles_ = 0;
     uint32_t frequence_ = 125000000;
     bool endormi_ = false;
+    // État du bloc IT en cours (ITSTATE de l'ARM). Zéro : hors bloc.
+    uint8_t it_ = 0;
 
     // État des ports, tel que le circuit le voit.
     struct EtatPort {
@@ -229,6 +251,7 @@ private:
     uint8_t* trouver(uint32_t adresse, uint32_t longueur);
     const uint8_t* trouver(uint32_t adresse, uint32_t longueur) const;
 
+    friend struct RemettreDrapeaux;
     int instruction();
     // Les instructions de trente-deux bits, propres à l'ARMv7-M. Un
     // Cortex-M0+ n'en connaît qu'une, BL ; un Cortex-M3 en emploie
