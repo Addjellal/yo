@@ -5162,6 +5162,184 @@ static void test_montages_du_cours() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// [43] Les montages du cours, suite
+//
+// La suite du balayage : redressement, gain d'un transistor, commutation d'un
+// MOSFET, comparateur. Même règle qu'à la section précédente — chaque réponse
+// est calculée à la main et écrite à côté.
+// ---------------------------------------------------------------------------
+static void test_montages_du_cours_suite() {
+    std::printf("\n[43] Les montages du cours, suite\n");
+
+    auto resistance = [](coeur::Netlist& n, const char* nom, double ohms,
+                         const char* a, const char* b) {
+        auto& r = n.ajouter(nom, "resistance");
+        r.valeurs["ohms"] = ohms;
+        n.relier(nom, "1", a);
+        n.relier(nom, "2", b);
+    };
+
+    // --- 1. Redresseur simple alternance avec lissage ---------------------
+    // 10 V crête à 50 Hz, une diode, 100 µF, charge 1 kΩ.
+    // La crête en sortie vaut 10 - 0,7 = 9,3 V. Entre deux crêtes le
+    // condensateur se décharge dans la charge pendant une période :
+    // dV = I / (f x C) = 9,3 mA / (50 x 100 µF) = 1,9 V d'ondulation.
+    {
+        coeur::Netlist n;
+        auto& source = n.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "sinus";
+        source.valeurs["amplitude"] = 10;
+        source.valeurs["frequence"] = 50;
+        n.relier("GBF1", "+", "AC");
+        n.relier("GBF1", "-", "GND");
+        n.ajouter("D1", "diode");
+        n.relier("D1", "A", "AC");
+        n.relier("D1", "K", "SORTIE");
+        auto& c = n.ajouter("C1", "condensateur");
+        c.valeurs["farads"] = 100e-6;
+        n.relier("C1", "1", "SORTIE");
+        n.relier("C1", "2", "GND");
+        resistance(n, "R1", 1000, "SORTIE", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire_transitoire(n, {}, {}, 0.2, 2e-5);
+        verifier(moteur.resoudre_transitoire(),
+                 "redresseur : le transitoire aboutit");
+        const coeur::Formes& formes = moteur.formes();
+        auto trace = formes.tensions.find("sortie");
+        if (trace != formes.tensions.end() && !trace->second.empty()) {
+            // Sur le dernier tiers, le régime est établi.
+            double haut = -1e9, bas = 1e9;
+            for (size_t k = trace->second.size() * 2 / 3;
+                 k < trace->second.size(); ++k) {
+                haut = std::max(haut, trace->second[k]);
+                bas = std::min(bas, trace->second[k]);
+            }
+            verifier(presque(haut, 9.3, 0.5),
+                     "redresseur : la crête vaut l'amplitude moins une chute "
+                     "directe",
+                     f(haut) + " V pour 9,3 V attendus");
+            verifier(presque(haut - bas, 1.9, 0.6),
+                     "redresseur : ondulation I/(f.C)",
+                     f(haut - bas, 2) + " V pour 1,9 V attendus");
+            // Et le point qui distingue un redresseur d'un simple filtre : la
+            // sortie ne descend JAMAIS en dessous de zéro.
+            verifier(bas > 0.0,
+                     "redresseur : la sortie ne passe jamais négative",
+                     f(bas) + " V au plus bas");
+        }
+    }
+
+    // --- 2. Gain en courant d'un transistor -------------------------------
+    // Le modèle 2N2222 déclare BF = 200. Une base alimentée en 5 V à travers
+    // 470 k donne Ib = (5 - 0,7) / 470k = 9,1 µA, donc Ic = 200 x 9,1 = 1,8 mA
+    // tant que le transistor n'est pas saturé. Avec Rc = 1 k, la chute vaut
+    // 1,8 V : le collecteur reste bien au-dessus de la saturation.
+    {
+        coeur::Netlist n;
+        auto& alim = n.ajouter("V1", "pile");
+        alim.valeurs["volts"] = 5;
+        n.relier("V1", "+", "VCC");
+        n.relier("V1", "-", "GND");
+        resistance(n, "RB", 470000, "VCC", "BASE");
+        resistance(n, "RC", 1000, "VCC", "COLLECTEUR");
+        n.ajouter("Q1", "transistor_npn");
+        n.relier("Q1", "B", "BASE");
+        n.relier("Q1", "C", "COLLECTEUR");
+        n.relier("Q1", "E", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.construire(n, {});
+        moteur.resoudre();
+        const double ib = std::fabs(moteur.courant("RB"));
+        const double ic = std::fabs(moteur.courant("RC"));
+        verifier(ib > 5e-6 && ib < 15e-6,
+                 "transistor : le courant de base suit la loi d'Ohm",
+                 f(ib * 1e6, 2) + " µA pour 9,1 µA attendus");
+        verifier(ib > 0 && presque(ic / ib, 200.0, 60.0),
+                 "transistor : gain en courant voisin du BF déclaré (200)",
+                 "beta mesuré = " + f(ic / std::max(ib, 1e-12), 0));
+        verifier(moteur.tension("COLLECTEUR") > 2.0,
+                 "transistor : le collecteur n'est pas saturé, le gain est donc "
+                 "celui du régime linéaire",
+                 f(moteur.tension("COLLECTEUR")) + " V");
+    }
+
+    // --- 3. MOSFET en commutation -----------------------------------------
+    // Grille à la masse : bloqué, le drain reste à l'alimentation. Grille à
+    // 5 V : passant, le drain tombe presque à zéro. C'est tout ce qu'on
+    // demande à un interrupteur, et c'est ce qu'on vérifie.
+    {
+        double drain[2] = {0, 0};
+        for (int commande = 0; commande < 2; ++commande) {
+            coeur::Netlist n;
+            auto& alim = n.ajouter("V1", "pile");
+            alim.valeurs["volts"] = 5;
+            n.relier("V1", "+", "VCC");
+            n.relier("V1", "-", "GND");
+            auto& grille = n.ajouter("V2", "pile");
+            grille.valeurs["volts"] = commande ? 5.0 : 0.0;
+            n.relier("V2", "+", "GRILLE");
+            n.relier("V2", "-", "GND");
+            resistance(n, "RD", 1000, "VCC", "DRAIN");
+            n.ajouter("M1", "mosfet_n");
+            n.relier("M1", "G", "GRILLE");
+            n.relier("M1", "D", "DRAIN");
+            n.relier("M1", "S", "GND");
+            coeur::NgspiceEngine moteur;
+            moteur.construire(n, {});
+            moteur.resoudre();
+            drain[commande] = moteur.tension("DRAIN");
+        }
+        verifier(drain[0] > 4.5,
+                 "MOSFET bloqué : le drain reste à l'alimentation",
+                 f(drain[0]) + " V");
+        verifier(drain[1] < 0.5,
+                 "MOSFET passant : le drain tombe presque à zéro",
+                 f(drain[1]) + " V");
+    }
+
+    // --- 4. Comparateur -----------------------------------------------------
+    // Un ampli op sans contre-réaction : sa sortie va d'un côté ou de l'autre
+    // selon le signe de la différence d'entrée. Quelques millivolts d'écart
+    // suffisent — c'est le gain en boucle ouverte qui le veut.
+    {
+        double sortie[2] = {0, 0};
+        const double entrees[2] = {2.49, 2.51};
+        for (int essai = 0; essai < 2; ++essai) {
+            coeur::Netlist n;
+            auto& reference = n.ajouter("V1", "pile");
+            reference.valeurs["volts"] = 2.5;
+            n.relier("V1", "+", "REF");
+            n.relier("V1", "-", "GND");
+            auto& signal = n.ajouter("V2", "pile");
+            signal.valeurs["volts"] = entrees[essai];
+            n.relier("V2", "+", "SIGNAL");
+            n.relier("V2", "-", "GND");
+            n.ajouter("A1", "ampli_op");
+            n.relier("A1", "IN+", "SIGNAL");
+            n.relier("A1", "IN-", "REF");
+            n.relier("A1", "OUT", "SORTIE");
+            coeur::NgspiceEngine moteur;
+            moteur.construire(n, {});
+            moteur.resoudre();
+            sortie[essai] = moteur.tension("SORTIE");
+        }
+        verifier(sortie[0] < 1.0,
+                 "comparateur : 10 mV en dessous du seuil, la sortie bascule bas",
+                 f(sortie[0]) + " V");
+        verifier(sortie[1] > 4.0,
+                 "comparateur : 10 mV au-dessus, elle bascule haut",
+                 f(sortie[1]) + " V");
+        verifier(sortie[1] - sortie[0] > 3.5,
+                 "comparateur : 20 mV d'écart en entrée font toute l'amplitude "
+                 "en sortie",
+                 f(sortie[1] - sortie[0]) + " V d'excursion");
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -5209,6 +5387,7 @@ int main() {
     test_notes_de_langage();
     test_serie_et_sauts_arm();
     test_montages_du_cours();
+    test_montages_du_cours_suite();
     test_programme_multifichier();
 
     std::printf("\n============================================================\n");
