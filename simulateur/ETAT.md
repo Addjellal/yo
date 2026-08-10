@@ -191,6 +191,25 @@ masquait tous :
 **Analyse alternative** : le solveur ne relevait **aucun courant** en `.ac`.
 `courants_alternatifs()` les déduit. Le panneau les affiche en dBA.
 
+**Déploiement Windows** :
+
+9. **L'exécutable se fermait sans rien dire.** Construction réussie, lien
+   réussi, `simulateur.exe` produit — et il rendait la main instantanément,
+   sans fenêtre ni message. Cause : `windeployqt --compiler-runtime` dépose le
+   runtime C++ **de Qt** (le MinGW qui a bâti Qt), alors que la construction
+   se faisait avec un MinGW plus récent (WinLibs GCC 16). Le dossier de
+   l'exécutable primant sur le PATH, le chargeur prenait la vieille
+   `libstdc++-6.dll`, n'y trouvait pas les symboles attendus, et tuait le
+   processus **avant `main()`** — d'où le silence total. Code de sortie
+   `0xC0000139`. Corrigé en copiant le runtime du compilateur réellement
+   utilisé (`SIM_DLL_RUNTIME`) et en passant `--no-compiler-runtime` à
+   windeployqt sous MinGW.
+
+   Leçon : sous Windows, un exécutable qui « ne se lance pas » sans le moindre
+   message n'a en général pas démarré du tout ; le code de sortie
+   (`$LASTEXITCODE`) est le seul témoin, et il suffit à trancher entre DLL
+   absente (`0xC0000135`) et DLL incompatible (`0xC0000139`).
+
 ## Ce qui est cassé ou inachevé
 
 1. **Analyseur Pi Pico** : ~~bloqué~~ **réparé**. Il achève son balayage

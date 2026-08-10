@@ -33,13 +33,21 @@ if(WIN32)
     message(STATUS "Déploiement de Qt avec ${SIM_WINDEPLOYQT}")
     execute_process(
       COMMAND "${SIM_WINDEPLOYQT}" --release --no-translations
-              --no-system-d3d-compiler --no-opengl-sw --compiler-runtime
+              --no-system-d3d-compiler --no-opengl-sw ${SIM_OPT_RUNTIME}
               "${SIM_INSTALLE}"
       RESULT_VARIABLE code)
     if(NOT code EQUAL 0)
       message(WARNING "windeployqt a échoué (code ${code})")
     endif()
   endif()
+  # Le runtime du compilateur avec lequel on a construit — pas celui de Qt.
+  # Voir le commentaire du CMakeLists : une DLL plus ancienne posée à côté de
+  # l'exécutable l'empêche de démarrer, silencieusement.
+  foreach(dll IN LISTS SIM_DLL_RUNTIME)
+    if(EXISTS "${dll}")
+      file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}" TYPE FILE FILES "${dll}")
+    endif()
+  endforeach()
   return()
 endif()
 

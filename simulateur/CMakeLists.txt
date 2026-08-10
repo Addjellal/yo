@@ -264,6 +264,35 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
                   OUTPUT_STRIP_TRAILING_WHITESPACE
                   ERROR_QUIET)
 
+  # Le runtime du compilateur (libstdc++, libgcc, libwinpthread) doit voyager
+  # lui aussi. windeployqt sait le faire — « --compiler-runtime » — mais il
+  # dépose celui **de Qt**, c'est-à-dire du MinGW avec lequel Qt a été bâti.
+  # Quand on construit avec un autre MinGW (WinLibs, MSYS2), ces DLL-là sont
+  # plus anciennes que le code qu'elles doivent servir ; et comme le dossier
+  # de l'exécutable passe avant le PATH, ce sont elles que le chargeur prend.
+  # L'application meurt alors avant main(), sans message et sans fenêtre, avec
+  # le code 0xC0000139 (« point d'entrée introuvable »). On copie donc le
+  # runtime du compilateur qu'on utilise vraiment, et on interdit à
+  # windeployqt de poser le sien.
+  set(SIM_OPT_RUNTIME --compiler-runtime)
+  set(SIM_DLL_RUNTIME)
+  if(WIN32 AND MINGW)
+    set(SIM_OPT_RUNTIME --no-compiler-runtime)
+    get_filename_component(SIM_DOSSIER_CXX "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    # seh sur x86_64, dw2 sur x86 ; un MinGW lié statiquement n'en a aucune,
+    # et alors il n'y a rien à emporter.
+    foreach(nom libstdc++-6 libgcc_s_seh-1 libgcc_s_dw2-1 libwinpthread-1)
+      if(EXISTS "${SIM_DOSSIER_CXX}/${nom}.dll")
+        list(APPEND SIM_DLL_RUNTIME "${SIM_DOSSIER_CXX}/${nom}.dll")
+      endif()
+    endforeach()
+    if(SIM_DLL_RUNTIME)
+      message(STATUS "Runtime du compilateur : ${SIM_DOSSIER_CXX}")
+    else()
+      message(STATUS "Runtime du compilateur : lié statiquement, rien à copier")
+    endif()
+  endif()
+
   # Sous Windows, on dépose les DLL de Qt à côté de l'exécutable dès la
   # compilation. Sans cela, le fichier produit dans le dossier de
   # construction refuse de démarrer — il va chercher Qt dans le PATH, y
@@ -272,9 +301,17 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   if(WIN32 AND SIM_WINDEPLOYQT)
     add_custom_command(TARGET simulateur POST_BUILD
       COMMAND "${SIM_WINDEPLOYQT}" --release --no-translations
-              --no-system-d3d-compiler --no-opengl-sw --compiler-runtime
+              --no-system-d3d-compiler --no-opengl-sw ${SIM_OPT_RUNTIME}
               "$<TARGET_FILE:simulateur>"
       COMMENT "Dépôt des DLL de Qt à côté de l'exécutable")
+    # Après windeployqt, pour écraser un runtime déposé par une construction
+    # antérieure : c'est le nôtre qui doit rester.
+    if(SIM_DLL_RUNTIME)
+      add_custom_command(TARGET simulateur POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${SIM_DLL_RUNTIME}
+                "$<TARGET_FILE_DIR:simulateur>"
+        COMMENT "Dépôt du runtime du compilateur")
+    endif()
   elseif(WIN32)
     message(WARNING
       "windeployqt introuvable : l'exécutable produit ne démarrera que si "
@@ -314,6 +351,8 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   install(CODE "set(SIM_EXECUTABLE \"$<TARGET_FILE:simulateur>\")")
   install(CODE "set(SIM_WINDEPLOYQT \"${SIM_WINDEPLOYQT}\")")
   install(CODE "set(SIM_QT_PLUGINS \"${SIM_QT_PLUGINS}\")")
+  install(CODE "set(SIM_OPT_RUNTIME \"${SIM_OPT_RUNTIME}\")")
+  install(CODE "set(SIM_DLL_RUNTIME \"${SIM_DLL_RUNTIME}\")")
   install(SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/outils/paquet.cmake")
 
   set(CPACK_PACKAGE_NAME "simulateur-embarque")

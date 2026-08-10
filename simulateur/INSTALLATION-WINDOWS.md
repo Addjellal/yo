@@ -209,9 +209,74 @@ Regardez le journal. S'il dit **« Aucun firmware »**, c'est qu'aucun programme
 n'a été compilé ni chargé : faites F5 d'abord. La simulation tourne quand même,
 mais la carte n'exécute rien.
 
-### La fenêtre ne s'ouvre pas, ou se ferme aussitôt
+### L'exécutable rend la main aussitôt, sans fenêtre et sans message
 
-Il manque les DLL de Qt à côté de l'exécutable. Depuis l'invite Qt :
+C'est le symptôme le plus déroutant : la construction a réussi,
+`simulateur.exe` existe, on le lance, et l'invite revient immédiatement comme
+s'il ne s'était rien passé.
+
+**Demandez d'abord le code de sortie** — c'est lui qui dit tout :
+
+```
+.\build\simulateur.exe ; $LASTEXITCODE
+```
+
+| Code | Ce qui s'est passé |
+|---|---|
+| `-1073741511` (0xC0000139) | une DLL est là, mais il lui manque un symbole |
+| `-1073741515` (0xC0000135) | une DLL manque complètement |
+| `0` | l'application a bien démarré puis s'est arrêtée normalement |
+
+Les deux premiers cas se règlent avant même que `main()` ne soit atteint :
+c'est le chargeur de Windows qui refuse, ce qui explique le silence.
+
+**Cause de loin la plus fréquente : deux MinGW différents.** Si vous avez
+construit avec un MinGW autre que celui livré avec Qt — WinLibs, MSYS2,
+un `g++` déjà présent dans le PATH — alors le runtime C++ déposé à côté de
+l'exécutable (`libstdc++-6.dll`, `libgcc_s_seh-1.dll`, `libwinpthread-1.dll`)
+peut être plus ancien que le code qu'il doit servir. Le dossier de
+l'exécutable passe avant le PATH : c'est la vieille DLL qui gagne, et
+l'application meurt en silence.
+
+*Dépannage immédiat*, sans rien reconstruire — on retire les trois DLL, ce
+qui laisse le chargeur prendre celles du PATH :
+
+```
+Remove-Item build\libstdc++-6.dll, build\libgcc_s_seh-1.dll, build\libwinpthread-1.dll -ErrorAction SilentlyContinue
+.\build\simulateur.exe
+```
+
+*Remède durable* : construire avec **le MinGW de Qt**, celui de
+`C:\Qt\Tools\mingw*\bin`. Il faut repartir d'une configuration propre, sinon
+CMake garde en cache le compilateur précédent :
+
+```
+$env:Path = "C:\Qt\Tools\mingw1310_64\bin;" + $env:Path
+Remove-Item -Recurse build\CMakeCache.txt, build\CMakeFiles
+cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.11.1/mingw_64"
+cmake --build build -j 8
+```
+
+(Adaptez les deux numéros de version à ce que contient votre `C:\Qt`.)
+Ce chemin-là n'a plus besoin de `-DFENETRE_WIN32=OFF` non plus — voir la
+rubrique suivante.
+
+### « undefined reference to `__imp___argc` » à l'édition de liens
+
+Même origine : `libQt6EntryPoint.a` vient telle quelle de chez Qt et n'accepte
+que le compilateur avec lequel Qt a été construit. Elle n'entre dans
+l'édition de liens que pour une application fenêtrée sans console.
+
+Le contournement est `cmake -S . -B build -DFENETRE_WIN32=OFF` : l'application
+se construit alors en mode console — elle marche, mais traîne une fenêtre noire
+derrière elle. Le vrai remède est le même que ci-dessus : utiliser le MinGW de
+Qt, et laisser `FENETRE_WIN32` à sa valeur par défaut.
+
+### Il manque simplement les DLL de Qt
+
+Normalement CMake les dépose tout seul après l'édition de liens. Si le journal
+de construction ne montre aucune ligne « Dépôt des DLL de Qt », faites-le à la
+main depuis l'invite Qt :
 
 ```
 windeployqt build\simulateur.exe
