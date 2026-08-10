@@ -216,6 +216,23 @@ masquait tous :
    Méthode qui a marché sur le Pico et qu'il faut reprendre : instrumenter le
    programme avec des jalons émis sur la liaison série, resserrer jusqu'à
    l'instruction, puis isoler celle-ci dans un programme de trois lignes.
+
+   **MAIS il y a bien mieux à faire, et c'est la vraie piste.** Les trois
+   défauts du cœur ARM (bloc IT, retenue d'ADC/SBC, décalage par registre) ont
+   tous été trouvés à la main, un par un. C'est parce que l'ARM est la SEULE
+   architecture pour laquelle il n'existe pas de référence indépendante ici :
+   l'AVR a simavr, le Xtensa a llvm-mc, l'analogique a ngspice. L'ARM n'a rien.
+
+   `qemu-system-arm` est disponible en paquet (`apt`, version 8.2). Il émule
+   le Cortex-M et sait charger un .elf nu. Renode s'appuie d'ailleurs sur
+   `tlib`, dérivé du même moteur QEMU — c'est la même référence par un autre
+   chemin.
+
+   Ce qu'il faut bâtir : faire tourner le MÊME firmware des deux côtés et
+   comparer registre par registre à chaque instruction, comme la section [22]
+   le fait déjà pour l'AVR contre simavr. Cela transformerait la chasse aux
+   défauts ARM — de « instrumenter et deviner » à « la divergence est à
+   l'instruction n ». C'est ce qui a rendu le cœur AVR fiable.
 2. **Analyseur ATmega328P nu, ATtiny85, ESP32** : pas écrits. L'ATtiny n'a
    pas d'UART matériel (sortie à inventer) ; l'ESP32 n'a **pas d'ADC
    modélisé** dans le cœur Xtensa.
