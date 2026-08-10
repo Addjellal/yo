@@ -4999,20 +4999,43 @@ static void test_montages_du_cours() {
         verifier(presque(sortie[1], 5.1, 0.4),
                  "Zener 5V1 sous 12 V : la sortie se tient à sa tension",
                  f(sortie[1]) + " V");
-        // LIMITE CONNUE, et elle est gênante : en dessous d'une dizaine de
-        // volts d'entrée, le point de repos ne converge pas — ni avec le
-        // solveur intégré, ni avec ngspice. C'est pourtant le montage du
-        // cours, une 5V1 alimentée en 9 V. Le claquage inverse est aussi
-        // raide que la conduction directe, et le pas de Newton n'y est pas
-        // bridé de la même façon. Deux correctifs ont été essayés — brider
-        // sur la variable décalée, partir du coude plutôt que de zéro — sans
-        // effet ; la cause est ailleurs et reste à trouver.
-        //
-        // Ce n'est pas affirmé comme un test : ce serait figer le défaut.
-        // C'est imprimé, pour que personne ne l'oublie.
-        std::printf("     LIMITE : sous 10 V d'entrée, le point de repos d'une "
-                    "Zener ne converge pas (%s V relevés sous 9 V)\n",
-                    f(sortie[0]).c_str());
+        verifier(presque(sortie[0], 5.1, 0.4),
+                 "Zener 5V1 sous 9 V : elle régule aussi sous le seuil où "
+                 "elle ne convergeait pas",
+                 f(sortie[0]) + " V");
+        // Et la confrontation qui compte : ngspice sur le même montage.
+        // Le modèle de claquage suit sa formulation, la comparaison doit donc
+        // tomber au millivolt près, pas seulement dans le bon ordre.
+        if (coeur::NgspiceEngine::compile_avec_ngspice()) {
+            coeur::Netlist n;
+            auto& source = n.ajouter("V1", "pile");
+            source.valeurs["volts"] = 9;
+            n.relier("V1", "+", "IN");
+            n.relier("V1", "-", "GND");
+            auto& r = n.ajouter("R1", "resistance");
+            r.valeurs["ohms"] = 1000;
+            n.relier("R1", "1", "IN");
+            n.relier("R1", "2", "OUT");
+            auto& z = n.ajouter("DZ1", "zener");
+            z.textes["tension"] = "5V1";
+            n.relier("DZ1", "K", "OUT");
+            n.relier("DZ1", "A", "GND");
+            double lu[2] = {0, 0};
+            for (int avec = 0; avec < 2; ++avec) {
+                coeur::NgspiceEngine m;
+                m.preferer_ngspice(avec == 1);
+                m.construire(n, {});
+                m.resoudre();
+                lu[avec] = m.tension("OUT");
+            }
+            verifier(lu[1] > 0 && presque(lu[0], lu[1], 0.03),
+                     "Zener : même tension que ngspice à 30 mV près",
+                     f(lu[0], 4) + " V contre " + f(lu[1], 4) + " V");
+        }
+        verifier(std::fabs(sortie[1] - sortie[0]) < 0.25,
+                 "et elle ne suit pas l'entrée : +3 V en entrée, presque rien "
+                 "en sortie",
+                 f(sortie[0]) + " V sous 9 V, " + f(sortie[1]) + " V sous 12 V");
     }
 
     // --- 4. Amplificateur non inverseur ----------------------------------

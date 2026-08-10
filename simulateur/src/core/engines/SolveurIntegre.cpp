@@ -371,6 +371,9 @@ struct SolveurIntegre::Impl {
     // le cas, on n'a pas le droit de déclarer la convergence.
     bool limitation_appliquee = false;
 
+    // Facteur appliqué aux sources indépendantes. Vaut un, sauf pendant le
+    // « pas sur les sources » : voir resoudre_newton.
+    double echelle_sources = 1.0;
     bool resoudre_newton(std::vector<double>& x, double instant, double pas,
                          Mode mode, bool trapeze);
 
@@ -480,14 +483,16 @@ void SolveurIntegre::Impl::assembler(const std::vector<double>& x,
                 ajouter(branche, element.a, 1.0);
                 ajouter(branche, element.b, -1.0);
                 second_membre[branche] +=
-                    mode == Mode::Continu ? element.source.valeur(0.0)
-                                          : element.source.valeur(instant);
+                    echelle_sources
+                    * (mode == Mode::Continu ? element.source.valeur(0.0)
+                                             : element.source.valeur(instant));
                 break;
             }
             case 'I': {
                 const double courant =
-                    mode == Mode::Continu ? element.source.valeur(0.0)
-                                          : element.source.valeur(instant);
+                    echelle_sources
+                    * (mode == Mode::Continu ? element.source.valeur(0.0)
+                                             : element.source.valeur(instant));
                 source_courant(element.a, element.b, courant);
                 break;
             }
@@ -517,15 +522,76 @@ void SolveurIntegre::Impl::assembler(const std::vector<double>& x,
                 if (limitee) limitation_appliquee = true;
                 element.vd = v;
 
-                double courant_diode = 0, conductance_diode = 0;
-                if (bv > 0 && v < -bv) {
-                    const double exposant = exponentielle_bornee(-(bv + v) / nvt);
-                    courant_diode = -ibv * exposant;
-                    conductance_diode = ibv * exposant / nvt;
-                } else {
-                    const double exposant = exponentielle_bornee(v / nvt);
-                    courant_diode = is * (exposant - 1.0);
-                    conductance_diode = is * exposant / nvt;
+                // Conduction directe et claquage inverse s'ADDITIONNENT au
+                // lieu de s'exclure. C'est ce qui rend le courant continu.
+                //
+                // L'ancienne écriture basculait d'une branche à l'autre à
+                // v = -BV, et le courant y sautait de zéro à IBV — cinq
+                // milliampères d'un coup. Newton ne traverse pas une
+                // discontinuité : le point de repos d'une Zener 5V1 sous 9 V
+                // ne convergeait pas, parce que le courant qu'il lui faut
+                // (3,9 mA) tombe précisément DANS le saut. Sous 12 V il en
+                // faut 6,9, au-delà du saut, et tout allait bien — d'où un
+                // défaut qui ne se voyait qu'en dessous d'un certain seuil.
+                //
+                // Le terme de claquage est écrit en (exp - 1) : il s'annule
+                // exactement à v = -BV et croît en dessous. Le courant est
+                // donc continu ; seule sa pente a un coude, ce que Newton
+                // encaisse sans peine.
+                const double exposant = exponentielle_bornee(v / nvt);
+                double courant_diode = is * (exposant - 1.0);
+                double conductance_diode = is * exposant / nvt;
+                if (bv > 0) {
+                    // Claquage inverse, dans la formulation de SPICE — celle
+                    // de diotemp.c et dioload.c de ngspice, et non une
+                    // approximation.
+                    //
+                    // Deux choses la caractérisent, et les deux comptent :
+                    //
+                    //   1. le terme « - 1 + vb/vt » raccorde l'exponentielle
+                    //      au courant de fuite. Sans lui le courant SAUTE de
+                    //      zéro à IBV à la tension de claquage, et Newton ne
+                    //      traverse pas une discontinuité — une Zener 5V1 sous
+                    //      9 V ne convergeait pas, parce que les 3,9 mA qu'il
+                    //      lui faut tombent précisément dans ce saut ;
+                    //
+                    //   2. la tension de claquage employée n'est PAS BV mais
+                    //      une valeur ajustée vb, cherchée par itération pour
+                    //      que le courant vaille exactement IBV à V = BV.
+                    //      C'est ce qui rend la fiche du constructeur
+                    //      respectée : « 5,1 V sous 5 mA » veut dire cela et
+                    //      rien d'autre.
+                    const double vt_seul = nvt / std::max(n, 1e-9);
+                    double vb = bv;
+                    double courant_bv = ibv;
+                    // Une valeur d'IBV plus petite que le courant de fuite à
+                    // BV n'a pas de sens : ngspice la relève, et sans cela le
+                    // logarithme ci-dessous prendrait un argument négatif.
+                    if (courant_bv < is * bv / vt_seul) {
+                        courant_bv = is * bv / vt_seul;
+                        vb = bv;
+                    } else {
+                        vb = bv - vt_seul * std::log(1 + courant_bv / is);
+                        for (int tour = 0; tour < 25; ++tour) {
+                            const double argument =
+                                courant_bv / is + 1 - vb / vt_seul;
+                            if (argument <= 0) break;
+                            vb = bv - vt_seul * std::log(argument);
+                            const double obtenu =
+                                is * (exponentielle_bornee((bv - vb) / vt_seul)
+                                      - 1 + vb / vt_seul);
+                            if (std::fabs(obtenu - courant_bv)
+                                <= 1e-3 * courant_bv + 1e-12)
+                                break;
+                        }
+                    }
+                    if (v < -vb) {
+                        const double claquage =
+                            exponentielle_bornee(-(v + vb) / vt_seul);
+                        courant_diode =
+                            -is * (claquage - 1 + vb / vt_seul);
+                        conductance_diode = is * claquage / vt_seul;
+                    }
                 }
                 conductance_diode = std::max(conductance_diode, kGmin);
                 const double equivalent = courant_diode - conductance_diode * v;
@@ -829,7 +895,65 @@ bool SolveurIntegre::Impl::resoudre_newton(std::vector<double>& x, double instan
         }
         x = courant;   // point de départ du palier suivant
     }
-    // Dernière chance : on garde le meilleur état atteint.
+
+    // --- PAS SUR LES SOURCES ---------------------------------------------
+    //
+    // La seconde méthode de secours de SPICE, et celle qui traite les cas que
+    // la rampe de conductance ne sait pas prendre : au lieu de rendre le
+    // circuit résistif, on l'ÉTEINT puis on le rallume par paliers. À chaque
+    // palier, la solution du précédent sert de point de départ — Newton part
+    // donc toujours d'un état proche, et les jonctions changent de régime
+    // progressivement au lieu d'être sautées d'un bond.
+    //
+    // C'est ce qu'il faut pour un montage qui n'a pas de solution « molle » :
+    // une Zener en régulation, une chaîne d'étages saturés, un circuit à
+    // rebouclage. La rampe de gmin, elle, ne fait qu'ajouter des fuites, ce
+    // qui n'aide pas quand le problème est le CHEMIN vers la solution.
+    //
+    // Le point de repos seulement : en transitoire, l'état précédent fournit
+    // déjà un départ proche, et rien ne justifierait ce coût.
+    if (mode == Mode::Continu) {
+        static const double paliers[] = {0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.85,
+                                         1.0};
+        std::vector<double> courant(taille, 0.0);
+        bool tout_passe = true;
+        for (double palier : paliers) {
+            echelle_sources = palier;
+            bool converge = false;
+            for (Element& element : elements) {
+                element.b_initialisee = false;
+                element.b_pas = 5.0;
+                element.b_delta = 0;
+            }
+            for (int iteration = 0; iteration < maximum; ++iteration) {
+                assembler(courant, instant, pas, mode, trapeze, kGmin);
+                std::vector<double> a = matrice, b = second_membre;
+                if (!eliminer(a, b, taille)) break;
+                double ecart = 0;
+                for (int k = 0; k < taille; ++k) {
+                    const double variation = std::fabs(b[k] - courant[k]);
+                    const double tolerance =
+                        1e-6
+                        + 1e-3 * std::max(std::fabs(b[k]), std::fabs(courant[k]));
+                    ecart = std::max(ecart, variation / tolerance);
+                }
+                courant = b;
+                if (ecart <= 1.0 && !limitation_appliquee) {
+                    converge = true;
+                    break;
+                }
+            }
+            if (!converge) { tout_passe = false; break; }
+        }
+        echelle_sources = 1.0;
+        if (tout_passe) {
+            x = courant;
+            return true;
+        }
+    }
+
+    // Les deux méthodes ont échoué : le circuit n'a pas de point de repos
+    // atteignable, et le dire vaut mieux que rendre un résultat inventé.
     return false;
 }
 
