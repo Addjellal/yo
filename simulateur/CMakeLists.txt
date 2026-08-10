@@ -164,6 +164,36 @@ add_executable(tests_coeur tests/test_coeur.cpp)
 target_link_libraries(tests_coeur PRIVATE coeur)
 add_test(NAME coeur COMMAND tests_coeur)
 
+# --- La passe sanitizers -----------------------------------------------------
+#
+# ASan et UBSan trouvent ce qu'aucun test fonctionnel ne voit : un dépassement
+# de tableau qui tombe sur de la mémoire encore valide, un décalage à gauche
+# qui déborde, une lecture après libération. Le simulateur en a déjà eu — neuf
+# décalages signés débordants dans les trois cœurs, trouvés par cette passe et
+# invisibles autrement, parce que le résultat était juste sur cette machine-là.
+#
+# Elle n'était lancée qu'à la main, donc pas lancée. Elle est maintenant un
+# ensemble ctest à part, parce qu'elle demande une SECONDE construction : on ne
+# peut pas assainir un binaire déjà compilé.
+#
+#   cmake -S . -B build-san -DSANITISER=ON -DCMAKE_BUILD_TYPE=Debug
+#   cmake --build build-san -j8 --target tests_coeur
+#   ctest --test-dir build-san -L sanitiseurs
+#
+# La détection de fuites est éteinte : Qt et ngspice en laissent au dernier
+# souffle, et les traquer ici noierait le signal.
+option(SANITISER "Compiler avec ASan et UBSan (construction séparée)" OFF)
+if(SANITISER)
+  foreach(cible coeur tests_coeur)
+    target_compile_options(${cible} PRIVATE
+      -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(${cible} PRIVATE -fsanitize=address,undefined)
+  endforeach()
+  set_tests_properties(coeur PROPERTIES
+    LABELS sanitiseurs
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
+endif()
+
 # ---------------------------------------------------------------------------
 # Générateur de figures : dessine les schémas du cours à partir du catalogue.
 # Sans Qt : c'est du SVG écrit directement.
