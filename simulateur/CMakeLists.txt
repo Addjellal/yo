@@ -37,7 +37,11 @@ endif()
 # Sous Windows, ngspice se télécharge en archive plutôt qu'il ne s'installe.
 # « -DNGSPICE_ROOT=C:/Spice64_dll » suffit alors : les sous-dossiers de la
 # distribution officielle sont connus ici, il n'y a pas à désigner le fichier.
-set(NGSPICE_ROOT "" CACHE PATH
+# Le dépôt en emporte une copie sous « tiers/ngspice » : c'est le défaut, et
+# sur Windows il n'y a donc rien à faire. Seuls trois fichiers y sont — l'
+# en-tête, la DLL et la bibliothèque d'import — et non la distribution
+# entière, qui pèse dix fois plus.
+set(NGSPICE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/tiers/ngspice" CACHE PATH
     "Dossier de ngspice décompressé (celui qui contient include/ et dll-vs/)")
 find_path(NGSPICE_INCLUDE_DIR ngspice/sharedspice.h
           HINTS ${NGSPICE_ROOT} ${NGSPICE_ROOT}/include)
