@@ -1953,8 +1953,42 @@ static void test_programmes_par_carte() {
              encore ? std::string("il a survécu au vidage")
                     : journal_apres.trimmed().left(60).toStdString());
 
-    // Les deux binaires existent, chacun chez soi. U2 est recompilé d'abord :
-    // l'essai précédent devait échouer, et un échec ne laisse pas de binaire.
+
+    // --- une compilation ratée ne laisse pas tourner l'ancien programme ---
+    //
+    // Le piège : on corrige son code, on compile, le message d'erreur passe
+    // inaperçu dans le journal, on lance — et c'est l'ANCIEN firmware qui
+    // tourne. On croit alors que ses modifications n'ont aucun effet, ce qui
+    // est la pire piste possible.
+    {
+        const coeur::Programme bon = {
+            {"principal.ino",
+             "void setup() { pinMode(13, OUTPUT); }\n"
+             "void loop() { digitalWrite(13, HIGH); }\n"}};
+        QString journal_bon;
+        verifier(moteur.compiler_et_charger(bon, atelier, &journal_bon, "U1")
+                     && moteur.firmware_charge("U1"),
+                 "un programme correct se charge",
+                 journal_bon.trimmed().toStdString());
+
+        const coeur::Programme casse = {
+            {"principal.ino", "void setup() { cette_ligne_est_fausse; }\n"}};
+        QString journal_casse;
+        const bool compile =
+            moteur.compiler_et_charger(casse, atelier, &journal_casse, "U1");
+        verifier(!compile, "un programme fautif ne compile pas");
+        verifier(!moteur.firmware_charge("U1"),
+                 "et l'ancien firmware a été DÉCHARGÉ : rien ne tourne à sa "
+                 "place",
+                 moteur.firmware_charge("U1")
+                     ? std::string("l'ancien est resté en place")
+                     : std::string("plus aucun firmware"));
+    }
+
+    // Les deux binaires existent, chacun chez soi. Les deux sont recompilés
+    // d'abord : les essais précédents devaient échouer, et un échec ne laisse
+    // pas de binaire — c'est justement ce qu'on vient de vérifier.
+    moteur.compiler_et_charger(pour_u1, atelier, &journal, "U1");
     moteur.compiler_et_charger(complet_u2, atelier, &journal_u2, "U2");
     verifier(QFile::exists(atelier + "/carte_u1/firmware.elf")
                  && QFile::exists(atelier + "/carte_u2/firmware.elf"),

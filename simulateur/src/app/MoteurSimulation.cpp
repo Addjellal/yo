@@ -262,6 +262,24 @@ bool MoteurSimulation::compiler_et_charger(const coeur::Programme& fichiers,
     const Carte& carte_cible = puce_cible;
     // La chaîne qui convient à la puce : avr-g++ pour un ATmega, un
     // compilateur ARM pour un Cortex-M.
+    // TOUTE COMPILATION DÉCHARGE D'ABORD L'ANCIEN FIRMWARE.
+    //
+    // Sans cela, une compilation qui échoue laisse en place le programme
+    // précédent : on corrige son code, on appuie sur Compiler, le message
+    // d'erreur passe inaperçu dans le journal, on lance — et c'est l'ANCIEN
+    // programme qui tourne. On croit alors que ses modifications n'ont aucun
+    // effet, ce qui est la pire piste possible.
+    //
+    // Après cet appel, ce qui s'exécute est donc toujours ce qu'on vient de
+    // compiler, ou rien. Il n'y a pas de troisième cas.
+    Carte& a_vider = obtenir_carte(cible);
+    if (a_vider.firmware_charge) {
+        a_vider.firmware_charge = false;
+        a_vider.mcu->reinitialiser();
+        a_vider.commutations.clear();
+        emit journal("Ancien firmware de " + cible + " déchargé.");
+    }
+
     const bool ok = coeur::compiler_pour(carte_cible.puce, fichiers,
                                          fichier.toStdString(),
                                          carte_cible.horloge, &compte_rendu);
