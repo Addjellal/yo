@@ -369,8 +369,25 @@ void MoteurSimulation::demarrer() {
         return;
     }
     if (!un_firmware_au_moins()) {
-        emit journal("Aucun firmware chargé : rien à exécuter.");
-        return;
+        // ON DÉMARRE QUAND MÊME. Refuser était le mauvais réflexe : le
+        // circuit analogique autour de la carte est parfaitement simulable —
+        // les alimentations, les résistances, un voltmètre posé sur une
+        // broche —, et c'est précisément ce qu'on veut voir quand on n'a pas
+        // encore de programme. La carte reste inerte, ses broches en entrée
+        // haute impédance, ce qui est l'état d'un microcontrôleur non
+        // programmé : c'est physiquement juste.
+        //
+        // Appuyer sur « Lancer » et ne rien obtenir, avec pour seule
+        // explication « rien à exécuter » répété à chaque essai, laisse
+        // croire que l'application est cassée. Le message dit maintenant ce
+        // qui manque ET les deux façons d'y remédier.
+        emit journal(
+            "Aucun firmware : la carte reste inerte (broches en entrée), mais "
+            "le circuit analogique est simulé.");
+        emit journal(
+            "   Pour exécuter un programme : compilez-le (F5) si une chaîne "
+            "est installée, ou chargez un .elf déjà compilé par "
+            "Simulation ▸ Charger un firmware.");
     }
     QStringList sans_firmware;
     for (const QString& reference : ordre_cartes_)
