@@ -1693,12 +1693,19 @@ void FenetrePrincipale::ouvrir_source_c() {
 void FenetrePrincipale::compiler_source() {
     QString compte_rendu;
     ranger_editeur();
-    const bool ok = moteur_->compiler_et_charger(
-        carte_courante_.isEmpty()
-            ? coeur::Programme{{"principal.ino",
-                                editeur_source_->toPlainText().toStdString()}}
-            : programme_de(carte_courante_),
-        dossier_travail(), &compte_rendu, carte_courante_);
+    // Le programme est nommé plutôt que construit dans l'appel. Un ternaire
+    // entre un temporaire et une référence produit une copie anonyme, et gcc
+    // le signale — « dangling pointer to an unnamed temporary ». La durée de
+    // vie est en fait correcte, mais une variable nommée l'est aussi et ne
+    // demande à personne de le vérifier.
+    coeur::Programme a_compiler;
+    if (carte_courante_.isEmpty())
+        a_compiler.push_back(
+            {"principal.ino", editeur_source_->toPlainText().toStdString()});
+    else
+        a_compiler = programme_de(carte_courante_);
+    const bool ok = moteur_->compiler_et_charger(a_compiler, dossier_travail(),
+                                                 &compte_rendu, carte_courante_);
     if (!compte_rendu.trimmed().isEmpty()) ecrire(compte_rendu.trimmed());
     if (ok) {
         ecrire("Compilation réussie.");
