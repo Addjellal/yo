@@ -193,10 +193,29 @@ masquait tous :
 
 ## Ce qui est cassé ou inachevé
 
-1. **Analyseur Pi Pico et STM32** : compilent, démarrent, publient leur
-   en-tête, puis **se bloquent** en cours de balayage. Cause non trouvée.
-   Ils sont dans `ProgrammesExemples.h` mais `programme_analyseur()` ne les
-   propose pas.
+1. **Analyseur Pi Pico** : ~~bloqué~~ **réparé**. Il achève son balayage
+   complet et publie ses neuf points. Deux défauts du cœur ARM le bloquaient,
+   tous deux silencieux (voir plus bas) : la retenue d'ADC/SBC, et le
+   décalage par registre de rang nul.
+
+   **Analyseur STM32 : toujours bloqué**, et c'est le fil à reprendre. État
+   précis de la traque, pour ne pas la refaire :
+
+   - il publie son en-tête, puis se bloque dans sa PREMIÈRE `mesurer` ;
+   - le jalon posé au début de la boucle de chauffe n'est **jamais atteint** :
+     le blocage est donc entre l'entrée de `mesurer` et sa première itération ;
+   - `attendre_jusque` a été isolée et testée sur les DEUX puces : elle marche
+     (vingt attentes successives, jalon à chaque fois) ;
+   - les deux calculs d'en-tête de `mesurer` ont été isolés et testés sur le
+     STM32 : `72000000u / (f * 8u)` rend bien 60000, et `(f*40L)/1000L + 2`
+     rend bien 8 ;
+   - restent donc, entre les deux : `instant = maintenant()` et les deux
+     écritures `*re = 0; *im = 0;`. Ou bien le jalon lui-même est mal posé et
+     il faut le vérifier avant de conclure.
+
+   Méthode qui a marché sur le Pico et qu'il faut reprendre : instrumenter le
+   programme avec des jalons émis sur la liaison série, resserrer jusqu'à
+   l'instruction, puis isoler celle-ci dans un programme de trois lignes.
 2. **Analyseur ATmega328P nu, ATtiny85, ESP32** : pas écrits. L'ATtiny n'a
    pas d'UART matériel (sortie à inventer) ; l'ESP32 n'a **pas d'ADC
    modélisé** dans le cœur Xtensa.
