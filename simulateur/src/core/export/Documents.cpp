@@ -287,6 +287,58 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
         }
     }
 
+    // Deux alimentations différentes ramenées sur le même nœud.
+    //
+    // C'est le court-circuit que rien ne rattrapait. Relier le 5V d'une carte
+    // à sa masse, ou poser un générateur entre les deux, donne au solveur deux
+    // potentiels imposés pour un seul nœud : le point de repos ne converge
+    // pas, et le message se répète à chaque pas de temps sans jamais dire d'où
+    // il vient. Pire, selon l'ordre d'assemblage la matrice peut être
+    // résoluble et le circuit tourner avec une masse à 5 V — accepté sans un
+    // mot, ce qui est le cas le plus trompeur des deux.
+    //
+    // La règle se lit d'un nœud : combien de potentiels distincts y arrivent.
+    {
+        // nœud -> { nom de l'alimentation -> composant qui l'apporte }
+        std::map<std::string, std::map<std::string, std::string>> potentiels;
+        for (const auto& instance : netlist.instances()) {
+            const Modele* modele = modele_de(instance);
+            if (!modele) continue;
+            if (!modele->noeud_impose.empty()) {
+                // Symbole de masse ou d'alimentation : il impose son potentiel
+                // au nœud sur lequel on le pose.
+                for (const auto& borne : instance.bornes)
+                    if (!borne.noeud.empty())
+                        potentiels[borne.noeud][modele->noeud_impose] =
+                            instance.reference;
+                continue;
+            }
+            // Les broches d'alimentation d'une carte sont tenues par sa propre
+            // régulation : deux d'entre elles sur un même nœud, c'est le
+            // régulateur en court-circuit.
+            if (!modele->carte) continue;
+            for (const auto& borne : instance.bornes)
+                if (!borne.noeud.empty() && est_alimentation(borne.nom))
+                    potentiels[borne.noeud][borne.nom] = instance.reference;
+        }
+        for (const auto& paire : potentiels) {
+            if (paire.second.size() < 2) continue;
+            std::string lesquelles, porteurs;
+            for (const auto& potentiel : paire.second) {
+                if (!lesquelles.empty()) lesquelles += " et ";
+                lesquelles += "« " + potentiel.first + " »";
+                if (porteurs.find(potentiel.second) == std::string::npos) {
+                    if (!porteurs.empty()) porteurs += ", ";
+                    porteurs += potentiel.second;
+                }
+            }
+            signaler(Gravite::Erreur, porteurs,
+                     lesquelles + " arrivent sur le même nœud : deux "
+                     "potentiels imposés pour un seul nœud, c'est un "
+                     "court-circuit d'alimentation");
+        }
+    }
+
     // Nœuds ne reliant qu'une seule borne : un fil qui ne mène nulle part
     for (const auto& paire : par_noeud) {
         if (est_alimentation(paire.first)) continue;

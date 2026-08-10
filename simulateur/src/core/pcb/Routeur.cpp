@@ -22,7 +22,8 @@ public:
           colonnes_(std::max(2, static_cast<int>(std::ceil(largeur / pas)) + 1)),
           lignes_(std::max(2, static_cast<int>(std::ceil(hauteur / pas)) + 1)),
           couches_(couches),
-          cases_(static_cast<size_t>(colonnes_) * lignes_ * couches_) {}
+          cases_(static_cast<size_t>(colonnes_) * lignes_ * couches_),
+          conflits_(static_cast<size_t>(colonnes_) * lignes_ * couches_, 0) {}
 
     int colonnes() const { return colonnes_; }
     int lignes() const { return lignes_; }
@@ -45,10 +46,29 @@ public:
     }
     void occuper(int colonne, int ligne, int couche, const std::string& net) {
         if (!dedans(colonne, ligne) || couche < 0 || couche >= couches_) return;
-        std::string& case_ = cases_[rang(colonne, ligne, couche)];
-        // Le cuivre d'un net ne s'efface pas au profit d'un autre : la
-        // première occupation gagne, et la suivante devra contourner.
-        if (case_.empty()) case_ = net;
+        const size_t ou = rang(colonne, ligne, couche);
+        std::string& case_ = cases_[ou];
+        if (case_.empty()) {
+            case_ = net;
+            return;
+        }
+        // Deux nets réclament la même case : leurs zones de garde se
+        // recouvrent. C'est la règle sur des pastilles de connecteur au pas de
+        // 2,54 mm, où les gardes de deux broches voisines se chevauchent.
+        //
+        // Laisser la case au premier arrivé était le défaut : sa piste la
+        // traversait librement — la case porte son nom — alors qu'elle est
+        // dans la garde du voisin. D'où des pistes qui frôlent les pastilles
+        // d'à côté sans que rien ne le dise. Une case disputée n'appartient à
+        // personne.
+        if (case_ != net) conflits_[ou] = 1;
+    }
+
+    // Case revendiquée par deux nets : interdite aux deux.
+    bool conflit(int colonne, int ligne, int couche) const {
+        if (!dedans(colonne, ligne) || couche < 0 || couche >= couches_)
+            return true;
+        return conflits_[rang(colonne, ligne, couche)] != 0;
     }
 
     // Marque un disque de cuivre : une pastille, ou le bout d'une piste.
@@ -86,6 +106,7 @@ private:
     double pas_;
     int colonnes_, lignes_, couches_;
     std::vector<std::string> cases_;
+    std::vector<char> conflits_;
 };
 
 struct CaseRoutage {
@@ -134,9 +155,24 @@ CompteRenduRoutage router(CartePcb& carte, const ReglagesRoutage& reglages) {
 
     // 1. Les pastilles occupent les deux faces : elles sont traversantes, et
     //    même une pastille montée en surface interdit le passage sous elle.
+    //
+    //    Le rayon interdit se compte depuis l'**axe** de la piste à venir, pas
+    //    depuis son bord : c'est l'axe que la grille positionne. Il faut donc
+    //    y ajouter sa demi-largeur — le même `garde` que pour les pistes.
+    //    L'oublier laisse l'axe s'approcher à `rayon + isolation`, ce qui met
+    //    le bord du cuivre à `rayon + isolation − largeur/2` : avec les
+    //    réglages courants (0,40 mm et 0,20 mm) la piste **touche** la
+    //    pastille, isolation nulle.
     for (const PastillePosee& pastille : pastilles) {
-        const double rayon = std::max(pastille.diametre, pastille.hauteur) / 2
-                             + reglages.isolation;
+        const double interdit =
+            std::max(pastille.diametre, pastille.hauteur) / 2 + garde;
+        // La grille n'autorise que des cases, mais la piste relie leurs
+        // centres par des segments : entre deux cases libres voisines, le
+        // segment mord légèrement dans le disque. La flèche d'une corde de
+        // longueur `pas` vaut environ pas²/8R. On la réserve, sans quoi le
+        // contrôle relèverait ses propres routages à quelques centièmes près.
+        const double rayon =
+            interdit + pas * pas / (8 * std::max(interdit, 1e-6));
         const std::string net = pastille.mecanique() ? "@fixation" : pastille.net;
         for (int couche = 0; couche < couches; ++couche)
             grille.marquer_disque(pastille.x, pastille.y, rayon, couche, net);
@@ -219,7 +255,9 @@ CompteRenduRoutage router(CartePcb& carte, const ReglagesRoutage& reglages) {
                 const bool arrivee = c == c_arrivee && l == l_arrivee;
                 // On traverse le vide, son propre net, et l'on entre dans la
                 // pastille visée. Rien d'autre.
-                if (!occupant.empty() && occupant != liaison.net && !arrivee)
+                if (!arrivee
+                    && ((!occupant.empty() && occupant != liaison.net)
+                        || grille.conflit(c, l, tete.couche)))
                     continue;
                 const double virage =
                     (tete.direction >= 0 && tete.direction != d)

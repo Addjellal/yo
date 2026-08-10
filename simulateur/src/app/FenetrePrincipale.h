@@ -249,6 +249,10 @@ private:
     QString chemin_projet_;
     bool silencieux_ = false;
     bool premier_affichage_ = true;
+    // Repli des lignes de journal identiques : la dernière écrite, et le
+    // nombre de fois qu'elle l'a été d'affilée.
+    QString derniere_ligne_;
+    int repetitions_ = 0;
 
     // Avertissement : boîte de dialogue en usage normal, journal en mode
     // silencieux.

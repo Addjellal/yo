@@ -1092,6 +1092,22 @@ void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
 // ---------------------------------------------------------------------------
 void FenetrePrincipale::ecrire(const QString& message) {
     if (!console_) return;
+    // Un message répété à l'identique — « le point de repos n'a pas convergé »
+    // à chaque pas de temps — remplit le journal de milliers de lignes
+    // jumelles et pousse hors de l'écran tout ce qui aurait servi à
+    // comprendre. On replie la répétition sur la ligne elle-même.
+    if (message == derniere_ligne_ && repetitions_ > 0) {
+        ++repetitions_;
+        QTextCursor curseur(console_->document());
+        curseur.movePosition(QTextCursor::End);
+        curseur.select(QTextCursor::BlockUnderCursor);
+        curseur.removeSelectedText();
+        console_->appendPlainText(
+            message + QString("   (× %1)").arg(repetitions_));
+        return;
+    }
+    derniere_ligne_ = message;
+    repetitions_ = 1;
     console_->appendPlainText(message);
 }
 

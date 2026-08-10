@@ -16,6 +16,13 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
+// Le contrôle énonce la règle exactement, moins une tolérance qui absorbe
+// l'imprécision géométrique — sinon il relève ses propres arrondis. LibrePCB
+// fait de même dans `checkCopperCopperClearances` (« subtract a tolerance to
+// avoid false-positives due to inaccuracies »), avec 5 µm ; en millimètres et
+// en double, le micron suffit largement.
+constexpr double kTolerance = 0.001;
+
 double distance_point_segment(double px, double py, double x1, double y1,
                               double x2, double y2) {
     const double dx = x2 - x1, dy = y2 - y1;
@@ -281,13 +288,14 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
                                  piste.y1});
     }
 
+    const std::vector<PastillePosee> toutes = pastilles();
+
     // Un trou mécanique qui traverse du cuivre. Un trou de fixation fait
     // souvent trois millimètres, une pastille en fait deux : le foret emporte
     // la pastille et la liaison avec elle. Rien ne le signale à l'écran — le
     // cuivre et le perçage sont dans deux fichiers différents, et c'est en
     // les superposant que le fabricant le découvre, ou pire, l'atelier.
     {
-        const std::vector<PastillePosee> toutes = pastilles();
         for (const PastillePosee& trou : toutes) {
             if (!trou.mecanique() || trou.percage <= 0) continue;
             for (const PastillePosee& cuivre : toutes) {
@@ -319,7 +327,42 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
         }
     }
 
-    const std::vector<PastillePosee> toutes = pastilles();
+    // Une piste qui frôle une pastille d'un autre net. C'est le court-circuit
+    // le plus banal d'un routage manuel : on tire un fil entre deux broches de
+    // connecteur, il en touche une troisième au passage, et rien ne le dit.
+    // Le contrôle ne le voyait pas — il comparait les pistes entre elles et
+    // les pastilles entre elles, jamais les unes aux autres.
+    //
+    // Un trou mécanique compte aussi, mais autrement : il n'a pas de cuivre,
+    // c'est le **foret** qui coupe la piste. Le rayon à respecter est donc
+    // celui du perçage, pas celui de la pastille.
+    for (const Piste& piste : pistes) {
+        for (const PastillePosee& pastille : toutes) {
+            const bool foret = pastille.mecanique();
+            if (!foret && !pastille.net.empty() && pastille.net == piste.net)
+                continue;
+            const double rayon =
+                foret ? pastille.percage / 2
+                      : std::max(pastille.diametre, pastille.hauteur) / 2;
+            if (rayon <= 0) continue;
+            const double marge =
+                distance_point_segment(pastille.x, pastille.y, piste.x1,
+                                       piste.y1, piste.x2, piste.y2)
+                - rayon - piste.largeur / 2;
+            if (marge >= isolation - kTolerance) continue;
+            if (foret)
+                anomalies.push_back({"la piste du net " + piste.net
+                                         + " passe dans un trou de fixation",
+                                     pastille.x, pastille.y});
+            else
+                anomalies.push_back({"la piste du net " + piste.net
+                                         + " frôle la pastille "
+                                         + pastille.composant + "."
+                                         + pastille.borne,
+                                     pastille.x, pastille.y});
+        }
+    }
+
     for (size_t a = 0; a < toutes.size(); ++a) {
         for (size_t b = a + 1; b < toutes.size(); ++b) {
             if (toutes[a].net == toutes[b].net && !toutes[a].net.empty())

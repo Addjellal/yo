@@ -1734,6 +1734,69 @@ static void test_documents() {
         const std::string rapport = coeur::rapport_regles(fautif);
         verifier(rapport.find("[ERREUR]") != std::string::npos,
                  "ERC : le rapport est lisible tel quel");
+
+        // Le court-circuit d'alimentation, dans ses deux formes vues à
+        // l'usage. Aucune des deux n'était détectée : la première noyait le
+        // journal sous « le point de repos n'a pas convergé » répété à chaque
+        // pas de temps, la seconde tournait sans un mot avec la masse à 5 V —
+        // le plus trompeur des deux.
+        auto court_circuit = [](const coeur::Netlist& n) {
+            for (const auto& anomalie : coeur::controler_regles(n))
+                if (anomalie.message.find("court-circuit d'alimentation")
+                    != std::string::npos)
+                    return true;
+            return false;
+        };
+
+        // 1. Un générateur posé entre le 5V et la masse d'une carte.
+        {
+            coeur::Netlist jus;
+            jus.ajouter("U1", "arduino_uno");
+            jus.relier("U1", "5V", "N1");
+            jus.relier("U1", "GND", "GND");
+            auto& gbf = jus.ajouter("GBF1", "generateur_signal");
+            (void)gbf;
+            jus.relier("GBF1", "+", "N1");
+            jus.relier("GBF1", "-", "GND");
+            verifier(!court_circuit(jus),
+                     "ERC : un générateur entre 5V et GND, chacun sur son "
+                     "nœud, n'est pas un court-circuit");
+            // Le même, mais les deux broches ramenées sur un seul nœud.
+            coeur::Netlist jus2;
+            jus2.ajouter("U1", "arduino_uno");
+            jus2.relier("U1", "5V", "GND");
+            jus2.relier("U1", "GND", "GND");
+            verifier(court_circuit(jus2),
+                     "ERC : le 5V et la masse d'une carte sur le même nœud");
+        }
+
+        // 2. Les trois broches d'alimentation réunies : la capture où GND
+        //    affichait 5,00 V.
+        {
+            coeur::Netlist fondu;
+            fondu.ajouter("U1", "arduino_uno");
+            fondu.relier("U1", "5V", "GND");
+            fondu.relier("U1", "3V3", "GND");
+            fondu.relier("U1", "GND", "GND");
+            verifier(court_circuit(fondu),
+                     "ERC : 5V, 3V3 et GND réunis sur un seul nœud");
+        }
+
+        // 3. Un symbole de masse posé sur le nœud d'alimentation.
+        {
+            coeur::Netlist melange;
+            auto& r = melange.ajouter("R1", "resistance");
+            r.valeurs["ohms"] = 220;
+            melange.relier("R1", "1", "5V");
+            melange.relier("R1", "2", "GND");
+            melange.ajouter("GND1", "masse");
+            melange.relier("GND1", "1", "5V");   // la masse sur le 5 V
+            melange.ajouter("VCC1", "alim5v");
+            melange.relier("VCC1", "1", "5V");
+            verifier(court_circuit(melange),
+                     "ERC : un symbole de masse posé sur le nœud "
+                     "d'alimentation");
+        }
     }
 
     // --- export netlist KiCad
@@ -2684,6 +2747,77 @@ static void test_pcb() {
             if (anomalie.message.find("hors du contour") != std::string::npos)
                 hors = true;
         verifier(hors, "une piste qui sort de la carte est refusée");
+
+        // Une piste qui traverse une pastille étrangère : le court-circuit le
+        // plus banal du routage manuel. Le contrôle ne le voyait pas — il
+        // comparait les pistes entre elles et les pastilles entre elles, mais
+        // jamais les unes aux autres. LibrePCB évite l'oubli en versant tout
+        // le cuivre dans une seule liste avant de la croiser avec elle-même.
+        {
+            coeur::CartePcb frole = carte;
+            const coeur::PastillePosee cible = frole.pastilles().front();
+            // On passe pile sur son centre, avec un net différent du sien.
+            const std::string autre = cible.net == "GND" ? "MILIEU" : "GND";
+            frole.pistes.push_back({autre, cible.x - 6, cible.y, cible.x + 6,
+                                    cible.y, 0.4, 0});
+            bool touche = false;
+            for (const auto& anomalie : frole.controler())
+                if (anomalie.message.find("frôle la pastille")
+                    != std::string::npos)
+                    touche = true;
+            verifier(touche,
+                     "une piste qui traverse la pastille d'un autre net est "
+                     "refusée");
+        }
+
+        // Le foret, lui, coupe la piste sans rien court-circuiter : c'est le
+        // même contrôle mais avec le rayon de perçage, pas celui du cuivre.
+        {
+            coeur::CartePcb percee = carte;
+            coeur::ComposantPose support;
+            support.reference = "TROU1";
+            support.empreinte = "arduino_uno";
+            const std::vector<coeur::PastillePosee> avant = percee.pastilles();
+            const coeur::PastillePosee* foret = nullptr;
+            for (const auto& pastille : avant)
+                if (pastille.mecanique()) foret = &pastille;
+            if (foret) {
+                percee.pistes.push_back({"MILIEU", foret->x - 6, foret->y,
+                                         foret->x + 6, foret->y, 0.4, 0});
+                bool coupee = false;
+                for (const auto& anomalie : percee.controler())
+                    if (anomalie.message.find("trou de fixation")
+                        != std::string::npos)
+                        coupee = true;
+                verifier(coupee,
+                         "une piste qui passe dans un trou de fixation est "
+                         "refusée");
+            }
+        }
+    }
+
+    // --- l'auto-routeur doit passer son propre contrôle
+    //
+    // Il réservait autour des pastilles le rayon du cuivre plus l'isolation,
+    // en oubliant la demi-largeur de la piste qu'il allait poser : l'axe
+    // s'approchait à la bonne distance, mais le **bord** touchait le cuivre.
+    // Avec les réglages courants (0,40 mm de piste, 0,20 mm d'isolation),
+    // l'isolation obtenue était exactement nulle. Le contrôle, aveugle au
+    // couple piste/pastille, n'en disait rien : les deux défauts se
+    // masquaient l'un l'autre.
+    {
+        coeur::CartePcb a_router = coeur::CartePcb::depuis_netlist(netlist);
+        coeur::ReglagesRoutage reglages;
+        const coeur::CompteRenduRoutage rendu = coeur::router(a_router, reglages);
+        verifier(rendu.echecs.empty() || !a_router.pistes.empty(),
+                 "l'auto-routeur produit du cuivre");
+        std::string premiere;
+        for (const auto& anomalie : a_router.controler(reglages.isolation,
+                                                       0.1))
+            if (premiere.empty()) premiere = anomalie.message;
+        verifier(premiere.empty(),
+                 "ce qu'il route respecte les règles qu'on lui a données",
+                 premiere);
     }
 
     // --- fichiers de fabrication

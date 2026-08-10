@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "core/Device.h"
+#include "core/export/Documents.h"
 #include <cmath>
 
 namespace {
@@ -361,6 +362,32 @@ void MoteurSimulation::remettre_a_zero() {
     analogique_.oublier_etat();
 }
 
+// Le compte rendu du contrôle, tel qu'il doit apparaître au moment où l'on
+// appuie sur « Lancer ». Une erreur se nomme : sans référence ni nœud, un
+// diagnostic ne sert à rien. Les avertissements suivent, plus discrets.
+void MoteurSimulation::signaler_regles() {
+    const std::vector<coeur::Anomalie> anomalies =
+        coeur::controler_regles(netlist_);
+    int erreurs = 0;
+    for (const auto& anomalie : anomalies)
+        if (anomalie.gravite == coeur::Anomalie::Gravite::Erreur) ++erreurs;
+    if (anomalies.empty()) return;
+
+    if (erreurs > 0)
+        emit journal(QString("Contrôle du schéma : %1 erreur(s). La simulation "
+                             "va tourner, mais ceci l'explique.")
+                         .arg(erreurs));
+    for (const auto& anomalie : anomalies) {
+        const bool erreur =
+            anomalie.gravite == coeur::Anomalie::Gravite::Erreur;
+        const QString ou = QString::fromStdString(anomalie.reference);
+        emit journal(QString("   %1 %2%3")
+                         .arg(erreur ? "ERREUR  " : "attention")
+                         .arg(ou.isEmpty() ? QString() : ou + " : ")
+                         .arg(QString::fromStdString(anomalie.message)));
+    }
+}
+
 void MoteurSimulation::demarrer() {
     // Reprise après une pause : rien à réamorcer, l'état est intact.
     if (etat_simulation_ == Etat::EnPause) {
@@ -370,6 +397,13 @@ void MoteurSimulation::demarrer() {
         emit journal("Simulation reprise.");
         return;
     }
+
+    // Le contrôle des règles électriques existait, mais n'était appelé que
+    // par l'export de dossier — c'est-à-dire jamais au moment où il sert.
+    // Résultat : un court-circuit d'alimentation ne se manifestait que par
+    // « le point de repos initial n'a pas convergé », répété à chaque pas de
+    // temps, sans jamais nommer le fautif. On le passe ici, avant de lancer.
+    signaler_regles();
 
     // Un montage sans carte reste un circuit : générateur, filtre, redresseur
     // se simulent très bien sans microcontrôleur, et c'est ce que fait

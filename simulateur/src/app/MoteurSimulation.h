@@ -141,6 +141,10 @@ private slots:
     void trame();
 
 private:
+    // Passe le contrôle des règles électriques et le publie dans le
+    // journal. Appelé au lancement : c'est là qu'il sert.
+    void signaler_regles();
+
     // Une carte programmable du schéma : son cœur, son firmware, son histoire.
     struct Carte {
         QString reference;
