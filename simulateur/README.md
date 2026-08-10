@@ -6,6 +6,13 @@ compilé** pendant que le circuit analogique est résolu autour de lui.
 
 C'est le principe de Proteus VSM.
 
+> **Sous Windows, suivez [INSTALLATION-WINDOWS.md](INSTALLATION-WINDOWS.md)** :
+> de zéro jusqu'à une LED qui clignote, avec un point de vérification après
+> chaque étape. Une seule étape s'ajoute à la construction — l'installation des
+> compilateurs croisés, en une commande — et le document dit aussi ce qui
+> fonctionne sans eux.
+
+
 **Rien à télécharger pour simuler.** Le solveur analogique est écrit dans ce
 projet : analyse nodale modifiée, méthode de Newton pour les composants non
 linéaires, intégration par la règle des trapèzes avec arrêt sur chaque front
