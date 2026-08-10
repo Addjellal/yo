@@ -143,6 +143,15 @@ Sections notables :
 - **[41]** liaison série ARM et Thumb-2 conditionnel.
 - **[42]/[43]** les montages du cours (voir plus bas).
 
+## Ce qui est propre, et par quel moyen
+
+- **ASan + UBSan** : 386 tests, zéro alerte (voir le point 4 plus bas pour la
+  commande). C'est cette passe qui avait trouvé neuf décalages signés
+  débordants dans les trois cœurs.
+- **Construction ordinaire** : zéro avertissement.
+- **ngspice** comme référence analogique indépendante, **simavr** pour l'AVR,
+  **llvm-mc** pour le Xtensa, les tables publiées par ARM pour le Cortex-M.
+
 ## Défauts trouvés et corrigés (les instructifs)
 
 **Cœur ARM**, trouvés en installant le vrai `arm-none-eabi-gcc` — clang les
@@ -193,8 +202,18 @@ masquait tous :
    modélisé** dans le cœur Xtensa.
 3. **Entrée de menu** « Exemples ▸ Analyseur d'impédance » : n'existe pas. Le
    montage n'est accessible que depuis le banc d'essai.
-4. **Sanitizers** non automatisés dans `ctest`. Une passe manuelle était en
-   cours au moment d'écrire ces lignes (`build-san`), résultat non consigné.
+4. ~~Sanitizers non automatisés.~~ **Fait.** Option `SANITISER`, étiquette
+   ctest `sanitiseurs`, construction séparée (on n'assainit pas un binaire
+   déjà compilé) :
+
+   ```
+   cmake -S . -B build-san -DSANITISER=ON -DCMAKE_BUILD_TYPE=Debug
+   cmake --build build-san -j8 --target tests_coeur
+   ctest --test-dir build-san -L sanitiseurs
+   ```
+
+   Dernière passe : **386 tests, zéro alerte** ASan et UBSan. La détection de
+   fuites est éteinte — Qt et ngspice en laissent au dernier souffle.
 5. **Trous de fixation Uno et Mega** : approximation sûre (aucun ne traverse
    une pastille), cotes exactes à prendre sur le plan mécanique officiel.
 6. **`build-asan/` est dans l'historique git** — 267 fichiers, 76 833 lignes,
