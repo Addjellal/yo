@@ -822,13 +822,13 @@ inline Programme programme_analyseur(const std::string& mcu) {
     const char* principal = nullptr;
     if (mcu == "atmega328p" || mcu == "atmega2560")
         principal = kAnalyseurArduino;
-    // Pi Pico et STM32 : les deux programmes existent plus bas et se
-    // compilent, mais ils se BLOQUENT en cours de balayage — ils publient leur
-    // en-tête puis s'arrêtent. La cause n'est pas trouvée ; les proposer dans
-    // cet état ferait perdre plus de temps qu'une absence. Ils restent dans ce
-    // fichier parce qu'ils sont presque justes, et que les défauts qu'ils ont
-    // déjà fait trouver (libgcc absent, débordement du compteur SysTick à
-    // vingt-quatre bits) valaient à eux seuls l'écriture.
+    else if (mcu == "rp2040")
+        principal = kAnalyseurPico;
+    // STM32 : le programme existe plus bas et se compile, mais il se BLOQUE
+    // dans sa première mesure. Le Pico, lui, achève son balayage depuis que
+    // la retenue d'ADC/SBC est corrigée — le STM32 a donc autre chose, non
+    // identifié. Le proposer dans cet état ferait perdre plus de temps qu'une
+    // absence.
     if (!principal) return {};
     return Programme{{nom_principal(mcu), principal},
                      {"analyseur.h", kAnalyseurCommun}};

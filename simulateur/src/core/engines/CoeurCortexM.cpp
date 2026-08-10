@@ -889,14 +889,28 @@ int CoeurCortexM::instruction() {
                 r_[rd] = resultat;
                 break;
             }
-            case 0x5:                                                         // ADC
-                poser_drapeaux_addition(r_[rd], r_[rm], c_ ? 1 : 0);
-                r_[rd] = r_[rd] + r_[rm] + (c_ ? 1 : 0);
+            // ADC et SBC : la retenue ENTRANTE doit être relevée AVANT de
+            // poser les drapeaux, puisque poser les drapeaux l'écrase. La
+            // seconde ligne lisait donc la retenue SORTANTE, et les deux
+            // instructions rendaient un résultat faux dès que la retenue
+            // changeait — ce qui est le cas normal.
+            //
+            // Conséquence, sur toute puce ARM : toute arithmétique sur
+            // plusieurs mots, et surtout la division logicielle de libgcc,
+            // que gcc appelle sur un Cortex-M0+ faute de diviseur matériel.
+            // « 150 / 10 » rendait zéro, en silence.
+            case 0x5: {                                                       // ADC
+                const uint32_t retenue = c_ ? 1u : 0u;
+                poser_drapeaux_addition(r_[rd], r_[rm], retenue);
+                r_[rd] = r_[rd] + r_[rm] + retenue;
                 return 1;
-            case 0x6:                                                         // SBC
-                poser_drapeaux_addition(r_[rd], ~r_[rm], c_ ? 1 : 0);
-                r_[rd] = r_[rd] + ~r_[rm] + (c_ ? 1 : 0);
+            }
+            case 0x6: {                                                       // SBC
+                const uint32_t retenue = c_ ? 1u : 0u;
+                poser_drapeaux_addition(r_[rd], ~r_[rm], retenue);
+                r_[rd] = r_[rd] + ~r_[rm] + retenue;
                 return 1;
+            }
             case 0x7:                                                         // ROR
                 resultat = rotation_droite(r_[rd], r_[rm] & 0xFF);
                 if (r_[rm] & 0xFF) c_ = (resultat >> 31) & 1;
@@ -1281,14 +1295,21 @@ int CoeurCortexM::instruction32(uint16_t premier, uint16_t second) {
                 if (drapeaux) poser_drapeaux_addition(a, valeur, 0);
                 resultat = a + valeur;
                 break;
-            case 0xA:                                                  // ADC
-                if (drapeaux) poser_drapeaux_addition(a, valeur, c_ ? 1 : 0);
-                resultat = a + valeur + (c_ ? 1 : 0);
+            // Même piège que sur les formes de seize bits : la retenue
+            // entrante est relevée d'abord, parce que poser les drapeaux
+            // l'écrase.
+            case 0xA: {                                                // ADC
+                const uint32_t retenue = c_ ? 1u : 0u;
+                if (drapeaux) poser_drapeaux_addition(a, valeur, retenue);
+                resultat = a + valeur + retenue;
                 break;
-            case 0xB:                                                  // SBC
-                if (drapeaux) poser_drapeaux_addition(a, ~valeur, c_ ? 1 : 0);
-                resultat = a + ~valeur + (c_ ? 1 : 0);
+            }
+            case 0xB: {                                                // SBC
+                const uint32_t retenue = c_ ? 1u : 0u;
+                if (drapeaux) poser_drapeaux_addition(a, ~valeur, retenue);
+                resultat = a + ~valeur + retenue;
                 break;
+            }
             case 0xD:                                                  // SUB/CMP
                 if (drapeaux) poser_drapeaux_soustraction(a, valeur);
                 resultat = a - valeur;

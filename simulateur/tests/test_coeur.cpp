@@ -4846,6 +4846,69 @@ static void test_serie_et_sauts_arm() {
              "CBZ, CBNZ et IT restent réservées à l'ARMv7-M",
              "Pico en v6-M, STM32 en v7-M");
 
+
+    // --- La retenue d'ADC et de SBC ---------------------------------------
+    //
+    // Poser les drapeaux ÉCRASE la retenue. ADC et SBC lisaient donc la
+    // retenue SORTANTE au lieu de l'entrante, et rendaient un résultat faux
+    // dès qu'elle changeait — c'est-à-dire dans le cas normal.
+    //
+    // Ce n'est pas un détail d'arithmétique : un Cortex-M0+ n'a pas de
+    // diviseur matériel, gcc appelle donc la division logicielle de libgcc,
+    // et celle-ci est bâtie sur une chaîne de « subs » suivis d'« adcs ».
+    // « 150 / 10 » rendait ZÉRO, en silence, sur toute carte Pi Pico.
+    {
+        // Chaque puce a sa liaison série, et les deux drapeaux sont de
+        // conventions opposées : voir plus haut.
+        struct Liaison { const char* mcu; const char* entete; };
+        const Liaison liaisons[] = {
+            {"rp2040",
+             "#define SR (*(volatile unsigned*)0x40034018u)\n"
+             "#define DR (*(volatile unsigned*)0x40034000u)\n"
+             "static void put(char c){ while(SR&(1u<<5)){} DR=(unsigned)c; }\n"},
+            {"stm32f103",
+             "#define SR (*(volatile unsigned*)0x40013800u)\n"
+             "#define DR (*(volatile unsigned*)0x40013804u)\n"
+             "static void put(char c){ while(!(SR&(1u<<7))){} DR=(unsigned)c; }\n"}};
+        for (const Liaison& liaison : liaisons) {
+        const std::string source =
+            std::string(liaison.entete)
+            + "volatile unsigned long v = 150, d = 10;\n"
+            "void _start(void) {\n"
+            "    unsigned long q = v / d;\n"
+            "    unsigned r;\n"
+            // La retenue prise sur le vif : 150 >= 10 donc pas d'emprunt,
+            // donc retenue à un sur un ARM, et adcs doit rendre 1.
+            "    __asm__ volatile(\"movs r2, #0\\n cmp %1, %2\\n adcs r2, r2\\n"
+            " mov %0, r2\" : \"=r\"(r) : \"r\"(v), \"r\"(d) : \"r2\", \"cc\");\n"
+            "    put((char)('0' + (q / 10) % 10));\n"
+            "    put((char)('0' + q % 10));\n"
+            "    put((char)('0' + r));\n"
+            "    for (;;) { }\n"
+            "}\n";
+        {
+            const char* mcu = liaison.mcu;
+            std::string journal;
+            const std::string firmware =
+                std::string("/tmp/sim_retenue_") + mcu + ".elf";
+            if (!coeur::CortexEngine::compiler_source(source, firmware,
+                                                      &journal, mcu)) {
+                verifier(false, std::string(mcu) + " : l'essai compile", journal);
+                continue;
+            }
+            coeur::CortexEngine puce;
+            std::string recu;
+            puce.sur_octet_serie([&](char octet) { recu += octet; });
+            puce.charger(firmware, mcu, 72000000);
+            puce.avancer(2000000);
+            verifier(recu == "151",
+                     std::string(mcu)
+                         + " : division logicielle et retenue d'ADC justes",
+                     "« " + recu + " » contre « 151 » attendu (15 puis 1)");
+        }
+        }
+    }
+
     // Le bloc IT, pris à part et sans ambiguïté : quatre instructions dans un
     // seul bloc, dont deux doivent s'exécuter et deux être sautées. Et une
     // vérification que les drapeaux ne bougent pas — « addne » emploie
