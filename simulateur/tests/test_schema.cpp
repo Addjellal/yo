@@ -1790,7 +1790,7 @@ static void test_analyseur_impedance() {
     moteur.definir_circuit(netlist, broches, cartes);
 
     QString journal;
-    if (!moteur.compiler_et_charger(QString::fromUtf8(coeur::kAnalyseurArduino),
+    if (!moteur.compiler_et_charger(coeur::programme_analyseur("atmega328p"),
                                     QDir::tempPath(), &journal, "U1")) {
         verifier(false, "l'analyseur compile et se charge",
                  journal.toStdString());

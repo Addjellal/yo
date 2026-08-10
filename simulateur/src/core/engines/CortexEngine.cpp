@@ -246,8 +246,15 @@ bool CortexEngine::compiler_projet(const Programme& fichiers,
     }
     commande += " -nostdlib -ffreestanding -Os -I \"" + dossier
                 + "\" -Wl,-e,_start -Wl,-Ttext=" + adresse + " -o \""
-                + chemin_elf + "\"" + a_compiler + " > \"" + journal_fichier
-                + "\" 2>&1";
+                + chemin_elf + "\"" + a_compiler;
+    // libgcc, et elle seule. « -nostdlib » écarte la bibliothèque C, ce qui
+    // est voulu — il n'y a ni système ni tas ici. Mais il écarte aussi les
+    // routines que le COMPILATEUR appelle de lui-même : un Cortex-M0+ n'a pas
+    // de diviseur matériel, et le moindre « a / b » devient un appel à
+    // __aeabi_uidiv. Sans libgcc, un programme parfaitement banal ne se lie
+    // pas, avec un message qui ne désigne rien d'écrit par l'utilisateur.
+    commande += " -lgcc";
+    commande += " > \"" + journal_fichier + "\" 2>&1";
 
     const int code = std::system(commande.c_str());
     if (journal) {

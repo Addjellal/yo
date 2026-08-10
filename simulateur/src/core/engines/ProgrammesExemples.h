@@ -13,6 +13,8 @@
 
 #include <cstdint>
 #include <string>
+
+#include "core/engines/Microcontroleur.h"
 #include <vector>
 
 namespace coeur {
@@ -375,81 +377,145 @@ void app_main(void) {
 // de remonter à l'impédance complexe du montage. Sans elle, on ne saurait
 // rien faire de deux amplitudes.
 // ---------------------------------------------------------------------------
-inline const char* kAnalyseurArduino = R"SRC(/* Analyseur d'impédance : la carte mesure le RLC qu'on lui branche.
+// L'en-tête partagé par toutes les variantes de l'analyseur. C'est lui qui a
+// motivé la compilation en plusieurs fichiers : la transformée est la même
+// sur les six cartes, et la recopier six fois aurait garanti qu'une copie
+// finisse par diverger.
+//
+// Il ne contient QUE de l'arithmétique — aucun registre, aucune broche. La
+// couche matérielle (produire le créneau, lire le convertisseur, attendre
+// l'instant) reste dans le programme de chaque puce, parce qu'elle n'a rien
+// de commun d'une architecture à l'autre.
+inline const char* kAnalyseurCommun = R"SRC(/* Transformee de Fourier discrete a huit points, raie 1.
+   Partage par toutes les cartes : voir le programme principal. */
+#ifndef ANALYSEUR_H
+#define ANALYSEUR_H
 
-   Montage (voir le schéma chargé avec cet exemple) :
+/* Huit echantillons par periode, seize periodes moyennees. */
+#define ANALYSEUR_N         8
+#define ANALYSEUR_PERIODES  16
+
+/* Poids de la raie 1, en virgule fixe sur 256. 181 vaut 256*racine(2)/2.
+   Leur somme est nulle : la composante continue est rejetee sans qu'on ait a
+   la retrancher, et le milieu d'alimentation des diviseurs de mesure
+   disparait tout seul.
+
+   Ces poids sont ORTHOGONAUX aux harmoniques 3, 5 et 7 du creneau
+   d'excitation. C'est ce qui rend la mesure juste : a 150 Hz, l'harmonique 3
+   tombe pres de la resonance et le courant reel y est autant harmonique 3
+   que fondamental. Un detecteur de crete mesurerait ce melange. */
+static const int ANALYSEUR_COS[8] = {256, 181, 0, -181, -256, -181, 0, 181};
+static const int ANALYSEUR_SIN[8] = {0, 181, 256, 181, 0, -181, -256, -181};
+
+/* Accumule un echantillon. `rang` est sa place dans la periode, 0 a 7. */
+static void analyseur_accumuler(long* re, long* im, int rang, long mesure) {
+    *re += mesure * (long)ANALYSEUR_COS[rang & 7];
+    *im -= mesure * (long)ANALYSEUR_SIN[rang & 7];
+}
+
+/* Racine carree entiere, par la methode de Newton sur des entiers.
+   Pourquoi pas sqrt() : sur un ATtiny85 la bibliotheque flottante prend
+   davantage de place que le programme entier, et sur un Cortex-M compile
+   sans bibliotheque standard elle n'existe pas du tout. */
+static unsigned long analyseur_racine(unsigned long valeur) {
+    unsigned long x, precedent;
+    if (valeur == 0) return 0;
+    x = valeur;
+    if (x > 65535UL) x = 65535UL;
+    for (;;) {
+        precedent = x;
+        x = (x + valeur / x) / 2;
+        if (x >= precedent) return precedent;
+    }
+}
+
+/* Module de la raie, ramene en points de conversion.
+   Le facteur 2 fait passer d'une somme ponderee a une amplitude ; 256 defait
+   la virgule fixe ; N*PERIODES defait le moyennage. */
+static unsigned long analyseur_amplitude(long re, long im) {
+    unsigned long a = (unsigned long)(re < 0 ? -re : re);
+    unsigned long b = (unsigned long)(im < 0 ? -im : im);
+    /* Les sommes tiennent sur 32 bits mais leurs carres non : on divise
+       d'abord, on eleve ensuite. La division par 256 est un decalage. */
+    a >>= 8;
+    b >>= 8;
+    return 2UL * analyseur_racine(a * a + b * b)
+           / (ANALYSEUR_N * ANALYSEUR_PERIODES);
+}
+
+/* Les frequences balayees, en hertz.
+   Aucune n'est multiple de 200 Hz : la fenetre de couplage du simulateur dure
+   cinq millisecondes, et une excitation commensurable avec elle donne un biais
+   systematique qui ne se moyenne pas. Corriger cela a divise l'erreur par
+   deux. Aucune non plus ne place son harmonique 3 sur la resonance. */
+#define ANALYSEUR_NB_FREQUENCES 9
+static const int ANALYSEUR_FREQUENCES[ANALYSEUR_NB_FREQUENCES] =
+    {150, 210, 260, 300, 339, 390, 455, 590, 810};
+
+#endif
+)SRC";
+
+inline const char* kAnalyseurArduino = R"SRC(/* Analyseur d'impedance : la carte mesure le RLC qu'on lui branche.
+
+   Montage (voir le schema charge avec cet exemple) :
 
      D8 --[ L1 1 H ]-- M --[ C1 220 nF ]-- S --[ R1 470 ]-- GND
 
-   S est l'image du courant : R1 est un shunt, et la tension a ses bornes
-   vaut 470 fois le courant. Chacun des deux points mesures passe par un
-   diviseur a trois resistances egales (vers +5 V, vers la masse, vers le
-   point) qui ramene le signal au tiers autour du milieu de l'alimentation :
-   sans lui les alternances negatives seraient ecretees, et la mesure fausse.
+   S est l'image du courant : R1 est un shunt, et la tension a ses bornes vaut
+   470 fois le courant. Les deux points de mesure passent par un diviseur a
+   trois resistances egales (vers le point, vers +5 V, vers la masse) qui
+   ramene le signal au tiers autour du milieu de l'alimentation : sans lui les
+   alternances negatives seraient ecretees, et la mesure fausse.
 
    ATTENTION au condensateur : a la resonance la tension a ses bornes vaut Q
    fois celle d'attaque, soit une quinzaine de volts pour cinq volts en
    entree. Aucune broche n'y touche, mais un condensateur reel doit tenir
    cette tension.
 
-   Resonance attendue : 1/(2*pi*racine(L*C)) = 339 Hz. */
+   Resonance attendue : 1/(2*pi*racine(L*C)) = 339 Hz.
 
-#include <math.h>
+   La transformee est dans analyseur.h, partage avec les autres cartes. */
+
+#include "analyseur.h"
 
 const int EXC = 8;              /* la broche qui excite le montage */
 const int VOIE_EXC = A1;        /* image de cette meme broche */
 const int VOIE_SHUNT = A0;      /* image de la tension aux bornes du shunt */
 const long SHUNT = 470;         /* ohms */
 
-const int N = 8;                /* echantillons par periode */
-const int PERIODES = 16;        /* periodes moyennees a chaque frequence */
-
-const int FREQUENCES[] = {150, 210, 260, 300, 339, 390, 455, 590, 810};
-const int NB_FREQUENCES = 9;
-
-/* Poids de la raie 1 d'une TFD a huit points, en virgule fixe sur 256.
-   181 vaut 256*racine(2)/2. Leur somme est nulle : la composante continue
-   est rejetee sans qu'on ait a la retrancher. */
-const int COS8[8] = {256, 181, 0, -181, -256, -181, 0, 181};
-const int SIN8[8] = {0, 181, 256, 181, 0, -181, -256, -181};
-
-/* Excite a la frequence f et releve une voie. Rend la raie 1, partie reelle
-   et partie imaginaire, en unites brutes (points de conversion x 256).
+/* Excite a la frequence f et releve une voie. Rend la raie 1 de la TFD.
    Le creneau est produit par cette boucle : l'echantillonnage lui est donc
    coherent par construction, sans horloge ni interruption. */
 void mesurer(int voie, long f, long* re, long* im) {
-    const unsigned long pas = 1000000UL / (f * N);   /* microsecondes */
+    const unsigned long pas = 1000000UL / (f * ANALYSEUR_N);   /* microsecondes */
     unsigned long instant = micros();
     *re = 0;
     *im = 0;
 
-    /* Chauffe : on excite sans rien compter pendant une vingtaine de
+    /* Chauffe : on excite sans rien compter pendant une quarantaine de
        millisecondes. Deux raisons, et les deux comptent.
 
        La premiere est physique : un circuit resonant met Q/(pi*f0) a
-       s'etablir, quelques millisecondes ici. Mesurer avant, c'est mesurer un
-       transitoire.
+       s'etablir. Mesurer avant, c'est mesurer un transitoire.
 
        La seconde tient au simulateur : le convertisseur lit la forme d'onde
        de la fenetre de couplage precedente, soit cinq millisecondes plus tot.
-       Sans chauffe, les premiers echantillons d'un balayage a 800 Hz
+       Sans chauffe, les premiers echantillons d'un balayage a 810 Hz
        porteraient encore la frequence precedente. */
-    const int CHAUFFE = (int)((f * 40L) / 1000L) + 2;
-    for (int p = 0; p < CHAUFFE; p++) {
-        for (int k = 0; k < N; k++) {
+    const int chauffe = (int)((f * 40L) / 1000L) + 2;
+    for (int p = 0; p < chauffe; p++) {
+        for (int k = 0; k < ANALYSEUR_N; k++) {
             while ((long)(micros() - instant) < 0) { }
-            digitalWrite(EXC, k < N / 2 ? HIGH : LOW);
+            digitalWrite(EXC, k < ANALYSEUR_N / 2 ? HIGH : LOW);
             instant += pas;
         }
     }
 
-    for (int p = 0; p < PERIODES; p++) {
-        for (int k = 0; k < N; k++) {
+    for (int p = 0; p < ANALYSEUR_PERIODES; p++) {
+        for (int k = 0; k < ANALYSEUR_N; k++) {
             while ((long)(micros() - instant) < 0) { }
-            digitalWrite(EXC, k < N / 2 ? HIGH : LOW);
-            const long v = analogRead(voie);
-            *re += v * (long)COS8[k];
-            *im -= v * (long)SIN8[k];
+            digitalWrite(EXC, k < ANALYSEUR_N / 2 ? HIGH : LOW);
+            analyseur_accumuler(re, im, k, analogRead(voie));
             instant += pas;
         }
     }
@@ -458,53 +524,315 @@ void mesurer(int voie, long f, long* re, long* im) {
 void setup() {
     pinMode(EXC, OUTPUT);
     Serial.begin(9600);
-    Serial.println("f(Hz)  U(mV)  I(uA)  |Z|(ohm)");
+    Serial.println("f(Hz)  U(mV)  I(uA)  Z(ohm)");
 }
 
 void loop() {
-    for (int rang = 0; rang < NB_FREQUENCES; rang++) {
-        const long f = FREQUENCES[rang];
+    for (int rang = 0; rang < ANALYSEUR_NB_FREQUENCES; rang++) {
+        const long f = ANALYSEUR_FREQUENCES[rang];
 
         /* Deux passes : une par voie. Le convertisseur ne sait convertir
            qu'une voie a la fois, et deux conversions ne tiendraient pas dans
-           un intervalle d'echantillonnage a 800 Hz. Les deux passes partagent
+           un intervalle d'echantillonnage a 810 Hz. Les deux passes partagent
            la meme reference de phase, puisque le creneau est refait a
            l'identique. */
-        long re_exc, im_exc, re_shunt, im_shunt;
-        mesurer(VOIE_EXC, f, &re_exc, &im_exc);
-        mesurer(VOIE_SHUNT, f, &re_shunt, &im_shunt);
+        long re, im;
+        mesurer(VOIE_EXC, f, &re, &im);
+        const unsigned long brut_u = analyseur_amplitude(re, im);
+        mesurer(VOIE_SHUNT, f, &re, &im);
+        const unsigned long brut_i = analyseur_amplitude(re, im);
         digitalWrite(EXC, LOW);
 
-        /* Des unites brutes aux volts. Le facteur 3 defait le diviseur ;
-           2/(256*N*PERIODES) est le passage d'une somme ponderee a une
-           amplitude ; 5/1023 est le pas du convertisseur. */
-        const float echelle = 3.0 * 2.0 * 5.0 / (256.0 * N * PERIODES * 1023.0);
-        const float ure = re_exc * echelle,   uim = im_exc * echelle;
-        const float sre = re_shunt * echelle, sim = im_shunt * echelle;
-
-        /* Le courant, par la loi d'Ohm dans le shunt. */
-        const float i = sqrtf(sre * sre + sim * sim) / SHUNT;
-
-        /* La tension appliquee au montage. La branche L-C-shunt va de la
-           broche a la masse : la tension a ses bornes est donc celle du noeud
-           d'excitation, et rien d'autre. On la mesure au lieu de la supposer,
-           car la broche n'est pas une source parfaite — sa resistance interne
-           fait chuter la tension la ou le montage tire du courant, et cette
-           chute fait partie du spectre. */
-        const float u = sqrtf(ure * ure + uim * uim);
+        /* Des points de conversion aux millivolts. Le facteur 3 defait le
+           diviseur de mesure ; 5000/1023 est le pas du convertisseur. */
+        const unsigned long u_mv = brut_u * 3UL * 5000UL / 1023UL;
+        const unsigned long i_mv = brut_i * 3UL * 5000UL / 1023UL;
+        /* Le courant, par la loi d'Ohm dans le shunt, en microamperes. */
+        const unsigned long i_ua = i_mv * 1000UL / SHUNT;
 
         Serial.print(f);
         Serial.print("  ");
-        Serial.print((long)(u * 1000.0));
+        Serial.print((long)u_mv);
         Serial.print("  ");
-        Serial.print((long)(i * 1000000.0));
+        Serial.print((long)i_ua);
         Serial.print("  ");
-        Serial.println(i > 1e-7 ? (long)(u / i) : 999999L);
+        Serial.println(i_ua > 0 ? (long)(u_mv * 1000UL / i_ua) : 999999L);
     }
     Serial.println("--- balayage termine ---");
     delay(1000);
 }
 )SRC";
+
+
+
+// Les deux cartes ARM. Le squelette est le même que celui du croquis Arduino
+// — c'est la même mesure —, mais tout ce qui touche au matériel change : pas
+// de noyau, pas de micros(), pas d'analogRead. La base de temps est le
+// compteur SysTick, présent sur tout Cortex-M ; c'est d'ailleurs lui que le
+// noyau Arduino emploie sur ces puces.
+inline const char* kAnalyseurPico = R"SRC(/* Pi Pico : analyseur d'impedance, en C sur registres.
+
+   Montage :
+     GP2 --[ L1 1 H ]-- M --[ C1 220 nF ]-- S --[ R1 470 ]-- GND
+   GP26 (ADC0) lit l'image du shunt, GP27 (ADC1) celle de l'excitation.
+   Les deux passent par un diviseur a trois resistances vers 3,3 V et la
+   masse, qui ramene le signal au tiers autour du milieu de l'alimentation.
+
+   Attention : 3,3 V ici, pas 5. Le pas du convertisseur en depend, et la
+   pleine echelle vaut 4095 points et non 1023.
+
+   Resonance attendue : 339 Hz. */
+
+#include "analyseur.h"
+
+#define SIO           0xd0000000u
+#define GPIO_OUT_SET  (*(volatile unsigned*)(SIO + 0x014))
+#define GPIO_OUT_CLR  (*(volatile unsigned*)(SIO + 0x018))
+#define GPIO_OE_SET   (*(volatile unsigned*)(SIO + 0x024))
+#define EXC           (1u << 2)
+
+#define ADC_BASE      0x4004c000u
+#define ADC_CS        (*(volatile unsigned*)(ADC_BASE + 0x00))
+#define ADC_RESULT    (*(volatile unsigned*)(ADC_BASE + 0x04))
+
+#define UART_DR       (*(volatile unsigned*)0x40034000u)
+#define UART_FR       (*(volatile unsigned*)0x40034018u)
+
+#define SYST_CSR      (*(volatile unsigned*)0xe000e010u)
+#define SYST_RVR      (*(volatile unsigned*)0xe000e014u)
+#define SYST_CVR      (*(volatile unsigned*)0xe000e018u)
+
+#define HORLOGE       125000000u
+#define SHUNT         470u
+
+/* Le temps. SysTick est un compteur DECROISSANT sur vingt-quatre bits : on le
+   charge au maximum et on lit son complement, ce qui donne un chronometre qui
+   monte. Il repasse par zero toutes les 0,134 seconde a 125 MHz ; les
+   intervalles mesures ici sont mille fois plus courts. */
+static void horloge_demarrer(void) {
+    SYST_RVR = 0x00ffffffu;
+    SYST_CVR = 0;
+    SYST_CSR = 5;                 /* actif, horloge du processeur */
+}
+static unsigned maintenant(void) { return (0x00ffffffu - SYST_CVR) & 0x00ffffffu; }
+/* SysTick ne compte que sur VINGT-QUATRE bits : au-dela il repasse par zero.
+   Comparer deux instants comme des entiers de trente-deux bits marche jusqu'au
+   premier repassage, puis bloque la boucle d'attente pour toujours. On ramene
+   donc l'ecart sur vingt-quatre bits signes avant de le comparer. */
+static void attendre_jusque(unsigned cible) {
+    for (;;) {
+        const int ecart = (int)((maintenant() - cible) << 8) >> 8;
+        if (ecart >= 0) return;
+    }
+}
+
+static void emettre(const char* t) {
+    while (*t) { while (UART_FR & (1u << 5)) { } UART_DR = (unsigned)*t++; }
+}
+static void emettre_nombre(unsigned long v) {
+    char tampon[12];
+    int rang = 0;
+    if (v == 0) { emettre("0"); return; }
+    while (v) { tampon[rang++] = (char)('0' + (v % 10)); v /= 10; }
+    while (rang) { char c[2]; c[0] = tampon[--rang]; c[1] = 0; emettre(c); }
+}
+
+static unsigned lire_voie(unsigned voie) {
+    ADC_CS = (1u << 0) | (voie << 12);      /* convertisseur en marche */
+    ADC_CS = (1u << 0) | (voie << 12) | (1u << 2);   /* START_ONCE */
+    while (!(ADC_CS & (1u << 8))) { }        /* READY */
+    return ADC_RESULT & 0x0fff;
+}
+
+static void mesurer(unsigned voie, long f, long* re, long* im) {
+    /* Ticks d'horloge entre deux echantillons. */
+    const unsigned pas = HORLOGE / ((unsigned)f * ANALYSEUR_N);
+    unsigned instant = maintenant();
+    int p, k;
+    const int chauffe = (int)((f * 40L) / 1000L) + 2;
+    *re = 0;
+    *im = 0;
+    for (p = 0; p < chauffe; p++) {
+        for (k = 0; k < ANALYSEUR_N; k++) {
+            attendre_jusque(instant);
+            if (k < ANALYSEUR_N / 2) GPIO_OUT_SET = EXC; else GPIO_OUT_CLR = EXC;
+            instant = (instant + pas) & 0x00ffffffu;
+        }
+    }
+    for (p = 0; p < ANALYSEUR_PERIODES; p++) {
+        for (k = 0; k < ANALYSEUR_N; k++) {
+            attendre_jusque(instant);
+            if (k < ANALYSEUR_N / 2) GPIO_OUT_SET = EXC; else GPIO_OUT_CLR = EXC;
+            analyseur_accumuler(re, im, k, (long)lire_voie(voie));
+            instant = (instant + pas) & 0x00ffffffu;
+        }
+    }
+}
+
+void _start(void) {
+    int rang;
+    GPIO_OE_SET = EXC;
+    horloge_demarrer();
+    emettre("f(Hz)  U(mV)  I(uA)  Z(ohm)\n");
+    for (;;) {
+        for (rang = 0; rang < ANALYSEUR_NB_FREQUENCES; rang++) {
+            const long f = ANALYSEUR_FREQUENCES[rang];
+            long re, im;
+            unsigned long u_mv, i_mv, i_ua;
+            mesurer(1, f, &re, &im);              /* ADC1 = GP27, excitation */
+            u_mv = analyseur_amplitude(re, im) * 3UL * 3300UL / 4095UL;
+            mesurer(0, f, &re, &im);              /* ADC0 = GP26, shunt */
+            i_mv = analyseur_amplitude(re, im) * 3UL * 3300UL / 4095UL;
+            GPIO_OUT_CLR = EXC;
+            i_ua = i_mv * 1000UL / SHUNT;
+            emettre_nombre((unsigned long)f); emettre("  ");
+            emettre_nombre(u_mv); emettre("  ");
+            emettre_nombre(i_ua); emettre("  ");
+            emettre_nombre(i_ua ? u_mv * 1000UL / i_ua : 999999UL);
+            emettre("\n");
+        }
+        emettre("--- balayage termine ---\n");
+    }
+}
+)SRC";
+
+inline const char* kAnalyseurStm32 = R"SRC(/* STM32F103 : analyseur d'impedance, en C sur registres.
+
+   Montage :
+     PB0 --[ L1 1 H ]-- M --[ C1 220 nF ]-- S --[ R1 470 ]-- GND
+   PA0 (ADC voie 0) lit l'image du shunt, PA1 (voie 1) celle de l'excitation.
+   Diviseur a trois resistances sur chacun, vers 3,3 V et la masse.
+
+   Sur cette famille la direction d'une broche ne tient pas dans un bit mais
+   dans un QUARTET : quatre bits de configuration par broche, dans CRL pour
+   les broches 0 a 7. C'est la difference la plus deroutante avec un AVR.
+
+   Resonance attendue : 339 Hz. */
+
+#include "analyseur.h"
+
+#define GPIOB_CRL     (*(volatile unsigned*)0x40010c00u)
+#define GPIOB_BSRR    (*(volatile unsigned*)0x40010c10u)
+#define ADC1_CR2      (*(volatile unsigned*)0x40012408u)
+#define ADC1_SQR3     (*(volatile unsigned*)0x40012434u)
+#define ADC1_DR       (*(volatile unsigned*)0x4001244cu)
+#define USART1_SR     (*(volatile unsigned*)0x40013800u)
+#define USART1_DR     (*(volatile unsigned*)0x40013804u)
+#define SYST_CSR      (*(volatile unsigned*)0xe000e010u)
+#define SYST_RVR      (*(volatile unsigned*)0xe000e014u)
+#define SYST_CVR      (*(volatile unsigned*)0xe000e018u)
+
+#define EXC           (1u << 0)          /* PB0 */
+#define HORLOGE       72000000u
+#define SHUNT         470u
+
+static void horloge_demarrer(void) {
+    SYST_RVR = 0x00ffffffu;
+    SYST_CVR = 0;
+    SYST_CSR = 5;
+}
+static unsigned maintenant(void) { return (0x00ffffffu - SYST_CVR) & 0x00ffffffu; }
+/* SysTick ne compte que sur VINGT-QUATRE bits : au-dela il repasse par zero.
+   Comparer deux instants comme des entiers de trente-deux bits marche jusqu'au
+   premier repassage, puis bloque la boucle d'attente pour toujours. On ramene
+   donc l'ecart sur vingt-quatre bits signes avant de le comparer. */
+static void attendre_jusque(unsigned cible) {
+    for (;;) {
+        const int ecart = (int)((maintenant() - cible) << 8) >> 8;
+        if (ecart >= 0) return;
+    }
+}
+
+static void emettre(const char* t) {
+    while (*t) { while (!(USART1_SR & (1u << 7))) { } USART1_DR = (unsigned)*t++; }
+}
+static void emettre_nombre(unsigned long v) {
+    char tampon[12];
+    int rang = 0;
+    if (v == 0) { emettre("0"); return; }
+    while (v) { tampon[rang++] = (char)('0' + (v % 10)); v /= 10; }
+    while (rang) { char c[2]; c[0] = tampon[--rang]; c[1] = 0; emettre(c); }
+}
+
+static unsigned lire_voie(unsigned voie) {
+    ADC1_SQR3 = voie;                    /* la voie de la premiere mesure */
+    ADC1_CR2 = 1u;                       /* ADON */
+    ADC1_CR2 = 1u | (1u << 22);          /* SWSTART */
+    return ADC1_DR & 0x0fff;
+}
+
+static void mesurer(unsigned voie, long f, long* re, long* im) {
+    const unsigned pas = HORLOGE / ((unsigned)f * ANALYSEUR_N);
+    unsigned instant = maintenant();
+    int p, k;
+    const int chauffe = (int)((f * 40L) / 1000L) + 2;
+    *re = 0;
+    *im = 0;
+    for (p = 0; p < chauffe; p++) {
+        for (k = 0; k < ANALYSEUR_N; k++) {
+            attendre_jusque(instant);
+            GPIOB_BSRR = (k < ANALYSEUR_N / 2) ? EXC : (EXC << 16);
+            instant = (instant + pas) & 0x00ffffffu;
+        }
+    }
+    for (p = 0; p < ANALYSEUR_PERIODES; p++) {
+        for (k = 0; k < ANALYSEUR_N; k++) {
+            attendre_jusque(instant);
+            GPIOB_BSRR = (k < ANALYSEUR_N / 2) ? EXC : (EXC << 16);
+            analyseur_accumuler(re, im, k, (long)lire_voie(voie));
+            instant = (instant + pas) & 0x00ffffffu;
+        }
+    }
+}
+
+void _start(void) {
+    int rang;
+    GPIOB_CRL = 0x00000003u;          /* PB0 en sortie, 50 MHz */
+    horloge_demarrer();
+    emettre("f(Hz)  U(mV)  I(uA)  Z(ohm)\n");
+    for (;;) {
+        for (rang = 0; rang < ANALYSEUR_NB_FREQUENCES; rang++) {
+            const long f = ANALYSEUR_FREQUENCES[rang];
+            long re, im;
+            unsigned long u_mv, i_mv, i_ua;
+            mesurer(1, f, &re, &im);
+            u_mv = analyseur_amplitude(re, im) * 3UL * 3300UL / 4095UL;
+            mesurer(0, f, &re, &im);
+            i_mv = analyseur_amplitude(re, im) * 3UL * 3300UL / 4095UL;
+            GPIOB_BSRR = EXC << 16;
+            i_ua = i_mv * 1000UL / SHUNT;
+            emettre_nombre((unsigned long)f); emettre("  ");
+            emettre_nombre(u_mv); emettre("  ");
+            emettre_nombre(i_ua); emettre("  ");
+            emettre_nombre(i_ua ? u_mv * 1000UL / i_ua : 999999UL);
+            emettre("\n");
+        }
+        emettre("--- balayage termine ---\n");
+    }
+}
+)SRC";
+
+// Le programme de l'analyseur pour une puce donnée, en DEUX fichiers : le
+// principal, et l'en-tête partagé. C'est le premier exemple du simulateur qui
+// s'écrive ainsi, et c'est ce pour quoi la compilation multi-fichiers existe.
+//
+// Rend un programme vide pour une puce dont l'analyseur n'existe pas :
+// l'appelant sait alors qu'il n'y a rien à proposer.
+inline Programme programme_analyseur(const std::string& mcu) {
+    const char* principal = nullptr;
+    if (mcu == "atmega328p" || mcu == "atmega2560")
+        principal = kAnalyseurArduino;
+    // Pi Pico et STM32 : les deux programmes existent plus bas et se
+    // compilent, mais ils se BLOQUENT en cours de balayage — ils publient leur
+    // en-tête puis s'arrêtent. La cause n'est pas trouvée ; les proposer dans
+    // cet état ferait perdre plus de temps qu'une absence. Ils restent dans ce
+    // fichier parce qu'ils sont presque justes, et que les défauts qu'ils ont
+    // déjà fait trouver (libgcc absent, débordement du compteur SysTick à
+    // vingt-quatre bits) valaient à eux seuls l'écriture.
+    if (!principal) return {};
+    return Programme{{nom_principal(mcu), principal},
+                     {"analyseur.h", kAnalyseurCommun}};
+}
 
 // Tous les exemples, pour les bancs d'essai : ce que le test compile.
 struct ProgrammeExemple {
