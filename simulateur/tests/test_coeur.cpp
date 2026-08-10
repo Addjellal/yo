@@ -5363,6 +5363,283 @@ static void test_montages_du_cours_suite() {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// [44] Continuité des modèles non linéaires
+//
+// D'où vient cette section : la Zener ne convergeait pas sous 10 V d'entrée,
+// et la cause était un SAUT dans le modèle — le courant passait de zéro à IBV
+// à la tension de claquage, sans rien entre les deux. Newton ne traverse pas
+// une discontinuité.
+//
+// Ce défaut a deux propriétés qui le rendent redoutable :
+//
+//   * il ne se voit qu'à certaines valeurs. Au-dessus du saut tout va bien,
+//     et le montage a l'air correct ;
+//   * aucun test fonctionnel ne le trouve par hasard, parce qu'il faut tomber
+//     précisément dans le trou.
+//
+// Plutôt que de corriger un modèle et d'espérer, on les balaie TOUS et l'on
+// regarde leur caractéristique de près. Un composant physique a une
+// caractéristique continue : le courant peut monter très vite — une diode le
+// fait —, mais il ne saute pas. Un saut est donc toujours l'aveu d'un modèle
+// écrit par morceaux dont les morceaux ne se rejoignent pas.
+// ---------------------------------------------------------------------------
+static void test_continuite_des_modeles() {
+    std::printf("\n[44] Continuite des modeles non lineaires\n");
+
+    // Cherche un saut dans une courbe : un écart entre deux points voisins qui
+    // pèse une part notable de toute l'excursion ET qui écrase ses voisins
+    // immédiats. Les deux conditions comptent. La première seule signalerait
+    // le coude d'une diode, qui est raide mais régulier ; la seconde seule
+    // signalerait le bruit numérique là où il ne se passe rien.
+    auto chercher_saut = [](const std::vector<double>& valeurs,
+                            const std::vector<double>& abscisse,
+                            double* ou, double* taille) {
+        *ou = 0;
+        *taille = 0;
+        if (valeurs.size() < 4) return false;
+        double mini = valeurs[0], maxi = valeurs[0];
+        for (double v : valeurs) {
+            mini = std::min(mini, v);
+            maxi = std::max(maxi, v);
+        }
+        const double excursion = maxi - mini;
+        if (excursion < 1e-12) return false;
+        for (size_t k = 1; k + 1 < valeurs.size(); ++k) {
+            const double saut = std::fabs(valeurs[k] - valeurs[k - 1]);
+            const double avant =
+                k >= 2 ? std::fabs(valeurs[k - 1] - valeurs[k - 2]) : 0.0;
+            const double apres = std::fabs(valeurs[k + 1] - valeurs[k]);
+            const double voisins = std::max(avant, apres);
+            if (saut < 0.10 * excursion) continue;
+            if (saut < 20.0 * std::max(voisins, 1e-15)) continue;
+            *ou = abscisse[k];
+            *taille = saut;
+            return true;
+        }
+        return false;
+    };
+
+    // AVANT DE S'EN SERVIR, ON VÉRIFIE QU'IL MORD.
+    //
+    // Un détecteur qui ne se déclenche jamais ne prouve rien — il rassure, ce
+    // qui est pire que rien. On lui donne donc deux courbes fabriquées : celle
+    // que le modèle de Zener produisait avant sa correction (le courant saute
+    // de zéro à IBV au claquage), et le coude d'une diode, qui est raide mais
+    // régulier. Il doit signaler la première et laisser passer la seconde.
+    {
+        std::vector<double> abscisse, avec_saut, exponentielle;
+        for (int k = 0; k < 200; ++k) {
+            const double v = -12.0 + k * 0.06;
+            abscisse.push_back(v);
+            // L'ancien modèle : rien, puis 5 mA d'un coup à -5,1 V.
+            avec_saut.push_back(v < -5.1 ? -0.005 - (-5.1 - v) * 1e-3 : 0.0);
+            // Une exponentielle : la pente double tous les 40 mV environ.
+            exponentielle.push_back(std::exp(v / 0.04) * 1e-14);
+        }
+        double ou = 0, taille = 0;
+        verifier(chercher_saut(avec_saut, abscisse, &ou, &taille),
+                 "le détecteur signale le saut que la Zener avait avant "
+                 "correction",
+                 "saut de " + f(taille * 1000, 2) + " mA à " + f(ou, 2) + " V");
+        verifier(!chercher_saut(exponentielle, abscisse, &ou, &taille),
+                 "et il laisse passer le coude d'une diode, raide mais régulier",
+                 "aucun saut signalé");
+    }
+
+    // Un composant à deux bornes, alimenté à travers une résistance, et la
+    // source balayée finement. On regarde le courant : c'est lui qui porte la
+    // non-linéarité.
+    struct Deux { const char* nom; const char* type; const char* choix;
+                  double debut; double fin; };
+    const Deux passifs[] = {
+        {"diode 1N4148", "diode", nullptr, -1.0, 1.5},
+        // La plage traverse le claquage : c'est là que se trouvait le saut.
+        {"Zener 5V1", "zener", "5V1", -12.0, 1.5},
+        {"Zener 3V3", "zener", "3V3", -9.0, 1.5},
+        {"LED rouge", "led", nullptr, -1.0, 3.5}};
+
+    for (const Deux& essai : passifs) {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 0;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 100;
+        netlist.relier("R1", "1", "IN");
+        netlist.relier("R1", "2", "HAUT");
+        auto& composant = netlist.ajouter("D1", essai.type);
+        if (essai.choix) composant.textes["tension"] = essai.choix;
+        // La cathode d'une LED s'appelle K, comme celle d'une diode.
+        netlist.relier("D1", "A", "HAUT");
+        netlist.relier("D1", "K", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.preferer_ngspice(false);      // c'est NOTRE modèle qu'on juge
+        moteur.construire_analyse(
+            netlist, {},
+            ".dc VGBF1 " + f(essai.debut, 3) + " " + f(essai.fin, 3) + " 0.02");
+        if (!moteur.resoudre_analyse()) {
+            verifier(false, std::string(essai.nom) + " : le balayage aboutit",
+                     moteur.erreurs().empty() ? "" : moteur.erreurs().front());
+            continue;
+        }
+        const coeur::Balayage& balayage = moteur.balayage();
+        const coeur::Courbe* courant = balayage.courbe("I(r1)");
+        if (!courant) {
+            verifier(false, std::string(essai.nom) + " : le courant est relevé");
+            continue;
+        }
+        double ou = 0, taille = 0;
+        const bool saut =
+            chercher_saut(courant->valeurs, balayage.abscisse, &ou, &taille);
+        verifier(!saut,
+                 std::string(essai.nom) + " : caractéristique sans saut",
+                 saut ? "saut de " + f(taille * 1000, 3) + " mA à " + f(ou, 2)
+                            + " V"
+                      : std::to_string(balayage.abscisse.size()) + " points");
+    }
+
+    // Le transistor : la grandeur commandée est le courant de collecteur, et
+    // la commande est la tension de base. On balaie de zéro à la saturation.
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 0;
+        netlist.relier("GBF1", "+", "COMMANDE");
+        netlist.relier("GBF1", "-", "GND");
+        auto& alim = netlist.ajouter("V1", "pile");
+        alim.valeurs["volts"] = 5;
+        netlist.relier("V1", "+", "VCC");
+        netlist.relier("V1", "-", "GND");
+        auto& rb = netlist.ajouter("R1", "resistance");
+        rb.valeurs["ohms"] = 10000;
+        netlist.relier("R1", "1", "COMMANDE");
+        netlist.relier("R1", "2", "BASE");
+        auto& rc = netlist.ajouter("R2", "resistance");
+        rc.valeurs["ohms"] = 1000;
+        netlist.relier("R2", "1", "VCC");
+        netlist.relier("R2", "2", "COLLECTEUR");
+        netlist.ajouter("Q1", "transistor_npn");
+        netlist.relier("Q1", "B", "BASE");
+        netlist.relier("Q1", "C", "COLLECTEUR");
+        netlist.relier("Q1", "E", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.preferer_ngspice(false);
+        moteur.construire_analyse(netlist, {}, ".dc VGBF1 0 5 0.02");
+        if (moteur.resoudre_analyse()) {
+            const coeur::Balayage& balayage = moteur.balayage();
+            const coeur::Courbe* collecteur = balayage.courbe("collecteur");
+            if (collecteur) {
+                double ou = 0, taille = 0;
+                const bool saut = chercher_saut(collecteur->valeurs,
+                                                balayage.abscisse, &ou, &taille);
+                verifier(!saut,
+                         "transistor NPN : du blocage à la saturation sans saut",
+                         saut ? "saut de " + f(taille * 1000, 1) + " mV à "
+                                    + f(ou, 2) + " V"
+                              : "balayage régulier");
+            }
+        } else {
+            verifier(false, "transistor NPN : le balayage aboutit");
+        }
+    }
+
+    // Le MOSFET : même question, la grille balayée de zéro à cinq volts. Le
+    // passage bloqué -> triode -> saturation est l'endroit classique où un
+    // modèle écrit par morceaux se trahit.
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 0;
+        netlist.relier("GBF1", "+", "GRILLE");
+        netlist.relier("GBF1", "-", "GND");
+        auto& alim = netlist.ajouter("V1", "pile");
+        alim.valeurs["volts"] = 5;
+        netlist.relier("V1", "+", "VCC");
+        netlist.relier("V1", "-", "GND");
+        auto& rd = netlist.ajouter("R1", "resistance");
+        rd.valeurs["ohms"] = 1000;
+        netlist.relier("R1", "1", "VCC");
+        netlist.relier("R1", "2", "DRAIN");
+        netlist.ajouter("M1", "mosfet_n");
+        netlist.relier("M1", "G", "GRILLE");
+        netlist.relier("M1", "D", "DRAIN");
+        netlist.relier("M1", "S", "GND");
+
+        coeur::NgspiceEngine moteur;
+        moteur.preferer_ngspice(false);
+        moteur.construire_analyse(netlist, {}, ".dc VGBF1 0 5 0.02");
+        if (moteur.resoudre_analyse()) {
+            const coeur::Balayage& balayage = moteur.balayage();
+            const coeur::Courbe* drain = balayage.courbe("drain");
+            if (drain) {
+                double ou = 0, taille = 0;
+                const bool saut = chercher_saut(drain->valeurs,
+                                                balayage.abscisse, &ou, &taille);
+                verifier(!saut,
+                         "MOSFET : bloqué, triode, saturation — sans saut",
+                         saut ? "saut de " + f(taille * 1000, 1) + " mV à "
+                                    + f(ou, 2) + " V"
+                              : "balayage régulier");
+            }
+        } else {
+            verifier(false, "MOSFET : le balayage aboutit");
+        }
+    }
+
+    // L'amplificateur opérationnel : sa sortie est bornée par min et max, ce
+    // qui EST une écriture par morceaux. La valeur y reste continue — c'est
+    // la pente qui casse —, et c'est justement ce que ce contrôle doit
+    // confirmer plutôt que supposer.
+    {
+        coeur::Netlist netlist;
+        auto& source = netlist.ajouter("GBF1", "generateur_signal");
+        source.textes["forme"] = "continu";
+        source.valeurs["offset"] = 0;
+        netlist.relier("GBF1", "+", "IN");
+        netlist.relier("GBF1", "-", "GND");
+        netlist.ajouter("A1", "ampli_op");
+        netlist.relier("A1", "IN+", "IN");
+        netlist.relier("A1", "IN-", "RETOUR");
+        netlist.relier("A1", "OUT", "OUT");
+        auto& r1 = netlist.ajouter("R1", "resistance");
+        r1.valeurs["ohms"] = 10000;
+        netlist.relier("R1", "1", "RETOUR");
+        netlist.relier("R1", "2", "GND");
+        auto& r2 = netlist.ajouter("R2", "resistance");
+        r2.valeurs["ohms"] = 10000;
+        netlist.relier("R2", "1", "OUT");
+        netlist.relier("R2", "2", "RETOUR");
+
+        coeur::NgspiceEngine moteur;
+        moteur.preferer_ngspice(false);
+        moteur.construire_analyse(netlist, {}, ".dc VGBF1 0 4 0.02");
+        if (moteur.resoudre_analyse()) {
+            const coeur::Balayage& balayage = moteur.balayage();
+            const coeur::Courbe* sortie = balayage.courbe("out");
+            if (sortie) {
+                double ou = 0, taille = 0;
+                const bool saut = chercher_saut(sortie->valeurs,
+                                                balayage.abscisse, &ou, &taille);
+                verifier(!saut,
+                         "ampli op : entrée en butée sans saut de sortie",
+                         saut ? "saut de " + f(taille, 3) + " V à " + f(ou, 2)
+                                    + " V"
+                              : "balayage régulier");
+            }
+        } else {
+            verifier(false, "ampli op : le balayage aboutit");
+        }
+    }
+}
+
 int main() {
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
@@ -5411,6 +5688,7 @@ int main() {
     test_serie_et_sauts_arm();
     test_montages_du_cours();
     test_montages_du_cours_suite();
+    test_continuite_des_modeles();
     test_programme_multifichier();
 
     std::printf("\n============================================================\n");
