@@ -233,6 +233,42 @@ masquait tous :
    le fait déjà pour l'AVR contre simavr. Cela transformerait la chasse aux
    défauts ARM — de « instrumenter et deviner » à « la divergence est à
    l'instruction n ». C'est ce qui a rendu le cœur AVR fiable.
+
+   **QEMU EST INSTALLÉ ET LA FAISABILITÉ EST PROUVÉE** (`qemu-system-arm`
+   8.2.2, paquet `qemu-system-arm`). Voici ce qu'il a fallu trouver, pour ne
+   pas le rechercher :
+
+   - QEMU n'a pas de machine STM32 ni RP2040, mais ce n'est pas nécessaire :
+     `mps2-an385` donne un Cortex-M3 générique et `microbit` un Cortex-M0.
+     C'est le CŒUR qu'on compare, pas les périphériques ;
+   - il faut une TABLE DE VECTEURS, sans quoi la machine part en HardFault
+     immédiat (« Lockup: can't escalate 3 to HardFault »). Un Cortex-M lit sa
+     pile initiale à l'adresse 0 et son point d'entrée à 4 :
+
+     ```c
+     __attribute__((section(".vectors"), used))
+     void* const table[2] = { (void*)0x20008000u, (void*)_start };
+     ```
+     ```
+     arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -masm-syntax-unified \
+       -nostdlib -ffreestanding -Os -Wl,-e,_start \
+       -Wl,--section-start=.vectors=0x00000000 -Wl,-Ttext=0x00000100 \
+       -o firmware.elf source.c -lgcc
+     ```
+
+   - la trace s'obtient ainsi, un bloc de registres par instruction :
+
+     ```
+     qemu-system-arm -M mps2-an385 -cpu cortex-m3 -nographic \
+       -kernel firmware.elf -d cpu -singlestep -D trace.log
+     ```
+
+     Format : `R00=…` à `R15=…` puis `XPSR=…`. Vérifié sur une division
+     logicielle : 3,26 millions d'instructions tracées, R07 = 0x0f pour
+     150/10. C'est exactement la forme qu'il faut pour comparer.
+
+   Reste à écrire : le producteur de trace équivalent côté `CoeurCortexM`, et
+   le comparateur qui s'arrête à la première divergence.
 2. **Analyseur ATmega328P nu, ATtiny85, ESP32** : pas écrits. L'ATtiny n'a
    pas d'UART matériel (sortie à inventer) ; l'ESP32 n'a **pas d'ADC
    modélisé** dans le cœur Xtensa.
