@@ -31,7 +31,7 @@ class QDockWidget;
 class QToolBar;
 
 class ItemComposant;
-class SceneSchema;
+#include "app/schematic/SceneSchema.h"
 class VueSchema;
 class MoteurSimulation;
 class Oscilloscope;
@@ -264,6 +264,11 @@ private:
 
     // Menu du clic droit, construit ici : la scène ne connaît pas les
     // actions de l'application.
+    // Change d'outil et synchronise la barre du haut.
+    void choisir_outil(SceneSchema::Outil outil);
+    QAction* action_selection_ = nullptr;
+    QAction* action_fil_ = nullptr;
+    QAction* action_gomme_ = nullptr;
     void menu_contextuel(ItemComposant* composant, const QPoint& ecran);
 
     // Nœud attaqué par le générateur : référence des gains et des campagnes.

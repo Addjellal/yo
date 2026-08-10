@@ -564,12 +564,18 @@ void FenetrePrincipale::construire_actions() {
     groupe->addAction(selection);
     groupe->addAction(fil);
     groupe->addAction(gomme);
+    // Les trois actions sont retenues : le menu contextuel change d'outil, et
+    // la barre doit le montrer. Deux commandes qui font la même chose sans se
+    // parler, c'est une case cochée qui ment.
+    action_selection_ = selection;
+    action_fil_ = fil;
+    action_gomme_ = gomme;
     connect(selection, &QAction::triggered, this,
-            [this] { scene_->definir_outil(SceneSchema::Outil::Selection); });
+            [this] { choisir_outil(SceneSchema::Outil::Selection); });
     connect(fil, &QAction::triggered, this,
-            [this] { scene_->definir_outil(SceneSchema::Outil::Fil); });
+            [this] { choisir_outil(SceneSchema::Outil::Fil); });
     connect(gomme, &QAction::triggered, this,
-            [this] { scene_->definir_outil(SceneSchema::Outil::Suppression); });
+            [this] { choisir_outil(SceneSchema::Outil::Suppression); });
     outils->addAction(selection);
     outils->addAction(fil);
     outils->addAction(gomme);
@@ -1010,6 +1016,16 @@ void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
     fenetre->show();
 }
 
+// Change d'outil, d'où que vienne la demande — barre du haut, menu
+// contextuel ou raccourci — et met tout le monde d'accord.
+void FenetrePrincipale::choisir_outil(SceneSchema::Outil outil) {
+    scene_->definir_outil(outil);
+    QAction* miroir = outil == SceneSchema::Outil::Fil          ? action_fil_
+                      : outil == SceneSchema::Outil::Suppression ? action_gomme_
+                                                                 : action_selection_;
+    if (miroir) miroir->setChecked(true);
+}
+
 void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
                                         const QPoint& ecran) {
     QMenu menu(this);
@@ -1038,11 +1054,38 @@ void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
             scene_->supprimer_selection();
             circuit_modifie();
         });
-    } else {
-        menu.addAction("Ajuster la vue", this, [this] { vue_->ajuster(); });
-        menu.addAction("Analyse au point de repos", this,
-                       &FenetrePrincipale::analyser_point_repos);
     }
+
+    // Ce qui suit est offert QUEL QUE SOIT l'endroit du clic : les outils et
+    // la vue. Ils vivaient dans la barre du haut, où ils prenaient de la place
+    // sans être souvent employés — et où « Sélection », « Fil » et
+    // « Supprimer » se lisaient comme trois boutons de même rang alors que le
+    // premier est l'état de repos et les deux autres des gestes.
+    if (composant) menu.addSeparator();
+    QMenu* outils = menu.addMenu("Outil");
+    auto ajouter_outil = [&](const QString& nom, SceneSchema::Outil outil,
+                             const QString& raccourci) {
+        QAction* action = outils->addAction(
+            raccourci.isEmpty() ? nom : nom + "\t" + raccourci);
+        action->setCheckable(true);
+        action->setChecked(scene_->outil() == outil);
+        connect(action, &QAction::triggered, this,
+                [this, outil] { choisir_outil(outil); });
+    };
+    ajouter_outil("Sélection", SceneSchema::Outil::Selection, "Échap");
+    ajouter_outil("Fil", SceneSchema::Outil::Fil, "F");
+    ajouter_outil("Suppression", SceneSchema::Outil::Suppression, "Suppr");
+
+    QMenu* vue = menu.addMenu("Vue");
+    vue->addAction("Zoom avant\tCtrl+molette", this,
+                   [this] { vue_->zoomer(1.25); });
+    vue->addAction("Zoom arrière\tCtrl+molette", this,
+                   [this] { vue_->zoomer(1.0 / 1.25); });
+    vue->addAction("Ajuster à la fenêtre", this, [this] { vue_->ajuster(); });
+
+    menu.addSeparator();
+    menu.addAction("Analyse au point de repos", this,
+                   &FenetrePrincipale::analyser_point_repos);
     menu.exec(ecran);
 }
 
