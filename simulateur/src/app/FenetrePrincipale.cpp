@@ -2009,7 +2009,14 @@ void FenetrePrincipale::ouvrir_source_c() {
     ecrire("Programme ouvert : " + chemin);
 }
 
-void FenetrePrincipale::compiler_source() {
+void FenetrePrincipale::compiler_source() { compiler_programme(); }
+
+// Compile le programme de la carte courante et dit si ça a marché.
+//
+// `silence_si_reussi` sert au lancement : quand on appuie sur « Lancer », la
+// compilation est un moyen, pas un but — on ne veut pas d'une ligne de succès
+// à chaque essai. L'échec, lui, se dit toujours.
+bool FenetrePrincipale::compiler_programme(bool silence_si_reussi) {
     QString compte_rendu;
     ranger_editeur();
     // Le programme est nommé plutôt que construit dans l'appel. Un ternaire
@@ -2027,18 +2034,51 @@ void FenetrePrincipale::compiler_source() {
                                                  &compte_rendu, carte_courante_);
     if (!compte_rendu.trimmed().isEmpty()) ecrire(compte_rendu.trimmed());
     if (ok) {
-        ecrire("Compilation réussie.");
+        if (!silence_si_reussi) ecrire("Compilation réussie.");
     } else {
         ecrire("Échec de la compilation.");
         avertir("Compilation", compte_rendu.isEmpty()
                                    ? QString("La compilation a échoué.")
                                    : compte_rendu);
     }
+    return ok;
 }
 
 // ---------------------------------------------------------------------------
+MoteurSimulation::Etat FenetrePrincipale::etat_simulation() const {
+    return moteur_->etat();
+}
+
+void FenetrePrincipale::definir_programme_affiche(const QString& source) {
+    if (editeur_source_) editeur_source_->setPlainText(source);
+    ranger_editeur();
+}
+
 void FenetrePrincipale::lancer() {
     circuit_modifie();
+
+    // S'il y a une carte, « Lancer » compile d'abord.
+    //
+    // Appuyer sur Lancer et voir la carte rester inerte parce qu'on a oublié
+    // F5 est la perte de temps la plus banale d'une séance : rien à l'écran
+    // ne distingue « le programme est faux » de « le programme n'est pas
+    // chargé ». Lancer suffit donc désormais.
+    //
+    // Et si le programme ne compile PAS, on ne lance pas. Démarrer sur un
+    // firmware absent ou périmé ferait chercher dans le montage une erreur
+    // qui est dans le code — c'est exactement le faux problème qu'on veut
+    // épargner. La reprise après une pause est exemptée : le programme
+    // tourne déjà, il n'y a rien à recompiler.
+    const bool reprise = moteur_->etat() == MoteurSimulation::Etat::EnPause;
+    if (!reprise && !moteur_->cartes().isEmpty()) {
+        if (!compiler_programme(/*silence_si_reussi=*/true)) {
+            ecrire("Simulation non lancée : le programme ne compile pas. "
+                   "Corrigez-le, puis relancez.");
+            afficher_onglet(1);            // le journal, où l'erreur est écrite
+            return;
+        }
+    }
+
     if (oscilloscope_) oscilloscope_->sonder_par_defaut();
     moteur_->demarrer();
 }
@@ -2275,6 +2315,11 @@ namespace {
 }  // namespace
 
 void FenetrePrincipale::charger_exemple(Exemple exemple) {
+    // Changer d'exemple pendant que ça tourne laissait la simulation en
+    // marche sur un schéma qui n'existe plus : le bouton disait « Pause »,
+    // l'horloge avançait, et l'on regardait un montage neuf animé par
+    // l'ancien. On arrête d'abord.
+    arreter();
     scene_->tout_effacer();
     scene_->oublier_historique();
     chemin_projet_.clear();

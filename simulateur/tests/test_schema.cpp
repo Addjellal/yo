@@ -1438,6 +1438,80 @@ static void test_pense_bete_engendre() {
 // DECISION-FILS.md supprime. Simulink ne connaît pas non plus d'outil fil :
 // on tire depuis un port, et c'est tout. Un raccourci qui rétablit un mode
 // que le geste a supprimé est une régression déguisée en fonctionnalité.
+// Un montage sans carte a une horloge, lui aussi.
+//
+// La barre d'état affichait « Temps simulé : 0,000 s » pendant que
+// l'oscilloscope en était à soixante-six secondes : temps_ms() ne savait lire
+// l'heure que sur une carte programmée. Or la moitié des exemples livrés sont
+// purement analogiques — générateur, filtre, redresseur. Deux temps
+// contradictoires sur le même écran.
+// « Lancer » compile, et refuse de partir si le code est faux.
+//
+// Trois gestes constatés à l'usage : appuyer sur Lancer sans avoir compilé et
+// voir la carte rester inerte ; ne pas savoir si le programme est faux ou
+// simplement pas chargé ; et changer d'exemple pendant que ça tourne, ce qui
+// laissait la simulation en marche sur un schéma qui n'existait plus.
+static void test_lancer_compile_et_refuse() {
+    std::printf("\n-- « Lancer » compile, et refuse un programme faux --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    fenetre.charger_exemple(FenetrePrincipale::Exemple::Clignotant);
+
+    if (!coeur::chaine_disponible_pour("atmega328p")) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    // 1. Un programme faux doit EMPÊCHER le démarrage.
+    fenetre.definir_programme_affiche("void setup() { ceci n'est pas du C++ }");
+    fenetre.lancer_simulation();
+    verifier(fenetre.etat_simulation() == MoteurSimulation::Etat::Arrete,
+             "un programme qui ne compile pas empêche le lancement");
+
+    // 2. Le programme d'origine, lui, part sans qu'on ait appuyé sur F5.
+    fenetre.charger_exemple(FenetrePrincipale::Exemple::Clignotant);
+    fenetre.lancer_simulation();
+    verifier(fenetre.etat_simulation() == MoteurSimulation::Etat::EnMarche,
+             "et « Lancer » suffit : il compile tout seul");
+
+    // 3. Changer d'exemple pendant que ça tourne doit arrêter.
+    fenetre.charger_exemple(FenetrePrincipale::Exemple::FiltreRC);
+    verifier(fenetre.etat_simulation() == MoteurSimulation::Etat::Arrete,
+             "changer d'exemple arrête la simulation en cours");
+    fenetre.arreter_simulation();
+}
+
+static void test_horloge_sans_carte() {
+    std::printf("\n-- un montage analogique a une horloge --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    scene.addItem(new ItemFil(pile, 0, r, 0));
+    scene.addItem(new ItemFil(r, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    MoteurSimulation moteur;
+    std::vector<LiaisonBroche> broches;
+    moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                           scene.cartes_presentes());
+    verifier(moteur.cartes().isEmpty(), "le montage n'a aucune carte");
+
+    moteur.demarrer();
+    QElapsedTimer chrono;
+    chrono.start();
+    while (chrono.elapsed() < 200)
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    const double t = moteur.temps_ms();
+    moteur.arreter();
+
+    verifier(t > 0.0,
+             "et son horloge avance quand même",
+             f(t) + " ms");
+}
+
 static void test_amorcer_fil_sans_mode() {
     std::printf("\n-- amorcer un fil au clavier, sans mode --\n");
 
@@ -2515,6 +2589,8 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_lancer_compile_et_refuse();
+    test_horloge_sans_carte();
     test_amorcer_fil_sans_mode();
     test_portee_des_commandes();
     test_derivation_en_t();

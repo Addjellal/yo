@@ -34,8 +34,8 @@ class QToolBar;
 
 class ItemComposant;
 #include "app/schematic/SceneSchema.h"
+#include "app/MoteurSimulation.h"
 class VueSchema;
-class MoteurSimulation;
 class Oscilloscope;
 class PanneauAnalyses;
 class FenetreInstrument;
@@ -149,6 +149,12 @@ public:
 
     // Arrêt de la simulation, accessible au mode de vérification « --gestes ».
     void arreter_simulation() { arreter(); }
+    // Lancement et état, pour la vérification automatique : c'est ce qui
+    // permet de constater qu'un programme faux n'a PAS démarré.
+    void lancer_simulation() { lancer(); }
+    MoteurSimulation::Etat etat_simulation() const;
+    // Remplace le programme de la carte affichée. Sert aux essais.
+    void definir_programme_affiche(const QString& source);
 
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
@@ -169,6 +175,8 @@ private slots:
     void ouvrir_firmware();
     void ouvrir_source_c();
     void compiler_source();
+    // Compile le programme de la carte courante ; rend faux en cas d'échec.
+    bool compiler_programme(bool silence_si_reussi = false);
     // Émet le contenu du champ de saisie sur la liaison série de la carte.
     void envoyer_serie();
     // Pense-bête des raccourcis, engendré depuis les QAction des menus.

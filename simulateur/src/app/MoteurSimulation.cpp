@@ -164,7 +164,15 @@ double MoteurSimulation::temps_ms() const {
         const Carte* cible = carte(reference);
         if (cible && cible->firmware_charge) return cible->mcu->temps_ms();
     }
-    return 0.0;
+    // Aucune carte, ou aucune programmée : l'heure est celle du circuit.
+    //
+    // On rendait zéro, et la barre d'état affichait « Temps simulé : 0,000 s »
+    // pendant que l'oscilloscope, lui, en était à soixante-six secondes. Un
+    // montage purement analogique — générateur, filtre, redresseur — se simule
+    // parfaitement sans microcontrôleur ; c'est même le cas de la moitié des
+    // exemples livrés. Lui refuser une horloge parce qu'aucune puce ne la
+    // porte, c'est afficher deux temps contradictoires sur le même écran.
+    return instant_trame_ * 1000.0;
 }
 
 // ---------------------------------------------------------------------------
