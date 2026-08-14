@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QTextEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QInputDialog>
@@ -489,25 +490,35 @@ void FenetrePrincipale::construire_actions() {
         scene_->coller();
         circuit_modifie();
     });
+    // « Ctrl+D » ne doit pas voler la frappe à l'éditeur de programme.
+    //
+    // Qt protège tout seul les touches nues : QPlainTextEdit accepte
+    // l'événement ShortcutOverride pour toute touche imprimable, si bien que
+    // « R » tapé dans du code s'écrit au lieu de pivoter un composant. Mais
+    // il laisse passer les « Ctrl+lettre » : Ctrl+D frappé dans le code
+    // dupliquait un composant du schéma, en silence, sans rien à l'écran qui
+    // l'explique. On refuse donc la commande quand le curseur est dans un
+    // champ de saisie — c'est le seul cas où l'utilisateur ne pense pas au
+    // schéma.
     edition->addAction("&Dupliquer", QKeySequence(Qt::CTRL | Qt::Key_D), this,
                        [this] {
+                           if (saisie_en_cours()) return;
                            scene_->dupliquer_selection();
                            circuit_modifie();
                        });
     edition->addSeparator();
+    // Ces deux commandes agissent sur la PAGE ACTIVE.
+    //
+    // Elles ne le faisaient pas : posées en raccourci de fenêtre, elles
+    // gagnaient toujours contre les gestionnaires de touches des vues, si
+    // bien que « R » sur la page Circuit imprimé pivotait la sélection du
+    // schéma — invisible à l'écran — et que `VuePcb::tourner_sous_curseur()`
+    // ne s'exécutait jamais. Une commande dont l'effet dépend d'une page
+    // qu'on ne voit pas est pire qu'une commande absente.
     edition->addAction("&Supprimer la sélection", QKeySequence::Delete, this,
-                       [this] {
-                           scene_->memoriser();
-                           scene_->supprimer_selection();
-                           circuit_modifie();
-                       });
-    edition->addAction("&Pivoter (R)", QKeySequence(Qt::Key_R), this, [this] {
-        scene_->memoriser();
-        for (QGraphicsItem* item : scene_->selectedItems())
-            if (item->type() == ItemComposant::Type)
-                static_cast<ItemComposant*>(item)->tourner();
-        circuit_modifie();
-    });
+                       [this] { supprimer_sur_page_active(); });
+    edition->addAction("&Pivoter (R)", QKeySequence(Qt::Key_R), this,
+                       [this] { pivoter_sur_page_active(); });
 
     auto* outils = menuBar()->addMenu("&Outils");
     // Sélecteur de page, dans sa propre barre : c'est la seule commande qui
@@ -832,6 +843,49 @@ void FenetrePrincipale::ouvrir_pcb() {
         ecrire("Placez les empreintes à la souris (R les fait tourner), puis "
                "tirez les pistes d'une pastille à l'autre.");
     }
+}
+
+// Pivoter et supprimer suivent la page qu'on regarde.
+//
+// Le schéma et le circuit imprimé sont deux dessins distincts avec chacun sa
+// sélection ; une même touche doit agir sur celui qui est sous les yeux.
+// Le curseur est-il dans un champ où l'on tape du texte ?
+//
+// Sert d'écran aux commandes de schéma portées par un « Ctrl+lettre » : ce
+// sont les seules que Qt laisse passer par-dessus un éditeur de texte, et
+// donc les seules qui puissent agir alors que l'utilisateur croit écrire.
+bool FenetrePrincipale::saisie_en_cours() const {
+    const QWidget* focus = QApplication::focusWidget();
+    while (focus) {
+        if (qobject_cast<const QPlainTextEdit*>(focus)
+            || qobject_cast<const QTextEdit*>(focus)
+            || qobject_cast<const QLineEdit*>(focus))
+            return true;
+        focus = focus->parentWidget();
+    }
+    return false;
+}
+
+void FenetrePrincipale::pivoter_sur_page_active() {
+    if (pages_ && pages_->currentIndex() == 1) {
+        if (pcb_ && pcb_->vue()) pcb_->vue()->tourner_sous_curseur();
+        return;
+    }
+    scene_->memoriser();
+    for (QGraphicsItem* item : scene_->selectedItems())
+        if (item->type() == ItemComposant::Type)
+            static_cast<ItemComposant*>(item)->tourner();
+    circuit_modifie();
+}
+
+void FenetrePrincipale::supprimer_sur_page_active() {
+    // Sur le circuit imprimé, rien ne s'efface à la touche Suppr : les
+    // empreintes viennent du schéma et s'y suppriment. « Défaire la piste »
+    // est le geste équivalent, et il a déjà sa touche.
+    if (pages_ && pages_->currentIndex() == 1) return;
+    scene_->memoriser();
+    scene_->supprimer_selection();
+    circuit_modifie();
 }
 
 void FenetrePrincipale::afficher_page(int page) {

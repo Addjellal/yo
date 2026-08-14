@@ -245,12 +245,15 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     # rend testable sans ouvrir l'application, et c'est là que se jouent les
     # gestes risqués (effacer un composant pendant que ça tourne).
     src/app/MoteurSimulation.cpp
+    # La fenêtre entre ici pour la même raison : ses commandes — pivoter,
+    # supprimer, changer de page — se vérifient sans ouvrir l'application, et
+    # ce sont justement celles où une erreur de portée est invisible à l'œil.
+    src/app/FenetrePrincipale.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
   add_executable(simulateur
     src/main.cpp
-    src/app/FenetrePrincipale.cpp
   )
   target_link_libraries(simulateur PRIVATE schema)
 

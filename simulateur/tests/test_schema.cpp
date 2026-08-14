@@ -33,6 +33,7 @@
 #include "app/panels/PanneauPcb.h"
 #include "core/engines/NgspiceEngine.h"
 #include "app/MoteurSimulation.h"
+#include "app/FenetrePrincipale.h"
 #include "app/schematic/ItemJonction.h"
 #include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
@@ -1370,6 +1371,62 @@ static void test_modification_en_marche() {
 }
 
 // ---------------------------------------------------------------------------
+// Les commandes suivent la page qu'on regarde
+//
+// « Pivoter » et « Supprimer » étaient des raccourcis de fenêtre : ils
+// gagnaient toujours contre les gestionnaires de touches des vues, si bien
+// que sur la page Circuit imprimé ils agissaient sur la sélection du schéma —
+// invisible à l'écran. Une commande dont l'effet dépend d'une page qu'on ne
+// voit pas est pire qu'une commande absente.
+// ---------------------------------------------------------------------------
+static void test_portee_des_commandes() {
+    std::printf("\n-- les commandes suivent la page affichée --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+
+    ItemComposant* r = scene->ajouter_composant("resistance", QPointF(0, 0));
+    scene->clearSelection();
+    r->setSelected(true);
+    const double angle_depart = r->rotation();
+
+    // Page Schéma : la commande agit.
+    fenetre.afficher_page(0);
+    fenetre.pivoter_sur_page_active();
+    const double apres_schema = r->rotation();
+    verifier(std::fabs(apres_schema - angle_depart) > 1.0,
+             "sur la page Schéma, « Pivoter » tourne le composant sélectionné",
+             f(angle_depart) + "° -> " + f(apres_schema) + "°");
+
+    // Page Circuit imprimé : la même commande ne doit PLUS toucher au schéma.
+    fenetre.ouvrir_pcb();
+    verifier(fenetre.page_courante() == 1, "on est bien sur la page carte");
+    r->setSelected(true);
+    const double avant_pcb = r->rotation();
+    fenetre.pivoter_sur_page_active();
+    verifier(std::fabs(r->rotation() - avant_pcb) < 1e-9,
+             "sur la page Circuit imprimé, elle ne pivote plus le schéma "
+             "invisible",
+             f(avant_pcb) + "° -> " + f(r->rotation()) + "°");
+
+    // Idem pour la suppression : rien ne doit disparaître du schéma.
+    const size_t avant = scene->composants().size();
+    r->setSelected(true);
+    fenetre.supprimer_sur_page_active();
+    verifier(scene->composants().size() == avant,
+             "et « Supprimer » n'efface rien du schéma non plus",
+             std::to_string(scene->composants().size()) + " composants");
+
+    // De retour au schéma, elle refonctionne.
+    fenetre.afficher_page(0);
+    r->setSelected(true);
+    fenetre.supprimer_sur_page_active();
+    verifier(scene->composants().size() == avant - 1,
+             "de retour sur le schéma, elle efface de nouveau");
+}
+
+// ---------------------------------------------------------------------------
 // Dérivation en T : un fil qui part d'un fil
 //
 // C'était impossible, et pas par oubli : `ItemFil` reliait deux broches de
@@ -2233,6 +2290,7 @@ int main(int argc, char** argv) {
     test_transfert_pcb();
     test_gestes_utilisateur();
     test_modification_en_marche();
+    test_portee_des_commandes();
     test_derivation_en_t();
     test_composants_grilles();
     test_pas_de_trainee();

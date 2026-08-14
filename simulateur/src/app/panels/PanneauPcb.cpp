@@ -509,14 +509,32 @@ void VuePcb::mouseReleaseEvent(QMouseEvent*) {
 }
 
 void VuePcb::wheelEvent(QWheelEvent* evenement) {
-    // Zoom centré sur le curseur : le geste attendu dans tout éditeur de
-    // carte.
-    const QPointF avant = vers_carte(evenement->position());
-    const double facteur = evenement->angleDelta().y() > 0 ? 1.15 : 1 / 1.15;
-    zoom_ = std::max(0.4, std::min(24.0, zoom_ * facteur));
-    const QPointF apres = vers_carte(evenement->position());
-    decalage_ += QPointF((apres.x() - avant.x()) * echelle(),
-                         (apres.y() - avant.y()) * echelle());
+    // Une seule règle pour les deux pages.
+    //
+    // La molette zoomait ici et déplaçait sur la page Schéma : on changeait
+    // de convention en changeant d'onglet, sans le moindre avertissement.
+    // C'est la page Schéma qui a raison, pour une raison qui ne se voit pas
+    // à la souris — sur un pavé tactile de précision, le glissement à deux
+    // doigts arrive à l'application sous forme d'événements de molette. La
+    // molette-déplacement donne donc le déplacement à deux doigts sans une
+    // ligne de code, et c'est ce qui compte pour un public sur portable.
+    const int pas = evenement->angleDelta().y();
+    if (evenement->modifiers() & Qt::ControlModifier) {
+        const QPointF avant = vers_carte(evenement->position());
+        // Zoom continu plutôt que par crans fixes : un pavé tactile envoie
+        // des dizaines de petits deltas par seconde là où une molette en
+        // envoie un gros. Le pas fixe faisait donc partir le pincement en
+        // vrille — défaut invisible tant qu'on ne teste qu'à la souris.
+        const double facteur = std::pow(1.0015, static_cast<double>(pas));
+        zoom_ = std::max(0.4, std::min(24.0, zoom_ * facteur));
+        const QPointF apres = vers_carte(evenement->position());
+        decalage_ += QPointF((apres.x() - avant.x()) * echelle(),
+                             (apres.y() - avant.y()) * echelle());
+    } else if (evenement->modifiers() & Qt::ShiftModifier) {
+        decalage_ += QPointF(pas, 0);
+    } else {
+        decalage_ += QPointF(evenement->angleDelta().x(), pas);
+    }
     update();
 }
 

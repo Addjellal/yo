@@ -137,6 +137,12 @@ public:
     void ouvrir_pcb();
     // Bascule entre les deux pages : 0 le schéma, 1 le circuit imprimé.
     void afficher_page(int page);
+    // Pivoter et supprimer suivent la page affichée, pas le schéma par défaut.
+    // Vrai quand le curseur est dans un champ de saisie : les commandes de
+    // schéma portées par un « Ctrl+lettre » doivent alors s'effacer.
+    bool saisie_en_cours() const;
+    void pivoter_sur_page_active();
+    void supprimer_sur_page_active();
     int page_courante() const;
 
     // Arrêt de la simulation, accessible au mode de vérification « --gestes ».
