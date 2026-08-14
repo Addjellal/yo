@@ -4659,6 +4659,64 @@ static void test_bobines() {
 
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// [45] La liaison série dans les deux sens
+//
+// Le cœur savait recevoir depuis toujours (`envoyer_octet_serie`), mais
+// l'interface n'avait aucun champ de saisie : `Serial.read()`,
+// `Serial.available()` et `parseInt()` n'avaient jamais rien à lire, et tout
+// un pan du programme de première année était inenseignable dans ce
+// logiciel — faute d'un champ de texte.
+//
+// On vérifie l'aller-retour complet : la puce lit un caractère et le renvoie
+// augmenté de un, ce qui distingue une vraie lecture d'un simple écho.
+// ---------------------------------------------------------------------------
+static void test_serie_reception() {
+    std::printf("\n[45] Liaison série : la carte reçoit ce qu'on lui envoie\n");
+
+    if (!coeur::chaine_disponible_pour("atmega328p")) {
+        std::printf("  (avr-g++ absent — section ignorée)\n");
+        return;
+    }
+
+    const char* source = R"SRC(
+void setup() { Serial.begin(9600); }
+void loop() {
+  if (Serial.available() > 0) {
+    int recu = Serial.read();
+    Serial.write((char)(recu + 1));
+  }
+}
+)SRC";
+
+    const std::string elf = "/tmp/sim_serie_aller_retour.elf";
+    std::string journal;
+    const bool compile =
+        coeur::compiler_pour("atmega328p", source, elf, 16000000, &journal);
+    verifier(compile, "l'écho série compile", journal);
+    if (!compile) return;
+
+    coeur::AvrEngine puce;
+    const bool charge = puce.charger(elf, "atmega328p", 16000000);
+    verifier(charge, "et se charge dans le cœur");
+    if (!charge) return;
+
+    std::string recu;
+    puce.sur_octet_serie([&recu](char octet) { recu.push_back(octet); });
+
+    // Laisser setup() s'exécuter avant d'écrire : Serial.begin() doit avoir
+    // armé le périphérique, sinon l'octet tombe dans une UART éteinte.
+    puce.avancer(200000);
+    puce.envoyer_octet_serie('A');
+    puce.avancer(400000);
+
+    verifier(!recu.empty(), "la puce a répondu quelque chose",
+             "« " + recu + " »");
+    verifier(recu.find('B') != std::string::npos,
+             "et elle a bien LU le 'A' : elle renvoie 'B'",
+             "reçu « " + recu + " »");
+}
+
 // [39] Un programme en plusieurs fichiers
 //
 // Ce que fait n'importe qui dès qu'un croquis dépasse une page : sortir les
@@ -5940,6 +5998,7 @@ int main() {
     test_montages_du_cours();
     test_montages_du_cours_suite();
     test_continuite_des_modeles();
+    test_serie_reception();
     test_programme_multifichier();
 
     std::printf("\n============================================================\n");

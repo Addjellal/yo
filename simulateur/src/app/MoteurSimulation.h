@@ -25,6 +25,7 @@
 
 #include <QObject>
 #include <QSet>
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -85,6 +86,11 @@ public:
     // lance, on met en pause, on reprend, on arrête. « Arrêté » remet les
     // microcontrôleurs à zéro ; « en pause » garde tout en place.
     enum class Etat { Arrete, EnMarche, EnPause };
+
+    // Émet des octets sur la liaison série d'une carte, comme le ferait le
+    // terminal d'un poste relié au vrai matériel. Sans cela, Serial.read()
+    // et parseInt() n'ont jamais rien à lire.
+    void envoyer_serie(const QByteArray& octets, const QString& carte = {});
 
     void demarrer();      // lance, ou reprend après une pause
     void suspendre();

@@ -11,6 +11,7 @@
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QImage>
+#include <QJsonObject>
 #include <QPainter>
 #include <QScrollArea>
 #include <QKeyEvent>
@@ -1517,6 +1518,79 @@ static void test_derivation_en_t() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce que la relecture et l'annulation font d'une dérivation
+//
+// Quatre défauts prouvés par un agent à l'ASan et à valgrind, tous dans le
+// code de câblage que je venais d'écrire, et aucun vu par le banc — parce
+// qu'aucun test ne fabriquait de jonction autrement qu'en appelant
+// `decouper()` en direct.
+// ---------------------------------------------------------------------------
+static void test_derivation_survit() {
+    std::printf("\n-- la dérivation survit à l'enregistrement et à l'annulation --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 200));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    ItemFil* dorsale = new ItemFil(pile, 0, r1, 0);
+    scene.addItem(dorsale);
+    scene.addItem(new ItemFil(r1, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+    ItemJonction* point = scene.decouper(dorsale, QPointF(150, 0));
+    scene.addItem(new ItemFil(Ancre(point), Ancre(r2, 0)));
+    scene.addItem(new ItemFil(r2, 1, masse, 0));
+    scene.balayer_jonctions();
+
+    const QString noeud = scene.noeud_de(r2, 0);
+    const size_t fils_avant = scene.fils().size();
+
+    // 1. Aller-retour par le fichier. Le T était intégralement détruit : les
+    //    fils touchant un point étaient jetés, faute d'être sérialisables.
+    const QJsonObject sauve = scene.vers_json();
+    SceneSchema relue;
+    relue.depuis_json(sauve);
+    verifier(relue.fils().size() == fils_avant,
+             "tous les fils survivent à l'enregistrement",
+             std::to_string(relue.fils().size()) + "/"
+                 + std::to_string(fils_avant));
+    verifier(relue.jonctions().size() == 1,
+             "et le point de dérivation aussi",
+             std::to_string(relue.jonctions().size()));
+    ItemComposant* r2_relu = nullptr;
+    for (ItemComposant* c : relue.composants())
+        if (c->reference() == r2->reference()) r2_relu = c;
+    verifier(r2_relu && relue.noeud_de(r2_relu, 0) == noeud,
+             "la dérivation est toujours sur le même nœud après relecture",
+             (r2_relu ? relue.noeud_de(r2_relu, 0).toStdString() : "absent")
+                 + " attendu " + noeud.toStdString());
+
+    // 2. Une annulation sans rapport ne doit pas emporter la dérivation.
+    scene.memoriser();
+    scene.ajouter_composant("resistance", QPointF(900, 400));
+    scene.annuler();
+    verifier(scene.fils().size() == fils_avant,
+             "annuler un geste sans rapport laisse la dérivation intacte",
+             std::to_string(scene.fils().size()) + "/"
+                 + std::to_string(fils_avant));
+
+    // 3. Effacer le point efface ses fils : les laisser pendants faisait lire
+    //    une position dans de la mémoire libérée dès le premier redessin.
+    scene.clearSelection();
+    for (ItemJonction* j : scene.jonctions()) j->setSelected(true);
+    scene.supprimer_selection();
+    for (ItemFil* fil : scene.fils())
+        verifier(fil->ancre_depart().jonction == nullptr
+                     && fil->ancre_arrivee().jonction == nullptr,
+                 "aucun fil ne pointe vers un point supprimé");
+    QImage image(80, 60, QImage::Format_ARGB32);
+    QPainter peintre(&image);
+    scene.render(&peintre);      // le redessin lisait la mémoire libérée
+    peintre.end();
+    verifier(true, "et le schéma se redessine sans lire de mémoire libérée");
+}
+
+// ---------------------------------------------------------------------------
 // Ce qui aurait grillé
 //
 // Le solveur ne connaît que des équations. Une LED branchée sans résistance
@@ -2292,6 +2366,7 @@ int main(int argc, char** argv) {
     test_modification_en_marche();
     test_portee_des_commandes();
     test_derivation_en_t();
+    test_derivation_survit();
     test_composants_grilles();
     test_pas_de_trainee();
     test_panneaux_retrecissables();

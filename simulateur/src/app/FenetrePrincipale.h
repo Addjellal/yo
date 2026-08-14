@@ -25,6 +25,8 @@ class QFormLayout;
 class QWidget;
 class QTabWidget;
 class QComboBox;
+class QTextDocument;
+class QLineEdit;
 class QTabBar;
 class QStackedWidget;
 class QDockWidget;
@@ -167,6 +169,11 @@ private slots:
     void ouvrir_firmware();
     void ouvrir_source_c();
     void compiler_source();
+    // Émet le contenu du champ de saisie sur la liaison série de la carte.
+    void envoyer_serie();
+    // Le document de ce fichier de cette carte, créé au besoin. Un document
+    // par fichier : c'est lui qui porte la pile d'annulation.
+    QTextDocument* document_de(const QString& carte, int rang);
 
     void lancer();
     void suspendre();
@@ -195,6 +202,12 @@ private:
     QPlainTextEdit* editeur_source_ = nullptr;
     QPlainTextEdit* console_ = nullptr;
     QPlainTextEdit* moniteur_serie_ = nullptr;
+    QLineEdit* saisie_serie_ = nullptr;
+    QComboBox* fin_ligne_serie_ = nullptr;
+    // Un QTextDocument par « carte/rang », pour que l'annulation et la
+    // position du curseur survivent au changement d'onglet ou de carte.
+    std::map<QString, QTextDocument*> documents_;
+    std::map<QString, int> curseurs_;
     Oscilloscope* oscilloscope_ = nullptr;
     PanneauAnalyses* analyses_ = nullptr;
     PanneauPcb* pcb_ = nullptr;

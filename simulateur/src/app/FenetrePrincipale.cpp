@@ -21,6 +21,12 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QTextEdit>
+#include <QTextDocument>
+#include <QPlainTextDocumentLayout>
+#include <QPushButton>
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QMenu>
 #include <QMenuBar>
 #include <QInputDialog>
@@ -340,11 +346,50 @@ void FenetrePrincipale::construire_docks() {
     console_->setMinimumHeight(70);
     onglets->addTab(console_, "Journal");
 
+    // Le moniteur série reçoit ET émet.
+    //
+    // Il ne savait que recevoir, alors que le moteur sait recevoir depuis
+    // toujours (`Microcontroleur::envoyer_octet_serie`). Sans champ de
+    // saisie, `Serial.read()`, `Serial.available()` et `parseInt()` sont
+    // inenseignables dans ce logiciel — tout un pan du programme de première
+    // année tombait, faute d'un QLineEdit.
+    auto* bloc_serie = new QWidget;
+    auto* pile_serie = new QVBoxLayout(bloc_serie);
+    pile_serie->setContentsMargins(0, 0, 0, 0);
+    pile_serie->setSpacing(3);
+
     moniteur_serie_ = new QPlainTextEdit;
     moniteur_serie_->setReadOnly(true);
     moniteur_serie_->setFont(fonte);
     moniteur_serie_->setMinimumHeight(70);
-    onglets->addTab(moniteur_serie_, "Moniteur série");
+    pile_serie->addWidget(moniteur_serie_, 1);
+
+    auto* ligne_serie = new QWidget;
+    auto* rang_serie = new QHBoxLayout(ligne_serie);
+    rang_serie->setContentsMargins(0, 0, 0, 0);
+    saisie_serie_ = new QLineEdit;
+    saisie_serie_->setFont(fonte);
+    saisie_serie_->setPlaceholderText(
+        "Texte à envoyer à la carte, puis Entrée…");
+    fin_ligne_serie_ = new QComboBox;
+    // Le choix de la fin de ligne est celui de l'IDE Arduino, et il n'est pas
+    // cosmétique : `Serial.readStringUntil('\n')` ne rend jamais la main sans
+    // saut de ligne, et l'élève croit son programme planté.
+    fin_ligne_serie_->addItem("Nouvelle ligne (\\n)", QString("\n"));
+    fin_ligne_serie_->addItem("Retour chariot (\\r)", QString("\r"));
+    fin_ligne_serie_->addItem("Les deux (\\r\\n)", QString("\r\n"));
+    fin_ligne_serie_->addItem("Aucune", QString());
+    auto* bouton_serie = new QPushButton("Envoyer");
+    rang_serie->addWidget(saisie_serie_, 1);
+    rang_serie->addWidget(fin_ligne_serie_);
+    rang_serie->addWidget(bouton_serie);
+    pile_serie->addWidget(ligne_serie);
+
+    connect(saisie_serie_, &QLineEdit::returnPressed, this,
+            &FenetrePrincipale::envoyer_serie);
+    connect(bouton_serie, &QPushButton::clicked, this,
+            &FenetrePrincipale::envoyer_serie);
+    onglets->addTab(bloc_serie, "Moniteur série");
 
     oscilloscope_ = new Oscilloscope;
     onglets->addTab(oscilloscope_, "Oscilloscope");
@@ -866,6 +911,26 @@ bool FenetrePrincipale::saisie_en_cours() const {
     return false;
 }
 
+// Envoie le contenu du champ de saisie à la carte, octet par octet.
+void FenetrePrincipale::envoyer_serie() {
+    if (!saisie_serie_ || !moteur_) return;
+    const QString texte = saisie_serie_->text();
+    if (texte.isEmpty()) return;
+    const QString fin = fin_ligne_serie_
+                            ? fin_ligne_serie_->currentData().toString()
+                            : QString("\n");
+    const QByteArray octets = (texte + fin).toUtf8();
+    // La carte qui reçoit est celle dont on regarde le programme : c'est
+    // celle à laquelle l'utilisateur pense, et sur un schéma à deux cartes
+    // c'est la seule réponse qui ne soit pas un tirage au sort.
+    moteur_->envoyer_serie(octets, carte_courante_);
+    // On répète ce qu'on vient d'envoyer : sans écho, rien ne distingue un
+    // envoi parti d'un envoi perdu.
+    if (moniteur_serie_)
+        moniteur_serie_->appendPlainText("> " + texte);
+    saisie_serie_->clear();
+}
+
 void FenetrePrincipale::pivoter_sur_page_active() {
     if (pages_ && pages_->currentIndex() == 1) {
         if (pcb_ && pcb_->vue()) pcb_->vue()->tourner_sous_curseur();
@@ -1376,15 +1441,62 @@ void FenetrePrincipale::ranger_editeur() {
     programme[rang].contenu = editeur_source_->toPlainText().toStdString();
 }
 
+// Un document par fichier, et non un seul contenu qu'on remplace.
+//
+// `setPlainText` **efface la pile d'annulation** du document et remet le
+// curseur en tête. Passer sur un second onglet puis revenir détruisait donc
+// tout l'historique — Ctrl+Z ne rendait plus rien —, et faisait remonter en
+// haut du fichier. Même effet à chaque changement de carte, c'est-à-dire en
+// permanence dans un TP à deux cartes.
+//
+// C'est la faute la plus coûteuse qu'un éditeur puisse commettre, parce
+// qu'elle est silencieuse : on ne s'en aperçoit qu'au moment où on a besoin
+// d'annuler, et il est alors trop tard. Un `QTextDocument` par fichier la
+// supprime — et donne au passage le socle propre auquel une coloration
+// syntaxique viendra s'attacher, un QSyntaxHighlighter s'accrochant à un
+// document.
+QTextDocument* FenetrePrincipale::document_de(const QString& carte,
+                                              int rang) {
+    const QString cle = carte + "/" + QString::number(rang);
+    auto it = documents_.find(cle);
+    if (it != documents_.end()) return it->second;
+    auto* document = new QTextDocument(this);
+    document->setDocumentLayout(new QPlainTextDocumentLayout(document));
+    documents_[cle] = document;
+    return document;
+}
+
 void FenetrePrincipale::afficher_fichier(int rang) {
     if (carte_courante_.isEmpty() || !editeur_source_) return;
     coeur::Programme& programme = programme_de(carte_courante_);
     if (rang < 0 || rang >= static_cast<int>(programme.size())) return;
     if (rang != fichier_courant_) ranger_editeur();
+
+    // Où en était le curseur dans le fichier qu'on quitte : le retrouver au
+    // retour fait partie de ce qu'on attend d'un éditeur à onglets.
+    if (fichier_courant_ >= 0 && !carte_courante_.isEmpty())
+        curseurs_[carte_courante_ + "/" + QString::number(fichier_courant_)] =
+            editeur_source_->textCursor().position();
+
     fichier_courant_ = rang;
     const QSignalBlocker silence(editeur_source_);
-    editeur_source_->setPlainText(
-        QString::fromStdString(programme[rang].contenu));
+    QTextDocument* document = document_de(carte_courante_, rang);
+    const QString contenu = QString::fromStdString(programme[rang].contenu);
+    // On ne réécrit le document que si le texte a changé sous lui — un
+    // chargement de projet, un exemple. Le réécrire à chaque bascule
+    // reviendrait à effacer l'historique qu'on cherche justement à garder.
+    if (document->toPlainText() != contenu) {
+        document->setPlainText(contenu);
+        document->clearUndoRedoStacks();
+    }
+    editeur_source_->setDocument(document);
+
+    auto place = curseurs_.find(carte_courante_ + "/" + QString::number(rang));
+    if (place != curseurs_.end()) {
+        QTextCursor curseur = editeur_source_->textCursor();
+        curseur.setPosition(std::min(place->second, document->characterCount() - 1));
+        editeur_source_->setTextCursor(curseur);
+    }
 }
 
 void FenetrePrincipale::rafraichir_onglets_fichiers() {

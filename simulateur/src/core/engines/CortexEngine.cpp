@@ -244,6 +244,10 @@ bool CortexEngine::compiler_projet(const Programme& fichiers,
         // que seul clang était installé sur la machine d'essai.
         commande += " -masm-syntax-unified";
     }
+    // Mêmes avertissements et même borne que côté AVR, pour la même raison :
+    // « if (x = 0) » doit parler, et un mur d'erreurs en cascade doit être
+    // coupé à sa source. Voir AvrEngine.cpp pour le détail.
+    commande += " -Wall -Wextra -fmax-errors=5";
     commande += " -nostdlib -ffreestanding -Os -I \"" + dossier
                 + "\" -Wl,-e,_start -Wl,-Ttext=" + adresse + " -o \""
                 + chemin_elf + "\"" + a_compiler;

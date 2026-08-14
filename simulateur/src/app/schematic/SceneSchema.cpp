@@ -221,21 +221,36 @@ ItemJonction* SceneSchema::decouper(ItemFil* fil, const QPointF& point) {
 // Le laisser afficherait une pastille de connexion là où il n'y a pas de
 // connexion, ce qui est exactement le contraire de ce qu'elle veut dire.
 void SceneSchema::balayer_jonctions() {
-    const std::vector<ItemFil*> tous = fils();
-    for (ItemJonction* jonction : jonctions()) {
-        int degre = 0;
-        for (ItemFil* fil : tous)
-            if (fil->touche(jonction)) ++degre;
-        jonction->degre = degre;
-        if (degre >= 2) continue;
-        // Le seul fil restant meurt avec elle : il ne mène plus nulle part.
-        for (ItemFil* fil : tous) {
-            if (!fil->touche(jonction)) continue;
-            removeItem(fil);
-            delete fil;
+    // La liste des fils se relit à CHAQUE tour.
+    //
+    // Elle était prise une fois avant la boucle : supprimer un fil au premier
+    // tour laissait un pointeur mort que le tour suivant relisait —
+    // use-after-free confirmé à l'ASan sur deux points voisins d'une même
+    // dorsale, et comptage de degré faux dans tous les autres cas.
+    //
+    // La boucle tourne jusqu'à point fixe : retirer un fil peut faire tomber
+    // un autre point sous le seuil, et il faut alors recommencer.
+    bool encore = true;
+    while (encore) {
+        encore = false;
+        const std::vector<ItemFil*> tous = fils();
+        for (ItemJonction* jonction : jonctions()) {
+            int degre = 0;
+            for (ItemFil* fil : tous)
+                if (fil->touche(jonction)) ++degre;
+            jonction->degre = degre;
+            if (degre >= 2) continue;
+            // Le seul fil restant meurt avec elle : il ne mène plus nulle part.
+            for (ItemFil* fil : tous) {
+                if (!fil->touche(jonction)) continue;
+                removeItem(fil);
+                delete fil;
+            }
+            removeItem(jonction);
+            delete jonction;
+            encore = true;
+            break;   // la liste vient de changer : on la reprend
         }
-        removeItem(jonction);
-        delete jonction;
     }
 }
 
@@ -260,16 +275,26 @@ void SceneSchema::supprimer_selection() {
             for (ItemFil* fil : fils())
                 if (fil->touche(composant)) a_supprimer.insert(fil);
         }
+        // Un point de dérivation est sélectionnable — un lasso qui passe
+        // dessus l'attrape, la gomme aussi. Il obéit à la même règle que le
+        // composant, et elle n'était appliquée qu'au composant : le point
+        // partait seul, ses fils restaient à lire sa position dans de la
+        // mémoire libérée dès le premier redessin.
+        if (item->type() == ItemJonction::Type) {
+            auto* jonction = static_cast<ItemJonction*>(item);
+            for (ItemFil* fil : fils())
+                if (fil->touche(jonction)) a_supprimer.insert(fil);
+        }
         a_supprimer.insert(item);
     }
     // Un fil en cours de tracé peut partir d'un composant qu'on efface : le
     // laisser en attente, c'est garder un pointeur vers un objet détruit.
     // Une ancre peut désigner un composant OU un point de fil : les deux
     // peuvent être dans la fournée.
-    if ((fil_depart_.composant && a_supprimer.count(fil_depart_.composant))
-        || (fil_depart_.jonction
-            && a_supprimer.count(reinterpret_cast<QGraphicsItem*>(
-                   fil_depart_.jonction))))
+    if ((cible_depart_.ancre.composant
+         && a_supprimer.count(cible_depart_.ancre.composant))
+        || (cible_depart_.fil
+            && a_supprimer.count(static_cast<QGraphicsItem*>(cible_depart_.fil))))
         abandonner_fil();
 
     // L'ordre compte, et il coûte cher à ignorer : retirer un composant fait
@@ -295,6 +320,10 @@ void SceneSchema::supprimer_selection() {
         removeItem(item);
         delete item;
     }
+    // Un point qui ne relie plus rien doit disparaître avec le reste. Sans
+    // cet appel, il restait à l'écran une pastille de connexion là où plus
+    // rien ne se connecte, et son degré gardait la valeur d'avant.
+    balayer_jonctions();
     emit selection_composant(nullptr);
 }
 
@@ -304,7 +333,7 @@ void SceneSchema::tout_effacer() {
     // Les pointeurs sont remis à zéro sans passer par abandonner_fil() : les
     // objets viennent d'être détruits par clear(). Un fil resté « en attente »
     // désignerait sinon un composant qui n'existe plus.
-    fil_depart_ = Ancre();
+    cible_depart_ = Cible();
     fil_provisoire_ = nullptr;
     fil_en_attente_ = false;
     emit selection_composant(nullptr);
@@ -842,11 +871,11 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
 
 // Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
 // curseur.
-void SceneSchema::commencer_fil(const Ancre& depart, const QPointF& point) {
-    fil_depart_ = depart;
+void SceneSchema::commencer_fil(const Cible& depart, const QPointF& point) {
+    cible_depart_ = depart;
     fil_en_attente_ = false;
     point_appui_ = point;
-    fil_provisoire_ = addLine(QLineF(depart.position(), point),
+    fil_provisoire_ = addLine(QLineF(depart.point, point),
                               QPen(QColor(0, 120, 215), 1.5, Qt::DashLine));
 }
 
@@ -860,19 +889,31 @@ static QString nom_ancre(const Ancre& ancre) {
 
 // Referme le fil sur une borne d'arrivée, si elle est valable.
 bool SceneSchema::terminer_fil(const QPointF& point) {
-    const Cible cible = viser(point);
-    // Un fil ne se referme pas sur lui-même, et ne peut pas non plus couper le
-    // fil qu'on est en train de tirer — il n'existe pas encore.
-    if (!cible.connectable()) {
+    if (!viser(point).connectable()) {
         abandonner_fil();
         return false;
     }
-    const Ancre arrivee = ancrer(cible);
-    if (!arrivee.valide() || arrivee == fil_depart_) {
+    // C'est ici, et seulement ici, que l'on découpe : le geste va aboutir.
+    const Ancre depart = ancrer(cible_depart_);
+    if (!depart.valide()) {
         abandonner_fil();
         return false;
     }
-    const Ancre depart = fil_depart_;
+    // Le départ vient peut-être de couper un fil — éventuellement celui que
+    // visait l'arrivée. On revise donc sur une scène à jour, sans quoi on
+    // ancrerait sur un objet détruit.
+    const Cible fraiche = viser(point);
+    if (!fraiche.connectable()) {
+        abandonner_fil();
+        balayer_jonctions();
+        return false;
+    }
+    const Ancre arrivee = ancrer(fraiche);
+    if (!arrivee.valide() || arrivee == depart) {
+        abandonner_fil();
+        balayer_jonctions();
+        return false;
+    }
     addItem(new ItemFil(depart, arrivee));
     emit journal(QString("Fil : %1 — %2").arg(nom_ancre(depart),
                                               nom_ancre(arrivee)));
@@ -887,7 +928,7 @@ void SceneSchema::abandonner_fil() {
         delete fil_provisoire_;
         fil_provisoire_ = nullptr;
     }
-    fil_depart_ = Ancre();
+    cible_depart_ = Cible();
     fil_en_attente_ = false;
 }
 
@@ -906,7 +947,7 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     if (evenement->button() == Qt::LeftButton && outil_ != Outil::Suppression) {
         // Fil laissé en attente par un premier clic : ce clic-ci le referme,
         // ou l'abandonne s'il tombe à côté d'une borne.
-        if (fil_en_attente_ && fil_depart_.valide()) {
+        if (fil_en_attente_ && cible_depart_.connectable()) {
             if (!terminer_fil(point)) abandonner_fil();
             return;
         }
@@ -918,11 +959,17 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
         // visible à l'usage.
         const Cible cible = viser(point);
         if (cible.connectable()) {
-            const Ancre depart = ancrer(cible);
-            if (depart.valide()) {
-                commencer_fil(depart, cible.point);
-                return;
-            }
+            // On NE DÉCOUPE PAS ici.
+            //
+            // On le faisait, et la découpe restait commise même quand le
+            // geste était abandonné : un clic au milieu d'un fil suivi d'un
+            // Échap laissait le fil coupé en deux autour d'un point mort, que
+            // l'enregistrement suivant jetait — la pile s'en trouvait
+            // débranchée, définitivement, sans trace. La cible est donc
+            // gardée telle quelle, et n'est ancrée qu'au moment où le fil
+            // naît vraiment.
+            commencer_fil(cible, cible.point);
+            return;
         }
         if (outil_ == Outil::Fil) return;   // l'outil fil ne fait que ça
         // Un déplacement commence peut-être : on garde l'état d'avant pour
@@ -954,9 +1001,9 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
-    if (fil_provisoire_ && fil_depart_.valide()) {
+    if (fil_provisoire_ && cible_depart_.connectable()) {
         fil_provisoire_->setLine(
-            QLineF(fil_depart_.position(), evenement->scenePos()));
+            QLineF(cible_depart_.point, evenement->scenePos()));
         return;
     }
 
@@ -983,11 +1030,11 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
-    if (fil_provisoire_ && fil_depart_.valide() && !fil_en_attente_) {
+    if (fil_provisoire_ && cible_depart_.connectable() && !fil_en_attente_) {
         const QPointF point = evenement->scenePos();
         // À relever AVANT : terminer_fil() appelle abandonner_fil() quand il
         // échoue, ce qui remet l'ancre à zéro.
-        const Ancre depart = fil_depart_;
+        const Cible depart = cible_depart_;
         if (terminer_fil(point)) return;
 
         // Relâché sans avoir bougé : c'était un clic, pas un glissement. Le
@@ -1106,16 +1153,52 @@ QJsonObject SceneSchema::vers_json(bool selection_seule) const {
         tableau_composants.append(objet);
     }
 
+    // Les points de dérivation s'enregistrent aussi.
+    //
+    // Ils ne s'enregistraient pas, et le filtre ci-dessous jetait alors TOUT
+    // fil qui en touchait un — `depart()` rend nullptr sur une jonction, et
+    // `index.count(nullptr)` vaut zéro. Un T de six fils repartait à trois, la
+    // dérivation débranchée, sans un mot. Et comme `memoriser()`, `annuler()`
+    // et `coller()` passent tous par ici, un simple Ctrl+Z sur un geste sans
+    // rapport suffisait à effacer le T.
+    QJsonArray tableau_jonctions;
+    std::map<const ItemJonction*, int> index_jonction;
+    for (ItemJonction* jonction : jonctions()) {
+        index_jonction[jonction] = tableau_jonctions.size();
+        QJsonObject objet;
+        objet["x"] = jonction->pos().x();
+        objet["y"] = jonction->pos().y();
+        tableau_jonctions.append(objet);
+    }
+
+    // Une extrémité de fil s'écrit selon sa nature : broche d'un composant,
+    // ou point de dérivation.
+    auto ecrire_ancre = [&](const Ancre& ancre, QJsonObject& objet,
+                            const char* cle_genre, const char* cle_index,
+                            const char* cle_borne) -> bool {
+        if (ancre.jonction) {
+            auto it = index_jonction.find(ancre.jonction);
+            if (it == index_jonction.end()) return false;
+            objet[cle_genre] = "point";
+            objet[cle_index] = it->second;
+            return true;
+        }
+        if (!ancre.composant || !index.count(ancre.composant)) return false;
+        objet[cle_genre] = "broche";
+        objet[cle_index] = index[ancre.composant];
+        objet[cle_borne] = ancre.borne;
+        return true;
+    };
+
     QJsonArray tableau_fils;
     for (ItemFil* fil : fils()) {
+        QJsonObject objet;
         // Un fil dont une extrémité sort de la sélection n'a nulle part où
         // aller : on ne le copie pas.
-        if (!index.count(fil->depart()) || !index.count(fil->arrivee())) continue;
-        QJsonObject objet;
-        objet["a"] = index[fil->depart()];
-        objet["borne_a"] = fil->borne_depart();
-        objet["b"] = index[fil->arrivee()];
-        objet["borne_b"] = fil->borne_arrivee();
+        if (!ecrire_ancre(fil->ancre_depart(), objet, "genre_a", "a", "borne_a"))
+            continue;
+        if (!ecrire_ancre(fil->ancre_arrivee(), objet, "genre_b", "b", "borne_b"))
+            continue;
         tableau_fils.append(objet);
     }
 
@@ -1124,6 +1207,7 @@ QJsonObject SceneSchema::vers_json(bool selection_seule) const {
     racine["version"] = 1;
     racine["composants"] = tableau_composants;
     racine["fils"] = tableau_fils;
+    racine["jonctions"] = tableau_jonctions;
     return racine;
 }
 
@@ -1155,16 +1239,41 @@ std::vector<ItemComposant*> SceneSchema::depuis_json(const QJsonObject& racine,
                 it.value().toString().toStdString();
         ajoutes.push_back(item);
     }
+    std::vector<ItemJonction*> points;
+    for (const QJsonValue& valeur : racine["jonctions"].toArray()) {
+        const QJsonObject objet = valeur.toObject();
+        auto* point = new ItemJonction(
+            QPointF(objet["x"].toDouble(), objet["y"].toDouble()));
+        addItem(point);
+        points.push_back(point);
+    }
+
+    // Relit une extrémité. L'absence de « genre » désigne un fichier écrit
+    // avant que les points existent : tout y était une broche.
+    auto lire_ancre = [&](const QJsonObject& objet, const char* cle_genre,
+                          const char* cle_index,
+                          const char* cle_borne) -> Ancre {
+        const int rang = objet[cle_index].toInt(-1);
+        if (rang < 0) return {};
+        if (objet[cle_genre].toString("broche") == "point") {
+            if (rang >= static_cast<int>(points.size())) return {};
+            return Ancre(points[rang]);
+        }
+        if (rang >= static_cast<int>(ajoutes.size()) || !ajoutes[rang])
+            return {};
+        return Ancre(ajoutes[rang], objet[cle_borne].toInt());
+    };
+
     for (const QJsonValue& valeur : racine["fils"].toArray()) {
         const QJsonObject objet = valeur.toObject();
-        const int a = objet["a"].toInt(), b = objet["b"].toInt();
-        if (a < 0 || b < 0 || a >= static_cast<int>(ajoutes.size())
-            || b >= static_cast<int>(ajoutes.size()))
-            continue;
-        if (!ajoutes[a] || !ajoutes[b]) continue;
-        addItem(new ItemFil(ajoutes[a], objet["borne_a"].toInt(), ajoutes[b],
-                            objet["borne_b"].toInt()));
+        const Ancre a = lire_ancre(objet, "genre_a", "a", "borne_a");
+        const Ancre b = lire_ancre(objet, "genre_b", "b", "borne_b");
+        if (!a.valide() || !b.valide()) continue;
+        addItem(new ItemFil(a, b));
     }
+    // Les points relus n'ont pas encore de degré : sans cela, aucun ne
+    // dessinerait sa pastille et un T rechargé passerait pour un croisement.
+    balayer_jonctions();
     return ajoutes;
 }
 

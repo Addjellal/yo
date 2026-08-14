@@ -391,6 +391,21 @@ void MoteurSimulation::signaler_regles() {
     }
 }
 
+void MoteurSimulation::envoyer_serie(const QByteArray& octets,
+                                     const QString& reference) {
+    Carte* cible = carte(reference);
+    if (!cible || !cible->mcu) return;
+    // Le firmware lit sa liaison série pendant qu'il tourne : émettre vers une
+    // carte arrêtée déposerait des octets que personne ne viendra chercher.
+    if (etat_simulation_ != Etat::EnMarche) {
+        emit journal("La simulation est arrêtée : lancez-la avant d'émettre "
+                     "sur la liaison série.");
+        return;
+    }
+    for (char octet : octets)
+        cible->mcu->envoyer_octet_serie(static_cast<uint8_t>(octet));
+}
+
 void MoteurSimulation::demarrer() {
     // Reprise après une pause : rien à réamorcer, l'état est intact.
     if (etat_simulation_ == Etat::EnPause) {

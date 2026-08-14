@@ -54,6 +54,24 @@ class SceneSchema : public QGraphicsScene {
 public:
     enum class Outil { Selection, Fil, Suppression };
 
+    // Ce que vise le curseur. Défini tôt : le tracé en cours le garde en
+    // membre, et la découpe n'a lieu qu'au bout du geste.
+    struct Cible {
+        enum class Genre { Rien, Broche, Jonction, Fil, Composant };
+        Genre genre = Genre::Rien;
+        Ancre ancre;                          // Broche et Jonction
+        ItemFil* fil = nullptr;               // Fil : celui qu'il faudra couper
+        ItemComposant* composant = nullptr;   // Composant : son corps
+        QPointF point;                        // position retenue
+
+        // Ce sur quoi un fil peut naître ou mourir.
+        bool connectable() const {
+            return genre == Genre::Broche || genre == Genre::Jonction
+                   || genre == Genre::Fil;
+        }
+    };
+
+
     explicit SceneSchema(QObject* parent = nullptr);
 
     void definir_outil(Outil outil);
@@ -170,9 +188,12 @@ protected:
 
 private:
     Outil outil_ = Outil::Selection;
-    // L'ancre d'où part le fil en cours. Une ancre, pas une broche : c'est
-    // ce qui permet de partir d'un fil existant.
-    Ancre fil_depart_;
+    // La CIBLE d'où part le fil en cours — pas une ancre.
+    //
+    // Garder la cible plutôt que l'ancre est ce qui permet de ne découper
+    // qu'au dernier moment : tant que le geste n'a pas abouti, aucun fil
+    // existant n'a été touché.
+    Cible cible_depart_;
     QGraphicsLineItem* fil_provisoire_ = nullptr;
     // Fil accroché au curseur entre deux clics (câblage en deux temps).
     bool fil_en_attente_ = false;
@@ -205,20 +226,6 @@ private:
     // les extrémités. Ici un fil se termine DIRECTEMENT sur une broche : le
     // fil gagnerait toujours, et cliquer une broche découperait le fil au
     // lieu de s'y connecter. La broche passe donc en tête.
-    struct Cible {
-        enum class Genre { Rien, Broche, Jonction, Fil, Composant };
-        Genre genre = Genre::Rien;
-        Ancre ancre;                          // Broche et Jonction
-        ItemFil* fil = nullptr;               // Fil : celui qu'il faudra couper
-        ItemComposant* composant = nullptr;   // Composant : son corps
-        QPointF point;                        // position retenue
-
-        // Ce sur quoi un fil peut naître ou mourir.
-        bool connectable() const {
-            return genre == Genre::Broche || genre == Genre::Jonction
-                   || genre == Genre::Fil;
-        }
-    };
     Cible viser(const QPointF& point) const;
 
     // Transforme une cible en ancre utilisable, en découpant le fil si c'est
@@ -227,7 +234,7 @@ private:
     Ancre ancrer(const Cible& cible);
 
     // Cycle de vie d'un fil en cours de tracé.
-    void commencer_fil(const Ancre& depart, const QPointF& point);
+    void commencer_fil(const Cible& depart, const QPointF& point);
     bool terminer_fil(const QPointF& point);   // vrai si un fil a été créé
     void abandonner_fil();
 

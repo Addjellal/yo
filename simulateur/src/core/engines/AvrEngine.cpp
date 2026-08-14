@@ -555,6 +555,21 @@ bool AvrEngine::compiler_projet(const Programme& fichiers,
         chaines::outil("avr", "avr-g++") + " -mmcu=" + mcu + " -DF_CPU="
         + std::to_string(frequence)
         + "UL -Os -std=gnu++17 "
+          // Les avertissements sont allumés, et c'est une décision
+          // pédagogique. Sans « -Wall », « if (x = 0) » ne dit RIEN : le
+          // programme compile, se charge, tourne, et ne fait pas ce qu'on
+          // croit — l'élève accuse alors le montage, l'oscilloscope, le
+          // simulateur, et y passe une demi-heure. Avec, GCC répond
+          // « suggest parentheses around assignment used as truth value »,
+          // et c'est réglé en dix secondes.
+          //
+          // « -fmax-errors=5 » borne la casse. Une accolade oubliée en tête
+          // de croquis produit sinon un mur de vingt erreurs, toutes fausses
+          // sauf la première ; l'élève les corrige de bas en haut et détruit
+          // son programme. Le forum Arduino en fait sa règle numéro un :
+          // « a long list of errors doesn't necessarily mean multiple
+          // problems ».
+          "-Wall -Wextra -fmax-errors=5 "
           "-fno-exceptions -fno-threadsafe-statics -ffunction-sections "
           "-fdata-sections -Wl,--gc-sections -I \"" + dossier + "\" -o \"" +
         chemin_elf + "\"" + a_compiler
