@@ -25,6 +25,7 @@ d'agir, là où les autres la déduisent.
 | **Simulink** | auto, orthogonal | sans objet | Ctrl + glisser |
 | **Altium** | 4 modes dont Auto Wire | `Maj+Espace` | jonction automatique |
 | **KiCad** | manuel | `Maj+Espace` | jonction manuelle |
+| **LibrePCB** | manuel, 5 postures | outil modal | **découpe du fil** |
 
 ### Proteus — le câblage sans mode
 
@@ -73,6 +74,57 @@ schéma**. Le tracé est entièrement manuel.
 C'est le rappel que l'auto-routage n'est pas une évidence : l'outil libre le
 plus utilisé s'en passe, et ses utilisateurs ne s'en plaignent pas. Ce qu'ils
 ont en échange, c'est un tracé prévisible.
+
+### LibrePCB — le seul dont on puisse lire le code
+
+Sur le tracé, LibrePCB est du côté de KiCad : un outil modal
+(`SchematicEditorState_DrawWire`), cinq postures — `HV`, `VH`, `90/45`,
+`45/90`, `Straight` —, et **aucun auto-routeur**. Rien à en tirer sur ce
+point.
+
+Son intérêt est ailleurs, et il est décisif : il montre **comment** on fait
+tenir le reste.
+
+**1. Une extrémité de fil ne sait pas à quoi elle s'accroche.** Broche de
+symbole, point de fil, jonction de bus dérivent tous de `SI_NetLineAnchor`.
+Un fil relie deux *ancres*, pas deux broches. C'est cette abstraction qui
+fait que « partir d'un fil » n'est pas un cas particulier — il n'y a rien à
+prévoir, une ancre en vaut une autre.
+
+**2. La dérivation en T est une découpe.** Quand un fil se termine sur un fil
+existant (`SGI_NetLine` sous le curseur), le code fait exactement ceci :
+
+```
+ajouter un point au lieu du clic
+ajouter deux fils : point→P1 et point→P2   (les deux moitiés de l'ancien)
+supprimer le fil d'origine
+```
+
+Le tout dans un seul groupe d'annulation, pour que ça se défasse d'un coup.
+Aucune notion de « jonction » n'est nécessaire : le T *est* trois fils
+partageant une ancre.
+
+**3. Le « sans mode » se ramène à une table de priorités.** LibrePCB
+n'est pas modeless, mais il résout la même question — que vise le curseur ?
+— et il le fait par un classement explicite, commenté dans le source :
+
+| priorité | objet |
+|---|---|
+| 0 | points de fil visibles |
+| 15 | jonctions de bus |
+| 20 | **fils** |
+| 40 | **broches** |
+| 50 | symbole dont l'origine est proche |
+| 70 | symbole sous le curseur |
+
+Tout ce à quoi on peut se connecter passe **avant** le corps du composant.
+S'y ajoutent deux paliers de distance : `+1000` pour un objet proche du
+curseur sans être dessous, `+2000` pour un objet au pas de grille suivant —
+l'aimantation fait partie du même classement, elle n'est pas un traitement à
+part.
+
+C'est la recette qui manquait. Proteus dit *ce que* fait un logiciel sans
+mode ; LibrePCB montre *comment* on décide, ligne par ligne.
 
 ## Ce que valent les idées relevées
 
@@ -125,6 +177,36 @@ Ce qui n'est **pas** retenu : les quatre modes d'Altium au clavier. Ils
 existent parce qu'Altium a gardé un outil de placement modal ; sans mode, ils
 n'ont plus d'objet. Un unique échappatoire (point 7) suffit.
 
+## Ce que ça implique pour notre code
+
+La lecture de LibrePCB change le diagnostic. Notre `ItemFil` s'écrit :
+
+```cpp
+ItemFil(ItemComposant* depart, int borne_depart,
+        ItemComposant* arrivee, int borne_arrivee);
+```
+
+Un fil y relie **deux broches de composant, et rien d'autre**. Un fil qui
+part d'un fil n'est pas seulement mal géré : il est *inexprimable*. Le
+basculement en mode sélection constaté à l'usage n'est donc pas une bévue de
+gestion de la souris à rattraper avec un `if` — c'est le modèle de données
+qui ne sait pas dire ce qu'on lui demande, et l'interface qui retombe sur le
+seul geste qu'elle sache faire.
+
+Cela réordonne le travail. Avant l'auto-routeur, avant le curseur qui change
+de forme, il faut :
+
+1. **une ancre** — broche, point de fil, ou point sur un fil —, et un
+   `ItemFil` qui relie deux ancres ;
+2. **la découpe** d'un fil en deux à l'endroit du clic, en une seule
+   opération annulable ;
+3. **la table de priorités** qui dit ce que vise le curseur, avec ses paliers
+   de distance.
+
+Ces trois-là faits, le reste — auto-routage, aperçu, ancrage au clic,
+minimum disturbance — se pose dessus. Faits dans le désordre, on écrirait un
+auto-routeur qui ne saurait toujours pas partir d'un fil.
+
 ## Ce qu'il faudra vérifier
 
 L'auto-routage est la partie facile à mal faire. Trois pièges connus :
@@ -146,3 +228,8 @@ L'auto-routage est la partie facile à mal faire. Trois pièges connus :
 - Altium, *Working with a Wire Object on a Schematic Sheet* : <https://www.altium.com/documentation/altium-designer/sch-obj-wirewire-ad>
 - Altium, *Creating Circuit Connectivity in Your Schematics* : <https://www.altium.com/documentation/altium-designer/schematic/creating-circuit-connectivity>
 - KiCad, *Schematic Editor 9.0* : <https://docs.kicad.org/9.0/en/eeschema/eeschema.html>
+- LibrePCB 2.1.1, source (GPL-3.0) — lu directement :
+  `libs/librepcb/editor/project/schematic/fsm/schematiceditorstate_drawwire.{h,cpp}`
+  pour les postures et la découpe de fil, et
+  `.../fsm/schematiceditorstate.cpp` (`findItemsAtPos`) pour la table de
+  priorités.
