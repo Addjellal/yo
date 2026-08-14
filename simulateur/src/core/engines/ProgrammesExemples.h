@@ -843,12 +843,26 @@ struct ProgrammeExemple {
     // l'inverse aussi.
     const char* mcu = "atmega328p";
     uint32_t horloge = 16000000;
+
     // Les fichiers annexes sans lesquels le principal ne compile pas.
+    //
+    // Le constructeur explicite n'est pas un ornement : en agrégat, chaque
+    // entrée de la liste qui ne mentionne pas `annexes` déclenche
+    // « -Wmissing-field-initializers » — quatorze avertissements par unité de
+    // compilation, dans un projet qui vient d'allumer -Wall -Wextra. Des
+    // avertissements qu'on apprend à ignorer sont pires qu'aucun
+    // avertissement : ils cachent les vrais.
     // L'analyseur est écrit en deux fichiers — c'est ce pour quoi la
     // compilation multi-fichiers existe —, et son principal ouvre par
     // « #include "analyseur.h" ». Le déclarer ici évite qu'un appelant le
     // compile seul et s'entende répondre « analyseur.h: No such file ».
     std::vector<Fichier> annexes;
+
+    ProgrammeExemple(const char* n, const char* src,
+                     const char* puce = "atmega328p",
+                     uint32_t f = 16000000,
+                     std::vector<Fichier> a = {})
+        : nom(n), source(src), mcu(puce), horloge(f), annexes(std::move(a)) {}
 };
 
 inline std::vector<ProgrammeExemple> tous_les_programmes() {

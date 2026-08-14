@@ -53,7 +53,16 @@ void TraceOscilloscope::definir_signal(int voie, const QString& designation) {
     if (voie < 0 || voie >= kVoies) return;
     if (voies_[voie].designation == designation) return;
     voies_[voie].designation = designation;
-    voies_[voie].valeurs.assign(temps_.size(), 0.0f);   // reste aligné
+    // Aligner la voie sur la base de temps, en bornant explicitement.
+    //
+    // `assign(temps_.size(), …)` seul fait avertir GCC 16 : il ne sait pas
+    // borner `size()` et suppose le pire, jusqu'à un memset de neuf
+    // trillions d'octets. C'est un faux positif — la mémoire de trace est
+    // purgée à `kMemoire` secondes — mais un avertissement qu'on apprend à
+    // ignorer est pire qu'aucun avertissement : il cache les vrais. La borne
+    // dit ce qu'on sait déjà, et le compilateur peut alors le vérifier.
+    const std::size_t points = std::min<std::size_t>(temps_.size(), kPointsMax);
+    voies_[voie].valeurs.assign(points, 0.0f);
     update();
 }
 

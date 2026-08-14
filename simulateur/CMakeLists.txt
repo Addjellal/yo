@@ -300,17 +300,47 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   # windeployqt de poser le sien.
   set(SIM_OPT_RUNTIME --compiler-runtime)
   set(SIM_DLL_RUNTIME)
+
+  # ngspice est une DLL : si on s'y lie, elle doit voyager avec l'exécutable.
+  #
+  # C'est le défaut introduit en embarquant ngspice dans le dépôt. Il est
+  # devenu le défaut sous Windows, donc `MOTEUR_NGSPICE` passe à ON tout seul
+  # et l'exécutable se lie à `ngspice.lib` — la bibliothèque d'IMPORT, qui ne
+  # contient pas le code. Au lancement, Windows cherche `ngspice.dll`, ne la
+  # trouve nulle part, et refuse d'exécuter avant même d'atteindre main().
+  # Le message ne parle pas de ngspice comme d'une option : il dit
+  # « Impossible d'exécuter le code ».
+  #
+  # Une dépendance qu'on active par défaut doit être déployée par défaut.
+  if(MOTEUR_NGSPICE)
+    find_file(NGSPICE_DLL
+              NAMES ngspice.dll libngspice-0.dll
+              HINTS ${NGSPICE_ROOT}/dll-vs ${NGSPICE_ROOT}/bin
+                    ${NGSPICE_ROOT}/lib
+              NO_DEFAULT_PATH)
+    if(NGSPICE_DLL)
+      list(APPEND SIM_DLL_RUNTIME "${NGSPICE_DLL}")
+      message(STATUS "DLL ngspice à déployer : ${NGSPICE_DLL}")
+    elseif(WIN32)
+      message(WARNING
+        "ngspice est lié mais sa DLL est introuvable : l'exécutable ne "
+        "démarrera pas. Reconfigurez avec -DMOTEUR_NGSPICE=OFF, ou indiquez "
+        "-DNGSPICE_ROOT vers une distribution complète.")
+    endif()
+  endif()
   if(WIN32 AND MINGW)
     set(SIM_OPT_RUNTIME --no-compiler-runtime)
     get_filename_component(SIM_DOSSIER_CXX "${CMAKE_CXX_COMPILER}" DIRECTORY)
     # seh sur x86_64, dw2 sur x86 ; un MinGW lié statiquement n'en a aucune,
     # et alors il n'y a rien à emporter.
+    set(SIM_TROUVE_RUNTIME OFF)
     foreach(nom libstdc++-6 libgcc_s_seh-1 libgcc_s_dw2-1 libwinpthread-1)
       if(EXISTS "${SIM_DOSSIER_CXX}/${nom}.dll")
         list(APPEND SIM_DLL_RUNTIME "${SIM_DOSSIER_CXX}/${nom}.dll")
+        set(SIM_TROUVE_RUNTIME ON)
       endif()
     endforeach()
-    if(SIM_DLL_RUNTIME)
+    if(SIM_TROUVE_RUNTIME)
       message(STATUS "Runtime du compilateur : ${SIM_DOSSIER_CXX}")
     else()
       message(STATUS "Runtime du compilateur : lié statiquement, rien à copier")

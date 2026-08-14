@@ -28,6 +28,9 @@ class TraceOscilloscope : public QWidget {
     Q_OBJECT
 
 public:
+    // Plafond du nombre de points gardés : la trace est purgée au-delà de
+    // `kMemoire` secondes, et cette borne le dit au compilateur.
+    static constexpr std::size_t kPointsMax = 4000000;
     static constexpr int kVoies = 4;
 
     explicit TraceOscilloscope(QWidget* parent = nullptr);

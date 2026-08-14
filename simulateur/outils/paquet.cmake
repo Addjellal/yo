@@ -40,7 +40,9 @@ if(WIN32)
       message(WARNING "windeployqt a échoué (code ${code})")
     endif()
   endif()
-  # Le runtime du compilateur avec lequel on a construit — pas celui de Qt.
+  # Le runtime du compilateur ET la DLL de ngspice quand il est lié : une
+  # dépendance activée par défaut doit voyager par défaut, sinon le paquet
+  # portable refuse de démarrer avec « Impossible d'exécuter le code ».
   # Voir le commentaire du CMakeLists : une DLL plus ancienne posée à côté de
   # l'exécutable l'empêche de démarrer, silencieusement.
   foreach(dll IN LISTS SIM_DLL_RUNTIME)
