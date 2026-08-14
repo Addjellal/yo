@@ -48,6 +48,19 @@ struct Anomalie {
     Gravite gravite = Gravite::Avertissement;
     std::string reference;                // composant concerné, ou nœud
     std::string message;
+
+    // Ce qu'il faut FAIRE, à l'impératif.
+    //
+    // Un diagnostic qui n'est pas actionnable ne vaut rien : les messages
+    // disaient déjà très bien le quoi et le pourquoi — « source
+    // court-circuitée : ses deux bornes sont sur le même nœud » — mais
+    // laissaient l'élève devant sa propre ignorance du remède. Rust en a fait
+    // une règle de conception, et le gain mesuré sur des débutants (Becker
+    // 2016) porte sur le nombre d'erreurs, pas seulement sur le confort.
+    //
+    // Vide quand il n'y a rien d'utile à dire : mieux vaut se taire qu'écrire
+    // une généralité.
+    std::string remede;
 };
 
 std::vector<Anomalie> controler_regles(const Netlist& netlist);

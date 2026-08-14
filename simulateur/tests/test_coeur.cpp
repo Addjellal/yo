@@ -1735,6 +1735,19 @@ static void test_documents() {
         verifier(rapport.find("[ERREUR]") != std::string::npos,
                  "ERC : le rapport est lisible tel quel");
 
+        // Toute anomalie doit dire QUOI FAIRE. Un diagnostic non actionnable
+        // ne vaut rien : les messages disaient déjà bien le quoi et le
+        // pourquoi, et laissaient l'élève devant sa propre ignorance du
+        // remède. Ce test attrape la règle qu'on ajouterait sans y penser.
+        std::string sans_remede;
+        for (const auto& anomalie : anomalies)
+            if (anomalie.remede.empty())
+                sans_remede += " « " + anomalie.message.substr(0, 40) + "… »";
+        verifier(sans_remede.empty(),
+                 "ERC : chaque anomalie dit quoi faire", sans_remede);
+        verifier(rapport.find("\u2192") != std::string::npos,
+                 "ERC : le rapport porte les remèdes, pas que les reproches");
+
         // Le court-circuit d'alimentation, dans ses deux formes vues à
         // l'usage. Aucune des deux n'était détectée : la première noyait le
         // journal sous « le point de repos n'a pas convergé » répété à chaque

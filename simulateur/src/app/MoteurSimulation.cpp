@@ -396,6 +396,13 @@ void MoteurSimulation::signaler_regles() {
                          .arg(erreur ? "ERREUR  " : "attention")
                          .arg(ou.isEmpty() ? QString() : ou + " : ")
                          .arg(QString::fromStdString(anomalie.message)));
+        // Le remède sur sa propre ligne, en retrait : c'est ce qui distingue
+        // un diagnostic d'un reproche. Sans lui, l'élève sait qu'il a tort
+        // sans savoir quoi faire — et un diagnostic non actionnable ne vaut
+        // rien.
+        if (!anomalie.remede.empty())
+            emit journal(QString("            → %1")
+                             .arg(QString::fromStdString(anomalie.remede)));
     }
 }
 

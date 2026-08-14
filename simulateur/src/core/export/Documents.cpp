@@ -170,8 +170,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
     std::vector<Anomalie> anomalies;
     using Gravite = Anomalie::Gravite;
     auto signaler = [&anomalies](Gravite gravite, const std::string& reference,
-                                 const std::string& message) {
-        anomalies.push_back({gravite, reference, message});
+                                 const std::string& message,
+                                 const std::string& remede = {}) {
+        anomalies.push_back({gravite, reference, message, remede});
     };
 
     if (netlist.instances().empty()) return anomalies;
@@ -192,19 +193,24 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
     if (!masse_presente)
         signaler(Gravite::Erreur, "",
                  "aucune masse dans le circuit : les tensions n'ont pas de "
-                 "référence");
+                 "référence",
+                 "Posez une masse (palette ▸ Alimentation ▸ Masse) et reliez-y "
+                 "le retour du montage.");
 
     for (const auto& paire : occurrences_reference)
         if (paire.second > 1)
             signaler(Gravite::Erreur, paire.first,
                      "référence utilisée " + std::to_string(paire.second)
-                         + " fois : chaque composant doit être unique");
+                         + " fois : chaque composant doit être unique",
+                     "Renommez l'un des deux dans le panneau Propriétés.");
 
     for (const auto& instance : netlist.instances()) {
         const Modele* modele = modele_de(instance);
         if (!modele) {
             signaler(Gravite::Erreur, instance.reference,
-                     "type inconnu du catalogue : « " + instance.type + " »");
+                     "type inconnu du catalogue : « " + instance.type + " »",
+                     "Ce projet vient sans doute d'une version plus récente. "
+                     "Effacez ce composant et reposez-en un équivalent.");
             continue;
         }
         if (est_symbole_alimentation(modele)) continue;
@@ -224,7 +230,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
                 if (!borne || borne->noeud.empty())
                     signaler(gravite, instance.reference,
                              "borne « " + borne_symbole.nom
-                                 + " » non connectée");
+                                 + " » non connectée",
+                             "Tirez un fil depuis cette borne : cliquez "
+                             "dessus, puis cliquez la borne d'arrivée.");
             }
         }
 
@@ -235,7 +243,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
             if (!a.empty() && a == b)
                 signaler(Gravite::Erreur, instance.reference,
                          "source court-circuitée : ses deux bornes sont sur le "
-                         "même nœud");
+                         "même nœud",
+                         "Débranchez l'une des deux bornes, ou intercalez un "
+                         "composant entre elles.");
             for (const auto& autre : netlist.instances()) {
                 if (&autre == &instance) continue;
                 if (autre.reference <= instance.reference) continue;
@@ -249,14 +259,17 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
                     signaler(Gravite::Erreur, instance.reference,
                              "en parallèle avec " + autre.reference
                                  + " : deux sources ne peuvent pas imposer la "
-                                   "même tension");
+                                   "même tension",
+                             "Gardez-en une seule, ou séparez-les par une "
+                             "résistance.");
             }
         }
 
         // Résistance nulle : c'est un fil, presque toujours involontaire
         if (instance.type == "resistance" && instance.valeur("ohms", 220) <= 0)
             signaler(Gravite::Avertissement, instance.reference,
-                     "valeur nulle : la résistance se comporte en fil");
+                     "valeur nulle : la résistance se comporte en fil",
+                     "Donnez-lui une valeur dans le panneau Propriétés.");
 
         // Composant lumineux sans résistance de limitation, faute classique
         if (modele->lumineux) {
@@ -270,7 +283,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
             if (!limite)
                 signaler(Gravite::Avertissement, instance.reference,
                          "aucune résistance série : le courant n'est pas "
-                         "limité");
+                         "limité",
+                         "Intercalez une résistance : 220 Ω pour une LED sous "
+                         "5 V, 100 Ω sous 3,3 V.");
         }
 
         // Broche de microcontrôleur reliée à une alimentation
@@ -282,7 +297,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
                     signaler(Gravite::Erreur, instance.reference,
                              "broche « " + borne.nom
                                  + " » reliée directement à « " + borne.noeud
-                                 + " » : la sortie serait détruite");
+                                 + " » : la sortie serait détruite",
+                             "Retirez ce fil. Pour piloter une charge, passez "
+                             "par une résistance ou un transistor.");
             }
         }
     }
@@ -335,7 +352,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
             signaler(Gravite::Erreur, porteurs,
                      lesquelles + " arrivent sur le même nœud : deux "
                      "potentiels imposés pour un seul nœud, c'est un "
-                     "court-circuit d'alimentation");
+                     "court-circuit d'alimentation",
+                     "Séparez ces deux points : ils ne doivent pas partager "
+                     "de fil.");
         }
     }
 
@@ -344,7 +363,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
         if (est_alimentation(paire.first)) continue;
         if (netlist.occurrences(paire.first) > 1) continue;
         signaler(Gravite::Avertissement, paire.first,
-                 "ce nœud ne relie qu'une seule borne");
+                 "ce nœud ne relie qu'une seule borne",
+                 "Reliez-le à un autre composant, ou effacez le fil qui ne "
+                 "mène nulle part.");
     }
 
     std::stable_sort(anomalies.begin(), anomalies.end(),
@@ -386,6 +407,10 @@ std::string rapport_regles(const Netlist& netlist) {
         }
         if (!anomalie.reference.empty()) flux << anomalie.reference << " : ";
         flux << anomalie.message << "\n";
+        // Le rapport sert de compte rendu de TP : sans le remède, l'élève
+        // rapporte une liste de reproches au lieu d'une liste de corrections.
+        if (!anomalie.remede.empty())
+            flux << "                \u2192 " << anomalie.remede << "\n";
     }
     return flux.str();
 }
