@@ -23,6 +23,25 @@ ItemFil::ItemFil(ItemComposant* depart, int borne_depart,
 QPainterPath ItemFil::chemin(const QPointF& a, const QPointF& b) {
     QPainterPath trace;
     trace.moveTo(a);
+
+    // Deux bornes presque alignées donnent un fil DROIT.
+    //
+    // Sans cette tolérance, trois pixels d'écart vertical entre une broche et
+    // la suivante suffisent à produire une équerre en trois segments : un
+    // petit décrochement inutile, au milieu du fil, qui salit le schéma et
+    // qu'aucun électronicien ne dessinerait à la main. Simulink fait de même —
+    // en deçà d'un seuil, la liaison reste une ligne.
+    //
+    // Le seuil vaut une demi-maille : à l'intérieur d'un demi-pas de grille,
+    // deux points sont « en face », et le léger biais du trait est invisible.
+    constexpr double kTolerance = 5.0;
+    const double dx = std::fabs(b.x() - a.x());
+    const double dy = std::fabs(b.y() - a.y());
+    if (dy <= kTolerance || dx <= kTolerance) {
+        trace.lineTo(b);
+        return trace;
+    }
+
     // Équerre en trois segments : on part horizontalement, on descend au
     // milieu, on repart horizontalement.
     const double milieu = (a.x() + b.x()) / 2.0;

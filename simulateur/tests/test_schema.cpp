@@ -1470,6 +1470,34 @@ static void test_pense_bete_engendre() {
 // C'est le geste de Simulink et celui de Proteus — « if you want a wire in a
 // particular place, you can simply click at the intermediate corners ». Le
 // clic dans le vide abandonnait le tracé au lieu de le coude.
+// Deux bornes presque alignées donnent un fil droit.
+//
+// Sans tolérance, trois pixels d'écart vertical suffisaient à produire une
+// équerre en trois segments : un décrochement inutile au milieu du fil, qui
+// salit le schéma et qu'aucun électronicien ne dessinerait à la main.
+static void test_tolerance_alignement() {
+    std::printf("\n-- tolérance avant qu'un fil monte --\n");
+
+    // Un chemin droit n'a qu'un seul segment : deux points dans le tracé.
+    const QPainterPath droit =
+        ItemFil::chemin(QPointF(0, 0), QPointF(200, 3));
+    verifier(droit.elementCount() == 2,
+             "trois pixels d'écart : le fil reste droit",
+             std::to_string(droit.elementCount()) + " points");
+
+    const QPainterPath coude =
+        ItemFil::chemin(QPointF(0, 0), QPointF(200, 60));
+    verifier(coude.elementCount() == 4,
+             "soixante pixels d'écart : le fil prend son équerre",
+             std::to_string(coude.elementCount()) + " points");
+
+    // Le cas vertical obéit à la même règle.
+    const QPainterPath vertical =
+        ItemFil::chemin(QPointF(0, 0), QPointF(4, 200));
+    verifier(vertical.elementCount() == 2,
+             "et deux bornes l'une au-dessus de l'autre restent droites");
+}
+
 static void test_points_de_passage() {
     std::printf("\n-- poser un point de passage --\n");
 
@@ -2740,6 +2768,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_tolerance_alignement();
     test_points_de_passage();
     test_capture_suit_le_zoom();
     test_scope_suit_son_cablage();

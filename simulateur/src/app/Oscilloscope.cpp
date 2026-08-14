@@ -53,16 +53,19 @@ void TraceOscilloscope::definir_signal(int voie, const QString& designation) {
     if (voie < 0 || voie >= kVoies) return;
     if (voies_[voie].designation == designation) return;
     voies_[voie].designation = designation;
-    // Aligner la voie sur la base de temps, en bornant explicitement.
+    // Un deque neuf, plutôt qu'un `assign` sur l'ancien.
     //
-    // `assign(temps_.size(), …)` seul fait avertir GCC 16 : il ne sait pas
-    // borner `size()` et suppose le pire, jusqu'à un memset de neuf
-    // trillions d'octets. C'est un faux positif — la mémoire de trace est
-    // purgée à `kMemoire` secondes — mais un avertissement qu'on apprend à
-    // ignorer est pire qu'aucun avertissement : il cache les vrais. La borne
-    // dit ce qu'on sait déjà, et le compilateur peut alors le vérifier.
-    const std::size_t points = std::min<std::size_t>(temps_.size(), kPointsMax);
-    voies_[voie].valeurs.assign(points, 0.0f);
+    // `deque::assign(n, …)` choisit entre effacer et insérer selon `n` et la
+    // taille courante ; sur la branche d'insertion GCC calcule `n - size()`
+    // sans pouvoir prouver que `n >= size()`, la soustraction non signée
+    // déborde, et il annonce un memset de dix-huit trillions d'octets.
+    // Borner `n` ne sert donc à rien — j'avais essayé — puisque c'est la
+    // SOUSTRACTION qui déborde, pas `n`.
+    //
+    // Construire puis échanger supprime la branche : il n'y a plus de taille
+    // précédente à comparer. C'est aussi plus clair — on veut un tampon neuf,
+    // pas une modification de l'ancien.
+    std::deque<float>(temps_.size(), 0.0f).swap(voies_[voie].valeurs);
     update();
 }
 
