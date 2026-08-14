@@ -860,6 +860,10 @@ void Oscilloscope::sonder(const QString& designation) {
     if (rang >= 0) selecteurs_[cible]->setCurrentIndex(rang);
 }
 
+QString Oscilloscope::signal_de_voie(int voie) const {
+    return trace_ ? trace_->signal_voie(voie) : QString();
+}
+
 bool Oscilloscope::aucune_voie_active() const {
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v)
         if (trace_->voie_active(v)) return false;

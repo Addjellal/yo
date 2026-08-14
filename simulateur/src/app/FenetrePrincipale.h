@@ -12,6 +12,7 @@
 
 #include <QPoint>
 #include <QString>
+#include <QStringList>
 
 #include <map>
 #include <vector>
@@ -158,6 +159,13 @@ public:
 
     // Fenêtre de mesure d'un instrument (voltmètre, ampèremètre, sonde).
     void ouvrir_fenetre_instrument(ItemComposant* composant);
+    // Fenêtre propre d'un scope posé sur le schéma, façon Simulink : ses voies
+    // suivent ce qui lui est câblé.
+    void ouvrir_scope(ItemComposant* composant);
+    // Le scope ouvert pour ce composant, ou nullptr. Sert aux essais.
+    Oscilloscope* scope_de(ItemComposant* composant) const;
+    // Recalcule netlist et liste de signaux, sans passer par un geste.
+    void circuit_modifie_pour_essai() { circuit_modifie(); }
     // Amène le programme de cette carte sous les yeux : onglet « Programme »,
     // carte sélectionnée, curseur dans l'éditeur.
     void ouvrir_programme(ItemComposant* carte);
@@ -221,6 +229,12 @@ private:
     std::map<QString, QTextDocument*> documents_;
     std::map<QString, int> curseurs_;
     Oscilloscope* oscilloscope_ = nullptr;
+    // Un oscilloscope par bloc « scope » posé sur le schéma, dans sa fenêtre.
+    std::map<ItemComposant*, Oscilloscope*> scopes_;
+    // Dernière liste de signaux proposée : les scopes ouverts après coup
+    // doivent la recevoir aussi.
+    QStringList derniers_signaux_;
+    std::map<QString, QString> derniers_libelles_;
     PanneauAnalyses* analyses_ = nullptr;
     PanneauPcb* pcb_ = nullptr;
     // Dernière trame calculée : c'est sur elle que porte le spectre et les

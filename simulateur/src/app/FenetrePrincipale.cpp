@@ -177,6 +177,9 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
                 oscilloscope_->ajouter_trame(formes, instant);
+                // Chaque scope posé sur le schéma reçoit la même trame.
+                for (auto& paire : scopes_)
+                    paire.second->ajouter_trame(formes, instant);
                 dernieres_formes_ = formes;
             });
     connect(moteur_, &MoteurSimulation::avancement, this,
@@ -1214,6 +1217,44 @@ void FenetrePrincipale::ouvrir_programme(ItemComposant* carte) {
     ecrire("Programme de " + reference + " : à vous.");
 }
 
+// Ouvre — ou ramène devant — la fenêtre du scope désigné.
+//
+// Les deux voies sont liées aux nœuds de ses bornes, pas choisies dans une
+// liste : c'est tout l'intérêt du modèle Simulink. Ce qu'on a câblé est ce
+// qu'on voit, et le schéma dit lui-même ce qui est observé.
+Oscilloscope* FenetrePrincipale::scope_de(ItemComposant* composant) const {
+    auto it = scopes_.find(composant);
+    return it == scopes_.end() ? nullptr : it->second;
+}
+
+void FenetrePrincipale::ouvrir_scope(ItemComposant* composant) {
+    auto place = scopes_.find(composant);
+    Oscilloscope* scope = place == scopes_.end() ? nullptr : place->second;
+    if (!scope) {
+        scope = new Oscilloscope;
+        // Une fenêtre à part entière, pas un panneau : on en ouvre plusieurs,
+        // et on les pose côte à côte pour comparer deux endroits du montage.
+        scope->setWindowFlags(Qt::Window);
+        scope->setAttribute(Qt::WA_DeleteOnClose, false);
+        scopes_[composant] = scope;
+        connect(scope, &Oscilloscope::resolution_souhaitee, this,
+                [this](double secondes) { moteur_->definir_resolution(secondes); });
+    }
+    scope->setWindowTitle(composant->reference() + " — oscilloscope");
+
+    // (Re)lier les voies : le câblage a pu changer depuis la dernière fois.
+    scope->proposer_signaux(derniers_signaux_, derniers_libelles_);
+    for (int voie = 0; voie < 2; ++voie) {
+        const QString noeud = scene_->noeud_de(composant, voie);
+        if (!noeud.isEmpty()) scope->sonder(noeud);
+    }
+
+    scope->resize(760, 520);
+    scope->show();
+    scope->raise();
+    scope->activateWindow();
+}
+
 void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
     if (!composant || !composant->modele()) return;
     // Une carte programmable, c'est d'abord un programme : double-cliquer
@@ -1227,6 +1268,11 @@ void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
     if (!composant->modele()->mesure_instrument) {
         // Pas un instrument : le double-clic sert alors à régler le composant.
         afficher_proprietes(composant);
+        return;
+    }
+    // Un scope a sa propre fenêtre, et elle montre CE QUI LUI EST CÂBLÉ.
+    if (composant->modele()->type == "scope") {
+        ouvrir_scope(composant);
         return;
     }
 
@@ -1440,7 +1486,13 @@ void FenetrePrincipale::circuit_modifie() {
     libelles["5V"] = "alimentation 5 V";
     libelles["3V3"] = "alimentation 3,3 V";
 
+    // Les scopes posés sur le schéma reçoivent la même liste : c'est elle qui
+    // leur permet de nommer les nœuds auxquels ils sont câblés.
+    derniers_signaux_ = signaux;
+    derniers_libelles_ = libelles;
     if (oscilloscope_) oscilloscope_->proposer_signaux(signaux, libelles);
+    for (auto& paire : scopes_)
+        paire.second->proposer_signaux(signaux, libelles);
 
     // Grandeurs balayables : les sources imposent une tension, les résistances
     // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
@@ -2116,6 +2168,7 @@ void FenetrePrincipale::arreter() {
     moteur_->arreter();
     scene_->effacer_resultats();
     if (oscilloscope_) oscilloscope_->vider();
+    for (auto& paire : scopes_) paire.second->vider();
 }
 
 void FenetrePrincipale::analyser_point_repos() {

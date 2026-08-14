@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QMenuBar>
 #include <QToolBar>
+#include "app/Oscilloscope.h"
 #include <QMenu>
 #include <functional>
 #include <QPainter>
@@ -1451,6 +1452,64 @@ static void test_pense_bete_engendre() {
 // voir la carte rester inerte ; ne pas savoir si le programme est faux ou
 // simplement pas chargé ; et changer d'exemple pendant que ça tourne, ce qui
 // laissait la simulation en marche sur un schéma qui n'existait plus.
+// Un scope posé sur le schéma montre CE QU'ON LUI A CÂBLÉ.
+//
+// C'est le modèle de Simulink, et c'est ce qui le distingue de
+// l'oscilloscope global déjà présent : on ne choisit pas les signaux dans une
+// liste, on les branche. Le schéma documente alors lui-même ce qu'on observe,
+// et deux scopes montrent deux endroits éloignés dans deux fenêtres.
+static void test_scope_suit_son_cablage() {
+    std::printf("\n-- un scope montre ce qu'on lui câble --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+
+    ItemComposant* pile = scene->ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene->ajouter_composant("resistance", QPointF(200, 0));
+    ItemComposant* r2 = scene->ajouter_composant("resistance", QPointF(400, 0));
+    ItemComposant* masse = scene->ajouter_composant("masse", QPointF(600, 0));
+    ItemComposant* scope = scene->ajouter_composant("scope", QPointF(300, 250));
+    verifier(scope != nullptr, "le bloc « scope » est au catalogue");
+    if (!scope) return;
+
+    scene->addItem(new ItemFil(pile, 0, r1, 0));
+    scene->addItem(new ItemFil(r1, 1, r2, 0));
+    scene->addItem(new ItemFil(r2, 1, masse, 0));
+    scene->addItem(new ItemFil(pile, 1, masse, 0));
+    // Voie 1 sur le haut du pont, voie 2 sur le milieu.
+    scene->addItem(new ItemFil(scope, 0, r1, 0));
+    scene->addItem(new ItemFil(scope, 1, r1, 1));
+
+    const QString haut = scene->noeud_de(r1, 0);
+    const QString milieu = scene->noeud_de(r1, 1);
+    verifier(haut != milieu && !haut.isEmpty(),
+             "les deux points observés sont bien deux nœuds distincts",
+             haut.toStdString() + " / " + milieu.toStdString());
+
+    fenetre.circuit_modifie_pour_essai();
+    fenetre.ouvrir_scope(scope);
+    Oscilloscope* vue = fenetre.scope_de(scope);
+    verifier(vue != nullptr, "le double-clic ouvre une fenêtre pour CE scope");
+    if (!vue) return;
+
+    verifier(vue->signal_de_voie(0) == haut,
+             "la voie 1 suit ce qui est câblé sur la borne A",
+             vue->signal_de_voie(0).toStdString() + " attendu " + haut.toStdString());
+    verifier(vue->signal_de_voie(1) == milieu,
+             "la voie 2 suit ce qui est câblé sur la borne B",
+             vue->signal_de_voie(1).toStdString() + " attendu " + milieu.toStdString());
+
+    // Deux scopes = deux fenêtres indépendantes : c'est ce que l'oscilloscope
+    // global ne sait pas faire.
+    ItemComposant* second = scene->ajouter_composant("scope", QPointF(300, 400));
+    fenetre.ouvrir_scope(second);
+    verifier(fenetre.scope_de(second) != nullptr
+                 && fenetre.scope_de(second) != vue,
+             "un second scope a sa propre fenêtre");
+}
+
 static void test_lancer_compile_et_refuse() {
     std::printf("\n-- « Lancer » compile, et refuse un programme faux --\n");
 
@@ -2589,6 +2648,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_scope_suit_son_cablage();
     test_lancer_compile_et_refuse();
     test_horloge_sans_carte();
     test_amorcer_fil_sans_mode();

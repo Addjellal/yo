@@ -217,6 +217,49 @@ void enregistrer_instruments(Catalogue& catalogue) {
         };
         enregistrer(std::move(m));
     }
+    {   // --------------------------------------------------------- oscilloscope
+        // Le scope est un COMPOSANT DU SCHÉMA, pas un appareil posé à côté.
+        //
+        // C'est le modèle de Simulink : le Scope est un bloc, on lui câble ce
+        // qu'on veut voir, et un double-clic ouvre SA fenêtre. Ce qui est
+        // câblé est ce qui s'affiche — il n'y a rien à choisir dans une liste
+        // de signaux, et le schéma documente lui-même ce qu'on observe.
+        //
+        // L'autre modèle — un oscilloscope unique sur le côté, dont on
+        // promène les sondes — est celui de la paillasse, et l'application
+        // l'a déjà. Il ne se remplace pas : il ne sait pas montrer deux
+        // endroits éloignés dans deux fenêtres, et c'est précisément ce que
+        // demande la comparaison entrée/sortie d'un filtre.
+        //
+        // Deux voies, comme un oscilloscope d'atelier et comme le Scope de
+        // Simulink dans son usage courant. Chaque voie se mesure par rapport à
+        // la masse : c'est ce que fait une sonde ordinaire, et la mesure
+        // différentielle demanderait un appareil que l'on n'a pas.
+        Modele m;
+        m.type = "scope";
+        m.libelle = "Oscilloscope (bloc)";
+        m.categorie = "Instruments";
+        m.prefixe = "SCP";
+        m.bornes = {{"A", {-40, -12}, "voie 1"}, {"B", {-40, 12}, "voie 2"}};
+        m.symbole = {
+            rect(-30, -26, 30, 26),
+            ligne(-40, -12, -30, -12), ligne(-40, 12, -30, 12),
+            // Une sinusoïde stylisée dans l'écran : on reconnaît l'appareil
+            // avant d'avoir lu son étiquette.
+            ligne(-22, 0, -16, -12), ligne(-16, -12, -10, 0),
+            ligne(-10, 0, -4, 12), ligne(-4, 12, 2, 0),
+            ligne(2, 0, 8, -12), ligne(8, -12, 14, 0),
+            ligne(14, 0, 20, 12), ligne(20, 12, 24, 6)};
+        m.empreinte = {"", {}, 0, 0};
+        // Il faut une lecture pour que le double-clic ouvre l'appareil plutôt
+        // que le panneau de propriétés ; l'étiquette dit ce qu'il montre.
+        m.mesure_instrument = [](const Instance&, const Modele::Lecture& l) {
+            const double a = l.tension ? l.tension("A") : 0.0;
+            const double b = l.tension ? l.tension("B") : 0.0;
+            return format_mesure(a, "V") + " / " + format_mesure(b, "V");
+        };
+        enregistrer(std::move(m));
+    }
 }
 
 }  // namespace coeur

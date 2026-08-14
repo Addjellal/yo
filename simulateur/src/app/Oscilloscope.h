@@ -185,6 +185,9 @@ public:
     // fier à l'œil qu'un signal en suit un autre.
     QString rapport() const;
     bool aucune_voie_active() const;
+    // Le signal affecté à une voie. Sert à vérifier qu'un scope posé sur le
+    // schéma suit bien ce qui lui est câblé.
+    QString signal_de_voie(int voie) const;
 
 signals:
     // La base de temps a changé : le moteur peut avoir besoin d'affiner son
