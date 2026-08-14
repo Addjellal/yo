@@ -41,7 +41,18 @@ endif()
 # sur Windows il n'y a donc rien à faire. Seuls trois fichiers y sont — l'
 # en-tête, la DLL et la bibliothèque d'import — et non la distribution
 # entière, qui pèse dix fois plus.
-set(NGSPICE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/tiers/ngspice" CACHE PATH
+#
+# La copie embarquée est celle de Windows — une DLL et sa bibliothèque
+# d'import PE. Ailleurs elle n'est bonne à rien, et pire : l'éditeur de liens
+# de GNU l'accepte à l'entrée puis échoue sur « dangerous relocation:
+# R_AMD64_IMAGEBASE ». Sur les autres systèmes, ngspice s'installe par le
+# gestionnaire de paquets et se trouve tout seul ; le défaut y reste vide.
+if(WIN32)
+  set(NGSPICE_DEFAUT "${CMAKE_CURRENT_SOURCE_DIR}/tiers/ngspice")
+else()
+  set(NGSPICE_DEFAUT "")
+endif()
+set(NGSPICE_ROOT "${NGSPICE_DEFAUT}" CACHE PATH
     "Dossier de ngspice décompressé (celui qui contient include/ et dll-vs/)")
 find_path(NGSPICE_INCLUDE_DIR ngspice/sharedspice.h
           HINTS ${NGSPICE_ROOT} ${NGSPICE_ROOT}/include)

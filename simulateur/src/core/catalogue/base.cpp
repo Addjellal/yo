@@ -22,7 +22,13 @@ void enregistrer_base(Catalogue& catalogue) {
         m.categorie = "Passifs";
         m.prefixe = "R";
         m.bornes = {{"1", {-30, 0}, ""}, {"2", {30, 0}, ""}};
-        m.proprietes = {{"ohms", "Valeur", G::Nombre, 220, 0, 0, "", {}, "Ω"}};
+        m.proprietes = {{"ohms", "Valeur", G::Nombre, 220, 0, 0, "", {}, "Ω"},
+                        {"watts", "Puissance admissible", G::Nombre, 0.25, 0, 0,
+                         "", {}, "W"}};
+        // La traversante ordinaire du tiroir : un quart de watt. C'est la
+        // limite que l'on dépasse sans s'en apercevoir en mettant 12 V aux
+        // bornes d'un 220 Ω — 0,65 W, elle brunit puis se coupe.
+        m.puissance_max = 0.25;
         m.symbole = {ligne(-30, 0, -18, 0), rect(-18, -7, 18, 7),
                      ligne(18, 0, 30, 0)};
         m.empreinte = {"R_AXIAL_0207",
@@ -42,7 +48,13 @@ void enregistrer_base(Catalogue& catalogue) {
         m.categorie = "Passifs";
         m.prefixe = "C";
         m.bornes = {{"1", {-25, 0}, ""}, {"2", {25, 0}, ""}};
-        m.proprietes = {{"farads", "Capacité", G::Nombre, 1e-7, 0, 0, "", {}, "F"}};
+        m.proprietes = {{"farads", "Capacité", G::Nombre, 1e-7, 0, 0, "", {}, "F"},
+                        {"volts_max", "Tension de service", G::Nombre, 50, 0, 0,
+                         "", {}, "V"}};
+        // 50 V : la tenue d'un céramique ou d'un film courant. Un
+        // électrolytique de 16 V se déclare par la propriété — et c'est lui
+        // qui explose pour de bon quand on l'oublie.
+        m.tension_max = 50;
         m.symbole = {ligne(-25, 0, -4, 0), ligne(-4, -12, -4, 12),
                      ligne(4, -12, 4, 12), ligne(4, 0, 25, 0)};
         m.empreinte = {"C_DISC_5MM",

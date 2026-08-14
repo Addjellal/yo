@@ -133,6 +133,10 @@ FenetrePrincipale::FenetrePrincipale() {
             &FenetrePrincipale::ecrire);
     connect(moteur_, &MoteurSimulation::etat_change, this,
             [this](MoteurSimulation::Etat) { refleter_etat(); });
+    connect(moteur_, &MoteurSimulation::composant_grille, this,
+            [this](const QString& reference) {
+                scene_->marquer_grille(reference);
+            });
     connect(moteur_, &MoteurSimulation::resultats, this,
             [this](const std::map<std::string, double>& courants,
                    const std::map<std::string, double>& tensions) {

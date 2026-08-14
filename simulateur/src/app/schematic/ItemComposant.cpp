@@ -167,6 +167,12 @@ void ItemComposant::definir_eclat(double eclat) {
     update();
 }
 
+void ItemComposant::definir_grille(bool grille) {
+    if (grille_ == grille) return;
+    grille_ = grille;
+    update();
+}
+
 void ItemComposant::definir_mesure(const QString& mesure) {
     if (mesure_ == mesure) return;
     mesure_ = mesure;
@@ -211,7 +217,7 @@ void ItemComposant::paint(QPainter* peintre,
     crayon.setCapStyle(Qt::RoundCap);
 
     // Halo lumineux : rendu du courant réellement calculé par ngspice.
-    if (modele_->lumineux && eclat_ > 0.02) {
+    if (modele_->lumineux && eclat_ > 0.02 && !grille_) {
         auto it = textes.find("couleur");
         const QColor lumiere =
             couleur_lumiere(it == textes.end() ? "rouge" : it->second);
@@ -224,12 +230,15 @@ void ItemComposant::paint(QPainter* peintre,
         }
     }
 
-    const QColor corps = couleur_de(modele_->couleur_corps, QColor(200, 200, 200));
+    QColor corps = couleur_de(modele_->couleur_corps, QColor(200, 200, 200));
+    // Grillé : le corps prend la couleur du composant brûlé, et n'obéit plus
+    // au courant — il ne s'allumera plus.
+    if (grille_) corps = QColor(58, 44, 40);
 
     for (const auto& trait : modele_->symbole) {
         peintre->setPen(crayon);
         QColor remplissage = corps;
-        if (modele_->lumineux) {
+        if (modele_->lumineux && !grille_) {
             // le corps s'éclaire proportionnellement au courant
             auto it = textes.find("couleur");
             const QColor lumiere =
@@ -279,6 +288,18 @@ void ItemComposant::paint(QPainter* peintre,
                 break;
             }
         }
+    }
+
+    // Grillé : une croix par-dessus le symbole. Elle se lit d'un coup d'œil,
+    // à n'importe quel niveau de zoom, et sur n'importe quel composant — c'est
+    // ce qu'on veut d'un montage qui a fumé.
+    if (grille_) {
+        const QRectF croix = cadre_.adjusted(4, 4, -4, -4);
+        peintre->setBrush(Qt::NoBrush);
+        peintre->setPen(QPen(QColor(190, 30, 25), 2.6, Qt::SolidLine,
+                             Qt::RoundCap));
+        peintre->drawLine(croix.topLeft(), croix.bottomRight());
+        peintre->drawLine(croix.topRight(), croix.bottomLeft());
     }
 
     // Bornes : un petit disque, repère visuel pour tirer un fil.

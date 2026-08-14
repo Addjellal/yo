@@ -843,6 +843,12 @@ struct ProgrammeExemple {
     // l'inverse aussi.
     const char* mcu = "atmega328p";
     uint32_t horloge = 16000000;
+    // Les fichiers annexes sans lesquels le principal ne compile pas.
+    // L'analyseur est écrit en deux fichiers — c'est ce pour quoi la
+    // compilation multi-fichiers existe —, et son principal ouvre par
+    // « #include "analyseur.h" ». Le déclarer ici évite qu'un appelant le
+    // compile seul et s'entende répondre « analyseur.h: No such file ».
+    std::vector<Fichier> annexes;
 };
 
 inline std::vector<ProgrammeExemple> tous_les_programmes() {
@@ -856,7 +862,8 @@ inline std::vector<ProgrammeExemple> tous_les_programmes() {
         {"kProgrammeRecepteur", kProgrammeRecepteur},
         {"kProgrammeServo", kProgrammeServo},
         {"kProgrammeMoteur", kProgrammeMoteur},
-        {"kAnalyseurArduino", kAnalyseurArduino},
+        {"kAnalyseurArduino", kAnalyseurArduino, "atmega328p",
+         16000000, {{"analyseur.h", kAnalyseurCommun}}},
         {"kProgrammeRegistre", kProgrammeRegistre},
         {"kProgrammeRegistresNu", kProgrammeRegistresNu},
         {"kProgrammeAttiny", kProgrammeAttiny, "attiny85", 8000000},

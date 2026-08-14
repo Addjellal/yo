@@ -183,6 +183,25 @@ struct Modele {
     double courant_nominal = 0.02;      // courant qui donne l'éclat maximal
     std::string couleur_corps = "#c8c8c8";
 
+    // --- limites absolues -----------------------------------------------
+    //
+    // Au-delà, le composant réel ne se comporte plus comme le modèle le
+    // décrit : il chauffe, puis il lâche. Le simulateur, lui, continue
+    // imperturbablement à résoudre — une résistance d'un quart de watt qui
+    // dissipe trois watts donne un résultat parfaitement convergé, et
+    // parfaitement faux dans la réalité. Ces trois nombres sont là pour le
+    // dire.
+    //
+    // Zéro signifie « pas de limite modélisée » : on ne prétend pas connaître
+    // ce qu'on ne connaît pas. Les valeurs retenues sont celles du composant
+    // ordinaire du tiroir — une résistance traversante d'un quart de watt,
+    // une LED 5 mm, une 1N4148 —, pas celles d'une référence précise ; les
+    // propriétés « watts », « ampères_max » et « volts_max » de l'instance
+    // les remplacent quand on sait ce qu'on a en main.
+    double puissance_max = 0;           // W dissipés
+    double courant_max = 0;             // A traversants
+    double tension_max = 0;             // V à ses bornes
+
     // Carte programmable : ses bornes ne sont pas des composants SPICE, ce
     // sont les broches du microcontrôleur pilotées par le firmware.
     bool carte = false;

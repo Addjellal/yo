@@ -358,6 +358,9 @@ void MoteurSimulation::remettre_a_zero() {
         paire.second->commutations.clear();
     }
     instant_trame_ = 0.0;
+    // Un composant grillé le reste tant que la simulation tourne, mais un
+    // arrêt remet le montage à neuf : on repart d'un tiroir plein.
+    grilles_.clear();
     etat_.clear();
     analogique_.oublier_etat();
 }
@@ -684,7 +687,111 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
         cible->mcu->definir_niveau_externe(liaison.numero, derniere > 2.5);
     }
 
+    surveiller_contraintes(formes);
     emit resultats(courants, tensions);
+}
+
+// Ce qui aurait grillé.
+//
+// Le solveur ne connaît que des équations : une résistance d'un quart de watt
+// qui en dissipe trois donne un résultat parfaitement convergé, et le montage
+// a l'air de marcher. Sur la paillasse il fume. Cette fonction relit les
+// formes d'onde de la fenêtre qui vient d'être calculée et compare, pour
+// chaque composant, ce qu'il a encaissé à ce qu'il supporte.
+//
+// On prend la **crête**, pas la moyenne : c'est une crête de courant qui ouvre
+// une piste de LED, et un composant ne se répare pas ensuite. Une fois marqué,
+// il le reste jusqu'à l'arrêt de la simulation — c'est le comportement du
+// vrai : on ne dégrille pas.
+void MoteurSimulation::surveiller_contraintes(const coeur::Formes& formes) {
+    auto crete = [](const std::vector<double>& courbe) {
+        double maxi = 0;
+        for (double valeur : courbe) maxi = std::max(maxi, std::fabs(valeur));
+        return maxi;
+    };
+    auto en_minuscules = [](std::string texte) {
+        std::transform(texte.begin(), texte.end(), texte.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        return texte;
+    };
+
+    for (const coeur::Instance& instance : netlist_.instances()) {
+        const QString reference = QString::fromStdString(instance.reference);
+        if (grilles_.contains(reference)) continue;   // déjà signalé
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        if (!modele) continue;
+        if (modele->puissance_max <= 0 && modele->courant_max <= 0
+            && modele->tension_max <= 0)
+            continue;
+
+        auto trace = formes.courants.find(en_minuscules(instance.reference));
+        const std::vector<double>* courant =
+            trace == formes.courants.end() ? nullptr : &trace->second;
+
+        // La tension aux bornes, instant par instant : la différence des deux
+        // premiers nœuds du composant. Un composant à trois bornes — un
+        // transistor — se juge entre la première et la dernière, ce qui est
+        // collecteur-émetteur dans l'ordre où le catalogue les déclare.
+        std::vector<double> aux_bornes;
+        if (instance.bornes.size() >= 2) {
+            const auto a = formes.tensions.find(
+                en_minuscules(instance.bornes.front().noeud));
+            const auto b = formes.tensions.find(
+                en_minuscules(instance.bornes.back().noeud));
+            const bool a_ok = a != formes.tensions.end();
+            const bool b_ok = b != formes.tensions.end();
+            const size_t n = a_ok ? a->second.size()
+                                  : (b_ok ? b->second.size() : 0);
+            for (size_t k = 0; k < n; ++k) {
+                // Un nœud absent des relevés est la masse : zéro volt.
+                const double va = a_ok && k < a->second.size() ? a->second[k] : 0;
+                const double vb = b_ok && k < b->second.size() ? b->second[k] : 0;
+                aux_bornes.push_back(va - vb);
+            }
+        }
+
+        QString faute;
+        const double i_max = instance.valeur("amperes_max", modele->courant_max);
+        if (courant && i_max > 0) {
+            const double mesure = crete(*courant);
+            if (mesure > i_max)
+                faute = QString("%1 mA de crête pour %2 mA admissibles")
+                            .arg(mesure * 1000, 0, 'f', 1)
+                            .arg(i_max * 1000, 0, 'f', 0);
+        }
+        const double v_max = instance.valeur("volts_max", modele->tension_max);
+        if (faute.isEmpty() && !aux_bornes.empty() && v_max > 0) {
+            const double mesure = crete(aux_bornes);
+            if (mesure > v_max)
+                faute = QString("%1 V de crête à ses bornes pour %2 V de "
+                                "service")
+                            .arg(mesure, 0, 'f', 1)
+                            .arg(v_max, 0, 'f', 0);
+        }
+        const double p_max = instance.valeur("watts", modele->puissance_max);
+        if (faute.isEmpty() && courant && !aux_bornes.empty() && p_max > 0) {
+            // La puissance se calcule instant par instant, pas en multipliant
+            // deux crêtes : sur un régime alternatif elles ne tombent pas au
+            // même moment, et le produit des maximums surestime largement.
+            double maxi = 0;
+            const size_t n = std::min(courant->size(), aux_bornes.size());
+            for (size_t k = 0; k < n; ++k)
+                maxi = std::max(maxi, std::fabs((*courant)[k] * aux_bornes[k]));
+            if (maxi > p_max)
+                faute = QString("%1 W dissipés pour %2 W admissibles")
+                            .arg(maxi, 0, 'f', 2)
+                            .arg(p_max, 0, 'f', 2);
+        }
+
+        if (faute.isEmpty()) continue;
+        grilles_.insert(reference);
+        emit journal(QString("GRILLÉ  %1 (%2) : %3.")
+                         .arg(reference)
+                         .arg(QString::fromStdString(modele->libelle))
+                         .arg(faute));
+        emit composant_grille(reference);
+    }
 }
 
 // Donne à chaque composant à état les formes d'onde de ses propres bornes.

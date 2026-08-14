@@ -1368,6 +1368,130 @@ static void test_modification_en_marche() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce qui aurait grillé
+//
+// Le solveur ne connaît que des équations. Une LED branchée sans résistance
+// sur du 5 V lui donne un résultat parfaitement convergé — et sur la
+// paillasse, la LED s'allume une fois. Une résistance d'un quart de watt qui
+// en dissipe deux fait de même. Rien ne le disait : le montage avait l'air de
+// marcher.
+// ---------------------------------------------------------------------------
+static void test_composants_grilles() {
+    std::printf("\n-- ce qui aurait grillé --\n");
+
+    auto tourner = [](int millisecondes) {
+        QElapsedTimer chrono;
+        chrono.start();
+        while (chrono.elapsed() < millisecondes)
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    };
+
+    // Le montage de référence : 5 V, 220 Ω, une LED. Environ 13 mA, une
+    // dizaine de milliwatts dans la résistance — tout est dans les clous, et
+    // rien ne doit être signalé. C'est le test qui compte le plus : un
+    // détecteur qui crie sur un montage correct ne sert à rien.
+    {
+        SceneSchema scene;
+        ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(250, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(500, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(750, 0));
+        pile->valeurs["volts"] = 5;
+        r->valeurs["ohms"] = 220;
+        scene.addItem(new ItemFil(pile, 0, r, 0));
+        scene.addItem(new ItemFil(r, 1, led, 0));
+        scene.addItem(new ItemFil(led, 1, masse, 0));
+        scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+        MoteurSimulation moteur;
+        std::vector<LiaisonBroche> broches;
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_presentes());
+        moteur.demarrer();
+        tourner(150);
+        const QSet<QString> grilles = moteur.composants_grilles();
+        verifier(grilles.isEmpty(),
+                 "un montage dans les clous ne grille rien",
+                 grilles.values().join(", ").toStdString());
+        moteur.arreter();
+    }
+
+    // La même LED, sans résistance. Le courant n'est plus limité que par la
+    // résistance série du modèle : bien au-delà des 30 mA d'une 5 mm.
+    {
+        SceneSchema scene;
+        ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+        ItemComposant* led = scene.ajouter_composant("led", QPointF(400, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(750, 0));
+        pile->valeurs["volts"] = 5;
+        scene.addItem(new ItemFil(pile, 0, led, 0));
+        scene.addItem(new ItemFil(led, 1, masse, 0));
+        scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+        MoteurSimulation moteur;
+        std::vector<LiaisonBroche> broches;
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_presentes());
+        moteur.demarrer();
+        tourner(150);
+        verifier(moteur.composants_grilles().contains("LED1"),
+                 "une LED sans résistance sur 5 V est signalée grillée");
+        moteur.arreter();
+        verifier(moteur.composants_grilles().isEmpty(),
+                 "l'arrêt remet le montage à neuf");
+    }
+
+    // Une résistance trop petite pour la tension qu'on lui impose : 12 V sur
+    // 100 Ω font 1,44 W, contre le quart de watt qu'elle encaisse.
+    {
+        SceneSchema scene;
+        ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(400, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(750, 0));
+        pile->valeurs["volts"] = 12;
+        r->valeurs["ohms"] = 100;
+        scene.addItem(new ItemFil(pile, 0, r, 0));
+        scene.addItem(new ItemFil(r, 1, masse, 0));
+        scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+        MoteurSimulation moteur;
+        std::vector<LiaisonBroche> broches;
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_presentes());
+        moteur.demarrer();
+        tourner(150);
+        verifier(moteur.composants_grilles().contains("R1"),
+                 "1,44 W dans une résistance d'un quart de watt est signalé");
+        moteur.arreter();
+    }
+
+    // La même, déclarée pour cinq watts : la propriété de l'instance prime sur
+    // le défaut du catalogue, et plus rien n'est signalé.
+    {
+        SceneSchema scene;
+        ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(400, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(750, 0));
+        pile->valeurs["volts"] = 12;
+        r->valeurs["ohms"] = 100;
+        r->valeurs["watts"] = 5;
+        scene.addItem(new ItemFil(pile, 0, r, 0));
+        scene.addItem(new ItemFil(r, 1, masse, 0));
+        scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+        MoteurSimulation moteur;
+        std::vector<LiaisonBroche> broches;
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_presentes());
+        moteur.demarrer();
+        tourner(150);
+        verifier(!moteur.composants_grilles().contains("R1"),
+                 "une résistance déclarée 5 W encaisse les mêmes 1,44 W");
+        moteur.arreter();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Traînées à l'écran : ce qu'on peint doit tenir dans ce qu'on déclare
 //
 // Qt n'efface qu'à l'intérieur du cadre annoncé par `boundingRect`. Tout ce
@@ -2017,6 +2141,7 @@ int main(int argc, char** argv) {
     test_transfert_pcb();
     test_gestes_utilisateur();
     test_modification_en_marche();
+    test_composants_grilles();
     test_pas_de_trainee();
     test_panneaux_retrecissables();
     test_famille_328p();

@@ -24,6 +24,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -133,6 +134,9 @@ signals:
     void etats_composants(
         const std::map<std::string, std::map<std::string, double>>& etats);
     void journal(const QString& message);
+    // Un composant vient de dépasser une de ses limites absolues : le schéma
+    // le marque, et il le reste jusqu'à l'arrêt.
+    void composant_grille(const QString& reference);
     void avancement(double temps_ms, double vitesse);
     // Changement d'état : c'est ce qui pilote l'apparence des commandes.
     void etat_change(Etat etat);
@@ -144,6 +148,10 @@ private:
     // Passe le contrôle des règles électriques et le publie dans le
     // journal. Appelé au lancement : c'est là qu'il sert.
     void signaler_regles();
+
+    // Compare ce que chaque composant a encaissé sur la fenêtre écoulée à ce
+    // qu'il supporte, et signale ceux qui auraient lâché.
+    void surveiller_contraintes(const coeur::Formes& formes);
 
     // Une carte programmable du schéma : son cœur, son firmware, son histoire.
     struct Carte {
@@ -202,6 +210,10 @@ private:
     double instant_trame_ = 0.0;    // horloge absolue, pour l'oscilloscope
     std::map<std::string, double> etat_;   // tensions reprises d'une trame à l'autre
     Etat etat_simulation_ = Etat::Arrete;  // marche, pause, arrêt
+    // Les composants qui ont dépassé une limite absolue depuis le dernier
+    // départ. On ne dégrille pas : un composant marqué le reste jusqu'à
+    // l'arrêt, comme le vrai.
+    QSet<QString> grilles_;
 
     Carte* carte(const QString& reference);
     const Carte* carte(const QString& reference) const;
@@ -223,4 +235,8 @@ private:
     uint64_t executer_pas(uint64_t cycles);
     // Pas de couplage réellement nécessaire pour ce schéma.
     int pas_couplage_utile() const;
+
+public:
+    // Les composants qui auraient lâché depuis le départ de la simulation.
+    QSet<QString> composants_grilles() const { return grilles_; }
 };

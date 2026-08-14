@@ -26,6 +26,10 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
                          {"rouge", "vert", "jaune", "bleu", "blanc"}, ""}};
         m.lumineux = true;
         m.couleur_corps = "#e04040";
+        // LED 5 mm ordinaire : 20 mA nominal, 30 mA en valeur absolue. Sans
+        // résistance sur du 5 V, une rouge encaisse plus de cent milliampères
+        // — elle s'éclaire vivement, une fois.
+        m.courant_max = 0.030;
         m.symbole = {ligne(-25, 0, -8, 0),
                      poly({{-8, -10}, {-8, 10}, {8, 0}}),   // triangle
                      ligne(8, -10, 8, 10),                  // barre cathode
@@ -60,6 +64,9 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
     {   // ------------------------------------------------- transistor NPN
         Modele m;
         m.type = "transistor_npn";
+        // Petit signal type 2N2222 : 800 mA de collecteur, 500 mW dissipés.
+        m.courant_max = 0.8;
+        m.puissance_max = 0.5;
         m.libelle = "Transistor NPN (2N2222)";
         m.categorie = "Semi-conducteurs";
         m.prefixe = "Q";
@@ -88,6 +95,8 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
     {   // ----------------------------------------------------------- diode
         Modele m;
         m.type = "diode";
+        // 1N4148 : 200 mA en direct continu.
+        m.courant_max = 0.2;
         m.libelle = "Diode";
         m.categorie = "Semi-conducteurs";
         m.prefixe = "D";
@@ -112,6 +121,9 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
     {   // ------------------------------------------------------ diode Zener
         Modele m;
         m.type = "zener";
+        // Zener 500 mW : c'est la puissance, pas le courant, qui la tue —
+        // 100 mA sous 5,1 V font déjà le double.
+        m.puissance_max = 0.5;
         m.libelle = "Diode Zener";
         m.categorie = "Semi-conducteurs";
         m.prefixe = "DZ";
@@ -138,6 +150,8 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
     {   // -------------------------------------------------- transistor PNP
         Modele m;
         m.type = "transistor_pnp";
+        m.courant_max = 0.8;
+        m.puissance_max = 0.5;
         m.libelle = "Transistor PNP (2N2907)";
         m.categorie = "Semi-conducteurs";
         m.prefixe = "Q";
@@ -160,6 +174,9 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
     {   // ---------------------------------------------------- MOSFET canal N
         Modele m;
         m.type = "mosfet_n";
+        // Petit MOSFET logique type 2N7000 : 200 mA continus, 400 mW.
+        m.courant_max = 0.2;
+        m.puissance_max = 0.4;
         m.libelle = "MOSFET canal N (IRF540)";
         m.categorie = "Semi-conducteurs";
         m.prefixe = "M";

@@ -615,10 +615,19 @@ void SceneSchema::appliquer_etats(
     }
 }
 
+void SceneSchema::marquer_grille(const QString& reference) {
+    for (ItemComposant* composant : composants())
+        if (composant->reference() == reference) composant->definir_grille(true);
+    update();
+}
+
 void SceneSchema::effacer_resultats() {
     for (ItemComposant* composant : composants()) {
         composant->definir_eclat(0.0);
         composant->definir_mesure({});
+        // L'arrêt de la simulation remet le montage à neuf, en accord avec
+        // MoteurSimulation qui vide sa liste au même moment.
+        composant->definir_grille(false);
     }
     for (ItemFil* fil : fils()) fil->rafraichir();
     update();

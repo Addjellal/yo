@@ -2969,7 +2969,13 @@ static void test_exemples_compilent() {
             continue;
         }
         ++compilables;
-        if (coeur::compiler_pour(exemple.mcu, exemple.source, firmware,
+        // Un exemple écrit en plusieurs fichiers passe par la compilation
+        // multi-fichiers : son principal ne compile pas seul.
+        coeur::Programme fichiers{
+            {coeur::nom_principal(exemple.mcu), exemple.source}};
+        for (const coeur::Fichier& annexe : exemple.annexes)
+            fichiers.push_back(annexe);
+        if (coeur::compiler_pour(exemple.mcu, fichiers, firmware,
                                  exemple.horloge, &journal)) {
             ++compiles;
         } else {

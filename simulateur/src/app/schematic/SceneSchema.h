@@ -130,6 +130,9 @@ public:
         const std::map<std::string, std::map<std::string, double>>& etats);
     void effacer_resultats();
 
+    // Marque un composant comme grillé : il se dessine noirci et barré.
+    void marquer_grille(const QString& reference);
+
 signals:
     void selection_composant(ItemComposant* composant);
     void journal(const QString& message);

@@ -55,6 +55,12 @@ public:
     void definir_eclat(double eclat);
     double eclat() const { return eclat_; }
 
+    // Composant qui a dépassé une de ses limites absolues pendant la
+    // simulation. Il se dessine noirci et barré : on doit le voir sans avoir
+    // à lire le journal.
+    void definir_grille(bool grille);
+    bool grille() const { return grille_; }
+
     // Valeurs et textes réglables, recopiés dans la netlist.
     std::map<std::string, double> valeurs;
     std::map<std::string, std::string> textes;
@@ -71,6 +77,7 @@ private:
     const coeur::Modele* modele_ = nullptr;
     QString reference_;
     double eclat_ = 0.0;
+    bool grille_ = false;
     QString mesure_;
     QRectF cadre_;          // zone cliquable
     QRectF cadre_peint_;    // tout ce que paint() peut toucher
