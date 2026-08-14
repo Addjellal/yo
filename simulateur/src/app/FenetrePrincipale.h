@@ -171,6 +171,8 @@ private slots:
     void compiler_source();
     // Émet le contenu du champ de saisie sur la liaison série de la carte.
     void envoyer_serie();
+    // Pense-bête des raccourcis, engendré depuis les QAction des menus.
+    void montrer_raccourcis();
     // Le document de ce fichier de cette carte, créé au besoin. Un document
     // par fichier : c'est lui qui porte la pile d'annulation.
     QTextDocument* document_de(const QString& carte, int rang);
@@ -203,6 +205,8 @@ private:
     QPlainTextEdit* console_ = nullptr;
     QPlainTextEdit* moniteur_serie_ = nullptr;
     QLineEdit* saisie_serie_ = nullptr;
+    QLineEdit* recherche_palette_ = nullptr;
+    QDockWidget* dock_palette_ = nullptr;
     QComboBox* fin_ligne_serie_ = nullptr;
     // Un QTextDocument par « carte/rang », pour que l'annulation et la
     // position du curseur survivent au changement d'onglet ou de carte.

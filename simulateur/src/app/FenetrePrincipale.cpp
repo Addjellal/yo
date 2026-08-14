@@ -22,6 +22,8 @@
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QTextDocument>
+#include <QMenu>
+#include <functional>
 #include <QPlainTextDocumentLayout>
 #include <QPushButton>
 #include <QComboBox>
@@ -230,6 +232,7 @@ void FenetrePrincipale::construire_palette() {
     auto* colonne = new QVBoxLayout(contenu);
     colonne->setContentsMargins(4, 4, 4, 4);
     auto* recherche = new QLineEdit;
+    recherche_palette_ = recherche;
     recherche->setPlaceholderText("Rechercher un composant…");
     recherche->setClearButtonEnabled(true);
     colonne->addWidget(recherche);
@@ -261,6 +264,7 @@ void FenetrePrincipale::construire_palette() {
     auto* dock = new QDockWidget("Composants", this);
     dock->setWidget(contenu);
     dock->setObjectName("dock_palette");
+    dock_palette_ = dock;
     addDockWidget(Qt::LeftDockWidgetArea, dock);
     docks_schema_.push_back(dock);
 }
@@ -564,8 +568,56 @@ void FenetrePrincipale::construire_actions() {
                        [this] { supprimer_sur_page_active(); });
     edition->addAction("&Pivoter (R)", QKeySequence(Qt::Key_R), this,
                        [this] { pivoter_sur_page_active(); });
+    edition->addSeparator();
+    // « Tout sélectionner » n'existait pas : avant un déplacement d'ensemble,
+    // il fallait un rectangle qui rate toujours un composant en bord de
+    // feuille. Entièrement clavier, donc praticable sans souris.
+    edition->addAction("Tout &sélectionner", QKeySequence::SelectAll, this,
+                       [this] {
+                           if (saisie_en_cours()) return;
+                           for (QGraphicsItem* item : scene_->items())
+                               item->setSelected(true);
+                       });
+    // « A » et « W » sont ceux de KiCad, et ce sont les deux gestes les plus
+    // répétés d'une séance : poser un composant, tirer un fil. Ils n'existaient
+    // qu'à la souris. Une touche nue ne menace pas l'éditeur de programme —
+    // QPlainTextEdit absorbe les touches imprimables par le ShortcutOverride —
+    // mais on garde la garde par prudence, elle ne coûte rien.
+    edition->addAction("&Ajouter un composant", QKeySequence(Qt::Key_A), this,
+                       [this] {
+                           if (saisie_en_cours()) return;
+                           afficher_page(0);
+                           if (dock_palette_) dock_palette_->show();
+                           if (recherche_palette_) {
+                               recherche_palette_->setFocus();
+                               recherche_palette_->selectAll();
+                           }
+                       });
+    edition->addAction("Tirer un &fil", QKeySequence(Qt::Key_W), this, [this] {
+        if (saisie_en_cours()) return;
+        afficher_page(0);
+        choisir_outil(SceneSchema::Outil::Fil);
+    });
 
     auto* outils = menuBar()->addMenu("&Outils");
+    // « Début » recadre sur tout le schéma, comme KiCad. La fonction existait
+    // déjà (bouton « Ajuster ») ; il ne manquait que la touche, et elle est
+    // sans danger dans l'éditeur de code, où Début va en début de ligne.
+    {
+        auto* recadrer = new QAction("Recadrer sur tout (Début)", this);
+        recadrer->setShortcut(QKeySequence(Qt::Key_Home));
+        connect(recadrer, &QAction::triggered, this, [this] {
+            if (saisie_en_cours()) return;
+            if (pages_ && pages_->currentIndex() == 1) {
+                if (pcb_ && pcb_->vue()) pcb_->vue()->recadrer();
+            } else if (vue_) {
+                vue_->ajuster();
+            }
+        });
+        outils->addAction(recadrer);
+    }
+
+
     // Sélecteur de page, dans sa propre barre : c'est la seule commande qui
     // survit au changement de page, puisque c'est elle qui en change.
     auto* barre_pages = addToolBar("Pages");
@@ -767,6 +819,9 @@ void FenetrePrincipale::construire_actions() {
     });
 
     auto* aide = menuBar()->addMenu("&Aide");
+    aide->addAction("&Raccourcis clavier", QKeySequence(Qt::Key_F1), this,
+                    &FenetrePrincipale::montrer_raccourcis);
+    aide->addSeparator();
     aide->addAction("À &propos", this, [this] {
         QMessageBox::about(
             this, "À propos",
@@ -929,6 +984,74 @@ void FenetrePrincipale::envoyer_serie() {
     if (moniteur_serie_)
         moniteur_serie_->appendPlainText("> " + texte);
     saisie_serie_->clear();
+}
+
+// Le pense-bête des raccourcis, ENGENDRÉ depuis les actions.
+//
+// C'est le point essentiel : une liste écrite à la main se désynchronise du
+// code à la première modification, et un pense-bête qui ment est pire que pas
+// de pense-bête. En parcourant les QAction de la barre de menus, la liste dit
+// toujours ce que l'application fait vraiment.
+//
+// Et c'est la seule réponse à « comment l'élève apprend-il que W existe ? ».
+// En enseignement, une fonction cachée n'existe pas : sans cette fenêtre, les
+// autres raccourcis du chantier seraient du travail perdu.
+void FenetrePrincipale::montrer_raccourcis() {
+    QString texte =
+        "<p style='color:#555'>Les raccourcis ci-dessous sont lus dans les "
+        "menus de l'application : cette liste ne peut donc pas mentir.</p>";
+
+    for (QAction* menu_action : menuBar()->actions()) {
+        QMenu* menu = menu_action->menu();
+        if (!menu) continue;
+        QString lignes;
+        // Les sous-menus comptent aussi : « Exemples » et « Fenêtres » en ont.
+        std::function<void(QMenu*)> parcourir = [&](QMenu* courant) {
+            for (QAction* action : courant->actions()) {
+                if (action->menu()) {
+                    parcourir(action->menu());
+                    continue;
+                }
+                if (action->isSeparator() || action->shortcut().isEmpty())
+                    continue;
+                QString nom = action->text();
+                nom.remove('&');
+                lignes += QString("<tr><td style='padding-right:18px'>%1</td>"
+                                  "<td><b>%2</b></td></tr>")
+                              .arg(nom.toHtmlEscaped(),
+                                   action->shortcut()
+                                       .toString(QKeySequence::NativeText)
+                                       .toHtmlEscaped());
+            }
+        };
+        parcourir(menu);
+        if (lignes.isEmpty()) continue;
+        QString titre = menu_action->text();
+        titre.remove('&');
+        texte += "<h4>" + titre.toHtmlEscaped() + "</h4><table>" + lignes
+                 + "</table>";
+    }
+
+    // Ce qui ne passe pas par un menu doit être dit ici aussi, sinon la liste
+    // est complète au sens du code et fausse au sens de l'utilisateur.
+    texte +=
+        "<h4>À la souris</h4><table>"
+        "<tr><td style='padding-right:18px'>Câbler</td><td><b>Clic sur une "
+        "broche, un point ou un fil</b></td></tr>"
+        "<tr><td>Dériver depuis un fil</td><td><b>Clic sur le fil</b></td></tr>"
+        "<tr><td>Abandonner le fil en cours</td><td><b>Clic droit</b> ou "
+        "<b>Échap</b></td></tr>"
+        "<tr><td>Déplacer la vue</td><td><b>Molette</b>, ou bouton du milieu "
+        "maintenu</td></tr>"
+        "<tr><td>Zoomer</td><td><b>Ctrl + molette</b></td></tr>"
+        "</table>";
+
+    QMessageBox boite(this);
+    boite.setWindowTitle("Raccourcis clavier");
+    boite.setTextFormat(Qt::RichText);
+    boite.setText(texte);
+    boite.setStandardButtons(QMessageBox::Close);
+    if (!silencieux_) boite.exec();
 }
 
 void FenetrePrincipale::pivoter_sur_page_active() {

@@ -12,6 +12,9 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QImage>
 #include <QJsonObject>
+#include <QMenuBar>
+#include <QMenu>
+#include <functional>
 #include <QPainter>
 #include <QScrollArea>
 #include <QKeyEvent>
@@ -1390,6 +1393,44 @@ static void test_modification_en_marche() {
 // invisible à l'écran. Une commande dont l'effet dépend d'une page qu'on ne
 // voit pas est pire qu'une commande absente.
 // ---------------------------------------------------------------------------
+// Le pense-bête des raccourcis est engendré, donc il ne peut pas mentir.
+//
+// Une liste écrite à la main se désynchronise du code à la première
+// modification, et un pense-bête qui ment est pire que pas de pense-bête. On
+// vérifie donc qu'il contient bien les raccourcis réellement branchés — et
+// qu'il en trouve un nombre plausible, pour attraper le cas où le parcours
+// des menus casserait en silence.
+static void test_pense_bete_engendre() {
+    std::printf("\n-- le pense-bête des raccourcis --\n");
+
+    FenetrePrincipale fenetre;
+    // On relit ce que le parcours produirait, par le même chemin que la
+    // fenêtre : les QAction des menus, sous-menus compris.
+    int comptes = 0;
+    QStringList raccourcis;
+    std::function<void(QMenu*)> parcourir = [&](QMenu* menu) {
+        for (QAction* action : menu->actions()) {
+            if (action->menu()) { parcourir(action->menu()); continue; }
+            if (action->isSeparator() || action->shortcut().isEmpty()) continue;
+            ++comptes;
+            raccourcis << action->shortcut().toString(QKeySequence::PortableText);
+        }
+    };
+    for (QAction* haut : fenetre.menuBar()->actions())
+        if (haut->menu()) parcourir(haut->menu());
+
+    verifier(comptes >= 15,
+             "la barre de menus porte assez de raccourcis pour valoir un "
+             "pense-bête",
+             std::to_string(comptes) + " raccourcis");
+    // Les cinq du chantier 2 doivent y être : s'ils n'apparaissent pas, c'est
+    // qu'ils ne sont pas dans un menu, donc introuvables pour l'utilisateur.
+    for (const char* attendu : {"A", "W", "R", "Home", "Ctrl+A"})
+        verifier(raccourcis.contains(QString(attendu)),
+                 std::string("« ") + attendu + " » est dans un menu, donc "
+                 "découvrable");
+}
+
 static void test_portee_des_commandes() {
     std::printf("\n-- les commandes suivent la page affichée --\n");
 
@@ -2413,6 +2454,7 @@ int main(int argc, char** argv) {
     test_transfert_pcb();
     test_gestes_utilisateur();
     test_modification_en_marche();
+    test_pense_bete_engendre();
     test_portee_des_commandes();
     test_derivation_en_t();
     test_derivation_survit();
