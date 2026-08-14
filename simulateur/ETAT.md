@@ -345,3 +345,122 @@ Ce qui a marché, et qu'il faut continuer :
   temps qu'une absence — d'où le point 1 ci-dessus, écrit plutôt que caché.
 - **enregistrer les limites là où on les verra**, plutôt que dans un test qui
   les figerait.
+
+---
+
+# Session du 14-15 août 2026 — interface, câblage, agents
+
+Vingt-cinq commits. Ce qui suit remplace tout ce qui précède **sur ces
+sujets-là** ; le reste du document (moteurs, cartes, chaînes) reste valable.
+
+## L'équipe d'agents
+
+Trois définitions dans `.claude/agents/`, disponibles nativement :
+
+| Agent | Rôle | La règle qui le tient |
+|---|---|---|
+| `critique-interface` | juge des propositions d'ergonomie | « un lot où tout est adopté est un lot mal critiqué » |
+| `suggestion` | cherche ce qui **manque**, va voir ailleurs | « ne propose jamais ce qui existe déjà — lis le code d'abord » |
+| `critique-code` | relit du C++/Qt, compile, prouve | « un défaut sans scénario déclencheur est une opinion » |
+
+**Le rendement observé est sans appel : les agents lâchés sur le code
+existant rapportent bien plus que les propositions inventées.** Cent
+propositions d'interface ont donné vingt-six retenues ; une seule relecture
+de code a donné quatre défauts graves, prouvés à l'ASan et à valgrind, dans
+du code écrit le jour même et couvert par deux cents tests verts.
+
+`critique-code` doit tourner **derrière chaque chantier**, pas en fin de
+parcours. En C++, c'est le filet qui remplace le compilateur qu'on n'a pas.
+
+## Le câblage : décision et mise en œuvre
+
+`DECISION-FILS.md` tranche la question, sources à l'appui (Proteus,
+Simulink, Altium, KiCad, LibrePCB lu dans le source). L'essentiel :
+
+- **Sans mode.** Ce qui est sous le curseur décide. L'outil « Fil » a été
+  retiré de la barre et des menus : il ne faisait que *restreindre*, et sa
+  présence enseignait le contraire de ce que fait le logiciel.
+- **`Ancre`** est la base commune de la broche et du point de fil. Un fil
+  relie deux ancres. C'est ce qui rend « partir d'un fil » possible.
+- **`ItemJonction`** sert à la fois de dérivation et de coude. À deux fils il
+  ne dessine aucune pastille — un point marque une connexion, pas un
+  changement de direction.
+- **`viser()`** est la table de priorités : broche 0, jonction 10, fil 20,
+  composant 70. Rayon de capture **constant à l'écran**, pas en unités de
+  scène.
+- **Coudes au clic** dans le vide, aperçu en équerre, tolérance d'alignement
+  d'une demi-maille.
+
+## Défauts corrigés, et ce qu'ils enseignent
+
+Les plus instructifs de la session — tous trouvés en regardant tourner
+l'application ou en la faisant relire :
+
+1. **Le rectangle de sélection venait de la VUE, pas de la scène.**
+   `QGraphicsView` le démarre quand la scène n'a pas *accepté* l'événement.
+   Trois tentatives avant de le voir : je cherchais dans la mauvaise classe.
+2. **Un clic annulé sur un fil détruisait ce fil.** On découpait avant de
+   savoir si le geste aboutirait.
+3. **`vers_json()` jetait tout fil touchant une jonction** — et comme
+   `memoriser()` passe par là, un `Ctrl+Z` sans rapport effaçait une
+   dérivation.
+4. **`ngspice.dll` n'était pas déployée** alors que le lien était activé par
+   défaut. Règle : *une dépendance activée par défaut doit être déployée par
+   défaut.*
+5. **Le runtime MinGW de Qt écrasait celui du compilateur** — l'exécutable
+   mourait avant `main()`, sans message.
+6. **`temps_ms()` rendait zéro sans carte**, pendant que l'oscilloscope
+   affichait soixante-six secondes.
+
+## Ce qui reste — par ordre de valeur
+
+### Interface (chantier 5 de `SYNTHESE-INTERFACE.md`)
+
+- survol qui allume tout le nœud (`calculer_noeuds()` fait déjà le calcul) ;
+- marqueur ERC **posé à côté** du symbole — jamais en noircissant le
+  composant, qui veut dire « grillé », un fait physique constaté ;
+- bornes non connectées marquées (la borne, pas le corps) ;
+- mode présentation `F11` (`afficher_page()` sait déjà masquer les docks) ;
+- mémoire de la disposition, **avec** « Réinitialiser » ;
+- cartouche à l'impression seulement.
+
+### Diagnostic (chantier 4, entamé)
+
+Le remède est écrit à côté de chaque anomalie et le compteur est en barre
+d'état. Restent le **panneau « Contrôle »** navigable et le **clic qui
+sélectionne le composant fautif** — attention, `Anomalie.reference` est
+tantôt une référence, tantôt un nom de nœud, tantôt une liste jointe par
+virgules.
+
+### Les trois manques lourds
+
+1. **Cliquer une erreur de compilation pour atteindre la ligne fautive.**
+   Les `#line` de `fusionner_croquis` propagent déjà le bon nom d'onglet et
+   le bon numéro — il n'y a qu'à lire la sortie, au format texte
+   `fichier:ligne:colonne:` (avr-g++ 7.3 ne connaît pas le JSON).
+2. **Les messages du solveur sans coupable ni remède.**
+3. **L'éditeur sans recherche, sans `Ctrl+S`, sans numéros de ligne** — alors
+   qu'on lui prend `Ctrl+F` et `Ctrl+D`.
+
+### PCB
+
+**Le placement, pas le routage.** Le chevelu est un authentique arbre
+couvrant minimal et le routeur fait son travail ; c'est
+`CartePcb::depuis_netlist()` qui pose les composants en rangée sans regarder
+la connectique, d'où cent quatre millimètres de cuivre pour trois
+composants. Une seule fonction à reprendre.
+
+### Si le projet grandit
+
+Trois écarts avec Simulink, par ordre de profondeur : **la hiérarchie**
+(absente, et structurelle — à faire tôt ou jamais), **le pas de temps fixe**
+(le seul qui rende les résultats *faux* sur un front raide), et **la
+comparaison de deux essais**.
+
+## Environnement — deux pièges vécus
+
+- **`build/chaines/` contient les compilateurs croisés (~370 Mo).** Effacer
+  `build` les perd. Les déplacer avant, les remettre après.
+- Le conteneur de développement peut perdre Qt6 et les chaînes en cours de
+  session. `apt-get update` puis réinstaller ; ce n'est pas une régression du
+  code.
