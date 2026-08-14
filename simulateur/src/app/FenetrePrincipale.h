@@ -9,6 +9,7 @@
 
 #include <QMainWindow>
 #include <QTreeWidget>
+#include <QIcon>
 
 #include <QPoint>
 #include <QString>
@@ -228,6 +229,7 @@ private:
     QComboBox* fin_ligne_serie_ = nullptr;
     // Un QTextDocument par « carte/rang », pour que l'annulation et la
     // position du curseur survivent au changement d'onglet ou de carte.
+    std::map<QString, QIcon> icones_;
     std::map<QString, QTextDocument*> documents_;
     std::map<QString, int> curseurs_;
     QLabel* etiquette_anomalies_ = nullptr;
@@ -307,6 +309,8 @@ private:
     void avertir(const QString& titre, const QString& message);
 
     void construire_palette();
+    // Le symbole d'un modèle, dessiné en petit pour la palette (mis en cache).
+    QIcon icone_du_modele(const coeur::Modele* modele);
     void construire_docks();
     void construire_actions();
     void construire_barre_etat();

@@ -1481,6 +1481,45 @@ static void test_pense_bete_engendre() {
 // QGraphicsView le démarre quand la scène n'a pas accepté l'événement. Les
 // branches de câblage faisaient « return » sans accepter, si bien qu'un fil
 // se tirait ET qu'un rectangle s'ouvrait par-dessus, en même temps.
+// La palette montre les symboles, pas seulement des mots.
+//
+// Un élève de première année reconnaît le zigzag d'une résistance bien avant
+// de savoir écrire « potentiomètre » : il cherche un dessin. Le tracé existe
+// déjà dans le modèle — il n'y avait aucun fichier graphique à créer.
+static void test_palette_montre_les_symboles() {
+    std::printf("\n-- la palette montre les symboles --\n");
+
+    FenetrePrincipale fenetre;
+    QTreeWidget* palette = fenetre.findChild<QTreeWidget*>();
+    verifier(palette != nullptr, "la palette existe");
+    if (!palette) return;
+
+    int feuilles = 0, avec_icone = 0;
+    for (int c = 0; c < palette->topLevelItemCount(); ++c) {
+        QTreeWidgetItem* categorie = palette->topLevelItem(c);
+        for (int k = 0; k < categorie->childCount(); ++k) {
+            ++feuilles;
+            if (!categorie->child(k)->icon(0).isNull()) ++avec_icone;
+        }
+    }
+    verifier(feuilles > 30, "elle propose bien tout le catalogue",
+             std::to_string(feuilles) + " composants");
+    verifier(avec_icone == feuilles,
+             "et chacun porte son propre symbole",
+             std::to_string(avec_icone) + "/" + std::to_string(feuilles));
+
+    // Une icône vide serait pire qu'aucune icône : elle promet un dessin et
+    // ne montre rien. On vérifie qu'au moins un pixel est peint.
+    QTreeWidgetItem* premier = palette->topLevelItem(0)->child(0);
+    const QImage rendu = premier->icon(0).pixmap(22, 22).toImage();
+    int peints = 0;
+    for (int y = 0; y < rendu.height(); ++y)
+        for (int x = 0; x < rendu.width(); ++x)
+            if (qAlpha(rendu.pixel(x, y)) > 0) ++peints;
+    verifier(peints > 10, "et le symbole est réellement dessiné",
+             std::to_string(peints) + " pixels");
+}
+
 static void test_pas_de_selection_pendant_un_fil() {
     std::printf("\n-- pas de rectangle de sélection pendant un fil --\n");
 
@@ -2795,6 +2834,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_palette_montre_les_symboles();
     test_pas_de_selection_pendant_un_fil();
     test_tolerance_alignement();
     test_points_de_passage();

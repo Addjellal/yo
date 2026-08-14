@@ -198,6 +198,80 @@ FenetrePrincipale::FenetrePrincipale() {
 FenetrePrincipale::~FenetrePrincipale() = default;
 
 // ---------------------------------------------------------------------------
+// Dessine le symbole d'un modèle dans une petite image.
+//
+// La même liste de traits que celle qu'`ItemComposant::paint` interprète, à
+// une échelle qui tient dans la palette. Mise en cache par type : la palette
+// se reconstruit à chaque filtrage de la recherche, et redessiner cinquante
+// symboles à chaque frappe serait du travail pur.
+QIcon FenetrePrincipale::icone_du_modele(const coeur::Modele* modele) {
+    if (!modele) return {};
+    const QString cle = QString::fromStdString(modele->type);
+    auto connue = icones_.find(cle);
+    if (connue != icones_.end()) return connue->second;
+
+    constexpr int kCote = 22;
+    QPixmap image(kCote, kCote);
+    image.fill(Qt::transparent);
+    {
+        QPainter peintre(&image);
+        peintre.setRenderHint(QPainter::Antialiasing, true);
+
+        // Cadrer sur ce que le symbole occupe vraiment : un symbole étroit
+        // doit remplir l'icône autant qu'un symbole large, sinon la palette
+        // ressemble à une suite de timbres de tailles différentes.
+        QRectF etendue;
+        for (const auto& trait : modele->symbole)
+            for (const auto& point : trait.points) {
+                const QPointF p(point.x, point.y);
+                etendue = etendue.isNull() ? QRectF(p, QSizeF(0.1, 0.1))
+                                           : etendue.united(QRectF(p, QSizeF(0.1, 0.1)));
+            }
+        if (etendue.isNull()) etendue = QRectF(-20, -20, 40, 40);
+        const double marge = 2.0;
+        const double echelle =
+            std::min((kCote - 2 * marge) / std::max(etendue.width(), 1.0),
+                     (kCote - 2 * marge) / std::max(etendue.height(), 1.0));
+        peintre.translate(kCote / 2.0, kCote / 2.0);
+        peintre.scale(echelle, echelle);
+        peintre.translate(-etendue.center());
+
+        QPen crayon(QColor(30, 30, 40), 1.6 / echelle);
+        crayon.setJoinStyle(Qt::RoundJoin);
+        crayon.setCapStyle(Qt::RoundCap);
+        peintre.setPen(crayon);
+        QColor corps(QString::fromStdString(modele->couleur_corps));
+        if (!corps.isValid()) corps = QColor(210, 210, 210);
+        for (const auto& trait : modele->symbole) {
+            peintre.setBrush(trait.rempli ? QBrush(corps) : Qt::NoBrush);
+            QPolygonF points;
+            for (const auto& point : trait.points)
+                points << QPointF(point.x, point.y);
+            switch (trait.genre) {
+                case coeur::TraitSymbole::Genre::Ligne:
+                    if (points.size() >= 2) peintre.drawPolyline(points);
+                    break;
+                case coeur::TraitSymbole::Genre::Rect:
+                    if (points.size() >= 2)
+                        peintre.drawRect(QRectF(points[0], points[1]));
+                    break;
+                case coeur::TraitSymbole::Genre::Cercle:
+                    if (points.size() >= 1)
+                        peintre.drawEllipse(points[0], trait.mesure, trait.mesure);
+                    break;
+                case coeur::TraitSymbole::Genre::Polygone:
+                    if (points.size() >= 3) peintre.drawPolygon(points);
+                    break;
+                default:
+                    break;   // le texte ne se lit pas à vingt-deux pixels
+            }
+        }
+    }
+    const QIcon icone(image);
+    icones_[cle] = icone;
+    return icone;
+}
+
 void FenetrePrincipale::construire_palette() {
     palette_ = new PaletteComposants(this);
 
@@ -216,6 +290,13 @@ void FenetrePrincipale::construire_palette() {
         auto* feuille = new QTreeWidgetItem(
             it->second, {QString::fromStdString(modele->libelle)});
         feuille->setData(0, Qt::UserRole, QString::fromStdString(modele->type));
+        // Le symbole plutôt qu'un mot. Un élève de première année reconnaît le
+        // zigzag d'une résistance bien avant de savoir écrire
+        // « potentiomètre », et il cherche un dessin, pas un intitulé.
+        // Cinquante-trois lignes de texte deviennent cinquante-trois symboles
+        // sans créer un seul fichier graphique : le tracé est déjà là, dans
+        // `modele->symbole`.
+        feuille->setIcon(0, icone_du_modele(modele));
         feuille->setToolTip(
             0, QString("%1 — glissez-le sur le schéma, ou double-cliquez")
                    .arg(QString::fromStdString(modele->libelle)));
