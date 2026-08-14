@@ -976,6 +976,14 @@ bool SceneSchema::amorcer_fil_au(const QPointF& point) {
 }
 
 void SceneSchema::commencer_fil(const Cible& depart, const QPointF& point) {
+    // Tant qu'un fil se tire, la vue ne sélectionne plus.
+    //
+    // Accepter l'événement suffit en théorie ; le couper à la source ne
+    // dépend d'aucune subtilité de propagation. Un geste de câblage et un
+    // rectangle de sélection ne peuvent pas coexister — c'est l'un OU
+    // l'autre, jamais les deux en même temps.
+    for (QGraphicsView* vue : views())
+        vue->setDragMode(QGraphicsView::NoDrag);
     cible_depart_ = depart;
     fil_en_attente_ = false;
     point_appui_ = point;
@@ -1036,6 +1044,9 @@ void SceneSchema::effacer_provisoire() {
 
 void SceneSchema::abandonner_fil() {
     effacer_provisoire();
+    // La sélection au rectangle reprend son droit dès que le fil est fini.
+    for (QGraphicsView* vue : views())
+        vue->setDragMode(QGraphicsView::RubberBandDrag);
     cible_depart_ = Cible();
     fil_en_attente_ = false;
     // Les points de passage d'un chemin abandonné n'ont plus qu'un fil : le
@@ -1060,6 +1071,14 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
         // Fil laissé en attente par un premier clic : ce clic-ci le referme,
         // ou l'abandonne s'il tombe à côté d'une borne.
         if (fil_en_attente_ && cible_depart_.connectable()) {
+            // ACCEPTER est indispensable, et ce n'est pas un détail.
+            //
+            // Le rectangle de sélection ne vient pas de la scène mais de la
+            // VUE : QGraphicsView le démarre quand la scène n'a pas accepté
+            // l'événement. Nos branches de câblage faisaient « return » sans
+            // accepter, si bien qu'un fil se tirait ET qu'un rectangle de
+            // sélection s'ouvrait par-dessus, en même temps.
+            evenement->accept();
             if (terminer_fil(point)) return;
             // Clic dans le vide pendant un tracé : on POSE UN POINT DE
             // PASSAGE et l'on continue, au lieu de tout abandonner.
@@ -1089,6 +1108,7 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
             // débranchée, définitivement, sans trace. La cible est donc
             // gardée telle quelle, et n'est ancrée qu'au moment où le fil
             // naît vraiment.
+            evenement->accept();
             commencer_fil(cible, cible.point);
             return;
         }
@@ -1125,6 +1145,9 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
     if (fil_provisoire_ && cible_depart_.connectable()) {
         fil_provisoire_->setPath(
             ItemFil::chemin(cible_depart_.point, evenement->scenePos()));
+        // Même raison qu'à l'appui : sans cela, la vue croit le geste libre
+        // et étire un rectangle de sélection pendant qu'on tire le fil.
+        evenement->accept();
         return;
     }
 
@@ -1152,6 +1175,7 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
     if (fil_provisoire_ && cible_depart_.connectable() && !fil_en_attente_) {
+        evenement->accept();
         const QPointF point = evenement->scenePos();
         // À relever AVANT : terminer_fil() appelle abandonner_fil() quand il
         // échoue, ce qui remet l'ancre à zéro.

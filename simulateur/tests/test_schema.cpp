@@ -1475,6 +1475,33 @@ static void test_pense_bete_engendre() {
 // Sans tolérance, trois pixels d'écart vertical suffisaient à produire une
 // équerre en trois segments : un décrochement inutile au milieu du fil, qui
 // salit le schéma et qu'aucun électronicien ne dessinerait à la main.
+// Pendant qu'un fil se tire, la vue ne sélectionne plus.
+//
+// Le rectangle de sélection ne vient pas de la scène mais de la VUE :
+// QGraphicsView le démarre quand la scène n'a pas accepté l'événement. Les
+// branches de câblage faisaient « return » sans accepter, si bien qu'un fil
+// se tirait ET qu'un rectangle s'ouvrait par-dessus, en même temps.
+static void test_pas_de_selection_pendant_un_fil() {
+    std::printf("\n-- pas de rectangle de sélection pendant un fil --\n");
+
+    SceneSchema scene;
+    VueSchema vue;
+    vue.setScene(&scene);
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+
+    verifier(vue.dragMode() == QGraphicsView::RubberBandDrag,
+             "au repos, le rectangle de sélection est disponible");
+
+    verifier(scene.amorcer_fil_au(pile->position_borne(0)),
+             "on amorce un fil");
+    verifier(vue.dragMode() == QGraphicsView::NoDrag,
+             "pendant le tracé, la vue ne sélectionne plus");
+
+    scene.abandonner_fil();
+    verifier(vue.dragMode() == QGraphicsView::RubberBandDrag,
+             "et elle reprend son droit dès que le fil est fini");
+}
+
 static void test_tolerance_alignement() {
     std::printf("\n-- tolérance avant qu'un fil monte --\n");
 
@@ -2768,6 +2795,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_pas_de_selection_pendant_un_fil();
     test_tolerance_alignement();
     test_points_de_passage();
     test_capture_suit_le_zoom();
