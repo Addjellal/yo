@@ -932,8 +932,11 @@ namespace {
 // Rien d'autre que des composants et des fils ne doit traîner dans la scène :
 // un trait provisoire resté en place serait un artefact visible à l'écran.
 bool scene_propre(SceneSchema& scene) {
+    // Les points de dérivation sont des objets de plein droit : les exclure
+    // faisait déclarer sale toute scène portant un T correct.
     for (QGraphicsItem* item : scene.items())
-        if (item->type() != ItemComposant::Type && item->type() != ItemFil::Type)
+        if (item->type() != ItemComposant::Type && item->type() != ItemFil::Type
+            && item->type() != ItemJonction::Type)
             return false;
     return true;
 }
@@ -941,18 +944,25 @@ bool scene_propre(SceneSchema& scene) {
 // Tous les fils désignent-ils des composants encore présents, et des bornes
 // qui existent ?
 bool fils_coherents(SceneSchema& scene) {
-    std::set<const ItemComposant*> vivants;
-    for (ItemComposant* composant : scene.composants()) vivants.insert(composant);
-    for (ItemFil* fil : scene.fils()) {
-        if (!vivants.count(fil->depart()) || !vivants.count(fil->arrivee()))
+    // L'invariant se lit sur les ANCRES. Écrit sur `depart()`, il jugeait
+    // incohérent tout fil accroché à un point — l'accesseur y rend nullptr —,
+    // c'est-à-dire exactement la fonctionnalité qu'il devrait garder.
+    std::set<const ItemComposant*> composants_vivants;
+    for (ItemComposant* composant : scene.composants())
+        composants_vivants.insert(composant);
+    std::set<const ItemJonction*> points_vivants;
+    for (ItemJonction* point : scene.jonctions()) points_vivants.insert(point);
+
+    auto ancre_saine = [&](const Ancre& ancre) {
+        if (ancre.jonction) return points_vivants.count(ancre.jonction) > 0;
+        if (!ancre.composant) return false;
+        if (!composants_vivants.count(ancre.composant)) return false;
+        return ancre.borne >= 0 && ancre.borne < ancre.composant->nb_bornes();
+    };
+    for (ItemFil* fil : scene.fils())
+        if (!ancre_saine(fil->ancre_depart())
+            || !ancre_saine(fil->ancre_arrivee()))
             return false;
-        if (fil->borne_depart() < 0
-            || fil->borne_depart() >= fil->depart()->nb_bornes())
-            return false;
-        if (fil->borne_arrivee() < 0
-            || fil->borne_arrivee() >= fil->arrivee()->nb_bornes())
-            return false;
-    }
     return true;
 }
 
@@ -1588,6 +1598,45 @@ static void test_derivation_survit() {
     scene.render(&peintre);      // le redessin lisait la mémoire libérée
     peintre.end();
     verifier(true, "et le schéma se redessine sans lire de mémoire libérée");
+
+    // 4. Les deux garde-fous du banc doivent accepter une dérivation. Écrits
+    //    sur `depart()`, qui rend nullptr sur un point, ils déclaraient
+    //    incohérent un T parfaitement correct : ils étaient aveugles à la
+    //    fonctionnalité qu'ils devaient garder.
+    verifier(scene_propre(relue),
+             "l'invariant « rien ne traîne » accepte un point de dérivation");
+    verifier(fils_coherents(relue),
+             "et l'invariant des fils accepte un fil accroché à un point");
+
+    // 5. Un fil tendu entre DEUX points doit afficher sa tension : aucune de
+    //    ses extrémités n'est une borne, et il restait sans mesure.
+    {
+        SceneSchema pont;
+        ItemComposant* p = pont.ajouter_composant("pile", QPointF(0, 0));
+        ItemComposant* rr = pont.ajouter_composant("resistance", QPointF(400, 0));
+        ItemComposant* gnd = pont.ajouter_composant("masse", QPointF(800, 0));
+        ItemFil* haut = new ItemFil(p, 0, rr, 0);
+        pont.addItem(haut);
+        pont.addItem(new ItemFil(rr, 1, gnd, 0));
+        pont.addItem(new ItemFil(p, 1, gnd, 0));
+        ItemJonction* j1 = pont.decouper(haut, QPointF(150, 0));
+        ItemFil* moitie = nullptr;
+        for (ItemFil* f : pont.fils())
+            if (f->ancre_depart().jonction == j1 && f->ancre_arrivee().composant == rr)
+                moitie = f;
+        ItemJonction* j2 = pont.decouper(moitie, QPointF(300, 0));
+        ItemFil* entre_points = new ItemFil(Ancre(j1), Ancre(j2));
+        pont.addItem(entre_points);
+        pont.balayer_jonctions();
+
+        const QString noeud_haut = pont.noeud_de(rr, 0);
+        std::map<std::string, double> tensions;
+        tensions[noeud_haut.toLower().toStdString()] = 9.0;
+        coeur::Formes vides;
+        pont.appliquer_resultats({}, tensions, &vides);
+        verifier(entre_points->tension_connue(),
+                 "un fil tendu entre deux points affiche sa tension");
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -114,6 +114,12 @@ SceneSchema::SceneSchema(QObject* parent) : QGraphicsScene(parent) {
 void SceneSchema::definir_outil(Outil outil) {
     outil_ = outil;
     abandonner_fil();
+    // Le curseur restait figé sur la forme du dernier survol : on survolait un
+    // composant, on prenait la gomme, et le curseur disait encore « déplacer »
+    // pendant tout le travail à la gomme. Rien ne le remettait à zéro.
+    for (QGraphicsView* vue : views())
+        vue->setCursor(outil == Outil::Suppression ? Qt::ForbiddenCursor
+                                                   : Qt::ArrowCursor);
 }
 
 QString SceneSchema::prochaine_reference(const std::string& prefixe) {
@@ -745,9 +751,45 @@ void SceneSchema::appliquer_resultats(
             return {};
         return it->second[ancre.borne];
     };
-    for (ItemFil* fil : fils()) {
+    // Un fil tendu entre DEUX points n'a aucune borne à interroger : essayer
+    // les deux bouts ne suffisait pas, et il restait sans tension ni couleur
+    // alors qu'il est sur un nœud parfaitement résolu. On donne donc d'abord
+    // son nom de nœud à chaque point, en le propageant de proche en proche
+    // depuis les bornes — un point et le fil qui l'atteint sont sur le même
+    // nœud, par définition.
+    const std::vector<ItemFil*> tous_les_fils = fils();
+    std::map<const ItemJonction*, std::string> noeud_du_point;
+    for (bool encore = true; encore;) {
+        encore = false;
+        for (ItemFil* fil : tous_les_fils) {
+            const Ancre& a = fil->ancre_depart();
+            const Ancre& b = fil->ancre_arrivee();
+            auto nom = [&](const Ancre& ancre) -> std::string {
+                if (ancre.composant) return noeud_de_ancre(ancre);
+                auto it = noeud_du_point.find(ancre.jonction);
+                return it == noeud_du_point.end() ? std::string() : it->second;
+            };
+            const std::string na = nom(a), nb = nom(b);
+            if (!na.empty() && b.jonction && nb.empty()) {
+                noeud_du_point[b.jonction] = na;
+                encore = true;
+            } else if (!nb.empty() && a.jonction && na.empty()) {
+                noeud_du_point[a.jonction] = nb;
+                encore = true;
+            }
+        }
+    }
+
+    for (ItemFil* fil : tous_les_fils) {
         std::string noeud = noeud_de_ancre(fil->ancre_depart());
         if (noeud.empty()) noeud = noeud_de_ancre(fil->ancre_arrivee());
+        if (noeud.empty()) {
+            for (const Ancre& ancre : {fil->ancre_depart(), fil->ancre_arrivee()}) {
+                if (!ancre.jonction) continue;
+                auto it = noeud_du_point.find(ancre.jonction);
+                if (it != noeud_du_point.end()) noeud = it->second;
+            }
+        }
         if (noeud.empty()) continue;
         std::transform(noeud.begin(), noeud.end(), noeud.begin(),
                        [](unsigned char c) { return std::tolower(c); });

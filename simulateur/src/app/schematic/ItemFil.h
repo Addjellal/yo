@@ -46,6 +46,8 @@ public:
 
     // Tension du nœud, affichée pendant la simulation (NaN = pas de mesure).
     void definir_tension(double volts);
+    // Vrai dès qu'une mesure a été portée sur ce fil.
+    bool tension_connue() const { return tension_connue_; }
     void rafraichir();
 
 private:
