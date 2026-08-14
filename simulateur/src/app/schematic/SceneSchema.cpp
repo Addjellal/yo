@@ -374,9 +374,28 @@ SceneSchema::Cible SceneSchema::viser(const QPointF& point) const {
         meilleure = candidate;
     };
 
+    // Le rayon de capture est constant À L'ÉCRAN, pas dans la scène.
+    //
+    // Il était exprimé en unités de scène, donc il rétrécissait avec le zoom :
+    // à 0,3× les quatorze unités ne faisaient plus que quatre pixels, et
+    // viser une broche devenait impossible. On appuyait alors dans le vide,
+    // le rectangle de sélection démarrait, et le geste de câblage tournait en
+    // sélection — sans que rien n'explique pourquoi ça marchait tout à
+    // l'heure et plus maintenant.
+    //
+    // C'est aussi le « palier de distance » de LibrePCB : un objet proche du
+    // curseur sans être dessous reste candidat. La tolérance appartient au
+    // geste de la main, pas à l'échelle du dessin.
+    double echelle = 1.0;
+    for (QGraphicsView* vue : views())
+        if (vue->transform().m11() > 1e-6) echelle = vue->transform().m11();
+    // Quatorze pixels à l'écran, quel que soit le zoom — borné pour qu'un
+    // dézoom extrême n'avale pas la moitié du schéma.
+    const double rayon = std::min(14.0 / echelle, 60.0);
+
     // 0 — une broche. La cible la plus précise et la plus demandée.
     for (ItemComposant* composant : composants()) {
-        const int borne = composant->borne_proche(point);
+        const int borne = composant->borne_proche(point, rayon);
         if (borne < 0) continue;
         Cible c;
         c.genre = Cible::Genre::Broche;
@@ -387,7 +406,8 @@ SceneSchema::Cible SceneSchema::viser(const QPointF& point) const {
 
     // 10 — un point de fil existant.
     for (ItemJonction* jonction : jonctions()) {
-        if (!jonction->shape().contains(jonction->mapFromScene(point))) continue;
+        const QPointF delta = jonction->pos() - point;
+        if (std::hypot(delta.x(), delta.y()) > rayon) continue;
         Cible c;
         c.genre = Cible::Genre::Jonction;
         c.ancre = Ancre(jonction);

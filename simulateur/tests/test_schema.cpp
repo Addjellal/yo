@@ -1458,6 +1458,49 @@ static void test_pense_bete_engendre() {
 // l'oscilloscope global déjà présent : on ne choisit pas les signaux dans une
 // liste, on les branche. Le schéma documente alors lui-même ce qu'on observe,
 // et deux scopes montrent deux endroits éloignés dans deux fenêtres.
+// Viser une broche doit rester possible quel que soit le zoom.
+//
+// Le rayon de capture était exprimé en unités de scène : à 0,3× ses quatorze
+// unités ne faisaient plus que quatre pixels à l'écran. On appuyait alors
+// dans le vide, le rectangle de sélection démarrait, et le geste de câblage
+// se changeait en sélection — sans que rien n'explique pourquoi ça marchait
+// tout à l'heure et plus maintenant.
+static void test_capture_suit_le_zoom() {
+    std::printf("\n-- viser une broche à tous les zooms --\n");
+
+    SceneSchema scene;
+    VueSchema vue;
+    vue.setScene(&scene);
+    vue.resize(800, 600);
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    const QPointF borne = pile->position_borne(0);
+
+    // À zoom 1, on vise à dix unités de la borne : c'est dans la tolérance.
+    vue.resetTransform();
+    const QPointF pres(borne.x() + 10, borne.y());
+    verifier(scene.viser(pres).genre == SceneSchema::Cible::Genre::Broche,
+             "à zoom 1, viser à dix unités attrape la broche");
+
+    // Dézoomé quatre fois, ces dix unités ne font plus que deux ou trois
+    // pixels à l'écran : la tolérance doit s'élargir d'autant.
+    vue.resetTransform();
+    vue.scale(0.25, 0.25);
+    verifier(scene.viser(pres).genre == SceneSchema::Cible::Genre::Broche,
+             "dézoomé, la même main attrape toujours la broche");
+    const QPointF loin(borne.x() + 45, borne.y());
+    verifier(scene.viser(loin).genre == SceneSchema::Cible::Genre::Broche,
+             "et même un peu plus loin, puisqu'à l'écran c'est aussi près",
+             std::to_string(static_cast<int>(scene.viser(loin).genre)));
+
+    // Zoomé, en revanche, la tolérance se resserre : on doit pouvoir viser
+    // deux bornes voisines sans les confondre.
+    vue.resetTransform();
+    vue.scale(4.0, 4.0);
+    const QPointF tres_loin(borne.x() + 30, borne.y());
+    verifier(scene.viser(tres_loin).genre != SceneSchema::Cible::Genre::Broche,
+             "zoomé, trente unités sont loin et n'attrapent plus rien");
+}
+
 static void test_scope_suit_son_cablage() {
     std::printf("\n-- un scope montre ce qu'on lui câble --\n");
 
@@ -2648,6 +2691,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_capture_suit_le_zoom();
     test_scope_suit_son_cablage();
     test_lancer_compile_et_refuse();
     test_horloge_sans_carte();

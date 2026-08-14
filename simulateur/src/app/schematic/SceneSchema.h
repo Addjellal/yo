@@ -75,6 +75,20 @@ public:
         }
     };
 
+    // Ce que vise le curseur.
+    //
+    // Sans mode, c'est cette question qui remplace le choix d'un outil : on
+    // ne demande plus à l'utilisateur de déclarer son intention, on la lit
+    // sous le curseur. LibrePCB résout la même question par une table de
+    // priorités explicite ; on reprend le principe.
+    //
+    // Écart assumé sur leur ordre : chez eux le fil (20) passe avant la
+    // broche (40). Ça marche parce qu'un point de fil, prioritaire, occupe
+    // les extrémités. Ici un fil se termine DIRECTEMENT sur une broche : le
+    // fil gagnerait toujours, et cliquer une broche découperait le fil au
+    // lieu de s'y connecter. La broche passe donc en tête.
+    Cible viser(const QPointF& point) const;
+
     // Amorce un fil depuis ce qui se trouve à ce point, sans changer de mode.
     //
     // C'est l'équivalent clavier du clic sur une broche : le fil suit ensuite
@@ -228,19 +242,7 @@ private:
     // Recherche la borne sous le curseur, tous composants confondus.
     std::pair<ItemComposant*, int> borne_sous(const QPointF& point) const;
 
-    // Ce que vise le curseur.
-    //
-    // Sans mode, c'est cette question qui remplace le choix d'un outil : on
-    // ne demande plus à l'utilisateur de déclarer son intention, on la lit
-    // sous le curseur. LibrePCB résout la même question par une table de
-    // priorités explicite ; on reprend le principe.
-    //
-    // Écart assumé sur leur ordre : chez eux le fil (20) passe avant la
-    // broche (40). Ça marche parce qu'un point de fil, prioritaire, occupe
-    // les extrémités. Ici un fil se termine DIRECTEMENT sur une broche : le
-    // fil gagnerait toujours, et cliquer une broche découperait le fil au
-    // lieu de s'y connecter. La broche passe donc en tête.
-    Cible viser(const QPointF& point) const;
+
 
 
 
