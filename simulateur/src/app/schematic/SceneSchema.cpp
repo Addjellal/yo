@@ -801,19 +801,43 @@ void SceneSchema::effacer_resultats() {
 // ---------------------------------------------------------------------------
 void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
     peintre->fillRect(zone, backgroundBrush());
-    peintre->setPen(QPen(QColor(226, 230, 226), 0.6));
-    const double gauche = std::floor(zone.left() / kPas) * kPas;
-    const double haut = std::floor(zone.top() / kPas) * kPas;
-    for (double x = gauche; x < zone.right(); x += kPas)
-        peintre->drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
-    for (double y = haut; y < zone.bottom(); y += kPas)
-        peintre->drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
-    // repères tous les 100 unités
-    peintre->setPen(QPen(QColor(206, 214, 206), 0.9));
-    for (double x = std::floor(zone.left() / 100) * 100; x < zone.right(); x += 100)
-        peintre->drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
-    for (double y = std::floor(zone.top() / 100) * 100; y < zone.bottom(); y += 100)
-        peintre->drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
+
+    // Une grille ne se trace que si on peut la voir.
+    //
+    // Elle se traçait sans condition. Au zoom minimal (0,15), deux lignes du
+    // pas fin sont séparées d'un pixel et demi : la feuille devient un aplat
+    // gris uniforme sur lequel on ne distingue plus un fil. Et comme la vue
+    // est en rafraîchissement intégral, ces milliers de lignes invisibles
+    // étaient retracées à chaque image pendant la simulation.
+    //
+    // KiCad règle la même question par un « Min grid spacing » en pixels :
+    // les lignes plus serrées que ce seuil ne sont pas tracées, quel que soit
+    // le pas courant. On reprend le principe, sans l'exposer — un seuil de
+    // cinq pixels ne se règle pas, il se constate.
+    constexpr double kEcartMinimal = 5.0;
+    const double echelle = peintre->transform().m11();
+
+    if (kPas * echelle >= kEcartMinimal) {
+        peintre->setPen(QPen(QColor(226, 230, 226), 0.6));
+        const double gauche = std::floor(zone.left() / kPas) * kPas;
+        const double haut = std::floor(zone.top() / kPas) * kPas;
+        for (double x = gauche; x < zone.right(); x += kPas)
+            peintre->drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
+        for (double y = haut; y < zone.bottom(); y += kPas)
+            peintre->drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
+    }
+
+    // Les repères de cent tiennent plus longtemps : quand le pas fin
+    // disparaît, ils restent seuls et gardent une échelle lisible.
+    if (100.0 * echelle >= kEcartMinimal) {
+        peintre->setPen(QPen(QColor(206, 214, 206), 0.9));
+        for (double x = std::floor(zone.left() / 100) * 100; x < zone.right();
+             x += 100)
+            peintre->drawLine(QPointF(x, zone.top()), QPointF(x, zone.bottom()));
+        for (double y = std::floor(zone.top() / 100) * 100; y < zone.bottom();
+             y += 100)
+            peintre->drawLine(QPointF(zone.left(), y), QPointF(zone.right(), y));
+    }
 }
 
 // Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
@@ -1006,9 +1030,18 @@ void SceneSchema::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) {
-    // Le clic droit ouvre les options et ne touche à rien d'autre : il
-    // n'entame pas de fil, il ne déplace rien.
-    abandonner_fil();
+    // Un geste en cours : le clic droit l'abandonne, et RIEN d'autre.
+    //
+    // Il abandonnait le fil puis ouvrait quand même le menu : on voulait
+    // renoncer, on se retrouvait avec un menu non demandé à chasser d'un
+    // second clic. Les deux rôles du bouton droit doivent s'exclure, et c'est
+    // ce que fait Proteus — « click left to effect the move, or else abort it
+    // by clicking right ».
+    if (fil_provisoire_ || fil_en_attente_) {
+        abandonner_fil();
+        evenement->accept();
+        return;
+    }
     ItemComposant* composant = composant_sous(this, evenement->scenePos());
     if (composant) {
         clearSelection();
