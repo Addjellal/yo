@@ -678,31 +678,29 @@ void FenetrePrincipale::construire_actions() {
     selection->setChecked(true);
     selection->setToolTip("Déplacer et régler les composants. Cliquer une "
                           "borne tire quand même un fil.");
-    auto* fil = barre->addAction("Fil");
-    fil->setCheckable(true);
-    fil->setToolTip("Ne faire que câbler : les composants ne bougent plus par "
-                    "mégarde.");
+    // Plus de bouton « Fil ».
+    //
+    // Il ne faisait que RESTREINDRE : le câblage fonctionne en mode sélection,
+    // et le mode n'ajoutait que d'empêcher la sélection et le déplacement. Sa
+    // présence enseignait le contraire de ce que fait le logiciel — un élève
+    // qui le voit croit qu'il faut le choisir pour câbler, alors que cliquer
+    // une broche suffit et a toujours suffi. Voir DECISION-FILS.md.
     auto* gomme = barre->addAction("Supprimer");
     gomme->setCheckable(true);
     gomme->setToolTip("Cliquer un composant ou un fil pour l'effacer.");
     auto* groupe = new QActionGroup(this);
     groupe->addAction(selection);
-    groupe->addAction(fil);
     groupe->addAction(gomme);
     // Les trois actions sont retenues : le menu contextuel change d'outil, et
     // la barre doit le montrer. Deux commandes qui font la même chose sans se
     // parler, c'est une case cochée qui ment.
     action_selection_ = selection;
-    action_fil_ = fil;
     action_gomme_ = gomme;
     connect(selection, &QAction::triggered, this,
             [this] { choisir_outil(SceneSchema::Outil::Selection); });
-    connect(fil, &QAction::triggered, this,
-            [this] { choisir_outil(SceneSchema::Outil::Fil); });
     connect(gomme, &QAction::triggered, this,
             [this] { choisir_outil(SceneSchema::Outil::Suppression); });
     outils->addAction(selection);
-    outils->addAction(fil);
     outils->addAction(gomme);
 
     barre->addSeparator();
@@ -1279,9 +1277,9 @@ void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
 // contextuel ou raccourci — et met tout le monde d'accord.
 void FenetrePrincipale::choisir_outil(SceneSchema::Outil outil) {
     scene_->definir_outil(outil);
-    QAction* miroir = outil == SceneSchema::Outil::Fil          ? action_fil_
-                      : outil == SceneSchema::Outil::Suppression ? action_gomme_
-                                                                 : action_selection_;
+    QAction* miroir = outil == SceneSchema::Outil::Suppression
+                          ? action_gomme_
+                          : action_selection_;
     if (miroir) miroir->setChecked(true);
 }
 
@@ -1332,7 +1330,6 @@ void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
                 [this, outil] { choisir_outil(outil); });
     };
     ajouter_outil("Sélection", SceneSchema::Outil::Selection, "Échap");
-    ajouter_outil("Fil", SceneSchema::Outil::Fil, "F");
     ajouter_outil("Suppression", SceneSchema::Outil::Suppression, "Suppr");
 
     QMenu* vue = menu.addMenu("Vue");

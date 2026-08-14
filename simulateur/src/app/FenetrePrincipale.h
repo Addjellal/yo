@@ -294,7 +294,6 @@ private:
     // Change d'outil et synchronise la barre du haut.
     void choisir_outil(SceneSchema::Outil outil);
     QAction* action_selection_ = nullptr;
-    QAction* action_fil_ = nullptr;
     QAction* action_gomme_ = nullptr;
     void menu_contextuel(ItemComposant* composant, const QPoint& ecran);
 

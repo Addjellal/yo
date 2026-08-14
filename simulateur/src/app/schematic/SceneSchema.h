@@ -52,6 +52,10 @@ class SceneSchema : public QGraphicsScene {
     Q_OBJECT
 
 public:
+    // `Fil` ne se choisit plus nulle part dans l'interface : le câblage est
+    // sans mode, et cliquer une broche suffit — voir DECISION-FILS.md. La
+    // valeur reste dans l'énumération parce que d'anciens projets peuvent
+    // l'avoir enregistrée, et qu'elle ne fait alors que restreindre.
     enum class Outil { Selection, Fil, Suppression };
 
     // Ce que vise le curseur. Défini tôt : le tracé en cours le garde en

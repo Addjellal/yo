@@ -13,6 +13,7 @@
 #include <QImage>
 #include <QJsonObject>
 #include <QMenuBar>
+#include <QToolBar>
 #include <QMenu>
 #include <functional>
 #include <QPainter>
@@ -1460,6 +1461,34 @@ static void test_amorcer_fil_sans_mode() {
              "dans le vide, rien ne s'amorce");
     verifier(scene.outil() == SceneSchema::Outil::Selection,
              "et l'on n'est toujours dans aucun mode à quitter");
+
+    // L'outil « Fil » ne doit plus s'offrir nulle part. Sa présence
+    // enseignait le contraire de ce que fait le logiciel : un élève qui le
+    // voit croit qu'il faut le choisir pour câbler, alors que cliquer une
+    // broche suffit et a toujours suffi.
+    FenetrePrincipale fenetre;
+    QStringList libelles;
+    std::function<void(QList<QAction*>)> ramasser = [&](QList<QAction*> actions) {
+        for (QAction* action : actions) {
+            if (action->menu()) { ramasser(action->menu()->actions()); continue; }
+            QString nom = action->text();
+            nom.remove('&');
+            libelles << nom;
+        }
+    };
+    for (QAction* haut : fenetre.menuBar()->actions())
+        if (haut->menu()) ramasser(haut->menu()->actions());
+    for (QToolBar* barre : fenetre.findChildren<QToolBar*>())
+        ramasser(barre->actions());
+
+    bool outil_fil_offert = false;
+    for (const QString& nom : libelles)
+        if (nom == "Fil") outil_fil_offert = true;
+    verifier(!outil_fil_offert,
+             "l'outil « Fil » ne s'offre plus ni en barre ni en menu");
+    // Mais « Tirer un fil » — le raccourci sans mode — doit rester, lui.
+    verifier(libelles.contains("Tirer un fil"),
+             "tandis que « Tirer un fil » reste offert, sans mode");
 }
 
 static void test_portee_des_commandes() {
