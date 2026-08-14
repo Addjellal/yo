@@ -1431,6 +1431,37 @@ static void test_pense_bete_engendre() {
                  "découvrable");
 }
 
+// « W » ne doit basculer dans AUCUN mode.
+//
+// Il basculait sur l'outil « Fil », ce qui rétablissait le mode que
+// DECISION-FILS.md supprime. Simulink ne connaît pas non plus d'outil fil :
+// on tire depuis un port, et c'est tout. Un raccourci qui rétablit un mode
+// que le geste a supprimé est une régression déguisée en fonctionnalité.
+static void test_amorcer_fil_sans_mode() {
+    std::printf("\n-- amorcer un fil au clavier, sans mode --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    scene.ajouter_composant("resistance", QPointF(300, 0));
+
+    verifier(scene.outil() == SceneSchema::Outil::Selection,
+             "on part du mode sélection");
+
+    // Sur une broche : le fil s'amorce.
+    const QPointF borne = pile->position_borne(0);
+    verifier(scene.amorcer_fil_au(borne),
+             "sur une broche, le fil s'amorce");
+    verifier(scene.outil() == SceneSchema::Outil::Selection,
+             "et l'outil n'a PAS changé — c'est tout le sujet");
+
+    // Dans le vide : rien ne s'amorce, et surtout on ne bascule nulle part.
+    scene.abandonner_fil();
+    verifier(!scene.amorcer_fil_au(QPointF(-900, -700)),
+             "dans le vide, rien ne s'amorce");
+    verifier(scene.outil() == SceneSchema::Outil::Selection,
+             "et l'on n'est toujours dans aucun mode à quitter");
+}
+
 static void test_portee_des_commandes() {
     std::printf("\n-- les commandes suivent la page affichée --\n");
 
@@ -2455,6 +2486,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_amorcer_fil_sans_mode();
     test_portee_des_commandes();
     test_derivation_en_t();
     test_derivation_survit();

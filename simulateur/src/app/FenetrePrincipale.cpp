@@ -23,6 +23,7 @@
 #include <QTextEdit>
 #include <QTextDocument>
 #include <QMenu>
+#include <QCursor>
 #include <functional>
 #include <QPlainTextDocumentLayout>
 #include <QPushButton>
@@ -593,10 +594,22 @@ void FenetrePrincipale::construire_actions() {
                                recherche_palette_->selectAll();
                            }
                        });
+    // « W » amorce un fil DEPUIS CE QU'IL Y A SOUS LE CURSEUR — il ne bascule
+    // dans aucun mode.
+    //
+    // Il basculait sur l'outil « Fil », ce qui contredisait la décision prise
+    // dans DECISION-FILS.md : « plus d'outil fil à choisir, ce qui est sous le
+    // curseur décide ». Simulink ne connaît pas non plus d'outil fil — on tire
+    // depuis un port, et c'est tout. Un raccourci qui rétablit un mode que le
+    // geste a supprimé est une régression déguisée en fonctionnalité.
     edition->addAction("Tirer un &fil", QKeySequence(Qt::Key_W), this, [this] {
-        if (saisie_en_cours()) return;
+        if (saisie_en_cours() || !vue_) return;
         afficher_page(0);
-        choisir_outil(SceneSchema::Outil::Fil);
+        const QPointF ou =
+            vue_->mapToScene(vue_->mapFromGlobal(QCursor::pos()));
+        if (!scene_->amorcer_fil_au(ou))
+            ecrire("Rien à câbler sous le curseur : placez-le sur une broche, "
+                   "un fil ou un point de dérivation, puis appuyez sur W.");
     });
 
     auto* outils = menuBar()->addMenu("&Outils");

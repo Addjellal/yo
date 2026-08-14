@@ -913,6 +913,18 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
 
 // Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
 // curseur.
+bool SceneSchema::amorcer_fil_au(const QPointF& point) {
+    const Cible cible = viser(point);
+    if (!cible.connectable()) return false;
+    abandonner_fil();
+    commencer_fil(cible, cible.point);
+    // Le fil reste accroché au curseur jusqu'au clic suivant : c'est la même
+    // mécanique que le clic simple sur une broche, et elle n'introduit aucun
+    // mode — rien à quitter, il suffit de cliquer ou d'appuyer sur Échap.
+    fil_en_attente_ = true;
+    return true;
+}
+
 void SceneSchema::commencer_fil(const Cible& depart, const QPointF& point) {
     cible_depart_ = depart;
     fil_en_attente_ = false;

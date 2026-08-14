@@ -71,6 +71,16 @@ public:
         }
     };
 
+    // Amorce un fil depuis ce qui se trouve à ce point, sans changer de mode.
+    //
+    // C'est l'équivalent clavier du clic sur une broche : le fil suit ensuite
+    // le curseur jusqu'au clic qui le referme. Rend faux si rien de
+    // connectable n'est visé — on ne bascule alors dans aucun état, ce qui est
+    // exactement la promesse du câblage sans mode.
+    bool amorcer_fil_au(const QPointF& point);
+    // Abandonne le tracé en cours, s'il y en a un.
+    void abandonner_fil();
+
 
     explicit SceneSchema(QObject* parent = nullptr);
 
@@ -228,6 +238,10 @@ private:
     // lieu de s'y connecter. La broche passe donc en tête.
     Cible viser(const QPointF& point) const;
 
+
+
+
+
     // Transforme une cible en ancre utilisable, en découpant le fil si c'est
     // un fil qui est visé. Rend une ancre invalide si la cible ne se connecte
     // pas.
@@ -236,7 +250,6 @@ private:
     // Cycle de vie d'un fil en cours de tracé.
     void commencer_fil(const Cible& depart, const QPointF& point);
     bool terminer_fil(const QPointF& point);   // vrai si un fil a été créé
-    void abandonner_fil();
 
     // Association (composant, borne) -> nom de nœud, calculée par les fils.
     std::map<const ItemComposant*, std::vector<std::string>> calculer_noeuds() const;
