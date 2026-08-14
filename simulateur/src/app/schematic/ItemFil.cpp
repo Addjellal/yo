@@ -20,19 +20,21 @@ ItemFil::ItemFil(ItemComposant* depart, int borne_depart,
                  ItemComposant* arrivee, int borne_arrivee)
     : ItemFil(Ancre(depart, borne_depart), Ancre(arrivee, borne_arrivee)) {}
 
-QPainterPath ItemFil::trace() const {
-    QPainterPath chemin;
-    if (!depart_.valide() || !arrivee_.valide()) return chemin;
-    const QPointF a = depart_.position();
-    const QPointF b = arrivee_.position();
-    chemin.moveTo(a);
+QPainterPath ItemFil::chemin(const QPointF& a, const QPointF& b) {
+    QPainterPath trace;
+    trace.moveTo(a);
     // Équerre en trois segments : on part horizontalement, on descend au
     // milieu, on repart horizontalement.
     const double milieu = (a.x() + b.x()) / 2.0;
-    chemin.lineTo(milieu, a.y());
-    chemin.lineTo(milieu, b.y());
-    chemin.lineTo(b);
-    return chemin;
+    trace.lineTo(milieu, a.y());
+    trace.lineTo(milieu, b.y());
+    trace.lineTo(b);
+    return trace;
+}
+
+QPainterPath ItemFil::trace() const {
+    if (!depart_.valide() || !arrivee_.valide()) return QPainterPath();
+    return chemin(depart_.position(), arrivee_.position());
 }
 
 QRectF ItemFil::boundingRect() const {

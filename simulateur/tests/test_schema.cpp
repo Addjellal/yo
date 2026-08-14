@@ -1465,6 +1465,55 @@ static void test_pense_bete_engendre() {
 // dans le vide, le rectangle de sélection démarrait, et le geste de câblage
 // se changeait en sélection — sans que rien n'explique pourquoi ça marchait
 // tout à l'heure et plus maintenant.
+// Poser un point de passage en cliquant dans le vide.
+//
+// C'est le geste de Simulink et celui de Proteus — « if you want a wire in a
+// particular place, you can simply click at the intermediate corners ». Le
+// clic dans le vide abandonnait le tracé au lieu de le coude.
+static void test_points_de_passage() {
+    std::printf("\n-- poser un point de passage --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(600, 400));
+
+    // On amorce depuis la borne de la pile, on coude deux fois, puis on
+    // referme sur la résistance.
+    verifier(scene.amorcer_fil_au(pile->position_borne(0)),
+             "le tracé s'amorce sur la broche");
+    scene.poser_point_de_passage(QPointF(300, 0));
+    scene.poser_point_de_passage(QPointF(300, 400));
+    verifier(scene.fils().size() == 2,
+             "deux coudes posés font deux segments",
+             std::to_string(scene.fils().size()));
+
+    verifier(scene.terminer_fil(r->position_borne(0)),
+             "et le chemin se referme sur la borne visée");
+    verifier(scene.fils().size() == 3,
+             "trois segments au total",
+             std::to_string(scene.fils().size()));
+    verifier(scene.noeud_de(pile, 0) == scene.noeud_de(r, 0),
+             "les deux bornes sont bien sur le même nœud",
+             scene.noeud_de(pile, 0).toStdString() + " / "
+                 + scene.noeud_de(r, 0).toStdString());
+    // Deux coudes : degré 2 chacun, donc aucune pastille — ce sont des
+    // changements de direction, pas des dérivations.
+    for (ItemJonction* j : scene.jonctions())
+        verifier(!j->jonction(),
+                 "un coude ne dessine pas de pastille de connexion");
+
+    // Un chemin abandonné en route ne doit rien laisser derrière lui.
+    const size_t avant = scene.fils().size();
+    scene.amorcer_fil_au(pile->position_borne(1));
+    scene.poser_point_de_passage(QPointF(-200, 300));
+    scene.poser_point_de_passage(QPointF(-400, 300));
+    scene.abandonner_fil();
+    verifier(scene.fils().size() == avant,
+             "un chemin abandonné ne laisse aucun segment",
+             std::to_string(scene.fils().size()) + "/"
+                 + std::to_string(avant));
+}
+
 static void test_capture_suit_le_zoom() {
     std::printf("\n-- viser une broche à tous les zooms --\n");
 
@@ -2691,6 +2740,7 @@ int main(int argc, char** argv) {
     test_gestes_utilisateur();
     test_modification_en_marche();
     test_pense_bete_engendre();
+    test_points_de_passage();
     test_capture_suit_le_zoom();
     test_scope_suit_son_cablage();
     test_lancer_compile_et_refuse();

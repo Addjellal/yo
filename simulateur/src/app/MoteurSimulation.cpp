@@ -379,9 +379,13 @@ void MoteurSimulation::remettre_a_zero() {
 void MoteurSimulation::signaler_regles() {
     const std::vector<coeur::Anomalie> anomalies =
         coeur::controler_regles(netlist_);
-    int erreurs = 0;
-    for (const auto& anomalie : anomalies)
+    int erreurs = 0, avertissements = 0;
+    for (const auto& anomalie : anomalies) {
         if (anomalie.gravite == coeur::Anomalie::Gravite::Erreur) ++erreurs;
+        else if (anomalie.gravite == coeur::Anomalie::Gravite::Avertissement)
+            ++avertissements;
+    }
+    emit controle_effectue(erreurs, avertissements);
     if (anomalies.empty()) return;
 
     if (erreurs > 0)

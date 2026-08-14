@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QGraphicsItem>
+#include <QPainterPath>
 
 #include "app/schematic/Ancre.h"
 
@@ -20,6 +21,11 @@ public:
             int borne_arrivee);
 
     int type() const override { return Type; }
+
+    // Le chemin en équerre entre deux points. Exposé pour que l'aperçu tracé
+    // pendant le geste soit EXACTEMENT celui du fil final : un aperçu qui
+    // montre une diagonale et pose une équerre est un aperçu qui ment.
+    static QPainterPath chemin(const QPointF& a, const QPointF& b);
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,

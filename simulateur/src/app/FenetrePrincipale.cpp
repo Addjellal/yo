@@ -143,6 +143,8 @@ FenetrePrincipale::FenetrePrincipale() {
             &FenetrePrincipale::ecrire);
     connect(moteur_, &MoteurSimulation::etat_change, this,
             [this](MoteurSimulation::Etat) { refleter_etat(); });
+    connect(moteur_, &MoteurSimulation::controle_effectue, this,
+            &FenetrePrincipale::refleter_controle);
     connect(moteur_, &MoteurSimulation::composant_grille, this,
             [this](const QString& reference) {
                 scene_->marquer_grille(reference);
@@ -856,6 +858,14 @@ void FenetrePrincipale::construire_actions() {
 void FenetrePrincipale::construire_barre_etat() {
     etiquette_moteurs_ = new QLabel;
     etiquette_etat_ = new QLabel;
+    // Le compteur d'anomalies : le seul endroit où l'existence du contrôle
+    // des règles est visible en permanence. Sans lui, un élève ne sait pas
+    // qu'on peut vérifier son montage — et en enseignement, une fonction
+    // cachée n'existe pas.
+    etiquette_anomalies_ = new QLabel("Contrôle : non passé");
+    etiquette_anomalies_->setToolTip(
+        "Contrôle des règles électriques. Il passe au lancement de la "
+        "simulation ; le détail est dans le journal.");
     etiquette_temps_ = new QLabel("Temps simulé : 0,000 s");
     etiquette_vitesse_ = new QLabel("Vitesse : —");
 
@@ -895,6 +905,8 @@ void FenetrePrincipale::construire_barre_etat() {
     statusBar()->addWidget(etiquette_etat_);
     statusBar()->addWidget(new QLabel("  "));
     statusBar()->addWidget(etiquette_moteurs_);
+    statusBar()->addWidget(new QLabel("  "));
+    statusBar()->addWidget(etiquette_anomalies_);
     statusBar()->addPermanentWidget(etiquette_temps_);
     statusBar()->addPermanentWidget(etiquette_vitesse_);
     refleter_etat();
@@ -1010,6 +1022,28 @@ void FenetrePrincipale::envoyer_serie() {
 // Et c'est la seule réponse à « comment l'élève apprend-il que W existe ? ».
 // En enseignement, une fonction cachée n'existe pas : sans cette fenêtre, les
 // autres raccourcis du chantier seraient du travail perdu.
+// Reflète le résultat du dernier contrôle dans la barre d'état.
+void FenetrePrincipale::refleter_controle(int erreurs, int avertissements) {
+    if (!etiquette_anomalies_) return;
+    if (erreurs == 0 && avertissements == 0) {
+        etiquette_anomalies_->setText("Contrôle : aucune anomalie");
+        etiquette_anomalies_->setStyleSheet("color:#2e7d32");
+        return;
+    }
+    QString texte;
+    if (erreurs > 0)
+        texte += QString("%1 erreur%2").arg(erreurs).arg(erreurs > 1 ? "s" : "");
+    if (avertissements > 0) {
+        if (!texte.isEmpty()) texte += " · ";
+        texte += QString("%1 avertissement%2")
+                     .arg(avertissements)
+                     .arg(avertissements > 1 ? "s" : "");
+    }
+    etiquette_anomalies_->setText("Contrôle : " + texte);
+    etiquette_anomalies_->setStyleSheet(erreurs > 0 ? "color:#c62828"
+                                                    : "color:#e65100");
+}
+
 void FenetrePrincipale::montrer_raccourcis() {
     QString texte =
         "<p style='color:#555'>Les raccourcis ci-dessous sont lus dans les "

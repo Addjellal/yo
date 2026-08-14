@@ -98,6 +98,12 @@ public:
     bool amorcer_fil_au(const QPointF& point);
     // Abandonne le tracé en cours, s'il y en a un.
     void abandonner_fil();
+    // Fige le segment tracé et repart du point posé (clic dans le vide) ;
+    // referme le chemin sur la cible visée. Exposés pour les essais.
+    void poser_point_de_passage(const QPointF& point);
+    bool terminer_fil(const QPointF& point);
+    // Retire le seul trait provisoire, sans toucher aux points déjà posés.
+    void effacer_provisoire();
 
 
     explicit SceneSchema(QObject* parent = nullptr);
@@ -222,7 +228,10 @@ private:
     // qu'au dernier moment : tant que le geste n'a pas abouti, aucun fil
     // existant n'a été touché.
     Cible cible_depart_;
-    QGraphicsLineItem* fil_provisoire_ = nullptr;
+    // L'aperçu du fil en cours : un CHEMIN, pas un segment — il doit
+    // montrer l'équerre que le fil aura, pas une diagonale qu'il n'aura
+    // jamais.
+    QGraphicsPathItem* fil_provisoire_ = nullptr;
     // Fil accroché au curseur entre deux clics (câblage en deux temps).
     bool fil_en_attente_ = false;
     QPointF point_appui_;
@@ -255,7 +264,7 @@ private:
 
     // Cycle de vie d'un fil en cours de tracé.
     void commencer_fil(const Cible& depart, const QPointF& point);
-    bool terminer_fil(const QPointF& point);   // vrai si un fil a été créé
+    // Fige le segment tracé et repart du point posé (clic dans le vide).
 
     // Association (composant, borne) -> nom de nœud, calculée par les fils.
     std::map<const ItemComposant*, std::vector<std::string>> calculer_noeuds() const;

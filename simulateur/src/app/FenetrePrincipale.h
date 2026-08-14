@@ -189,6 +189,8 @@ private slots:
     void envoyer_serie();
     // Pense-bête des raccourcis, engendré depuis les QAction des menus.
     void montrer_raccourcis();
+    // Met la barre d'état au diapason du dernier contrôle des règles.
+    void refleter_controle(int erreurs, int avertissements);
     // Le document de ce fichier de cette carte, créé au besoin. Un document
     // par fichier : c'est lui qui porte la pile d'annulation.
     QTextDocument* document_de(const QString& carte, int rang);
@@ -228,6 +230,7 @@ private:
     // position du curseur survivent au changement d'onglet ou de carte.
     std::map<QString, QTextDocument*> documents_;
     std::map<QString, int> curseurs_;
+    QLabel* etiquette_anomalies_ = nullptr;
     Oscilloscope* oscilloscope_ = nullptr;
     // Un oscilloscope par bloc « scope » posé sur le schéma, dans sa fenêtre.
     std::map<ItemComposant*, Oscilloscope*> scopes_;

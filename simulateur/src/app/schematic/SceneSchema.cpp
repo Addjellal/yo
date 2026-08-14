@@ -1,6 +1,7 @@
 #include "app/schematic/SceneSchema.h"
 
 #include <QGraphicsLineItem>
+#include <QGraphicsPathItem>
 #include <QJsonArray>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
@@ -933,6 +934,35 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
 
 // Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
 // curseur.
+// Fige le segment déjà tracé et repart du point posé.
+//
+// Le point créé n'a qu'un fil tant que la suite n'est pas tracée : c'est
+// pourquoi le balayage ne doit pas passer avant que le chemin soit terminé.
+// Un abandon en cours de route le laisse à un seul fil, et le balayage le
+// retire alors avec sa branche — un chemin qui ne mène nulle part ne se
+// garde pas.
+void SceneSchema::poser_point_de_passage(const QPointF& point) {
+    const Ancre depart = ancrer(cible_depart_);
+    if (!depart.valide()) {
+        abandonner_fil();
+        return;
+    }
+    auto* etape = new ItemJonction(aligner(point));
+    addItem(etape);
+    addItem(new ItemFil(depart, Ancre(etape)));
+
+    Cible suite;
+    suite.genre = Cible::Genre::Jonction;
+    suite.ancre = Ancre(etape);
+    suite.point = etape->pos();
+    // On efface le trait provisoire SANS balayer : le point qu'on vient de
+    // poser n'a encore qu'un fil, et le balayage l'emporterait aussitôt avec
+    // sa branche. Il ne reprendra son droit qu'à la fin du chemin.
+    effacer_provisoire();
+    commencer_fil(suite, suite.point);
+    fil_en_attente_ = true;
+}
+
 bool SceneSchema::amorcer_fil_au(const QPointF& point) {
     const Cible cible = viser(point);
     if (!cible.connectable()) return false;
@@ -949,8 +979,9 @@ void SceneSchema::commencer_fil(const Cible& depart, const QPointF& point) {
     cible_depart_ = depart;
     fil_en_attente_ = false;
     point_appui_ = point;
-    fil_provisoire_ = addLine(QLineF(depart.point, point),
-                              QPen(QColor(0, 120, 215), 1.5, Qt::DashLine));
+    fil_provisoire_ =
+        addPath(ItemFil::chemin(depart.point, point),
+                QPen(QColor(0, 120, 215), 1.5, Qt::DashLine));
 }
 
 // Le nom lisible d'une ancre, pour le journal.
@@ -996,14 +1027,21 @@ bool SceneSchema::terminer_fil(const QPointF& point) {
     return true;
 }
 
+void SceneSchema::effacer_provisoire() {
+    if (!fil_provisoire_) return;
+    removeItem(fil_provisoire_);
+    delete fil_provisoire_;
+    fil_provisoire_ = nullptr;
+}
+
 void SceneSchema::abandonner_fil() {
-    if (fil_provisoire_) {
-        removeItem(fil_provisoire_);
-        delete fil_provisoire_;
-        fil_provisoire_ = nullptr;
-    }
+    effacer_provisoire();
     cible_depart_ = Cible();
     fil_en_attente_ = false;
+    // Les points de passage d'un chemin abandonné n'ont plus qu'un fil : le
+    // balayage les retire, de proche en proche jusqu'au premier point qui
+    // relie vraiment quelque chose.
+    balayer_jonctions();
 }
 
 // Composant sous un point, quelle que soit la partie touchée.
@@ -1022,7 +1060,16 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
         // Fil laissé en attente par un premier clic : ce clic-ci le referme,
         // ou l'abandonne s'il tombe à côté d'une borne.
         if (fil_en_attente_ && cible_depart_.connectable()) {
-            if (!terminer_fil(point)) abandonner_fil();
+            if (terminer_fil(point)) return;
+            // Clic dans le vide pendant un tracé : on POSE UN POINT DE
+            // PASSAGE et l'on continue, au lieu de tout abandonner.
+            //
+            // C'est le geste de Simulink et celui de Proteus — « if you want
+            // a wire in a particular place, you can simply click at the
+            // intermediate corners ». Il donne la main sur le chemin sans
+            // changer d'outil, et c'était le point 3 de DECISION-FILS.md,
+            // écrit mais jamais fait.
+            poser_point_de_passage(point);
             return;
         }
 
@@ -1076,8 +1123,8 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
 
 void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
     if (fil_provisoire_ && cible_depart_.connectable()) {
-        fil_provisoire_->setLine(
-            QLineF(cible_depart_.point, evenement->scenePos()));
+        fil_provisoire_->setPath(
+            ItemFil::chemin(cible_depart_.point, evenement->scenePos()));
         return;
     }
 

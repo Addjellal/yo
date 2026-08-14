@@ -143,6 +143,8 @@ signals:
     // Un composant vient de dépasser une de ses limites absolues : le schéma
     // le marque, et il le reste jusqu'à l'arrêt.
     void composant_grille(const QString& reference);
+    // Bilan du contrôle des règles, à chaque lancement.
+    void controle_effectue(int erreurs, int avertissements);
     void avancement(double temps_ms, double vitesse);
     // Changement d'état : c'est ce qui pilote l'apparence des commandes.
     void etat_change(Etat etat);
