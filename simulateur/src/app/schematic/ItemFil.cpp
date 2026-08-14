@@ -8,20 +8,23 @@
 #include <cmath>
 
 #include "app/schematic/ItemComposant.h"
+#include "app/schematic/ItemJonction.h"
 
-ItemFil::ItemFil(ItemComposant* depart, int borne_depart,
-                 ItemComposant* arrivee, int borne_arrivee)
-    : depart_(depart), arrivee_(arrivee), borne_depart_(borne_depart),
-      borne_arrivee_(borne_arrivee) {
+ItemFil::ItemFil(const Ancre& depart, const Ancre& arrivee)
+    : depart_(depart), arrivee_(arrivee) {
     setFlag(ItemIsSelectable, true);
     setZValue(-1);   // les fils passent sous les composants
 }
 
+ItemFil::ItemFil(ItemComposant* depart, int borne_depart,
+                 ItemComposant* arrivee, int borne_arrivee)
+    : ItemFil(Ancre(depart, borne_depart), Ancre(arrivee, borne_arrivee)) {}
+
 QPainterPath ItemFil::trace() const {
     QPainterPath chemin;
-    if (!depart_ || !arrivee_) return chemin;
-    const QPointF a = depart_->position_borne(borne_depart_);
-    const QPointF b = arrivee_->position_borne(borne_arrivee_);
+    if (!depart_.valide() || !arrivee_.valide()) return chemin;
+    const QPointF a = depart_.position();
+    const QPointF b = arrivee_.position();
     chemin.moveTo(a);
     // Équerre en trois segments : on part horizontalement, on descend au
     // milieu, on repart horizontalement.
@@ -78,8 +81,8 @@ void ItemFil::paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,
     peintre->drawPath(trace());
 
     if (tension_connue_) {
-        const QPointF a = depart_->position_borne(borne_depart_);
-        const QPointF b = arrivee_->position_borne(borne_arrivee_);
+        const QPointF a = depart_.position();
+        const QPointF b = arrivee_.position();
         const QPointF milieu((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0);
         QFont police = peintre->font();
         police.setPointSizeF(8.0);

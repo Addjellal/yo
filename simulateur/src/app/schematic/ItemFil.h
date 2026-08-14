@@ -4,12 +4,18 @@
 
 #include <QGraphicsItem>
 
+#include "app/schematic/Ancre.h"
+
 class ItemComposant;
 
 class ItemFil : public QGraphicsItem {
 public:
     enum { Type = UserType + 2 };
 
+    // Le fil relie deux ancres. C'est la forme générale.
+    ItemFil(const Ancre& depart, const Ancre& arrivee);
+    // Broche à broche : le cas courant, et celui qu'écrivaient tous les
+    // appelants avant que l'ancre existe.
     ItemFil(ItemComposant* depart, int borne_depart, ItemComposant* arrivee,
             int borne_arrivee);
 
@@ -19,13 +25,23 @@ public:
     void paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,
                QWidget* widget) override;
 
-    ItemComposant* depart() const { return depart_; }
-    ItemComposant* arrivee() const { return arrivee_; }
-    int borne_depart() const { return borne_depart_; }
-    int borne_arrivee() const { return borne_arrivee_; }
+    const Ancre& ancre_depart() const { return depart_; }
+    const Ancre& ancre_arrivee() const { return arrivee_; }
+    void definir_ancre_arrivee(const Ancre& ancre) { arrivee_ = ancre; }
+
+    // Les quatre accesseurs d'origine. Ils rendent nullptr / 0 quand
+    // l'extrémité est une jonction : les appelants qui ne connaissent que les
+    // broches — sauvegarde, netlist, surbrillance — testent déjà le nullptr.
+    ItemComposant* depart() const { return depart_.composant; }
+    ItemComposant* arrivee() const { return arrivee_.composant; }
+    int borne_depart() const { return depart_.borne; }
+    int borne_arrivee() const { return arrivee_.borne; }
 
     bool touche(const ItemComposant* composant) const {
-        return depart_ == composant || arrivee_ == composant;
+        return depart_.composant == composant || arrivee_.composant == composant;
+    }
+    bool touche(const ItemJonction* jonction) const {
+        return depart_.jonction == jonction || arrivee_.jonction == jonction;
     }
 
     // Tension du nœud, affichée pendant la simulation (NaN = pas de mesure).
@@ -33,10 +49,8 @@ public:
     void rafraichir();
 
 private:
-    ItemComposant* depart_ = nullptr;
-    ItemComposant* arrivee_ = nullptr;
-    int borne_depart_ = 0;
-    int borne_arrivee_ = 0;
+    Ancre depart_;
+    Ancre arrivee_;
     double tension_ = 0.0;
     bool tension_connue_ = false;
 

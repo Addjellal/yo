@@ -33,6 +33,8 @@
 #include "app/panels/PanneauPcb.h"
 #include "core/engines/NgspiceEngine.h"
 #include "app/MoteurSimulation.h"
+#include "app/schematic/ItemJonction.h"
+#include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
 #include <QDir>
 #include "app/schematic/SceneSchema.h"
@@ -1368,6 +1370,96 @@ static void test_modification_en_marche() {
 }
 
 // ---------------------------------------------------------------------------
+// Dérivation en T : un fil qui part d'un fil
+//
+// C'était impossible, et pas par oubli : `ItemFil` reliait deux broches de
+// composant et rien d'autre, si bien qu'un fil partant d'un fil était
+// inexprimable. L'ancre le rend dicible, la découpe le rend faisable.
+//
+// La règle à vérifier est électrique, pas graphique : après découpe, les
+// trois fils doivent être sur le MÊME nœud. Un T qui se dessine sans relier
+// serait pire que pas de T du tout.
+// ---------------------------------------------------------------------------
+static void test_derivation_en_t() {
+    std::printf("\n-- dérivation en T --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 200));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+
+    ItemFil* dorsale = new ItemFil(pile, 0, r1, 0);
+    scene.addItem(dorsale);
+    scene.addItem(new ItemFil(r1, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    const size_t fils_avant = scene.fils().size();
+    const QString noeud_dorsale = scene.noeud_de(r1, 0);
+
+    // On dérive depuis le fil pile→R1 pour alimenter R2.
+    ItemJonction* point = scene.decouper(dorsale, QPointF(150, 0));
+    verifier(point != nullptr, "la découpe rend le point créé");
+    verifier(scene.fils().size() == fils_avant + 1,
+             "un fil coupé en deux en fait un de plus",
+             std::to_string(scene.fils().size()) + " fils");
+    verifier(scene.jonctions().size() == 1, "et pose exactement un point");
+
+    scene.addItem(new ItemFil(Ancre(point), Ancre(r2, 0)));
+    scene.addItem(new ItemFil(r2, 1, masse, 0));
+
+    // Le contrôle qui compte : R2 doit se retrouver sur le nœud de la dorsale.
+    verifier(scene.noeud_de(r1, 0) == noeud_dorsale,
+             "la découpe ne change pas le nœud de la dorsale",
+             scene.noeud_de(r1, 0).toStdString());
+    verifier(scene.noeud_de(r2, 0) == noeud_dorsale,
+             "la dérivation met R2 sur ce même nœud",
+             scene.noeud_de(r2, 0).toStdString() + " attendu "
+                 + noeud_dorsale.toStdString());
+    verifier(scene.noeud_de(pile, 0) == noeud_dorsale,
+             "et la pile y est toujours");
+
+    // Le montage doit rester simulable : c'est le vrai juge.
+    {
+        std::vector<LiaisonBroche> broches;
+        const coeur::Netlist netlist = scene.construire_netlist(&broches);
+        MoteurSimulation moteur;
+        moteur.definir_circuit(netlist, broches, scene.cartes_presentes());
+        moteur.demarrer();
+        QElapsedTimer chrono;
+        chrono.start();
+        while (chrono.elapsed() < 120)
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        const double v = moteur.analogique().tension(
+            scene.noeud_de(r2, 0).toStdString());
+        verifier(std::fabs(v) > 0.5,
+                 "le circuit dérivé est bien alimenté",
+                 f(v) + " V");
+        moteur.arreter();
+    }
+
+    // Effacer la dérivation doit reprendre le point : une pastille de
+    // connexion là où plus rien ne se connecte serait un mensonge.
+    for (ItemFil* fil : scene.fils()) {
+        if (fil->ancre_depart().jonction != point) continue;
+        if (fil->ancre_arrivee().composant != r2) continue;
+        scene.removeItem(fil);
+        delete fil;
+        break;
+    }
+    scene.balayer_jonctions();
+    verifier(scene.jonctions().size() == 1 && point->degre == 2,
+             "le point retombe à deux fils : ce n'est plus une jonction mais "
+             "un coude",
+             std::to_string(point->degre) + " fils");
+    verifier(!point->jonction(),
+             "et il ne dessine plus de pastille — un point de connexion là où "
+             "rien ne se connecte serait un mensonge");
+    verifier(scene.noeud_de(r1, 0) == noeud_dorsale,
+             "la dorsale reste d'un seul tenant à travers le coude");
+}
+
+// ---------------------------------------------------------------------------
 // Ce qui aurait grillé
 //
 // Le solveur ne connaît que des équations. Une LED branchée sans résistance
@@ -2141,6 +2233,7 @@ int main(int argc, char** argv) {
     test_transfert_pcb();
     test_gestes_utilisateur();
     test_modification_en_marche();
+    test_derivation_en_t();
     test_composants_grilles();
     test_pas_de_trainee();
     test_panneaux_retrecissables();

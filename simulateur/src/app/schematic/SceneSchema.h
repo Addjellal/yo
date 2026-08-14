@@ -23,6 +23,7 @@
 
 class ItemComposant;
 class ItemFil;
+class ItemJonction;
 
 // Une broche de carte programmable reliée à un nœud du circuit.
 struct LiaisonBroche {
@@ -116,6 +117,19 @@ public:
 
     std::vector<ItemComposant*> composants() const;
     std::vector<ItemFil*> fils() const;
+    std::vector<ItemJonction*> jonctions() const;
+
+    // Coupe un fil en deux autour d'un point, et rend le point créé.
+    //
+    // C'est le mécanisme de la dérivation en T, pris tel quel dans LibrePCB :
+    // on pose une ancre au lieu du clic, on crée les deux moitiés de l'ancien
+    // fil, on supprime l'ancien. Aucune notion de « jonction » n'est
+    // nécessaire ailleurs — le T est trois fils partageant une ancre.
+    ItemJonction* decouper(ItemFil* fil, const QPointF& point);
+
+    // Balaie les points devenus inutiles : un point d'où ne part plus qu'un
+    // fil, ou aucun, n'a plus de raison d'être. Appelé après toute suppression.
+    void balayer_jonctions();
 
     // Applique les résultats d'une résolution : éclat des LED, tension des fils.
     // `formes` est facultatif : sans lui, les instruments affichent la valeur

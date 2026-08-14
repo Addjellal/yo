@@ -15,6 +15,7 @@
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
+#include "app/schematic/ItemJonction.h"
 #include "core/Device.h"
 
 namespace {
@@ -187,6 +188,57 @@ std::vector<CartePosee> SceneSchema::cartes_posees() const {
     return resultat;
 }
 
+std::vector<ItemJonction*> SceneSchema::jonctions() const {
+    std::vector<ItemJonction*> resultat;
+    for (QGraphicsItem* item : items())
+        if (item->type() == ItemJonction::Type)
+            resultat.push_back(static_cast<ItemJonction*>(item));
+    return resultat;
+}
+
+// Coupe un fil en deux autour d'un point.
+//
+// Repris de LibrePCB (`schematiceditorstate_drawwire.cpp`, branche
+// « split netline ») : poser une ancre, créer les deux moitiés, supprimer
+// l'original. L'ordre importe — on ajoute avant de retirer, pour qu'aucune
+// extrémité ne pende dans le vide entre-temps.
+ItemJonction* SceneSchema::decouper(ItemFil* fil, const QPointF& point) {
+    if (!fil) return nullptr;
+    const Ancre a = fil->ancre_depart();
+    const Ancre b = fil->ancre_arrivee();
+    if (!a.valide() || !b.valide()) return nullptr;
+
+    ItemJonction* jonction = new ItemJonction(point);
+    addItem(jonction);
+    addItem(new ItemFil(a, Ancre(jonction)));
+    addItem(new ItemFil(Ancre(jonction), b));
+    removeItem(fil);
+    delete fil;
+    return jonction;
+}
+
+// Un point d'où ne part plus qu'un fil — ou aucun — ne relie plus rien.
+// Le laisser afficherait une pastille de connexion là où il n'y a pas de
+// connexion, ce qui est exactement le contraire de ce qu'elle veut dire.
+void SceneSchema::balayer_jonctions() {
+    const std::vector<ItemFil*> tous = fils();
+    for (ItemJonction* jonction : jonctions()) {
+        int degre = 0;
+        for (ItemFil* fil : tous)
+            if (fil->touche(jonction)) ++degre;
+        jonction->degre = degre;
+        if (degre >= 2) continue;
+        // Le seul fil restant meurt avec elle : il ne mène plus nulle part.
+        for (ItemFil* fil : tous) {
+            if (!fil->touche(jonction)) continue;
+            removeItem(fil);
+            delete fil;
+        }
+        removeItem(jonction);
+        delete jonction;
+    }
+}
+
 std::vector<ItemFil*> SceneSchema::fils() const {
     std::vector<ItemFil*> resultat;
     for (QGraphicsItem* item : items())
@@ -278,14 +330,33 @@ SceneSchema::calculer_noeuds() const {
         indices[composant] = pour_ce_composant;
     }
 
+    // Les points de fil sont des nœuds comme les autres : ils entrent dans la
+    // même relation d'équivalence. C'est ce qui fait qu'une dérivation en T
+    // relie électriquement les trois fils sans code particulier — trois unions
+    // sur la même classe.
+    std::map<const ItemJonction*, int> indices_jonction;
+    for (ItemJonction* jonction : jonctions())
+        indices_jonction[jonction] = classes.ajouter();
+
+    // L'indice d'une extrémité de fil, quelle que soit sa nature. -1 quand
+    // l'ancre ne désigne rien de connu — un composant effacé, par exemple.
+    auto indice_de = [&](const Ancre& ancre) -> int {
+        if (ancre.jonction) {
+            auto it = indices_jonction.find(ancre.jonction);
+            return it == indices_jonction.end() ? -1 : it->second;
+        }
+        auto it = indices.find(ancre.composant);
+        if (it == indices.end()) return -1;
+        if (ancre.borne < 0 || ancre.borne >= static_cast<int>(it->second.size()))
+            return -1;
+        return it->second[ancre.borne];
+    };
+
     for (ItemFil* fil : fils()) {
-        auto a = indices.find(fil->depart());
-        auto b = indices.find(fil->arrivee());
-        if (a == indices.end() || b == indices.end()) continue;
-        if (fil->borne_depart() >= static_cast<int>(a->second.size())) continue;
-        if (fil->borne_arrivee() >= static_cast<int>(b->second.size())) continue;
-        classes.unir(a->second[fil->borne_depart()],
-                     b->second[fil->borne_arrivee()]);
+        const int a = indice_de(fil->ancre_depart());
+        const int b = indice_de(fil->ancre_arrivee());
+        if (a < 0 || b < 0) continue;
+        classes.unir(a, b);
     }
 
     // Nommage : un symbole d'alimentation impose son nom ; à défaut une broche
@@ -550,11 +621,22 @@ void SceneSchema::appliquer_resultats(
             QString::fromStdString(modele->mesure_instrument(provisoire, lecture)));
     }
 
+    // La tension d'un fil se lit à l'une ou l'autre de ses extrémités : elles
+    // sont sur le même nœud. Interroger la seule extrémité de départ laissait
+    // sans mesure tout fil partant d'un point de dérivation, puisqu'un point
+    // n'est pas un composant — on essaie donc les deux.
+    auto noeud_de_ancre = [&noeuds](const Ancre& ancre) -> std::string {
+        if (!ancre.composant) return {};
+        auto it = noeuds.find(ancre.composant);
+        if (it == noeuds.end()) return {};
+        if (ancre.borne < 0 || ancre.borne >= static_cast<int>(it->second.size()))
+            return {};
+        return it->second[ancre.borne];
+    };
     for (ItemFil* fil : fils()) {
-        auto it = noeuds.find(fil->depart());
-        if (it == noeuds.end()) continue;
-        if (fil->borne_depart() >= static_cast<int>(it->second.size())) continue;
-        std::string noeud = it->second[fil->borne_depart()];
+        std::string noeud = noeud_de_ancre(fil->ancre_depart());
+        if (noeud.empty()) noeud = noeud_de_ancre(fil->ancre_arrivee());
+        if (noeud.empty()) continue;
         std::transform(noeud.begin(), noeud.end(), noeud.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         auto mesure = tensions.find(noeud);

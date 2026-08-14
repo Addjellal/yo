@@ -236,6 +236,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     src/app/schematic/VueSchema.cpp
     src/app/schematic/ItemComposant.cpp
     src/app/schematic/ItemFil.cpp
+    src/app/schematic/ItemJonction.cpp
     src/app/panels/PanneauAnalyses.cpp
     src/app/panels/FenetreInstrument.cpp
     src/app/panels/PanneauPcb.cpp
