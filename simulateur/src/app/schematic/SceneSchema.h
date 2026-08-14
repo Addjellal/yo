@@ -21,6 +21,8 @@
 #include "core/Netlist.h"
 #include "core/engines/NgspiceEngine.h"
 
+#include "app/schematic/Ancre.h"
+
 class ItemComposant;
 class ItemFil;
 class ItemJonction;
@@ -168,8 +170,9 @@ protected:
 
 private:
     Outil outil_ = Outil::Selection;
-    ItemComposant* fil_depart_ = nullptr;
-    int fil_borne_ = -1;
+    // L'ancre d'où part le fil en cours. Une ancre, pas une broche : c'est
+    // ce qui permet de partir d'un fil existant.
+    Ancre fil_depart_;
     QGraphicsLineItem* fil_provisoire_ = nullptr;
     // Fil accroché au curseur entre deux clics (câblage en deux temps).
     bool fil_en_attente_ = false;
@@ -190,8 +193,41 @@ private:
     // Recherche la borne sous le curseur, tous composants confondus.
     std::pair<ItemComposant*, int> borne_sous(const QPointF& point) const;
 
+    // Ce que vise le curseur.
+    //
+    // Sans mode, c'est cette question qui remplace le choix d'un outil : on
+    // ne demande plus à l'utilisateur de déclarer son intention, on la lit
+    // sous le curseur. LibrePCB résout la même question par une table de
+    // priorités explicite ; on reprend le principe.
+    //
+    // Écart assumé sur leur ordre : chez eux le fil (20) passe avant la
+    // broche (40). Ça marche parce qu'un point de fil, prioritaire, occupe
+    // les extrémités. Ici un fil se termine DIRECTEMENT sur une broche : le
+    // fil gagnerait toujours, et cliquer une broche découperait le fil au
+    // lieu de s'y connecter. La broche passe donc en tête.
+    struct Cible {
+        enum class Genre { Rien, Broche, Jonction, Fil, Composant };
+        Genre genre = Genre::Rien;
+        Ancre ancre;                          // Broche et Jonction
+        ItemFil* fil = nullptr;               // Fil : celui qu'il faudra couper
+        ItemComposant* composant = nullptr;   // Composant : son corps
+        QPointF point;                        // position retenue
+
+        // Ce sur quoi un fil peut naître ou mourir.
+        bool connectable() const {
+            return genre == Genre::Broche || genre == Genre::Jonction
+                   || genre == Genre::Fil;
+        }
+    };
+    Cible viser(const QPointF& point) const;
+
+    // Transforme une cible en ancre utilisable, en découpant le fil si c'est
+    // un fil qui est visé. Rend une ancre invalide si la cible ne se connecte
+    // pas.
+    Ancre ancrer(const Cible& cible);
+
     // Cycle de vie d'un fil en cours de tracé.
-    void commencer_fil(ItemComposant* composant, int borne, const QPointF& point);
+    void commencer_fil(const Ancre& depart, const QPointF& point);
     bool terminer_fil(const QPointF& point);   // vrai si un fil a été créé
     void abandonner_fil();
 

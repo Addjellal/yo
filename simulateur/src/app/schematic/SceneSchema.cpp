@@ -264,7 +264,13 @@ void SceneSchema::supprimer_selection() {
     }
     // Un fil en cours de tracé peut partir d'un composant qu'on efface : le
     // laisser en attente, c'est garder un pointeur vers un objet détruit.
-    if (fil_depart_ && a_supprimer.count(fil_depart_)) abandonner_fil();
+    // Une ancre peut désigner un composant OU un point de fil : les deux
+    // peuvent être dans la fournée.
+    if ((fil_depart_.composant && a_supprimer.count(fil_depart_.composant))
+        || (fil_depart_.jonction
+            && a_supprimer.count(reinterpret_cast<QGraphicsItem*>(
+                   fil_depart_.jonction))))
+        abandonner_fil();
 
     // L'ordre compte, et il coûte cher à ignorer : retirer un composant fait
     // recalculer par Qt le cadre des objets voisins, donc celui des fils qui
@@ -298,9 +304,8 @@ void SceneSchema::tout_effacer() {
     // Les pointeurs sont remis à zéro sans passer par abandonner_fil() : les
     // objets viennent d'être détruits par clear(). Un fil resté « en attente »
     // désignerait sinon un composant qui n'existe plus.
-    fil_depart_ = nullptr;
+    fil_depart_ = Ancre();
     fil_provisoire_ = nullptr;
-    fil_borne_ = -1;
     fil_en_attente_ = false;
     emit selection_composant(nullptr);
 }
@@ -312,6 +317,84 @@ std::pair<ItemComposant*, int> SceneSchema::borne_sous(
         if (borne >= 0) return {composant, borne};
     }
     return {nullptr, -1};
+}
+
+// Ce que vise le curseur, par ordre de priorité.
+//
+// Le principe est celui de `findItemsAtPos` de LibrePCB : un classement
+// explicite, tout ce à quoi on peut se connecter passant avant le corps du
+// composant. On y ajoute leur idée de palier — un objet proche du curseur sans
+// être dessous reste candidat, mais après ceux qui sont dessous —, ce qui fait
+// de l'aimantation une conséquence du classement plutôt qu'un traitement à
+// part.
+static ItemComposant* composant_sous(const QGraphicsScene* scene,
+                                     const QPointF& point);
+
+SceneSchema::Cible SceneSchema::viser(const QPointF& point) const {
+    Cible meilleure;
+    int meilleure_priorite = 1 << 20;
+    auto retenir = [&](int priorite, const Cible& candidate) {
+        if (priorite >= meilleure_priorite) return;
+        meilleure_priorite = priorite;
+        meilleure = candidate;
+    };
+
+    // 0 — une broche. La cible la plus précise et la plus demandée.
+    for (ItemComposant* composant : composants()) {
+        const int borne = composant->borne_proche(point);
+        if (borne < 0) continue;
+        Cible c;
+        c.genre = Cible::Genre::Broche;
+        c.ancre = Ancre(composant, borne);
+        c.point = c.ancre.position();   // aimantée sur la broche
+        retenir(0, c);
+    }
+
+    // 10 — un point de fil existant.
+    for (ItemJonction* jonction : jonctions()) {
+        if (!jonction->shape().contains(jonction->mapFromScene(point))) continue;
+        Cible c;
+        c.genre = Cible::Genre::Jonction;
+        c.ancre = Ancre(jonction);
+        c.point = jonction->pos();
+        retenir(10, c);
+    }
+
+    // 20 — un fil. Le viser, c'est demander à le couper.
+    for (ItemFil* fil : fils()) {
+        if (!fil->shape().contains(fil->mapFromScene(point))) continue;
+        Cible c;
+        c.genre = Cible::Genre::Fil;
+        c.fil = fil;
+        c.point = point;
+        retenir(20, c);
+    }
+
+    // 70 — le corps d'un composant : on le sélectionne, on le déplace.
+    if (ItemComposant* composant = composant_sous(this, point)) {
+        Cible c;
+        c.genre = Cible::Genre::Composant;
+        c.composant = composant;
+        c.point = point;
+        retenir(70, c);
+    }
+    return meilleure;
+}
+
+// Une cible devient une ancre. Un fil visé se coupe en deux pour la fournir :
+// c'est là, et seulement là, que naît un point de dérivation.
+Ancre SceneSchema::ancrer(const Cible& cible) {
+    switch (cible.genre) {
+        case Cible::Genre::Broche:
+        case Cible::Genre::Jonction:
+            return cible.ancre;
+        case Cible::Genre::Fil: {
+            ItemJonction* point = decouper(cible.fil, cible.point);
+            return point ? Ancre(point) : Ancre();
+        }
+        default:
+            return Ancre();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -735,31 +818,43 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
 
 // Démarre un fil depuis une borne, et pose le trait provisoire qui suit le
 // curseur.
-void SceneSchema::commencer_fil(ItemComposant* composant, int borne,
-                                const QPointF& point) {
-    fil_depart_ = composant;
-    fil_borne_ = borne;
+void SceneSchema::commencer_fil(const Ancre& depart, const QPointF& point) {
+    fil_depart_ = depart;
     fil_en_attente_ = false;
     point_appui_ = point;
-    fil_provisoire_ = addLine(QLineF(composant->position_borne(borne), point),
+    fil_provisoire_ = addLine(QLineF(depart.position(), point),
                               QPen(QColor(0, 120, 215), 1.5, Qt::DashLine));
+}
+
+// Le nom lisible d'une ancre, pour le journal.
+static QString nom_ancre(const Ancre& ancre) {
+    if (ancre.composant)
+        return ancre.composant->reference() + "."
+               + ancre.composant->nom_borne(ancre.borne);
+    return QStringLiteral("dérivation");
 }
 
 // Referme le fil sur une borne d'arrivée, si elle est valable.
 bool SceneSchema::terminer_fil(const QPointF& point) {
-    auto [composant, borne] = borne_sous(point);
-    const bool valable =
-        composant && !(composant == fil_depart_ && borne == fil_borne_);
-    if (valable) {
-        addItem(new ItemFil(fil_depart_, fil_borne_, composant, borne));
-        emit journal(QString("Fil : %1.%2 — %3.%4")
-                         .arg(fil_depart_->reference(),
-                              fil_depart_->nom_borne(fil_borne_),
-                              composant->reference(),
-                              composant->nom_borne(borne)));
+    const Cible cible = viser(point);
+    // Un fil ne se referme pas sur lui-même, et ne peut pas non plus couper le
+    // fil qu'on est en train de tirer — il n'existe pas encore.
+    if (!cible.connectable()) {
+        abandonner_fil();
+        return false;
     }
+    const Ancre arrivee = ancrer(cible);
+    if (!arrivee.valide() || arrivee == fil_depart_) {
+        abandonner_fil();
+        return false;
+    }
+    const Ancre depart = fil_depart_;
+    addItem(new ItemFil(depart, arrivee));
+    emit journal(QString("Fil : %1 — %2").arg(nom_ancre(depart),
+                                              nom_ancre(arrivee)));
+    balayer_jonctions();
     abandonner_fil();
-    return valable;
+    return true;
 }
 
 void SceneSchema::abandonner_fil() {
@@ -768,13 +863,13 @@ void SceneSchema::abandonner_fil() {
         delete fil_provisoire_;
         fil_provisoire_ = nullptr;
     }
-    fil_depart_ = nullptr;
-    fil_borne_ = -1;
+    fil_depart_ = Ancre();
     fil_en_attente_ = false;
 }
 
 // Composant sous un point, quelle que soit la partie touchée.
-static ItemComposant* composant_sous(QGraphicsScene* scene, const QPointF& point) {
+static ItemComposant* composant_sous(const QGraphicsScene* scene,
+                                    const QPointF& point) {
     for (QGraphicsItem* item : scene->items(point))
         if (item->type() == ItemComposant::Type)
             return static_cast<ItemComposant*>(item);
@@ -787,25 +882,31 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     if (evenement->button() == Qt::LeftButton && outil_ != Outil::Suppression) {
         // Fil laissé en attente par un premier clic : ce clic-ci le referme,
         // ou l'abandonne s'il tombe à côté d'une borne.
-        if (fil_en_attente_ && fil_depart_) {
+        if (fil_en_attente_ && fil_depart_.valide()) {
             if (!terminer_fil(point)) abandonner_fil();
             return;
         }
 
-        // Cliquer une borne suffit à tirer un fil : c'est ce que font les
-        // ateliers de saisie de schéma, et cela évite d'aller chercher un
-        // outil pour l'opération la plus fréquente du dessin.
-        auto [composant, borne] = borne_sous(point);
-        if (composant) {
-            commencer_fil(composant, borne, point);
-            return;
+        // Sans mode : ce qui est sous le curseur décide. Broche, point de
+        // fil ou fil — on câble ; corps de composant — on sélectionne. Plus
+        // d'outil à choisir avant d'agir, et notamment plus de bascule en
+        // sélection quand on part d'un fil, qui était le défaut le plus
+        // visible à l'usage.
+        const Cible cible = viser(point);
+        if (cible.connectable()) {
+            const Ancre depart = ancrer(cible);
+            if (depart.valide()) {
+                commencer_fil(depart, cible.point);
+                return;
+            }
         }
         if (outil_ == Outil::Fil) return;   // l'outil fil ne fait que ça
         // Un déplacement commence peut-être : on garde l'état d'avant pour
         // pouvoir l'annuler, et on ne l'empilera qu'en cas de vrai changement.
         // Seulement si le clic porte sur un composant : sérialiser la scène à
         // chaque clic dans le vide serait du travail pour rien.
-        if (composant_sous(this, point)) etat_avant_geste_ = vers_json();
+        if (cible.genre == Cible::Genre::Composant)
+            etat_avant_geste_ = vers_json();
     }
     if (outil_ == Outil::Suppression && evenement->button() == Qt::LeftButton) {
         clearSelection();
@@ -829,19 +930,27 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
-    if (fil_provisoire_ && fil_depart_) {
+    if (fil_provisoire_ && fil_depart_.valide()) {
         fil_provisoire_->setLine(
-            QLineF(fil_depart_->position_borne(fil_borne_),
-                   evenement->scenePos()));
+            QLineF(fil_depart_.position(), evenement->scenePos()));
         return;
     }
 
-    // Le curseur change au-dessus d'une borne : sans ce signe, rien ne dirait
-    // qu'un clic va tirer un fil plutôt que déplacer le composant.
+    // Le curseur annonce ce que le clic va faire. C'est ce qui rend l'absence
+    // de mode lisible plutôt que surprenante : sans ce signe, rien ne dirait
+    // qu'un clic va câbler plutôt que déplacer. Proteus fait de même — crayon
+    // au-dessus d'une broche, marque verte au-dessus d'un fil.
     if (outil_ != Outil::Suppression) {
-        const bool sur_borne = borne_sous(evenement->scenePos()).first != nullptr;
-        for (QGraphicsView* vue : views())
-            vue->setCursor(sur_borne ? Qt::CrossCursor : Qt::ArrowCursor);
+        const Cible cible = viser(evenement->scenePos());
+        Qt::CursorShape forme = Qt::ArrowCursor;
+        if (cible.genre == Cible::Genre::Broche
+            || cible.genre == Cible::Genre::Jonction)
+            forme = Qt::CrossCursor;
+        else if (cible.genre == Cible::Genre::Fil)
+            forme = Qt::PointingHandCursor;   // ici, on dérive
+        else if (cible.genre == Cible::Genre::Composant)
+            forme = Qt::SizeAllCursor;        // ici, on déplace
+        for (QGraphicsView* vue : views()) vue->setCursor(forme);
     }
 
     QGraphicsScene::mouseMoveEvent(evenement);
@@ -850,19 +959,22 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
-    if (fil_provisoire_ && fil_depart_ && !fil_en_attente_) {
+    if (fil_provisoire_ && fil_depart_.valide() && !fil_en_attente_) {
         const QPointF point = evenement->scenePos();
+        // À relever AVANT : terminer_fil() appelle abandonner_fil() quand il
+        // échoue, ce qui remet l'ancre à zéro.
+        const Ancre depart = fil_depart_;
         if (terminer_fil(point)) return;
 
         // Relâché sans avoir bougé : c'était un clic, pas un glissement. Le
         // fil reste alors accroché au curseur jusqu'au clic suivant — les
         // deux façons de câbler cohabitent ainsi sans se gêner.
         if (QLineF(point_appui_, point).length() < 6.0) {
-            auto [composant, borne] = borne_sous(point_appui_);
-            if (composant) {
-                commencer_fil(composant, borne, point);
-                fil_en_attente_ = true;
-            }
+            // Le départ est déjà ancré — éventuellement sur un point de
+            // dérivation créé au clic. Le reprendre tel quel, sans re-viser :
+            // re-viser découperait une seconde fois.
+            commencer_fil(depart, point);
+            fil_en_attente_ = true;
         }
         return;
     }
