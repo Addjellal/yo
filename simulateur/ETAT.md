@@ -9,9 +9,14 @@ quand le fil de la conversation est perdu.
 Un simulateur de circuits façon Proteus : schéma, simulation analogique,
 microcontrôleurs exécutés pour de vrai, circuit imprimé. C++17 + Qt6.
 
-Branche de travail : `claude/auto-job-application-system-3Q2iB`.
-(L'en-tête de session mentionne une autre branche — elle est périmée, ignorée
-depuis plusieurs sessions.)
+Branche de travail : `main`, branche par défaut du dépôt.
+
+Il y en avait trois, toutes sur le même commit, et aucune ne portait un nom qui
+voulait dire quelque chose ici : `claude/auto-job-application-system-3Q2iB`
+(défaut), `claude/embedded-systems-course-nk90q7`, et
+`claude/simulateur-circuits-proteus-2rd0ef` — cette dernière déjà supprimée du
+distant, survivant en copie locale périmée. Le dépôt tient trois projets :
+la branche par défaut ne peut donc porter le nom d'aucun des trois.
 
 Construction : `cmake -S . -B build && cmake --build build -j8`
 Bancs d'essai : `./build/tests_coeur` et `QT_QPA_PLATFORM=offscreen ./build/tests_schema`
