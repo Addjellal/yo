@@ -289,6 +289,7 @@ private:
     QLabel* etiquette_vitesse_ = nullptr;
     QLabel* etiquette_moteurs_ = nullptr;
     QLabel* etiquette_etat_ = nullptr;
+    QLabel* etiquette_noeud_ = nullptr;   // le nœud survolé
 
     QAction* action_annuler_ = nullptr;
     QAction* action_retablir_ = nullptr;

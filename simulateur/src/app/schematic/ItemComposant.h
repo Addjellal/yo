@@ -10,6 +10,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 namespace coeur {
 struct Modele;
@@ -61,6 +62,14 @@ public:
     void definir_grille(bool grille);
     bool grille() const { return grille_; }
 
+    // Bornes appartenant au nœud survolé — leur INDICE, pas le composant.
+    //
+    // Un composant n'est jamais « dans » un nœud : il en relie plusieurs, et
+    // c'est justement ce qu'un élève doit comprendre. Allumer le corps dirait
+    // le contraire, et confondrait en plus avec le noirci du composant grillé.
+    void definir_bornes_allumees(std::vector<int> bornes);
+    const std::vector<int>& bornes_allumees() const { return bornes_allumees_; }
+
     // Valeurs et textes réglables, recopiés dans la netlist.
     std::map<std::string, double> valeurs;
     std::map<std::string, std::string> textes;
@@ -78,6 +87,7 @@ private:
     QString reference_;
     double eclat_ = 0.0;
     bool grille_ = false;
+    std::vector<int> bornes_allumees_;
     QString mesure_;
     QRectF cadre_;          // zone cliquable
     QRectF cadre_peint_;    // tout ce que paint() peut toucher

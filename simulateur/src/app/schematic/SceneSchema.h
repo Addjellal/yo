@@ -16,6 +16,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Netlist.h"
@@ -74,6 +75,32 @@ public:
                    || genre == Genre::Fil;
         }
     };
+
+    // Tout ce qui appartient au même nœud électrique.
+    //
+    // C'est la réponse à « qu'est-ce qui est relié à quoi ? » — la question
+    // que pose l'élève dont la LED ne s'allume pas, et à laquelle un schéma
+    // immobile ne répond pas : deux fils qui se croisent à l'écran se
+    // ressemblent, qu'ils soient reliés ou non.
+    struct Noeud {
+        QString nom;   // vide quand la borne visée est en l'air
+        std::vector<std::pair<ItemComposant*, int>> bornes;
+        std::vector<ItemFil*> fils;
+        std::vector<ItemJonction*> jonctions;
+        bool vide() const {
+            return bornes.empty() && fils.empty() && jonctions.empty();
+        }
+    };
+
+    // Le nœud sous ce point. Vide si le curseur est sur le corps d'un
+    // composant : un composant RELIE des nœuds, il n'en est pas un — et
+    // l'apprendre est la moitié de l'intérêt du survol.
+    Noeud noeud_sous(const QPointF& point) const;
+
+    // Allume le nœud visé, éteint ce qui ne lui appartient pas.
+    void allumer_noeud(const QPointF& point);
+    void eteindre_noeud();
+    const QString& noeud_allume() const { return noeud_allume_; }
 
     // Ce que vise le curseur.
     //
@@ -204,6 +231,11 @@ public:
 signals:
     void selection_composant(ItemComposant* composant);
     void journal(const QString& message);
+    // Le nœud survolé, et ce qu'il relie. Nom vide = plus rien sous le
+    // curseur. C'est ce que fait LTspice, et la seule chose qu'il fasse : il
+    // n'affiche pas les noms de nœuds en permanence, il les montre au survol,
+    // en barre d'état.
+    void survol_noeud(const QString& nom, const QString& description);
     // Double-clic sur un composant : ouvrir ce qu'il a de plus utile à
     // montrer — la fenêtre de mesure d'un instrument, par exemple.
     void double_clic_composant(ItemComposant* composant);
@@ -246,6 +278,11 @@ private:
     // État d'avant le geste en cours : un déplacement à la souris doit
     // pouvoir s'annuler, et on ne connaît son résultat qu'au relâchement.
     QJsonObject etat_avant_geste_;
+    // Nom du nœud actuellement allumé — un NOM, pas des pointeurs. La
+    // surbrillance elle-même est un drapeau porté par chaque objet : un objet
+    // supprimé emporte le sien, là où une liste de pointeurs gardée ici
+    // survivrait à ce qu'elle désigne.
+    QString noeud_allume_;
     static constexpr int kProfondeurAnnulation = 50;
 
     // Recherche la borne sous le curseur, tous composants confondus.

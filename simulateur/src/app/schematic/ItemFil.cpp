@@ -76,6 +76,12 @@ void ItemFil::definir_tension(double volts) {
     update();
 }
 
+void ItemFil::definir_surbrillance(bool active) {
+    if (surbrillance_ == active) return;
+    surbrillance_ = active;
+    update();
+}
+
 void ItemFil::rafraichir() {
     prepareGeometryChange();
     update();
@@ -85,6 +91,16 @@ void ItemFil::paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,
                     QWidget*) {
     peintre->setRenderHint(QPainter::Antialiasing, true);
     const bool selectionne = option->state & QStyle::State_Selected;
+
+    // Le halo du nœud survolé, tracé AVANT le fil pour passer dessous. C'est
+    // la même teinte que la surbrillance des pastilles du circuit imprimé :
+    // deux pages, un seul signe pour « ceci appartient au même nœud ».
+    if (surbrillance_) {
+        peintre->setPen(QPen(QColor(255, 233, 168), 9.0, Qt::SolidLine,
+                             Qt::RoundCap, Qt::RoundJoin));
+        peintre->setBrush(Qt::NoBrush);
+        peintre->drawPath(trace());
+    }
 
     QColor couleur(20, 90, 40);
     if (tension_connue_) {

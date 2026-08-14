@@ -105,6 +105,61 @@ struct Classes {
     }
 };
 
+// Le tissu électrique du schéma : quelles bornes et quels points de fil sont
+// le même nœud.
+//
+// Extrait de `calculer_noeuds` pour être partagé avec le survol. Les deux
+// questions — « comment s'appelle chaque nœud ? » et « qu'y a-t-il sur le
+// nœud sous le curseur ? » — se répondent sur le même tissu ; les calculer
+// séparément serait le meilleur moyen qu'elles finissent par se contredire,
+// et le survol montrerait alors un nœud que la netlist ne connaît pas.
+struct Reseau {
+    Classes classes;
+    std::map<const ItemComposant*, std::vector<int>> bornes;
+    std::map<const ItemJonction*, int> jonctions;
+
+    // L'indice d'une extrémité de fil, quelle que soit sa nature. -1 quand
+    // l'ancre ne désigne rien de connu — un composant effacé, par exemple.
+    int indice(const Ancre& ancre) const {
+        if (ancre.jonction) {
+            auto it = jonctions.find(ancre.jonction);
+            return it == jonctions.end() ? -1 : it->second;
+        }
+        auto it = bornes.find(ancre.composant);
+        if (it == bornes.end()) return -1;
+        if (ancre.borne < 0 || ancre.borne >= static_cast<int>(it->second.size()))
+            return -1;
+        return it->second[ancre.borne];
+    }
+};
+
+Reseau tisser(const std::vector<ItemComposant*>& composants,
+              const std::vector<ItemJonction*>& jonctions,
+              const std::vector<ItemFil*>& fils) {
+    Reseau reseau;
+    for (ItemComposant* composant : composants) {
+        std::vector<int> pour_ce_composant;
+        for (int k = 0; k < composant->nb_bornes(); ++k)
+            pour_ce_composant.push_back(reseau.classes.ajouter());
+        reseau.bornes[composant] = pour_ce_composant;
+    }
+
+    // Les points de fil sont des nœuds comme les autres : ils entrent dans la
+    // même relation d'équivalence. C'est ce qui fait qu'une dérivation en T
+    // relie électriquement les trois fils sans code particulier — trois unions
+    // sur la même classe.
+    for (ItemJonction* jonction : jonctions)
+        reseau.jonctions[jonction] = reseau.classes.ajouter();
+
+    for (ItemFil* fil : fils) {
+        const int a = reseau.indice(fil->ancre_depart());
+        const int b = reseau.indice(fil->ancre_arrivee());
+        if (a < 0 || b < 0) continue;
+        reseau.classes.unir(a, b);
+    }
+    return reseau;
+}
+
 }  // namespace
 
 SceneSchema::SceneSchema(QObject* parent) : QGraphicsScene(parent) {
@@ -454,49 +509,130 @@ Ancre SceneSchema::ancrer(const Cible& cible) {
 }
 
 // ---------------------------------------------------------------------------
+// Le nœud sous le curseur
+// ---------------------------------------------------------------------------
+SceneSchema::Noeud SceneSchema::noeud_sous(const QPointF& point) const {
+    Noeud noeud;
+    const Cible cible = viser(point);
+    if (!cible.connectable()) return noeud;
+
+    const std::vector<ItemComposant*> liste = composants();
+    const std::vector<ItemJonction*> points = jonctions();
+    const std::vector<ItemFil*> traits = fils();
+    Reseau reseau = tisser(liste, points, traits);
+
+    // De quelle classe part-on ? Un fil visé n'est PAS coupé pour la
+    // circonstance : la découpe appartient au clic, pas au survol. C'est son
+    // ancre de départ qui donne le nœud — les deux bouts d'un fil sont dans
+    // la même classe, puisque c'est lui qui les a unis.
+    int depart = -1;
+    switch (cible.genre) {
+        case Cible::Genre::Broche:
+        case Cible::Genre::Jonction:
+            depart = reseau.indice(cible.ancre);
+            break;
+        case Cible::Genre::Fil:
+            depart = cible.fil ? reseau.indice(cible.fil->ancre_depart()) : -1;
+            break;
+        default:
+            break;
+    }
+    if (depart < 0) return noeud;
+    const int racine = reseau.classes.racine(depart);
+
+    for (ItemComposant* composant : liste) {
+        auto it = reseau.bornes.find(composant);
+        if (it == reseau.bornes.end()) continue;
+        for (int k = 0; k < static_cast<int>(it->second.size()); ++k)
+            if (reseau.classes.racine(it->second[k]) == racine)
+                noeud.bornes.emplace_back(composant, k);
+    }
+    for (ItemJonction* jonction : points) {
+        auto it = reseau.jonctions.find(jonction);
+        if (it != reseau.jonctions.end()
+            && reseau.classes.racine(it->second) == racine)
+            noeud.jonctions.push_back(jonction);
+    }
+    for (ItemFil* fil : traits) {
+        const int a = reseau.indice(fil->ancre_depart());
+        if (a >= 0 && reseau.classes.racine(a) == racine)
+            noeud.fils.push_back(fil);
+    }
+
+    // Le nom est celui que porte n'importe laquelle de ses bornes — c'est le
+    // même calcul que celui de la netlist, donc le même nom que SPICE verra.
+    // Une borne en l'air n'en a pas, et c'est exact : elle n'est pas un nœud.
+    const auto noms = calculer_noeuds();
+    for (const auto& [composant, borne] : noeud.bornes) {
+        auto it = noms.find(composant);
+        if (it == noms.end() || borne >= static_cast<int>(it->second.size()))
+            continue;
+        if (it->second[borne].empty()) continue;
+        noeud.nom = QString::fromStdString(it->second[borne]);
+        break;
+    }
+    return noeud;
+}
+
+void SceneSchema::eteindre_noeud() {
+    if (noeud_allume_.isEmpty()) return;
+    noeud_allume_.clear();
+    for (ItemComposant* composant : composants())
+        composant->definir_bornes_allumees({});
+    for (ItemFil* fil : fils()) fil->definir_surbrillance(false);
+    for (ItemJonction* jonction : jonctions())
+        jonction->definir_surbrillance(false);
+    emit survol_noeud(QString(), QString());
+}
+
+void SceneSchema::allumer_noeud(const QPointF& point) {
+    const Noeud noeud = noeud_sous(point);
+    if (noeud.nom.isEmpty()) {
+        eteindre_noeud();
+        return;
+    }
+
+    // La surbrillance est REPOSÉE à chaque appel, au lieu d'être court-
+    // circuitée quand le nom n'a pas changé. Entre deux survols le schéma a
+    // pu changer — un fil supprimé, une annulation — et le nom seul ne le
+    // dirait pas : on garderait un halo sur un fil qui n'appartient plus au
+    // nœud. Les `definir_…` ne repeignent que ce qui change réellement ; le
+    // coût est donc celui d'une comparaison par objet, pas d'un rendu.
+    std::map<ItemComposant*, std::vector<int>> par_composant;
+    for (const auto& [composant, borne] : noeud.bornes)
+        par_composant[composant].push_back(borne);
+    for (ItemComposant* composant : composants()) {
+        auto it = par_composant.find(composant);
+        composant->definir_bornes_allumees(
+            it == par_composant.end() ? std::vector<int>() : it->second);
+    }
+    const std::set<const ItemFil*> fils_allumes(noeud.fils.begin(),
+                                                noeud.fils.end());
+    for (ItemFil* fil : fils())
+        fil->definir_surbrillance(fils_allumes.count(fil) > 0);
+    const std::set<const ItemJonction*> points_allumes(noeud.jonctions.begin(),
+                                                       noeud.jonctions.end());
+    for (ItemJonction* jonction : jonctions())
+        jonction->definir_surbrillance(points_allumes.count(jonction) > 0);
+
+    if (noeud.nom == noeud_allume_) return;
+    noeud_allume_ = noeud.nom;
+    QStringList relie;
+    for (const auto& [composant, borne] : noeud.bornes)
+        relie << composant->reference() + "." + composant->nom_borne(borne);
+    emit survol_noeud(noeud.nom, relie.join(" · "));
+}
+
+// ---------------------------------------------------------------------------
 // Attribution des noms de nœuds
 // ---------------------------------------------------------------------------
 std::map<const ItemComposant*, std::vector<std::string>>
 SceneSchema::calculer_noeuds() const {
     const std::vector<ItemComposant*> liste = composants();
-
-    Classes classes;
-    std::map<const ItemComposant*, std::vector<int>> indices;
-    for (ItemComposant* composant : liste) {
-        std::vector<int> pour_ce_composant;
-        for (int k = 0; k < composant->nb_bornes(); ++k)
-            pour_ce_composant.push_back(classes.ajouter());
-        indices[composant] = pour_ce_composant;
-    }
-
-    // Les points de fil sont des nœuds comme les autres : ils entrent dans la
-    // même relation d'équivalence. C'est ce qui fait qu'une dérivation en T
-    // relie électriquement les trois fils sans code particulier — trois unions
-    // sur la même classe.
-    std::map<const ItemJonction*, int> indices_jonction;
-    for (ItemJonction* jonction : jonctions())
-        indices_jonction[jonction] = classes.ajouter();
-
-    // L'indice d'une extrémité de fil, quelle que soit sa nature. -1 quand
-    // l'ancre ne désigne rien de connu — un composant effacé, par exemple.
-    auto indice_de = [&](const Ancre& ancre) -> int {
-        if (ancre.jonction) {
-            auto it = indices_jonction.find(ancre.jonction);
-            return it == indices_jonction.end() ? -1 : it->second;
-        }
-        auto it = indices.find(ancre.composant);
-        if (it == indices.end()) return -1;
-        if (ancre.borne < 0 || ancre.borne >= static_cast<int>(it->second.size()))
-            return -1;
-        return it->second[ancre.borne];
-    };
-
-    for (ItemFil* fil : fils()) {
-        const int a = indice_de(fil->ancre_depart());
-        const int b = indice_de(fil->ancre_arrivee());
-        if (a < 0 || b < 0) continue;
-        classes.unir(a, b);
-    }
+    Reseau reseau = tisser(liste, jonctions(), fils());
+    Classes& classes = reseau.classes;
+    const std::map<const ItemComposant*, std::vector<int>>& indices =
+        reseau.bornes;
 
     // Nommage : un symbole d'alimentation impose son nom ; à défaut une broche
     // de carte donne le sien ; sinon un nom interne N1, N2…
@@ -519,7 +655,7 @@ SceneSchema::calculer_noeuds() const {
         }
         if (impose.empty()) continue;
         for (int k = 0; k < composant->nb_bornes(); ++k)
-            noms[classes.racine(indices[composant][k])] = impose;
+            noms[classes.racine(indices.at(composant)[k])] = impose;
     }
     // Combien de cartes ? La réponse change le nommage : avec une seule, la
     // broche D13 donne le nœud « D13 », lisible. Avec deux, ce nom
@@ -537,7 +673,7 @@ SceneSchema::calculer_noeuds() const {
             nombre_cartes > 1 ? composant->reference().toStdString() + "_"
                               : std::string();
         for (int k = 0; k < composant->nb_bornes(); ++k) {
-            const int racine = classes.racine(indices[composant][k]);
+            const int racine = classes.racine(indices.at(composant)[k]);
             if (noms.count(racine)) continue;
             // Les broches d'alimentation restent communes : deux cartes
             // posées sur le même schéma partagent forcément leur masse.
@@ -562,7 +698,7 @@ SceneSchema::calculer_noeuds() const {
     }
     for (ItemComposant* composant : liste) {
         for (int k = 0; k < composant->nb_bornes(); ++k) {
-            const int racine = classes.racine(indices[composant][k]);
+            const int racine = classes.racine(indices.at(composant)[k]);
             if (noms.count(racine)) continue;
             // Une borne en l'air n'est pas un nœud : elle n'est reliée à rien.
             if (!cablees.count({composant, k})) continue;
@@ -576,7 +712,7 @@ SceneSchema::calculer_noeuds() const {
     for (ItemComposant* composant : liste) {
         std::vector<std::string> pour_ce_composant;
         for (int k = 0; k < composant->nb_bornes(); ++k) {
-            const int racine = classes.racine(indices[composant][k]);
+            const int racine = classes.racine(indices.at(composant)[k]);
             auto it = noms.find(racine);
             pour_ce_composant.push_back(it == noms.end() ? std::string()
                                                          : it->second);
@@ -1166,6 +1302,11 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
         else if (cible.genre == Cible::Genre::Composant)
             forme = Qt::SizeAllCursor;        // ici, on déplace
         for (QGraphicsView* vue : views()) vue->setCursor(forme);
+
+        // … et tout le nœud s'allume. Le curseur dit ce que le clic FERA ;
+        // la surbrillance dit ce qui EST relié. Deux questions différentes,
+        // posées par le même geste, répondues au même endroit.
+        allumer_noeud(evenement->scenePos());
     }
 
     QGraphicsScene::mouseMoveEvent(evenement);

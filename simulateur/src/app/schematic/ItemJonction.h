@@ -34,4 +34,13 @@ public:
     // changement de direction —, et l'afficher ferait croire à une dérivation
     // qui n'existe pas.
     bool jonction() const { return degre >= 3; }
+
+    // Ce point appartient au nœud survolé. Un coude à deux fils ne dessine
+    // rien d'ordinaire ; allumé, il montre son halo — sans quoi le nœud
+    // s'interromprait visuellement à chaque changement de direction.
+    void definir_surbrillance(bool active);
+    bool surbrillance() const { return surbrillance_; }
+
+private:
+    bool surbrillance_ = false;
 };

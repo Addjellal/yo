@@ -50,6 +50,15 @@ public:
         return depart_.jonction == jonction || arrivee_.jonction == jonction;
     }
 
+    // Ce fil appartient au nœud survolé : il s'entoure d'un halo.
+    //
+    // La surbrillance ne remplace aucune couleur existante — ni celle de la
+    // tension, ni celle de la sélection. Un halo POSÉ DESSOUS répond « ceci
+    // est relié » sans effacer la réponse à « combien de volts » ni à « qu'ai-
+    // je sélectionné » : les trois questions se posent en même temps.
+    void definir_surbrillance(bool active);
+    bool surbrillance() const { return surbrillance_; }
+
     // Tension du nœud, affichée pendant la simulation (NaN = pas de mesure).
     void definir_tension(double volts);
     // Vrai dès qu'une mesure a été portée sur ce fil.
@@ -61,6 +70,7 @@ private:
     Ancre arrivee_;
     double tension_ = 0.0;
     bool tension_connue_ = false;
+    bool surbrillance_ = false;
 
     QPainterPath trace() const;
 };

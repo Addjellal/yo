@@ -2812,6 +2812,95 @@ static void test_programmes_par_carte() {
              "carte_u1/ et carte_u2/");
 }
 
+// ---------------------------------------------------------------------------
+// Le survol allume tout le nœud
+//
+// La question à laquelle ce dispositif répond est celle de l'élève dont la LED
+// ne s'allume pas : « qu'est-ce qui est relié à quoi ? » Un schéma immobile n'y
+// répond pas — deux fils qui se croisent à l'écran se ressemblent, qu'ils
+// soient reliés ou non. C'est le contrôle décisif de cette section.
+// ---------------------------------------------------------------------------
+static void test_survol_allume_le_noeud() {
+    std::printf("\n-- le survol allume tout le nœud --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+
+    ItemFil* haut = new ItemFil(pile, 0, r1, 0);
+    ItemFil* droite = new ItemFil(r1, 1, masse, 0);
+    ItemFil* retour = new ItemFil(pile, 1, masse, 0);
+    for (ItemFil* fil : {haut, droite, retour}) scene.addItem(fil);
+
+    // --- ce que le nœud contient -------------------------------------------
+    const SceneSchema::Noeud noeud = scene.noeud_sous(r1->position_borne(0));
+    verifier(!noeud.nom.isEmpty(), "survoler une broche câblée nomme son nœud",
+             noeud.nom.toStdString());
+    verifier(noeud.nom == scene.noeud_de(r1, 0),
+             "et c'est le nom que la netlist emploiera — pas un second calcul",
+             noeud.nom.toStdString() + " / "
+                 + scene.noeud_de(r1, 0).toStdString());
+    verifier(noeud.bornes.size() == 2,
+             "le nœud pile→R1 tient exactement deux bornes",
+             std::to_string(noeud.bornes.size()));
+    verifier(noeud.fils.size() == 1 && noeud.fils.front() == haut,
+             "et le seul fil qui les relie");
+
+    // --- le contrôle qui compte : le nœud voisin reste éteint --------------
+    scene.allumer_noeud(r1->position_borne(0));
+    verifier(haut->surbrillance(), "le fil du nœud survolé s'allume");
+    verifier(!droite->surbrillance() && !retour->surbrillance(),
+             "les fils des AUTRES nœuds restent éteints — sans quoi la "
+             "surbrillance ne distinguerait plus deux fils qui se croisent");
+    verifier(r1->bornes_allumees() == std::vector<int>{0},
+             "sur R1, la borne 0 seule est allumée : un composant RELIE des "
+             "nœuds, il n'en est pas un",
+             std::to_string(r1->bornes_allumees().size()) + " borne(s)");
+
+    // --- le corps d'un composant n'est pas un nœud -------------------------
+    //
+    // Viser à dix unités du centre, et non le centre lui-même : l'équerre du
+    // fil pile→masse passe exactement par x = 300, et un fil l'emporte sur un
+    // corps de composant (priorités 20 contre 70). Le premier jet de ce test
+    // visait le centre et allumait GND — le classement de `viser()` faisait
+    // son travail, c'est le point de mesure qui était mal choisi.
+    scene.allumer_noeud(r1->pos() + QPointF(10, 0));
+    verifier(scene.noeud_allume().isEmpty(),
+             "survoler le CORPS d'un composant n'allume aucun nœud");
+    verifier(!haut->surbrillance() && r1->bornes_allumees().empty(),
+             "et éteint ce qui l'était");
+
+    // --- une borne en l'air n'est pas un nœud ------------------------------
+    ItemComposant* seule = scene.ajouter_composant("resistance", QPointF(0, 400));
+    scene.allumer_noeud(seule->position_borne(0));
+    verifier(scene.noeud_allume().isEmpty(),
+             "une borne en l'air n'allume rien : elle n'est reliée à rien");
+
+    // --- la surbrillance ne survit pas au schéma qui change ----------------
+    //
+    // Le piège qu'un raccourci « le nom n'a pas changé, ne rien faire »
+    // laisserait passer : on rallume le MÊME nœud après avoir supprimé un de
+    // ses fils. Le nom est identique, le contenu non.
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 200));
+    ItemFil* derivation = new ItemFil(r1, 0, r2, 0);
+    scene.addItem(derivation);
+    scene.allumer_noeud(r1->position_borne(0));
+    verifier(derivation->surbrillance() && haut->surbrillance(),
+             "les deux fils du nœud élargi s'allument");
+    const QString avant = scene.noeud_allume();
+
+    scene.removeItem(derivation);
+    delete derivation;
+    scene.allumer_noeud(r1->position_borne(0));
+    verifier(scene.noeud_allume() == avant,
+             "le nœud garde son nom après la suppression du fil dérivé",
+             scene.noeud_allume().toStdString());
+    verifier(r2->bornes_allumees().empty(),
+             "mais R2 n'en fait plus partie : la surbrillance suit le schéma, "
+             "pas le nom du nœud");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -2852,6 +2941,7 @@ int main(int argc, char** argv) {
     test_famille_328p();
     test_analyseur_impedance();
     test_programmes_par_carte();
+    test_survol_allume_le_noeud();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

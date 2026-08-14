@@ -173,6 +173,12 @@ void ItemComposant::definir_grille(bool grille) {
     update();
 }
 
+void ItemComposant::definir_bornes_allumees(std::vector<int> bornes) {
+    if (bornes_allumees_ == bornes) return;
+    bornes_allumees_ = std::move(bornes);
+    update();
+}
+
 void ItemComposant::definir_mesure(const QString& mesure) {
     if (mesure_ == mesure) return;
     mesure_ = mesure;
@@ -300,6 +306,18 @@ void ItemComposant::paint(QPainter* peintre,
                              Qt::RoundCap));
         peintre->drawLine(croix.topLeft(), croix.bottomRight());
         peintre->drawLine(croix.topRight(), croix.bottomLeft());
+    }
+
+    // Le halo des bornes du nœud survolé, sous les disques de borne.
+    if (!bornes_allumees_.empty()) {
+        peintre->setPen(Qt::NoPen);
+        peintre->setBrush(QColor(255, 233, 168));
+        for (int index : bornes_allumees_) {
+            if (index < 0 || index >= static_cast<int>(modele_->bornes.size()))
+                continue;
+            peintre->drawEllipse(vers_qt(modele_->bornes[index].position), 7.5,
+                                 7.5);
+        }
     }
 
     // Bornes : un petit disque, repère visuel pour tirer un fil.

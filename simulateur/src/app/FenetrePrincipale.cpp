@@ -132,6 +132,19 @@ FenetrePrincipale::FenetrePrincipale() {
             });
     connect(scene_, &SceneSchema::changed, this,
             [this](const QList<QRectF>&) { circuit_modifie(); });
+    // Le nom du nœud survolé, en barre d'état. C'est ce que fait LTspice, et
+    // la seule chose qu'il fasse : il n'affiche PAS les noms en permanence —
+    // un schéma constellé d'étiquettes internes est moins lisible, pas plus.
+    // La surbrillance montre l'étendue du nœud, l'étiquette le nomme.
+    connect(scene_, &SceneSchema::survol_noeud, this,
+            [this](const QString& nom, const QString& description) {
+                if (nom.isEmpty()) {
+                    etiquette_noeud_->clear();
+                    return;
+                }
+                etiquette_noeud_->setText(
+                    QString("Nœud %1 — %2").arg(nom, description));
+            });
     connect(vue_, &VueSchema::composant_depose, this,
             [this](const QString& type, const QPointF& position) {
                 scene_->memoriser();
@@ -947,6 +960,10 @@ void FenetrePrincipale::construire_barre_etat() {
     etiquette_anomalies_->setToolTip(
         "Contrôle des règles électriques. Il passe au lancement de la "
         "simulation ; le détail est dans le journal.");
+    // Le nœud survolé. Vide au repos : une étiquette qui dirait « aucun nœud »
+    // occuperait la place en permanence pour ne rien apprendre.
+    etiquette_noeud_ = new QLabel;
+    etiquette_noeud_->setStyleSheet("color:#7a5c00");
     etiquette_temps_ = new QLabel("Temps simulé : 0,000 s");
     etiquette_vitesse_ = new QLabel("Vitesse : —");
 
@@ -988,6 +1005,8 @@ void FenetrePrincipale::construire_barre_etat() {
     statusBar()->addWidget(etiquette_moteurs_);
     statusBar()->addWidget(new QLabel("  "));
     statusBar()->addWidget(etiquette_anomalies_);
+    statusBar()->addWidget(new QLabel("  "));
+    statusBar()->addWidget(etiquette_noeud_, 1);
     statusBar()->addPermanentWidget(etiquette_temps_);
     statusBar()->addPermanentWidget(etiquette_vitesse_);
     refleter_etat();
