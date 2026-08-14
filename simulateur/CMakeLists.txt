@@ -252,8 +252,17 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
 
+  # L'icône voyage dans l'exécutable : rien à déposer à côté, et le paquet
+  # portable reste un dossier qu'on copie.
+  qt_add_resources(SIM_RESSOURCES ressources/ressources.qrc)
+
   add_executable(simulateur
     src/main.cpp
+    ${SIM_RESSOURCES}
+    # Icône du FICHIER sous Windows — celle que montre l'explorateur avant
+    # même qu'on lance. Elle ne peut pas venir de Qt : c'est une ressource
+    # de l'exécutable. Ignoré ailleurs.
+    $<$<BOOL:${WIN32}>:${CMAKE_CURRENT_SOURCE_DIR}/ressources/icone.rc>
   )
   target_link_libraries(simulateur PRIVATE schema)
 

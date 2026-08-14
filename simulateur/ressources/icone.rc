@@ -1,0 +1,9 @@
+/* Icône de l'exécutable Windows.
+ *
+ * L'icône Qt ne concerne que la fenêtre et la barre des tâches une fois le
+ * programme lancé. Celle du FICHIER — ce qu'on voit dans l'explorateur avant
+ * de double-cliquer — vient d'une ressource Windows, et elle seule.
+ * « IDI_ICON1 » doit rester le premier identifiant : l'explorateur prend le
+ * plus petit numéro.
+ */
+IDI_ICON1 ICON "icone.ico"

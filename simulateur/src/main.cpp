@@ -1,5 +1,6 @@
 // Point d'entrée de l'application.
 #include <QApplication>
+#include <QIcon>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileInfo>
@@ -23,6 +24,12 @@ int main(int argc, char** argv) {
     application.setApplicationName("Simulateur embarqué");
     application.setOrganizationName("Formation embarquée");
     application.setApplicationVersion("0.1.0");
+    // L'icône de la fenêtre et de la barre des tâches. Posée sur
+    // l'application entière plutôt que sur la fenêtre : les fenêtres
+    // détachées — oscilloscopes, instruments — en héritent alors sans qu'on
+    // ait à y penser, et une famille de fenêtres qui ne se ressemblent pas
+    // se retrouve mal dans une barre des tâches.
+    application.setWindowIcon(QIcon(":/icone.svg"));
 
     QFont police = application.font();
     police.setPointSizeF(police.pointSizeF() + 0.5);

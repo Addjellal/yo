@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!--
+    L'icône du simulateur.
+
+    Elle doit dire deux choses en même temps, parce que le logiciel fait les
+    deux : un circuit, et un signal qu'on observe. D'où le fond de carte —
+    le vert du verre époxy, reconnaissable entre tous — et la trace jaune
+    d'oscilloscope par-dessus.
+
+    Dessinée pour tenir à SEIZE pixels : pas de dégradé, pas de détail fin,
+    deux couleurs franches et un trait épais. Une icône qui n'est lisible
+    qu'en grand est une icône ratée, puisque c'est en petit qu'on la cherche
+    dans une barre des tâches.
+  -->
+  <rect x="8" y="8" width="240" height="240" rx="46" fill="#12401f"/>
+  <rect x="8" y="8" width="240" height="240" rx="46" fill="none"
+        stroke="#1f6b33" stroke-width="6"/>
+
+  <!-- Deux pastilles et leurs pistes : le circuit imprimé, en fond. -->
+  <g stroke="#2e8b4a" stroke-width="9" fill="none" stroke-linecap="round">
+    <path d="M42 196 L42 152 L96 152"/>
+    <path d="M214 60 L214 104 L160 104"/>
+  </g>
+  <circle cx="42" cy="196" r="15" fill="#12401f" stroke="#caa53d" stroke-width="9"/>
+  <circle cx="214" cy="60" r="15" fill="#12401f" stroke="#caa53d" stroke-width="9"/>
+
+  <!-- La trace : une alternance qui se lit encore à seize pixels. -->
+  <path d="M36 128 L70 128 L70 76 L104 76 L104 180 L138 180 L138 76
+           L172 76 L172 128 L220 128"
+        fill="none" stroke="#f2c94c" stroke-width="16"
+        stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
