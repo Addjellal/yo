@@ -46,6 +46,8 @@
 #include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
 #include <QDir>
+#include <QStyleOptionGraphicsItem>
+#include <QTransform>
 #include "app/schematic/SceneSchema.h"
 #include "app/schematic/VueSchema.h"
 #include "core/Device.h"
@@ -3331,6 +3333,185 @@ static void test_panneau_controle_mene_au_coupable() {
              "qui porte sur le montage entier");
 }
 
+// ---------------------------------------------------------------------------
+// Ce qu'une relecture a trouvé, et que le premier banc laissait passer
+//
+// Quatre défauts rapportés par `critique-code`, tous avec leur scénario.
+// Trois cassaient réellement quelque chose. Ils sont ici AVANT leur
+// correction : c'est la seule façon de savoir que ces tests prouvent
+// quelque chose.
+// ---------------------------------------------------------------------------
+static void test_survol_noeuds_noues_par_le_nom() {
+    std::printf("\n-- le survol suit les nœuds noués par le NOM --\n");
+
+    // Deux masses, sans le moindre fil entre elles. Elles SONT le même nœud
+    // — c'est même la première chose qu'un cours d'électronique enseigne, et
+    // la raison d'être du symbole de masse. Un survol qui n'en allume qu'une
+    // enseignerait le contraire.
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* m1 = scene.ajouter_composant("masse", QPointF(0, 200));
+    ItemComposant* m2 = scene.ajouter_composant("masse", QPointF(600, 200));
+    scene.addItem(new ItemFil(pile, 0, r1, 0));
+    scene.addItem(new ItemFil(pile, 1, m1, 0));
+    scene.addItem(new ItemFil(r1, 1, m2, 0));
+
+    verifier(scene.noeud_de(m1, 0) == scene.noeud_de(m2, 0),
+             "les deux masses portent bien le même nom de nœud",
+             scene.noeud_de(m1, 0).toStdString() + " / "
+                 + scene.noeud_de(m2, 0).toStdString());
+
+    const SceneSchema::Noeud noeud = scene.noeud_sous(m1->position_borne(0));
+    bool tient_m2 = false;
+    for (const auto& [composant, borne] : noeud.bornes)
+        if (composant == m2) tient_m2 = true;
+    verifier(tient_m2,
+             "survoler une masse allume l'AUTRE masse : sans fil entre elles, "
+             "c'est pourtant le même nœud");
+
+    scene.allumer_noeud(m1->position_borne(0));
+    verifier(!m2->bornes_allumees().empty(),
+             "et la seconde masse s'allume pour de bon");
+
+    // Même chose pour deux étiquettes de nœud de même nom : c'est tout
+    // l'intérêt de l'étiquette, et le code de nommage le dit déjà.
+    SceneSchema autre;
+    ItemComposant* ra = autre.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* rb = autre.ajouter_composant("resistance", QPointF(0, 300));
+    ItemComposant* ea = autre.ajouter_composant("etiquette", QPointF(200, 0));
+    ItemComposant* eb = autre.ajouter_composant("etiquette", QPointF(200, 300));
+    if (ea && eb) {
+        ea->textes["nom"] = "SIG";
+        eb->textes["nom"] = "SIG";
+        autre.addItem(new ItemFil(ra, 1, ea, 0));
+        autre.addItem(new ItemFil(rb, 1, eb, 0));
+        const SceneSchema::Noeud sig = autre.noeud_sous(ra->position_borne(1));
+        bool tient_rb = false;
+        for (const auto& [composant, borne] : sig.bornes)
+            if (composant == rb) tient_rb = true;
+        verifier(tient_rb,
+                 "deux étiquettes « SIG » relient leurs deux résistances, "
+                 "sans fil entre elles");
+    }
+}
+
+static void test_survol_description_suit_le_contenu() {
+    std::printf("\n-- la description du nœud suit son contenu --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 200));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    scene.addItem(new ItemFil(pile, 0, r1, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    QString derniere;
+    int emissions = 0;
+    QObject::connect(&scene, &SceneSchema::survol_noeud,
+                     [&](const QString&, const QString& description) {
+                         if (description.isEmpty()) return;
+                         derniere = description;
+                         ++emissions;
+                     });
+
+    scene.allumer_noeud(r1->position_borne(0));
+    const QString avant = derniere;
+    verifier(!avant.isEmpty(), "le survol décrit ce que relie le nœud",
+             avant.toStdString());
+    verifier(!avant.contains("R2"), "R2 n'en fait pas encore partie");
+
+    // On élargit le nœud SANS changer son nom, puis on resurvole le même
+    // point — SANS repasser ailleurs entre les deux. C'est la condition qui
+    // révèle le défaut : sortir du nœud remettrait le nom à zéro et le
+    // raccourci ne se déclencherait pas. Mon premier jet le faisait, et
+    // masquait donc exactement ce qu'il prétendait vérifier.
+    ItemFil* derivation = new ItemFil(r1, 0, r2, 0);
+    scene.addItem(derivation);
+    scene.allumer_noeud(r1->position_borne(0));
+    verifier(derniere.contains("R2"),
+             "après l'ajout d'un fil, la description nomme R2 — le NOM du "
+             "nœud n'a pas changé, son contenu si",
+             derniere.toStdString());
+}
+
+static void test_marqueur_erc_tient_dans_son_cadre() {
+    std::printf("\n-- le marqueur ERC tient dans le cadre de dessin --\n");
+
+    // L'ATtiny85 porte ses bornes à x = ±90, tout au bord de son boîtier.
+    // C'est le cas le plus serré du catalogue, et celui qui débordait.
+    SceneSchema scene;
+    ItemComposant* puce = scene.ajouter_composant("attiny85", QPointF(0, 0));
+    verifier(puce != nullptr, "l'ATtiny85 est au catalogue");
+    if (!puce) return;
+
+    std::vector<ItemComposant::MarqueurErc> marqueurs;
+    for (int k = 0; k < puce->nb_bornes(); ++k)
+        marqueurs.push_back({k, true});
+    puce->definir_anomalies(marqueurs);
+
+    // On peint l'item seul dans une image, en repérant où tombe son cadre.
+    // Tout pixel encré hors du cadre est un pixel que Qt n'effacera pas quand
+    // le composant bougera : une traînée à l'écran.
+    for (double angle : {0.0, 90.0, 180.0, 270.0}) {
+        puce->setRotation(angle);
+        const QRectF cadre = puce->boundingRect();
+        QImage image(700, 700, QImage::Format_ARGB32);
+        image.fill(Qt::white);
+        {
+            QPainter peintre(&image);
+            peintre.translate(350, 350);
+            QStyleOptionGraphicsItem option;
+            peintre.rotate(angle);
+            puce->paint(&peintre, &option, nullptr);
+        }
+        int dehors = 0;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x) {
+                if (image.pixelColor(x, y) == QColor(Qt::white)) continue;
+                // Repère de l'item : le cadre est exprimé dans SON repère,
+                // tourné comme lui autour de (350, 350).
+                const QPointF local =
+                    QTransform().rotate(-angle).map(QPointF(x - 350, y - 350));
+                if (!cadre.adjusted(-1, -1, 1, 1).contains(local)) ++dehors;
+            }
+        verifier(dehors == 0,
+                 "à " + std::to_string(static_cast<int>(angle))
+                     + "° rien n'est peint hors du cadre",
+                 std::to_string(dehors) + " pixels dehors");
+    }
+    puce->setRotation(0);
+}
+
+static void test_surbrillance_ne_survit_pas_a_la_suppression() {
+    std::printf("\n-- la surbrillance ne survit pas à ce qu'elle désignait --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    ItemFil* haut = new ItemFil(pile, 0, r1, 0);
+    scene.addItem(haut);
+    scene.addItem(new ItemFil(r1, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    scene.allumer_noeud(r1->position_borne(0));
+    verifier(!r1->bornes_allumees().empty() && !scene.noeud_allume().isEmpty(),
+             "le nœud est allumé au départ");
+
+    // On supprime le fil SANS bouger la souris : aucun mouseMoveEvent ne
+    // viendra rafraîchir quoi que ce soit. C'est le chemin réel — sélection
+    // puis Suppr.
+    haut->setSelected(true);
+    scene.supprimer_selection();
+    verifier(scene.noeud_allume().isEmpty(),
+             "supprimer un fil du nœud éteint la surbrillance : la borne de "
+             "R1 est maintenant en l'air");
+    verifier(r1->bornes_allumees().empty(),
+             "et plus aucune borne ne reste allumée");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3384,6 +3565,10 @@ int main(int argc, char** argv) {
     test_cartouche_a_l_impression_seulement();
     test_erreur_compilation_cliquable();
     test_panneau_controle_mene_au_coupable();
+    test_survol_noeuds_noues_par_le_nom();
+    test_survol_description_suit_le_contenu();
+    test_marqueur_erc_tient_dans_son_cadre();
+    test_surbrillance_ne_survit_pas_a_la_suppression();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

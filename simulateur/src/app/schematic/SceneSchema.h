@@ -302,6 +302,10 @@ private:
     // supprimé emporte le sien, là où une liste de pointeurs gardée ici
     // survivrait à ce qu'elle désigne.
     QString noeud_allume_;
+    // Ce que le nœud reliait au dernier signal émis. Le nom seul ne suffit
+    // pas à décider qu'il n'y a rien de neuf à annoncer : un fil ajouté ou
+    // retiré change le contenu sans toucher au nom.
+    QString description_allumee_;
     static constexpr int kProfondeurAnnulation = 50;
 
     // Recherche la borne sous le curseur, tous composants confondus.

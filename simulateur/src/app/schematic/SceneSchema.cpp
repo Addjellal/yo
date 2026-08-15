@@ -133,6 +133,26 @@ struct Reseau {
     }
 };
 
+// Le nom qu'un composant IMPOSE à son nœud, s'il en impose un.
+//
+// Une masse impose « GND », une étiquette impose ce que l'utilisateur a
+// tapé. C'est ce mécanisme qui relie deux points du schéma SANS fil entre
+// eux — et c'est même toute la raison d'être du symbole de masse : personne
+// ne tire un fil d'un bout à l'autre de la feuille pour refermer un circuit.
+std::string nom_impose(const ItemComposant* composant) {
+    const coeur::Modele* modele = composant->modele();
+    if (!modele) return {};
+    if (!modele->noeud_impose.empty()) return modele->noeud_impose;
+    if (modele->noeud_depuis_texte.empty()) return {};
+    auto texte = composant->textes.find(modele->noeud_depuis_texte);
+    if (texte != composant->textes.end() && !texte->second.empty())
+        return texte->second;
+    for (const coeur::Propriete& propriete : modele->proprietes)
+        if (propriete.cle == modele->noeud_depuis_texte)
+            return propriete.defaut_texte;
+    return {};
+}
+
 Reseau tisser(const std::vector<ItemComposant*>& composants,
               const std::vector<ItemJonction*>& jonctions,
               const std::vector<ItemFil*>& fils) {
@@ -156,6 +176,32 @@ Reseau tisser(const std::vector<ItemComposant*>& composants,
         const int b = reseau.indice(fil->ancre_arrivee());
         if (a < 0 || b < 0) continue;
         reseau.classes.unir(a, b);
+    }
+
+    // Un fil n'est PAS le seul moyen de relier deux points.
+    //
+    // Deux masses posées aux deux bouts de la feuille sont le même nœud, sans
+    // le moindre trait entre elles ; deux étiquettes de même nom aussi.
+    // `calculer_noeuds()` le savait déjà — il donnait le même NOM aux deux —
+    // mais leurs classes restaient distinctes, si bien que le survol
+    // n'allumait que la moitié du nœud. Un élève y aurait lu que ses deux
+    // masses ne communiquent pas : l'exact contraire de ce que le cours
+    // enseigne, et de ce que la simulation calcule.
+    std::map<std::string, int> par_nom_impose;
+    for (ItemComposant* composant : composants) {
+        const std::string impose = nom_impose(composant);
+        if (impose.empty()) continue;
+        auto indices = reseau.bornes.find(composant);
+        if (indices == reseau.bornes.end() || indices->second.empty()) continue;
+        // Un symbole d'alimentation impose son nom à TOUTES ses bornes ; il
+        // n'en a qu'une en pratique, mais rien ne l'y oblige.
+        for (int index : indices->second) {
+            auto place = par_nom_impose.find(impose);
+            if (place == par_nom_impose.end())
+                par_nom_impose[impose] = index;
+            else
+                reseau.classes.unir(place->second, index);
+        }
     }
     return reseau;
 }
@@ -265,6 +311,11 @@ std::vector<ItemJonction*> SceneSchema::jonctions() const {
 // l'original. L'ordre importe — on ajoute avant de retirer, pour qu'aucune
 // extrémité ne pende dans le vide entre-temps.
 ItemJonction* SceneSchema::decouper(ItemFil* fil, const QPointF& point) {
+    // Le schéma vient de changer sous la surbrillance : ce qu'elle désignait
+    // n'existe peut-être plus, et aucun mouvement de souris ne viendra la
+    // rafraîchir tant que le curseur reste immobile. On l'éteint donc ici —
+    // le prochain déplacement la rallumera sur l'état neuf.
+    eteindre_noeud();
     if (!fil) return nullptr;
     const Ancre a = fil->ancre_depart();
     const Ancre b = fil->ancre_arrivee();
@@ -325,6 +376,11 @@ std::vector<ItemFil*> SceneSchema::fils() const {
 }
 
 void SceneSchema::supprimer_selection() {
+    // Le schéma vient de changer sous la surbrillance : ce qu'elle désignait
+    // n'existe peut-être plus, et aucun mouvement de souris ne viendra la
+    // rafraîchir tant que le curseur reste immobile. On l'éteint donc ici —
+    // le prochain déplacement la rallumera sur l'état neuf.
+    eteindre_noeud();
     // On retire d'abord les fils : supprimer un composant sans ses fils
     // laisserait des pointeurs pendants.
     //
@@ -390,6 +446,11 @@ void SceneSchema::supprimer_selection() {
 }
 
 void SceneSchema::tout_effacer() {
+    // Le schéma vient de changer sous la surbrillance : ce qu'elle désignait
+    // n'existe peut-être plus, et aucun mouvement de souris ne viendra la
+    // rafraîchir tant que le curseur reste immobile. On l'éteint donc ici —
+    // le prochain déplacement la rallumera sur l'état neuf.
+    eteindre_noeud();
     clear();                     // détruit déjà le trait provisoire
     compteurs_.clear();
     // Les pointeurs sont remis à zéro sans passer par abandonner_fil() : les
@@ -577,6 +638,7 @@ SceneSchema::Noeud SceneSchema::noeud_sous(const QPointF& point) const {
 void SceneSchema::eteindre_noeud() {
     if (noeud_allume_.isEmpty()) return;
     noeud_allume_.clear();
+    description_allumee_.clear();
     for (ItemComposant* composant : composants())
         composant->definir_bornes_allumees({});
     for (ItemFil* fil : fils()) fil->definir_surbrillance(false);
@@ -615,12 +677,22 @@ void SceneSchema::allumer_noeud(const QPointF& point) {
     for (ItemJonction* jonction : jonctions())
         jonction->definir_surbrillance(points_allumes.count(jonction) > 0);
 
-    if (noeud.nom == noeud_allume_) return;
-    noeud_allume_ = noeud.nom;
+    // Le nom NE SUFFIT PAS à décider qu'il n'y a rien à réémettre.
+    //
+    // C'est le raccourci écarté quinze lignes plus haut pour la surbrillance,
+    // et que j'avais laissé ici : entre deux survols du même nœud, un fil a
+    // pu s'ajouter ou disparaître. Le nom reste « R1_1 », le contenu non — et
+    // la barre d'état annonçait alors la composition du tout premier survol,
+    // indéfiniment.
     QStringList relie;
     for (const auto& [composant, borne] : noeud.bornes)
         relie << composant->reference() + "." + composant->nom_borne(borne);
-    emit survol_noeud(noeud.nom, relie.join(" · "));
+    const QString description = relie.join(" · ");
+    if (noeud.nom == noeud_allume_ && description == description_allumee_)
+        return;
+    noeud_allume_ = noeud.nom;
+    description_allumee_ = description;
+    emit survol_noeud(noeud.nom, description);
 }
 
 // ---------------------------------------------------------------------------
@@ -1613,6 +1685,10 @@ QJsonObject SceneSchema::vers_json(bool selection_seule) const {
 std::vector<ItemComposant*> SceneSchema::depuis_json(const QJsonObject& racine,
                                                      bool remplacer,
                                                      const QPointF& decalage) {
+    // Relire un schéma — ouverture, annulation, collage — remplace ce que la
+    // surbrillance désignait. `tout_effacer()` l'éteint déjà, mais pas dans
+    // le cas d'un collage qui ajoute sans remplacer.
+    eteindre_noeud();
     if (remplacer) tout_effacer();
 
     std::vector<ItemComposant*> ajoutes;

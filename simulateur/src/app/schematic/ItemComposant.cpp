@@ -95,6 +95,29 @@ void ItemComposant::recalculer_cadre() {
     const QRectF transpose(textes.top(), textes.left(), textes.height(),
                            textes.width());
     cadre_peint_ = cadre_ | textes | transpose;
+
+    // Le marqueur ERC est posé À CÔTÉ de la borne, donc HORS de la boîte des
+    // bornes : treize unités vers l'extérieur, plus la demi-largeur du
+    // triangle. Sur un boîtier dont les bornes touchent le bord — l'ATtiny85
+    // les porte à x = ±90 —, `cadre_` ne réservait que huit unités et le
+    // triangle sortait du cadre de dessin : Qt n'efface que ce qu'on lui
+    // déclare, et ces pixels-là restaient à l'écran quand la puce bougeait.
+    //
+    // Le même oubli avait déjà coûté un correctif sur le halo d'ItemJonction.
+    // C'est le genre de défaut qu'aucun test de logique n'attrape : il faut
+    // peindre pour de bon et compter les pixels.
+    if (modele_ && !modele_->bornes.empty()) {
+        constexpr double kPortee = 13.0 + 7.5;   // pose + demi-triangle
+        QRectF autour_bornes;
+        for (const auto& borne : modele_->bornes) {
+            const QPointF p = vers_qt(borne.position);
+            const QRectF cellule(p.x() - kPortee, p.y() - kPortee, 2 * kPortee,
+                                 2 * kPortee);
+            autour_bornes =
+                autour_bornes.isNull() ? cellule : autour_bornes.united(cellule);
+        }
+        cadre_peint_ = cadre_peint_ | autour_bornes;
+    }
 }
 
 QRectF ItemComposant::boundingRect() const { return cadre_peint_; }
