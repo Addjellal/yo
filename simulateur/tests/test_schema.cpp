@@ -3928,6 +3928,94 @@ static void test_ctrl_clic_designe_un_fil() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce qui arrive PENDANT que le bouton est enfoncé
+//
+// Les cinq tests précédents vérifient le geste du début à la fin, sans
+// interruption. C'est le trou : rien n'y fait survenir un événement extérieur
+// — Suppr, Ctrl+Z, l'ouverture d'un fichier — alors que le bouton est encore
+// tenu et que la scène garde des pointeurs vers ce que ce geste manipule.
+//
+// Trois use-after-free vivaient là, confirmés à l'ASan. Tous de la même
+// famille : un geste de souris désigne des objets d'un événement à l'autre, et
+// ce qui les détruit ne sait pas que ce geste existe. Le remède est unique —
+// tout ce qui détruit clôt d'abord le geste en cours.
+// ---------------------------------------------------------------------------
+static void test_geste_interrompu_par_une_destruction() {
+    std::printf("\n-- détruire pendant qu'un geste tient des pointeurs --\n");
+
+    auto montage = [](SceneSchema& scene) {
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 =
+            scene.ajouter_composant("resistance", QPointF(400, 0));
+        scene.addItem(new ItemFil(r1, 1, r2, 0));
+        const QPointF a = r1->position_borne(1);
+        return QPointF((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
+    };
+
+    // --- Ctrl+Z pendant le glissé d'un segment
+    {
+        SceneSchema scene;
+        const QPointF milieu = montage(scene);
+        scene.memoriser();   // il y a quelque chose à annuler
+
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+        // Le raccourci d'annulation appartient à la FENÊTRE : il part même si
+        // le bouton de la souris est encore enfoncé.
+        scene.annuler();
+        // La scène a été reconstruite de fond en comble : les poignées que le
+        // glissé tenait n'existent plus.
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 80));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease,
+                milieu + QPointF(0, 80));
+        verifier(scene.fils().size() == 1,
+                 "annuler pendant un glissé ne laisse pas le geste courir",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- Suppr pendant le glissé d'un segment
+    {
+        SceneSchema scene;
+        const QPointF milieu = montage(scene);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+        // Tout sélectionner puis effacer : les poignées partent avec.
+        for (QGraphicsItem* item : scene.items()) item->setSelected(true);
+        frapper(scene, Qt::Key_Delete);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 90));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease,
+                milieu + QPointF(0, 90));
+        verifier(scene.fils().empty() && scene.jonctions().empty(),
+                 "supprimer pendant un glissé n'y laisse aucun survivant",
+                 std::to_string(scene.fils().size()) + " fil(s), "
+                     + std::to_string(scene.jonctions().size()) + " point(s)");
+    }
+
+    // --- Suppr entre l'appui et le verdict, sur le fil même qu'on tient
+    //
+    // Celui-ci est le plus retors : le fil est sélectionné par Ctrl+clic, puis
+    // repris par un clic ordinaire — qui arme l'attente SANS toucher à la
+    // sélection. Suppr détruit alors le fil que l'attente désigne, et c'est le
+    // franchissement du seuil qui va le relire.
+    {
+        SceneSchema scene;
+        const QPointF milieu = montage(scene);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu, Qt::LeftButton,
+                Qt::ControlModifier);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu,
+                Qt::LeftButton, Qt::ControlModifier);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+        frapper(scene, Qt::Key_Delete);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease,
+                milieu + QPointF(0, 60));
+        verifier(scene.fils().empty(),
+                 "le fil supprimé sous le geste n'est plus relu",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Un clic raté sur un fil ne doit RIEN changer au schéma
 //
 // Appuyer sur un fil et relâcher sans bouger d'un pixel — le geste le plus
@@ -4360,6 +4448,7 @@ int main(int argc, char** argv) {
     test_clic_bref_derive_toujours();
     test_fil_en_equerre_ne_se_deplace_pas();
     test_ctrl_clic_designe_un_fil();
+    test_geste_interrompu_par_une_destruction();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

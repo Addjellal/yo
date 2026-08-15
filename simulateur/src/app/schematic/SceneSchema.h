@@ -366,6 +366,10 @@ private:
     void terminer_deplacement_segment();
     // Rend la vue à la sélection au rectangle, une fois le geste fini.
     void rendre_le_rectangle_a_la_vue();
+    // Oublie tout geste de souris en cours. À appeler par TOUT ce qui détruit
+    // des objets de la scène : un geste garde des pointeurs entre deux
+    // événements, et Suppr comme Ctrl+Z partent bouton enfoncé.
+    void oublier_geste_en_cours();
     // Fige le segment tracé et repart du point posé (clic dans le vide).
 
     // Association (composant, borne) -> nom de nœud, calculée par les fils.

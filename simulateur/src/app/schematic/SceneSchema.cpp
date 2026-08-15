@@ -415,6 +415,13 @@ void SceneSchema::supprimer_selection() {
         || (cible_depart_.fil
             && a_supprimer.count(static_cast<QGraphicsItem*>(cible_depart_.fil))))
         abandonner_fil();
+    // Le glissé d'un segment et l'attente d'un verdict, eux, tiennent des
+    // pointeurs qu'aucun tri ne met à l'abri : une poignée peut aussi être
+    // emportée INDIRECTEMENT par le balayage, quand la suppression d'un
+    // voisin fait tomber son degré à un. On clôt donc le geste sans chercher
+    // à savoir s'il est concerné — un geste interrompu par une suppression
+    // n'a de toute façon plus rien à finir.
+    oublier_geste_en_cours();
 
     // L'ordre compte, et il coûte cher à ignorer : retirer un composant fait
     // recalculer par Qt le cadre des objets voisins, donc celui des fils qui
@@ -447,6 +454,9 @@ void SceneSchema::supprimer_selection() {
 }
 
 void SceneSchema::tout_effacer() {
+    // Tout ce que la scène contient va disparaître : un geste en cours ne
+    // peut plus désigner quoi que ce soit.
+    oublier_geste_en_cours();
     // Le schéma vient de changer sous la surbrillance : ce qu'elle désignait
     // n'existe peut-être plus, et aucun mouvement de souris ne viendra la
     // rafraîchir tant que le curseur reste immobile. On l'éteint donc ici —
@@ -1567,8 +1577,16 @@ void SceneSchema::poursuivre_deplacement_segment(const QPointF& point) {
 void SceneSchema::terminer_deplacement_segment() {
     if (poignees_.empty()) return;
     const bool immobile = poignees_[0]->pos() == origines_poignees_[0];
+    // UNE COPIE, PAS LE MEMBRE.
+    //
+    // `depuis_json` prend une référence, et il passe par `tout_effacer`, qui
+    // remet désormais l'état du geste à zéro — dont ce membre. On lui aurait
+    // donc donné un objet vidé au moment même où il le lit, et l'annulation
+    // aurait effacé le schéma entier.
+    const QJsonObject avant = avant_deplacement_;
     poignees_.clear();
     origines_poignees_.clear();
+    avant_deplacement_ = QJsonObject();
     rendre_le_rectangle_a_la_vue();
 
     if (immobile) {
@@ -1576,13 +1594,34 @@ void SceneSchema::terminer_deplacement_segment() {
         // de raison d'être, et laisser une topologie modifiée derrière un
         // geste sans effet est exactement le défaut qu'on vient de corriger
         // ailleurs. On remet le schéma tel qu'il était.
-        depuis_json(avant_deplacement_);
-    } else if (avant_deplacement_ != vers_json()) {
-        empiler(avant_deplacement_);
+        depuis_json(avant);
+    } else if (avant != vers_json()) {
+        empiler(avant);
         emit journal("Segment déplacé.");
     }
-    avant_deplacement_ = QJsonObject();
     balayer_jonctions();
+}
+
+// CE QUI DÉTRUIT CLÔT D'ABORD LE GESTE EN COURS.
+//
+// Un geste de souris désigne des objets d'un événement à l'autre : le fil sur
+// lequel on vient d'appuyer, les deux poignées qu'on est en train de glisser.
+// Rien n'oblige l'utilisateur à finir ce geste avant d'appuyer sur Suppr ou
+// Ctrl+Z — le raccourci appartient à la fenêtre, il part même bouton enfoncé.
+// La scène était alors reconstruite ou vidée sous les pieds du geste, qui
+// continuait à écrire dans des objets détruits.
+//
+// Trois use-after-free confirmés à l'ASan tenaient à cet oubli, et tous à la
+// même cause : `abandonner_fil()` était bien appelé par ce qui détruit, mais
+// il ne connaît que le TRACÉ. L'attente d'un verdict et le glissé d'un segment
+// sont deux états de plus, arrivés depuis, et que personne n'avait pensé à
+// clore.
+void SceneSchema::oublier_geste_en_cours() {
+    poignees_.clear();
+    origines_poignees_.clear();
+    avant_deplacement_ = QJsonObject();
+    appui_en_attente_ = Cible();
+    rendre_le_rectangle_a_la_vue();
 }
 
 void SceneSchema::rendre_le_rectangle_a_la_vue() {
@@ -1767,6 +1806,13 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
         const Cible appui = appui_en_attente_;
         appui_en_attente_ = Cible();
         evenement->accept();
+        // Le fil a pu être supprimé entre l'appui et ce mouvement. Le
+        // relâchement le vérifiait, pas le mouvement : deux usages du même
+        // état, un seul gardé.
+        if (!fil_vivant(appui.fil)) {
+            rendre_le_rectangle_a_la_vue();
+            return;
+        }
         QPointF axe;
         const bool perpendiculaire =
             axe_perpendiculaire(appui.fil, &axe)
