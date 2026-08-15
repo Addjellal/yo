@@ -341,12 +341,33 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   # construction refuse de démarrer — il va chercher Qt dans le PATH, y
   # trouve une autre version, et se plaint d'un point d'entrée introuvable.
   # Un exécutable qui existe doit se lancer : c'est le minimum.
+  # LES GREFFONS DANS UN SEUL DOSSIER, ET PAS LES DLL.
+  #
+  # windeployqt sème sept dossiers à côté de l'exécutable — platforms,
+  # styles, imageformats, iconengines, generic, networkinformation, tls. On
+  # lui demande de tout mettre dans « greffons », et un `qt.conf` dit à Qt où
+  # regarder. Sept dossiers deviennent un.
+  #
+  # Les DLL, elles, RESTENT à côté de l'exécutable et doivent y rester : le
+  # chargeur de Windows les cherche dans le dossier du binaire, et nulle part
+  # ailleurs. Les ranger « proprement » dans un sous-dossier produit un
+  # 0xC0000135 au lancement, sans message — c'est le silence au démarrage que
+  # ce projet a déjà connu, et la raison de tout le paragraphe sur le runtime
+  # MinGW plus haut. La propreté visuelle ne vaut pas ça.
   if(WIN32 AND SIM_WINDEPLOYQT)
     add_custom_command(TARGET simulateur POST_BUILD
       COMMAND "${SIM_WINDEPLOYQT}" --release --no-translations
               --no-system-d3d-compiler --no-opengl-sw ${SIM_OPT_RUNTIME}
+              --plugindir "$<TARGET_FILE_DIR:simulateur>/greffons"
               "$<TARGET_FILE:simulateur>"
-      COMMENT "Dépôt des DLL de Qt à côté de l'exécutable")
+      COMMENT "Dépôt des DLL de Qt à côté de l'exécutable, greffons dans greffons/")
+
+    # `qt.conf` écrit à la génération, pas par une commande : une redirection
+    # « > » dans un add_custom_command ne marche pas, CMake ne passe pas par
+    # un interpréteur de commandes.
+    file(GENERATE
+      OUTPUT "$<TARGET_FILE_DIR:simulateur>/qt.conf"
+      CONTENT "[Paths]\nPlugins = greffons\n")
     # Après windeployqt, pour écraser un runtime déposé par une construction
     # antérieure : c'est le nôtre qui doit rester.
     if(SIM_DLL_RUNTIME)

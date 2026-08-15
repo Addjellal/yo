@@ -31,11 +31,20 @@ if(WIN32)
       "Indiquez-le avec -DSIM_WINDEPLOYQT=C:/Qt/6.x/mingw_64/bin/windeployqt.exe")
   else()
     message(STATUS "Déploiement de Qt avec ${SIM_WINDEPLOYQT}")
+    # Les greffons dans UN dossier, « greffons/ », plutôt que les sept que
+    # windeployqt sème par défaut. Un `qt.conf` posé à côté de l'exécutable
+    # dit à Qt où regarder.
+    #
+    # Les DLL, elles, restent à côté du binaire : le chargeur de Windows ne
+    # les cherche pas ailleurs, et les déplacer donne un 0xC0000135 au
+    # lancement, sans message.
     execute_process(
       COMMAND "${SIM_WINDEPLOYQT}" --release --no-translations
               --no-system-d3d-compiler --no-opengl-sw ${SIM_OPT_RUNTIME}
+              --plugindir "${CMAKE_INSTALL_PREFIX}/greffons"
               "${SIM_INSTALLE}"
       RESULT_VARIABLE code)
+    file(WRITE "${CMAKE_INSTALL_PREFIX}/qt.conf" "[Paths]\nPlugins = greffons\n")
     if(NOT code EQUAL 0)
       message(WARNING "windeployqt a échoué (code ${code})")
     endif()
