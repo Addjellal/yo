@@ -507,7 +507,34 @@ static void test_cablage_souris() {
                  std::to_string(scene.fils().size()) + " fil(s)");
     }
 
-    // --- cliquer ailleurs qu'une borne ne fabrique rien, et ne casse rien
+    // --- cliquer dans le vide POSE UN COUDE, et n'abandonne rien
+    //
+    // C'est le point 3 de DECISION-FILS : « if you want a wire in a particular
+    // place, you can simply click at the intermediate corners ». Le code
+    // l'annonçait mais ne le faisait pas : `terminer_fil` abandonnait le tracé
+    // avant de rendre la main, si bien que le coude était posé à partir d'une
+    // cible de départ remise à zéro — c'est-à-dire jamais.
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(600, 0));
+        const QPointF depart = r1->position_borne(1);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, depart);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, depart);
+        envoyer(scene, QEvent::GraphicsSceneMousePress, QPointF(300, 300));
+        verifier(scene.fils().size() == 1 && scene.jonctions().size() == 1,
+                 "un clic dans le vide pose un coude et poursuit le tracé",
+                 std::to_string(scene.fils().size()) + " fil(s), "
+                     + std::to_string(scene.jonctions().size()) + " point(s)");
+
+        // Le tracé continue vraiment : le clic suivant referme sur une borne.
+        envoyer(scene, QEvent::GraphicsSceneMousePress, r2->position_borne(0));
+        verifier(scene.fils().size() == 2,
+                 "et le clic suivant referme le chemin en deux segments",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+    }
+
+    // --- Échap abandonne, et le chemin inachevé ne laisse rien derrière lui
     {
         SceneSchema scene;
         ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
@@ -515,8 +542,11 @@ static void test_cablage_souris() {
         envoyer(scene, QEvent::GraphicsSceneMousePress, depart);
         envoyer(scene, QEvent::GraphicsSceneMouseRelease, depart);
         envoyer(scene, QEvent::GraphicsSceneMousePress, QPointF(600, 600));
-        verifier(scene.fils().empty(),
-                 "un clic dans le vide abandonne le fil en cours");
+        scene.abandonner_fil();
+        verifier(scene.fils().empty() && scene.jonctions().empty(),
+                 "un chemin abandonné est balayé, coude compris",
+                 std::to_string(scene.fils().size()) + " fil(s), "
+                     + std::to_string(scene.jonctions().size()) + " point(s)");
 
         // et l'on peut recommencer aussitôt
         ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 0));
@@ -3634,26 +3664,33 @@ static void test_depart_sur_fil_detruit() {
 
     verifier(scene.amorcer_fil_au(milieu), "le tracé s'amorce depuis ce fil");
 
-    // Refermer sur le MÊME point : la découpe a lieu, puis l'arrivée tombe
-    // sur le départ et le geste échoue. C'est là que la cible se périme.
+    // Refermer sur le MÊME point. La découpe n'a plus lieu du tout — c'est
+    // elle qui périmait la cible — mais la garde reste indispensable : une
+    // dérivation qui aboutit détruit bel et bien le fil d'origine.
     Ancre materialisee;
     const bool abouti = scene.terminer_fil(milieu, &materialisee);
     verifier(!abouti, "le geste échoue — on ne relie pas un point à lui-même");
+    verifier(!materialisee.valide(),
+             "et il n'a RIEN matérialisé : l'échec ne coupe plus");
 
-    // Le fil d'origine n'existe plus : c'est le pointeur que l'ancien code
-    // réutilisait.
-    bool dorsale_encore_la = false;
-    for (ItemFil* fil : scene.fils())
-        if (fil == dorsale) dorsale_encore_la = true;
-    verifier(!dorsale_encore_la,
-             "le fil de départ a bien été détruit par la découpe");
-
-    // Ce qu'il faut à la place : l'ancre réellement créée, et la certitude
-    // qu'elle est encore là.
-    verifier(materialisee.valide(),
-             "terminer_fil rend l'ancre matérialisée pour le départ");
-    verifier(materialisee.jonction != nullptr,
-             "et c'est une jonction, pas le fil d'origine");
+    // Une dérivation qui aboutit, elle, détruit le fil d'origine : c'est le
+    // pointeur que l'ancien code réutilisait ensuite.
+    ItemComposant* cible = scene.ajouter_composant("masse", QPointF(200, 400));
+    verifier(scene.terminer_fil(cible->position_borne(0), &materialisee),
+             "la dérivation vers la masse, elle, aboutit");
+    // On ne compare pas au POINTEUR `dorsale` : il est détruit, et l'allocateur
+    // rend volontiers la même adresse à l'un des deux segments qui le
+    // remplacent — le test passerait ou non selon l'humeur du tas. C'est la
+    // STRUCTURE qui dit la découpe : deux fils là où il y en avait un, plus
+    // celui de la dérivation.
+    verifier(scene.fils().size() == 4,
+             "le fil de départ a été découpé en deux, plus la dérivation",
+             std::to_string(scene.fils().size()) + " fil(s)");
+    verifier(scene.jonctions().size() == 1,
+             "et une seule jonction marque la dérivation",
+             std::to_string(scene.jonctions().size()));
+    verifier(materialisee.valide() && materialisee.jonction != nullptr,
+             "terminer_fil rend la jonction matérialisée, pas le fil mort");
     verifier(scene.ancre_vivante(materialisee),
              "cette jonction est bien dans la scène : on peut repartir de là");
 
@@ -3663,6 +3700,78 @@ static void test_depart_sur_fil_detruit() {
     verifier(!scene.ancre_vivante(materialisee),
              "retirée de la scène, la même ancre est déclarée morte");
     delete survivante;
+
+    // Et le fil, de même : c'est ce qui protège un tracé dont le fil de
+    // départ disparaît avant le clic de fermeture.
+    verifier(!scene.fils().empty() && scene.fil_vivant(scene.fils().front()),
+             "un fil présent dans la scène est déclaré vivant");
+    auto* etranger = new ItemFil(pile, 0, r1, 0);   // jamais ajouté
+    verifier(!scene.fil_vivant(etranger),
+             "un fil qui n'est pas dans la scène est déclaré mort");
+    verifier(!scene.fil_vivant(nullptr), "et un fil nul aussi");
+    delete etranger;
+}
+
+// ---------------------------------------------------------------------------
+// Un clic raté sur un fil ne doit RIEN changer au schéma
+//
+// Appuyer sur un fil et relâcher sans bouger d'un pixel — le geste le plus
+// banal du monde, celui qu'on fait pour désigner un fil avant de le déplacer —
+// coupait le fil en deux et y laissait une jonction de degré 2, que le
+// balayage ne retire pas puisqu'elle relie bien deux fils. Rien à l'écran ne
+// le disait : la pastille ne se dessine qu'au-delà de deux fils. Le schéma
+// enregistré, lui, gardait la coupure, et la pile d'annulation une entrée
+// pour un geste qui n'avait rien demandé.
+//
+// C'est une mutation topologique silencieuse au moindre clic, et c'est la
+// racine de la plainte « le mouvement des fils est loin de Simulink » : chez
+// nous on ne peut même pas TOUCHER un fil sans l'abîmer.
+// ---------------------------------------------------------------------------
+static void test_clic_immobile_ne_coupe_pas() {
+    std::printf("\n-- un clic sans mouvement sur un fil ne coupe rien --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    ItemFil* dorsale = new ItemFil(pile, 0, r1, 0);
+    scene.addItem(dorsale);
+    scene.oublier_historique();
+
+    const QPointF a = pile->position_borne(0);
+    const QPointF b = r1->position_borne(0);
+    const QPointF milieu((a.x() + b.x()) / 2.0, a.y());
+    verifier(scene.viser(milieu).genre == SceneSchema::Cible::Genre::Fil,
+             "le point visé est bien sur le fil");
+
+    const QJsonObject avant = scene.vers_json();
+    verifier(scene.amorcer_fil_au(milieu), "le tracé s'amorce depuis ce fil");
+    verifier(!scene.terminer_fil(milieu),
+             "refermer au point de départ n'aboutit à aucun fil");
+    scene.abandonner_fil();
+
+    // LE CONTRÔLE : le schéma est celui d'avant, au caractère près.
+    verifier(scene.fils().size() == 1, "il reste UN fil, pas deux moitiés",
+             std::to_string(scene.fils().size()));
+    bool dorsale_encore_la = false;
+    for (ItemFil* fil : scene.fils())
+        if (fil == dorsale) dorsale_encore_la = true;
+    verifier(dorsale_encore_la, "et c'est bien le fil d'origine, intact");
+    verifier(scene.jonctions().empty(),
+             "aucune jonction fantôme n'a été semée",
+             std::to_string(scene.jonctions().size()));
+    verifier(scene.vers_json() == avant,
+             "le schéma enregistré est identique à celui d'avant le clic");
+    verifier(!scene.annuler(),
+             "et rien n'est entré dans la pile : il n'y a rien à annuler");
+
+    // Ce qui doit encore marcher : dériver POUR DE BON depuis ce même fil.
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(400, 400));
+    verifier(scene.amorcer_fil_au(milieu), "le tracé se réamorce sur le fil");
+    verifier(scene.terminer_fil(masse->position_borne(0)),
+             "et cette fois, la dérivation aboutit");
+    verifier(scene.jonctions().size() == 1,
+             "une jonction, et une seule, matérialise la dérivation",
+             std::to_string(scene.jonctions().size()));
 }
 
 // ---------------------------------------------------------------------------
@@ -4030,6 +4139,7 @@ int main(int argc, char** argv) {
     test_apercu_suit_la_grille();
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
+    test_clic_immobile_ne_coupe_pas();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

@@ -136,6 +136,9 @@ public:
     bool terminer_fil(const QPointF& point, Ancre* depart_materialise = nullptr);
     // Cet objet est-il toujours dans la scène ?
     bool ancre_vivante(const Ancre& ancre) const;
+    // Ce fil est-il toujours dans la scène ? Un tracé peut attendre son clic
+    // de fermeture pendant que le fil dont il part se fait supprimer.
+    bool fil_vivant(const ItemFil* fil) const;
     // Retire le seul trait provisoire, sans toucher aux points déjà posés.
     void effacer_provisoire();
 

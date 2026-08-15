@@ -1271,6 +1271,13 @@ void SceneSchema::poser_point_de_passage(const QPointF& point) {
     // Un coude posé est une modification définitive : il s'annule aussi.
     // L'état est relevé avant la découpe qu'`ancrer` peut déclencher.
     const QJsonObject avant_le_coude = vers_json();
+    // Même précaution qu'à la fermeture : un tracé qui attendait depuis un fil
+    // ne doit pas découper un fil qui n'existe plus.
+    if (cible_depart_.genre == Cible::Genre::Fil
+        && !fil_vivant(cible_depart_.fil)) {
+        abandonner_fil();
+        return;
+    }
     const Ancre depart = ancrer(cible_depart_);
     if (!depart.valide()) {
         abandonner_fil();
@@ -1336,6 +1343,34 @@ static QString nom_ancre(const Ancre& ancre) {
 // Un fil coupé est détruit, un point de fil devenu inutile est balayé. Toute
 // ancre relevée avant l'un de ces deux gestes doit être revérifiée avant
 // d'être réutilisée, sans quoi on déréférence un objet mort.
+bool SceneSchema::fil_vivant(const ItemFil* fil) const {
+    if (!fil) return false;
+    for (const ItemFil* trait : fils())
+        if (trait == fil) return true;
+    return false;
+}
+
+// Ces deux cibles désignent-elles le MÊME point de raccordement ?
+//
+// C'est la question qui décide si un geste de câblage mène quelque part. Sur
+// un fil, l'écart se juge à la demi-maille : deux points plus proches que ça
+// s'aimanteraient sur le même nœud de grille, et le « fil » qui les relierait
+// ne serait pas un fil mais un clic qui a glissé.
+static bool meme_raccord(const SceneSchema::Cible& a,
+                         const SceneSchema::Cible& b) {
+    if (a.genre != b.genre) return false;
+    switch (a.genre) {
+        case SceneSchema::Cible::Genre::Broche:
+        case SceneSchema::Cible::Genre::Jonction:
+            return a.ancre == b.ancre;
+        case SceneSchema::Cible::Genre::Fil:
+            if (a.fil != b.fil) return false;
+            return (a.point - b.point).manhattanLength() < kPas / 2.0;
+        default:
+            return false;
+    }
+}
+
 bool SceneSchema::ancre_vivante(const Ancre& ancre) const {
     if (ancre.jonction) {
         for (ItemJonction* jonction : jonctions())
@@ -1350,10 +1385,31 @@ bool SceneSchema::ancre_vivante(const Ancre& ancre) const {
 
 bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) {
     if (depart_materialise) *depart_materialise = Ancre();
-    if (!viser(point).connectable()) {
+    if (!cible_depart_.connectable()) return false;
+
+    // UN GESTE QUI N'ABOUTIT PAS NE TOUCHE À RIEN.
+    //
+    // C'était faux, et ça coûtait cher : appuyer sur un fil puis relâcher sans
+    // bouger — le geste qu'on fait pour DÉSIGNER un fil — découpait ce fil en
+    // deux et y laissait une jonction de degré 2. Le balayage ne l'enlève pas
+    // (elle relie bien deux fils), la pastille ne se dessine pas (il en
+    // faudrait trois) : la topologie changeait en silence, au moindre clic
+    // raté, et la pile d'annulation gagnait une entrée pour un geste que
+    // personne n'avait demandé.
+    //
+    // Tout ce qui peut être vérifié l'est donc AVANT la moindre découpe, et
+    // l'échec laisse le tracé exactement dans l'état où il l'a trouvé : c'est
+    // à l'appelant, pas à cette fonction, de décider si le geste continue.
+    if (cible_depart_.genre == Cible::Genre::Fil
+        && !fil_vivant(cible_depart_.fil)) {
+        // Le fil de départ a disparu pendant que le tracé attendait le clic
+        // de fermeture. Il n'y a plus rien à couper — ni à déréférencer.
         abandonner_fil();
         return false;
     }
+    const Cible arrivee_visee = viser(point);
+    if (!arrivee_visee.connectable()) return false;
+    if (meme_raccord(arrivee_visee, cible_depart_)) return false;
 
     // TIRER UN FIL S'ANNULE, comme le reste.
     //
@@ -1455,6 +1511,18 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
             // sélection s'ouvrait par-dessus, en même temps.
             evenement->accept();
             if (terminer_fil(point)) return;
+            // Le clic tombe sur une cible, mais le fil n'a pas pu s'y
+            // refermer : c'est le point de départ lui-même. Y poser un coude
+            // fabriquerait un segment de longueur nulle — on renonce.
+            //
+            // Ce cas ne se distinguait pas du clic dans le vide parce que
+            // `terminer_fil` abandonnait le tracé dans les deux cas ; le clic
+            // dans le vide n'avait donc plus de cible de départ et ne posait
+            // AUCUN coude, contrairement à ce que la suite annonce.
+            if (viser(point).connectable()) {
+                abandonner_fil();
+                return;
+            }
             // Clic dans le vide pendant un tracé : on POSE UN POINT DE
             // PASSAGE et l'on continue, au lieu de tout abandonner.
             //
@@ -1572,9 +1640,6 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
     if (fil_provisoire_ && cible_depart_.connectable() && !fil_en_attente_) {
         evenement->accept();
         const QPointF point = evenement->scenePos();
-        // À relever AVANT : terminer_fil() appelle abandonner_fil() quand il
-        // échoue, ce qui remet l'ancre à zéro.
-        const Cible depart = cible_depart_;
         Ancre materialisee;
         if (terminer_fil(point, &materialisee)) return;
 
@@ -1609,21 +1674,23 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
         // après avoir vérifié qu'elle est encore dans la scène : `ancrer` peut
         // avoir échoué, et `balayer_jonctions` peut avoir emporté un point
         // devenu inutile entre-temps.
-        Cible reprise;
         if (materialisee.valide() && ancre_vivante(materialisee)) {
+            Cible reprise;
             reprise.genre = materialisee.jonction ? Cible::Genre::Jonction
                                                   : Cible::Genre::Broche;
             reprise.ancre = materialisee;
             reprise.point = materialisee.position();
-        } else if (depart.genre != Cible::Genre::Fil
-                   && ancre_vivante(depart.ancre)) {
-            // Rien n'a été matérialisé : la cible n'a pas été touchée, sauf
-            // si elle visait un fil — auquel cas on ne peut rien affirmer.
-            reprise = depart;
+            commencer_fil(reprise, point);
+            fil_en_attente_ = true;
+            return;
         }
-        if (!reprise.connectable()) return;   // plus rien où raccrocher
-        commencer_fil(reprise, point);
-        fil_en_attente_ = true;
+        // Rien n'a été matérialisé : `terminer_fil` n'a alors touché à rien
+        // du tout, tracé compris. Le fil provisoire est encore accroché au
+        // curseur et son départ tient toujours — il n'y a qu'à le laisser
+        // en attente du clic qui le refermera. Plus besoin de reconstruire
+        // une cible à partir d'une copie que la découpe pouvait périmer :
+        // c'est cette reconstruction qui était l'use-after-free.
+        if (cible_depart_.connectable()) fil_en_attente_ = true;
         return;
     }
     QGraphicsScene::mouseReleaseEvent(evenement);
