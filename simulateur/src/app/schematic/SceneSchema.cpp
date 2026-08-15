@@ -1316,13 +1316,36 @@ static QString nom_ancre(const Ancre& ancre) {
 }
 
 // Referme le fil sur une borne d'arrivée, si elle est valable.
-bool SceneSchema::terminer_fil(const QPointF& point) {
+// Cet objet est-il TOUJOURS dans la scène ?
+//
+// Un fil coupé est détruit, un point de fil devenu inutile est balayé. Toute
+// ancre relevée avant l'un de ces deux gestes doit être revérifiée avant
+// d'être réutilisée, sans quoi on déréférence un objet mort.
+bool SceneSchema::ancre_vivante(const Ancre& ancre) const {
+    if (ancre.jonction) {
+        for (ItemJonction* jonction : jonctions())
+            if (jonction == ancre.jonction) return true;
+        return false;
+    }
+    if (!ancre.composant) return false;
+    for (ItemComposant* composant : composants())
+        if (composant == ancre.composant) return true;
+    return false;
+}
+
+bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) {
+    if (depart_materialise) *depart_materialise = Ancre();
     if (!viser(point).connectable()) {
         abandonner_fil();
         return false;
     }
     // C'est ici, et seulement ici, que l'on découpe : le geste va aboutir.
     const Ancre depart = ancrer(cible_depart_);
+    // Le départ est désormais MATÉRIALISÉ, et la cible d'origine est périmée :
+    // si elle visait un fil, ce fil vient d'être coupé et détruit. L'appelant
+    // qui veut reprendre le tracé doit repartir de cette ancre-ci, jamais de
+    // la cible.
+    if (depart_materialise) *depart_materialise = depart;
     if (!depart.valide()) {
         abandonner_fil();
         return false;
@@ -1500,7 +1523,8 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
         // À relever AVANT : terminer_fil() appelle abandonner_fil() quand il
         // échoue, ce qui remet l'ancre à zéro.
         const Cible depart = cible_depart_;
-        if (terminer_fil(point)) return;
+        Ancre materialisee;
+        if (terminer_fil(point, &materialisee)) return;
 
         // RELÂCHER NE TERMINE JAMAIS UN FIL.
         //
@@ -1517,10 +1541,36 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
         // lui, pose un point de passage : c'est le presseEvent qui s'en
         // charge, et c'est ce qui permet d'imposer un tracé.
         //
-        // Le départ est déjà ancré — éventuellement sur un point de dérivation
-        // créé au clic. Le reprendre tel quel, sans re-viser : re-viser
-        // découperait une seconde fois.
-        commencer_fil(depart, point);
+        // ON NE REPART JAMAIS DE LA CIBLE D'ORIGINE.
+        //
+        // C'était un use-after-free, et il plantait pour de bon. Quand le
+        // tracé part d'un FIL, `terminer_fil` appelle `ancrer`, qui découpe ce
+        // fil et le DÉTRUIT pour y poser une jonction. Si l'arrivée n'aboutit
+        // pas, la cible gardée par l'appelant désigne alors un objet mort.
+        //
+        // Avant que « relâcher ne termine plus un fil », ce chemin n'était
+        // atteint que si la souris n'avait pas bougé de six pixels — le
+        // défaut existait déjà, il était seulement très difficile à
+        // déclencher.
+        //
+        // On repart donc de l'ancre RÉELLEMENT matérialisée, et seulement
+        // après avoir vérifié qu'elle est encore dans la scène : `ancrer` peut
+        // avoir échoué, et `balayer_jonctions` peut avoir emporté un point
+        // devenu inutile entre-temps.
+        Cible reprise;
+        if (materialisee.valide() && ancre_vivante(materialisee)) {
+            reprise.genre = materialisee.jonction ? Cible::Genre::Jonction
+                                                  : Cible::Genre::Broche;
+            reprise.ancre = materialisee;
+            reprise.point = materialisee.position();
+        } else if (depart.genre != Cible::Genre::Fil
+                   && ancre_vivante(depart.ancre)) {
+            // Rien n'a été matérialisé : la cible n'a pas été touchée, sauf
+            // si elle visait un fil — auquel cas on ne peut rien affirmer.
+            reprise = depart;
+        }
+        if (!reprise.connectable()) return;   // plus rien où raccrocher
+        commencer_fil(reprise, point);
         fil_en_attente_ = true;
         return;
     }

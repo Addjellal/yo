@@ -129,7 +129,13 @@ public:
     // Fige le segment tracé et repart du point posé (clic dans le vide) ;
     // referme le chemin sur la cible visée. Exposés pour les essais.
     void poser_point_de_passage(const QPointF& point);
-    bool terminer_fil(const QPointF& point);
+    // `depart_materialise` reçoit l'ancre réellement créée pour le départ —
+    // celle qui remplace la cible d'origine dès qu'un fil a été découpé.
+    // L'appelant qui veut reprendre le tracé DOIT repartir de là : la cible,
+    // elle, peut désigner un fil qui vient d'être détruit.
+    bool terminer_fil(const QPointF& point, Ancre* depart_materialise = nullptr);
+    // Cet objet est-il toujours dans la scène ?
+    bool ancre_vivante(const Ancre& ancre) const;
     // Retire le seul trait provisoire, sans toucher aux points déjà posés.
     void effacer_provisoire();
 

@@ -1098,27 +1098,99 @@ void FenetrePrincipale::construire_actions() {
         onglets_->setCurrentIndex(1);
     });
 
+    // Les exemples se rangent PAR CARTE.
+    //
+    // La liste était plate, et neuf de ses dix entrées posaient un Arduino Uno
+    // en dur. Sur un poste réglé pour un TP ESP32 ou STM32, huit entrées
+    // chargeaient donc silencieusement un Uno à la place de la carte du jour.
+    // Ce n'est pas un problème de rangement : c'est une erreur d'élève qu'on
+    // fabrique, et qu'il n'a aucun moyen de diagnostiquer.
+    //
+    // L'IDE Arduino range de même — « Examples for <board> » —, à ceci près
+    // qu'il ne montre que la carte active. Ici les branches sont toutes
+    // visibles : elles disent AUSSI que le simulateur connaît neuf cartes,
+    // ce que la liste plate cachait.
     auto* exemples = menuBar()->addMenu("E&xemples");
-    exemples->addAction("Clignotant sur D13", this,
-                        [this] { charger_exemple(Exemple::Clignotant); });
-    exemples->addAction("Bouton et LED (entrée avec pull-up)", this,
-                        [this] { charger_exemple(Exemple::BoutonLed); });
-    exemples->addAction("Potentiomètre sur A0 (conversion analogique)", this,
-                        [this] { charger_exemple(Exemple::PotentiometreLed); });
-    exemples->addAction("Moteur commandé par transistor", this,
-                        [this] { charger_exemple(Exemple::Transistor); });
-    exemples->addAction("PWM sur D9 (à observer à l'oscilloscope)", this,
-                        [this] { charger_exemple(Exemple::Pwm); });
-    exemples->addAction("Deux cartes qui communiquent", this,
-                        [this] { charger_exemple(Exemple::DeuxCartes); });
-    exemples->addAction("Servomoteur balayé", this,
-                        [this] { charger_exemple(Exemple::Servo); });
-    exemples->addAction("Chenillard sur registre 74HC595 (moteur numérique)",
-                        this, [this] { charger_exemple(Exemple::Registre); });
-    exemples->addAction("Filtre RC (analyses : Bode, balayage, spectre)", this,
-                        [this] { charger_exemple(Exemple::FiltreRC); });
-    exemples->addAction("Moteur en PWM avec transistor", this,
-                        [this] { charger_exemple(Exemple::MoteurPuissance); });
+
+    // La famille ATmega328P d'abord : c'est celle du cours, et la seule dont
+    // les montages soient tous écrits.
+    auto* uno = exemples->addMenu("Arduino &Uno");
+    uno->addAction("Clignotant sur D13", this,
+                   [this] { charger_exemple(Exemple::Clignotant); });
+    uno->addAction("Bouton et LED (entrée avec pull-up)", this,
+                   [this] { charger_exemple(Exemple::BoutonLed); });
+    uno->addAction("Potentiomètre sur A0 (conversion analogique)", this,
+                   [this] { charger_exemple(Exemple::PotentiometreLed); });
+    uno->addAction("PWM sur D9 (à observer à l'oscilloscope)", this,
+                   [this] { charger_exemple(Exemple::Pwm); });
+    uno->addSeparator();
+    uno->addAction("Moteur commandé par transistor", this,
+                   [this] { charger_exemple(Exemple::Transistor); });
+    uno->addAction("Moteur en PWM avec transistor", this,
+                   [this] { charger_exemple(Exemple::MoteurPuissance); });
+    uno->addAction("Servomoteur balayé", this,
+                   [this] { charger_exemple(Exemple::Servo); });
+    uno->addAction("Chenillard sur registre 74HC595 (moteur numérique)", this,
+                   [this] { charger_exemple(Exemple::Registre); });
+    uno->addSeparator();
+    uno->addAction("Deux cartes qui communiquent", this,
+                   [this] { charger_exemple(Exemple::DeuxCartes); });
+
+    // Les autres cartes. Chacune porte déjà son clignotant dans le catalogue,
+    // vérifié par le banc d'essai ; ce qui change d'une à l'autre tient au nom
+    // de la broche qui porte la LED.
+    //
+    // Aucune n'a plus d'un exemple, et c'est dit plutôt que caché : le noyau
+    // Arduino ne couvre que la famille ATmega328P, et les catalogues officiels
+    // de Pico (pico-sdk), STM32 (HAL) et ESP32 (ESP-IDF) ne se compilent pas
+    // ici — le simulateur n'accepte que du C nu sur registres. Proposer un
+    // exemple qui se bloque coûte plus cher qu'une absence.
+    struct Branche {
+        const char* menu;
+        const char* type;
+        const char* broche;
+        const char* note;
+    };
+    static const Branche kBranches[] = {
+        {"Arduino &Nano", "arduino_nano", "D13", nullptr},
+        {"Arduino &Pro Mini", "arduino_pro_mini", "D13", nullptr},
+        {"Arduino &Mega 2560", "arduino_mega", "D13", nullptr},
+        {"ATmega328P n&u", "atmega328p", "PB5",
+         "Puce nue, en C sur registres : pas de noyau Arduino."},
+        {"A&Ttiny85", "attiny85", "PB1",
+         "Pas d'UART matériel : aucune sortie série sur cette puce."},
+        {"Raspberry Pi Pi&co", "pi_pico", "GP25",
+         "C nu sur registres : le pico-sdk ne se compile pas ici."},
+        {"&STM32F103 (Blue Pill)", "stm32f103", "PC13",
+         "C nu sur registres : ni HAL ni CubeMX."},
+        {"&ESP32", "esp32", "GPIO2",
+         "Chaîne Xtensa absente : chargez un .elf déjà compilé."},
+    };
+    for (const Branche& branche : kBranches) {
+        auto* sous_menu = exemples->addMenu(branche.menu);
+        const QString type = branche.type;
+        const QString broche = branche.broche;
+        QAction* action = sous_menu->addAction(
+            QString("Clignotant sur %1").arg(broche), this,
+            [this, type, broche] { charger_clignotant_carte(type, broche); });
+        if (branche.note) action->setToolTip(branche.note);
+        if (branche.note) {
+            // La limite est écrite DANS le menu, pas seulement en info-bulle :
+            // un élève qui cherche pourquoi son exemple ESP32 ne compile pas
+            // ne pensera pas à survoler une entrée.
+            auto* limite = sous_menu->addAction(branche.note);
+            limite->setEnabled(false);
+        }
+    }
+
+    exemples->addSeparator();
+    // Sans carte : un filtre, un pont diviseur ou un redresseur n'ont pas
+    // besoin de microcontrôleur, et ce sont les séances d'électronique du
+    // cours. Elles n'avaient qu'un seul exemple, perdu au milieu des montages
+    // Arduino.
+    auto* sans_carte = exemples->addMenu("Sans &carte (analogique pur)");
+    sans_carte->addAction("Filtre RC (analyses : Bode, balayage, spectre)",
+                          this, [this] { charger_exemple(Exemple::FiltreRC); });
 
     // Fenêtres : c'est l'utilisateur qui sort un panneau de mesure, jamais
     // l'application. Le raccourci le remet aussi bien qu'il le sort.
@@ -3260,6 +3332,71 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
     carte_courante_.clear();
     changer_carte(carte->reference());
 
+    vue_->ajuster();
+    ecrire("Compilez le programme (F5) puis lancez la simulation.");
+}
+
+// Le clignotant de N'IMPORTE QUELLE carte.
+//
+// Cinq cartes portaient déjà leur programme de démarrage dans le catalogue
+// (`Modele::programme_exemple`, écrit ET compilé par le banc d'essai), et
+// aucune n'était atteignable depuis le menu : il fallait poser la carte à la
+// main, puis deviner qu'un double-clic dessus chargeait son programme. Le
+// travail était fait ; il manquait le branchement.
+//
+// Ce qui change d'une carte à l'autre tient en un nom de broche — la LED est
+// sur D13 chez Arduino, PB5 sur un ATmega nu, PB1 sur un ATtiny85, GP25 sur
+// un Pico, PC13 sur une Blue Pill, GPIO2 sur un DevKit ESP32. Tout le reste
+// est commun, d'où une seule fonction plutôt que huit.
+void FenetrePrincipale::charger_clignotant_carte(const QString& type,
+                                                 const QString& broche) {
+    arreter();
+    scene_->tout_effacer();
+    scene_->oublier_historique();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* carte = scene_->ajouter_composant(type, QPointF(-320, 0));
+    if (!carte) return;
+
+    int rang = -1;
+    for (int k = 0; k < carte->nb_bornes(); ++k)
+        if (carte->nom_borne(k) == broche) rang = k;
+    if (rang < 0) {
+        // La carte est posée avec son programme : c'est déjà mieux que rien.
+        // Mais on le DIT, plutôt que de livrer un montage muet dont l'élève
+        // croirait qu'il est complet.
+        ecrire("La broche « " + broche + " » n'existe pas sur cette carte : "
+               "la LED n'a pas été câblée. Câblez-la à la main.");
+    } else {
+        ItemComposant* led = scene_->ajouter_composant("led", QPointF(60, -130));
+        ItemComposant* r = scene_->ajouter_composant("resistance", QPointF(190, -130));
+        ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(300, -40));
+        if (led && r && masse) {
+            // 220 Ω sous 5 V, 100 Ω sous 3,3 V : c'est le calcul du cours, et
+            // livrer la mauvaise valeur sur une carte 3,3 V enseignerait une
+            // erreur au lieu de la corriger.
+            r->valeurs["ohms"] =
+                carte->modele() && carte->modele()->tension_logique < 4.0 ? 100
+                                                                          : 220;
+            scene_->addItem(new ItemFil(carte, rang, led, 0));
+            scene_->addItem(new ItemFil(led, 1, r, 0));
+            scene_->addItem(new ItemFil(r, 1, masse, 0));
+        }
+    }
+
+    circuit_modifie();
+    // Le nom du fichier suit la puce : un croquis Arduino porte « .ino », une
+    // puce nue porte « .c ». Ce n'est pas cosmétique — c'est l'extension qui
+    // décide si le noyau Arduino est fondu dans la compilation.
+    const std::string mcu =
+        carte->modele() ? carte->modele()->mcu : std::string("atmega328p");
+    programmes_[carte->reference()] = coeur::Programme{
+        {coeur::nom_principal(mcu), programme_par_defaut(carte->reference())
+                                        .toStdString()}};
+    carte_courante_.clear();
+    changer_carte(carte->reference());
     vue_->ajuster();
     ecrire("Compilez le programme (F5) puis lancez la simulation.");
 }

@@ -3582,6 +3582,65 @@ static void test_marqueur_erc_evite_la_reference() {
     pot->definir_anomalies({});
 }
 
+// ---------------------------------------------------------------------------
+// Le fil détruit sous les pieds du geste qui le tenait
+//
+// Un vrai plantage, signalé en câblant « un peu n'importe quoi ». Partir d'un
+// FIL et refermer sur ce même fil : `ancrer` le découpe et le DÉTRUIT pour y
+// poser une jonction, puis l'arrivée se retrouve égale au départ et le geste
+// échoue. La cible gardée par l'appelant désignait alors un objet mort.
+// ---------------------------------------------------------------------------
+static void test_depart_sur_fil_detruit() {
+    std::printf("\n-- repartir d'un fil que la découpe a détruit --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(700, 0));
+    ItemFil* dorsale = new ItemFil(pile, 0, r1, 0);
+    scene.addItem(dorsale);
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    // Un point franchement SUR la dorsale.
+    const QPointF a = pile->position_borne(0);
+    const QPointF b = r1->position_borne(0);
+    const QPointF milieu((a.x() + b.x()) / 2.0, a.y());
+    verifier(scene.viser(milieu).genre == SceneSchema::Cible::Genre::Fil,
+             "le point visé est bien sur le fil");
+
+    verifier(scene.amorcer_fil_au(milieu), "le tracé s'amorce depuis ce fil");
+
+    // Refermer sur le MÊME point : la découpe a lieu, puis l'arrivée tombe
+    // sur le départ et le geste échoue. C'est là que la cible se périme.
+    Ancre materialisee;
+    const bool abouti = scene.terminer_fil(milieu, &materialisee);
+    verifier(!abouti, "le geste échoue — on ne relie pas un point à lui-même");
+
+    // Le fil d'origine n'existe plus : c'est le pointeur que l'ancien code
+    // réutilisait.
+    bool dorsale_encore_la = false;
+    for (ItemFil* fil : scene.fils())
+        if (fil == dorsale) dorsale_encore_la = true;
+    verifier(!dorsale_encore_la,
+             "le fil de départ a bien été détruit par la découpe");
+
+    // Ce qu'il faut à la place : l'ancre réellement créée, et la certitude
+    // qu'elle est encore là.
+    verifier(materialisee.valide(),
+             "terminer_fil rend l'ancre matérialisée pour le départ");
+    verifier(materialisee.jonction != nullptr,
+             "et c'est une jonction, pas le fil d'origine");
+    verifier(scene.ancre_vivante(materialisee),
+             "cette jonction est bien dans la scène : on peut repartir de là");
+
+    // Une ancre qui désigne un objet retiré doit être déclarée morte.
+    ItemJonction* survivante = materialisee.jonction;
+    scene.removeItem(survivante);
+    verifier(!scene.ancre_vivante(materialisee),
+             "retirée de la scène, la même ancre est déclarée morte");
+    delete survivante;
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3640,6 +3699,7 @@ int main(int argc, char** argv) {
     test_marqueur_erc_tient_dans_son_cadre();
     test_surbrillance_ne_survit_pas_a_la_suppression();
     test_marqueur_erc_evite_la_reference();
+    test_depart_sur_fil_detruit();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

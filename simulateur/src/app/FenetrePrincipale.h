@@ -68,6 +68,9 @@ public:
                          Registre };
     void charger_exemple(Exemple exemple);
     void charger_exemple_deux_cartes();
+    // Le clignotant d'une carte quelconque : elle porte déjà son programme
+    // dans le catalogue, seule la broche de LED change.
+    void charger_clignotant_carte(const QString& type, const QString& broche);
     // Montage purement analogique : c'est celui sur lequel les analyses
     // paramétriques prennent tout leur sens (Bode, balayage, spectre).
     void charger_exemple_filtre();
