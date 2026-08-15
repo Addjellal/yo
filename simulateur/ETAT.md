@@ -419,15 +419,50 @@ l'application ou en la faisant relire :
 
 ## Ce qui reste — par ordre de valeur
 
-### Interface (chantier 5 de `SYNTHESE-INTERFACE.md`)
+### Interface — chantier 5 : **FAIT**
 
-- survol qui allume tout le nœud (`calculer_noeuds()` fait déjà le calcul) ;
-- marqueur ERC **posé à côté** du symbole — jamais en noircissant le
-  composant, qui veut dire « grillé », un fait physique constaté ;
-- bornes non connectées marquées (la borne, pas le corps) ;
-- mode présentation `F11` (`afficher_page()` sait déjà masquer les docks) ;
-- mémoire de la disposition, **avec** « Réinitialiser » ;
-- cartouche à l'impression seulement.
+Les six points sont livrés, chacun avec son banc. Ce qu'ils ont appris :
+
+- **Survol qui allume tout le nœud.** `calculer_noeuds()` ne suffisait pas :
+  il rend les NOMS par composant, pas l'appartenance des fils ni des coudes.
+  L'union-find est donc extrait dans `tisser()` et partagé par le nommage et
+  le survol — les calculer séparément aurait fini par les faire diverger, et
+  le survol aurait montré un nœud que la netlist ne connaît pas.
+
+  Deux décisions à ne pas défaire : la surbrillance est un **drapeau porté
+  par chaque objet**, jamais une liste de pointeurs gardée dans la scène (un
+  objet supprimé emporte le sien) ; et elle est **reposée à chaque survol**
+  au lieu d'être court-circuitée quand le nom n'a pas changé — après
+  suppression d'un fil, le nom est identique et le contenu non. Le banc
+  attrape ce raccourci : le remettre fait tomber un test, et lui seul.
+
+  Le nom part en barre d'état, comme LTspice — le seul précédent vérifié.
+
+- **Marqueur ERC à côté du symbole.** `Anomalie` porte désormais un champ
+  `borne` : le nom figurait déjà dans la phrase du message, mais l'y relire
+  à l'expression régulière aurait fait dépendre le dessin du schéma de la
+  ponctuation d'une phrase française. Le report traite les **trois formes**
+  de `reference` (référence, nœud, liste jointe par virgules).
+
+- **Bornes non connectées** : même mécanisme — la règle existait déjà, il
+  lui manquait de dire *laquelle*.
+
+- **`F11` présentation.** Ce qui bloquait : la scène consommait `Échap`
+  **même sans fil à abandonner**, l'événement mourait là. Sortie par deux
+  `Échap` rapprochés.
+
+- **Mémoire de la disposition**, avec « Réinitialiser ». La disposition de
+  référence est relevée **après construction**, jamais écrite en dur : une
+  disposition en dur se désynchronise du constructeur au premier panneau
+  ajouté. La portée `QSettings` suit l'identité de l'application — sans quoi
+  le banc, qui construit de vraies `FenetrePrincipale`, relirait la
+  disposition de l'utilisateur sur sa machine.
+
+- **Cartouche à l'impression seulement.** Champ « Nom » tracé même vide, en
+  pointillé : une ligne à remplir à la main vaut mieux qu'une feuille
+  anonyme.
+
+Bancs : **396** (cœur) et **295** (schéma).
 
 ### Diagnostic (chantier 4, entamé)
 
