@@ -222,6 +222,11 @@ public:
     // fichier n'appartient pas au programme de la carte courante.
     bool aller_a_erreur(const ErreurCompilation& erreur);
 
+    // Remplit le panneau « Contrôle » et y mène.
+    void remplir_controle(const std::vector<coeur::Anomalie>& anomalies);
+    // Sélectionne sur le schéma ce que désigne une anomalie, et l'y cadre.
+    bool atteindre_anomalie(const QString& reference);
+
 private slots:
     void nouveau_projet();
     void ouvrir_projet();
@@ -280,6 +285,9 @@ private:
     std::map<QString, QTextDocument*> documents_;
     std::map<QString, int> curseurs_;
     QLabel* etiquette_anomalies_ = nullptr;
+    // La liste des anomalies, à côté du journal. Le compteur en barre d'état
+    // dit COMBIEN ; ce panneau dit lesquelles, et y mène.
+    QTreeWidget* panneau_controle_ = nullptr;
     Oscilloscope* oscilloscope_ = nullptr;
     // Un oscilloscope par bloc « scope » posé sur le schéma, dans sa fenêtre.
     std::map<ItemComposant*, Oscilloscope*> scopes_;

@@ -3271,6 +3271,66 @@ static void test_erreur_compilation_cliquable() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Le panneau « Contrôle » mène au coupable
+//
+// Le piège de cette section, et la raison pour laquelle elle existe :
+// `Anomalie.reference` est tantôt une référence de composant, tantôt un nom
+// de nœud, tantôt une liste jointe par virgules. Un clic qui ne traiterait
+// que le premier cas serait mort sur un bon tiers des lignes — et un clic
+// mort est pire qu'une ligne non cliquable, puisqu'il se laisse essayer.
+// ---------------------------------------------------------------------------
+static void test_panneau_controle_mene_au_coupable() {
+    std::printf("\n-- le panneau Contrôle mène au coupable --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    scene.addItem(new ItemFil(pile, 0, r1, 0));
+    scene.addItem(new ItemFil(r1, 1, masse, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    // --- forme 1 : une référence de composant -----------------------------
+    const QRectF sur_r1 = scene.designer_anomalie("R1");
+    verifier(!sur_r1.isNull(), "une référence désigne un rectangle à cadrer");
+    verifier(r1->isSelected() && !pile->isSelected(),
+             "et sélectionne ce composant, lui seul");
+
+    // --- forme 2 : une liste jointe par virgules ---------------------------
+    const QRectF sur_deux = scene.designer_anomalie("R1, V1");
+    verifier(!sur_deux.isNull() && r1->isSelected() && pile->isSelected(),
+             "une liste jointe par virgules les sélectionne tous les deux");
+    verifier(sur_deux.width() > sur_r1.width(),
+             "et le cadre les englobe — il est plus large que celui de R1 "
+             "seule",
+             f(sur_deux.width()) + " contre " + f(sur_r1.width()));
+
+    // --- forme 3 : un nom de nœud -----------------------------------------
+    //
+    // Un nœud n'a pas de symbole. Ce sont ses fils qui le matérialisent, et
+    // les sélectionner montre son étendue exacte.
+    const QString noeud = scene.noeud_de(r1, 0);
+    verifier(!noeud.isEmpty(), "le nœud de R1.1 porte bien un nom",
+             noeud.toStdString());
+    const QRectF sur_noeud = scene.designer_anomalie(noeud);
+    verifier(!sur_noeud.isNull(),
+             "un nom de nœud désigne lui aussi un rectangle — pas un clic mort");
+    int fils_choisis = 0;
+    for (ItemFil* fil : scene.fils())
+        if (fil->isSelected()) ++fils_choisis;
+    verifier(fils_choisis >= 1,
+             "et ce sont les FILS du nœud qui sont sélectionnés",
+             std::to_string(fils_choisis) + " fil(s)");
+
+    // --- ce qui ne désigne rien ne prétend pas le contraire ----------------
+    verifier(scene.designer_anomalie("R99").isNull(),
+             "une référence absente ne rend aucun cadre");
+    verifier(scene.designer_anomalie("").isNull(),
+             "une référence vide non plus — c'est le cas de « aucune masse », "
+             "qui porte sur le montage entier");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3323,6 +3383,7 @@ int main(int argc, char** argv) {
     test_presentation_et_disposition();
     test_cartouche_a_l_impression_seulement();
     test_erreur_compilation_cliquable();
+    test_panneau_controle_mene_au_coupable();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

@@ -1073,6 +1073,54 @@ void SceneSchema::poser_anomalies(
     }
 }
 
+QRectF SceneSchema::designer_anomalie(const QString& reference) {
+    clearSelection();
+    QRectF cadre;
+    auto retenir = [&cadre](QGraphicsItem* item) {
+        item->setSelected(true);
+        cadre = cadre.isNull() ? item->sceneBoundingRect()
+                               : cadre.united(item->sceneBoundingRect());
+    };
+
+    // Forme 1 et 2 : une référence, ou plusieurs jointes par virgules.
+    bool trouve_un_composant = false;
+    for (const QString& brute : reference.split(',')) {
+        const QString cible = brute.trimmed();
+        if (cible.isEmpty()) continue;
+        for (ItemComposant* composant : composants())
+            if (composant->reference() == cible) {
+                retenir(composant);
+                trouve_un_composant = true;
+            }
+    }
+    if (trouve_un_composant) return cadre;
+
+    // Forme 3 : un nom de nœud. Il n'a pas de symbole — ce sont ses fils qui
+    // le matérialisent, et les sélectionner montre son étendue exacte.
+    const QString noeud = reference.trimmed();
+    if (noeud.isEmpty()) return cadre;
+    const auto noms = calculer_noeuds();
+    std::set<const ItemComposant*> touches;
+    for (const auto& [composant, par_borne] : noms)
+        for (const std::string& nom : par_borne)
+            if (QString::fromStdString(nom) == noeud) touches.insert(composant);
+    if (touches.empty()) return cadre;
+
+    for (ItemFil* fil : fils()) {
+        const ItemComposant* a = fil->depart();
+        const ItemComposant* b = fil->arrivee();
+        if ((a && touches.count(a)) || (b && touches.count(b))) retenir(fil);
+    }
+    // Un nœud peut n'avoir aucun fil — deux étiquettes de même nom le
+    // relient sans trait. On se rabat alors sur les composants qu'il touche,
+    // faute de quoi le clic ne montrerait rien.
+    if (cadre.isNull())
+        for (const ItemComposant* composant : touches)
+            for (ItemComposant* pose : composants())
+                if (pose == composant) retenir(pose);
+    return cadre;
+}
+
 void SceneSchema::effacer_resultats() {
     for (ItemComposant* composant : composants()) {
         composant->definir_eclat(0.0);

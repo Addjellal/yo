@@ -464,13 +464,43 @@ Les six points sont livrés, chacun avec son banc. Ce qu'ils ont appris :
 
 Bancs : **396** (cœur) et **295** (schéma).
 
-### Diagnostic (chantier 4, entamé)
+### Diagnostic (chantier 4) : **FAIT**
 
-Le remède est écrit à côté de chaque anomalie et le compteur est en barre
-d'état. Restent le **panneau « Contrôle »** navigable et le **clic qui
-sélectionne le composant fautif** — attention, `Anomalie.reference` est
-tantôt une référence, tantôt un nom de nœud, tantôt une liste jointe par
-virgules.
+Panneau « Contrôle » à côté du journal, jamais modal, chaque ligne menant à
+son coupable. `SceneSchema::designer_anomalie()` traite les **trois formes**
+de `Anomalie.reference` par trois gestes différents :
+
+| forme | geste |
+|---|---|
+| `R1` | sélectionne ce composant |
+| `R1, V1` | les sélectionne tous |
+| `GND` (un nœud) | sélectionne les **fils** du nœud |
+
+La troisième est celle qu'on oublie, et l'oublier fait un **clic mort** —
+pire qu'une ligne non cliquable, puisqu'il se laisse essayer. Un nœud n'a
+pas de symbole : ce sont ses fils qui le matérialisent.
+
+Le cadrage ne change pas l'échelle : un zoom qui saute à chaque clic ferait
+perdre le repère qu'on vient de se construire.
+
+**Les deux boîtes modales ont disparu** — celle de l'ERC (elle recouvrait le
+schéma qu'elle décrivait) et celle du compilateur (défaut 4).
+
+### Cliquer une erreur de compilation : **FAIT**
+
+Double-clic dans le journal → l'onglet et la ligne. Lu au format **texte**
+`fichier:ligne:colonne: erreur:` — avr-g++ 7.3, celui des paquets Debian, ne
+connaît pas `-fdiagnostics-format=json` (apparu avec GCC 9).
+
+Deux pièges, tous deux dans le banc :
+- **la locale.** Le compilateur suit la langue du système : le motif accepte
+  `error:` et `erreur:`. Un analyseur qui ne lirait que l'anglais marcherait
+  sur le conteneur d'essai et nulle part en salle.
+- **les lignes de contexte.** `principal.ino: In function 'void setup()':`
+  n'a pas de numéro et ne doit rien déclencher.
+
+Le motif est vérifié contre la sortie **réelle** d'avr-g++ 7.3.0, recopiée
+verbatim dans le banc après compilation d'un croquis fautif.
 
 ### Les trois manques lourds
 

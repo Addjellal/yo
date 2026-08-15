@@ -238,6 +238,15 @@ public:
     void poser_anomalies(const std::vector<coeur::Anomalie>& anomalies);
     void effacer_anomalies();
 
+    // Sélectionne ce que désigne une anomalie et rend le rectangle à cadrer.
+    //
+    // Les trois formes de `reference` mènent à trois gestes différents : une
+    // référence sélectionne son composant, une liste les sélectionne tous, un
+    // nom de nœud sélectionne les FILS de ce nœud — car un nœud n'a pas de
+    // symbole, et ne rien sélectionner du tout ferait un clic mort. Rectangle
+    // vide quand la référence ne désigne rien de posé sur la feuille.
+    QRectF designer_anomalie(const QString& reference);
+
 signals:
     void selection_composant(ItemComposant* composant);
     void journal(const QString& message);

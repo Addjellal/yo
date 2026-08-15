@@ -26,6 +26,7 @@
 #include <QCursor>
 #include <functional>
 #include <QPlainTextDocumentLayout>
+#include <QHeaderView>
 #include <QMouseEvent>
 #include <QTextBlock>
 #include <QRegularExpression>
@@ -41,6 +42,7 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
+#include <QHeaderView>
 #include <QMouseEvent>
 #include <QTextBlock>
 #include <QRegularExpression>
@@ -199,6 +201,7 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &MoteurSimulation::anomalies_relevees, this,
             [this](const std::vector<coeur::Anomalie>& anomalies) {
                 scene_->poser_anomalies(anomalies);
+                remplir_controle(anomalies);
             });
     connect(moteur_, &MoteurSimulation::composant_grille, this,
             [this](const QString& reference) {
@@ -505,6 +508,30 @@ void FenetrePrincipale::construire_docks() {
         "Double-cliquez une ligne d'erreur de compilation pour aller à la "
         "ligne fautive dans le programme.");
     onglets->addTab(console_, "Journal");
+
+    // Le panneau « Contrôle » — à CÔTÉ du journal, jamais modal.
+    //
+    // L'ERC ouvrait une boîte qui recouvrait le schéma qu'elle décrivait :
+    // impossible de lire l'anomalie et de regarder le montage en même temps,
+    // alors que c'est le seul geste utile. Ici la liste reste ouverte pendant
+    // qu'on corrige, et chaque ligne mène à son coupable.
+    panneau_controle_ = new QTreeWidget;
+    panneau_controle_->setColumnCount(3);
+    panneau_controle_->setHeaderLabels({"", "Où", "Quoi faire"});
+    panneau_controle_->setRootIsDecorated(false);
+    panneau_controle_->setAlternatingRowColors(true);
+    panneau_controle_->setMinimumHeight(70);
+    panneau_controle_->setToolTip(
+        "Cliquez une ligne pour sélectionner et cadrer ce qu'elle désigne sur "
+        "le schéma.");
+    panneau_controle_->header()->setStretchLastSection(true);
+    connect(panneau_controle_, &QTreeWidget::itemSelectionChanged, this, [this] {
+        const QList<QTreeWidgetItem*> choisis =
+            panneau_controle_->selectedItems();
+        if (choisis.isEmpty()) return;
+        atteindre_anomalie(choisis.front()->data(0, Qt::UserRole).toString());
+    });
+    onglets->addTab(panneau_controle_, "Contrôle");
 
     // Le moniteur série reçoit ET émet.
     //
@@ -925,12 +952,26 @@ void FenetrePrincipale::construire_actions() {
     analyse->addSeparator();
     analyse->addAction("&Contrôler les règles électriques (ERC)", this, [this] {
         circuit_modifie();
-        const QString rapport =
-            QString::fromStdString(coeur::rapport_regles(moteur_->netlist()));
-        ecrire(rapport);
-        onglets_->setCurrentIndex(1);            // onglet « Journal »
-        if (!silencieux_)
-            QMessageBox::information(this, "Contrôle des règles", rapport);
+        const std::vector<coeur::Anomalie> anomalies =
+            coeur::controler_regles(moteur_->netlist());
+        int erreurs = 0, avertissements = 0;
+        for (const coeur::Anomalie& a : anomalies) {
+            if (a.gravite == coeur::Anomalie::Gravite::Erreur) ++erreurs;
+            else if (a.gravite == coeur::Anomalie::Gravite::Avertissement)
+                ++avertissements;
+        }
+        scene_->poser_anomalies(anomalies);
+        remplir_controle(anomalies);
+        refleter_controle(erreurs, avertissements);
+        ecrire(QString::fromStdString(coeur::rapport_regles(moteur_->netlist())));
+        // PAS DE BOÎTE MODALE : elle recouvrait le schéma qu'elle décrivait,
+        // et il fallait la fermer pour regarder ce dont elle parlait. Le
+        // panneau reste ouvert pendant qu'on corrige.
+        if (onglets_) onglets_->setCurrentIndex(2);   // onglet « Contrôle »
+        for (QDockWidget* dock : docks_schema_)
+            if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea
+                && !dock->isVisible())
+                dock->setVisible(true);
     });
     analyse->addAction("&Nomenclature du montage", this, [this] {
         circuit_modifie();
@@ -2634,6 +2675,59 @@ bool FenetrePrincipale::exporter_courbes(const QString& chemin_demande) {
         return false;
     }
     ecrire("Relevés exportés : " + chemin);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Le panneau « Contrôle »
+// ---------------------------------------------------------------------------
+void FenetrePrincipale::remplir_controle(
+    const std::vector<coeur::Anomalie>& anomalies) {
+    if (!panneau_controle_) return;
+    const QSignalBlocker silence(panneau_controle_);
+    panneau_controle_->clear();
+
+    for (const coeur::Anomalie& anomalie : anomalies) {
+        auto* ligne = new QTreeWidgetItem(panneau_controle_);
+        const bool erreur =
+            anomalie.gravite == coeur::Anomalie::Gravite::Erreur;
+        ligne->setText(0, erreur ? "Erreur" : "Avertissement");
+        ligne->setForeground(0, erreur ? QColor(198, 40, 40)
+                                       : QColor(180, 83, 9));
+        // Une anomalie sans référence — « aucune masse » — n'a pas de
+        // coupable : le dire plutôt que laisser une case vide, qui ferait
+        // croire à un défaut d'affichage.
+        const QString ou = anomalie.reference.empty()
+                               ? QString("tout le montage")
+                               : QString::fromStdString(anomalie.reference);
+        ligne->setText(1, ou);
+        // Le remède à l'impératif est ce qu'on vient chercher ; le message
+        // explique pourquoi, et le survol le donne en entier.
+        ligne->setText(2, anomalie.remede.empty()
+                              ? QString::fromStdString(anomalie.message)
+                              : QString::fromStdString(anomalie.remede));
+        ligne->setToolTip(2, QString::fromStdString(anomalie.message));
+        ligne->setData(0, Qt::UserRole,
+                       QString::fromStdString(anomalie.reference));
+    }
+    for (int colonne = 0; colonne < 2; ++colonne)
+        panneau_controle_->resizeColumnToContents(colonne);
+}
+
+bool FenetrePrincipale::atteindre_anomalie(const QString& reference) {
+    if (reference.trimmed().isEmpty()) return false;
+    afficher_page(0);   // le schéma, pas la carte
+    const QRectF cadre = scene_->designer_anomalie(reference);
+    if (cadre.isNull()) {
+        ecrire("« " + reference
+               + " » ne désigne rien de posé sur le schéma : l'anomalie porte "
+                 "sur le montage entier.");
+        return false;
+    }
+    // Cadrer sans changer d'échelle : un zoom qui saute à chaque clic ferait
+    // perdre le repère qu'on vient de se construire.
+    vue_->centerOn(cadre.center());
+    vue_->setFocus();
     return true;
 }
 
