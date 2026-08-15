@@ -1268,6 +1268,9 @@ void SceneSchema::drawBackground(QPainter* peintre, const QRectF& zone) {
 // retire alors avec sa branche — un chemin qui ne mène nulle part ne se
 // garde pas.
 void SceneSchema::poser_point_de_passage(const QPointF& point) {
+    // Un coude posé est une modification définitive : il s'annule aussi.
+    // L'état est relevé avant la découpe qu'`ancrer` peut déclencher.
+    const QJsonObject avant_le_coude = vers_json();
     const Ancre depart = ancrer(cible_depart_);
     if (!depart.valide()) {
         abandonner_fil();
@@ -1276,6 +1279,7 @@ void SceneSchema::poser_point_de_passage(const QPointF& point) {
     auto* etape = new ItemJonction(aligner(point));
     addItem(etape);
     addItem(new ItemFil(depart, Ancre(etape)));
+    empiler(avant_le_coude);
 
     Cible suite;
     suite.genre = Cible::Genre::Jonction;
@@ -1350,6 +1354,24 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
         abandonner_fil();
         return false;
     }
+
+    // TIRER UN FIL S'ANNULE, comme le reste.
+    //
+    // Ce n'était pas le cas : `terminer_fil` n'appelait pas `memoriser()`.
+    // L'action la plus fréquente du logiciel n'entrait donc PAS dans la pile,
+    // qui ne gardait que les suppressions, les rotations et les collages —
+    // d'où l'impression qu'un seul geste tenait en mémoire, alors que Ctrl+Z
+    // sautait par-dessus tous les fils pour retomber bien plus loin en
+    // arrière.
+    //
+    // L'état est relevé AVANT toute découpe, et n'est empilé QUE s'il diffère
+    // vraiment de ce qui suit : un geste qui échoue sans rien changer ne doit
+    // pas laisser derrière lui une entrée d'annulation qui ne fait rien, ce
+    // qui serait aussi déroutant que l'absence.
+    const QJsonObject avant_le_fil = vers_json();
+    auto consigner = [this, &avant_le_fil] {
+        if (avant_le_fil != vers_json()) empiler(avant_le_fil);
+    };
     // C'est ici, et seulement ici, que l'on découpe : le geste va aboutir.
     const Ancre depart = ancrer(cible_depart_);
     // Le départ est désormais MATÉRIALISÉ, et la cible d'origine est périmée :
@@ -1359,6 +1381,7 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
     if (depart_materialise) *depart_materialise = depart;
     if (!depart.valide()) {
         abandonner_fil();
+        consigner();
         return false;
     }
     // Le départ vient peut-être de couper un fil — éventuellement celui que
@@ -1368,12 +1391,14 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
     if (!fraiche.connectable()) {
         abandonner_fil();
         balayer_jonctions();
+        consigner();
         return false;
     }
     const Ancre arrivee = ancrer(fraiche);
     if (!arrivee.valide() || arrivee == depart) {
         abandonner_fil();
         balayer_jonctions();
+        consigner();
         return false;
     }
     addItem(new ItemFil(depart, arrivee));
@@ -1381,6 +1406,7 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
                                               nom_ancre(arrivee)));
     balayer_jonctions();
     abandonner_fil();
+    consigner();
     return true;
 }
 

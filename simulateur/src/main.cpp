@@ -28,9 +28,43 @@
 #  include <windows.h>
 #endif
 
+#ifdef _WIN32
+// Fait disparaître la console que traîne une construction FENETRE_WIN32=OFF.
+//
+// Le symptôme, relevé à l'usage : l'application livrée s'ouvre avec une
+// invite de commandes derrière elle, et FERMER CETTE INVITE FERME
+// L'APPLICATION. Personne à qui l'on donne un logiciel ne doit avoir à
+// deviner qu'une fenêtre noire est vitale.
+//
+// La bonne réponse reste WIN32_EXECUTABLE (option FENETRE_WIN32, active par
+// défaut) : l'exécutable est alors graphique et aucune console n'est créée.
+// FENETRE_WIN32=OFF n'existe que pour dépanner quand Qt6::EntryPoint refuse
+// de se lier avec un MinGW différent de celui qui a bâti Qt. Ceci est le
+// filet pour ce cas-là.
+//
+// DEUX PRÉCAUTIONS, et elles comptent :
+//
+//   - on ne masque QUE si cette console nous appartient. Lancée depuis un
+//     PowerShell déjà ouvert, la console est CELLE DE L'UTILISATEUR, et la
+//     masquer lui escamoterait son terminal. `GetConsoleProcessList` le dit :
+//     un seul processus attaché, elle est à nous ;
+//   - on ne masque pas quand des arguments sont passés (`--diagnostic`,
+//     `--capture`…) : ces modes-là n'existent que pour écrire dans la
+//     console, la cacher les rendrait muets.
+void escamoter_console_si_elle_est_a_nous(int argc) {
+    if (argc > 1) return;
+    HWND console = GetConsoleWindow();
+    if (!console) return;
+    DWORD processus[2] = {};
+    if (GetConsoleProcessList(processus, 2) != 1) return;
+    ShowWindow(console, SW_HIDE);
+}
+#endif
+
 int main(int argc, char** argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
+    escamoter_console_si_elle_est_a_nous(argc);
 #endif
     QApplication application(argc, argv);
     application.setApplicationName("Simulateur embarqué");

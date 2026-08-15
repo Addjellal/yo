@@ -3909,6 +3909,61 @@ static void test_apercu_suit_la_grille() {
     scene.abandonner_fil();
 }
 
+// ---------------------------------------------------------------------------
+// Tirer un fil s'annule, et plusieurs fils s'annulent un par un
+//
+// `terminer_fil` n'appelait pas `memoriser()`. L'action la plus fréquente du
+// logiciel n'entrait donc pas dans la pile, qui ne gardait que suppressions,
+// rotations et collages — d'où l'impression qu'un seul geste tenait en
+// mémoire, alors que Ctrl+Z sautait par-dessus tous les fils.
+// ---------------------------------------------------------------------------
+static void test_annulation_des_fils() {
+    std::printf("\n-- tirer un fil s'annule, un par un --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 200));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    scene.oublier_historique();
+
+    // Trois fils, tirés comme l'utilisateur le fait : amorcer puis refermer.
+    struct Lien { ItemComposant* a; int ba; ItemComposant* b; int bb; };
+    const Lien liens[] = {{pile, 0, r1, 0}, {r1, 1, masse, 0}, {pile, 1, r2, 0}};
+    for (const Lien& l : liens) {
+        verifier(scene.amorcer_fil_au(l.a->position_borne(l.ba)),
+                 "le tracé s'amorce");
+        verifier(scene.terminer_fil(l.b->position_borne(l.bb)),
+                 "et le fil se referme");
+    }
+    verifier(scene.fils().size() == 3, "trois fils tirés",
+             std::to_string(scene.fils().size()));
+
+    // LE CONTRÔLE : trois annulations retirent les trois fils, un par un.
+    verifier(scene.annuler() && scene.fils().size() == 2,
+             "une annulation retire UN fil",
+             std::to_string(scene.fils().size()) + " restants");
+    verifier(scene.annuler() && scene.fils().size() == 1,
+             "la deuxième en retire un autre",
+             std::to_string(scene.fils().size()) + " restants");
+    verifier(scene.annuler() && scene.fils().empty(),
+             "la troisième vide le schéma de ses fils",
+             std::to_string(scene.fils().size()) + " restants");
+
+    // Et le rétablissement les repose dans l'ordre.
+    verifier(scene.retablir() && scene.fils().size() == 1,
+             "rétablir en repose un");
+    verifier(scene.retablir() && scene.fils().size() == 2,
+             "puis deux");
+    verifier(scene.retablir() && scene.fils().size() == 3,
+             "puis les trois");
+
+    // Les composants n'ont pas bougé au passage.
+    verifier(scene.composants().size() == 4,
+             "et les quatre composants sont toujours là",
+             std::to_string(scene.composants().size()));
+}
+
 int main(int argc, char** argv) {
     console_en_utf8();
     QApplication application(argc, argv);
@@ -3973,6 +4028,7 @@ int main(int argc, char** argv) {
     test_nom_de_noeud_impose_assaini();
     test_exemples_sans_carte();
     test_apercu_suit_la_grille();
+    test_annulation_des_fils();
     test_depart_sur_fil_detruit();
 
     std::printf("\n============================================================\n");
