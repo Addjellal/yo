@@ -207,6 +207,49 @@ Ces trois-là faits, le reste — auto-routage, aperçu, ancrage au clic,
 minimum disturbance — se pose dessus. Faits dans le désordre, on écrirait un
 auto-routeur qui ne saurait toujours pas partir d'un fil.
 
+## Le point 6, enfin élucidé : par quel geste reprend-on un tracé ?
+
+La décision exigeait « tracé repris après coup en attrapant un segment »
+sans dire comment. La réponse est dans le source de LibrePCB 2.1.1, et elle
+est plus simple que prévu : **il n'y a pas de geste dédié.** On sélectionne
+le segment et on le glisse ; c'est le code de déplacement ordinaire qui
+fait le reste.
+
+`SchematicSelectionQuery::addNetPointsOfNetLines()`
+(`libs/librepcb/editor/project/schematic/schematicselectionquery.cpp:243`) :
+
+```cpp
+foreach (SI_NetLine* netline, mResultNetLines) {
+  SI_NetPoint* p1 = dynamic_cast<SI_NetPoint*>(&netline->getP1());
+  SI_NetPoint* p2 = dynamic_cast<SI_NetPoint*>(&netline->getP2());
+  if (p1 && (…)) mResultNetPoints.insert(p1);
+  …
+```
+
+Deux détails portent tout :
+
+1. **Le `dynamic_cast` est le filtre.** Une extrémité qui est un point de
+   fil devient déplaçable ; une extrémité qui est une **broche** échoue au
+   transtypage et n'est simplement pas ajoutée. Glisser un fil dont un bout
+   tient à une broche fait donc bouger l'autre bout seulement — la broche
+   reste où elle est, sans qu'aucun code ne traite ce cas à part.
+2. **`onlyIfAllNetLinesSelected`** : un point n'est déplacé que si *tous*
+   les fils qui s'y accrochent sont eux aussi sélectionnés. Sans cette
+   garde, attraper un segment déformerait des fils voisins qu'on n'a pas
+   désignés.
+
+**Ce que ça donne chez nous.** La traduction est directe, parce que notre
+`Ancre` est déjà leur `SI_NetLineAnchor` : `ancre.jonction` se déplace,
+`ancre.composant` ne se déplace pas. Le `dynamic_cast` devient un test sur
+le membre renseigné. Reste à écrire : rendre `ItemFil` sélectionnable et
+glissable, propager le déplacement à ses ancres-jonctions, et poser la garde
+du point 2 — un point partagé par trois fils ne bouge que si les trois sont
+pris.
+
+Corollaire : attraper un fil tendu **entre deux broches** ne peut rien
+déplacer, puisqu'aucun de ses bouts n'est mobile. Il faudra alors y insérer
+une jonction au point saisi — ce que `decouper()` sait déjà faire.
+
 ## Ce qu'il faudra vérifier
 
 L'auto-routage est la partie facile à mal faire. Trois pièges connus :
@@ -228,6 +271,11 @@ L'auto-routage est la partie facile à mal faire. Trois pièges connus :
 - Altium, *Working with a Wire Object on a Schematic Sheet* : <https://www.altium.com/documentation/altium-designer/sch-obj-wirewire-ad>
 - Altium, *Creating Circuit Connectivity in Your Schematics* : <https://www.altium.com/documentation/altium-designer/schematic/creating-circuit-connectivity>
 - KiCad, *Schematic Editor 9.0* : <https://docs.kicad.org/9.0/en/eeschema/eeschema.html>
+- LibrePCB 2.1.1, source complet (GPL-3.0) — fourni et lu directement, dont
+  `libs/librepcb/editor/project/schematic/schematicselectionquery.cpp`
+  (`addNetPointsOfNetLines`) et
+  `libs/librepcb/editor/project/cmd/cmddragselectedschematicitems.cpp`
+  pour la reprise d'un tracé ;
 - LibrePCB 2.1.1, source (GPL-3.0) — lu directement :
   `libs/librepcb/editor/project/schematic/fsm/schematiceditorstate_drawwire.{h,cpp}`
   pour les postures et la découpe de fil, et
