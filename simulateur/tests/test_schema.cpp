@@ -2901,6 +2901,37 @@ static void test_survol_allume_le_noeud() {
              "pas le nom du nœud");
 }
 
+
+#include <QElapsedTimer>
+
+static void experience_cout_survol() {
+    std::printf("\n-- experience: cout de allumer_noeud() et emission changed --\n");
+    for (int n : {5, 20, 60, 150, 300}) {
+        SceneSchema scene;
+        int compte_changed = 0;
+        QObject::connect(&scene, &QGraphicsScene::changed,
+                          [&](const QList<QRectF>&) { compte_changed++; });
+        std::vector<ItemComposant*> rs;
+        for (int i = 0; i < n; ++i)
+            rs.push_back(scene.ajouter_composant(
+                "resistance", QPointF(i * 60, 0)));
+        for (int i = 0; i + 1 < n; ++i) {
+            ItemFil* fil = new ItemFil(rs[i], 1, rs[i + 1], 0);
+            scene.addItem(fil);
+        }
+        QElapsedTimer chrono;
+        chrono.start();
+        const int essais = 50;
+        for (int e = 0; e < essais; ++e)
+            scene.allumer_noeud(rs[n / 2]->position_borne(0));
+        const qint64 ns = chrono.nsecsElapsed();
+        QCoreApplication::processEvents();
+        std::printf("  n=%4d composants : %6.1f microsecondes / appel a "
+                    "allumer_noeud(), changed emis %d fois pour %d appels\n",
+                    n, (double)ns / essais / 1000.0, compte_changed, essais);
+    }
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -2941,6 +2972,7 @@ int main(int argc, char** argv) {
     test_famille_328p();
     test_analyseur_impedance();
     test_programmes_par_carte();
+    experience_cout_survol();
     test_survol_allume_le_noeud();
 
     std::printf("\n============================================================\n");
