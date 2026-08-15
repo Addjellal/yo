@@ -140,7 +140,49 @@ Relevé obtenu (Uno), contre |R + j(ωL − 1/ωC)| avec R = 495 Ω :
 Le minimum tombe sur la résonance, l'ordre de grandeur est bon, **390 et
 810 Hz s'écartent nettement** et la cause n'est pas cherchée.
 
-## Bancs d'essai — 386 (cœur) + 177 (schéma)
+## Les deux moteurs de référence ne sont PAS installés par défaut
+
+Trouvé à l'audit, et c'est le point le plus important de ce document.
+
+`ngspice` et `simavr` sont **facultatifs**. Sans eux le projet compile,
+tourne, et le banc passe au vert — mais les sections **[21]** (solveur maison
+confronté à ngspice) et **[22]** (cœur AVR confronté à simavr) **se sautent
+toutes seules**, en l'annonçant sur une ligne qu'on ne remarque pas au milieu
+de quatre cents « ok ».
+
+Autrement dit : **un banc vert ne veut pas dire la même chose selon la
+machine.** Sans ces deux paquets, l'analogique et l'AVR ne sont plus vérifiés
+que contre eux-mêmes et contre la théorie — ce qui contredit la règle que ce
+document se donne plus bas : « vérifier un décodeur avec un assembleur qu'on
+a écrit soi-même ne prouve rien ».
+
+Les installer, toujours, avant de croire un banc vert :
+
+```
+apt-get install -y libngspice0-dev simavr libsimavr-dev libelf-dev
+cmake -S . -B build          # doit afficher « Second moteur ngspice : ON »
+```
+
+Une fois installés, les deux confrontations passent : mêmes tensions que
+ngspice à 20 mV près sur diode et transistor, même transitoire, même coupure
+à 2 % ; et contre simavr, mêmes commutations, mêmes sens, **mêmes instants**
+sur quatre millions de cycles. La garantie annoncée est donc réelle — elle
+n'était simplement pas exercée.
+
+## Bancs d'essai
+
+Les chiffres dépendent des moteurs présents : **401 (cœur) + 342 (schéma)**
+sans ngspice ni simavr, davantage avec, puisque [21] et [22] s'ajoutent.
+
+Ce document a porté pendant plusieurs sessions quatre comptes périmés, dont
+un faux du simple au double (« 177 » pour un banc schéma qui en comptait plus
+de trois cents). **Un chiffre écrit dans un document se périme ; la commande
+qui le produit, non.** Préférer relancer :
+
+```
+./build/tests_coeur
+QT_QPA_PLATFORM=offscreen ./build/tests_schema
+```
 
 Sections notables :
 
@@ -156,8 +198,7 @@ Sections notables :
 
 ## Ce qui est propre, et par quel moyen
 
-- **ASan + UBSan** : 386 tests, zéro alerte (voir le point 4 plus bas pour la
-  commande). C'est cette passe qui avait trouvé neuf décalages signés
+- **ASan + UBSan** : zéro alerte (voir le point 4 plus bas pour la commande). C'est cette passe qui avait trouvé neuf décalages signés
   débordants dans les trois cœurs.
 - **Construction ordinaire** : zéro avertissement.
 - **ngspice** comme référence analogique indépendante, **simavr** pour l'AVR,
@@ -325,13 +366,19 @@ masquait tous :
    ctest --test-dir build-san -L sanitiseurs
    ```
 
-   Dernière passe : **386 tests, zéro alerte** ASan et UBSan. La détection de
+   Dernière passe : **zéro alerte** ASan et UBSan. La détection de
    fuites est éteinte — Qt et ngspice en laissent au dernier souffle.
 5. **Trous de fixation Uno et Mega** : approximation sûre (aucun ne traverse
    une pastille), cotes exactes à prendre sur le plan mécanique officiel.
-6. **`build-asan/` est dans l'historique git** — 267 fichiers, 76 833 lignes,
-   commis par erreur. Les fichiers sont détraqués du suivi et `.gitignore`
-   ferme la porte ; réécrire l'historique demande l'accord de l'utilisateur.
+6. ~~`build-asan/` est dans l'historique git~~ — **faux, et vérifié faux.**
+   `git rev-list --objects --all | grep -c build-asan` rend **0** : aucun
+   objet du dépôt ne porte ce chemin. Il n'y a donc rien à réécrire, et
+   l'accord qu'on croyait devoir demander n'a pas lieu d'être.
+
+   Ce point a survécu plusieurs sessions comme une dette imaginaire. La leçon
+   vaut mieux que le point lui-même : **une entrée « ce qui est cassé » doit
+   se revérifier, pas se recopier.** Une dette qu'on traîne sans la mesurer
+   coûte de l'attention à chaque relecture, et celle-ci en a coûté pour rien.
 7. **Cœur Xtensa non exact au cycle**, et il ne peut pas l'être : Espressif ne
    publie pas de table de temps, celles du LX6 sont sous accord de
    confidentialité chez Cadence. Le pipeline est à **7 étages** (fiche
@@ -468,7 +515,7 @@ Les six points sont livrés, chacun avec son banc. Ce qu'ils ont appris :
   pointillé : une ligne à remplir à la main vaut mieux qu'une feuille
   anonyme.
 
-Bancs : **396** (cœur) et **295** (schéma).
+Bancs : relancer plutôt que citer un chiffre — voir « Bancs d'essai ».
 
 ### Diagnostic (chantier 4) : **FAIT**
 
