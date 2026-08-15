@@ -64,6 +64,8 @@ static void console_en_utf8() {
 #include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
 #include <QDir>
+#include <QGraphicsPathItem>
+#include <QGraphicsSceneMouseEvent>
 #include <QDoubleSpinBox>
 #include <QPlainTextEdit>
 #include <QTextBlock>
@@ -3854,6 +3856,59 @@ static void test_exemples_sans_carte() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// L'aperçu du fil suit la grille, comme le clic
+//
+// DECISION-FILS annonçait le piège : « l'aperçu doit être celui du tracé
+// final, sinon il ment ». Il mentait — il suivait le curseur au pixel près
+// alors que le clic aligne toujours son point sur la grille.
+// ---------------------------------------------------------------------------
+static void test_apercu_suit_la_grille() {
+    std::printf("\n-- l'aperçu du fil suit la grille --\n");
+
+    SceneSchema scene;
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+    verifier(r != nullptr, "une résistance est posée");
+    if (!r) return;
+
+    verifier(scene.amorcer_fil_au(r->position_borne(1)),
+             "le tracé s'amorce depuis la borne 2");
+
+    // Un point franchement HORS grille : 247 et 103 ne sont multiples de rien.
+    const QPointF hors_grille(247, 103);
+    QGraphicsSceneMouseEvent glissement(QEvent::GraphicsSceneMouseMove);
+    glissement.setScenePos(hors_grille);
+    glissement.setButtons(Qt::NoButton);
+    QCoreApplication::sendEvent(&scene, &glissement);
+
+    QGraphicsPathItem* apercu = nullptr;
+    for (QGraphicsItem* item : scene.items())
+        if (auto* chemin = dynamic_cast<QGraphicsPathItem*>(item)) apercu = chemin;
+    verifier(apercu != nullptr, "l'aperçu existe pendant le tracé");
+    if (!apercu) return;
+
+    const QPointF bout = apercu->path().pointAtPercent(1.0);
+    verifier(std::fmod(std::fabs(bout.x()), 10.0) < 0.01,
+             "l'abscisse du bout de l'aperçu est sur la grille (pas de 10)",
+             f(bout.x()));
+    verifier(std::fmod(std::fabs(bout.y()), 10.0) < 0.01,
+             "et son ordonnée aussi — le curseur était pourtant à (247, 103)",
+             f(bout.y()));
+
+    // Et ce bout est bien celui que le clic poserait.
+    scene.poser_point_de_passage(hors_grille);
+    ItemJonction* pose = nullptr;
+    for (ItemJonction* j : scene.jonctions()) pose = j;
+    verifier(pose != nullptr, "le clic pose bien un point de passage");
+    if (pose)
+        verifier(std::fabs(pose->pos().x() - bout.x()) < 0.01
+                     && std::fabs(pose->pos().y() - bout.y()) < 0.01,
+                 "et il tombe EXACTEMENT où l'aperçu l'annonçait",
+                 f(pose->pos().x()) + "," + f(pose->pos().y()) + " contre "
+                     + f(bout.x()) + "," + f(bout.y()));
+    scene.abandonner_fil();
+}
+
 int main(int argc, char** argv) {
     console_en_utf8();
     QApplication application(argc, argv);
@@ -3917,6 +3972,7 @@ int main(int argc, char** argv) {
     test_notation_scientifique();
     test_nom_de_noeud_impose_assaini();
     test_exemples_sans_carte();
+    test_apercu_suit_la_grille();
     test_depart_sur_fil_detruit();
 
     std::printf("\n============================================================\n");

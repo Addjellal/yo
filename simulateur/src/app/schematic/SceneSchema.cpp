@@ -1492,8 +1492,23 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
 
 void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
     if (fil_provisoire_ && cible_depart_.connectable()) {
-        fil_provisoire_->setPath(
-            ItemFil::chemin(cible_depart_.point, evenement->scenePos()));
+        // L'APERÇU DOIT ÊTRE LE TRACÉ FINAL, sinon il ment.
+        //
+        // Il suivait le curseur au pixel près. Or le clic, lui, ne pose
+        // jamais son point là : dans le vide il l'ALIGNE SUR LA GRILLE
+        // (`poser_point_de_passage`), et sur une cible il le pose sur
+        // l'ancre. On voyait donc un fil en biais et l'on en obtenait un
+        // droit — et à quelques pixels d'écart vertical, la tolérance
+        // d'alignement décidait l'inverse de ce que l'aperçu montrait.
+        //
+        // C'est le troisième piège que DECISION-FILS §« Ce qu'il faudra
+        // vérifier » annonçait : « l'aperçu doit être celui du tracé final,
+        // sinon il ment ». Il mentait.
+        const Cible sous_curseur = viser(evenement->scenePos());
+        const QPointF arrivee = sous_curseur.connectable()
+                                    ? sous_curseur.point
+                                    : aligner(evenement->scenePos());
+        fil_provisoire_->setPath(ItemFil::chemin(cible_depart_.point, arrivee));
         // Même raison qu'à l'appui : sans cela, la vue croit le geste libre
         // et étire un rectangle de sélection pendant qu'on tire le fil.
         evenement->accept();
