@@ -508,6 +508,60 @@ Deux pièges, tous deux dans le banc :
 Le motif est vérifié contre la sortie **réelle** d'avr-g++ 7.3.0, recopiée
 verbatim dans le banc après compilation d'un croquis fautif.
 
+### Exemples rangés par carte : **FAIT**
+
+Neuf branches, plus « Sans carte ». La justification n'est pas le rangement :
+**neuf des dix exemples posaient un `arduino_uno` en dur**. Sur un poste
+réglé pour un TP ESP32 ou STM32, huit entrées chargeaient donc silencieusement
+un Uno à la place de la carte du jour — une erreur d'élève fabriquée, qu'il
+n'a aucun moyen de diagnostiquer.
+
+Cinq cartes portaient **déjà** leur clignotant dans `Modele::programme_exemple`,
+écrit et compilé par le banc, atteignable seulement en posant la carte à la
+main puis en devinant le double-clic. Le travail était fait ; il manquait le
+branchement. `charger_clignotant_carte(type, broche)` fait les huit — ce qui
+change d'une carte à l'autre tient à un nom de broche (D13, PB5, PB1, GP25,
+PC13, GPIO2).
+
+Deux règles à ne pas défaire :
+
+- **la limite est écrite DANS le menu**, en entrée grisée, pas en info-bulle :
+  « chaîne Xtensa absente », « ni HAL ni CubeMX », « pas d'UART matériel ». Un
+  élève qui cherche pourquoi son exemple ESP32 ne compile pas ne pensera pas à
+  survoler une entrée ;
+- **la résistance suit la tension** : 220 Ω sous 5 V, 100 Ω sous 3,3 V. Livrer
+  220 Ω sur un Pico enseignerait une erreur.
+
+Ce qui a été écarté, et pourquoi : importer les catalogues officiels. Pico
+(pico-sdk), STM32 (HAL) et ESP32 (ESP-IDF) donnent **0 exemple compilable
+ici** — le simulateur n'accepte que du C nu sur registres. Côté Arduino, 33
+des 68 exemples officiels tournent ; les blocages tiennent surtout à la classe
+`String` (14) et à l'USB HID (7).
+
+### `pulseIn()` : **FAIT**
+
+Le cours §4 écrit `long duree = pulseIn(ECHO, HIGH);` pour le HC-SR04. La
+fonction n'existait pas : **le code du cours ne compilait pas**, alors que le
+composant `telemetre_ultrason` est vérifié à ±0,3 ms. Un modèle exact que
+rien ne pouvait interroger.
+
+Écart assumé : Arduino compte des passages de boucle calibrés, ici on lit
+`micros()`. La résolution est celle du timer 0 — 4 µs à 16 MHz, soit 0,07 %
+sur un écho de 5 800 µs, bien en deçà de l'erreur du couplage analogique.
+
+Vérifié en **exécution réelle** : le banc fabrique une impulsion de 5 ms
+depuis l'extérieur pendant que la puce tourne dans sa boucle d'attente, et la
+puce publie la bonne durée à mieux que 10 %.
+
+**Ce qui n'est PAS couvert, et c'est un fil à reprendre.** Le délai de garde
+— une broche muette doit rendre 0 plutôt que figer le programme — n'est pas
+vérifié. Une première version du test appelait `pulseIn(ECHO, HIGH, 2000)`
+sur une broche immobile, et **le banc entier se bloquait à cet endroit**,
+alors que `avancer(cycles)` est borné. La cause n'a pas été trouvée, et je
+n'ai pas voulu livrer un banc qui fige. La garde est écrite dans le noyau et
+suit le contrat d'Arduino, mais elle n'est pas prouvée : c'est le premier
+endroit à regarder si un montage se bloque dans une lecture de télémètre.
+
 ### Les trois manques lourds
 
 1. **Cliquer une erreur de compilation pour atteindre la ligne fautive.**

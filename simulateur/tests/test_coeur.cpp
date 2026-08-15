@@ -2749,6 +2749,63 @@ static void test_placement_suit_la_connectique() {
              "saisie : aucun lien utile ne les départage");
 }
 
+// ---------------------------------------------------------------------------
+// [47] pulseIn — la fonction que le cours écrit et que le noyau n'avait pas
+//
+// `cours/03-arduino.md` §4 donne littéralement « long duree = pulseIn(ECHO,
+// HIGH); » pour le HC-SR04. Le composant telemetre_ultrason produit bien son
+// écho daté, vérifié à ±0,3 ms en section [23] — mais le code du cours ne
+// compilait pas, faute de la fonction. Un modèle exact que rien ne pouvait
+// interroger.
+// ---------------------------------------------------------------------------
+static const char* kCroquisPulseIn = R"(
+const uint8_t ECHO = 7;
+
+void setup() {
+    Serial.begin(9600);
+    pinMode(ECHO, INPUT);
+    unsigned long duree = pulseIn(ECHO, HIGH);
+    Serial.print("d=");
+    Serial.println(duree);
+}
+
+void loop() { }
+)";
+
+static void test_pulse_in() {
+    std::printf("\n[47] pulseIn : la fonction du telemetre\n");
+    if (!coeur::AvrEngine::avr_gpp_disponible()) {
+        std::printf("  (avr-g++ absent - section ignoree)\n");
+        return;
+    }
+
+    // CE QUE CE TEST PROUVE, ET CE QU'IL NE PROUVE PAS.
+    //
+    // Il prouve le defaut signale : le code du cours - « long duree =
+    // pulseIn(ECHO, HIGH); », recopie tel quel de `cours/03-arduino.md` §4 -
+    // ne compilait pas, et compile maintenant.
+    //
+    // Il ne prouve PAS le comportement a l'execution. Une version qui
+    // fabriquait une impulsion de 5 ms depuis l'exterieur pendant que la puce
+    // tournait a bien mesure la bonne duree a mieux que 10 % - je l'ai vue
+    // passer deux fois - mais le banc se BLOQUAIT ensuite, a un endroit que
+    // je n'ai pas su localiser : `avancer(cycles)` est pourtant borne, et le
+    // blocage survivait au retrait de la partie suspecte.
+    //
+    // Un banc qui fige coute plus cher qu'une couverture incomplete, et
+    // pretendre verifier ce qu'on ne verifie pas coute plus cher encore. La
+    // mesure et le delai de garde restent donc a prouver - c'est ecrit dans
+    // ETAT.md, et c'est le premier fil a reprendre si une lecture de
+    // telemetre se bloque.
+    const std::string firmware = "/tmp/sim_pulsein.elf";
+    std::string journal;
+    verifier(coeur::AvrEngine::compiler_source(kCroquisPulseIn, firmware,
+                                               &journal),
+             "le code du cours compile - « pulseIn(ECHO, HIGH) », sans une "
+             "ligne de reecriture",
+             journal);
+}
+
 static void test_pcb() {
     std::printf("\n[20] Circuit imprimé\n");
 
@@ -6063,6 +6120,7 @@ int main() {
     test_coeur_avr();
     test_campagnes();
     test_numerique();
+    test_pulse_in();
     test_pcb();
     test_placement_suit_la_connectique();
     test_exemples_compilent();

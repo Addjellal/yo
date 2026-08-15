@@ -1490,8 +1490,27 @@ void FenetrePrincipale::montrer_raccourcis() {
         "<tr><td style='padding-right:18px'>Câbler</td><td><b>Clic sur une "
         "broche, un point ou un fil</b></td></tr>"
         "<tr><td>Dériver depuis un fil</td><td><b>Clic sur le fil</b></td></tr>"
+        "<tr><td>Poser un coude</td><td><b>Clic dans le vide</b> pendant le "
+        "tracé</td></tr>"
         "<tr><td>Abandonner le fil en cours</td><td><b>Clic droit</b> ou "
         "<b>Échap</b></td></tr>"
+        // Les deux lignes qui manquaient le plus.
+        //
+        // Le double-clic sur une carte ouvre son programme depuis toujours, et
+        // personne ne le savait — pas même celui qui a commandé le logiciel.
+        // Ce pense-bête n'engendre que les QAction des menus ; un geste de
+        // souris n'en est pas une, et n'apparaissait donc nulle part. C'est la
+        // porte d'entrée vers l'éditeur de code, pour le seul TP que le
+        // simulateur couvre entièrement : elle ne pouvait pas rester cachée.
+        "<tr><td><b>Ouvrir le programme d'une carte</b></td><td><b>Double-clic "
+        "sur la carte</b></td></tr>"
+        "<tr><td>Régler un composant, ouvrir un instrument</td>"
+        "<td><b>Double-clic dessus</b></td></tr>"
+        "<tr><td>Aller au code d'une erreur de compilation</td>"
+        "<td><b>Double-clic sur la ligne</b> du Journal</td></tr>"
+        "<tr><td>Voir tout ce qui est relié à un point</td>"
+        "<td><b>Survol</b> — le nœud s'allume, son nom est en barre d'état"
+        "</td></tr>"
         "<tr><td>Déplacer la vue</td><td><b>Molette</b>, ou bouton du milieu "
         "maintenu</td></tr>"
         "<tr><td>Zoomer</td><td><b>Ctrl + molette</b></td></tr>"

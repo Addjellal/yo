@@ -76,6 +76,8 @@ unsigned long millis(void);
 unsigned long micros(void);
 void delay(unsigned long ms);
 void delayMicroseconds(unsigned int us);
+unsigned long pulseIn(uint8_t broche, uint8_t etat);
+unsigned long pulseIn(uint8_t broche, uint8_t etat, unsigned long delai_max);
 
 long map(long x, long e1, long e2, long s1, long s2);
 long random(long maxi);
@@ -317,6 +319,42 @@ void delay(unsigned long ms) {
 void delayMicroseconds(unsigned int us) {
     const unsigned long depart = micros();
     while (micros() - depart < us) { }
+}
+
+/* Largeur d'une impulsion, en microsecondes. 0 si elle n'arrive pas.
+ *
+ * C'est la fonction du télémètre à ultrasons, et le cours l'écrit telle
+ * quelle : « long duree = pulseIn(ECHO, HIGH); ». Elle manquait au noyau,
+ * si bien que le code du cours ne compilait pas — alors que le composant
+ * `telemetre_ultrason` produit son écho daté et qu'il est vérifié à ±0,3 ms.
+ *
+ * Trois attentes, comme dans l'implémentation d'Arduino : la fin d'une
+ * impulsion déjà commencée (sans quoi on mesurerait un reste), le front qui
+ * ouvre la nôtre, puis le front qui la ferme. Chacune est bornée par le même
+ * délai : une broche muette ne doit pas bloquer le programme pour toujours.
+ *
+ * Écart assumé avec l'AVR réel : Arduino compte des passages de boucle
+ * calibrés, ici on lit `micros()`. La résolution est donc celle du timer 0,
+ * soit 4 µs à 16 MHz — largement suffisante pour un écho de 5 800 µs, et
+ * l'erreur qui en résulte (0,07 %) est bien inférieure à celle du couplage
+ * analogique. */
+unsigned long pulseIn(uint8_t broche, uint8_t etat, unsigned long delai_max) {
+    const unsigned long debut = micros();
+    /* Attendre la fin d'une impulsion en cours. */
+    while (digitalRead(broche) == etat)
+        if (micros() - debut > delai_max) return 0;
+    /* Attendre le front qui commence la nôtre. */
+    while (digitalRead(broche) != etat)
+        if (micros() - debut > delai_max) return 0;
+    const unsigned long montee = micros();
+    /* Et celui qui la termine. */
+    while (digitalRead(broche) == etat)
+        if (micros() - debut > delai_max) return 0;
+    return micros() - montee;
+}
+
+unsigned long pulseIn(uint8_t broche, uint8_t etat) {
+    return pulseIn(broche, etat, 1000000UL);   /* une seconde, comme Arduino */
 }
 
 // --- entrées et sorties tout ou rien -------------------------------------
