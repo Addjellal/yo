@@ -46,6 +46,10 @@
 #include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
 #include <QDir>
+#include <QDoubleSpinBox>
+#include <QPlainTextEdit>
+#include <QTextBlock>
+#include <QLineEdit>
 #include <QStyleOptionGraphicsItem>
 #include <QTransform>
 #include "app/schematic/SceneSchema.h"
@@ -3641,6 +3645,103 @@ static void test_depart_sur_fil_detruit() {
     delete survivante;
 }
 
+// ---------------------------------------------------------------------------
+// Ce qu'une seconde relecture a trouvé, après un banc vert et un audit
+//
+// Deux défauts CASSE dans du code livré, compilé sans avertissement, couvert
+// par 342 tests verts et passé sous ASan sans une alerte. Ils rappellent ce
+// qu'un banc vert prouve : que les chemins parcourus marchent. Pas les autres.
+// ---------------------------------------------------------------------------
+static void test_colonne_en_octets_pas_en_caracteres() {
+    std::printf("\n-- la colonne d'erreur se compte en octets --\n");
+
+    // avr-g++ 7.3.0 compte les colonnes en OCTETS, Qt déplace le curseur en
+    // CARACTÈRES. Sur `const char* s = "café";` les deux divergent dès
+    // l'accent — et tout ce projet est écrit en français.
+    FenetrePrincipale fenetre;
+    QPlainTextEdit essai;
+    essai.setPlainText(QString::fromUtf8("const char* s = \"café\"; erreur;"));
+
+    const QString ligne = essai.document()->firstBlock().text();
+    const QByteArray brut = ligne.toUtf8();
+    verifier(brut.size() > ligne.size(),
+             "la ligne compte plus d'octets que de caractères",
+             std::to_string(brut.size()) + " octets pour "
+                 + std::to_string(ligne.size()) + " caractères");
+
+    // La colonne qu'annonce le compilateur pour « erreur » : son rang en
+    // octets, un de plus que son rang en caractères à cause du « é ».
+    const int rang_caractere = ligne.indexOf("erreur");
+    const int rang_octet = brut.indexOf("erreur");
+    verifier(rang_octet == rang_caractere + 1,
+             "et l'accent décale le compte d'exactement un",
+             std::to_string(rang_octet) + " contre "
+                 + std::to_string(rang_caractere));
+
+    // La conversion qu'applique aller_a_erreur : tronquer au bon nombre
+    // d'octets, redécoder, compter les caractères.
+    const int converti = QString::fromUtf8(brut.left(rang_octet)).size();
+    verifier(converti == rang_caractere,
+             "tronquer en octets puis redécoder rend le bon rang caractère — "
+             "sans quoi le curseur tombe un cran trop loin",
+             std::to_string(converti));
+}
+
+static void test_notation_scientifique() {
+    std::printf("\n-- le champ de valeur lit la notation scientifique --\n");
+
+    // « 1e9 » pour un gigaohm était TRONQUÉ EN SILENCE : le champ retenait 1,
+    // et validate() répondait « acceptable ». Se tromper d'un facteur
+    // milliard sans le moindre signe est le pire comportement possible pour
+    // un réglage de composant.
+    FenetrePrincipale fenetre;
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* r = scene->ajouter_composant("resistance", QPointF(0, 0));
+    verifier(r != nullptr, "une résistance est posée");
+    if (!r) return;
+
+    struct Cas { const char* saisi; double attendu; };
+    const Cas cas[] = {
+        {"1e9", 1e9},      {"2.5e3", 2500.0},  {"1e-9", 1e-9},
+        {"4.7k", 4700.0},  {"220n", 220e-9},   {"10k", 10000.0},
+        {"4,7k", 4700.0},  {"220", 220.0},
+    };
+    for (const Cas& c : cas) {
+        // On passe par le champ réel : c'est lui qui a le défaut, pas une
+        // fonction d'aide qu'on aurait écrite pour l'occasion.
+        // Le panneau se remplit par le signal de sélection de la scène —
+        // le chemin réel, celui qu'emprunte un clic de l'utilisateur.
+        emit scene->selection_composant(r);
+        QCoreApplication::processEvents();
+        // DANS LE PANNEAU PROPRIÉTÉS, pas n'importe où : `findChild` sur la
+        // fenêtre entière rendait le premier QDoubleSpinBox venu — celui de
+        // la largeur de piste du circuit imprimé, à 0,40 mm. Le test mesurait
+        // alors un champ qui n'a rien à voir.
+        QDockWidget* proprietes =
+            fenetre.findChild<QDockWidget*>("dock_proprietes");
+        QDoubleSpinBox* champ =
+            proprietes ? proprietes->findChild<QDoubleSpinBox*>() : nullptr;
+        if (!champ) {
+            verifier(false, "le champ de valeur existe");
+            return;
+        }
+        QLineEdit* saisie = champ->findChild<QLineEdit*>();
+        if (!saisie) {
+            verifier(false, "le champ a bien une zone de saisie");
+            return;
+        }
+        saisie->setText(c.saisi);
+        champ->interpretText();
+        const double lu = champ->value();
+        const double ecart = std::fabs(lu - c.attendu);
+        verifier(ecart <= std::fabs(c.attendu) * 1e-6,
+                 std::string("« ") + c.saisi + " » vaut "
+                     + f(c.attendu),
+                 "lu " + f(lu));
+    }
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3699,6 +3800,8 @@ int main(int argc, char** argv) {
     test_marqueur_erc_tient_dans_son_cadre();
     test_surbrillance_ne_survit_pas_a_la_suppression();
     test_marqueur_erc_evite_la_reference();
+    test_colonne_en_octets_pas_en_caracteres();
+    test_notation_scientifique();
     test_depart_sur_fil_detruit();
 
     std::printf("\n============================================================\n");

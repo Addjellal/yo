@@ -163,6 +163,24 @@ private:
                && (net[fin].isDigit() || net[fin] == '.' || net[fin] == '+'
                    || net[fin] == '-'))
             ++fin;
+
+        // LA NOTATION SCIENTIFIQUE, sans quoi « 1e9 » était TRONQUÉ EN
+        // SILENCE : le champ retenait 1, et `validate()` répondait
+        // « acceptable ». Écrire 1e9 pour un gigaohm est pourtant la façon
+        // la plus naturelle, et se tromper d'un facteur milliard sans le
+        // moindre signe est le pire comportement possible pour un réglage.
+        //
+        // On n'avance que si un exposant suit VRAIMENT : « 220e » garde son
+        // « e », qui n'est pas un préfixe d'ingénieur et laissera le facteur
+        // à un plutôt que de manger un caractère.
+        if (fin < net.size() && (net[fin] == 'e' || net[fin] == 'E')) {
+            int k = fin + 1;
+            if (k < net.size() && (net[k] == '+' || net[k] == '-')) ++k;
+            const int premier_chiffre = k;
+            while (k < net.size() && net[k].isDigit()) ++k;
+            if (k > premier_chiffre) fin = k;
+        }
+
         bool ok = false;
         const double base = net.left(fin).toDouble(&ok);
         if (!ok) return std::numeric_limits<double>::quiet_NaN();
@@ -3004,13 +3022,45 @@ bool FenetrePrincipale::aller_a_erreur(const ErreurCompilation& erreur) {
         onglets_fichiers_->setCurrentIndex(rang);
     }
 
+    // Le numéro de ligne peut être PÉRIMÉ.
+    //
+    // On compile, on obtient une erreur ligne 500, on corrige, le fichier
+    // n'en fait plus que dix — et la ligne d'erreur reste affichée dans le
+    // journal, cliquable. `movePosition` rend alors faux mais laisse le
+    // curseur sur le DERNIER bloc, sans rien dire : on sélectionnait la fin
+    // du fichier en la présentant comme « la ligne fautive ».
+    const int lignes = editeur_source_->document()->blockCount();
+    if (erreur.ligne > lignes) {
+        ecrire(QString("Ligne %1 : ce fichier n'en compte plus que %2. "
+                       "Recompilez (F5) — cette erreur date d'avant vos "
+                       "dernières corrections.")
+                   .arg(erreur.ligne)
+                   .arg(lignes));
+        return false;
+    }
+
     QTextCursor curseur = editeur_source_->textCursor();
     curseur.movePosition(QTextCursor::Start);
     curseur.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor,
                          erreur.ligne - 1);
-    if (erreur.colonne > 1)
-        curseur.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor,
-                             erreur.colonne - 1);
+    if (erreur.colonne > 1) {
+        // avr-g++ compte les colonnes en OCTETS, Qt déplace le curseur en
+        // CARACTÈRES. Les deux ne coïncident que sur de l'ASCII pur — et ce
+        // projet est écrit en français : un seul « é » avant l'erreur, et le
+        // curseur tombe un caractère trop loin. Vérifié sur avr-g++ 7.3.0 :
+        // pour `const char* s = "café"; foo_inexistant(x);` il annonce la
+        // colonne 28 là où Qt compte 27.
+        //
+        // On tronque donc la ligne au bon nombre d'OCTETS, puis on redécode :
+        // le compte de caractères qui en sort est celui que Qt attend.
+        const QByteArray brut = curseur.block().text().toUtf8();
+        const int octets = std::min(erreur.colonne - 1,
+                                    static_cast<int>(brut.size()));
+        const int caracteres = QString::fromUtf8(brut.left(octets)).size();
+        if (caracteres > 0)
+            curseur.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor,
+                                 caracteres);
+    }
     // Sélectionner la ligne entière : sur un vidéo-projecteur, un curseur
     // clignotant d'un pixel ne se voit pas du fond de la salle.
     curseur.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);

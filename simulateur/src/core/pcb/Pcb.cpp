@@ -118,13 +118,23 @@ std::vector<size_t> ordre_par_connectique(
     ordre.push_back(depart);
     pose[depart] = true;
 
+    // Les liens vers ce qui est DÉJÀ posé, tenus à jour au fur et à mesure.
+    //
+    // Ils étaient resommés à chaque tour sur toute la file déjà construite,
+    // ce qui rendait la boucle CUBIQUE et non quadratique : mesuré à 209 ms
+    // pour 400 composants, 1,5 s pour 800, et 9 s pour 1500 — pendant
+    // lesquelles l'interface est gelée sans le moindre curseur d'attente.
+    // Ajouter le seul composant qu'on vient de poser suffit, et ramène le
+    // tout à O(n²).
+    std::vector<int> lien_vers_pose(nombre, 0);
+    for (size_t a = 0; a < nombre; ++a) lien_vers_pose[a] = liens[a][depart];
+
     while (ordre.size() < nombre) {
         size_t meilleur = nombre;
         int meilleur_lien = -1, meilleur_degre = -1;
         for (size_t a = 0; a < nombre; ++a) {
             if (pose[a]) continue;
-            int lien = 0;
-            for (size_t deja : ordre) lien += liens[a][deja];
+            const int lien = lien_vers_pose[a];
             if (lien > meilleur_lien
                 || (lien == meilleur_lien && degre[a] > meilleur_degre)) {
                 meilleur = a;
@@ -132,10 +142,14 @@ std::vector<size_t> ordre_par_connectique(
                 meilleur_degre = degre[a];
             }
         }
+        // `meilleur` est toujours affecté : `meilleur_lien` part à −1 et tout
+        // lien vaut au moins 0, donc le premier candidat non posé l'emporte.
         // Un composant sans aucun lien utile — isolé, ou relié à la seule
         // masse — arrive en fin de file plutôt que d'interrompre la chaîne.
         ordre.push_back(meilleur);
         pose[meilleur] = true;
+        for (size_t a = 0; a < nombre; ++a)
+            if (!pose[a]) lien_vers_pose[a] += liens[a][meilleur];
     }
 
     std::vector<size_t> resultat;

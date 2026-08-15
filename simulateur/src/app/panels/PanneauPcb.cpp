@@ -711,7 +711,12 @@ void PanneauPcb::router_tout() {
 
 QString PanneauPcb::construire_depuis(const coeur::Netlist& netlist) {
     const coeur::CartePcb ancienne = vue_->carte();
+    // Le placement croît en carré du nombre de composants : sur un gros
+    // schéma il gèle l'interface le temps qu'il faut. Le routage voisin pose
+    // déjà son sablier ; ne pas le faire ici laissait croire à un plantage.
+    QApplication::setOverrideCursor(Qt::WaitCursor);
     coeur::CartePcb nouvelle = coeur::CartePcb::depuis_netlist(netlist);
+    QApplication::restoreOverrideCursor();
 
     // Le placement déjà fait est précieux : on le reprend pour les composants
     // qui existaient avant, plutôt que de tout remettre en grille. C'est ce
