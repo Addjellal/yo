@@ -3153,6 +3153,124 @@ static void test_cartouche_a_l_impression_seulement() {
     QFile::remove(pdf);
 }
 
+// ---------------------------------------------------------------------------
+// Cliquer une erreur de compilation mène à la ligne fautive
+//
+// C'est la PREMIÈRE erreur que rencontre un élève, et l'éditeur est dans la
+// même fenêtre. Jusqu'ici la sortie d'avr-g++ était déversée telle quelle,
+// à charge pour lui de recompter les lignes.
+// ---------------------------------------------------------------------------
+static void test_erreur_compilation_cliquable() {
+    std::printf("\n-- cliquer une erreur mène à la ligne fautive --\n");
+
+    using Erreur = FenetrePrincipale::ErreurCompilation;
+
+    // --- la forme ordinaire, telle qu'avr-g++ 7.3 l'écrit ------------------
+    {
+        const QString sortie =
+            "principal.ino:12:5: error: 'digitalWrit' was not declared in "
+            "this scope\n"
+            "   digitalWrit(13, HIGH);\n"
+            "   ^~~~~~~~~~~\n";
+        const std::vector<Erreur> lues =
+            FenetrePrincipale::analyser_sortie_compilateur(sortie);
+        verifier(lues.size() == 1, "une erreur lue dans un compte rendu ordinaire",
+                 std::to_string(lues.size()));
+        if (!lues.empty()) {
+            verifier(lues[0].fichier == "principal.ino"
+                         && lues[0].ligne == 12 && lues[0].colonne == 5,
+                     "fichier, ligne et colonne sont extraits",
+                     lues[0].fichier.toStdString() + ":"
+                         + std::to_string(lues[0].ligne) + ":"
+                         + std::to_string(lues[0].colonne));
+            verifier(lues[0].erreur, "et c'est bien une erreur");
+        }
+    }
+
+    // --- la sortie RÉELLE d'avr-g++ 7.3.0, recopiée telle quelle ----------
+    //
+    // Relevée en compilant pour de bon un croquis fautif. Les deux lignes
+    // « In function » n'ont pas de numéro et ne doivent rien déclencher :
+    // c'est du contexte, pas un endroit à corriger.
+    {
+        const QString sortie =
+            "principal.ino: In function 'void setup()':\n"
+            "principal.ino:1:15: error: 'digitalWrit' was not declared in this "
+            "scope\n"
+            "principal.ino: In function 'void loop()':\n"
+            "principal.ino:2:22: error: expected primary-expression before ';' "
+            "token\n";
+        const std::vector<Erreur> lues =
+            FenetrePrincipale::analyser_sortie_compilateur(sortie);
+        verifier(lues.size() == 2,
+                 "deux erreurs lues dans la sortie réelle d'avr-g++ 7.3.0, "
+                 "sans prendre les lignes « In function » pour des défauts",
+                 std::to_string(lues.size()));
+        if (lues.size() == 2)
+            verifier(lues[0].ligne == 1 && lues[0].colonne == 15
+                         && lues[1].ligne == 2 && lues[1].colonne == 22,
+                     "aux bonnes lignes et colonnes");
+    }
+
+    // --- le compilateur suit la LOCALE ------------------------------------
+    //
+    // Le conteneur qui fait tourner ce banc est en anglais ; la salle de
+    // classe est en français. Un analyseur qui ne lirait que « error: »
+    // marcherait ici et nulle part là-bas.
+    {
+        const std::vector<Erreur> lues =
+            FenetrePrincipale::analyser_sortie_compilateur(
+                "mesure.ino:4:1: erreur: « capteur » n'a pas été déclaré\n");
+        verifier(lues.size() == 1 && lues[0].erreur && lues[0].ligne == 4,
+                 "« erreur: » en français est reconnu comme « error: »",
+                 std::to_string(lues.size()) + " lue(s)");
+    }
+
+    // --- avertissements, colonne absente, notes ----------------------------
+    {
+        const QString sortie =
+            "principal.ino:7: warning: unused variable 'x'\n"
+            "principal.ino:9:2: note: in expansion of macro 'F'\n"
+            "principal.ino:11:3: error: expected ';' before '}' token\n";
+        const std::vector<Erreur> lues =
+            FenetrePrincipale::analyser_sortie_compilateur(sortie);
+        verifier(lues.size() == 2,
+                 "la « note » est écartée : elle complète l'erreur précédente, "
+                 "elle n'ajoute aucun endroit à corriger",
+                 std::to_string(lues.size()));
+        if (lues.size() == 2) {
+            verifier(!lues[0].erreur && lues[0].ligne == 7
+                         && lues[0].colonne == 0,
+                     "un avertissement sans colonne reste exploitable");
+            verifier(lues[1].erreur && lues[1].ligne == 11,
+                     "et l'erreur qui suit est bien lue");
+        }
+    }
+
+    // --- une ligne quelconque du journal n'est pas une erreur --------------
+    {
+        const std::vector<Erreur> lues =
+            FenetrePrincipale::analyser_sortie_compilateur(
+                "Compilation réussie.\n"
+                "Temps simulé : 1.500 s\n"
+                "Nœud R1_2 — R1.2 · D1.1\n");
+        verifier(lues.empty(),
+                 "aucune ligne ordinaire du journal n'est prise pour une "
+                 "erreur",
+                 std::to_string(lues.size()) + " fausse(s) prise(s)");
+    }
+
+    // --- et le saut atterrit sur la bonne ligne ---------------------------
+    {
+        FenetrePrincipale fenetre;
+        Erreur cible;
+        cible.fichier = "n-existe-pas.ino";
+        cible.ligne = 3;
+        verifier(!fenetre.aller_a_erreur(cible),
+                 "un fichier étranger au programme ne fait sauter nulle part");
+    }
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3204,6 +3322,7 @@ int main(int argc, char** argv) {
     test_marqueur_erc_a_cote();
     test_presentation_et_disposition();
     test_cartouche_a_l_impression_seulement();
+    test_erreur_compilation_cliquable();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

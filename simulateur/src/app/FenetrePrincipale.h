@@ -197,6 +197,31 @@ public:
     // dessiner sur une image et vérifier qu'il porte bien ce qu'il annonce.
     void dessiner_cartouche(QPainter* peintre, const QRectF& bandeau) const;
 
+    // Une erreur du compilateur, ramenée à ce qu'il faut pour y aller.
+    struct ErreurCompilation {
+        QString fichier;
+        int ligne = 0;
+        int colonne = 0;
+        QString message;
+        bool erreur = true;   // sinon : simple avertissement
+    };
+    // Lit la sortie TEXTE du compilateur.
+    //
+    // Au format `fichier:ligne:colonne: erreur: message`, et pas en JSON :
+    // avr-g++ 7.3 — la version des paquets Debian, celle qui compilera les
+    // croquis des élèves — ne connaît pas `-fdiagnostics-format=json`, apparu
+    // avec GCC 9. C'est donc le texte qu'il faut savoir lire, avec ses
+    // variantes de langue.
+    //
+    // Les `#line` posés par `fusionner_croquis` font que le compilateur nomme
+    // l'ONGLET d'origine et non le fichier fusionné : le nom rendu ici est
+    // directement celui d'un onglet de l'éditeur.
+    static std::vector<ErreurCompilation> analyser_sortie_compilateur(
+        const QString& sortie);
+    // Ouvre le bon onglet et pose le curseur sur la ligne. Rend faux si le
+    // fichier n'appartient pas au programme de la carte courante.
+    bool aller_a_erreur(const ErreurCompilation& erreur);
+
 private slots:
     void nouveau_projet();
     void ouvrir_projet();

@@ -26,6 +26,9 @@
 #include <QCursor>
 #include <functional>
 #include <QPlainTextDocumentLayout>
+#include <QMouseEvent>
+#include <QTextBlock>
+#include <QRegularExpression>
 #include <QPushButton>
 #include <QComboBox>
 #include <QHBoxLayout>
@@ -38,6 +41,9 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
+#include <QMouseEvent>
+#include <QTextBlock>
+#include <QRegularExpression>
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
@@ -491,6 +497,13 @@ void FenetrePrincipale::construire_docks() {
     console_->setReadOnly(true);
     console_->setFont(fonte);
     console_->setMinimumHeight(70);
+    // Double-cliquer une ligne d'erreur ouvre le bon onglet à la bonne ligne.
+    // Le filtre est posé sur la ZONE D'AFFICHAGE, pas sur le widget : c'est
+    // elle qui reçoit les événements de souris d'une vue défilante.
+    console_->viewport()->installEventFilter(this);
+    console_->setToolTip(
+        "Double-cliquez une ligne d'erreur de compilation pour aller à la "
+        "ligne fautive dans le programme.");
     onglets->addTab(console_, "Journal");
 
     // Le moniteur série reçoit ET émet.
@@ -1467,6 +1480,22 @@ void FenetrePrincipale::basculer_fenetre(QWidget* panneau) {
 }
 
 bool FenetrePrincipale::eventFilter(QObject* objet, QEvent* evenement) {
+    // Double-clic dans le journal : si la ligne est une erreur de
+    // compilation, on va s'y poser. C'est la première erreur que rencontre un
+    // élève, et jusqu'ici la sortie du compilateur était déversée telle
+    // quelle — à lui de recompter les lignes à la main.
+    if (evenement->type() == QEvent::MouseButtonDblClick && console_
+        && objet == console_->viewport()) {
+        auto* souris = static_cast<QMouseEvent*>(evenement);
+        const QTextCursor curseur =
+            console_->cursorForPosition(souris->position().toPoint());
+        const std::vector<ErreurCompilation> trouvees =
+            analyser_sortie_compilateur(curseur.block().text());
+        if (!trouvees.empty() && aller_a_erreur(trouvees.front())) {
+            evenement->accept();
+            return true;
+        }
+    }
     // Fermer la fenêtre détachée la remet dans les onglets : le panneau n'est
     // jamais perdu, et rien ne se rouvre tout seul au démarrage.
     if (evenement->type() == QEvent::Close) {
@@ -2376,12 +2405,31 @@ bool FenetrePrincipale::compiler_programme(bool silence_si_reussi) {
     if (!compte_rendu.trimmed().isEmpty()) ecrire(compte_rendu.trimmed());
     if (ok) {
         if (!silence_si_reussi) ecrire("Compilation réussie.");
-    } else {
-        ecrire("Échec de la compilation.");
-        avertir("Compilation", compte_rendu.isEmpty()
-                                   ? QString("La compilation a échoué.")
-                                   : compte_rendu);
+        return ok;
     }
+
+    // PAS DE BOÎTE MODALE.
+    //
+    // Elle passait le compte rendu entier d'avr-g++ à une QMessageBox non
+    // redimensionnable, qu'il fallait fermer pour regarder le code dont elle
+    // parlait. Or c'est exactement le moment où l'on veut avoir les deux sous
+    // les yeux. Le compte rendu est déjà dans le journal, à côté de
+    // l'éditeur, et il y est maintenant cliquable.
+    ecrire("Échec de la compilation.");
+    const std::vector<ErreurCompilation> erreurs =
+        analyser_sortie_compilateur(compte_rendu);
+    int nombre = 0;
+    for (const ErreurCompilation& e : erreurs)
+        if (e.erreur) ++nombre;
+    if (nombre > 0)
+        ecrire(QString("%1 erreur%2 — double-cliquez une ligne ci-dessus pour "
+                       "aller au code fautif.")
+                   .arg(nombre)
+                   .arg(nombre > 1 ? "s" : ""));
+    if (onglets_) onglets_->setCurrentIndex(1);   // onglet « Journal »
+    for (QDockWidget* dock : docks_schema_)
+        if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
+            dock->setVisible(true);
     return ok;
 }
 
@@ -2586,6 +2634,86 @@ bool FenetrePrincipale::exporter_courbes(const QString& chemin_demande) {
         return false;
     }
     ecrire("Relevés exportés : " + chemin);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Aller à la ligne fautive
+// ---------------------------------------------------------------------------
+std::vector<FenetrePrincipale::ErreurCompilation>
+FenetrePrincipale::analyser_sortie_compilateur(const QString& sortie) {
+    std::vector<ErreurCompilation> erreurs;
+
+    // Le nom de fichier est pris NON GOURMAND et sans deux-points : un chemin
+    // Windows commence par « C:\ », et une expression gourmande y couperait à
+    // la mauvaise place. Les `#line` ne produisent de toute façon que des
+    // noms d'onglet, mais un message venant d'un en-tête du noyau Arduino
+    // porte, lui, un vrai chemin.
+    //
+    // Les deux langues sont acceptées : le compilateur suit la locale, et
+    // celle d'une salle de classe française n'est pas celle du conteneur qui
+    // fait tourner le banc.
+    static const QRegularExpression motif(
+        R"(^\s*([^:\n]+(?::[^:\n]*[^:\d\n][^:\n]*)?):(\d+)(?::(\d+))?:\s*)"
+        R"((erreur fatale|fatal error|erreur|error|attention|warning|note)\s*:\s*(.*)$)",
+        QRegularExpression::CaseInsensitiveOption);
+
+    for (const QString& ligne : sortie.split('\n')) {
+        const QRegularExpressionMatch trouve = motif.match(ligne);
+        if (!trouve.hasMatch()) continue;
+        ErreurCompilation erreur;
+        erreur.fichier = trouve.captured(1).trimmed();
+        erreur.ligne = trouve.captured(2).toInt();
+        erreur.colonne = trouve.captured(3).toInt();   // 0 si absente
+        const QString genre = trouve.captured(4).toLower();
+        erreur.erreur = genre.contains("err");
+        erreur.message = trouve.captured(5).trimmed();
+        // Une « note » n'est pas un défaut : c'est le complément de celui qui
+        // précède. La retenir doublerait le nombre de lignes cliquables sans
+        // ajouter un seul endroit à corriger.
+        if (genre == "note") continue;
+        if (erreur.ligne <= 0) continue;
+        erreurs.push_back(erreur);
+    }
+    return erreurs;
+}
+
+bool FenetrePrincipale::aller_a_erreur(const ErreurCompilation& erreur) {
+    if (carte_courante_.isEmpty() || !editeur_source_) return false;
+    const coeur::Programme& programme = programme_de(carte_courante_);
+
+    // Le compilateur nomme l'onglet grâce aux `#line` ; un en-tête inclus,
+    // lui, porte un chemin complet. On compare donc sur le nom seul.
+    const QString cible = QFileInfo(erreur.fichier).fileName();
+    int rang = -1;
+    for (size_t k = 0; k < programme.size(); ++k)
+        if (QString::fromStdString(programme[k].nom) == cible)
+            rang = static_cast<int>(k);
+    if (rang < 0) return false;
+
+    if (onglets_) onglets_->setCurrentIndex(0);   // onglet « Programme »
+    for (QDockWidget* dock : docks_schema_)
+        if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
+            dock->setVisible(true);
+    afficher_fichier(rang);
+    if (onglets_fichiers_) {
+        const QSignalBlocker silence(onglets_fichiers_);
+        onglets_fichiers_->setCurrentIndex(rang);
+    }
+
+    QTextCursor curseur = editeur_source_->textCursor();
+    curseur.movePosition(QTextCursor::Start);
+    curseur.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor,
+                         erreur.ligne - 1);
+    if (erreur.colonne > 1)
+        curseur.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor,
+                             erreur.colonne - 1);
+    // Sélectionner la ligne entière : sur un vidéo-projecteur, un curseur
+    // clignotant d'un pixel ne se voit pas du fond de la salle.
+    curseur.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+    editeur_source_->setTextCursor(curseur);
+    editeur_source_->centerCursor();
+    editeur_source_->setFocus();
     return true;
 }
 
