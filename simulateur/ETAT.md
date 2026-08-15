@@ -9,14 +9,20 @@ quand le fil de la conversation est perdu.
 Un simulateur de circuits façon Proteus : schéma, simulation analogique,
 microcontrôleurs exécutés pour de vrai, circuit imprimé. C++17 + Qt6.
 
-Branche de travail : `main`, branche par défaut du dépôt.
+Branche de travail : **`main`**, et c'est la seule. Branche par défaut du
+dépôt.
 
-Il y en avait trois, toutes sur le même commit, et aucune ne portait un nom qui
-voulait dire quelque chose ici : `claude/auto-job-application-system-3Q2iB`
-(défaut), `claude/embedded-systems-course-nk90q7`, et
-`claude/simulateur-circuits-proteus-2rd0ef` — cette dernière déjà supprimée du
-distant, survivant en copie locale périmée. Le dépôt tient trois projets :
-la branche par défaut ne peut donc porter le nom d'aucun des trois.
+Il y en avait trois, toutes sur le même commit, aucune ne portant un nom qui
+voulût dire quelque chose ici — elles étaient nommées d'après la tâche qui
+les avait créées. Un nom de tâche vieillit en une session ; le dépôt, lui,
+tient trois projets (`simulateur/`, `formation-embarque/`, `auto-emploi/`) et
+n'en privilégie aucun. D'où `main`.
+
+Les deux autres ont été supprimées après vérification que tout leur contenu
+était dans `main` — pas seulement qu'elles « semblaient à jour ». Si le cas
+se represente : `git log --oneline origin/<branche> ^origin/main` compte les
+commits exclusifs, et un commit de FUSION en montre un sans rien apporter,
+ce qu'il faut alors confirmer en comparant les arbres.
 
 Construction : `cmake -S . -B build && cmake --build build -j8`
 Bancs d'essai : `./build/tests_coeur` et `QT_QPA_PLATFORM=offscreen ./build/tests_schema`
