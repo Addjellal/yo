@@ -295,6 +295,25 @@ private:
     // Fil accroché au curseur entre deux clics (câblage en deux temps).
     bool fil_en_attente_ = false;
     QPointF point_appui_;
+
+    // APPUYER SUR UN FIL NE DÉCIDE PLUS RIEN.
+    //
+    // Le clic sur un fil dérive ; le glissé perpendiculaire déplace le
+    // segment. On ne peut pas savoir lequel des deux au moment de l'appui —
+    // il faut attendre que la souris ait parlé. La cible est donc mise de
+    // côté, et le geste se décide au franchissement du seuil de glissé de Qt
+    // (`QApplication::startDragDistance()`), celui-là même qui sépare partout
+    // ailleurs un clic d'un glissé.
+    Cible appui_en_attente_;
+    QPointF appui_point_;
+
+    // Déplacement d'un segment en cours : les deux points qui le tiennent,
+    // leur position de départ, et l'axe autorisé (perpendiculaire au fil).
+    std::vector<ItemJonction*> poignees_;
+    std::vector<QPointF> origines_poignees_;
+    QPointF axe_deplacement_;
+    QJsonObject avant_deplacement_;
+    bool deplace_un_segment() const { return !poignees_.empty(); }
     std::map<std::string, int> compteurs_;   // par préfixe : R1, R2…
 
     // Annulation : des états complets du schéma. Un schéma pèse quelques
@@ -333,6 +352,20 @@ private:
 
     // Cycle de vie d'un fil en cours de tracé.
     void commencer_fil(const Cible& depart, const QPointF& point);
+
+    // Le déplacement d'un segment, de bout en bout.
+    //
+    // `axe_perpendiculaire` rend faux quand le fil n'est pas d'aplomb : un
+    // segment en équerre n'a pas d'axe unique, et le déplacer voudrait dire
+    // deux choses à la fois.
+    static bool axe_perpendiculaire(const ItemFil* fil, QPointF* axe);
+    // Matérialise les deux poignées du segment — en insérant un point là où
+    // le fil tient à une broche, qui ne bouge pas — et arme le déplacement.
+    bool commencer_deplacement_segment(ItemFil* fil, const QPointF& appui);
+    void poursuivre_deplacement_segment(const QPointF& point);
+    void terminer_deplacement_segment();
+    // Rend la vue à la sélection au rectangle, une fois le geste fini.
+    void rendre_le_rectangle_a_la_vue();
     // Fige le segment tracé et repart du point posé (clic dans le vide).
 
     // Association (composant, borne) -> nom de nœud, calculée par les fils.

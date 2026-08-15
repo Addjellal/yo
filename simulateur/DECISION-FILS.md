@@ -281,3 +281,74 @@ L'auto-routage est la partie facile à mal faire. Trois pièges connus :
   pour les postures et la découpe de fil, et
   `.../fsm/schematiceditorstate.cpp` (`findItemsAtPos`) pour la table de
   priorités.
+
+---
+
+# Le point 6, tranché : déplacer un segment
+
+Écrit après coup, la plainte à la main : « le mouvement des fils quand on
+appuie dessus une fois branché est loin d'être comme dans Simulink,
+renseigne-toi et applique, repars de zéro s'il le faut ».
+
+## Ce que fait Simulink, vérifié
+
+Un glissé simple sur un segment le **déplace**, et le curseur change de forme
+pour annoncer l'axe permis. C'est `Ctrl`+glissé qui **dérive**.
+
+C'est la polarité **inverse** de la nôtre : ici, un clic sur un fil dérive.
+
+## Ce qui a été retenu, et pourquoi pas la lettre de Simulink
+
+Reprendre `Ctrl`+glissé aurait inversé une convention déjà écrite, déjà codée
+et déjà éprouvée, pour un public qui n'a aucune habitude Simulink à préserver
+— il n'ouvrira jamais Simulink. Le coût du réapprentissage serait payé par
+l'élève, le bénéfice encaissé par une ressemblance que personne ne constatera.
+
+Le partage retenu ne demande **aucune touche** : c'est le seuil de glissé de
+Qt (`QApplication::startDragDistance()`, dix pixels) qui tranche — celui qui
+sépare déjà un clic d'un glissé dans tous les logiciels que l'élève utilise.
+
+- en deçà du seuil : **on dérive**, exactement comme avant. Zéro régression
+  sur le geste le plus fréquent du logiciel ;
+- au-delà, et perpendiculairement au fil : **on déplace le segment** ;
+- `Ctrl`+clic : **on désigne** le fil, sans rien câbler. Les flèches le
+  déplacent ensuite — ce mécanisme existait déjà et n'attendait que ça.
+
+De Simulink, on garde donc le geste (glisser déplace), l'aimant sur la grille,
+le curseur qui annonce l'axe, et le dérangement minimal. On n'en prend pas la
+touche modificatrice.
+
+## Le corollaire, réglé
+
+« Un fil tendu entre deux broches n'a rien à déplacer. » On lui donne de quoi :
+chaque extrémité tenue par une **broche** reçoit un point de fil, relié à la
+broche par un bout de fil neuf ; c'est ce point qui suit la souris. Le
+composant ne bouge pas d'un pixel, et rien n'est débranché — la netlist est
+identique avant et après, ce que le banc vérifie.
+
+Une extrémité qui est **déjà** un point de fil se déplace telle quelle : ses
+autres fils s'allongent. C'est le dérangement minimal appliqué.
+
+Un fil **en équerre** n'a pas d'axe unique : le déplacement lui est refusé, et
+le clic y garde son sens de dérivation — ce qui permet justement d'y poser les
+coudes qui le rendront d'aplomb.
+
+Reposé là où il était, le segment ne laisse **rien** : les points insérés pour
+le tenir sont retirés, et la pile d'annulation reste vide. Un geste sans effet
+ne doit pas modifier la topologie — c'est le même principe que celui qui a
+fait corriger le clic immobile.
+
+## Ce qui reste à faire
+
+Les points 2 (auto-routage orthogonal), 5 (reroutage à dérangement minimal
+lors du déplacement d'un **composant**) et 7 (échappatoire en tracé libre) ne
+sont toujours pas écrits.
+
+## Sources ajoutées
+
+- MathWorks, *Connect Blocks* (glissé d'un segment, `Ctrl`+glissé pour
+  dériver) : <https://www.mathworks.com/help/simulink/ug/connect-blocks.html>
+- Qt 6, `QApplication::startDragDistance()` — seuil clic/glissé, dix pixels
+  par défaut : <https://doc.qt.io/qt-6/qapplication.html#startDragDistance-prop>
+- KiCad 9, *Schematic Editor* — `G` glisse en gardant les connexions, `M`
+  déplace en les détachant : <https://docs.kicad.org/9.0/en/eeschema/eeschema.html>

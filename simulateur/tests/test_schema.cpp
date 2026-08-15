@@ -456,7 +456,8 @@ static void test_panneau_analyses() {
 namespace {
 
 void envoyer(SceneSchema& scene, QEvent::Type type, const QPointF& point,
-             Qt::MouseButton bouton = Qt::LeftButton) {
+             Qt::MouseButton bouton = Qt::LeftButton,
+             Qt::KeyboardModifiers touches = Qt::NoModifier) {
     QGraphicsSceneMouseEvent evenement(type);
     evenement.setScenePos(point);
     evenement.setPos(point);
@@ -464,6 +465,14 @@ void envoyer(SceneSchema& scene, QEvent::Type type, const QPointF& point,
     evenement.setButtons(type == QEvent::GraphicsSceneMouseRelease
                              ? Qt::NoButton
                              : bouton);
+    evenement.setModifiers(touches);
+    QApplication::sendEvent(&scene, &evenement);
+}
+
+// Une flèche du clavier, envoyée à la scène.
+void frapper(SceneSchema& scene, int touche,
+             Qt::KeyboardModifiers touches = Qt::NoModifier) {
+    QKeyEvent evenement(QEvent::KeyPress, touche, touches);
     QApplication::sendEvent(&scene, &evenement);
 }
 
@@ -3713,6 +3722,212 @@ static void test_depart_sur_fil_detruit() {
 }
 
 // ---------------------------------------------------------------------------
+// Déplacer un segment de fil, comme dans Simulink
+//
+// « Le mouvement des fils quand on appuie dessus une fois branché est loin
+// d'être comme dans Simulink. » Chez MathWorks, un glissé simple sur un
+// segment le déplace et le curseur annonce l'axe permis ; c'est `Ctrl`+glissé
+// qui dérive. Ici le CLIC dérive déjà — polarité inverse, arbitrée et écrite.
+//
+// Le partage retenu ne demande donc aucune touche : c'est le seuil de glissé
+// de Qt qui tranche, celui qui sépare partout ailleurs un clic d'un
+// déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
+// au fil, on déplace le segment.
+// ---------------------------------------------------------------------------
+static void test_deplacer_un_segment() {
+    std::printf("\n-- glisser un fil déplace le segment --\n");
+
+    // Deux composants reliés par un fil bien horizontal.
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF b = r2->position_borne(0);
+    verifier(std::fabs(a.y() - b.y()) < 0.01, "le fil d'essai est d'aplomb");
+    const QPointF milieu((a.x() + b.x()) / 2.0, a.y());
+    const QPointF composant_avant = r1->pos();
+    scene.oublier_historique();
+
+    // Ce que voit l'utilisateur AVANT d'appuyer : le nombre de nœuds, qu'un
+    // déplacement ne doit pas changer d'un iota.
+    const std::size_t noeuds_avant =
+        scene.construire_netlist(nullptr).noeuds().size();
+
+    // Le glissé : bien au-delà du seuil de Qt, et perpendiculaire au fil.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+    verifier(scene.fils().size() == 1,
+             "l'appui seul ne décide rien : toujours un fil",
+             std::to_string(scene.fils().size()));
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(0, 60));
+
+    // LE CONTRÔLE : le segment est descendu, les composants n'ont pas bougé,
+    // et rien n'a été débranché.
+    verifier(r1->pos() == composant_avant,
+             "le composant n'a pas bougé d'un pixel");
+    verifier(scene.jonctions().size() == 2,
+             "deux poignées tiennent le segment déplacé",
+             std::to_string(scene.jonctions().size()));
+    verifier(scene.fils().size() == 3,
+             "et le fil est devenu trois segments : raccord, segment, raccord",
+             std::to_string(scene.fils().size()));
+    for (ItemJonction* point : scene.jonctions())
+        verifier(std::fabs(point->pos().y() - (a.y() + 60)) < 0.01,
+                 "chaque poignée est descendue de 60, aimantée sur la grille",
+                 std::to_string(point->pos().y()));
+    const std::size_t noeuds_apres =
+        scene.construire_netlist(nullptr).noeuds().size();
+    verifier(noeuds_apres == noeuds_avant,
+             "et le circuit est électriquement le même",
+             std::to_string(noeuds_apres) + " contre "
+                 + std::to_string(noeuds_avant));
+
+    // Le geste s'annule d'un bloc — poignées comprises.
+    verifier(scene.annuler(), "le déplacement s'annule");
+    verifier(scene.fils().size() == 1 && scene.jonctions().empty(),
+             "et le fil redevient un seul segment, sans poignée",
+             std::to_string(scene.fils().size()) + " fil(s), "
+                 + std::to_string(scene.jonctions().size()) + " point(s)");
+}
+
+static void test_glisser_sans_deplacer_ne_laisse_rien() {
+    std::printf("\n-- un glissé qui revient à zéro ne laisse rien --\n");
+
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF milieu((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
+    scene.oublier_historique();
+    const QJsonObject avant = scene.vers_json();
+
+    // On déplace, puis on revient exactement d'où l'on venait.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu);
+
+    verifier(scene.vers_json() == avant,
+             "le schéma est celui d'avant : pas de poignée orpheline");
+    verifier(!scene.annuler(),
+             "et rien n'est entré dans la pile d'annulation");
+}
+
+static void test_clic_bref_derive_toujours() {
+    std::printf("\n-- sous le seuil, le clic dérive comme avant --\n");
+
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(200, 400));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF milieu((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
+
+    // Un clic, avec le tremblement de main qui va avec : deux pixels.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(1, 2));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(1, 2));
+    verifier(scene.fils().size() == 1 && scene.jonctions().empty(),
+             "le clic n'a encore rien coupé",
+             std::to_string(scene.fils().size()) + " fil(s), "
+                 + std::to_string(scene.jonctions().size()) + " point(s)");
+
+    // …et le clic suivant referme la dérivation sur la masse.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, masse->position_borne(0));
+    verifier(scene.fils().size() == 3 && scene.jonctions().size() == 1,
+             "le second clic referme la dérivation",
+             std::to_string(scene.fils().size()) + " fil(s), "
+                 + std::to_string(scene.jonctions().size()) + " point(s)");
+}
+
+static void test_fil_en_equerre_ne_se_deplace_pas() {
+    std::printf("\n-- un fil en équerre n'a pas d'axe : il se dérive --\n");
+
+    // Bornes décalées en x ET en y : le fil est tracé en équerre, et
+    // « déplacer le segment » n'y veut rien dire — quel segment ?
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 300));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF b = r2->position_borne(0);
+    verifier(std::fabs(a.x() - b.x()) > 0.01 && std::fabs(a.y() - b.y()) > 0.01,
+             "le fil d'essai est bien en équerre");
+
+    // Un point franchement sur le fil : le coin de l'équerre.
+    const QPointF coin(b.x(), a.y());
+    const QPointF sur_le_fil((a.x() + b.x()) / 2.0, a.y());
+    verifier(scene.viser(sur_le_fil).genre == SceneSchema::Cible::Genre::Fil,
+             "et le point visé est bien dessus");
+    (void)coin;
+
+    envoyer(scene, QEvent::GraphicsSceneMousePress, sur_le_fil);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(0, 60));
+    // Le geste bascule en DÉRIVATION : rien n'a encore été coupé, et un fil
+    // provisoire suit le curseur.
+    verifier(scene.jonctions().empty(),
+             "aucune poignée n'a été posée sur un fil sans axe",
+             std::to_string(scene.jonctions().size()));
+    scene.abandonner_fil();
+    verifier(scene.fils().size() == 1,
+             "et le fil est intact après abandon",
+             std::to_string(scene.fils().size()));
+}
+
+static void test_ctrl_clic_designe_un_fil() {
+    std::printf("\n-- Ctrl+clic désigne un fil, les flèches le déplacent --\n");
+
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF milieu((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
+
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu, Qt::LeftButton,
+            Qt::ControlModifier);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu, Qt::LeftButton,
+            Qt::ControlModifier);
+    verifier(scene.fils().size() == 1 && scene.jonctions().empty(),
+             "le fil n'a été ni coupé ni dérivé",
+             std::to_string(scene.fils().size()) + " fil(s), "
+                 + std::to_string(scene.jonctions().size()) + " point(s)");
+    verifier(scene.selectedItems().size() == 1
+                 && scene.selectedItems().front()->type() == ItemFil::Type,
+             "il est SÉLECTIONNÉ — ce qu'aucun geste ne permettait avant",
+             std::to_string(scene.selectedItems().size()) + " objet(s)");
+
+    // Et les flèches, mécanisme déjà écrit, s'appliquent enfin à un fil : ses
+    // deux bouts tiennent à des broches, il n'a donc rien à déplacer, et
+    // c'est exactement ce que dit DECISION-FILS. La touche ne casse rien.
+    frapper(scene, Qt::Key_Down);
+    verifier(scene.fils().size() == 1,
+             "une flèche sur un fil tendu entre deux broches ne casse rien",
+             std::to_string(scene.fils().size()));
+
+    // Sur un fil qui porte une poignée, en revanche, elle déplace vraiment.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 60));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(0, 60));
+    verifier(scene.jonctions().size() == 2, "le segment porte deux poignées",
+             std::to_string(scene.jonctions().size()));
+    // Un banc qui plante n'accuse plus rien : sans poignée, la suite n'a plus
+    // d'objet et doit s'arrêter là, pas déréférencer un vecteur vide.
+    if (scene.jonctions().empty()) return;
+    const double y_avant = scene.jonctions().front()->pos().y();
+    scene.clearSelection();
+    for (ItemJonction* point : scene.jonctions()) point->setSelected(true);
+    frapper(scene, Qt::Key_Down);
+    verifier(std::fabs(scene.jonctions().front()->pos().y() - (y_avant + 10))
+                 < 0.01,
+             "et la flèche descend le segment d'un pas de grille",
+             std::to_string(scene.jonctions().front()->pos().y()));
+}
+
+// ---------------------------------------------------------------------------
 // Un clic raté sur un fil ne doit RIEN changer au schéma
 //
 // Appuyer sur un fil et relâcher sans bouger d'un pixel — le geste le plus
@@ -4140,6 +4355,11 @@ int main(int argc, char** argv) {
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
+    test_deplacer_un_segment();
+    test_glisser_sans_deplacer_ne_laisse_rien();
+    test_clic_bref_derive_toujours();
+    test_fil_en_equerre_ne_se_deplace_pas();
+    test_ctrl_clic_designe_un_fil();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

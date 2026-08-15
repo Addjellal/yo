@@ -1,5 +1,6 @@
 #include "app/schematic/SceneSchema.h"
 
+#include <QApplication>
 #include <QGraphicsLineItem>
 #include <QGraphicsPathItem>
 #include <QJsonArray>
@@ -1466,6 +1467,129 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Déplacer un segment de fil
+//
+// La plainte : « le mouvement des fils quand on appuie dessus une fois branché
+// est loin d'être comme dans Simulink ». Chez MathWorks, un glissé simple sur
+// un segment le déplace, et le curseur annonce l'axe permis.
+//
+// Ce qu'on garde de Simulink : le glissé nu déplace, l'aperçu est le tracé
+// final, le voisinage est dérangé le moins possible. Ce qu'on n'en prend pas :
+// leur `Ctrl`+glissé pour dériver, qui inverserait la polarité déjà écrite ici
+// — chez nous un CLIC dérive, et cette convention n'a pas à se réapprendre
+// pour ressembler à un logiciel que l'élève n'ouvrira jamais.
+//
+// Le partage se fait au seuil de glissé de Qt, celui qui sépare partout
+// ailleurs un clic d'un déplacement : en deçà on dérive, au-delà on déplace.
+// Aucun mode, aucune touche à retenir.
+// ---------------------------------------------------------------------------
+bool SceneSchema::axe_perpendiculaire(const ItemFil* fil, QPointF* axe) {
+    if (!fil) return false;
+    const QPointF a = fil->ancre_depart().position();
+    const QPointF b = fil->ancre_arrivee().position();
+    const double dx = std::fabs(a.x() - b.x());
+    const double dy = std::fabs(a.y() - b.y());
+    // Un fil en équerre n'a pas d'axe : le déplacer voudrait dire deux choses
+    // à la fois. On refuse — et le clic y garde son sens de dérivation, ce qui
+    // permet justement d'y poser les coudes qui le rendront d'aplomb.
+    if (dx > 0.01 && dy > 0.01) return false;
+    if (dx <= 0.01 && dy <= 0.01) return false;
+    if (axe) *axe = (dy <= 0.01) ? QPointF(0, 1) : QPointF(1, 0);
+    return true;
+}
+
+bool SceneSchema::commencer_deplacement_segment(ItemFil* fil,
+                                                const QPointF& appui) {
+    QPointF axe;
+    if (!fil_vivant(fil) || !axe_perpendiculaire(fil, &axe)) return false;
+
+    // L'état d'avant, relevé avant la moindre insertion : le geste s'annule
+    // d'un bloc, poignées comprises.
+    avant_deplacement_ = vers_json();
+
+    // LE DÉRANGEMENT MINIMAL, appliqué.
+    //
+    // Une extrémité tenue par une BROCHE ne bouge pas : elle appartient au
+    // composant. On y insère donc un point, relié à la broche par un bout de
+    // fil neuf, et c'est ce point qui suivra la souris — le composant ne
+    // bouge pas d'un pixel, et le segment se décale en emmenant ses deux
+    // raccords. Une extrémité qui est DÉJÀ un point de fil se déplace telle
+    // quelle : ses autres fils s'allongent, personne n'est débranché.
+    //
+    // C'est le corollaire écrit dans DECISION-FILS : « un fil tendu entre
+    // deux broches n'a rien à déplacer ». Il n'a rien à déplacer tant qu'on
+    // ne lui a pas donné de quoi.
+    auto poignee = [this](const Ancre& bout) -> ItemJonction* {
+        if (bout.jonction) return bout.jonction;
+        auto* point = new ItemJonction(bout.position());
+        addItem(point);
+        addItem(new ItemFil(bout, Ancre(point)));
+        return point;
+    };
+    const Ancre a = fil->ancre_depart();
+    const Ancre b = fil->ancre_arrivee();
+    ItemJonction* pa = poignee(a);
+    ItemJonction* pb = poignee(b);
+    if (pa != a.jonction || pb != b.jonction) {
+        // Le segment change d'ancres : on le refait, plutôt que d'ouvrir
+        // `ItemFil` à la mutation de son départ.
+        removeItem(fil);
+        delete fil;
+        addItem(new ItemFil(Ancre(pa), Ancre(pb)));
+    }
+
+    poignees_ = {pa, pb};
+    origines_poignees_ = {pa->pos(), pb->pos()};
+    axe_deplacement_ = axe;
+    appui_point_ = appui;
+    for (QGraphicsView* vue : views()) vue->setDragMode(QGraphicsView::NoDrag);
+    eteindre_noeud();
+    balayer_jonctions();
+    return true;
+}
+
+void SceneSchema::poursuivre_deplacement_segment(const QPointF& point) {
+    if (poignees_.size() != 2) return;
+    // Seule la composante perpendiculaire compte : le long du fil, un
+    // déplacement ne déplacerait rien de visible.
+    const QPointF ecart = point - appui_point_;
+    const double libre =
+        axe_deplacement_.x() != 0.0 ? ecart.x() : ecart.y();
+    // Aimanté sur la grille, comme tout le reste — sans quoi le segment
+    // atterrirait entre deux mailles et les fils voisins avec lui.
+    const double pas = std::round(libre / kPas) * kPas;
+    for (std::size_t i = 0; i < poignees_.size(); ++i)
+        poignees_[i]->setPos(origines_poignees_[i] + axe_deplacement_ * pas);
+    for (ItemFil* fil : fils()) fil->rafraichir();
+}
+
+void SceneSchema::terminer_deplacement_segment() {
+    if (poignees_.empty()) return;
+    const bool immobile = poignees_[0]->pos() == origines_poignees_[0];
+    poignees_.clear();
+    origines_poignees_.clear();
+    rendre_le_rectangle_a_la_vue();
+
+    if (immobile) {
+        // Reposé là où il était : les points insérés pour le tenir n'ont plus
+        // de raison d'être, et laisser une topologie modifiée derrière un
+        // geste sans effet est exactement le défaut qu'on vient de corriger
+        // ailleurs. On remet le schéma tel qu'il était.
+        depuis_json(avant_deplacement_);
+    } else if (avant_deplacement_ != vers_json()) {
+        empiler(avant_deplacement_);
+        emit journal("Segment déplacé.");
+    }
+    avant_deplacement_ = QJsonObject();
+    balayer_jonctions();
+}
+
+void SceneSchema::rendre_le_rectangle_a_la_vue() {
+    for (QGraphicsView* vue : views())
+        vue->setDragMode(QGraphicsView::RubberBandDrag);
+}
+
 void SceneSchema::effacer_provisoire() {
     if (!fil_provisoire_) return;
     removeItem(fil_provisoire_);
@@ -1476,8 +1600,9 @@ void SceneSchema::effacer_provisoire() {
 void SceneSchema::abandonner_fil() {
     effacer_provisoire();
     // La sélection au rectangle reprend son droit dès que le fil est fini.
-    for (QGraphicsView* vue : views())
-        vue->setDragMode(QGraphicsView::RubberBandDrag);
+    rendre_le_rectangle_a_la_vue();
+    // Un appui resté sans verdict n'a plus rien à trancher.
+    appui_en_attente_ = Cible();
     cible_depart_ = Cible();
     fil_en_attente_ = false;
     // Les points de passage d'un chemin abandonné n'ont plus qu'un fil : le
@@ -1541,6 +1666,44 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
         // sélection quand on part d'un fil, qui était le défaut le plus
         // visible à l'usage.
         const Cible cible = viser(point);
+
+        // Ctrl+clic DÉSIGNE, sans rien câbler.
+        //
+        // C'est le seul moyen de sélectionner UN fil précis : le rectangle de
+        // sélection emporte ses voisins dans un schéma dense. Une fois
+        // désigné, le fil se déplace aux flèches — le mécanisme existe déjà et
+        // n'attendait que ça. Ctrl est ici la convention de l'explorateur de
+        // fichiers, pas un mode : il ajoute à une sélection, il n'arme rien.
+        if (evenement->modifiers() & Qt::ControlModifier) {
+            if (cible.genre == Cible::Genre::Fil && cible.fil) {
+                evenement->accept();
+                cible.fil->setSelected(!cible.fil->isSelected());
+                return;
+            }
+            if (cible.genre == Cible::Genre::Jonction && cible.ancre.jonction) {
+                evenement->accept();
+                ItemJonction* point_de_fil = cible.ancre.jonction;
+                point_de_fil->setSelected(!point_de_fil->isSelected());
+                return;
+            }
+        }
+
+        // APPUYER SUR UN FIL NE DÉCIDE PAS ENCORE.
+        //
+        // Clic = dériver, glissé perpendiculaire = déplacer le segment. Les
+        // deux commencent par le même appui ; c'est la souris qui tranche, au
+        // seuil de glissé de Qt. Décider dès l'appui, comme on le faisait,
+        // rendait le déplacement impossible à offrir sans une touche à
+        // retenir.
+        if (cible.genre == Cible::Genre::Fil) {
+            evenement->accept();
+            appui_en_attente_ = cible;
+            appui_point_ = point;
+            for (QGraphicsView* vue : views())
+                vue->setDragMode(QGraphicsView::NoDrag);
+            return;
+        }
+
         if (cible.connectable()) {
             // On NE DÉCOUPE PAS ici.
             //
@@ -1585,6 +1748,40 @@ void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
+    if (deplace_un_segment()) {
+        evenement->accept();
+        poursuivre_deplacement_segment(evenement->scenePos());
+        return;
+    }
+
+    // Le geste amorcé sur un fil attend le verdict de la souris.
+    if (appui_en_attente_.genre == Cible::Genre::Fil) {
+        const QPointF ecart = evenement->scenePos() - appui_point_;
+        // Le seuil de Qt, pas une constante maison : c'est celui qui sépare
+        // déjà le clic du glissé dans toute la boîte à outils, donc celui que
+        // la main de l'utilisateur connaît sans le savoir.
+        if (ecart.manhattanLength() < QApplication::startDragDistance()) {
+            evenement->accept();
+            return;
+        }
+        const Cible appui = appui_en_attente_;
+        appui_en_attente_ = Cible();
+        evenement->accept();
+        QPointF axe;
+        const bool perpendiculaire =
+            axe_perpendiculaire(appui.fil, &axe)
+            && (axe.x() != 0.0 ? std::fabs(ecart.x()) > std::fabs(ecart.y())
+                               : std::fabs(ecart.y()) > std::fabs(ecart.x()));
+        if (perpendiculaire
+            && commencer_deplacement_segment(appui.fil, appui_point_)) {
+            poursuivre_deplacement_segment(evenement->scenePos());
+            return;
+        }
+        // Sinon, c'est une dérivation : le tracé commence au point d'appui,
+        // exactement comme si l'on avait cliqué.
+        commencer_fil(appui, appui.point);
+    }
+
     if (fil_provisoire_ && cible_depart_.connectable()) {
         // L'APERÇU DOIT ÊTRE LE TRACÉ FINAL, sinon il ment.
         //
@@ -1619,8 +1816,21 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
         if (cible.genre == Cible::Genre::Broche
             || cible.genre == Cible::Genre::Jonction)
             forme = Qt::CrossCursor;
-        else if (cible.genre == Cible::Genre::Fil)
-            forme = Qt::PointingHandCursor;   // ici, on dérive
+        else if (cible.genre == Cible::Genre::Fil) {
+            // LE CURSEUR ANNONCE L'AXE, comme chez MathWorks.
+            //
+            // Sur un fil, deux gestes cohabitent : le clic dérive, le glissé
+            // déplace. Le second est le seul des deux qui soit CONTRAINT — on
+            // ne déplace un segment que perpendiculairement à lui-même — et
+            // c'est donc lui que le curseur doit dire, sans quoi l'utilisateur
+            // découvrirait la contrainte en la heurtant. La main reste pour
+            // les fils en équerre, qu'on ne peut que dériver.
+            QPointF axe;
+            if (axe_perpendiculaire(cible.fil, &axe))
+                forme = axe.x() != 0.0 ? Qt::SizeHorCursor : Qt::SizeVerCursor;
+            else
+                forme = Qt::PointingHandCursor;
+        }
         else if (cible.genre == Cible::Genre::Composant)
             forme = Qt::SizeAllCursor;        // ici, on déplace
         for (QGraphicsView* vue : views()) vue->setCursor(forme);
@@ -1637,6 +1847,28 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
+    if (deplace_un_segment()) {
+        evenement->accept();
+        terminer_deplacement_segment();
+        return;
+    }
+
+    // Appuyé sur un fil, relâché sans avoir franchi le seuil : c'était un
+    // clic, donc une dérivation — le fil part du point d'appui et attend le
+    // clic qui le refermera.
+    if (appui_en_attente_.genre == Cible::Genre::Fil) {
+        const Cible appui = appui_en_attente_;
+        appui_en_attente_ = Cible();
+        evenement->accept();
+        if (fil_vivant(appui.fil)) {
+            commencer_fil(appui, appui.point);
+            fil_en_attente_ = true;
+        } else {
+            rendre_le_rectangle_a_la_vue();
+        }
+        return;
+    }
+
     if (fil_provisoire_ && cible_depart_.connectable() && !fil_en_attente_) {
         evenement->accept();
         const QPointF point = evenement->scenePos();
