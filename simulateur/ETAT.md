@@ -386,10 +386,16 @@ masquait tous :
    ctest --test-dir build-san -L sanitiseurs
    ```
 
-   Cœur assaini : **401 tests, zéro alerte** ASan et UBSan. Schéma assaini :
-   **jamais exécuté à ce jour** — c'est le premier chiffre à établir. La
-   détection de fuites est éteinte : Qt et ngspice en laissent au dernier
-   souffle.
+   Cœur assaini : **401 tests, zéro alerte**. Schéma assaini, pour la
+   PREMIÈRE fois : **342 tests, zéro alerte** — la scène, les fils, les
+   ancres et la découpe passent. La détection de fuites est éteinte : Qt et
+   ngspice en laissent au dernier souffle.
+
+   Ce zéro ne dit pas que le code est sain : il dit qu'ASan ne trouve rien
+   **sur les chemins que le banc parcourt**. Le use-after-free corrigé cette
+   session vivait sur un chemin qu'aucun test n'empruntait — c'est un test
+   neuf qui l'a rendu visible, pas l'outil. L'outil ne voit que ce qu'on
+   exécute devant lui.
 5. **Trous de fixation Uno et Mega** : approximation sûre (aucun ne traverse
    une pastille), cotes exactes à prendre sur le plan mécanique officiel.
 6. ~~`build-asan/` est dans l'historique git~~ — **faux, et vérifié faux.**
