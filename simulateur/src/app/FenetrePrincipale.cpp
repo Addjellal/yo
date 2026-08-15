@@ -1207,8 +1207,12 @@ void FenetrePrincipale::construire_actions() {
     // cours. Elles n'avaient qu'un seul exemple, perdu au milieu des montages
     // Arduino.
     auto* sans_carte = exemples->addMenu("Sans &carte (analogique pur)");
+    sans_carte->addAction("Pont diviseur (la base de toute entrée analogique)",
+                          this, [this] { charger_exemple_pont_diviseur(); });
     sans_carte->addAction("Filtre RC (analyses : Bode, balayage, spectre)",
                           this, [this] { charger_exemple(Exemple::FiltreRC); });
+    sans_carte->addAction("Régulateur à diode Zener", this,
+                          [this] { charger_exemple_zener(); });
 
     // Fenêtres : c'est l'utilisateur qui sort un panneau de mesure, jamais
     // l'application. Le raccourci le remet aussi bien qu'il le sort.
@@ -3534,6 +3538,101 @@ void FenetrePrincipale::charger_exemple_deux_cartes() {
 // Filtre RC : le montage de référence pour les analyses. Sa coupure vaut
 // 1/(2 pi R C), soit 1591 Hz ici — une valeur qu'on peut confronter au
 // diagramme de Bode que trace le simulateur.
+// Le pont diviseur : la figure que le cours pose AVANT le potentiomètre.
+//
+// `cours/03-arduino.md` §3.2 l'introduit comme « la base de toute entrée
+// analogique » — le convertisseur ne sait lire qu'une tension, et c'est le
+// pont qui transforme une résistance variable en tension. Le simulateur
+// n'en montrait aucun : le seul « pont » du menu passait par un
+// potentiomètre, ce qui est le montage SUIVANT, pas celui-là.
+void FenetrePrincipale::charger_exemple_pont_diviseur() {
+    arreter();
+    scene_->tout_effacer();
+    scene_->oublier_historique();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* alim = scene_->ajouter_composant("alim5v", QPointF(-200, -180));
+    ItemComposant* r1 = scene_->ajouter_composant("resistance", QPointF(-200, -60));
+    ItemComposant* r2 = scene_->ajouter_composant("resistance", QPointF(-200, 100));
+    ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(-200, 220));
+    ItemComposant* vm = scene_->ajouter_composant("voltmetre", QPointF(60, 20));
+    if (!alim || !r1 || !r2 || !masse || !vm) return;
+
+    // 10 kΩ et 10 kΩ : le cas le plus lisible, la moitié de la tension. Un
+    // élève qui change une des deux valeurs voit la formule marcher.
+    r1->valeurs["ohms"] = 10000;
+    r2->valeurs["ohms"] = 10000;
+    r1->setRotation(90);
+    r2->setRotation(90);
+
+    scene_->addItem(new ItemFil(alim, 0, r1, 0));
+    scene_->addItem(new ItemFil(r1, 1, r2, 0));
+    scene_->addItem(new ItemFil(r2, 1, masse, 0));
+    scene_->addItem(new ItemFil(r1, 1, vm, 0));
+    scene_->addItem(new ItemFil(vm, 1, masse, 0));
+
+    circuit_modifie();
+    vue_->ajuster();
+    ecrire("Exemple : pont diviseur, deux résistances de 10 kΩ sous 5 V.");
+    ecrire("Le voltmètre doit lire 2,50 V — soit U × R2/(R1+R2). Changez R2 "
+           "pour 20 kΩ et la lecture passe à 3,33 V.");
+    ecrire("C'est le montage qui est derrière TOUTE entrée analogique : le "
+           "convertisseur ne sait lire qu'une tension.");
+}
+
+// Le régulateur Zener : le composant le plus soigneusement corrigé du dépôt,
+// et qui n'avait aucune vitrine.
+//
+// Son modèle a été repris de `diotemp.c` de ngspice après qu'un modèle écrit
+// de mémoire eut donné le coude 29 mV trop bas et la mauvaise pente (voir
+// ETAT.md, défaut 7). Ce travail ne servait à rien tant qu'aucun exemple ne
+// le donnait à voir.
+void FenetrePrincipale::charger_exemple_zener() {
+    arreter();
+    scene_->tout_effacer();
+    scene_->oublier_historique();
+    chemin_projet_.clear();
+    programmes_.clear();
+    carte_courante_.clear();
+
+    ItemComposant* pile = scene_->ajouter_composant("pile", QPointF(-260, 20));
+    ItemComposant* rs = scene_->ajouter_composant("resistance", QPointF(-80, -120));
+    ItemComposant* dz = scene_->ajouter_composant("zener", QPointF(80, 20));
+    ItemComposant* charge = scene_->ajouter_composant("resistance", QPointF(240, 20));
+    ItemComposant* masse = scene_->ajouter_composant("masse", QPointF(0, 220));
+    ItemComposant* vm = scene_->ajouter_composant("voltmetre", QPointF(400, 20));
+    if (!pile || !rs || !dz || !charge || !masse || !vm) return;
+
+    pile->valeurs["volts"] = 12;
+    rs->valeurs["ohms"] = 470;      // résistance de ballast
+    charge->valeurs["ohms"] = 2200;
+    // La Zener se monte EN INVERSE : cathode vers le +, anode vers la masse.
+    // C'est tout l'objet du montage, et l'inverser est l'erreur classique.
+    dz->setRotation(90);
+    charge->setRotation(90);
+
+    scene_->addItem(new ItemFil(pile, 0, rs, 0));
+    scene_->addItem(new ItemFil(rs, 1, dz, 1));       // ballast -> cathode
+    scene_->addItem(new ItemFil(rs, 1, charge, 0));
+    scene_->addItem(new ItemFil(dz, 0, masse, 0));    // anode -> masse
+    scene_->addItem(new ItemFil(charge, 1, masse, 0));
+    scene_->addItem(new ItemFil(pile, 1, masse, 0));
+    scene_->addItem(new ItemFil(rs, 1, vm, 0));
+    scene_->addItem(new ItemFil(vm, 1, masse, 0));
+
+    circuit_modifie();
+    vue_->ajuster();
+    ecrire("Exemple : régulateur à diode Zener — 12 V en entrée, ballast de "
+           "470 Ω, charge de 2,2 kΩ.");
+    ecrire("La sortie doit tenir près de la tension Zener malgré les 12 V "
+           "d'entrée. Changez la pile pour 9 V ou 15 V : la sortie bouge à "
+           "peine, c'est tout l'intérêt.");
+    ecrire("Onglet « Analyses » ▸ balayage continu de la source : la "
+           "caractéristique montre le coude, puis le plateau.");
+}
+
 void FenetrePrincipale::charger_exemple_filtre() {
     scene_->tout_effacer();
     scene_->oublier_historique();

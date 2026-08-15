@@ -3742,6 +3742,100 @@ static void test_notation_scientifique() {
     }
 }
 
+static void test_nom_de_noeud_impose_assaini() {
+    std::printf("\n-- un nom de nœud imposé est assaini comme les autres --\n");
+
+    // Une étiquette dont le nom vient d'un fichier de projet, pas de la
+    // liste fermée de l'interface : `depuis_json` recopie les textes sans
+    // les valider. Une virgule y suffit à tromper le panneau « Contrôle »,
+    // qui s'en sert pour distinguer un nœud d'une LISTE de composants.
+    SceneSchema scene;
+    ItemComposant* r = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* etiquette = scene.ajouter_composant("etiquette", QPointF(200, 0));
+    verifier(etiquette != nullptr, "l'étiquette de nœud est au catalogue");
+    if (!r || !etiquette) return;
+
+    etiquette->textes["nom"] = "A,B";
+    scene.addItem(new ItemFil(r, 1, etiquette, 0));
+
+    const QString noeud = scene.noeud_de(r, 1);
+    verifier(!noeud.isEmpty(), "le nœud porte bien un nom",
+             noeud.toStdString());
+    verifier(!noeud.contains(','),
+             "et ce nom ne contient AUCUNE virgule — sans quoi le panneau "
+             "Contrôle le prendrait pour deux composants",
+             noeud.toStdString());
+}
+
+// ---------------------------------------------------------------------------
+// Les deux exemples sans carte donnent bien ce qu'ils annoncent
+//
+// Un exemple qui ment vaut moins que pas d'exemple : l'élève croit le
+// journal, mesure autre chose, et conclut qu'il n'a rien compris. On vérifie
+// donc le CHIFFRE, pas seulement que le montage se charge.
+// ---------------------------------------------------------------------------
+static void test_exemples_sans_carte() {
+    std::printf("\n-- pont diviseur et Zener donnent le bon chiffre --\n");
+
+    FenetrePrincipale fenetre;
+
+    // --- pont diviseur : 5 V, deux fois 10 kΩ -> 2,50 V ---------------------
+    fenetre.charger_exemple_pont_diviseur();
+    {
+        std::vector<LiaisonBroche> broches;
+        const coeur::Netlist netlist =
+            fenetre.scene()->construire_netlist(&broches);
+        coeur::NgspiceEngine moteur;
+        moteur.construire(netlist, {});
+        verifier(moteur.resoudre() && moteur.erreurs().empty(),
+                 "le pont diviseur se résout");
+
+        // Le point milieu : la borne 1 de R1, celle où pend le voltmètre.
+        ItemComposant* r1 = nullptr;
+        for (ItemComposant* c : fenetre.scene()->composants())
+            if (c->reference() == "R1") r1 = c;
+        verifier(r1 != nullptr, "R1 est bien là");
+        if (r1) {
+            const double v = moteur.tension(
+                fenetre.scene()->noeud_de(r1, 1).toStdString());
+            verifier(std::fabs(v - 2.5) < 0.05,
+                     "le point milieu est à 2,50 V — U × R2/(R1+R2)",
+                     f(v) + " V");
+        }
+    }
+
+    // --- Zener : 12 V en entrée, la sortie doit être RÉGULÉE ---------------
+    fenetre.charger_exemple_zener();
+    {
+        std::vector<LiaisonBroche> broches;
+        const coeur::Netlist netlist =
+            fenetre.scene()->construire_netlist(&broches);
+        coeur::NgspiceEngine moteur;
+        moteur.construire(netlist, {});
+        verifier(moteur.resoudre() && moteur.erreurs().empty(),
+                 "le régulateur Zener converge — c'est précisément ce qui ne "
+                 "marchait pas avant la reprise du modèle sur diotemp.c");
+
+        ItemComposant* dz = nullptr;
+        for (ItemComposant* c : fenetre.scene()->composants())
+            if (c->reference().startsWith("DZ") || c->reference().startsWith("D"))
+                if (c->modele() && c->modele()->type == "zener") dz = c;
+        verifier(dz != nullptr, "la Zener est bien là");
+        if (dz) {
+            // Borne 1 = cathode, le point régulé.
+            const double v = moteur.tension(
+                fenetre.scene()->noeud_de(dz, 1).toStdString());
+            // Sous 12 V d'entrée avec 470 Ω de ballast, la sortie doit être
+            // très en dessous de l'entrée : c'est ça, réguler. Le seuil est
+            // large exprès — la tension Zener est un réglage du composant, et
+            // le test ne doit pas se casser si le défaut du catalogue change.
+            verifier(v > 1.0 && v < 11.0,
+                     "la sortie est régulée bien en dessous des 12 V d'entrée",
+                     f(v) + " V");
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3802,6 +3896,8 @@ int main(int argc, char** argv) {
     test_marqueur_erc_evite_la_reference();
     test_colonne_en_octets_pas_en_caracteres();
     test_notation_scientifique();
+    test_nom_de_noeud_impose_assaini();
+    test_exemples_sans_carte();
     test_depart_sur_fil_detruit();
 
     std::printf("\n============================================================\n");

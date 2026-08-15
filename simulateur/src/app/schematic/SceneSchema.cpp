@@ -726,6 +726,17 @@ SceneSchema::calculer_noeuds() const {
                         impose = propriete.defaut_texte;
         }
         if (impose.empty()) continue;
+        // ASSAINI COMME LES AUTRES, et pas seulement les noms engendrés.
+        //
+        // Un nom imposé — étiquette de nœud, symbole d'alimentation — passait
+        // tel quel. Une virgule y suffit à tromper le panneau « Contrôle »,
+        // qui s'en sert pour distinguer un nom de nœud d'une LISTE de
+        // composants : l'anomalie s'afficherait alors comme si elle visait
+        // deux composants. L'interface n'est pas atteignable ainsi (le nom
+        // vient d'une liste fermée), mais `depuis_json` recopie les textes
+        // d'un fichier de projet sans les valider — et SPICE, lui, refuse
+        // déjà bien d'autres caractères.
+        impose = assainir_noeud(impose);
         for (int k = 0; k < composant->nb_bornes(); ++k)
             noms[classes.racine(indices.at(composant)[k])] = impose;
     }

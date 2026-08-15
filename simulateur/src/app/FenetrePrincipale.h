@@ -74,6 +74,11 @@ public:
     // Montage purement analogique : c'est celui sur lequel les analyses
     // paramétriques prennent tout leur sens (Bode, balayage, spectre).
     void charger_exemple_filtre();
+    // Les deux figures du cours qui n'avaient aucun exemple, toutes deux
+    // sans carte : le pont diviseur (§3.2, « la base de toute entrée
+    // analogique ») et le régulateur Zener.
+    void charger_exemple_pont_diviseur();
+    void charger_exemple_zener();
     // Chenillard sur registre à décalage : la démonstration du moteur
     // numérique événementiel.
     void charger_exemple_registre();

@@ -156,7 +156,17 @@ que contre eux-mêmes et contre la théorie — ce qui contredit la règle que c
 document se donne plus bas : « vérifier un décodeur avec un assembleur qu'on
 a écrit soi-même ne prouve rien ».
 
-Les installer, toujours, avant de croire un banc vert :
+**C'est réglé par un hook de démarrage**, `.claude/hooks/session-start.sh` :
+il installe Qt6, les chaînes AVR et ARM, ngspice et simavr, uniquement en
+environnement distant, de façon idempotente — et il DIT quand un moteur de
+référence manque, plutôt que de laisser la session suivante croire un banc
+complet.
+
+Une garantie qui dépend d'un paquet facultatif ne tient pas dans un
+document : il faudrait que quelqu'un lise ce paragraphe-ci, à chaque
+session, avant de croire un banc vert. Elle tient dans un script.
+
+À la main, si le hook n'a pas tourné :
 
 ```
 apt-get install -y libngspice0-dev simavr libsimavr-dev libelf-dev
@@ -542,6 +552,22 @@ Les six points sont livrés, chacun avec son banc. Ce qu'ils ont appris :
 - **Cartouche à l'impression seulement.** Champ « Nom » tracé même vide, en
   pointillé : une ligne à remplir à la main vaut mieux qu'une feuille
   anonyme.
+
+### Exemples sans carte : deux figures du cours enfin montrées
+
+Le **pont diviseur** (§3.2, « la base de toute entrée analogique ») et le
+**régulateur Zener**. Le cours dessine huit figures ; il en manquait trois,
+il en manque encore une (l'afficheur 7 segments, et l'optocoupleur).
+
+Le Zener méritait particulièrement sa vitrine : son modèle a été repris de
+`diotemp.c` de ngspice après qu'un modèle écrit de mémoire eut donné le
+coude 29 mV trop bas (défaut 7 ci-dessus). Ce travail n'enseignait rien tant
+qu'aucun exemple ne le donnait à voir.
+
+Le banc vérifie le CHIFFRE que le journal annonce, pas seulement que le
+montage se charge : 2,50 V au point milieu du pont. Un exemple qui ment vaut
+moins que pas d'exemple — l'élève croit le journal, mesure autre chose, et
+conclut qu'il n'a rien compris.
 
 Bancs : relancer plutôt que citer un chiffre — voir « Bancs d'essai ».
 
