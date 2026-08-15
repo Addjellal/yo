@@ -1017,6 +1017,31 @@ void FenetrePrincipale::construire_actions() {
     action_arreter_->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F5));
     connect(action_arreter_, &QAction::triggered, this,
             &FenetrePrincipale::arreter);
+    // L'oscilloscope, à un clic — SANS quitter le panneau du bas.
+    //
+    // Le mécanisme existait déjà (`Ctrl+1`, menu Fenêtres) : ce qui manquait
+    // n'était pas la fonction mais le bouton qui la montre. Un raccourci que
+    // personne ne découvre n'existe pas, et l'oscilloscope est l'instrument
+    // du TP — voir une PWM, la charge d'un RC.
+    //
+    // Il est posé près de Lancer/Arrêter et non de Sélection/Supprimer :
+    // ces deux-là forment un groupe exclusif de mode d'édition, Zoom et
+    // Ajuster commandent la vue. Une commande d'instrument n'est ni l'un ni
+    // l'autre — elle appartient à la simulation.
+    //
+    // Et l'onglet reste. Multisim met ses instruments dans une barre séparée
+    // mais ne retire rien ; sur le portable 1366×768 de la salle, une fenêtre
+    // flottante recouvre le schéma qu'elle mesure, et l'on perdrait la
+    // comparaison en un clic avec le Journal et le Contrôle, qui sont dans le
+    // même panneau exprès.
+    barre->addSeparator();
+    auto* action_scope = barre->addAction("Oscilloscope");
+    action_scope->setToolTip(
+        "Sortir l'oscilloscope dans sa propre fenêtre, ou le remettre dans le "
+        "panneau du bas (Ctrl+1).");
+    connect(action_scope, &QAction::triggered, this,
+            [this] { basculer_fenetre(oscilloscope_); });
+
     simulation->addAction(action_marche_);
     simulation->addAction(action_arreter_);
     simulation->addSeparator();
