@@ -61,6 +61,14 @@ struct Anomalie {
     // Vide quand il n'y a rien d'utile à dire : mieux vaut se taire qu'écrire
     // une généralité.
     std::string remede;
+
+    // La borne visée, quand l'anomalie en désigne une. Vide sinon.
+    //
+    // Le nom figure déjà dans le message — « borne « 2 » non connectée » —
+    // mais l'y relire à l'expression régulière ferait dépendre le dessin du
+    // schéma de la ponctuation d'une phrase française. Le jour où le message
+    // change, le marqueur se poserait ailleurs, en silence.
+    std::string borne;
 };
 
 std::vector<Anomalie> controler_regles(const Netlist& netlist);

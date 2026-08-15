@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QPolygonF>
 #include <QStyleOptionGraphicsItem>
+#include <QTransform>
 
 #include <cmath>
 
@@ -176,6 +177,12 @@ void ItemComposant::definir_grille(bool grille) {
 void ItemComposant::definir_bornes_allumees(std::vector<int> bornes) {
     if (bornes_allumees_ == bornes) return;
     bornes_allumees_ = std::move(bornes);
+    update();
+}
+
+void ItemComposant::definir_anomalies(std::vector<MarqueurErc> marqueurs) {
+    if (anomalies_ == marqueurs) return;
+    anomalies_ = std::move(marqueurs);
     update();
 }
 
@@ -353,4 +360,61 @@ void ItemComposant::paint(QPainter* peintre,
                           Qt::AlignHCenter | Qt::AlignVCenter, mesure_);
     }
     peintre->restore();
+
+    dessiner_anomalies(peintre);
+}
+
+// Le marqueur ERC : un triangle d'avertissement POSÉ À CÔTÉ.
+//
+// Il ne touche ni au trait ni au remplissage du symbole. C'est la condition
+// pour qu'il ne se confonde pas avec le noirci-barré du composant grillé, qui
+// dit tout autre chose : l'un signale un schéma incomplet, l'autre un
+// composant détruit par le courant qu'on lui a fait passer.
+void ItemComposant::dessiner_anomalies(QPainter* peintre) const {
+    if (anomalies_.empty() || !modele_) return;
+
+    for (const MarqueurErc& marqueur : anomalies_) {
+        // Où poser le marqueur : à côté de la borne visée, sinon au coin du
+        // symbole. « À côté » veut dire vers l'extérieur — un marqueur posé
+        // vers le centre recouvrirait le symbole qu'il commente.
+        QPointF point;
+        if (marqueur.borne >= 0
+            && marqueur.borne < static_cast<int>(modele_->bornes.size())) {
+            const QPointF borne = vers_qt(modele_->bornes[marqueur.borne].position);
+            const double norme = std::hypot(borne.x(), borne.y());
+            const QPointF sortant =
+                norme > 1e-6 ? borne / norme : QPointF(0, -1);
+            point = borne + sortant * 13.0;
+        } else {
+            point = QPointF(cadre_.right() - 6, cadre_.top() + 10);
+        }
+
+        // Redressé : le triangle et son point d'exclamation restent lisibles
+        // quel que soit le quart de tour subi par le composant. Le point de
+        // pose, lui, a tourné avec le symbole — d'où la rotation directe
+        // appliquée à ses coordonnées avant d'annuler celle du peintre.
+        peintre->save();
+        peintre->rotate(-rotation());
+        const QPointF ancre = QTransform().rotate(rotation()).map(point);
+
+        const QColor teinte = marqueur.erreur ? QColor(198, 40, 40)
+                                              : QColor(230, 145, 20);
+        QPolygonF triangle;
+        triangle << ancre + QPointF(0, -7) << ancre + QPointF(6.5, 4.5)
+                 << ancre + QPointF(-6.5, 4.5);
+        peintre->setPen(QPen(teinte.darker(130), 1.2, Qt::SolidLine,
+                             Qt::RoundCap, Qt::RoundJoin));
+        peintre->setBrush(marqueur.erreur ? QColor(255, 226, 226)
+                                          : QColor(255, 243, 214));
+        peintre->drawPolygon(triangle);
+
+        QFont police = peintre->font();
+        police.setPointSizeF(7.0);
+        police.setBold(true);
+        peintre->setFont(police);
+        peintre->setPen(QPen(teinte, 1));
+        peintre->drawText(QRectF(ancre.x() - 6, ancre.y() - 5.5, 12, 11),
+                          Qt::AlignCenter, "!");
+        peintre->restore();
+    }
 }

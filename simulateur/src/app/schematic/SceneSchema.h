@@ -21,6 +21,7 @@
 
 #include "core/Netlist.h"
 #include "core/engines/NgspiceEngine.h"
+#include "core/export/Documents.h"
 
 #include "app/schematic/Ancre.h"
 
@@ -227,6 +228,15 @@ public:
 
     // Marque un composant comme grillé : il se dessine noirci et barré.
     void marquer_grille(const QString& reference);
+
+    // Reporte les anomalies du contrôle des règles sur le schéma.
+    //
+    // `Anomalie.reference` n'est PAS toujours une référence de composant :
+    // c'est un nom de nœud pour les nœuds isolés, et une liste jointe par
+    // virgules pour les courts-circuits. Les trois formes sont traitées ici,
+    // faute de quoi deux tiers des anomalies ne marqueraient rien.
+    void poser_anomalies(const std::vector<coeur::Anomalie>& anomalies);
+    void effacer_anomalies();
 
 signals:
     void selection_composant(ItemComposant* composant);

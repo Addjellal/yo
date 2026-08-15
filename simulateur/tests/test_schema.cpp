@@ -2932,6 +2932,89 @@ static void experience_cout_survol() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Le marqueur ERC est posé À CÔTÉ, et il vise la borne
+//
+// Deux choses à ne pas confondre, et c'est tout l'objet de cette section : le
+// noirci-barré dit « ce composant a grillé », un fait physique constaté
+// pendant la simulation ; le triangle dit « ce schéma est incomplet ». Les
+// dessiner pareil enseignerait qu'un fil oublié détruit un composant.
+// ---------------------------------------------------------------------------
+static void test_marqueur_erc_a_cote() {
+    std::printf("\n-- le marqueur ERC est posé à côté, pas sur le composant --\n");
+
+    SceneSchema scene;
+    ItemComposant* pile = scene.ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* masse = scene.ajouter_composant("masse", QPointF(600, 0));
+    // R1 n'est câblée que d'un côté : sa borne 2 reste en l'air. C'est
+    // l'erreur de câblage la plus fréquente en TP.
+    scene.addItem(new ItemFil(pile, 0, r1, 0));
+    scene.addItem(new ItemFil(pile, 1, masse, 0));
+
+    std::vector<LiaisonBroche> broches;
+    const coeur::Netlist netlist = scene.construire_netlist(&broches);
+    const std::vector<coeur::Anomalie> anomalies =
+        coeur::controler_regles(netlist);
+
+    // --- l'anomalie porte le nom de la borne, en clair -------------------
+    bool borne_nommee = false;
+    for (const coeur::Anomalie& anomalie : anomalies)
+        if (anomalie.reference == "R1" && anomalie.borne == "2")
+            borne_nommee = true;
+    verifier(borne_nommee,
+             "l'anomalie désigne la borne dans un champ, pas seulement dans "
+             "sa phrase");
+
+    // --- le marqueur atterrit sur la bonne borne -------------------------
+    scene.poser_anomalies(anomalies);
+    verifier(r1->anomalies().size() == 1,
+             "R1 porte un marqueur, un seul",
+             std::to_string(r1->anomalies().size()));
+    verifier(!r1->anomalies().empty() && r1->anomalies().front().borne == 1,
+             "et il vise la borne 2 (indice 1) — la borne, pas le corps");
+    verifier(!r1->anomalies().empty() && r1->anomalies().front().erreur,
+             "un composant à deux bornes mal câblé est une erreur, pas un "
+             "avertissement");
+
+    // --- le fait physique et le manquement aux règles restent distincts --
+    verifier(!r1->grille(),
+             "une borne en l'air ne noircit PAS le composant : un fil oublié "
+             "ne détruit rien");
+    scene.marquer_grille("R1");
+    verifier(r1->grille() && r1->anomalies().size() == 1,
+             "les deux marques coexistent sans se confondre");
+
+    // --- corriger le câblage retire le marqueur --------------------------
+    scene.addItem(new ItemFil(r1, 1, masse, 0));
+    std::vector<LiaisonBroche> broches2;
+    const coeur::Netlist complete = scene.construire_netlist(&broches2);
+    scene.poser_anomalies(coeur::controler_regles(complete));
+    verifier(r1->anomalies().empty(),
+             "le fil enfin tiré fait disparaître le marqueur");
+
+    // --- une référence qui n'est pas un composant ne marque rien ---------
+    //
+    // `Anomalie.reference` est tantôt une référence, tantôt un nom de nœud,
+    // tantôt une liste jointe par virgules. Les deux dernières formes ne
+    // doivent marquer aucun symbole plutôt que de marquer le mauvais.
+    coeur::Anomalie noeud;
+    noeud.gravite = coeur::Anomalie::Gravite::Erreur;
+    noeud.reference = "GND";           // un nœud, pas un composant
+    coeur::Anomalie liste;
+    liste.gravite = coeur::Anomalie::Gravite::Erreur;
+    liste.reference = "R1, V1";        // deux composants d'un coup
+    scene.poser_anomalies({noeud, liste});
+    verifier(r1->anomalies().size() == 1,
+             "la liste jointe par virgules marque bien R1",
+             std::to_string(r1->anomalies().size()));
+    verifier(pile->anomalies().size() == 1,
+             "et V1 aussi, dans la même anomalie",
+             std::to_string(pile->anomalies().size()));
+    verifier(masse->anomalies().empty(),
+             "tandis qu'un nom de nœud ne marque aucun symbole");
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     std::printf("============================================================\n");
@@ -2974,6 +3057,7 @@ int main(int argc, char** argv) {
     test_programmes_par_carte();
     experience_cout_survol();
     test_survol_allume_le_noeud();
+    test_marqueur_erc_a_cote();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

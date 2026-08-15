@@ -158,6 +158,14 @@ FenetrePrincipale::FenetrePrincipale() {
             [this](MoteurSimulation::Etat) { refleter_etat(); });
     connect(moteur_, &MoteurSimulation::controle_effectue, this,
             &FenetrePrincipale::refleter_controle);
+    // Le contrôle repose TOUS les marqueurs, y compris quand il ne trouve
+    // rien : une liste vide efface les triangles précédents. C'est ce qui
+    // fait qu'un fil enfin tiré fait disparaître son marqueur, au lieu de
+    // laisser l'élève douter de ce qu'il vient de corriger.
+    connect(moteur_, &MoteurSimulation::anomalies_relevees, this,
+            [this](const std::vector<coeur::Anomalie>& anomalies) {
+                scene_->poser_anomalies(anomalies);
+            });
     connect(moteur_, &MoteurSimulation::composant_grille, this,
             [this](const QString& reference) {
                 scene_->marquer_grille(reference);

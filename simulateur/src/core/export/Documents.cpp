@@ -171,8 +171,9 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
     using Gravite = Anomalie::Gravite;
     auto signaler = [&anomalies](Gravite gravite, const std::string& reference,
                                  const std::string& message,
-                                 const std::string& remede = {}) {
-        anomalies.push_back({gravite, reference, message, remede});
+                                 const std::string& remede = {},
+                                 const std::string& borne = {}) {
+        anomalies.push_back({gravite, reference, message, remede, borne});
     };
 
     if (netlist.instances().empty()) return anomalies;
@@ -232,7 +233,8 @@ std::vector<Anomalie> controler_regles(const Netlist& netlist) {
                              "borne « " + borne_symbole.nom
                                  + " » non connectée",
                              "Tirez un fil depuis cette borne : cliquez "
-                             "dessus, puis cliquez la borne d'arrivée.");
+                             "dessus, puis cliquez la borne d'arrivée.",
+                             borne_symbole.nom);
             }
         }
 

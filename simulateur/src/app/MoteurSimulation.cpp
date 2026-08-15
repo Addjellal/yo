@@ -386,6 +386,7 @@ void MoteurSimulation::signaler_regles() {
             ++avertissements;
     }
     emit controle_effectue(erreurs, avertissements);
+    emit anomalies_relevees(anomalies);
     if (anomalies.empty()) return;
 
     if (erreurs > 0)

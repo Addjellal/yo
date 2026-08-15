@@ -145,6 +145,10 @@ signals:
     void composant_grille(const QString& reference);
     // Bilan du contrôle des règles, à chaque lancement.
     void controle_effectue(int erreurs, int avertissements);
+    // Le détail, pour que le schéma puisse porter les marqueurs. Le compte
+    // ci-dessus suffit à la barre d'état ; il ne dit pas OÙ, et « 3 erreurs »
+    // sans l'endroit laisse l'élève relire son montage en entier.
+    void anomalies_relevees(const std::vector<coeur::Anomalie>& anomalies);
     void avancement(double temps_ms, double vitesse);
     // Changement d'état : c'est ce qui pilote l'apparence des commandes.
     void etat_change(Etat etat);

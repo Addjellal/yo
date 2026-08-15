@@ -1014,6 +1014,65 @@ void SceneSchema::marquer_grille(const QString& reference) {
     update();
 }
 
+void SceneSchema::effacer_anomalies() {
+    for (ItemComposant* composant : composants())
+        composant->definir_anomalies({});
+}
+
+void SceneSchema::poser_anomalies(
+    const std::vector<coeur::Anomalie>& anomalies) {
+    // Table des marqueurs à poser, par composant. On la remplit d'abord, on
+    // la pose ensuite : un composant peut porter plusieurs anomalies — deux
+    // bornes en l'air sur la même résistance, c'est le cas ordinaire d'un
+    // composant qu'on vient de déposer.
+    std::map<ItemComposant*, std::vector<ItemComposant::MarqueurErc>> a_poser;
+    std::map<QString, ItemComposant*> par_reference;
+    for (ItemComposant* composant : composants())
+        par_reference[composant->reference()] = composant;
+
+    for (const coeur::Anomalie& anomalie : anomalies) {
+        if (anomalie.gravite == coeur::Anomalie::Gravite::Information) continue;
+        const bool erreur =
+            anomalie.gravite == coeur::Anomalie::Gravite::Erreur;
+
+        // Les trois formes de `reference`. La liste jointe par virgules est
+        // celle des courts-circuits ; un nom de nœud ne désigne aucun
+        // composant et ne trouvera simplement rien, ce qui est le traitement
+        // correct — un nœud n'a pas de symbole où poser un triangle.
+        const QStringList cibles =
+            QString::fromStdString(anomalie.reference).split(',');
+        for (const QString& brute : cibles) {
+            const QString cible = brute.trimmed();
+            if (cible.isEmpty()) continue;
+            auto it = par_reference.find(cible);
+            if (it == par_reference.end()) continue;
+
+            ItemComposant::MarqueurErc marqueur;
+            marqueur.erreur = erreur;
+            marqueur.borne = -1;
+            if (!anomalie.borne.empty()) {
+                const QString nom = QString::fromStdString(anomalie.borne);
+                for (int k = 0; k < it->second->nb_bornes(); ++k)
+                    if (it->second->nom_borne(k) == nom) {
+                        marqueur.borne = k;
+                        break;
+                    }
+            }
+            std::vector<ItemComposant::MarqueurErc>& liste = a_poser[it->second];
+            // Deux règles peuvent viser la même borne : un seul triangle.
+            if (std::find(liste.begin(), liste.end(), marqueur) == liste.end())
+                liste.push_back(marqueur);
+        }
+    }
+
+    for (ItemComposant* composant : composants()) {
+        auto it = a_poser.find(composant);
+        composant->definir_anomalies(
+            it == a_poser.end() ? std::vector<ItemComposant::MarqueurErc>()
+                                : it->second);
+    }
+}
+
 void SceneSchema::effacer_resultats() {
     for (ItemComposant* composant : composants()) {
         composant->definir_eclat(0.0);

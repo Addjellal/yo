@@ -70,6 +70,23 @@ public:
     void definir_bornes_allumees(std::vector<int> bornes);
     const std::vector<int>& bornes_allumees() const { return bornes_allumees_; }
 
+    // Un manquement aux règles électriques, posé À CÔTÉ de ce qu'il vise.
+    //
+    // Jamais en noircissant le composant : le noirci-barré dit « grillé », un
+    // fait PHYSIQUE constaté pendant la simulation. Dessiner pareil une broche
+    // en l'air enseignerait qu'un fil oublié détruit un composant — c'est
+    // faux, et c'est précisément le genre de fausse idée qu'un simulateur de
+    // formation doit se garder d'installer.
+    struct MarqueurErc {
+        int borne = -1;        // -1 : le composant entier
+        bool erreur = true;    // erreur (rouge) ou avertissement (orangé)
+        bool operator==(const MarqueurErc& autre) const {
+            return borne == autre.borne && erreur == autre.erreur;
+        }
+    };
+    void definir_anomalies(std::vector<MarqueurErc> marqueurs);
+    const std::vector<MarqueurErc>& anomalies() const { return anomalies_; }
+
     // Valeurs et textes réglables, recopiés dans la netlist.
     std::map<std::string, double> valeurs;
     std::map<std::string, std::string> textes;
@@ -88,9 +105,11 @@ private:
     double eclat_ = 0.0;
     bool grille_ = false;
     std::vector<int> bornes_allumees_;
+    std::vector<MarqueurErc> anomalies_;
     QString mesure_;
     QRectF cadre_;          // zone cliquable
     QRectF cadre_peint_;    // tout ce que paint() peut toucher
 
     void recalculer_cadre();
+    void dessiner_anomalies(QPainter* peintre) const;
 };
