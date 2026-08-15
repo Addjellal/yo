@@ -418,7 +418,23 @@ void ItemComposant::dessiner_anomalies(QPainter* peintre) const {
         // appliquée à ses coordonnées avant d'annuler celle du peintre.
         peintre->save();
         peintre->rotate(-rotation());
-        const QPointF ancre = QTransform().rotate(rotation()).map(point);
+        QPointF ancre = QTransform().rotate(rotation()).map(point);
+
+        // Le marqueur ne se pose JAMAIS sur la référence.
+        //
+        // Elle s'écrit en bandeau au-dessus du symbole, centrée. Une borne
+        // située en haut au centre — le curseur d'un potentiomètre est à
+        // (0, −25) — y projetait son triangle en plein milieu du texte : on
+        // lisait « P⚠T1 ». Le test se fait ICI, dans le repère redressé, qui
+        // est celui où la référence est écrite ; le faire avant la rotation
+        // le rendrait faux dès qu'on pivote le composant.
+        const QRectF bandeau(-70, cadre_.top() - 2, 140, 16);
+        const QRectF boite(ancre.x() - 7, ancre.y() - 8, 14, 14);
+        if (boite.intersects(bandeau)) {
+            // Sous le bandeau, et décalé du côté où il y a de la place.
+            ancre.setY(bandeau.bottom() + 9);
+            ancre.setX(ancre.x() + (ancre.x() >= 0 ? 15.0 : -15.0));
+        }
 
         const QColor teinte = marqueur.erreur ? QColor(198, 40, 40)
                                               : QColor(230, 145, 20);

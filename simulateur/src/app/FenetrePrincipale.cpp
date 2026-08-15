@@ -64,6 +64,8 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include <cmath>
+#include <limits>
 #include <map>
 
 #include <QImage>
@@ -101,6 +103,87 @@ QSettings reglages_disposition() {
     return QSettings(QCoreApplication::organizationName(),
                      QCoreApplication::applicationName());
 }
+
+// Un champ de valeur qui parle comme un électronicien.
+//
+// Il affichait « 10000,000000000 » pour une résistance de 10 kΩ : neuf
+// décimales en dur, choisies parce qu'un condensateur de 220 nF vaut
+// 0,000000220 F. Une seule précision pour toutes les grandeurs ne peut pas
+// convenir aux deux — il y a douze décades entre un picofarad et un
+// mégohm.
+//
+// La sortie réutilise `format_ingenieur`, déjà employé par la nomenclature
+// et par l'étiquette sous le symbole : le panneau dit désormais « 10 kΩ »
+// comme le schéma, au lieu de le contredire.
+//
+// L'entrée accepte les préfixes : on tape « 220n », « 4k7 » s'écrit « 4.7k »,
+// et l'unité peut être omise. C'est ce que fait tout logiciel de CAO
+// électronique, et ce que fait la main d'un électronicien sur un cahier.
+class ChampValeur : public QDoubleSpinBox {
+public:
+    explicit ChampValeur(std::string unite, QWidget* parent = nullptr)
+        : QDoubleSpinBox(parent), unite_(std::move(unite)) {
+        // La précision INTERNE, pas celle de l'affichage : un picofarad vaut
+        // 1e-12, et setValue arrondirait à `decimals` sans cela.
+        setDecimals(12);
+    }
+
+protected:
+    QString textFromValue(double valeur) const override {
+        return QString::fromStdString(coeur::format_ingenieur(valeur, unite_));
+    }
+
+    double valueFromText(const QString& texte) const override {
+        const double lu = lire(texte);
+        return std::isnan(lu) ? value() : lu;
+    }
+
+    QValidator::State validate(QString& texte, int&) const override {
+        if (texte.trimmed().isEmpty()) return QValidator::Intermediate;
+        return std::isnan(lire(texte)) ? QValidator::Intermediate
+                                       : QValidator::Acceptable;
+    }
+
+    // Un pas fixe n'a pas plus de sens qu'une précision fixe : monter de 1 Ω
+    // sur un mégohm ne se voit pas, monter de 1 F sur un nanofarad est absurde.
+    // Le pas vaut donc un dixième de la décade courante.
+    void stepBy(int pas) override {
+        const double v = value();
+        const double decade =
+            v > 0 ? std::pow(10.0, std::floor(std::log10(v))) : 1.0;
+        setValue(v + pas * decade / 10.0);
+    }
+
+private:
+    double lire(const QString& texte) const {
+        QString net = texte.trimmed();
+        net.replace(',', '.');   // le clavier français écrit la virgule
+        int fin = 0;
+        while (fin < net.size()
+               && (net[fin].isDigit() || net[fin] == '.' || net[fin] == '+'
+                   || net[fin] == '-'))
+            ++fin;
+        bool ok = false;
+        const double base = net.left(fin).toDouble(&ok);
+        if (!ok) return std::numeric_limits<double>::quiet_NaN();
+
+        // Le premier caractère non blanc qui suit : un préfixe d'ingénieur,
+        // ou le début de l'unité. « 220 nF » donne n ; « 0.25 W » donne W,
+        // qui n'est pas un préfixe — le facteur reste 1.
+        static const QString prefixes = "pnµumkMG";
+        static const double facteurs[] = {1e-12, 1e-9, 1e-6, 1e-6,
+                                          1e-3,  1e3,  1e6,  1e9};
+        for (int k = fin; k < net.size(); ++k) {
+            if (net[k].isSpace()) continue;
+            const int rang = prefixes.indexOf(net[k]);
+            if (rang >= 0) return base * facteurs[rang];
+            break;
+        }
+        return base;
+    }
+
+    std::string unite_;
+};
 }  // namespace
 
 #include "core/Device.h"
@@ -2233,8 +2316,7 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
                 break;
             }
             case coeur::Propriete::Genre::Nombre: {
-                auto* champ = new QDoubleSpinBox;
-                champ->setDecimals(9);
+                auto* champ = new ChampValeur(propriete.unite);
                 champ->setRange(0, 1e9);
                 champ->setValue(composant->valeurs[cle]);
                 champ->setKeyboardTracking(false);

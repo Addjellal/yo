@@ -1502,16 +1502,26 @@ void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
         const Cible depart = cible_depart_;
         if (terminer_fil(point)) return;
 
-        // Relâché sans avoir bougé : c'était un clic, pas un glissement. Le
-        // fil reste alors accroché au curseur jusqu'au clic suivant — les
-        // deux façons de câbler cohabitent ainsi sans se gêner.
-        if (QLineF(point_appui_, point).length() < 6.0) {
-            // Le départ est déjà ancré — éventuellement sur un point de
-            // dérivation créé au clic. Le reprendre tel quel, sans re-viser :
-            // re-viser découperait une seconde fois.
-            commencer_fil(depart, point);
-            fil_en_attente_ = true;
-        }
+        // RELÂCHER NE TERMINE JAMAIS UN FIL.
+        //
+        // Le fil reste accroché au curseur jusqu'à ce qu'un clic le referme
+        // sur une cible, ou qu'Échap l'abandonne. C'est la seule règle qui
+        // n'oblige à rien : on peut câbler d'un glissement continu comme on
+        // peut lâcher le bouton, réfléchir, se déplacer, puis cliquer.
+        //
+        // Auparavant le fil n'était gardé que si la souris n'avait pas bougé
+        // de plus de six pixels — au-delà, relâcher dans le vide le JETAIT.
+        // Le geste le plus naturel du débutant (partir d'une broche, traverser
+        // le schéma, souffler, reprendre) effaçait donc son travail sans un
+        // mot, et rien à l'écran ne disait pourquoi. Un clic dans le vide,
+        // lui, pose un point de passage : c'est le presseEvent qui s'en
+        // charge, et c'est ce qui permet d'imposer un tracé.
+        //
+        // Le départ est déjà ancré — éventuellement sur un point de dérivation
+        // créé au clic. Le reprendre tel quel, sans re-viser : re-viser
+        // découperait une seconde fois.
+        commencer_fil(depart, point);
+        fil_en_attente_ = true;
         return;
     }
     QGraphicsScene::mouseReleaseEvent(evenement);
@@ -1580,6 +1590,72 @@ void SceneSchema::keyPressEvent(QKeyEvent* evenement) {
         supprimer_selection();
         return;
     }
+    // Les flèches déplacent la sélection d'un pas de grille.
+    //
+    // C'est la seule façon d'ALIGNER pour de bon : à la souris, on approche,
+    // on dépasse, on recommence. Au clavier, deux composants posés sur la
+    // même ligne y restent. La proposition était retenue au chantier 2 et
+    // n'avait jamais été écrite.
+    //
+    // `Maj` donne le pas fin — une unité — pour les cas où la grille est trop
+    // grosse. C'est la convention de KiCad et d'Inkscape.
+    {
+        const int touche = evenement->key();
+        QPointF pas;
+        if (touche == Qt::Key_Left) pas = QPointF(-1, 0);
+        else if (touche == Qt::Key_Right) pas = QPointF(1, 0);
+        else if (touche == Qt::Key_Up) pas = QPointF(0, -1);
+        else if (touche == Qt::Key_Down) pas = QPointF(0, 1);
+        if (!pas.isNull()) {
+            // Rien de sélectionné : la flèche appartient à la vue, qui s'en
+            // sert pour défiler. La consommer sans rien déplacer priverait
+            // l'utilisateur du seul déplacement au clavier qu'il avait.
+            if (selectedItems().isEmpty()) {
+                QGraphicsScene::keyPressEvent(evenement);
+                return;
+            }
+            const double amplitude =
+                (evenement->modifiers() & Qt::ShiftModifier) ? 1.0 : kPas;
+            const QPointF ecart = pas * amplitude;
+
+            // Un point de fil déplacé deux fois avancerait du double : on
+            // rassemble d'abord, on déplace ensuite. Le cas arrive dès qu'un
+            // fil ET son point sont tous deux dans la sélection.
+            std::set<QGraphicsItem*> a_deplacer;
+            for (QGraphicsItem* item : selectedItems()) {
+                if (item->type() == ItemComposant::Type
+                    || item->type() == ItemJonction::Type) {
+                    a_deplacer.insert(item);
+                    continue;
+                }
+                // Un FIL sélectionné se déplace par ses ancres mobiles.
+                //
+                // Une extrémité tenue par une broche ne bouge pas — elle
+                // appartient au composant. Une extrémité qui est un point de
+                // fil, si. C'est exactement le partage que fait LibrePCB, où
+                // un `dynamic_cast` vers le point de fil sert de filtre :
+                // voir DECISION-FILS.md.
+                if (item->type() != ItemFil::Type) continue;
+                auto* fil = static_cast<ItemFil*>(item);
+                for (const Ancre& ancre :
+                     {fil->ancre_depart(), fil->ancre_arrivee()})
+                    if (ancre.jonction) a_deplacer.insert(ancre.jonction);
+            }
+            if (a_deplacer.empty()) {
+                evenement->accept();
+                return;
+            }
+            memoriser();
+            for (QGraphicsItem* item : a_deplacer)
+                item->setPos(item->pos() + ecart);
+            for (ItemFil* fil : fils()) fil->rafraichir();
+            // Ce qui vient de bouger n'est plus sous le curseur.
+            eteindre_noeud();
+            evenement->accept();
+            return;
+        }
+    }
+
     if (evenement->key() == Qt::Key_R) {
         if (selectedItems().isEmpty()) return;
         memoriser();

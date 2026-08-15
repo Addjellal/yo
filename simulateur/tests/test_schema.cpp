@@ -3512,6 +3512,76 @@ static void test_surbrillance_ne_survit_pas_a_la_suppression() {
              "et plus aucune borne ne reste allumée");
 }
 
+// ---------------------------------------------------------------------------
+// Deux défauts vus sur une capture d'écran
+//
+// Ni le compilateur ni les tests ne les voyaient. Il a fallu regarder
+// l'application tourner — c'est la méthode que le projet s'est donnée, et
+// elle continue de rapporter plus que la relecture.
+// ---------------------------------------------------------------------------
+static void test_marqueur_erc_evite_la_reference() {
+    std::printf("\n-- le marqueur ERC ne se pose pas sur la référence --\n");
+
+    // Le curseur du potentiomètre est en (0, −25) : en haut, AU CENTRE,
+    // c'est-à-dire exactement là où la référence « POT1 » est écrite. Le
+    // triangle y atterrissait en plein milieu du texte — on lisait « P⚠T1 ».
+    SceneSchema scene;
+    ItemComposant* pot = scene.ajouter_composant("potentiometre", QPointF(0, 0));
+    verifier(pot != nullptr, "le potentiomètre est au catalogue");
+    if (!pot) return;
+
+    int borne_curseur = -1;
+    for (int k = 0; k < pot->nb_bornes(); ++k)
+        if (pot->nom_borne(k) == "W") borne_curseur = k;
+    verifier(borne_curseur >= 0, "sa borne « W » (le curseur) existe");
+    if (borne_curseur < 0) return;
+
+    pot->definir_anomalies({{borne_curseur, true}});
+
+    // On peint deux fois : avec et sans le marqueur. La référence doit
+    // rester IDENTIQUE — si le triangle mordait dessus, les pixels du texte
+    // changeraient.
+    auto peindre = [&](bool avec_marqueur) {
+        pot->definir_anomalies(
+            avec_marqueur
+                ? std::vector<ItemComposant::MarqueurErc>{{borne_curseur, true}}
+                : std::vector<ItemComposant::MarqueurErc>{});
+        QImage image(400, 400, QImage::Format_ARGB32);
+        image.fill(Qt::white);
+        QPainter peintre(&image);
+        peintre.translate(200, 200);
+        QStyleOptionGraphicsItem option;
+        pot->paint(&peintre, &option, nullptr);
+        return image;
+    };
+    const QImage sans = peindre(false);
+    const QImage avec = peindre(true);
+
+    // Le bandeau de la référence, dans le repère de l'image.
+    const QRectF cadre = pot->boundingRect();
+    const int haut = 200 + static_cast<int>(cadre.top()) - 2;
+    int pixels_changes = 0;
+    for (int y = std::max(0, haut); y < std::min(400, haut + 16); ++y)
+        for (int x = 130; x < 270; ++x)
+            if (sans.pixelColor(x, y) != avec.pixelColor(x, y)) ++pixels_changes;
+    verifier(pixels_changes == 0,
+             "poser le marqueur ne change AUCUN pixel du bandeau de la "
+             "référence",
+             std::to_string(pixels_changes) + " pixels modifiés");
+
+    // Et il est bien dessiné quelque part — sinon le test ci-dessus passerait
+    // pour la mauvaise raison.
+    int pixels_marqueur = 0;
+    for (int y = 0; y < 400; ++y)
+        for (int x = 0; x < 400; ++x)
+            if (sans.pixelColor(x, y) != avec.pixelColor(x, y))
+                ++pixels_marqueur;
+    verifier(pixels_marqueur > 30,
+             "mais le marqueur est bien peint, ailleurs",
+             std::to_string(pixels_marqueur) + " pixels");
+    pot->definir_anomalies({});
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3569,6 +3639,7 @@ int main(int argc, char** argv) {
     test_survol_description_suit_le_contenu();
     test_marqueur_erc_tient_dans_son_cadre();
     test_surbrillance_ne_survit_pas_a_la_suppression();
+    test_marqueur_erc_evite_la_reference();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {
