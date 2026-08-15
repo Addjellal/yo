@@ -44,6 +44,11 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QCloseEvent>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QElapsedTimer>
+#include <QSettings>
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
@@ -214,6 +219,13 @@ FenetrePrincipale::FenetrePrincipale() {
             });
 
     charger_exemple_clignotant();
+
+    // La disposition de référence, relevée ICI : après que tout est construit,
+    // avant toute restauration. C'est la seule façon que « Réinitialiser »
+    // reste d'accord avec le constructeur — une disposition écrite en dur
+    // se désynchroniserait au premier panneau ajouté.
+    disposition_par_defaut_ = saveState();
+    restaurer_disposition();
 }
 
 FenetrePrincipale::~FenetrePrincipale() = default;
@@ -919,6 +931,14 @@ void FenetrePrincipale::construire_actions() {
         while (!fenetres_instruments_.empty())
             fenetres_instruments_.front()->close();
     });
+    fenetres->addSeparator();
+    // F11 : la convention du plein écran partout — navigateurs, lecteurs,
+    // visionneuses. Rien à apprendre.
+    fenetres->addAction("Mode &présentation (schéma seul, plein écran)",
+                        QKeySequence(Qt::Key_F11), this,
+                        &FenetrePrincipale::basculer_presentation);
+    fenetres->addAction("&Réinitialiser la disposition", this,
+                        &FenetrePrincipale::reinitialiser_disposition);
 
     // Le circuit imprimé consomme la netlist du schéma : même composants,
     // mêmes nets, aucune ressaisie.
@@ -1230,6 +1250,112 @@ void FenetrePrincipale::supprimer_sur_page_active() {
     scene_->memoriser();
     scene_->supprimer_selection();
     circuit_modifie();
+}
+
+// ---------------------------------------------------------------------------
+// Disposition et mode présentation
+// ---------------------------------------------------------------------------
+namespace {
+// Un seul endroit pour ces clés : elles se retrouvent dans le registre de
+// l'utilisateur, et une faute de frappe y perdrait sa disposition en silence.
+constexpr char kCleGeometrie[] = "disposition/geometrie";
+constexpr char kCleEtat[] = "disposition/etat";
+
+// La portée d'enregistrement suit l'identité de l'application, au lieu de
+// noms écrits en dur ici.
+//
+// C'est ce qui isole le banc d'essai : `tests_schema` construit de vraies
+// `FenetrePrincipale`, et avec une portée fixe il aurait relu la disposition
+// enregistrée par l'utilisateur sur sa machine — un banc dont le résultat
+// dépend de l'état d'un poste n'est plus un banc. Il lui suffit désormais de
+// se donner un autre `applicationName`.
+QSettings reglages_disposition() {
+    return QSettings(QCoreApplication::organizationName(),
+                     QCoreApplication::applicationName());
+}
+}  // namespace
+
+void FenetrePrincipale::enregistrer_disposition() const {
+    // Ne JAMAIS enregistrer la disposition du mode présentation : elle n'a
+    // ni panneau ni barre d'outils, et la relire au démarrage suivant
+    // donnerait une fenêtre vide dont rien n'expliquerait l'état.
+    if (presentation_) return;
+    QSettings reglages = reglages_disposition();
+    reglages.setValue(kCleGeometrie, saveGeometry());
+    reglages.setValue(kCleEtat, saveState());
+}
+
+void FenetrePrincipale::restaurer_disposition() {
+    QSettings reglages = reglages_disposition();
+    const QByteArray geometrie = reglages.value(kCleGeometrie).toByteArray();
+    const QByteArray etat = reglages.value(kCleEtat).toByteArray();
+    if (!geometrie.isEmpty()) restoreGeometry(geometrie);
+    if (!etat.isEmpty()) restoreState(etat);
+}
+
+void FenetrePrincipale::reinitialiser_disposition() {
+    if (presentation_) basculer_presentation();
+    if (disposition_par_defaut_.isEmpty()) return;
+    restoreState(disposition_par_defaut_);
+    // Les panneaux du schéma n'appartiennent qu'à la page schéma : les
+    // reposer tous visibles alors qu'on est sur la carte contredirait la
+    // règle. On repasse donc par `afficher_page`, qui la connaît.
+    afficher_page(pages_ ? pages_->currentIndex() : 0);
+    ecrire("Disposition réinitialisée.");
+}
+
+void FenetrePrincipale::basculer_presentation() {
+    if (!presentation_) {
+        disposition_avant_presentation_ = saveState();
+        for (QDockWidget* dock : findChildren<QDockWidget*>())
+            dock->hide();
+        for (QToolBar* barre : findChildren<QToolBar*>()) barre->hide();
+        if (menuBar()) menuBar()->hide();
+        if (statusBar()) statusBar()->hide();
+        presentation_ = true;
+        showFullScreen();
+        return;
+    }
+
+    presentation_ = false;
+    showNormal();
+    if (menuBar()) menuBar()->show();
+    if (statusBar()) statusBar()->show();
+    // `restoreState` repose la visibilité de chaque panneau telle qu'elle
+    // était : c'est ce qui évite de rouvrir des panneaux que l'utilisateur
+    // avait lui-même fermés avant d'appuyer sur F11.
+    if (!disposition_avant_presentation_.isEmpty())
+        restoreState(disposition_avant_presentation_);
+    afficher_page(pages_ ? pages_->currentIndex() : 0);
+}
+
+void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
+    enregistrer_disposition();
+    QMainWindow::closeEvent(evenement);
+}
+
+// Sortir du plein écran par DEUX Échap rapprochés, jamais un seul.
+//
+// Un Échap isolé abandonne le fil en cours de tracé : lui donner aussi la
+// sortie du plein écran ferait qu'abandonner un fil quitterait la
+// présentation, en pleine démonstration. Deux appuis lèvent l'ambiguïté sans
+// rien apprendre à personne — et F11 reste la sortie évidente.
+void FenetrePrincipale::keyPressEvent(QKeyEvent* evenement) {
+    if (presentation_ && evenement->key() == Qt::Key_Escape) {
+        const qint64 maintenant = QDateTime::currentMSecsSinceEpoch();
+        constexpr qint64 kFenetreMs = 700;
+        if (dernier_echap_ms_ != 0
+            && maintenant - dernier_echap_ms_ <= kFenetreMs) {
+            dernier_echap_ms_ = 0;
+            basculer_presentation();
+            evenement->accept();
+            return;
+        }
+        dernier_echap_ms_ = maintenant;
+        evenement->accept();
+        return;
+    }
+    QMainWindow::keyPressEvent(evenement);
 }
 
 void FenetrePrincipale::afficher_page(int page) {

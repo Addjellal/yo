@@ -1446,8 +1446,14 @@ void SceneSchema::contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) {
 
 void SceneSchema::keyPressEvent(QKeyEvent* evenement) {
     if (evenement->key() == Qt::Key_Escape) {
+        // Échap n'est consommé QUE s'il avait un tracé à abandonner. Sans
+        // fil en cours il poursuit sa route vers la fenêtre, qui s'en sert
+        // pour sortir du mode présentation. Un événement avalé sans rien
+        // faire rendait ce second usage impossible à brancher — et rien à
+        // l'écran n'aurait expliqué pourquoi la touche ne répondait pas.
+        const bool tracait = fil_provisoire_ != nullptr || fil_en_attente_;
         abandonner_fil();
-        return;
+        if (tracait) return;
     }
     if (evenement->key() == Qt::Key_Delete) {
         if (!selectedItems().isEmpty()) memoriser();

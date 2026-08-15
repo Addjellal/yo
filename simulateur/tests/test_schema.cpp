@@ -8,6 +8,8 @@
 //   QT_QPA_PLATFORM=offscreen ./tests_schema
 
 #include <QApplication>
+#include <QDockWidget>
+#include <QMenuBar>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QImage>
@@ -3015,8 +3017,71 @@ static void test_marqueur_erc_a_cote() {
              "tandis qu'un nom de nœud ne marque aucun symbole");
 }
 
+// ---------------------------------------------------------------------------
+// Mode présentation, et mémoire de la disposition
+//
+// Le mode présentation sert le vidéo-projecteur de la salle ; la
+// réinitialisation sert le poste partagé, où un élève qui replie un panneau
+// à zéro le lègue au suivant sans que celui-ci sache quoi rappeler.
+// ---------------------------------------------------------------------------
+static void test_presentation_et_disposition() {
+    std::printf("\n-- mode présentation et mémoire de la disposition --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.show();
+    QCoreApplication::processEvents();
+
+    const QList<QDockWidget*> docks = fenetre.findChildren<QDockWidget*>();
+    verifier(!docks.isEmpty(), "la fenêtre a bien des panneaux",
+             std::to_string(docks.size()) + " panneaux");
+
+    // --- F11 : tout disparaît sauf le schéma -----------------------------
+    fenetre.basculer_presentation();
+    QCoreApplication::processEvents();
+    verifier(fenetre.en_presentation(), "F11 entre en mode présentation");
+    bool un_dock_visible = false;
+    for (QDockWidget* dock : docks)
+        if (dock->isVisible()) un_dock_visible = true;
+    verifier(!un_dock_visible, "aucun panneau ne reste visible");
+    verifier(!fenetre.menuBar()->isVisible(),
+             "la barre de menus s'efface aussi : elle mange une ligne sur un "
+             "vidéo-projecteur");
+
+    // --- et tout revient -------------------------------------------------
+    fenetre.basculer_presentation();
+    QCoreApplication::processEvents();
+    verifier(!fenetre.en_presentation(), "un second F11 en sort");
+    verifier(fenetre.menuBar()->isVisible(), "la barre de menus revient");
+
+    // --- réinitialiser rend un panneau replié -----------------------------
+    //
+    // Le geste qu'on répare : replier un panneau à zéro. Qt le laisse faire,
+    // et rien à l'écran ne dit ensuite comment le rappeler.
+    QDockWidget* palette = nullptr;
+    for (QDockWidget* dock : docks)
+        if (dock->objectName() == "dock_palette") palette = dock;
+    verifier(palette != nullptr, "la palette est identifiable par son nom "
+                                 "d'objet — sans quoi Qt ne sait pas la "
+                                 "réenregistrer");
+    if (palette) {
+        palette->hide();
+        QCoreApplication::processEvents();
+        verifier(!palette->isVisible(), "la palette est repliée");
+        fenetre.reinitialiser_disposition();
+        QCoreApplication::processEvents();
+        verifier(palette->isVisible(),
+                 "« Réinitialiser la disposition » la fait revenir");
+    }
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
+    // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
+    // disposition dans QSettings, et sans cette ligne le banc lirait celle
+    // que l'utilisateur a laissée sur sa machine. Un essai dont le résultat
+    // dépend de l'état d'un poste ne prouve rien.
+    application.setApplicationName("Simulateur embarqué — banc d'essai");
+    application.setOrganizationName("Formation embarquée");
     std::printf("============================================================\n");
     std::printf("TESTS DE LA SAISIE DE SCHÉMA — exemplaires multiples\n");
     std::printf("============================================================\n");
@@ -3058,6 +3123,7 @@ int main(int argc, char** argv) {
     experience_cout_survol();
     test_survol_allume_le_noeud();
     test_marqueur_erc_a_cote();
+    test_presentation_et_disposition();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

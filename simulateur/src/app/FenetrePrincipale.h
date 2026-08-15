@@ -7,6 +7,7 @@
 
 #include "core/engines/Microcontroleur.h"
 
+#include <QByteArray>
 #include <QMainWindow>
 #include <QTreeWidget>
 #include <QIcon>
@@ -173,7 +174,25 @@ public:
 
 protected:
     void showEvent(QShowEvent* evenement) override;
+    void closeEvent(QCloseEvent* evenement) override;
+    void keyPressEvent(QKeyEvent* evenement) override;
     bool eventFilter(QObject* objet, QEvent* evenement) override;
+
+public:
+    // Mode présentation : le schéma seul, en plein écran. Pour le vidéo-
+    // projecteur de la salle — les panneaux mangent près du tiers de la
+    // largeur, et personne au fond ne lit une palette de composants.
+    void basculer_presentation();
+    bool en_presentation() const { return presentation_; }
+    // Repose la disposition telle qu'elle sort du constructeur.
+    //
+    // Indispensable en salle de classe : un poste est partagé, et un élève
+    // qui replie un panneau à zéro le lègue au suivant, qui n'a aucun moyen
+    // de deviner ce qui a disparu ni comment le rappeler.
+    void reinitialiser_disposition();
+    // Relit la disposition enregistrée à la session précédente.
+    void restaurer_disposition();
+    void enregistrer_disposition() const;
 
 private slots:
     void nouveau_projet();
@@ -257,6 +276,21 @@ private:
     // Tailles des panneaux du schéma, mises de côté le temps d'aller sur la
     // carte : sans elles, la palette revient rétrécie.
     std::vector<int> tailles_docks_;
+
+    // --- disposition ------------------------------------------------------
+    // La disposition telle qu'elle sort de `construire_*`, relevée avant
+    // toute restauration. C'est ce que « Réinitialiser la disposition »
+    // repose — sans cette copie, réinitialiser n'aurait aucune référence où
+    // revenir, et il faudrait coder en dur une disposition qui se
+    // désynchroniserait du constructeur au premier panneau ajouté.
+    QByteArray disposition_par_defaut_;
+    // Disposition d'avant le mode présentation, pour la rendre intacte.
+    QByteArray disposition_avant_presentation_;
+    bool presentation_ = false;
+    // Un `Échap` isolé abandonne le fil en cours : il ne peut pas AUSSI
+    // sortir du plein écran. On demande donc deux appuis rapprochés, et cet
+    // instant est celui du premier.
+    qint64 dernier_echap_ms_ = 0;
     bool carte_transferee_ = false;
     // Panneaux sortis dans leur propre fenêtre : titre et rang d'origine,
     // pour savoir où les remettre à la fermeture.
