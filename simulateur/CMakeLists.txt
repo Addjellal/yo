@@ -487,6 +487,32 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     DEPENDS simulateur
     COMMENT "Fabrication du paquet portable")
+
+  # UN DOSSIER PRÊT À DONNER, pas seulement une archive.
+  #
+  # `paquet` produit un ZIP : c'est ce qu'il faut pour envoyer. Mais pour
+  # poser le simulateur sur une clé, le montrer en salle, ou simplement
+  # REGARDER ce que le client recevra, un dossier est plus commode — on
+  # l'ouvre, on double-clique.
+  #
+  #   cmake --build build --target livraison
+  #
+  # Il est reconstruit à neuf à chaque fois : un dossier de livraison qui
+  # garde les restes d'une version précédente est le meilleur moyen de livrer
+  # une DLL périmée à côté d'un exécutable neuf, et de rejouer le silence au
+  # démarrage documenté plus haut.
+  #
+  # Ce qu'il contient : l'application, les DLL de Qt, les greffons, ngspice,
+  # le runtime du compilateur, la documentation, le mot d'accueil — et les
+  # chaînes de compilation si `outils/chaines` les a posées. Rien d'autre.
+  # Le dossier de construction, lui, reste un atelier.
+  add_custom_target(livraison
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory
+            "${CMAKE_BINARY_DIR}/livraison"
+    COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}"
+            --config $<CONFIG> --prefix "${CMAKE_BINARY_DIR}/livraison"
+    DEPENDS simulateur
+    COMMENT "Dossier prêt à livrer : build/livraison/")
 else()
   message(STATUS "Application Qt : désactivée (Qt6 introuvable) — le cœur reste compilable")
 endif()
