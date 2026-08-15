@@ -46,6 +46,8 @@
 #include <QStatusBar>
 #include <QCloseEvent>
 #include <QCoreApplication>
+#include <QDate>
+#include <QFileInfo>
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QSettings>
@@ -72,6 +74,27 @@
 #include "app/schematic/ItemFil.h"
 #include "app/schematic/SceneSchema.h"
 #include "app/schematic/VueSchema.h"
+
+namespace {
+// Un seul endroit pour ces clés : elles se retrouvent dans le registre de
+// l'utilisateur, et une faute de frappe y perdrait sa disposition en silence.
+constexpr char kCleGeometrie[] = "disposition/geometrie";
+constexpr char kCleEtat[] = "disposition/etat";
+
+// La portée d'enregistrement suit l'identité de l'application, au lieu de
+// noms écrits en dur ici.
+//
+// C'est ce qui isole le banc d'essai : `tests_schema` construit de vraies
+// `FenetrePrincipale`, et avec une portée fixe il aurait relu la disposition
+// enregistrée par l'utilisateur sur sa machine — un banc dont le résultat
+// dépend de l'état d'un poste n'est plus un banc. Il lui suffit désormais de
+// se donner un autre `applicationName`.
+QSettings reglages_disposition() {
+    return QSettings(QCoreApplication::organizationName(),
+                     QCoreApplication::applicationName());
+}
+}  // namespace
+
 #include "core/Device.h"
 
 namespace {
@@ -638,6 +661,24 @@ void FenetrePrincipale::construire_actions() {
                        [this] { exporter_schema(); });
     exports->addAction("Rapport de &contrôle des règles…", this,
                        [this] { exporter_regles(); });
+    fichier->addSeparator();
+    // Le nom qui ira dans le cartouche du schéma imprimé. Demandé une fois,
+    // retenu ensuite — et jamais montré à l'écran, où il ne sert à rien.
+    fichier->addAction("Nom pour le &cartouche…", this, [this] {
+        QSettings reglages = reglages_disposition();
+        bool valide = false;
+        const QString saisi = QInputDialog::getText(
+            this, "Cartouche du schéma imprimé",
+            "Nom porté sur les schémas exportés ou imprimés :", QLineEdit::Normal,
+            reglages.value("cartouche/auteur").toString(), &valide);
+        if (!valide) return;
+        reglages.setValue("cartouche/auteur", saisi);
+        ecrire(saisi.isEmpty()
+                   ? "Cartouche : le champ « Nom » sera laissé à remplir à la "
+                     "main."
+                   : "Cartouche : les schémas exportés porteront « " + saisi
+                         + " ».");
+    });
     fichier->addSeparator();
     fichier->addAction("&Quitter", QKeySequence::Quit, this, &QWidget::close);
 
@@ -1255,26 +1296,6 @@ void FenetrePrincipale::supprimer_sur_page_active() {
 // ---------------------------------------------------------------------------
 // Disposition et mode présentation
 // ---------------------------------------------------------------------------
-namespace {
-// Un seul endroit pour ces clés : elles se retrouvent dans le registre de
-// l'utilisateur, et une faute de frappe y perdrait sa disposition en silence.
-constexpr char kCleGeometrie[] = "disposition/geometrie";
-constexpr char kCleEtat[] = "disposition/etat";
-
-// La portée d'enregistrement suit l'identité de l'application, au lieu de
-// noms écrits en dur ici.
-//
-// C'est ce qui isole le banc d'essai : `tests_schema` construit de vraies
-// `FenetrePrincipale`, et avec une portée fixe il aurait relu la disposition
-// enregistrée par l'utilisateur sur sa machine — un banc dont le résultat
-// dépend de l'état d'un poste n'est plus un banc. Il lui suffit désormais de
-// se donner un autre `applicationName`.
-QSettings reglages_disposition() {
-    return QSettings(QCoreApplication::organizationName(),
-                     QCoreApplication::applicationName());
-}
-}  // namespace
-
 void FenetrePrincipale::enregistrer_disposition() const {
     // Ne JAMAIS enregistrer la disposition du mode présentation : elle n'a
     // ni panneau ni barre d'outils, et la relire au démarrage suivant
@@ -2568,6 +2589,76 @@ bool FenetrePrincipale::exporter_courbes(const QString& chemin_demande) {
     return true;
 }
 
+// Le cartouche — À L'IMPRESSION SEULEMENT.
+//
+// Rien de nouveau n'apparaît à l'écran : la place y est trop précieuse, et
+// l'information qu'il porte ne sert qu'une fois la feuille détachée du
+// logiciel. C'est sur le papier qu'elle manque — trente copies de TP sans
+// nom d'auteur ne sont pas corrigeables, et le professeur n'a aucun moyen
+// de les rattacher après coup.
+//
+// Le champ « Nom » reste tracé même vide : une ligne à remplir à la main
+// vaut mieux qu'une absence, puisqu'une feuille anonyme est le défaut qu'on
+// cherche à supprimer.
+void FenetrePrincipale::dessiner_cartouche(QPainter* peintre,
+                                           const QRectF& bandeau) const {
+    peintre->save();
+    peintre->setRenderHint(QPainter::Antialiasing, true);
+    const double trait = std::max(1.0, bandeau.height() / 90.0);
+    peintre->setPen(QPen(QColor(40, 40, 40), trait));
+    peintre->setBrush(Qt::NoBrush);
+    peintre->drawRect(bandeau);
+
+    // Trois colonnes, comme sur un cartouche de dessin technique : ce qu'on
+    // regarde (le titre), qui l'a fait, et quand.
+    const double colonne = bandeau.width() / 3.0;
+    for (int k = 1; k < 3; ++k)
+        peintre->drawLine(QPointF(bandeau.left() + k * colonne, bandeau.top()),
+                          QPointF(bandeau.left() + k * colonne,
+                                  bandeau.bottom()));
+
+    QFont police = peintre->font();
+    police.setPointSizeF(std::max(5.0, bandeau.height() / 5.5));
+    peintre->setFont(police);
+
+    const QString titre = chemin_projet_.isEmpty()
+                              ? QString("Schéma sans titre")
+                              : QFileInfo(chemin_projet_).completeBaseName();
+    const QString auteur =
+        reglages_disposition().value("cartouche/auteur").toString();
+
+    const struct { const char* etiquette; QString valeur; } cases[3] = {
+        {"Montage", titre},
+        {"Nom", auteur},
+        {"Date", QDate::currentDate().toString("dd/MM/yyyy")}};
+
+    for (int k = 0; k < 3; ++k) {
+        const QRectF boite(bandeau.left() + k * colonne, bandeau.top(), colonne,
+                           bandeau.height());
+        const QRectF interieur = boite.adjusted(bandeau.height() / 4.0, 0,
+                                                -bandeau.height() / 8.0, 0);
+        QFont petite = police;
+        petite.setPointSizeF(police.pointSizeF() * 0.72);
+        peintre->setFont(petite);
+        peintre->setPen(QPen(QColor(110, 110, 110), trait));
+        peintre->drawText(interieur, Qt::AlignLeft | Qt::AlignTop,
+                          QString(cases[k].etiquette));
+        peintre->setFont(police);
+        peintre->setPen(QPen(QColor(20, 20, 20), trait));
+        peintre->drawText(interieur, Qt::AlignLeft | Qt::AlignBottom,
+                          cases[k].valeur);
+        // Le trait à remplir à la main, quand la case est vide.
+        if (cases[k].valeur.isEmpty()) {
+            const double y = boite.bottom() - bandeau.height() / 5.0;
+            peintre->setPen(QPen(QColor(150, 150, 150), trait,
+                                 Qt::DashLine));
+            peintre->drawLine(QPointF(interieur.left(), y),
+                              QPointF(interieur.right(), y));
+        }
+    }
+    peintre->restore();
+}
+
 bool FenetrePrincipale::exporter_schema(const QString& chemin_demande) {
     QString chemin = chemin_demande;
     if (chemin.isEmpty())
@@ -2596,7 +2687,17 @@ bool FenetrePrincipale::exporter_schema(const QString& chemin_demande) {
             avertir("Export", "Impossible d'écrire " + chemin);
             return false;
         }
-        scene_->render(&peintre, QRectF(), zone, Qt::KeepAspectRatio);
+        // Le schéma se rend au-dessus du bandeau, pas par-dessus : un
+        // cartouche qui recouvre le montage qu'il décrit ne vaut rien.
+        const QRectF page(0, 0, peintre.device()->width(),
+                          peintre.device()->height());
+        const double hauteur = std::min(page.height() * 0.08, page.width() / 12.0);
+        const QRectF bandeau(page.left(), page.bottom() - hauteur, page.width(),
+                             hauteur);
+        scene_->render(&peintre,
+                       page.adjusted(0, 0, 0, -hauteur - page.height() * 0.01),
+                       zone, Qt::KeepAspectRatio);
+        dessiner_cartouche(&peintre, bandeau);
     } else {
         const double echelle =
             std::min(4.0, 2000.0 / std::max(zone.width(), zone.height()));

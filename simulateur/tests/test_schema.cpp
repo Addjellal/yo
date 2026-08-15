@@ -3074,6 +3074,85 @@ static void test_presentation_et_disposition() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Le cartouche est sur le papier, et NULLE PART ailleurs
+//
+// Les deux moitiés comptent autant l'une que l'autre. Sur le papier, sans
+// lui, trente copies de TP sont anonymes et le professeur n'a aucun moyen de
+// les rattacher. À l'écran, la place est trop précieuse pour une information
+// qui ne sert qu'une fois la feuille détachée du logiciel.
+// ---------------------------------------------------------------------------
+static void test_cartouche_a_l_impression_seulement() {
+    std::printf("\n-- le cartouche est à l'impression, pas à l'écran --\n");
+
+    FenetrePrincipale fenetre;
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* pile = scene->ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene->ajouter_composant("resistance", QPointF(200, 0));
+    scene->addItem(new ItemFil(pile, 0, r1, 0));
+
+    // --- rien de neuf à l'écran -------------------------------------------
+    //
+    // On rend la scène telle qu'elle s'affiche, puis on compte les pixels
+    // non blancs de la bande basse. Un cartouche y laisserait un cadre.
+    const QRectF zone = scene->itemsBoundingRect().adjusted(-20, -20, 20, 20);
+    QImage ecran(600, 400, QImage::Format_ARGB32);
+    ecran.fill(Qt::white);
+    {
+        QPainter peintre(&ecran);
+        scene->render(&peintre, QRectF(ecran.rect()), zone, Qt::KeepAspectRatio);
+    }
+    int encre_en_bas = 0;
+    for (int y = ecran.height() - 40; y < ecran.height(); ++y)
+        for (int x = 0; x < ecran.width(); ++x)
+            if (ecran.pixelColor(x, y) != QColor(Qt::white)) ++encre_en_bas;
+    verifier(encre_en_bas == 0,
+             "la scène rendue seule ne porte aucun cartouche",
+             std::to_string(encre_en_bas) + " pixels encrés");
+
+    // --- mais il est bien dessiné quand on le demande ----------------------
+    QImage papier(600, 400, QImage::Format_ARGB32);
+    papier.fill(Qt::white);
+    {
+        QPainter peintre(&papier);
+        fenetre.dessiner_cartouche(&peintre, QRectF(0, 340, 600, 60));
+    }
+    int encre_cartouche = 0;
+    for (int y = 340; y < 400; ++y)
+        for (int x = 0; x < 600; ++x)
+            if (papier.pixelColor(x, y) != QColor(Qt::white)) ++encre_cartouche;
+    verifier(encre_cartouche > 200,
+             "dessiné à la demande, le cartouche marque bien le bandeau",
+             std::to_string(encre_cartouche) + " pixels encrés");
+
+    // Le haut de la feuille reste au schéma : le cartouche ne déborde pas sur
+    // le montage qu'il décrit.
+    //
+    // La marge de deux pixels n'est pas de la complaisance : le trait du
+    // cadre est CENTRÉ sur le bord du rectangle, il mord donc d'un demi-trait
+    // au-dessus par construction. Un seuil à zéro échouait sur exactement
+    // 600 pixels — la largeur de l'image, soit une seule ligne, celle du
+    // bord. Ce qu'il faut interdire, c'est l'empiètement sur le dessin, pas
+    // l'épaisseur du trait de cadre.
+    int encre_hors_bandeau = 0;
+    for (int y = 0; y < 338; ++y)
+        for (int x = 0; x < 600; ++x)
+            if (papier.pixelColor(x, y) != QColor(Qt::white))
+                ++encre_hors_bandeau;
+    verifier(encre_hors_bandeau == 0,
+             "et il ne déborde pas de son bandeau",
+             std::to_string(encre_hors_bandeau) + " pixels débordés");
+
+    // --- l'export PDF passe bien par là ------------------------------------
+    const QString pdf = QDir::tempPath() + "/cartouche-essai.pdf";
+    QFile::remove(pdf);
+    verifier(fenetre.exporter_schema(pdf), "l'export PDF aboutit");
+    verifier(QFile::exists(pdf) && QFileInfo(pdf).size() > 0,
+             "et produit un fichier non vide");
+    QFile::remove(pdf);
+}
+
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
@@ -3124,6 +3203,7 @@ int main(int argc, char** argv) {
     test_survol_allume_le_noeud();
     test_marqueur_erc_a_cote();
     test_presentation_et_disposition();
+    test_cartouche_a_l_impression_seulement();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

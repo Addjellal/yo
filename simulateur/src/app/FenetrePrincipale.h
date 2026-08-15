@@ -193,6 +193,9 @@ public:
     // Relit la disposition enregistrée à la session précédente.
     void restaurer_disposition();
     void enregistrer_disposition() const;
+    // Le cartouche du schéma imprimé. Public pour que le banc puisse le
+    // dessiner sur une image et vérifier qu'il porte bien ce qu'il annonce.
+    void dessiner_cartouche(QPainter* peintre, const QRectF& bandeau) const;
 
 private slots:
     void nouveau_projet();
