@@ -2779,9 +2779,20 @@ void FenetrePrincipale::remplir_controle(
         // Une anomalie sans référence — « aucune masse » — n'a pas de
         // coupable : le dire plutôt que laisser une case vide, qui ferait
         // croire à un défaut d'affichage.
-        const QString ou = anomalie.reference.empty()
-                               ? QString("tout le montage")
-                               : QString::fromStdString(anomalie.reference);
+        QString ou = QString::fromStdString(anomalie.reference);
+        if (ou.isEmpty()) {
+            ou = "tout le montage";
+        } else if (!ou.contains(',')) {
+            // « D13 » ressemble à une référence de composant et n'en est pas
+            // une : c'est un nom de NŒUD. Sans le dire, on envoie l'élève
+            // chercher sur son schéma un composant qui n'existe pas. On ne
+            // devine pas la nature du nom — on demande à la scène si un
+            // composant le porte.
+            bool est_un_composant = false;
+            for (ItemComposant* composant : scene_->composants())
+                if (composant->reference() == ou) est_un_composant = true;
+            if (!est_un_composant) ou = "nœud " + ou;
+        }
         ligne->setText(1, ou);
         // Le remède à l'impératif est ce qu'on vient chercher ; le message
         // explique pourquoi, et le survol le donne en entier.
