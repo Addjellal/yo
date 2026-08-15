@@ -125,6 +125,33 @@ endif()
 # Bibliothèque « cœur » : aucune dépendance à l'interface graphique, donc
 # testable sans écran et réutilisable par le futur module PCB.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Ranger le dossier de construction
+#
+# Ce qu'on y cherche des yeux, c'est `simulateur.exe`. Il se noyait au milieu
+# des bibliothèques statiques, des sources engendrées et des dossiers de
+# `moc`. On les écarte dans des sous-dossiers.
+#
+# CE QUI NE PEUT PAS BOUGER, et il faut le savoir avant de s'y essayer :
+#
+#   - les DLL (Qt6*, ngspice, runtime MinGW). Le chargeur de Windows les
+#     cherche dans le dossier du binaire et nulle part ailleurs : les
+#     déplacer donne un 0xC0000135 au lancement, SANS message. Ce projet a
+#     déjà perdu des heures sur ce silence-là ;
+#   - `tests_schema.exe`, pour la même raison — il lie Qt, donc il doit
+#     rester auprès des DLL ;
+#   - les fichiers de travail de CMake (CMakeCache.txt, CMakeFiles/,
+#     build.ninja, cmake_install.cmake, CPack*.cmake, CTestTestfile.cmake).
+#     CMake exige qu'ils soient à la racine du dossier de construction.
+#
+# Pour un dossier vraiment propre — l'exécutable et ce qu'il lui faut, rien
+# d'autre — c'est le PAQUET qu'il faut regarder, pas le dossier de
+# construction : `cmake --build build --target package`.
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bibliotheques")
+# Les dossiers de `moc` se rangent par une propriété DE CIBLE : il n'existe
+# pas de variable globale pour cela, contrairement à la plupart des autres
+# réglages de sortie. Elle est posée plus bas, cible par cible.
+
 add_library(coeur STATIC
   src/core/Netlist.cpp
   src/core/Device.cpp
@@ -243,6 +270,9 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 
   # L'icône voyage dans l'exécutable : rien à déposer à côté, et le paquet
   # portable reste un dossier qu'on copie.
+  # `qrc_ressources.cpp` reste à la racine du dossier de construction : cette
+  # forme de qt_add_resources n'honore pas « -o », essayé et constaté. Un
+  # fichier engendré de plus, sans conséquence.
   qt_add_resources(SIM_RESSOURCES ressources/ressources.qrc)
 
   add_executable(simulateur
@@ -385,6 +415,16 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   add_executable(tests_schema tests/test_schema.cpp)
   target_link_libraries(tests_schema PRIVATE schema)
   add_test(NAME schema COMMAND tests_schema)
+
+  # Les trois dossiers de `moc` sous un seul parent, « engendre/ ». C'est une
+  # propriété DE CIBLE : il n'existe pas de variable globale équivalente,
+  # contrairement aux autres réglages de sortie. Posée ici, une fois les
+  # trois cibles définies.
+  foreach(cible schema simulateur tests_schema)
+    set_target_properties(${cible} PROPERTIES
+      AUTOGEN_BUILD_DIR "${CMAKE_BINARY_DIR}/engendre/${cible}")
+  endforeach()
+
   # Sans écran, Qt tente le greffon xcb et abandonne : ctest doit lui imposer
   # le rendu hors écran.
   set_tests_properties(schema PROPERTIES
