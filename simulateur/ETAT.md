@@ -171,8 +171,10 @@ n'était simplement pas exercée.
 
 ## Bancs d'essai
 
-Les chiffres dépendent des moteurs présents : **401 (cœur) + 342 (schéma)**
-sans ngspice ni simavr, davantage avec, puisque [21] et [22] s'ajoutent.
+Les chiffres dépendent des moteurs présents : **401** au cœur sans ngspice ni
+simavr, **416** avec. Ces quinze assertions de différence *sont* la
+vérification indépendante — c'est exactement ce qu'on perd sans les paquets.
+Le banc schéma en compte **342**, indépendamment.
 
 Ce document a porté pendant plusieurs sessions quatre comptes périmés, dont
 un faux du simple au double (« 177 » pour un banc schéma qui en comptait plus
