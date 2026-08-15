@@ -54,12 +54,115 @@ std::string coordonnee(double millimetres) {
 
 }  // namespace
 
+namespace {
+
+// Un net d'alimentation ne dit rien du placement.
+//
+// La masse touche presque tout : la retenir comme lien ferait de chaque
+// composant le voisin de tous les autres, et le classement par voisinage
+// n'apprendrait plus rien. Les placeurs réels l'écartent pour la même raison
+// — c'est aussi pourquoi une masse se route en plan de cuivre et non en
+// piste.
+bool net_d_alimentation(const std::string& net) {
+    return net.empty() || net == Netlist::kMasse || net == Netlist::kAlim
+           || net == "3V3" || net == "VIN" || net == "VCC" || net == "VDD";
+}
+
+// L'ordre de pose : les composants reliés se suivent.
+//
+// `depuis_netlist` posait les composants dans l'ordre de la netlist, sans
+// jamais regarder ce qui était relié à quoi. Sur une chaîne R1-R3-R4-R2, les
+// pistes traversaient donc la carte en tous sens — 215,6 mm de cuivre pour
+// cinq composants, mesurés avant correction.
+//
+// La méthode est la croissance de grappe des placeurs constructifs : on part
+// du composant le plus relié, puis on ajoute à chaque tour celui qui a le
+// plus de liens avec ce qui est DÉJÀ posé. Ce n'est pas un optimum — le
+// placement optimal est NP-difficile — mais c'est ce qui transforme une
+// rangée arbitraire en un chemin qui suit le circuit.
+//
+// Les égalités se tranchent par l'ordre de la netlist : sans cela, deux
+// exécutions sur le même schéma pourraient rendre deux cartes différentes.
+std::vector<size_t> ordre_par_connectique(
+    const std::vector<size_t>& retenus, const Netlist& netlist) {
+    const size_t nombre = retenus.size();
+    if (nombre < 3) return retenus;
+
+    std::vector<std::vector<int>> liens(nombre, std::vector<int>(nombre, 0));
+    for (size_t a = 0; a < nombre; ++a) {
+        for (size_t b = a + 1; b < nombre; ++b) {
+            int communs = 0;
+            for (const Borne& borne_a : netlist.instances()[retenus[a]].bornes) {
+                if (net_d_alimentation(borne_a.noeud)) continue;
+                for (const Borne& borne_b :
+                     netlist.instances()[retenus[b]].bornes)
+                    if (borne_a.noeud == borne_b.noeud) ++communs;
+            }
+            liens[a][b] = liens[b][a] = communs;
+        }
+    }
+
+    std::vector<int> degre(nombre, 0);
+    for (size_t a = 0; a < nombre; ++a)
+        for (size_t b = 0; b < nombre; ++b) degre[a] += liens[a][b];
+
+    std::vector<bool> pose(nombre, false);
+    std::vector<size_t> ordre;
+    ordre.reserve(nombre);
+
+    // Le premier : le plus relié. C'est en général la carte ou la source,
+    // celle autour de laquelle le reste s'organise.
+    size_t depart = 0;
+    for (size_t a = 1; a < nombre; ++a)
+        if (degre[a] > degre[depart]) depart = a;
+    ordre.push_back(depart);
+    pose[depart] = true;
+
+    while (ordre.size() < nombre) {
+        size_t meilleur = nombre;
+        int meilleur_lien = -1, meilleur_degre = -1;
+        for (size_t a = 0; a < nombre; ++a) {
+            if (pose[a]) continue;
+            int lien = 0;
+            for (size_t deja : ordre) lien += liens[a][deja];
+            if (lien > meilleur_lien
+                || (lien == meilleur_lien && degre[a] > meilleur_degre)) {
+                meilleur = a;
+                meilleur_lien = lien;
+                meilleur_degre = degre[a];
+            }
+        }
+        // Un composant sans aucun lien utile — isolé, ou relié à la seule
+        // masse — arrive en fin de file plutôt que d'interrompre la chaîne.
+        ordre.push_back(meilleur);
+        pose[meilleur] = true;
+    }
+
+    std::vector<size_t> resultat;
+    resultat.reserve(nombre);
+    for (size_t rang : ordre) resultat.push_back(retenus[rang]);
+    return resultat;
+}
+
+}  // namespace
+
 CartePcb CartePcb::depuis_netlist(const Netlist& netlist) {
     CartePcb carte;
     double x = 6.0, y = 6.0;
     double hauteur_rangee = 0;
 
-    for (const Instance& instance : netlist.instances()) {
+    // Deux temps : on retient d'abord ce qui existe physiquement, puis on
+    // décide de l'ORDRE. Le placement lui-même n'a pas changé — c'est la
+    // suite dans laquelle on le parcourt qui portait tout le défaut.
+    std::vector<size_t> retenus;
+    for (size_t k = 0; k < netlist.instances().size(); ++k) {
+        const Modele* modele =
+            Catalogue::instance().modele(netlist.instances()[k].type);
+        if (modele && empreintes::physique(*modele)) retenus.push_back(k);
+    }
+
+    for (size_t rang : ordre_par_connectique(retenus, netlist)) {
+        const Instance& instance = netlist.instances()[rang];
         const Modele* modele = Catalogue::instance().modele(instance.type);
         if (!modele) continue;
         // Masse, symboles d'alimentation, voltmètres, sondes : rien de tout

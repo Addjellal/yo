@@ -512,13 +512,37 @@ verbatim dans le banc après compilation d'un croquis fautif.
 3. **L'éditeur sans recherche, sans `Ctrl+S`, sans numéros de ligne** — alors
    qu'on lui prend `Ctrl+F` et `Ctrl+D`.
 
-### PCB
+### PCB — placement : **FAIT**
 
-**Le placement, pas le routage.** Le chevelu est un authentique arbre
-couvrant minimal et le routeur fait son travail ; c'est
-`CartePcb::depuis_netlist()` qui pose les composants en rangée sans regarder
-la connectique, d'où cent quatre millimètres de cuivre pour trois
-composants. Une seule fonction à reprendre.
+`depuis_netlist()` posait les composants dans l'ordre de la **netlist**, sans
+jamais regarder ce qui était relié à quoi. Mesuré avant correction, sur une
+chaîne R1→R3→R4→R2 saisie dans l'ordre R1,R2,R3,R4 : **215,6 mm** de cuivre.
+Après : **115,6 mm**, et les composants suivent la chaîne.
+
+Méthode : croissance de grappe, comme les placeurs constructifs. On part du
+composant le plus relié, puis on ajoute à chaque tour celui qui a le plus de
+liens avec ce qui est déjà posé. Ce n'est pas un optimum — le placement
+optimal est NP-difficile — mais cela suffit à transformer une rangée
+arbitraire en un chemin qui suit le circuit.
+
+Deux points à ne pas défaire :
+
+- **les nets d'alimentation ne comptent pas comme liens.** La masse touche
+  presque tout : la retenir ferait de chaque composant le voisin de tous les
+  autres, et le classement n'apprendrait plus rien. C'est aussi pourquoi une
+  masse se route en plan de cuivre plutôt qu'en piste.
+- **les égalités se tranchent par l'ordre de la netlist**, sinon deux
+  exécutions sur le même schéma rendraient deux cartes différentes.
+
+Honnêteté sur la portée : le montage à trois composants du cours ne gagne
+rien (59,6 mm avant comme après) — son ordre de saisie était déjà le bon. Le
+gain apparaît dès que la saisie ne suit pas la topologie, ce qui est le cas
+ordinaire d'un schéma qu'on a fait évoluer.
+
+**Reste** : le placement ne fait qu'ordonner une rangée. Il ne tourne aucun
+composant, ne tasse rien en deux dimensions, et ne cherche pas à raccourcir
+après coup. Un recuit ou une descente de gradient sur les positions serait
+l'étape suivante, si le besoin s'en fait sentir.
 
 ### Si le projet grandit
 

@@ -2678,6 +2678,77 @@ static void test_numerique() {
 // ---------------------------------------------------------------------------
 // [20] Module de circuit imprimé : placement, chevelu, règles, fabrication.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// [46] Le placement regarde la connectique
+//
+// `depuis_netlist` posait les composants dans l'ordre de la NETLIST, sans
+// jamais regarder ce qui était relié à quoi. Sur une chaîne dont l'ordre de
+// saisie contrarie la topologie, les pistes traversaient donc la carte en
+// tous sens. Le routeur, lui, faisait son travail — c'est vérifié plus haut.
+// ---------------------------------------------------------------------------
+static void test_placement_suit_la_connectique() {
+    std::printf("\n[46] Le placement suit la connectique\n");
+
+    // Chaîne électrique R1 → R3 → R4 → R2, saisie dans l'ordre R1,R2,R3,R4.
+    coeur::Netlist netlist;
+    netlist.ajouter("R1", "resistance");
+    netlist.relier("R1", "1", "E");   netlist.relier("R1", "2", "A");
+    netlist.ajouter("R2", "resistance");
+    netlist.relier("R2", "1", "C");   netlist.relier("R2", "2", "GND");
+    netlist.ajouter("R3", "resistance");
+    netlist.relier("R3", "1", "A");   netlist.relier("R3", "2", "B");
+    netlist.ajouter("R4", "resistance");
+    netlist.relier("R4", "1", "B");   netlist.relier("R4", "2", "C");
+    netlist.ajouter("V1", "pile");
+    netlist.relier("V1", "+", "E");   netlist.relier("V1", "-", "GND");
+
+    coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+
+    // L'ordre de pose doit suivre la chaîne, pas la saisie.
+    std::vector<std::string> ordre;
+    for (const auto& pose : carte.composants) ordre.push_back(pose.reference);
+    const std::vector<std::string> attendu = {"R1", "R3", "R4", "R2", "V1"};
+    std::string lu;
+    for (const std::string& r : ordre) lu += r + " ";
+    verifier(ordre == attendu,
+             "les composants sont posés dans l'ordre de la CHAÎNE, pas dans "
+             "celui de la netlist",
+             lu);
+
+    // Et le cuivre s'en ressent. Mesuré avant correction : 215,6 mm ; après :
+    // 115,6 mm. Le seuil garde de la marge pour que le banc ne se casse pas
+    // au premier réglage du routeur — c'est l'ordre de grandeur qu'il
+    // surveille, pas la décimale.
+    const coeur::CompteRenduRoutage rendu = coeur::router(carte);
+    verifier(rendu.routees == rendu.liaisons,
+             "toutes les liaisons sont routées",
+             std::to_string(rendu.routees) + "/"
+                 + std::to_string(rendu.liaisons));
+    verifier(rendu.longueur < 150.0,
+             "et le cuivre posé reste sous 150 mm — il en fallait 215,6 quand "
+             "le placement ignorait la connectique",
+             f(rendu.longueur) + " mm");
+
+    // La masse ne doit PAS servir de lien : elle touche presque tout, et la
+    // retenir ferait de chaque composant le voisin de tous les autres.
+    // R2 et V1 ne partagent que GND ; ils ne doivent pas être rapprochés pour
+    // cette raison-là.
+    coeur::Netlist etoile;
+    for (const char* r : {"RA", "RB", "RC"}) {
+        etoile.ajouter(r, "resistance");
+        etoile.relier(r, "1", std::string("N") + r[1]);
+        etoile.relier(r, "2", "GND");
+    }
+    coeur::CartePcb sur_masse = coeur::CartePcb::depuis_netlist(etoile);
+    std::vector<std::string> ordre_etoile;
+    for (const auto& pose : sur_masse.composants)
+        ordre_etoile.push_back(pose.reference);
+    verifier(ordre_etoile
+                 == std::vector<std::string>({"RA", "RB", "RC"}),
+             "trois composants ne partageant QUE la masse gardent l'ordre de "
+             "saisie : aucun lien utile ne les départage");
+}
+
 static void test_pcb() {
     std::printf("\n[20] Circuit imprimé\n");
 
@@ -5993,6 +6064,7 @@ int main() {
     test_campagnes();
     test_numerique();
     test_pcb();
+    test_placement_suit_la_connectique();
     test_exemples_compilent();
     test_cartes_qui_tournent();
     test_attiny85();
