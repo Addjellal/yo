@@ -192,22 +192,11 @@ add_test(NAME coeur COMMAND tests_coeur)
 # peut pas assainir un binaire déjà compilé.
 #
 #   cmake -S . -B build-san -DSANITISER=ON -DCMAKE_BUILD_TYPE=Debug
-#   cmake --build build-san -j8 --target tests_coeur
+#   cmake --build build-san -j8 --target tests_coeur tests_schema
 #   ctest --test-dir build-san -L sanitiseurs
 #
 # La détection de fuites est éteinte : Qt et ngspice en laissent au dernier
 # souffle, et les traquer ici noierait le signal.
-option(SANITISER "Compiler avec ASan et UBSan (construction séparée)" OFF)
-if(SANITISER)
-  foreach(cible coeur tests_coeur)
-    target_compile_options(${cible} PRIVATE
-      -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(${cible} PRIVATE -fsanitize=address,undefined)
-  endforeach()
-  set_tests_properties(coeur PROPERTIES
-    LABELS sanitiseurs
-    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
-endif()
 
 # ---------------------------------------------------------------------------
 # Générateur de figures : dessine les schémas du cours à partir du catalogue.
@@ -461,4 +450,52 @@ else()
     "Aucune chaîne dans ${CMAKE_BINARY_DIR}/chaines : le paquet dépendra de "
     "ce qui est installé sur la machine. Lancez outils/chaines pour le rendre "
     "autosuffisant.")
+endif()
+
+
+# ---------------------------------------------------------------------------
+# Assainisseurs — EN FIN DE FICHIER, ET C'EST LA RAISON D'ÊTRE DE CE BLOC ICI.
+#
+# `target_compile_options` exige que la cible EXISTE DÉJÀ. Ce bloc vivait au
+# milieu du fichier, avant `add_library(schema)` et `add_executable(
+# tests_schema)` : les deux cibles du schéma ne pouvaient donc pas y être
+# ajoutées, et un garde `if(TARGET ...)` aurait sauté sans un mot.
+#
+# Toute cible nouvelle doit être déclarée AVANT ce bloc.
+# ---------------------------------------------------------------------------
+option(SANITISER "Compiler avec ASan et UBSan (construction séparée)" OFF)
+if(SANITISER)
+  # LA LISTE DOIT COUVRIR LE SCHÉMA AUSSI.
+  #
+  # Elle ne portait que `coeur` et `tests_coeur`. Conséquence, trouvée à
+  # l'audit : `tests_schema` ne se LIAIT MÊME PAS en construction assainie —
+  # il tire `coeur`, compilé avec les assainisseurs, sans recevoir lui-même
+  # leur bibliothèque d'exécution, d'où des « undefined reference to
+  # __asan_report_store_n ». L'édition de liens échouait, et l'échec passait
+  # inaperçu parce que la commande documentée juste au-dessus ne demandait
+  # que `--target tests_coeur`.
+  #
+  # Autrement dit : TOUT le code Qt du schéma — la scène, les fils, les
+  # ancres, la découpe — n'a jamais tourné sous ASan. C'est précisément là
+  # qu'un use-after-free a été trouvé à la main, faute d'outil.
+  set(CIBLES_ASSAINIES coeur tests_coeur)
+  if(TARGET schema)
+    list(APPEND CIBLES_ASSAINIES schema)
+  endif()
+  if(TARGET tests_schema)
+    list(APPEND CIBLES_ASSAINIES tests_schema)
+  endif()
+  foreach(cible ${CIBLES_ASSAINIES})
+    target_compile_options(${cible} PRIVATE
+      -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(${cible} PRIVATE -fsanitize=address,undefined)
+  endforeach()
+  set_tests_properties(coeur PROPERTIES
+    LABELS sanitiseurs
+    ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
+  if(TEST schema)
+    set_tests_properties(schema PROPERTIES
+      LABELS sanitiseurs
+      ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1;QT_QPA_PLATFORM=offscreen")
+  endif()
 endif()

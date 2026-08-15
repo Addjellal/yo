@@ -358,18 +358,38 @@ masquait tous :
    modélisé** dans le cœur Xtensa.
 3. **Entrée de menu** « Exemples ▸ Analyseur d'impédance » : n'existe pas. Le
    montage n'est accessible que depuis le banc d'essai.
-4. ~~Sanitizers non automatisés.~~ **Fait.** Option `SANITISER`, étiquette
-   ctest `sanitiseurs`, construction séparée (on n'assainit pas un binaire
-   déjà compilé) :
+4. **Sanitizers : « Fait » n'était vrai qu'à MOITIÉ**, et la moitié manquante
+   était la pire. Corrigé à l'audit.
+
+   Le bloc `SANITISER` ne listait que `coeur` et `tests_coeur`. `tests_schema`
+   **ne se liait même pas** : il tire `coeur`, compilé avec les assainisseurs,
+   sans recevoir lui-même leur bibliothèque d'exécution — des dizaines
+   d'`undefined reference to __asan_report_store_n`. Et l'échec passait
+   inaperçu parce que **la commande documentée ici ne demandait que
+   `--target tests_coeur`** : la documentation cachait le défaut qu'elle
+   aurait dû montrer.
+
+   Donc : **tout le code Qt du schéma n'a jamais tourné sous ASan** — la
+   scène, les fils, les ancres, la découpe. C'est précisément là qu'un
+   use-after-free a été trouvé à la main, faute d'outil. L'outil existait,
+   il n'était pas branché.
+
+   La première correction n'a pas suffi, et la raison mérite d'être retenue :
+   le bloc vivait AVANT `add_library(schema)` et `add_executable(tests_schema)`.
+   `target_compile_options` exige que la cible existe déjà, si bien qu'un
+   garde `if(TARGET ...)` sautait en silence. **Le bloc est maintenant en fin
+   de fichier ; toute cible nouvelle doit être déclarée avant lui.**
 
    ```
    cmake -S . -B build-san -DSANITISER=ON -DCMAKE_BUILD_TYPE=Debug
-   cmake --build build-san -j8 --target tests_coeur
+   cmake --build build-san -j8 --target tests_coeur tests_schema
    ctest --test-dir build-san -L sanitiseurs
    ```
 
-   Dernière passe : **zéro alerte** ASan et UBSan. La détection de
-   fuites est éteinte — Qt et ngspice en laissent au dernier souffle.
+   Cœur assaini : **401 tests, zéro alerte** ASan et UBSan. Schéma assaini :
+   **jamais exécuté à ce jour** — c'est le premier chiffre à établir. La
+   détection de fuites est éteinte : Qt et ngspice en laissent au dernier
+   souffle.
 5. **Trous de fixation Uno et Mega** : approximation sûre (aucun ne traverse
    une pastille), cotes exactes à prendre sur le plan mécanique officiel.
 6. ~~`build-asan/` est dans l'historique git~~ — **faux, et vérifié faux.**
