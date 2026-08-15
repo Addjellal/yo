@@ -19,7 +19,19 @@
 #include <functional>
 #include <memory>
 
+// L'application écrit son diagnostic et son journal en UTF-8. Compilée avec
+// FENETRE_WIN32=OFF elle garde une console, où la page de code héritée de
+// Windows rendait ces sorties illisibles. Sans effet ailleurs.
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     QApplication application(argc, argv);
     application.setApplicationName("Simulateur embarqué");
     application.setOrganizationName("Formation embarquée");

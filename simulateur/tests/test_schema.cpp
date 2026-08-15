@@ -7,6 +7,24 @@
 //
 //   QT_QPA_PLATFORM=offscreen ./tests_schema
 
+
+// La console Windows lit dans une page de code héritée ; ce banc écrit de
+// l'UTF-8. Sans cette bascule on y lisait « TESTS DU C┼ÆUR », « r├®sistance »
+// et « ╬® » au lieu de « Ω » — un compte rendu qu'on ne peut pas juger d'un
+// coup d'œil, alors que c'est tout ce qu'on lui demande.
+//
+// Sans effet ailleurs : la fonction n'existe que sous Windows.
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+static void console_en_utf8() {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+}
+
 #include <QApplication>
 #include <QDockWidget>
 #include <QMenuBar>
@@ -3837,6 +3855,7 @@ static void test_exemples_sans_carte() {
 }
 
 int main(int argc, char** argv) {
+    console_en_utf8();
     QApplication application(argc, argv);
     // Une identité PROPRE AU BANC : la fenêtre enregistre et relit sa
     // disposition dans QSettings, et sans cette ligne le banc lirait celle

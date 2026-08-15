@@ -4,6 +4,24 @@
 //
 // Aucun écran nécessaire : ./tests_coeur
 
+
+// La console Windows lit dans une page de code héritée ; ce banc écrit de
+// l'UTF-8. Sans cette bascule on y lisait « TESTS DU C┼ÆUR », « r├®sistance »
+// et « ╬® » au lieu de « Ω » — un compte rendu qu'on ne peut pas juger d'un
+// coup d'œil, alors que c'est tout ce qu'on lui demande.
+//
+// Sans effet ailleurs : la fonction n'existe que sous Windows.
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+static void console_en_utf8() {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+}
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -6091,6 +6109,7 @@ static void test_continuite_des_modeles() {
 }
 
 int main() {
+    console_en_utf8();
     std::printf("============================================================\n");
     std::printf("TESTS DU CŒUR — simulateur embarqué (C++)\n");
     std::printf("============================================================\n");
