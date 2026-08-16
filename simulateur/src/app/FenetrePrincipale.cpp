@@ -359,6 +359,31 @@ FenetrePrincipale::FenetrePrincipale() {
     // se désynchroniserait au premier panneau ajouté.
     disposition_par_defaut_ = saveState();
     restaurer_disposition();
+
+    // LA DATE DE CONSTRUCTION, ANNONCÉE À CHAQUE DÉMARRAGE.
+    //
+    // Deux heures perdues en une journée sur des exécutables PÉRIMÉS : une
+    // fois parce que l'édition de liens avait échoué et que l'ancien binaire
+    // était resté en place, une fois parce que le dossier de livraison n'est
+    // pas reconstruit par la construction ordinaire. Dans les deux cas on
+    // essayait du code vieux de plusieurs jours en croyant tester le neuf, et
+    // RIEN à l'écran ne le disait.
+    //
+    // Une ligne dans le journal règle les deux : si la date n'est pas celle
+    // du jour, on regarde le mauvais exécutable, et on le voit en une seconde
+    // au lieu d'une heure.
+    //
+    // C'est la date de l'EXÉCUTABLE, pas `__DATE__`. La macro est figée à la
+    // compilation de CE fichier-ci : modifier la scène et relier ne la change
+    // pas, et elle annoncerait fièrement une date périmée — exactement le
+    // défaut qu'elle prétend supprimer. La date du fichier, elle, est celle
+    // de l'édition de liens, donc du binaire qu'on est vraiment en train de
+    // lancer.
+    const QDateTime construit =
+        QFileInfo(QCoreApplication::applicationFilePath()).lastModified();
+    ecrire(QString("Simulateur embarqué %1 — exécutable du %2.")
+               .arg(QApplication::applicationVersion(),
+                    construit.toString("dd/MM/yyyy à HH:mm")));
 }
 
 FenetrePrincipale::~FenetrePrincipale() = default;
@@ -1270,7 +1295,15 @@ void FenetrePrincipale::construire_actions() {
             "vrai firmware compilé, exécuté instruction par instruction. "
             "<b>simavr</b> peut le doubler pour comparaison.</p>"
             "<p>Raccourcis : <b>R</b> pivote la sélection, <b>Suppr</b> "
-            "l'efface, la molette zoome.</p>");
+            "l'efface, la molette zoome.</p>"
+            "<p>Sur un fil : <b>clic gauche</b> le désigne, <b>glissé "
+            "gauche</b> déplace le segment, <b>glissé au bouton droit</b> en "
+            "dérive un nouveau — comme dans Simulink.</p>"
+            + QString("<p style='color:#666'>Version %1, exécutable du %2.</p>")
+                  .arg(QApplication::applicationVersion(),
+                       QFileInfo(QCoreApplication::applicationFilePath())
+                           .lastModified()
+                           .toString("dd/MM/yyyy à HH:mm")));
     });
 }
 
