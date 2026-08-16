@@ -101,6 +101,9 @@ public:
     // le banc : la liste des signaux est une promesse faite à l'utilisateur,
     // et une promesse se vérifie.
     QStringList signaux_observables() const { return derniers_signaux_; }
+    // Ce qu'un bloc précis a le droit de montrer. Exposé pour le banc : la
+    // restriction est une promesse, et une promesse se vérifie.
+    QStringList signaux_offerts_au_bloc(ItemComposant* bloc) const;
     std::map<QString, QString> libelles_signaux() const {
         return derniers_libelles_;
     }
@@ -185,9 +188,21 @@ public:
     // Fenêtre propre d'un scope posé sur le schéma, façon Simulink : ses voies
     // suivent ce qui lui est câblé.
     void ouvrir_scope(ItemComposant* composant);
+    // La sonde générale : ouverte à la demande, jamais avant. Tant que
+    // personne ne la réclame, elle n'existe pas et ne coûte rien.
+    void ouvrir_sonde_generale();
     // L'appareil d'un bloc, créé s'il n'existe pas encore. Fenêtre fermée
     // comprise : un scope posé enregistre, qu'on le regarde ou non.
     Oscilloscope* scope_pour(ItemComposant* composant);
+    // Les signaux qu'un bloc a le droit de montrer : ceux de l'endroit où il
+    // est câblé, et rien d'autre. Tout le circuit s'il n'est pas encore câblé.
+    QStringList signaux_du_bloc(ItemComposant* bloc,
+                                const coeur::Netlist& netlist,
+                                const QStringList& tous) const;
+    // La sonde générale : un oscilloscope qui n'est câblé à rien et voit
+    // tout. C'est l'appareil d'atelier, remis là où on le cherche — dans la
+    // barre du haut — et non plus mêlé aux journaux.
+    Oscilloscope* sonde_generale_ = nullptr;
     // Le scope ouvert pour ce composant, ou nullptr. Sert aux essais.
     Oscilloscope* scope_de(ItemComposant* composant) const;
     // Recalcule netlist et liste de signaux, sans passer par un geste.

@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QCursor>
 #include <algorithm>
+#include <set>
 #include <functional>
 #include <QPlainTextDocumentLayout>
 #include <QHeaderView>
@@ -361,6 +362,8 @@ FenetrePrincipale::FenetrePrincipale() {
                        etats) { scene_->appliquer_etats(etats); });
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
+                if (sonde_generale_)
+                    sonde_generale_->ajouter_trame(formes, instant);
                 // Chaque scope posé sur le schéma reçoit la même trame.
                 for (auto& paire : scopes_)
                     paire.second->ajouter_trame(formes, instant);
@@ -1127,6 +1130,22 @@ void FenetrePrincipale::construire_actions() {
                 [this] { vue_->ajuster(); });
     vue_->poser_ilot(ilot);
 
+    // LA SONDE GÉNÉRALE, DANS LA BARRE DU HAUT.
+    //
+    // Le bloc oscilloscope répond à « je veux VOIR ce point-là, et que le
+    // schéma le dise ». Il ne répond pas à « je veux juste jeter un œil » :
+    // pour cela il faudrait poser un composant, le câbler, l'effacer ensuite.
+    // La sonde générale est l'appareil d'atelier — elle n'est câblée à rien
+    // et voit tout le circuit. Elle vit dans les commandes du haut, là où on
+    // cherche un instrument, et non plus mêlée aux journaux.
+    auto* action_sonde = barre->addAction("Sonde");
+    action_sonde->setToolTip(
+        "Un oscilloscope qui voit tout le circuit, sans rien câbler. Pour "
+        "observer un point précis et que le schéma le dise, posez plutôt un "
+        "bloc « Oscilloscope ».");
+    connect(action_sonde, &QAction::triggered, this,
+            &FenetrePrincipale::ouvrir_sonde_generale);
+
     auto* simulation = menuBar()->addMenu("&Simulation");
     // Ce qui LANCE est poussé à droite, loin de ce qui DESSINE. Les deux
     // familles se touchaient au milieu de la barre, et rien ne disait qu'un
@@ -1784,6 +1803,7 @@ void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
     // après la disparition de sa fenêtre principale, sans plus aucun moyen de
     // la faire revenir. Un processus fantôme, qu'il fallait tuer.
     if (fenetre_programme_) fenetre_programme_->close();
+    if (sonde_generale_) sonde_generale_->close();
     for (auto& paire : scopes_) paire.second->close();
     for (FenetreInstrument* fenetre : fenetres_instruments_) fenetre->close();
 
@@ -1996,6 +2016,24 @@ Oscilloscope* FenetrePrincipale::scope_pour(ItemComposant* composant) {
     return scope;
 }
 
+void FenetrePrincipale::ouvrir_sonde_generale() {
+    if (!sonde_generale_) {
+        sonde_generale_ = new Oscilloscope;
+        sonde_generale_->setWindowFlags(Qt::Window);
+        sonde_generale_->setWindowTitle("Sonde — oscilloscope général");
+        sonde_generale_->resize(760, 520);
+        connect(sonde_generale_, &Oscilloscope::resolution_souhaitee, this,
+                [this](double secondes) { moteur_->definir_resolution(secondes); });
+        // Elle n'a jamais été renseignée : le circuit n'a pas changé depuis
+        // qu'elle existe. On lui donne l'état courant tout de suite.
+        circuit_modifie();
+        sonde_generale_->sonder_par_defaut();
+    }
+    sonde_generale_->show();
+    sonde_generale_->raise();
+    sonde_generale_->activateWindow();
+}
+
 void FenetrePrincipale::ouvrir_scope(ItemComposant* composant) {
     Oscilloscope* scope = scope_pour(composant);
     if (!scope) return;
@@ -2065,13 +2103,11 @@ void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
                 // n'y en a pas, on ne fait pas semblant : on dit où le
                 // trouver. Une commande qui ne répond rien laisse croire à
                 // une panne.
-                if (scopes_.empty()) {
-                    ecrire("Aucun oscilloscope sur le schéma : posez un bloc "
-                           "« Oscilloscope » (catégorie Instruments), câblez "
-                           "une voie, puis double-cliquez dessus.");
-                    return;
-                }
-                Oscilloscope* scope = scopes_.begin()->second;
+                // La sonde générale est faite pour ça : elle voit tout, et
+                // il n'y a rien à câbler.
+                ouvrir_sonde_generale();
+                Oscilloscope* scope = sonde_generale_;
+                if (!scope) return;
                 scope->sonder(designation);
                 scope->show();
                 scope->raise();
@@ -2227,6 +2263,53 @@ QString FenetrePrincipale::dossier_travail() const {
            "/simulateur-embarque";
 }
 
+// CE QU'UN BLOC OSCILLOSCOPE A LE DROIT DE MONTRER.
+//
+// Il proposait TOUT le circuit, si bien qu'un bloc câblé sur la sortie d'un
+// filtre offrait aussi les courants de l'étage d'à côté. C'est le contraire
+// du modèle qu'on a choisi : chez MATLAB, ce qui est CÂBLÉ est ce qui
+// s'affiche, et c'est ce qui fait que le schéma documente lui-même ce qu'on
+// observe. Une liste qui ignore le câblage rend cette promesse fausse.
+//
+// On garde donc les nœuds où il est branché, et ce qui se rattache à ces
+// nœuds : le courant et la tension des composants qui les touchent. Un bloc
+// posé mais PAS ENCORE CÂBLÉ voit tout : sinon sa liste serait vide et il
+// passerait pour cassé avant même d'avoir servi.
+QStringList FenetrePrincipale::signaux_du_bloc(
+    ItemComposant* bloc, const coeur::Netlist& netlist,
+    const QStringList& tous) const {
+    std::set<QString> noeuds;
+    for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
+        const QString noeud = scene_->noeud_de(bloc, voie);
+        if (!noeud.isEmpty()) noeuds.insert(noeud);
+    }
+    if (noeuds.empty()) return tous;
+
+    std::set<QString> retenus(noeuds.begin(), noeuds.end());
+    for (const coeur::Instance& instance : netlist.instances()) {
+        bool touche = false;
+        for (const coeur::Borne& borne : instance.bornes)
+            if (noeuds.count(QString::fromStdString(borne.noeud))) touche = true;
+        if (!touche) continue;
+        const QString reference = QString::fromStdString(instance.reference);
+        retenus.insert(QString("I(%1)").arg(reference));
+        if (instance.bornes.size() == 2)
+            retenus.insert(QString("U(%1)").arg(reference));
+    }
+
+    QStringList liste;
+    for (const QString& signal : tous)
+        if (retenus.count(signal)) liste << signal;
+    return liste;
+}
+
+QStringList FenetrePrincipale::signaux_offerts_au_bloc(
+    ItemComposant* bloc) const {
+    std::vector<LiaisonBroche> broches;
+    return signaux_du_bloc(bloc, scene_->construire_netlist(&broches),
+                           derniers_signaux_);
+}
+
 // ---------------------------------------------------------------------------
 void FenetrePrincipale::circuit_modifie() {
     std::vector<LiaisonBroche> broches;
@@ -2325,12 +2408,18 @@ void FenetrePrincipale::circuit_modifie() {
             Oscilloscope* scope = scope_pour(composant);
             if (!scope) continue;
             scope->definir_bornes(bornes);
-            scope->proposer_signaux(signaux, libelles);
+            scope->proposer_signaux(signaux_du_bloc(composant, netlist, signaux),
+                                    libelles);
             for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
                 const QString noeud = scene_->noeud_de(composant, voie);
                 if (!noeud.isEmpty()) scope->sonder(noeud);
             }
         }
+    // La sonde générale, elle, voit TOUT le circuit : c'est sa raison d'être.
+    if (sonde_generale_) {
+        sonde_generale_->definir_bornes(bornes);
+        sonde_generale_->proposer_signaux(signaux, libelles);
+    }
 
     // Grandeurs balayables : les sources imposent une tension, les résistances
     // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
@@ -3026,6 +3115,7 @@ void FenetrePrincipale::lancer() {
 
 void FenetrePrincipale::definir_base_temps(double secondes) {
     for (auto& paire : scopes_) paire.second->definir_base_temps(secondes);
+    if (sonde_generale_) sonde_generale_->definir_base_temps(secondes);
 }
 
 double FenetrePrincipale::vitesse() const { return moteur_->vitesse(); }
@@ -3108,7 +3198,9 @@ void FenetrePrincipale::arreter() {
     moteur_->arreter();
     scene_->effacer_resultats();
     for (auto& paire : scopes_) paire.second->vider();
+    if (sonde_generale_) sonde_generale_->vider();
     for (auto& paire : scopes_) paire.second->vider();
+    if (sonde_generale_) sonde_generale_->vider();
 }
 
 void FenetrePrincipale::analyser_point_repos() {

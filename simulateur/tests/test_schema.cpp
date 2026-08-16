@@ -3776,6 +3776,78 @@ static void test_tension_aux_bornes() {
 }
 
 // ---------------------------------------------------------------------------
+// Un bloc ne montre que là où il est câblé
+//
+// Il proposait TOUT le circuit : un bloc posé sur la sortie d'un filtre
+// offrait aussi les courants de l'étage d'à côté. C'est le contraire du
+// modèle choisi — chez MATLAB, ce qui est CÂBLÉ est ce qui s'affiche, et
+// c'est ce qui fait que le schéma documente lui-même ce qu'on observe.
+// ---------------------------------------------------------------------------
+static void test_bloc_ne_voit_que_son_branchement() {
+    std::printf("\n-- un bloc ne propose que là où il est câblé --\n");
+
+    // Le point mesuré est le MILIEU d'un pont diviseur : il ne touche que les
+    // deux résistances qui l'encadrent. Une troisième résistance pend
+    // ailleurs sur la même pile — elle partage l'alimentation et la masse,
+    // mais pas ce nœud-là, et le bloc n'a donc rien à en dire.
+    //
+    // Deux branches « indépendantes » ne l'auraient pas prouvé : elles
+    // partagent toujours le nœud d'alimentation et la masse, et le bloc y
+    // aurait vu tout le circuit à bon droit.
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* pile = scene->ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* r1 = scene->ajouter_composant("resistance", QPointF(300, -300));
+    ItemComposant* r3 = scene->ajouter_composant("resistance", QPointF(300, 0));
+    ItemComposant* r2 = scene->ajouter_composant("resistance", QPointF(900, 0));
+    ItemComposant* masse = scene->ajouter_composant("masse", QPointF(600, 400));
+    ItemComposant* bloc = scene->ajouter_composant("scope", QPointF(0, -600));
+    if (!pile || !r1 || !r3 || !r2 || !masse || !bloc) return;
+    scene->addItem(new ItemFil(pile, 0, r1, 0));
+    scene->addItem(new ItemFil(r1, 1, r3, 0));      // le MILIEU du pont
+    scene->addItem(new ItemFil(r3, 1, masse, 0));
+    scene->addItem(new ItemFil(pile, 1, masse, 0));
+    scene->addItem(new ItemFil(pile, 0, r2, 0));    // la branche d'à côté
+    scene->addItem(new ItemFil(r2, 1, masse, 0));
+    // La voie 1 du bloc sur le milieu du pont, et rien d'autre.
+    scene->addItem(new ItemFil(r1, 1, bloc, 0));
+
+    // LA LISTE SE RAFRAÎCHIT SUR `changed`, QUE QT ÉMET EN DIFFÉRÉ.
+    //
+    // Sans laisser tourner la boucle d'événements, la liste gardée par la
+    // fenêtre date d'avant le montage : le test mesurerait un état périmé et
+    // conclurait n'importe quoi. C'est le chemin réel de l'application, on le
+    // suit plutôt que d'appeler la mise à jour en douce.
+    QCoreApplication::processEvents();
+    const QStringList tous = fenetre.signaux_observables();
+    verifier(tous.contains(QString("I(%1)").arg(r2->reference())),
+             "le circuit entier connaît le courant de la seconde branche",
+             tous.join(' ').left(60).toStdString());
+
+    const QStringList offerts = fenetre.signaux_offerts_au_bloc(bloc);
+    verifier(offerts.contains(QString("I(%1)").arg(r1->reference()))
+                 && offerts.contains(QString("I(%1)").arg(r3->reference())),
+             "le bloc propose les deux résistances qui encadrent son point");
+    verifier(!offerts.contains(QString("I(%1)").arg(r2->reference())),
+             "et PAS celui de la branche d'à côté",
+             offerts.join(' ').toStdString());
+    verifier(offerts.size() < tous.size(),
+             "sa liste est donc plus courte que celle du circuit",
+             std::to_string(offerts.size()) + " contre "
+                 + std::to_string(tous.size()));
+
+    // Un bloc pas encore câblé, lui, voit tout : une liste vide le ferait
+    // passer pour cassé avant même d'avoir servi.
+    ItemComposant* nu = scene->ajouter_composant("scope", QPointF(900, 500));
+    if (!nu) return;
+    verifier(fenetre.signaux_offerts_au_bloc(nu).size() == tous.size(),
+             "un bloc pas encore câblé voit tout le circuit",
+             std::to_string(fenetre.signaux_offerts_au_bloc(nu).size()));
+}
+
+// ---------------------------------------------------------------------------
 // Ce qu'un audit a trouvé derrière les changements du jour
 //
 // Trois défauts, dont deux introduits le jour même, et tous les trois
@@ -4789,6 +4861,7 @@ int main(int argc, char** argv) {
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
     test_tension_aux_bornes();
+    test_bloc_ne_voit_que_son_branchement();
     test_scope_supprime_ne_hante_pas();
     test_scope_survit_a_une_annulation();
     test_fermer_ferme_les_fenetres_detachees();
