@@ -1,3 +1,4 @@
+#include "app/Apparence.h"
 #include "app/FenetrePrincipale.h"
 
 #include "core/engines/Chaines.h"
@@ -1330,6 +1331,32 @@ void FenetrePrincipale::construire_actions() {
     // Fenêtres : c'est l'utilisateur qui sort un panneau de mesure, jamais
     // l'application. Le raccourci le remet aussi bien qu'il le sort.
     auto* fenetres = menuBar()->addMenu("Fe&nêtres");
+    // LE THÈME, ET SON SOUVENIR.
+    //
+    // Le choix se garde d'une session à l'autre : imposer le clair à chaque
+    // lancement à quelqu'un qui travaille en sombre serait pire que de ne pas
+    // offrir le choix du tout.
+    auto* theme = fenetres->addMenu("&Thème");
+    auto* groupe_theme = new QActionGroup(this);
+    auto poser_theme = [this](apparence::Theme choix) {
+        apparence::appliquer(choix);
+        apparence::enregistrer_theme(choix);
+        ecrire(choix == apparence::Theme::Sombre ? "Thème sombre."
+                                                 : "Thème clair.");
+    };
+    auto* clair = theme->addAction("Clair");
+    clair->setCheckable(true);
+    connect(clair, &QAction::triggered, this,
+            [poser_theme] { poser_theme(apparence::Theme::Clair); });
+    auto* fonce = theme->addAction("Sombre");
+    fonce->setCheckable(true);
+    connect(fonce, &QAction::triggered, this,
+            [poser_theme] { poser_theme(apparence::Theme::Sombre); });
+    groupe_theme->addAction(clair);
+    groupe_theme->addAction(fonce);
+    (apparence::theme_enregistre() == apparence::Theme::Sombre ? fonce : clair)
+        ->setChecked(true);
+    fenetres->addSeparator();
     fenetres->addAction("Analyses dans leur propre fenêtre",
                         QKeySequence(Qt::CTRL | Qt::Key_2), this,
                         [this] { basculer_fenetre(analyses_); });

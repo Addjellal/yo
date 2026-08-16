@@ -32,10 +32,30 @@ struct Palette {
     QColor erreur;
 };
 
-// Le thème clair, seul pour l'instant. Le sombre demandera de reprendre AUSSI
-// les couleurs du schéma — grille, fils, symboles — sans quoi une feuille
-// blanche resterait plantée au milieu d'une fenêtre noire.
+// Les deux thèmes. La FEUILLE du schéma reste claire dans les deux : c'est du
+// papier, et un schéma d'électronique se lit sur du blanc — KiCad, Altium et
+// LTspice font tous ce choix, cadre sombre et feuille claire. Ce qui change,
+// c'est tout le reste.
 const Palette& claire();
+const Palette& sombre();
+
+enum class Theme { Clair, Sombre };
+
+// Pose le thème sur TOUTE l'application : style, palette Qt et feuille de
+// style d'un seul geste.
+//
+// La feuille de style seule ne suffit pas, et c'est ce qui donnait ce mélange
+// de gris sombres et de blancs : ce qu'elle ne nomme pas garde la palette du
+// SYSTÈME. Sur un Windows réglé en sombre, les fenêtres, les menus et les
+// boîtes de dialogue arrivaient donc en sombre au milieu d'une interface
+// claire. Poser la palette Qt ferme cette porte — plus rien ne dépend du
+// réglage du poste.
+void appliquer(Theme theme);
+
+// Le thème enregistré, et son enregistrement. Le choix se garde d'une session
+// à l'autre : le changer à chaque lancement serait le pire des deux mondes.
+Theme theme_enregistre();
+void enregistrer_theme(Theme theme);
 
 // La feuille de style de toute l'application, produite à partir d'une
 // palette. C'est elle qui remplace les quatre feuilles éparpillées.

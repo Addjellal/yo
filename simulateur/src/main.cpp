@@ -93,9 +93,15 @@ int main(int argc, char** argv) {
     //
     // Il n'y en avait aucune : Qt par défaut, plus quatre feuilles de style
     // écrites à la main dans quatre endroits, qui ne s'accordaient même pas
-    // sur la couleur de survol. Une interface sans palette a autant de
-    // palettes qu'elle a d'endroits où l'on a eu besoin d'une couleur.
-    application.setStyleSheet(apparence::feuille(apparence::claire()));
+    // sur la couleur de survol.
+    //
+    // Et la feuille de style seule ne suffisait pas : ce qu'elle ne nomme pas
+    // garde la palette du SYSTÈME. Sur un poste réglé en sombre, les fenêtres,
+    // les menus et les boîtes de dialogue arrivaient en sombre au milieu d'une
+    // interface claire — le mélange que l'utilisateur a vu tout de suite.
+    // `appliquer` pose le style, la palette Qt ET la feuille : plus rien ne
+    // dépend du réglage du poste.
+    apparence::appliquer(apparence::theme_enregistre());
 
     FenetrePrincipale fenetre;
 

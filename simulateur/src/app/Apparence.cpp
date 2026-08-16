@@ -1,5 +1,11 @@
 #include "app/Apparence.h"
 
+#include <QApplication>
+#include <QCoreApplication>
+#include <QPalette>
+#include <QSettings>
+#include <QStyleFactory>
+
 namespace apparence {
 
 const Palette& claire() {
@@ -25,6 +31,27 @@ const Palette& claire() {
         QColor("#2e7d32"),   // succès
         QColor("#b26a00"),   // alerte
         QColor("#c62828"),   // erreur
+    };
+    return p;
+}
+
+const Palette& sombre() {
+    // Le sombre n'est pas le clair inversé : les gris tirent vers le bleu-vert
+    // pour rester de la même famille que la feuille, et l'accent s'éclaircit
+    // — un bleu pétrole foncé sur fond foncé ne se verrait plus.
+    static const Palette p{
+        QColor("#1a1f1d"),   // fond
+        QColor("#232927"),   // surface
+        QColor("#1f2523"),   // surface haute
+        QColor("#39413e"),   // bordure
+        QColor("#e6ebe8"),   // texte
+        QColor("#9aa5a0"),   // texte doux
+        QColor("#4aa8c9"),   // accent
+        QColor("#2b3a40"),   // accent doux
+        QColor("#0f1513"),   // texte sur accent
+        QColor("#6ec36e"),   // succès
+        QColor("#e0a54a"),   // alerte
+        QColor("#ef6b6b"),   // erreur
     };
     return p;
 }
@@ -271,4 +298,58 @@ QCheckBox::indicator, QRadioButton::indicator { width: 15px; height: 15px; }
         .replace("%HAUTEUR%", QString::number(kHauteurControle - 12));
 }
 
-}   // namespace apparence
+// ---------------------------------------------------------------------------
+// Poser le thème sur toute l'application
+// ---------------------------------------------------------------------------
+static QSettings reglages() {
+    return QSettings(QCoreApplication::organizationName(),
+                     QCoreApplication::applicationName());
+}
+
+Theme theme_enregistre() {
+    return reglages().value("apparence/theme").toString() == "sombre"
+               ? Theme::Sombre
+               : Theme::Clair;
+}
+
+void enregistrer_theme(Theme theme) {
+    QSettings r = reglages();
+    r.setValue("apparence/theme",
+               theme == Theme::Sombre ? "sombre" : "clair");
+}
+
+void appliquer(Theme theme) {
+    const Palette& p = theme == Theme::Sombre ? sombre() : claire();
+
+    // FUSION, ET PAS LE STYLE DU SYSTÈME.
+    //
+    // Le style natif de Windows dessine ses propres fonds, que la feuille de
+    // style ne peut pas toujours reprendre : d'où des cadres clairs autour de
+    // widgets sombres, et l'inverse. Fusion dessine tout lui-même, à partir de
+    // la palette qu'on lui donne — c'est le seul moyen qu'une application Qt
+    // ait exactement la même tête sur les trois systèmes.
+    QApplication::setStyle(QStyleFactory::create("Fusion"));
+
+    QPalette palette;
+    palette.setColor(QPalette::Window, p.fond);
+    palette.setColor(QPalette::WindowText, p.texte);
+    palette.setColor(QPalette::Base, p.surface);
+    palette.setColor(QPalette::AlternateBase, p.surface_haute);
+    palette.setColor(QPalette::Text, p.texte);
+    palette.setColor(QPalette::Button, p.surface);
+    palette.setColor(QPalette::ButtonText, p.texte);
+    palette.setColor(QPalette::Highlight, p.accent);
+    palette.setColor(QPalette::HighlightedText, p.accent_texte);
+    palette.setColor(QPalette::ToolTipBase, p.texte);
+    palette.setColor(QPalette::ToolTipText, p.surface);
+    palette.setColor(QPalette::PlaceholderText, p.texte_doux);
+    palette.setColor(QPalette::Link, p.accent);
+    palette.setColor(QPalette::Disabled, QPalette::Text, p.texte_doux);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, p.texte_doux);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, p.texte_doux);
+    QApplication::setPalette(palette);
+
+    qApp->setStyleSheet(feuille(p));
+}
+
+}  // namespace apparence
