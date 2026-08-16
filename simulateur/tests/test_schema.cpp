@@ -3776,6 +3776,64 @@ static void test_tension_aux_bornes() {
 }
 
 // ---------------------------------------------------------------------------
+// Une mesure ABSENTE n'est pas une mesure NULLE
+//
+// Le sélecteur de voie propose « I(REF) » pour tous les composants, mais
+// aucun moteur ne fournit le courant de tous : il faut qu'un élément du
+// circuit porte exactement cette référence. Pour un relais, un afficheur, un
+// moteur pas à pas — dont les éléments portent des noms suffixés — la courbe
+// demandée n'existe pas.
+//
+// Elle se traçait alors en LIGNE PLATE À ZÉRO, indiscernable de « aucun
+// courant ne circule ». L'élève en concluait que son montage ne marchait pas,
+// alors que c'est la mesure qui manquait. Une courbe fausse est pire qu'une
+// courbe absente : elle répond.
+// ---------------------------------------------------------------------------
+static void test_mesure_absente_se_dit() {
+    std::printf("\n-- une mesure absente se dit, elle ne se trace pas --\n");
+
+    Oscilloscope scope;
+    coeur::Formes formes;
+    formes.temps = {0.0, 0.001, 0.002};
+    formes.tensions["n1"] = {1.0, 2.0, 3.0};
+
+    // Les deux signaux doivent d'abord être PROPOSÉS : on ne suit que ce que
+    // le sélecteur offre, et c'est bien le cas réel — le menu propose
+    // « I(K1) » pour tout composant, sans savoir si quelqu'un le mesure.
+    scope.proposer_signaux({"n1", "I(K1)"});
+
+    // Une voie sur un signal RÉELLEMENT présent dans la trame.
+    scope.sonder("n1");
+    // …et une voie sur un courant que rien ne fournit.
+    scope.sonder("I(K1)");
+    scope.ajouter_trame(formes, 0.0);
+
+    // On CHERCHE les voies plutôt que de supposer où `sonder` les a mises :
+    // un test qui suppose l'ordre d'affectation teste l'ordre, pas la mesure.
+    int voie_presente = -1, voie_absente = -1;
+    for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
+        if (scope.signal_de_voie(v) == "n1") voie_presente = v;
+        if (scope.signal_de_voie(v) == "I(K1)") voie_absente = v;
+    }
+    verifier(voie_presente >= 0 && voie_absente >= 0,
+             "les deux signaux ont bien été affectés à une voie",
+             std::to_string(voie_presente) + " et "
+                 + std::to_string(voie_absente));
+    if (voie_presente < 0 || voie_absente < 0) return;
+
+    verifier(scope.voie_est_mesuree(voie_presente),
+             "la voie branchée sur un signal présent est mesurée");
+    verifier(!scope.voie_est_mesuree(voie_absente),
+             "celle branchée sur un courant absent ne l'est PAS");
+    const QString rapport = scope.rapport();
+    verifier(rapport.contains("n1") && rapport.contains("moyenne"),
+             "le rapport chiffre le signal mesuré", rapport.toStdString());
+    verifier(rapport.contains("aucune mesure"),
+             "et dit clairement qu'il n'a pas mesuré l'autre",
+             rapport.toStdString());
+}
+
+// ---------------------------------------------------------------------------
 // Un bloc ne montre que là où il est câblé
 //
 // Il proposait TOUT le circuit : un bloc posé sur la sortie d'un filtre
@@ -4861,6 +4919,7 @@ int main(int argc, char** argv) {
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
     test_tension_aux_bornes();
+    test_mesure_absente_se_dit();
     test_bloc_ne_voit_que_son_branchement();
     test_scope_supprime_ne_hante_pas();
     test_scope_survit_a_une_annulation();

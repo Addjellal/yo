@@ -219,6 +219,16 @@ void TraceOscilloscope::ajouter(const coeur::Formes& formes,
     for (int v = 0; v < kVoies; ++v)
         courbes[v] = courbe_pour(formes, voies_[v].designation);
 
+    // UNE MESURE ABSENTE N'EST PAS UNE MESURE NULLE.
+    //
+    // On note, voie par voie, si la trame contenait vraiment le signal
+    // demandé. Sans cela, un signal que le moteur ne fournit pas se traçait
+    // en ligne plate à zéro : l'élève lisait « aucun courant » là où il aurait
+    // fallu lire « je ne sais pas mesurer ça ».
+    for (int v = 0; v < kVoies; ++v)
+        voies_[v].mesuree =
+            voies_[v].designation.isEmpty() || !courbes[v].empty();
+
     for (size_t k = 0; k < formes.temps.size(); ++k) {
         temps_.push_back(static_cast<float>(instant_debut + formes.temps[k]));
         for (int v = 0; v < kVoies; ++v) {
@@ -350,7 +360,11 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     }
 
     for (int v = 0; v < kVoies; ++v) {
-        if (!voie_active(v) || voies_[v].valeurs.size() != temps_.size()) continue;
+        // Une voie SANS MESURE ne se dessine pas du tout : tracer ses zéros
+        // reviendrait à affirmer une valeur qu'on n'a jamais obtenue.
+        if (!voie_active(v) || !voies_[v].mesuree
+            || voies_[v].valeurs.size() != temps_.size())
+            continue;
         const double continu = continu_voie(v, debut);
 
         std::vector<float> minima(largeur, std::numeric_limits<float>::max());
@@ -849,6 +863,14 @@ void Oscilloscope::ajouter_trame(const coeur::Formes& formes,
 
 void Oscilloscope::vider() { trace_->vider(); }
 
+bool TraceOscilloscope::voie_mesuree(int voie) const {
+    return voie >= 0 && voie < kVoies && voies_[voie].mesuree;
+}
+
+bool Oscilloscope::voie_est_mesuree(int voie) const {
+    return trace_ && trace_->voie_mesuree(voie);
+}
+
 void Oscilloscope::rafraichir_mesures() {
     // Niveau automatique : la case le montre, sans passer pour un réglage
     // manuel — sinon le premier rafraîchissement figerait le niveau.
@@ -860,6 +882,12 @@ void Oscilloscope::rafraichir_mesures() {
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
         if (!trace_->voie_active(v)) {
             mesures_[v]->setText("—");
+            continue;
+        }
+        if (!trace_->voie_mesuree(v)) {
+            // On le DIT, plutôt que de tracer un zéro qui ment.
+            mesures_[v]->setText("aucune mesure pour ce signal");
+            mesures_[v]->setStyleSheet("color: #b26a00;");
             continue;
         }
         double moyenne = 0, maximum = 0;
@@ -970,6 +998,16 @@ QString Oscilloscope::rapport() const {
     QString texte;
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
         if (!trace_->voie_active(v)) continue;
+        // UN RAPPORT NE CHIFFRE QUE CE QU'IL A MESURÉ. Une voie sans donnée
+        // y écrivait « moyenne 0,000, crête 0,000 » — trois chiffres faux
+        // présentés comme un relevé, et c'est ce rapport que lit la
+        // vérification automatique.
+        if (!trace_->voie_mesuree(v)) {
+            texte += QString("voie %1 (%2) : aucune mesure disponible\n")
+                         .arg(v + 1)
+                         .arg(trace_->signal_voie(v));
+            continue;
+        }
         double moyenne = 0, maximum = 0;
         trace_->mesurer(v, moyenne, maximum);
         texte += QString("voie %1 (%2) : moyenne %3, crete %4, "

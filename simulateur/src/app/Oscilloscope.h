@@ -95,6 +95,10 @@ public:
     double rapport_cyclique(int voie) const;
     double concordance(int a, int b) const;
     bool voie_active(int voie) const;
+    // Vrai si la dernière trame contenait vraiment ce signal. Faux quand il a
+    // été choisi mais que rien ne le fournit — ce qui doit se DIRE, et non se
+    // dessiner comme un zéro.
+    bool voie_mesuree(int voie) const;
 
 signals:
     // Les curseurs ont bougé : le panneau met sa lecture à jour.
@@ -112,6 +116,14 @@ private:
         std::deque<float> valeurs;
         double decalage = 0.0;            // volts, à l'affichage seulement
         bool alternatif = false;          // couplage : continu retiré
+        // Ce signal a-t-il RÉELLEMENT été mesuré à la dernière trame ?
+        //
+        // Un signal choisi mais que le moteur ne fournit pas — le courant
+        // d'un composant dont aucun élément SPICE ne porte la référence —
+        // donnait une suite de zéros, tracée en LIGNE PLATE. Indiscernable
+        // de « aucun courant ne circule ». L'élève en concluait que son
+        // montage ne marchait pas, alors que c'est la mesure qui manquait.
+        bool mesuree = false;
     };
 
     std::array<Voie, kVoies> voies_;
@@ -210,6 +222,9 @@ public:
     // concordance entre les deux premières voies. Sert à vérifier sans se
     // fier à l'œil qu'un signal en suit un autre.
     QString rapport() const;
+    // Cette voie a-t-elle vraiment été mesurée ? Exposé pour le banc : une
+    // courbe absente doit se DIRE, et cette promesse se vérifie.
+    bool voie_est_mesuree(int voie) const;
     bool aucune_voie_active() const;
     // Le signal affecté à une voie. Sert à vérifier qu'un scope posé sur le
     // schéma suit bien ce qui lui est câblé.
