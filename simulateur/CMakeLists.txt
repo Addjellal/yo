@@ -285,16 +285,35 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   )
   target_link_libraries(simulateur PRIVATE schema)
 
-  # Sous Windows, une application graphique se construit « WIN32 » pour ne pas
-  # traîner une console derrière elle. C'est aussi ce qui fait entrer
-  # Qt6::EntryPoint dans l'édition de liens — et cette bibliothèque-là vient
-  # telle quelle de chez Qt : elle n'accepte que le compilateur avec lequel Qt
-  # a été construit (sinon « undefined reference to __imp___argc »).
-  # « -DFENETRE_WIN32=OFF » permet donc de compiler malgré tout avec un autre
-  # MinGW, au prix d'une console qui reste ouverte : dépannage, pas remède.
-  option(FENETRE_WIN32 "Application fenêtrée sans console (Windows)" ON)
+  # PAS DE CONSOLE DERRIÈRE L'APPLICATION — et sans rien devoir à Qt.
+  #
+  # Sous Windows, c'est le SOUS-SYSTÈME inscrit dans l'exécutable qui décide :
+  # « console » (3) et Windows en ouvre une, systématiquement ; « GUI » (2) et
+  # il n'en ouvre aucune. Rien d'autre n'entre en jeu.
+  #
+  # `WIN32_EXECUTABLE` demande le sous-système GUI, mais il fait AUSSI entrer
+  # `Qt6::EntryPoint` dans l'édition de liens — et cette bibliothèque-là vient
+  # compilée telle quelle de chez Qt. Elle réclame `__imp___argc`, que le CRT
+  # d'un autre MinGW n'exporte pas : « undefined reference to __imp___argc ».
+  # Le lien échoue, et l'on se retrouvait à devoir choisir entre compiler et
+  # ne pas traîner de console.
+  #
+  # Ce choix n'existe pas. Sous MinGW, `-mwindows` inscrit le même
+  # sous-système sans réclamer `Qt6::EntryPoint` : le démarrage du CRT appelle
+  # `main()` comme d'habitude. Vérifié plutôt que supposé — un `main()` nu
+  # compilé avec `-mwindows` produit un en-tête PE dont le sous-système vaut
+  # bien 2.
+  #
+  # `-DFENETRE_WIN32=OFF` ne reste que pour observer le contraire.
+  option(FENETRE_WIN32 "Application sans console (Windows)" ON)
   if(WIN32 AND FENETRE_WIN32)
-    set_target_properties(simulateur PROPERTIES WIN32_EXECUTABLE ON)
+    if(MINGW)
+      target_link_options(simulateur PRIVATE -mwindows)
+    else()
+      # MSVC n'a pas ce problème : son `Qt6::EntryPoint` est celui de son
+      # propre compilateur.
+      set_target_properties(simulateur PROPERTIES WIN32_EXECUTABLE ON)
+    endif()
   endif()
 
   # windeployqt vit à côté de qmake ; le dossier des greffons se demande à Qt.
