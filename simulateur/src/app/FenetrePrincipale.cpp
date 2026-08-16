@@ -18,6 +18,7 @@
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonParseError>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
@@ -25,6 +26,7 @@
 #include <QTextDocument>
 #include <QMenu>
 #include <QCursor>
+#include <algorithm>
 #include <functional>
 #include <QPlainTextDocumentLayout>
 #include <QHeaderView>
@@ -1772,6 +1774,19 @@ void FenetrePrincipale::basculer_presentation() {
 
 void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
     enregistrer_disposition();
+
+    // FERMER LA FENÊTRE PRINCIPALE FERME CE QU'ELLE A DÉTACHÉ.
+    //
+    // Les fenêtres du programme et des oscilloscopes n'ont pas de parent Qt —
+    // c'est ce qui leur permet d'être de vraies fenêtres, déplaçables sur un
+    // second écran. Mais Qt ne quitte que lorsque la DERNIÈRE fenêtre se
+    // ferme : l'une d'elles restée ouverte gardait donc l'application en vie
+    // après la disparition de sa fenêtre principale, sans plus aucun moyen de
+    // la faire revenir. Un processus fantôme, qu'il fallait tuer.
+    if (fenetre_programme_) fenetre_programme_->close();
+    for (auto& paire : scopes_) paire.second->close();
+    for (FenetreInstrument* fenetre : fenetres_instruments_) fenetre->close();
+
     QMainWindow::closeEvent(evenement);
 }
 
@@ -2248,9 +2263,37 @@ void FenetrePrincipale::circuit_modifie() {
     // leur permet de nommer les nœuds auxquels ils sont câblés.
     derniers_signaux_ = signaux;
     derniers_libelles_ = libelles;
+    // LA CARTE DES APPAREILS SE PURGE AVANT D'ÊTRE LUE.
+    //
+    // Ses CLÉS sont des composants du schéma. Supprimer un bloc, annuler,
+    // ouvrir un autre projet ou en commencer un neuf les détruit — et
+    // `depuis_json` les détruit TOUS, même ceux que l'annulation ne
+    // concernait pas, puisqu'il reconstruit la scène entière à d'autres
+    // adresses. La carte pointait alors dans le vide, et le rapport de
+    // mesures lisait un composant mort.
+    //
+    // C'est la leçon déjà apprise pour les gestes de souris — « ce qui
+    // détruit clôt d'abord le geste en cours » — que ce code-ci, écrit
+    // après, n'avait pas reçue. `FenetreInstrument` fait de même depuis
+    // toujours : elle vérifie que son composant est encore là et se referme
+    // sinon.
+    const std::vector<ItemComposant*> presents = scene_->composants();
+    for (auto it = scopes_.begin(); it != scopes_.end();) {
+        const bool vivant =
+            std::find(presents.begin(), presents.end(), it->first)
+            != presents.end();
+        if (vivant) {
+            ++it;
+            continue;
+        }
+        it->second->close();
+        it->second->deleteLater();
+        it = scopes_.erase(it);
+    }
+
     // Tout bloc posé a son appareil, même fenêtre fermée : c'est ce qui lui
     // permet d'enregistrer pendant qu'on ne le regarde pas.
-    for (ItemComposant* composant : scene_->composants())
+    for (ItemComposant* composant : presents)
         if (composant->modele() && composant->modele()->type == "scope") {
             Oscilloscope* scope = scope_pour(composant);
             if (!scope) continue;
@@ -2260,22 +2303,6 @@ void FenetrePrincipale::circuit_modifie() {
                 if (!noeud.isEmpty()) scope->sonder(noeud);
             }
         }
-    for (auto& paire : scopes_)
-        paire.second->proposer_signaux(signaux, libelles);
-    // Tout bloc posé a son appareil, même fenêtre fermée : c'est ce qui lui
-    // permet d'enregistrer pendant qu'on ne le regarde pas.
-    for (ItemComposant* composant : scene_->composants())
-        if (composant->modele() && composant->modele()->type == "scope") {
-            Oscilloscope* scope = scope_pour(composant);
-            if (!scope) continue;
-            scope->proposer_signaux(signaux, libelles);
-            for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
-                const QString noeud = scene_->noeud_de(composant, voie);
-                if (!noeud.isEmpty()) scope->sonder(noeud);
-            }
-        }
-    for (auto& paire : scopes_)
-        paire.second->proposer_signaux(signaux, libelles);
 
     // Grandeurs balayables : les sources imposent une tension, les résistances
     // une valeur. Ce sont exactement les deux formes de « .dc » de SPICE, et
@@ -2762,8 +2789,27 @@ bool FenetrePrincipale::ouvrir_depuis(const QString& chemin) {
         avertir("Ouverture", "Impossible de lire " + chemin);
         return false;
     }
-    const QJsonObject racine =
-        QJsonDocument::fromJson(fichier.readAll()).object();
+    // ON REGARDE L'ERREUR D'ANALYSE, et c'est tout ce qui manquait.
+    //
+    // Sans ce contrôle, un fichier tronqué donnait un objet VIDE, que
+    // `depuis_json` relisait consciencieusement : il commence par tout
+    // effacer, puis ne trouve rien à reposer. Le schéma en cours — non
+    // enregistré, peut-être — disparaissait, et la fonction rendait « vrai »
+    // en écrivant « Schéma ouvert » dans le journal.
+    //
+    // Une perte silencieuse annoncée comme un succès est pire qu'un
+    // plantage : le plantage, au moins, on le raconte.
+    QJsonParseError erreur;
+    const QJsonDocument document =
+        QJsonDocument::fromJson(fichier.readAll(), &erreur);
+    if (erreur.error != QJsonParseError::NoError || !document.isObject()) {
+        avertir("Ouverture",
+                "Ce fichier n'est pas un projet lisible : "
+                    + erreur.errorString()
+                    + ".\nLe schéma en cours n'a pas été touché.");
+        return false;
+    }
+    const QJsonObject racine = document.object();
     scene_->depuis_json(racine);
     scene_->oublier_historique();
 
@@ -2959,8 +3005,22 @@ double FenetrePrincipale::vitesse() const { return moteur_->vitesse(); }
 QString FenetrePrincipale::mesures_oscilloscope() const {
     // Le rapport de TOUS les blocs, chacun précédé de sa référence. Sans le
     // nom, deux scopes rendraient deux blocs de chiffres indiscernables.
+    // ON NE LIT JAMAIS UNE CLÉ QUI N'EST PLUS DANS LA SCÈNE.
+    //
+    // La purge de `circuit_modifie` ne suffit pas : elle est déclenchée par
+    // `QGraphicsScene::changed`, que Qt émet en DIFFÉRÉ, à la fin de la boucle
+    // d'événements. Entre la suppression d'un bloc et le tour suivant de cette
+    // boucle, la carte contient donc encore un composant détruit — et c'est
+    // précisément l'instant où l'on peut demander les mesures.
+    //
+    // Comparer un pointeur ne le déréférence pas : le test est sûr même sur
+    // une clé morte. Ce qui ne l'est pas, c'est de lui demander sa référence.
+    const std::vector<ItemComposant*> presents = scene_->composants();
     QStringList morceaux;
-    for (auto& paire : scopes_) {
+    for (const auto& paire : scopes_) {
+        if (std::find(presents.begin(), presents.end(), paire.first)
+            == presents.end())
+            continue;
         const QString rapport = paire.second->rapport();
         if (rapport.isEmpty()) continue;
         morceaux << paire.first->reference() + " :\n" + rapport;

@@ -184,7 +184,8 @@ n'était simplement pas exercée.
 Les chiffres dépendent des moteurs présents : **401** au cœur sans ngspice ni
 simavr, **416** avec. Ces quinze assertions de différence *sont* la
 vérification indépendante — c'est exactement ce qu'on perd sans les paquets.
-Le banc schéma en compte **342**, indépendamment.
+Le banc schéma, lui, ne dépend d'aucun paquet — mais son compte change à
+chaque session, alors ne le cherchez pas ici : `tests_schema` l'affiche.
 
 Ce document a porté pendant plusieurs sessions quatre comptes périmés, dont
 un faux du simple au double (« 177 » pour un banc schéma qui en comptait plus
@@ -396,8 +397,8 @@ masquait tous :
    ctest --test-dir build-san -L sanitiseurs
    ```
 
-   Cœur assaini : **401 tests, zéro alerte**. Schéma assaini, pour la
-   PREMIÈRE fois : **342 tests, zéro alerte** — la scène, les fils, les
+   Cœur assaini : **zéro alerte**. Schéma assaini, pour la PREMIÈRE fois :
+   **zéro alerte** — la scène, les fils, les
    ancres et la découpe passent. La détection de fuites est éteinte : Qt et
    ngspice en laissent au dernier souffle.
 
@@ -800,9 +801,15 @@ vert ne prouve que les chemins qu'il parcourt.**
 
 | | avant | après |
 |---|---|---|
-| banc schéma | 384 | **428** |
+| banc schéma | 384 | **relancer `tests_schema`** |
 | banc cœur (ngspice + simavr) | 416 | 416 |
-| ASan/UBSan sur le schéma | 342 | **428, aucune alerte** |
+| ASan/UBSan sur le schéma | 342 | **aucune alerte** |
+
+Les comptes du banc schéma ont été retirés de ce document APRÈS qu'un audit y
+a trouvé trois valeurs différentes pour le même banc, dans le même fichier,
+deux lignes après l'avertissement « un chiffre écrit dans un document se
+périme ». Le document se donnait tort à lui-même sans le voir. Ce qui se
+périme, on ne l'écrit pas : on écrit la commande.
 | avertissements | 0 | 0 |
 
 Les tests du déplacement ont été **vérifiés en échec** avant d'être crus :

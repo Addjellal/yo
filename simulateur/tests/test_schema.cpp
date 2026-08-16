@@ -64,6 +64,8 @@ static void console_en_utf8() {
 #include "app/schematic/Ancre.h"
 #include "core/engines/ProgrammesExemples.h"
 #include <QDir>
+#include <QSettings>
+#include <QFile>
 #include <QGraphicsPathItem>
 #include <QGraphicsSceneMouseEvent>
 #include <QDoubleSpinBox>
@@ -3722,6 +3724,159 @@ static void test_depart_sur_fil_detruit() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce qu'un audit a trouvé derrière les changements du jour
+//
+// Trois défauts, dont deux introduits le jour même, et tous les trois
+// atteignables en quelques clics. Ils partagent une seule cause : du code
+// NOUVEAU qui n'a pas reçu la leçon apprise par le code ancien — un objet qui
+// désigne un composant du schéma doit savoir que ce composant peut mourir.
+// ---------------------------------------------------------------------------
+static void test_scope_supprime_ne_hante_pas() {
+    std::printf("\n-- un bloc oscilloscope supprimé ne hante plus la carte --\n");
+
+    FenetrePrincipale fenetre;
+    SceneSchema* scene = fenetre.scene();
+    ItemComposant* bloc =
+        scene->ajouter_composant("scope", QPointF(-1200, -1200));
+    verifier(bloc != nullptr, "le bloc oscilloscope est posé");
+    if (!bloc) return;
+
+    // On l'ouvre : c'est ce geste qui inscrit le composant dans la carte des
+    // appareils, avec son pointeur pour clé.
+    envoyer(*scene, QEvent::GraphicsSceneMouseDoubleClick, bloc->pos());
+    verifier(!fenetre.mesures_oscilloscope().isNull(),
+             "la carte des appareils connaît ce bloc");
+
+    // …puis on le supprime, comme n'importe quel composant. On retient SA
+    // référence : le montage d'exemple porte déjà un oscilloscope, qui lui
+    // reste et continue de mesurer à bon droit. C'est celui-CI qui doit
+    // disparaître du rapport, pas les oscilloscopes en général.
+    const QString disparu = bloc->reference();
+    const std::size_t avant_suppression = scene->composants().size();
+    scene->clearSelection();
+    bloc->setSelected(true);
+    scene->supprimer_selection();
+
+    verifier(scene->composants().size() == avant_suppression - 1,
+             "le bloc a bien quitté la scène",
+             std::to_string(scene->composants().size()) + " contre "
+                 + std::to_string(avant_suppression));
+
+    // LE CONTRÔLE : demander les mesures ne doit pas lire un composant mort.
+    // Sans le remède, c'est un use-after-free — invisible en construction
+    // ordinaire, immédiat sous ASan.
+    const QString mesures = fenetre.mesures_oscilloscope();
+    verifier(!mesures.contains(disparu),
+             "et les mesures ne parlent plus du bloc supprimé",
+             disparu.toStdString() + " dans « " + mesures.left(30).toStdString()
+                 + " »");
+}
+
+static void test_scope_survit_a_une_annulation() {
+    std::printf("\n-- annuler après avoir ouvert un scope --\n");
+
+    // `depuis_json` reconstruit TOUTE la scène : le composant scope est
+    // détruit et recréé à une AUTRE adresse, même si l'annulation ne le
+    // concernait pas. La carte des appareils pointait alors dans le vide.
+    FenetrePrincipale fenetre;
+    SceneSchema* scene = fenetre.scene();
+    ItemComposant* bloc =
+        scene->ajouter_composant("scope", QPointF(-1200, -1200));
+    if (!bloc) return;
+    envoyer(*scene, QEvent::GraphicsSceneMouseDoubleClick, bloc->pos());
+
+    scene->memoriser();
+    scene->ajouter_composant("resistance", QPointF(-1600, -1600));
+    verifier(scene->annuler(), "l'annulation reconstruit la scène");
+
+    // L'INVARIANT : le rapport ne nomme QUE des blocs présents.
+    //
+    // Une assertion sur « le rapport n'est pas nul » ne prouvait rien — elle
+    // passait en construction ordinaire et tombait sous ASan, où le rapport
+    // se trouve vide pour une raison sans rapport. Ce qui compte est que
+    // chaque référence citée corresponde à un composant vivant : c'est
+    // exactement ce qu'un pointeur périmé fait échouer.
+    const QString mesures = fenetre.mesures_oscilloscope();
+    QStringList presentes;
+    for (ItemComposant* composant : scene->composants())
+        presentes << composant->reference();
+    bool toutes_vivantes = true;
+    for (const QString& ligne : mesures.split('\n')) {
+        if (!ligne.endsWith(" :")) continue;
+        if (!presentes.contains(ligne.left(ligne.size() - 2)))
+            toutes_vivantes = false;
+    }
+    verifier(toutes_vivantes,
+             "et le rapport ne nomme que des blocs encore là",
+             mesures.left(30).toStdString());
+}
+
+static void test_fermer_ferme_les_fenetres_detachees() {
+    std::printf("\n-- fermer la fenêtre principale ferme tout --\n");
+
+    // Les fenêtres détachées — programme d'une carte, oscilloscope d'un bloc —
+    // n'ont PAS de parent Qt. Laissées ouvertes, elles empêchaient
+    // l'application de quitter : la fenêtre principale disparaissait, le
+    // processus restait, sans plus aucun moyen de le faire réapparaître.
+    FenetrePrincipale fenetre;
+    SceneSchema* scene = fenetre.scene();
+    ItemComposant* carte = nullptr;
+    for (ItemComposant* composant : scene->composants())
+        if (composant->modele() && composant->modele()->carte) carte = composant;
+    verifier(carte != nullptr, "le montage d'exemple porte une carte");
+    if (!carte) return;
+
+    envoyer(*scene, QEvent::GraphicsSceneMouseDoubleClick, carte->pos());
+    verifier(fenetre.programme_est_ouvert(),
+             "le programme de la carte est ouvert");
+
+    fenetre.close();
+    verifier(!fenetre.programme_est_ouvert(),
+             "fermer la fenêtre principale referme celle du programme");
+
+    // FERMER ENREGISTRE LA DISPOSITION, et cette disposition-là serait relue
+    // par la fenêtre du test SUIVANT — qui verrait alors les panneaux de
+    // celui-ci. Un banc dont un test dépend de l'ordre des autres ne prouve
+    // plus ce qu'il annonce. On efface donc ce que cette fermeture a écrit.
+    QSettings reglages(QCoreApplication::organizationName(),
+                       QCoreApplication::applicationName());
+    reglages.remove("disposition2");
+}
+
+static void test_fichier_corrompu_ne_vide_pas_le_schema() {
+    std::printf("\n-- un fichier corrompu n'efface pas le travail --\n");
+
+    FenetrePrincipale fenetre;
+    // SANS CECI, LE BANC SE FIGE. Le refus d'ouvrir passe par `avertir`, qui
+    // ouvre une boîte de dialogue MODALE : sans personne pour cliquer, le
+    // banc attend indéfiniment. Le mode silencieux redirige l'avertissement
+    // vers le journal — c'est exactement à cela qu'il sert.
+    fenetre.definir_mode_silencieux(true);
+    const std::size_t avant = fenetre.scene()->composants().size();
+    verifier(avant > 0, "le montage d'exemple est en place",
+             std::to_string(avant));
+
+    // Un fichier tronqué : du JSON qui s'arrête au milieu.
+    const QString chemin =
+        QDir::tempPath() + "/simulateur-essai-corrompu.projet";
+    QFile fichier(chemin);
+    verifier(fichier.open(QIODevice::WriteOnly), "le fichier d'essai s'écrit");
+    fichier.write("{\"composants\": [{\"type\": \"resis");
+    fichier.close();
+
+    // LE CONTRÔLE : l'ouverture ÉCHOUE, et surtout elle ne détruit rien.
+    // Elle rendait « vrai » après avoir vidé la scène — une perte silencieuse
+    // annoncée comme un succès, ce qui est pire qu'un plantage.
+    verifier(!fenetre.ouvrir_depuis(chemin),
+             "l'ouverture d'un fichier illisible échoue");
+    verifier(fenetre.scene()->composants().size() == avant,
+             "et le schéma en cours est intact",
+             std::to_string(fenetre.scene()->composants().size()) + " contre "
+                 + std::to_string(avant));
+    QFile::remove(chemin);
+}
+
+// ---------------------------------------------------------------------------
 // Ce que le sélecteur annonce doit être ce que l'écran dessine
 //
 // L'oscilloscope s'ouvrait sur « Base de temps : 500 ms » en affichant une
@@ -4581,6 +4736,10 @@ int main(int argc, char** argv) {
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
+    test_scope_supprime_ne_hante_pas();
+    test_scope_survit_a_une_annulation();
+    test_fermer_ferme_les_fenetres_detachees();
+    test_fichier_corrompu_ne_vide_pas_le_schema();
     test_base_de_temps_annoncee_est_celle_dessinee();
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
