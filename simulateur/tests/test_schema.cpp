@@ -3783,6 +3783,27 @@ static void test_deplacer_un_segment() {
              std::to_string(noeuds_apres) + " contre "
                  + std::to_string(noeuds_avant));
 
+    // LE DÉGAGEMENT DE BROCHE.
+    //
+    // Les poignées ne doivent PAS être posées sur les bornes : le segment
+    // partirait du point d'accroche à angle droit, et l'on ne verrait plus
+    // d'où le fil part — coude, borne et étiquette de tension superposés.
+    // Un fil quitte sa broche en ligne droite sur une petite longueur, comme
+    // sur un schéma tracé à la main.
+    for (ItemJonction* point : scene.jonctions()) {
+        const double ecart = std::min(std::fabs(point->pos().x() - a.x()),
+                                      std::fabs(point->pos().x() - b.x()));
+        verifier(ecart >= 10.0 - 0.01,
+                 "la poignée dégage la borne d'au moins une maille",
+                 std::to_string(ecart));
+        // …et le dégagement reste À L'INTÉRIEUR du fil : une poignée qui
+        // dépasserait l'autre bout ferait revenir le fil sur ses pas.
+        verifier(point->pos().x() > std::min(a.x(), b.x()) - 0.01
+                     && point->pos().x() < std::max(a.x(), b.x()) + 0.01,
+                 "et elle reste entre les deux bornes",
+                 std::to_string(point->pos().x()));
+    }
+
     // Le geste s'annule d'un bloc — poignées comprises.
     verifier(scene.annuler(), "le déplacement s'annule");
     verifier(scene.fils().size() == 1 && scene.jonctions().empty(),

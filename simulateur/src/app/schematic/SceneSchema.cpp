@@ -1530,17 +1530,42 @@ bool SceneSchema::commencer_deplacement_segment(ItemFil* fil,
     // C'est le corollaire écrit dans DECISION-FILS : « un fil tendu entre
     // deux broches n'a rien à déplacer ». Il n'a rien à déplacer tant qu'on
     // ne lui a pas donné de quoi.
-    auto poignee = [this](const Ancre& bout) -> ItemJonction* {
+    // UN FIL SORT TOUT DROIT D'UNE BROCHE AVANT DE TOURNER.
+    //
+    // La poignée était posée EXACTEMENT sur la broche. Le segment déplacé
+    // partait donc du point d'accroche à angle droit, et l'on ne voyait plus
+    // d'où le fil partait : le coude, la borne et l'étiquette de tension se
+    // superposaient en un seul amas de traits. C'est la remarque de
+    // l'utilisateur, et c'est une règle de dessin d'électronique bien avant
+    // d'être une question de goût — sur un schéma tracé à la main, un fil
+    // quitte toujours sa broche en ligne droite sur une petite longueur.
+    //
+    // La poignée est donc reculée le long du fil, vers l'autre bout. Deux
+    // mailles suffisent à rendre l'accroche lisible ; sur un fil court on se
+    // contente du tiers, et en deçà d'une maille on renonce — un dégagement
+    // plus long que le fil lui-même le ferait revenir sur ses pas.
+    const QPointF le_long(axe.y(), axe.x());   // l'axe DU fil, pas le sien
+    auto poignee = [this, &le_long](const Ancre& bout,
+                                    const QPointF& vers) -> ItemJonction* {
         if (bout.jonction) return bout.jonction;
-        auto* point = new ItemJonction(bout.position());
+        const QPointF depart = bout.position();
+        const QPointF ecart = vers - depart;
+        const double course =
+            le_long.x() != 0.0 ? ecart.x() : ecart.y();
+        double degagement = std::min(2.0 * kPas, std::fabs(course) / 3.0);
+        degagement = std::floor(degagement / kPas) * kPas;
+        if (degagement < kPas) degagement = 0.0;
+        const QPointF pose =
+            depart + le_long * (course < 0 ? -degagement : degagement);
+        auto* point = new ItemJonction(pose);
         addItem(point);
         addItem(new ItemFil(bout, Ancre(point)));
         return point;
     };
     const Ancre a = fil->ancre_depart();
     const Ancre b = fil->ancre_arrivee();
-    ItemJonction* pa = poignee(a);
-    ItemJonction* pb = poignee(b);
+    ItemJonction* pa = poignee(a, b.position());
+    ItemJonction* pb = poignee(b, a.position());
     if (pa != a.jonction || pb != b.jonction) {
         // Le segment change d'ancres : on le refait, plutôt que d'ouvrir
         // `ItemFil` à la mutation de son départ.
