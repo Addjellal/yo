@@ -1617,6 +1617,7 @@ void SceneSchema::terminer_deplacement_segment() {
 // sont deux états de plus, arrivés depuis, et que personne n'avait pensé à
 // clore.
 void SceneSchema::oublier_geste_en_cours() {
+    trace_au_bouton_droit_ = false;
     poignees_.clear();
     origines_poignees_.clear();
     avant_deplacement_ = QJsonObject();
@@ -1661,6 +1662,30 @@ static ItemComposant* composant_sous(const QGraphicsScene* scene,
 
 void SceneSchema::mousePressEvent(QGraphicsSceneMouseEvent* evenement) {
     const QPointF point = evenement->scenePos();
+
+    // LE BOUTON DROIT TIRE UNE DÉRIVATION — depuis un fil, et depuis lui seul.
+    //
+    // C'est le geste de Simulink, à la lettre : « position the pointer on the
+    // line where you want the branch to start, then right-click and drag ».
+    // Sur un fil, le bouton gauche MANIPULE ce qui existe — il déplace le
+    // segment, il le désigne — et c'est le bouton droit qui fait NAÎTRE un
+    // fil neuf. Les deux rôles ne se disputent plus le même geste, et c'est
+    // ce qui permet enfin au glissé gauche de vouloir dire « déplacer », sans
+    // seuil ni devinette.
+    //
+    // Depuis une broche, rien ne change : le bouton gauche câble, comme dans
+    // Simulink où l'on tire un signal d'un port à la souris.
+    if (evenement->button() == Qt::RightButton && outil_ != Outil::Suppression
+        && !fil_provisoire_ && !fil_en_attente_) {
+        const Cible cible = viser(point);
+        if (cible.genre == Cible::Genre::Fil) {
+            evenement->accept();
+            commencer_fil(cible, cible.point);
+            trace_au_bouton_droit_ = true;
+            appui_point_ = point;
+            return;
+        }
+    }
 
     if (evenement->button() == Qt::LeftButton && outil_ != Outil::Suppression) {
         // Fil laissé en attente par un premier clic : ce clic-ci le referme,
@@ -1893,25 +1918,52 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) {
+    // Fin d'un glissé au bouton droit : la dérivation se referme si elle
+    // tombe sur une cible, sinon elle reste accrochée au curseur et c'est un
+    // clic GAUCHE qui la terminera — la suite du tracé ne dépend plus du
+    // bouton par lequel il a commencé.
+    if (trace_au_bouton_droit_ && evenement->button() == Qt::RightButton) {
+        trace_au_bouton_droit_ = false;
+        evenement->accept();
+        const QPointF point = evenement->scenePos();
+        if ((point - appui_point_).manhattanLength()
+            < QApplication::startDragDistance()) {
+            // Un simple clic droit, sans glissé : ce n'était pas une
+            // dérivation. On rend la main au menu contextuel.
+            abandonner_fil();
+            return;
+        }
+        // Le menu contextuel part au RELÂCHEMENT sous Windows, donc APRÈS ce
+        // geste : sans cela, chaque dérivation finirait par un menu à
+        // chasser.
+        ignorer_prochain_menu_ = true;
+        if (terminer_fil(point)) return;
+        if (cible_depart_.connectable()) fil_en_attente_ = true;
+        return;
+    }
+
     if (deplace_un_segment()) {
         evenement->accept();
         terminer_deplacement_segment();
         return;
     }
 
-    // Appuyé sur un fil, relâché sans avoir franchi le seuil : c'était un
-    // clic, donc une dérivation — le fil part du point d'appui et attend le
-    // clic qui le refermera.
+    // Appuyé sur un fil au bouton GAUCHE, relâché sans avoir franchi le
+    // seuil : c'était un clic, et un clic gauche sur un fil le DÉSIGNE.
+    //
+    // Il dérivait, et c'est ce qui rendait le fil intouchable : on ne pouvait
+    // pas le montrer sans en faire pousser un autre. La dérivation est passée
+    // au bouton droit, comme dans Simulink ; le bouton gauche ne s'occupe plus
+    // que de ce qui existe déjà — désigner d'un clic, déplacer d'un glissé.
     if (appui_en_attente_.genre == Cible::Genre::Fil) {
         const Cible appui = appui_en_attente_;
         appui_en_attente_ = Cible();
         evenement->accept();
-        if (fil_vivant(appui.fil)) {
-            commencer_fil(appui, appui.point);
-            fil_en_attente_ = true;
-        } else {
-            rendre_le_rectangle_a_la_vue();
-        }
+        rendre_le_rectangle_a_la_vue();
+        if (!fil_vivant(appui.fil)) return;
+        if (!(evenement->modifiers() & Qt::ControlModifier)) clearSelection();
+        appui.fil->setSelected(true);
+        emit selection_composant(nullptr);
         return;
     }
 
@@ -1999,6 +2051,14 @@ void SceneSchema::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) {
 }
 
 void SceneSchema::contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) {
+    // Une dérivation vient d'être tirée au bouton droit : le menu qui suit
+    // n'a pas été demandé. Sous Windows il part au relâchement, donc APRÈS le
+    // geste — le test doit venir avant tout le reste.
+    if (ignorer_prochain_menu_) {
+        ignorer_prochain_menu_ = false;
+        evenement->accept();
+        return;
+    }
     // Un geste en cours : le clic droit l'abandonne, et RIEN d'autre.
     //
     // Il abandonnait le fil puis ouvrait quand même le menu : on voulait

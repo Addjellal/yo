@@ -3815,9 +3815,19 @@ static void test_glisser_sans_deplacer_ne_laisse_rien() {
              "et rien n'est entré dans la pile d'annulation");
 }
 
-static void test_clic_bref_derive_toujours() {
-    std::printf("\n-- sous le seuil, le clic dérive comme avant --\n");
+static void test_clic_gauche_designe_clic_droit_derive() {
+    std::printf("\n-- gauche désigne, droit dérive : les deux boutons de "
+                "Simulink --\n");
 
+    // Simulink, mot pour mot : « Déplacer des segments : cliquez sur un
+    // segment de fil horizontal ou vertical, glissez-le pour ajuster sa
+    // position sans déconnecter les blocs » et « Créer une dérivation :
+    // cliquez avec le bouton DROIT sur un fil existant, glissez le curseur
+    // vers le nouveau bloc ».
+    //
+    // Le bouton gauche ne s'occupe donc que de ce qui existe déjà, et le
+    // bouton droit fait naître. C'est ce partage qui rend un fil TOUCHABLE :
+    // avant, le montrer en faisait pousser un autre.
     SceneSchema scene;
     ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
     ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
@@ -3826,21 +3836,51 @@ static void test_clic_bref_derive_toujours() {
     const QPointF a = r1->position_borne(1);
     const QPointF milieu((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
 
-    // Un clic, avec le tremblement de main qui va avec : deux pixels.
+    // --- Clic GAUCHE, avec le tremblement de main qui va avec : il DÉSIGNE.
     envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
     envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(1, 2));
     envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(1, 2));
     verifier(scene.fils().size() == 1 && scene.jonctions().empty(),
-             "le clic n'a encore rien coupé",
+             "le clic gauche ne coupe rien et ne dérive rien",
+             std::to_string(scene.fils().size()) + " fil(s), "
+                 + std::to_string(scene.jonctions().size()) + " point(s)");
+    verifier(scene.selectedItems().size() == 1
+                 && scene.selectedItems().front()->type() == ItemFil::Type,
+             "il DÉSIGNE le fil, et rien d'autre",
+             std::to_string(scene.selectedItems().size()) + " objet(s)");
+
+    // --- Clic DROIT maintenu : il tire une dérivation.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 80),
+            Qt::RightButton);
+    verifier(scene.fils().size() == 1,
+             "pendant le glissé, rien n'est encore coupé",
+             std::to_string(scene.fils().size()) + " fil(s)");
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(0, 80),
+            Qt::RightButton);
+    // Relâché dans le vide : le fil reste accroché au curseur, et c'est un
+    // clic GAUCHE qui le referme — la suite ne dépend plus du bouton par
+    // lequel le tracé a commencé.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, masse->position_borne(0));
+    verifier(scene.fils().size() == 3 && scene.jonctions().size() == 1,
+             "le glissé droit a bien dérivé, et le clic gauche a refermé",
              std::to_string(scene.fils().size()) + " fil(s), "
                  + std::to_string(scene.jonctions().size()) + " point(s)");
 
-    // …et le clic suivant referme la dérivation sur la masse.
-    envoyer(scene, QEvent::GraphicsSceneMousePress, masse->position_borne(0));
-    verifier(scene.fils().size() == 3 && scene.jonctions().size() == 1,
-             "le second clic referme la dérivation",
-             std::to_string(scene.fils().size()) + " fil(s), "
-                 + std::to_string(scene.jonctions().size()) + " point(s)");
+    // --- Un simple clic droit, sans glissé, ne dérive pas : il laisse le
+    // menu contextuel faire son travail.
+    SceneSchema autre;
+    ItemComposant* r3 = autre.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r4 = autre.ajouter_composant("resistance", QPointF(400, 0));
+    autre.addItem(new ItemFil(r3, 1, r4, 0));
+    const QPointF b = r3->position_borne(1);
+    const QPointF milieu2((b.x() + r4->position_borne(0).x()) / 2.0, b.y());
+    envoyer(autre, QEvent::GraphicsSceneMousePress, milieu2, Qt::RightButton);
+    envoyer(autre, QEvent::GraphicsSceneMouseRelease, milieu2, Qt::RightButton);
+    verifier(autre.fils().size() == 1 && autre.jonctions().empty(),
+             "un clic droit sans glissé ne laisse aucune dérivation",
+             std::to_string(autre.fils().size()) + " fil(s), "
+                 + std::to_string(autre.jonctions().size()) + " point(s)");
 }
 
 static void test_fil_en_equerre_ne_se_deplace_pas() {
@@ -4445,7 +4485,7 @@ int main(int argc, char** argv) {
     test_clic_immobile_ne_coupe_pas();
     test_deplacer_un_segment();
     test_glisser_sans_deplacer_ne_laisse_rien();
-    test_clic_bref_derive_toujours();
+    test_clic_gauche_designe_clic_droit_derive();
     test_fil_en_equerre_ne_se_deplace_pas();
     test_ctrl_clic_designe_un_fil();
     test_geste_interrompu_par_une_destruction();

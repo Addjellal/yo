@@ -23,8 +23,15 @@
 // FENETRE_WIN32=OFF elle garde une console, où la page de code héritée de
 // Windows rendait ces sorties illisibles. Sans effet ailleurs.
 #ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  define NOMINMAX
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+// La bibliothèque standard de MinGW le définit déjà (os_defines.h) : le
+// redéfinir tel quel est un avertissement, et un avertissement qu'on laisse
+// passer est un avertissement qu'on cessera de lire.
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
 #  include <windows.h>
 #endif
 

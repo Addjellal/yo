@@ -307,6 +307,15 @@ private:
     Cible appui_en_attente_;
     QPointF appui_point_;
 
+    // Un tracé né du BOUTON DROIT. Sur un fil, le bouton gauche manipule ce
+    // qui existe — il déplace le segment, il le désigne — et c'est le bouton
+    // droit qui en fait naître un nouveau. Les deux rôles ne se disputent
+    // plus le même geste.
+    bool trace_au_bouton_droit_ = false;
+    // Un glissé au bouton droit ne doit pas finir par un menu contextuel :
+    // sous Windows, celui-ci part au RELÂCHEMENT, donc après le geste.
+    bool ignorer_prochain_menu_ = false;
+
     // Déplacement d'un segment en cours : les deux points qui le tiennent,
     // leur position de départ, et l'axe autorisé (perpendiculaire au fil).
     std::vector<ItemJonction*> poignees_;

@@ -338,11 +338,51 @@ le tenir sont retirés, et la pile d'annulation reste vide. Un geste sans effet
 ne doit pas modifier la topologie — c'est le même principe que celui qui a
 fait corriger le clic immobile.
 
+## Correction : les DEUX boutons, comme dans Simulink
+
+Le partage au seuil de glissé était une invention pour éviter une touche
+modificatrice. Il ne fallait pas l'éviter — MathWorks documente **deux
+boutons**, pas un seuil :
+
+> « Déplacer des segments : cliquez sur un segment de fil horizontal ou
+> vertical, glissez-le pour ajuster sa position **sans déconnecter les
+> blocs**. »
+> « Créer une dérivation : cliquez avec le bouton **droit** sur un fil
+> existant, glissez le curseur vers le nouveau bloc. »
+
+D'où la règle définitive, sur un fil :
+
+| geste | effet |
+|---|---|
+| clic gauche | **désigne** le fil (les flèches le déplacent ensuite) |
+| glissé gauche perpendiculaire | **déplace le segment** |
+| glissé au bouton **droit** | **dérive** — un fil neuf naît de celui-là |
+| clic droit sans glissé | menu contextuel, comme avant |
+
+Sur une **broche**, rien ne change : le bouton gauche câble, comme dans
+Simulink où l'on tire un signal d'un port à la souris.
+
+Ce que ce partage débloque, et qui n'était pas atteignable autrement : un fil
+devient **touchable**. Avant, le montrer en faisait pousser un autre.
+
+Le seuil de glissé de Qt reste, mais pour une seule question désormais : un
+clic gauche a-t-il bougé assez pour être un déplacement plutôt qu'une
+désignation.
+
 ## Ce qui reste à faire
 
 Les points 2 (auto-routage orthogonal), 5 (reroutage à dérangement minimal
 lors du déplacement d'un **composant**) et 7 (échappatoire en tracé libre) ne
 sont toujours pas écrits.
+
+Trois gestes de Simulink relevés par l'utilisateur et **non repris** :
+
+- **insérer un composant sur un fil** en le glissant par-dessus : le fil se
+  coupe et le composant s'intercale. Rien de tel ici — c'est le manque le
+  plus utile de la liste ;
+- **`Ctrl+R` pour redresser** un fil tordu (*Smart Signal Routing*) ;
+- **`Maj` pendant le glissé** pour forcer les angles droits — sans objet
+  chez nous, où tout fil est déjà tracé en équerre.
 
 ## Sources ajoutées
 
