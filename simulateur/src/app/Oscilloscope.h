@@ -179,6 +179,9 @@ public:
     // chercher où sont les réglages.
     void sonder_par_defaut();
     void definir_base_temps(double secondes);
+    // La durée réellement AFFICHÉE, en secondes. Exposée pour le banc : le
+    // sélecteur et la trace peuvent diverger, et c'est arrivé.
+    double fenetre_affichee() const;
 
     // Compte rendu chiffré des voies : moyenne, crête, rapport cyclique, et
     // concordance entre les deux premières voies. Sert à vérifier sans se

@@ -429,7 +429,6 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
                                 ? QString("%1 ms").arg(fenetre * 1000, 0, 'g', 3)
                                 : QString("%1 s").arg(fenetre, 0, 'g', 3),
                             fenetre);
-    base_temps->setCurrentIndex(7);            // 500 ms
     connect(base_temps, &QComboBox::currentIndexChanged, this,
             [this, base_temps](int) {
                 const double fenetre = base_temps->currentData().toDouble();
@@ -441,6 +440,17 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
                 emit resolution_souhaitee(
                     std::clamp(fenetre / 1000.0, 5e-6, 50e-6));
             });
+    // LA VALEUR DE DÉPART SE POSE APRÈS LA CONNEXION.
+    //
+    // Elle se posait avant : `setCurrentIndex` ne déclenchait alors personne,
+    // et la trace gardait sa fenêtre par défaut — cinquante millisecondes —
+    // pendant que le sélecteur affichait « 500 ms ». Dix fois trop étroite,
+    // sans que rien plante ni ne paraisse vide.
+    //
+    // C'est le pire genre de défaut d'interface : le réglage affiché est un
+    // mensonge. Sur un clignotant d'une demi-seconde, l'élève ne voyait qu'un
+    // trait plat et en concluait que son programme ne marchait pas.
+    base_temps->setCurrentIndex(7);            // 500 ms
 
     auto* echelle = new QComboBox;
     for (double volts : {0.1, 0.25, 0.5, 1.0, 2.0, 5.0})
@@ -894,6 +904,10 @@ void Oscilloscope::sonder_par_defaut() {
         sonder(signal);
         ++poses;
     }
+}
+
+double Oscilloscope::fenetre_affichee() const {
+    return trace_ ? trace_->fenetre() : 0.0;
 }
 
 void Oscilloscope::definir_base_temps(double secondes) {

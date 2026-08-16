@@ -3722,6 +3722,38 @@ static void test_depart_sur_fil_detruit() {
 }
 
 // ---------------------------------------------------------------------------
+// Ce que le sélecteur annonce doit être ce que l'écran dessine
+//
+// L'oscilloscope s'ouvrait sur « Base de temps : 500 ms » en affichant une
+// fenêtre de 50 ms — dix fois trop étroite. `setCurrentIndex(7)` était appelé
+// AVANT le `connect` : le réglage initial n'atteignait jamais la trace, qui
+// gardait sa valeur par défaut.
+//
+// C'est le pire genre de défaut d'interface : rien ne plante, rien n'est
+// vide, et le réglage affiché est un mensonge. Sur un clignotant d'une demi-
+// seconde, l'élève ne voit qu'un trait plat et conclut que son programme ne
+// marche pas.
+// ---------------------------------------------------------------------------
+static void test_base_de_temps_annoncee_est_celle_dessinee() {
+    std::printf("\n-- la base de temps affichée est celle qui est dessinée --\n");
+
+    Oscilloscope scope;
+    verifier(std::fabs(scope.fenetre_affichee() - 0.5) < 1e-9,
+             "à l'ouverture, l'écran couvre bien les 500 ms annoncées",
+             std::to_string(scope.fenetre_affichee()) + " s");
+
+    // Et le réglage suit, dans les deux sens.
+    scope.definir_base_temps(0.02);
+    verifier(std::fabs(scope.fenetre_affichee() - 0.02) < 1e-9,
+             "choisir 20 ms rétrécit la fenêtre pour de bon",
+             std::to_string(scope.fenetre_affichee()) + " s");
+    scope.definir_base_temps(2.0);
+    verifier(std::fabs(scope.fenetre_affichee() - 2.0) < 1e-9,
+             "et choisir 2 s l'élargit",
+             std::to_string(scope.fenetre_affichee()) + " s");
+}
+
+// ---------------------------------------------------------------------------
 // Un panneau vide ne garde pas sa place
 //
 // « Propriétés » occupait 260 pixels en permanence pour afficher
@@ -4549,6 +4581,7 @@ int main(int argc, char** argv) {
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
+    test_base_de_temps_annoncee_est_celle_dessinee();
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
     test_glisser_sans_deplacer_ne_laisse_rien();
