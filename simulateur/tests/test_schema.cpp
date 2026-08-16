@@ -3724,6 +3724,58 @@ static void test_depart_sur_fil_detruit() {
 }
 
 // ---------------------------------------------------------------------------
+// La tension AUX BORNES d'un composant
+//
+// Elle manquait : les signaux observables n'étaient que des potentiels de
+// nœuds et des courants. Or c'est la grandeur qu'on cherche dès qu'on quitte
+// les montages où tout se mesure par rapport à la masse — la tension aux
+// bornes du condensateur d'un filtre, de la bobine, de la résistance haute
+// d'un pont diviseur.
+//
+// Aucune raison de la réserver aux condensateurs : tout dipôle en a une.
+// ---------------------------------------------------------------------------
+static void test_tension_aux_bornes() {
+    std::printf("\n-- la tension aux bornes d'un dipôle --\n");
+
+    // Un pont diviseur : 9 V, deux résistances égales. La tension aux bornes
+    // de celle du HAUT vaut 4,5 V, alors qu'AUCUN potentiel de nœud ne vaut
+    // 4,5 V par rapport à la masse — c'est exactement ce qu'un potentiel ne
+    // sait pas dire.
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* pile = scene->ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* haute = scene->ajouter_composant("resistance", QPointF(300, -100));
+    ItemComposant* basse = scene->ajouter_composant("resistance", QPointF(300, 100));
+    ItemComposant* masse = scene->ajouter_composant("masse", QPointF(0, 300));
+    if (!pile || !haute || !basse || !masse) return;
+    pile->valeurs["volts"] = 9.0;
+    haute->valeurs["ohms"] = 1000.0;
+    basse->valeurs["ohms"] = 1000.0;
+    scene->addItem(new ItemFil(pile, 0, haute, 0));
+    scene->addItem(new ItemFil(haute, 1, basse, 0));
+    scene->addItem(new ItemFil(basse, 1, masse, 0));
+    scene->addItem(new ItemFil(pile, 1, masse, 0));
+
+    // Le signal existe, et il est nommé pour un humain.
+    const QStringList signaux = fenetre.signaux_observables();
+    const QString attendu = QString("U(%1)").arg(haute->reference());
+    verifier(signaux.contains(attendu),
+             "la tension aux bornes de la résistance est proposée",
+             attendu.toStdString());
+    verifier(signaux.contains(QString("I(%1)").arg(haute->reference())),
+             "le courant l'est toujours aussi");
+
+    // …et il vaut la différence des deux potentiels, pas l'un des deux.
+    const std::map<QString, QString> libelles = fenetre.libelles_signaux();
+    verifier(libelles.count(attendu) > 0
+                 && libelles.at(attendu).contains("aux bornes"),
+             "et son libellé dit ce qu'il mesure",
+             libelles.count(attendu) ? libelles.at(attendu).toStdString() : "");
+}
+
+// ---------------------------------------------------------------------------
 // Ce qu'un audit a trouvé derrière les changements du jour
 //
 // Trois défauts, dont deux introduits le jour même, et tous les trois
@@ -4736,6 +4788,7 @@ int main(int argc, char** argv) {
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
+    test_tension_aux_bornes();
     test_scope_supprime_ne_hante_pas();
     test_scope_survit_a_une_annulation();
     test_fermer_ferme_les_fenetres_detachees();

@@ -156,17 +156,58 @@ double TraceOscilloscope::concordance(int a, int b) const {
     return total ? static_cast<double>(accord) / total : 0.0;
 }
 
-const std::vector<double>* TraceOscilloscope::courbe_pour(
-    const coeur::Formes& formes, const QString& designation) {
-    if (designation.isEmpty()) return nullptr;
+std::vector<double> TraceOscilloscope::courbe_pour(
+    const coeur::Formes& formes, const QString& designation) const {
+    if (designation.isEmpty()) return {};
+
+    auto potentiel = [&formes](const QString& noeud) -> const std::vector<double>* {
+        if (noeud.isEmpty()) return nullptr;
+        auto it = formes.tensions.find(noeud.toLower().toStdString());
+        return it == formes.tensions.end() ? nullptr : &it->second;
+    };
+
     if (designation.startsWith("I(") && designation.endsWith(")")) {
         const std::string reference =
             designation.mid(2, designation.size() - 3).toLower().toStdString();
         auto it = formes.courants.find(reference);
-        return it == formes.courants.end() ? nullptr : &it->second;
+        return it == formes.courants.end() ? std::vector<double>{} : it->second;
     }
-    auto it = formes.tensions.find(designation.toLower().toStdString());
-    return it == formes.tensions.end() ? nullptr : &it->second;
+
+    // LA TENSION AUX BORNES, et non le potentiel d'un point.
+    //
+    // C'est la grandeur qu'on cherche dès qu'on quitte les montages où tout
+    // se mesure par rapport à la masse : la tension aux bornes d'un
+    // condensateur dans un filtre, d'une bobine, de la résistance haute d'un
+    // pont diviseur. Un oscilloscope d'atelier la donne avec deux sondes et
+    // une soustraction mentale ; ici on la calcule.
+    if (designation.startsWith("U(") && designation.endsWith(")")) {
+        const QString reference = designation.mid(2, designation.size() - 3);
+        auto it = bornes_.find(reference);
+        if (it == bornes_.end()) return {};
+        const std::vector<double>* a = potentiel(it->second.first);
+        const std::vector<double>* b = potentiel(it->second.second);
+        // Une borne EN L'AIR n'a pas de potentiel calculé : le nœud n'existe
+        // pas dans la trame. On la prend pour zéro plutôt que de ne rien
+        // tracer — c'est le comportement d'une sonde dont la pince est en
+        // l'air, et le tracé plat dit alors la vérité.
+        const std::size_t points =
+            std::max(a ? a->size() : 0u, b ? b->size() : 0u);
+        std::vector<double> difference(points, 0.0);
+        for (std::size_t k = 0; k < points; ++k) {
+            const double va = (a && k < a->size()) ? (*a)[k] : 0.0;
+            const double vb = (b && k < b->size()) ? (*b)[k] : 0.0;
+            difference[k] = va - vb;
+        }
+        return difference;
+    }
+
+    const std::vector<double>* courbe = potentiel(designation);
+    return courbe ? *courbe : std::vector<double>{};
+}
+
+void Oscilloscope::definir_bornes(
+    const std::map<QString, std::pair<QString, QString>>& bornes) {
+    if (trace_) trace_->definir_bornes(bornes);
 }
 
 void TraceOscilloscope::ajouter(const coeur::Formes& formes,
@@ -174,16 +215,15 @@ void TraceOscilloscope::ajouter(const coeur::Formes& formes,
     if (gele_ || formes.vide()) return;
 
     // Les courbes sont recherchées une seule fois par trame, pas par point.
-    const std::vector<double>* courbes[kVoies] = {};
+    std::vector<double> courbes[kVoies];
     for (int v = 0; v < kVoies; ++v)
         courbes[v] = courbe_pour(formes, voies_[v].designation);
 
     for (size_t k = 0; k < formes.temps.size(); ++k) {
         temps_.push_back(static_cast<float>(instant_debut + formes.temps[k]));
         for (int v = 0; v < kVoies; ++v) {
-            const std::vector<double>* courbe = courbes[v];
-            const double valeur =
-                (courbe && k < courbe->size()) ? (*courbe)[k] : 0.0;
+            const std::vector<double>& courbe = courbes[v];
+            const double valeur = k < courbe.size() ? courbe[k] : 0.0;
             voies_[v].valeurs.push_back(static_cast<float>(valeur));
         }
     }

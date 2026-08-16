@@ -97,6 +97,13 @@ public:
 
     // Mesures de l'oscilloscope, en texte (vérification automatique).
     QString mesures_oscilloscope() const;
+    // Ce que l'on peut observer, et ce que chaque nom désigne. Exposés pour
+    // le banc : la liste des signaux est une promesse faite à l'utilisateur,
+    // et une promesse se vérifie.
+    QStringList signaux_observables() const { return derniers_signaux_; }
+    std::map<QString, QString> libelles_signaux() const {
+        return derniers_libelles_;
+    }
 
     // Analyses paramétriques. `rang` : 0 balayage continu, 1 réponse en
     // fréquence, 2 spectre. Le compte rendu textuel sert à la vérification

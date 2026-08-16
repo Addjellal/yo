@@ -2240,6 +2240,26 @@ void FenetrePrincipale::circuit_modifie() {
     for (const coeur::Instance& instance : netlist.instances())
         signaux << QString("I(%1)").arg(
             QString::fromStdString(instance.reference));
+
+    // LA TENSION AUX BORNES DE CHAQUE COMPOSANT À DEUX BORNES.
+    //
+    // Elle manquait, et c'est la grandeur qu'on cherche dès qu'on quitte les
+    // montages où tout se mesure par rapport à la masse : la tension aux
+    // bornes du condensateur d'un filtre, de la bobine, de la résistance
+    // haute d'un pont diviseur, de la diode qu'on caractérise. Un potentiel
+    // de nœud ne la donne pas — il faut la différence de deux.
+    //
+    // Aucune raison de la réserver aux condensateurs et aux bobines : tout
+    // dipôle en a une, et c'est le même calcul.
+    std::map<QString, std::pair<QString, QString>> bornes;
+    for (const coeur::Instance& instance : netlist.instances()) {
+        if (instance.bornes.size() != 2) continue;
+        const QString reference = QString::fromStdString(instance.reference);
+        bornes[reference] = {
+            QString::fromStdString(instance.bornes[0].noeud),
+            QString::fromStdString(instance.bornes[1].noeud)};
+        signaux << QString("U(%1)").arg(reference);
+    }
     signaux.sort();
 
     // Un nom de nœud ne dit rien tout seul : on lui joint ce qu'il relie, et
@@ -2254,6 +2274,13 @@ void FenetrePrincipale::circuit_modifie() {
                 .arg(reference,
                      modele ? " (" + QString::fromStdString(modele->libelle) + ")"
                             : QString());
+        if (instance.bornes.size() == 2)
+            libelles[QString("U(%1)").arg(reference)] =
+                QString("tension aux bornes de %1%2")
+                    .arg(reference,
+                         modele
+                             ? " (" + QString::fromStdString(modele->libelle) + ")"
+                             : QString());
     }
     libelles["GND"] = "masse, 0 V";
     libelles["5V"] = "alimentation 5 V";
@@ -2297,6 +2324,7 @@ void FenetrePrincipale::circuit_modifie() {
         if (composant->modele() && composant->modele()->type == "scope") {
             Oscilloscope* scope = scope_pour(composant);
             if (!scope) continue;
+            scope->definir_bornes(bornes);
             scope->proposer_signaux(signaux, libelles);
             for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
                 const QString noeud = scene_->noeud_de(composant, voie);

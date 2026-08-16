@@ -151,8 +151,26 @@ private:
 
     void purger();
     // Cherche la courbe correspondant à une désignation dans une trame.
-    static const std::vector<double>* courbe_pour(const coeur::Formes& formes,
-                                                  const QString& designation);
+    //
+    // Elle rend une COPIE, et non un pointeur dans la trame, parce qu'une
+    // désignation ne renvoie pas toujours à une courbe existante : la tension
+    // AUX BORNES d'un composant se calcule, point par point, comme la
+    // différence de deux potentiels. Le coût est une recopie par voie et par
+    // trame — quelques milliers de doubles, sans commune mesure avec le
+    // calcul du circuit qui les produit.
+    std::vector<double> courbe_pour(const coeur::Formes& formes,
+                                    const QString& designation) const;
+
+    // Les deux nœuds de chaque composant à deux bornes, par référence. C'est
+    // ce qui permet de tracer « U(R1) » sans que l'oscilloscope connaisse le
+    // schéma : on lui donne la table, il fait la soustraction.
+    std::map<QString, std::pair<QString, QString>> bornes_;
+
+public:
+    void definir_bornes(
+        const std::map<QString, std::pair<QString, QString>>& bornes) {
+        bornes_ = bornes;
+    }
 };
 
 // Le panneau complet : la zone de tracé et ses réglages.
@@ -170,6 +188,11 @@ public:
     // veut rien dire pour qui vient de dessiner le montage.
     void proposer_signaux(const QStringList& signaux,
                           const std::map<QString, QString>& libelles = {});
+
+    // La table des bornes, transmise à la trace : « U(R1) » a besoin de
+    // savoir entre QUELS nœuds mesurer.
+    void definir_bornes(
+        const std::map<QString, std::pair<QString, QString>>& bornes);
 
     // Voie affectée automatiquement quand on clique un fil du schéma.
     void sonder(const QString& designation);
