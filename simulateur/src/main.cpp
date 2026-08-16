@@ -11,6 +11,7 @@
 #include <QTextStream>
 #include <QTimer>
 
+#include "app/Apparence.h"
 #include "app/FenetrePrincipale.h"
 #include "app/panels/PanneauPcb.h"
 #include "app/schematic/ItemComposant.h"
@@ -87,6 +88,14 @@ int main(int argc, char** argv) {
     QFont police = application.font();
     police.setPointSizeF(police.pointSizeF() + 0.5);
     application.setFont(police);
+
+    // L'IDENTITÉ VISUELLE, POSÉE UNE FOIS POUR TOUTE L'APPLICATION.
+    //
+    // Il n'y en avait aucune : Qt par défaut, plus quatre feuilles de style
+    // écrites à la main dans quatre endroits, qui ne s'accordaient même pas
+    // sur la couleur de survol. Une interface sans palette a autant de
+    // palettes qu'elle a d'endroits où l'on a eu besoin d'une couleur.
+    application.setStyleSheet(apparence::feuille(apparence::claire()));
 
     FenetrePrincipale fenetre;
 

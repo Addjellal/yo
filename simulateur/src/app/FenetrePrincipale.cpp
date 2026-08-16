@@ -616,10 +616,28 @@ void FenetrePrincipale::construire_docks() {
     // du bas qui décide, et c'est l'utilisateur qui décide de celle-là.
     editeur_source_->setMinimumHeight(70);
     disposition->addWidget(editeur_source_);
-    auto* bouton = new QPushButton("Compiler avec avr-gcc et charger");
+    auto* bouton = new QPushButton("Compiler et charger");
+    // LE bouton de cette page : il porte l'accent, et il est le seul.
+    //
+    // Il s'appelait « Compiler avec avr-gcc et charger » — le nom de l'outil
+    // dans le bouton. L'utilisateur n'a pas à savoir qu'il existe un programme
+    // nommé avr-gcc pour appuyer dessus ; et s'il l'apprend, c'est par le
+    // journal, quand quelque chose échoue.
+    bouton->setProperty("principal", true);
+    bouton->setShortcut(QKeySequence(Qt::Key_F5));
+    bouton->setToolTip("Compile le programme et le charge dans la carte (F5).");
     connect(bouton, &QPushButton::clicked, this,
             &FenetrePrincipale::compiler_source);
-    disposition->addWidget(bouton);
+    // À DROITE, ET À SA TAILLE.
+    //
+    // Il barrait toute la largeur de la fenêtre — mille cinq cents pixels de
+    // bleu pour une commande qui n'en demande cent cinquante. Un bouton
+    // pleine largeur crie sans rien dire de plus, et il écrase le seul objet
+    // qui compte sur cette page : le code.
+    auto* pied = new QHBoxLayout;
+    pied->addStretch(1);
+    pied->addWidget(bouton);
+    disposition->addLayout(pied);
     onglets->addTab(page_source, "Programme (Arduino)");
 
     console_ = new QPlainTextEdit;
@@ -796,10 +814,11 @@ void FenetrePrincipale::construire_docks() {
     // retrouvent collées aux barres de défilement du schéma et de la palette :
     // on visait la poignée, on attrapait la barre, et la page glissait au lieu
     // de se redimensionner. Sept pixels, teintés au survol, se visent.
-    setStyleSheet(
-        "QMainWindow::separator { background: #c8ccc8; width: 7px; "
-        "height: 7px; }"
-        "QMainWindow::separator:hover { background: #6f9f6f; }");
+    // Les poignées de redimensionnement, la barre de pages et la barre
+    // principale portaient chacune leur propre feuille de style, écrite à la
+    // main ici. Elles vivent désormais dans `apparence::feuille()`, avec tout
+    // le reste — c'est la seule façon qu'une couleur de survol soit la même
+    // partout sans qu'on ait à y penser.
 }
 
 void FenetrePrincipale::construire_actions() {
@@ -963,11 +982,6 @@ void FenetrePrincipale::construire_actions() {
     barre_pages->setObjectName("barre_pages");
     barre_pages->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     barre_pages->setMovable(false);
-    barre_pages->setStyleSheet(
-        "QToolBar { spacing: 4px; padding: 3px; }"
-        "QToolButton { padding: 4px 12px; border-radius: 4px; }"
-        "QToolButton:hover { background: #e6eef5; }"
-        "QToolButton:checked { background: #cfe0f2; font-weight: bold; }");
 
     action_page_schema_ = barre_pages->addAction("Schéma");
     action_page_schema_->setCheckable(true);
@@ -989,13 +1003,6 @@ void FenetrePrincipale::construire_actions() {
     barre->setObjectName("barre_principale");
     barre->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     barre->setMovable(false);
-    // Un peu d'air autour des commandes : une barre d'outils compacte se lit
-    // mal, et les deux boutons qui comptent doivent sauter aux yeux.
-    barre->setStyleSheet(
-        "QToolBar { spacing: 4px; padding: 3px; }"
-        "QToolButton { padding: 4px 10px; border-radius: 4px; }"
-        "QToolButton:hover { background: #e6eef5; }"
-        "QToolButton:checked { background: #d7e6f5; }");
 
     barre_schema_ = barre;
 

@@ -264,6 +264,7 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     # La fenêtre entre ici pour la même raison : ses commandes — pivoter,
     # supprimer, changer de page — se vérifient sans ouvrir l'application, et
     # ce sont justement celles où une erreur de portée est invisible à l'œil.
+    src/app/Apparence.cpp
     src/app/FenetrePrincipale.cpp
   )
   target_link_libraries(schema PUBLIC coeur Qt6::Widgets)
