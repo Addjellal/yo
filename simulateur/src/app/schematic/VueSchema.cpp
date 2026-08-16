@@ -113,3 +113,25 @@ void VueSchema::dropEvent(QDropEvent* evenement) {
     emit composant_depose(type, mapToScene(evenement->position().toPoint()));
     evenement->acceptProposedAction();
 }
+
+void VueSchema::poser_ilot(QWidget* ilot) {
+    ilot_ = ilot;
+    if (!ilot_) return;
+    ilot_->setParent(this);
+    ilot_->raise();
+    ilot_->show();
+    replacer_ilot();
+}
+
+void VueSchema::replacer_ilot() {
+    if (!ilot_) return;
+    const int marge = 14;
+    ilot_->adjustSize();
+    ilot_->move(width() - ilot_->width() - marge,
+                height() - ilot_->height() - marge);
+}
+
+void VueSchema::resizeEvent(QResizeEvent* evenement) {
+    QGraphicsView::resizeEvent(evenement);
+    replacer_ilot();
+}

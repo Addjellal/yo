@@ -88,8 +88,19 @@
 namespace {
 // Un seul endroit pour ces clés : elles se retrouvent dans le registre de
 // l'utilisateur, et une faute de frappe y perdrait sa disposition en silence.
-constexpr char kCleGeometrie[] = "disposition/geometrie";
-constexpr char kCleEtat[] = "disposition/etat";
+// LA CLÉ PORTE UN NUMÉRO, ET IL COMPTE.
+//
+// La disposition enregistrée sur la machine de l'utilisateur ÉCRASE celle que
+// le code met en place au démarrage. Tant que la clé ne change pas, une
+// refonte de la disposition est donc invisible pour quiconque a déjà lancé
+// l'application une fois : il continue de voir l'ancienne, et il n'a aucun
+// moyen de le deviner.
+//
+// Le numéro se change à chaque refonte. L'ancienne disposition est alors
+// simplement ignorée — c'est le prix, et il est juste : on ne peut pas
+// deviner comment reporter des panneaux d'hier sur une fenêtre d'aujourd'hui.
+constexpr char kCleGeometrie[] = "disposition2/geometrie";
+constexpr char kCleEtat[] = "disposition2/etat";
 
 // La portée d'enregistrement suit l'identité de l'application, au lieu de
 // noms écrits en dur ici.
@@ -216,6 +227,16 @@ namespace {
 // ---------------------------------------------------------------------------
 PaletteComposants::PaletteComposants(QWidget* parent) : QTreeWidget(parent) {
     setHeaderHidden(true);
+    // DE LA PLACE POUR LES NOMS, prise sur ce qui n'en dit aucun.
+    //
+    // Le retrait par défaut de Qt vaut vingt pixels par niveau, et il n'y a
+    // que deux niveaux ici : une catégorie, des composants. Ces pixels-là
+    // étaient perdus pour le nom, qui s'affichait « Capteur analogiq… ». Un
+    // catalogue dont les entrées sont coupées ne se parcourt pas — on ne
+    // choisit pas ce qu'on ne peut pas lire.
+    setIndentation(12);
+    setIconSize(QSize(16, 16));
+    setUniformRowHeights(true);
     setDragEnabled(true);
     setDragDropMode(QAbstractItemView::DragOnly);
     setSelectionMode(QAbstractItemView::SingleSelection);
@@ -557,6 +578,14 @@ void FenetrePrincipale::construire_docks() {
     dock_proprietes->setWidget(panneau_proprietes_);
     addDockWidget(Qt::RightDockWidgetArea, dock_proprietes);
     docks_schema_.push_back(dock_proprietes);
+    dock_proprietes_ = dock_proprietes;
+    // UN PANNEAU VIDE NE GARDE PAS SA PLACE.
+    //
+    // Il occupait 260 pixels en permanence pour afficher « Sélectionnez un
+    // composant » — un quart de la largeur utile, pris à la seule chose que
+    // l'utilisateur regarde. Il n'apparaît plus qu'avec une sélection, et
+    // s'efface dès qu'il n'a plus rien à montrer.
+    dock_proprietes->hide();
 
     // --- programme et console, en onglets
     auto* onglets = new QTabWidget(this);
@@ -803,12 +832,21 @@ void FenetrePrincipale::construire_docks() {
     dock_bas->setWidget(onglets);
     addDockWidget(Qt::BottomDockWidgetArea, dock_bas);
     docks_schema_.push_back(dock_bas);
-    resizeDocks({dock_bas}, {300}, Qt::Vertical);
+    // Le panneau du bas prenait un tiers de la hauteur pour montrer quatre
+    // lignes de code. Il s'ouvre à la hauteur d'un vrai extrait, et c'est
+    // l'utilisateur qui l'agrandit quand il édite pour de bon.
+    resizeDocks({dock_bas}, {210}, Qt::Vertical);
 
     // Largeurs de départ des panneaux latéraux. Sans cela, Qt les répartit au
     // jugé et la palette s'ouvrait amputée.
-    resizeDocks({docks_schema_.front(), dock_proprietes}, {250, 260},
-                Qt::Horizontal);
+    // La palette garde de quoi lire un nom en entier : rétrécie à 230, elle
+    // affichait « Capteur analogiq… », « Codeur incrémen… ». La place rendue
+    // au schéma doit venir du panneau VIDE, pas de celui qui travaille.
+    // La palette SEULE : redimensionner un panneau caché ne fait rien, et
+    // Qt renonce alors à la paire entière — la palette restait à la largeur
+    // que Qt lui avait donnée au jugé, noms coupés compris.
+    resizeDocks({docks_schema_.front()}, {265}, Qt::Horizontal);
+    resizeDocks({dock_proprietes}, {260}, Qt::Horizontal);
 
     // Les poignées de redimensionnement font 4 pixels par défaut, et se
     // retrouvent collées aux barres de défilement du schéma et de la palette :
@@ -1036,13 +1074,40 @@ void FenetrePrincipale::construire_actions() {
     outils->addAction(selection);
     outils->addAction(gomme);
 
-    barre->addSeparator();
-    barre->addAction("Zoom +", this, [this] { vue_->zoomer(1.25); });
-    barre->addAction("Zoom −", this, [this] { vue_->zoomer(1 / 1.25); });
-    barre->addAction("Ajuster", this, [this] { vue_->ajuster(); });
+    // LE ZOOM DESCEND SUR LA FEUILLE.
+    //
+    // Il vivait en haut de la fenêtre, à un mètre visuel de l'endroit qu'on
+    // regarde en zoomant. Les cartes et les logiciels de dessin l'ont tous
+    // descendu SUR le dessin depuis quinze ans, pour la même raison : la main
+    // et l'œil y sont déjà. L'îlot flotte en bas à droite de la vue.
+    auto* ilot = new QWidget;
+    ilot->setObjectName("ilot_vue");
+    auto* rang = new QHBoxLayout(ilot);
+    rang->setContentsMargins(4, 4, 4, 4);
+    rang->setSpacing(2);
+    auto bouton_ilot = [&](const QString& texte, const QString& aide,
+                           auto action) {
+        auto* b = new QPushButton(texte);
+        b->setToolTip(aide);
+        b->setCursor(Qt::PointingHandCursor);
+        b->setProperty("ilot", true);
+        connect(b, &QPushButton::clicked, this, action);
+        rang->addWidget(b);
+        return b;
+    };
+    bouton_ilot("−", "Reculer (Ctrl+molette)", [this] { vue_->zoomer(1 / 1.25); });
+    bouton_ilot("+", "Approcher (Ctrl+molette)", [this] { vue_->zoomer(1.25); });
+    bouton_ilot("Ajuster", "Voir tout le schéma (Ctrl+0)",
+                [this] { vue_->ajuster(); });
+    vue_->poser_ilot(ilot);
 
     auto* simulation = menuBar()->addMenu("&Simulation");
-    barre->addSeparator();
+    // Ce qui LANCE est poussé à droite, loin de ce qui DESSINE. Les deux
+    // familles se touchaient au milieu de la barre, et rien ne disait qu'un
+    // bouton modifiait le schéma quand le voisin faisait tourner le temps.
+    auto* ressort = new QWidget;
+    ressort->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    barre->addWidget(ressort);
     simulation->addAction("Charger un &firmware (.elf)…", this,
                           &FenetrePrincipale::ouvrir_firmware);
     simulation->addAction("Ouvrir un &programme C…", this,
@@ -1709,9 +1774,12 @@ void FenetrePrincipale::afficher_page(int page) {
                     : dock->width());
     }
     pages_->setCurrentIndex(page);
+    page_courante_ = page;
     // Les outils du schéma n'ont rien à faire sur la carte : la palette de
     // composants, les propriétés et le journal appartiennent à la saisie.
     for (QDockWidget* dock : docks_schema_) dock->setVisible(page == 0);
+    // …sauf les propriétés, qui n'apparaissent qu'avec une sélection.
+    if (dock_proprietes_ && (page == 1 || !selection_)) dock_proprietes_->hide();
     if (page == 0 && tailles_docks_.size() == docks_schema_.size()) {
         // Après le retour à l'affichage, pas avant : Qt doit avoir refait sa
         // mise en page pour qu'un redimensionnement de panneau prenne effet.
@@ -2438,8 +2506,14 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
 
     if (!composant || !composant->modele()) {
         formulaire_->addRow(new QLabel("Sélectionnez un composant."));
+        // Rien à montrer : le panneau rend sa place au schéma. Il ne se cache
+        // que sur la page du schéma — sur celle du circuit imprimé il est
+        // déjà masqué par le changement de page, et le rappeler ici ferait
+        // clignoter la disposition à chaque désélection.
+        if (dock_proprietes_ && page_courante_ == 0) dock_proprietes_->hide();
         return;
     }
+    if (dock_proprietes_ && page_courante_ == 0) dock_proprietes_->show();
     const coeur::Modele* modele = composant->modele();
     formulaire_->addRow("Référence", new QLabel(composant->reference()));
     formulaire_->addRow("Type", new QLabel(QString::fromStdString(modele->libelle)));

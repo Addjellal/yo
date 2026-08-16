@@ -3722,6 +3722,51 @@ static void test_depart_sur_fil_detruit() {
 }
 
 // ---------------------------------------------------------------------------
+// Un panneau vide ne garde pas sa place
+//
+// « Propriétés » occupait 260 pixels en permanence pour afficher
+// « Sélectionnez un composant » — un quart de la largeur utile, pris à la
+// seule chose que l'utilisateur regarde. Il n'apparaît plus qu'avec une
+// sélection.
+// ---------------------------------------------------------------------------
+static void test_proprietes_rendent_la_place() {
+    std::printf("\n-- le panneau des propriétés rend sa place --\n");
+
+    FenetrePrincipale fenetre;
+    QDockWidget* proprietes = nullptr;
+    for (QDockWidget* dock : fenetre.findChildren<QDockWidget*>())
+        if (dock->objectName() == "dock_proprietes") proprietes = dock;
+    verifier(proprietes != nullptr, "le panneau des propriétés existe");
+    if (!proprietes) return;
+
+    verifier(proprietes->isHidden(),
+             "au démarrage, sans sélection, il est effacé");
+
+    // On passe par le VRAI chemin — un clic sur le corps du composant —
+    // plutôt que par la méthode qui met à jour le panneau : c'est le chemin
+    // que l'utilisateur emprunte, et le seul dont la rupture se verrait.
+    SceneSchema* scene = fenetre.scene();
+    // UNE CARTE, PAS UNE RÉSISTANCE, et loin du montage d'exemple.
+    //
+    // Le corps d'une résistance ne fait que soixante unités : son centre est
+    // à trente unités de chaque borne, c'est-à-dire DANS le rayon de capture
+    // des broches. `viser()` y répond « broche », le clic tire un fil, et
+    // rien n'est sélectionné. Le montage d'essai était trop petit — le code,
+    // lui, faisait exactement ce qu'on lui demande.
+    ItemComposant* r =
+        scene->ajouter_composant("arduino_uno", QPointF(-1500, -1500));
+    envoyer(*scene, QEvent::GraphicsSceneMousePress, r->pos());
+    envoyer(*scene, QEvent::GraphicsSceneMouseRelease, r->pos());
+    verifier(!proprietes->isHidden(),
+             "il apparaît dès qu'un composant est sélectionné");
+
+    envoyer(*scene, QEvent::GraphicsSceneMousePress, QPointF(-4000, -4000));
+    envoyer(*scene, QEvent::GraphicsSceneMouseRelease, QPointF(-4000, -4000));
+    verifier(proprietes->isHidden(),
+             "et il s'efface dès que la sélection tombe");
+}
+
+// ---------------------------------------------------------------------------
 // Déplacer un segment de fil, comme dans Simulink
 //
 // « Le mouvement des fils quand on appuie dessus une fois branché est loin
@@ -4504,6 +4549,7 @@ int main(int argc, char** argv) {
     test_annulation_des_fils();
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
+    test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();

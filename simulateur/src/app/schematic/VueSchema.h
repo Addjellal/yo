@@ -21,7 +21,19 @@ public:
     void zoomer(double facteur);
     void ajuster();
 
+    // L'ÎLOT DE COMMANDES, POSÉ SUR LA FEUILLE.
+    //
+    // Le zoom vivait dans la barre d'outils, tout en haut, à un mètre visuel
+    // de l'endroit qu'on regarde en zoomant. Toutes les cartes et tous les
+    // logiciels de dessin l'ont descendu SUR le dessin depuis quinze ans,
+    // pour la même raison : la main et l'œil sont déjà là.
+    //
+    // Il flotte au-dessus de la vue, en bas à droite, et se repositionne
+    // seul quand la fenêtre change de taille.
+    void poser_ilot(QWidget* ilot);
+
 protected:
+    void resizeEvent(QResizeEvent* evenement) override;
     void wheelEvent(QWheelEvent* evenement) override;
     void mousePressEvent(QMouseEvent* evenement) override;
     void mouseMoveEvent(QMouseEvent* evenement) override;
@@ -37,4 +49,6 @@ private:
     // Glissement du schéma au bouton du milieu.
     bool glissement_ = false;
     QPoint depart_glissement_;
+    QWidget* ilot_ = nullptr;
+    void replacer_ilot();
 };

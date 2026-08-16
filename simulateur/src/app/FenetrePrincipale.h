@@ -286,6 +286,10 @@ private:
     QLineEdit* saisie_serie_ = nullptr;
     QLineEdit* recherche_palette_ = nullptr;
     QDockWidget* dock_palette_ = nullptr;
+    // Le panneau des propriétés n'existe à l'écran que s'il a quelque chose à
+    // dire : on le garde donc sous la main pour le montrer et l'effacer.
+    QDockWidget* dock_proprietes_ = nullptr;
+    int page_courante_ = 0;
     QComboBox* fin_ligne_serie_ = nullptr;
     // Un QTextDocument par « carte/rang », pour que l'annulation et la
     // position du curseur survivent au changement d'onglet ou de carte.

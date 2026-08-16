@@ -194,6 +194,25 @@ QPushButton[principal="true"] {
 }
 QPushButton[principal="true"]:hover { background: %TEXTE%; border-color: %TEXTE%; }
 
+/* L'îlot posé SUR la feuille : il flotte, donc il porte une ombre portée
+   simulée par une bordure plus marquée, et ses boutons sont carrés et petits
+   — ils ne doivent pas manger le dessin qu'ils servent à regarder. */
+QWidget#ilot_vue {
+    background: %SURFACE%;
+    border: 1px solid %BORDURE%;
+    border-radius: 9px;
+}
+QPushButton[ilot="true"] {
+    min-width: 26px;
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 0;
+    background: transparent;
+    font-weight: 600;
+    color: %TEXTE_DOUX%;
+}
+QPushButton[ilot="true"]:hover { background: %ACCENT_DOUX%; color: %ACCENT%; }
+
 /* ---------- barres de défilement ---------- */
 QScrollBar:vertical, QScrollBar:horizontal {
     background: transparent;
