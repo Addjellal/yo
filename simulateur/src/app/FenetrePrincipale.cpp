@@ -667,7 +667,23 @@ void FenetrePrincipale::construire_docks() {
     pied->addStretch(1);
     pied->addWidget(bouton);
     disposition->addLayout(pied);
-    onglets->addTab(page_source, "Programme (Arduino)");
+    // PAS D'ONGLET : une fenêtre à part.
+    //
+    // Le programme n'appartient pas au bandeau des journaux. Un journal se
+    // lit, un moniteur série se regarde ; un programme s'ÉCRIT, et c'est la
+    // moitié du travail dans un projet embarqué. Il partageait deux cents
+    // pixels de hauteur avec des sorties qu'on ne fait que consulter, et il
+    // fallait choisir entre voir son code et voir ce que le compilateur en
+    // dit.
+    //
+    // Il s'ouvre d'un double-clic sur la carte — le geste de Proteus et de
+    // Wokwi — ou par son menu contextuel. Fermer la fenêtre ne perd rien :
+    // le texte vit dans l'éditeur, pas dans la fenêtre.
+    fenetre_programme_ = page_source;
+    page_source->setParent(nullptr);
+    page_source->setWindowFlags(Qt::Window);
+    page_source->setWindowTitle("Programme — simulateur");
+    page_source->resize(760, 620);
 
     console_ = new QPlainTextEdit;
     console_->setReadOnly(true);
@@ -827,7 +843,8 @@ void FenetrePrincipale::construire_docks() {
                     coeur::mesurer(dernieres_formes_.temps, *courbe), signal);
             });
 
-    auto* dock_bas = new QDockWidget("Programme et journaux", this);
+    // Le bandeau ne contient plus de programme : il ne garde que ce qui se LIT.
+    auto* dock_bas = new QDockWidget("Journaux et mesures", this);
     dock_bas->setObjectName("dock_bas");
     dock_bas->setWidget(onglets);
     addDockWidget(Qt::BottomDockWidgetArea, dock_bas);
@@ -1190,7 +1207,7 @@ void FenetrePrincipale::construire_actions() {
         // PAS DE BOÎTE MODALE : elle recouvrait le schéma qu'elle décrivait,
         // et il fallait la fermer pour regarder ce dont elle parlait. Le
         // panneau reste ouvert pendant qu'on corrige.
-        if (onglets_) onglets_->setCurrentIndex(2);   // onglet « Contrôle »
+        montrer_onglet("Contrôle");
         for (QDockWidget* dock : docks_schema_)
             if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea
                 && !dock->isVisible())
@@ -1210,7 +1227,7 @@ void FenetrePrincipale::construire_actions() {
                          .arg(references.join(' '));
         }
         ecrire(texte);
-        onglets_->setCurrentIndex(1);
+        montrer_onglet("Journal");
     });
 
     // Les exemples se rangent PAR CARTE.
@@ -1880,7 +1897,7 @@ bool FenetrePrincipale::eventFilter(QObject* objet, QEvent* evenement) {
 }
 
 void FenetrePrincipale::ouvrir_programme(ItemComposant* carte) {
-    if (!carte || !onglets_ || !editeur_source_) return;
+    if (!carte || !editeur_source_) return;
     const QString reference = carte->reference();
 
     // Le sélecteur ne connaît que les cartes que le moteur a vues : une carte
@@ -1890,14 +1907,17 @@ void FenetrePrincipale::ouvrir_programme(ItemComposant* carte) {
     if (selecteur_carte_ && selecteur_carte_->findText(reference) >= 0)
         selecteur_carte_->setCurrentText(reference);
 
-    // Le panneau du bas peut avoir été replié : l'onglet ne servirait à rien
-    // s'il restait caché.
-    for (QDockWidget* dock : docks_schema_)
-        if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
-            dock->setVisible(true);
-
     afficher_page(0);
-    onglets_->setCurrentIndex(0);
+    if (fenetre_programme_) {
+        // Le titre dit DE QUELLE CARTE il s'agit : sur un schéma à deux
+        // microcontrôleurs, une fenêtre « Programme » tout court laisserait
+        // charger le mauvais code sans le moindre signe.
+        fenetre_programme_->setWindowTitle("Programme de " + reference
+                                           + " — simulateur");
+        fenetre_programme_->show();
+        fenetre_programme_->raise();
+        fenetre_programme_->activateWindow();
+    }
     editeur_source_->setFocus();
     // La sélection accompagne le geste : les propriétés de la carte restent
     // visibles à droite pendant qu'on écrit son programme.
@@ -2032,6 +2052,10 @@ void FenetrePrincipale::menu_contextuel(ItemComposant* composant,
                            [this, composant] {
                                ouvrir_fenetre_instrument(composant);
                            });
+        // Une carte, c'est d'abord un programme.
+        if (modele && modele->carte)
+            menu.addAction("Ouvrir le programme…", this,
+                           [this, composant] { ouvrir_programme(composant); });
         menu.addAction("Propriétés", this,
                        [this, composant] { afficher_proprietes(composant); });
         menu.addAction("Pivoter de 90°", this, [this, composant] {
@@ -2484,7 +2508,15 @@ void FenetrePrincipale::refleter_langage(const QString& reference) {
         if (modele) note = QString::fromStdString(modele->note_langage);
         break;
     }
-    onglets_->setTabText(0, "Programme (" + langage + ")");
+    // LE LANGAGE VA DANS LE TITRE DE LA FENÊTRE, plus dans un onglet.
+    //
+    // Cette ligne renommait l'onglet de rang ZÉRO. Le programme parti dans sa
+    // propre fenêtre, le rang zéro est devenu le JOURNAL — qui s'est retrouvé
+    // intitulé « Programme (Arduino) » tout en affichant des journaux. Le
+    // pire des deux mondes : la fonction marchait toujours, et elle mentait.
+    if (fenetre_programme_)
+        fenetre_programme_->setWindowTitle("Programme de " + reference + " ("
+                                           + langage + ") — simulateur");
     // Le titre de l'onglet ne tient que deux mots. Ce qui compte vraiment —
     // quels langages la vraie carte accepte, lequel le simulateur sait
     // compiler, et où les deux divergent — vit dans l'infobulle, et passe une
@@ -2801,7 +2833,7 @@ bool FenetrePrincipale::compiler_programme(bool silence_si_reussi) {
                        "aller au code fautif.")
                    .arg(nombre)
                    .arg(nombre > 1 ? "s" : ""));
-    if (onglets_) onglets_->setCurrentIndex(1);   // onglet « Journal »
+    montrer_onglet("Journal");
     for (QDockWidget* dock : docks_schema_)
         if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
             dock->setVisible(true);
@@ -2838,7 +2870,7 @@ void FenetrePrincipale::lancer() {
         if (!compiler_programme(/*silence_si_reussi=*/true)) {
             ecrire("Simulation non lancée : le programme ne compile pas. "
                    "Corrigez-le, puis relancez.");
-            afficher_onglet(1);            // le journal, où l'erreur est écrite
+            montrer_onglet("Journal");     // là où l'erreur est écrite
             return;
         }
     }
@@ -2860,6 +2892,35 @@ QString FenetrePrincipale::mesures_oscilloscope() const {
 void FenetrePrincipale::afficher_onglet(int rang) {
     if (onglets_ && rang >= 0 && rang < onglets_->count())
         onglets_->setCurrentIndex(rang);
+}
+
+// UN ONGLET SE DÉSIGNE PAR SON NOM, PAS PAR SON RANG.
+//
+// Les rangs étaient écrits en dur — « setCurrentIndex(2) // onglet Contrôle ».
+// Sortir le programme du bandeau les a tous décalés d'un cran d'un seul coup,
+// et un commentaire qui dit « Contrôle » à côté d'un 2 qui désigne le
+// moniteur série est pire que pas de commentaire : il se lit comme une
+// garantie. Le nom, lui, ne glisse pas.
+bool FenetrePrincipale::programme_est_ouvert() const {
+    return fenetre_programme_ && fenetre_programme_->isVisible();
+}
+
+QString FenetrePrincipale::titre_programme() const {
+    return fenetre_programme_ ? fenetre_programme_->windowTitle() : QString();
+}
+
+void FenetrePrincipale::montrer_onglet(const QString& titre) {
+    if (!onglets_) return;
+    for (int rang = 0; rang < onglets_->count(); ++rang)
+        if (onglets_->tabText(rang) == titre) {
+            onglets_->setCurrentIndex(rang);
+            break;
+        }
+    // Le bandeau peut avoir été replié : l'onglet ne servirait à rien caché.
+    for (QDockWidget* dock : docks_schema_)
+        if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea
+            && !dock->isVisible())
+            dock->setVisible(true);
 }
 
 int FenetrePrincipale::onglet_courant() const {
@@ -3130,7 +3191,11 @@ bool FenetrePrincipale::aller_a_erreur(const ErreurCompilation& erreur) {
             rang = static_cast<int>(k);
     if (rang < 0) return false;
 
-    if (onglets_) onglets_->setCurrentIndex(0);   // onglet « Programme »
+    // L'erreur montre le PROGRAMME : sa fenêtre, désormais.
+    if (fenetre_programme_) {
+        fenetre_programme_->show();
+        fenetre_programme_->raise();
+    }
     for (QDockWidget* dock : docks_schema_)
         if (dockWidgetArea(dock) == Qt::BottomDockWidgetArea && !dock->isVisible())
             dock->setVisible(true);

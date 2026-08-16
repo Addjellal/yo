@@ -116,6 +116,13 @@ public:
 
     // Choisit l'onglet du bas (programme, journal, série, oscilloscope).
     void afficher_onglet(int rang);
+    // Montre l'onglet du bandeau du bas qui porte ce titre, et déplie le
+    // bandeau s'il était replié.
+    void montrer_onglet(const QString& titre);
+    // Pour la vérification automatique : la fenêtre du programme est-elle
+    // ouverte, et de quelle carte parle-t-elle ?
+    bool programme_est_ouvert() const;
+    QString titre_programme() const;
     // Onglet du bas affiché, et son intitulé : la vérification automatique
     // doit pouvoir constater qu'un double-clic sur une carte a bien amené le
     // programme sous les yeux.
@@ -289,6 +296,14 @@ private:
     // Le panneau des propriétés n'existe à l'écran que s'il a quelque chose à
     // dire : on le garde donc sous la main pour le montrer et l'effacer.
     QDockWidget* dock_proprietes_ = nullptr;
+    // LE PROGRAMME D'UNE CARTE A SA PROPRE FENÊTRE.
+    //
+    // Il était un onglet du bandeau du bas, à côté du journal et du moniteur
+    // série. Or ce n'est pas un journal : c'est ce qu'on ÉCRIT, la moitié du
+    // travail dans un projet embarqué, et il partageait deux cents pixels de
+    // hauteur avec des sorties qu'on ne fait que lire. Il s'ouvre d'un
+    // double-clic sur la carte, comme dans Proteus et dans Wokwi.
+    QWidget* fenetre_programme_ = nullptr;
     int page_courante_ = 0;
     QComboBox* fin_ligne_serie_ = nullptr;
     // Un QTextDocument par « carte/rang », pour que l'annulation et la

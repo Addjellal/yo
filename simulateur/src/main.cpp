@@ -353,10 +353,16 @@ int main(int argc, char** argv) {
                 QApplication::sendEvent(fenetre.scene(), &deux);
                 break;
             }
+            // CE QU'ON VÉRIFIE A CHANGÉ AVEC LE GESTE.
+            //
+            // Le programme n'est plus un onglet du bandeau des journaux mais
+            // une FENÊTRE à lui. La vérification suivait l'onglet courant :
+            // elle serait restée verte en ne prouvant plus rien, ce qui est
+            // le pire état d'un contrôle automatique.
             QTextStream(stdout)
-                << "double-clic carte -> onglet « "
-                << fenetre.titre_onglet_courant() << " » ("
-                << fenetre.onglet_courant() << "), carte "
+                << "double-clic carte -> fenêtre programme "
+                << (fenetre.programme_est_ouvert() ? "ouverte" : "FERMÉE")
+                << ", titre « " << fenetre.titre_programme() << " », carte "
                 << fenetre.carte_affichee() << ", croquis "
                 << (fenetre.programme_affiche().contains("void loop(") ? "oui"
                                                                        : "non")
