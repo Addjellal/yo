@@ -231,19 +231,35 @@ void enregistrer_instruments(Catalogue& catalogue) {
         // endroits éloignés dans deux fenêtres, et c'est précisément ce que
         // demande la comparaison entrée/sortie d'un filtre.
         //
-        // Deux voies, comme un oscilloscope d'atelier et comme le Scope de
-        // Simulink dans son usage courant. Chaque voie se mesure par rapport à
-        // la masse : c'est ce que fait une sonde ordinaire, et la mesure
-        // différentielle demanderait un appareil que l'on n'a pas.
+        // QUATRE VOIES, et c'est le seul oscilloscope du logiciel.
+        //
+        // Il y en avait deux : celui-ci, et un appareil d'atelier à quatre
+        // voies dont on promenait les sondes depuis un onglet. Deux réponses
+        // à la même question — « comment je regarde un signal ? » — dont
+        // aucune n'était la bonne à coup sûr, et un débutant qui trouve deux
+        // oscilloscopes en cherche un troisième.
+        //
+        // Le bloc l'emporte parce que c'est le modèle de MATLAB : ce qui est
+        // CÂBLÉ est ce qui s'affiche, et le schéma documente alors lui-même
+        // ce qu'on observe. Il hérite des quatre voies de l'appareil qu'il
+        // remplace : rien n'est perdu au change.
+        //
+        // Chaque voie se mesure par rapport à la masse : c'est ce que fait une
+        // sonde ordinaire, et la mesure différentielle demanderait un appareil
+        // que l'on n'a pas.
         Modele m;
         m.type = "scope";
         m.libelle = "Oscilloscope (bloc)";
         m.categorie = "Instruments";
         m.prefixe = "SCP";
-        m.bornes = {{"A", {-40, -12}, "voie 1"}, {"B", {-40, 12}, "voie 2"}};
+        m.bornes = {{"A", {-40, -30}, "voie 1"},
+                    {"B", {-40, -10}, "voie 2"},
+                    {"C", {-40, 10}, "voie 3"},
+                    {"D", {-40, 30}, "voie 4"}};
         m.symbole = {
-            rect(-30, -26, 30, 26),
-            ligne(-40, -12, -30, -12), ligne(-40, 12, -30, 12),
+            rect(-30, -40, 30, 40),
+            ligne(-40, -30, -30, -30), ligne(-40, -10, -30, -10),
+            ligne(-40, 10, -30, 10), ligne(-40, 30, -30, 30),
             // Une sinusoïde stylisée dans l'écran : on reconnaît l'appareil
             // avant d'avoir lu son étiquette.
             ligne(-22, 0, -16, -12), ligne(-16, -12, -10, 0),
@@ -254,6 +270,9 @@ void enregistrer_instruments(Catalogue& catalogue) {
         // Il faut une lecture pour que le double-clic ouvre l'appareil plutôt
         // que le panneau de propriétés ; l'étiquette dit ce qu'il montre.
         m.mesure_instrument = [](const Instance&, const Modele::Lecture& l) {
+            // L'étiquette ne montre que les deux premières voies : quatre
+            // tensions à côté d'un symbole en font une bouillie, et le détail
+            // est dans la fenêtre, à un double-clic.
             const double a = l.tension ? l.tension("A") : 0.0;
             const double b = l.tension ? l.tension("B") : 0.0;
             return format_mesure(a, "V") + " / " + format_mesure(b, "V");

@@ -358,7 +358,6 @@ FenetrePrincipale::FenetrePrincipale() {
                        etats) { scene_->appliquer_etats(etats); });
     connect(moteur_, &MoteurSimulation::trame_calculee, this,
             [this](const coeur::Formes& formes, double instant) {
-                oscilloscope_->ajouter_trame(formes, instant);
                 // Chaque scope posé sur le schéma reçoit la même trame.
                 for (auto& paire : scopes_)
                     paire.second->ajouter_trame(formes, instant);
@@ -767,10 +766,17 @@ void FenetrePrincipale::construire_docks() {
             &FenetrePrincipale::envoyer_serie);
     onglets->addTab(bloc_serie, "Moniteur série");
 
-    oscilloscope_ = new Oscilloscope;
-    onglets->addTab(oscilloscope_, "Oscilloscope");
-    connect(oscilloscope_, &Oscilloscope::resolution_souhaitee, this,
-            [this](double secondes) { moteur_->definir_resolution(secondes); });
+    // L'OSCILLOSCOPE D'ATELIER EST SUPPRIMÉ.
+    //
+    // Il y en avait deux : celui-ci, dont on promenait les sondes depuis un
+    // onglet, et le BLOC qu'on pose sur le schéma. Deux réponses à la même
+    // question — « comment je regarde un signal ? » — dont aucune n'était la
+    // bonne à coup sûr. Un débutant qui trouve deux oscilloscopes en cherche
+    // un troisième.
+    //
+    // Le bloc l'emporte : c'est le modèle de MATLAB, ce qui est CÂBLÉ est ce
+    // qui s'affiche, et le schéma documente alors lui-même ce qu'on observe.
+    // Il a hérité des quatre voies de l'appareil qu'il remplace.
 
     analyses_ = new PanneauAnalyses;
     onglets->addTab(analyses_, "Analyses");
@@ -1166,13 +1172,6 @@ void FenetrePrincipale::construire_actions() {
     // flottante recouvre le schéma qu'elle mesure, et l'on perdrait la
     // comparaison en un clic avec le Journal et le Contrôle, qui sont dans le
     // même panneau exprès.
-    barre->addSeparator();
-    auto* action_scope = barre->addAction("Oscilloscope");
-    action_scope->setToolTip(
-        "Sortir l'oscilloscope dans sa propre fenêtre, ou le remettre dans le "
-        "panneau du bas (Ctrl+1).");
-    connect(action_scope, &QAction::triggered, this,
-            [this] { basculer_fenetre(oscilloscope_); });
 
     simulation->addAction(action_marche_);
     simulation->addAction(action_arreter_);
@@ -1331,9 +1330,6 @@ void FenetrePrincipale::construire_actions() {
     // Fenêtres : c'est l'utilisateur qui sort un panneau de mesure, jamais
     // l'application. Le raccourci le remet aussi bien qu'il le sort.
     auto* fenetres = menuBar()->addMenu("Fe&nêtres");
-    fenetres->addAction("Oscilloscope dans sa propre fenêtre",
-                        QKeySequence(Qt::CTRL | Qt::Key_1), this,
-                        [this] { basculer_fenetre(oscilloscope_); });
     fenetres->addAction("Analyses dans leur propre fenêtre",
                         QKeySequence(Qt::CTRL | Qt::Key_2), this,
                         [this] { basculer_fenetre(analyses_); });
@@ -1935,24 +1931,37 @@ Oscilloscope* FenetrePrincipale::scope_de(ItemComposant* composant) const {
     return it == scopes_.end() ? nullptr : it->second;
 }
 
-void FenetrePrincipale::ouvrir_scope(ItemComposant* composant) {
+// L'APPAREIL EXISTE DÈS QUE LE BLOC EST POSÉ, fenêtre fermée ou non.
+//
+// Il n'était créé qu'au premier double-clic. Un bloc posé et câblé mais
+// jamais ouvert n'enregistrait donc RIEN : on lançait la simulation, on
+// ouvrait le scope à la fin, et l'écran était vide — sans que rien n'explique
+// pourquoi. C'est aussi ce qui vidait la vérification automatique, qui lit le
+// rapport des scopes : sans fenêtre ouverte, elle ne lisait plus rien et
+// restait verte en ne prouvant rien.
+Oscilloscope* FenetrePrincipale::scope_pour(ItemComposant* composant) {
+    if (!composant) return nullptr;
     auto place = scopes_.find(composant);
-    Oscilloscope* scope = place == scopes_.end() ? nullptr : place->second;
-    if (!scope) {
-        scope = new Oscilloscope;
-        // Une fenêtre à part entière, pas un panneau : on en ouvre plusieurs,
-        // et on les pose côte à côte pour comparer deux endroits du montage.
-        scope->setWindowFlags(Qt::Window);
-        scope->setAttribute(Qt::WA_DeleteOnClose, false);
-        scopes_[composant] = scope;
-        connect(scope, &Oscilloscope::resolution_souhaitee, this,
-                [this](double secondes) { moteur_->definir_resolution(secondes); });
-    }
+    if (place != scopes_.end()) return place->second;
+    auto* scope = new Oscilloscope;
+    // Une fenêtre à part entière, pas un panneau : on en ouvre plusieurs, et
+    // on les pose côte à côte pour comparer deux endroits du montage.
+    scope->setWindowFlags(Qt::Window);
+    scope->setAttribute(Qt::WA_DeleteOnClose, false);
+    scopes_[composant] = scope;
+    connect(scope, &Oscilloscope::resolution_souhaitee, this,
+            [this](double secondes) { moteur_->definir_resolution(secondes); });
+    return scope;
+}
+
+void FenetrePrincipale::ouvrir_scope(ItemComposant* composant) {
+    Oscilloscope* scope = scope_pour(composant);
+    if (!scope) return;
     scope->setWindowTitle(composant->reference() + " — oscilloscope");
 
     // (Re)lier les voies : le câblage a pu changer depuis la dernière fois.
     scope->proposer_signaux(derniers_signaux_, derniers_libelles_);
-    for (int voie = 0; voie < 2; ++voie) {
+    for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
         const QString noeud = scene_->noeud_de(composant, voie);
         if (!noeud.isEmpty()) scope->sonder(noeud);
     }
@@ -2010,10 +2019,20 @@ void FenetrePrincipale::ouvrir_fenetre_instrument(ItemComposant* composant) {
         this);
     connect(fenetre, &FenetreInstrument::sonde_demandee, this,
             [this](const QString& designation) {
-                if (!oscilloscope_) return;
-                oscilloscope_->sonder(designation);
-                if (!detaches_.count(oscilloscope_))
-                    onglets_->setCurrentWidget(oscilloscope_);
+                // La sonde va sur le PREMIER bloc oscilloscope ouvert. S'il
+                // n'y en a pas, on ne fait pas semblant : on dit où le
+                // trouver. Une commande qui ne répond rien laisse croire à
+                // une panne.
+                if (scopes_.empty()) {
+                    ecrire("Aucun oscilloscope sur le schéma : posez un bloc "
+                           "« Oscilloscope » (catégorie Instruments), câblez "
+                           "une voie, puis double-cliquez dessus.");
+                    return;
+                }
+                Oscilloscope* scope = scopes_.begin()->second;
+                scope->sonder(designation);
+                scope->show();
+                scope->raise();
                 ecrire("Suivi à l'oscilloscope : " + designation);
             });
     connect(fenetre, &QObject::destroyed, this, [this, fenetre] {
@@ -2202,7 +2221,32 @@ void FenetrePrincipale::circuit_modifie() {
     // leur permet de nommer les nœuds auxquels ils sont câblés.
     derniers_signaux_ = signaux;
     derniers_libelles_ = libelles;
-    if (oscilloscope_) oscilloscope_->proposer_signaux(signaux, libelles);
+    // Tout bloc posé a son appareil, même fenêtre fermée : c'est ce qui lui
+    // permet d'enregistrer pendant qu'on ne le regarde pas.
+    for (ItemComposant* composant : scene_->composants())
+        if (composant->modele() && composant->modele()->type == "scope") {
+            Oscilloscope* scope = scope_pour(composant);
+            if (!scope) continue;
+            scope->proposer_signaux(signaux, libelles);
+            for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
+                const QString noeud = scene_->noeud_de(composant, voie);
+                if (!noeud.isEmpty()) scope->sonder(noeud);
+            }
+        }
+    for (auto& paire : scopes_)
+        paire.second->proposer_signaux(signaux, libelles);
+    // Tout bloc posé a son appareil, même fenêtre fermée : c'est ce qui lui
+    // permet d'enregistrer pendant qu'on ne le regarde pas.
+    for (ItemComposant* composant : scene_->composants())
+        if (composant->modele() && composant->modele()->type == "scope") {
+            Oscilloscope* scope = scope_pour(composant);
+            if (!scope) continue;
+            scope->proposer_signaux(signaux, libelles);
+            for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
+                const QString noeud = scene_->noeud_de(composant, voie);
+                if (!noeud.isEmpty()) scope->sonder(noeud);
+            }
+        }
     for (auto& paire : scopes_)
         paire.second->proposer_signaux(signaux, libelles);
 
@@ -2875,18 +2919,26 @@ void FenetrePrincipale::lancer() {
         }
     }
 
-    if (oscilloscope_) oscilloscope_->sonder_par_defaut();
+    for (auto& paire : scopes_) paire.second->sonder_par_defaut();
     moteur_->demarrer();
 }
 
 void FenetrePrincipale::definir_base_temps(double secondes) {
-    if (oscilloscope_) oscilloscope_->definir_base_temps(secondes);
+    for (auto& paire : scopes_) paire.second->definir_base_temps(secondes);
 }
 
 double FenetrePrincipale::vitesse() const { return moteur_->vitesse(); }
 
 QString FenetrePrincipale::mesures_oscilloscope() const {
-    return oscilloscope_ ? oscilloscope_->rapport() : QString();
+    // Le rapport de TOUS les blocs, chacun précédé de sa référence. Sans le
+    // nom, deux scopes rendraient deux blocs de chiffres indiscernables.
+    QStringList morceaux;
+    for (auto& paire : scopes_) {
+        const QString rapport = paire.second->rapport();
+        if (rapport.isEmpty()) continue;
+        morceaux << paire.first->reference() + " :\n" + rapport;
+    }
+    return morceaux.join('\n');
 }
 
 void FenetrePrincipale::afficher_onglet(int rang) {
@@ -2940,7 +2992,7 @@ void FenetrePrincipale::suspendre() { moteur_->suspendre(); }
 void FenetrePrincipale::arreter() {
     moteur_->arreter();
     scene_->effacer_resultats();
-    if (oscilloscope_) oscilloscope_->vider();
+    for (auto& paire : scopes_) paire.second->vider();
     for (auto& paire : scopes_) paire.second->vider();
 }
 
@@ -3443,8 +3495,17 @@ void FenetrePrincipale::charger_exemple(Exemple exemple) {
             scene_->addItem(new ItemFil(carte, borne_nommee("D13"), led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
+            // L'OSCILLOSCOPE EST POSÉ D'AVANCE, câblé sur la broche qui
+            // clignote. C'est le seul oscilloscope du logiciel désormais, et
+            // un instrument qu'il faut penser à chercher dans un catalogue
+            // n'existe pas pour un débutant. Double-clic dessus pour le voir.
+            if (ItemComposant* scope =
+                    scene_->ajouter_composant("scope", QPointF(140, 170)))
+                scene_->addItem(
+                    new ItemFil(carte, borne_nommee("D13"), scope, 0));
             programme = QString::fromUtf8(coeur::kSourceExemple);
-            ecrire("Exemple : clignotant sur D13 (LED rouge + 220 Ω).");
+            ecrire("Exemple : clignotant sur D13 (LED rouge + 220 Ω), avec un "
+                   "oscilloscope câblé — double-cliquez dessus.");
             break;
         }
         case Exemple::BoutonLed: {
@@ -3635,6 +3696,22 @@ void FenetrePrincipale::charger_clignotant_carte(const QString& type,
             scene_->addItem(new ItemFil(carte, rang, led, 0));
             scene_->addItem(new ItemFil(led, 1, r, 0));
             scene_->addItem(new ItemFil(r, 1, masse, 0));
+
+            // UN OSCILLOSCOPE POSÉ D'AVANCE, câblé sur la broche qui clignote.
+            //
+            // Deux raisons, et la seconde vaut la première :
+            //
+            //   - il se DÉCOUVRE. C'est le seul oscilloscope du logiciel
+            //     désormais, et un instrument qu'il faut d'abord penser à
+            //     chercher dans un catalogue n'existe pas pour un débutant ;
+            //   - il rend la vérification automatique VÉRIFIABLE. Le contrôle
+            //     de `--capture` lit le rapport des scopes : sans aucun bloc
+            //     sur le schéma, il ne lisait plus rien et restait vert en ne
+            //     prouvant rien — exactement le défaut qu'on traque partout
+            //     ailleurs dans ce projet.
+            ItemComposant* scope =
+                scene_->ajouter_composant("scope", QPointF(300, 150));
+            if (scope) scene_->addItem(new ItemFil(carte, rang, scope, 0));
         }
     }
 

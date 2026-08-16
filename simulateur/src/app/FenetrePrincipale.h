@@ -147,7 +147,6 @@ public:
     // les onglets s'il en sort déjà. C'est l'utilisateur qui décide, par le
     // menu « Fenêtres » : rien ne s'ouvre tout seul.
     void basculer_fenetre(QWidget* panneau);
-    Oscilloscope* oscilloscope() const { return oscilloscope_; }
     PanneauAnalyses* analyses() const { return analyses_; }
     PanneauPcb* pcb() const { return pcb_; }
     // Transfère le schéma vers la carte et bascule sur la page « circuit
@@ -179,6 +178,9 @@ public:
     // Fenêtre propre d'un scope posé sur le schéma, façon Simulink : ses voies
     // suivent ce qui lui est câblé.
     void ouvrir_scope(ItemComposant* composant);
+    // L'appareil d'un bloc, créé s'il n'existe pas encore. Fenêtre fermée
+    // comprise : un scope posé enregistre, qu'on le regarde ou non.
+    Oscilloscope* scope_pour(ItemComposant* composant);
     // Le scope ouvert pour ce composant, ou nullptr. Sert aux essais.
     Oscilloscope* scope_de(ItemComposant* composant) const;
     // Recalcule netlist et liste de signaux, sans passer par un geste.
@@ -315,7 +317,6 @@ private:
     // La liste des anomalies, à côté du journal. Le compteur en barre d'état
     // dit COMBIEN ; ce panneau dit lesquelles, et y mène.
     QTreeWidget* panneau_controle_ = nullptr;
-    Oscilloscope* oscilloscope_ = nullptr;
     // Un oscilloscope par bloc « scope » posé sur le schéma, dans sa fenêtre.
     std::map<ItemComposant*, Oscilloscope*> scopes_;
     // Dernière liste de signaux proposée : les scopes ouverts après coup
