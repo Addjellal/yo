@@ -719,3 +719,92 @@ comparaison de deux essais**.
 - Le conteneur de développement peut perdre Qt6 et les chaînes en cours de
   session. `apt-get update` puis réinstaller ; ce n'est pas une régression du
   code.
+
+---
+
+# Session du 16 août 2026 — le geste sur les fils
+
+Trois commits, une seule question : **on ne pouvait pas toucher un fil sans
+l'abîmer**, et c'est ce qui rendait tout déplacement impossible à offrir.
+
+## Le défaut de fond, et pourquoi il était invisible
+
+Appuyer sur un fil et relâcher sans bouger — le geste qu'on fait pour
+*désigner* un fil — le découpait en deux et y laissait une jonction de degré
+deux. Rien ne le montrait : la pastille de connexion ne se dessine qu'au-delà
+de deux fils, et le balayage ne retire pas un point qui relie bien deux fils.
+La coupure partait pourtant dans le fichier enregistré, et la pile
+d'annulation gagnait une entrée pour un geste que personne n'avait demandé.
+
+La cause : `terminer_fil` découpait le départ **avant** de savoir si le geste
+allait aboutir. Tout ce qui peut être vérifié l'est désormais avant la moindre
+découpe, et un échec laisse le tracé exactement dans l'état où il l'a trouvé.
+
+En corrigeant, un second défaut est tombé — **écrit dans `DECISION-FILS.md`
+point 3 et jamais fonctionnel** : cliquer dans le vide pendant un tracé devait
+poser un coude. `terminer_fil` abandonnait le tracé avant de rendre la main,
+si bien que `poser_point_de_passage` travaillait sur une cible déjà remise à
+zéro. **Une fonction documentée, appelée, compilée — et qui ne faisait rien.**
+
+## Le geste retenu : le seuil, pas la touche
+
+Voir `DECISION-FILS.md`, section « Le point 6, tranché ». En deux lignes : le
+clic dérive (inchangé), le glissé perpendiculaire déplace le segment, et
+`Ctrl`+clic désigne. Le partage se fait au seuil de glissé de Qt — aucune
+touche à retenir, aucune convention à réapprendre.
+
+`critique-interface` a rejeté le `Ctrl`+glissé littéral de Simulink, et a
+corrigé au passage deux erreurs de mon énoncé : `startDragDistance()` est un
+précédent **plus** solide que je ne le croyais, et l'option « état de
+sélection » telle que je l'avais formulée n'était pas fidèle à LibrePCB.
+
+## Ce que la relecture a trouvé derrière le chantier
+
+`critique-code`, lancé **derrière le chantier et non à la fin**, a rendu trois
+use-after-free confirmés à l'ASan, tous de la même famille et tous invisibles
+au banc vert :
+
+| Quand | Ce qui détruit | Ce qui écrivait encore |
+|---|---|---|
+| `Ctrl+Z` pendant un glissé | `depuis_json` reconstruit la scène | les deux poignées |
+| `Suppr` pendant un glissé | le balayage emporte une poignée **indirectement** | idem |
+| `Suppr` entre l'appui et le verdict | la sélection détruit le fil | `appui_en_attente_.fil` |
+
+**La leçon, et elle est générale : `abandonner_fil()` était bien appelé par
+tout ce qui détruit — mais il ne connaît que le TRACÉ.** L'attente d'un
+verdict et le glissé d'un segment sont deux états arrivés *après*, et personne
+n'avait pensé à les clore. Un état de geste ajouté à une scène Qt doit être
+inscrit, le jour même, dans ce qui détruit.
+
+Corollaire nouveau, à retenir pour les prochains gestes : **un raccourci
+clavier part même bouton de souris enfoncé.** `Ctrl+Z` et `Suppr`
+appartiennent à la fenêtre, pas à la scène. Aucun geste ne peut supposer qu'il
+sera terminé avant qu'autre chose n'arrive.
+
+Un quatrième défaut a été créé **par le remède lui-même** et corrigé dans le
+même commit : `depuis_json` prend une **référence**, et on lui donnait le
+membre que `tout_effacer` remet désormais à zéro — reposer un segment là où il
+était aurait effacé le schéma entier.
+
+## Ce que le banc ne couvrait pas
+
+Les cinq tests du nouveau geste le suivaient du début à la fin **sans
+interruption**. C'était exactement le trou : aucun ne faisait survenir un
+événement extérieur pendant que le bouton est tenu. `QApplication::sendEvent`
+le permettait sans la moindre difficulté technique — il fallait y penser.
+
+C'est la même leçon que l'audit de la veille, sous une autre forme : **un banc
+vert ne prouve que les chemins qu'il parcourt.**
+
+## Chiffres de la session
+
+| | avant | après |
+|---|---|---|
+| banc schéma | 384 | **428** |
+| banc cœur (ngspice + simavr) | 416 | 416 |
+| ASan/UBSan sur le schéma | 342 | **428, aucune alerte** |
+| avertissements | 0 | 0 |
+
+Les tests du déplacement ont été **vérifiés en échec** avant d'être crus :
+cinq assertions tombent quand on désactive le mécanisme, et les trois tests
+d'interruption plantent à l'ASan sans le remède.
