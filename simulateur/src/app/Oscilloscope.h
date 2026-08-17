@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QColor>
+#include <QSize>
 #include <QStringList>
 #include <QWidget>
 
@@ -213,6 +214,18 @@ class Oscilloscope : public QWidget {
 
 public:
     explicit Oscilloscope(QWidget* parent = nullptr);
+
+    // LA TAILLE D'OUVERTURE, ÉNONCÉE UNE SEULE FOIS.
+    //
+    // Choisie pour la COURBE : un oscilloscope se lit en largeur, et 940 px
+    // laissent quatre cent cinquante pixels de haut au tracé une fois les
+    // réglages posés. Les réglages, eux, n'en réclament que 746 depuis qu'ils
+    // ne partagent plus les colonnes des voies — ils tiendraient dans une
+    // fenêtre nettement plus étroite, et le banc le vérifie aussi, pour que le
+    // remède reste une VRAIE réorganisation et non une fenêtre agrandie.
+    //
+    // Écrite ici, elle sert aux deux fenêtres de l'application et au banc.
+    static QSize taille_conseillee() { return QSize(940, 620); }
 
     void ajouter_trame(const coeur::Formes& formes, double instant_debut);
     void vider();

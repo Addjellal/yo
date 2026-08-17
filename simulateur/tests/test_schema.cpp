@@ -68,6 +68,7 @@ static void console_en_utf8() {
 #include <QFile>
 #include <QGraphicsPathItem>
 #include <QGraphicsSceneMouseEvent>
+#include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
 #include <QPlainTextEdit>
@@ -4425,6 +4426,118 @@ static void test_base_de_temps_annoncee_est_celle_dessinee() {
 }
 
 // ---------------------------------------------------------------------------
+// Un réglage hors de l'écran n'existe pas
+//
+// « Le trigger est bien mais je vois pas comment modifier le curseur du
+// trigger. » Le réglage était pourtant là, construit, connecté, fonctionnel —
+// et à neuf cents pixels hors de la fenêtre.
+//
+// Les quatre voies étaient alignées sur UNE rangée : pastille, sélecteur de
+// 140 pixels, mesure de 150, quatre fois. Mesuré dans une fenêtre de 760 :
+// 1670 pixels réclamés, la case du niveau à 595..758 — collée au bord, contre
+// la barre de défilement — et le sélecteur de front à 768..918, franchement
+// hors de l'écran.
+//
+// Qt ne s'en plaint pas : le minimum d'une étiquette est zéro, alors le texte
+// se laisse rogner en silence. C'est le même défaut que la base de temps qui
+// mentait : rien ne plante, rien n'est vide, et le réglage est inatteignable.
+//
+// L'essai ne juge donc pas une largeur choisie à la main, il mesure la place
+// que les réglages réclament et vérifie que la case du niveau tombe DANS la
+// fenêtre telle que l'application l'ouvre.
+// ---------------------------------------------------------------------------
+static void test_reglage_du_declenchement_est_atteignable() {
+    std::printf("\n-- le niveau de déclenchement est visible sans défiler --\n");
+
+    Oscilloscope scope;
+    scope.resize(Oscilloscope::taille_conseillee());
+    scope.show();
+    QCoreApplication::processEvents();
+
+    QScrollArea* zone = nullptr;
+    for (QScrollArea* candidat : scope.findChildren<QScrollArea*>())
+        if (candidat->widget()) zone = candidat;
+    verifier(zone != nullptr, "les réglages sont bien dans une barre défilante");
+    if (!zone) return;
+
+    const int voulue = zone->widget()->sizeHint().width();
+    verifier(voulue <= scope.width(),
+             "les réglages tiennent dans la largeur d'ouverture",
+             std::to_string(voulue) + " px de réglages pour "
+                 + std::to_string(scope.width()) + " px de fenêtre");
+
+    // ET ILS TIENDRAIENT DANS L'ANCIENNE FENÊTRE. Sans cette ligne, on pourrait
+    // faire passer l'essai en agrandissant la fenêtre — ce qui ne réorganise
+    // rien et laisse le défaut revenir dès que l'utilisateur la rétrécit.
+    verifier(voulue <= 760,
+             "et ils tiendraient même dans la fenêtre d'avant : le remède est "
+             "une réorganisation, pas une fenêtre agrandie",
+             std::to_string(voulue) + " px réclamés");
+
+    // La case du niveau : la seule qui s'exprime en volts.
+    QDoubleSpinBox* niveau = nullptr;
+    for (QDoubleSpinBox* candidat : scope.findChildren<QDoubleSpinBox*>())
+        if (candidat->suffix() == " V") niveau = candidat;
+    verifier(niveau != nullptr, "la case du niveau de déclenchement existe");
+    if (!niveau) return;
+
+    const QRect place(niveau->mapTo(&scope, QPoint(0, 0)), niveau->size());
+    verifier(scope.rect().contains(place),
+             "elle est entièrement dans la fenêtre, sans avoir à défiler",
+             "case en " + std::to_string(place.left()) + ".."
+                 + std::to_string(place.right()) + " × "
+                 + std::to_string(place.top()) + ".."
+                 + std::to_string(place.bottom()) + " dans une fenêtre de "
+                 + std::to_string(scope.width()) + "×"
+                 + std::to_string(scope.height()));
+
+    // Et le déclenchement s'ENLÈVE. « Sans » figure bien dans la liste, mais
+    // une liste déroulante peut proposer un choix qui n'atteint jamais la
+    // trace : c'est précisément ce qui faisait mentir la base de temps. On
+    // vérifie donc par la trace elle-même, en passant par le SÉLECTEUR.
+    QComboBox* mode = nullptr;
+    for (QComboBox* candidat : scope.findChildren<QComboBox*>())
+        if (candidat->findText("Sans") >= 0 && candidat->findText("Auto") >= 0)
+            mode = candidat;
+    verifier(mode != nullptr, "le mode de déclenchement propose « Sans »");
+    TraceOscilloscope* trace = scope.findChild<TraceOscilloscope*>();
+    if (!mode || !trace) return;
+
+    // Un créneau de 50 Hz, à qui il ne manque aucun front. Le nom d'un signal
+    // de tension est le nœud lui-même — pas « V(n1) », qui ne désignerait
+    // rien et laisserait la voie SANS mesure : les deux vérifications
+    // passeraient alors à vide, puisqu'une voie non mesurée ne déclenche pas.
+    coeur::Formes trame;
+    for (int k = 0; k <= 400; ++k) {
+        trame.temps.push_back(k * 0.0005);
+        trame.tensions["n1"].push_back(k % 40 < 20 ? 5.0 : 0.0);
+    }
+    scope.proposer_signaux(QStringList{"n1"});
+    scope.sonder("n1");
+    scope.ajouter_trame(trame, 0.0);
+    scope.definir_base_temps(0.05);
+    trace->definir_niveau_declenchement(2.5);
+    trace->grab();
+    verifier(scope.voie_est_mesuree(0),
+             "la voie d'essai est bien mesurée — sans quoi la suite ne "
+             "prouverait rien");
+    verifier(trace->declenche(),
+             "à l'ouverture, en « Auto », un front est trouvé");
+
+    // Le passage par le SÉLECTEUR, dans les deux sens : c'est le câblage entre
+    // la liste et la trace qu'on vérifie, pas la trace seule.
+    mode->setCurrentIndex(mode->findText("Sans"));
+    trace->grab();
+    verifier(!trace->declenche(),
+             "« Sans » l'arrête pour de bon : plus aucun front cherché, donc "
+             "plus de repère tracé");
+
+    mode->setCurrentIndex(mode->findText("Auto"));
+    trace->grab();
+    verifier(trace->declenche(), "et revenir à « Auto » le remet en marche");
+}
+
+// ---------------------------------------------------------------------------
 // Un panneau vide ne garde pas sa place
 //
 // « Propriétés » occupait 260 pixels en permanence pour afficher
@@ -5267,6 +5380,7 @@ int main(int argc, char** argv) {
     test_fermer_ferme_les_fenetres_detachees();
     test_fichier_corrompu_ne_vide_pas_le_schema();
     test_base_de_temps_annoncee_est_celle_dessinee();
+    test_reglage_du_declenchement_est_atteignable();
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
     test_glisser_sans_deplacer_ne_laisse_rien();

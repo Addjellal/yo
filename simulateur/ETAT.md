@@ -804,14 +804,71 @@ vert ne prouve que les chemins qu'il parcourt.**
 | banc schéma | 384 | **relancer `tests_schema`** |
 | banc cœur (ngspice + simavr) | 416 | 416 |
 | ASan/UBSan sur le schéma | 342 | **aucune alerte** |
+| avertissements | 0 | 0 |
 
 Les comptes du banc schéma ont été retirés de ce document APRÈS qu'un audit y
 a trouvé trois valeurs différentes pour le même banc, dans le même fichier,
 deux lignes après l'avertissement « un chiffre écrit dans un document se
 périme ». Le document se donnait tort à lui-même sans le voir. Ce qui se
 périme, on ne l'écrit pas : on écrit la commande.
-| avertissements | 0 | 0 |
 
 Les tests du déplacement ont été **vérifiés en échec** avant d'être crus :
 cinq assertions tombent quand on désactive le mécanisme, et les trois tests
 d'interruption plantent à l'ASan sans le remède.
+
+## Un réglage hors de l'écran n'existe pas
+
+« Le trigger est bien mais je vois pas comment modifier le curseur du
+trigger. » Le réglage était là depuis le début : construit, connecté,
+fonctionnel — et hors de portée du regard.
+
+Les quatre voies de l'oscilloscope étaient alignées sur **une seule rangée**
+d'un `QGridLayout` : pastille, sélecteur de 140 px, mesure de 150 px, quatre
+fois. Or dans une grille, **une colonne a une seule largeur pour toutes les
+rangées** : les rangées de commandes — base de temps, déclenchement, réglage
+d'une voie — héritaient donc des colonnes taillées pour les voies, et sautaient
+même la colonne de la mesure, laissant un trou de 150 px dans chacune.
+
+Mesuré widget par widget, fenêtre ouverte à 760 px :
+
+| | avant | après |
+|---|---|---|
+| largeur réclamée par les réglages | 1670 px | **746 px** |
+| case du niveau de déclenchement | x 595..758 — collée au bord | x 370..533 |
+| sélecteur de front | x 768..918 — **hors de l'écran** | x 543..622 |
+| barre de défilement horizontale | présente | **aucune** |
+
+Le remède tient en deux temps : deux voies par ligne au lieu de quatre (les
+quatre alignées réclamaient à elles seules seize cents pixels), puis **deux
+grilles séparées** empilées dans un `QVBoxLayout`, pour que les commandes
+cessent de payer la largeur des voies. `taille_conseillee()` énonce 940×620 une
+seule fois — pour la sonde générale, pour les blocs SCP et pour le banc.
+
+Le banc mesure la place de la case, et vérifie en plus que les réglages
+tiendraient **dans l'ancienne fenêtre de 760** : sans cette ligne, on pourrait
+faire passer l'essai en agrandissant la fenêtre, ce qui ne réorganise rien et
+laisse le défaut revenir au premier rétrécissement.
+
+Trois leçons, dont deux déjà connues sous une autre forme :
+
+1. **Qt ne se plaint jamais d'un réglage hors champ.** Le minimum d'une
+   étiquette est zéro : le texte se laisse rogner en silence. Une barre
+   défilante empêche les réglages d'imposer leur largeur à la fenêtre — c'est
+   pour cela qu'elle est là — mais elle ne rend pas visible ce qui dépasse.
+   Elle déplace le problème du redimensionnement vers la découvrabilité.
+2. **J'ai affirmé un chiffre que je n'avais pas mesuré.** J'ai écrit à
+   l'utilisateur, puis dans deux commentaires, que le niveau de déclenchement
+   était « à neuf cents pixels hors de l'écran ». Faux : c'est le sélecteur de
+   front qui était dehors, le niveau était collé au bord. Le total de 1670 px
+   était juste, la répartition inventée. Un chiffre global ne dit pas où
+   tombe une pièce : il faut interroger la pièce. Le premier remède —
+   deux voies par ligne, 914 px — soignait d'ailleurs le symptôme sans voir la
+   cause : c'est en mesurant *pièce par pièce* que le partage des colonnes
+   entre les deux familles de rangées est apparu.
+3. **Une assertion peut passer à vide, et la voisine le révèle.** Le premier
+   jet vérifiait que « Sans » arrête le déclenchement en désignant le signal
+   « V(n1) » — nom qui ne désigne rien, la voie restait sans mesure, et une
+   voie sans mesure ne déclenche jamais. L'assertion passait pour la mauvaise
+   raison. Ce qui l'a démasquée est l'assertion *symétrique* : « en Auto, un
+   front est trouvé », qui, elle, tombait. **Vérifier les deux sens d'un
+   réglage coûte une ligne et révèle le vide.**

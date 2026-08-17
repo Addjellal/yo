@@ -477,8 +477,33 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     disposition->setContentsMargins(4, 4, 4, 4);
     disposition->addWidget(trace_, 1);
 
+    // DEUX GRILLES, ET NON UNE.
+    //
+    // Tout tenait dans une seule grille : les quatre voies sur la rangée 0,
+    // puis base de temps, déclenchement et réglages d'une voie sur les
+    // suivantes. Or dans un QGridLayout, une colonne a UNE largeur pour toutes
+    // les rangées. Les rangées de commandes héritaient donc des colonnes
+    // taillées pour les voies — un sélecteur de 140 px, une mesure de 150 px —
+    // et sautaient même la colonne de la mesure, laissant un trou de 150 px
+    // dans chacune.
+    //
+    // Mesuré, fenêtre à 760 : 1670 px réclamés, la case du niveau de
+    // déclenchement rejetée à 595..758 — collée au bord, contre la barre de
+    // défilement — et le sélecteur de front à 768..918, franchement hors de
+    // l'écran. C'est ce qui rendait le déclenchement introuvable.
+    //
+    // Séparées, chaque grille est mesurée par son propre contenu : les
+    // commandes ne paient plus la largeur des voies, et elles tiennent même
+    // dans une fenêtre rétrécie.
+    auto* voies = new QGridLayout;
+    voies->setHorizontalSpacing(10);
     auto* reglages = new QGridLayout;
     reglages->setHorizontalSpacing(10);
+    auto* pile = new QVBoxLayout;
+    pile->setContentsMargins(0, 0, 0, 0);
+    pile->setSpacing(4);
+    pile->addLayout(voies);
+    pile->addLayout(reglages);
 
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
         auto* pastille = new QLabel(QString("■ Voie %1").arg(v + 1));
@@ -498,12 +523,17 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
         auto* mesure = new QLabel("—");
         mesure->setMinimumWidth(150);
 
-        reglages->addWidget(pastille, 0, v * 3);
-        reglages->addWidget(selecteur, 0, v * 3 + 1);
-        reglages->addWidget(mesure, 0, v * 3 + 2);
+        // Deux voies par ligne : quatre alignées réclamaient à elles seules
+        // seize cents pixels, largeur qu'aucune fenêtre raisonnable n'offre.
+        const int ligne = v / 2;
+        const int colonne = (v % 2) * 3;
+        voies->addWidget(pastille, ligne, colonne);
+        voies->addWidget(selecteur, ligne, colonne + 1);
+        voies->addWidget(mesure, ligne, colonne + 2);
         selecteurs_[v] = selecteur;
         mesures_[v] = mesure;
     }
+    voies->setColumnStretch(6, 1);
 
     auto* base_temps = new QComboBox;
     for (double fenetre : kFenetres)
@@ -547,12 +577,12 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
             [this](bool coche) { trace_->definir_gel(coche); });
 
     base_temps_ = base_temps;
-    reglages->addWidget(new QLabel("Base de temps"), 1, 0);
-    reglages->addWidget(base_temps, 1, 1);
-    reglages->addWidget(new QLabel("Échelle"), 1, 3);
-    reglages->addWidget(echelle, 1, 4);
-    reglages->addWidget(gel, 1, 6);
-    reglages->setColumnStretch(11, 1);
+    reglages->addWidget(new QLabel("Base de temps"), 0, 0);
+    reglages->addWidget(base_temps, 0, 1);
+    reglages->addWidget(new QLabel("Échelle"), 0, 2);
+    reglages->addWidget(echelle, 0, 3);
+    reglages->addWidget(gel, 0, 4);
+    reglages->setColumnStretch(5, 1);
 
     // --- déclenchement : la rangée qui manquait pour que l'image tienne en
     // place. Mêmes réglages que sur un appareil : mode, voie, niveau, front.
@@ -625,22 +655,24 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     connect(xy, &QCheckBox::toggled, this,
             [this](bool coche) { trace_->definir_mode_xy(coche); });
 
-    reglages->addWidget(voie_reglee, 3, 1);
-    reglages->addWidget(couplage, 3, 3);
-    reglages->addWidget(decalage, 3, 4);
-    reglages->addWidget(xy, 3, 6);
-    reglages->addWidget(new QLabel("Réglage d'une voie"), 3, 0);
+    reglages->addWidget(new QLabel("Réglage d'une voie"), 2, 0);
+    reglages->addWidget(voie_reglee, 2, 1);
+    reglages->addWidget(couplage, 2, 2);
+    reglages->addWidget(decalage, 2, 3);
+    reglages->addWidget(xy, 2, 4);
 
     niveau_ = niveau;
-    reglages->addWidget(new QLabel("Déclenchement"), 2, 0);
-    reglages->addWidget(mode, 2, 1);
-    reglages->addWidget(source, 2, 3);
-    reglages->addWidget(niveau, 2, 4);
-    reglages->addWidget(front, 2, 6);
-    // Quatre rangées de sept colonnes : mises telles quelles, elles exigeaient
-    // 1738 pixels de large pour toute la fenêtre, et plus aucun panneau ne
-    // pouvait être redimensionné. Défilantes, elles n'exigent plus rien.
-    disposition->addWidget(ihm::barre_defilante(reglages));
+    reglages->addWidget(new QLabel("Déclenchement"), 1, 0);
+    reglages->addWidget(mode, 1, 1);
+    reglages->addWidget(source, 1, 2);
+    reglages->addWidget(niveau, 1, 3);
+    reglages->addWidget(front, 1, 4);
+    // La barre défilante empêche les réglages d'imposer leur largeur à toute la
+    // fenêtre — sans elle, aucun panneau ne pouvait plus être redimensionné.
+    // Mais elle ne rend pas visible ce qui dépasse : le déclenchement, rangée
+    // la plus basse, restait à défiler pour être vu. La largeur réclamée doit
+    // donc tenir dans la fenêtre : un essai la mesure et le prouve.
+    disposition->addWidget(ihm::barre_defilante(pile));
 
     // Lecture des curseurs, sous la courbe : la souris suit, un clic pose le
     // repère, et l'écart des deux donne temps, tension et fréquence.

@@ -2021,7 +2021,7 @@ void FenetrePrincipale::ouvrir_sonde_generale() {
         sonde_generale_ = new Oscilloscope;
         sonde_generale_->setWindowFlags(Qt::Window);
         sonde_generale_->setWindowTitle("Sonde — oscilloscope général");
-        sonde_generale_->resize(760, 520);
+        sonde_generale_->resize(Oscilloscope::taille_conseillee());
         connect(sonde_generale_, &Oscilloscope::resolution_souhaitee, this,
                 [this](double secondes) { moteur_->definir_resolution(secondes); });
         // Elle n'a jamais été renseignée : le circuit n'a pas changé depuis
@@ -2046,7 +2046,7 @@ void FenetrePrincipale::ouvrir_scope(ItemComposant* composant) {
         if (!noeud.isEmpty()) scope->sonder(noeud);
     }
 
-    scope->resize(760, 520);
+    scope->resize(Oscilloscope::taille_conseillee());
     scope->show();
     scope->raise();
     scope->activateWindow();
