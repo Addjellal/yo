@@ -3776,6 +3776,196 @@ static void test_tension_aux_bornes() {
 }
 
 // ---------------------------------------------------------------------------
+// Le relais dit enfin où il en est
+//
+// C'était le seul actionneur du catalogue sans AUCUN retour d'état : ni texte,
+// ni courbe, ni symbole. Son contact est dessiné identique, collé ou relâché,
+// et toute sa logique de commutation vivait dans une source comportementale
+// SPICE, opaque au reste du modèle.
+//
+// Le seuil affiché doit être LE MÊME que celui du contact réellement commuté
+// (VT = 2,5 V du modèle d'interrupteur) : un état qui ne s'accorderait pas
+// avec la commutation serait pire que pas d'état du tout.
+// ---------------------------------------------------------------------------
+static void test_relais_annonce_son_etat() {
+    std::printf("\n-- le relais annonce son état --\n");
+
+    const coeur::Modele* relais = coeur::Catalogue::instance().modele("relais");
+    verifier(relais != nullptr, "le relais est au catalogue");
+    if (!relais) return;
+    verifier(relais->evoluer != nullptr,
+             "il relit désormais sa bobine après chaque fenêtre");
+    verifier(relais->lecture != nullptr, "et il sait dire son état");
+
+    coeur::Instance instance;
+    instance.reference = "K1";
+    instance.type = "relais";
+    instance.bornes = {{"A", "cmd"}, {"B", ""}, {"COM", "com"},
+                       {"NO", "no"}, {"NC", "nc"}};
+
+    // Une bobine sous 5 V : le contact colle.
+    std::vector<double> hautes(4, 5.0);
+    coeur::Evolution sous_tension;
+    sous_tension.duree = 0.01;
+    sous_tension.tension = [&](const std::string& borne)
+        -> const std::vector<double>* {
+        return borne == "A" ? &hautes : nullptr;
+    };
+    relais->evoluer(instance, sous_tension);
+    verifier(instance.valeur("colle", 0) > 0.5,
+             "sous 5 V, le contact est collé");
+    verifier(relais->lecture(instance).find("NO") != std::string::npos,
+             "et l'étiquette annonce COM–NO", relais->lecture(instance));
+
+    // Sous le seuil de 2,5 V du modèle d'interrupteur : il retombe.
+    std::vector<double> basses(4, 1.0);
+    coeur::Evolution sous_seuil;
+    sous_seuil.duree = 0.01;
+    sous_seuil.tension = [&](const std::string& borne)
+        -> const std::vector<double>* {
+        return borne == "A" ? &basses : nullptr;
+    };
+    relais->evoluer(instance, sous_seuil);
+    verifier(instance.valeur("colle", 1) < 0.5,
+             "sous le seuil, il retombe au repos");
+    verifier(relais->lecture(instance).find("NC") != std::string::npos,
+             "et l'étiquette annonce COM–NC", relais->lecture(instance));
+
+    // La tension de bobine est traçable : c'est ce qui permet de voir
+    // POURQUOI il n'a pas collé.
+    bool tension_declaree = false;
+    for (const coeur::Grandeur& grandeur : relais->grandeurs)
+        if (grandeur.cle == "bobine_v" && grandeur.unite == "V")
+            tension_declaree = true;
+    verifier(tension_declaree,
+             "et la tension de bobine est déclarée traçable, en volts");
+}
+
+// ---------------------------------------------------------------------------
+// L'afficheur sept segments s'allume enfin
+//
+// Il déclarait `lumineux = true` et restait NOIR quoi que fasse le circuit :
+// le halo cherche un courant sous la référence du composant, or ses sept
+// diodes s'appellent D<RÉF>0 à D<RÉF>6. Un élève câblait son décodeur, lançait
+// la simulation, et n'obtenait aucun retour — pas même un message. Et un
+// développeur qui lisait le catalogue croyait la chose gérée.
+// ---------------------------------------------------------------------------
+static void test_afficheur_sept_segments_s_allume() {
+    std::printf("\n-- l'afficheur sept segments s'allume segment par segment --\n");
+
+    SceneSchema scene;
+    ItemComposant* afficheur =
+        scene.ajouter_composant("afficheur_7seg", QPointF(0, 0));
+    verifier(afficheur != nullptr, "l'afficheur est posé");
+    if (!afficheur) return;
+
+    // Le modèle déclare-t-il des segments allumables ? C'est le préalable :
+    // sans cela, aucun courant ne pourrait éclairer quoi que ce soit.
+    int allumables = 0;
+    for (const coeur::TraitSymbole& trait : afficheur->modele()->symbole)
+        if (!trait.lumiere.empty()) ++allumables;
+    verifier(allumables == 7, "sept traits du symbole sont allumables",
+             std::to_string(allumables));
+
+    // On applique un courant sur les segments a, b et g seulement — le « 7 »
+    // n'aurait pas de segment du milieu, c'est donc un « 3 » partiel.
+    const std::string reference = afficheur->reference().toLower().toStdString();
+    std::map<std::string, double> courants;
+    courants[reference + "0"] = 0.015;   // a
+    courants[reference + "1"] = 0.015;   // b
+    courants[reference + "6"] = 0.015;   // g
+    scene.appliquer_resultats(courants, {}, nullptr);
+
+    verifier(afficheur->eclat_segment("0") > 0.5
+                 && afficheur->eclat_segment("1") > 0.5
+                 && afficheur->eclat_segment("6") > 0.5,
+             "les trois segments alimentés sont allumés",
+             std::to_string(afficheur->eclat_segment("0")));
+    verifier(afficheur->eclat_segment("2") == 0.0
+                 && afficheur->eclat_segment("3") == 0.0
+                 && afficheur->eclat_segment("4") == 0.0
+                 && afficheur->eclat_segment("5") == 0.0,
+             "et les quatre autres restent éteints");
+
+    // Couper le courant les éteint : un afficheur qui garde sa dernière
+    // valeur mentirait sur l'état du circuit.
+    scene.appliquer_resultats({}, {}, nullptr);
+    verifier(afficheur->eclat_segment("0") == 0.0,
+             "couper le courant éteint le segment");
+}
+
+// ---------------------------------------------------------------------------
+// Ce que le simulateur calculait déjà sans jamais le montrer
+//
+// `Modele::evoluer` calcule à chaque fenêtre l'angle d'un servomoteur, la
+// vitesse d'un moteur avec sa constante de temps, le pas d'un pas à pas, le
+// synchronisme d'un asynchrone. Tout cela n'était visible que sous forme d'un
+// texte sous le symbole : le simulateur savait, et se taisait.
+//
+// Chaque composant DÉCLARE désormais ce qu'il accepte de montrer — on n'expose
+// pas le contenu de ses valeurs internes, qui mêlerait ses réglages (inertie,
+// constante k, résistance d'induit) à ses mesures.
+// ---------------------------------------------------------------------------
+static void test_grandeurs_internes_tracables() {
+    std::printf("\n-- les grandeurs internes deviennent des courbes --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* pile = scene->ajouter_composant("pile", QPointF(0, 0));
+    ItemComposant* moteur = scene->ajouter_composant("moteur_cc_dynamique",
+                                                     QPointF(400, 0));
+    ItemComposant* masse = scene->ajouter_composant("masse", QPointF(0, 300));
+    if (!pile || !moteur || !masse) return;
+    scene->addItem(new ItemFil(pile, 0, moteur, 0));
+    scene->addItem(new ItemFil(moteur, 1, masse, 0));
+    scene->addItem(new ItemFil(pile, 1, masse, 0));
+    QCoreApplication::processEvents();
+
+    const QStringList signaux = fenetre.signaux_observables();
+    const QString vitesse = QString("G(%1.tr_min)").arg(moteur->reference());
+    verifier(signaux.contains(vitesse),
+             "la vitesse du moteur est proposée comme signal",
+             vitesse.toStdString());
+
+    // Et son libellé porte l'UNITÉ : « 90,00 V » pour un angle enseignerait
+    // un contresens.
+    const std::map<QString, QString> libelles = fenetre.libelles_signaux();
+    verifier(libelles.count(vitesse) > 0
+                 && libelles.at(vitesse).contains("tr/min"),
+             "et son libellé donne l'unité",
+             libelles.count(vitesse) ? libelles.at(vitesse).toStdString() : "");
+
+    // Ce qui n'est PAS déclaré ne doit pas apparaître : l'inertie et la
+    // constante k sont des réglages, pas des mesures.
+    verifier(!signaux.contains(QString("G(%1.inertie)").arg(moteur->reference()))
+                 && !signaux.contains(
+                     QString("G(%1.k)").arg(moteur->reference())),
+             "les réglages du moteur ne sont pas présentés comme des mesures");
+}
+
+static void test_grandeur_tracee_depuis_une_trame() {
+    std::printf("\n-- une grandeur interne se trace vraiment --\n");
+
+    // La trace doit savoir lire « G(...) » comme elle lit une tension.
+    Oscilloscope scope;
+    coeur::Formes formes;
+    formes.temps = {0.0, 0.001, 0.002};
+    formes.grandeurs["M1.tr_min"] = {1200.0, 1200.0, 1200.0};
+    scope.proposer_signaux({"G(M1.tr_min)"});
+    scope.definir_unites({{"G(M1.tr_min)", "tr/min"}});
+    scope.sonder("G(M1.tr_min)");
+    scope.ajouter_trame(formes, 0.0);
+
+    verifier(scope.voie_est_mesuree(0),
+             "la voie sur une grandeur interne est bien mesurée");
+    verifier(scope.rapport().contains("1200"),
+             "et le relevé donne la valeur calculée par le modèle",
+             scope.rapport().toStdString());
+}
+
+// ---------------------------------------------------------------------------
 // Une mesure ABSENTE n'est pas une mesure NULLE
 //
 // Le sélecteur de voie propose « I(REF) » pour tous les composants, mais
@@ -4919,6 +5109,10 @@ int main(int argc, char** argv) {
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
     test_tension_aux_bornes();
+    test_relais_annonce_son_etat();
+    test_afficheur_sept_segments_s_allume();
+    test_grandeurs_internes_tracables();
+    test_grandeur_tracee_depuis_une_trame();
     test_mesure_absente_se_dit();
     test_bloc_ne_voit_que_son_branchement();
     test_scope_supprime_ne_hante_pas();

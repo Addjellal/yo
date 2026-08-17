@@ -24,20 +24,31 @@ inline std::string nombre(double valeur) {
 using T = TraitSymbole;
 
 inline T ligne(double x1, double y1, double x2, double y2) {
-    return {T::Genre::Ligne, {{x1, y1}, {x2, y2}}, 0, "", false};
+    return {T::Genre::Ligne, {{x1, y1}, {x2, y2}}, 0, "", false, ""};
 }
 inline T rect(double x1, double y1, double x2, double y2, bool rempli = false) {
-    return {T::Genre::Rect, {{x1, y1}, {x2, y2}}, 0, "", rempli};
+    return {T::Genre::Rect, {{x1, y1}, {x2, y2}}, 0, "", rempli, ""};
 }
 inline T cercle(double x, double y, double rayon, bool rempli = false) {
-    return {T::Genre::Cercle, {{x, y}}, rayon, "", rempli};
+    return {T::Genre::Cercle, {{x, y}}, rayon, "", rempli, ""};
 }
 inline T poly(std::vector<PointSymbole> points, bool rempli = true) {
-    return {T::Genre::Polygone, std::move(points), 0, "", rempli};
+    return {T::Genre::Polygone, std::move(points), 0, "", rempli, ""};
 }
 inline T texte(double x, double y, const std::string& contenu,
                double taille = 9) {
-    return {T::Genre::Texte, {{x, y}}, taille, contenu, false};
+    return {T::Genre::Texte, {{x, y}}, taille, contenu, false, ""};
+}
+
+// Un trait QUI S'ALLUME, et par quel courant.
+//
+// Le suffixe s'ajoute à la référence du composant pour trouver le courant :
+// « 0 » sur un afficheur AF1 désigne le courant relevé sous « af10 ». C'est ce
+// qui permet à un morceau de symbole de s'éclairer seul, là où le halo
+// n'éclaire qu'un composant entier.
+inline T segment(T trait, const std::string& suffixe) {
+    trait.lumiere = suffixe;
+    return trait;
 }
 
 // Corps rectangulaire avec deux rangées de broches : la forme de la plupart

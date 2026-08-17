@@ -81,6 +81,11 @@ void enregistrer_actionneurs_dynamiques(Catalogue& catalogue) {
         m.lecture = [](const Instance& i) {
             return arrondi(i.valeur("angle", 90), 0) + " °";
         };
+        // L'angle réel ET la consigne : superposés à l'oscilloscope, ils
+        // montrent que le palonnier MET DU TEMPS à rejoindre l'ordre reçu —
+        // la première cause de « mon servo saccade ».
+        m.grandeurs = {{"angle", "angle du palonnier", "°"},
+                       {"consigne", "angle demandé", "°"}};
         enregistrer(std::move(m));
     }
 
@@ -132,6 +137,11 @@ void enregistrer_actionneurs_dynamiques(Catalogue& catalogue) {
         m.lecture = [](const Instance& i) {
             return arrondi(i.valeur("tr_min", 0), 0) + " tr/min";
         };
+        // La vitesse était CALCULÉE à chaque fenêtre, avec sa constante de
+        // temps, et seulement écrite en texte sous le symbole. La déclarer la
+        // rend traçable : on voit alors la montée exponentielle vers le
+        // régime — la même courbe qu'un RC, ce que le cours enseigne déjà.
+        m.grandeurs = {{"tr_min", "vitesse", "tr/min"}};
         enregistrer(std::move(m));
     }
 
@@ -204,6 +214,14 @@ void enregistrer_actionneurs_dynamiques(Catalogue& catalogue) {
             return arrondi(i.valeur("angle", 0), 1) + " ° (" +
                    arrondi(i.valeur("pas", 0), 0) + " pas)";
         };
+        // Le NOMBRE DE PAS autant que l'angle : c'est lui que le programme
+        // compte, et pouvoir comparer son compte logiciel à la mécanique
+        // réelle est tout l'intérêt du pas à pas. La phase dit quelle bobine
+        // est alimentée — ce qu'on cherche quand la séquence ne fait pas
+        // avancer le moteur.
+        m.grandeurs = {{"pas", "pas effectués", "pas"},
+                       {"angle", "angle", "°"},
+                       {"phase", "phase alimentée", ""}};
         enregistrer(std::move(m));
     }
 
@@ -272,6 +290,11 @@ void enregistrer_actionneurs_dynamiques(Catalogue& catalogue) {
             return arrondi(i.valeur("tr_min", 0), 0) + " tr/min  (Ns = " +
                    arrondi(i.valeur("synchrone", 1500), 0) + ")";
         };
+        // La vitesse et le SYNCHRONISME : leur écart est le glissement, LE
+        // concept du cours sur l'asynchrone. Les deux courbes côte à côte le
+        // montrent sans qu'on ait à le calculer de tête.
+        m.grandeurs = {{"tr_min", "vitesse", "tr/min"},
+                       {"synchrone", "vitesse de synchronisme", "tr/min"}};
         enregistrer(std::move(m));
     }
 

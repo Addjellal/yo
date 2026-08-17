@@ -55,6 +55,14 @@ public:
     // Éclat 0..1 : pour les composants lumineux, calculé à partir du courant.
     void definir_eclat(double eclat);
     double eclat() const { return eclat_; }
+    // ÉCLAT PAR MORCEAU DE SYMBOLE.
+    //
+    // Un afficheur sept segments n'a pas UN éclat mais sept : ce qui intéresse
+    // l'élève qui câble un décodeur, c'est de voir quels segments sont
+    // alimentés, pas que le boîtier rougeoie. La clé est le suffixe déclaré
+    // par le trait (`TraitSymbole::lumiere`).
+    void definir_eclat_segment(const std::string& suffixe, double eclat);
+    double eclat_segment(const std::string& suffixe) const;
 
     // Composant qui a dépassé une de ses limites absolues pendant la
     // simulation. Il se dessine noirci et barré : on doit le voir sans avoir
@@ -103,6 +111,7 @@ private:
     const coeur::Modele* modele_ = nullptr;
     QString reference_;
     double eclat_ = 0.0;
+    std::map<std::string, double> eclats_segments_;
     bool grille_ = false;
     std::vector<int> bornes_allumees_;
     std::vector<MarqueurErc> anomalies_;

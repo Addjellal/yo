@@ -648,7 +648,7 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     }
     etat_ = analogique_.etat_final();
 
-    const coeur::Formes& formes = analogique_.formes();
+    coeur::Formes& formes = analogique_.formes_modifiables();
 
     // Les composants à état lisent ce que le circuit vient de leur faire
     // subir, et avancent leur mécanique. Un servomoteur mesure son
@@ -830,8 +830,7 @@ void MoteurSimulation::surveiller_contraintes(const coeur::Formes& formes) {
 }
 
 // Donne à chaque composant à état les formes d'onde de ses propres bornes.
-void MoteurSimulation::faire_evoluer(const coeur::Formes& formes,
-                                     double duree) {
+void MoteurSimulation::faire_evoluer(coeur::Formes& formes, double duree) {
     auto minuscules = [](std::string texte) {
         std::transform(texte.begin(), texte.end(), texte.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -861,6 +860,19 @@ void MoteurSimulation::faire_evoluer(const coeur::Formes& formes,
         };
         modele->evoluer(instance, evolution);
         etats[instance.reference] = instance.valeurs;
+
+        // LES GRANDEURS DÉCLARÉES DEVIENNENT DES COURBES.
+        //
+        // Une valeur par fenêtre, tenue sur toute sa durée : `evoluer` ne
+        // rend qu'un état final, pas une trajectoire. Répéter la valeur est
+        // honnête — c'est un échantillonnage bloqué — là où interpoler
+        // inventerait des points que personne n'a calculés.
+        for (const coeur::Grandeur& grandeur : modele->grandeurs) {
+            auto valeur = instance.valeurs.find(grandeur.cle);
+            if (valeur == instance.valeurs.end()) continue;
+            formes.grandeurs[instance.reference + "." + grandeur.cle] =
+                std::vector<double>(formes.temps.size(), valeur->second);
+        }
     }
     if (!etats.empty()) emit etats_composants(etats);
 }

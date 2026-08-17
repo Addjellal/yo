@@ -2365,6 +2365,38 @@ void FenetrePrincipale::circuit_modifie() {
                              ? " (" + QString::fromStdString(modele->libelle) + ")"
                              : QString());
     }
+    // LES GRANDEURS INTERNES DÉCLARÉES PAR LES COMPOSANTS.
+    //
+    // L'angle d'un servomoteur, la vitesse d'un moteur, le pas d'un pas à
+    // pas, le synchronisme d'un asynchrone : tout cela était CALCULÉ à chaque
+    // fenêtre et n'était visible que sous forme d'un texte sous le symbole.
+    // Le simulateur savait, et se taisait.
+    //
+    // Chaque composant DÉCLARE ce qu'il accepte de montrer — on n'expose pas
+    // le contenu de ses valeurs internes, qui mêlerait ses réglages (inertie,
+    // constante k) à ses mesures.
+    std::map<QString, QString> unites;
+    for (const coeur::Instance& instance : netlist.instances()) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        if (!modele) continue;
+        const QString reference = QString::fromStdString(instance.reference);
+        for (const coeur::Grandeur& grandeur : modele->grandeurs) {
+            const QString nom = QString("G(%1.%2)")
+                                    .arg(reference,
+                                         QString::fromStdString(grandeur.cle));
+            signaux << nom;
+            unites[nom] = QString::fromStdString(grandeur.unite);
+            libelles[nom] = QString("%1 de %2%3")
+                                .arg(QString::fromStdString(grandeur.libelle),
+                                     reference,
+                                     grandeur.unite.empty()
+                                         ? QString()
+                                         : " (" + QString::fromStdString(
+                                                      grandeur.unite) + ")");
+        }
+    }
+    signaux.sort();
     libelles["GND"] = "masse, 0 V";
     libelles["5V"] = "alimentation 5 V";
     libelles["3V3"] = "alimentation 3,3 V";
@@ -2408,6 +2440,7 @@ void FenetrePrincipale::circuit_modifie() {
             Oscilloscope* scope = scope_pour(composant);
             if (!scope) continue;
             scope->definir_bornes(bornes);
+            scope->definir_unites(unites);
             scope->proposer_signaux(signaux_du_bloc(composant, netlist, signaux),
                                     libelles);
             for (int voie = 0; voie < TraceOscilloscope::kVoies; ++voie) {
@@ -2418,6 +2451,7 @@ void FenetrePrincipale::circuit_modifie() {
     // La sonde générale, elle, voit TOUT le circuit : c'est sa raison d'être.
     if (sonde_generale_) {
         sonde_generale_->definir_bornes(bornes);
+        sonde_generale_->definir_unites(unites);
         sonde_generale_->proposer_signaux(signaux, libelles);
     }
 

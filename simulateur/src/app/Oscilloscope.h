@@ -205,6 +205,9 @@ public:
     // savoir entre QUELS nœuds mesurer.
     void definir_bornes(
         const std::map<QString, std::pair<QString, QString>>& bornes);
+    // L'unité de chaque signal qui n'est pas en volts : tours par minute,
+    // degrés, pas. Sans elle, l'appareil annoncerait des volts pour un angle.
+    void definir_unites(const std::map<QString, QString>& unites);
 
     // Voie affectée automatiquement quand on clique un fil du schéma.
     void sonder(const QString& designation);
@@ -238,6 +241,7 @@ signals:
 private:
     TraceOscilloscope* trace_ = nullptr;
     std::array<QComboBox*, TraceOscilloscope::kVoies> selecteurs_ = {};
+    std::map<QString, QString> unites_;
     std::array<QLabel*, TraceOscilloscope::kVoies> mesures_ = {};
     QComboBox* base_temps_ = nullptr;
     QDoubleSpinBox* niveau_ = nullptr;

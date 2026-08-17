@@ -46,11 +46,19 @@ struct Formes {
     std::vector<double> temps;                            // en secondes
     std::map<std::string, std::vector<double>> tensions;  // par nœud
     std::map<std::string, std::vector<double>> courants;  // par référence
+    // Grandeurs INTERNES des composants à état : « SRV1.angle », « M1.tr_min ».
+    //
+    // Elles ne sortent pas du solveur électrique mais de `Modele::evoluer`,
+    // qui tourne après chaque fenêtre. Une valeur par fenêtre, tenue jusqu'à
+    // la suivante : c'est un échantillonnage bloqué, comme un signal discret
+    // chez Simulink, et non une interpolation qu'on inventerait.
+    std::map<std::string, std::vector<double>> grandeurs;
 
     void vider() {
         temps.clear();
         tensions.clear();
         courants.clear();
+        grandeurs.clear();
     }
     bool vide() const { return temps.empty(); }
 };
@@ -106,6 +114,15 @@ public:
     // Lance l'analyse transitoire préparée par `construire_transitoire`.
     bool resoudre_transitoire();
     const Formes& formes() const { return formes_; }
+    // Le même relevé, ouvert à l'écriture.
+    //
+    // Il ne sert qu'à une chose, et c'est assumé : y déposer les grandeurs
+    // INTERNES des composants à état — angle d'un servomoteur, vitesse d'un
+    // moteur —, calculées après le solveur par `Modele::evoluer`. Elles
+    // appartiennent à la même fenêtre de temps que les tensions ; les porter
+    // dans une structure séparée obligerait tout ce qui consomme un relevé à
+    // en recevoir deux, et à les garder en phase.
+    Formes& formes_modifiables() { return formes_; }
 
     // Tensions au dernier instant calculé : elles servent de conditions
     // initiales à la fenêtre suivante, sans quoi un condensateur se

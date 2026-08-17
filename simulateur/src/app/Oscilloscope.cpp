@@ -201,8 +201,27 @@ std::vector<double> TraceOscilloscope::courbe_pour(
         return difference;
     }
 
+    // LES GRANDEURS INTERNES : ni une tension, ni un courant.
+    //
+    // L'angle d'un servomoteur, la vitesse d'un moteur, le pas d'un pas à
+    // pas. Elles ne sortent pas du solveur électrique mais du modèle du
+    // composant, et c'est tout l'intérêt : on superpose alors la cause
+    // électrique et l'effet mécanique sur le même écran.
+    if (designation.startsWith("G(") && designation.endsWith(")")) {
+        const std::string cle =
+            designation.mid(2, designation.size() - 3).toStdString();
+        auto it = formes.grandeurs.find(cle);
+        return it == formes.grandeurs.end() ? std::vector<double>{}
+                                            : it->second;
+    }
+
     const std::vector<double>* courbe = potentiel(designation);
     return courbe ? *courbe : std::vector<double>{};
+}
+
+void Oscilloscope::definir_unites(
+    const std::map<QString, QString>& unites) {
+    unites_ = unites;
 }
 
 void Oscilloscope::definir_bornes(
@@ -892,14 +911,26 @@ void Oscilloscope::rafraichir_mesures() {
         }
         double moyenne = 0, maximum = 0;
         trace_->mesurer(v, moyenne, maximum);
-        const bool courant = trace_->signal_voie(v).startsWith("I(");
-        mesures_[v]->setText(
-            courant ? QString("moy %1 / crête %2 mA")
-                          .arg(moyenne * 1000, 0, 'f', 2)
-                          .arg(maximum * 1000, 0, 'f', 2)
-                    : QString("moy %1 / crête %2 V")
-                          .arg(moyenne, 0, 'f', 2)
-                          .arg(maximum, 0, 'f', 2));
+        const QString signal = trace_->signal_voie(v);
+        // L'UNITÉ SUIT LE SIGNAL, et ce n'est pas cosmétique : afficher
+        // « 90,00 V » pour l'angle d'un servomoteur enseignerait un
+        // contresens. Une unité déclarée par le composant l'emporte ; sinon
+        // c'est le volt, sauf pour un courant.
+        auto unite = unites_.find(signal);
+        if (unite != unites_.end()) {
+            mesures_[v]->setText(QString("moy %1 / crête %2 %3")
+                                     .arg(moyenne, 0, 'f', 2)
+                                     .arg(maximum, 0, 'f', 2)
+                                     .arg(unite->second));
+        } else if (signal.startsWith("I(")) {
+            mesures_[v]->setText(QString("moy %1 / crête %2 mA")
+                                     .arg(moyenne * 1000, 0, 'f', 2)
+                                     .arg(maximum * 1000, 0, 'f', 2));
+        } else {
+            mesures_[v]->setText(QString("moy %1 / crête %2 V")
+                                     .arg(moyenne, 0, 'f', 2)
+                                     .arg(maximum, 0, 'f', 2));
+        }
         mesures_[v]->setStyleSheet(
             QString("color: %1;")
                 .arg(TraceOscilloscope::couleur_voie(v).name()));

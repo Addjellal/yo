@@ -46,6 +46,18 @@ struct TraitSymbole {
     double mesure = 0;                  // rayon (Cercle) ou taille (Texte)
     std::string texte;
     bool rempli = false;
+
+    // CE TRAIT S'ALLUME-T-IL, ET PAR QUEL COURANT ?
+    //
+    // Suffixe ajouté à la référence pour trouver le courant qui l'allume :
+    // « 0 » sur un afficheur AF1 désigne le courant relevé sous « af10 ».
+    // Vide : le trait est du dessin, il ne s'allume pas.
+    //
+    // Un composant lumineux ENTIER (une LED) s'éclaire par son halo, et cela
+    // existait déjà. Ce qui manquait, c'est le composant dont chaque MORCEAU
+    // s'allume séparément — un afficheur sept segments, dont l'intérêt
+    // pédagogique tient précisément à voir quels segments sont alimentés.
+    std::string lumiere;
 };
 
 // Empreinte : ce qu'on pose sur le circuit imprimé. Le modèle nomme son
@@ -107,6 +119,27 @@ struct Propriete {
     std::string defaut_texte;
     std::vector<std::string> choix;     // pour Choix
     std::string unite;
+};
+
+// Une grandeur INTERNE observable d'un composant.
+//
+// Ce que `evoluer` calcule à chaque fenêtre — l'angle d'un servomoteur, les
+// tours par minute d'un moteur, le pas d'un pas à pas, le glissement d'un
+// asynchrone — existait déjà sans que rien ne puisse le tracer ni même le
+// nommer. Le simulateur savait, et se taisait.
+//
+// Elle se DÉCLARE, elle ne se devine pas. Exposer tout le contenu de
+// `Instance::valeurs` reviendrait à présenter les RÉGLAGES du composant
+// (résistance d'induit, inertie, constante k) comme des mesures — la
+// confusion exacte que ce projet reproche à ses capteurs, où l'on ne
+// distingue pas la valeur réglée au curseur de la grandeur recalculée.
+//
+// L'unité compte autant que le nombre : un axe gradué en volts sur lequel on
+// trace des tours par minute est un mensonge d'échelle.
+struct Grandeur {
+    std::string cle;        // "tr_min", "angle"
+    std::string libelle;    // "vitesse", "angle du palonnier"
+    std::string unite;      // "tr/min", "°"
 };
 
 // --- évolution d'un composant à état ---------------------------------------
@@ -174,6 +207,9 @@ struct Modele {
     std::string prefixe = "U";          // pour les références : R1, LED2…
     std::vector<BorneSymbole> bornes;
     std::vector<Propriete> proprietes;
+    // Ce que le composant sait de lui-même et accepte de montrer : traçable à
+    // l'oscilloscope sous « G(RÉF.clé) », et affiché avec son unité.
+    std::vector<Grandeur> grandeurs;
     std::vector<TraitSymbole> symbole;  // tracé ; si vide, un cadre est dessiné
     Empreinte empreinte;                // nom du boîtier, pour la carte
 

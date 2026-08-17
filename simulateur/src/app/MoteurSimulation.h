@@ -242,7 +242,7 @@ private:
     std::vector<coeur::BrocheElectrique> broches_pour(bool au_depart) const;
     void resoudre_trame(uint64_t cycles_ecoules);
     // Fait avancer la mécanique des composants à état.
-    void faire_evoluer(const coeur::Formes& formes, double duree);
+    void faire_evoluer(coeur::Formes& formes, double duree);
     // Un pas de couplage complet : exécution puis résolution.
     uint64_t executer_pas(uint64_t cycles);
     // Pas de couplage réellement nécessaire pour ce schéma.

@@ -70,6 +70,30 @@ void enregistrer_electromecanique(Catalogue& catalogue) {
                 "S" + ref + "_nc " + noeud("COM") + " " + noeud("NC") + " "
                     + ref + "_inv 0 RELAIS_SW"};
         };
+        // LE RELAIS DIT ENFIN OÙ IL EN EST.
+        //
+        // C'était le seul actionneur du catalogue sans AUCUN retour d'état :
+        // ni texte, ni courbe, ni symbole. Son contact est dessiné identique,
+        // collé ou relâché, et toute sa logique de commutation vivait dans une
+        // source comportementale SPICE — opaque au reste du modèle, donc
+        // invisible de l'interface.
+        //
+        // On relit donc la tension de bobine après chaque fenêtre, comme le
+        // fait déjà le moteur à courant continu, et le seuil est le MÊME que
+        // celui du modèle d'interrupteur (VT = 2,5 V) : un état affiché qui ne
+        // s'accorderait pas avec le contact réellement commuté serait pire que
+        // pas d'état du tout.
+        m.evoluer = [](Instance& i, const Evolution& evolution) {
+            const double u = evolution.moyenne("A") - evolution.moyenne("B");
+            i.valeurs["bobine_v"] = u;
+            i.valeurs["colle"] = u > 2.5 ? 1.0 : 0.0;
+        };
+        m.lecture = [](const Instance& i) {
+            return i.valeur("colle", 0) > 0.5 ? std::string("collé (COM–NO)")
+                                              : std::string("repos (COM–NC)");
+        };
+        m.grandeurs = {{"colle", "contact collé", ""},
+                       {"bobine_v", "tension de bobine", "V"}};
         enregistrer(std::move(m));
     }
     {   // ------------------------------------------------------- moteur à CC

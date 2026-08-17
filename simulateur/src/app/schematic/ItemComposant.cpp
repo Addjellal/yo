@@ -184,6 +184,19 @@ void ItemComposant::tourner() {
     setRotation(std::fmod(rotation() + 90.0, 360.0));
 }
 
+void ItemComposant::definir_eclat_segment(const std::string& suffixe,
+                                          double eclat) {
+    double& memoire = eclats_segments_[suffixe];
+    if (std::fabs(eclat - memoire) < 0.01) return;
+    memoire = eclat;
+    update();
+}
+
+double ItemComposant::eclat_segment(const std::string& suffixe) const {
+    auto it = eclats_segments_.find(suffixe);
+    return it == eclats_segments_.end() ? 0.0 : it->second;
+}
+
 void ItemComposant::definir_eclat(double eclat) {
     eclat = std::max(0.0, std::min(1.0, eclat));
     if (std::fabs(eclat - eclat_) < 0.01) return;
@@ -274,7 +287,24 @@ void ItemComposant::paint(QPainter* peintre,
     for (const auto& trait : modele_->symbole) {
         peintre->setPen(crayon);
         QColor remplissage = corps;
-        if (modele_->lumineux && !grille_) {
+        // UN SEGMENT ALLUMÉ SE VOIT, ÉTEINT IL RESTE VISIBLE MAIS TERNE.
+        //
+        // Éteint, il ne disparaît pas : un afficheur dont les segments
+        // éteints s'effacent ne se lit plus comme un afficheur, et l'élève ne
+        // peut pas anticiper le chiffre qu'il obtiendra. C'est ce que fait un
+        // vrai afficheur, dont on devine les segments morts.
+        if (!trait.lumiere.empty() && !grille_) {
+            const double eclat = eclat_segment(trait.lumiere);
+            auto couleur = textes.find("couleur");
+            const QColor vive =
+                couleur_lumiere(couleur == textes.end() ? "rouge"
+                                                        : couleur->second);
+            QPen crayon_segment(
+                eclat > 0.02 ? vive : QColor(206, 200, 198),
+                eclat > 0.02 ? 5.0 : 3.5);
+            crayon_segment.setCapStyle(Qt::RoundCap);
+            peintre->setPen(crayon_segment);
+        } else if (modele_->lumineux && !grille_) {
             // le corps s'éclaire proportionnellement au courant
             auto it = textes.find("couleur");
             const QColor lumiere =

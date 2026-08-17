@@ -910,7 +910,30 @@ void SceneSchema::appliquer_resultats(
     const coeur::Formes* formes) {
     for (ItemComposant* composant : composants()) {
         const coeur::Modele* modele = composant->modele();
-        if (!modele || !modele->lumineux) continue;
+        if (!modele) continue;
+        std::string reference = composant->reference().toStdString();
+        std::transform(reference.begin(), reference.end(), reference.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        // CHAQUE MORCEAU DE SYMBOLE QUI S'ALLUME A SON PROPRE COURANT.
+        //
+        // L'afficheur sept segments déclarait `lumineux = true` et restait
+        // NOIR quoi que fasse le circuit : le halo cherche un courant sous la
+        // référence du composant, or ses sept diodes s'appellent D<RÉF>0 à
+        // D<RÉF>6. Rien ne le signalait — ni message, ni test.
+        for (const coeur::TraitSymbole& trait : modele->symbole) {
+            if (trait.lumiere.empty()) continue;
+            auto mesure = courants.find(reference + trait.lumiere);
+            const double courant =
+                mesure == courants.end() ? 0.0 : std::fabs(mesure->second);
+            const double nominal = modele->courant_nominal > 0
+                                       ? modele->courant_nominal
+                                       : 0.02;
+            double eclat = nominal > 0 ? courant / nominal : 0.0;
+            eclat = eclat <= 0 ? 0 : std::pow(std::min(eclat, 1.5), 0.45);
+            composant->definir_eclat_segment(trait.lumiere,
+                                             std::min(1.0, eclat));
+        }
+        if (!modele->lumineux) continue;
         std::string cle = composant->reference().toStdString();
         std::transform(cle.begin(), cle.end(), cle.begin(),
                        [](unsigned char c) { return std::tolower(c); });

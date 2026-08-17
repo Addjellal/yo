@@ -214,11 +214,28 @@ void enregistrer_semiconducteurs(Catalogue& catalogue) {
                     {"g", {-60, 50}, ""},  {"COM", {60, 5}, "commun"}};
         m.proprietes = {{"type", "Type", G::Choix, 0, 0, 0, "cathode_commune",
                          {"cathode_commune", "anode_commune"}, ""}};
+        // LES SEPT SEGMENTS S'ALLUMENT UN PAR UN.
+        //
+        // `m.lumineux = true` était déclaré et ne produisait RIEN : le halo
+        // cherche un courant sous la référence du composant, or les sept
+        // diodes de l'afficheur s'appellent D<RÉF>0 à D<RÉF>6. L'afficheur
+        // restait donc noir quoi que fasse le circuit, sans le moindre
+        // message — et un développeur qui lisait le catalogue le croyait
+        // géré.
+        //
+        // Un halo global n'aurait de toute façon rien appris : ce qui
+        // intéresse l'élève qui câble un décodeur, c'est QUELS segments sont
+        // alimentés. Chaque trait porte donc le suffixe du courant qui
+        // l'allume, dans l'ordre a, b, c, d, e, f, g du modèle SPICE.
         m.symbole = {rect(-40, -50, 40, 60),
-                     ligne(-24, -36, 16, -36), ligne(-26, -34, -26, 0),
-                     ligne(18, -34, 18, 0), ligne(-26, 2, 18, 2),
-                     ligne(-28, 4, -28, 40), ligne(16, 4, 16, 40),
-                     ligne(-28, 42, 16, 42), cercle(26, 44, 3, true)};
+                     segment(ligne(-24, -36, 16, -36), "0"),   // a, haut
+                     segment(ligne(18, -34, 18, 0), "1"),      // b, haut droit
+                     segment(ligne(16, 4, 16, 40), "2"),       // c, bas droit
+                     segment(ligne(-28, 42, 16, 42), "3"),     // d, bas
+                     segment(ligne(-28, 4, -28, 40), "4"),     // e, bas gauche
+                     segment(ligne(-26, -34, -26, 0), "5"),    // f, haut gauche
+                     segment(ligne(-26, 2, 18, 2), "6"),       // g, milieu
+                     cercle(26, 44, 3, true)};
         m.directives = {".model SEG_LED D(IS=1e-20 N=1.7 RS=2.5)"};
         m.empreinte = {"7SEG_0.56", {}, 19.0, 12.7};
         m.vers_spice = [](const Instance& i, const auto& noeud) {
