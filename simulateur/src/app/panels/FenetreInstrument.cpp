@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "app/Apparence.h"
 #include "app/schematic/ItemComposant.h"
 #include "core/Device.h"
 
@@ -70,7 +71,7 @@ FenetreInstrument::FenetreInstrument(
 
     description_ = new QLabel(
         modele ? QString::fromStdString(modele->libelle) : QString());
-    description_->setStyleSheet("color: #666;");
+    apparence::poser_ton(description_, apparence::Ton::Doux);
     colonne->addWidget(description_);
 
     valeur_ = new QLabel("—");
@@ -84,7 +85,7 @@ FenetreInstrument::FenetreInstrument(
 
     extremes_ = new QLabel("—");
     extremes_->setAlignment(Qt::AlignCenter);
-    extremes_->setStyleSheet("color: #555;");
+    apparence::poser_ton(extremes_, apparence::Ton::Doux);
     colonne->addWidget(extremes_);
 
     // Sélecteur de position, quand l'appareil en a un : c'est le commutateur

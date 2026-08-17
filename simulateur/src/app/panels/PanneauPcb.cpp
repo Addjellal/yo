@@ -2,6 +2,7 @@
 
 #include "core/pcb/Routeur.h"
 
+#include "app/Apparence.h"
 #include "app/BarreDefilante.h"
 
 #include <QApplication>
@@ -638,7 +639,7 @@ PanneauPcb::PanneauPcb(QWidget* parent) : QWidget(parent) {
     survol_ = new QLabel("Molette : zoom · clic milieu : déplacer · R : "
                          "tourner · Échap : annuler le tracé");
     survol_->setFont(fonte);
-    survol_->setStyleSheet("color:#7f8f7f");
+    apparence::poser_ton(survol_, apparence::Ton::Doux);
     // Ces deux étiquettes changent de texte à chaque geste ; sans cela, leur
     // largeur imposerait une largeur minimale à toute la page — et, la page
     // étant empilée avec le schéma, la palette du schéma se retrouvait

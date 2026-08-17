@@ -12,6 +12,8 @@
 #include <QColor>
 #include <QString>
 
+class QWidget;
+
 namespace apparence {
 
 // La palette. Un nom par rôle, pas par couleur : « accent » se relit dix ans
@@ -60,6 +62,24 @@ void enregistrer_theme(Theme theme);
 // La feuille de style de toute l'application, produite à partir d'une
 // palette. C'est elle qui remplace les quatre feuilles éparpillées.
 QString feuille(const Palette& p);
+
+// LE TON D'UNE ÉTIQUETTE, et non sa couleur.
+//
+// Une étiquette qui porte « color: #444 » dans sa propre feuille de style
+// l'emporte sur celle de l'application : elle ne suit aucun thème, et la
+// teinte choisie pour un fond clair devient illisible sur un fond sombre.
+// C'est arrivé sept fois, dont une sur la lecture des curseurs de
+// l'oscilloscope — gris foncé sur gris foncé.
+//
+// Un ton est un rôle : la couleur vient de la palette du thème en cours, et
+// reposer la feuille de l'application les repeint toutes d'un coup.
+enum class Ton { Normal, Doux, Accent, Succes, Alerte, Erreur };
+void poser_ton(QWidget* widget, Ton ton);
+
+// La palette du thème en cours. Pour le texte enrichi — le HTML d'une boîte de
+// dialogue — qu'aucun sélecteur de feuille de style n'atteint : il faut alors
+// écrire la couleur, et autant qu'elle vienne d'ici.
+const Palette& courante();
 
 // La hauteur de référence d'un contrôle, en pixels. Sert aussi bien à la
 // feuille de style qu'au code qui dimensionne à la main.

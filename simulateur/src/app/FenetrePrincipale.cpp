@@ -1441,8 +1441,11 @@ void FenetrePrincipale::construire_actions() {
             "<p>Sur un fil : <b>clic gauche</b> le désigne, <b>glissé "
             "gauche</b> déplace le segment, <b>glissé au bouton droit</b> en "
             "dérive un nouveau — comme dans Simulink.</p>"
-            + QString("<p style='color:#666'>Version %1, exécutable du %2.</p>")
-                  .arg(QApplication::applicationVersion(),
+            // Le texte enrichi échappe aux sélecteurs de la feuille de style :
+            // la couleur doit s'écrire, alors elle vient de la palette.
+            + QString("<p style='color:%1'>Version %2, exécutable du %3.</p>")
+                  .arg(apparence::courante().texte_doux.name(),
+                       QApplication::applicationVersion(),
                        QFileInfo(QCoreApplication::applicationFilePath())
                            .lastModified()
                            .toString("dd/MM/yyyy à HH:mm")));
@@ -1463,7 +1466,7 @@ void FenetrePrincipale::construire_barre_etat() {
     // Le nœud survolé. Vide au repos : une étiquette qui dirait « aucun nœud »
     // occuperait la place en permanence pour ne rien apprendre.
     etiquette_noeud_ = new QLabel;
-    etiquette_noeud_->setStyleSheet("color:#7a5c00");
+    apparence::poser_ton(etiquette_noeud_, apparence::Ton::Accent);
     etiquette_temps_ = new QLabel("Temps simulé : 0,000 s");
     etiquette_vitesse_ = new QLabel("Vitesse : —");
 
@@ -1627,7 +1630,7 @@ void FenetrePrincipale::refleter_controle(int erreurs, int avertissements) {
     if (!etiquette_anomalies_) return;
     if (erreurs == 0 && avertissements == 0) {
         etiquette_anomalies_->setText("Contrôle : aucune anomalie");
-        etiquette_anomalies_->setStyleSheet("color:#2e7d32");
+        apparence::poser_ton(etiquette_anomalies_, apparence::Ton::Succes);
         return;
     }
     QString texte;
@@ -1640,14 +1643,17 @@ void FenetrePrincipale::refleter_controle(int erreurs, int avertissements) {
                      .arg(avertissements > 1 ? "s" : "");
     }
     etiquette_anomalies_->setText("Contrôle : " + texte);
-    etiquette_anomalies_->setStyleSheet(erreurs > 0 ? "color:#c62828"
-                                                    : "color:#e65100");
+    apparence::poser_ton(etiquette_anomalies_, erreurs > 0
+                                                   ? apparence::Ton::Erreur
+                                                   : apparence::Ton::Alerte);
 }
 
 void FenetrePrincipale::montrer_raccourcis() {
     QString texte =
-        "<p style='color:#555'>Les raccourcis ci-dessous sont lus dans les "
-        "menus de l'application : cette liste ne peut donc pas mentir.</p>";
+        QString("<p style='color:%1'>Les raccourcis ci-dessous sont lus dans "
+                "les menus de l'application : cette liste ne peut donc pas "
+                "mentir.</p>")
+            .arg(apparence::courante().texte_doux.name());
 
     for (QAction* menu_action : menuBar()->actions()) {
         QMenu* menu = menu_action->menu();

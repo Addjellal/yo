@@ -4,7 +4,9 @@
 #include <QCoreApplication>
 #include <QPalette>
 #include <QSettings>
+#include <QStyle>
 #include <QStyleFactory>
+#include <QWidget>
 
 namespace apparence {
 
@@ -284,7 +286,28 @@ QToolTip {
 }
 QSplitter::handle { background: %BORDURE%; }
 QCheckBox::indicator, QRadioButton::indicator { width: 15px; height: 15px; }
+
+/* ---------- le TON d'une étiquette ----------
+   Sept étiquettes portaient leur couleur en dur dans leur propre feuille de
+   style : « color: #444 » pour la lecture des curseurs, « #666 » pour une
+   description, « #2e7d32 » pour un état sain. Toutes choisies pour un fond
+   clair : sur fond sombre, la lecture des curseurs devenait du gris foncé sur
+   du gris foncé, et aucune ne suivait le changement de thème puisqu'une
+   feuille posée sur un widget l'emporte sur celle de l'application.
+
+   Ici, le ton est un RÔLE — doux, succès, alerte, erreur — et la couleur
+   vient de la palette. Reposer la feuille de l'application les repeint
+   toutes, ce qui rend le passage clair/sombre immédiat. */
+QLabel[ton="normal"] { color: %TEXTE%; }
+QLabel[ton="doux"]   { color: %TEXTE_DOUX%; }
+QLabel[ton="accent"] { color: %ACCENT%; }
+QLabel[ton="succes"] { color: %SUCCES%; }
+QLabel[ton="alerte"] { color: %ALERTE%; }
+QLabel[ton="erreur"] { color: %ERREUR%; }
 )")
+        .replace("%SUCCES%", c(p.succes))
+        .replace("%ALERTE%", c(p.alerte))
+        .replace("%ERREUR%", c(p.erreur))
         .replace("%FOND%", c(p.fond))
         .replace("%SURFACE_HAUTE%", c(p.surface_haute))
         .replace("%SURFACE%", c(p.surface))
@@ -296,6 +319,26 @@ QCheckBox::indicator, QRadioButton::indicator { width: 15px; height: 15px; }
         .replace("%ACCENT%", c(p.accent))
         .replace("%RAYON%", QString::number(kRayon))
         .replace("%HAUTEUR%", QString::number(kHauteurControle - 12));
+}
+
+// ---------------------------------------------------------------------------
+// Le ton d'une étiquette
+// ---------------------------------------------------------------------------
+void poser_ton(QWidget* widget, Ton ton) {
+    if (!widget) return;
+    const char* nom = ton == Ton::Succes   ? "succes"
+                      : ton == Ton::Alerte ? "alerte"
+                      : ton == Ton::Erreur ? "erreur"
+                      : ton == Ton::Accent ? "accent"
+                      : ton == Ton::Doux   ? "doux"
+                                           : "normal";
+    if (widget->property("ton").toByteArray() == nom) return;
+    widget->setProperty("ton", nom);
+    // Une propriété dynamique posée APRÈS la feuille de style ne redéclenche
+    // pas le calcul du style : sans ce va-et-vient, la couleur n'arrive qu'au
+    // prochain changement de thème.
+    widget->style()->unpolish(widget);
+    widget->style()->polish(widget);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,8 +361,21 @@ void enregistrer_theme(Theme theme) {
                theme == Theme::Sombre ? "sombre" : "clair");
 }
 
+// Le thème réellement posé. Avant tout appel à `appliquer`, c'est celui qui est
+// enregistré : `main` le pose au démarrage, et une fenêtre construite entre
+// deux ne doit pas lire une palette qui n'est pas la sienne.
+static Theme g_theme_pose = Theme::Clair;
+static bool g_theme_connu = false;
+
+const Palette& courante() {
+    const Theme t = g_theme_connu ? g_theme_pose : theme_enregistre();
+    return t == Theme::Sombre ? sombre() : claire();
+}
+
 void appliquer(Theme theme) {
     const Palette& p = theme == Theme::Sombre ? sombre() : claire();
+    g_theme_pose = theme;
+    g_theme_connu = true;
 
     // FUSION, ET PAS LE STYLE DU SYSTÈME.
     //
