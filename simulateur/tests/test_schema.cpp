@@ -69,6 +69,7 @@ static void console_en_utf8() {
 #include <QGraphicsPathItem>
 #include <QGraphicsSceneMouseEvent>
 #include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QPlainTextEdit>
 #include <QTextBlock>
 #include <QLineEdit>
@@ -3776,6 +3777,149 @@ static void test_tension_aux_bornes() {
 }
 
 // ---------------------------------------------------------------------------
+// Le curseur de mesure ne dérive pas tout seul
+//
+// Plainte de l'utilisateur : « un curseur s'affiche tout seul », « ça fait
+// tout bugger ». Le curseur était gardé en SECONDES, or la fenêtre avance
+// avec la simulation : un curseur posé à t = 100 s glissait vers la gauche
+// pendant que la souris ne bougeait pas, jusqu'à se coller au bord de
+// l'écran. On voyait un trait vertical dériver sans y toucher.
+//
+// Il est désormais gardé en fraction de fenêtre : il reste sous le pointeur,
+// quoi que fasse le temps.
+// ---------------------------------------------------------------------------
+static void test_curseur_ne_derive_pas() {
+    std::printf("\n-- le curseur de mesure ne dérive pas avec le temps --\n");
+
+    Oscilloscope scope;
+    scope.resize(600, 400);
+    scope.proposer_signaux({"n1"});
+    scope.sonder("n1");
+    scope.definir_base_temps(1.0);
+
+    coeur::Formes formes;
+    formes.temps = {0.0, 0.25, 0.5, 0.75};
+    formes.tensions["n1"] = {0.0, 5.0, 0.0, 5.0};
+    scope.ajouter_trame(formes, 0.0);
+
+    // La souris se pose au milieu de l'écran, puis NE BOUGE PLUS.
+    scope.poser_curseur_pour_essai(0.5);
+    const QString avant = scope.lecture_curseurs_pour_essai();
+    verifier(avant.contains("A : t ="), "le curseur affiche un instant",
+             avant.toStdString());
+
+    // Le temps avance de plusieurs fenêtres.
+    for (int trame = 1; trame <= 8; ++trame)
+        scope.ajouter_trame(formes, trame * 1.0);
+
+    // LE CONTRÔLE : le curseur est toujours au MILIEU de la fenêtre visible,
+    // et non collé au bord gauche. Son instant a donc changé — c'est même le
+    // signe qu'il suit l'écran et non le temps.
+    verifier(std::fabs(scope.part_curseur_pour_essai() - 0.5) < 0.001,
+             "il est resté au milieu de l'écran",
+             std::to_string(scope.part_curseur_pour_essai()));
+    const QString apres = scope.lecture_curseurs_pour_essai();
+    verifier(apres != avant,
+             "et l'instant qu'il annonce a suivi la fenêtre",
+             apres.toStdString());
+}
+
+// ---------------------------------------------------------------------------
+// Ctrl+Z doit défaire LE dernier geste, quel qu'il soit
+//
+// Plainte de l'utilisateur : « le Ctrl+Z est bizarre ». Il l'est, et la cause
+// n'est pas dans la pile mais dans ce qui n'y entre pas. Changer la valeur
+// d'un composant — le geste le plus courant après le câblage — ne s'y
+// inscrivait PAS. On passait une résistance de 220 Ω à 1 kΩ, on faisait
+// Ctrl+Z, et le logiciel défaisait autre chose : le fil d'avant, la rotation
+// d'avant. La pile n'était pas cassée, elle était TROUÉE.
+//
+// Même défaut pour le bouton « Pivoter de 90° » du panneau des propriétés,
+// alors que l'entrée du menu contextuel, elle, enregistrait bien.
+// ---------------------------------------------------------------------------
+static void test_annuler_defait_un_changement_de_valeur() {
+    std::printf("\n-- annuler défait un changement de valeur --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* r = scene->ajouter_composant("resistance", QPointF(0, 0));
+    if (!r) return;
+    r->valeurs["ohms"] = 220;
+    scene->oublier_historique();
+
+    // On passe par le VRAI chemin : le panneau des propriétés, comme
+    // l'utilisateur par le menu « Propriétés ». Un test qui écrirait
+    // `valeurs["ohms"]` directement ne prouverait rien de l'interface.
+    //
+    // Et non par un clic : le rayon de capture des broches vaut jusqu'à
+    // soixante unités quand la vue n'a pas d'échelle, si bien qu'au banc le
+    // centre d'une résistance — trente unités de ses bornes — est lu comme
+    // une BROCHE. Le clic tirerait un fil. Le montage déciderait à la place
+    // du code.
+    fenetre.afficher_proprietes(r);
+    QDoubleSpinBox* champ = nullptr;
+    for (QDoubleSpinBox* boite : fenetre.findChildren<QDoubleSpinBox*>())
+        if (std::fabs(boite->value() - 220.0) < 0.01) champ = boite;
+    verifier(champ != nullptr,
+             "le panneau des propriétés offre bien le champ de valeur");
+    if (!champ) return;
+
+    champ->setValue(1000);
+    verifier(std::fabs(r->valeurs["ohms"] - 1000.0) < 0.01,
+             "la valeur est bien passée à 1 kΩ",
+             std::to_string(r->valeurs["ohms"]));
+
+    // LE CONTRÔLE : une annulation revient à 220 Ω, et une seule.
+    verifier(scene->annuler(), "il y a quelque chose à annuler");
+    ItemComposant* apres = scene->composants().empty()
+                               ? nullptr
+                               : scene->composants().front();
+    verifier(apres && std::fabs(apres->valeurs["ohms"] - 220.0) < 0.01,
+             "annuler ramène la valeur d'avant",
+             apres ? std::to_string(apres->valeurs["ohms"]) : "aucun composant");
+
+    // …et rétablir la repose.
+    verifier(scene->retablir(), "on peut rétablir");
+    apres = scene->composants().empty() ? nullptr : scene->composants().front();
+    verifier(apres && std::fabs(apres->valeurs["ohms"] - 1000.0) < 0.01,
+             "rétablir remet 1 kΩ",
+             apres ? std::to_string(apres->valeurs["ohms"]) : "aucun composant");
+}
+
+static void test_annuler_defait_la_rotation_du_panneau() {
+    std::printf("\n-- annuler défait la rotation lancée du panneau --\n");
+
+    FenetrePrincipale fenetre;
+    fenetre.definir_mode_silencieux(true);
+    SceneSchema* scene = fenetre.scene();
+    scene->tout_effacer();
+    ItemComposant* r = scene->ajouter_composant("resistance", QPointF(0, 0));
+    if (!r) return;
+    scene->oublier_historique();
+    const double avant = r->rotation();
+
+    fenetre.afficher_proprietes(r);
+    QPushButton* pivoter = nullptr;
+    for (QPushButton* bouton : fenetre.findChildren<QPushButton*>())
+        if (bouton->text().contains("Pivoter")) pivoter = bouton;
+    verifier(pivoter != nullptr, "le panneau offre le bouton « Pivoter »");
+    if (!pivoter) return;
+
+    pivoter->click();
+    ItemComposant* tourne = scene->composants().front();
+    verifier(std::fabs(tourne->rotation() - avant) > 1.0,
+             "le composant a bien tourné",
+             std::to_string(tourne->rotation()));
+
+    verifier(scene->annuler(), "et cette rotation s'annule");
+    verifier(std::fabs(scene->composants().front()->rotation() - avant) < 0.01,
+             "le composant retrouve son orientation",
+             std::to_string(scene->composants().front()->rotation()));
+}
+
+// ---------------------------------------------------------------------------
 // Le relais dit enfin où il en est
 //
 // C'était le seul actionneur du catalogue sans AUCUN retour d'état : ni texte,
@@ -5109,6 +5253,9 @@ int main(int argc, char** argv) {
     test_depart_sur_fil_detruit();
     test_clic_immobile_ne_coupe_pas();
     test_tension_aux_bornes();
+    test_curseur_ne_derive_pas();
+    test_annuler_defait_un_changement_de_valeur();
+    test_annuler_defait_la_rotation_du_panneau();
     test_relais_annonce_son_etat();
     test_afficheur_sept_segments_s_allume();
     test_grandeurs_internes_tracables();

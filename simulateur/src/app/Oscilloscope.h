@@ -108,6 +108,7 @@ protected:
     void paintEvent(QPaintEvent* evenement) override;
     void mouseMoveEvent(QMouseEvent* evenement) override;
     void mousePressEvent(QMouseEvent* evenement) override;
+    void mouseReleaseEvent(QMouseEvent* evenement) override;
     void leaveEvent(QEvent* evenement) override;
 
 private:
@@ -145,8 +146,29 @@ private:
     double debut_affiche_ = 0.0;      // début de la fenêtre réellement tracée
 
     bool mode_xy_ = false;
-    double curseur_a_ = -1.0;         // en secondes, -1 = aucun
-    double curseur_b_ = -1.0;
+    // LE CURSEUR DE MESURE SUIT LA SOURIS, DONC L'ÉCRAN — PAS LE TEMPS.
+    //
+    // Il était gardé en secondes. Or la fenêtre AVANCE avec la simulation :
+    // un curseur posé à t = 100 s glissait tout seul vers la gauche pendant
+    // que la souris ne bougeait pas, jusqu'à se coller au bord. On voyait un
+    // trait vertical dériver sans y toucher, puis rester planté là.
+    //
+    // Il est donc gardé en FRACTION de la fenêtre (0 à 1) : il reste sous le
+    // pointeur, quoi que fasse le temps. Le curseur de référence B, lui, est
+    // bien un instant — c'est tout son intérêt, mesurer une durée — et sort
+    // de l'écran quand la fenêtre l'a dépassé.
+    double curseur_a_part_ = -1.0;    // 0..1 dans la fenêtre, -1 = aucun
+    double curseur_b_ = -1.0;         // en secondes, -1 = aucun
+    // Le niveau de déclenchement s'attrape à la souris : on tire le trait.
+    bool tire_le_niveau_ = false;
+    // L'instant du curseur A, déduit de sa position à l'écran.
+    double curseur_a() const;
+
+public:
+    void poser_part_curseur(double part) { curseur_a_part_ = part; }
+    double part_curseur() const { return curseur_a_part_; }
+
+private:
 
     // Instant du dernier front trouvé dans le tampon, ou -1.
     double chercher_front() const;
@@ -232,6 +254,14 @@ public:
     // Le signal affecté à une voie. Sert à vérifier qu'un scope posé sur le
     // schéma suit bien ce qui lui est câblé.
     QString signal_de_voie(int voie) const;
+    // Pose le curseur de mesure à une fraction de la fenêtre, et la relit.
+    // Pour le banc : simuler un déplacement de souris dans un widget non
+    // affiché ne dit rien de fiable sur les coordonnées, alors qu'on veut
+    // vérifier une règle simple — le curseur ne dérive pas.
+    void poser_curseur_pour_essai(double part);
+    double part_curseur_pour_essai() const;
+    // Ce que le bandeau des curseurs affiche.
+    QString lecture_curseurs_pour_essai() const;
 
 signals:
     // La base de temps a changé : le moteur peut avoir besoin d'affiner son

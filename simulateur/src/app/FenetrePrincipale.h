@@ -100,6 +100,13 @@ public:
     // Ce que l'on peut observer, et ce que chaque nom désigne. Exposés pour
     // le banc : la liste des signaux est une promesse faite à l'utilisateur,
     // et une promesse se vérifie.
+    // Montre les propriétés d'un composant. C'est ce que fait l'entrée
+    // « Propriétés » du menu contextuel, et ce que déclenche la sélection.
+    // Public parce que c'est une commande de l'application, pas un détail de
+    // la fenêtre — et parce qu'un banc doit pouvoir l'emprunter sans simuler
+    // un clic dont le rayon de capture décide à sa place.
+    void afficher_proprietes(ItemComposant* composant);
+
     QStringList signaux_observables() const { return derniers_signaux_; }
     // Ce qu'un bloc précis a le droit de montrer. Exposé pour le banc : la
     // restriction est une promesse, et une promesse se vérifie.
@@ -292,7 +299,7 @@ private slots:
     void arreter();
     void analyser_point_repos();
 
-    void afficher_proprietes(ItemComposant* composant);
+
     void circuit_modifie();
     void changer_carte(const QString& reference);
     // Le programme d'exemple de cette carte : celui de son contrôleur.

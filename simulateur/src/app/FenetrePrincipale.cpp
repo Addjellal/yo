@@ -2817,6 +2817,16 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
                     liste->setCurrentText(QString::fromStdString(it->second));
                 connect(liste, &QComboBox::currentTextChanged, this,
                         [this, composant, cle](const QString& valeur) {
+                            // CHANGER UNE VALEUR S'ANNULE, comme le reste.
+                            //
+                            // Ces trois éditeurs n'entraient PAS dans la pile.
+                            // C'est le geste le plus courant après le
+                            // câblage : on passait une résistance de 220 Ω à
+                            // 1 kΩ, on faisait Ctrl+Z, et le logiciel défaisait
+                            // autre chose — le fil d'avant, la rotation
+                            // d'avant. La pile n'était pas cassée, elle était
+                            // TROUÉE, et c'est bien plus déroutant.
+                            scene_->memoriser();
                             composant->textes[cle] = valeur.toStdString();
                             composant->update();
                             circuit_modifie();
@@ -2832,8 +2842,20 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
                     static_cast<int>(composant->valeurs[cle]));
                 auto* valeur_affichee =
                     new QLabel(QString::number(composant->valeurs[cle]));
+                // UNE ENTRÉE PAR GESTE, PAS PAR PIXEL.
+                //
+                // Un curseur émet à chaque pixel parcouru : enregistrer là
+                // remplirait la pile de cinquante états pour un seul
+                // mouvement, et il faudrait cinquante Ctrl+Z pour revenir. On
+                // relève donc l'état à l'APPUI, avant que la valeur bouge.
+                connect(curseur, &QSlider::sliderPressed, this,
+                        [this] { scene_->memoriser(); });
                 connect(curseur, &QSlider::valueChanged, this,
-                        [this, composant, cle, valeur_affichee](int valeur) {
+                        [this, composant, cle, valeur_affichee,
+                         curseur](int valeur) {
+                            // Flèches et molette ne passent pas par l'appui :
+                            // chacune est un geste à part entière.
+                            if (!curseur->isSliderDown()) scene_->memoriser();
                             composant->valeurs[cle] = valeur;
                             valeur_affichee->setText(QString::number(valeur));
                             composant->update();
@@ -2855,6 +2877,10 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
                 champ->setKeyboardTracking(false);
                 connect(champ, &QDoubleSpinBox::valueChanged, this,
                         [this, composant, cle](double valeur) {
+                            // `setKeyboardTracking(false)` fait qu'une frappe
+                            // ne notifie qu'à la validation : une entrée de
+                            // pile par valeur saisie, et non par caractère.
+                            scene_->memoriser();
                             composant->valeurs[cle] = valeur;
                             composant->update();
                             circuit_modifie();
@@ -2868,8 +2894,13 @@ void FenetrePrincipale::afficher_proprietes(ItemComposant* composant) {
 
     auto* pivoter = new QPushButton("Pivoter de 90°");
     connect(pivoter, &QPushButton::clicked, this, [this, composant] {
+        // Le même geste, lancé du MENU, enregistrait bien ; lancé d'ici, non.
+        // Deux chemins pour une seule action, dont un seul annulable : c'est
+        // le genre d'écart qui fait douter de la pile entière.
+        scene_->memoriser();
         composant->tourner();
         for (ItemFil* fil : scene_->fils()) fil->rafraichir();
+        circuit_modifie();
     });
     formulaire_->addRow(pivoter);
 }
