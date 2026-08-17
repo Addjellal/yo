@@ -31,9 +31,12 @@ static void console_en_utf8() {
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QImage>
+#include <QGridLayout>
+#include <QLabel>
 #include <QJsonObject>
 #include <QMenuBar>
 #include <QToolBar>
+#include "app/Apparence.h"
 #include "app/Oscilloscope.h"
 #include <QMenu>
 #include <functional>
@@ -4426,6 +4429,234 @@ static void test_base_de_temps_annoncee_est_celle_dessinee() {
 }
 
 // ---------------------------------------------------------------------------
+// Le trait qu'on attrape doit être celui qui est dessiné
+//
+// Trois endroits calculaient la géométrie de l'écran de l'oscilloscope : le
+// tracé, l'appui qui attrape le trait de déclenchement, et le glissé qui le
+// déplace. Et les trois ne disaient pas la même chose.
+//
+// Le tracé pose le zéro EN BAS de l'écran tant que tout reste positif, et AU
+// MILIEU dès qu'un signal descend sous zéro. Les deux gestionnaires de souris,
+// eux, le posaient une division au-dessus du bas, quel que soit le signal. Sur
+// un signal positif, il fallait donc cliquer une cinquantaine de pixels sous le
+// trait pour l'attraper, et la valeur réglée était fausse d'une division. Sur un
+// signal alternatif, l'écart valait la moitié de l'écran : le geste était
+// impossible.
+//
+// Et la case du niveau, elle, ne suivait pas du tout : `rafraichir_mesures` ne
+// la mettait à jour qu'en niveau AUTOMATIQUE — état que le glissé quitte
+// justement, et définitivement. Elle affichait 2,50 V pendant que l'appareil
+// déclenchait ailleurs.
+// ---------------------------------------------------------------------------
+static void test_niveau_de_declenchement_se_tire() {
+    std::printf("\n-- le niveau de déclenchement s'attrape à la souris --\n");
+    const double pi = 3.14159265358979323846;
+
+    Oscilloscope scope;
+    scope.resize(Oscilloscope::taille_conseillee());
+    scope.show();
+    QCoreApplication::processEvents();
+
+    // UN SIGNAL ALTERNATIF : le cas où l'écart valait la moitié de l'écran.
+    coeur::Formes trame;
+    for (int k = 0; k <= 400; ++k) {
+        const double t = k * 0.0005;
+        trame.temps.push_back(t);
+        trame.tensions["n1"].push_back(3.0 * std::sin(2 * pi * 50 * t));
+    }
+    scope.proposer_signaux(QStringList{"n1"});
+    scope.sonder("n1");
+    scope.ajouter_trame(trame, 0.0);
+    scope.definir_base_temps(0.05);
+
+    TraceOscilloscope* trace = scope.findChild<TraceOscilloscope*>();
+    QDoubleSpinBox* niveau = nullptr;
+    for (QDoubleSpinBox* candidat : scope.findChildren<QDoubleSpinBox*>())
+        if (candidat->suffix() == " V") niveau = candidat;
+    verifier(trace && niveau, "la trace et la case du niveau existent");
+    if (!trace || !niveau) return;
+    trace->grab();
+    verifier(trace->voie_mesuree(0),
+             "la voie d'essai est mesurée — sans quoi aucun repère n'est tracé");
+
+    // LE ZÉRO TEL QU'IL EST DESSINÉ, relevé dans l'image.
+    //
+    // C'est l'ancre qui compte : demander à `y_du_niveau()` où est le zéro,
+    // puis vérifier que la souris tombe au même endroit, ne prouverait qu'une
+    // cohérence interne — les deux formules recopiées étaient chacune cohérente
+    // avec elle-même. Sur un écran bipolaire, le tracé souligne le zéro d'un
+    // trait plein de la couleur des axes : on le retrouve en comptant les
+    // pixels de cette couleur par rangée.
+    trace->definir_niveau_declenchement(0.0);
+    const QImage rendu = trace->grab().toImage();
+    const QColor couleur_axe(86, 100, 112);
+    int y_axe_dessine = -1;
+    int meilleur_compte = 0;
+    for (int y = 30; y < rendu.height() - 30; ++y) {
+        int compte = 0;
+        for (int x = 60; x < rendu.width() - 20; ++x) {
+            const QColor c = rendu.pixelColor(x, y);
+            if (std::abs(c.red() - couleur_axe.red()) < 24
+                && std::abs(c.green() - couleur_axe.green()) < 24
+                && std::abs(c.blue() - couleur_axe.blue()) < 24)
+                ++compte;
+        }
+        if (compte > meilleur_compte) {
+            meilleur_compte = compte;
+            y_axe_dessine = y;
+        }
+    }
+    // Un quart de la largeur suffit à l'affirmer : le trait fait 1,2 pixel de
+    // large et l'anticrénelage en répartit l'encre sur deux rangées, dont
+    // aucune n'est donc pleine. Aucune autre rangée ne peut rivaliser — la
+    // grille est d'une autre couleur, et les courbes aussi.
+    verifier(meilleur_compte > (rendu.width() - 80) / 4,
+             "le trait du zéro est bien dessiné en travers de l'écran",
+             std::to_string(meilleur_compte) + " pixels sur la rangée "
+                 + std::to_string(y_axe_dessine));
+
+    const double y_zero = trace->y_du_niveau();   // niveau nul = le zéro
+    verifier(std::fabs(y_zero - y_axe_dessine) < 3.0,
+             "et la souris cherche le niveau nul À CET ENDROIT, pas ailleurs",
+             "dessiné en y=" + std::to_string(y_axe_dessine) + ", visé en y="
+                 + f(y_zero));
+
+    // L'échelle se DÉDUIT de deux positions du trait, plutôt que de recopier
+    // la formule qu'on est justement en train de vérifier.
+    trace->definir_niveau_declenchement(1.0);
+    const double y_un_volt = trace->y_du_niveau();
+    const double pixels_par_volt = y_zero - y_un_volt;
+    verifier(pixels_par_volt > 1.0,
+             "un volt occupe une hauteur mesurable à l'écran",
+             std::to_string(pixels_par_volt) + " px/V");
+    if (pixels_par_volt <= 1.0) return;
+
+    const int x = trace->width() / 2;
+    const double y_depart = trace->y_du_niveau();
+    verifier(y_depart > 0 && y_depart < trace->height(),
+             "le repère est dans la zone tracée, donc attrapable",
+             std::to_string(y_depart) + " px sur " + std::to_string(trace->height()));
+
+    auto souris = [&](QEvent::Type genre, double y, Qt::MouseButton bouton) {
+        QMouseEvent evenement(genre, QPointF(x, y), QPointF(x, y),
+                              bouton, bouton, Qt::NoModifier);
+        QApplication::sendEvent(trace, &evenement);
+    };
+
+    // On attrape le trait LÀ OÙ IL EST DESSINÉ, et on le tire vers le haut.
+    const double montee = 40.0;
+    souris(QEvent::MouseButtonPress, y_depart, Qt::LeftButton);
+    souris(QEvent::MouseMove, y_depart - montee, Qt::LeftButton);
+    souris(QEvent::MouseButtonRelease, y_depart - montee, Qt::LeftButton);
+
+    const double attendu = 1.0 + montee / pixels_par_volt;
+    const double obtenu = trace->niveau_declenchement();
+    verifier(std::fabs(obtenu - attendu) < 0.05,
+             "tirer le trait de 40 pixels vers le haut monte le niveau d'autant "
+             "de volts",
+             f(obtenu) + " V au lieu de " + f(attendu) + " V");
+
+    verifier(std::fabs(niveau->value() - obtenu) < 0.01,
+             "et la case affiche le niveau réellement en vigueur",
+             "case " + f(niveau->value()) + " V, appareil " + f(obtenu) + " V");
+
+    // Un appui LOIN du trait ne le déplace pas : il pose le curseur de mesure.
+    const double avant = trace->niveau_declenchement();
+    const double y_loin = trace->y_du_niveau() + 3 * montee;
+    souris(QEvent::MouseButtonPress, y_loin, Qt::LeftButton);
+    souris(QEvent::MouseButtonRelease, y_loin, Qt::LeftButton);
+    verifier(std::fabs(trace->niveau_declenchement() - avant) < 1e-9,
+             "un clic loin du trait ne vole pas le geste du curseur",
+             f(trace->niveau_declenchement()) + " V");
+}
+
+// ---------------------------------------------------------------------------
+// Une couleur écrite en dur ne suit aucun thème
+//
+// « Curseurs : passez la souris sur la courbe » s'écrivait en `color: #444` —
+// un gris foncé, choisi pour un fond clair. Sur le thème sombre, cela donnait
+// du gris foncé sur du gris foncé : la phrase était là, illisible. Sept
+// étiquettes étaient dans ce cas, et aucune ne suivait le changement de thème,
+// puisqu'une feuille de style posée SUR un widget l'emporte sur celle de
+// l'application.
+//
+// L'essai ne relit pas le code : il DESSINE l'étiquette dans les deux thèmes
+// et relève la couleur de l'encre. C'est la seule vérification qui aurait
+// attrapé le défaut, parce que le code, lui, était parfaitement cohérent.
+// ---------------------------------------------------------------------------
+static void test_etiquettes_suivent_le_theme() {
+    std::printf("\n-- les étiquettes suivent le thème --\n");
+
+    // L'encre d'une zone : le pixel le plus éloigné du fond. Une étiquette est
+    // presque tout fond ; c'est la minorité qui porte le texte.
+    auto encre = [](const QImage& image, const QRect& zone, const QColor& fond) {
+        QColor trouvee = fond;
+        int ecart_max = -1;
+        for (int y = zone.top(); y <= zone.bottom(); ++y)
+            for (int x = zone.left(); x <= zone.right(); ++x) {
+                const QColor c = image.pixelColor(x, y);
+                const int ecart = std::abs(c.red() - fond.red())
+                                  + std::abs(c.green() - fond.green())
+                                  + std::abs(c.blue() - fond.blue());
+                if (ecart > ecart_max) {
+                    ecart_max = ecart;
+                    trouvee = c;
+                }
+            }
+        return trouvee;
+    };
+
+    const apparence::Theme themes[] = {apparence::Theme::Clair,
+                                       apparence::Theme::Sombre};
+    const char* noms[] = {"clair", "sombre"};
+
+    for (int t = 0; t < 2; ++t) {
+        apparence::appliquer(themes[t]);
+        const apparence::Palette& p = apparence::courante();
+
+        Oscilloscope scope;
+        scope.resize(Oscilloscope::taille_conseillee());
+        scope.show();
+        QCoreApplication::processEvents();
+
+        QLabel* bandeau = nullptr;
+        for (QLabel* candidat : scope.findChildren<QLabel*>())
+            if (candidat->text().startsWith("Curseurs")) bandeau = candidat;
+        verifier(bandeau != nullptr,
+                 std::string("thème ") + noms[t]
+                     + " : le bandeau des curseurs existe");
+        if (!bandeau) continue;
+
+        const QImage image = scope.grab().toImage();
+        const QRect place(bandeau->mapTo(&scope, QPoint(0, 0)),
+                          bandeau->size());
+        const QColor lue = encre(image, place.adjusted(1, 1, -1, -1), p.fond);
+
+        verifier(lue == p.texte_doux,
+                 std::string("thème ") + noms[t]
+                     + " : l'encre du bandeau est bien le texte doux de la "
+                       "palette",
+                 "lu " + lue.name().toStdString() + ", attendu "
+                     + p.texte_doux.name().toStdString());
+
+        // Et elle se DÉTACHE du fond. Une teinte issue de la palette pourrait
+        // encore être trop proche : c'est la lisibilité qu'on veut, pas la
+        // provenance de la couleur.
+        const int contraste = std::abs(lue.red() - p.fond.red())
+                              + std::abs(lue.green() - p.fond.green())
+                              + std::abs(lue.blue() - p.fond.blue());
+        verifier(contraste > 120,
+                 std::string("thème ") + noms[t]
+                     + " : et elle se détache franchement du fond",
+                 std::to_string(contraste) + " d'écart sur trois canaux");
+    }
+
+    // On repose le thème enregistré : un essai ne laisse pas l'application
+    // dans un état qu'il a choisi pour lui-même.
+    apparence::appliquer(apparence::theme_enregistre());
+}
+
+// ---------------------------------------------------------------------------
 // Un réglage hors de l'écran n'existe pas
 //
 // « Le trigger est bien mais je vois pas comment modifier le curseur du
@@ -4466,13 +4697,37 @@ static void test_reglage_du_declenchement_est_atteignable() {
              std::to_string(voulue) + " px de réglages pour "
                  + std::to_string(scope.width()) + " px de fenêtre");
 
-    // ET ILS TIENDRAIENT DANS L'ANCIENNE FENÊTRE. Sans cette ligne, on pourrait
-    // faire passer l'essai en agrandissant la fenêtre — ce qui ne réorganise
-    // rien et laisse le défaut revenir dès que l'utilisateur la rétrécit.
-    verifier(voulue <= 760,
-             "et ils tiendraient même dans la fenêtre d'avant : le remède est "
-             "une réorganisation, pas une fenêtre agrandie",
-             std::to_string(voulue) + " px réclamés");
+    // LE REMÈDE EST STRUCTUREL, ET CELA SE VÉRIFIE.
+    //
+    // Un essai qui ne regarderait que « ça tient » se satisferait d'une fenêtre
+    // agrandie — ce qui ne réorganise rien et laisse le défaut revenir au
+    // premier rétrécissement. Ce qu'il faut vérifier, c'est que les commandes
+    // ne partagent plus les colonnes des voies : deux grilles distinctes, et
+    // celle des commandes plus étroite que celle des voies. Avec une grille
+    // unique, elles avaient forcément la même largeur.
+    QList<QGridLayout*> grilles = scope.findChildren<QGridLayout*>();
+    verifier(grilles.size() == 2,
+             "les voies et les commandes sont dans deux grilles distinctes",
+             std::to_string(grilles.size()) + " grille(s)");
+    if (grilles.size() != 2) return;
+
+    QGridLayout* commandes = nullptr;
+    QGridLayout* canaux = nullptr;
+    for (QGridLayout* grille : grilles) {
+        bool tient_le_niveau = false;
+        for (int k = 0; k < grille->count(); ++k)
+            if (auto* boite = qobject_cast<QDoubleSpinBox*>(
+                    grille->itemAt(k)->widget()))
+                if (boite->suffix() == " V") tient_le_niveau = true;
+        (tient_le_niveau ? commandes : canaux) = grille;
+    }
+    verifier(commandes && canaux,
+             "on distingue la grille des commandes de celle des voies");
+    if (!commandes || !canaux) return;
+    verifier(commandes->sizeHint().width() < canaux->sizeHint().width(),
+             "les commandes ne paient plus la largeur des voies",
+             std::to_string(commandes->sizeHint().width()) + " px contre "
+                 + std::to_string(canaux->sizeHint().width()));
 
     // La case du niveau : la seule qui s'exprime en volts.
     QDoubleSpinBox* niveau = nullptr;
@@ -5307,6 +5562,18 @@ int main(int argc, char** argv) {
     // dépend de l'état d'un poste ne prouve rien.
     application.setApplicationName("Simulateur embarqué — banc d'essai");
     application.setOrganizationName("Formation embarquée");
+    // LE BANC S'HABILLE COMME L'APPLICATION.
+    //
+    // Sans cette ligne, il mesurait des widgets nus, avec les marges du style
+    // par défaut de Qt — une interface que personne ne voit. Les réglages de
+    // l'oscilloscope, mesurés ainsi, réclamaient 746 pixels ; habillés de la
+    // feuille de style, qui donne aux contrôles leur hauteur et leurs marges,
+    // ils en réclament 764. Toute mesure de géométrie faite sans le thème est
+    // une mesure d'autre chose.
+    //
+    // Le thème est IMPOSÉ, et non relu : sinon le résultat du banc dépendrait
+    // du dernier choix fait sur le poste.
+    apparence::appliquer(apparence::Theme::Clair);
     std::printf("============================================================\n");
     std::printf("TESTS DE LA SAISIE DE SCHÉMA — exemplaires multiples\n");
     std::printf("============================================================\n");
@@ -5380,6 +5647,8 @@ int main(int argc, char** argv) {
     test_fermer_ferme_les_fenetres_detachees();
     test_fichier_corrompu_ne_vide_pas_le_schema();
     test_base_de_temps_annoncee_est_celle_dessinee();
+    test_niveau_de_declenchement_se_tire();
+    test_etiquettes_suivent_le_theme();
     test_reglage_du_declenchement_est_atteignable();
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QColor>
+#include <QRectF>
 #include <QSize>
 #include <QStringList>
 #include <QWidget>
@@ -100,6 +101,32 @@ public:
     // été choisi mais que rien ne le fournit — ce qui doit se DIRE, et non se
     // dessiner comme un zéro.
     bool voie_mesuree(int voie) const;
+
+    // LA GÉOMÉTRIE DE L'ÉCRAN, ÉNONCÉE EN UN SEUL ENDROIT.
+    //
+    // Elle l'était en trois : le tracé, la souris qui attrape le trait de
+    // déclenchement, et celle qui le déplace. Et les trois ne disaient pas la
+    // même chose. Le tracé pose le zéro EN BAS de l'écran tant que tout reste
+    // positif, et AU MILIEU dès qu'un signal descend sous zéro ; les deux
+    // gestionnaires de souris, eux, le posaient une division au-dessus du bas,
+    // quel que soit le signal.
+    //
+    // Conséquence : le trait de déclenchement n'était pas là où la souris
+    // croyait. Décalé d'une division sur un signal positif — on l'attrapait
+    // cinquante pixels plus bas et on réglait une valeur fausse — et de la
+    // moitié de l'écran sur un signal alternatif, où le geste devenait
+    // simplement impossible.
+    struct Cadre {
+        QRectF zone;             // le rectangle tracé, marges retirées
+        double y_zero = 0;       // l'ordonnée du zéro volt
+        double echelle = 0;      // pixels par volt
+        bool bipolaire = false;  // un signal descend-il sous zéro ?
+    };
+    Cadre cadre() const;
+    // L'ordonnée du repère de déclenchement. Publique parce que le banc doit
+    // pouvoir viser ce trait SANS recopier la formule : c'est précisément la
+    // recopie qui a créé le défaut.
+    double y_du_niveau() const;
 
 signals:
     // Les curseurs ont bougé : le panneau met sa lecture à jour.

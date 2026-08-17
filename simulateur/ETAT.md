@@ -872,3 +872,114 @@ Trois leçons, dont deux déjà connues sous une autre forme :
    raison. Ce qui l'a démasquée est l'assertion *symétrique* : « en Auto, un
    front est trouvé », qui, elle, tombait. **Vérifier les deux sens d'un
    réglage coûte une ligne et révèle le vide.**
+
+## Le banc mesurait une interface que personne ne voit
+
+Le banc construisait ses fenêtres **sans poser le thème**. Il mesurait donc des
+widgets nus, avec les marges du style Qt par défaut, alors que l'application
+pose une feuille de style qui donne aux contrôles leur hauteur et leurs marges.
+Les mêmes réglages d'oscilloscope réclament **746 px sans le thème et 764 px
+avec** : toute mesure de géométrie faite sans la feuille de style est une mesure
+d'autre chose.
+
+Le thème est désormais posé au démarrage du banc, et **imposé** plutôt que relu
+— sinon le résultat dépendrait du dernier choix fait sur le poste.
+
+Corollaire sur la forme des essais : l'assertion « les réglages tiendraient dans
+760 » a été remplacée par une assertion **structurelle** — deux grilles
+distinctes, et celle des commandes plus étroite que celle des voies. Une mesure
+en pixels comparée à un nombre écrit à la main se périme au premier changement
+de police ; la propriété structurelle, non.
+
+## Trois formules pour un seul écran
+
+Trois endroits calculaient la géométrie de l'écran de l'oscilloscope : le tracé,
+l'appui qui attrape le trait de déclenchement, et le glissé qui le déplace. Les
+trois ne disaient pas la même chose.
+
+| | zéro volt placé à |
+|---|---|
+| le tracé, signal positif | en bas de la zone |
+| le tracé, signal alternatif | au milieu de la zone |
+| les deux gestionnaires de souris | une division au-dessus du bas, **toujours** |
+
+Conséquences, vérifiées en rejouant de vrais événements de souris : sur un signal
+positif il fallait cliquer une cinquantaine de pixels sous le trait pour
+l'attraper, et la valeur réglée était fausse d'une division ; sur un signal
+alternatif l'écart valait la moitié de l'écran et **le geste était impossible**.
+
+Et la case du niveau ne suivait pas du tout : `rafraichir_mesures` ne la mettait
+à jour qu'en niveau AUTOMATIQUE — l'état que le glissé quitte justement, et
+définitivement. Elle affichait 2,50 V pendant que l'appareil déclenchait
+ailleurs ; cliquer ensuite sa flèche « + » repartait de la valeur affichée et
+écrasait le réglage fait à la souris.
+
+Les trois formules sont réunies dans `TraceOscilloscope::cadre()`, et
+`y_du_niveau()` dit où le trait est dessiné — pour le peintre comme pour la
+souris.
+
+**Ce qui rend l'essai probant :** il ne demande pas à `y_du_niveau()` où est le
+zéro pour vérifier ensuite que la souris tombe au même endroit — les deux
+formules recopiées étaient chacune cohérente avec elle-même, et un essai bâti
+sur la fonction partagée passe même quand on réintroduit le défaut. Je l'ai
+vérifié : il faut relever le trait du zéro **dans l'image rendue**, en comptant
+les pixels de la couleur des axes par rangée. Alors seulement, réintroduire la
+divergence fait tomber l'essai — « 1,000 V au lieu de 1,806 V », le glissé
+n'ayant jamais eu lieu.
+
+Leçon générale : **quand un défaut est une divergence entre deux calculs, un
+essai qui interroge l'un des deux ne le voit pas.** Il faut une troisième source
+— ici les pixels.
+
+## Onze couleurs qui ignoraient le thème
+
+`color: #444` pour la lecture des curseurs, `#666` pour une description, `#555`
+pour des extrêmes, `#2e7d32` pour un contrôle sain, `#7a5c00` pour le nœud
+survolé. Onze en tout, dont deux dans du HTML de boîte de dialogue. Toutes
+choisies pour un fond clair, et toutes posées **sur le widget** — donc
+l'emportant sur la feuille de l'application, et ne suivant aucun changement de
+thème. Sur le thème sombre, la lecture des curseurs était du gris foncé sur du
+gris foncé : la phrase était là, illisible.
+
+Le remède est un **rôle** et non une couleur : `apparence::poser_ton(widget,
+Ton::Doux)` pose une propriété dynamique que la feuille de l'application lit
+(`QLabel[ton="doux"] { color: … }`). Reposer la feuille les repeint toutes, ce
+qui rend le passage clair/sombre immédiat. Pour le texte enrichi, qu'aucun
+sélecteur n'atteint, `apparence::courante()` donne la palette en vigueur.
+
+Deux choses apprises en le faisant :
+
+1. **`grep "color:#"` en avait manqué une** — celle dont la couleur est
+   interpolée : `QString("color: %1;").arg(couleur_voie(v).name())`. Et cette
+   onzième contredisait le diagnostic que je venais d'écrire : j'avais affirmé
+   que la couleur d'alerte d'une voie sans mesure « n'était jamais retirée »,
+   alors qu'elle l'était, deux branches plus bas, par cette ligne. **Un motif
+   de recherche qui ne trouve rien ne prouve pas l'absence ; il prouve que le
+   motif est trop étroit.**
+2. **Ne pas mélanger les deux mécaniques sur un même widget.** L'étiquette des
+   mesures porte la couleur de SA VOIE, ce qui est une vraie décision de
+   dessin. Y ajouter un ton l'aurait rendu inopérant — la feuille du widget
+   gagne — et l'alerte aurait cessé de s'afficher dès qu'une mesure aurait eu
+   lieu. Les trois états passent donc par la même voie.
+
+## Deux fenêtres survivaient à la fenêtre principale
+
+`setParent(nullptr)` puis `setWindowFlags(Qt::Window)` : c'est ainsi qu'étaient
+détachées la fenêtre du programme, les onglets détachés, les blocs SCP et la
+sonde générale. Une fenêtre sans parent n'appartient à personne — **476 widgets
+vivants, 162 survivants** après destruction de la fenêtre principale.
+
+Ce n'était pas qu'une fuite. Reposer le thème parcourt tous les widgets vivants
+pour leur envoyer un changement de police ; il tombait sur un éditeur dont
+l'entourage venait d'être détruit, et l'application partait en **segmentation
+fault au changement de thème**. Le plantage n'a été découvert que parce qu'un
+essai a osé changer de thème deux fois de suite.
+
+`setParent(this, Qt::Window)` garde les deux propriétés : une vraie fenêtre
+indépendante à l'écran, et un enfant que le destructeur emporte. **476 vivants,
+0 survivant.**
+
+C'est la même leçon que celle déjà écrite plus haut — « un état gardé entre deux
+événements doit être inscrit, le jour même, dans tout ce qui détruit » — sous sa
+forme la plus littérale : **une fenêtre est un état, et elle doit avoir un
+propriétaire.**

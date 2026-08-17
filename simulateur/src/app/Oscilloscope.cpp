@@ -1,5 +1,6 @@
 #include "app/Oscilloscope.h"
 
+#include "app/Apparence.h"
 #include "app/BarreDefilante.h"
 
 #include <QCheckBox>
@@ -280,7 +281,8 @@ void TraceOscilloscope::vider() {
 void TraceOscilloscope::paintEvent(QPaintEvent*) {
     QPainter peintre(this);
     peintre.setRenderHint(QPainter::Antialiasing, true);
-    const QRectF zone = rect().adjusted(46, 8, -8, -22);
+    const Cadre repere = cadre();
+    const QRectF zone = repere.zone;
     peintre.fillRect(rect(), kFond);
 
     // --- grille : 10 divisions en temps, 8 en tension
@@ -296,16 +298,8 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     peintre.setPen(QPen(kGrilleAxe, 1.0));
     peintre.drawRect(zone);
 
-    // Où placer le zéro ? En bas tant que tout reste positif — c'est le cas
-    // d'une sortie logique ou d'une PWM, et on gagne toute la hauteur. Dès
-    // qu'un signal descend sous zéro, on le remonte au milieu : sinon la
-    // moitié d'une sinusoïde serait purement et simplement invisible.
-    bool bipolaire = false;
-    for (int v = 0; v < kVoies; ++v)
-        for (float valeur : voies_[v].valeurs)
-            if (valeur < -0.05f) { bipolaire = true; break; }
-    const double y_zero =
-        bipolaire ? zone.top() + zone.height() / 2.0 : zone.bottom();
+    const bool bipolaire = repere.bipolaire;
+    const double y_zero = repere.y_zero;
 
     // --- axes chiffrés
     QFont police = peintre.font();
@@ -371,7 +365,7 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
     // conserve fidèlement les fronts. C'est la méthode des oscilloscopes
     // numériques.
     const int largeur = std::max(1, static_cast<int>(zone.width()));
-    const double echelle_y = zone.height() / (8.0 * volts_par_division_);
+    const double echelle_y = repere.echelle;
 
     if (mode_xy_) {
         tracer_xy(peintre, zone, debut, echelle_y, y_zero);
@@ -431,7 +425,7 @@ void TraceOscilloscope::paintEvent(QPaintEvent*) {
 
     // --- repère du niveau de déclenchement
     if (declenchement_ != Declenchement::Aucun && voie_active(voie_declenchement_)) {
-        const double y = y_zero - niveau_declenchement_ * echelle_y;
+        const double y = y_du_niveau();
         if (y > zone.top() && y < zone.bottom()) {
             peintre.setPen(QPen(kCouleurs[voie_declenchement_], 1.0,
                                 Qt::DashDotLine));
@@ -681,7 +675,7 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
     QFont fonte("monospace");
     fonte.setStyleHint(QFont::TypeWriter);
     curseurs_->setFont(fonte);
-    curseurs_->setStyleSheet("color: #444;");
+    apparence::poser_ton(curseurs_, apparence::Ton::Doux);
     // Le texte d'une étiquette fixe sa largeur minimale : cette phrase-là, en
     // chasse fixe, réclamait à elle seule 528 pixels pour toute la fenêtre.
     // Elle accepte donc d'être tronquée plutôt que d'imposer sa mesure.
@@ -693,6 +687,21 @@ Oscilloscope::Oscilloscope(QWidget* parent) : QWidget(parent) {
                                ? QString("Curseurs : passez la souris sur la "
                                          "courbe, cliquez pour poser le repère.")
                                : lecture);
+        // LA CASE SUIT LE TRAIT QU'ON TIRE.
+        //
+        // Tirer le niveau sur la trace changeait le déclenchement réel sans
+        // toucher à la case, et `rafraichir_mesures` ne la remettait à jour
+        // qu'en niveau AUTOMATIQUE — état que le glissé quitte justement, et
+        // pour de bon. La case restait donc à 2,50 V pendant que l'appareil
+        // déclenchait à 4,02 V ; pire, cliquer ensuite sa flèche « + »
+        // repartait de la valeur affichée et écrasait le réglage à la souris.
+        //
+        // Une case qui affiche autre chose que le réglage en vigueur est un
+        // mensonge, et celle-ci en était un dès le premier glissé.
+        if (niveau_) {
+            const QSignalBlocker silence(niveau_);
+            niveau_->setValue(trace_->niveau_declenchement());
+        }
     });
 }
 
@@ -894,8 +903,30 @@ double TraceOscilloscope::curseur_a() const {
                                : debut_affiche_ + curseur_a_part_ * fenetre_;
 }
 
+TraceOscilloscope::Cadre TraceOscilloscope::cadre() const {
+    Cadre c;
+    c.zone = rect().adjusted(46, 8, -8, -22);
+    // Où placer le zéro ? En bas tant que tout reste positif — c'est le cas
+    // d'une sortie logique ou d'une PWM, et on gagne toute la hauteur. Dès
+    // qu'un signal descend sous zéro, on le remonte au milieu : sinon la
+    // moitié d'une sinusoïde serait purement et simplement invisible.
+    for (int v = 0; v < kVoies && !c.bipolaire; ++v)
+        for (float valeur : voies_[v].valeurs)
+            if (valeur < -0.05f) { c.bipolaire = true; break; }
+    c.y_zero = c.bipolaire ? c.zone.top() + c.zone.height() / 2.0
+                           : c.zone.bottom();
+    c.echelle = c.zone.height() / (8.0 * volts_par_division_);
+    return c;
+}
+
+double TraceOscilloscope::y_du_niveau() const {
+    const Cadre c = cadre();
+    return c.y_zero - niveau_declenchement_ * c.echelle;
+}
+
 void TraceOscilloscope::mouseMoveEvent(QMouseEvent* evenement) {
-    const QRectF zone = rect().adjusted(46, 8, -8, -22);
+    const Cadre repere = cadre();
+    const QRectF zone = repere.zone;
     if (zone.width() <= 0 || zone.height() <= 0) return;
 
     // ON TIRE LE NIVEAU DE DÉCLENCHEMENT.
@@ -904,10 +935,8 @@ void TraceOscilloscope::mouseMoveEvent(QMouseEvent* evenement) {
     // au trait affiché sur l'écran. Sur un appareil, on tourne le bouton et le
     // trait suit ; ici on attrape le trait lui-même.
     if (tire_le_niveau_) {
-        const double y_zero = zone.bottom() - zone.height() / 8.0;
-        const double echelle = zone.height() / (8.0 * volts_par_division_);
         niveau_declenchement_ =
-            (y_zero - evenement->position().y()) / echelle;
+            (repere.y_zero - evenement->position().y()) / repere.echelle;
         // Le régler à la main, c'est cesser de le laisser deviner.
         niveau_automatique_ = false;
         emit curseurs_changes();
@@ -922,16 +951,14 @@ void TraceOscilloscope::mouseMoveEvent(QMouseEvent* evenement) {
 }
 
 void TraceOscilloscope::mousePressEvent(QMouseEvent* evenement) {
-    const QRectF zone = rect().adjusted(46, 8, -8, -22);
     // APPUYER SUR LE TRAIT DE DÉCLENCHEMENT, C'EST LE PRENDRE.
     //
     // Six pixels de tolérance : assez pour l'attraper sans viser, trop peu
-    // pour voler un clic destiné au curseur de mesure.
-    if (declenchement_ != Declenchement::Aucun && zone.height() > 0) {
-        const double y_zero = zone.bottom() - zone.height() / 8.0;
-        const double echelle = zone.height() / (8.0 * volts_par_division_);
-        const double y_niveau = y_zero - niveau_declenchement_ * echelle;
-        if (std::fabs(evenement->position().y() - y_niveau) < 6.0) {
+    // pour voler un clic destiné au curseur de mesure. Encore faut-il viser
+    // là où le trait est DESSINÉ, et non là où une formule recopiée le
+    // croyait : c'est `y_du_niveau()` qui fait foi, pour les deux.
+    if (declenchement_ != Declenchement::Aucun && cadre().zone.height() > 0) {
+        if (std::fabs(evenement->position().y() - y_du_niveau()) < 6.0) {
             tire_le_niveau_ = true;
             mouseMoveEvent(evenement);
             return;
@@ -986,14 +1013,28 @@ void Oscilloscope::rafraichir_mesures() {
     }
 
     for (int v = 0; v < TraceOscilloscope::kVoies; ++v) {
+        // UNE SEULE MÉCANIQUE PAR ÉTIQUETTE.
+        //
+        // Celle-ci ne prend pas un ton du thème : elle porte la COULEUR DE SA
+        // VOIE, pour que le chiffre appartienne visiblement à la courbe. Or une
+        // feuille posée sur un widget l'emporte sur celle de l'application :
+        // mélanger les deux mécaniques ici rendrait le ton inopérant, et
+        // l'alerte ne s'afficherait plus dès qu'une mesure aurait eu lieu. Les
+        // trois états passent donc par la même voie, et les couleurs qui ne
+        // sont pas celles des voies viennent de la palette.
+        auto peindre = [&](const QColor& couleur) {
+            mesures_[v]->setStyleSheet(
+                QString("color: %1;").arg(couleur.name()));
+        };
         if (!trace_->voie_active(v)) {
             mesures_[v]->setText("—");
+            peindre(apparence::courante().texte_doux);
             continue;
         }
         if (!trace_->voie_mesuree(v)) {
             // On le DIT, plutôt que de tracer un zéro qui ment.
             mesures_[v]->setText("aucune mesure pour ce signal");
-            mesures_[v]->setStyleSheet("color: #b26a00;");
+            peindre(apparence::courante().alerte);
             continue;
         }
         double moyenne = 0, maximum = 0;
@@ -1018,9 +1059,7 @@ void Oscilloscope::rafraichir_mesures() {
                                      .arg(moyenne, 0, 'f', 2)
                                      .arg(maximum, 0, 'f', 2));
         }
-        mesures_[v]->setStyleSheet(
-            QString("color: %1;")
-                .arg(TraceOscilloscope::couleur_voie(v).name()));
+        peindre(TraceOscilloscope::couleur_voie(v));
     }
 }
 
