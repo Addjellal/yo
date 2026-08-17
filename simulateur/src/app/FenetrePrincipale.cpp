@@ -685,8 +685,17 @@ void FenetrePrincipale::construire_docks() {
     // Wokwi — ou par son menu contextuel. Fermer la fenêtre ne perd rien :
     // le texte vit dans l'éditeur, pas dans la fenêtre.
     fenetre_programme_ = page_source;
-    page_source->setParent(nullptr);
-    page_source->setWindowFlags(Qt::Window);
+    // PARENTÉE, ET POURTANT UNE FENÊTRE À PART.
+    //
+    // `setParent(nullptr)` en faisait une fenêtre que plus personne ne
+    // possédait : elle survivait à la fenêtre principale. Ce n'était pas
+    // qu'une fuite — reposer le thème parcourt TOUS les widgets vivants, et
+    // celui-là traînait un éditeur dont l'entourage venait d'être détruit :
+    // segmentation fault au changement de thème.
+    //
+    // `setParent(this, Qt::Window)` garde les deux propriétés : une vraie
+    // fenêtre indépendante à l'écran, et un enfant que le destructeur emporte.
+    page_source->setParent(this, Qt::Window);
     page_source->setWindowTitle("Programme — simulateur");
     page_source->resize(760, 620);
 
@@ -1915,8 +1924,9 @@ void FenetrePrincipale::basculer_fenetre(QWidget* panneau) {
     const QString titre = onglets_->tabText(rang);
     onglets_->removeTab(rang);
     detaches_[panneau] = {titre, rang};
-    panneau->setParent(nullptr);
-    panneau->setWindowFlags(Qt::Window);
+    // Parentée à la fenêtre principale : détacher un panneau ne doit pas le
+    // faire sortir de la propriété de qui l'a créé (voir fenetre_programme_).
+    panneau->setParent(this, Qt::Window);
     panneau->setWindowTitle(titre + " — simulateur");
     panneau->resize(940, 520);
     panneau->installEventFilter(this);
@@ -2005,9 +2015,10 @@ Oscilloscope* FenetrePrincipale::scope_pour(ItemComposant* composant) {
     if (!composant) return nullptr;
     auto place = scopes_.find(composant);
     if (place != scopes_.end()) return place->second;
-    auto* scope = new Oscilloscope;
     // Une fenêtre à part entière, pas un panneau : on en ouvre plusieurs, et
-    // on les pose côte à côte pour comparer deux endroits du montage.
+    // on les pose côte à côte pour comparer deux endroits du montage. Elle
+    // reste néanmoins un enfant, pour que le destructeur l'emporte.
+    auto* scope = new Oscilloscope(this);
     scope->setWindowFlags(Qt::Window);
     scope->setAttribute(Qt::WA_DeleteOnClose, false);
     scopes_[composant] = scope;
@@ -2018,7 +2029,7 @@ Oscilloscope* FenetrePrincipale::scope_pour(ItemComposant* composant) {
 
 void FenetrePrincipale::ouvrir_sonde_generale() {
     if (!sonde_generale_) {
-        sonde_generale_ = new Oscilloscope;
+        sonde_generale_ = new Oscilloscope(this);
         sonde_generale_->setWindowFlags(Qt::Window);
         sonde_generale_->setWindowTitle("Sonde — oscilloscope général");
         sonde_generale_->resize(Oscilloscope::taille_conseillee());
