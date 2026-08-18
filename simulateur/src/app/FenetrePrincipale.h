@@ -14,6 +14,7 @@
 
 #include <QPoint>
 #include <QString>
+#include <QStringConverter>
 #include <QStringList>
 
 #include <map>
@@ -148,6 +149,10 @@ public:
     // Programme actuellement à l'écran, et carte à qui il appartient.
     QString programme_affiche() const;
     QString carte_affichee() const { return carte_courante_; }
+    // Reçoit un octet du port série et l'écrit au moniteur, décodé. Publique
+    // pour que le banc emprunte LE chemin du signal, et non une porte dérobée
+    // qui prouverait autre chose.
+    void ecrire_octet_serie(char octet, const QString& carte = {});
 
     // Base de temps de l'oscilloscope, en secondes (vérification).
     void definir_base_temps(double secondes);
@@ -322,6 +327,22 @@ private:
     QPlainTextEdit* console_ = nullptr;
     QPlainTextEdit* moniteur_serie_ = nullptr;
     QLineEdit* saisie_serie_ = nullptr;
+    // UN OCTET N'EST PAS UN CARACTÈRE.
+    //
+    // Le moniteur écrivait `QChar(octet)` : chaque octet devenait un caractère
+    // Latin-1. Or `Serial.print("Durées")` envoie de l'UTF-8, où « é » vaut
+    // DEUX octets — 0xC3 puis 0xA9 — qui s'affichaient donc « Ã© ». Les
+    // majuscules accentuées étaient pires : « É » vaut 0xC3 0x89, et 0x89 est
+    // un caractère de commande qu'aucune police ne dessine.
+    //
+    // Le décodeur garde son état entre les appels : c'est indispensable ici,
+    // puisque les octets arrivent UN PAR UN et qu'une séquence UTF-8 s'étale
+    // sur plusieurs. Il est donc un membre, et non une variable locale.
+    QStringDecoder decodeur_serie_{QStringDecoder::Utf8};
+    // La dernière carte à avoir parlé, pour ne préfixer qu'aux changements.
+    // C'était une variable `static` dans une lambda — donc partagée par toutes
+    // les fenêtres du processus, ce qui mêlait leurs états.
+    QString carte_serie_;
     QLineEdit* recherche_palette_ = nullptr;
     QDockWidget* dock_palette_ = nullptr;
     // Le panneau des propriétés n'existe à l'écran que s'il a quelque chose à

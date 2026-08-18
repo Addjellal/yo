@@ -1020,3 +1020,36 @@ Trois points de méthode :
 Et l'ancien essai ne couvrait que l'horizontale : cinq assertions vertes sur un
 seul des trois cas. Toujours la même leçon — **un banc vert ne prouve que les
 chemins qu'il parcourt**.
+
+## Le moniteur série écrivait en UTF-8 et lisait en Latin-1
+
+`Serial.print("Durées")` s'affichait « DurÃ©es », et « ALLUMÉE » se terminait
+par un rectangle vide. La cause tenait en une expression :
+
+```cpp
+moniteur_serie_->insertPlainText(QString(QChar(octet)));
+```
+
+**Un octet n'est pas un caractère.** `QChar(char)` interprète en Latin-1, et
+« é » vaut deux octets en UTF-8 — 0xC3 0xA9 — lus alors « Ã » et « © ». Pour
+« É », 0xC3 0x89, le second octet est un caractère de commande qu'aucune police
+ne dessine : d'où le rectangle.
+
+Le pire n'est pas l'encodage supposé, c'est le **découpage** : traiter les
+octets un par un rend toute séquence multi-octets indécodable, quel que soit
+l'encodage choisi. Il faut un décodeur qui garde son état d'un octet à l'autre
+(`QStringDecoder`), puisque le microcontrôleur les émet un par un.
+
+Deux détails que la même correction emporte :
+
+- **Le `\r` de `println` faisait une ligne vide sur deux.** Les deux octets de
+  « \r\n » passaient à la ligne chacun de leur côté. On laisse tomber le
+  `\r`, comme le moniteur de l'IDE Arduino.
+- **La carte précédente était une variable `static` dans une lambda** — donc
+  partagée par toutes les fenêtres du processus. C'est un membre.
+
+La leçon qui vaut au-delà de ce widget : **l'application ENVOYAIT pourtant de
+l'UTF-8** (`toUtf8()` dans `envoyer_serie`). Elle écrivait dans un encodage et
+lisait dans un autre, dans le même fichier, à deux cents lignes d'écart. Un
+aller-retour n'est jamais gratuit à vérifier : ici, taper un accent dans la
+saisie et le voir revenir déformé aurait suffi.

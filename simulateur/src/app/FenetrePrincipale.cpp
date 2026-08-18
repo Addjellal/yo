@@ -345,17 +345,7 @@ FenetrePrincipale::FenetrePrincipale() {
             });
     connect(moteur_, &MoteurSimulation::octet_serie, this,
             [this](char octet, const QString& carte) {
-                // Avec plusieurs cartes, on préfixe chaque ligne par son
-                // émetteur : sans cela les deux flux seraient indémêlables.
-                static QString derniere;
-                if (moteur_->cartes().size() > 1 && derniere != carte) {
-                    moniteur_serie_->appendPlainText("[" + carte + "] ");
-                    derniere = carte;
-                }
-                moniteur_serie_->moveCursor(QTextCursor::End);
-                moniteur_serie_->insertPlainText(QString(QChar(octet)));
-                moniteur_serie_->moveCursor(QTextCursor::End);
-                if (octet == '\n') derniere.clear();
+                ecrire_octet_serie(octet, carte);
             });
     connect(moteur_, &MoteurSimulation::etats_composants, this,
             [this](const std::map<std::string, std::map<std::string, double>>&
@@ -749,6 +739,7 @@ void FenetrePrincipale::construire_docks() {
     pile_serie->setSpacing(3);
 
     moniteur_serie_ = new QPlainTextEdit;
+    moniteur_serie_->setObjectName("moniteur_serie");
     moniteur_serie_->setReadOnly(true);
     moniteur_serie_->setFont(fonte);
     moniteur_serie_->setMinimumHeight(70);
@@ -1596,6 +1587,37 @@ bool FenetrePrincipale::saisie_en_cours() const {
 }
 
 // Envoie le contenu du champ de saisie à la carte, octet par octet.
+void FenetrePrincipale::ecrire_octet_serie(char octet, const QString& carte) {
+    if (!moniteur_serie_ || !moteur_) return;
+
+    // Avec plusieurs cartes, on préfixe chaque ligne par son émetteur : sans
+    // cela les deux flux seraient indémêlables.
+    if (moteur_->cartes().size() > 1 && carte_serie_ != carte) {
+        moniteur_serie_->appendPlainText("[" + carte + "] ");
+        carte_serie_ = carte;
+    }
+
+    // LE RETOUR CHARIOT N'EST PAS UNE LIGNE.
+    //
+    // `Serial.println` envoie « \r\n ». Insérés tels quels, les deux passaient
+    // à la ligne chacun de leur côté et le moniteur affichait une ligne vide
+    // entre chaque message. On laisse donc tomber le « \r » : c'est ce que
+    // fait le moniteur de l'IDE Arduino, et c'est la seule lecture qui rende
+    // à `println` le sens qu'il a partout ailleurs.
+    if (octet == '\r') return;
+
+    // Le décodeur retient les octets d'une séquence incomplète et ne rend
+    // rien tant qu'elle ne l'est pas : c'est exactement ce qu'il faut ici,
+    // puisque les octets arrivent un par un.
+    const QString texte = decodeur_serie_(QByteArrayView(&octet, 1));
+    if (!texte.isEmpty()) {
+        moniteur_serie_->moveCursor(QTextCursor::End);
+        moniteur_serie_->insertPlainText(texte);
+        moniteur_serie_->moveCursor(QTextCursor::End);
+    }
+    if (octet == '\n') carte_serie_.clear();
+}
+
 void FenetrePrincipale::envoyer_serie() {
     if (!saisie_serie_ || !moteur_) return;
     const QString texte = saisie_serie_->text();

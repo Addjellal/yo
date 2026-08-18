@@ -4850,6 +4850,73 @@ static void test_proprietes_rendent_la_place() {
 // déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
 // au fil, on déplace le segment.
 // ---------------------------------------------------------------------------
+// Le moniteur série lit de l'UTF-8, pas des octets isolés
+//
+// Le programme de l'utilisateur écrivait « Durées », « ALLUMÉE », « ÉTEINTE ».
+// Le moniteur affichait « DurÃ©es », « ALLUMÃ<caractère de commande>E ».
+//
+// La cause tenait en une expression : `QString(QChar(octet))`. Chaque octet
+// devenait un caractère Latin-1. Or « é » en UTF-8 vaut DEUX octets, 0xC3 puis
+// 0xA9, qui se lisent alors « Ã » et « © ». Les majuscules accentuées étaient
+// pires : « É » vaut 0xC3 0x89, et 0x89 est un caractère de commande qu'aucune
+// police ne dessine — d'où le rectangle vide.
+//
+// Ce n'est pas une affaire de police ni de terminal : l'application ENVOIE
+// pourtant de l'UTF-8 (`toUtf8()` dans envoyer_serie). Elle écrivait dans un
+// encodage et lisait dans un autre.
+//
+// Deuxième défaut, même endroit : `Serial.println` termine par « \r\n ». Les
+// deux octets passaient à la ligne chacun de leur côté, d'où une ligne vide
+// entre chaque message — visible sur la copie d'écran de l'utilisateur.
+// ---------------------------------------------------------------------------
+static void test_moniteur_serie_lit_l_utf8() {
+    std::printf("\n-- le moniteur série lit de l'UTF-8 --\n");
+
+    FenetrePrincipale fenetre;
+    QPlainTextEdit* moniteur = nullptr;
+    for (QPlainTextEdit* candidat : fenetre.findChildren<QPlainTextEdit*>())
+        if (candidat->objectName() == "moniteur_serie") moniteur = candidat;
+    verifier(moniteur != nullptr, "le moniteur série existe");
+    if (!moniteur) return;
+
+    // Les octets EXACTS qu'une carte enverrait pour ce texte-là, un par un,
+    // comme le fait le microcontrôleur.
+    const QString attendu = QString::fromUtf8("Durées : LED ALLUMÉE\n");
+    const QByteArray octets = attendu.toUtf8();
+    verifier(octets.size() > attendu.size(),
+             "le texte d'essai contient bien des caractères sur plusieurs "
+             "octets",
+             std::to_string(octets.size()) + " octets pour "
+                 + std::to_string(attendu.size()) + " caractères");
+
+    for (char octet : octets) fenetre.ecrire_octet_serie(octet);
+
+    const QString lu = moniteur->toPlainText();
+    verifier(lu.contains(QString::fromUtf8("Durées")),
+             "« Durées » se lit avec son accent",
+             lu.toStdString());
+    verifier(lu.contains(QString::fromUtf8("ALLUMÉE")),
+             "« ALLUMÉE » aussi, majuscule accentuée comprise",
+             lu.toStdString());
+    verifier(!lu.contains(QString::fromUtf8("Ã")),
+             "et aucun « Ã » ne traîne : plus de lecture en Latin-1",
+             lu.toStdString());
+
+    // LE RETOUR CHARIOT DE println NE FAIT PAS UNE LIGNE DE PLUS.
+    moniteur->clear();
+    for (char octet : QByteArray("A\r\nB\r\n"))
+        fenetre.ecrire_octet_serie(octet);
+    const QStringList lignes = moniteur->toPlainText().split('\n');
+    int pleines = 0;
+    for (const QString& ligne : lignes)
+        if (!ligne.trimmed().isEmpty()) ++pleines;
+    verifier(pleines == 2 && lignes.size() <= 3,
+             "deux println donnent deux lignes, pas quatre",
+             std::to_string(pleines) + " ligne(s) pleine(s) sur "
+                 + std::to_string(lignes.size()));
+}
+
+// ---------------------------------------------------------------------------
 // Un fil coudé se déplace aussi — branche par branche
 //
 // « Le sliding du fil fonctionne sur les fils horizontaux mais pas verticaux. »
@@ -5789,6 +5856,7 @@ int main(int argc, char** argv) {
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
     test_deplacer_un_segment_vertical_et_coude();
+    test_moniteur_serie_lit_l_utf8();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
     test_glisser_le_long_du_fil_derive();
