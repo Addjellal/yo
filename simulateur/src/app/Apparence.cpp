@@ -148,8 +148,24 @@ QPlainTextEdit, QTextEdit {
     selection-background-color: %ACCENT%;
     selection-color: %ACCENT_TEXTE%;
 }
-QTreeWidget::item, QListWidget::item { padding: 3px 2px; border-radius: 4px; }
-QTreeWidget::item:hover, QListWidget::item:hover { background: %ACCENT_DOUX%; }
+QTreeView::item, QListView::item { padding: 3px 2px; border-radius: 4px; }
+QTreeView::item:hover, QListView::item:hover { background: %ACCENT_DOUX%; }
+/* LA LIGNE CHOISIE DOIT RESTER LISIBLE.
+   Styler `::item` fait passer le dessin des lignes par la feuille de style, et
+   `selection-background-color`, posé sur le widget, cesse alors de s'appliquer.
+   Mais `selection-color` continuait, lui, de teindre le TEXTE : en thème clair
+   on écrivait donc du blanc sur du blanc — contraste mesuré à ZÉRO, le texte
+   disparaissait purement et simplement en cliquant dessus. En sombre, du
+   presque-noir sur le fond du panneau, à peine mieux.
+   Dès qu'on style `::item`, il faut styler `::item:selected` : les deux vont
+   ensemble, et la moitié seule est pire que rien. */
+QTreeView::item:selected, QListView::item:selected,
+QTableView::item:selected,
+QTreeView::item:selected:hover, QListView::item:selected:hover,
+QTableView::item:selected:hover {
+    background: %ACCENT%;
+    color: %ACCENT_TEXTE%;
+}
 QHeaderView::section {
     background: %SURFACE_HAUTE%;
     border: 0;

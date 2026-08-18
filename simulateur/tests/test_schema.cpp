@@ -75,6 +75,8 @@ static void console_en_utf8() {
 #include <QDoubleSpinBox>
 #include <QPushButton>
 #include <QPlainTextEdit>
+#include <QVBoxLayout>
+#include <QTreeWidget>
 #include <QTextBlock>
 #include <QLineEdit>
 #include <QStyleOptionGraphicsItem>
@@ -4850,6 +4852,109 @@ static void test_proprietes_rendent_la_place() {
 // déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
 // au fil, on déplace le segment.
 // ---------------------------------------------------------------------------
+// Une ligne choisie doit rester lisible
+//
+// « Dans le contrôle, quand on clique sur une ligne, on ne voit plus la
+// ligne. » Puis : « de même quand je sélectionne un item », et « en sombre
+// c'est le même problème ».
+//
+// Mesuré, thème clair : fond de la ligne #ffffff, encre #ffffff. **Contraste
+// zéro** — le texte n'était pas pâli, il était strictement invisible. En
+// sombre, du presque-noir (#0f1513) sur le fond du panneau (#232927).
+//
+// La palette n'y était pour rien : Highlight et HighlightedText étaient justes
+// dans les trois groupes. C'est la feuille de style. Dès qu'on écrit une règle
+// `::item`, le dessin des lignes passe par la feuille, et
+// `selection-background-color` — posé sur le widget — cesse de s'appliquer.
+// Mais `selection-color`, lui, continuait de teindre le TEXTE. La moitié de la
+// règle survivait, et c'est pire que rien : le texte prenait la couleur prévue
+// pour un fond qui n'était plus peint.
+//
+// L'essai ne relit pas la feuille de style — elle serait « cohérente » à la
+// lecture. Il DESSINE la ligne choisie et mesure l'écart entre l'encre et le
+// fond, dans les deux thèmes.
+// ---------------------------------------------------------------------------
+static void test_ligne_choisie_reste_lisible() {
+    std::printf("\n-- une ligne choisie reste lisible --\n");
+
+    const apparence::Theme themes[] = {apparence::Theme::Clair,
+                                       apparence::Theme::Sombre};
+    const char* noms[] = {"clair", "sombre"};
+
+    for (int t = 0; t < 2; ++t) {
+        apparence::appliquer(themes[t]);
+
+        // Un arbre ordinaire, habillé par la feuille de l'application : la
+        // règle vaut pour toutes les listes, du panneau de contrôle à la
+        // palette des composants.
+        QWidget fenetre;
+        auto* pile = new QVBoxLayout(&fenetre);
+        auto* arbre = new QTreeWidget;
+        arbre->setHeaderLabels({"Où", "Quoi faire"});
+        for (int k = 0; k < 4; ++k)
+            new QTreeWidgetItem(arbre, {QString("ligne %1").arg(k), "à faire"});
+        pile->addWidget(arbre);
+        // Un autre widget prend le focus : c'est le cas RÉEL, puisqu'on clique
+        // une ligne puis on va regarder le schéma. Sans cela l'essai ne
+        // verrait que l'état actif, qui n'est pas celui qui posait problème.
+        auto* ailleurs = new QLineEdit;
+        pile->addWidget(ailleurs);
+        fenetre.resize(420, 220);
+        fenetre.show();
+        QCoreApplication::processEvents();
+
+        arbre->setCurrentItem(arbre->topLevelItem(1));
+        ailleurs->setFocus();
+        QCoreApplication::processEvents();
+
+        const QImage image = fenetre.grab().toImage();
+        const QRect place = arbre->visualItemRect(arbre->topLevelItem(1))
+                                .translated(arbre->mapTo(&fenetre, QPoint(0, 0)))
+                                .translated(arbre->viewport()->pos());
+        verifier(place.width() > 20 && place.height() > 4,
+                 std::string("thème ") + noms[t]
+                     + " : la ligne choisie occupe une vraie place",
+                 std::to_string(place.width()) + "×"
+                     + std::to_string(place.height()));
+        if (place.width() <= 20) continue;
+
+        // Le fond est la couleur la plus répandue de la ligne ; l'encre, la
+        // plus éloignée de ce fond.
+        std::map<QRgb, int> compte;
+        for (int y = place.top() + 2; y < place.bottom() - 1; ++y)
+            for (int x = place.left() + 4; x < place.right() - 4; ++x)
+                ++compte[image.pixel(x, y)];
+        QRgb fond = 0;
+        int plus = 0;
+        for (const auto& [couleur, n] : compte)
+            if (n > plus) { plus = n; fond = couleur; }
+        int contraste = 0;
+        for (const auto& [couleur, n] : compte) {
+            (void)n;
+            const int ecart = std::abs(qRed(couleur) - qRed(fond))
+                              + std::abs(qGreen(couleur) - qGreen(fond))
+                              + std::abs(qBlue(couleur) - qBlue(fond));
+            contraste = std::max(contraste, ecart);
+        }
+        verifier(contraste > 120,
+                 std::string("thème ") + noms[t]
+                     + " : le texte de la ligne choisie se détache du fond",
+                 std::to_string(contraste) + " d'écart sur trois canaux");
+
+        // Et le fond de la ligne est bien l'ACCENT : sans quoi un contraste
+        // suffisant pourrait venir d'une ligne qu'on n'a pas peinte du tout.
+        const apparence::Palette& p = apparence::courante();
+        verifier(QColor(fond) == p.accent,
+                 std::string("thème ") + noms[t]
+                     + " : et ce fond est bien la couleur d'accent",
+                 QColor(fond).name().toStdString() + " au lieu de "
+                     + p.accent.name().toStdString());
+    }
+
+    apparence::appliquer(apparence::Theme::Clair);
+}
+
+// ---------------------------------------------------------------------------
 // Le moniteur série lit de l'UTF-8, pas des octets isolés
 //
 // Le programme de l'utilisateur écrivait « Durées », « ALLUMÉE », « ÉTEINTE ».
@@ -5857,6 +5962,7 @@ int main(int argc, char** argv) {
     test_deplacer_un_segment();
     test_deplacer_un_segment_vertical_et_coude();
     test_moniteur_serie_lit_l_utf8();
+    test_ligne_choisie_reste_lisible();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
     test_glisser_le_long_du_fil_derive();

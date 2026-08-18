@@ -1053,3 +1053,29 @@ l'UTF-8** (`toUtf8()` dans `envoyer_serie`). Elle écrivait dans un encodage et
 lisait dans un autre, dans le même fichier, à deux cents lignes d'écart. Un
 aller-retour n'est jamais gratuit à vérifier : ici, taper un accent dans la
 saisie et le voir revenir déformé aurait suffi.
+
+## Une ligne choisie devenait invisible
+
+« Dans le contrôle, quand on clique sur une ligne, on ne voit plus la ligne » —
+puis, de même dans la palette, et dans les deux thèmes.
+
+Mesuré, thème clair : fond de la ligne `#ffffff`, encre `#ffffff`. **Contraste
+zéro.** Le texte n'était pas pâli, il était strictement invisible. En sombre,
+`#0f1513` sur `#232927` : 60 d'écart, à peine mieux.
+
+La palette n'y était pour rien — `Highlight` et `HighlightedText` étaient justes
+dans les trois groupes, y compris `Inactive`, que je soupçonnais d'abord. C'est
+la feuille de style, et la règle est générale :
+
+> Dès qu'on écrit une règle `::item`, le dessin des lignes passe par la feuille,
+> et `selection-background-color` — posé sur le widget — cesse de s'appliquer.
+
+Or `selection-color`, lui, continuait de teindre le TEXTE. **La moitié de la
+règle survivait, et c'est pire que rien** : le texte prenait la couleur prévue
+pour un fond qui n'était plus peint. `::item` et `::item:selected` vont
+ensemble.
+
+L'essai ne relit pas la feuille — elle est parfaitement « cohérente » à la
+lecture. Il dessine la ligne choisie, **avec le focus ailleurs** comme dans
+l'usage réel, et mesure l'écart entre l'encre et le fond. Vérifié en échec :
+0 d'écart en clair, 60 en sombre.
