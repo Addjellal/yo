@@ -6,6 +6,7 @@
 
 #include <QFont>
 #include <QPainter>
+#include <QFontMetricsF>
 #include <QPolygonF>
 #include <QStyleOptionGraphicsItem>
 #include <QTransform>
@@ -385,6 +386,110 @@ void ItemComposant::paint(QPainter* peintre,
     peintre->setBrush(QColor(255, 245, 235));
     for (const auto& borne : modele_->bornes)
         peintre->drawEllipse(vers_qt(borne.position), 3.0, 3.0);
+
+    // LE NOM DE CHAQUE BORNE, ÉCRIT À CÔTÉ D'ELLE.
+    //
+    // « Label les entrées sorties pour comprendre comment les brancher. » Un
+    // symbole de LED montre deux pastilles identiques : rien ne dit laquelle
+    // est l'anode. Le catalogue le savait pourtant — cinquante-huit bornes y
+    // portent un libellé — mais rien ne l'affichait nulle part. Les cartes,
+    // elles, écrivaient leurs noms à la main dans leur propre symbole : deux
+    // demi-mécanismes, aucun général.
+    //
+    // Le nom COURT est dessiné ici ; le libellé en toutes lettres se lit dans
+    // l'infobulle, où la place ne manque pas.
+    if (modele_->nommer_les_bornes) {
+        peintre->save();
+        QFont fonte = peintre->font();
+        fonte.setPointSizeF(7.5);
+        peintre->setFont(fonte);
+        peintre->setPen(QPen(QColor(120, 90, 60), 1));
+        const QFontMetricsF regle(fonte);
+        // Le CORPS du symbole, sans les bornes : c'est lui qui dit de quel
+        // côté chaque borne sort. Le test « |x| contre |y| » se trompait sur
+        // les boîtiers hauts — la borne du haut d'un afficheur est plus loin
+        // en y qu'en x, et se croyait donc horizontale.
+        QRectF corps;
+        for (const auto& trait : modele_->symbole)
+            for (const auto& point : trait.points)
+                corps |= QRectF(vers_qt(point), QSizeF(0.01, 0.01));
+        for (const auto& borne : modele_->bornes) {
+            const QString nom = QString::fromStdString(borne.nom);
+            if (nom.isEmpty()) continue;
+            const QPointF ou = vers_qt(borne.position);
+            const double largeur = regle.horizontalAdvance(nom) + 4.0;
+            const double hauteur = regle.height();
+            // PERPENDICULAIREMENT À LA BORNE, et non vers l'intérieur.
+            //
+            // Posé vers l'intérieur, le nom tombait sur le dessin lui-même :
+            // « IN » et « OUT » barraient le « 7805 » du régulateur, « A » et
+            // « K » le triangle de la LED. Posé vers l'extérieur, il tomberait
+            // sur le fil qu'on vient d'y brancher — c'est-à-dire au moment
+            // précis où on veut le lire.
+            //
+            // Perpendiculairement, il n'est ni sur le corps ni sur le fil :
+            // au-dessus d'une borne horizontale, à droite d'une borne
+            // verticale. C'est la convention de KiCad et d'Altium.
+            // De quel côté sort-elle ? On le lit sur le corps, pas sur la
+            // distance au centre.
+            const bool cote_vertical =
+                corps.isNull() ? std::fabs(ou.x()) >= std::fabs(ou.y())
+                               : (ou.x() <= corps.left() + 0.5
+                                  || ou.x() >= corps.right() - 0.5);
+
+            // DES BORNES SERRÉES NE PEUVENT PAS PORTER LEUR NOM À CÔTÉ.
+            //
+            // Un afficheur sept segments aligne huit bornes tous les douze
+            // points sur le même bord : leurs noms, posés perpendiculairement,
+            // se recouvrent en une colonne illisible. Quand une voisine est
+            // trop proche, on rentre donc le nom DANS le boîtier — c'est ce
+            // que fait KiCad pour les circuits intégrés, et la place y est.
+            bool serree = false;
+            for (const auto& autre : modele_->bornes) {
+                if (&autre == &borne) continue;
+                const QPointF la = vers_qt(autre.position);
+                const double le_long = cote_vertical ? std::fabs(la.x() - ou.x())
+                                                     : std::fabs(la.y() - ou.y());
+                const double au_travers = cote_vertical
+                                              ? std::fabs(la.y() - ou.y())
+                                              : std::fabs(la.x() - ou.x());
+                if (le_long < 0.5 && au_travers < hauteur + 4.0) serree = true;
+            }
+
+            QRectF place;
+            if (serree) {
+                // Vers l'intérieur du boîtier.
+                place = cote_vertical
+                            ? (ou.x() <= corps.left() + 0.5
+                                   ? QRectF(ou.x() + 6, ou.y() - hauteur / 2,
+                                            largeur, hauteur)
+                                   : QRectF(ou.x() - 6 - largeur,
+                                            ou.y() - hauteur / 2, largeur,
+                                            hauteur))
+                            : (ou.y() <= corps.top() + 0.5
+                                   ? QRectF(ou.x() - largeur / 2, ou.y() + 4,
+                                            largeur, hauteur)
+                                   : QRectF(ou.x() - largeur / 2,
+                                            ou.y() - 4 - hauteur, largeur,
+                                            hauteur));
+            } else {
+                // PERPENDICULAIREMENT À LA BORNE, et non vers l'intérieur.
+                //
+                // Vers l'intérieur, le nom tombait sur le dessin lui-même :
+                // « IN » et « OUT » barraient le « 7805 » du régulateur, « A »
+                // et « K » le triangle de la LED. Vers l'extérieur, il
+                // tomberait sur le fil qu'on vient d'y brancher — c'est-à-dire
+                // au moment précis où on veut le lire.
+                place = cote_vertical
+                            ? QRectF(ou.x() - largeur / 2,
+                                     ou.y() - 9 - hauteur / 2, largeur, hauteur)
+                            : QRectF(ou.x() + 7, ou.y() - hauteur / 2, largeur,
+                                     hauteur);
+            }
+            peintre->drawText(place, Qt::AlignCenter, nom);
+        }
+        peintre->restore();
+    }
 
     // Référence et valeur, redressées pour rester lisibles après rotation.
     peintre->save();

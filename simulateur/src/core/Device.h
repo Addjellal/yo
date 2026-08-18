@@ -30,7 +30,12 @@ struct PointSymbole {
 struct BorneSymbole {
     std::string nom;          // "A", "K", "1"…
     PointSymbole position;    // par rapport au centre du symbole
-    std::string libelle;      // texte affiché à côté (facultatif)
+    // À QUOI SERT CETTE BORNE, en toutes lettres : « anode », « base »,
+    // « entrée non inverseuse ». Le schéma dessine le NOM, court, à côté de
+    // la borne ; ce libellé-ci se lit dans l'infobulle, où la place ne manque
+    // pas. Cinquante-huit bornes du catalogue en portaient un depuis le
+    // début, et rien ne l'affichait nulle part.
+    std::string libelle;
 };
 
 // --- dessin du symbole, décrit en données -------------------------------
@@ -263,6 +268,18 @@ struct Modele {
     // 1 sur un ATtiny85 : ce sont deux puces, et le même nom y désigne deux
     // broches différentes. Le modèle est le seul à pouvoir trancher.
     std::map<std::string, int> broches_mcu;
+
+    // LE SCHÉMA NOMME-T-IL LES BORNES À LA PLACE DU MODÈLE ?
+    //
+    // Vrai par défaut : le nom court de chaque borne — « A », « K », « B » —
+    // est dessiné à côté d'elle, et l'on sait comment brancher sans avoir à
+    // deviner. C'était la question de l'utilisateur : « label les entrées
+    // sorties pour comprendre comment les branchez ».
+    //
+    // Les cartes le mettent à FAUX : elles dessinent déjà « D13 », « GND »,
+    // « A0 » comme textes de leur symbole, à l'intérieur du boîtier et alignés
+    // par côté. Le mécanisme général les doublerait.
+    bool nommer_les_bornes = true;
     // Le programme proposé quand on pose la carte. Une carte Arduino reçoit
     // un croquis (setup / loop, pinMode, digitalWrite) ; un microcontrôleur
     // nu reçoit du C sur registres, parce que c'est ainsi qu'on le programme

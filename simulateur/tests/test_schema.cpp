@@ -4852,6 +4852,97 @@ static void test_proprietes_rendent_la_place() {
 // déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
 // au fil, on déplace le segment.
 // ---------------------------------------------------------------------------
+// Chaque borne porte son nom
+//
+// « Sur les items techniques, label les entrées sorties pour comprendre
+// comment les brancher. » Un symbole de LED montre deux pastilles identiques :
+// rien ne disait laquelle est l'anode.
+//
+// Le catalogue le savait pourtant — cinquante-huit bornes y portent un libellé
+// (« anode », « base », « collecteur ») depuis le début, et RIEN ne l'affichait
+// nulle part. Les cartes, elles, écrivaient leurs noms de broche à la main
+// comme textes de leur symbole. Deux demi-mécanismes, aucun général : c'est le
+// motif qui revient le plus souvent dans ce projet.
+//
+// Le nom court se dessine à côté de la borne, le libellé complet se lit dans
+// l'infobulle de la palette. Et les cartes se retirent du mécanisme général,
+// sans quoi elles écriraient tout deux fois.
+// ---------------------------------------------------------------------------
+static void test_bornes_portent_leur_nom() {
+    std::printf("\n-- chaque borne porte son nom --\n");
+
+    // 1. LES CARTES SE RETIRENT, et elles seules.
+    int cartes = 0, autres_sans_nom = 0;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        if (modele->categorie == "Cartes") {
+            ++cartes;
+            if (modele->nommer_les_bornes)
+                autres_sans_nom = -1000;   // une carte doublerait ses noms
+        } else if (!modele->bornes.empty()) {
+            bool toutes_nommees = true;
+            for (const coeur::BorneSymbole& borne : modele->bornes)
+                if (borne.nom.empty()) toutes_nommees = false;
+            if (!toutes_nommees) ++autres_sans_nom;
+        }
+    }
+    verifier(cartes >= 9, "le catalogue contient bien les cartes",
+             std::to_string(cartes));
+    verifier(autres_sans_nom == 0,
+             "aucune carte ne double ses noms, et tout autre composant a de "
+             "quoi nommer ses bornes",
+             std::to_string(autres_sans_nom) + " cas");
+
+    // 2. LE NOM EST VRAIMENT DESSINÉ.
+    //
+    // On compte l'encre juste au-dessus de chaque borne de la LED — l'endroit
+    // où « A » et « K » se posent. Avant, cette bande était strictement vide :
+    // c'est donc elle qui prouve que le nom existe à l'écran, et pas seulement
+    // dans le modèle.
+    SceneSchema scene;
+    ItemComposant* led = scene.ajouter_composant("led", QPointF(0, 0));
+    verifier(led != nullptr, "la LED d'essai est posée");
+    if (!led) return;
+    verifier(led->modele()->bornes.size() == 2,
+             "elle a bien deux bornes",
+             std::to_string(led->modele()->bornes.size()));
+
+    const QRectF vue(-60, -60, 120, 120);
+    QImage image(240, 240, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    QPainter peintre(&image);
+    peintre.setRenderHint(QPainter::Antialiasing);
+    scene.render(&peintre, QRectF(0, 0, 240, 240), vue);
+    peintre.end();
+
+    auto encre_dans = [&image](const QRectF& zone_scene, const QRectF& vue) {
+        // De la scène vers l'image : deux fois plus grand, origine en haut à
+        // gauche de la vue.
+        const double k = image.width() / vue.width();
+        const QRect pixels(int((zone_scene.left() - vue.left()) * k),
+                           int((zone_scene.top() - vue.top()) * k),
+                           int(zone_scene.width() * k),
+                           int(zone_scene.height() * k));
+        int sombres = 0;
+        for (int y = pixels.top(); y < pixels.bottom(); ++y)
+            for (int x = pixels.left(); x < pixels.right(); ++x) {
+                if (x < 0 || y < 0 || x >= image.width() || y >= image.height())
+                    continue;
+                if (qGray(image.pixel(x, y)) < 200) ++sombres;
+            }
+        return sombres;
+    };
+
+    for (const coeur::BorneSymbole& borne : led->modele()->bornes) {
+        // La bande où le nom se pose : au-dessus de la borne, hors du corps.
+        const QRectF bande(borne.position.x - 7, borne.position.y - 18, 14, 12);
+        const int encre = encre_dans(bande, vue);
+        verifier(encre > 4,
+                 "le nom « " + borne.nom + " » est dessiné au-dessus de sa borne",
+                 std::to_string(encre) + " pixels d'encre");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Une ligne choisie doit rester lisible
 //
 // « Dans le contrôle, quand on clique sur une ligne, on ne voit plus la
@@ -5963,6 +6054,7 @@ int main(int argc, char** argv) {
     test_deplacer_un_segment_vertical_et_coude();
     test_moniteur_serie_lit_l_utf8();
     test_ligne_choisie_reste_lisible();
+    test_bornes_portent_leur_nom();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
     test_glisser_le_long_du_fil_derive();

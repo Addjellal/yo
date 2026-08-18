@@ -504,9 +504,30 @@ void FenetrePrincipale::construire_palette() {
         // sans créer un seul fichier graphique : le tracé est déjà là, dans
         // `modele->symbole`.
         feuille->setIcon(0, icone_du_modele(modele));
-        feuille->setToolTip(
-            0, QString("%1 — glissez-le sur le schéma, ou double-cliquez")
-                   .arg(QString::fromStdString(modele->libelle)));
+        // L'INFOBULLE DIT COMMENT LE BRANCHER.
+        //
+        // Elle ne disait que le nom du composant et le geste pour le poser —
+        // ce que l'utilisateur voyait déjà. Ce qui lui manque avant de poser
+        // une pièce, c'est ce qu'il faudra y relier : les bornes, et à quoi
+        // chacune sert. Le catalogue le sait, borne par borne, depuis le
+        // début ; rien ne l'affichait nulle part.
+        QString bulle = QString("<b>%1</b><br>Glissez-le sur le schéma, ou "
+                                "double-cliquez.")
+                            .arg(QString::fromStdString(modele->libelle));
+        if (!modele->bornes.empty()) {
+            bulle += "<br><br><i>Bornes :</i><br>";
+            for (const coeur::BorneSymbole& borne : modele->bornes) {
+                bulle += "&nbsp;&nbsp;<b>"
+                         + QString::fromStdString(borne.nom).toHtmlEscaped()
+                         + "</b>";
+                if (!borne.libelle.empty())
+                    bulle += " — "
+                             + QString::fromStdString(borne.libelle)
+                                   .toHtmlEscaped();
+                bulle += "<br>";
+            }
+        }
+        feuille->setToolTip(0, bulle);
     }
     palette_->expandAll();
 

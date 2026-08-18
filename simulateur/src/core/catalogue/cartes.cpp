@@ -20,6 +20,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "arduino_uno";
         m.libelle = "Carte Arduino Uno";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#1a7f8c";
@@ -80,6 +82,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "arduino_nano";
         m.libelle = "Carte Arduino Nano";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#1a7f8c";
@@ -127,6 +131,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "arduino_pro_mini";
         m.libelle = "Carte Arduino Pro Mini";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#20707f";
@@ -180,6 +186,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "atmega328p";
         m.libelle = "ATmega328P nu (DIP-28)";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#3a3a3a";
@@ -234,6 +242,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "attiny85";
         m.libelle = "ATtiny85 (DIP-8)";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#3a3a3a";
@@ -290,6 +300,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "arduino_mega";
         m.libelle = "Carte Arduino Mega 2560";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#1a7f8c";
@@ -346,6 +358,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "pi_pico";
         m.libelle = "Carte Raspberry Pi Pico";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#2f3a4a";
@@ -414,6 +428,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "stm32f103";
         m.libelle = "Carte STM32F103 (Blue Pill)";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#2a4a6a";
@@ -491,6 +507,8 @@ void enregistrer_cartes(Catalogue& catalogue) {
         m.type = "esp32";
         m.libelle = "Carte ESP32 DevKit";
         m.categorie = "Cartes";
+        // Elle dessine elle-même « D13 », « GND », « A0 » dans son boîtier.
+        m.nommer_les_bornes = false;
         m.prefixe = "U";
         m.carte = true;
         m.couleur_corps = "#3a3f4a";

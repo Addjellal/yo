@@ -1079,3 +1079,39 @@ L'essai ne relit pas la feuille — elle est parfaitement « cohérente » à la
 lecture. Il dessine la ligne choisie, **avec le focus ailleurs** comme dans
 l'usage réel, et mesure l'écart entre l'encre et le fond. Vérifié en échec :
 0 d'écart en clair, 60 en sombre.
+
+## Chaque borne porte enfin son nom
+
+« Sur les items techniques, label les entrées sorties pour comprendre comment
+les brancher. » Un symbole de LED montre deux pastilles identiques : rien ne
+disait laquelle est l'anode.
+
+Le catalogue le savait pourtant. **Cinquante-huit bornes y portent un libellé**
+— « anode », « base », « collecteur » — depuis le début, et rien ne l'affichait
+nulle part. Les cartes, elles, écrivaient leurs noms de broche à la main comme
+`texte(...)` dans leur propre symbole. **Deux demi-mécanismes, aucun général**
+— c'est le motif qui revient le plus souvent dans ce projet, et il se
+reconnaît à ceci : la donnée existe, quelqu'un a résolu le cas particulier, et
+personne n'a écrit la règle.
+
+Désormais : `Modele::nommer_les_bornes` (vrai par défaut) fait dessiner le nom
+court à côté de chaque borne ; les neuf cartes le mettent à faux puisqu'elles
+écrivent déjà les leurs. Le libellé complet se lit dans l'infobulle de la
+palette, où la place ne manque pas.
+
+**Où poser le nom** a demandé trois essais, chacun corrigé sur une image rendue
+et non sur une intuition :
+
+1. *Vers l'intérieur* — « IN » et « OUT » barraient le « 7805 » du régulateur,
+   « A » et « K » le triangle de la LED.
+2. *Perpendiculairement à la borne* — bon pour tous les petits composants, mais
+   l'afficheur sept segments aligne huit bornes tous les douze points sur le
+   même bord : les noms se recouvraient en une colonne illisible.
+3. *Perpendiculairement, sauf quand une voisine est trop proche* — auquel cas
+   le nom rentre dans le boîtier, comme le fait KiCad pour un circuit intégré,
+   où la place est justement là.
+
+Et le côté d'où sort une borne se lit sur le **corps du symbole**, pas sur sa
+distance au centre : le test « |x| contre |y| » se trompait sur les boîtiers
+hauts, où la borne du haut est plus loin en y qu'en x et se croyait donc
+horizontale.
