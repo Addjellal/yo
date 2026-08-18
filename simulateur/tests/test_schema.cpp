@@ -5490,49 +5490,90 @@ static void test_clic_gauche_designe_clic_droit_derive() {
                  + std::to_string(autre.jonctions().size()) + " point(s)");
 }
 
-static void test_glisser_le_long_du_fil_derive() {
-    std::printf("\n-- glisser LE LONG d'une branche dérive, il ne déplace pas --\n");
+static void test_glisser_le_long_du_fil_ne_fait_rien() {
+    std::printf("\n-- glisser LE LONG d'une branche ne fait rien --\n");
 
-    // CE QUE CET ESSAI GARDAIT, ET CE QU'IL AFFIRMAIT DE TROP.
+    // UN BOUTON, UN SENS.
     //
-    // Il affirmait qu'un fil en équerre ne se déplace pas du tout — « quel
-    // segment ? ». La question était mal posée : le trait n'a pas d'axe, mais
-    // chacune de ses trois branches en a un, et l'utilisateur a signalé que la
-    // limite se voyait à l'usage. Le fil coudé se déplace donc désormais
-    // branche par branche, et c'est un autre essai qui le vérifie.
+    // Le glissé gauche sur un fil ne déplaçait la branche que s'il était
+    // franchement perpendiculaire ; sinon il basculait en DÉRIVATION et
+    // dessinait un fil neuf. Or ce fil part d'un point du fil et aboutit
+    // souvent sur ce même fil ou juste à côté : il se posait donc LE LONG de
+    // l'ancien. « J'ai l'impression qu'un nouveau fil se crée en parallèle
+    // quand je fais ça » — c'était exactement cela.
     //
-    // Ce qui reste vrai, et qui n'était gardé nulle part : le déplacement est
-    // CONTRAINT. Un glissé parallèle à la branche ne déplacerait rien de
-    // visible ; c'est donc une dérivation, comme un clic. Sans cette règle, le
-    // moindre tremblement de la main le long d'un fil le couperait.
+    // Le partage était de surcroît invisible : rien à l'écran ne dit qu'un
+    // glissé de trente degrés déplace et qu'un de soixante dessine. Deux
+    // gestes voisins, deux effets sans rapport, aucun signe.
+    //
+    // Désormais le glissé gauche déplace la branche le long de son axe, la
+    // composante parallèle étant ignorée. Un glissé parallèle ne fait donc
+    // RIEN — et « rien » veut dire un schéma identique, coudes compris : le
+    // geste matérialise bien les angles pour avoir de quoi bouger, mais les
+    // rend quand il repose la branche là où il l'a prise.
     SceneSchema scene;
     ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
     ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 300));
     scene.addItem(new ItemFil(r1, 1, r2, 0));
     const QPointF a = r1->position_borne(1);
     const QPointF b = r2->position_borne(0);
-    verifier(std::fabs(a.x() - b.x()) > 0.01 && std::fabs(a.y() - b.y()) > 0.01,
-             "le fil d'essai est bien coudé");
-
-    // Un point franchement sur la première branche, qui est horizontale.
     const QList<QPointF> points = ItemFil::sommets(a, b);
-    verifier(points.size() == 4, "il est tracé en Z, à quatre sommets",
+    verifier(points.size() == 4, "le fil d'essai est tracé en Z",
              std::to_string(points.size()));
     if (points.size() != 4) return;
+    scene.oublier_historique();
+
+    const std::size_t fils_avant = scene.fils().size();
+    const std::size_t points_avant = scene.jonctions().size();
+
+    // Un point franchement sur la première branche, loin des broches pour que
+    // ce soit bien le FIL qui soit visé et non une borne.
     const QPointF sur_le_fil((points[0].x() + points[1].x()) / 2.0, a.y());
     verifier(scene.viser(sur_le_fil).genre == SceneSchema::Cible::Genre::Fil,
-             "et le point visé est bien dessus");
+             "et le point visé est bien le fil, pas une borne");
 
-    // Le glissé est PARALLÈLE à la branche : rien à déplacer, donc on dérive.
     envoyer(scene, QEvent::GraphicsSceneMousePress, sur_le_fil);
     envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(60, 0));
-    verifier(scene.jonctions().empty(),
-             "aucune poignée n'a été posée : le geste a basculé en dérivation",
-             std::to_string(scene.jonctions().size()));
-    scene.abandonner_fil();
-    verifier(scene.fils().size() == 1,
-             "et le fil est intact après abandon",
-             std::to_string(scene.fils().size()));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, sur_le_fil + QPointF(60, 0));
+
+    verifier(scene.fils().size() == fils_avant,
+             "aucun fil n'a été ajouté le long de l'ancien",
+             std::to_string(scene.fils().size()) + " contre "
+                 + std::to_string(fils_avant));
+    verifier(scene.jonctions().size() == points_avant,
+             "et aucun point n'a été semé",
+             std::to_string(scene.jonctions().size()) + " contre "
+                 + std::to_string(points_avant));
+
+    // LE GLISSÉ OBLIQUE : c'est LUI que l'ancienne règle traitait en
+    // dérivation, et c'est là que le fil parallèle naissait. Soixante le long,
+    // vingt en travers : la main ne vise pas au degré près.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, sur_le_fil);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(60, 20));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, sur_le_fil + QPointF(60, 20));
+
+    verifier(scene.jonctions().size() >= 2,
+             "un glissé oblique DÉPLACE la branche au lieu d'en dériver une",
+             std::to_string(scene.jonctions().size()) + " poignée(s)");
+    bool descendue = false;
+    for (ItemJonction* point : scene.jonctions())
+        if (std::fabs(point->pos().y() - (a.y() + 20)) < 0.01) descendue = true;
+    verifier(descendue,
+             "et elle est descendue de la composante perpendiculaire, "
+             "la parallèle étant ignorée");
+
+    // LA DÉRIVATION RESTE POSSIBLE, au bouton droit — sinon on aurait échangé
+    // un défaut contre une fonction perdue.
+    ItemComposant* r3 = scene.ajouter_composant("resistance", QPointF(-300, 500));
+    const QPointF vers = r3->position_borne(0);
+    envoyer(scene, QEvent::GraphicsSceneMousePress, sur_le_fil, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(0, 40),
+            Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, vers, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, vers, Qt::RightButton);
+    verifier(scene.fils().size() > fils_avant,
+             "le glissé au bouton DROIT dérive toujours",
+             std::to_string(scene.fils().size()) + " fil(s)");
 }
 
 static void test_ctrl_clic_designe_un_fil() {
@@ -6140,7 +6181,7 @@ int main(int argc, char** argv) {
     test_deriver_sur_le_meme_fil_ne_laisse_rien();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
-    test_glisser_le_long_du_fil_derive();
+    test_glisser_le_long_du_fil_ne_fait_rien();
     test_ctrl_clic_designe_un_fil();
     test_geste_interrompu_par_une_destruction();
 

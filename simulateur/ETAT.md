@@ -1154,3 +1154,54 @@ L'assertion « le circuit est électriquement le même » passe **même quand le
 doublon est là** : deux fils entre les deux mêmes points ne changent rien à la
 netlist. Le défaut était purement visuel, et tous les invariants du banc
 portaient sur l'électricité. Il en fallait un sur le **dessin**.
+
+## Le vrai coupable : un glissé gauche qui changeait de sens tout seul
+
+« Ça le fait toujours, j'ai l'impression qu'un nouveau fil se crée en parallèle
+quand je fais ça. » La correction précédente était juste mais partielle : elle
+supprimait le doublon quand le geste retombait sur le fil de départ. Elle ne
+touchait pas à la CAUSE.
+
+Le glissé gauche sur un fil ne déplaçait la branche que si le mouvement était
+**franchement perpendiculaire** à elle. Sinon il basculait en dérivation et
+dessinait un fil neuf — qui part d'un point du fil et aboutit souvent sur ce
+même fil ou juste à côté, donc **le long de l'ancien**.
+
+Deux défauts en un :
+
+1. **Le partage était invisible.** Rien à l'écran ne dit qu'un glissé de trente
+   degrés déplace et qu'un de soixante dessine. Deux gestes voisins, deux
+   effets sans rapport, aucun signe. La main ne vise pas au degré près.
+2. **Le mauvais côté du partage créait de la matière.** Se tromper de dix
+   degrés n'aurait dû rien coûter ; cela ajoutait un fil.
+
+Un bouton, un sens : le glissé **gauche** déplace la branche le long de son
+axe, la composante parallèle étant simplement ignorée — un glissé parallèle ne
+fait donc rien, ce qui est le résultat attendu. Le glissé au bouton **droit**
+dérive, et lui seul. La convention était déjà écrite ailleurs dans le fichier ;
+elle est désormais sans exception.
+
+### Ce que la recherche a appris sur les sondes
+
+Quatre sondes successives, et deux fausses pistes à écarter :
+
+- Le premier balayage des fils superposés donnait 44 cas sur 576. **40 étaient
+  des artefacts** : la sonde relâchait sur l'autre broche d'un composant, ce
+  qui crée légitimement un fil superposé.
+- Les 4 restants aussi : le point d'appui tombait dans le rayon de capture
+  d'une broche (soixante unités dans une scène non zoomée, contre quatorze
+  pixels à l'écran), si bien que `viser` répondait « broche » et que le
+  déplacement de segment n'était jamais tenté.
+
+**Une sonde dont la géométrie est plus petite que les tolérances de
+l'interface mesure les tolérances, pas le programme.** Vérifié en imprimant ce
+que `viser` répondait au point d'appui, plutôt qu'en supposant.
+
+### Et l'essai qui ne prouvait rien
+
+Le premier essai écrit pour la nouvelle règle passait **aussi avec
+l'ancienne** : un glissé strictement parallèle retombe sur le fil de départ, et
+le garde-fou du commit précédent l'annulait déjà. Il fallait un glissé
+**oblique** — soixante le long, vingt en travers — car c'est lui que l'ancienne
+règle traitait en dérivation. C'est la troisième fois de la journée qu'un essai
+doit être renforcé après avoir été vu passer dans les deux états.

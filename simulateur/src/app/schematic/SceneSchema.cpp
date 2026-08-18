@@ -1989,20 +1989,30 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
             rendre_le_rectangle_a_la_vue();
             return;
         }
-        // La question se pose à la BRANCHE visée, pas au fil entier : un fil
-        // coudé n'a pas d'axe, mais chacune de ses trois branches en a un.
-        QPointF axe;
-        const bool perpendiculaire =
-            axe_de_la_branche(appui.fil, appui_point_, &axe)
-            && (axe.x() != 0.0 ? std::fabs(ecart.x()) > std::fabs(ecart.y())
-                               : std::fabs(ecart.y()) > std::fabs(ecart.x()));
-        if (perpendiculaire
-            && commencer_deplacement_segment(appui.fil, appui_point_)) {
+        // UN GLISSÉ GAUCHE SUR UN FIL DÉPLACE. TOUJOURS.
+        //
+        // Il ne déplaçait que si le mouvement était franchement
+        // perpendiculaire à la branche ; sinon il basculait en DÉRIVATION et
+        // dessinait un fil neuf. Or ce fil neuf part d'un point du fil et
+        // aboutit souvent sur ce même fil ou juste à côté : il se pose donc
+        // le long de l'ancien. « J'ai l'impression qu'un nouveau fil se crée
+        // en parallèle quand je fais ça » — c'était exactement cela.
+        //
+        // Le partage était de surcroît invisible : rien, à l'écran, ne dit
+        // qu'un glissé de trente degrés déplace et qu'un de soixante dessine.
+        // Deux gestes voisins, deux effets sans rapport, aucun signe.
+        //
+        // Un bouton, un sens : le glissé GAUCHE déplace la branche le long de
+        // son axe — la composante parallèle est simplement ignorée, et un
+        // glissé parallèle ne fait donc rien, ce qui est le résultat attendu.
+        // Le glissé au bouton DROIT dérive, et lui seul. C'est la convention
+        // déjà écrite ailleurs dans ce fichier, désormais sans exception.
+        if (commencer_deplacement_segment(appui.fil, appui_point_)) {
             poursuivre_deplacement_segment(evenement->scenePos());
             return;
         }
-        // Sinon, c'est une dérivation : le tracé commence au point d'appui,
-        // exactement comme si l'on avait cliqué.
+        // Le point visé n'est sur aucune branche déplaçable : on dérive,
+        // faute de mieux.
         commencer_fil(appui, appui.point);
     }
 
