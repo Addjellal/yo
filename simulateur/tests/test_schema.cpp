@@ -4852,6 +4852,88 @@ static void test_proprietes_rendent_la_place() {
 // déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
 // au fil, on déplace le segment.
 // ---------------------------------------------------------------------------
+// Partir d'un fil et retomber dessus ne laisse pas un bout
+//
+// « J'ai déplacé le fil vers la gauche et j'ai eu un bout qui est resté. »
+//
+// Le geste réel : un glissé PARALLÈLE à la branche, qui bascule donc en
+// dérivation — et qui se termine sur le fil dont il est parti. Ce que faisait
+// alors `terminer_fil` :
+//
+//   1. `ancrer` coupe le fil au point de départ : un point, deux moitiés ;
+//   2. `ancrer` coupe une moitié au point d'arrivée : un second point, et
+//      surtout LE SEGMENT QUI JOINT LES DEUX POINTS ;
+//   3. puis un fil de plus est ajouté entre ces deux mêmes points.
+//
+// Deux fils superposés, dont un qui dépasse. Le garde-fou `meme_raccord` ne
+// l'attrapait pas : il compare des positions à une demi-maille près, et les
+// deux points sont ici franchement écartés. Ce qu'il fallait comparer, c'est
+// le fil lui-même.
+//
+// Trouvé en balayant 432 combinaisons de géométrie, de dérivation, de branche
+// et de direction : 108 laissaient un bout. Aucune après correction. Un défaut
+// que trois sondes successives n'avaient pas vu, parce qu'elles cherchaient un
+// cul-de-sac — or `balayer_jonctions` emporte les culs-de-sac, et ce bout-ci
+// était raccroché aux deux extrémités.
+// ---------------------------------------------------------------------------
+static void test_deriver_sur_le_meme_fil_ne_laisse_rien() {
+    std::printf("\n-- dériver d'un fil pour retomber dessus ne laisse rien --\n");
+
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF b = r2->position_borne(0);
+    const QPointF depart((a.x() + b.x()) / 2.0 - 40, a.y());
+    const QPointF arrivee((a.x() + b.x()) / 2.0 + 40, a.y());
+    scene.oublier_historique();
+
+    const std::size_t fils_avant = scene.fils().size();
+    const std::size_t points_avant = scene.jonctions().size();
+    const std::size_t noeuds_avant =
+        scene.construire_netlist(nullptr).noeuds().size();
+
+    // Le glissé au bouton droit, LE LONG du fil : il dérive, et il retombe sur
+    // le fil dont il part.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, depart, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, arrivee, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, arrivee, Qt::RightButton);
+
+    verifier(scene.fils().size() == fils_avant,
+             "aucun fil n'a été ajouté",
+             std::to_string(scene.fils().size()) + " contre "
+                 + std::to_string(fils_avant));
+    verifier(scene.jonctions().size() == points_avant,
+             "aucun point n'a été semé",
+             std::to_string(scene.jonctions().size()) + " contre "
+                 + std::to_string(points_avant));
+    verifier(scene.construire_netlist(nullptr).noeuds().size() == noeuds_avant,
+             "et le circuit est électriquement le même");
+
+    // AUCUN FIL EN DOUBLE, où que ce soit. C'est l'invariant qui manquait :
+    // un doublon reste raccroché aux deux bouts, donc le balayage des
+    // jonctions ne le voit pas, et rien d'autre ne le cherchait.
+    const std::vector<ItemFil*> tous = scene.fils();
+    int doublons = 0;
+    for (std::size_t i = 0; i < tous.size(); ++i)
+        for (std::size_t j = i + 1; j < tous.size(); ++j) {
+            const QPointF a1 = tous[i]->ancre_depart().position();
+            const QPointF b1 = tous[i]->ancre_arrivee().position();
+            const QPointF a2 = tous[j]->ancre_depart().position();
+            const QPointF b2 = tous[j]->ancre_arrivee().position();
+            auto pareil = [](const QPointF& p, const QPointF& q) {
+                return std::hypot(p.x() - q.x(), p.y() - q.y()) < 0.5;
+            };
+            if ((pareil(a1, a2) && pareil(b1, b2))
+                || (pareil(a1, b2) && pareil(b1, a2)))
+                ++doublons;
+        }
+    verifier(doublons == 0, "et aucun fil n'en double un autre",
+             std::to_string(doublons) + " doublon(s)");
+}
+
+// ---------------------------------------------------------------------------
 // Chaque borne porte son nom
 //
 // « Sur les items techniques, label les entrées sorties pour comprendre
@@ -6055,6 +6137,7 @@ int main(int argc, char** argv) {
     test_moniteur_serie_lit_l_utf8();
     test_ligne_choisie_reste_lisible();
     test_bornes_portent_leur_nom();
+    test_deriver_sur_le_meme_fil_ne_laisse_rien();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
     test_glisser_le_long_du_fil_derive();

@@ -1115,3 +1115,42 @@ Et le côté d'où sort une borne se lit sur le **corps du symbole**, pas sur sa
 distance au centre : le test « |x| contre |y| » se trompait sur les boîtiers
 hauts, où la borne du haut est plus loin en y qu'en x et se croyait donc
 horizontale.
+
+## « J'ai déplacé le fil et j'ai eu un bout qui est resté »
+
+Le geste réel n'était pas un déplacement : c'était un glissé **parallèle** à la
+branche, qui bascule donc en dérivation — et qui se terminait **sur le fil dont
+il était parti**. `terminer_fil` faisait alors trois choses :
+
+1. `ancrer` coupe le fil au départ : un point, deux moitiés ;
+2. `ancrer` coupe une moitié à l'arrivée : un second point, **et le segment qui
+   joint les deux points** ;
+3. puis un fil de plus est ajouté entre ces deux mêmes points.
+
+Deux fils superposés, dont un qui dépasse. Le garde-fou `meme_raccord` ne
+l'attrapait pas : il compare des **positions** à une demi-maille près, et les
+deux points sont ici franchement écartés. Ce qu'il fallait comparer, c'est **le
+fil lui-même**.
+
+### Comment il a été trouvé — trois définitions successives du mot « bout »
+
+1. *Une jonction qui ne tient qu'un fil.* Zéro cas sur 144. Et pour cause :
+   `balayer_jonctions` emporte déjà tout point de degré inférieur à deux. **Un
+   vrai cul-de-sac ne survit pas** ; le bout signalé était donc raccroché aux
+   deux extrémités.
+2. *Idem, avec une dérivation sur le fil.* Zéro cas sur 432. La dérivation ne
+   se faisait pas dans la sonde : elle se fait au **bouton droit**, et je
+   l'avais tentée au clic gauche — qui, lui, désigne.
+3. *Un fil de longueur nulle, ou deux fils entre les mêmes bouts.* **108 cas
+   sur 432.**
+
+La leçon : **un défaut qu'on ne reproduit pas peut n'être qu'une définition
+mal posée.** Trois sondes ont dit « rien » avant que la bonne question soit
+formulée, et aucune de ces trois ne prouvait l'absence du défaut.
+
+### Pourquoi rien ne l'avait attrapé
+
+L'assertion « le circuit est électriquement le même » passe **même quand le
+doublon est là** : deux fils entre les deux mêmes points ne changent rien à la
+netlist. Le défaut était purement visuel, et tous les invariants du banc
+portaient sur l'électricité. Il en fallait un sur le **dessin**.

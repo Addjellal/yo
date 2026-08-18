@@ -1445,6 +1445,26 @@ bool SceneSchema::terminer_fil(const QPointF& point, Ancre* depart_materialise) 
     if (!arrivee_visee.connectable()) return false;
     if (meme_raccord(arrivee_visee, cible_depart_)) return false;
 
+    // PARTIR D'UN FIL ET RETOMBER SUR LE MÊME FIL NE RELIE RIEN.
+    //
+    // Les deux points y sont déjà reliés — par ce fil. Et le geste ne se
+    // contentait pas d'être inutile : il laissait un TRAIT EN DOUBLE.
+    // `ancrer` coupe le fil au départ, ce qui crée un point ; `ancrer` le
+    // coupe de nouveau à l'arrivée, ce qui crée un second point ET le segment
+    // qui les joint ; puis un fil de plus était ajouté entre ces deux points.
+    // Deux fils superposés entre les mêmes bouts, dont un qui dépasse : c'est
+    // le « bout qui est resté » signalé par l'utilisateur.
+    //
+    // Le garde-fou `meme_raccord` ne l'attrapait pas : il compare des
+    // POSITIONS à une demi-maille près, et les deux points sont ici
+    // franchement écartés. Ce qu'il faut comparer, c'est le fil lui-même.
+    if (arrivee_visee.genre == Cible::Genre::Fil
+        && cible_depart_.genre == Cible::Genre::Fil
+        && arrivee_visee.fil == cible_depart_.fil) {
+        abandonner_fil();
+        return false;
+    }
+
     // TIRER UN FIL S'ANNULE, comme le reste.
     //
     // Ce n'était pas le cas : `terminer_fil` n'appelait pas `memoriser()`.
