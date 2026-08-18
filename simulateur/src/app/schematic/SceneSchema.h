@@ -364,10 +364,28 @@ private:
 
     // Le déplacement d'un segment, de bout en bout.
     //
-    // `axe_perpendiculaire` rend faux quand le fil n'est pas d'aplomb : un
-    // segment en équerre n'a pas d'axe unique, et le déplacer voudrait dire
-    // deux choses à la fois.
+    // `axe_perpendiculaire` rend faux quand le fil n'est pas d'aplomb : le
+    // TRAIT entier n'a pas d'axe unique. Chacune de ses branches en a un,
+    // et c'est `axe_de_la_branche` qui le donne.
     static bool axe_perpendiculaire(const ItemFil* fil, QPointF* axe);
+
+    // LA BRANCHE SOUS LE CURSEUR, et son axe.
+    //
+    // Un fil coudé est tracé en Z : deux branches horizontales et une
+    // verticale. Aucune n'était déplaçable, parce que la question était posée
+    // au fil entier — qui, lui, n'a pas d'axe. On la pose donc à la branche
+    // que le curseur désigne. Rend faux si le point n'est sur aucune, ou si
+    // le fil est réduit à un point.
+    static bool axe_de_la_branche(const ItemFil* fil, const QPointF& point,
+                                  QPointF* axe, int* rang = nullptr);
+    // Coupe un fil coudé en autant de fils droits que de branches, réunis par
+    // de vrais points. Rend la branche de rang `rang`, désormais déplaçable —
+    // ou le fil lui-même s'il était déjà droit.
+    //
+    // C'est le corollaire déjà écrit plus bas : un fil n'a rien à déplacer
+    // tant qu'on ne lui a pas donné de quoi. Les coudes existaient dans le
+    // dessin sans exister dans le schéma ; les voilà réels.
+    ItemFil* materialiser_les_coudes(ItemFil* fil, int rang);
     // Matérialise les deux poignées du segment — en insérant un point là où
     // le fil tient à une broche, qui ne bouge pas — et arme le déplacement.
     bool commencer_deplacement_segment(ItemFil* fil, const QPointF& appui);

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <QGraphicsItem>
+#include <QList>
 #include <QPainterPath>
 
 #include "app/schematic/Ancre.h"
@@ -26,6 +27,16 @@ public:
     // pendant le geste soit EXACTEMENT celui du fil final : un aperçu qui
     // montre une diagonale et pose une équerre est un aperçu qui ment.
     static QPainterPath chemin(const QPointF& a, const QPointF& b);
+
+    // LES SOMMETS DU TRACÉ, ET NON SEULEMENT SON DESSIN.
+    //
+    // Un fil droit va de a à b ; un fil coudé passe par deux angles. La scène
+    // a besoin de ces points-là pour savoir SUR QUELLE BRANCHE le curseur se
+    // trouve — sans quoi elle ne peut ni déplacer une branche, ni même dire
+    // dans quel sens elle se déplacerait. Recopier la règle du coude ici
+    // aurait produit une deuxième vérité sur la forme du fil ; `chemin` la lit
+    // désormais d'ici, et il n'y en a qu'une.
+    static QList<QPointF> sommets(const QPointF& a, const QPointF& b);
     QRectF boundingRect() const override;
     QPainterPath shape() const override;
     void paint(QPainter* peintre, const QStyleOptionGraphicsItem* option,

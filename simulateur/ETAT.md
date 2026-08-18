@@ -983,3 +983,40 @@ C'est la même leçon que celle déjà écrite plus haut — « un état gardé 
 événements doit être inscrit, le jour même, dans tout ce qui détruit » — sous sa
 forme la plus littérale : **une fenêtre est un état, et elle doit avoir un
 propriétaire.**
+
+## « Le sliding marche sur les fils horizontaux mais pas verticaux »
+
+Le constat de l'utilisateur était juste, sa cause supposée non — et la mienne
+non plus tant que je ne l'avais pas mesurée. **Un fil vertical pur se déplace
+très bien** : je l'ai vérifié avec une sonde avant de toucher à quoi que ce
+soit. Ce qui refusait, c'est le fil **coudé**. Comme un schéma n'a de descentes
+que dans ses coudes, la limite se lisait comme une affaire de verticales.
+
+`axe_perpendiculaire` posait la question au TRAIT ENTIER, qui n'a effectivement
+pas d'axe. Mais un fil coudé est dessiné en **Z** — deux branches horizontales
+et une verticale — et chacune, elle, en a un. La question se pose donc à la
+branche que le curseur désigne (`axe_de_la_branche`).
+
+Restait à lui donner de quoi bouger : **les angles n'existaient que dans le
+dessin**. `materialiser_les_coudes` les rend réels — deux points, trois fils
+droits, aimantés sur la grille — puis le déplacement ordinaire s'applique.
+C'est le corollaire déjà écrit pour les broches : « un fil n'a rien à déplacer
+tant qu'on ne lui a pas donné de quoi. »
+
+Trois points de méthode :
+
+1. **L'instantané d'annulation précède la matérialisation.** Sinon Ctrl+Z
+   laisserait les coudes réels derrière lui : le geste ne s'annulerait plus
+   d'un bloc.
+2. **`ItemFil::sommets` est extrait de `chemin`.** La scène avait besoin de la
+   forme du Z ; la recopier aurait créé une deuxième vérité sur la forme du
+   fil. C'est la même leçon que `cadre()` dans l'oscilloscope, le même jour.
+3. **Un essai a dû être RÉÉCRIT, pas seulement ajouté.**
+   `test_fil_en_equerre_ne_se_deplace_pas` figeait l'ancienne règle. Le
+   supprimer aurait perdu ce qu'il gardait vraiment ; il affirme désormais ce
+   qui reste vrai — un glissé PARALLÈLE à la branche dérive au lieu de
+   déplacer, sans quoi le moindre tremblement de la main couperait le fil.
+
+Et l'ancien essai ne couvrait que l'horizontale : cinq assertions vertes sur un
+seul des trois cas. Toujours la même leçon — **un banc vert ne prouve que les
+chemins qu'il parcourt**.

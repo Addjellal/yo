@@ -1532,14 +1532,97 @@ bool SceneSchema::axe_perpendiculaire(const ItemFil* fil, QPointF* axe) {
     return true;
 }
 
+bool SceneSchema::axe_de_la_branche(const ItemFil* fil, const QPointF& point,
+                                    QPointF* axe, int* rang) {
+    if (!fil) return false;
+    const QList<QPointF> points = ItemFil::sommets(fil->ancre_depart().position(),
+                                                   fil->ancre_arrivee().position());
+    // La branche la plus proche du point, à condition d'être vraiment dessous.
+    // La tolérance est celle du trait épaissi par `shape()` : c'est déjà elle
+    // qui a décidé qu'on visait ce fil.
+    int meilleur = -1;
+    double meilleure_distance = 8.0;
+    for (int k = 0; k + 1 < points.size(); ++k) {
+        const QPointF a = points[k];
+        const QPointF b = points[k + 1];
+        const QPointF ab = b - a;
+        const double longueur2 = ab.x() * ab.x() + ab.y() * ab.y();
+        if (longueur2 < 1e-6) continue;
+        double t = ((point.x() - a.x()) * ab.x() + (point.y() - a.y()) * ab.y())
+                   / longueur2;
+        t = std::clamp(t, 0.0, 1.0);
+        const QPointF pied = a + ab * t;
+        const double distance = std::hypot(point.x() - pied.x(),
+                                           point.y() - pied.y());
+        if (distance < meilleure_distance) {
+            meilleure_distance = distance;
+            meilleur = k;
+        }
+    }
+    if (meilleur < 0) return false;
+    const QPointF a = points[meilleur];
+    const QPointF b = points[meilleur + 1];
+    const double dx = std::fabs(a.x() - b.x());
+    const double dy = std::fabs(a.y() - b.y());
+    if (dx <= 0.01 && dy <= 0.01) return false;
+    if (axe) *axe = (dy <= dx) ? QPointF(0, 1) : QPointF(1, 0);
+    if (rang) *rang = meilleur;
+    return true;
+}
+
+ItemFil* SceneSchema::materialiser_les_coudes(ItemFil* fil, int rang) {
+    if (!fil_vivant(fil)) return nullptr;
+    const Ancre depart = fil->ancre_depart();
+    const Ancre arrivee = fil->ancre_arrivee();
+    const QList<QPointF> points = ItemFil::sommets(depart.position(),
+                                                   arrivee.position());
+    if (points.size() <= 2) return fil;          // déjà droit : rien à couper
+    if (rang < 0 || rang + 1 >= points.size()) return nullptr;
+
+    // Les coudes deviennent de vrais points, AIMANTÉS SUR LA GRILLE — comme
+    // tout ce qu'on pose ici. Le milieu calculé par le tracé tombe une fois
+    // sur deux entre deux mailles ; le rendre réel sans l'aligner poserait un
+    // point que plus rien ne pourrait rejoindre proprement.
+    std::vector<Ancre> etapes;
+    etapes.push_back(depart);
+    for (int k = 1; k + 1 < points.size(); ++k) {
+        auto* coude = new ItemJonction(aligner(points[k]));
+        addItem(coude);
+        etapes.push_back(Ancre(coude));
+    }
+    etapes.push_back(arrivee);
+
+    removeItem(fil);
+    delete fil;
+    ItemFil* vise = nullptr;
+    for (std::size_t k = 0; k + 1 < etapes.size(); ++k) {
+        auto* branche = new ItemFil(etapes[k], etapes[k + 1]);
+        addItem(branche);
+        if (static_cast<int>(k) == rang) vise = branche;
+    }
+    return vise;
+}
+
 bool SceneSchema::commencer_deplacement_segment(ItemFil* fil,
                                                 const QPointF& appui) {
     QPointF axe;
-    if (!fil_vivant(fil) || !axe_perpendiculaire(fil, &axe)) return false;
+    int rang = 0;
+    if (!fil_vivant(fil) || !axe_de_la_branche(fil, appui, &axe, &rang))
+        return false;
 
     // L'état d'avant, relevé avant la moindre insertion : le geste s'annule
-    // d'un bloc, poignées comprises.
+    // d'un bloc, poignées ET coudes matérialisés compris. C'est pourquoi
+    // l'instantané précède la matérialisation, et non l'inverse.
     avant_deplacement_ = vers_json();
+
+    // Un fil coudé n'a rien à déplacer tant qu'on ne lui a pas donné de quoi :
+    // ses angles n'existaient que dans le dessin. On les rend réels, et la
+    // branche visée devient un fil droit comme un autre.
+    fil = materialiser_les_coudes(fil, rang);
+    if (!fil || !axe_perpendiculaire(fil, &axe)) {
+        avant_deplacement_ = QJsonObject();
+        return false;
+    }
 
     // LE DÉRANGEMENT MINIMAL, appliqué.
     //
@@ -1886,9 +1969,11 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
             rendre_le_rectangle_a_la_vue();
             return;
         }
+        // La question se pose à la BRANCHE visée, pas au fil entier : un fil
+        // coudé n'a pas d'axe, mais chacune de ses trois branches en a un.
         QPointF axe;
         const bool perpendiculaire =
-            axe_perpendiculaire(appui.fil, &axe)
+            axe_de_la_branche(appui.fil, appui_point_, &axe)
             && (axe.x() != 0.0 ? std::fabs(ecart.x()) > std::fabs(ecart.y())
                                : std::fabs(ecart.y()) > std::fabs(ecart.x()));
         if (perpendiculaire
@@ -1945,7 +2030,7 @@ void SceneSchema::mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) {
             // découvrirait la contrainte en la heurtant. La main reste pour
             // les fils en équerre, qu'on ne peut que dériver.
             QPointF axe;
-            if (axe_perpendiculaire(cible.fil, &axe))
+            if (axe_de_la_branche(cible.fil, evenement->scenePos(), &axe))
                 forme = axe.x() != 0.0 ? Qt::SizeHorCursor : Qt::SizeVerCursor;
             else
                 forme = Qt::PointingHandCursor;

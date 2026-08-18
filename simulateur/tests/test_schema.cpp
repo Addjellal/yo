@@ -4850,6 +4850,131 @@ static void test_proprietes_rendent_la_place() {
 // déplacement. En deçà on dérive comme avant ; au-delà, et perpendiculairement
 // au fil, on déplace le segment.
 // ---------------------------------------------------------------------------
+// Un fil coudé se déplace aussi — branche par branche
+//
+// « Le sliding du fil fonctionne sur les fils horizontaux mais pas verticaux. »
+// Le constat est juste, la cause n'est pas l'orientation : un fil VERTICAL pur
+// se déplace très bien. Ce qui refusait, c'est le fil COUDÉ — et comme un
+// schéma n'a de descentes que dans ses coudes, la limite se lisait comme une
+// affaire de verticales.
+//
+// `axe_perpendiculaire` posait la question au TRAIT ENTIER, qui n'a
+// effectivement pas d'axe : le déplacer voudrait dire deux choses à la fois.
+// Mais le trait est dessiné en Z — deux branches horizontales et une verticale
+// — et chacune, elle, a un axe. La question se pose donc à la branche que le
+// curseur désigne.
+//
+// Restait à lui donner de quoi bouger : les angles n'existaient que dans le
+// dessin. On les rend réels — deux points, trois fils droits — puis le
+// déplacement ordinaire s'applique. C'est le même corollaire que pour les
+// broches, déjà écrit dans DECISION-FILS.
+//
+// Le banc ne couvrait que l'horizontale : cinq assertions vertes sur un seul
+// des trois cas. Encore la même leçon — un banc vert ne prouve que les chemins
+// qu'il parcourt.
+// ---------------------------------------------------------------------------
+static void test_deplacer_un_segment_vertical_et_coude() {
+    std::printf("\n-- un fil vertical, puis un fil coudé, se déplacent --\n");
+
+    // --- 1. LA VERTICALE PURE, qui marchait déjà mais que rien ne gardait.
+    {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(0, 400));
+        scene.addItem(new ItemFil(r1, 1, r2, 1));
+        const QPointF a = r1->position_borne(1);
+        const QPointF b = r2->position_borne(1);
+        verifier(std::fabs(a.x() - b.x()) < 0.01,
+                 "le fil d'essai est bien vertical",
+                 std::to_string(a.x()) + " contre " + std::to_string(b.x()));
+        const QPointF milieu(a.x(), (a.y() + b.y()) / 2.0);
+        scene.oublier_historique();
+
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(60, 0));
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + QPointF(60, 0));
+
+        verifier(scene.jonctions().size() == 2,
+                 "deux poignées tiennent le segment vertical déplacé",
+                 std::to_string(scene.jonctions().size()));
+        for (ItemJonction* point : scene.jonctions())
+            verifier(std::fabs(point->pos().x() - (a.x() + 60)) < 0.01,
+                     "chaque poignée s'est décalée de 60 vers la droite",
+                     std::to_string(point->pos().x()));
+    }
+
+    // --- 2. LE FIL COUDÉ, branche par branche.
+    //
+    // Deux résistances en diagonale : le tracé fait un Z dont on connaît les
+    // sommets, puisque `ItemFil::sommets` est la seule règle de la forme.
+    for (int branche = 0; branche < 3; ++branche) {
+        SceneSchema scene;
+        ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+        ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 400));
+        scene.addItem(new ItemFil(r1, 1, r2, 0));
+        const QPointF a = r1->position_borne(1);
+        const QPointF b = r2->position_borne(0);
+        const QList<QPointF> points = ItemFil::sommets(a, b);
+        verifier(points.size() == 4,
+                 "le fil en diagonale est bien tracé en Z, à quatre sommets",
+                 std::to_string(points.size()));
+        if (points.size() != 4) return;
+
+        const QPointF p1 = points[branche];
+        const QPointF p2 = points[branche + 1];
+        const QPointF milieu((p1.x() + p2.x()) / 2.0, (p1.y() + p2.y()) / 2.0);
+        // Perpendiculairement à la branche visée.
+        const bool horizontale = std::fabs(p1.y() - p2.y()) < 0.01;
+        const QPointF glissee = horizontale ? QPointF(0, 60) : QPointF(60, 0);
+        const QPointF composant_avant = r1->pos();
+        scene.oublier_historique();
+        const std::size_t noeuds_avant =
+            scene.construire_netlist(nullptr).noeuds().size();
+
+        envoyer(scene, QEvent::GraphicsSceneMousePress, milieu);
+        envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + glissee);
+        envoyer(scene, QEvent::GraphicsSceneMouseRelease, milieu + glissee);
+
+        const std::string quelle =
+            "branche " + std::to_string(branche + 1)
+            + (horizontale ? " (horizontale)" : " (VERTICALE)");
+        verifier(scene.jonctions().size() >= 2,
+                 quelle + " : les coudes sont devenus de vrais points",
+                 std::to_string(scene.jonctions().size()) + " point(s)");
+        verifier(scene.fils().size() >= 3,
+                 quelle + " : le fil est devenu plusieurs fils droits",
+                 std::to_string(scene.fils().size()) + " fil(s)");
+        verifier(r1->pos() == composant_avant,
+                 quelle + " : le composant n'a pas bougé d'un pixel");
+        verifier(scene.construire_netlist(nullptr).noeuds().size() == noeuds_avant,
+                 quelle + " : le circuit est électriquement le même",
+                 std::to_string(scene.construire_netlist(nullptr).noeuds().size())
+                     + " contre " + std::to_string(noeuds_avant));
+
+        // LE DÉPLACEMENT A VRAIMENT EU LIEU. Sans cette assertion, tout ce qui
+        // précède se contenterait d'une matérialisation des coudes suivie d'un
+        // glissé de zéro — ce qui est exactement ce que faisait le code fautif
+        // sur la première branche.
+        bool decale = false;
+        for (ItemJonction* point : scene.jonctions()) {
+            const double le_long = horizontale ? point->pos().y() : point->pos().x();
+            const double repere = horizontale ? p1.y() : p1.x();
+            if (std::fabs(le_long - (repere + 60)) < 0.01) decale = true;
+        }
+        verifier(decale,
+                 quelle + " : au moins une poignée a bien bougé de 60",
+                 "aucune poignée à la position attendue");
+
+        // Et le geste s'annule d'un bloc — coudes matérialisés compris.
+        verifier(scene.annuler(), quelle + " : le déplacement s'annule");
+        verifier(scene.fils().size() == 1 && scene.jonctions().empty(),
+                 quelle + " : le fil redevient un seul trait, sans coude réel",
+                 std::to_string(scene.fils().size()) + " fil(s), "
+                     + std::to_string(scene.jonctions().size()) + " point(s)");
+    }
+}
+
+// ---------------------------------------------------------------------------
 static void test_deplacer_un_segment() {
     std::printf("\n-- glisser un fil déplace le segment --\n");
 
@@ -5020,11 +5145,21 @@ static void test_clic_gauche_designe_clic_droit_derive() {
                  + std::to_string(autre.jonctions().size()) + " point(s)");
 }
 
-static void test_fil_en_equerre_ne_se_deplace_pas() {
-    std::printf("\n-- un fil en équerre n'a pas d'axe : il se dérive --\n");
+static void test_glisser_le_long_du_fil_derive() {
+    std::printf("\n-- glisser LE LONG d'une branche dérive, il ne déplace pas --\n");
 
-    // Bornes décalées en x ET en y : le fil est tracé en équerre, et
-    // « déplacer le segment » n'y veut rien dire — quel segment ?
+    // CE QUE CET ESSAI GARDAIT, ET CE QU'IL AFFIRMAIT DE TROP.
+    //
+    // Il affirmait qu'un fil en équerre ne se déplace pas du tout — « quel
+    // segment ? ». La question était mal posée : le trait n'a pas d'axe, mais
+    // chacune de ses trois branches en a un, et l'utilisateur a signalé que la
+    // limite se voyait à l'usage. Le fil coudé se déplace donc désormais
+    // branche par branche, et c'est un autre essai qui le vérifie.
+    //
+    // Ce qui reste vrai, et qui n'était gardé nulle part : le déplacement est
+    // CONTRAINT. Un glissé parallèle à la branche ne déplacerait rien de
+    // visible ; c'est donc une dérivation, comme un clic. Sans cette règle, le
+    // moindre tremblement de la main le long d'un fil le couperait.
     SceneSchema scene;
     ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
     ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 300));
@@ -5032,21 +5167,22 @@ static void test_fil_en_equerre_ne_se_deplace_pas() {
     const QPointF a = r1->position_borne(1);
     const QPointF b = r2->position_borne(0);
     verifier(std::fabs(a.x() - b.x()) > 0.01 && std::fabs(a.y() - b.y()) > 0.01,
-             "le fil d'essai est bien en équerre");
+             "le fil d'essai est bien coudé");
 
-    // Un point franchement sur le fil : le coin de l'équerre.
-    const QPointF coin(b.x(), a.y());
-    const QPointF sur_le_fil((a.x() + b.x()) / 2.0, a.y());
+    // Un point franchement sur la première branche, qui est horizontale.
+    const QList<QPointF> points = ItemFil::sommets(a, b);
+    verifier(points.size() == 4, "il est tracé en Z, à quatre sommets",
+             std::to_string(points.size()));
+    if (points.size() != 4) return;
+    const QPointF sur_le_fil((points[0].x() + points[1].x()) / 2.0, a.y());
     verifier(scene.viser(sur_le_fil).genre == SceneSchema::Cible::Genre::Fil,
              "et le point visé est bien dessus");
-    (void)coin;
 
+    // Le glissé est PARALLÈLE à la branche : rien à déplacer, donc on dérive.
     envoyer(scene, QEvent::GraphicsSceneMousePress, sur_le_fil);
-    envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(0, 60));
-    // Le geste bascule en DÉRIVATION : rien n'a encore été coupé, et un fil
-    // provisoire suit le curseur.
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, sur_le_fil + QPointF(60, 0));
     verifier(scene.jonctions().empty(),
-             "aucune poignée n'a été posée sur un fil sans axe",
+             "aucune poignée n'a été posée : le geste a basculé en dérivation",
              std::to_string(scene.jonctions().size()));
     scene.abandonner_fil();
     verifier(scene.fils().size() == 1,
@@ -5652,9 +5788,10 @@ int main(int argc, char** argv) {
     test_reglage_du_declenchement_est_atteignable();
     test_proprietes_rendent_la_place();
     test_deplacer_un_segment();
+    test_deplacer_un_segment_vertical_et_coude();
     test_glisser_sans_deplacer_ne_laisse_rien();
     test_clic_gauche_designe_clic_droit_derive();
-    test_fil_en_equerre_ne_se_deplace_pas();
+    test_glisser_le_long_du_fil_derive();
     test_ctrl_clic_designe_un_fil();
     test_geste_interrompu_par_une_destruction();
 

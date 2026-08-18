@@ -20,10 +20,7 @@ ItemFil::ItemFil(ItemComposant* depart, int borne_depart,
                  ItemComposant* arrivee, int borne_arrivee)
     : ItemFil(Ancre(depart, borne_depart), Ancre(arrivee, borne_arrivee)) {}
 
-QPainterPath ItemFil::chemin(const QPointF& a, const QPointF& b) {
-    QPainterPath trace;
-    trace.moveTo(a);
-
+QList<QPointF> ItemFil::sommets(const QPointF& a, const QPointF& b) {
     // Deux bornes presque alignées donnent un fil DROIT.
     //
     // Sans cette tolérance, trois pixels d'écart vertical entre une broche et
@@ -37,17 +34,19 @@ QPainterPath ItemFil::chemin(const QPointF& a, const QPointF& b) {
     constexpr double kTolerance = 5.0;
     const double dx = std::fabs(b.x() - a.x());
     const double dy = std::fabs(b.y() - a.y());
-    if (dy <= kTolerance || dx <= kTolerance) {
-        trace.lineTo(b);
-        return trace;
-    }
+    if (dy <= kTolerance || dx <= kTolerance) return {a, b};
 
     // Équerre en trois segments : on part horizontalement, on descend au
     // milieu, on repart horizontalement.
     const double milieu = (a.x() + b.x()) / 2.0;
-    trace.lineTo(milieu, a.y());
-    trace.lineTo(milieu, b.y());
-    trace.lineTo(b);
+    return {a, QPointF(milieu, a.y()), QPointF(milieu, b.y()), b};
+}
+
+QPainterPath ItemFil::chemin(const QPointF& a, const QPointF& b) {
+    const QList<QPointF> points = sommets(a, b);
+    QPainterPath trace;
+    trace.moveTo(points.first());
+    for (int k = 1; k < points.size(); ++k) trace.lineTo(points[k]);
     return trace;
 }
 
