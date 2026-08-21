@@ -34,7 +34,6 @@ static void console_en_utf8() {
 #include <QGridLayout>
 #include <QLabel>
 #include <QJsonObject>
-#include <QMenuBar>
 #include <QToolBar>
 #include "app/Apparence.h"
 #include "app/Oscilloscope.h"
@@ -56,7 +55,6 @@ static void console_en_utf8() {
 
 #include "app/schematic/ItemComposant.h"
 #include "app/schematic/ItemFil.h"
-#include "app/Oscilloscope.h"
 #include "app/panels/FenetreInstrument.h"
 #include "app/panels/PanneauAnalyses.h"
 #include "app/panels/PanneauPcb.h"
@@ -70,7 +68,6 @@ static void console_en_utf8() {
 #include <QSettings>
 #include <QFile>
 #include <QGraphicsPathItem>
-#include <QGraphicsSceneMouseEvent>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QPushButton>
@@ -2978,7 +2975,6 @@ static void test_survol_allume_le_noeud() {
 }
 
 
-#include <QElapsedTimer>
 
 static void experience_cout_survol() {
     std::printf("\n-- experience: cout de allumer_noeud() et emission changed --\n");

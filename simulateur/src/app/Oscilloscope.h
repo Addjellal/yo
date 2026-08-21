@@ -75,7 +75,6 @@ public:
     // disparaît. C'est la figure de Lissajous — déphasage et non-linéarité s'y
     // lisent d'un coup d'œil.
     void definir_mode_xy(bool xy);
-    bool mode_xy() const { return mode_xy_; }
 
     // --- curseurs -----------------------------------------------------------
     // Curseur A suit la souris, curseur B se pose au clic. L'écart des deux
@@ -316,7 +315,6 @@ private:
     QComboBox* base_temps_ = nullptr;
     QDoubleSpinBox* niveau_ = nullptr;
     QLabel* curseurs_ = nullptr;
-    QLabel* etat_declenchement_ = nullptr;
     QStringList signaux_;
     std::map<QString, QString> libelles_;
     int prochaine_voie_ = 0;

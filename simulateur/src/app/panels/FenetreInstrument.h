@@ -10,7 +10,6 @@
 #include <QString>
 #include <QWidget>
 
-#include <deque>
 #include <functional>
 
 class QLabel;
@@ -45,7 +44,6 @@ private:
     QLabel* description_ = nullptr;
 
     // Petit historique, pour dire d'où vient la valeur affichée.
-    std::deque<double> historique_;
     bool premiere_ = true;
     double mini_ = 0, maxi_ = 0, somme_ = 0;
     int compte_ = 0;

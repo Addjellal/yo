@@ -102,7 +102,6 @@ public:
     // Pas d'échantillonnage de l'analyse transitoire, en secondes. Plus il est
     // fin, plus l'oscilloscope est précis et plus la simulation coûte cher.
     void definir_resolution(double secondes);
-    double resolution() const { return pas_; }
     double vitesse() const { return vitesse_; }
     const QString& source_spice() const { return source_spice_; }
     const coeur::Netlist& netlist() const { return netlist_; }

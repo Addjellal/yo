@@ -43,9 +43,6 @@ public:
     // de faire tourner ce moteur sur un montage qui n'en a pas.
     static bool circuit_numerique(const Netlist& netlist);
 
-    // Seuil de basculement, en volts : au-dessus, un niveau est vu haut.
-    void definir_seuil(double volts) { seuil_ = volts; }
-
 private:
     double seuil_ = 2.5;
 };

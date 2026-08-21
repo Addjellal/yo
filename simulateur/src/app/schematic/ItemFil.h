@@ -44,7 +44,6 @@ public:
 
     const Ancre& ancre_depart() const { return depart_; }
     const Ancre& ancre_arrivee() const { return arrivee_; }
-    void definir_ancre_arrivee(const Ancre& ancre) { arrivee_ = ancre; }
 
     // Les quatre accesseurs d'origine. Ils rendent nullptr / 0 quand
     // l'extrémité est une jonction : les appelants qui ne connaissent que les

@@ -35,10 +35,7 @@
 #include <QTextBlock>
 #include <QRegularExpression>
 #include <QPushButton>
-#include <QComboBox>
-#include <QHBoxLayout>
 #include <QVBoxLayout>
-#include <QMenu>
 #include <QMenuBar>
 #include <QInputDialog>
 #include <QTabBar>
@@ -46,11 +43,6 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPlainTextEdit>
-#include <QHeaderView>
-#include <QMouseEvent>
-#include <QTextBlock>
-#include <QRegularExpression>
-#include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -66,7 +58,6 @@
 #include <QTabWidget>
 #include <QTimer>
 #include <QToolBar>
-#include <QVBoxLayout>
 
 #include <cmath>
 #include <limits>

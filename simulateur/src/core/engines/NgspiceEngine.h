@@ -77,9 +77,6 @@ public:
     // Choisit le solveur. Sert aux tests, qui font tourner les deux sur le
     // même circuit et comparent.
     void preferer_ngspice(bool oui) { prefere_ngspice_ = oui; }
-    const char* nom_du_solveur() const {
-        return utilise_ngspice() ? "ngspice" : "solveur intégré";
-    }
 
     // Construit le fichier SPICE à partir de la netlist et des broches.
     // Renvoie le texte généré (utile pour l'afficher et pour les tests).
