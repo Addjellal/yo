@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
-#include "core/Device.h"
-#include "core/Netlist.h"
+#include "coeur/Device.h"
+#include "coeur/Netlist.h"
 
 namespace {
 

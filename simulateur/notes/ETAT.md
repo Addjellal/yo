@@ -42,7 +42,7 @@ compléter pour ajouter une architecture.
 
 ## Les neuf cartes
 
-`src/core/catalogue/cartes.cpp`. Chacune porte `mcu`, `horloge`,
+`src/coeur/catalogue/cartes.cpp`. Chacune porte `mcu`, `horloge`,
 `tension_logique`, `langage` et `note_langage` (les langages réels de la
 carte, ce que le simulateur accepte, et les écarts).
 
@@ -1368,3 +1368,49 @@ l'identique.
 Le nom `documentation/` a été choisi pour coïncider avec le dossier que CMake
 crée déjà dans le paquet livré : la source et la livraison portent le même mot
 pour la même chose.
+
+## Le vrai rangement, après une bonne question
+
+« T'as bien fait un meilleur rangement dans les dossiers ? » — non. Le premier
+passage n'avait déplacé que six fichiers `.md`. `src/` n'avait pas été touché,
+et c'est là qu'était le désordre.
+
+Deux défauts, mesurés :
+
+1. **`engines/` mélangeait quatre sujets** dans vingt-six fichiers : le solveur
+   analogique, les cœurs de microcontrôleurs, le moteur numérique — et le
+   support de compilation (`Chaines`, `noyau_arduino.h`, `ProgrammesExemples`),
+   qui n'est **pas un moteur du tout**.
+2. **Cinq dossiers portaient un nom anglais** dans un projet entièrement en
+   français : `analysis`, `engines`, `export`, `panels`, `schematic`. Et
+   `src/core/` contenait l'espace de noms `coeur::` — le dossier et le code ne
+   disaient pas le même mot pour la même chose.
+
+Nouvelle arborescence :
+
+```
+src/coeur/                  ← porte enfin le nom de son espace de noms
+  Device / Netlist
+  catalogue/                (inchangé)
+  moteurs/                  les TROIS familles, séparées
+    analogique/             SolveurIntegre, NgspiceEngine, ExpressionSpice
+    microcontroleurs/       Microcontroleur, les trois cœurs, les trois façades
+    numerique/              MoteurNumerique
+  compilation/              ce qui sert à COMPILER un croquis, et non à simuler
+  analyses/                 (ex analysis)
+  documents/                (ex export — le fichier s'appelait déjà Documents)
+  pcb/                      (inchangé)
+src/app/
+  panneaux/                 (ex panels)
+  schema/                   (ex schematic)
+```
+
+**Ce qui rend l'opération sûre : le compilateur vérifie TOUT.** Un chemin
+d'inclusion faux ne se dégrade pas en silence, il refuse de compiler. 194
+lignes `#include` et 46 chemins CMake réécrits par une table de correspondance
+unique, puis une reconstruction **à partir de rien** — un dossier de build neuf,
+pour qu'aucun objet déjà compilé ne masque une référence perdue.
+
+Le seul angle mort du compilateur, ce sont les **documents** : ils citaient des
+chemins que rien ne vérifie. Balayés à part, jusqu'à ce qu'aucune mention de
+l'ancienne arborescence ne subsiste nulle part.

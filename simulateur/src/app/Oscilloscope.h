@@ -17,7 +17,7 @@
 class QMouseEvent;
 #include <map>
 
-#include "core/engines/NgspiceEngine.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
 
 class QComboBox;
 class QDoubleSpinBox;

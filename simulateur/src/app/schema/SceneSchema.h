@@ -1,0 +1,406 @@
+// Scène de saisie du schéma.
+//
+// Son rôle décisif : transformer un dessin en `coeur::Netlist`. C'est la
+// couture du projet — le schéma produit la netlist, les moteurs la consomment,
+// et le futur module PCB la consommera aussi, sans rien changer ici.
+#pragma once
+
+#include <QGraphicsScene>
+
+#include <cstdint>
+#include <QJsonObject>
+#include <QPoint>
+#include <QPointF>
+#include <QString>
+#include <QStringList>
+
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "coeur/Netlist.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
+#include "coeur/documents/Documents.h"
+
+#include "app/schema/Ancre.h"
+
+class ItemComposant;
+class ItemFil;
+class ItemJonction;
+
+// Une broche de carte programmable reliée à un nœud du circuit.
+struct LiaisonBroche {
+    int numero = 0;            // numérotation Arduino : 0..13, A0=14…A5=19
+    std::string nom;           // "D13", "A0"
+    std::string noeud;         // nœud auquel elle est reliée
+    std::string carte;         // référence de la carte : "U1", "U2"…
+};
+
+// Une carte programmable posée sur le schéma, avec ce qu'il faut pour la
+// faire tourner : quelle puce, à quelle vitesse. Deux cartes du même schéma
+// peuvent porter deux puces différentes — un Arduino et un ATtiny — et
+// chacune doit être compilée et exécutée pour la sienne.
+struct CartePosee {
+    QString reference;
+    std::string mcu = "atmega328p";
+    uint32_t horloge = 16000000;
+    double tension_logique = 5.0;
+    double resistance_sortie = 25.0;
+    double resistance_tirage = 35000.0;
+};
+
+class SceneSchema : public QGraphicsScene {
+    Q_OBJECT
+
+public:
+    // `Fil` ne se choisit plus nulle part dans l'interface : le câblage est
+    // sans mode, et cliquer une broche suffit — voir DECISION-FILS.md. La
+    // valeur reste dans l'énumération parce que d'anciens projets peuvent
+    // l'avoir enregistrée, et qu'elle ne fait alors que restreindre.
+    enum class Outil { Selection, Fil, Suppression };
+
+    // Ce que vise le curseur. Défini tôt : le tracé en cours le garde en
+    // membre, et la découpe n'a lieu qu'au bout du geste.
+    struct Cible {
+        enum class Genre { Rien, Broche, Jonction, Fil, Composant };
+        Genre genre = Genre::Rien;
+        Ancre ancre;                          // Broche et Jonction
+        ItemFil* fil = nullptr;               // Fil : celui qu'il faudra couper
+        ItemComposant* composant = nullptr;   // Composant : son corps
+        QPointF point;                        // position retenue
+
+        // Ce sur quoi un fil peut naître ou mourir.
+        bool connectable() const {
+            return genre == Genre::Broche || genre == Genre::Jonction
+                   || genre == Genre::Fil;
+        }
+    };
+
+    // Tout ce qui appartient au même nœud électrique.
+    //
+    // C'est la réponse à « qu'est-ce qui est relié à quoi ? » — la question
+    // que pose l'élève dont la LED ne s'allume pas, et à laquelle un schéma
+    // immobile ne répond pas : deux fils qui se croisent à l'écran se
+    // ressemblent, qu'ils soient reliés ou non.
+    struct Noeud {
+        QString nom;   // vide quand la borne visée est en l'air
+        std::vector<std::pair<ItemComposant*, int>> bornes;
+        std::vector<ItemFil*> fils;
+        std::vector<ItemJonction*> jonctions;
+        bool vide() const {
+            return bornes.empty() && fils.empty() && jonctions.empty();
+        }
+    };
+
+    // Le nœud sous ce point. Vide si le curseur est sur le corps d'un
+    // composant : un composant RELIE des nœuds, il n'en est pas un — et
+    // l'apprendre est la moitié de l'intérêt du survol.
+    Noeud noeud_sous(const QPointF& point) const;
+
+    // Allume le nœud visé, éteint ce qui ne lui appartient pas.
+    void allumer_noeud(const QPointF& point);
+    void eteindre_noeud();
+    const QString& noeud_allume() const { return noeud_allume_; }
+
+    // Ce que vise le curseur.
+    //
+    // Sans mode, c'est cette question qui remplace le choix d'un outil : on
+    // ne demande plus à l'utilisateur de déclarer son intention, on la lit
+    // sous le curseur. LibrePCB résout la même question par une table de
+    // priorités explicite ; on reprend le principe.
+    //
+    // Écart assumé sur leur ordre : chez eux le fil (20) passe avant la
+    // broche (40). Ça marche parce qu'un point de fil, prioritaire, occupe
+    // les extrémités. Ici un fil se termine DIRECTEMENT sur une broche : le
+    // fil gagnerait toujours, et cliquer une broche découperait le fil au
+    // lieu de s'y connecter. La broche passe donc en tête.
+    Cible viser(const QPointF& point) const;
+
+    // Amorce un fil depuis ce qui se trouve à ce point, sans changer de mode.
+    //
+    // C'est l'équivalent clavier du clic sur une broche : le fil suit ensuite
+    // le curseur jusqu'au clic qui le referme. Rend faux si rien de
+    // connectable n'est visé — on ne bascule alors dans aucun état, ce qui est
+    // exactement la promesse du câblage sans mode.
+    bool amorcer_fil_au(const QPointF& point);
+    // Abandonne le tracé en cours, s'il y en a un.
+    void abandonner_fil();
+    // Fige le segment tracé et repart du point posé (clic dans le vide) ;
+    // referme le chemin sur la cible visée. Exposés pour les essais.
+    void poser_point_de_passage(const QPointF& point);
+    // `depart_materialise` reçoit l'ancre réellement créée pour le départ —
+    // celle qui remplace la cible d'origine dès qu'un fil a été découpé.
+    // L'appelant qui veut reprendre le tracé DOIT repartir de là : la cible,
+    // elle, peut désigner un fil qui vient d'être détruit.
+    bool terminer_fil(const QPointF& point, Ancre* depart_materialise = nullptr);
+    // Cet objet est-il toujours dans la scène ?
+    bool ancre_vivante(const Ancre& ancre) const;
+    // Ce fil est-il toujours dans la scène ? Un tracé peut attendre son clic
+    // de fermeture pendant que le fil dont il part se fait supprimer.
+    bool fil_vivant(const ItemFil* fil) const;
+    // Retire le seul trait provisoire, sans toucher aux points déjà posés.
+    void effacer_provisoire();
+
+
+    explicit SceneSchema(QObject* parent = nullptr);
+
+    void definir_outil(Outil outil);
+    Outil outil() const { return outil_; }
+
+    ItemComposant* ajouter_composant(const QString& type, const QPointF& position);
+    void supprimer_selection();
+    void tout_effacer();
+
+    // --- sérialisation ------------------------------------------------------
+    // Le schéma sait s'écrire et se relire. C'est ce qui sert à
+    // l'enregistrement, mais aussi à l'annulation (une pile d'états) et au
+    // presse-papiers (un extrait d'état) : trois usages, une seule mécanique.
+    QJsonObject vers_json(bool selection_seule = false) const;
+    // `decalage` déplace ce qui est relu — utile pour un collage qui ne doit
+    // pas se superposer à l'original. Renvoie les composants créés.
+    std::vector<ItemComposant*> depuis_json(const QJsonObject& racine,
+                                            bool remplacer = true,
+                                            const QPointF& decalage = {});
+
+    // --- annulation ---------------------------------------------------------
+    // À appeler AVANT une modification : l'état courant est empilé.
+    void memoriser();
+    // Empile un état précis (celui d'avant un geste déjà commencé).
+    void empiler(QJsonObject etat);
+    bool annuler();
+    bool retablir();
+    bool peut_annuler() const { return !pile_annulation_.empty(); }
+    // Ouvrir un projet ou en commencer un neuf efface l'histoire : annuler
+    // ramènerait sinon le schéma précédent, ce que personne n'attend.
+    void oublier_historique();
+    bool peut_retablir() const { return !pile_retablissement_.empty(); }
+
+    // --- presse-papiers -----------------------------------------------------
+    void copier_selection();
+    bool coller();
+    void dupliquer_selection();
+    bool presse_papiers_rempli() const { return !presse_papiers_.isEmpty(); }
+
+    // Construit la netlist du schéma et la liste des broches de carte.
+    coeur::Netlist construire_netlist(std::vector<LiaisonBroche>* broches) const;
+
+    // Netlist destinée au circuit imprimé. Elle diffère sur un point : les
+    // cartes programmables en font partie. La simulation les confie à
+    // l'émulateur et les tient hors de SPICE, mais sur une carte elles
+    // existent bel et bien — ce sont leurs connecteurs qu'on y soude.
+    coeur::Netlist netlist_pcb() const;
+
+    // Nom du nœud rattaché à une borne (après construction de la netlist).
+    // Références des cartes programmables posées, câblées ou non. La liste
+    // des broches ne suffit pas : une carte seule sur un schéma vide n'a
+    // aucune broche reliée, et resterait pourtant à programmer.
+    QStringList cartes_presentes() const;
+    // Les mêmes, avec leur puce et leur horloge.
+    std::vector<CartePosee> cartes_posees() const;
+
+    // Ce que relie chaque nœud : « R1_2 » -> « C1.1 · R1.2 ». Sert à ne
+    // jamais proposer un nom de nœud sans dire ce qu'il désigne.
+    std::map<QString, QString> description_noeuds() const;
+
+    // Nom du nœud auquel est rattachée une borne. Vide si elle est en l'air.
+    QString noeud_de(const ItemComposant* composant, int borne) const;
+
+    std::vector<ItemComposant*> composants() const;
+    std::vector<ItemFil*> fils() const;
+    std::vector<ItemJonction*> jonctions() const;
+
+    // Coupe un fil en deux autour d'un point, et rend le point créé.
+    //
+    // C'est le mécanisme de la dérivation en T, pris tel quel dans LibrePCB :
+    // on pose une ancre au lieu du clic, on crée les deux moitiés de l'ancien
+    // fil, on supprime l'ancien. Aucune notion de « jonction » n'est
+    // nécessaire ailleurs — le T est trois fils partageant une ancre.
+    ItemJonction* decouper(ItemFil* fil, const QPointF& point);
+
+    // Balaie les points devenus inutiles : un point d'où ne part plus qu'un
+    // fil, ou aucun, n'a plus de raison d'être. Appelé après toute suppression.
+    void balayer_jonctions();
+
+    // Applique les résultats d'une résolution : éclat des LED, tension des fils.
+    // `formes` est facultatif : sans lui, les instruments affichent la valeur
+    // instantanée ; avec lui, ils font ce que fait un multimètre — moyenne en
+    // continu, valeur efficace en alternatif.
+    void appliquer_resultats(const std::map<std::string, double>& courants,
+                             const std::map<std::string, double>& tensions,
+                             const coeur::Formes* formes = nullptr);
+    // Reporte sur le schéma l'état interne des composants à mécanique, tel
+    // que le moteur de simulation l'a fait évoluer.
+    void appliquer_etats(
+        const std::map<std::string, std::map<std::string, double>>& etats);
+    void effacer_resultats();
+
+    // Marque un composant comme grillé : il se dessine noirci et barré.
+    void marquer_grille(const QString& reference);
+
+    // Reporte les anomalies du contrôle des règles sur le schéma.
+    //
+    // `Anomalie.reference` n'est PAS toujours une référence de composant :
+    // c'est un nom de nœud pour les nœuds isolés, et une liste jointe par
+    // virgules pour les courts-circuits. Les trois formes sont traitées ici,
+    // faute de quoi deux tiers des anomalies ne marqueraient rien.
+    void poser_anomalies(const std::vector<coeur::Anomalie>& anomalies);
+    void effacer_anomalies();
+
+    // Sélectionne ce que désigne une anomalie et rend le rectangle à cadrer.
+    //
+    // Les trois formes de `reference` mènent à trois gestes différents : une
+    // référence sélectionne son composant, une liste les sélectionne tous, un
+    // nom de nœud sélectionne les FILS de ce nœud — car un nœud n'a pas de
+    // symbole, et ne rien sélectionner du tout ferait un clic mort. Rectangle
+    // vide quand la référence ne désigne rien de posé sur la feuille.
+    QRectF designer_anomalie(const QString& reference);
+
+signals:
+    void selection_composant(ItemComposant* composant);
+    void journal(const QString& message);
+    // Le nœud survolé, et ce qu'il relie. Nom vide = plus rien sous le
+    // curseur. C'est ce que fait LTspice, et la seule chose qu'il fasse : il
+    // n'affiche pas les noms de nœuds en permanence, il les montre au survol,
+    // en barre d'état.
+    void survol_noeud(const QString& nom, const QString& description);
+    // Double-clic sur un composant : ouvrir ce qu'il a de plus utile à
+    // montrer — la fenêtre de mesure d'un instrument, par exemple.
+    void double_clic_composant(ItemComposant* composant);
+    // Clic droit : la fenêtre principale construit le menu, la scène ne
+    // connaît pas les actions de l'application.
+    void menu_demande(ItemComposant* composant, const QPoint& ecran);
+
+protected:
+    void drawBackground(QPainter* peintre, const QRectF& zone) override;
+    void mousePressEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* evenement) override;
+    void contextMenuEvent(QGraphicsSceneContextMenuEvent* evenement) override;
+    void keyPressEvent(QKeyEvent* evenement) override;
+
+private:
+    Outil outil_ = Outil::Selection;
+    // La CIBLE d'où part le fil en cours — pas une ancre.
+    //
+    // Garder la cible plutôt que l'ancre est ce qui permet de ne découper
+    // qu'au dernier moment : tant que le geste n'a pas abouti, aucun fil
+    // existant n'a été touché.
+    Cible cible_depart_;
+    // L'aperçu du fil en cours : un CHEMIN, pas un segment — il doit
+    // montrer l'équerre que le fil aura, pas une diagonale qu'il n'aura
+    // jamais.
+    QGraphicsPathItem* fil_provisoire_ = nullptr;
+    // Fil accroché au curseur entre deux clics (câblage en deux temps).
+    bool fil_en_attente_ = false;
+    QPointF point_appui_;
+
+    // APPUYER SUR UN FIL NE DÉCIDE PLUS RIEN.
+    //
+    // Le clic sur un fil dérive ; le glissé perpendiculaire déplace le
+    // segment. On ne peut pas savoir lequel des deux au moment de l'appui —
+    // il faut attendre que la souris ait parlé. La cible est donc mise de
+    // côté, et le geste se décide au franchissement du seuil de glissé de Qt
+    // (`QApplication::startDragDistance()`), celui-là même qui sépare partout
+    // ailleurs un clic d'un glissé.
+    Cible appui_en_attente_;
+    QPointF appui_point_;
+
+    // Un tracé né du BOUTON DROIT. Sur un fil, le bouton gauche manipule ce
+    // qui existe — il déplace le segment, il le désigne — et c'est le bouton
+    // droit qui en fait naître un nouveau. Les deux rôles ne se disputent
+    // plus le même geste.
+    bool trace_au_bouton_droit_ = false;
+    // Un glissé au bouton droit ne doit pas finir par un menu contextuel :
+    // sous Windows, celui-ci part au RELÂCHEMENT, donc après le geste.
+    bool ignorer_prochain_menu_ = false;
+
+    // Déplacement d'un segment en cours : les deux points qui le tiennent,
+    // leur position de départ, et l'axe autorisé (perpendiculaire au fil).
+    std::vector<ItemJonction*> poignees_;
+    std::vector<QPointF> origines_poignees_;
+    QPointF axe_deplacement_;
+    QJsonObject avant_deplacement_;
+    bool deplace_un_segment() const { return !poignees_.empty(); }
+    std::map<std::string, int> compteurs_;   // par préfixe : R1, R2…
+
+    // Annulation : des états complets du schéma. Un schéma pèse quelques
+    // kilo-octets, en garder cinquante ne coûte rien et évite d'inventer un
+    // journal d'opérations que chaque nouvelle commande faudrait enrichir.
+    std::vector<QJsonObject> pile_annulation_;
+    std::vector<QJsonObject> pile_retablissement_;
+    QJsonObject presse_papiers_;
+    // État d'avant le geste en cours : un déplacement à la souris doit
+    // pouvoir s'annuler, et on ne connaît son résultat qu'au relâchement.
+    QJsonObject etat_avant_geste_;
+    // Nom du nœud actuellement allumé — un NOM, pas des pointeurs. La
+    // surbrillance elle-même est un drapeau porté par chaque objet : un objet
+    // supprimé emporte le sien, là où une liste de pointeurs gardée ici
+    // survivrait à ce qu'elle désigne.
+    QString noeud_allume_;
+    // Ce que le nœud reliait au dernier signal émis. Le nom seul ne suffit
+    // pas à décider qu'il n'y a rien de neuf à annoncer : un fil ajouté ou
+    // retiré change le contenu sans toucher au nom.
+    QString description_allumee_;
+    static constexpr int kProfondeurAnnulation = 50;
+
+    // Recherche la borne sous le curseur, tous composants confondus.
+    std::pair<ItemComposant*, int> borne_sous(const QPointF& point) const;
+
+
+
+
+
+
+
+    // Transforme une cible en ancre utilisable, en découpant le fil si c'est
+    // un fil qui est visé. Rend une ancre invalide si la cible ne se connecte
+    // pas.
+    Ancre ancrer(const Cible& cible);
+
+    // Cycle de vie d'un fil en cours de tracé.
+    void commencer_fil(const Cible& depart, const QPointF& point);
+
+    // Le déplacement d'un segment, de bout en bout.
+    //
+    // `axe_perpendiculaire` rend faux quand le fil n'est pas d'aplomb : le
+    // TRAIT entier n'a pas d'axe unique. Chacune de ses branches en a un,
+    // et c'est `axe_de_la_branche` qui le donne.
+    static bool axe_perpendiculaire(const ItemFil* fil, QPointF* axe);
+
+    // LA BRANCHE SOUS LE CURSEUR, et son axe.
+    //
+    // Un fil coudé est tracé en Z : deux branches horizontales et une
+    // verticale. Aucune n'était déplaçable, parce que la question était posée
+    // au fil entier — qui, lui, n'a pas d'axe. On la pose donc à la branche
+    // que le curseur désigne. Rend faux si le point n'est sur aucune, ou si
+    // le fil est réduit à un point.
+    static bool axe_de_la_branche(const ItemFil* fil, const QPointF& point,
+                                  QPointF* axe, int* rang = nullptr);
+    // Coupe un fil coudé en autant de fils droits que de branches, réunis par
+    // de vrais points. Rend la branche de rang `rang`, désormais déplaçable —
+    // ou le fil lui-même s'il était déjà droit.
+    //
+    // C'est le corollaire déjà écrit plus bas : un fil n'a rien à déplacer
+    // tant qu'on ne lui a pas donné de quoi. Les coudes existaient dans le
+    // dessin sans exister dans le schéma ; les voilà réels.
+    ItemFil* materialiser_les_coudes(ItemFil* fil, int rang);
+    // Matérialise les deux poignées du segment — en insérant un point là où
+    // le fil tient à une broche, qui ne bouge pas — et arme le déplacement.
+    bool commencer_deplacement_segment(ItemFil* fil, const QPointF& appui);
+    void poursuivre_deplacement_segment(const QPointF& point);
+    void terminer_deplacement_segment();
+    // Rend la vue à la sélection au rectangle, une fois le geste fini.
+    void rendre_le_rectangle_a_la_vue();
+    // Oublie tout geste de souris en cours. À appeler par TOUT ce qui détruit
+    // des objets de la scène : un geste garde des pointeurs entre deux
+    // événements, et Suppr comme Ctrl+Z partent bouton enfoncé.
+    void oublier_geste_en_cours();
+    // Fige le segment tracé et repart du point posé (clic dans le vide).
+
+    // Association (composant, borne) -> nom de nœud, calculée par les fils.
+    std::map<const ItemComposant*, std::vector<std::string>> calculer_noeuds() const;
+
+    QString prochaine_reference(const std::string& prefixe);
+};

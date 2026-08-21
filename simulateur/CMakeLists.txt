@@ -18,7 +18,7 @@ endif()
 # Dépendances.
 #
 # OBLIGATOIRE : un compilateur C++17, et Qt 6 pour l'interface. Rien d'autre.
-# Le solveur analogique est écrit dans ce projet (src/core/engines/
+# Le solveur analogique est écrit dans ce projet (src/coeur/moteurs/analogique/
 # SolveurIntegre.cpp) : il n'y a aucune bibliothèque de simulation à
 # télécharger, aucune DLL à poser à côté de l'exécutable.
 #
@@ -153,37 +153,37 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bibliotheques")
 # réglages de sortie. Elle est posée plus bas, cible par cible.
 
 add_library(coeur STATIC
-  src/core/Netlist.cpp
-  src/core/Device.cpp
-  src/core/catalogue/base.cpp
-  src/core/catalogue/cartes.cpp
-  src/core/catalogue/semiconducteurs.cpp
-  src/core/catalogue/capteurs.cpp
-  src/core/catalogue/electromecanique.cpp
-  src/core/catalogue/logique.cpp
-  src/core/catalogue/instruments.cpp
-  src/core/catalogue/actionneurs_dynamiques.cpp
-  src/core/catalogue/capteurs_avances.cpp
-  src/core/catalogue/sources.cpp
-  src/core/catalogue/numerique.cpp
-  src/core/engines/SolveurIntegre.cpp
-  src/core/engines/ExpressionSpice.cpp
-  src/core/engines/NgspiceEngine.cpp
-  src/core/engines/CoeurAvr.cpp
-  src/core/engines/CoeurCortexM.cpp
-  src/core/engines/CoeurXtensa.cpp
-  src/core/engines/XtensaEngine.cpp
-  src/core/engines/CortexEngine.cpp
-  src/core/engines/AvrEngine.cpp
-  src/core/engines/Chaines.cpp
-  src/core/engines/Microcontroleur.cpp
-  src/core/engines/MoteurNumerique.cpp
-  src/core/analysis/Analyses.cpp
-  src/core/analysis/Campagne.cpp
-  src/core/export/Documents.cpp
-  src/core/pcb/Pcb.cpp
-  src/core/pcb/Empreintes.cpp
-  src/core/pcb/Routeur.cpp
+  src/coeur/Netlist.cpp
+  src/coeur/Device.cpp
+  src/coeur/catalogue/base.cpp
+  src/coeur/catalogue/cartes.cpp
+  src/coeur/catalogue/semiconducteurs.cpp
+  src/coeur/catalogue/capteurs.cpp
+  src/coeur/catalogue/electromecanique.cpp
+  src/coeur/catalogue/logique.cpp
+  src/coeur/catalogue/instruments.cpp
+  src/coeur/catalogue/actionneurs_dynamiques.cpp
+  src/coeur/catalogue/capteurs_avances.cpp
+  src/coeur/catalogue/sources.cpp
+  src/coeur/catalogue/numerique.cpp
+  src/coeur/moteurs/analogique/SolveurIntegre.cpp
+  src/coeur/moteurs/analogique/ExpressionSpice.cpp
+  src/coeur/moteurs/analogique/NgspiceEngine.cpp
+  src/coeur/moteurs/microcontroleurs/CoeurAvr.cpp
+  src/coeur/moteurs/microcontroleurs/CoeurCortexM.cpp
+  src/coeur/moteurs/microcontroleurs/CoeurXtensa.cpp
+  src/coeur/moteurs/microcontroleurs/XtensaEngine.cpp
+  src/coeur/moteurs/microcontroleurs/CortexEngine.cpp
+  src/coeur/moteurs/microcontroleurs/AvrEngine.cpp
+  src/coeur/compilation/Chaines.cpp
+  src/coeur/moteurs/microcontroleurs/Microcontroleur.cpp
+  src/coeur/moteurs/numerique/MoteurNumerique.cpp
+  src/coeur/analyses/Analyses.cpp
+  src/coeur/analyses/Campagne.cpp
+  src/coeur/documents/Documents.cpp
+  src/coeur/pcb/Pcb.cpp
+  src/coeur/pcb/Empreintes.cpp
+  src/coeur/pcb/Routeur.cpp
 )
 target_include_directories(coeur PUBLIC src)
 
@@ -248,14 +248,14 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   # La saisie de schéma est une bibliothèque à part : elle est ainsi
   # testable sans lancer l'application ni ouvrir de fenêtre.
   add_library(schema STATIC
-    src/app/schematic/SceneSchema.cpp
-    src/app/schematic/VueSchema.cpp
-    src/app/schematic/ItemComposant.cpp
-    src/app/schematic/ItemFil.cpp
-    src/app/schematic/ItemJonction.cpp
-    src/app/panels/PanneauAnalyses.cpp
-    src/app/panels/FenetreInstrument.cpp
-    src/app/panels/PanneauPcb.cpp
+    src/app/schema/SceneSchema.cpp
+    src/app/schema/VueSchema.cpp
+    src/app/schema/ItemComposant.cpp
+    src/app/schema/ItemFil.cpp
+    src/app/schema/ItemJonction.cpp
+    src/app/panneaux/PanneauAnalyses.cpp
+    src/app/panneaux/FenetreInstrument.cpp
+    src/app/panneaux/PanneauPcb.cpp
     src/app/Oscilloscope.cpp
     # Le couplage des moteurs ne dépend pas de la fenêtre : le mettre ici le
     # rend testable sans ouvrir l'application, et c'est là que se jouent les

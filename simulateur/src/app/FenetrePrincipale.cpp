@@ -1,9 +1,9 @@
 #include "app/Apparence.h"
 #include "app/FenetrePrincipale.h"
 
-#include "core/engines/Chaines.h"
-#include "core/engines/Microcontroleur.h"
-#include "core/engines/ProgrammesExemples.h"
+#include "coeur/compilation/Chaines.h"
+#include "coeur/moteurs/microcontroleurs/Microcontroleur.h"
+#include "coeur/compilation/ProgrammesExemples.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -69,16 +69,16 @@
 
 #include "app/MoteurSimulation.h"
 #include "app/Oscilloscope.h"
-#include "app/panels/FenetreInstrument.h"
-#include "app/panels/PanneauAnalyses.h"
-#include "app/panels/PanneauPcb.h"
-#include "core/analysis/Analyses.h"
-#include "core/analysis/Campagne.h"
-#include "core/export/Documents.h"
-#include "app/schematic/ItemComposant.h"
-#include "app/schematic/ItemFil.h"
-#include "app/schematic/SceneSchema.h"
-#include "app/schematic/VueSchema.h"
+#include "app/panneaux/FenetreInstrument.h"
+#include "app/panneaux/PanneauAnalyses.h"
+#include "app/panneaux/PanneauPcb.h"
+#include "coeur/analyses/Analyses.h"
+#include "coeur/analyses/Campagne.h"
+#include "coeur/documents/Documents.h"
+#include "app/schema/ItemComposant.h"
+#include "app/schema/ItemFil.h"
+#include "app/schema/SceneSchema.h"
+#include "app/schema/VueSchema.h"
 
 namespace {
 // Un seul endroit pour ces clés : elles se retrouvent dans le registre de
@@ -210,7 +210,7 @@ private:
 };
 }  // namespace
 
-#include "core/Device.h"
+#include "coeur/Device.h"
 
 namespace {
 

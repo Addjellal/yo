@@ -13,9 +13,9 @@
 
 #include "app/Apparence.h"
 #include "app/FenetrePrincipale.h"
-#include "app/panels/PanneauPcb.h"
-#include "app/schematic/ItemComposant.h"
-#include "app/schematic/SceneSchema.h"
+#include "app/panneaux/PanneauPcb.h"
+#include "app/schema/ItemComposant.h"
+#include "app/schema/SceneSchema.h"
 
 #include <functional>
 #include <memory>

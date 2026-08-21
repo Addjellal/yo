@@ -36,12 +36,12 @@
 #include <string>
 #include <vector>
 
-#include "app/schematic/SceneSchema.h"
-#include "core/Netlist.h"
-#include "core/engines/AvrEngine.h"
-#include "core/engines/Microcontroleur.h"
-#include "core/engines/MoteurNumerique.h"
-#include "core/engines/NgspiceEngine.h"
+#include "app/schema/SceneSchema.h"
+#include "coeur/Netlist.h"
+#include "coeur/moteurs/microcontroleurs/AvrEngine.h"
+#include "coeur/moteurs/microcontroleurs/Microcontroleur.h"
+#include "coeur/moteurs/numerique/MoteurNumerique.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
 
 class MoteurSimulation : public QObject {
     Q_OBJECT

@@ -6,8 +6,8 @@
 
 #include <algorithm>
 
-#include "core/Device.h"
-#include "core/export/Documents.h"
+#include "coeur/Device.h"
+#include "coeur/documents/Documents.h"
 #include <cmath>
 
 namespace {

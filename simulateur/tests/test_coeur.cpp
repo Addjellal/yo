@@ -36,24 +36,24 @@ static void console_en_utf8() {
 #include <string>
 #include <vector>
 
-#include "core/Device.h"
-#include "core/Netlist.h"
-#include "core/analysis/Analyses.h"
-#include "core/analysis/Campagne.h"
+#include "coeur/Device.h"
+#include "coeur/Netlist.h"
+#include "coeur/analyses/Analyses.h"
+#include "coeur/analyses/Campagne.h"
 #include <fstream>
 #include <set>
 
-#include "core/engines/AvrEngine.h"
-#include "core/engines/CortexEngine.h"
-#include "core/engines/CoeurXtensa.h"
-#include "core/engines/Microcontroleur.h"
-#include "core/engines/ProgrammesExemples.h"
-#include "core/engines/MoteurNumerique.h"
-#include "core/engines/NgspiceEngine.h"
-#include "core/export/Documents.h"
-#include "core/pcb/Empreintes.h"
-#include "core/pcb/Pcb.h"
-#include "core/pcb/Routeur.h"
+#include "coeur/moteurs/microcontroleurs/AvrEngine.h"
+#include "coeur/moteurs/microcontroleurs/CortexEngine.h"
+#include "coeur/moteurs/microcontroleurs/CoeurXtensa.h"
+#include "coeur/moteurs/microcontroleurs/Microcontroleur.h"
+#include "coeur/compilation/ProgrammesExemples.h"
+#include "coeur/moteurs/numerique/MoteurNumerique.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
+#include "coeur/documents/Documents.h"
+#include "coeur/pcb/Empreintes.h"
+#include "coeur/pcb/Pcb.h"
+#include "coeur/pcb/Routeur.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;

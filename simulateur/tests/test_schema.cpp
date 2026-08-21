@@ -53,17 +53,17 @@ static void console_en_utf8() {
 #include <string>
 #include <vector>
 
-#include "app/schematic/ItemComposant.h"
-#include "app/schematic/ItemFil.h"
-#include "app/panels/FenetreInstrument.h"
-#include "app/panels/PanneauAnalyses.h"
-#include "app/panels/PanneauPcb.h"
-#include "core/engines/NgspiceEngine.h"
+#include "app/schema/ItemComposant.h"
+#include "app/schema/ItemFil.h"
+#include "app/panneaux/FenetreInstrument.h"
+#include "app/panneaux/PanneauAnalyses.h"
+#include "app/panneaux/PanneauPcb.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
 #include "app/MoteurSimulation.h"
 #include "app/FenetrePrincipale.h"
-#include "app/schematic/ItemJonction.h"
-#include "app/schematic/Ancre.h"
-#include "core/engines/ProgrammesExemples.h"
+#include "app/schema/ItemJonction.h"
+#include "app/schema/Ancre.h"
+#include "coeur/compilation/ProgrammesExemples.h"
 #include <QDir>
 #include <QSettings>
 #include <QFile>
@@ -78,10 +78,10 @@ static void console_en_utf8() {
 #include <QLineEdit>
 #include <QStyleOptionGraphicsItem>
 #include <QTransform>
-#include "app/schematic/SceneSchema.h"
-#include "app/schematic/VueSchema.h"
-#include "core/Device.h"
-#include "core/pcb/Empreintes.h"
+#include "app/schema/SceneSchema.h"
+#include "app/schema/VueSchema.h"
+#include "coeur/Device.h"
+#include "coeur/pcb/Empreintes.h"
 
 static int g_ok = 0;
 static std::vector<std::string> g_echecs;

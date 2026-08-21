@@ -22,8 +22,8 @@ Qt 6 suffisent donc à construire et à faire tourner l'ensemble.
 
 | Moteur | Rôle | D'où il vient |
 |---|---|---|
-| **solveur analogique intégré** | diodes, transistors, MOSFET, amplificateurs, transitoire, Bode, bruit | écrit ici, `src/core/engines/SolveurIntegre.cpp` |
-| **cœur ATmega328P intégré** | exécution cycle par cycle du vrai firmware | écrit ici, `src/core/engines/CoeurAvr.cpp` |
+| **solveur analogique intégré** | diodes, transistors, MOSFET, amplificateurs, transitoire, Bode, bruit | écrit ici, `src/coeur/moteurs/analogique/SolveurIntegre.cpp` |
+| **cœur ATmega328P intégré** | exécution cycle par cycle du vrai firmware | écrit ici, `src/coeur/moteurs/microcontroleurs/CoeurAvr.cpp` |
 | [**ngspice**](https://ngspice.sourceforge.io/) | *facultatif* : moteur analogique de référence | KiCad — sert ici à contrôler le premier |
 | [**simavr**](https://github.com/buserror/simavr) | *facultatif* : cœur AVR de référence | simulateurs AVR — même rôle de juge |
 
@@ -460,13 +460,15 @@ simulateur/
 ├── CMakeLists.txt
 ├── src/
 │   ├── main.cpp                     point d'entrée + modes de vérification
-│   ├── core/                        ← aucune dépendance à l'interface
+│   ├── coeur/                       ← aucune dépendance à l'interface
+│   │                                  (le dossier porte le nom de son
+│   │                                  espace de noms : `coeur::`)
 │   │   ├── Netlist.{h,cpp}          le modèle central, partagé par tout
 │   │   ├── Device.{h,cpp}           structure d'un composant + catalogue
 │   │   ├── catalogue/               un fichier par famille de composants
 │   │   │   ├── Traits.h             raccourcis de tracé
 │   │   │   ├── base.cpp             passifs, alimentations
-│   │   │   ├── cartes.cpp           carte Arduino Uno
+│   │   │   ├── cartes.cpp           les neuf cartes
 │   │   │   ├── semiconducteurs.cpp  diodes, transistors, afficheurs
 │   │   │   ├── capteurs.cpp         boutons, potentiomètres, LDR, CTN…
 │   │   │   ├── electromecanique.cpp relais, moteur, buzzer, haut-parleur
@@ -474,29 +476,43 @@ simulateur/
 │   │   │   ├── instruments.cpp      voltmètre, ampèremètre
 │   │   │   ├── actionneurs_dynamiques.cpp  servo, moteurs, triphasé
 │   │   │   └── capteurs_avances.cpp        accéléromètre, télémètre, codeur
-│   │   ├── analysis/                  balayages, mesures, spectre, campagnes
-│   │   ├── export/                    nomenclature, ERC, netlist KiCad
+│   │   ├── moteurs/                 les trois familles de simulation
+│   │   │   ├── analogique/
+│   │   │   │   ├── SolveurIntegre.{h,cpp}  le solveur du projet (MNA,
+│   │   │   │   │                           Newton, trapèzes) — sans dépendance
+│   │   │   │   ├── NgspiceEngine.{h,cpp}   façade : construit le circuit et
+│   │   │   │   │                           choisit le solveur, intégré ou ngspice
+│   │   │   │   └── ExpressionSpice.{h,cpp} expressions des sources « B »
+│   │   │   ├── microcontroleurs/
+│   │   │   │   ├── Microcontroleur.{h,cpp} l'interface commune — le SEUL
+│   │   │   │   │                           endroit à compléter pour une
+│   │   │   │   │                           architecture de plus
+│   │   │   │   ├── CoeurAvr / CoeurCortexM / CoeurXtensa   les jeux
+│   │   │   │   │                           d'instructions, exécutés au cycle
+│   │   │   │   └── AvrEngine / CortexEngine / XtensaEngine  firmware →
+│   │   │   │                               cycles → états de broches
+│   │   │   └── numerique/
+│   │   │       └── MoteurNumerique.{h,cpp} fronts datés → événements → sources
+│   │   ├── compilation/             ce qu'il faut pour compiler un croquis —
+│   │   │   │                        ce ne sont pas des moteurs
+│   │   │   ├── Chaines.{h,cpp}      trouver les compilateurs croisés
+│   │   │   ├── noyau_arduino.h      le noyau Arduino, embarqué en texte
+│   │   │   └── ProgrammesExemples.h les croquis livrés avec les exemples
+│   │   ├── analyses/                balayages, mesures, spectre, campagnes
+│   │   ├── documents/               nomenclature, ERC, netlist KiCad
 │   │   ├── pcb/
-│   │   │   ├── Empreintes.{h,cpp}     bibliothèque de boîtiers aux cotes réelles
-│   │   │   └── Pcb.{h,cpp}            placement, chevelu, DRC, Gerber, Excellon
-│   │   └── engines/
-│   │       ├── noyau_arduino.h        le noyau Arduino, embarqué en texte
-│   │       ├── SolveurIntegre.{h,cpp} le solveur analogique du projet (MNA,
-│   │       │                          Newton, trapèzes) — aucune dépendance
-│   │       ├── ExpressionSpice.{h,cpp} expressions des sources « B »
-│   │       ├── NgspiceEngine.{h,cpp}  façade : construit le circuit, choisit
-│   │       │                          le solveur intégré ou ngspice
-│   │       ├── MoteurNumerique.{h,cpp} fronts datés → événements → sources
-│   │       └── AvrEngine.{h,cpp}      firmware → cycles → états de broches
+│   │   │   ├── Empreintes.{h,cpp}   bibliothèque de boîtiers aux cotes réelles
+│   │   │   └── Pcb.{h,cpp}          placement, chevelu, DRC, Gerber, Excellon
 │   └── app/                         ← tout ce qui dépend de Qt
 │       ├── FenetrePrincipale.{h,cpp}  les deux pages : schéma et carte
 │       ├── MoteurSimulation.{h,cpp}   couplage des moteurs
 │       ├── Oscilloscope.{h,cpp}       quatre voies, tracé min/max
-│       ├── panels/
+│       ├── Apparence.{h,cpp}          la palette, les deux thèmes
+│       ├── panneaux/
 │       │   ├── PanneauAnalyses.{h,cpp}  les six analyses
 │       │   ├── PanneauPcb.{h,cpp}       la page circuit imprimé
 │       │   └── FenetreInstrument.{h,cpp}
-│       └── schematic/                 bibliothèque à part, donc testable
+│       └── schema/                    bibliothèque à part, donc testable
 ├── outils/
 │   ├── generer_figures.cpp          schémas SVG pour les cours
 │   ├── figures_liste.inc            les montages, décrits en données
@@ -516,10 +532,10 @@ simulateur/
     └── PROPOSITIONS-INTERFACE.md    les cent propositions soumises
 ```
 
-La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
+La séparation `coeur` / `app` n'est pas décorative : `coeur` ne connaît pas Qt
 et se teste sans écran. Le module de circuit imprimé en est la démonstration —
 placement, chevelu, règles de fabrication et fichiers Gerber sont calculés
-dans `core/pcb`, sans une ligne d'interface, et vérifiés sans ouvrir de
+dans `coeur/pcb`, sans une ligne d'interface, et vérifiés sans ouvrir de
 fenêtre.
 
 ### Ajouter un composant

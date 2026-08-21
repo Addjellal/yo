@@ -5,7 +5,7 @@
 // journal et console série en bas.
 #pragma once
 
-#include "core/engines/Microcontroleur.h"
+#include "coeur/moteurs/microcontroleurs/Microcontroleur.h"
 
 #include <QByteArray>
 #include <QMainWindow>
@@ -20,7 +20,7 @@
 #include <map>
 #include <vector>
 
-#include "core/engines/NgspiceEngine.h"
+#include "coeur/moteurs/analogique/NgspiceEngine.h"
 
 class QAction;
 class QLabel;
@@ -37,7 +37,7 @@ class QDockWidget;
 class QToolBar;
 
 class ItemComposant;
-#include "app/schematic/SceneSchema.h"
+#include "app/schema/SceneSchema.h"
 #include "app/MoteurSimulation.h"
 class VueSchema;
 class Oscilloscope;
