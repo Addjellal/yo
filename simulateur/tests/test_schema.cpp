@@ -5128,6 +5128,259 @@ static void test_ligne_choisie_reste_lisible() {
 }
 
 // ---------------------------------------------------------------------------
+// Un fil en attente parti d'un POINT survit à la mort de ce point
+//
+// La garde de `supprimer_selection` protégeait le composant de départ et le
+// fil de départ. Pas le POINT de départ — alors que son propre commentaire
+// annonçait « une ancre peut désigner un composant OU un point de fil : les
+// deux peuvent être dans la fournée ».
+//
+// Un commentaire qui décrit ce que le code ne fait pas est pire qu'aucun
+// commentaire : il fait passer la relecture suivante sans s'arrêter. Celui-là
+// est resté vrai en apparence pendant des semaines.
+//
+// Le scénario : tirer un fil depuis un point de dérivation, relâcher dans le
+// vide, supprimer ce point, puis refermer le fil ailleurs. Le relâchement
+// déréférence l'objet détruit — dans l'événement lui-même.
+// ---------------------------------------------------------------------------
+static void test_fil_parti_d_un_point_supprime() {
+    std::printf("\n-- un fil en attente ne survit pas à la mort de son point --\n");
+
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(400, 0));
+    ItemComposant* r3 = scene.ajouter_composant("resistance", QPointF(200, 300));
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+    const QPointF a = r1->position_borne(1);
+    const QPointF milieu((a.x() + r2->position_borne(0).x()) / 2.0, a.y());
+
+    // On dérive au bouton droit : cela pose un point sur le fil.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, milieu, Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, milieu + QPointF(0, 40),
+            Qt::RightButton);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease,
+            r3->position_borne(0), Qt::RightButton);
+    verifier(scene.jonctions().size() == 1,
+             "la dérivation a posé un point",
+             std::to_string(scene.jonctions().size()));
+    if (scene.jonctions().empty()) return;
+    ItemJonction* point = scene.jonctions().front();
+    const QPointF ou = point->pos();
+
+    // On repart de CE POINT, et on laisse le fil en attente.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, ou);
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, ou);
+
+    // Le point est sélectionné et supprimé pendant que le fil attend.
+    point->setSelected(true);
+    frapper(scene, Qt::Key_Delete);
+
+    // Refermer le fil ne doit plus rien lire du point détruit. Sans la garde,
+    // c'est ici que l'ASan relève un accès à de la mémoire libérée.
+    envoyer(scene, QEvent::GraphicsSceneMousePress, r3->position_borne(1));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, r3->position_borne(1));
+    verifier(true, "refermer le fil après la suppression ne lit rien de mort");
+
+    // Et le schéma reste cohérent : aucun fil n'est accroché à un fantôme.
+    for (ItemFil* fil : scene.fils())
+        verifier(fil->ancre_depart().valide() && fil->ancre_arrivee().valide(),
+                 "chaque fil restant tient par ses deux bouts");
+}
+
+// ---------------------------------------------------------------------------
+// Un geste qui échoue ne laisse pas le schéma à moitié transformé
+//
+// `materialiser_les_coudes` aimante chaque coude sur la grille SÉPARÉMENT.
+// Deux angles distants de moins d'une maille — le cas des bornes qui ne
+// tombent pas sur la grille, comme celles d'une porte logique — se posaient
+// donc au MÊME point : deux objets superposés, reliés par un fil de longueur
+// nulle, invisible et presque impossible à resélectionner.
+//
+// Pire : la branche du milieu devenant dégénérée, elle n'avait plus d'axe, le
+// geste échouait — et rendait faux en laissant la mutation commise, hors de
+// l'historique. Ctrl+Z ne pouvait rien y faire.
+// ---------------------------------------------------------------------------
+static void test_geste_rate_ne_laisse_pas_le_schema_a_moitie() {
+    std::printf("\n-- un geste qui échoue ne transforme rien --\n");
+
+    SceneSchema scene;
+    ItemComposant* p1 = scene.ajouter_composant("porte_et", QPointF(0, 0));
+    ItemComposant* p2 = scene.ajouter_composant("porte_et", QPointF(300, -20));
+    verifier(p1 && p2, "les deux portes d'essai sont posées");
+    if (!p1 || !p2) return;
+    scene.addItem(new ItemFil(p1, 0, p2, 2));
+    const QPointF a = p1->position_borne(0);
+    const QPointF b = p2->position_borne(2);
+    const QList<QPointF> pts = ItemFil::sommets(a, b);
+    if (pts.size() != 4) {
+        verifier(true, "ce montage ne produit pas de Z ici : cas sans objet");
+        return;
+    }
+    scene.oublier_historique();
+    const QJsonObject avant = scene.vers_json();
+
+    // On tire la branche du milieu — celle qui peut dégénérer.
+    const QPointF m((pts[1].x() + pts[2].x()) / 2.0,
+                    (pts[1].y() + pts[2].y()) / 2.0);
+    envoyer(scene, QEvent::GraphicsSceneMousePress, m);
+    envoyer(scene, QEvent::GraphicsSceneMouseMove, m + QPointF(60, 0));
+    envoyer(scene, QEvent::GraphicsSceneMouseRelease, m + QPointF(60, 0));
+
+    // AUCUN FIL DE LONGUEUR NULLE, ni point superposé à un autre.
+    int degeneres = 0;
+    for (ItemFil* fil : scene.fils()) {
+        const QPointF d = fil->ancre_depart().position();
+        const QPointF f = fil->ancre_arrivee().position();
+        if (std::hypot(d.x() - f.x(), d.y() - f.y()) < 0.5) ++degeneres;
+    }
+    verifier(degeneres == 0, "aucun fil de longueur nulle n'a été semé",
+             std::to_string(degeneres) + " fil(s) dégénéré(s)");
+
+    int superposes = 0;
+    const std::vector<ItemJonction*> points = scene.jonctions();
+    for (std::size_t i = 0; i < points.size(); ++i)
+        for (std::size_t j = i + 1; j < points.size(); ++j)
+            if (points[i]->pos() == points[j]->pos()) ++superposes;
+    verifier(superposes == 0, "et aucun point n'en recouvre un autre",
+             std::to_string(superposes) + " superposition(s)");
+
+    // Et si le geste n'a rien déplacé, le schéma doit être INTACT — sinon
+    // il aurait changé sans que rien ne puisse le défaire.
+    if (scene.jonctions().empty())
+        verifier(scene.vers_json() == avant,
+                 "un geste sans effet laisse le schéma exactement tel quel");
+}
+
+// ---------------------------------------------------------------------------
+// L'AUDIT : trois défauts trouvés en relisant, et vérifiés à l'exécution
+// ---------------------------------------------------------------------------
+
+// Un bouton ne doit pas lire un composant mort
+//
+// La fenêtre d'un instrument survit à la suppression de son composant : elle
+// se referme au prochain top de son minuteur, cent millisecondes plus tard.
+// `rafraichir()` vérifiait donc que le composant est toujours là — mais le
+// bouton « Suivre à l'oscilloscope », non. Effacer le voltmètre puis cliquer
+// ce bouton dans l'intervalle déréférençait un objet détruit.
+//
+// La suppression est SYNCHRONE dans la scène : il n'y a pas de sursis, pas de
+// `deleteLater`. Deux usages du même pointeur, un seul gardé — c'est le même
+// défaut que celui déjà corrigé sur les gestes de fil, à un autre endroit.
+static void test_bouton_instrument_ne_lit_pas_un_mort() {
+    std::printf("\n-- un bouton ne lit pas un composant supprimé --\n");
+
+    SceneSchema scene;
+    ItemComposant* vm = scene.ajouter_composant("voltmetre", QPointF(0, 0));
+    verifier(vm != nullptr, "le voltmètre d'essai est posé");
+    if (!vm) return;
+
+    bool encore_la = true;
+    int demandes = 0;
+    auto* fenetre = new FenetreInstrument(
+        vm, [&](ItemComposant*) { return encore_la; },
+        [&](ItemComposant* c) {
+            ++demandes;
+            return c->reference();          // déréférence : c'est le piège
+        });
+    QObject::connect(fenetre, &FenetreInstrument::sonde_demandee,
+                     [](const QString&) {});
+
+    QPushButton* sonder = nullptr;
+    for (QPushButton* bouton : fenetre->findChildren<QPushButton*>())
+        if (bouton->text().contains("oscilloscope")) sonder = bouton;
+    verifier(sonder != nullptr, "le bouton « Suivre à l'oscilloscope » existe");
+    if (!sonder) { delete fenetre; return; }
+
+    sonder->click();
+    verifier(demandes == 1, "tant que le composant est là, le bouton répond",
+             std::to_string(demandes) + " demande(s)");
+
+    // Le composant disparaît. La fenêtre ne le sait pas encore : son minuteur
+    // ne bat que dix fois par seconde.
+    encore_la = false;
+    sonder->click();
+    verifier(demandes == 1,
+             "une fois supprimé, le bouton ne va plus le lire",
+             std::to_string(demandes) + " demande(s)");
+    delete fenetre;
+}
+
+// ---------------------------------------------------------------------------
+// Un décodage appartient à l'exécution qui l'a produit
+//
+// Le décodeur du moniteur série garde les octets d'une séquence UTF-8
+// incomplète — c'est tout son intérêt, puisque le microcontrôleur les émet un
+// par un. Mais arrêter la simulation au milieu d'un « é » (0xC3 reçu, 0xA9
+// jamais) laissait ce demi-caractère en attente : au lancement suivant, le
+// premier octet du nouveau texte venait le compléter et se perdait.
+// ---------------------------------------------------------------------------
+static void test_decodeur_serie_repart_a_zero() {
+    std::printf("\n-- le décodeur série repart de zéro à l'arrêt --\n");
+
+    FenetrePrincipale fenetre;
+    QPlainTextEdit* moniteur = nullptr;
+    for (QPlainTextEdit* candidat : fenetre.findChildren<QPlainTextEdit*>())
+        if (candidat->objectName() == "moniteur_serie") moniteur = candidat;
+    verifier(moniteur != nullptr, "le moniteur série existe");
+    if (!moniteur) return;
+
+    // Une exécution coupée au milieu d'un caractère accentué.
+    for (char octet : QByteArray("caf\xC3")) fenetre.ecrire_octet_serie(octet);
+    fenetre.arreter();
+    moniteur->clear();
+
+    // L'exécution suivante, purement ASCII.
+    for (char octet : QByteArray("Hi\n")) fenetre.ecrire_octet_serie(octet);
+    const QString lu = moniteur->toPlainText();
+    verifier(lu.contains("Hi"),
+             "le premier caractère de la nouvelle exécution n'est pas dévoré "
+             "par la séquence tronquée de l'ancienne",
+             "lu « " + lu.trimmed().toStdString() + " »");
+}
+
+// ---------------------------------------------------------------------------
+// Fermer la fenêtre principale ferme TOUT ce qu'elle a détaché
+//
+// Qt ne quitte que lorsque la dernière fenêtre se ferme. Une énumération
+// oubliait les panneaux détachés — Analyses, journal, propriétés sortis dans
+// leur propre fenêtre : l'application restait alors en vie sans plus aucun
+// moyen de la faire revenir. Un processus fantôme.
+//
+// Une énumération de ce genre est un piège : elle a l'air juste tant qu'on ne
+// compte pas ce qui existe ailleurs. L'essai ne relit donc pas la liste, il
+// compte les fenêtres RESTÉES VISIBLES.
+// ---------------------------------------------------------------------------
+static void test_fermer_ne_laisse_aucune_fenetre() {
+    std::printf("\n-- fermer la fenêtre principale ne laisse rien --\n");
+
+    auto* fenetre = new FenetrePrincipale;
+    fenetre->show();
+    QCoreApplication::processEvents();
+
+    // On détache un panneau : il devient une fenêtre à part entière.
+    QWidget* analyses = fenetre->analyses();
+    verifier(analyses != nullptr, "le panneau des analyses existe");
+    if (!analyses) { delete fenetre; return; }
+    fenetre->basculer_fenetre(analyses);
+    QCoreApplication::processEvents();
+    verifier(analyses->isWindow() && analyses->isVisible(),
+             "détaché, il est bien une fenêtre visible");
+
+    fenetre->close();
+    QCoreApplication::processEvents();
+    verifier(!analyses->isVisible(),
+             "fermer la principale referme le panneau détaché");
+
+    int visibles = 0;
+    for (QWidget* haut : QApplication::topLevelWidgets())
+        if (haut->isVisible() && haut != fenetre) ++visibles;
+    verifier(visibles == 0,
+             "et plus aucune fenêtre ne reste ouverte derrière",
+             std::to_string(visibles) + " fenêtre(s) restée(s)");
+    delete fenetre;
+}
+
+// ---------------------------------------------------------------------------
 // Le moniteur série lit de l'UTF-8, pas des octets isolés
 //
 // Le programme de l'utilisateur écrivait « Durées », « ALLUMÉE », « ÉTEINTE ».
@@ -6176,6 +6429,11 @@ int main(int argc, char** argv) {
     test_deplacer_un_segment();
     test_deplacer_un_segment_vertical_et_coude();
     test_moniteur_serie_lit_l_utf8();
+    test_bouton_instrument_ne_lit_pas_un_mort();
+    test_decodeur_serie_repart_a_zero();
+    test_fermer_ne_laisse_aucune_fenetre();
+    test_fil_parti_d_un_point_supprime();
+    test_geste_rate_ne_laisse_pas_le_schema_a_moitie();
     test_ligne_choisie_reste_lisible();
     test_bornes_portent_leur_nom();
     test_deriver_sur_le_meme_fil_ne_laisse_rien();

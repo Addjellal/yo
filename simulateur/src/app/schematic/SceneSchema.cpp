@@ -408,10 +408,19 @@ void SceneSchema::supprimer_selection() {
     }
     // Un fil en cours de tracé peut partir d'un composant qu'on efface : le
     // laisser en attente, c'est garder un pointeur vers un objet détruit.
-    // Une ancre peut désigner un composant OU un point de fil : les deux
-    // peuvent être dans la fournée.
+    //
+    // Une ancre peut désigner un composant OU UN POINT DE FIL — le commentaire
+    // le disait déjà, le code ne le faisait pas : le cas du point manquait.
+    // Tirer un fil depuis un point de dérivation, relâcher dans le vide,
+    // supprimer ce point puis refermer le fil déréférençait l'objet détruit,
+    // dans l'événement de relâchement lui-même. Un commentaire qui décrit ce
+    // que le code ne fait pas est pire qu'aucun commentaire : il fait passer
+    // la relecture suivante sans s'arrêter.
     if ((cible_depart_.ancre.composant
          && a_supprimer.count(cible_depart_.ancre.composant))
+        || (cible_depart_.ancre.jonction
+            && a_supprimer.count(
+                   static_cast<QGraphicsItem*>(cible_depart_.ancre.jonction)))
         || (cible_depart_.fil
             && a_supprimer.count(static_cast<QGraphicsItem*>(cible_depart_.fil))))
         abandonner_fil();
@@ -1606,7 +1615,19 @@ ItemFil* SceneSchema::materialiser_les_coudes(ItemFil* fil, int rang) {
     std::vector<Ancre> etapes;
     etapes.push_back(depart);
     for (int k = 1; k + 1 < points.size(); ++k) {
-        auto* coude = new ItemJonction(aligner(points[k]));
+        const QPointF pose = aligner(points[k]);
+        // DEUX COUDES NE SE POSENT PAS AU MÊME ENDROIT.
+        //
+        // Chaque coude est aimanté sur la grille indépendamment : deux angles
+        // séparés de moins d'une maille — le cas des bornes qui ne tombent pas
+        // sur la grille, comme celles d'une porte logique — atterrissaient sur
+        // le MÊME point. On créait alors deux objets superposés reliés par un
+        // fil de longueur nulle, invisible et presque impossible à
+        // resélectionner.
+        if (!etapes.empty() && etapes.back().jonction
+            && etapes.back().position() == pose)
+            continue;
+        auto* coude = new ItemJonction(pose);
         addItem(coude);
         etapes.push_back(Ancre(coude));
     }
@@ -1640,7 +1661,20 @@ bool SceneSchema::commencer_deplacement_segment(ItemFil* fil,
     // branche visée devient un fil droit comme un autre.
     fil = materialiser_les_coudes(fil, rang);
     if (!fil || !axe_perpendiculaire(fil, &axe)) {
+        // ON DÉFAIT CE QU'ON VIENT DE FAIRE.
+        //
+        // La matérialisation a déjà détruit le fil et posé les coudes ; se
+        // contenter de rendre faux laissait cette mutation commise, hors de
+        // l'historique — donc IMPOSSIBLE À ANNULER. Le cas se produit quand
+        // deux coudes s'alignent sur la même maille : la branche du milieu
+        // devient de longueur nulle, n'a plus d'axe, et le geste échoue après
+        // avoir modifié le schéma.
+        //
+        // Une copie, pas le membre : `depuis_json` passe par `tout_effacer`,
+        // qui remet l'état du geste à zéro pendant qu'il le lit.
+        const QJsonObject avant = avant_deplacement_;
         avant_deplacement_ = QJsonObject();
+        depuis_json(avant);
         return false;
     }
 

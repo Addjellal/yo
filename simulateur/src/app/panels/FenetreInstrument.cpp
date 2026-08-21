@@ -119,7 +119,13 @@ FenetreInstrument::FenetreInstrument(
 
     auto* sonder = new QPushButton("Suivre à l'oscilloscope");
     connect(sonder, &QPushButton::clicked, this, [this] {
-        if (!designation_) return;
+        // LE COMPOSANT A PU MOURIR PENDANT QUE LA FENÊTRE RESTAIT OUVERTE.
+        //
+        // `rafraichir()` le vérifiait, ce bouton non : supprimer le composant
+        // du schéma puis cliquer « Suivre » avant le prochain top du minuteur
+        // — cent millisecondes — déréférençait un objet détruit. La
+        // suppression est synchrone dans la scène, il n'y a pas de sursis.
+        if (!designation_ || !toujours_la_ || !toujours_la_(composant_)) return;
         const QString signal = designation_(composant_);
         if (!signal.isEmpty()) emit sonde_demandee(signal);
     });

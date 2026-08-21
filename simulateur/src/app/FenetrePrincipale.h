@@ -170,6 +170,9 @@ public:
     // menu « Fenêtres » : rien ne s'ouvre tout seul.
     void basculer_fenetre(QWidget* panneau);
     PanneauAnalyses* analyses() const { return analyses_; }
+    // Arrête la simulation. Publique pour que le banc emprunte le chemin
+    // qu'emprunte le bouton « Arrêter », et non une porte dérobée.
+    void arreter();
     PanneauPcb* pcb() const { return pcb_; }
     // Transfère le schéma vers la carte et bascule sur la page « circuit
     // imprimé ». C'est l'équivalent du « Update PCB from Schematic » de
@@ -301,7 +304,6 @@ private slots:
 
     void lancer();
     void suspendre();
-    void arreter();
     void analyser_point_repos();
 
 

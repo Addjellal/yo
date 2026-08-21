@@ -1852,18 +1852,29 @@ void FenetrePrincipale::basculer_presentation() {
 void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
     enregistrer_disposition();
 
-    // FERMER LA FENÊTRE PRINCIPALE FERME CE QU'ELLE A DÉTACHÉ.
+    // FERMER LA FENÊTRE PRINCIPALE FERME TOUT CE QU'ELLE A DÉTACHÉ.
     //
-    // Les fenêtres du programme et des oscilloscopes n'ont pas de parent Qt —
-    // c'est ce qui leur permet d'être de vraies fenêtres, déplaçables sur un
-    // second écran. Mais Qt ne quitte que lorsque la DERNIÈRE fenêtre se
-    // ferme : l'une d'elles restée ouverte gardait donc l'application en vie
-    // après la disparition de sa fenêtre principale, sans plus aucun moyen de
-    // la faire revenir. Un processus fantôme, qu'il fallait tuer.
+    // Qt ne quitte que lorsque la DERNIÈRE fenêtre se ferme : l'une d'elles
+    // restée ouverte garde l'application en vie après la disparition de sa
+    // fenêtre principale, sans plus aucun moyen de la faire revenir. Un
+    // processus fantôme, qu'il faut tuer à la main.
+    //
+    // La liste doit être COMPLÈTE, et elle ne l'était pas : les panneaux
+    // détachés (`detaches_` — Analyses, journal, propriétés sortis dans leur
+    // propre fenêtre) manquaient. Une énumération de ce genre est un piège :
+    // elle a l'air juste tant qu'on ne compte pas ce qui existe ailleurs.
     if (fenetre_programme_) fenetre_programme_->close();
     if (sonde_generale_) sonde_generale_->close();
     for (auto& paire : scopes_) paire.second->close();
     for (FenetreInstrument* fenetre : fenetres_instruments_) fenetre->close();
+    // SUR UNE COPIE, ET C'EST INDISPENSABLE.
+    //
+    // Fermer un panneau détaché le fait revenir dans les onglets : le filtre
+    // d'événements le retire alors de `detaches_`, c'est-à-dire du conteneur
+    // qu'on est en train de parcourir. Parcourir directement plantait — je
+    // l'ai écrit, le banc l'a attrapé au premier essai.
+    const auto sortis = detaches_;
+    for (const auto& paire : sortis) paire.first->close();
 
     QMainWindow::closeEvent(evenement);
 }
@@ -3322,10 +3333,24 @@ void FenetrePrincipale::suspendre() { moteur_->suspendre(); }
 void FenetrePrincipale::arreter() {
     moteur_->arreter();
     scene_->effacer_resultats();
+    // Les deux lignes qui suivent figuraient DEUX FOIS. Sans conséquence —
+    // vider deux fois ne vide pas davantage — mais une répétition pareille
+    // fait douter de ce qu'on lit, et c'est déjà trop cher.
     for (auto& paire : scopes_) paire.second->vider();
     if (sonde_generale_) sonde_generale_->vider();
-    for (auto& paire : scopes_) paire.second->vider();
-    if (sonde_generale_) sonde_generale_->vider();
+
+    // LE DÉCODEUR SÉRIE REPART DE ZÉRO.
+    //
+    // Il garde les octets d'une séquence UTF-8 incomplète, ce qui est tout
+    // l'intérêt puisque le microcontrôleur les émet un par un. Mais arrêter
+    // la simulation au milieu d'un « é » — l'octet 0xC3 reçu, 0xA9 jamais —
+    // laissait ce demi-caractère en attente : au lancement suivant, le
+    // premier octet du nouveau texte venait le compléter et se perdait. Un
+    // « Hi » devenait « ?i ».
+    //
+    // L'état d'un décodage appartient à l'exécution qui l'a produit.
+    decodeur_serie_ = QStringDecoder(QStringDecoder::Utf8);
+    carte_serie_.clear();
 }
 
 void FenetrePrincipale::analyser_point_repos() {
