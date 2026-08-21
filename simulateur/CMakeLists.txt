@@ -460,10 +460,10 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
   # l'application, et les moteurs de simulation sont déjà dans l'exécutable.
   # -------------------------------------------------------------------------
   install(TARGETS simulateur RUNTIME DESTINATION . BUNDLE DESTINATION .)
-  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/INSTALLATION-WINDOWS.md"
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/documentation/INSTALLATION-WINDOWS.md"
           DESTINATION .)
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-                "${CMAKE_CURRENT_SOURCE_DIR}/COMPARAISON.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/documentation/COMPARAISON.md"
           DESTINATION documentation)
 
   # Le mot d'accueil du paquet : ce qu'il contient, comment on le lance, et

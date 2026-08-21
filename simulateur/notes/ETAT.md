@@ -1290,3 +1290,81 @@ Mesurée sur les deux bancs réunis. `SceneSchema.cpp` est à 89,5 %,
 chaîne Xtensa est absente), les analyses paramétriques, et `FenetrePrincipale`
 à 56,6 % — c'est l'interface, dont une bonne part n'est atteignable qu'à la
 souris.
+
+# NETTOYAGE ET RÉORGANISATION
+
+## La méthode, parce que c'est elle qui compte
+
+La demande portait le risque dans son énoncé : « éviter les problèmes de
+suppression de programme dépendant d'un autre ». **Rien n'a été supprimé sans
+preuve d'absence de référence**, et le compilateur a tranché après chaque
+étape — y compris une reconstruction NEUVE, à partir de rien, pour que rien ne
+survive dans un cache d'objets.
+
+Trois inventaires ont précédé la moindre suppression :
+
+| question posée | réponse |
+|---|---|
+| des `.cpp` présents mais jamais compilés ? | aucun — 44 déclarés, 44 présents |
+| des en-têtes que personne n'inclut ? | aucun |
+| des fichiers hors `src/` que rien ne cite ? | deux, tous deux légitimes (`.gitignore`, le LISEZ-MOI d'une bibliothèque tierce) |
+
+## Ce qui a été retiré, et pourquoi
+
+**Sept membres déclarés et appelés par personne.** Chacun vérifié avec TOUTES
+les formes d'appel — `a.f()`, `A::f()`, et `&A::f` pour les signaux Qt, sans
+quoi tout signal passe pour mort. Le premier jet en signalait dix ; trois
+étaient des signaux bien employés.
+
+- `ItemFil::definir_ancre_arrivee` — un mutateur que le code s'interdit
+  d'employer : le commentaire de `commencer_deplacement_segment` dit
+  explicitement « plutôt que d'ouvrir `ItemFil` à la mutation de son départ ».
+  Une porte que personne n'ouvre et qu'on s'interdit d'ouvrir n'a pas à rester
+  entrebâillée — elle contournerait tous les invariants.
+- `MoteurNumerique::definir_seuil` — un seuil réglable que rien ne règle. Même
+  famille qu'`impedance_sortie` corrigé à l'audit : **un bouton relié à rien
+  fait croire qu'on peut agir.**
+- `Oscilloscope::mode_xy`, `NgspiceEngine::nom_du_solveur`,
+  `MoteurSimulation::resolution` — trois accesseurs que personne ne lit.
+- `Oscilloscope::etat_declenchement_` — un pointeur de widget jamais créé.
+- `FenetreInstrument::historique_` — une file que rien n'alimente ni ne lit ;
+  son `#include <deque>` est parti avec elle.
+
+**Treize inclusions en double**, neuf dans `FenetrePrincipale.cpp` et quatre
+dans `test_schema.cpp`.
+
+**Piège évité** : `ProgrammesExemples.h` et `test_coeur.cpp` semblaient en
+contenir aussi — `#include <avr/io.h>` deux fois. C'est du **texte de croquis
+Arduino** dans une chaîne brute, pas une inclusion. Le dédoublonneur suit donc
+l'état « dans une chaîne brute » et ne touche à rien à l'intérieur. Un outil
+qui lit du code sans savoir ce qui est du code casse ce qu'il prétend nettoyer.
+
+## Ce qui n'a PAS été supprimé, et pourquoi
+
+`PROPOSITIONS-INTERFACE.md` est déclaré remplacé par son propre successeur, et
+n'est cité que par lui. Il aurait pu partir. Il reste : c'est le relevé de ce
+qui a été **envisagé**, y compris ce qui a été écarté et pour quelle raison.
+Dans un dépôt dont toute la culture est de garder le pourquoi, économiser cent
+vingt-six lignes en perdant les motifs d'un refus est un mauvais échange.
+
+## Les dossiers, rangés par PUBLIC
+
+Sept fichiers `.md` à la racine, sans ordre. Le critère de rangement n'est pas
+le sujet mais le **lecteur** :
+
+```
+README.md            ← la porte d'entrée, reste à la racine
+documentation/       ← pour qui SE SERT du logiciel (et qui est livré)
+notes/               ← pour qui ÉCRIT le logiciel
+```
+
+Ce qui a rendu le déplacement sûr : **toutes les citations dans le code
+emploient le nom nu** — « voir DECISION-FILS.md » — et jamais un chemin. Elles
+restent donc exactes. Seuls quatre endroits pointaient un chemin : deux règles
+`install` de CMake et deux liens du README. Vérifié ensuite qu'aucun lien
+Markdown ne pointe dans le vide, et que le paquet client se construit à
+l'identique.
+
+Le nom `documentation/` a été choisi pour coïncider avec le dossier que CMake
+crée déjà dans le paquet livré : la source et la livraison portent le même mot
+pour la même chose.

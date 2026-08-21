@@ -6,7 +6,7 @@ compilé** pendant que le circuit analogique est résolu autour de lui.
 
 C'est le principe de Proteus VSM.
 
-> **Sous Windows, suivez [INSTALLATION-WINDOWS.md](INSTALLATION-WINDOWS.md)** :
+> **Sous Windows, suivez [documentation/INSTALLATION-WINDOWS.md](documentation/INSTALLATION-WINDOWS.md)** :
 > de zéro jusqu'à une LED qui clignote, avec un point de vérification après
 > chaque étape. Une seule étape s'ajoute à la construction — l'installation des
 > compilateurs croisés, en une commande — et le document dit aussi ce qui
@@ -153,7 +153,7 @@ d'entrée. Les deux sens sont testés (voir plus bas).
   moteur en PWM commandé par transistor, et filtre RC pour les analyses.
 
 Ce que le projet couvre, comparé à Proteus, Multisim, LTspice et KiCad, est
-détaillé — sans complaisance — dans [COMPARAISON.md](COMPARAISON.md).
+détaillé — sans complaisance — dans [documentation/COMPARAISON.md](documentation/COMPARAISON.md).
 
 ## Ce que ça ne fait pas encore
 
@@ -503,9 +503,17 @@ simulateur/
 │   ├── paquet.cmake                 déploiement du paquet portable
 │   ├── paquet.ps1 / paquet.sh       « faites-moi une archive qui marche »
 │   └── LISEZ-MOI.txt.in             mot d'accueil livré dans le paquet
-└── tests/
-    ├── test_coeur.cpp                le cœur, sans Qt
-    └── test_schema.cpp               la saisie de schéma, sans fenêtre
+├── tests/
+│   ├── test_coeur.cpp                le cœur, sans Qt
+│   └── test_schema.cpp               la saisie de schéma, sans fenêtre
+├── documentation/                   ← pour qui SE SERT du logiciel
+│   ├── INSTALLATION-WINDOWS.md      installer et compiler sous Windows
+│   └── COMPARAISON.md               ce qu'il sait faire, et ce qu'il ne sait pas
+└── notes/                           ← pour qui ÉCRIT le logiciel
+    ├── ETAT.md                      état, décisions, pièges — à relire d'abord
+    ├── DECISION-FILS.md             comment on tire un fil, et pourquoi
+    ├── SYNTHESE-INTERFACE.md        ce que la critique a retenu
+    └── PROPOSITIONS-INTERFACE.md    les cent propositions soumises
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
