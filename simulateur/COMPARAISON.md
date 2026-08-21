@@ -129,8 +129,9 @@ la constante de temps d'un RC, la montée du courant dans l'induit d'un moteur
 freinée par son inductance, la distorsion d'un signal — tout cela sort d'un
 solveur d'analyse nodale, pas d'une animation.
 
-C'est aussi un projet dont **chaque affirmation est vérifiée** : 250 tests du
-cœur et 137 tests de saisie, dont beaucoup comparent le résultat à une valeur
+C'est aussi un projet dont **chaque affirmation est vérifiée** : deux bancs
+d'essai, l'un pour le cœur et l'autre pour la saisie, dont beaucoup des
+vérifications comparent le résultat à une valeur
 que la théorie donne à l'avance — 3,16 V après une constante de temps, 1591 Hz
 de coupure pour 1 kΩ et 100 nF, −20 dB par décade, 48,3 % de distorsion pour
 un signal carré.

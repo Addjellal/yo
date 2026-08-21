@@ -1205,3 +1205,88 @@ le garde-fou du commit précédent l'annulait déjà. Il fallait un glissé
 **oblique** — soixante le long, vingt en travers — car c'est lui que l'ancienne
 règle traitait en dérivation. C'est la troisième fois de la journée qu'un essai
 doit être renforcé après avoir été vu passer dans les deux états.
+
+# AUDIT COMPLET — ce qu'il a trouvé
+
+Sept défauts réels, tous **vérifiés à l'exécution** avant d'être crus, et
+corrigés. Deux relecteurs indépendants, un balayage de mutations, une mesure de
+couverture, une chasse aux fuites et une relecture des documents livrés.
+
+## Les trois qui cassaient
+
+| | où | ce qui arrivait |
+|---|---|---|
+| **1** | `supprimer_selection` | Tirer un fil depuis un point de dérivation, relâcher dans le vide, supprimer ce point, refermer le fil ailleurs → **lecture de mémoire libérée**, dans l'événement de relâchement lui-même. |
+| **2** | `FenetreInstrument`, bouton « Suivre à l'oscilloscope » | Supprimer le composant puis cliquer ce bouton dans les cent millisecondes avant le top du minuteur → **même chose**. |
+| **3** | `closeEvent` | Un panneau détaché (Analyses, journal) restait ouvert après la fermeture de la fenêtre principale → **processus fantôme**, application vivante sans moyen de revenir. |
+
+Les deux premiers ont la **même signature** : deux usages du même pointeur, un
+seul gardé. Le premier est le plus instructif — le commentaire au-dessus de la
+garde annonçait déjà « une ancre peut désigner un composant OU un point de
+fil : les deux peuvent être dans la fournée », et le code ne testait que le
+composant. **Un commentaire qui décrit ce que le code ne fait pas est pire
+qu'aucun commentaire : il fait passer la relecture suivante sans s'arrêter.**
+
+Le troisième est un défaut d'ÉNUMÉRATION : quatre collections fermées, une
+oubliée. Ce genre de liste a l'air juste tant qu'on ne compte pas ce qui existe
+ailleurs. L'essai ne relit donc pas la liste — il compte les fenêtres restées
+visibles.
+
+Et mon premier correctif du troisième **plantait** : fermer un panneau détaché
+le remet dans les onglets, donc modifie la liste qu'on parcourt. Le banc l'a
+attrapé au premier essai.
+
+## Les quatre autres
+
+- **Le décodeur série ne repartait pas de zéro.** Arrêter la simulation au
+  milieu d'un « é » — 0xC3 reçu, 0xA9 jamais — laissait ce demi-caractère en
+  attente ; au lancement suivant, le premier octet du nouveau texte venait le
+  compléter et se perdait. « Hi » devenait « ?i ». *L'état d'un décodage
+  appartient à l'exécution qui l'a produit.* (Code écrit le matin même.)
+- **`materialiser_les_coudes` n'était pas transactionnel.** Deux coudes
+  aimantés séparément peuvent tomber sur la même maille : fil de longueur
+  nulle, deux points superposés, branche sans axe — le geste échouait **après**
+  avoir modifié le schéma, hors de l'historique, donc **impossible à annuler**.
+  (Code écrit le matin même, lui aussi.)
+- **`impedance_sortie` était déclarée et lue par personne.** Les deux sites
+  d'appel passaient le littéral `100.0`. La changer au catalogue n'aurait rien
+  changé au circuit, en silence. *Un réglage qui n'agit pas est pire qu'un
+  réglage absent : on croit l'avoir posé.*
+- **Le README annonçait « 250 tests » et « 137 tests ».** Réels : 416 et 589 —
+  et le rapport est inversé, le banc de saisie étant devenu le plus gros. Trois
+  endroits du README, un de COMPARAISON.md. Remplacés par la commande, jamais
+  par un nombre.
+
+## Le document livré contredisait le paquet livré
+
+Le LISEZ-MOI du dossier client disait **toujours** « avr-gcc n'est pas
+embarqué, installez-le » — y compris quand les chaînes de compilation étaient
+dans le paquet. CMake, lui, le sait et l'écrit dans son journal, que le client
+ne lit jamais. Le paragraphe est désormais choisi par CMake selon ce qui est
+réellement emporté ; vérifié dans les deux cas.
+
+## Ce que l'audit a vérifié sans rien trouver
+
+- **Fuites de mémoire** : les seules relevées viennent des processus fils
+  `avr-gcc`, qui héritent du `LD_PRELOAD` de l'ASan. Aucune attribuable au
+  code du simulateur.
+- **Mutations** : `balayer_jonctions`, l'aimantation sur la grille,
+  `meme_raccord` et la garde du même fil ont été désactivés un par un — le
+  banc tombe à chaque fois. Ces quatre mécanismes sont réellement gardés.
+- **Bornes de fichier** : l'index de borne relu d'un fichier n'est pas borné
+  à la lecture, mais `position_borne` l'est — pas de lecture hors limites.
+- **Moteurs de référence** : ngspice et simavr sont présents ici, donc les
+  sections [21] et [22] ne se sautent pas. Le banc vert veut dire ce qu'il dit.
+- **Avertissements** : zéro au réglage du projet. Un réglage strict
+  (`-Wconversion -Wshadow -Wold-style-cast`) en révèle 56, dont 43 de
+  conversion numérique. Les onze masquages ont été relus un par un : **aucun
+  ne cache de défaut** — celui de `Pcb.cpp` porte sur des paramètres d'une
+  lambda qui ne capture pas `this`, donc le membre n'est même pas atteignable.
+
+## Couverture
+
+Mesurée sur les deux bancs réunis. `SceneSchema.cpp` est à 89,5 %,
+`Apparence.cpp` à 94,5 %. Les plus basses sont attendues : `CoeurXtensa` (la
+chaîne Xtensa est absente), les analyses paramétriques, et `FenetrePrincipale`
+à 56,6 % — c'est l'interface, dont une bonne part n'est atteignable qu'à la
+souris.

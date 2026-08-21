@@ -467,7 +467,30 @@ if(Qt6_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
           DESTINATION documentation)
 
   # Le mot d'accueil du paquet : ce qu'il contient, comment on le lance, et
-  # la seule chose qui reste à installer si l'on veut écrire du C.
+  # ce qu'il faut pour écrire du C.
+  #
+  # CE PARAGRAPHE DÉPEND DE CE QUI EST RÉELLEMENT EMPORTÉ.
+  #
+  # Il annonçait toujours « avr-gcc n'est pas embarqué, installez-le » — même
+  # quand les chaînes de compilation étaient dans le paquet. Le document livré
+  # contredisait alors le paquet livré, et envoyait le client installer ce
+  # qu'il avait déjà. CMake sait laquelle des deux situations est vraie : il
+  # n'y a aucune raison que le lecteur, lui, ne le sache pas.
+  if(EXISTS "${CMAKE_BINARY_DIR}/chaines")
+    set(BLOC_COMPILATEUR
+"Rien à installer : le compilateur AVR est DANS ce dossier, sous « chaines ».
+L'application l'y trouve seule. Tapez votre programme, appuyez sur F5.")
+  else()
+    set(BLOC_COMPILATEUR
+"Pour taper un programme dans l'application et le compiler avec F5, il faut
+avr-gcc dans le PATH — ce paquet-ci ne l'emporte pas.
+
+  Windows (MSYS2) : pacman -S mingw-w64-ucrt-x86_64-avr-gcc mingw-w64-ucrt-x86_64-avr-libc
+  Debian / Ubuntu : sudo apt install gcc-avr avr-libc
+
+Sans lui, tout le reste fonctionne, et l'on charge un .elf produit par l'IDE
+Arduino.")
+  endif()
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/outils/LISEZ-MOI.txt.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" @ONLY)
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LISEZ-MOI.txt" DESTINATION .)

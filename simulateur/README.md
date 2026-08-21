@@ -229,8 +229,8 @@ sudo apt install libngspice0-dev libsimavr-dev libelf-dev
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-./build/tests_coeur                        # 250 tests, sans Qt
-QT_QPA_PLATFORM=offscreen ./build/tests_schema   # 137 tests, sans fenêtre
+./build/tests_coeur                        # le cœur, sans Qt
+QT_QPA_PLATFORM=offscreen ./build/tests_schema   # la saisie, sans fenêtre
 ./build/simulateur                         # l'application
 ```
 
@@ -504,8 +504,8 @@ simulateur/
 │   ├── paquet.ps1 / paquet.sh       « faites-moi une archive qui marche »
 │   └── LISEZ-MOI.txt.in             mot d'accueil livré dans le paquet
 └── tests/
-    ├── test_coeur.cpp                250 tests, sans Qt
-    └── test_schema.cpp               137 tests, saisie de schéma sans fenêtre
+    ├── test_coeur.cpp                le cœur, sans Qt
+    └── test_schema.cpp               la saisie de schéma, sans fenêtre
 ```
 
 La séparation `core` / `app` n'est pas décorative : `core` ne connaît pas Qt
@@ -647,7 +647,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 ./build/tests_coeur
 ```
 
-**250 tests du cœur**, sans Qt, en vingt-deux sections :
+**Le banc du cœur**, sans Qt, en vingt-deux sections :
 
 | Section | Ce qui est vérifié |
 |---|---|
@@ -674,7 +674,7 @@ Affiner la base de temps affine automatiquement le pas de calcul, jusqu'à
 | 16 | **multimètres** : position continu et alternatif confrontées à une sinusoïde connue (moyenne 2 V, efficace 3,54 V), et ohmmètre qui injecte réellement son courant d'essai |
 | 15 | **balayages** : pont diviseur relevé point par point, filtre RC dont la coupure tombe à 1/(2·π·R·C), −20 dB par décade, −45° à la coupure, balayage d'une résistance, distorsion d'un carré réellement simulé |
 
-Et **137 tests de la saisie de schéma**, sans ouvrir de fenêtre : attribution
+Et **le banc de la saisie de schéma**, sans ouvrir de fenêtre : attribution
 des références sur vingt exemplaires, dix LED câblées en parallèle, symboles
 d'alimentation répétés, deux cartes sur le même schéma, le panneau
 d'analyses (Bode, spectre, exports CSV), le câblage à la souris, le

@@ -117,16 +117,26 @@ void enregistrer_numerique(Catalogue& catalogue) {
         m.symbole.push_back(texte(-30, haut - 6, "74HC595", 10));
         m.empreinte = {"DIP16", {}, 19.0, 6.4};
 
-        m.vers_spice = [](const Instance& i, const auto& noeud) {
+        // LA VALEUR DÉCLARÉE EST CELLE QUI SERT.
+        //
+        // Les deux sites d'appel ci-dessous passaient le littéral « 100.0 »
+        // pendant que `m.impedance_sortie`, déclaré quelques lignes plus haut
+        // à la même valeur, n'était lu par personne. La changer au catalogue
+        // n'aurait rien changé au circuit, en silence — et un composant à
+        // sortie plus faible aurait été simulé faux sans que rien ne le dise.
+        // Un réglage qui n'agit pas est pire qu'un réglage absent : on croit
+        // l'avoir posé.
+        const double impedance = m.impedance_sortie;
+        m.vers_spice = [impedance](const Instance& i, const auto& noeud) {
             return sorties_continues(i, {"Q0", "Q1", "Q2", "Q3", "Q4", "Q5",
                                          "Q6", "Q7"},
-                                     noeud, 100.0);
+                                     noeud, impedance);
         };
-        m.vers_spice_transitoire = [](const Instance& i, const auto& noeud,
-                                      double duree) {
+        m.vers_spice_transitoire = [impedance](const Instance& i,
+                                               const auto& noeud, double duree) {
             return sorties_datees(i, {"Q0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6",
                                       "Q7"},
-                                  noeud, 100.0, duree);
+                                  noeud, impedance, duree);
         };
 
         // La machine à états, telle que la décrit la fiche technique :

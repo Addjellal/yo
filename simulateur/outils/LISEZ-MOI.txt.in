@@ -38,17 +38,10 @@ sont écrits dans l'application. Il n'y a pas de bibliothèque tierce à
 trouver.
 
 
-LA SEULE CHOSE QUI RESTE À INSTALLER, ET SEULEMENT SI VOUS ÉCRIVEZ DU C
------------------------------------------------------------------------
+ÉCRIRE DU C ET LE COMPILER
+--------------------------
 
-Pour taper un programme dans l'application et le compiler avec F5, il faut
-avr-gcc dans le PATH. Un compilateur C ne s'embarque pas.
-
-  Windows (MSYS2) : pacman -S mingw-w64-ucrt-x86_64-avr-gcc mingw-w64-ucrt-x86_64-avr-libc
-  Debian / Ubuntu : sudo apt install gcc-avr avr-libc
-
-Sans lui, tout le reste fonctionne, et l'on charge un .elf produit par l'IDE
-Arduino.
+@BLOC_COMPILATEUR@
 
 
 POUR COMMENCER
