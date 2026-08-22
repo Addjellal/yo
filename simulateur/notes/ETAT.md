@@ -181,11 +181,12 @@ n'était simplement pas exercée.
 
 ## Bancs d'essai
 
-Les chiffres dépendent des moteurs présents : **401** au cœur sans ngspice ni
-simavr, **416** avec. Ces quinze assertions de différence *sont* la
-vérification indépendante — c'est exactement ce qu'on perd sans les paquets.
-Le banc schéma, lui, ne dépend d'aucun paquet — mais son compte change à
-chaque session, alors ne le cherchez pas ici : `tests_schema` l'affiche.
+Le compte du banc cœur dépend des moteurs présents : les sections qui
+confrontent le solveur intégré à ngspice et le cœur AVR à simavr s'annoncent
+« non exécutables » quand les paquets manquent, au lieu de se déclarer
+réussies. **Cette différence-là *est* la vérification indépendante** — c'est
+exactement ce qu'on perd sans les paquets. Ni ce compte ni celui du banc
+schéma ne sont écrits ici : les deux bancs les affichent.
 
 Ce document a porté pendant plusieurs sessions quatre comptes périmés, dont
 un faux du simple au double (« 177 » pour un banc schéma qui en comptait plus
@@ -802,7 +803,7 @@ vert ne prouve que les chemins qu'il parcourt.**
 | | avant | après |
 |---|---|---|
 | banc schéma | 384 | **relancer `tests_schema`** |
-| banc cœur (ngspice + simavr) | 416 | 416 |
+| banc cœur (ngspice + simavr) | 416 | **relancer `tests_coeur`** |
 | ASan/UBSan sur le schéma | 342 | **aucune alerte** |
 | avertissements | 0 | 0 |
 
@@ -1414,3 +1415,131 @@ pour qu'aucun objet déjà compilé ne masque une référence perdue.
 Le seul angle mort du compilateur, ce sont les **documents** : ils citaient des
 chemins que rien ne vérifie. Balayés à part, jusqu'à ce qu'aucune mention de
 l'ancienne arborescence ne subsiste nulle part.
+
+# SECOND AUDIT COMPLET
+
+Le premier audit avait porté sur la saisie de schéma et sur la fenêtre. Cette
+passe-ci a couvert ce qui n'avait jamais été relu : **la carte, les documents,
+les analyses, le solveur intégré, les cœurs de microcontrôleurs et le moteur
+numérique**.
+
+## Neuf défauts, et un seul motif
+
+Presque tous ont la même forme, déjà rencontrée à l'audit précédent : **la
+règle juste existait à quelques lignes de là, et n'avait pas été appliquée
+ici.**
+
+| où | ce qui n'allait pas | où la bonne règle était déjà écrite |
+|---|---|---|
+| `Pcb.cpp` gerber | pastille CMS gravée sur les DEUX faces | la boucle des pistes, juste en dessous, teste la couche |
+| `Pcb.cpp` DRC | contour comparé à l'AXE de la piste | — (le cuivre déborde d'une demi-largeur) |
+| `Pcb.cpp` DRC | pastille mesurée à son seul diamètre | `std::max(diametre, hauteur)` vingt lignes plus bas |
+| `Documents.cpp` | un voltmètre à la nomenclature et au routage | `empreintes::physique()` sert déjà au placement |
+| `Analyses.cpp` | pas de coupure pour un passe-haut | la recherche ne regardait qu'un côté du sommet |
+| `SceneSchema.cpp` | borne 999 acceptée d'un fichier de projet | l'index du COMPOSANT, lui, était borné |
+| `CoeurAvr.cpp` | écrire TCNTx sans effet durable | — |
+| `MoteurNumerique` + `MoteurSimulation` | seuil 2,5 V et sortie 5 V en dur | `tension_logique` sert déjà aux broches analogiques |
+| `CMakeLists.txt` | l'application jamais compilée sous ASan | la liste avait DÉJÀ été oubliée une fois |
+
+## Les deux qui cassaient le calcul
+
+**Le compteur d'un AVR ignorait qu'on l'écrive.** `avancer_compteur` travaille
+sur `compteurs_[n].compte`, un champ interne ; `donnees_[TCNTx]` n'en était que
+le reflet, réécrit à chaque tic. Précharger TCNT0 à 200 — le geste de base pour
+obtenir une période qui n'est pas une puissance de deux : une milliseconde, un
+pas de servo, une note — n'avait donc aucun effet.
+
+Le chiffre vient de **simavr, sur le même `.elf`** : 262 144 cycles de période
+contre les 57 344 attendus. Le cœur intégré rend maintenant 57 344, au cycle
+près comme simavr. Le même mécanisme touchait `compte_haut`, donc Timer1 16
+bits sur toutes les puces.
+
+**La règle des trapèzes oscillait.** Le solveur intégré — celui qui calcule
+TOUT sur un poste sans ngspice, c'est-à-dire la plupart des machines d'atelier
+— prenait un seul pas amorti après un coude de source, puis repartait aussitôt
+au pas maximal. Or les trapèzes oscillent dès que le pas dépasse deux fois la
+constante de temps : la raison entre deux pas vaut (1−h/2τ)/(1+h/2τ), donc
+NÉGATIVE. Une décharge RC descendait à −157 mV, remontait, redescendait — et se
+trompait d'un facteur quatre mille sur l'amplitude.
+
+Ce n'était pas un cas d'école : les fronts de broche d'un microcontrôleur
+durent 100 ns et la résolution par défaut de l'application vaut 50 µs. **Tout
+filtre RC rapide posé sur une sortie numérique tombait dedans.**
+
+Le pas est maintenant contrôlé sur l'écart entre le résultat calculé et
+l'extrapolation de la pente précédente : il se raccourcit dans les coudes et
+repousse dans les parties lisses. Le coût mesuré est faible parce que le
+raffinement ne dure que le temps du transitoire — 50 ms de fenêtre sur un RC
+d'une microseconde coûtent 11 ms de calcul, pour 1128 points.
+
+## Le silence qui accompagnait
+
+Le même `transitoire()` **rendait « réussi » une simulation tronquée**.
+`.tran 1p 50u` s'arrêtait à 2 µs sur les 50 demandées, renvoyait `true` et
+laissait `erreurs()` vide. Pire : l'échec de convergence poussait bien son
+message, mais le `return !formes.temps.empty()` d'en bas le contredisait
+aussitôt — et l'appelant ne lit `erreurs()` que sur un échec. **Un message
+d'erreur que la valeur de retour dément n'est pas un message d'erreur.**
+
+Et `pas_maximal` ne faisait que décroître, jamais restauré : un accroc de
+convergence en début de fenêtre condamnait tout le reste à un pas minuscule,
+donc à la troncature. Le pas courant est maintenant distinct du plafond.
+
+## Un seuil réglable que rien ne réglait — et ce qu'on en avait conclu
+
+Le nettoyage de la session précédente avait supprimé
+`MoteurNumerique::definir_seuil`, « un seuil réglable que rien ne règle ».
+Le raisonnement était juste, la conclusion incomplète : **un mutateur mort ne
+dit pas que le réglage est inutile, il dit que personne ne l'a jamais
+branché.** Ici, la valeur à lui donner existait déjà — `tension_logique` de la
+carte, employée vingt lignes plus haut pour les broches analogiques et les
+tirages.
+
+Un 74HC595 posé sur un Pi Pico sortait donc 4,95 V au lieu de 3,27 V, et lisait
+2,0 V — un niveau haut parfaitement valide en 3,3 V — comme un niveau BAS. Le
+défaut avait deux moitiés sur deux chemins différents : le transitoire, qui
+passe par `MoteurNumerique`, et le point de repos, qui passe par `vers_spice`
+du catalogue. **Corriger la première moitié aurait laissé la seconde intacte,
+et l'essai de la première serait passé au vert.**
+
+## Ce qui a rendu ces défauts invisibles
+
+- **Le solveur intégré n'était vérifié qu'à travers ngspice.** Sur cette
+  machine ngspice est installé : les 443 essais du banc cœur passaient donc à
+  côté, tous, sans exception. Les nouveaux essais l'attaquent EN DIRECT.
+- **Le seuil numérique n'était vérifié qu'en 5 V.** Tous les montages du banc
+  employaient une carte à cinq volts, où 2,5 V est le bon seuil : le chiffre en
+  dur et le chiffre juste coïncidaient.
+- **L'essai de bout en bout employait la mauvaise variante.** `cartes_presentes()`
+  rend une liste de noms, `cartes_posees()` rend les cartes AVEC leur puce et
+  leur tension. La fenêtre emploie la seconde, la plupart des essais la
+  première : ils simulaient donc des cartes sans tension déclarée.
+
+## Vérifications
+
+Chacun des neuf correctifs a **son essai, et l'essai a été vu tomber sans lui**
+— y compris une assertion qui passait dans les deux sens et qu'il a fallu
+refaire : une piste posée sur le bord sortait du contour par un autre côté, et
+le contrôle d'origine la signalait déjà pour cette autre raison.
+
+| | résultat |
+|---|---|
+| banc cœur | **443** — relancer `./build/tests_coeur` |
+| banc schéma | **606** — relancer `QT_QPA_PLATFORM=offscreen ./build/tests_schema` |
+| ASan/UBSan, les deux bancs | aucune alerte |
+| ASan/UBSan, l'APPLICATION | aucune alerte, sur la séance de gestes entière plus `--diagnostic`, `--aller-retour`, `--documents`, `--pcb` |
+| avertissements de compilation | 0 |
+
+L'application sous ASan est une première : la liste des cibles assainies ne
+l'avait jamais contenue, et `cmake --build build-san` échouait à l'édition de
+liens sans que personne le voie, parce que la commande documentée ne demandait
+que les bancs. La liste n'existe plus — toutes les cibles du projet sont
+assainies.
+
+## Un faux défaut, dit comme tel
+
+Le mode `--gestes` avait été noté « expire, code 124, inexpliqué ». Il
+n'expire pas : la séance dure une dizaine de secondes de minuteries, et le
+délai que je lui avais laissé était plus court. Relancé avec le temps qu'il
+faut, il rend 0 et produit ses neuf images. **Le défaut était dans la mesure,
+pas dans le programme.**
