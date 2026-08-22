@@ -33,6 +33,7 @@ static void console_en_utf8() {
 #include <QImage>
 #include <QGridLayout>
 #include <QLabel>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QToolBar>
 #include "app/Apparence.h"
@@ -6154,6 +6155,55 @@ static void test_nom_de_noeud_impose_assaini() {
 // journal, mesure autre chose, et conclut qu'il n'a rien compris. On vérifie
 // donc le CHIFFRE, pas seulement que le montage se charge.
 // ---------------------------------------------------------------------------
+static void test_borne_hors_limites_refusee() {
+    std::printf("\n-- un fichier qui annonce une borne inexistante ne crée pas de fil --\n");
+
+    // L'index du COMPOSANT était vérifié à la relecture, celui de la BORNE
+    // non. Un fichier annonçant la borne 999 d'une résistance à deux bornes
+    // était accepté : `position_borne` rend alors (0,0) et le fil se dessinait
+    // depuis l'origine de la scène — visiblement faux, mais sans un mot, et la
+    // netlist y gagnait un nœud dont l'autre extrémité n'existe pas.
+    //
+    // Un fichier de projet est du JSON, donc éditable à la main, et il circule
+    // entre élèves : ce n'est pas une hypothèse d'école.
+    SceneSchema scene;
+    ItemComposant* r1 = scene.ajouter_composant("resistance", QPointF(0, 0));
+    ItemComposant* r2 = scene.ajouter_composant("resistance", QPointF(300, 0));
+    verifier(r1 && r2, "les deux résistances sont posées");
+    if (!r1 || !r2) return;
+    scene.addItem(new ItemFil(r1, 1, r2, 0));
+
+    const QJsonObject sain = scene.vers_json();
+    {   // Témoin : sans altération, le fil revient. Sinon le test ne prouve
+        // rien — il suffirait que la relecture soit cassée pour qu'il passe.
+        SceneSchema relue;
+        relue.depuis_json(sain);
+        verifier(relue.fils().size() == 1,
+                 "le fichier intact se relit avec son fil",
+                 std::to_string(relue.fils().size()));
+    }
+
+    for (const int borne : {999, -1}) {
+        QJsonObject altere = sain;
+        QJsonArray fils = altere["fils"].toArray();
+        QJsonObject fil = fils[0].toObject();
+        fil["borne_b"] = borne;
+        fils[0] = fil;
+        altere["fils"] = fils;
+
+        SceneSchema relue;
+        relue.depuis_json(altere);
+        verifier(relue.composants().size() == 2,
+                 "borne " + std::to_string(borne)
+                     + " : les composants sont relus quand même",
+                 std::to_string(relue.composants().size()));
+        verifier(relue.fils().empty(),
+                 "et le fil, lui, est REFUSÉ — pas dessiné depuis l'origine",
+                 std::to_string(relue.fils().size()) + " fil(s)");
+    }
+}
+
+// ---------------------------------------------------------------------------
 static void test_exemples_sans_carte() {
     std::printf("\n-- pont diviseur et Zener donnent le bon chiffre --\n");
 
@@ -6398,6 +6448,7 @@ int main(int argc, char** argv) {
     test_colonne_en_octets_pas_en_caracteres();
     test_notation_scientifique();
     test_nom_de_noeud_impose_assaini();
+    test_borne_hors_limites_refusee();
     test_exemples_sans_carte();
     test_apercu_suit_la_grille();
     test_annulation_des_fils();

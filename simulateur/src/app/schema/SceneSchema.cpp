@@ -2516,7 +2516,19 @@ std::vector<ItemComposant*> SceneSchema::depuis_json(const QJsonObject& racine,
         }
         if (rang >= static_cast<int>(ajoutes.size()) || !ajoutes[rang])
             return {};
-        return Ancre(ajoutes[rang], objet[cle_borne].toInt());
+        // LE NUMÉRO DE BORNE SE BORNE AUSSI.
+        //
+        // L'index du composant était vérifié, celui de la borne non. Un
+        // fichier annonçant la borne 999 d'une résistance à deux bornes était
+        // ACCEPTÉ : `position_borne` rend alors (0,0), et le fil se dessinait
+        // depuis l'origine de la scène — visiblement faux, mais silencieux.
+        // La netlist y gagnait un nœud dont l'autre extrémité n'existe pas.
+        //
+        // Un fichier de projet est du JSON, donc éditable à la main : ce n'est
+        // pas une hypothèse d'école.
+        const int borne = objet[cle_borne].toInt();
+        if (borne < 0 || borne >= ajoutes[rang]->nb_bornes()) return {};
+        return Ancre(ajoutes[rang], borne);
     };
 
     for (const QJsonValue& valeur : racine["fils"].toArray()) {
