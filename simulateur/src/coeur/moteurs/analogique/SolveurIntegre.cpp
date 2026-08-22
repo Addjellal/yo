@@ -1696,8 +1696,42 @@ bool SolveurIntegre::transitoire(Formes& formes) {
     bool premier_pas = true;      // après une rupture, Euler amorti d'abord
     int garde = 0;
     const int garde_maximale = 2000000;
+
+    // LE PAS SE RÉDUIT QUAND LE CIRCUIT L'EXIGE, ET REPOUSSE ENSUITE.
+    //
+    // Le pas courant est distinct du plafond demandé. Auparavant, une seule
+    // difficulté de convergence abaissait `pas_maximal` DÉFINITIVEMENT : le
+    // reste de la fenêtre se calculait alors avec un pas minuscule, et la
+    // simulation se faisait tronquer par le garde-fou.
+    double pas_courant = pas_maximal;
+
+    // La règle des trapèzes OSCILLE quand le pas dépasse la constante de
+    // temps du circuit. C'est un défaut connu de la méthode : la raison entre
+    // deux pas successifs vaut (1−h/2τ)/(1+h/2τ), donc NÉGATIVE dès que
+    // h > 2τ. Une décharge RC, qui doit descendre doucement vers zéro, se
+    // mettait à changer de signe à chaque pas — et se trompait d'un facteur
+    // quatre mille sur l'amplitude.
+    //
+    // Ce n'était pas un cas d'école : les fronts de broche d'un
+    // microcontrôleur durent cent nanosecondes, la résolution par défaut de
+    // l'application vaut cinquante microsecondes, et tout filtre RC rapide
+    // posé sur une sortie numérique tombait dedans.
+    //
+    // La parade est celle de tous les simulateurs : comparer le résultat
+    // calculé à une simple extrapolation de la pente précédente. Quand les
+    // deux s'écartent trop, c'est que le pas ne suit plus la courbure — on le
+    // raccourcit et on refait le pas. Quand ils s'accordent, on le laisse
+    // repousser. Un circuit lent garde donc son grand pas et ne coûte rien de
+    // plus.
+    constexpr double kEcartRelatif = 0.01;   // 1 % du signal
+    constexpr double kEcartAbsolu = 1e-3;    // et 1 mV de plancher
+    constexpr double kPasMinimal = 1e-12;
+    std::vector<double> x_precedent;
+    double pas_precedent = 0;
+    bool convergence_perdue = false;
+
     while (instant < fin - 1e-15 && ++garde < garde_maximale) {
-        double pas = pas_maximal;
+        double pas = std::min(pas_courant, pas_maximal);
         // On ne dépasse jamais la prochaine rupture : on s'y arrête.
         auto suivante = ruptures.upper_bound(instant + 1e-15);
         if (suivante != ruptures.end())
@@ -1713,19 +1747,66 @@ bool SolveurIntegre::transitoire(Formes& formes) {
                                     trapeze)) {
             // Un pas plus court est la seule réponse utile à un refus de
             // convergence.
-            if (pas > 1e-12) {
+            if (pas > kPasMinimal) {
                 premier_pas = true;
-                pas_maximal = std::max(pas_maximal / 2, 1e-12);
+                pas_courant = std::max(pas / 2, kPasMinimal);
                 continue;
             }
             erreurs_.push_back("la simulation transitoire n'a pas convergé");
+            convergence_perdue = true;
             break;
         }
+
+        if (trapeze && pas_precedent > 0 && !x_precedent.empty()) {
+            double pire = 0;
+            for (int k = 0; k < impl_->nb_noeuds; ++k) {
+                const double pente = (x[k] - x_precedent[k]) / pas_precedent;
+                const double prevu = x[k] + pente * pas;
+                const double tolere =
+                    kEcartRelatif
+                        * std::max(std::fabs(essai[k]), std::fabs(x[k]))
+                    + kEcartAbsolu;
+                pire = std::max(pire, std::fabs(essai[k] - prevu) / tolere);
+            }
+            if (pire > 1.0 && pas > kPasMinimal) {
+                pas_courant = std::max(
+                    pas * std::max(0.25, 0.9 / std::sqrt(pire)), kPasMinimal);
+                continue;             // on refait ce pas, plus court
+            }
+            if (pire < 0.25)
+                pas_courant = std::min(pas * 1.5, pas_maximal);
+        }
+
+        x_precedent = x;
+        pas_precedent = pas;
         x = essai;
         instant = vise;
         impl_->memoriser_etat(x, pas, Impl::Mode::Transitoire, trapeze);
         enregistrer(instant, x);
         premier_pas = ruptures.count(instant) > 0;
+        if (premier_pas) {
+            // Après un coude de source, la pente d'avant ne dit plus rien, et
+            // on repart d'un pas court et amorti.
+            pas_courant = pas_maximal / 20;
+            pas_precedent = 0;
+        }
+    }
+
+    // UNE SIMULATION TRONQUÉE N'EST PAS UNE SIMULATION RÉUSSIE.
+    //
+    // La boucle sortait en silence dès que le garde-fou était atteint : la
+    // fonction rendait « vrai », `erreurs()` restait vide, et l'appelant
+    // affichait une courbe qui s'arrête au vingt-cinquième de la fenêtre sans
+    // que rien ne le dise. Le même silence couvrait l'échec de convergence,
+    // dont le message était poussé mais que le « return » d'en bas
+    // contredisait aussitôt.
+    const bool complet = instant >= fin - 1e-12;
+    if (!complet && !convergence_perdue) {
+        std::ostringstream dit;
+        dit << "simulation transitoire interrompue à " << instant << " s sur "
+            << fin << " : le pas demandé est trop fin pour la fenêtre "
+            << "(plus de " << garde_maximale << " pas).";
+        erreurs_.push_back(dit.str());
     }
 
     impl_->solution = x;
@@ -1739,7 +1820,7 @@ bool SolveurIntegre::transitoire(Formes& formes) {
         if (element.nom.size() > 1)
             courants_[element.nom.substr(1)] = element.courant;
     }
-    return !formes.temps.empty();
+    return complet && !formes.temps.empty();
 }
 
 // ---------------------------------------------------------------------------

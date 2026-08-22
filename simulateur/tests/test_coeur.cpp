@@ -48,6 +48,7 @@ static void console_en_utf8() {
 #include "coeur/moteurs/microcontroleurs/CoeurXtensa.h"
 #include "coeur/moteurs/microcontroleurs/Microcontroleur.h"
 #include "coeur/compilation/ProgrammesExemples.h"
+#include "coeur/moteurs/analogique/SolveurIntegre.h"
 #include "coeur/moteurs/numerique/MoteurNumerique.h"
 #include "coeur/moteurs/analogique/NgspiceEngine.h"
 #include "coeur/documents/Documents.h"
@@ -2529,6 +2530,111 @@ static void test_solveur_integre() {
 // commutent. C'est ce qui distingue « ça a l'air de marcher » de « c'est le
 // même microcontrôleur ».
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// [51] AUDIT — le solveur intégré, celui qui sert quand ngspice est absent
+//
+// C'est le solveur de secours : sur un poste sans ngspice — le cas de la
+// plupart des machines d'atelier — c'est LUI qui calcule tout. Il n'était
+// jusqu'ici vérifié qu'indirectement, par des essais qui passaient par
+// ngspice dès qu'il était installé.
+// ---------------------------------------------------------------------------
+static void test_solveur_integre_troncature_et_ringing() {
+    std::printf("\n[51] Audit : le solveur intégré dit ce qu'il n'a pas pu faire\n");
+
+    // --- 1. UNE SIMULATION TRONQUÉE N'EST PAS UNE SIMULATION RÉUSSIE.
+    //
+    // Un pas demandé très fin sur une longue fenêtre dépasse le garde-fou de
+    // deux millions de pas. La boucle s'arrêtait alors en silence : la
+    // fonction rendait « vrai », `erreurs()` restait vide, et l'appelant
+    // affichait une courbe qui s'arrête au vingt-cinquième de la fenêtre sans
+    // que rien ne le dise.
+    {
+        const std::string deck =
+            "* RC\n"
+            "V1 in 0 DC 5\n"
+            "R1 in out 1k\n"
+            "C1 out 0 1u\n"
+            ".tran 1p 50u\n"
+            ".end\n";
+        coeur::SolveurIntegre solveur;
+        coeur::Formes formes;
+        verifier(solveur.charger(deck), "le circuit se charge");
+        const bool dit_oui = solveur.transitoire(formes);
+        const double atteint = formes.temps.empty() ? 0 : formes.temps.back();
+        const bool complet = atteint >= 50e-6 * 0.999;
+        verifier(complet || !dit_oui || !solveur.erreurs().empty(),
+                 "une simulation qui s'arrête avant la fin le DIT",
+                 "arrivée à " + f(atteint * 1e6, 3) + " µs sur 50, rendu « "
+                     + (dit_oui ? "réussi" : "échoué") + " », "
+                     + std::to_string(solveur.erreurs().size()) + " message(s)");
+    }
+
+    // --- 2. UNE DÉCHARGE RC NE CHANGE PAS DE SIGNE.
+    //
+    // Une impulsion de 100 ns sur un RC de 1 µs, dans une fenêtre échantillonnée
+    // tous les 5 µs : la règle des trapèzes, appliquée avec un pas très
+    // supérieur à la constante de temps, oscille autour de la vraie solution
+    // au lieu de la suivre — c'est le « ringing » bien connu de cette méthode,
+    // de raison (1−h/2τ)/(1+h/2τ), soit −0,43 ici.
+    //
+    // Ce n'est pas un cas d'école : les fronts de broche d'un microcontrôleur
+    // durent 100 ns, et la résolution par défaut de l'application vaut 50 µs.
+    // Tout filtre RC rapide posé sur une sortie numérique tombe dedans.
+    {
+        const std::string deck =
+            "* RC rapide sous impulsion breve\n"
+            "V1 in 0 PULSE(0 5 20u 1n 1n 100n 1000)\n"
+            "R1 in out 1k\n"
+            "C1 out 0 1n\n"
+            ".tran 5u 50u\n"
+            ".end\n";
+        coeur::SolveurIntegre solveur;
+        coeur::Formes formes;
+        verifier(solveur.charger(deck), "le circuit se charge");
+        verifier(solveur.transitoire(formes), "le transitoire se calcule",
+                 solveur.erreurs().empty() ? "" : solveur.erreurs().front());
+        auto onde = formes.tensions.find("out");
+        verifier(onde != formes.tensions.end(), "la sortie est relevée");
+        if (onde == formes.tensions.end()) return;
+
+        double sommet = 0;
+        std::size_t rang_sommet = 0;
+        for (std::size_t k = 0; k < onde->second.size(); ++k)
+            if (onde->second[k] > sommet) { sommet = onde->second[k]; rang_sommet = k; }
+        // Cent nanosecondes sur une constante de temps d'une microseconde :
+        // le condensateur n'a le temps de se charger qu'à 5·(1−e^−0,1), soit
+        // 476 mV. C'est cette valeur-là qu'il faut retrouver — pas les cinq
+        // volts de l'entrée.
+        const double attendu = 5.0 * (1.0 - std::exp(-0.1));
+        verifier(std::fabs(sommet - attendu) < attendu * 0.15,
+                 "l'impulsion de 100 ns est bien vue, à sa vraie hauteur",
+                 f(sommet) + " V au lieu de " + f(attendu));
+
+        // Après le sommet, plus aucune source : la décharge est monotone et
+        // ne passe jamais sous zéro.
+        //
+        // La mesure se fait au millivolt : c'est le plancher que le contrôle
+        // de pas s'impose lui-même, et en dessous duquel il laisse le pas
+        // repousser. La queue de courbe y garde un frisson de quelques
+        // dixièmes de microvolt — sans objet physique, et invisible sur tout
+        // écran. Exiger mieux reviendrait à demander au solveur de suivre le
+        // bruit de l'arithmétique.
+        constexpr double kPlancher = 1e-3;
+        double plus_negatif = 0, plus_grande_remontee = 0;
+        for (std::size_t k = rang_sommet + 1; k < onde->second.size(); ++k) {
+            plus_negatif = std::min(plus_negatif, onde->second[k]);
+            plus_grande_remontee = std::max(
+                plus_grande_remontee, onde->second[k] - onde->second[k - 1]);
+        }
+        verifier(plus_negatif > -kPlancher,
+                 "la décharge ne repasse jamais sous zéro",
+                 f(plus_negatif * 1e3, 4) + " mV au plus bas");
+        verifier(plus_grande_remontee < kPlancher,
+                 "et elle ne remonte jamais",
+                 f(plus_grande_remontee * 1e3, 4) + " mV de remontée au pire");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // [49] AUDIT — un temporisateur préchargé
 //
@@ -6468,6 +6574,7 @@ int main() {
     test_temperature_et_bruit();
     test_solveur_integre();
     test_numerique_trois_volts_trois();
+    test_solveur_integre_troncature_et_ringing();
     test_coeur_avr();
     test_compteur_precharge();
     test_campagnes();
