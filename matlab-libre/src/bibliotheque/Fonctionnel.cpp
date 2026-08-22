@@ -1,0 +1,361 @@
+// Fonctionnel.cpp — fonctions qui prennent des fonctions.
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <sstream>
+
+#include "matlibre/Affichage.h"
+#include "matlibre/Analyseur.h"
+#include "matlibre/Bibliotheque.h"
+#include "matlibre/Erreur.h"
+#include "matlibre/Interpreteur.h"
+#include "matlibre/Operations.h"
+
+namespace matlibre {
+namespace {
+
+#define FONCTION(nom) \
+    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+#define INUTILISE (void)it; (void)args; (void)nargout;
+
+FONCTION(fnFeval) {
+    INUTILISE
+    exigerArguments(args, 1, 0, "feval");
+    std::vector<Valeur> reste(args.begin() + 1, args.end());
+    if (args[0].classe == Classe::Fonction)
+        return it.appelerValeur(args[0], reste, std::max(nargout, 1));
+    return it.appeler(args[0].versTexte(), reste, std::max(nargout, 1));
+}
+
+FONCTION(fnFunc2str) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "func2str");
+    if (args[0].classe != Classe::Fonction || !args[0].fn)
+        erreur("MATLAB:func2str:BadInput", "Input must be a function handle.");
+    return {Valeur::texte(args[0].fn->texte.empty() ? "@" + args[0].fn->nom
+                                                    : args[0].fn->texte)};
+}
+
+FONCTION(fnStr2func) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "str2func");
+    std::string s = args[0].versTexte();
+    while (!s.empty() && s.front() == ' ') s.erase(s.begin());
+    if (!s.empty() && s[0] == '@') {
+        NoeudPtr bloc = compilerBloc(s, "<str2func>");
+        if (!bloc->enfants.empty() && bloc->enfants[0]->type == TypeN::Expression)
+            return {it.evaluer(bloc->enfants[0]->enfants[0])};
+    }
+    auto f = it.resoudrePoignee(s);
+    f->texte = "@" + s;
+    return {Valeur::poignee(f)};
+}
+
+// Les options « UniformOutput » et « ErrorHandler » sont lues en fin
+// d'arguments, comme dans MATLAB.
+struct Options {
+    bool uniforme = true;
+    Valeur gestionnaire;
+    std::size_t finDonnees = 0;
+};
+
+Options lireOptions(std::vector<Valeur>& args, std::size_t debut) {
+    Options o;
+    o.finDonnees = args.size();
+    for (std::size_t k = debut; k + 1 < args.size(); ++k) {
+        if (!(args[k].estTexte() || args[k].estChaine())) continue;
+        std::string nom = args[k].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (nom == "uniformoutput") {
+            o.uniforme = args[k + 1].vrai();
+            o.finDonnees = std::min(o.finDonnees, k);
+        } else if (nom == "errorhandler") {
+            o.gestionnaire = args[k + 1];
+            o.finDonnees = std::min(o.finDonnees, k);
+        }
+    }
+    return o;
+}
+
+std::vector<Valeur> appliquerSur(Interpreteur& it, const Valeur& fonction,
+                                 const std::vector<Valeur>& entrees, bool cellule,
+                                 const Options& options, int nargout, const Dims& forme,
+                                 std::size_t n) {
+    int sorties = std::max(1, nargout);
+    std::vector<std::vector<Valeur>> resultats((std::size_t)sorties);
+    for (std::size_t i = 0; i < n; ++i) {
+        std::vector<Valeur> appel;
+        for (const auto& e : entrees) {
+            if (cellule && e.classe == Classe::Cellule)
+                appel.push_back(e.cellules[i]);
+            else
+                appel.push_back(extraireElement(e, i));
+        }
+        std::vector<Valeur> r;
+        try {
+            r = it.appelerValeur(fonction, appel, sorties);
+        } catch (const ErreurMatlab& e) {
+            if (options.gestionnaire.classe != Classe::Fonction) throw;
+            Valeur info = Valeur::structureVide();
+            info.poserChamp("identifier", Valeur::texte(e.identifiant));
+            info.poserChamp("message", Valeur::texte(e.message));
+            info.poserChamp("index", Valeur::scalaire((double)(i + 1)));
+            std::vector<Valeur> appelGestion = {info};
+            for (auto& a : appel) appelGestion.push_back(a);
+            r = it.appelerValeur(options.gestionnaire, appelGestion, sorties);
+        }
+        for (int s = 0; s < sorties; ++s)
+            resultats[(std::size_t)s].push_back((std::size_t)s < r.size() ? r[(std::size_t)s]
+                                                                          : Valeur::vide());
+    }
+    std::vector<Valeur> sortiesFinales;
+    for (int s = 0; s < sorties; ++s) {
+        if (options.uniforme) {
+            Valeur v = Valeur::matriceDims(forme);
+            bool logique = true;
+            for (std::size_t i = 0; i < n; ++i) {
+                const Valeur& e = resultats[(std::size_t)s][i];
+                if (e.nelem() != 1)
+                    erreur("MATLAB:cellfun:NotAScalarOutput",
+                           "Non-scalar in Uniform output. Set 'UniformOutput' to false.");
+                v.re[i] = e.re.empty() ? 0.0 : e.re[0];
+                if (!e.im.empty()) {
+                    v.assurerImaginaire();
+                    v.im[i] = e.im[0];
+                }
+                if (e.classe != Classe::Logique) logique = false;
+            }
+            if (logique && n > 0) v.classe = Classe::Logique;
+            sortiesFinales.push_back(v);
+        } else {
+            Valeur v = Valeur::celluleDims(forme);
+            for (std::size_t i = 0; i < n; ++i) v.cellules[i] = resultats[(std::size_t)s][i];
+            sortiesFinales.push_back(v);
+        }
+    }
+    return sortiesFinales;
+}
+
+FONCTION(fnCellfun) {
+    INUTILISE
+    exigerArguments(args, 2, 0, "cellfun");
+    Options o = lireOptions(args, 2);
+    Valeur fonction = args[0];
+    if (fonction.estTexte() || fonction.estChaine()) {
+        auto f = it.resoudrePoignee(fonction.versTexte());
+        f->texte = "@" + fonction.versTexte();
+        fonction = Valeur::poignee(f);
+    }
+    std::vector<Valeur> entrees(args.begin() + 1, args.begin() + (long)o.finDonnees);
+    if (entrees.empty()) erreur("MATLAB:minrhs", "Not enough input arguments to 'cellfun'.");
+    std::size_t n = entrees[0].nelem();
+    return appliquerSur(it, fonction, entrees, true, o, nargout, entrees[0].dims, n);
+}
+
+FONCTION(fnArrayfun) {
+    INUTILISE
+    exigerArguments(args, 2, 0, "arrayfun");
+    Options o = lireOptions(args, 2);
+    Valeur fonction = args[0];
+    if (fonction.estTexte() || fonction.estChaine()) {
+        auto f = it.resoudrePoignee(fonction.versTexte());
+        f->texte = "@" + fonction.versTexte();
+        fonction = Valeur::poignee(f);
+    }
+    std::vector<Valeur> entrees(args.begin() + 1, args.begin() + (long)o.finDonnees);
+    if (entrees.empty()) erreur("MATLAB:minrhs", "Not enough input arguments to 'arrayfun'.");
+    std::size_t n = entrees[0].nelem();
+    return appliquerSur(it, fonction, entrees, false, o, nargout, entrees[0].dims, n);
+}
+
+FONCTION(fnStructfun) {
+    INUTILISE
+    exigerArguments(args, 2, 0, "structfun");
+    Options o = lireOptions(args, 2);
+    const Valeur& s = args[1];
+    const auto& noms = s.champs();
+    std::vector<Valeur> valeurs;
+    for (const auto& nom : noms) valeurs.push_back(s.champ(nom, 0));
+    Valeur c = Valeur::celluleDims({(int)valeurs.size(), 1});
+    for (std::size_t k = 0; k < valeurs.size(); ++k) c.cellules[k] = valeurs[k];
+    std::vector<Valeur> entrees = {c};
+    auto r = appliquerSur(it, args[0], entrees, true, o, nargout, c.dims, valeurs.size());
+    if (!o.uniforme && !r.empty()) {
+        Valeur sortie = Valeur::structureVide();
+        for (std::size_t k = 0; k < noms.size(); ++k)
+            sortie.poserChamp(noms[k], r[0].cellules[k]);
+        return {sortie};
+    }
+    return r;
+}
+
+// ------------------------------------------------------------ évaluation
+
+FONCTION(fnEval) {
+    INUTILISE
+    exigerArguments(args, 1, 2, "eval");
+    std::string code = args[0].versTexte();
+    try {
+        it.executerTexte(code, "<eval>");
+    } catch (const ErreurMatlab& e) {
+        if (args.size() > 1) {
+            it.dernierMessage = e.message;
+            it.executerTexte(args[1].versTexte(), "<eval>");
+            return {};
+        }
+        throw;
+    }
+    return {};
+}
+
+FONCTION(fnEvalc) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "evalc");
+    std::ostringstream tampon;
+    it.definirSortie(&tampon);
+    try {
+        it.executerTexte(args[0].versTexte(), "<evalc>");
+    } catch (...) {
+        it.definirSortie(nullptr);
+        throw;
+    }
+    it.definirSortie(nullptr);
+    return {Valeur::texte(tampon.str())};
+}
+
+FONCTION(fnEvalin) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "evalin");
+    it.executerTexte(args[1].versTexte(), "<evalin>");
+    return {};
+}
+
+FONCTION(fnAssignin) {
+    INUTILISE
+    exigerArguments(args, 3, 3, "assignin");
+    std::string ou = args[0].versTexte();
+    if (ou == "base") it.porteeBase().variables[args[1].versTexte()] = args[2];
+    else it.porteeAppelante().variables[args[1].versTexte()] = args[2];
+    return {};
+}
+
+FONCTION(fnExist) {
+    INUTILISE
+    exigerArguments(args, 1, 2, "exist");
+    std::string nom = args[0].versTexte();
+    std::string genre = args.size() > 1 ? args[1].versTexte() : "";
+    if ((genre.empty() || genre == "var") && it.existeVariable(nom))
+        return {Valeur::scalaire(1)};
+    if (genre == "var") return {Valeur::scalaire(0)};
+    if ((genre.empty() || genre == "file") && !nom.empty()) {
+        std::error_code ec;
+        if (std::filesystem::exists(nom, ec)) return {Valeur::scalaire(2)};
+    }
+    if (genre.empty() || genre == "file") {
+        if (it.indexFichiers().count(nom)) return {Valeur::scalaire(2)};
+    }
+    if (genre.empty() || genre == "class") {
+        if (it.classeDefinie(nom)) return {Valeur::scalaire(8)};
+    }
+    if (genre.empty() || genre == "builtin") {
+        if (it.natif(nom)) return {Valeur::scalaire(5)};
+    }
+    return {Valeur::scalaire(0)};
+}
+
+FONCTION(fnIsvarname) {
+    INUTILISE
+    std::string s = args[0].versTexte();
+    bool ok = !s.empty() && (std::isalpha((unsigned char)s[0]) || s[0] == '_');
+    for (char c : s)
+        if (!(std::isalnum((unsigned char)c) || c == '_')) ok = false;
+    if (estMotCle(s)) ok = false;
+    return {Valeur::booleen(ok)};
+}
+
+FONCTION(fnNarginFn) {
+    INUTILISE
+    if (args.empty()) return {Valeur::scalaire(it.portee().nargin)};
+    // nargin('nom') : nombre d'entrées déclarées.
+    auto f = it.fonctionFichier(args[0].versTexte());
+    if (!f) return {Valeur::scalaire(-1)};
+    return {Valeur::scalaire((double)f->entrees.size() * (f->variadiqueEntree() ? -1 : 1))};
+}
+
+FONCTION(fnNargoutFn) {
+    INUTILISE
+    if (args.empty()) return {Valeur::scalaire(it.portee().nargout)};
+    auto f = it.fonctionFichier(args[0].versTexte());
+    if (!f) return {Valeur::scalaire(-1)};
+    return {Valeur::scalaire((double)f->sorties.size() * (f->variadiqueSortie() ? -1 : 1))};
+}
+
+FONCTION(fnNarginchk) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "narginchk");
+    int n = it.portee().nargin;
+    if (n < (int)args[0].scal())
+        erreur("MATLAB:narginchk:notEnoughInputs", "Not enough input arguments.");
+    if (n > (int)args[1].scal())
+        erreur("MATLAB:narginchk:tooManyInputs", "Too many input arguments.");
+    return {};
+}
+
+FONCTION(fnNargoutchk) {
+    INUTILISE
+    return {};
+}
+
+FONCTION(fnInputname) {
+    INUTILISE
+    return {Valeur::texte("")};
+}
+
+FONCTION(fnFunctions) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "functions");
+    Valeur r = Valeur::structureVide();
+    if (args[0].fn) {
+        r.poserChamp("function", Valeur::texte(args[0].fn->nom.empty() ? args[0].fn->texte
+                                                                       : args[0].fn->nom));
+        const char* genre = args[0].fn->genre == Fonction::Anonyme
+                                ? "anonymous"
+                                : (args[0].fn->genre == Fonction::Native ? "simple"
+                                                                         : "simple");
+        r.poserChamp("type", Valeur::texte(genre));
+        r.poserChamp("file", Valeur::texte(""));
+    }
+    return {r};
+}
+
+FONCTION(fnIsHandle) {
+    INUTILISE
+    return {Valeur::booleen(args[0].classe == Classe::Fonction)};
+}
+
+}  // namespace
+
+void enregistrerFonctionnel(Interpreteur& it) {
+    it.enregistrer("feval", fnFeval, "fonctionnel", "feval  Appelle une fonction nommee.");
+    it.enregistrer("func2str", fnFunc2str, "fonctionnel", "func2str  Poignee -> texte.");
+    it.enregistrer("str2func", fnStr2func, "fonctionnel", "str2func  Texte -> poignee.");
+    it.enregistrer("cellfun", fnCellfun, "fonctionnel", "cellfun  Applique a chaque case.");
+    it.enregistrer("arrayfun", fnArrayfun, "fonctionnel", "arrayfun  Applique a chaque element.");
+    it.enregistrer("structfun", fnStructfun, "fonctionnel", "structfun  Applique a chaque champ.");
+    it.enregistrer("eval", fnEval, "fonctionnel", "eval  Evalue du code.");
+    it.enregistrer("evalc", fnEvalc, "fonctionnel", "evalc  Evalue et capture l'affichage.");
+    it.enregistrer("evalin", fnEvalin, "fonctionnel", "evalin  Evalue dans un autre espace.");
+    it.enregistrer("assignin", fnAssignin, "fonctionnel", "assignin  Affecte dans un autre espace.");
+    it.enregistrer("exist", fnExist, "fonctionnel", "exist  Le nom existe-t-il, et comme quoi.");
+    it.enregistrer("isvarname", fnIsvarname, "fonctionnel", "isvarname  Nom de variable valide.");
+    it.enregistrer("nargin", fnNarginFn, "fonctionnel", "nargin  Nombre d'arguments recus.");
+    it.enregistrer("nargout", fnNargoutFn, "fonctionnel", "nargout  Nombre de sorties demandees.");
+    it.enregistrer("narginchk", fnNarginchk, "fonctionnel", "narginchk  Verifie le nombre d'entrees.");
+    it.enregistrer("nargoutchk", fnNargoutchk, "fonctionnel",
+                   "nargoutchk  Verifie le nombre de sorties.");
+    it.enregistrer("inputname", fnInputname, "fonctionnel", "inputname  Nom de l'argument appelant.");
+    it.enregistrer("functions", fnFunctions, "fonctionnel", "functions  Information sur une poignee.");
+    it.enregistrer("is_function_handle_", fnIsHandle, "fonctionnel", "Reserve.");
+}
+
+}  // namespace matlibre

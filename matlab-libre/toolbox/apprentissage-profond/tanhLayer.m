@@ -1,0 +1,5 @@
+function couche = tanhLayer(varargin)
+%TANHLAYER Couche à tangente hyperbolique.
+    couche = struct('type', 'tanh', 'sorties', 0, 'W', [], 'b', [], ...
+                    'entree', [], 'sortie', []);
+end

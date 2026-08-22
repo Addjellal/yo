@@ -8,6 +8,7 @@ sorties à l'intérieur de son dossier.
 |---|---|---|
 | 🎓 [`formation-embarque/`](formation-embarque/) | **Formation complète systèmes embarqués & bas niveau** : 11 modules de cours, 10 TD corrigés, 5 TP guidés (18 fiches de séance), mini-TP sur simulateur, évaluations, ~190 h. Du binaire aux automates Siemens/Schneider, en passant par C, C++, Arduino, VHDL/FPGA, Java et STM32. | [Commencer ici](formation-embarque/parcours-type.md) |
 | 🔌 [`simulateur/`](simulateur/) | **Simulateur électronique façon Proteus** : saisie de schéma, 38 composants, simulation analogique par ngspice et exécution du **vrai firmware** compilé par avr-gcc sur un ATmega328P émulé (simavr). Application de bureau en C++/Qt. | [README](simulateur/) |
+| 🧮 [`matlab-libre/`](matlab-libre/) | **Interpréteur libre du langage MATLAB** : 537 fonctions natives en C++17, 51 toolboxes (signal, image, apprentissage, automatique, Simulink, Simscape…) écrites dans le langage lui-même, rendu graphique SVG, aucune dépendance obligatoire. | [README](matlab-libre/) |
 | 💼 [`auto-emploi/`](auto-emploi/) | Recherche d'emploi automatisée : interface web locale, scraping multi-sources, matching IA, lettres de motivation, suivi de candidatures et relances. | [README](auto-emploi/) |
 
 ---
@@ -50,6 +51,23 @@ pip install -r requirements.txt
 python main.py --check      # vérifier la configuration
 python web.py               # interface web locale
 ```
+
+---
+
+## 🧮 MatLibre
+
+```bash
+cd matlab-libre
+make            # compile — un compilateur C++17 suffit
+make test       # 57 verifications C++ + 7 suites en langage MATLAB
+./build/matlibre exemples/01-prise-en-main.m
+./build/matlibre                       # session interactive
+```
+
+Le langage complet — types, indexation, fonctions, `classdef`,
+`try/catch` avec les identifiants d'erreur de MATLAB — plus 966 fonctions
+au total. Ce qui manque est écrit noir sur blanc dans
+[`documentation/couverture.md`](matlab-libre/documentation/couverture.md).
 
 ---
 
