@@ -239,6 +239,14 @@ private:
     // `au_depart` : état des broches au début du pas de couplage (analyse
     // transitoire) ou état courant (analyse au point de repos).
     std::vector<coeur::BrocheElectrique> broches_pour(bool au_depart) const;
+
+    // La tension d'un niveau haut sur ce schéma. Deux cartes de tensions
+    // différentes sur un même bus, c'est déjà une faute de câblage : c'est la
+    // plus haute qui décide de ce que voit un composant numérique.
+    double tension_logique_commune() const;
+    // Note cette tension sur les composants numériques, pour que l'analyse au
+    // point de repos la connaisse avant même la première trame.
+    void marquer_tension_logique();
     void resoudre_trame(uint64_t cycles_ecoules);
     // Fait avancer la mécanique des composants à état.
     void faire_evoluer(coeur::Formes& formes, double duree);

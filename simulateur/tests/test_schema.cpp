@@ -6204,6 +6204,89 @@ static void test_borne_hors_limites_refusee() {
 }
 
 // ---------------------------------------------------------------------------
+static void test_numerique_suit_la_tension_de_la_carte() {
+    std::printf("\n-- un 74HC595 sur un Pico sort 3,3 V, pas 5 --\n");
+
+    // Le moteur numérique travaillait à 5 V en dur : amplitude de sortie ET
+    // seuil de lecture. Or la carte déclare sa `tension_logique`, et celle-ci
+    // servait déjà pour les broches analogiques et les tirages. Un registre
+    // posé sur un Pico sortait donc 5 V : de quoi fausser tout calcul de
+    // courant, et laisser croire qu'un montage 3,3 V pilote du 5 V sans
+    // adaptation.
+    struct Cas { const char* carte; double volts; };
+    const Cas cas[] = {{"pi_pico", 3.3}, {"arduino_uno", 5.0}};
+
+    for (const Cas& essai : cas) {
+        SceneSchema scene;
+        scene.ajouter_composant(essai.carte, QPointF(0, 400));
+        ItemComposant* ic =
+            scene.ajouter_composant("registre_74hc595", QPointF(400, 0));
+        ItemComposant* r = scene.ajouter_composant("resistance", QPointF(800, 0));
+        ItemComposant* masse = scene.ajouter_composant("masse", QPointF(1100, 0));
+        verifier(ic && r && masse,
+                 std::string(essai.carte) + " : le montage est posé");
+        if (!ic || !r || !masse) return;
+        r->valeurs["ohms"] = 10000;
+        // Le verrou porte déjà un bit : la sortie Q0 part haute, sans qu'on
+        // ait besoin de cadencer quoi que ce soit.
+        ic->valeurs["_verrou"] = 1;
+        ic->valeurs["_niveau_Q0"] = 1;
+
+        // Q0 est la sixième borne du symbole : cinq entrées, puis les sorties.
+        scene.addItem(new ItemFil(ic, 5, r, 0));
+        scene.addItem(new ItemFil(r, 1, masse, 0));
+
+        std::vector<LiaisonBroche> broches;
+        MoteurSimulation moteur;
+        // `cartes_posees()`, pas `cartes_presentes()` : c'est la variante qui
+        // porte la puce ET la tension, et c'est celle qu'emploie la fenêtre.
+        moteur.definir_circuit(scene.construire_netlist(&broches), broches,
+                               scene.cartes_posees());
+
+        double sommet = 0;
+        // Le solveur rend les nœuds en minuscules, comme SPICE.
+        const std::string noeud =
+            scene.noeud_de(r, 0).toLower().toStdString();
+
+        // --- d'abord le point de repos, calculé avant toute trame. Il
+        // passait par un autre chemin du catalogue, où cinq volts étaient
+        // écrits en dur : corriger la moitié transitoire du défaut aurait
+        // laissé l'autre moitié intacte.
+        double repos = 0;
+        QObject::connect(&moteur, &MoteurSimulation::resultats,
+                         [&](const std::map<std::string, double>&,
+                             const std::map<std::string, double>& tensions) {
+                             auto it = tensions.find(noeud);
+                             if (it != tensions.end()) repos = it->second;
+                         });
+        moteur.resoudre_une_fois();
+        verifier(std::fabs(repos - essai.volts) < 0.2,
+                 std::string(essai.carte) + " : au point de repos aussi, "
+                     + f(essai.volts, 1) + " V",
+                 f(repos) + " V");
+
+        QObject::connect(&moteur, &MoteurSimulation::trame_calculee,
+                         [&](const coeur::Formes& formes, double) {
+                             auto onde = formes.tensions.find(noeud);
+                             if (onde == formes.tensions.end()) return;
+                             for (double v : onde->second)
+                                 sommet = std::max(sommet, v);
+                         });
+        moteur.demarrer();
+        QElapsedTimer chrono;
+        chrono.start();
+        while (chrono.elapsed() < 300 && sommet <= 0)
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        moteur.arreter();
+
+        verifier(std::fabs(sommet - essai.volts) < 0.2,
+                 std::string(essai.carte) + " : la sortie du registre monte à "
+                     + f(essai.volts, 1) + " V",
+                 f(sommet) + " V sur le nœud " + noeud);
+    }
+}
+
+// ---------------------------------------------------------------------------
 static void test_exemples_sans_carte() {
     std::printf("\n-- pont diviseur et Zener donnent le bon chiffre --\n");
 
@@ -6449,6 +6532,7 @@ int main(int argc, char** argv) {
     test_notation_scientifique();
     test_nom_de_noeud_impose_assaini();
     test_borne_hors_limites_refusee();
+    test_numerique_suit_la_tension_de_la_carte();
     test_exemples_sans_carte();
     test_apercu_suit_la_grille();
     test_annulation_des_fils();

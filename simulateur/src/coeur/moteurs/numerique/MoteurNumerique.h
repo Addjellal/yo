@@ -42,9 +42,6 @@ public:
     // Vrai si la netlist contient au moins un composant numérique : inutile
     // de faire tourner ce moteur sur un montage qui n'en a pas.
     static bool circuit_numerique(const Netlist& netlist);
-
-private:
-    double seuil_ = 2.5;
 };
 
 }  // namespace coeur

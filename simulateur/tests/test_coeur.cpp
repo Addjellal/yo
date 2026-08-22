@@ -2605,6 +2605,78 @@ static void test_compteur_precharge() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// [50] AUDIT — le numérique sur une carte 3,3 V
+//
+// Le seuil de basculement était figé à 2,5 V et l'amplitude de sortie à 5 V,
+// alors que la carte déclare sa `tension_logique` et que celle-ci sert déjà
+// pour les broches analogiques. Un 74HC595 posé sur un Pico sortait donc
+// 5 V — de quoi griller ce qu'il pilote sur le papier, et fausser tout calcul
+// de courant — et lisait ses entrées avec un seuil trop haut pour la carte.
+// ---------------------------------------------------------------------------
+static void test_numerique_trois_volts_trois() {
+    std::printf("\n[50] Audit : le numérique suit la tension de la carte\n");
+
+    auto monter = []() {
+        coeur::Netlist netlist;
+        netlist.ajouter("IC1", "registre_74hc595");
+        netlist.relier("IC1", "SER", "D11");
+        netlist.relier("IC1", "SRCLK", "D13");
+        netlist.relier("IC1", "RCLK", "D10");
+        netlist.relier("IC1", "OE", "VALIDATION");
+        for (int k = 0; k < 8; ++k)
+            netlist.relier("IC1", "Q" + std::to_string(k),
+                           "SORTIE" + std::to_string(k));
+        return netlist;
+    };
+    // Un seul bit décalé, puis verrouillé : Q0 doit monter.
+    const std::vector<coeur::FrontNoeud> fronts = {
+        {1e-6, "D11", true},  {1.1e-6, "D13", true}, {1.2e-6, "D13", false},
+        {2e-6, "D10", true},  {2.1e-6, "D10", false}};
+
+    // --- 1. L'AMPLITUDE EST CELLE DE LA CARTE.
+    {
+        coeur::Netlist netlist = monter();
+        coeur::MoteurNumerique moteur;
+        moteur.propager(netlist, fronts, {}, 1e-3, 3.3);
+        const coeur::Instance* ic = netlist.trouver("IC1");
+        double maximum = 0;
+        if (ic) {
+            auto onde = ic->ondes.find("Q0");
+            if (onde != ic->ondes.end())
+                for (const auto& point : onde->second)
+                    maximum = std::max(maximum, point.second);
+        }
+        verifier(std::fabs(maximum - 3.3) < 1e-9,
+                 "sur une carte 3,3 V, la sortie du registre monte à 3,3 V",
+                 f(maximum) + " V");
+    }
+
+    // --- 2. LE SEUIL SUIT, LUI AUSSI.
+    //
+    // OE tenu à 2,0 V : sur une carte 3,3 V c'est un niveau HAUT (le seuil
+    // vaut 1,65 V), donc les sorties sont inhibées. Avec le seuil figé à
+    // 2,5 V, le registre le lisait BAS et publiait ses huit sorties.
+    {
+        const std::map<std::string, double> niveaux = {{"validation", 2.0}};
+        struct Cas { double carte; bool inhibe; const char* dit; };
+        const Cas cas[] = {
+            {3.3, true, "sur une carte 3,3 V, 2,0 V sur OE est un niveau HAUT "
+                        "— les sorties restent inhibées"},
+            {5.0, false, "sur une carte 5 V, les mêmes 2,0 V sont un niveau "
+                         "BAS — les sorties sortent"}};
+        for (const Cas& c : cas) {
+            coeur::Netlist netlist = monter();
+            coeur::MoteurNumerique moteur;
+            moteur.propager(netlist, fronts, niveaux, 1e-3, c.carte);
+            const coeur::Instance* ic = netlist.trouver("IC1");
+            const bool q0 = ic && ic->valeur("_niveau_Q0", 0.0) > 0.5;
+            verifier(q0 != c.inhibe, c.dit,
+                     std::string("Q0 ") + (q0 ? "haute" : "basse"));
+        }
+    }
+}
+
 static void test_coeur_avr() {
     std::printf("\n[22] Cœur AVR intégré confronté à simavr\n");
 
@@ -6395,6 +6467,7 @@ int main() {
     test_multimetres();
     test_temperature_et_bruit();
     test_solveur_integre();
+    test_numerique_trois_volts_trois();
     test_coeur_avr();
     test_compteur_precharge();
     test_campagnes();

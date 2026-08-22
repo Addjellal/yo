@@ -34,12 +34,19 @@ std::vector<std::string> sorties_continues(const Instance& i,
                                                const std::string&)>& noeud,
                                            double impedance) {
     std::vector<std::string> lignes;
+    // L'AMPLITUDE EST CELLE DE LA CARTE, ICI AUSSI.
+    //
+    // Cinq volts en dur : un registre posé sur un Pico sortait 5 V au point
+    // de repos, même après que le moteur numérique eut appris à travailler à
+    // 3,3 V. Il note désormais l'amplitude sur l'instance, et c'est elle qui
+    // sert des deux côtés.
+    const double haute = i.valeur("_tension_haute", 5.0);
     for (size_t k = 0; k < bornes.size(); ++k) {
         const std::string& borne = bornes[k];
         const bool haut = i.valeur("_niveau_" + borne, 0.0) > 0.5;
         const std::string interne = i.reference + "_" + borne + "_src";
         lignes.push_back("V" + i.reference + "_" + borne + " " + interne
-                         + " 0 DC " + traits::nombre(haut ? 5.0 : 0.0));
+                         + " 0 DC " + traits::nombre(haut ? haute : 0.0));
         lignes.push_back("R" + i.reference + "_" + borne + " " + interne + " "
                          + noeud(borne) + " " + traits::nombre(impedance));
     }
@@ -54,13 +61,14 @@ std::vector<std::string> sorties_datees(const Instance& i,
                                             const std::string&)>& noeud,
                                         double impedance, double duree) {
     std::vector<std::string> lignes;
+    const double haute = i.valeur("_tension_haute", 5.0);
     for (const std::string& borne : bornes) {
         auto onde = i.ondes.find(borne);
         const std::string interne = i.reference + "_" + borne + "_src";
         if (onde == i.ondes.end() || onde->second.empty()) {
             const bool haut = i.valeur("_niveau_" + borne, 0.0) > 0.5;
             lignes.push_back("V" + i.reference + "_" + borne + " " + interne
-                             + " 0 DC " + traits::nombre(haut ? 5.0 : 0.0));
+                             + " 0 DC " + traits::nombre(haut ? haute : 0.0));
         } else {
             std::string pwl = "V" + i.reference + "_" + borne + " " + interne
                               + " 0 PWL(";

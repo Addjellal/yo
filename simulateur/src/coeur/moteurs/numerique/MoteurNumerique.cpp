@@ -16,6 +16,14 @@ int MoteurNumerique::propager(Netlist& netlist,
                               const std::vector<FrontNoeud>& fronts,
                               const std::map<std::string, double>& niveaux,
                               double duree, double tension_haute) {
+    // LE SEUIL SUIT LA CARTE, COMME L'AMPLITUDE.
+    //
+    // Il était figé à 2,5 V — la moitié de cinq volts — sur un moteur qui
+    // sait pourtant à quelle tension il travaille. Sur une carte 3,3 V, un
+    // niveau haut réel (2,0 V par exemple, sorti d'un diviseur ou d'un
+    // capteur) était lu BAS. La moitié de l'alimentation est la règle des
+    // familles CMOS, et c'est celle qu'annonce la fiche du 74HC.
+    const double seuil = tension_haute / 2.0;
     int traites = 0;
     for (Instance& instance : netlist.instances()) {
         const Modele* modele = Catalogue::instance().modele(instance.type);
@@ -38,7 +46,7 @@ int MoteurNumerique::propager(Netlist& netlist,
                            [](unsigned char c) { return std::tolower(c); });
             auto trouve = niveaux.find(cle);
             entrees.niveaux[borne.nom] =
-                trouve != niveaux.end() && trouve->second > seuil_;
+                trouve != niveaux.end() && trouve->second > seuil;
 
             for (const FrontNoeud& front : fronts) {
                 if (front.noeud != borne.noeud) continue;
@@ -62,6 +70,9 @@ int MoteurNumerique::propager(Netlist& netlist,
         // événement que lorsqu'elle CHANGE, sinon chaque fenêtre repartirait
         // de zéro et les sorties clignoteraient sans raison.
         instance.ondes.clear();
+        // L'amplitude est notée sur l'instance : l'analyse au point de repos
+        // n'a pas d'onde à lire et se rabattait sur cinq volts en dur.
+        instance.valeurs["_tension_haute"] = tension_haute;
         for (const std::string& borne : modele->sorties_numeriques) {
             const std::string cle = "_niveau_" + borne;
             const bool depart = instance.valeur(cle, 0.0) > 0.5;

@@ -303,6 +303,24 @@ bool MoteurSimulation::compiler_et_charger(const coeur::Programme& fichiers,
 }
 
 // ---------------------------------------------------------------------------
+double MoteurSimulation::tension_logique_commune() const {
+    double tension = 0;
+    for (const auto& paire : cartes_)
+        tension = std::max(tension, paire.second->tension_logique);
+    return tension > 0 ? tension : 5.0;
+}
+
+void MoteurSimulation::marquer_tension_logique() {
+    const double tension = tension_logique_commune();
+    for (coeur::Instance& instance : netlist_.instances()) {
+        const coeur::Modele* modele =
+            coeur::Catalogue::instance().modele(instance.type);
+        if (modele && modele->reagir)
+            instance.valeurs["_tension_haute"] = tension;
+    }
+}
+
+// ---------------------------------------------------------------------------
 void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
                                        std::vector<LiaisonBroche> broches,
                                        const std::vector<CartePosee>& cartes) {
@@ -332,6 +350,9 @@ void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
         carte.resistance_sortie = posee.resistance_sortie;
         carte.resistance_tirage = posee.resistance_tirage;
     }
+    // Le point de repos est calculé AVANT la première trame : sans ce
+    // marquage, un registre posé sur un Pico y sortirait encore cinq volts.
+    marquer_tension_logique();
 }
 
 void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
@@ -616,10 +637,23 @@ void MoteurSimulation::resoudre_trame(uint64_t cycles_ecoules) {
     if (coeur::MoteurNumerique::circuit_numerique(netlist_)) {
         std::vector<coeur::FrontNoeud> fronts;
         fronts.reserve(transitions.size());
+        // LA TENSION LOGIQUE DE LA CARTE VA JUSQU'AU NUMÉRIQUE.
+        //
+        // Le seuil valait 2,5 V et l'amplitude 5 V, en dur, alors que la
+        // carte déclare sa tension et que celle-ci sert déjà pour les broches
+        // analogiques et les tirages, vingt lignes plus haut. Un 74HC595 posé
+        // sur un Pico sortait donc 5 V : de quoi fausser tout calcul de
+        // courant, et faire croire à l'élève qu'un montage 3,3 V pilote du
+        // 5 V sans adaptation.
+        //
+        // Deux cartes de tensions différentes sur un même bus, c'est déjà une
+        // faute de câblage ; c'est la plus haute qui décide de ce que voit un
+        // composant numérique.
+        const double tension_logique = tension_logique_commune();
         for (const coeur::TransitionBroche& transition : transitions)
             fronts.push_back({transition.instant, transition.noeud,
-                              transition.tension > 2.5});
-        numerique_.propager(netlist_, fronts, etat_, duree);
+                              transition.tension > tension_logique / 2});
+        numerique_.propager(netlist_, fronts, etat_, duree, tension_logique);
 
         // L'état d'un registre vit dans son instance, et la netlist est
         // reconstruite à chaque modification du schéma : sans ce renvoi vers
