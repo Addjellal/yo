@@ -222,10 +222,10 @@ static void test_ngspice() {
 }
 
 // ---------------------------------------------------------------------------
-// [30] AUDIT — cinq défauts trouvés en relisant la carte et les analyses
+// [48] AUDIT — cinq défauts trouvés en relisant la carte et les analyses
 // ---------------------------------------------------------------------------
 static void test_audit_carte_et_analyses() {
-    std::printf("\n[31] Audit : carte, documents, analyses\n");
+    std::printf("\n[48] Audit : carte, documents, analyses\n");
 
     // --- 1. UNE PASTILLE CMS N'A DE CUIVRE QUE SUR UNE FACE.
     //
@@ -2529,6 +2529,82 @@ static void test_solveur_integre() {
 // commutent. C'est ce qui distingue « ça a l'air de marcher » de « c'est le
 // même microcontrôleur ».
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// [49] AUDIT — un temporisateur préchargé
+//
+// Précharger TCNTx est le geste de base d'un temporisateur : on part de 200
+// au lieu de 0 pour que le débordement arrive au bout de 56 pas, pas de 256.
+// C'est ainsi qu'on obtient une période qui n'est pas une puissance de deux —
+// une milliseconde, un pas de servo, une note de musique.
+// ---------------------------------------------------------------------------
+static const char* kPrechargeTimer = R"(
+#include <avr/io.h>
+
+int main(void) {
+    DDRB |= (1 << 5);                       /* D13 en sortie */
+    TCCR0B = (1 << CS02) | (1 << CS00);     /* prédiviseur /1024 */
+    while (1) {
+        TCNT0 = 200;                        /* 56 pas avant le débordement */
+        TIFR0 = (1 << TOV0);                /* on efface le drapeau */
+        while (!(TIFR0 & (1 << TOV0))) { }  /* on attend */
+        PORTB ^= (1 << 5);                  /* et on bascule */
+    }
+    return 0;
+}
+)";
+
+static void test_compteur_precharge() {
+    std::printf("\n[49] Audit : un temporisateur préchargé bat au bon rythme\n");
+
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
+        std::printf("  (avr-gcc absent — section ignorée)\n");
+        return;
+    }
+    const std::string firmware = "/tmp/sim_precharge.elf";
+    std::string journal;
+    if (!coeur::AvrEngine::compiler_source(kPrechargeTimer, firmware,
+                                           &journal)) {
+        verifier(false, "compilation du firmware de préchargement", journal);
+        return;
+    }
+
+    // 56 pas de 1024 cycles : 57 344 cycles entre deux bascules. Sans la
+    // prise en compte de l'écriture, le compteur repart de 0 et il en faut
+    // 262 144 — la LED bat quatre fois et demie trop lentement.
+    const double attendue = (256 - 200) * 1024.0;
+
+    for (int avec_simavr = 0; avec_simavr < 2; ++avec_simavr) {
+        if (avec_simavr == 1 && !coeur::AvrEngine::compile_avec_simavr())
+            continue;
+        coeur::AvrEngine mcu;
+        mcu.preferer_simavr(avec_simavr == 1);
+        if (!mcu.charger(firmware)) {
+            verifier(false, "chargement du firmware", mcu.erreur());
+            return;
+        }
+        std::vector<uint64_t> bascules;
+        mcu.sur_changement_broche([&](int broche, bool) {
+            if (broche == 13) bascules.push_back(mcu.cycle());
+        });
+        mcu.avancer(600000);
+
+        const std::string qui =
+            avec_simavr == 1 ? "simavr" : "cœur intégré";
+        verifier(bascules.size() >= 4, qui + " : la LED bascule",
+                 std::to_string(bascules.size()) + " bascule(s)");
+        if (bascules.size() < 4) continue;
+        // On mesure entre la deuxième et la dernière : la première période
+        // porte encore le démarrage du programme.
+        const double periode =
+            static_cast<double>(bascules.back() - bascules[1])
+            / static_cast<double>(bascules.size() - 2);
+        verifier(std::fabs(periode - attendue) < attendue * 0.05,
+                 qui + " : une période de " + f(attendue, 0) + " cycles, "
+                 "parce que le compteur repart de 200",
+                 f(periode, 0) + " cycles");
+    }
+}
+
 static void test_coeur_avr() {
     std::printf("\n[22] Cœur AVR intégré confronté à simavr\n");
 
@@ -6320,6 +6396,7 @@ int main() {
     test_temperature_et_bruit();
     test_solveur_integre();
     test_coeur_avr();
+    test_compteur_precharge();
     test_campagnes();
     test_numerique();
     test_pulse_in();

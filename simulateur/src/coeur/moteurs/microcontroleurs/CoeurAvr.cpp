@@ -531,6 +531,30 @@ void CoeurAvr::ecrire(uint16_t adresse, uint8_t valeur) {
     }
 
     donnees_[adresse] = valeur;
+    // ÉCRIRE DANS TCNTx DOIT DÉPLACER LE COMPTEUR.
+    //
+    // Le compte vit dans `compteurs_[n].compte` ; le registre n'en était que
+    // le reflet, réécrit à chaque tic. Un firmware qui préchargeait TCNT0 à
+    // 200 — le geste de base pour obtenir une période qui n'est pas une
+    // puissance de deux — voyait sa valeur écrasée au cycle suivant, et le
+    // débordement arrivait au bout de 256 pas au lieu de 56. Confronté à
+    // simavr sur le même .elf : 57 344 cycles de période contre 262 144.
+    //
+    // Le compteur 16 bits se recompose de ses deux moitiés, quel que soit
+    // l'ordre dans lequel le firmware les écrit.
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
+        const ProfilAvr::ProfilCompteur& compteur = p_.compteurs[numero];
+        if (!compteur.present) continue;
+        if (adresse != compteur.compte && adresse != compteur.compte_haut)
+            continue;
+        uint16_t compte = donnees_[compteur.compte];
+        if (compteur.compte_haut != ProfilAvr::kAbsent)
+            compte |= static_cast<uint16_t>(donnees_[compteur.compte_haut]) << 8;
+        compteurs_[numero].compte = compte;
+        // Le prédiviseur n'est pas remis à zéro par cette écriture : sur la
+        // puce non plus, il tourne pour tous les compteurs à la fois.
+        break;
+    }
     if (touche_les_sorties(adresse)) rafraichir_sorties();
 }
 
