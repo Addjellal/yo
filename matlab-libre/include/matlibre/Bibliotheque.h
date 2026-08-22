@@ -47,6 +47,10 @@ double argScalaire(const std::vector<Valeur>& args, std::size_t k, const char* n
 std::string argTexte(const std::vector<Valeur>& args, std::size_t k, const char* nom);
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin);
 int dimensionParDefaut(const Valeur& v);
+// Vrai si l'un des arguments est l'option « all » : la réduction porte
+// alors sur tous les éléments, comme depuis MATLAB R2018b.
+bool optionToutesDimensions(const std::vector<Valeur>& args);
+Valeur aplatirColonne(const Valeur& v);
 Classe classeDepuisNom(const std::string& nom, bool* trouve = nullptr);
 
 // Réductions le long d'une dimension (sum, prod, max, cumsum…).

@@ -53,6 +53,7 @@ FONCTION(fnMean) {
     exigerArguments(args, 1, 3, "mean");
     Valeur v = versDouble(args[0]);
     if (v.estVide()) return {Valeur::scalaire(NAN)};
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
     return {reduire(v, dim, false, moyenneDe)};
 }
@@ -62,6 +63,7 @@ FONCTION(fnMedian) {
     exigerArguments(args, 1, 3, "median");
     Valeur v = versDouble(args[0]);
     if (v.estVide()) return {Valeur::scalaire(NAN)};
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
     return {reduire(v, dim, false, [](const std::vector<double>& t) { return medianeDe(t); })};
 }

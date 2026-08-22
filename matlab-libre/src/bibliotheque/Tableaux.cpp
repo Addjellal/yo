@@ -77,6 +77,8 @@ FONCTION(fnSum) {
     INUTILISE
     exigerArguments(args, 1, 4, "sum");
     if (args[0].estVide()) return {Valeur::scalaire(0)};
+    if (optionToutesDimensions(args))
+        return {reductionSomme(aplatirColonne(args[0]), 0, false, omettreNaN(args))};
     int dim = dimensionArgument(args, 1, args[0]);
     return {reductionSomme(args[0], dim, false, omettreNaN(args))};
 }
@@ -84,6 +86,8 @@ FONCTION(fnProd) {
     INUTILISE
     exigerArguments(args, 1, 4, "prod");
     if (args[0].estVide()) return {Valeur::scalaire(1)};
+    if (optionToutesDimensions(args))
+        return {reductionSomme(aplatirColonne(args[0]), 0, true, omettreNaN(args))};
     int dim = dimensionArgument(args, 1, args[0]);
     return {reductionSomme(args[0], dim, true, omettreNaN(args))};
 }
@@ -128,6 +132,10 @@ std::vector<Valeur> extremum(Interpreteur& it, std::vector<Valeur>& args, int na
     (void)it;
     const char* nom = maximum ? "max" : "min";
     exigerArguments(args, 1, 4, nom);
+    if (optionToutesDimensions(args)) {
+        std::vector<Valeur> plat = {aplatirColonne(args[0])};
+        return extremum(it, plat, nargout, maximum);
+    }
     if (args.size() >= 2 && !args[1].estVide()) {
         Valeur a = enDouble(args[0]), b = enDouble(args[1]);
         Classe cr = classeResultat(args[0], args[1], nom);
@@ -360,7 +368,8 @@ FONCTION(fnAny) {
     exigerArguments(args, 1, 2, "any");
     Valeur v = enDouble(args[0]);
     if (v.estVide()) return {Valeur::booleen(false)};
-    if (v.estVecteur() && args.size() < 2) {
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
+    if (v.estVecteur() && (args.size() < 2 || optionToutesDimensions(args))) {
         for (std::size_t k = 0; k < v.re.size(); ++k)
             if (v.re[k] != 0 || (!v.im.empty() && v.im[k] != 0))
                 return {Valeur::booleen(true)};
@@ -381,7 +390,8 @@ FONCTION(fnAll) {
     exigerArguments(args, 1, 2, "all");
     Valeur v = enDouble(args[0]);
     if (v.estVide()) return {Valeur::booleen(true)};
-    if (v.estVecteur() && args.size() < 2) {
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
+    if (v.estVecteur() && (args.size() < 2 || optionToutesDimensions(args))) {
         for (std::size_t k = 0; k < v.re.size(); ++k)
             if (v.re[k] == 0 && (v.im.empty() || v.im[k] == 0))
                 return {Valeur::booleen(false)};
@@ -471,6 +481,27 @@ CleValeur cleDe(const Valeur& v, std::size_t k) {
     return c;
 }
 
+// Quand l'un des ensembles est une cellule ou un tableau de chaînes, un
+// tableau de caractères compte pour un seul élément : « ismember('b',
+// {'a','b'}) » est vrai, alors que « ismember('abc','bcd') » compare les
+// codes un à un.
+bool ensembleDeTextes(const Valeur& v) {
+    return v.classe == Classe::Cellule || v.classe == Classe::Chaine;
+}
+
+std::vector<CleValeur> clesDe(const Valeur& v, bool commeTexte) {
+    std::vector<CleValeur> cles;
+    if (commeTexte && v.classe == Classe::Caractere) {
+        CleValeur c;
+        c.texte = true;
+        c.chaine = v.versTexte();
+        cles.push_back(c);
+        return cles;
+    }
+    for (std::size_t k = 0; k < v.nelem(); ++k) cles.push_back(cleDe(v, k));
+    return cles;
+}
+
 Valeur elementDe(const Valeur& v, const std::vector<std::size_t>& indices, bool colonne) {
     Valeur r;
     if (v.classe == Classe::Cellule) {
@@ -535,24 +566,22 @@ FONCTION(fnIsmember) {
     exigerArguments(args, 2, 3, "ismember");
     const Valeur& a = args[0];
     const Valeur& b = args[1];
+    bool commeTexte = ensembleDeTextes(a) || ensembleDeTextes(b);
+    std::vector<CleValeur> clesA = clesDe(a, commeTexte);
+    std::vector<CleValeur> clesB = clesDe(b, commeTexte);
     std::map<CleValeur, std::size_t> table;
-    for (std::size_t k = 0; k < b.nelem(); ++k) {
-        CleValeur c = cleDe(b, k);
-        if (!table.count(c)) table[c] = k + 1;
-    }
-    Valeur r = Valeur::matriceDims(a.dims);
+    for (std::size_t k = 0; k < clesB.size(); ++k)
+        if (!table.count(clesB[k])) table[clesB[k]] = k + 1;
+    Dims forme = (clesA.size() == a.nelem()) ? a.dims : Dims{1, 1};
+    Valeur r = Valeur::matriceDims(forme);
     r.classe = Classe::Logique;
-    Valeur pos = Valeur::matriceDims(a.dims);
-    for (std::size_t k = 0; k < a.nelem(); ++k) {
-        auto t = table.find(cleDe(a, k));
+    Valeur pos = Valeur::matriceDims(forme);
+    r.re.assign(clesA.size(), 0.0);
+    pos.re.assign(clesA.size(), 0.0);
+    for (std::size_t k = 0; k < clesA.size(); ++k) {
+        auto t = table.find(clesA[k]);
         r.re[k] = t == table.end() ? 0 : 1;
         pos.re[k] = t == table.end() ? 0 : (double)t->second;
-    }
-    if (a.classe == Classe::Cellule || a.classe == Classe::Chaine) {
-        r.cellules.clear();
-        r.chaines.clear();
-        r.re.resize(a.nelem());
-        pos.re.resize(a.nelem());
     }
     if (nargout >= 2) return {r, pos};
     return {r};

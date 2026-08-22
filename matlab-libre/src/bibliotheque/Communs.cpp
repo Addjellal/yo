@@ -67,6 +67,20 @@ int dimensionParDefaut(const Valeur& v) {
     return 0;
 }
 
+bool optionToutesDimensions(const std::vector<Valeur>& args) {
+    for (std::size_t k = 1; k < args.size(); ++k) {
+        const Valeur& a = args[k];
+        if ((a.estTexte() || a.estChaine()) && a.versTexte() == "all") return true;
+    }
+    return false;
+}
+
+Valeur aplatirColonne(const Valeur& v) {
+    Valeur r = v;
+    r.dims = {(int)v.nelem(), 1};
+    return r;
+}
+
 Classe classeDepuisNom(const std::string& nom, bool* trouve) {
     if (trouve) *trouve = true;
     if (nom == "double") return Classe::Double;

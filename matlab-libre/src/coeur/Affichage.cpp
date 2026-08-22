@@ -30,8 +30,11 @@ std::string rendreScalaire(double x, int format) {
     if (std::isinf(x)) return x > 0 ? "Inf" : "-Inf";
     switch (f) {
         case Format::Long:
+            // « format long » montre quinze décimales, pas quinze chiffres
+            // significatifs : pi s'écrit 3.141592653589793.
             if (estEntierAffichable(x)) return formater("%.0f", x);
-            return formater("%.15g", x);
+            if (std::fabs(x) >= 1e5 || std::fabs(x) < 1e-5) return formater("%.15e", x);
+            return formater("%.15f", x);
         case Format::CourtE: return formater("%.4e", x);
         case Format::LongE: return formater("%.15e", x);
         case Format::CourtG: return formater("%g", x);
