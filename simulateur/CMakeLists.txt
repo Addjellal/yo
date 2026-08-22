@@ -219,7 +219,7 @@ add_test(NAME coeur COMMAND tests_coeur)
 # peut pas assainir un binaire déjà compilé.
 #
 #   cmake -S . -B build-san -DSANITISER=ON -DCMAKE_BUILD_TYPE=Debug
-#   cmake --build build-san -j8 --target tests_coeur tests_schema
+#   cmake --build build-san -j8
 #   ctest --test-dir build-san -L sanitiseurs
 #
 # La détection de fuites est éteinte : Qt et ngspice en laissent au dernier
@@ -608,14 +608,24 @@ if(SANITISER)
   # Autrement dit : TOUT le code Qt du schéma — la scène, les fils, les
   # ancres, la découpe — n'a jamais tourné sous ASan. C'est précisément là
   # qu'un use-after-free a été trouvé à la main, faute d'outil.
-  set(CIBLES_ASSAINIES coeur tests_coeur)
-  if(TARGET schema)
-    list(APPEND CIBLES_ASSAINIES schema)
-  endif()
-  if(TARGET tests_schema)
-    list(APPEND CIBLES_ASSAINIES tests_schema)
-  endif()
+  #
+  # ET LA LISTE A ÉTÉ OUBLIÉE UNE FOIS DE PLUS.
+  #
+  # Corrigée pour `schema` et `tests_schema`, elle laissait toujours de côté
+  # `simulateur` — l'APPLICATION elle-même — et `generer_figures`. Un simple
+  # `cmake --build build-san` échouait donc à l'édition de liens, et l'échec
+  # restait invisible parce que la commande documentée ci-dessus ne demande
+  # que les deux bancs. Autrement dit : le binaire que l'utilisateur lance
+  # n'a JAMAIS tourné sous ASan.
+  #
+  # Une liste tenue à la main se périme : on prend maintenant toutes les
+  # cibles du projet, et il n'y a plus rien à tenir à jour.
+  get_property(CIBLES_ASSAINIES DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
   foreach(cible ${CIBLES_ASSAINIES})
+    get_target_property(genre ${cible} TYPE)
+    if(genre STREQUAL "INTERFACE_LIBRARY" OR genre STREQUAL "UTILITY")
+      continue()
+    endif()
     target_compile_options(${cible} PRIVATE
       -fsanitize=address,undefined -fno-omit-frame-pointer -g)
     target_link_options(${cible} PRIVATE -fsanitize=address,undefined)
