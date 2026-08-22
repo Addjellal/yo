@@ -1,5 +1,7 @@
 #include "coeur/documents/Documents.h"
 
+#include "coeur/pcb/Empreintes.h"
+
 #include <algorithm>
 #include <cmath>
 #include <ctime>
@@ -116,8 +118,18 @@ std::vector<LigneNomenclature> nomenclature(const Netlist& netlist) {
     for (const auto& instance : netlist.instances()) {
         const Modele* modele = modele_de(instance);
         if (!modele) continue;
-        // Masse et symboles d'alimentation ne s'achètent pas.
-        if (est_symbole_alimentation(modele)) continue;
+        // NI LES SYMBOLES, NI LES INSTRUMENTS VIRTUELS.
+        //
+        // Masse et alimentations ne s'achètent pas — c'était déjà écarté. Mais
+        // un voltmètre, un ampèremètre, un oscilloscope non plus : ce sont des
+        // sondes de simulation, sans existence physique, et elles figuraient
+        // dans le tableau « qu'on envoie au fournisseur ».
+        //
+        // Le critère existait déjà, et servait déjà au placement sur la
+        // carte : `empreintes::physique`. Il n'avait simplement pas été
+        // appliqué ici. Deux endroits qui répondent à la même question doivent
+        // la poser de la même façon.
+        if (!empreintes::physique(*modele)) continue;
 
         const std::string valeur = valeur_lisible(instance);
         auto trouvee = std::find_if(
@@ -431,7 +443,9 @@ std::string netlist_kicad(const Netlist& netlist) {
     flux << "  (components\n";
     for (const auto& instance : netlist.instances()) {
         const Modele* modele = modele_de(instance);
-        if (est_symbole_alimentation(modele)) continue;
+        // Même critère que la nomenclature : une sonde de simulation n'a rien
+        // à faire dans le fichier qui part vers le routage.
+        if (!modele || !empreintes::physique(*modele)) continue;
         flux << "    (comp (ref \"" << instance.reference << "\")\n";
         flux << "      (value \"" << valeur_lisible(instance) << "\")\n";
         if (modele && !modele->empreinte.nom.empty())
@@ -445,7 +459,7 @@ std::string netlist_kicad(const Netlist& netlist) {
     std::map<std::string, std::vector<std::pair<std::string, std::string>>> nets;
     for (const auto& instance : netlist.instances()) {
         const Modele* modele = modele_de(instance);
-        if (est_symbole_alimentation(modele)) continue;
+        if (!modele || !empreintes::physique(*modele)) continue;
         for (const auto& borne : instance.bornes) {
             if (borne.noeud.empty()) continue;
             nets[borne.noeud].emplace_back(instance.reference, borne.nom);

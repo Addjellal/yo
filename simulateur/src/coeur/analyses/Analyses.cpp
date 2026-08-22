@@ -100,16 +100,33 @@ double frequence_coupure(const Balayage& balayage, const Courbe& sortie,
         static_cast<size_t>(std::max_element(gains.begin(), gains.end())
                             - gains.begin());
     const double seuil = gains[sommet] - 3.0;
-    for (size_t k = sommet + 1; k < gains.size(); ++k) {
-        if (gains[k] > seuil) continue;
-        // interpolation dans l'espace logarithmique : c'est là que la courbe
-        // est droite, donc là que l'interpolation est juste.
-        const double g0 = gains[k - 1], g1 = gains[k];
-        const double f0 = balayage.abscisse[k - 1], f1 = balayage.abscisse[k];
+
+    // Interpolation dans l'espace logarithmique : c'est là que la courbe est
+    // droite, donc là que l'interpolation est juste.
+    auto interpoler = [&](size_t k0, size_t k1) {
+        const double g0 = gains[k0], g1 = gains[k1];
+        const double f0 = balayage.abscisse[k0], f1 = balayage.abscisse[k1];
         if (f0 <= 0 || f1 <= 0 || std::fabs(g1 - g0) < 1e-12) return f1;
         const double poids = (seuil - g0) / (g1 - g0);
         return std::pow(10.0, std::log10(f0)
                                   + poids * (std::log10(f1) - std::log10(f0)));
+    };
+
+    // ON CHERCHE DES DEUX CÔTÉS DU SOMMET.
+    //
+    // La recherche ne regardait que les fréquences SUPÉRIEURES au sommet —
+    // ce qui suppose un passe-bas, dont le gain redescend ensuite. Sur un
+    // passe-haut, le sommet est au bout du balayage et la coupure est de
+    // l'autre côté : la fonction rendait zéro, et le panneau se contentait
+    // alors d'omettre la ligne « coupure à … Hz ». Un filtre parfaitement
+    // caractérisé n'affichait aucune coupure, sans un mot d'explication.
+    for (size_t k = sommet + 1; k < gains.size(); ++k) {
+        if (gains[k] > seuil) continue;
+        return interpoler(k - 1, k);
+    }
+    for (size_t k = sommet; k-- > 0;) {
+        if (gains[k] > seuil) continue;
+        return interpoler(k + 1, k);
     }
     return 0.0;
 }

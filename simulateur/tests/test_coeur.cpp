@@ -222,6 +222,189 @@ static void test_ngspice() {
 }
 
 // ---------------------------------------------------------------------------
+// [30] AUDIT — cinq défauts trouvés en relisant la carte et les analyses
+// ---------------------------------------------------------------------------
+static void test_audit_carte_et_analyses() {
+    std::printf("\n[31] Audit : carte, documents, analyses\n");
+
+    // --- 1. UNE PASTILLE CMS N'A DE CUIVRE QUE SUR UNE FACE.
+    //
+    // La boucle qui grave les pastilles ne regardait pas la couche demandée —
+    // contrairement à celle des pistes, juste en dessous. Un boîtier monté en
+    // surface ressortait donc avec ses pastilles sur LES DEUX FACES : du
+    // cuivre qui n'existe pas, payé au fabricant et court-circuitant ce qui
+    // passe dessous.
+    {
+        coeur::Netlist netlist;
+        netlist.ajouter("U1", "capteur_courant");   // empreinte SOIC-8, CMS
+        netlist.relier("U1", "VCC", "P5V");
+        coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+        int cms = 0, traversantes = 0;
+        for (const auto& pastille : carte.pastilles()) {
+            if (pastille.mecanique()) continue;
+            (pastille.percage > 0 ? traversantes : cms)++;
+        }
+        verifier(cms > 0, "le boîtier d'essai est bien monté en surface",
+                 std::to_string(cms) + " pastille(s) sans perçage");
+        if (cms > 0) {
+            auto compter = [](const std::string& gerber) {
+                int n = 0;
+                for (std::size_t k = gerber.find("D03*"); k != std::string::npos;
+                     k = gerber.find("D03*", k + 1))
+                    ++n;
+                return n;
+            };
+            const int dessus = compter(carte.gerber(0));
+            const int dessous = compter(carte.gerber(1));
+            verifier(dessus > 0, "les pastilles sont gravées sur le dessus",
+                     std::to_string(dessus));
+            verifier(dessous == traversantes,
+                     "et le dessous ne reçoit QUE les trous traversants",
+                     std::to_string(dessous) + " flash(s) pour "
+                         + std::to_string(traversantes) + " traversante(s)");
+        }
+    }
+
+    // --- 2. LE CUIVRE DÉBORDE, PAS L'AXE.
+    //
+    // Le contrôle comparait les coordonnées brutes au contour : une piste d'un
+    // millimètre tracée pile sur le bord passait pour bonne, alors qu'un
+    // demi-millimètre de cuivre sort de la carte et sera coupé à la fraise.
+    {
+        coeur::Netlist netlist;
+        netlist.ajouter("R1", "resistance");
+        netlist.relier("R1", "1", "A");
+        netlist.relier("R1", "2", "B");
+        coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+        // Un contour large : la piste ne doit sortir QUE par sa demi-largeur,
+        // sinon le test passerait aussi sans le correctif, pour une autre
+        // raison — et ne prouverait rien.
+        carte.largeur = 40.0;
+        carte.hauteur = 40.0;
+        carte.pistes.push_back({"A", 0.0, 10.0, 0.0, 30.0, 1.0, 0});
+        const auto anomalies = carte.controler();
+        bool signalee = false;
+        for (const auto& a : anomalies)
+            if (a.message.find("hors du contour") != std::string::npos)
+                signalee = true;
+        verifier(signalee,
+                 "une piste dont le CUIVRE sort de la carte est signalée, "
+                 "même si son axe est pile sur le bord");
+    }
+
+    // --- 3. L'ENCOMBREMENT D'UNE PASTILLE, C'EST SON PLUS GRAND CÔTÉ.
+    //
+    // Une pastille CMS fait 0,65 mm de large pour 1,55 de haut : le
+    // demi-diamètre seul la croyait trois fois plus petite qu'elle n'est, et
+    // un foret qui la mord le long de son grand côté ne déclenchait rien. Le
+    // contrôle « piste frôle une pastille », quelques lignes plus bas, faisait
+    // pourtant déjà le calcul juste — la règle était écrite, pas appliquée.
+    {
+        coeur::Netlist netlist;
+        netlist.ajouter("U1", "capteur_courant");
+        netlist.relier("U1", "VCC", "P5V");
+        coeur::CartePcb carte = coeur::CartePcb::depuis_netlist(netlist);
+        const std::vector<coeur::PastillePosee> pastilles = carte.pastilles();
+        const coeur::PastillePosee* haute = nullptr;
+        for (const auto& p : pastilles)
+            if (!p.mecanique() && p.hauteur > p.diametre * 1.5) haute = &p;
+        verifier(haute != nullptr,
+                 "le boîtier a bien une pastille plus haute que large");
+        if (haute) {
+            // Un trou de fixation posé le long du GRAND côté, à une distance
+            // qui laisse le demi-diamètre tranquille (0,5 + 0,325 = 0,825 mm)
+            // mais entame la hauteur (0,5 + 0,775 = 1,275 mm).
+            coeur::PastillePosee trou;
+            trou.composant = carte.composants.front().reference;
+            trou.numero = 0;              // ni numéro ni borne : c'est un trou,
+            trou.borne.clear();           // pas du cuivre — voir mecanique()
+            trou.percage = 1.0;
+            trou.diametre = 1.0;
+            // Les pastilles d'un composant sont relatives à son centre.
+            trou.x = haute->x - carte.composants.front().x;
+            trou.y = haute->y - carte.composants.front().y + 1.0;
+            carte.composants.front().pastilles.push_back(trou);
+            bool signale = false;
+            for (const auto& a : carte.controler())
+                if (a.message.find("trou de fixation dans la pastille")
+                    != std::string::npos)
+                    signale = true;
+            verifier(signale,
+                     "un foret qui mord une pastille par son grand côté est "
+                     "signalé");
+        }
+    }
+
+    // --- 4. UN INSTRUMENT VIRTUEL NE S'ACHÈTE NI NE SE ROUTE.
+    //
+    // Un voltmètre figurait dans le tableau « qu'on envoie au fournisseur »,
+    // et dans le fichier qui part vers le routage. Le critère existait
+    // pourtant déjà, et servait déjà au placement sur la carte : il n'avait
+    // simplement pas été appliqué ici.
+    {
+        coeur::Netlist netlist;
+        auto& r = netlist.ajouter("R1", "resistance");
+        r.valeurs["ohms"] = 220;
+        netlist.relier("R1", "1", "A");
+        netlist.relier("R1", "2", "B");
+        netlist.ajouter("VM1", "voltmetre");
+        netlist.relier("VM1", "+", "A");
+        netlist.relier("VM1", "-", "B");
+
+        bool voltmetre_liste = false, resistance_listee = false;
+        for (const auto& ligne : coeur::nomenclature(netlist)) {
+            if (ligne.type == "voltmetre") voltmetre_liste = true;
+            if (ligne.type == "resistance") resistance_listee = true;
+        }
+        verifier(resistance_listee, "la résistance figure à la nomenclature");
+        verifier(!voltmetre_liste,
+                 "le voltmètre, non : c'est une sonde, elle ne s'achète pas");
+
+        const std::string kicad = coeur::netlist_kicad(netlist);
+        verifier(kicad.find("\"R1\"") != std::string::npos,
+                 "la résistance part vers le routage");
+        verifier(kicad.find("\"VM1\"") == std::string::npos,
+                 "le voltmètre, non");
+    }
+
+    // --- 5. UN PASSE-HAUT A UNE COUPURE, LUI AUSSI.
+    //
+    // La recherche ne regardait que les fréquences SUPÉRIEURES au sommet — ce
+    // qui suppose un passe-bas, dont le gain redescend ensuite. Sur un
+    // passe-haut, le sommet est au bout du balayage et la coupure est de
+    // l'autre côté : la fonction rendait zéro, et le panneau se contentait
+    // alors d'omettre la ligne. Un filtre parfaitement caractérisé n'affichait
+    // aucune coupure, sans un mot.
+    {
+        const double fc = 1000.0;
+        coeur::Balayage balayage;
+        coeur::Courbe sortie;
+        for (int k = 0; k <= 80; ++k) {
+            const double f = 10.0 * std::pow(10.0, k / 20.0);   // 10 Hz → 100 kHz
+            balayage.abscisse.push_back(f);
+            const double x = f / fc;
+            sortie.valeurs.push_back(x / std::sqrt(1.0 + x * x));   // passe-haut
+        }
+        const double trouvee = coeur::frequence_coupure(balayage, sortie, nullptr);
+        verifier(std::fabs(trouvee - fc) < fc * 0.15,
+                 "la coupure d'un passe-haut est trouvée",
+                 f(trouvee) + " Hz au lieu de " + f(fc));
+
+        // Et le passe-bas continue de marcher : on ne remplace pas un trou
+        // par un autre.
+        coeur::Courbe passe_bas;
+        for (double freq : balayage.abscisse) {
+            const double x = freq / fc;
+            passe_bas.valeurs.push_back(1.0 / std::sqrt(1.0 + x * x));
+        }
+        const double bas = coeur::frequence_coupure(balayage, passe_bas, nullptr);
+        verifier(std::fabs(bas - fc) < fc * 0.15,
+                 "et celle d'un passe-bas ne s'est pas perdue en chemin",
+                 f(bas) + " Hz");
+    }
+}
+
+// ---------------------------------------------------------------------------
 static const char* kBlink = R"(
 #include <avr/io.h>
 
@@ -6162,6 +6345,8 @@ int main() {
     test_continuite_des_modeles();
     test_serie_reception();
     test_programme_multifichier();
+
+    test_audit_carte_et_analyses();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

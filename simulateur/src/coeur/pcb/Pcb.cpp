@@ -398,9 +398,17 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
         if (piste.largeur < largeur_mini)
             anomalies.push_back({"piste trop fine sur le net " + piste.net,
                                  piste.x1, piste.y1});
-        if (piste.x1 < 0 || piste.y1 < 0 || piste.x2 < 0 || piste.y2 < 0
-            || piste.x1 > largeur || piste.x2 > largeur || piste.y1 > hauteur
-            || piste.y2 > hauteur)
+        // LE CUIVRE DÉBORDE, PAS L'AXE.
+        //
+        // Le contrôle comparait les coordonnées brutes au contour : une piste
+        // d'un millimètre tracée pile sur le bord passait pour bonne, alors
+        // qu'un demi-millimètre de cuivre sort de la carte et sera coupé à la
+        // fraise. C'est la demi-largeur qui compte.
+        const double debord = piste.largeur / 2;
+        if (piste.x1 - debord < 0 || piste.y1 - debord < 0
+            || piste.x2 - debord < 0 || piste.y2 - debord < 0
+            || piste.x1 + debord > largeur || piste.x2 + debord > largeur
+            || piste.y1 + debord > hauteur || piste.y2 + debord > hauteur)
             anomalies.push_back({"piste hors du contour de la carte", piste.x1,
                                  piste.y1});
     }
@@ -420,7 +428,15 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
                 const double ecart = std::hypot(cuivre.x - trou.x,
                                                 cuivre.y - trou.y);
                 // Le foret mord la pastille dès qu'il entame son cuivre.
-                if (ecart >= trou.percage / 2 + cuivre.diametre / 2) continue;
+                //
+                // Et « son cuivre » se mesure sur son PLUS GRAND CÔTÉ : une
+                // pastille CMS fait 0,65 mm de large pour 1,55 de haut, et le
+                // demi-diamètre seul la croyait trois fois plus petite qu'elle
+                // n'est. Le contrôle « piste frôle une pastille », quelques
+                // lignes plus bas, faisait déjà le calcul juste.
+                const double encombrement =
+                    std::max(cuivre.diametre, cuivre.hauteur) / 2;
+                if (ecart >= trou.percage / 2 + encombrement) continue;
                 anomalies.push_back(
                     {"trou de fixation dans la pastille " + cuivre.composant
                          + "." + cuivre.borne + " : le perçage l'emporterait",
@@ -487,9 +503,11 @@ std::vector<CartePcb::AnomaliePcb> CartePcb::controler(
             // Deux pastilles d'un même boîtier sont à leur écartement normalisé
             // : c'est l'affaire de l'empreinte, pas du contrôle de la carte.
             if (toutes[a].composant == toutes[b].composant) continue;
+            // Même règle qu'au-dessus : le plus grand côté, pas la largeur.
             const double marge =
                 std::hypot(toutes[a].x - toutes[b].x, toutes[a].y - toutes[b].y)
-                - (toutes[a].diametre + toutes[b].diametre) / 2;
+                - (std::max(toutes[a].diametre, toutes[a].hauteur)
+                   + std::max(toutes[b].diametre, toutes[b].hauteur)) / 2;
             if (marge < isolation)
                 anomalies.push_back({"pastilles trop proches : "
                                          + toutes[a].composant + "." + toutes[a].borne
@@ -533,6 +551,14 @@ std::string CartePcb::gerber(int couche) const {
     // Pastilles : elles existent sur les deux faces d'un trou traversant.
     for (const PastillePosee& pastille : pastilles()) {
         if (pastille.mecanique()) continue;   // un trou de fixation n'est pas du cuivre
+        // UNE PASTILLE MONTÉE EN SURFACE N'A DE CUIVRE QUE SUR UNE FACE.
+        //
+        // La boucle ne regardait pas la couche demandée — contrairement à
+        // celle des pistes, juste en dessous. Un boîtier CMS ressortait donc
+        // avec ses pastilles gravées SUR LES DEUX FACES : du cuivre qui
+        // n'existe pas, payé au fabricant et court-circuitant ce qui passe
+        // dessous. Un trou traversant, lui, relie bien les deux faces.
+        if (pastille.percage <= 0 && couche != 0) continue;
         double largeur_pastille = pastille.diametre;
         double hauteur_pastille =
             pastille.hauteur > 0 ? pastille.hauteur : pastille.diametre;
