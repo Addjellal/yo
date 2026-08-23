@@ -60,6 +60,14 @@ struct Fonction {
     std::string texte;  // pour func2str
 };
 
+// --- tableau creux : colonnes comprimées, comme SuiteSparse et MATLAB ---
+struct DonneesCreuses {
+    std::vector<int> debutColonne;   // taille ncolonnes + 1
+    std::vector<int> ligne;          // indice de ligne de chaque non-nul
+    std::vector<double> valeur;      // valeurs non nulles
+    std::vector<double> imaginaire;  // vide si réel
+};
+
 // --- tableau de structures : chaque champ porte autant de valeurs que
 //     d'éléments dans le tableau, dans l'ordre des colonnes. ---
 struct ChampsStructure {
@@ -78,6 +86,11 @@ public:
     std::shared_ptr<ChampsStructure> st;    // Structure / Objet
     std::shared_ptr<Fonction> fn;           // Fonction
     std::string nomObjet;                   // Objet : nom de la classe
+    // Un objet de classe « handle » partage son état entre toutes ses
+    // copies : l'écriture ne détache donc pas la structure.
+    bool poigneeObjet = false;
+    // Tableau creux : rangement par colonnes comprimées (CSC).
+    std::shared_ptr<struct DonneesCreuses> creux;
 
     Valeur() = default;
 
@@ -116,6 +129,7 @@ public:
     bool estCellule() const { return classe == Classe::Cellule; }
     bool estStructure() const { return classe == Classe::Structure || classe == Classe::Objet; }
     bool estFonction() const { return classe == Classe::Fonction; }
+    bool estCreux() const { return creux != nullptr; }
     bool estReel() const { return im.empty(); }
 
     // ---- accès ----

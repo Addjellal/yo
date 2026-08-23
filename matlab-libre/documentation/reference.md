@@ -4,12 +4,14 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-537 fonctions ecrites en C++, reparties en 16 groupes.
+561 fonctions ecrites en C++, reparties en 18 groupes.
 
 | Groupe | Fichier |
 |---|---|
 | algebre | [natif-algebre.md](reference/natif-algebre.md) |
 | base | [natif-base.md](reference/natif-base.md) |
+| cartes | [natif-cartes.md](reference/natif-cartes.md) |
+| creux | [natif-creux.md](reference/natif-creux.md) |
 | es | [natif-es.md](reference/natif-es.md) |
 | fonctionnel | [natif-fonctionnel.md](reference/natif-fonctionnel.md) |
 | graphique | [natif-graphique.md](reference/natif-graphique.md) |
@@ -27,7 +29,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-429 fonctions ecrites dans le langage, reparties en 51 toolboxes.
+463 fonctions ecrites dans le langage, reparties en 52 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -80,5 +82,6 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
 | [`statistiques`](reference/toolbox-statistiques.md) | 27 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 14 |
+| [`types`](reference/toolbox-types.md) | 34 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |
 | [`vision`](reference/toolbox-vision.md) | 10 |

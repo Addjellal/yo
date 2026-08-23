@@ -5,6 +5,7 @@
 #include <complex>
 
 #include "matlibre/AlgebreLineaire.h"
+#include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"
 
 namespace matlibre {
@@ -189,6 +190,7 @@ static Valeur puissanceElement(const Valeur& a, const Valeur& b) {
 }
 
 Valeur transposer(const Valeur& a, bool conjuguee) {
+    if (a.estCreux()) return transposeeCreuse(a);
     if (a.dims.size() > 2)
         erreur("MATLAB:transpose:NDArray", "Transpose on ND array is not defined.");
     Valeur r = a;
@@ -281,6 +283,35 @@ static bool scalaireSimple(const Valeur& v) {
 }
 
 Valeur operationBinaire(const std::string& op, const Valeur& ga, const Valeur& gb) {
+    // Matrices creuses : les opérations qui gardent la structure creuse
+    // sont traitées telles quelles ; les autres passent par le dense, ce
+    // qui garantit un résultat identique quel que soit le stockage.
+    if (ga.estCreux() || gb.estCreux()) {
+        bool deuxCreuses = ga.estCreux() && gb.estCreux();
+        if (deuxCreuses && (op == "+" || op == "-"))
+            return sommeCreuse(ga, gb, op == "+" ? 1.0 : -1.0);
+        if (deuxCreuses && op == ".*") return produitElementCreux(ga, gb);
+        if (op == "*" && !ga.estScalaire() && !gb.estScalaire() && ga.estCreux())
+            return produitCreux(ga, gb);
+        if (op == "*" && !ga.estScalaire() && !gb.estScalaire() && gb.estCreux())
+            return transposeeCreuse(produitCreux(transposeeCreuse(gb), transposer(assurerDense(ga), false)));
+        if (op == "\\" && ga.estCreux()) return resoudreCreux(ga, assurerDense(gb));
+        if ((op == "*" || op == ".*" || op == "/" || op == "./") &&
+            (ga.estScalaire() || gb.estScalaire())) {
+            // Un facteur scalaire préserve la structure creuse.
+            const Valeur& creuse = ga.estCreux() ? ga : gb;
+            double facteur = ga.estCreux() ? gb.scal() : ga.scal();
+            if (op == "/" || op == "./") {
+                if (!ga.estCreux()) return operationBinaire(op, assurerDense(ga), assurerDense(gb));
+                facteur = 1.0 / facteur;
+            }
+            Valeur r = creuse;
+            r.creux = std::make_shared<DonneesCreuses>(*creuse.creux);
+            for (auto& v : r.creux->valeur) v *= facteur;
+            return r;
+        }
+        return operationBinaire(op, assurerDense(ga), assurerDense(gb));
+    }
     if (scalaireSimple(ga) && scalaireSimple(gb) && op.size() <= 2) {
         double x = ga.re[0], y = gb.re[0];
         switch (op[0]) {

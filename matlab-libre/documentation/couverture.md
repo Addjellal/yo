@@ -11,13 +11,18 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **537 fonctions natives** couvrant le MATLAB de base.
-- **429 fonctions de toolbox** réparties en 51 modules, écrites dans le
+- **561 fonctions natives** couvrant le MATLAB de base.
+- **463 fonctions de toolbox** réparties en 52 modules, écrites dans le
   langage.
+- **Les types de données de MATLAB moderne** : `duration`,
+  `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
+  `containers.Map` et les tableaux creux `sparse`, avec leurs
+  constructeurs, leurs conversions et leur affichage.
 - **Un rendu graphique** en SVG : courbes, barres, nuages, tiges,
   escaliers, images, sous-graphes, légendes, échelles logarithmiques.
-- **Des tests** : 57 vérifications C++ sur le cœur, et six suites en
-  langage MATLAB dont une qui contrôle un résultat exact par toolbox.
+- **Des tests** : 57 vérifications C++ sur le cœur, et sept suites en
+  langage MATLAB dont une qui contrôle un résultat exact par toolbox et
+  une qui contrôle les types de données valeur par valeur.
 
 ## Ce qui n'est pas là
 
@@ -46,10 +51,15 @@ totalité.
    Chaque module offre entre 4 et 27 fonctions, choisies pour être celles
    qu'on appelle d'abord. La Signal Processing Toolbox de MathWorks en
    compte plusieurs centaines.
-5. **Pas de tableaux creux** (`sparse`), pas de `table` ni `timetable`,
-   pas de `datetime`/`duration`, pas de `containers.Map`, pas de
-   `categorical`. Les structures et les cellules les remplacent dans la
-   plupart des scripts.
+5. **Les types de données modernes sont là, mais partiellement.**
+   `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
+   `timetable`, `containers.Map` et `sparse` existent avec leurs
+   opérations courantes. Manquent : les fuseaux horaires réels de
+   `datetime` (la propriété `TimeZone` est conservée mais n'applique
+   aucun décalage), `stack`/`unstack`, `withtol`/`timerange`,
+   `groupsummary` sur plusieurs dimensions, la lecture de feuilles
+   Excel, et les tableaux creux logiques ou complexes creux au-delà du
+   stockage.
 6. **Pas de calcul parallèle réel.** `parfor` et `spmd` s'exécutent
    séquentiellement : le résultat est le même, le temps ne l'est pas.
 7. **Pas de MEX, pas d'interface Java, pas d'interface Python.**
@@ -60,7 +70,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test           # 57 vérifications C++ + 6 suites en langage MATLAB
+make test           # 57 vérifications C++ + 7 suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

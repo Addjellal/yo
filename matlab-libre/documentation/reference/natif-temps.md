@@ -44,6 +44,30 @@ datevec  Numero de serie -> vecteur.
 etime  Secondes entre deux vecteurs d'horloge.
 ```
 
+## `matlibre_addmonths`
+
+```
+matlibre_addmonths  Ajout de mois calendaires avec calage de fin de mois.
+```
+
+## `matlibre_num2ymd`
+
+```
+matlibre_num2ymd  Numero de serie -> matrice Nx6 de composantes.
+```
+
+## `matlibre_weekday`
+
+```
+matlibre_weekday  Jour de la semaine (1 = dimanche), vectorise.
+```
+
+## `matlibre_ymd2num`
+
+```
+matlibre_ymd2num  Composantes de date -> numero de serie (vectorise).
+```
+
 ## `now`
 
 ```

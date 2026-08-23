@@ -337,6 +337,9 @@ void Valeur::detacherStructure() {
         st = std::make_shared<ChampsStructure>();
         return;
     }
+    // Une classe « handle » partage son état : ses copies doivent voir la
+    // modification, on ne détache donc pas.
+    if (poigneeObjet) return;
     if (st.use_count() > 1) st = std::make_shared<ChampsStructure>(*st);
 }
 

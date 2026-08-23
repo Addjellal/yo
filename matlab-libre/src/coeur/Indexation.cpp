@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Operations.h"
@@ -102,13 +103,33 @@ static void copierCase(Valeur& dst, std::size_t di, const Valeur& src, std::size
             dst.chaines[di] = si < src.chaines.size() ? src.chaines[si] : std::string();
             break;
         case Classe::Structure:
-        case Classe::Objet:
+        case Classe::Objet: {
+            // Écrire une structure dans un tableau de structures peut y
+            // introduire des champs nouveaux : MATLAB les ajoute alors à
+            // tout le tableau, vides ailleurs (« s(1).a = 1; s(1).b = 2 »).
+            if (src.st) {
+                bool manque = false;
+                for (const auto& nom : src.st->ordre)
+                    if (!dst.st || dst.st->champs.find(nom) == dst.st->champs.end())
+                        manque = true;
+                if (manque) {
+                    dst.detacherStructure();
+                    for (const auto& nom : src.st->ordre) {
+                        if (dst.st->champs.find(nom) != dst.st->champs.end()) continue;
+                        dst.st->ordre.push_back(nom);
+                        dst.st->champs[nom] =
+                            std::vector<Valeur>(dst.nelem(), Valeur::vide());
+                    }
+                }
+            }
             for (auto& kv : dst.st->champs) {
-                const auto it = src.st ? src.st->champs.find(kv.first) : decltype(src.st->champs.end())();
+                const auto it = src.st ? src.st->champs.find(kv.first)
+                                       : decltype(src.st->champs.end())();
                 if (src.st && it != src.st->champs.end() && si < it->second.size())
                     kv.second[di] = it->second[si];
             }
             break;
+        }
         default:
             dst.re[di] = si < src.re.size() ? src.re[si] : 0.0;
             if (!dst.im.empty()) dst.im[di] = si < src.im.size() ? src.im[si] : 0.0;
@@ -130,6 +151,10 @@ Valeur Interpreteur::indexer(const Valeur& base, std::vector<Valeur>& idx, char 
 
 std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<Valeur>& idx,
                                                char genre) {
+    if (base.estCreux()) {
+        Valeur dense = denseDepuisCreux(base);
+        return indexerListe(dense, idx, genre);
+    }
     if (genre == '{' && base.classe != Classe::Cellule)
         erreur("MATLAB:cellRefFromNonCell",
                formater("Brace indexing is not supported for variables of this type. "
@@ -346,6 +371,12 @@ static Valeur supprimer(const Valeur& base, std::vector<Valeur>& idx) {
 }
 
 static Valeur ecrire(Valeur base, std::vector<Valeur>& idx, const Valeur& valeur, char genre) {
+    if (base.estCreux()) {
+        // L'écriture passe par le dense puis revient au creux : c'est le
+        // comportement observable de MATLAB, au coût près.
+        Valeur dense = denseDepuisCreux(base);
+        return creuxDepuisDense(ecrire(std::move(dense), idx, valeur, genre));
+    }
     Valeur v = valeur;
     if (genre == '{') {
         if (base.classe != Classe::Cellule && base.estVide()) base = Valeur::celluleDims({0, 0});

@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <regex>
+#include <set>
 #include <sstream>
 
 #include "matlibre/Bibliotheque.h"
@@ -696,6 +697,90 @@ FONCTION(fnNatsort) {
     return {args[0]};
 }
 
+
+// --- espace de noms matlab.lang ------------------------------------------
+
+// Rend un identifiant valide : lettres, chiffres et « _ », premier caractère
+// alphabétique. Les autres caractères deviennent « _ », et un nom vide ou
+// commençant par un chiffre reçoit le préfixe « x », comme le documente
+// matlab.lang.makeValidName.
+std::string rendreNomValide(const std::string& entree) {
+    std::string s;
+    for (char c : entree) {
+        if (std::isalnum((unsigned char)c) || c == '_') s += c;
+        else if (!s.empty() || true) s += '_';
+    }
+    // Un blanc suivi d'une lettre donne une majuscule dans MATLAB ; on garde
+    // ici la substitution simple par « _ », plus lisible et réversible.
+    while (!s.empty() && s.back() == '_' && s.size() > 1 && entree.back() != '_')
+        s.pop_back();
+    if (s.empty()) s = "x";
+    if (!std::isalpha((unsigned char)s[0])) s = "x" + s;
+    if (s.size() > 63) s = s.substr(0, 63);
+    return s;
+}
+
+FONCTION(fnMakeValidName) {
+    INUTILISE
+    exigerArguments(args, 1, 3, "matlab.lang.makeValidName");
+    const Valeur& v = args[0];
+    if (v.classe == Classe::Cellule) {
+        Valeur r = v;
+        for (std::size_t k = 0; k < r.cellules.size(); ++k)
+            r.cellules[k] = Valeur::texte(rendreNomValide(r.cellules[k].versTexte()));
+        return {r};
+    }
+    if (v.classe == Classe::Chaine) {
+        Valeur r = v;
+        for (auto& c : r.chaines) c = rendreNomValide(c);
+        return {r};
+    }
+    return {Valeur::texte(rendreNomValide(v.versTexte()))};
+}
+
+FONCTION(fnMakeUniqueStrings) {
+    INUTILISE
+    exigerArguments(args, 1, 3, "matlab.lang.makeUniqueStrings");
+    std::vector<std::string> noms;
+    bool cellule = args[0].classe == Classe::Cellule;
+    if (cellule)
+        for (const auto& c : args[0].cellules) noms.push_back(c.versTexte());
+    else
+        noms.push_back(args[0].versTexte());
+    std::set<std::string> vus;
+    for (auto& n : noms) {
+        if (!vus.count(n)) { vus.insert(n); continue; }
+        int k = 1;
+        std::string candidat;
+        do {
+            candidat = n + "_" + std::to_string(k++);
+        } while (vus.count(candidat));
+        n = candidat;
+        vus.insert(n);
+    }
+    if (!cellule) return {Valeur::texte(noms[0])};
+    std::vector<Valeur> cases;
+    for (const auto& n : noms) cases.push_back(Valeur::texte(n));
+    Valeur r = Valeur::celluleLigne(cases);
+    r.dims = args[0].dims;
+    return {r};
+}
+
+FONCTION(fnIsValidName) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "isvarname");
+    std::string s = args[0].versTexte();
+    bool ok = !s.empty() && (std::isalpha((unsigned char)s[0]) != 0);
+    for (char c : s)
+        if (!std::isalnum((unsigned char)c) && c != '_') ok = false;
+    static const std::set<std::string> motsCles = {
+        "break", "case", "catch", "classdef", "continue", "else", "elseif", "end",
+        "for", "function", "global", "if", "otherwise", "parfor", "persistent",
+        "return", "spmd", "switch", "try", "while"};
+    if (motsCles.count(s)) ok = false;
+    return {Valeur::booleen(ok)};
+}
+
 }  // namespace
 
 void enregistrerTexte(Interpreteur& it) {
@@ -739,6 +824,12 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("natsort", fnNatsort, "texte", "natsort  Tri naturel (identite ici).");
     it.enregistrer("strip", fnStrtrim, "texte", "strip  Retire les blancs aux deux bouts.");
     it.enregistrer("num2str_", fnStrtrimNombre, "texte", "num2str_  Reserve.");
+    it.enregistrer("matlab.lang.makeValidName", fnMakeValidName, "texte",
+                   "matlab.lang.makeValidName  Rend un identifiant valide.");
+    it.enregistrer("matlab.lang.makeUniqueStrings", fnMakeUniqueStrings, "texte",
+                   "matlab.lang.makeUniqueStrings  Rend les noms uniques.");
+    it.enregistrer("isvarname", fnIsValidName, "texte",
+                   "isvarname  Vrai si le texte est un nom de variable valide.");
 }
 
 }  // namespace matlibre

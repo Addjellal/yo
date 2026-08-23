@@ -7,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Operations.h"
@@ -274,6 +275,7 @@ static std::string rendreStructure(const Valeur& v, int format, bool compact, in
 
 std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur) {
     Format f = (Format)format;
+    if (v.estCreux()) return rendreCreux(v);
     switch (v.classe) {
         case Classe::Fonction:
             return "    " + (v.fn ? v.fn->texte : std::string("@()")) + "\n";
@@ -318,6 +320,23 @@ std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur)
 
 void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v) {
     std::ostream& os = it.sortie();
+    // Une classe qui définit display prend en charge tout l'affichage ; si
+    // elle ne définit que disp, on écrit l'en-tête « nom = » puis on lui
+    // laisse le corps, comme le fait l'affichage par défaut de MATLAB.
+    if (v.classe == Classe::Objet && !it.estCarte(v)) {
+        auto def = it.classeDe(v);
+        if (def && def->aMethode("display")) {
+            it.appelerMethode(v, "display", {}, 0);
+            return;
+        }
+        if (def && def->aMethode("disp")) {
+            os << nom << " = \n";
+            if (!it.formatCompact) os << "\n";
+            it.appelerMethode(v, "disp", {}, 0);
+            if (!it.formatCompact) os << "\n";
+            return;
+        }
+    }
     int format = (int)it.format;
     bool compact = it.formatCompact;
     // Cas court : « x = 5 » sur une seule ligne.

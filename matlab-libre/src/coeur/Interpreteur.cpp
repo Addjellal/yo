@@ -11,12 +11,30 @@
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
 #include "matlibre/Bibliotheque.h"
+#include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Operations.h"
 
 namespace fs = std::filesystem;
 
 namespace matlibre {
+
+// Les méthodes d'une classe voient les fonctions locales écrites après le
+// bloc classdef ; elles ne se voient pas entre elles par leur nom : comme
+// dans MATLAB, un appel de méthode se résout sur la classe du premier
+// argument, sans quoi « numel(d.Secondes) » écrit dans la méthode numel
+// rappellerait cette méthode au lieu de la fonction du langage.
+static void relierClasse(const std::shared_ptr<DefinitionClasse>& def,
+                         const std::vector<std::shared_ptr<FonctionUtilisateur>>& locales) {
+    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
+    for (const auto& f : locales) voisines[f->nom] = f;
+    for (auto& kv : def->methodes) {
+        kv.second->voisines = voisines;
+        kv.second->classeProprietaire = def->nom;
+    }
+    for (const auto& f : locales) f->voisines = voisines;
+}
+
 
 GardePortee::GardePortee(Interpreteur& i, std::shared_ptr<Portee> p) : it(i) {
     it.piles_.push_back(std::move(p));
@@ -230,7 +248,10 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
     if (!u.classes.empty()) {
         // C'est un fichier de classe, pas de fonction : on le retient comme
         // tel et l'on ne rend rien.
-        for (auto& c : u.classes) cacheClasses_[c->nom] = c;
+        for (auto& c : u.classes) {
+            relierClasse(c, u.fonctions);
+            cacheClasses_[c->nom] = c;
+        }
         cacheFonctions_[nom] = nullptr;
         return nullptr;
     }
@@ -259,6 +280,68 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
     return u.fonctions[0];
 }
 
+// Concaténation d'un crochet : quand une classe définit horzcat ou vertcat,
+// MATLAB lui confie l'assemblage plutôt que d'empiler les propriétés.
+Valeur Interpreteur::concatenerObjets(const std::vector<std::vector<Valeur>>& rangees) {
+    auto methodeUtile = [&](const std::vector<Valeur>& liste,
+                            const std::string& methode) -> std::shared_ptr<DefinitionClasse> {
+        for (const auto& v : liste) {
+            if (v.classe != Classe::Objet || estCarte(v)) continue;
+            auto def = classeDe(v);
+            if (def && def->aMethode(methode)) return def;
+        }
+        return nullptr;
+    };
+    std::vector<Valeur> lignes;
+    for (const auto& r : rangees) {
+        std::vector<Valeur> elements;
+        for (const auto& v : r)
+            if (!(v.estVide() && v.classe == Classe::Double)) elements.push_back(v);
+        if (elements.empty()) continue;
+        auto def = methodeUtile(elements, "horzcat");
+        if (def && elements.size() > 1) {
+            Valeur acc = elements[0];
+            for (std::size_t k = 1; k < elements.size(); ++k) {
+                std::vector<Valeur> args = {acc, elements[k]};
+                auto res = appelerUtilisateur(def->methodes["horzcat"], args, 1);
+                acc = res.empty() ? Valeur::vide() : res[0];
+            }
+            lignes.push_back(acc);
+        } else if (def) {
+            lignes.push_back(elements[0]);
+        } else {
+            lignes.push_back(concatener(elements, 1));
+        }
+    }
+    if (lignes.empty()) return Valeur::vide();
+    auto def = methodeUtile(lignes, "vertcat");
+    if (def && lignes.size() > 1) {
+        Valeur acc = lignes[0];
+        for (std::size_t k = 1; k < lignes.size(); ++k) {
+            std::vector<Valeur> args = {acc, lignes[k]};
+            auto res = appelerUtilisateur(def->methodes["vertcat"], args, 1);
+            acc = res.empty() ? Valeur::vide() : res[0];
+        }
+        return acc;
+    }
+    if (def) return lignes[0];
+    return concatener(lignes, 0);
+}
+
+// Longueur, en nombre d'accès pointés, du plus long nom composé connu qui
+// commence par « nom ». Zéro si aucun n'existe.
+std::size_t Interpreteur::nomPointe(const std::string& nom,
+                                    const std::vector<ElementAcces>& acces) {
+    std::string compose = nom;
+    std::size_t meilleur = 0;
+    for (std::size_t k = 0; k < acces.size(); ++k) {
+        if (acces[k].genre != '.') break;
+        compose += "." + acces[k].nom;
+        if (natif(compose) || indexFichiers().count(compose)) meilleur = k + 1;
+    }
+    return meilleur;
+}
+
 std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string& nom) {
     auto itc = cacheClasses_.find(nom);
     if (itc != cacheClasses_.end()) return itc->second;
@@ -270,11 +353,13 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
         if (source.find("classdef") == std::string::npos) return nullptr;
         UniteCompilee u = compiler(source, itm->second);
         if (u.classes.empty()) return nullptr;
+        relierClasse(u.classes[0], u.fonctions);
         cacheClasses_[nom] = u.classes[0];
         return u.classes[0];
     }
     UniteCompilee u = compiler(lireFichier(it->second), it->second);
     if (u.classes.empty()) return nullptr;
+    relierClasse(u.classes[0], u.fonctions);
     cacheClasses_[nom] = u.classes[0];
     return u.classes[0];
 }
@@ -324,19 +409,45 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         if (it != p.fonction->voisines.end())
             return appelerUtilisateur(it->second, args, nargout);
     }
-    // Méthode d'un objet : dispatch sur la classe du premier argument.
-    if (!args.empty() && args[0].classe == Classe::Objet) {
-        auto def = classeDefinie(args[0].nomObjet);
-        if (def) {
+    // Méthode d'un objet : dispatch sur la classe de l'argument dominant.
+    // MATLAB retient le premier argument qui est un objet et dont la classe
+    // définit la méthode ; « varfun(@sum, T) » atteint ainsi table.varfun.
+    for (const auto& a : args) {
+        if (a.classe != Classe::Objet) continue;
+        auto def = classeDefinie(a.nomObjet);
+        if (!def) continue;
+        auto itm = def->methodes.find(nom);
+        if (itm != def->methodes.end()) return appelerUtilisateur(itm->second, args, nargout);
+        break;  // le premier objet décide : pas de méthode, pas de dispatch
+    }
+    if (!args.empty() && args[0].classe == Classe::Fonction) {
+        for (std::size_t k = 1; k < args.size(); ++k) {
+            if (args[k].classe != Classe::Objet) continue;
+            auto def = classeDefinie(args[k].nomObjet);
+            if (!def) continue;
             auto itm = def->methodes.find(nom);
             if (itm != def->methodes.end())
                 return appelerUtilisateur(itm->second, args, nargout);
+            break;
         }
     }
     auto uf = fonctionFichier(nom);
     if (uf) return appelerUtilisateur(uf, args, nargout);
     auto it = natifs_.find(nom);
-    if (it != natifs_.end()) return it->second.fonction(*this, args, nargout);
+    if (it != natifs_.end()) {
+        // Les fonctions qui ignorent le stockage creux reçoivent une copie
+        // dense : aucun résultat ne dépend alors du stockage.
+        static const std::set<std::string> saventLireCreux = {
+            "sparse", "full", "issparse", "nnz", "nonzeros", "spy", "size", "numel",
+            "length", "ndims", "isempty", "class", "isa", "isnumeric", "isreal",
+            "spalloc", "spones", "nzmax", "isequal", "disp", "display", "transpose",
+            "ctranspose", "spdiags", "speye", "sprand", "sprandn", "mtimes", "mldivide",
+            "plus", "minus", "times", "isdiag", "istriu", "istril", "issymmetric"};
+        if (!saventLireCreux.count(nom))
+            for (auto& a : args)
+                if (a.estCreux()) a = denseDepuisCreux(a);
+        return it->second.fonction(*this, args, nargout);
+    }
     auto def = classeDefinie(nom);
     if (def) return {construireObjet(*this, def, args)};
     erreur("MATLAB:UndefinedFunction",
@@ -441,7 +552,10 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
 
 void Interpreteur::executerTexte(const std::string& source, const std::string& origine) {
     UniteCompilee u = compiler(source, origine);
-    for (auto& c : u.classes) cacheClasses_[c->nom] = c;
+    for (auto& c : u.classes) {
+        relierClasse(c, u.fonctions);
+        cacheClasses_[c->nom] = c;
+    }
     if (!u.fonctions.empty()) {
         std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
         for (auto& f : u.fonctions) voisines[f->nom] = f;
@@ -459,6 +573,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
     std::string source = lireFichier(fichier);
     UniteCompilee u = compiler(source, fichier);
     for (auto& c : u.classes) cacheClasses_[c->nom] = c;
+    for (auto& c : u.classes) relierClasse(c, u.fonctions);
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
     for (auto& f : u.fonctions) {
         f->fichier = fichier;
@@ -514,6 +629,39 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
         courante = Valeur::vide();
     // « courante » est notre copie de travail : on la déplace ensuite de
     // proche en proche plutôt que de recopier le tableau à chaque étape.
+    if (courante.classe == Classe::Objet && !cible->acces.empty()) {
+        if (estCarte(courante) && cible->acces.size() == 1 && cible->acces[0].genre == '(') {
+            auto args = evaluerListe(cible->acces[0].args);
+            if (args.size() != 1)
+                erreur("MATLAB:Map:invalidKeyType",
+                       "Specify a single key when writing to a Map.");
+            ecrireCarte(courante, args[0], v);
+            return;
+        }
+        auto def = classeDe(courante);
+        if (def && def->aMethode("subsasgn") && !dansMethodeDe(courante.nomObjet)) {
+            Valeur s = substruct(cible->acces, 0, &courante);
+            auto r = appelerMethode(courante, "subsasgn", {s, v}, 1);
+            if (!r.empty()) {
+                Valeur o = r[0];
+                o.classe = Classe::Objet;
+                o.nomObjet = courante.nomObjet;
+                o.poigneeObjet = courante.poigneeObjet;
+                ecrireVariable(nom, std::move(o));
+            }
+            return;
+        }
+        if (cible->acces.size() == 1 &&
+            (cible->acces[0].genre == '.' || cible->acces[0].genre == '?')) {
+            std::string champ = cible->acces[0].nom;
+            if (cible->acces[0].genre == '?') {
+                auto args = evaluerListe(cible->acces[0].args);
+                if (!args.empty()) champ = args[0].versTexte();
+            }
+            ecrireVariable(nom, ecrireProprieteObjet(std::move(courante), champ, v));
+            return;
+        }
+    }
     Valeur nouvelle = affecterIndex(std::move(courante), cible->acces, 0, v, false);
     ecrireVariable(nom, std::move(nouvelle));
 }
@@ -787,8 +935,19 @@ Valeur Interpreteur::evaluer(const NoeudPtr& n) {
             if (a.classe != Classe::Objet) return operationUnaire(n->texte, a);
             break;
         }
-        case TypeN::OpPostfixe:
-            return transposer(evaluer(n->enfants[0]), n->texte == "'");
+        case TypeN::OpPostfixe: {
+            Valeur a = evaluer(n->enfants[0]);
+            // Une classe peut définir transpose et ctranspose.
+            if (a.classe == Classe::Objet && !estCarte(a)) {
+                const char* methode = n->texte == "'" ? "ctranspose" : "transpose";
+                auto def = classeDe(a);
+                if (def && def->aMethode(methode)) {
+                    auto r = appelerMethode(a, methode, {}, 1);
+                    if (!r.empty()) return r[0];
+                }
+            }
+            return transposer(a, n->texte == "'");
+        }
         default: break;
     }
     auto r = evaluerMulti(n, 1);
@@ -864,6 +1023,45 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                 courant = appelerValeur(*v, args, std::max(nargout, 1));
                 debut = 1;
             }
+        } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
+                   nomPointe(nom, n->acces) > 0) {
+            // Nom pointé, comme « containers.Map » ou
+            // « matlab.lang.makeValidName » : les premiers accès font partie
+            // du nom de la fonction. On retient le plus long qui existe.
+            std::size_t segments = nomPointe(nom, n->acces);
+            std::string compose = nom;
+            for (std::size_t k = 0; k < segments; ++k) compose += "." + n->acces[k].nom;
+            std::vector<Valeur> args;
+            debut = segments;
+            if (n->acces.size() > segments && n->acces[segments].genre == '(') {
+                args = evaluerListe(n->acces[segments].args);
+                debut = segments + 1;
+            }
+            courant = appeler(compose, args,
+                              debut < n->acces.size() ? 1 : std::max(nargout, 1));
+        } else if (!n->acces.empty() && n->acces[0].genre == '.' && classeDefinie(nom)) {
+            // Méthode statique ou propriété constante d'une classe.
+            auto def = classeDefinie(nom);
+            const std::string& membre = n->acces[0].nom;
+            if (def->aMethode(membre)) {
+                std::vector<Valeur> args;
+                debut = 1;
+                if (n->acces.size() > 1 && n->acces[1].genre == '(') {
+                    args = evaluerListe(n->acces[1].args);
+                    debut = 2;
+                }
+                courant = appelerUtilisateur(def->methodes[membre], args,
+                                             debut < n->acces.size() ? 1
+                                                                     : std::max(nargout, 1));
+            } else {
+                auto itd = def->defauts.find(membre);
+                if (itd == def->defauts.end() || !itd->second)
+                    erreur("MATLAB:noSuchMethodOrField",
+                           "Unrecognized method or property '" + membre + "' for class '" +
+                               nom + "'.");
+                courant.push_back(evaluer(itd->second));
+                debut = 1;
+            }
         } else {
             // Fonction : les arguments du premier accès sont ses paramètres.
             int demandees = nargout < 0 ? 1 : nargout;
@@ -889,7 +1087,28 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
         const ElementAcces& e = n->acces[k];
         bool dernier = (k + 1 == n->acces.size());
         std::vector<Valeur> suivant;
+        bool chaineConsommee = false;
         for (const Valeur& base : courant) {
+            if (base.classe == Classe::Objet) {
+                if (estCarte(base) && e.genre == '(') {
+                    auto args = evaluerListe(e.args);
+                    if (args.size() != 1)
+                        erreur("MATLAB:Map:invalidKeyType",
+                               "Specify a single key when reading from a Map.");
+                    suivant.push_back(lireCarte(base, args[0]));
+                    continue;
+                }
+                auto def = classeDe(base);
+                if (def && def->aMethode("subsref") && !dansMethodeDe(base.nomObjet)) {
+                    // La classe prend en charge toute la chaîne restante,
+                    // comme le veut la documentation de subsref.
+                    Valeur s = substruct(n->acces, k, &base);
+                    auto r = appelerMethode(base, "subsref", {s}, std::max(nargout, 1));
+                    for (auto& x : r) suivant.push_back(x);
+                    chaineConsommee = true;
+                    continue;
+                }
+            }
             if (e.genre == '(') {
                 if (base.classe == Classe::Fonction) {
                     auto args = evaluerListe(e.args);
@@ -931,6 +1150,10 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
                         continue;
                     }
                 }
+                if (base.classe == Classe::Objet) {
+                    suivant.push_back(lireProprieteObjet(base, nom));
+                    continue;
+                }
                 if (!base.estStructure())
                     erreur("MATLAB:structRefFromNonStruct",
                            formater("Dot indexing is not supported for variables of this "
@@ -943,6 +1166,7 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             }
         }
         courant = suivant;
+        if (chaineConsommee) break;
     }
 
     if (multi) *multi = courant;
@@ -976,6 +1200,31 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
                        "The 'end' operator must be used within an array index expression.");
             auto [base, position, total] = pileFin_.back();
             if (!base) return {Valeur::scalaire(0)};
+            if (base->classe == Classe::Objet) {
+                // Une classe peut définir « end », comme le prévoit la
+                // documentation ; sinon on interroge sa taille.
+                Valeur copie = *base;
+                auto def = classeDe(copie);
+                if (def && def->aMethode("end")) {
+                    auto r = appelerMethode(copie, "end",
+                                            {Valeur::scalaire(position + 1),
+                                             Valeur::scalaire(total)}, 1);
+                    if (!r.empty()) return {r[0]};
+                }
+                if (def && def->aMethode("size")) {
+                    auto r = appelerMethode(copie, "size", {}, 1);
+                    if (!r.empty() && r[0].nelem() > (std::size_t)position) {
+                        if (total == 1) {
+                            double n2 = 1;
+                            for (std::size_t d = 0; d < r[0].nelem(); ++d) n2 *= r[0].re[d];
+                            return {Valeur::scalaire(n2)};
+                        }
+                        return {Valeur::scalaire(r[0].re[(std::size_t)position])};
+                    }
+                }
+                if (estCarte(copie))
+                    return {Valeur::scalaire((double)carteDe(copie)->ordre.size())};
+            }
             std::size_t taille;
             if (total == 1) {
                 taille = base->nelem();
@@ -1031,6 +1280,16 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
         }
         case TypeN::OpPostfixe: {
             Valeur a = evaluer(n->enfants[0]);
+            // Une classe peut définir transpose et ctranspose : « x.' » et
+            // « x' » passent alors par elles.
+            if (a.classe == Classe::Objet && !estCarte(a)) {
+                const char* methode = n->texte == "'" ? "ctranspose" : "transpose";
+                auto def = classeDe(a);
+                if (def && def->aMethode(methode)) {
+                    auto r = appelerMethode(a, methode, {}, 1);
+                    if (!r.empty()) return {r[0]};
+                }
+            }
             return {transposer(a, n->texte == "'")};
         }
         case TypeN::Plage: {
@@ -1042,7 +1301,7 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
         case TypeN::Matrice: {
             std::vector<std::vector<Valeur>> rangees;
             for (const auto& r : n->rangees) rangees.push_back(evaluerListe(r));
-            return {concatenerRangees(rangees)};
+            return {concatenerObjets(rangees)};
         }
         case TypeN::Cellule: {
             std::vector<std::vector<Valeur>> rangees;

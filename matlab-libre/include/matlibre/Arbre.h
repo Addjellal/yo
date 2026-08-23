@@ -60,6 +60,10 @@ struct FonctionUtilisateur {
     NoeudPtr corps;
     std::string fichier;
     std::string aide;  // bloc de commentaires d'en-tête
+    // Nom de la classe propriétaire quand la fonction est une méthode : à
+    // l'intérieur d'une méthode, l'indexation d'un objet de cette classe
+    // reste l'indexation par défaut, subsref/subsasgn ne sont pas appelés.
+    std::string classeProprietaire;
     // Sous-fonctions du même fichier, visibles seulement depuis lui.
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
     bool variadiqueEntree() const {
@@ -79,7 +83,16 @@ struct DefinitionClasse {
     std::map<std::string, NoeudPtr> defauts;  // valeur par défaut (expression)
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> methodes;
     std::vector<std::string> constantes;
+    std::vector<std::string> dependantes;   // propriétés calculées par get.
+    std::vector<std::string> statiques;     // méthodes appelables sans objet
+    std::vector<std::string> evenements;    // noms déclarés par « events »
     std::string aide;
+    bool aMethode(const std::string& nom) const { return methodes.count(nom) > 0; }
+    bool estStatique(const std::string& nom) const {
+        for (const auto& s : statiques)
+            if (s == nom) return true;
+        return false;
+    }
 };
 
 struct UniteCompilee {

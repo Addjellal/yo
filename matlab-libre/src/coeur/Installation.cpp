@@ -21,6 +21,8 @@ void Interpreteur::installerBibliotheque() {
     enregistrerSysteme(*this);
     enregistrerGraphique(*this);
     enregistrerTests(*this);
+    enregistrerCartes(*this);
+    enregistrerCreuses(*this);
 }
 
 }  // namespace matlibre

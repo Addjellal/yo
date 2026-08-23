@@ -42,6 +42,17 @@ enum class Format { Court, Long, CourtE, LongE, CourtG, LongG, Hex, Rationnel, P
 
 struct Figure;  // Graphique.h
 
+// Table associative de « containers.Map ». Elle vit dans l'interpréteur et
+// non dans la valeur : c'est ce qui donne à containers.Map sa sémantique de
+// poignée, où toutes les copies désignent la même table.
+struct CarteAssociative {
+    std::vector<std::string> ordre;                 // clés triées
+    std::map<std::string, Valeur> valeurs;
+    std::map<std::string, Valeur> clesOriginales;
+    std::string typeCle = "char";
+    std::string typeValeur = "any";
+};
+
 class Interpreteur {
 public:
     Interpreteur();
@@ -120,6 +131,31 @@ public:
     std::unordered_map<std::string, Valeur> globales;
     long long compteurAppels = 0;
     bool modeInteractif = false;
+
+    // --- objets et classes (Objets.cpp) ---
+    std::shared_ptr<DefinitionClasse> classeDe(const Valeur& v);
+    bool classePossede(const Valeur& v, const std::string& methode);
+    // Vrai quand le code en cours d'exécution est une méthode de « classe » :
+    // MATLAB n'appelle alors ni subsref ni subsasgn, l'indexation à
+    // l'intérieur d'une méthode reste celle du langage.
+    bool dansMethodeDe(const std::string& classe) const;
+    std::vector<Valeur> appelerMethode(const Valeur& objet, const std::string& methode,
+                                       std::vector<Valeur> args, int nargout);
+    Valeur concatenerObjets(const std::vector<std::vector<Valeur>>& rangees);
+    std::size_t nomPointe(const std::string& nom, const std::vector<ElementAcces>& acces);
+    Valeur substruct(const std::vector<ElementAcces>& chaine, std::size_t debut,
+                     const Valeur* base);
+    Valeur lireProprieteObjet(const Valeur& objet, const std::string& nom);
+    Valeur ecrireProprieteObjet(Valeur objet, const std::string& nom, const Valeur& valeur);
+    bool estCarte(const Valeur& v) const;
+    std::shared_ptr<CarteAssociative> carteDe(const Valeur& v);
+    Valeur creerCarte(std::shared_ptr<CarteAssociative> carte);
+    Valeur lireCarte(const Valeur& carte, const Valeur& cle);
+    void ecrireCarte(const Valeur& carte, const Valeur& cle, const Valeur& valeur);
+    std::string cleCanonique(const Valeur& cle);
+    std::map<long long, std::shared_ptr<CarteAssociative>> cartes;
+    long long prochaineCarte = 1;
+    std::map<std::string, std::vector<Valeur>> auditeurs;  // événements
 
     // --- indexation (Indexation.cpp) ---
     Valeur indexer(const Valeur& base, std::vector<Valeur>& idx, char genre);

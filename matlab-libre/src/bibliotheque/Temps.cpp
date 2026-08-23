@@ -226,6 +226,110 @@ FONCTION(fnWeekday) {
     return {Valeur::scalaire(jour)};
 }
 
+
+// --- fonctions vectorisées servant de socle à datetime ------------------
+
+// Diffuse un ensemble d'arguments numériques comme le fait MATLAB : les
+// scalaires s'étendent à la taille du plus grand tableau.
+Dims dimsCommunes(const std::vector<Valeur>& v) {
+    Dims d = {1, 1};
+    for (const auto& a : v)
+        if (a.nelem() > produitDims(d)) d = a.dims;
+    return d;
+}
+
+double elementDiffuse(const Valeur& v, std::size_t k) {
+    if (v.nelem() == 0) return 0.0;
+    if (v.nelem() == 1) return v.re[0];
+    return v.re[k % v.nelem()];
+}
+
+FONCTION(fnYmdVersNum) {
+    INUTILISE
+    if (args.size() < 3)
+        erreur("MATLAB:minrhs", "matlibre_ymd2num requires at least three arguments.");
+    Dims d = dimsCommunes(args);
+    std::size_t n = produitDims(d);
+    Valeur r = Valeur::matriceDims(d, 0.0);
+    for (std::size_t k = 0; k < n; ++k) {
+        double annee = elementDiffuse(args[0], k);
+        double mois = elementDiffuse(args[1], k);
+        double jour = elementDiffuse(args[2], k);
+        double heure = args.size() > 3 ? elementDiffuse(args[3], k) : 0.0;
+        double minute = args.size() > 4 ? elementDiffuse(args[4], k) : 0.0;
+        double seconde = args.size() > 5 ? elementDiffuse(args[5], k) : 0.0;
+        // Les mois hors de 1..12 débordent sur l'année, comme datenum.
+        double debordement = std::floor((mois - 1) / 12.0);
+        annee += debordement;
+        mois -= debordement * 12.0;
+        double base = versDatenum((int)annee, (int)mois, 1, 0, 0, 0.0);
+        r.re[k] = base + (jour - 1) + (heure * 3600.0 + minute * 60.0 + seconde) / 86400.0;
+    }
+    return {r};
+}
+
+FONCTION(fnNumVersYmd) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "matlibre_num2ymd");
+    std::size_t n = args[0].nelem();
+    Valeur r = Valeur::matrice((int)n, 6, 0.0);
+    for (std::size_t k = 0; k < n; ++k) {
+        int annee, mois, jour, heure, minute;
+        double seconde;
+        // On arrondit à la microseconde pour éviter 59,999999 au lieu de 0.
+        double x = std::round(args[0].re[k] * 86400.0 * 1e6) / (86400.0 * 1e6);
+        depuisDatenum(x, annee, mois, jour, heure, minute, seconde);
+        seconde = std::round(seconde * 1e6) / 1e6;
+        r.re[k] = annee;
+        r.re[n + k] = mois;
+        r.re[2 * n + k] = jour;
+        r.re[3 * n + k] = heure;
+        r.re[4 * n + k] = minute;
+        r.re[5 * n + k] = seconde;
+    }
+    return {r};
+}
+
+FONCTION(fnAjouterMois) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "matlibre_addmonths");
+    Dims d = dimsCommunes(args);
+    std::size_t n = produitDims(d);
+    Valeur r = Valeur::matriceDims(d, 0.0);
+    for (std::size_t k = 0; k < n; ++k) {
+        double x = elementDiffuse(args[0], k);
+        double k_mois = elementDiffuse(args[1], k);
+        int annee, mois, jour, heure, minute;
+        double seconde;
+        depuisDatenum(x, annee, mois, jour, heure, minute, seconde);
+        long long total = (long long)annee * 12 + (mois - 1) + (long long)k_mois;
+        int na = (int)(total / 12);
+        int nm = (int)(total % 12) + 1;
+        if (nm <= 0) { nm += 12; na -= 1; }
+        // Le jour est ramené au dernier jour du mois cible, comme MATLAB :
+        // 31 janvier + 1 mois donne le 28 (ou 29) février.
+        static const int longueur[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        int maxi = longueur[nm - 1];
+        bool bissextile = (na % 4 == 0 && na % 100 != 0) || (na % 400 == 0);
+        if (nm == 2 && bissextile) maxi = 29;
+        int nj = jour < maxi ? jour : maxi;
+        r.re[k] = versDatenum(na, nm, nj, heure, minute, seconde);
+    }
+    return {r};
+}
+
+// Jour de la semaine et numéro de semaine ISO, utilisés par datetime.
+FONCTION(fnJourSemaine) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "matlibre_weekday");
+    Valeur r = Valeur::matriceDims(args[0].dims, 0.0);
+    for (std::size_t k = 0; k < args[0].nelem(); ++k) {
+        long long jours = (long long)std::floor(args[0].re[k]);
+        r.re[k] = (double)(((jours % 7) + 7 + 5) % 7 + 1);
+    }
+    return {r};
+}
+
 }  // namespace
 
 void enregistrerTemps(Interpreteur& it) {
@@ -241,6 +345,14 @@ void enregistrerTemps(Interpreteur& it) {
     it.enregistrer("etime", fnEtime, "temps", "etime  Secondes entre deux vecteurs d'horloge.");
     it.enregistrer("pause", fnPause, "temps", "pause  Attend un nombre de secondes.");
     it.enregistrer("weekday", fnWeekday, "temps", "weekday  Jour de la semaine.");
+    it.enregistrer("matlibre_ymd2num", fnYmdVersNum, "temps",
+                   "matlibre_ymd2num  Composantes de date -> numero de serie (vectorise).");
+    it.enregistrer("matlibre_num2ymd", fnNumVersYmd, "temps",
+                   "matlibre_num2ymd  Numero de serie -> matrice Nx6 de composantes.");
+    it.enregistrer("matlibre_addmonths", fnAjouterMois, "temps",
+                   "matlibre_addmonths  Ajout de mois calendaires avec calage de fin de mois.");
+    it.enregistrer("matlibre_weekday", fnJourSemaine, "temps",
+                   "matlibre_weekday  Jour de la semaine (1 = dimanche), vectorise.");
 }
 
 }  // namespace matlibre

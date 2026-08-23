@@ -122,12 +122,6 @@ max  Plus grand element, avec son indice.
 min  Plus petit element, avec son indice.
 ```
 
-## `nnz`
-
-```
-nnz  Nombre d'elements non nuls.
-```
-
 ## `prod`
 
 ```

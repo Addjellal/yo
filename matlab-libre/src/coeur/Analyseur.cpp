@@ -99,13 +99,18 @@ UniteCompilee Analyseur::analyserUnite() {
     UniteCompilee u;
     sauterSeparateurs();
     if (jeton().estMot("classdef")) {
+        // Un fichier de classe peut porter, après le bloc classdef, des
+        // fonctions locales visibles depuis ses méthodes.
         while (!fini()) {
             sauterSeparateurs();
             if (fini()) break;
             if (jeton().estMot("classdef")) {
                 u.classes.push_back(definitionClasse());
+            } else if (jeton().estMot("function")) {
+                u.fonctions.push_back(definitionFonction());
             } else {
-                erreurSyntaxe("Only class definitions are allowed after 'classdef'.");
+                erreurSyntaxe("Only class definitions and local functions are allowed "
+                              "in a classdef file.");
             }
         }
         return u;
@@ -489,13 +494,18 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
     } else {
         i_ = sauve;
     }
-    if (jeton().genre != Genre::Ident) erreurSyntaxe("Expected a function name.");
+    // « end » est un nom de méthode valide : c'est celle qu'appelle
+    // l'interpréteur pour résoudre « end » dans un indice.
+    bool nomValide = jeton().genre == Genre::Ident ||
+                     (jeton().genre == Genre::MotCle && jeton().texte == "end");
+    if (!nomValide) erreurSyntaxe("Expected a function name.");
     f->nom = jeton().texte;
     avancer();
-    // Méthode d'une classe écrite « obj.methode » — on ne garde que le nom.
+    // « get.Propriete » et « set.Propriete » gardent leur nom complet : ce
+    // sont les accesseurs d'une propriété dépendante.
     while (jeton().estOp(".") && jeton(1).genre == Genre::Ident) {
         avancer();
-        f->nom = jeton().texte;
+        f->nom += "." + jeton().texte;
         avancer();
     }
     if (accepterOp("(")) {
@@ -549,13 +559,21 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
     while (!fini() && !motFin()) {
         if (jeton().estMot("properties")) {
             avancer();
+            std::vector<std::string> attributs;
             if (accepterOp("(")) {
                 int p = 1;
                 while (!fini() && p > 0) {
                     if (jeton().estOp("(")) ++p;
-                    if (jeton().estOp(")")) --p;
+                    else if (jeton().estOp(")")) --p;
+                    else if (jeton().genre == Genre::Ident) attributs.push_back(jeton().texte);
                     avancer();
                 }
+            }
+            bool dependantes = false;
+            bool constantes = false;
+            for (const auto& a : attributs) {
+                if (a == "Dependent") dependantes = true;
+                if (a == "Constant") constantes = true;
             }
             sauterSeparateurs();
             while (!fini() && !motFin()) {
@@ -567,7 +585,9 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
                 while (!fini() && jeton().genre != Genre::NouvelleLigne &&
                        !jeton().estOp("=") && !jeton().estOp(";"))
                     avancer();
-                c->ordreProprietes.push_back(nom);
+                if (dependantes) c->dependantes.push_back(nom);
+                else c->ordreProprietes.push_back(nom);
+                if (constantes) c->constantes.push_back(nom);
                 if (accepterOp("=")) c->defauts[nom] = expression();
                 else c->defauts[nom] = nullptr;
                 sauterSeparateurs();
@@ -575,11 +595,14 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
             exigerMotFin();
         } else if (jeton().estMot("methods")) {
             avancer();
+            bool statiques = false;
             if (accepterOp("(")) {
                 int p = 1;
                 while (!fini() && p > 0) {
                     if (jeton().estOp("(")) ++p;
-                    if (jeton().estOp(")")) --p;
+                    else if (jeton().estOp(")")) --p;
+                    else if (jeton().genre == Genre::Ident && jeton().texte == "Static")
+                        statiques = true;
                     avancer();
                 }
             }
@@ -587,10 +610,20 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
             while (!fini() && jeton().estMot("function")) {
                 auto f = definitionFonction();
                 c->methodes[f->nom] = f;
+                if (statiques) c->statiques.push_back(f->nom);
                 sauterSeparateurs();
             }
             exigerMotFin();
-        } else if (jeton().estMot("events") || jeton().estMot("enumeration")) {
+        } else if (jeton().estMot("events")) {
+            avancer();
+            sauterSeparateurs();
+            while (!fini() && !motFin()) {
+                if (jeton().genre == Genre::Ident) c->evenements.push_back(jeton().texte);
+                avancer();
+                sauterSeparateurs();
+            }
+            exigerMotFin();
+        } else if (jeton().estMot("enumeration")) {
             avancer();
             sauterSeparateurs();
             while (!fini() && !motFin()) avancer();

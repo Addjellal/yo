@@ -31,6 +31,8 @@ void enregistrerTemps(Interpreteur& it);
 void enregistrerSysteme(Interpreteur& it);
 void enregistrerGraphique(Interpreteur& it);
 void enregistrerTests(Interpreteur& it);
+void enregistrerCartes(Interpreteur& it);
+void enregistrerCreuses(Interpreteur& it);
 
 // --- utilitaires communs ---
 Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin);

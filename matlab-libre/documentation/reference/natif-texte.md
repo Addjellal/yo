@@ -74,6 +74,18 @@ isspace  Caracteres blancs.
 lower  Passe en minuscules.
 ```
 
+## `matlab.lang.makeUniqueStrings`
+
+```
+matlab.lang.makeUniqueStrings  Rend les noms uniques.
+```
+
+## `matlab.lang.makeValidName`
+
+```
+matlab.lang.makeValidName  Rend un identifiant valide.
+```
+
 ## `natsort`
 
 ```

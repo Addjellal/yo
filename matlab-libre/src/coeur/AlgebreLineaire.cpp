@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Operations.h"
 
@@ -193,6 +194,7 @@ static Mat<T> moindresCarres(Mat<T> a, Mat<T> b) {
 }
 
 Valeur divisionGauche(const Valeur& a, const Valeur& b) {
+    if (a.estCreux()) return resoudreCreux(a, assurerDense(b));
     verifierMatrice2D(a, "A");
     verifierMatrice2D(b, "B");
     if (a.estScalaire()) return operationBinaire("./", b, a);

@@ -1,7 +1,7 @@
 # MatLibre
 
 Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
-51 toolboxes écrites dans le langage lui-même.
+52 toolboxes écrites dans le langage lui-même.
 
 ```bash
 make            # compile — aucune dépendance obligatoire
@@ -33,15 +33,20 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **537 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **561 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **429 fonctions de toolbox** en langage MATLAB, réparties en
-  **51 modules** : signal, image, vision, apprentissage profond,
+- **463 fonctions de toolbox** en langage MATLAB, réparties en
+  **52 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
   antennes, audio, symbolique, EDP, Simulink, Stateflow, Simscape…
+- **Les types de données de MATLAB moderne** : `duration`,
+  `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
+  `containers.Map` et les tableaux creux `sparse`, avec l'indexation par
+  `subsref`/`subsasgn`, les jointures, les regroupements et le
+  ré-échantillonnage temporel.
 - **Un rendu graphique** en SVG, écrit à la main : courbes, barres,
   nuages, tiges, escaliers, images, sous-graphes, légendes.
 - **Aucune dépendance obligatoire.** LAPACK, BLAS et FFTW sont utilisés
@@ -80,7 +85,7 @@ make
 | Fichier | Contenu |
 |---|---|
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
-| [`toolboxes.md`](documentation/toolboxes.md) | les 51 modules et leur correspondance MathWorks |
+| [`toolboxes.md`](documentation/toolboxes.md) | les 52 modules et leur correspondance MathWorks |
 | [`reference.md`](documentation/reference.md) | les 966 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
