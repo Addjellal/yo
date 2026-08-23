@@ -29,6 +29,7 @@ configurer:
 
 test: tout
 	@$(BUILD)/matlibre_tests
+	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/verifierDoublons.m
 	@for f in tests/scripts/test_*.m; do \
 	  echo "--> $$f"; \
 	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre --path tests/scripts $$f || exit 1; \

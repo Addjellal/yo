@@ -4,8 +4,6 @@
 % DSP System Toolbox — traitement du signal en temps réel.
 %
 %   fftfilt   - Filtrage RIF par blocs (recouvrement-addition)
-%   sosfilt   - Filtrage en sections du second ordre
-%   tf2sos    - Fonction de transfert vers sections du second ordre
 %   upfirdn   - Sur-échantillonnage, filtrage, décimation
 %   firls     - Filtre RIF par moindres carrés
 %   levinson  - Récursion de Levinson-Durbin
@@ -51,20 +49,6 @@ LEVINSON Récursion de Levinson-Durbin.
 ```
 LPC Coefficients de prédiction linéaire.
   [A,E] = LPC(X,P) minimise l'erreur de prédiction d'ordre P.
-```
-
-## `sosfilt`
-
-```
-SOSFILT Filtrage par sections du second ordre.
-  Chaque ligne de SOS vaut [b0 b1 b2 a0 a1 a2].
-```
-
-## `tf2sos`
-
-```
-TF2SOS Fonction de transfert vers sections du second ordre.
-  Les pôles et zéros sont appariés par proximité, comme le veut l'usage.
 ```
 
 ## `upfirdn`

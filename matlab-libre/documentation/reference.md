@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-474 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+523 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -54,7 +54,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
-| [`dsp`](reference/toolbox-dsp.md) | 8 |
+| [`dsp`](reference/toolbox-dsp.md) | 6 |
 | [`econometrie`](reference/toolbox-econometrie.md) | 8 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 16 |
@@ -81,7 +81,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`rf`](reference/toolbox-rf.md) | 7 |
 | [`robotique`](reference/toolbox-robotique.md) | 19 |
 | [`robuste`](reference/toolbox-robuste.md) | 5 |
-| [`signal`](reference/toolbox-signal.md) | 17 |
+| [`signal`](reference/toolbox-signal.md) | 68 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |

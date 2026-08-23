@@ -289,14 +289,34 @@ FONCTION(fnFilter) {
 FONCTION(fnFiltfilt) {
     INUTILISE
     exigerArguments(args, 3, 3, "filtfilt");
-    std::vector<Valeur> a1 = args;
+    const Valeur& x = versDouble(args[2]);
+    std::size_t n = x.nelem();
+    std::size_t ordre = std::max(args[0].nelem(), args[1].nelem());
+    if (ordre == 0) return {x};
+    // MATLAB prolonge le signal des deux côtés par symétrie centrale sur
+    // 3*(ordre-1) points avant les deux passages : sans cela le transitoire
+    // initial du filtre se propage dans tout le résultat.
+    std::size_t marge = 3 * (ordre - 1);
+    if (n <= marge) marge = n > 1 ? n - 1 : 0;
+    std::vector<double> etendu;
+    etendu.reserve(n + 2 * marge);
+    for (std::size_t k = marge; k >= 1; --k)
+        etendu.push_back(2.0 * x.re[0] - x.re[k]);
+    for (std::size_t k = 0; k < n; ++k) etendu.push_back(x.re[k]);
+    for (std::size_t k = 2; k <= marge + 1; ++k)
+        etendu.push_back(2.0 * x.re[n - 1] - x.re[n - k]);
+
+    Valeur signal = Valeur::colonne(etendu);
+    std::vector<Valeur> a1 = {args[0], args[1], signal};
     auto aller = fnFilter(it, a1, 1);
     Valeur inverse = aller[0];
     std::reverse(inverse.re.begin(), inverse.re.end());
     std::vector<Valeur> a2 = {args[0], args[1], inverse};
     auto retour = fnFilter(it, a2, 1);
-    Valeur r = retour[0];
-    std::reverse(r.re.begin(), r.re.end());
+    std::reverse(retour[0].re.begin(), retour[0].re.end());
+
+    Valeur r = x;
+    for (std::size_t k = 0; k < n; ++k) r.re[k] = retour[0].re[marge + k];
     return {r};
 }
 
@@ -380,28 +400,65 @@ FONCTION(fnUnwrap) {
 
 FONCTION(fnFreqz) {
     INUTILISE
-    exigerArguments(args, 2, 3, "freqz");
+    exigerArguments(args, 1, 5, "freqz");
     const Valeur& b = versDouble(args[0]);
-    const Valeur& a = versDouble(args[1]);
-    int n = args.size() > 2 ? (int)args[2].scal() : 512;
+    Valeur unite = Valeur::scalaire(1.0);
+    const Valeur& a = args.size() > 1 && args[1].estNumerique() ? versDouble(args[1]) : unite;
+
+    // freqz accepte un nombre de points, un vecteur de fréquences, l'option
+    // « whole » pour couvrir 0..2*pi, et une fréquence d'échantillonnage.
+    bool cercleEntier = false;
+    double fs = 0.0;
+    std::vector<double> frequences;   // en radians par échantillon
+    std::vector<double> axe;          // ce que l'on rend en sortie
+    int n = 512;
+    bool vecteurDonne = false;
+    for (std::size_t k = 2; k < args.size(); ++k) {
+        if (args[k].estTexte() || args[k].estChaine()) {
+            std::string mot = args[k].versTexte();
+            for (auto& c : mot) c = (char)std::tolower((unsigned char)c);
+            if (mot == "whole") cercleEntier = true;
+        } else if (!vecteurDonne && args[k].nelem() > 1) {
+            vecteurDonne = true;
+            for (std::size_t i = 0; i < args[k].nelem(); ++i)
+                frequences.push_back(args[k].re[i]);
+        } else if (!vecteurDonne && args[k].nelem() == 1 && k == 2) {
+            n = (int)args[k].scal();
+        } else if (args[k].nelem() == 1) {
+            fs = args[k].scal();
+        }
+    }
+    if (vecteurDonne) {
+        axe = frequences;
+        if (fs > 0)
+            for (auto& f : frequences) f = 2.0 * PI * f / fs;
+    } else {
+        if (n <= 0) n = 512;
+        frequences.resize((std::size_t)n);
+        axe.resize((std::size_t)n);
+        for (int k = 0; k < n; ++k) {
+            double omega = (cercleEntier ? 2.0 * PI : PI) * k / n;
+            frequences[(std::size_t)k] = omega;
+            axe[(std::size_t)k] = fs > 0 ? omega * fs / (2.0 * PI) : omega;
+        }
+    }
+    std::size_t m = frequences.size();
     Valeur h;
-    h.dims = {n, 1};
-    h.re.resize((std::size_t)n);
-    h.im.resize((std::size_t)n);
-    std::vector<double> w((std::size_t)n);
-    for (int k = 0; k < n; ++k) {
-        double omega = PI * k / n;
+    h.dims = {(int)m, 1};
+    h.re.resize(m);
+    h.im.resize(m);
+    for (std::size_t k = 0; k < m; ++k) {
+        double omega = frequences[k];
         cplx num(0), den(0);
         for (std::size_t i = 0; i < b.nelem(); ++i)
             num += b.re[i] * std::exp(cplx(0, -omega * (double)i));
         for (std::size_t i = 0; i < a.nelem(); ++i)
             den += a.re[i] * std::exp(cplx(0, -omega * (double)i));
-        cplx z = num / den;
-        h.re[(std::size_t)k] = z.real();
-        h.im[(std::size_t)k] = z.imag();
-        w[(std::size_t)k] = omega;
+        cplx z = den == cplx(0) ? cplx(0) : num / den;
+        h.re[k] = z.real();
+        h.im[k] = z.imag();
     }
-    if (nargout >= 2) return {h, Valeur::colonne(w)};
+    if (nargout >= 2) return {h, Valeur::colonne(axe)};
     return {h};
 }
 

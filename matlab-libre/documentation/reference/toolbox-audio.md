@@ -50,6 +50,11 @@ SPECTRALCENTROID Centre de gravité du spectre, en hertz.
 ## `zerocrossrate`
 
 ```
-ZEROCROSSRATE Proportion de changements de signe.
+ZEROCROSSRATE Proportion de passages par zéro.
+  R = ZEROCROSSRATE(X) compte les changements de signe et divise par la
+  longueur de la fenêtre, comme le fait MATLAB.
+
+  Exemple :
+     zerocrossrate([1 -1 1 -1])   % 0.75
 ```
 

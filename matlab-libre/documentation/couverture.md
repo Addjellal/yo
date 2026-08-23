@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **592 fonctions natives** couvrant le MATLAB de base.
-- **474 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **523 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -75,9 +75,12 @@ totalité.
    d'Embedded Coder. Ce qui n'est pas traduisible est refusé avec le
    numéro de ligne, jamais approximé.
 4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   Chaque module offre entre 4 et 27 fonctions, choisies pour être celles
-   qu'on appelle d'abord. La Signal Processing Toolbox de MathWorks en
-   compte plusieurs centaines.
+   La Signal Processing Toolbox compte 68 fonctions — conception de
+   filtres avec choix d'ordre, sections du second ordre, dix fenêtres,
+   analyse spectrale à court terme, cohérence, rééchantillonnage,
+   mesures. Les autres modules offrent entre 4 et 30 fonctions, choisies
+   pour être celles qu'on appelle d'abord. MathWorks en compte plusieurs
+   centaines par toolbox.
 5. **Les types de données modernes sont là, mais partiellement.**
    `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
    `timetable`, `containers.Map` et `sparse` existent avec leurs
