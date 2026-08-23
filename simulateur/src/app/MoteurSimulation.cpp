@@ -377,6 +377,12 @@ void MoteurSimulation::definir_circuit(coeur::Netlist netlist,
     // veuille dire quelque chose.
     ordre_cartes_ = cartes;
     ordre_cartes_.sort();
+
+    // Même par ce chemin-là — celui qui ne connaît que les NOMS des cartes —
+    // les composants numériques doivent savoir à quelle tension ils
+    // travaillent. Sans cela, un appelant qui emploie cette surcharge les
+    // laisse à cinq volts sans qu'aucun signe ne le dise.
+    marquer_tension_logique();
 }
 
 void MoteurSimulation::remettre_a_zero() {

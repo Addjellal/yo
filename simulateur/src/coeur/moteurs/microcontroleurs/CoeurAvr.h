@@ -85,8 +85,15 @@ struct ProfilAvr {
     struct ProfilCompteur {
         bool present = false;
         uint16_t controle_a = kAbsent, controle_b = kAbsent;
+        // `compte_haut` renseigné SIGNE un compteur seize bits : c'est lui qui
+        // décide du plafond de comptage (65 535 et non 255) comme du registre
+        // tampon des accès en deux fois.
         uint16_t compte = kAbsent, compte_haut = kAbsent;
         uint16_t compare_a = kAbsent, compare_b = kAbsent, sommet = kAbsent;
+        // Les moitiés hautes des registres de comparaison, sur un compteur
+        // seize bits. Sans elles, un sommet de 15 999 — la valeur qui fait la
+        // milliseconde à 16 MHz — se lisait 127.
+        uint16_t compare_a_haut = kAbsent, compare_b_haut = kAbsent;
         uint16_t drapeaux = kAbsent, masques = kAbsent;
         // Positions des drapeaux dans TIFR — et, aux mêmes places, des
         // autorisations dans TIMSK.
@@ -178,6 +185,10 @@ private:
     bool serie_disponible_ = false;
 
     // --- compteurs
+    // Le registre tampon des accès seize bits. La puce n'en a qu'UN, partagé
+    // par tous les registres à deux octets : c'est la raison pour laquelle on
+    // coupe les interruptions autour d'un accès à TCNT1.
+    uint8_t temp_16bits_ = 0;
     struct Compteur {
         uint16_t compte = 0;
         int diviseur = 0;                  // cycles par pas ; 0 = arrêté

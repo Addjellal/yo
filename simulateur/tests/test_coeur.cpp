@@ -2605,6 +2605,12 @@ static void test_solveur_integre_troncature_et_ringing() {
         // le condensateur n'a le temps de se charger qu'à 5·(1−e^−0,1), soit
         // 476 mV. C'est cette valeur-là qu'il faut retrouver — pas les cinq
         // volts de l'entrée.
+        //
+        // Cette assertion-ci garde un mécanisme qui MARCHAIT DÉJÀ — les points
+        // de rupture et le pas amorti qui les suit — et elle passe donc aussi
+        // sans le contrôle de pas ajouté ici. Elle reste parce qu'elle protège
+        // ce mécanisme d'une régression ; ce sont les deux assertions
+        // suivantes qui prouvent le correctif.
         const double attendu = 5.0 * (1.0 - std::exp(-0.1));
         verifier(std::fabs(sommet - attendu) < attendu * 0.15,
                  "l'impulsion de 100 ns est bien vue, à sa vraie hauteur",
@@ -2659,6 +2665,48 @@ int main(void) {
 }
 )";
 
+// Le même geste sur le compteur SEIZE BITS. Il ne s'écrit pas d'un coup :
+// avr-gcc pose l'octet haut, puis l'octet bas. Sur la puce, l'octet haut
+// attend dans un registre tampon et les deux moitiés entrent ENSEMBLE à
+// l'écriture de l'octet bas — sans quoi le compteur passerait un instant par
+// une valeur qui n'a jamais été demandée.
+static const char* kPrechargeTimer16 = R"(
+#include <avr/io.h>
+
+int main(void) {
+    DDRB |= (1 << 5);                       /* D13 en sortie */
+    TCCR1A = 0;
+    TCCR1B = (1 << CS12) | (1 << CS10);     /* prédiviseur /1024 */
+    while (1) {
+        TCNT1 = 65480;                      /* 56 pas avant le débordement */
+        TIFR1 = (1 << TOV1);                /* on efface le drapeau */
+        while (!(TIFR1 & (1 << TOV1))) { }  /* on attend */
+        PORTB ^= (1 << 5);                  /* et on bascule */
+    }
+    return 0;
+}
+)";
+
+// Et le geste le plus courant de tous : la base de temps d'une milliseconde,
+// obtenue en mode CTC avec un sommet de 15 999. Elle demande les SEIZE bits
+// du registre de comparaison — 15 999 ne tient pas sur un octet.
+static const char* kBaseDeTemps16 = R"(
+#include <avr/io.h>
+
+int main(void) {
+    DDRB |= (1 << 5);                       /* D13 en sortie */
+    TCCR1A = 0;
+    TCCR1B = (1 << WGM12) | (1 << CS10);    /* CTC, prédiviseur /1 */
+    OCR1A = 15999;                          /* 16 000 cycles = 1 ms à 16 MHz */
+    while (1) {
+        while (!(TIFR1 & (1 << OCF1A))) { }
+        TIFR1 = (1 << OCF1A);
+        PORTB ^= (1 << 5);
+    }
+    return 0;
+}
+)";
+
 static void test_compteur_precharge() {
     std::printf("\n[49] Audit : un temporisateur préchargé bat au bon rythme\n");
 
@@ -2666,48 +2714,68 @@ static void test_compteur_precharge() {
         std::printf("  (avr-gcc absent — section ignorée)\n");
         return;
     }
-    const std::string firmware = "/tmp/sim_precharge.elf";
-    std::string journal;
-    if (!coeur::AvrEngine::compiler_source(kPrechargeTimer, firmware,
-                                           &journal)) {
-        verifier(false, "compilation du firmware de préchargement", journal);
-        return;
-    }
 
-    // 56 pas de 1024 cycles : 57 344 cycles entre deux bascules. Sans la
-    // prise en compte de l'écriture, le compteur repart de 0 et il en faut
-    // 262 144 — la LED bat quatre fois et demie trop lentement.
-    const double attendue = (256 - 200) * 1024.0;
+    struct Cas {
+        const char* quoi;
+        const char* source;
+        const char* fichier;
+        double attendue;
+    };
+    const Cas cas[] = {
+        // 56 pas de 1024 cycles : 57 344 cycles entre deux bascules. Sans la
+        // prise en compte de l'écriture, le compteur repart de zéro et il en
+        // faut 262 144 — la LED bat quatre fois et demie trop lentement.
+        {"compteur 8 bits (TCNT0)", kPrechargeTimer, "/tmp/sim_precharge.elf",
+         56 * 1024.0},
+        // Le même geste sur seize bits. Il exposait DEUX défauts de plus : les
+        // deux moitiés du compteur entraient séparément, et le plafond de
+        // comptage valait 255 pour tout le monde.
+        {"compteur 16 bits (TCNT1)", kPrechargeTimer16,
+         "/tmp/sim_precharge16.elf", 56 * 1024.0},
+        // Et la base de temps d'une milliseconde, qui demande les seize bits
+        // du COMPARATEUR : 15 999 ne tient pas sur un octet, et n'en gardait
+        // que 127.
+        {"base de temps 1 ms (CTC, OCR1A)", kBaseDeTemps16,
+         "/tmp/sim_base_temps.elf", 16000.0}};
 
-    for (int avec_simavr = 0; avec_simavr < 2; ++avec_simavr) {
-        if (avec_simavr == 1 && !coeur::AvrEngine::compile_avec_simavr())
+    for (const Cas& essai : cas) {
+        std::string journal;
+        if (!coeur::AvrEngine::compiler_source(essai.source, essai.fichier,
+                                               &journal)) {
+            verifier(false, std::string("compilation — ") + essai.quoi,
+                     journal);
             continue;
-        coeur::AvrEngine mcu;
-        mcu.preferer_simavr(avec_simavr == 1);
-        if (!mcu.charger(firmware)) {
-            verifier(false, "chargement du firmware", mcu.erreur());
-            return;
         }
-        std::vector<uint64_t> bascules;
-        mcu.sur_changement_broche([&](int broche, bool) {
-            if (broche == 13) bascules.push_back(mcu.cycle());
-        });
-        mcu.avancer(600000);
+        for (int avec_simavr = 0; avec_simavr < 2; ++avec_simavr) {
+            if (avec_simavr == 1 && !coeur::AvrEngine::compile_avec_simavr())
+                continue;
+            coeur::AvrEngine mcu;
+            mcu.preferer_simavr(avec_simavr == 1);
+            if (!mcu.charger(essai.fichier)) {
+                verifier(false, "chargement du firmware", mcu.erreur());
+                return;
+            }
+            std::vector<uint64_t> bascules;
+            mcu.sur_changement_broche([&](int broche, bool) {
+                if (broche == 13) bascules.push_back(mcu.cycle());
+            });
+            mcu.avancer(600000);
 
-        const std::string qui =
-            avec_simavr == 1 ? "simavr" : "cœur intégré";
-        verifier(bascules.size() >= 4, qui + " : la LED bascule",
-                 std::to_string(bascules.size()) + " bascule(s)");
-        if (bascules.size() < 4) continue;
-        // On mesure entre la deuxième et la dernière : la première période
-        // porte encore le démarrage du programme.
-        const double periode =
-            static_cast<double>(bascules.back() - bascules[1])
-            / static_cast<double>(bascules.size() - 2);
-        verifier(std::fabs(periode - attendue) < attendue * 0.05,
-                 qui + " : une période de " + f(attendue, 0) + " cycles, "
-                 "parce que le compteur repart de 200",
-                 f(periode, 0) + " cycles");
+            const std::string qui = std::string(essai.quoi) + ", "
+                                    + (avec_simavr == 1 ? "simavr"
+                                                        : "cœur intégré");
+            verifier(bascules.size() >= 4, qui + " : la LED bascule",
+                     std::to_string(bascules.size()) + " bascule(s)");
+            if (bascules.size() < 4) continue;
+            // On mesure entre la deuxième et la dernière : la première période
+            // porte encore le démarrage du programme.
+            const double periode =
+                static_cast<double>(bascules.back() - bascules[1])
+                / static_cast<double>(bascules.size() - 2);
+            verifier(std::fabs(periode - essai.attendue) < essai.attendue * 0.05,
+                     qui + " : période de " + f(essai.attendue, 0) + " cycles",
+                     f(periode, 0) + " cycles");
+        }
     }
 }
 
@@ -2740,25 +2808,18 @@ static void test_numerique_trois_volts_trois() {
         {1e-6, "D11", true},  {1.1e-6, "D13", true}, {1.2e-6, "D13", false},
         {2e-6, "D10", true},  {2.1e-6, "D10", false}};
 
-    // --- 1. L'AMPLITUDE EST CELLE DE LA CARTE.
-    {
-        coeur::Netlist netlist = monter();
-        coeur::MoteurNumerique moteur;
-        moteur.propager(netlist, fronts, {}, 1e-3, 3.3);
-        const coeur::Instance* ic = netlist.trouver("IC1");
-        double maximum = 0;
-        if (ic) {
-            auto onde = ic->ondes.find("Q0");
-            if (onde != ic->ondes.end())
-                for (const auto& point : onde->second)
-                    maximum = std::max(maximum, point.second);
-        }
-        verifier(std::fabs(maximum - 3.3) < 1e-9,
-                 "sur une carte 3,3 V, la sortie du registre monte à 3,3 V",
-                 f(maximum) + " V");
-    }
+    // L'AMPLITUDE, ELLE, SE VÉRIFIE AILLEURS — ET C'EST VOULU.
+    //
+    // Un essai qui appelle `propager(..., 3.3)` et constate que la sortie vaut
+    // 3,3 V ne prouve rien : ce paramètre existait déjà et était déjà honoré.
+    // Le défaut était dans le SITE D'APPEL, `MoteurSimulation`, qui ne le
+    // passait pas. L'essai est donc au banc schéma, où il emprunte le vrai
+    // chemin — « un 74HC595 sur un Pico sort 3,3 V, pas 5 ».
+    //
+    // Un essai qui ne peut pas tomber est pire qu'aucun essai : il occupe la
+    // place de celui qui aurait prouvé quelque chose.
 
-    // --- 2. LE SEUIL SUIT, LUI AUSSI.
+    // LE SEUIL SUIT LA CARTE.
     //
     // OE tenu à 2,0 V : sur une carte 3,3 V c'est un niveau HAUT (le seuil
     // vaut 1,65 V), donc les sorties sont inhibées. Avec le seuil figé à
@@ -2780,6 +2841,75 @@ static void test_numerique_trois_volts_trois() {
             verifier(q0 != c.inhibe, c.dit,
                      std::string("Q0 ") + (q0 ? "haute" : "basse"));
         }
+    }
+}
+
+// Lire un compteur seize bits se fait aussi en deux instructions. Entre les
+// deux, il a avancé : sans le registre tampon de la puce, la valeur composée
+// mélange l'octet bas d'un instant et l'octet haut d'un autre, et le compteur
+// paraît reculer. C'est le défaut qui fait qu'une mesure de durée sort
+// parfois négative, une fois sur cent, sans qu'on comprenne pourquoi.
+static const char* kLectureCompteur16 = R"(
+#include <avr/io.h>
+
+int main(void) {
+    TCCR1A = 0;
+    TCCR1B = (1 << CS10);        /* seize bits, prédiviseur /1 */
+    UCSR0B = (1 << TXEN0);
+    uint8_t recules = 0;
+    uint16_t avant = TCNT1;
+    for (uint16_t k = 0; k < 3000; k++) {
+        uint16_t maintenant = TCNT1;
+        if (maintenant < avant && recules < 250) recules++;
+        avant = maintenant;
+    }
+    UDR0 = recules;              /* on l'annonce sur la liaison série */
+    while (1) { }
+    return 0;
+}
+)";
+
+static void test_lecture_compteur_16_bits() {
+    std::printf("\n[52] Audit : un compteur seize bits ne recule pas quand on le lit\n");
+
+    if (!coeur::AvrEngine::avr_gcc_disponible()) {
+        std::printf("  (avr-gcc absent — section ignorée)\n");
+        return;
+    }
+    const std::string fichier = "/tmp/sim_lecture16.elf";
+    std::string journal;
+    if (!coeur::AvrEngine::compiler_source(kLectureCompteur16, fichier,
+                                           &journal)) {
+        verifier(false, "compilation du firmware de lecture", journal);
+        return;
+    }
+
+    for (int avec_simavr = 0; avec_simavr < 2; ++avec_simavr) {
+        if (avec_simavr == 1 && !coeur::AvrEngine::compile_avec_simavr())
+            continue;
+        coeur::AvrEngine mcu;
+        mcu.preferer_simavr(avec_simavr == 1);
+        if (!mcu.charger(fichier)) {
+            verifier(false, "chargement du firmware", mcu.erreur());
+            return;
+        }
+        int recules = -1;
+        mcu.sur_octet_serie([&](char octet) {
+            if (recules < 0) recules = static_cast<unsigned char>(octet);
+        });
+        mcu.avancer(400000);
+
+        const std::string qui =
+            avec_simavr == 1 ? "simavr" : "cœur intégré";
+        verifier(recules >= 0, qui + " : le firmware rend son compte",
+                 std::to_string(recules));
+        // Trois mille lectures en moins de 65 536 cycles : le compteur ne
+        // repasse par zéro qu'une fois au plus, donc un recul légitime au
+        // plus. Sans le registre tampon, il y en a des dizaines.
+        if (recules >= 0)
+            verifier(recules <= 1,
+                     qui + " : aucune lecture ne voit le compteur reculer",
+                     std::to_string(recules) + " recul(s) sur 3000 lectures");
     }
 }
 
@@ -6577,6 +6707,7 @@ int main() {
     test_solveur_integre_troncature_et_ringing();
     test_coeur_avr();
     test_compteur_precharge();
+    test_lecture_compteur_16_bits();
     test_campagnes();
     test_numerique();
     test_pulse_in();

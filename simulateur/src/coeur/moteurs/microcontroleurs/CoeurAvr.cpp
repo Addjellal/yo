@@ -95,6 +95,7 @@ const ProfilAvr& profil_atmega328p() {
         t1.controle_a = 0x80; t1.controle_b = 0x81;
         t1.compte = 0x84; t1.compte_haut = 0x85;
         t1.compare_a = 0x88; t1.compare_b = 0x8A;
+        t1.compare_a_haut = 0x89; t1.compare_b_haut = 0x8B;
         t1.drapeaux = 0x36; t1.masques = 0x6F;
         t1.vecteur_compa = 11; t1.vecteur_compb = 12; t1.vecteur_ovf = 13;
         t1.port_a = 0; t1.bit_a = 1;        // OC1A -> PB1
@@ -224,6 +225,7 @@ const ProfilAvr& profil_atmega2560() {
         t1.controle_a = 0x80; t1.controle_b = 0x81;
         t1.compte = 0x84; t1.compte_haut = 0x85;
         t1.compare_a = 0x88; t1.compare_b = 0x8A;
+        t1.compare_a_haut = 0x89; t1.compare_b_haut = 0x8B;
         t1.drapeaux = 0x36; t1.masques = 0x6F;
         t1.vecteur_compa = 17; t1.vecteur_compb = 18; t1.vecteur_ovf = 20;
         t1.port_a = 1; t1.bit_a = 5;        // PB5 = D11
@@ -496,6 +498,24 @@ uint8_t CoeurAvr::lire(uint16_t adresse) {
         donnees_[p_.ucsra] &= static_cast<uint8_t>(~0x80);   // RXC0
         return octet_recu;
     }
+    // LIRE UN COMPTEUR SEIZE BITS SE FAIT AUSSI EN DEUX FOIS.
+    //
+    // Entre les deux instructions de lecture, le compteur a avancé : lire
+    // l'octet bas à 0xFF puis l'octet haut après le passage à 0x0100 rendrait
+    // 0x01FF, une valeur que le compteur n'a jamais eue. La puce fige donc
+    // l'octet haut au moment où l'on lit l'octet bas — c'est le même registre
+    // tampon que pour l'écriture.
+    for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
+        const ProfilAvr::ProfilCompteur& compteur = p_.compteurs[numero];
+        if (!compteur.present || compteur.compte_haut == ProfilAvr::kAbsent)
+            continue;
+        if (adresse == compteur.compte) {
+            temp_16bits_ =
+                static_cast<uint8_t>(compteurs_[numero].compte >> 8);
+            return static_cast<uint8_t>(compteurs_[numero].compte);
+        }
+        if (adresse == compteur.compte_haut) return temp_16bits_;
+    }
     return donnees_[adresse];
 }
 
@@ -540,16 +560,57 @@ void CoeurAvr::ecrire(uint16_t adresse, uint8_t valeur) {
     // débordement arrivait au bout de 256 pas au lieu de 56. Confronté à
     // simavr sur le même .elf : 57 344 cycles de période contre 262 144.
     //
-    // Le compteur 16 bits se recompose de ses deux moitiés, quel que soit
-    // l'ordre dans lequel le firmware les écrit.
+    // ET LES DEUX MOITIÉS D'UN COMPTEUR SEIZE BITS ENTRENT ENSEMBLE.
+    //
+    // TCNT1 ne s'écrit pas d'un coup : avr-gcc pose l'octet haut, puis
+    // l'octet bas. Recomposer le compte à chaque demi-écriture le faisait
+    // passer par une valeur que personne n'a demandée — nouvel octet haut
+    // collé à l'ancien octet bas —, valeur aussitôt avancée, débordée, et qui
+    // effaçait au passage l'octet haut que le firmware venait de poser. Le
+    // préchargement était perdu : période mesurée 1 024 cycles au lieu de
+    // 57 344, là où simavr rend 57 344.
+    //
+    // La puce résout cela par un registre tampon : l'octet haut y attend, et
+    // les deux entrent à l'écriture de l'octet bas.
+    //
+    // Honnêteté sur la preuve : c'est le côté LECTURE de ce même tampon qui
+    // est vérifié par un essai qui tombe sans lui (banc [52], 26 reculs
+    // apparents du compteur sur 3 000 lectures). Le côté écriture est modelé
+    // de la même façon parce que c'est le même registre sur la puce et le même
+    // comportement dans simavr — mais je n'ai pas de firmware qui le mette en
+    // défaut à lui seul une fois le plafond seize bits corrigé. Le dire plutôt
+    // que de laisser croire qu'un essai le couvre.
     for (int numero = 0; numero < p_.nb_compteurs; ++numero) {
         const ProfilAvr::ProfilCompteur& compteur = p_.compteurs[numero];
         if (!compteur.present) continue;
-        if (adresse != compteur.compte && adresse != compteur.compte_haut)
-            continue;
-        uint16_t compte = donnees_[compteur.compte];
-        if (compteur.compte_haut != ProfilAvr::kAbsent)
-            compte |= static_cast<uint16_t>(donnees_[compteur.compte_haut]) << 8;
+        // Les registres de comparaison seize bits passent par le même tampon
+        // que le compteur : c'est le même registre sur la puce.
+        if ((compteur.compte_haut != ProfilAvr::kAbsent
+             && adresse == compteur.compte_haut)
+            || (compteur.compare_a_haut != ProfilAvr::kAbsent
+                && adresse == compteur.compare_a_haut)
+            || (compteur.compare_b_haut != ProfilAvr::kAbsent
+                && adresse == compteur.compare_b_haut)) {
+            temp_16bits_ = valeur;      // il attend l'octet bas
+            return;
+        }
+        if (compteur.compare_a_haut != ProfilAvr::kAbsent
+            && adresse == compteur.compare_a) {
+            donnees_[compteur.compare_a_haut] = temp_16bits_;
+            break;
+        }
+        if (compteur.compare_b_haut != ProfilAvr::kAbsent
+            && adresse == compteur.compare_b) {
+            donnees_[compteur.compare_b_haut] = temp_16bits_;
+            break;
+        }
+        if (adresse != compteur.compte) continue;
+        uint16_t compte = valeur;
+        if (compteur.compte_haut != ProfilAvr::kAbsent) {
+            compte |= static_cast<uint16_t>(temp_16bits_) << 8;
+            donnees_[compteur.compte_haut] =
+                static_cast<uint8_t>(compte >> 8);
+        }
         compteurs_[numero].compte = compte;
         // Le prédiviseur n'est pas remis à zéro par cette écriture : sur la
         // puce non plus, il tourne pour tous les compteurs à la fois.
@@ -714,25 +775,45 @@ void CoeurAvr::avancer_compteur(Compteur& compteur, int cycles, int numero) {
                      && !(donnees_[profil.controle_a] & 0x01))
                   : ((donnees_[profil.controle_a] & 0x03) == 0x02);
     }
-    const uint16_t sommet =
+    // UN COMPTEUR SEIZE BITS COMPTE JUSQU'À 65 535.
+    //
+    // Le plafond valait 0xFF pour tout le monde : Timer1 débordait au bout de
+    // 256 pas comme un compteur huit bits. Toute base de temps un peu longue
+    // — un pas de servomoteur, une milliseconde, une note — était donc fausse
+    // d'un facteur 256, et la MLI seize bits inatteignable. Le profil le
+    // disait pourtant déjà : un compteur qui a un `compte_haut` est un
+    // compteur seize bits.
+    const bool seize_bits = profil.compte_haut != ProfilAvr::kAbsent;
+    // Et son registre de comparaison en fait seize aussi. Sans sa moitié
+    // haute, un sommet de 15 999 se lisait 127.
+    auto comparateur = [this](uint16_t bas, uint16_t haut) -> uint32_t {
+        if (bas == ProfilAvr::kAbsent) return 0xFFFFFFFFu;   // jamais atteint
+        uint32_t valeur = donnees_[bas];
+        if (haut != ProfilAvr::kAbsent)
+            valeur |= static_cast<uint32_t>(donnees_[haut]) << 8;
+        return valeur;
+    };
+    const uint32_t compare_a =
+        comparateur(profil.compare_a, profil.compare_a_haut);
+    const uint32_t compare_b =
+        comparateur(profil.compare_b, profil.compare_b_haut);
+    const uint32_t sommet =
         profil.sommet != ProfilAvr::kAbsent
             ? donnees_[profil.sommet]
-            : (ctc ? donnees_[profil.compare_a] : 0xFF);
+            : (ctc ? compare_a : (seize_bits ? 0xFFFFu : 0xFFu));
 
     compteur.reste += cycles;
     while (compteur.reste >= diviseur) {
         compteur.reste -= diviseur;
         const uint16_t avant = compteur.compte;
-        uint16_t apres = static_cast<uint16_t>(avant + 1);
+        uint32_t apres = static_cast<uint32_t>(avant) + 1;
         if (apres > sommet) {
             apres = 0;
             if (!ctc) donnees_[profil.drapeaux] |= profil.bit_tov;
         }
-        compteur.compte = apres;
-        if (avant == donnees_[profil.compare_a])
-            donnees_[profil.drapeaux] |= profil.bit_ocfa;
-        if (avant == donnees_[profil.compare_b])
-            donnees_[profil.drapeaux] |= profil.bit_ocfb;
+        compteur.compte = static_cast<uint16_t>(apres);
+        if (avant == compare_a) donnees_[profil.drapeaux] |= profil.bit_ocfa;
+        if (avant == compare_b) donnees_[profil.drapeaux] |= profil.bit_ocfb;
     }
     donnees_[profil.compte] = static_cast<uint8_t>(compteur.compte);
     if (profil.compte_haut != ProfilAvr::kAbsent)
