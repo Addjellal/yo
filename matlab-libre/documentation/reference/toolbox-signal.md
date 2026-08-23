@@ -150,6 +150,17 @@
 %   arSpectre, signalLobe, signalSommet, signalSpectrePuissance,
 %   signalNiveaux, signalTraverses, signalTransitions,
 %   signalMatriceCorrelation, puissancesSousEspace, lireOptionsSousEspace
+%
+% Conception de filtres, suite
+%   ellip       - Filtre elliptique, ou de Cauer
+%   ellipord    - Ordre minimal d'un filtre elliptique
+%   besself     - Filtre analogique de Bessel, retard de groupe plat
+%   firpm       - RIF équiondulant, échange de Remez
+%   yulewalk    - Filtre récursif ajusté sur un gabarit de module
+%   invfreqz    - Filtre ajusté sur une réponse en fréquence complexe
+%
+% Fonctions internes supplémentaires (absentes de MATLAB)
+%   prototypeElliptique - Pôles et zéros du prototype de Cauer
 ```
 
 ## `ac2poly`
@@ -249,6 +260,28 @@ BANDPOWER Puissance moyenne d'un signal, éventuellement dans une bande.
 
 ```
 BARTHANNWIN Fenêtre de Bartlett-Hann.
+```
+
+## `besself`
+
+```
+BESSELF Filtre analogique de Bessel.
+  [B,A] = BESSELF(N,WO) rend les coefficients du filtre passe-bas
+  analogique d'ordre N dont le temps de propagation de groupe reste
+  plat jusqu'à WO radians par seconde. Contrairement aux autres
+  familles, BESSELF ne conçoit pas de filtre numérique : la
+  transformation bilinéaire détruirait la platitude du retard.
+
+  Le dénominateur est le polynôme de Bessel inverse
+
+     theta_n(s) = somme des a_k s^k,  a_k = (2n-k)! / (2^(n-k) k! (n-k)!)
+
+  dont le retard de groupe vaut exactement 1 en zéro.
+
+  Exemple :
+     [b, a] = besself(2, 1);   % a = [1 3 3], b = 3
+
+  Voir aussi BUTTER, CHEBY1, ELLIP.
 ```
 
 ## `blackmanharris`
@@ -518,6 +551,48 @@ DUTYCYCLE Rapport cyclique des impulsions.
      dutycycle([0 1 1 0 0 1 1 0 0 1], 1)   % environ 0.5
 ```
 
+## `ellip`
+
+```
+ELLIP Filtre elliptique, ou filtre de Cauer.
+  [B,A] = ELLIP(N,RP,RS,WN) conçoit un passe-bas d'ordre N dont
+  l'ondulation en bande passante vaut RP décibels et l'atténuation en
+  bande coupée RS décibels ; WN est la fréquence de coupure
+  normalisée, 1 valant la moitié de la fréquence d'échantillonnage.
+  ELLIP(N,RP,RS,WN,'high') donne un passe-haut.
+
+  À ordre égal, l'elliptique est le filtre dont la transition est la
+  plus raide : il ondule dans les deux bandes, là où Chebyshev n'ondule
+  que dans l'une et Butterworth dans aucune.
+
+  Exemple :
+     [b, a] = ellip(4, 1, 40, 0.3);
+
+  Voir aussi ELLIPORD, BUTTER, CHEBY1, CHEBY2, BESSELF.
+```
+
+## `ellipord`
+
+```
+ELLIPORD Ordre minimal d'un filtre elliptique.
+  [N,WN] = ELLIPORD(WP,WS,RP,RS) rend le plus petit ordre qui laisse
+  passer la bande WP avec au plus RP décibels d'ondulation et atténue
+  la bande WS d'au moins RS décibels. Les fréquences sont normalisées,
+  1 valant la moitié de la fréquence d'échantillonnage.
+
+  ELLIPORD(...,'s') travaille en radians par seconde, sans
+  pré-distorsion.
+
+  L'ordre vient de l'équation du degré des fonctions elliptiques :
+
+     N = ceil( K(k) K'(k1) / (K'(k) K(k1)) )
+
+  avec k le rapport des fréquences et k1 celui des ondulations.
+
+  Exemple :
+     [n, Wn] = ellipord(0.2, 0.3, 1, 40)   % n = 5
+```
+
 ## `enbw`
 
 ```
@@ -591,6 +666,37 @@ FIR2 Filtre RIF défini par un gabarit de réponse en fréquence.
 
   Exemple :
      b = fir2(20, [0 0.5 0.5 1], [1 1 0 0]);
+```
+
+## `firpm`
+
+```
+FIRPM Filtre RIF équiondulant, par l'échange de Remez.
+  B = FIRPM(N,F,A) conçoit le filtre à phase linéaire d'ordre N — donc
+  N+1 coefficients — dont l'écart maximal au gabarit est le plus petit
+  possible. F donne les bords de bande par paires, normalisés entre 0
+  et 1 où 1 est la moitié de la fréquence d'échantillonnage ; A donne
+  l'amplitude visée à chacun de ces bords.
+
+  B = FIRPM(N,F,A,W) pondère les bandes : une bande de poids double
+  verra son ondulation deux fois plus faible que les autres.
+
+  B = FIRPM(N,F,A,'hilbert') ou 'differentiator' conçoit un filtre
+  antisymétrique.
+
+  [B,ERR,RES] = FIRPM(...) rend aussi l'ondulation obtenue et une
+  structure décrivant la convergence.
+
+  Le principe est celui de Parks et McClellan : le meilleur
+  approximant au sens de Tchebychev est celui dont l'erreur pondérée
+  atteint son maximum, en alternant de signe, en au moins L+2 points.
+  On part d'un jeu de fréquences, on résout exactement l'erreur
+  d'alternance, on cherche les nouveaux extrema, et on recommence.
+
+  Exemple :
+     b = firpm(20, [0 0.3 0.5 1], [1 1 0 0]);
+
+  Voir aussi FIR1, FIR2, FIRLS.
 ```
 
 ## `firtype`
@@ -749,6 +855,31 @@ INTERP Augmente la fréquence d'échantillonnage d'un facteur entier.
   Y = INTERP(X,R) insère R-1 zéros entre les échantillons puis filtre
   passe-bas ; le résultat a R fois plus de points, et le gain est
   compensé pour que l'amplitude soit conservée.
+```
+
+## `invfreqz`
+
+```
+INVFREQZ Filtre numérique ajusté sur une réponse en fréquence complexe.
+  [B,A] = INVFREQZ(H,W,NB,NA) cherche le numérateur d'ordre NB et le
+  dénominateur d'ordre NA dont la réponse aux pulsations W approche au
+  mieux H, au sens des moindres carrés.
+
+  [B,A] = INVFREQZ(H,W,NB,NA,WT) pondère chaque point.
+  [B,A] = INVFREQZ(H,W,NB,NA,WT,ITER,TOL) demande ITER itérations de
+  Steiglitz et McBride, arrêtées quand les coefficients bougent de
+  moins de TOL.
+
+  Le premier passage minimise l'erreur d'équation |B - H A|, qui est
+  linéaire en les coefficients mais pondère mal les fréquences où A est
+  petit. Les itérations suivantes divisent par |A| trouvé au tour
+  précédent : on converge alors vers l'erreur de sortie |B/A - H|,
+  celle qui compte.
+
+  Exemple :
+     [bt, at] = butter(4, 0.3);
+     [h, w] = freqz(bt, at, 256);
+     [b, a] = invfreqz(h, w, 4, 4);   % retrouve bt et at
 ```
 
 ## `islinphase`
@@ -1070,6 +1201,29 @@ POLYSTAB Stabilise un polynôme en repliant ses racines dans le disque.
   B = POLYSTAB(A) remplace chaque racine de module supérieur à 1 par son
   inverse conjugué : le module de la réponse est conservé, mais le
   polynôme devient à phase minimale.
+```
+
+## `prototypeElliptique`
+
+```
+PROTOTYPEELLIPTIQUE Pôles et zéros du prototype passe-bas de Cauer.
+  Le bord de bande passante est en oméga = 1, le bord de bande
+  atténuée en 1/k où k est la sélectivité tirée de l'équation du degré
+
+     N K'(k)/K(k) = K'(k1)/K(k1),    k1 = eps_p / eps_s.
+
+  Les zéros et les pôles s'écrivent alors avec les fonctions
+  elliptiques de Jacobi :
+
+     zeta_i = cd(u_i K, k),   z_i = j/(k zeta_i)
+     p_i    = j cd((u_i - j v0) K, k),   u_i = (2i-1)/N
+
+  et, pour un ordre impair, un pôle réel supplémentaire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+  Référence : les formules classiques de la conception elliptique,
+  telles qu'on les trouve dans la littérature ouverte sur les filtres
+  de Cauer.
 ```
 
 ## `prototypeVersNumerique`
@@ -1726,6 +1880,27 @@ XCOV Covariance croisée : la corrélation des signaux centrés.
 
   Exemple :
      c = xcov([1 2 3 4], 'coeff');   % c(4) == 1
+```
+
+## `yulewalk`
+
+```
+YULEWALK Filtre récursif ajusté sur un gabarit de module.
+  [B,A] = YULEWALK(N,F,M) conçoit un filtre d'ordre N dont le module
+  suit la courbe donnée par les points (F,M). F va de 0 à 1, 1 valant
+  la moitié de la fréquence d'échantillonnage, et doit croître ; M
+  donne le module visé. Contrairement à FIRPM, la phase n'est pas
+  imposée : seul le module compte.
+
+  La méthode est celle de Friedlander et Porat : le dénominateur sort
+  des équations de Yule-Walker modifiées, écrites sur l'autocorrélation
+  déduite du gabarit ; le numérateur vient ensuite d'une factorisation
+  spectrale à phase minimale du spectre résiduel.
+
+  Exemple :
+     [b, a] = yulewalk(8, [0 0.6 0.6 1], [1 1 0 0]);
+
+  Voir aussi FIRPM, FIR2, BUTTER.
 ```
 
 ## `zerophase`

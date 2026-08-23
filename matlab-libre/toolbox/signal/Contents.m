@@ -147,3 +147,14 @@
 %   arSpectre, signalLobe, signalSommet, signalSpectrePuissance,
 %   signalNiveaux, signalTraverses, signalTransitions,
 %   signalMatriceCorrelation, puissancesSousEspace, lireOptionsSousEspace
+%
+% Conception de filtres, suite
+%   ellip       - Filtre elliptique, ou de Cauer
+%   ellipord    - Ordre minimal d'un filtre elliptique
+%   besself     - Filtre analogique de Bessel, retard de groupe plat
+%   firpm       - RIF équiondulant, échange de Remez
+%   yulewalk    - Filtre récursif ajusté sur un gabarit de module
+%   invfreqz    - Filtre ajusté sur une réponse en fréquence complexe
+%
+% Fonctions internes supplémentaires (absentes de MATLAB)
+%   prototypeElliptique - Pôles et zéros du prototype de Cauer

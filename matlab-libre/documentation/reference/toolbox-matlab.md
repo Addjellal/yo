@@ -32,6 +32,8 @@
 %   zip, unzip                             - Archives
 %   residue     - Décomposition en éléments simples d'une fraction
 %                 rationnelle, et son inverse
+%   ellipke     - Intégrales elliptiques complètes
+%   ellipj      - Fonctions elliptiques de Jacobi
 ```
 
 ## `bounds`
@@ -39,6 +41,36 @@
 ```
 BOUNDS Minimum et maximum en un seul appel.
   [B,H] = BOUNDS(X) rend le plus petit et le plus grand élément.
+```
+
+## `ellipj`
+
+```
+ELLIPJ Fonctions elliptiques de Jacobi.
+  [SN,CN,DN] = ELLIPJ(U,M) évalue les trois fonctions au point U pour
+  le paramètre M = k^2.
+
+  La méthode est celle de la transformation de Landen descendante
+  (Abramowitz et Stegun 16.4) : on descend la suite arithmético-
+  géométrique, puis on remonte l'angle par arcsinus. Pour M = 0 on
+  retrouve le sinus et le cosinus ordinaires, pour M = 1 la tangente
+  et la sécante hyperboliques.
+
+  Exemple :
+     [s, c, d] = ellipj(0.5, 0);   % sin(0.5), cos(0.5), 1
+```
+
+## `ellipke`
+
+```
+ELLIPKE Intégrales elliptiques complètes de première et seconde espèce.
+  [K,E] = ELLIPKE(M) où M est le paramètre, M = k^2 avec k le module.
+  Le calcul suit la moyenne arithmético-géométrique de Gauss : la suite
+  converge quadratiquement, une dizaine de tours suffisent à la
+  précision machine.
+
+  Exemple :
+     [K, E] = ellipke(0.5)   % 1.854074677301372 et 1.350643881047676
 ```
 
 ## `humps`

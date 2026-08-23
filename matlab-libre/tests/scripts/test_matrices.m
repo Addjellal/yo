@@ -100,4 +100,76 @@ assert(isequal(size(zeros(2, 1, 1)), [2 1]));
 % Une dimension nulle n'est pas un singleton.
 assert(isequal(size(zeros(0, 3)), [0 3]));
 
+%% ------------------------------------------- nombres complexes
+% Ecrire un complexe dans un tableau reel rend le tableau complexe, y
+% compris quand l'ecriture fait grandir le tableau.
+p = zeros(0, 1);
+p(end+1, 1) = 1 + 2i;
+p(end+1, 1) = 3 + 4i;
+assert(isequal(p, [1+2i; 3+4i]));
+t = [];
+t(3) = 2 + 3i;
+assert(isequal(t, [0 0 2+3i]));
+q = zeros(2, 1);
+q(1) = 1 + 2i;
+assert(q(1) == 1+2i && q(2) == 0);
+r = [1 2 3];
+r(2) = 5i;
+assert(isequal(r, [1 5i 3]));
+
+% conv, deconv et filter travaillent sur les complexes.
+assert(isequal(conv([1 1i], [1 -1i]), [1 0 1]));
+assert(max(abs(conv([1 0.5-0.866i], [1 0.5+0.866i]) - [1 1 1.0000 - 0i])) < 1e-3);
+assert(isequal(conv([1+2i 3], [2 1]), [2+4i 7+2i 3]));
+assert(max(abs(deconv([1 0 1], [1 1i]) - [1 -1i])) < 1e-14);
+assert(isequal(filter([1 1i], 1, [1 0 0]), [1 1i 0]));
+
+% Le produit de complexes ne se decompose pas en parties.
+assert(prod([1+1i, 1-1i]) == 2);
+assert(isequal(cumprod([1+1i, 1-1i]), [1+1i, 2]));
+assert(sum([1+1i, 1-1i]) == 2);
+assert(isequal(cumsum([1+1i, 1-1i]), [1+1i, 2]));
+
+% roots et eig convergent sur des racines complexes : les racines
+% n-iemes de l'unite sont toutes de module 1.
+for n = [2 3 5 8 12 14]
+    racines = roots([1 zeros(1, n-1) -1]);
+    assert(numel(racines) == n);
+    assert(max(abs(abs(racines) - 1)) < 1e-10);
+    % Leur produit vaut (-1)^(n+1), leur somme est nulle pour n > 1.
+    assert(abs(sum(racines)) < 1e-9);
+end
+% Matrice de permutation cyclique : valeurs propres sur le cercle unite.
+for n = [3 5 7]
+    P = zeros(n);
+    for k = 1:n
+        P(k, mod(k, n) + 1) = 1;
+    end
+    assert(max(abs(abs(eig(P)) - 1)) < 1e-10);
+end
+% Trace et determinant se lisent sur les valeurs propres.
+randn('seed', 5);
+for n = [4 8 16]
+    A = randn(n);
+    e = eig(A);
+    assert(abs(sum(e) - trace(A)) < 1e-12 * n);
+    assert(abs(abs(prod(e)) - abs(det(A))) < 1e-8 * max(1, abs(det(A))));
+end
+
+% pinv, rank, cond, norm et svd acceptent les matrices complexes.
+Ac = [1 1; 1i -1i; -1 -1];
+assert(max(max(abs(pinv(Ac) * Ac - eye(2)))) < 1e-14);
+assert(rank(Ac) == 2);
+Vc = exp(1i * (0:7)' * [-1.885 -1.257 1.257 1.885]);
+assert(rank(Vc) == 4);
+assert(cond(Vc) < 2);
+assert(max(max(abs(pinv(Vc) * Vc - eye(4)))) < 1e-12);
+[Uc, Sc, Wc] = svd(Ac, 0);
+assert(max(max(abs(Uc * Sc * Wc' - Ac))) < 1e-14);
+assert(max(max(abs(Uc' * Uc - eye(2)))) < 1e-14);
+assert(max(abs(svd(Ac) - [2; sqrt(2)])) < 1e-14);
+randn('seed', 7);
+Cc = randn(4) + 1i * randn(4);
+assert(abs(norm(Cc) - max(svd(Cc))) < 1e-12);
+
 disp('matrices : toutes les verifications passent');

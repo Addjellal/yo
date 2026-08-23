@@ -29,3 +29,5 @@
 %   zip, unzip                             - Archives
 %   residue     - Décomposition en éléments simples d'une fraction
 %                 rationnelle, et son inverse
+%   ellipke     - Intégrales elliptiques complètes
+%   ellipj      - Fonctions elliptiques de Jacobi

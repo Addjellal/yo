@@ -674,4 +674,180 @@ yProche = cos(w3*nnSE) + cos(w4*nnSE) + 0.01*randn(nSE, 1);
 wProche = sort(abs(rootmusic(yProche, 4)));
 assert(abs(wProche(1) - w3) < 5e-3 && abs(wProche(4) - w4) < 5e-3);
 
+%% ------------------------------------ conception de filtres
+% Intégrales et fonctions elliptiques : valeurs tabulées et identités.
+[Ke, Ee] = ellipke(0.5);
+assert(abs(Ke - 1.854074677301372) < 1e-13);
+assert(abs(Ee - 1.350643881047676) < 1e-13);
+[K0, E0] = ellipke(0);
+assert(abs(K0 - pi/2) < 1e-15 && abs(E0 - pi/2) < 1e-15);
+[K9, E9] = ellipke(0.9);
+assert(abs(K9 - 2.578092113348172) < 1e-12);
+assert(abs(E9 - 1.104774732704073) < 1e-12);
+% Contre-vérification par quadrature de la définition intégrale.
+angles = linspace(0, pi/2, 200001);
+assert(abs(trapz(angles, 1 ./ sqrt(1 - 0.5*sin(angles).^2)) - Ke) < 1e-9);
+assert(abs(trapz(angles, sqrt(1 - 0.5*sin(angles).^2)) - Ee) < 1e-9);
+% Jacobi : m = 0 rend sinus et cosinus, m = 1 les hyperboliques.
+[sj, cj, dj] = ellipj(0.5, 0);
+assert(abs(sj - sin(0.5)) < 1e-14 && abs(cj - cos(0.5)) < 1e-14 && abs(dj - 1) < 1e-14);
+[s1, c1, ~] = ellipj(0.7, 1);
+assert(abs(s1 - tanh(0.7)) < 1e-14 && abs(c1 - sech(0.7)) < 1e-14);
+% Les deux identités fondamentales.
+[s2, c2, d2] = ellipj(0.8, 0.5);
+assert(abs(s2^2 + c2^2 - 1) < 1e-15);
+assert(abs(d2^2 + 0.5*s2^2 - 1) < 1e-15);
+% sn vaut 1 au quart de période, et change de signe au bout d'une demie.
+Km = ellipke(0.3);
+[sK, cK, dK] = ellipj(Km, 0.3);
+assert(abs(sK - 1) < 1e-12 && abs(cK) < 1e-12);
+assert(abs(dK - sqrt(1 - 0.3)) < 1e-12);
+[sa, ~, ~] = ellipj(0.4, 0.3);
+[sb, ~, ~] = ellipj(0.4 + 2*Km, 0.3);
+assert(abs(sa + sb) < 1e-12);
+
+% Prototype elliptique : l'ondulation passe exactement de 0 à -RP, et la
+% bande coupée reste exactement à -RS. C'est ce qui définit le filtre.
+for essai = {{3, 1, 40}, {4, 0.5, 40}, {5, 0.1, 60}, {6, 1, 60}}
+    ordre = essai{1}{1};
+    rp = essai{1}{2};
+    rs = essai{1}{3};
+    [zp, pp] = prototypeElliptique(ordre, rp, rs);
+    assert(all(real(pp) < 0));                     % stable
+    assert(numel(zp) == 2 * floor(ordre/2));
+    assert(max(abs(real(zp))) < 1e-10);            % zéros sur l'axe imaginaire
+    if mod(ordre, 2) == 1
+        reference = 1;
+    else
+        reference = 10^(-rp/20);
+    end
+    reponse = @(s) abs(prod(s - zp(:).') / prod(s - pp(:).'));
+    gain0 = reponse(0);
+    bord = reponse(1i) / gain0 * reference;
+    assert(abs(20*log10(bord) + rp) < 1e-6);
+    omegaP = linspace(0, 1, 3001);
+    magP = zeros(size(omegaP));
+    for k = 1:numel(omegaP)
+        magP(k) = reponse(1i*omegaP(k)) / gain0 * reference;
+    end
+    assert(abs(max(20*log10(magP))) < 1e-6);
+    assert(abs(min(20*log10(magP)) + rp) < 1e-6);
+end
+
+% ellip : le filtre numérique hérite des deux ondulations.
+for essai = {{4, 0.5, 40}, {5, 1, 60}}
+    ordre = essai{1}{1};
+    rp = essai{1}{2};
+    rs = essai{1}{3};
+    [be, ae] = ellip(ordre, rp, rs, 0.3);
+    assert(numel(be) == ordre + 1 && numel(ae) == ordre + 1);
+    assert(isstable(be, ae));
+    [he, we] = freqz(be, ae, 8192);
+    fe = we / pi;
+    dB = 20 * log10(abs(he));
+    dansPasse = fe <= 0.3;
+    assert(abs(max(dB(dansPasse))) < 1e-4);
+    assert(abs(min(dB(dansPasse)) + rp) < 1e-4);
+    premier = find(dB <= -rs, 1);
+    assert(~isempty(premier));
+    assert(max(dB(premier:end)) < -rs + 1e-4);
+end
+
+% ellipord : l'ordre rendu suffit, celui juste en dessous non.
+for essai = {{0.2, 0.3, 1, 40}, {0.1, 0.4, 0.5, 60}, {0.25, 0.35, 0.1, 50}}
+    Wp = essai{1}{1};
+    Ws = essai{1}{2};
+    Rp = essai{1}{3};
+    Rs = essai{1}{4};
+    [ordre, WnOrd] = ellipord(Wp, Ws, Rp, Rs);
+    assert(WnOrd == Wp);
+    for candidat = [ordre - 1, ordre]
+        [bo, ao] = ellip(candidat, Rp, Rs, Wp);
+        [ho, wo] = freqz(bo, ao, 8192);
+        attenuation = max(20 * log10(abs(ho(wo/pi >= Ws))));
+        if candidat < ordre
+            assert(attenuation > -Rs);
+        else
+            assert(attenuation <= -Rs + 1e-6);
+        end
+    end
+end
+
+% besself : le polynôme de Bessel inverse, en entiers exacts.
+[bb1, ab1] = besself(3, 1);
+assert(isequal(ab1, [1 6 15 15]) && bb1 == 15);
+[~, denominateurBessel] = besself(4, 1);
+assert(isequal(denominateurBessel, [1 10 45 105 105]));
+[~, denominateurBessel] = besself(5, 1);
+assert(isequal(denominateurBessel, [1 15 105 420 945 945]));
+[~, denominateurBessel] = besself(6, 1);
+assert(isequal(denominateurBessel, [1 21 210 1260 4725 10395 10395]));
+[bb4, ab4] = besself(4, 2);
+assert(isequal(ab4, [1 20 180 840 1680]));
+% Le retard de groupe vaut 1 en continu, à la précision de la différence.
+for ordre = [3 4 5]
+    [bg, ag] = besself(ordre, 1);
+    omegaG = linspace(1e-4, 0.4, 200);
+    reponseG = polyval(bg, 1i*omegaG) ./ polyval(ag, 1i*omegaG);
+    retard = -diff(unwrap(angle(reponseG))) ./ diff(omegaG);
+    assert(max(abs(retard - 1)) < 1e-3);
+end
+
+% firpm : la propriété qui définit le filtre est l'équi-ondulation, et
+% l'égalité des ondulations quand les poids sont égaux.
+[bp, errp] = firpm(20, [0 0.3 0.5 1], [1 1 0 0]);
+assert(numel(bp) == 21);
+assert(max(abs(bp - fliplr(bp))) < 1e-12);
+[hp, wp2] = freqz(bp, 1, 8192);
+fp = wp2 / pi;
+ondulationPasse = max(abs(abs(hp(fp <= 0.3)) - 1));
+ondulationCoupe = max(abs(hp(fp >= 0.5)));
+assert(abs(ondulationPasse - ondulationCoupe) < 1e-4);
+assert(abs(errp - ondulationCoupe) < 1e-3);
+% Un poids de dix sur la bande coupée divise son ondulation par dix.
+bpw = firpm(30, [0 0.3 0.4 1], [1 1 0 0], [1 10]);
+[hw2, ww2] = freqz(bpw, 1, 8192);
+fw2 = ww2 / pi;
+rapport = max(abs(abs(hw2(fw2 <= 0.3)) - 1)) / max(abs(hw2(fw2 >= 0.4)));
+assert(abs(rapport - 10) < 0.5);
+% Ordre impair : longueur paire, et un zéro forcé à Nyquist.
+bp2 = firpm(21, [0 0.3 0.5 1], [1 1 0 0]);
+assert(numel(bp2) == 22);
+assert(max(abs(bp2 - fliplr(bp2))) < 1e-10);
+assert(abs(polyval(bp2, -1)) < 1e-10);
+% Hilbert et différentiateur : antisymétriques.
+bh = firpm(20, [0.05 0.95], [1 1], 'hilbert');
+assert(max(abs(bh + fliplr(bh))) < 1e-10);
+bd = firpm(21, [0 0.9], [0 0.9*pi], 'differentiator');
+assert(max(abs(bd + fliplr(bd))) < 1e-10);
+
+% invfreqz : sur une réponse qui vient d'un filtre rationnel du bon
+% ordre, l'ajustement doit rendre exactement ce filtre.
+[bref2, aref2] = butter(4, 0.3);
+[href, wref] = freqz(bref2, aref2, 256);
+[bfit, afit] = invfreqz(href, wref, 4, 4);
+assert(max(abs(bfit - bref2)) < 1e-10);
+assert(max(abs(afit - aref2)) < 1e-10);
+[bell, aell] = ellip(5, 1, 40, 0.4);
+[hell, well] = freqz(bell, aell, 512);
+[bfit2, afit2] = invfreqz(hell, well, 5, 5);
+assert(max(abs(bfit2 - bell)) < 1e-9);
+assert(max(abs(afit2 - aell)) < 1e-9);
+
+% yulewalk : le module suit le gabarit, marche d'escalier comprise.
+[by, ay] = yulewalk(10, [0 0.3 0.3 0.6 0.6 1], [1 1 0.5 0.5 0 0]);
+assert(numel(by) == 11 && numel(ay) == 11);
+assert(isstable(by, ay));
+[hy, wy2] = freqz(by, ay, 4096);
+fy = wy2 / pi;
+assert(abs(abs(hy(find(fy >= 0.15, 1))) - 1) < 0.1);
+assert(abs(abs(hy(find(fy >= 0.45, 1))) - 0.5) < 0.1);
+assert(abs(hy(find(fy >= 0.8, 1))) < 0.1);
+[by2, ay2] = yulewalk(8, [0 0.6 0.6 1], [1 1 0 0]);
+[hy2, wy3] = freqz(by2, ay2, 4096);
+fy3 = wy3 / pi;
+assert(isstable(by2, ay2));
+assert(min(abs(hy2(fy3 <= 0.5))) > 0.8);
+assert(max(abs(hy2(fy3 >= 0.7))) < 0.2);
+
 disp('signal : toutes les verifications passent');

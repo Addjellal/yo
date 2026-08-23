@@ -131,6 +131,11 @@ static void copierCase(Valeur& dst, std::size_t di, const Valeur& src, std::size
             break;
         }
         default:
+            // Écrire un complexe dans un tableau réel rend le tableau
+            // complexe : sans cette promotion, la partie imaginaire
+            // disparaîtrait en silence — c'est ce qui arrivait en faisant
+            // grandir un tableau, « p(end+1) = 1+2i » sur un p réel.
+            if (!src.im.empty() && dst.im.empty()) dst.assurerImaginaire();
             dst.re[di] = si < src.re.size() ? src.re[si] : 0.0;
             if (!dst.im.empty()) dst.im[di] = si < src.im.size() ? src.im[si] : 0.0;
             break;
