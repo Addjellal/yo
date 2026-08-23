@@ -575,6 +575,34 @@ FONCTION(fnGetpid) {
     return {Valeur::scalaire((double)identifiantProcessus())};
 }
 
+
+FONCTION(fnMfilename) {
+    INUTILISE
+    // Nom du fichier en cours : celui de la fonction si l'on est dedans,
+    // sinon celui du script exécuté.
+    std::string chemin;
+    for (int k = it.profondeur() - 1; k >= 0; --k) {
+        const Portee& p = it.porteeNumero(k);
+        if (p.fonction && !p.fonction->fichier.empty()) {
+            chemin = p.fonction->fichier;
+            break;
+        }
+    }
+    if (chemin.empty()) chemin = it.fichierCourant;
+    std::string mode = args.empty() ? std::string() : args[0].versTexte();
+    if (chemin.empty()) return {Valeur::texte("")};
+    fs::path p(chemin);
+    if (mode == "fullpath") {
+        std::error_code ec;
+        fs::path absolu = fs::absolute(p, ec);
+        if (ec) absolu = p;
+        absolu.replace_extension();
+        return {Valeur::texte(absolu.string())};
+    }
+    if (mode == "class") return {Valeur::texte("")};
+    return {Valeur::texte(p.stem().string())};
+}
+
 }  // namespace
 
 void enregistrerSysteme(Interpreteur& it) {
@@ -585,6 +613,8 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("mkdir", fnMkdir, "systeme", "mkdir  Cree un dossier.");
     it.enregistrer("rmdir", fnRmdir, "systeme", "rmdir  Supprime un dossier.");
     it.enregistrer("delete", fnDelete, "systeme", "delete  Supprime des fichiers.");
+    it.enregistrer("mfilename", fnMfilename, "systeme",
+                   "mfilename  Nom du fichier en cours d'execution.");
     it.enregistrer("copyfile", fnCopyfile, "systeme", "copyfile  Copie un fichier.");
     it.enregistrer("movefile", fnMovefile, "systeme", "movefile  Deplace un fichier.");
     it.enregistrer("fullfile", fnFullfile, "systeme", "fullfile  Assemble un chemin.");

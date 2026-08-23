@@ -4,13 +4,14 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-574 fonctions ecrites en C++, reparties en 19 groupes.
+576 fonctions ecrites en C++, reparties en 20 groupes.
 
 | Groupe | Fichier |
 |---|---|
 | algebre | [natif-algebre.md](reference/natif-algebre.md) |
 | base | [natif-base.md](reference/natif-base.md) |
 | cartes | [natif-cartes.md](reference/natif-cartes.md) |
+| coder | [natif-coder.md](reference/natif-coder.md) |
 | creux | [natif-creux.md](reference/natif-creux.md) |
 | es | [natif-es.md](reference/natif-es.md) |
 | fonctionnel | [natif-fonctionnel.md](reference/natif-fonctionnel.md) |
@@ -30,7 +31,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-458 fonctions ecrites dans le langage, reparties en 52 toolboxes.
+459 fonctions ecrites dans le langage, reparties en 52 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -46,7 +47,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
-| [`coder`](reference/toolbox-coder.md) | 2 |
+| [`coder`](reference/toolbox-coder.md) | 3 |
 | [`communications`](reference/toolbox-communications.md) | 16 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |

@@ -572,6 +572,14 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
 
 void Interpreteur::executerFichier(const std::string& fichier) {
     std::string source = lireFichier(fichier);
+    // mfilename doit pouvoir nommer le fichier en cours d'exécution.
+    std::string precedent = fichierCourant;
+    fichierCourant = fichier;
+    struct Restaurer {
+        std::string& cible;
+        std::string valeur;
+        ~Restaurer() { cible = valeur; }
+    } restaurer{fichierCourant, precedent};
     UniteCompilee u = compiler(source, fichier);
     for (auto& c : u.classes) cacheClasses_[c->nom] = c;
     for (auto& c : u.classes) relierClasse(c, u.fonctions);
@@ -586,6 +594,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
         if (!voisines.empty()) {
             auto enveloppe = std::make_shared<FonctionUtilisateur>();
             enveloppe->nom = "<script>";
+            enveloppe->fichier = fichier;
             enveloppe->voisines = voisines;
             portee->fonction = enveloppe;
         }

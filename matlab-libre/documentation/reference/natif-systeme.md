@@ -170,6 +170,12 @@ maxNumCompThreads  Nombre de fils de calcul.
 memory  Memoire disponible.
 ```
 
+## `mfilename`
+
+```
+mfilename  Nom du fichier en cours d'execution.
+```
+
 ## `mkdir`
 
 ```

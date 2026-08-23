@@ -24,6 +24,7 @@ void Interpreteur::installerBibliotheque() {
     enregistrerCartes(*this);
     enregistrerCreuses(*this);
     enregistrerParallele(*this);
+    enregistrerGenerationC(*this);
 }
 
 }  // namespace matlibre

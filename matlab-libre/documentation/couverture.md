@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **574 fonctions natives** couvrant le MATLAB de base.
-- **458 fonctions de toolbox** réparties en 52 modules, écrites dans le
+- **576 fonctions natives** couvrant le MATLAB de base.
+- **459 fonctions de toolbox** réparties en 52 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -23,9 +23,12 @@ mieux le lire avant de s'appuyer dessus.
 - **Le calcul parallèle** : un pool de travailleurs indépendants pour
   `parfor`, `spmd` et `parfeval`, avec la classification des variables de
   MATLAB (tranches, réductions, diffusées, temporaires).
-- **Des tests** : 57 vérifications C++ sur le cœur, et huit suites en
+- **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
+  types et les dimensions, et produit du C sans allocation.
+- **Des tests** : 57 vérifications C++ sur le cœur, et neuf suites en
   langage MATLAB dont une qui contrôle un résultat exact par toolbox, une
-  les types de données et une le calcul parallèle, valeur par valeur.
+  les types de données, une le calcul parallèle et une qui compile puis
+  exécute le C produit pour le comparer à l'interpréteur.
 
 ## Ce qui n'est pas là
 
@@ -46,10 +49,18 @@ totalité.
    éditeurs.** Un modèle se décrit en appelant `add_block` et `add_line`,
    pas en le dessinant. La simulation, elle, est réelle : pas fixe, tri
    topologique, blocs à état, analyse nodale modifiée pour les circuits.
-3. **La génération de code est restreinte.** `codegen` traduit en C un
-   sous-ensemble volontairement étroit — fonctions scalaires, `if`, `for`,
-   `while`, arithmétique. Il signale ce qu'il ne sait pas traduire au lieu
-   de produire du C approximatif. Ce n'est pas Embedded Coder.
+3. **La génération de code couvre les matrices et les types, pas tout.**
+   `codegen` travaille sur l'arbre syntaxique et propage les types depuis
+   la signature donnée par `-args` : scalaires et matrices de taille fixe,
+   `double`, `single`, `int8`..`int64`, `uint8`..`uint64`, `logical`,
+   `char`, produit matriciel, transposition, indexation, `if`, `for`,
+   `while`, `switch`, `break`, `continue`, `return`, une trentaine de
+   fonctions mathématiques, et la saturation entière de MATLAB. Le C
+   produit n'alloue rien et compile sous `-Wall -Werror`. Manquent :
+   cellules, structures, objets, nombres complexes, tableaux de taille
+   variable, `varargin`, la récursivité, et les cibles matérielles
+   d'Embedded Coder. Ce qui n'est pas traduisible est refusé avec le
+   numéro de ligne, jamais approximé.
 4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
    Chaque module offre entre 4 et 27 fonctions, choisies pour être celles
    qu'on appelle d'abord. La Signal Processing Toolbox de MathWorks en
@@ -81,7 +92,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test           # 57 vérifications C++ + 8 suites en langage MATLAB
+make test           # 57 vérifications C++ + 9 suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

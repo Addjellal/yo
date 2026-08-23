@@ -91,6 +91,7 @@ public:
     Portee& portee() { return *piles_.back(); }
     const Portee& portee() const { return *piles_.back(); }
     Portee& porteeBase() { return *piles_.front(); }
+    const Portee& porteeNumero(int k) const { return *piles_[(std::size_t)k]; }
     Portee& porteeAppelante();
     bool existeVariable(const std::string& nom) const;
     const Valeur* trouverVariable(const std::string& nom) const;
@@ -131,6 +132,7 @@ public:
     std::unordered_map<std::string, Valeur> globales;
     long long compteurAppels = 0;
     bool modeInteractif = false;
+    std::string fichierCourant;   // fichier en cours, pour mfilename
 
     // --- objets et classes (Objets.cpp) ---
     std::shared_ptr<DefinitionClasse> classeDe(const Valeur& v);

@@ -284,8 +284,9 @@ tensions = solveDC(c);
 assert(abs(tensions(2) - 5) < 1e-9);
 
 % MATLAB Coder
-code = codegen('carreDeTest');
-assert(~isempty(strfind(code, 'double carreDeTest(double x)')));
-assert(~isempty(strfind(code, 'return')));
+resultat = codegen('carreDeTest', '-args', {0}, '-report');
+assert(~isempty(strfind(resultat.source, 'double carreDeTest(double x)')));
+assert(~isempty(strfind(resultat.source, 'return')));
+assert(~isempty(strfind(resultat.entete, 'double carreDeTest(double x);')));
 
 disp('toolboxes : toutes les verifications passent');
