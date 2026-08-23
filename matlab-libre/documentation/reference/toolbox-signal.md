@@ -77,6 +77,43 @@
 % Filtrage
 %   medfilt1    - Filtre médian glissant
 %   sgolayfilt  - Lissage de Savitzky-Golay
+%
+% Analyse et prédicats
+%   freqs       - Réponse en fréquence d'un filtre analogique
+%   phasez      - Réponse en phase déroulée
+%   phasedelay  - Retard de phase
+%   zerophase   - Amplitude à phase nulle, signe compris
+%   isstable    - Tous les pôles dans le cercle unité
+%   isminphase  - Zéros et pôles dans le cercle unité
+%   ismaxphase  - Zéros hors du cercle unité
+%   islinphase  - Coefficients symétriques ou antisymétriques
+%   firtype     - Type d'un RIF à phase linéaire, de 1 à 4
+%
+% Conversions entre représentations
+%   residuez    - Éléments simples en z^-1
+%   sos2zp, ss2zp, zp2ss, ss2sos, sos2ss
+%
+% Transformées supplémentaires
+%   dst / idst  - Transformée en sinus discrète, première espèce
+%   fwht / ifwht - Walsh-Hadamard rapide, trois rangements
+%   rceps       - Cepstre réel, et version à phase minimale
+%   cceps / icceps - Cepstre complexe et son inverse
+%
+% Fenêtres
+%   chebwin     - Dolph-Tchebychev, lobes secondaires égaux
+%   taylorwin   - Taylor, celle des radars
+%   window      - Aiguillage par nom ou par poignée
+%
+% Formes d'onde
+%   rectpuls, tripuls, gauspuls - Impulsions élémentaires
+%   diric       - Noyau de Dirichlet
+%   pulstran    - Train d'impulsions
+%   vco         - Oscillateur commandé en tension
+%   modulate / demod - Modulation et démodulation
+%   sgolay      - Matrice de lissage de Savitzky-Golay
+%
+% Fonctions internes (absentes de MATLAB)
+%   papillonHadamard, permutationWalsh, rangerWalsh, rangerWalshInverse
 ```
 
 ## `alignsignals`
@@ -156,6 +193,18 @@ BUTTORD Ordre minimal d'un filtre de Butterworth.
      [n, Wn] = buttord(0.2, 0.4, 1, 40);   % n = 8
 ```
 
+## `cceps`
+
+```
+CCEPS Cepstre complexe.
+  [XHAT,ND] = CCEPS(X) rend le cepstre complexe et le nombre
+  d'échantillons de retard retirés avant le déroulement de la phase.
+  Le cepstre complexe garde la phase, à la différence de RCEPS.
+
+  Exemple :
+     xhat = cceps([1 0 0 0 0.5 0 0 0]);
+```
+
 ## `cconv`
 
 ```
@@ -181,6 +230,23 @@ CHEB1ORD Ordre minimal d'un filtre de Chebyshev de type I.
 ```
 CHEB2ORD Ordre minimal d'un filtre de Chebyshev de type II.
   WN vaut WS : c'est la bande atténuée qui est fixée.
+```
+
+## `chebwin`
+
+```
+CHEBWIN Fenêtre de Dolph-Tchebychev.
+  W = CHEBWIN(N,R) rend la fenêtre de N points dont les lobes
+  secondaires sont tous à R décibels sous le lobe principal ; R vaut
+  100 par défaut. C'est la fenêtre qui minimise la largeur du lobe
+  principal à atténuation donnée.
+
+  La construction est celle de Dolph : la transformée de la fenêtre est
+  le polynôme de Tchebychev T(N-1) échantillonné sur le cercle, ce qui
+  donne exactement des lobes secondaires égaux.
+
+  Exemple :
+     w = chebwin(51, 60);   % lobes secondaires à -60 dB
 ```
 
 ## `cheby1`
@@ -259,12 +325,43 @@ DECIMATE Réduit la fréquence d'échantillonnage d'un facteur entier.
      numel(decimate(1:100, 4))   % 25
 ```
 
+## `demod`
+
+```
+DEMOD Démodulation, réciproque de MODULATE.
+  X = DEMOD(Y,FC,FS,METHODE). La démodulation d'amplitude multiplie par
+  la porteuse puis filtre passe-bas ; celle de phase et de fréquence
+  passe par la transformée de Hilbert.
+```
+
 ## `dftmtx`
 
 ```
 DFTMTX Matrice de la transformée de Fourier discrète.
   M = DFTMTX(N) : M*X vaut FFT(X). La matrice coûte N^2 : elle sert à
   raisonner, pas à calculer.
+```
+
+## `diric`
+
+```
+DIRIC Fonction de Dirichlet, ou sinus cardinal périodique.
+  Y = DIRIC(X,N) vaut sin(N X/2)/(N sin(X/2)), prolongée par
+  (-1)^(k(N-1)) aux multiples de 2 pi.
+
+  C'est la transformée de Fourier de la fenêtre rectangulaire de N
+  points, normalisée.
+
+  Exemple :  diric(0, 5)   % 1
+```
+
+## `dst`
+
+```
+DST Transformée en sinus discrète, première espèce.
+  Y(k) = somme des X(n) sin(pi n k/(N+1)), k = 1..N.
+
+  Exemple :  dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
 ```
 
 ## `enbw`
@@ -335,12 +432,64 @@ FIR2 Filtre RIF défini par un gabarit de réponse en fréquence.
      b = fir2(20, [0 0.5 0.5 1], [1 1 0 0]);
 ```
 
+## `firtype`
+
+```
+FIRTYPE Type d'un filtre RIF à phase linéaire, de 1 à 4.
+  Type 1 : symétrique, longueur impaire.  Type 2 : symétrique, paire.
+  Type 3 : antisymétrique, impaire.       Type 4 : antisymétrique, paire.
+```
+
 ## `flattopwin`
 
 ```
 FLATTOPWIN Fenêtre à sommet plat, pour la mesure d'amplitude.
   Coefficients de MathWorks : 0,21557895 ; 0,41663158 ; 0,277263158 ;
   0,083578947 ; 0,006947368.
+```
+
+## `freqs`
+
+```
+FREQS Réponse en fréquence d'un filtre analogique.
+  H = FREQS(B,A,W) évalue B(s)/A(s) en s = j*W. Sans W, deux cents
+  points logarithmiques couvrant les pôles et les zéros.
+
+  Exemple :  abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
+```
+
+## `fwht`
+
+```
+FWHT Transformée de Walsh-Hadamard rapide.
+  Y = FWHT(X) transforme X, dont la longueur est complétée à la
+  puissance de deux supérieure. Le facteur 1/N est porté par la
+  transformée directe, comme dans MATLAB.
+
+  Y = FWHT(X,N) impose la longueur. Y = FWHT(X,N,ORDRE) choisit
+  l'ordre des fonctions de Walsh : 'sequency' (par défaut, rangées par
+  nombre de changements de signe), 'hadamard' (ordre naturel de la
+  construction de Sylvester) ou 'dyadic' (ordre de Paley).
+
+  Exemple :
+     fwht([1 0 0 0])   % [0.25 0.25 0.25 0.25]
+```
+
+## `gauspuls`
+
+```
+GAUSPULS Impulsion sinusoïdale à enveloppe gaussienne.
+  YI = GAUSPULS(T,FC,BW,BWR) : porteuse à FC hertz, largeur de bande
+  relative BW mesurée à BWR décibels. FC vaut 1000, BW 0,5 et BWR -6.
+
+  [YI,YQ,YE] = GAUSPULS(...) rend aussi la voie en quadrature et
+  l'enveloppe.
+
+  TC = GAUSPULS('cutoff',FC,BW,BWR,TPE) rend l'instant où l'enveloppe
+  retombe TPE décibels sous son maximum.
+
+  Exemple :
+     t = -1e-3:1e-6:1e-3;  y = gauspuls(t, 1e4, 0.6);
 ```
 
 ## `gausswin`
@@ -388,10 +537,36 @@ HILBERT Signal analytique par transformée de Hilbert.
   la partie imaginaire sa transformée de Hilbert.
 ```
 
+## `icceps`
+
+```
+ICCEPS Cepstre complexe inverse.
+  X = ICCEPS(XHAT,ND) reconstitue le signal à partir de son cepstre
+  complexe et du retard ND rendu par CCEPS.
+```
+
 ## `idct`
 
 ```
 IDCT Transformée en cosinus discrète inverse.
+```
+
+## `idst`
+
+```
+IDST Transformée en sinus discrète inverse.
+  La matrice de la DST-I est symétrique et son carré vaut (N+1)/2 fois
+  l'identité : l'inverse n'est donc qu'un facteur d'échelle.
+```
+
+## `ifwht`
+
+```
+IFWHT Transformée de Walsh-Hadamard inverse.
+  La transformée directe porte le facteur 1/N ; l'inverse n'en a pas.
+
+  Exemple :
+     ifwht(fwht([1 2 3 4]))   % [1 2 3 4]
 ```
 
 ## `impz`
@@ -413,6 +588,38 @@ INTERP Augmente la fréquence d'échantillonnage d'un facteur entier.
   Y = INTERP(X,R) insère R-1 zéros entre les échantillons puis filtre
   passe-bas ; le résultat a R fois plus de points, et le gain est
   compensé pour que l'amplitude soit conservée.
+```
+
+## `islinphase`
+
+```
+ISLINPHASE Le filtre est-il à phase linéaire ?
+  Un RIF est à phase linéaire si ses coefficients sont symétriques ou
+  antisymétriques. Un RII ne l'est qu'avec un dénominateur trivial.
+```
+
+## `ismaxphase`
+
+```
+ISMAXPHASE Le filtre est-il à phase maximale ?
+  Tous les zéros sont hors du cercle unité, les pôles dedans.
+```
+
+## `isminphase`
+
+```
+ISMINPHASE Le filtre est-il à phase minimale ?
+  Tous les zéros et tous les pôles doivent être dans le cercle unité.
+```
+
+## `isstable`
+
+```
+ISSTABLE Le filtre est-il stable ?
+  Un filtre numérique est stable si tous ses pôles sont strictement à
+  l'intérieur du cercle unité.
+
+  ISSTABLE(SOS) accepte aussi une matrice de sections du second ordre.
 ```
 
 ## `kaiser`
@@ -464,6 +671,19 @@ MEDFILT1 Filtre médian glissant d'ordre N.
 MEDFREQ Fréquence médiane : celle qui coupe la puissance en deux.
 ```
 
+## `modulate`
+
+```
+MODULATE Modulation d'un signal en bande de base.
+  Y = MODULATE(X,FC,FS,METHODE) où METHODE vaut 'am' (double bande à
+  porteuse supprimée, par défaut), 'amdsb-tc' (porteuse transmise),
+  'fm', 'pm' ou 'qam'.
+
+  Exemple :
+     fs = 1e4;  x = sin(2*pi*10*(0:999)'/fs);
+     y = modulate(x, 1e3, fs, 'am');
+```
+
 ## `mscohere`
 
 ```
@@ -478,6 +698,16 @@ MSCOHERE Cohérence quadratique moyenne entre deux signaux.
 ```
 NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
+```
+
+## `papillonHadamard`
+
+```
+PAPILLONHADAMARD Transformée de Hadamard rapide, ordre naturel.
+  Chaque étage remplace un couple (a,b) par (a+b, a-b) : c'est la
+  construction de Sylvester appliquée en place, en N log2 N additions.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `parzenwin`
@@ -509,6 +739,34 @@ PERIODOGRAM Densité spectrale de puissance par périodogramme.
   de la transformée et la fréquence d'échantillonnage.
 ```
 
+## `permutationWalsh`
+
+```
+PERMUTATIONWALSH Rangement des fonctions de Walsh.
+  Rend le vecteur d'indices qui fait passer de l'ordre naturel de
+  Sylvester à l'ordre demandé : 'hadamard' (identité), 'dyadic'
+  (renversement des bits, ordre de Paley) ou 'sequency' (renversement
+  puis code de Gray, rangement par nombre de changements de signe).
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `phasedelay`
+
+```
+PHASEDELAY Retard de phase d'un filtre numérique.
+  Le retard de phase vaut -phi(w)/w. Pour un filtre à phase linéaire
+  d'ordre N il vaut N/2 échantillons, constant.
+```
+
+## `phasez`
+
+```
+PHASEZ Réponse en phase déroulée d'un filtre numérique.
+  [PHI,W] = PHASEZ(B,A,N) rend la phase continue sur N points entre 0
+  et pi, comme FREQZ pour le module.
+```
+
 ## `polystab`
 
 ```
@@ -530,6 +788,20 @@ PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
   type I d'ordre pair descend à 10^(-RP/20).
 ```
 
+## `pulstran`
+
+```
+PULSTRAN Train d'impulsions.
+  Y = PULSTRAN(T,D,@FONC,...) somme les impulsions FONC(T-D(k)). Si D
+  a deux colonnes, la seconde donne l'amplitude de chaque impulsion.
+
+  Y = PULSTRAN(T,D,P,FS) répète le prototype échantillonné P, supposé
+  échantillonné à FS hertz, par interpolation linéaire.
+
+  Exemple :
+     t = 0:1/1e3:1;  y = pulstran(t, 0:0.1:1, @rectpuls, 0.02);
+```
+
 ## `pwelch`
 
 ```
@@ -539,12 +811,69 @@ PWELCH Densité spectrale par la méthode de Welch.
   périodogrammes.
 ```
 
+## `rangerWalsh`
+
+```
+RANGERWALSH Passe de l'ordre naturel à l'ordre demandé.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `rangerWalshInverse`
+
+```
+RANGERWALSHINVERSE Revient de l'ordre demandé à l'ordre naturel.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `rceps`
+
+```
+RCEPS Cepstre réel.
+  Y = RCEPS(X) rend le cepstre réel, transformée de Fourier inverse du
+  logarithme du module du spectre.
+
+  [Y,YM] = RCEPS(X) rend aussi la version à phase minimale de X : le
+  cepstre est replié sur les temps positifs, puis exponentié.
+
+  Exemple :
+     y = rceps([1 0 0 0 0.5 0 0 0]);   % un écho à l'échantillon 5
+```
+
+## `rectpuls`
+
+```
+RECTPULS Impulsion rectangulaire de largeur W centrée en zéro.
+  L'impulsion vaut 1 sur [-W/2, W/2[ et 0 ailleurs ; W vaut 1 par défaut.
+
+  Exemple :  rectpuls([-1 -0.4 0 0.4 1])   % [0 1 1 1 0]
+```
+
 ## `resample`
 
 ```
 RESAMPLE Rééchantillonnage d'un facteur rationnel P/Q.
   Y = RESAMPLE(X,P,Q) interpole linéairement le signal sur la nouvelle
   grille temporelle.
+```
+
+## `residuez`
+
+```
+RESIDUEZ Éléments simples d'une fraction en z^-1.
+  [R,P,K] = RESIDUEZ(B,A) décompose
+
+     B(z)     R(1)                R(n)
+     ---- = ----------- + ... + ----------- + K(1) + K(2) z^-1 + ...
+     A(z)   1-P(1)z^-1          1-P(n)z^-1
+
+  B et A sont donnés en puissances croissantes de z^-1, comme pour
+  FILTER. Le calcul passe par RESIDUE sur la variable w = z^-1 : un
+  terme R/(w-P) s'y réécrit (-R/P)/(1-w/P), d'où P -> 1/P.
+
+  Exemple :
+     [r,p] = residuez(1, [1 -0.5])   % r = 1, p = 0.5
 ```
 
 ## `rms`
@@ -578,6 +907,22 @@ SEQPERIOD Période la plus courte qui explique une séquence.
   Exemple :  seqperiod([1 2 1 2 1 2])   % 2
 ```
 
+## `sgolay`
+
+```
+SGOLAY Matrice de lissage de Savitzky-Golay.
+  B = SGOLAY(K,F) rend la matrice F x F de projection sur les polynômes
+  de degré K : la ligne centrale de B est le filtre à appliquer au
+  milieu du signal, les autres lignes traitent les bords.
+
+  [B,G] = SGOLAY(K,F) rend aussi la matrice des différentiateurs : la
+  colonne j+1 de G donne le filtre de la dérivée j-ième, au facteur
+  j! près.
+
+  Exemple :
+     b = sgolay(2, 5);   % lissage quadratique sur cinq points
+```
+
 ## `sgolayfilt`
 
 ```
@@ -594,10 +939,24 @@ SNR Rapport signal sur bruit, en décibels.
   R = SNR(SIGNAL,BRUIT) rend 10*log10(puissance signal / puissance bruit).
 ```
 
+## `sos2ss`
+
+```
+SOS2SS Représentation d'état d'un enchaînement de sections du second ordre.
+```
+
 ## `sos2tf`
 
 ```
 SOS2TF Sections du second ordre vers fonction de transfert.
+```
+
+## `sos2zp`
+
+```
+SOS2ZP Zéros, pôles et gain d'un enchaînement de sections du second ordre.
+  [Z,P,K] = SOS2ZP(SOS,G) où SOS a une section par ligne, sous la forme
+  [b0 b1 b2 a0 a1 a2].
 ```
 
 ## `sosfilt`
@@ -632,11 +991,41 @@ SQUARE Signal carré de période 2*pi.
   seconde. Y = SQUARE(T,RAPPORT) fixe le rapport cyclique en pour cent.
 ```
 
+## `ss2sos`
+
+```
+SS2SOS Sections du second ordre d'une représentation d'état.
+```
+
+## `ss2zp`
+
+```
+SS2ZP Zéros, pôles et gain d'une représentation d'état.
+  Les pôles sont les valeurs propres de A ; les zéros sont les racines
+  du numérateur de la fonction de transfert.
+```
+
 ## `stepz`
 
 ```
 STEPZ Réponse indicielle d'un filtre numérique.
   [H,T] = STEPZ(B,A,N) : la réponse à un échelon unité.
+```
+
+## `taylorwin`
+
+```
+TAYLORWIN Fenêtre de Taylor.
+  W = TAYLORWIN(N,NBAR,SLL) rend la fenêtre de N points dont les NBAR
+  premiers lobes secondaires sont proches de SLL décibels, les suivants
+  décroissant. NBAR vaut 4 et SLL -30 par défaut.
+
+  C'est la fenêtre des antennes et des radars : à la différence de
+  Dolph-Tchebychev, elle ne garde pas des lobes égaux jusqu'au bout, ce
+  qui évite les impulsions aux extrémités.
+
+  Exemple :
+     w = taylorwin(64, 5, -35);
 ```
 
 ## `tf2sos`
@@ -678,6 +1067,16 @@ TRIANG Fenêtre triangulaire.
      triang(4)'   % [0.25 0.75 0.75 0.25]
 ```
 
+## `tripuls`
+
+```
+TRIPULS Impulsion triangulaire de largeur W et d'asymétrie S.
+  S vaut 0 pour un triangle symétrique, -1 pour une rampe descendante,
+  +1 pour une rampe montante. W vaut 1 et S vaut 0 par défaut.
+
+  Exemple :  tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
+```
+
 ## `tukeywin`
 
 ```
@@ -687,6 +1086,30 @@ TUKEYWIN Fenêtre de Tukey, cosinus surélevé à rapport réglable.
 
   Exemple :
      isequal(tukeywin(8, 0), rectwin(8))   % vrai
+```
+
+## `vco`
+
+```
+VCO Oscillateur commandé en tension.
+  Y = VCO(X,FC,FS) rend un cosinus dont la fréquence instantanée suit
+  X : X = -1 donne 0 hertz, X = 0 donne FC, X = +1 donne 2*FC.
+
+  Y = VCO(X,[FMIN FMAX],FS) fixe les fréquences des extrêmes -1 et +1.
+
+  Exemple :
+     fs = 1e4;  t = (0:fs-1)'/fs;  y = vco(sin(2*pi*t), 1e3, fs);
+```
+
+## `window`
+
+```
+WINDOW Fabrique une fenêtre par son nom ou sa poignée.
+  W = WINDOW(@hamming, N) équivaut à HAMMING(N).
+  W = WINDOW(@chebwin, N, R) passe les arguments supplémentaires.
+
+  Exemple :
+     w = window(@kaiser, 64, 5);
 ```
 
 ## `xcov`
@@ -700,12 +1123,36 @@ XCOV Covariance croisée : la corrélation des signaux centrés.
      c = xcov([1 2 3 4], 'coeff');   % c(4) == 1
 ```
 
+## `zerophase`
+
+```
+ZEROPHASE Réponse en amplitude à phase nulle.
+  [HR,W,PHI] = ZEROPHASE(B,A,N) décompose la réponse en fréquence en
+  H(e^jw) = HR(w) exp(j PHI(w)) avec HR réelle. Contrairement au
+  module, HR peut être négative : son signe porte les sauts de phase
+  de pi que provoquent les zéros posés sur le cercle unité.
+
+  Pour un RIF à phase linéaire la décomposition est exacte : retirer le
+  retard (N-1)/2 rend la réponse réelle pour les types 1 et 2,
+  imaginaire pure pour les types 3 et 4. Sinon l'amplitude vaut le
+  module, affecté du signe qui bascule à chaque zéro sur le cercle.
+
+  Exemple :
+     [hr, w] = zerophase([1 1]);   % hr = 2 cos(w/2), jamais négatif
+```
+
 ## `zp2sos`
 
 ```
 ZP2SOS Zéros et pôles vers sections du second ordre.
   Les racines complexes sont appariées avec leur conjuguée ; les racines
   réelles sont groupées deux par deux. Le résultat est réel.
+```
+
+## `zp2ss`
+
+```
+ZP2SS Représentation d'état à partir des zéros, pôles et gain.
 ```
 
 ## `zp2tf`

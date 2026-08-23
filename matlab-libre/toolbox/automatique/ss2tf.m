@@ -1,4 +1,4 @@
-function [num, den] = ss2tf(A, B, C, D)
+function [num, den] = ss2tf(A, B, C, D, iu)
 %SS2TF Fonction de transfert d'un modèle d'état.
 %   [NUM,DEN] = SS2TF(A,B,C,D) applique H(s) = C (sI - A)^-1 B + D par
 %   l'algorithme de Leverrier-Faddeev : les matrices M_k de l'adjointe
@@ -11,6 +11,13 @@ function [num, den] = ss2tf(A, B, C, D)
 %
 %   Exemple :
 %      [n, d] = ss2tf(-1, 1, -1, 1);   % n = [1 0], d = [1 1] : s/(s+1)
+%
+%   SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle à plusieurs
+%   entrées : seule la colonne IU de B et de D est retenue.
+    if nargin >= 5 && ~isempty(iu)
+        B = B(:, iu);
+        if ~isempty(D), D = D(:, iu); end
+    end
     n = size(A, 1);
     den = real(poly(eig(A)));
     if isempty(D), D = 0; end

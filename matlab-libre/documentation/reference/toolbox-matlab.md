@@ -30,6 +30,8 @@
 %   matlab.addons.toolbox.packageToolbox   - Empaquette en archive
 %   matlabroot, matlibre_racine_toolbox    - Racine de l'installation
 %   zip, unzip                             - Archives
+%   residue     - Décomposition en éléments simples d'une fraction
+%                 rationnelle, et son inverse
 ```
 
 ## `bounds`
@@ -170,6 +172,27 @@ RAT Approximation rationnelle par fractions continues.
 RESCALE Remise à l'échelle linéaire d'un tableau.
   Y = RESCALE(X) ramène les valeurs dans [0,1].
   Y = RESCALE(X,A,B) les ramène dans [A,B].
+```
+
+## `residue`
+
+```
+RESIDUE Décomposition en éléments simples d'une fraction rationnelle.
+  [R,P,K] = RESIDUE(B,A) décompose B(s)/A(s), polynômes donnés par
+  leurs coefficients en puissances décroissantes, sous la forme
+
+     B(s)     R(1)         R(n)
+     ---- = -------- +...+ -------- + K(s)
+     A(s)   s - P(1)       s - P(n)
+
+  Pour un pôle de multiplicité M, les M termes qui lui correspondent
+  sont consécutifs et valent R(j)/(s-P)^j, j = 1..M, comme dans MATLAB.
+
+  [B,A] = RESIDUE(R,P,K) fait le chemin inverse et reconstitue la
+  fraction.
+
+  Exemple :
+     [r,p,k] = residue([1 0], [1 3 2])   % 1/(s+1) et -... sur s+2
 ```
 
 ## `uniquetol`

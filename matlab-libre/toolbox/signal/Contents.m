@@ -74,3 +74,40 @@
 % Filtrage
 %   medfilt1    - Filtre médian glissant
 %   sgolayfilt  - Lissage de Savitzky-Golay
+%
+% Analyse et prédicats
+%   freqs       - Réponse en fréquence d'un filtre analogique
+%   phasez      - Réponse en phase déroulée
+%   phasedelay  - Retard de phase
+%   zerophase   - Amplitude à phase nulle, signe compris
+%   isstable    - Tous les pôles dans le cercle unité
+%   isminphase  - Zéros et pôles dans le cercle unité
+%   ismaxphase  - Zéros hors du cercle unité
+%   islinphase  - Coefficients symétriques ou antisymétriques
+%   firtype     - Type d'un RIF à phase linéaire, de 1 à 4
+%
+% Conversions entre représentations
+%   residuez    - Éléments simples en z^-1
+%   sos2zp, ss2zp, zp2ss, ss2sos, sos2ss
+%
+% Transformées supplémentaires
+%   dst / idst  - Transformée en sinus discrète, première espèce
+%   fwht / ifwht - Walsh-Hadamard rapide, trois rangements
+%   rceps       - Cepstre réel, et version à phase minimale
+%   cceps / icceps - Cepstre complexe et son inverse
+%
+% Fenêtres
+%   chebwin     - Dolph-Tchebychev, lobes secondaires égaux
+%   taylorwin   - Taylor, celle des radars
+%   window      - Aiguillage par nom ou par poignée
+%
+% Formes d'onde
+%   rectpuls, tripuls, gauspuls - Impulsions élémentaires
+%   diric       - Noyau de Dirichlet
+%   pulstran    - Train d'impulsions
+%   vco         - Oscillateur commandé en tension
+%   modulate / demod - Modulation et démodulation
+%   sgolay      - Matrice de lissage de Savitzky-Golay
+%
+% Fonctions internes (absentes de MATLAB)
+%   papillonHadamard, permutationWalsh, rangerWalsh, rangerWalshInverse

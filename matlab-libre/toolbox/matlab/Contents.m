@@ -27,3 +27,5 @@
 %   matlab.addons.toolbox.packageToolbox   - Empaquette en archive
 %   matlabroot, matlibre_racine_toolbox    - Racine de l'installation
 %   zip, unzip                             - Archives
+%   residue     - Décomposition en éléments simples d'une fraction
+%                 rationnelle, et son inverse

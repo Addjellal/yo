@@ -339,6 +339,9 @@ SS2TF Fonction de transfert d'un modèle d'état.
 
   Exemple :
      [n, d] = ss2tf(-1, 1, -1, 1);   % n = [1 0], d = [1 1] : s/(s+1)
+
+  SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle à plusieurs
+  entrées : seule la colonne IU de B et de D est retenue.
 ```
 
 ## `step`
