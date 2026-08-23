@@ -18,6 +18,32 @@
 %   classify            - Classe prédite
 %   crossentropy, mse   - Fonctions de coût
 %   sigmoid, relu, softmax - Fonctions d'activation
+%
+% Couches supplémentaires
+%   leakyReluLayer, eluLayer     - Activations à fuite et exponentielle
+%   dropoutLayer                 - Abandon, à l'apprentissage seulement
+%   batchNormalizationLayer      - Normalisation par lot, avec moyennes
+%                                  glissantes pour la prédiction
+%   featureInputLayer            - Entrée de caractéristiques
+%   classificationLayer          - Déclare le coût d'entropie croisée
+%   regressionLayer              - Déclare le coût quadratique
+```
+
+## `batchNormalizationLayer`
+
+```
+BATCHNORMALIZATIONLAYER Normalisation par lot.
+  Centre et réduit chaque composante sur le lot, puis applique un gain
+  et un décalage appris. Les moyennes glissantes servent à la
+  prédiction.
+```
+
+## `classificationLayer`
+
+```
+CLASSIFICATIONLAYER Couche de sortie pour la classification.
+  Elle déclare que le coût est l'entropie croisée ; elle n'a pas de
+  paramètre et ne transforme pas la sortie.
 ```
 
 ## `classify`
@@ -32,12 +58,41 @@ CLASSIFY Classe de plus forte probabilité pour chaque observation.
 CROSSENTROPY Entropie croisée moyenne par observation.
 ```
 
+## `dropoutLayer`
+
+```
+DROPOUTLAYER Couche d'abandon : éteint des unités pendant l'apprentissage.
+  C = DROPOUTLAYER(P) éteint chaque unité avec la probabilité P et
+  divise le reste par 1-P, de sorte que l'espérance ne change pas.
+  À la prédiction, la couche est transparente.
+```
+
+## `eluLayer`
+
+```
+ELULAYER Couche ELU : linéaire pour les positifs, exponentielle sinon.
+  C = ELULAYER(ALPHA) ; ALPHA vaut 1 par défaut.
+```
+
+## `featureInputLayer`
+
+```
+FEATUREINPUTLAYER Couche d'entrée pour des vecteurs de caractéristiques.
+```
+
 ## `fullyConnectedLayer`
 
 ```
 FULLYCONNECTEDLAYER Couche entièrement connectée de N sorties.
   Les poids sont initialisés par la règle de Glorot une fois la taille
   d'entrée connue, au premier appel de TRAINNETWORK.
+```
+
+## `leakyReluLayer`
+
+```
+LEAKYRELULAYER Couche ReLU à fuite : pente non nulle pour les négatifs.
+  C = LEAKYRELULAYER(PENTE) ; PENTE vaut 0,01 par défaut.
 ```
 
 ## `mse`
@@ -50,6 +105,15 @@ MSE Erreur quadratique moyenne.
 
 ```
 PREDICT Sortie d'un réseau appris.
+  Les couches qui se comportent autrement à l'apprentissage — abandon,
+  normalisation par lot — sont ici en mode prédiction.
+```
+
+## `regressionLayer`
+
+```
+REGRESSIONLAYER Couche de sortie pour la régression.
+  Elle déclare que le coût est l'erreur quadratique moyenne.
 ```
 
 ## `relu`

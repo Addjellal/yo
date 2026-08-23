@@ -22,7 +22,17 @@ function reseau = trainNetwork(X, Y, couches, options)
             couches{k} = c;
         end
     end
+    % Les couches de sortie de MATLAB ne transforment rien : elles ne
+    % font que déclarer le coût. On les retire après en avoir lu le sens.
     entropie = strcmp(couches{end}.type, 'softmax');
+    if strcmp(couches{end}.type, 'classification')
+        entropie = numel(couches) > 1 && strcmp(couches{end-1}.type, 'softmax');
+        couches(end) = [];
+    elseif strcmp(couches{end}.type, 'regression')
+        entropie = false;
+        couches(end) = [];
+    end
+    couches = couches(~cellfun(@(c) strcmp(c.type, 'input'), couches));
     vitesseW = cell(numel(couches), 1);
     vitesseB = cell(numel(couches), 1);
     for k = 1:numel(couches)
@@ -72,7 +82,7 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
     activations = cell(numel(couches) + 1, 1);
     activations{1} = x;
     for k = 1:numel(couches)
-        activations{k+1} = appliquerCouche(couches{k}, activations{k});
+        [activations{k+1}, couches{k}] = appliquerCouche(couches{k}, activations{k}, true);
     end
     m = size(x, 2);
     sortie = activations{end};
@@ -93,6 +103,24 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
                 delta = c.W.' * delta;
             case 'relu'
                 delta = delta .* (activations{k+1} > 0);
+            case 'leakyrelu'
+                entree = activations{k};
+                delta = delta .* ((entree > 0) + c.pente * (entree <= 0));
+            case 'elu'
+                entree = activations{k};
+                delta = delta .* ((entree > 0) + ...
+                                  (entree <= 0) .* (activations{k+1} + c.alpha));
+            case 'dropout'
+                if isfield(c, 'masque') && ~isempty(c.masque)
+                    delta = delta .* c.masque / max(1 - c.probabilite, eps);
+                end
+            case 'batchnorm'
+                gG = sum(delta .* c.centre, 2);
+                gB2 = sum(delta, 2);
+                couches{k}.gamma = c.gamma - 0.01 * gG;
+                couches{k}.beta = c.beta - 0.01 * gB2;
+                delta = delta .* repmat(c.gamma ./ sqrt(c.variance + c.epsilon), ...
+                                        1, size(delta, 2));
             case 'sigmoid'
                 s = activations{k+1};
                 delta = delta .* s .* (1 - s);
@@ -115,18 +143,54 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
     end
 end
 
-function y = appliquerCouche(c, x)
+function [y, c] = appliquerCouche(c, x, apprentissage)
+%APPLIQUERCOUCHE Propagation avant d'une couche.
+%   APPRENTISSAGE distingue les couches qui se comportent autrement à
+%   l'apprentissage : l'abandon et la normalisation par lot.
+    if nargin < 3, apprentissage = false; end
     switch c.type
         case 'fc'
             y = c.W * x + repmat(c.b, 1, size(x, 2));
         case 'relu'
             y = relu(x);
+        case 'leakyrelu'
+            y = max(x, 0) + c.pente * min(x, 0);
+        case 'elu'
+            y = max(x, 0) + c.alpha * (exp(min(x, 0)) - 1);
         case 'sigmoid'
             y = sigmoid(x);
         case 'tanh'
             y = tanh(x);
         case 'softmax'
             y = softmax(x);
+        case 'dropout'
+            if apprentissage
+                masque = rand(size(x)) >= c.probabilite;
+                c.masque = masque;
+                y = x .* masque / max(1 - c.probabilite, eps);
+            else
+                y = x;
+            end
+        case 'batchnorm'
+            if isempty(c.gamma)
+                c.gamma = ones(size(x, 1), 1);
+                c.beta = zeros(size(x, 1), 1);
+                c.moyenne = zeros(size(x, 1), 1);
+                c.variance = ones(size(x, 1), 1);
+            end
+            if apprentissage && size(x, 2) > 1
+                m = mean(x, 2);
+                v = mean((x - repmat(m, 1, size(x, 2))).^2, 2);
+                % Moyennes glissantes, comme dans MATLAB : facteur 0,1.
+                c.moyenne = 0.9 * c.moyenne + 0.1 * m;
+                c.variance = 0.9 * c.variance + 0.1 * v;
+            else
+                m = c.moyenne;
+                v = c.variance;
+            end
+            centre = (x - repmat(m, 1, size(x, 2))) ./ repmat(sqrt(v + c.epsilon), 1, size(x, 2));
+            c.centre = centre;
+            y = repmat(c.gamma, 1, size(x, 2)) .* centre + repmat(c.beta, 1, size(x, 2));
         otherwise
             y = x;
     end
@@ -135,6 +199,6 @@ end
 function y = propager(couches, x)
     y = x;
     for k = 1:numel(couches)
-        y = appliquerCouche(couches{k}, y);
+        y = appliquerCouche(couches{k}, y, false);
     end
 end

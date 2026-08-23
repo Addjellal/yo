@@ -13,6 +13,27 @@
 %   houghLines           - Détection de droites par transformée de Hough
 %   opticalFlowLK        - Flot optique de Lucas-Kanade
 %   bboxOverlapRatio     - Recouvrement de boîtes englobantes
+%
+% Boîtes englobantes
+%   bbox2points             - Coins d'une boîte
+%   bboxresize              - Redimensionnement
+%   bboxOverlapRatioMatrix  - Recouvrement de toutes les paires
+%   selectStrongestBbox     - Suppression des non-maxima
+%   selectStrongest         - Les N points les mieux notés
+%
+% Affichage
+%   insertMarker            - Marqueurs sur une image
+```
+
+## `bbox2points`
+
+```
+BBOX2POINTS Coins d'une boîte englobante.
+  P = BBOX2POINTS([X Y L H]) rend les quatre coins, dans le sens
+  horaire depuis le coin haut-gauche : une matrice 4x2.
+
+  Exemple :
+     bbox2points([1 2 10 20])   % [1 2; 11 2; 11 22; 1 22]
 ```
 
 ## `bboxOverlapRatio`
@@ -20,6 +41,25 @@
 ```
 BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
   Les boîtes s'écrivent [x y largeur hauteur].
+```
+
+## `bboxOverlapRatioMatrix`
+
+```
+BBOXOVERLAPRATIOMATRIX Recouvrement de toutes les paires de boîtes.
+  R(i,j) est le rapport de l'intersection sur l'union entre A(i,:) et
+  B(j,:). C'est la forme matricielle de BBOXOVERLAPRATIO.
+```
+
+## `bboxresize`
+
+```
+BBOXRESIZE Redimensionne des boîtes englobantes.
+  B = BBOXRESIZE(BBOX,ECHELLE) où ECHELLE est un facteur ou un couple
+  [vertical horizontal], comme dans MATLAB.
+
+  Exemple :
+     bboxresize([1 1 10 20], 2)   % [2 2 20 40]
 ```
 
 ## `detectFASTFeatures`
@@ -63,6 +103,15 @@ HOUGHLINES Détection de droites par transformée de Hough.
   forme de couples [rho theta] (theta en degrés).
 ```
 
+## `insertMarker`
+
+```
+INSERTMARKER Dessine des marqueurs sur une image.
+  SORTIE = INSERTMARKER(I,POSITIONS,FORME) où FORME vaut 'circle',
+  'x', 'plus' ou 'square'. POSITIONS est une matrice Nx2 de [x y].
+  Options : 'Color' et 'Size'.
+```
+
 ## `insertShape`
 
 ```
@@ -94,5 +143,26 @@ MATCHFEATURES Appariement de descripteurs par plus proche voisin.
 OPTICALFLOWLK Flot optique par la méthode de Lucas-Kanade.
   [U,V] = OPTICALFLOWLK(I1,I2) rend les deux composantes du déplacement
   estimé en chaque pixel.
+```
+
+## `selectStrongest`
+
+```
+SELECTSTRONGEST Garde les N points les plus forts.
+  [P,IDX] = SELECTSTRONGEST(POINTS,METRIQUE,N) trie par métrique
+  décroissante et garde les N premiers.
+```
+
+## `selectStrongestBbox`
+
+```
+SELECTSTRONGESTBBOX Suppression des non-maxima sur des boîtes.
+  [B,S] = SELECTSTRONGESTBBOX(BOITES,SCORES,SEUIL) garde la boîte la
+  mieux notée, écarte celles qui la recouvrent de plus de SEUIL, et
+  recommence. SEUIL vaut 0,5 par défaut.
+
+  Exemple :
+     b = [1 1 10 10; 2 2 10 10; 50 50 10 10];
+     size(selectStrongestBbox(b, [0.9; 0.8; 0.7]), 1)   % 2
 ```
 
