@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-604 fonctions ecrites en C++, reparties en 22 groupes.
+605 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-648 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+734 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -42,7 +42,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`ajustement-courbes`](reference/toolbox-ajustement-courbes.md) | 4 |
 | [`analyse-de-texte`](reference/toolbox-analyse-de-texte.md) | 8 |
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
-| [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 21 |
+| [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 27 |
 | [`audio`](reference/toolbox-audio.md) | 7 |
 | [`automatique`](reference/toolbox-automatique.md) | 40 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
@@ -85,7 +85,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 47 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 127 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 14 |
 | [`types`](reference/toolbox-types.md) | 34 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |

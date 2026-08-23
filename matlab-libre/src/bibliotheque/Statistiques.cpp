@@ -390,6 +390,14 @@ FONCTION(fnChi2pdf) {
     double k = args[1].scal();
     return {appliquerReel(versDouble(args[0]), [k](double x) {
         if (x < 0) return 0.0;
+        if (x == 0.0) {
+            // En zero la densite depend de la forme k/2 : elle diverge
+            // en dessous de 1, vaut 1/2 a 1 degre de liberte pres, et
+            // s'annule au-dela. Le calcul general y donnerait 0*log(0).
+            if (k < 2.0) return (double)INFINITY;
+            if (k == 2.0) return 0.5;
+            return 0.0;
+        }
         return std::exp((k / 2 - 1) * std::log(x) - x / 2 - std::lgamma(k / 2) -
                         (k / 2) * std::log(2.0));
     })};

@@ -585,6 +585,75 @@ FONCTION(fnBetaln) {
                      Classe::Double)};
 }
 
+// Fonction digamma : derivee logarithmique de gamma. On remonte
+// l'argument par la recurrence psi(x+1) = psi(x) + 1/x jusqu'a un domaine
+// ou le developpement asymptotique d'Euler-Maclaurin converge.
+double digammaFn(double x) {
+    if (std::isnan(x)) return x;
+    if (x == 0.0) return -INFINITY;
+    if (x < 0.0 && x == std::floor(x)) return NAN;  // poles aux entiers negatifs
+    if (x < 0.0) {
+        // Reflexion : psi(1-x) - psi(x) = pi cot(pi x).
+        return digammaFn(1.0 - x) - 3.14159265358979323846 / std::tan(3.14159265358979323846 * x);
+    }
+    double r = 0.0;
+    while (x < 10.0) {
+        r -= 1.0 / x;
+        x += 1.0;
+    }
+    double f = 1.0 / (x * x);
+    double serie = f * (-1.0 / 12.0 +
+                   f * (1.0 / 120.0 +
+                   f * (-1.0 / 252.0 +
+                   f * (1.0 / 240.0 +
+                   f * (-1.0 / 132.0 +
+                   f * (691.0 / 32760.0))))));
+    return r + std::log(x) - 0.5 / x + serie;
+}
+
+// Zeta de Hurwitz par Euler-Maclaurin, pour les polygamma d'ordre >= 1.
+static double zetaHurwitz(double s, double a) {
+    const int N = 12;
+    double somme = 0.0;
+    for (int k = 0; k < N; ++k) somme += std::pow(a + k, -s);
+    double b = a + N;
+    somme += std::pow(b, 1.0 - s) / (s - 1.0) + 0.5 * std::pow(b, -s);
+    // Termes de Bernoulli : B2/2! , B4/4! , B6/6! , B8/8! , B10/10!.
+    static const double coef[5] = {1.0 / 12.0, -1.0 / 720.0, 1.0 / 30240.0,
+                                   -1.0 / 1209600.0, 1.0 / 47900160.0};
+    double montant = s * std::pow(b, -s - 1.0);
+    for (int j = 0; j < 5; ++j) {
+        somme += coef[j] * montant;
+        // Passage du terme 2j au terme 2j+2 : facteur (s+2j)(s+2j+1)/b^2.
+        double e = s + 2.0 * j + 1.0;
+        montant *= (e) * (e + 1.0) / (b * b);
+    }
+    return somme;
+}
+
+// Polygamma d'ordre k : psi^(k)(x) = (-1)^(k+1) k! zeta(k+1, x).
+double polygammaFn(int k, double x) {
+    if (k == 0) return digammaFn(x);
+    if (std::isnan(x)) return x;
+    if (x <= 0.0 && x == std::floor(x)) return NAN;
+    double signe = (k % 2 == 0) ? -1.0 : 1.0;
+    return signe * std::exp(std::lgamma((double)k + 1.0)) * zetaHurwitz((double)k + 1.0, x);
+}
+
+FONCTION(fnPsi) {
+    INUTILISE
+    exigerArguments(args, 1, 2, "psi");
+    if (args.size() == 1)
+        return {appliquerReel(numerique(args[0]), [](double x) { return digammaFn(x); })};
+    // psi(K,X) : derivee K-ieme, K entier positif ou nul.
+    double kk = argScalaire(args, 0, "psi");
+    if (kk < 0 || kk != std::floor(kk))
+        throw ErreurMatlab("MATLAB:psi:kMustBeNonNegativeInteger",
+                           "psi : K doit etre un entier positif ou nul.");
+    int k = (int)kk;
+    return {appliquerReel(numerique(args[1]), [k](double x) { return polygammaFn(k, x); })};
+}
+
 double erfinvFn(double y) {
     if (y <= -1) return -INFINITY;
     if (y >= 1) return INFINITY;
@@ -889,6 +958,7 @@ void enregistrerMath(Interpreteur& it) {
         {"sinc", fnSincFn, "sinc  sin(pi x)/(pi x)."},
         {"betainc", fnBetainc, "betainc  Fonction beta incomplete regularisee."},
         {"gammainc", fnGammainc, "gammainc  Fonction gamma incomplete regularisee."},
+        {"psi", fnPsi, "psi  Fonction digamma et polygamma."},
     };
     for (const auto& e : table) it.enregistrer(e.nom, e.f, "math", e.aide);
 }

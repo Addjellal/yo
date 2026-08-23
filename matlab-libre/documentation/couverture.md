@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **604 fonctions natives** couvrant le MATLAB de base.
-- **654 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **605 fonctions natives** couvrant le MATLAB de base.
+- **734 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -82,10 +82,21 @@ totalité.
    La Signal Processing Toolbox compte 68 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, dix fenêtres,
    analyse spectrale à court terme, cohérence, rééchantillonnage,
-   mesures. L'Image Processing Toolbox en compte 61 — filtrage avec
+   mesures. L'Image Processing Toolbox en compte 73 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
-   texture, qualité (PSNR, SSIM). Les autres modules offrent entre 4 et
-   30 fonctions, choisies pour être celles qu'on appelle d'abord.
+   texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
+   40, la Communications 25, la logique floue 20. Les autres modules
+   offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
+   appelle d'abord.
+   La Statistics and Machine Learning Toolbox en compte 127 : dix-huit
+   lois de probabilité complètes — densité, répartition, quantile,
+   tirages, moments, estimation — plus les accès génériques `pdf`,
+   `cdf`, `icdf` et `random` par nom de loi. Les quantiles continus
+   inversent les fonctions incomplètes natives par dichotomie ; les
+   quantiles discrets marchent sur la même répartition que celle
+   exportée, si bien que l'aller-retour est exact. Les tirages gamma
+   suivent Marsaglia-Tsang, vectorisés : seuls les refusés sont retirés
+   au tour suivant.
    La Deep Learning Toolbox apprend les réseaux denses et les réseaux
    convolutifs : `imageInputLayer`, `convolution2dLayer` avec pas et
    remplissage `'same'`, `maxPooling2dLayer`, `averagePooling2dLayer`,

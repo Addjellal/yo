@@ -14,7 +14,7 @@ PORT  ?= 8421
 aide:
 	@echo "make tout        compile l'interpreteur"
 	@echo "make test        compile puis execute toute la suite de tests"
-	@echo "make doc         regenere documentation/reference/"
+	@echo "make doc         regenere documentation/reference/ et les comptes"
 	@echo "make exemples    execute les scripts de exemples/"
 	@echo "make atelier     ouvre l'atelier dans le navigateur (port $(PORT))"
 	@echo "make verifier-atelier   pilote l'atelier avec un vrai navigateur"
@@ -40,6 +40,7 @@ tests: test
 
 doc: tout
 	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/genererReference.m
+	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/majComptes.m
 
 reference: doc
 

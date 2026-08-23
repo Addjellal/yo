@@ -7,5 +7,11 @@ function y = gampdf(x, a, b)
     positif = x > 0;
     y(positif) = exp((a - 1) .* log(x(positif)) - x(positif) ./ b - ...
                      gammaln(a) - a .* log(b));
-    if a == 1, y(x == 0) = 1 ./ b; end
+    % En zero la densite vaut 1/b pour une forme de 1, diverge en
+    % dessous, s'annule au-dessus : le calcul general y ferait 0*log(0).
+    if a == 1
+        y(x == 0) = 1 ./ b;
+    elseif a < 1
+        y(x == 0) = Inf;
+    end
 end

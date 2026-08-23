@@ -524,6 +524,12 @@ power  Puissance element par element.
 primes  Nombres premiers jusqu'a n.
 ```
 
+## `psi`
+
+```
+psi  Fonction digamma et polygamma.
+```
+
 ## `rad2deg`
 
 ```
