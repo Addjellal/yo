@@ -46,6 +46,20 @@ FONCTION(fnCond) {
     exigerArguments(args, 1, 2, "cond");
     return {conditionnement(args[0])};
 }
+
+FONCTION(fnRcond) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "rcond");
+    // Estimation en norme 1 : 1/(||A||_1 * ||A^-1||_1). Une matrice
+    // singulière rend zéro, ce que le code appelant teste.
+    const Valeur& a = args[0];
+    if (a.nlignes() != a.ncolonnes())
+        erreur("MATLAB:square", "Matrix must be square.");
+    Valeur c = conditionnement(a);
+    double valeur = c.nelem() ? c.re[0] : 0.0;
+    if (!std::isfinite(valeur) || valeur == 0.0) return {Valeur::scalaire(0.0)};
+    return {Valeur::scalaire(1.0 / valeur)};
+}
 FONCTION(fnNorm) {
     INUTILISE
     exigerArguments(args, 1, 2, "norm");
@@ -221,6 +235,8 @@ void enregistrerAlgebre(Interpreteur& it) {
     it.enregistrer("rank", fnRank, "algebre", "rank  Rang numerique.");
     it.enregistrer("pinv", fnPinv, "algebre", "pinv  Pseudo-inverse de Moore-Penrose.");
     it.enregistrer("cond", fnCond, "algebre", "cond  Conditionnement en norme 2.");
+    it.enregistrer("rcond", fnRcond, "algebre",
+                   "rcond  Estimation de l'inverse du conditionnement.");
     it.enregistrer("norm", fnNorm, "algebre", "norm  Norme d'un vecteur ou d'une matrice.");
     it.enregistrer("expm", fnExpm, "algebre", "expm  Exponentielle de matrice.");
     it.enregistrer("logm", fnLogm, "algebre", "logm  Logarithme de matrice.");

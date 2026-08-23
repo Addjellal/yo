@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **603 fonctions natives** couvrant le MATLAB de base.
-- **599 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **604 fonctions natives** couvrant le MATLAB de base.
+- **611 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -34,7 +34,7 @@ mieux le lire avant de s'appuyer dessus.
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
   toolboxes depuis le langage, intégration continue sur les trois
   systèmes.
-- **Des tests** : 57 vérifications C++ sur le cœur, quatorze suites en
+- **Des tests** : 57 vérifications C++ sur le cœur, quinze suites en
   langage MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
   types de données, une le calcul parallèle, une qui compile puis exécute
   le C produit pour le comparer à l'interpréteur — et une vérification de
@@ -120,7 +120,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + 14 suites en langage MATLAB
+make test              # 57 vérifications C++ + 15 suites en langage MATLAB
 make verifier-atelier  # l'atelier, piloté par un vrai navigateur
 matlibre --test tests/scripts
 ```

@@ -16,3 +16,22 @@
 %   place             - Placement de pôles (Ackermann)
 %   lqr, dlqr         - Commande linéaire quadratique
 %   rlocus            - Lieu des racines
+%
+% Équations matricielles
+%   lyap        - Lyapunov continue, et Sylvester
+%   dlyap       - Lyapunov discrète
+%   care        - Riccati continue, par la matrice hamiltonienne
+%   dare        - Riccati discrète
+%   gram        - Grammiens de commandabilité et d'observabilité
+%
+% Analyse
+%   tzero       - Zéros de transmission
+%   initial     - Réponse libre à une condition initiale
+%   stepinfo    - Montée, établissement, dépassement
+%   bandwidth   - Bande passante à -3 décibels
+%   minreal     - Réalisation minimale
+%
+% Synthèse
+%   pid         - Correcteur proportionnel intégral dérivé
+%   lqe         - Gain de l'estimateur linéaire quadratique
+%   kalman      - Filtre de Kalman en régime permanent

@@ -122,6 +122,12 @@ qr  Factorisation QR de Householder.
 rank  Rang numerique.
 ```
 
+## `rcond`
+
+```
+rcond  Estimation de l'inverse du conditionnement.
+```
+
 ## `rref`
 
 ```

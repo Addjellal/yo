@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-603 fonctions ecrites en C++, reparties en 22 groupes.
+604 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-599 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+612 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -44,7 +44,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 14 |
 | [`audio`](reference/toolbox-audio.md) | 7 |
-| [`automatique`](reference/toolbox-automatique.md) | 27 |
+| [`automatique`](reference/toolbox-automatique.md) | 40 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
