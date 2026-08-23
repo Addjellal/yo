@@ -85,7 +85,7 @@ totalité.
    d'Embedded Coder. Ce qui n'est pas traduisible est refusé avec le
    numéro de ligne, jamais approximé.
 4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   La Signal Processing Toolbox compte 156 fonctions — conception de
+   La Signal Processing Toolbox compte 163 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
    cohérence, rééchantillonnage, cepstres réel et complexe,

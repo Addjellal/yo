@@ -57,6 +57,30 @@ for k = 1:numel(lignes)
 end
 ecrireLignes(chemin, lignes);
 
+% ------------------------- les comptes cités en toutes lettres dans le texte
+% « La Signal Processing Toolbox compte 163 fonctions » : ces phrases
+% vieillissent aussi. On les relie au dossier correspondant.
+citations = {
+    'signal',               'La Signal Processing Toolbox compte %d fonctions'
+    'images',               'L''Image Processing Toolbox en compte %d'
+    'statistiques',         'La Statistics and Machine Learning Toolbox en compte %d'
+    'automatique',          'La Control System Toolbox en compte\n   %d'
+    };
+cheminCouverture = fullfile(racine, 'documentation', 'couverture.md');
+texteCouverture = fileread(cheminCouverture);
+for k = 1:size(citations, 1)
+    indice = find(strcmp(noms, citations{k, 1}), 1);
+    if isempty(indice)
+        continue
+    end
+    motif = strrep(citations{k, 2}, '%d', '\d+');
+    remplacement = sprintf(strrep(citations{k, 2}, '%%', '%%%%'), comptes(indice));
+    texteCouverture = regexprep(texteCouverture, motif, remplacement);
+end
+fid = fopen(cheminCouverture, 'w');
+fprintf(fid, '%s', texteCouverture);
+fclose(fid);
+
 % ------------------------------------------------- les totaux, partout où ils sont
 fichiers = {fullfile(racine, 'README.md'), ...
             fullfile(racine, 'documentation', 'couverture.md'), ...
