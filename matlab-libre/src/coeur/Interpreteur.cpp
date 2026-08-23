@@ -343,6 +343,15 @@ std::size_t Interpreteur::nomPointe(const std::string& nom,
     return meilleur;
 }
 
+// Fichier de l'unité en cours : celui de la fonction, sinon le script.
+std::string Interpreteur::fichierExecute() const {
+    for (auto it = piles_.rbegin(); it != piles_.rend(); ++it) {
+        const auto& p = *it;
+        if (p && p->fonction && !p->fonction->fichier.empty()) return p->fonction->fichier;
+    }
+    return fichierCourant;
+}
+
 std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string& nom) {
     auto itc = cacheClasses_.find(nom);
     if (itc != cacheClasses_.end()) return itc->second;
@@ -447,7 +456,16 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         if (!saventLireCreux.count(nom))
             for (auto& a : args)
                 if (a.estCreux()) a = denseDepuisCreux(a);
-        return it->second.fonction(*this, args, nargout);
+        if (!profil.actif) return it->second.fonction(*this, args, nargout);
+        profil.entrerAppel(nom);
+        try {
+            auto r = it->second.fonction(*this, args, nargout);
+            profil.sortirAppel(nom);
+            return r;
+        } catch (...) {
+            profil.sortirAppel(nom);
+            throw;
+        }
     }
     auto def = classeDefinie(nom);
     if (def) return {construireObjet(*this, def, args)};
@@ -518,10 +536,15 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
     portee->nargin = (int)args.size();
     portee->nargout = nargout;
     GardePortee garde(*this, portee);
+    if (profil.actif) profil.entrerAppel(f->nom);
     try {
         executerBloc(f->corps);
     } catch (RetourFonction&) {
+    } catch (...) {
+        if (profil.actif) profil.sortirAppel(f->nom);
+        throw;
     }
+    if (profil.actif) profil.sortirAppel(f->nom);
     std::vector<Valeur> sorties;
     std::size_t nFixes = f->sorties.size();
     if (f->variadiqueSortie()) nFixes -= 1;
@@ -678,6 +701,21 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
 
 void Interpreteur::executerInstruction(const NoeudPtr& n) {
     if (!n) return;
+    // Profileur et débogueur : deux tests de booléen quand ils sont éteints.
+    if (profil.actif) profil.compterLigne(fichierExecute(), n->ligne);
+    if ((debogueur.actif || debogueur.action != ActionDebogueur::Continuer) &&
+        crochetArret && n->ligne > 0) {
+        std::string fichier = fichierExecute();
+        if (debogueur.doitArreter(fichier, n->ligne, profondeur())) {
+            debogueur.enPause = true;
+            debogueur.fichierCourant = fichier;
+            debogueur.ligneCourante = n->ligne;
+            crochetArret(*this, fichier, n->ligne);
+            debogueur.enPause = false;
+            if (debogueur.action == ActionDebogueur::Quitter)
+                throw RetourFonction{};
+        }
+    }
     switch (n->type) {
         case TypeN::Rien:
             return;

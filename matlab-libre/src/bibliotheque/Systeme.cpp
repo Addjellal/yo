@@ -555,11 +555,6 @@ FONCTION(fnBeep) {
     return {};
 }
 
-FONCTION(fnProfile) {
-    INUTILISE
-    return {};
-}
-
 FONCTION(fnGraphicsToolkit) {
     INUTILISE
     return {Valeur::texte("svg")};
@@ -655,7 +650,6 @@ void enregistrerSysteme(Interpreteur& it) {
                    "matlibre_fonctions  Liste des fonctions natives et de leur groupe.");
     it.enregistrer("memory", fnMemory, "systeme", "memory  Memoire disponible.");
     it.enregistrer("beep", fnBeep, "systeme", "beep  Emet un bip.");
-    it.enregistrer("profile", fnProfile, "systeme", "profile  Profilage (sans effet).");
     it.enregistrer("graphics_toolkit", fnGraphicsToolkit, "systeme",
                    "graphics_toolkit  Moteur graphique utilise.");
     it.enregistrer("maxNumCompThreads", fnMaxNumCompThreads, "systeme",

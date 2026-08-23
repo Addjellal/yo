@@ -51,6 +51,48 @@ void chargerToolboxes(Interpreteur& it, const std::string& racine) {
     it.ajouterChemin(racine, true);
 }
 
+// Console du débogueur : appelée quand l'exécution s'arrête sur un point
+// d'arrêt. On lit des commandes jusqu'à ce que l'utilisateur reprenne.
+void consoleDebogueur(Interpreteur& it, const std::string& fichier, int ligne) {
+    std::cout << "\nArret dans " << (fichier.empty() ? "<console>" : fichier) << " ligne "
+              << ligne << ".\n";
+    // Montre la ligne concernée quand le fichier est lisible.
+    std::ifstream f(fichier);
+    if (f) {
+        std::string texte;
+        for (int k = 1; k <= ligne && std::getline(f, texte); ++k)
+            if (k == ligne) std::cout << ligne << "  " << texte << "\n";
+    }
+    std::string commande;
+    for (;;) {
+        std::cout << "K>> " << std::flush;
+        if (!std::getline(std::cin, commande)) {
+            it.debogueur.action = ActionDebogueur::Continuer;
+            return;
+        }
+        std::string mot = commande;
+        while (!mot.empty() && (mot.back() == ' ' || mot.back() == '\t')) mot.pop_back();
+        if (mot == "dbcont" || mot == "return") {
+            it.debogueur.action = ActionDebogueur::Continuer;
+            return;
+        }
+        if (mot == "dbstep" || mot == "dbstep in" || mot == "dbstep out" || mot == "dbquit") {
+            try {
+                it.executerTexte(mot, "<debogueur>");
+            } catch (const ErreurMatlab& e) {
+                std::cerr << "Error: " << e.message << "\n";
+            }
+            return;
+        }
+        if (mot.empty()) continue;
+        try {
+            it.executerTexte(mot, "<debogueur>");
+        } catch (const ErreurMatlab& e) {
+            std::cerr << "Error: " << e.message << "\n";
+        }
+    }
+}
+
 int executerFluxInteractif(Interpreteur& it) {
     it.modeInteractif = true;
     std::string tampon;
@@ -101,6 +143,7 @@ int main(int argc, char** argv) {
     it.installerBibliotheque();
     chargerToolboxes(it, racineInstallation(argv[0]));
     it.ajouterChemin(fs::current_path().string(), true);
+    it.crochetArret = consoleDebogueur;
 
     try {
         if (arguments.empty()) return executerFluxInteractif(it);

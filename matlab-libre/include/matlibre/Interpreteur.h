@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "matlibre/Arbre.h"
+#include "matlibre/Deboguage.h"
 #include "matlibre/Valeur.h"
 
 namespace matlibre {
@@ -134,6 +135,13 @@ public:
     bool modeInteractif = false;
     std::string fichierCourant;   // fichier en cours, pour mfilename
 
+    // --- profileur et débogueur (Deboguage.h) ---
+    Profil profil;
+    Debogueur debogueur;
+    // Appelé avant chaque instruction quand le débogueur est armé. Rend la
+    // main quand l'utilisateur reprend l'exécution.
+    std::function<void(Interpreteur&, const std::string& fichier, int ligne)> crochetArret;
+
     // --- objets et classes (Objets.cpp) ---
     std::shared_ptr<DefinitionClasse> classeDe(const Valeur& v);
     bool classePossede(const Valeur& v, const std::string& methode);
@@ -145,6 +153,7 @@ public:
                                        std::vector<Valeur> args, int nargout);
     Valeur concatenerObjets(const std::vector<std::vector<Valeur>>& rangees);
     std::size_t nomPointe(const std::string& nom, const std::vector<ElementAcces>& acces);
+    std::string fichierExecute() const;
     Valeur substruct(const std::vector<ElementAcces>& chaine, std::size_t debut,
                      const Valeur* base);
     Valeur lireProprieteObjet(const Valeur& objet, const std::string& nom);
