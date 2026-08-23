@@ -129,6 +129,12 @@ ELEMENTAIRE(fnCsch, 1.0 / std::sinh(x))
 ELEMENTAIRE(fnSind, std::sin(x * 3.14159265358979323846 / 180.0))
 ELEMENTAIRE(fnCosd, std::cos(x * 3.14159265358979323846 / 180.0))
 ELEMENTAIRE(fnTand, std::tan(x * 3.14159265358979323846 / 180.0))
+ELEMENTAIRE(fnAsind, std::asin(x) * 180.0 / 3.14159265358979323846)
+ELEMENTAIRE(fnAcosd, std::acos(x) * 180.0 / 3.14159265358979323846)
+ELEMENTAIRE(fnAtand, std::atan(x) * 180.0 / 3.14159265358979323846)
+ELEMENTAIRE(fnSecd, 1.0 / std::cos(x * 3.14159265358979323846 / 180.0))
+ELEMENTAIRE(fnCscd, 1.0 / std::sin(x * 3.14159265358979323846 / 180.0))
+ELEMENTAIRE(fnCotd, 1.0 / std::tan(x * 3.14159265358979323846 / 180.0))
 ELEMENTAIRE(fnDeg2rad, x * 3.14159265358979323846 / 180.0)
 ELEMENTAIRE(fnRad2deg, x * 180.0 / 3.14159265358979323846)
 ELEMENTAIRE(fnFloor, std::floor(x))
@@ -192,6 +198,16 @@ FONCTION(fnAtan2) {
     return {diffuser(numerique(args[0]), numerique(args[1]),
                      [](double y, double x) { return std::atan2(y, x); }, Classe::Double)};
 }
+FONCTION(fnAtan2d) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "atan2d");
+    return {diffuser(numerique(args[0]), numerique(args[1]),
+                     [](double y, double x) {
+                         return std::atan2(y, x) * 180.0 / 3.14159265358979323846;
+                     },
+                     Classe::Double)};
+}
+
 FONCTION(fnHypot) {
     INUTILISE
     exigerArguments(args, 2, 2, "hypot");
@@ -769,6 +785,7 @@ void enregistrerMath(Interpreteur& it) {
         {"acos", fnAcos, "acos  Arc cosinus."},
         {"atan", fnAtan, "atan  Arc tangente."},
         {"atan2", fnAtan2, "atan2  Arc tangente a quatre quadrants."},
+        {"atan2d", fnAtan2d, "atan2d  Arc tangente a quatre quadrants, en degres."},
         {"sinh", fnSinh, "sinh  Sinus hyperbolique."},
         {"cosh", fnCosh, "cosh  Cosinus hyperbolique."},
         {"tanh", fnTanh, "tanh  Tangente hyperbolique."},
@@ -784,6 +801,12 @@ void enregistrerMath(Interpreteur& it) {
         {"sind", fnSind, "sind  Sinus en degres."},
         {"cosd", fnCosd, "cosd  Cosinus en degres."},
         {"tand", fnTand, "tand  Tangente en degres."},
+        {"asind", fnAsind, "asind  Arc sinus, en degres."},
+        {"acosd", fnAcosd, "acosd  Arc cosinus, en degres."},
+        {"atand", fnAtand, "atand  Arc tangente, en degres."},
+        {"secd", fnSecd, "secd  Secante en degres."},
+        {"cscd", fnCscd, "cscd  Cosecante en degres."},
+        {"cotd", fnCotd, "cotd  Cotangente en degres."},
         {"deg2rad", fnDeg2rad, "deg2rad  Degres vers radians."},
         {"rad2deg", fnRad2deg, "rad2deg  Radians vers degres."},
         {"floor", fnFloor, "floor  Arrondi vers moins l'infini."},

@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **592 fonctions natives** couvrant le MATLAB de base.
-- **523 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **599 fonctions natives** couvrant le MATLAB de base.
+- **569 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -30,8 +30,8 @@ mieux le lire avant de s'appuyer dessus.
   profileur, concepteur d'applications et éditeur de schémas-blocs.
 - **Les fonctions imbriquées** avec partage de l'espace de travail, ce qui
   rend les rappels d'application naturels.
-- **Des tests** : 57 vérifications C++ sur le cœur, dix suites en langage
-  MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
+- **Des tests** : 57 vérifications C++ sur le cœur, douze suites en
+  langage MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
   types de données, une le calcul parallèle, une qui compile puis exécute
   le C produit pour le comparer à l'interpréteur — et une vérification de
   l'atelier menée par un vrai navigateur.
@@ -78,9 +78,11 @@ totalité.
    La Signal Processing Toolbox compte 68 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, dix fenêtres,
    analyse spectrale à court terme, cohérence, rééchantillonnage,
-   mesures. Les autres modules offrent entre 4 et 30 fonctions, choisies
-   pour être celles qu'on appelle d'abord. MathWorks en compte plusieurs
-   centaines par toolbox.
+   mesures. L'Image Processing Toolbox en compte 61 — filtrage avec
+   remplissage des bords, gradient, morphologie complète, régions,
+   texture, qualité (PSNR, SSIM). Les autres modules offrent entre 4 et
+   30 fonctions, choisies pour être celles qu'on appelle d'abord.
+   MathWorks en compte plusieurs centaines par toolbox.
 5. **Les types de données modernes sont là, mais partiellement.**
    `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
    `timetable`, `containers.Map` et `sparse` existent avec leurs
@@ -108,7 +110,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + 10 suites en langage MATLAB
+make test              # 57 vérifications C++ + 12 suites en langage MATLAB
 make verifier-atelier  # l'atelier, piloté par un vrai navigateur
 matlibre --test tests/scripts
 ```

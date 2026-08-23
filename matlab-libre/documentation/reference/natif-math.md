@@ -14,6 +14,12 @@ abs  Valeur absolue, module d'un complexe.
 acos  Arc cosinus.
 ```
 
+## `acosd`
+
+```
+acosd  Arc cosinus, en degres.
+```
+
 ## `acosh`
 
 ```
@@ -44,6 +50,12 @@ arg  Argument d'un complexe.
 asin  Arc sinus.
 ```
 
+## `asind`
+
+```
+asind  Arc sinus, en degres.
+```
+
 ## `asinh`
 
 ```
@@ -60,6 +72,18 @@ atan  Arc tangente.
 
 ```
 atan2  Arc tangente a quatre quadrants.
+```
+
+## `atan2d`
+
+```
+atan2d  Arc tangente a quatre quadrants, en degres.
+```
+
+## `atand`
+
+```
+atand  Arc tangente, en degres.
 ```
 
 ## `atanh`
@@ -164,6 +188,12 @@ cosh  Cosinus hyperbolique.
 cot  Cotangente.
 ```
 
+## `cotd`
+
+```
+cotd  Cotangente en degres.
+```
+
 ## `coth`
 
 ```
@@ -174,6 +204,12 @@ coth  Cotangente hyperbolique.
 
 ```
 csc  Cosecante.
+```
+
+## `cscd`
+
+```
+cscd  Cosecante en degres.
 ```
 
 ## `csch`
@@ -516,6 +552,12 @@ round  Arrondi au plus proche.
 
 ```
 sec  Secante.
+```
+
+## `secd`
+
+```
+secd  Secante en degres.
 ```
 
 ## `sech`

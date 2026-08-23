@@ -260,6 +260,17 @@ FONCTION(fnConv2) {
                     plein.re[(std::size_t)(i + di) + (std::size_t)(j + dj) * lr];
         return {r};
     }
+    if (forme == "valid") {
+        // Seule la partie calculée sans dépassement des bords.
+        int lv = la - lb + 1, cv = ca - cb + 1;
+        if (lv <= 0 || cv <= 0) return {Valeur::matrice(std::max(lv, 0), std::max(cv, 0))};
+        Valeur r = Valeur::matrice(lv, cv);
+        for (int i = 0; i < lv; ++i)
+            for (int j = 0; j < cv; ++j)
+                r.re[(std::size_t)i + (std::size_t)j * lv] =
+                    plein.re[(std::size_t)(i + lb - 1) + (std::size_t)(j + cb - 1) * lr];
+        return {r};
+    }
     return {plein};
 }
 

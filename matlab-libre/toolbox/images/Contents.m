@@ -1,23 +1,57 @@
 % Image Processing Toolbox — traitement d'images.
 %
-% Une image est une matrice : niveaux de gris en 2-D, couleur en 3-D
-% (hauteur x largeur x 3). Les entiers uint8 valent 0 à 255, les doubles
-% 0 à 1, comme dans la documentation MathWorks.
+% Les images sont des matrices : un plan pour les niveaux de gris, trois
+% pour la couleur. Les doubles vivent dans [0,1], les uint8 dans [0,255],
+% comme dans MATLAB.
 %
-%   im2double, im2uint8   - Conversions d'échelle
-%   rgb2gray, gray2rgb    - Couleur et niveaux de gris
-%   imresize              - Redimensionnement bilinéaire
-%   imrotate              - Rotation
-%   imcrop                - Découpe
-%   imfilter, fspecial    - Filtrage linéaire et noyaux usuels
-%   imgaussfilt           - Lissage gaussien
-%   medfilt2              - Filtre médian 2-D
-%   edge                  - Détection de contours (Sobel, Prewitt, Laplacien)
-%   imbinarize, graythresh- Seuillage, méthode d'Otsu
-%   imadjust, histeq      - Contraste et égalisation d'histogramme
-%   imhist                - Histogramme
-%   imerode, imdilate     - Morphologie mathématique
-%   imopen, imclose       - Ouverture et fermeture
-%   bwlabel               - Étiquetage des composantes connexes
-%   imnoise               - Ajout de bruit
-%   imshow, imwrite       - Affichage et écriture (PGM/PPM)
+% Lecture, écriture, affichage
+%   imread, imwrite, imshow
+%
+% Conversions
+%   im2double, im2uint8, im2gray, rgb2gray, gray2rgb
+%   rgb2hsv, hsv2rgb, rgb2ycbcr, ycbcr2rgb
+%   imcomplement - Négatif
+%
+% Arithmétique
+%   imadd, imsubtract, immultiply, imdivide, imabsdiff, imlincomb
+%
+% Géométrie
+%   imresize, imrotate, imcrop, imtranslate, padarray
+%
+% Filtrage
+%   imfilter    - Filtrage linéaire, avec choix du remplissage des bords
+%   fspecial    - Noyaux usuels
+%   imgaussfilt - Flou gaussien
+%   imboxfilt   - Moyenne sur un carré
+%   imsharpen   - Accentuation par masque flou
+%   medfilt2    - Filtre médian
+%   ordfilt2    - Filtre de rang
+%   stdfilt, rangefilt, entropyfilt - Statistiques locales
+%
+% Gradient et contours
+%   imgradientxy, imgradient - Gradient, amplitude et direction
+%   edge        - Détection de contours
+%
+% Histogramme et contraste
+%   imhist, histeq, imadjust, stretchlim
+%   graythresh, imbinarize, multithresh, imquantize
+%
+% Morphologie
+%   strel       - Élément structurant
+%   imdilate, imerode, imopen, imclose
+%   imtophat, imbothat - Chapeaux haut et bas de forme
+%   imfill      - Bouchage des trous
+%   bwperim, bwarea, bweuler, bwdist
+%   bwlabel, bwconncomp, regionprops, label2rgb
+%
+% Texture
+%   graycomatrix, graycoprops - Cooccurrence et ses descripteurs
+%
+% Qualité
+%   mean2, std2, corr2, immse, psnr, ssim
+%
+% Transformées
+%   dct2, idct2 - Cosinus discrète bidimensionnelle
+%
+% Bruit
+%   imnoise
