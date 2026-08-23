@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **576 fonctions natives** couvrant le MATLAB de base.
-- **459 fonctions de toolbox** réparties en 52 modules, écrites dans le
+- **592 fonctions natives** couvrant le MATLAB de base.
+- **474 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -25,10 +25,16 @@ mieux le lire avant de s'appuyer dessus.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Des tests** : 57 vérifications C++ sur le cœur, et neuf suites en
-  langage MATLAB dont une qui contrôle un résultat exact par toolbox, une
-  les types de données, une le calcul parallèle et une qui compile puis
-  exécute le C produit pour le comparer à l'interpréteur.
+- **Un atelier dans le navigateur** : éditeur avec coloration et points
+  d'arrêt, console, explorateur de variables, débogueur pas à pas,
+  profileur, concepteur d'applications et éditeur de schémas-blocs.
+- **Les fonctions imbriquées** avec partage de l'espace de travail, ce qui
+  rend les rappels d'application naturels.
+- **Des tests** : 57 vérifications C++ sur le cœur, dix suites en langage
+  MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
+  types de données, une le calcul parallèle, une qui compile puis exécute
+  le C produit pour le comparer à l'interpréteur — et une vérification de
+  l'atelier menée par un vrai navigateur.
 
 ## Ce qui n'est pas là
 
@@ -40,15 +46,22 @@ totalité.
 
 Écarts connus, par ordre d'importance :
 
-1. **Pas d'interface graphique de bureau.** Pas d'éditeur intégré, pas
-   d'App Designer, pas d'explorateur de variables cliquable, pas d'éditeur
-   de schéma Simulink. L'interpréteur est en ligne de commande ; les
-   figures sortent en SVG. `who`, `whos`, `dbstop` et `profile` existent
-   sous forme de commandes, pas de fenêtres.
-2. **Simulink, Stateflow et Simscape sont des solveurs, pas des
-   éditeurs.** Un modèle se décrit en appelant `add_block` et `add_line`,
-   pas en le dessinant. La simulation, elle, est réelle : pas fixe, tri
-   topologique, blocs à état, analyse nodale modifiée pour les circuits.
+1. **L'atelier est dans le navigateur, pas sur le bureau.**
+   `matlibre --ide` ouvre un éditeur avec coloration et points d'arrêt,
+   une console, un explorateur de variables, un débogueur pas à pas, un
+   profileur, un concepteur d'applications qui exécute vraiment ce qu'il
+   dessine, et un éditeur de schémas-blocs qui simule. Ce qui manque par
+   rapport au bureau MATLAB : pas d'application native, pas d'édition
+   collaborative, pas de Live Script (cellules exécutables mêlées au
+   texte), pas de comparaison de fichiers, et l'éditeur n'a ni repliement
+   de code ni recherche multi-fichiers.
+2. **Simulink se dessine et se simule ; Stateflow et Simscape restent des
+   solveurs.** L'atelier a un éditeur de schémas-blocs : on glisse les
+   dix-sept blocs du solveur, on tire les fils à la souris, et le modèle
+   part en `new_system` / `add_block` / `add_line`. La simulation est
+   réelle : pas fixe, tri topologique, blocs à état, analyse nodale
+   modifiée pour les circuits. Manquent : les sous-systèmes, les bus, le
+   pas variable, et les éditeurs graphiques de Stateflow et Simscape.
 3. **La génération de code couvre les matrices et les types, pas tout.**
    `codegen` travaille sur l'arbre syntaxique et propage les types depuis
    la signature donnée par `-args` : scalaires et matrices de taille fixe,
@@ -92,7 +105,8 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test           # 57 vérifications C++ + 9 suites en langage MATLAB
+make test              # 57 vérifications C++ + 10 suites en langage MATLAB
+make verifier-atelier  # l'atelier, piloté par un vrai navigateur
 matlibre --test tests/scripts
 ```
 

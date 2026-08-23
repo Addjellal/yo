@@ -1,6 +1,8 @@
 #include "matlibre/Analyseur.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <set>
 
 #include "matlibre/Erreur.h"
@@ -115,6 +117,7 @@ UniteCompilee Analyseur::analyserUnite() {
         }
         return u;
     }
+    fonctionsTerminees_ = detecterFonctionsTerminees();
     if (!jeton().estMot("function")) {
         u.script = bloc({"function"});
         if (u.script->enfants.empty()) u.script = nullptr;
@@ -130,6 +133,35 @@ UniteCompilee Analyseur::analyserUnite() {
     }
     (void)aideDeTete;
     return u;
+}
+
+// Un fichier dont les fonctions sont fermées par « end » se reconnaît à un
+// « end » qui ne ferme aucun bloc de contrôle : c'est celui de la fonction.
+// Les « end » d'indexation, entre parenthèses ou crochets, sont ignorés.
+bool Analyseur::detecterFonctionsTerminees() const {
+    static const std::set<std::string> ouvrants = {
+        "if", "for", "parfor", "while", "switch", "try", "spmd", "do",
+        "unwind_protect", "classdef", "methods", "properties", "events",
+        "enumeration"};
+    int profondeur = 0;
+    int crochets = 0;
+    bool vuFonction = false;
+    for (const Jeton& t : j_) {
+        if (t.genre == Genre::Operateur) {
+            if (t.texte == "(" || t.texte == "[" || t.texte == "{") ++crochets;
+            else if (t.texte == ")" || t.texte == "]" || t.texte == "}") --crochets;
+            continue;
+        }
+        if (crochets > 0) continue;
+        if (t.genre != Genre::MotCle) continue;
+        if (t.texte == "function") { vuFonction = true; continue; }
+        if (ouvrants.count(t.texte)) { ++profondeur; continue; }
+        if (t.texte == "end" || t.texte.rfind("end", 0) == 0) {
+            if (profondeur > 0) --profondeur;
+            else if (vuFonction) return true;
+        }
+    }
+    return false;
 }
 
 NoeudPtr Analyseur::analyserBloc() { return bloc({}); }
@@ -529,6 +561,18 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
         exigerOp(")");
     }
     f->corps = bloc({"function"});
+    // Dans un fichier dont les fonctions sont fermées par « end », une
+    // fonction écrite avant ce « end » est imbriquée : elle partage
+    // l'espace de travail de celle qui l'entoure.
+    if (fonctionsTerminees_) {
+        sauterSeparateurs();
+        while (jeton().estMot("function")) {
+            auto sous = definitionFonction();
+            sous->imbriquee = true;
+            f->imbriquees[sous->nom] = sous;
+            sauterSeparateurs();
+        }
+    }
     if (motFin()) avancer();
     return f;
 }

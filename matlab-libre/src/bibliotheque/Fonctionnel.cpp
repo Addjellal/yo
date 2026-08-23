@@ -6,6 +6,7 @@
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
+#include "matlibre/Lexeur.h"
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
@@ -226,7 +227,28 @@ FONCTION(fnEvalc) {
 FONCTION(fnEvalin) {
     INUTILISE
     exigerArguments(args, 2, 2, "evalin");
-    it.executerTexte(args[1].versTexte(), "<evalin>");
+    // evalin rend une valeur quand on la demande : on évalue alors
+    // l'expression dans l'espace de travail visé, comme le fait MATLAB.
+    std::string ou = args[0].versTexte();
+    std::string texte = args[1].versTexte();
+    if (nargout > 0) {
+        Portee& cible = ou == "base" ? it.porteeBase() : it.porteeAppelante();
+        auto sauvegarde = std::make_shared<Portee>(cible);
+        GardePortee garde(it, sauvegarde);
+        Analyseur analyseur(Lexeur(texte).analyser(), "<evalin>");
+        NoeudPtr bloc = analyseur.analyserBloc();
+        if (!bloc || bloc->enfants.empty()) return {Valeur::vide()};
+        const NoeudPtr& derniere = bloc->enfants.back();
+        for (std::size_t k = 0; k + 1 < bloc->enfants.size(); ++k)
+            it.executerInstruction(bloc->enfants[k]);
+        const NoeudPtr& expr = derniere->type == TypeN::Expression ? derniere->enfants[0]
+                                                                   : derniere;
+        auto r = it.evaluerMulti(expr, std::max(nargout, 1));
+        // Les variables créées repartent dans l'espace de travail visé.
+        for (const auto& kv : sauvegarde->variables) cible.variables[kv.first] = kv.second;
+        return r;
+    }
+    it.executerTexte(texte, "<evalin>");
     return {};
 }
 

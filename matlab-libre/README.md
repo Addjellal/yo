@@ -1,7 +1,7 @@
 # MatLibre
 
 Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
-52 toolboxes écrites dans le langage lui-même.
+53 toolboxes écrites dans le langage lui-même.
 
 ```bash
 make            # compile — aucune dépendance obligatoire
@@ -33,12 +33,12 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **576 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **592 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **459 fonctions de toolbox** en langage MATLAB, réparties en
-  **52 modules** : signal, image, vision, apprentissage profond,
+- **474 fonctions de toolbox** en langage MATLAB, réparties en
+  **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
   antennes, audio, symbolique, EDP, Simulink, Stateflow, Simscape…
@@ -50,6 +50,10 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Du calcul parallèle réel** : `parfor`, `spmd`, `parfeval` et leurs
   compagnons répartissent le travail sur un pool de travailleurs, chacun
   portant son propre interpréteur.
+- **Un atelier dans le navigateur** (`matlibre --ide`) : éditeur avec
+  coloration et points d'arrêt, console, explorateur de variables,
+  débogueur pas à pas, profileur, concepteur d'applications qui exécute
+  vraiment ce qu'il dessine, et éditeur de schémas-blocs qui simule.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
   taille fixe, tous les types entiers avec leur saturation, le produit
   matriciel et le contrôle de flux, en C qui n'alloue rien.
@@ -91,7 +95,8 @@ make
 | Fichier | Contenu |
 |---|---|
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
-| [`toolboxes.md`](documentation/toolboxes.md) | les 52 modules et leur correspondance MathWorks |
+| [`atelier.md`](documentation/atelier.md) | l'atelier : éditeur, débogueur, profileur, concepteur, schémas-blocs |
+| [`toolboxes.md`](documentation/toolboxes.md) | les 53 modules et leur correspondance MathWorks |
 | [`reference.md`](documentation/reference.md) | les 966 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |

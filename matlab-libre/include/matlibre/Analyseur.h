@@ -45,6 +45,8 @@ private:
     NoeudPtr instruction();
     NoeudPtr instructionSi();
     NoeudPtr instructionPour(bool parallele);
+    bool fonctionsTerminees_ = false;  // le fichier ferme ses fonctions par « end »
+    bool detecterFonctionsTerminees() const;
     NoeudPtr instructionTantQue();
     NoeudPtr instructionFaire();
     NoeudPtr instructionChoix();

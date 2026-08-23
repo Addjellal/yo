@@ -54,6 +54,9 @@ struct Fonction {
     std::vector<std::string> parametres;
     std::shared_ptr<Noeud> corps;
     std::shared_ptr<std::unordered_map<std::string, Valeur>> capture;
+    // Portée de la fonction qui a créé la poignée : une fonction imbriquée
+    // appelée par un rappel y retrouve les variables de son parent.
+    std::shared_ptr<struct Portee> porteeEnglobante;
     // Fonction où la poignée a été créée : ses sous-fonctions restent
     // visibles depuis le corps, comme dans MATLAB.
     std::shared_ptr<FonctionUtilisateur> contexte;

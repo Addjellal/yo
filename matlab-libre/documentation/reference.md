@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-576 fonctions ecrites en C++, reparties en 20 groupes.
+592 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -13,9 +13,11 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | cartes | [natif-cartes.md](reference/natif-cartes.md) |
 | coder | [natif-coder.md](reference/natif-coder.md) |
 | creux | [natif-creux.md](reference/natif-creux.md) |
+| deboguage | [natif-deboguage.md](reference/natif-deboguage.md) |
 | es | [natif-es.md](reference/natif-es.md) |
 | fonctionnel | [natif-fonctionnel.md](reference/natif-fonctionnel.md) |
 | graphique | [natif-graphique.md](reference/natif-graphique.md) |
+| interface | [natif-interface.md](reference/natif-interface.md) |
 | math | [natif-math.md](reference/natif-math.md) |
 | optimisation | [natif-optimisation.md](reference/natif-optimisation.md) |
 | parallele | [natif-parallele.md](reference/natif-parallele.md) |
@@ -31,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-459 fonctions ecrites dans le langage, reparties en 52 toolboxes.
+474 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -64,6 +66,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`images`](reference/toolbox-images.md) | 27 |
 | [`instruments`](reference/toolbox-instruments.md) | 4 |
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 6 |
+| [`interface`](reference/toolbox-interface.md) | 15 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
 | [`matlab`](reference/toolbox-matlab.md) | 14 |

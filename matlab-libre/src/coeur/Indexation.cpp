@@ -516,6 +516,15 @@ Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>&
             if (args.empty()) erreur("MATLAB:badsubscript", "Invalid dynamic field name.");
             nom = args[0].versTexte();
         }
+        // Un objet reçoit ses propriétés par ses accesseurs : c'est là que
+        // « set.Propriete » d'une classe prend effet, et ce qui fait qu'un
+        // objet « handle » se modifie à travers toutes ses copies.
+        if (base.classe == Classe::Objet && !estCarte(base)) {
+            if (k + 1 == chaine.size()) return ecrireProprieteObjet(std::move(base), nom, v);
+            Valeur ancienne = lireProprieteObjet(base, nom);
+            Valeur nouvelle = affecterIndex(std::move(ancienne), chaine, k + 1, v, suppression);
+            return ecrireProprieteObjet(std::move(base), nom, nouvelle);
+        }
         if (!base.estStructure()) {
             if (!base.estVide())
                 erreur("MATLAB:invalidAssignment",

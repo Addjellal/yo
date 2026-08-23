@@ -16,6 +16,7 @@
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
+#include "matlibre/Atelier.h"
 #include "matlibre/Version.h"
 
 namespace fs = std::filesystem;
@@ -157,8 +158,26 @@ int main(int argc, char** argv) {
                       << "  -q, --quiet        pas de banniere\n"
                       << "  --path DOSSIER     ajoute DOSSIER au chemin de recherche\n"
                       << "  --test DOSSIER     execute les fichiers de test du dossier\n"
+                      << "  --ide [PORT]       ouvre l'atelier dans le navigateur\n"
+                      << "  --ide-sans-navigateur [PORT]  atelier sans ouvrir le navigateur\n"
                       << "  -v, --version      affiche la version\n";
             return 0;
+        }
+        if (arguments[0] == "--ide" || arguments[0] == "--ide-sans-navigateur") {
+            int port = 842;
+            if (arguments.size() > 1) {
+                int demande = std::atoi(arguments[1].c_str());
+                if (demande > 0) port = demande;
+            }
+            std::string racineToolbox = racineInstallation(argv[0]);
+            if (!racineToolbox.empty())
+#ifdef _WIN32
+                _putenv_s("MATLIBRE_TOOLBOX", racineToolbox.c_str());
+#else
+                setenv("MATLIBRE_TOOLBOX", racineToolbox.c_str(), 0);
+#endif
+            return lancerAtelier(port, trouverRacineWeb(argv[0]),
+                                 arguments[0] == "--ide");
         }
         std::size_t k = 0;
         while (k < arguments.size() && arguments[k].rfind("--path", 0) == 0) {

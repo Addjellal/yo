@@ -25,10 +25,10 @@ make install  # installe dans /usr/local (variable PREFIX)
 ```
 include/matlibre/   en-têtes publics du cœur
 src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre
-src/bibliotheque/   les 576 fonctions natives, par domaine
+src/bibliotheque/   les 592 fonctions natives, par domaine
 src/graphique/      rendu SVG
 src/console/        l'exécutable
-toolbox/            52 toolboxes écrites en langage MATLAB
+toolbox/            53 toolboxes écrites en langage MATLAB
 tests/coeur/        tests unitaires C++
 tests/scripts/      suites écrites en langage MATLAB
 outils/             générateur de la référence

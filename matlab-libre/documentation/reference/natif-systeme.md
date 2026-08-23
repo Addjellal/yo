@@ -206,12 +206,6 @@ path  Chemin de recherche.
 pathsep  Separateur de liste de chemins.
 ```
 
-## `profile`
-
-```
-profile  Profilage (sans effet).
-```
-
 ## `pwd`
 
 ```

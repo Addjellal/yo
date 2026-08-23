@@ -26,6 +26,7 @@ void Interpreteur::installerBibliotheque() {
     enregistrerParallele(*this);
     enregistrerGenerationC(*this);
     enregistrerDeboguage(*this);
+    enregistrerInterface(*this);
 }
 
 }  // namespace matlibre

@@ -64,13 +64,34 @@ Portee& Interpreteur::porteeAppelante() {
 
 // ------------------------------------------------------------- variables
 
+// Retrouve la poignée partagée d'une portée atteinte par le chaînage.
+std::shared_ptr<Portee> Interpreteur::trouverPortee(const Portee* brut) const {
+    for (const auto& p : piles_)
+        if (p.get() == brut) return p;
+    for (const auto& p : piles_)
+        for (std::shared_ptr<Portee> q = p->englobante; q; q = q->englobante)
+            if (q.get() == brut) return q;
+    return nullptr;
+}
+
+// Cherche une variable dans une portée, puis dans celles qui l'englobent :
+// c'est le partage d'espace de travail des fonctions imbriquées.
+static const Valeur* chercherDansChaine(const Portee& depart, const std::string& nom) {
+    for (const Portee* p = depart.englobante.get(); p; p = p->englobante.get()) {
+        auto it = p->variables.find(nom);
+        if (it != p->variables.end()) return &it->second;
+    }
+    return nullptr;
+}
+
 const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
     const Portee& p = *piles_.back();
     // Le cas courant est une portée sans variable globale ni persistante :
     // on va droit à la table locale.
     if (p.globales.empty() && p.liensPersistants.empty()) {
         auto it = p.variables.find(nom);
-        return it == p.variables.end() ? nullptr : &it->second;
+        if (it != p.variables.end()) return &it->second;
+        return p.englobante ? chercherDansChaine(p, nom) : nullptr;
     }
     if (p.globales.count(nom)) {
         auto it = globales.find(nom);
@@ -82,7 +103,8 @@ const Valeur* Interpreteur::trouverVariable(const std::string& nom) const {
         return it == persistantes.end() ? nullptr : &it->second;
     }
     auto it = p.variables.find(nom);
-    return it == p.variables.end() ? nullptr : &it->second;
+    if (it != p.variables.end()) return &it->second;
+    return p.englobante ? chercherDansChaine(p, nom) : nullptr;
 }
 
 bool Interpreteur::existeVariable(const std::string& nom) const {
@@ -99,6 +121,17 @@ Valeur Interpreteur::lireVariable(const std::string& nom) const {
 
 void Interpreteur::ecrireVariable(const std::string& nom, Valeur v) {
     Portee& p = *piles_.back();
+    // Une variable déjà présente dans une portée englobante s'écrit là-bas :
+    // la fonction imbriquée et son parent partagent bien la même case.
+    if (p.englobante && p.variables.find(nom) == p.variables.end()) {
+        for (Portee* q = p.englobante.get(); q; q = q->englobante.get()) {
+            auto it = q->variables.find(nom);
+            if (it != q->variables.end()) {
+                it->second = std::move(v);
+                return;
+            }
+        }
+    }
     if (p.globales.empty() && p.liensPersistants.empty()) {
         p.variables[nom] = std::move(v);
         return;
@@ -387,6 +420,22 @@ std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) 
     auto f = std::make_shared<Fonction>();
     f->nom = nom;
     const Portee& p = *piles_.back();
+    // Une poignée vers une fonction imbriquée emporte la portée partagée :
+    // c'est ce qui fait vivre les rappels d'une application.
+    {
+        std::shared_ptr<Portee> portante = piles_.back();
+        for (Portee* q = portante.get(); q; q = q->englobante.get()) {
+            if (!q->fonction) continue;
+            auto it = q->fonction->imbriquees.find(nom);
+            if (it == q->fonction->imbriquees.end()) continue;
+            Portee* hote = q;
+            while (hote->anonyme && hote->englobante) hote = hote->englobante.get();
+            f->genre = Fonction::Utilisateur;
+            f->utilisateur = it->second;
+            f->porteeEnglobante = hote == portante.get() ? portante : trouverPortee(hote);
+            return f;
+        }
+    }
     if (p.fonction) {
         auto it = p.fonction->voisines.find(nom);
         if (it != p.fonction->voisines.end()) {
@@ -414,6 +463,27 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
                                           int nargout) {
     ++compteurAppels;
     const Portee& p = *piles_.back();
+    // Une fonction imbriquée se résout d'abord : elle est visible depuis son
+    // parent et depuis ses sœurs, et nulle part ailleurs.
+    {
+        std::shared_ptr<Portee> portante = piles_.back();
+        for (Portee* q = portante.get(); q; q = q->englobante.get()) {
+            if (!q->fonction) {
+                if (!q->englobante) break;
+                continue;
+            }
+            auto it = q->fonction->imbriquees.find(nom);
+            if (it != q->fonction->imbriquees.end()) {
+                // L'activation d'une fonction anonyme ne porte qu'une copie
+                // de la capture : la vraie portée partagée est derrière.
+                Portee* hote = q;
+                while (hote->anonyme && hote->englobante) hote = hote->englobante.get();
+                englobanteEnAttente_ =
+                    hote == portante.get() ? portante : trouverPortee(hote);
+                return appelerUtilisateur(it->second, args, nargout);
+            }
+        }
+    }
     if (p.fonction) {
         auto it = p.fonction->voisines.find(nom);
         if (it != p.fonction->voisines.end())
@@ -482,11 +552,16 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     }
     const Fonction& f = *poignee.fn;
     if (f.genre == Fonction::Native) return f.native(*this, args, nargout);
-    if (f.genre == Fonction::Utilisateur) return appelerUtilisateur(f.utilisateur, args, nargout);
+    if (f.genre == Fonction::Utilisateur) {
+        if (f.porteeEnglobante) englobanteEnAttente_ = f.porteeEnglobante;
+        return appelerUtilisateur(f.utilisateur, args, nargout);
+    }
     // Fonction anonyme : la capture forme la portée, les paramètres par-dessus.
     auto portee = std::make_shared<Portee>();
     portee->nomFonction = "@anonyme";
     portee->fonction = f.contexte;
+    portee->englobante = f.porteeEnglobante;
+    portee->anonyme = true;
     if (f.capture)
         for (const auto& kv : *f.capture) portee->variables[kv.first] = kv.second;
     for (std::size_t k = 0; k < f.parametres.size(); ++k) {
@@ -524,6 +599,12 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
     auto portee = std::make_shared<Portee>();
     portee->nomFonction = f->nom;
     portee->fonction = f;
+    if (f->imbriquee) {
+        portee->englobante = englobanteEnAttente_;
+        englobanteEnAttente_.reset();
+    } else {
+        englobanteEnAttente_.reset();
+    }
     for (std::size_t k = 0; k < fixes && k < args.size(); ++k) {
         if (f->entrees[k] == "~") continue;
         portee->variables[f->entrees[k]] = args[k];
@@ -1387,12 +1468,21 @@ std::vector<Valeur> Interpreteur::evaluerMulti(const NoeudPtr& n, int nargout) {
             f->capture = std::make_shared<std::unordered_map<std::string, Valeur>>(
                 portee().variables);
             f->contexte = portee().fonction;
+            // Si la fonction courante a des imbriquées, ou en est une, la
+            // poignée garde sa portée : le rappel appelé plus tard y
+            // retrouvera les variables partagées.
+            if (portee().fonction &&
+                (!portee().fonction->imbriquees.empty() || portee().fonction->imbriquee))
+                f->porteeEnglobante = piles_.back();
             f->texte = texteExpression(n);
             return {Valeur::poignee(f)};
         }
         case TypeN::PoigneeNom: {
             auto f = resoudrePoignee(n->texte);
             f->texte = "@" + n->texte;
+            if (portee().fonction &&
+                (!portee().fonction->imbriquees.empty() || portee().fonction->imbriquee))
+                f->porteeEnglobante = piles_.back();
             return {Valeur::poignee(f)};
         }
         case TypeN::Acces: {

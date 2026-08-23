@@ -26,7 +26,8 @@ endif()
 file(GLOB_RECURSE MATLIBRE_SOURCES
      ${CMAKE_CURRENT_SOURCE_DIR}/src/coeur/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/src/bibliotheque/*.cpp
-     ${CMAKE_CURRENT_SOURCE_DIR}/src/graphique/*.cpp)
+     ${CMAKE_CURRENT_SOURCE_DIR}/src/graphique/*.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/src/ide/*.cpp)
 
 add_library(matlibre_coeur STATIC ${MATLIBRE_SOURCES})
 target_include_directories(matlibre_coeur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -68,6 +69,8 @@ include(GNUInstallDirs)
 install(TARGETS matlibre RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/toolbox/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ide/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre-ide)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/documentation/
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 

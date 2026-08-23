@@ -29,6 +29,8 @@ struct EntreeNative {
     std::string groupe;
 };
 
+struct Portee;
+
 struct Portee {
     std::unordered_map<std::string, Valeur> variables;
     std::set<std::string> globales;
@@ -37,11 +39,36 @@ struct Portee {
     int nargin = 0;
     int nargout = 0;
     std::shared_ptr<FonctionUtilisateur> fonction;
+    // Portée de la fonction englobante : une fonction imbriquée lit et écrit
+    // les variables de son parent à travers ce chaînage.
+    std::shared_ptr<Portee> englobante;
+    // Vraie pour l'activation d'une fonction anonyme : sa table n'est qu'une
+    // copie de la capture, ce n'est pas là que vivent les variables partagées.
+    bool anonyme = false;
 };
 
 enum class Format { Court, Long, CourtE, LongE, CourtG, LongG, Hex, Rationnel, Plus, Banque };
 
 struct Figure;  // Graphique.h
+
+// Un composant d'interface : ce que pose uifigure, uibutton, uislider…
+// L'atelier lit cette table pour dessiner la fenêtre, et renvoie les
+// événements qui déclenchent les rappels.
+struct ComposantInterface {
+    long long id = 0;
+    long long parent = 0;
+    std::string type;
+    std::string texte;
+    std::vector<double> position;   // [x y largeur hauteur]
+    Valeur valeur;
+    std::vector<std::string> items;
+    double minimum = 0.0;
+    double maximum = 1.0;
+    bool actif = true;
+    bool visible = true;
+    Valeur rappel;
+    std::map<std::string, Valeur> autres;
+};
 
 // Table associative de « containers.Map ». Elle vit dans l'interpréteur et
 // non dans la valeur : c'est ce qui donne à containers.Map sa sémantique de
@@ -168,6 +195,11 @@ public:
     long long prochaineCarte = 1;
     std::map<std::string, std::vector<Valeur>> auditeurs;  // événements
 
+    // --- interface (Interface.cpp) ---
+    std::map<long long, ComposantInterface> composantsInterface;
+    long long prochainComposant = 1;
+    long long figureInterfaceCourante = 0;
+
     // --- indexation (Indexation.cpp) ---
     Valeur indexer(const Valeur& base, std::vector<Valeur>& idx, char genre);
     std::vector<Valeur> indexerListe(const Valeur& base, std::vector<Valeur>& idx, char genre);
@@ -179,6 +211,9 @@ public:
 
 private:
     std::vector<std::shared_ptr<Portee>> piles_;
+    // Portée à rattacher au prochain appel d'une fonction imbriquée.
+    std::shared_ptr<Portee> englobanteEnAttente_;
+    std::shared_ptr<Portee> trouverPortee(const Portee* brut) const;
     std::unordered_map<std::string, EntreeNative> natifs_;
     std::vector<std::string> chemin_;
     std::map<std::string, std::string> indexM_;       // nom -> fichier

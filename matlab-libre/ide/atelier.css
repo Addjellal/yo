@@ -1,0 +1,331 @@
+/* atelier.css — l'apparence de l'atelier MatLibre.
+   Sobre, dense, lisible : on regarde du code et des nombres toute la
+   journée. Les couleurs viennent d'une palette unique, déclarée ici. */
+:root {
+  --fond: #1e1f22;
+  --fond-clair: #26282c;
+  --fond-panneau: #202225;
+  --trait: #34373d;
+  --texte: #d8dae0;
+  --texte-doux: #9aa0aa;
+  --accent: #4f9cf9;
+  --accent-doux: #1f3350;
+  --vert: #74c69d;
+  --rouge: #e06c75;
+  --jaune: #e5c07b;
+  --violet: #c678dd;
+  --arret: #e06c75;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--fond);
+  color: var(--texte);
+  font: 13px/1.5 "SF Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+}
+
+#barre {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: var(--fond-panneau);
+  border-bottom: 1px solid var(--trait);
+}
+
+.marque { font-weight: 700; letter-spacing: 0.5px; color: var(--accent); }
+
+#onglets { display: flex; gap: 4px; }
+
+.onglet {
+  background: transparent;
+  color: var(--texte-doux);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.onglet:hover { color: var(--texte); background: var(--fond-clair); }
+.onglet.actif { color: var(--texte); background: var(--fond-clair); border-color: var(--trait); }
+
+.etat { margin-left: auto; color: var(--texte-doux); }
+.etat.occupe { color: var(--jaune); }
+.etat.arrete { color: var(--arret); font-weight: 700; }
+
+main { height: calc(100% - 37px); }
+
+.vue { display: none; height: 100%; }
+.vue.active { display: block; }
+
+.colonnes {
+  display: grid;
+  grid-template-columns: 220px 1fr 320px;
+  height: 100%;
+}
+
+.panneau {
+  background: var(--fond-panneau);
+  border-right: 1px solid var(--trait);
+  padding: 8px;
+  overflow: auto;
+}
+.colonnes > .panneau:last-child { border-right: none; border-left: 1px solid var(--trait); }
+
+.panneau h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--texte-doux);
+  margin: 10px 0 6px;
+}
+
+.panneau ul { list-style: none; margin: 0; padding: 0; }
+.panneau li {
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panneau li:hover { background: var(--fond-clair); }
+.panneau li.dossier { color: var(--accent); }
+
+.chemin { color: var(--texte-doux); font-size: 11px; margin-bottom: 6px; word-break: break-all; }
+
+.centre { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+
+.barreOutils {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--fond-clair);
+  border-bottom: 1px solid var(--trait);
+  flex-wrap: wrap;
+}
+.barreOutils button, .barreOutils input, .barreOutils select {
+  background: var(--fond-panneau);
+  color: var(--texte);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.barreOutils button:hover:not(:disabled) { border-color: var(--accent); }
+.barreOutils button:disabled { opacity: 0.4; cursor: default; }
+.barreOutils label { color: var(--texte-doux); display: flex; align-items: center; gap: 4px; }
+.separateur { width: 1px; height: 18px; background: var(--trait); }
+#nomFichier { color: var(--jaune); margin-right: auto; }
+#aideSchema { color: var(--texte-doux); font-size: 11px; }
+
+.editeurCadre { display: flex; flex: 1 1 60%; min-height: 0; overflow: auto; position: relative; }
+
+#gouttiere {
+  width: 52px;
+  flex: 0 0 52px;
+  background: var(--fond-panneau);
+  border-right: 1px solid var(--trait);
+  text-align: right;
+  color: var(--texte-doux);
+  user-select: none;
+}
+#gouttiere div { padding: 0 6px 0 0; cursor: pointer; height: 19.5px; }
+#gouttiere div:hover { background: var(--fond-clair); }
+#gouttiere div.arret::before { content: "●"; color: var(--arret); float: left; padding-left: 4px; }
+#gouttiere div.ici { background: rgba(229, 192, 123, 0.18); }
+
+#calqueEditeur { position: relative; flex: 1 1 auto; min-width: 0; }
+
+#coloration, #editeur {
+  margin: 0;
+  padding: 0 8px;
+  font: inherit;
+  line-height: 19.5px;
+  white-space: pre;
+  overflow-wrap: normal;
+  border: 0;
+  min-height: 100%;
+  width: 100%;
+}
+#coloration { position: absolute; inset: 0; pointer-events: none; color: var(--texte); }
+#editeur {
+  position: relative;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--texte);
+  resize: none;
+  outline: none;
+  overflow: hidden;
+}
+
+.mot { color: var(--violet); }
+.chaine { color: var(--vert); }
+.commentaire { color: var(--texte-doux); font-style: italic; }
+.nombre { color: var(--jaune); }
+.fonction { color: var(--accent); }
+
+.console {
+  flex: 1 1 40%;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--trait);
+  background: var(--fond);
+}
+#sortieConsole {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#sortieConsole .erreur { color: var(--rouge); }
+.ligneSaisie { display: flex; gap: 6px; padding: 4px 8px; border-top: 1px solid var(--trait); }
+.invite { color: var(--accent); }
+#saisie {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--texte);
+  font: inherit;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--trait);
+  font-size: 12px;
+  vertical-align: top;
+}
+th { color: var(--texte-doux); font-weight: 600; }
+td.nombre { text-align: right; }
+tbody tr:hover { background: var(--fond-clair); }
+
+#tableVariables td:last-child {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#cadreFigure { padding: 12px; overflow: auto; height: calc(100% - 40px); background: #fff; }
+#cadreFigure svg { max-width: 100%; }
+
+#tableProfil { margin: 8px; width: calc(100% - 16px); }
+.barreProportion { display: block; height: 8px; background: var(--accent); border-radius: 2px; }
+
+#toileExecution {
+  position: relative;
+  flex: 1 1 auto;
+  margin: 8px;
+  min-height: 280px;
+  background: #f3f4f6;
+  color: #1f2328;
+  border: 1px solid var(--trait);
+  overflow: auto;
+}
+#toileExecution .vivant {
+  position: absolute;
+  font: inherit;
+}
+#toileExecution button {
+  background: #e8eaee;
+  border: 1px solid #b9bec7;
+  border-radius: 3px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+#toileExecution input, #toileExecution select {
+  background: #fff;
+  border: 1px solid #b9bec7;
+  border-radius: 3px;
+  font: inherit;
+  color: inherit;
+  padding: 2px 4px;
+}
+#toileExecution .zoneAxes { background: #fff; border: 1px solid #b9bec7; overflow: hidden; }
+#toileExecution .zonePanneau { border: 1px solid #b9bec7; border-radius: 3px; }
+#toileExecution table { background: #fff; border: 1px solid #b9bec7; font-size: 11px; }
+
+#toileApplication {
+  position: relative;
+  flex: 1 1 auto;
+  margin: 8px;
+  min-height: 280px;
+  background: var(--fond-clair);
+  border: 1px dashed var(--trait);
+  overflow: auto;
+}
+.composant {
+  position: absolute;
+  background: var(--fond-panneau);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: move;
+  user-select: none;
+  min-width: 70px;
+  text-align: center;
+}
+.composant.choisi { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.composant.axes { background: #fff; color: #333; min-width: 160px; min-height: 110px; }
+.composant.panel { background: transparent; border-style: dashed; min-width: 140px; min-height: 90px; }
+
+.code {
+  margin: 8px;
+  padding: 8px;
+  background: var(--fond-panneau);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre;
+}
+
+#toileSchema {
+  flex: 1 1 auto;
+  margin: 8px;
+  min-height: 320px;
+  background: var(--fond-clair);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+}
+#toileSchema .bloc rect { fill: var(--fond-panneau); stroke: var(--trait); }
+#toileSchema .bloc.choisi rect { stroke: var(--accent); stroke-width: 2; }
+#toileSchema .bloc text { fill: var(--texte); font-size: 11px; text-anchor: middle; }
+#toileSchema .port { fill: var(--accent); cursor: crosshair; }
+#toileSchema .port.entree { fill: var(--vert); }
+#toileSchema .lien { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#fleche); }
+#toileSchema .lien.provisoire { stroke-dasharray: 4 3; }
+
+#resultatSimulation { margin: 8px; background: #fff; border-radius: 3px; overflow: auto; }
+#resultatSimulation:empty { display: none; }
+
+.champProp { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.champProp label { color: var(--texte-doux); font-size: 11px; }
+.champProp input, .champProp select, .champProp textarea {
+  background: var(--fond-clair);
+  color: var(--texte);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  padding: 3px 6px;
+  font: inherit;
+}
+.boutonDanger {
+  background: transparent;
+  color: var(--rouge);
+  border: 1px solid var(--trait);
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font: inherit;
+}

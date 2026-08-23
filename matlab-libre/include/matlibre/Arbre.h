@@ -66,6 +66,10 @@ struct FonctionUtilisateur {
     std::string classeProprietaire;
     // Sous-fonctions du même fichier, visibles seulement depuis lui.
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
+    // Fonctions imbriquées, écrites dans le corps de celle-ci : elles
+    // partagent son espace de travail, comme le veut MATLAB.
+    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> imbriquees;
+    bool imbriquee = false;   // vraie pour une fonction écrite dans une autre
     bool variadiqueEntree() const {
         return !entrees.empty() && entrees.back() == "varargin";
     }
