@@ -24,3 +24,14 @@
 %   featureInputLayer            - Entrée de caractéristiques
 %   classificationLayer          - Déclare le coût d'entropie croisée
 %   regressionLayer              - Déclare le coût quadratique
+%
+% Couches spatiales — réseaux convolutifs
+%   imageInputLayer              - Entrée H x L x P, un tableau
+%                                  H x L x P x N à l'apprentissage
+%   convolution2dLayer           - Convolution 2-D, options 'Stride' et
+%                                  'Padding' (entier ou 'same')
+%   maxPooling2dLayer            - Agrégation par le maximum
+%   averagePooling2dLayer        - Agrégation par la moyenne
+%   flattenLayer                 - Passage des images aux vecteurs
+%   couchesConvolution           - Propagation avant et arrière de ces
+%                                  couches (appelée par TRAINNETWORK)

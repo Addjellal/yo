@@ -42,6 +42,13 @@ std::string argTexte(const std::vector<Valeur>& args, std::size_t k, const char*
     return v.versTexte();
 }
 
+void rognerDimsFinales(Dims& d) {
+    // MATLAB ne garde jamais de dimension singleton en queue au-dela de la
+    // deuxieme : size(zeros(2,2,1,1)) vaut [2 2].
+    while (d.size() > 2 && d.back() == 1) d.pop_back();
+    while (d.size() < 2) d.push_back(1);
+}
+
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin) {
     Dims d;
     if (debut >= fin) return Dims{1, 1};
@@ -53,10 +60,12 @@ Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std
         }
         for (std::size_t k = 0; k < v.nelem(); ++k) d.push_back(std::max(0, (int)v.re[k]));
         if (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
+        rognerDimsFinales(d);
         return d;
     }
     for (std::size_t k = debut; k < fin; ++k) d.push_back(std::max(0, (int)args[k].scal()));
     while (d.size() < 2) d.push_back(1);
+    rognerDimsFinales(d);
     return d;
 }
 

@@ -62,6 +62,168 @@ optionsR = trainingOptions('sgdm', 'MaxEpochs', 3000, ...
 reseauR = trainNetwork(t, t, couchesR, optionsR);
 assert(mse(predict(reseauR, t), t) < 0.01);
 
+%% ------------------------------------------- couches convolutives
+% Constructeurs.
+c = convolution2dLayer(3, 8, 'Padding', 'same', 'Stride', 2);
+assert(strcmp(c.type, 'conv2d'));
+assert(isequal(c.taille, [3 3]));
+assert(c.filtres == 8);
+assert(isequal(c.pas, [2 2]));
+assert(strcmp(c.marge, 'same'));
+assert(isequal(convolution2dLayer([2 5], 1).taille, [2 5]));
+assert(isequal(convolution2dLayer(3, 1).pas, [1 1]));
+assert(isequal(maxPooling2dLayer(2).pas, [2 2]));       % pas = taille par défaut
+assert(isequal(maxPooling2dLayer(3, 'Stride', 1).pas, [1 1]));
+assert(strcmp(averagePooling2dLayer(2).type, 'avgpool'));
+assert(strcmp(flattenLayer().type, 'flatten'));
+assert(isequal(imageInputLayer([8 8]).taille, [8 8 1]));
+
+% Convolution à noyau connu : x = reshape(1:16,4,4), noyau de uns 3x3.
+% La sortie vaut la somme de chaque bloc 3x3, calculée à la main.
+c = convolution2dLayer(3, 1);
+c.W = ones(3, 3, 1, 1);
+c.b = 0;
+x = reshape(1:16, 4, 4);
+y = couchesConvolution('avant', c, x);
+assert(isequal(size(y), [2 2]));
+assert(isequal(y, [54 90; 63 99]));
+
+% Le biais s'ajoute à tout le plan.
+c.b = 10;
+assert(isequal(couchesConvolution('avant', c, x), [64 100; 73 109]));
+
+% 'same' conserve la taille quand le pas vaut 1 ; sinon elle diminue.
+c2 = convolution2dLayer(3, 2, 'Padding', 'same');
+c2.W = zeros(3, 3, 1, 2);
+c2.b = zeros(1, 2);
+assert(isequal(size(couchesConvolution('avant', c2, zeros(6, 5))), [6 5 2]));
+c3 = convolution2dLayer(2, 1, 'Stride', 2);
+c3.W = ones(2, 2);
+c3.b = 0;
+assert(isequal(size(couchesConvolution('avant', c3, zeros(6, 6))), [3 3]));
+
+% Agrégation : valeurs exactes sur reshape(1:16,4,4).
+assert(isequal(couchesConvolution('avant', maxPooling2dLayer(2), x), [6 14; 8 16]));
+assert(isequal(couchesConvolution('avant', averagePooling2dLayer(2), x), ...
+               [3.5 11.5; 5.5 13.5]));
+% Fenêtres qui se recouvrent : pas de 1 sur une fenêtre de 2.
+assert(isequal(couchesConvolution('avant', maxPooling2dLayer(2, 'Stride', 1), x), ...
+               [6 10 14; 7 11 15; 8 12 16]));
+
+% Aplatissement : aller-retour exact sur un tableau 4-D.
+img = reshape(1:24, 2, 3, 2, 2);
+[plat, aplati] = couchesConvolution('avant', flattenLayer(), img);
+assert(isequal(size(plat), [12 2]));
+assert(isequal(aplati.forme, [2 3 2 2]));
+assert(isequal(couchesConvolution('arriere', aplati, [], plat, plat), img));
+
+% Le maximum ne renvoie le gradient qu'au pixel gagnant.
+p = maxPooling2dLayer(2);
+yp = couchesConvolution('avant', p, x);
+dp = couchesConvolution('arriere', p, x, yp, ones(2));
+assert(isequal(dp, [0 0 0 0; 0 1 0 1; 0 0 0 0; 0 1 0 1]));
+% La moyenne le répartit également.
+a = averagePooling2dLayer(2);
+ya = couchesConvolution('avant', a, x);
+assert(max(max(abs(couchesConvolution('arriere', a, x, ya, ones(2)) - 0.25))) < 1e-15);
+
+% Gradients de la convolution vérifiés par différences finies centrées.
+rand('seed', 7);
+cg = convolution2dLayer([2 3], 2);
+xg = rand(5, 4, 2, 3);
+[yg, cg] = couchesConvolution('avant', cg, xg);
+assert(isequal(size(yg), [4 2 2 3]));
+g = rand(size(yg));
+[dx, gW, gB] = couchesConvolution('arriere', cg, xg, yg, g);
+cout = @(t) sum(t(:) .* g(:));
+h = 1e-6;
+ecart = 0;
+for k = 1:numel(xg)
+    xplus = xg;  xplus(k)  = xplus(k)  + h;
+    xmoins = xg; xmoins(k) = xmoins(k) - h;
+    num = (cout(couchesConvolution('avant', cg, xplus)) - ...
+           cout(couchesConvolution('avant', cg, xmoins))) / (2 * h);
+    ecart = max(ecart, abs(num - dx(k)));
+end
+assert(ecart < 1e-7);
+ecart = 0;
+for k = 1:numel(cg.W)
+    cplus = cg;  cplus.W(k)  = cplus.W(k)  + h;
+    cmoins = cg; cmoins.W(k) = cmoins.W(k) - h;
+    num = (cout(couchesConvolution('avant', cplus, xg)) - ...
+           cout(couchesConvolution('avant', cmoins, xg))) / (2 * h);
+    ecart = max(ecart, abs(num - gW(k)));
+end
+assert(ecart < 1e-7);
+ecart = 0;
+for k = 1:numel(cg.b)
+    cplus = cg;  cplus.b(k)  = cplus.b(k)  + h;
+    cmoins = cg; cmoins.b(k) = cmoins.b(k) - h;
+    num = (cout(couchesConvolution('avant', cplus, xg)) - ...
+           cout(couchesConvolution('avant', cmoins, xg))) / (2 * h);
+    ecart = max(ecart, abs(num - gB(k)));
+end
+assert(ecart < 1e-7);
+
+% Action inconnue : erreur identifiée.
+essai = false;
+try
+    couchesConvolution('milieu', flattenLayer(), 1);
+catch err
+    essai = strcmp(err.identifier, 'nnet:couchesConvolution:UnknownAction');
+end
+assert(essai);
+
+%% ----------------------------- réseau convolutif de bout en bout
+% Barres verticales contre barres horizontales dans des images 8x8 : une
+% couche dense seule y arriverait aussi, mais on vérifie ici que la pile
+% entrée-image / convolution / ReLU / agrégation / aplatissement /
+% dense / softmax s'apprend et prédit sans erreur.
+rand('seed', 3);
+nImages = 24;
+Ximg = zeros(8, 8, 1, nImages);
+Yimg = zeros(2, nImages);
+for k = 1:nImages
+    plan = zeros(8);
+    if mod(k, 2) == 1
+        plan(:, mod(k, 6) + 2) = 1;
+        Yimg(1, k) = 1;
+    else
+        plan(mod(k, 6) + 2, :) = 1;
+        Yimg(2, k) = 1;
+    end
+    Ximg(:, :, 1, k) = plan;
+end
+couchesConv = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4, 'Padding', 'same'), ...
+               reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
+               fullyConnectedLayer(2), softmaxLayer(), classificationLayer()};
+optionsConv = trainingOptions('sgdm', 'MaxEpochs', 120, 'InitialLearnRate', 0.05, ...
+                              'MiniBatchSize', 8, 'Verbose', false);
+reseauConv = trainNetwork(Ximg, Yimg, couchesConv, optionsConv);
+% La couche d'entrée d'image ne transforme rien : elle est retirée, la
+% convolution garde ses poids appris.
+assert(numel(reseauConv.couches) == 6);
+assert(reseauConv.spatial);
+assert(isequal(reseauConv.entree, [8 8 1]));
+assert(isequal(size(reseauConv.couches{1}.W), [3 3 1 4]));
+pConv = predict(reseauConv, Ximg);
+assert(isequal(size(pConv), [2 nImages]));
+[~, obtenu] = max(pConv);
+[~, attendu] = max(Yimg);
+assert(isequal(obtenu, attendu));
+assert(crossentropy(pConv, Yimg) < 0.05);
+assert(max(abs(sum(pConv, 1) - 1)) < 1e-12);
+assert(isequal(classify(reseauConv, Ximg)', obtenu));
+% Une seule image passe aussi.
+assert(isequal(size(predict(reseauConv, Ximg(:, :, :, 1))), [2 1]));
+
+% L'agrégation par moyenne donne un réseau qui apprend également.
+couchesMoy = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4, 'Padding', 'same'), ...
+              reluLayer(), averagePooling2dLayer(2), flattenLayer(), ...
+              fullyConnectedLayer(2), softmaxLayer(), classificationLayer()};
+[~, obtenuMoy] = max(predict(trainNetwork(Ximg, Yimg, couchesMoy, optionsConv), Ximg));
+assert(isequal(obtenuMoy, attendu));
+
 %% ----------------------------------------------- vision : géométrie
 assert(isequal(bbox2points([1 2 10 20]), [1 2; 11 2; 11 22; 1 22]));
 assert(isequal(bboxresize([1 1 10 20], 2), [2 2 20 40]));

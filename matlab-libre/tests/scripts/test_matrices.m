@@ -84,4 +84,20 @@ assert(ndims(T) == 3);
 assert(T(2, 2, 2) == 4);
 assert(size(T, 3) == 2);
 
+% MATLAB ne conserve jamais de dimension singleton en queue au-dela de la
+% deuxieme : un tableau demande en 2x2x1x1 est une matrice 2x2.
+assert(isequal(size(zeros(2, 2, 1, 1)), [2 2]));
+assert(isequal(size(ones([2 2 1 1])), [2 2]));
+assert(isequal(size(false(2, 2, 1, 1)), [2 2]));
+assert(isequal(size(rand(2, 3, 1)), [2 3]));
+assert(isequal(size(cell(2, 2, 1, 1)), [2 2]));
+assert(isequal(size(reshape(1:4, 2, 2, 1, 1)), [2 2]));
+assert(ndims(zeros(2, 2, 1, 1)) == 2);
+% Les singletons interieurs et de tete restent.
+assert(isequal(size(ones(1, 1, 3)), [1 1 3]));
+assert(isequal(size(zeros(2, 1, 3)), [2 1 3]));
+assert(isequal(size(zeros(2, 1, 1)), [2 1]));
+% Une dimension nulle n'est pas un singleton.
+assert(isequal(size(zeros(0, 3)), [0 3]));
+
 disp('matrices : toutes les verifications passent');

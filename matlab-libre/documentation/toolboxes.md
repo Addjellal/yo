@@ -16,7 +16,7 @@ existant appellera.
 | `ajustement-courbes` | Curve Fitting Toolbox — ajustement de courbes et de surfaces. | 4 |
 | `analyse-de-texte` | Text Analytics Toolbox — analyse de textes. | 8 |
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
-| `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones. | 14 |
+| `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 27 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 7 |
 | `automatique` | Control System Toolbox — systèmes asservis linéaires. | 27 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |

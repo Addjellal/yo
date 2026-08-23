@@ -3,18 +3,42 @@ function reseau = trainNetwork(X, Y, couches, options)
 %   RESEAU = TRAINNETWORK(X,Y,COUCHES,OPTIONS) apprend à associer les
 %   colonnes de X (une observation par colonne) aux colonnes de Y.
 %
+%   Si le réseau contient des couches spatiales — IMAGEINPUTLAYER,
+%   CONVOLUTION2DLAYER, MAXPOOLING2DLAYER, AVERAGEPOOLING2DLAYER,
+%   FLATTENLAYER — alors X est un tableau H x L x P x N : une image par
+%   tranche, comme dans MATLAB. Y reste une matrice, une colonne par
+%   observation.
+%
 %   Le coût est l'entropie croisée si la dernière couche est un softmax,
 %   l'erreur quadratique sinon. La descente est stochastique avec inertie.
+%
+%   Exemple :
+%      couches = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4), ...
+%                 reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
+%                 fullyConnectedLayer(2), softmaxLayer()};
+%      reseau = trainNetwork(images, etiquettes, couches, options);
     if nargin < 4
         options = trainingOptions('sgdm');
     end
-    n = size(X, 2);
-    entree = size(X, 1);
-    % Initialisation de Glorot.
+    spatial = reseauSpatial(couches);
+    if spatial
+        forme = tailleImage(X);
+        n = forme(4);
+        entree = forme(1:3);
+    else
+        n = size(X, 2);
+        entree = size(X, 1);
+    end
+    % Initialisation de Glorot. Après une couche spatiale la largeur
+    % d'entrée d'une couche dense n'est connue qu'au premier passage :
+    % elle est alors initialisée paresseusement dans APPLIQUERCOUCHE.
     taille = entree;
+    connue = ~spatial;
     for k = 1:numel(couches)
         c = couches{k};
-        if strcmp(c.type, 'fc')
+        if any(strcmp(c.type, {'imageinput', 'conv2d', 'maxpool', 'avgpool'}))
+            connue = false;
+        elseif strcmp(c.type, 'fc') && connue
             limite = sqrt(6 / (taille + c.sorties));
             c.W = (rand(c.sorties, taille) * 2 - 1) * limite;
             c.b = zeros(c.sorties, 1);
@@ -32,7 +56,7 @@ function reseau = trainNetwork(X, Y, couches, options)
         entropie = false;
         couches(end) = [];
     end
-    couches = couches(~cellfun(@(c) strcmp(c.type, 'input'), couches));
+    couches = couches(~cellfun(@(c) any(strcmp(c.type, {'input', 'imageinput'})), couches));
     vitesseW = cell(numel(couches), 1);
     vitesseB = cell(numel(couches), 1);
     for k = 1:numel(couches)
@@ -46,11 +70,15 @@ function reseau = trainNetwork(X, Y, couches, options)
         while debut <= n
             fin = min(n, debut + options.MiniBatchSize - 1);
             lot = ordre(debut:fin);
-            xb = X(:, lot);
+            if spatial
+                xb = X(:, :, :, lot);
+            else
+                xb = X(:, lot);
+            end
             yb = Y(:, lot);
             [couches, gW, gB] = passe(couches, xb, yb, entropie);
             for k = 1:numel(couches)
-                if strcmp(couches{k}.type, 'fc')
+                if any(strcmp(couches{k}.type, {'fc', 'conv2d'}))
                     vitesseW{k} = options.Momentum * vitesseW{k} - taux * gW{k};
                     vitesseB{k} = options.Momentum * vitesseB{k} - taux * gB{k};
                     couches{k}.W = couches{k}.W + vitesseW{k};
@@ -75,6 +103,7 @@ function reseau = trainNetwork(X, Y, couches, options)
     reseau.couches = couches;
     reseau.entree = entree;
     reseau.entropie = entropie;
+    reseau.spatial = spatial;
 end
 
 function [couches, gW, gB] = passe(couches, x, y, entropie)
@@ -84,8 +113,10 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
     for k = 1:numel(couches)
         [activations{k+1}, couches{k}] = appliquerCouche(couches{k}, activations{k}, true);
     end
-    m = size(x, 2);
+    % La sortie du réseau est toujours une matrice : une colonne par
+    % observation, y compris derrière une pile de couches spatiales.
     sortie = activations{end};
+    m = size(sortie, 2);
     if entropie
         delta = (sortie - y) / m;   % gradient combiné softmax + entropie
     else
@@ -96,11 +127,17 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
     for k = numel(couches):-1:1
         c = couches{k};
         a = activations{k};
+        gW{k} = 0;
+        gB{k} = 0;
         switch c.type
             case 'fc'
                 gW{k} = delta * a.';
                 gB{k} = sum(delta, 2);
                 delta = c.W.' * delta;
+            case {'conv2d', 'maxpool', 'avgpool', 'flatten'}
+                [delta, gw, gb] = couchesConvolution('arriere', c, a, activations{k+1}, delta);
+                gW{k} = gw;
+                gB{k} = gb;
             case 'relu'
                 delta = delta .* (activations{k+1} > 0);
             case 'leakyrelu'
@@ -133,12 +170,7 @@ function [couches, gW, gB] = passe(couches, x, y, entropie)
                     delta = delta .* s .* (1 - s);
                 end
             otherwise
-                gW{k} = 0;
-                gB{k} = 0;
-        end
-        if ~strcmp(c.type, 'fc')
-            gW{k} = 0;
-            gB{k} = 0;
+                % couche transparente
         end
     end
 end
@@ -150,7 +182,16 @@ function [y, c] = appliquerCouche(c, x, apprentissage)
     if nargin < 3, apprentissage = false; end
     switch c.type
         case 'fc'
+            if isempty(c.W)
+                % Largeur d'entrée découverte au premier passage, après
+                % une pile de couches spatiales.
+                limite = sqrt(6 / (size(x, 1) + c.sorties));
+                c.W = (rand(c.sorties, size(x, 1)) * 2 - 1) * limite;
+                c.b = zeros(c.sorties, 1);
+            end
             y = c.W * x + repmat(c.b, 1, size(x, 2));
+        case {'conv2d', 'maxpool', 'avgpool', 'flatten'}
+            [y, c] = couchesConvolution('avant', c, x);
         case 'relu'
             y = relu(x);
         case 'leakyrelu'
@@ -201,4 +242,20 @@ function y = propager(couches, x)
     for k = 1:numel(couches)
         y = appliquerCouche(couches{k}, y, false);
     end
+end
+
+function tf = reseauSpatial(couches)
+%RESEAUSPATIAL Vrai si le réseau attend des images en entrée.
+    tf = false;
+    for k = 1:numel(couches)
+        if any(strcmp(couches{k}.type, {'imageinput', 'conv2d', 'maxpool', 'avgpool'}))
+            tf = true;
+            return
+        end
+    end
+end
+
+function d = tailleImage(x)
+    d = size(x);
+    d(end+1:4) = 1;
 end

@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **604 fonctions natives** couvrant le MATLAB de base.
-- **648 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **654 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -86,6 +86,13 @@ totalité.
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). Les autres modules offrent entre 4 et
    30 fonctions, choisies pour être celles qu'on appelle d'abord.
+   La Deep Learning Toolbox apprend les réseaux denses et les réseaux
+   convolutifs : `imageInputLayer`, `convolution2dLayer` avec pas et
+   remplissage `'same'`, `maxPooling2dLayer`, `averagePooling2dLayer`,
+   `flattenLayer`. Les gradients de la convolution sont vérifiés par
+   différences finies centrées, à 1e-7 près. Manquent : la convolution
+   transposée, les couches groupées, les réseaux récurrents (LSTM, GRU),
+   et les réseaux à graphe quelconque — la pile reste une séquence.
    MathWorks en compte plusieurs centaines par toolbox.
 5. **Les types de données modernes sont là, mais partiellement.**
    `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
