@@ -236,7 +236,25 @@ FONCTION(fnConv) {
 
 FONCTION(fnConv2) {
     INUTILISE
-    exigerArguments(args, 2, 3, "conv2");
+    exigerArguments(args, 2, 4, "conv2");
+    // Forme separable conv2(h1, h2, A, forme) : deux vecteurs et une
+    // matrice. Le produit exterieur des deux vecteurs donne le noyau,
+    // et le reste du calcul est identique.
+    std::vector<Valeur> reecrits;
+    if (args.size() >= 3 && !(args[2].estTexte() || args[2].estChaine())) {
+        const Valeur& h1 = versDouble(args[0]);
+        const Valeur& h2 = versDouble(args[1]);
+        int n1 = (int)h1.nelem(), n2 = (int)h2.nelem();
+        Valeur noyau = Valeur::matrice(n1, n2);
+        for (int i = 0; i < n1; ++i)
+            for (int j = 0; j < n2; ++j)
+                noyau.re[(std::size_t)i + (std::size_t)j * n1] = h1.re[(std::size_t)i] *
+                                                                 h2.re[(std::size_t)j];
+        reecrits.push_back(args[2]);
+        reecrits.push_back(noyau);
+        if (args.size() > 3) reecrits.push_back(args[3]);
+        args = reecrits;
+    }
     const Valeur& a = versDouble(args[0]);
     const Valeur& b = versDouble(args[1]);
     int la = a.nlignes(), ca = a.ncolonnes(), lb = b.nlignes(), cb = b.ncolonnes();

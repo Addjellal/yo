@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **832 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **899 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -103,7 +103,7 @@ totalité.
    Jacobi ajoutées au MATLAB de base —, Bessel, l'équi-ondulation de Parks
    et McClellan par échange de Remez, l'ajustement sur gabarit de
    `yulewalk` et l'ajustement sur réponse complexe d'`invfreqz`.
-   L'Image Processing Toolbox en compte 73 — filtrage avec
+   L'Image Processing Toolbox en compte 123 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
    40, la Communications 25, la logique floue 20. Les autres modules

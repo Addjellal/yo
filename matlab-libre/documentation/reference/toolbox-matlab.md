@@ -34,6 +34,25 @@
 %                 rationnelle, et son inverse
 %   ellipke     - Intégrales elliptiques complètes
 %   ellipj      - Fonctions elliptiques de Jacobi
+%   convhull    - Enveloppe convexe d'un nuage de points
+%   inpolygon   - Points intérieurs à un polygone
+%
+% Cartes de couleurs
+%   gray, hot, cool, spring, summer, autumn, winter, bone, copper,
+%   pink, jet, hsv, flag, prism
+```
+
+## `autumn`
+
+```
+AUTUMN Carte de couleurs rouge - jaune.
+```
+
+## `bone`
+
+```
+BONE Carte de couleurs gris à reflet bleuté.
+  Sept huitièmes de gris et un huitième de HOT retourné.
 ```
 
 ## `bounds`
@@ -41,6 +60,36 @@
 ```
 BOUNDS Minimum et maximum en un seul appel.
   [B,H] = BOUNDS(X) rend le plus petit et le plus grand élément.
+```
+
+## `convhull`
+
+```
+CONVHULL Enveloppe convexe d'un nuage de points du plan.
+  K = CONVHULL(X,Y) rend les indices des points de l'enveloppe, dans
+  le sens des aiguilles d'une montre, le premier point étant répété à
+  la fin pour fermer le contour — la convention de MATLAB.
+
+  [K,AIRE] = CONVHULL(...) rend aussi l'aire de l'enveloppe.
+
+  L'algorithme est la chaîne monotone d'Andrew : on trie les points,
+  puis on construit la moitié basse et la moitié haute en retirant
+  chaque sommet qui ferait tourner du mauvais côté.
+
+  Exemple :
+     k = convhull([0 1 1 0 0.5], [0 0 1 1 0.5]);   % le carré
+```
+
+## `cool`
+
+```
+COOL Carte de couleurs cyan - magenta.
+```
+
+## `copper`
+
+```
+COPPER Carte de couleurs noir - cuivre.
 ```
 
 ## `ellipj`
@@ -73,11 +122,63 @@ ELLIPKE Intégrales elliptiques complètes de première et seconde espèce.
      [K, E] = ellipke(0.5)   % 1.854074677301372 et 1.350643881047676
 ```
 
+## `flag`
+
+```
+FLAG Carte de couleurs alternant rouge, blanc, bleu et noir.
+  Utile pour faire ressortir les lignes de niveau : deux valeurs
+  voisines y prennent des couleurs très différentes.
+```
+
+## `gray`
+
+```
+GRAY Carte de couleurs en niveaux de gris.
+  CARTE = GRAY(M) rend une matrice M x 3 allant du noir au blanc.
+  M vaut 256 par défaut.
+
+  Exemple :
+     carte = gray(4)   % [0 0 0; 1/3 1/3 1/3; 2/3 2/3 2/3; 1 1 1]
+```
+
+## `hot`
+
+```
+HOT Carte de couleurs noir - rouge - jaune - blanc.
+  Les trois tiers de la rampe montent tour à tour le rouge, le vert
+  puis le bleu : c'est la couleur d'un corps chauffé.
+```
+
+## `hsv`
+
+```
+HSV Carte de couleurs parcourant le cercle des teintes.
+  La saturation et la valeur restent à 1 : seule la teinte tourne, du
+  rouge au rouge en passant par tout le spectre.
+```
+
 ## `humps`
 
 ```
 HUMPS Fonction d'essai à deux pics, utilisée par les démonstrations.
   Y = HUMPS(X) évalue 1/((x-0.3)^2+0.01) + 1/((x-0.9)^2+0.04) - 6.
+```
+
+## `inpolygon`
+
+```
+INPOLYGON Points intérieurs à un polygone.
+  IN = INPOLYGON(XQ,YQ,XV,YV) vaut vrai pour les points de (XQ,YQ) qui
+  sont dans le polygone de sommets (XV,YV), bord compris.
+
+  [IN,ON] = INPOLYGON(...) distingue les points posés sur le bord.
+
+  Le test est celui du nombre de traversées : on compte les côtés que
+  coupe une demi-droite partant du point ; un nombre impair signifie
+  que le point est dedans.
+
+  Exemple :
+     inpolygon(0.5, 0.5, [0 1 1 0], [0 0 1 1])   % vrai
 ```
 
 ## `iskeyword`
@@ -92,6 +193,17 @@ ISKEYWORD Mot réservé du langage ?
 
 ```
 ISMEMBERTOL Appartenance à un ensemble, à une tolérance près.
+```
+
+## `jet`
+
+```
+JET Carte de couleurs bleu - cyan - jaune - rouge.
+  Construite par interpolation linéaire entre les six teintes qui la
+  définissent : bleu foncé, bleu, cyan, jaune, rouge, rouge foncé.
+
+  Exemple :
+     c = jet(64);   % c(1,:) vaut [0 0 0.5], c(end,:) vaut [0.5 0 0]
 ```
 
 ## `matlab.addons.installedAddons`
@@ -181,12 +293,33 @@ PERMS Toutes les permutations des éléments d'un vecteur.
   de V. L'ordre suit celui de MATLAB : lexicographique inverse.
 ```
 
+## `pink`
+
+```
+PINK Carte de couleurs pastel, pour les images en sépia.
+```
+
 ## `pow2`
 
 ```
 POW2 Puissance de deux, ou mantisse mise à l'échelle.
   Y = POW2(X) rend 2.^X.
   Y = POW2(F,E) rend F .* 2.^E.
+```
+
+## `prism`
+
+```
+PRISM Carte de couleurs répétant les six couleurs du prisme.
+```
+
+## `rampeCarte`
+
+```
+RAMPECARTE Rampe de 0 à 1 sur M points, colonne.
+  Pour M = 1 la rampe vaut zéro, comme dans MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `rat`
@@ -227,6 +360,18 @@ RESIDUE Décomposition en éléments simples d'une fraction rationnelle.
      [r,p,k] = residue([1 0], [1 3 2])   % 1/(s+1) et -... sur s+2
 ```
 
+## `spring`
+
+```
+SPRING Carte de couleurs magenta - jaune.
+```
+
+## `summer`
+
+```
+SUMMER Carte de couleurs vert - jaune.
+```
+
 ## `uniquetol`
 
 ```
@@ -259,6 +404,12 @@ VECNORM Norme de chaque vecteur d'un tableau.
   N = VECNORM(A) rend la norme 2 de chaque colonne.
   N = VECNORM(A,P) utilise la norme P.
   N = VECNORM(A,P,DIM) travaille le long de la dimension DIM.
+```
+
+## `winter`
+
+```
+WINTER Carte de couleurs bleu - vert.
 ```
 
 ## `zip`

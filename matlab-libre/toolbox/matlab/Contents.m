@@ -31,3 +31,9 @@
 %                 rationnelle, et son inverse
 %   ellipke     - Intégrales elliptiques complètes
 %   ellipj      - Fonctions elliptiques de Jacobi
+%   convhull    - Enveloppe convexe d'un nuage de points
+%   inpolygon   - Points intérieurs à un polygone
+%
+% Cartes de couleurs
+%   gray, hot, cool, spring, summer, autumn, winter, bone, copper,
+%   pink, jet, hsv, flag, prism

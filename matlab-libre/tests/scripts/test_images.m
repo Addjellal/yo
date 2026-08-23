@@ -168,4 +168,242 @@ c = label2rgb([1 0; 0 2]);
 assert(isequal(size(c), [2 2 3]));
 assert(max(abs(squeeze(c(1, 2, :))' - [1 1 1])) < 1e-12);   % fond blanc
 
+%% --------------------------------------------- espaces de couleur
+% La correction gamma de sRGB et son inverse se referment exactement.
+assert(abs(rgb2lin(0.5) - 0.2140411) < 1e-6);
+niveaux = linspace(0, 1, 101);
+assert(max(abs(lin2rgb(rgb2lin(niveaux)) - niveaux)) < 1e-14);
+% Le blanc sRGB tombe sur le blanc D65, donc sur L* = 100, a* = b* = 0.
+assert(max(abs(rgb2xyz([1 1 1]) - whitepoint('d65'))) < 1e-6);
+assert(max(abs(rgb2lab([1 1 1]) - [100 0 0])) < 1e-3);
+assert(max(abs(rgb2lab([0 0 0]))) < 1e-9);
+% Valeurs publiées pour les primaires sRGB sous D65.
+assert(max(abs(rgb2lab([1 0 0]) - [53.24 80.09 67.20])) < 0.02);
+assert(max(abs(rgb2lab([0 1 0]) - [87.73 -86.18 83.18])) < 0.02);
+assert(max(abs(rgb2lab([0 0 1]) - [32.30 79.19 -107.86])) < 0.02);
+% Tous les allers-retours de couleur sont exacts.
+couleurs = [0.2 0.4 0.6; 0.9 0.1 0.5; 0 0.5 1];
+assert(max(max(abs(lab2rgb(rgb2lab(couleurs)) - couleurs))) < 1e-12);
+assert(max(max(abs(xyz2rgb(rgb2xyz(couleurs)) - couleurs))) < 1e-12);
+assert(max(max(abs(lab2xyz(xyz2lab(rgb2xyz(couleurs))) - rgb2xyz(couleurs)))) < 1e-14);
+assert(max(max(abs(ntsc2rgb(rgb2ntsc(couleurs)) - couleurs))) < 1e-12);
+% La luminance NTSC du blanc vaut 1, ses chrominances zéro.
+assert(max(abs(rgb2ntsc([1 1 1]) - [1 0 0])) < 1e-12);
+% Une image à trois plans garde sa forme.
+imageCouleur = reshape(couleurs, [3 1 3]);
+assert(isequal(size(rgb2lab(imageCouleur)), [3 1 3]));
+[planR, planV, planB] = imsplit(imageCouleur);
+assert(isequal(size(planR), [3 1]));
+assert(isequal(planR(:)', couleurs(:, 1)'));
+% Un autre blanc de référence change le résultat, et reste inversible.
+labD50 = rgb2lab(couleurs, 'WhitePoint', 'd50');
+assert(max(max(abs(labD50 - rgb2lab(couleurs)))) > 1e-3);
+
+% Images indexées.
+[indices, palette] = gray2ind([0 0.5 1], 4);
+assert(isequal(indices, [0 2 3]));
+assert(isequal(size(palette), [4 3]));
+assert(max(abs(ind2gray(indices, palette) - [0 2/3 1])) < 1e-9);
+assert(isequal(size(ind2rgb(indices, palette)), [1 3 3]));
+% Quatre couleurs distinctes se retrouvent exactement.
+imageQuatre = zeros(2, 2, 3);
+imageQuatre(1, 1, :) = [1 0 0];
+imageQuatre(1, 2, :) = [0 1 0];
+imageQuatre(2, 1, :) = [0 0 1];
+imageQuatre(2, 2, :) = [1 1 0];
+[ind4, pal4] = rgb2ind(imageQuatre, 4);
+assert(isequal(size(pal4), [4 3]));
+assert(max(max(max(abs(ind2rgb(ind4, pal4) - imageQuatre)))) < 1e-12);
+[~, pal2] = imapprox(ind4, pal4, 2);
+assert(isequal(size(pal2), [2 3]));
+
+% Cartes de couleurs.
+assert(isequal(gray(4), [0 0 0; 1/3 1/3 1/3; 2/3 2/3 2/3; 1 1 1]));
+assert(isequal(size(gray()), [256 3]));
+for nomCarte = {'gray', 'hot', 'cool', 'spring', 'summer', 'autumn', 'winter', ...
+                'bone', 'copper', 'pink', 'jet', 'hsv', 'flag', 'prism'}
+    carte = feval(nomCarte{1}, 64);
+    assert(isequal(size(carte), [64 3]));
+    assert(all(all(carte >= -1e-12 & carte <= 1 + 1e-12)));
+end
+carteJet = jet(64);
+assert(max(abs(carteJet(1, :) - [0 0 0.5])) < 1e-12);
+assert(max(abs(carteJet(end, :) - [0.5 0 0])) < 1e-12);
+% Six teintes pures pour hsv(6).
+assert(max(max(abs(hsv(6) - [1 0 0; 1 1 0; 0 1 0; 0 1 1; 0 0 1; 1 0 1]))) < 1e-12);
+assert(isequal(cool(2), [0 1 1; 1 0 1]));
+
+%% ------------------------------- reconstruction morphologique
+assert(isequal(double(conndef(2, 'minimal')), [0 1 0; 1 1 1; 0 1 0]));
+assert(sum(sum(conndef(2, 'maximal'))) == 9);
+% Un germe remplit la composante du masque qui le contient, pas les autres.
+germe = zeros(5); germe(3, 3) = 1;
+assert(sum(sum(imreconstruct(germe, ones(5)))) == 25);
+masqueDouble = false(5, 7);
+masqueDouble(2:4, 1:3) = true;
+masqueDouble(2:4, 5:7) = true;
+germeGauche = false(5, 7);
+germeGauche(3, 2) = true;
+assert(sum(sum(imreconstruct(double(germeGauche), double(masqueDouble)))) == 9);
+
+% Maxima régionaux : un sommet isolé, puis un plateau.
+assert(isequal(double(imregionalmax([1 2 1; 2 3 2; 1 2 1])), [0 0 0; 0 1 0; 0 0 0]));
+plateau = [10 10 10 10; 10 22 22 10; 10 22 22 10; 10 10 10 10];
+assert(sum(sum(imregionalmax(plateau))) == 4);
+assert(isequal(imregionalmin(-[1 2 1; 2 3 2; 1 2 1]), imregionalmax([1 2 1; 2 3 2; 1 2 1])));
+% La transformée H-maxima rabote les sommets trop bas.
+assert(isequal(imhmax([1 3 1], 1), [1 2 1]));
+assert(isequal(imhmin([3 1 3], 1), [3 2 3]));
+% Maxima étendus : seul le sommet de hauteur 4 dépasse le seuil 2.
+etendus = imextendedmax([1 1 1 1 1; 1 5 1 2 1; 1 1 1 1 1], 2);
+assert(sum(sum(etendus)) == 1 && etendus(2, 2));
+% Les objets qui touchent le bord disparaissent.
+auBord = false(5);
+auBord(1, 1) = true;
+auBord(3, 3) = true;
+assert(sum(sum(imclearborder(auBord))) == 1);
+% Minima imposés : après imposition, il n'y en a plus d'autres.
+relief = [3 3 3; 3 1 3; 3 3 3];
+marqueur = false(3);
+marqueur(1, 1) = true;
+imposee = imimposemin(relief, marqueur);
+assert(isequal(double(imregionalmin(imposee)), [1 0 0; 0 0 0; 0 0 0]));
+rand('seed', 1);
+deuxMarqueurs = false(5);
+deuxMarqueurs(1, 1) = true;
+deuxMarqueurs(5, 5) = true;
+assert(sum(sum(imregionalmin(imimposemin(rand(5), deuxMarqueurs)))) == 2);
+
+% Filtres sur composantes connexes.
+objets = false(6);
+objets(2, 2) = true;
+objets(4:5, 4:5) = true;
+assert(sum(sum(bwareaopen(objets, 2))) == 4);
+[garde, aires] = bwareafilt(objets, 1);
+assert(sum(garde(:)) == 4);
+assert(isequal(sort(aires)', [1 4]));
+assert(sum(sum(bwareafilt(objets, [1 1]))) == 1);
+assert(sum(sum(bwselect(objets, 4, 4))) == 4);
+assert(sum(sum(bwselect(objets, 2, 2))) == 1);
+assert(sum(sum(bwpropfilt(objets, 'Area', 1))) == 4);
+% La connexité change le compte : deux pixels en diagonale.
+diagonale = false(3);
+diagonale(1, 1) = true;
+diagonale(2, 2) = true;
+[~, nQuatre] = bwlabeln(diagonale, 4);
+[~, nHuit] = bwlabeln(diagonale, 8);
+assert(nQuatre == 2 && nHuit == 1);
+% Tout ou rien : un seul coin correspond au motif.
+carre = false(5);
+carre(2:4, 2:4) = true;
+motifCoin = [-1 -1 -1; -1 1 1; -1 1 1];
+assert(sum(sum(bwhitmiss(carre, motifCoin))) == 1);
+% Enveloppe convexe : elle contient les sommets et un triangle plein.
+triangle = false(7);
+triangle(2, 2) = true;
+triangle(2, 6) = true;
+triangle(6, 4) = true;
+enveloppe = bwconvhull(triangle);
+assert(enveloppe(2, 2) && enveloppe(2, 6) && enveloppe(6, 4));
+assert(sum(enveloppe(:)) > 10);
+
+%% --------------------------- opérations sur images binaires
+isole = false(5);
+isole(3, 3) = true;
+assert(sum(sum(bwmorph(isole, 'clean'))) == 0);
+troue = false(5);
+troue(2:4, 2:4) = true;
+troue(3, 3) = false;
+assert(sum(sum(bwmorph(troue, 'fill'))) == 9);
+coupe = false(5);
+coupe(3, 2) = true;
+coupe(3, 4) = true;
+assert(sum(sum(bwmorph(coupe, 'bridge'))) == 3);
+assert(sum(sum(bwmorph(carre, 'remove'))) == 8);
+assert(sum(sum(bwmorph(carre, 'erode'))) == 1);
+assert(sum(sum(bwmorph(carre, 'dilate'))) == 25);
+% Le squelette d'un rectangle est un trait, et bwskel dit la même chose.
+rectangle = false(11);
+rectangle(4:8, 2:10) = true;
+squelette = bwmorph(rectangle, 'thin', Inf);
+assert(sum(squelette(:)) < sum(rectangle(:)) / 5);
+assert(sum(any(squelette, 2)) == 1);           % une seule ligne occupée
+assert(isequal(bwskel(rectangle), squelette));
+% Une croix a quatre extrémités et un seul embranchement.
+croix = false(7);
+croix(4, 2:6) = true;
+croix(2:6, 4) = true;
+assert(sum(sum(bwmorph(croix, 'endpoints'))) == 4);
+assert(sum(sum(bwmorph(croix, 'branchpoints'))) == 1);
+erreurMorph = false;
+try
+    bwmorph(croix, 'inconnu');
+catch err
+    erreurMorph = strcmp(err.identifier, 'images:bwmorph:UnknownOperation');
+end
+assert(erreurMorph);
+
+% Contours : celui d'un carré plein est fermé et tient sur l'objet.
+contours = bwboundaries(carre);
+assert(numel(contours) == 1);
+premier = contours{1};
+assert(isequal(premier(1, :), premier(end, :)));
+for k = 1:size(premier, 1)
+    assert(carre(premier(k, 1), premier(k, 2)));
+end
+% Un objet troué donne deux contours, mais un seul objet.
+anneau = false(7);
+anneau(2:6, 2:6) = true;
+anneau(4, 4) = false;
+[contoursAnneau, ~, nombreObjets] = bwboundaries(anneau);
+assert(numel(contoursAnneau) == 2 && nombreObjets == 1);
+
+% Ligne de partage des eaux : un sommet sépare deux bassins.
+assert(isequal(watershed([1 2 3 2 1]), [1 1 0 2 2]));
+reliefQuatre = [1 1 1 1 1; 1 0 1 0 1; 1 1 1 1 1; 1 0 1 0 1; 1 1 1 1 1];
+assert(max(max(watershed(reliefQuatre))) == 4);
+
+%% --------------------------------- découpage en blocs
+carreMagique = magic(4);
+blocsDisjoints = im2col(carreMagique, [2 2], 'distinct');
+assert(isequal(size(blocsDisjoints), [4 4]));
+assert(isequal(col2im(blocsDisjoints, [2 2], [4 4], 'distinct'), carreMagique));
+assert(isequal(size(im2col(carreMagique, [2 2], 'sliding')), [4 9]));
+% nlfilter et colfilt disent la même chose, et disent juste.
+parVoisinage = nlfilter(carreMagique, [3 3], @(x) max(x(:)));
+parColonnes = colfilt(carreMagique, [3 3], 'sliding', @max);
+assert(isequal(parVoisinage, parColonnes));
+assert(parVoisinage(2, 2) == max(max(carreMagique(1:3, 1:3))));
+% blockproc : chaque bloc remplacé par sa moyenne.
+moyennes = blockproc(carreMagique, [2 2], @(b) mean(b.data(:)) * ones(2));
+assert(isequal(size(moyennes), [4 4]));
+assert(abs(moyennes(1, 1) - mean(mean(carreMagique(1:2, 1:2)))) < 1e-12);
+% conv2 accepte la forme séparable.
+noyauSeparable = [1 2 1] / 4;
+assert(max(max(abs(conv2(noyauSeparable, noyauSeparable, carreMagique, 'valid') - ...
+                   conv2(carreMagique, noyauSeparable' * noyauSeparable, 'valid')))) < 1e-14);
+% Damier et pyramide.
+assert(isequal(size(checkerboard(4, 2, 2)), [16 16]));
+rand('seed', 4);
+imagePyramide = rand(16);
+reduite = impyramid(imagePyramide, 'reduce');
+assert(isequal(size(reduite), [8 8]));
+assert(isequal(size(impyramid(reduite, 'expand')), [15 15]));
+
+% convhull et inpolygon, du MATLAB de base.
+[sommets, aireCarre] = convhull([0 1 1 0 0.5], [0 0 1 1 0.5]);
+assert(numel(sommets) == 5 && sommets(1) == sommets(end));
+assert(abs(aireCarre - 1) < 1e-12);
+[~, aireTriangle] = convhull([0 4 2 2], [0 0 3 1]);
+assert(abs(aireTriangle - 6) < 1e-12);
+angles = linspace(0, 2*pi, 200);
+angles(end) = [];
+[~, aireCercle] = convhull(cos(angles), sin(angles));
+assert(abs(aireCercle - pi) < 1e-3);
+assert(inpolygon(0.5, 0.5, [0 1 1 0], [0 0 1 1]));
+assert(~inpolygon(1.5, 0.5, [0 1 1 0], [0 0 1 1]));
+[dedans, surLeBord] = inpolygon([0 0.5 1.5], [0 0.5 0.5], [0 1 1 0], [0 0 1 1]);
+assert(isequal(dedans, [true true false]));
+assert(isequal(surLeBord, [true false false]));
+
 disp('images : toutes les verifications passent');

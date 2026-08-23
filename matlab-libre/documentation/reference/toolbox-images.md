@@ -58,12 +58,125 @@
 %
 % Bruit
 %   imnoise
+%
+% Espaces de couleur
+%   rgb2lin, lin2rgb   - Correction gamma de sRGB, dans les deux sens
+%   rgb2xyz, xyz2rgb   - Passage à l'espace XYZ de la CIE
+%   xyz2lab, lab2xyz   - Passage de XYZ à L*a*b*
+%   rgb2lab, lab2rgb   - Enchaînement des deux
+%   rgb2ntsc, ntsc2rgb - Espace YIQ de la télévision
+%   whitepoint         - Blancs de référence normalisés
+%   imsplit            - Sépare les plans d'une image
+%
+% Images indexées
+%   gray2ind, ind2gray, ind2rgb, rgb2ind, imapprox
+%
+% Reconstruction morphologique
+%   imreconstruct      - Dilatation géodésique jusqu'à stabilité
+%   imregionalmax, imregionalmin - Extrema régionaux
+%   imhmax, imhmin     - Rabote les extrema de faible relief
+%   imextendedmax, imextendedmin - Extrema d'au moins H
+%   imimposemin        - Impose les minima, pour la ligne de partage
+%   imclearborder      - Retire ce qui touche le bord
+%   conndef            - Tableau de connexité par défaut
+%
+% Composantes connexes
+%   bwlabeln           - Étiquetage, connexité quelconque
+%   bwareaopen, bwareafilt, bwpropfilt, bwselect
+%   bwhitmiss          - Transformation tout ou rien
+%   bwconvhull         - Enveloppe convexe des objets
+%
+% Squelettes et contours
+%   bwmorph            - Vingt opérations sur images binaires
+%   bwskel             - Squelette par amincissement
+%   bwboundaries       - Contours des objets et de leurs trous
+%   bwtraceboundary    - Suivi de contour de Moore
+%   watershed          - Ligne de partage des eaux
+%
+% Découpage en blocs
+%   im2col, col2im     - Blocs vers colonnes et retour
+%   nlfilter, colfilt, blockproc - Filtres définis par une fonction
+%   checkerboard       - Damier d'essai
+%   impyramid          - Étage de pyramide gaussienne
+%
+% Fonctions internes (absentes de MATLAB)
+%   morphologie, matriceRVBversXYZ, appliquerMatriceCouleur,
+%   adapterBlanc, voisinageConnexite
+```
+
+## `adapterBlanc`
+
+```
+ADAPTERBLANC Adaptation chromatique de von Kries, en coordonnées XYZ.
+  Chaque axe est mis à l'échelle du rapport des blancs. C'est la forme
+  la plus simple de l'adaptation, celle que MATLAB emploie par défaut
+  pour les conversions entre illuminants.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `appliquerMatriceCouleur`
+
+```
+APPLIQUERMATRICECOULEUR Combine linéairement les trois plans d'une image.
+  Accepte une image H x L x 3 ou une liste N x 3 de couleurs, et rend
+  la même forme.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `blockproc`
+
+```
+BLOCKPROC Applique une fonction bloc par bloc.
+  B = BLOCKPROC(A,[M N],FUN) découpe A en blocs disjoints de M x N et
+  applique FUN à chacun. FUN reçoit une structure dont le champ `data`
+  porte le bloc, comme dans MATLAB.
+
+  Exemple :
+     blockproc(magic(4), [2 2], @(b) mean(b.data(:)) * ones(2))
 ```
 
 ## `bwarea`
 
 ```
 BWAREA Aire d'une région binaire, en pixels.
+```
+
+## `bwareafilt`
+
+```
+BWAREAFILT Ne garde que les composantes de l'aire voulue.
+  BWAREAFILT(BW,N) garde les N plus grandes ; BWAREAFILT(BW,[MIN MAX])
+  garde celles dont l'aire est dans l'intervalle.
+```
+
+## `bwareaopen`
+
+```
+BWAREAOPEN Retire les composantes de moins de P pixels.
+
+  Exemple :
+     bw = false(5); bw(2,2) = true; bw(4:5,4:5) = true;
+     bwareaopen(bw, 2)   % le point isolé disparaît
+```
+
+## `bwboundaries`
+
+```
+BWBOUNDARIES Contours des objets d'une image binaire.
+  B = BWBOUNDARIES(BW) rend un tableau de cellules ; chaque cellule est
+  une liste de couples [ligne colonne] parcourant le contour d'un
+  objet, le premier point étant répété à la fin.
+
+  [B,L,N,A] = BWBOUNDARIES(...) rend aussi l'image étiquetée, le nombre
+  d'objets et la matrice d'adjacence entre objets et trous.
+
+  BWBOUNDARIES(BW,CONN,'noholes') ignore les trous.
+
+  Exemple :
+     bw = false(5); bw(2:4, 2:4) = true;
+     b = bwboundaries(bw);   % un contour de huit points plus le retour
 ```
 
 ## `bwconncomp`
@@ -73,6 +186,14 @@ BWCONNCOMP Composantes connexes d'une image binaire.
   CC = BWCONNCOMP(BW,CONNEXITE) rend une structure aux champs
   Connectivity, ImageSize, NumObjects et PixelIdxList — la même que
   celle de MATLAB.
+```
+
+## `bwconvhull`
+
+```
+BWCONVHULL Enveloppe convexe des objets d'une image binaire.
+  BWCONVHULL(BW) rend l'enveloppe de l'ensemble des pixels allumés.
+  BWCONVHULL(BW,'objects') traite chaque composante à part.
 ```
 
 ## `bwdist`
@@ -94,12 +215,50 @@ BWEULER Nombre d'Euler : régions moins trous.
   E = BWEULER(BW,8) par défaut.
 ```
 
+## `bwhitmiss`
+
+```
+BWHITMISS Transformation tout ou rien.
+  BWHITMISS(BW,SE1,SE2) garde les pixels dont le voisinage contient
+  SE1 dans l'objet et SE2 dans le fond. Avec un seul élément à trois
+  valeurs, 1 impose l'objet, -1 le fond, 0 laisse libre.
+```
+
 ## `bwlabel`
 
 ```
 BWLABEL Étiquetage des composantes connexes d'une image binaire.
   [L,N] = BWLABEL(BW) numérote les régions de pixels vrais.
   CONNEXITE vaut 4 ou 8 (8 par défaut).
+```
+
+## `bwlabeln`
+
+```
+BWLABELN Étiquetage des composantes connexes, connexité quelconque.
+  Sur une image bidimensionnelle, CONNEXITE peut valoir 4, 8 ou un
+  tableau logique 3 x 3.
+```
+
+## `bwmorph`
+
+```
+BWMORPH Opérations morphologiques sur une image binaire.
+  BW2 = BWMORPH(BW,OPERATION) applique une fois l'opération nommée ;
+  BWMORPH(BW,OPERATION,N) la répète N fois, ou jusqu'à stabilité si N
+  vaut Inf.
+
+  Opérations reconnues : 'clean' (retire les pixels isolés), 'fill'
+  (bouche les trous d'un pixel), 'bridge' (relie deux pixels séparés
+  par un seul), 'remove' (ne garde que le bord), 'majority' (garde le
+  pixel si cinq voisins sur neuf sont allumés), 'erode', 'dilate',
+  'open', 'close', 'diag' (comble les liaisons diagonales),
+  'endpoints', 'branchpoints', 'thin', 'skel', 'spur', 'thicken',
+  'hbreak', 'tophat', 'bothat'.
+
+  Exemple :
+     bw = false(5); bw(3,3) = true;
+     bwmorph(bw, 'clean')   % le pixel isolé disparaît
 ```
 
 ## `bwperim`
@@ -111,6 +270,95 @@ BWPERIM Contour d'une région binaire.
 
   Exemple :
      sum(sum(bwperim(true(3))))   % 8 : tout sauf le centre
+```
+
+## `bwpropfilt`
+
+```
+BWPROPFILT Ne garde que les composantes classées par une propriété.
+  BWPROPFILT(BW,'Area',N) équivaut à BWAREAFILT. Toute propriété
+  scalaire rendue par REGIONPROPS convient : 'Perimeter',
+  'EquivDiameter', 'Eccentricity'…
+```
+
+## `bwselect`
+
+```
+BWSELECT Garde les objets qui contiennent les points désignés.
+  BWSELECT(BW,C,R) où C sont les colonnes et R les lignes des points,
+  dans cet ordre — c'est la convention de MATLAB.
+```
+
+## `bwskel`
+
+```
+BWSKEL Squelette d'une image binaire.
+  Amincissement de Zhang et Suen jusqu'à stabilité : il ne reste qu'un
+  trait d'un pixel d'épaisseur, de même topologie que l'objet.
+
+  BWSKEL(...,'MinBranchLength',L) élague ensuite les barbes de moins de
+  L pixels.
+
+  Exemple :
+     bw = false(9); bw(4:6, 2:8) = true;
+     s = bwskel(bw);   % un segment horizontal
+```
+
+## `bwtraceboundary`
+
+```
+BWTRACEBOUNDARY Suit le contour d'un objet à partir d'un point.
+  C = BWTRACEBOUNDARY(BW,P,DIR) part du pixel P = [ligne colonne] en
+  cherchant d'abord dans la direction DIR ('N', 'NE', 'E'…) et suit le
+  bord de l'objet jusqu'à revenir au départ.
+
+  L'algorithme est celui de Moore : on tourne autour du pixel courant à
+  partir du voisin d'où l'on vient, et l'on saute sur le premier pixel
+  allumé rencontré.
+```
+
+## `checkerboard`
+
+```
+CHECKERBOARD Damier d'essai pour les transformations géométriques.
+  I = CHECKERBOARD(N,P,Q) rend un damier dont chaque carreau fait N
+  pixels de côté, avec P rangées et Q colonnes de paires de carreaux.
+  La moitié droite est plus claire, ce qui permet de repérer une
+  symétrie.
+
+  Exemple :
+     imshow(checkerboard(10));
+```
+
+## `col2im`
+
+```
+COL2IM Réassemble une image à partir de colonnes de blocs.
+  Réciproque d'IM2COL pour le découpage disjoint ; pour le découpage
+  glissant, chaque colonne fournit un pixel, comme dans MATLAB.
+```
+
+## `colfilt`
+
+```
+COLFILT Filtre par colonnes : la fonction voit tous les blocs à la fois.
+  B = COLFILT(A,[M N],'sliding',FUN) passe à FUN une matrice dont
+  chaque colonne est un voisinage, et attend une ligne de résultats.
+  C'est la version rapide de NLFILTER.
+
+  Exemple :
+     colfilt(magic(4), [3 3], 'sliding', @max)
+```
+
+## `conndef`
+
+```
+CONNDEF Tableau de connexité par défaut.
+  C = CONNDEF(N,TYPE) où TYPE vaut 'minimal' (les voisins qui partagent
+  une face) ou 'maximal' (tous les voisins immédiats).
+
+  Exemple :
+     conndef(2, 'minimal')   % [0 1 0; 1 1 1; 0 1 0]
 ```
 
 ## `corr2`
@@ -152,6 +400,18 @@ FSPECIAL Noyaux de filtrage usuels.
   H = FSPECIAL('prewitt')        gradient vertical
   H = FSPECIAL('laplacian')      laplacien
   H = FSPECIAL('log',N,SIG)      laplacien de gaussienne
+```
+
+## `gray2ind`
+
+```
+GRAY2IND Image en niveaux de gris vers image indexée.
+  [X,MAP] = GRAY2IND(I,N) quantifie I sur N niveaux ; N vaut 64 par
+  défaut. Les indices commencent à zéro, comme dans MATLAB pour les
+  entiers non signés.
+
+  Exemple :
+     [x, map] = gray2ind([0 0.5 1], 4);   % x = [0 1 3]
 ```
 
 ## `gray2rgb`
@@ -198,13 +458,25 @@ HISTEQ Égalisation d'histogramme.
 
 ```
 HSV2RGB Teinte, saturation, valeur vers RVB.
-  R = HSV2RGB(IMAGE) où IMAGE est MxNx3.
+  R = HSV2RGB(IMAGE) où IMAGE est MxNx3, ou HSV2RGB(CARTE) où CARTE
+  est une carte de couleurs Mx3. La sortie garde la forme de l'entrée.
 ```
 
 ## `idct2`
 
 ```
 IDCT2 Transformée en cosinus discrète inverse bidimensionnelle.
+```
+
+## `im2col`
+
+```
+IM2COL Réarrange les blocs d'une image en colonnes.
+  IM2COL(A,[M N],'distinct') découpe l'image en blocs disjoints ;
+  'sliding' (par défaut) prend tous les blocs glissants.
+
+  Exemple :
+     im2col(magic(4), [2 2], 'distinct')   % quatre colonnes de quatre
 ```
 
 ## `im2double`
@@ -246,6 +518,13 @@ IMADJUST Étirement de contraste.
   affine par morceaux suivie de la correction gamma.
 ```
 
+## `imapprox`
+
+```
+IMAPPROX Réduit le nombre de couleurs d'une image indexée.
+  [Y,NEWMAP] = IMAPPROX(X,MAP,N) rend une image à N couleurs.
+```
+
 ## `imbinarize`
 
 ```
@@ -265,6 +544,17 @@ IMBOTHAT Chapeau bas de forme : la fermeture moins l'image.
 IMBOXFILT Filtre moyenneur, à noyau carré.
   R = IMBOXFILT(I,N) moyenne sur un carré de N points de côté ; N est
   impair. C'est le filtre le moins cher, et le plus flou.
+```
+
+## `imclearborder`
+
+```
+IMCLEARBORDER Supprime les objets qui touchent le bord de l'image.
+  La reconstruction part du bord : tout ce qu'elle atteint est retiré.
+
+  Exemple :
+     bw = false(5); bw(1,1) = true; bw(3,3) = true;
+     imclearborder(bw)   % il ne reste que le point du centre
 ```
 
 ## `imclose`
@@ -303,6 +593,18 @@ IMDIVIDE Quotient terme à terme de deux images.
 
 ```
 IMERODE Érosion morphologique.
+```
+
+## `imextendedmax`
+
+```
+IMEXTENDEDMAX Maxima étendus : les sommets d'au moins H de hauteur.
+```
+
+## `imextendedmin`
+
+```
+IMEXTENDEDMIN Minima étendus : les cuvettes d'au moins H de profondeur.
 ```
 
 ## `imfill`
@@ -370,6 +672,41 @@ IMGRADIENTXY Composantes horizontale et verticale du gradient.
 IMHIST Histogramme d'une image.
 ```
 
+## `imhmax`
+
+```
+IMHMAX Supprime les maxima de hauteur inférieure à H.
+  La reconstruction de l'image depuis elle-même abaissée de H rabote
+  les sommets peu marqués et laisse les autres.
+
+  Exemple :
+     imhmax([1 3 1], 5)   % [1 1 1] : le sommet ne fait que 2
+```
+
+## `imhmin`
+
+```
+IMHMIN Comble les minima de profondeur inférieure à H.
+```
+
+## `imimposemin`
+
+```
+IMIMPOSEMIN Force les minima régionaux à se trouver là où on le dit.
+  Sert à contrôler la ligne de partage des eaux : sans cela, chaque
+  petite cuvette du relief donne un bassin.
+
+  La construction est celle de Soille : on creuse à moins l'infini là
+  où sont les marqueurs, on remonte tout le reste d'un cran, et on
+  reconstruit par en dessous. Les seuls minima qui survivent sont ceux
+  qu'on a imposés.
+
+  Exemple :
+     relief = [3 3 3; 3 1 3; 3 3 3];
+     m = false(3); m(1,1) = true;
+     imregionalmin(imimposemin(relief, m))   % le seul minimum est en (1,1)
+```
+
 ## `imlincomb`
 
 ```
@@ -408,6 +745,17 @@ IMNOISE Ajoute du bruit à une image.
 IMOPEN Ouverture morphologique : érosion puis dilatation.
 ```
 
+## `impyramid`
+
+```
+IMPYRAMID Un étage de pyramide gaussienne, vers le haut ou vers le bas.
+  IMPYRAMID(A,'reduce') divise la taille par deux après lissage ;
+  'expand' la double.
+
+  Le noyau est le noyau binomial 5 x 5 de Burt et Adelson, celui que
+  MATLAB emploie : [1 4 6 4 1]/16 dans chaque direction.
+```
+
 ## `imquantize`
 
 ```
@@ -421,6 +769,49 @@ IMQUANTIZE Quantifie une image selon des seuils.
 
 ```
 IMREAD Lit une image aux formats PGM/PPM en texte (P2 et P3).
+```
+
+## `imreconstruct`
+
+```
+IMRECONSTRUCT Reconstruction morphologique par dilatation géodésique.
+  J = IMRECONSTRUCT(MARQUEUR,MASQUE) dilate le marqueur sous le masque
+  jusqu'à stabilité : chaque pixel prend le maximum de son voisinage,
+  sans jamais dépasser le masque. C'est la brique de toutes les
+  opérations qui suivent — extrema régionaux, remplissage de trous,
+  suppression des objets touchant le bord.
+
+  L'implémentation fait deux balayages par tour, l'un en avant, l'autre
+  en arrière : la propagation traverse alors l'image en un tour au lieu
+  d'un par pixel de distance.
+
+  Exemple :
+     m = zeros(5); m(3,3) = 1;
+     imreconstruct(m, ones(5))   % tout à 1 : le masque est connexe
+```
+
+## `imregionalmax`
+
+```
+IMREGIONALMAX Maxima régionaux d'une image.
+  Un maximum régional est un plateau connexe dont tous les voisins sont
+  strictement plus bas. On le trouve en reconstruisant l'image depuis
+  elle-même diminuée d'un cran : ce qui reste au-dessus est un maximum.
+
+  Le « cran » est pris sur les rangs des valeurs, pas sur les valeurs
+  elles-mêmes : les maxima régionaux ne changent pas si l'on applique
+  une fonction strictement croissante, et travailler sur les rangs rend
+  le calcul exact même en présence d'infinis.
+
+  Exemple :
+     imregionalmax([1 2 1; 2 3 2; 1 2 1])   % le centre seulement
+```
+
+## `imregionalmin`
+
+```
+IMREGIONALMIN Minima régionaux d'une image.
+  Dual d'IMREGIONALMAX, appliqué à l'image inversée.
 ```
 
 ## `imresize`
@@ -451,6 +842,16 @@ IMSHARPEN Accentue les contours par masque flou.
 ```
 IMSHOW Affiche une image dans les axes courants.
   Le rendu se fait en SVG : « print » écrit le fichier.
+```
+
+## `imsplit`
+
+```
+IMSPLIT Sépare les plans d'une image en autant de sorties.
+  [R,V,B] = IMSPLIT(RGB).
+
+  Exemple :
+     [r, v, b] = imsplit(zeros(4, 4, 3));
 ```
 
 ## `imsubtract`
@@ -484,6 +885,32 @@ IMWRITE Écrit une image au format PGM (gris) ou PPM (couleur).
   nécessaire, et tous les visionneurs les lisent.
 ```
 
+## `ind2gray`
+
+```
+IND2GRAY Image indexée vers niveaux de gris.
+  La luminance suit la même pondération que RGB2GRAY.
+```
+
+## `ind2rgb`
+
+```
+IND2RGB Image indexée vers image en couleurs.
+```
+
+## `lab2rgb`
+
+```
+LAB2RGB Passage de L*a*b* à sRGB.
+```
+
+## `lab2xyz`
+
+```
+LAB2XYZ Passage de L*a*b* à XYZ.
+  Réciproque exacte de XYZ2LAB.
+```
+
 ## `label2rgb`
 
 ```
@@ -491,6 +918,26 @@ LABEL2RGB Colorie une image étiquetée.
   RGB = LABEL2RGB(L) donne une couleur par étiquette ; le fond (zéro)
   reste blanc. LABEL2RGB(L,CARTE,FOND) choisit la palette et la couleur
   du fond.
+```
+
+## `lin2rgb`
+
+```
+LIN2RGB Applique la correction gamma de sRGB.
+  Réciproque exacte de RGB2LIN.
+
+  Exemple :
+     lin2rgb(0.214)   % 0.4999
+```
+
+## `matriceRVBversXYZ`
+
+```
+MATRICERVBVERSXYZ Matrice sRGB linéaire vers XYZ, blanc D65.
+  Les coefficients sont ceux de la recommandation UIT-R BT.709, celle
+  que sRGB reprend : ils envoient le blanc [1 1 1] sur le blanc D65.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `mean2`
@@ -509,6 +956,10 @@ MEDFILT2 Filtre médian bidimensionnel.
 
 ```
 MORPHOLOGIE Noyau commun de l'érosion et de la dilatation.
+  Hors de l'image, le voisinage vaut l'élément neutre de l'opération :
+  plus l'infini pour l'érosion, moins l'infini pour la dilatation. Un
+  pixel dont tout le voisinage sort du cadre garde donc sa valeur
+  neutre, au lieu de faire échouer le calcul sur un ensemble vide.
 ```
 
 ## `multithresh`
@@ -521,6 +972,23 @@ MULTITHRESH Seuils d'Otsu multiples.
 
   Exemple :
      multithresh([zeros(1,50) ones(1,50)], 1)   % proche de 0,5
+```
+
+## `nlfilter`
+
+```
+NLFILTER Filtre défini par une fonction du voisinage.
+  B = NLFILTER(A,[M N],FUN) applique FUN à chaque voisinage glissant de
+  M x N pixels ; le résultat prend la valeur rendue par FUN.
+
+  Exemple :
+     nlfilter(magic(4), [3 3], @(x) max(x(:)))
+```
+
+## `ntsc2rgb`
+
+```
+NTSC2RGB Passage de YIQ à RVB.
 ```
 
 ## `ordfilt2`
@@ -598,11 +1066,76 @@ RGB2GRAY Luminance d'une image couleur.
 
 ```
 RGB2HSV Couleurs RVB vers teinte, saturation, valeur.
-  H = RGB2HSV(IMAGE) où IMAGE est MxNx3 dans [0,1]. Les trois plans du
-  résultat sont la teinte (0 à 1), la saturation et la valeur.
+  H = RGB2HSV(IMAGE) où IMAGE est MxNx3 dans [0,1], ou RGB2HSV(CARTE)
+  où CARTE est une carte de couleurs Mx3. Les trois plans du résultat
+  sont la teinte (0 à 1), la saturation et la valeur.
 
   Exemple :
      c = rgb2hsv(cat(3, 1, 0, 0));   % rouge pur : teinte 0, S = V = 1
+```
+
+## `rgb2ind`
+
+```
+RGB2IND Image en couleurs vers image indexée.
+  [X,MAP] = RGB2IND(RGB,N) réduit l'image à N couleurs par les
+  k-moyennes sur les pixels, initialisées régulièrement pour que le
+  résultat ne dépende pas du tirage.
+
+  [X,MAP] = RGB2IND(RGB,MAP) utilise la palette donnée et affecte
+  chaque pixel à sa couleur la plus proche.
+
+  Exemple :
+     [x, map] = rgb2ind(cat(3, [0 1], [0 1], [0 1]), 2);
+```
+
+## `rgb2lab`
+
+```
+RGB2LAB Passage de sRGB à L*a*b*.
+  L* va de 0 à 100, a* et b* sont centrés sur zéro. C'est l'espace où
+  les distances euclidiennes correspondent le mieux aux différences
+  perçues.
+
+  Exemple :
+     rgb2lab([1 1 1])   % [100 0 0]
+```
+
+## `rgb2lin`
+
+```
+RGB2LIN Défait la correction gamma d'une image sRGB.
+  U = RGB2LIN(V) applique la fonction de transfert inverse de sRGB :
+  une droite près de zéro, une puissance 2,4 au-delà. Les valeurs
+  entrent et sortent entre 0 et 1.
+
+  Exemple :
+     rgb2lin(0.5)   % 0.2140
+```
+
+## `rgb2ntsc`
+
+```
+RGB2NTSC Passage de RVB à l'espace YIQ de la télévision NTSC.
+  Y porte la luminance, I et Q la chrominance. La première ligne de la
+  matrice est celle de RGB2GRAY.
+
+  Exemple :
+     rgb2ntsc([1 1 1])   % [1 0 0]
+```
+
+## `rgb2xyz`
+
+```
+RGB2XYZ Passage de sRGB à l'espace XYZ de la CIE.
+  XYZ = RGB2XYZ(RGB) linéarise d'abord l'image, puis applique la
+  matrice de la recommandation BT.709.
+
+  RGB2XYZ(...,'WhitePoint',W) adapte le résultat à un autre blanc que
+  le D65 de sRGB, par la mise à l'échelle de von Kries.
+
+  Exemple :
+     rgb2xyz([1 1 1])   % le blanc D65
 ```
 
 ## `rgb2ycbcr`
@@ -660,6 +1193,64 @@ STRETCHLIM Bornes de contraste, pour IMADJUST.
   L = STRETCHLIM(I,TOL) rend [bas; haut] tels que la proportion TOL(1)
   des pixels soit sous « bas » et TOL(2) au-dessus de « haut ». TOL vaut
   [0.01 0.99] par défaut.
+```
+
+## `voisinageConnexite`
+
+```
+VOISINAGECONNEXITE Décalages [di dj] d'une connexité 2-D.
+  Accepte 4, 8 ou un tableau logique 3 x 3.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `watershed`
+
+```
+WATERSHED Ligne de partage des eaux.
+  L = WATERSHED(A) inonde le relief A depuis ses minima régionaux : les
+  pixels reçoivent le numéro du bassin qui les a atteints, et ceux où
+  deux bassins se rejoignent restent à zéro — c'est la ligne de
+  partage.
+
+  L'inondation suit l'algorithme de Meyer : on traite les pixels par
+  altitude croissante, en propageant l'étiquette du voisin déjà
+  inondé, et l'on marque la crête quand deux étiquettes se disputent
+  le même pixel.
+
+  Exemple :
+     relief = [1 2 3 2 1];
+     watershed(relief)   % deux bassins séparés par le sommet
+```
+
+## `whitepoint`
+
+```
+WHITEPOINT Coordonnées XYZ d'un blanc de référence.
+  XYZ = WHITEPOINT(NOM) où NOM vaut 'ICC' (par défaut), 'D50', 'D55',
+  'D65', 'A' ou 'C'. Le blanc est normalisé à Y = 1.
+
+  Exemple :
+     whitepoint('d65')   % [0.9504 1.0000 1.0888]
+```
+
+## `xyz2lab`
+
+```
+XYZ2LAB Passage de XYZ à L*a*b*.
+  Le blanc de référence est le D65 par défaut ; l'option 'WhitePoint'
+  en choisit un autre.
+
+  Exemple :
+     xyz2lab(whitepoint('d65'))   % [100 0 0], le blanc parfait
+```
+
+## `xyz2rgb`
+
+```
+XYZ2RGB Passage de l'espace XYZ à sRGB.
+  Réciproque de RGB2XYZ. Les valeurs hors du domaine affichable sont
+  ramenées entre 0 et 1, comme le fait MATLAB.
 ```
 
 ## `ycbcr2rgb`

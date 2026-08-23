@@ -1,10 +1,16 @@
 function r = hsv2rgb(h, s, v)
 %HSV2RGB Teinte, saturation, valeur vers RVB.
-%   R = HSV2RGB(IMAGE) où IMAGE est MxNx3.
+%   R = HSV2RGB(IMAGE) où IMAGE est MxNx3, ou HSV2RGB(CARTE) où CARTE
+%   est une carte de couleurs Mx3. La sortie garde la forme de l'entrée.
     if nargin == 3
         image = cat(3, h, s, v);
     else
         image = h;
+    end
+    image = double(image);
+    carte = ismatrix(image) && size(image, 2) == 3;
+    if carte
+        image = reshape(image, [], 1, 3);
     end
     H = image(:, :, 1) * 6;
     S = image(:, :, 2);
@@ -28,4 +34,7 @@ function r = hsv2rgb(h, s, v)
         end
     end
     r = cat(3, R, G, B);
+    if carte
+        r = reshape(r, [], 3);
+    end
 end

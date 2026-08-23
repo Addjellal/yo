@@ -570,14 +570,61 @@ Valeur elementDe(const Valeur& v, const std::vector<std::size_t>& indices, bool 
     return r;
 }
 
+// unique(A,'rows') : les lignes entieres sont les elements a comparer.
+// Le tri se fait sur la suite des colonnes, dans l'ordre lexicographique,
+// et le resultat garde une ligne par valeur distincte.
+std::vector<Valeur> uniqueParLignes(const Valeur& v, bool stable, int nargout) {
+    int m = v.nlignes(), c = v.ncolonnes();
+    auto ligneDe = [&](int i) {
+        std::vector<double> r((std::size_t)c);
+        for (int j = 0; j < c; ++j) r[(std::size_t)j] = v.re[(std::size_t)i + (std::size_t)j * m];
+        return r;
+    };
+    std::vector<int> ordre((std::size_t)m);
+    std::iota(ordre.begin(), ordre.end(), 0);
+    if (!stable)
+        std::stable_sort(ordre.begin(), ordre.end(),
+                         [&](int a, int b) { return ligneDe(a) < ligneDe(b); });
+    std::vector<int> gardes;
+    std::vector<double> ic((std::size_t)m, 0.0);
+    std::map<std::vector<double>, std::size_t> vues;
+    for (int i : ordre) {
+        std::vector<double> cle = ligneDe(i);
+        auto trouve = vues.find(cle);
+        if (trouve == vues.end()) {
+            vues[cle] = gardes.size();
+            gardes.push_back(i);
+            ic[(std::size_t)i] = (double)gardes.size();
+        } else {
+            ic[(std::size_t)i] = (double)(trouve->second + 1);
+        }
+    }
+    Valeur u = Valeur::matrice((int)gardes.size(), c);
+    u.classe = v.classe;
+    for (std::size_t k = 0; k < gardes.size(); ++k)
+        for (int j = 0; j < c; ++j)
+            u.re[k + (std::size_t)j * gardes.size()] =
+                v.re[(std::size_t)gardes[k] + (std::size_t)j * m];
+    std::vector<double> ia;
+    for (int g : gardes) ia.push_back((double)(g + 1));
+    if (nargout <= 1) return {u};
+    if (nargout == 2) return {u, Valeur::colonne(ia)};
+    return {u, Valeur::colonne(ia), Valeur::colonne(ic)};
+}
+
 FONCTION(fnUnique) {
     INUTILISE
     exigerArguments(args, 1, 3, "unique");
     const Valeur& v = args[0];
     bool stable = false;
+    bool parLignes = false;
     for (std::size_t k = 1; k < args.size(); ++k)
-        if ((args[k].estTexte() || args[k].estChaine()) && args[k].versTexte() == "stable")
-            stable = true;
+        if (args[k].estTexte() || args[k].estChaine()) {
+            std::string opt = args[k].versTexte();
+            if (opt == "stable") stable = true;
+            if (opt == "rows") parLignes = true;
+        }
+    if (parLignes) return uniqueParLignes(v, stable, nargout);
     std::size_t n = v.nelem();
     std::vector<std::size_t> ordre(n);
     std::iota(ordre.begin(), ordre.end(), 0);

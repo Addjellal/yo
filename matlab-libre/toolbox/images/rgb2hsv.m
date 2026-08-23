@@ -1,7 +1,8 @@
 function h = rgb2hsv(r, g, b)
 %RGB2HSV Couleurs RVB vers teinte, saturation, valeur.
-%   H = RGB2HSV(IMAGE) où IMAGE est MxNx3 dans [0,1]. Les trois plans du
-%   résultat sont la teinte (0 à 1), la saturation et la valeur.
+%   H = RGB2HSV(IMAGE) où IMAGE est MxNx3 dans [0,1], ou RGB2HSV(CARTE)
+%   où CARTE est une carte de couleurs Mx3. Les trois plans du résultat
+%   sont la teinte (0 à 1), la saturation et la valeur.
 %
 %   Exemple :
 %      c = rgb2hsv(cat(3, 1, 0, 0));   % rouge pur : teinte 0, S = V = 1
@@ -11,6 +12,10 @@ function h = rgb2hsv(r, g, b)
         image = r;
     end
     image = im2double(image);
+    carte = ismatrix(image) && size(image, 2) == 3;
+    if carte
+        image = reshape(image, [], 1, 3);
+    end
     R = image(:, :, 1);
     G = image(:, :, 2);
     B = image(:, :, 3);
@@ -29,4 +34,7 @@ function h = rgb2hsv(r, g, b)
     teinte(vert) = ((B(vert) - R(vert)) ./ delta(vert) + 2) / 6;
     teinte(bleu) = ((R(bleu) - G(bleu)) ./ delta(bleu) + 4) / 6;
     h = cat(3, teinte, s, v);
+    if carte
+        h = reshape(h, [], 3);
+    end
 end
