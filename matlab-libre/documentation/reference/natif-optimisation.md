@@ -56,16 +56,46 @@ lsqnonneg  Moindres carres a coefficients positifs.
 ode113  Solveur a pas variable.
 ```
 
+## `ode15s`
+
+```
+ode15s  Solveur raide, BDF a pas et ordre variables.
+```
+
 ## `ode23`
 
 ```
 ode23  Runge-Kutta d'ordre 2(3).
 ```
 
+## `ode23s`
+
+```
+ode23s  Solveur raide, Rosenbrock modifie (2,3).
+```
+
+## `ode23t`
+
+```
+ode23t  Solveur peu raide, regle des trapezes.
+```
+
+## `ode23tb`
+
+```
+ode23tb  Solveur raide, trapeze puis BDF2.
+```
+
 ## `ode45`
 
 ```
 ode45  Runge-Kutta Dormand-Prince 4(5).
+```
+
+## `odeget`
+
+```
+odeget  Lit une option d'EDO.
 ```
 
 ## `odeset`

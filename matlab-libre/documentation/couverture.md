@@ -11,13 +11,19 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **605 fonctions natives** couvrant le MATLAB de base.
+- **610 fonctions natives** couvrant le MATLAB de base.
 - **734 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
   `containers.Map` et les tableaux creux `sparse`, avec leurs
   constructeurs, leurs conversions et leur affichage.
+- **Des solveurs d'équations différentielles, raides et non raides** :
+  `ode45`, `ode23`, `ode113`, et pour les problèmes raides `ode15s`
+  (BDF à pas et ordre variables, ordre 1 à 5), `ode23s` (Rosenbrock
+  modifié (2,3) de Shampine et Reichelt), `ode23t` (trapèzes) et
+  `ode23tb` (trapèze puis BDF2). Les jacobiennes sont calculées par
+  différences finies, chaque pas résout un système par Newton.
 - **Un rendu graphique** en SVG : courbes, barres, nuages, tiges,
   escaliers, images, sous-graphes, légendes, échelles logarithmiques.
 - **Le calcul parallèle** : un pool de travailleurs indépendants pour
@@ -131,7 +137,19 @@ totalité.
    code natif arbitraire depuis le langage. TensorFlow et PyTorch ne
    sont pas branchés : les réseaux de neurones tournent sur
    l'implémentation interne.
-8. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
+8. **Les solveurs d'EDO n'ont ni détection d'événements ni masse.**
+   `ode45`, `ode15s` et les autres acceptent `RelTol`, `AbsTol`,
+   `MaxStep`, `InitialStep` et, pour `ode15s`, `MaxOrder`. Manquent :
+   `Events`, `Mass`, `Jacobian` fourni à la main (elle est toujours
+   calculée par différences finies), `JPattern` et le creux, la sortie
+   dense d'ordre élevé (l'interpolation entre deux pas est linéaire), et
+   `deval`. Les tolérances par défaut sont 1e-6 et 1e-9, plus serrées que
+   les 1e-3 et 1e-6 de MATLAB. `ode23t` et `ode23tb` estiment leur erreur
+   locale en la comparant à un pas d'Euler implicite : l'estimation
+   majore l'erreur réelle, donc les pas sont plus courts que nécessaire.
+   La variable d'environnement `MATLIBRE_ODE_TRACE` affiche le journal
+   des pas acceptés et refusés.
+9. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
    instruction scalaire. Les opérations vectorisées, elles, tournent à la
    vitesse du C++.
 
@@ -152,7 +170,8 @@ Les suites ne se contentent pas d'appeler les fonctions : elles comparent
 
 Rien n'est repris de MathWorks. Les algorithmes viennent de la littérature
 publique — Golub et Van Loan pour l'algèbre linéaire, Cooley-Tukey et
-Bluestein pour Fourier, Dormand-Prince pour les équations différentielles,
+Bluestein pour Fourier, Dormand-Prince et les BDF pour les équations
+différentielles,
 Nelder-Mead pour l'optimisation sans dérivées, Otsu pour le seuillage,
 Needleman-Wunsch et Smith-Waterman pour l'alignement de séquences,
 Madgwick pour l'attitude, Pacejka pour le pneumatique — et des
