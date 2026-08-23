@@ -213,24 +213,25 @@ FONCTION(fnConv) {
     const Valeur& b = versDouble(args[1]);
     std::size_t na = a.nelem(), nb = b.nelem();
     if (na == 0 || nb == 0) return {Valeur::matrice(1, 0)};
-    std::vector<double> r(na + nb - 1, 0.0);
+    std::vector<cplx> va = versVecteurComplexe(a), vb = versVecteurComplexe(b);
+    std::vector<cplx> r(na + nb - 1, cplx(0.0, 0.0));
     for (std::size_t i = 0; i < na; ++i)
-        for (std::size_t j = 0; j < nb; ++j) r[i + j] += a.re[i] * b.re[j];
+        for (std::size_t j = 0; j < nb; ++j) r[i + j] += va[i] * vb[j];
     std::string forme = args.size() > 2 ? args[2].versTexte() : "full";
     if (forme == "same") {
         std::size_t debut = (nb - 1) / 2;
-        std::vector<double> s(r.begin() + (long)debut, r.begin() + (long)(debut + na));
+        std::vector<cplx> s(r.begin() + (long)debut, r.begin() + (long)(debut + na));
         r = s;
     } else if (forme == "valid") {
         if (na >= nb) {
-            std::vector<double> s(r.begin() + (long)(nb - 1), r.begin() + (long)na);
+            std::vector<cplx> s(r.begin() + (long)(nb - 1), r.begin() + (long)na);
             r = s;
         } else {
             r.clear();
         }
     }
     bool colonne = a.estColonne() && !a.estScalaire();
-    return {colonne ? Valeur::colonne(r) : Valeur::ligne(r)};
+    return {depuisVecteurComplexe(r, colonne)};
 }
 
 FONCTION(fnConv2) {
@@ -280,21 +281,23 @@ FONCTION(fnFilter) {
     const Valeur& b = versDouble(args[0]);
     const Valeur& a = versDouble(args[1]);
     const Valeur& x = versDouble(args[2]);
-    if (a.nelem() == 0 || a.re[0] == 0)
+    if (a.nelem() == 0 || (a.re[0] == 0 && !(a.estComplexe() && a.im[0] != 0)))
         erreur("MATLAB:filter:zeroLeadingCoefficient",
                "First denominator filter coefficient must be non-zero.");
-    double a0 = a.re[0];
-    std::size_t n = x.nelem();
-    std::vector<double> y(n, 0.0);
+    std::vector<cplx> vb = versVecteurComplexe(b), va = versVecteurComplexe(a),
+                      vx = versVecteurComplexe(x);
+    cplx a0 = va[0];
+    std::size_t n = vx.size();
+    std::vector<cplx> y(n, cplx(0.0, 0.0));
     for (std::size_t i = 0; i < n; ++i) {
-        double s = 0;
-        for (std::size_t k = 0; k < b.nelem(); ++k)
-            if (i >= k) s += b.re[k] * x.re[i - k];
-        for (std::size_t k = 1; k < a.nelem(); ++k)
-            if (i >= k) s -= a.re[k] * y[i - k];
+        cplx s(0.0, 0.0);
+        for (std::size_t k = 0; k < vb.size(); ++k)
+            if (i >= k) s += vb[k] * vx[i - k];
+        for (std::size_t k = 1; k < va.size(); ++k)
+            if (i >= k) s -= va[k] * y[i - k];
         y[i] = s / a0;
     }
-    return {x.estColonne() && !x.estScalaire() ? Valeur::colonne(y) : Valeur::ligne(y)};
+    return {depuisVecteurComplexe(y, x.estColonne() && !x.estScalaire())};
 }
 
 FONCTION(fnFiltfilt) {

@@ -114,6 +114,61 @@
 %
 % Fonctions internes (absentes de MATLAB)
 %   papillonHadamard, permutationWalsh, rangerWalsh, rangerWalshInverse
+%
+% Mesures sur un signal à deux états
+%   statelevels - Niveaux bas et haut, par histogramme
+%   midcross    - Traversées du niveau médian
+%   risetime, falltime, slewrate - Fronts
+%   overshoot, undershoot, settlingtime - Régime transitoire
+%   pulsewidth, pulseperiod, pulsesep, dutycycle - Impulsions
+%
+% Distorsion et plage dynamique
+%   thd         - Distorsion harmonique totale
+%   sinad       - Signal sur bruit et distorsion
+%   sfdr        - Plage dynamique libre de parasites
+%   toi         - Point d'interception d'ordre trois
+%
+% Prédiction linéaire
+%   ac2poly, poly2ac   - Autocorrélation et polynôme de prédiction
+%   ac2rc, rc2ac       - Autocorrélation et coefficients de réflexion
+%   poly2rc, rc2poly   - Polynôme et coefficients de réflexion
+%   schurrc            - Réflexion par l'algorithme de Schur
+%   poly2lsf, lsf2poly - Fréquences spectrales de raies
+%
+% Modèles autorégressifs et spectres paramétriques
+%   aryule, arburg, arcov, armcov - Estimation du modèle
+%   pyulear, pburg, pcov, pmcov   - Densité spectrale associée
+%   corrmtx     - Matrice de données pour la corrélation
+%   dpss        - Fenêtres de Slepian
+%   pmtm        - Densité spectrale multi-fenêtres de Thomson
+%
+% Méthodes à sous-espaces
+%   rootmusic, rooteig - Fréquences par les racines du polynôme du bruit
+%   pmusic, peig       - Pseudospectres correspondants
+%
+% Fonctions internes supplémentaires (absentes de MATLAB)
+%   arSpectre, signalLobe, signalSommet, signalSpectrePuissance,
+%   signalNiveaux, signalTraverses, signalTransitions,
+%   signalMatriceCorrelation, puissancesSousEspace, lireOptionsSousEspace
+```
+
+## `ac2poly`
+
+```
+AC2POLY Polynôme de prédiction d'une suite d'autocorrélation.
+  [A,E] = AC2POLY(R) résout les équations de Yule-Walker par
+  Levinson-Durbin. E est la puissance de l'erreur de prédiction.
+
+  Exemple :
+     [a, e] = ac2poly([1 0.5 0.25]);   % a = [1 -0.5 0]
+```
+
+## `ac2rc`
+
+```
+AC2RC Coefficients de réflexion d'une suite d'autocorrélation.
+  [K,R0] = AC2RC(R) applique Levinson-Durbin : R(1) est la puissance du
+  signal, K les coefficients de réflexion des ordres successifs.
 ```
 
 ## `alignsignals`
@@ -122,6 +177,60 @@
 ALIGNSIGNALS Aligne deux signaux en compensant leur retard.
   [XA,YA,D] = ALIGNSIGNALS(X,Y) ajoute des zéros en tête du signal en
   avance, de sorte que les deux se superposent.
+```
+
+## `arSpectre`
+
+```
+ARSPECTRE Densité spectrale d'un modèle autorégressif.
+  Le modèle X = E/A(z) a pour densité e/(fs |A(f)|^2), doublée sur la
+  moitié positive du spectre quand on ne garde qu'un côté.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `arburg`
+
+```
+ARBURG Modèle autorégressif par la méthode de Burg.
+  [A,E,K] = ARBURG(X,P) minimise, à chaque ordre, la somme des erreurs
+  de prédiction avant et arrière sous la contrainte de la récurrence de
+  Levinson. Contrairement à Yule-Walker, la méthode ne suppose aucune
+  fenêtre : elle donne des estimations plus nettes sur les séries
+  courtes, et le filtre reste toujours stable.
+
+  Exemple :
+     a = arburg(x, 4);
+```
+
+## `arcov`
+
+```
+ARCOV Modèle autorégressif par la méthode de la covariance.
+  Moindres carrés sur l'erreur de prédiction avant, sans fenêtrage : on
+  n'utilise que les échantillons pour lesquels toute la fenêtre de
+  prédiction existe.
+```
+
+## `armcov`
+
+```
+ARMCOV Modèle autorégressif par la covariance modifiée.
+  Moindres carrés sur les erreurs de prédiction avant et arrière à la
+  fois : c'est la méthode qui résout le mieux deux sinusoïdes proches.
+```
+
+## `aryule`
+
+```
+ARYULE Modèle autorégressif par les équations de Yule-Walker.
+  [A,E,K] = ARYULE(X,P) estime un modèle d'ordre P à partir de
+  l'autocorrélation biaisée du signal, résolue par Levinson-Durbin. E
+  est la variance de l'erreur de prédiction, K les coefficients de
+  réflexion.
+
+  Exemple :
+     a = aryule(filter(1, [1 -0.9], randn(1000,1)), 1);
 ```
 
 ## `bandpower`
@@ -284,6 +393,21 @@ CHIRP Sinusoïde à fréquence instantanée variable.
   Y = CHIRP(T,F0,T1,F1,'quadratic') fait un balayage quadratique.
 ```
 
+## `corrmtx`
+
+```
+CORRMTX Matrice de données pour l'estimation de la corrélation.
+  X = CORRMTX(V,M,METHODE) rend une matrice rectangulaire dont X'*X est
+  une estimation de la matrice d'autocorrélation d'ordre M+1. METHODE
+  vaut 'autocorrelation' (par défaut), 'prewindowed', 'postwindowed',
+  'covariance' ou 'modified'.
+
+  [X,R] = CORRMTX(...) rend aussi X'*X.
+
+  Exemple :
+     [X, R] = corrmtx(randn(100,1), 4, 'modified');
+```
+
 ## `cpsd`
 
 ```
@@ -355,6 +479,25 @@ DIRIC Fonction de Dirichlet, ou sinus cardinal périodique.
   Exemple :  diric(0, 5)   % 1
 ```
 
+## `dpss`
+
+```
+DPSS Suites sphéroïdales aplaties discrètes, ou fenêtres de Slepian.
+  [E,V] = DPSS(N,NW,K) rend les K premières suites de longueur N et de
+  produit temps-bande NW, ainsi que leurs taux de concentration V.
+
+  Ce sont les suites de longueur N dont l'énergie est la plus
+  concentrée dans la bande [-NW/N, NW/N]. Elles s'obtiennent comme
+  vecteurs propres d'une matrice tridiagonale symétrique qui commute
+  avec le noyau de concentration : c'est numériquement bien plus sûr
+  que de diagonaliser le noyau lui-même, et la structure tridiagonale
+  permet de n'extraire que les K vecteurs voulus, par bissection sur la
+  suite de Sturm puis itération inverse.
+
+  Exemple :
+     [E, V] = dpss(128, 4, 7);   % sept fenêtres, V proches de 1
+```
+
 ## `dst`
 
 ```
@@ -362,6 +505,17 @@ DST Transformée en sinus discrète, première espèce.
   Y(k) = somme des X(n) sin(pi n k/(N+1)), k = 1..N.
 
   Exemple :  dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
+```
+
+## `dutycycle`
+
+```
+DUTYCYCLE Rapport cyclique des impulsions.
+  D = DUTYCYCLE(X,FS) rend, pour chaque période, la largeur de
+  l'impulsion divisée par la période.
+
+  Exemple :
+     dutycycle([0 1 1 0 0 1 1 0 0 1], 1)   % environ 0.5
 ```
 
 ## `enbw`
@@ -379,6 +533,13 @@ ENBW Largeur de bande de bruit équivalente d'une fenêtre.
 ```
 ENVELOPE Enveloppes supérieure et inférieure d'un signal.
   [H,B] = ENVELOPE(X) utilise le module du signal analytique.
+```
+
+## `falltime`
+
+```
+FALLTIME Temps de descente d'un signal à deux états.
+  Symétrique de RISETIME : de 90 % à 10 % sur chaque front descendant.
 ```
 
 ## `finddelay`
@@ -650,6 +811,23 @@ KAISERORD Ordre et paramètre d'un filtre RIF fenêtré par Kaiser.
      [n, Wn, beta] = kaiserord([1000 1200], [1 0], [0.05 0.01], 8000);
 ```
 
+## `lireOptionsSousEspace`
+
+```
+LIREOPTIONSSOUSESPACE Analyse les arguments communs aux méthodes sous-espace.
+  Reconnaît une fréquence d'échantillonnage et le mot-clé 'corr'.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `lsf2poly`
+
+```
+LSF2POLY Polynôme de prédiction à partir des fréquences de raies.
+  Inverse de POLY2LSF : les racines de rangs pairs reconstituent Q,
+  celles de rangs impairs P, et A = (P + Q)/2.
+```
+
 ## `meanfreq`
 
 ```
@@ -669,6 +847,17 @@ MEDFILT1 Filtre médian glissant d'ordre N.
 
 ```
 MEDFREQ Fréquence médiane : celle qui coupe la puissance en deux.
+```
+
+## `midcross`
+
+```
+MIDCROSS Instants de traversée du niveau médian.
+  [C,NIVEAU] = MIDCROSS(X,FS) rend les instants où le signal coupe le
+  niveau à mi-chemin entre ses deux états, et ce niveau.
+
+  Exemple :
+     midcross([0 0 1 1], 1)   % 1.5 : la moitié est franchie là
 ```
 
 ## `modulate`
@@ -700,6 +889,18 @@ NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
 ```
 
+## `overshoot`
+
+```
+OVERSHOOT Dépassement après chaque transition, en pourcentage.
+  Le dépassement est mesuré entre le niveau d'état atteint et
+  l'extremum observé après la transition, rapporté à l'écart entre les
+  deux états. Il vaut zéro si le signal ne dépasse pas.
+
+  Exemple :
+     overshoot([0 0 1.2 1 1 1], 1)   % 20 %
+```
+
 ## `papillonHadamard`
 
 ```
@@ -716,6 +917,20 @@ PAPILLONHADAMARD Transformée de Hadamard rapide, ordre naturel.
 PARZENWIN Fenêtre de Parzen, ou de de la Vallée Poussin.
 ```
 
+## `pburg`
+
+```
+PBURG Densité spectrale par la méthode de Burg.
+  Même principe que PYULEAR, avec un modèle estimé par ARBURG : plus
+  sûr sur les séries courtes.
+```
+
+## `pcov`
+
+```
+PCOV Densité spectrale par la méthode de la covariance.
+```
+
 ## `peak2peak`
 
 ```
@@ -728,6 +943,14 @@ PEAK2PEAK Écart entre le maximum et le minimum.
 ```
 PEAK2RMS Rapport entre la valeur crête et la valeur efficace.
   Exemple :  peak2rms([1 -1 1 -1])   % 1
+```
+
+## `peig`
+
+```
+PEIG Pseudospectre par la méthode des vecteurs propres.
+  Comme PMUSIC, avec chaque vecteur du sous-espace bruit pondéré par
+  l'inverse de sa valeur propre.
 ```
 
 ## `periodogram`
@@ -767,6 +990,79 @@ PHASEZ Réponse en phase déroulée d'un filtre numérique.
   et pi, comme FREQZ pour le module.
 ```
 
+## `pmcov`
+
+```
+PMCOV Densité spectrale par la méthode de la covariance modifiée.
+```
+
+## `pmtm`
+
+```
+PMTM Densité spectrale par la méthode multi-fenêtres de Thomson.
+  [PXX,F] = PMTM(X,NW,NFFT,FS) moyenne les périodogrammes obtenus avec
+  les 2*NW-1 premières fenêtres de Slepian, pondérés par leur taux de
+  concentration. NW vaut 4 par défaut.
+
+  Chaque fenêtre voit le signal autrement : la moyenne réduit la
+  variance de l'estimation sans élargir autant qu'un lissage.
+
+  Exemple :
+     [pxx, f] = pmtm(x, 4, 512, 1000);
+```
+
+## `pmusic`
+
+```
+PMUSIC Pseudospectre par la méthode MUSIC.
+  [S,F] = PMUSIC(X,P,NFFT,FS) rend l'inverse de la projection du
+  vecteur directeur sur le sous-espace bruit : le pseudospectre monte
+  très haut aux fréquences présentes, mais ses valeurs ne sont pas des
+  puissances.
+
+  Exemple :
+     [S, f] = pmusic(x, 4, 1024, 1000);
+```
+
+## `poly2ac`
+
+```
+POLY2AC Autocorrélation d'un polynôme de prédiction.
+  R = POLY2AC(A,EFINAL) rend la suite d'autocorrélation dont A est le
+  filtre de prédiction et EFINAL l'erreur résiduelle.
+```
+
+## `poly2lsf`
+
+```
+POLY2LSF Fréquences spectrales de raies d'un polynôme de prédiction.
+  LSF = POLY2LSF(A) forme les polynômes somme et différence
+     P(z) = A(z) + z^-(p+1) A(1/z),   Q(z) = A(z) - z^-(p+1) A(1/z),
+  dont toutes les racines sont sur le cercle unité et s'entrelacent.
+  Les LSF sont leurs arguments, rangés par ordre croissant dans
+  ]0, pi[. C'est la représentation utilisée par les codeurs de parole :
+  elle se quantifie sans perdre la stabilité.
+
+  Exemple :
+     lsf = poly2lsf([1 -0.5]);
+```
+
+## `poly2rc`
+
+```
+POLY2RC Coefficients de réflexion d'un polynôme de prédiction.
+  K = POLY2RC(A) applique la récurrence de Levinson à l'envers : à
+  chaque étape, le dernier coefficient du polynôme d'ordre M est le
+  coefficient de réflexion K(M), et le polynôme d'ordre M-1 s'en
+  déduit.
+
+  [K,E] = POLY2RC(A,EFINAL) rend aussi les erreurs de prédiction de
+  chaque ordre, à partir de l'erreur finale.
+
+  Exemple :
+     k = poly2rc([1 0.6149 0.9899 0 0.0031 -0.0082]);
+```
+
 ## `polystab`
 
 ```
@@ -786,6 +1082,43 @@ PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
   GAINREFERENCE est le module attendu en continu (passe-bas) ou à
   Nyquist (passe-haut) ; il vaut 1 par défaut, mais un Chebyshev de
   type I d'ordre pair descend à 10^(-RP/20).
+```
+
+## `puissancesSousEspace`
+
+```
+PUISSANCESSOUSESPACE Puissance de chaque composante sinusoïdale.
+  La matrice de corrélation vaut A P A' + sigma^2 I ; sigma^2 est la
+  moyenne des plus petites valeurs propres, et P se lit par moindres
+  carrés une fois les fréquences connues.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `pulseperiod`
+
+```
+PULSEPERIOD Période des impulsions.
+  P = PULSEPERIOD(X,FS) rend l'écart entre deux fronts montants
+  consécutifs, mesuré au niveau médian.
+```
+
+## `pulsesep`
+
+```
+PULSESEP Séparation entre impulsions.
+  S = PULSESEP(X,FS) rend l'écart entre la fin d'une impulsion et le
+  début de la suivante, mesuré au niveau médian.
+```
+
+## `pulsewidth`
+
+```
+PULSEWIDTH Largeur des impulsions à mi-hauteur.
+  W = PULSEWIDTH(X,FS) rend la durée entre le front montant et le front
+  descendant qui le suit, mesurée au niveau médian.
+
+  PULSEWIDTH(...,'Polarity','negative') mesure les creux.
 ```
 
 ## `pulstran`
@@ -811,6 +1144,18 @@ PWELCH Densité spectrale par la méthode de Welch.
   périodogrammes.
 ```
 
+## `pyulear`
+
+```
+PYULEAR Densité spectrale par un modèle autorégressif de Yule-Walker.
+  [PXX,F] = PYULEAR(X,P,NFFT,FS). Le spectre paramétrique n'a pas de
+  lobes de fuite : il est lisse, et sa résolution ne dépend pas de la
+  longueur de l'enregistrement mais de l'ordre choisi.
+
+  Exemple :
+     [pxx, f] = pyulear(x, 8, 512, 1000);
+```
+
 ## `rangerWalsh`
 
 ```
@@ -825,6 +1170,25 @@ RANGERWALSH Passe de l'ordre naturel à l'ordre demandé.
 RANGERWALSHINVERSE Revient de l'ordre demandé à l'ordre naturel.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `rc2ac`
+
+```
+RC2AC Autocorrélation à partir des coefficients de réflexion.
+  R = RC2AC(K,R0) remonte la récurrence de Levinson : à chaque ordre,
+  le nouveau terme d'autocorrélation se déduit du polynôme courant.
+```
+
+## `rc2poly`
+
+```
+RC2POLY Polynôme de prédiction à partir des coefficients de réflexion.
+  A = RC2POLY(K) applique la récurrence de Levinson dans le sens
+  direct. C'est l'inverse de POLY2RC.
+
+  [A,E] = RC2POLY(K,R0) rend aussi l'erreur de prédiction finale, à
+  partir de la puissance R0 du signal.
 ```
 
 ## `rceps`
@@ -876,10 +1240,56 @@ RESIDUEZ Éléments simples d'une fraction en z^-1.
      [r,p] = residuez(1, [1 -0.5])   % r = 1, p = 0.5
 ```
 
+## `risetime`
+
+```
+RISETIME Temps de montée d'un signal à deux états.
+  R = RISETIME(X,FS) rend, pour chaque front montant, la durée entre le
+  passage à 10 % et le passage à 90 % de l'écart entre les deux états.
+
+  RISETIME(...,'PercentReferenceLevels',[BAS HAUT]) change les seuils.
+
+  Exemple :
+     risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+```
+
 ## `rms`
 
 ```
 RMS Valeur efficace (racine de la moyenne des carrés).
+```
+
+## `rooteig`
+
+```
+ROOTEIG Fréquences par la méthode des vecteurs propres.
+  Comme ROOTMUSIC, mais chaque vecteur propre du sous-espace bruit est
+  pondéré par l'inverse de sa valeur propre : les directions les moins
+  bruitées pèsent davantage.
+```
+
+## `rootmusic`
+
+```
+ROOTMUSIC Fréquences par la méthode MUSIC, racines du polynôme du bruit.
+  W = ROOTMUSIC(X,P) estime les P fréquences, en radians par
+  échantillon, de P exponentielles complexes noyées dans du bruit. Une
+  sinusoïde réelle en compte deux : lui donner P = 2.
+
+  W = ROOTMUSIC(X,P,FS) rend les fréquences en hertz.
+  W = ROOTMUSIC(R,P,'corr') prend R pour matrice de corrélation.
+
+  [W,POW] = ROOTMUSIC(...) estime aussi la puissance de chaque
+  composante.
+
+  La méthode ne cherche pas un maximum de spectre : elle prend les
+  racines du polynôme formé par le sous-espace bruit, ce qui donne des
+  fréquences continues, sans quantification par une grille.
+
+  Exemple :
+     n = (0:99)';
+     x = 2*cos(0.4*pi*n) + cos(0.6*pi*n) + 0.1*randn(100,1);
+     w = rootmusic(x, 4);
 ```
 
 ## `rssq`
@@ -897,6 +1307,19 @@ SAWTOOTH Signal en dents de scie de période 2*pi.
   Y = SAWTOOTH(T,LARGEUR) place le sommet à LARGEUR*2*pi.
 ```
 
+## `schurrc`
+
+```
+SCHURRC Coefficients de réflexion par l'algorithme de Schur.
+  [K,E] = SCHURRC(R) applique la récurrence de Schur sur la suite
+  d'autocorrélation : elle donne les mêmes coefficients de réflexion
+  que Levinson-Durbin sans former le polynôme de prédiction, ce qui la
+  rend plus stable numériquement et parallélisable.
+
+  Exemple :
+     k = schurrc([1 0.5 0.25]);   % [-0.5 0]
+```
+
 ## `seqperiod`
 
 ```
@@ -905,6 +1328,28 @@ SEQPERIOD Période la plus courte qui explique une séquence.
   tout k possible. Sans période exacte, rend celle qui minimise l'écart.
 
   Exemple :  seqperiod([1 2 1 2 1 2])   % 2
+```
+
+## `settlingtime`
+
+```
+SETTLINGTIME Temps d'établissement après chaque transition.
+  S = SETTLINGTIME(X,FS,D) rend la durée entre la traversée médiane et
+  l'instant à partir duquel le signal reste dans une bande de D pour
+  cent de l'écart entre états autour du niveau atteint. D vaut 2 par
+  défaut.
+```
+
+## `sfdr`
+
+```
+SFDR Plage dynamique libre de parasites, en décibels.
+  R = SFDR(X) compare la puissance du fondamental à celle du plus fort
+  parasite, harmonique ou non.
+
+  Exemple :
+     t = (0:999)'/1000;
+     sfdr(cos(2*pi*50*t) + 0.01*cos(2*pi*130*t))   % environ 40 dB
 ```
 
 ## `sgolay`
@@ -930,6 +1375,104 @@ SGOLAYFILT Lissage polynomial de Savitzky-Golay.
   Y = SGOLAYFILT(X,ORDRE,LONGUEUR) ajuste, sur chaque fenêtre de
   LONGUEUR points, un polynôme de degré ORDRE au sens des moindres
   carrés, et garde la valeur ajustée au centre.
+```
+
+## `signalLobe`
+
+```
+SIGNALLOBE Puissance d'un lobe spectral autour de la raie K.
+  On somme de part et d'autre du sommet tant que le spectre décroît :
+  la fuite de la fenêtre est ainsi ramassée avec la raie.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalMatriceCorrelation`
+
+```
+SIGNALMATRICECORRELATION Matrice d'autocorrélation pour les méthodes sous-espace.
+  Si le premier argument est déjà une matrice de corrélation carrée, on
+  la prend telle quelle. Sinon on l'estime par la méthode de la
+  covariance modifiée, avant et arrière, sur une fenêtre d'ordre
+  suffisant pour laisser un sous-espace bruit non vide.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalNiveaux`
+
+```
+SIGNALNIVEAUX Niveaux d'état et seuils de référence d'un signal.
+  Traduit des pourcentages de l'écart entre les deux états en valeurs
+  absolues, comme le font toutes les mesures de transition de MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalSommet`
+
+```
+SIGNALSOMMET Indice du maximum local le plus proche de AUTOUR.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalSpectrePuissance`
+
+```
+SIGNALSPECTREPUISSANCE Spectre de puissance unilatéral, fenêtre de Kaiser.
+  Normalisé pour que la somme sur le lobe d'une sinusoïde d'amplitude A
+  rende A^2/2, sa puissance. La fenêtre de Kaiser à beta = 38 est celle
+  que MATLAB emploie pour ses mesures de distorsion : ses lobes
+  secondaires à -180 dB laissent voir des harmoniques très faibles.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalTransitions`
+
+```
+SIGNALTRANSITIONS Découpe le signal en transitions et les mesure.
+  Rend une matrice à cinq colonnes : instant de la traversée basse,
+  instant de la traversée haute, instant de la traversée médiane,
+  polarité (+1 montante, -1 descendante) et indice de l'échantillon de
+  la traversée médiane.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `signalTraverses`
+
+```
+SIGNALTRAVERSES Instants de traversée d'un seuil, par interpolation.
+  Rend les instants où X coupe SEUIL et, pour chacun, un booléen vrai
+  si la traversée est montante.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `sinad`
+
+```
+SINAD Rapport signal sur bruit et distorsion, en décibels.
+  R = SINAD(X) compare la puissance du fondamental à celle de tout le
+  reste, harmoniques et bruit confondus, la composante continue exclue.
+
+  Exemple :
+     t = (0:999)'/1000;
+     sinad(cos(2*pi*50*t) + 0.1*cos(2*pi*100*t))   % environ 20 dB
+```
+
+## `slewrate`
+
+```
+SLEWRATE Vitesse de balayage d'un signal à deux états.
+  S = SLEWRATE(X,FS) rend, pour chaque transition, la pente moyenne
+  entre les seuils bas et haut : l'écart d'amplitude divisé par la
+  durée. La pente est négative sur un front descendant.
+
+  Exemple :
+     slewrate([0 0 1 1], 1)   % 0.8/0.8 = 1 par seconde
 ```
 
 ## `snr`
@@ -1005,6 +1548,22 @@ SS2ZP Zéros, pôles et gain d'une représentation d'état.
   du numérateur de la fonction de transfert.
 ```
 
+## `statelevels`
+
+```
+STATELEVELS Niveaux bas et haut d'un signal à deux états.
+  NIVEAUX = STATELEVELS(X) rend [BAS HAUT] par la méthode de
+  l'histogramme : l'étendue est découpée en NBINS classes (100 par
+  défaut), séparées en deux moitiés, et chaque niveau est le mode de sa
+  moitié. METHODE vaut 'mode' (par défaut) ou 'mean'.
+
+  [NIVEAUX,HISTOGRAMME,BORNES] = STATELEVELS(...) rend aussi le compte
+  par classe et les bornes utilisées.
+
+  Exemple :
+     statelevels([zeros(1,50) ones(1,50)])   % [0 1]
+```
+
 ## `stepz`
 
 ```
@@ -1056,6 +1615,44 @@ TFESTIMATE Estimation de la fonction de transfert entre deux signaux.
   de X à Y, au sens des moindres carrés.
 ```
 
+## `thd`
+
+```
+THD Distorsion harmonique totale, en décibels.
+  R = THD(X) rend le rapport, en décibels, entre la puissance des
+  harmoniques et celle du fondamental. La valeur est négative : plus
+  elle est basse, plus le signal est pur.
+
+  R = THD(X,FS,N) prend en compte N harmoniques, six par défaut.
+
+  [R,POW,FREQ] = THD(...) rend aussi la puissance et la fréquence de
+  chaque harmonique, fondamental compris.
+
+  Exemple :
+     t = (0:999)'/1000;
+     x = cos(2*pi*50*t) + 0.1*cos(2*pi*100*t);
+     thd(x)      % -20 dB : l'harmonique est dix fois plus petite
+```
+
+## `toi`
+
+```
+TOI Point d'interception d'ordre trois.
+  OIP3 = TOI(X,FS) mesure, sur un signal à deux tons, le niveau
+  extrapolé où les produits d'intermodulation d'ordre trois
+  rejoindraient les fondamentaux. Le résultat est en décibels par
+  rapport à la puissance unité.
+
+  [OIP3,F,FIM] = TOI(...) rend aussi les fréquences des deux tons et
+  celles des produits 2f1-f2 et 2f2-f1.
+
+  Exemple :
+     t = (0:4095)'/1e4;
+     x = cos(2*pi*1000*t) + cos(2*pi*1100*t) + 0.001*cos(2*pi*900*t) ...
+         + 0.001*cos(2*pi*1200*t);
+     toi(x, 1e4)
+```
+
 ## `triang`
 
 ```
@@ -1086,6 +1683,14 @@ TUKEYWIN Fenêtre de Tukey, cosinus surélevé à rapport réglable.
 
   Exemple :
      isequal(tukeywin(8, 0), rectwin(8))   % vrai
+```
+
+## `undershoot`
+
+```
+UNDERSHOOT Creux avant chaque transition, en pourcentage.
+  Symétrique d'OVERSHOOT : l'extremum est cherché avant la transition,
+  du côté opposé au niveau de départ.
 ```
 
 ## `vco`

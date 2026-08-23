@@ -439,8 +439,80 @@ static void svdJacobi(Mat<double> A, Mat<double>& U, std::vector<double>& s, Mat
     if (transposee) std::swap(U, V);
 }
 
+// Plongement reel d'une matrice complexe : a X + iY on associe le bloc
+// reel [X -Y ; Y X], qui represente la meme application lineaire sur R^2n.
+// Ses valeurs singulieres sont celles de X + iY, chacune presente deux
+// fois, et sa pseudo-inverse a la meme forme de bloc. Cela donne une SVD
+// complexe correcte sans ecrire un Jacobi complexe.
+static Mat<double> plongementReel(const Valeur& a) {
+    int m = a.nlignes(), n = a.ncolonnes();
+    Mat<double> t(2 * m, 2 * n);
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < n; ++j) {
+            double x = a.re[(std::size_t)i + (std::size_t)j * m];
+            double y = a.im.empty() ? 0.0 : a.im[(std::size_t)i + (std::size_t)j * m];
+            t(i, j) = x;
+            t(i, n + j) = -y;
+            t(m + i, j) = y;
+            t(m + i, n + j) = x;
+        }
+    return t;
+}
+
+// Valeurs singulieres d'une matrice, reelle ou complexe.
+static std::vector<double> valeursSingulieres(const Valeur& a) {
+    Mat<double> U, V;
+    std::vector<double> s;
+    if (a.estComplexe()) {
+        svdJacobi(plongementReel(a), U, s, V);
+        std::vector<double> moitie;
+        for (std::size_t k = 0; k + 1 < s.size(); k += 2) moitie.push_back(s[k]);
+        if (s.size() % 2 == 1) moitie.push_back(s.back());
+        return moitie;
+    }
+    svdJacobi(versReel(a), U, s, V);
+    return s;
+}
+
 void decompositionSVD(const Valeur& a, Valeur& u, Valeur& s, Valeur& v, bool economique) {
     int m = a.nlignes(), n = a.ncolonnes();
+    if (a.estComplexe()) {
+        // Les vecteurs singuliers du plongement viennent par paires
+        // [ur ; ui] et [-ui ; ur] : chacune porte le meme vecteur
+        // complexe ur + i ui, a une phase pres. On en prend un sur deux.
+        Mat<double> Ut, Vt;
+        std::vector<double> st;
+        svdJacobi(plongementReel(a), Ut, st, Vt);
+        int rang = std::min(m, n);
+        Valeur uc, vc;
+        uc.dims = {m, rang};
+        uc.re.assign((std::size_t)m * rang, 0.0);
+        uc.im.assign((std::size_t)m * rang, 0.0);
+        vc.dims = {n, rang};
+        vc.re.assign((std::size_t)n * rang, 0.0);
+        vc.im.assign((std::size_t)n * rang, 0.0);
+        Valeur S = economique ? Valeur::matrice(rang, rang) : Valeur::matrice(m, n);
+        int lignesS = economique ? rang : m;
+        for (int k = 0; k < rang; ++k) {
+            int colonne = 2 * k;
+            if (colonne >= (int)st.size()) break;
+            S.re[(std::size_t)k + (std::size_t)k * lignesS] = st[(std::size_t)colonne];
+            for (int i = 0; i < m; ++i) {
+                uc.re[(std::size_t)i + (std::size_t)k * m] = Ut(i, colonne);
+                uc.im[(std::size_t)i + (std::size_t)k * m] = Ut(m + i, colonne);
+            }
+            for (int i = 0; i < n; ++i) {
+                vc.re[(std::size_t)i + (std::size_t)k * n] = Vt(i, colonne);
+                vc.im[(std::size_t)i + (std::size_t)k * n] = Vt(n + i, colonne);
+            }
+        }
+        uc.compacter();
+        vc.compacter();
+        u = uc;
+        v = vc;
+        s = S;
+        return;
+    }
     Mat<double> U, V;
     std::vector<double> sv;
     svdJacobi(versReel(a), U, sv, V);
@@ -593,13 +665,61 @@ static void hessenberg(Mat<double>& A) {
     }
 }
 
-static void qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
+// Equilibrage de Parlett et Reinsch : une similitude diagonale par
+// puissances de deux rapproche les normes de chaque ligne et de sa
+// colonne. Les valeurs propres sont inchangees — la transformation est
+// une similitude — mais le conditionnement du QR s'ameliore
+// spectaculairement. Sans cela, la matrice compagnon d'un polynome dont
+// le coefficient de tete est mille fois plus petit que les autres donne
+// des racines fausses.
+static void equilibrer(Mat<double>& A) {
+    int n = A.l;
+    const double base = 2.0;
+    bool stable = false;
+    int tours = 0;
+    while (!stable && tours < 100) {
+        stable = true;
+        ++tours;
+        for (int i = 0; i < n; ++i) {
+            double colonne = 0, ligne = 0;
+            for (int j = 0; j < n; ++j)
+                if (j != i) {
+                    colonne += std::fabs(A(j, i));
+                    ligne += std::fabs(A(i, j));
+                }
+            if (colonne == 0 || ligne == 0) continue;
+            double g = ligne / base;
+            double facteur = 1.0;
+            double c = colonne;
+            double somme = colonne + ligne;
+            while (c < g) {
+                facteur *= base;
+                c *= base * base;
+            }
+            g = ligne * base;
+            while (c > g) {
+                facteur /= base;
+                c /= base * base;
+            }
+            if ((c + ligne / facteur) < 0.95 * somme) {
+                stable = false;
+                double inverse = 1.0 / facteur;
+                for (int j = 0; j < n; ++j) A(i, j) *= inverse;
+                for (int j = 0; j < n; ++j) A(j, i) *= facteur;
+            }
+        }
+    }
+}
+
+static bool qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
     int n = H.l;
     valeurs.assign((std::size_t)n, cplx(0, 0));
     int haut = n - 1;
     int iterations = 0;
+    int depuisDeflation = 0;
     while (haut >= 0 && iterations < 100 * n + 1000) {
         ++iterations;
+        ++depuisDeflation;
         // Chercher un sous-diagonal négligeable.
         int bas = haut;
         while (bas > 0) {
@@ -611,6 +731,7 @@ static void qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
         if (bas == haut) {
             valeurs[(std::size_t)haut] = cplx(H(haut, haut), 0.0);
             --haut;
+            depuisDeflation = 0;
             continue;
         }
         if (bas == haut - 1) {
@@ -628,6 +749,7 @@ static void qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
                 valeurs[(std::size_t)haut] = cplx(tr / 2, -r);
             }
             haut -= 2;
+            depuisDeflation = 0;
             continue;
         }
         // Décalage de Wilkinson.
@@ -641,6 +763,18 @@ static void qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
             mu = (std::fabs(r1 - d) < std::fabs(r2 - d)) ? r1 : r2;
         } else {
             mu = d;
+        }
+        // Décalage exceptionnel : sur une matrice de permutation, le
+        // décalage de Wilkinson vaut zéro et l'itération QR reste sur
+        // place indéfiniment. Un décalage arbitraire tiré des
+        // sous-diagonales casse la symétrie et relance la convergence.
+        // C'est la parade d'EISPACK, appliquée tous les dix tours sans
+        // déflation.
+        if (depuisDeflation > 0 && depuisDeflation % 10 == 0) {
+            double s = std::fabs(H(haut, haut - 1));
+            if (haut >= 2) s += std::fabs(H(haut - 1, haut - 2));
+            if (s == 0) s = 1.0;
+            mu = d + 0.75 * s * (1.0 + 0.1 * (double)(depuisDeflation / 10));
         }
         for (int i = bas; i <= haut; ++i) H(i, i) -= mu;
         // QR de Givens sur le bloc actif.
@@ -667,6 +801,88 @@ static void qrValeursPropres(Mat<double> H, std::vector<cplx>& valeurs) {
         }
         for (int i = bas; i <= haut; ++i) H(i, i) += mu;
     }
+    return haut < 0;
+}
+
+// QR décalé en arithmétique complexe. Le décalage de Wilkinson y est
+// complexe, donc la convergence est cubique même quand les valeurs
+// propres sont complexes conjuguées : le QR réel, lui, ne peut décaler
+// que par un réel et reste parfois sur place. On ne s'en sert qu'en
+// second recours, quand le QR réel n'a pas convergé, car l'arithmétique
+// complexe coûte quatre fois plus cher.
+static void qrValeursPropresComplexe(Mat<cplx> H, std::vector<cplx>& valeurs) {
+    int n = H.l;
+    valeurs.assign((std::size_t)n, cplx(0, 0));
+    int haut = n - 1;
+    int iterations = 0;
+    int depuisDeflation = 0;
+    while (haut >= 0 && iterations < 200 * n + 2000) {
+        ++iterations;
+        ++depuisDeflation;
+        int bas = haut;
+        while (bas > 0) {
+            double s = std::abs(H(bas - 1, bas - 1)) + std::abs(H(bas, bas));
+            if (s == 0) s = 1;
+            if (std::abs(H(bas, bas - 1)) < 1e-15 * s) {
+                H(bas, bas - 1) = cplx(0, 0);
+                break;
+            }
+            --bas;
+        }
+        if (bas == haut) {
+            valeurs[(std::size_t)haut] = H(haut, haut);
+            --haut;
+            depuisDeflation = 0;
+            continue;
+        }
+        cplx a = H(haut - 1, haut - 1), b = H(haut - 1, haut);
+        cplx c = H(haut, haut - 1), d = H(haut, haut);
+        cplx trace = a + d, det = a * d - b * c;
+        cplx racine = std::sqrt(trace * trace / 4.0 - det);
+        cplx r1 = trace / 2.0 + racine, r2 = trace / 2.0 - racine;
+        cplx mu = (std::abs(r1 - d) < std::abs(r2 - d)) ? r1 : r2;
+        if (depuisDeflation % 15 == 0)
+            mu = d + cplx(0.75 * std::abs(H(haut, haut - 1)), 0.25 * std::abs(H(haut, haut - 1)));
+        for (int i = bas; i <= haut; ++i) H(i, i) -= mu;
+        // Rotations de Givens complexes : G = [c s ; -conj(s) c] avec c réel.
+        std::vector<double> cs;
+        std::vector<cplx> sn;
+        for (int k = bas; k < haut; ++k) {
+            cplx x = H(k, k), y = H(k + 1, k);
+            double nx = std::abs(x), ny = std::abs(y);
+            double r = std::hypot(nx, ny);
+            double co;
+            cplx si;
+            if (r == 0) {
+                co = 1.0;
+                si = cplx(0, 0);
+            } else if (nx == 0) {
+                co = 0.0;
+                si = cplx(1, 0);
+            } else {
+                co = nx / r;
+                si = (x / nx) * std::conj(y) / r;
+            }
+            cs.push_back(co);
+            sn.push_back(si);
+            for (int j = k; j < n; ++j) {
+                cplx h1 = H(k, j), h2 = H(k + 1, j);
+                H(k, j) = co * h1 + si * h2;
+                H(k + 1, j) = -std::conj(si) * h1 + co * h2;
+            }
+        }
+        for (int k = bas; k < haut; ++k) {
+            double co = cs[(std::size_t)(k - bas)];
+            cplx si = sn[(std::size_t)(k - bas)];
+            for (int i = 0; i <= std::min(haut, k + 2); ++i) {
+                cplx h1 = H(i, k), h2 = H(i, k + 1);
+                H(i, k) = co * h1 + std::conj(si) * h2;
+                H(i, k + 1) = -si * h1 + co * h2;
+            }
+        }
+        for (int i = bas; i <= haut; ++i) H(i, i) += mu;
+    }
+    for (int i = 0; i <= haut; ++i) valeurs[(std::size_t)i] = H(i, i);
 }
 
 void valeursPropres(const Valeur& a, Valeur& valeurs, Valeur* vecteurs) {
@@ -693,9 +909,17 @@ void valeursPropres(const Valeur& a, Valeur& valeurs, Valeur* vecteurs) {
         return;
     }
     Mat<double> H = versReel(a);
+    equilibrer(H);
     hessenberg(H);
     std::vector<cplx> vals;
-    qrValeursPropres(H, vals);
+    if (!qrValeursPropres(H, vals)) {
+        // Le QR réel n'a pas convergé : on recommence en complexe, où le
+        // décalage peut suivre une paire conjuguée.
+        Mat<cplx> Hc(H.l, H.c);
+        for (int i = 0; i < H.l; ++i)
+            for (int j = 0; j < H.c; ++j) Hc(i, j) = cplx(H(i, j), 0.0);
+        qrValeursPropresComplexe(Hc, vals);
+    }
     Valeur lambda;
     lambda.dims = {n, 1};
     lambda.re.resize((std::size_t)n);
@@ -815,17 +1039,13 @@ Valeur normeMatrice(const Valeur& a, const Valeur& type) {
         }
         return Valeur::scalaire(meilleur);
     }
-    Mat<double> U, V;
-    std::vector<double> s;
-    svdJacobi(versReel(a), U, s, V);
-    return Valeur::scalaire(s.empty() ? 0.0 : s[0]);
+    std::vector<double> valeurs = valeursSingulieres(a);
+    return Valeur::scalaire(valeurs.empty() ? 0.0 : valeurs[0]);
 }
 
 int rangMatrice(const Valeur& a, double tolerance) {
     if (a.estVide()) return 0;
-    Mat<double> U, V;
-    std::vector<double> s;
-    svdJacobi(versReel(a), U, s, V);
+    std::vector<double> s = valeursSingulieres(a);
     double tol = tolerance;
     if (tol < 0) {
         double smax = s.empty() ? 0 : s[0];
@@ -838,6 +1058,26 @@ int rangMatrice(const Valeur& a, double tolerance) {
 }
 
 Valeur pseudoInverse(const Valeur& a, double tolerance) {
+    if (a.estComplexe()) {
+        // La pseudo-inverse du plongement est le plongement de la
+        // pseudo-inverse : il suffit d'en relire les deux blocs.
+        int m = a.nlignes(), n = a.ncolonnes();
+        Valeur tilde = depuis(plongementReel(a));
+        Valeur pt = pseudoInverse(tilde, tolerance);
+        Valeur p;
+        p.dims = {n, m};
+        p.re.assign((std::size_t)n * m, 0.0);
+        p.im.assign((std::size_t)n * m, 0.0);
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < m; ++j) {
+                p.re[(std::size_t)i + (std::size_t)j * n] =
+                    pt.re[(std::size_t)i + (std::size_t)j * (2 * n)];
+                p.im[(std::size_t)i + (std::size_t)j * n] =
+                    pt.re[(std::size_t)(n + i) + (std::size_t)j * (2 * n)];
+            }
+        p.compacter();
+        return p;
+    }
     Mat<double> U, V;
     std::vector<double> s;
     svdJacobi(versReel(a), U, s, V);
@@ -859,9 +1099,7 @@ Valeur pseudoInverse(const Valeur& a, double tolerance) {
 
 Valeur conditionnement(const Valeur& a) {
     if (a.estVide()) return Valeur::scalaire(0);
-    Mat<double> U, V;
-    std::vector<double> s;
-    svdJacobi(versReel(a), U, s, V);
+    std::vector<double> s = valeursSingulieres(a);
     if (s.empty()) return Valeur::scalaire(0);
     double smin = s.back();
     if (smin == 0) return Valeur::scalaire(INFINITY);

@@ -111,3 +111,39 @@
 %
 % Fonctions internes (absentes de MATLAB)
 %   papillonHadamard, permutationWalsh, rangerWalsh, rangerWalshInverse
+%
+% Mesures sur un signal à deux états
+%   statelevels - Niveaux bas et haut, par histogramme
+%   midcross    - Traversées du niveau médian
+%   risetime, falltime, slewrate - Fronts
+%   overshoot, undershoot, settlingtime - Régime transitoire
+%   pulsewidth, pulseperiod, pulsesep, dutycycle - Impulsions
+%
+% Distorsion et plage dynamique
+%   thd         - Distorsion harmonique totale
+%   sinad       - Signal sur bruit et distorsion
+%   sfdr        - Plage dynamique libre de parasites
+%   toi         - Point d'interception d'ordre trois
+%
+% Prédiction linéaire
+%   ac2poly, poly2ac   - Autocorrélation et polynôme de prédiction
+%   ac2rc, rc2ac       - Autocorrélation et coefficients de réflexion
+%   poly2rc, rc2poly   - Polynôme et coefficients de réflexion
+%   schurrc            - Réflexion par l'algorithme de Schur
+%   poly2lsf, lsf2poly - Fréquences spectrales de raies
+%
+% Modèles autorégressifs et spectres paramétriques
+%   aryule, arburg, arcov, armcov - Estimation du modèle
+%   pyulear, pburg, pcov, pmcov   - Densité spectrale associée
+%   corrmtx     - Matrice de données pour la corrélation
+%   dpss        - Fenêtres de Slepian
+%   pmtm        - Densité spectrale multi-fenêtres de Thomson
+%
+% Méthodes à sous-espaces
+%   rootmusic, rooteig - Fréquences par les racines du polynôme du bruit
+%   pmusic, peig       - Pseudospectres correspondants
+%
+% Fonctions internes supplémentaires (absentes de MATLAB)
+%   arSpectre, signalLobe, signalSommet, signalSpectrePuissance,
+%   signalNiveaux, signalTraverses, signalTransitions,
+%   signalMatriceCorrelation, puissancesSousEspace, lireOptionsSousEspace

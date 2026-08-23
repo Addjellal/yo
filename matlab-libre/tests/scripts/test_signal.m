@@ -434,4 +434,244 @@ s9 = (-4:4)';
 assert(abs(g3(:, 2)' * (s9.^2)) < 1e-12);        % derivee de s^2 nulle au centre
 assert(abs(g3(:, 3)' * (s9.^2) - 1) < 1e-12);    % derivee seconde / 2! = 1
 
+%% ------------------------------ mesures sur un signal a deux etats
+% Rampe de 0 a 1 sur une seconde, encadree de paliers. Les niveaux
+% d'etat sortent de l'histogramme : ils valent 0.005 et 0.995, centres
+% des classes extremes. Le temps de montee est donc 0.8 * 0.99 seconde.
+fsMesure = 1000;
+rampe = [zeros(1, 200) linspace(0, 1, 1001) ones(1, 200)];
+niveaux = statelevels(rampe);
+assert(abs(niveaux(1) - 0.005) < 1e-12 && abs(niveaux(2) - 0.995) < 1e-12);
+assert(isequal(statelevels([zeros(1,50) ones(1,50)]), statelevels([zeros(1,50) ones(1,50)], 100, 'mode')));
+[~, histogramme, bornes] = statelevels(rampe);
+assert(numel(histogramme) == 100 && sum(histogramme) == numel(rampe));
+assert(bornes(1) == 0 && bornes(2) == 1);
+
+tm = risetime(rampe, fsMesure);
+assert(numel(tm) == 1);
+assert(abs(tm - 0.792) < 1e-9);
+assert(abs(slewrate(rampe, fsMesure) - 1) < 1e-9);
+assert(abs(falltime(fliplr(rampe), fsMesure) - 0.792) < 1e-9);
+assert(abs(slewrate(fliplr(rampe), fsMesure) + 1) < 1e-9);
+% Le passage au niveau median tombe au milieu de la rampe.
+assert(abs(midcross(rampe, fsMesure) - 0.7) < 1e-9);
+[~, niveauMedian] = midcross(rampe, fsMesure);
+assert(abs(niveauMedian - 0.5) < 1e-12);
+
+% Depassement et creux, en pourcentage de l'ecart entre etats.
+assert(abs(overshoot([zeros(1,20) ones(1,5)*1.2 ones(1,40)], 1) - 20) < 0.5);
+% Un echelon net ne depasse pas : le residu vient des classes de
+% l'histogramme, il reste sous le pour cent.
+assert(overshoot([zeros(1,20) ones(1,40)], 1) < 1);
+assert(abs(undershoot([zeros(1,20) -0.15*ones(1,3) zeros(1,5) ones(1,40)], 1) - 15) < 1);
+
+% Creneau de rapport cyclique 1/4 et de periode 1 seconde.
+fsCreneau = 1000;
+tc = (0:4*fsCreneau-1) / fsCreneau;
+creneau = double(mod(tc, 1) < 0.25);
+assert(max(abs(dutycycle(creneau, fsCreneau) - 0.25)) < 1e-9);
+assert(max(abs(pulseperiod(creneau, fsCreneau) - 1)) < 1e-9);
+assert(max(abs(pulsewidth(creneau, fsCreneau) - 0.25)) < 1e-9);
+assert(max(abs(pulsesep(creneau, fsCreneau) - 0.75)) < 1e-9);
+% Le signal part haut, redescend a 0.25 puis alterne : sept traversees
+% du niveau median en quatre secondes, comptees une seule fois chacune.
+assert(numel(midcross(creneau, fsCreneau)) == 7);
+
+% Temps d'etablissement d'une reponse amortie : exp(-5t) passe sous 2 %
+% de l'amplitude a t = log(50)/5 = 0.782 s apres le debut de l'echelon.
+techelon = (0:0.001:2)';
+amortie = 1 - exp(-5*techelon) .* cos(20*techelon);
+etabli = settlingtime([zeros(200,1); amortie], 1000, 2);
+assert(etabli(1) > 0.4 && etabli(1) < 0.9);
+
+%% --------------------------- distorsion et plage dynamique
+% Un fondamental et deux harmoniques d'amplitude connue : le taux de
+% distorsion se calcule a la main.
+fsD = 1000;
+td = (0:999)' / fsD;
+signalD = cos(2*pi*50*td) + 0.1*cos(2*pi*100*td) + 0.01*cos(2*pi*150*td);
+attenduTHD = 10 * log10((0.1^2 + 0.01^2) / 1);
+assert(abs(thd(signalD, fsD) - attenduTHD) < 1e-3);
+% Sans bruit, le SINAD est l'oppose du THD.
+assert(abs(sinad(signalD, fsD) + attenduTHD) < 1e-3);
+% Le plus fort parasite est dix fois plus petit : 20 dB.
+assert(abs(sfdr(signalD, fsD) - 20) < 1e-3);
+% Un parasite non harmonique est trouve aussi.
+assert(abs(sfdr(cos(2*pi*50*td) + 0.01*cos(2*pi*130*td), fsD) - 40) < 1e-3);
+% Puissances et frequences des harmoniques : A^2/2 exactement.
+[~, puissancesH, frequencesH] = thd(signalD, fsD, 3);
+assert(max(abs(puissancesH(:)' - [0.5 0.005 5e-05])) < 1e-9);
+assert(isequal(frequencesH(:)', [50 100 150]));
+% Le spectre de puissance interne rend bien A^2/2 sur le lobe.
+[Sp, fp] = signalSpectrePuissance(2*cos(2*pi*50*td), fsD);
+[~, kp] = max(Sp);
+assert(abs(signalLobe(Sp, kp) - 2) < 1e-9);
+assert(fp(kp) == 50);
+% SINAD avec un bruit blanc de variance connue.
+randn('seed', 3);
+bruitBlanc = 0.01 * randn(1000, 1);
+assert(abs(sinad(cos(2*pi*50*td) + bruitBlanc, fsD) - 10*log10(0.5/var(bruitBlanc))) < 0.5);
+% Point d'interception d'ordre trois, deux tons et leurs produits.
+fsT = 1e4;
+tt = (0:4095)' / fsT;
+deuxTons = cos(2*pi*1000*tt) + cos(2*pi*1100*tt) + ...
+           0.001*cos(2*pi*900*tt) + 0.001*cos(2*pi*1200*tt);
+attenduTOI = 10*log10(0.5) + (10*log10(0.5) - 10*log10(0.001^2/2)) / 2;
+assert(abs(toi(deuxTons, fsT) - attenduTOI) < 0.1);
+
+%% ------------------------- prediction lineaire et conversions
+% Exemple documente par MathWorks pour POLY2RC.
+aRef = [1.0000 0.6149 0.9899 0.0000 0.0031 -0.0082];
+kRef = poly2rc(aRef);
+assert(max(abs(kRef(:)' - [0.3090 0.9801 0.0031 0.0081 -0.0082])) < 1e-3);
+assert(max(abs(rc2poly(kRef) - aRef)) < 1e-12);
+% Yule-Walker : ac2poly doit resoudre le meme systeme que la resolution
+% directe des equations normales.
+rAuto = [1 0.5 0.25 0.125];
+[aAuto, eAuto] = ac2poly(rAuto);
+direct = -toeplitz(rAuto(1:3)) \ rAuto(2:4)';
+assert(max(abs(aAuto(2:4) - direct')) < 1e-12);
+assert(abs(eAuto - 0.75) < 1e-12);
+assert(max(abs(poly2ac(aAuto, eAuto)' - rAuto)) < 1e-12);
+% Schur et Levinson donnent les memes coefficients de reflexion.
+[kAuto, r0Auto] = ac2rc(rAuto);
+assert(max(abs(kAuto - schurrc(rAuto))) < 1e-12);
+assert(abs(r0Auto - 1) < 1e-15);
+assert(max(abs(rc2ac(kAuto, r0Auto)' - rAuto)) < 1e-12);
+% Fréquences spectrales de raies : aller-retour exact, entrelacement.
+for polyLSF = {[1 -0.5], [1 -1.2 0.8], [1 -0.9 0.7 -0.3], [1 -1.5 1.1 -0.4 0.1]}
+    aLSF = polyLSF{1};
+    lsf = poly2lsf(aLSF);
+    assert(numel(lsf) == numel(aLSF) - 1);
+    assert(all(lsf > 0 & lsf < pi));
+    assert(all(diff(lsf) > 0));
+    assert(max(abs(lsf2poly(lsf) - aLSF)) < 1e-12);
+end
+erreurLSF = false;
+try
+    poly2lsf([1 -2]);          % pole hors du cercle unite
+catch err
+    erreurLSF = strcmp(err.identifier, 'signal:poly2lsf:UnstablePolynomial');
+end
+assert(erreurLSF);
+
+%% ------------------------ modeles autoregressifs et spectres
+% Processus AR(2) a poles connus : rayon 0.9, angle pi/4.
+randn('seed', 11);
+rayon = 0.9;
+angleAR = pi / 4;
+aVrai = [1 -2*rayon*cos(angleAR) rayon^2];
+xAR = filter(1, aVrai, randn(8000, 1));
+for methode = {'aryule', 'arburg', 'arcov', 'armcov'}
+    [aEstime, eEstime] = feval(methode{1}, xAR, 2);
+    assert(numel(aEstime) == 3 && aEstime(1) == 1);
+    assert(max(abs(aEstime - aVrai)) < 0.05);
+    assert(abs(eEstime - 1) < 0.05);
+    % Le filtre estime est stable.
+    assert(all(abs(roots(aEstime)) < 1));
+end
+% Les quatre spectres parametriques placent leur maximum sur la resonance.
+for methode = {'pyulear', 'pburg', 'pcov', 'pmcov'}
+    [pxx, fSpec] = feval(methode{1}, xAR, 2, 1024, 1);
+    assert(numel(pxx) == 513);
+    [~, kSpec] = max(pxx);
+    assert(abs(fSpec(kSpec) - angleAR/(2*pi)) < 0.005);
+    assert(all(pxx > 0));
+end
+% L'integrale de la densite rend la puissance du signal.
+[pxxB, fB] = pburg(xAR, 2, 4096, 1);
+assert(abs(sum(pxxB) * (fB(2) - fB(1)) - var(xAR)) / var(xAR) < 0.02);
+
+% corrmtx : X'X estime l'autocorrelation, et le terme diagonal la puissance.
+[Xc, Rc] = corrmtx(xAR(1:200), 3, 'autocorrelation');
+assert(isequal(size(Xc), [203 4]));
+assert(abs(Rc(1, 1) - mean(xAR(1:200).^2)) < 1e-12);
+[Xm, Rm] = corrmtx(xAR(1:200), 3, 'modified');
+assert(isequal(size(Xm), [394 4]));
+assert(max(max(abs(Rm - Rm'))) < 1e-12);
+erreurCorr = false;
+try
+    corrmtx(xAR, 3, 'inconnue');
+catch err
+    erreurCorr = strcmp(err.identifier, 'signal:corrmtx:UnknownMethod');
+end
+assert(erreurCorr);
+
+%% ------------------------------ fenetres de Slepian, multi-fenetres
+[Edpss, Vdpss] = dpss(128, 4, 7);
+assert(isequal(size(Edpss), [128 7]));
+assert(max(max(abs(Edpss' * Edpss - eye(7)))) < 1e-10);
+% Les taux de concentration decroissent et restent sous 1.
+assert(all(diff(Vdpss) < 0));
+assert(all(Vdpss > 0.9 & Vdpss <= 1 + 1e-12));
+% Les suites sont bien vecteurs propres du noyau de concentration.
+nD = 128;
+WD = 4 / nD;
+indD = (0:nD-1)';
+ecartD = indD - indD';
+noyauD = 2 * WD * ones(nD);
+horsD = ecartD ~= 0;
+noyauD(horsD) = sin(2*pi*WD*ecartD(horsD)) ./ (pi*ecartD(horsD));
+for j = 1:7
+    assert(norm(noyauD * Edpss(:, j) - Vdpss(j) * Edpss(:, j)) < 1e-9);
+end
+% Convention de signe : somme positive pour les rangs impairs.
+assert(sum(Edpss(:, 1)) > 0 && sum(Edpss(:, 3)) > 0);
+
+fsMT = 1000;
+tMT = (0:511)' / fsMT;
+signalMT = cos(2*pi*100*tMT) + 0.5*cos(2*pi*250*tMT);
+[pMT, fMT] = pmtm(signalMT, 4, 512, fsMT);
+assert(numel(pMT) == 257);
+[~, iMT] = max(pMT);
+resteMT = pMT;
+resteMT(abs(fMT - fMT(iMT)) < 20) = 0;
+[~, jMT] = max(resteMT);
+assert(abs(min(fMT(iMT), fMT(jMT)) - 100) < 3);
+assert(abs(max(fMT(iMT), fMT(jMT)) - 250) < 3);
+assert(abs(sum(pMT) * (fMT(2) - fMT(1)) - mean(signalMT.^2)) / mean(signalMT.^2) < 0.05);
+
+%% ------------------------------- methodes a sous-espaces
+% Deux sinusoides reelles, donc quatre exponentielles complexes.
+randn('seed', 21);
+nSE = 100;
+nnSE = (0:nSE-1)';
+w1 = 0.4 * pi;
+w2 = 0.6 * pi;
+xSE = 2*cos(w1*nnSE) + cos(w2*nnSE) + 0.05*randn(nSE, 1);
+[wSE, powSE] = rootmusic(xSE, 4);
+assert(numel(wSE) == 4);
+attenduSE = sort([-w2 -w1 w1 w2]);
+assert(max(abs(sort(wSE(:)') - attenduSE)) < 5e-3);
+% Les puissances : amplitude 2 se partage en deux exponentielles de
+% puissance 1, amplitude 1 en deux de puissance 0.25.
+puissancesTriees = sort(powSE(:)');
+assert(max(abs(puissancesTriees - [0.25 0.25 1 1])) < 0.05);
+% En hertz.
+assert(max(abs(sort(abs(rootmusic(xSE, 4, 1000))') - [200 200 300 300])) < 1);
+% rooteig trouve les memes frequences.
+wEig = rooteig(xSE, 4);
+assert(max(abs(sort(wEig(:)') - attenduSE)) < 5e-3);
+% Les pseudospectres montrent leurs pics aux memes endroits.
+[Smus, fmus] = pmusic(xSE, 4, 1024, 1);
+[~, kmus] = max(Smus);
+resteMus = Smus;
+resteMus(abs(fmus - fmus(kmus)) < 0.05) = 0;
+[~, kmus2] = max(resteMus);
+assert(abs(min(fmus(kmus), fmus(kmus2)) - 0.2) < 0.002);
+assert(abs(max(fmus(kmus), fmus(kmus2)) - 0.3) < 0.002);
+[Seig, feig] = peig(xSE, 4, 1024, 1);
+[~, keig] = max(Seig);
+resteEig = Seig;
+resteEig(abs(feig - feig(keig)) < 0.05) = 0;
+[~, keig2] = max(resteEig);
+assert(abs(min(feig(keig), feig(keig2)) - 0.2) < 0.002);
+% Deux frequences trop proches pour la transformee de Fourier sur 100
+% points : la methode sous-espace les separe quand meme.
+w3 = 0.30 * pi;
+w4 = 0.32 * pi;
+yProche = cos(w3*nnSE) + cos(w4*nnSE) + 0.01*randn(nSE, 1);
+wProche = sort(abs(rootmusic(yProche, 4)));
+assert(abs(wProche(1) - w3) < 5e-3 && abs(wProche(4) - w4) < 5e-3);
+
 disp('signal : toutes les verifications passent');

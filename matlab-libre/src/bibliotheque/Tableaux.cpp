@@ -1,6 +1,7 @@
 // Tableaux.cpp — réductions et manipulations de tableaux.
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <map>
 #include <numeric>
 #include <set>
@@ -49,18 +50,43 @@ Valeur reductionSomme(const Valeur& brut, int dim, bool produit, bool sansNaN) {
         while ((int)d.size() <= dim) d.push_back(1);
         Dims rd = d;
         rd[(std::size_t)dim] = 1;
+        if (!produit) {
+            // Une somme se decompose : parties reelle et imaginaire
+            // s'additionnent chacune de leur cote.
+            Valeur partieRe = v, partieIm = v;
+            partieRe.im.clear();
+            partieIm.re = v.im;
+            partieIm.im.clear();
+            Valeur sr = reductionSomme(partieRe, dim, false, sansNaN);
+            Valeur si = reductionSomme(partieIm, dim, false, sansNaN);
+            sr.assurerImaginaire();
+            for (std::size_t k = 0; k < sr.re.size(); ++k) sr.im[k] = si.re[k];
+            sr.compacter();
+            return sr;
+        }
+        // Un produit, lui, ne se decompose pas : (a+ib)(c+id) melange les
+        // deux parties. On multiplie donc en complexes.
         Valeur r = Valeur::matriceDims(rd);
         r.assurerImaginaire();
-        Valeur partieRe = v, partieIm = v;
-        partieRe.im.clear();
-        partieIm.re = v.im;
-        partieIm.im.clear();
-        Valeur sr = reductionSomme(partieRe, dim, produit, sansNaN);
-        Valeur si = reductionSomme(partieIm, dim, produit, sansNaN);
-        sr.assurerImaginaire();
-        for (std::size_t k = 0; k < sr.re.size(); ++k) sr.im[k] = si.re[k];
-        sr.compacter();
-        return sr;
+        std::size_t interne = 1;
+        for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
+        std::size_t taille = (std::size_t)d[(std::size_t)dim];
+        std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+        for (std::size_t a = 0; a < externe; ++a)
+            for (std::size_t b = 0; b < interne; ++b) {
+                std::complex<double> acc(1.0, 0.0);
+                for (std::size_t i = 0; i < taille; ++i) {
+                    std::size_t p = a * interne * taille + b + i * interne;
+                    std::complex<double> z(v.re[p], v.im[p]);
+                    if (sansNaN && (std::isnan(z.real()) || std::isnan(z.imag()))) continue;
+                    acc *= z;
+                }
+                std::size_t q = a * interne + b;
+                r.re[q] = acc.real();
+                r.im[q] = acc.imag();
+            }
+        r.compacter();
+        return r;
     }
     return reduire(v, dim, false, [produit, sansNaN](const std::vector<double>& t) {
         double acc = produit ? 1.0 : 0.0;
@@ -102,6 +128,27 @@ Valeur cumulatif(const Valeur& brut, int dim, bool produit) {
     for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
     std::size_t taille = (std::size_t)d[(std::size_t)dim];
     std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    if (v.estComplexe()) {
+        // Le cumul porte sur les complexes entiers : pour un produit, les
+        // parties reelle et imaginaire ne peuvent pas etre cumulees
+        // separement.
+        r.assurerImaginaire();
+        for (std::size_t a = 0; a < externe; ++a)
+            for (std::size_t b = 0; b < interne; ++b) {
+                std::complex<double> acc = produit ? std::complex<double>(1.0, 0.0)
+                                                   : std::complex<double>(0.0, 0.0);
+                for (std::size_t i = 0; i < taille; ++i) {
+                    std::size_t p = a * interne * taille + b + i * interne;
+                    std::complex<double> z(v.re[p], v.im[p]);
+                    if (produit) acc *= z;
+                    else acc += z;
+                    r.re[p] = acc.real();
+                    r.im[p] = acc.imag();
+                }
+            }
+        r.compacter();
+        return r;
+    }
     for (std::size_t a = 0; a < externe; ++a)
         for (std::size_t b = 0; b < interne; ++b) {
             double acc = produit ? 1.0 : 0.0;

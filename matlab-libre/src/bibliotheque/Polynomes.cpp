@@ -12,6 +12,8 @@
 namespace matlibre {
 namespace {
 
+using cplx = std::complex<double>;
+
 #define FONCTION(nom) \
     std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
@@ -186,21 +188,40 @@ FONCTION(fnPolyint) {
 FONCTION(fnDeconv) {
     INUTILISE
     exigerArguments(args, 2, 2, "deconv");
-    std::vector<double> num(args[0].re.begin(), args[0].re.end());
-    std::vector<double> den(args[1].re.begin(), args[1].re.end());
-    if (den.empty() || den[0] == 0)
+    // La division fonctionne sur les complexes comme sur les reels : un
+    // polynome a coefficients complexes se divise tout aussi bien.
+    auto lire = [](const Valeur& v) {
+        std::vector<cplx> r(v.nelem());
+        for (std::size_t k = 0; k < v.nelem(); ++k)
+            r[k] = cplx(v.re[k], v.estComplexe() ? v.im[k] : 0.0);
+        return r;
+    };
+    auto ecrire = [](const std::vector<cplx>& v) {
+        Valeur r;
+        r.dims = {1, (int)v.size()};
+        r.re.resize(v.size());
+        r.im.resize(v.size());
+        for (std::size_t k = 0; k < v.size(); ++k) {
+            r.re[k] = v[k].real();
+            r.im[k] = v[k].imag();
+        }
+        r.compacter();
+        return r;
+    };
+    std::vector<cplx> num = lire(args[0]), den = lire(args[1]);
+    if (den.empty() || den[0] == cplx(0.0, 0.0))
         erreur("MATLAB:deconv:ZeroCoef", "First coefficient of B must be non-zero.");
     if (num.size() < den.size())
-        return {Valeur::scalaire(0), Valeur::ligne(num)};
+        return {Valeur::scalaire(0), ecrire(num)};
     std::size_t nq = num.size() - den.size() + 1;
-    std::vector<double> q(nq, 0.0);
-    std::vector<double> reste = num;
+    std::vector<cplx> q(nq, cplx(0.0, 0.0));
+    std::vector<cplx> reste = num;
     for (std::size_t k = 0; k < nq; ++k) {
         q[k] = reste[k] / den[0];
         for (std::size_t j = 0; j < den.size(); ++j) reste[k + j] -= q[k] * den[j];
     }
-    if (nargout >= 2) return {Valeur::ligne(q), Valeur::ligne(reste)};
-    return {Valeur::ligne(q)};
+    if (nargout >= 2) return {ecrire(q), ecrire(reste)};
+    return {ecrire(q)};
 }
 
 // ---------------------------------------------------------- interpolation

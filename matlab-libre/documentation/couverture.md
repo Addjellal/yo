@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **773 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **823 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -85,13 +85,20 @@ totalité.
    d'Embedded Coder. Ce qui n'est pas traduisible est refusé avec le
    numéro de ligne, jamais approximé.
 4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   La Signal Processing Toolbox compte 106 fonctions — conception de
+   La Signal Processing Toolbox compte 156 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
-   cohérence, rééchantillonnage, mesures, cepstres réel et complexe,
+   cohérence, rééchantillonnage, cepstres réel et complexe,
    Walsh-Hadamard, transformée en sinus, formes d'onde et modulation,
    prédicats de filtre et conversions entre les quatre représentations
-   (transfert, pôles-zéros, état, sections du second ordre). L'Image Processing Toolbox en compte 73 — filtrage avec
+   (transfert, pôles-zéros, état, sections du second ordre), mesures sur
+   les signaux à deux états (temps de montée, dépassement, rapport
+   cyclique), distorsion (THD, SINAD, SFDR, TOI), prédiction linéaire
+   avec toutes les conversions entre autocorrélation, coefficients de
+   réflexion, polynôme et fréquences spectrales de raies, quatre
+   estimateurs autorégressifs et leurs spectres, fenêtres de Slepian et
+   multi-fenêtres de Thomson, et les méthodes à sous-espaces MUSIC et
+   vecteurs propres. L'Image Processing Toolbox en compte 73 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
    40, la Communications 25, la logique floue 20. Les autres modules
