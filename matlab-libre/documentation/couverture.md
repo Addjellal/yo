@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **561 fonctions natives** couvrant le MATLAB de base.
-- **463 fonctions de toolbox** réparties en 52 modules, écrites dans le
+- **574 fonctions natives** couvrant le MATLAB de base.
+- **458 fonctions de toolbox** réparties en 52 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -20,9 +20,12 @@ mieux le lire avant de s'appuyer dessus.
   constructeurs, leurs conversions et leur affichage.
 - **Un rendu graphique** en SVG : courbes, barres, nuages, tiges,
   escaliers, images, sous-graphes, légendes, échelles logarithmiques.
-- **Des tests** : 57 vérifications C++ sur le cœur, et sept suites en
-  langage MATLAB dont une qui contrôle un résultat exact par toolbox et
-  une qui contrôle les types de données valeur par valeur.
+- **Le calcul parallèle** : un pool de travailleurs indépendants pour
+  `parfor`, `spmd` et `parfeval`, avec la classification des variables de
+  MATLAB (tranches, réductions, diffusées, temporaires).
+- **Des tests** : 57 vérifications C++ sur le cœur, et huit suites en
+  langage MATLAB dont une qui contrôle un résultat exact par toolbox, une
+  les types de données et une le calcul parallèle, valeur par valeur.
 
 ## Ce qui n'est pas là
 
@@ -60,8 +63,16 @@ totalité.
    `groupsummary` sur plusieurs dimensions, la lecture de feuilles
    Excel, et les tableaux creux logiques ou complexes creux au-delà du
    stockage.
-6. **Pas de calcul parallèle réel.** `parfor` et `spmd` s'exécutent
-   séquentiellement : le résultat est le même, le temps ne l'est pas.
+6. **Le calcul parallèle est réel, mais limité à une machine.** `parfor`,
+   `spmd`, `parfeval`, `pararrayfun` et `parcellfun` répartissent le
+   travail sur un pool de fils, chacun portant un interpréteur complet et
+   son propre espace de travail. Mesuré sur quatre cœurs : 2,99× sur une
+   boucle de calcul pur. Ce qui manque : MPI entre machines, le GPU
+   (`gpuArray`), les tableaux réellement distribués (`distributed` est
+   l'identité), et les échanges entre travailleurs pendant un `spmd`
+   (`labSend`, `labReceive`, `gop`). Un corps de `parfor` que la
+   classification des variables ne sait pas trancher retombe sur
+   l'exécution séquentielle plutôt que d'échouer.
 7. **Pas de MEX, pas d'interface Java, pas d'interface Python.**
 8. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
    instruction scalaire. Les opérations vectorisées, elles, tournent à la
@@ -70,7 +81,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test           # 57 vérifications C++ + 7 suites en langage MATLAB
+make test           # 57 vérifications C++ + 8 suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

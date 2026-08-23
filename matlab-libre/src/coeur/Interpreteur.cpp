@@ -1,4 +1,5 @@
 #include "matlibre/Interpreteur.h"
+#include "matlibre/Parallele.h"
 
 #include <algorithm>
 #include <cmath>
@@ -672,6 +673,9 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
         case TypeN::Rien:
             return;
         case TypeN::Bloc:
+            // Un bloc marqué « spmd » part sur tous les travailleurs ; les
+            // variables qu'il écrit reviennent en Composite.
+            if (n->texte == "spmd" && executerSpmd(*this, n)) return;
             executerBloc(n);
             return;
         case TypeN::Expression: {
@@ -784,6 +788,26 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
                 colonnes = (std::size_t)plage.ncolonnes();
             }
             if (plage.nelem() == 0) return;
+            // parfor : on tente le pool de travailleurs. Si le corps n'est
+            // pas classable (variables ni en tranches ni réduites), on
+            // retombe sur la boucle séquentielle, dont le résultat est le
+            // même.
+            if (n->drapeau && lignes == 1 && n->cibles[0]->type == TypeN::Ident &&
+                plage.classe != Classe::Cellule && !plage.estStructure()) {
+                std::vector<Valeur> iterations;
+                iterations.reserve(colonnes);
+                for (std::size_t j = 0; j < colonnes; ++j)
+                    iterations.push_back(extraireElement(plage, j));
+                PlanParfor plan = analyserParfor(n, n->cibles[0]->texte, *this);
+                if (plan.utilisable &&
+                    executerParforParallele(*this, n, iterations, plan)) {
+                    // La variable de boucle garde sa dernière valeur, comme
+                    // après une boucle ordinaire.
+                    if (!iterations.empty())
+                        ecrireVariable(n->cibles[0]->texte, iterations.back());
+                    return;
+                }
+            }
             for (std::size_t j = 0; j < colonnes; ++j) {
                 Valeur iteration;
                 if (lignes == 1) {

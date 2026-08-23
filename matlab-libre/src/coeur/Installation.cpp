@@ -23,6 +23,7 @@ void Interpreteur::installerBibliotheque() {
     enregistrerTests(*this);
     enregistrerCartes(*this);
     enregistrerCreuses(*this);
+    enregistrerParallele(*this);
 }
 
 }  // namespace matlibre

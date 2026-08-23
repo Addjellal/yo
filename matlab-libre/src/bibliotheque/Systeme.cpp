@@ -13,6 +13,7 @@
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
+#include "matlibre/Parallele.h"
 #include "matlibre/Operations.h"
 #include "matlibre/Version.h"
 
@@ -138,6 +139,12 @@ FONCTION(fnRmdir) {
 FONCTION(fnDelete) {
     INUTILISE
     for (const auto& a : args) {
+        // delete(pool) ferme le pool de travailleurs ; delete('f.txt')
+        // supprime un fichier. C'est le type de l'argument qui tranche.
+        if (a.estStructure() && a.aChamp("NumWorkers")) {
+            definirTaillePool(0);
+            continue;
+        }
         std::error_code ec;
         fs::remove(a.versTexte(), ec);
     }

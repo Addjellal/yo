@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-561 fonctions ecrites en C++, reparties en 18 groupes.
+574 fonctions ecrites en C++, reparties en 19 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -17,6 +17,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | graphique | [natif-graphique.md](reference/natif-graphique.md) |
 | math | [natif-math.md](reference/natif-math.md) |
 | optimisation | [natif-optimisation.md](reference/natif-optimisation.md) |
+| parallele | [natif-parallele.md](reference/natif-parallele.md) |
 | polynomes | [natif-polynomes.md](reference/natif-polynomes.md) |
 | signal | [natif-signal.md](reference/natif-signal.md) |
 | statistiques | [natif-statistiques.md](reference/natif-statistiques.md) |
@@ -29,7 +30,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-463 fonctions ecrites dans le langage, reparties en 52 toolboxes.
+458 fonctions ecrites dans le langage, reparties en 52 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -43,7 +44,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`automatique`](reference/toolbox-automatique.md) | 27 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
-| [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 9 |
+| [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
 | [`coder`](reference/toolbox-coder.md) | 2 |
 | [`communications`](reference/toolbox-communications.md) | 16 |

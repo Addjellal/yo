@@ -160,6 +160,7 @@ public:
     // --- indexation (Indexation.cpp) ---
     Valeur indexer(const Valeur& base, std::vector<Valeur>& idx, char genre);
     std::vector<Valeur> indexerListe(const Valeur& base, std::vector<Valeur>& idx, char genre);
+    Valeur ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Valeur& v, char genre);
     Valeur affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine, std::size_t k,
                          const Valeur& v, bool suppression);
     std::vector<Valeur> evaluerIndices(const std::vector<NoeudPtr>& args, const Valeur* base,

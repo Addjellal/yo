@@ -497,6 +497,13 @@ static Valeur ecrire(Valeur base, std::vector<Valeur>& idx, const Valeur& valeur
     return base;
 }
 
+// Écriture par indices déjà évalués : c'est « ecrire » rendu accessible aux
+// autres unités, notamment à l'exécution parallèle de parfor.
+Valeur Interpreteur::ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Valeur& v,
+                                 char genre) {
+    return ecrire(std::move(base), idx, v, genre);
+}
+
 Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine,
                                    std::size_t k, const Valeur& v, bool suppression) {
     if (k >= chaine.size()) return v;

@@ -33,11 +33,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **561 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **574 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **463 fonctions de toolbox** en langage MATLAB, réparties en
+- **458 fonctions de toolbox** en langage MATLAB, réparties en
   **52 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -47,6 +47,9 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   `containers.Map` et les tableaux creux `sparse`, avec l'indexation par
   `subsref`/`subsasgn`, les jointures, les regroupements et le
   ré-échantillonnage temporel.
+- **Du calcul parallèle réel** : `parfor`, `spmd`, `parfeval` et leurs
+  compagnons répartissent le travail sur un pool de travailleurs, chacun
+  portant son propre interpréteur.
 - **Un rendu graphique** en SVG, écrit à la main : courbes, barres,
   nuages, tiges, escaliers, images, sous-graphes, légendes.
 - **Aucune dépendance obligatoire.** LAPACK, BLAS et FFTW sont utilisés

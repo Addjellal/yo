@@ -240,8 +240,15 @@ NoeudPtr Analyseur::instruction() {
         if (t.texte == "persistent") return instructionDeclaration(TypeN::Persistant);
         if (t.texte == "spmd") {
             avancer();
+            // spmd (n) : le nombre de travailleurs demandé est accepté puis
+            // ignoré ; c'est la taille du pool qui décide.
+            if (accepterOp("(")) {
+                expression();
+                exigerOp(")");
+            }
             auto corps = bloc({});
             exigerMotFin();
+            corps->texte = "spmd";
             return corps;
         }
         erreurSyntaxe("Unexpected keyword '" + t.texte + "'.");

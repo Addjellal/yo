@@ -1,26 +1,19 @@
-function varargout = pararrayfun(fonction, varargin)
-%PARARRAYFUN Équivalent parallèle d'ARRAYFUN.
-%   Chaque élément part sur un travailleur du pool ; les résultats
-%   reviennent dans l'ordre des indices.
+function varargout = parcellfun(fonction, varargin)
+%PARCELLFUN Équivalent parallèle de CELLFUN.
+%   Chaque case part sur un travailleur du pool.
 %
 %   Exemple :
-%      v = pararrayfun(@(x) x^2, 1:4)      % [1 4 9 16]
-    options = {};
+%      v = parcellfun(@numel, {'a', 'bb', 'ccc'})   % [1 2 3]
     entrees = varargin;
+    uniforme = true;
     k = 1;
     while k <= numel(entrees)
         if (ischar(entrees{k}) || isstring(entrees{k})) && k < numel(entrees) && ...
-                any(strcmpi(char(entrees{k}), {'UniformOutput', 'ErrorHandler'}))
-            options = [options, entrees(k:k + 1)]; %#ok<AGROW>
+                strcmpi(char(entrees{k}), 'UniformOutput')
+            uniforme = logical(entrees{k + 1});
             entrees(k:k + 1) = [];
         else
             k = k + 1;
-        end
-    end
-    uniforme = true;
-    for k = 1:2:numel(options) - 1
-        if strcmpi(char(options{k}), 'UniformOutput')
-            uniforme = logical(options{k + 1});
         end
     end
     n = numel(entrees{1});
@@ -28,7 +21,7 @@ function varargout = pararrayfun(fonction, varargin)
     for i = 1:n
         arguments_ = cell(1, numel(entrees));
         for j = 1:numel(entrees)
-            arguments_{j} = entrees{j}(i);
+            arguments_{j} = entrees{j}{i};
         end
         futurs{i} = parfeval(fonction, 1, arguments_{:});
     end
