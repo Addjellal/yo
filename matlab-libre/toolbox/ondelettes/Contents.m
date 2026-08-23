@@ -7,3 +7,10 @@
 %   wdenoise   - Débruitage par seuillage universel
 %   cwt        - Transformée continue (chapeau mexicain)
 %   wenergy    - Répartition de l'énergie par niveau
+%
+% Décomposition
+%   wmaxlev     - Niveau maximal utile
+%   appcoef     - Coefficients d'approximation
+%   detcoef     - Coefficients de détail d'un niveau
+%   dwt2, idwt2 - Transformée bidimensionnelle, un niveau
+%   wcodemat    - Mise à l'échelle pour l'affichage

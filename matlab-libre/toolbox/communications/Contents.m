@@ -10,3 +10,14 @@
 %   hammgen / encode  - Code de Hamming
 %   rcosdesign        - Filtre en racine de cosinus surélevé
 %   eyediagram        - Diagramme de l'œil (données)
+%
+% Probabilités d'erreur
+%   qfunc, qfuncinv - Fonction Q et sa réciproque
+%
+% Modulations supplémentaires
+%   dpskmod, dpskdemod - Déplacement de phase différentiel
+%   fskmod, fskdemod   - Déplacement de fréquence
+%
+% Codes correcteurs
+%   hammgen         - Matrices d'un code de Hamming
+%   encode, decode  - Codage en blocs, correction d'une erreur

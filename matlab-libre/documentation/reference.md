@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-612 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+635 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -50,7 +50,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
 | [`coder`](reference/toolbox-coder.md) | 3 |
-| [`communications`](reference/toolbox-communications.md) | 16 |
+| [`communications`](reference/toolbox-communications.md) | 25 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
@@ -58,7 +58,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`econometrie`](reference/toolbox-econometrie.md) | 8 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 16 |
-| [`flou`](reference/toolbox-flou.md) | 12 |
+| [`flou`](reference/toolbox-flou.md) | 20 |
 | [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
 | [`identification`](reference/toolbox-identification.md) | 6 |
@@ -72,7 +72,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`matlab`](reference/toolbox-matlab.md) | 21 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
-| [`ondelettes`](reference/toolbox-ondelettes.md) | 9 |
+| [`ondelettes`](reference/toolbox-ondelettes.md) | 15 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 10 |
 | [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 4 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
