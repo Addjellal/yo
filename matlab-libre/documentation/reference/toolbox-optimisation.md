@@ -3,17 +3,26 @@
 ```
 % Optimization Toolbox — optimisation sous contraintes.
 %
-% Les solveurs sans contrainte (fzero, fminsearch, fminunc, fsolve,
-% integral, ode45) sont natifs. Ce dossier ajoute la programmation
-% linéaire et quadratique, et les moindres carrés.
+% Programmation linéaire et quadratique
+%   linprog     - Minimise f'x sous contraintes linéaires
+%   quadprog    - Minimise une forme quadratique
+%   intlinprog  - Variables entières, par séparation et évaluation
+%   bintprog    - Variables binaires
 %
-%   linprog     - Programmation linéaire (points intérieurs)
-%   quadprog    - Programmation quadratique (gradient projeté)
-%   fmincon     - Minimisation sous contraintes (pénalisation)
-%   lsqcurvefit - Ajustement de courbe non linéaire
-%   lsqlin      - Moindres carrés linéaires sous contraintes de bornes
-%   fminimax    - Minimisation du pire cas
-%   bintprog    - Programmation en nombres binaires (énumération)
+% Optimisation non linéaire
+%   fmincon     - Minimisation sous contraintes
+%   fminimax    - Minimise le pire des critères
+%
+% Moindres carrés
+%   lsqlin      - Moindres carrés linéaires sous contraintes
+%   lsqcurvefit - Ajustement de courbe
+%   lsqnonlin   - Moindres carrés non linéaires (Levenberg-Marquardt)
+%
+% Réglages
+%   optimoptions - Options d'un solveur, noms modernes et anciens
+%
+% Les fonctions natives fminsearch, fminbnd, fminunc, fsolve, fzero et
+% lsqnonneg complètent l'ensemble.
 ```
 
 ## `bintprog`
@@ -38,6 +47,22 @@ FMINCON Minimisation sous contraintes, par pénalisation extérieure.
 ```
 FMINIMAX Minimise le maximum d'un ensemble de fonctions.
   X = FMINIMAX(F,X0) où F(x) rend un vecteur : on minimise max(F(x)).
+```
+
+## `intlinprog`
+
+```
+INTLINPROG Programmation linéaire en nombres entiers.
+  X = INTLINPROG(F,INTCON,A,B,AEQ,BEQ,LB,UB) minimise F'*X sous
+  A*X <= B et AEQ*X = BEQ, les variables d'indices INTCON étant
+  entières.
+
+  La résolution se fait par séparation et évaluation : on résout la
+  relaxation continue, puis on scinde sur une variable fractionnaire.
+  C'est exact, au prix d'un arbre qui peut grandir.
+
+  Exemple :
+     x = intlinprog([-1; -2], [1 2], [1 1], 4, [], [], [0; 0], []);
 ```
 
 ## `linprog`
@@ -65,6 +90,35 @@ LSQCURVEFIT Ajustement non linéaire au sens des moindres carrés.
 ```
 LSQLIN Moindres carrés linéaires avec contraintes de bornes.
   X = LSQLIN(C,D) minimise ||C*x - d||.
+```
+
+## `lsqnonlin`
+
+```
+LSQNONLIN Moindres carrés non linéaires.
+  X = LSQNONLIN(F,X0) minimise la somme des carrés des composantes de
+  F(X). LSQNONLIN(F,X0,LB,UB) impose des bornes.
+
+  La méthode est celle de Levenberg-Marquardt : le jacobien est estimé
+  par différences finies, et l'amortissement passe de la descente de
+  gradient à Gauss-Newton selon que le pas améliore ou non le critère.
+
+  Exemple :
+     % Ajustement de a*exp(b*t) sur des données exactes.
+     t = (0:0.5:2)';  y = 3 * exp(-0.5 * t);
+     p = lsqnonlin(@(p) p(1) * exp(p(2) * t) - y, [1; -1]);
+```
+
+## `optimoptions`
+
+```
+OPTIMOPTIONS Options d'un solveur d'optimisation.
+  OPTIONS = OPTIMOPTIONS('fmincon','Display','iter','MaxIterations',100)
+  rend une structure d'options. Les noms modernes et les anciens sont
+  acceptés : MaxIterations ou MaxIter, OptimalityTolerance ou TolFun,
+  StepTolerance ou TolX.
+
+  Voir aussi OPTIMSET.
 ```
 
 ## `quadprog`

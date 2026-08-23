@@ -1,13 +1,22 @@
 % Optimization Toolbox — optimisation sous contraintes.
 %
-% Les solveurs sans contrainte (fzero, fminsearch, fminunc, fsolve,
-% integral, ode45) sont natifs. Ce dossier ajoute la programmation
-% linéaire et quadratique, et les moindres carrés.
+% Programmation linéaire et quadratique
+%   linprog     - Minimise f'x sous contraintes linéaires
+%   quadprog    - Minimise une forme quadratique
+%   intlinprog  - Variables entières, par séparation et évaluation
+%   bintprog    - Variables binaires
 %
-%   linprog     - Programmation linéaire (points intérieurs)
-%   quadprog    - Programmation quadratique (gradient projeté)
-%   fmincon     - Minimisation sous contraintes (pénalisation)
-%   lsqcurvefit - Ajustement de courbe non linéaire
-%   lsqlin      - Moindres carrés linéaires sous contraintes de bornes
-%   fminimax    - Minimisation du pire cas
-%   bintprog    - Programmation en nombres binaires (énumération)
+% Optimisation non linéaire
+%   fmincon     - Minimisation sous contraintes
+%   fminimax    - Minimise le pire des critères
+%
+% Moindres carrés
+%   lsqlin      - Moindres carrés linéaires sous contraintes
+%   lsqcurvefit - Ajustement de courbe
+%   lsqnonlin   - Moindres carrés non linéaires (Levenberg-Marquardt)
+%
+% Réglages
+%   optimoptions - Options d'un solveur, noms modernes et anciens
+%
+% Les fonctions natives fminsearch, fminbnd, fminunc, fsolve, fzero et
+% lsqnonneg complètent l'ensemble.

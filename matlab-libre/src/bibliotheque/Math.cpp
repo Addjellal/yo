@@ -573,6 +573,18 @@ FONCTION(fnBeta) {
                      Classe::Double)};
 }
 
+FONCTION(fnBetaln) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "betaln");
+    // Le logarithme passe par gammaln : la fonction bêta déborde vite,
+    // son logarithme non.
+    return {diffuser(args[0], args[1],
+                     [](double a, double b) {
+                         return std::lgamma(a) + std::lgamma(b) - std::lgamma(a + b);
+                     },
+                     Classe::Double)};
+}
+
 double erfinvFn(double y) {
     if (y <= -1) return -INFINITY;
     if (y >= 1) return INFINITY;
@@ -867,6 +879,7 @@ void enregistrerMath(Interpreteur& it) {
         {"gamma", fnGamma, "gamma  Fonction gamma."},
         {"gammaln", fnGammaLn, "gammaln  Logarithme de la fonction gamma."},
         {"beta", fnBeta, "beta  Fonction beta."},
+        {"betaln", fnBetaln, "betaln  Logarithme de la fonction beta."},
         {"erf", fnErf, "erf  Fonction d'erreur."},
         {"erfc", fnErfc, "erfc  Fonction d'erreur complementaire."},
         {"erfinv", fnErfinv, "erfinv  Reciproque de erf."},

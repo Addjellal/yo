@@ -116,6 +116,12 @@ beta  Fonction beta.
 betainc  Fonction beta incomplete regularisee.
 ```
 
+## `betaln`
+
+```
+betaln  Logarithme de la fonction beta.
+```
+
 ## `bin2dec`
 
 ```

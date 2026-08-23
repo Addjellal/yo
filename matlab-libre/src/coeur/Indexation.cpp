@@ -175,11 +175,22 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
         // par un vecteur — l'orientation de la source l'emporte alors.
         if (estColonMagique(idx[0])) {
             formeResultat = {(int)p.size(), 1};
+        } else if (idx[0].classe == Classe::Logique) {
+            // Un masque logique équivaut à find(masque) : un masque en
+            // matrice donne une colonne, un masque en ligne une ligne, et
+            // deux vecteurs laissent l'orientation à la source.
+            if (!idx[0].estVecteur()) {
+                formeResultat = Dims{(int)p.size(), 1};
+            } else if (base.estVecteur()) {
+                formeResultat =
+                    base.estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
+            } else {
+                formeResultat =
+                    idx[0].estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
+            }
         } else if (idx[0].dims.size() == 2 && !idx[0].estVecteur() && !idx[0].estScalaire()) {
             formeResultat = idx[0].dims;
         } else if (base.estVecteur() && idx[0].estVecteur()) {
-            formeResultat = base.estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
-        } else if (idx[0].classe == Classe::Logique) {
             formeResultat = base.estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
         } else {
             formeResultat = idx[0].dims;
