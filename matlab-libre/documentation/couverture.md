@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **600 fonctions natives** couvrant le MATLAB de base.
-- **592 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **603 fonctions natives** couvrant le MATLAB de base.
+- **599 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -30,7 +30,11 @@ mieux le lire avant de s'appuyer dessus.
   profileur, concepteur d'applications et éditeur de schémas-blocs.
 - **Les fonctions imbriquées** avec partage de l'espace de travail, ce qui
   rend les rappels d'application naturels.
-- **Des tests** : 57 vérifications C++ sur le cœur, treize suites en
+- **Une chaîne d'installation** : scripts de compilation pour Linux,
+  macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
+  toolboxes depuis le langage, intégration continue sur les trois
+  systèmes.
+- **Des tests** : 57 vérifications C++ sur le cœur, quatorze suites en
   langage MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
   types de données, une le calcul parallèle, une qui compile puis exécute
   le C produit pour le comparer à l'interpréteur — et une vérification de
@@ -102,7 +106,13 @@ totalité.
    (`labSend`, `labReceive`, `gop`). Un corps de `parfor` que la
    classification des variables ne sait pas trancher retombe sur
    l'exécution séquentielle plutôt que d'échouer.
-7. **Pas de MEX, pas d'interface Java, pas d'interface Python.**
+7. **Pas de MEX, pas d'interface Java, pas d'interface Python.** Les
+   bibliothèques externes sont branchées à la compilation, pas chargées
+   à l'exécution : LAPACK, BLAS, FFTW, SuiteSparse et OpenCV sont
+   utilisés s'ils sont trouvés, mais il n'y a pas de moyen d'appeler du
+   code natif arbitraire depuis le langage. TensorFlow et PyTorch ne
+   sont pas branchés : les réseaux de neurones tournent sur
+   l'implémentation interne.
 8. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
    instruction scalaire. Les opérations vectorisées, elles, tournent à la
    vitesse du C++.
@@ -110,7 +120,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + 13 suites en langage MATLAB
+make test              # 57 vérifications C++ + 14 suites en langage MATLAB
 make verifier-atelier  # l'atelier, piloté par un vrai navigateur
 matlibre --test tests/scripts
 ```
