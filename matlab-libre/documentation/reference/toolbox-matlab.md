@@ -22,6 +22,14 @@
 %   peaks         - Surface d'essai à trois bosses
 %   humps         - Fonction d'essai à deux pics
 %   fliplr2       - (interne) inversion utilisée par les démonstrations
+%
+% Gestion des toolboxes
+%   matlab.addons.installedAddons          - Liste les toolboxes
+%   matlab.addons.toolbox.installToolbox   - Installe un dossier
+%   matlab.addons.toolbox.uninstallToolbox - Retire une toolbox
+%   matlab.addons.toolbox.packageToolbox   - Empaquette en archive
+%   matlabroot, matlibre_racine_toolbox    - Racine de l'installation
+%   zip, unzip                             - Archives
 ```
 
 ## `bounds`
@@ -52,10 +60,60 @@ ISKEYWORD Mot réservé du langage ?
 ISMEMBERTOL Appartenance à un ensemble, à une tolérance près.
 ```
 
+## `matlab.addons.installedAddons`
+
+```
+MATLAB.ADDONS.INSTALLEDADDONS Liste les toolboxes installées.
+  T = MATLAB.ADDONS.INSTALLEDADDONS rend une table à colonnes Name,
+  Version, Enabled et Identifier — une ligne par dossier de la racine
+  des toolboxes.
+
+  Exemple :
+     t = matlab.addons.installedAddons;
+     height(t)
+```
+
+## `matlab.addons.toolbox.installToolbox`
+
+```
+MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX Installe une toolbox.
+  ID = ...INSTALLTOOLBOX(DOSSIER) copie le dossier donné dans la racine
+  des toolboxes et l'ajoute au chemin de recherche. Le dossier doit
+  contenir un fichier Contents.m, comme toute toolbox MATLAB.
+
+  Exemple :
+     matlab.addons.toolbox.installToolbox('/tmp/maToolbox');
+```
+
+## `matlab.addons.toolbox.packageToolbox`
+
+```
+MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX Empaquette une toolbox.
+  F = ...PACKAGETOOLBOX(DOSSIER,NOM) fabrique une archive du dossier.
+  MATLAB produit un .mltbx ; ici c'est une archive ZIP, lisible partout
+  et réinstallable par installToolbox après décompression.
+```
+
+## `matlab.addons.toolbox.uninstallToolbox`
+
+```
+MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
+  ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin.
+```
+
 ## `matlabroot`
 
 ```
 MATLABROOT Racine de l'installation de MatLibre.
+  C'est le dossier qui contient les toolboxes.
+```
+
+## `matlibre_racine_toolbox`
+
+```
+MATLIBRE_RACINE_TOOLBOX Dossier qui contient les toolboxes.
+  C'est celui que l'interpréteur a trouvé au démarrage ; la variable
+  d'environnement MATLIBRE_TOOLBOX le remplace quand elle est posée.
 ```
 
 ## `nextpow2`
@@ -122,6 +180,14 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
   inférieur à TOL (1e-6 par défaut).
 ```
 
+## `unzip`
+
+```
+UNZIP Extrait une archive ZIP.
+  UNZIP(ARCHIVE,DOSSIER) extrait dans le dossier donné, le dossier
+  courant par défaut.
+```
+
 ## `validatestring`
 
 ```
@@ -138,5 +204,17 @@ VECNORM Norme de chaque vecteur d'un tableau.
   N = VECNORM(A) rend la norme 2 de chaque colonne.
   N = VECNORM(A,P) utilise la norme P.
   N = VECNORM(A,P,DIM) travaille le long de la dimension DIM.
+```
+
+## `zip`
+
+```
+ZIP Fabrique une archive ZIP.
+  ZIP(ARCHIVE,FICHIERS) empaquette les fichiers donnés. FICHIERS peut
+  être un nom, une cellule de noms ou un motif.
+
+  L'archive est produite par la commande « zip » du système ; sans
+  elle, la fonction le dit clairement plutôt que d'écrire un fichier
+  incomplet.
 ```
 

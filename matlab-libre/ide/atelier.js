@@ -445,3 +445,7 @@ function installer() {
 }
 
 document.addEventListener('DOMContentLoaded', installer);
+
+// L'objet est exposé pour les vérifications automatiques, qui doivent
+// pouvoir déplacer le dossier de travail.
+window.Atelier = Atelier;

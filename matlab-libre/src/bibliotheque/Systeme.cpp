@@ -598,6 +598,47 @@ FONCTION(fnMfilename) {
     return {Valeur::texte(p.stem().string())};
 }
 
+
+FONCTION(fnIsfolder) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "isfolder");
+    if (args[0].classe == Classe::Cellule) {
+        Valeur r = Valeur::matriceDims(args[0].dims, 0.0);
+        r.classe = Classe::Logique;
+        for (std::size_t k = 0; k < args[0].cellules.size(); ++k) {
+            std::error_code ec;
+            r.re[k] = fs::is_directory(args[0].cellules[k].versTexte(), ec) ? 1.0 : 0.0;
+        }
+        return {r};
+    }
+    std::error_code ec;
+    return {Valeur::booleen(fs::is_directory(args[0].versTexte(), ec))};
+}
+
+FONCTION(fnIsfile) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "isfile");
+    if (args[0].classe == Classe::Cellule) {
+        Valeur r = Valeur::matriceDims(args[0].dims, 0.0);
+        r.classe = Classe::Logique;
+        for (std::size_t k = 0; k < args[0].cellules.size(); ++k) {
+            std::error_code ec;
+            r.re[k] = fs::is_regular_file(args[0].cellules[k].versTexte(), ec) ? 1.0 : 0.0;
+        }
+        return {r};
+    }
+    std::error_code ec;
+    return {Valeur::booleen(fs::is_regular_file(args[0].versTexte(), ec))};
+}
+
+
+FONCTION(fnRacineToolbox) {
+    INUTILISE
+    // La racine réelle, telle que le démarrage l'a trouvée : la variable
+    // d'environnement n'est pas toujours posée.
+    return {Valeur::texte(it.racineToolbox())};
+}
+
 }  // namespace
 
 void enregistrerSysteme(Interpreteur& it) {
@@ -608,6 +649,10 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("mkdir", fnMkdir, "systeme", "mkdir  Cree un dossier.");
     it.enregistrer("rmdir", fnRmdir, "systeme", "rmdir  Supprime un dossier.");
     it.enregistrer("delete", fnDelete, "systeme", "delete  Supprime des fichiers.");
+    it.enregistrer("isfolder", fnIsfolder, "systeme", "isfolder  Vrai pour un dossier.");
+    it.enregistrer("matlibre_racine", fnRacineToolbox, "systeme",
+                   "matlibre_racine  Dossier racine des toolboxes.");
+    it.enregistrer("isfile", fnIsfile, "systeme", "isfile  Vrai pour un fichier ordinaire.");
     it.enregistrer("mfilename", fnMfilename, "systeme",
                    "mfilename  Nom du fichier en cours d'execution.");
     it.enregistrer("copyfile", fnCopyfile, "systeme", "copyfile  Copie un fichier.");

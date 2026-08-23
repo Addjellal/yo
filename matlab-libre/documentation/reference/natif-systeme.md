@@ -122,6 +122,18 @@ graphics_toolkit  Moteur graphique utilise.
 help  Aide d'une fonction.
 ```
 
+## `isfile`
+
+```
+isfile  Vrai pour un fichier ordinaire.
+```
+
+## `isfolder`
+
+```
+isfolder  Vrai pour un dossier.
+```
+
 ## `ismac`
 
 ```
@@ -156,6 +168,12 @@ ls  Liste un dossier.
 
 ```
 matlibre_fonctions  Liste des fonctions natives et de leur groupe.
+```
+
+## `matlibre_racine`
+
+```
+matlibre_racine  Dossier racine des toolboxes.
 ```
 
 ## `maxNumCompThreads`

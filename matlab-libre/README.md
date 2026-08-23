@@ -95,6 +95,7 @@ make
 | Fichier | Contenu |
 |---|---|
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
+| [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
 | [`atelier.md`](documentation/atelier.md) | l'atelier : éditeur, débogueur, profileur, concepteur, schémas-blocs |
 | [`toolboxes.md`](documentation/toolboxes.md) | les 53 modules et leur correspondance MathWorks |
 | [`reference.md`](documentation/reference.md) | les 966 fonctions, avec leur aide — généré |

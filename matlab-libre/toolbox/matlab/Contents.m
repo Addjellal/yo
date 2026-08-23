@@ -19,3 +19,11 @@
 %   peaks         - Surface d'essai à trois bosses
 %   humps         - Fonction d'essai à deux pics
 %   fliplr2       - (interne) inversion utilisée par les démonstrations
+%
+% Gestion des toolboxes
+%   matlab.addons.installedAddons          - Liste les toolboxes
+%   matlab.addons.toolbox.installToolbox   - Installe un dossier
+%   matlab.addons.toolbox.uninstallToolbox - Retire une toolbox
+%   matlab.addons.toolbox.packageToolbox   - Empaquette en archive
+%   matlabroot, matlibre_racine_toolbox    - Racine de l'installation
+%   zip, unzip                             - Archives

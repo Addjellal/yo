@@ -115,6 +115,10 @@ verifier('le code appelle uiaxes', codeApplication.includes('uiaxes'));
 verifier('le code se termine par end', codeApplication.trim().endsWith('end'));
 
 /* ------------------------------------------------ editeur de schemas */
+// Les fichiers produits par le concepteur et l'éditeur de schémas vont
+// dans un dossier temporaire, pas dans le dépôt.
+const dossierTravail = mkdtempSync(join(tmpdir(), 'matlibre-atelier-'));
+await page.evaluate((d) => { window.Atelier.dossier = d; }, dossierTravail);
 await page.click('.onglet[data-vue="schema"]');
 await page.dblclick('#paletteBlocs li[data-type="step"]');
 await page.waitForTimeout(150);
