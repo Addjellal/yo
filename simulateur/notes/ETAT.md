@@ -1543,3 +1543,48 @@ n'expire pas : la séance dure une dizaine de secondes de minuteries, et le
 délai que je lui avais laissé était plus court. Relancé avec le temps qu'il
 faut, il rend 0 et produit ses neuf images. **Le défaut était dans la mesure,
 pas dans le programme.**
+
+## Ce que la relecture a trouvé derrière l'audit
+
+`critique-code` a relu les sept commits. Trois constats, tous justes, et le
+premier a ouvert un trou bien plus grand que lui.
+
+**Mon correctif du compteur ne tenait pas sur seize bits.** Il recomposait le
+compte à chaque demi-écriture ; or TCNT1 s'écrit en deux fois. En tirant ce
+fil, deux défauts PRÉEXISTANTS sont apparus, plus graves que celui que je
+venais de corriger :
+
+- **le plafond de comptage valait 255 pour tout le monde.** Timer1 débordait
+  au bout de 256 pas comme un compteur huit bits ;
+- **le registre de comparaison n'était lu que sur huit bits.** En mode CTC, un
+  sommet de 15 999 — la valeur qui fait la milliseconde à 16 MHz, le montage
+  le plus courant de tout l'enseignement embarqué — n'en gardait que 127.
+  Période mesurée : **128 cycles au lieu de 16 000**.
+
+Autrement dit, aucune base de temps sérieuse ne marchait sur Timer1, et
+personne ne s'en était aperçu parce qu'aucun essai ne s'en servait. Les trois
+cas sont maintenant confrontés à simavr sur le même `.elf` : 57 344, 57 344,
+16 000 des deux côtés.
+
+**Un de mes essais ne pouvait pas tomber.** « Sur une carte 3,3 V, la sortie
+du registre monte à 3,3 V » appelait `propager(..., 3.3)` — il passait
+lui-même la valeur qu'il prétendait vérifier. Le paramètre existait déjà et
+était déjà honoré ; le défaut était dans le SITE D'APPEL. L'essai est retiré :
+celui du banc schéma, qui emprunte le vrai chemin, prouve la même chose pour
+de bon. **Un essai qui ne peut pas tomber occupe la place de celui qui aurait
+prouvé quelque chose.**
+
+**Une assertion gardait un mécanisme préexistant, pas le correctif.**
+« L'impulsion de 100 ns est bien vue » passe aussi sans le contrôle de pas :
+elle protège les points de rupture, qui marchaient déjà. Elle reste — mais le
+commentaire dit maintenant lequel des deux elle garde.
+
+### Ce qui n'est PAS prouvé, et pourquoi c'est écrit
+
+Le registre tampon des accès seize bits est vérifié **du côté lecture** par un
+essai qui tombe sans lui : le compteur paraît reculer 26 fois sur 3 000
+lectures — de quoi rendre une mesure de durée négative une fois sur cent. Le
+côté **écriture** est modelé de la même façon, parce que c'est le même
+registre sur la puce et le même comportement dans simavr, mais je n'ai pas de
+firmware qui le mette en défaut à lui seul une fois le plafond corrigé. C'est
+écrit dans le code et ici, plutôt que laissé croire couvert.
