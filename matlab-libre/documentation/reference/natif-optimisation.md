@@ -2,6 +2,12 @@
 
 Fonctions natives du groupe `optimisation`.
 
+## `deval`
+
+```
+deval  Evalue une solution d'EDO.
+```
+
 ## `fminbnd`
 
 ```
