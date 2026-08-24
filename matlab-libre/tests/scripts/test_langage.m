@@ -132,6 +132,38 @@ assert(real(z) == 3 && imag(z) == 4);
 assert(conj(z) == 3 - 4i);
 assert(abs(sqrt(-4) - 2i) < 1e-12);
 
+%% ------------------- affectation multiple dans une liste separee
+% Une cible qui designe plusieurs elements consomme autant de sorties :
+% c'est l'idiome [c{:}] = deal(...) de MATLAB.
+c = cell(1, 3);
+[c{:}] = deal(1, 2, 3);
+assert(isequal(c, {1, 2, 3}));
+d = cell(1, 2);
+[d{:}] = size(zeros(2, 3));
+assert(isequal(d, {2, 3}));
+e = cell(1, 3);
+[e{1:2}] = deal(4, 5);
+assert(isequal(e{1}, 4) && isequal(e{2}, 5) && isempty(e{3}));
+f = cell(1, 3);
+[f{[1 3]}] = deal(7, 8);
+assert(isequal(f{1}, 7) && isempty(f{2}) && isequal(f{3}, 8));
+% Sur un tableau de structures, le champ se remplit element par element.
+s = struct('a', {[] []});
+[s.a] = deal(7, 8);
+assert(s(1).a == 7 && s(2).a == 8);
+% Un champ absent est cree.
+t = struct('x', {1 2});
+[t.y] = deal(10, 20);
+assert(t(1).y == 10 && t(2).y == 20);
+% Les cibles simples n'ont pas change de comportement.
+[g, h] = deal(1, 2);
+assert(g == 1 && h == 2);
+cc = {0 0};
+cc{end} = 5;
+assert(isequal(cc, {0, 5}));
+cc{end+1} = 6;
+assert(numel(cc) == 3 && cc{3} == 6);
+
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions

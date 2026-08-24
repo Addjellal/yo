@@ -46,8 +46,8 @@ existant appellera.
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 15 |
-| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 10 |
-| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 4 |
+| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 12 |
+| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 9 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |

@@ -20,3 +20,7 @@
 %
 % Les fonctions natives fminsearch, fminbnd, fminunc, fsolve, fzero et
 % lsqnonneg complètent l'ensemble.
+%
+% Objectifs multiples et contraintes semi-infinies
+%   fgoalattain - Atteinte d'objectifs pondérés
+%   fseminf     - Contraintes valables pour tout un intervalle

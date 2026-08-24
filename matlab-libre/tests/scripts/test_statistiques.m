@@ -360,4 +360,64 @@ catch err
 end
 assert(erreurDonnees);
 
+%% ------------------------------- optimisation directe et globale
+% patternsearch trouve le minimum d'une quadratique exactement, et
+% traverse aussi les fonctions non derivables.
+[xPattern, vPattern, ~, sortiePattern] = patternsearch(@(p) (p(1)-1)^2 + (p(2)+2)^2, [0 0]);
+assert(max(abs(xPattern - [1 -2])) < 1e-6);
+assert(vPattern < 1e-12);
+assert(sortiePattern.funccount > 0);
+assert(max(abs(patternsearch(@(p) abs(p(1)-3) + abs(p(2)+1), [0 0]) - [3 -1])) < 1e-6);
+% Bornes et contraintes lineaires sont respectees.
+assert(abs(patternsearch(@(p) (p(1)-5)^2, 0, [], [], [], [], 0, 2) - 2) < 1e-9);
+xContraint = patternsearch(@(p) -(p(1)+p(2)), [0 0], [1 1], 1, [], [], [0 0], [1 1]);
+assert(abs(sum(xContraint) - 1) < 1e-6);
+assert(all(xContraint >= -1e-9));
+
+% Front de Pareto de [x^2, (x-2)^2] : les solutions sont x dans [0,2].
+rand('seed', 3);
+deuxObjectifs = @(x) [x(1)^2, (x(1)-2)^2];
+optionsPareto = struct('PopulationSize', 40, 'MaxGenerations', 30);
+[xPareto, vPareto] = gamultiobj(deuxObjectifs, 1, [], [], [], [], -2, 4, optionsPareto);
+assert(size(xPareto, 1) > 5);
+assert(all(xPareto >= -0.05 & xPareto <= 2.05));
+assert(min(xPareto) < 0.2 && max(xPareto) > 1.8);
+% Par construction, aucun point du front n'en domine un autre.
+for i = 1:size(vPareto, 1)
+    for j = 1:size(vPareto, 1)
+        if i ~= j
+            assert(~(all(vPareto(j, :) <= vPareto(i, :)) && any(vPareto(j, :) < vPareto(i, :))));
+        end
+    end
+end
+optionsRecherche = struct('ParetoSetSize', 20, 'MaxIterations', 25);
+[xRecherche, vRecherche] = paretosearch(deuxObjectifs, 1, [], [], [], [], -2, 4, [], optionsRecherche);
+assert(size(xRecherche, 1) > 5);
+assert(min(xRecherche) < 0.2 && max(xRecherche) > 1.8);
+assert(size(vRecherche, 2) == 2);
+
+% surrogateopt sur une fonction lisse : il approche le minimum en cent
+% evaluations, sans jamais deriver.
+rand('seed', 7);
+[xSubstitut, vSubstitut, ~, sortieSubstitut] = ...
+    surrogateopt(@(p) (p(1)-0.3)^2 + (p(2)+0.7)^2, [-1 -1], [1 1]);
+assert(max(abs(xSubstitut - [0.3 -0.7])) < 0.05);
+assert(vSubstitut < 5e-3);
+assert(sortieSubstitut.funccount <= 100);
+
+% fgoalattain : les deux objectifs valent 1 en x = 1, donc gamma = 0.
+[xBut, vBut, gamma] = fgoalattain(deuxObjectifs, 0, [1 1], [1 1]);
+assert(abs(xBut - 1) < 1e-3);
+assert(max(abs(vBut - [1 1])) < 1e-3);
+assert(abs(gamma) < 1e-3);
+assert(all(vBut - gamma <= [1 1] + 1e-4));
+
+% fseminf : minimiser x^2 sous x >= t + 0.2 pour tout t de [0,1] donne
+% x = 1.2, la contrainte la plus serree etant celle de t = 1.
+contrainteSemi = @(x, pas) deal([], [], -(x(1) - (0:pas:1)' - 0.2), pas);
+[xSemi, vSemi, pireSemi] = fseminf(@(x) x(1)^2, 3, 1, contrainteSemi);
+assert(abs(xSemi - 1.2) < 1e-3);
+assert(abs(vSemi - 1.44) < 1e-2);
+assert(pireSemi < 1e-6);
+
 disp('statistiques : toutes les verifications passent');

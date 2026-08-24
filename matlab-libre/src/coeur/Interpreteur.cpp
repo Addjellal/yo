@@ -718,6 +718,53 @@ static bool estSuppression(const NoeudPtr& valeur) {
     return valeur && valeur->type == TypeN::Matrice && valeur->rangees.empty();
 }
 
+// Positions désignées par une cible « c{...} » quand elle en désigne
+// plusieurs. Rend une liste vide si la cible ne consomme qu'une sortie —
+// c'est le cas ordinaire.
+std::vector<std::size_t> Interpreteur::ciblesCellule(const NoeudPtr& cible) {
+    std::vector<std::size_t> vide;
+    if (!cible || cible->type != TypeN::Acces || cible->acces.size() != 1) return vide;
+    const NoeudPtr& base = cible->enfants[0];
+    if (base->type != TypeN::Ident) return vide;
+    const Valeur* p = trouverVariable(base->texte);
+    if (!p) return vide;
+    if (cible->acces[0].genre == '.') {
+        // « [s.champ] = deal(...) » : autant de sorties que d'éléments du
+        // tableau de structures.
+        if (p->classe != Classe::Structure || p->nelem() <= 1) return vide;
+        std::vector<std::size_t> toutes;
+        for (std::size_t k = 1; k <= p->nelem(); ++k) toutes.push_back(k);
+        return toutes;
+    }
+    if (cible->acces[0].genre != '{') return vide;
+    if (p->classe != Classe::Cellule) return vide;
+    const auto& args = cible->acces[0].args;
+    if (args.size() != 1) return vide;
+    std::vector<std::size_t> positions;
+    if (args[0] && args[0]->type == TypeN::DeuxPointsSeul) {
+        for (std::size_t k = 1; k <= p->nelem(); ++k) positions.push_back(k);
+    } else {
+        // L'indice est évalué hors du contexte d'indexation : un « end »
+        // ne s'y résout pas. Dans ce cas on retombe sur une cible simple,
+        // ce qui est le comportement d'avant.
+        Valeur idx;
+        try {
+            idx = evaluer(args[0]);
+        } catch (...) {
+            return vide;
+        }
+        if (idx.classe == Classe::Logique) {
+            for (std::size_t k = 0; k < idx.nelem(); ++k)
+                if (idx.re[k] != 0) positions.push_back(k + 1);
+        } else {
+            for (std::size_t k = 0; k < idx.nelem(); ++k)
+                positions.push_back((std::size_t)idx.re[k]);
+        }
+    }
+    if (positions.size() <= 1) return vide;
+    return positions;
+}
+
 void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
     if (cible->type == TypeN::Ident) {
         if (cible->texte == "~") return;
@@ -826,7 +873,11 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
                                n->cibles[0]->type == TypeN::Acces &&
                                !n->cibles[0]->acces.empty() &&
                                n->cibles[0]->acces.back().genre == '(';
-            if (n->cibles.size() == 1) {
+            // « [c{:}] = deal(...) » n'a qu'une cible écrite, mais elle en
+            // désigne plusieurs : ce cas passe par le chemin général.
+            bool cibleEclatee = n->cibles.size() == 1 && !suppression &&
+                                !ciblesCellule(n->cibles[0]).empty();
+            if (n->cibles.size() == 1 && !cibleEclatee) {
                 Valeur v;
                 if (suppression && n->cibles[0]->type == TypeN::Acces) {
                     const NoeudPtr& cible = n->cibles[0];
@@ -847,15 +898,58 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
                 }
                 return;
             }
-            std::vector<Valeur> r = evaluerMulti(n->enfants[0], (int)n->cibles.size());
-            if (r.size() < n->cibles.size()) {
-                std::size_t demandees = n->cibles.size();
-                if (r.size() + 1 == demandees || r.size() < demandees)
-                    erreur("MATLAB:TooManyOutputs",
-                           "Insufficient number of outputs from right hand side of equal "
-                           "sign to satisfy assignment.");
+            // Une cible « c{...} » peut désigner plusieurs éléments : elle
+            // consomme alors autant de sorties, ce qui rend possible le
+            // « [c{:}] = deal(...) » de MATLAB.
+            std::vector<std::vector<std::size_t>> multiples(n->cibles.size());
+            std::size_t total = 0;
+            bool aMultiple = false;
+            for (std::size_t k = 0; k < n->cibles.size(); ++k) {
+                multiples[k] = ciblesCellule(n->cibles[k]);
+                if (multiples[k].empty()) {
+                    total += 1;
+                } else {
+                    total += multiples[k].size();
+                    aMultiple = true;
+                }
             }
-            for (std::size_t k = 0; k < n->cibles.size(); ++k) affecter(n->cibles[k], r[k]);
+            std::vector<Valeur> r = evaluerMulti(n->enfants[0], (int)total);
+            if (r.size() < total)
+                erreur("MATLAB:TooManyOutputs",
+                       "Insufficient number of outputs from right hand side of equal "
+                       "sign to satisfy assignment.");
+            if (!aMultiple) {
+                for (std::size_t k = 0; k < n->cibles.size(); ++k) affecter(n->cibles[k], r[k]);
+            } else {
+                std::size_t pris = 0;
+                for (std::size_t k = 0; k < n->cibles.size(); ++k) {
+                    if (multiples[k].empty()) {
+                        affecter(n->cibles[k], r[pris++]);
+                        continue;
+                    }
+                    const std::string& nom = n->cibles[k]->enfants[0]->texte;
+                    Valeur courante = lireVariable(nom);
+                    if (n->cibles[k]->acces[0].genre == '.') {
+                        const std::string& champ = n->cibles[k]->acces[0].nom;
+                        courante.detacherStructure();
+                        auto trouve = courante.st->champs.find(champ);
+                        if (trouve == courante.st->champs.end()) {
+                            courante.st->ordre.push_back(champ);
+                            courante.st->champs[champ] =
+                                std::vector<Valeur>(courante.nelem(), Valeur::vide());
+                            trouve = courante.st->champs.find(champ);
+                        }
+                        for (std::size_t position : multiples[k])
+                            trouve->second[position - 1] = r[pris++];
+                    } else {
+                        for (std::size_t position : multiples[k]) {
+                            std::vector<Valeur> un{Valeur::scalaire((double)position)};
+                            courante = ecrireIndex(std::move(courante), un, r[pris++], '{');
+                        }
+                    }
+                    ecrireVariable(nom, std::move(courante));
+                }
+            }
             if (n->afficher)
                 for (const auto& c : n->cibles) {
                     if (c->type == TypeN::Ident && c->texte == "~") continue;

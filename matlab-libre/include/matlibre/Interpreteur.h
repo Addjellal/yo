@@ -227,6 +227,7 @@ private:
 
     Valeur evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Valeur>* multi);
     void affecter(const NoeudPtr& cible, const Valeur& v);
+    std::vector<std::size_t> ciblesCellule(const NoeudPtr& cible);
     friend struct GardePortee;
 };
 

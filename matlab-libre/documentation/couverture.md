@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **899 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **906 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
