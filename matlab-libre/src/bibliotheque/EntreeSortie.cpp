@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <fstream>
@@ -493,6 +495,185 @@ FONCTION(fnStr2num) {
     }
 }
 
+// ------------------------------------------------------------- sscanf
+
+// Analyse syntaxique du format de sscanf. On avance en parallele dans le
+// format et dans le texte ; le format est repete tant qu'il consomme
+// quelque chose, comme le fait MATLAB.
+namespace {
+
+struct ResultatScan {
+    std::vector<double> nombres;
+    std::string caracteres;
+    bool queDesCaracteres = true;
+    std::size_t compte = 0;
+    std::size_t position = 0;   // indice, base 1, du premier caractere non lu
+    std::string erreur;
+};
+
+void sauterBlancs(const std::string& s, std::size_t& i) {
+    while (i < s.size() && std::isspace((unsigned char)s[i])) ++i;
+}
+
+bool lireNombre(const std::string& s, std::size_t& i, char conversion,
+                std::size_t largeur, double& valeur) {
+    sauterBlancs(s, i);
+    std::size_t debut = i;
+    std::size_t fin = (largeur == 0) ? s.size() : std::min(s.size(), i + largeur);
+    if (debut >= fin) return false;
+    std::string morceau = s.substr(debut, fin - debut);
+    const char* texte = morceau.c_str();
+    char* apres = nullptr;
+    if (conversion == 'd' || conversion == 'i' || conversion == 'u') {
+        long long v = std::strtoll(texte, &apres, 10);
+        if (apres == texte) return false;
+        valeur = (double)v;
+    } else if (conversion == 'x') {
+        long long v = std::strtoll(texte, &apres, 16);
+        if (apres == texte) return false;
+        valeur = (double)v;
+    } else if (conversion == 'o') {
+        long long v = std::strtoll(texte, &apres, 8);
+        if (apres == texte) return false;
+        valeur = (double)v;
+    } else {
+        double v = std::strtod(texte, &apres);
+        if (apres == texte) return false;
+        valeur = v;
+    }
+    i = debut + (std::size_t)(apres - texte);
+    return true;
+}
+
+ResultatScan scannerTexte(const std::string& texte, const std::string& format,
+                          std::size_t maximum) {
+    ResultatScan r;
+    std::size_t i = 0;
+    bool progresse = true;
+    while (progresse && i <= texte.size()) {
+        progresse = false;
+        std::size_t f = 0;
+        bool echec = false;
+        while (f < format.size()) {
+            char c = format[f];
+            if (std::isspace((unsigned char)c)) {
+                sauterBlancs(texte, i);
+                ++f;
+                continue;
+            }
+            if (c != '%') {
+                sauterBlancs(texte, i);
+                if (i < texte.size() && texte[i] == c) { ++i; ++f; progresse = true; continue; }
+                echec = true;
+                break;
+            }
+            ++f;
+            if (f < format.size() && format[f] == '%') {
+                sauterBlancs(texte, i);
+                if (i < texte.size() && texte[i] == '%') { ++i; ++f; progresse = true; continue; }
+                echec = true;
+                break;
+            }
+            bool ignorer = false;
+            if (f < format.size() && format[f] == '*') { ignorer = true; ++f; }
+            std::size_t largeur = 0;
+            while (f < format.size() && std::isdigit((unsigned char)format[f])) {
+                largeur = largeur * 10 + (std::size_t)(format[f] - '0');
+                ++f;
+            }
+            // Les modificateurs de longueur du C sont acceptes et ignores.
+            while (f < format.size() && std::strchr("hlLqjzt", format[f])) ++f;
+            if (f >= format.size()) { echec = true; break; }
+            char conversion = format[f++];
+            if (conversion == 'c') {
+                std::size_t n = largeur == 0 ? 1 : largeur;
+                if (i + n > texte.size()) { echec = true; break; }
+                if (!ignorer) {
+                    r.caracteres += texte.substr(i, n);
+                    r.compte += n;
+                }
+                i += n;
+                progresse = true;
+            } else if (conversion == 's') {
+                sauterBlancs(texte, i);
+                std::size_t debut = i;
+                while (i < texte.size() && !std::isspace((unsigned char)texte[i]) &&
+                       (largeur == 0 || i - debut < largeur))
+                    ++i;
+                if (i == debut) { echec = true; break; }
+                if (!ignorer) {
+                    r.caracteres += texte.substr(debut, i - debut);
+                    r.compte += i - debut;
+                }
+                progresse = true;
+            } else {
+                double valeur = 0;
+                if (!lireNombre(texte, i, conversion, largeur, valeur)) { echec = true; break; }
+                if (!ignorer) {
+                    r.nombres.push_back(valeur);
+                    r.queDesCaracteres = false;
+                    ++r.compte;
+                }
+                progresse = true;
+            }
+            if (maximum != 0 && r.compte >= maximum) { echec = true; break; }
+        }
+        if (echec && !progresse) break;
+        if (maximum != 0 && r.compte >= maximum) break;
+        if (echec) continue;
+    }
+    r.position = i + 1;
+    return r;
+}
+
+}  // namespace
+
+FONCTION(fnSscanf) {
+    INUTILISE
+    exigerArguments(args, 2, 3, "sscanf");
+    std::string texte = args[0].versTexte();
+    std::string format = args[1].versTexte();
+    std::size_t maximum = 0;
+    int lignes = -1, colonnes = -1;
+    if (args.size() > 2 && !args[2].estVide()) {
+        const Valeur& taille = args[2];
+        if (taille.nelem() == 1) {
+            double v = taille.scal();
+            if (std::isfinite(v) && v > 0) maximum = (std::size_t)v;
+        } else if (taille.nelem() >= 2) {
+            lignes = (int)taille.re[0];
+            double c = taille.re[1];
+            if (std::isfinite(c)) {
+                colonnes = (int)c;
+                if (lignes > 0 && colonnes > 0) maximum = (std::size_t)(lignes * colonnes);
+            }
+        }
+    }
+    ResultatScan r = scannerTexte(texte, format, maximum);
+    Valeur sortie;
+    if (r.queDesCaracteres && !r.caracteres.empty()) {
+        sortie = Valeur::texte(r.caracteres);
+    } else {
+        std::vector<double> v = r.nombres;
+        for (char c : r.caracteres) v.push_back((double)(unsigned char)c);
+        sortie = Valeur::matrice((int)v.size(), v.empty() ? 0 : 1);
+        for (std::size_t k = 0; k < v.size(); ++k) sortie.re[k] = v[k];
+        if (lignes > 0 && !v.empty()) {
+            int total = (int)v.size();
+            int nc = (colonnes > 0) ? colonnes : (total + lignes - 1) / lignes;
+            // MATLAB remplit colonne par colonne et complete par des zeros.
+            Valeur m = Valeur::matrice(lignes, nc, 0.0);
+            for (int k = 0; k < total && k < lignes * nc; ++k) m.re[(std::size_t)k] = v[(std::size_t)k];
+            sortie = m;
+        }
+    }
+    std::vector<Valeur> sorties{sortie};
+    if (nargout >= 2) sorties.push_back(Valeur::scalaire((double)r.compte));
+    if (nargout >= 3) sorties.push_back(Valeur::texte(r.erreur));
+    if (nargout >= 4) sorties.push_back(Valeur::scalaire((double)r.position));
+    return sorties;
+}
+
 // ------------------------------------------------------------- erreurs
 
 bool ressembleIdentifiant(const std::string& s) {
@@ -806,6 +987,7 @@ void enregistrerEntreeSortie(Interpreteur& it) {
     it.enregistrer("disp", fnDisp, "es", "disp  Affiche une valeur sans son nom.");
     it.enregistrer("display", fnDisplay, "es", "display  Affiche une valeur avec son nom.");
     it.enregistrer("sprintf", fnSprintf, "es", "sprintf  Formate dans une chaine.");
+    it.enregistrer("sscanf", fnSscanf, "es", "sscanf  Lit des donnees depuis une chaine.");
     it.enregistrer("fprintf", fnFprintf, "es", "fprintf  Ecrit du texte formate.");
     it.enregistrer("printf", fnPrintf, "es", "printf  Ecrit du texte formate (sortie standard).");
     it.enregistrer("num2str", fnNum2str, "es", "num2str  Nombre vers texte.");

@@ -67,6 +67,7 @@ citations = {
     'automatique',          'La Control System Toolbox en compte\n   %d'
     'ondelettes',           'La Wavelet Toolbox en compte %d'
     'communications',       'La Communications en\n   compte %d'
+    'flou',                 'La logique floue en compte %d'
     'apprentissage-profond', 'La Deep Learning Toolbox compte %d'
     };
 cheminCouverture = fullfile(racine, 'documentation', 'couverture.md');

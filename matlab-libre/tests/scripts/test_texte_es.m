@@ -75,4 +75,28 @@ relu = dlmread(nomCsv, ',');
 assert(isequal(relu, [1 2; 3 4]));
 delete(nomCsv);
 
+%% ------------------------------------------------------------- sscanf
+% Conversions, littéraux, largeurs de champ, suppression et taille imposée.
+assert(isequal(sscanf('1 2 3', '%f'), [1;2;3]));
+assert(sscanf('12', '%d') == 12);
+assert(abs(sscanf('1.5e3', '%f') - 1500) < 1e-12);
+assert(isequal(sscanf('[1 2 3]', '[%f %f %f]'), [1;2;3]));
+assert(sscanf('a=5', 'a=%d') == 5);
+assert(isequal(sscanf('1,2,3', '%f,'), [1;2;3]));
+assert(strcmp(sscanf('abc', '%s'), 'abc'));
+assert(strcmp(sscanf('ab', '%c'), 'ab'));
+assert(sscanf('ff', '%x') == 255);
+assert(sscanf('17', '%o') == 15);
+% Le troisième argument limite la lecture, ou range en matrice, colonne
+% par colonne comme partout dans MATLAB.
+assert(isequal(sscanf('1 2 3 4', '%f', 2), [1;2]));
+assert(isequal(sscanf('1 2 3 4', '%f', [2 2]), [1 3; 2 4]));
+assert(isequal(sscanf('1234', '%2d'), [12;34]));
+assert(isequal(sscanf('1 2 3 4', '%*f %f'), [2;4]));
+assert(isempty(sscanf('', '%f')));
+% La lecture s'arrête au premier champ qui ne correspond pas, et rend la
+% position atteinte.
+[valeursLues, compteLu, ~, positionLue] = sscanf('1 2 x', '%f');
+assert(isequal(valeursLues, [1;2]) && compteLu == 2 && positionLue == 5);
+
 disp('texte et entrees-sorties : toutes les verifications passent');

@@ -32,7 +32,7 @@ existant appellera.
 | `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 8 |
 | `edp` | Partial Differential Equation Toolbox — équations aux dérivées partielles. | 5 |
 | `finance` | Financial Toolbox — finance quantitative. | 16 |
-| `flou` | Fuzzy Logic Toolbox — logique floue. | 20 |
+| `flou` | Fuzzy Logic Toolbox — logique floue. | 42 |
 | `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 4 |
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 5 |
 | `identification` | System Identification Toolbox — identification de modèles. | 6 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 16 |
 
-Les fonctions natives — 610, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 611, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

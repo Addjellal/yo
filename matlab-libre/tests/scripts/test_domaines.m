@@ -538,4 +538,151 @@ for f = {@(v) zmf(v, [2 8]), @(v) smf(v, [2 8]), @(v) pimf(v, [1 4 6 9]), ...
     assert(all(valeurs >= -1e-12) && all(valeurs <= 1 + 1e-12));
 end
 
+% Triangles et trapèzes : les côtés de largeur nulle valent un.
+assert(isequal(trimf(0:10, [0 5 10]), [0 .2 .4 .6 .8 1 .8 .6 .4 .2 0]));
+assert(isequal(trimf(0:5, [0 0 5]), [1 .8 .6 .4 .2 0]));
+assert(isequal(trimf(5:10, [5 10 10]), [0 .2 .4 .6 .8 1]));
+assert(isequal(trapmf(0:6, [1 2 4 5]), [0 0 1 1 1 0 0]));
+assert(isequal(trapmf(0:5, [0 0 2 4]), [1 1 1 0.5 0 0]));
+assert(isequal(evalmf(0:4, 'trimf', [0 2 4]), [0 0.5 1 0.5 0]));
+assert(max(abs(evalmf([0 5 10], 'zmf', [2 8]) - [1 0.5 0])) < 1e-12);
+assert(abs(probor(0.5, 0.5) - 0.75) < 1e-12);
+assert(abs(probor([0.5 0.5]) - 0.75) < 1e-12);
+
+% Inférence de Mamdani : un système symétrique donne une sortie symétrique,
+% et le centre de gravité d'un triangle coupé se retrouve.
+fisMamdani = newfis('symetrique');
+fisMamdani = addvar(fisMamdani, 'input', 'x', [0 10]);
+fisMamdani = addmf(fisMamdani, 'input', 1, 'bas', 'trimf', [0 0 5]);
+fisMamdani = addmf(fisMamdani, 'input', 1, 'haut', 'trimf', [5 10 10]);
+fisMamdani = addvar(fisMamdani, 'output', 'y', [0 1]);
+fisMamdani = addmf(fisMamdani, 'output', 1, 'petit', 'trimf', [0 0 0.5]);
+fisMamdani = addmf(fisMamdani, 'output', 1, 'grand', 'trimf', [0.5 1 1]);
+fisMamdani = addrule(fisMamdani, [1 1 1 1; 2 2 1 1]);
+assert(abs(evalfis(5, fisMamdani) - 0.5) < 1e-12);
+assert(abs(evalfis(2, fisMamdani) + evalfis(8, fisMamdani) - 1) < 1e-12);
+% Un jeu d'entrées par ligne.
+assert(isequal(size(evalfis([0; 5; 10], fisMamdani)), [3 1]));
+% Les forces d'activation sont les degrés d'appartenance.
+[~, forcesMamdani] = evalfis(2, fisMamdani);
+assert(max(abs(forcesMamdani' - [0.6 0])) < 1e-12);
+
+% Inférence de Sugeno : constante puis affine, cette dernière exacte.
+fisSugeno = newfis('sugeno1', 'sugeno');
+assert(strcmp(fisSugeno.defuzzification, 'wtaver'));
+fisSugeno = addvar(fisSugeno, 'input', 'x', [0 10]);
+fisSugeno = addmf(fisSugeno, 'input', 1, 'bas', 'trimf', [0 0 10]);
+fisSugeno = addmf(fisSugeno, 'input', 1, 'haut', 'trimf', [0 10 10]);
+fisSugeno = addvar(fisSugeno, 'output', 'y', [0 1]);
+fisSugeno = addmf(fisSugeno, 'output', 1, 'zero', 'constant', 0);
+fisSugeno = addmf(fisSugeno, 'output', 1, 'un', 'constant', 1);
+fisSugeno = addrule(fisSugeno, [1 1 1 1; 2 2 1 1]);
+assert(max(abs(evalfis([0; 5; 10], fisSugeno) - [0; 0.5; 1])) < 1e-12);
+fisAffine = newfis('sugeno2', 'sugeno');
+fisAffine = addvar(fisAffine, 'input', 'x', [0 10]);
+fisAffine = addmf(fisAffine, 'input', 1, 'partout', 'trimf', [-10 5 20]);
+fisAffine = addvar(fisAffine, 'output', 'y', [0 100]);
+fisAffine = addmf(fisAffine, 'output', 1, 'affine', 'linear', [3 2]);
+fisAffine = addrule(fisAffine, [1 1 1 1]);
+assert(max(abs(evalfis([0; 5; 10], fisAffine) - [2; 17; 32])) < 1e-12);
+% mamfis et sugfis nomment le type.
+assert(strcmp(mamfis('Name', 'a').type, 'mamdani'));
+assert(strcmp(sugfis('Name', 'b').type, 'sugeno'));
+
+% Lecture, écriture et accès aux champs.
+fisPourboire = newfis('pourboire');
+fisPourboire = addvar(fisPourboire, 'input', 'service', [0 10]);
+fisPourboire = addmf(fisPourboire, 'input', 1, 'mauvais', 'gaussmf', [1.5 0]);
+fisPourboire = addmf(fisPourboire, 'input', 1, 'bon', 'gaussmf', [1.5 5]);
+fisPourboire = addmf(fisPourboire, 'input', 1, 'excellent', 'gaussmf', [1.5 10]);
+fisPourboire = addvar(fisPourboire, 'input', 'nourriture', [0 10]);
+fisPourboire = addmf(fisPourboire, 'input', 2, 'passable', 'trapmf', [0 0 1 3]);
+fisPourboire = addmf(fisPourboire, 'input', 2, 'delicieuse', 'trapmf', [7 9 10 10]);
+fisPourboire = addvar(fisPourboire, 'output', 'pourboire', [0 30]);
+fisPourboire = addmf(fisPourboire, 'output', 1, 'bas', 'trimf', [0 5 10]);
+fisPourboire = addmf(fisPourboire, 'output', 1, 'moyen', 'trimf', [10 15 20]);
+fisPourboire = addmf(fisPourboire, 'output', 1, 'haut', 'trimf', [20 25 30]);
+fisPourboire = addrule(fisPourboire, [1 1 1 1 2; 2 0 2 1 1; 3 2 3 1 2]);
+assert(getfis(fisPourboire, 'numinputs') == 2);
+assert(getfis(fisPourboire, 'numrules') == 3);
+assert(strcmp(getfis(fisPourboire, 'name'), 'pourboire'));
+assert(getfis(fisPourboire, 'input', 1, 'nummfs') == 3);
+assert(isequal(getfis(fisPourboire, 'input', 1, 'mf', 2, 'params'), [1.5 5]));
+assert(strcmp(getfis(setfis(fisPourboire, 'defuzzmethod', 'bisector'), 'defuzzmethod'), 'bisector'));
+assert(isequal(getfis(setfis(fisPourboire, 'input', 1, 'mf', 2, 'params', [2 5]), ...
+                      'input', 1, 'mf', 2, 'params'), [2 5]));
+% Aller-retour par fichier : la sortie doit être identique au bit près.
+avantEcriture = evalfis([3 8], fisPourboire);
+cheminFis = fullfile(tempdir, 'matlibre_essai_pourboire.fis');
+writefis(fisPourboire, cheminFis);
+fisRelu = readfis(cheminFis);
+assert(strcmp(fisRelu.nom, 'pourboire'));
+assert(numel(fisRelu.entrees) == 2 && numel(fisRelu.sorties) == 1);
+assert(isequal(fisRelu.regles, fisPourboire.regles));
+assert(abs(evalfis([3 8], fisRelu) - avantEcriture) < 1e-12);
+delete(cheminFis);
+% Retraits : les règles suivent.
+fisSansMf = rmmf(fisPourboire, 'input', 2, 'mf', 1);
+assert(numel(fisSansMf.entrees{2}.mf) == 1);
+assert(size(fisSansMf.regles, 1) == 2);
+assert(isequal(fisSansMf.regles(2, 1:2), [3 1]));
+fisSansVar = rmvar(fisPourboire, 'input', 2);
+assert(numel(fisSansVar.entrees) == 1);
+assert(size(fisSansVar.regles, 2) == size(fisPourboire.regles, 2) - 1);
+
+% Classification floue : deux groupes bien séparés se retrouvent.
+rng(11);
+nuage = [randn(60, 2) * 0.4; randn(60, 2) * 0.4 + 6];
+[centresFcm, appartenances, critere] = fcm(nuage, 2);
+centresFcm = sortrows(centresFcm);
+assert(max(max(abs(centresFcm - [0 0; 6 6]))) < 0.4);
+assert(max(abs(sum(appartenances, 1) - 1)) < 1e-12);
+assert(all(diff(critere) <= 1e-9));
+[~, classes] = max(appartenances, [], 1);
+assert(numel(unique(classes(1:60))) == 1 && numel(unique(classes(61:end))) == 1);
+assert(classes(1) ~= classes(61));
+% Classification soustractive : le nombre de classes sort du calcul.
+assert(size(subclust(nuage, 0.4), 1) == 2);
+troisGroupes = [randn(40, 2) * 0.3; randn(40, 2) * 0.3 + 5; randn(40, 2) * 0.3 + [10 0]];
+assert(size(subclust(troisGroupes, 0.35), 1) == 3);
+
+% Construction et apprentissage d'un système de Sugeno.
+abscisses = (0:0.05:10)';
+donneesSinus = [abscisses, sin(abscisses)];
+fisGrille = genfis1(donneesSinus, 7);
+assert(size(fisGrille.regles, 1) == 7);
+assert(strcmp(fisGrille.sorties{1}.mf{1}.type, 'linear'));
+erreurAvant = sqrt(mean((evalfis(abscisses, fisGrille) - sin(abscisses)) .^ 2));
+[fisAppris, erreursAnfis] = anfis(donneesSinus, fisGrille, 15);
+assert(all(diff(erreursAnfis) <= 1e-12));
+assert(erreursAnfis(end) < erreurAvant / 100);
+% Les moindres carrés seuls reproduisent exactement une fonction affine.
+donneesAffines = [abscisses, 3 * abscisses + 2];
+fisLineaire = anfis(donneesAffines, genfis1(donneesAffines, 3), 1);
+assert(sqrt(mean((evalfis(abscisses, fisLineaire) - (3 * abscisses + 2)) .^ 2)) < 1e-8);
+% genfis1 sur deux entrées : une règle par combinaison.
+assert(size(genfis1([rand(50, 2), rand(50, 1)], 3).regles, 1) == 9);
+assert(size(genfis2(abscisses, sin(abscisses), 0.25).regles, 1) >= 2);
+assert(size(genfis3(abscisses, sin(abscisses), 'sugeno', 6).regles, 1) == 6);
+assert(size(genfis(abscisses, sin(abscisses), struct('Methode', 'fcm', 'NumClusters', 6)).regles, 1) == 6);
+
+% Arithmétique floue : les sommets se composent comme les nombres nets.
+grilleFloue = linspace(-10, 30, 401);
+nombreA = trimf(grilleFloue, [1 2 3]);
+nombreB = trimf(grilleFloue, [4 6 8]);
+sommeFloue = fuzarith(grilleFloue, nombreA, nombreB, 'sum');
+assert(abs(grilleFloue(find(sommeFloue == max(sommeFloue), 1)) - 8) < 0.11);
+differenceFloue = fuzarith(grilleFloue, nombreA, nombreB, 'sub');
+assert(abs(grilleFloue(find(differenceFloue == max(differenceFloue), 1)) + 4) < 0.11);
+produitFlou = fuzarith(grilleFloue, nombreA, nombreB, 'prod');
+assert(abs(grilleFloue(find(produitFlou == max(produitFlou), 1)) - 12) < 0.11);
+% Le support de la somme est la somme des supports.
+assert(min(grilleFloue(sommeFloue > 0)) >= 5 - 0.3 && max(grilleFloue(sommeFloue > 0)) <= 11 + 0.3);
+
+% Tracés rendus sous forme de données.
+[courbesMf, grilleMf] = plotmf(fisGrille, 'input', 1);
+assert(isequal(size(courbesMf), [181 7]));
+assert(abs(grilleMf(1)) < 1e-12 && abs(grilleMf(end) - 10) < 1e-12);
+assert(~isempty(plotfis(fisGrille)));
+
 disp('domaines : toutes les verifications passent');

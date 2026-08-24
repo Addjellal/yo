@@ -170,6 +170,12 @@ rethrow  Relance une exception.
 sprintf  Formate dans une chaine.
 ```
 
+## `sscanf`
+
+```
+sscanf  Lit des donnees depuis une chaine.
+```
+
 ## `str2double`
 
 ```

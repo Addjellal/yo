@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-610 fonctions ecrites en C++, reparties en 22 groupes.
+611 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1023 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1045 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -58,7 +58,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`econometrie`](reference/toolbox-econometrie.md) | 8 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 16 |
-| [`flou`](reference/toolbox-flou.md) | 20 |
+| [`flou`](reference/toolbox-flou.md) | 42 |
 | [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
 | [`identification`](reference/toolbox-identification.md) | 6 |

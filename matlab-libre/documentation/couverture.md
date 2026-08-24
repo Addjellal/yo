@@ -11,8 +11,8 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **610 fonctions natives** couvrant le MATLAB de base.
-- **1023 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **611 fonctions natives** couvrant le MATLAB de base.
+- **1045 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -124,7 +124,15 @@ totalité.
    rendement k/n —, les codes en blocs cycliques avec leur table de
    syndromes, les trois familles d'entrelaceurs, et les taux d'erreur
    théoriques sur canal gaussien comme sur canal de Rayleigh avec
-   diversité. La logique floue en compte 20. Les autres modules
+   diversité. La logique floue en compte 42 : les onze
+   fonctions d'appartenance, l'inférence de Mamdani comme celle de
+   Sugeno — plusieurs sorties, conclusions constantes ou affines, les
+   cinq opérateurs configurables, la négation dans les prémisses —, la
+   lecture et l'écriture des fichiers .fis, l'arithmétique sur les
+   nombres flous par coupes de niveau, les c-moyennes floues, la
+   classification soustractive de Chiu, les trois générateurs de systèmes
+   à partir de données, et l'apprentissage hybride d'ANFIS, qui résout
+   exactement la moitié linéaire du problème par moindres carrés. Les autres modules
    offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
    appelle d'abord.
    La Wavelet Toolbox en compte 54. Les filtres de Daubechies et les

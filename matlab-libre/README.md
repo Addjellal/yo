@@ -33,11 +33,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **610 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **611 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **1023 fonctions de toolbox** en langage MATLAB, réparties en
+- **1045 fonctions de toolbox** en langage MATLAB, réparties en
   **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
