@@ -45,7 +45,7 @@ existant appellera.
 | `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 41 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
-| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 15 |
+| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 54 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 12 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 9 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |

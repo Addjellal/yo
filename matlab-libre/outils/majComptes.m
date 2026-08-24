@@ -65,6 +65,8 @@ citations = {
     'images',               'L''Image Processing Toolbox en compte %d'
     'statistiques',         'La Statistics and Machine Learning Toolbox en compte %d'
     'automatique',          'La Control System Toolbox en compte\n   %d'
+    'ondelettes',           'La Wavelet Toolbox en compte %d'
+    'apprentissage-profond', 'La Deep Learning Toolbox compte %d'
     };
 cheminCouverture = fullfile(racine, 'documentation', 'couverture.md');
 texteCouverture = fileread(cheminCouverture);

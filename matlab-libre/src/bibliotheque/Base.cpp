@@ -661,6 +661,24 @@ Valeur convertirVers(const Valeur& v, Classe c) {
         }
         return r;
     }
+    if (c == Classe::Caractere && v.classe == Classe::Chaine) {
+        // char("2D") rend le texte, pas le code numerique : c'est une
+        // conversion de representation, pas de valeur. Un tableau de
+        // chaines devient une matrice de caracteres completee par des
+        // blancs, comme dans MATLAB.
+        if (v.nelem() == 1) return Valeur::texte(v.chaines.empty() ? "" : v.chaines[0]);
+        std::size_t largeur = 0;
+        for (const auto& t : v.chaines) largeur = std::max(largeur, t.size());
+        int lignes = (int)v.nelem();
+        Valeur r = Valeur::matrice(lignes, (int)largeur, (double)' ');
+        r.classe = Classe::Caractere;
+        for (int i = 0; i < lignes; ++i) {
+            const std::string& t = v.chaines[(std::size_t)i];
+            for (std::size_t j = 0; j < t.size(); ++j)
+                r.re[(std::size_t)i + j * (std::size_t)lignes] = (double)(unsigned char)t[j];
+        }
+        return r;
+    }
     Valeur base = v;
     if (v.classe == Classe::Chaine) {
         // "3.5" -> 3.5 ; sinon les codes de caractères.

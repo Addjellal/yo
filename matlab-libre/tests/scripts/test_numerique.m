@@ -51,6 +51,14 @@ assert(max(abs(conv([1 1], [1 -1]) - [1 0 -1])) < 1e-12);
 
 % Interpolation.
 assert(abs(interp1([1 2 3], [10 20 30], 2.5) - 25) < 1e-12);
+% Hors de l'intervalle : NaN, sauf si on donne 'extrap' ou une valeur.
+assert(isnan(interp1([1 2 3], [10 20 30], 4)));
+assert(interp1([1 2 3], [10 20 30], 4, 'linear', 0) == 0);
+assert(interp1([1 2 3], [10 20 30], 0, 'linear', -1) == -1);
+assert(abs(interp1([1 2 3], [10 20 30], 4, 'linear', 'extrap') - 40) < 1e-12);
+assert(isnan(interp1([1 2 3], [10 20 30], 0.5, 'nearest')));
+assert(interp1([1 2 3], [10 20 30], 0.5, 'nearest', 7) == 7);
+assert(interp1([1 2 3], [10 20 30], 1.4, 'nearest') == 10);
 assert(abs(spline([0 1 2 3], [0 1 4 9], 1.5) - 2.25) < 0.2);
 
 % Zéros et minimisation.

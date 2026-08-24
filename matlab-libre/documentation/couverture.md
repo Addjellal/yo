@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **906 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **945 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -109,6 +109,22 @@ totalité.
    40, la Communications 25, la logique floue 20. Les autres modules
    offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
    appelle d'abord.
+   La Wavelet Toolbox en compte 54. Les filtres de Daubechies et les
+   symlets sont construits par factorisation spectrale du polynôme de
+   Daubechies, à n'importe quel ordre : `wfilters('db4')` rend la table
+   publiée à 4e-13 près, et le signe du passe-haut est celui de MATLAB.
+   Autour d'eux : la transformée décimée en une et deux dimensions avec
+   ses reconstructions partielles, la transformée stationnaire — dont
+   l'invariance par translation est exacte —, la transformée à
+   chevauchement maximal qui conserve l'énergie, l'analyse
+   multirésolution associée, les quatre règles de choix du seuil de
+   Donoho et Johnstone, l'estimation robuste du bruit, le débruitage et
+   la compression, les quatre signaux d'essai de 1994, les neuf modes de
+   prolongement aux bords, et l'algorithme en cascade qui rend les
+   fonctions d'échelle et d'ondelette elles-mêmes. Du côté continu :
+   chapeau mexicain, Morlet réelle et les huit dérivées de la
+   gaussienne, avec les fréquences centrales publiées — 0.25, 0.8125,
+   0.2 — retrouvées exactement.
    La Statistics and Machine Learning Toolbox en compte 127 : dix-huit
    lois de probabilité complètes — densité, répartition, quantile,
    tirages, moments, estimation — plus les accès génériques `pdf`,
@@ -164,7 +180,24 @@ totalité.
    majore l'erreur réelle, donc les pas sont plus courts que nécessaire.
    La variable d'environnement `MATLIBRE_ODE_TRACE` affiche le journal
    des pas acceptés et refusés.
-9. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
+9. **La transformée en ondelettes ne connaît que l'extension
+   périodique et deux familles.** `dwt`, `wavedec`, `swt` et `modwt`
+   prolongent toujours le signal par périodisation : c'est le mode
+   `'per'` de MATLAB, et il n'y a pas de `dwtmode` pour en changer. Les
+   longueurs suivent cette convention — `dwt` rend NUMEL(X)/2
+   coefficients, là où le mode `'sym'` de MATLAB en rendrait
+   FLOOR((N+L-1)/2). Les familles disponibles sont les Daubechies et les
+   symlets ; manquent les coiflets, les biorthogonales (`bior`, `rbio`),
+   les Meyer discrètes, et les ondelettes complexes. Il n'y a pas de
+   paquets d'ondelettes (`wpdec`, `besttree`). La transformée continue
+   accepte le chapeau mexicain, Morlet réelle, les huit dérivées de la
+   gaussienne et n'importe quelle ondelette discrète, mais pas Morlet
+   analytique ni un banc de filtres à Q constant : `cwt` rend les
+   coefficients et les pseudo-fréquences, pas le scalogramme d'un banc.
+   `wavefun` échantillonne le support [0, L-1] sur 2^ITER*(L-1)+1
+   points, avec l'intégrale de la fonction d'échelle exactement à un.
+
+10. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
    instruction scalaire. Les opérations vectorisées, elles, tournent à la
    vitesse du C++.
 

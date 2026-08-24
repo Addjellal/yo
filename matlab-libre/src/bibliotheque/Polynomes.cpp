@@ -263,16 +263,31 @@ FONCTION(fnInterp1) {
     const Valeur& cible = args[decalage];
     std::string methode = "linear";
     bool extrapoler = false;
+    bool aValeurHors = false;
+    double valeurHors = NAN;
     for (std::size_t k = decalage + 1; k < args.size(); ++k) {
         if (args[k].estTexte() || args[k].estChaine()) {
             std::string s = args[k].versTexte();
             if (s == "extrap") extrapoler = true;
             else methode = s;
+        } else if (args[k].estNumerique() && args[k].nelem() == 1) {
+            // interp1(x,y,xq,methode,EXTRAPVAL) : la valeur rendue hors
+            // de l'intervalle des abscisses, au lieu de NaN.
+            aValeurHors = true;
+            valeurHors = args[k].re[0];
         }
     }
+    double borneBasse = x.empty() ? NAN : x.front();
+    double borneHaute = x.empty() ? NAN : x.back();
     Valeur r = versDouble(cible);
     for (std::size_t k = 0; k < cible.nelem(); ++k) {
         double xi = cible.re[k];
+        if (!extrapoler && !x.empty() && (xi < borneBasse || xi > borneHaute)) {
+            // Hors intervalle : toutes les méthodes rendent la même chose,
+            // NaN par défaut.
+            r.re[k] = aValeurHors ? valeurHors : NAN;
+            continue;
+        }
         if (methode == "nearest") {
             double meilleur = NAN;
             double distance = INFINITY;

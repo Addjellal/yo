@@ -1,20 +1,27 @@
-function x = idwt2(ca, ch, cv, cd, ondelette)
-%IDWT2 Transformée en ondelettes bidimensionnelle inverse, un niveau.
-%   X = IDWT2(CA,CH,CV,CD,ONDELETTE) reconstruit l'image.
-    % Colonnes d'abord, dans l'ordre inverse de DWT2.
-    for j = 1:size(ca, 2)
-        r = idwt(ca(:, j)', ch(:, j)', ondelette);
-        if j == 1, ligneA = zeros(numel(r), size(ca, 2)); end
-        ligneA(:, j) = r(:);
+function x = idwt2(ca, ch, cv, cd, nom)
+%IDWT2 Reconstruction bidimensionnelle, un niveau.
+%   Réciproque de DWT2 : on remonte d'abord les colonnes, puis les lignes.
+%
+%   Exemple :
+%      [a,h,v,d] = dwt2(magic(4), 'db2');
+%      max(max(abs(idwt2(a,h,v,d,'db2') - magic(4))))   % nul
+    if nargin < 5 || isempty(nom), nom = 'haar'; end
+    ligneA = remonterColonnes(ca, ch, nom);
+    ligneD = remonterColonnes(cv, cd, nom);
+    m = size(ligneA, 1);
+    x = zeros(m, 2 * size(ligneA, 2));
+    for i = 1:m
+        x(i, :) = idwt(ligneA(i, :), ligneD(i, :), nom);
     end
-    for j = 1:size(cv, 2)
-        r = idwt(cv(:, j)', cd(:, j)', ondelette);
-        if j == 1, ligneD = zeros(numel(r), size(cv, 2)); end
-        ligneD(:, j) = r(:);
-    end
-    for i = 1:size(ligneA, 1)
-        r = idwt(ligneA(i, :), ligneD(i, :), ondelette);
-        if i == 1, x = zeros(size(ligneA, 1), numel(r)); end
-        x(i, :) = r;
+end
+
+function y = remonterColonnes(a, d, nom)
+    colonnes = size(a, 2);
+    for j = 1:colonnes
+        v = idwt(a(:, j)', d(:, j)', nom);
+        if j == 1
+            y = zeros(numel(v), colonnes);
+        end
+        y(:, j) = v(:);
     end
 end
