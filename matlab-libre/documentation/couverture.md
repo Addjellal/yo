@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **981 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1023 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -117,7 +117,14 @@ totalité.
    réglage de PID par la marge de phase. Les deux équations de Riccati
    sont résolues par sous-espace invariant, hamiltonien en continu et
    symplectique en discret, et non par itération. La Communications en
-   compte 25, la logique floue 20. Les autres modules
+   compte 67 : les modulations numériques usuelles avec leurs
+   constellations, de Gray comme binaires, les trois modulations
+   analogiques, le codage convolutif complet — treillis construit depuis
+   les polynômes, décodage de Viterbi à décision dure ou souple, jusqu'au
+   rendement k/n —, les codes en blocs cycliques avec leur table de
+   syndromes, les trois familles d'entrelaceurs, et les taux d'erreur
+   théoriques sur canal gaussien comme sur canal de Rayleigh avec
+   diversité. La logique floue en compte 20. Les autres modules
    offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
    appelle d'abord.
    La Wavelet Toolbox en compte 54. Les filtres de Daubechies et les

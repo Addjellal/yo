@@ -14,7 +14,7 @@ function [swa, swd] = swt(x, niveaux, nom)
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     % L'analyse corrèle avec les filtres de reconstruction, comme DWT.
     [~, ~, Lo_D, Hi_D] = wfilters(nom);
-    x = double(x(:))';
+    x = double(x(:)).';
     n = numel(x);
     if mod(n, 2 ^ niveaux) ~= 0
         error('wavelet:swt:BadLength', ...

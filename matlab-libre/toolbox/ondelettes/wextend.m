@@ -36,7 +36,7 @@ function y = wextend(type, mode, x, longueur, cote)
         return
     end
     ligne = isrow(x);
-    v = double(x(:))';
+    v = double(x(:)).';
     y = prolongerVecteur(v, mode, longueur, cote);
     if ~ligne, y = y'; end
 end

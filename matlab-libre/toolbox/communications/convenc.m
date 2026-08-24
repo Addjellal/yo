@@ -1,25 +1,56 @@
-function code = convenc(message, generateurs, contrainte)
-%CONVENC Codeur convolutif systématique en octal.
-%   CODE = CONVENC(MESSAGE,GENERATEURS,CONTRAINTE) où GENERATEURS est un
-%   vecteur de polynômes en octal, par exemple [7 5] pour le code de
-%   rendement 1/2 et de longueur de contrainte 3.
-    if nargin < 3
-        contrainte = 3;
+function [code, etatFinal] = convenc(message, treillis, arg3)
+%CONVENC Codage convolutif.
+%   CODE = CONVENC(MESSAGE,TRELLIS) code MESSAGE, vecteur de bits, avec le
+%   treillis rendu par POLY2TRELLIS. Le message est lu par groupes de K
+%   bits et chaque groupe produit N bits de sortie.
+%
+%   [CODE,ETATFINAL] = CONVENC(MESSAGE,TRELLIS,ETATINITIAL) part d'un état
+%   donné et rend l'état atteint : c'est ce qu'il faut pour coder un long
+%   message par morceaux.
+%
+%   CODE = CONVENC(MESSAGE,GENERATEURS,CONTRAINTE) accepte aussi la forme
+%   directe, GENERATEURS étant un vecteur de polynômes en octal, par
+%   exemple [7 5] pour le rendement 1/2 de longueur de contrainte 3.
+%
+%   Exemple :
+%      convenc([1 0 1 1], poly2trellis(3, [7 5]))
+%      % [1 1 1 0 0 0 0 1]
+%
+%   Voir aussi VITDEC, POLY2TRELLIS, ISTRELLIS.
+    if ~isstruct(treillis)
+        if nargin < 3, arg3 = 3; end
+        treillis = poly2trellis(arg3, treillis);
+        etatInitial = 0;
+    elseif nargin >= 3 && ~isempty(arg3)
+        etatInitial = arg3;
+    else
+        etatInitial = 0;
     end
-    n = numel(generateurs);
-    registres = zeros(1, contrainte);
-    code = zeros(1, numel(message) * n);
-    masques = zeros(n, contrainte);
-    for g = 1:n
-        bits = de2bi(base2dec(dec2base(generateurs(g), 8), 8), contrainte);
-        masques(g, :) = bits(end:-1:1);
+    message = double(message(:))';
+    k = round(log2(treillis.numInputSymbols));
+    n = round(log2(treillis.numOutputSymbols));
+    if mod(numel(message), k) ~= 0
+        error('comm:convenc:BadLength', ...
+              'La longueur du message doit être un multiple de %d.', k);
     end
-    indice = 1;
-    for k = 1:numel(message)
-        registres = [message(k), registres(1:end-1)];
-        for g = 1:n
-            code(indice) = mod(sum(registres .* masques(g, :)), 2);
-            indice = indice + 1;
-        end
+    pas = numel(message) / k;
+    code = zeros(1, pas * n);
+    etat = etatInitial;
+    sortiesDecimales = oct2dec(treillis.outputs);
+    for t = 1:pas
+        bitsEntree = message((t-1)*k + 1 : t*k);
+        symbole = sum(bitsEntree .* 2 .^ (k-1:-1:0));
+        valeur = sortiesDecimales(etat + 1, symbole + 1);
+        code((t-1)*n + 1 : t*n) = bitsDepuisEntier(valeur, n);
+        etat = treillis.nextStates(etat + 1, symbole + 1);
+    end
+    etatFinal = etat;
+end
+
+function bits = bitsDepuisEntier(valeur, longueur)
+    bits = zeros(1, longueur);
+    for position = longueur:-1:1
+        bits(position) = mod(valeur, 2);
+        valeur = floor(valeur / 2);
     end
 end

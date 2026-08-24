@@ -41,6 +41,184 @@ for position = 1:7
     assert(isequal(decode(abime, 7, 4, 'hamming/fmt'), message));
 end
 
+% Chiffres et bases : les deux conventions de poids.
+assert(isequal(de2bi(5, 4), [1 0 1 0]));
+assert(isequal(de2bi(5, 4, 2, 'left-msb'), [0 1 0 1]));
+assert(bi2de([0 1 1 0]) == 6);
+assert(bi2de([1 0 0 0], 2, 'left-msb') == 8);
+assert(isequal(de2bi(63, 2, 8), [7 7]));
+assert(isequal(bi2de(de2bi(0:15, 4)), (0:15)'));
+assert(isequal(oct2dec([171 133]), [121 91]));
+assert(isequal(dec2oct([121 91]), [171 133]));
+
+% Treillis d'un codeur convolutif : le (7,5) de longueur de contrainte
+% trois est celui de tous les manuels.
+treillis = poly2trellis(3, [7 5]);
+assert(treillis.numInputSymbols == 2);
+assert(treillis.numOutputSymbols == 4);
+assert(treillis.numStates == 4);
+assert(isequal(treillis.nextStates, [0 2; 0 2; 1 3; 1 3]));
+assert(isequal(treillis.outputs, [0 3; 3 0; 2 1; 1 2]));
+assert(istrellis(treillis));
+assert(~istrellis(struct('numInputSymbols', 2)));
+treillisAbime = treillis;
+treillisAbime.nextStates(1, 1) = 99;
+assert(~istrellis(treillisAbime));
+assert(isequal(convenc([1 0 1 1], treillis), [1 1 1 0 0 0 0 1]));
+assert(isequal(convenc([1 0 1 1], [7 5], 3), [1 1 1 0 0 0 0 1]));
+% Aller-retour, décision dure puis souple, et correction d'une erreur.
+motConvolutif = [1 0 1 1 0 0 1 0 1 1 0 0];
+codeConvolutif = convenc(motConvolutif, treillis);
+assert(isequal(vitdec(codeConvolutif, treillis, 5, 'term', 'hard'), motConvolutif));
+codeAbime = codeConvolutif;
+codeAbime(7) = 1 - codeAbime(7);
+assert(isequal(vitdec(codeAbime, treillis, 5, 'term', 'hard'), motConvolutif));
+assert(isequal(vitdec(1 - 2 * codeConvolutif, treillis, 5, 'term', 'unquant'), motConvolutif));
+% Le code de la NASA, longueur de contrainte sept.
+treillisNasa = poly2trellis(7, [171 133]);
+assert(treillisNasa.numStates == 64);
+motNasa = [1 0 1 1 0 1 0 0 1 1 1 0 0 0 0 0 0 0];
+assert(isequal(vitdec(convenc(motNasa, treillisNasa), treillisNasa, 34, 'term', 'hard'), motNasa));
+% Codage par morceaux : l'état final se reprend tel quel.
+[codeDebut, etatIntermediaire] = convenc([1 0 1 1], treillis);
+codeSuite = convenc([0 0 1 0], treillis, etatIntermediaire);
+assert(isequal([codeDebut codeSuite], convenc([1 0 1 1 0 0 1 0], treillis)));
+% Rendement deux tiers.
+treillisDeuxTiers = poly2trellis([5 4], [23 35 0; 0 5 13]);
+motDeuxTiers = [1 0 1 1 0 0 1 1 0 1 0 0];
+codeDeuxTiers = convenc(motDeuxTiers, treillisDeuxTiers);
+assert(numel(codeDeuxTiers) == 18);
+assert(isequal(vitdec(codeDeuxTiers, treillisDeuxTiers, 10, 'trunc', 'hard'), motDeuxTiers));
+
+% Codes en blocs : matrices, polynômes cycliques, table de syndromes.
+assert(isequal(mod(gen2par(G), 2), mod(H, 2)));
+assert(isequal(mod(gen2par(H), 2), mod(G, 2)));
+polynomeCyclique = cyclpoly(7, 4);
+assert(isequal(size(cyclpoly(7, 4, 'all')), [2 4]));
+[Hcyclique, Gcyclique, kCyclique] = cyclgen(7, polynomeCyclique);
+assert(kCyclique == 4);
+assert(all(all(mod(Gcyclique * Hcyclique', 2) == 0)));
+assert(isequal(Gcyclique(:, 1:kCyclique), eye(kCyclique)));
+% Distance minimale : trois pour le [7,4], quatre pour le [7,3].
+motsCode = zeros(2 ^ kCyclique, 7);
+for indiceMot = 0:2 ^ kCyclique - 1
+    motsCode(indiceMot + 1, :) = mod(de2bi(indiceMot, kCyclique, 2, 'left-msb') * Gcyclique, 2);
+end
+assert(min(sum(motsCode(2:end, :), 2)) == 3);
+[~, Gsimplexe, kSimplexe] = cyclgen(7, cyclpoly(7, 3));
+motsSimplexe = zeros(2 ^ kSimplexe, 7);
+for indiceMot = 0:2 ^ kSimplexe - 1
+    motsSimplexe(indiceMot + 1, :) = mod(de2bi(indiceMot, kSimplexe, 2, 'left-msb') * Gsimplexe, 2);
+end
+assert(min(sum(motsSimplexe(2:end, :), 2)) == 4);
+% Table de syndromes : sept motifs de poids un et le motif nul.
+tableSyndromes = syndtable(H);
+assert(isequal(size(tableSyndromes), [8 7]));
+assert(isequal(sort(sum(tableSyndromes, 2))', [0 1 1 1 1 1 1 1]));
+for position = 1:7
+    motifErreur = zeros(1, 7);
+    motifErreur(position) = 1;
+    syndrome = mod(motifErreur * H', 2);
+    assert(isequal(tableSyndromes(bi2de(syndrome, 2, 'left-msb') + 1, :), motifErreur));
+end
+
+% Modulations analogiques : la porteuse doit tenir sous Nyquist.
+tAnalogique = (0:1999)' / 10000;
+modulant = sin(2 * pi * 30 * tAnalogique);
+milieuUtile = 400:1600;
+signalAm = ammod(modulant, 1000, 10000);
+% Le spectre d'une modulation d'amplitude a deux raies, à FC +- FM.
+spectreAm = abs(fft(signalAm));
+frequences = (0:1999) / 2000 * 10000;
+[~, plusFortes] = sort(spectreAm(1:1000), 'descend');
+assert(isequal(sort(round(frequences(plusFortes(1:2)))), [970 1030]));
+recuAm = amdemod(signalAm, 1000, 10000);
+assert(max(abs(recuAm(milieuUtile) - modulant(milieuUtile))) < 0.15);
+% Avec porteuse, l'enveloppe ne s'annule jamais.
+assert(min(abs(ammod(modulant, 1000, 10000, 0, 2))) > 0);
+% Phase et fréquence se retrouvent presque exactement.
+recuPm = pmdemod(pmmod(modulant, 1000, 10000, 1), 1000, 10000, 1);
+assert(max(abs(recuPm(milieuUtile) - modulant(milieuUtile))) < 1e-6);
+recuFm = fmdemod(fmmod(modulant, 1000, 10000, 200), 1000, 10000, 200);
+assert(max(abs(recuFm(milieuUtile) - modulant(milieuUtile))) < 0.02);
+% Un modulant constant donne un écart de fréquence constant.
+recuConstant = fmdemod(fmmod(ones(2000, 1), 1000, 10000, 200), 1000, 10000, 200);
+assert(abs(mean(recuConstant(milieuUtile)) - 1) < 1e-6);
+erreurAttrapee = false;
+try
+    ammod(modulant, 6000, 10000);
+catch
+    erreurAttrapee = true;
+end
+assert(erreurAttrapee);
+
+% Modulations numériques supplémentaires.
+assert(isequal(pammod(0:3, 4), [-3 -1 1 3]));
+assert(isequal(pamdemod([-3 -0.9 1.2 3], 4), [0 1 2 3]));
+assert(isequal(pamdemod(pammod(0:7, 8), 8), 0:7));
+assert(isequal(pamdemod(pammod(0:7, 8, 0, 'gray'), 8, 0, 'gray'), 0:7));
+constellationLibre = [1, 1i, -1, -1i];
+assert(max(abs(genqammod([0 1 2 3], constellationLibre) - constellationLibre)) < 1e-12);
+assert(isequal(genqamdemod([0.9+0.1i, -0.2+1.1i], constellationLibre), [0 1]));
+constellationQam = qammod(0:15, 16);
+assert(abs(mean(abs(modnorm(constellationQam, 'avpow', 1) * constellationQam) .^ 2) - 1) < 1e-12);
+assert(abs(max(abs(modnorm(constellationQam, 'peakpow', 1) * constellationQam) .^ 2) - 1) < 1e-12);
+% Gray : deux points voisins ne diffèrent que d'un bit.
+assert(isequal(bin2gray(0:7, 'psk', 8), [0 1 3 2 6 7 5 4]));
+assert(isequal(gray2bin(bin2gray(0:7, 'psk', 8), 'psk', 8), 0:7));
+codesGray = bin2gray(0:15, 'pam', 16);
+for indiceGray = 1:15
+    assert(sum(de2bi(bitxor(codesGray(indiceGray), codesGray(indiceGray + 1)), 4)) == 1);
+end
+assert(isequal(sort(bin2gray(0:15, 'qam', 16)), 0:15));
+% MSK : enveloppe constante, phase avançant de pi/2 par symbole.
+bitsMsk = [1 0 1 1 0 0 1];
+signalMsk = mskmod(bitsMsk, 8);
+assert(max(abs(abs(signalMsk) - 1)) < 1e-12);
+assert(numel(signalMsk) == 56);
+assert(isequal(mskdemod(signalMsk, 8), bitsMsk));
+assert(isequal(mskdemod(mskmod(bitsMsk, 8, 'nondiff'), 8, 'nondiff'), bitsMsk));
+phasesMsk = unwrap(angle([1, mskmod(bitsMsk, 8, 'nondiff')]));
+assert(max(abs(abs(diff(phasesMsk(1:8:end))) - pi/2)) < 1e-12);
+
+% Entrelacement.
+assert(isequal(intrlv([10 20 30 40], [3 1 4 2]), [30 10 40 20]));
+assert(isequal(deintrlv(intrlv([10 20 30 40], [3 1 4 2]), [3 1 4 2]), [10 20 30 40]));
+assert(isequal(randdeintrlv(randintrlv(1:8, 42), 42), 1:8));
+assert(isequal(randintrlv(1:8, 42), randintrlv(1:8, 42)));
+assert(~isequal(randintrlv(1:8, 42), randintrlv(1:8, 7)));
+assert(isequal(matintrlv(1:6, 2, 3), [1 4 2 5 3 6]));
+assert(isequal(matdeintrlv(matintrlv(1:6, 2, 3), 2, 3), 1:6));
+% Une rafale de trois erreurs consécutives se retrouve espacée de quatre.
+rafale = zeros(1, 12);
+rafale(4:6) = 1;
+assert(isequal(find(matdeintrlv(rafale, 3, 4)), [2 6 10]));
+% Canal binaire symétrique : le taux mesuré suit la probabilité.
+rng(1);
+[sortieBsc, erreursBsc] = bsc(zeros(1, 10000), 0.1);
+assert(abs(sum(erreursBsc) / 10000 - 0.1) < 0.02);
+assert(isequal(sortieBsc, erreursBsc));
+assert(isequal(vec2mat(1:5, 3), [1 2 3; 4 5 0]));
+[~, resteVec] = vec2mat(1:5, 3);
+assert(resteVec == 1);
+
+% Taux d'erreur sur canal de Rayleigh : la formule close pour la MDP-2.
+for niveauDb = [0 5 10 20]
+    gammaMoyen = 10 ^ (niveauDb / 10);
+    assert(abs(berfading(niveauDb, 'psk', 2, 1) - (1 - sqrt(gammaMoyen / (1 + gammaMoyen))) / 2) < 1e-12);
+end
+% La diversité fait chuter le taux, et Rayleigh reste pire que le gaussien.
+assert(berfading(10, 'psk', 2, 1) > berfading(10, 'psk', 2, 2));
+assert(berfading(10, 'psk', 2, 2) > berfading(10, 'psk', 2, 4));
+assert(berfading(15, 'qam', 16, 1) > berawgn(15, 'qam', 16));
+assert(berfading(15, 'qam', 16, 1) > berfading(15, 'qam', 16, 3));
+% Conversions de rapport signal sur bruit.
+assert(abs(convertSNR(10, 'ebno', 'snr', 'BitsPerSymbol', 4) - (10 + 10 * log10(4))) < 1e-12);
+assert(abs(convertSNR(10, 'ebno', 'esno', 'BitsPerSymbol', 4, 'CodingRate', 0.5) - (10 + 10 * log10(2))) < 1e-12);
+assert(abs(convertSNR(10, 'snr', 'esno', 'SamplesPerSymbol', 8) - (10 + 10 * log10(8))) < 1e-12);
+assert(abs(convertSNR(convertSNR(10, 'ebno', 'snr', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8), ...
+                      'snr', 'ebno', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8) - 10) < 1e-12);
+
 %% -------------------------------------------------------- ondelettes
 % Bancs de filtres : les valeurs de db2 sont celles que publie la
 % documentation, au signe près qui est celui de MATLAB.

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <sstream>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
@@ -261,16 +262,87 @@ FONCTION(fnRandperm) {
     return {Valeur::ligne(v)};
 }
 
+// Etat du generateur, rendu sous forme numerique. Les mots de mt19937_64
+// font 64 bits, ce qu'un double ne represente pas exactement : chacun est
+// donc coupe en deux moities de 32 bits, ce qui rend la restitution exacte.
+static Valeur etatGenerateur(const std::mt19937_64& g) {
+    std::ostringstream flux;
+    flux << g;
+    std::istringstream lecture(flux.str());
+    std::vector<double> mots;
+    unsigned long long mot = 0;
+    while (lecture >> mot) {
+        mots.push_back((double)(mot >> 32));
+        mots.push_back((double)(mot & 0xFFFFFFFFull));
+    }
+    Valeur v = Valeur::matrice((int)mots.size(), 1);
+    for (std::size_t k = 0; k < mots.size(); ++k) v.re[k] = mots[k];
+    return v;
+}
+
+static void restaurerGenerateur(std::mt19937_64& g, const Valeur& etat) {
+    if (etat.nelem() % 2 != 0) erreur("MATLAB:rng:badState", "rng : etat de longueur impaire.");
+    std::ostringstream flux;
+    for (std::size_t k = 0; k + 1 < etat.nelem(); k += 2) {
+        unsigned long long haut = (unsigned long long)etat.re[k];
+        unsigned long long bas = (unsigned long long)etat.re[k + 1];
+        if (k) flux << ' ';
+        flux << ((haut << 32) | bas);
+    }
+    std::istringstream lecture(flux.str());
+    lecture >> g;
+    if (lecture.fail()) erreur("MATLAB:rng:badState", "rng : etat illisible.");
+}
+
 FONCTION(fnRng) {
-    INUTILISE
-    if (args.empty()) return {};
+    static double dernierGerme = 5489.0;
+    auto rendreEtat = [&]() {
+        Valeur s;
+        s.classe = Classe::Structure;
+        s.dims = {1, 1};
+        s.st = std::make_shared<ChampsStructure>();
+        s.st->ordre = {"Type", "Seed", "State"};
+        s.st->champs["Type"] = {Valeur::texte("twister")};
+        s.st->champs["Seed"] = {Valeur::scalaire(dernierGerme)};
+        s.st->champs["State"] = {etatGenerateur(it.generateur)};
+        return s;
+    };
+    if (args.empty()) {
+        if (nargout >= 1) return {rendreEtat()};
+        return {};
+    }
+    if (args[0].classe == Classe::Structure) {
+        // rng(S) restitue un etat rendu par un appel precedent.
+        if (!args[0].st) erreur("MATLAB:rng:badState", "rng : structure vide.");
+        auto it2 = args[0].st->champs.find("State");
+        if (it2 == args[0].st->champs.end() || it2->second.empty())
+            erreur("MATLAB:rng:badState", "rng : la structure doit porter un champ State.");
+        Valeur avant;
+        if (nargout >= 1) avant = rendreEtat();
+        restaurerGenerateur(it.generateur, it2->second[0]);
+        auto itGerme = args[0].st->champs.find("Seed");
+        if (itGerme != args[0].st->champs.end() && !itGerme->second.empty() &&
+            itGerme->second[0].nelem() == 1)
+            dernierGerme = itGerme->second[0].re[0];
+        if (nargout >= 1) return {avant};
+        return {};
+    }
+    Valeur avant;
+    if (nargout >= 1) avant = rendreEtat();
     if (args[0].estTexte() || args[0].estChaine()) {
         std::string s = args[0].versTexte();
-        if (s == "default") it.generateur.seed(5489u);
-        else if (s == "shuffle") it.generateur.seed(std::random_device{}());
+        if (s == "default") { it.generateur.seed(5489u); dernierGerme = 5489.0; }
+        else if (s == "shuffle") {
+            unsigned germe = std::random_device{}();
+            it.generateur.seed(germe);
+            dernierGerme = (double)germe;
+        }
+        if (nargout >= 1) return {avant};
         return {};
     }
     it.generateur.seed((unsigned long long)args[0].scal());
+    dernierGerme = args[0].scal();
+    if (nargout >= 1) return {avant};
     return {};
 }
 

@@ -10,7 +10,7 @@ function w = modwt(x, nom, niveaux)
 %      w = modwt(1:8, 'haar', 2);
 %      abs(sum(sum(w.^2)) - sum((1:8).^2))   % nul
     if nargin < 2 || isempty(nom), nom = 'haar'; end
-    x = double(x(:))';
+    x = double(x(:)).';
     n = numel(x);
     if nargin < 3 || isempty(niveaux), niveaux = floor(log2(n)); end
     [~, ~, Lo_D, Hi_D] = wfilters(nom);

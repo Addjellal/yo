@@ -6,7 +6,7 @@ function y = upcoef(genre, x, nom, niveaux, longueur)
 %   Exemple :
 %      upcoef('a', 1, 'haar', 1)   % [0.7071 0.7071]
     if nargin < 4 || isempty(niveaux), niveaux = 1; end
-    x = double(x(:))';
+    x = double(x(:)).';
     for k = 1:niveaux
         zeroCoef = zeros(size(x));
         if lower(char(genre)) == 'a'
