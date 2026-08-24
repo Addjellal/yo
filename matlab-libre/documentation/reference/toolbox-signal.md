@@ -912,6 +912,10 @@ ISSTABLE Le filtre est-il stable ?
   l'intérieur du cercle unité.
 
   ISSTABLE(SOS) accepte aussi une matrice de sections du second ordre.
+
+  ISSTABLE(SYS) accepte un modèle linéaire : la stabilité s'y lit sur
+  les pôles, strictement à gauche de l'axe imaginaire pour un modèle
+  continu, strictement dans le cercle unité pour un modèle discret.
 ```
 
 ## `kaiser`

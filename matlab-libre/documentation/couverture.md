@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **610 fonctions natives** couvrant le MATLAB de base.
-- **945 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **981 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -106,7 +106,18 @@ totalité.
    L'Image Processing Toolbox en compte 123 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
-   40, la Communications 25, la logique floue 20. Les autres modules
+   76 : construction et conversion des modèles dans les trois
+   représentations, réponses temporelles et fréquentielles avec les trois
+   diagrammes, toutes les marges — gain, phase, retard —, formes
+   échelonnées de commandabilité et d'observabilité, formes modale et
+   compagne, réduction d'ordre par troncature équilibrée avec la borne
+   d'erreur en deux fois la somme des valeurs singulières de Hankel
+   supprimées, et la synthèse : placement de pôles, commande linéaire
+   quadratique sous cinq formes, observateur, régulateur complet et
+   réglage de PID par la marge de phase. Les deux équations de Riccati
+   sont résolues par sous-espace invariant, hamiltonien en continu et
+   symplectique en discret, et non par itération. La Communications en
+   compte 25, la logique floue 20. Les autres modules
    offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
    appelle d'abord.
    La Wavelet Toolbox en compte 54. Les filtres de Daubechies et les

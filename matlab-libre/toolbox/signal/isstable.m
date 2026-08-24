@@ -4,6 +4,22 @@ function tf = isstable(b, a)
 %   l'intérieur du cercle unité.
 %
 %   ISSTABLE(SOS) accepte aussi une matrice de sections du second ordre.
+%
+%   ISSTABLE(SYS) accepte un modèle linéaire : la stabilité s'y lit sur
+%   les pôles, strictement à gauche de l'axe imaginaire pour un modèle
+%   continu, strictement dans le cercle unité pour un modèle discret.
+    if nargin < 2 && isstruct(b) && isfield(b, 'type')
+        % Modèle linéaire de la Control System Toolbox : la stabilité se
+        % lit sur les pôles, à gauche de l'axe imaginaire en continu, dans
+        % le cercle unité en discret.
+        p = pole(b);
+        if b.Ts == 0
+            tf = all(real(p) < 0);
+        else
+            tf = all(abs(p) < 1);
+        end
+        return
+    end
     if nargin < 2
         if size(b, 2) == 6 && size(b, 1) >= 1
             tf = true;

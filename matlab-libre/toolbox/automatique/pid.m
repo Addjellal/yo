@@ -25,7 +25,13 @@ function sys = pid(Kp, Ki, Kd, Tf, Ts)
         end
     else
         if Ki ~= 0
-            num = [Kd, Kp, Ki];
+            % Sans terme dérivé, le numérateur reste de degré un : on ne
+            % laisse pas de zéro de tête, comme MATLAB.
+            if Kd ~= 0
+                num = [Kd, Kp, Ki];
+            else
+                num = [Kp, Ki];
+            end
             den = [1, 0];
         elseif Kd ~= 0
             num = [Kd, Kp];

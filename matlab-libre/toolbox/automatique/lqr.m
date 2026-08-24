@@ -1,20 +1,37 @@
-function [K, S] = lqr(A, B, Q, R)
+function [K, S, poles] = lqr(A, B, Q, R, N)
 %LQR Commande linéaire quadratique en temps continu.
-%   [K,S] = LQR(A,B,Q,R) minimise l'intégrale de x'Qx + u'Ru. S est la
-%   solution de l'équation de Riccati, résolue par itération sur la
-%   version discrétisée.
-    n = size(A, 1);
-    S = Q;
-    dt = 0.001;
-    Ad = eye(n) + A * dt;
-    Bd = B * dt;
-    for k = 1:200000
-        Sn = Ad' * S * Ad - (Ad' * S * Bd) / (R + Bd' * S * Bd) * (Bd' * S * Ad) + Q * dt;
-        if max(max(abs(Sn - S))) < 1e-12 * max(1, max(max(abs(S))))
-            S = Sn;
-            break;
-        end
-        S = Sn;
+%   [K,S,P] = LQR(A,B,Q,R) minimise l'intégrale de x'Qx + u'Ru sous
+%   dx/dt = Ax + Bu, et rend le gain K du retour u = -Kx, la solution S
+%   de l'équation de Riccati et les pôles P de la boucle fermée.
+%
+%   [K,S,P] = LQR(A,B,Q,R,N) ajoute le terme croisé 2x'Nu au coût. Il se
+%   ramène au cas sans terme croisé en posant
+%      Atilde = A - B R^{-1} N',   Qtilde = Q - N R^{-1} N',
+%   puis K = R^{-1} (B'S + N').
+%
+%   LQR(SYS,Q,R,N) accepte aussi un modèle d'état.
+%
+%   Exemple :
+%      lqr(0, 1, 1, 1)   % 1 : le gain qui place le pôle en -1
+%
+%   Voir aussi CARE, DLQR, LQRY, LQI.
+    if isstruct(A)
+        systeme = ss(A);
+        if nargin >= 4, N = R; else, N = []; end
+        R = Q;
+        Q = B;
+        B = systeme.B;
+        A = systeme.A;
+        if isempty(N), N = zeros(size(B)); end
+    elseif nargin < 5 || isempty(N)
+        N = zeros(size(B));
     end
-    K = R \ (B' * S);
+    if nargin < 4 || isempty(R), R = eye(size(B, 2)); end
+    Atilde = A - B * (R \ N');
+    Qtilde = Q - N * (R \ N');
+    S = care(Atilde, B, Qtilde, R);
+    K = R \ (B' * S + N');
+    if nargout > 2
+        poles = eig(A - B * K);
+    end
 end
