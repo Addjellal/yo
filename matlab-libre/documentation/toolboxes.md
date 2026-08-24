@@ -61,7 +61,7 @@ existant appellera.
 | `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 127 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 14 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
-| `vision` | Computer Vision Toolbox — vision par ordinateur. | 16 |
+| `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
 Les fonctions natives — 611, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,

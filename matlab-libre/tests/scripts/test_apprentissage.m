@@ -257,4 +257,205 @@ assert(abs(img(10, 10, 1) - 1) < 1e-12);
 assert(abs(img(10, 10, 2)) < 1e-12);
 assert(abs(img(1, 1, 1)) < 1e-12);      % le reste n'a pas bougé
 
+%% ------------------------------------- vision : images intégrales
+% La somme d'un rectangle se lit en quatre accès.
+tableIntegrale = integralImage(ones(3));
+assert(isequal(size(tableIntegrale), [4 4]));
+assert(tableIntegrale(end, end) == 9);
+assert(tableIntegrale(3, 3) - tableIntegrale(1, 3) - tableIntegrale(3, 1) + tableIntegrale(1, 1) == 4);
+integraleMagique = integralImage(magic(5));
+assert(abs(integraleMagique(end, end) - sum(sum(magic(5)))) < 1e-12);
+noyauCarre = struct('BoundingBoxes', [1 1 3 3], 'Weights', 1);
+reponseIntegrale = integralFilter(integralImage(ones(5)), noyauCarre);
+assert(isequal(size(reponseIntegrale), [3 3]));
+assert(abs(reponseIntegrale(1) - 9) < 1e-12);
+% Filtre à deux rectangles : détecte un bord vertical.
+noyauBord = struct('BoundingBoxes', [1 1 2 2; 3 1 2 2], 'Weights', [1 -1]);
+assert(all(integralFilter(integralImage([ones(4, 2) zeros(4, 2)]), noyauBord) == 4));
+
+%% ------------------------------------------ vision : points d'intérêt
+% Un carré blanc sur fond noir a quatre coins, et le détecteur de
+% Shi-Tomasi les trouve tous les quatre.
+carre = zeros(20);
+carre(6:15, 6:15) = 1;
+coinsMinEigen = detectMinEigenFeatures(carre);
+assert(size(coinsMinEigen, 1) == 4);
+coinsTries = sortrows(coinsMinEigen);
+assert(max(max(abs(coinsTries - [7 7; 7 14; 14 7; 14 14]))) <= 1);
+% Sélection uniforme : les points retenus couvrent toute l'image.
+rng(2);
+pointsDenses = rand(500, 2) * 100;
+retenus = selectUniform(pointsDenses, 20, [100 100]);
+assert(size(retenus, 1) == 20);
+assert(min(retenus(:, 1)) < 25 && max(retenus(:, 1)) > 75);
+
+%% ------------------------------------------------ vision : descripteurs
+% HOG : la longueur suit la formule de Dalal et Triggs, et chaque bloc est
+% normalisé à un.
+descripteurHog = extractHOGFeatures(zeros(64, 64));
+assert(numel(descripteurHog) == 1764);
+[descripteur32, dispositionHog] = extractHOGFeatures(rand(32, 32));
+assert(numel(descripteur32) == prod(dispositionHog.NumBlocks) * ...
+       prod(dispositionHog.BlockSize) * dispositionHog.NumBins);
+assert(isequal(dispositionHog.NumBlocks, [3 3]));
+assert(abs(norm(descripteur32(1:36)) - 1) < 1e-9);
+% La normalisation par bloc rend le descripteur insensible au gain.
+imageHog = rand(32);
+assert(max(abs(extractHOGFeatures(imageHog) - extractHOGFeatures(imageHog * 3))) < 1e-12);
+% LBP : la longueur vaut P*(P-1)+3 par cellule, ou P+2 si l'on demande
+% l'invariance par rotation.
+assert(numel(extractLBPFeatures(rand(32))) == 59);
+assert(numel(extractLBPFeatures(rand(32), 'Upright', false)) == 10);
+assert(numel(extractLBPFeatures(rand(32), 'CellSize', [16 16])) == 236);
+assert(abs(norm(extractLBPFeatures(rand(32))) - 1) < 1e-9);
+% Avec quatre voisins, tous sur des positions entières, le motif ne dépend
+% que de l'ordre des intensités : une transformation monotone ne change
+% rien.
+textureLbp = rand(24);
+assert(max(abs(extractLBPFeatures(textureLbp, 'NumNeighbors', 4) - ...
+               extractLBPFeatures(textureLbp .^ 2, 'NumNeighbors', 4))) < 1e-12);
+
+%% ------------------------------------- vision : géométrie épipolaire
+% Rodrigues : aller-retour exact, matrice orthogonale de déterminant un.
+matriceRotation = rotationVectorToMatrix([0 0 pi/2]);
+assert(max(abs(matriceRotation * [1; 0; 0] - [0; 1; 0])) < 1e-12);
+assert(norm(matriceRotation * matriceRotation' - eye(3)) < 1e-12);
+assert(abs(det(matriceRotation) - 1) < 1e-12);
+vecteurRotation = [0.1 0.2 0.3];
+assert(max(abs(rotationMatrixToVector(rotationVectorToMatrix(vecteurRotation)) - vecteurRotation)) < 1e-12);
+assert(isequal(rotationMatrixToVector(eye(3)), [0 0 0]));
+assert(max(abs(rotationMatrixToVector(rotationVectorToMatrix([pi 0 0])) - [pi 0 0])) < 1e-6);
+
+% Scène synthétique : deux vues d'un nuage de points.
+rng(3);
+nuage3D = [rand(30, 1) * 4 - 2, rand(30, 1) * 4 - 2, rand(30, 1) * 3 + 5];
+projection1 = [eye(3), zeros(3, 1)];
+projection2 = [rotationVectorToMatrix([0 0.05 0]), [-1; 0.1; 0]];
+homogene1 = (projection1 * [nuage3D ones(30, 1)]')';
+vue1 = homogene1(:, 1:2) ./ [homogene1(:, 3) homogene1(:, 3)];
+homogene2 = (projection2 * [nuage3D ones(30, 1)]')';
+vue2 = homogene2(:, 1:2) ./ [homogene2(:, 3) homogene2(:, 3)];
+matriceFondamentale = estimateFundamentalMatrix(vue1, vue2);
+% La contrainte épipolaire est vérifiée, et la matrice est de rang deux.
+assert(max(abs(sum(([vue2 ones(30, 1)] * matriceFondamentale) .* [vue1 ones(30, 1)], 2))) < 1e-10);
+assert(min(svd(matriceFondamentale)) < 1e-12);
+assert(rank(matriceFondamentale, 1e-8) == 2);
+% Chaque point de la seconde vue est sur la droite épipolaire de son
+% correspondant.
+droitesEpipolaires = epipolarLine(matriceFondamentale, vue1);
+assert(max(abs(sum(droitesEpipolaires .* [vue2 ones(30, 1)], 2))) < 1e-10);
+assert(all(sqrt(sum(droitesEpipolaires(:, 1:2) .^ 2, 2)) > 1e-9));
+% Triangulation : on retrouve le nuage de départ.
+[nuageReconstruit, erreursReprojection] = triangulate(vue1, vue2, projection1, projection2);
+assert(max(max(abs(nuageReconstruit - nuage3D))) < 1e-10);
+assert(max(erreursReprojection) < 1e-10);
+assert(max(abs(triangulate([0 0], [-1 0], [eye(3) zeros(3, 1)], [eye(3) [-1; 0; 0]]) - [0 0 1])) < 1e-10);
+% Les matrices 4x3 de MATLAB sont acceptées telles quelles.
+assert(max(abs(triangulate([0 0], [-1 0], [eye(3) zeros(3, 1)]', [eye(3) [-1; 0; 0]]') - [0 0 1])) < 1e-10);
+% MSAC écarte les appariements aberrants.
+vueSalie = vue2;
+vueSalie(1:5, :) = vueSalie(1:5, :) + 30;
+[matriceRobuste, valides] = estimateFundamentalMatrix(vue1, vueSalie, ...
+    'Method', 'MSAC', 'DistanceThreshold', 0.01, 'NumTrials', 300);
+assert(sum(valides) == 25);
+assert(~any(valides(1:5)));
+residusPropres = abs(sum(([vue2 ones(30, 1)] * matriceRobuste) .* [vue1 ones(30, 1)], 2));
+assert(max(residusPropres(6:end)) < 1e-10);
+
+%% --------------------------------------- vision : stéréo et mouvement
+anaglyphe = stereoAnaglyph(zeros(4), ones(4));
+assert(isequal(reshape(anaglyphe(1, 1, :), 1, 3), [0 1 1]));
+% Disparité : une barre décalée de trois puis de cinq colonnes.
+imageGauche = zeros(20, 40);
+imageGauche(:, 10:15) = 1;
+imageDroite = zeros(20, 40);
+imageDroite(:, 7:12) = 1;
+carteDisparite = disparityBM(imageGauche, imageDroite, 'BlockSize', 5, 'DisparityRange', [0 8]);
+bandeDisparite = carteDisparite(6:15, 11:14);
+assert(median(bandeDisparite(:)) == 3);
+imageDroite5 = zeros(20, 40);
+imageDroite5(:, 5:10) = 1;
+carte5 = disparityBM(imageGauche, imageDroite5, 'BlockSize', 5, 'DisparityRange', [0 8]);
+bande5 = carte5(6:15, 11:14);
+assert(median(bande5(:)) == 5);
+% Horn et Schunck : sur un motif lisse décalé d'un pixel, le champ
+% retrouve le déplacement dans les deux directions.
+[grilleX, grilleY] = meshgrid(1:40, 1:40);
+motifA = sin(2 * pi * grilleX / 12) .* sin(2 * pi * grilleY / 12);
+motifDecaleX = sin(2 * pi * (grilleX - 1) / 12) .* sin(2 * pi * grilleY / 12);
+[flotX, flotY] = opticalFlowHS(motifA, motifDecaleX, 'MaxIteration', 300, 'Smoothness', 0.5);
+assert(abs(mean(mean(flotX(10:30, 10:30))) - 1) < 0.05);
+assert(abs(mean(mean(flotY(10:30, 10:30)))) < 0.05);
+motifDecaleY = sin(2 * pi * grilleX / 12) .* sin(2 * pi * (grilleY - 1) / 12);
+[flotX2, flotY2] = opticalFlowHS(motifA, motifDecaleY, 'MaxIteration', 300, 'Smoothness', 0.5);
+assert(abs(mean(mean(flotY2(10:30, 10:30))) - 1) < 0.05);
+assert(abs(mean(mean(flotX2(10:30, 10:30)))) < 0.05);
+assert(~any(any(isnan(flotX))));
+
+%% ---------------------------------------- vision : appariement optimal
+% Le cas glouton et le cas optimal diffèrent : l'algorithme hongrois
+% trouve le minimum global.
+[appariements, pistesLibres, detectionsLibres] = assignDetectionsToTracks([1 100; 100 2], 50);
+assert(isequal(appariements, [1 1; 2 2]));
+assert(isempty(pistesLibres) && isempty(detectionsLibres));
+coutsTrois = [4 1 3; 2 0 5; 3 2 2];
+appariementsTrois = assignDetectionsToTracks(coutsTrois, 100);
+coutTotal = 0;
+for k = 1:size(appariementsTrois, 1)
+    coutTotal = coutTotal + coutsTrois(appariementsTrois(k, 1), appariementsTrois(k, 2));
+end
+assert(coutTotal == 5);
+% Vérification exhaustive sur une matrice cinq par cinq.
+rng(4);
+coutsCinq = round(rand(5) * 20);
+appariementsCinq = assignDetectionsToTracks(coutsCinq, 1000);
+coutMunkres = 0;
+for k = 1:size(appariementsCinq, 1)
+    coutMunkres = coutMunkres + coutsCinq(appariementsCinq(k, 1), appariementsCinq(k, 2));
+end
+toutesPermutations = perms(1:5);
+coutOptimal = Inf;
+for k = 1:size(toutesPermutations, 1)
+    somme = 0;
+    for i = 1:5
+        somme = somme + coutsCinq(i, toutesPermutations(k, i));
+    end
+    coutOptimal = min(coutOptimal, somme);
+end
+assert(coutMunkres == coutOptimal);
+% Au-delà du coût de non-appariement, mieux vaut laisser seul.
+[appariementsChers, pistesSeules, detectionsSeules] = assignDetectionsToTracks([1 100; 100 200], 50);
+assert(isequal(appariementsChers, [1 1]));
+assert(isequal(pistesSeules', 2) && isequal(detectionsSeules', 2));
+[~, ~, detectionsRestantes] = assignDetectionsToTracks([1 100 100], 50);
+assert(isequal(detectionsRestantes', [2 3]));
+
+%% ------------------------------------ vision : transformations et boîtes
+pointsDamier = generateCheckerboardPoints([3 4], 10);
+assert(isequal(size(pointsDamier), [6 2]));
+assert(isequal(pointsDamier(1, :), [0 0]));
+assert(isequal(sort(unique(pointsDamier(:, 1)))', [0 10 20]));
+% Transformations exactes : similitude, affine, projective.
+sourceTransfo = [0 0; 1 0; 0 1; 2 2; 3 1];
+cibleSimilitude = sourceTransfo * 2 + 3;
+transfoSimilitude = estimateGeometricTransform2D(sourceTransfo, cibleSimilitude, 'similarity');
+assert(max(max(abs([sourceTransfo ones(5, 1)] * transfoSimilitude - [cibleSimilitude ones(5, 1)]))) < 1e-10);
+cibleAffine = sourceTransfo * [2 0; 1 3] + [1 -2];
+transfoAffine = estimateGeometricTransform2D(sourceTransfo, cibleAffine, 'affine');
+assert(max(max(abs([sourceTransfo ones(5, 1)] * transfoAffine - [cibleAffine ones(5, 1)]))) < 1e-10);
+homographie = [1 0.2 0.001; -0.1 1.1 0.002; 3 -2 1];
+sourceProjective = [0 0; 10 0; 10 10; 0 10; 5 3];
+homogeneProjective = [sourceProjective ones(5, 1)] * homographie;
+cibleProjective = homogeneProjective(:, 1:2) ./ [homogeneProjective(:, 3) homogeneProjective(:, 3)];
+transfoProjective = estimateGeometricTransform2D(sourceProjective, cibleProjective, 'projective');
+verifProjective = [sourceProjective ones(5, 1)] * transfoProjective;
+assert(max(max(abs(verifProjective(:, 1:2) ./ [verifProjective(:, 3) verifProjective(:, 3)] - cibleProjective))) < 1e-9);
+% Précision et rappel d'une détection de boîtes.
+[precisionParfaite, rappelParfait] = bboxPrecisionRecall([10 10 20 20], [10 10 20 20]);
+assert(precisionParfaite == 1 && rappelParfait == 1);
+[precisionFausse, rappelFausse] = bboxPrecisionRecall([10 10 20 20; 100 100 5 5], [10 10 20 20]);
+assert(abs(precisionFausse - 0.5) < 1e-12 && rappelFausse == 1);
+[precisionManquee, rappelManque] = bboxPrecisionRecall([10 10 20 20], [10 10 20 20; 60 60 10 10]);
+assert(precisionManquee == 1 && abs(rappelManque - 0.5) < 1e-12);
+
 disp('apprentissage : toutes les verifications passent');

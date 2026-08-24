@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **611 fonctions natives** couvrant le MATLAB de base.
-- **1045 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1062 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -132,8 +132,16 @@ totalité.
    nombres flous par coupes de niveau, les c-moyennes floues, la
    classification soustractive de Chiu, les trois générateurs de systèmes
    à partir de données, et l'apprentissage hybride d'ANFIS, qui résout
-   exactement la moitié linéaire du problème par moindres carrés. Les autres modules
-   offrent entre 4 et 16 fonctions, choisies pour être celles qu'on
+   exactement la moitié linéaire du problème par moindres carrés.
+   La Computer Vision en compte 33 : points
+   d'intérêt de Harris, de Shi et Tomasi et FAST, descripteurs HOG et
+   LBP, images intégrales et filtrage par boîtes, géométrie épipolaire
+   complète — matrice fondamentale par les huit points normalisés ou par
+   MSAC, droites épipolaires, triangulation —, formule de Rodrigues dans
+   les deux sens, disparité par appariement de blocs, flot optique de
+   Lucas et Kanade comme de Horn et Schunck, et l'appariement optimal de
+   détections à des pistes par l'algorithme hongrois. Les autres modules
+   offrent entre 4 et 19 fonctions, choisies pour être celles qu'on
    appelle d'abord.
    La Wavelet Toolbox en compte 54. Les filtres de Daubechies et les
    symlets sont construits par factorisation spectrale du polynôme de
