@@ -1,0 +1,10 @@
+build/
+build-*/
+*.o
+*.svg
+*.wav
+*.pgm
+*.ppm
+compile_commands.json
+.atelier.pid
+node_modules/

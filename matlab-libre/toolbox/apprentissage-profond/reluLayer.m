@@ -1,0 +1,5 @@
+function couche = reluLayer(varargin)
+%RELULAYER Couche de redressement : max(0,x).
+    couche = struct('type', 'relu', 'sorties', 0, 'W', [], 'b', [], ...
+                    'entree', [], 'sortie', []);
+end
