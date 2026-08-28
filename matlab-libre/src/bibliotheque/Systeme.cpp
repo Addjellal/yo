@@ -236,7 +236,11 @@ FONCTION(fnGetenv) {
 FONCTION(fnSetenv) {
     INUTILISE
     exigerArguments(args, 2, 2, "setenv");
-#ifndef _WIN32
+    // Windows n'a pas setenv : _putenv_s fait la meme chose, et sans lui
+    // l'appel etait un silencieux coup d'epee dans l'eau.
+#ifdef _WIN32
+    _putenv_s(args[0].versTexte().c_str(), args[1].versTexte().c_str());
+#else
     ::setenv(args[0].versTexte().c_str(), args[1].versTexte().c_str(), 1);
 #endif
     return {};

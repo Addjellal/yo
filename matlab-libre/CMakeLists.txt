@@ -71,6 +71,15 @@ if(Threads_FOUND)
   target_link_libraries(matlibre_coeur PUBLIC Threads::Threads)
 endif()
 
+# Le serveur de l'atelier ouvre une prise réseau. Sous Windows, les
+# fonctions de Winsock vivent dans ws2_32 : sans cette ligne, MinGW
+# s'arrête à l'édition de liens sur des références indéfinies à socket,
+# bind et WSAStartup. Visual Studio ne s'en tire que grâce à un pragma,
+# qu'on ne veut pas dans le code portable.
+if(WIN32)
+  target_link_libraries(matlibre_coeur PUBLIC ws2_32)
+endif()
+
 add_executable(matlibre ${CMAKE_CURRENT_SOURCE_DIR}/src/console/Principal.cpp)
 target_link_libraries(matlibre PRIVATE matlibre_coeur)
 
