@@ -74,18 +74,33 @@ totalité.
    réelle : pas fixe, tri topologique, blocs à état, analyse nodale
    modifiée pour les circuits. Manquent : les sous-systèmes, les bus, le
    pas variable, et les éditeurs graphiques de Stateflow et Simscape.
-3. **La génération de code couvre les matrices et les types, pas tout.**
-   `codegen` travaille sur l'arbre syntaxique et propage les types depuis
-   la signature donnée par `-args` : scalaires et matrices de taille fixe,
-   `double`, `single`, `int8`..`int64`, `uint8`..`uint64`, `logical`,
-   `char`, produit matriciel, transposition, indexation, `if`, `for`,
-   `while`, `switch`, `break`, `continue`, `return`, une trentaine de
-   fonctions mathématiques, et la saturation entière de MATLAB. Le C
-   produit n'alloue rien et compile sous `-Wall -Werror`. Manquent :
-   cellules, structures, objets, nombres complexes, tableaux de taille
-   variable, `varargin`, la récursivité, et les cibles matérielles
-   d'Embedded Coder. Ce qui n'est pas traduisible est refusé avec le
-   numéro de ligne, jamais approximé.
+3. **La génération de code couvre les matrices, les types et les
+   complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
+   propage les types depuis la signature donnée par `-args` : scalaires et
+   matrices de taille fixe, `double`, `single`, `int8`..`int64`,
+   `uint8`..`uint64`, `logical`, `char`, produit matriciel, transposition,
+   indexation, `if`, `for`, `while`, `switch`, `break`, `continue`,
+   `return`, une trentaine de fonctions mathématiques, et la saturation
+   entière de MATLAB. Les nombres complexes sont traduits : le type
+   `matlibre_cplx` — deux `double`, comme le `creal_T` de MATLAB Coder —
+   est défini dans l'en-tête produit, et les quatre opérations, la
+   puissance, la comparaison, `real`, `imag`, `conj`, `abs`, `angle`,
+   `complex`, `isreal`, `sqrt`, `exp`, `log`, `sum`, `prod`, `mean`, le
+   produit matriciel et la transposition conjuguée passent par des
+   fonctions d'appui écrites au besoin. `'` conjugue, `.'` ne conjugue
+   pas ; `<` et `>` comparent les parties réelles et `==` les deux
+   parties, comme MATLAB ; `z^n` à exposant entier passe par carrés
+   successifs, ce qui rend `(1+2i)^2` exactement `-3+4i`. Comme sous
+   MATLAB Coder, une variable qui doit recevoir un complexe se déclare
+   avec `complex(...)` : y ranger un complexe sans cela est refusé, avec
+   le remède dans le message. Le C produit n'alloue rien et compile sous
+   `-Wall -Werror`. Manquent : cellules, structures, objets, complexes
+   `single` ou entiers, tableaux de taille variable, `varargin`, la
+   récursivité, et les cibles matérielles d'Embedded Coder. Le traducteur
+   se réserve le préfixe `mlb_` pour ses indices de boucle, ses
+   temporaires et ses accumulateurs ; une variable MATLAB qui le porterait
+   est refusée. Ce qui n'est pas traduisible est refusé avec le numéro de
+   ligne, jamais approximé.
 4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
    La Signal Processing Toolbox compte 163 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres

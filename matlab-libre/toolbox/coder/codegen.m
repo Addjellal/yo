@@ -19,9 +19,14 @@ function sortie = codegen(varargin)
 %   Le C produit n'alloue rien : les tableaux sont de taille fixe, rangés
 %   par colonnes comme en MATLAB, et les conversions entières saturent.
 %
+%   Les entrées complexes se déclarent avec COMPLEX : la classe et la
+%   complexité de l'exemple décident du C produit. Un complexe devient une
+%   structure matlibre_cplx de deux double, définie dans l'en-tête.
+%
 %   Exemple :
 %      codegen('carreDeTest', '-args', {0}, '-report')
 %      codegen('produitTest', '-args', {zeros(3,3), zeros(3,1)})
+%      codegen('filtreTest',  '-args', {complex(zeros(1,8))})
 %
 %   Voir aussi CODEGENBUILD, CODER.TYPEOF.
     if isempty(varargin)

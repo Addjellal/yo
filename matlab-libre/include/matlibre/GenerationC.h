@@ -26,6 +26,7 @@ struct TypeC {
     Base base = Base::Double;
     int lignes = 1;
     int colonnes = 1;
+    bool complexe = false;   // partie imaginaire stockée, comme en MATLAB
     bool estScalaire() const { return lignes == 1 && colonnes == 1; }
     int elements() const { return lignes * colonnes; }
     std::string nomC() const;
@@ -36,7 +37,8 @@ struct TypeC {
     double maximum() const;
 };
 
-TypeC typeDepuisTexte(const std::string& classe, int lignes, int colonnes);
+TypeC typeDepuisTexte(const std::string& classe, int lignes, int colonnes,
+                      bool complexe = false);
 
 struct OptionsC {
     std::string nomFonction;

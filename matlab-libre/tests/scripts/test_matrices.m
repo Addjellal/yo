@@ -117,6 +117,25 @@ r = [1 2 3];
 r(2) = 5i;
 assert(isequal(r, [1 5i 3]));
 
+% complex() force le stockage complexe : contrairement a une somme, la
+% partie imaginaire nulle n'est pas abandonnee.
+assert(~isreal(complex(0, 0)));
+assert(~isreal(complex(3)));
+assert(~isreal(complex(zeros(2, 2))));
+assert(isreal(1 + 0i));                 % une somme, elle, se reduit
+assert(complex(3, 0) == 3);
+assert(isequal(class(complex(single(1), single(2))), 'single'));
+assert(isequal(size(complex(zeros(2, 3))), [2 3]));
+
+% z^n a exposant entier reel passe par carres successifs, comme MATLAB :
+% le resultat est exact quand il peut l'etre.
+assert((1+2i)^2 == -3+4i);
+assert((1+1i)^4 == -4);
+assert((2+0i)^3 == 8);
+assert(abs((1+2i)^-2 - 1/(-3+4i)) < 1e-16);
+assert(abs((1+1i)^0.5 - exp(0.5*log(1+1i))) < 1e-15);
+assert((1+2i)^0 == 1);
+
 % conv, deconv et filter travaillent sur les complexes.
 assert(isequal(conv([1 1i], [1 -1i]), [1 0 1]));
 assert(max(abs(conv([1 0.5-0.866i], [1 0.5+0.866i]) - [1 1 1.0000 - 0i])) < 1e-3);

@@ -167,6 +167,25 @@ static Valeur concatChaines(const Valeur& a, const Valeur& b) {
 
 // --------------------------------------------------------------- opérateurs
 
+// z^n : MATLAB élève par carrés successifs quand l'exposant est un entier
+// réel — c'est ce qui rend (1+2i)^2 exactement -3+4i, là où exp(n log z)
+// laisse une erreur d'arrondi sur le dernier bit.
+static cplx puissanceComplexe(cplx base, cplx exposant) {
+    double n = exposant.real();
+    if (exposant.imag() != 0 || n != std::floor(n) || std::fabs(n) > 9007199254740992.0)
+        return std::pow(base, exposant);
+    cplx r(1.0, 0.0);
+    cplx facteur = base;
+    double reste = std::fabs(n);
+    while (reste > 0) {
+        if (std::fmod(reste, 2.0) == 1.0) r *= facteur;
+        facteur *= facteur;
+        reste = std::floor(reste / 2.0);
+    }
+    if (n < 0) return cplx(1.0, 0.0) / r;
+    return r;
+}
+
 static Valeur puissanceElement(const Valeur& a, const Valeur& b) {
     bool complexeNecessaire = a.estComplexe() || b.estComplexe();
     if (!complexeNecessaire) {
@@ -185,7 +204,7 @@ static Valeur puissanceElement(const Valeur& a, const Valeur& b) {
     return diffuserComplexe(a, b,
                             [](double ar, double ai, double br, double bi, double& rr,
                                double& ri) {
-                                cplx z = std::pow(cplx(ar, ai), cplx(br, bi));
+                                cplx z = puissanceComplexe(cplx(ar, ai), cplx(br, bi));
                                 rr = z.real();
                                 ri = z.imag();
                             });

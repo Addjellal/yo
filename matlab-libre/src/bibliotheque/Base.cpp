@@ -788,11 +788,19 @@ FONCTION(fnComplexe) {
     exigerArguments(args, 1, 2, "complex");
     Valeur a = args[0];
     Valeur b = args.size() > 1 ? args[1] : Valeur::scalaire(0);
-    return {diffuserComplexe(a, b, [](double ar, double, double br, double, double& rr,
-                                      double& ri) {
+    Valeur r = diffuserComplexe(a, b, [](double ar, double, double br, double, double& rr,
+                                         double& ri) {
         rr = ar;
         ri = br;
-    })};
+    });
+    // complex() force le stockage complexe : contrairement à une addition,
+    // MATLAB ne laisse pas tomber une partie imaginaire nulle. C'est ce qui
+    // fait que isreal(complex(0,0)) est faux, et c'est ainsi qu'on déclare
+    // une variable complexe avant une boucle pour la génération de code.
+    if (r.im.empty() && !r.re.empty()) r.im.assign(r.re.size(), 0.0);
+    if (a.classe == Classe::Simple && (args.size() < 2 || b.classe == Classe::Simple))
+        r.classe = Classe::Simple;
+    return {r};
 }
 
 FONCTION(fnIsnumeric) { INUTILISE return {Valeur::booleen(args[0].estNumerique())}; }
