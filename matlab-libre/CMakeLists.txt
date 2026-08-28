@@ -10,17 +10,35 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# MatLibre n'emploie pas les modules C++20. Depuis CMake 3.28, le
-# générateur Ninja écrit malgré tout des règles de balayage de modules dont
-# le nom contient « $type » ; un ninja antérieur à 1.11 ne sait pas les
-# lire et s'arrête sur « expected newline, got lexing error ». Couper le
-# balayage supprime ces règles et ne coûte rien.
+# MatLibre n'emploie pas les modules C++20 : couper le balayage évite un
+# travail inutile à chaque compilation.
 if(POLICY CMP0155)
   cmake_policy(SET CMP0155 NEW)
 endif()
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+endif()
+
+# Le générateur Ninja met le type de construction dans le nom de ses
+# règles : « rule CXX_COMPILER__matlibre_coeur_unscanned_Release ». Or « $ »
+# ouvre une référence de variable dans la syntaxe de ninja. Un type de
+# construction qui en contient un — une variable de shell qui n'a pas été
+# remplacée, « $type » ou « %type% » — produit une règle que ninja refuse
+# de lire, sur un message qui ne dit pas d'où vient le problème :
+#
+#   ninja: error: CMakeFiles/rules.ninja:17: expected newline, got lexing error
+#
+# La valeur est vérifiée ici, où l'on peut encore nommer le remède. Elle
+# reste dans le cache tant que le dossier de construction existe : c'est
+# pourquoi le message demande de l'effacer.
+if(NOT CMAKE_BUILD_TYPE MATCHES "^[A-Za-z][A-Za-z0-9_]*$" AND NOT CMAKE_BUILD_TYPE STREQUAL "")
+  message(FATAL_ERROR
+    "CMAKE_BUILD_TYPE vaut « ${CMAKE_BUILD_TYPE} », ce qui n'est pas un type "
+    "de construction : une variable de shell n'a pas ete remplacee. Effacez "
+    "le dossier de construction, puis reconfigurez :\n"
+    "    cmake -E rm -rf \"${CMAKE_BINARY_DIR}\"\n"
+    "    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release")
 endif()
 
 option(MATLIBRE_AVEC_LAPACK "Utiliser LAPACK/BLAS si disponible" ON)

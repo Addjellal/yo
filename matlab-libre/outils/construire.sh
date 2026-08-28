@@ -39,6 +39,17 @@ fi
 
 taches=$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4) )
 
+# Le cache de CMake garde le type de construction du premier appel. Un
+# cache qui ne correspond plus donne des erreurs sans rapport avec la
+# cause : on efface plutot que de compiler sur une configuration perimee.
+if [ -f "$dossier/CMakeCache.txt" ]; then
+    typeCache=$(sed -n 's/^CMAKE_BUILD_TYPE:[^=]*=//p' "$dossier/CMakeCache.txt" | head -1)
+    if [ -n "$typeCache" ] && [ "$typeCache" != "$type" ]; then
+        echo "MatLibre : le cache est en « $typeCache », on demande « $type » : dossier efface"
+        rm -rf "$dossier"
+    fi
+fi
+
 echo "MatLibre : configuration ($type) dans $dossier"
 cmake -S "$racine" -B "$dossier" -DCMAKE_BUILD_TYPE="$type"
 echo "MatLibre : compilation sur $taches taches"

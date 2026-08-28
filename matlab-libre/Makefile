@@ -9,7 +9,7 @@ JOBS  ?= $(shell nproc 2>/dev/null || echo 4)
 PORT  ?= 8421
 
 .PHONY: aide tout configurer test tests doc install propre reference exemples \
-        atelier verifier-atelier windows
+        atelier verifier-atelier windows ninja generateurs
 
 aide:
 	@echo "make tout        compile l'interpreteur"
@@ -19,6 +19,8 @@ aide:
 	@echo "make atelier     ouvre l'atelier dans le navigateur (port $(PORT))"
 	@echo "make verifier-atelier   pilote l'atelier avec un vrai navigateur"
 	@echo "make windows     verifie la compilation pour Windows (MinGW)"
+	@echo "make ninja       verifie la compilation avec le generateur Ninja"
+	@echo "make generateurs verifie Ninja et MinGW : les deux autres chemins"
 	@echo "make install     installe dans $(PREFIX)"
 	@echo "make propre      efface $(BUILD)"
 
@@ -79,6 +81,22 @@ windows:
 	      -DCMAKE_BUILD_TYPE=Release > /dev/null && \
 	cmake --build build-windows -j $(JOBS) && \
 	echo "MatLibre : la compilation pour Windows passe"
+
+# Le générateur Ninja met le type de construction dans le nom de ses
+# règles, là où les Makefiles ne le font pas : une valeur qui contient un
+# « $$ » n'y casse que sous Ninja. Ce chemin-là n'était vérifié nulle part,
+# et c'est par là que le défaut est passé.
+ninja:
+	@if ! command -v ninja > /dev/null; then \
+	  echo "ninja absent : apt install ninja-build"; \
+	  exit 0; \
+	fi; \
+	rm -rf build-ninja && \
+	cmake -S . -B build-ninja -G Ninja -DCMAKE_BUILD_TYPE=$(TYPE) > /dev/null && \
+	cmake --build build-ninja -j $(JOBS) > /dev/null && \
+	echo "MatLibre : la compilation avec Ninja passe"
+
+generateurs: ninja windows
 
 install: tout
 	@cmake --install $(BUILD) --prefix $(PREFIX)
