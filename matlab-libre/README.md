@@ -33,7 +33,7 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **614 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **615 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
@@ -50,6 +50,9 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Du calcul parallèle réel** : `parfor`, `spmd`, `parfeval` et leurs
   compagnons répartissent le travail sur un pool de travailleurs, chacun
   portant son propre interpréteur.
+- **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
+  fenêtre de commandes, l'espace de travail et les figures dans un seul
+  exécutable.
 - **Un atelier dans le navigateur** (`matlibre --ide`) : éditeur avec
   coloration et points d'arrêt, console, explorateur de variables,
   débogueur pas à pas, profileur, concepteur d'applications qui exécute
@@ -77,18 +80,27 @@ d'être lue avant de s'appuyer sur ce projet.
 
 ```bash
 make
-./build/matlibre --ide                          # l'atelier dans le navigateur
+./build/matlibre-bureau                         # le bureau : une fenêtre native
 ./build/matlibre                                # session interactive
 ./build/matlibre exemples/01-prise-en-main.m
 ./build/matlibre exemples/03-asservissement.m   # écrit une figure SVG
 ```
 
-Sous Windows, `.\outils\construire.ps1` puis `.\build\matlibre.exe --ide`.
+Sous Windows, `.\outils\construire.ps1` puis `.\build\matlibre-bureau.exe`.
 
-L'atelier est l'équivalent du bureau de MATLAB : éditeur de scripts avec
-coloration, points d'arrêt et exécution pas à pas, console, table des
-variables, figures, profileur, concepteur d'applications et éditeur de
-schémas-blocs. Depuis une session interactive, la commande `ide` l'ouvre.
+**Le bureau** (`matlibre-bureau`) est une application native : un seul
+exécutable, une seule fenêtre, l'interpréteur dans le même processus. Rien
+à ouvrir dans un navigateur. On y trouve la disposition de MATLAB —
+dossier courant à gauche, éditeur à onglets avec coloration et numérotation
+au centre, fenêtre de commandes en dessous, espace de travail et historique
+à droite, figures dans leur onglet, peintes directement à l'écran. Le
+calcul tourne dans un fil à part : la fenêtre ne se fige pas. Qt6 est la
+seule dépendance, et elle reste facultative — sans Qt, tout le reste se
+compile comme avant.
+
+**L'atelier** (`matlibre --ide`, ou la commande `ide`) reste disponible
+dans le navigateur, avec en plus le profileur, le concepteur
+d'applications, l'éditeur de schémas-blocs et le débogueur pas à pas.
 
 | Exemple | Ce qu'il montre |
 |---|---|

@@ -11,7 +11,7 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **614 fonctions natives** couvrant le MATLAB de base.
+- **615 fonctions natives** couvrant le MATLAB de base.
 - **1067 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
@@ -58,15 +58,20 @@ totalité.
 
 Écarts connus, par ordre d'importance :
 
-1. **L'atelier est dans le navigateur, pas sur le bureau.**
-   `matlibre --ide` ouvre un éditeur avec coloration et points d'arrêt,
-   une console, un explorateur de variables, un débogueur pas à pas, un
-   profileur, un concepteur d'applications qui exécute vraiment ce qu'il
-   dessine, et un éditeur de schémas-blocs qui simule. Ce qui manque par
-   rapport au bureau MATLAB : pas d'application native, pas d'édition
-   collaborative, pas de Live Script (cellules exécutables mêlées au
-   texte), pas de comparaison de fichiers, et l'éditeur n'a ni repliement
-   de code ni recherche multi-fichiers.
+1. **Le bureau est natif ; l'atelier du navigateur reste plus complet.**
+   `matlibre-bureau` est une application Qt : un exécutable, une fenêtre,
+   l'interpréteur dans le même processus. La disposition est celle de
+   MATLAB — dossier courant, éditeur à onglets avec coloration et
+   numérotation, fenêtre de commandes avec historique aux flèches, espace
+   de travail, figures peintes directement avec QPainter. Le calcul tourne
+   dans un fil séparé : la fenêtre répond pendant qu'il tourne. Manquent
+   encore, côté bureau : les points d'arrêt et le pas à pas, le profileur,
+   le concepteur d'applications et l'éditeur de schémas-blocs — ils
+   n'existent aujourd'hui que dans l'atelier du navigateur, qu'ouvre
+   `matlibre --ide`. Ce qui manque des deux côtés, par rapport au bureau
+   MATLAB : l'édition collaborative, les Live Scripts (cellules
+   exécutables mêlées au texte), la comparaison de fichiers, le repliement
+   de code et la recherche multi-fichiers.
 2. **Simulink se dessine et se simule ; Stateflow et Simscape restent des
    solveurs.** L'atelier a un éditeur de schémas-blocs : on glisse les
    dix-sept blocs du solveur, on tire les fils à la souris, et le modèle

@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <sstream>
 
@@ -194,6 +195,45 @@ FONCTION(fnStructfun) {
 
 // ------------------------------------------------------------ évaluation
 
+// run('script.m') : execute le fichier dans l'espace de travail courant.
+// C'est la facon de lancer un script qui n'est pas sur le chemin de
+// recherche — celui qu'on vient d'ecrire ailleurs, par exemple.
+FONCTION(fnRun) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "run");
+    std::string chemin = args[0].versTexte();
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_regular_file(chemin, ec)) {
+        // MATLAB accepte le nom sans extension.
+        if (fs::is_regular_file(chemin + ".m", ec)) chemin += ".m";
+        else
+            erreur("MATLAB:run:FileNotFound",
+                   "Unable to find file '" + chemin + "'.");
+    }
+    std::ifstream f(chemin);
+    if (!f) erreur("MATLAB:run:FileNotFound", "Unable to open file '" + chemin + "'.");
+    std::ostringstream tampon;
+    tampon << f.rdbuf();
+    // Le dossier du script devient temporairement le dossier courant, comme
+    // le fait MATLAB : un script trouve ainsi ses voisins.
+    fs::path dossier = fs::path(chemin).parent_path();
+    fs::path avant = fs::current_path(ec);
+    if (!dossier.empty()) fs::current_path(dossier, ec);
+    struct Restaurer {
+        fs::path cible;
+        bool actif;
+        ~Restaurer() {
+            if (actif) {
+                std::error_code e;
+                fs::current_path(cible, e);
+            }
+        }
+    } restaurer{avant, !dossier.empty()};
+    it.executerTexte(tampon.str(), chemin);
+    return {};
+}
+
 FONCTION(fnEval) {
     INUTILISE
     exigerArguments(args, 1, 2, "eval");
@@ -367,6 +407,8 @@ void enregistrerFonctionnel(Interpreteur& it) {
     it.enregistrer("arrayfun", fnArrayfun, "fonctionnel", "arrayfun  Applique a chaque element.");
     it.enregistrer("structfun", fnStructfun, "fonctionnel", "structfun  Applique a chaque champ.");
     it.enregistrer("eval", fnEval, "fonctionnel", "eval  Evalue du code.");
+    it.enregistrer("run", fnRun, "fonctionnel",
+                   "run  Execute un script, meme hors du chemin de recherche.");
     it.enregistrer("evalc", fnEvalc, "fonctionnel", "evalc  Evalue et capture l'affichage.");
     it.enregistrer("evalin", fnEvalin, "fonctionnel", "evalin  Evalue dans un autre espace.");
     it.enregistrer("assignin", fnAssignin, "fonctionnel", "assignin  Affecte dans un autre espace.");

@@ -299,6 +299,7 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         f->aide = aideDepuisSource(source);
         f->entrees.clear();
         f->sorties.clear();
+        f->script = true;
         cacheFonctions_[nom] = f;
         return f;
     }
@@ -592,6 +593,24 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
         erreur("MATLAB:recursionLimit",
                "Maximum recursion limit of 400 reached. Use set(0,'RecursionLimit',N) to "
                "change the limit.");
+    // Un script s'exécute dans l'espace de travail de l'appelant : les
+    // variables qu'il crée y restent après lui. C'est ce qui distingue un
+    // script d'une fonction, et ce qui fait qu'on peut écrire un fichier
+    // dans l'éditeur, l'exécuter, et retrouver ses variables.
+    if (f->script) {
+        if (!args.empty())
+            erreur("MATLAB:scriptNotAFunction",
+                   "Attempt to execute SCRIPT " + f->nom + " as a function:\n" + f->fichier);
+        std::string precedent = fichierCourant;
+        fichierCourant = f->fichier;
+        struct Restaurer {
+            std::string& cible;
+            std::string valeur;
+            ~Restaurer() { cible = valeur; }
+        } restaurer{fichierCourant, precedent};
+        executerBloc(f->corps);
+        return {};
+    }
     std::size_t fixes = f->entrees.size();
     if (f->variadiqueEntree()) fixes -= 1;
     if (!f->variadiqueEntree() && args.size() > f->entrees.size())

@@ -9,13 +9,14 @@ JOBS  ?= $(shell nproc 2>/dev/null || echo 4)
 PORT  ?= 8421
 
 .PHONY: aide tout configurer test tests doc install propre reference exemples \
-        atelier verifier-atelier windows ninja generateurs
+        atelier verifier-atelier windows ninja generateurs bureau
 
 aide:
 	@echo "make tout        compile l'interpreteur"
 	@echo "make test        compile puis execute toute la suite de tests"
 	@echo "make doc         regenere documentation/reference/ et les comptes"
 	@echo "make exemples    execute les scripts de exemples/"
+	@echo "make bureau      ouvre le bureau natif (fenetre Qt)"
 	@echo "make atelier     ouvre l'atelier dans le navigateur (port $(PORT))"
 	@echo "make verifier-atelier   pilote l'atelier avec un vrai navigateur"
 	@echo "make windows     verifie la compilation pour Windows (MinGW)"
@@ -32,6 +33,10 @@ configurer:
 
 test: tout
 	@$(BUILD)/matlibre_tests
+	@if [ -x $(BUILD)/matlibre_tests_bureau ]; then \
+	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox QT_QPA_PLATFORM=offscreen \
+	    $(BUILD)/matlibre_tests_bureau; \
+	fi
 	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/verifierDoublons.m
 	@for f in tests/scripts/test_*.m; do \
 	  echo "--> $$f"; \
@@ -72,6 +77,15 @@ verifier-atelier: tout
 # Compilation croisee pour Windows : elle ne sert pas a livrer, mais a
 # verifier la portabilite depuis la machine de developpement. Sans le
 # cross-compilateur, la cible le dit et s'arrete sans echouer.
+# Le bureau natif : un seul executable, une vraie fenetre.
+bureau: tout
+	@if [ ! -x $(BUILD)/matlibre-bureau ]; then \
+	  echo "Le bureau n'a pas ete construit : Qt6 est absent."; \
+	  echo "  apt install qt6-base-dev   (Debian, Ubuntu)"; \
+	  exit 1; \
+	fi; \
+	MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre-bureau
+
 windows:
 	@if ! command -v x86_64-w64-mingw32-g++ > /dev/null; then \
 	  echo "MinGW-w64 absent : apt install g++-mingw-w64-x86-64"; \

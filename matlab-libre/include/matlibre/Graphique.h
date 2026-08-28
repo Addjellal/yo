@@ -53,6 +53,22 @@ struct Figure {
     std::string nom;
 };
 
+// Réduit une polyligne à ce qu'un écran peut montrer.
+//
+// Un tracé de cent mille points sur huit cents pixels de large dessine
+// cent vingt-cinq points par colonne : cent vingt-quatre d'entre eux sont
+// invisibles, mais ils pèsent — un SVG de 1,6 Mo que le navigateur met des
+// secondes à lire. Pour chaque colonne de pixels on ne garde donc que ce
+// qui se voit : le premier point, le minimum, le maximum et le dernier,
+// dans l'ordre où ils arrivent. L'enveloppe tracée est identique au pixel
+// près ; c'est ce que font les bibliothèques de tracé sérieuses.
+//
+// Les indices sont rendus dans l'ordre croissant. Un tracé déjà court, ou
+// dont les x ne progressent pas régulièrement, est rendu tel quel.
+std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
+                                         const std::vector<double>& y, double xmin,
+                                         double xmax, int colonnes);
+
 std::string rendreSVG(const Figure& figure);
 std::shared_ptr<Figure> figureCourante(Interpreteur& it);
 std::shared_ptr<Axes> axesCourants(Interpreteur& it);

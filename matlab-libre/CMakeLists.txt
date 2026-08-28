@@ -140,6 +140,64 @@ if(MATLIBRE_AVEC_OPENCV)
   endif()
 endif()
 
+# --- bureau natif (facultatif : le reste se compile et se teste sans Qt) ------
+#
+# « matlibre-bureau » est un seul exécutable : la fenêtre, l'interpréteur,
+# l'éditeur et les figures dans le même processus. Pas de navigateur, pas de
+# serveur, pas de second processus. Qt6 Widgets est la seule dépendance, et
+# elle reste facultative : sans Qt, tout le reste se compile comme avant.
+option(MATLIBRE_BUREAU "Construire le bureau natif si Qt6 est present" ON)
+if(MATLIBRE_BUREAU)
+  find_package(Qt6 COMPONENTS Widgets QUIET)
+  if(Qt6_FOUND)
+    set(CMAKE_AUTOMOC ON)
+    # La fenetre est une bibliotheque a part : elle se verifie ainsi sans
+    # lancer l'application, sur un ecran hors-champ, et c'est la que se
+    # jouent les gestes qu'on ne voit pas a l'oeil — l'espace de travail qui
+    # se met a jour, la figure qui se peint, le fil qui ne bloque pas.
+    add_library(matlibre_bureau STATIC
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetrePrincipale.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Editeur.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/VueFigure.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Moteur.cpp)
+    target_link_libraries(matlibre_bureau PUBLIC matlibre_coeur Qt6::Widgets)
+    target_include_directories(matlibre_bureau PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau)
+
+    add_executable(matlibre-bureau ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Principal.cpp)
+    target_link_libraries(matlibre-bureau PRIVATE matlibre_bureau)
+    install(TARGETS matlibre-bureau RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    if(MATLIBRE_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/bureau/test_bureau.cpp")
+      add_executable(matlibre_tests_bureau
+                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/bureau/test_bureau.cpp)
+      target_link_libraries(matlibre_tests_bureau PRIVATE matlibre_bureau)
+      add_test(NAME bureau COMMAND matlibre_tests_bureau)
+      set_tests_properties(bureau PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+
+    # Pas de console derriere la fenetre, sous Windows.
+    #
+    # C'est le sous-systeme inscrit dans l'executable qui decide : « console »
+    # et Windows en ouvre une systematiquement, « GUI » et il n'en ouvre
+    # aucune. WIN32_EXECUTABLE demande le bon sous-systeme, mais fait aussi
+    # entrer Qt6::EntryPoint dans l'edition de liens ; cette bibliotheque-la
+    # vient compilee de chez Qt et reclame __imp___argc, que le CRT d'un
+    # autre MinGW n'exporte pas. Sous MinGW, « -mwindows » inscrit le meme
+    # sous-systeme sans reclamer EntryPoint.
+    if(WIN32)
+      if(MINGW)
+        target_link_options(matlibre-bureau PRIVATE -mwindows)
+      else()
+        set_target_properties(matlibre-bureau PROPERTIES WIN32_EXECUTABLE ON)
+      endif()
+    endif()
+    message(STATUS "MatLibre : Qt6 trouve, le bureau natif sera construit")
+  else()
+    message(STATUS "MatLibre : pas de Qt6, pas de bureau natif "
+                   "(apt install qt6-base-dev, ou l'installateur Qt sous Windows)")
+  endif()
+endif()
+
 # --- fabrication de paquets ---------------------------------------------------
 set(CPACK_PACKAGE_NAME "MatLibre")
 set(CPACK_PACKAGE_VENDOR "MatLibre")

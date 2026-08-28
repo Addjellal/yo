@@ -70,6 +70,10 @@ struct FonctionUtilisateur {
     // partagent son espace de travail, comme le veut MATLAB.
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> imbriquees;
     bool imbriquee = false;   // vraie pour une fonction écrite dans une autre
+    // Vraie pour un fichier .m sans « function » : un script. MATLAB
+    // l'exécute dans l'espace de travail de l'appelant, pas dans le sien —
+    // c'est toute la différence entre un script et une fonction.
+    bool script = false;
     bool variadiqueEntree() const {
         return !entrees.empty() && entrees.back() == "varargin";
     }

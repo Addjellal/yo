@@ -104,6 +104,12 @@ nargout  Nombre de sorties demandees.
 nargoutchk  Verifie le nombre de sorties.
 ```
 
+## `run`
+
+```
+run  Execute un script, meme hors du chemin de recherche.
+```
+
 ## `str2func`
 
 ```

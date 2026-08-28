@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <climits>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
@@ -62,6 +63,62 @@ struct Echelle {
         return pixelsMin + (a - lo) / (hi - lo) * (pixelsMax - pixelsMin);
     }
 };
+
+}  // namespace
+
+std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
+                                         const std::vector<double>& y, double xmin,
+                                         double xmax, int colonnes) {
+    std::size_t n = std::min(x.size(), y.size());
+    std::vector<std::size_t> gardes;
+    // En dessous de quatre points par colonne il n'y a rien a gagner, et le
+    // trace garde exactement les points d'origine.
+    if (colonnes < 2 || n <= (std::size_t)colonnes * 4 || !(xmax > xmin)) {
+        gardes.reserve(n);
+        for (std::size_t k = 0; k < n; ++k) gardes.push_back(k);
+        return gardes;
+    }
+    gardes.reserve((std::size_t)colonnes * 4 + 8);
+    std::size_t k = 0;
+    long long colonneCourante = LLONG_MIN;
+    std::size_t premier = 0, dernier = 0, bas = 0, haut = 0;
+    bool ouverte = false;
+    auto fermer = [&]() {
+        if (!ouverte) return;
+        // Premier, minimum, maximum, dernier — dans l'ordre des indices, et
+        // sans doublon : c'est ce qui rend l'enveloppe a l'identique.
+        std::size_t quatre[4] = {premier, bas, haut, dernier};
+        std::sort(quatre, quatre + 4);
+        for (int i = 0; i < 4; ++i)
+            if (i == 0 || quatre[i] != quatre[i - 1]) gardes.push_back(quatre[i]);
+        ouverte = false;
+    };
+    for (; k < n; ++k) {
+        if (!std::isfinite(x[k]) || !std::isfinite(y[k])) {
+            // Une coupure separe deux morceaux : elle se garde telle quelle.
+            fermer();
+            gardes.push_back(k);
+            colonneCourante = LLONG_MIN;
+            continue;
+        }
+        long long colonne =
+            (long long)((x[k] - xmin) / (xmax - xmin) * (double)colonnes);
+        if (!ouverte || colonne != colonneCourante) {
+            fermer();
+            colonneCourante = colonne;
+            premier = dernier = bas = haut = k;
+            ouverte = true;
+            continue;
+        }
+        dernier = k;
+        if (y[k] < y[bas]) bas = k;
+        if (y[k] > y[haut]) haut = k;
+    }
+    fermer();
+    return gardes;
+}
+
+namespace {
 
 std::vector<double> graduations(double min, double max, int cible) {
     std::vector<double> t;
@@ -231,18 +288,26 @@ std::string rendreSVG(const Figure& figure) {
                 }
                 continue;
             }
+            // Les points qu'aucun pixel ne distingue sont retires : le
+            // dessin est le meme, le fichier tient.
+            std::vector<std::size_t> visibles =
+                indicesVisibles(s.x, s.y, ex.min, ex.max, ex.pixelsMax - ex.pixelsMin);
             std::string chemin;
             bool premier = true;
-            for (std::size_t k = 0; k < n; ++k) {
+            std::size_t precedent = 0;
+            for (std::size_t indice : visibles) {
+                std::size_t k = indice;
+                if (k >= n) continue;
                 if (!std::isfinite(s.x[k]) || !std::isfinite(s.y[k])) {
                     premier = true;
                     continue;
                 }
                 double px = ex.versPixel(s.x[k]), py = ey.versPixel(s.y[k]);
                 if (s.genre == GenreTrace::Escalier && !premier)
-                    chemin += formater("L %.2f %.2f ", px, ey.versPixel(s.y[k - 1]));
+                    chemin += formater("L %.2f %.2f ", px, ey.versPixel(s.y[precedent]));
                 chemin += formater("%s %.2f %.2f ", premier ? "M" : "L", px, py);
                 premier = false;
+                precedent = k;
             }
             std::string tirets;
             if (s.style == "--") tirets = " stroke-dasharray=\"8,4\"";
