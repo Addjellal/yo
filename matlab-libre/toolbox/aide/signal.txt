@@ -1,57 +1,4 @@
-# Signal et Fourier
-
-Fonctions natives du groupe `signal`.
-
-## `bartlett`
-
-```
-bartlett  Fenetre triangulaire.
-```
-
-## `blackman`
-
-```
-blackman  Fenetre de Blackman.
-```
-
-## `conv`
-
-```
-CONV  Convolution, ou multiplication de polynômes.
-    C = CONV(A,B) rend la convolution des vecteurs A et B. Sa longueur
-    vaut numel(A)+numel(B)-1.
-    C = CONV(A,B,'same') rend la partie centrale, de la longueur de A.
-    C = CONV(A,B,'valid') ne rend que la partie sans dépassement.
-
-    Quand A et B sont les coefficients de deux polynômes, CONV rend ceux
-    de leur produit.
-
-    Syntaxe
-       w = conv(u,v)
-       w = conv(u,v,forme)
-
-    Exemples
-       conv([1 1], [1 -1])        % [1 0 -1], soit (x+1)(x-1)
-       y = conv(x, ones(1,5)/5);  % moyenne glissante sur 5 points
-
-    Voir aussi DECONV, FILTER, CONV2, POLYVAL.
-```
-
-## `conv2`
-
-```
-conv2  Convolution 2-D.
-```
-
-## `downsample`
-
-```
-downsample  Decimation.
-```
-
-## `fft`
-
-```
+### fft
 FFT  Transformée de Fourier discrète.
     Y = FFT(X) rend la transformée de Fourier discrète de X, calculée par
     un algorithme rapide. Pour une matrice, FFT travaille par colonnes.
@@ -84,17 +31,28 @@ FFT  Transformée de Fourier discrète.
        plot((0:floor(n/2))*Fs/n, P);
 
     Voir aussi IFFT, FFT2, FFTSHIFT, ABS, ANGLE, PERIODOGRAM.
-```
 
-## `fft2`
+### ifft
+IFFT  Transformée de Fourier discrète inverse.
+    X = IFFT(Y) rend la transformée inverse de Y.
+    X = IFFT(Y,N) sur N points.
+    X = IFFT(Y,N,DIM) selon la dimension DIM.
+    X = IFFT(...,'symmetric') force un résultat réel : utile quand Y
+    devrait être conjugué-symétrique et que l'arrondi laisse une partie
+    imaginaire résiduelle.
 
-```
-fft2  Transformee 2-D.
-```
+    Syntaxe
+       X = ifft(Y)
+       X = ifft(Y,n)
+       X = ifft(___,'symmetric')
 
-## `fftshift`
+    Exemples
+       x = ifft(fft(x));               % rend x, aux arrondis près
+       max(abs(x - real(ifft(fft(x)))))  % de l'ordre de 1e-16
 
-```
+    Voir aussi FFT, IFFT2, REAL.
+
+### fftshift
 FFTSHIFT  Recentre le spectre sur la fréquence nulle.
     Y = FFTSHIFT(X) échange les moitiés de X. Sur le résultat d'une FFT,
     la composante continue se retrouve au centre, ce qui donne un axe de
@@ -110,11 +68,28 @@ FFTSHIFT  Recentre le spectre sur la fréquence nulle.
        plot(f, abs(Y));
 
     Voir aussi FFT, IFFTSHIFT, CIRCSHIFT.
-```
 
-## `filter`
+### conv
+CONV  Convolution, ou multiplication de polynômes.
+    C = CONV(A,B) rend la convolution des vecteurs A et B. Sa longueur
+    vaut numel(A)+numel(B)-1.
+    C = CONV(A,B,'same') rend la partie centrale, de la longueur de A.
+    C = CONV(A,B,'valid') ne rend que la partie sans dépassement.
 
-```
+    Quand A et B sont les coefficients de deux polynômes, CONV rend ceux
+    de leur produit.
+
+    Syntaxe
+       w = conv(u,v)
+       w = conv(u,v,forme)
+
+    Exemples
+       conv([1 1], [1 -1])        % [1 0 -1], soit (x+1)(x-1)
+       y = conv(x, ones(1,5)/5);  % moyenne glissante sur 5 points
+
+    Voir aussi DECONV, FILTER, CONV2, POLYVAL.
+
+### filter
 FILTER  Filtre numérique à réponse rationnelle.
     Y = FILTER(B,A,X) filtre X par le filtre de numérateur B et de
     dénominateur A, selon la récurrence
@@ -134,82 +109,22 @@ FILTER  Filtre numérique à réponse rationnelle.
        y = filter(b, a, x);                  % passe-bas de Butterworth
 
     Voir aussi FILTFILT, CONV, BUTTER, FREQZ.
-```
 
-## `filtfilt`
-
-```
-filtfilt  Filtrage aller-retour.
-```
-
-## `freqz`
-
-```
-freqz  Reponse en frequence.
-```
-
-## `hamming`
-
-```
-hamming  Fenetre de Hamming.
-```
-
-## `hann`
-
-```
-hann  Fenetre de Hann.
-```
-
-## `hanning`
-
-```
-hanning  Fenetre de Hann.
-```
-
-## `ifft`
-
-```
-IFFT  Transformée de Fourier discrète inverse.
-    X = IFFT(Y) rend la transformée inverse de Y.
-    X = IFFT(Y,N) sur N points.
-    X = IFFT(Y,N,DIM) selon la dimension DIM.
-    X = IFFT(...,'symmetric') force un résultat réel : utile quand Y
-    devrait être conjugué-symétrique et que l'arrondi laisse une partie
-    imaginaire résiduelle.
+### angle
+ANGLE  Argument d'un nombre complexe, en radians.
+    P = ANGLE(Z) rend l'argument de Z, dans ]-pi, pi].
 
     Syntaxe
-       X = ifft(Y)
-       X = ifft(Y,n)
-       X = ifft(___,'symmetric')
+       P = angle(Z)
 
     Exemples
-       x = ifft(fft(x));               % rend x, aux arrondis près
-       max(abs(x - real(ifft(fft(x)))))  % de l'ordre de 1e-16
+       angle(1i)                  % pi/2
+       angle(-1)                  % pi
+       unwrap(angle(fft(x)))      % phase déroulée d'un spectre
 
-    Voir aussi FFT, IFFT2, REAL.
-```
+    Voir aussi ABS, UNWRAP, REAL, IMAG, ATAN2.
 
-## `ifft2`
-
-```
-ifft2  Transformee 2-D inverse.
-```
-
-## `ifftshift`
-
-```
-ifftshift  Annule fftshift.
-```
-
-## `rectwin`
-
-```
-rectwin  Fenetre rectangulaire.
-```
-
-## `unwrap`
-
-```
+### unwrap
 UNWRAP  Déroule une phase.
     Q = UNWRAP(P) corrige les sauts de la phase P en ajoutant des
     multiples de 2*pi partout où l'écart entre deux points consécutifs
@@ -226,17 +141,3 @@ UNWRAP  Déroule une phase.
        plot(f, p*180/pi);         % en degrés
 
     Voir aussi ANGLE, MOD.
-```
-
-## `upsample`
-
-```
-upsample  Sur-echantillonnage.
-```
-
-## `xcorr`
-
-```
-xcorr  Correlation croisee.
-```
-

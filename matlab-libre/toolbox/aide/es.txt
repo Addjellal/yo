@@ -1,0 +1,109 @@
+### fopen
+FOPEN  Ouvre un fichier.
+    FID = FOPEN(NOM) ouvre en lecture.
+    FID = FOPEN(NOM,MODE) ouvre selon le mode : 'r' lecture, 'w' écriture
+    (le fichier est vidé), 'a' ajout, 'r+' lecture et écriture.
+    [FID,MSG] = FOPEN(...) rend en plus le message d'erreur.
+
+    FID vaut -1 quand l'ouverture échoue : il faut le vérifier.
+
+    Syntaxe
+       fid = fopen(nom)
+       fid = fopen(nom,mode)
+       [fid,msg] = fopen(___)
+
+    Exemples
+       fid = fopen('donnees.txt','r');
+       if fid < 0, error('fichier introuvable'); end
+       texte = fread(fid, '*char')';
+       fclose(fid);
+
+    Voir aussi FCLOSE, FGETL, FREAD, FWRITE, FPRINTF, FILEREAD.
+
+### fclose
+FCLOSE  Ferme un fichier.
+    FCLOSE(FID) ferme le fichier ouvert par FOPEN.
+    FCLOSE('all') ferme tous les fichiers ouverts.
+    ST = FCLOSE(...) rend 0 en cas de succès, -1 sinon.
+
+    Syntaxe
+       fclose(fid)
+       fclose('all')
+
+    Exemples
+       fid = fopen('sortie.txt','w');
+       fprintf(fid,'%d\n',x);
+       fclose(fid);
+
+    Voir aussi FOPEN, FPRINTF, FREAD.
+
+### fileread
+FILEREAD  Lit un fichier entier dans une chaîne.
+    S = FILEREAD(NOM) rend le contenu du fichier, retours à la ligne
+    compris. Plus court que FOPEN, FREAD, FCLOSE quand on veut tout.
+
+    Syntaxe
+       s = fileread(nom)
+
+    Exemples
+       texte = fileread('script.m');
+       lignes = strsplit(texte, newline);
+
+    Voir aussi FOPEN, FGETL, READTABLE, WRITEMATRIX.
+
+### disp
+DISP  Affiche une valeur, sans son nom.
+    DISP(X) affiche X. Contrairement à l'affichage automatique, DISP
+    n'écrit pas « x = » devant, et rien du tout pour un tableau vide.
+
+    Syntaxe
+       disp(X)
+
+    Exemples
+       disp('bonjour')
+       disp(pi)
+       disp(['x vaut ' num2str(x)])
+
+    Voir aussi FPRINTF, SPRINTF, FORMAT, DISPLAY.
+
+### error
+ERROR  Lève une erreur et arrête l'exécution.
+    ERROR(MESSAGE) lève une erreur portant ce message.
+    ERROR(FORMAT,A,...) met le message en forme comme SPRINTF.
+    ERROR(IDENTIFIANT,FORMAT,...) donne en plus un identifiant de la
+    forme « composant:mnemonique », que TRY/CATCH peut examiner.
+
+    Syntaxe
+       error(message)
+       error(format,A1,...)
+       error(identifiant,format,A1,...)
+
+    Exemples
+       error('la matrice doit être carrée');
+       error('taille %dx%d refusée', m, n);
+       error('MonModule:tailleInvalide', 'A doit être carrée');
+
+       try
+           ...
+       catch e
+           if strcmp(e.identifier, 'MonModule:tailleInvalide'), ... end
+       end
+
+    Voir aussi WARNING, TRY, ASSERT, MEXCEPTION, LASTERR.
+
+### warning
+WARNING  Signale un avertissement, sans arrêter.
+    WARNING(MESSAGE) affiche l'avertissement.
+    WARNING(IDENTIFIANT,FORMAT,...) lui donne un identifiant.
+    WARNING('off',IDENTIFIANT) éteint cet avertissement ; 'on' le rallume.
+
+    Syntaxe
+       warning(message)
+       warning(identifiant,format,...)
+       warning('off',identifiant)
+
+    Exemples
+       warning('résultat approché');
+       warning('off', 'MATLAB:singularMatrix');
+
+    Voir aussi ERROR, TRY, ASSERT, LASTWARN.

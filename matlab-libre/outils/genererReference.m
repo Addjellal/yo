@@ -73,7 +73,9 @@ dossierToolbox = fullfile(racine, 'toolbox');
 entrees = dir(dossierToolbox);
 nomsToolbox = {};
 for k = 1:numel(entrees)
-    if entrees(k).isdir && ~strcmp(entrees(k).name, '.') && ~strcmp(entrees(k).name, '..')
+    % « aide » porte les fiches des fonctions natives, pas des toolboxes.
+    if entrees(k).isdir && ~strcmp(entrees(k).name, '.') && ...
+            ~strcmp(entrees(k).name, '..') && ~strcmp(entrees(k).name, 'aide')
         nomsToolbox{end+1} = entrees(k).name;
     end
 end

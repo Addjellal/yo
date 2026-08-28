@@ -5,7 +5,19 @@ Fonctions natives du groupe `math`.
 ## `abs`
 
 ```
-abs  Valeur absolue, module d'un complexe.
+ABS  Valeur absolue, ou module d'un complexe.
+    Y = ABS(X) rend |X|. Pour un complexe, ABS rend le module,
+    SQRT(REAL(X).^2 + IMAG(X).^2).
+
+    Syntaxe
+       Y = abs(X)
+
+    Exemples
+       abs(-3)                    % 3
+       abs(3 + 4i)                % 5
+       abs(fft(x))                % spectre d'amplitude
+
+    Voir aussi SIGN, ANGLE, REAL, IMAG, HYPOT.
 ```
 
 ## `acos`
@@ -35,7 +47,18 @@ and  Et logique.
 ## `angle`
 
 ```
-angle  Argument d'un complexe.
+ANGLE  Argument d'un nombre complexe, en radians.
+    P = ANGLE(Z) rend l'argument de Z, dans ]-pi, pi].
+
+    Syntaxe
+       P = angle(Z)
+
+    Exemples
+       angle(1i)                  % pi/2
+       angle(-1)                  % pi
+       unwrap(angle(fft(x)))      % phase déroulée d'un spectre
+
+    Voir aussi ABS, UNWRAP, REAL, IMAG, ATAN2.
 ```
 
 ## `arg`
@@ -71,7 +94,19 @@ atan  Arc tangente.
 ## `atan2`
 
 ```
-atan2  Arc tangente a quatre quadrants.
+ATAN2  Arc tangente à quatre quadrants.
+    P = ATAN2(Y,X) rend l'angle du point (X,Y), dans ]-pi, pi]. À la
+    différence d'ATAN(Y/X), ATAN2 distingue les quadrants et gère X = 0.
+
+    Syntaxe
+       P = atan2(Y,X)
+
+    Exemples
+       atan2(1,1)                 % pi/4
+       atan2(1,-1)                % 3*pi/4 — et non -pi/4
+       angle = atan2(dy, dx);
+
+    Voir aussi ATAN, ANGLE, HYPOT, CART2POL.
 ```
 
 ## `atan2d`
@@ -275,7 +310,19 @@ erfinv  Reciproque de erf.
 ## `exp`
 
 ```
-exp  Exponentielle.
+EXP  Exponentielle.
+    Y = EXP(X) rend e élevé à la puissance X, terme à terme. Pour un
+    complexe, EXP(x+iy) = EXP(x)*(COS(y)+i*SIN(y)).
+
+    Syntaxe
+       Y = exp(X)
+
+    Exemples
+       exp(1)                     % 2.7183
+       exp(1i*pi)                 % -1, aux arrondis près
+       y = exp(-t/tau);           % décroissance
+
+    Voir aussi LOG, EXPM1, POWER, EXPM.
 ```
 
 ## `expm1`
@@ -413,7 +460,19 @@ le  Inferieur ou egal.
 ## `log`
 
 ```
-log  Logarithme naturel.
+LOG  Logarithme népérien.
+    Y = LOG(X) rend le logarithme de base e. Pour un X négatif réel, le
+    résultat est complexe.
+
+    Syntaxe
+       Y = log(X)
+
+    Exemples
+       log(exp(2))                % 2
+       log(-1)                    % 0 + 3.1416i
+       dB = 20*log10(abs(H));     % pour des décibels, log10
+
+    Voir aussi LOG2, LOG10, LOG1P, EXP, REALLOG.
 ```
 
 ## `log10`
@@ -449,13 +508,45 @@ minus  Soustraction.
 ## `mldivide`
 
 ```
-mldivide  Division matricielle a gauche.
+MLDIVIDE  Division à gauche, « A\b » : résout A*x = b.
+    X = A\B résout le système A*X = B. Pour une matrice carrée, la
+    factorisation adaptée est choisie ; pour une matrice rectangulaire,
+    la solution est celle des moindres carrés.
+
+    C'est la façon d'inverser un système : plus rapide et plus précise
+    que INV(A)*B.
+
+    Syntaxe
+       X = A\B
+       X = mldivide(A,B)
+
+    Exemples
+       A = [2 1; 1 3];  b = [3; 5];
+       x = A \ b;                 % [0.8; 1.4]
+       p = X \ y;                 % régression aux moindres carrés
+
+    Voir aussi MRDIVIDE, INV, LU, QR, PINV, LSQMINNORM.
 ```
 
 ## `mod`
 
 ```
-mod  Modulo, du signe du diviseur.
+MOD  Reste de la division, du signe du diviseur.
+    M = MOD(X,Y) rend X - FLOOR(X./Y).*Y. Le résultat a le signe de Y.
+    MOD(X,0) rend X.
+
+    MOD et REM diffèrent quand les signes diffèrent : MOD(-1,3) vaut 2,
+    REM(-1,3) vaut -1.
+
+    Syntaxe
+       M = mod(a,m)
+
+    Exemples
+       mod(7,3)                   % 1
+       mod(-1,3)                  % 2
+       mod(k-1, n) + 1            % indice cyclique de 1 à n
+
+    Voir aussi REM, IDIVIDE, FLOOR.
 ```
 
 ## `mpower`
@@ -551,13 +642,37 @@ real  Partie reelle.
 ## `rem`
 
 ```
-rem  Reste, du signe du dividende.
+REM  Reste de la division, du signe du dividende.
+    R = REM(X,Y) rend X - FIX(X./Y).*Y. Le résultat a le signe de X.
+
+    Syntaxe
+       R = rem(a,b)
+
+    Exemples
+       rem(7,3)                   % 1
+       rem(-1,3)                  % -1
+
+    Voir aussi MOD, FIX, IDIVIDE.
 ```
 
 ## `round`
 
 ```
-round  Arrondi au plus proche.
+ROUND  Arrondit au plus proche.
+    Y = ROUND(X) arrondit à l'entier le plus proche, les demis s'éloignant
+    de zéro.
+    Y = ROUND(X,N) arrondit à N décimales.
+
+    Syntaxe
+       Y = round(X)
+       Y = round(X,n)
+
+    Exemples
+       round(2.5)                 % 3
+       round(-2.5)                % -3
+       round(pi, 2)               % 3.14
+
+    Voir aussi FLOOR, CEIL, FIX.
 ```
 
 ## `sec`
@@ -611,7 +726,19 @@ sinh  Sinus hyperbolique.
 ## `sqrt`
 
 ```
-sqrt  Racine carree (complexe si l'argument est negatif).
+SQRT  Racine carrée.
+    Y = SQRT(X) rend la racine carrée de X. Pour un X négatif réel, le
+    résultat est complexe.
+
+    Syntaxe
+       Y = sqrt(X)
+
+    Exemples
+       sqrt(16)                   % 4
+       sqrt(-4)                   % 0 + 2i
+       sqrt([1 4 9])              % [1 2 3]
+
+    Voir aussi NTHROOT, REALSQRT, EXP, POWER.
 ```
 
 ## `tan`

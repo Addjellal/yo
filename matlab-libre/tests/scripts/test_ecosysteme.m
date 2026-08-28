@@ -83,8 +83,13 @@ assert(exist('ide', 'builtin') == 5);
 assert(exist('atelier', 'builtin') == 5);
 aideIde = help('ide');
 assert(~isempty(strfind(aideIde, 'atelier')));
-assert(~isempty(strfind(aideIde, 'points d''arret')));
-assert(~isempty(strfind(aideIde, 'schemas-blocs')));
+% Les mots isoles : le texte est mis en forme, une phrase peut etre
+% coupee entre deux lignes.
+assert(~isempty(strfind(aideIde, 'arr')));
+assert(~isempty(strfind(aideIde, 'blocs')));
+% La fiche donne aussi la syntaxe et un exemple, comme celles de MATLAB.
+assert(~isempty(strfind(aideIde, 'Syntaxe')));
+assert(~isempty(strfind(aideIde, 'ide(port)')));
 % L'aide generale y renvoie : c'est par la qu'on le decouvre.
 aideGenerale = help();
 assert(~isempty(strfind(aideGenerale, 'ide')));

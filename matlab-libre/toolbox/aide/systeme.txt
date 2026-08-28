@@ -1,0 +1,114 @@
+### help
+HELP  Aide d'une fonction.
+    HELP NOM affiche l'aide de la fonction NOM : sa syntaxe, ce qu'elle
+    fait, des exemples et les fonctions voisines.
+    T = HELP(NOM) rend ce texte au lieu de l'afficher.
+    HELP seul rappelle les commandes d'orientation.
+
+    Syntaxe
+       help nom
+       help('nom')
+       t = help('nom')
+
+    Exemples
+       help fft
+       help gca
+       t = help('sort');
+
+    Voir aussi DOC, LOOKFOR, WHICH, VER, IDE.
+
+### ide
+IDE  Ouvre l'atelier dans le navigateur.
+    IDE ouvre l'atelier : éditeur de scripts avec coloration et points
+    d'arrêt, console, table des variables, figures, profileur, concepteur
+    d'applications et éditeur de schémas-blocs.
+    IDE(PORT) choisit le port ; 8421 par défaut.
+
+    L'atelier tourne dans un second processus et a son propre espace de
+    travail, séparé de celui de la console.
+
+    Pour un bureau natif — une fenêtre, pas un navigateur — lancer
+    « matlibre-bureau ».
+
+    Syntaxe
+       ide
+       ide(port)
+
+    Exemples
+       ide
+       ide(9000)
+
+    Voir aussi HELP, VER.
+
+### which
+WHICH  Où se trouve une fonction.
+    WHICH NOM affiche le chemin du fichier qui définit NOM, ou signale
+    une fonction native.
+    S = WHICH(NOM) rend ce chemin.
+    WHICH NOM -all liste toutes les définitions visibles : c'est ainsi
+    qu'on trouve un masquage.
+
+    Syntaxe
+       which nom
+       s = which('nom')
+       which nom -all
+
+    Exemples
+       which fft
+       which butter
+
+    Voir aussi EXIST, PATH, HELP, TYPE.
+
+### exist
+EXIST  Ce que désigne un nom.
+    E = EXIST(NOM) rend :
+       0  rien
+       1  une variable
+       2  un fichier
+       5  une fonction native
+       7  un dossier
+       8  une classe
+    E = EXIST(NOM,GENRE) restreint la recherche : 'var', 'file', 'dir',
+    'builtin', 'class'.
+
+    Syntaxe
+       e = exist(nom)
+       e = exist(nom,genre)
+
+    Exemples
+       if exist('resultat','var'), ... end
+       if exist('donnees.mat','file') == 2, ... end
+
+    Voir aussi WHICH, ISFIELD, ISVARNAME.
+
+### tic
+TIC  Démarre le chronomètre.
+    TIC met à zéro le chronomètre ; TOC lit le temps écoulé.
+    ID = TIC rend un identifiant, à passer à TOC : c'est ce qui permet
+    d'imbriquer deux mesures.
+
+    Syntaxe
+       tic
+       id = tic;
+
+    Exemples
+       tic; y = fft(x); toc
+       id = tic; ... ; ecoule = toc(id);
+
+    Voir aussi TOC, CPUTIME, TIMEIT, PROFILE.
+
+### toc
+TOC  Lit le chronomètre.
+    TOC affiche le temps écoulé depuis TIC.
+    T = TOC rend ce temps en secondes, sans l'afficher.
+    T = TOC(ID) lit le chronomètre démarré par « ID = TIC ».
+
+    Syntaxe
+       toc
+       t = toc;
+       t = toc(id);
+
+    Exemples
+       tic; pause(0.5); t = toc;      % t vaut environ 0.5
+
+    Voir aussi TIC, CPUTIME, TIMEIT.

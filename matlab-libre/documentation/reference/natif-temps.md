@@ -83,13 +83,39 @@ pause  Attend un nombre de secondes.
 ## `tic`
 
 ```
-tic  Demarre le chronometre.
+TIC  Démarre le chronomètre.
+    TIC met à zéro le chronomètre ; TOC lit le temps écoulé.
+    ID = TIC rend un identifiant, à passer à TOC : c'est ce qui permet
+    d'imbriquer deux mesures.
+
+    Syntaxe
+       tic
+       id = tic;
+
+    Exemples
+       tic; y = fft(x); toc
+       id = tic; ... ; ecoule = toc(id);
+
+    Voir aussi TOC, CPUTIME, TIMEIT, PROFILE.
 ```
 
 ## `toc`
 
 ```
-toc  Temps ecoule depuis tic.
+TOC  Lit le chronomètre.
+    TOC affiche le temps écoulé depuis TIC.
+    T = TOC rend ce temps en secondes, sans l'afficher.
+    T = TOC(ID) lit le chronomètre démarré par « ID = TIC ».
+
+    Syntaxe
+       toc
+       t = toc;
+       t = toc(id);
+
+    Exemples
+       tic; pause(0.5); t = toc;      % t vaut environ 0.5
+
+    Voir aussi TIC, CPUTIME, TIMEIT.
 ```
 
 ## `weekday`

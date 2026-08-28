@@ -17,6 +17,11 @@ for k = 1:numel(entrees)
     if ~entrees(k).isdir || entrees(k).name(1) == '.'
         continue
     end
+    % « aide » n'est pas un module : ce sont les fiches d'aide des
+    % fonctions natives, en texte, pas des fonctions de toolbox.
+    if strcmp(entrees(k).name, 'aide')
+        continue
+    end
     fichiers = dir(fullfile(racine, 'toolbox', entrees(k).name, '*.m'));
     n = 0;
     for j = 1:numel(fichiers)

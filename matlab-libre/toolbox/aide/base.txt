@@ -1,0 +1,455 @@
+### zeros
+ZEROS  Tableau de zéros.
+    ZEROS(N) rend une matrice N par N de zéros.
+    ZEROS(M,N) rend une matrice M par N de zéros.
+    ZEROS(M,N,P,...) rend un tableau M par N par P de zéros.
+    ZEROS(SIZE(A)) rend un tableau de la taille de A.
+    ZEROS(...,CLASSE) rend un tableau de la classe donnée : 'double',
+    'single', 'int8'..'int64', 'uint8'..'uint64', 'logical'.
+
+    Syntaxe
+       X = zeros
+       X = zeros(n)
+       X = zeros(sz1,...,szN)
+       X = zeros(sz)
+       X = zeros(___,classe)
+
+    Exemples
+       zeros(2)              % matrice 2x2 de zéros
+       zeros(2,3)            % matrice 2x3
+       zeros(1,4,'int8')     % vecteur d'entiers 8 bits
+       zeros(size(A))        % de la taille de A
+
+    Voir aussi ONES, EYE, NAN, RAND, SIZE.
+
+### ones
+ONES  Tableau de uns.
+    ONES(N) rend une matrice N par N de uns.
+    ONES(M,N) rend une matrice M par N de uns.
+    ONES(...,CLASSE) rend un tableau de la classe donnée.
+
+    Syntaxe
+       X = ones
+       X = ones(n)
+       X = ones(sz1,...,szN)
+       X = ones(___,classe)
+
+    Exemples
+       ones(3)               % matrice 3x3 de uns
+       5 * ones(1,4)         % vecteur [5 5 5 5]
+       ones(2,2,'single')
+
+    Voir aussi ZEROS, EYE, REPMAT.
+
+### eye
+EYE  Matrice identité.
+    EYE(N) rend la matrice identité N par N.
+    EYE(M,N) rend une matrice M par N dont la diagonale vaut un.
+    EYE(SIZE(A)) rend une identité de la taille de A.
+
+    Syntaxe
+       I = eye
+       I = eye(n)
+       I = eye(n,m)
+       I = eye(___,classe)
+
+    Exemples
+       eye(3)                % identité 3x3
+       A \ eye(size(A))      % une façon d'écrire inv(A)
+
+    Voir aussi ZEROS, ONES, DIAG, INV.
+
+### size
+SIZE  Dimensions d'un tableau.
+    D = SIZE(A) rend un vecteur ligne dont les éléments sont les
+    longueurs de A selon chaque dimension.
+    [M,N] = SIZE(A) rend le nombre de lignes et de colonnes.
+    M = SIZE(A,DIM) rend la longueur selon la dimension DIM.
+
+    Un tableau a toujours au moins deux dimensions : SIZE d'un scalaire
+    rend [1 1].
+
+    Syntaxe
+       sz = size(A)
+       [m,n] = size(A)
+       szdim = size(A,dim)
+
+    Exemples
+       size(zeros(2,3))      % [2 3]
+       size(zeros(2,3), 2)   % 3
+       [m,n] = size(A);
+
+    Voir aussi NUMEL, LENGTH, NDIMS, RESHAPE.
+
+### numel
+NUMEL  Nombre d'éléments d'un tableau.
+    N = NUMEL(A) rend le nombre d'éléments de A, c'est-à-dire le produit
+    de ses dimensions.
+
+    Syntaxe
+       n = numel(A)
+
+    Exemples
+       numel(zeros(2,3))     % 6
+       numel('bonjour')      % 7
+       numel({1,2,3})        % 3
+
+    Voir aussi SIZE, LENGTH, NDIMS.
+
+### length
+LENGTH  Longueur du plus grand côté.
+    L = LENGTH(A) rend MAX(SIZE(A)) pour un tableau non vide, et 0 pour
+    un tableau vide. Pour un vecteur, c'est son nombre d'éléments.
+
+    Syntaxe
+       L = length(A)
+
+    Exemples
+       length(1:10)          % 10
+       length(zeros(3,7))    % 7
+       length([])            % 0
+
+    Voir aussi NUMEL, SIZE, NDIMS.
+
+### reshape
+RESHAPE  Change la forme d'un tableau.
+    B = RESHAPE(A,M,N) rend une matrice M par N dont les éléments sont
+    ceux de A, pris colonne par colonne. Le nombre d'éléments doit être
+    conservé.
+    B = RESHAPE(A,M,N,P,...) ou RESHAPE(A,[M N P ...]) pour plus de
+    dimensions.
+    Une dimension peut valoir [] : elle est alors calculée.
+
+    Syntaxe
+       B = reshape(A,sz1,...,szN)
+       B = reshape(A,sz)
+
+    Exemples
+       reshape(1:6, 2, 3)    % [1 3 5; 2 4 6]
+       reshape(1:6, 2, [])   % même résultat
+       reshape(A, 1, [])     % A en un vecteur ligne
+
+    Voir aussi SIZE, PERMUTE, SQUEEZE, CIRCSHIFT.
+
+### linspace
+LINSPACE  Vecteur de points régulièrement espacés.
+    Y = LINSPACE(A,B) rend 100 points également répartis entre A et B.
+    Y = LINSPACE(A,B,N) en rend N. Les bornes A et B sont incluses.
+
+    LINSPACE contrôle le NOMBRE de points, là où le deux-points contrôle
+    le PAS : « 0:0.1:1 » et « linspace(0,1,11) » donnent le même vecteur.
+
+    Syntaxe
+       y = linspace(a,b)
+       y = linspace(a,b,n)
+
+    Exemples
+       linspace(0,1,5)       % [0 0.25 0.5 0.75 1]
+       linspace(0,2*pi,1000) % 1000 points sur une période
+
+    Voir aussi LOGSPACE, COLON.
+
+### logspace
+LOGSPACE  Vecteur de points espacés logarithmiquement.
+    Y = LOGSPACE(A,B) rend 50 points entre 10^A et 10^B.
+    Y = LOGSPACE(A,B,N) en rend N.
+
+    Syntaxe
+       y = logspace(a,b)
+       y = logspace(a,b,n)
+
+    Exemples
+       logspace(0,3,4)       % [1 10 100 1000]
+       f = logspace(-1,3,200);   % un axe de Bode
+
+    Voir aussi LINSPACE, SEMILOGX.
+
+### sum
+SUM  Somme des éléments.
+    S = SUM(A) somme les colonnes d'une matrice, ou les éléments d'un
+    vecteur.
+    S = SUM(A,DIM) somme selon la dimension DIM.
+    S = SUM(...,'omitnan') ignore les NaN.
+
+    Syntaxe
+       S = sum(A)
+       S = sum(A,dim)
+       S = sum(A,'all')
+       S = sum(___,'omitnan')
+
+    Exemples
+       sum([1 2 3])          % 6
+       sum([1 2; 3 4])       % [4 6]   — par colonnes
+       sum([1 2; 3 4], 2)    % [3; 7]  — par lignes
+       sum(A(:))             % somme de tout
+
+    Voir aussi PROD, CUMSUM, MEAN, MAX, MIN.
+
+### prod
+PROD  Produit des éléments.
+    P = PROD(A) multiplie les colonnes d'une matrice, ou les éléments
+    d'un vecteur.
+    P = PROD(A,DIM) multiplie selon la dimension DIM.
+
+    Syntaxe
+       P = prod(A)
+       P = prod(A,dim)
+
+    Exemples
+       prod([1 2 3 4])       % 24
+       prod([1 2; 3 4])      % [3 8]
+
+    Voir aussi SUM, CUMPROD, FACTORIAL.
+
+### max
+MAX  Plus grand élément.
+    M = MAX(A) rend le plus grand élément d'un vecteur, ou le plus grand
+    de chaque colonne d'une matrice.
+    [M,I] = MAX(A) rend en plus l'indice où il se trouve.
+    C = MAX(A,B) compare A et B terme à terme.
+    M = MAX(A,[],DIM) travaille selon la dimension DIM.
+
+    Les NaN sont ignorés. Pour un complexe, MAX compare les modules.
+
+    Syntaxe
+       M = max(A)
+       [M,I] = max(A)
+       C = max(A,B)
+       M = max(A,[],dim)
+       M = max(A,[],'all')
+
+    Exemples
+       max([3 1 4 1 5])      % 5
+       [m,i] = max([3 1 4]); % m = 4, i = 3
+       max([1 2], [3 0])     % [3 2]
+
+    Voir aussi MIN, SORT, BOUNDS, CUMMAX.
+
+### min
+MIN  Plus petit élément.
+    Mêmes formes que MAX, pour le minimum.
+
+    Syntaxe
+       M = min(A)
+       [M,I] = min(A)
+       C = min(A,B)
+       M = min(A,[],dim)
+
+    Exemples
+       min([3 1 4 1 5])      % 1
+       [m,i] = min([3 1 4]); % m = 1, i = 2
+
+    Voir aussi MAX, SORT, BOUNDS.
+
+### sort
+SORT  Trie dans l'ordre croissant.
+    B = SORT(A) trie les colonnes d'une matrice, ou les éléments d'un
+    vecteur, dans l'ordre croissant.
+    B = SORT(A,'descend') trie dans l'ordre décroissant.
+    [B,I] = SORT(A) rend en plus la permutation : B = A(I).
+    B = SORT(A,DIM) trie selon la dimension DIM.
+
+    Les NaN sont placés en fin. Un complexe est trié par module, puis
+    par argument.
+
+    Syntaxe
+       B = sort(A)
+       B = sort(A,direction)
+       B = sort(A,dim,direction)
+       [B,I] = sort(___)
+
+    Exemples
+       sort([3 1 2])              % [1 2 3]
+       sort([3 1 2], 'descend')   % [3 2 1]
+       [~,i] = sort(cle);         % trier autre chose par la même clé
+       tableau = tableau(i,:);
+
+    Voir aussi SORTROWS, UNIQUE, MAX, MIN, ISSORTED.
+
+### find
+FIND  Indices des éléments non nuls.
+    I = FIND(X) rend les indices linéaires des éléments non nuls de X.
+    I = FIND(X,K) rend les K premiers.
+    I = FIND(X,K,'last') rend les K derniers.
+    [R,C] = FIND(X) rend les indices de ligne et de colonne.
+    [R,C,V] = FIND(X) rend en plus les valeurs.
+
+    FIND s'emploie surtout sur un test : FIND(A > 3).
+
+    Syntaxe
+       k = find(X)
+       k = find(X,n)
+       k = find(X,n,direction)
+       [row,col] = find(___)
+
+    Exemples
+       find([0 3 0 7])            % [2 4]
+       find(A > 5)                % où A dépasse 5
+       A(find(A < 0)) = 0;        % ou plus simplement A(A < 0) = 0
+
+    Voir aussi ANY, ALL, NNZ, LOGICAL.
+
+### any
+ANY  Vrai si un élément au moins est vrai.
+    B = ANY(A) rend vrai s'il existe un élément non nul. Sur une matrice,
+    travaille par colonnes.
+    B = ANY(A,DIM) travaille selon la dimension DIM.
+    B = ANY(A,'all') sur tout le tableau.
+
+    Syntaxe
+       B = any(A)
+       B = any(A,dim)
+       B = any(A,'all')
+
+    Exemples
+       any([0 0 1])               % 1
+       if any(isnan(x)), ... end
+       any(A(:) < 0)              % un négatif quelque part ?
+
+    Voir aussi ALL, FIND, XOR.
+
+### all
+ALL  Vrai si tous les éléments sont vrais.
+    Mêmes formes que ANY.
+
+    Syntaxe
+       B = all(A)
+       B = all(A,dim)
+       B = all(A,'all')
+
+    Exemples
+       all([1 1 0])               % 0
+       if all(size(A) == size(B)), ... end
+
+    Voir aussi ANY, FIND.
+
+### abs
+ABS  Valeur absolue, ou module d'un complexe.
+    Y = ABS(X) rend |X|. Pour un complexe, ABS rend le module,
+    SQRT(REAL(X).^2 + IMAG(X).^2).
+
+    Syntaxe
+       Y = abs(X)
+
+    Exemples
+       abs(-3)                    % 3
+       abs(3 + 4i)                % 5
+       abs(fft(x))                % spectre d'amplitude
+
+    Voir aussi SIGN, ANGLE, REAL, IMAG, HYPOT.
+
+### sqrt
+SQRT  Racine carrée.
+    Y = SQRT(X) rend la racine carrée de X. Pour un X négatif réel, le
+    résultat est complexe.
+
+    Syntaxe
+       Y = sqrt(X)
+
+    Exemples
+       sqrt(16)                   % 4
+       sqrt(-4)                   % 0 + 2i
+       sqrt([1 4 9])              % [1 2 3]
+
+    Voir aussi NTHROOT, REALSQRT, EXP, POWER.
+
+### mod
+MOD  Reste de la division, du signe du diviseur.
+    M = MOD(X,Y) rend X - FLOOR(X./Y).*Y. Le résultat a le signe de Y.
+    MOD(X,0) rend X.
+
+    MOD et REM diffèrent quand les signes diffèrent : MOD(-1,3) vaut 2,
+    REM(-1,3) vaut -1.
+
+    Syntaxe
+       M = mod(a,m)
+
+    Exemples
+       mod(7,3)                   % 1
+       mod(-1,3)                  % 2
+       mod(k-1, n) + 1            % indice cyclique de 1 à n
+
+    Voir aussi REM, IDIVIDE, FLOOR.
+
+### rem
+REM  Reste de la division, du signe du dividende.
+    R = REM(X,Y) rend X - FIX(X./Y).*Y. Le résultat a le signe de X.
+
+    Syntaxe
+       R = rem(a,b)
+
+    Exemples
+       rem(7,3)                   % 1
+       rem(-1,3)                  % -1
+
+    Voir aussi MOD, FIX, IDIVIDE.
+
+### round
+ROUND  Arrondit au plus proche.
+    Y = ROUND(X) arrondit à l'entier le plus proche, les demis s'éloignant
+    de zéro.
+    Y = ROUND(X,N) arrondit à N décimales.
+
+    Syntaxe
+       Y = round(X)
+       Y = round(X,n)
+
+    Exemples
+       round(2.5)                 % 3
+       round(-2.5)                % -3
+       round(pi, 2)               % 3.14
+
+    Voir aussi FLOOR, CEIL, FIX.
+
+### rand
+RAND  Nombres pseudo-aléatoires uniformes sur ]0,1[.
+    R = RAND(N) rend une matrice N par N.
+    R = RAND(M,N) rend une matrice M par N.
+    R = RAND(SIZE(A)) rend un tableau de la taille de A.
+
+    La suite est reproductible : RNG(graine) la fixe.
+
+    Syntaxe
+       X = rand
+       X = rand(n)
+       X = rand(sz1,...,szN)
+
+    Exemples
+       rand(3)                    % matrice 3x3
+       a + (b-a)*rand(1,100)      % 100 tirages entre a et b
+       rng(0); rand(1,3)          % suite reproductible
+
+    Voir aussi RANDN, RANDI, RANDPERM, RNG.
+
+### randn
+RANDN  Nombres pseudo-aléatoires normaux, de moyenne 0 et d'écart-type 1.
+    Mêmes formes que RAND.
+
+    Syntaxe
+       X = randn(n)
+       X = randn(sz1,...,szN)
+
+    Exemples
+       randn(1,1000)              % bruit blanc gaussien
+       mu + sigma*randn(1,n)      % loi normale de paramètres mu, sigma
+
+    Voir aussi RAND, RANDI, RNG.
+
+### rng
+RNG  Fixe ou lit l'état du générateur aléatoire.
+    RNG(GRAINE) part de la graine donnée : la suite devient reproductible.
+    RNG('default') revient à l'état de démarrage.
+    S = RNG rend l'état courant ; RNG(S) le restaure.
+
+    Syntaxe
+       rng(graine)
+       rng('default')
+       s = rng;
+       rng(s)
+
+    Exemples
+       rng(42); a = rand(1,3);
+       rng(42); b = rand(1,3);    % b est identique à a
+       s = rng; x = rand; rng(s); y = rand;   % y == x
+
+    Voir aussi RAND, RANDN, RANDI.

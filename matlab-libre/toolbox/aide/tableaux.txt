@@ -1,0 +1,144 @@
+### cat
+CAT  Concatène des tableaux.
+    C = CAT(DIM,A,B,...) concatène selon la dimension DIM.
+    CAT(1,A,B) empile verticalement, comme [A;B].
+    CAT(2,A,B) accole horizontalement, comme [A,B].
+
+    Syntaxe
+       C = cat(dim,A1,A2,...,An)
+
+    Exemples
+       cat(1, [1 2], [3 4])       % [1 2; 3 4]
+       cat(2, [1;2], [3;4])       % [1 3; 2 4]
+       cat(3, A, B)               % empile en profondeur
+
+    Voir aussi HORZCAT, VERTCAT, RESHAPE, PERMUTE.
+
+### repmat
+REPMAT  Répète un tableau en mosaïque.
+    B = REPMAT(A,M,N) fait une mosaïque de M par N copies de A.
+    B = REPMAT(A,[M N P ...]) pour plus de dimensions.
+    B = REPMAT(A,N) fait N par N copies.
+
+    Syntaxe
+       B = repmat(A,n)
+       B = repmat(A,r1,...,rN)
+       B = repmat(A,r)
+
+    Exemples
+       repmat([1 2], 2, 3)        % 2x6
+       repmat(x, 1, n)            % n copies d'un vecteur colonne
+
+    Voir aussi KRON, RESHAPE, CAT, MESHGRID.
+
+### unique
+UNIQUE  Valeurs distinctes, triées.
+    C = UNIQUE(A) rend les valeurs distinctes de A, dans l'ordre
+    croissant et sans répétition.
+    [C,IA,IC] = UNIQUE(A) rend en plus les indices tels que
+    C = A(IA) et A = C(IC).
+    C = UNIQUE(A,'stable') garde l'ordre d'apparition.
+    C = UNIQUE(A,'rows') travaille sur les lignes d'une matrice.
+
+    Syntaxe
+       C = unique(A)
+       C = unique(A,'stable')
+       C = unique(A,'rows')
+       [C,ia,ic] = unique(___)
+
+    Exemples
+       unique([3 1 3 2])              % [1 2 3]
+       unique([3 1 3 2], 'stable')    % [3 1 2]
+       [c,~,ic] = unique(etiquettes);
+       comptes = accumarray(ic, 1);   % combien de fois chacune
+
+    Voir aussi SORT, ISMEMBER, INTERSECT, UNION, HISTCOUNTS.
+
+### ismember
+ISMEMBER  Test d'appartenance.
+    TF = ISMEMBER(A,S) rend un tableau logique de la taille de A, vrai
+    là où l'élément se trouve dans S.
+    [TF,LOC] = ISMEMBER(A,S) rend en plus l'indice dans S, ou 0.
+    ISMEMBER(A,S,'rows') travaille sur les lignes.
+
+    Syntaxe
+       tf = ismember(A,S)
+       [tf,loc] = ismember(A,S)
+
+    Exemples
+       ismember(3, [1 2 3])           % 1
+       ismember([1 5], [1 2 3])       % [1 0]
+       x(ismember(x, aRetirer)) = [];
+
+    Voir aussi UNIQUE, INTERSECT, SETDIFF, ANY, CONTAINS.
+
+### cumsum
+CUMSUM  Somme cumulée.
+    B = CUMSUM(A) rend les sommes partielles : B(k) est la somme des k
+    premiers éléments. Sur une matrice, travaille par colonnes.
+    B = CUMSUM(A,DIM) selon la dimension DIM.
+
+    Syntaxe
+       B = cumsum(A)
+       B = cumsum(A,dim)
+
+    Exemples
+       cumsum([1 2 3 4])              % [1 3 6 10]
+       aire = cumsum(y) * pas;        % intégration rectangulaire
+
+    Voir aussi SUM, CUMPROD, DIFF, TRAPZ.
+
+### diff
+DIFF  Différences entre éléments voisins.
+    Y = DIFF(X) rend X(2:end) - X(1:end-1) : un élément de moins que X.
+    Y = DIFF(X,N) applique DIFF N fois.
+    Y = DIFF(X,N,DIM) selon la dimension DIM.
+
+    Syntaxe
+       Y = diff(X)
+       Y = diff(X,n)
+       Y = diff(X,n,dim)
+
+    Exemples
+       diff([1 4 9 16])               % [3 5 7]
+       pente = diff(y) ./ diff(x);    % dérivée approchée
+       if all(diff(x) > 0), ... end   % x est-il croissant ?
+
+    Voir aussi CUMSUM, GRADIENT, SORT, ISSORTED.
+
+### cellfun
+CELLFUN  Applique une fonction à chaque case d'une cellule.
+    A = CELLFUN(F,C) applique F à chaque case et rend un tableau. F doit
+    rendre un scalaire, sinon employer 'UniformOutput'.
+    A = CELLFUN(F,C,'UniformOutput',false) rend une cellule : c'est ce
+    qu'il faut dès que les résultats ne sont pas des scalaires.
+    CELLFUN(F,C1,C2) applique F case par case sur plusieurs cellules.
+
+    Syntaxe
+       A = cellfun(f,C)
+       A = cellfun(f,C,'UniformOutput',false)
+
+    Exemples
+       cellfun(@numel, {'a','bb','ccc'})            % [1 2 3]
+       cellfun(@(s) upper(s), noms, 'UniformOutput', false)
+       cellfun(@isempty, C)
+
+    Voir aussi ARRAYFUN, STRUCTFUN, CELL2MAT, MAP.
+
+### arrayfun
+ARRAYFUN  Applique une fonction à chaque élément d'un tableau.
+    B = ARRAYFUN(F,A) applique F à chaque élément.
+    B = ARRAYFUN(F,A,'UniformOutput',false) rend une cellule.
+
+    Une opération vectorisée est presque toujours plus rapide :
+    ARRAYFUN sert quand la fonction ne se vectorise pas.
+
+    Syntaxe
+       B = arrayfun(f,A)
+       B = arrayfun(f,A,'UniformOutput',false)
+
+    Exemples
+       arrayfun(@(k) k^2, 1:4)                      % [1 4 9 16]
+       arrayfun(@(k) zeros(k), 1:3, 'UniformOutput', false)
+
+    Voir aussi CELLFUN, STRUCTFUN, BSXFUN.

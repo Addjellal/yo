@@ -125,18 +125,49 @@ graphics_toolkit  Moteur graphique utilise.
 ## `help`
 
 ```
-help  Aide d'une fonction.
+HELP  Aide d'une fonction.
+    HELP NOM affiche l'aide de la fonction NOM : sa syntaxe, ce qu'elle
+    fait, des exemples et les fonctions voisines.
+    T = HELP(NOM) rend ce texte au lieu de l'afficher.
+    HELP seul rappelle les commandes d'orientation.
+
+    Syntaxe
+       help nom
+       help('nom')
+       t = help('nom')
+
+    Exemples
+       help fft
+       help gca
+       t = help('sort');
+
+    Voir aussi DOC, LOOKFOR, WHICH, VER, IDE.
 ```
 
 ## `ide`
 
 ```
-ide  Ouvre l'atelier dans le navigateur : editeur de scripts avec
-     coloration et points d'arret, console, table des variables,
-     figures, profileur, concepteur d'applications et editeur de
-     schemas-blocs. « ide PORT » choisit le port (8421 par defaut).
-     L'atelier tourne dans un second processus et a son propre
-     espace de travail.
+IDE  Ouvre l'atelier dans le navigateur.
+    IDE ouvre l'atelier : éditeur de scripts avec coloration et points
+    d'arrêt, console, table des variables, figures, profileur, concepteur
+    d'applications et éditeur de schémas-blocs.
+    IDE(PORT) choisit le port ; 8421 par défaut.
+
+    L'atelier tourne dans un second processus et a son propre espace de
+    travail, séparé de celui de la console.
+
+    Pour un bureau natif — une fenêtre, pas un navigateur — lancer
+    « matlibre-bureau ».
+
+    Syntaxe
+       ide
+       ide(port)
+
+    Exemples
+       ide
+       ide(9000)
+
+    Voir aussi HELP, VER.
 ```
 
 ## `isfile`
@@ -328,7 +359,23 @@ version  Version de l'interpreteur.
 ## `which`
 
 ```
-which  Ou se trouve une fonction.
+WHICH  Où se trouve une fonction.
+    WHICH NOM affiche le chemin du fichier qui définit NOM, ou signale
+    une fonction native.
+    S = WHICH(NOM) rend ce chemin.
+    WHICH NOM -all liste toutes les définitions visibles : c'est ainsi
+    qu'on trouve un masquage.
+
+    Syntaxe
+       which nom
+       s = which('nom')
+       which nom -all
+
+    Exemples
+       which fft
+       which butter
+
+    Voir aussi EXIST, PATH, HELP, TYPE.
 ```
 
 ## `who`

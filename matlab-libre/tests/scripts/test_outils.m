@@ -90,4 +90,40 @@ assert(isstruct(pile) || isempty(pile));
 assert(strcmp(mfilename(), 'test_outils'));
 assert(~isempty(strfind(mfilename('fullpath'), 'test_outils')));
 
+%% ------------------------------------- fiches d'aide des fonctions natives
+% L'aide d'une fonction native tenait en une ligne, la ou MATLAB donne la
+% syntaxe, la description, des exemples et les fonctions voisines. Les
+% fiches vivent dans toolbox/aide/*.txt ; ce qui suit verifie qu'elles
+% arrivent bien jusqu'a « help ».
+aideFft = help('fft');
+assert(~isempty(strfind(aideFft, 'Syntaxe')));
+assert(~isempty(strfind(aideFft, 'Exemples')));
+assert(~isempty(strfind(aideFft, 'Voir aussi')));
+assert(~isempty(strfind(aideFft, 'Y = fft(X,n)')));
+
+% « doc » donne la meme fiche que « help ».
+assert(strcmp(help('sort'), doc('sort')));
+
+% Une fonction sans fiche garde sa ligne d'enregistrement : rien ne
+% disparait, l'aide riche s'ajoute la ou elle existe.
+aideCourte = help('cumsum');
+assert(~isempty(aideCourte));
+
+% Les fiches nommees ci-dessous sont celles qu'on consulte le plus : elles
+% doivent toutes porter une syntaxe et un exemple.
+attendues = {'zeros', 'ones', 'size', 'sum', 'max', 'sort', 'find', ...
+             'fft', 'ifft', 'plot', 'subplot', 'gca', 'gcf', 'sprintf', ...
+             'strsplit', 'strcmp', 'regexp', 'inv', 'mldivide', 'norm', ...
+             'error', 'fopen', 'help', 'rng', 'linspace', 'unique', ...
+             'cellfun', 'interp1', 'polyfit', 'roots', 'diff', 'repmat'};
+for k = 1:numel(attendues)
+    fiche = help(attendues{k});
+    if isempty(strfind(fiche, 'Syntaxe')) || isempty(strfind(fiche, 'Exemple'))
+        fprintf('fiche incomplete : %s\n', attendues{k});
+    end
+    assert(~isempty(strfind(fiche, 'Syntaxe')));
+    assert(~isempty(strfind(fiche, 'Exemple')));
+    assert(~isempty(strfind(fiche, 'Voir aussi')));
+end
+
 disp('outils : toutes les verifications passent');

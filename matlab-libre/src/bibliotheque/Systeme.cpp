@@ -574,6 +574,68 @@ FONCTION(fnMexext) {
 #endif
 }
 
+// --- fiches d'aide des fonctions natives ---------------------------------
+//
+// L'aide d'une fonction native tenait en une ligne, la ou MATLAB donne la
+// syntaxe, la description, un exemple et les fonctions voisines. Les
+// fiches vivent dans toolbox/aide/*.txt, une par groupe, decoupees par une
+// ligne « ### nom ». Elles sont chargees a la premiere demande et gardees.
+//
+// Les mettre dans des fichiers plutot que dans le code garde les lignes
+// d'enregistrement lisibles, et permet d'en ajouter sans recompiler.
+std::map<std::string, std::string>& fichesAide(Interpreteur& it) {
+    static std::map<std::string, std::string> fiches;
+    static bool chargees = false;
+    if (chargees) return fiches;
+    chargees = true;
+    std::string racine = it.racineToolbox();
+    if (racine.empty()) {
+        const char* env = std::getenv("MATLIBRE_TOOLBOX");
+        if (env) racine = env;
+    }
+    if (racine.empty()) return fiches;
+    std::error_code ec;
+    fs::path dossier = fs::path(racine) / "aide";
+    if (!fs::is_directory(dossier, ec)) return fiches;
+    for (const auto& entree : fs::directory_iterator(dossier, ec)) {
+        if (!entree.is_regular_file()) continue;
+        if (entree.path().extension() != ".txt") continue;
+        std::ifstream f(entree.path());
+        if (!f) continue;
+        std::string ligne, nom, corps;
+        auto poser = [&]() {
+            if (nom.empty()) return;
+            while (!corps.empty() && corps.back() == '\n') corps.pop_back();
+            fiches[nom] = corps;
+            nom.clear();
+            corps.clear();
+        };
+        while (std::getline(f, ligne)) {
+            if (ligne.rfind("### ", 0) == 0) {
+                poser();
+                nom = ligne.substr(4);
+                while (!nom.empty() && (nom.back() == ' ' || nom.back() == '\r')) nom.pop_back();
+                continue;
+            }
+            if (!nom.empty()) {
+                if (!ligne.empty() && ligne.back() == '\r') ligne.pop_back();
+                corps += ligne;
+                corps += '\n';
+            }
+        }
+        poser();
+    }
+    return fiches;
+}
+
+// La fiche d'une fonction, ou la ligne d'enregistrement a defaut.
+std::string aideNative(Interpreteur& it, const std::string& nom, const EntreeNative* n) {
+    const auto& fiches = fichesAide(it);
+    auto trouve = fiches.find(nom);
+    if (trouve != fiches.end()) return trouve->second;
+    return n ? n->aide : std::string();
+}
+
 FONCTION(fnHelp) {
     INUTILISE
     if (args.empty()) {
@@ -592,8 +654,9 @@ FONCTION(fnHelp) {
     std::string nom = args[0].versTexte();
     const EntreeNative* n = it.natif(nom);
     if (n) {
-        if (nargout > 0) return {Valeur::texte(n->aide)};
-        it.sortie() << n->aide << "\n";
+        std::string texte = aideNative(it, nom, n);
+        if (nargout > 0) return {Valeur::texte(texte + "\n")};
+        it.sortie() << texte << "\n";
         return {};
     }
     auto f = it.fonctionFichier(nom);

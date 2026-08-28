@@ -107,7 +107,27 @@ pad  Complete par des espaces.
 ## `regexp`
 
 ```
-regexp  Expression reguliere.
+REGEXP  Cherche une expression régulière.
+    [DEBUT] = REGEXP(TEXTE,MOTIF) rend les positions des correspondances.
+    REGEXP(TEXTE,MOTIF,OPTION) choisit ce qui est rendu :
+       'match'   les textes trouvés
+       'tokens'  les groupes capturés
+       'names'   les groupes nommés
+       'split'   les morceaux entre les correspondances
+       'once'    la première correspondance seulement
+       'start', 'end' les positions
+
+    Syntaxe
+       debut = regexp(texte,motif)
+       trouve = regexp(texte,motif,'match')
+       jetons = regexp(texte,motif,'tokens')
+
+    Exemples
+       regexp('a1b22c', '\d+', 'match')       % {'1','22'}
+       regexp('nom: Jean', '(\w+): (\w+)', 'tokens')
+       regexp('a,b;c', '[,;]', 'split')       % {'a','b','c'}
+
+    Voir aussi REGEXPI, REGEXPREP, STRFIND, CONTAINS.
 ```
 
 ## `regexpi`
@@ -143,7 +163,24 @@ strcat  Concatene des textes.
 ## `strcmp`
 
 ```
-strcmp  Comparaison exacte.
+STRCMP  Compare deux chaînes.
+    TF = STRCMP(S1,S2) rend vrai si les deux chaînes sont identiques,
+    longueur comprise. La comparaison tient compte de la casse.
+    Si l'un des arguments est une cellule, la comparaison est faite terme
+    à terme et rend un tableau logique.
+
+    L'égalité « == » compare caractère par caractère et exige la même
+    longueur : STRCMP est ce qu'il faut pour comparer des chaînes.
+
+    Syntaxe
+       tf = strcmp(s1,s2)
+
+    Exemples
+       strcmp('abc', 'abc')            % 1
+       strcmp('abc', 'ABC')            % 0
+       strcmp({'a','b'}, 'a')          % [1 0]
+
+    Voir aussi STRCMPI, STRNCMP, ISEQUAL, CONTAINS.
 ```
 
 ## `strcmpi`
@@ -173,7 +210,19 @@ strip  Retire les blancs aux deux bouts.
 ## `strjoin`
 
 ```
-strjoin  Assemble avec un separateur.
+STRJOIN  Assemble une cellule de chaînes.
+    S = STRJOIN(C) joint avec une espace.
+    S = STRJOIN(C,DELIM) joint avec le délimiteur donné.
+
+    Syntaxe
+       str = strjoin(C)
+       str = strjoin(C,delimiteur)
+
+    Exemples
+       strjoin({'a','b','c'}, ', ')    % 'a, b, c'
+       strjoin(noms, filesep)
+
+    Voir aussi STRSPLIT, JOIN, SPRINTF.
 ```
 
 ## `strjust`
@@ -203,13 +252,37 @@ strncmpi  Comparaison des n premiers, sans la casse.
 ## `strrep`
 
 ```
-strrep  Remplace un motif.
+STRREP  Remplace du texte.
+    S = STRREP(TEXTE,ANCIEN,NOUVEAU) remplace toutes les occurrences.
+
+    Syntaxe
+       newStr = strrep(str,ancien,nouveau)
+
+    Exemples
+       strrep('abcabc', 'b', 'X')      % 'aXcaXc'
+       strrep(chemin, '\', '/')
+
+    Voir aussi REGEXPREP, STRFIND, ERASE, INSERTAFTER.
 ```
 
 ## `strsplit`
 
 ```
-strsplit  Decoupe selon un separateur.
+STRSPLIT  Découpe une chaîne.
+    C = STRSPLIT(S) découpe S sur les blancs et rend une cellule.
+    C = STRSPLIT(S,DELIM) découpe sur le délimiteur donné, qui peut être
+    une chaîne ou une cellule de chaînes.
+
+    Syntaxe
+       C = strsplit(str)
+       C = strsplit(str,delimiteur)
+
+    Exemples
+       strsplit('a,b,c', ',')          % {'a','b','c'}
+       strsplit('un deux trois')       % {'un','deux','trois'}
+       strsplit('a1b2c', {'1','2'})    % {'a','b','c'}
+
+    Voir aussi STRJOIN, SPLIT, STRTOK, REGEXP.
 ```
 
 ## `strtok`

@@ -1,16 +1,49 @@
-# Polynomes et interpolation
+### exp
+EXP  Exponentielle.
+    Y = EXP(X) rend e élevé à la puissance X, terme à terme. Pour un
+    complexe, EXP(x+iy) = EXP(x)*(COS(y)+i*SIN(y)).
 
-Fonctions natives du groupe `polynomes`.
+    Syntaxe
+       Y = exp(X)
 
-## `deconv`
+    Exemples
+       exp(1)                     % 2.7183
+       exp(1i*pi)                 % -1, aux arrondis près
+       y = exp(-t/tau);           % décroissance
 
-```
-deconv  Division polynomiale.
-```
+    Voir aussi LOG, EXPM1, POWER, EXPM.
 
-## `interp1`
+### log
+LOG  Logarithme népérien.
+    Y = LOG(X) rend le logarithme de base e. Pour un X négatif réel, le
+    résultat est complexe.
 
-```
+    Syntaxe
+       Y = log(X)
+
+    Exemples
+       log(exp(2))                % 2
+       log(-1)                    % 0 + 3.1416i
+       dB = 20*log10(abs(H));     % pour des décibels, log10
+
+    Voir aussi LOG2, LOG10, LOG1P, EXP, REALLOG.
+
+### atan2
+ATAN2  Arc tangente à quatre quadrants.
+    P = ATAN2(Y,X) rend l'angle du point (X,Y), dans ]-pi, pi]. À la
+    différence d'ATAN(Y/X), ATAN2 distingue les quadrants et gère X = 0.
+
+    Syntaxe
+       P = atan2(Y,X)
+
+    Exemples
+       atan2(1,1)                 % pi/4
+       atan2(1,-1)                % 3*pi/4 — et non -pi/4
+       angle = atan2(dy, dx);
+
+    Voir aussi ATAN, ANGLE, HYPOT, CART2POL.
+
+### interp1
 INTERP1  Interpolation en une dimension.
     VQ = INTERP1(X,V,XQ) interpole les valeurs V définies aux points X,
     aux points demandés XQ. X doit être monotone.
@@ -30,29 +63,8 @@ INTERP1  Interpolation en une dimension.
        yq = interp1(t, y, tq, 'linear', 0);     % 0 hors bornes
 
     Voir aussi INTERP2, SPLINE, PCHIP, POLYFIT.
-```
 
-## `interp2`
-
-```
-interp2  Interpolation 2-D bilineaire.
-```
-
-## `poly`
-
-```
-poly  Polynome de racines donnees.
-```
-
-## `polyder`
-
-```
-polyder  Derivee d'un polynome.
-```
-
-## `polyfit`
-
-```
+### polyfit
 POLYFIT  Ajuste un polynôme aux moindres carrés.
     P = POLYFIT(X,Y,N) rend les coefficients du polynôme de degré N qui
     passe au plus près des points (X,Y), du degré le plus élevé au terme
@@ -70,17 +82,8 @@ POLYFIT  Ajuste un polynôme aux moindres carrés.
        plot(x, y, 'o', x, yAjuste, '-');
 
     Voir aussi POLYVAL, ROOTS, MLDIVIDE, INTERP1.
-```
 
-## `polyint`
-
-```
-polyint  Primitive d'un polynome.
-```
-
-## `polyval`
-
-```
+### polyval
 POLYVAL  Évalue un polynôme.
     Y = POLYVAL(P,X) évalue en X le polynôme dont les coefficients sont
     P, du degré le plus élevé au terme constant.
@@ -94,23 +97,8 @@ POLYVAL  Évalue un polynôme.
        polyval(polyfit(x,y,3), xq)
 
     Voir aussi POLYFIT, ROOTS, CONV, POLYDER.
-```
 
-## `polyvalm`
-
-```
-polyvalm  Evalue sur une matrice.
-```
-
-## `ppval`
-
-```
-ppval  Evalue une spline par morceaux.
-```
-
-## `roots`
-
-```
+### roots
 ROOTS  Racines d'un polynôme.
     R = ROOTS(P) rend les racines du polynôme dont les coefficients sont
     P, du degré le plus élevé au terme constant. Elles sont calculées
@@ -124,11 +112,3 @@ ROOTS  Racines d'un polynôme.
        roots([1 2 5])                   % -1 ± 2i
 
     Voir aussi POLY, POLYVAL, EIG, POLYFIT.
-```
-
-## `spline`
-
-```
-spline  Spline cubique.
-```
-
