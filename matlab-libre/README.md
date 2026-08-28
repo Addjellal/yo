@@ -86,7 +86,19 @@ make
 ./build/matlibre exemples/03-asservissement.m   # écrit une figure SVG
 ```
 
-Sous Windows, `.\outils\construire.ps1` puis `.\build\matlibre-bureau.exe`.
+Sous Windows :
+
+```powershell
+.\outils\construire.ps1        # Qt est cherche tout seul dans C:\Qt
+.\build\matlibre-bureau.exe
+```
+
+Si Qt est ailleurs, ou si plusieurs versions cohabitent, indiquez-la :
+`.\outils\construire.ps1 -Propre -Qt C:\Qt\6.11.1\mingw_64`. Le dossier
+attendu est celui du compilateur — `mingw_64` avec MinGW, `msvc2022_64`
+avec Visual Studio ; les mélanger ne produit rien de bon. Les DLL de Qt
+sont déposées à côté de l'exécutable pendant la compilation, il n'y a donc
+rien à ajouter au `PATH`.
 
 **Le bureau** (`matlibre-bureau`) est une application native : un seul
 exécutable, une seule fenêtre, l'interpréteur dans le même processus. Rien

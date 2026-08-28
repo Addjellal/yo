@@ -7,6 +7,7 @@
 #   .\outils\construire.ps1 -Installer C:\MatLibre
 #   .\outils\construire.ps1 -Paquet            fabrique l'archive ZIP
 #   .\outils\construire.ps1 -Generateur "MinGW Makefiles"
+#   .\outils\construire.ps1 -Qt C:\Qt\6.11.1\mingw_64
 #
 # Visual Studio 2019 ou plus récent, ou MinGW, et CMake. Aucune autre
 # dépendance n'est requise.
@@ -21,7 +22,8 @@ param(
     [switch]$Propre,
     [string]$Installer = "",
     [string]$Dossier = "",
-    [string]$Generateur = ""
+    [string]$Generateur = "",
+    [string]$Qt = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -81,6 +83,17 @@ if ($aEffacer -and (Test-Path $Dossier)) {
 $argumentsConfiguration = @("-S", "$racine", "-B", "$Dossier", "-DCMAKE_BUILD_TYPE=$type")
 if ($Generateur -ne "") {
     $argumentsConfiguration += @("-G", "$Generateur")
+}
+# Qt est cherche tout seul dans C:\Qt ; -Qt sert quand il est ailleurs, ou
+# quand plusieurs versions cohabitent et qu'on veut choisir.
+if ($Qt -ne "") {
+    $cheminQt = $Qt.Replace("\", "/")
+    if (-not (Test-Path (Join-Path $Qt "lib\cmake\Qt6\Qt6Config.cmake"))) {
+        Write-Error ("MatLibre : « $Qt » ne ressemble pas a une installation Qt6. " +
+                     "Le dossier attendu est celui du compilateur, par exemple " +
+                     "C:\Qt\6.11.1\mingw_64.")
+    }
+    $argumentsConfiguration += "-DCMAKE_PREFIX_PATH=$cheminQt"
 }
 
 Write-Host "MatLibre : configuration ($type) dans $Dossier"
@@ -143,5 +156,16 @@ if ($Paquet) {
 }
 
 Write-Host "MatLibre : fini. L'executable est $exe"
-Write-Host "  $exe --ide   ouvre l'atelier : editeur de scripts, figures, debogueur"
-Write-Host "  $exe         session interactive ; la commande « ide » y ouvre l'atelier"
+$bureau = Trouver "matlibre-bureau"
+if ($bureau -ne "") {
+    Write-Host "  $bureau"
+    Write-Host "      le bureau : une fenetre, l'editeur, les figures, l'espace de travail"
+}
+Write-Host "  $exe --ide   ouvre l'atelier dans le navigateur"
+Write-Host "  $exe         session interactive"
+if ($bureau -eq "") {
+    Write-Host ""
+    Write-Host "Le bureau natif n'a pas ete construit : Qt6 est introuvable."
+    Write-Host "S'il est installe, indiquez-le :"
+    Write-Host "  .\outils\construire.ps1 -Propre -Qt C:\Qt\6.11.1\mingw_64"
+}

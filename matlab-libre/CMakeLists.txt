@@ -148,6 +148,41 @@ endif()
 # elle reste facultative : sans Qt, tout le reste se compile comme avant.
 option(MATLIBRE_BUREAU "Construire le bureau natif si Qt6 est present" ON)
 if(MATLIBRE_BUREAU)
+  # Qt ne se trouve pas tout seul sous Windows : l'installateur le pose dans
+  # C:/Qt/<version>/<compilateur>, qui n'est sur aucun chemin que CMake
+  # regarde. On l'y cherche donc, en prenant la version la plus recente dont
+  # le compilateur correspond au notre — melanger un Qt MSVC avec MinGW ne
+  # produit rien de bon, et la panne serait obscure.
+  #
+  # Tout ce qu'indique l'utilisateur passe avant : -DCMAKE_PREFIX_PATH,
+  # -DQt6_DIR, ou la variable d'environnement QTDIR.
+  if(WIN32 AND NOT Qt6_DIR AND NOT DEFINED ENV{Qt6_DIR})
+    set(MATLIBRE_QT_INDICES)
+    if(DEFINED ENV{QTDIR})
+      list(APPEND MATLIBRE_QT_INDICES "$ENV{QTDIR}")
+    endif()
+    if(MINGW)
+      set(MATLIBRE_QT_ABI "mingw")
+    else()
+      set(MATLIBRE_QT_ABI "msvc")
+    endif()
+    file(GLOB MATLIBRE_QT_CANDIDATS
+         "C:/Qt/6.*/${MATLIBRE_QT_ABI}*"
+         "C:/Qt/Qt6*/6.*/${MATLIBRE_QT_ABI}*"
+         "D:/Qt/6.*/${MATLIBRE_QT_ABI}*")
+    # La plus recente d'abord : « 6.11.1 » doit passer avant « 6.9.0 », ce
+    # qu'un tri alphabetique ne donne pas.
+    list(SORT MATLIBRE_QT_CANDIDATS COMPARE NATURAL ORDER DESCENDING)
+    list(APPEND MATLIBRE_QT_INDICES ${MATLIBRE_QT_CANDIDATS})
+    foreach(candidat ${MATLIBRE_QT_INDICES})
+      if(EXISTS "${candidat}/lib/cmake/Qt6/Qt6Config.cmake")
+        list(APPEND CMAKE_PREFIX_PATH "${candidat}")
+        message(STATUS "MatLibre : Qt trouve dans ${candidat}")
+        break()
+      endif()
+    endforeach()
+  endif()
+
   find_package(Qt6 COMPONENTS Widgets QUIET)
   if(Qt6_FOUND)
     set(CMAKE_AUTOMOC ON)
@@ -191,10 +226,79 @@ if(MATLIBRE_BUREAU)
         set_target_properties(matlibre-bureau PROPERTIES WIN32_EXECUTABLE ON)
       endif()
     endif()
+    # --- deploiement des DLL a cote de l'executable, sous Windows ---------
+    #
+    # Un executable qui existe doit se lancer. Sans les DLL de Qt dans son
+    # dossier, celui-ci va les chercher dans le PATH, y trouve autre chose
+    # ou rien, et meurt avant main() sur un 0xC0000135 sans message.
+    if(WIN32)
+      get_target_property(MATLIBRE_QMAKE Qt6::qmake IMPORTED_LOCATION)
+      get_filename_component(MATLIBRE_QT_BIN "${MATLIBRE_QMAKE}" DIRECTORY)
+      find_program(MATLIBRE_WINDEPLOYQT NAMES windeployqt windeployqt6
+                   HINTS "${MATLIBRE_QT_BIN}")
+
+      # Le runtime du compilateur doit voyager lui aussi. windeployqt sait le
+      # faire, mais il depose celui DE QT — c'est-a-dire du MinGW avec lequel
+      # Qt a ete bati. Quand on compile avec un autre MinGW (WinLibs, MSYS2),
+      # ces DLL-la sont plus anciennes que le code qu'elles doivent servir ;
+      # et comme le dossier de l'executable passe avant le PATH, ce sont
+      # elles que le chargeur prend. L'application meurt alors avant main(),
+      # sans fenetre et sans message, sur un 0xC0000139 (« point d'entree
+      # introuvable »). On copie donc le runtime du compilateur qu'on utilise
+      # vraiment, et on interdit a windeployqt de poser le sien.
+      set(MATLIBRE_OPT_RUNTIME --compiler-runtime)
+      set(MATLIBRE_DLL_RUNTIME)
+      if(MINGW)
+        set(MATLIBRE_OPT_RUNTIME --no-compiler-runtime)
+        get_filename_component(MATLIBRE_DOSSIER_CXX "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        foreach(nom libstdc++-6 libgcc_s_seh-1 libgcc_s_dw2-1 libwinpthread-1)
+          if(EXISTS "${MATLIBRE_DOSSIER_CXX}/${nom}.dll")
+            list(APPEND MATLIBRE_DLL_RUNTIME "${MATLIBRE_DOSSIER_CXX}/${nom}.dll")
+          endif()
+        endforeach()
+      endif()
+
+      if(MATLIBRE_WINDEPLOYQT)
+        # Les greffons vont dans un seul dossier, un qt.conf dit ou. Les DLL,
+        # elles, RESTENT a cote de l'executable : le chargeur de Windows les
+        # cherche la, et nulle part ailleurs.
+        add_custom_command(TARGET matlibre-bureau POST_BUILD
+          COMMAND "${MATLIBRE_WINDEPLOYQT}" --release --no-translations
+                  --no-system-d3d-compiler --no-opengl-sw ${MATLIBRE_OPT_RUNTIME}
+                  --plugindir "$<TARGET_FILE_DIR:matlibre-bureau>/greffons"
+                  "$<TARGET_FILE:matlibre-bureau>"
+          COMMENT "Depot des DLL de Qt a cote de matlibre-bureau")
+        file(GENERATE
+          OUTPUT "$<TARGET_FILE_DIR:matlibre-bureau>/qt.conf"
+          CONTENT "[Paths]\nPlugins = greffons\n")
+        if(MATLIBRE_DLL_RUNTIME)
+          # Apres windeployqt, pour ecraser un runtime depose par une
+          # construction anterieure : c'est le notre qui doit rester.
+          add_custom_command(TARGET matlibre-bureau POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${MATLIBRE_DLL_RUNTIME}
+                    "$<TARGET_FILE_DIR:matlibre-bureau>"
+            COMMENT "Depot du runtime du compilateur")
+        endif()
+      else()
+        message(WARNING
+          "MatLibre : windeployqt est introuvable. matlibre-bureau.exe sera "
+          "construit mais ne demarrera pas tant que les DLL de Qt ne seront "
+          "pas dans son dossier ou dans le PATH.")
+      endif()
+    endif()
     message(STATUS "MatLibre : Qt6 trouve, le bureau natif sera construit")
   else()
-    message(STATUS "MatLibre : pas de Qt6, pas de bureau natif "
-                   "(apt install qt6-base-dev, ou l'installateur Qt sous Windows)")
+    if(WIN32)
+      message(STATUS
+        "MatLibre : Qt6 introuvable, pas de bureau natif. Si Qt est installe, "
+        "indiquez-le : construire.ps1 -Qt C:/Qt/6.11.1/mingw_64, ou "
+        "cmake -DCMAKE_PREFIX_PATH=C:/Qt/6.11.1/mingw_64. Attention : le "
+        "dossier doit correspondre au compilateur (mingw_64 avec MinGW, "
+        "msvc2022_64 avec Visual Studio).")
+    else()
+      message(STATUS "MatLibre : pas de Qt6, pas de bureau natif "
+                     "(apt install qt6-base-dev)")
+    endif()
   endif()
 endif()
 
