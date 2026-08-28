@@ -8,6 +8,12 @@ Fonctions natives du groupe `systeme`.
 addpath  Ajoute au chemin de recherche.
 ```
 
+## `atelier`
+
+```
+atelier  Synonyme de ide.
+```
+
 ## `beep`
 
 ```
@@ -120,6 +126,17 @@ graphics_toolkit  Moteur graphique utilise.
 
 ```
 help  Aide d'une fonction.
+```
+
+## `ide`
+
+```
+ide  Ouvre l'atelier dans le navigateur : editeur de scripts avec
+     coloration et points d'arret, console, table des variables,
+     figures, profileur, concepteur d'applications et editeur de
+     schemas-blocs. « ide PORT » choisit le port (8421 par defaut).
+     L'atelier tourne dans un second processus et a son propre
+     espace de travail.
 ```
 
 ## `isfile`

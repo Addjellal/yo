@@ -118,9 +118,10 @@ end
 assert(essai);
 
 %% ------------------------------------------- compilation et exécution du C
-% Cette partie ne tourne que si un compilateur C est disponible.
-[codeCC, ~] = system('cc --version');
-if codeCC == 0
+% Cette partie ne tourne que si un compilateur C est disponible. Le nom
+% n'est pas toujours « cc » : sous Windows, MinGW n'installe que gcc.
+compilateur = compilateurC();
+if ~isempty(compilateur)
     dossier = tempdir();
     ignore = codegen('cgScalaire', '-args', {0},                          '-d', dossier);
     ignore = codegen('cgMatrice',      '-args', {zeros(2, 2), zeros(2, 2)},   '-d', dossier);
@@ -225,7 +226,13 @@ if codeCC == 0
         fprintf(fid, '%s\n', lignesC{k});
     end
     fclose(fid);
-    binaire = fullfile(dossier, 'matlibre_essai_coder');
+    % gcc ajoute « .exe » sous Windows : on le nomme pour pouvoir ensuite
+    % lancer puis effacer le bon fichier.
+    if ispc()
+        binaire = fullfile(dossier, 'matlibre_essai_coder.exe');
+    else
+        binaire = fullfile(dossier, 'matlibre_essai_coder');
+    end
     aCompiler = {'cgScalaire', 'cgMatrice', 'cgBoucle', 'cgEntiers', 'cgDeuxSorties', ...
                  'cgTableauSortie', 'cgSwitch', 'cgCollision', 'cgComplexe', ...
                  'cgComplexeParties', 'cgComplexeVecteur', 'cgComplexeConstruit', ...
@@ -234,7 +241,8 @@ if codeCC == 0
     for k = 1:numel(aCompiler)
         sources = [sources ' ' fullfile(dossier, [aCompiler{k} '.c'])];  %#ok<AGROW>
     end
-    commande = sprintf('cc -O2 -Wall -Werror -I%s -o %s %s -lm', dossier, binaire, sources);
+    commande = sprintf('%s -O2 -Wall -Werror -I%s -o %s %s -lm', ...
+                       compilateur, dossier, binaire, sources);
     [codeCompilation, messageCompilation] = system(commande);
     if codeCompilation ~= 0
         fprintf('%s\n', messageCompilation);
@@ -290,9 +298,34 @@ if codeCC == 0
         assert(strcmp(strtrim(lignes{k}), strtrim(attendu{k})));
     end
     delete(binaire);
+
+    % codegenBuild est le chemin qu'emprunte un utilisateur : il traduit
+    % puis compile. Il appelait « cc », que MinGW n'installe pas ; rien ne
+    % le verifiait.
+    [okObjet, messageObjet, sortieObjet] = codegenBuild('cgScalaire', '-args', {0}, ...
+                                                        '-d', dossier);
+    if ~okObjet
+        fprintf('%s\n', messageObjet);
+    end
+    assert(okObjet);
+    assert(exist(sortieObjet.cible, 'file') == 2);
+    assert(~isempty(strfind(sortieObjet.commande, compilateur)));
+    delete(sortieObjet.cible);
+
+    % En executable de demonstration, le programme produit doit se lancer.
+    [okExe, messageExe, sortieExe] = codegenBuild('cgBoucle', '-args', {zeros(1, 5)}, ...
+                                                  '-exe', '-d', dossier);
+    if ~okExe
+        fprintf('%s\n', messageExe);
+    end
+    assert(okExe);
+    assert(exist(sortieExe.cible, 'file') == 2);
+    [codeExe, ~] = system(sortieExe.cible);
+    assert(codeExe == 0);
+    delete(sortieExe.cible);
     clear ignore
 else
-    disp('coder : pas de compilateur C, la partie compilation est sautee');
+    disp('coder : pas de compilateur C (cc, gcc, clang), la partie compilation est sautee');
 end
 
 disp('coder : toutes les verifications passent');

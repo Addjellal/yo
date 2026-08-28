@@ -15,6 +15,7 @@
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
 #include "matlibre/Bibliotheque.h"
+#include "matlibre/Console.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Atelier.h"
@@ -100,8 +101,10 @@ int executerFluxInteractif(Interpreteur& it) {
     std::string tampon;
     std::string ligne;
     std::cout << "MatLibre " << MATLIBRE_VERSION
-              << " — clone libre du langage MATLAB.  « help » pour l'aide, « exit » pour "
-                 "quitter.\n\n";
+              << " — clone libre du langage MATLAB.\n"
+                 "« ide » ouvre l'atelier : editeur de scripts, figures, debogueur, "
+                 "schemas-blocs.\n"
+                 "« help » pour l'aide, « exit » pour quitter.\n\n";
     for (;;) {
         std::cout << (tampon.empty() ? ">> " : "... ") << std::flush;
         if (!std::getline(std::cin, ligne)) break;
@@ -140,6 +143,8 @@ int executerFluxInteractif(Interpreteur& it) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // Avant tout affichage : la console de Windows doit lire de l'UTF-8.
+    ConsoleUtf8 console;
     std::vector<std::string> arguments(argv + 1, argv + argc);
     Interpreteur it;
     it.installerBibliotheque();

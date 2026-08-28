@@ -6,8 +6,19 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#ifndef _WIN32
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
 #endif
 
 #include "matlibre/Affichage.h"
@@ -31,6 +42,28 @@ int identifiantProcessus() {
     return 0;
 #else
     return (int)::getpid();
+#endif
+}
+
+// Chemin de l'exécutable en cours. Sert à relancer MatLibre — pour ouvrir
+// l'atelier, par exemple — sans dépendre de ce qu'il y a dans le PATH.
+std::string cheminExecutable() {
+    std::error_code ec;
+#ifdef _WIN32
+    std::wstring tampon(32768, L'\0');
+    DWORD n = GetModuleFileNameW(nullptr, &tampon[0], (DWORD)tampon.size());
+    if (n == 0 || n >= tampon.size()) return std::string();
+    return fs::path(tampon.substr(0, n)).string();
+#elif defined(__APPLE__)
+    std::uint32_t taille = 0;
+    _NSGetExecutablePath(nullptr, &taille);
+    std::string tampon(taille, '\0');
+    if (_NSGetExecutablePath(&tampon[0], &taille) != 0) return std::string();
+    return fs::weakly_canonical(fs::path(tampon.c_str()), ec).string();
+#else
+    fs::path lien = fs::read_symlink("/proc/self/exe", ec);
+    if (ec) return std::string();
+    return lien.string();
 #endif
 }
 
@@ -488,12 +521,48 @@ FONCTION(fnType) {
     return {};
 }
 
+// ide : ouvre l'atelier. Le serveur occupe le processus tant qu'il tourne,
+// on en lance donc un second, et cette console reste utilisable. Les deux
+// ont chacun leur espace de travail : c'est dit, plutot que decouvert.
+FONCTION(fnIde) {
+    INUTILISE
+    int port = 8421;
+    if (!args.empty()) port = (int)args[0].scal();
+    std::string exe = cheminExecutable();
+    if (exe.empty()) {
+        it.sortie() << "Ouvrez l'atelier avec : matlibre --ide " << port << "\n";
+        return {};
+    }
+    std::ostringstream commande;
+#ifdef _WIN32
+    commande << "start \"MatLibre\" \"" << exe << "\" --ide " << port;
+#else
+    commande << "\"" << exe << "\" --ide " << port << " >/dev/null 2>&1 &";
+#endif
+    int code = std::system(commande.str().c_str());
+    if (code != 0 && code != -1) {
+        it.sortie() << "Ouvrez l'atelier avec : matlibre --ide " << port << "\n";
+        return {};
+    }
+    it.sortie() << "Atelier ouvert sur http://127.0.0.1:" << port
+                << " — il a son propre espace de travail,\n"
+                   "separe de celui de cette console.\n";
+    return {};
+}
+
 FONCTION(fnHelp) {
     INUTILISE
     if (args.empty()) {
-        it.sortie() << "MatLibre " << MATLIBRE_VERSION
-                    << " — tapez « help nom » pour l'aide d'une fonction,\n"
-                       "« lookfor motif » pour chercher, « ver » pour la version.\n";
+        // Comme MATLAB : « help » affiche, « t = help » rend le texte.
+        std::ostringstream general;
+        general << "MatLibre " << MATLIBRE_VERSION
+                << " — tapez « help nom » pour l'aide d'une fonction,\n"
+                   "« lookfor motif » pour chercher, « ver » pour la version.\n"
+                   "« ide » ouvre l'atelier : editeur de scripts, figures, "
+                   "debogueur,\nprofileur, concepteur d'applications et "
+                   "editeur de schemas-blocs.\n";
+        if (nargout > 0) return {Valeur::texte(general.str())};
+        it.sortie() << general.str();
         return {};
     }
     std::string nom = args[0].versTexte();
@@ -676,6 +745,14 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("computer", fnComputer, "systeme", "computer  Plateforme d'execution.");
     it.enregistrer("version", fnVersion, "systeme", "version  Version de l'interpreteur.");
     it.enregistrer("ver", fnVer, "systeme", "ver  Version detaillee.");
+    it.enregistrer("ide", fnIde, "systeme",
+                   "ide  Ouvre l'atelier dans le navigateur : editeur de scripts avec\n"
+                   "     coloration et points d'arret, console, table des variables,\n"
+                   "     figures, profileur, concepteur d'applications et editeur de\n"
+                   "     schemas-blocs. « ide PORT » choisit le port (8421 par defaut).\n"
+                   "     L'atelier tourne dans un second processus et a son propre\n"
+                   "     espace de travail.");
+    it.enregistrer("atelier", fnIde, "systeme", "atelier  Synonyme de ide.");
     it.enregistrer("isunix", fnIsunix, "systeme", "isunix  Systeme de type UNIX ?");
     it.enregistrer("ispc", fnIspc, "systeme", "ispc  Systeme Windows ?");
     it.enregistrer("ismac", fnIsmac, "systeme", "ismac  Systeme macOS ?");

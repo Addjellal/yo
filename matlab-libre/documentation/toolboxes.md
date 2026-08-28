@@ -23,7 +23,7 @@ existant appellera.
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
 | `cartographie` | Mapping Toolbox — géodésie et cartographie. | 4 |
-| `coder` | MATLAB Coder — génération de code C. | 3 |
+| `coder` | MATLAB Coder — génération de code C. | 4 |
 | `communications` | Communications Toolbox — transmissions numériques. | 67 |
 | `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 6 |
 | `compilateur` | MATLAB Compiler — distribution d'un programme. | 2 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
-Les fonctions natives — 612, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 614, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

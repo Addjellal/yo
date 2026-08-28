@@ -33,11 +33,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **612 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **614 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **1066 fonctions de toolbox** en langage MATLAB, réparties en
+- **1067 fonctions de toolbox** en langage MATLAB, réparties en
   **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -77,10 +77,18 @@ d'être lue avant de s'appuyer sur ce projet.
 
 ```bash
 make
+./build/matlibre --ide                          # l'atelier dans le navigateur
+./build/matlibre                                # session interactive
 ./build/matlibre exemples/01-prise-en-main.m
 ./build/matlibre exemples/03-asservissement.m   # écrit une figure SVG
-./build/matlibre                                # session interactive
 ```
+
+Sous Windows, `.\outils\construire.ps1` puis `.\build\matlibre.exe --ide`.
+
+L'atelier est l'équivalent du bureau de MATLAB : éditeur de scripts avec
+coloration, points d'arrêt et exécution pas à pas, console, table des
+variables, figures, profileur, concepteur d'applications et éditeur de
+schémas-blocs. Depuis une session interactive, la commande `ide` l'ouvre.
 
 | Exemple | Ce qu'il montre |
 |---|---|

@@ -40,3 +40,5 @@
 %
 %   codegen        - Traduit une fonction en C ou C++
 %   codegenBuild   - Traduit puis compile avec le compilateur du système
+%   compilateurC   - Trouve un compilateur C sur la machine
+%   coder.typeof   - Décrit le type et la taille d'une entrée

@@ -143,3 +143,5 @@ if ($Paquet) {
 }
 
 Write-Host "MatLibre : fini. L'executable est $exe"
+Write-Host "  $exe --ide   ouvre l'atelier : editeur de scripts, figures, debogueur"
+Write-Host "  $exe         session interactive ; la commande « ide » y ouvre l'atelier"

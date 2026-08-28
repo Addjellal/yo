@@ -15,6 +15,7 @@
 #include "matlibre/AlgebreLineaire.h"
 #include "matlibre/Analyseur.h"
 #include "matlibre/Bibliotheque.h"
+#include "matlibre/Console.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Lexeur.h"
@@ -212,6 +213,7 @@ void testErreurs() {
 }  // namespace
 
 int main() {
+    matlibre::ConsoleUtf8 console;
     struct Cas {
         const char* nom;
         void (*fonction)();

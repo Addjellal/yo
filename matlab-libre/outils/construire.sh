@@ -78,3 +78,5 @@ if [ "$paquet" -eq 1 ]; then
 fi
 
 echo "MatLibre : fini. L'executable est $dossier/matlibre"
+echo "  $dossier/matlibre --ide   ouvre l'atelier : editeur de scripts, figures, debogueur"
+echo "  $dossier/matlibre         session interactive ; la commande « ide » y ouvre l'atelier"

@@ -43,6 +43,8 @@
 %
 %   codegen        - Traduit une fonction en C ou C++
 %   codegenBuild   - Traduit puis compile avec le compilateur du système
+%   compilateurC   - Trouve un compilateur C sur la machine
+%   coder.typeof   - Décrit le type et la taille d'une entrée
 ```
 
 ## `codegen`
@@ -103,5 +105,32 @@ CODER.TYPEOF Décrit le type et la taille d'une entrée pour CODEGEN.
 
   Exemple :
      codegen('f', '-args', {coder.typeof(int32(0), [3 3])})
+```
+
+## `compilateurC`
+
+```
+COMPILATEURC Trouve un compilateur C sur la machine.
+  NOM = COMPILATEURC() rend le nom de l'exécutable à appeler, ou une
+  chaîne vide si aucun compilateur n'est trouvé.
+
+  [NOM,FAMILLE] = COMPILATEURC() rend en plus la famille d'options :
+  'gcc' pour cc, gcc et clang, qui partagent la ligne de commande d'Unix.
+
+  Les candidats sont essayés dans l'ordre : cc, gcc, clang. Sous Windows,
+  MinGW installe gcc mais pas cc, d'où l'essai des trois — c'est ce qui
+  faisait sauter la compilation du C produit dans les tests.
+
+  Visual Studio (cl) n'est pas encore géré : sa ligne de commande n'a
+  rien de commun avec celle d'Unix. Il est détecté et signalé plutôt que
+  d'être appelé avec des options qu'il ne comprend pas.
+
+  Exemple :
+     compilateur = compilateurC();
+     if isempty(compilateur)
+         disp('pas de compilateur C');
+     end
+
+  Voir aussi CODEGEN, CODEGENBUILD.
 ```
 

@@ -76,4 +76,17 @@ rmdir(source, 's');
 assert(~isempty(version()));
 assert(exist('ver', 'file') || exist('ver', 'builtin') || true);
 
+%% ------------------------------------------------------------- atelier
+% L'atelier existait mais rien ne le nommait : ni la banniere, ni l'aide.
+% « ide » l'ouvre depuis la console, et son aide dit ce qu'on y trouve.
+assert(exist('ide', 'builtin') == 5);
+assert(exist('atelier', 'builtin') == 5);
+aideIde = help('ide');
+assert(~isempty(strfind(aideIde, 'atelier')));
+assert(~isempty(strfind(aideIde, 'points d''arret')));
+assert(~isempty(strfind(aideIde, 'schemas-blocs')));
+% L'aide generale y renvoie : c'est par la qu'on le decouvre.
+aideGenerale = help();
+assert(~isempty(strfind(aideGenerale, 'ide')));
+
 disp('ecosysteme : toutes les verifications passent');
