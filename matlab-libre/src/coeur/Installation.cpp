@@ -20,6 +20,8 @@ void Interpreteur::installerBibliotheque() {
     enregistrerTemps(*this);
     enregistrerSysteme(*this);
     enregistrerGraphique(*this);
+    // Apres le graphique : « set » et « get » y remplacent les coquilles vides.
+    enregistrerPoigneesGraphiques(*this);
     enregistrerTests(*this);
     enregistrerCartes(*this);
     enregistrerCreuses(*this);

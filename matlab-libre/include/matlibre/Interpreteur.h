@@ -139,6 +139,10 @@ public:
     std::shared_ptr<DefinitionClasse> classeDefinie(const std::string& nom);
 
     // --- sorties ---
+    // Posé par une interface graphique : « clc » l'appelle au lieu
+    // d'écrire une séquence ANSI que la fenêtre afficherait telle quelle.
+    std::function<void()> effacerEcran;
+
     std::ostream& sortie();
     std::ostream& erreurSortie();
     void definirSortie(std::ostream* s) { sortie_ = s; }
@@ -240,5 +244,13 @@ struct GardePortee {
     explicit GardePortee(Interpreteur& i, std::shared_ptr<Portee> p);
     ~GardePortee();
 };
+
+// Crochets posés par la bibliothèque graphique : ils donnent aux poignées
+// de figure et d'axes leurs propriétés — « ax.XTick », « f.Name ». Rendent
+// vrai quand la propriété leur appartient.
+extern std::function<bool(Interpreteur&, const Valeur&, const std::string&, const Valeur&)>
+    crochetEcrirePropriete;
+extern std::function<bool(Interpreteur&, const Valeur&, const std::string&, Valeur&)>
+    crochetLirePropriete;
 
 }  // namespace matlibre

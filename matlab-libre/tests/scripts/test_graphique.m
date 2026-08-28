@@ -97,5 +97,58 @@ texteCourt = fileread(fichierCourt);
 delete(fichierCourt);
 assert(numel(strfind(texteCourt, 'L ')) >= 4);
 
+%% ----------------------------- poignees : gca, gcf et leurs proprietes
+% « ax = gca ; ax.XTick = [...] » est la facon courante de regler un axe en
+% MATLAB. gca rendait un simple nombre : l'ecriture au point echouait sur
+% « dot indexing is not supported », et le script s'arretait la.
+close all;
+figure;
+plot(0:0.1:10, sin(0:0.1:10));
+ax = gca;
+assert(strcmp(class(ax), 'matlab.graphics.axis.Axes'));
+ax.XTick = [0 2.5 5 7.5 10];
+assert(isequal(ax.XTick, [0 2.5 5 7.5 10]));
+% Les limites qu'on n'a pas fixees sont celles des donnees, pas 0..1.
+bornes = ax.XLim;
+assert(abs(bornes(1) - 0) < 1e-9 && abs(bornes(2) - 10) < 1e-9);
+ax.YLim = [-2 2];
+assert(isequal(ax.YLim, [-2 2]));
+ax.XScale = 'log';
+assert(strcmp(ax.XScale, 'log'));
+ax.XScale = 'linear';
+ax.Box = 'off';
+assert(strcmp(ax.Box, 'off'));
+ax.Title = 'un titre';
+assert(strcmp(ax.Title, 'un titre'));
+
+% La forme historique marche aussi.
+set(ax, 'YTick', [-1 0 1], 'FontSize', 12);
+assert(isequal(get(ax, 'YTick'), [-1 0 1]));
+assert(get(ax, 'FontSize') == 12);
+
+% Les graduations imposees se retrouvent dans le rendu.
+fichierTicks = [tempname() '.svg'];
+print(fichierTicks);
+texteTicks = fileread(fichierTicks);
+delete(fichierTicks);
+assert(~isempty(strfind(texteTicks, '2.5')));
+assert(~isempty(strfind(texteTicks, 'un titre')));
+
+% La poignee de figure porte son nom et son numero.
+fg = gcf;
+assert(strcmp(class(fg), 'matlab.ui.Figure'));
+fg.Name = 'ma figure';
+assert(strcmp(fg.Name, 'ma figure'));
+assert(fg.Number >= 1);
+
+% Une propriete inconnue est refusee, en la nommant.
+essaiPropriete = false;
+try
+    ax.ProprieteQuiNExistePas = 3;
+catch e
+    essaiPropriete = ~isempty(strfind(e.message, 'ProprieteQuiNExistePas'));
+end
+assert(essaiPropriete);
+
 close all;
 disp('graphique : toutes les verifications passent');

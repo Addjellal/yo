@@ -422,11 +422,11 @@ FONCTION(fnYlim) {
 
 FONCTION(fnGcf) {
     INUTILISE
-    return {Valeur::scalaire(figureCourante(it)->numero)};
+    return {poigneeFigureCourante(it)};
 }
 FONCTION(fnGca) {
     INUTILISE
-    return {Valeur::scalaire(figureCourante(it)->axeCourant + 1)};
+    return {poigneeAxesCourants(it)};
 }
 
 FONCTION(fnPrint) {
@@ -466,8 +466,6 @@ FONCTION(fnColormap) { INUTILISE return {}; }
 FONCTION(fnColorbar) { INUTILISE return {}; }
 FONCTION(fnBox) { INUTILISE return {}; }
 FONCTION(fnShading) { INUTILISE return {}; }
-FONCTION(fnSet) { INUTILISE return {}; }
-FONCTION(fnGet) { INUTILISE return {Valeur::vide()}; }
 
 FONCTION(fnText) {
     INUTILISE
@@ -524,8 +522,6 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("colorbar", fnColorbar, "graphique", "colorbar  Barre de couleurs.");
     it.enregistrer("box", fnBox, "graphique", "box  Cadre autour des axes.");
     it.enregistrer("shading", fnShading, "graphique", "shading  Mode d'ombrage.");
-    it.enregistrer("set", fnSet, "graphique", "set  Regle une propriete graphique.");
-    it.enregistrer("get", fnGet, "graphique", "get  Lit une propriete graphique.");
     it.enregistrer("text", fnText, "graphique", "text  Texte dans les axes.");
     it.enregistrer("matlibre_svg", fnFigureSVG, "graphique",
                    "matlibre_svg  Rend la figure courante en SVG (texte).");

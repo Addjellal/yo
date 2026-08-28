@@ -479,6 +479,14 @@ FONCTION(fnClear) {
 
 FONCTION(fnClc) {
     INUTILISE
+    // Une interface graphique n'interprete pas les sequences ANSI : elle
+    // les affichait telles quelles, « [2J[H ». Quand elle a pose son
+    // crochet, c'est lui qui efface ; sinon on garde la sequence, que tout
+    // terminal comprend.
+    if (it.effacerEcran) {
+        it.effacerEcran();
+        return {};
+    }
     it.sortie() << "\033[2J\033[H";
     return {};
 }

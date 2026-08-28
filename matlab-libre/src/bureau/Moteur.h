@@ -55,6 +55,7 @@ signals:
     void sortieProduite(const QString& texte);
     void commandeFinie();
     void espaceTravailChange(const QVector<LigneEspaceTravail>& lignes);
+    void effacementDemande();   // « clc »
     void figuresChangees(const QVector<FigureCopiee>& figures);
     void dossierChange(const QString& chemin);
     void pret();

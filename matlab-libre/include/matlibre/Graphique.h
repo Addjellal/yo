@@ -42,6 +42,12 @@ struct Axes {
     std::vector<std::string> legende;
     bool legendeVisible = false;
     int rangee = 1, colonne = 1, position = 1;  // découpage subplot
+    // Graduations imposées par l'utilisateur : « ax.XTick = [15 40 60] ».
+    // Vides, les graduations sont choisies automatiquement.
+    std::vector<double> ticksX, ticksY;
+    std::vector<std::string> etiquettesTicksX, etiquettesTicksY;
+    bool boite = true;
+    double taillePolice = 10;
 };
 
 struct Figure {
@@ -68,6 +74,10 @@ struct Figure {
 std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
                                          const std::vector<double>& y, double xmin,
                                          double xmax, int colonnes);
+
+// Poignées de MATLAB : « ax = gca » puis « ax.XTick = [...] ».
+Valeur poigneeAxesCourants(Interpreteur& it);
+Valeur poigneeFigureCourante(Interpreteur& it);
 
 std::string rendreSVG(const Figure& figure);
 std::shared_ptr<Figure> figureCourante(Interpreteur& it);

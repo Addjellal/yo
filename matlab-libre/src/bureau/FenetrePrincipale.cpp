@@ -54,6 +54,8 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::figuresChangees, this, &FenetrePrincipale::surFigures);
     connect(moteur_, &Moteur::dossierChange, this, &FenetrePrincipale::surDossier);
     connect(moteur_, &Moteur::commandeFinie, this, &FenetrePrincipale::surCommandeFinie);
+    connect(moteur_, &Moteur::effacementDemande, this,
+            &FenetrePrincipale::effacerCommandes);
 
     construirePanneaux();
     construireMenus();

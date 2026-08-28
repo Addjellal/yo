@@ -77,7 +77,7 @@ gcf  Numero de la figure courante.
 ## `get`
 
 ```
-get  Lit une propriete graphique.
+get  Lit une propriete d'une poignee graphique.
 ```
 
 ## `grid`
@@ -191,7 +191,7 @@ semilogy  Axe des y logarithmique.
 ## `set`
 
 ```
-set  Regle une propriete graphique.
+set  Ecrit une propriete d'une poignee graphique.
 ```
 
 ## `shading`

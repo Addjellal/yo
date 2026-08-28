@@ -250,6 +250,15 @@ int main(int argc, char** argv) {
                                 .arg(d->windowTitle())));
     }
 
+    // « clc » efface la fenetre au lieu d'y ecrire « [2J[H » : une
+    // interface graphique n'interprete pas les sequences ANSI.
+    envoyer(fenetre, QStringLiteral("clc"));
+    verifier(attendre([&] {
+                 return !console->toPlainText().contains(QLatin1String("[2J")) &&
+                        console->toPlainText().count(QLatin1Char('\n')) < 4;
+             }),
+             "« clc » efface la console sans y ecrire de sequence ANSI");
+
     // --- l'editeur : coloration et numerotation ---------------------------
     auto* editeur = fenetre.findChild<Editeur*>();
     verifier(editeur != nullptr, "l'editeur existe");

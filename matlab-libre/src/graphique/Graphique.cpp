@@ -198,8 +198,10 @@ std::string rendreSVG(const Figure& figure) {
         out << "<rect x=\"" << gauche << "\" y=\"" << haut << "\" width=\"" << (droite - gauche)
             << "\" height=\"" << (bas - haut) << "\" fill=\"white\" stroke=\"#222\"/>\n";
 
-        auto tx = graduations(xmin, xmax, 6);
-        auto ty = graduations(ymin, ymax, 6);
+        // Les graduations imposees par « ax.XTick = [...] » l'emportent sur
+        // celles qu'on choisirait.
+        auto tx = a.ticksX.empty() ? graduations(xmin, xmax, 6) : a.ticksX;
+        auto ty = a.ticksY.empty() ? graduations(ymin, ymax, 6) : a.ticksY;
         for (double v : tx) {
             double px = ex.versPixel(v);
             if (px < gauche - 1 || px > droite + 1) continue;

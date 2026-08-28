@@ -30,6 +30,7 @@ void enregistrerOptimisation(Interpreteur& it);
 void enregistrerTemps(Interpreteur& it);
 void enregistrerSysteme(Interpreteur& it);
 void enregistrerGraphique(Interpreteur& it);
+void enregistrerPoigneesGraphiques(Interpreteur& it);
 void enregistrerTests(Interpreteur& it);
 void enregistrerCartes(Interpreteur& it);
 void enregistrerCreuses(Interpreteur& it);

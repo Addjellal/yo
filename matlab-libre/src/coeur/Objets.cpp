@@ -6,6 +6,7 @@
 //     et subsasgn, telle que la documente MathWorks ;
 //   - les tables « containers.Map », dont l'état vit dans l'interpréteur
 //     pour leur donner la sémantique de poignée.
+#include <functional>
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -84,6 +85,10 @@ Valeur Interpreteur::substruct(const std::vector<ElementAcces>& chaine, std::siz
 }
 
 Valeur Interpreteur::lireProprieteObjet(const Valeur& objet, const std::string& nom) {
+    if (crochetLirePropriete) {
+        Valeur resultat;
+        if (crochetLirePropriete(*this, objet, nom, resultat)) return resultat;
+    }
     if (estCarte(objet)) {
         auto table = carteDe(objet);
         if (nom == "Count") return Valeur::scalaire((double)table->ordre.size());
@@ -112,8 +117,19 @@ Valeur Interpreteur::lireProprieteObjet(const Valeur& objet, const std::string& 
     return objet.champ(nom, 0);
 }
 
+// Poignées graphiques : « ax.XTick = [...] », « f.Name = '...' ». Elles ne
+// sont pas des objets de classe MATLAB mais des références vers une figure
+// et un axe, et leurs propriétés vivent dans la figure. Les deux crochets
+// ci-dessous sont posés par la bibliothèque graphique.
+std::function<bool(Interpreteur&, const Valeur&, const std::string&, const Valeur&)>
+    crochetEcrirePropriete;
+std::function<bool(Interpreteur&, const Valeur&, const std::string&, Valeur&)>
+    crochetLirePropriete;
+
 Valeur Interpreteur::ecrireProprieteObjet(Valeur objet, const std::string& nom,
                                           const Valeur& valeur) {
+    if (crochetEcrirePropriete && crochetEcrirePropriete(*this, objet, nom, valeur))
+        return objet;
     auto def = classeDe(objet);
     if (def) {
         std::string accesseur = "set." + nom;

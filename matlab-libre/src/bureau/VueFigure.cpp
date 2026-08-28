@@ -130,8 +130,9 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
     };
 
     // Grille et graduations.
-    std::vector<double> gx = graduations(xmin, xmax, 6);
-    std::vector<double> gy = graduations(ymin, ymax, 6);
+    // « ax.XTick = [15 40 60] » l'emporte sur les graduations calculees.
+    std::vector<double> gx = axes.ticksX.empty() ? graduations(xmin, xmax, 6) : axes.ticksX;
+    std::vector<double> gy = axes.ticksY.empty() ? graduations(ymin, ymax, 6) : axes.ticksY;
     peintre.setPen(QPen(QColor("#d8d8d8"), 1));
     if (axes.grille) {
         for (double v : gx) peintre.drawLine(QPointF(versEcranX(v), trace.top()),
@@ -140,19 +141,33 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                                              QPointF(trace.right(), versEcranY(v)));
     }
     peintre.setPen(QPen(QColor("#303030"), 1));
-    peintre.drawRect(trace);
-    for (double v : gx) {
-        double x = versEcranX(v);
-        peintre.drawLine(QPointF(x, trace.bottom()), QPointF(x, trace.bottom() - 5));
-        peintre.drawText(QRectF(x - 40, trace.bottom() + 4, 80, metrique.height() + 2),
-                         Qt::AlignHCenter | Qt::AlignTop, etiquetteNombre(v));
+    if (axes.boite) peintre.drawRect(trace);
+    else {
+        peintre.drawLine(trace.bottomLeft(), trace.bottomRight());
+        peintre.drawLine(trace.bottomLeft(), trace.topLeft());
     }
-    for (double v : gy) {
+    for (std::size_t k = 0; k < gx.size(); ++k) {
+        double v = gx[k];
+        double x = versEcranX(v);
+        if (x < trace.left() - 1 || x > trace.right() + 1) continue;
+        peintre.drawLine(QPointF(x, trace.bottom()), QPointF(x, trace.bottom() - 5));
+        QString texte = k < axes.etiquettesTicksX.size()
+                            ? QString::fromStdString(axes.etiquettesTicksX[k])
+                            : etiquetteNombre(v);
+        peintre.drawText(QRectF(x - 40, trace.bottom() + 4, 80, metrique.height() + 2),
+                         Qt::AlignHCenter | Qt::AlignTop, texte);
+    }
+    for (std::size_t k = 0; k < gy.size(); ++k) {
+        double v = gy[k];
         double y = versEcranY(v);
+        if (y < trace.top() - 1 || y > trace.bottom() + 1) continue;
         peintre.drawLine(QPointF(trace.left(), y), QPointF(trace.left() + 5, y));
         peintre.drawText(QRectF(cadre.left() + 4, y - metrique.height() / 2,
                                 margeGauche - 12, metrique.height()),
-                         Qt::AlignRight | Qt::AlignVCenter, etiquetteNombre(v));
+                         Qt::AlignRight | Qt::AlignVCenter,
+                         k < axes.etiquettesTicksY.size()
+                             ? QString::fromStdString(axes.etiquettesTicksY[k])
+                             : etiquetteNombre(v));
     }
 
     // Les séries. Le tracé est découpé au cadre : une limite manuelle ne

@@ -122,6 +122,8 @@ void Moteur::demarrer() {
     it_->installerBibliotheque();
     it_->definirSortie(flux_.get());
     it_->modeInteractif = true;
+    // « clc » efface la fenetre au lieu d'y ecrire « [2J[H ».
+    it_->effacerEcran = [this] { emit effacementDemande(); };
     // Sans cela, un script pose dans le dossier courant reste introuvable :
     // c'est la premiere chose qu'on fait dans un bureau — ecrire un
     // fichier a cote, et l'executer.
