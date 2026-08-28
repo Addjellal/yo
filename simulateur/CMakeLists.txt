@@ -204,6 +204,10 @@ endif()
 enable_testing()
 add_executable(tests_coeur tests/test_coeur.cpp)
 target_link_libraries(tests_coeur PRIVATE coeur)
+# Le banc doit pouvoir RELIRE les documents du dépôt : un chiffre annoncé dans
+# le README se périme en silence, et c'est arrivé plusieurs fois ici.
+target_compile_definitions(tests_coeur PRIVATE
+  RACINE_PROJET="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME coeur COMMAND tests_coeur)
 
 # --- La passe sanitizers -----------------------------------------------------

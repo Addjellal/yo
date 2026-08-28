@@ -223,6 +223,55 @@ static void test_ngspice() {
 }
 
 // ---------------------------------------------------------------------------
+// [53] Le README annonce le catalogue qu'il y a VRAIMENT
+//
+// Le document a déjà annoncé « 250 tests », « 137 tests », « 38 composants » —
+// tous faux, tous restés en place des mois. Un chiffre écrit dans un document
+// se périme sans bruit : personne ne relit un README pour vérifier une
+// addition. Alors c'est le banc qui le relit.
+// ---------------------------------------------------------------------------
+static void test_readme_dit_vrai() {
+    std::printf("\n[53] Le README annonce le catalogue qu'il y a vraiment\n");
+
+    const std::string chemin = std::string(RACINE_PROJET) + "/README.md";
+    std::ifstream fichier(chemin);
+    if (!fichier) {
+        std::printf("  (README introuvable en %s — section ignorée)\n",
+                    chemin.c_str());
+        return;
+    }
+    std::string texte((std::istreambuf_iterator<char>(fichier)),
+                      std::istreambuf_iterator<char>());
+
+    int total = 0, simulables = 0;
+    for (const coeur::Modele* modele : coeur::Catalogue::instance().tous()) {
+        ++total;
+        if (modele->vers_spice) ++simulables;
+    }
+
+    // « Catalogue de N composants (M simulables, … familles) »
+    const std::string debut = "Catalogue de ";
+    const std::size_t ou = texte.find(debut);
+    verifier(ou != std::string::npos,
+             "le README annonce bien la taille du catalogue");
+    if (ou == std::string::npos) return;
+
+    const int annonce = std::atoi(texte.c_str() + ou + debut.size());
+    verifier(annonce == total,
+             "et ce nombre est celui du catalogue",
+             "le README dit " + std::to_string(annonce) + ", le catalogue en "
+                 "compte " + std::to_string(total));
+
+    const std::size_t apres = texte.find('(', ou);
+    const int annonce_simulables =
+        apres == std::string::npos ? -1 : std::atoi(texte.c_str() + apres + 1);
+    verifier(annonce_simulables == simulables,
+             "et le nombre de composants simulables aussi",
+             "le README dit " + std::to_string(annonce_simulables)
+                 + ", il y en a " + std::to_string(simulables));
+}
+
+// ---------------------------------------------------------------------------
 // [48] AUDIT — cinq défauts trouvés en relisant la carte et les analyses
 // ---------------------------------------------------------------------------
 static void test_audit_carte_et_analyses() {
@@ -6735,6 +6784,7 @@ int main() {
     test_programme_multifichier();
 
     test_audit_carte_et_analyses();
+    test_readme_dit_vrai();
 
     std::printf("\n============================================================\n");
     if (!g_echecs.empty()) {

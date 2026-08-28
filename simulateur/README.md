@@ -47,7 +47,7 @@ d'entrée. Les deux sens sont testés (voir plus bas).
 
 - **Saisie de schéma** : palette par famille, glisser-déposer, fils en équerre,
   rotation, grille magnétique, zoom à la molette.
-- **Catalogue de 57 composants** (51 simulables, 10 familles), tous vérifiés
+- **Catalogue de 66 composants** (51 simulables, 10 familles), tous vérifiés
   par les tests : passifs, diodes et Zener, transistors NPN/PNP, MOSFET,
   optocoupleur, afficheur 7 segments, relais, portes logiques, amplificateur
   opérationnel, régulateur 7805, instruments de mesure.
