@@ -12,7 +12,9 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QPlainTextEdit>
+#include <QFontMetrics>
 #include <QTabWidget>
+#include <QToolButton>
 #include <QTableWidget>
 #include <QFileInfo>
 #include <QTemporaryDir>
@@ -25,6 +27,8 @@
 
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
+#include "FenetreFigure.h"
+#include "Icone.h"
 #include "Theme.h"
 #include "FenetrePrincipale.h"
 #include "Moteur.h"
@@ -152,11 +156,19 @@ int main(int argc, char** argv) {
     envoyer(fenetre, QStringLiteral("plot(x, y); hold on; plot(x, cos(2*pi*x)); title('deux signaux'); "
         "xlabel('t'); ylabel('a'); legend('sin','cos'); grid on;"));
     VueFigure* vue = nullptr;
+    FenetreFigure* fenetreFigure = nullptr;
     verifier(attendre([&] {
-                 vue = fenetre.findChild<VueFigure*>();
+                 fenetreFigure = fenetre.findChild<FenetreFigure*>();
+                 vue = fenetreFigure ? fenetreFigure->vue() : nullptr;
                  return vue != nullptr;
              }),
-             "un onglet de figure apparait");
+             "une fenetre de figure s'ouvre, comme sous MATLAB");
+    if (fenetreFigure) {
+        verifier(fenetreFigure->isWindow(), "la figure est une fenetre a part entiere");
+        verifier(fenetreFigure->windowTitle().startsWith(QLatin1String("Figure 1")),
+                 "la fenetre s'appelle « Figure 1 »");
+        verifier(!fenetreFigure->windowIcon().isNull(), "la fenetre de figure a une icone");
+    }
     if (vue) {
         vue->resize(640, 480);
         QImage image(640, 480, QImage::Format_ARGB32);
@@ -190,6 +202,43 @@ int main(int argc, char** argv) {
             for (int x = 0; x < grande.width(); x += 2)
                 if (qGray(grande.pixel(x, y)) < 220) ++encreLarge;
         verifier(encreLarge > encre, "la figure se redessine quand on l'agrandit");
+    }
+
+    // L'application a son icone : sur le fichier comme sur la fenetre.
+    verifier(!iconeApplication().isNull(), "l'icone de l'application existe");
+    verifier(iconeApplication().availableSizes().size() >= 5,
+             "l'icone est fournie en plusieurs tailles");
+
+    // --- le ruban ---------------------------------------------------------
+    auto* ruban = fenetre.findChild<QTabWidget*>(QString(), Qt::FindChildrenRecursively);
+    QTabWidget* bandeau = nullptr;
+    for (QTabWidget* t : fenetre.findChildren<QTabWidget*>())
+        if (t->count() >= 2 && t->tabText(0) == QLatin1String("Accueil")) bandeau = t;
+    (void)ruban;
+    verifier(bandeau != nullptr, "le ruban a ses onglets");
+    if (bandeau) {
+        verifier(bandeau->tabText(1) == QString::fromUtf8("Tracés"),
+                 "l'onglet des traces est la");
+        // Les fleches de defilement de la barre d'onglets sont aussi des
+        // QToolButton, sans texte : ce ne sont pas des boutons du ruban.
+        QList<QToolButton*> boutons;
+        for (QToolButton* b : bandeau->findChildren<QToolButton*>())
+            if (!b->text().isEmpty()) boutons << b;
+        verifier(boutons.size() >= 10, "le ruban porte ses boutons");
+        int avecIcone = 0, assezLarges = 0;
+        for (QToolButton* b : boutons) {
+            if (!b->icon().isNull()) ++avecIcone;
+            // Un bouton doit etre assez large pour son libelle : sinon Qt
+            // elide, et « Nouveau script » sort en « ouveau scrip ».
+            QFontMetrics m(b->font());
+            int large = 0;
+            for (const QString& mot : b->text().split(QLatin1Char('\n')))
+                large = qMax(large, m.horizontalAdvance(mot));
+            if (b->width() >= large) ++assezLarges;
+        }
+        verifier(avecIcone == boutons.size(), "chaque bouton du ruban a son icone");
+        verifier(assezLarges == boutons.size(),
+                 "aucun libelle du ruban n'est rogne");
     }
 
     // Les panneaux de droite doivent avoir une largeur utilisable : sans
@@ -233,6 +282,20 @@ int main(int argc, char** argv) {
 
     // --- executer un fichier depuis l'editeur -----------------------------
     if (editeur) {
+        // Un fichier dont le nom n'est pas un identifiant MATLAB doit
+        // s'executer aussi : c'est le cas de « sans-titre.m », le nom que
+        // le bureau propose par defaut.
+        {
+            QString avecTiret = QDir::current().filePath(QStringLiteral("sans-titre.m"));
+            editeur->setPlainText(QStringLiteral("valeurAvecTiret = 5 * 5;\n"));
+            editeur->definirFichier(avecTiret);
+            QMetaObject::invokeMethod(&fenetre, "enregistrer");
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+            QMetaObject::invokeMethod(&fenetre, "executerScript");
+            verifier(attendre([&] { return ligneDe(QStringLiteral("valeurAvecTiret")) >= 0; }),
+                     "un fichier nomme « sans-titre.m » s'execute quand meme");
+        }
+
         QString chemin = QDir::current().filePath(QStringLiteral("essaiBureau.m"));
         editeur->setPlainText(QStringLiteral("valeurDuScript = 6 * 7;\n"));
         editeur->definirFichier(chemin);

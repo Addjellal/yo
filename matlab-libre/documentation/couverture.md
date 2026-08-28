@@ -61,9 +61,12 @@ totalité.
 1. **Le bureau est natif ; l'atelier du navigateur reste plus complet.**
    `matlibre-bureau` est une application Qt : un exécutable, une fenêtre,
    l'interpréteur dans le même processus. La disposition est celle de
-   MATLAB — dossier courant, éditeur à onglets avec coloration et
-   numérotation, fenêtre de commandes avec historique aux flèches, espace
-   de travail, figures peintes directement avec QPainter. Le calcul tourne
+   MATLAB — un ruban à onglets (Accueil, Tracés) dont les groupes portent
+   leur nom, dossier courant, éditeur à onglets avec coloration,
+   numérotation, sections `%%`, indentation automatique et Ctrl-R/Ctrl-T
+   pour commenter, fenêtre de commandes où l'invite vit dans le texte
+   comme sous MATLAB, espace de travail, historique, figures peintes
+   directement avec QPainter. Le calcul tourne
    dans un fil séparé : la fenêtre répond pendant qu'il tourne. Manquent
    encore, côté bureau : les points d'arrêt et le pas à pas, le profileur,
    le concepteur d'applications et l'éditeur de schémas-blocs — ils

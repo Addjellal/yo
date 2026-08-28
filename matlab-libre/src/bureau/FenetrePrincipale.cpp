@@ -24,10 +24,14 @@
 #include <QTableWidget>
 #include <QThread>
 #include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
+#include "FenetreFigure.h"
+#include "Icone.h"
+#include "Ruban.h"
 #include "Theme.h"
 #include "VueFigure.h"
 #include "matlibre/Version.h"
@@ -102,19 +106,12 @@ void FenetrePrincipale::construirePanneaux() {
                                           Q_ARG(QString, commande));
             });
 
-    ongletsFigures_ = new QTabWidget;
-    ongletsFigures_->setTabsClosable(true);
-    ongletsFigures_->setDocumentMode(true);
-    connect(ongletsFigures_, &QTabWidget::tabCloseRequested, this, [this](int index) {
-        QWidget* w = ongletsFigures_->widget(index);
-        ongletsFigures_->removeTab(index);
-        delete w;
-    });
-
+    // Les figures ne sont pas des onglets du bureau : chacune a sa fenêtre,
+    // comme sous MATLAB. Le centre ne porte donc que l'éditeur.
     auto* centreHaut = new QTabWidget;
     centreHaut->setDocumentMode(true);
-    centreHaut->addTab(onglets_, QStringLiteral("Éditeur"));
-    centreHaut->addTab(ongletsFigures_, QStringLiteral("Figures"));
+    centreHaut->addTab(onglets_, iconeDessinee("script", 16),
+                       QStringLiteral("Éditeur"));
 
     // La console porte son titre, comme un panneau de MATLAB.
     auto* boiteConsole = new QWidget;
@@ -199,20 +196,23 @@ void FenetrePrincipale::construirePanneaux() {
 
 void FenetrePrincipale::construireMenus() {
     QMenu* fichier = menuBar()->addMenu(QStringLiteral("&Fichier"));
-    QAction* aNouveau = fichier->addAction(QStringLiteral("&Nouveau script"), this,
+    QAction* aNouveau = fichier->addAction(iconeDessinee("nouveau", 16),
+                                           QStringLiteral("&Nouveau script"), this,
                                            &FenetrePrincipale::nouveauFichier);
     aNouveau->setShortcut(QKeySequence::New);
-    QAction* aOuvrir = fichier->addAction(QStringLiteral("&Ouvrir…"), this,
+    QAction* aOuvrir = fichier->addAction(iconeDessinee("ouvrir", 16),
+                                          QStringLiteral("&Ouvrir…"), this,
                                           &FenetrePrincipale::ouvrirParDialogue);
     aOuvrir->setShortcut(QKeySequence::Open);
-    QAction* aEnregistrer = fichier->addAction(QStringLiteral("&Enregistrer"), this,
+    QAction* aEnregistrer = fichier->addAction(iconeDessinee("enregistrer", 16),
+                                               QStringLiteral("&Enregistrer"), this,
                                                &FenetrePrincipale::enregistrer);
     aEnregistrer->setShortcut(QKeySequence::Save);
     fichier->addAction(QStringLiteral("Enregistrer &sous…"), this,
                        &FenetrePrincipale::enregistrerSous);
     fichier->addSeparator();
-    fichier->addAction(QStringLiteral("Changer de &dossier…"), this,
-                       &FenetrePrincipale::changerDossierParDialogue);
+    fichier->addAction(iconeDessinee("dossier", 16), QStringLiteral("Changer de &dossier…"),
+                       this, &FenetrePrincipale::changerDossierParDialogue);
     fichier->addSeparator();
     QAction* aQuitter = fichier->addAction(QStringLiteral("&Quitter"), this, &QWidget::close);
     aQuitter->setShortcut(QKeySequence::Quit);
@@ -243,39 +243,111 @@ void FenetrePrincipale::construireMenus() {
                        &FenetrePrincipale::effacerCommandes);
 
     QMenu* executer = menuBar()->addMenu(QStringLiteral("E&xécuter"));
-    QAction* aExecuter = executer->addAction(QStringLiteral("Exécuter le script"), this,
+    QAction* aExecuter = executer->addAction(iconeDessinee("executer", 16),
+                                             QStringLiteral("Exécuter le script"), this,
                                              &FenetrePrincipale::executerScript);
     aExecuter->setShortcut(Qt::Key_F5);
-    QAction* aSelection = executer->addAction(QStringLiteral("Exécuter la sélection"), this,
+    QAction* aSelection = executer->addAction(iconeDessinee("selection", 16),
+                                              QStringLiteral("Exécuter la sélection"), this,
                                               &FenetrePrincipale::executerSelection);
     aSelection->setShortcut(Qt::Key_F9);
 
     QMenu* aide = menuBar()->addMenu(QStringLiteral("&Aide"));
-    aide->addAction(QStringLiteral("À propos de MatLibre"), this,
+    aide->addAction(iconeDessinee("aide", 16), QStringLiteral("À propos de MatLibre"), this,
                     &FenetrePrincipale::aPropos);
 
     QMenu* affichage = menuBar()->addMenu(QStringLiteral("&Affichage"));
+    affichage->addAction(QStringLiteral("Afficher le &ruban"), this, [this](bool) {
+        if (ruban_) ruban_->setVisible(!ruban_->isVisible());
+    })->setCheckable(true);
     affichage->addAction(QStringLiteral("Rétablir la disposition par défaut"), this, [this] {
         for (QDockWidget* d : findChildren<QDockWidget*>()) d->show();
         QSettings().remove(QStringLiteral("fenetre/etat"));
     });
 
-    QToolBar* barre = addToolBar(QStringLiteral("Principale"));
-    barre->setObjectName(QStringLiteral("barrePrincipale"));
+    // Le ruban : des onglets et des groupes nommes, comme MATLAB. Il tient
+    // lieu de barre d'outils, et porte les memes actions que les menus.
+    ruban_ = new Ruban;
+    auto* barre = new QToolBar(QStringLiteral("Ruban"));
+    barre->setObjectName(QStringLiteral("barreRuban"));
     barre->setMovable(false);
-    barre->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    barre->addAction(aNouveau);
-    barre->addAction(aOuvrir);
-    barre->addAction(aEnregistrer);
-    barre->addSeparator();
-    barre->addAction(aExecuter);
-    barre->addAction(aSelection);
-    barre->addSeparator();
-    barre->addAction(QStringLiteral("Effacer les variables"), this, [this] {
-        envoyer(QStringLiteral("clear"));
-    });
-    barre->addAction(QStringLiteral("Effacer la console"), this,
-                     &FenetrePrincipale::effacerCommandes);
+    barre->setFloatable(false);
+    barre->addWidget(ruban_);
+    barre->setStyleSheet(QStringLiteral("QToolBar { padding:0; spacing:0; }"));
+    addToolBar(Qt::TopToolBarArea, barre);
+
+    auto* fichierGroupe = new GroupeRuban(QStringLiteral("Fichier"));
+    connect(fichierGroupe->ajouter(QStringLiteral("Nouveau\nscript"), QStringLiteral("nouveau"),
+                          QStringLiteral("Nouveau script (Ctrl+N)")),
+            &QToolButton::clicked, aNouveau, &QAction::trigger);
+    connect(fichierGroupe->ajouter(QStringLiteral("Ouvrir"), QStringLiteral("ouvrir"),
+                          QStringLiteral("Ouvrir un fichier (Ctrl+O)")),
+            &QToolButton::clicked, aOuvrir, &QAction::trigger);
+    connect(fichierGroupe->ajouter(QStringLiteral("Enregistrer"), QStringLiteral("enregistrer"),
+                          QStringLiteral("Enregistrer (Ctrl+S)")),
+            &QToolButton::clicked, aEnregistrer, &QAction::trigger);
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), fichierGroupe);
+
+    auto* variablesGroupe = new GroupeRuban(QStringLiteral("Variable"));
+    QToolButton* bEspace = variablesGroupe->ajouter(
+        QStringLiteral("Espace de\ntravail"), QStringLiteral("variables"),
+        QStringLiteral("Afficher l'espace de travail"));
+    connect(bEspace, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("whos")); });
+    QToolButton* bVider = variablesGroupe->ajouter(
+        QStringLiteral("Effacer les\nvariables"), QStringLiteral("effacer"),
+        QStringLiteral("clear"));
+    connect(bVider, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("clear")); });
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), variablesGroupe);
+
+    auto* codeGroupe = new GroupeRuban(QStringLiteral("Code"));
+    connect(codeGroupe->ajouter(QStringLiteral("Exécuter"), QStringLiteral("executer"),
+                          QStringLiteral("Exécuter le script (F5)")),
+            &QToolButton::clicked, aExecuter, &QAction::trigger);
+    connect(codeGroupe->ajouter(QStringLiteral("Exécuter la\nsélection"), QStringLiteral("selection"),
+                          QStringLiteral("Exécuter la sélection (F9)")),
+            &QToolButton::clicked, aSelection, &QAction::trigger);
+    QToolButton* bEffacer = codeGroupe->ajouter(QStringLiteral("Effacer les\ncommandes"),
+                                                QStringLiteral("effacer"),
+                                                QStringLiteral("clc"));
+    connect(bEffacer, &QToolButton::clicked, this, &FenetrePrincipale::effacerCommandes);
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), codeGroupe);
+
+    auto* environnementGroupe = new GroupeRuban(QStringLiteral("Environnement"));
+    QToolButton* bDossier = environnementGroupe->ajouter(
+        QStringLiteral("Dossier\ncourant"), QStringLiteral("dossier"),
+        QStringLiteral("Changer de dossier courant"));
+    connect(bDossier, &QToolButton::clicked, this,
+            &FenetrePrincipale::changerDossierParDialogue);
+    QToolButton* bAtelier = environnementGroupe->ajouter(
+        QStringLiteral("Atelier\nweb"), QStringLiteral("bureau"),
+        QStringLiteral("Ouvre l'atelier dans le navigateur : profileur, "
+                       "concepteur d'applications, schémas-blocs"));
+    connect(bAtelier, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("ide")); });
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), environnementGroupe);
+
+    auto* aideGroupe = new GroupeRuban(QStringLiteral("Ressources"));
+    QToolButton* bAide = aideGroupe->ajouter(QStringLiteral("Aide"), QStringLiteral("aide"),
+                                             QStringLiteral("help"));
+    connect(bAide, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("help")); });
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), aideGroupe);
+
+    // Onglet TRACÉS : les tracés courants, appliqués à la variable choisie
+    // dans l'espace de travail — c'est ce que fait MATLAB.
+    auto* tracesGroupe = new GroupeRuban(QStringLiteral("Tracés"));
+    struct Trace { const char* libelle; const char* dessin; const char* fonction; };
+    const Trace traces[] = {{"plot", "trace", "plot"},   {"bar", "barres", "bar"},
+                            {"stem", "trace", "stem"},   {"stairs", "trace", "stairs"},
+                            {"area", "trace", "area"},   {"histogram", "barres", "histogram"},
+                            {"semilogy", "trace", "semilogy"}};
+    for (const Trace& t : traces) {
+        QToolButton* b = tracesGroupe->ajouter(QLatin1String(t.libelle),
+                                               QLatin1String(t.dessin),
+                                               QStringLiteral("Tracer la variable "
+                                                              "sélectionnée"));
+        QString fonction = QLatin1String(t.fonction);
+        connect(b, &QToolButton::clicked, this, [this, fonction] { tracerSelection(fonction); });
+    }
+    ruban_->ajouterGroupe(QStringLiteral("Tracés"), tracesGroupe);
 }
 
 Editeur* FenetrePrincipale::editeurCourant() const {
@@ -369,8 +441,14 @@ void FenetrePrincipale::executerScript() {
     } else if (editeur->document()->isModified()) {
         editeur->enregistrerFichier(editeur->fichier());
     }
-    QString nom = QFileInfo(editeur->fichier()).completeBaseName();
-    envoyer(nom);
+    // On passe par run('chemin') et non par le nom du fichier : un fichier
+    // dont le nom n'est pas un identifiant MATLAB — « sans-titre.m », que
+    // le bureau propose par defaut — donnerait sinon « Unrecognized
+    // function or variable 'sans' ». run accepte n'importe quel chemin, et
+    // n'exige pas que le dossier soit sur le chemin de recherche.
+    QString chemin = QDir::toNativeSeparators(editeur->fichier());
+    chemin.replace(QLatin1Char('\''), QStringLiteral("''"));
+    envoyer(QStringLiteral("run('%1')").arg(chemin));
 }
 
 void FenetrePrincipale::executerSelection() {
@@ -425,16 +503,23 @@ void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lign
 
 void FenetrePrincipale::surFigures(const QVector<FigureCopiee>& figures) {
     for (const FigureCopiee& f : figures) {
-        VueFigure* vue = nullptr;
-        for (int k = 0; k < ongletsFigures_->count(); ++k) {
-            auto* candidat = qobject_cast<VueFigure*>(ongletsFigures_->widget(k));
-            if (candidat && candidat->numero() == f.numero) { vue = candidat; break; }
+        FenetreFigure* fenetre = fenetresFigures_.value(f.numero, nullptr);
+        if (!fenetre) {
+            fenetre = new FenetreFigure(f.numero, this);
+            fenetre->setWindowFlag(Qt::Window);
+            // La fenêtre ne se détruit pas à la fermeture : elle se cache.
+            // Retracer dans la même figure la rouvre, comme sous MATLAB.
+            connect(fenetre, &FenetreFigure::fermee, this,
+                    [this](int numero) { (void)numero; });
+            fenetresFigures_.insert(f.numero, fenetre);
+            // Les figures se décalent l'une de l'autre pour ne pas se
+            // recouvrir exactement, comme le fait MATLAB.
+            int rang = fenetresFigures_.size() - 1;
+            fenetre->move(x() + 90 + rang * 26, y() + 90 + rang * 26);
         }
-        if (!vue) {
-            vue = new VueFigure;
-            ongletsFigures_->addTab(vue, QStringLiteral("Figure %1").arg(f.numero));
-        }
-        vue->definirFigure(f);
+        fenetre->definirFigure(f);
+        if (!fenetre->isVisible()) fenetre->show();
+        fenetre->raise();
     }
 }
 
@@ -468,6 +553,20 @@ void FenetrePrincipale::changerDossierParDialogue() {
 }
 
 void FenetrePrincipale::effacerCommandes() { console_->effacer(); }
+
+// Trace la variable choisie dans l'espace de travail, comme l'onglet
+// TRACÉS de MATLAB. Sans sélection, on le dit plutôt que de ne rien faire.
+void FenetrePrincipale::tracerSelection(const QString& fonction) {
+    int ligne = tableVariables_->currentRow();
+    if (ligne < 0 || !tableVariables_->item(ligne, 0)) {
+        ecrire(QStringLiteral("Choisissez d'abord une variable dans l'espace de "
+                              "travail.\n"),
+               theme::avertissement().name());
+        return;
+    }
+    envoyer(fonction + QLatin1Char('(') + tableVariables_->item(ligne, 0)->text() +
+            QLatin1Char(')'));
+}
 
 void FenetrePrincipale::commenterSelection() {
     if (Editeur* e = editeurCourant()) e->commenter();

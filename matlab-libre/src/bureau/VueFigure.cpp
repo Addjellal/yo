@@ -184,15 +184,32 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
             case GenreTrace::Points: {
                 peintre.setPen(QPen(couleur, 1));
                 peintre.setBrush(couleur);
-                for (std::size_t k = 0; k < n; ++k)
-                    peintre.drawEllipse(QPointF(versEcranX(serie.x[k]), versEcranY(serie.y[k])),
-                                        3, 3);
+                std::vector<std::size_t> visibles =
+                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                for (std::size_t indice : visibles) {
+                    if (indice >= n) continue;
+                    peintre.drawEllipse(
+                        QPointF(versEcranX(serie.x[indice]), versEcranY(serie.y[indice])), 3, 3);
+                }
                 peintre.setBrush(Qt::NoBrush);
                 break;
             }
             case GenreTrace::Tige: {
                 peintre.setPen(QPen(couleur, serie.epaisseur));
                 double zero = versEcranY(std::max(ymin, std::min(ymax, 0.0)));
+                if ((double)n > trace.width() * 2) {
+                    // Plus de deux tiges par pixel : elles ne se distinguent
+                    // plus, on trace l'enveloppe.
+                    std::vector<std::size_t> visibles =
+                        indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                    for (std::size_t indice : visibles) {
+                        if (indice >= n) continue;
+                        double x = versEcranX(serie.x[indice]);
+                        peintre.drawLine(QPointF(x, zero),
+                                         QPointF(x, versEcranY(serie.y[indice])));
+                    }
+                    break;
+                }
                 for (std::size_t k = 0; k < n; ++k) {
                     double x = versEcranX(serie.x[k]);
                     double y = versEcranY(serie.y[k]);
@@ -233,14 +250,25 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 peintre.setPen(crayon);
                 QPainterPath chemin;
                 bool commence = false;
-                for (std::size_t k = 0; k < n; ++k) {
-                    double x = versEcranX(serie.x[k]), y = versEcranY(serie.y[k]);
+                // Un million de points sur mille pixels : neuf cent
+                // quatre-vingt-dix-neuf sur mille se superposent, et
+                // QPainterPath les garde tous. La fenetre gelait. On ne
+                // trace que l'enveloppe visible de chaque colonne — le
+                // dessin est le meme, le nombre de segments s'effondre.
+                std::vector<std::size_t> visibles =
+                    indicesVisibles(serie.x, serie.y, xmin, xmax, (int)trace.width());
+                for (std::size_t indice : visibles) {
+                    if (indice >= n) continue;
+                    double x = versEcranX(serie.x[indice]), y = versEcranY(serie.y[indice]);
                     if (!std::isfinite(x) || !std::isfinite(y)) { commence = false; continue; }
                     if (!commence) { chemin.moveTo(x, y); commence = true; }
                     else chemin.lineTo(x, y);
                 }
                 peintre.drawPath(chemin);
-                if (!serie.marqueur.empty() && serie.marqueur != "none") {
+                // Les marqueurs ne se dessinent que s'ils se distinguent :
+                // au-dela d'un point par pixel ils forment un trait plein.
+                if (!serie.marqueur.empty() && serie.marqueur != "none" &&
+                    (double)n < trace.width()) {
                     peintre.setBrush(couleur);
                     for (std::size_t k = 0; k < n; ++k)
                         peintre.drawEllipse(

@@ -216,11 +216,19 @@ if(MATLIBRE_BUREAU)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/VueFigure.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Moteur.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/ConsoleCommandes.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Theme.cpp)
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Theme.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Ruban.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreFigure.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Icone.cpp)
     target_link_libraries(matlibre_bureau PUBLIC matlibre_coeur Qt6::Widgets)
     target_include_directories(matlibre_bureau PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau)
 
-    add_executable(matlibre-bureau ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Principal.cpp)
+    add_executable(matlibre-bureau
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Principal.cpp
+      # L'icone du FICHIER sous Windows : celle de l'explorateur, avant
+      # meme qu'on lance. Qt ne peut pas la poser, c'est une ressource de
+      # l'executable. Ignoree ailleurs.
+      $<$<BOOL:${WIN32}>:${CMAKE_CURRENT_SOURCE_DIR}/ressources/icone.rc>)
     target_link_libraries(matlibre-bureau PRIVATE matlibre_bureau)
     install(TARGETS matlibre-bureau RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 

@@ -1,0 +1,4 @@
+// icone.rc — l'icone du FICHIER sous Windows, celle que montre
+// l'explorateur avant meme qu'on lance. Elle ne peut pas venir de Qt :
+// c'est une ressource de l'executable. Ignore ailleurs qu'a Windows.
+IDI_ICON1 ICON "matlibre.ico"

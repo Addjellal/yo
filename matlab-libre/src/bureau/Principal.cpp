@@ -8,6 +8,7 @@
 #include <QFileInfo>
 
 #include "FenetrePrincipale.h"
+#include "Icone.h"
 #include "Theme.h"
 
 #ifdef _WIN32
@@ -45,6 +46,7 @@ int main(int argc, char** argv) {
     application.setApplicationName(QStringLiteral("MatLibre"));
     application.setOrganizationName(QStringLiteral("MatLibre"));
     theme::appliquer();
+    application.setWindowIcon(iconeApplication());
     poserRacineToolbox(QString::fromLocal8Bit(argv[0]));
 
     FenetrePrincipale fenetre;

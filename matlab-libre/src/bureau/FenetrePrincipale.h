@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QMap>
 #include <QVector>
 
 #include "Moteur.h"
@@ -14,8 +15,10 @@ class QTableWidget;
 class QThread;
 class QLabel;
 class Editeur;
+class Ruban;
 class ConsoleCommandes;
 class VueFigure;
+class FenetreFigure;
 
 class FenetrePrincipale : public QMainWindow {
     Q_OBJECT
@@ -50,6 +53,7 @@ private slots:
     void ouvrirDepuisListe();
     void effacerCommandes();
     void commenterSelection();
+    void tracerSelection(const QString& fonction);
     void decommenterSelection();
     void aPropos();
 
@@ -64,12 +68,13 @@ private:
     QThread* filMoteur_;
     Moteur* moteur_;
 
+    Ruban* ruban_ = nullptr;
     QTabWidget* onglets_;
     ConsoleCommandes* console_;
     QTableWidget* tableVariables_;
     QListWidget* listeFichiers_;
     QListWidget* historique_;
-    QTabWidget* ongletsFigures_;
+    QMap<int, FenetreFigure*> fenetresFigures_;
     QLabel* etat_;
     QLabel* etiquetteDossier_;
     QString dossierCourant_;

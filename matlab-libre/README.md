@@ -102,13 +102,16 @@ rien à ajouter au `PATH`.
 
 **Le bureau** (`matlibre-bureau`) est une application native : un seul
 exécutable, une seule fenêtre, l'interpréteur dans le même processus. Rien
-à ouvrir dans un navigateur. On y trouve la disposition de MATLAB —
-dossier courant à gauche, éditeur à onglets avec coloration et numérotation
-au centre, fenêtre de commandes en dessous, espace de travail et historique
-à droite, figures dans leur onglet, peintes directement à l'écran. Le
-calcul tourne dans un fil à part : la fenêtre ne se fige pas. Qt6 est la
-seule dépendance, et elle reste facultative — sans Qt, tout le reste se
-compile comme avant.
+à ouvrir dans un navigateur. On y retrouve le bureau de MATLAB — un ruban
+à onglets (Accueil, Tracés) dont les groupes portent leur nom, le dossier
+courant à gauche, l'éditeur à onglets au centre avec coloration, sections
+`%%`, indentation automatique et Ctrl-R/Ctrl-T pour commenter, la fenêtre
+de commandes en dessous où l'invite vit dans le texte, l'espace de travail
+et l'historique à droite. Chaque figure s'ouvre dans sa propre fenêtre,
+peinte directement à l'écran, et s'enregistre ou se copie depuis son menu.
+Le calcul tourne dans un fil à part : la fenêtre ne se fige pas, même sur
+un tracé d'un million de points. Qt6 est la seule dépendance, et elle
+reste facultative — sans Qt, tout le reste se compile comme avant.
 
 **L'atelier** (`matlibre --ide`, ou la commande `ide`) reste disponible
 dans le navigateur, avec en plus le profileur, le concepteur
