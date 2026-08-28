@@ -8,3 +8,4 @@ build-*/
 compile_commands.json
 .atelier.pid
 node_modules/
+build-windows/

@@ -17,8 +17,29 @@ Le `Makefile` de la racine enveloppe ces deux commandes :
 make          # compile
 make test     # compile et exécute toute la suite
 make doc      # régénère documentation/reference/
+make windows  # vérifie que la compilation pour Windows passe
 make install  # installe dans /usr/local (variable PREFIX)
 ```
+
+## Compiler pour Windows
+
+Sur Windows, `outils\construire.ps1` fait tout : configuration,
+compilation, tests, installation, archive. Il s'arrête au premier échec
+et dit lequel — PowerShell, lui, ne s'arrête pas sur le code de retour
+d'un programme externe.
+
+```powershell
+.\outils\construire.ps1                    # Release
+.\outils\construire.ps1 -Tests             # compile puis teste
+.\outils\construire.ps1 -Generateur "MinGW Makefiles"
+```
+
+Depuis Linux, `make windows` compile en croisé avec MinGW-w64
+(`apt install g++-mingw-w64-x86-64`). Ce n'est pas la version qu'on
+livre : c'est le moyen de voir tout de suite ce que la bibliothèque
+standard de GNU/Linux masque — un en-tête tiré par transitivité, une
+fonction POSIX employée sans garde, une bibliothèque système oubliée à
+l'édition de liens.
 
 ## Arborescence
 
