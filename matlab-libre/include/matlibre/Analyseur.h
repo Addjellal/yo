@@ -7,6 +7,7 @@
 // La puissance est associative à gauche : 2^3^2 vaut 64, comme dans MATLAB.
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -56,6 +57,12 @@ private:
     NoeudPtr instructionCommande();
     void terminer(NoeudPtr n);
     bool ressembleCommande() const;
+    // Noms deja vus comme cible d'affectation, variable de boucle, entree
+    // ou sortie de fonction. MATLAB s'en sert pour trancher entre la
+    // syntaxe commande et une expression : « x -1 » soustrait quand x est
+    // une variable, et appelle x('-1') quand c'est une fonction.
+    std::set<std::string> variablesVues_;
+    void noterVariable(const NoeudPtr& cible);
 
     std::shared_ptr<FonctionUtilisateur> definitionFonction();
     std::shared_ptr<DefinitionClasse> definitionClasse();

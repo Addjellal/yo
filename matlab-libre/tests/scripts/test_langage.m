@@ -164,6 +164,31 @@ assert(isequal(cc, {0, 5}));
 cc{end+1} = 6;
 assert(numel(cc) == 3 && cc{3} == 6);
 
+%% --------------------------------------------- syntaxe commande
+% MATLAB accepte « f arg1 arg2 » pour n'importe quelle fonction, pas pour
+% une liste choisie : c'est ainsi que s'ecrivent « cvx_begin sdp » ou
+% « hold on ». La regle est syntaxique, sauf que le nom ne doit pas etre
+% une variable — « x -1 » soustrait quand x en est une.
+assert(strcmp(evalc('disp bonjour'), sprintf('bonjour\n')));
+
+xCmd = 10;
+assert(xCmd -1 == 9);          % xCmd est une variable : soustraction
+assert(xCmd - 1 == 9);
+assert(xCmd-1 == 9);
+
+% Un nom qui n'est pas une variable prend ses arguments comme du texte.
+% La syntaxe commande n'existe qu'en instruction seule : « r = f arg » est
+% une erreur de syntaxe en MATLAB aussi.
+assert(strcmp(commandeDEssai('un', 'deux'), 'un|deux'));
+sortieCmd = evalc('commandeDEssai trois quatre');
+assert(~isempty(strfind(sortieCmd, 'trois|quatre')));
+% L'apostrophe groupe : « f 'un texte' » ne fait qu'un argument.
+sortieCmd = evalc('commandeDEssai ''un texte'' seul');
+assert(~isempty(strfind(sortieCmd, 'un texte|seul')));
+% Un operateur colle au mot en fait partie.
+sortieCmd = evalc('commandeDEssai -verbose');
+assert(~isempty(strfind(sortieCmd, '-verbose')));
+
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions

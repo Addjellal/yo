@@ -5,7 +5,11 @@
 #include <QFontDatabase>
 #include <QPainter>
 #include <QTextBlock>
+#include <QKeyEvent>
+#include <QRegularExpression>
 #include <QTextStream>
+
+#include "Theme.h"
 
 namespace {
 
@@ -27,8 +31,7 @@ private:
 
 ColorationMatlab::ColorationMatlab(QTextDocument* document) : QSyntaxHighlighter(document) {
     QTextCharFormat motCle;
-    motCle.setForeground(QColor("#0000ff"));
-    motCle.setFontWeight(QFont::Bold);
+    motCle.setForeground(theme::motCle());
     const char* mots[] = {"function", "end",     "if",       "elseif",   "else",
                           "for",      "while",   "switch",   "case",     "otherwise",
                           "break",    "continue", "return",  "try",      "catch",
@@ -41,19 +44,22 @@ ColorationMatlab::ColorationMatlab(QTextDocument* document) : QSyntaxHighlighter
         regles_.push_back(r);
     }
 
-    QTextCharFormat nombre;
-    nombre.setForeground(QColor("#7f3fbf"));
-    Regle rn;
-    rn.motif = QRegularExpression(QStringLiteral("\\b\\d+\\.?\\d*([eE][-+]?\\d+)?[ij]?\\b"));
-    rn.format = nombre;
-    regles_.push_back(rn);
-
-    formatChaine_.setForeground(QColor("#a020f0"));
-    formatCommentaire_.setForeground(QColor("#028002"));
-    formatCommentaire_.setFontItalic(true);
+    formatChaine_.setForeground(theme::chaine());
+    formatCommentaire_.setForeground(theme::commentaire());
 }
 
 void ColorationMatlab::highlightBlock(const QString& texte) {
+    // Une section « %% » : MATLAB la met en valeur sur toute la ligne, avec
+    // un fond pale, et c'est ce qui rend un script decoupe en cellules
+    // lisible d'un coup d'oeil.
+    if (texte.trimmed().startsWith(QLatin1String("%%"))) {
+        QTextCharFormat section;
+        section.setForeground(theme::commentaire());
+        section.setFontWeight(QFont::Bold);
+        section.setBackground(theme::fondSection());
+        setFormat(0, texte.size(), section);
+        return;
+    }
     for (const Regle& r : regles_) {
         auto it = r.motif.globalMatch(texte);
         while (it.hasNext()) {
@@ -113,6 +119,13 @@ Editeur::Editeur(QWidget* parent) : QPlainTextEdit(parent) {
     police.setPointSize(11);
     setFont(police);
     setTabStopDistance(4 * QFontMetricsF(police).horizontalAdvance(QLatin1Char(' ')));
+    // Le fond ne suit pas le theme du systeme : l'editeur de MATLAB est
+    // blanc, et la coloration est reglee pour du texte sombre sur clair.
+    QPalette palette = this->palette();
+    palette.setColor(QPalette::Base, theme::fondTexte());
+    palette.setColor(QPalette::Text, theme::texte());
+    setPalette(palette);
+    setFrameStyle(QFrame::NoFrame);
     marge_ = new MargeNumeros(this);
     coloration_ = new ColorationMatlab(document());
     connect(this, &Editeur::blockCountChanged, this, &Editeur::ajusterMarge);
@@ -147,7 +160,7 @@ void Editeur::surlignerLigneCourante() {
     QList<QTextEdit::ExtraSelection> selections;
     if (!isReadOnly()) {
         QTextEdit::ExtraSelection s;
-        s.format.setBackground(QColor("#f0f0f8"));
+        s.format.setBackground(theme::ligneCourante());
         s.format.setProperty(QTextFormat::FullWidthSelection, true);
         s.cursor = textCursor();
         s.cursor.clearSelection();
@@ -158,14 +171,14 @@ void Editeur::surlignerLigneCourante() {
 
 void Editeur::peindreMarge(QPaintEvent* evenement) {
     QPainter peintre(marge_);
-    peintre.fillRect(evenement->rect(), QColor("#f4f4f4"));
+    peintre.fillRect(evenement->rect(), theme::fondMarge());
     QTextBlock bloc = firstVisibleBlock();
     int numero = bloc.blockNumber();
     int haut = (int)blockBoundingGeometry(bloc).translated(contentOffset()).top();
     int bas = haut + (int)blockBoundingRect(bloc).height();
     while (bloc.isValid() && haut <= evenement->rect().bottom()) {
         if (bloc.isVisible() && bas >= evenement->rect().top()) {
-            peintre.setPen(QColor("#909090"));
+            peintre.setPen(theme::numeroLigne());
             peintre.drawText(0, haut, marge_->width() - 6, fontMetrics().height(),
                              Qt::AlignRight, QString::number(numero + 1));
         }
@@ -174,6 +187,87 @@ void Editeur::peindreMarge(QPaintEvent* evenement) {
         bas = haut + (int)blockBoundingRect(bloc).height();
         ++numero;
     }
+}
+
+QString Editeur::indentationDe(const QString& ligne) const {
+    int k = 0;
+    while (k < ligne.size() && (ligne[k] == QLatin1Char(' ') || ligne[k] == QLatin1Char('\t')))
+        ++k;
+    return ligne.left(k);
+}
+
+void Editeur::keyPressEvent(QKeyEvent* evenement) {
+    if (evenement->key() == Qt::Key_Return || evenement->key() == Qt::Key_Enter) {
+        // Indentation automatique, comme MATLAB : la ligne suivante reprend
+        // l'indentation de la precedente, et gagne un cran apres un mot-cle
+        // qui ouvre un bloc.
+        QString ligne = textCursor().block().text();
+        QString marge = indentationDe(ligne);
+        static const QRegularExpression ouvrant(
+            QStringLiteral("^\\s*(if|for|while|switch|try|function|parfor|spmd|"
+                           "classdef|properties|methods|events|enumeration|else|"
+                           "elseif|case|otherwise|catch)\\b"));
+        if (ouvrant.match(ligne).hasMatch()) marge += QStringLiteral("    ");
+        QPlainTextEdit::keyPressEvent(evenement);
+        insertPlainText(marge);
+        return;
+    }
+    if (evenement->key() == Qt::Key_Tab && textCursor().hasSelection()) {
+        // Tab sur une selection indente le bloc, il ne l'efface pas.
+        QTextCursor c = textCursor();
+        int debut = c.selectionStart(), fin = c.selectionEnd();
+        c.setPosition(debut);
+        int premier = c.blockNumber();
+        c.setPosition(fin);
+        int dernier = c.blockNumber();
+        c.beginEditBlock();
+        for (int b = premier; b <= dernier; ++b) {
+            QTextCursor l(document()->findBlockByNumber(b));
+            l.insertText(QStringLiteral("    "));
+        }
+        c.endEditBlock();
+        return;
+    }
+    QPlainTextEdit::keyPressEvent(evenement);
+}
+
+void Editeur::commenter() {
+    QTextCursor c = textCursor();
+    int debut = c.selectionStart(), fin = c.selectionEnd();
+    c.setPosition(debut);
+    int premier = c.blockNumber();
+    c.setPosition(fin);
+    int dernier = c.blockNumber();
+    c.beginEditBlock();
+    for (int b = premier; b <= dernier; ++b) {
+        QTextCursor l(document()->findBlockByNumber(b));
+        l.insertText(QStringLiteral("% "));
+    }
+    c.endEditBlock();
+}
+
+void Editeur::decommenter() {
+    QTextCursor c = textCursor();
+    int debut = c.selectionStart(), fin = c.selectionEnd();
+    c.setPosition(debut);
+    int premier = c.blockNumber();
+    c.setPosition(fin);
+    int dernier = c.blockNumber();
+    c.beginEditBlock();
+    for (int b = premier; b <= dernier; ++b) {
+        QTextBlock bloc = document()->findBlockByNumber(b);
+        QString texte = bloc.text();
+        int p = 0;
+        while (p < texte.size() && texte[p].isSpace()) ++p;
+        if (p >= texte.size() || texte[p] != QLatin1Char('%')) continue;
+        int aRetirer = 1;
+        if (p + 1 < texte.size() && texte[p + 1] == QLatin1Char(' ')) aRetirer = 2;
+        QTextCursor l(bloc);
+        l.setPosition(bloc.position() + p);
+        l.setPosition(bloc.position() + p + aRetirer, QTextCursor::KeepAnchor);
+        l.removeSelectedText();
+    }
+    c.endEditBlock();
 }
 
 bool Editeur::chargerFichier(const QString& chemin) {

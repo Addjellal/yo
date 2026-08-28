@@ -205,6 +205,12 @@ maxNumCompThreads  Nombre de fils de calcul.
 memory  Memoire disponible.
 ```
 
+## `mexext`
+
+```
+mexext  Extension des fichiers MEX de cette plateforme.
+```
+
 ## `mfilename`
 
 ```

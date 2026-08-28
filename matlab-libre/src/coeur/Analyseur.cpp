@@ -10,11 +10,17 @@
 
 namespace matlibre {
 
-// Fonctions qui acceptent la syntaxe « commande » : « hold on » plutôt que
-// « hold('on') ». MATLAB l'autorise pour n'importe quelle fonction, mais
-// seulement quand le nom n'est pas une variable ; comme l'analyseur ignore
-// les variables, on s'en tient à la liste des fonctions où l'usage est
-// répandu. Tout le reste s'écrit avec des parenthèses.
+// La syntaxe « commande » — « hold on » plutôt que « hold('on') » — vaut
+// en MATLAB pour N'IMPORTE QUELLE fonction, pas pour une liste choisie :
+// « cvx_begin sdp », « maFonction argument » s'écrivent ainsi. La règle
+// est syntaxique, à une réserve près : le nom ne doit pas être une
+// variable, car « x -1 » soustrait quand x en est une et appelle
+// x('-1') sinon. L'analyseur retient donc les noms affectés au fil de la
+// lecture, comme le fait MATLAB.
+//
+// Cette liste-ci ne sert plus qu'aux quelques noms dont l'usage en
+// commande est si répandu qu'on l'accepte même après une affectation du
+// même nom — « hold on » après un « hold = ... » resterait une commande.
 static const std::set<std::string>& commandesConnues() {
     static const std::set<std::string> c = {
         "format", "clc", "clear", "close", "hold", "grid", "warning", "more",
@@ -212,21 +218,50 @@ void Analyseur::terminer(NoeudPtr n) {
 bool Analyseur::ressembleCommande() const {
     const Jeton& t = jeton();
     if (t.genre != Genre::Ident) return false;
-    if (!commandesConnues().count(t.texte)) return false;
+    // Une variable ne se commande pas : « x -1 » est une soustraction.
+    if (variablesVues_.count(t.texte) && !commandesConnues().count(t.texte)) return false;
     const Jeton& s = jeton(1);
     if (!s.espaceAvant) return false;
+
     if (s.genre == Genre::Ident || s.genre == Genre::Nombre) {
         const Jeton& u = jeton(2);
-        // « clear x » : commande.  « format = 3 » : affectation.
-        if (u.estOp("=") ) return false;
+        // « format = 3 » est une affectation ; « x == 3 » une comparaison,
+        // mais elle ne commence pas par un identifiant suivi d'un mot.
+        if (u.estOp("=")) return false;
+        // « f (x) » reste un appel : la parenthèse fait l'argument.
         if (u.estOp("(")) return false;
+        // « a b + c » n'a pas de sens en commande ; « a b, c » ni « a b; »
+        // en ont un, ce sont des séparateurs d'instruction. Un opérateur
+        // collé au mot — « clear -all » — reste dans le mot.
         if (u.genre == Genre::Operateur && u.texte != "," && u.texte != ";" &&
-            u.texte != "-" && u.texte != "*" && u.texte != "." && u.texte != "/")
+            !(u.espaceAvant == false))
             return false;
         return true;
     }
-    if (s.genre == Genre::Operateur && s.texte == "-" && !s.espaceApres) return true;
+    // « commande 'texte' » : le lexeur a pris l'apostrophe pour une
+    // transposition, faute de savoir que « commande » n'est pas une
+    // variable. Ici on le sait : elle ouvre une chaîne.
+    if (s.genre == Genre::Litteral || s.genre == Genre::LitteralChaine) return true;
+    if (s.genre == Genre::Operateur && s.texte == "'") return true;
+    // « f -option », « f +x », « f ~x » : l'opérateur collé au mot qui suit
+    // fait partie de l'argument. Avec une espace de part et d'autre, c'est
+    // une opération.
+    if (s.genre == Genre::Operateur && !s.espaceApres &&
+        (s.texte == "-" || s.texte == "+" || s.texte == "~" || s.texte == "@"))
+        return true;
     return false;
+}
+
+// Retient un nom affecté. Seul le nom compte : « a(3) = 1 » fait de « a »
+// une variable tout autant que « a = 1 ».
+void Analyseur::noterVariable(const NoeudPtr& cible) {
+    if (!cible) return;
+    if (cible->type == TypeN::Ident) {
+        variablesVues_.insert(cible->texte);
+        return;
+    }
+    if (cible->type == TypeN::Acces && !cible->enfants.empty())
+        noterVariable(cible->enfants[0]);
 }
 
 NoeudPtr Analyseur::instructionCommande() {
@@ -234,24 +269,59 @@ NoeudPtr Analyseur::instructionCommande() {
     n->ligne = jeton().ligne;
     n->texte = jeton().texte;
     avancer();
-    // Chaque mot jusqu'à la fin de l'instruction devient un argument texte.
-    std::string mot;
-    auto pousser = [&]() {
-        if (!mot.empty()) { n->noms.push_back(mot); mot.clear(); }
-    };
+
+    // Les arguments d'une commande ne sont pas des expressions : ce sont
+    // des mots, découpés sur les espaces, où l'apostrophe groupe. On
+    // reconstitue donc le texte de la ligne à partir des jetons, puis on le
+    // découpe soi-même — c'est ce que fait MATLAB, et c'est la seule façon
+    // d'accepter « f 'un texte' », que le lexeur découpe en apostrophe de
+    // transposition suivie de deux identifiants.
+    std::string ligne;
+    bool premier = true;
     while (!fini() && jeton().genre != Genre::NouvelleLigne && !jeton().estOp(";") &&
            !jeton().estOp(",")) {
         const Jeton& t = jeton();
-        if (t.espaceAvant) pousser();
-        if (t.genre == Genre::Litteral || t.genre == Genre::LitteralChaine)
-            mot += t.texte;
-        else if (t.genre == Genre::Nombre)
-            mot += t.texte;
-        else
-            mot += t.texte;
+        if (!premier && t.espaceAvant) ligne += ' ';
+        premier = false;
+        // Un littéral que le lexeur a su reconnaître a perdu ses
+        // apostrophes : on les lui rend, pour que le découpage qui suit le
+        // traite comme les autres.
+        if (t.genre == Genre::Litteral || t.genre == Genre::LitteralChaine) {
+            ligne += '\'';
+            for (char c : t.texte) {
+                ligne += c;
+                if (c == '\'') ligne += c;
+            }
+            ligne += '\'';
+        } else {
+            ligne += t.texte;
+        }
         avancer();
     }
-    pousser();
+
+    std::string mot;
+    bool dansMot = false;
+    for (std::size_t k = 0; k < ligne.size(); ++k) {
+        char c = ligne[k];
+        if (c == ' ' || c == '\t') {
+            if (dansMot) { n->noms.push_back(mot); mot.clear(); dansMot = false; }
+            continue;
+        }
+        dansMot = true;
+        if (c != '\'') { mot += c; continue; }
+        // Une apostrophe ouvre un groupe : tout y entre tel quel jusqu'à la
+        // suivante, et « '' » y désigne une apostrophe.
+        ++k;
+        while (k < ligne.size()) {
+            if (ligne[k] == '\'') {
+                if (k + 1 < ligne.size() && ligne[k + 1] == '\'') { mot += '\''; k += 2; continue; }
+                break;
+            }
+            mot += ligne[k];
+            ++k;
+        }
+    }
+    if (dansMot) n->noms.push_back(mot);
     terminer(n);
     return n;
 }
@@ -312,6 +382,7 @@ NoeudPtr Analyseur::instruction() {
             n->ligne = ligne;
             n->cibles = {gauche};
             n->enfants = {bin};
+            noterVariable(gauche);
             terminer(n);
             return n;
         }
@@ -328,6 +399,7 @@ NoeudPtr Analyseur::instruction() {
         n->ligne = ligne;
         n->cibles = {gauche};
         n->enfants = {bin};
+        noterVariable(gauche);
         terminer(n);
         return n;
     }
@@ -346,6 +418,7 @@ NoeudPtr Analyseur::instruction() {
         for (auto& c : n->cibles) {
             if (c->type != TypeN::Ident && c->type != TypeN::Acces)
                 erreurSyntaxe("Invalid assignment target.");
+            noterVariable(c);
         }
         n->enfants = {valeur};
         terminer(n);
@@ -416,6 +489,7 @@ NoeudPtr Analyseur::instructionPour(bool parallele) {
     auto cible = postfixe();
     if (cible->type != TypeN::Ident && cible->type != TypeN::Acces)
         erreurSyntaxe("Invalid loop variable.");
+    noterVariable(cible);
     exigerOp("=");
     auto plageExpr = expression();
     if (paren) {
@@ -561,6 +635,14 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
         }
         exigerOp(")");
     }
+    // MATLAB analyse chaque fonction pour elle-meme : ses parametres sont
+    // des variables, et les variables de la fonction precedente ne le sont
+    // plus. Sans cette remise a zero, un nom affecte dans une fonction
+    // empecherait la syntaxe commande dans la suivante.
+    std::set<std::string> variablesEnglobantes;
+    variablesEnglobantes.swap(variablesVues_);
+    for (const auto& nom : f->entrees) variablesVues_.insert(nom);
+    for (const auto& nom : f->sorties) variablesVues_.insert(nom);
     f->corps = bloc({"function"});
     // Dans un fichier dont les fonctions sont fermées par « end », une
     // fonction écrite avant ce « end » est imbriquée : elle partage
@@ -575,6 +657,7 @@ std::shared_ptr<FonctionUtilisateur> Analyseur::definitionFonction() {
         }
     }
     if (motFin()) avancer();
+    variablesVues_.swap(variablesEnglobantes);
     return f;
 }
 

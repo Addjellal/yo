@@ -8,9 +8,9 @@
 // chaine de caracteres.
 #include <QApplication>
 #include <QDir>
+#include <QDockWidget>
 #include <QElapsedTimer>
 #include <QImage>
-#include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -23,7 +23,9 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "ConsoleCommandes.h"
 #include "Editeur.h"
+#include "Theme.h"
 #include "FenetrePrincipale.h"
 #include "Moteur.h"
 #include "VueFigure.h"
@@ -68,6 +70,7 @@ static bool envoyer(FenetrePrincipale& fenetre, const QString& commande) {
 int main(int argc, char** argv) {
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication application(argc, argv);
+    theme::appliquer();
 
     QTemporaryDir travail;
     if (travail.isValid()) QDir::setCurrent(travail.path());
@@ -77,13 +80,15 @@ int main(int argc, char** argv) {
     fenetre.resize(1280, 820);
     fenetre.show();
 
-    auto* console = fenetre.findChild<QPlainTextEdit*>();
-    auto* saisie = fenetre.findChild<QLineEdit*>();
+    auto* console = fenetre.findChild<ConsoleCommandes*>();
     auto* variables = fenetre.findChild<QTableWidget*>();
     verifier(console != nullptr, "la fenetre de commandes existe");
-    verifier(saisie != nullptr, "la ligne de commande existe");
     verifier(variables != nullptr, "l'espace de travail existe");
-    if (!console || !saisie || !variables) return 1;
+    if (!console || !variables) return 1;
+    // L'invite vit dans le texte, comme sous MATLAB : pas de ligne de
+    // saisie separee sous la console.
+    verifier(console->toPlainText().endsWith(QLatin1String(">> ")),
+             "l'invite est posee dans la fenetre de commandes elle-meme");
 
     // L'interpreteur demarre dans son fil ; on attend qu'il reponde.
     verifier(attendre([&] { return variables->rowCount() >= 0 && console->isVisible(); }),
@@ -187,6 +192,15 @@ int main(int argc, char** argv) {
         verifier(encreLarge > encre, "la figure se redessine quand on l'agrandit");
     }
 
+    // Les panneaux de droite doivent avoir une largeur utilisable : sans
+    // elle, leur titre lui-meme se reduit a « ... ».
+    for (QDockWidget* d : fenetre.findChildren<QDockWidget*>()) {
+        if (!d->isVisible()) continue;
+        verifier(d->width() >= 180,
+                 qPrintable(QStringLiteral("le panneau « %1 » a une largeur utilisable")
+                                .arg(d->windowTitle())));
+    }
+
     // --- l'editeur : coloration et numerotation ---------------------------
     auto* editeur = fenetre.findChild<Editeur*>();
     verifier(editeur != nullptr, "l'editeur existe");
@@ -207,7 +221,7 @@ int main(int argc, char** argv) {
             return false;
         };
         verifier(contientCouleur(0, QColor("#0000ff")), "« function » est colore en mot-cle");
-        verifier(contientCouleur(0, QColor("#028002")), "le commentaire est colore");
+        verifier(contientCouleur(0, QColor("#028009")), "le commentaire est colore");
         verifier(contientCouleur(1, QColor("#a020f0")), "la chaine 'texte' est coloree");
         // Le piege de la coloration MATLAB : dans « x' * 2 », l'apostrophe
         // transpose, elle n'ouvre pas une chaine. Rien ne doit etre colore

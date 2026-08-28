@@ -41,6 +41,13 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "^[A-Za-z][A-Za-z0-9_]*$" AND NOT CMAKE_BUILD_TY
     "    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release")
 endif()
 
+# Les bibliotheques ci-dessous sont des ACCELERATEURS, pas des dependances :
+# MatLibre a ses propres algorithmes pour tout ce qu'elles font, et les
+# resultats sont les memes. On note celles qui manquent pour les resumer en
+# une ligne a la fin, au lieu de quatre lignes qui ressemblent a des pannes.
+set(MATLIBRE_INTERNES)
+set(MATLIBRE_TROUVEES)
+
 option(MATLIBRE_AVEC_LAPACK "Utiliser LAPACK/BLAS si disponible" ON)
 option(MATLIBRE_AVEC_FFTW   "Utiliser FFTW si disponible"        ON)
 option(MATLIBRE_TESTS       "Construire les tests"               ON)
@@ -65,9 +72,9 @@ if(MATLIBRE_AVEC_LAPACK)
   if(LAPACK_FOUND)
     target_link_libraries(matlibre_coeur PUBLIC ${LAPACK_LIBRARIES})
     target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_LAPACK=1)
-    message(STATUS "MatLibre : LAPACK trouve, il servira aux grandes matrices")
+    list(APPEND MATLIBRE_TROUVEES "LAPACK/BLAS")
   else()
-    message(STATUS "MatLibre : pas de LAPACK, algebre lineaire interne")
+    list(APPEND MATLIBRE_INTERNES "LAPACK/BLAS")
   endif()
 endif()
 
@@ -78,9 +85,9 @@ if(MATLIBRE_AVEC_FFTW)
     target_link_libraries(matlibre_coeur PUBLIC ${FFTW3_LIB})
     target_include_directories(matlibre_coeur PUBLIC ${FFTW3_INC})
     target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_FFTW=1)
-    message(STATUS "MatLibre : FFTW trouve")
+    list(APPEND MATLIBRE_TROUVEES "FFTW")
   else()
-    message(STATUS "MatLibre : pas de FFTW, transformee interne")
+    list(APPEND MATLIBRE_INTERNES "FFTW")
   endif()
 endif()
 
@@ -122,9 +129,9 @@ if(MATLIBRE_AVEC_SUITESPARSE)
     target_link_libraries(matlibre_coeur PUBLIC ${UMFPACK_LIB})
     target_include_directories(matlibre_coeur PUBLIC ${UMFPACK_INC})
     target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_SUITESPARSE=1)
-    message(STATUS "MatLibre : SuiteSparse trouve, il servira aux grands systemes creux")
+    list(APPEND MATLIBRE_TROUVEES "SuiteSparse")
   else()
-    message(STATUS "MatLibre : pas de SuiteSparse, solveur creux interne")
+    list(APPEND MATLIBRE_INTERNES "SuiteSparse")
   endif()
 endif()
 
@@ -134,10 +141,23 @@ if(MATLIBRE_AVEC_OPENCV)
     target_link_libraries(matlibre_coeur PUBLIC ${OpenCV_LIBS})
     target_include_directories(matlibre_coeur PUBLIC ${OpenCV_INCLUDE_DIRS})
     target_compile_definitions(matlibre_coeur PUBLIC MATLIBRE_OPENCV=1)
-    message(STATUS "MatLibre : OpenCV trouve, lecture et ecriture d'images elargies")
+    list(APPEND MATLIBRE_TROUVEES "OpenCV")
   else()
-    message(STATUS "MatLibre : pas d'OpenCV, lecture d'images interne (PGM, PPM, BMP)")
+    list(APPEND MATLIBRE_INTERNES "OpenCV")
   endif()
+endif()
+
+# --- resume des accelerateurs -------------------------------------------------
+if(MATLIBRE_TROUVEES)
+  list(JOIN MATLIBRE_TROUVEES ", " MATLIBRE_TEXTE_TROUVEES)
+  message(STATUS "MatLibre : acceleree par ${MATLIBRE_TEXTE_TROUVEES}")
+endif()
+if(MATLIBRE_INTERNES)
+  list(JOIN MATLIBRE_INTERNES ", " MATLIBRE_TEXTE_INTERNES)
+  message(STATUS
+    "MatLibre : ${MATLIBRE_TEXTE_INTERNES} absente(s) — les algorithmes internes "
+    "prennent le relais, rien ne manque a l'execution. Ces bibliotheques ne font "
+    "qu'accelerer les gros calculs.")
 endif()
 
 # --- bureau natif (facultatif : le reste se compile et se teste sans Qt) ------
@@ -194,7 +214,9 @@ if(MATLIBRE_BUREAU)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetrePrincipale.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Editeur.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/VueFigure.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Moteur.cpp)
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Moteur.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/ConsoleCommandes.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Theme.cpp)
     target_link_libraries(matlibre_bureau PUBLIC matlibre_coeur Qt6::Widgets)
     target_include_directories(matlibre_bureau PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau)
 

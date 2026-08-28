@@ -8,6 +8,7 @@
 #include <QFileInfo>
 
 #include "FenetrePrincipale.h"
+#include "Theme.h"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -43,6 +44,7 @@ int main(int argc, char** argv) {
     QApplication application(argc, argv);
     application.setApplicationName(QStringLiteral("MatLibre"));
     application.setOrganizationName(QStringLiteral("MatLibre"));
+    theme::appliquer();
     poserRacineToolbox(QString::fromLocal8Bit(argv[0]));
 
     FenetrePrincipale fenetre;

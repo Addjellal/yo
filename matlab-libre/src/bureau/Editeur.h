@@ -41,8 +41,14 @@ public:
     bool chargerFichier(const QString& chemin);
     bool enregistrerFichier(const QString& chemin);
 
+    // Commente ou décommente les lignes sélectionnées : Ctrl-R et Ctrl-T,
+    // les raccourcis de MATLAB.
+    void commenter();
+    void decommenter();
+
 protected:
     void resizeEvent(QResizeEvent* evenement) override;
+    void keyPressEvent(QKeyEvent* evenement) override;
 
 private slots:
     void ajusterMarge();
@@ -50,6 +56,8 @@ private slots:
     void surlignerLigneCourante();
 
 private:
+    QString indentationDe(const QString& ligne) const;
+
     QWidget* marge_;
     ColorationMatlab* coloration_;
     QString fichier_;

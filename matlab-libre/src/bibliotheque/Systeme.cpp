@@ -550,6 +550,22 @@ FONCTION(fnIde) {
     return {};
 }
 
+// mexext : l'extension d'un fichier MEX sur cette plateforme. MatLibre ne
+// compile pas de MEX, mais la fonction existe et rend la bonne extension —
+// beaucoup de toolboxes s'en servent pour composer un chemin, et sans elle
+// leur script d'installation s'arrete des la premiere ligne.
+FONCTION(fnMexext) {
+    INUTILISE
+    (void)args;
+#if defined(_WIN32)
+    return {Valeur::texte("mexw64")};
+#elif defined(__APPLE__)
+    return {Valeur::texte("mexmaci64")};
+#else
+    return {Valeur::texte("mexa64")};
+#endif
+}
+
 FONCTION(fnHelp) {
     INUTILISE
     if (args.empty()) {
@@ -743,6 +759,8 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("unix", fnSystem, "systeme", "unix  Execute une commande du systeme.");
     it.enregistrer("dos", fnSystem, "systeme", "dos  Execute une commande du systeme.");
     it.enregistrer("computer", fnComputer, "systeme", "computer  Plateforme d'execution.");
+    it.enregistrer("mexext", fnMexext, "systeme",
+                   "mexext  Extension des fichiers MEX de cette plateforme.");
     it.enregistrer("version", fnVersion, "systeme", "version  Version de l'interpreteur.");
     it.enregistrer("ver", fnVer, "systeme", "ver  Version detaillee.");
     it.enregistrer("ide", fnIde, "systeme",

@@ -12,12 +12,12 @@
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QScrollBar>
+#include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTabWidget>
@@ -26,43 +26,13 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "ConsoleCommandes.h"
 #include "Editeur.h"
+#include "Theme.h"
 #include "VueFigure.h"
 #include "matlibre/Version.h"
 
-namespace {
 
-// La ligne de commande : flèches haut et bas rappellent l'historique,
-// comme à l'invite de MATLAB.
-class LigneCommande : public QLineEdit {
-public:
-    LigneCommande(QVector<QString>* historique, int* index, QWidget* parent)
-        : QLineEdit(parent), historique_(historique), index_(index) {}
-
-protected:
-    void keyPressEvent(QKeyEvent* evenement) override {
-        if (evenement->key() == Qt::Key_Up || evenement->key() == Qt::Key_Down) {
-            if (historique_->isEmpty()) return;
-            if (evenement->key() == Qt::Key_Up) {
-                if (*index_ < 0) *index_ = historique_->size() - 1;
-                else if (*index_ > 0) --(*index_);
-            } else {
-                if (*index_ >= 0 && *index_ < historique_->size() - 1) ++(*index_);
-                else { *index_ = -1; clear(); return; }
-            }
-            setText(historique_->at(*index_));
-            return;
-        }
-        *index_ = -1;
-        QLineEdit::keyPressEvent(evenement);
-    }
-
-private:
-    QVector<QString>* historique_;
-    int* index_;
-};
-
-}  // namespace
 
 FenetrePrincipale::FenetrePrincipale() {
     setWindowTitle(QStringLiteral("MatLibre %1").arg(QLatin1String(MATLIBRE_VERSION)));
@@ -84,12 +54,21 @@ FenetrePrincipale::FenetrePrincipale() {
     construirePanneaux();
     construireMenus();
 
+    etiquetteDossier_ = new QLabel;
+    statusBar()->addWidget(etiquetteDossier_, 1);
     etat_ = new QLabel(QStringLiteral("prêt"));
     statusBar()->addPermanentWidget(etat_);
 
+    // La disposition des panneaux et la taille de la fenêtre se retrouvent
+    // d'une session à l'autre : c'est ce qu'on attend d'un bureau.
+    QSettings reglages;
+    restoreGeometry(reglages.value(QStringLiteral("fenetre/geometrie")).toByteArray());
+    restoreState(reglages.value(QStringLiteral("fenetre/etat")).toByteArray());
+
     filMoteur_->start();
     nouveauFichier();
-    saisie_->setFocus();
+    console_->poserInvite();
+    console_->setFocus();
 }
 
 FenetrePrincipale::~FenetrePrincipale() {
@@ -98,10 +77,13 @@ FenetrePrincipale::~FenetrePrincipale() {
 }
 
 void FenetrePrincipale::construirePanneaux() {
-    // --- centre : éditeur au-dessus, fenêtre de commandes en dessous ---
+    // --- centre : l'éditeur au-dessus, la fenêtre de commandes en dessous.
+    // Les proportions sont celles de MATLAB : l'éditeur occupe les deux
+    // tiers, la console le reste.
     onglets_ = new QTabWidget;
     onglets_->setTabsClosable(true);
     onglets_->setDocumentMode(true);
+    onglets_->setMovable(true);
     connect(onglets_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget* w = onglets_->widget(index);
         onglets_->removeTab(index);
@@ -109,35 +91,20 @@ void FenetrePrincipale::construirePanneaux() {
         if (onglets_->count() == 0) nouveauFichier();
     });
 
-    console_ = new QPlainTextEdit;
-    console_->setReadOnly(true);
-    QFont fixe = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    fixe.setPointSize(11);
-    console_->setFont(fixe);
-    console_->setStyleSheet(QStringLiteral("background:#ffffff;"));
-
-    saisie_ = new LigneCommande(&commandesPassees_, &indexHistorique_, nullptr);
-    saisie_->setFont(fixe);
-    saisie_->setFrame(false);
-    connect(saisie_, &QLineEdit::returnPressed, this, &FenetrePrincipale::validerCommande);
-
-    auto* barreSaisie = new QWidget;
-    auto* dispositionSaisie = new QHBoxLayout(barreSaisie);
-    dispositionSaisie->setContentsMargins(6, 2, 6, 4);
-    auto* invite = new QLabel(QStringLiteral(">>"));
-    invite->setFont(fixe);
-    dispositionSaisie->addWidget(invite);
-    dispositionSaisie->addWidget(saisie_, 1);
-
-    auto* boiteCommandes = new QWidget;
-    auto* dispositionCommandes = new QVBoxLayout(boiteCommandes);
-    dispositionCommandes->setContentsMargins(0, 0, 0, 0);
-    dispositionCommandes->setSpacing(0);
-    dispositionCommandes->addWidget(console_, 1);
-    dispositionCommandes->addWidget(barreSaisie);
+    console_ = new ConsoleCommandes;
+    connect(console_, &ConsoleCommandes::commandeValidee, this,
+            [this](const QString& commande) {
+                historique_->addItem(commande);
+                historique_->scrollToBottom();
+                occupe_ = true;
+                etat_->setText(QStringLiteral("occupé"));
+                QMetaObject::invokeMethod(moteur_, "executer", Qt::QueuedConnection,
+                                          Q_ARG(QString, commande));
+            });
 
     ongletsFigures_ = new QTabWidget;
     ongletsFigures_->setTabsClosable(true);
+    ongletsFigures_->setDocumentMode(true);
     connect(ongletsFigures_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         QWidget* w = ongletsFigures_->widget(index);
         ongletsFigures_->removeTab(index);
@@ -145,18 +112,33 @@ void FenetrePrincipale::construirePanneaux() {
     });
 
     auto* centreHaut = new QTabWidget;
+    centreHaut->setDocumentMode(true);
     centreHaut->addTab(onglets_, QStringLiteral("Éditeur"));
     centreHaut->addTab(ongletsFigures_, QStringLiteral("Figures"));
 
+    // La console porte son titre, comme un panneau de MATLAB.
+    auto* boiteConsole = new QWidget;
+    auto* dispositionConsole = new QVBoxLayout(boiteConsole);
+    dispositionConsole->setContentsMargins(0, 0, 0, 0);
+    dispositionConsole->setSpacing(0);
+    auto* titreConsole = new QLabel(QStringLiteral("  Fenêtre de commandes"));
+    titreConsole->setStyleSheet(
+        QStringLiteral("background:%1; padding:5px 4px; border-bottom:1px solid %2;")
+            .arg(theme::titrePanneau().name(), theme::bordure().name()));
+    dispositionConsole->addWidget(titreConsole);
+    dispositionConsole->addWidget(console_, 1);
+
     auto* separateur = new QSplitter(Qt::Vertical);
     separateur->addWidget(centreHaut);
-    separateur->addWidget(boiteCommandes);
-    separateur->setStretchFactor(0, 3);
-    separateur->setStretchFactor(1, 2);
+    separateur->addWidget(boiteConsole);
+    separateur->setStretchFactor(0, 2);
+    separateur->setStretchFactor(1, 1);
+    separateur->setSizes({520, 260});
     setCentralWidget(separateur);
 
-    // --- panneaux latéraux ---
+    // --- panneaux, disposés comme le bureau de MATLAB ---------------------
     listeFichiers_ = new QListWidget;
+    listeFichiers_->setAlternatingRowColors(true);
     connect(listeFichiers_, &QListWidget::itemDoubleClicked, this,
             &FenetrePrincipale::ouvrirDepuisListe);
     auto* dockFichiers = new QDockWidget(QStringLiteral("Dossier courant"), this);
@@ -172,18 +154,47 @@ void FenetrePrincipale::construirePanneaux() {
     tableVariables_->verticalHeader()->setVisible(false);
     tableVariables_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tableVariables_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tableVariables_->setAlternatingRowColors(true);
+    tableVariables_->setShowGrid(false);
+    // Double-clic sur une variable : elle s'affiche dans la console, comme
+    // le fait MATLAB quand on ouvre une variable.
+    connect(tableVariables_, &QTableWidget::itemDoubleClicked, this,
+            [this](QTableWidgetItem* item) {
+                QTableWidgetItem* nom = tableVariables_->item(item->row(), 0);
+                if (nom) envoyer(nom->text());
+            });
     auto* dockVariables = new QDockWidget(QStringLiteral("Espace de travail"), this);
     dockVariables->setWidget(tableVariables_);
     dockVariables->setObjectName(QStringLiteral("dockVariables"));
     addDockWidget(Qt::RightDockWidgetArea, dockVariables);
 
     historique_ = new QListWidget;
+    historique_->setAlternatingRowColors(true);
     connect(historique_, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem* item) { envoyer(item->text()); });
     auto* dockHistorique = new QDockWidget(QStringLiteral("Historique des commandes"), this);
     dockHistorique->setWidget(historique_);
     dockHistorique->setObjectName(QStringLiteral("dockHistorique"));
     addDockWidget(Qt::RightDockWidgetArea, dockHistorique);
+    // L'espace de travail occupe le haut, l'historique le bas — MATLAB.
+    // Les largeurs comptent autant que les hauteurs : sans elles, Qt donne
+    // aux panneaux de droite la largeur de leur contenu minimal, et leur
+    // titre lui-meme se retrouve reduit a « ... ».
+    listeFichiers_->setMinimumWidth(180);
+    tableVariables_->setMinimumWidth(260);
+    historique_->setMinimumWidth(260);
+    resizeDocks({dockVariables, dockHistorique}, {520, 260}, Qt::Vertical);
+    resizeDocks({dockFichiers, dockVariables, dockHistorique}, {240, 330, 330},
+                Qt::Horizontal);
+    // Les colonnes de l'espace de travail : « Valeur » prend la place qui
+    // reste, les trois autres celle qu'il leur faut.
+    tableVariables_->horizontalHeader()->setSectionResizeMode(
+        0, QHeaderView::ResizeToContents);
+    tableVariables_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    tableVariables_->horizontalHeader()->setSectionResizeMode(
+        2, QHeaderView::ResizeToContents);
+    tableVariables_->horizontalHeader()->setSectionResizeMode(
+        3, QHeaderView::ResizeToContents);
 }
 
 void FenetrePrincipale::construireMenus() {
@@ -221,7 +232,14 @@ void FenetrePrincipale::construireMenus() {
         if (Editeur* e = editeurCourant()) e->paste();
     });
     edition->addSeparator();
-    edition->addAction(QStringLiteral("Effacer la fenêtre de commandes"), this,
+    // Ctrl-R et Ctrl-T : les raccourcis de MATLAB pour commenter.
+    edition->addAction(QStringLiteral("Co&mmenter"), QKeySequence(QStringLiteral("Ctrl+R")),
+                       this, &FenetrePrincipale::commenterSelection);
+    edition->addAction(QStringLiteral("Dé&commenter"), QKeySequence(QStringLiteral("Ctrl+T")),
+                       this, &FenetrePrincipale::decommenterSelection);
+    edition->addSeparator();
+    edition->addAction(QStringLiteral("Effacer la fenêtre de commandes"),
+                       QKeySequence(QStringLiteral("Ctrl+L")), this,
                        &FenetrePrincipale::effacerCommandes);
 
     QMenu* executer = menuBar()->addMenu(QStringLiteral("E&xécuter"));
@@ -236,15 +254,28 @@ void FenetrePrincipale::construireMenus() {
     aide->addAction(QStringLiteral("À propos de MatLibre"), this,
                     &FenetrePrincipale::aPropos);
 
+    QMenu* affichage = menuBar()->addMenu(QStringLiteral("&Affichage"));
+    affichage->addAction(QStringLiteral("Rétablir la disposition par défaut"), this, [this] {
+        for (QDockWidget* d : findChildren<QDockWidget*>()) d->show();
+        QSettings().remove(QStringLiteral("fenetre/etat"));
+    });
+
     QToolBar* barre = addToolBar(QStringLiteral("Principale"));
     barre->setObjectName(QStringLiteral("barrePrincipale"));
     barre->setMovable(false);
+    barre->setToolButtonStyle(Qt::ToolButtonTextOnly);
     barre->addAction(aNouveau);
     barre->addAction(aOuvrir);
     barre->addAction(aEnregistrer);
     barre->addSeparator();
     barre->addAction(aExecuter);
     barre->addAction(aSelection);
+    barre->addSeparator();
+    barre->addAction(QStringLiteral("Effacer les variables"), this, [this] {
+        envoyer(QStringLiteral("clear"));
+    });
+    barre->addAction(QStringLiteral("Effacer la console"), this,
+                     &FenetrePrincipale::effacerCommandes);
 }
 
 Editeur* FenetrePrincipale::editeurCourant() const {
@@ -351,48 +382,35 @@ void FenetrePrincipale::executerSelection() {
     if (!texte.trimmed().isEmpty()) envoyer(texte);
 }
 
-void FenetrePrincipale::validerCommande() {
-    QString commande = saisie_->text();
-    if (commande.trimmed().isEmpty()) return;
-    saisie_->clear();
-    envoyer(commande);
-}
-
+// Envoyer une commande depuis ailleurs que la console — un double-clic
+// dans l'historique, F5 sur un script — passe par le même chemin : la
+// commande s'écrit à l'invite, puis part.
 void FenetrePrincipale::envoyer(const QString& commande) {
     if (occupe_) {
         ecrire(QStringLiteral("MatLibre est occupé ; attendez la fin du calcul.\n"),
-               QStringLiteral("#b06000"));
+               theme::avertissement().name());
         return;
     }
-    ecrire(QStringLiteral(">> ") + commande + QLatin1Char('\n'), QStringLiteral("#000080"));
-    commandesPassees_.push_back(commande);
-    indexHistorique_ = -1;
-    historique_->addItem(commande);
-    historique_->scrollToBottom();
-    occupe_ = true;
-    etat_->setText(QStringLiteral("occupé"));
-    QMetaObject::invokeMethod(moteur_, "executer", Qt::QueuedConnection,
-                              Q_ARG(QString, commande));
+    console_->poserInvite();
+    console_->insertPlainText(commande);
+    QKeyEvent entree(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+    QCoreApplication::sendEvent(console_, &entree);
 }
 
 void FenetrePrincipale::ecrire(const QString& texte, const QString& couleur) {
-    QTextCharFormat format;
-    format.setForeground(couleur.isEmpty() ? QColor("#101010") : QColor(couleur));
-    QTextCursor curseur = console_->textCursor();
-    curseur.movePosition(QTextCursor::End);
-    curseur.insertText(texte, format);
-    console_->setTextCursor(curseur);
-    console_->verticalScrollBar()->setValue(console_->verticalScrollBar()->maximum());
+    console_->ecrireSortie(texte, couleur.isEmpty() ? theme::texte() : QColor(couleur));
 }
 
 void FenetrePrincipale::surSortie(const QString& texte) {
-    ecrire(texte, texte.startsWith(QStringLiteral("Error")) ? QStringLiteral("#c00000")
-                                                            : QString());
+    const bool estErreur = texte.contains(QStringLiteral("Error:")) ||
+                           texte.startsWith(QStringLiteral("Error"));
+    console_->ecrireSortie(texte, estErreur ? theme::erreur() : theme::texte());
 }
 
 void FenetrePrincipale::surCommandeFinie() {
     occupe_ = false;
     etat_->setText(QStringLiteral("prêt"));
+    console_->poserInvite();
 }
 
 void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lignes) {
@@ -403,7 +421,6 @@ void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lign
         tableVariables_->setItem(k, 2, new QTableWidgetItem(lignes[k].taille));
         tableVariables_->setItem(k, 3, new QTableWidgetItem(lignes[k].classe));
     }
-    tableVariables_->resizeColumnsToContents();
 }
 
 void FenetrePrincipale::surFigures(const QVector<FigureCopiee>& figures) {
@@ -423,8 +440,10 @@ void FenetrePrincipale::surFigures(const QVector<FigureCopiee>& figures) {
 
 void FenetrePrincipale::surDossier(const QString& chemin) {
     dossierCourant_ = chemin;
-    setWindowTitle(QStringLiteral("MatLibre %1 — %2")
-                       .arg(QLatin1String(MATLIBRE_VERSION), chemin));
+    // Le titre porte le nom du produit, pas un chemin de trois lignes : le
+    // dossier courant a sa place dans la barre d'etat, comme sous MATLAB.
+    setWindowTitle(QStringLiteral("MatLibre %1").arg(QLatin1String(MATLIBRE_VERSION)));
+    etiquetteDossier_->setText(QStringLiteral("  ") + QDir::toNativeSeparators(chemin));
     rafraichirListeFichiers();
 }
 
@@ -448,7 +467,15 @@ void FenetrePrincipale::changerDossierParDialogue() {
                               Q_ARG(QString, chemin));
 }
 
-void FenetrePrincipale::effacerCommandes() { console_->clear(); }
+void FenetrePrincipale::effacerCommandes() { console_->effacer(); }
+
+void FenetrePrincipale::commenterSelection() {
+    if (Editeur* e = editeurCourant()) e->commenter();
+}
+
+void FenetrePrincipale::decommenterSelection() {
+    if (Editeur* e = editeurCourant()) e->decommenter();
+}
 
 void FenetrePrincipale::aPropos() {
     QMessageBox::about(
@@ -463,6 +490,9 @@ void FenetrePrincipale::aPropos() {
 }
 
 void FenetrePrincipale::closeEvent(QCloseEvent* evenement) {
+    QSettings reglages;
+    reglages.setValue(QStringLiteral("fenetre/geometrie"), saveGeometry());
+    reglages.setValue(QStringLiteral("fenetre/etat"), saveState());
     for (int k = 0; k < onglets_->count(); ++k) {
         auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
         if (!e || !e->document()->isModified()) continue;

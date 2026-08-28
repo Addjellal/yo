@@ -7,7 +7,6 @@
 #include "Moteur.h"
 
 class QAction;
-class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
 class QTabWidget;
@@ -15,6 +14,7 @@ class QTableWidget;
 class QThread;
 class QLabel;
 class Editeur;
+class ConsoleCommandes;
 class VueFigure;
 
 class FenetrePrincipale : public QMainWindow {
@@ -41,7 +41,6 @@ private slots:
     void enregistrerSous();
     void executerScript();
     void executerSelection();
-    void validerCommande();
     void surSortie(const QString& texte);
     void surEspaceTravail(const QVector<LigneEspaceTravail>& lignes);
     void surFigures(const QVector<FigureCopiee>& figures);
@@ -50,6 +49,8 @@ private slots:
     void changerDossierParDialogue();
     void ouvrirDepuisListe();
     void effacerCommandes();
+    void commenterSelection();
+    void decommenterSelection();
     void aPropos();
 
 private:
@@ -64,15 +65,13 @@ private:
     Moteur* moteur_;
 
     QTabWidget* onglets_;
-    QPlainTextEdit* console_;
-    QLineEdit* saisie_;
+    ConsoleCommandes* console_;
     QTableWidget* tableVariables_;
     QListWidget* listeFichiers_;
     QListWidget* historique_;
     QTabWidget* ongletsFigures_;
     QLabel* etat_;
+    QLabel* etiquetteDossier_;
     QString dossierCourant_;
-    QVector<QString> commandesPassees_;
-    int indexHistorique_ = -1;
     bool occupe_ = false;
 };
