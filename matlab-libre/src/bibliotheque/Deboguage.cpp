@@ -5,7 +5,9 @@
 // de vrais points d'arrêt : l'exécution s'interrompt, on inspecte l'espace
 // de travail, on avance pas à pas.
 #include <algorithm>
+#include <cctype>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
 #include "matlibre/Affichage.h"

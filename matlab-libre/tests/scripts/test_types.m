@@ -278,4 +278,119 @@ assert(isequal(matlab.lang.makeUniqueStrings({'a', 'a'}), {'a', 'a_1'}));
 assert(isvarname('abc'));
 assert(~isvarname('2a'));
 
+%% ------------------------------------------- remise en forme des tables
+% stack empile plusieurs variables en une, avec une colonne indicatrice.
+tableLarge = table([1; 2], [10; 20], [100; 200], 'VariableNames', {'a', 'b', 'c'});
+[tableHaute, indicesSources] = stack(tableLarge, {'b', 'c'});
+assert(height(tableHaute) == 4 && width(tableHaute) == 3);
+assert(isequal(tableHaute.Properties.VariableNames, {'a', 'Indicator', 'Value'}));
+assert(isequal(tableHaute.Value', [10 100 20 200]));
+assert(isequal(indicesSources', [1 1 2 2]));
+assert(isequal(tableHaute.a', [1 1 2 2]));
+% Les noms sont réglables, et unstack refait la table de départ.
+tableNommee = stack(tableLarge, {'b', 'c'}, ...
+                    'NewDataVariableName', 'valeur', 'IndexVariableName', 'quoi');
+tableRefaite = unstack(tableNommee, 'valeur', 'quoi');
+assert(height(tableRefaite) == 2);
+assert(isequal(tableRefaite.Properties.VariableNames, {'a', 'b', 'c'}));
+assert(isequal(tableRefaite.b', [10 20]) && isequal(tableRefaite.c', [100 200]));
+% unstack seul, sur une table déjà haute.
+tableEmpilee = table([1; 1; 2; 2], {'b'; 'c'; 'b'; 'c'}, [10; 100; 20; 200], ...
+                     'VariableNames', {'g', 'quoi', 'v'});
+tableEtalee = unstack(tableEmpilee, 'v', 'quoi');
+assert(height(tableEtalee) == 2);
+assert(isequal(tableEtalee.b', [10 20]));
+% Deux valeurs dans la même case : il faut une fonction d'agrégation.
+tableDouble = table([1; 1], {'b'; 'b'}, [10; 20], 'VariableNames', {'g', 'quoi', 'v'});
+erreurAttrapee = false;
+try
+    unstack(tableDouble, 'v', 'quoi');
+catch
+    erreurAttrapee = true;
+end
+assert(erreurAttrapee);
+assert(unstack(tableDouble, 'v', 'quoi', 'AggregationFunction', @sum).b == 30);
+% rows2vars transpose.
+tableTransposee = rows2vars(table([1; 2], [3; 4], 'VariableNames', {'a', 'b'}));
+assert(isequal(tableTransposee.Properties.VariableNames, ...
+               {'OriginalVariableNames', 'Var1', 'Var2'}));
+assert(isequal(tableTransposee.Var1', [1 3]));
+% mergevars réunit, splitvars sépare.
+tableFusionnee = mergevars(tableLarge, {'a', 'b'});
+assert(isequal(size(tableFusionnee.a), [2 2]));
+assert(isequal(tableFusionnee.Properties.VariableNames, {'a', 'c'}));
+tableSeparee = splitvars(tableFusionnee);
+assert(isequal(tableSeparee.Properties.VariableNames, {'a_1', 'a_2', 'c'}));
+assert(isequal(splitvars(table([1 2; 3 4], 'VariableNames', {'ab'})).Properties.VariableNames, ...
+               {'ab_1', 'ab_2'}));
+
+%% ---------------------------------------------- sélecteurs d'indexation
+% timerange choisit des lignes par période, avec les quatre bornes.
+tableTemporelle = timetable(seconds([1; 2; 3; 4]), (10:10:40)');
+assert(isequal(tableTemporelle(timerange(seconds(2), seconds(4)), :).Var1', [20 30]));
+assert(isequal(tableTemporelle(timerange(seconds(2), seconds(4), 'closed'), :).Var1', [20 30 40]));
+assert(isequal(tableTemporelle(timerange(seconds(2), seconds(4), 'open'), :).Var1', 30));
+assert(isequal(tableTemporelle(timerange(seconds(2), seconds(4), 'openleft'), :).Var1', [30 40]));
+% withtol retrouve un instant à une tolérance près.
+assert(isequal(tableTemporelle(withtol(seconds(2.05), seconds(0.1)), :).Var1', 20));
+assert(isequal(tableTemporelle(withtol(seconds([1.02; 3.05]), seconds(0.1)), :).Var1', [10 30]));
+assert(height(tableTemporelle(withtol(seconds(2.5), seconds(0.1)), :)) == 0);
+% vartype choisit des variables par type.
+tableMelangee = table([1; 2], {'a'; 'b'}, true(2, 1), ...
+                      'VariableNames', {'n', 'lettre', 'vrai'});
+assert(isequal(tableMelangee(:, vartype('numeric')).Properties.VariableNames, {'n'}));
+assert(isequal(tableMelangee(:, vartype('cellstr')).Properties.VariableNames, {'lettre'}));
+assert(isequal(tableMelangee(:, vartype('logical')).Properties.VariableNames, {'vrai'}));
+assert(width(timetable(seconds([1; 2]), [1; 2], {'a'; 'b'})(:, vartype('numeric'))) == 1);
+
+%% --------------------------------------------------- fuseaux horaires
+% Décalage d'hiver et d'été, sur les deux hémisphères.
+assert(hours(tzoffset(datetime(2020, 1, 15, 'TimeZone', 'Europe/Paris'))) == 1);
+assert(hours(tzoffset(datetime(2020, 7, 15, 'TimeZone', 'Europe/Paris'))) == 2);
+assert(~isdst(datetime(2020, 1, 15, 'TimeZone', 'Europe/Paris')));
+assert(isdst(datetime(2020, 7, 15, 'TimeZone', 'Europe/Paris')));
+assert(hours(tzoffset(datetime(2020, 1, 15, 'TimeZone', 'America/New_York'))) == -5);
+assert(hours(tzoffset(datetime(2020, 7, 15, 'TimeZone', 'America/New_York'))) == -4);
+assert(hours(tzoffset(datetime(2020, 1, 15, 'TimeZone', 'Australia/Sydney'))) == 11);
+assert(hours(tzoffset(datetime(2020, 7, 15, 'TimeZone', 'Australia/Sydney'))) == 10);
+assert(hours(tzoffset(datetime(2020, 1, 1, 'TimeZone', 'Asia/Kolkata'))) == 5.5);
+% Les bascules de 2020, à la minute : 8 mars aux États-Unis, 29 mars en
+% Europe. L'heure qui se répète à l'automne compte pour l'heure d'été,
+% comme dans MATLAB.
+assert(~isdst(datetime(2020, 3, 8, 1, 59, 0, 'TimeZone', 'America/New_York')));
+assert(isdst(datetime(2020, 3, 8, 2, 0, 0, 'TimeZone', 'America/New_York')));
+assert(isdst(datetime(2020, 11, 1, 1, 59, 0, 'TimeZone', 'America/New_York')));
+assert(~isdst(datetime(2020, 11, 1, 2, 0, 0, 'TimeZone', 'America/New_York')));
+assert(~isdst(datetime(2020, 3, 29, 1, 59, 0, 'TimeZone', 'Europe/Paris')));
+assert(isdst(datetime(2020, 3, 29, 2, 0, 0, 'TimeZone', 'Europe/Paris')));
+assert(isdst(datetime(2020, 10, 25, 2, 59, 0, 'TimeZone', 'Europe/Paris')));
+assert(~isdst(datetime(2020, 10, 25, 3, 0, 0, 'TimeZone', 'Europe/Paris')));
+% Changer de fuseau décrit le même instant dans une autre heure locale.
+dateParis = datetime(2020, 1, 15, 12, 0, 0, 'TimeZone', 'Europe/Paris');
+dateUTC = dateParis;
+dateUTC.TimeZone = 'UTC';
+assert(hour(dateUTC) == 11 && minute(dateUTC) == 0 && second(dateUTC) == 0);
+dateNewYork = dateParis;
+dateNewYork.TimeZone = 'America/New_York';
+assert(hour(dateNewYork) == 6 && minute(dateNewYork) == 0);
+dateEte = datetime(2020, 7, 15, 12, 0, 0, 'TimeZone', 'Europe/Paris');
+dateTokyo = dateEte;
+dateTokyo.TimeZone = 'Asia/Tokyo';
+assert(hour(dateTokyo) == 19 && minute(dateTokyo) == 0 && second(dateTokyo) == 0);
+% Un décalage fixe est accepté, avec ses minutes.
+dateFixe = datetime(2020, 1, 1, 12, 0, 0, 'TimeZone', '+05:30');
+assert(hours(tzoffset(dateFixe)) == 5.5);
+dateFixe.TimeZone = 'UTC';
+assert(hour(dateFixe) == 6 && minute(dateFixe) == 30);
+% La table des fuseaux se consulte, et un nom inconnu est refusé.
+assert(height(timezones('Europe')) >= 20);
+assert(isequal(timezones.Properties.VariableNames, {'Name', 'UTCOffset', 'DSTRule'}));
+erreurFuseau = false;
+try
+    datetime(2020, 1, 1, 'TimeZone', 'Mars/Olympus');
+catch
+    erreurFuseau = true;
+end
+assert(erreurFuseau);
+
 disp('types : toutes les verifications passent');

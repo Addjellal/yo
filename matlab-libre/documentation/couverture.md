@@ -12,7 +12,7 @@ mieux le lire avant de s'appuyer dessus.
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
 - **612 fonctions natives** couvrant le MATLAB de base.
-- **1062 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1066 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -181,12 +181,17 @@ totalité.
 5. **Les types de données modernes sont là, mais partiellement.**
    `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
    `timetable`, `containers.Map` et `sparse` existent avec leurs
-   opérations courantes. Manquent : les fuseaux horaires réels de
-   `datetime` (la propriété `TimeZone` est conservée mais n'applique
-   aucun décalage), `stack`/`unstack`, `withtol`/`timerange`,
-   `groupsummary` sur plusieurs dimensions, la lecture de feuilles
-   Excel, et les tableaux creux logiques ou complexes creux au-delà du
-   stockage.
+   opérations courantes, y compris `stack`, `unstack`, `rows2vars`,
+   `mergevars`, `splitvars`, et les sélecteurs `timerange`, `withtol` et
+   `vartype`. Les fuseaux horaires de `datetime` appliquent un vrai
+   décalage : `tzoffset` et `isdst` répondent juste, changer de fuseau
+   décrit le même instant dans une autre heure locale, et l'heure qui se
+   répète à l'automne est rattachée à sa première occurrence, comme dans
+   MATLAB. Ce n'est pas la base IANA complète : soixante-quatre fuseaux,
+   les règles en vigueur depuis 2007, aucun changement historique — mais
+   n'importe quel décalage fixe écrit `+05:30` est accepté. Manquent :
+   la lecture de feuilles Excel, et les tableaux creux logiques ou
+   complexes creux au-delà du stockage.
 6. **Le calcul parallèle est réel, mais limité à une machine.** `parfor`,
    `spmd`, `parfeval`, `pararrayfun` et `parcellfun` répartissent le
    travail sur un pool de fils, chacun portant un interpréteur complet et

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"

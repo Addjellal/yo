@@ -1,9 +1,11 @@
 // TracesGraphiques.cpp — les fonctions de tracé du langage.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <memory>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"

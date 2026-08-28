@@ -1,6 +1,7 @@
 // Base.cpp — création de tableaux, tailles, classes et conversions.
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <random>
 #include <sstream>
 

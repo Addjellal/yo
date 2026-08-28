@@ -5,6 +5,7 @@
 // ne copie pas la table, et « n('a') = 1 » se voit depuis m.
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"

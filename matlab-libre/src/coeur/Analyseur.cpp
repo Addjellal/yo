@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <set>
 
 #include "matlibre/Erreur.h"

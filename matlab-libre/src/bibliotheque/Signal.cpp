@@ -4,6 +4,7 @@
 // deux, algorithme de Bluestein sinon — donc exacte pour toute longueur,
 // sans dépendance à FFTW.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <complex>
 #include <vector>

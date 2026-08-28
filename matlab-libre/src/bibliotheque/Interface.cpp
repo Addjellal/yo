@@ -9,6 +9,7 @@
 // pilotée en ligne de commande, ce qui la rend testable.
 #include <algorithm>
 #include <map>
+#include <memory>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"

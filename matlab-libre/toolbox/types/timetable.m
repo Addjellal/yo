@@ -365,6 +365,12 @@ classdef timetable
         function i = indicesLignes(tt, sujet)
             n = height(tt);
             if ischar(sujet) && strcmp(sujet, ':'), i = (1:n)'; return, end
+            % Sélecteurs de lignes : un intervalle de temps, ou des
+            % instants à tolérance près.
+            if isa(sujet, 'timerange') || isa(sujet, 'withtol')
+                i = lignesRetenues(sujet, tt.Temps);
+                return
+            end
             if islogical(sujet), i = find(sujet(:)); return, end
             if isnumeric(sujet), i = double(sujet(:)); return, end
             if isa(sujet, 'datetime') || isa(sujet, 'duration')
@@ -386,6 +392,10 @@ classdef timetable
 
         function j = indicesVariables(tt, vars)
             if ischar(vars) && strcmp(vars, ':'), j = 1:width(tt); return, end
+            if isa(vars, 'vartype')
+                j = variablesRetenues(vars, tt.Donnees);
+                return
+            end
             if isnumeric(vars), j = reshape(double(vars), 1, []); return, end
             if islogical(vars), j = reshape(find(vars), 1, []); return, end
             liste = table.enCellules(vars);

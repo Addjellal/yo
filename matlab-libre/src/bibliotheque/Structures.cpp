@@ -1,6 +1,7 @@
 // Structures.cpp — cellules, structures et conversions entre les deux.
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"

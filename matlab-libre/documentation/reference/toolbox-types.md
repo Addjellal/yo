@@ -30,6 +30,8 @@
 % Dates
 %   NaT               - Date manquante
 %   isdatetime, isnat - Tests
+%   timezones         - Table des fuseaux reconnus
+%   tzoffset, isdst   - Décalage du fuseau, heure d'été (méthodes)
 %   year, month, day, hour, minute, second - composantes (méthodes)
 %   quarter, week, weekday, isweekend, ymd, hms, timeofday - dérivées
 %   dateshift, between, caldiff, isbetween - déplacements et écarts
@@ -49,11 +51,17 @@
 %   addvars, removevars, movevars, renamevars, convertvars - variables
 %   varfun, rowfun, groupsummary          - calculs, groupés ou non
 %   join, innerjoin, outerjoin            - jointures par clé
+%   stack, unstack                        - passage large / haut
+%   rows2vars                             - transposition
+%   mergevars, splitvars                  - variables à plusieurs colonnes
+%   vartype                               - sélection de variables par type
 %
 % Tables temporelles
 %   table2timetable, timetable2table - conversions
 %   retime, synchronize              - ré-échantillonnage et réunion
 %   isregular, istimetable           - inspection
+%   timerange, withtol               - sélection de lignes par période ou
+%                       par proximité d'instant
 %
 % Outils internes
 %   appliquerReste, assignerReste - application d'une chaîne d'indexation
@@ -365,6 +373,29 @@ TABLE2TIMETABLE Convertit une table en timetable.
 TIME Partie horaire d'une durée de calendrier, sous forme de duration.
 ```
 
+## `timerange`
+
+```
+TIMERANGE Sélecteur de lignes d'une table temporelle, par intervalle.
+  S = TIMERANGE(DEBUT,FIN) désigne les lignes dont l'instant tombe dans
+  [DEBUT, FIN[. On s'en sert comme d'un indice :
+
+     tt(timerange(d1, d2), :)
+
+  S = TIMERANGE(DEBUT,FIN,TYPE) où TYPE vaut 'openright' (défaut),
+  'openleft', 'open' ou 'closed' choisit quelles bornes sont incluses.
+
+  L'intérêt est de ne pas avoir à connaître les instants exacts : on
+  décrit une période, et la table rend les lignes qui y tombent.
+
+  Exemple :
+     tt = timetable(seconds([1;2;3;4]), (10:10:40)');
+     s = tt(timerange(seconds(2), seconds(4)), :);
+     height(s)   % 2 : les instants 2 et 3
+
+  Voir aussi WITHTOL, VARTYPE, TIMETABLE.
+```
+
 ## `timetable`
 
 ```
@@ -386,6 +417,69 @@ TIMETABLE Table dont chaque ligne porte un instant ou une durée.
      height(tt)     % 3
 
   Voir aussi TABLE, RETIME, SYNCHRONIZE, TABLE2TIMETABLE.
+```
+
+## `timezones`
+
+```
+TIMEZONES Liste des fuseaux horaires reconnus.
+  T = TIMEZONES rend une table des fuseaux, de leur décalage d'hiver en
+  heures et de la règle d'heure d'été qu'ils suivent.
+  T = TIMEZONES(REGION) ne garde que les fuseaux dont le nom commence
+  par REGION, par exemple 'Europe' ou 'America'.
+
+  Ce n'est pas la base IANA complète : c'est une sélection des fuseaux
+  les plus employés, avec les règles en vigueur depuis 2007. Les
+  changements historiques ne sont pas suivis, et un décalage fixe écrit
+  '+02:00' est toujours accepté par DATETIME sans figurer ici.
+
+  Exemple :
+     height(timezones('Europe'))
+
+  Voir aussi DATETIME, TZOFFSET, ISDST.
+```
+
+## `vartype`
+
+```
+VARTYPE Sélecteur de variables d'une table, par type.
+  S = VARTYPE(TYPE) désigne les variables du type demandé. On s'en sert
+  comme d'un indice de colonne :
+
+     t(:, vartype('numeric'))
+
+  TYPE vaut 'numeric', 'logical', 'cellstr', 'string', 'categorical',
+  'datetime', 'duration', 'char', ou le nom exact d'une classe.
+
+  C'est ce qu'il faut pour appliquer un calcul à toutes les colonnes
+  numériques d'une table qui en contient d'autres.
+
+  Exemple :
+     t = table([1;2], {'a';'b'}, 'VariableNames', {'n','lettre'});
+     width(t(:, vartype('numeric')))   % 1
+
+  Voir aussi TIMERANGE, WITHTOL, VARFUN.
+```
+
+## `withtol`
+
+```
+WITHTOL Sélecteur de lignes d'une table temporelle, à tolérance près.
+  S = WITHTOL(TEMPS,TOLERANCE) désigne les lignes dont l'instant est à
+  moins de TOLERANCE de l'un des instants demandés. On s'en sert comme
+  d'un indice :
+
+     tt(withtol(t, seconds(0.1)), :)
+
+  Sans tolérance, une table temporelle exige l'instant exact, ce qui
+  n'arrive jamais avec des mesures datées par une horloge réelle.
+
+  Exemple :
+     tt = timetable(seconds([1;2;3]), (10:10:30)');
+     s = tt(withtol(seconds(2.05), seconds(0.1)), :);
+     height(s)   % 1
+
+  Voir aussi TIMERANGE, VARTYPE, TIMETABLE.
 ```
 
 ## `writetable`

@@ -27,6 +27,8 @@
 % Dates
 %   NaT               - Date manquante
 %   isdatetime, isnat - Tests
+%   timezones         - Table des fuseaux reconnus
+%   tzoffset, isdst   - Décalage du fuseau, heure d'été (méthodes)
 %   year, month, day, hour, minute, second - composantes (méthodes)
 %   quarter, week, weekday, isweekend, ymd, hms, timeofday - dérivées
 %   dateshift, between, caldiff, isbetween - déplacements et écarts
@@ -46,11 +48,17 @@
 %   addvars, removevars, movevars, renamevars, convertvars - variables
 %   varfun, rowfun, groupsummary          - calculs, groupés ou non
 %   join, innerjoin, outerjoin            - jointures par clé
+%   stack, unstack                        - passage large / haut
+%   rows2vars                             - transposition
+%   mergevars, splitvars                  - variables à plusieurs colonnes
+%   vartype                               - sélection de variables par type
 %
 % Tables temporelles
 %   table2timetable, timetable2table - conversions
 %   retime, synchronize              - ré-échantillonnage et réunion
 %   isregular, istimetable           - inspection
+%   timerange, withtol               - sélection de lignes par période ou
+%                       par proximité d'instant
 %
 % Outils internes
 %   appliquerReste, assignerReste - application d'une chaîne d'indexation

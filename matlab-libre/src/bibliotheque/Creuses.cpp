@@ -1,6 +1,7 @@
 // Creuses.cpp — les fonctions du langage qui manipulent les matrices creuses.
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <random>
 
 #include "matlibre/Bibliotheque.h"

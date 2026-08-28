@@ -9,6 +9,16 @@ project(MatLibre VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# MatLibre n'emploie pas les modules C++20. Depuis CMake 3.28, le
+# générateur Ninja écrit malgré tout des règles de balayage de modules dont
+# le nom contient « $type » ; un ninja antérieur à 1.11 ne sait pas les
+# lire et s'arrête sur « expected newline, got lexing error ». Couper le
+# balayage supprime ces règles et ne coûte rien.
+if(POLICY CMP0155)
+  cmake_policy(SET CMP0155 NEW)
+endif()
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()

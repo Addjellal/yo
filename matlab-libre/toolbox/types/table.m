@@ -469,6 +469,286 @@ classdef table
             r = table(colonnes{:}, 'VariableNames', noms);
         end
 
+        % --- remise en forme ----------------------------------------------------------
+        function [s, indices] = stack(t, variablesDonnees, varargin)
+%STACK Empile plusieurs variables en une seule, plus un indicateur.
+%   S = STACK(T,VARS) remplace les variables VARS par une seule colonne
+%   qui les met bout à bout, et par une colonne indicatrice qui dit de
+%   laquelle chaque valeur provient. La table passe donc de large à
+%   haute : elle compte HEIGHT(T)*NUMEL(VARS) lignes.
+%
+%   C'est la forme qu'attendent les fonctions groupées : une observation
+%   par ligne, la variable observée devenant une donnée comme une autre.
+%
+%   Options : 'NewDataVariableName', 'IndexVariableName',
+%   'ConstantVariables'.
+%
+%   [S,I] = STACK(...) rend l'indice, dans T, de la ligne d'où vient
+%   chaque ligne de S.
+%
+%   Exemple :
+%      t = table([1;2], [10;20], [100;200], 'VariableNames', {'a','b','c'});
+%      s = stack(t, {'b','c'});
+%      height(s)   % 4
+%
+%   Voir aussi UNSTACK, GROUPSUMMARY, VARFUN.
+            iv = table.indicesVariables(t, variablesDonnees);
+            nomDonnees = 'Value';
+            nomIndicateur = 'Indicator';
+            constantes = setdiff(1:width(t), iv);
+            for k = 1:2:numel(varargin)-1
+                switch lower(char(varargin{k}))
+                    case 'newdatavariablename', nomDonnees = char(varargin{k+1});
+                    case 'indexvariablename',   nomIndicateur = char(varargin{k+1});
+                    case 'constantvariables',   constantes = table.indicesVariables(t, varargin{k+1});
+                end
+            end
+            n = height(t);
+            m = numel(iv);
+            indices = reshape(repmat((1:n)', 1, m)', [], 1);
+            source = reshape(repmat((1:m), n, 1)', [], 1);
+            colonnes = {};
+            noms = {};
+            for c = constantes
+                colonnes{end+1} = table.lignesDe(t.Donnees{c}, indices); %#ok<AGROW>
+                noms{end+1} = t.NomsVariables{c};                        %#ok<AGROW>
+            end
+            % Colonne indicatrice : catégorielle ordonnée comme VARS.
+            etiquettes = t.NomsVariables(iv);
+            colonnes{end+1} = categorical(etiquettes(source)', etiquettes);
+            noms{end+1} = nomIndicateur;
+            empilee = [];
+            for k = 1:numel(indices)
+                valeur = t.Donnees{iv(source(k))}(indices(k), :);
+                if isempty(empilee)
+                    empilee = valeur;
+                else
+                    empilee = [empilee; valeur];                         %#ok<AGROW>
+                end
+            end
+            colonnes{end+1} = empilee;
+            noms{end+1} = nomDonnees;
+            s = table(colonnes{:}, 'VariableNames', noms);
+        end
+
+        function u = unstack(t, variableDonnees, variableIndicatrice, varargin)
+%UNSTACK Étale une variable selon les valeurs d'une autre.
+%   U = UNSTACK(T,DONNEE,INDICATEUR) fait l'inverse de STACK : chaque
+%   valeur distincte de INDICATEUR devient une variable, et les lignes
+%   qui partagent les mêmes variables de groupement se rassemblent.
+%
+%   Options : 'GroupingVariables', 'NewDataVariableNames',
+%   'AggregationFunction'. Sans fonction d'agrégation, deux valeurs pour
+%   la même case sont une erreur.
+%
+%   Exemple :
+%      t = table([1;1;2;2], {'b';'c';'b';'c'}, [10;100;20;200], ...
+%                'VariableNames', {'g','quoi','v'});
+%      u = unstack(t, 'v', 'quoi');
+%      height(u)   % 2
+%
+%   Voir aussi STACK, GROUPSUMMARY.
+            id = table.indicesVariables(t, variableDonnees);
+            ii = table.indicesVariables(t, variableIndicatrice);
+            groupes = setdiff(1:width(t), [id ii]);
+            nouveauxNoms = {};
+            agregation = [];
+            for k = 1:2:numel(varargin)-1
+                switch lower(char(varargin{k}))
+                    case 'groupingvariables',    groupes = table.indicesVariables(t, varargin{k+1});
+                    case 'newdatavariablenames', nouveauxNoms = table.enCellules(varargin{k+1});
+                    case 'aggregationfunction',  agregation = varargin{k+1};
+                end
+            end
+            indicateur = t.Donnees{ii};
+            etiquettes = table.etiquettesDe(indicateur);
+            categoriesUniques = unique(etiquettes, 'stable');
+            cles = table.clesGroupes(t, groupes);
+            [~, premiers, ou] = table.uniqueCellules(cles);
+            ng = numel(premiers);
+            colonnes = {};
+            noms = {};
+            for g = groupes
+                indices = zeros(ng, 1);
+                for k = 1:ng, indices(k) = find(ou == k, 1); end
+                colonnes{end+1} = table.lignesDe(t.Donnees{g}, indices); %#ok<AGROW>
+                noms{end+1} = t.NomsVariables{g};                        %#ok<AGROW>
+            end
+            donnees = t.Donnees{id};
+            for c = 1:numel(categoriesUniques)
+                colonne = NaN(ng, 1);
+                for k = 1:ng
+                    lignes = find(ou == k & strcmp(etiquettes, categoriesUniques{c}));
+                    if isempty(lignes)
+                        continue
+                    elseif numel(lignes) == 1
+                        colonne(k) = donnees(lignes);
+                    elseif ~isempty(agregation)
+                        colonne(k) = feval(agregation, donnees(lignes));
+                    else
+                        error('MATLAB:unstack:MultipleRows', ...
+                              ['Plusieurs lignes tombent dans la même case ; ' ...
+                               'donnez une fonction d''agrégation.']);
+                    end
+                end
+                colonnes{end+1} = colonne;                               %#ok<AGROW>
+                if numel(nouveauxNoms) >= c
+                    noms{end+1} = nouveauxNoms{c};                       %#ok<AGROW>
+                else
+                    noms{end+1} = matlab.lang.makeValidName(categoriesUniques{c}); %#ok<AGROW>
+                end
+            end
+            u = table(colonnes{:}, 'VariableNames', noms);
+        end
+
+        function r = rows2vars(t, varargin)
+%ROWS2VARS Transposition d'une table.
+%   R = ROWS2VARS(T) fait des variables de T des lignes, et de ses lignes
+%   des variables. La première colonne du résultat porte les anciens noms
+%   de variables.
+%
+%   Toutes les variables transposées doivent être numériques ou logiques,
+%   puisqu'elles se retrouvent mélangées dans une même colonne.
+%
+%   Exemple :
+%      t = table([1;2], [3;4], 'VariableNames', {'a','b'});
+%      r = rows2vars(t);
+%      r.Properties.VariableNames   % OriginalVariableNames, Var1, Var2
+%
+%   Voir aussi STACK, UNSTACK.
+            nomColonne = 'OriginalVariableNames';
+            nomsLignes = {};
+            for k = 1:2:numel(varargin)-1
+                switch lower(char(varargin{k}))
+                    case 'variablenamessource'
+                        j = table.indicesVariables(t, varargin{k+1});
+                        nomsLignes = table.etiquettesDe(t.Donnees{j});
+                end
+            end
+            variables = 1:width(t);
+            if ~isempty(nomsLignes)
+                variables = setdiff(variables, table.indicesVariables(t, nomsLignes));
+            end
+            n = height(t);
+            colonnes = {t.NomsVariables(variables)'};
+            noms = {nomColonne};
+            for i = 1:n
+                colonne = zeros(numel(variables), 1);
+                for k = 1:numel(variables)
+                    v = t.Donnees{variables(k)};
+                    colonne(k) = double(v(i, 1));
+                end
+                colonnes{end+1} = colonne;                               %#ok<AGROW>
+                if ~isempty(nomsLignes)
+                    noms{end+1} = matlab.lang.makeValidName(nomsLignes{i}); %#ok<AGROW>
+                elseif ~isempty(t.NomsLignes)
+                    noms{end+1} = matlab.lang.makeValidName(t.NomsLignes{i}); %#ok<AGROW>
+                else
+                    noms{end+1} = sprintf('Var%d', i);                   %#ok<AGROW>
+                end
+            end
+            r = table(colonnes{:}, 'VariableNames', noms);
+        end
+
+        function r = mergevars(t, vars, varargin)
+%MERGEVARS Réunit plusieurs variables en une seule, à plusieurs colonnes.
+%   R = MERGEVARS(T,VARS) remplace les variables VARS par une seule, dont
+%   la valeur est la matrice de leurs colonnes mises côte à côte. La
+%   nouvelle variable prend la place de la première.
+%
+%   Option : 'NewVariableName'.
+%
+%   Exemple :
+%      t = table([1;2], [3;4], [5;6], 'VariableNames', {'a','b','c'});
+%      r = mergevars(t, {'a','b'});
+%      size(r.a)   % [2 2]
+%
+%   Voir aussi SPLITVARS, ADDVARS, REMOVEVARS.
+            iv = table.indicesVariables(t, vars);
+            nouveauNom = t.NomsVariables{iv(1)};
+            for k = 1:2:numel(varargin)-1
+                if strcmpi(char(varargin{k}), 'newvariablename')
+                    nouveauNom = char(varargin{k+1});
+                end
+            end
+            bloc = [];
+            for k = iv
+                v = t.Donnees{k};
+                if isempty(bloc), bloc = v; else, bloc = [bloc, v]; end  %#ok<AGROW>
+            end
+            garde = setdiff(1:width(t), iv);
+            position = sum(garde < iv(1)) + 1;
+            colonnes = {};
+            noms = {};
+            for k = 1:numel(garde)
+                if k == position
+                    colonnes{end+1} = bloc;                              %#ok<AGROW>
+                    noms{end+1} = nouveauNom;                            %#ok<AGROW>
+                end
+                colonnes{end+1} = t.Donnees{garde(k)};                   %#ok<AGROW>
+                noms{end+1} = t.NomsVariables{garde(k)};                 %#ok<AGROW>
+            end
+            if position > numel(garde)
+                colonnes{end+1} = bloc;
+                noms{end+1} = nouveauNom;
+            end
+            r = table(colonnes{:}, 'VariableNames', noms);
+            r.NomsLignes = t.NomsLignes;
+        end
+
+        function r = splitvars(t, vars, varargin)
+%SPLITVARS Sépare une variable à plusieurs colonnes en autant de variables.
+%   R = SPLITVARS(T,VAR) fait l'inverse de MERGEVARS : chaque colonne de
+%   VAR devient une variable à part, nommée VAR_1, VAR_2, et ainsi de
+%   suite. Sans second argument, toutes les variables à plusieurs
+%   colonnes sont séparées.
+%
+%   Option : 'NewVariableNames'.
+%
+%   Exemple :
+%      t = table([1 2; 3 4], 'VariableNames', {'ab'});
+%      r = splitvars(t);
+%      r.Properties.VariableNames   % ab_1, ab_2
+%
+%   Voir aussi MERGEVARS.
+            if nargin < 2 || isempty(vars)
+                iv = [];
+                for k = 1:width(t)
+                    if size(t.Donnees{k}, 2) > 1, iv(end+1) = k; end     %#ok<AGROW>
+                end
+            else
+                iv = table.indicesVariables(t, vars);
+            end
+            nouveauxNoms = {};
+            for k = 1:2:numel(varargin)-1
+                if strcmpi(char(varargin{k}), 'newvariablenames')
+                    nouveauxNoms = table.enCellules(varargin{k+1});
+                end
+            end
+            colonnes = {};
+            noms = {};
+            compteur = 0;
+            for k = 1:width(t)
+                v = t.Donnees{k};
+                if ~any(iv == k) || size(v, 2) <= 1
+                    colonnes{end+1} = v;                                 %#ok<AGROW>
+                    noms{end+1} = t.NomsVariables{k};                    %#ok<AGROW>
+                    continue
+                end
+                for c = 1:size(v, 2)
+                    compteur = compteur + 1;
+                    colonnes{end+1} = v(:, c);                           %#ok<AGROW>
+                    if numel(nouveauxNoms) >= compteur
+                        noms{end+1} = nouveauxNoms{compteur};            %#ok<AGROW>
+                    else
+                        noms{end+1} = sprintf('%s_%d', t.NomsVariables{k}, c); %#ok<AGROW>
+                    end
+                end
+            end
+            r = table(colonnes{:}, 'VariableNames', noms);
+            r.NomsLignes = t.NomsLignes;
+        end
+
         % --- jointures ----------------------------------------------------------------
         function r = innerjoin(a, b, varargin)
             r = table.jointure(a, b, varargin, 'inner');
@@ -570,6 +850,11 @@ classdef table
         function j = indicesVariables(t, vars)
             if ischar(vars) && strcmp(vars, ':')
                 j = 1:width(t); return
+            end
+            % Sélection par type : t(:, vartype('numeric')).
+            if isa(vars, 'vartype')
+                j = variablesRetenues(vars, t.Donnees);
+                return
             end
             if isnumeric(vars), j = reshape(double(vars), 1, []); return, end
             if islogical(vars), j = reshape(find(vars), 1, []); return, end
@@ -701,6 +986,34 @@ classdef table
                     error('MATLAB:table:UnknownProperty', ...
                           'Unrecognized table property ''%s''.', nom);
             end
+        end
+
+        function e = etiquettesDe(v)
+%ETIQUETTESDE Représentation textuelle d'une colonne, une cellule par ligne.
+%   Sert aux fonctions qui groupent par valeur : catégories, chaînes,
+%   nombres, tout se ramène à du texte comparable.
+            if isa(v, 'categorical')
+                e = cellstr(v);
+            elseif iscell(v)
+                e = cell(numel(v), 1);
+                for k = 1:numel(v)
+                    if ischar(v{k}) || isstring(v{k})
+                        e{k} = char(v{k});
+                    else
+                        e{k} = mat2str(v{k});
+                    end
+                end
+            elseif isstring(v)
+                e = cellstr(v);
+            elseif ischar(v)
+                e = cellstr(v);
+            else
+                e = cell(size(v, 1), 1);
+                for k = 1:size(v, 1)
+                    e{k} = num2str(v(k, 1));
+                end
+            end
+            e = e(:);
         end
 
         function bloc = lignesDe(v, lignes)

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <functional>
+#include <memory>
 
 #include "matlibre/AlgebreLineaire.h"
 #include "matlibre/Creux.h"

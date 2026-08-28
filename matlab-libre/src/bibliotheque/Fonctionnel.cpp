@@ -1,7 +1,9 @@
 // Fonctionnel.cpp — fonctions qui prennent des fonctions.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <memory>
 #include <sstream>
 
 #include "matlibre/Affichage.h"

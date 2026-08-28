@@ -2,6 +2,7 @@
 #include "matlibre/Serveur.h"
 
 #include <cstring>
+#include <functional>
 #include <sstream>
 #include <thread>
 #include <vector>

@@ -1,6 +1,8 @@
 // Communs.cpp — briques partagées par tous les modules de la bibliothèque.
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <memory>
 #include <sstream>
 
 #include "matlibre/Affichage.h"

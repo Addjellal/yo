@@ -9,6 +9,7 @@
 #include "matlibre/GenerationC.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <set>

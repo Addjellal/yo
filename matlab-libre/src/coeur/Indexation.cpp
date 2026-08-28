@@ -6,6 +6,7 @@
 // par des virgules produites par « c{...} » ou « s.champ ».
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "matlibre/Creux.h"
 #include "matlibre/Erreur.h"

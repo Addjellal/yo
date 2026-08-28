@@ -4,6 +4,7 @@
 //   matlibre script.m [args]    exécute un script
 //   matlibre -e "expr"          évalue une expression
 //   matlibre --test dossier     exécute les tests d'un dossier
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>

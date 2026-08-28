@@ -80,7 +80,13 @@ classdef datetime
                 if numel(positionnels) == 3, t.Format = 'dd-MMM-uuuu'; end
             end
             if ~isempty(options.Format),   t.Format = options.Format; end
-            if ~isempty(options.TimeZone), t.TimeZone = options.TimeZone; end
+            if ~isempty(options.TimeZone)
+                % Le fuseau est validé tout de suite : un nom inconnu doit
+                % être refusé à la construction, pas des heures plus tard
+                % au premier calcul de décalage.
+                datetime.infoZone(options.TimeZone);
+                t.TimeZone = char(options.TimeZone);
+            end
         end
 
         % --- arithmétique ---------------------------------------------------
@@ -249,7 +255,34 @@ classdef datetime
                 case '.'
                     nom = s(1).subs;
                     switch nom
-                        case {'Serie', 'Format', 'TimeZone'}
+                        case 'TimeZone'
+                            % Attacher un fuseau a une date qui n'en avait
+                            % pas ne deplace rien : les composantes sont
+                            % deja l'heure locale. Passer d'un fuseau a un
+                            % autre, en revanche, decrit le meme instant
+                            % dans une autre heure locale.
+                            nouveau = char(valeur);
+                            if ~isempty(nouveau), datetime.infoZone(nouveau); end
+                            if ~isempty(t.TimeZone) && ~isempty(nouveau)
+                                serie = t.Serie;
+                                for k = 1:numel(serie)
+                                    depart = datetime.decalageZone(t.TimeZone, serie(k));
+                                    instant = serie(k) - depart / 24;
+                                    arrivee = datetime.decalageZone(nouveau, instant);
+                                    % Un tour de plus : le décalage
+                                    % d'arrivée se juge sur l'heure locale
+                                    % d'arrivée, pas sur l'instant nu.
+                                    arrivee = datetime.decalageZone(nouveau, instant + arrivee / 24);
+                                    % Ajouter la différence d'un coup évite
+                                    % la double erreur d'arrondi d'un
+                                    % retrait suivi d'un ajout.
+                                    serie(k) = serie(k) + (arrivee - depart) / 24;
+                                    serie(k) = round(serie(k) * 86400e6) / 86400e6;
+                                end
+                                t.Serie = serie;
+                            end
+                            t.TimeZone = nouveau;
+                        case {'Serie', 'Format'}
                             t.(nom) = valeur;
                         otherwise
                             c = matlibre_num2ymd(t.Serie(:));
@@ -444,6 +477,50 @@ classdef datetime
             end
             cd = calendarDuration.depuis(mois, jours, temps);
         end
+
+        % --- fuseaux horaires ---------------------------------------------------------
+        function d = tzoffset(t)
+%TZOFFSET Décalage du fuseau par rapport au temps universel.
+%   D = TZOFFSET(T) rend, pour chaque instant, la durée à ajouter au
+%   temps universel pour obtenir l'heure locale. Elle change au cours de
+%   l'année quand le fuseau observe l'heure d'été.
+%
+%   Exemple :
+%      d = datetime(2020, 1, 15, 'TimeZone', 'Europe/Paris');
+%      hours(tzoffset(d))   % 1
+%
+%   Voir aussi ISDST, TIMEZONES, DATETIME.
+            if isempty(t.TimeZone)
+                error('MATLAB:datetime:UnzonedTzoffset', ...
+                      'TZOFFSET demande une date avec fuseau.');
+            end
+            heures = zeros(size(t.Serie));
+            for k = 1:numel(t.Serie)
+                heures(k) = datetime.decalageZone(t.TimeZone, t.Serie(k));
+            end
+            d = hours(heures);
+        end
+
+        function v = isdst(t)
+%ISDST L'heure d'été est-elle en vigueur ?
+%   V = ISDST(T) est vrai aux instants où le fuseau applique son décalage
+%   supplémentaire.
+%
+%   Exemple :
+%      d = datetime(2020, 7, 15, 'TimeZone', 'Europe/Paris');
+%      isdst(d)   % vrai
+%
+%   Voir aussi TZOFFSET, TIMEZONES.
+            if isempty(t.TimeZone)
+                error('MATLAB:datetime:UnzonedIsdst', ...
+                      'ISDST demande une date avec fuseau.');
+            end
+            [standard, ~] = datetime.infoZone(t.TimeZone);
+            v = false(size(t.Serie));
+            for k = 1:numel(t.Serie)
+                v(k) = datetime.decalageZone(t.TimeZone, t.Serie(k)) > standard + 1e-9;
+            end
+        end
     end
 
     methods (Static)
@@ -459,6 +536,184 @@ classdef datetime
         end
         function e = epoquePosix(), e = matlibre_ymd2num(1970, 1, 1, 0, 0, 0); end
         function e = epoqueExcel(),  e = matlibre_ymd2num(1899, 12, 30, 0, 0, 0); end
+
+        % --- table des fuseaux -----------------------------------------------------------
+        function [noms, decalages, familles] = tableFuseaux()
+%TABLEFUSEAUX Fuseaux reconnus, leur décalage d'hiver et leur règle d'été.
+%   Ce n'est pas la base IANA complète : c'est une sélection des fuseaux
+%   les plus employés, avec les règles en vigueur depuis 2007. Les
+%   changements historiques ne sont pas suivis.
+            noms = {'UTC', 'GMT', 'Z', ...
+                    'Europe/London', 'Europe/Dublin', 'Europe/Lisbon', ...
+                    'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Rome', ...
+                    'Europe/Amsterdam', 'Europe/Brussels', 'Europe/Zurich', ...
+                    'Europe/Vienna', 'Europe/Stockholm', 'Europe/Oslo', ...
+                    'Europe/Copenhagen', 'Europe/Warsaw', 'Europe/Prague', ...
+                    'Europe/Budapest', 'Europe/Athens', 'Europe/Helsinki', ...
+                    'Europe/Bucharest', 'Europe/Kiev', 'Europe/Moscow', ...
+                    'America/New_York', 'America/Toronto', 'America/Chicago', ...
+                    'America/Denver', 'America/Phoenix', 'America/Los_Angeles', ...
+                    'America/Vancouver', 'America/Anchorage', 'America/Halifax', ...
+                    'America/Sao_Paulo', 'America/Mexico_City', 'America/Bogota', ...
+                    'America/Lima', 'America/Argentina/Buenos_Aires', ...
+                    'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Hong_Kong', ...
+                    'Asia/Taipei', 'Asia/Singapore', 'Asia/Bangkok', 'Asia/Jakarta', ...
+                    'Asia/Kolkata', 'Asia/Karachi', 'Asia/Dubai', 'Asia/Riyadh', ...
+                    'Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', ...
+                    'Australia/Perth', 'Australia/Adelaide', 'Pacific/Auckland', ...
+                    'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos', ...
+                    'Africa/Nairobi', 'Africa/Casablanca', 'Atlantic/Reykjavik', ...
+                    'Pacific/Honolulu'};
+            decalages = [0, 0, 0, ...
+                         0, 0, 0, ...
+                         1, 1, 1, 1, ...
+                         1, 1, 1, ...
+                         1, 1, 1, ...
+                         1, 1, 1, ...
+                         1, 2, 2, ...
+                         2, 2, 3, ...
+                         -5, -5, -6, ...
+                         -7, -7, -8, ...
+                         -8, -9, -4, ...
+                         -3, -6, -5, ...
+                         -5, -3, ...
+                         9, 9, 8, 8, ...
+                         8, 8, 7, 7, ...
+                         5.5, 5, 4, 3, ...
+                         10, 10, 10, ...
+                         8, 9.5, 12, ...
+                         2, 2, 1, ...
+                         3, 1, 0, ...
+                         -10];
+            familles = {'none', 'none', 'none', ...
+                        'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'eu', ...
+                        'eu', 'eu', 'none', ...
+                        'us', 'us', 'us', ...
+                        'us', 'none', 'us', ...
+                        'us', 'us', 'us', ...
+                        'none', 'none', 'none', ...
+                        'none', 'none', ...
+                        'none', 'none', 'none', 'none', ...
+                        'none', 'none', 'none', 'none', ...
+                        'none', 'none', 'none', 'none', ...
+                        'au', 'au', 'none', ...
+                        'none', 'au', 'nz', ...
+                        'none', 'none', 'none', ...
+                        'none', 'none', 'none', ...
+                        'none'};
+        end
+
+        function [standard, famille] = infoZone(zone)
+%INFOZONE Décalage d'hiver et règle d'heure d'été d'un fuseau.
+%   Reconnaît les noms de la table, les décalages fixes écrits
+%   '+HH:MM' ou '-HH', et le fuseau vide, qui vaut le temps universel.
+            zone = char(zone);
+            if isempty(zone) || strcmpi(zone, 'local')
+                standard = 0; famille = 'none'; return
+            end
+            if zone(1) == '+' || zone(1) == '-'
+                signe = 1;
+                if zone(1) == '-', signe = -1; end
+                reste = zone(2:end);
+                deuxPoints = find(reste == ':', 1);
+                if isempty(deuxPoints)
+                    if numel(reste) == 4
+                        h = str2double(reste(1:2));
+                        m = str2double(reste(3:4));
+                    else
+                        h = str2double(reste);
+                        m = 0;
+                    end
+                else
+                    h = str2double(reste(1:deuxPoints-1));
+                    m = str2double(reste(deuxPoints+1:end));
+                end
+                if isnan(h) || isnan(m)
+                    error('MATLAB:datetime:UnknownTimeZone', ...
+                          'Fuseau horaire inconnu : ''%s''.', zone);
+                end
+                standard = signe * (h + m / 60);
+                famille = 'none';
+                return
+            end
+            [noms, decalages, familles] = datetime.tableFuseaux();
+            k = find(strcmpi(zone, noms), 1);
+            if isempty(k)
+                error('MATLAB:datetime:UnknownTimeZone', ...
+                      'Fuseau horaire inconnu : ''%s''.', zone);
+            end
+            standard = decalages(k);
+            famille = familles{k};
+        end
+
+        function h = decalageZone(zone, serieLocale)
+%DECALAGEZONE Décalage effectif, en heures, à un instant local donné.
+%   L'heure d'été est décidée sur l'heure locale d'hiver : dans l'heure
+%   même de la bascule, où l'heure locale est ambiguë, le résultat suit la
+%   convention de l'heure d'hiver.
+            [standard, famille] = datetime.infoZone(zone);
+            h = standard;
+            if strcmp(famille, 'none'), return, end
+            composantes = matlibre_num2ymd(serieLocale);
+            annee = composantes(1);
+            % Les deux bornes sont exprimées en heure locale telle que
+            % l'utilisateur l'écrit : celle d'hiver au printemps, celle
+            % d'été à l'automne. L'heure qui se répète à l'automne est
+            % ainsi rattachée à sa première occurrence, comme le fait
+            % MATLAB.
+            switch famille
+                case 'eu'
+                    % Dernier dimanche de mars et dernier dimanche
+                    % d'octobre, tous deux à 01:00 temps universel.
+                    debut = datetime.dernierDimanche(annee, 3) + (1 + standard) / 24;
+                    fin = datetime.dernierDimanche(annee, 10) + (2 + standard) / 24;
+                    dedans = serieLocale >= debut && serieLocale < fin;
+                case 'us'
+                    % Deuxième dimanche de mars à 02:00 heure d'hiver,
+                    % premier dimanche de novembre à 02:00 heure d'été.
+                    debut = datetime.niemeDimanche(annee, 3, 2) + 2 / 24;
+                    fin = datetime.niemeDimanche(annee, 11, 1) + 2 / 24;
+                    dedans = serieLocale >= debut && serieLocale < fin;
+                case 'au'
+                    % Hémisphère sud : l'été enjambe le changement d'année.
+                    debut = datetime.niemeDimanche(annee, 10, 1) + 2 / 24;
+                    fin = datetime.niemeDimanche(annee, 4, 1) + 3 / 24;
+                    dedans = serieLocale >= debut || serieLocale < fin;
+                case 'nz'
+                    debut = datetime.dernierDimanche(annee, 9) + 2 / 24;
+                    fin = datetime.niemeDimanche(annee, 4, 1) + 3 / 24;
+                    dedans = serieLocale >= debut || serieLocale < fin;
+                otherwise
+                    dedans = false;
+            end
+            if dedans, h = standard + 1; end
+        end
+
+        function s = niemeDimanche(annee, mois, n)
+%NIEMEDIMANCHE Numéro de série du N-ième dimanche d'un mois, à minuit.
+            premier = matlibre_ymd2num(annee, mois, 1, 0, 0, 0);
+            jour = matlibre_weekday(premier);      % 1 = dimanche
+            decalage = mod(1 - jour, 7);
+            s = premier + decalage + 7 * (n - 1);
+        end
+
+        function s = dernierDimanche(annee, mois)
+%DERNIERDIMANCHE Numéro de série du dernier dimanche d'un mois, à minuit.
+            if mois == 12
+                premierSuivant = matlibre_ymd2num(annee + 1, 1, 1, 0, 0, 0);
+            else
+                premierSuivant = matlibre_ymd2num(annee, mois + 1, 1, 0, 0, 0);
+            end
+            dernier = premierSuivant - 1;
+            jour = matlibre_weekday(dernier);
+            s = dernier - mod(jour - 1, 7);
+        end
+
         function n = nomOption(nom)
             noms = {'ConvertFrom', 'InputFormat', 'Format', 'TimeZone'};
             i = find(strcmpi(nom, noms), 1);

@@ -1,5 +1,6 @@
 // Systeme.cpp — environnement, fichiers, chemin de recherche, aide.
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>

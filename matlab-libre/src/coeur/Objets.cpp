@@ -8,6 +8,7 @@
 //     pour leur donner la sémantique de poignée.
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"

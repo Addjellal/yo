@@ -61,8 +61,27 @@ double versDatenum(int annee, int mois, int jour, int heure, int minute, double 
 
 void depuisDatenum(double n, int& annee, int& mois, int& jour, int& heure, int& minute,
                    double& seconde) {
+    // Le jour et l'heure sont séparés avant tout arrondi. Un numéro de
+    // série proche de 738000 ne distingue pas mieux que la dizaine de
+    // microsecondes : lire la fraction telle quelle ferait afficher
+    // 18:59:59,999997 là où il faut lire 19:00:00, et 60 secondes après
+    // arrondi à la seconde. On arrondit donc les secondes du jour à la
+    // puissance de dix immédiatement supérieure à la résolution réelle,
+    // et l'on reporte sur le jour quand la journée est pleine.
     long long jours = (long long)std::floor(n);
-    double fraction = n - (double)jours;
+    double secondes = (n - (double)jours) * 86400.0;
+    double pasDouble = std::nextafter(std::fabs(n) + 1.0, 1e308) - (std::fabs(n) + 1.0);
+    double resolution = std::max(8.0 * 86400.0 * pasDouble, 1e-9);
+    double grille = std::pow(10.0, std::ceil(std::log10(resolution)));
+    secondes = std::round(secondes / grille) * grille;
+    if (secondes >= 86400.0) {
+        secondes -= 86400.0;
+        jours += 1;
+    }
+    if (secondes < 0.0) {
+        secondes += 86400.0;
+        jours -= 1;
+    }
     long long jdn = jours + 1721059;
     long long a = jdn + 32044;
     long long b = (4 * a + 3) / 146097;
@@ -73,11 +92,10 @@ void depuisDatenum(double n, int& annee, int& mois, int& jour, int& heure, int& 
     jour = (int)(e - (153 * m + 2) / 5 + 1);
     mois = (int)(m + 3 - 12 * (m / 10));
     annee = (int)(100 * b + d - 4800 + m / 10);
-    double h = fraction * 24.0;
-    heure = (int)std::floor(h);
-    double mn = (h - heure) * 60.0;
-    minute = (int)std::floor(mn);
-    seconde = (mn - minute) * 60.0;
+    heure = (int)std::floor(secondes / 3600.0);
+    minute = (int)std::floor((secondes - heure * 3600.0) / 60.0);
+    seconde = secondes - heure * 3600.0 - minute * 60.0;
+    seconde = std::round(seconde * 1e9) / 1e9;
 }
 
 FONCTION(fnNow) {
@@ -276,10 +294,7 @@ FONCTION(fnNumVersYmd) {
     for (std::size_t k = 0; k < n; ++k) {
         int annee, mois, jour, heure, minute;
         double seconde;
-        // On arrondit à la microseconde pour éviter 59,999999 au lieu de 0.
-        double x = std::round(args[0].re[k] * 86400.0 * 1e6) / (86400.0 * 1e6);
-        depuisDatenum(x, annee, mois, jour, heure, minute, seconde);
-        seconde = std::round(seconde * 1e6) / 1e6;
+        depuisDatenum(args[0].re[k], annee, mois, jour, heure, minute, seconde);
         r.re[k] = annee;
         r.re[n + k] = mois;
         r.re[2 * n + k] = jour;
