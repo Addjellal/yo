@@ -624,7 +624,12 @@ std::string enMinuscules(std::string s) {
 // une fonction ecrite par l'utilisateur suit souvent MATLAB a la lettre.
 std::string sectionDe(const std::string& ligne) {
     std::string t = enMinuscules(sansBlancs(ligne));
-    while (!t.empty() && (t.back() == ':' || t.back() == '.')) t.pop_back();
+    // « Exemple : » s'ecrit avec une espace avant le deux-points en
+    // francais : sans ce nettoyage, l'en-tete n'etait pas reconnu et la
+    // section entiere restait dans la description.
+    while (!t.empty() && (t.back() == ':' || t.back() == '.' || t.back() == ' ' ||
+                          t.back() == '\t'))
+        t.pop_back();
     if (t == "syntaxe" || t == "syntax" || t == "syntaxes") return "syntaxe";
     if (t == "exemple" || t == "exemples" || t == "example" || t == "examples")
         return "exemples";
@@ -730,6 +735,15 @@ std::string texteAide(Interpreteur& it, const std::string& nom, std::string* sou
         if (source) *source = f->script ? "script" : "fichier";
         if (fichier) *fichier = f->fichier;
         return f->aide;
+    }
+    // Une classe a son bloc d'aide comme une fonction : « help tf » et
+    // « doc duration » doivent le trouver.
+    if (auto c = it.classeDefinie(nom)) {
+        if (!c->aide.empty()) {
+            if (source) *source = "classe";
+            if (fichier) *fichier = c->fichier;
+            return c->aide;
+        }
     }
     if (n) return n->aide;
     return std::string();

@@ -17,6 +17,7 @@
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTableWidget>
+#include <QTreeWidget>
 #include <QTextBrowser>
 #include <QLineEdit>
 #include <QListWidget>
@@ -869,6 +870,82 @@ int main(int argc, char** argv) {
         // fenetre alors que le fil de calcul dort dans le crochet.
         delete second;
         verifier(true, "fermer le bureau pendant un arret ne tue pas le programme");
+    }
+
+    // « doc » sur une classe : le navigateur ouvre sa page comme pour une
+    // fonction. Il ne trouvait plus rien depuis que tf est une classe.
+    {
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        envoyer(fenetre, QStringLiteral("doc tf"));
+        verifier(attendre([&] {
+                     FenetreAide* a = fenetre.findChild<FenetreAide*>();
+                     return a && a->page() &&
+                            a->page()->toPlainText().contains(
+                                QLatin1String("fonction de transfert"));
+                 }, 15000),
+                 "« doc tf » ouvre la page d'une classe");
+    }
+
+    // --- le panneau « Dossier courant » ------------------------------------
+    //
+    // MATLAB y montre TOUT le dossier — fichiers et sous-dossiers, quelle
+    // que soit l'extension —, avec la taille, le type et une icone par
+    // famille. Il n'a longtemps montre ici que les .m, ce qui cachait les
+    // donnees a cote desquelles on travaille.
+    {
+        QDir dossier = QDir::current();
+        dossier.mkdir(QStringLiteral("resultats"));
+        auto ecrire = [&](const QString& nom, const QByteArray& contenu) {
+            QFile f(dossier.filePath(nom));
+            if (f.open(QIODevice::WriteOnly)) f.write(contenu);
+        };
+        ecrire(QStringLiteral("mesures.csv"), "a,b\n1,2\n");
+        ecrire(QStringLiteral("notes.txt"), "quelques notes\n");
+        ecrire(QStringLiteral("courbe.svg"), "<svg/>");
+        ecrire(QStringLiteral("donnees.mat"), QByteArray(64, '\0'));
+        fenetre.rafraichirListeFichiers();
+        auto* arbre = fenetre.findChild<QTreeWidget*>();
+        verifier(arbre != nullptr, "le panneau du dossier courant est un arbre a colonnes");
+        if (arbre) {
+            auto ligneDe = [&](const QString& nom) -> QTreeWidgetItem* {
+                for (int k = 0; k < arbre->topLevelItemCount(); ++k)
+                    if (arbre->topLevelItem(k)->text(0) == nom) return arbre->topLevelItem(k);
+                return nullptr;
+            };
+            verifier(arbre->columnCount() == 3, "il a les colonnes nom, taille et type");
+            verifier(ligneDe(QStringLiteral("mesures.csv")) != nullptr,
+                     "un fichier qui n'est pas un .m y figure");
+            verifier(ligneDe(QStringLiteral("notes.txt")) != nullptr,
+                     "un fichier texte aussi");
+            verifier(ligneDe(QStringLiteral("donnees.mat")) != nullptr,
+                     "un fichier de donnees aussi");
+            verifier(ligneDe(QStringLiteral("resultats")) != nullptr,
+                     "un sous-dossier aussi");
+            verifier(ligneDe(QStringLiteral("..")) != nullptr, "et le dossier parent");
+            QTreeWidgetItem* csv = ligneDe(QStringLiteral("mesures.csv"));
+            QTreeWidgetItem* dos = ligneDe(QStringLiteral("resultats"));
+            verifier(csv && !csv->text(1).isEmpty(), "la taille est donnee");
+            verifier(csv && csv->text(2) == QLatin1String("Fichier CSV"),
+                     "le type nomme ce qu'est le fichier");
+            QTreeWidgetItem* mat = ligneDe(QStringLiteral("donnees.mat"));
+            verifier(mat && mat->text(2) == QLatin1String("Fichier MAT"),
+                     "et il distingue les familles entre elles");
+            verifier(dos && dos->text(2) == QLatin1String("Dossier"),
+                     "un dossier est annonce comme tel");
+            verifier(csv && !csv->icon(0).isNull(), "chaque entree porte son icone");
+            // Deux familles differentes ne portent pas la meme icone :
+            // c'est ce qui permet de les distinguer d'un coup d'oeil.
+            QTreeWidgetItem* m = ligneDe(QStringLiteral("sans-titre.m"));
+            if (!m) m = ligneDe(QStringLiteral("essaiProfil.m"));
+            if (m && csv) {
+                QImage a = m->icon(0).pixmap(16, 16).toImage();
+                QImage b = csv->icon(0).pixmap(16, 16).toImage();
+                verifier(a != b, "un .m et un .csv n'ont pas la meme icone");
+            }
+            QImage c = dos ? dos->icon(0).pixmap(16, 16).toImage() : QImage();
+            QImage d = csv ? csv->icon(0).pixmap(16, 16).toImage() : QImage();
+            verifier(!c.isNull() && c != d, "un dossier et un fichier non plus");
+        }
     }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.

@@ -29,6 +29,9 @@ private:
     std::string origine_;
     int dansIndice_ = 0;   // « end » et « : » ont un sens particulier
     int dansTableau_ = 0;  // les blancs séparent les éléments
+    // Vrai quand « primaire » vient de lire un groupe « ( ... ) » : c'est
+    // ce qui permet de refuser « (a)(b) », une multiplication oubliée.
+    bool groupeParenthese_ = false;
 
     const Jeton& jeton(int k = 0) const;
     bool fini() const;

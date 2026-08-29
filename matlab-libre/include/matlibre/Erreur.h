@@ -13,13 +13,31 @@
 
 namespace matlibre {
 
+// Un cadre de la pile d'exécution, tel que le message d'erreur le nomme :
+// « Error in monScript (line 12) », suivi de la ligne elle-même.
+struct CadreErreur {
+    std::string nom;       // fonction ou script ; vide pour la console
+    std::string fichier;   // chemin du fichier, vide s'il n'y en a pas
+    int ligne = 0;
+};
+
 struct ErreurMatlab : std::runtime_error {
     std::string identifiant;
     std::string message;
-    std::vector<std::string> pile;
+    // Du plus profond au plus haut : chaque cadre traversé s'y inscrit en
+    // sortant. Vide quand l'erreur naît hors de tout fichier.
+    std::vector<CadreErreur> pile;
+    // Nom de la fonction native qui a levé l'erreur, s'il y en a une :
+    // c'est ce que MATLAB nomme dans « Error using double ».
+    std::string fonctionNative;
     ErreurMatlab(std::string id, std::string msg)
         : std::runtime_error(msg), identifiant(std::move(id)), message(std::move(msg)) {}
 };
+
+// Le rapport que MATLAB imprime : la fonction qui a échoué, le message,
+// puis un cadre par appelant avec la ligne de code fautive. Sans pile, il
+// se réduit à « Error: <message> », ce qu'on imprimait jusqu'ici.
+std::string rapportErreur(const ErreurMatlab& e);
 
 [[noreturn]] void erreur(const std::string& identifiant, const std::string& message);
 [[noreturn]] void erreurSimple(const std::string& message);

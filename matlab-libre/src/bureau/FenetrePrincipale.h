@@ -13,6 +13,7 @@
 class QAction;
 class QToolButton;
 class QListWidget;
+class QTreeWidget;
 class QPlainTextEdit;
 class QTabWidget;
 class QTableWidget;
@@ -44,6 +45,9 @@ public:
     // ligne noyait le fil graphique.
     int paquetsSortie() const { return paquetsSortie_; }
     void envoyerCommande(const QString& commande) { envoyer(commande); }
+    // Relit le dossier courant. Public pour qu'un test puisse deposer des
+    // fichiers et verifier ce que le panneau en montre.
+    void rafraichirListeFichiers();
 
 protected:
     void closeEvent(QCloseEvent* evenement) override;
@@ -99,7 +103,6 @@ private:
     Editeur* editeurCourant() const;
     FenetreProfileur* profileur();
     FenetreAide* fenetreAide();
-    void rafraichirListeFichiers();
     void poserOccupe(bool occupe);
 
     QThread* filMoteur_;
@@ -109,7 +112,9 @@ private:
     QTabWidget* onglets_;
     ConsoleCommandes* console_;
     QTableWidget* tableVariables_;
-    QListWidget* listeFichiers_;
+    // Le panneau « Dossier courant » : un arbre à colonnes, comme celui de
+    // MATLAB — nom, taille, type — et une icône par famille de fichier.
+    QTreeWidget* listeFichiers_;
     QListWidget* historique_;
     QMap<int, FenetreFigure*> fenetresFigures_;
     // Ce qui est deja peint, pour ne remonter une fenetre que lorsque son

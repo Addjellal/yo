@@ -10,6 +10,16 @@ make test       # 57 verifications C++ + 7 suites en langage MATLAB
 ```
 
 ```matlab
+>> s = tf('s');
+>> G = 1 / (s^2 + 2*s + 1)
+G =
+ 
+        1
+  -------------
+  s^2 + 2 s + 1
+ 
+Continuous-time transfer function.
+
 >> A = [4 1; 1 3];
 >> A \ [1; 2]
 ans =
@@ -103,7 +113,8 @@ rien à ajouter au `PATH`.
 exécutable, une seule fenêtre, l'interpréteur dans le même processus. Rien
 à ouvrir dans un navigateur. On y retrouve le bureau de MATLAB — un ruban
 à onglets (Accueil, Tracés) dont les groupes portent leur nom, le dossier
-courant à gauche, l'éditeur à onglets au centre avec coloration, sections
+courant à gauche — tout ce qu'il contient, avec la taille, le type et une
+icône par famille —, l'éditeur à onglets au centre avec coloration, sections
 `%%`, indentation automatique et Ctrl-R/Ctrl-T pour commenter, la fenêtre
 de commandes en dessous où l'invite vit dans le texte, l'espace de travail
 et l'historique à droite. Chaque figure s'ouvre dans sa propre fenêtre,
@@ -118,6 +129,22 @@ et chronométrer » (Ctrl+F5) ouvre le profileur : les fonctions classées
 par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
 la seule dépendance, et elle reste facultative — sans Qt, tout le reste se
 compile comme avant.
+
+**Quand quelque chose casse**, le message dit où : la fonction qui a
+échoué, le fichier et la ligne de chaque appel traversé, avec la ligne de
+code elle-même — c'est le rapport de MATLAB, et `err.stack` porte les
+mêmes cadres.
+
+```
+Error using double
+Conversion to double from struct is not possible.
+
+Error in isstable (line 35)
+    a = double(a(:)).';
+
+Error in monScript (line 12)
+    assert(isstable(modele));
+```
 
 **La documentation** vit dans le bureau : `doc nom` — ou F1 sur un mot de
 l'éditeur — ouvre le navigateur d'aide, avec la liste des fonctions, la

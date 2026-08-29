@@ -38,10 +38,39 @@ static void relierClasse(const std::shared_ptr<DefinitionClasse>& def,
 }
 
 
+// Ce que le message d'erreur nomme : le nom de la fonction, ou celui du
+// fichier quand la fonction n'en a pas (un script).
+std::string nomCourt(const std::string& nom, const std::string& fichier) {
+    std::string base;
+    if (!fichier.empty()) {
+        std::size_t barre = fichier.find_last_of("/\\");
+        base = barre == std::string::npos ? fichier : fichier.substr(barre + 1);
+        std::size_t point = base.find_last_of('.');
+        if (point != std::string::npos) base = base.substr(0, point);
+    }
+    // Un script, ou l'enveloppe posee autour : c'est le fichier qui nomme.
+    if (nom.empty() || nom[0] == '<') return base;
+    // Une sous-fonction se nomme « fichier>fonction », comme sous MATLAB.
+    if (!base.empty() && base != nom) return base + ">" + nom;
+    return nom;
+}
+
 GardePortee::GardePortee(Interpreteur& i, std::shared_ptr<Portee> p) : it(i) {
     it.piles_.push_back(std::move(p));
 }
 GardePortee::~GardePortee() { it.piles_.pop_back(); }
+
+// Empile un cadre d'exécution pour la durée d'un appel. Le cadre reste
+// lisible pendant le déroulement de la pile : c'est là que l'erreur va
+// chercher le nom du fichier et la ligne.
+GardeCadre::GardeCadre(Interpreteur& i, const std::string& nom, const std::string& fichier)
+    : it(i) {
+    it.cadres.push_back(CadreErreur{nomCourt(nom, fichier), fichier, 0});
+}
+
+GardeCadre::~GardeCadre() {
+    if (!it.cadres.empty()) it.cadres.pop_back();
+}
 
 Interpreteur::Interpreteur() {
     piles_.push_back(std::make_shared<Portee>());
@@ -285,6 +314,8 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         // tel et l'on ne rend rien.
         for (auto& c : u.classes) {
             relierClasse(c, u.fonctions);
+            c->aide = aideDepuisSource(source);
+            c->fichier = it->second;
             cacheClasses_[c->nom] = c;
         }
         cacheFonctions_[nom] = nullptr;
@@ -399,12 +430,20 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
         UniteCompilee u = compiler(source, itm->second);
         if (u.classes.empty()) return nullptr;
         relierClasse(u.classes[0], u.fonctions);
+        // Le bloc de commentaires sous « classdef » est l'aide de la
+        // classe, comme celui sous « function » l'est d'une fonction :
+        // « help tf » doit le trouver.
+        u.classes[0]->aide = aideDepuisSource(source);
+        u.classes[0]->fichier = itm->second;
         cacheClasses_[nom] = u.classes[0];
         return u.classes[0];
     }
-    UniteCompilee u = compiler(lireFichier(it->second), it->second);
+    std::string source = lireFichier(it->second);
+    UniteCompilee u = compiler(source, it->second);
     if (u.classes.empty()) return nullptr;
     relierClasse(u.classes[0], u.fonctions);
+    u.classes[0]->aide = aideDepuisSource(source);
+    u.classes[0]->fichier = it->second;
     cacheClasses_[nom] = u.classes[0];
     return u.classes[0];
 }
@@ -496,6 +535,13 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
     // définit la méthode ; « varfun(@sum, T) » atteint ainsi table.varfun.
     for (const auto& a : args) {
         if (a.classe != Classe::Objet) continue;
+        // Un nom de classe est toujours un appel de constructeur. Sans ce
+        // test, « ss(sys) » où sys est déjà un ss partait vers la méthode
+        // « ss » de la classe — c'est-à-dire son constructeur, mais appelé
+        // comme une fonction ordinaire : la valeur rendue était une simple
+        // structure, et tout ce qui suivait la prenait pour telle.
+        if (auto classe = classeDefinie(nom))
+            return {construireObjet(*this, classe, args)};
         auto def = classeDefinie(a.nomObjet);
         if (!def) continue;
         auto itm = def->methodes.find(nom);
@@ -528,12 +574,35 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         if (!saventLireCreux.count(nom))
             for (auto& a : args)
                 if (a.estCreux()) a = denseDepuisCreux(a);
-        if (!profil.actif) return it->second.fonction(*this, args, nargout);
+        // Le nom de la native qui echoue est ce que MATLAB imprime en
+        // tete de son rapport : « Error using double ». Le try/catch ne
+        // coute rien tant que rien n'est leve.
+        //
+        // Sauf pour « error » et sa famille : l'erreur qu'elles levent
+        // n'est pas la leur, elle appartient a la fonction qui les
+        // appelle. MATLAB ecrit « Error using sim », jamais « Error
+        // using error ».
+        static const std::set<std::string> porteParole = {
+            "error", "rethrow", "throw", "throwAsCaller", "MException", "assert_"};
+        if (!profil.actif) {
+            try {
+                return it->second.fonction(*this, args, nargout);
+            } catch (ErreurMatlab& e) {
+                if (e.fonctionNative.empty() && e.pile.empty() && !porteParole.count(nom))
+                    e.fonctionNative = nom;
+                throw;
+            }
+        }
         profil.entrerAppel(nom);
         try {
             auto r = it->second.fonction(*this, args, nargout);
             profil.sortirAppel(nom);
             return r;
+        } catch (ErreurMatlab& e) {
+            profil.sortirAppel(nom);
+            if (e.fonctionNative.empty() && e.pile.empty() && !porteParole.count(nom))
+                e.fonctionNative = nom;
+            throw;
         } catch (...) {
             profil.sortirAppel(nom);
             throw;
@@ -608,11 +677,15 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
             std::string valeur;
             ~Restaurer() { cible = valeur; }
         } restaurer{fichierCourant, precedent};
+        GardeCadre cadre(*this, f->nom, f->fichier);
         // « return » dans un script rend la main a ce qui l'a lance : il
         // arrete le script, il ne quitte pas la fonction appelante.
         try {
             executerBloc(f->corps);
         } catch (RetourFonction&) {
+        } catch (ErreurMatlab& e) {
+            e.pile.push_back(cadres.back());
+            throw;
         }
         return {};
     }
@@ -642,10 +715,15 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
     portee->nargin = (int)args.size();
     portee->nargout = nargout;
     GardePortee garde(*this, portee);
+    GardeCadre cadre(*this, f->nom, f->fichier);
     if (profil.actif) profil.entrerAppel(f->nom);
     try {
         executerBloc(f->corps);
     } catch (RetourFonction&) {
+    } catch (ErreurMatlab& e) {
+        if (profil.actif) profil.sortirAppel(f->nom);
+        e.pile.push_back(cadres.back());
+        throw;
     } catch (...) {
         if (profil.actif) profil.sortirAppel(f->nom);
         throw;
@@ -726,6 +804,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
         std::string valeur;
         ~Restaurer() { cible = valeur; }
     } restaurer{fichierCourant, precedent};
+    GardeCadre cadre(*this, "<script>", fichier);
     UniteCompilee u = compiler(source, fichier);
     for (auto& c : u.classes) cacheClasses_[c->nom] = c;
     for (auto& c : u.classes) relierClasse(c, u.fonctions);
@@ -750,6 +829,9 @@ void Interpreteur::executerFichier(const std::string& fichier) {
             executerBloc(u.script);
         } catch (RetourFonction&) {
             if (profondeur() > 1) throw;
+        } catch (ErreurMatlab& e) {
+            e.pile.push_back(cadres.back());
+            throw;
         }
     } else if (!u.fonctions.empty()) {
         std::vector<Valeur> args;
@@ -881,6 +963,9 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
     // permet de sortir d'une boucle qui ne finit pas, et de couper
     // l'affichage d'un tableau énorme.
     verifierInterruption();
+    // Ou l'on en est : une ecriture d'entier, pour que le message d'erreur
+    // puisse nommer la ligne.
+    if (n->ligne > 0 && !cadres.empty()) cadres.back().ligne = n->ligne;
     // Profileur et débogueur : deux tests de booléen quand ils sont éteints.
     if (profil.actif) profil.compterLigne(fichierExecute(), n->ligne);
     if ((debogueur.actif || debogueur.action != ActionDebogueur::Continuer) &&
@@ -1186,10 +1271,28 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
                 Valeur err = Valeur::structureVide();
                 err.poserChamp("identifier", Valeur::texte(e.identifiant));
                 err.poserChamp("message", Valeur::texte(e.message));
+                // « err.stack » de MATLAB : un cadre par appel traverse, du
+                // plus profond au plus haut, avec son fichier et sa ligne.
                 Valeur pile = Valeur::structureVide();
-                pile.poserChamp("file", Valeur::texte(""));
-                pile.poserChamp("name", Valeur::texte(portee().nomFonction));
-                pile.poserChamp("line", Valeur::scalaire(n->ligne));
+                pile.st = std::make_shared<ChampsStructure>();
+                pile.st->ordre = {"file", "name", "line"};
+                std::size_t cadresErreur = e.pile.size();
+                pile.dims = {1, (int)std::max<std::size_t>(cadresErreur, 1)};
+                for (const auto& champ : pile.st->ordre)
+                    pile.st->champs[champ] =
+                        std::vector<Valeur>(std::max<std::size_t>(cadresErreur, 1),
+                                            Valeur::vide());
+                if (cadresErreur == 0) {
+                    pile.st->champs["file"][0] = Valeur::texte("");
+                    pile.st->champs["name"][0] = Valeur::texte(portee().nomFonction);
+                    pile.st->champs["line"][0] = Valeur::scalaire(n->ligne);
+                } else {
+                    for (std::size_t k = 0; k < cadresErreur; ++k) {
+                        pile.st->champs["file"][k] = Valeur::texte(e.pile[k].fichier);
+                        pile.st->champs["name"][k] = Valeur::texte(e.pile[k].nom);
+                        pile.st->champs["line"][k] = Valeur::scalaire(e.pile[k].ligne);
+                    }
+                }
                 err.poserChamp("stack", pile);
                 err.classe = Classe::Objet;
                 err.nomObjet = "MException";

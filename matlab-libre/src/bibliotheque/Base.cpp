@@ -761,9 +761,18 @@ Valeur convertirVers(const Valeur& v, Classe c) {
         for (std::size_t k = 0; k < v.nelem(); ++k) r.re[k] = std::atof(v.chaines[k].c_str());
         base = r;
     }
-    if (v.classe == Classe::Cellule)
+    // Une structure, un objet ou une poignee ne portent aucun nombre :
+    // les convertir donnait une valeur numerique sans donnees, dont la
+    // premiere lecture sortait du tableau. MATLAB refuse, en nommant les
+    // deux classes.
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction) {
+        Valeur cible;
+        cible.classe = c;
         erreur("MATLAB:invalidConversion",
-               "Conversion to double from cell is not possible.");
+               formater("Conversion to %s from %s is not possible.",
+                        cible.classeNom().c_str(), v.classeNom().c_str()));
+    }
     return appliquerClasse(base, c);
 }
 

@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QFontMetrics>
 #include <QFrame>
+#include <QFont>
 #include <QPainterPath>
 #include <cmath>
 #include <QToolButton>
@@ -129,6 +130,96 @@ void dessiner(QPainter& p, const QString& nom, const QRectF& r) {
         p.setBrush(jaune);
         p.drawRect(QRectF(r.left() + r.width() * 0.12, r.top() + r.height() * 0.26,
                           r.width() * 0.76, r.height() * 0.52));
+        return;
+    }
+    // --- le panneau « Dossier courant » ----------------------------------
+    //
+    // Un dossier a la forme d'une chemise, un fichier celle d'une feuille
+    // au coin replié ; la couleur dit la famille, comme dans le panneau de
+    // MATLAB — bleu pour le code, violet pour les données, vert pour les
+    // images, gris pour le reste.
+    auto chemise = [&](const QColor& couleur) {
+        p.setPen(QPen(couleur.darker(130), r.width() * 0.06));
+        p.setBrush(couleur);
+        QPainterPath c;
+        double g = r.left() + r.width() * 0.08, d = r.right() - r.width() * 0.08;
+        double h = r.top() + r.height() * 0.22, b = r.bottom() - r.height() * 0.16;
+        c.moveTo(g, b);
+        c.lineTo(g, h);
+        c.lineTo(g + (d - g) * 0.34, h);
+        c.lineTo(g + (d - g) * 0.46, h + r.height() * 0.11);
+        c.lineTo(d, h + r.height() * 0.11);
+        c.lineTo(d, b);
+        c.closeSubpath();
+        p.drawPath(c);
+    };
+    // Une feuille au coin replié, avec une pastille de couleur : c'est
+    // elle qui distingue un .m d'un .mat d'un coup d'œil.
+    auto document = [&](const QColor& couleur, const QString& etiquette) {
+        double g = r.left() + r.width() * 0.20, d = r.right() - r.width() * 0.16;
+        double h = r.top() + r.height() * 0.08, b = r.bottom() - r.height() * 0.08;
+        double pli = r.width() * 0.22;
+        QPainterPath f;
+        f.moveTo(g, b);
+        f.lineTo(g, h);
+        f.lineTo(d - pli, h);
+        f.lineTo(d, h + pli);
+        f.lineTo(d, b);
+        f.closeSubpath();
+        p.setPen(QPen(gris.lighter(120), r.width() * 0.05));
+        p.setBrush(Qt::white);
+        p.drawPath(f);
+        // Le coin replié.
+        QPainterPath coin;
+        coin.moveTo(d - pli, h);
+        coin.lineTo(d - pli, h + pli);
+        coin.lineTo(d, h + pli);
+        coin.closeSubpath();
+        p.setBrush(gris.lighter(170));
+        p.drawPath(coin);
+        // La pastille, et sa lettre quand la place le permet.
+        QRectF pastille(g, b - r.height() * 0.34, (d - g) * 0.86, r.height() * 0.26);
+        p.setPen(Qt::NoPen);
+        p.setBrush(couleur);
+        p.drawRoundedRect(pastille, r.width() * 0.05, r.width() * 0.05);
+        if (!etiquette.isEmpty() && r.width() >= 20) {
+            QFont police = p.font();
+            police.setBold(true);
+            police.setPixelSize((int)(r.height() * 0.22));
+            p.setFont(police);
+            p.setPen(Qt::white);
+            p.drawText(pastille, Qt::AlignCenter, etiquette);
+        }
+    };
+    if (nom == QLatin1String("dossier-plein")) { chemise(jaune); return; }
+    if (nom == QLatin1String("dossier-parent")) {
+        chemise(jaune.darker(115));
+        p.setPen(QPen(Qt::white, r.width() * 0.10, Qt::SolidLine, Qt::RoundCap));
+        double cx = r.center().x(), cy = r.center().y() + r.height() * 0.06;
+        p.drawLine(QPointF(cx, cy + r.height() * 0.14), QPointF(cx, cy - r.height() * 0.12));
+        p.drawLine(QPointF(cx - r.width() * 0.12, cy), QPointF(cx, cy - r.height() * 0.12));
+        p.drawLine(QPointF(cx + r.width() * 0.12, cy), QPointF(cx, cy - r.height() * 0.12));
+        return;
+    }
+    if (nom == QLatin1String("fichier-m")) { document(bleu, QStringLiteral("m")); return; }
+    if (nom == QLatin1String("fichier-mlx")) {
+        document(QColor("#7b3fa0"), QStringLiteral("mlx"));
+        return;
+    }
+    if (nom == QLatin1String("fichier-donnees")) {
+        document(orange, QStringLiteral("mat"));
+        return;
+    }
+    if (nom == QLatin1String("fichier-image")) {
+        document(vert, QString());
+        return;
+    }
+    if (nom == QLatin1String("fichier-texte")) {
+        document(gris, QString());
+        return;
+    }
+    if (nom == QLatin1String("fichier-autre")) {
+        document(gris.lighter(130), QString());
         return;
     }
     if (nom == QLatin1String("trace")) {
@@ -305,6 +396,30 @@ QIcon iconeDessinee(const QString& nom, int taille) {
     dessiner(p, nom, QRectF(0, 0, taille, taille));
     p.end();
     return QIcon(image);
+}
+
+QIcon iconeEntree(const QString& suffixe, bool dossier, int taille) {
+    if (dossier) return iconeDessinee(QStringLiteral("dossier-plein"), taille);
+    const QString s = suffixe.toLower();
+    if (s == QLatin1String("m")) return iconeDessinee(QStringLiteral("fichier-m"), taille);
+    if (s == QLatin1String("mlx") || s == QLatin1String("mlapp"))
+        return iconeDessinee(QStringLiteral("fichier-mlx"), taille);
+    if (s == QLatin1String("mat") || s == QLatin1String("csv") ||
+        s == QLatin1String("xlsx") || s == QLatin1String("xls") ||
+        s == QLatin1String("json") || s == QLatin1String("dat"))
+        return iconeDessinee(QStringLiteral("fichier-donnees"), taille);
+    if (s == QLatin1String("png") || s == QLatin1String("jpg") ||
+        s == QLatin1String("jpeg") || s == QLatin1String("bmp") ||
+        s == QLatin1String("gif") || s == QLatin1String("svg") ||
+        s == QLatin1String("fig") || s == QLatin1String("pdf"))
+        return iconeDessinee(QStringLiteral("fichier-image"), taille);
+    if (s == QLatin1String("txt") || s == QLatin1String("md") ||
+        s == QLatin1String("log") || s == QLatin1String("c") ||
+        s == QLatin1String("h") || s == QLatin1String("cpp") ||
+        s == QLatin1String("py") || s == QLatin1String("xml") ||
+        s == QLatin1String("html"))
+        return iconeDessinee(QStringLiteral("fichier-texte"), taille);
+    return iconeDessinee(QStringLiteral("fichier-autre"), taille);
 }
 
 GroupeRuban::GroupeRuban(const QString& titre, QWidget* parent)

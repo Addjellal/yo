@@ -287,6 +287,54 @@ assert(marqueRetour == 1);
 assert(lanceurDeScript(true) == 42);
 assert(lanceurDeScript(false) == 42);
 
+% Ce qui ne porte pas de nombre ne se convertit pas. Convertir une
+% structure, un objet ou une poignee rendait une valeur numerique sans
+% donnees, dont la premiere lecture sortait du tableau — le programme
+% tombait.
+for aConvertir = {struct('a', 1), @sin, {1, 2}}
+    refuse = false;
+    try
+        double(aConvertir{1});                          %#ok<VUNUS>
+    catch e
+        refuse = strcmp(e.identifier, 'MATLAB:invalidConversion');
+    end
+    assert(refuse);
+end
+refuse = false;
+try
+    int32(struct('a', 1));                              %#ok<VUNUS>
+catch e
+    refuse = strcmp(e.identifier, 'MATLAB:invalidConversion') && ...
+             ~isempty(strfind(e.message, 'int32'));
+end
+assert(refuse);
+
+% « err.stack » nomme les cadres traverses, du plus profond au plus haut,
+% avec leur ligne : c'est ce que MATLAB imprime sous le message.
+try
+    profondEnErreur();
+catch e
+    assert(numel(e.stack) >= 2);
+    assert(~isempty(strfind(e.stack(1).name, 'plusProfondEncore')));
+    assert(e.stack(1).line > 0);
+    assert(~isempty(strfind(e.stack(2).name, 'profondEnErreur')));
+    assert(e.stack(2).line > e.stack(1).line - 100);
+end
+
+% « (a)(b) » : une multiplication oubliee. MATLAB le refuse a l'analyse ;
+% on rendait « Index in position 1 is invalid », qui ne designe rien.
+refuse = false;
+try
+    eval('x = (1+2)(3+4);');
+catch e
+    refuse = strcmp(e.identifier, 'MATLAB:parseError') && ...
+             ~isempty(strfind(e.message, 'missing multiplication operator'));
+end
+assert(refuse);
+% Ce qui reste licite le reste.
+assert((1 + 2) * 3 == 9);
+assert(isequal(([1 2 3])', [1; 2; 3]));
+
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions
@@ -360,4 +408,12 @@ function n = appels()
     end
     nombre = nombre + 1;
     n = nombre;
+end
+
+function profondEnErreur()
+    plusProfondEncore();
+end
+
+function plusProfondEncore()
+    error('Essai:profond', 'au fond');
 end

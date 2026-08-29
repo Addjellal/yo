@@ -15,7 +15,7 @@ function [K, S, poles] = lqr(A, B, Q, R, N)
 %      lqr(0, 1, 1, 1)   % 1 : le gain qui place le pôle en -1
 %
 %   Voir aussi CARE, DLQR, LQRY, LQI.
-    if isstruct(A)
+    if isa(A, 'ss') || isa(A, 'tf')
         systeme = ss(A);
         if nargin >= 4, N = R; else, N = []; end
         R = Q;

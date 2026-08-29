@@ -17,12 +17,7 @@ function sys = append(varargin)
     end
     A = []; B = []; C = []; D = []; Ts = 0;
     for k = 1:numel(varargin)
-        courant = varargin{k};
-        if ~isstruct(courant)
-            courant = ss(courant);
-        else
-            courant = ss(courant);
-        end
+        courant = ss(varargin{k});
         if courant.Ts ~= 0
             Ts = courant.Ts;
         end

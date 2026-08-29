@@ -264,6 +264,24 @@ modele = add_block(modele, 'transferfcn', 'systeme', 'Numerator', 1, 'Denominato
 modele = add_line(modele, 'entree', 'systeme', 1);
 resultat = sim(modele, 5, 0.01);
 assert(abs(resultat.signaux.systeme(end) - (1 - exp(-5))) < 2e-2);
+% La forme « structure with time » que journalise Simulink : c'est celle
+% que lisent les scripts ecrits pour lui.
+assert(numel(resultat.time) == numel(resultat.temps));
+assert(numel(resultat.signals) == 2);
+assert(abs(resultat.signals(2).values(end) - resultat.signaux.systeme(end)) < 1e-12);
+assert(strcmp(resultat.signals(2).label, 'systeme'));
+% « sim » accepte aussi le nom d'un modele pose dans l'espace de travail.
+resultatParNom = sim('modele', 5, 0.01);
+assert(abs(resultatParNom.signaux.systeme(end) - resultat.signaux.systeme(end)) < 1e-12);
+% Et il dit clairement ce qui manque quand le modele est introuvable, au
+% lieu d'echouer sur une indexation par point.
+introuvable = false;
+try
+    sim('modeleQuiNExistePas', 5);                       %#ok<VUNUS>
+catch e
+    introuvable = strcmp(e.identifier, 'Simulink:Commands:OpenSystemUnknownSystem');
+end
+assert(introuvable);
 
 % Stateflow
 machine = sfchart('bascule');

@@ -12,8 +12,35 @@ function resultat = sim(modele, tFinal, pas)
 %
 %   Tous les paramètres sont résolus avant la boucle : à l'intérieur, il
 %   ne reste que de l'arithmétique.
+%
+%   SIM('NOM') accepte aussi le nom d'un modèle : une variable de
+%   l'espace de travail qui porte ce nom, ou un fichier NOM.m qui
+%   construit le modèle et le rend. Les modèles se décrivent ici en
+%   appelant NEW_SYSTEM, ADD_BLOCK et ADD_LINE ; les fichiers .slx de
+%   MathWorks, dont le format n'est pas public, ne se lisent pas.
+%
+%   Le résultat porte les deux formes que Simulink journalise :
+%   RESULTAT.temps et RESULTAT.signaux.<nom> pour l'accès direct,
+%   RESULTAT.time et RESULTAT.signals(k).values pour la « structure with
+%   time » qu'attendent les scripts écrits pour Simulink.
     if nargin < 2, tFinal = 10; end
     if nargin < 3, pas = 0.01; end
+    if ischar(modele) || isstring(modele)
+        % L'espace de travail à consulter est celui de l'appelant de SIM :
+        % « evalin('caller') » depuis une sous-fonction ne verrait que
+        % l'espace de SIM lui-même.
+        nom = char(modele);
+        if isvarname(nom) && evalin('caller', sprintf('exist(''%s'', ''var'')', nom)) == 1
+            modele = evalin('caller', nom);
+        else
+            modele = chargerModele(nom);
+        end
+    end
+    if ~isstruct(modele) || ~isfield(modele, 'blocs')
+        error('Simulink:Commands:InvalidModel', ...
+              ['SIM expects a model built with NEW_SYSTEM, ADD_BLOCK and ' ...
+               'ADD_LINE, or the name of one.']);
+    end
     n = numel(modele.blocs);
     instants = 0:pas:tFinal;
     nInstants = numel(instants);
@@ -147,6 +174,37 @@ function resultat = sim(modele, tFinal, pas)
     for k = 1:n
         resultat.signaux.(nomValide(modele.blocs{k}.nom)) = releves(:, k);
     end
+    % La forme « structure with time » de Simulink : c'est celle que lisent
+    % les scripts écrits pour lui, avec res.time et res.signals(k).values.
+    resultat.time = instants(:);
+    signals = struct('values', {}, 'dimensions', {}, 'label', {}, 'blockName', {});
+    for k = 1:n
+        signals(k).values = releves(:, k);
+        signals(k).dimensions = 1;
+        signals(k).label = modele.blocs{k}.nom;
+        signals(k).blockName = modele.blocs{k}.nom;
+    end
+    resultat.signals = signals;
+    resultat.blockName = modele.nom;
+end
+
+% Un modèle désigné par son nom : une variable de l'espace de travail de
+% l'appelant, ou un fichier .m qui le construit. Les .slx de MathWorks ne
+% se lisent pas — leur format n'est pas public.
+function modele = chargerModele(nom)
+    if exist(nom, 'file') == 2 || exist(nom, 'file') == 6
+        modele = feval(nom);
+        return
+    end
+    if exist([nom '.slx'], 'file') || exist([nom '.mdl'], 'file')
+        error('Simulink:Commands:SlxNonLu', ...
+              ['MatLibre ne lit pas les fichiers .slx ni .mdl : leur format ' ...
+               'n''est pas public. Decrivez le modele ''%s'' en appelant ' ...
+               'NEW_SYSTEM, ADD_BLOCK et ADD_LINE, dans un fichier %s.m qui ' ...
+               'le rend.'], nom, nom);
+    end
+    error('Simulink:Commands:OpenSystemUnknownSystem', ...
+          'Invalid Simulink object name: ''%s''.', nom);
 end
 
 function entrees = rassembler(liste, sorties)

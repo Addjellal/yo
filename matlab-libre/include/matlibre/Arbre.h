@@ -95,6 +95,7 @@ struct DefinitionClasse {
     std::vector<std::string> statiques;     // méthodes appelables sans objet
     std::vector<std::string> evenements;    // noms déclarés par « events »
     std::string aide;
+    std::string fichier;   // d'où elle vient, pour « help » et le navigateur
     bool aMethode(const std::string& nom) const { return methodes.count(nom) > 0; }
     bool estStatique(const std::string& nom) const {
         for (const auto& s : statiques)

@@ -281,9 +281,16 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     portee->nargout = 1;
     {
         GardePortee garde(it, portee);
+        // Le constructeur est un cadre d'execution comme un autre : sans
+        // cela, ses instructions ecrasaient la ligne courante de
+        // l'appelant, et le message d'erreur nommait la mauvaise.
+        GardeCadre cadre(it, f->nom, f->fichier);
         try {
             it.executerBloc(f->corps);
         } catch (RetourFonction&) {
+        } catch (ErreurMatlab& e) {
+            e.pile.push_back(it.cadres.back());
+            throw;
         }
         const Valeur* resultat = it.trouverVariable(nomSortie);
         if (resultat) obj = *resultat;

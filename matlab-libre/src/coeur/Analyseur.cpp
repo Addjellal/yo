@@ -959,7 +959,13 @@ std::vector<NoeudPtr> Analyseur::listeArguments(const char* fermeture) {
 }
 
 NoeudPtr Analyseur::postfixe() {
+    groupeParenthese_ = false;
     auto base = primaire();
+    // « (a)(b) » : une parenthèse qui en suit une autre est presque
+    // toujours une multiplication oubliée. MATLAB refuse à l'analyse, en
+    // le disant ; sans ce test, on tentait d'indexer le résultat et l'on
+    // rendait « Index in position 1 is invalid », qui ne désigne rien.
+    const bool baseParenthesee = groupeParenthese_;
     NoeudPtr acces;
     auto ajouter = [&](ElementAcces e) {
         if (!acces) {
@@ -972,6 +978,10 @@ NoeudPtr Analyseur::postfixe() {
     for (;;) {
         const Jeton& t = jeton();
         if (t.estOp("(") && !(dansTableau_ && t.espaceAvant)) {
+            if (baseParenthesee && !acces)
+                erreurSyntaxe("Invalid expression. Check for missing multiplication "
+                              "operator, missing or unbalanced delimiters, or other "
+                              "syntax error.");
             avancer();
             ElementAcces e;
             e.genre = '(';
@@ -1114,6 +1124,7 @@ NoeudPtr Analyseur::primaire() {
                 sauterFinsLignes();
                 dansTableau_ = sauve;
                 exigerOp(")");
+                groupeParenthese_ = true;
                 return e;
             }
             if (t.texte == "[") return litteralTableau(false);

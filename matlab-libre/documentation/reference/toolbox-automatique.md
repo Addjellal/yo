@@ -1026,6 +1026,10 @@ SS Modèle d'état.
   fonction de transfert passe par TF2SS, forme compagne de commande.
   SYS = SS(K) crée un gain statique, sans état.
 
+  Les opérateurs + - * / ^ sont définis, comme sur les fonctions de
+  transfert : le calcul passe par TF, et le résultat revient en modèle
+  d'état dès qu'un des opérandes en est un.
+
   Exemple :
      s = ss(tf(1, [1 1]));   % A = -1, B = 1, C = 1, D = 0
 
@@ -1118,6 +1122,19 @@ TF Modèle sous forme de fonction de transfert.
   SYS = TF(SYS) convertit n'importe quel modèle en fonction de
   transfert : un modèle d'état passe par SS2TF.
 
+  S = TF('s') rend la variable de Laplace, Z = TF('z',TS) la variable
+  d'avance échantillonnée. On écrit alors les modèles comme on les
+  écrit à la main :
+
+     s = tf('s');
+     G = 1 / (s^2 + 2*s + 1)
+     z = tf('z', 0.1);
+     C = 0.5*(z - 0.9) / (z - 1)
+
+  Les opérateurs + - * / ^ sont définis entre modèles et avec les
+  nombres : SERIES, PARALLEL et FEEDBACK ne servent plus qu'à nommer
+  l'intention.
+
   Exemple :
      G = tf([1], [1 2 1]);   % 1/(s+1)^2
      tf(ss(-1, 1, 1, 0))     % 1/(s+1)
@@ -1184,7 +1201,7 @@ ZPK Modèle par zéros, pôles et gain.
 
   Le modèle rendu porte le type 'tf' : la représentation interne reste
   celle des polynômes, ZPKDATA rendant les zéros et les pôles à la
-  demande.
+  demande. Il s'affiche en facteurs, comme sous MATLAB.
 
   Exemple :
      g = zpk(-1, [-2 -3], 6);

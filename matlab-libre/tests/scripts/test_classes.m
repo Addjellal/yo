@@ -35,4 +35,20 @@ assert(f.valeur == 0);
 f.valeur = 42;
 assert(f.valeur == 42);
 
+% « help » et « doc » lisent aussi le bloc d'aide d'une classe : il est
+% sous « classdef » comme celui d'une fonction est sous « function ».
+% « help tf » repondait « 'tf' not found » des que tf est devenue une
+% classe.
+for nomClasse = {'tf', 'ss', 'duration'}
+    fiche = matlibre_aide_structuree(nomClasse{1});
+    assert(strcmp(fiche.Source, 'classe'));
+    assert(~isempty(fiche.Resume));
+    assert(~isempty(fiche.Fichier));
+end
+% Et les sections y sont decoupees, « Exemple : » compris — l'espace
+% avant le deux-points empechait de reconnaitre l'en-tete.
+ficheTf = matlibre_aide_structuree('tf');
+assert(numel(ficheTf.Exemples) >= 2);
+assert(any(strcmp(ficheTf.VoirAussi, 'zpk')));
+
 disp('classes : toutes les verifications passent');

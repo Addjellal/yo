@@ -67,7 +67,7 @@ void consoleDebogueur(Interpreteur& it, const std::string& fichier, int ligne) {
             try {
                 it.executerTexte(mot, "<debogueur>");
             } catch (const ErreurMatlab& e) {
-                std::cerr << "Error: " << e.message << "\n";
+                std::cerr << rapportErreur(e);
             }
             return;
         }
@@ -75,7 +75,7 @@ void consoleDebogueur(Interpreteur& it, const std::string& fichier, int ligne) {
         try {
             it.executerTexte(mot, "<debogueur>");
         } catch (const ErreurMatlab& e) {
-            std::cerr << "Error: " << e.message << "\n";
+            std::cerr << rapportErreur(e);
         }
     }
 }
@@ -153,7 +153,7 @@ int executerFluxInteractif(Interpreteur& it) {
                  e.message.find("Unexpected end of statement") != std::string::npos)) {
                 continue;
             }
-            std::cerr << "Error: " << e.message << "\n";
+            std::cerr << rapportErreur(e);
             tampon.clear();
         } catch (const DemandeSortie& s) {
             return s.code;
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
         std::cout << "\nOperation terminated by user.\n";
         return 130;
     } catch (const ErreurMatlab& e) {
-        std::cerr << "Error: " << e.message << "\n";
+        std::cerr << rapportErreur(e);
         return 1;
     } catch (const std::exception& e) {
         std::cerr << "Erreur interne : " << e.what() << "\n";

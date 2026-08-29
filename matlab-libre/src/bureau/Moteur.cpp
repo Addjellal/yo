@@ -309,7 +309,7 @@ void Moteur::demarrer() {
             } catch (const InterruptionUtilisateur&) {
                 *flux_ << "Operation terminated by user.\n";
             } catch (const ErreurMatlab& e) {
-                *flux_ << "Error: " << e.message << "\n";
+                *flux_ << rapportErreur(e);
             } catch (const std::exception& e) {
                 *flux_ << "Error: " << e.what() << "\n";
             } catch (...) {
@@ -384,7 +384,7 @@ void Moteur::executer(const QString& texte) {
         // Le message de MATLAB, mot pour mot.
         *flux_ << "Operation terminated by user.\n";
     } catch (const ErreurMatlab& e) {
-        *flux_ << "Error: " << e.message << "\n";
+        *flux_ << rapportErreur(e);
     } catch (const std::exception& e) {
         *flux_ << "Error: " << e.what() << "\n";
     } catch (...) {
@@ -413,7 +413,7 @@ void Moteur::executerEtChronometrer(const QString& texte) {
     } catch (const InterruptionUtilisateur&) {
         *flux_ << "Operation terminated by user.\n";
     } catch (const ErreurMatlab& e) {
-        *flux_ << "Error: " << e.message << "\n";
+        *flux_ << rapportErreur(e);
     } catch (const std::exception& e) {
         *flux_ << "Error: " << e.what() << "\n";
     } catch (...) {

@@ -190,6 +190,12 @@ public:
     bool modeInteractif = false;
     std::string fichierCourant;   // fichier en cours, pour mfilename
 
+    // Pile d'exécution : le nom, le fichier et la ligne de chaque cadre.
+    // Tenue en permanence — une écriture d'entier par instruction — pour
+    // que le message d'erreur puisse dire dans quel fichier et à quelle
+    // ligne le calcul s'est arrêté, comme le fait MATLAB.
+    std::vector<CadreErreur> cadres;
+
     // --- profileur et débogueur (Deboguage.h) ---
     Profil profil;
     Debogueur debogueur;
@@ -268,6 +274,18 @@ struct GardePortee {
     explicit GardePortee(Interpreteur& i, std::shared_ptr<Portee> p);
     ~GardePortee();
 };
+
+// Empile un cadre d'exécution — nom, fichier, ligne — pour la durée d'un
+// appel, et le dépile en sortant.
+struct GardeCadre {
+    Interpreteur& it;
+    GardeCadre(Interpreteur& i, const std::string& nom, const std::string& fichier);
+    ~GardeCadre();
+};
+
+// Le nom qu'un message d'erreur donne à un cadre : celui de la fonction,
+// ou celui du fichier pour un script.
+std::string nomCourt(const std::string& nom, const std::string& fichier);
 
 // Crochets posés par la bibliothèque graphique : ils donnent aux poignées
 // de figure et d'axes leurs propriétés — « ax.XTick », « f.Name ». Rendent

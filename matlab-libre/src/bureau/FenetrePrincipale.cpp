@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QHeaderView>
@@ -26,6 +27,7 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QThread>
+#include <QTreeWidget>
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -41,6 +43,63 @@
 #include "Theme.h"
 #include "VueFigure.h"
 #include "matlibre/Version.h"
+
+namespace {
+
+// La taille d'un fichier telle que le panneau de MATLAB l'écrit : des
+// kilooctets dès qu'on dépasse le millier, jamais plus de trois chiffres.
+QString tailleLisible(qint64 octets) {
+    if (octets < 1024) return QStringLiteral("%1 o").arg(octets);
+    double valeur = (double)octets / 1024.0;
+    const char* unites[] = {"Ko", "Mo", "Go", "To"};
+    int k = 0;
+    while (valeur >= 1024.0 && k < 3) {
+        valeur /= 1024.0;
+        ++k;
+    }
+    return QStringLiteral("%1 %2")
+        .arg(valeur, 0, 'f', valeur < 10.0 ? 1 : 0)
+        .arg(QLatin1String(unites[k]));
+}
+
+// La colonne « Type » : ce que MATLAB y met, en français.
+QString typeFichier(const QString& suffixe) {
+    const QString s = suffixe.toLower();
+    if (s.isEmpty()) return QStringLiteral("Fichier");
+    // Court : la colonne partage la largeur du panneau avec le nom, qui
+    // passe avant. « Valeurs séparées par des virgules » ne laissait au
+    // nom que trois points de suspension.
+    if (s == QLatin1String("m")) return QStringLiteral("Fichier M");
+    if (s == QLatin1String("mlx")) return QStringLiteral("Live Script");
+    if (s == QLatin1String("mat")) return QStringLiteral("Fichier MAT");
+    if (s == QLatin1String("fig")) return QStringLiteral("Figure");
+    if (s == QLatin1String("svg")) return QStringLiteral("Image SVG");
+    if (s == QLatin1String("txt")) return QStringLiteral("Texte");
+    if (s == QLatin1String("png") || s == QLatin1String("jpg") ||
+        s == QLatin1String("jpeg") || s == QLatin1String("bmp") ||
+        s == QLatin1String("gif"))
+        return QStringLiteral("Image");
+    return QStringLiteral("Fichier %1").arg(suffixe.toUpper());
+}
+
+// Un fichier qu'on peut ouvrir dans l'éditeur. On ne se fie pas au
+// suffixe seul : un fichier sans extension peut être du texte, et un
+// « .dat » peut être binaire. On regarde le début du contenu, comme le
+// fait « file ».
+bool estFichierTexte(const QString& chemin) {
+    QFile f(chemin);
+    if (!f.open(QIODevice::ReadOnly)) return false;
+    const QByteArray debut = f.read(4096);
+    for (char c : debut) {
+        unsigned char o = (unsigned char)c;
+        if (o == 0) return false;
+        // Les caractères de commande, hors tabulation et fins de ligne.
+        if (o < 9 || (o > 13 && o < 32)) return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 
 
@@ -171,10 +230,23 @@ void FenetrePrincipale::construirePanneaux() {
     setCentralWidget(separateur);
 
     // --- panneaux, disposés comme le bureau de MATLAB ---------------------
-    listeFichiers_ = new QListWidget;
+    listeFichiers_ = new QTreeWidget;
+    listeFichiers_->setColumnCount(3);
+    listeFichiers_->setHeaderLabels(
+        {QStringLiteral("Nom"), QStringLiteral("Taille"), QStringLiteral("Type")});
+    listeFichiers_->setRootIsDecorated(false);
     listeFichiers_->setAlternatingRowColors(true);
-    connect(listeFichiers_, &QListWidget::itemDoubleClicked, this,
-            &FenetrePrincipale::ouvrirDepuisListe);
+    listeFichiers_->setUniformRowHeights(true);
+    listeFichiers_->setIconSize(QSize(16, 16));
+    // Le nom prend la place qui reste ; taille et type se serrent sur leur
+    // contenu. Sans cela, trois colonnes de largeur égale coupaient les
+    // noms de fichiers dès le huitième caractère.
+    listeFichiers_->header()->setStretchLastSection(true);
+    listeFichiers_->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    listeFichiers_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    listeFichiers_->setColumnWidth(0, 150);
+    connect(listeFichiers_, &QTreeWidget::itemDoubleClicked, this,
+            [this](QTreeWidgetItem*, int) { ouvrirDepuisListe(); });
     auto* dockFichiers = new QDockWidget(QStringLiteral("Dossier courant"), this);
     dockFichiers->setWidget(listeFichiers_);
     dockFichiers->setObjectName(QStringLiteral("dockFichiers"));
@@ -235,11 +307,13 @@ void FenetrePrincipale::construirePanneaux() {
     // Les largeurs comptent autant que les hauteurs : sans elles, Qt donne
     // aux panneaux de droite la largeur de leur contenu minimal, et leur
     // titre lui-meme se retrouve reduit a « ... ».
-    listeFichiers_->setMinimumWidth(180);
+    listeFichiers_->setMinimumWidth(240);
     tableVariables_->setMinimumWidth(260);
     historique_->setMinimumWidth(260);
     resizeDocks({dockVariables, dockHistorique}, {520, 260}, Qt::Vertical);
-    resizeDocks({dockFichiers, dockVariables, dockHistorique}, {240, 330, 330},
+    // Le dossier courant porte trois colonnes : à 240 pixels, « Type » se
+    // retrouvait coupé au troisième caractère.
+    resizeDocks({dockFichiers, dockVariables, dockHistorique}, {300, 330, 330},
                 Qt::Horizontal);
     // Les colonnes de l'espace de travail : « Valeur » prend la place qui
     // reste, les trois autres celle qu'il leur faut.
@@ -532,12 +606,19 @@ void FenetrePrincipale::ouvrirParDialogue() {
 }
 
 void FenetrePrincipale::ouvrirDepuisListe() {
-    QListWidgetItem* item = listeFichiers_->currentItem();
+    QTreeWidgetItem* item = listeFichiers_->currentItem();
     if (!item) return;
-    QString chemin = QDir(dossierCourant_).filePath(item->text());
+    QString chemin = QDir(dossierCourant_).filePath(item->text(0));
     if (QFileInfo(chemin).isDir()) {
         QMetaObject::invokeMethod(moteur_, "changerDossier", Qt::QueuedConnection,
                                   Q_ARG(QString, QDir(chemin).absolutePath()));
+        return;
+    }
+    // Un fichier binaire n'a rien à faire dans l'éditeur : on le dit, au
+    // lieu d'en déverser les octets.
+    if (!estFichierTexte(chemin)) {
+        etat_->setText(QStringLiteral("%1 n'est pas un fichier texte")
+                           .arg(QFileInfo(chemin).fileName()));
         return;
     }
     ouvrirFichier(chemin);
@@ -840,16 +921,47 @@ void FenetrePrincipale::surDossier(const QString& chemin) {
     rafraichirListeFichiers();
 }
 
+// Ce que le panneau montre du dossier courant : tout ce qu'il contient,
+// dossiers d'abord, avec la taille et le type — c'est la colonne « Type »
+// de MATLAB, et l'icône qui va avec.
 void FenetrePrincipale::rafraichirListeFichiers() {
+    // La sélection survit au rafraîchissement : le panneau se reconstruit
+    // à chaque commande, il ne doit pas sauter sous les yeux.
+    const QString selection =
+        listeFichiers_->currentItem() ? listeFichiers_->currentItem()->text(0) : QString();
     listeFichiers_->clear();
     QDir dossier(dossierCourant_);
-    listeFichiers_->addItem(QStringLiteral(".."));
-    for (const QFileInfo& e : dossier.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot,
-                                                    QDir::Name))
-        listeFichiers_->addItem(e.fileName());
+
+    auto ajouter = [&](const QFileInfo& info, const QString& nom, const QIcon& icone,
+                       const QString& taille, const QString& type) {
+        auto* ligne = new QTreeWidgetItem(listeFichiers_);
+        ligne->setText(0, nom);
+        ligne->setIcon(0, icone);
+        ligne->setText(1, taille);
+        ligne->setTextAlignment(1, Qt::AlignRight | Qt::AlignVCenter);
+        ligne->setText(2, type);
+        ligne->setToolTip(0, QDir::toNativeSeparators(info.absoluteFilePath()));
+    };
+
+    if (QDir(dossierCourant_).cdUp()) {
+        auto* parent = new QTreeWidgetItem(listeFichiers_);
+        parent->setText(0, QStringLiteral(".."));
+        parent->setIcon(0, iconeDessinee(QStringLiteral("dossier-parent"), 16));
+        parent->setText(2, QStringLiteral("Dossier parent"));
+    }
     for (const QFileInfo& e :
-         dossier.entryInfoList({QStringLiteral("*.m")}, QDir::Files, QDir::Name))
-        listeFichiers_->addItem(e.fileName());
+         dossier.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
+        ajouter(e, e.fileName(), iconeEntree(QString(), true), QString(),
+                QStringLiteral("Dossier"));
+    for (const QFileInfo& e : dossier.entryInfoList(QDir::Files, QDir::Name))
+        ajouter(e, e.fileName(), iconeEntree(e.suffix(), false), tailleLisible(e.size()),
+                typeFichier(e.suffix()));
+
+    if (!selection.isEmpty()) {
+        const auto trouves =
+            listeFichiers_->findItems(selection, Qt::MatchExactly | Qt::MatchCaseSensitive, 0);
+        if (!trouves.isEmpty()) listeFichiers_->setCurrentItem(trouves.first());
+    }
 }
 
 void FenetrePrincipale::changerDossierParDialogue() {

@@ -74,3 +74,7 @@ private:
 // Dessine une icône simple à partir d'un nom symbolique : « nouveau »,
 // « ouvrir », « enregistrer », « executer »… Rien n'est lu sur le disque.
 QIcon iconeDessinee(const QString& nom, int taille = 28);
+
+// L'icône d'une entrée du panneau « Dossier courant » : une chemise pour
+// un dossier, une feuille marquée de sa famille pour un fichier.
+QIcon iconeEntree(const QString& suffixe, bool dossier, int taille = 16);

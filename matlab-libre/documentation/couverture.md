@@ -68,7 +68,9 @@ totalité.
    `matlibre-bureau` est une application Qt : un exécutable, une fenêtre,
    l'interpréteur dans le même processus. La disposition est celle de
    MATLAB — un ruban à onglets (Accueil, Tracés) dont les groupes portent
-   leur nom, dossier courant, éditeur à onglets avec coloration,
+   leur nom, dossier courant — tout ce qu'il contient, fichiers et
+   sous-dossiers, avec la taille, le type et une icône par famille —,
+   éditeur à onglets avec coloration,
    numérotation, sections `%%`, indentation automatique et Ctrl-R/Ctrl-T
    pour commenter, fenêtre de commandes où l'invite vit dans le texte
    comme sous MATLAB, espace de travail, historique, figures peintes
@@ -91,10 +93,15 @@ totalité.
 2. **Simulink se simule, mais ne se dessine plus.** Le solveur est là :
    dix-sept blocs, `new_system` / `add_block` / `add_line`, pas fixe, tri
    topologique, blocs à état, analyse nodale modifiée pour les circuits.
-   L'éditeur graphique, lui, vivait dans l'atelier du navigateur, retiré
-   de la compilation : il reviendra dans le bureau natif. Manquent aussi :
-   les sous-systèmes, les bus, le pas variable, et les éditeurs graphiques
-   de Stateflow et Simscape.
+   `sim` accepte le nom d'un modèle — une variable de l'espace de travail,
+   ou un fichier `.m` qui le construit — et journalise dans les deux
+   formes de Simulink, `res.signaux.<nom>` et
+   `res.signals(k).values`. Les fichiers `.slx` et `.mdl` de MathWorks ne
+   se lisent pas : leur format n'est pas public, et `sim` le dit au lieu
+   d'échouer sur autre chose. L'éditeur graphique, lui, vivait dans
+   l'atelier du navigateur, retiré de la compilation : il reviendra dans
+   le bureau natif. Manquent aussi : les sous-systèmes, les bus, le pas
+   variable, et les éditeurs graphiques de Stateflow et Simscape.
 3. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et
@@ -145,7 +152,11 @@ totalité.
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
    76 : construction et conversion des modèles dans les trois
-   représentations, réponses temporelles et fréquentielles avec les trois
+   représentations — `tf` et `ss` sont des classes, avec les opérateurs
+   de MATLAB : `s = tf('s')`, `z = tf('z',Te)`, puis
+   `G = 1/(s^2+2*s+1)` s'écrivent comme on les écrit à la main, et
+   l'affichage reprend celui de MATLAB, polynôme pour `tf`, facteurs
+   pour `zpk` —, réponses temporelles et fréquentielles avec les trois
    diagrammes, toutes les marges — gain, phase, retard —, formes
    échelonnées de commandabilité et d'observabilité, formes modale et
    compagne, réduction d'ordre par troncature équilibrée avec la borne

@@ -77,6 +77,17 @@ SIM Simule un modèle à pas fixe.
 
   Tous les paramètres sont résolus avant la boucle : à l'intérieur, il
   ne reste que de l'arithmétique.
+
+  SIM('NOM') accepte aussi le nom d'un modèle : une variable de
+  l'espace de travail qui porte ce nom, ou un fichier NOM.m qui
+  construit le modèle et le rend. Les modèles se décrivent ici en
+  appelant NEW_SYSTEM, ADD_BLOCK et ADD_LINE ; les fichiers .slx de
+  MathWorks, dont le format n'est pas public, ne se lisent pas.
+
+  Le résultat porte les deux formes que Simulink journalise :
+  RESULTAT.temps et RESULTAT.signaux.<nom> pour l'accès direct,
+  RESULTAT.time et RESULTAT.signals(k).values pour la « structure with
+  time » qu'attendent les scripts écrits pour Simulink.
 ```
 
 ## `simplot`

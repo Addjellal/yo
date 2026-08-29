@@ -304,4 +304,71 @@ for genreCorrecteur = {'p', 'pi', 'pd', 'pid'}
     assert(renseignements.Stable);
 end
 
+%% ------------------------------------- les modeles sont des objets
+% « tf » et « ss » sont des classes, avec les operateurs de MATLAB : on
+% ecrit les modeles comme on les ecrit a la main. Ils etaient de simples
+% structures, et « z - 1.5 » donnait « Operator '-' is not supported for
+% operands of type 'struct' ».
+assert(strcmp(class(tf(1, [1 1])), 'tf'));
+assert(strcmp(class(ss(-1, 1, 1, 0)), 'ss'));
+assert(isa(tf(1, [1 1]), 'tf'));
+% Convertir un modele deja converti rend bien un modele, pas une structure.
+assert(strcmp(class(ss(ss(-1, 1, 1, 0))), 'ss'));
+assert(strcmp(class(tf(tf(1, [1 1]))), 'tf'));
+assert(strcmp(class(tf(ss(-1, 1, 1, 0))), 'tf'));
+assert(strcmp(class(ss(tf(1, [1 1]))), 'ss'));
+
+% La variable de Laplace, et celle de l'avance echantillonnee.
+s = tf('s');
+assert(max(abs(s.num - [1 0])) < 1e-12 && max(abs(s.den - 1)) < 1e-12);
+assert(s.Ts == 0);
+z = tf('z', 0.1);
+assert(z.Ts == 0.1);
+assert(tf('z').Ts == -1);            % periode encore indeterminee
+
+% L'arithmetique des fractions rationnelles.
+G = 1 / (s^2 + 2*s + 1);
+assert(max(abs(G.num - 1)) < 1e-12);
+assert(max(abs(G.den - [1 2 1])) < 1e-12);
+H = 2.5 / (z - 1.5);
+assert(max(abs(H.num - 2.5)) < 1e-12);
+assert(max(abs(H.den - [1 -1.5])) < 1e-12);
+assert(H.Ts == 0.1);
+C = 0.5 * (z - 0.9) / (z - 1);
+assert(max(abs(C.num - [0.5 -0.45])) < 1e-12);
+assert(max(abs(C.den - [1 -1])) < 1e-12);
+% Somme, produit, difference, puissance, inverse.
+assert(max(abs((tf(1, [1 1]) + tf(1, [1 2])).num - [2 3])) < 1e-12);
+assert(max(abs((tf(1, [1 1]) + tf(1, [1 2])).den - [1 3 2])) < 1e-12);
+assert(max(abs((tf(1, [1 1]) - tf(1, [1 1])).num - 0)) < 1e-12);
+assert(max(abs((tf(2, [1 1]) * tf(3, [1 2])).num - 6)) < 1e-12);
+assert(max(abs((tf(1, [1 1])^2).den - [1 2 1])) < 1e-12);
+assert(max(abs(inv(tf(1, [1 1])).num - [1 1])) < 1e-12);
+assert(max(abs((1 - tf(1, [1 1])).num - [1 0])) < 1e-12);   % s/(s+1)
+% Un gain n'impose aucune periode : il se marie aux deux.
+assert((3 * z).Ts == 0.1);
+% Deux periodes differentes ne se melangent pas.
+essaiPeriodes = false;
+try
+    tf(1, [1 -0.5], 0.1) + tf(1, [1 -0.5], 0.2);   %#ok<VUNUS>
+catch err
+    essaiPeriodes = strcmp(err.identifier, 'Control:tf:periodes');
+end
+assert(essaiPeriodes);
+% Un modele d'etat garde sa forme a travers les operations.
+assert(strcmp(class(ss(-1, 1, 1, 0) * 2), 'ss'));
+assert(abs(dcgain(ss(-1, 1, 1, 0) * 2) - 2) < 1e-10);
+% Et l'ecriture par operateurs donne le meme resultat que feedback.
+boucle = feedback(tf(1, [1 1]), 1);
+assert(max(abs(boucle.den - [1 2])) < 1e-12);
+
+% L'affichage nomme la variable et la periode, comme MATLAB.
+texte = evalc('disp(2.5 / (tf(''z'', 1) - 1.5))');
+assert(contains(texte, 'z - 1.5'));
+assert(contains(texte, 'Sample time: 1 seconds'));
+assert(contains(texte, 'Discrete-time transfer function.'));
+texte = evalc('disp(tf(1, [1 2 1]))');
+assert(contains(texte, 's^2 + 2 s + 1'));
+assert(contains(texte, 'Continuous-time transfer function.'));
+
 disp('automatique : toutes les verifications passent');
