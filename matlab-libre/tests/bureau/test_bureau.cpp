@@ -16,6 +16,7 @@
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTableWidget>
+#include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <QTextBlock>
@@ -72,6 +73,9 @@ static bool envoyer(FenetrePrincipale& fenetre, const QString& commande) {
 }
 
 int main(int argc, char** argv) {
+    // Sortie ligne a ligne : si le test meurt en cours de route, on garde
+    // tout ce qui a deja ete verifie au lieu de perdre le tampon.
+    std::setvbuf(stdout, nullptr, _IOLBF, 0);
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QApplication application(argc, argv);
     theme::appliquer();
@@ -336,6 +340,122 @@ int main(int argc, char** argv) {
     verifier(tours > 5, "l'interface repond pendant qu'un calcul tourne");
     verifier(attendre([&] { return ligneDe(QStringLiteral("s")) >= 0; }, 20000),
              "le calcul long finit et publie son resultat");
+
+    // --- le debogueur ------------------------------------------------------
+    //
+    // Un bureau MATLAB sans points d'arret n'en est pas un. Ce qui suit
+    // pose un point d'arret, verifie que l'execution s'y arrete, que la
+    // ligne est montree, qu'on peut lire ET MODIFIER une variable a
+    // l'arret — le « K>> » de MATLAB —, puis avancer et reprendre.
+    if (editeur) {
+        QString scriptDebug = QDir::current().filePath(QStringLiteral("essaiDebug.m"));
+        editeur->setPlainText(QStringLiteral("a = 1;\n"
+                                             "b = a + 1;\n"
+                                             "c = b * 10;\n"
+                                             "d = c + 5;\n"));
+        editeur->definirFichier(scriptDebug);
+        QMetaObject::invokeMethod(&fenetre, "enregistrer");
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+
+        // Le clic dans la marge pose le point d'arret ; ici on appelle le
+        // meme chemin que ce clic.
+        editeur->basculerPointArret(3);
+        verifier(editeur->pointsArret().contains(3),
+                 "le point d'arret est pose sur la ligne 3");
+
+        fenetre.envoyerCommande(QStringLiteral("run('") + scriptDebug + QStringLiteral("')"));
+        verifier(attendre([&] { return editeur->ligneArret() == 3; }, 15000),
+                 "l'execution s'arrete sur le point d'arret");
+        verifier(fenetre.enPause(), "le bureau se sait en pause");
+
+        // A l'arret, les variables deja calculees sont visibles.
+        verifier(attendre([&] {
+                     int l = ligneDe(QStringLiteral("b"));
+                     return l >= 0 && variables->item(l, 1)->text() == QLatin1String("2");
+                 }),
+                 "les variables sont lisibles a l'arret");
+        // ... et « c » ne l'est pas encore : la ligne 3 n'a pas tourne.
+        verifier(ligneDe(QStringLiteral("c")) < 0,
+                 "la ligne ou l'on est arrete n'a pas encore tourne");
+        // L'invite est passee a « K>> ».
+        verifier(console->toPlainText().contains(QLatin1String("K>> ")),
+                 "l'invite passe a « K>> », comme sous MATLAB");
+
+        // On modifie une variable a l'arret : c'est ce qui distingue un
+        // vrai debogueur d'un simple point d'observation.
+        fenetre.envoyerCommande(QStringLiteral("b = 7;"));
+        verifier(attendre([&] {
+                     int l = ligneDe(QStringLiteral("b"));
+                     return l >= 0 && variables->item(l, 1)->text() == QLatin1String("7");
+                 }),
+                 "on peut modifier une variable a l'arret");
+
+        // Pas a pas : la ligne 3 s'execute, on s'arrete ligne 4.
+        QMetaObject::invokeMethod(&fenetre, "pasAPas");
+        verifier(attendre([&] { return editeur->ligneArret() == 4; }, 15000),
+                 "le pas a pas avance d'une ligne");
+        verifier(attendre([&] {
+                     int l = ligneDe(QStringLiteral("c"));
+                     return l >= 0 && variables->item(l, 1)->text() == QLatin1String("70");
+                 }),
+                 "la ligne franchie a bien calcule, avec la valeur modifiee");
+
+        // Reprise : le script finit.
+        QMetaObject::invokeMethod(&fenetre, "continuerExecution");
+        verifier(attendre([&] { return !fenetre.enPause() && !fenetre.occupe(); }, 15000),
+                 "l'execution reprend et le script finit");
+        verifier(editeur->ligneArret() == 0, "la fleche d'arret disparait");
+        int ligneD = ligneDe(QStringLiteral("d"));
+        verifier(ligneD >= 0 && variables->item(ligneD, 1)->text() == QLatin1String("75"),
+                 "le script rend 75, la modification comprise");
+
+        // Retirer le point d'arret : le script ne s'arrete plus.
+        QMetaObject::invokeMethod(&fenetre, "retirerTousPointsArret");
+        verifier(editeur->pointsArret().isEmpty(), "les points d'arret sont retires");
+        fenetre.envoyerCommande(QStringLiteral("clear c d"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        fenetre.envoyerCommande(QStringLiteral("run('") + scriptDebug + QStringLiteral("')"));
+        verifier(attendre([&] {
+                     return !fenetre.occupe() && ligneDe(QStringLiteral("d")) >= 0;
+                 }, 15000),
+                 "sans point d'arret, le script tourne d'un trait");
+        verifier(!fenetre.enPause(), "et ne s'arrete pas");
+    }
+
+    // Fermer le bureau pendant un arret : le fil de calcul dort dans le
+    // crochet et n'entend plus rien. S'il n'est pas libere, Qt abandonne
+    // le programme sur « QThread: Destroyed while thread is still
+    // running ». Ce bloc est la pour que cela ne revienne pas.
+    {
+        auto* second = new FenetrePrincipale;
+        QString scriptFermeture =
+            QDir::current().filePath(QStringLiteral("essaiFermeture.m"));
+        {
+            QFile f(scriptFermeture);
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                f.write("x = 1;\ny = x + 1;\nz = y + 1;\n");
+        }
+        second->ouvrirFichier(scriptFermeture);
+        auto* editeurFermeture =
+            qobject_cast<Editeur*>(second->findChild<Editeur*>());
+        bool pose = false;
+        for (Editeur* e : second->findChildren<Editeur*>())
+            if (e->fichier() == scriptFermeture) {
+                e->basculerPointArret(2);
+                editeurFermeture = e;
+                pose = true;
+            }
+        verifier(pose, "le second bureau ouvre le script et y pose un point d'arret");
+        (void)editeurFermeture;
+        second->envoyerCommande(QStringLiteral("run('") + scriptFermeture +
+                                QStringLiteral("')"));
+        verifier(attendre([&] { return second->enPause(); }, 15000),
+                 "le second bureau s'arrete sur son point d'arret");
+        // C'est le geste qui faisait tomber le programme : detruire la
+        // fenetre alors que le fil de calcul dort dans le crochet.
+        delete second;
+        verifier(true, "fermer le bureau pendant un arret ne tue pas le programme");
+    }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.
     const char* sortie = std::getenv("MATLIBRE_CAPTURE");

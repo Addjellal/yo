@@ -189,6 +189,25 @@ assert(~isempty(strfind(sortieCmd, 'un texte|seul')));
 sortieCmd = evalc('commandeDEssai -verbose');
 assert(~isempty(strfind(sortieCmd, '-verbose')));
 
+%% ------------------------------------------- « return » dans un script
+% MATLAB : « return force le retour du controle au programme appelant
+% avant la fin du script ou de la fonction ». Un script s'arrete donc sur
+% « return » — et rien de plus : ni la fonction qui l'a lance, ni, dans une
+% interface, la boucle d'evenements que l'exception traverserait.
+clear marqueRetour
+scriptQuiRend;                      % appele par son nom
+assert(exist('marqueRetour', 'var') == 1);
+assert(marqueRetour == 1);          % la ligne d'apres n'a pas tourne
+
+clear marqueRetour
+run('scriptQuiRend');               % appele par « run »
+assert(marqueRetour == 1);
+
+% Lance depuis une fonction, le script rend la main a la fonction, qui
+% continue : c'est le sens de « programme appelant ».
+assert(lanceurDeScript(true) == 42);
+assert(lanceurDeScript(false) == 42);
+
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions

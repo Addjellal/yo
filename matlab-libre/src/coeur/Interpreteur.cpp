@@ -608,7 +608,12 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
             std::string valeur;
             ~Restaurer() { cible = valeur; }
         } restaurer{fichierCourant, precedent};
-        executerBloc(f->corps);
+        // « return » dans un script rend la main a ce qui l'a lance : il
+        // arrete le script, il ne quitte pas la fonction appelante.
+        try {
+            executerBloc(f->corps);
+        } catch (RetourFonction&) {
+        }
         return {};
     }
     std::size_t fixes = f->entrees.size();
@@ -691,7 +696,18 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
             for (auto& kv : voisines) cacheFonctions_[kv.first] = kv.second;
         }
     }
-    if (u.script) executerBloc(u.script);
+    if (u.script) {
+        // Un « return » au plus haut niveau — comme l'abandon du debogueur,
+        // qui se sert du meme signal — arrete le script et rien de plus :
+        // il n'y a pas de fonction a quitter. Sans cela l'exception
+        // traverserait l'appelant, et jusqu'a la boucle d'evenements d'une
+        // interface, ou Qt ne pardonne pas.
+        try {
+            executerBloc(u.script);
+        } catch (RetourFonction&) {
+            if (profondeur() > 1) throw;
+        }
+    }
 }
 
 void Interpreteur::executerFichier(const std::string& fichier) {
@@ -722,7 +738,13 @@ void Interpreteur::executerFichier(const std::string& fichier) {
             enveloppe->voisines = voisines;
             portee->fonction = enveloppe;
         }
-        executerBloc(u.script);
+        // Meme raison que dans executerTexte : au plus haut niveau, un
+        // « return » arrete le script sans remonter plus loin.
+        try {
+            executerBloc(u.script);
+        } catch (RetourFonction&) {
+            if (profondeur() > 1) throw;
+        }
     } else if (!u.fonctions.empty()) {
         std::vector<Valeur> args;
         appelerUtilisateur(u.fonctions[0], args, 0);

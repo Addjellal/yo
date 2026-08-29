@@ -3,7 +3,9 @@
 
 #include <QFile>
 #include <QFontDatabase>
+#include <QMouseEvent>
 #include <QPainter>
+#include <QPolygonF>
 #include <QTextBlock>
 #include <QKeyEvent>
 #include <QRegularExpression>
@@ -17,11 +19,19 @@ namespace {
 // setViewportMargins, et lui délègue sa peinture.
 class MargeNumeros : public QWidget {
 public:
-    explicit MargeNumeros(Editeur* editeur) : QWidget(editeur), editeur_(editeur) {}
+    explicit MargeNumeros(Editeur* editeur) : QWidget(editeur), editeur_(editeur) {
+        setCursor(Qt::PointingHandCursor);
+        setToolTip(QStringLiteral("Cliquez pour poser ou retirer un point d'arrêt"));
+    }
     QSize sizeHint() const override { return QSize(editeur_->largeurMarge(), 0); }
 
 protected:
     void paintEvent(QPaintEvent* evenement) override { editeur_->peindreMarge(evenement); }
+    // Cliquer dans la marge pose un point d'arrêt sur la ligne visée :
+    // c'est le geste de MATLAB, et de tous les éditeurs de code.
+    void mousePressEvent(QMouseEvent* evenement) override {
+        editeur_->clicMarge((int)evenement->position().y());
+    }
 
 private:
     Editeur* editeur_;
@@ -139,7 +149,8 @@ int Editeur::largeurMarge() const {
     int chiffres = 1;
     int lignes = qMax(1, blockCount());
     while (lignes >= 10) { lignes /= 10; ++chiffres; }
-    return 12 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * chiffres;
+    // La place des numéros, plus celle de la pastille du point d'arrêt.
+    return 14 + fontMetrics().height() + fontMetrics().horizontalAdvance(QLatin1Char('9')) * chiffres;
 }
 
 void Editeur::ajusterMarge() { setViewportMargins(largeurMarge(), 0, 0, 0); }
@@ -166,26 +177,101 @@ void Editeur::surlignerLigneCourante() {
         s.cursor.clearSelection();
         selections.append(s);
     }
+    // La ligne où l'exécution est arrêtée passe devant : un fond vert
+    // pâle, celui que MATLAB emploie.
+    if (ligneArret_ >= 1 && ligneArret_ <= document()->blockCount()) {
+        QTextEdit::ExtraSelection a;
+        a.format.setBackground(QColor("#d8f0d8"));
+        a.format.setProperty(QTextFormat::FullWidthSelection, true);
+        a.cursor = QTextCursor(document()->findBlockByNumber(ligneArret_ - 1));
+        a.cursor.clearSelection();
+        selections.append(a);
+    }
     setExtraSelections(selections);
 }
 
 void Editeur::peindreMarge(QPaintEvent* evenement) {
     QPainter peintre(marge_);
+    peintre.setRenderHint(QPainter::Antialiasing, true);
     peintre.fillRect(evenement->rect(), theme::fondMarge());
     QTextBlock bloc = firstVisibleBlock();
     int numero = bloc.blockNumber();
     int haut = (int)blockBoundingGeometry(bloc).translated(contentOffset()).top();
     int bas = haut + (int)blockBoundingRect(bloc).height();
+    int hauteurLigne = fontMetrics().height();
+    int largeurPastille = hauteurLigne;
     while (bloc.isValid() && haut <= evenement->rect().bottom()) {
         if (bloc.isVisible() && bas >= evenement->rect().top()) {
+            int ligne = numero + 1;
+            // La pastille du point d'arrêt, à gauche du numéro.
+            if (pointsArret_.contains(ligne)) {
+                peintre.setPen(Qt::NoPen);
+                peintre.setBrush(QColor("#c0392b"));
+                double d = hauteurLigne * 0.62;
+                peintre.drawEllipse(QPointF(2 + largeurPastille / 2.0, haut + hauteurLigne / 2.0),
+                                    d / 2, d / 2);
+            }
+            // La flèche de la ligne où l'exécution est arrêtée.
+            if (ligne == ligneArret_) {
+                peintre.setPen(Qt::NoPen);
+                peintre.setBrush(QColor("#1f8b24"));
+                double y = haut + hauteurLigne / 2.0, x = 3.0;
+                double h = hauteurLigne * 0.30, l = largeurPastille - 6.0;
+                QPolygonF fleche({QPointF(x, y - h), QPointF(x + l * 0.55, y - h),
+                                  QPointF(x + l, y), QPointF(x + l * 0.55, y + h),
+                                  QPointF(x, y + h)});
+                peintre.drawPolygon(fleche);
+            }
             peintre.setPen(theme::numeroLigne());
-            peintre.drawText(0, haut, marge_->width() - 6, fontMetrics().height(),
-                             Qt::AlignRight, QString::number(numero + 1));
+            peintre.drawText(largeurPastille, haut, marge_->width() - largeurPastille - 6,
+                             hauteurLigne, Qt::AlignRight, QString::number(ligne));
         }
         bloc = bloc.next();
         haut = bas;
         bas = haut + (int)blockBoundingRect(bloc).height();
         ++numero;
+    }
+}
+
+void Editeur::clicMarge(int y) {
+    // Retrouve la ligne sous le clic.
+    QTextBlock bloc = firstVisibleBlock();
+    int haut = (int)blockBoundingGeometry(bloc).translated(contentOffset()).top();
+    while (bloc.isValid()) {
+        int bas = haut + (int)blockBoundingRect(bloc).height();
+        if (y >= haut && y < bas) {
+            basculerPointArret(bloc.blockNumber() + 1);
+            return;
+        }
+        bloc = bloc.next();
+        haut = bas;
+    }
+}
+
+void Editeur::basculerPointArret(int ligne) {
+    if (ligne < 1) return;
+    bool pose;
+    if (pointsArret_.contains(ligne)) {
+        pointsArret_.remove(ligne);
+        pose = false;
+    } else {
+        pointsArret_.insert(ligne);
+        pose = true;
+    }
+    marge_->update();
+    emit pointArretBascule(ligne, pose);
+}
+
+void Editeur::definirLigneArret(int ligne) {
+    ligneArret_ = ligne;
+    surlignerLigneCourante();
+    marge_->update();
+    if (ligne >= 1) {
+        // Amener la ligne sous les yeux : un arrêt hors de l'écran ne se
+        // verrait pas.
+        QTextCursor c(document()->findBlockByNumber(ligne - 1));
+        setTextCursor(c);
+        centerCursor();
     }
 }
 

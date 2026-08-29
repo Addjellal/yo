@@ -2,6 +2,7 @@
 #include "Moteur.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QStringList>
 #include <ostream>
 #include <sstream>
@@ -10,6 +11,7 @@
 #include "matlibre/Affichage.h"
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
+#include "matlibre/Deboguage.h"
 #include "matlibre/Interpreteur.h"
 
 using namespace matlibre;
@@ -124,6 +126,59 @@ void Moteur::demarrer() {
     it_->modeInteractif = true;
     // « clc » efface la fenetre au lieu d'y ecrire « [2J[H ».
     it_->effacerEcran = [this] { emit effacementDemande(); };
+
+    // Le crochet d'arret : appele par l'interpreteur avant l'instruction
+    // ou se pose un point d'arret. Il rend la main quand l'utilisateur
+    // reprend. Le fil de calcul dort ici ; l'interface reste vivante.
+    it_->crochetArret = [this](Interpreteur& moteur, const std::string& fichier, int ligne) {
+        arrete_ = true;
+        // L'espace de travail est publie AVANT de dormir, depuis ce fil :
+        // le fil graphique n'a ainsi rien a lire dans une structure qui
+        // pourrait bouger.
+        publierEtat();
+        flux_->flush();
+        emit arreteSur(QString::fromStdString(fichier), ligne);
+        int action = (int)ActionDebogueur::Continuer;
+        for (;;) {
+            QString expression;
+            {
+                std::unique_lock<std::mutex> garde(verrouArret_);
+                signalArret_.wait(garde, [this] {
+                    return repriseDemandee_ || !aEvaluer_.isEmpty();
+                });
+                if (repriseDemandee_) {
+                    repriseDemandee_ = false;
+                    action = actionDemandee_;
+                    break;
+                }
+                expression = aEvaluer_;
+                aEvaluer_.clear();
+            }
+            // « K>> » de MATLAB : on evalue dans l'espace de travail ou
+            // l'execution s'est arretee, sans la reprendre.
+            try {
+                moteur.executerTexte(expression.toStdString(), "<K>>");
+            } catch (const ErreurMatlab& e) {
+                *flux_ << "Error: " << e.message << "\n";
+            } catch (const std::exception& e) {
+                *flux_ << "Error: " << e.what() << "\n";
+            } catch (...) {
+                // Rien ne doit remonter : ce fil finit dans une boucle
+                // d'evenements Qt, qui n'accepte aucune exception.
+                *flux_ << "Error: interrompu.\n";
+            }
+            flux_->flush();
+            publierEtat();
+        }
+        // C'est ici, dans le fil de calcul, que l'action prend effet :
+        // l'interpréteur n'est jamais écrit depuis le fil graphique.
+        auto mode = (ActionDebogueur)action;
+        moteur.debogueur.action = mode;
+        if (mode == ActionDebogueur::PasAPas || mode == ActionDebogueur::SortirDe)
+            moteur.debogueur.profondeurPause = moteur.profondeur();
+        arrete_ = false;
+        emit repriseEffectuee();
+    };
     // Sans cela, un script pose dans le dossier courant reste introuvable :
     // c'est la premiere chose qu'on fait dans un bureau — ecrire un
     // fichier a cote, et l'executer.
@@ -148,6 +203,9 @@ void Moteur::executer(const QString& texte) {
         *flux_ << "Error: " << e.message << "\n";
     } catch (const std::exception& e) {
         *flux_ << "Error: " << e.what() << "\n";
+    } catch (...) {
+        // Idem : une exception qui traverserait Qt abattrait le bureau.
+        *flux_ << "Error: interrompu.\n";
     }
     flux_->flush();
     occupe_ = false;
@@ -160,6 +218,53 @@ void Moteur::changerDossier(const QString& chemin) {
     QDir::setCurrent(chemin);
     it_->ajouterChemin(chemin.toStdString(), true);
     emit dossierChange(QDir::currentPath());
+}
+
+void Moteur::poserPointArret(const QString& fichier, int ligne) {
+    if (!it_) return;
+    // Le debogueur designe un fichier par son nom court, sans dossier ni
+    // extension : c'est ainsi que MATLAB nomme « dbstop in monScript ».
+    QFileInfo info(fichier);
+    it_->debogueur.poser(info.completeBaseName().toStdString(), ligne, std::string());
+}
+
+void Moteur::retirerPointArret(const QString& fichier, int ligne) {
+    if (!it_) return;
+    QFileInfo info(fichier);
+    it_->debogueur.retirer(info.completeBaseName().toStdString(), ligne);
+}
+
+void Moteur::retirerTousPointsArret() {
+    if (!it_) return;
+    it_->debogueur.toutRetirer();
+}
+
+// Appele depuis le fil graphique pendant que le fil de calcul dort : ne
+// touche donc que l'etat garde par le verrou. L'action elle-meme est posee
+// dans le debogueur par le fil de calcul, a son reveil.
+void Moteur::reprendre(int action) {
+    {
+        std::lock_guard<std::mutex> garde(verrouArret_);
+        actionDemandee_ = action;
+        repriseDemandee_ = true;
+    }
+    signalArret_.notify_all();
+}
+
+void Moteur::evaluerALArret(const QString& texte) {
+    {
+        std::lock_guard<std::mutex> garde(verrouArret_);
+        aEvaluer_ = texte;
+    }
+    signalArret_.notify_all();
+}
+
+// A la fermeture : on reveille le fil arrete en lui demandant de quitter le
+// debogage, ce qui deroule le script et rend la main a la boucle
+// d'evenements — sans quoi « quit() » n'aurait personne pour l'entendre.
+void Moteur::libererPourFermeture() {
+    fermeture_ = true;
+    reprendre((int)ActionDebogueur::Quitter);
 }
 
 void Moteur::reindexer() {

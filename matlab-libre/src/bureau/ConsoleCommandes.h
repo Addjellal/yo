@@ -19,7 +19,7 @@ public:
     // ce que l'utilisateur avait commencé à taper.
     void ecrireSortie(const QString& texte, const QColor& couleur);
     // Repose l'invite « >> » et rend la main à l'utilisateur.
-    void poserInvite();
+    void poserInvite(const QString& invite = QStringLiteral(">> "));
     void masquerInvite();
     void effacer();
 
@@ -40,6 +40,7 @@ private:
     void remplacerSaisie(const QString& texte);
 
     int debutSaisie_ = 0;      // position du premier caractère modifiable
+    QString invite_ = QStringLiteral(">> ");
     bool inviteVisible_ = false;
     QStringList historique_;
     int indexHistorique_ = -1;

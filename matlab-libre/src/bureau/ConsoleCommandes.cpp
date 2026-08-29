@@ -10,9 +10,7 @@
 
 #include "Theme.h"
 
-namespace {
-const QLatin1String INVITE(">> ");
-}
+
 
 ConsoleCommandes::ConsoleCommandes(QWidget* parent) : QPlainTextEdit(parent) {
     QFont police = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -54,15 +52,17 @@ void ConsoleCommandes::remplacerSaisie(const QString& texte) {
     setTextCursor(c);
 }
 
-void ConsoleCommandes::poserInvite() {
-    if (inviteVisible_) return;
+void ConsoleCommandes::poserInvite(const QString& invite) {
+    if (inviteVisible_ && invite == invite_) return;
+    if (inviteVisible_) masquerInvite();
+    invite_ = invite;
     QTextCursor c = textCursor();
     c.movePosition(QTextCursor::End);
     // L'invite commence toujours en début de ligne.
     if (!c.atBlockStart()) c.insertBlock();
     QTextCharFormat format;
     format.setForeground(theme::invite());
-    c.insertText(INVITE, format);
+    c.insertText(invite_, format);
     debutSaisie_ = c.position();
     inviteVisible_ = true;
     setTextCursor(c);
@@ -88,7 +88,7 @@ void ConsoleCommandes::ecrireSortie(const QString& texte, const QColor& couleur)
         enCours = commandeEnCours();
         decalageCurseur = textCursor().position() - debutSaisie_;
         QTextCursor c = textCursor();
-        c.setPosition(debutSaisie_ - INVITE.size());
+        c.setPosition(debutSaisie_ - invite_.size());
         c.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
         c.removeSelectedText();
         // Retire aussi le bloc vide laissé par l'invite.

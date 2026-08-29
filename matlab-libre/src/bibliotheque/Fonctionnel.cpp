@@ -206,10 +206,27 @@ FONCTION(fnRun) {
     std::error_code ec;
     if (!fs::is_regular_file(chemin, ec)) {
         // MATLAB accepte le nom sans extension.
-        if (fs::is_regular_file(chemin + ".m", ec)) chemin += ".m";
-        else
-            erreur("MATLAB:run:FileNotFound",
-                   "Unable to find file '" + chemin + "'.");
+        if (fs::is_regular_file(chemin + ".m", ec)) {
+            chemin += ".m";
+        } else {
+            // ... et le cherche sur le chemin de recherche, comme il le
+            // ferait pour un appel par son nom.
+            std::string trouve;
+            fs::path demande(chemin);
+            std::string nom = demande.filename().string();
+            if (demande.extension().empty()) nom += ".m";
+            for (const std::string& dossierChemin : it.chemin()) {
+                fs::path essai = fs::path(dossierChemin) / nom;
+                if (fs::is_regular_file(essai, ec)) {
+                    trouve = essai.string();
+                    break;
+                }
+            }
+            if (trouve.empty())
+                erreur("MATLAB:run:FileNotFound",
+                       "Unable to find file '" + chemin + "'.");
+            chemin = trouve;
+        }
     }
     std::ifstream f(chemin);
     if (!f) erreur("MATLAB:run:FileNotFound", "Unable to open file '" + chemin + "'.");
@@ -230,7 +247,22 @@ FONCTION(fnRun) {
             }
         }
     } restaurer{avant, !dossier.empty()};
-    it.executerTexte(tampon.str(), chemin);
+    // Le fichier en cours doit etre connu de l'interpreteur : c'est ce qui
+    // permet au debogueur de reconnaitre ses points d'arret, et a
+    // mfilename de nommer le script.
+    std::string fichierPrecedent = it.fichierCourant;
+    it.fichierCourant = fs::absolute(chemin, ec).string();
+    struct RestaurerFichier {
+        Interpreteur& moteur;
+        std::string valeur;
+        ~RestaurerFichier() { moteur.fichierCourant = valeur; }
+    } restaurerFichier{it, fichierPrecedent};
+    // « return » dans le script arrete le script, comme quand on l'appelle
+    // par son nom ; il ne quitte pas la fonction qui a appele « run ».
+    try {
+        it.executerTexte(tampon.str(), chemin);
+    } catch (RetourFonction&) {
+    }
     return {};
 }
 

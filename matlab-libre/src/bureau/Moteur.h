@@ -10,6 +10,8 @@
 #include <QString>
 #include <QVector>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <memory>
 
 #include "matlibre/Graphique.h"
@@ -45,15 +47,41 @@ public:
     // Demande l'arrêt de la commande en cours (Ctrl-C).
     void demanderArret();
 
+    // Vrai quand l'exécution est arrêtée sur un point d'arrêt.
+    bool arrete() const { return arrete_.load(); }
+
 public slots:
     void demarrer();                      // construit l'interpréteur dans ce fil
     void executer(const QString& texte);  // évalue, puis publie l'état
     void changerDossier(const QString& chemin);
     void reindexer();                     // apres l'ecriture d'un fichier
 
+    // --- débogueur ------------------------------------------------------
+    //
+    // Attention au fil : pendant un arrêt, le fil de calcul dort DANS le
+    // crochet, sa boucle d'événements ne tourne donc plus. Une connexion
+    // en file n'y arriverait jamais — c'est le fil graphique qui appelle
+    // « reprendre » et « evaluerALArret » directement. Ces deux-là ne
+    // touchent que l'état gardé par « verrouArret_ », ce qui les rend sûrs
+    // depuis n'importe quel fil ; les points d'arrêt, eux, passent en file
+    // tant que le calcul tourne, et en direct quand il dort.
+    void poserPointArret(const QString& fichier, int ligne);
+    void retirerPointArret(const QString& fichier, int ligne);
+    void retirerTousPointsArret();
+    void reprendre(int action);           // ActionDebogueur, en entier
+    void evaluerALArret(const QString& texte);
+    // Réveille un fil arrêté et lui demande d'abandonner : sans cela, la
+    // fenêtre se fermerait sur un fil qui dort, et Qt abandonne le
+    // programme (« QThread: Destroyed while thread is still running »).
+    void libererPourFermeture();
+
 signals:
     void sortieProduite(const QString& texte);
     void commandeFinie();
+    // L'exécution s'est arrêtée : le fichier et la ligne, pour que
+    // l'éditeur y amène le regard.
+    void arreteSur(const QString& fichier, int ligne);
+    void repriseEffectuee();
     void espaceTravailChange(const QVector<LigneEspaceTravail>& lignes);
     void effacementDemande();   // « clc »
     void figuresChangees(const QVector<FigureCopiee>& figures);
@@ -62,6 +90,19 @@ signals:
 
 private:
     void publierEtat();
+
+    // Le fil de calcul dort ici pendant un arrêt, et se réveille sur une
+    // reprise ou sur une expression à évaluer.
+    std::mutex verrouArret_;
+    std::condition_variable signalArret_;
+    bool repriseDemandee_ = false;
+    // L'action demandée voyage sous le verrou, et c'est le fil de calcul
+    // qui la pose dans le débogueur : l'interpréteur n'est ainsi jamais
+    // touché depuis le fil graphique.
+    int actionDemandee_ = 0;
+    QString aEvaluer_;
+    std::atomic<bool> arrete_{false};
+    std::atomic<bool> fermeture_{false};
 
     std::unique_ptr<matlibre::Interpreteur> it_;
     std::unique_ptr<std::streambuf> tampon_;

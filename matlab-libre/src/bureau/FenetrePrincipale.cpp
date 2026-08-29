@@ -1,6 +1,8 @@
 // FenetrePrincipale.cpp — la disposition du bureau et ce qui l'anime.
 #include "FenetrePrincipale.h"
 
+#include <functional>
+
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
@@ -26,6 +28,7 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <algorithm>
 
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
@@ -56,6 +59,8 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::commandeFinie, this, &FenetrePrincipale::surCommandeFinie);
     connect(moteur_, &Moteur::effacementDemande, this,
             &FenetrePrincipale::effacerCommandes);
+    connect(moteur_, &Moteur::arreteSur, this, &FenetrePrincipale::surArret);
+    connect(moteur_, &Moteur::repriseEffectuee, this, &FenetrePrincipale::surReprise);
 
     construirePanneaux();
     construireMenus();
@@ -78,6 +83,10 @@ FenetrePrincipale::FenetrePrincipale() {
 }
 
 FenetrePrincipale::~FenetrePrincipale() {
+    // Un fil arrete dans le crochet de debogage n'entendrait pas
+    // « quit() » : on le libere d'abord, sinon Qt abandonne le programme
+    // sur « QThread: Destroyed while thread is still running ».
+    if (moteur_->arrete()) moteur_->libererPourFermeture();
     filMoteur_->quit();
     filMoteur_->wait(3000);
 }
@@ -102,6 +111,18 @@ void FenetrePrincipale::construirePanneaux() {
             [this](const QString& commande) {
                 historique_->addItem(commande);
                 historique_->scrollToBottom();
+                if (enPause_) {
+                    // Arrêté sur un point d'arrêt : la commande s'évalue
+                    // dans l'espace de travail de l'arrêt, sans reprendre.
+                    // C'est le « K>> » de MATLAB.
+                    // Appel direct, et non en file : le fil de calcul
+                    // dort dans le crochet d'arret, sa boucle d'evenements
+                    // ne tourne plus — une connexion en file n'arriverait
+                    // jamais. « evaluerALArret » ne touche que l'etat
+                    // garde par le verrou du moteur.
+                    moteur_->evaluerALArret(commande);
+                    return;
+                }
                 occupe_ = true;
                 etat_->setText(QStringLiteral("occupé"));
                 QMetaObject::invokeMethod(moteur_, "executer", Qt::QueuedConnection,
@@ -171,6 +192,27 @@ void FenetrePrincipale::construirePanneaux() {
     historique_->setAlternatingRowColors(true);
     connect(historique_, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem* item) { envoyer(item->text()); });
+    listePointsArret_ = new QListWidget;
+    listePointsArret_->setAlternatingRowColors(true);
+    connect(listePointsArret_, &QListWidget::itemDoubleClicked, this,
+            [this](QListWidgetItem* item) {
+                // « fichier.m : 12 » — on ouvre le fichier a cette ligne.
+                QStringList morceaux = item->text().split(QStringLiteral(" : "));
+                if (morceaux.size() != 2) return;
+                QString chemin = QDir(dossierCourant_).filePath(morceaux[0]);
+                if (!QFileInfo::exists(chemin)) return;
+                ouvrirFichier(chemin);
+                if (Editeur* e = editeurCourant()) {
+                    QTextCursor c(e->document()->findBlockByNumber(morceaux[1].toInt() - 1));
+                    e->setTextCursor(c);
+                    e->centerCursor();
+                }
+            });
+    auto* dockPointsArret = new QDockWidget(QStringLiteral("Points d'arrêt"), this);
+    dockPointsArret->setWidget(listePointsArret_);
+    dockPointsArret->setObjectName(QStringLiteral("dockPointsArret"));
+    addDockWidget(Qt::RightDockWidgetArea, dockPointsArret);
+
     auto* dockHistorique = new QDockWidget(QStringLiteral("Historique des commandes"), this);
     dockHistorique->setWidget(historique_);
     dockHistorique->setObjectName(QStringLiteral("dockHistorique"));
@@ -254,6 +296,33 @@ void FenetrePrincipale::construireMenus() {
                                               &FenetrePrincipale::executerSelection);
     aSelection->setShortcut(Qt::Key_F9);
 
+    QMenu* debogage = menuBar()->addMenu(QStringLiteral("&Déboguer"));
+    aContinuer_ = debogage->addAction(iconeDessinee("executer", 16),
+                                      QStringLiteral("&Continuer"), this,
+                                      &FenetrePrincipale::continuerExecution);
+    aContinuer_->setShortcut(Qt::Key_F5 | Qt::ShiftModifier);
+    aPasAPas_ = debogage->addAction(QStringLiteral("&Pas à pas"), this,
+                                    &FenetrePrincipale::pasAPas);
+    aPasAPas_->setShortcut(Qt::Key_F10);
+    aEntrer_ = debogage->addAction(QStringLiteral("&Entrer dedans"), this,
+                                   &FenetrePrincipale::entrerDedans);
+    aEntrer_->setShortcut(Qt::Key_F11);
+    aSortir_ = debogage->addAction(QStringLiteral("&Sortir de"), this,
+                                   &FenetrePrincipale::sortirDe);
+    aSortir_->setShortcut(Qt::Key_F11 | Qt::ShiftModifier);
+    aQuitterDebug_ = debogage->addAction(iconeDessinee("effacer", 16),
+                                         QStringLiteral("&Arrêter le débogage"), this,
+                                         &FenetrePrincipale::quitterDebogage);
+    debogage->addSeparator();
+    debogage->addAction(QStringLiteral("Basculer un point d'arrêt"),
+                        QKeySequence(Qt::Key_F12), this, [this] {
+                            if (Editeur* e = editeurCourant())
+                                e->basculerPointArret(e->textCursor().blockNumber() + 1);
+                        });
+    debogage->addAction(QStringLiteral("Retirer tous les points d'arrêt"), this,
+                        &FenetrePrincipale::retirerTousPointsArret);
+    activerCommandesDebogueur(false);
+
     QMenu* aide = menuBar()->addMenu(QStringLiteral("&Aide"));
     aide->addAction(iconeDessinee("aide", 16), QStringLiteral("À propos de MatLibre"), this,
                     &FenetrePrincipale::aPropos);
@@ -327,6 +396,18 @@ void FenetrePrincipale::construireMenus() {
     connect(bAtelier, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("ide")); });
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), environnementGroupe);
 
+    auto* debogageGroupe = new GroupeRuban(QStringLiteral("Déboguer"));
+    connect(debogageGroupe->ajouter(QStringLiteral("Continuer"), QStringLiteral("executer"),
+                                    QStringLiteral("Reprendre l'exécution (Maj+F5)")),
+            &QToolButton::clicked, aContinuer_, &QAction::trigger);
+    connect(debogageGroupe->ajouter(QStringLiteral("Pas à\npas"), QStringLiteral("selection"),
+                                    QStringLiteral("Exécuter la ligne suivante (F10)")),
+            &QToolButton::clicked, aPasAPas_, &QAction::trigger);
+    connect(debogageGroupe->ajouter(QStringLiteral("Arrêter"), QStringLiteral("effacer"),
+                                    QStringLiteral("Arrêter le débogage")),
+            &QToolButton::clicked, aQuitterDebug_, &QAction::trigger);
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), debogageGroupe);
+
     auto* aideGroupe = new GroupeRuban(QStringLiteral("Ressources"));
     QToolButton* bAide = aideGroupe->ajouter(QStringLiteral("Aide"), QStringLiteral("aide"),
                                              QStringLiteral("help"));
@@ -358,6 +439,7 @@ Editeur* FenetrePrincipale::editeurCourant() const {
 
 void FenetrePrincipale::nouveauFichier() {
     auto* editeur = new Editeur;
+    connect(editeur, &Editeur::pointArretBascule, this, &FenetrePrincipale::surPointArret);
     onglets_->addTab(editeur, QStringLiteral("sans-titre.m"));
     onglets_->setCurrentWidget(editeur);
     editeur->setFocus();
@@ -372,6 +454,7 @@ void FenetrePrincipale::ouvrirFichier(const QString& chemin) {
         }
     }
     auto* editeur = new Editeur;
+    connect(editeur, &Editeur::pointArretBascule, this, &FenetrePrincipale::surPointArret);
     if (!editeur->chargerFichier(chemin)) {
         delete editeur;
         QMessageBox::warning(this, QStringLiteral("MatLibre"),
@@ -466,7 +549,9 @@ void FenetrePrincipale::executerSelection() {
 // dans l'historique, F5 sur un script — passe par le même chemin : la
 // commande s'écrit à l'invite, puis part.
 void FenetrePrincipale::envoyer(const QString& commande) {
-    if (occupe_) {
+    // A l'arret, le bureau est « occupe » — le script tourne encore — mais
+    // MATLAB accepte quand meme les commandes a l'invite « K>> ».
+    if (occupe_ && !enPause_) {
         ecrire(QStringLiteral("MatLibre est occupé ; attendez la fin du calcul.\n"),
                theme::avertissement().name());
         return;
@@ -494,6 +579,7 @@ void FenetrePrincipale::surCommandeFinie() {
 }
 
 void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lignes) {
+    if (enPause_) console_->poserInvite(QStringLiteral("K>> "));
     tableVariables_->setRowCount(lignes.size());
     for (int k = 0; k < lignes.size(); ++k) {
         tableVariables_->setItem(k, 0, new QTableWidgetItem(lignes[k].nom));
@@ -568,6 +654,125 @@ void FenetrePrincipale::tracerSelection(const QString& fonction) {
     }
     envoyer(fonction + QLatin1Char('(') + tableVariables_->item(ligne, 0)->text() +
             QLatin1Char(')'));
+}
+
+// --- débogueur ------------------------------------------------------------
+
+Editeur* FenetrePrincipale::editeurDuFichier(const QString& fichier) {
+    // Le débogueur nomme les fichiers par leur nom court ; on retrouve
+    // l'onglet qui le porte, ou on l'ouvre.
+    QFileInfo cible(fichier);
+    for (int k = 0; k < onglets_->count(); ++k) {
+        auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
+        if (!e || e->fichier().isEmpty()) continue;
+        QFileInfo info(e->fichier());
+        if (info.completeBaseName() == cible.completeBaseName() ||
+            info.absoluteFilePath() == cible.absoluteFilePath())
+            return e;
+    }
+    if (cible.isFile()) {
+        ouvrirFichier(cible.absoluteFilePath());
+        return qobject_cast<Editeur*>(onglets_->currentWidget());
+    }
+    // Le fichier n'est pas ouvert : on le cherche dans le dossier courant.
+    QString essai = QDir(dossierCourant_).filePath(cible.completeBaseName() + ".m");
+    if (QFileInfo::exists(essai)) {
+        ouvrirFichier(essai);
+        return qobject_cast<Editeur*>(onglets_->currentWidget());
+    }
+    return nullptr;
+}
+
+// Un appel au moteur qui marche dans les deux etats du fil de calcul :
+// en file quand il tourne — la modification arrive alors entre deux
+// commandes, sans course —, en direct quand il dort dans le crochet
+// d'arret, ou plus rien ne depile la file mais ou rien non plus ne lit
+// l'interpreteur.
+void FenetrePrincipale::versMoteur(std::function<void()> action) {
+    if (moteur_->arrete()) {
+        action();
+        return;
+    }
+    QMetaObject::invokeMethod(moteur_, std::move(action), Qt::QueuedConnection);
+}
+
+void FenetrePrincipale::surArret(const QString& fichier, int ligne) {
+    enPause_ = true;
+    activerCommandesDebogueur(true);
+    etat_->setText(QStringLiteral("arrêté ligne %1").arg(ligne));
+    if (Editeur* e = editeurDuFichier(fichier)) {
+        onglets_->setCurrentWidget(e);
+        e->definirLigneArret(ligne);
+    }
+    // L'invite passe à « K>> », comme MATLAB : on peut regarder et
+    // modifier les variables sans reprendre l'exécution.
+    console_->poserInvite(QStringLiteral("K>> "));
+    console_->setFocus();
+}
+
+void FenetrePrincipale::surReprise() {
+    enPause_ = false;
+    activerCommandesDebogueur(false);
+    etat_->setText(occupe_ ? QStringLiteral("occupé") : QStringLiteral("prêt"));
+    for (int k = 0; k < onglets_->count(); ++k)
+        if (auto* e = qobject_cast<Editeur*>(onglets_->widget(k))) e->definirLigneArret(0);
+}
+
+void FenetrePrincipale::surPointArret(int ligne, bool pose) {
+    auto* editeur = qobject_cast<Editeur*>(sender());
+    if (!editeur) return;
+    if (editeur->fichier().isEmpty()) {
+        ecrire(QStringLiteral("Enregistrez le fichier avant d'y poser un point "
+                              "d'arrêt.\n"),
+               theme::avertissement().name());
+        editeur->basculerPointArret(ligne);   // annule la pastille
+        return;
+    }
+    QString fichier = editeur->fichier();
+    versMoteur([this, pose, fichier, ligne] {
+        if (pose) moteur_->poserPointArret(fichier, ligne);
+        else moteur_->retirerPointArret(fichier, ligne);
+    });
+    rafraichirPointsArret();
+}
+
+void FenetrePrincipale::rafraichirPointsArret() {
+    if (!listePointsArret_) return;
+    listePointsArret_->clear();
+    for (int k = 0; k < onglets_->count(); ++k) {
+        auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
+        if (!e || e->fichier().isEmpty()) continue;
+        QString nom = QFileInfo(e->fichier()).fileName();
+        QList<int> lignes = e->pointsArret().values();
+        std::sort(lignes.begin(), lignes.end());
+        for (int ligne : lignes)
+            listePointsArret_->addItem(QStringLiteral("%1 : %2").arg(nom).arg(ligne));
+    }
+}
+
+void FenetrePrincipale::activerCommandesDebogueur(bool actif) {
+    for (QAction* a : {aContinuer_, aPasAPas_, aEntrer_, aSortir_, aQuitterDebug_})
+        if (a) a->setEnabled(actif);
+}
+
+// Les cinq commandes. ActionDebogueur : 0 continuer, 1 pas a pas,
+// 2 entrer, 3 sortir, 4 quitter. Toutes appellent le moteur DIRECTEMENT :
+// le fil de calcul dort dans le crochet, il n'y a plus de boucle
+// d'evenements pour delivrer une connexion en file.
+void FenetrePrincipale::continuerExecution() { moteur_->reprendre(0); }
+void FenetrePrincipale::pasAPas()            { moteur_->reprendre(1); }
+void FenetrePrincipale::entrerDedans()       { moteur_->reprendre(2); }
+void FenetrePrincipale::sortirDe()           { moteur_->reprendre(3); }
+void FenetrePrincipale::quitterDebogage()    { moteur_->reprendre(4); }
+
+void FenetrePrincipale::retirerTousPointsArret() {
+    versMoteur([this] { moteur_->retirerTousPointsArret(); });
+    for (int k = 0; k < onglets_->count(); ++k) {
+        auto* e = qobject_cast<Editeur*>(onglets_->widget(k));
+        if (!e) continue;
+        for (int ligne : e->pointsArret().values()) e->basculerPointArret(ligne);
+    }
+    rafraichirPointsArret();
 }
 
 void FenetrePrincipale::commenterSelection() {

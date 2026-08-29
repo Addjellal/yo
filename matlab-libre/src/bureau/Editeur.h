@@ -4,6 +4,7 @@
 #include <QPlainTextEdit>
 #include <QRegularExpression>
 #include <QSyntaxHighlighter>
+#include <QSet>
 #include <QVector>
 
 // Coloration du langage MATLAB : mots-clés, chaînes, commentaires,
@@ -41,10 +42,24 @@ public:
     bool chargerFichier(const QString& chemin);
     bool enregistrerFichier(const QString& chemin);
 
+    // --- points d'arrêt et ligne d'exécution ----------------------------
+    const QSet<int>& pointsArret() const { return pointsArret_; }
+    void basculerPointArret(int ligne);
+    // Ligne où l'exécution est arrêtée, 0 pour aucune. Elle est surlignée
+    // et une flèche la désigne dans la marge, comme sous MATLAB.
+    void definirLigneArret(int ligne);
+    int ligneArret() const { return ligneArret_; }
+
     // Commente ou décommente les lignes sélectionnées : Ctrl-R et Ctrl-T,
     // les raccourcis de MATLAB.
     void commenter();
     void decommenter();
+
+    // Appelée par la marge quand on y clique : la ligne visée y bascule.
+    void clicMarge(int y);
+
+signals:
+    void pointArretBascule(int ligne, bool pose);
 
 protected:
     void resizeEvent(QResizeEvent* evenement) override;
@@ -61,4 +76,6 @@ private:
     QWidget* marge_;
     ColorationMatlab* coloration_;
     QString fichier_;
+    QSet<int> pointsArret_;      // numéros de ligne, à partir de 1
+    int ligneArret_ = 0;
 };
