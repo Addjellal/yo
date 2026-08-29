@@ -720,6 +720,9 @@ void FenetrePrincipale::surSortie(const QString& texte) {
     const bool estErreur = texte.contains(QStringLiteral("Error:")) ||
                            texte.startsWith(QStringLiteral("Error"));
     console_->ecrireSortie(texte, estErreur ? theme::erreur() : theme::texte());
+    // Le calcul attend cet accusé pour envoyer la suite : il ne prend
+    // ainsi jamais plus d'avance que la console n'en peut peindre.
+    moteur_->accuserSortie();
 }
 
 // Ctrl-C, ou le bouton « Arrêter ». Le moteur ne fait que lever un

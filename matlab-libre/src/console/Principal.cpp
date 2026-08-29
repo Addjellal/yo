@@ -5,21 +5,31 @@
 //   matlibre -e "expr"          évalue une expression
 //   matlibre --test dossier     exécute les tests d'un dossier
 #include <algorithm>
+#include <atomic>
+#include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 #include "matlibre/Affichage.h"
 #include "matlibre/Analyseur.h"
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Console.h"
 #include "matlibre/Erreur.h"
-#include <atomic>
-#include <csignal>
-
+#include "matlibre/Installation.h"
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Version.h"
 
@@ -27,34 +37,6 @@ namespace fs = std::filesystem;
 using namespace matlibre;
 
 namespace {
-
-std::string racineInstallation(const char* argv0) {
-    std::error_code ec;
-    fs::path exe = fs::weakly_canonical(fs::path(argv0), ec);
-    fs::path dossier = exe.parent_path();
-    // Arborescence installée : <prefixe>/bin/matlibre et <prefixe>/share/matlibre
-    for (fs::path p : {dossier / ".." / "share" / "matlibre", dossier / ".." / "toolbox",
-                       dossier / "toolbox"}) {
-        std::error_code e2;
-        if (fs::is_directory(p, e2)) return fs::weakly_canonical(p, e2).string();
-    }
-    const char* env = std::getenv("MATLIBRE_TOOLBOX");
-    if (env) return env;
-    return std::string();
-}
-
-void chargerToolboxes(Interpreteur& it, const std::string& racine) {
-    if (racine.empty()) return;
-    it.definirRacineToolbox(racine);
-    std::error_code ec;
-    std::vector<std::string> dossiers;
-    for (const auto& e : fs::directory_iterator(racine, ec))
-        if (e.is_directory()) dossiers.push_back(e.path().string());
-    std::sort(dossiers.begin(), dossiers.end());
-    for (auto rit = dossiers.rbegin(); rit != dossiers.rend(); ++rit)
-        it.ajouterChemin(*rit, true);
-    it.ajouterChemin(racine, true);
-}
 
 // Console du débogueur : appelée quand l'exécution s'arrête sur un point
 // d'arrêt. On lit des commandes jusqu'à ce que l'utilisateur reprenne.
@@ -106,14 +88,39 @@ std::atomic<bool>* drapeauConsole = nullptr;
 
 extern "C" void surSignalInterruption(int) {
     if (drapeauConsole) drapeauConsole->store(true, std::memory_order_relaxed);
+#ifndef _WIN32
+    // POSIX remet le comportement par defaut sur certains systemes : on
+    // reinstalle, sinon le deuxieme Ctrl-C tuerait le programme.
+    std::signal(SIGINT, surSignalInterruption);
+#endif
+}
+
+#ifdef _WIN32
+// Windows ne delivre pas de vrai signal : il appelle ce gestionnaire dans
+// un fil a lui. Le CRT en fabrique un qui appelle « surSignalInterruption »,
+// mais il n'existe que si le programme est lie a la bonne variante, et il
+// laisse passer la fermeture par defaut. On s'inscrit donc directement :
+// rendre TRUE dit a Windows que l'evenement est traite, et le programme
+// n'est pas tue.
+BOOL WINAPI surEvenementConsole(DWORD type) {
+    if (type != CTRL_C_EVENT && type != CTRL_BREAK_EVENT) return FALSE;
+    if (drapeauConsole) drapeauConsole->store(true, std::memory_order_relaxed);
+    return TRUE;
+}
+#endif
+
+// A appeler dans le fil qui execute : Ctrl-C coupe le calcul et rend
+// l'invite, au lieu de tuer le programme. C'est ce que fait MATLAB.
+void armerCtrlC(Interpreteur& it) {
+    drapeauConsole = &it.interruption;
+    std::signal(SIGINT, surSignalInterruption);
+#ifdef _WIN32
+    SetConsoleCtrlHandler(surEvenementConsole, TRUE);
+#endif
 }
 
 int executerFluxInteractif(Interpreteur& it) {
     it.modeInteractif = true;
-    // Ctrl-C coupe le calcul et rend l'invite, au lieu de tuer le
-    // programme : c'est ce que fait MATLAB.
-    drapeauConsole = &it.interruption;
-    std::signal(SIGINT, surSignalInterruption);
     std::string tampon;
     std::string ligne;
     std::cout << "MatLibre " << MATLIBRE_VERSION
@@ -131,6 +138,9 @@ int executerFluxInteractif(Interpreteur& it) {
             sansBlanc.pop_back();
         if (sansBlanc.size() >= 3 && sansBlanc.substr(sansBlanc.size() - 3) == "...") continue;
         try {
+            // Un Ctrl-C tombe entre deux commandes n'a rien a interrompre :
+            // on repart d'un drapeau propre.
+            it.armerInterruption();
             it.executerTexte(tampon, "<console>");
             tampon.clear();
         } catch (const InterruptionUtilisateur&) {
@@ -164,12 +174,23 @@ int executerFluxInteractif(Interpreteur& it) {
 int main(int argc, char** argv) {
     // Avant tout affichage : la console de Windows doit lire de l'UTF-8.
     ConsoleUtf8 console;
+    // Un tampon franc sur la sortie. Sans lui, la console de Windows fait
+    // un appel systeme par ligne : afficher un vecteur de dix millions
+    // d'elements demandait des minutes de plus, passees dans le pilote de
+    // la console et non dans le calcul. L'invite, elle, se purge
+    // explicitement — « std::flush » est deja la ou il faut.
+    static char tamponSortie[1 << 16];
+    std::setvbuf(stdout, tamponSortie, _IOFBF, sizeof tamponSortie);
     std::vector<std::string> arguments(argv + 1, argv + argc);
     Interpreteur it;
     it.installerBibliotheque();
-    chargerToolboxes(it, racineInstallation(argv[0]));
+    chargerToolboxes(it, racineToolboxes(argv[0]));
     it.ajouterChemin(fs::current_path().string(), true);
     it.crochetArret = consoleDebogueur;
+    // Ctrl-C arrete aussi un script lance depuis la ligne de commande, pas
+    // seulement la session interactive.
+    armerCtrlC(it);
+    it.armerInterruption();
 
     try {
         if (arguments.empty()) return executerFluxInteractif(it);
@@ -224,6 +245,9 @@ int main(int argc, char** argv) {
         return executerFluxInteractif(it);
     } catch (const DemandeSortie& s) {
         return s.code;
+    } catch (const InterruptionUtilisateur&) {
+        std::cout << "\nOperation terminated by user.\n";
+        return 130;
     } catch (const ErreurMatlab& e) {
         std::cerr << "Error: " << e.message << "\n";
         return 1;

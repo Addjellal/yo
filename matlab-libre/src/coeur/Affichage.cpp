@@ -139,23 +139,27 @@ static std::string indenter(const std::string& texte, int n) {
 static std::string rendreStructure(const Valeur& v, int format, bool compact, int largeur);
 static std::string rendreCellule(const Valeur& v, int format, bool compact, int largeur);
 
-static std::string rendreNumerique(const Valeur& v, Format format, int largeurEcran) {
+static void ecrireNumerique(std::ostream& os, const Valeur& v, Format format,
+                            int largeurEcran) {
     PlanColonne p = planifier(v, format);
     int l = v.nlignes(), c = v.ncolonnes();
-    std::string sortie;
     if (p.facteur != 1.0) {
         int e = (int)std::round(std::log10(p.facteur));
-        sortie += formater("  1.0e%+03d *\n\n", e);
+        os << formater("  1.0e%+03d *\n\n", e);
     }
     int largeurCellule = p.largeur;
     if (v.estComplexe()) largeurCellule = 2 * p.largeur + 2;
     int parPaquet = std::max(1, (largeurEcran - 3) / std::max(1, largeurCellule));
+    // La ligne est bâtie dans un tampon réutilisé : dix millions de
+    // colonnes font dix millions de lignes, et autant d'allocations si on
+    // en crée une par tour.
+    std::string ligne;
     for (int debut = 0; debut < c; debut += parPaquet) {
         verifierInterruption();
         int fin = std::min(c, debut + parPaquet);
         if (c > parPaquet) {
-            if (fin - debut == 1) sortie += formater("  Column %d\n\n", debut + 1);
-            else sortie += formater("  Columns %d through %d\n\n", debut + 1, fin);
+            if (fin - debut == 1) os << formater("  Column %d\n\n", debut + 1);
+            else os << formater("  Columns %d through %d\n\n", debut + 1, fin);
         }
         for (int i = 0; i < l; ++i) {
             // Ctrl-C : un tableau de dix millions d'elements demande des
@@ -163,7 +167,7 @@ static std::string rendreNumerique(const Valeur& v, Format format, int largeurEc
             // lignes — assez souvent pour repondre, assez rare pour ne
             // rien couter.
             if ((i & 1023) == 0) verifierInterruption();
-            std::string ligne;
+            ligne.clear();
             for (int j = debut; j < fin; ++j) {
                 std::size_t k = (std::size_t)i + (std::size_t)j * l;
                 std::string texte = cellule(v.re[k], p, format);
@@ -174,37 +178,34 @@ static std::string rendreNumerique(const Valeur& v, Format format, int largeurEc
                 }
                 ligne += formater("%*s", largeurCellule, texte.c_str());
             }
-            sortie += ligne + "\n";
+            ligne += '\n';
+            os.write(ligne.data(), (std::streamsize)ligne.size());
         }
-        if (fin < c) sortie += "\n";
+        if (fin < c) os << "\n";
     }
-    return sortie;
 }
 
-static std::string rendreTexte(const Valeur& v) {
+static void ecrireTexte(std::ostream& os, const Valeur& v) {
     int l = v.nlignes(), c = v.ncolonnes();
-    std::string sortie;
     for (int i = 0; i < l; ++i) {
+        if ((i & 1023) == 0) verifierInterruption();
         std::string ligne;
         for (int j = 0; j < c; ++j)
             ligne += (char)(int)v.re[(std::size_t)i + (std::size_t)j * l];
-        sortie += "    '" + ligne + "'\n";
+        os << "    '" << ligne << "'\n";
     }
-    return sortie;
 }
 
-static std::string rendreChaines(const Valeur& v) {
+static void ecrireChaines(std::ostream& os, const Valeur& v) {
     int l = v.nlignes(), c = v.ncolonnes();
-    std::string sortie;
     for (int i = 0; i < l; ++i) {
-        std::string ligne;
+        if ((i & 1023) == 0) verifierInterruption();
         for (int j = 0; j < c; ++j) {
             std::size_t k = (std::size_t)i + (std::size_t)j * l;
-            ligne += "    \"" + (k < v.chaines.size() ? v.chaines[k] : std::string()) + "\"";
+            os << "    \"" << (k < v.chaines.size() ? v.chaines[k] : std::string()) << "\"";
         }
-        sortie += ligne + "\n";
+        os << "\n";
     }
-    return sortie;
 }
 
 std::string descriptionCourte(const Valeur& v) {
@@ -281,32 +282,38 @@ static std::string rendreStructure(const Valeur& v, int format, bool compact, in
     return sortie;
 }
 
-std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur) {
+void ecrireValeur(std::ostream& os, const Valeur& v, int format, bool compact,
+                  int largeur) {
     Format f = (Format)format;
-    if (v.estCreux()) return rendreCreux(v);
+    if (v.estCreux()) { os << rendreCreux(v); return; }
     switch (v.classe) {
         case Classe::Fonction:
-            return "    " + (v.fn ? v.fn->texte : std::string("@()")) + "\n";
-        case Classe::Cellule: return rendreCellule(v, format, compact, largeur);
+            os << "    " << (v.fn ? v.fn->texte : std::string("@()")) << "\n";
+            return;
+        case Classe::Cellule: os << rendreCellule(v, format, compact, largeur); return;
         case Classe::Structure:
-        case Classe::Objet: return rendreStructure(v, format, compact, largeur);
+        case Classe::Objet: os << rendreStructure(v, format, compact, largeur); return;
         case Classe::Caractere:
-            if (v.estVide()) return "  ''\n";
-            return rendreTexte(v);
+            if (v.estVide()) os << "  ''\n";
+            else ecrireTexte(os, v);
+            return;
         case Classe::Chaine:
-            if (v.estVide()) return "  0x0 empty string array\n";
-            return rendreChaines(v);
+            if (v.estVide()) os << "  0x0 empty string array\n";
+            else ecrireChaines(os, v);
+            return;
         default: break;
     }
-    if (v.estVide()) return formater("  %s empty %s matrix\n", texteDims(v.dims).c_str(),
-                                     v.classeNom());
+    if (v.estVide()) {
+        os << formater("  %s empty %s matrix\n", texteDims(v.dims).c_str(), v.classeNom());
+        return;
+    }
     if (v.dims.size() > 2) {
         // Affichage page par page, comme MATLAB.
-        std::string sortie;
         int l = v.dims[0], c = v.dims[1];
         std::size_t pageTaille = (std::size_t)l * c;
         std::size_t pages = v.nelem() / std::max<std::size_t>(pageTaille, 1);
         for (std::size_t p = 0; p < pages; ++p) {
+            verifierInterruption();
             Dims reste(v.dims.begin() + 2, v.dims.end());
             std::string etiquette;
             std::size_t r = p;
@@ -314,16 +321,24 @@ std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur)
                 etiquette += formater(",%zu", r % (std::size_t)reste[d] + 1);
                 r /= (std::size_t)reste[d];
             }
-            sortie += formater("ans(:,:%s) =\n\n", etiquette.c_str());
+            os << formater("ans(:,:%s) =\n\n", etiquette.c_str());
             Valeur page = Valeur::matrice(l, c);
             page.classe = v.classe;
             for (std::size_t k = 0; k < pageTaille; ++k) page.re[k] = v.re[p * pageTaille + k];
-            sortie += rendreNumerique(page, f, largeur);
-            sortie += "\n";
+            ecrireNumerique(os, page, f, largeur);
+            os << "\n";
         }
-        return sortie;
+        return;
     }
-    return rendreNumerique(v, f, largeur);
+    ecrireNumerique(os, v, f, largeur);
+}
+
+// La forme en chaîne reste, pour « evalc », les cellules imbriquées et
+// tout ce qui a besoin du texte plutôt que de l'écran.
+std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur) {
+    std::ostringstream os;
+    ecrireValeur(os, v, format, compact, largeur);
+    return os.str();
 }
 
 void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v) {
@@ -382,7 +397,7 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
     }
     os << nom << " =\n";
     if (!compact) os << "\n";
-    os << rendreValeur(v, format, compact, 80);
+    ecrireValeur(os, v, format, compact, 80);
     if (!compact) os << "\n";
 }
 

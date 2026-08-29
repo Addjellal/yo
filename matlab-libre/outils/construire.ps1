@@ -11,7 +11,10 @@
 #
 # Chaque compilation part d'un arbre neuf : l'ancien est effacé avant de
 # reconfigurer. C'est ce qui évite les objets orphelins et les caches
-# périmés. « -Incrementale » garde l'arbre, pour itérer.
+# périmés. À la fin, le dossier est nettoyé de tout ce qui ne sert qu'à
+# recompiler — objets, caches, projets générés — et il ne reste que ce
+# qu'on lance : bin\, lib\ et ce que l'installation a produit.
+# « -Incrementale » garde l'arbre et son ménage, pour itérer.
 #
 # Visual Studio 2019 ou plus récent, ou MinGW, et CMake. Aucune autre
 # dépendance n'est requise.
@@ -170,14 +173,57 @@ if ($Paquet) {
     }
 }
 
-Write-Host "MatLibre : fini. L'executable est $exe"
 $bureau = Trouver "matlibre-bureau"
+
+# Menage. Ce qui reste dans le dossier de construction apres coup ne sert
+# qu'a recompiler : objets, fichiers de dependances, caches de CMake,
+# projets generes par Visual Studio. C'est aussi ce qui pese : le dossier
+# passe de plusieurs centaines de megaoctets a la taille des programmes.
+# Comme chaque compilation repart d'un arbre neuf, rien de tout cela n'est
+# reutilise. « -Incrementale » le garde, puisque c'est justement ce qu'il
+# sert a reutiliser.
+#
+# On garde bin\ et lib\ — ce qu'on lance et ce a quoi on lie —, et les
+# archives que « -Paquet » a produites.
+function TailleDe($chemin) {
+    if (-not (Test-Path $chemin)) { return 0 }
+    $somme = (Get-ChildItem -Recurse -Force -File $chemin -ErrorAction SilentlyContinue |
+              Measure-Object -Property Length -Sum).Sum
+    if ($null -eq $somme) { return 0 }
+    return $somme
+}
+
+if (-not $Incrementale.IsPresent) {
+    $avant = TailleDe $Dossier
+    $garder = @("bin", "lib")
+    # Un arbre de construction deja en place a pu deposer les binaires
+    # ailleurs — a la racine, ou dans un dossier par configuration. On ne
+    # jette jamais le dossier ou l'on vient de trouver un executable.
+    foreach ($trouve in @($exe, $bureau)) {
+        if ($trouve -eq "") { continue }
+        $relatif = $trouve.Substring($Dossier.Length).TrimStart('\', '/')
+        $premier = $relatif.Split([char[]]@('\', '/'))[0]
+        if ($premier -ne "" -and $garder -notcontains $premier) { $garder += $premier }
+    }
+    Get-ChildItem -Path $Dossier -Force -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $garder -notcontains $_.Name } |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $Dossier -Force -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension -notin @(".zip", ".gz", ".exe", ".msi") } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    $apres = TailleDe $Dossier
+    $gagne = [math]::Round(($avant - $apres) / 1MB)
+    Write-Host "MatLibre : menage du dossier de construction, $gagne Mo liberes"
+}
+
+Write-Host ""
+Write-Host "MatLibre : fini."
 if ($bureau -ne "") {
     Write-Host "  $bureau"
     Write-Host "      le bureau : une fenetre, l'editeur, les figures, l'espace de travail"
 }
-Write-Host "  $exe-bureau  ouvre le bureau (si Qt6 est present)"
-Write-Host "  $exe         session interactive"
+Write-Host "  $exe"
+Write-Host "      session interactive dans le terminal"
 if ($bureau -eq "") {
     Write-Host ""
     Write-Host "Le bureau natif n'a pas ete construit : Qt6 est introuvable."

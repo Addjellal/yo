@@ -681,10 +681,11 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
 // ------------------------------------------------------------- exécution
 
 void Interpreteur::executerTexte(const std::string& source, const std::string& origine) {
-    // Le drapeau d'interruption est propre au fil : on l'arme ici, dans
+    // Le drapeau d'interruption est propre au fil : on le suit ici, dans
     // celui qui va executer, pour que « verifierInterruption » lise bien
-    // le notre.
-    armerInterruption();
+    // le notre. On ne l'efface pas : c'est a l'hote — la console, le
+    // bureau — de le faire au debut de chaque commande.
+    suivreInterruption();
     UniteCompilee u = compiler(source, origine);
     for (auto& c : u.classes) {
         relierClasse(c, u.fonctions);
@@ -715,7 +716,7 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
 }
 
 void Interpreteur::executerFichier(const std::string& fichier) {
-    armerInterruption();
+    suivreInterruption();
     std::string source = lireFichier(fichier);
     // mfilename doit pouvoir nommer le fichier en cours d'exécution.
     std::string precedent = fichierCourant;

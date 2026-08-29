@@ -393,6 +393,22 @@ int main(int argc, char** argv) {
                  "le script a bien calcule 42");
     }
 
+    // --- les toolboxes sont la ---------------------------------------------
+    //
+    // Le bureau doit voir les 1067 fonctions ecrites en langage MATLAB, pas
+    // seulement les natives : elles vivent dans toolbox/, qu'il faut
+    // trouver a cote de l'executable. Le jour ou les binaires ont demenage
+    // dans build/bin, la recherche a cesse d'aboutir et le bureau s'est
+    // retrouve sans ses toolboxes — et sans les fiches d'aide.
+    envoyer(fenetre, QStringLiteral("[bb, aa] = butter(2, 0.2);"));
+    verifier(attendre([&] { return ligneDe(QStringLiteral("bb")) >= 0; }, 20000),
+             "une fonction de toolbox repond dans le bureau");
+    envoyer(fenetre, QStringLiteral("prixAppel = blsprice(100, 100, 0.05, 1, 0.2);"));
+    verifier(attendre([&] { return ligneDe(QStringLiteral("prixAppel")) >= 0; }, 20000),
+             "et une autre, prise dans une toolbox differente");
+    envoyer(fenetre, QStringLiteral("clear bb aa prixAppel"));
+    verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+
     // --- le fil de calcul ne bloque pas l'interface ------------------------
     verifier(envoyer(fenetre, QStringLiteral("s = 0; for k = 1:400000, s = s + k; end")),
              "une commande longue est acceptee");
@@ -607,18 +623,50 @@ int main(int argc, char** argv) {
                  "et rien n'est perdu en chemin");
 
         // L'affichage d'un tableau enorme se coupe aussi : c'est la que le
-        // bureau se figeait.
+        // bureau se figeait. Un million d'elements font seize megaoctets
+        // de texte ; la fenetre doit les voir arriver au fil de l'eau,
+        // rester vivante pendant, et s'arreter au Ctrl-C.
         fenetre.envoyerCommande(QStringLiteral("enorme = 0:0.0001:100;"));
         verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
                  "le grand vecteur est construit");
+        paquetsAvant = fenetre.paquetsSortie();
+        QElapsedTimer chronoAffichage;
+        chronoAffichage.start();
         fenetre.envoyerCommande(QStringLiteral("enorme"));
         verifier(attendre([&] { return fenetre.occupe(); }, 8000),
                  "son affichage est parti");
+        // Au fil de l'eau : du texte paraît AVANT la fin. Tant que
+        // l'affichage se rendait dans une seule chaine, rien ne sortait
+        // avant la derniere colonne — seize megaoctets plus tard.
+        verifier(attendre([&] {
+                     return fenetre.paquetsSortie() > paquetsAvant && fenetre.occupe();
+                 }, 15000),
+                 "le texte paraît pendant l'affichage, pas seulement a la fin");
+        std::printf("  (premier texte apres %lld ms)\n",
+                    (long long)chronoAffichage.elapsed());
+        // Et la fenetre repond toujours, sous le flot : c'est ce qui
+        // permet au Ctrl-C d'arriver jusqu'au moteur.
+        tours = 0;
+        patience.restart();
+        while (patience.elapsed() < 200) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            ++tours;
+        }
+        verifier(tours > 5, "l'interface repond pendant l'affichage enorme");
+        chronoAffichage.restart();
         QMetaObject::invokeMethod(&fenetre, "interrompre");
         verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
                  "l'affichage d'un tableau enorme se coupe");
+        std::printf("  (coupe apres %lld ms)\n", (long long)chronoAffichage.elapsed());
         envoyer(fenetre, QStringLiteral("clear enorme interminable"));
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+
+        // Un Ctrl-C qui arrive alors qu'il n'y a plus rien a couper ne
+        // doit pas couper la commande suivante.
+        QMetaObject::invokeMethod(&fenetre, "interrompre");
+        envoyer(fenetre, QStringLiteral("apresCtrlC = 1 + 1;"));
+        verifier(attendre([&] { return ligneDe(QStringLiteral("apresCtrlC")) >= 0; }),
+                 "un Ctrl-C sans calcul a couper ne gene pas la commande suivante");
     }
 
     // --- le navigateur d'aide ----------------------------------------------

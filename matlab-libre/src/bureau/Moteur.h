@@ -94,6 +94,16 @@ public:
     // Vrai quand l'exécution est arrêtée sur un point d'arrêt.
     bool arrete() const { return arrete_.load(); }
 
+    // La fenêtre a fini d'écrire un paquet de sortie. Sans cet accusé, le
+    // fil de calcul produit plus vite que la fenêtre ne consomme : la file
+    // d'événements enfle, la fenêtre ne répond plus — Windows propose de
+    // tuer le programme — et le Ctrl-C qui l'aurait arrêtée n'est jamais
+    // lu, puisqu'il faudrait justement que la fenêtre réponde.
+    void accuserSortie();
+    // Appelé par le tampon de sortie, dans le fil de calcul, avant chaque
+    // envoi : attend que la fenêtre ait rattrapé son retard.
+    void attendreLaFenetre();
+
 public slots:
     void demarrer();                      // construit l'interpréteur dans ce fil
     void executer(const QString& texte);  // évalue, puis publie l'état
@@ -151,6 +161,12 @@ private:
     void publierEtat();
     // Purge complète de la sortie en attente vers le fil graphique.
     void viderSortie();
+    // Au plus ce nombre de paquets en vol vers la fenêtre. Huit paquets de
+    // seize kilooctets : de quoi peindre sans à-coups, pas de quoi noyer.
+    static const int PAQUETS_MAX = 8;
+    std::mutex verrouSortie_;
+    std::condition_variable signalSortie_;
+    int paquetsEnVol_ = 0;
 
     // Le fil de calcul dort ici pendant un arrêt, et se réveille sur une
     // reprise ou sur une expression à évaluer.
@@ -168,6 +184,9 @@ private:
     // Ce qui a deja ete envoye au fil graphique, pour ne pas recopier deux
     // fois la meme figure.
     std::map<int, std::uint64_t> empreintesEnvoyees_;
+
+    // Releve a la construction, dans le fil graphique.
+    QString cheminExecutable_;
 
     std::unique_ptr<matlibre::Interpreteur> it_;
     std::unique_ptr<std::streambuf> tampon_;

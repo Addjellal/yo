@@ -4,42 +4,11 @@
 // figures dans le même processus. Rien à installer, rien à ouvrir dans un
 // navigateur.
 #include <QApplication>
-#include <QDir>
 #include <QFileInfo>
 
 #include "FenetrePrincipale.h"
 #include "Icone.h"
 #include "Theme.h"
-
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
-
-namespace {
-
-// Les toolboxes vivent à côté de l'exécutable, comme pour la console.
-void poserRacineToolbox(const QString& executable) {
-    if (!qEnvironmentVariableIsEmpty("MATLIBRE_TOOLBOX")) return;
-    QDir dossier = QFileInfo(executable).absoluteDir();
-    const QStringList candidats = {dossier.filePath(QStringLiteral("../share/matlibre")),
-                                   dossier.filePath(QStringLiteral("../toolbox")),
-                                   dossier.filePath(QStringLiteral("toolbox"))};
-    for (const QString& c : candidats) {
-        QFileInfo info(c);
-        if (info.isDir()) {
-            qputenv("MATLIBRE_TOOLBOX", info.absoluteFilePath().toUtf8());
-            return;
-        }
-    }
-}
-
-}  // namespace
 
 int main(int argc, char** argv) {
     QApplication application(argc, argv);
@@ -47,7 +16,6 @@ int main(int argc, char** argv) {
     application.setOrganizationName(QStringLiteral("MatLibre"));
     theme::appliquer();
     application.setWindowIcon(iconeApplication());
-    poserRacineToolbox(QString::fromLocal8Bit(argv[0]));
 
     FenetrePrincipale fenetre;
     // Les fichiers passés en argument s'ouvrent dans l'éditeur.

@@ -147,9 +147,19 @@ public:
     // console, leve ce drapeau ; l'interprete s'arrete au prochain point
     // de controle. Il est atomique parce que deux fils y touchent.
     std::atomic<bool> interruption{false};
-    // A appeler dans le fil qui execute, pour que « verifierInterruption »
-    // lise le bon drapeau.
-    void armerInterruption() { poserDrapeauInterruption(&interruption); }
+    // A appeler dans le fil qui execute, au debut de chaque commande de
+    // l'utilisateur : le drapeau devient celui de ce fil, et il est remis
+    // a zero. Sans cette remise a zero, un Ctrl-C arrive juste apres la
+    // fin d'un calcul coupait la commande suivante — MATLAB, lui, oublie
+    // un Ctrl-C qui n'a rien trouve a interrompre.
+    void armerInterruption() {
+        interruption.store(false, std::memory_order_relaxed);
+        poserDrapeauInterruption(&interruption);
+    }
+    // Pose le drapeau sans l'effacer : pour les entrees imbriquees — un
+    // script qui en lance un autre — qui ne doivent pas annuler un Ctrl-C
+    // deja demande.
+    void suivreInterruption() { poserDrapeauInterruption(&interruption); }
     void demanderArret() { interruption.store(true, std::memory_order_relaxed); }
 
     std::function<void()> effacerEcran;

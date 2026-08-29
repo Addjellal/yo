@@ -6,19 +6,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
+#ifndef _WIN32
 #include <unistd.h>
-#endif
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
 #endif
 
 #include "matlibre/Affichage.h"
@@ -42,28 +31,6 @@ int identifiantProcessus() {
     return 0;
 #else
     return (int)::getpid();
-#endif
-}
-
-// Chemin de l'exécutable en cours. Sert à relancer MatLibre — pour ouvrir
-// le bureau, par exemple — sans dépendre de ce qu'il y a dans le PATH.
-std::string cheminExecutable() {
-    std::error_code ec;
-#ifdef _WIN32
-    std::wstring tampon(32768, L'\0');
-    DWORD n = GetModuleFileNameW(nullptr, &tampon[0], (DWORD)tampon.size());
-    if (n == 0 || n >= tampon.size()) return std::string();
-    return fs::path(tampon.substr(0, n)).string();
-#elif defined(__APPLE__)
-    std::uint32_t taille = 0;
-    _NSGetExecutablePath(nullptr, &taille);
-    std::string tampon(taille, '\0');
-    if (_NSGetExecutablePath(&tampon[0], &taille) != 0) return std::string();
-    return fs::weakly_canonical(fs::path(tampon.c_str()), ec).string();
-#else
-    fs::path lien = fs::read_symlink("/proc/self/exe", ec);
-    if (ec) return std::string();
-    return lien.string();
 #endif
 }
 

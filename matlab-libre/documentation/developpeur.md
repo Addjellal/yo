@@ -31,6 +31,16 @@ davantage. Pour itérer en boucle courte : `make incrementale`, ou
 n'importe quelle cible avec `NEUF=0`.
 
 Les binaires sortent dans `build/bin`, les bibliothèques dans `build/lib`.
+Les scripts d'empaquetage — `outils/construire.sh` et
+`outils/construire.ps1` — vident le reste en partant : objets, caches,
+projets générés. Il ne reste que `bin/`, `lib/` et les archives. Là encore,
+`--incrementale` (`-Incrementale`) garde tout, pour itérer.
+
+Les toolboxes sont cherchées à côté de l'exécutable — c'est
+`racineToolboxes` de [`include/matlibre/Installation.h`](../include/matlibre/Installation.h)
+qui décide, et la console comme le bureau l'appellent. Sans elle, un
+binaire lancé depuis l'arbre de construction n'aurait que ses fonctions
+natives.
 
 ## Compiler pour Windows
 

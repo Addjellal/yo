@@ -104,13 +104,11 @@ void ConsoleCommandes::ecrireSortie(const QString& texte, const QColor& couleur)
     if (!c.atBlockStart()) c.insertBlock();
     QTextCharFormat format;
     format.setForeground(couleur.isValid() ? couleur : theme::texte());
-    // Le texte arrive avec ses fins de ligne : on les traduit en blocs pour
-    // que la console reste un vrai document et non une seule ligne.
-    const QStringList lignes = texte.split(QLatin1Char('\n'));
-    for (int k = 0; k < lignes.size(); ++k) {
-        if (k) c.insertBlock();
-        if (!lignes[k].isEmpty()) c.insertText(lignes[k], format);
-    }
+    // Le paquet part d'un seul coup : « insertText » traite déjà les fins
+    // de ligne comme des séparateurs de bloc. Le faire ligne à ligne
+    // demandait une mise en page par ligne, et un affichage de plusieurs
+    // millions de lignes figeait la fenêtre.
+    c.insertText(texte, format);
     setTextCursor(c);
     if (!enCours.isEmpty() || decalageCurseur > 0) {
         poserInvite();

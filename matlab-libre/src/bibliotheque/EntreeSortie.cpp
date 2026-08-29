@@ -309,7 +309,7 @@ FONCTION(fnDisp) {
         return {};
     }
     if (v.estVide()) return {};
-    os << rendreValeur(v, (int)it.format, it.formatCompact, 80);
+    ecrireValeur(os, v, (int)it.format, it.formatCompact, 80);
     return {};
 }
 

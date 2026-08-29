@@ -10,7 +10,9 @@
 #
 # Chaque compilation part d'un arbre neuf : l'ancien est effacé avant de
 # reconfigurer. C'est ce qui évite les objets orphelins et les caches
-# périmés. « --incrementale » garde l'arbre, pour itérer.
+# périmés. À la fin, le dossier est nettoyé de tout ce qui ne sert qu'à
+# recompiler ; il n'y reste que bin/, lib/ et les archives.
+# « --incrementale » garde l'arbre et son ménage, pour itérer.
 #
 # Aucune dépendance n'est requise : un compilateur C++17 et CMake suffisent.
 # LAPACK, BLAS et FFTW sont utilisés s'ils sont trouvés.
@@ -94,10 +96,35 @@ if [ "$paquet" -eq 1 ]; then
     ls -1 "$dossier"/MatLibre-* 2>/dev/null || true
 fi
 
-echo "MatLibre : fini. L'executable est $binaires/matlibre"
+# Menage. Ce qui reste dans le dossier apres coup ne sert qu'a recompiler :
+# objets, fichiers de dependances, caches de CMake. C'est aussi ce qui
+# pese. Comme chaque compilation repart d'un arbre neuf, rien de tout cela
+# n'est reutilise ; « --incrementale » le garde, puisque c'est justement
+# ce qu'il sert a reutiliser. On garde bin/, lib/ et les archives.
+if [ "$neuf" -eq 1 ]; then
+    avant=$(du -sm "$dossier" 2>/dev/null | cut -f1)
+    for entree in "$dossier"/* "$dossier"/.[!.]*; do
+        [ -e "$entree" ] || continue
+        case "$(basename "$entree")" in
+            bin|lib) continue ;;
+            MatLibre-*) continue ;;
+        esac
+        rm -rf "$entree"
+    done
+    apres=$(du -sm "$dossier" 2>/dev/null | cut -f1)
+    echo "MatLibre : menage du dossier de construction, $((avant - apres)) Mo liberes"
+fi
+
+echo ""
+echo "MatLibre : fini."
 if [ -x "$binaires/matlibre-bureau" ]; then
     echo "  $binaires/matlibre-bureau"
     echo "      le bureau : une fenetre, l'editeur, les figures, l'espace de travail"
 fi
-echo "  $binaires/matlibre-bureau  ouvre le bureau (si Qt6 est present)"
-echo "  $binaires/matlibre         session interactive"
+echo "  $binaires/matlibre"
+echo "      session interactive dans le terminal"
+if [ ! -x "$binaires/matlibre-bureau" ]; then
+    echo ""
+    echo "Le bureau natif n'a pas ete construit : Qt6 est introuvable."
+    echo "Installez qt6-base-dev (Debian, Ubuntu) ou qt6-qtbase-devel (Fedora)."
+fi

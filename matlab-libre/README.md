@@ -68,10 +68,10 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
 MATLAB, ce sont plusieurs milliers de fonctions et un environnement
 graphique complet. Ce dépôt en couvre une part utile, pas la totalité :
-pas d'interface de bureau, pas d'éditeur de schéma Simulink (les modèles
-se décrivent en appelant `add_block` et `add_line`, mais la simulation est
-réelle), génération de code C restreinte à un sous-ensemble scalaire, ni
-`sparse`, ni `table`, ni `datetime`. La liste complète des écarts est dans
+pas d'éditeur de schéma Simulink (les modèles se décrivent en appelant
+`add_block` et `add_line`, mais la simulation est réelle), pas d'App
+Designer, génération de code C restreinte aux scalaires et aux matrices de
+taille fixe, pas de fichiers MAT. La liste complète des écarts est dans
 [`documentation/couverture.md`](documentation/couverture.md) — elle vaut
 d'être lue avant de s'appuyer sur ce projet.
 

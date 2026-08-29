@@ -1,6 +1,7 @@
 // Moteur.cpp — l'interpréteur dans son fil, et ce qu'il publie.
 #include "Moteur.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
@@ -17,6 +18,7 @@
 #include "matlibre/Erreur.h"
 #include "matlibre/Deboguage.h"
 #include "matlibre/Arbre.h"
+#include "matlibre/Installation.h"
 #include "matlibre/Interpreteur.h"
 
 using namespace matlibre;
@@ -80,6 +82,7 @@ private:
 
     void vider() {
         if (attente_.empty()) return;
+        moteur_->attendreLaFenetre();
         emit moteur_->sortieProduite(QString::fromUtf8(attente_.data(),
                                                        (int)attente_.size()));
         attente_.clear();
@@ -237,7 +240,11 @@ QString resumeValeur(Interpreteur& it, const Valeur& v) {
 
 }  // namespace
 
-Moteur::Moteur(QObject* parent) : QObject(parent) {}
+// Le chemin de l'executable est releve ici, dans le fil graphique qui
+// construit le moteur : « applicationFilePath » n'est pas garanti sur un
+// autre fil, et « demarrer » tourne dans le fil de calcul.
+Moteur::Moteur(QObject* parent)
+    : QObject(parent), cheminExecutable_(QCoreApplication::applicationFilePath()) {}
 
 // Purge complete : tout ce qui attend part vers le fil graphique. A
 // appeler quand une commande finit, pas au milieu d'une rafale.
@@ -255,6 +262,10 @@ void Moteur::demarrer() {
     tampon_ = std::move(tampon);
     flux_ = std::make_unique<std::ostream>(tampon_.get());
     it_->installerBibliotheque();
+    // Les toolboxes sont des fichiers .m : sans elles sur le chemin, le
+    // bureau n'aurait que les fonctions natives, et l'aide n'aurait pas
+    // ses fiches. La console les charge de la meme facon.
+    chargerToolboxes(*it_, racineToolboxes(cheminExecutable_.toStdString()));
     it_->definirSortie(flux_.get());
     it_->modeInteractif = true;
     // « clc » efface la fenetre au lieu d'y ecrire « [2J[H ».
@@ -332,11 +343,41 @@ void Moteur::demarrer() {
 // son prochain point de controle.
 void Moteur::demanderArret() {
     if (it_) it_->demanderArret();
+    // Le calcul peut dormir en attendant que la fenetre rattrape sa
+    // sortie : on le reveille, sinon l'arret n'arriverait qu'au paquet
+    // suivant.
+    signalSortie_.notify_all();
+}
+
+// Le fil de calcul attend ici que la fenetre ait consomme ce qu'on lui a
+// deja envoye. Sans cette retenue, afficher un vecteur de dix millions
+// d'elements poste des milliers de paquets dans une file que le fil
+// graphique n'a pas le temps de vider : la fenetre cesse de repondre, et
+// avec elle le Ctrl-C qui l'aurait arretee.
+//
+// L'attente est bornee : si la fenetre ne consomme plus du tout — elle se
+// ferme, une boite modale tient le fil —, le calcul repart quand meme.
+void Moteur::attendreLaFenetre() {
+    std::unique_lock<std::mutex> verrou(verrouSortie_);
+    signalSortie_.wait_for(verrou, std::chrono::milliseconds(500), [this] {
+        return paquetsEnVol_ < PAQUETS_MAX || fermeture_.load();
+    });
+    ++paquetsEnVol_;
+}
+
+// Appelee par la fenetre, dans son fil, quand un paquet est ecrit.
+void Moteur::accuserSortie() {
+    {
+        std::lock_guard<std::mutex> verrou(verrouSortie_);
+        if (paquetsEnVol_ > 0) --paquetsEnVol_;
+    }
+    signalSortie_.notify_all();
 }
 
 void Moteur::executer(const QString& texte) {
     if (!it_) return;
     occupe_ = true;
+    it_->armerInterruption();
     try {
         it_->executerTexte(texte.toStdString(), "<bureau>");
     } catch (const InterruptionUtilisateur&) {
@@ -362,6 +403,7 @@ void Moteur::executer(const QString& texte) {
 void Moteur::executerEtChronometrer(const QString& texte) {
     if (!it_) return;
     occupe_ = true;
+    it_->armerInterruption();
     it_->profil.effacer();
     it_->profil.demarrer();
     QElapsedTimer chrono;
@@ -453,6 +495,10 @@ void Moteur::evaluerALArret(const QString& texte) {
 // d'evenements — sans quoi « quit() » n'aurait personne pour l'entendre.
 void Moteur::libererPourFermeture() {
     fermeture_ = true;
+    if (it_) it_->demanderArret();
+    // Un fil qui attend la fenetre doit repartir : elle ne consommera
+    // plus rien.
+    signalSortie_.notify_all();
     reprendre((int)ActionDebogueur::Quitter);
 }
 
