@@ -5,7 +5,19 @@ Fonctions natives du groupe `optimisation`.
 ## `deval`
 
 ```
-deval  Evalue une solution d'EDO.
+DEVAL  Évalue la solution d'une équation différentielle entre les pas.
+    DEVAL(SOL,T) interpole la solution rendue par un solveur appelé avec
+    une seule sortie.
+
+    Syntaxe
+       y = deval(sol,t)
+
+    Exemples
+       sol = ode45(@(t,y) -y, [0 2], 1);
+       y = deval(sol, 1);
+       abs(y - exp(-1)) < 1e-4
+
+    Voir aussi ODE45, ODE15S, INTERP1.
 ```
 
 ## `fminbnd`
@@ -50,7 +62,18 @@ FMINSEARCH  Minimum sans dérivées, par simplexe de Nelder-Mead.
 ## `fminunc`
 
 ```
-fminunc  Minimisation sans contrainte.
+FMINUNC  Minimum sans contrainte, avec dérivées estimées.
+    FMINUNC(F,X0) minimise F à partir de X0 par une méthode de descente.
+
+    Syntaxe
+       x = fminunc(f,x0)
+       [x,fval] = fminunc(f,x0)
+
+    Exemples
+       x = fminunc(@(v) (v(1)-2)^2 + (v(2)+1)^2, [0 0]);
+       norm(x - [2 -1]) < 1e-3
+
+    Voir aussi FMINSEARCH, FMINBND, FSOLVE, OPTIMSET.
 ```
 
 ## `fsolve`
@@ -109,19 +132,51 @@ INTEGRAL  Intégrale définie d'une fonction.
 ## `integral2`
 
 ```
-integral2  Integrale double.
+INTEGRAL2  Intégrale double.
+    INTEGRAL2(F,A,B,C,D) intègre F(x,y) sur le rectangle [A,B]x[C,D].
+
+    Syntaxe
+       q = integral2(f,a,b,c,d)
+
+    Exemples
+       abs(integral2(@(x,y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-8
+       abs(integral2(@(x,y) x.*y, 0, 1, 0, 1) - 0.25) < 1e-8
+
+    Voir aussi INTEGRAL, TRAPZ, QUAD2D.
 ```
 
 ## `lsqnonneg`
 
 ```
-lsqnonneg  Moindres carres a coefficients positifs.
+LSQNONNEG  Moindres carrés à solution positive.
+    LSQNONNEG(C,D) minimise ||C*x - d|| sous la contrainte x >= 0.
+
+    Syntaxe
+       x = lsqnonneg(C,d)
+
+    Exemples
+       C = [1 0; 0 1; 1 1];
+       d = [1; -1; 1];
+       x = lsqnonneg(C, d);
+       all(x >= 0)
+
+    Voir aussi MLDIVIDE, PINV, FMINSEARCH, FSOLVE.
 ```
 
 ## `ode113`
 
 ```
-ode113  Solveur a pas variable.
+ODE113  Résout une équation différentielle, méthode à pas multiples.
+    Utile quand la fonction est coûteuse à évaluer et la solution lisse.
+
+    Syntaxe
+       [t,y] = ode113(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode113(@(t,y) -y, [0 2], 1);
+       abs(y(end) - exp(-2)) < 1e-3
+
+    Voir aussi ODE45, ODE23, ODE15S.
 ```
 
 ## `ode15s`
@@ -144,7 +199,18 @@ ODE15S  Résout une équation différentielle raide.
 ## `ode23`
 
 ```
-ode23  Runge-Kutta d'ordre 2(3).
+ODE23  Résout une équation différentielle, Runge-Kutta 2(3).
+    Moins précis qu'ODE45 mais moins coûteux par pas : utile quand la
+    tolérance demandée est lâche.
+
+    Syntaxe
+       [t,y] = ode23(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23(@(t,y) -y, [0 2], 1);
+       abs(y(end) - exp(-2)) < 1e-2
+
+    Voir aussi ODE45, ODE113, ODE15S, ODESET.
 ```
 
 ## `ode23s`
@@ -191,7 +257,18 @@ ODE45  Résout une équation différentielle, méthode de Runge-Kutta 4(5).
 ## `odeget`
 
 ```
-odeget  Lit une option d'EDO.
+ODEGET  Lit une option de solveur différentiel.
+
+    Syntaxe
+       v = odeget(options,'Nom')
+       v = odeget(options,'Nom',defaut)
+
+    Exemples
+       options = odeset('RelTol', 1e-7);
+       odeget(options, 'RelTol')
+       odeget(options, 'AbsTol', 1e-6)
+
+    Voir aussi ODESET, ODE45, OPTIMGET.
 ```
 
 ## `odeset`
@@ -215,13 +292,38 @@ ODESET  Options des solveurs d'équations différentielles.
 ## `optimget`
 
 ```
-optimget  Lit une option.
+OPTIMGET  Lit une option d'optimisation.
+    OPTIMGET(OPTIONS,'Nom',DEFAUT) rend la valeur, ou le défaut si elle
+    n'est pas posée.
+
+    Syntaxe
+       v = optimget(options,'Nom')
+       v = optimget(options,'Nom',defaut)
+
+    Exemples
+       options = optimset('TolX', 1e-8);
+       optimget(options, 'TolX')
+       optimget(options, 'MaxIter', 400)
+
+    Voir aussi OPTIMSET, ODEGET.
 ```
 
 ## `optimset`
 
 ```
-optimset  Options d'optimisation.
+OPTIMSET  Options des solveurs d'optimisation.
+    OPTIMSET('Nom',valeur,...) construit la structure : 'TolX', 'TolFun',
+    'MaxIter', 'Display'.
+
+    Syntaxe
+       options = optimset('Nom',valeur,...)
+
+    Exemples
+       options = optimset('TolX', 1e-10);
+       x = fminbnd(@(x) (x-3)^2, 0, 10, options);
+       abs(x - 3) < 1e-6
+
+    Voir aussi OPTIMGET, FMINBND, FMINSEARCH, ODESET.
 ```
 
 ## `quad`
@@ -233,6 +335,17 @@ quad  Quadrature de Simpson adaptative.
 ## `quadgk`
 
 ```
-quadgk  Quadrature adaptative.
+QUADGK  Intégrale par quadrature de Gauss-Kronrod.
+    QUADGK(F,A,B) convient aux intégrandes difficiles et aux bornes
+    infinies.
+
+    Syntaxe
+       q = quadgk(f,a,b)
+
+    Exemples
+       abs(quadgk(@(x) exp(-x.^2), -Inf, Inf) - sqrt(pi)) < 1e-6
+       abs(quadgk(@sin, 0, pi) - 2) < 1e-8
+
+    Voir aussi INTEGRAL, QUAD, TRAPZ.
 ```
 

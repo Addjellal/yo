@@ -24,19 +24,49 @@ DBCLEAR  Retire des points d'arrêt.
 ## `dbcont`
 
 ```
-dbcont  Reprend l'execution.
+DBCONT  Reprend l'exécution après un point d'arrêt.
+
+    Syntaxe
+       dbcont
+
+    Exemples
+       % À l'invite « K>> » : dbcont reprend jusqu'au prochain arrêt.
+       disp('dbcont s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBSTEP, DBQUIT.
 ```
 
 ## `dbquit`
 
 ```
-dbquit  Abandonne l'execution.
+DBQUIT  Abandonne le débogage et rend la main à l'invite.
+
+    Syntaxe
+       dbquit
+
+    Exemples
+       % À l'invite « K>> » : dbquit abandonne l'exécution en cours.
+       disp('dbquit s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBCONT, DBSTEP.
 ```
 
 ## `dbstack`
 
 ```
-dbstack  Pile des appels.
+DBSTACK  Pile des appels.
+    DBSTACK affiche la pile ; S = DBSTACK la rend en structure, champs
+    file, name et line.
+
+    Syntaxe
+       dbstack
+       s = dbstack
+
+    Exemples
+       s = dbstack;
+       isstruct(s)
+
+    Voir aussi DBSTOP, DBSTEP, MFILENAME, ERROR.
 ```
 
 ## `dbstatus`
@@ -58,7 +88,22 @@ DBSTATUS  Liste les points d'arrêt posés.
 ## `dbstep`
 
 ```
-dbstep  Avance d'une instruction.
+DBSTEP  Avance d'une ligne dans le débogueur.
+    DBSTEP exécute la ligne courante et s'arrête à la suivante.
+    DBSTEP IN entre dans l'appel ; DBSTEP OUT en sort.
+
+    Syntaxe
+       dbstep
+       dbstep in
+       dbstep out
+
+    Exemples
+       % À l'invite « K>> » d'un point d'arrêt :
+       %   dbstep        % ligne suivante
+       %   dbstep in     % entrer dans l'appel
+       disp('dbstep s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBCONT, DBQUIT, DBSTACK, KEYBOARD.
 ```
 
 ## `dbstop`
@@ -83,7 +128,18 @@ DBSTOP  Pose un point d'arrêt.
 ## `keyboard`
 
 ```
-keyboard  Rend la main a l'utilisateur.
+KEYBOARD  Rend la main à l'utilisateur au milieu d'un programme.
+    KEYBOARD suspend l'exécution et donne l'invite « K>> » : on inspecte
+    et modifie les variables, puis DBCONT reprend.
+
+    Syntaxe
+       keyboard
+
+    Exemples
+       % Posé dans un script, « keyboard » ouvre l'invite « K>> ».
+       disp('keyboard suspend le programme là où il est écrit');
+
+    Voir aussi DBSTOP, DBCONT, DBQUIT, INPUT.
 ```
 
 ## `matlibre_profil_lignes`

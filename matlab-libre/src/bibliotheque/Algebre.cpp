@@ -87,7 +87,20 @@ FONCTION(fnOrth) {
 }
 FONCTION(fnRref) {
     INUTILISE
-    return {formeEchelonnee(args[0])};
+    Valeur r = formeEchelonnee(args[0]);
+    if (nargout <= 1) return {r};
+    // MATLAB rend aussi les colonnes de pivot : la premiere colonne non
+    // nulle de chaque ligne de la forme reduite. C'est ce qui donne le
+    // rang, et les variables libres d'un systeme.
+    int lignes = r.nlignes(), colonnes = r.ncolonnes();
+    std::vector<double> pivots;
+    for (int i = 0; i < lignes; ++i)
+        for (int j = 0; j < colonnes; ++j)
+            if (std::fabs(r.re[(std::size_t)i + (std::size_t)j * lignes]) > 1e-12) {
+                pivots.push_back(j + 1);
+                break;
+            }
+    return {r, Valeur::ligne(pivots)};
 }
 
 FONCTION(fnLu) {

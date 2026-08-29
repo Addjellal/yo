@@ -5,43 +5,119 @@ Fonctions natives du groupe `temps`.
 ## `clock`
 
 ```
-clock  Date et heure en vecteur.
+CLOCK  Date et heure courantes, en vecteur.
+    CLOCK rend [année mois jour heure minute seconde].
+
+    Syntaxe
+       c = clock
+
+    Exemples
+       c = clock;
+       numel(c)                       % 6
+       c(1) > 2000
+
+    Voir aussi NOW, DATE, DATESTR, ETIME, TIC.
 ```
 
 ## `cputime`
 
 ```
-cputime  Temps processeur consomme.
+CPUTIME  Temps processeur consommé depuis le démarrage, en secondes.
+
+    Syntaxe
+       t = cputime
+
+    Exemples
+       t0 = cputime;
+       y = fft(randn(1,4096));
+       cputime - t0 >= 0
+
+    Voir aussi TIC, TOC, ETIME, PROFILE.
 ```
 
 ## `date`
 
 ```
-date  Date du jour.
+DATE  Date du jour, en texte.
+
+    Syntaxe
+       s = date
+
+    Exemples
+       s = date;
+       ischar(s)
+
+    Voir aussi CLOCK, NOW, DATESTR, DATENUM.
 ```
 
 ## `datenum`
 
 ```
-datenum  Date -> numero de serie.
+DATENUM  Numéro de série d'une date.
+    DATENUM(A,M,J) rend le numéro correspondant ; DATENUM(TEXTE) lit une
+    date écrite. Les numéros se soustraient : la différence est en jours.
+
+    Syntaxe
+       d = datenum(a,m,j)
+       d = datenum(texte)
+
+    Exemples
+       d1 = datenum(2024,1,1);
+       d2 = datenum(2024,12,31);
+       d2 - d1                        % 365 jours
+       datenum(2024,5,1) > 0
+
+    Voir aussi DATESTR, DATEVEC, NOW, ETIME.
 ```
 
 ## `datestr`
 
 ```
-datestr  Numero de serie -> texte.
+DATESTR  Écrit une date.
+    DATESTR(D) écrit le numéro de série D ; DATESTR(D,FORMAT) impose le
+    format, par exemple 'yyyy-mm-dd'.
+
+    Syntaxe
+       s = datestr(d)
+       s = datestr(d,format)
+
+    Exemples
+       datestr(datenum(2024,5,1), 'yyyy-mm-dd')
+       ischar(datestr(now))
+
+    Voir aussi DATENUM, DATEVEC, NOW, CLOCK.
 ```
 
 ## `datevec`
 
 ```
-datevec  Numero de serie -> vecteur.
+DATEVEC  Décompose une date en [année mois jour heure minute seconde].
+
+    Syntaxe
+       v = datevec(d)
+
+    Exemples
+       v = datevec(datenum(2024,5,1));
+       v(1:3)                         % [2024 5 1]
+
+    Voir aussi DATENUM, DATESTR, CLOCK.
 ```
 
 ## `etime`
 
 ```
-etime  Secondes entre deux vecteurs d'horloge.
+ETIME  Temps écoulé entre deux vecteurs d'horloge, en secondes.
+
+    Syntaxe
+       s = etime(t2,t1)
+
+    Exemples
+       t1 = clock;
+       pause(0.05);
+       ecoule = etime(clock, t1);
+       ecoule >= 0.04
+
+    Voir aussi TIC, TOC, CLOCK, CPUTIME.
 ```
 
 ## `matlibre_addmonths`
@@ -71,7 +147,17 @@ matlibre_ymd2num  Composantes de date -> numero de serie (vectorise).
 ## `now`
 
 ```
-now  Date et heure courantes en numero de serie.
+NOW  Date et heure courantes, en numéro de série.
+
+    Syntaxe
+       d = now
+
+    Exemples
+       d = now;
+       d > 700000
+       datestr(now);
+
+    Voir aussi CLOCK, DATE, DATESTR, DATENUM.
 ```
 
 ## `pause`

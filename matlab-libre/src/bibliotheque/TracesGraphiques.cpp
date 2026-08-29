@@ -190,9 +190,23 @@ FONCTION(fnHistogramme) {
     return {};
 }
 
+// MATLAB : « hist(x) » trace ; « [n,c] = hist(x) » rend les effectifs et
+// les centres des classes, SANS tracer. C'est la forme historique,
+// remplacee par histogram et histcounts, mais encore tres ecrite.
 FONCTION(fnHist) {
     INUTILISE
-    return fnHistogramme(it, args, nargout);
+    exigerArguments(args, 1, 3, "hist");
+    if (nargout == 0) return fnHistogramme(it, args, 0);
+    std::vector<Valeur> a = {args[0]};
+    if (args.size() > 1) a.push_back(args[1]);
+    auto comptes = it.appeler("histcounts", a, 2);
+    if (comptes.size() < 2) return {};
+    std::vector<double> centres;
+    const Valeur& bords = comptes[1];
+    for (std::size_t k = 0; k + 1 < bords.nelem(); ++k)
+        centres.push_back(0.5 * (bords.re[k] + bords.re[k + 1]));
+    if (nargout == 1) return {comptes[0]};
+    return {comptes[0], Valeur::ligne(centres)};
 }
 
 FONCTION(fnImagesc) {

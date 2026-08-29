@@ -71,6 +71,17 @@ assert(abs(xm(1) - 1) < 1e-4 && abs(xm(2) + 2) < 1e-4);
 assert(abs(integral(@(x) x.^2, 0, 3) - 9) < 1e-8);
 assert(abs(integral(@(x) sin(x), 0, pi) - 2) < 1e-8);
 assert(abs(trapz([0 1 2], [0 1 2]) - 2) < 1e-12);
+% Bornes infinies : MATLAB les accepte, par changement de variable. Sans
+% cela le milieu de [-Inf, Inf] valait NaN, et la subdivision ne
+% s'arretait jamais.
+assert(abs(integral(@(x) exp(-x.^2), -Inf, Inf) - sqrt(pi)) < 1e-6);
+assert(abs(integral(@(x) 1./(1+x.^2), -Inf, Inf) - pi) < 1e-5);
+assert(abs(integral(@(x) exp(-x), 0, Inf) - 1) < 1e-6);
+assert(abs(integral(@(x) exp(x), -Inf, 0) - 1) < 1e-6);
+assert(abs(quadgk(@(x) exp(-x.^2), -Inf, Inf) - sqrt(pi)) < 1e-6);
+% Les bornes finies n'ont pas change.
+assert(abs(integral(@sin, 0, pi) - 2) < 1e-8);
+assert(abs(integral(@(x) x.^2, 3, 0) + 9) < 1e-8);   % bornes inversees
 
 % Équations différentielles.
 [t, y] = ode45(@(t, y) -y, [0 1], 1);

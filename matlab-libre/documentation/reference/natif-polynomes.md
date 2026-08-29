@@ -174,7 +174,19 @@ POLYVAL  Évalue un polynôme.
 ## `polyvalm`
 
 ```
-polyvalm  Evalue sur une matrice.
+POLYVALM  Évalue un polynôme au sens matriciel.
+    POLYVALM(P,A) remplace x par la matrice A : x² devient A*A, et le
+    terme constant devient c*EYE(A).
+
+    Syntaxe
+       Y = polyvalm(p,A)
+
+    Exemples
+       A = [1 2; 3 4];
+       polyvalm([1 0 0], A)               % A*A
+       norm(polyvalm([1 0 0], A) - A*A) < 1e-12
+
+    Voir aussi POLYVAL, EXPM, EIG, POLY.
 ```
 
 ## `ppval`

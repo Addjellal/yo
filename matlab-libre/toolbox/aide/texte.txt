@@ -471,3 +471,154 @@ STRLENGTH  Longueur du texte, caractère par caractère.
        strlength({'a','bb','ccc'})    % [1 2 3]
 
     Voir aussi LENGTH, NUMEL, SIZE.
+
+### string
+STRING  Convertit en tableau de strings.
+    STRING(X) rend une string : "abc" plutôt que 'abc'. Les strings se
+    concatènent avec « + », se comparent avec « == », et gardent leurs
+    blancs de fin — ce que les tableaux de caractères ne font pas.
+
+    Syntaxe
+       s = string(x)
+
+    Exemples
+       s = string('abc');
+       isstring(s)                        % 1
+       string(42)
+       string({'a','b'})
+
+    Voir aussi ISSTRING, CHAR, CELLSTR, STRLENGTH.
+
+### str2num
+STR2NUM  Évalue un texte comme une expression MATLAB.
+    STR2NUM(S) évalue S : « '[1 2 3]' » devient un vecteur. C'est puissant
+    et risqué — S est du code. Préférer STR2DOUBLE pour un simple nombre.
+
+    Syntaxe
+       a = str2num(s)
+
+    Exemples
+       str2num('[1 2 3]')
+       str2num('2*pi')
+       str2double('2*pi')                 % NaN : elle ne lit qu'un nombre
+
+    Voir aussi STR2DOUBLE, EVAL, SSCANF, MAT2STR.
+
+### strncmpi
+STRNCMPI  Compare les N premiers caractères, sans distinguer la casse.
+
+    Syntaxe
+       tf = strncmpi(s1,s2,n)
+
+    Exemples
+       strncmpi('Bonjour','bonsoir',3)     % 1
+       strncmp('Bonjour','bonsoir',3)      % 0
+
+    Voir aussi STRNCMP, STRCMPI, STARTSWITH.
+
+### strjust
+STRJUST  Justifie les lignes d'un tableau de caractères.
+    STRJUST(S,'right') aligne à droite, 'left' à gauche, 'center' au
+    milieu.
+
+    Syntaxe
+       t = strjust(s,cote)
+
+    Exemples
+       s = char('un','trois');
+       size(strjust(s,'right'))
+
+    Voir aussi CHAR, STRTRIM, BLANKS, PAD.
+
+### strvcat
+STRVCAT  Empile des textes en lignes, en ignorant les vides.
+    STRVCAT(S1,S2,...) complète d'espaces jusqu'à la plus longue ligne.
+    C'est CHAR, à ceci près que les textes vides sont sautés.
+
+    Syntaxe
+       s = strvcat(s1,s2,...)
+
+    Exemples
+       s = strvcat('un','deux');
+       size(s)                            % [2 4]
+       size(strvcat('a','','b'))          % 2 lignes : le vide est ignoré
+       size(char('a','','b'))             % 3 lignes : char le garde
+
+    Voir aussi CHAR, CELLSTR, STRJUST.
+
+### regexpi
+REGEXPI  Expression régulière, sans distinguer la casse.
+    REGEXPI(S,MOTIF,...) est REGEXP en ignorant majuscules et minuscules.
+
+    Syntaxe
+       k = regexpi(s,motif)
+       t = regexpi(s,motif,'match')
+
+    Exemples
+       regexpi('ABC', 'b')                % 2
+       regexpi('Bonjour Bonsoir', 'bon\w+', 'match')
+
+    Voir aussi REGEXP, REGEXPREP, STRCMPI, CONTAINS.
+
+### strip
+STRIP  Retire les blancs aux deux bouts.
+    STRIP(S) est l'équivalent moderne de STRTRIM.
+
+    Syntaxe
+       t = strip(s)
+
+    Exemples
+       strip('  abc  ')
+       numel(strip('  a  '))              % 1
+
+    Voir aussi STRTRIM, DEBLANK, PAD.
+
+### reverse
+REVERSE  Renverse un texte.
+
+    Syntaxe
+       t = reverse(s)
+
+    Exemples
+       reverse('abc')                     % 'cba'
+       s = 'kayak';
+       strcmp(s, reverse(s))              % un palindrome
+
+    Voir aussi FLIP, FLIPLR, STRTRIM.
+
+### compose
+COMPOSE  Formate vers une string.
+    COMPOSE(FORMAT,...) est SPRINTF, mais rend une string.
+
+    Syntaxe
+       s = compose(format,...)
+
+    Exemples
+       s = compose('%d points', 42);
+       isstring(s)
+
+    Voir aussi SPRINTF, STRING, NUM2STR.
+
+### tolower
+TOLOWER  Synonyme de LOWER, hérité du C.
+
+    Syntaxe
+       t = tolower(s)
+
+    Exemples
+       tolower('ABC')                     % 'abc'
+       strcmp(tolower('Oui'), lower('Oui'))
+
+    Voir aussi LOWER, UPPER, TOUPPER.
+
+### toupper
+TOUPPER  Synonyme de UPPER, hérité du C.
+
+    Syntaxe
+       t = toupper(s)
+
+    Exemples
+       toupper('abc')                     % 'ABC'
+       strcmp(toupper('oui'), upper('oui'))
+
+    Voir aussi UPPER, LOWER, TOLOWER.

@@ -167,7 +167,21 @@ colon  Equivalent fonctionnel de a:b:c.
 ## `complex`
 
 ```
-complex  Construit un nombre complexe.
+COMPLEX  Construit un nombre complexe.
+    COMPLEX(A,B) rend A + Bi, et force le stockage complexe même si B est
+    nul — c'est sa raison d'être.
+
+    Syntaxe
+       z = complex(a,b)
+       z = complex(a)
+
+    Exemples
+       complex(1,2)                   % 1 + 2i
+       isreal(complex(3,0))           % 0 — la partie imaginaire existe
+       isreal(3 + 0)                  % 1
+       abs(complex(3,4))              % 5
+
+    Voir aussi REAL, IMAG, ISREAL, ABS, ANGLE.
 ```
 
 ## `ctranspose`
@@ -465,7 +479,18 @@ INTMIN  Plus petit entier d'une classe.
 ## `ipermute`
 
 ```
-ipermute  Permutation inverse.
+IPERMUTE  Inverse de PERMUTE.
+    IPERMUTE(B,ORDRE) défait PERMUTE(A,ORDRE).
+
+    Syntaxe
+       A = ipermute(B,ordre)
+
+    Exemples
+       A = reshape(1:24, 2, 3, 4);
+       B = permute(A, [3 1 2]);
+       isequal(ipermute(B, [3 1 2]), A)
+
+    Voir aussi PERMUTE, RESHAPE, SQUEEZE.
 ```
 
 ## `is_function_handle`
@@ -531,7 +556,18 @@ ISCHAR  La valeur est-elle un tableau de caractères.
 ## `iscolumn`
 
 ```
-iscolumn  Vrai pour un vecteur colonne.
+ISCOLUMN  La valeur est-elle un vecteur colonne, c'est-à-dire N par 1.
+
+    Syntaxe
+       tf = iscolumn(x)
+
+    Exemples
+       iscolumn([1;2;3])              % 1
+       iscolumn([1 2 3])              % 0
+       v = (1:5)';
+       iscolumn(v)
+
+    Voir aussi ISROW, ISVECTOR, SIZE.
 ```
 
 ## `isempty`
@@ -581,31 +617,84 @@ ISEQUAL  Les valeurs sont-elles identiques.
 ## `isequaln`
 
 ```
-isequaln  Egalite, NaN compris.
+ISEQUALN  Comme ISEQUAL, mais NaN y est égal à NaN.
+    C'est ce qu'on veut pour comparer des données à trous.
+
+    Syntaxe
+       tf = isequaln(a,b)
+
+    Exemples
+       isequal([1 NaN], [1 NaN])      % 0
+       isequaln([1 NaN], [1 NaN])     % 1
+
+    Voir aussi ISEQUAL, ISNAN.
 ```
 
 ## `isfloat`
 
 ```
-isfloat  Vrai pour double ou single.
+ISFLOAT  La valeur est-elle en virgule flottante.
+    ISFLOAT(X) rend vrai pour double et single.
+
+    Syntaxe
+       tf = isfloat(x)
+
+    Exemples
+       isfloat(1)                     % 1
+       isfloat(single(1))             % 1
+       isfloat(int8(1))               % 0
+
+    Voir aussi ISINTEGER, ISNUMERIC, ISA, CLASS.
 ```
 
 ## `isinteger`
 
 ```
-isinteger  Vrai pour un entier machine.
+ISINTEGER  La valeur est-elle d'une classe entière.
+    ISINTEGER(X) rend vrai pour int8..int64 et uint8..uint64, faux pour un
+    double qui se trouve valoir un entier.
+
+    Syntaxe
+       tf = isinteger(x)
+
+    Exemples
+       isinteger(int8(1))             % 1
+       isinteger(3)                   % 0 — un double vaut 3, sans être entier
+       mod(3,1) == 0                  % le test qu'on voulait sans doute
+
+    Voir aussi ISFLOAT, ISNUMERIC, ISA, INT32.
 ```
 
 ## `islogical`
 
 ```
-islogical  Vrai pour un tableau logique.
+ISLOGICAL  La valeur est-elle un tableau logique.
+
+    Syntaxe
+       tf = islogical(x)
+
+    Exemples
+       islogical(true)                % 1
+       islogical(1)                   % 0
+       islogical([1 2] > 1)           % 1
+
+    Voir aussi LOGICAL, TRUE, FALSE, ISNUMERIC.
 ```
 
 ## `ismatrix`
 
 ```
-ismatrix  Vrai pour un tableau 2-D.
+ISMATRIX  La valeur a-t-elle exactement deux dimensions.
+
+    Syntaxe
+       tf = ismatrix(x)
+
+    Exemples
+       ismatrix(magic(3))             % 1
+       ismatrix(5)                    % 1
+       ismatrix(ones(2,3,4))          % 0
+
+    Voir aussi ISVECTOR, ISSCALAR, NDIMS, SIZE.
 ```
 
 ## `isnumeric`
@@ -636,13 +725,37 @@ isobject  Vrai pour un objet.
 ## `isreal`
 
 ```
-isreal  Vrai si aucune partie imaginaire.
+ISREAL  La valeur est-elle dépourvue de partie imaginaire.
+    ISREAL(X) rend faux dès que X a une partie imaginaire enregistrée,
+    même nulle : c'est le stockage qui compte, pas la valeur.
+
+    Syntaxe
+       tf = isreal(x)
+
+    Exemples
+       isreal(3)                      % 1
+       isreal(3 + 0i)                 % 0 — la partie imaginaire existe
+       isreal(abs(3 + 4i))            % 1
+       isreal(complex(1,0))           % 0
+
+    Voir aussi COMPLEX, REAL, IMAG, ISNUMERIC.
 ```
 
 ## `isrow`
 
 ```
-isrow  Vrai pour un vecteur ligne.
+ISROW  La valeur est-elle un vecteur ligne, c'est-à-dire 1 par N.
+
+    Syntaxe
+       tf = isrow(x)
+
+    Exemples
+       isrow([1 2 3])                 % 1
+       isrow([1;2;3])                 % 0
+       x = 1:5;
+       if ~isrow(x), x = x'; end      % forcer une ligne
+
+    Voir aussi ISCOLUMN, ISVECTOR, ISSCALAR, SIZE.
 ```
 
 ## `isscalar`
@@ -665,7 +778,19 @@ ISSCALAR  La valeur est-elle un scalaire, c'est-à-dire 1x1.
 ## `isstring`
 
 ```
-isstring  Vrai pour un tableau string.
+ISSTRING  La valeur est-elle un tableau de strings.
+    ISSTRING(X) distingue "abc", une string, de 'abc', un tableau de
+    caractères.
+
+    Syntaxe
+       tf = isstring(x)
+
+    Exemples
+       isstring("abc")                % 1
+       isstring('abc')                % 0
+       ischar('abc')                  % 1
+
+    Voir aussi ISCHAR, STRING, ISCELLSTR.
 ```
 
 ## `isstruct`
@@ -815,7 +940,21 @@ nan  Tableau de NaN.
 ## `ndgrid`
 
 ```
-ndgrid  Grille en ordre tableau.
+NDGRID  Grille de coordonnées, convention tableau.
+    [X,Y] = NDGRID(x,y) est comme MESHGRID, mais X varie selon les lignes
+    et Y selon les colonnes : c'est la convention des tableaux, transposée
+    de celle du graphique.
+
+    Syntaxe
+       [X,Y] = ndgrid(x,y)
+
+    Exemples
+       [X, Y] = ndgrid(1:3, 1:2);
+       size(X)                            % [3 2]
+       [Xm, Ym] = meshgrid(1:3, 1:2);
+       isequal(X, Xm')                    % l'une est la transposée de l'autre
+
+    Voir aussi MESHGRID, SUB2IND, INTERP2.
 ```
 
 ## `ndims`
@@ -1282,7 +1421,23 @@ UINT8  Convertit en entier non signé 8 bits.
 ## `validateattributes`
 
 ```
-validateattributes  Verifie des attributs (tolerant).
+VALIDATEATTRIBUTES  Vérifie qu'une valeur a la forme attendue.
+    VALIDATEATTRIBUTES(A,CLASSES,ATTRIBUTS) lève une erreur explicite si A
+    n'est pas d'une des classes, ou ne respecte pas les attributs :
+    'positive', 'nonempty', 'scalar', 'vector', 'integer', 'finite'…
+
+    Syntaxe
+       validateattributes(a,classes,attributs)
+
+    Exemples
+       validateattributes(3, {'numeric'}, {'positive','scalar'});
+       try
+           validateattributes(-1, {'numeric'}, {'positive'});
+       catch e
+           disp('rejeté, comme il se doit');
+       end
+
+    Voir aussi ASSERT, NARGINCHK, ERROR, ISA.
 ```
 
 ## `vertcat`

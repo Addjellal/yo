@@ -254,7 +254,23 @@ GCF  Poignée de la figure courante.
 ## `get`
 
 ```
-get  Lit une propriete d'une poignee graphique.
+GET  Lit une propriété d'un objet graphique.
+    GET(H,'Nom') rend la valeur de la propriété.
+    GET(H) rend toutes les propriétés en structure.
+
+    Syntaxe
+       v = get(h,'Nom')
+       s = get(h)
+
+    Exemples
+       plot(1:10);
+       ax = gca;
+       get(ax, 'XLim')
+       s = get(ax);
+       isstruct(s)
+       close all
+
+    Voir aussi SET, GCA, GCF, FIGURE.
 ```
 
 ## `grid`
@@ -278,7 +294,22 @@ GRID  Quadrillage des axes.
 ## `hist`
 
 ```
-hist  Histogramme (ancienne forme).
+HIST  Histogramme, forme historique.
+    HIST(X) trace l'histogramme de X en dix classes.
+    [N,C] = HIST(X) rend les effectifs et les centres, sans tracer.
+    HISTOGRAM lui est préférée dans du code neuf.
+
+    Syntaxe
+       hist(x)
+       [n,c] = hist(x)
+       [n,c] = hist(x,nbClasses)
+
+    Exemples
+       [n, c] = hist([1 2 2 3 3 3], 3);
+       sum(n)                             % 6
+       numel(c)                           % 3
+
+    Voir aussi HISTOGRAM, HISTCOUNTS, HISTC, BAR.
 ```
 
 ## `histogram`
@@ -593,7 +624,23 @@ SEMILOGY  Trace avec l'axe des ordonnées en échelle logarithmique.
 ## `set`
 
 ```
-set  Ecrit une propriete d'une poignee graphique.
+SET  Écrit une propriété d'un objet graphique.
+    SET(H,'Nom',VALEUR) pose la propriété.
+    SET(H,'N1',V1,'N2',V2) en pose plusieurs.
+
+    Syntaxe
+       set(h,'Nom',valeur)
+       set(h,'N1',v1,'N2',v2)
+
+    Exemples
+       plot(1:10);
+       ax = gca;
+       set(ax, 'XLim', [2 8]);
+       get(ax, 'XLim')
+       set(ax, 'XTick', [2 5 8], 'YGrid', 'on');
+       close all
+
+    Voir aussi GET, GCA, GCF, AXIS.
 ```
 
 ## `shading`

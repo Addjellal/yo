@@ -194,7 +194,18 @@ DIR  Contenu d'un dossier.
 ## `doc`
 
 ```
-doc  Aide d'une fonction.
+DOC  Documentation d'une fonction.
+    DOC NOM affiche l'aide détaillée — la même que HELP, dans la
+    présentation longue.
+
+    Syntaxe
+       doc nom
+
+    Exemples
+       doc fft
+       doc('plot');
+
+    Voir aussi HELP, LOOKFOR, WHICH, TYPE.
 ```
 
 ## `dos`
@@ -374,25 +385,64 @@ ISFOLDER  Le chemin désigne-t-il un dossier.
 ## `ismac`
 
 ```
-ismac  Systeme macOS ?
+ISMAC  Tourne-t-on sous macOS.
+
+    Syntaxe
+       tf = ismac
+
+    Exemples
+       ismac
+       if ismac, disp('macOS'); end
+
+    Voir aussi ISPC, ISUNIX, COMPUTER.
 ```
 
 ## `ispc`
 
 ```
-ispc  Systeme Windows ?
+ISPC  Tourne-t-on sous Windows.
+
+    Syntaxe
+       tf = ispc
+
+    Exemples
+       ispc
+       if ispc, sep = '\'; else, sep = '/'; end
+       isequal(sep, filesep)
+
+    Voir aussi ISUNIX, ISMAC, COMPUTER, FILESEP.
 ```
 
 ## `isunix`
 
 ```
-isunix  Systeme de type UNIX ?
+ISUNIX  Tourne-t-on sous Linux ou macOS.
+
+    Syntaxe
+       tf = isunix
+
+    Exemples
+       isunix
+       ispc + isunix                  % l'un ou l'autre
+
+    Voir aussi ISPC, ISMAC, COMPUTER.
 ```
 
 ## `lookfor`
 
 ```
-lookfor  Cherche dans les aides.
+LOOKFOR  Cherche un mot dans la première ligne d'aide des fonctions.
+    LOOKFOR MOT liste les fonctions dont le résumé contient le mot : c'est
+    ainsi qu'on trouve une fonction dont on ignore le nom.
+
+    Syntaxe
+       lookfor mot
+
+    Exemples
+       lookfor fourier
+       lookfor('inverse');
+
+    Voir aussi HELP, DOC, WHICH, EXIST.
 ```
 
 ## `ls`
@@ -428,13 +478,35 @@ memory  Memoire disponible.
 ## `mexext`
 
 ```
-mexext  Extension des fichiers MEX de cette plateforme.
+MEXEXT  Extension des fichiers MEX de la plate-forme.
+
+    Syntaxe
+       e = mexext
+
+    Exemples
+       mexext
+       ischar(mexext)
+
+    Voir aussi COMPUTER, VERSION, MEX.
 ```
 
 ## `mfilename`
 
 ```
-mfilename  Nom du fichier en cours d'execution.
+MFILENAME  Nom du fichier en cours d'exécution.
+    MFILENAME rend le nom sans extension du script ou de la fonction qui
+    l'appelle, et le texte vide à l'invite.
+    MFILENAME('fullpath') rend le chemin complet, sans extension.
+
+    Syntaxe
+       nom = mfilename
+       chemin = mfilename('fullpath')
+
+    Exemples
+       nom = mfilename;
+       ischar(nom)
+
+    Voir aussi WHICH, INPUTNAME, DBSTACK, EXIST.
 ```
 
 ## `mkdir`
@@ -528,7 +600,17 @@ PWD  Dossier courant.
 ## `quit`
 
 ```
-quit  Quitte l'interpreteur.
+QUIT  Quitte MatLibre.
+    QUIT ferme la session ; EXIT en est le synonyme.
+
+    Syntaxe
+       quit
+       exit
+
+    Exemples
+       % quit                         % ferme la session
+
+    Voir aussi EXIT, CLEAR, DIARY.
 ```
 
 ## `rehash`
@@ -550,7 +632,21 @@ REHASH  Reconstruit l'index des fonctions du chemin.
 ## `rmdir`
 
 ```
-rmdir  Supprime un dossier.
+RMDIR  Supprime un dossier.
+    RMDIR(D) supprime le dossier s'il est vide.
+    RMDIR(D,'s') le supprime avec son contenu.
+
+    Syntaxe
+       rmdir(dossier)
+       rmdir(dossier,'s')
+
+    Exemples
+       d = fullfile(tempdir,'aSupprimer');
+       mkdir(d);
+       rmdir(d);
+       isfolder(d)                    % 0
+
+    Voir aussi MKDIR, DELETE, ISFOLDER, DIR.
 ```
 
 ## `rmpath`
@@ -587,7 +683,19 @@ SETENV  Écrit une variable d'environnement.
 ## `system`
 
 ```
-system  Execute une commande du systeme.
+SYSTEM  Exécute une commande du système.
+    [ETAT,SORTIE] = SYSTEM(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = system(commande)
+       [etat,sortie] = system(commande)
+
+    Exemples
+       [etat, sortie] = system('echo bonjour');
+       etat                           % 0
+       strtrim(sortie)
+
+    Voir aussi DOS, UNIX, GETENV, COMPUTER.
 ```
 
 ## `tempdir`
@@ -647,7 +755,19 @@ unix  Execute une commande du systeme.
 ## `ver`
 
 ```
-ver  Version detaillee.
+VER  Versions installées.
+    VER affiche la version du noyau et des toolboxes ; S = VER les rend en
+    structure.
+
+    Syntaxe
+       ver
+       s = ver
+
+    Exemples
+       s = ver;
+       isstruct(s)
+
+    Voir aussi VERSION, COMPUTER, WHICH.
 ```
 
 ## `version`

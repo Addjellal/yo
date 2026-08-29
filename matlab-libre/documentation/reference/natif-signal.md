@@ -5,7 +5,18 @@ Fonctions natives du groupe `signal`.
 ## `bartlett`
 
 ```
-bartlett  Fenetre triangulaire.
+BARTLETT  Fenêtre triangulaire de Bartlett.
+    BARTLETT(N) rend la fenêtre de longueur N, nulle aux deux bouts.
+
+    Syntaxe
+       w = bartlett(n)
+
+    Exemples
+       w = bartlett(32);
+       [w(1) w(end)]                      % zéro aux extrémités
+       max(w)                             % 1 au milieu
+
+    Voir aussi HAMMING, HANN, BLACKMAN, RECTWIN.
 ```
 
 ## `blackman`
@@ -272,7 +283,16 @@ HANN  Fenêtre de Hann.
 ## `hanning`
 
 ```
-hanning  Fenetre de Hann.
+HANNING  Synonyme historique de HANN.
+
+    Syntaxe
+       w = hanning(n)
+
+    Exemples
+       numel(hanning(32))                 % 32
+       max(hanning(32)) <= 1
+
+    Voir aussi HANN, HAMMING, BLACKMAN.
 ```
 
 ## `ifft`
@@ -335,7 +355,18 @@ IFFTSHIFT  Défait FFTSHIFT.
 ## `rectwin`
 
 ```
-rectwin  Fenetre rectangulaire.
+RECTWIN  Fenêtre rectangulaire : que des uns.
+    RECTWIN(N) rend un vecteur de N uns — c'est l'absence de fenêtrage,
+    nommée pour pouvoir la comparer aux autres.
+
+    Syntaxe
+       w = rectwin(n)
+
+    Exemples
+       all(rectwin(16) == 1)
+       numel(rectwin(16))                 % 16
+
+    Voir aussi HAMMING, HANN, BLACKMAN, BARTLETT.
 ```
 
 ## `unwrap`

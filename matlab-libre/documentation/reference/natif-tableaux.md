@@ -76,7 +76,20 @@ ANY  Vrai si un élément au moins est vrai.
 ## `cross`
 
 ```
-cross  Produit vectoriel.
+CROSS  Produit vectoriel.
+    CROSS(A,B) rend le produit vectoriel de deux vecteurs de trois
+    éléments : perpendiculaire aux deux, de norme égale à l'aire du
+    parallélogramme.
+
+    Syntaxe
+       c = cross(a,b)
+
+    Exemples
+       cross([1 0 0], [0 1 0])            % [0 0 1]
+       n = cross([1 2 3], [4 5 6]);
+       abs(dot(n, [1 2 3])) < 1e-12       % perpendiculaire, comme il se doit
+
+    Voir aussi DOT, NORM, MTIMES.
 ```
 
 ## `cummax`
@@ -221,7 +234,19 @@ DIFF  Différences entre éléments voisins.
 ## `dot`
 
 ```
-dot  Produit scalaire.
+DOT  Produit scalaire.
+    DOT(A,B) rend la somme des produits terme à terme.
+
+    Syntaxe
+       s = dot(a,b)
+
+    Exemples
+       dot([1 2 3], [4 5 6])              % 32
+       a = [1 0]; b = [0 1];
+       dot(a, b) == 0                     % orthogonaux
+       norm(a)^2 - dot(a,a) < 1e-12
+
+    Voir aussi CROSS, NORM, SUM, MTIMES.
 ```
 
 ## `find`
@@ -255,7 +280,18 @@ FIND  Indices des éléments non nuls.
 ## `histc`
 
 ```
-histc  Comptage par intervalles.
+HISTC  Compte les valeurs par classe, forme historique.
+    HISTC(X,BORDS) compte : la dernière case reçoit les valeurs
+    exactement égales au dernier bord. HISTCOUNTS lui est préférée.
+
+    Syntaxe
+       n = histc(x,bords)
+
+    Exemples
+       histc([1 2 2 3], [1 2 3])
+       sum(histc([1 2 2 3], [1 2 3]))     % 4
+
+    Voir aussi HISTCOUNTS, HIST, HISTOGRAM.
 ```
 
 ## `intersect`

@@ -25,7 +25,17 @@ ARRAYFUN  Applique une fonction à chaque élément d'un tableau.
 ## `assignin`
 
 ```
-assignin  Affecte dans un autre espace.
+ASSIGNIN  Écrit une variable dans un autre espace de travail.
+    ASSIGNIN('base',NOM,VALEUR) crée la variable dans l'espace de base.
+
+    Syntaxe
+       assignin(ou,nom,valeur)
+
+    Exemples
+       assignin('base', 'resultatFinal', 3);
+       evalin('base', 'resultatFinal')
+
+    Voir aussi EVALIN, EVAL, GLOBAL.
 ```
 
 ## `cellfun`
@@ -62,13 +72,38 @@ eval  Evalue du code.
 ## `evalc`
 
 ```
-evalc  Evalue et capture l'affichage.
+EVALC  Évalue du texte en capturant l'affichage.
+    EVALC(TEXTE) exécute le texte et rend tout ce qui aurait été affiché.
+    C'est ainsi qu'on teste ce qu'une fonction imprime.
+
+    Syntaxe
+       s = evalc(texte)
+
+    Exemples
+       s = evalc('disp(''bonjour'')');
+       strtrim(s)
+       s2 = evalc('1+1');
+       ~isempty(strfind(s2, '2'))
+
+    Voir aussi EVAL, DIARY, DISP, SPRINTF.
 ```
 
 ## `evalin`
 
 ```
-evalin  Evalue dans un autre espace.
+EVALIN  Évalue du texte dans un autre espace de travail.
+    EVALIN('base',TEXTE) évalue dans l'espace de travail de base ;
+    EVALIN('caller',TEXTE) dans celui de l'appelant.
+
+    Syntaxe
+       evalin(ou,texte)
+       v = evalin(ou,texte)
+
+    Exemples
+       assignin('base', 'venuDAilleurs', 42);
+       evalin('base', 'venuDAilleurs')
+
+    Voir aussi ASSIGNIN, EVAL, EVALC.
 ```
 
 ## `exist`
@@ -146,7 +181,18 @@ functions  Information sur une poignee.
 ## `inputname`
 
 ```
-inputname  Nom de l'argument appelant.
+INPUTNAME  Nom de la variable passée en argument.
+    INPUTNAME(K) rend le nom de la K-ième entrée telle que l'appelant l'a
+    écrite, ou le texte vide si ce n'était pas une variable.
+
+    Syntaxe
+       nom = inputname(k)
+
+    Exemples
+       f = @(x) class(x);
+       f(1)
+
+    Voir aussi MFILENAME, NARGIN, DBSTACK.
 ```
 
 ## `is_function_handle_`
@@ -158,7 +204,19 @@ Reserve.
 ## `isvarname`
 
 ```
-isvarname  Nom de variable valide.
+ISVARNAME  Le texte est-il un nom de variable valide.
+    Un nom valide commence par une lettre et ne contient que lettres,
+    chiffres et « _ ».
+
+    Syntaxe
+       tf = isvarname(s)
+
+    Exemples
+       isvarname('x1')                % 1
+       isvarname('1x')                % 0
+       isvarname('mon nom')           % 0
+
+    Voir aussi GENVARNAME, EXIST, FIELDNAMES.
 ```
 
 ## `nargin`
@@ -184,7 +242,20 @@ NARGIN  Nombre d'arguments réellement passés à la fonction courante.
 ## `narginchk`
 
 ```
-narginchk  Verifie le nombre d'entrees.
+NARGINCHK  Vérifie le nombre d'arguments d'entrée.
+    NARGINCHK(MIN,MAX) lève une erreur si NARGIN sort de l'intervalle.
+
+    Syntaxe
+       narginchk(min,max)
+
+    Exemples
+       try
+           narginchk(2, 3);
+       catch e
+           disp(e.identifier);
+       end
+
+    Voir aussi NARGOUTCHK, NARGIN, VALIDATEATTRIBUTES, ERROR.
 ```
 
 ## `nargout`
@@ -209,13 +280,37 @@ NARGOUT  Nombre de sorties demandées à la fonction courante.
 ## `nargoutchk`
 
 ```
-nargoutchk  Verifie le nombre de sorties.
+NARGOUTCHK  Vérifie le nombre d'arguments de sortie.
+    NARGOUTCHK(MIN,MAX) lève une erreur si NARGOUT sort de l'intervalle.
+
+    Syntaxe
+       nargoutchk(min,max)
+
+    Exemples
+       nargoutchk(0, 2);
+
+    Voir aussi NARGINCHK, NARGOUT, ERROR.
 ```
 
 ## `run`
 
 ```
-run  Execute un script, meme hors du chemin de recherche.
+RUN  Exécute un script désigné par son chemin.
+    RUN(CHEMIN) exécute le script dans l'espace de travail courant, même
+    si son dossier n'est pas sur le chemin de recherche — et même si son
+    nom n'est pas un identifiant valide.
+
+    Syntaxe
+       run(chemin)
+
+    Exemples
+       f = fullfile(tempdir,'monScript.m');
+       fid = fopen(f,'w'); fprintf(fid,'venuDuScript = 7;\n'); fclose(fid);
+       run(f);
+       venuDuScript                   % 7 — le script partage l'espace de travail
+       delete(f);
+
+    Voir aussi ADDPATH, EVAL, TYPE, WHICH.
 ```
 
 ## `str2func`

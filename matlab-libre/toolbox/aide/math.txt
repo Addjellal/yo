@@ -547,3 +547,277 @@ NORMALIZE  Normalise des données.
        [min(z) max(z)]                % [0 1]
 
     Voir aussi MEAN, STD, RESCALE, ZSCORE.
+
+### movmean
+MOVMEAN  Moyenne glissante.
+    MOVMEAN(X,K) rend la moyenne sur une fenêtre de K points centrée sur
+    chaque élément ; aux bords, la fenêtre se raccourcit.
+
+    Syntaxe
+       y = movmean(x,k)
+
+    Exemples
+       movmean([1 2 3 4 5], 3)
+       x = sin(linspace(0,2*pi,100)) + 0.3*randn(1,100);
+       lisse = movmean(x, 9);
+       std(lisse) < std(x)
+
+    Voir aussi MEAN, FILTER, CONV, CUMSUM.
+
+### range
+RANGE  Étendue : maximum moins minimum.
+
+    Syntaxe
+       r = range(x)
+
+    Exemples
+       range([3 1 4 1 5])                 % 4
+       range(magic(3))                    % par colonnes
+
+    Voir aussi MAX, MIN, STD, PRCTILE.
+
+### randsample
+RANDSAMPLE  Tire au hasard dans une population.
+    RANDSAMPLE(N,K) tire K entiers parmi 1..N, sans remise.
+    RANDSAMPLE(V,K) tire K éléments de V.
+    RANDSAMPLE(...,true) tire avec remise.
+
+    Syntaxe
+       y = randsample(n,k)
+       y = randsample(v,k)
+       y = randsample(v,k,true)
+
+    Exemples
+       rng(0);
+       y = randsample(10, 3);
+       numel(unique(y)) == 3              % sans remise
+       randsample([10 20 30], 2);
+
+    Voir aussi RANDPERM, RANDI, RAND, RNG.
+
+### normrnd
+NORMRND  Tirages selon une loi normale.
+    NORMRND(MU,SIGMA,M,N) rend une matrice M par N de tirages.
+
+    Syntaxe
+       x = normrnd(mu,sigma)
+       x = normrnd(mu,sigma,m,n)
+
+    Exemples
+       rng(0);
+       x = normrnd(10, 2, 1, 5000);
+       abs(mean(x) - 10) < 0.2
+       abs(std(x) - 2) < 0.2
+
+    Voir aussi RANDN, UNIFRND, NORMPDF, RNG.
+
+### unifrnd
+UNIFRND  Tirages selon une loi uniforme.
+    UNIFRND(A,B,M,N) tire dans [A,B].
+
+    Syntaxe
+       x = unifrnd(a,b)
+       x = unifrnd(a,b,m,n)
+
+    Exemples
+       rng(0);
+       x = unifrnd(-1, 1, 1, 1000);
+       all(x >= -1 & x <= 1)
+
+    Voir aussi RAND, NORMRND, RANDI, RNG.
+
+### binopdf
+BINOPDF  Densité de la loi binomiale.
+    BINOPDF(K,N,P) rend la probabilité d'obtenir K succès en N essais de
+    probabilité P.
+
+    Syntaxe
+       y = binopdf(k,n,p)
+
+    Exemples
+       binopdf(0, 3, 0.5)                 % 0.1250
+       abs(sum(binopdf(0:10, 10, 0.3)) - 1) < 1e-12
+
+    Voir aussi POISSPDF, NORMPDF, NCHOOSEK.
+
+### poisspdf
+POISSPDF  Densité de la loi de Poisson.
+    POISSPDF(K,LAMBDA) rend la probabilité d'observer K événements quand
+    on en attend LAMBDA.
+
+    Syntaxe
+       y = poisspdf(k,lambda)
+
+    Exemples
+       abs(poisspdf(0, 1) - exp(-1)) < 1e-12
+       abs(sum(poisspdf(0:60, 3)) - 1) < 1e-10
+
+    Voir aussi BINOPDF, EXPPDF, NORMPDF.
+
+### exppdf
+EXPPDF  Densité de la loi exponentielle.
+    EXPPDF(X,MU) rend la densité de moyenne MU.
+
+    Syntaxe
+       y = exppdf(x,mu)
+
+    Exemples
+       abs(exppdf(0, 2) - 0.5) < 1e-12
+       abs(trapz(0:0.001:60, exppdf(0:0.001:60, 2)) - 1) < 1e-3
+
+    Voir aussi EXPCDF, POISSPDF, NORMPDF.
+
+### expcdf
+EXPCDF  Répartition de la loi exponentielle.
+
+    Syntaxe
+       p = expcdf(x,mu)
+
+    Exemples
+       abs(expcdf(2, 2) - (1 - exp(-1))) < 1e-12
+       expcdf(0, 1)                       % 0
+
+    Voir aussi EXPPDF, NORMCDF.
+
+### integral2
+INTEGRAL2  Intégrale double.
+    INTEGRAL2(F,A,B,C,D) intègre F(x,y) sur le rectangle [A,B]x[C,D].
+
+    Syntaxe
+       q = integral2(f,a,b,c,d)
+
+    Exemples
+       abs(integral2(@(x,y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-8
+       abs(integral2(@(x,y) x.*y, 0, 1, 0, 1) - 0.25) < 1e-8
+
+    Voir aussi INTEGRAL, TRAPZ, QUAD2D.
+
+### quadgk
+QUADGK  Intégrale par quadrature de Gauss-Kronrod.
+    QUADGK(F,A,B) convient aux intégrandes difficiles et aux bornes
+    infinies.
+
+    Syntaxe
+       q = quadgk(f,a,b)
+
+    Exemples
+       abs(quadgk(@(x) exp(-x.^2), -Inf, Inf) - sqrt(pi)) < 1e-6
+       abs(quadgk(@sin, 0, pi) - 2) < 1e-8
+
+    Voir aussi INTEGRAL, QUAD, TRAPZ.
+
+### fminunc
+FMINUNC  Minimum sans contrainte, avec dérivées estimées.
+    FMINUNC(F,X0) minimise F à partir de X0 par une méthode de descente.
+
+    Syntaxe
+       x = fminunc(f,x0)
+       [x,fval] = fminunc(f,x0)
+
+    Exemples
+       x = fminunc(@(v) (v(1)-2)^2 + (v(2)+1)^2, [0 0]);
+       norm(x - [2 -1]) < 1e-3
+
+    Voir aussi FMINSEARCH, FMINBND, FSOLVE, OPTIMSET.
+
+### lsqnonneg
+LSQNONNEG  Moindres carrés à solution positive.
+    LSQNONNEG(C,D) minimise ||C*x - d|| sous la contrainte x >= 0.
+
+    Syntaxe
+       x = lsqnonneg(C,d)
+
+    Exemples
+       C = [1 0; 0 1; 1 1];
+       d = [1; -1; 1];
+       x = lsqnonneg(C, d);
+       all(x >= 0)
+
+    Voir aussi MLDIVIDE, PINV, FMINSEARCH, FSOLVE.
+
+### optimset
+OPTIMSET  Options des solveurs d'optimisation.
+    OPTIMSET('Nom',valeur,...) construit la structure : 'TolX', 'TolFun',
+    'MaxIter', 'Display'.
+
+    Syntaxe
+       options = optimset('Nom',valeur,...)
+
+    Exemples
+       options = optimset('TolX', 1e-10);
+       x = fminbnd(@(x) (x-3)^2, 0, 10, options);
+       abs(x - 3) < 1e-6
+
+    Voir aussi OPTIMGET, FMINBND, FMINSEARCH, ODESET.
+
+### optimget
+OPTIMGET  Lit une option d'optimisation.
+    OPTIMGET(OPTIONS,'Nom',DEFAUT) rend la valeur, ou le défaut si elle
+    n'est pas posée.
+
+    Syntaxe
+       v = optimget(options,'Nom')
+       v = optimget(options,'Nom',defaut)
+
+    Exemples
+       options = optimset('TolX', 1e-8);
+       optimget(options, 'TolX')
+       optimget(options, 'MaxIter', 400)
+
+    Voir aussi OPTIMSET, ODEGET.
+
+### odeget
+ODEGET  Lit une option de solveur différentiel.
+
+    Syntaxe
+       v = odeget(options,'Nom')
+       v = odeget(options,'Nom',defaut)
+
+    Exemples
+       options = odeset('RelTol', 1e-7);
+       odeget(options, 'RelTol')
+       odeget(options, 'AbsTol', 1e-6)
+
+    Voir aussi ODESET, ODE45, OPTIMGET.
+
+### ode23
+ODE23  Résout une équation différentielle, Runge-Kutta 2(3).
+    Moins précis qu'ODE45 mais moins coûteux par pas : utile quand la
+    tolérance demandée est lâche.
+
+    Syntaxe
+       [t,y] = ode23(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23(@(t,y) -y, [0 2], 1);
+       abs(y(end) - exp(-2)) < 1e-2
+
+    Voir aussi ODE45, ODE113, ODE15S, ODESET.
+
+### ode113
+ODE113  Résout une équation différentielle, méthode à pas multiples.
+    Utile quand la fonction est coûteuse à évaluer et la solution lisse.
+
+    Syntaxe
+       [t,y] = ode113(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode113(@(t,y) -y, [0 2], 1);
+       abs(y(end) - exp(-2)) < 1e-3
+
+    Voir aussi ODE45, ODE23, ODE15S.
+
+### deval
+DEVAL  Évalue la solution d'une équation différentielle entre les pas.
+    DEVAL(SOL,T) interpole la solution rendue par un solveur appelé avec
+    une seule sortie.
+
+    Syntaxe
+       y = deval(sol,t)
+
+    Exemples
+       sol = ode45(@(t,y) -y, [0 2], 1);
+       y = deval(sol, 1);
+       abs(y - exp(-1)) < 1e-4
+
+    Voir aussi ODE45, ODE15S, INTERP1.

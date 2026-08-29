@@ -108,7 +108,18 @@ EXPM  Exponentielle de matrice.
 ## `hilb`
 
 ```
-hilb  Matrice de Hilbert.
+HILB  Matrice de Hilbert.
+    HILB(N) a pour élément (i,j) la valeur 1/(i+j-1). Célèbre pour son
+    très mauvais conditionnement : c'est l'étalon des tests numériques.
+
+    Syntaxe
+       H = hilb(n)
+
+    Exemples
+       hilb(3)
+       cond(hilb(5)) > 1e5                % franchement mal conditionnée
+
+    Voir aussi COND, MAGIC, TOEPLITZ, INV.
 ```
 
 ## `inv`
@@ -160,13 +171,36 @@ istriu  Triangulaire superieure ?
 ## `linsolve`
 
 ```
-linsolve  Resolution de systeme lineaire.
+LINSOLVE  Résout A*X = B.
+    LINSOLVE(A,B) résout le système ; c'est la forme explicite de
+    l'opérateur « \ ».
+
+    Syntaxe
+       x = linsolve(A,B)
+
+    Exemples
+       A = [2 1; 1 3];  b = [3; 5];
+       x = linsolve(A, b);
+       norm(A*x - b) < 1e-12
+       norm(x - (A\b)) < 1e-12
+
+    Voir aussi MLDIVIDE, INV, LU, QR, PINV.
 ```
 
 ## `logm`
 
 ```
-logm  Logarithme de matrice.
+LOGM  Logarithme de matrice.
+    LOGM(A) rend X tel que EXPM(X) = A.
+
+    Syntaxe
+       X = logm(A)
+
+    Exemples
+       A = expm([0 1; 0 0]);
+       norm(logm(A) - [0 1; 0 0]) < 1e-10
+
+    Voir aussi EXPM, SQRTM, LOG, EIG.
 ```
 
 ## `lu`
@@ -217,13 +251,39 @@ NORM  Norme d'un vecteur ou d'une matrice.
 ## `null`
 
 ```
-null  Base du noyau.
+NULL  Base du noyau d'une matrice.
+    NULL(A) rend une base orthonormée des X tels que A*X = 0. Le noyau est
+    vide quand A est de rang plein.
+
+    Syntaxe
+       Z = null(A)
+
+    Exemples
+       A = [1 2; 2 4];                    % rang 1
+       Z = null(A);
+       norm(A*Z) < 1e-10
+       isempty(null(eye(3)))              % noyau vide
+
+    Voir aussi ORTH, RANK, SVD, MLDIVIDE.
 ```
 
 ## `orth`
 
 ```
-orth  Base orthonormale de l'image.
+ORTH  Base orthonormée de l'image d'une matrice.
+    ORTH(A) rend une base orthonormée de l'espace engendré par les
+    colonnes de A ; elle a RANK(A) colonnes.
+
+    Syntaxe
+       Q = orth(A)
+
+    Exemples
+       A = [1 2; 2 4; 3 6];
+       Q = orth(A);
+       size(Q, 2) == rank(A)
+       norm(Q'*Q - eye(size(Q,2))) < 1e-10
+
+    Voir aussi NULL, QR, RANK, SVD.
 ```
 
 ## `pinv`
@@ -288,19 +348,57 @@ RANK  Rang d'une matrice.
 ## `rcond`
 
 ```
-rcond  Estimation de l'inverse du conditionnement.
+RCOND  Estimation de l'inverse du conditionnement.
+    RCOND(A) est proche de 1 pour une matrice bien conditionnée, et proche
+    de 0 pour une matrice presque singulière.
+
+    Syntaxe
+       c = rcond(A)
+
+    Exemples
+       rcond(eye(3))                      % 1
+       rcond([1 1; 1 1+1e-12]) < 1e-6     % presque singulière
+
+    Voir aussi COND, DET, INV, MLDIVIDE.
 ```
 
 ## `rref`
 
 ```
-rref  Forme echelonnee reduite.
+RREF  Forme échelonnée réduite par lignes.
+    RREF(A) rend la forme obtenue par élimination de Gauss-Jordan : c'est
+    la méthode qu'on apprend, plus lisible que stable numériquement.
+    [R,PIVOTS] = RREF(A) rend aussi les colonnes de pivot.
+
+    Syntaxe
+       R = rref(A)
+       [R,pivots] = rref(A)
+
+    Exemples
+       rref([1 2; 2 4])
+       [R, p] = rref(magic(4));
+       numel(p) == rank(magic(4))
+
+    Voir aussi RANK, MLDIVIDE, LU, INV.
 ```
 
 ## `sqrtm`
 
 ```
-sqrtm  Racine carree de matrice.
+SQRTM  Racine carrée de matrice.
+    SQRTM(A) rend X tel que X*X = A — à ne pas confondre avec SQRT(A),
+    qui travaille élément par élément.
+
+    Syntaxe
+       X = sqrtm(A)
+
+    Exemples
+       A = [4 0; 0 9];
+       X = sqrtm(A);
+       norm(X*X - A) < 1e-10
+       isequal(sqrt(A), [2 0; 0 3])       % sqrt, lui, va élément par élément
+
+    Voir aussi EXPM, LOGM, SQRT, EIG.
 ```
 
 ## `svd`
@@ -329,7 +427,20 @@ SVD  Décomposition en valeurs singulières.
 ## `toeplitz`
 
 ```
-toeplitz  Matrice de Toeplitz.
+TOEPLITZ  Matrice de Toeplitz : constante le long des diagonales.
+    TOEPLITZ(C,R) prend C pour première colonne et R pour première ligne.
+    TOEPLITZ(C) rend la matrice symétrique.
+
+    Syntaxe
+       T = toeplitz(c,r)
+       T = toeplitz(c)
+
+    Exemples
+       toeplitz([1 2 3])
+       toeplitz([1 2 3], [1 4 5])
+       T = toeplitz([2 -1 0 0]);          % la matrice du laplacien 1D
+
+    Voir aussi HILB, VANDER, DIAG, CONV.
 ```
 
 ## `trace`
@@ -352,6 +463,18 @@ TRACE  Somme des éléments diagonaux.
 ## `vander`
 
 ```
-vander  Matrice de Vandermonde.
+VANDER  Matrice de Vandermonde.
+    VANDER(V) a pour colonnes les puissances décroissantes de V : c'est la
+    matrice de l'interpolation polynomiale.
+
+    Syntaxe
+       A = vander(v)
+
+    Exemples
+       vander([1 2 3])
+       v = [1 2 3];
+       size(vander(v))                    % [3 3]
+
+    Voir aussi POLYFIT, TOEPLITZ, HILB, POLYVAL.
 ```
 

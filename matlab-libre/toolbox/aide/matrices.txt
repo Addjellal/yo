@@ -569,3 +569,339 @@ ACCUMARRAY  Agrège des valeurs par groupe.
        accumarray(groupes, valeurs, [], @mean)    % moyenne par groupe
 
     Voir aussi UNIQUE, HISTCOUNTS, SUM, ARRAYFUN.
+
+### cross
+CROSS  Produit vectoriel.
+    CROSS(A,B) rend le produit vectoriel de deux vecteurs de trois
+    éléments : perpendiculaire aux deux, de norme égale à l'aire du
+    parallélogramme.
+
+    Syntaxe
+       c = cross(a,b)
+
+    Exemples
+       cross([1 0 0], [0 1 0])            % [0 0 1]
+       n = cross([1 2 3], [4 5 6]);
+       abs(dot(n, [1 2 3])) < 1e-12       % perpendiculaire, comme il se doit
+
+    Voir aussi DOT, NORM, MTIMES.
+
+### dot
+DOT  Produit scalaire.
+    DOT(A,B) rend la somme des produits terme à terme.
+
+    Syntaxe
+       s = dot(a,b)
+
+    Exemples
+       dot([1 2 3], [4 5 6])              % 32
+       a = [1 0]; b = [0 1];
+       dot(a, b) == 0                     % orthogonaux
+       norm(a)^2 - dot(a,a) < 1e-12
+
+    Voir aussi CROSS, NORM, SUM, MTIMES.
+
+### null
+NULL  Base du noyau d'une matrice.
+    NULL(A) rend une base orthonormée des X tels que A*X = 0. Le noyau est
+    vide quand A est de rang plein.
+
+    Syntaxe
+       Z = null(A)
+
+    Exemples
+       A = [1 2; 2 4];                    % rang 1
+       Z = null(A);
+       norm(A*Z) < 1e-10
+       isempty(null(eye(3)))              % noyau vide
+
+    Voir aussi ORTH, RANK, SVD, MLDIVIDE.
+
+### orth
+ORTH  Base orthonormée de l'image d'une matrice.
+    ORTH(A) rend une base orthonormée de l'espace engendré par les
+    colonnes de A ; elle a RANK(A) colonnes.
+
+    Syntaxe
+       Q = orth(A)
+
+    Exemples
+       A = [1 2; 2 4; 3 6];
+       Q = orth(A);
+       size(Q, 2) == rank(A)
+       norm(Q'*Q - eye(size(Q,2))) < 1e-10
+
+    Voir aussi NULL, QR, RANK, SVD.
+
+### rref
+RREF  Forme échelonnée réduite par lignes.
+    RREF(A) rend la forme obtenue par élimination de Gauss-Jordan : c'est
+    la méthode qu'on apprend, plus lisible que stable numériquement.
+    [R,PIVOTS] = RREF(A) rend aussi les colonnes de pivot.
+
+    Syntaxe
+       R = rref(A)
+       [R,pivots] = rref(A)
+
+    Exemples
+       rref([1 2; 2 4])
+       [R, p] = rref(magic(4));
+       numel(p) == rank(magic(4))
+
+    Voir aussi RANK, MLDIVIDE, LU, INV.
+
+### rcond
+RCOND  Estimation de l'inverse du conditionnement.
+    RCOND(A) est proche de 1 pour une matrice bien conditionnée, et proche
+    de 0 pour une matrice presque singulière.
+
+    Syntaxe
+       c = rcond(A)
+
+    Exemples
+       rcond(eye(3))                      % 1
+       rcond([1 1; 1 1+1e-12]) < 1e-6     % presque singulière
+
+    Voir aussi COND, DET, INV, MLDIVIDE.
+
+### linsolve
+LINSOLVE  Résout A*X = B.
+    LINSOLVE(A,B) résout le système ; c'est la forme explicite de
+    l'opérateur « \ ».
+
+    Syntaxe
+       x = linsolve(A,B)
+
+    Exemples
+       A = [2 1; 1 3];  b = [3; 5];
+       x = linsolve(A, b);
+       norm(A*x - b) < 1e-12
+       norm(x - (A\b)) < 1e-12
+
+    Voir aussi MLDIVIDE, INV, LU, QR, PINV.
+
+### sqrtm
+SQRTM  Racine carrée de matrice.
+    SQRTM(A) rend X tel que X*X = A — à ne pas confondre avec SQRT(A),
+    qui travaille élément par élément.
+
+    Syntaxe
+       X = sqrtm(A)
+
+    Exemples
+       A = [4 0; 0 9];
+       X = sqrtm(A);
+       norm(X*X - A) < 1e-10
+       isequal(sqrt(A), [2 0; 0 3])       % sqrt, lui, va élément par élément
+
+    Voir aussi EXPM, LOGM, SQRT, EIG.
+
+### logm
+LOGM  Logarithme de matrice.
+    LOGM(A) rend X tel que EXPM(X) = A.
+
+    Syntaxe
+       X = logm(A)
+
+    Exemples
+       A = expm([0 1; 0 0]);
+       norm(logm(A) - [0 1; 0 0]) < 1e-10
+
+    Voir aussi EXPM, SQRTM, LOG, EIG.
+
+### polyvalm
+POLYVALM  Évalue un polynôme au sens matriciel.
+    POLYVALM(P,A) remplace x par la matrice A : x² devient A*A, et le
+    terme constant devient c*EYE(A).
+
+    Syntaxe
+       Y = polyvalm(p,A)
+
+    Exemples
+       A = [1 2; 3 4];
+       polyvalm([1 0 0], A)               % A*A
+       norm(polyvalm([1 0 0], A) - A*A) < 1e-12
+
+    Voir aussi POLYVAL, EXPM, EIG, POLY.
+
+### toeplitz
+TOEPLITZ  Matrice de Toeplitz : constante le long des diagonales.
+    TOEPLITZ(C,R) prend C pour première colonne et R pour première ligne.
+    TOEPLITZ(C) rend la matrice symétrique.
+
+    Syntaxe
+       T = toeplitz(c,r)
+       T = toeplitz(c)
+
+    Exemples
+       toeplitz([1 2 3])
+       toeplitz([1 2 3], [1 4 5])
+       T = toeplitz([2 -1 0 0]);          % la matrice du laplacien 1D
+
+    Voir aussi HILB, VANDER, DIAG, CONV.
+
+### vander
+VANDER  Matrice de Vandermonde.
+    VANDER(V) a pour colonnes les puissances décroissantes de V : c'est la
+    matrice de l'interpolation polynomiale.
+
+    Syntaxe
+       A = vander(v)
+
+    Exemples
+       vander([1 2 3])
+       v = [1 2 3];
+       size(vander(v))                    % [3 3]
+
+    Voir aussi POLYFIT, TOEPLITZ, HILB, POLYVAL.
+
+### hilb
+HILB  Matrice de Hilbert.
+    HILB(N) a pour élément (i,j) la valeur 1/(i+j-1). Célèbre pour son
+    très mauvais conditionnement : c'est l'étalon des tests numériques.
+
+    Syntaxe
+       H = hilb(n)
+
+    Exemples
+       hilb(3)
+       cond(hilb(5)) > 1e5                % franchement mal conditionnée
+
+    Voir aussi COND, MAGIC, TOEPLITZ, INV.
+
+### ndgrid
+NDGRID  Grille de coordonnées, convention tableau.
+    [X,Y] = NDGRID(x,y) est comme MESHGRID, mais X varie selon les lignes
+    et Y selon les colonnes : c'est la convention des tableaux, transposée
+    de celle du graphique.
+
+    Syntaxe
+       [X,Y] = ndgrid(x,y)
+
+    Exemples
+       [X, Y] = ndgrid(1:3, 1:2);
+       size(X)                            % [3 2]
+       [Xm, Ym] = meshgrid(1:3, 1:2);
+       isequal(X, Xm')                    % l'une est la transposée de l'autre
+
+    Voir aussi MESHGRID, SUB2IND, INTERP2.
+
+### ipermute
+IPERMUTE  Inverse de PERMUTE.
+    IPERMUTE(B,ORDRE) défait PERMUTE(A,ORDRE).
+
+    Syntaxe
+       A = ipermute(B,ordre)
+
+    Exemples
+       A = reshape(1:24, 2, 3, 4);
+       B = permute(A, [3 1 2]);
+       isequal(ipermute(B, [3 1 2]), A)
+
+    Voir aussi PERMUTE, RESHAPE, SQUEEZE.
+
+### sparse
+SPARSE  Matrice creuse : seuls les non-nuls sont rangés.
+    SPARSE(A) convertit une matrice pleine.
+    SPARSE(I,J,V,M,N) construit une matrice M par N dont l'élément
+    (I(k),J(k)) vaut V(k).
+
+    Une matrice creuse d'un million de lignes tient en mémoire tant qu'elle
+    a peu de non-nuls, et les opérations n'en parcourent que ceux-là.
+
+    Syntaxe
+       S = sparse(A)
+       S = sparse(i,j,v,m,n)
+
+    Exemples
+       S = sparse([1 3], [2 3], [5 7], 3, 3);
+       full(S)
+       nnz(S)                             % 2
+       issparse(S)
+
+    Voir aussi FULL, SPEYE, SPDIAGS, NNZ, ISSPARSE, SPY.
+
+### full
+FULL  Convertit une matrice creuse en matrice pleine.
+
+    Syntaxe
+       A = full(S)
+
+    Exemples
+       S = speye(3);
+       full(S)
+       issparse(full(S))                  % 0
+
+    Voir aussi SPARSE, ISSPARSE, NNZ.
+
+### speye
+SPEYE  Identité creuse.
+    SPEYE(N) rend l'identité N par N sous forme creuse : N valeurs rangées
+    au lieu de N².
+
+    Syntaxe
+       S = speye(n)
+       S = speye(m,n)
+
+    Exemples
+       S = speye(4);
+       nnz(S)                             % 4
+       isequal(full(speye(3)), eye(3))
+
+    Voir aussi SPARSE, EYE, SPDIAGS, SPONES.
+
+### spdiags
+SPDIAGS  Matrice creuse construite par diagonales.
+    SPDIAGS(B,D,M,N) place les colonnes de B sur les diagonales D d'une
+    matrice M par N.
+
+    Syntaxe
+       S = spdiags(B,d,m,n)
+
+    Exemples
+       n = 5;
+       e = ones(n,1);
+       L = spdiags([e -2*e e], [-1 0 1], n, n);   % le laplacien 1D
+       full(L(1:3,1:3))
+
+    Voir aussi SPARSE, DIAG, SPEYE, FULL.
+
+### issparse
+ISSPARSE  La matrice est-elle creuse.
+
+    Syntaxe
+       tf = issparse(S)
+
+    Exemples
+       issparse(speye(3))                 % 1
+       issparse(eye(3))                   % 0
+
+    Voir aussi SPARSE, FULL, NNZ.
+
+### nzmax
+NZMAX  Place réservée aux non-nuls d'une matrice creuse.
+
+    Syntaxe
+       n = nzmax(S)
+
+    Exemples
+       S = sparse([1 2], [1 2], [3 4]);
+       nzmax(S) >= nnz(S)
+
+    Voir aussi NNZ, SPARSE, SPALLOC.
+
+### spy
+SPY  Dessine la structure des non-nuls.
+    SPY(S) place un point à chaque non-nul : la forme de la matrice se lit
+    d'un coup d'oeil.
+
+    Syntaxe
+       spy(S)
+
+    Exemples
+       n = 20;
+       e = ones(n,1);
+       L = spdiags([e -2*e e], [-1 0 1], n, n);
+       spy(L);
+
+    Voir aussi SPARSE, NNZ, IMAGESC, PLOT.

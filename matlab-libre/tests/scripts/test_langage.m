@@ -213,6 +213,15 @@ assert(eval('zzzInconnu', '42') == 42);
 % Les variables temporaires de eval ne restent pas dans l'espace de travail.
 assert(exist('matlibre__eval1__', 'var') == 0);
 
+% evalin evalue DANS l'espace vise, avec ou sans sortie : sans cela,
+% « evalin('base','x') » lisait la portee courante.
+assert(essaiEvalin() == 6);
+
+% Un evalc dans un evalc ne laisse rien echapper vers la console : le plus
+% interne rend son texte au plus externe, qui le capture aussi.
+sortieImbriquee = evalc('interne = evalc(''disp(42)''); disp([''vu : '' strtrim(interne)])');
+assert(~isempty(strfind(sortieImbriquee, 'vu : 42')));
+
 %% ------------------------------------------- « return » dans un script
 % MATLAB : « return force le retour du controle au programme appelant
 % avant la fin du script ou de la fonction ». Un script s'arrete donc sur
@@ -235,6 +244,16 @@ assert(lanceurDeScript(false) == 42);
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions
+
+function r = essaiEvalin()
+%ESSAIEVALIN assignin ecrit dans la base, evalin l'y relit — sans sortie
+%   comme avec, et depuis l'interieur d'un evalc.
+    code = sprintf('assignin(''base'',''venuDeLaBase'',6);\nevalin(''base'',''venuDeLaBase'')');
+    texte = evalc(code);
+    assert(~isempty(strfind(texte, '6')));
+    evalin('base', 'creeeParEvalin = 6;');
+    r = evalin('base', 'creeeParEvalin');
+end
 
 function r = effetDeBord()
     r = true;

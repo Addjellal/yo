@@ -5,7 +5,18 @@ Fonctions natives du groupe `statistiques`.
 ## `binopdf`
 
 ```
-binopdf  Densite binomiale.
+BINOPDF  Densité de la loi binomiale.
+    BINOPDF(K,N,P) rend la probabilité d'obtenir K succès en N essais de
+    probabilité P.
+
+    Syntaxe
+       y = binopdf(k,n,p)
+
+    Exemples
+       binopdf(0, 3, 0.5)                 % 0.1250
+       abs(sum(binopdf(0:10, 10, 0.3)) - 1) < 1e-12
+
+    Voir aussi POISSPDF, NORMPDF, NCHOOSEK.
 ```
 
 ## `chi2pdf`
@@ -59,13 +70,32 @@ COV  Covariance.
 ## `expcdf`
 
 ```
-expcdf  Repartition exponentielle.
+EXPCDF  Répartition de la loi exponentielle.
+
+    Syntaxe
+       p = expcdf(x,mu)
+
+    Exemples
+       abs(expcdf(2, 2) - (1 - exp(-1))) < 1e-12
+       expcdf(0, 1)                       % 0
+
+    Voir aussi EXPPDF, NORMCDF.
 ```
 
 ## `exppdf`
 
 ```
-exppdf  Densite exponentielle.
+EXPPDF  Densité de la loi exponentielle.
+    EXPPDF(X,MU) rend la densité de moyenne MU.
+
+    Syntaxe
+       y = exppdf(x,mu)
+
+    Exemples
+       abs(exppdf(0, 2) - 0.5) < 1e-12
+       abs(trapz(0:0.001:60, exppdf(0:0.001:60, 2)) - 1) < 1e-3
+
+    Voir aussi EXPCDF, POISSPDF, NORMPDF.
 ```
 
 ## `histcounts`
@@ -151,7 +181,20 @@ MODE  Valeur la plus fréquente.
 ## `movmean`
 
 ```
-movmean  Moyenne glissante.
+MOVMEAN  Moyenne glissante.
+    MOVMEAN(X,K) rend la moyenne sur une fenêtre de K points centrée sur
+    chaque élément ; aux bords, la fenêtre se raccourcit.
+
+    Syntaxe
+       y = movmean(x,k)
+
+    Exemples
+       movmean([1 2 3 4 5], 3)
+       x = sin(linspace(0,2*pi,100)) + 0.3*randn(1,100);
+       lisse = movmean(x, 9);
+       std(lisse) < std(x)
+
+    Voir aussi MEAN, FILTER, CONV, CUMSUM.
 ```
 
 ## `normalize`
@@ -231,13 +274,37 @@ NORMPDF  Densité de la loi normale.
 ## `normrnd`
 
 ```
-normrnd  Tirage normal.
+NORMRND  Tirages selon une loi normale.
+    NORMRND(MU,SIGMA,M,N) rend une matrice M par N de tirages.
+
+    Syntaxe
+       x = normrnd(mu,sigma)
+       x = normrnd(mu,sigma,m,n)
+
+    Exemples
+       rng(0);
+       x = normrnd(10, 2, 1, 5000);
+       abs(mean(x) - 10) < 0.2
+       abs(std(x) - 2) < 0.2
+
+    Voir aussi RANDN, UNIFRND, NORMPDF, RNG.
 ```
 
 ## `poisspdf`
 
 ```
-poisspdf  Densite de Poisson.
+POISSPDF  Densité de la loi de Poisson.
+    POISSPDF(K,LAMBDA) rend la probabilité d'observer K événements quand
+    on en attend LAMBDA.
+
+    Syntaxe
+       y = poisspdf(k,lambda)
+
+    Exemples
+       abs(poisspdf(0, 1) - exp(-1)) < 1e-12
+       abs(sum(poisspdf(0:60, 3)) - 1) < 1e-10
+
+    Voir aussi BINOPDF, EXPPDF, NORMPDF.
 ```
 
 ## `prctile`
@@ -278,13 +345,38 @@ QUANTILE  Quantiles d'un échantillon.
 ## `randsample`
 
 ```
-randsample  Tirage dans un ensemble.
+RANDSAMPLE  Tire au hasard dans une population.
+    RANDSAMPLE(N,K) tire K entiers parmi 1..N, sans remise.
+    RANDSAMPLE(V,K) tire K éléments de V.
+    RANDSAMPLE(...,true) tire avec remise.
+
+    Syntaxe
+       y = randsample(n,k)
+       y = randsample(v,k)
+       y = randsample(v,k,true)
+
+    Exemples
+       rng(0);
+       y = randsample(10, 3);
+       numel(unique(y)) == 3              % sans remise
+       randsample([10 20 30], 2);
+
+    Voir aussi RANDPERM, RANDI, RAND, RNG.
 ```
 
 ## `range`
 
 ```
-range  Etendue.
+RANGE  Étendue : maximum moins minimum.
+
+    Syntaxe
+       r = range(x)
+
+    Exemples
+       range([3 1 4 1 5])                 % 4
+       range(magic(3))                    % par colonnes
+
+    Voir aussi MAX, MIN, STD, PRCTILE.
 ```
 
 ## `std`
@@ -316,7 +408,19 @@ tpdf  Densite de Student.
 ## `unifrnd`
 
 ```
-unifrnd  Tirage uniforme.
+UNIFRND  Tirages selon une loi uniforme.
+    UNIFRND(A,B,M,N) tire dans [A,B].
+
+    Syntaxe
+       x = unifrnd(a,b)
+       x = unifrnd(a,b,m,n)
+
+    Exemples
+       rng(0);
+       x = unifrnd(-1, 1, 1, 1000);
+       all(x >= -1 & x <= 1)
+
+    Voir aussi RAND, NORMRND, RANDI, RNG.
 ```
 
 ## `var`

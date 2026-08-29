@@ -46,7 +46,19 @@ CELL2MAT  Recolle une cellule en un tableau.
 ## `cell2struct`
 
 ```
-cell2struct  Cellule -> structure.
+CELL2STRUCT  Construit une structure depuis une cellule et des noms.
+    CELL2STRUCT(C,CHAMPS,DIM) prend les valeurs de C et les noms de
+    CHAMPS.
+
+    Syntaxe
+       s = cell2struct(c,champs,dim)
+
+    Exemples
+       s = cell2struct({1; 'deux'}, {'a','b'}, 1);
+       s.a
+       s.b
+
+    Voir aussi STRUCT2CELL, STRUCT, FIELDNAMES.
 ```
 
 ## `deal`
@@ -134,7 +146,20 @@ ISFIELD  La structure a-t-elle ce champ.
 ## `mat2cell`
 
 ```
-mat2cell  Decoupe en blocs.
+MAT2CELL  Découpe une matrice en blocs, dans une cellule.
+    MAT2CELL(A,LIGNES,COLONNES) découpe A selon les tailles données ; leur
+    somme doit faire la taille de A.
+
+    Syntaxe
+       C = mat2cell(A,lignes,colonnes)
+
+    Exemples
+       A = magic(4);
+       C = mat2cell(A, [2 2], [2 2]);
+       size(C)                        % [2 2]
+       C{1,1}
+
+    Voir aussi CELL2MAT, NUM2CELL, RESHAPE.
 ```
 
 ## `num2cell`
@@ -158,7 +183,17 @@ NUM2CELL  Un tableau vers une cellule, élément par élément.
 ## `orderfields`
 
 ```
-orderfields  Trie les champs.
+ORDERFIELDS  Range les champs d'une structure par ordre alphabétique.
+
+    Syntaxe
+       t = orderfields(s)
+
+    Exemples
+       s = struct('b',2,'a',1);
+       t = orderfields(s);
+       fieldnames(t)
+
+    Voir aussi FIELDNAMES, RMFIELD, STRUCT, SORT.
 ```
 
 ## `rmfield`
@@ -222,7 +257,18 @@ STRUCT  Crée une structure.
 ## `struct2cell`
 
 ```
-struct2cell  Structure -> cellule.
+STRUCT2CELL  Les valeurs d'une structure, en cellule colonne.
+
+    Syntaxe
+       c = struct2cell(s)
+
+    Exemples
+       s = struct('a',1,'b','deux');
+       c = struct2cell(s);
+       numel(c)                       % 2
+       c{2}
+
+    Voir aussi CELL2STRUCT, FIELDNAMES, STRUCT, NUM2CELL.
 ```
 
 ## `structfun_aide`

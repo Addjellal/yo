@@ -587,3 +587,517 @@ DBSTATUS  Liste les points d'arrêt posés.
        dbstatus
 
     Voir aussi DBSTOP, DBCLEAR.
+
+### mfilename
+MFILENAME  Nom du fichier en cours d'exécution.
+    MFILENAME rend le nom sans extension du script ou de la fonction qui
+    l'appelle, et le texte vide à l'invite.
+    MFILENAME('fullpath') rend le chemin complet, sans extension.
+
+    Syntaxe
+       nom = mfilename
+       chemin = mfilename('fullpath')
+
+    Exemples
+       nom = mfilename;
+       ischar(nom)
+
+    Voir aussi WHICH, INPUTNAME, DBSTACK, EXIST.
+
+### inputname
+INPUTNAME  Nom de la variable passée en argument.
+    INPUTNAME(K) rend le nom de la K-ième entrée telle que l'appelant l'a
+    écrite, ou le texte vide si ce n'était pas une variable.
+
+    Syntaxe
+       nom = inputname(k)
+
+    Exemples
+       f = @(x) class(x);
+       f(1)
+
+    Voir aussi MFILENAME, NARGIN, DBSTACK.
+
+### narginchk
+NARGINCHK  Vérifie le nombre d'arguments d'entrée.
+    NARGINCHK(MIN,MAX) lève une erreur si NARGIN sort de l'intervalle.
+
+    Syntaxe
+       narginchk(min,max)
+
+    Exemples
+       try
+           narginchk(2, 3);
+       catch e
+           disp(e.identifier);
+       end
+
+    Voir aussi NARGOUTCHK, NARGIN, VALIDATEATTRIBUTES, ERROR.
+
+### nargoutchk
+NARGOUTCHK  Vérifie le nombre d'arguments de sortie.
+    NARGOUTCHK(MIN,MAX) lève une erreur si NARGOUT sort de l'intervalle.
+
+    Syntaxe
+       nargoutchk(min,max)
+
+    Exemples
+       nargoutchk(0, 2);
+
+    Voir aussi NARGINCHK, NARGOUT, ERROR.
+
+### validateattributes
+VALIDATEATTRIBUTES  Vérifie qu'une valeur a la forme attendue.
+    VALIDATEATTRIBUTES(A,CLASSES,ATTRIBUTS) lève une erreur explicite si A
+    n'est pas d'une des classes, ou ne respecte pas les attributs :
+    'positive', 'nonempty', 'scalar', 'vector', 'integer', 'finite'…
+
+    Syntaxe
+       validateattributes(a,classes,attributs)
+
+    Exemples
+       validateattributes(3, {'numeric'}, {'positive','scalar'});
+       try
+           validateattributes(-1, {'numeric'}, {'positive'});
+       catch e
+           disp('rejeté, comme il se doit');
+       end
+
+    Voir aussi ASSERT, NARGINCHK, ERROR, ISA.
+
+### rethrow
+RETHROW  Relance une erreur capturée.
+    RETHROW(E) relance l'erreur telle quelle, identifiant et message
+    compris : c'est ce qu'on fait après avoir nettoyé dans un catch.
+
+    Syntaxe
+       rethrow(e)
+
+    Exemples
+       try
+           try
+               error('Mon:id', 'raté');
+           catch e
+               rethrow(e);
+           end
+       catch f
+           disp(f.identifier);
+       end
+
+    Voir aussi ERROR, MEXCEPTION, THROW, LASTERR.
+
+### MException
+MEXCEPTION  Objet d'erreur : identifiant, message, pile.
+    E = MEXCEPTION(ID,FORMAT,...) construit l'erreur sans la lever.
+    THROW(E) la lève.
+
+    Syntaxe
+       e = MException(id,format,...)
+       throw(e)
+
+    Exemples
+       e = MException('Mon:id', 'valeur %d refusée', 7);
+       e.identifier
+       e.message
+       try
+           throw(e);
+       catch f
+           disp(f.message);
+       end
+
+    Voir aussi ERROR, THROW, RETHROW, TRY.
+
+### throw
+THROW  Lève une erreur construite avec MException.
+
+    Syntaxe
+       throw(e)
+
+    Exemples
+       try
+           throw(MException('Mon:id','raté'));
+       catch e
+           disp(e.identifier);
+       end
+
+    Voir aussi MEXCEPTION, ERROR, RETHROW.
+
+### evalin
+EVALIN  Évalue du texte dans un autre espace de travail.
+    EVALIN('base',TEXTE) évalue dans l'espace de travail de base ;
+    EVALIN('caller',TEXTE) dans celui de l'appelant.
+
+    Syntaxe
+       evalin(ou,texte)
+       v = evalin(ou,texte)
+
+    Exemples
+       assignin('base', 'venuDAilleurs', 42);
+       evalin('base', 'venuDAilleurs')
+
+    Voir aussi ASSIGNIN, EVAL, EVALC.
+
+### assignin
+ASSIGNIN  Écrit une variable dans un autre espace de travail.
+    ASSIGNIN('base',NOM,VALEUR) crée la variable dans l'espace de base.
+
+    Syntaxe
+       assignin(ou,nom,valeur)
+
+    Exemples
+       assignin('base', 'resultatFinal', 3);
+       evalin('base', 'resultatFinal')
+
+    Voir aussi EVALIN, EVAL, GLOBAL.
+
+### evalc
+EVALC  Évalue du texte en capturant l'affichage.
+    EVALC(TEXTE) exécute le texte et rend tout ce qui aurait été affiché.
+    C'est ainsi qu'on teste ce qu'une fonction imprime.
+
+    Syntaxe
+       s = evalc(texte)
+
+    Exemples
+       s = evalc('disp(''bonjour'')');
+       strtrim(s)
+       s2 = evalc('1+1');
+       ~isempty(strfind(s2, '2'))
+
+    Voir aussi EVAL, DIARY, DISP, SPRINTF.
+
+### clock
+CLOCK  Date et heure courantes, en vecteur.
+    CLOCK rend [année mois jour heure minute seconde].
+
+    Syntaxe
+       c = clock
+
+    Exemples
+       c = clock;
+       numel(c)                       % 6
+       c(1) > 2000
+
+    Voir aussi NOW, DATE, DATESTR, ETIME, TIC.
+
+### now
+NOW  Date et heure courantes, en numéro de série.
+
+    Syntaxe
+       d = now
+
+    Exemples
+       d = now;
+       d > 700000
+       datestr(now);
+
+    Voir aussi CLOCK, DATE, DATESTR, DATENUM.
+
+### date
+DATE  Date du jour, en texte.
+
+    Syntaxe
+       s = date
+
+    Exemples
+       s = date;
+       ischar(s)
+
+    Voir aussi CLOCK, NOW, DATESTR, DATENUM.
+
+### datestr
+DATESTR  Écrit une date.
+    DATESTR(D) écrit le numéro de série D ; DATESTR(D,FORMAT) impose le
+    format, par exemple 'yyyy-mm-dd'.
+
+    Syntaxe
+       s = datestr(d)
+       s = datestr(d,format)
+
+    Exemples
+       datestr(datenum(2024,5,1), 'yyyy-mm-dd')
+       ischar(datestr(now))
+
+    Voir aussi DATENUM, DATEVEC, NOW, CLOCK.
+
+### datenum
+DATENUM  Numéro de série d'une date.
+    DATENUM(A,M,J) rend le numéro correspondant ; DATENUM(TEXTE) lit une
+    date écrite. Les numéros se soustraient : la différence est en jours.
+
+    Syntaxe
+       d = datenum(a,m,j)
+       d = datenum(texte)
+
+    Exemples
+       d1 = datenum(2024,1,1);
+       d2 = datenum(2024,12,31);
+       d2 - d1                        % 365 jours
+       datenum(2024,5,1) > 0
+
+    Voir aussi DATESTR, DATEVEC, NOW, ETIME.
+
+### datevec
+DATEVEC  Décompose une date en [année mois jour heure minute seconde].
+
+    Syntaxe
+       v = datevec(d)
+
+    Exemples
+       v = datevec(datenum(2024,5,1));
+       v(1:3)                         % [2024 5 1]
+
+    Voir aussi DATENUM, DATESTR, CLOCK.
+
+### etime
+ETIME  Temps écoulé entre deux vecteurs d'horloge, en secondes.
+
+    Syntaxe
+       s = etime(t2,t1)
+
+    Exemples
+       t1 = clock;
+       pause(0.05);
+       ecoule = etime(clock, t1);
+       ecoule >= 0.04
+
+    Voir aussi TIC, TOC, CLOCK, CPUTIME.
+
+### cputime
+CPUTIME  Temps processeur consommé depuis le démarrage, en secondes.
+
+    Syntaxe
+       t = cputime
+
+    Exemples
+       t0 = cputime;
+       y = fft(randn(1,4096));
+       cputime - t0 >= 0
+
+    Voir aussi TIC, TOC, ETIME, PROFILE.
+
+### system
+SYSTEM  Exécute une commande du système.
+    [ETAT,SORTIE] = SYSTEM(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = system(commande)
+       [etat,sortie] = system(commande)
+
+    Exemples
+       [etat, sortie] = system('echo bonjour');
+       etat                           % 0
+       strtrim(sortie)
+
+    Voir aussi DOS, UNIX, GETENV, COMPUTER.
+
+### ispc
+ISPC  Tourne-t-on sous Windows.
+
+    Syntaxe
+       tf = ispc
+
+    Exemples
+       ispc
+       if ispc, sep = '\'; else, sep = '/'; end
+       isequal(sep, filesep)
+
+    Voir aussi ISUNIX, ISMAC, COMPUTER, FILESEP.
+
+### isunix
+ISUNIX  Tourne-t-on sous Linux ou macOS.
+
+    Syntaxe
+       tf = isunix
+
+    Exemples
+       isunix
+       ispc + isunix                  % l'un ou l'autre
+
+    Voir aussi ISPC, ISMAC, COMPUTER.
+
+### ismac
+ISMAC  Tourne-t-on sous macOS.
+
+    Syntaxe
+       tf = ismac
+
+    Exemples
+       ismac
+       if ismac, disp('macOS'); end
+
+    Voir aussi ISPC, ISUNIX, COMPUTER.
+
+### mexext
+MEXEXT  Extension des fichiers MEX de la plate-forme.
+
+    Syntaxe
+       e = mexext
+
+    Exemples
+       mexext
+       ischar(mexext)
+
+    Voir aussi COMPUTER, VERSION, MEX.
+
+### ver
+VER  Versions installées.
+    VER affiche la version du noyau et des toolboxes ; S = VER les rend en
+    structure.
+
+    Syntaxe
+       ver
+       s = ver
+
+    Exemples
+       s = ver;
+       isstruct(s)
+
+    Voir aussi VERSION, COMPUTER, WHICH.
+
+### doc
+DOC  Documentation d'une fonction.
+    DOC NOM affiche l'aide détaillée — la même que HELP, dans la
+    présentation longue.
+
+    Syntaxe
+       doc nom
+
+    Exemples
+       doc fft
+       doc('plot');
+
+    Voir aussi HELP, LOOKFOR, WHICH, TYPE.
+
+### lookfor
+LOOKFOR  Cherche un mot dans la première ligne d'aide des fonctions.
+    LOOKFOR MOT liste les fonctions dont le résumé contient le mot : c'est
+    ainsi qu'on trouve une fonction dont on ignore le nom.
+
+    Syntaxe
+       lookfor mot
+
+    Exemples
+       lookfor fourier
+       lookfor('inverse');
+
+    Voir aussi HELP, DOC, WHICH, EXIST.
+
+### dbstep
+DBSTEP  Avance d'une ligne dans le débogueur.
+    DBSTEP exécute la ligne courante et s'arrête à la suivante.
+    DBSTEP IN entre dans l'appel ; DBSTEP OUT en sort.
+
+    Syntaxe
+       dbstep
+       dbstep in
+       dbstep out
+
+    Exemples
+       % À l'invite « K>> » d'un point d'arrêt :
+       %   dbstep        % ligne suivante
+       %   dbstep in     % entrer dans l'appel
+       disp('dbstep s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBCONT, DBQUIT, DBSTACK, KEYBOARD.
+
+### dbcont
+DBCONT  Reprend l'exécution après un point d'arrêt.
+
+    Syntaxe
+       dbcont
+
+    Exemples
+       % À l'invite « K>> » : dbcont reprend jusqu'au prochain arrêt.
+       disp('dbcont s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBSTEP, DBQUIT.
+
+### dbquit
+DBQUIT  Abandonne le débogage et rend la main à l'invite.
+
+    Syntaxe
+       dbquit
+
+    Exemples
+       % À l'invite « K>> » : dbquit abandonne l'exécution en cours.
+       disp('dbquit s''emploie à l''arrêt');
+
+    Voir aussi DBSTOP, DBCONT, DBSTEP.
+
+### dbstack
+DBSTACK  Pile des appels.
+    DBSTACK affiche la pile ; S = DBSTACK la rend en structure, champs
+    file, name et line.
+
+    Syntaxe
+       dbstack
+       s = dbstack
+
+    Exemples
+       s = dbstack;
+       isstruct(s)
+
+    Voir aussi DBSTOP, DBSTEP, MFILENAME, ERROR.
+
+### keyboard
+KEYBOARD  Rend la main à l'utilisateur au milieu d'un programme.
+    KEYBOARD suspend l'exécution et donne l'invite « K>> » : on inspecte
+    et modifie les variables, puis DBCONT reprend.
+
+    Syntaxe
+       keyboard
+
+    Exemples
+       % Posé dans un script, « keyboard » ouvre l'invite « K>> ».
+       disp('keyboard suspend le programme là où il est écrit');
+
+    Voir aussi DBSTOP, DBCONT, DBQUIT, INPUT.
+
+### quit
+QUIT  Quitte MatLibre.
+    QUIT ferme la session ; EXIT en est le synonyme.
+
+    Syntaxe
+       quit
+       exit
+
+    Exemples
+       % quit                         % ferme la session
+
+    Voir aussi EXIT, CLEAR, DIARY.
+
+### rmdir
+RMDIR  Supprime un dossier.
+    RMDIR(D) supprime le dossier s'il est vide.
+    RMDIR(D,'s') le supprime avec son contenu.
+
+    Syntaxe
+       rmdir(dossier)
+       rmdir(dossier,'s')
+
+    Exemples
+       d = fullfile(tempdir,'aSupprimer');
+       mkdir(d);
+       rmdir(d);
+       isfolder(d)                    % 0
+
+    Voir aussi MKDIR, DELETE, ISFOLDER, DIR.
+
+### run
+RUN  Exécute un script désigné par son chemin.
+    RUN(CHEMIN) exécute le script dans l'espace de travail courant, même
+    si son dossier n'est pas sur le chemin de recherche — et même si son
+    nom n'est pas un identifiant valide.
+
+    Syntaxe
+       run(chemin)
+
+    Exemples
+       f = fullfile(tempdir,'monScript.m');
+       fid = fopen(f,'w'); fprintf(fid,'venuDuScript = 7;\n'); fclose(fid);
+       run(f);
+       venuDuScript                   % 7 — le script partage l'espace de travail
+       delete(f);
+
+    Voir aussi ADDPATH, EVAL, TYPE, WHICH.

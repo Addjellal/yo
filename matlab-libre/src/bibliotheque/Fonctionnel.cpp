@@ -334,14 +334,17 @@ FONCTION(fnEvalc) {
     INUTILISE
     exigerArguments(args, 1, 1, "evalc");
     std::ostringstream tampon;
+    // On restaure la sortie PRECEDENTE, et non la sortie par defaut : un
+    // evalc dans un evalc laissait sinon echapper l'affichage du plus
+    // interne vers la console.
+    std::ostream* precedente = &it.sortie();
     it.definirSortie(&tampon);
-    try {
-        it.executerTexte(args[0].versTexte(), "<evalc>");
-    } catch (...) {
-        it.definirSortie(nullptr);
-        throw;
-    }
-    it.definirSortie(nullptr);
+    struct Restaurer {
+        Interpreteur& moteur;
+        std::ostream* valeur;
+        ~Restaurer() { moteur.definirSortie(valeur); }
+    } restaurer{it, precedente};
+    it.executerTexte(args[0].versTexte(), "<evalc>");
     return {Valeur::texte(tampon.str())};
 }
 
@@ -352,10 +355,22 @@ FONCTION(fnEvalin) {
     // l'expression dans l'espace de travail visé, comme le fait MATLAB.
     std::string ou = args[0].versTexte();
     std::string texte = args[1].versTexte();
+    // Dans les deux cas — avec ou sans sortie — le texte s'evalue DANS
+    // l'espace de travail vise : c'est tout ce que evalin veut dire. Sans
+    // cela, « evalin('base','x') » lisait la portee courante, et ne
+    // trouvait pas ce qu'assignin venait d'ecrire dans la base.
+    Portee& cible = ou == "base" ? it.porteeBase() : it.porteeAppelante();
+    auto sauvegarde = std::make_shared<Portee>(cible);
+    GardePortee garde(it, sauvegarde);
+    struct Reporter {
+        Portee& cible;
+        const std::shared_ptr<Portee>& source;
+        // Les variables creees ou modifiees repartent dans l'espace vise.
+        ~Reporter() {
+            for (const auto& kv : source->variables) cible.variables[kv.first] = kv.second;
+        }
+    } reporter{cible, sauvegarde};
     if (nargout > 0) {
-        Portee& cible = ou == "base" ? it.porteeBase() : it.porteeAppelante();
-        auto sauvegarde = std::make_shared<Portee>(cible);
-        GardePortee garde(it, sauvegarde);
         Analyseur analyseur(Lexeur(texte).analyser(), "<evalin>");
         NoeudPtr bloc = analyseur.analyserBloc();
         if (!bloc || bloc->enfants.empty()) return {Valeur::vide()};
@@ -364,10 +379,7 @@ FONCTION(fnEvalin) {
             it.executerInstruction(bloc->enfants[k]);
         const NoeudPtr& expr = derniere->type == TypeN::Expression ? derniere->enfants[0]
                                                                    : derniere;
-        auto r = it.evaluerMulti(expr, std::max(nargout, 1));
-        // Les variables créées repartent dans l'espace de travail visé.
-        for (const auto& kv : sauvegarde->variables) cible.variables[kv.first] = kv.second;
-        return r;
+        return it.evaluerMulti(expr, std::max(nargout, 1));
     }
     it.executerTexte(texte, "<evalin>");
     return {};

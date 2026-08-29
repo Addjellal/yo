@@ -302,8 +302,11 @@ double simpsonAdaptatif(const std::function<double(double)>& f, double a, double
     double fd = f(d), fe = f(e);
     double gauche = (c - a) / 6 * (fa + 4 * fd + fm);
     double droite = (b - c) / 6 * (fm + 4 * fe + fb);
-    if (profondeur <= 0 || std::fabs(gauche + droite - total) <= 15 * eps)
-        return gauche + droite + (gauche + droite - total) / 15;
+    double ecart = gauche + droite - total;
+    // Un ecart qui n'est pas fini ne diminuera jamais : subdiviser
+    // dedoublerait le travail a chaque niveau, sans fin utile.
+    if (profondeur <= 0 || !std::isfinite(ecart) || std::fabs(ecart) <= 15 * eps)
+        return gauche + droite + (std::isfinite(ecart) ? ecart / 15 : 0.0);
     return simpsonAdaptatif(f, a, c, eps / 2, gauche, fa, fd, fm, profondeur - 1) +
            simpsonAdaptatif(f, c, b, eps / 2, droite, fm, fe, fb, profondeur - 1);
 }
@@ -323,9 +326,51 @@ FONCTION(fnIntegral) {
         std::swap(a, b);
         signe = -1.0;
     }
-    double fa = f(a), fb = f(b), fm = f(0.5 * (a + b));
+
+    // MATLAB accepte les bornes infinies. On ramene l'intervalle a un
+    // segment borne par changement de variable, et l'on rend zero aux
+    // extremites : c'est la que le jacobien explose, et c'est la que
+    // l'integrande doit s'annuler plus vite pour que l'integrale existe.
+    std::function<double(double)> g = f;
+    bool aInfini = std::isinf(a), bInfini = std::isinf(b);
+    if (aInfini && bInfini) {
+        // x = t/(1-t^2), t dans (-1,1).
+        g = [f](double t) {
+            double u = 1 - t * t;
+            if (std::fabs(u) < 1e-15) return 0.0;
+            double v = f(t / u) * (1 + t * t) / (u * u);
+            return std::isfinite(v) ? v : 0.0;
+        };
+        a = -1;
+        b = 1;
+    } else if (bInfini) {
+        // x = a + t/(1-t), t dans [0,1).
+        double base = a;
+        g = [f, base](double t) {
+            double u = 1 - t;
+            if (u < 1e-15) return 0.0;
+            double v = f(base + t / u) / (u * u);
+            return std::isfinite(v) ? v : 0.0;
+        };
+        a = 0;
+        b = 1;
+    } else if (aInfini) {
+        // x = b - t/(1-t), t dans [0,1) ; les deux changements de signe
+        // s'annulent, l'integrale garde son sens de parcours.
+        double base = b;
+        g = [f, base](double t) {
+            double u = 1 - t;
+            if (u < 1e-15) return 0.0;
+            double v = f(base - t / u) / (u * u);
+            return std::isfinite(v) ? v : 0.0;
+        };
+        a = 0;
+        b = 1;
+    }
+
+    double fa = g(a), fb = g(b), fm = g(0.5 * (a + b));
     double total = (b - a) / 6 * (fa + 4 * fm + fb);
-    double v = simpsonAdaptatif(f, a, b, 1e-10, total, fa, fm, fb, 50);
+    double v = simpsonAdaptatif(g, a, b, 1e-10, total, fa, fm, fb, 50);
     return {Valeur::scalaire(signe * v)};
 }
 

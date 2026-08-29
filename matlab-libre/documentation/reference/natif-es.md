@@ -5,7 +5,25 @@ Fonctions natives du groupe `es`.
 ## `MException`
 
 ```
-MException  Construit une exception.
+MEXCEPTION  Objet d'erreur : identifiant, message, pile.
+    E = MEXCEPTION(ID,FORMAT,...) construit l'erreur sans la lever.
+    THROW(E) la lève.
+
+    Syntaxe
+       e = MException(id,format,...)
+       throw(e)
+
+    Exemples
+       e = MException('Mon:id', 'valeur %d refusée', 7);
+       e.identifier
+       e.message
+       try
+           throw(e);
+       catch f
+           disp(f.message);
+       end
+
+    Voir aussi ERROR, THROW, RETHROW, TRY.
 ```
 
 ## `csvread`
@@ -509,7 +527,25 @@ printf  Ecrit du texte formate (sortie standard).
 ## `rethrow`
 
 ```
-rethrow  Relance une exception.
+RETHROW  Relance une erreur capturée.
+    RETHROW(E) relance l'erreur telle quelle, identifiant et message
+    compris : c'est ce qu'on fait après avoir nettoyé dans un catch.
+
+    Syntaxe
+       rethrow(e)
+
+    Exemples
+       try
+           try
+               error('Mon:id', 'raté');
+           catch e
+               rethrow(e);
+           end
+       catch f
+           disp(f.identifier);
+       end
+
+    Voir aussi ERROR, MEXCEPTION, THROW, LASTERR.
 ```
 
 ## `sprintf`
@@ -574,13 +610,37 @@ STR2DOUBLE  Convertit un texte en nombre.
 ## `str2num`
 
 ```
-str2num  Evalue un texte comme expression.
+STR2NUM  Évalue un texte comme une expression MATLAB.
+    STR2NUM(S) évalue S : « '[1 2 3]' » devient un vecteur. C'est puissant
+    et risqué — S est du code. Préférer STR2DOUBLE pour un simple nombre.
+
+    Syntaxe
+       a = str2num(s)
+
+    Exemples
+       str2num('[1 2 3]')
+       str2num('2*pi')
+       str2double('2*pi')                 % NaN : elle ne lit qu'un nombre
+
+    Voir aussi STR2DOUBLE, EVAL, SSCANF, MAT2STR.
 ```
 
 ## `throw`
 
 ```
-throw  Lance une exception.
+THROW  Lève une erreur construite avec MException.
+
+    Syntaxe
+       throw(e)
+
+    Exemples
+       try
+           throw(MException('Mon:id','raté'));
+       catch e
+           disp(e.identifier);
+       end
+
+    Voir aussi MEXCEPTION, ERROR, RETHROW.
 ```
 
 ## `warning`

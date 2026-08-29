@@ -5,13 +5,32 @@ Fonctions natives du groupe `creux`.
 ## `full`
 
 ```
-full  Matrice pleine correspondante.
+FULL  Convertit une matrice creuse en matrice pleine.
+
+    Syntaxe
+       A = full(S)
+
+    Exemples
+       S = speye(3);
+       full(S)
+       issparse(full(S))                  % 0
+
+    Voir aussi SPARSE, ISSPARSE, NNZ.
 ```
 
 ## `issparse`
 
 ```
-issparse  Le stockage est-il creux.
+ISSPARSE  La matrice est-elle creuse.
+
+    Syntaxe
+       tf = issparse(S)
+
+    Exemples
+       issparse(speye(3))                 % 1
+       issparse(eye(3))                   % 0
+
+    Voir aussi SPARSE, FULL, NNZ.
 ```
 
 ## `nnz`
@@ -49,7 +68,16 @@ NONZEROS  Les éléments non nuls, en colonne.
 ## `nzmax`
 
 ```
-nzmax  Place reservee aux non-nuls.
+NZMAX  Place réservée aux non-nuls d'une matrice creuse.
+
+    Syntaxe
+       n = nzmax(S)
+
+    Exemples
+       S = sparse([1 2], [1 2], [3 4]);
+       nzmax(S) >= nnz(S)
+
+    Voir aussi NNZ, SPARSE, SPALLOC.
 ```
 
 ## `spalloc`
@@ -61,23 +89,63 @@ spalloc  Matrice creuse vide.
 ## `sparse`
 
 ```
-sparse  Matrice creuse.
-  S = sparse(A) comprime une matrice pleine.
-  S = sparse(m,n) cree une matrice creuse de zeros.
-  S = sparse(i,j,v,m,n) construit depuis des triplets ; les
-  doublons s'additionnent.
+SPARSE  Matrice creuse : seuls les non-nuls sont rangés.
+    SPARSE(A) convertit une matrice pleine.
+    SPARSE(I,J,V,M,N) construit une matrice M par N dont l'élément
+    (I(k),J(k)) vaut V(k).
+
+    Une matrice creuse d'un million de lignes tient en mémoire tant qu'elle
+    a peu de non-nuls, et les opérations n'en parcourent que ceux-là.
+
+    Syntaxe
+       S = sparse(A)
+       S = sparse(i,j,v,m,n)
+
+    Exemples
+       S = sparse([1 3], [2 3], [5 7], 3, 3);
+       full(S)
+       nnz(S)                             % 2
+       issparse(S)
+
+    Voir aussi FULL, SPEYE, SPDIAGS, NNZ, ISSPARSE, SPY.
 ```
 
 ## `spdiags`
 
 ```
-spdiags  Matrice creuse par diagonales.
+SPDIAGS  Matrice creuse construite par diagonales.
+    SPDIAGS(B,D,M,N) place les colonnes de B sur les diagonales D d'une
+    matrice M par N.
+
+    Syntaxe
+       S = spdiags(B,d,m,n)
+
+    Exemples
+       n = 5;
+       e = ones(n,1);
+       L = spdiags([e -2*e e], [-1 0 1], n, n);   % le laplacien 1D
+       full(L(1:3,1:3))
+
+    Voir aussi SPARSE, DIAG, SPEYE, FULL.
 ```
 
 ## `speye`
 
 ```
-speye  Identite creuse.
+SPEYE  Identité creuse.
+    SPEYE(N) rend l'identité N par N sous forme creuse : N valeurs rangées
+    au lieu de N².
+
+    Syntaxe
+       S = speye(n)
+       S = speye(m,n)
+
+    Exemples
+       S = speye(4);
+       nnz(S)                             % 4
+       isequal(full(speye(3)), eye(3))
+
+    Voir aussi SPARSE, EYE, SPDIAGS, SPONES.
 ```
 
 ## `spones`
@@ -101,6 +169,19 @@ sprandn  Matrice creuse normale.
 ## `spy`
 
 ```
-spy  Trace le motif des non-nuls.
+SPY  Dessine la structure des non-nuls.
+    SPY(S) place un point à chaque non-nul : la forme de la matrice se lit
+    d'un coup d'oeil.
+
+    Syntaxe
+       spy(S)
+
+    Exemples
+       n = 20;
+       e = ones(n,1);
+       L = spdiags([e -2*e e], [-1 0 1], n, n);
+       spy(L);
+
+    Voir aussi SPARSE, NNZ, IMAGESC, PLOT.
 ```
 

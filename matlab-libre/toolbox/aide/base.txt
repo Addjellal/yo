@@ -1067,3 +1067,355 @@ ASSERT  Vérifie une condition, et lève une erreur sinon.
        end
 
     Voir aussi ERROR, VALIDATEATTRIBUTES, TRY, WARNING.
+
+### iscellstr
+ISCELLSTR  La cellule ne contient-elle que du texte.
+    ISCELLSTR(C) rend vrai si C est une cellule dont toutes les cases sont
+    des tableaux de caractères.
+
+    Syntaxe
+       tf = iscellstr(c)
+
+    Exemples
+       iscellstr({'a','bb'})          % 1
+       iscellstr({'a',1})             % 0
+       iscellstr('abc')               % 0 — ce n'est pas une cellule
+
+    Voir aussi ISCELL, ISCHAR, CELLSTR, ISSTRING.
+
+### isrow
+ISROW  La valeur est-elle un vecteur ligne, c'est-à-dire 1 par N.
+
+    Syntaxe
+       tf = isrow(x)
+
+    Exemples
+       isrow([1 2 3])                 % 1
+       isrow([1;2;3])                 % 0
+       x = 1:5;
+       if ~isrow(x), x = x'; end      % forcer une ligne
+
+    Voir aussi ISCOLUMN, ISVECTOR, ISSCALAR, SIZE.
+
+### iscolumn
+ISCOLUMN  La valeur est-elle un vecteur colonne, c'est-à-dire N par 1.
+
+    Syntaxe
+       tf = iscolumn(x)
+
+    Exemples
+       iscolumn([1;2;3])              % 1
+       iscolumn([1 2 3])              % 0
+       v = (1:5)';
+       iscolumn(v)
+
+    Voir aussi ISROW, ISVECTOR, SIZE.
+
+### ismatrix
+ISMATRIX  La valeur a-t-elle exactement deux dimensions.
+
+    Syntaxe
+       tf = ismatrix(x)
+
+    Exemples
+       ismatrix(magic(3))             % 1
+       ismatrix(5)                    % 1
+       ismatrix(ones(2,3,4))          % 0
+
+    Voir aussi ISVECTOR, ISSCALAR, NDIMS, SIZE.
+
+### isreal
+ISREAL  La valeur est-elle dépourvue de partie imaginaire.
+    ISREAL(X) rend faux dès que X a une partie imaginaire enregistrée,
+    même nulle : c'est le stockage qui compte, pas la valeur.
+
+    Syntaxe
+       tf = isreal(x)
+
+    Exemples
+       isreal(3)                      % 1
+       isreal(3 + 0i)                 % 0 — la partie imaginaire existe
+       isreal(abs(3 + 4i))            % 1
+       isreal(complex(1,0))           % 0
+
+    Voir aussi COMPLEX, REAL, IMAG, ISNUMERIC.
+
+### isfloat
+ISFLOAT  La valeur est-elle en virgule flottante.
+    ISFLOAT(X) rend vrai pour double et single.
+
+    Syntaxe
+       tf = isfloat(x)
+
+    Exemples
+       isfloat(1)                     % 1
+       isfloat(single(1))             % 1
+       isfloat(int8(1))               % 0
+
+    Voir aussi ISINTEGER, ISNUMERIC, ISA, CLASS.
+
+### isinteger
+ISINTEGER  La valeur est-elle d'une classe entière.
+    ISINTEGER(X) rend vrai pour int8..int64 et uint8..uint64, faux pour un
+    double qui se trouve valoir un entier.
+
+    Syntaxe
+       tf = isinteger(x)
+
+    Exemples
+       isinteger(int8(1))             % 1
+       isinteger(3)                   % 0 — un double vaut 3, sans être entier
+       mod(3,1) == 0                  % le test qu'on voulait sans doute
+
+    Voir aussi ISFLOAT, ISNUMERIC, ISA, INT32.
+
+### islogical
+ISLOGICAL  La valeur est-elle un tableau logique.
+
+    Syntaxe
+       tf = islogical(x)
+
+    Exemples
+       islogical(true)                % 1
+       islogical(1)                   % 0
+       islogical([1 2] > 1)           % 1
+
+    Voir aussi LOGICAL, TRUE, FALSE, ISNUMERIC.
+
+### isstring
+ISSTRING  La valeur est-elle un tableau de strings.
+    ISSTRING(X) distingue "abc", une string, de 'abc', un tableau de
+    caractères.
+
+    Syntaxe
+       tf = isstring(x)
+
+    Exemples
+       isstring("abc")                % 1
+       isstring('abc')                % 0
+       ischar('abc')                  % 1
+
+    Voir aussi ISCHAR, STRING, ISCELLSTR.
+
+### isequaln
+ISEQUALN  Comme ISEQUAL, mais NaN y est égal à NaN.
+    C'est ce qu'on veut pour comparer des données à trous.
+
+    Syntaxe
+       tf = isequaln(a,b)
+
+    Exemples
+       isequal([1 NaN], [1 NaN])      % 0
+       isequaln([1 NaN], [1 NaN])     % 1
+
+    Voir aussi ISEQUAL, ISNAN.
+
+### isvarname
+ISVARNAME  Le texte est-il un nom de variable valide.
+    Un nom valide commence par une lettre et ne contient que lettres,
+    chiffres et « _ ».
+
+    Syntaxe
+       tf = isvarname(s)
+
+    Exemples
+       isvarname('x1')                % 1
+       isvarname('1x')                % 0
+       isvarname('mon nom')           % 0
+
+    Voir aussi GENVARNAME, EXIST, FIELDNAMES.
+
+### isspace
+ISSPACE  Quels caractères sont des blancs.
+    ISSPACE(S) rend un booléen par caractère.
+
+    Syntaxe
+       tf = isspace(s)
+
+    Exemples
+       isspace('a b')                 % [0 1 0]
+       s = 'un  mot';
+       s(~isspace(s))                 % retirer tous les blancs
+
+    Voir aussi ISLETTER, ISDIGIT, STRTRIM, REGEXPREP.
+
+### isletter
+ISLETTER  Quels caractères sont des lettres.
+
+    Syntaxe
+       tf = isletter(s)
+
+    Exemples
+       isletter('a1b')                % [1 0 1]
+       s = 'ab12cd';
+       s(isletter(s))                 % 'abcd'
+
+    Voir aussi ISSPACE, ISDIGIT, ISVARNAME.
+
+### isdigit
+ISDIGIT  Quels caractères sont des chiffres.
+
+    Syntaxe
+       tf = isdigit(s)
+
+    Exemples
+       isdigit('a1b2')                % [0 1 0 1]
+       s = 'ref-2024';
+       str2double(s(isdigit(s)))      % 2024
+
+    Voir aussi ISLETTER, ISSPACE, STR2DOUBLE, REGEXP.
+
+### complex
+COMPLEX  Construit un nombre complexe.
+    COMPLEX(A,B) rend A + Bi, et force le stockage complexe même si B est
+    nul — c'est sa raison d'être.
+
+    Syntaxe
+       z = complex(a,b)
+       z = complex(a)
+
+    Exemples
+       complex(1,2)                   % 1 + 2i
+       isreal(complex(3,0))           % 0 — la partie imaginaire existe
+       isreal(3 + 0)                  % 1
+       abs(complex(3,4))              % 5
+
+    Voir aussi REAL, IMAG, ISREAL, ABS, ANGLE.
+
+### containers
+CONTAINERS.MAP  Table associative : une clé, une valeur.
+    M = CONTAINERS.MAP crée une table vide.
+    M = CONTAINERS.MAP(CLES,VALEURS) la remplit.
+    M(cle) lit, M(cle) = valeur écrit.
+
+    Les clés sont des textes ou des nombres ; les valeurs, n'importe quoi.
+
+    Syntaxe
+       m = containers.Map
+       m = containers.Map(cles,valeurs)
+       v = m(cle)
+       m(cle) = v
+
+    Exemples
+       m = containers.Map();
+       m('un') = 1;
+       m('deux') = 2;
+       m('un')                        % 1
+       isKey(m, 'trois')              % 0
+       keys(m)
+       values(m)
+       m.Count
+
+    Voir aussi ISKEY, KEYS, VALUES, REMOVE, STRUCT.
+
+### isKey
+ISKEY  La table contient-elle cette clé.
+
+    Syntaxe
+       tf = isKey(m,cle)
+
+    Exemples
+       m = containers.Map({'a','b'}, {1, 2});
+       isKey(m,'a')                   % 1
+       isKey(m,'z')                   % 0
+       if ~isKey(m,'z'), m('z') = 0; end
+
+    Voir aussi CONTAINERS, KEYS, VALUES, REMOVE.
+
+### keys
+KEYS  Les clés d'une table associative, triées.
+
+    Syntaxe
+       c = keys(m)
+
+    Exemples
+       m = containers.Map({'b','a'}, {2, 1});
+       keys(m)                        % {'a','b'} — triées
+       numel(keys(m))
+
+    Voir aussi VALUES, ISKEY, CONTAINERS, REMOVE.
+
+### values
+VALUES  Les valeurs d'une table associative, dans l'ordre des clés.
+
+    Syntaxe
+       c = values(m)
+       c = values(m,cles)
+
+    Exemples
+       m = containers.Map({'a','b'}, {1, 2});
+       values(m)
+       values(m, {'b'})
+
+    Voir aussi KEYS, ISKEY, CONTAINERS.
+
+### remove
+REMOVE  Retire une clé d'une table associative.
+
+    Syntaxe
+       m = remove(m,cle)
+
+    Exemples
+       m = containers.Map({'a','b'}, {1, 2});
+       remove(m,'a');
+       keys(m)
+
+    Voir aussi CONTAINERS, ISKEY, KEYS, RMFIELD.
+
+### struct2cell
+STRUCT2CELL  Les valeurs d'une structure, en cellule colonne.
+
+    Syntaxe
+       c = struct2cell(s)
+
+    Exemples
+       s = struct('a',1,'b','deux');
+       c = struct2cell(s);
+       numel(c)                       % 2
+       c{2}
+
+    Voir aussi CELL2STRUCT, FIELDNAMES, STRUCT, NUM2CELL.
+
+### cell2struct
+CELL2STRUCT  Construit une structure depuis une cellule et des noms.
+    CELL2STRUCT(C,CHAMPS,DIM) prend les valeurs de C et les noms de
+    CHAMPS.
+
+    Syntaxe
+       s = cell2struct(c,champs,dim)
+
+    Exemples
+       s = cell2struct({1; 'deux'}, {'a','b'}, 1);
+       s.a
+       s.b
+
+    Voir aussi STRUCT2CELL, STRUCT, FIELDNAMES.
+
+### orderfields
+ORDERFIELDS  Range les champs d'une structure par ordre alphabétique.
+
+    Syntaxe
+       t = orderfields(s)
+
+    Exemples
+       s = struct('b',2,'a',1);
+       t = orderfields(s);
+       fieldnames(t)
+
+    Voir aussi FIELDNAMES, RMFIELD, STRUCT, SORT.
+
+### mat2cell
+MAT2CELL  Découpe une matrice en blocs, dans une cellule.
+    MAT2CELL(A,LIGNES,COLONNES) découpe A selon les tailles données ; leur
+    somme doit faire la taille de A.
+
+    Syntaxe
+       C = mat2cell(A,lignes,colonnes)
+
+    Exemples
+       A = magic(4);
+       C = mat2cell(A, [2 2], [2 2]);
+       size(C)                        % [2 2]
+       C{1,1}
+
+    Voir aussi CELL2MAT, NUM2CELL, RESHAPE.

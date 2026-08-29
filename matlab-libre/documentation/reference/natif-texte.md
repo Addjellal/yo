@@ -38,7 +38,17 @@ CELLSTR  Convertit un tableau de caractères en cellule de textes.
 ## `compose`
 
 ```
-compose  Formate vers une string.
+COMPOSE  Formate vers une string.
+    COMPOSE(FORMAT,...) est SPRINTF, mais rend une string.
+
+    Syntaxe
+       s = compose(format,...)
+
+    Exemples
+       s = compose('%d points', 42);
+       isstring(s)
+
+    Voir aussi SPRINTF, STRING, NUM2STR.
 ```
 
 ## `contains`
@@ -103,25 +113,68 @@ fliplr_str  Inverse un texte.
 ## `iscellstr`
 
 ```
-iscellstr  Cellule de textes ?
+ISCELLSTR  La cellule ne contient-elle que du texte.
+    ISCELLSTR(C) rend vrai si C est une cellule dont toutes les cases sont
+    des tableaux de caractères.
+
+    Syntaxe
+       tf = iscellstr(c)
+
+    Exemples
+       iscellstr({'a','bb'})          % 1
+       iscellstr({'a',1})             % 0
+       iscellstr('abc')               % 0 — ce n'est pas une cellule
+
+    Voir aussi ISCELL, ISCHAR, CELLSTR, ISSTRING.
 ```
 
 ## `isdigit`
 
 ```
-isdigit  Caracteres numeriques.
+ISDIGIT  Quels caractères sont des chiffres.
+
+    Syntaxe
+       tf = isdigit(s)
+
+    Exemples
+       isdigit('a1b2')                % [0 1 0 1]
+       s = 'ref-2024';
+       str2double(s(isdigit(s)))      % 2024
+
+    Voir aussi ISLETTER, ISSPACE, STR2DOUBLE, REGEXP.
 ```
 
 ## `isletter`
 
 ```
-isletter  Caracteres alphabetiques.
+ISLETTER  Quels caractères sont des lettres.
+
+    Syntaxe
+       tf = isletter(s)
+
+    Exemples
+       isletter('a1b')                % [1 0 1]
+       s = 'ab12cd';
+       s(isletter(s))                 % 'abcd'
+
+    Voir aussi ISSPACE, ISDIGIT, ISVARNAME.
 ```
 
 ## `isspace`
 
 ```
-isspace  Caracteres blancs.
+ISSPACE  Quels caractères sont des blancs.
+    ISSPACE(S) rend un booléen par caractère.
+
+    Syntaxe
+       tf = isspace(s)
+
+    Exemples
+       isspace('a b')                 % [0 1 0]
+       s = 'un  mot';
+       s(~isspace(s))                 % retirer tous les blancs
+
+    Voir aussi ISLETTER, ISDIGIT, STRTRIM, REGEXPREP.
 ```
 
 ## `lower`
@@ -208,7 +261,18 @@ REGEXP  Cherche une expression régulière.
 ## `regexpi`
 
 ```
-regexpi  Expression reguliere, sans la casse.
+REGEXPI  Expression régulière, sans distinguer la casse.
+    REGEXPI(S,MOTIF,...) est REGEXP en ignorant majuscules et minuscules.
+
+    Syntaxe
+       k = regexpi(s,motif)
+       t = regexpi(s,motif,'match')
+
+    Exemples
+       regexpi('ABC', 'b')                % 2
+       regexpi('Bonjour Bonsoir', 'bon\w+', 'match')
+
+    Voir aussi REGEXP, REGEXPREP, STRCMPI, CONTAINS.
 ```
 
 ## `regexprep`
@@ -232,7 +296,17 @@ REGEXPREP  Remplace par expression régulière.
 ## `reverse`
 
 ```
-reverse  Inverse un texte.
+REVERSE  Renverse un texte.
+
+    Syntaxe
+       t = reverse(s)
+
+    Exemples
+       reverse('abc')                     % 'cba'
+       s = 'kayak';
+       strcmp(s, reverse(s))              % un palindrome
+
+    Voir aussi FLIP, FLIPLR, STRTRIM.
 ```
 
 ## `startsWith`
@@ -330,13 +404,37 @@ STRFIND  Cherche un motif dans un texte.
 ## `string`
 
 ```
-string  Vers tableau string.
+STRING  Convertit en tableau de strings.
+    STRING(X) rend une string : "abc" plutôt que 'abc'. Les strings se
+    concatènent avec « + », se comparent avec « == », et gardent leurs
+    blancs de fin — ce que les tableaux de caractères ne font pas.
+
+    Syntaxe
+       s = string(x)
+
+    Exemples
+       s = string('abc');
+       isstring(s)                        % 1
+       string(42)
+       string({'a','b'})
+
+    Voir aussi ISSTRING, CHAR, CELLSTR, STRLENGTH.
 ```
 
 ## `strip`
 
 ```
-strip  Retire les blancs aux deux bouts.
+STRIP  Retire les blancs aux deux bouts.
+    STRIP(S) est l'équivalent moderne de STRTRIM.
+
+    Syntaxe
+       t = strip(s)
+
+    Exemples
+       strip('  abc  ')
+       numel(strip('  a  '))              % 1
+
+    Voir aussi STRTRIM, DEBLANK, PAD.
 ```
 
 ## `strjoin`
@@ -362,7 +460,18 @@ STRJOIN  Assemble une cellule de chaînes.
 ## `strjust`
 
 ```
-strjust  Justifie un tableau de caracteres.
+STRJUST  Justifie les lignes d'un tableau de caractères.
+    STRJUST(S,'right') aligne à droite, 'left' à gauche, 'center' au
+    milieu.
+
+    Syntaxe
+       t = strjust(s,cote)
+
+    Exemples
+       s = char('un','trois');
+       size(strjust(s,'right'))
+
+    Voir aussi CHAR, STRTRIM, BLANKS, PAD.
 ```
 
 ## `strlength`
@@ -403,7 +512,16 @@ STRNCMP  Compare les N premiers caractères.
 ## `strncmpi`
 
 ```
-strncmpi  Comparaison des n premiers, sans la casse.
+STRNCMPI  Compare les N premiers caractères, sans distinguer la casse.
+
+    Syntaxe
+       tf = strncmpi(s1,s2,n)
+
+    Exemples
+       strncmpi('Bonjour','bonsoir',3)     % 1
+       strncmp('Bonjour','bonsoir',3)      % 0
+
+    Voir aussi STRNCMP, STRCMPI, STARTSWITH.
 ```
 
 ## `strrep`
@@ -483,19 +601,50 @@ STRTRIM  Retire les blancs de début et de fin.
 ## `strvcat`
 
 ```
-strvcat  Empile des textes en lignes.
+STRVCAT  Empile des textes en lignes, en ignorant les vides.
+    STRVCAT(S1,S2,...) complète d'espaces jusqu'à la plus longue ligne.
+    C'est CHAR, à ceci près que les textes vides sont sautés.
+
+    Syntaxe
+       s = strvcat(s1,s2,...)
+
+    Exemples
+       s = strvcat('un','deux');
+       size(s)                            % [2 4]
+       size(strvcat('a','','b'))          % 2 lignes : le vide est ignoré
+       size(char('a','','b'))             % 3 lignes : char le garde
+
+    Voir aussi CHAR, CELLSTR, STRJUST.
 ```
 
 ## `tolower`
 
 ```
-tolower  Passe en minuscules.
+TOLOWER  Synonyme de LOWER, hérité du C.
+
+    Syntaxe
+       t = tolower(s)
+
+    Exemples
+       tolower('ABC')                     % 'abc'
+       strcmp(tolower('Oui'), lower('Oui'))
+
+    Voir aussi LOWER, UPPER, TOUPPER.
 ```
 
 ## `toupper`
 
 ```
-toupper  Passe en majuscules.
+TOUPPER  Synonyme de UPPER, hérité du C.
+
+    Syntaxe
+       t = toupper(s)
+
+    Exemples
+       toupper('abc')                     % 'ABC'
+       strcmp(toupper('oui'), upper('oui'))
+
+    Voir aussi UPPER, LOWER, TOLOWER.
 ```
 
 ## `upper`
