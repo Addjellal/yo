@@ -29,4 +29,28 @@ std::string formater(const char* format, ...) {
     return std::string(tampon.data(), (std::size_t)n);
 }
 
+// --- interruption ---------------------------------------------------
+//
+// Le drapeau est propre au fil : chaque interpreteur pose le sien quand il
+// commence a executer. Un pointeur, et non un booleen, pour que le fil qui
+// demande l'arret ecrive dans le meme mot que celui qui le lit.
+namespace {
+thread_local std::atomic<bool>* drapeau = nullptr;
+}
+
+void poserDrapeauInterruption(std::atomic<bool>* nouveau) { drapeau = nouveau; }
+
+std::atomic<bool>* drapeauInterruption() { return drapeau; }
+
+void demanderInterruption() {
+    if (drapeau) drapeau->store(true, std::memory_order_relaxed);
+}
+
+void verifierInterruption() {
+    if (!drapeau) return;
+    if (!drapeau->load(std::memory_order_relaxed)) return;
+    drapeau->store(false, std::memory_order_relaxed);
+    throw InterruptionUtilisateur{};
+}
+
 }  // namespace matlibre

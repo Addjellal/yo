@@ -82,7 +82,9 @@ totalité.
    montre le code de chacune ligne à ligne, les lignes chaudes teintées.
    Le ruban se replie quand la fenêtre rétrécit, comme celui de MATLAB,
    plutôt que de rogner ses libellés. `doc nom`, ou F1 sur un mot, ouvre
-   le navigateur d'aide. Manquent encore : le concepteur d'applications,
+   le navigateur d'aide. Ctrl+C interrompt le calcul — y compris
+   l'affichage d'un tableau de dix millions d'éléments —, dans le bureau
+   comme dans la console. Manquent encore : le concepteur d'applications,
    l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
    (cellules exécutables mêlées au texte), la comparaison de fichiers, le
    repliement de code et la recherche multi-fichiers.

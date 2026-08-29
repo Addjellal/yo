@@ -6,6 +6,7 @@
 // attrapent la même chose ici.
 #pragma once
 
+#include <atomic>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -31,5 +32,26 @@ struct RuptureBoucle {};
 struct ContinuerBoucle {};
 struct RetourFonction {};
 struct DemandeSortie { int code = 0; };
+
+// --- interruption (Ctrl-C) --------------------------------------------
+//
+// Un calcul long doit pouvoir être coupé : sans cela, afficher un vecteur
+// de dix millions d'éléments fige la fenêtre pour de bon. Le fil qui
+// demande l'arrêt lève un drapeau ; l'interprète le lit aux points de
+// contrôle — avant chaque instruction, et pendant l'affichage d'un grand
+// tableau. Le drapeau est propre au fil : le bureau, la console et chaque
+// travailleur du pool parallèle ont le leur.
+//
+// L'interruption n'est PAS une ErreurMatlab : « try/catch » ne l'attrape
+// donc pas, exactement comme sous MATLAB.
+struct InterruptionUtilisateur {};
+
+void poserDrapeauInterruption(std::atomic<bool>* drapeau);
+std::atomic<bool>* drapeauInterruption();
+void demanderInterruption();
+
+// Lève InterruptionUtilisateur si l'arrêt a été demandé, et rabaisse le
+// drapeau : une interruption ne vaut que pour le calcul en cours.
+void verifierInterruption();
 
 }  // namespace matlibre

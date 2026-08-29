@@ -119,6 +119,9 @@ void FenetrePrincipale::construirePanneaux() {
     });
 
     console_ = new ConsoleCommandes;
+    // Ctrl-C dans la console coupe le calcul, comme sous MATLAB.
+    connect(console_, &ConsoleCommandes::interruptionDemandee, this,
+            &FenetrePrincipale::interrompre);
     connect(console_, &ConsoleCommandes::commandeValidee, this,
             [this](const QString& commande) {
                 historique_->addItem(commande);
@@ -135,8 +138,7 @@ void FenetrePrincipale::construirePanneaux() {
                     moteur_->evaluerALArret(commande);
                     return;
                 }
-                occupe_ = true;
-                etat_->setText(QStringLiteral("occupé"));
+                poserOccupe(true);
                 QMetaObject::invokeMethod(moteur_, "executer", Qt::QueuedConnection,
                                           Q_ARG(QString, commande));
             });
@@ -307,6 +309,11 @@ void FenetrePrincipale::construireMenus() {
                                               QStringLiteral("Exécuter la sélection"), this,
                                               &FenetrePrincipale::executerSelection);
     aSelection->setShortcut(Qt::Key_F9);
+    executer->addSeparator();
+    aArreter_ = executer->addAction(iconeDessinee("arret", 16),
+                                    QStringLiteral("&Interrompre le calcul"), this,
+                                    &FenetrePrincipale::interrompre);
+    aArreter_->setEnabled(false);
 
     // « Exécuter et chronométrer » vit dans le menu Exécuter, comme
     // « Run and Time » vit dans l'onglet Éditeur de MATLAB.
@@ -418,6 +425,10 @@ void FenetrePrincipale::construireMenus() {
                                 QStringLiteral("chronometre"),
                                 QStringLiteral("Mesurer le script ligne à ligne (Ctrl+F5)")),
             &QToolButton::clicked, this, &FenetrePrincipale::executerEtChronometrer);
+    bArreter_ = codeGroupe->ajouter(QStringLiteral("Arrêter"), QStringLiteral("arret"),
+                                    QStringLiteral("Interrompre le calcul (Ctrl+C)"));
+    bArreter_->setEnabled(false);
+    connect(bArreter_, &QToolButton::clicked, this, &FenetrePrincipale::interrompre);
     QToolButton* bEffacer = codeGroupe->ajouter(QStringLiteral("Effacer les\ncommandes"),
                                                 QStringLiteral("effacer"),
                                                 QStringLiteral("clc"));
@@ -595,8 +606,11 @@ void FenetrePrincipale::executerEtChronometrer() {
         editeur->enregistrerFichier(editeur->fichier());
     }
     if (occupe_) {
-        ecrire(QStringLiteral("MatLibre est occupé ; attendez la fin du calcul.\n"),
-               theme::avertissement().name());
+        if (!refusOccupeDit_) {
+            refusOccupeDit_ = true;
+            ecrire(QStringLiteral("MatLibre est occupé ; Ctrl+C interrompt le calcul.\n"),
+                   theme::avertissement().name());
+        }
         return;
     }
     QString chemin = QDir::toNativeSeparators(editeur->fichier());
@@ -606,7 +620,7 @@ void FenetrePrincipale::executerEtChronometrer() {
     console_->ecrireSortie(commande + QStringLiteral("\n"), theme::texte());
     historique_->addItem(commande);
     historique_->scrollToBottom();
-    occupe_ = true;
+    poserOccupe(true);
     etat_->setText(QStringLiteral("mesure en cours"));
     QMetaObject::invokeMethod(moteur_, "executerEtChronometrer", Qt::QueuedConnection,
                               Q_ARG(QString, commande));
@@ -682,8 +696,13 @@ void FenetrePrincipale::envoyer(const QString& commande) {
     // A l'arret, le bureau est « occupe » — le script tourne encore — mais
     // MATLAB accepte quand meme les commandes a l'invite « K>> ».
     if (occupe_ && !enPause_) {
-        ecrire(QStringLiteral("MatLibre est occupé ; attendez la fin du calcul.\n"),
-               theme::avertissement().name());
+        // Une fois suffit : repeter la phrase a chaque frappe n'apprend
+        // rien et noie la console.
+        if (!refusOccupeDit_) {
+            refusOccupeDit_ = true;
+            ecrire(QStringLiteral("MatLibre est occupé ; Ctrl+C interrompt le calcul.\n"),
+                   theme::avertissement().name());
+        }
         return;
     }
     console_->poserInvite();
@@ -697,14 +716,33 @@ void FenetrePrincipale::ecrire(const QString& texte, const QString& couleur) {
 }
 
 void FenetrePrincipale::surSortie(const QString& texte) {
+    ++paquetsSortie_;
     const bool estErreur = texte.contains(QStringLiteral("Error:")) ||
                            texte.startsWith(QStringLiteral("Error"));
     console_->ecrireSortie(texte, estErreur ? theme::erreur() : theme::texte());
 }
 
+// Ctrl-C, ou le bouton « Arrêter ». Le moteur ne fait que lever un
+// drapeau : le calcul s'arrête à son prochain point de contrôle — avant
+// une instruction, ou pendant l'affichage d'un grand tableau.
+void FenetrePrincipale::interrompre() {
+    if (!occupe_) return;
+    moteur_->demanderArret();
+    etat_->setText(QStringLiteral("interruption demandée…"));
+}
+
+// Un seul endroit décide de l'état « occupé » : le bandeau, le bouton
+// d'arrêt et le message le suivent.
+void FenetrePrincipale::poserOccupe(bool occupe) {
+    occupe_ = occupe;
+    if (!occupe) refusOccupeDit_ = false;
+    etat_->setText(occupe ? QStringLiteral("occupé") : QStringLiteral("prêt"));
+    if (bArreter_) bArreter_->setEnabled(occupe);
+    if (aArreter_) aArreter_->setEnabled(occupe);
+}
+
 void FenetrePrincipale::surCommandeFinie() {
-    occupe_ = false;
-    etat_->setText(QStringLiteral("prêt"));
+    poserOccupe(false);
     console_->poserInvite();
 }
 
@@ -892,7 +930,7 @@ void FenetrePrincipale::surArret(const QString& fichier, int ligne) {
 void FenetrePrincipale::surReprise() {
     enPause_ = false;
     activerCommandesDebogueur(false);
-    etat_->setText(occupe_ ? QStringLiteral("occupé") : QStringLiteral("prêt"));
+    poserOccupe(occupe_);
     for (int k = 0; k < onglets_->count(); ++k)
         if (auto* e = qobject_cast<Editeur*>(onglets_->widget(k))) e->definirLigneArret(0);
 }

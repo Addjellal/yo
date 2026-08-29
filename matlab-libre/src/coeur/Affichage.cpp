@@ -151,12 +151,18 @@ static std::string rendreNumerique(const Valeur& v, Format format, int largeurEc
     if (v.estComplexe()) largeurCellule = 2 * p.largeur + 2;
     int parPaquet = std::max(1, (largeurEcran - 3) / std::max(1, largeurCellule));
     for (int debut = 0; debut < c; debut += parPaquet) {
+        verifierInterruption();
         int fin = std::min(c, debut + parPaquet);
         if (c > parPaquet) {
             if (fin - debut == 1) sortie += formater("  Column %d\n\n", debut + 1);
             else sortie += formater("  Columns %d through %d\n\n", debut + 1, fin);
         }
         for (int i = 0; i < l; ++i) {
+            // Ctrl-C : un tableau de dix millions d'elements demande des
+            // minutes a mettre en forme. On regarde toutes les mille
+            // lignes — assez souvent pour repondre, assez rare pour ne
+            // rien couter.
+            if ((i & 1023) == 0) verifierInterruption();
             std::string ligne;
             for (int j = debut; j < fin; ++j) {
                 std::size_t k = (std::size_t)i + (std::size_t)j * l;
@@ -209,6 +215,7 @@ std::string descriptionCourte(const Valeur& v) {
 }
 
 static std::string rendreCellule(const Valeur& v, int format, bool compact, int largeur) {
+    verifierInterruption();
     if (v.estVide()) return "  {}\n";
     int l = v.nlignes(), c = v.ncolonnes();
     std::string sortie = "  {\n";
@@ -238,6 +245,7 @@ static std::string rendreCellule(const Valeur& v, int format, bool compact, int 
 }
 
 static std::string rendreStructure(const Valeur& v, int format, bool compact, int largeur) {
+    verifierInterruption();
     std::string sortie;
     if (v.nelem() != 1) {
         sortie += formater("  %s struct array with fields:\n\n", texteDims(v.dims).c_str());

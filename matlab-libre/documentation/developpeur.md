@@ -14,12 +14,23 @@ prennent le relais, sans que rien ne manque.
 Le `Makefile` de la racine enveloppe ces deux commandes :
 
 ```bash
-make          # compile
-make test     # compile et exécute toute la suite
-make doc      # régénère documentation/reference/
-make windows  # vérifie que la compilation pour Windows passe
-make install  # installe dans /usr/local (variable PREFIX)
+make              # compile
+make test         # compile et exécute toute la suite
+make doc          # régénère documentation/reference/
+make windows      # vérifie que la compilation pour Windows passe
+make incrementale # recompile sans effacer l'arbre
+make install      # installe dans /usr/local (variable PREFIX)
 ```
+
+Chaque compilation part d'un arbre neuf : `build/` est effacé avant d'être
+reconfiguré. Un arbre garde ce qu'on croit avoir enlevé — le `.o` d'un
+fichier supprimé, une option de cache qui n'existe plus, une bibliothèque
+trouvée la fois d'avant et disparue depuis. Effacer coûte quelques
+minutes ; chercher pourquoi « ça ne compile que chez moi » en coûte
+davantage. Pour itérer en boucle courte : `make incrementale`, ou
+n'importe quelle cible avec `NEUF=0`.
+
+Les binaires sortent dans `build/bin`, les bibliothèques dans `build/lib`.
 
 ## Compiler pour Windows
 
@@ -31,6 +42,7 @@ d'un programme externe.
 ```powershell
 .\outils\construire.ps1                    # Release
 .\outils\construire.ps1 -Tests             # compile puis teste
+.\outils\construire.ps1 -Incrementale      # garde l'arbre
 .\outils\construire.ps1 -Generateur "MinGW Makefiles"
 ```
 
@@ -101,8 +113,8 @@ chemin de recherche au démarrage, sans autre déclaration.
 ## Tests
 
 ```bash
-./build/matlibre_tests                       # 57 vérifications C++
-./build/matlibre tests/scripts/test_langage.m
+./build/bin/matlibre_tests                       # 57 vérifications C++
+./build/bin/matlibre tests/scripts/test_langage.m
 ctest --test-dir build --output-on-failure   # tout
 ```
 
@@ -121,7 +133,7 @@ MATLAB, et `assert(observé, attendu, tolérance)` comme Octave.
 ## Régénérer la référence
 
 ```bash
-./build/matlibre outils/genererReference.m
+./build/bin/matlibre outils/genererReference.m
 ```
 
 Le générateur est écrit dans le langage qu'il documente : s'il tourne, une

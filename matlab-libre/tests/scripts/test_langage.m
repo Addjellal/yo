@@ -202,6 +202,52 @@ for kGarde = 1:2
 end
 assert(kGarde == 2);
 
+%% ------------------------------------------ « for » sur un intervalle
+% MATLAB parcourt un intervalle sans le construire : « for k = 1:1e9 »
+% n'alloue rien. Ici, construire le vecteur demandait seize gigaoctets,
+% et le programme se faisait tuer avant d'entrer dans la boucle.
+compte = 0;
+for k = 1:2000000000
+    compte = compte + 1;
+    if compte >= 1000
+        break
+    end
+end
+assert(compte == 1000);
+
+% Le parcours reste celui de MATLAB, dans tous les cas de figure.
+sommeCroissante = 0;
+for k = 1:10, sommeCroissante = sommeCroissante + k; end
+assert(sommeCroissante == 55);
+sommePas = 0;
+for k = 10:-2:1, sommePas = sommePas + k; end
+assert(sommePas == 30);
+sommeFractionnaire = 0;
+for k = 0:0.25:1, sommeFractionnaire = sommeFractionnaire + k; end
+assert(abs(sommeFractionnaire - 2.5) < 1e-12);
+toursVides = 0;
+for k = 1:0, toursVides = toursVides + 1; end
+assert(toursVides == 0);
+sommeContinue = 0;
+for k = 1:10
+    if mod(k, 2) == 0
+        continue
+    end
+    sommeContinue = sommeContinue + k;
+end
+assert(sommeContinue == 25);
+% La variable de boucle garde sa derniere valeur, et reste un double.
+for kFinal = 1:5, end
+assert(kFinal == 5);
+assert(strcmp(class(kFinal), 'double'));
+% Une boucle sur une matrice parcourt toujours ses colonnes.
+colonnes = 0;
+for colonne = magic(3)
+    assert(isequal(size(colonne), [3 1]));
+    colonnes = colonnes + 1;
+end
+assert(colonnes == 3);
+
 %% ---------------------------------------------------- eval avec sortie
 % MATLAB : « eval(texte) » execute ; « x = eval(texte) » evalue une
 % expression et rend sa valeur, jusqu'a nargout valeurs.

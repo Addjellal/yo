@@ -6,6 +6,7 @@
 // d'affichage, générateur aléatoire, dernier message d'erreur).
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <iosfwd>
 #include <map>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include "matlibre/Arbre.h"
+#include "matlibre/Erreur.h"
 #include "matlibre/Deboguage.h"
 #include "matlibre/Valeur.h"
 
@@ -141,6 +143,15 @@ public:
     // --- sorties ---
     // Posé par une interface graphique : « clc » l'appelle au lieu
     // d'écrire une séquence ANSI que la fenêtre afficherait telle quelle.
+    // Ctrl-C : le fil graphique, ou le gestionnaire de signal de la
+    // console, leve ce drapeau ; l'interprete s'arrete au prochain point
+    // de controle. Il est atomique parce que deux fils y touchent.
+    std::atomic<bool> interruption{false};
+    // A appeler dans le fil qui execute, pour que « verifierInterruption »
+    // lise le bon drapeau.
+    void armerInterruption() { poserDrapeauInterruption(&interruption); }
+    void demanderArret() { interruption.store(true, std::memory_order_relaxed); }
+
     std::function<void()> effacerEcran;
     // « doc nom » : le bureau ouvre son navigateur d'aide. Sans crochet,
     // « doc » imprime la documentation dans la console.

@@ -11,6 +11,7 @@
 #include "Moteur.h"
 
 class QAction;
+class QToolButton;
 class QListWidget;
 class QPlainTextEdit;
 class QTabWidget;
@@ -38,6 +39,10 @@ public:
     // depuis un test, sans ouvrir de fenêtre.
     bool occupe() const { return occupe_; }
     bool enPause() const { return enPause_; }
+    // Nombre de paquets de sortie recus du fil de calcul. Publie pour
+    // qu'un test verifie que la sortie arrive groupee : un signal par
+    // ligne noyait le fil graphique.
+    int paquetsSortie() const { return paquetsSortie_; }
     void envoyerCommande(const QString& commande) { envoyer(commande); }
 
 protected:
@@ -54,6 +59,7 @@ private slots:
     void montrerProfileur();
     void montrerAide(const QString& nom);
     void aideSurMotCourant();
+    void interrompre();
     void surProfil(const QVector<LigneProfil>& entrees, double duree);
     void surSortie(const QString& texte);
     void surEspaceTravail(const QVector<LigneEspaceTravail>& lignes);
@@ -94,6 +100,7 @@ private:
     FenetreProfileur* profileur();
     FenetreAide* fenetreAide();
     void rafraichirListeFichiers();
+    void poserOccupe(bool occupe);
 
     QThread* filMoteur_;
     Moteur* moteur_;
@@ -125,4 +132,10 @@ private:
     QLabel* etiquetteDossier_;
     QString dossierCourant_;
     bool occupe_ = false;
+    // « MatLibre est occupé » se dit une fois par calcul, pas a chaque
+    // frappe : repeter la phrase noyait la console.
+    bool refusOccupeDit_ = false;
+    int paquetsSortie_ = 0;
+    QAction* aArreter_ = nullptr;
+    QToolButton* bArreter_ = nullptr;
 };

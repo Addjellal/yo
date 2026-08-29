@@ -17,6 +17,9 @@
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Console.h"
 #include "matlibre/Erreur.h"
+#include <atomic>
+#include <csignal>
+
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Version.h"
 
@@ -95,8 +98,22 @@ void consoleDebogueur(Interpreteur& it, const std::string& fichier, int ligne) {
     }
 }
 
+// Ctrl-C : le gestionnaire de signal ne peut presque rien faire — pas
+// d'allocation, pas d'affichage. Il lève le drapeau de l'interprète, qui
+// s'arrête à son prochain point de contrôle. Le pointeur est global parce
+// qu'un gestionnaire de signal ne reçoit rien d'autre.
+std::atomic<bool>* drapeauConsole = nullptr;
+
+extern "C" void surSignalInterruption(int) {
+    if (drapeauConsole) drapeauConsole->store(true, std::memory_order_relaxed);
+}
+
 int executerFluxInteractif(Interpreteur& it) {
     it.modeInteractif = true;
+    // Ctrl-C coupe le calcul et rend l'invite, au lieu de tuer le
+    // programme : c'est ce que fait MATLAB.
+    drapeauConsole = &it.interruption;
+    std::signal(SIGINT, surSignalInterruption);
     std::string tampon;
     std::string ligne;
     std::cout << "MatLibre " << MATLIBRE_VERSION
@@ -115,6 +132,9 @@ int executerFluxInteractif(Interpreteur& it) {
         if (sansBlanc.size() >= 3 && sansBlanc.substr(sansBlanc.size() - 3) == "...") continue;
         try {
             it.executerTexte(tampon, "<console>");
+            tampon.clear();
+        } catch (const InterruptionUtilisateur&) {
+            std::cout << "\nOperation terminated by user.\n";
             tampon.clear();
         } catch (const ErreurMatlab& e) {
             // Un bloc incomplet (if/for/function) attend la suite.

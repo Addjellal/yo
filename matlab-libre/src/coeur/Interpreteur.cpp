@@ -681,6 +681,10 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
 // ------------------------------------------------------------- exécution
 
 void Interpreteur::executerTexte(const std::string& source, const std::string& origine) {
+    // Le drapeau d'interruption est propre au fil : on l'arme ici, dans
+    // celui qui va executer, pour que « verifierInterruption » lise bien
+    // le notre.
+    armerInterruption();
     UniteCompilee u = compiler(source, origine);
     for (auto& c : u.classes) {
         relierClasse(c, u.fonctions);
@@ -711,6 +715,7 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
 }
 
 void Interpreteur::executerFichier(const std::string& fichier) {
+    armerInterruption();
     std::string source = lireFichier(fichier);
     // mfilename doit pouvoir nommer le fichier en cours d'exécution.
     std::string precedent = fichierCourant;
@@ -871,6 +876,10 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
 
 void Interpreteur::executerInstruction(const NoeudPtr& n) {
     if (!n) return;
+    // Ctrl-C : un test de booléen atomique par instruction. C'est ce qui
+    // permet de sortir d'une boucle qui ne finit pas, et de couper
+    // l'affichage d'un tableau énorme.
+    verifierInterruption();
     // Profileur et débogueur : deux tests de booléen quand ils sont éteints.
     if (profil.actif) profil.compterLigne(fichierExecute(), n->ligne);
     if ((debogueur.actif || debogueur.action != ActionDebogueur::Continuer) &&
@@ -1038,6 +1047,45 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
             return;
         }
         case TypeN::Pour: {
+            // « for k = 1:1e9 » ne doit rien allouer : MATLAB parcourt un
+            // intervalle sans le construire, et c'est ce qui permet
+            // d'ecrire une boucle d'un milliard de tours. Construire le
+            // vecteur demanderait ici seize gigaoctets — et le programme
+            // se faisait tuer par le systeme avant meme d'entrer dans la
+            // boucle.
+            if (!n->drapeau && n->enfants[0] && n->enfants[0]->type == TypeN::Plage &&
+                n->cibles.size() == 1 && n->cibles[0]->type == TypeN::Ident) {
+                Valeur d = evaluer(n->enfants[0]->enfants[0]);
+                Valeur p = n->enfants[0]->enfants[1] ? evaluer(n->enfants[0]->enfants[1])
+                                                     : Valeur::scalaire(1.0);
+                Valeur f = evaluer(n->enfants[0]->enfants[2]);
+                if (d.estScalaire() && p.estScalaire() && f.estScalaire() &&
+                    d.estNumerique() && p.estNumerique() && f.estNumerique() &&
+                    !d.estComplexe() && !p.estComplexe() && !f.estComplexe()) {
+                    double a = d.re[0], pas = p.re[0], b = f.re[0];
+                    // Le nombre de tours, calcule comme le fait MATLAB :
+                    // une seule multiplication, pas une accumulation qui
+                    // deriverait sur les flottants.
+                    long long tours = 0;
+                    if (pas != 0 && std::isfinite(a) && std::isfinite(pas) &&
+                        std::isfinite(b))
+                        tours = (long long)std::floor((b - a) / pas + 1e-10) + 1;
+                    if (tours < 0) tours = 0;
+                    const std::string& nomBoucle = n->cibles[0]->texte;
+                    for (long long j = 0; j < tours; ++j) {
+                        verifierInterruption();
+                        ecrireVariable(nomBoucle, Valeur::scalaire(a + (double)j * pas));
+                        try {
+                            executerBloc(n->enfants[1]);
+                        } catch (RuptureBoucle&) {
+                            break;
+                        } catch (ContinuerBoucle&) {
+                            continue;
+                        }
+                    }
+                    return;
+                }
+            }
             Valeur plage = evaluer(n->enfants[0]);
             std::size_t colonnes;
             int lignes;

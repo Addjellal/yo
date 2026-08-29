@@ -557,6 +557,70 @@ int main(int argc, char** argv) {
         QCoreApplication::processEvents();
     }
 
+    // --- Ctrl-C ------------------------------------------------------------
+    //
+    // Un calcul long doit pouvoir etre coupe : sans cela, afficher un
+    // vecteur de dix millions d'elements fige la fenetre pour de bon.
+    {
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        fenetre.envoyerCommande(
+            QStringLiteral("interminable = 0; for k = 1:2000000000, "
+                           "interminable = interminable + 1; end"));
+        verifier(attendre([&] { return fenetre.occupe(); }, 8000),
+                 "le calcul interminable est parti");
+        // Pendant qu'il tourne, l'interface repond encore.
+        int tours = 0;
+        QElapsedTimer patience;
+        patience.start();
+        while (patience.elapsed() < 200) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            ++tours;
+        }
+        verifier(tours > 5, "l'interface repond pendant le calcul interminable");
+        QMetaObject::invokeMethod(&fenetre, "interrompre");
+        verifier(attendre([&] { return !fenetre.occupe(); }, 15000),
+                 "Ctrl-C coupe le calcul et rend l'invite");
+        verifier(console->toPlainText().contains(
+                     QLatin1String("Operation terminated by user")),
+                 "le message est celui de MATLAB");
+        // Et le bureau repart : l'interpreteur n'est pas casse.
+        envoyer(fenetre, QStringLiteral("apresArret = 7;"));
+        verifier(attendre([&] { return ligneDe(QStringLiteral("apresArret")) >= 0; }),
+                 "on peut retravailler juste apres");
+
+        // Une sortie abondante ne doit pas noyer le fil graphique : elle
+        // arrive groupee, pas un signal par ligne. Sans cela la fenetre
+        // cessait de repondre, et Windows proposait de la tuer.
+        int paquetsAvant = fenetre.paquetsSortie();
+        fenetre.envoyerCommande(
+            QStringLiteral("for k = 1:20000, fprintf('ligne %d\\n', k); end"));
+        verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                 "la sortie abondante finit");
+        int paquets = fenetre.paquetsSortie() - paquetsAvant;
+        // Vingt mille lignes doivent arriver en quelques centaines de
+        // paquets, pas en vingt mille signaux : c'est la file du fil
+        // graphique qui debordait, et la fenetre cessait de repondre.
+        std::printf("  (paquets recus : %d pour 20000 lignes)\n", paquets);
+        verifier(paquets > 0 && paquets < 500,
+                 "vingt mille lignes arrivent groupees, pas une par signal");
+        verifier(console->toPlainText().contains(QLatin1String("ligne 20000")),
+                 "et rien n'est perdu en chemin");
+
+        // L'affichage d'un tableau enorme se coupe aussi : c'est la que le
+        // bureau se figeait.
+        fenetre.envoyerCommande(QStringLiteral("enorme = 0:0.0001:100;"));
+        verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                 "le grand vecteur est construit");
+        fenetre.envoyerCommande(QStringLiteral("enorme"));
+        verifier(attendre([&] { return fenetre.occupe(); }, 8000),
+                 "son affichage est parti");
+        QMetaObject::invokeMethod(&fenetre, "interrompre");
+        verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                 "l'affichage d'un tableau enorme se coupe");
+        envoyer(fenetre, QStringLiteral("clear enorme interminable"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+    }
+
     // --- le navigateur d'aide ----------------------------------------------
     //
     // MATLAB n'imprime pas « doc fft » dans la console : il ouvre une

@@ -149,6 +149,8 @@ signals:
 
 private:
     void publierEtat();
+    // Purge complète de la sortie en attente vers le fil graphique.
+    void viderSortie();
 
     // Le fil de calcul dort ici pendant un arrêt, et se réveille sur une
     // reprise ou sur une expression à évaluer.
@@ -169,6 +171,9 @@ private:
 
     std::unique_ptr<matlibre::Interpreteur> it_;
     std::unique_ptr<std::streambuf> tampon_;
+    // Le meme tampon, dans son type concret : la purge complete n'est pas
+    // dans l'interface de std::streambuf.
+    std::streambuf* tamponConcret_ = nullptr;
     std::unique_ptr<std::ostream> flux_;
     std::atomic<bool> occupe_{false};
 };

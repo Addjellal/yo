@@ -6,7 +6,7 @@ Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
 ```bash
 make            # compile — aucune dépendance obligatoire
 make test       # 57 verifications C++ + 7 suites en langage MATLAB
-./build/matlibre
+./build/bin/matlibre
 ```
 
 ```matlab
@@ -79,21 +79,21 @@ d'être lue avant de s'appuyer sur ce projet.
 
 ```bash
 make
-./build/matlibre-bureau                         # le bureau : une fenêtre native
-./build/matlibre                                # session interactive
-./build/matlibre exemples/01-prise-en-main.m
-./build/matlibre exemples/03-asservissement.m   # écrit une figure SVG
+./build/bin/matlibre-bureau                         # le bureau : une fenêtre native
+./build/bin/matlibre                                # session interactive
+./build/bin/matlibre exemples/01-prise-en-main.m
+./build/bin/matlibre exemples/03-asservissement.m   # écrit une figure SVG
 ```
 
 Sous Windows :
 
 ```powershell
 .\outils\construire.ps1        # Qt est cherche tout seul dans C:\Qt
-.\build\matlibre-bureau.exe
+.\build\bin\matlibre-bureau.exe
 ```
 
 Si Qt est ailleurs, ou si plusieurs versions cohabitent, indiquez-la :
-`.\outils\construire.ps1 -Propre -Qt C:\Qt\6.11.1\mingw_64`. Le dossier
+`.\outils\construire.ps1 -Qt C:\Qt\6.11.1\mingw_64`. Le dossier
 attendu est celui du compilateur — `mingw_64` avec MinGW, `msvc2022_64`
 avec Visual Studio ; les mélanger ne produit rien de bon. Les DLL de Qt
 sont déposées à côté de l'exécutable pendant la compilation, il n'y a donc
@@ -112,7 +112,8 @@ Le calcul tourne dans un fil à part : la fenêtre ne se fige pas, même sur
 un tracé d'un million de points. Le débogueur est là : un clic dans la
 marge pose un point d'arrêt, l'exécution s'y arrête, l'invite passe à
 `K>>` — on lit et on modifie les variables sans reprendre —, puis pas à
-pas (F10), entrer (F11), sortir (Maj+F11), continuer (Maj+F5). « Exécuter
+pas (F10), entrer (F11), sortir (Maj+F11), continuer (Maj+F5). Ctrl+C
+interrompt un calcul qui n'en finit pas, comme sous MATLAB. « Exécuter
 et chronométrer » (Ctrl+F5) ouvre le profileur : les fonctions classées
 par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
 la seule dépendance, et elle reste facultative — sans Qt, tout le reste se

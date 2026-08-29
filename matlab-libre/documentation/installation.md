@@ -13,11 +13,21 @@ formats d'image.
 ./outils/construire.sh                    # compile dans build/
 ./outils/construire.sh --tests            # compile puis exécute les tests
 ./outils/construire.sh --debug            # avec les assertions
+./outils/construire.sh --incrementale     # garde l'arbre au lieu de l'effacer
 ./outils/construire.sh --installer /usr/local
 ./outils/construire.sh --paquet           # archives dans build/
 ```
 
-Ou directement :
+Chaque compilation part d'un arbre neuf : `build/` est effacé avant d'être
+reconfiguré. Un arbre garde ce qu'on croit avoir enlevé — le `.o` d'un
+fichier supprimé, une option de cache qui n'existe plus, une bibliothèque
+trouvée la fois d'avant et disparue depuis —, et les pannes qui en
+découlent n'arrivent que chez celui qui n'a pas effacé. Pour itérer sans
+tout refaire : `--incrementale`, ou `make incrementale`.
+
+Les binaires sortent dans `build/bin`, les bibliothèques dans `build/lib`.
+
+Ou directement, sans passer par le script :
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -29,6 +39,7 @@ cmake --build build -j
 ```powershell
 .\outils\construire.ps1                   # Visual Studio ou MinGW
 .\outils\construire.ps1 -Tests
+.\outils\construire.ps1 -Incrementale     # garde l'arbre au lieu de l'effacer
 .\outils\construire.ps1 -Installer C:\MatLibre
 .\outils\construire.ps1 -Paquet
 ```

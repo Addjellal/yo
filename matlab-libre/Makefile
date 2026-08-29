@@ -9,8 +9,17 @@ TYPE  ?= Release
 PREFIX ?= /usr/local
 JOBS  ?= $(shell nproc 2>/dev/null || echo 4)
 
-.PHONY: aide tout configurer test tests doc install propre reference exemples \
-        windows ninja generateurs bureau
+# Une compilation part d'un arbre neuf : l'ancien est efface avant de
+# reconfigurer. C'est ce qui evite les objets orphelins — le .o d'un
+# fichier source supprime, un cache CMake qui garde une option qui
+# n'existe plus, une bibliotheque trouvee la derniere fois et disparue
+# depuis — et les pannes qui n'arrivent que chez celui qui n'a pas
+# efface. Pour iterer sans tout refaire : « make incrementale », ou
+# n'importe quelle cible avec « NEUF=0 ».
+NEUF ?= 1
+
+.PHONY: aide tout incrementale configurer test tests doc install propre \
+        reference exemples windows ninja generateurs bureau
 
 aide:
 	@echo "make tout        compile l'interpreteur"
@@ -21,13 +30,23 @@ aide:
 	@echo "make windows     verifie la compilation pour Windows (MinGW)"
 	@echo "make ninja       verifie la compilation avec le generateur Ninja"
 	@echo "make generateurs verifie Ninja et MinGW : les deux autres chemins"
+	@echo "make incrementale  recompile sans effacer l'arbre (iteration)"
 	@echo "make install     installe dans $(PREFIX)"
-	@echo "make propre      efface $(BUILD)"
+	@echo "make propre      efface les arbres de construction"
+	@echo ""
+	@echo "Chaque compilation efface $(BUILD) avant de reconfigurer."
+	@echo "Pour la garder : NEUF=0, par exemple « make test NEUF=0 »"
 
 tout: configurer
 	@cmake --build $(BUILD) -j $(JOBS)
 
+# Recompiler sans effacer : ce qu'on veut en boucle courte, quand on sait
+# que rien n'a bouge du cote de la configuration.
+incrementale:
+	@$(MAKE) --no-print-directory tout NEUF=0
+
 configurer:
+	@if [ "$(NEUF)" != "0" ]; then rm -rf $(BUILD); fi
 	@cmake -S . -B $(BUILD) -DCMAKE_BUILD_TYPE=$(TYPE) > /dev/null
 
 test: tout
@@ -74,6 +93,7 @@ windows:
 	  echo "MinGW-w64 absent : apt install g++-mingw-w64-x86-64"; \
 	  exit 0; \
 	fi; \
+	if [ "$(NEUF)" != "0" ]; then rm -rf build-windows; fi && \
 	cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=outils/mingw.cmake \
 	      -DCMAKE_BUILD_TYPE=Release > /dev/null && \
 	cmake --build build-windows -j $(JOBS) && \

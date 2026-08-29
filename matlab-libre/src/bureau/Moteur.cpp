@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QStringList>
 #include <ostream>
+#include <chrono>
 #include <cstring>
 #include <functional>
 #include <sstream>
@@ -25,35 +26,68 @@ namespace {
 // Tampon de sortie qui pousse le texte vers le fil graphique au fil de
 // l'eau : une boucle qui affiche pendant une minute se voit avancer, au
 // lieu de tout livrer à la fin.
+//
+// Mais pas à chaque ligne. Afficher un vecteur de dix millions
+// d'éléments postait dix millions de signaux dans la file du fil
+// graphique : la fenêtre ne répondait plus, et Windows proposait de tuer
+// le programme. On groupe donc : on envoie quand il y a de quoi remplir
+// un paquet, ou quand assez de temps a passé pour qu'on voie avancer.
 class TamponVersSignal : public std::streambuf {
 public:
-    explicit TamponVersSignal(Moteur* moteur) : moteur_(moteur) {}
+    explicit TamponVersSignal(Moteur* moteur)
+        : moteur_(moteur), dernier_(std::chrono::steady_clock::now()) {}
 
 protected:
     int overflow(int c) override {
         if (c == EOF) return 0;
         attente_ += (char)c;
-        if (c == '\n' || attente_.size() > 4096) vider();
+        if (c == '\n') viderSiCestLeMoment();
+        else if (attente_.size() >= TAILLE_PAQUET) vider();
         return c;
     }
     std::streamsize xsputn(const char* s, std::streamsize n) override {
         attente_.append(s, (std::size_t)n);
-        if (attente_.find('\n') != std::string::npos || attente_.size() > 4096) vider();
+        if (attente_.size() >= TAILLE_PAQUET) vider();
+        else if (attente_.find('\n') != std::string::npos) viderSiCestLeMoment();
         return n;
     }
+    // « fprintf » demande une purge a chaque appel : c'est ce qu'il faut
+    // pour qu'une ligne isolee paraisse tout de suite, mais pas pour que
+    // vingt mille lignes fassent vingt mille signaux. On respecte donc le
+    // meme delai — une ligne apres un silence part immediatement, une
+    // rafale se groupe.
     int sync() override {
-        vider();
+        viderSiCestLeMoment();
         return 0;
     }
 
+public:
+    // A la fin d'une commande : plus rien ne doit rester en attente.
+    void forcer() { vider(); }
+
 private:
+    // Assez gros pour que dix millions de lignes tiennent en quelques
+    // centaines de signaux ; assez petit pour que la console reste vive.
+    static const std::size_t TAILLE_PAQUET = 16384;
+    static const int DELAI_MS = 40;
+
+    void viderSiCestLeMoment() {
+        auto maintenant = std::chrono::steady_clock::now();
+        auto ecoule = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          maintenant - dernier_).count();
+        if (ecoule >= DELAI_MS) vider();
+    }
+
     void vider() {
         if (attente_.empty()) return;
-        emit moteur_->sortieProduite(QString::fromUtf8(attente_.c_str()));
+        emit moteur_->sortieProduite(QString::fromUtf8(attente_.data(),
+                                                       (int)attente_.size()));
         attente_.clear();
+        dernier_ = std::chrono::steady_clock::now();
     }
     Moteur* moteur_;
     std::string attente_;
+    std::chrono::steady_clock::time_point dernier_;
 };
 
 // Empreinte du contenu d'une figure : ce qui, en changeant, doit faire
@@ -205,11 +239,20 @@ QString resumeValeur(Interpreteur& it, const Valeur& v) {
 
 Moteur::Moteur(QObject* parent) : QObject(parent) {}
 
+// Purge complete : tout ce qui attend part vers le fil graphique. A
+// appeler quand une commande finit, pas au milieu d'une rafale.
+void Moteur::viderSortie() {
+    if (flux_) flux_->flush();
+    if (tamponConcret_) static_cast<TamponVersSignal*>(tamponConcret_)->forcer();
+}
+
 Moteur::~Moteur() = default;
 
 void Moteur::demarrer() {
     it_ = std::make_unique<Interpreteur>();
-    tampon_ = std::make_unique<TamponVersSignal>(this);
+    auto tampon = std::make_unique<TamponVersSignal>(this);
+    tamponConcret_ = tampon.get();
+    tampon_ = std::move(tampon);
     flux_ = std::make_unique<std::ostream>(tampon_.get());
     it_->installerBibliotheque();
     it_->definirSortie(flux_.get());
@@ -230,7 +273,7 @@ void Moteur::demarrer() {
         // le fil graphique n'a ainsi rien a lire dans une structure qui
         // pourrait bouger.
         publierEtat();
-        flux_->flush();
+        viderSortie();
         emit arreteSur(QString::fromStdString(fichier), ligne);
         int action = (int)ActionDebogueur::Continuer;
         for (;;) {
@@ -252,6 +295,8 @@ void Moteur::demarrer() {
             // l'execution s'est arretee, sans la reprendre.
             try {
                 moteur.executerTexte(expression.toStdString(), "<K>>");
+            } catch (const InterruptionUtilisateur&) {
+                *flux_ << "Operation terminated by user.\n";
             } catch (const ErreurMatlab& e) {
                 *flux_ << "Error: " << e.message << "\n";
             } catch (const std::exception& e) {
@@ -261,7 +306,7 @@ void Moteur::demarrer() {
                 // d'evenements Qt, qui n'accepte aucune exception.
                 *flux_ << "Error: interrompu.\n";
             }
-            flux_->flush();
+            viderSortie();
             publierEtat();
         }
         // C'est ici, dans le fil de calcul, que l'action prend effet :
@@ -282,10 +327,11 @@ void Moteur::demarrer() {
     publierEtat();
 }
 
+// Ctrl-C. Appelee depuis le fil graphique pendant que le calcul tourne :
+// elle ne fait que lever un drapeau atomique, que le fil de calcul lit a
+// son prochain point de controle.
 void Moteur::demanderArret() {
-    // L'interpréteur n'a pas encore de point d'interruption : le bouton
-    // reste donc grisé tant que ce n'est pas implémenté, plutôt que de
-    // promettre un arrêt qui n'arrive pas.
+    if (it_) it_->demanderArret();
 }
 
 void Moteur::executer(const QString& texte) {
@@ -293,6 +339,9 @@ void Moteur::executer(const QString& texte) {
     occupe_ = true;
     try {
         it_->executerTexte(texte.toStdString(), "<bureau>");
+    } catch (const InterruptionUtilisateur&) {
+        // Le message de MATLAB, mot pour mot.
+        *flux_ << "Operation terminated by user.\n";
     } catch (const ErreurMatlab& e) {
         *flux_ << "Error: " << e.message << "\n";
     } catch (const std::exception& e) {
@@ -301,7 +350,7 @@ void Moteur::executer(const QString& texte) {
         // Idem : une exception qui traverserait Qt abattrait le bureau.
         *flux_ << "Error: interrompu.\n";
     }
-    flux_->flush();
+    viderSortie();
     occupe_ = false;
     publierEtat();
     emit commandeFinie();
@@ -319,6 +368,8 @@ void Moteur::executerEtChronometrer(const QString& texte) {
     chrono.start();
     try {
         it_->executerTexte(texte.toStdString(), "<bureau>");
+    } catch (const InterruptionUtilisateur&) {
+        *flux_ << "Operation terminated by user.\n";
     } catch (const ErreurMatlab& e) {
         *flux_ << "Error: " << e.message << "\n";
     } catch (const std::exception& e) {
@@ -328,7 +379,7 @@ void Moteur::executerEtChronometrer(const QString& texte) {
     }
     double duree = chrono.nsecsElapsed() / 1e9;
     it_->profil.arreter();
-    flux_->flush();
+    viderSortie();
 
     QVector<LigneProfil> entrees;
     for (const auto& e : it_->profil.classees()) {

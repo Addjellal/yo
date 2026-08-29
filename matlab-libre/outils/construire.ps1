@@ -3,11 +3,15 @@
 #   .\outils\construire.ps1                    compile en Release
 #   .\outils\construire.ps1 -Debogage          compile avec les assertions
 #   .\outils\construire.ps1 -Tests             compile puis teste
-#   .\outils\construire.ps1 -Propre            repart d'un dossier vide
+#   .\outils\construire.ps1 -Incrementale      garde l'arbre au lieu de l'effacer
 #   .\outils\construire.ps1 -Installer C:\MatLibre
 #   .\outils\construire.ps1 -Paquet            fabrique l'archive ZIP
 #   .\outils\construire.ps1 -Generateur "MinGW Makefiles"
 #   .\outils\construire.ps1 -Qt C:\Qt\6.11.1\mingw_64
+#
+# Chaque compilation part d'un arbre neuf : l'ancien est effacé avant de
+# reconfigurer. C'est ce qui évite les objets orphelins et les caches
+# périmés. « -Incrementale » garde l'arbre, pour itérer.
 #
 # Visual Studio 2019 ou plus récent, ou MinGW, et CMake. Aucune autre
 # dépendance n'est requise.
@@ -20,6 +24,7 @@ param(
     [switch]$Tests,
     [switch]$Paquet,
     [switch]$Propre,
+    [switch]$Incrementale,
     [string]$Installer = "",
     [string]$Dossier = "",
     [string]$Generateur = "",
@@ -47,14 +52,19 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
     Write-Error "cmake est introuvable. Installez-le, puis relancez."
 }
 
-# Le cache de CMake garde le type de construction et le générateur du
-# premier appel. Un cache qui ne correspond plus à ce qu'on demande donne
-# des erreurs qui n'ont aucun rapport avec la cause — le générateur Ninja,
-# par exemple, s'arrête sur « expected newline, got lexing error » quand le
-# type de construction contient un « $ ». On le relit et on efface le
-# dossier plutôt que de compiler sur une configuration périmée.
+# On part d'un arbre neuf. Un arbre garde ce qu'on croit avoir enlevé : le
+# .obj d'un fichier supprimé, une option de cache qui n'existe plus, une
+# bibliothèque trouvée la fois d'avant et disparue depuis. Le cache garde
+# aussi le type de construction et le générateur du premier appel, et un
+# cache qui ne correspond plus donne des erreurs sans rapport avec la
+# cause — le générateur Ninja, par exemple, s'arrête sur « expected
+# newline, got lexing error » quand le type contient un « $ ».
+#
+# « -Incrementale » garde l'arbre ; on l'efface alors quand même si le
+# type ou le générateur ont changé.
 $cache = Join-Path $Dossier "CMakeCache.txt"
-$aEffacer = $Propre.IsPresent
+$aEffacer = -not $Incrementale.IsPresent
+if ($Propre.IsPresent) { $aEffacer = $true }
 if ((-not $aEffacer) -and (Test-Path $cache)) {
     $lignes = Get-Content $cache
     $typeCache = ($lignes | Where-Object { $_ -like "CMAKE_BUILD_TYPE:*=*" } |
@@ -71,6 +81,7 @@ if ((-not $aEffacer) -and (Test-Path $cache)) {
     }
 }
 if ($aEffacer -and (Test-Path $Dossier)) {
+    Write-Host "MatLibre : l'arbre precedent est efface ($Dossier)"
     Remove-Item -Recurse -Force $Dossier
 }
 

@@ -6,6 +6,11 @@
 #   ./outils/construire.sh --tests         compile puis exécute les tests
 #   ./outils/construire.sh --installer /usr/local
 #   ./outils/construire.sh --paquet        fabrique les archives dans build/
+#   ./outils/construire.sh --incrementale  garde l'arbre au lieu de l'effacer
+#
+# Chaque compilation part d'un arbre neuf : l'ancien est effacé avant de
+# reconfigurer. C'est ce qui évite les objets orphelins et les caches
+# périmés. « --incrementale » garde l'arbre, pour itérer.
 #
 # Aucune dépendance n'est requise : un compilateur C++17 et CMake suffisent.
 # LAPACK, BLAS et FFTW sont utilisés s'ils sont trouvés.
@@ -17,6 +22,7 @@ type=Release
 tests=0
 paquet=0
 prefixe=""
+neuf=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -25,8 +31,9 @@ while [ $# -gt 0 ]; do
         --paquet)    paquet=1; shift ;;
         --installer) prefixe="${2:-/usr/local}"; shift 2 ;;
         --dossier)   dossier="$2"; shift 2 ;;
+        --incrementale) neuf=0; shift ;;
         -h|--help)
-            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "option inconnue : $1" >&2; exit 2 ;;
     esac
@@ -39,10 +46,18 @@ fi
 
 taches=$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4) )
 
-# Le cache de CMake garde le type de construction du premier appel. Un
-# cache qui ne correspond plus donne des erreurs sans rapport avec la
-# cause : on efface plutot que de compiler sur une configuration perimee.
-if [ -f "$dossier/CMakeCache.txt" ]; then
+# On part d'un arbre neuf. Un arbre garde ce qu'on croit avoir enleve :
+# le .o d'un fichier supprime, une option de cache qui n'existe plus, une
+# bibliotheque trouvee la fois d'avant et disparue depuis. Effacer coute
+# quelques minutes ; chercher pourquoi « ca ne compile que chez moi » en
+# coute davantage.
+if [ "$neuf" -eq 1 ] && [ -d "$dossier" ]; then
+    echo "MatLibre : l'arbre precedent est efface ($dossier)"
+    rm -rf "$dossier"
+elif [ -f "$dossier/CMakeCache.txt" ]; then
+    # En incremental, on efface quand meme si le type de construction a
+    # change : le cache garde celui du premier appel, et un cache qui ne
+    # correspond plus donne des erreurs sans rapport avec la cause.
     typeCache=$(sed -n 's/^CMAKE_BUILD_TYPE:[^=]*=//p' "$dossier/CMakeCache.txt" | head -1)
     if [ -n "$typeCache" ] && [ "$typeCache" != "$type" ]; then
         echo "MatLibre : le cache est en « $typeCache », on demande « $type » : dossier efface"
