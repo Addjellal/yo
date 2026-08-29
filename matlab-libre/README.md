@@ -5,7 +5,7 @@ Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 20 suites en langage MATLAB
+make test       # 57 verifications C++ + 21 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -43,7 +43,7 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **617 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **621 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
@@ -63,12 +63,16 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Une aide qui ne ment pas** : 489 fonctions ont leur fiche — syntaxe,
+- **Une aide qui ne ment pas** : 491 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
   taille fixe, tous les types entiers avec leur saturation, le produit
   matriciel et le contrôle de flux, en C qui n'alloue rien.
+- **Les fichiers MAT** : `save` et `load` écrivent et relisent le format
+  de MathWorks — niveaux 4 et 5, compressés ou non, quel que soit l'ordre
+  des octets. Le décompresseur DEFLATE est écrit ici même : rien à
+  installer, et les fichiers vont dans les deux sens avec MATLAB.
 - **Un rendu graphique** en SVG, écrit à la main : courbes, barres,
   nuages, tiges, escaliers, images, sous-graphes, légendes.
 - **Aucune dépendance obligatoire.** LAPACK, BLAS et FFTW sont utilisés
@@ -81,7 +85,8 @@ graphique complet. Ce dépôt en couvre une part utile, pas la totalité :
 pas d'éditeur de schéma Simulink (les modèles se décrivent en appelant
 `add_block` et `add_line`, mais la simulation est réelle), pas d'App
 Designer, génération de code C restreinte aux scalaires et aux matrices de
-taille fixe, pas de fichiers MAT. La liste complète des écarts est dans
+taille fixe, pas d'objets ni de poignées de fonction dans les fichiers
+MAT. La liste complète des écarts est dans
 [`documentation/couverture.md`](documentation/couverture.md) — elle vaut
 d'être lue avant de s'appuyer sur ce projet.
 
@@ -185,7 +190,7 @@ make test
 ```
 
 57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 20 suites en langage MATLAB dont une qui
+et les messages d'erreur ; 21 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du

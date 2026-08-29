@@ -20,7 +20,9 @@ des jetons, les jetons un arbre, l'arbre est parcouru.
        ├── Operations.cpp      opérateurs et expansion implicite
        ├── AlgebreLineaire.cpp LU, QR, Cholesky, SVD, valeurs propres
        ├── Affichage.cpp       mise en forme des résultats
-       └── bibliotheque/       617 fonctions natives, par domaine
+       ├── FichierMat.cpp      le format MAT, lecture et écriture
+       ├── Compression.cpp     DEFLATE, pour les MAT compressés
+       └── bibliotheque/       621 fonctions natives, par domaine
 ```
 
 ## Le type unique

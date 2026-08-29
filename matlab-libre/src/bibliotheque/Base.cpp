@@ -1,6 +1,7 @@
 // Base.cpp — création de tableaux, tailles, classes et conversions.
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -807,6 +808,83 @@ Valeur convertirVers(const Valeur& v, Classe c) {
     return appliquerClasse(base, c);
 }
 
+// La largeur en octets d'une classe, telle que « typecast » la voit.
+std::size_t octetsDe(Classe c) {
+    switch (c) {
+        case Classe::Logique: case Classe::Int8: case Classe::UInt8: return 1;
+        case Classe::Caractere: case Classe::Int16: case Classe::UInt16: return 2;
+        case Classe::Simple: case Classe::Int32: case Classe::UInt32: return 4;
+        default: return 8;
+    }
+}
+
+// Ecrit un element dans sa representation binaire, et le relit dans une
+// autre classe : c'est tout ce que fait « typecast ». Les octets ne sont
+// pas convertis, ils sont relus autrement.
+void versOctets(double x, Classe c, unsigned char* p) {
+    switch (c) {
+        case Classe::Logique: case Classe::UInt8: { std::uint8_t v = (std::uint8_t)x; std::memcpy(p, &v, 1); break; }
+        case Classe::Int8: { std::int8_t v = (std::int8_t)x; std::memcpy(p, &v, 1); break; }
+        case Classe::Caractere: case Classe::UInt16: { std::uint16_t v = (std::uint16_t)x; std::memcpy(p, &v, 2); break; }
+        case Classe::Int16: { std::int16_t v = (std::int16_t)x; std::memcpy(p, &v, 2); break; }
+        case Classe::UInt32: { std::uint32_t v = (std::uint32_t)x; std::memcpy(p, &v, 4); break; }
+        case Classe::Int32: { std::int32_t v = (std::int32_t)x; std::memcpy(p, &v, 4); break; }
+        case Classe::Simple: { float v = (float)x; std::memcpy(p, &v, 4); break; }
+        case Classe::UInt64: { std::uint64_t v = (std::uint64_t)x; std::memcpy(p, &v, 8); break; }
+        case Classe::Int64: { std::int64_t v = (std::int64_t)x; std::memcpy(p, &v, 8); break; }
+        default: { double v = x; std::memcpy(p, &v, 8); break; }
+    }
+}
+
+double depuisOctets(const unsigned char* p, Classe c) {
+    switch (c) {
+        case Classe::Logique: case Classe::UInt8: { std::uint8_t v; std::memcpy(&v, p, 1); return (double)v; }
+        case Classe::Int8: { std::int8_t v; std::memcpy(&v, p, 1); return (double)v; }
+        case Classe::Caractere: case Classe::UInt16: { std::uint16_t v; std::memcpy(&v, p, 2); return (double)v; }
+        case Classe::Int16: { std::int16_t v; std::memcpy(&v, p, 2); return (double)v; }
+        case Classe::UInt32: { std::uint32_t v; std::memcpy(&v, p, 4); return (double)v; }
+        case Classe::Int32: { std::int32_t v; std::memcpy(&v, p, 4); return (double)v; }
+        case Classe::Simple: { float v; std::memcpy(&v, p, 4); return (double)v; }
+        case Classe::UInt64: { std::uint64_t v; std::memcpy(&v, p, 8); return (double)v; }
+        case Classe::Int64: { std::int64_t v; std::memcpy(&v, p, 8); return (double)v; }
+        default: { double v; std::memcpy(&v, p, 8); return v; }
+    }
+}
+
+FONCTION(fnTypecast) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "typecast");
+    exigerNumerique(args[0], "typecast");
+    const Valeur& v = args[0];
+    if (v.estComplexe())
+        erreur("MATLAB:typecast:complexInput", "TYPECAST does not support complex values.");
+    bool trouve = false;
+    Classe cible = classeDepuisNom(args[1].versTexte(), &trouve);
+    if (!trouve || cible == Classe::Cellule || cible == Classe::Structure)
+        erreur("MATLAB:typecast:invalidOutputClass",
+               "The output class of TYPECAST must be a numeric or logical class.");
+    std::size_t largeurEntree = octetsDe(v.classe);
+    std::size_t largeurSortie = octetsDe(cible);
+    std::size_t total = v.nelem() * largeurEntree;
+    if (total % largeurSortie != 0)
+        erreur("MATLAB:typecast:notEnoughInputElements",
+               formater("The number of bytes of the input (%zu) is not a multiple of the "
+                        "size of the output class (%zu).", total, largeurSortie));
+    std::vector<unsigned char> octets(total);
+    for (std::size_t k = 0; k < v.nelem(); ++k)
+        versOctets(v.re[k], v.classe, octets.data() + k * largeurEntree);
+    std::size_t n = total / largeurSortie;
+    // MATLAB rend une colonne quand l'entree en est une, une ligne sinon.
+    // Un scalaire n'est pas une colonne a ce titre : « typecast(uint32(1),
+    // 'uint8') » rend 1x4.
+    bool colonne = v.dims.size() == 2 && v.dims[1] == 1 && v.dims[0] > 1;
+    Valeur r = colonne ? Valeur::matrice((int)n, 1) : Valeur::matrice(1, (int)n);
+    for (std::size_t k = 0; k < n; ++k)
+        r.re[k] = depuisOctets(octets.data() + k * largeurSortie, cible);
+    r.classe = cible;
+    return {r};
+}
+
 FONCTION(fnCast) {
     INUTILISE
     exigerArguments(args, 2, 3, "cast");
@@ -1071,6 +1149,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("isa", fnIsa, "base", "isa  Teste l'appartenance a une classe.");
     it.enregistrer("cast", fnCast, "base", "cast  Conversion vers une classe nommee.");
     it.enregistrer("double", fnConversion<Classe::Double>, "base", "double  Conversion double.");
+    it.enregistrer("typecast", fnTypecast, "base",
+                   "typecast  Relit les octets d'une valeur dans une autre classe.");
     it.enregistrer("single", fnConversion<Classe::Simple>, "base", "single  Conversion single.");
     // « float » n'existe pas sous MATLAB — « single » est le nom de la
     // simple precision. On l'accepte comme synonyme, parce que c'est le

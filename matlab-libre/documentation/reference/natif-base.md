@@ -1533,6 +1533,12 @@ TRUE  Tableau logique de vrais.
     Voir aussi FALSE, LOGICAL, ANY, ALL.
 ```
 
+## `typecast`
+
+```
+typecast  Relit les octets d'une valeur dans une autre classe.
+```
+
 ## `uint16`
 
 ```

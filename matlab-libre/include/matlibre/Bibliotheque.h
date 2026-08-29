@@ -22,6 +22,7 @@ void enregistrerTexte(Interpreteur& it);
 void enregistrerStructures(Interpreteur& it);
 void enregistrerFonctionnel(Interpreteur& it);
 void enregistrerEntreeSortie(Interpreteur& it);
+void enregistrerMat(Interpreteur& it);
 void enregistrerAlgebre(Interpreteur& it);
 void enregistrerStatistiques(Interpreteur& it);
 void enregistrerSignal(Interpreteur& it);

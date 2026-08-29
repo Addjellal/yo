@@ -74,7 +74,10 @@ foreach(config ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${CONFIG_MAJ} ${CMAKE_BINARY_DIR}/lib)
 endforeach()
 
-file(GLOB_RECURSE MATLIBRE_SOURCES
+# CONFIGURE_DEPENDS : sans lui, un fichier ajoute n'entre dans la
+# compilation qu'apres un « cmake » explicite, et l'edition de liens
+# echoue sur un symbole qu'on vient pourtant d'ecrire.
+file(GLOB_RECURSE MATLIBRE_SOURCES CONFIGURE_DEPENDS
      ${CMAKE_CURRENT_SOURCE_DIR}/src/coeur/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/src/bibliotheque/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/src/graphique/*.cpp
@@ -362,13 +365,15 @@ include(CPack)
 # --- tests ------------------------------------------------------------------
 if(MATLIBRE_TESTS)
   enable_testing()
-  file(GLOB MATLIBRE_TESTS_CPP ${CMAKE_CURRENT_SOURCE_DIR}/tests/coeur/*.cpp)
+  file(GLOB MATLIBRE_TESTS_CPP CONFIGURE_DEPENDS
+       ${CMAKE_CURRENT_SOURCE_DIR}/tests/coeur/*.cpp)
   if(MATLIBRE_TESTS_CPP)
     add_executable(matlibre_tests ${MATLIBRE_TESTS_CPP})
     target_link_libraries(matlibre_tests PRIVATE matlibre_coeur)
     add_test(NAME unitaires COMMAND matlibre_tests)
   endif()
-  file(GLOB MATLIBRE_TESTS_M ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
+  file(GLOB MATLIBRE_TESTS_M CONFIGURE_DEPENDS
+       ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/test_*.m)
   foreach(fichier ${MATLIBRE_TESTS_M})
     get_filename_component(nom ${fichier} NAME_WE)
     add_test(NAME langage_${nom}

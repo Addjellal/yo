@@ -22,6 +22,7 @@ void Interpreteur::installerBibliotheque() {
     enregistrerStructures(*this);
     enregistrerFonctionnel(*this);
     enregistrerEntreeSortie(*this);
+    enregistrerMat(*this);
     enregistrerAlgebre(*this);
     enregistrerStatistiques(*this);
     enregistrerSignal(*this);

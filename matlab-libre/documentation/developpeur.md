@@ -67,8 +67,9 @@ l'édition de liens.
 
 ```
 include/matlibre/   en-têtes publics du cœur
-src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre
-src/bibliotheque/   les 617 fonctions natives, par domaine
+src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre,
+                    format MAT et décompression DEFLATE
+src/bibliotheque/   les 621 fonctions natives, par domaine
 src/graphique/      rendu SVG
 src/console/        l'exécutable
 toolbox/            53 toolboxes écrites en langage MATLAB

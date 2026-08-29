@@ -163,7 +163,7 @@ public:
 // « operator[] » qui refuse au lieu de lire hors du tableau.
 //
 // C'est un contrôle par accès — une comparaison d'entiers —, et il vaut
-// pour les six cent dix-sept fonctions à la fois. Sans lui, chacune
+// pour toutes les fonctions natives à la fois. Sans lui, chacune
 // devait penser à vérifier son arité : « asin() » sans argument lisait
 // args[0] d'un vecteur vide et le programme tombait, là où MATLAB dit
 // « Not enough input arguments ».

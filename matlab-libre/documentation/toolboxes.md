@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
-Les fonctions natives — 617, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 621, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

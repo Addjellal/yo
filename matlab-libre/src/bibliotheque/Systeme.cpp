@@ -401,6 +401,31 @@ FONCTION(fnWho) {
 
 FONCTION(fnWhos) {
     INUTILISE
+    // « whos -file f.mat » regarde dans un fichier au lieu de l'espace de
+    // travail : c'est ce qu'on fait avant de charger, pour savoir ce qu'on
+    // va charger.
+    for (std::size_t k = 0; k + 1 < args.size(); ++k) {
+        std::string mot = args[k].versTexte();
+        for (char& c : mot) c = (char)std::tolower((unsigned char)c);
+        if (mot != "-file") continue;
+        std::vector<Valeur> a = {args[k + 1]};
+        std::vector<Valeur> r = it.appeler("matlibre_contenu_mat", a, 1);
+        if (r.empty()) return {};
+        const Valeur& inventaire = r[0];
+        std::size_t n = inventaire.nelem();
+        if (nargout > 0) return {inventaire};
+        it.sortie() << formater("%-20s %-12s %-10s\n", "Name", "Size", "Class");
+        for (std::size_t j = 0; j < n; ++j) {
+            Valeur nom = inventaire.champ("name", j);
+            Valeur taille = inventaire.champ("size", j);
+            Valeur classe = inventaire.champ("class", j);
+            Dims d;
+            for (double x : taille.re) d.push_back((int)x);
+            it.sortie() << formater("%-20s %-12s %-10s\n", nom.versTexte().c_str(),
+                                    texteDims(d).c_str(), classe.versTexte().c_str());
+        }
+        return {};
+    }
     auto noms = it.nomsVariables();
     if (nargout == 0) {
         it.sortie() << formater("%-20s %-12s %-10s\n", "Name", "Size", "Class");

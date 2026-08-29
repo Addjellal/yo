@@ -383,3 +383,71 @@ FORMAT  Choisit l'affichage des nombres.
        pi
 
     Voir aussi DISP, FPRINTF, NUM2STR, SPRINTF.
+
+### save
+SAVE  Écrit des variables dans un fichier MAT.
+    SAVE(FICHIER) écrit toutes les variables de l'espace de travail. Sans
+    extension, FICHIER reçoit « .mat ».
+    SAVE(FICHIER,'a','b') n'écrit que les variables nommées. Les jokers
+    sont admis : SAVE(FICHIER,'x*') écrit tout ce qui commence par x.
+    SAVE(FICHIER,'-regexp',MOTIF) choisit par expression régulière.
+    SAVE(FICHIER,'-struct',S) écrit chaque champ de S comme une variable.
+    SAVE(FICHIER,'-append') ajoute au fichier au lieu de le remplacer ; une
+    variable déjà présente est remplacée.
+    SAVE(FICHIER,'-ascii') écrit les nombres en texte, sans les noms ;
+    '-double' y met quinze décimales au lieu de sept.
+
+    Le format écrit est le MAT de niveau 5 que MATLAB relit depuis la
+    version 5. '-v7' et '-v7.3' enveloppent chaque variable dans un flux
+    zlib, comme MATLAB ; '-v4' et '-v6' écrivent sans compression.
+
+    Un tableau de chaînes (string) est écrit en cellule de caractères : le
+    niveau 5 ne connaît pas les chaînes, que MATLAB range dans un
+    sous-système propriétaire.
+
+    Syntaxe
+       save(fichier)
+       save(fichier, 'a', 'b')
+       save(fichier, '-append')
+       save(fichier, '-struct', s)
+
+    Exemples
+       a = magic(4);  b = 'texte';
+       f = [tempname() '.mat'];
+       save(f, 'a', 'b');
+       clear a b
+       load(f);
+       disp(size(a));            % 4 4
+       delete(f);
+
+    Voir aussi LOAD, WHOS, CLEAR.
+
+### load
+LOAD  Relit des variables depuis un fichier MAT ou un fichier texte.
+    LOAD(FICHIER) remet les variables du fichier dans l'espace de travail.
+    S = LOAD(FICHIER) les rend dans une structure, sans toucher à l'espace
+    de travail.
+    LOAD(FICHIER,'a','b') ne charge que les variables nommées ; les jokers
+    et '-regexp' fonctionnent comme pour SAVE.
+    LOAD(FICHIER,'-ascii') force la lecture en texte, LOAD(FICHIER,'-mat')
+    force la lecture du format MAT.
+
+    Les fichiers MAT de niveau 4 et de niveau 5 sont lus, compressés ou
+    non, quel que soit l'ordre des octets de la machine qui les a écrits.
+    Un fichier texte est lu comme une matrice : autant de colonnes que de
+    nombres par ligne, les lignes vides et les commentaires % ou # sautés.
+
+    Syntaxe
+       load(fichier)
+       s = load(fichier)
+       load(fichier, 'a', 'b')
+
+    Exemples
+       f = [tempname() '.mat'];
+       x = (1:5)';
+       save(f, 'x');
+       s = load(f);
+       disp(s.x');               % 1 2 3 4 5
+       delete(f);
+
+    Voir aussi SAVE, WHOS, FOPEN.
