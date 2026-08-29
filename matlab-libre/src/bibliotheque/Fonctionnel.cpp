@@ -266,15 +266,62 @@ FONCTION(fnRun) {
     return {};
 }
 
+// MATLAB : « eval(texte) » execute ; « x = eval(texte) » evalue une
+// expression et rend sa valeur. La seconde forme passe par des variables
+// temporaires, effacees juste apres : c'est la seule facon de recuperer
+// la valeur d'un texte qu'on ne connait qu'a l'execution.
+static std::vector<Valeur> evaluerAvecSorties(Interpreteur& it, const std::string& code,
+                                              int nargout) {
+    std::string expression = code;
+    while (!expression.empty() &&
+           (std::isspace((unsigned char)expression.back()) || expression.back() == ';' ||
+            expression.back() == ','))
+        expression.pop_back();
+    std::vector<std::string> temporaires;
+    for (int k = 1; k <= nargout; ++k)
+        temporaires.push_back("matlibre__eval" + std::to_string(k) + "__");
+    std::string cible;
+    if (nargout == 1) {
+        cible = temporaires[0];
+    } else {
+        cible = "[";
+        for (std::size_t k = 0; k < temporaires.size(); ++k) {
+            if (k) cible += ", ";
+            cible += temporaires[k];
+        }
+        cible += "]";
+    }
+    struct Nettoyer {
+        Interpreteur& moteur;
+        const std::vector<std::string>& noms;
+        ~Nettoyer() {
+            for (const auto& n : noms) moteur.effacerVariable(n);
+        }
+    } nettoyer{it, temporaires};
+    it.executerTexte(cible + " = " + expression + ";", "<eval>");
+    std::vector<Valeur> sorties;
+    for (const auto& n : temporaires) {
+        const Valeur* v = it.trouverVariable(n);
+        if (!v)
+            erreur("MATLAB:eval:noValue",
+                   "Error: The expression to the left of the equals sign is not a valid "
+                   "target for an assignment.");
+        sorties.push_back(*v);
+    }
+    return sorties;
+}
+
 FONCTION(fnEval) {
     INUTILISE
     exigerArguments(args, 1, 2, "eval");
     std::string code = args[0].versTexte();
     try {
+        if (nargout > 0) return evaluerAvecSorties(it, code, nargout);
         it.executerTexte(code, "<eval>");
     } catch (const ErreurMatlab& e) {
         if (args.size() > 1) {
             it.dernierMessage = e.message;
+            if (nargout > 0) return evaluerAvecSorties(it, args[1].versTexte(), nargout);
             it.executerTexte(args[1].versTexte(), "<eval>");
             return {};
         }

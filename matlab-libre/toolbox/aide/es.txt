@@ -13,10 +13,18 @@ FOPEN  Ouvre un fichier.
        [fid,msg] = fopen(___)
 
     Exemples
+
+       fid = fopen('donnees.txt','w');
+       fprintf(fid, 'une ligne\n');
+       fclose(fid);
+
        fid = fopen('donnees.txt','r');
-       if fid < 0, error('fichier introuvable'); end
+       if fid < 0
+           error('fichier introuvable');
+       end
        texte = fread(fid, '*char')';
        fclose(fid);
+       delete('donnees.txt');
 
     Voir aussi FCLOSE, FGETL, FREAD, FWRITE, FPRINTF, FILEREAD.
 
@@ -31,9 +39,12 @@ FCLOSE  Ferme un fichier.
        fclose('all')
 
     Exemples
+
+       x = [1 2 3];
        fid = fopen('sortie.txt','w');
        fprintf(fid,'%d\n',x);
        fclose(fid);
+       delete('sortie.txt');
 
     Voir aussi FOPEN, FPRINTF, FREAD.
 
@@ -46,8 +57,13 @@ FILEREAD  Lit un fichier entier dans une chaîne.
        s = fileread(nom)
 
     Exemples
-       texte = fileread('script.m');
+
+       fid = fopen('essai.m','w');
+       fprintf(fid, 'a = 1;\nb = 2;\n');
+       fclose(fid);
+       texte = fileread('essai.m');
        lignes = strsplit(texte, newline);
+       delete('essai.m');
 
     Voir aussi FOPEN, FGETL, READTABLE, WRITEMATRIX.
 
@@ -60,8 +76,10 @@ DISP  Affiche une valeur, sans son nom.
        disp(X)
 
     Exemples
+
        disp('bonjour')
        disp(pi)
+       x = 42;
        disp(['x vaut ' num2str(x)])
 
     Voir aussi FPRINTF, SPRINTF, FORMAT, DISPLAY.
@@ -79,14 +97,20 @@ ERROR  Lève une erreur et arrête l'exécution.
        error(identifiant,format,A1,...)
 
     Exemples
-       error('la matrice doit être carrée');
-       error('taille %dx%d refusée', m, n);
-       error('MonModule:tailleInvalide', 'A doit être carrée');
+
+       m = 2;  n = 3;
+       try
+           error('taille %dx%d refusée', m, n);
+       catch e
+           disp(e.message);
+       end
 
        try
-           ...
+           error('MonModule:tailleInvalide', 'A doit être carrée');
        catch e
-           if strcmp(e.identifier, 'MonModule:tailleInvalide'), ... end
+           if strcmp(e.identifier, 'MonModule:tailleInvalide')
+               disp('c''est bien la nôtre');
+           end
        end
 
     Voir aussi WARNING, TRY, ASSERT, MEXCEPTION, LASTERR.

@@ -122,6 +122,15 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
 
     double xmin, xmax, ymin, ymax;
     bornes(axes, xmin, xmax, ymin, ymax);
+    // « axis equal » et « axis square » passent par la meme fonction que
+    // le rendu SVG : les deux images doivent se ressembler.
+    if (axes.proportions != Axes::Proportions::Auto) {
+        int gauche = (int)std::lround(trace.left()), droite = (int)std::lround(trace.right());
+        int haut = (int)std::lround(trace.top()), bas = (int)std::lround(trace.bottom());
+        appliquerProportions(axes, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
+        trace = QRectF(gauche, haut, droite - gauche, bas - haut);
+        if (trace.width() < 10 || trace.height() < 10) return;
+    }
     auto versEcranX = [&](double x) {
         return trace.left() + (x - xmin) / (xmax - xmin) * trace.width();
     };
@@ -141,8 +150,14 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                                              QPointF(trace.right(), versEcranY(v)));
     }
     peintre.setPen(QPen(QColor("#303030"), 1));
-    if (axes.boite) peintre.drawRect(trace);
-    else {
+    // « axis off » : ni cadre, ni graduations, ni nombres — les courbes
+    // seules, comme sous MATLAB.
+    if (!axes.axesVisibles) {
+        gx.clear();
+        gy.clear();
+    } else if (axes.boite) {
+        peintre.drawRect(trace);
+    } else {
         peintre.drawLine(trace.bottomLeft(), trace.bottomRight());
         peintre.drawLine(trace.bottomLeft(), trace.topLeft());
     }
@@ -308,10 +323,10 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                          Qt::AlignCenter, QString::fromStdString(axes.titre));
         peintre.restore();
     }
-    if (!axes.etiquetteX.empty())
+    if (!axes.etiquetteX.empty() && axes.axesVisibles)
         peintre.drawText(QRectF(trace.left(), cadre.bottom() - 20, trace.width(), 18),
                          Qt::AlignCenter, QString::fromStdString(axes.etiquetteX));
-    if (!axes.etiquetteY.empty()) {
+    if (!axes.etiquetteY.empty() && axes.axesVisibles) {
         peintre.save();
         peintre.translate(cadre.left() + 14, trace.center().y());
         peintre.rotate(-90);

@@ -76,8 +76,14 @@ EXIST  Ce que désigne un nom.
        e = exist(nom,genre)
 
     Exemples
-       if exist('resultat','var'), ... end
-       if exist('donnees.mat','file') == 2, ... end
+
+       resultat = 1;
+       if exist('resultat','var')
+           disp('la variable existe');
+       end
+       if exist('donnees.mat','file') == 2
+           disp('le fichier est là');
+       end
 
     Voir aussi WHICH, ISFIELD, ISVARNAME.
 
@@ -92,8 +98,10 @@ TIC  Démarre le chronomètre.
        id = tic;
 
     Exemples
+
+       x = randn(1,1024);
        tic; y = fft(x); toc
-       id = tic; ... ; ecoule = toc(id);
+       id = tic; y = fft(x); ecoule = toc(id);
 
     Voir aussi TOC, CPUTIME, TIMEIT, PROFILE.
 

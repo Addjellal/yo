@@ -47,7 +47,9 @@ IFFT  Transformée de Fourier discrète inverse.
        X = ifft(___,'symmetric')
 
     Exemples
-       x = ifft(fft(x));               % rend x, aux arrondis près
+
+       x = sin(2*pi*(0:63)/16);
+       y = ifft(fft(x));                 % rend x, aux arrondis près
        max(abs(x - real(ifft(fft(x)))))  % de l'ordre de 1e-16
 
     Voir aussi FFT, IFFT2, REAL.
@@ -63,6 +65,9 @@ FFTSHIFT  Recentre le spectre sur la fréquence nulle.
        Y = fftshift(X,dim)
 
     Exemples
+
+       n = 64;  Fs = 1000;
+       x = sin(2*pi*100*(0:n-1)/Fs);
        Y = fftshift(fft(x));
        f = (-n/2 : n/2-1) * Fs/n;
        plot(f, abs(Y));
@@ -84,7 +89,9 @@ CONV  Convolution, ou multiplication de polynômes.
        w = conv(u,v,forme)
 
     Exemples
+
        conv([1 1], [1 -1])        % [1 0 -1], soit (x+1)(x-1)
+       x = randn(1,100);
        y = conv(x, ones(1,5)/5);  % moyenne glissante sur 5 points
 
     Voir aussi DECONV, FILTER, CONV2, POLYVAL.
@@ -104,6 +111,8 @@ FILTER  Filtre numérique à réponse rationnelle.
        y = filter(b,a,x,zi,dim)
 
     Exemples
+
+       x = randn(1,200);
        y = filter(ones(1,5)/5, 1, x);        % moyenne glissante
        [b,a] = butter(4, 0.2);
        y = filter(b, a, x);                  % passe-bas de Butterworth
@@ -118,8 +127,10 @@ ANGLE  Argument d'un nombre complexe, en radians.
        P = angle(Z)
 
     Exemples
+
        angle(1i)                  % pi/2
        angle(-1)                  % pi
+       x = randn(1,64);
        unwrap(angle(fft(x)))      % phase déroulée d'un spectre
 
     Voir aussi ABS, UNWRAP, REAL, IMAG, ATAN2.
@@ -137,6 +148,9 @@ UNWRAP  Déroule une phase.
        Q = unwrap(P,tol,dim)
 
     Exemples
+
+       f = linspace(0, 1, 200);
+       H = 1 ./ (1 + 1i*2*pi*f).^3;
        p = unwrap(angle(H));      % phase continue d'une réponse
        plot(f, p*180/pi);         % en degrés
 

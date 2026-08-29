@@ -34,10 +34,13 @@ FPRINTF  Écrit du texte formaté à l'écran ou dans un fichier.
        fprintf(fid,format,A1,...,An)
 
     Exemples
+
        fprintf('%s vaut %.2f\n', 'x', 3.14159);
+       donnees = [1 2 3];
        fid = fopen('sortie.txt','w');
        fprintf(fid, '%d\n', donnees);
        fclose(fid);
+       delete('sortie.txt');
 
     Voir aussi SPRINTF, FOPEN, FCLOSE, DISP.
 
@@ -53,9 +56,11 @@ NUM2STR  Convertit un nombre en texte.
        s = num2str(A,format)
 
     Exemples
+
        num2str(pi)                % '3.1416'
        num2str(pi, 8)             % '3.1415927'
        num2str(pi, '%.2f')        % '3.14'
+       x = 42;
        ['x = ' num2str(x)]
 
     Voir aussi STR2NUM, STR2DOUBLE, SPRINTF, MAT2STR.
@@ -87,7 +92,9 @@ STRJOIN  Assemble une cellule de chaînes.
        str = strjoin(C,delimiteur)
 
     Exemples
+
        strjoin({'a','b','c'}, ', ')    % 'a, b, c'
+       noms = {'usr', 'local', 'bin'};
        strjoin(noms, filesep)
 
     Voir aussi STRSPLIT, JOIN, SPRINTF.
@@ -100,7 +107,9 @@ STRREP  Remplace du texte.
        newStr = strrep(str,ancien,nouveau)
 
     Exemples
+
        strrep('abcabc', 'b', 'X')      % 'aXcaXc'
+       chemin = 'C:\\dossier\\fichier.txt';
        strrep(chemin, '\', '/')
 
     Voir aussi REGEXPREP, STRFIND, ERASE, INSERTAFTER.
@@ -147,3 +156,318 @@ REGEXP  Cherche une expression régulière.
        regexp('a,b;c', '[,;]', 'split')       % {'a','b','c'}
 
     Voir aussi REGEXPI, REGEXPREP, STRFIND, CONTAINS.
+
+### upper
+UPPER  Met le texte en majuscules.
+    UPPER(S) rend S en majuscules ; ce qui n'est pas une lettre ne bouge
+    pas.
+
+    Syntaxe
+       t = upper(s)
+
+    Exemples
+       upper('bonjour')               % 'BONJOUR'
+       upper({'un','deux'})
+       strcmp(upper('Oui'), 'OUI')
+
+    Voir aussi LOWER, STRCMPI, STRTRIM.
+
+### lower
+LOWER  Met le texte en minuscules.
+    LOWER(S) rend S en minuscules.
+
+    Syntaxe
+       t = lower(s)
+
+    Exemples
+       lower('BONJOUR')               % 'bonjour'
+       reponse = 'OUI';
+       if strcmp(lower(reponse), 'oui')
+           disp('accepté');
+       end
+
+    Voir aussi UPPER, STRCMPI.
+
+### strtrim
+STRTRIM  Retire les blancs de début et de fin.
+    STRTRIM(S) enlève espaces, tabulations et fins de ligne aux deux bouts.
+
+    Syntaxe
+       t = strtrim(s)
+
+    Exemples
+       strtrim('   ligne   ')          % 'ligne'
+       ['[' strtrim(sprintf('  a  ')) ']']
+       strtrim({'  un ', ' deux'})
+
+    Voir aussi DEBLANK, STRIP, STRREP, ISSPACE.
+
+### strcat
+STRCAT  Concatène des textes.
+    STRCAT(S1,S2,...) colle les textes. Sur des tableaux de caractères,
+    les blancs de fin sont retirés — pas ceux d'une cellule.
+
+    Syntaxe
+       t = strcat(s1,s2,...)
+
+    Exemples
+       strcat('abc', 'def')           % 'abcdef'
+       strcat({'a','b'}, '_1')
+       ['abc' 'def']                  % la façon la plus directe
+
+    Voir aussi STRJOIN, SPRINTF, HORZCAT.
+
+### strcmpi
+STRCMPI  Compare deux textes sans distinguer la casse.
+    STRCMPI(S1,S2) rend vrai si les textes sont égaux à la casse près.
+
+    Syntaxe
+       tf = strcmpi(s1,s2)
+
+    Exemples
+       strcmpi('Oui','oui')           % 1
+       strcmp('Oui','oui')            % 0
+       strcmpi({'A','b'}, 'a')        % [1 0]
+
+    Voir aussi STRCMP, STRNCMPI, LOWER.
+
+### strncmp
+STRNCMP  Compare les N premiers caractères.
+    STRNCMP(S1,S2,N) rend vrai si les N premiers caractères coïncident.
+
+    Syntaxe
+       tf = strncmp(s1,s2,n)
+
+    Exemples
+       strncmp('bonjour','bonsoir',3) % 1
+       strncmp('abc','abd',3)         % 0
+       noms = {'test_a','autre'};
+       strncmp(noms, 'test', 4)       % [1 0]
+
+    Voir aussi STRCMP, STRNCMPI, STARTSWITH.
+
+### strfind
+STRFIND  Cherche un motif dans un texte.
+    STRFIND(S,MOTIF) rend les positions de départ de chaque occurrence,
+    et un vecteur vide s'il n'y en a pas.
+
+    Syntaxe
+       k = strfind(s,motif)
+
+    Exemples
+       strfind('abracadabra', 'abra')     % [1 8]
+       isempty(strfind('abc', 'z'))       % 1
+       numel(strfind('aaa', 'aa'))        % 2 — les occurrences se recouvrent
+
+    Voir aussi CONTAINS, REGEXP, STRREP, STRTOK.
+
+### contains
+CONTAINS  Le texte contient-il le motif.
+    CONTAINS(S,MOTIF) rend un booléen — plus lisible que « ~isempty(strfind(...)) ».
+    CONTAINS(S,MOTIF,'IgnoreCase',true) ignore la casse.
+
+    Syntaxe
+       tf = contains(s,motif)
+       tf = contains(s,motif,'IgnoreCase',true)
+
+    Exemples
+       contains('bonjour', 'jour')        % 1
+       contains({'abc','xyz'}, 'b')       % [1 0]
+       contains('Bonjour', 'bon', 'IgnoreCase', true)
+
+    Voir aussi STRFIND, STARTSWITH, ENDSWITH, REGEXP.
+
+### startsWith
+STARTSWITH  Le texte commence-t-il par le motif.
+
+    Syntaxe
+       tf = startsWith(s,motif)
+       tf = startsWith(s,motif,'IgnoreCase',true)
+
+    Exemples
+       startsWith('fichier.txt', 'fichier')   % 1
+       startsWith({'a.m','b.c'}, 'a')         % [1 0]
+
+    Voir aussi ENDSWITH, CONTAINS, STRNCMP.
+
+### endsWith
+ENDSWITH  Le texte finit-il par le motif.
+
+    Syntaxe
+       tf = endsWith(s,motif)
+       tf = endsWith(s,motif,'IgnoreCase',true)
+
+    Exemples
+       endsWith('fichier.txt', '.txt')        % 1
+       noms = {'a.m','b.c'};
+       noms(endsWith(noms, '.m'))
+
+    Voir aussi STARTSWITH, CONTAINS, FILEPARTS.
+
+### strtok
+STRTOK  Détache le premier morceau d'un texte.
+    [T,RESTE] = STRTOK(S) coupe au premier blanc.
+    [T,RESTE] = STRTOK(S,SEP) coupe au premier caractère de SEP.
+
+    Syntaxe
+       t = strtok(s)
+       [t,reste] = strtok(s,sep)
+
+    Exemples
+       [mot, reste] = strtok('un deux trois')
+       [cle, valeur] = strtok('nom=valeur', '=')
+       strtrim(valeur(2:end))
+
+    Voir aussi STRSPLIT, REGEXP, STRFIND.
+
+### str2double
+STR2DOUBLE  Convertit un texte en nombre.
+    STR2DOUBLE(S) rend le nombre écrit dans S, et NaN si S n'en est pas
+    un. Sur une cellule, elle rend un tableau.
+
+    Syntaxe
+       x = str2double(s)
+
+    Exemples
+       str2double('3.14')             % 3.1400
+       str2double('1e-3')             % 0.0010
+       str2double('abc')              % NaN
+       str2double({'1','2','x'})      % [1 2 NaN]
+
+    Voir aussi STR2NUM, NUM2STR, SSCANF, ISNAN.
+
+### mat2str
+MAT2STR  Écrit une matrice comme on l'aurait tapée.
+    MAT2STR(A) rend un texte qui, évalué, redonne A — crochets, points-
+    virgules et espaces compris.
+    MAT2STR(A,N) donne N chiffres significatifs.
+
+    Syntaxe
+       s = mat2str(A)
+       s = mat2str(A,n)
+
+    Exemples
+       mat2str([1 2; 3 4])            % '[1 2;3 4]'
+       mat2str(pi, 4)                 % '3.142'
+       A = magic(2);
+       isequal(eval(mat2str(A)), A)
+
+    Voir aussi NUM2STR, INT2STR, DISP, EVAL.
+
+### int2str
+INT2STR  Arrondit et écrit en entier.
+    INT2STR(X) arrondit X et rend son écriture décimale.
+
+    Syntaxe
+       s = int2str(x)
+
+    Exemples
+       int2str(3.7)                   % '4'
+       int2str(-3.5)                  % '-4'
+       ['il en reste ' int2str(12.4)]
+
+    Voir aussi NUM2STR, MAT2STR, ROUND, SPRINTF.
+
+### cellstr
+CELLSTR  Convertit un tableau de caractères en cellule de textes.
+    CELLSTR(S) fait une cellule d'une ligne par ligne de S, blancs de fin
+    retirés.
+
+    Syntaxe
+       C = cellstr(s)
+
+    Exemples
+       C = cellstr(char('un','deux'))
+       numel(C)                       % 2
+       C{2}
+
+    Voir aussi CHAR, ISCELLSTR, STRSPLIT, STRING.
+
+### blanks
+BLANKS  Chaîne de N espaces.
+
+    Syntaxe
+       s = blanks(n)
+
+    Exemples
+       ['[' blanks(3) ']']            % '[   ]'
+       numel(blanks(5))               % 5
+
+    Voir aussi SPACE, STRTRIM, REPMAT, SPRINTF.
+
+### deblank
+DEBLANK  Retire les blancs de fin.
+    DEBLANK(S) enlève les espaces de fin, mais garde ceux du début — c'est
+    la différence avec STRTRIM.
+
+    Syntaxe
+       t = deblank(s)
+
+    Exemples
+       ['[' deblank('  a  ') ']']     % '[  a]'
+       numel(deblank('abc   '))       % 3
+
+    Voir aussi STRTRIM, STRIP, BLANKS.
+
+### regexprep
+REGEXPREP  Remplace par expression régulière.
+    REGEXPREP(S,MOTIF,REMPLACEMENT) remplace toutes les occurrences ; le
+    remplacement peut citer les groupes par $1, $2…
+
+    Syntaxe
+       t = regexprep(s,motif,remplacement)
+
+    Exemples
+       regexprep('a1b22c', '\d+', '#')            % 'a#b#c'
+       regexprep('2024-05-01', '(\d+)-(\d+)-(\d+)', '$3/$2/$1')
+       regexprep('  trop   d''espaces ', '\s+', ' ')
+
+    Voir aussi REGEXP, STRREP, REGEXPI.
+
+### sprintf
+SPRINTF  Écrit du texte formaté.
+    SPRINTF(FORMAT,...) rend le texte au lieu de l'afficher. Le format
+    reprend celui du C : %d entier, %f décimal, %g compact, %s texte,
+    %e exponentiel, %% un pour cent. Le format est réappliqué tant qu'il
+    reste des données.
+
+    Syntaxe
+       s = sprintf(format,...)
+
+    Exemples
+       sprintf('%d + %d = %d', 2, 3, 5)
+       sprintf('%.3f', pi)
+       sprintf('%5.1f|', [1.23 45.6])     % le format se répète
+       sprintf('%s a %d ans', 'Ada', 36)
+
+    Voir aussi FPRINTF, NUM2STR, DISP, SSCANF.
+
+### sscanf
+SSCANF  Lit des nombres dans un texte.
+    SSCANF(S,FORMAT) lit S selon le format et rend une colonne de valeurs.
+    SSCANF(S,FORMAT,TAILLE) limite ce qui est lu.
+
+    Syntaxe
+       a = sscanf(s,format)
+       a = sscanf(s,format,taille)
+
+    Exemples
+       sscanf('12 34 56', '%d')
+       sscanf('1.5,2.5', '%f,%f')
+       sscanf('x=3', 'x=%d')
+
+    Voir aussi SPRINTF, STR2DOUBLE, TEXTSCAN, FSCANF.
+
+### strlength
+STRLENGTH  Longueur du texte, caractère par caractère.
+    STRLENGTH(S) rend le nombre de caractères ; sur une cellule, un nombre
+    par élément.
+
+    Syntaxe
+       n = strlength(s)
+
+    Exemples
+       strlength('abc')               % 3
+       strlength({'a','bb','ccc'})    % [1 2 3]
+
+    Voir aussi LENGTH, NUMEL, SIZE.

@@ -10,7 +10,9 @@ INV  Inverse d'une matrice carrée.
        Y = inv(X)
 
     Exemples
+
        inv([2 0; 0 4])            % [0.5 0; 0 0.25]
+       A = [2 1; 1 3];  b = [3; 5];
        x = A \ b;                 % plutôt que inv(A)*b
 
     Voir aussi MLDIVIDE, PINV, DET, RANK, COND, LU.
@@ -58,9 +60,11 @@ EIG  Valeurs et vecteurs propres.
        [V,D] = eig(A)
 
     Exemples
+
        eig([2 0; 0 3])            % [2; 3]
+       A = [4 1; 2 3];
        [V,D] = eig(A);
-       max(abs(eig(A))) < 1       % stabilité d'un système discret
+       max(abs(eig(0.5*A))) < 1   % stabilité d'un système discret
 
     Voir aussi SVD, POLY, ROOTS, EXPM.
 
@@ -76,6 +80,8 @@ SVD  Décomposition en valeurs singulières.
        [U,S,V] = svd(A,'econ')
 
     Exemples
+
+       A = magic(4);
        s = svd(A);
        cond2 = s(1)/s(end);       % conditionnement en norme 2
        rang = sum(s > 1e-10);
@@ -96,8 +102,10 @@ MLDIVIDE  Division à gauche, « A\b » : résout A*x = b.
        X = mldivide(A,B)
 
     Exemples
+
        A = [2 1; 1 3];  b = [3; 5];
        x = A \ b;                 % [0.8; 1.4]
+       X = [ones(10,1) (1:10)'];  y = (1:10)' * 2 + 1;
        p = X \ y;                 % régression aux moindres carrés
 
     Voir aussi MRDIVIDE, INV, LU, QR, PINV, LSQMINNORM.
@@ -113,8 +121,451 @@ NORM  Norme d'un vecteur ou d'une matrice.
        n = norm(A,p)
 
     Exemples
+
        norm([3 4])                % 5
+       A = magic(3);  B = ones(3);
        norm(A - B, 'fro')         % écart entre deux matrices
+       x = A \ ones(3,1);  b = ones(3,1);
        norm(A*x - b) / norm(b)    % résidu relatif
 
     Voir aussi COND, RANK, SVD, HYPOT.
+
+### diag
+DIAG  Diagonale d'une matrice, ou matrice diagonale.
+    DIAG(V), V étant un vecteur, rend la matrice carrée dont la diagonale
+    est V.
+    DIAG(A), A étant une matrice, rend sa diagonale en colonne.
+    DIAG(X,K) travaille sur la K-ième diagonale : K>0 au-dessus, K<0
+    en dessous.
+
+    Syntaxe
+       D = diag(v)
+       v = diag(A)
+       X = diag(x,k)
+
+    Exemples
+       diag([1 2 3])              % matrice 3x3
+       diag(magic(3))             % la diagonale, en colonne
+       diag([1 1], 1)             % surdiagonale
+       trace(magic(3)) == sum(diag(magic(3)))
+
+    Voir aussi TRIL, TRIU, EYE, TRACE, SPDIAGS.
+
+### tril
+TRIL  Partie triangulaire inférieure.
+    TRIL(A) met à zéro tout ce qui est au-dessus de la diagonale.
+    TRIL(A,K) garde tout ce qui est sur ou sous la K-ième diagonale.
+
+    Syntaxe
+       L = tril(A)
+       L = tril(A,k)
+
+    Exemples
+       tril(ones(3))
+       tril(magic(4), -1)         % strictement sous la diagonale
+
+    Voir aussi TRIU, DIAG, ISTRIL, LU.
+
+### triu
+TRIU  Partie triangulaire supérieure.
+    TRIU(A) met à zéro tout ce qui est sous la diagonale.
+    TRIU(A,K) garde tout ce qui est sur ou au-dessus de la K-ième diagonale.
+
+    Syntaxe
+       U = triu(A)
+       U = triu(A,k)
+
+    Exemples
+       triu(ones(3))
+       triu(magic(4), 1)          % strictement au-dessus
+
+    Voir aussi TRIL, DIAG, ISTRIU, QR.
+
+### trace
+TRACE  Somme des éléments diagonaux.
+    TRACE(A) vaut SUM(DIAG(A)), et aussi la somme des valeurs propres.
+
+    Syntaxe
+       t = trace(A)
+
+    Exemples
+       trace(magic(3))
+       A = [4 1; 2 3];
+       abs(trace(A) - sum(eig(A))) < 1e-10
+
+    Voir aussi DIAG, EIG, DET, RANK.
+
+### kron
+KRON  Produit de Kronecker.
+    KRON(A,B) remplace chaque élément a de A par a*B : le résultat est de
+    taille (m1*m2) par (n1*n2).
+
+    Syntaxe
+       K = kron(A,B)
+
+    Exemples
+       kron(eye(2), [1 2; 3 4])
+       size(kron(ones(2,3), ones(4,5)))   % [8 15]
+
+    Voir aussi REPMAT, DIAG, MTIMES.
+
+### transpose
+TRANSPOSE  Transposée non conjuguée, l'opérateur « .' ».
+    TRANSPOSE(A) échange lignes et colonnes sans conjuguer. Sur du
+    complexe, c'est « .' » et non « ' ».
+
+    Syntaxe
+       B = transpose(A)
+       B = A.'
+
+    Exemples
+       transpose([1 2; 3 4])
+       z = [1+2i 3-1i];
+       z.'                        % transposée seule
+       z'                         % transposée conjuguée
+
+    Voir aussi CTRANSPOSE, PERMUTE, RESHAPE.
+
+### ctranspose
+CTRANSPOSE  Transposée conjuguée, l'opérateur « ' ».
+    CTRANSPOSE(A) transpose et conjugue. Sur du réel, c'est la transposée.
+
+    Syntaxe
+       B = ctranspose(A)
+       B = A'
+
+    Exemples
+       z = [1+2i 3-1i];
+       z'                         % conjuguée et transposée
+       A = magic(3);
+       isequal(A', A.')           % vrai : A est réelle
+
+    Voir aussi TRANSPOSE, CONJ, MLDIVIDE.
+
+### rank
+RANK  Rang d'une matrice.
+    RANK(A) compte les valeurs singulières franchement non nulles.
+    RANK(A,TOL) impose le seuil.
+
+    Syntaxe
+       r = rank(A)
+       r = rank(A,tol)
+
+    Exemples
+       rank(eye(3))               % 3
+       rank([1 2; 2 4])           % 1 — la seconde ligne est double
+       rank(magic(4))             % 3, et non 4
+
+    Voir aussi SVD, DET, COND, NULL, ORTH.
+
+### cond
+COND  Conditionnement d'une matrice.
+    COND(A) est le rapport de la plus grande valeur singulière à la plus
+    petite : il dit combien l'erreur relative sur b se retrouve amplifiée
+    dans la solution de A*x = b.
+
+    Syntaxe
+       c = cond(A)
+
+    Exemples
+       cond(eye(3))               % 1 — le mieux possible
+       cond(hilb(5))              % très grand : mal conditionnée
+
+    Voir aussi RCOND, SVD, RANK, NORM.
+
+### pinv
+PINV  Pseudo-inverse de Moore-Penrose.
+    PINV(A) rend la matrice qui donne la solution de moindre norme au sens
+    des moindres carrés, y compris quand A n'est pas carrée ou est
+    singulière.
+
+    Syntaxe
+       B = pinv(A)
+       B = pinv(A,tol)
+
+    Exemples
+       A = [1 2; 2 4];            % singulière
+       pinv(A)
+       b = [1; 2];
+       x = pinv(A) * b;           % solution de moindre norme
+
+    Voir aussi INV, MLDIVIDE, SVD, RANK, LSQNONNEG.
+
+### lu
+LU  Factorisation LU avec pivotage.
+    [L,U] = LU(A) rend L (produit d'une triangulaire inférieure et d'une
+    permutation) et U triangulaire supérieure, avec L*U = A.
+    [L,U,P] = LU(A) rend la permutation à part : P*A = L*U.
+
+    Syntaxe
+       [L,U] = lu(A)
+       [L,U,P] = lu(A)
+
+    Exemples
+       A = [4 3; 6 3];
+       [L,U] = lu(A);
+       norm(L*U - A) < 1e-12
+       [L,U,P] = lu(A);
+       norm(P*A - L*U) < 1e-12
+
+    Voir aussi QR, CHOL, DET, MLDIVIDE, INV.
+
+### qr
+QR  Factorisation QR.
+    [Q,R] = QR(A) rend Q orthogonale et R triangulaire supérieure, avec
+    Q*R = A. C'est la façon stable de résoudre les moindres carrés.
+
+    Syntaxe
+       [Q,R] = qr(A)
+
+    Exemples
+       A = [1 1; 1 2; 1 3];
+       [Q,R] = qr(A);
+       norm(Q*R - A) < 1e-12
+       norm(Q'*Q - eye(size(Q,2))) < 1e-12
+
+    Voir aussi LU, CHOL, SVD, MLDIVIDE, ORTH.
+
+### chol
+CHOL  Factorisation de Cholesky.
+    R = CHOL(A) rend R triangulaire supérieure telle que R'*R = A, pour A
+    symétrique définie positive. Elle échoue sinon — ce qui en fait le test
+    de définie-positivité.
+
+    Syntaxe
+       R = chol(A)
+
+    Exemples
+       A = [4 2; 2 3];
+       R = chol(A);
+       norm(R'*R - A) < 1e-12
+       try
+           chol([1 2; 2 1]);      % pas définie positive
+       catch e
+           disp('A n''est pas définie positive');
+       end
+
+    Voir aussi LU, QR, EIG, ISSYMMETRIC.
+
+### expm
+EXPM  Exponentielle de matrice.
+    EXPM(A) calcule e^A au sens matriciel — la somme de la série —, à ne
+    pas confondre avec EXP(A), qui travaille élément par élément. C'est
+    elle qui résout x' = A x.
+
+    Syntaxe
+       E = expm(A)
+
+    Exemples
+       expm(zeros(2))             % l'identité
+       A = [0 1; -1 0];
+       expm(A*pi)                 % -I, à l'arrondi près
+       isequal(expm(diag([0 0])), exp(diag([0 0])))   % faux en général
+
+    Voir aussi LOGM, SQRTM, EXP, EIG.
+
+### magic
+MAGIC  Carré magique d'ordre N.
+    MAGIC(N) rend une matrice N par N des entiers 1 à N², dont toutes les
+    lignes, colonnes et diagonales ont la même somme.
+
+    Syntaxe
+       M = magic(n)
+
+    Exemples
+       magic(3)
+       sum(magic(4))              % la même somme partout
+       sum(magic(4), 2)'
+
+    Voir aussi ONES, EYE, RAND, HILB.
+
+### meshgrid
+MESHGRID  Grille de coordonnées à partir de deux vecteurs.
+    [X,Y] = MESHGRID(x,y) rend deux matrices : X répète x en lignes, Y
+    répète y en colonnes. C'est ce qu'on donne à SURF, MESH ou CONTOUR.
+    [X,Y] = MESHGRID(x) vaut MESHGRID(x,x).
+
+    Syntaxe
+       [X,Y] = meshgrid(x,y)
+       [X,Y] = meshgrid(x)
+
+    Exemples
+       [X,Y] = meshgrid(1:3, 1:2);
+       X
+       Y
+       [X,Y] = meshgrid(-2:0.1:2);
+       surf(X, Y, X.^2 - Y.^2);
+
+    Voir aussi NDGRID, SURF, MESH, CONTOUR.
+
+### permute
+PERMUTE  Réordonne les dimensions d'un tableau.
+    PERMUTE(A,ORDRE) échange les dimensions selon ORDRE ; c'est la
+    transposée généralisée aux tableaux de plus de deux dimensions.
+
+    Syntaxe
+       B = permute(A,ordre)
+
+    Exemples
+       A = reshape(1:24, 2, 3, 4);
+       size(permute(A, [3 1 2]))      % [4 2 3]
+       isequal(permute(magic(3), [2 1]), magic(3)')
+
+    Voir aussi IPERMUTE, RESHAPE, SQUEEZE, TRANSPOSE.
+
+### squeeze
+SQUEEZE  Retire les dimensions de longueur 1.
+    SQUEEZE(A) supprime les dimensions singleton au-delà de la deuxième :
+    un tableau 1x1x5 devient un vecteur colonne de 5.
+
+    Syntaxe
+       B = squeeze(A)
+
+    Exemples
+       A = reshape(1:6, 1, 1, 6);
+       size(squeeze(A))               % [6 1]
+       size(squeeze(ones(2,1,3)))     % [2 3]
+
+    Voir aussi RESHAPE, PERMUTE, SIZE.
+
+### circshift
+CIRCSHIFT  Décale circulairement les éléments.
+    CIRCSHIFT(A,K) décale de K, ce qui sort d'un côté rentrant de l'autre.
+    CIRCSHIFT(A,K,DIM) décale selon la dimension DIM.
+
+    Syntaxe
+       B = circshift(A,k)
+       B = circshift(A,k,dim)
+
+    Exemples
+       circshift([1 2 3 4], 1)        % [4 1 2 3]
+       circshift([1 2 3 4], -1)       % [2 3 4 1]
+       circshift(magic(3), 1, 2)      % décale les colonnes
+
+    Voir aussi FLIP, ROT90, FFTSHIFT, PERMUTE.
+
+### flip
+FLIP  Retourne l'ordre des éléments.
+    FLIP(A) retourne selon la première dimension non singleton.
+    FLIP(A,DIM) retourne selon la dimension DIM.
+
+    Syntaxe
+       B = flip(A)
+       B = flip(A,dim)
+
+    Exemples
+       flip([1 2 3])                  % [3 2 1]
+       flip(magic(3), 2)              % colonnes inversées
+
+    Voir aussi FLIPLR, FLIPUD, ROT90, CIRCSHIFT.
+
+### fliplr
+FLIPLR  Retourne de gauche à droite.
+    FLIPLR(A) inverse l'ordre des colonnes.
+
+    Syntaxe
+       B = fliplr(A)
+
+    Exemples
+       fliplr([1 2 3])                % [3 2 1]
+       fliplr(magic(3))
+
+    Voir aussi FLIPUD, FLIP, ROT90.
+
+### flipud
+FLIPUD  Retourne de haut en bas.
+    FLIPUD(A) inverse l'ordre des lignes.
+
+    Syntaxe
+       B = flipud(A)
+
+    Exemples
+       flipud([1;2;3])                % [3;2;1]
+       flipud(magic(3))
+
+    Voir aussi FLIPLR, FLIP, ROT90.
+
+### rot90
+ROT90  Rotation d'un quart de tour dans le sens direct.
+    ROT90(A) tourne A de 90 degrés.
+    ROT90(A,K) tourne de K quarts de tour.
+
+    Syntaxe
+       B = rot90(A)
+       B = rot90(A,k)
+
+    Exemples
+       rot90([1 2; 3 4])
+       isequal(rot90(magic(3), 4), magic(3))   % quatre quarts, on revient
+
+    Voir aussi FLIPLR, FLIPUD, FLIP, TRANSPOSE.
+
+### sortrows
+SORTROWS  Trie les lignes d'une matrice.
+    SORTROWS(A) trie sur la première colonne, puis la deuxième, etc.
+    SORTROWS(A,COL) trie sur la colonne COL ; COL négative trie à
+    l'envers.
+    [B,I] = SORTROWS(...) rend aussi la permutation.
+
+    Syntaxe
+       B = sortrows(A)
+       B = sortrows(A,col)
+       [B,i] = sortrows(...)
+
+    Exemples
+       A = [3 1; 1 2; 2 3];
+       sortrows(A)
+       sortrows(A, 2)
+       sortrows(A, -1)                % décroissant
+
+    Voir aussi SORT, UNIQUE, ISSORTED.
+
+### sub2ind
+SUB2IND  Indice linéaire à partir des indices par dimension.
+    SUB2IND(TAILLE,I,J) rend l'indice unique correspondant à (I,J) dans un
+    tableau de la taille donnée. MATLAB range par colonnes.
+
+    Syntaxe
+       k = sub2ind(taille,i,j)
+
+    Exemples
+       A = magic(3);
+       k = sub2ind(size(A), 2, 3);
+       A(k) == A(2,3)
+       sub2ind([3 3], 1, 2)           % 4
+
+    Voir aussi IND2SUB, SIZE, RESHAPE, FIND.
+
+### ind2sub
+IND2SUB  Indices par dimension à partir de l'indice linéaire.
+    [I,J] = IND2SUB(TAILLE,K) est l'inverse de SUB2IND.
+
+    Syntaxe
+       [i,j] = ind2sub(taille,k)
+
+    Exemples
+       A = magic(4);
+       [~, k] = max(A(:));
+       [i,j] = ind2sub(size(A), k);   % où est le maximum
+       A(i,j) == max(A(:))
+
+    Voir aussi SUB2IND, FIND, SIZE, MAX.
+
+### accumarray
+ACCUMARRAY  Agrège des valeurs par groupe.
+    ACCUMARRAY(INDICES,VALEURS) additionne les valeurs partageant le même
+    indice : c'est le « group by » de MATLAB.
+    ACCUMARRAY(INDICES,VALEURS,TAILLE,FONCTION) applique une autre
+    fonction que la somme.
+
+    Syntaxe
+       s = accumarray(indices,valeurs)
+       s = accumarray(indices,valeurs,taille,fonction)
+
+    Exemples
+       accumarray([1;2;1;3], [10;20;30;40])       % [40;20;40]
+       groupes = [1;1;2;2;2];
+       valeurs = [3;5;2;4;6];
+       accumarray(groupes, valeurs, [], @mean)    % moyenne par groupe
+
+    Voir aussi UNIQUE, HISTCOUNTS, SUM, ARRAYFUN.

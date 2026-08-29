@@ -41,9 +41,14 @@ SUBPLOT  Découpe la figure en une grille d'axes.
        subplot(mnp)
 
     Exemples
-       subplot(2,1,1); plot(f, abs(Y));  title('Amplitude');
+
+       f = (0:63) / 64;
+       Y = fft(sin(2*pi*8*(0:63)/64));
+       subplot(2,1,1); plot(f, abs(Y));   title('Amplitude');
        subplot(2,1,2); plot(f, angle(Y)); title('Phase');
 
+       donnees = randn(50,4);
+       figure
        for k = 1:4
            subplot(2,2,k); plot(donnees(:,k));
        end
@@ -101,6 +106,9 @@ HOLD  Conserve ou efface le tracé précédent.
        hold
 
     Exemples
+
+       x = linspace(0, 2*pi);
+       y1 = sin(x);  y2 = cos(x);
        plot(x, y1); hold on; plot(x, y2); hold off
 
     Voir aussi PLOT, FIGURE, CLA.
@@ -118,7 +126,562 @@ LEGEND  Légende des courbes.
        legend('off')
 
     Exemples
+
+       x = linspace(0, 1);
+       y1 = x.^2;  y2 = sqrt(x);
        plot(x, y1, x, y2);
        legend('mesure', 'modèle');
 
     Voir aussi PLOT, TITLE, XLABEL, YLABEL.
+
+### figure
+FIGURE  Crée une fenêtre de figure, ou en active une.
+    FIGURE crée une nouvelle fenêtre et en fait la figure courante.
+    FIGURE(N) fait de la figure numéro N la figure courante, et la crée
+    si elle n'existe pas.
+    F = FIGURE(...) rend la poignée de la figure.
+
+    Syntaxe
+       figure
+       figure(n)
+       f = figure
+
+    Exemples
+       figure                     % une fenêtre neuve
+       plot(1:10);
+       figure(2); plot(rand(1,10));
+       figure(1);                 % revenir à la première
+
+    Voir aussi CLF, CLOSE, GCF, SUBPLOT, HOLD.
+
+### clf
+CLF  Efface la figure courante.
+    CLF vide la figure courante de ses axes et de ses courbes, sans la
+    fermer.
+
+    Syntaxe
+       clf
+
+    Exemples
+       plot(1:10);
+       clf                        % la fenêtre reste, vide
+
+    Voir aussi FIGURE, CLOSE, CLA, HOLD.
+
+### close
+CLOSE  Ferme une figure.
+    CLOSE ferme la figure courante.
+    CLOSE(N) ferme la figure numéro N.
+    CLOSE ALL ferme toutes les figures.
+
+    Syntaxe
+       close
+       close(n)
+       close all
+
+    Exemples
+       figure; plot(1:10);
+       close                      % ferme celle-là
+       close all                  % ferme tout
+
+    Voir aussi FIGURE, CLF, GCF.
+
+### axis
+AXIS  Bornes et proportions des axes.
+    AXIS([xmin xmax ymin ymax]) impose les bornes.
+    AXIS AUTO revient au calcul automatique.
+    AXIS EQUAL donne la même échelle aux deux axes : un cercle est rond.
+    AXIS SQUARE rend la boîte des axes carrée.
+    AXIS TIGHT serre les bornes sur les données.
+    AXIS OFF / AXIS ON cache ou montre les axes.
+    V = AXIS rend les bornes courantes.
+
+    Syntaxe
+       axis([xmin xmax ymin ymax])
+       axis auto | equal | square | tight | off | on
+       v = axis
+
+    Exemples
+
+       t = linspace(0, 2*pi);
+       plot(cos(t), sin(t)); axis equal    % un vrai cercle
+       axis([0 1 -1 1]);
+       v = axis
+
+    Voir aussi XLIM, YLIM, GRID, BOX, PLOT.
+
+### xlim
+XLIM  Bornes de l'axe des abscisses.
+    XLIM([min max]) impose les bornes.
+    L = XLIM rend les bornes courantes.
+    XLIM AUTO revient au calcul automatique.
+
+    Syntaxe
+       xlim([min max])
+       l = xlim
+       xlim auto
+
+    Exemples
+       plot(0:100); xlim([20 60]);
+       l = xlim
+
+    Voir aussi YLIM, AXIS, GRID.
+
+### ylim
+YLIM  Bornes de l'axe des ordonnées.
+    YLIM([min max]) impose les bornes.
+    L = YLIM rend les bornes courantes.
+    YLIM AUTO revient au calcul automatique.
+
+    Syntaxe
+       ylim([min max])
+       l = ylim
+       ylim auto
+
+    Exemples
+       plot(randn(1,100)); ylim([-3 3]);
+
+    Voir aussi XLIM, AXIS, GRID.
+
+### title
+TITLE  Titre des axes.
+    TITLE(TEXTE) écrit un titre au-dessus des axes courants.
+    TITLE(TEXTE,'Nom',Valeur) règle 'FontSize', 'Color', 'FontWeight'.
+
+    Syntaxe
+       title(texte)
+       title(texte,'Nom',Valeur)
+
+    Exemples
+       plot(1:10); title('Ma courbe');
+       title(sprintf('n = %d', 10));
+       title('Grand', 'FontSize', 16);
+
+    Voir aussi XLABEL, YLABEL, ZLABEL, LEGEND, TEXT.
+
+### xlabel
+XLABEL  Étiquette de l'axe des abscisses.
+    XLABEL(TEXTE) nomme l'axe des x des axes courants.
+
+    Syntaxe
+       xlabel(texte)
+       xlabel(texte,'Nom',Valeur)
+
+    Exemples
+
+       t = 0:0.01:1;
+       y = sin(2*pi*5*t);
+       plot(t, y); xlabel('temps (s)'); ylabel('amplitude');
+
+    Voir aussi YLABEL, ZLABEL, TITLE, LEGEND.
+
+### ylabel
+YLABEL  Étiquette de l'axe des ordonnées.
+    YLABEL(TEXTE) nomme l'axe des y des axes courants.
+
+    Syntaxe
+       ylabel(texte)
+       ylabel(texte,'Nom',Valeur)
+
+    Exemples
+
+       f = logspace(0, 3, 100);
+       module = 1 ./ sqrt(1 + (f/100).^2);
+       plot(f, module); ylabel('|H(f)|');
+
+    Voir aussi XLABEL, ZLABEL, TITLE.
+
+### zlabel
+ZLABEL  Étiquette de l'axe des cotes.
+    ZLABEL(TEXTE) nomme l'axe des z des axes courants.
+
+    Syntaxe
+       zlabel(texte)
+
+    Exemples
+
+       t = linspace(0, 10*pi, 300);
+       x = cos(t);  y = sin(t);  z = t;
+       plot3(x, y, z); zlabel('hauteur');
+
+    Voir aussi XLABEL, YLABEL, PLOT3, SURF, MESH.
+
+### grid
+GRID  Quadrillage des axes.
+    GRID ON dessine le quadrillage, GRID OFF l'efface.
+    GRID sans argument bascule entre les deux.
+
+    Syntaxe
+       grid on
+       grid off
+       grid
+
+    Exemples
+       plot(1:10); grid on
+
+    Voir aussi AXIS, BOX, XLIM, YLIM.
+
+### box
+BOX  Cadre des axes.
+    BOX ON entoure les axes d'un cadre complet, BOX OFF ne laisse que les
+    deux axes de gauche et du bas.
+
+    Syntaxe
+       box on
+       box off
+       box
+
+    Exemples
+       plot(1:10); box off
+
+    Voir aussi GRID, AXIS.
+
+### bar
+BAR  Diagramme en barres.
+    BAR(Y) trace une barre par élément de Y.
+    BAR(X,Y) place les barres aux abscisses X.
+    BAR(...,LARGEUR) règle la largeur relative des barres (0.8 par défaut).
+
+    Syntaxe
+       bar(y)
+       bar(x,y)
+       bar(___,largeur)
+
+    Exemples
+
+       bar([3 7 2 9]);
+       bar(2000:2004, [12 19 7 15 22]);
+       x = 1:5;  y = rand(1,5);
+       bar(x, y, 0.4);
+
+    Voir aussi HISTOGRAM, STEM, STAIRS, PLOT.
+
+### stem
+STEM  Trace un signal discret : une tige et un cercle par échantillon.
+    STEM(Y) trace Y en fonction de son indice.
+    STEM(X,Y) trace Y en fonction de X.
+
+    C'est le tracé naturel d'une suite : on voit les échantillons, pas une
+    courbe continue qui n'existe pas entre eux.
+
+    Syntaxe
+       stem(y)
+       stem(x,y)
+       stem(___,style)
+
+    Exemples
+       n = 0:20;
+       stem(n, 0.9.^n);
+
+    Voir aussi PLOT, STAIRS, BAR.
+
+### stairs
+STAIRS  Trace en escalier.
+    STAIRS(Y) relie les points par des paliers horizontaux.
+    STAIRS(X,Y) place les paliers aux abscisses X.
+
+    C'est le tracé d'un signal bloqué entre deux échantillons — la sortie
+    d'un bloqueur d'ordre zéro, par exemple.
+
+    Syntaxe
+       stairs(y)
+       stairs(x,y)
+
+    Exemples
+       stairs(0:10, rand(1,11));
+
+    Voir aussi STEM, PLOT, BAR.
+
+### scatter
+SCATTER  Nuage de points.
+    SCATTER(X,Y) place un marqueur à chaque couple (X,Y).
+    SCATTER(X,Y,TAILLE) règle la surface des marqueurs.
+    SCATTER(X,Y,TAILLE,COULEUR) donne leur couleur.
+
+    Syntaxe
+       scatter(x,y)
+       scatter(x,y,taille)
+       scatter(x,y,taille,couleur)
+
+    Exemples
+
+       scatter(randn(1,200), randn(1,200));
+       x = rand(1,50);  y = rand(1,50);
+       scatter(x, y, 36, 'r');
+
+    Voir aussi PLOT, PLOT3, BAR.
+
+### semilogx
+SEMILOGX  Trace avec l'axe des abscisses en échelle logarithmique.
+    SEMILOGX(X,Y) est PLOT(X,Y) avec l'axe des x logarithmique.
+
+    Syntaxe
+       semilogx(y)
+       semilogx(x,y)
+       semilogx(x,y,style)
+
+    Exemples
+
+       f = logspace(0, 4, 200);
+       h = 1 ./ (1 + 1i*f/100);
+       semilogx(f, 20*log10(abs(h))); grid on
+
+    Voir aussi SEMILOGY, LOGLOG, PLOT, LOGSPACE.
+
+### semilogy
+SEMILOGY  Trace avec l'axe des ordonnées en échelle logarithmique.
+    SEMILOGY(X,Y) est PLOT(X,Y) avec l'axe des y logarithmique.
+
+    Syntaxe
+       semilogy(y)
+       semilogy(x,y)
+
+    Exemples
+       semilogy(0:20, exp(-(0:20)/3));
+
+    Voir aussi SEMILOGX, LOGLOG, PLOT.
+
+### loglog
+LOGLOG  Trace avec les deux axes en échelle logarithmique.
+    LOGLOG(X,Y) est PLOT(X,Y) avec les deux axes logarithmiques : une loi
+    de puissance y devient une droite.
+
+    Syntaxe
+       loglog(y)
+       loglog(x,y)
+
+    Exemples
+       x = logspace(0, 3, 50);
+       loglog(x, x.^-2); grid on
+
+    Voir aussi SEMILOGX, SEMILOGY, PLOT.
+
+### plot3
+PLOT3  Courbe en trois dimensions.
+    PLOT3(X,Y,Z) trace la courbe passant par les points (X,Y,Z).
+    PLOT3(X,Y,Z,STYLE) impose couleur, trait et marqueur.
+
+    Syntaxe
+       plot3(x,y,z)
+       plot3(x,y,z,style)
+
+    Exemples
+       t = linspace(0, 10*pi, 500);
+       plot3(cos(t), sin(t), t); grid on
+
+    Voir aussi PLOT, MESH, SURF, ZLABEL.
+
+### mesh
+MESH  Surface en fil de fer.
+    MESH(Z) trace Z sur une grille régulière.
+    MESH(X,Y,Z) trace Z aux points (X,Y).
+
+    Syntaxe
+       mesh(Z)
+       mesh(X,Y,Z)
+
+    Exemples
+       [X, Y] = meshgrid(-3:0.2:3);
+       mesh(X, Y, peaks(X, Y));
+
+    Voir aussi SURF, CONTOUR, MESHGRID, PLOT3.
+
+### surf
+SURF  Surface pleine, colorée par la hauteur.
+    SURF(Z) trace Z sur une grille régulière.
+    SURF(X,Y,Z) trace Z aux points (X,Y).
+
+    Syntaxe
+       surf(Z)
+       surf(X,Y,Z)
+
+    Exemples
+       [X, Y] = meshgrid(-2:0.1:2);
+       surf(X, Y, X.^2 - Y.^2); shading interp
+
+    Voir aussi MESH, CONTOUR, SHADING, COLORMAP, COLORBAR.
+
+### contour
+CONTOUR  Lignes de niveau.
+    CONTOUR(Z) trace les lignes de niveau de Z.
+    CONTOUR(X,Y,Z) les place aux coordonnées (X,Y).
+    CONTOUR(...,N) demande N niveaux.
+
+    Syntaxe
+       contour(Z)
+       contour(X,Y,Z)
+       contour(___,n)
+
+    Exemples
+       [X, Y] = meshgrid(-3:0.1:3);
+       contour(X, Y, X.^2 + Y.^2, 12);
+
+    Voir aussi SURF, MESH, PCOLOR, COLORBAR.
+
+### image
+IMAGE  Affiche une matrice comme une image.
+    IMAGE(C) affiche C, chaque élément étant un indice dans la palette.
+    IMAGE(X,Y,C) place l'image dans le repère.
+
+    Syntaxe
+       image(C)
+       image(x,y,C)
+
+    Exemples
+       image(magic(8)); colormap(gray); axis image
+
+    Voir aussi IMAGESC, COLORMAP, COLORBAR, IMSHOW.
+
+### imagesc
+IMAGESC  Affiche une matrice en étalant ses valeurs sur toute la palette.
+    IMAGESC(C) met le minimum de C au premier ton de la palette et son
+    maximum au dernier : c'est la façon de regarder des données dont on
+    ignore l'échelle.
+    IMAGESC(C,[bas haut]) impose les bornes.
+
+    Syntaxe
+       imagesc(C)
+       imagesc(C,[bas haut])
+       imagesc(x,y,C)
+
+    Exemples
+       imagesc(randn(50)); colorbar
+
+    Voir aussi IMAGE, COLORMAP, COLORBAR, AXIS.
+
+### colorbar
+COLORBAR  Barre de couleurs, avec son échelle.
+    COLORBAR ajoute la barre à droite des axes courants.
+
+    Syntaxe
+       colorbar
+
+    Exemples
+       imagesc(peaks(30)); colorbar
+
+    Voir aussi COLORMAP, IMAGESC, SURF, CONTOUR.
+
+### colormap
+COLORMAP  Palette de couleurs.
+    COLORMAP(NOM) choisit une palette : 'parula', 'jet', 'hot', 'cool',
+    'gray', 'bone', 'copper', 'spring', 'summer', 'autumn', 'winter'.
+    COLORMAP(M) impose une matrice N par 3 de valeurs entre 0 et 1.
+    M = COLORMAP rend la palette courante.
+
+    Syntaxe
+       colormap(nom)
+       colormap(M)
+       M = colormap
+
+    Exemples
+       imagesc(peaks(40)); colormap('hot'); colorbar
+
+    Voir aussi COLORBAR, IMAGESC, SURF, SHADING.
+
+### shading
+SHADING  Rendu des facettes d'une surface.
+    SHADING FLAT donne une couleur unie à chaque facette.
+    SHADING INTERP interpole la couleur à l'intérieur des facettes.
+    SHADING FACETED garde les arêtes noires (défaut).
+
+    Syntaxe
+       shading flat | interp | faceted
+
+    Exemples
+       surf(peaks(40)); shading interp
+
+    Voir aussi SURF, MESH, COLORMAP.
+
+### pcolor
+PCOLOR  Damier coloré : une case par élément.
+    PCOLOR(C) colore une grille selon C.
+    PCOLOR(X,Y,C) la place aux coordonnées (X,Y).
+
+    Syntaxe
+       pcolor(C)
+       pcolor(X,Y,C)
+
+    Exemples
+       pcolor(peaks(30)); shading interp
+
+    Voir aussi IMAGESC, SURF, CONTOUR, SHADING.
+
+### text
+TEXT  Écrit du texte dans les axes.
+    TEXT(X,Y,TEXTE) place le texte au point (X,Y).
+    TEXT(...,'Nom',Valeur) règle 'FontSize', 'Color', 'HorizontalAlignment'.
+
+    Syntaxe
+       text(x,y,texte)
+       text(x,y,texte,'Nom',Valeur)
+
+    Exemples
+       plot(1:10);
+       text(5, 5, 'ici', 'FontSize', 14, 'Color', 'r');
+
+    Voir aussi TITLE, XLABEL, LEGEND.
+
+### drawnow
+DRAWNOW  Force le rafraîchissement des figures.
+    DRAWNOW vide la file d'affichage : ce qui a été tracé apparaît tout de
+    suite, sans attendre la fin du script. C'est ce qu'on met dans une
+    boucle d'animation.
+
+    Syntaxe
+       drawnow
+
+    Exemples
+       for k = 1:100
+           plot(sin((1:100)/10 + k/5)); ylim([-1 1]);
+           drawnow
+       end
+
+    Voir aussi PLOT, FIGURE, PAUSE.
+
+### saveas
+SAVEAS  Enregistre une figure dans un fichier.
+    SAVEAS(F,NOM) enregistre la figure F sous le nom donné ; le format se
+    déduit de l'extension.
+    SAVEAS(F,NOM,FORMAT) impose le format : 'png', 'svg', 'pdf'.
+
+    Syntaxe
+       saveas(f,nom)
+       saveas(f,nom,format)
+
+    Exemples
+       plot(1:10);
+       saveas(gcf, 'courbe.png');
+       saveas(gcf, 'courbe', 'svg');
+
+    Voir aussi PRINT, FIGURE, GCF.
+
+### print
+PRINT  Enregistre ou imprime une figure.
+    PRINT(NOM,PILOTE) enregistre la figure courante ; le pilote est
+    '-dpng', '-dsvg', '-dpdf'.
+
+    Syntaxe
+       print(nom,pilote)
+       print -dpng nom
+
+    Exemples
+       plot(1:10);
+       print('figure.png', '-dpng');
+
+    Voir aussi SAVEAS, FIGURE.
+
+### histogram
+HISTOGRAM  Histogramme des données.
+    HISTOGRAM(X) répartit X en classes choisies automatiquement.
+    HISTOGRAM(X,N) demande N classes.
+    HISTOGRAM(X,BORDS) impose les bords des classes.
+
+    Syntaxe
+       histogram(x)
+       histogram(x,n)
+       histogram(x,bords)
+
+    Exemples
+       histogram(randn(1,10000), 50);
+
+    Voir aussi HISTCOUNTS, BAR, MEAN, STD.

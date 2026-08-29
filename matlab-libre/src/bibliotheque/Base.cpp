@@ -770,10 +770,68 @@ Valeur convertirVers(const Valeur& v, Classe c) {
 FONCTION(fnCast) {
     INUTILISE
     exigerArguments(args, 2, 3, "cast");
+    // MATLAB : « cast(X,'like',p) » convertit X dans la classe de p. C'est
+    // la forme qu'on ecrit dans du code destine a la generation, ou la
+    // classe cible n'est connue qu'a travers un prototype.
+    std::string mode = args[1].versTexte();
+    for (auto& c : mode) c = (char)std::tolower((unsigned char)c);
+    if (mode == "like") {
+        if (args.size() < 3)
+            erreur("MATLAB:minrhs", "Not enough input arguments.");
+        return {convertirVers(args[0], args[2].classe)};
+    }
     bool trouve;
     Classe c = classeDepuisNom(args[1].versTexte(), &trouve);
     if (!trouve) erreur("MATLAB:cast:invalidClass", "Invalid class name.");
     return {convertirVers(args[0], c)};
+}
+
+// Les lignes de texte que porte une valeur : une par ligne d'un tableau de
+// caracteres, une par element d'une cellule ou d'un tableau de strings.
+static void lignesTexte(const Valeur& v, std::vector<std::string>& sortie) {
+    if (v.classe == Classe::Cellule) {
+        for (const auto& c : v.cellules) lignesTexte(c, sortie);
+        return;
+    }
+    if (v.classe == Classe::Chaine) {
+        for (const auto& s : v.chaines) sortie.push_back(s);
+        return;
+    }
+    if (v.classe == Classe::Caractere && v.nlignes() > 1) {
+        int nl = v.nlignes(), nc = v.ncolonnes();
+        for (int i = 0; i < nl; ++i) {
+            std::string s;
+            for (int j = 0; j < nc; ++j)
+                s += (char)(int)v.re[(std::size_t)i + (std::size_t)j * nl];
+            sortie.push_back(s);
+        }
+        return;
+    }
+    // Des nombres : ce sont les codes des caracteres.
+    sortie.push_back(convertirVers(v, Classe::Caractere).versTexte());
+}
+
+// MATLAB : « char(S1,S2,...) » et « char(C) » empilent les textes en
+// lignes, completees d'espaces jusqu'a la plus longue. Avec un seul
+// argument qui n'est ni cellule ni string, c'est la conversion ordinaire.
+FONCTION(fnChar) {
+    INUTILISE
+    if (args.empty()) return {Valeur::videClasse(Classe::Caractere)};
+    if (args.size() == 1 && args[0].classe != Classe::Cellule &&
+        args[0].classe != Classe::Chaine)
+        return {convertirVers(args[0], Classe::Caractere)};
+    std::vector<std::string> lignes;
+    for (const auto& a : args) lignesTexte(a, lignes);
+    if (lignes.empty()) return {Valeur::texte("")};
+    std::size_t largeur = 0;
+    for (const auto& l : lignes) largeur = std::max(largeur, l.size());
+    std::vector<Valeur> rangs;
+    rangs.reserve(lignes.size());
+    for (auto l : lignes) {
+        l.resize(largeur, ' ');
+        rangs.push_back(Valeur::texte(l));
+    }
+    return {concatener(rangs, 0)};
 }
 
 template <Classe C>
@@ -976,7 +1034,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("single", fnConversion<Classe::Simple>, "base", "single  Conversion single.");
     it.enregistrer("logical", fnConversion<Classe::Logique>, "base",
                    "logical  Conversion logique.");
-    it.enregistrer("char", fnConversion<Classe::Caractere>, "base", "char  Conversion char.");
+    it.enregistrer("char", fnChar, "base",
+                   "char  Conversion en caracteres ; empile plusieurs textes en lignes.");
     it.enregistrer("int8", fnConversion<Classe::Int8>, "base", "int8  Entier signe 8 bits.");
     it.enregistrer("int16", fnConversion<Classe::Int16>, "base", "int16  Entier signe 16 bits.");
     it.enregistrer("int32", fnConversion<Classe::Int32>, "base", "int32  Entier signe 32 bits.");

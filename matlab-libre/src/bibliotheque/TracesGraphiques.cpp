@@ -371,17 +371,84 @@ FONCTION(fnHold) {
     return {};
 }
 
+// Bornes qu'on verrait a l'ecran : celles qu'on a fixees, sinon celles des
+// donnees. C'est ce que rend « v = axis », et ce que fige « axis manual ».
+static void bornesAffichees(const Axes& a, double& xmin, double& xmax, double& ymin,
+                            double& ymax) {
+    xmin = INFINITY;
+    xmax = -INFINITY;
+    ymin = INFINITY;
+    ymax = -INFINITY;
+    for (const auto& s : a.series) {
+        for (double v : s.x) {
+            if (!std::isfinite(v)) continue;
+            xmin = std::min(xmin, v);
+            xmax = std::max(xmax, v);
+        }
+        for (double v : s.y) {
+            if (!std::isfinite(v)) continue;
+            ymin = std::min(ymin, v);
+            ymax = std::max(ymax, v);
+        }
+    }
+    if (!std::isfinite(xmin)) { xmin = 0; xmax = 1; }
+    if (!std::isfinite(ymin)) { ymin = 0; ymax = 1; }
+    if (xmax == xmin) { xmin -= 0.5; xmax += 0.5; }
+    if (ymax == ymin) { ymin -= 0.5; ymax += 0.5; }
+    if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
+    if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
+}
+
 FONCTION(fnAxis) {
     INUTILISE
     auto a = axesCourants(it);
-    if (args.empty()) return {};
+    // « v = axis » rend [xmin xmax ymin ymax], comme sous MATLAB.
+    auto rendreBornes = [&]() -> std::vector<Valeur> {
+        double xmin, xmax, ymin, ymax;
+        bornesAffichees(*a, xmin, xmax, ymin, ymax);
+        std::vector<double> v = {xmin, xmax, ymin, ymax};
+        return {Valeur::ligne(v)};
+    };
+    if (args.empty()) return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
     if (args[0].estTexte() || args[0].estChaine()) {
         std::string s = args[0].versTexte();
+        for (auto& c : s) c = (char)std::tolower((unsigned char)c);
         if (s == "auto") {
             a->limitesManuellesX = false;
             a->limitesManuellesY = false;
+        } else if (s == "manual" || s == "tight" || s == "image") {
+            // « tight » serre sur les donnees et fige ; « manual » fige ce
+            // qui est affiche ; « image » y ajoute des echelles egales.
+            double xmin, xmax, ymin, ymax;
+            bornesAffichees(*a, xmin, xmax, ymin, ymax);
+            a->xmin = xmin;
+            a->xmax = xmax;
+            a->ymin = ymin;
+            a->ymax = ymax;
+            a->limitesManuellesX = true;
+            a->limitesManuellesY = true;
+            if (s == "image") a->proportions = Axes::Proportions::Egales;
+        } else if (s == "equal") {
+            a->proportions = Axes::Proportions::Egales;
+        } else if (s == "square") {
+            a->proportions = Axes::Proportions::Carre;
+        } else if (s == "normal") {
+            a->proportions = Axes::Proportions::Auto;
+        } else if (s == "off") {
+            a->axesVisibles = false;
+        } else if (s == "on") {
+            a->axesVisibles = true;
+        } else {
+            erreur("MATLAB:axis:InvalidOption",
+                   "Unknown command option '" + args[0].versTexte() + "'.");
         }
-        return {};
+        // MATLAB accepte « axis equal tight » : on traite les mots
+        // suivants de la meme facon.
+        if (args.size() > 1) {
+            std::vector<Valeur> reste(args.begin() + 1, args.end());
+            fnAxis(it, reste, 0);
+        }
+        return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
     }
     if (args[0].nelem() >= 4) {
         a->xmin = args[0].re[0];
@@ -391,7 +458,7 @@ FONCTION(fnAxis) {
         a->limitesManuellesX = true;
         a->limitesManuellesY = true;
     }
-    return {};
+    return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
 }
 
 FONCTION(fnXlim) {

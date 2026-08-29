@@ -146,6 +146,33 @@ std::string nombreCourt(double v) {
 
 }  // namespace
 
+// « axis square » d'abord — elle change la boite —, puis « axis equal »,
+// qui elargit les bornes de l'axe qui a trop de place pour que les deux
+// echelles aient le meme nombre d'unites par pixel.
+void appliquerProportions(const Axes& a, int& gauche, int& droite, int& haut, int& bas,
+                          double& xmin, double& xmax, double& ymin, double& ymax) {
+    if (a.proportions == Axes::Proportions::Auto) return;
+    if (a.proportions == Axes::Proportions::Carre) {
+        int cote = std::min(droite - gauche, bas - haut);
+        int centreX = (gauche + droite) / 2, centreY = (haut + bas) / 2;
+        gauche = centreX - cote / 2;
+        droite = gauche + cote;
+        haut = centreY - cote / 2;
+        bas = haut + cote;
+        return;
+    }
+    double largeur = droite - gauche, hauteur = bas - haut;
+    if (largeur <= 0 || hauteur <= 0) return;
+    double echelle = std::max((xmax - xmin) / largeur, (ymax - ymin) / hauteur);
+    if (!(echelle > 0)) return;
+    double cx = (xmin + xmax) / 2, cy = (ymin + ymax) / 2;
+    double demiX = echelle * largeur / 2, demiY = echelle * hauteur / 2;
+    xmin = cx - demiX;
+    xmax = cx + demiX;
+    ymin = cy - demiY;
+    ymax = cy + demiY;
+}
+
 std::string rendreSVG(const Figure& figure) {
     std::ostringstream out;
     int L = figure.largeur, H = figure.hauteur;
@@ -191,17 +218,26 @@ std::string rendreSVG(const Figure& figure) {
         ymax += margeY;
         if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
         if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
+        appliquerProportions(a, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
 
         Echelle ex{xmin, xmax, gauche, droite, a.logX};
         Echelle ey{ymin, ymax, bas, haut, a.logY};
 
-        out << "<rect x=\"" << gauche << "\" y=\"" << haut << "\" width=\"" << (droite - gauche)
-            << "\" height=\"" << (bas - haut) << "\" fill=\"white\" stroke=\"#222\"/>\n";
+        // « axis off » : le cadre, les graduations et leurs nombres
+        // disparaissent ; les courbes, elles, restent.
+        if (a.axesVisibles)
+            out << "<rect x=\"" << gauche << "\" y=\"" << haut << "\" width=\""
+                << (droite - gauche) << "\" height=\"" << (bas - haut)
+                << "\" fill=\"white\" stroke=\"#222\"/>\n";
 
         // Les graduations imposees par « ax.XTick = [...] » l'emportent sur
         // celles qu'on choisirait.
-        auto tx = a.ticksX.empty() ? graduations(xmin, xmax, 6) : a.ticksX;
-        auto ty = a.ticksY.empty() ? graduations(ymin, ymax, 6) : a.ticksY;
+        auto tx = a.axesVisibles
+                      ? (a.ticksX.empty() ? graduations(xmin, xmax, 6) : a.ticksX)
+                      : std::vector<double>{};
+        auto ty = a.axesVisibles
+                      ? (a.ticksY.empty() ? graduations(ymin, ymax, 6) : a.ticksY)
+                      : std::vector<double>{};
         for (double v : tx) {
             double px = ex.versPixel(v);
             if (px < gauche - 1 || px > droite + 1) continue;
@@ -343,10 +379,12 @@ std::string rendreSVG(const Figure& figure) {
             out << "<text class=\"titre\" x=\"" << ((gauche + droite) / 2) << "\" y=\""
                 << (haut - 14) << "\" text-anchor=\"middle\">" << echapperXml(a.titre)
                 << "</text>\n";
-        if (!a.etiquetteX.empty())
+        // MATLAB garde le titre sous « axis off », mais pas les etiquettes
+        // des axes : elles nomment ce qui n'est plus dessine.
+        if (!a.etiquetteX.empty() && a.axesVisibles)
             out << "<text x=\"" << ((gauche + droite) / 2) << "\" y=\"" << (bas + 36)
                 << "\" text-anchor=\"middle\">" << echapperXml(a.etiquetteX) << "</text>\n";
-        if (!a.etiquetteY.empty())
+        if (!a.etiquetteY.empty() && a.axesVisibles)
             out << "<text x=\"" << (gauche - 46) << "\" y=\"" << ((haut + bas) / 2)
                 << "\" text-anchor=\"middle\" transform=\"rotate(-90 " << (gauche - 46) << " "
                 << ((haut + bas) / 2) << ")\">" << echapperXml(a.etiquetteY) << "</text>\n";

@@ -48,7 +48,20 @@ struct Axes {
     std::vector<std::string> etiquettesTicksX, etiquettesTicksY;
     bool boite = true;
     double taillePolice = 10;
+    // « axis equal » / « axis square » / « axis off ». MATLAB : equal
+    // donne la meme echelle aux deux axes — un cercle est rond —, square
+    // rend la boite carree, off cache le cadre, les graduations et les
+    // etiquettes sans toucher aux courbes.
+    enum class Proportions { Auto, Egales, Carre };
+    Proportions proportions = Proportions::Auto;
+    bool axesVisibles = true;
 };
+
+// Applique « axis equal » et « axis square » : ajuste la boite en pixels
+// et les bornes pour tenir les proportions demandees. Les deux rendus —
+// le SVG et le bureau — passent par la, pour donner la meme image.
+void appliquerProportions(const Axes& a, int& gauche, int& droite, int& haut, int& bas,
+                          double& xmin, double& xmax, double& ymin, double& ymax);
 
 struct Figure {
     int numero = 1;

@@ -375,6 +375,13 @@ FONCTION(fnBlanks) {
     return {Valeur::texte(std::string((std::size_t)std::max(0, n), ' '))};
 }
 
+// MATLAB : « newline » rend le caractere de fin de ligne, char(10). Il
+// evite d'ecrire sprintf('\n') pour une seule lettre.
+FONCTION(fnNewline) {
+    INUTILISE
+    return {Valeur::texte(std::string(1, '\n'))};
+}
+
 FONCTION(fnStrjust) {
     INUTILISE
     return {args[0]};
@@ -804,6 +811,7 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("fliplr_str", fnFliplrTexte, "texte", "fliplr_str  Inverse un texte.");
     it.enregistrer("reverse", fnFliplrTexte, "texte", "reverse  Inverse un texte.");
     it.enregistrer("blanks", fnBlanks, "texte", "blanks  Chaine de n espaces.");
+    it.enregistrer("newline", fnNewline, "texte", "newline  Caractere de fin de ligne.");
     it.enregistrer("strjust", fnStrjust, "texte", "strjust  Justifie un tableau de caracteres.");
     it.enregistrer("contains", fnContains, "texte", "contains  Le texte contient-il le motif.");
     it.enregistrer("startsWith", fnStartsWith, "texte", "startsWith  Commence par le motif.");
