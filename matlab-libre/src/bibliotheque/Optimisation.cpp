@@ -17,7 +17,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 // Enveloppe une poignée MATLAB en fonction C++ scalaire.
@@ -53,6 +53,7 @@ double lireOption(const std::vector<Valeur>& args, std::size_t debut, const char
 FONCTION(fnFzero) {
     INUTILISE
     exigerArguments(args, 2, 3, "fzero");
+    exigerNumerique(args[1], "fzero");
     auto f = fonctionScalaire(it, args[0]);
     double a, b;
     if (args[1].nelem() >= 2) {
@@ -1597,6 +1598,7 @@ FONCTION(fnOptimget) {
 FONCTION(fnLsqnonneg) {
     INUTILISE
     exigerArguments(args, 2, 3, "lsqnonneg");
+    exigerNumerique(args[0], "lsqnonneg");
     // Algorithme de Lawson-Hanson, version simple.
     const Valeur& A = args[0];
     const Valeur& b = args[1];

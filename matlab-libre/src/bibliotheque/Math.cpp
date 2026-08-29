@@ -15,7 +15,7 @@ namespace {
 using cplx = std::complex<double>;
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 Valeur appliquerComplexe(const Valeur& v, cplx (*f)(const cplx&)) {
@@ -34,9 +34,14 @@ Valeur appliquerComplexe(const Valeur& v, cplx (*f)(const cplx&)) {
 
 Valeur numerique(const Valeur& v) {
     if (v.classe == Classe::Chaine) return versDouble(v);
-    if (v.classe == Classe::Cellule)
+    // Une cellule, une structure, un objet ou une poignee ne portent aucun
+    // nombre : les laisser passer fabriquait une valeur dont « nelem »
+    // annonce des elements que « re » n'a pas, et c'est son affichage qui
+    // faisait tomber le programme.
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction)
         erreur("MATLAB:UndefinedFunction",
-               "Undefined function for input arguments of type 'cell'.");
+               "Undefined function for input arguments of type '" + v.classeNom() + "'.");
     return v;
 }
 
@@ -396,6 +401,8 @@ FONCTION(fnFactorial) {
 FONCTION(fnNchoosek) {
     INUTILISE
     exigerArguments(args, 2, 2, "nchoosek");
+    exigerNumerique(args[0], "nchoosek");
+    exigerNumerique(args[1], "nchoosek");
     if (args[0].nelem() > 1) {
         // Toutes les combinaisons de k éléments.
         int n = (int)args[0].nelem(), k = (int)args[1].scal();

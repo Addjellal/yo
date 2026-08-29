@@ -574,6 +574,28 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         if (!saventLireCreux.count(nom))
             for (auto& a : args)
                 if (a.estCreux()) a = denseDepuisCreux(a);
+        // Garde-fou : une valeur numerique dont « re » est plus court que
+        // « nelem » n'est pas lisible — sa mise en forme sortirait du
+        // tableau, et le programme tomberait loin de la fonction fautive.
+        // Deux comparaisons d'entiers par sortie, et l'erreur nomme le
+        // coupable au lieu de laisser un segment de memoire par terre.
+        auto verifierSorties = [&nom](std::vector<Valeur>& sorties) {
+            for (const Valeur& v : sorties) {
+                if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+                    v.classe == Classe::Objet || v.classe == Classe::Chaine ||
+                    v.classe == Classe::Fonction)
+                    continue;
+                if (v.estCreux()) continue;
+                if (v.re.size() < v.nelem())
+                    erreur("MatLibre:sortieIncoherente",
+                           formater("La fonction '%s' a rendu un tableau %s annonce a %zu "
+                                    "element(s) mais n'en portant que %zu. C'est un defaut "
+                                    "de MatLibre : signalez-le.",
+                                    nom.c_str(), texteDims(v.dims).c_str(), v.nelem(),
+                                    v.re.size()));
+            }
+        };
+
         // Le nom de la native qui echoue est ce que MATLAB imprime en
         // tete de son rapport : « Error using double ». Le try/catch ne
         // coute rien tant que rien n'est leve.
@@ -586,7 +608,9 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
             "error", "rethrow", "throw", "throwAsCaller", "MException", "assert_"};
         if (!profil.actif) {
             try {
-                return it->second.fonction(*this, args, nargout);
+                auto r = it->second.fonction(*this, args, nargout);
+                verifierSorties(r);
+                return r;
             } catch (ErreurMatlab& e) {
                 if (e.fonctionNative.empty() && e.pile.empty() && !porteParole.count(nom))
                     e.fonctionNative = nom;
@@ -596,6 +620,7 @@ std::vector<Valeur> Interpreteur::appeler(const std::string& nom, std::vector<Va
         profil.entrerAppel(nom);
         try {
             auto r = it->second.fonction(*this, args, nargout);
+            verifierSorties(r);
             profil.sortirAppel(nom);
             return r;
         } catch (ErreurMatlab& e) {

@@ -19,7 +19,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 Valeur tableProfil(Interpreteur& it) {

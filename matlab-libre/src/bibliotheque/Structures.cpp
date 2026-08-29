@@ -12,7 +12,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 FONCTION(fnCell) {
@@ -131,6 +131,11 @@ FONCTION(fnStruct2cell) {
 FONCTION(fnCell2struct) {
     INUTILISE
     exigerArguments(args, 2, 3, "cell2struct");
+    // Le premier argument doit etre une cellule : « c.cellules[k] » n'existe
+    // pas ailleurs, et le lire sortait du tableau.
+    if (args[0].classe != Classe::Cellule)
+        erreur("MATLAB:cell2struct:NotACell", "Input C must be a cell array.");
+    exigerSansObjet(args[1], "cell2struct");
     const Valeur& c = args[0];
     const Valeur& noms = args[1];
     Valeur r = Valeur::structureVide();
@@ -172,6 +177,8 @@ FONCTION(fnCell2mat) {
 FONCTION(fnMat2cell) {
     INUTILISE
     exigerArguments(args, 2, 3, "mat2cell");
+    exigerNumerique(args[0], "mat2cell");
+    for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "mat2cell");
     const Valeur& v = args[0];
     std::vector<int> lignes, colonnes;
     for (std::size_t k = 0; k < args[1].nelem(); ++k) lignes.push_back((int)args[1].re[k]);

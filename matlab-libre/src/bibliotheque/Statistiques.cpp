@@ -14,15 +14,19 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 const double PI = 3.14159265358979323846;
 
 int dimensionChoisie(std::vector<Valeur>& args, std::size_t position, const Valeur& v) {
     if (args.size() > position && !args[position].estVide() &&
-        !(args[position].estTexte() || args[position].estChaine()))
-        return (int)args[position].scal() - 1;
+        !(args[position].estTexte() || args[position].estChaine())) {
+        exigerNumerique(args[position], "dim");
+        int d = (int)args[position].scal() - 1;
+        exigerDimension(d);
+        return d;
+    }
     return dimensionParDefaut(v);
 }
 
@@ -137,6 +141,8 @@ double quantileDe(std::vector<double> t, double p) {
 FONCTION(fnQuantile) {
     INUTILISE
     exigerArguments(args, 2, 3, "quantile");
+    exigerNumerique(args[0], "quantile");
+    if (args.size() > 1) exigerNumerique(args[1], "quantile");
     Valeur v = versDouble(args[0]);
     std::vector<double> t(v.re.begin(), v.re.end());
     const Valeur& p = args[1];
@@ -149,6 +155,8 @@ FONCTION(fnQuantile) {
 FONCTION(fnPrctile) {
     INUTILISE
     exigerArguments(args, 2, 3, "prctile");
+    exigerNumerique(args[0], "prctile");
+    if (args.size() > 1) exigerNumerique(args[1], "prctile");
     Valeur v = versDouble(args[0]);
     std::vector<double> t(v.re.begin(), v.re.end());
     const Valeur& p = args[1];
@@ -224,6 +232,8 @@ FONCTION(fnCorr) {
 FONCTION(fnHistcounts) {
     INUTILISE
     exigerArguments(args, 1, 3, "histcounts");
+    exigerNumerique(args[0], "histcounts");
+    if (args.size() > 1) exigerNumerique(args[1], "histcounts");
     Valeur v = versDouble(args[0]);
     int nbClasses = 10;
     std::vector<double> bords;

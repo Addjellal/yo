@@ -15,7 +15,7 @@ namespace {
 using cplx = std::complex<double>;
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 FONCTION(fnPolyval) {
@@ -65,6 +65,7 @@ FONCTION(fnPolyvalm) {
 FONCTION(fnRoots) {
     INUTILISE
     exigerArguments(args, 1, 1, "roots");
+    exigerNumerique(args[0], "roots");
     std::vector<double> c;
     for (std::size_t k = 0; k < args[0].nelem(); ++k) c.push_back(args[0].re[k]);
     // On retire les zéros de tête, puis on résout par la matrice compagnon.
@@ -188,6 +189,8 @@ FONCTION(fnPolyint) {
 FONCTION(fnDeconv) {
     INUTILISE
     exigerArguments(args, 2, 2, "deconv");
+    exigerNumerique(args[0], "deconv");
+    if (args.size() > 1) exigerNumerique(args[1], "deconv");
     // La division fonctionne sur les complexes comme sur les reels : un
     // polynome a coefficients complexes se divise tout aussi bien.
     auto lire = [](const Valeur& v) {
@@ -352,6 +355,7 @@ FONCTION(fnInterp2) {
 FONCTION(fnSpline) {
     INUTILISE
     exigerArguments(args, 2, 3, "spline");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "spline");
     std::vector<double> x(args[0].re.begin(), args[0].re.end());
     std::vector<double> y(args[1].re.begin(), args[1].re.end());
     std::size_t n = x.size();

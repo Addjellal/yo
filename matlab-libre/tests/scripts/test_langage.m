@@ -335,6 +335,58 @@ assert(refuse);
 assert((1 + 2) * 3 == 9);
 assert(isequal(([1 2 3])', [1; 2; 3]));
 
+% Aucune fonction native ne doit tomber sur un argument qui n'a pas la
+% forme attendue. Une cellule, une structure, une poignee ou un tableau de
+% chaines ne portent aucun nombre : « nelem » y compte des elements que le
+% tableau de reels n'a pas, et les parcourir sortait de la memoire — le
+% programme tombait, parfois plus loin, a l'affichage. Une erreur MATLAB
+% est la bonne reponse ; un plantage n'en est jamais une.
+%
+% On ne peut pas eprouver ici les 617 fonctions — un plantage tuerait le
+% test lui-meme — mais on couvre celles ou le defaut se logeait, et les
+% deux familles de garde qui les protegent.
+hostiles = {struct(), @sin, {1, 2}, "", [], 'abc'};
+aEprouver = {'acos', 'asin', 'angle', 'conj', 'roots', 'expm', 'rot90', ...
+             'fliplr', 'flipud', 'flip', 'ctranspose', 'sort', 'sortrows', ...
+             'num2str', 'mat2str', 'string', 'isletter', 'isspace', 'isdigit', ...
+             'fftshift', 'ifftshift', 'zeros', 'ones', 'randi', 'speye', ...
+             'histcounts', 'prctile', 'quantile', 'cumtrapz', 'nchoosek'};
+for k = 1:numel(aEprouver)
+    for j = 1:numel(hostiles)
+        try
+            feval(aEprouver{k}, hostiles{j});
+        catch
+            % Une erreur est le comportement voulu.
+        end
+    end
+end
+% Les arguments de taille et de dimension, eux aussi.
+mauvaisesTailles = {{1, 2}, struct(), @sin, NaN, Inf, -1};
+for j = 1:numel(mauvaisesTailles)
+    for nom = {'zeros', 'ones', 'speye', 'size', 'reshape', 'permute', 'circshift'}
+        try
+            feval(nom{1}, 1, mauvaisesTailles{j});
+        catch
+        end
+    end
+end
+% Une dimension negative indexait avant le tableau et corrompait le tas.
+for nom = {'sum', 'all', 'any', 'prod', 'cumsum', 'cumprod', 'mean'}
+    coupe = false;
+    try
+        feval(nom{1}, [1 2 3], -1);
+    catch e
+        coupe = ~isempty(strfind(e.message, 'Dimension argument'));
+    end
+    assert(coupe);
+end
+% Et ce qui doit marcher marche toujours.
+assert(isequal(sort({'b', 'a'}), {'a', 'b'}));
+assert(isequal(size(zeros(3, 7)), [3 7]));
+assert(isequal(permute(ones(2, 3), [2 1]), ones(3, 2)));
+assert(isletter('a') && ~isletter('1'));
+assert(~isletter(NaN));       % isalpha(INT_MIN) lisait hors de sa table
+
 disp('langage : toutes les verifications passent');
 
 % --------------------------------------------------------------- fonctions

@@ -407,6 +407,12 @@ FLIPUD  Retourne de haut en bas.
     Voir aussi FLIPLR, FLIP, ROT90.
 ```
 
+## `float`
+
+```
+float  Conversion en simple precision. Synonyme de single, propre a MatLibre : MATLAB ne connait que single.
+```
+
 ## `horzcat`
 
 ```

@@ -68,7 +68,7 @@ l'édition de liens.
 ```
 include/matlibre/   en-têtes publics du cœur
 src/coeur/          lexeur, analyseur, interpréteur, indexation, algèbre
-src/bibliotheque/   les 616 fonctions natives, par domaine
+src/bibliotheque/   les 617 fonctions natives, par domaine
 src/graphique/      rendu SVG
 src/console/        l'exécutable
 toolbox/            53 toolboxes écrites en langage MATLAB
@@ -139,6 +139,22 @@ assert(abs(call - 10.4506) < 1e-3);
 
 `assert` accepte les deux formes : `assert(condition, message)` comme
 MATLAB, et `assert(observé, attendu, tolérance)` comme Octave.
+
+## Éprouver les fonctions natives
+
+```bash
+./outils/eprouverNatives.sh
+```
+
+Chaque fonction native est appelée avec des arguments qu'elle n'attend
+pas — une cellule, une structure, une poignée, une taille absurde, une
+dimension négative — chacun dans son propre processus. Une erreur MATLAB
+est le bon comportement ; un plantage n'en est jamais un. C'est là que se
+logent les défauts qu'aucun test ne trouve : une fonction qui parcourt
+`re` d'une valeur qui n'en a pas lit hors de la mémoire, et le programme
+tombe — parfois bien plus loin, à l'affichage. Trois gardes couvrent le
+cas : `exigerNumerique`, `exigerSansObjet` et `argTaille`, dans
+`src/bibliotheque/Communs.cpp`. Le passage prend une demi-heure.
 
 ## Régénérer la référence
 

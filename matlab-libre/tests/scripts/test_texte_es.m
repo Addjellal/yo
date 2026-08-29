@@ -120,4 +120,34 @@ assert(isequal(size(char({'a', 'bbb'})), [2 3]));
 assert(double(newline) == 10);
 assert(numel(strsplit(['a' newline 'b'], newline)) == 2);
 
+%% ------------------------------------------------------- affichage
+% MatLibre montre par defaut tous les chiffres que la valeur porte : pi
+% s'ecrit en entier, et non arrondi a quatre decimales.
+assert(strcmp(strtrim(evalc('disp(pi)')), '3.141592653589793'));
+% Un single n'en porte que sept : au-dela on ecrirait le bruit de sa
+% conversion, pas la valeur. MATLAB s'arrete a sept lui aussi.
+assert(strcmp(strtrim(evalc('disp(single(pi))')), '3.1415927'));
+assert(strcmp(strtrim(evalc('disp(single(1/3))')), '0.3333333'));
+assert(strcmp(class(float(pi)), 'single'));
+assert(float(pi) == single(pi));
+% « format short » rend l'affichage de MATLAB par defaut, « format »
+% seul revient au reglage de depart.
+format short
+assert(strcmp(strtrim(evalc('disp(pi)')), '3.1416'));
+assert(strcmp(strtrim(evalc('disp(single(pi))')), '3.1416'));
+format long
+assert(strcmp(strtrim(evalc('disp(pi)')), '3.141592653589793'));
+format short
+format
+assert(strcmp(strtrim(evalc('disp(pi)')), '3.141592653589793'));
+% Les formes exponentielles suivent la meme regle de chiffres.
+format longE
+assert(strcmp(strtrim(evalc('disp(single(pi))')), '3.1415927e+00'));
+assert(strcmp(strtrim(evalc('disp(pi)')), '3.141592653589793e+00'));
+format
+% Un tableau de singles n'aligne pas plus de chiffres qu'il n'en porte.
+ligneSingle = strtrim(evalc('disp(single([pi 1/3]))'));
+assert(~isempty(strfind(ligneSingle, '3.1415927')));
+assert(isempty(strfind(ligneSingle, '3.14159274')));
+
 disp('texte et entrees-sorties : toutes les verifications passent');

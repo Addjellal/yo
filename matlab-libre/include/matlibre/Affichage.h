@@ -23,7 +23,11 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
 void ecrireValeur(std::ostream& os, const Valeur& v, int format, bool compact,
                   int largeur = 80);
 std::string rendreValeur(const Valeur& v, int format, bool compact, int largeur = 80);
-std::string rendreScalaire(double x, int format);
+// Un scalaire, mis en forme. « simple » dit que la valeur est un
+// « single » : elle ne porte que sept décimales sûres, et MATLAB n'en
+// montre pas davantage — « format long » rend 3.1415927, non
+// 3.141592741012573, qui n'est que la lecture en double d'un single.
+std::string rendreScalaire(double x, int format, bool simple = false);
 std::string nombreVersTexte(double x, int chiffres);
 std::string descriptionCourte(const Valeur& v);
 

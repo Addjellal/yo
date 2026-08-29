@@ -43,7 +43,9 @@ struct Bloc;   // Arbre.h
 struct Noeud;  // Arbre.h
 struct FonctionUtilisateur;
 
-using Builtin = std::vector<Valeur> (*)(Interpreteur&, std::vector<Valeur>&, int);
+class Arguments;
+
+using Builtin = std::vector<Valeur> (*)(Interpreteur&, Arguments, int);
 
 struct Fonction {
     enum Genre { Native, Utilisateur, Anonyme } genre = Native;
@@ -156,6 +158,48 @@ public:
     void retirerChamp(const std::string& nom);
     void detacherStructure();  // copie à l'écriture
 };
+
+// Les arguments d'une fonction native : le vecteur lui-même, avec un
+// « operator[] » qui refuse au lieu de lire hors du tableau.
+//
+// C'est un contrôle par accès — une comparaison d'entiers —, et il vaut
+// pour les six cent dix-sept fonctions à la fois. Sans lui, chacune
+// devait penser à vérifier son arité : « asin() » sans argument lisait
+// args[0] d'un vecteur vide et le programme tombait, là où MATLAB dit
+// « Not enough input arguments ».
+class Arguments {
+public:
+    Arguments(std::vector<Valeur>& v) : v_(v) {}   // conversion voulue
+    Valeur& operator[](std::size_t k) const {
+        if (k >= v_.size()) manquant();
+        return v_[k];
+    }
+    std::size_t size() const { return v_.size(); }
+    bool empty() const { return v_.empty(); }
+    std::vector<Valeur>::iterator begin() const { return v_.begin(); }
+    std::vector<Valeur>::iterator end() const { return v_.end(); }
+    Valeur& back() const {
+        if (v_.empty()) manquant();
+        return v_.back();
+    }
+    void push_back(Valeur v) { v_.push_back(std::move(v)); }
+    void pop_back() { v_.pop_back(); }
+    void resize(std::size_t n) { v_.resize(n); }
+    // Quelques fonctions réécrivent leur liste d'arguments avant de la
+    // relire : « conv2 » la remplace par la forme séparable.
+    Arguments& operator=(const std::vector<Valeur>& autre) {
+        v_ = autre;
+        return *this;
+    }
+    // Pour tout ce qui attend encore un vecteur : les fonctions communes,
+    // « appeler », la boucle des tranches.
+    operator std::vector<Valeur>&() const { return v_; }
+
+private:
+    [[noreturn]] static void manquant();
+    std::vector<Valeur>& v_;
+};
+
 
 std::size_t produitDims(const Dims& d);
 Dims dimsDe(int l, int c);

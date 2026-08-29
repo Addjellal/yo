@@ -37,8 +37,25 @@ comptes = comptes(ordre);
 total = sum(comptes);
 modules = numel(noms);
 
+% Les fiches d'aide : une par ligne « ### nom » dans toolbox/aide.
+fiches = 0;
+fichesTrouvees = dir(fullfile(racine, 'toolbox', 'aide', '*.txt'));
+for k = 1:numel(fichesTrouvees)
+    lignesFiche = strsplit(fileread(fullfile(racine, 'toolbox', 'aide', ...
+                                             fichesTrouvees(k).name)), sprintf('\n'));
+    for j = 1:numel(lignesFiche)
+        if strncmp(lignesFiche{j}, '### ', 4)
+            fiches = fiches + 1;
+        end
+    end
+end
+
+% Les suites de test ecrites dans le langage.
+suites = numel(dir(fullfile(racine, 'tests', 'scripts', 'test_*.m')));
+
 fprintf('%d fonctions natives, %d fonctions de toolbox, %d modules\n', ...
         natives, total, modules);
+fprintf('%d fiches d''aide, %d suites de test\n', fiches, suites);
 
 % ------------------------------------ la colonne de documentation/toolboxes.md
 chemin = fullfile(racine, 'documentation', 'toolboxes.md');
@@ -102,7 +119,11 @@ motifs = {'\d+ fonctions natives', sprintf('%d fonctions natives', natives)
           'fonctions natives — \d+,', sprintf('fonctions natives — %d,', natives)
           'réparties en \*\*\d+ modules\*\*', sprintf('réparties en **%d modules**', modules)
           'réparties en \d+ modules', sprintf('réparties en %d modules', modules)
-          'les \d+ modules et leur', sprintf('les %d modules et leur', modules)};
+          'les \d+ modules et leur', sprintf('les %d modules et leur', modules)
+          '\d+ fonctions ont leur fiche', sprintf('%d fonctions ont leur fiche', fiches)
+          '\d+ suites en langage MATLAB', sprintf('%d suites en langage MATLAB', suites)
+          '\d+ suites écrites dans le langage', ...
+              sprintf('%d suites écrites dans le langage', suites)};
 for f = 1:numel(fichiers)
     texte = fileread(fichiers{f});
     avant = texte;

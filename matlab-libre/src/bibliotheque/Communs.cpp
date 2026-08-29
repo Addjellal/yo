@@ -23,6 +23,59 @@ void exigerArguments(const std::vector<Valeur>& args, std::size_t mini, std::siz
                formater("Too many input arguments to '%s'.", nom));
 }
 
+// Ce qui ne porte pas de nombres : une cellule, une structure, un objet,
+// une poignee. « nelem » y compte des elements que « re » n'a pas, si
+// bien qu'un parcours de « re » sort du tableau. A appeler avant de le
+// parcourir, dans les fonctions qui le font a la main.
+void exigerNumerique(const Valeur& v, const char* nom) {
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction ||
+        v.classe == Classe::Chaine)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.", nom,
+                        v.classeNom().c_str()));
+}
+
+// Une taille : finie, positive, representable en « int ». Sans ce
+// controle, « (int)NaN » vaut INT_MIN et l'on demandait un tableau de
+// taille negative.
+int argTaille(double x, const char* nom) {
+    if (!std::isfinite(x) || x < 0.0 || x > 2147483647.0)
+        erreur("MATLAB:invalidSizeInput",
+               formater("Size argument of '%s' must be a finite non-negative integer.",
+                        nom));
+    return (int)x;
+}
+
+// L'ordre donne a PERMUTE doit etre une permutation de 1..N, N valant au
+// moins le nombre de dimensions : un ordre incomplet ou hors bornes
+// indexait le tableau hors de lui.
+void exigerPermutation(const Valeur& ordre, const Valeur& v, const char* nom) {
+    std::size_t n = ordre.nelem();
+    if (n < v.dims.size())
+        erreur("MATLAB:permute:invalidPermutation",
+               formater("ORDER must have at least N elements for an N-D array in '%s'.",
+                        nom));
+    std::vector<bool> vus(n, false);
+    for (std::size_t k = 0; k < n && k < ordre.re.size(); ++k) {
+        double x = ordre.re[k];
+        if (!(x >= 1.0 && x <= (double)n) || x != std::floor(x) || vus[(std::size_t)x - 1])
+            erreur("MATLAB:permute:invalidPermutation",
+                   formater("ORDER must be a permutation of 1:N in '%s'.", nom));
+        vus[(std::size_t)x - 1] = true;
+    }
+}
+
+// Comme au-dessus, mais les cellules restent admises : « sort », « setdiff »
+// et « string » travaillent aussi sur des cellules de textes.
+void exigerSansObjet(const Valeur& v, const char* nom) {
+    if (v.classe == Classe::Structure || v.classe == Classe::Objet ||
+        v.classe == Classe::Fonction)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.", nom,
+                        v.classeNom().c_str()));
+}
+
 double argScalaire(const std::vector<Valeur>& args, std::size_t k, const char* nom) {
     if (k >= args.size())
         erreur("MATLAB:minrhs", formater("Not enough input arguments to '%s'.", nom));
@@ -51,16 +104,29 @@ void rognerDimsFinales(Dims& d) {
     while (d.size() < 2) d.push_back(1);
 }
 
+// Une cellule, une structure, un objet ou une poignee ne portent aucun
+// nombre : « nelem » compte leurs elements, mais « re » est vide. Lire
+// « re[k] » sortait du tableau, et « zeros({1,2}) » faisait tomber le
+// programme. MATLAB refuse, en le disant.
+static void exigerTailleNumerique(const Valeur& v) {
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction ||
+        v.classe == Classe::Chaine)
+        erreur("MATLAB:invalidSizeInput", "Size inputs must be numeric.");
+}
+
 Dims dimsDepuisArguments(const std::vector<Valeur>& args, std::size_t debut, std::size_t fin) {
     Dims d;
     if (debut >= fin) return Dims{1, 1};
+    for (std::size_t k = debut; k < fin; ++k) exigerTailleNumerique(args[k]);
     if (fin - debut == 1) {
         const Valeur& v = args[debut];
         if (v.nelem() == 1) {
             int n = (int)v.scal();
             return Dims{std::max(0, n), std::max(0, n)};
         }
-        for (std::size_t k = 0; k < v.nelem(); ++k) d.push_back(std::max(0, (int)v.re[k]));
+        for (std::size_t k = 0; k < v.nelem() && k < v.re.size(); ++k)
+            d.push_back(std::max(0, (int)v.re[k]));
         if (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
         rognerDimsFinales(d);
         return d;
@@ -302,8 +368,21 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
 
 // ------------------------------------------------------------- réductions
 
+// Une dimension negative indexait « d[(std::size_t)dimension] », donc un
+// mot situe bien avant le tableau : le tas etait ecrase, et le programme
+// tombait plus tard, ailleurs. Les deux parcours qui suivent sont le
+// passage oblige de toutes les reductions : le controle y tient une fois
+// pour toutes.
+void exigerDimension(int dimension) {
+    if (dimension < 0)
+        erreur("MATLAB:getdimarg:dimensionMustBePositiveInteger",
+               "Dimension argument must be a positive integer scalar within indexing "
+               "range.");
+}
+
 void parcourirTranches(const Valeur& v, int dimension,
                        const std::function<void(std::vector<double>&, std::size_t)>& f) {
+    exigerDimension(dimension);
     Dims d = v.dims;
     while ((int)d.size() <= dimension) d.push_back(1);
     std::size_t interne = 1;
@@ -323,6 +402,7 @@ void parcourirTranches(const Valeur& v, int dimension,
 
 Valeur reduire(const Valeur& v, int dimension, bool garderDim,
                const std::function<double(const std::vector<double>&)>& f) {
+    exigerDimension(dimension);
     Dims d = v.dims;
     while ((int)d.size() <= dimension) d.push_back(1);
     Dims rd = d;

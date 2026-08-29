@@ -17,7 +17,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 const char* palette(std::size_t k) {
@@ -171,6 +171,7 @@ FONCTION(fnPlot3) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, 
 FONCTION(fnHistogramme) {
     INUTILISE
     exigerArguments(args, 1, 3, "histogram");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "histogram");
     std::vector<Valeur> a = {args[0]};
     if (args.size() > 1) a.push_back(args[1]);
     auto comptes = it.appeler("histcounts", a, 2);

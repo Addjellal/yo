@@ -202,7 +202,7 @@ bool lireFigure(Interpreteur& it, const Valeur& p, const std::string& nom, Valeu
 }
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 
 // set(poignee, 'Nom', valeur, ...) — la forme historique, toujours en usage.
 FONCTION(fnSetPoignee) {

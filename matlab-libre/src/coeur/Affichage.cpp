@@ -25,8 +25,15 @@ std::string nombreVersTexte(double x, int chiffres) {
     return formater("%.*g", chiffres, x);
 }
 
-std::string rendreScalaire(double x, int format) {
+// Nombre de décimales que « format long » accorde à une classe : quinze
+// pour un double, sept pour un single. Au-delà, on n'écrirait plus la
+// valeur mais le bruit de sa conversion — 3.141592741012573 n'est pas
+// « pi en simple précision », c'est la lecture en double d'un single.
+int decimalesLongues(bool simple) { return simple ? 7 : 15; }
+
+std::string rendreScalaire(double x, int format, bool simple) {
     Format f = (Format)format;
+    const int longues = decimalesLongues(simple);
     if (std::isnan(x)) return "NaN";
     if (std::isinf(x)) return x > 0 ? "Inf" : "-Inf";
     switch (f) {
@@ -34,12 +41,13 @@ std::string rendreScalaire(double x, int format) {
             // « format long » montre quinze décimales, pas quinze chiffres
             // significatifs : pi s'écrit 3.141592653589793.
             if (estEntierAffichable(x)) return formater("%.0f", x);
-            if (std::fabs(x) >= 1e5 || std::fabs(x) < 1e-5) return formater("%.15e", x);
-            return formater("%.15f", x);
+            if (std::fabs(x) >= 1e5 || std::fabs(x) < 1e-5)
+                return formater("%.*e", longues, x);
+            return formater("%.*f", longues, x);
         case Format::CourtE: return formater("%.4e", x);
-        case Format::LongE: return formater("%.15e", x);
+        case Format::LongE: return formater("%.*e", longues, x);
         case Format::CourtG: return formater("%g", x);
-        case Format::LongG: return formater("%.15g", x);
+        case Format::LongG: return formater("%.*g", longues + 1, x);
         case Format::Banque: return formater("%.2f", x);
         case Format::Plus: return x > 0 ? "+" : (x < 0 ? "-" : " ");
         case Format::Hex: {
@@ -77,6 +85,8 @@ struct PlanColonne {
     double facteur = 1.0;
 };
 
+int decimalesLongues(bool simple);
+
 static PlanColonne planifier(const Valeur& v, Format format) {
     PlanColonne p;
     double maxAbs = 0, minAbs = INFINITY;
@@ -97,7 +107,10 @@ static PlanColonne planifier(const Valeur& v, Format format) {
     }
     if (!aFini) maxAbs = 1.0;
     if (!std::isfinite(minAbs)) minAbs = maxAbs;
-    p.decimales = (format == Format::Long || format == Format::LongG) ? 15 : 4;
+    const bool simple = v.classe == Classe::Simple;
+    p.decimales = (format == Format::Long || format == Format::LongG)
+                      ? decimalesLongues(simple)
+                      : 4;
     if (p.entiers) {
         int largeurMax = 1;
         for (std::size_t k = 0; k < v.re.size(); ++k) {
@@ -116,7 +129,8 @@ static PlanColonne planifier(const Valeur& v, Format format) {
     double echelle = maxAbs / p.facteur;
     if (echelle >= 1) chiffresEntiers = (int)std::floor(std::log10(echelle)) + 1;
     p.largeur = std::max(chiffresEntiers + 1 + p.decimales + 3 + (aNegatif ? 1 : 0), 8);
-    if (format == Format::Long) p.largeur = chiffresEntiers + 1 + 15 + 3 + (aNegatif ? 1 : 0);
+    if (format == Format::Long)
+        p.largeur = chiffresEntiers + 1 + p.decimales + 3 + (aNegatif ? 1 : 0);
     return p;
 }
 
@@ -226,7 +240,9 @@ static std::string rendreCellule(const Valeur& v, int format, bool compact, int 
             const Valeur& e = v.cellules[k];
             std::string entete = formater("[%d,%d] = ", i + 1, j + 1);
             if (e.estScalaire() && (e.estNumerique() || e.classe == Classe::Logique)) {
-                sortie += "    " + entete + rendreScalaire(e.re.empty() ? 0 : e.re[0], format) +
+                sortie += "    " + entete +
+                          rendreScalaire(e.re.empty() ? 0 : e.re[0], format,
+                                         e.classe == Classe::Simple) +
                           "\n";
             } else if (e.estTexte() && e.nlignes() <= 1) {
                 sortie += "    " + entete + "'" + e.versTexte() + "'\n";
@@ -257,7 +273,9 @@ static std::string rendreStructure(const Valeur& v, int format, bool compact, in
         Valeur e = v.champ(nom, 0);
         std::string entete = "    " + nom + ": ";
         if (e.estScalaire() && (e.estNumerique() || e.classe == Classe::Logique)) {
-            sortie += entete + rendreScalaire(e.re.empty() ? 0 : e.re[0], format) + "\n";
+            sortie += entete +
+                      rendreScalaire(e.re.empty() ? 0 : e.re[0], format,
+                                     e.classe == Classe::Simple) + "\n";
         } else if (e.estTexte() && e.nlignes() <= 1) {
             sortie += entete + "'" + e.versTexte() + "'\n";
         } else if (e.estChaine() && e.estScalaire()) {
@@ -271,7 +289,7 @@ static std::string rendreStructure(const Valeur& v, int format, bool compact, in
             std::string ligne = "[";
             for (std::size_t k = 0; k < e.re.size(); ++k) {
                 if (k) ligne += " ";
-                ligne += rendreScalaire(e.re[k], format);
+                ligne += rendreScalaire(e.re[k], format, e.classe == Classe::Simple);
             }
             ligne += "]";
             sortie += entete + ligne + "\n";
@@ -368,12 +386,13 @@ void afficherResultat(Interpreteur& it, const std::string& nom, const Valeur& v)
     if (v.estScalaire() && (v.estNumerique() || v.classe == Classe::Logique) &&
         !v.estComplexe()) {
         court = true;
-        valeurCourte = rendreScalaire(v.re[0], format);
+        valeurCourte = rendreScalaire(v.re[0], format, v.classe == Classe::Simple);
     } else if (v.estScalaire() && v.estComplexe()) {
         court = true;
         double re = v.re[0], im = v.im[0];
-        valeurCourte = rendreScalaire(re, format) + (im < 0 ? " - " : " + ") +
-                       rendreScalaire(std::fabs(im), format) + "i";
+        const bool simple = v.classe == Classe::Simple;
+        valeurCourte = rendreScalaire(re, format, simple) + (im < 0 ? " - " : " + ") +
+                       rendreScalaire(std::fabs(im), format, simple) + "i";
     } else if (v.classe == Classe::Fonction) {
         court = true;
         valeurCourte = v.fn ? v.fn->texte : "@()";

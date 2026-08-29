@@ -14,7 +14,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 // Sépare une éventuelle classe finale : zeros(3,'int32').
@@ -37,6 +37,7 @@ Classe extraireClasse(std::vector<Valeur>& args, Classe defaut) {
 FONCTION(fnSize) {
     INUTILISE
     exigerArguments(args, 1, 3, "size");
+    for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "size");
     Dims d = args[0].dims;
     while (d.size() < 2) d.push_back(1);
     if (args.size() >= 2) {
@@ -231,6 +232,7 @@ FONCTION(fnRandn) {
 FONCTION(fnRandi) {
     INUTILISE
     exigerArguments(args, 1, 0, "randi");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "randi");
     Classe c = extraireClasse(args, Classe::Double);
     double bas = 1, haut = 1;
     if (args[0].nelem() >= 2) {
@@ -385,6 +387,7 @@ FONCTION(fnColon) {
 FONCTION(fnRepmat) {
     INUTILISE
     exigerArguments(args, 2, 0, "repmat");
+    exigerSansObjet(args[0], "repmat");
     const Valeur& v = args[0];
     Dims rep = dimsDepuisArguments(args, 1, args.size());
     std::size_t nd = std::max(v.dims.size(), rep.size());
@@ -450,6 +453,8 @@ FONCTION(fnVertcat) { INUTILISE return {concatener(args, 0)}; }
 FONCTION(fnReshape) {
     INUTILISE
     exigerArguments(args, 2, 0, "reshape");
+    exigerSansObjet(args[0], "reshape");
+    for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "reshape");
     Dims d;
     int inconnue = -1;
     if (args.size() == 2) {
@@ -476,6 +481,9 @@ FONCTION(fnReshape) {
 FONCTION(fnPermute) {
     INUTILISE
     exigerArguments(args, 2, 2, "permute");
+    exigerSansObjet(args[0], "permute");
+    if (args.size() > 1) exigerNumerique(args[1], "permute");
+    exigerPermutation(args[1], args[0], "permute");
     std::vector<int> ordre;
     for (std::size_t k = 0; k < args[1].nelem(); ++k) ordre.push_back((int)args[1].re[k] - 1);
     return {permuterDims(args[0], ordre)};
@@ -484,6 +492,9 @@ FONCTION(fnPermute) {
 FONCTION(fnIpermute) {
     INUTILISE
     exigerArguments(args, 2, 2, "ipermute");
+    exigerSansObjet(args[0], "ipermute");
+    if (args.size() > 1) exigerNumerique(args[1], "ipermute");
+    exigerPermutation(args[1], args[0], "ipermute");
     std::vector<int> ordre((std::size_t)args[1].nelem());
     for (std::size_t k = 0; k < args[1].nelem(); ++k)
         ordre[(std::size_t)((int)args[1].re[k] - 1)] = (int)k;
@@ -504,6 +515,8 @@ FONCTION(fnSqueeze) {
 FONCTION(fnCircshift) {
     INUTILISE
     exigerArguments(args, 2, 3, "circshift");
+    exigerSansObjet(args[0], "circshift");
+    for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "circshift");
     const Valeur& v = args[0];
     Dims d = v.dims;
     std::vector<int> decalages(d.size(), 0);
@@ -573,15 +586,25 @@ Valeur retourner(const Valeur& v, int dimension) {
 FONCTION(fnFlip) {
     INUTILISE
     exigerArguments(args, 1, 2, "flip");
+    exigerSansObjet(args[0], "flip");
     int dim = args.size() > 1 ? (int)args[1].scal() - 1 : dimensionParDefaut(args[0]);
     return {retourner(args[0], dim)};
 }
-FONCTION(fnFliplr) { INUTILISE return {retourner(args[0], 1)}; }
-FONCTION(fnFlipud) { INUTILISE return {retourner(args[0], 0)}; }
+FONCTION(fnFliplr) {
+    INUTILISE
+    exigerSansObjet(args[0], "fliplr");
+    return {retourner(args[0], 1)};
+}
+FONCTION(fnFlipud) {
+    INUTILISE
+    exigerSansObjet(args[0], "flipud");
+    return {retourner(args[0], 0)};
+}
 
 FONCTION(fnRot90) {
     INUTILISE
     exigerArguments(args, 1, 2, "rot90");
+    exigerSansObjet(args[0], "rot90");
     int k = args.size() > 1 ? ((int)args[1].scal() % 4 + 4) % 4 : 1;
     Valeur v = args[0];
     for (int i = 0; i < k; ++i) v = retourner(transposer(v, false), 0);
@@ -589,11 +612,16 @@ FONCTION(fnRot90) {
 }
 
 FONCTION(fnTranspose) { INUTILISE return {transposer(args[0], false)}; }
-FONCTION(fnCtranspose) { INUTILISE return {transposer(args[0], true)}; }
+FONCTION(fnCtranspose) {
+    INUTILISE
+    exigerSansObjet(args[0], "ctranspose");
+    return {transposer(args[0], true)};
+}
 
 FONCTION(fnMeshgrid) {
     INUTILISE
     exigerArguments(args, 1, 3, "meshgrid");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "meshgrid");
     Valeur x = args[0];
     Valeur y = args.size() > 1 ? args[1] : args[0];
     int nx = (int)x.nelem(), ny = (int)y.nelem();
@@ -627,6 +655,7 @@ FONCTION(fnMeshgrid) {
 FONCTION(fnNdgrid) {
     INUTILISE
     exigerArguments(args, 1, 0, "ndgrid");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "ndgrid");
     if (args.size() == 1) args.push_back(args[0]);
     Valeur x = args[0], y = args[1];
     int nx = (int)x.nelem(), ny = (int)y.nelem();
@@ -663,6 +692,8 @@ FONCTION(fnSub2ind) {
 FONCTION(fnInd2sub) {
     INUTILISE
     exigerArguments(args, 2, 2, "ind2sub");
+    exigerNumerique(args[0], "ind2sub");
+    exigerNumerique(args[1], "ind2sub");
     Dims d;
     for (std::size_t k = 0; k < args[0].nelem(); ++k) d.push_back((int)args[0].re[k]);
     int sorties = std::max(1, nargout);
@@ -1041,6 +1072,14 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("cast", fnCast, "base", "cast  Conversion vers une classe nommee.");
     it.enregistrer("double", fnConversion<Classe::Double>, "base", "double  Conversion double.");
     it.enregistrer("single", fnConversion<Classe::Simple>, "base", "single  Conversion single.");
+    // « float » n'existe pas sous MATLAB — « single » est le nom de la
+    // simple precision. On l'accepte comme synonyme, parce que c'est le
+    // mot qu'on ecrit en venant d'un autre langage ; « class » rend bien
+    // « single », et un script ecrit avec « float » ne tournera pas sous
+    // MATLAB.
+    it.enregistrer("float", fnConversion<Classe::Simple>, "base",
+                   "float  Conversion en simple precision. Synonyme de single, propre a "
+                   "MatLibre : MATLAB ne connait que single.");
     it.enregistrer("logical", fnConversion<Classe::Logique>, "base",
                    "logical  Conversion logique.");
     it.enregistrer("char", fnChar, "base",

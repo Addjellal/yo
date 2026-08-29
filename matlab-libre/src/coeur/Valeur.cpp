@@ -283,6 +283,10 @@ std::string Valeur::versTexte() const {
     return s;
 }
 
+void Arguments::manquant() {
+    erreur("MATLAB:minrhs", "Not enough input arguments.");
+}
+
 std::string Valeur::classeNom() const {
     if (classe == Classe::Objet) return nomObjet;
     return nomClasse(classe);
@@ -372,6 +376,16 @@ void Valeur::retirerChamp(const std::string& nom) {
 }
 
 Valeur versDouble(const Valeur& v) {
+    // Une cellule, une structure, un objet ou une poignee ne portent aucun
+    // nombre. Leur poser la classe « double » fabriquait une valeur dont
+    // « nelem » annonce des elements que « re » n'a pas : la premiere
+    // lecture sortait du tableau, et le programme tombait — parfois plus
+    // tard, ailleurs. MATLAB refuse la conversion, en nommant les deux
+    // classes.
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction)
+        erreur("MATLAB:invalidConversion",
+               "Conversion to double from " + v.classeNom() + " is not possible.");
     Valeur r = v;
     if (r.classe == Classe::Chaine) {
         Valeur t = Valeur::texte(r.chaines.empty() ? std::string() : r.chaines[0]);

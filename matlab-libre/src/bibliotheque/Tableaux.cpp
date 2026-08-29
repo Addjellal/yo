@@ -17,21 +17,28 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 Valeur enDouble(const Valeur& v) {
-    if (v.classe == Classe::Cellule)
+    // Une cellule, une structure, un objet ou une poignee n'ont pas de
+    // « re » : les parcourir sortait du tableau.
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction)
         erreur("MATLAB:UndefinedFunction",
-               "Undefined function for input arguments of type 'cell'.");
+               "Undefined function for input arguments of type '" + v.classeNom() + "'.");
     if (v.classe == Classe::Chaine || v.classe == Classe::Caractere) return versDouble(v);
     return v;
 }
 
 int dimensionArgument(std::vector<Valeur>& args, std::size_t position, const Valeur& v) {
     if (args.size() > position && !args[position].estVide() &&
-        !(args[position].estTexte() || args[position].estChaine()))
-        return (int)args[position].scal() - 1;
+        !(args[position].estTexte() || args[position].estChaine())) {
+        exigerNumerique(args[position], "dim");
+        int d = (int)args[position].scal() - 1;
+        exigerDimension(d);
+        return d;
+    }
     return dimensionParDefaut(v);
 }
 
@@ -338,12 +345,15 @@ std::vector<Valeur> trier(std::vector<Valeur>& args, int nargout) {
 
 FONCTION(fnSort) {
     INUTILISE
+    exigerSansObjet(args[0], "sort");
     return trier(args, nargout);
 }
 
 FONCTION(fnSortrows) {
     INUTILISE
     exigerArguments(args, 1, 2, "sortrows");
+    exigerNumerique(args[0], "sortrows");
+    if (args.size() > 1) exigerNumerique(args[1], "sortrows");
     const Valeur& v = args[0];
     int l = v.nlignes(), c = v.ncolonnes();
     std::vector<int> colonnes;
@@ -776,6 +786,8 @@ FONCTION(fnIntersect) {
 FONCTION(fnSetdiff) {
     INUTILISE
     exigerArguments(args, 2, 3, "setdiff");
+    exigerSansObjet(args[0], "setdiff");
+    if (args.size() > 1) exigerSansObjet(args[1], "setdiff");
     return operationEnsemble(args, nargout, 2);
 }
 
@@ -899,8 +911,8 @@ FONCTION(fnDot) {
 FONCTION(fnAccumarray) {
     INUTILISE
     exigerArguments(args, 2, 5, "accumarray");
-    const Valeur& sujets = args[0];
-    const Valeur& valeurs = args[1];
+    const Valeur sujets = enDouble(args[0]);
+    const Valeur valeurs = enDouble(args[1]);
     std::size_t n = sujets.nlignes();
     int taille = 0;
     for (std::size_t k = 0; k < n; ++k) taille = std::max(taille, (int)sujets.re[k]);
@@ -938,6 +950,7 @@ FONCTION(fnHistc) {
 FONCTION(fnCumtrapz) {
     INUTILISE
     exigerArguments(args, 1, 2, "cumtrapz");
+    exigerNumerique(args[0], "cumtrapz");
     const Valeur& y = enDouble(args.size() > 1 ? args[1] : args[0]);
     std::vector<double> x;
     if (args.size() > 1)

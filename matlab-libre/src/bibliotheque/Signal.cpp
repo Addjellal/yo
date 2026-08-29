@@ -80,7 +80,7 @@ void transformeeFourier(std::vector<cplx>& a, bool inverse) {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 std::vector<cplx> versVecteurComplexe(const Valeur& v) {
@@ -180,6 +180,7 @@ FONCTION(fnIfft2) {
 }
 
 Valeur decalage(const Valeur& v, bool inverse) {
+    exigerNumerique(v, "fftshift");
     Valeur r = v;
     std::size_t n = v.nelem();
     if (v.estVecteur() || v.estScalaire()) {
@@ -204,8 +205,16 @@ Valeur decalage(const Valeur& v, bool inverse) {
     return r;
 }
 
-FONCTION(fnFftshift) { INUTILISE return {decalage(args[0], false)}; }
-FONCTION(fnIfftshift) { INUTILISE return {decalage(args[0], true)}; }
+FONCTION(fnFftshift) {
+    INUTILISE
+    exigerNumerique(args[0], "fftshift");
+    return {decalage(args[0], false)};
+}
+FONCTION(fnIfftshift) {
+    INUTILISE
+    exigerNumerique(args[0], "ifftshift");
+    return {decalage(args[0], true)};
+}
 
 FONCTION(fnConv) {
     INUTILISE
@@ -498,6 +507,7 @@ FONCTION(fnFreqz) {
 FONCTION(fnDownsample) {
     INUTILISE
     exigerArguments(args, 2, 3, "downsample");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "downsample");
     const Valeur& v = args[0];
     int n = (int)args[1].scal();
     int decalage = args.size() > 2 ? (int)args[2].scal() : 0;

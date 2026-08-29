@@ -16,7 +16,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 std::string typeDeCle(const Valeur& v) {
@@ -51,9 +51,13 @@ FONCTION(fnMap) {
             for (const auto& c : cles.chaines) listeCles.push_back(Valeur::chaine(c));
         else if (cles.estTexte())
             listeCles.push_back(cles);
-        else
+        else {
+            // Une structure, un objet ou une poignee ne portent pas de
+            // nombres : « re[k] » y sortait du tableau.
+            exigerNumerique(cles, "containers.Map");
             for (std::size_t k = 0; k < cles.nelem(); ++k)
                 listeCles.push_back(Valeur::scalaire(cles.re[k]));
+        }
         if (valeurs.classe == Classe::Cellule)
             for (const auto& c : valeurs.cellules) listeValeurs.push_back(c);
         else if (valeurs.estTexte() && listeCles.size() == 1)

@@ -134,6 +134,12 @@ UniteCompilee Analyseur::analyserUnite() {
         if (fini()) break;
         if (jeton().estMot("function")) {
             u.fonctions.push_back(definitionFonction());
+        } else if (u.script) {
+            // Du code apres une definition de fonction, dans un script :
+            // MATLAB veut les fonctions locales a la fin du fichier, et le
+            // dit. « Unexpected token 'x' at file level » ne designait rien.
+            erreurSyntaxe("Function definitions in a script must appear at the end of "
+                          "the file.");
         } else {
             erreurSyntaxe("Unexpected token '" + jeton().texte + "' at file level.");
         }

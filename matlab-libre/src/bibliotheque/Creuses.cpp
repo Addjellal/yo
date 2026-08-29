@@ -14,7 +14,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 FONCTION(fnSparse) {
@@ -89,8 +89,9 @@ FONCTION(fnSpalloc) {
 FONCTION(fnSpeye) {
     INUTILISE
     exigerArguments(args, 1, 2, "speye");
-    int m = (int)args[0].scal();
-    int n = args.size() > 1 ? (int)args[1].scal() : m;
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "speye");
+    int m = argTaille(args[0].scal(), "speye");
+    int n = args.size() > 1 ? argTaille(args[1].scal(), "speye") : m;
     Valeur s = creuxVide(m, n);
     for (int j = 0; j < n; ++j) {
         s.creux->debutColonne[(std::size_t)j] = (int)s.creux->ligne.size();
@@ -181,6 +182,7 @@ FONCTION(fnSprandn) {
 FONCTION(fnSpy) {
     INUTILISE
     exigerArguments(args, 1, 1, "spy");
+    exigerNumerique(args[0], "spy");
     std::vector<double> x, y;
     const Valeur& s = args[0];
     if (s.estCreux()) {

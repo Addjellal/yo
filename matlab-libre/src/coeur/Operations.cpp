@@ -24,7 +24,12 @@ Dims dimsDiffusees(const Dims& a, const Dims& b) {
         else if (x == 1) r[k] = y;
         else if (y == 1) r[k] = x;
         else
-            erreur("MATLAB:dimagree",
+            // « MATLAB:dimagree » va avec « Matrix dimensions must agree »,
+            // que rendent encore l'algebre lineaire et les creuses.
+            // L'expansion implicite, elle, porte l'identifiant moderne :
+            // c'est celui qu'attrape un try/catch ecrit pour MATLAB
+            // d'aujourd'hui.
+            erreur("MATLAB:sizeDimensionsMustMatch",
                    "Arrays have incompatible sizes for this operation.");
     }
     return r;

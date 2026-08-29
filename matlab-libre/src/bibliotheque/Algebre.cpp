@@ -12,7 +12,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 FONCTION(fnInv) {
@@ -67,6 +67,7 @@ FONCTION(fnNorm) {
 }
 FONCTION(fnExpm) {
     INUTILISE
+    exigerNumerique(args[0], "expm");
     return {exponentielleMatrice(args[0])};
 }
 FONCTION(fnLogm) {
@@ -172,6 +173,7 @@ FONCTION(fnIssymmetric) {
 
 FONCTION(fnIsdiag) {
     INUTILISE
+    exigerNumerique(args[0], "isdiag");
     const Valeur& v = args[0];
     int l = v.nlignes(), c = v.ncolonnes();
     for (int i = 0; i < l; ++i)
@@ -183,6 +185,7 @@ FONCTION(fnIsdiag) {
 
 FONCTION(fnIstriu) {
     INUTILISE
+    exigerNumerique(args[0], "istriu");
     const Valeur& v = args[0];
     int l = v.nlignes(), c = v.ncolonnes();
     for (int i = 0; i < l; ++i)
@@ -194,6 +197,7 @@ FONCTION(fnIstriu) {
 
 FONCTION(fnIstril) {
     INUTILISE
+    exigerNumerique(args[0], "istril");
     const Valeur& v = args[0];
     int l = v.nlignes(), c = v.ncolonnes();
     for (int i = 0; i < l; ++i)

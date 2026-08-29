@@ -11,7 +11,7 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **616 fonctions natives** couvrant le MATLAB de base.
+- **617 fonctions natives** couvrant le MATLAB de base.
   Quatre-vingts d'entre elles — les plus consultées — ont une fiche
   d'aide complète : syntaxe, description, exemples et fonctions
   voisines, dans `toolbox/aide/`. Les autres gardent leur ligne de
@@ -47,12 +47,15 @@ mieux le lire avant de s'appuyer dessus.
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
   toolboxes depuis le langage, intégration continue sur les trois
   systèmes.
-- **Des tests** : 57 vérifications C++ sur le cœur, dix-sept suites en
-  langage MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
-  types de données, une le calcul parallèle, une qui compile puis exécute
-  le C produit pour le comparer à l'interpréteur, une qui exécute les 489
-  exemples de l'aide — et 113 vérifications du bureau natif, pilotées sans
-  ouvrir de fenêtre.
+- **Des tests** : 57 vérifications C++ sur le cœur, 20 suites écrites dans le langage
+  — dont une qui contrôle un résultat exact par toolbox, une les types de
+  données, une le calcul parallèle, une qui compile puis exécute le C
+  produit pour le comparer à l'interpréteur, une qui exécute les 489
+  exemples de l'aide — et 148 vérifications du bureau natif, pilotées sans
+  ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en plus chacune
+  des 617 fonctions natives avec des arguments qu'elle n'attend pas — une
+  cellule, une structure, une poignée, une taille absurde, une dimension
+  négative — et vérifie qu'elle rend une erreur au lieu de tomber.
 
 ## Ce qui n'est pas là
 
@@ -90,7 +93,14 @@ totalité.
    l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
    (cellules exécutables mêlées au texte), la comparaison de fichiers, le
    repliement de code et la recherche multi-fichiers.
-2. **Simulink se simule, mais ne se dessine plus.** Le solveur est là :
+2. **L'affichage montre tous les chiffres, MATLAB quatre.** MatLibre
+   démarre en `format long` : `pi` s'écrit `3.141592653589793`, et un
+   `single` `3.1415927` — sept décimales, tout ce qu'il porte. MATLAB
+   démarre en `format short`. C'est le seul écart d'affichage, et
+   `format short` le rétablit ; `format` seul revient à `long`. La
+   fonction `float`, synonyme de `single`, est également propre à
+   MatLibre : MATLAB ne connaît que `single`.
+3. **Simulink se simule, mais ne se dessine plus.** Le solveur est là :
    dix-sept blocs, `new_system` / `add_block` / `add_line`, pas fixe, tri
    topologique, blocs à état, analyse nodale modifiée pour les circuits.
    `sim` accepte le nom d'un modèle — une variable de l'espace de travail,
@@ -102,7 +112,7 @@ totalité.
    l'atelier du navigateur, retiré de la compilation : il reviendra dans
    le bureau natif. Manquent aussi : les sous-systèmes, les bus, le pas
    variable, et les éditeurs graphiques de Stateflow et Simscape.
-3. **La génération de code couvre les matrices, les types et les
+4. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et
    matrices de taille fixe, `double`, `single`, `int8`..`int64`,
@@ -129,7 +139,7 @@ totalité.
    temporaires et ses accumulateurs ; une variable MATLAB qui le porterait
    est refusée. Ce qui n'est pas traduisible est refusé avec le numéro de
    ligne, jamais approximé.
-4. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
+5. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
    La Signal Processing Toolbox compte 163 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
@@ -225,7 +235,7 @@ totalité.
    transposée, les couches groupées, les réseaux récurrents (LSTM, GRU),
    et les réseaux à graphe quelconque — la pile reste une séquence.
    MathWorks en compte plusieurs centaines par toolbox.
-5. **Les types de données modernes sont là, mais partiellement.**
+6. **Les types de données modernes sont là, mais partiellement.**
    `duration`, `calendarDuration`, `datetime`, `categorical`, `table`,
    `timetable`, `containers.Map` et `sparse` existent avec leurs
    opérations courantes, y compris `stack`, `unstack`, `rows2vars`,
@@ -239,7 +249,7 @@ totalité.
    n'importe quel décalage fixe écrit `+05:30` est accepté. Manquent :
    la lecture de feuilles Excel, et les tableaux creux logiques ou
    complexes creux au-delà du stockage.
-6. **Le calcul parallèle est réel, mais limité à une machine.** `parfor`,
+7. **Le calcul parallèle est réel, mais limité à une machine.** `parfor`,
    `spmd`, `parfeval`, `pararrayfun` et `parcellfun` répartissent le
    travail sur un pool de fils, chacun portant un interpréteur complet et
    son propre espace de travail. Mesuré sur quatre cœurs : 2,99× sur une
@@ -249,14 +259,14 @@ totalité.
    (`labSend`, `labReceive`, `gop`). Un corps de `parfor` que la
    classification des variables ne sait pas trancher retombe sur
    l'exécution séquentielle plutôt que d'échouer.
-7. **Pas de MEX, pas d'interface Java, pas d'interface Python.** Les
+8. **Pas de MEX, pas d'interface Java, pas d'interface Python.** Les
    bibliothèques externes sont branchées à la compilation, pas chargées
    à l'exécution : LAPACK, BLAS, FFTW, SuiteSparse et OpenCV sont
    utilisés s'ils sont trouvés, mais il n'y a pas de moyen d'appeler du
    code natif arbitraire depuis le langage. TensorFlow et PyTorch ne
    sont pas branchés : les réseaux de neurones tournent sur
    l'implémentation interne.
-8. **Les solveurs d'EDO ne traitent pas les problèmes
+9. **Les solveurs d'EDO ne traitent pas les problèmes
    algébro-différentiels.** `ode45`, `ode15s` et les autres acceptent
    `RelTol`, `AbsTol`, `MaxStep`, `InitialStep`, `Refine`, `Events`,
    `Mass`, `Jacobian`, `JPattern` et, pour `ode15s`, `MaxOrder`.
@@ -278,7 +288,7 @@ totalité.
    majore l'erreur réelle, donc les pas sont plus courts que nécessaire.
    La variable d'environnement `MATLIBRE_ODE_TRACE` affiche le journal
    des pas acceptés et refusés.
-9. **La transformée en ondelettes ne connaît que l'extension
+10. **La transformée en ondelettes ne connaît que l'extension
    périodique et deux familles.** `dwt`, `wavedec`, `swt` et `modwt`
    prolongent toujours le signal par périodisation : c'est le mode
    `'per'` de MATLAB, et il n'y a pas de `dwtmode` pour en changer. Les
@@ -295,7 +305,7 @@ totalité.
    `wavefun` échantillonne le support [0, L-1] sur 2^ITER*(L-1)+1
    points, avec l'intégrale de la fonction d'échelle exactement à un.
 
-10. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
+11. **Performance d'un interpréteur à parcours d'arbre** : environ 8 µs par
    instruction scalaire. Les opérations vectorisées, elles, tournent à la
    vitesse du C++.
 

@@ -12,7 +12,7 @@ namespace matlibre {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 using Horloge = std::chrono::steady_clock;
@@ -214,8 +214,15 @@ FONCTION(fnDate) {
 FONCTION(fnEtime) {
     INUTILISE
     exigerArguments(args, 2, 2, "etime");
+    exigerNumerique(args[0], "etime");
+    if (args.size() > 1) exigerNumerique(args[1], "etime");
     const Valeur& t2 = args[0];
     const Valeur& t1 = args[1];
+    // Un vecteur de date porte ses six champs : sans eux, on lisait hors
+    // du tableau.
+    if (t2.re.size() < 6 || t1.re.size() < 6)
+        erreur("MATLAB:etime:InvalidDateVector",
+               "ETIME expects two date vectors of six elements.");
     double a = versDatenum((int)t2.re[0], (int)t2.re[1], (int)t2.re[2], (int)t2.re[3],
                            (int)t2.re[4], t2.re[5]);
     double b = versDatenum((int)t1.re[0], (int)t1.re[1], (int)t1.re[2], (int)t1.re[3],
@@ -289,6 +296,7 @@ FONCTION(fnYmdVersNum) {
 FONCTION(fnNumVersYmd) {
     INUTILISE
     exigerArguments(args, 1, 1, "matlibre_num2ymd");
+    exigerNumerique(args[0], "datevec");
     std::size_t n = args[0].nelem();
     Valeur r = Valeur::matrice((int)n, 6, 0.0);
     for (std::size_t k = 0; k < n; ++k) {
@@ -308,6 +316,7 @@ FONCTION(fnNumVersYmd) {
 FONCTION(fnAjouterMois) {
     INUTILISE
     exigerArguments(args, 2, 2, "matlibre_addmonths");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "addmonths");
     Dims d = dimsCommunes(args);
     std::size_t n = produitDims(d);
     Valeur r = Valeur::matriceDims(d, 0.0);
@@ -337,6 +346,7 @@ FONCTION(fnAjouterMois) {
 FONCTION(fnJourSemaine) {
     INUTILISE
     exigerArguments(args, 1, 1, "matlibre_weekday");
+    exigerNumerique(args[0], "weekday");
     Valeur r = Valeur::matriceDims(args[0].dims, 0.0);
     for (std::size_t k = 0; k < args[0].nelem(); ++k) {
         long long jours = (long long)std::floor(args[0].re[k]);

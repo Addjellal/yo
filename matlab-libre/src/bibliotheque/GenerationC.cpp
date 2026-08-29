@@ -1818,7 +1818,7 @@ ResultatC genererC(Interpreteur& it, const OptionsC& options) {
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 
 TypeC typeDepuisValeur(const Valeur& v) {
     std::string classe = "double";

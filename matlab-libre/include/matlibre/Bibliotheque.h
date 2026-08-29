@@ -62,6 +62,18 @@ Valeur aplatirColonne(const Valeur& v);
 Classe classeDepuisNom(const std::string& nom, bool* trouve = nullptr);
 
 // Réductions le long d'une dimension (sum, prod, max, cumsum…).
+// Refuse une dimension negative : « all(1,-1) » indexait avant le
+// tableau et corrompait le tas.
+void exigerDimension(int dimension);
+// Refuse ce qui ne porte pas de nombres — cellule, structure, objet,
+// poignee : « re » y est vide alors que « nelem » annonce des elements.
+void exigerNumerique(const Valeur& v, const char* nom);
+// Idem, cellules admises : « sort » et « setdiff » les acceptent.
+void exigerSansObjet(const Valeur& v, const char* nom);
+// Une taille : finie, positive, representable.
+int argTaille(double x, const char* nom);
+// L'ordre de PERMUTE doit etre une permutation de 1..N.
+void exigerPermutation(const Valeur& ordre, const Valeur& v, const char* nom);
 Valeur reduire(const Valeur& v, int dimension, bool garderDim,
                const std::function<double(const std::vector<double>&)>& f);
 void parcourirTranches(const Valeur& v, int dimension,

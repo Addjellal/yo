@@ -174,7 +174,11 @@ public:
     void fermerJournal();
 
     // --- état visible par l'utilisateur ---
-    Format format = Format::Court;
+    // MatLibre montre par défaut tous les chiffres que la valeur porte —
+    // « pi » s'écrit 3.141592653589793, un single 3.1415927. MATLAB, lui,
+    // démarre en « format short » et n'en montre que quatre décimales :
+    // c'est le seul écart, et « format short » le rétablit.
+    Format format = Format::Long;
     bool formatCompact = false;
     std::mt19937_64 generateur{5489u};
     std::string dernierIdentifiant;

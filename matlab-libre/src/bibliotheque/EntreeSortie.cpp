@@ -270,7 +270,7 @@ std::string formatMatlab(const std::string& formatBrut, const std::vector<Valeur
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 std::map<int, std::shared_ptr<std::fstream>>& fichiers() {
@@ -305,7 +305,8 @@ FONCTION(fnDisp) {
     }
     if (v.estScalaire() && (v.estNumerique() || v.classe == Classe::Logique) &&
         !v.estComplexe()) {
-        os << "     " << rendreScalaire(v.re[0], (int)it.format) << "\n";
+        os << "     "
+           << rendreScalaire(v.re[0], (int)it.format, v.classe == Classe::Simple) << "\n";
         return {};
     }
     if (v.estVide()) return {};
@@ -361,6 +362,9 @@ FONCTION(fnPrintf) {
 FONCTION(fnNum2str) {
     INUTILISE
     exigerArguments(args, 1, 2, "num2str");
+    exigerNumerique(args[0], "num2str");
+    if (args.size() > 1 && !args[1].estTexte() && !args[1].estChaine())
+        exigerNumerique(args[1], "num2str");
     const Valeur& v = args[0];
     if (v.estTexte() || v.estChaine()) return {Valeur::texte(v.versTexte())};
     if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
@@ -408,6 +412,7 @@ FONCTION(fnNum2str) {
 
 FONCTION(fnInt2str) {
     INUTILISE
+    exigerNumerique(args[0], "int2str");
     Valeur r = appliquerReel(args[0], [](double x) {
         return (x < 0) ? -std::floor(-x + 0.5) : std::floor(x + 0.5);
     });
@@ -418,6 +423,8 @@ FONCTION(fnInt2str) {
 FONCTION(fnMat2str) {
     INUTILISE
     exigerArguments(args, 1, 2, "mat2str");
+    exigerNumerique(args[0], "mat2str");
+    if (args.size() > 1) exigerNumerique(args[1], "mat2str");
     const Valeur& v = args[0];
     int chiffres = args.size() > 1 ? (int)args[1].scal() : 15;
     if (v.estTexte()) return {Valeur::texte("\"" + v.versTexte() + "\"")};
@@ -901,7 +908,9 @@ FONCTION(fnInput) {
 FONCTION(fnFormat) {
     INUTILISE
     if (args.empty()) {
-        it.format = Format::Court;
+        // « format » tout seul revient au réglage de départ. Ici c'est
+        // « long » : MatLibre montre par défaut tous les chiffres portés.
+        it.format = Format::Long;
         it.formatCompact = false;
         return {};
     }
@@ -926,6 +935,7 @@ FONCTION(fnFormat) {
 FONCTION(fnDlmwrite) {
     INUTILISE
     exigerArguments(args, 2, 3, "dlmwrite");
+    exigerNumerique(args[1], "dlmwrite");
     std::string sep = args.size() > 2 ? args[2].versTexte() : ",";
     std::ofstream f(args[0].versTexte());
     const Valeur& v = args[1];
@@ -978,6 +988,7 @@ FONCTION(fnCsvread) {
 }
 FONCTION(fnCsvwrite) {
     INUTILISE
+    exigerNumerique(args[1], "csvwrite");
     std::vector<Valeur> a = {args[0], args[1], Valeur::texte(",")};
     return fnDlmwrite(it, a, nargout);
 }

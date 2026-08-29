@@ -19,7 +19,7 @@ std::string formatMatlab(const std::string& format, const std::vector<Valeur>& a
 namespace {
 
 #define FONCTION(nom) \
-    std::vector<Valeur> nom(Interpreteur& it, std::vector<Valeur>& args, int nargout)
+    std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
 bool estTextuel(const Valeur& v) {
@@ -453,9 +453,11 @@ FONCTION(fnStrlength) {
 FONCTION(fnPad) {
     INUTILISE
     exigerArguments(args, 1, 3, "pad");
+    exigerSansObjet(args[0], "pad");
+    if (args.size() > 1) exigerNumerique(args[1], "pad");
     ListeTextes l = listeDe(args[0]);
     std::size_t largeur = 0;
-    if (args.size() > 1) largeur = (std::size_t)args[1].scal();
+    if (args.size() > 1) largeur = (std::size_t)argTaille(args[1].scal(), "pad");
     else
         for (auto& s : l.valeurs) largeur = std::max(largeur, s.size());
     std::vector<std::string> r;
@@ -620,6 +622,7 @@ FONCTION(fnIscellstr) {
 
 FONCTION(fnString) {
     INUTILISE
+    exigerSansObjet(args[0], "string");
     if (args.empty()) return {Valeur::videClasse(Classe::Chaine)};
     const Valeur& v = args[0];
     if (v.classe == Classe::Chaine) return {v};
@@ -642,29 +645,42 @@ FONCTION(fnString) {
     return {r};
 }
 
+// « std::isspace » et ses voisines n'admettent qu'une valeur representable
+// en « unsigned char », ou EOF. « isletter(NaN) » leur passait INT_MIN, et
+// la table de la bibliotheque C etait lue hors de ses bornes.
+static int pointDeCode(double x) {
+    if (!(x >= 0.0 && x <= 255.0)) return 0;
+    return (int)x;
+}
+
 FONCTION(fnIsspace) {
     INUTILISE
+    exigerNumerique(args[0], "isspace");
     Valeur v = args[0];
     Valeur r = Valeur::matriceDims(v.dims);
     r.classe = Classe::Logique;
     for (std::size_t k = 0; k < v.nelem(); ++k)
-        r.re[k] = std::isspace((int)v.re[k]) ? 1 : 0;
+        r.re[k] = std::isspace(pointDeCode(v.re[k])) ? 1 : 0;
     return {r};
 }
 FONCTION(fnIsletter) {
     INUTILISE
+    exigerNumerique(args[0], "isletter");
     Valeur v = args[0];
     Valeur r = Valeur::matriceDims(v.dims);
     r.classe = Classe::Logique;
-    for (std::size_t k = 0; k < v.nelem(); ++k) r.re[k] = std::isalpha((int)v.re[k]) ? 1 : 0;
+    for (std::size_t k = 0; k < v.nelem(); ++k)
+        r.re[k] = std::isalpha(pointDeCode(v.re[k])) ? 1 : 0;
     return {r};
 }
 FONCTION(fnIsdigitTexte) {
     INUTILISE
+    exigerNumerique(args[0], "isdigit");
     Valeur v = args[0];
     Valeur r = Valeur::matriceDims(v.dims);
     r.classe = Classe::Logique;
-    for (std::size_t k = 0; k < v.nelem(); ++k) r.re[k] = std::isdigit((int)v.re[k]) ? 1 : 0;
+    for (std::size_t k = 0; k < v.nelem(); ++k)
+        r.re[k] = std::isdigit(pointDeCode(v.re[k])) ? 1 : 0;
     return {r};
 }
 
