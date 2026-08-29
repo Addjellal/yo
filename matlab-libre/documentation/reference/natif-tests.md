@@ -5,7 +5,27 @@ Fonctions natives du groupe `tests`.
 ## `assert`
 
 ```
-assert  Verifie une condition, ou compare deux valeurs a une tolerance pres.
+ASSERT  Vérifie une condition, et lève une erreur sinon.
+    ASSERT(COND) lève une erreur si COND est faux.
+    ASSERT(COND,MESSAGE,...) donne le message, avec le format de SPRINTF.
+    ASSERT(COND,ID,MESSAGE,...) donne aussi l'identifiant.
+
+    Syntaxe
+       assert(cond)
+       assert(cond,message,...)
+       assert(cond,id,message,...)
+
+    Exemples
+       assert(1 + 1 == 2);
+       n = 3;
+       assert(n > 0, 'n doit être positif, reçu %d', n);
+       try
+           assert(false, 'MonModule:rate', 'raté');
+       catch e
+           disp(e.identifier);
+       end
+
+    Voir aussi ERROR, VALIDATEATTRIBUTES, TRY, WARNING.
 ```
 
 ## `assertAlmostEqual`

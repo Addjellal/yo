@@ -11,7 +11,19 @@ bartlett  Fenetre triangulaire.
 ## `blackman`
 
 ```
-blackman  Fenetre de Blackman.
+BLACKMAN  Fenêtre de Blackman.
+    BLACKMAN(N) rend la fenêtre de longueur N : lobes secondaires très
+    bas, lobe principal large.
+
+    Syntaxe
+       w = blackman(n)
+
+    Exemples
+       w = blackman(64);
+       numel(w)
+       max(w) <= 1
+
+    Voir aussi HAMMING, HANN, BARTLETT, FFT.
 ```
 
 ## `conv`
@@ -31,7 +43,9 @@ CONV  Convolution, ou multiplication de polynômes.
        w = conv(u,v,forme)
 
     Exemples
+
        conv([1 1], [1 -1])        % [1 0 -1], soit (x+1)(x-1)
+       x = randn(1,100);
        y = conv(x, ones(1,5)/5);  % moyenne glissante sur 5 points
 
     Voir aussi DECONV, FILTER, CONV2, POLYVAL.
@@ -40,13 +54,41 @@ CONV  Convolution, ou multiplication de polynômes.
 ## `conv2`
 
 ```
-conv2  Convolution 2-D.
+CONV2  Convolution à deux dimensions.
+    CONV2(A,NOYAU) convolue A par le noyau : c'est le filtrage d'une
+    image.
+    CONV2(A,NOYAU,'same') rend un résultat de la taille de A.
+
+    Syntaxe
+       C = conv2(A,noyau)
+       C = conv2(A,noyau,'same')
+
+    Exemples
+       A = magic(5);
+       flou = conv2(A, ones(3)/9, 'same');
+       size(flou)                     % [5 5]
+       contours = conv2(A, [-1 0 1], 'same');
+
+    Voir aussi CONV, FILTER2, IMFILTER, FFT2.
 ```
 
 ## `downsample`
 
 ```
-downsample  Decimation.
+DOWNSAMPLE  Sous-échantillonne en gardant un point sur N.
+    DOWNSAMPLE(X,N) garde un échantillon sur N. Filtrer avant, sinon le
+    repliement de spectre est garanti.
+
+    Syntaxe
+       y = downsample(x,n)
+
+    Exemples
+       downsample(1:10, 3)            % [1 4 7 10]
+       x = randn(1,100);
+       [b, a] = butter(4, 0.4);
+       y = downsample(filter(b, a, x), 2);
+
+    Voir aussi UPSAMPLE, FILTER, DECIMATE, INTERP1.
 ```
 
 ## `fft`
@@ -89,7 +131,20 @@ FFT  Transformée de Fourier discrète.
 ## `fft2`
 
 ```
-fft2  Transformee 2-D.
+FFT2  Transformée de Fourier à deux dimensions.
+    FFT2(A) applique la FFT aux lignes puis aux colonnes : c'est la
+    transformée d'une image.
+
+    Syntaxe
+       Y = fft2(A)
+       Y = fft2(A,m,n)
+
+    Exemples
+       A = zeros(8); A(1,1) = 1;
+       Y = fft2(A);
+       all(abs(Y(:) - 1) < 1e-12)     % la FFT d'une impulsion est plate
+
+    Voir aussi IFFT2, FFT, FFTSHIFT, IMAGESC.
 ```
 
 ## `fftshift`
@@ -105,6 +160,9 @@ FFTSHIFT  Recentre le spectre sur la fréquence nulle.
        Y = fftshift(X,dim)
 
     Exemples
+
+       n = 64;  Fs = 1000;
+       x = sin(2*pi*100*(0:n-1)/Fs);
        Y = fftshift(fft(x));
        f = (-n/2 : n/2-1) * Fs/n;
        plot(f, abs(Y));
@@ -129,6 +187,8 @@ FILTER  Filtre numérique à réponse rationnelle.
        y = filter(b,a,x,zi,dim)
 
     Exemples
+
+       x = randn(1,200);
        y = filter(ones(1,5)/5, 1, x);        % moyenne glissante
        [b,a] = butter(4, 0.2);
        y = filter(b, a, x);                  % passe-bas de Butterworth
@@ -139,25 +199,74 @@ FILTER  Filtre numérique à réponse rationnelle.
 ## `filtfilt`
 
 ```
-filtfilt  Filtrage aller-retour.
+FILTFILT  Filtrage aller-retour, sans déphasage.
+    FILTFILT(B,A,X) filtre X dans un sens puis dans l'autre : la phase du
+    filtre s'annule, et l'ordre effectif double.
+
+    Syntaxe
+       y = filtfilt(b,a,x)
+
+    Exemples
+       x = sin(2*pi*(0:299)/50) + 0.2*randn(1,300);
+       [b, a] = butter(4, 0.1);
+       y = filtfilt(b, a, x);
+       numel(y) == numel(x)
+
+    Voir aussi FILTER, BUTTER, FREQZ, CONV.
 ```
 
 ## `freqz`
 
 ```
-freqz  Reponse en frequence.
+FREQZ  Réponse en fréquence d'un filtre numérique.
+    [H,W] = FREQZ(B,A,N) rend la réponse complexe en N points entre 0 et π.
+
+    Syntaxe
+       [h,w] = freqz(b,a,n)
+
+    Exemples
+       [b, a] = butter(4, 0.25);
+       [h, w] = freqz(b, a, 256);
+       abs(h(1)) > 0.99               % gain unité en continu
+       plot(w/pi, 20*log10(abs(h))); grid on
+
+    Voir aussi FILTER, BUTTER, FILTFILT, FFT.
 ```
 
 ## `hamming`
 
 ```
-hamming  Fenetre de Hamming.
+HAMMING  Fenêtre de Hamming.
+    HAMMING(N) rend la fenêtre de longueur N : elle réduit les fuites
+    spectrales, au prix d'un lobe principal plus large.
+
+    Syntaxe
+       w = hamming(n)
+
+    Exemples
+       w = hamming(64);
+       numel(w)                       % 64
+       x = randn(1,64);
+       Y = fft(x(:) .* w);
+
+    Voir aussi HANN, BLACKMAN, BARTLETT, RECTWIN, FFT.
 ```
 
 ## `hann`
 
 ```
-hann  Fenetre de Hann.
+HANN  Fenêtre de Hann.
+    HANN(N) rend la fenêtre de longueur N ; elle s'annule aux deux bouts.
+
+    Syntaxe
+       w = hann(n)
+
+    Exemples
+       w = hann(32);
+       [w(1) w(end)]                  % zéro aux extrémités
+       max(w)                         % 1 au milieu
+
+    Voir aussi HAMMING, BLACKMAN, BARTLETT, FFT.
 ```
 
 ## `hanning`
@@ -183,7 +292,9 @@ IFFT  Transformée de Fourier discrète inverse.
        X = ifft(___,'symmetric')
 
     Exemples
-       x = ifft(fft(x));               % rend x, aux arrondis près
+
+       x = sin(2*pi*(0:63)/16);
+       y = ifft(fft(x));                 % rend x, aux arrondis près
        max(abs(x - real(ifft(fft(x)))))  % de l'ordre de 1e-16
 
     Voir aussi FFT, IFFT2, REAL.
@@ -192,13 +303,33 @@ IFFT  Transformée de Fourier discrète inverse.
 ## `ifft2`
 
 ```
-ifft2  Transformee 2-D inverse.
+IFFT2  Transformée de Fourier inverse à deux dimensions.
+
+    Syntaxe
+       A = ifft2(Y)
+
+    Exemples
+       A = magic(8);
+       max(max(abs(A - real(ifft2(fft2(A)))))) < 1e-10
+
+    Voir aussi FFT2, IFFT, FFTSHIFT.
 ```
 
 ## `ifftshift`
 
 ```
-ifftshift  Annule fftshift.
+IFFTSHIFT  Défait FFTSHIFT.
+    IFFTSHIFT(X) remet la fréquence nulle au début : c'est l'inverse exact
+    de FFTSHIFT, y compris pour une longueur impaire.
+
+    Syntaxe
+       y = ifftshift(x)
+
+    Exemples
+       x = 1:5;
+       isequal(ifftshift(fftshift(x)), x)
+
+    Voir aussi FFTSHIFT, FFT, IFFT.
 ```
 
 ## `rectwin`
@@ -222,6 +353,9 @@ UNWRAP  Déroule une phase.
        Q = unwrap(P,tol,dim)
 
     Exemples
+
+       f = linspace(0, 1, 200);
+       H = 1 ./ (1 + 1i*2*pi*f).^3;
        p = unwrap(angle(H));      % phase continue d'une réponse
        plot(f, p*180/pi);         % en degrés
 
@@ -231,12 +365,38 @@ UNWRAP  Déroule une phase.
 ## `upsample`
 
 ```
-upsample  Sur-echantillonnage.
+UPSAMPLE  Sur-échantillonne en insérant des zéros.
+    UPSAMPLE(X,N) insère N-1 zéros entre les échantillons.
+
+    Syntaxe
+       y = upsample(x,n)
+
+    Exemples
+       upsample([1 2 3], 2)           % [1 0 2 0 3 0]
+       numel(upsample(1:10, 3))       % 30
+
+    Voir aussi DOWNSAMPLE, INTERP1, FILTER, RESAMPLE.
 ```
 
 ## `xcorr`
 
 ```
-xcorr  Correlation croisee.
+XCORR  Corrélation croisée.
+    XCORR(X,Y) mesure la ressemblance de X et Y à chaque décalage ; le
+    maximum dit de combien l'un retarde sur l'autre.
+    [C,DECALAGES] = XCORR(...) rend aussi les décalages.
+
+    Syntaxe
+       c = xcorr(x,y)
+       [c,decalages] = xcorr(x,y)
+
+    Exemples
+       x = [zeros(1,10) 1 zeros(1,10)];
+       y = [zeros(1,13) 1 zeros(1,7)];
+       [c, d] = xcorr(x, y);
+       [~, k] = max(c);
+       d(k)                           % -3 : y retarde de 3 échantillons
+
+    Voir aussi CONV, FILTER, FFT, CORRCOEF.
 ```
 

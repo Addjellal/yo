@@ -77,7 +77,20 @@ now  Date et heure courantes en numero de serie.
 ## `pause`
 
 ```
-pause  Attend un nombre de secondes.
+PAUSE  Suspend l'exécution.
+    PAUSE(N) attend N secondes.
+    PAUSE ON / PAUSE OFF autorise ou interdit les pauses.
+
+    Syntaxe
+       pause(n)
+       pause on
+       pause off
+
+    Exemples
+       tic; pause(0.05); ecoule = toc;
+       ecoule >= 0.04
+
+    Voir aussi TIC, TOC, DRAWNOW.
 ```
 
 ## `tic`
@@ -93,8 +106,10 @@ TIC  Démarre le chronomètre.
        id = tic;
 
     Exemples
+
+       x = randn(1,1024);
        tic; y = fft(x); toc
-       id = tic; ... ; ecoule = toc(id);
+       id = tic; y = fft(x); ecoule = toc(id);
 
     Voir aussi TOC, CPUTIME, TIMEIT, PROFILE.
 ```

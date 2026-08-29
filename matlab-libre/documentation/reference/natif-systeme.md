@@ -5,7 +5,21 @@ Fonctions natives du groupe `systeme`.
 ## `addpath`
 
 ```
-addpath  Ajoute au chemin de recherche.
+ADDPATH  Ajoute un dossier au chemin de recherche.
+    ADDPATH(D) ajoute D en tête du chemin : les fonctions qui s'y trouvent
+    deviennent appelables.
+    ADDPATH(D,'-end') l'ajoute à la fin.
+
+    Syntaxe
+       addpath(dossier)
+       addpath(dossier,'-end')
+
+    Exemples
+       d = tempdir;
+       addpath(d);
+       rmpath(d);
+
+    Voir aussi RMPATH, PATH, WHICH, REHASH.
 ```
 
 ## `atelier`
@@ -23,49 +37,158 @@ beep  Emet un bip.
 ## `cd`
 
 ```
-cd  Change de dossier.
+CD  Change de dossier.
+    CD(CHEMIN) va dans le dossier donné.
+    CD .. remonte d'un cran.
+    P = CD rend le dossier courant sans en changer.
+
+    Syntaxe
+       cd(chemin)
+       cd ..
+       p = cd
+
+    Exemples
+       avant = pwd;
+       cd(tempdir);
+       cd(avant);
+
+    Voir aussi PWD, DIR, LS, ADDPATH.
 ```
 
 ## `clc`
 
 ```
-clc  Efface l'ecran.
+CLC  Efface la fenêtre de commandes.
+    CLC vide l'affichage ; les variables, elles, ne bougent pas — c'est
+    CLEAR qui les efface.
+
+    Syntaxe
+       clc
+
+    Exemples
+       clc
+
+    Voir aussi CLEAR, CLOSE, HOME, DIARY.
 ```
 
 ## `clear`
 
 ```
-clear  Efface des variables.
+CLEAR  Efface des variables de l'espace de travail.
+    CLEAR efface tout.
+    CLEAR A B efface les variables nommées.
+    CLEAR ALL efface aussi les fonctions en cache.
+
+    Syntaxe
+       clear
+       clear a b
+       clear all
+
+    Exemples
+       aEffacer = 1;
+       clear aEffacer
+       exist('aEffacer','var')        % 0
+
+    Voir aussi CLC, WHO, WHOS, EXIST.
 ```
 
 ## `computer`
 
 ```
-computer  Plateforme d'execution.
+COMPUTER  Nom de la plate-forme.
+    COMPUTER rend 'GLNXA64', 'MACA64', 'PCWIN64'… selon le système.
+
+    Syntaxe
+       c = computer
+
+    Exemples
+       computer
+       ispc || isunix || ismac
+
+    Voir aussi ISPC, ISUNIX, ISMAC, VERSION.
 ```
 
 ## `copyfile`
 
 ```
-copyfile  Copie un fichier.
+COPYFILE  Copie un fichier.
+    COPYFILE(SOURCE,CIBLE) copie ; [OK,MSG] = COPYFILE(...) rend un compte
+    rendu au lieu d'une erreur.
+
+    Syntaxe
+       copyfile(source,cible)
+       [ok,msg] = copyfile(source,cible)
+
+    Exemples
+       a = fullfile(tempdir, 'a.txt');
+       b = fullfile(tempdir, 'b.txt');
+       fid = fopen(a,'w'); fprintf(fid,'x'); fclose(fid);
+       copyfile(a, b);
+       isfile(b)
+       delete(a); delete(b);
+
+    Voir aussi MOVEFILE, DELETE, ISFILE.
 ```
 
 ## `delete`
 
 ```
-delete  Supprime des fichiers.
+DELETE  Supprime un fichier.
+    DELETE(NOM) efface le fichier ; le motif '*.txt' en efface plusieurs.
+
+    Syntaxe
+       delete(nom)
+
+    Exemples
+       f = fullfile(tempdir, 'essai.txt');
+       fid = fopen(f, 'w'); fprintf(fid, 'x'); fclose(fid);
+       delete(f);
+       isfile(f)                      % 0
+
+    Voir aussi RMDIR, ISFILE, DIR, MOVEFILE.
 ```
 
 ## `diary`
 
 ```
-diary  Journalise la session.
+DIARY  Enregistre la session dans un fichier.
+    DIARY ON commence l'enregistrement dans « diary », DIARY OFF l'arrête.
+    DIARY(NOM) enregistre dans le fichier nommé.
+
+    Syntaxe
+       diary on
+       diary off
+       diary(nom)
+
+    Exemples
+       f = fullfile(tempdir,'journal.txt');
+       diary(f);
+       disp('ceci est enregistré');
+       diary off
+       delete(f);
+
+    Voir aussi FPRINTF, EVALC, DISP.
 ```
 
 ## `dir`
 
 ```
-dir  Liste un dossier.
+DIR  Contenu d'un dossier.
+    DIR rend la liste du dossier courant, sous forme d'un tableau de
+    structures : champs name, folder, bytes, isdir.
+    DIR(MOTIF) filtre : dir('*.m').
+
+    Syntaxe
+       s = dir
+       s = dir(motif)
+
+    Exemples
+       fichiers = dir;
+       isstruct(fichiers)
+       fieldnames(fichiers)
+       nombreM = numel(dir('*.m'));
+
+    Voir aussi LS, PWD, EXIST, ISFOLDER, FULLFILE.
 ```
 
 ## `doc`
@@ -89,25 +212,70 @@ exit  Quitte l'interpreteur.
 ## `fileparts`
 
 ```
-fileparts  Decompose un chemin.
+FILEPARTS  Découpe un chemin.
+    [DOSSIER,NOM,EXT] = FILEPARTS(CHEMIN) sépare le dossier, le nom et
+    l'extension — point compris.
+
+    Syntaxe
+       [dossier,nom,ext] = fileparts(chemin)
+
+    Exemples
+       [d,n,e] = fileparts('/tmp/essai.m');
+       n
+       e                              % '.m'
+       [~,nom] = fileparts('rapport.pdf');
+
+    Voir aussi FULLFILE, FILESEP, EXIST, DIR.
 ```
 
 ## `filesep`
 
 ```
-filesep  Separateur de chemin.
+FILESEP  Séparateur de chemin du système : « / » ou « \ ».
+
+    Syntaxe
+       s = filesep
+
+    Exemples
+       filesep
+       ['dossier' filesep 'fichier']  % mais FULLFILE est préférable
+
+    Voir aussi FULLFILE, FILEPARTS, PATHSEP.
 ```
 
 ## `fullfile`
 
 ```
-fullfile  Assemble un chemin.
+FULLFILE  Assemble un chemin avec le bon séparateur.
+    FULLFILE(A,B,...) colle les morceaux avec « / » ou « \ » selon le
+    système, sans jamais en doubler un.
+
+    Syntaxe
+       chemin = fullfile(a,b,...)
+
+    Exemples
+       fullfile('dossier', 'fichier.txt')
+       fullfile(tempdir, 'essai.mat')
+       fullfile('a', 'b', 'c.m')
+
+    Voir aussi FILEPARTS, FILESEP, PATHSEP, EXIST.
 ```
 
 ## `getenv`
 
 ```
-getenv  Variable d'environnement.
+GETENV  Lit une variable d'environnement.
+    GETENV(NOM) rend sa valeur, ou le texte vide si elle n'existe pas.
+
+    Syntaxe
+       v = getenv(nom)
+
+    Exemples
+       setenv('MATLIBRE_ESSAI', 'oui');
+       getenv('MATLIBRE_ESSAI')
+       isempty(getenv('VARIABLE_QUI_NEXISTE_PAS'))
+
+    Voir aussi SETENV, SYSTEM, COMPUTER.
 ```
 
 ## `getpid`
@@ -173,13 +341,34 @@ IDE  Ouvre l'atelier dans le navigateur.
 ## `isfile`
 
 ```
-isfile  Vrai pour un fichier ordinaire.
+ISFILE  Le chemin désigne-t-il un fichier.
+
+    Syntaxe
+       tf = isfile(chemin)
+
+    Exemples
+       isfile(tempdir)                % 0 — c'est un dossier
+       f = fullfile(tempdir,'x.txt');
+       fid = fopen(f,'w'); fclose(fid);
+       isfile(f)                      % 1
+       delete(f);
+
+    Voir aussi ISFOLDER, EXIST, DIR.
 ```
 
 ## `isfolder`
 
 ```
-isfolder  Vrai pour un dossier.
+ISFOLDER  Le chemin désigne-t-il un dossier.
+
+    Syntaxe
+       tf = isfolder(chemin)
+
+    Exemples
+       isfolder(tempdir)              % 1
+       isfolder('n''existe pas')      % 0
+
+    Voir aussi ISFILE, EXIST, MKDIR, DIR.
 ```
 
 ## `ismac`
@@ -251,7 +440,21 @@ mfilename  Nom du fichier en cours d'execution.
 ## `mkdir`
 
 ```
-mkdir  Cree un dossier.
+MKDIR  Crée un dossier.
+    MKDIR(D) crée le dossier D, avec ses parents au besoin.
+    [OK,MESSAGE] = MKDIR(D) rend un compte rendu au lieu d'une erreur.
+
+    Syntaxe
+       mkdir(dossier)
+       [ok,message] = mkdir(dossier)
+
+    Exemples
+       d = fullfile(tempdir, 'essaiMatLibre');
+       mkdir(d);
+       isfolder(d)
+       rmdir(d);
+
+    Voir aussi RMDIR, ISFOLDER, DIR, DELETE.
 ```
 
 ## `more`
@@ -263,13 +466,40 @@ more  Pagination (sans effet).
 ## `movefile`
 
 ```
-movefile  Deplace un fichier.
+MOVEFILE  Déplace ou renomme un fichier.
+
+    Syntaxe
+       movefile(source,cible)
+       [ok,msg] = movefile(source,cible)
+
+    Exemples
+       a = fullfile(tempdir, 'a.txt');
+       b = fullfile(tempdir, 'b.txt');
+       fid = fopen(a,'w'); fprintf(fid,'x'); fclose(fid);
+       movefile(a, b);
+       isfile(a)                      % 0
+       delete(b);
+
+    Voir aussi COPYFILE, DELETE, DIR.
 ```
 
 ## `path`
 
 ```
-path  Chemin de recherche.
+PATH  Chemin de recherche.
+    PATH affiche le chemin ; P = PATH le rend en texte, les dossiers
+    séparés par PATHSEP.
+
+    Syntaxe
+       path
+       p = path
+
+    Exemples
+       p = path;
+       dossiers = strsplit(p, pathsep);
+       numel(dossiers) > 0
+
+    Voir aussi ADDPATH, RMPATH, PATHSEP, WHICH, REHASH.
 ```
 
 ## `pathsep`
@@ -281,7 +511,18 @@ pathsep  Separateur de liste de chemins.
 ## `pwd`
 
 ```
-pwd  Dossier courant.
+PWD  Dossier courant.
+    PWD rend le chemin du dossier courant.
+
+    Syntaxe
+       p = pwd
+
+    Exemples
+       p = pwd;
+       ischar(p)
+       cd(p);                         % on y reste
+
+    Voir aussi CD, DIR, FULLFILE, WHAT.
 ```
 
 ## `quit`
@@ -293,7 +534,17 @@ quit  Quitte l'interpreteur.
 ## `rehash`
 
 ```
-rehash  Reconstruit l'index du chemin.
+REHASH  Reconstruit l'index des fonctions du chemin.
+    REHASH fait relire les dossiers du chemin : un fichier qu'on vient
+    d'écrire devient appelable sans redémarrer.
+
+    Syntaxe
+       rehash
+
+    Exemples
+       rehash
+
+    Voir aussi ADDPATH, PATH, WHICH, EXIST.
 ```
 
 ## `rmdir`
@@ -305,13 +556,32 @@ rmdir  Supprime un dossier.
 ## `rmpath`
 
 ```
-rmpath  Retire du chemin de recherche.
+RMPATH  Retire un dossier du chemin de recherche.
+
+    Syntaxe
+       rmpath(dossier)
+
+    Exemples
+       d = tempdir;
+       addpath(d);
+       rmpath(d);
+
+    Voir aussi ADDPATH, PATH, WHICH.
 ```
 
 ## `setenv`
 
 ```
-setenv  Pose une variable d'environnement.
+SETENV  Écrit une variable d'environnement.
+
+    Syntaxe
+       setenv(nom,valeur)
+
+    Exemples
+       setenv('MATLIBRE_ESSAI', '42');
+       str2double(getenv('MATLIBRE_ESSAI'))
+
+    Voir aussi GETENV, SYSTEM.
 ```
 
 ## `system`
@@ -323,19 +593,49 @@ system  Execute une commande du systeme.
 ## `tempdir`
 
 ```
-tempdir  Dossier temporaire.
+TEMPDIR  Dossier des fichiers temporaires du système.
+
+    Syntaxe
+       d = tempdir
+
+    Exemples
+       d = tempdir;
+       isfolder(d)
+
+    Voir aussi TEMPNAME, FULLFILE, MKDIR.
 ```
 
 ## `tempname`
 
 ```
-tempname  Nom de fichier temporaire.
+TEMPNAME  Nom de fichier temporaire, unique.
+
+    Syntaxe
+       f = tempname
+
+    Exemples
+       f = tempname;
+       isfile(f)                      % 0 — il n'existe pas encore
+
+    Voir aussi TEMPDIR, FULLFILE, FOPEN.
 ```
 
 ## `type`
 
 ```
-type  Affiche le source d'un fichier.
+TYPE  Affiche le contenu d'un fichier.
+    TYPE NOM affiche le fichier, comme « cat » d'un terminal.
+
+    Syntaxe
+       type nom
+
+    Exemples
+       f = fullfile(tempdir,'t.m');
+       fid = fopen(f,'w'); fprintf(fid,'a = 1;\n'); fclose(fid);
+       type(f)
+       delete(f);
+
+    Voir aussi FILEREAD, DIR, WHICH, EDIT.
 ```
 
 ## `unix`
@@ -353,7 +653,16 @@ ver  Version detaillee.
 ## `version`
 
 ```
-version  Version de l'interpreteur.
+VERSION  Version de MatLibre.
+
+    Syntaxe
+       v = version
+
+    Exemples
+       version
+       ischar(version)
+
+    Voir aussi VER, COMPUTER, MEXEXT.
 ```
 
 ## `which`
@@ -381,12 +690,36 @@ WHICH  Où se trouve une fonction.
 ## `who`
 
 ```
-who  Liste les variables.
+WHO  Liste les variables de l'espace de travail.
+    WHO affiche les noms ; C = WHO les rend en cellule.
+
+    Syntaxe
+       who
+       c = who
+
+    Exemples
+       uneVariable = 1;
+       c = who;
+       any(strcmp(c, 'uneVariable'))
+
+    Voir aussi WHOS, CLEAR, EXIST.
 ```
 
 ## `whos`
 
 ```
-whos  Liste detaillee des variables.
+WHOS  Liste les variables avec leur taille et leur classe.
+    WHOS affiche un tableau ; S = WHOS le rend en structure.
+
+    Syntaxe
+       whos
+       s = whos
+
+    Exemples
+       uneMatrice = magic(4);
+       s = whos;
+       isstruct(s)
+
+    Voir aussi WHO, CLEAR, CLASS, SIZE.
 ```
 

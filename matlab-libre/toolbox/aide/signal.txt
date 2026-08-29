@@ -155,3 +155,303 @@ UNWRAP  Déroule une phase.
        plot(f, p*180/pi);         % en degrés
 
     Voir aussi ANGLE, MOD.
+
+### fft2
+FFT2  Transformée de Fourier à deux dimensions.
+    FFT2(A) applique la FFT aux lignes puis aux colonnes : c'est la
+    transformée d'une image.
+
+    Syntaxe
+       Y = fft2(A)
+       Y = fft2(A,m,n)
+
+    Exemples
+       A = zeros(8); A(1,1) = 1;
+       Y = fft2(A);
+       all(abs(Y(:) - 1) < 1e-12)     % la FFT d'une impulsion est plate
+
+    Voir aussi IFFT2, FFT, FFTSHIFT, IMAGESC.
+
+### ifft2
+IFFT2  Transformée de Fourier inverse à deux dimensions.
+
+    Syntaxe
+       A = ifft2(Y)
+
+    Exemples
+       A = magic(8);
+       max(max(abs(A - real(ifft2(fft2(A)))))) < 1e-10
+
+    Voir aussi FFT2, IFFT, FFTSHIFT.
+
+### ifftshift
+IFFTSHIFT  Défait FFTSHIFT.
+    IFFTSHIFT(X) remet la fréquence nulle au début : c'est l'inverse exact
+    de FFTSHIFT, y compris pour une longueur impaire.
+
+    Syntaxe
+       y = ifftshift(x)
+
+    Exemples
+       x = 1:5;
+       isequal(ifftshift(fftshift(x)), x)
+
+    Voir aussi FFTSHIFT, FFT, IFFT.
+
+### xcorr
+XCORR  Corrélation croisée.
+    XCORR(X,Y) mesure la ressemblance de X et Y à chaque décalage ; le
+    maximum dit de combien l'un retarde sur l'autre.
+    [C,DECALAGES] = XCORR(...) rend aussi les décalages.
+
+    Syntaxe
+       c = xcorr(x,y)
+       [c,decalages] = xcorr(x,y)
+
+    Exemples
+       x = [zeros(1,10) 1 zeros(1,10)];
+       y = [zeros(1,13) 1 zeros(1,7)];
+       [c, d] = xcorr(x, y);
+       [~, k] = max(c);
+       d(k)                           % -3 : y retarde de 3 échantillons
+
+    Voir aussi CONV, FILTER, FFT, CORRCOEF.
+
+### conv2
+CONV2  Convolution à deux dimensions.
+    CONV2(A,NOYAU) convolue A par le noyau : c'est le filtrage d'une
+    image.
+    CONV2(A,NOYAU,'same') rend un résultat de la taille de A.
+
+    Syntaxe
+       C = conv2(A,noyau)
+       C = conv2(A,noyau,'same')
+
+    Exemples
+       A = magic(5);
+       flou = conv2(A, ones(3)/9, 'same');
+       size(flou)                     % [5 5]
+       contours = conv2(A, [-1 0 1], 'same');
+
+    Voir aussi CONV, FILTER2, IMFILTER, FFT2.
+
+### deconv
+DECONV  Division polynomiale.
+    [Q,R] = DECONV(A,B) rend le quotient et le reste de A par B : c'est
+    l'inverse de CONV.
+
+    Syntaxe
+       [q,r] = deconv(a,b)
+
+    Exemples
+       [q, r] = deconv([1 0 -1], [1 1]);
+       q                              % [1 -1], soit x - 1
+       all(abs(r) < 1e-12)
+
+    Voir aussi CONV, POLYDIV, ROOTS, FILTER.
+
+### filtfilt
+FILTFILT  Filtrage aller-retour, sans déphasage.
+    FILTFILT(B,A,X) filtre X dans un sens puis dans l'autre : la phase du
+    filtre s'annule, et l'ordre effectif double.
+
+    Syntaxe
+       y = filtfilt(b,a,x)
+
+    Exemples
+       x = sin(2*pi*(0:299)/50) + 0.2*randn(1,300);
+       [b, a] = butter(4, 0.1);
+       y = filtfilt(b, a, x);
+       numel(y) == numel(x)
+
+    Voir aussi FILTER, BUTTER, FREQZ, CONV.
+
+### freqz
+FREQZ  Réponse en fréquence d'un filtre numérique.
+    [H,W] = FREQZ(B,A,N) rend la réponse complexe en N points entre 0 et π.
+
+    Syntaxe
+       [h,w] = freqz(b,a,n)
+
+    Exemples
+       [b, a] = butter(4, 0.25);
+       [h, w] = freqz(b, a, 256);
+       abs(h(1)) > 0.99               % gain unité en continu
+       plot(w/pi, 20*log10(abs(h))); grid on
+
+    Voir aussi FILTER, BUTTER, FILTFILT, FFT.
+
+### hamming
+HAMMING  Fenêtre de Hamming.
+    HAMMING(N) rend la fenêtre de longueur N : elle réduit les fuites
+    spectrales, au prix d'un lobe principal plus large.
+
+    Syntaxe
+       w = hamming(n)
+
+    Exemples
+       w = hamming(64);
+       numel(w)                       % 64
+       x = randn(1,64);
+       Y = fft(x(:) .* w);
+
+    Voir aussi HANN, BLACKMAN, BARTLETT, RECTWIN, FFT.
+
+### hann
+HANN  Fenêtre de Hann.
+    HANN(N) rend la fenêtre de longueur N ; elle s'annule aux deux bouts.
+
+    Syntaxe
+       w = hann(n)
+
+    Exemples
+       w = hann(32);
+       [w(1) w(end)]                  % zéro aux extrémités
+       max(w)                         % 1 au milieu
+
+    Voir aussi HAMMING, BLACKMAN, BARTLETT, FFT.
+
+### blackman
+BLACKMAN  Fenêtre de Blackman.
+    BLACKMAN(N) rend la fenêtre de longueur N : lobes secondaires très
+    bas, lobe principal large.
+
+    Syntaxe
+       w = blackman(n)
+
+    Exemples
+       w = blackman(64);
+       numel(w)
+       max(w) <= 1
+
+    Voir aussi HAMMING, HANN, BARTLETT, FFT.
+
+### upsample
+UPSAMPLE  Sur-échantillonne en insérant des zéros.
+    UPSAMPLE(X,N) insère N-1 zéros entre les échantillons.
+
+    Syntaxe
+       y = upsample(x,n)
+
+    Exemples
+       upsample([1 2 3], 2)           % [1 0 2 0 3 0]
+       numel(upsample(1:10, 3))       % 30
+
+    Voir aussi DOWNSAMPLE, INTERP1, FILTER, RESAMPLE.
+
+### downsample
+DOWNSAMPLE  Sous-échantillonne en gardant un point sur N.
+    DOWNSAMPLE(X,N) garde un échantillon sur N. Filtrer avant, sinon le
+    repliement de spectre est garanti.
+
+    Syntaxe
+       y = downsample(x,n)
+
+    Exemples
+       downsample(1:10, 3)            % [1 4 7 10]
+       x = randn(1,100);
+       [b, a] = butter(4, 0.4);
+       y = downsample(filter(b, a, x), 2);
+
+    Voir aussi UPSAMPLE, FILTER, DECIMATE, INTERP1.
+
+### poly
+POLY  Polynôme dont on donne les racines, ou polynôme caractéristique.
+    POLY(R), R étant un vecteur de racines, rend les coefficients du
+    polynôme unitaire correspondant.
+    POLY(A), A étant une matrice carrée, rend son polynôme
+    caractéristique.
+
+    Syntaxe
+       p = poly(r)
+       p = poly(A)
+
+    Exemples
+       poly([1 -1])                   % [1 0 -1], soit x^2 - 1
+       p = poly([2 3]);
+       sort(roots(p))'                % [2 3], on revient aux racines
+       poly([2 0; 0 3])
+
+    Voir aussi ROOTS, POLYVAL, CONV, EIG.
+
+### polyder
+POLYDER  Dérivée d'un polynôme.
+    POLYDER(P) rend les coefficients de la dérivée.
+    POLYDER(A,B) dérive le produit A*B.
+
+    Syntaxe
+       d = polyder(p)
+       d = polyder(a,b)
+
+    Exemples
+       polyder([1 0 -1])              % [2 0], soit 2x
+       p = [1 -3 2];
+       racinesExtremum = roots(polyder(p));
+
+    Voir aussi POLYINT, POLYVAL, ROOTS, DIFF.
+
+### polyint
+POLYINT  Primitive d'un polynôme.
+    POLYINT(P) rend la primitive de constante nulle.
+    POLYINT(P,K) impose la constante d'intégration.
+
+    Syntaxe
+       q = polyint(p)
+       q = polyint(p,k)
+
+    Exemples
+       polyint([2 0])                 % [1 0 0], soit x^2
+       p = [3 0 0];
+       q = polyint(p);
+       polyval(q, 2) - polyval(q, 0)  % l'intégrale de 0 à 2
+
+    Voir aussi POLYDER, POLYVAL, TRAPZ, INTEGRAL.
+
+### spline
+SPLINE  Interpolation par splines cubiques.
+    SPLINE(X,Y,XQ) rend les valeurs interpolées en XQ.
+    PP = SPLINE(X,Y) rend la forme par morceaux, à évaluer avec PPVAL.
+
+    Syntaxe
+       yq = spline(x,y,xq)
+       pp = spline(x,y)
+
+    Exemples
+       x = 0:0.5:4;  y = sin(x);
+       xq = 0:0.05:4;
+       yq = spline(x, y, xq);
+       max(abs(yq - sin(xq))) < 0.02
+       pp = spline(x, y);
+       abs(ppval(pp, 1) - spline(x,y,1)) < 1e-12
+
+    Voir aussi INTERP1, PPVAL, POLYFIT.
+
+### ppval
+PPVAL  Évalue une forme polynomiale par morceaux.
+    PPVAL(PP,XQ) évalue en XQ la forme rendue par SPLINE.
+
+    Syntaxe
+       y = ppval(pp,xq)
+
+    Exemples
+       x = 0:4;  y = x.^2;
+       pp = spline(x, y);
+       abs(ppval(pp, 2.5) - 6.25) < 1e-6
+
+    Voir aussi SPLINE, INTERP1.
+
+### interp2
+INTERP2  Interpolation sur une grille à deux dimensions.
+    INTERP2(X,Y,Z,XQ,YQ) interpole Z, défini sur la grille (X,Y), aux
+    points demandés.
+
+    Syntaxe
+       zq = interp2(X,Y,Z,xq,yq)
+       zq = interp2(X,Y,Z,xq,yq,methode)
+
+    Exemples
+       [X, Y] = meshgrid(0:4);
+       Z = X + Y;
+       abs(interp2(X, Y, Z, 1.5, 2.5) - 4) < 1e-12
+
+    Voir aussi INTERP1, MESHGRID, SURF, SPLINE.

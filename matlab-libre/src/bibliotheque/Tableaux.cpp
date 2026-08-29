@@ -722,22 +722,45 @@ std::vector<Valeur> operationEnsemble(std::vector<Valeur>& args, int nargout, in
     }
     // Reconstitution
     bool colonne = !(a.dims.size() == 2 && a.dims[0] == 1);
+
+    // Les indices que MATLAB rend en plus : « C = A(IA) » et « C = B(IB) ».
+    // Pour l'intersection, chaque element vient de A, mais se retrouve
+    // aussi dans B — on note sa premiere position la-bas.
+    std::map<CleValeur, std::size_t> premierB;
+    for (std::size_t k = b.nelem(); k-- > 0;) premierB[cleDe(b, k)] = k;
+    std::vector<double> ia, ib;
+    for (auto& p : resultat) {
+        if (p.first == &a) {
+            ia.push_back((double)(p.second + 1));
+            if (genre == 1) {
+                auto t = premierB.find(cleDe(a, p.second));
+                if (t != premierB.end()) ib.push_back((double)(t->second + 1));
+            }
+        } else {
+            ib.push_back((double)(p.second + 1));
+        }
+    }
+    auto indices = [&](const std::vector<double>& v) {
+        return colonne ? Valeur::colonne(v) : Valeur::ligne(v);
+    };
+
+    std::vector<Valeur> sorties;
     if (a.classe == Classe::Cellule) {
         Valeur r = Valeur::celluleDims(colonne ? Dims{(int)resultat.size(), 1}
                                                : Dims{1, (int)resultat.size()});
         for (std::size_t k = 0; k < resultat.size(); ++k)
             r.cellules[k] = resultat[k].first->cellules[resultat[k].second];
-        return {r};
+        sorties.push_back(r);
+    } else {
+        std::vector<double> x;
+        for (auto& p : resultat) x.push_back(p.first->re[p.second]);
+        sorties.push_back(colonne ? Valeur::colonne(x) : Valeur::ligne(x));
     }
-    std::vector<double> x;
-    std::vector<double> ia;
-    for (auto& p : resultat) {
-        x.push_back(p.first->re[p.second]);
-        ia.push_back((double)(p.second + 1));
-    }
-    Valeur r = colonne ? Valeur::colonne(x) : Valeur::ligne(x);
-    if (nargout >= 2) return {r, colonne ? Valeur::colonne(ia) : Valeur::ligne(ia)};
-    return {r};
+    // « setdiff » n'a pas de troisieme sortie : ses elements ne sont, par
+    // definition, dans aucune position de B.
+    if (nargout >= 2) sorties.push_back(indices(ia));
+    if (nargout >= 3 && genre != 2) sorties.push_back(indices(ib));
+    return sorties;
 }
 
 FONCTION(fnUnion) {

@@ -6,21 +6,20 @@ Fonctions natives du groupe `fonctionnel`.
 
 ```
 ARRAYFUN  Applique une fonction à chaque élément d'un tableau.
-    B = ARRAYFUN(F,A) applique F à chaque élément.
-    B = ARRAYFUN(F,A,'UniformOutput',false) rend une cellule.
-
-    Une opération vectorisée est presque toujours plus rapide :
-    ARRAYFUN sert quand la fonction ne se vectorise pas.
+    ARRAYFUN(F,A) applique F à chaque élément ; F doit rendre un scalaire.
+    ARRAYFUN(F,A,'UniformOutput',false) rend une cellule, ce qui permet à F
+    de rendre n'importe quoi.
 
     Syntaxe
        B = arrayfun(f,A)
-       B = arrayfun(f,A,'UniformOutput',false)
+       C = arrayfun(f,A,'UniformOutput',false)
 
     Exemples
-       arrayfun(@(k) k^2, 1:4)                      % [1 4 9 16]
-       arrayfun(@(k) zeros(k), 1:3, 'UniformOutput', false)
+       arrayfun(@(x) x^2, 1:4)                    % [1 4 9 16]
+       arrayfun(@(n) zeros(1,n), 1:3, 'UniformOutput', false)
+       arrayfun(@(a,b) a+b, [1 2], [10 20])       % [11 22]
 
-    Voir aussi CELLFUN, STRUCTFUN, BSXFUN.
+    Voir aussi CELLFUN, STRUCTFUN, MAP, FOR.
 ```
 
 ## `assignin`
@@ -44,8 +43,11 @@ CELLFUN  Applique une fonction à chaque case d'une cellule.
        A = cellfun(f,C,'UniformOutput',false)
 
     Exemples
+
        cellfun(@numel, {'a','bb','ccc'})            % [1 2 3]
+       noms = {'ada', 'grace'};
        cellfun(@(s) upper(s), noms, 'UniformOutput', false)
+       C = {[], 1, []};
        cellfun(@isempty, C)
 
     Voir aussi ARRAYFUN, STRUCTFUN, CELL2MAT, MAP.
@@ -88,8 +90,14 @@ EXIST  Ce que désigne un nom.
        e = exist(nom,genre)
 
     Exemples
-       if exist('resultat','var'), ... end
-       if exist('donnees.mat','file') == 2, ... end
+
+       resultat = 1;
+       if exist('resultat','var')
+           disp('la variable existe');
+       end
+       if exist('donnees.mat','file') == 2
+           disp('le fichier est là');
+       end
 
     Voir aussi WHICH, ISFIELD, ISVARNAME.
 ```
@@ -97,13 +105,36 @@ EXIST  Ce que désigne un nom.
 ## `feval`
 
 ```
-feval  Appelle une fonction nommee.
+FEVAL  Appelle une fonction désignée par son nom ou sa poignée.
+    FEVAL(F,X1,...) appelle F avec les arguments donnés ; F est une
+    poignée « @sin » ou un nom 'sin'.
+
+    Syntaxe
+       y = feval(f,x1,...)
+       [y1,y2] = feval(f,...)
+
+    Exemples
+       feval(@sin, pi/2)              % 1
+       feval('max', [3 1 4])          % 4
+       nom = 'sqrt';
+       feval(nom, 16)                 % 4
+
+    Voir aussi FUNC2STR, STR2FUNC, ARRAYFUN, CELLFUN.
 ```
 
 ## `func2str`
 
 ```
-func2str  Poignee -> texte.
+FUNC2STR  Rend le texte d'une poignée de fonction.
+
+    Syntaxe
+       texte = func2str(f)
+
+    Exemples
+       func2str(@sin)                 % 'sin'
+       func2str(@(x) x + 1)
+
+    Voir aussi STR2FUNC, FEVAL.
 ```
 
 ## `functions`
@@ -133,7 +164,21 @@ isvarname  Nom de variable valide.
 ## `nargin`
 
 ```
-nargin  Nombre d'arguments recus.
+NARGIN  Nombre d'arguments réellement passés à la fonction courante.
+    NARGIN, dans le corps d'une fonction, rend le nombre d'entrées reçues :
+    c'est ainsi qu'on donne des valeurs par défaut.
+    NARGIN('nom') rend le nombre d'entrées déclarées par la fonction.
+
+    Syntaxe
+       n = nargin
+       n = nargin('nom')
+
+    Exemples
+       f = @(varargin) numel(varargin);
+       f(1,2,3)                       % 3
+       nargin('size')
+
+    Voir aussi NARGOUT, NARGINCHK, VARARGIN, EXIST.
 ```
 
 ## `narginchk`
@@ -145,7 +190,20 @@ narginchk  Verifie le nombre d'entrees.
 ## `nargout`
 
 ```
-nargout  Nombre de sorties demandees.
+NARGOUT  Nombre de sorties demandées à la fonction courante.
+    NARGOUT permet de ne calculer que ce qu'on demande : « [~,i] = max(x) »
+    n'a pas le même coût que « m = max(x) ».
+    NARGOUT('nom') rend le nombre de sorties déclarées.
+
+    Syntaxe
+       n = nargout
+       n = nargout('nom')
+
+    Exemples
+       nargout('size')
+       [m,i] = max([3 9 4]);          % la fonction voit nargout == 2
+
+    Voir aussi NARGIN, NARGOUTCHK, VARARGOUT.
 ```
 
 ## `nargoutchk`
@@ -163,12 +221,38 @@ run  Execute un script, meme hors du chemin de recherche.
 ## `str2func`
 
 ```
-str2func  Texte -> poignee.
+STR2FUNC  Fabrique une poignée à partir d'un texte.
+    STR2FUNC('sin') rend @sin.
+    STR2FUNC('@(x) x.^2') rend la fonction anonyme écrite dans le texte.
+
+    Syntaxe
+       f = str2func(texte)
+
+    Exemples
+       f = str2func('cos');
+       f(0)                           % 1
+       g = str2func('@(x) x.^2 + 1');
+       g(3)                           % 10
+
+    Voir aussi FUNC2STR, FEVAL, ARRAYFUN.
 ```
 
 ## `structfun`
 
 ```
-structfun  Applique a chaque champ.
+STRUCTFUN  Applique une fonction à chaque champ d'une structure.
+    STRUCTFUN(F,S) applique F à chaque valeur et rend un vecteur colonne.
+    STRUCTFUN(F,S,'UniformOutput',false) rend une structure.
+
+    Syntaxe
+       v = structfun(f,s)
+       t = structfun(f,s,'UniformOutput',false)
+
+    Exemples
+       s = struct('a',1,'b',4);
+       structfun(@(x) x*2, s)
+       structfun(@(x) x*2, s, 'UniformOutput', false)
+
+    Voir aussi ARRAYFUN, CELLFUN, FIELDNAMES.
 ```
 

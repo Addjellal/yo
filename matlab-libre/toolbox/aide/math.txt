@@ -125,3 +125,425 @@ ROOTS  Racines d'un polynôme.
        roots([1 2 5])                   % -1 ± 2i
 
     Voir aussi POLY, POLYVAL, EIG, POLYFIT.
+
+### mean
+MEAN  Moyenne arithmétique.
+    MEAN(X) rend la moyenne d'un vecteur, ou la moyenne de chaque colonne
+    d'une matrice.
+    MEAN(X,DIM) travaille selon la dimension DIM.
+
+    Syntaxe
+       m = mean(x)
+       m = mean(x,dim)
+
+    Exemples
+       mean([1 2 3 4])                % 2.5000
+       mean([1 2; 3 4])               % [2 3] — par colonnes
+       mean([1 2; 3 4], 2)            % [1.5; 3.5]
+       A = magic(4);
+       mean(A(:))                     % moyenne de tout
+
+    Voir aussi MEDIAN, MODE, STD, VAR, SUM.
+
+### median
+MEDIAN  Médiane : la valeur du milieu.
+    MEDIAN(X) rend la médiane, insensible aux valeurs extrêmes — c'est ce
+    qui la distingue de la moyenne.
+
+    Syntaxe
+       m = median(x)
+       m = median(x,dim)
+
+    Exemples
+       median([1 2 3 4 100])          % 3
+       mean([1 2 3 4 100])            % 22 — une valeur aberrante suffit
+       median([1 2; 3 4])
+
+    Voir aussi MEAN, MODE, PRCTILE, QUANTILE, SORT.
+
+### std
+STD  Écart-type.
+    STD(X) rend l'écart-type estimé, normalisé par N-1.
+    STD(X,1) normalise par N — l'écart-type de la population.
+
+    Syntaxe
+       s = std(x)
+       s = std(x,1)
+       s = std(x,w,dim)
+
+    Exemples
+       std([2 4 4 4 5 5 7 9])         % 2.1381
+       std([2 4 4 4 5 5 7 9], 1)      % 2
+       std(randn(1,10000)) - 1        % proche de zéro
+
+    Voir aussi VAR, MEAN, MEDIAN, NORMALIZE.
+
+### var
+VAR  Variance.
+    VAR(X) rend la variance estimée, normalisée par N-1.
+    VAR(X,1) normalise par N.
+
+    Syntaxe
+       v = var(x)
+       v = var(x,1)
+
+    Exemples
+       var([1 2 3 4])                 % 1.6667
+       abs(var([1 2 3 4]) - std([1 2 3 4])^2) < 1e-12
+
+    Voir aussi STD, MEAN, COV.
+
+### mode
+MODE  Valeur la plus fréquente.
+    MODE(X) rend la valeur qui revient le plus souvent ; à égalité, la
+    plus petite.
+
+    Syntaxe
+       m = mode(x)
+
+    Exemples
+       mode([1 2 2 3 3 3])            % 3
+       mode([1 1 2 2])                % 1 — la plus petite à égalité
+
+    Voir aussi MEDIAN, MEAN, HISTCOUNTS, UNIQUE.
+
+### cov
+COV  Covariance.
+    COV(X) rend la variance d'un vecteur, ou la matrice de covariance des
+    colonnes d'une matrice.
+    COV(X,Y) rend la matrice 2x2 de deux vecteurs.
+
+    Syntaxe
+       C = cov(x)
+       C = cov(x,y)
+
+    Exemples
+       x = randn(1,500);  y = 2*x + randn(1,500);
+       C = cov(x, y);
+       size(C)                        % [2 2]
+       abs(C(1,1) - var(x)) < 1e-10
+
+    Voir aussi CORRCOEF, VAR, STD, MEAN.
+
+### corrcoef
+CORRCOEF  Coefficients de corrélation.
+    CORRCOEF(X,Y) rend la matrice 2x2 des corrélations : hors diagonale,
+    le coefficient de Pearson, entre -1 et 1.
+
+    Syntaxe
+       R = corrcoef(x,y)
+       R = corrcoef(X)
+
+    Exemples
+       x = 1:100;
+       R = corrcoef(x, 2*x + 1);
+       abs(R(1,2) - 1) < 1e-10        % corrélation parfaite
+       R2 = corrcoef(x, -x);
+       abs(R2(1,2) + 1) < 1e-10
+
+    Voir aussi COV, POLYFIT, VAR.
+
+### prctile
+PRCTILE  Centiles d'un échantillon.
+    PRCTILE(X,P) rend le centile d'ordre P, P étant entre 0 et 100.
+
+    Syntaxe
+       y = prctile(x,p)
+
+    Exemples
+       prctile(1:100, 50)             % la médiane
+       prctile(1:100, [25 75])        % les quartiles
+       x = randn(1,10000);
+       ecart = prctile(x,75) - prctile(x,25);
+
+    Voir aussi QUANTILE, MEDIAN, SORT, HISTCOUNTS.
+
+### quantile
+QUANTILE  Quantiles d'un échantillon.
+    QUANTILE(X,P) rend le quantile d'ordre P, P étant entre 0 et 1 — c'est
+    PRCTILE avec une autre échelle.
+
+    Syntaxe
+       y = quantile(x,p)
+
+    Exemples
+       quantile(1:100, 0.5)
+       quantile(1:100, [0.25 0.75])
+
+    Voir aussi PRCTILE, MEDIAN, SORT.
+
+### histcounts
+HISTCOUNTS  Compte les valeurs par classe.
+    [N,BORDS] = HISTCOUNTS(X) répartit X en classes choisies
+    automatiquement.
+    N = HISTCOUNTS(X,BORDS) compte selon les bords donnés : une valeur
+    tombe dans la classe k si BORDS(k) <= x < BORDS(k+1).
+
+    Syntaxe
+       n = histcounts(x)
+       [n,bords] = histcounts(x)
+       n = histcounts(x,bords)
+
+    Exemples
+       histcounts([1 2 2 3], [1 2 3 4])       % [1 2 1]
+       [n, bords] = histcounts(randn(1,1000));
+       sum(n)                                 % 1000
+
+    Voir aussi HISTOGRAM, ACCUMARRAY, MODE, BAR.
+
+### trapz
+TRAPZ  Intégration par la méthode des trapèzes.
+    TRAPZ(Y) intègre avec un pas de 1.
+    TRAPZ(X,Y) intègre Y en fonction de X.
+
+    Syntaxe
+       q = trapz(y)
+       q = trapz(x,y)
+
+    Exemples
+       x = linspace(0, pi, 1000);
+       abs(trapz(x, sin(x)) - 2) < 1e-4       % l'aire vaut 2
+       trapz([1 1 1])                         % 2
+
+    Voir aussi CUMTRAPZ, INTEGRAL, SUM, QUAD.
+
+### cumtrapz
+CUMTRAPZ  Intégrale cumulée par trapèzes.
+    CUMTRAPZ(Y) rend l'intégrale à chaque point.
+    CUMTRAPZ(X,Y) le fait en fonction de X.
+
+    Syntaxe
+       q = cumtrapz(y)
+       q = cumtrapz(x,y)
+
+    Exemples
+       x = linspace(0, pi, 200);
+       aire = cumtrapz(x, sin(x));
+       abs(aire(end) - 2) < 1e-3
+
+    Voir aussi TRAPZ, CUMSUM, INTEGRAL.
+
+### integral
+INTEGRAL  Intégrale définie d'une fonction.
+    INTEGRAL(F,A,B) intègre F de A à B, F étant une poignée vectorisée.
+
+    Syntaxe
+       q = integral(f,a,b)
+
+    Exemples
+       integral(@(x) sin(x), 0, pi)           % 2
+       abs(integral(@(x) exp(-x.^2), -5, 5) - sqrt(pi)) < 1e-6
+
+    Voir aussi TRAPZ, QUAD, QUADGK, INTEGRAL2, ODE45.
+
+### fzero
+FZERO  Racine d'une fonction d'une variable.
+    FZERO(F,X0) cherche une racine près de X0.
+    FZERO(F,[A B]) cherche entre A et B, où F doit changer de signe.
+
+    Syntaxe
+       x = fzero(f,x0)
+       x = fzero(f,[a b])
+
+    Exemples
+       fzero(@cos, 1)                         % pi/2
+       fzero(@(x) x^2 - 2, [0 2])             % sqrt(2)
+       abs(fzero(@(x) x^3 - x - 2, 1.5) - 1.5214) < 1e-3
+
+    Voir aussi FSOLVE, FMINBND, ROOTS, FMINSEARCH.
+
+### fminbnd
+FMINBND  Minimum d'une fonction sur un intervalle.
+    FMINBND(F,A,B) cherche le minimum de F entre A et B.
+    [X,FVAL] = FMINBND(...) rend aussi la valeur atteinte.
+
+    Syntaxe
+       x = fminbnd(f,a,b)
+       [x,fval] = fminbnd(f,a,b)
+
+    Exemples
+       abs(fminbnd(@(x) (x-3).^2, 0, 10) - 3) < 1e-4
+       [x, f] = fminbnd(@cos, 0, 2*pi);
+       abs(x - pi) < 1e-4
+
+    Voir aussi FMINSEARCH, FMINUNC, FZERO, OPTIMSET.
+
+### fminsearch
+FMINSEARCH  Minimum sans dérivées, par simplexe de Nelder-Mead.
+    FMINSEARCH(F,X0) minimise F à partir de X0, X0 pouvant être un
+    vecteur : c'est la méthode à prendre quand on n'a pas le gradient.
+
+    Syntaxe
+       x = fminsearch(f,x0)
+       [x,fval] = fminsearch(f,x0)
+
+    Exemples
+       x = fminsearch(@(v) (v(1)-1)^2 + (v(2)-2)^2, [0 0]);
+       norm(x - [1 2]) < 1e-3
+       rosenbrock = @(v) (1-v(1))^2 + 100*(v(2)-v(1)^2)^2;
+       xr = fminsearch(rosenbrock, [-1.2 1]);
+
+    Voir aussi FMINBND, FMINUNC, FSOLVE, OPTIMSET.
+
+### fsolve
+FSOLVE  Résout un système d'équations non linéaires.
+    FSOLVE(F,X0) cherche X tel que F(X) = 0, à partir de X0.
+
+    Syntaxe
+       x = fsolve(f,x0)
+       [x,fval] = fsolve(f,x0)
+
+    Exemples
+       f = @(v) [v(1)^2 + v(2)^2 - 1; v(1) - v(2)];
+       x = fsolve(f, [1 0]);
+       norm(f(x)) < 1e-6
+
+    Voir aussi FZERO, FMINSEARCH, MLDIVIDE, LSQNONNEG.
+
+### ode45
+ODE45  Résout une équation différentielle, méthode de Runge-Kutta 4(5).
+    [T,Y] = ODE45(F,[T0 TF],Y0) intègre y' = f(t,y) de T0 à TF depuis Y0.
+    C'est le solveur à essayer en premier ; ODE15S est pour les problèmes
+    raides.
+
+    Syntaxe
+       [t,y] = ode45(f,[t0 tf],y0)
+       [t,y] = ode45(f,tspan,y0,options)
+
+    Exemples
+       [t, y] = ode45(@(t,y) -2*y, [0 3], 1);
+       abs(y(end) - exp(-6)) < 1e-4
+
+       % Un oscillateur : y'' + y = 0, écrit en système d'ordre 1.
+       [t, y] = ode45(@(t,v) [v(2); -v(1)], [0 2*pi], [1; 0]);
+       abs(y(end,1) - 1) < 1e-3
+
+    Voir aussi ODE23, ODE15S, ODESET, DEVAL, INTEGRAL.
+
+### ode15s
+ODE15S  Résout une équation différentielle raide.
+    [T,Y] = ODE15S(F,[T0 TF],Y0) convient quand les échelles de temps sont
+    très différentes — là où ODE45 avance à pas minuscules.
+
+    Syntaxe
+       [t,y] = ode15s(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode15s(@(t,y) -1000*(y - cos(t)), [0 1], 0);
+       numel(t) > 1
+
+    Voir aussi ODE45, ODE23S, ODESET.
+
+### odeset
+ODESET  Options des solveurs d'équations différentielles.
+    ODESET('Nom',valeur,...) construit la structure d'options :
+    'RelTol', 'AbsTol', 'MaxStep'.
+
+    Syntaxe
+       options = odeset('Nom',valeur,...)
+
+    Exemples
+       options = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+       [t, y] = ode45(@(t,y) -y, [0 1], 1, options);
+       abs(y(end) - exp(-1)) < 1e-7
+
+    Voir aussi ODEGET, ODE45, ODE15S, OPTIMSET.
+
+### normpdf
+NORMPDF  Densité de la loi normale.
+    NORMPDF(X) est la densité de la loi normale centrée réduite.
+    NORMPDF(X,MU,SIGMA) celle de la loi de moyenne MU et d'écart-type SIGMA.
+
+    Syntaxe
+       y = normpdf(x)
+       y = normpdf(x,mu,sigma)
+
+    Exemples
+       abs(normpdf(0) - 1/sqrt(2*pi)) < 1e-12
+       x = -4:0.1:4;
+       plot(x, normpdf(x));
+
+    Voir aussi NORMCDF, NORMINV, NORMRND, RANDN.
+
+### normcdf
+NORMCDF  Fonction de répartition de la loi normale.
+    NORMCDF(X) rend la probabilité qu'une normale centrée réduite soit
+    inférieure à X.
+
+    Syntaxe
+       p = normcdf(x)
+       p = normcdf(x,mu,sigma)
+
+    Exemples
+       abs(normcdf(0) - 0.5) < 1e-12
+       abs(normcdf(1.96) - 0.975) < 1e-3
+
+    Voir aussi NORMPDF, NORMINV, ERF.
+
+### norminv
+NORMINV  Quantiles de la loi normale.
+    NORMINV(P) rend la valeur x telle que NORMCDF(x) = P.
+
+    Syntaxe
+       x = norminv(p)
+       x = norminv(p,mu,sigma)
+
+    Exemples
+       abs(norminv(0.975) - 1.96) < 1e-3
+       abs(norminv(normcdf(0.7)) - 0.7) < 1e-10
+
+    Voir aussi NORMCDF, NORMPDF, PRCTILE.
+
+### randi
+RANDI  Entiers pseudo-aléatoires.
+    RANDI(N) tire un entier entre 1 et N.
+    RANDI(N,M,K) rend une matrice M par K.
+    RANDI([A B],...) tire entre A et B.
+
+    Syntaxe
+       x = randi(n)
+       x = randi(n,m,k)
+       x = randi([a b],m,k)
+
+    Exemples
+       rng(0);
+       x = randi(6, 1, 10);           % dix lancers de dé
+       all(x >= 1 & x <= 6)
+       randi([10 20], 1, 5);
+
+    Voir aussi RAND, RANDN, RANDPERM, RNG.
+
+### randperm
+RANDPERM  Permutation aléatoire.
+    RANDPERM(N) rend une permutation des entiers 1 à N.
+    RANDPERM(N,K) en rend K, tirés sans remise.
+
+    Syntaxe
+       p = randperm(n)
+       p = randperm(n,k)
+
+    Exemples
+       rng(0);
+       p = randperm(5);
+       isequal(sort(p), 1:5)
+       x = 10:10:50;
+       x(randperm(numel(x)))          % mélanger un vecteur
+
+    Voir aussi RANDI, RAND, RNG, SORT.
+
+### normalize
+NORMALIZE  Normalise des données.
+    NORMALIZE(X) centre et réduit : moyenne nulle, écart-type 1.
+    NORMALIZE(X,'range') ramène dans [0,1].
+
+    Syntaxe
+       y = normalize(x)
+       y = normalize(x,'range')
+
+    Exemples
+       y = normalize([1 2 3 4 5]);
+       abs(mean(y)) < 1e-12
+       z = normalize([1 2 3], 'range');
+       [min(z) max(z)]                % [0 1]
+
+    Voir aussi MEAN, STD, RESCALE, ZSCORE.

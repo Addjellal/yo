@@ -191,4 +191,47 @@ randn('seed', 7);
 Cc = randn(4) + 1i * randn(4);
 assert(abs(norm(Cc) - max(svd(Cc))) < 1e-12);
 
+%% ------------------------------------------- ensembles et leurs indices
+% MATLAB rend jusqu'a trois sorties : « C = A(IA) » et « C = B(IB) ».
+a = [5 1 3];  b = [3 5];
+[c, ia, ib] = intersect(a, b);
+assert(isequal(c, [3 5]));
+assert(isequal(a(ia), c));
+assert(isequal(b(ib), c));
+
+[u, iau, ibu] = union([1 2], [2 3]);
+assert(isequal(u, [1 2 3]));
+sourceA = [1 2];  sourceB = [2 3];
+assert(isequal(sourceA(iau), [1 2]));   % ce qui vient de A
+assert(isequal(sourceB(ibu), 3));       % et ce qui vient de B
+
+% setdiff n'a que deux sorties : ses elements ne sont dans aucune
+% position de B.
+[d, iad] = setdiff([1 2 3 4], [2 4]);
+assert(isequal(d, [1 3]));
+assert(isequal(iad, [1 3]));
+
+% Sur des cellules aussi.
+[cc, icc] = intersect({'a','b'}, {'b','c'});
+assert(numel(cc) == 1 && strcmp(cc{1}, 'b'));
+assert(icc == 2);
+
+%% ------------------------------------------------ « axis » de MATLAB
+% axis rend les bornes, les impose, egalise les echelles et masque les
+% axes — les mots-cles de la documentation.
+figure
+plot([0 1], [0 2]);
+axis([0 1 -1 1]);
+assert(isequal(axis, [0 1 -1 1]));
+axis auto
+plot(1:10);
+axis tight
+bornesTight = axis;
+assert(bornesTight(1) == 1 && bornesTight(2) == 10);
+axis equal
+axis square
+axis off
+axis on
+close all
+
 disp('matrices : toutes les verifications passent');

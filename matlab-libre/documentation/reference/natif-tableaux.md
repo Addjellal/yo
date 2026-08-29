@@ -5,7 +5,23 @@ Fonctions natives du groupe `tableaux`.
 ## `accumarray`
 
 ```
-accumarray  Accumulation par indice.
+ACCUMARRAY  Agrège des valeurs par groupe.
+    ACCUMARRAY(INDICES,VALEURS) additionne les valeurs partageant le même
+    indice : c'est le « group by » de MATLAB.
+    ACCUMARRAY(INDICES,VALEURS,TAILLE,FONCTION) applique une autre
+    fonction que la somme.
+
+    Syntaxe
+       s = accumarray(indices,valeurs)
+       s = accumarray(indices,valeurs,taille,fonction)
+
+    Exemples
+       accumarray([1;2;1;3], [10;20;30;40])       % [40;20;40]
+       groupes = [1;1;2;2;2];
+       valeurs = [3;5;2;4;6];
+       accumarray(groupes, valeurs, [], @mean)    % moyenne par groupe
+
+    Voir aussi UNIQUE, HISTCOUNTS, SUM, ARRAYFUN.
 ```
 
 ## `all`
@@ -20,8 +36,12 @@ ALL  Vrai si tous les éléments sont vrais.
        B = all(A,'all')
 
     Exemples
+
        all([1 1 0])               % 0
-       if all(size(A) == size(B)), ... end
+       A = magic(3);  B = ones(3);
+       if all(size(A) == size(B))
+           disp('mêmes dimensions');
+       end
 
     Voir aussi ANY, FIND.
 ```
@@ -41,8 +61,13 @@ ANY  Vrai si un élément au moins est vrai.
        B = any(A,'all')
 
     Exemples
+
        any([0 0 1])               % 1
-       if any(isnan(x)), ... end
+       x = [1 NaN 3];
+       if any(isnan(x))
+           disp('il y a un NaN');
+       end
+       A = magic(4);
        any(A(:) < 0)              % un négatif quelque part ?
 
     Voir aussi ALL, FIND, XOR.
@@ -57,19 +82,51 @@ cross  Produit vectoriel.
 ## `cummax`
 
 ```
-cummax  Maximum cumule.
+CUMMAX  Maximum courant.
+    CUMMAX(X) rend, à chaque position, le plus grand élément vu jusque-là.
+
+    Syntaxe
+       y = cummax(x)
+
+    Exemples
+       cummax([3 1 4 1 5])                    % [3 3 4 4 5]
+       plafond = cummax(randn(1,10));
+
+    Voir aussi CUMMIN, CUMSUM, MAX, MOVMEAN.
 ```
 
 ## `cummin`
 
 ```
-cummin  Minimum cumule.
+CUMMIN  Minimum courant.
+    CUMMIN(X) rend, à chaque position, le plus petit élément vu jusque-là.
+
+    Syntaxe
+       y = cummin(x)
+
+    Exemples
+       cummin([3 1 4 1 5])                    % [3 1 1 1 1]
+
+    Voir aussi CUMMAX, CUMSUM, MIN.
 ```
 
 ## `cumprod`
 
 ```
-cumprod  Produit cumule.
+CUMPROD  Produit cumulé.
+    CUMPROD(X) rend les produits successifs.
+    CUMPROD(X,DIM) travaille selon la dimension DIM.
+
+    Syntaxe
+       y = cumprod(x)
+       y = cumprod(x,dim)
+
+    Exemples
+       cumprod([1 2 3 4])                     % [1 2 6 24]
+       cumprod([1 2; 3 4])
+       factorielles = cumprod(1:5)
+
+    Voir aussi CUMSUM, PROD, CUMMAX, CUMMIN.
 ```
 
 ## `cumsum`
@@ -85,7 +142,9 @@ CUMSUM  Somme cumulée.
        B = cumsum(A,dim)
 
     Exemples
+
        cumsum([1 2 3 4])              % [1 3 6 10]
+       pas = 0.1;  y = sin(0:pas:pi);
        aire = cumsum(y) * pas;        % intégration rectangulaire
 
     Voir aussi SUM, CUMPROD, DIFF, TRAPZ.
@@ -94,13 +153,44 @@ CUMSUM  Somme cumulée.
 ## `cumtrapz`
 
 ```
-cumtrapz  Integration cumulee.
+CUMTRAPZ  Intégrale cumulée par trapèzes.
+    CUMTRAPZ(Y) rend l'intégrale à chaque point.
+    CUMTRAPZ(X,Y) le fait en fonction de X.
+
+    Syntaxe
+       q = cumtrapz(y)
+       q = cumtrapz(x,y)
+
+    Exemples
+       x = linspace(0, pi, 200);
+       aire = cumtrapz(x, sin(x));
+       abs(aire(end) - 2) < 1e-3
+
+    Voir aussi TRAPZ, CUMSUM, INTEGRAL.
 ```
 
 ## `diag`
 
 ```
-diag  Diagonale ou matrice diagonale.
+DIAG  Diagonale d'une matrice, ou matrice diagonale.
+    DIAG(V), V étant un vecteur, rend la matrice carrée dont la diagonale
+    est V.
+    DIAG(A), A étant une matrice, rend sa diagonale en colonne.
+    DIAG(X,K) travaille sur la K-ième diagonale : K>0 au-dessus, K<0
+    en dessous.
+
+    Syntaxe
+       D = diag(v)
+       v = diag(A)
+       X = diag(x,k)
+
+    Exemples
+       diag([1 2 3])              % matrice 3x3
+       diag(magic(3))             % la diagonale, en colonne
+       diag([1 1], 1)             % surdiagonale
+       trace(magic(3)) == sum(diag(magic(3)))
+
+    Voir aussi TRIL, TRIU, EYE, TRACE, SPDIAGS.
 ```
 
 ## `diff`
@@ -117,9 +207,13 @@ DIFF  Différences entre éléments voisins.
        Y = diff(X,n,dim)
 
     Exemples
+
        diff([1 4 9 16])               % [3 5 7]
+       x = 0:0.1:1;  y = x.^2;
        pente = diff(y) ./ diff(x);    % dérivée approchée
-       if all(diff(x) > 0), ... end   % x est-il croissant ?
+       if all(diff(x) > 0)
+           disp('x est croissant');
+       end
 
     Voir aussi CUMSUM, GRADIENT, SORT, ISSORTED.
 ```
@@ -149,7 +243,9 @@ FIND  Indices des éléments non nuls.
        [row,col] = find(___)
 
     Exemples
+
        find([0 3 0 7])            % [2 4]
+       A = magic(4);
        find(A > 5)                % où A dépasse 5
        A(find(A < 0)) = 0;        % ou plus simplement A(A < 0) = 0
 
@@ -165,7 +261,21 @@ histc  Comptage par intervalles.
 ## `intersect`
 
 ```
-intersect  Intersection.
+INTERSECT  Éléments communs à deux ensembles.
+    INTERSECT(A,B) rend les valeurs présentes dans les deux, triées et
+    sans répétition.
+    [C,IA,IB] = INTERSECT(A,B) rend aussi où elles se trouvent.
+
+    Syntaxe
+       c = intersect(a,b)
+       [c,ia,ib] = intersect(a,b)
+
+    Exemples
+       intersect([1 2 3 4], [3 4 5])          % [3 4]
+       intersect({'a','b'}, {'b','c'})
+       [c,ia,ib] = intersect([5 1 3], [3 5]);
+
+    Voir aussi UNION, SETDIFF, ISMEMBER, UNIQUE.
 ```
 
 ## `ismember`
@@ -182,8 +292,10 @@ ISMEMBER  Test d'appartenance.
        [tf,loc] = ismember(A,S)
 
     Exemples
+
        ismember(3, [1 2 3])           % 1
        ismember([1 5], [1 2 3])       % [1 0]
+       x = 1:10;  aRetirer = [3 7];
        x(ismember(x, aRetirer)) = [];
 
     Voir aussi UNIQUE, INTERSECT, SETDIFF, ANY, CONTAINS.
@@ -192,13 +304,36 @@ ISMEMBER  Test d'appartenance.
 ## `kron`
 
 ```
-kron  Produit de Kronecker.
+KRON  Produit de Kronecker.
+    KRON(A,B) remplace chaque élément a de A par a*B : le résultat est de
+    taille (m1*m2) par (n1*n2).
+
+    Syntaxe
+       K = kron(A,B)
+
+    Exemples
+       kron(eye(2), [1 2; 3 4])
+       size(kron(ones(2,3), ones(4,5)))   % [8 15]
+
+    Voir aussi REPMAT, DIAG, MTIMES.
 ```
 
 ## `magic`
 
 ```
-magic  Carre magique d'ordre n.
+MAGIC  Carré magique d'ordre N.
+    MAGIC(N) rend une matrice N par N des entiers 1 à N², dont toutes les
+    lignes, colonnes et diagonales ont la même somme.
+
+    Syntaxe
+       M = magic(n)
+
+    Exemples
+       magic(3)
+       sum(magic(4))              % la même somme partout
+       sum(magic(4), 2)'
+
+    Voir aussi ONES, EYE, RAND, HILB.
 ```
 
 ## `max`
@@ -269,7 +404,18 @@ PROD  Produit des éléments.
 ## `setdiff`
 
 ```
-setdiff  Difference ensembliste.
+SETDIFF  Éléments de A absents de B.
+    SETDIFF(A,B) rend les valeurs de A qui ne sont pas dans B, triées et
+    sans répétition.
+
+    Syntaxe
+       c = setdiff(a,b)
+
+    Exemples
+       setdiff([1 2 3 4], [2 4])              % [1 3]
+       setdiff({'a','b','c'}, {'b'})
+
+    Voir aussi UNION, INTERSECT, ISMEMBER, UNIQUE.
 ```
 
 ## `sort`
@@ -292,8 +438,11 @@ SORT  Trie dans l'ordre croissant.
        [B,I] = sort(___)
 
     Exemples
+
        sort([3 1 2])              % [1 2 3]
        sort([3 1 2], 'descend')   % [3 2 1]
+       cle = [30 10 20];
+       tableau = ['c'; 'a'; 'b'];
        [~,i] = sort(cle);         % trier autre chose par la même clé
        tableau = tableau(i,:);
 
@@ -303,7 +452,24 @@ SORT  Trie dans l'ordre croissant.
 ## `sortrows`
 
 ```
-sortrows  Tri des lignes d'une matrice.
+SORTROWS  Trie les lignes d'une matrice.
+    SORTROWS(A) trie sur la première colonne, puis la deuxième, etc.
+    SORTROWS(A,COL) trie sur la colonne COL ; COL négative trie à
+    l'envers.
+    [B,I] = SORTROWS(...) rend aussi la permutation.
+
+    Syntaxe
+       B = sortrows(A)
+       B = sortrows(A,col)
+       [B,i] = sortrows(...)
+
+    Exemples
+       A = [3 1; 1 2; 2 3];
+       sortrows(A)
+       sortrows(A, 2)
+       sortrows(A, -1)                % décroissant
+
+    Voir aussi SORT, UNIQUE, ISSORTED.
 ```
 
 ## `sum`
@@ -322,9 +488,11 @@ SUM  Somme des éléments.
        S = sum(___,'omitnan')
 
     Exemples
+
        sum([1 2 3])          % 6
        sum([1 2; 3 4])       % [4 6]   — par colonnes
        sum([1 2; 3 4], 2)    % [3; 7]  — par lignes
+       A = magic(4);
        sum(A(:))             % somme de tout
 
     Voir aussi PROD, CUMSUM, MEAN, MAX, MIN.
@@ -333,25 +501,72 @@ SUM  Somme des éléments.
 ## `trapz`
 
 ```
-trapz  Integration par trapezes.
+TRAPZ  Intégration par la méthode des trapèzes.
+    TRAPZ(Y) intègre avec un pas de 1.
+    TRAPZ(X,Y) intègre Y en fonction de X.
+
+    Syntaxe
+       q = trapz(y)
+       q = trapz(x,y)
+
+    Exemples
+       x = linspace(0, pi, 1000);
+       abs(trapz(x, sin(x)) - 2) < 1e-4       % l'aire vaut 2
+       trapz([1 1 1])                         % 2
+
+    Voir aussi CUMTRAPZ, INTEGRAL, SUM, QUAD.
 ```
 
 ## `tril`
 
 ```
-tril  Partie triangulaire inferieure.
+TRIL  Partie triangulaire inférieure.
+    TRIL(A) met à zéro tout ce qui est au-dessus de la diagonale.
+    TRIL(A,K) garde tout ce qui est sur ou sous la K-ième diagonale.
+
+    Syntaxe
+       L = tril(A)
+       L = tril(A,k)
+
+    Exemples
+       tril(ones(3))
+       tril(magic(4), -1)         % strictement sous la diagonale
+
+    Voir aussi TRIU, DIAG, ISTRIL, LU.
 ```
 
 ## `triu`
 
 ```
-triu  Partie triangulaire superieure.
+TRIU  Partie triangulaire supérieure.
+    TRIU(A) met à zéro tout ce qui est sous la diagonale.
+    TRIU(A,K) garde tout ce qui est sur ou au-dessus de la K-ième diagonale.
+
+    Syntaxe
+       U = triu(A)
+       U = triu(A,k)
+
+    Exemples
+       triu(ones(3))
+       triu(magic(4), 1)          % strictement au-dessus
+
+    Voir aussi TRIL, DIAG, ISTRIU, QR.
 ```
 
 ## `union`
 
 ```
-union  Reunion de deux ensembles.
+UNION  Réunion de deux ensembles.
+    UNION(A,B) rend toutes les valeurs des deux, triées et sans répétition.
+
+    Syntaxe
+       c = union(a,b)
+
+    Exemples
+       union([1 2], [2 3])                    % [1 2 3]
+       union({'a'}, {'b','a'})
+
+    Voir aussi INTERSECT, SETDIFF, UNIQUE, ISMEMBER.
 ```
 
 ## `unique`
@@ -372,10 +587,12 @@ UNIQUE  Valeurs distinctes, triées.
        [C,ia,ic] = unique(___)
 
     Exemples
+
        unique([3 1 3 2])              % [1 2 3]
        unique([3 1 3 2], 'stable')    % [3 1 2]
+       etiquettes = [2 1 2 3 1 2];
        [c,~,ic] = unique(etiquettes);
-       comptes = accumarray(ic, 1);   % combien de fois chacune
+       comptes = accumarray(ic(:), 1);   % combien de fois chacune
 
     Voir aussi SORT, ISMEMBER, INTERSECT, UNION, HISTCOUNTS.
 ```

@@ -17,13 +17,33 @@ issparse  Le stockage est-il creux.
 ## `nnz`
 
 ```
-nnz  Nombre d'elements non nuls.
+NNZ  Nombre d'éléments non nuls.
+
+    Syntaxe
+       n = nnz(x)
+
+    Exemples
+       nnz([0 1 0 2])                         % 2
+       nnz(eye(4))                            % 4
+       nnz(magic(4) > 8)                      % combien dépassent 8
+
+    Voir aussi FIND, NONZEROS, ANY, SUM, SPARSE.
 ```
 
 ## `nonzeros`
 
 ```
-nonzeros  Valeurs non nulles.
+NONZEROS  Les éléments non nuls, en colonne.
+
+    Syntaxe
+       v = nonzeros(x)
+
+    Exemples
+       nonzeros([0 1 0 2])                    % [1; 2]
+       A = eye(3);
+       numel(nonzeros(A))                     % 3
+
+    Voir aussi NNZ, FIND, SPARSE.
 ```
 
 ## `nzmax`

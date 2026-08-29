@@ -11,7 +11,7 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **616 fonctions natives** couvrant le MATLAB de base.
+- **617 fonctions natives** couvrant le MATLAB de base.
   Quatre-vingts d'entre elles — les plus consultées — ont une fiche
   d'aide complète : syntaxe, description, exemples et fonctions
   voisines, dans `toolbox/aide/`. Les autres gardent leur ligne de

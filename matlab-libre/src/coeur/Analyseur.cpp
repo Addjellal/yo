@@ -223,7 +223,11 @@ bool Analyseur::ressembleCommande() const {
     const Jeton& s = jeton(1);
     if (!s.espaceAvant) return false;
 
-    if (s.genre == Genre::Ident || s.genre == Genre::Nombre) {
+    // Un mot-cle en argument reste un mot : « dbstop if error » et
+    // « warning off all » sont des commandes, pas des « if » ni des
+    // « for ». Le premier jeton, lui, ne peut pas etre un mot-cle : il a
+    // deja fallu que ce soit un identifiant.
+    if (s.genre == Genre::Ident || s.genre == Genre::Nombre || s.genre == Genre::MotCle) {
         const Jeton& u = jeton(2);
         // « format = 3 » est une affectation ; « x == 3 » une comparaison,
         // mais elle ne commence pas par un identifiant suivi d'un mot.

@@ -159,3 +159,319 @@ ARRAYFUN  Applique une fonction à chaque élément d'un tableau.
        arrayfun(@(k) zeros(k), 1:3, 'UniformOutput', false)
 
     Voir aussi CELLFUN, STRUCTFUN, BSXFUN.
+
+### cell
+CELL  Tableau de cellules vide.
+    CELL(N) rend une cellule N par N, chaque case contenant [].
+    CELL(M,N) rend une cellule M par N.
+
+    Une cellule contient n'importe quoi dans chaque case : c'est ce qu'on
+    prend quand les éléments n'ont ni la même taille ni le même type.
+
+    Syntaxe
+       C = cell(n)
+       C = cell(m,n)
+
+    Exemples
+       C = cell(1,3);
+       C{1} = 'texte';
+       C{2} = magic(3);
+       C{3} = @sin;
+       class(C{2})
+
+    Voir aussi ISCELL, CELLFUN, NUM2CELL, CELL2MAT, STRUCT.
+
+### num2cell
+NUM2CELL  Un tableau vers une cellule, élément par élément.
+    NUM2CELL(A) rend une cellule de la taille de A, chaque case portant un
+    élément.
+
+    Syntaxe
+       C = num2cell(A)
+
+    Exemples
+       C = num2cell([1 2 3]);
+       C{2}                           % 2
+       size(num2cell(magic(3)))       % [3 3]
+
+    Voir aussi CELL2MAT, MAT2CELL, CELL, ARRAYFUN.
+
+### cell2mat
+CELL2MAT  Recolle une cellule en un tableau.
+    CELL2MAT(C) concatène le contenu des cases ; elles doivent s'assembler.
+
+    Syntaxe
+       A = cell2mat(C)
+
+    Exemples
+       cell2mat({1 2; 3 4})
+       cell2mat({[1 2], [3]})         % [1 2 3]
+       isequal(cell2mat(num2cell(magic(3))), magic(3))
+
+    Voir aussi NUM2CELL, MAT2CELL, CAT, CELLFUN.
+
+### struct
+STRUCT  Crée une structure.
+    STRUCT('champ',valeur,...) crée une structure avec ces champs.
+    STRUCT('champ',{v1,v2}) crée un tableau de structures, une par valeur
+    de la cellule.
+    STRUCT() crée une structure sans champ.
+
+    Syntaxe
+       s = struct('champ',valeur,...)
+       s = struct()
+
+    Exemples
+       s = struct('nom','Ada','age',36);
+       s.nom
+       t = struct('x', {1, 2, 3});     % tableau 1x3 de structures
+       numel(t)
+       t(2).x
+
+    Voir aussi ISSTRUCT, FIELDNAMES, ISFIELD, RMFIELD, STRUCT2CELL.
+
+### fieldnames
+FIELDNAMES  Noms des champs d'une structure.
+    FIELDNAMES(S) rend une cellule colonne des noms, dans l'ordre où ils
+    ont été créés.
+
+    Syntaxe
+       C = fieldnames(s)
+
+    Exemples
+       s = struct('a',1,'b',2);
+       fieldnames(s)
+       for c = fieldnames(s)'
+           fprintf('%s = %g\n', c{1}, s.(c{1}));
+       end
+
+    Voir aussi ISFIELD, RMFIELD, STRUCT, ORDERFIELDS.
+
+### rmfield
+RMFIELD  Retire un champ d'une structure.
+    RMFIELD(S,NOM) rend S sans ce champ.
+    RMFIELD(S,{'a','b'}) en retire plusieurs.
+
+    Syntaxe
+       t = rmfield(s,nom)
+
+    Exemples
+       s = struct('a',1,'b',2,'c',3);
+       t = rmfield(s,'b');
+       fieldnames(t)
+
+    Voir aussi ISFIELD, FIELDNAMES, SETFIELD, STRUCT.
+
+### getfield
+GETFIELD  Lit un champ par son nom.
+    GETFIELD(S,NOM) vaut S.(NOM) ; c'est utile quand le nom est calculé.
+
+    Syntaxe
+       v = getfield(s,nom)
+
+    Exemples
+       s = struct('largeur',3);
+       getfield(s,'largeur')          % 3
+       nom = 'largeur';
+       s.(nom)                        % la même chose, en plus court
+
+    Voir aussi SETFIELD, ISFIELD, FIELDNAMES.
+
+### setfield
+SETFIELD  Écrit un champ par son nom.
+    SETFIELD(S,NOM,V) rend S avec le champ modifié.
+
+    Syntaxe
+       s = setfield(s,nom,v)
+
+    Exemples
+       s = struct('a',1);
+       s = setfield(s,'b',2);
+       fieldnames(s)
+
+    Voir aussi GETFIELD, RMFIELD, ISFIELD.
+
+### structfun
+STRUCTFUN  Applique une fonction à chaque champ d'une structure.
+    STRUCTFUN(F,S) applique F à chaque valeur et rend un vecteur colonne.
+    STRUCTFUN(F,S,'UniformOutput',false) rend une structure.
+
+    Syntaxe
+       v = structfun(f,s)
+       t = structfun(f,s,'UniformOutput',false)
+
+    Exemples
+       s = struct('a',1,'b',4);
+       structfun(@(x) x*2, s)
+       structfun(@(x) x*2, s, 'UniformOutput', false)
+
+    Voir aussi ARRAYFUN, CELLFUN, FIELDNAMES.
+
+### arrayfun
+ARRAYFUN  Applique une fonction à chaque élément d'un tableau.
+    ARRAYFUN(F,A) applique F à chaque élément ; F doit rendre un scalaire.
+    ARRAYFUN(F,A,'UniformOutput',false) rend une cellule, ce qui permet à F
+    de rendre n'importe quoi.
+
+    Syntaxe
+       B = arrayfun(f,A)
+       C = arrayfun(f,A,'UniformOutput',false)
+
+    Exemples
+       arrayfun(@(x) x^2, 1:4)                    % [1 4 9 16]
+       arrayfun(@(n) zeros(1,n), 1:3, 'UniformOutput', false)
+       arrayfun(@(a,b) a+b, [1 2], [10 20])       % [11 22]
+
+    Voir aussi CELLFUN, STRUCTFUN, MAP, FOR.
+
+### intersect
+INTERSECT  Éléments communs à deux ensembles.
+    INTERSECT(A,B) rend les valeurs présentes dans les deux, triées et
+    sans répétition.
+    [C,IA,IB] = INTERSECT(A,B) rend aussi où elles se trouvent.
+
+    Syntaxe
+       c = intersect(a,b)
+       [c,ia,ib] = intersect(a,b)
+
+    Exemples
+       intersect([1 2 3 4], [3 4 5])          % [3 4]
+       intersect({'a','b'}, {'b','c'})
+       [c,ia,ib] = intersect([5 1 3], [3 5]);
+
+    Voir aussi UNION, SETDIFF, ISMEMBER, UNIQUE.
+
+### union
+UNION  Réunion de deux ensembles.
+    UNION(A,B) rend toutes les valeurs des deux, triées et sans répétition.
+
+    Syntaxe
+       c = union(a,b)
+
+    Exemples
+       union([1 2], [2 3])                    % [1 2 3]
+       union({'a'}, {'b','a'})
+
+    Voir aussi INTERSECT, SETDIFF, UNIQUE, ISMEMBER.
+
+### setdiff
+SETDIFF  Éléments de A absents de B.
+    SETDIFF(A,B) rend les valeurs de A qui ne sont pas dans B, triées et
+    sans répétition.
+
+    Syntaxe
+       c = setdiff(a,b)
+
+    Exemples
+       setdiff([1 2 3 4], [2 4])              % [1 3]
+       setdiff({'a','b','c'}, {'b'})
+
+    Voir aussi UNION, INTERSECT, ISMEMBER, UNIQUE.
+
+### cumprod
+CUMPROD  Produit cumulé.
+    CUMPROD(X) rend les produits successifs.
+    CUMPROD(X,DIM) travaille selon la dimension DIM.
+
+    Syntaxe
+       y = cumprod(x)
+       y = cumprod(x,dim)
+
+    Exemples
+       cumprod([1 2 3 4])                     % [1 2 6 24]
+       cumprod([1 2; 3 4])
+       factorielles = cumprod(1:5)
+
+    Voir aussi CUMSUM, PROD, CUMMAX, CUMMIN.
+
+### cummax
+CUMMAX  Maximum courant.
+    CUMMAX(X) rend, à chaque position, le plus grand élément vu jusque-là.
+
+    Syntaxe
+       y = cummax(x)
+
+    Exemples
+       cummax([3 1 4 1 5])                    % [3 3 4 4 5]
+       plafond = cummax(randn(1,10));
+
+    Voir aussi CUMMIN, CUMSUM, MAX, MOVMEAN.
+
+### cummin
+CUMMIN  Minimum courant.
+    CUMMIN(X) rend, à chaque position, le plus petit élément vu jusque-là.
+
+    Syntaxe
+       y = cummin(x)
+
+    Exemples
+       cummin([3 1 4 1 5])                    % [3 1 1 1 1]
+
+    Voir aussi CUMMAX, CUMSUM, MIN.
+
+### nnz
+NNZ  Nombre d'éléments non nuls.
+
+    Syntaxe
+       n = nnz(x)
+
+    Exemples
+       nnz([0 1 0 2])                         % 2
+       nnz(eye(4))                            % 4
+       nnz(magic(4) > 8)                      % combien dépassent 8
+
+    Voir aussi FIND, NONZEROS, ANY, SUM, SPARSE.
+
+### nonzeros
+NONZEROS  Les éléments non nuls, en colonne.
+
+    Syntaxe
+       v = nonzeros(x)
+
+    Exemples
+       nonzeros([0 1 0 2])                    % [1; 2]
+       A = eye(3);
+       numel(nonzeros(A))                     % 3
+
+    Voir aussi NNZ, FIND, SPARSE.
+
+### ndims
+NDIMS  Nombre de dimensions.
+    NDIMS(A) vaut NUMEL(SIZE(A)), et jamais moins de 2 : en MATLAB, un
+    scalaire est une matrice 1x1.
+
+    Syntaxe
+       n = ndims(A)
+
+    Exemples
+       ndims(5)                               % 2
+       ndims(magic(3))                        % 2
+       ndims(ones(2,3,4))                     % 3
+
+    Voir aussi SIZE, NUMEL, LENGTH, SQUEEZE.
+
+### horzcat
+HORZCAT  Concaténation horizontale, l'opérateur « [A, B] ».
+
+    Syntaxe
+       C = horzcat(A,B,...)
+       C = [A, B]
+
+    Exemples
+       horzcat([1 2], [3 4])                  % [1 2 3 4]
+       [magic(2), ones(2,1)]
+
+    Voir aussi VERTCAT, CAT, REPMAT.
+
+### vertcat
+VERTCAT  Concaténation verticale, l'opérateur « [A; B] ».
+
+    Syntaxe
+       C = vertcat(A,B,...)
+       C = [A; B]
+
+    Exemples
+       vertcat([1 2], [3 4])                  % [1 2; 3 4]
+       [magic(2); ones(1,2)]
+
+    Voir aussi HORZCAT, CAT, REPMAT.

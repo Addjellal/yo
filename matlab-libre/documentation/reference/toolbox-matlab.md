@@ -277,8 +277,12 @@ NEXTPOW2 Exposant de la puissance de deux immédiatement supérieure.
 
 ```
 PEAKS Surface d'essai à trois bosses et trois creux.
+  Z = PEAKS rend la surface sur une grille 49 x 49 de [-3,3]^2.
   Z = PEAKS(N) évalue la fonction sur une grille N x N de [-3,3]^2.
-  [X,Y,Z] = PEAKS(N) rend aussi la grille.
+  Z = PEAKS(V) utilise la grille MESHGRID(V,V), V étant un vecteur.
+  Z = PEAKS(X,Y) évalue la fonction aux points donnés ; X et Y doivent
+  avoir la même taille.
+  [X,Y,Z] = PEAKS(...) rend aussi la grille.
 
   La formule est celle de la documentation :
      z = 3(1-x)^2 e^{-x^2-(y+1)^2} - 10(x/5 - x^3 - y^5) e^{-x^2-y^2}

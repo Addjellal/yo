@@ -99,4 +99,25 @@ assert(isempty(sscanf('', '%f')));
 [valeursLues, compteLu, ~, positionLue] = sscanf('1 2 x', '%f');
 assert(isequal(valeursLues, [1;2]) && compteLu == 2 && positionLue == 5);
 
+%% ------------------------------------- char empile, comme sous MATLAB
+% « char(S1,S2,...) » et « char(C) » empilent une ligne par texte,
+% completee d'espaces jusqu'a la plus longue.
+empile = char('un', 'deux');
+assert(isequal(size(empile), [2 4]));
+assert(strcmp(empile(1,:), 'un  '));
+assert(strcmp(strtrim(empile(2,:)), 'deux'));
+listeEmpile = cellstr(empile);
+assert(numel(listeEmpile) == 2);
+assert(strcmp(listeEmpile{2}, 'deux'));
+% Un seul argument : la conversion ordinaire, inchangee.
+assert(strcmp(char(72), 'H'));
+assert(strcmp(char([72 105]), 'Hi'));
+assert(isequal(size(char('abc')), [1 3]));
+% Une cellule s'empile aussi.
+assert(isequal(size(char({'a', 'bbb'})), [2 3]));
+
+% newline vaut char(10).
+assert(double(newline) == 10);
+assert(numel(strsplit(['a' newline 'b'], newline)) == 2);
+
 disp('texte et entrees-sorties : toutes les verifications passent');

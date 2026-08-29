@@ -13,8 +13,10 @@ ABS  Valeur absolue, ou module d'un complexe.
        Y = abs(X)
 
     Exemples
+
        abs(-3)                    % 3
        abs(3 + 4i)                % 5
+       x = sin(2*pi*(0:63)/64);
        abs(fft(x))                % spectre d'amplitude
 
     Voir aussi SIGN, ANGLE, REAL, IMAG, HYPOT.
@@ -54,8 +56,10 @@ ANGLE  Argument d'un nombre complexe, en radians.
        P = angle(Z)
 
     Exemples
+
        angle(1i)                  % pi/2
        angle(-1)                  % pi
+       x = randn(1,64);
        unwrap(angle(fft(x)))      % phase déroulée d'un spectre
 
     Voir aussi ABS, UNWRAP, REAL, IMAG, ATAN2.
@@ -102,9 +106,11 @@ ATAN2  Arc tangente à quatre quadrants.
        P = atan2(Y,X)
 
     Exemples
+
        atan2(1,1)                 % pi/4
        atan2(1,-1)                % 3*pi/4 — et non -pi/4
-       angle = atan2(dy, dx);
+       dx = 3;  dy = 4;
+       theta = atan2(dy, dx);
 
     Voir aussi ATAN, ANGLE, HYPOT, CART2POL.
 ```
@@ -318,8 +324,10 @@ EXP  Exponentielle.
        Y = exp(X)
 
     Exemples
+
        exp(1)                     % 2.7183
        exp(1i*pi)                 % -1, aux arrondis près
+       t = 0:0.1:5;  tau = 1.5;
        y = exp(-t/tau);           % décroissance
 
     Voir aussi LOG, EXPM1, POWER, EXPM.
@@ -468,8 +476,10 @@ LOG  Logarithme népérien.
        Y = log(X)
 
     Exemples
+
        log(exp(2))                % 2
        log(-1)                    % 0 + 3.1416i
+       H = [1 0.5 0.25];
        dB = 20*log10(abs(H));     % pour des décibels, log10
 
     Voir aussi LOG2, LOG10, LOG1P, EXP, REALLOG.
@@ -521,8 +531,10 @@ MLDIVIDE  Division à gauche, « A\b » : résout A*x = b.
        X = mldivide(A,B)
 
     Exemples
+
        A = [2 1; 1 3];  b = [3; 5];
        x = A \ b;                 % [0.8; 1.4]
+       X = [ones(10,1) (1:10)'];  y = (1:10)' * 2 + 1;
        p = X \ y;                 % régression aux moindres carrés
 
     Voir aussi MRDIVIDE, INV, LU, QR, PINV, LSQMINNORM.
@@ -542,8 +554,10 @@ MOD  Reste de la division, du signe du diviseur.
        M = mod(a,m)
 
     Exemples
+
        mod(7,3)                   % 1
        mod(-1,3)                  % 2
+       k = 5;  n = 4;
        mod(k-1, n) + 1            % indice cyclique de 1 à n
 
     Voir aussi REM, IDIVIDE, FLOOR.

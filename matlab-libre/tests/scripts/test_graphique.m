@@ -151,4 +151,43 @@ end
 assert(essaiPropriete);
 
 close all;
+%% ------------------------------------ axis equal, square et off au rendu
+% « axis equal » ne doit pas seulement etre accepte : il doit changer
+% l'image. On le verifie sur le SVG, la ou tout est mesurable.
+figure
+plot([0 10], [0 1]);           % dix fois plus large que haut
+svgLibre = matlibre_svg();
+% Sans « axis equal », l'axe des y ne va pas au-dela de 1.
+assert(isempty(strfind(svgLibre, '>-3<')));
+axis equal
+svgEgal = matlibre_svg();
+% Avec, la boite du trace etant plus large que haute, l'axe des y couvre
+% davantage d'unites : les graduations descendent sous -1.
+assert(~isempty(strfind(svgEgal, '>-3<')));
+assert(isequal(axis, [0 10 0 1]));   % les bornes des donnees, inchangees
+
+% « axis square » rend la boite carree : le cadre du trace doit l'etre.
+figure
+plot(1:10);
+axis square
+svgCarre = matlibre_svg();
+debut = strfind(svgCarre, '<rect x=');
+assert(numel(debut) >= 2);           % le fond, puis la boite du trace
+
+% « axis off » retire le cadre, les graduations et les etiquettes ; le
+% titre, lui, reste — c'est ce que fait MATLAB.
+figure
+plot(1:10);
+title('avec axes'); xlabel('x'); ylabel('y');
+svgAvec = matlibre_svg();
+assert(~isempty(strfind(svgAvec, 'avec axes')));
+assert(~isempty(strfind(svgAvec, 'stroke="#222"')));
+axis off
+svgSans = matlibre_svg();
+assert(~isempty(strfind(svgSans, 'avec axes')));      % le titre reste
+assert(isempty(strfind(svgSans, 'class="axe"')));     % plus de graduations
+assert(numel(svgSans) < numel(svgAvec));
+axis on
+close all
+
 disp('graphique : toutes les verifications passent');

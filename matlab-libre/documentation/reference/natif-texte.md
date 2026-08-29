@@ -5,13 +5,34 @@ Fonctions natives du groupe `texte`.
 ## `blanks`
 
 ```
-blanks  Chaine de n espaces.
+BLANKS  Chaîne de N espaces.
+
+    Syntaxe
+       s = blanks(n)
+
+    Exemples
+       ['[' blanks(3) ']']            % '[   ]'
+       numel(blanks(5))               % 5
+
+    Voir aussi SPACE, STRTRIM, REPMAT, SPRINTF.
 ```
 
 ## `cellstr`
 
 ```
-cellstr  Vers cellule de textes.
+CELLSTR  Convertit un tableau de caractères en cellule de textes.
+    CELLSTR(S) fait une cellule d'une ligne par ligne de S, blancs de fin
+    retirés.
+
+    Syntaxe
+       C = cellstr(s)
+
+    Exemples
+       C = cellstr(char('un','deux'))
+       numel(C)                       % 2
+       C{2}
+
+    Voir aussi CHAR, ISCELLSTR, STRSPLIT, STRING.
 ```
 
 ## `compose`
@@ -23,19 +44,54 @@ compose  Formate vers une string.
 ## `contains`
 
 ```
-contains  Le texte contient-il le motif.
+CONTAINS  Le texte contient-il le motif.
+    CONTAINS(S,MOTIF) rend un booléen — plus lisible que « ~isempty(strfind(...)) ».
+    CONTAINS(S,MOTIF,'IgnoreCase',true) ignore la casse.
+
+    Syntaxe
+       tf = contains(s,motif)
+       tf = contains(s,motif,'IgnoreCase',true)
+
+    Exemples
+       contains('bonjour', 'jour')        % 1
+       contains({'abc','xyz'}, 'b')       % [1 0]
+       contains('Bonjour', 'bon', 'IgnoreCase', true)
+
+    Voir aussi STRFIND, STARTSWITH, ENDSWITH, REGEXP.
 ```
 
 ## `deblank`
 
 ```
-deblank  Retire les blancs finaux.
+DEBLANK  Retire les blancs de fin.
+    DEBLANK(S) enlève les espaces de fin, mais garde ceux du début — c'est
+    la différence avec STRTRIM.
+
+    Syntaxe
+       t = deblank(s)
+
+    Exemples
+       ['[' deblank('  a  ') ']']     % '[  a]'
+       numel(deblank('abc   '))       % 3
+
+    Voir aussi STRTRIM, STRIP, BLANKS.
 ```
 
 ## `endsWith`
 
 ```
-endsWith  Finit par le motif.
+ENDSWITH  Le texte finit-il par le motif.
+
+    Syntaxe
+       tf = endsWith(s,motif)
+       tf = endsWith(s,motif,'IgnoreCase',true)
+
+    Exemples
+       endsWith('fichier.txt', '.txt')        % 1
+       noms = {'a.m','b.c'};
+       noms(endsWith(noms, '.m'))
+
+    Voir aussi STARTSWITH, CONTAINS, FILEPARTS.
 ```
 
 ## `fliplr_str`
@@ -71,7 +127,20 @@ isspace  Caracteres blancs.
 ## `lower`
 
 ```
-lower  Passe en minuscules.
+LOWER  Met le texte en minuscules.
+    LOWER(S) rend S en minuscules.
+
+    Syntaxe
+       t = lower(s)
+
+    Exemples
+       lower('BONJOUR')               % 'bonjour'
+       reponse = 'OUI';
+       if strcmp(lower(reponse), 'oui')
+           disp('accepté');
+       end
+
+    Voir aussi UPPER, STRCMPI.
 ```
 
 ## `matlab.lang.makeUniqueStrings`
@@ -90,6 +159,12 @@ matlab.lang.makeValidName  Rend un identifiant valide.
 
 ```
 natsort  Tri naturel (identite ici).
+```
+
+## `newline`
+
+```
+newline  Caractere de fin de ligne.
 ```
 
 ## `num2str_`
@@ -139,7 +214,19 @@ regexpi  Expression reguliere, sans la casse.
 ## `regexprep`
 
 ```
-regexprep  Remplacement par motif.
+REGEXPREP  Remplace par expression régulière.
+    REGEXPREP(S,MOTIF,REMPLACEMENT) remplace toutes les occurrences ; le
+    remplacement peut citer les groupes par $1, $2…
+
+    Syntaxe
+       t = regexprep(s,motif,remplacement)
+
+    Exemples
+       regexprep('a1b22c', '\d+', '#')            % 'a#b#c'
+       regexprep('2024-05-01', '(\d+)-(\d+)-(\d+)', '$3/$2/$1')
+       regexprep('  trop   d''espaces ', '\s+', ' ')
+
+    Voir aussi REGEXP, STRREP, REGEXPI.
 ```
 
 ## `reverse`
@@ -151,13 +238,35 @@ reverse  Inverse un texte.
 ## `startsWith`
 
 ```
-startsWith  Commence par le motif.
+STARTSWITH  Le texte commence-t-il par le motif.
+
+    Syntaxe
+       tf = startsWith(s,motif)
+       tf = startsWith(s,motif,'IgnoreCase',true)
+
+    Exemples
+       startsWith('fichier.txt', 'fichier')   % 1
+       startsWith({'a.m','b.c'}, 'a')         % [1 0]
+
+    Voir aussi ENDSWITH, CONTAINS, STRNCMP.
 ```
 
 ## `strcat`
 
 ```
-strcat  Concatene des textes.
+STRCAT  Concatène des textes.
+    STRCAT(S1,S2,...) colle les textes. Sur des tableaux de caractères,
+    les blancs de fin sont retirés — pas ceux d'une cellule.
+
+    Syntaxe
+       t = strcat(s1,s2,...)
+
+    Exemples
+       strcat('abc', 'def')           % 'abcdef'
+       strcat({'a','b'}, '_1')
+       ['abc' 'def']                  % la façon la plus directe
+
+    Voir aussi STRJOIN, SPRINTF, HORZCAT.
 ```
 
 ## `strcmp`
@@ -186,13 +295,36 @@ STRCMP  Compare deux chaînes.
 ## `strcmpi`
 
 ```
-strcmpi  Comparaison sans la casse.
+STRCMPI  Compare deux textes sans distinguer la casse.
+    STRCMPI(S1,S2) rend vrai si les textes sont égaux à la casse près.
+
+    Syntaxe
+       tf = strcmpi(s1,s2)
+
+    Exemples
+       strcmpi('Oui','oui')           % 1
+       strcmp('Oui','oui')            % 0
+       strcmpi({'A','b'}, 'a')        % [1 0]
+
+    Voir aussi STRCMP, STRNCMPI, LOWER.
 ```
 
 ## `strfind`
 
 ```
-strfind  Positions d'un motif.
+STRFIND  Cherche un motif dans un texte.
+    STRFIND(S,MOTIF) rend les positions de départ de chaque occurrence,
+    et un vecteur vide s'il n'y en a pas.
+
+    Syntaxe
+       k = strfind(s,motif)
+
+    Exemples
+       strfind('abracadabra', 'abra')     % [1 8]
+       isempty(strfind('abc', 'z'))       % 1
+       numel(strfind('aaa', 'aa'))        % 2 — les occurrences se recouvrent
+
+    Voir aussi CONTAINS, REGEXP, STRREP, STRTOK.
 ```
 
 ## `string`
@@ -219,7 +351,9 @@ STRJOIN  Assemble une cellule de chaînes.
        str = strjoin(C,delimiteur)
 
     Exemples
+
        strjoin({'a','b','c'}, ', ')    % 'a, b, c'
+       noms = {'usr', 'local', 'bin'};
        strjoin(noms, filesep)
 
     Voir aussi STRSPLIT, JOIN, SPRINTF.
@@ -234,13 +368,36 @@ strjust  Justifie un tableau de caracteres.
 ## `strlength`
 
 ```
-strlength  Longueur de chaque texte.
+STRLENGTH  Longueur du texte, caractère par caractère.
+    STRLENGTH(S) rend le nombre de caractères ; sur une cellule, un nombre
+    par élément.
+
+    Syntaxe
+       n = strlength(s)
+
+    Exemples
+       strlength('abc')               % 3
+       strlength({'a','bb','ccc'})    % [1 2 3]
+
+    Voir aussi LENGTH, NUMEL, SIZE.
 ```
 
 ## `strncmp`
 
 ```
-strncmp  Comparaison des n premiers.
+STRNCMP  Compare les N premiers caractères.
+    STRNCMP(S1,S2,N) rend vrai si les N premiers caractères coïncident.
+
+    Syntaxe
+       tf = strncmp(s1,s2,n)
+
+    Exemples
+       strncmp('bonjour','bonsoir',3) % 1
+       strncmp('abc','abd',3)         % 0
+       noms = {'test_a','autre'};
+       strncmp(noms, 'test', 4)       % [1 0]
+
+    Voir aussi STRCMP, STRNCMPI, STARTSWITH.
 ```
 
 ## `strncmpi`
@@ -259,7 +416,9 @@ STRREP  Remplace du texte.
        newStr = strrep(str,ancien,nouveau)
 
     Exemples
+
        strrep('abcabc', 'b', 'X')      % 'aXcaXc'
+       chemin = 'C:\\dossier\\fichier.txt';
        strrep(chemin, '\', '/')
 
     Voir aussi REGEXPREP, STRFIND, ERASE, INSERTAFTER.
@@ -288,13 +447,37 @@ STRSPLIT  Découpe une chaîne.
 ## `strtok`
 
 ```
-strtok  Premier jeton et reste.
+STRTOK  Détache le premier morceau d'un texte.
+    [T,RESTE] = STRTOK(S) coupe au premier blanc.
+    [T,RESTE] = STRTOK(S,SEP) coupe au premier caractère de SEP.
+
+    Syntaxe
+       t = strtok(s)
+       [t,reste] = strtok(s,sep)
+
+    Exemples
+       [mot, reste] = strtok('un deux trois')
+       [cle, valeur] = strtok('nom=valeur', '=')
+       strtrim(valeur(2:end))
+
+    Voir aussi STRSPLIT, REGEXP, STRFIND.
 ```
 
 ## `strtrim`
 
 ```
-strtrim  Retire les blancs aux deux bouts.
+STRTRIM  Retire les blancs de début et de fin.
+    STRTRIM(S) enlève espaces, tabulations et fins de ligne aux deux bouts.
+
+    Syntaxe
+       t = strtrim(s)
+
+    Exemples
+       strtrim('   ligne   ')          % 'ligne'
+       ['[' strtrim(sprintf('  a  ')) ']']
+       strtrim({'  un ', ' deux'})
+
+    Voir aussi DEBLANK, STRIP, STRREP, ISSPACE.
 ```
 
 ## `strvcat`
@@ -318,6 +501,18 @@ toupper  Passe en majuscules.
 ## `upper`
 
 ```
-upper  Passe en majuscules.
+UPPER  Met le texte en majuscules.
+    UPPER(S) rend S en majuscules ; ce qui n'est pas une lettre ne bouge
+    pas.
+
+    Syntaxe
+       t = upper(s)
+
+    Exemples
+       upper('bonjour')               % 'BONJOUR'
+       upper({'un','deux'})
+       strcmp(upper('Oui'), 'OUI')
+
+    Voir aussi LOWER, STRCMPI, STRTRIM.
 ```
 

@@ -120,3 +120,470 @@ TOC  Lit le chronomètre.
        tic; pause(0.5); t = toc;      % t vaut environ 0.5
 
     Voir aussi TIC, CPUTIME, TIMEIT.
+
+### pwd
+PWD  Dossier courant.
+    PWD rend le chemin du dossier courant.
+
+    Syntaxe
+       p = pwd
+
+    Exemples
+       p = pwd;
+       ischar(p)
+       cd(p);                         % on y reste
+
+    Voir aussi CD, DIR, FULLFILE, WHAT.
+
+### cd
+CD  Change de dossier.
+    CD(CHEMIN) va dans le dossier donné.
+    CD .. remonte d'un cran.
+    P = CD rend le dossier courant sans en changer.
+
+    Syntaxe
+       cd(chemin)
+       cd ..
+       p = cd
+
+    Exemples
+       avant = pwd;
+       cd(tempdir);
+       cd(avant);
+
+    Voir aussi PWD, DIR, LS, ADDPATH.
+
+### dir
+DIR  Contenu d'un dossier.
+    DIR rend la liste du dossier courant, sous forme d'un tableau de
+    structures : champs name, folder, bytes, isdir.
+    DIR(MOTIF) filtre : dir('*.m').
+
+    Syntaxe
+       s = dir
+       s = dir(motif)
+
+    Exemples
+       fichiers = dir;
+       isstruct(fichiers)
+       fieldnames(fichiers)
+       nombreM = numel(dir('*.m'));
+
+    Voir aussi LS, PWD, EXIST, ISFOLDER, FULLFILE.
+
+### fullfile
+FULLFILE  Assemble un chemin avec le bon séparateur.
+    FULLFILE(A,B,...) colle les morceaux avec « / » ou « \ » selon le
+    système, sans jamais en doubler un.
+
+    Syntaxe
+       chemin = fullfile(a,b,...)
+
+    Exemples
+       fullfile('dossier', 'fichier.txt')
+       fullfile(tempdir, 'essai.mat')
+       fullfile('a', 'b', 'c.m')
+
+    Voir aussi FILEPARTS, FILESEP, PATHSEP, EXIST.
+
+### fileparts
+FILEPARTS  Découpe un chemin.
+    [DOSSIER,NOM,EXT] = FILEPARTS(CHEMIN) sépare le dossier, le nom et
+    l'extension — point compris.
+
+    Syntaxe
+       [dossier,nom,ext] = fileparts(chemin)
+
+    Exemples
+       [d,n,e] = fileparts('/tmp/essai.m');
+       n
+       e                              % '.m'
+       [~,nom] = fileparts('rapport.pdf');
+
+    Voir aussi FULLFILE, FILESEP, EXIST, DIR.
+
+### filesep
+FILESEP  Séparateur de chemin du système : « / » ou « \ ».
+
+    Syntaxe
+       s = filesep
+
+    Exemples
+       filesep
+       ['dossier' filesep 'fichier']  % mais FULLFILE est préférable
+
+    Voir aussi FULLFILE, FILEPARTS, PATHSEP.
+
+### addpath
+ADDPATH  Ajoute un dossier au chemin de recherche.
+    ADDPATH(D) ajoute D en tête du chemin : les fonctions qui s'y trouvent
+    deviennent appelables.
+    ADDPATH(D,'-end') l'ajoute à la fin.
+
+    Syntaxe
+       addpath(dossier)
+       addpath(dossier,'-end')
+
+    Exemples
+       d = tempdir;
+       addpath(d);
+       rmpath(d);
+
+    Voir aussi RMPATH, PATH, WHICH, REHASH.
+
+### rmpath
+RMPATH  Retire un dossier du chemin de recherche.
+
+    Syntaxe
+       rmpath(dossier)
+
+    Exemples
+       d = tempdir;
+       addpath(d);
+       rmpath(d);
+
+    Voir aussi ADDPATH, PATH, WHICH.
+
+### path
+PATH  Chemin de recherche.
+    PATH affiche le chemin ; P = PATH le rend en texte, les dossiers
+    séparés par PATHSEP.
+
+    Syntaxe
+       path
+       p = path
+
+    Exemples
+       p = path;
+       dossiers = strsplit(p, pathsep);
+       numel(dossiers) > 0
+
+    Voir aussi ADDPATH, RMPATH, PATHSEP, WHICH, REHASH.
+
+### rehash
+REHASH  Reconstruit l'index des fonctions du chemin.
+    REHASH fait relire les dossiers du chemin : un fichier qu'on vient
+    d'écrire devient appelable sans redémarrer.
+
+    Syntaxe
+       rehash
+
+    Exemples
+       rehash
+
+    Voir aussi ADDPATH, PATH, WHICH, EXIST.
+
+### mkdir
+MKDIR  Crée un dossier.
+    MKDIR(D) crée le dossier D, avec ses parents au besoin.
+    [OK,MESSAGE] = MKDIR(D) rend un compte rendu au lieu d'une erreur.
+
+    Syntaxe
+       mkdir(dossier)
+       [ok,message] = mkdir(dossier)
+
+    Exemples
+       d = fullfile(tempdir, 'essaiMatLibre');
+       mkdir(d);
+       isfolder(d)
+       rmdir(d);
+
+    Voir aussi RMDIR, ISFOLDER, DIR, DELETE.
+
+### delete
+DELETE  Supprime un fichier.
+    DELETE(NOM) efface le fichier ; le motif '*.txt' en efface plusieurs.
+
+    Syntaxe
+       delete(nom)
+
+    Exemples
+       f = fullfile(tempdir, 'essai.txt');
+       fid = fopen(f, 'w'); fprintf(fid, 'x'); fclose(fid);
+       delete(f);
+       isfile(f)                      % 0
+
+    Voir aussi RMDIR, ISFILE, DIR, MOVEFILE.
+
+### copyfile
+COPYFILE  Copie un fichier.
+    COPYFILE(SOURCE,CIBLE) copie ; [OK,MSG] = COPYFILE(...) rend un compte
+    rendu au lieu d'une erreur.
+
+    Syntaxe
+       copyfile(source,cible)
+       [ok,msg] = copyfile(source,cible)
+
+    Exemples
+       a = fullfile(tempdir, 'a.txt');
+       b = fullfile(tempdir, 'b.txt');
+       fid = fopen(a,'w'); fprintf(fid,'x'); fclose(fid);
+       copyfile(a, b);
+       isfile(b)
+       delete(a); delete(b);
+
+    Voir aussi MOVEFILE, DELETE, ISFILE.
+
+### movefile
+MOVEFILE  Déplace ou renomme un fichier.
+
+    Syntaxe
+       movefile(source,cible)
+       [ok,msg] = movefile(source,cible)
+
+    Exemples
+       a = fullfile(tempdir, 'a.txt');
+       b = fullfile(tempdir, 'b.txt');
+       fid = fopen(a,'w'); fprintf(fid,'x'); fclose(fid);
+       movefile(a, b);
+       isfile(a)                      % 0
+       delete(b);
+
+    Voir aussi COPYFILE, DELETE, DIR.
+
+### isfile
+ISFILE  Le chemin désigne-t-il un fichier.
+
+    Syntaxe
+       tf = isfile(chemin)
+
+    Exemples
+       isfile(tempdir)                % 0 — c'est un dossier
+       f = fullfile(tempdir,'x.txt');
+       fid = fopen(f,'w'); fclose(fid);
+       isfile(f)                      % 1
+       delete(f);
+
+    Voir aussi ISFOLDER, EXIST, DIR.
+
+### isfolder
+ISFOLDER  Le chemin désigne-t-il un dossier.
+
+    Syntaxe
+       tf = isfolder(chemin)
+
+    Exemples
+       isfolder(tempdir)              % 1
+       isfolder('n''existe pas')      % 0
+
+    Voir aussi ISFILE, EXIST, MKDIR, DIR.
+
+### tempdir
+TEMPDIR  Dossier des fichiers temporaires du système.
+
+    Syntaxe
+       d = tempdir
+
+    Exemples
+       d = tempdir;
+       isfolder(d)
+
+    Voir aussi TEMPNAME, FULLFILE, MKDIR.
+
+### tempname
+TEMPNAME  Nom de fichier temporaire, unique.
+
+    Syntaxe
+       f = tempname
+
+    Exemples
+       f = tempname;
+       isfile(f)                      % 0 — il n'existe pas encore
+
+    Voir aussi TEMPDIR, FULLFILE, FOPEN.
+
+### clc
+CLC  Efface la fenêtre de commandes.
+    CLC vide l'affichage ; les variables, elles, ne bougent pas — c'est
+    CLEAR qui les efface.
+
+    Syntaxe
+       clc
+
+    Exemples
+       clc
+
+    Voir aussi CLEAR, CLOSE, HOME, DIARY.
+
+### clear
+CLEAR  Efface des variables de l'espace de travail.
+    CLEAR efface tout.
+    CLEAR A B efface les variables nommées.
+    CLEAR ALL efface aussi les fonctions en cache.
+
+    Syntaxe
+       clear
+       clear a b
+       clear all
+
+    Exemples
+       aEffacer = 1;
+       clear aEffacer
+       exist('aEffacer','var')        % 0
+
+    Voir aussi CLC, WHO, WHOS, EXIST.
+
+### who
+WHO  Liste les variables de l'espace de travail.
+    WHO affiche les noms ; C = WHO les rend en cellule.
+
+    Syntaxe
+       who
+       c = who
+
+    Exemples
+       uneVariable = 1;
+       c = who;
+       any(strcmp(c, 'uneVariable'))
+
+    Voir aussi WHOS, CLEAR, EXIST.
+
+### whos
+WHOS  Liste les variables avec leur taille et leur classe.
+    WHOS affiche un tableau ; S = WHOS le rend en structure.
+
+    Syntaxe
+       whos
+       s = whos
+
+    Exemples
+       uneMatrice = magic(4);
+       s = whos;
+       isstruct(s)
+
+    Voir aussi WHO, CLEAR, CLASS, SIZE.
+
+### computer
+COMPUTER  Nom de la plate-forme.
+    COMPUTER rend 'GLNXA64', 'MACA64', 'PCWIN64'… selon le système.
+
+    Syntaxe
+       c = computer
+
+    Exemples
+       computer
+       ispc || isunix || ismac
+
+    Voir aussi ISPC, ISUNIX, ISMAC, VERSION.
+
+### version
+VERSION  Version de MatLibre.
+
+    Syntaxe
+       v = version
+
+    Exemples
+       version
+       ischar(version)
+
+    Voir aussi VER, COMPUTER, MEXEXT.
+
+### getenv
+GETENV  Lit une variable d'environnement.
+    GETENV(NOM) rend sa valeur, ou le texte vide si elle n'existe pas.
+
+    Syntaxe
+       v = getenv(nom)
+
+    Exemples
+       setenv('MATLIBRE_ESSAI', 'oui');
+       getenv('MATLIBRE_ESSAI')
+       isempty(getenv('VARIABLE_QUI_NEXISTE_PAS'))
+
+    Voir aussi SETENV, SYSTEM, COMPUTER.
+
+### setenv
+SETENV  Écrit une variable d'environnement.
+
+    Syntaxe
+       setenv(nom,valeur)
+
+    Exemples
+       setenv('MATLIBRE_ESSAI', '42');
+       str2double(getenv('MATLIBRE_ESSAI'))
+
+    Voir aussi GETENV, SYSTEM.
+
+### pause
+PAUSE  Suspend l'exécution.
+    PAUSE(N) attend N secondes.
+    PAUSE ON / PAUSE OFF autorise ou interdit les pauses.
+
+    Syntaxe
+       pause(n)
+       pause on
+       pause off
+
+    Exemples
+       tic; pause(0.05); ecoule = toc;
+       ecoule >= 0.04
+
+    Voir aussi TIC, TOC, DRAWNOW.
+
+### profile
+PROFILE  Profileur : où passe le temps.
+    PROFILE ON démarre la mesure, PROFILE OFF l'arrête.
+    PROFILE VIEWER affiche le classement des fonctions.
+    S = PROFILE('info') rend le relevé en structure.
+    PROFILE CLEAR efface les mesures.
+
+    Syntaxe
+       profile on
+       profile off
+       profile viewer
+       s = profile('info')
+
+    Exemples
+       profile on
+       for k = 1:100, y = fft(randn(1,64)); end
+       profile off
+       s = profile('info');
+       isstruct(s)
+       profile clear
+
+    Voir aussi TIC, TOC, DBSTOP, KEYBOARD.
+
+### dbstop
+DBSTOP  Pose un point d'arrêt.
+    DBSTOP IN fichier AT ligne arrête avant cette ligne.
+    DBSTOP IF ERROR arrête à la première erreur.
+
+    Syntaxe
+       dbstop in fichier at ligne
+       dbstop if error
+
+    Exemples
+       dbstop if error
+       dbstatus
+       dbclear all
+
+    Voir aussi DBCLEAR, DBSTATUS, DBSTEP, DBCONT, DBQUIT, KEYBOARD.
+
+### dbclear
+DBCLEAR  Retire des points d'arrêt.
+    DBCLEAR ALL les retire tous.
+    DBCLEAR IN fichier retire ceux d'un fichier.
+
+    Syntaxe
+       dbclear all
+       dbclear in fichier
+
+    Exemples
+       dbstop if error
+       dbclear all
+       dbstatus
+
+    Voir aussi DBSTOP, DBSTATUS.
+
+### dbstatus
+DBSTATUS  Liste les points d'arrêt posés.
+
+    Syntaxe
+       dbstatus
+       s = dbstatus
+
+    Exemples
+       dbclear all
+       dbstatus
+
+    Voir aussi DBSTOP, DBCLEAR.

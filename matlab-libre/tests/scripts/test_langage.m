@@ -189,6 +189,30 @@ assert(~isempty(strfind(sortieCmd, 'un texte|seul')));
 sortieCmd = evalc('commandeDEssai -verbose');
 assert(~isempty(strfind(sortieCmd, '-verbose')));
 
+% Un mot-cle en argument reste un mot : « dbstop if error » est une
+% commande, pas un « if ». Le premier jeton, lui, ne peut pas etre un
+% mot-cle, donc « if x > 1 » reste un vrai if.
+sortieCmd = evalc('commandeDEssai if error');
+assert(~isempty(strfind(sortieCmd, 'if|error')));
+xGarde = 3;
+if xGarde > 1
+    assert(true);
+end
+for kGarde = 1:2
+end
+assert(kGarde == 2);
+
+%% ---------------------------------------------------- eval avec sortie
+% MATLAB : « eval(texte) » execute ; « x = eval(texte) » evalue une
+% expression et rend sa valeur, jusqu'a nargout valeurs.
+assert(eval('1+1') == 2);
+assert(isequal(eval('[1 2 3]'), [1 2 3]));
+[lignesEval, colonnesEval] = eval('size(magic(3))');
+assert(lignesEval == 3 && colonnesEval == 3);
+assert(eval('zzzInconnu', '42') == 42);
+% Les variables temporaires de eval ne restent pas dans l'espace de travail.
+assert(exist('matlibre__eval1__', 'var') == 0);
+
 %% ------------------------------------------- « return » dans un script
 % MATLAB : « return force le retour du controle au programme appelant
 % avant la fin du script ou de la fonction ». Un script s'arrete donc sur

@@ -131,3 +131,255 @@ WARNING  Signale un avertissement, sans arrêter.
        warning('off', 'MATLAB:singularMatrix');
 
     Voir aussi ERROR, TRY, ASSERT, LASTWARN.
+
+### input
+INPUT  Demande une valeur à l'utilisateur.
+    INPUT(INVITE) affiche l'invite et évalue ce qui est tapé.
+    INPUT(INVITE,'s') rend le texte brut, sans l'évaluer.
+
+    Syntaxe
+       x = input(invite)
+       s = input(invite,'s')
+
+    Exemples
+       % x = input('Combien de points ? ');
+       % nom = input('Votre nom : ', 's');
+       disp('input attend une saisie : l''exemple reste en commentaire');
+
+    Voir aussi KEYBOARD, DISP, FPRINTF, MENU.
+
+### fgetl
+FGETL  Lit une ligne d'un fichier, sans le saut de ligne.
+    FGETL(FID) rend la ligne suivante, ou -1 à la fin du fichier.
+
+    Syntaxe
+       ligne = fgetl(fid)
+
+    Exemples
+       f = fullfile(tempdir,'lignes.txt');
+       fid = fopen(f,'w'); fprintf(fid,'une\ndeux\n'); fclose(fid);
+       fid = fopen(f,'r');
+       while true
+           ligne = fgetl(fid);
+           if ~ischar(ligne), break; end
+           disp(ligne);
+       end
+       fclose(fid);
+       delete(f);
+
+    Voir aussi FGETS, FEOF, FOPEN, FILEREAD, TEXTSCAN.
+
+### fgets
+FGETS  Lit une ligne d'un fichier, saut de ligne compris.
+
+    Syntaxe
+       ligne = fgets(fid)
+
+    Exemples
+       f = fullfile(tempdir,'l.txt');
+       fid = fopen(f,'w'); fprintf(fid,'abc\n'); fclose(fid);
+       fid = fopen(f,'r');
+       ligne = fgets(fid);
+       fclose(fid);
+       numel(ligne)                   % 4 : le saut de ligne est là
+       delete(f);
+
+    Voir aussi FGETL, FEOF, FOPEN.
+
+### feof
+FEOF  Est-on à la fin du fichier.
+    FEOF(FID) rend vrai après une lecture qui a atteint la fin.
+
+    Syntaxe
+       tf = feof(fid)
+
+    Exemples
+       f = fullfile(tempdir,'e.txt');
+       fid = fopen(f,'w'); fprintf(fid,'a\n'); fclose(fid);
+       fid = fopen(f,'r');
+       n = 0;
+       while ~feof(fid)
+           ligne = fgetl(fid);
+           if ischar(ligne), n = n + 1; end
+       end
+       fclose(fid);
+       delete(f);
+
+    Voir aussi FGETL, FOPEN, FREWIND, FREAD.
+
+### fread
+FREAD  Lit des octets ou des nombres dans un fichier.
+    FREAD(FID) lit tout le fichier en octets.
+    FREAD(FID,'*char')' lit tout le fichier en texte.
+    FREAD(FID,N,TYPE) lit N valeurs du type donné.
+
+    Syntaxe
+       a = fread(fid)
+       a = fread(fid,n,type)
+
+    Exemples
+       f = fullfile(tempdir,'b.txt');
+       fid = fopen(f,'w'); fprintf(fid,'abc'); fclose(fid);
+       fid = fopen(f,'r');
+       texte = fread(fid,'*char')';
+       fclose(fid);
+       texte                          % 'abc'
+       delete(f);
+
+    Voir aussi FWRITE, FGETL, FILEREAD, FOPEN.
+
+### fwrite
+FWRITE  Écrit des octets dans un fichier.
+    FWRITE(FID,A) écrit A en octets.
+    FWRITE(FID,A,TYPE) écrit dans le type donné.
+
+    Syntaxe
+       fwrite(fid,a)
+       fwrite(fid,a,type)
+
+    Exemples
+       f = fullfile(tempdir,'w.bin');
+       fid = fopen(f,'w');
+       fwrite(fid, uint8([65 66 67]));
+       fclose(fid);
+       fid = fopen(f,'r');
+       double(fread(fid))'            % [65 66 67]
+       fclose(fid);
+       delete(f);
+
+    Voir aussi FREAD, FPRINTF, FOPEN.
+
+### frewind
+FREWIND  Revient au début du fichier.
+
+    Syntaxe
+       frewind(fid)
+
+    Exemples
+       f = fullfile(tempdir,'r.txt');
+       fid = fopen(f,'w'); fprintf(fid,'un\ndeux\n'); fclose(fid);
+       fid = fopen(f,'r');
+       premiere = fgetl(fid);
+       frewind(fid);
+       encore = fgetl(fid);
+       fclose(fid);
+       strcmp(premiere, encore)       % 1
+       delete(f);
+
+    Voir aussi FSEEK, FTELL, FOPEN, FEOF.
+
+### dlmwrite
+DLMWRITE  Écrit une matrice dans un fichier texte, avec un séparateur.
+    DLMWRITE(NOM,A) écrit A séparé par des virgules.
+    DLMWRITE(NOM,A,SEP) impose le séparateur.
+
+    Syntaxe
+       dlmwrite(nom,A)
+       dlmwrite(nom,A,sep)
+
+    Exemples
+       f = fullfile(tempdir,'m.csv');
+       dlmwrite(f, magic(3));
+       B = dlmread(f);
+       isequal(B, magic(3))
+       delete(f);
+
+    Voir aussi DLMREAD, CSVWRITE, WRITEMATRIX, FPRINTF.
+
+### dlmread
+DLMREAD  Lit une matrice dans un fichier texte.
+    DLMREAD(NOM) lit un fichier séparé par des virgules ou des blancs.
+    DLMREAD(NOM,SEP) impose le séparateur.
+
+    Syntaxe
+       A = dlmread(nom)
+       A = dlmread(nom,sep)
+
+    Exemples
+       f = fullfile(tempdir,'m2.csv');
+       dlmwrite(f, [1 2; 3 4]);
+       dlmread(f)
+       delete(f);
+
+    Voir aussi DLMWRITE, CSVREAD, READMATRIX, TEXTSCAN.
+
+### csvwrite
+CSVWRITE  Écrit une matrice dans un fichier CSV.
+    CSVWRITE(NOM,A) est DLMWRITE avec la virgule.
+
+    Syntaxe
+       csvwrite(nom,A)
+
+    Exemples
+       f = fullfile(tempdir,'c.csv');
+       csvwrite(f, [1 2; 3 4]);
+       csvread(f)
+       delete(f);
+
+    Voir aussi CSVREAD, DLMWRITE, WRITEMATRIX.
+
+### csvread
+CSVREAD  Lit une matrice dans un fichier CSV.
+
+    Syntaxe
+       A = csvread(nom)
+
+    Exemples
+       f = fullfile(tempdir,'c2.csv');
+       csvwrite(f, magic(3));
+       isequal(csvread(f), magic(3))
+       delete(f);
+
+    Voir aussi CSVWRITE, DLMREAD, READMATRIX.
+
+### diary
+DIARY  Enregistre la session dans un fichier.
+    DIARY ON commence l'enregistrement dans « diary », DIARY OFF l'arrête.
+    DIARY(NOM) enregistre dans le fichier nommé.
+
+    Syntaxe
+       diary on
+       diary off
+       diary(nom)
+
+    Exemples
+       f = fullfile(tempdir,'journal.txt');
+       diary(f);
+       disp('ceci est enregistré');
+       diary off
+       delete(f);
+
+    Voir aussi FPRINTF, EVALC, DISP.
+
+### type
+TYPE  Affiche le contenu d'un fichier.
+    TYPE NOM affiche le fichier, comme « cat » d'un terminal.
+
+    Syntaxe
+       type nom
+
+    Exemples
+       f = fullfile(tempdir,'t.m');
+       fid = fopen(f,'w'); fprintf(fid,'a = 1;\n'); fclose(fid);
+       type(f)
+       delete(f);
+
+    Voir aussi FILEREAD, DIR, WHICH, EDIT.
+
+### format
+FORMAT  Choisit l'affichage des nombres.
+    FORMAT SHORT donne cinq chiffres significatifs, FORMAT LONG en donne
+    seize. FORMAT COMPACT retire les lignes vides.
+
+    Syntaxe
+       format short
+       format long
+       format compact
+
+    Exemples
+       format long
+       pi
+       format short
+       pi
+
+    Voir aussi DISP, FPRINTF, NUM2STR, SPRINTF.

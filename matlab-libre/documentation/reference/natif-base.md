@@ -11,7 +11,22 @@ I  Unite imaginaire.
 ## `Inf`
 
 ```
-Inf  Tableau d'infinis.
+INF  L'infini de la virgule flottante.
+    INF rend +∞. INF(N) rend une matrice N par N d'infinis.
+    -INF est l'infini négatif. 1/0 vaut Inf, et non une erreur.
+
+    Syntaxe
+       Inf
+       Inf(n)
+       Inf(m,n)
+
+    Exemples
+       1/0                        % Inf
+       -1/0                       % -Inf
+       isinf([1 Inf -Inf])        % [0 1 1]
+       min([3 1 4])               % démarrer une recherche depuis Inf
+
+    Voir aussi NAN, ISINF, ISFINITE, REALMAX.
 ```
 
 ## `J`
@@ -23,13 +38,44 @@ J  Unite imaginaire.
 ## `NaN`
 
 ```
-NaN  Tableau de NaN.
+NAN  « Not a Number » : le résultat d'une opération indéterminée.
+    NAN rend NaN. NAN(N) rend une matrice N par N de NaN.
+    0/0 et Inf-Inf valent NaN. NaN n'est égal à rien, pas même à lui-même :
+    on le teste avec ISNAN.
+
+    Syntaxe
+       NaN
+       NaN(n)
+       NaN(m,n)
+
+    Exemples
+       0/0                        % NaN
+       NaN == NaN                 % 0 — jamais égal
+       isnan([1 NaN 3])           % [0 1 0]
+       x = [1 NaN 3];
+       mean(x(~isnan(x)))         % moyenne en ignorant les trous
+
+    Voir aussi ISNAN, INF, ISFINITE.
 ```
 
 ## `cast`
 
 ```
-cast  Conversion vers une classe nommee.
+CAST  Convertit dans la classe d'un autre tableau.
+    CAST(X,'nom') convertit X dans la classe nommée.
+    CAST(X,'like',Y) convertit X dans la classe de Y.
+
+    Syntaxe
+       y = cast(x,'nom')
+       y = cast(x,'like',y)
+
+    Exemples
+       cast(3.7,'int8')           % 4
+       cast(300,'uint8')          % 255 — la saturation, pas le débordement
+       y = single(1);
+       class(cast(pi,'like',y))   % 'single'
+
+    Voir aussi DOUBLE, SINGLE, INT8, CLASS.
 ```
 
 ## `cat`
@@ -44,8 +90,10 @@ CAT  Concatène des tableaux.
        C = cat(dim,A1,A2,...,An)
 
     Exemples
+
        cat(1, [1 2], [3 4])       % [1 2; 3 4]
        cat(2, [1;2], [3;4])       % [1 3; 2 4]
+       A = magic(3);  B = ones(3);
        cat(3, A, B)               % empile en profondeur
 
     Voir aussi HORZCAT, VERTCAT, RESHAPE, PERMUTE.
@@ -54,19 +102,60 @@ CAT  Concatène des tableaux.
 ## `char`
 
 ```
-char  Conversion char.
+CHAR  Convertit en tableau de caractères.
+    CHAR(X) sur des nombres rend les caractères de ces codes.
+    CHAR(S1,S2,...) empile les textes en lignes, complétées d'espaces.
+
+    Syntaxe
+       s = char(x)
+       s = char(s1,s2,...)
+
+    Exemples
+       char(72)                   % 'H'
+       char([72 101 108 108 111]) % 'Hello'
+       char('un','deux')          % deux lignes, complétées d'espaces
+       double('a':'e')
+
+    Voir aussi DOUBLE, STRING, CELLSTR, BLANKS.
 ```
 
 ## `circshift`
 
 ```
-circshift  Decalage circulaire.
+CIRCSHIFT  Décale circulairement les éléments.
+    CIRCSHIFT(A,K) décale de K, ce qui sort d'un côté rentrant de l'autre.
+    CIRCSHIFT(A,K,DIM) décale selon la dimension DIM.
+
+    Syntaxe
+       B = circshift(A,k)
+       B = circshift(A,k,dim)
+
+    Exemples
+       circshift([1 2 3 4], 1)        % [4 1 2 3]
+       circshift([1 2 3 4], -1)       % [2 3 4 1]
+       circshift(magic(3), 1, 2)      % décale les colonnes
+
+    Voir aussi FLIP, ROT90, FFTSHIFT, PERMUTE.
 ```
 
 ## `class`
 
 ```
-class  Nom de la classe d'une valeur.
+CLASS  Nom de la classe d'une valeur.
+    CLASS(X) rend le nom de la classe de X : 'double', 'single', 'char',
+    'logical', 'cell', 'struct', 'function_handle', 'int8'..'uint64'.
+
+    Syntaxe
+       c = class(x)
+
+    Exemples
+       class(1)                   % 'double'
+       class('a')                 % 'char'
+       class({1,2})               % 'cell'
+       class(int8(1))             % 'int8'
+       class(@sin)                % 'function_handle'
+
+    Voir aussi ISA, ISNUMERIC, ISCHAR, ISCELL, ISSTRUCT.
 ```
 
 ## `colon`
@@ -84,13 +173,39 @@ complex  Construit un nombre complexe.
 ## `ctranspose`
 
 ```
-ctranspose  Transposition conjuguee.
+CTRANSPOSE  Transposée conjuguée, l'opérateur « ' ».
+    CTRANSPOSE(A) transpose et conjugue. Sur du réel, c'est la transposée.
+
+    Syntaxe
+       B = ctranspose(A)
+       B = A'
+
+    Exemples
+       z = [1+2i 3-1i];
+       z'                         % conjuguée et transposée
+       A = magic(3);
+       isequal(A', A.')           % vrai : A est réelle
+
+    Voir aussi TRANSPOSE, CONJ, MLDIVIDE.
 ```
 
 ## `double`
 
 ```
-double  Conversion double.
+DOUBLE  Convertit en double précision.
+    DOUBLE(X) convertit X en double : c'est la classe par défaut de tout
+    calcul en MATLAB. Sur du texte, elle rend les codes des caractères.
+
+    Syntaxe
+       y = double(x)
+
+    Exemples
+       double(int8(-5))           % -5, en double
+       double('A')                % 65
+       double(true)               % 1
+       class(double(single(1)))   % 'double'
+
+    Voir aussi SINGLE, INT32, CHAR, LOGICAL, CAST, CLASS.
 ```
 
 ## `e`
@@ -102,7 +217,27 @@ e  2.71828182845905...
 ## `eps`
 
 ```
-eps  Precision relative des flottants.
+EPS  Précision relative de la virgule flottante.
+    EPS est l'écart entre 1 et le nombre flottant suivant, soit
+    2.2204e-16 en double précision.
+    EPS(X) rend l'écart entre X et le flottant suivant.
+    EPS('single') rend la précision en simple précision.
+
+    C'est avec quoi on compare des flottants : « a == b » est presque
+    toujours faux, « abs(a-b) < 1e-10 » est ce qu'on veut dire.
+
+    Syntaxe
+       eps
+       eps(x)
+       eps('single')
+
+    Exemples
+       eps
+       0.1 + 0.2 == 0.3               % faux
+       abs((0.1+0.2) - 0.3) < eps     % vrai
+       eps(1e6)
+
+    Voir aussi REALMIN, REALMAX, FLINTMAX, ROUND.
 ```
 
 ## `eye`
@@ -120,7 +255,9 @@ EYE  Matrice identité.
        I = eye(___,classe)
 
     Exemples
+
        eye(3)                % identité 3x3
+       A = [2 1; 1 3];
        A \ eye(size(A))      % une façon d'écrire inv(A)
 
     Voir aussi ZEROS, ONES, DIAG, INV.
@@ -129,7 +266,22 @@ EYE  Matrice identité.
 ## `false`
 
 ```
-false  Tableau logique faux.
+FALSE  Tableau logique de faux.
+    FALSE rend le scalaire logique faux.
+    FALSE(N) rend une matrice N par N de faux.
+
+    Syntaxe
+       false
+       false(n)
+       false(m,n)
+
+    Exemples
+       false
+       vus = false(1,10);
+       vus([2 5]) = true;
+       find(vus)
+
+    Voir aussi TRUE, LOGICAL, ANY, ALL.
 ```
 
 ## `flintmax`
@@ -141,25 +293,67 @@ flintmax  Plus grand entier exact.
 ## `flip`
 
 ```
-flip  Retourne selon une dimension.
+FLIP  Retourne l'ordre des éléments.
+    FLIP(A) retourne selon la première dimension non singleton.
+    FLIP(A,DIM) retourne selon la dimension DIM.
+
+    Syntaxe
+       B = flip(A)
+       B = flip(A,dim)
+
+    Exemples
+       flip([1 2 3])                  % [3 2 1]
+       flip(magic(3), 2)              % colonnes inversées
+
+    Voir aussi FLIPLR, FLIPUD, ROT90, CIRCSHIFT.
 ```
 
 ## `fliplr`
 
 ```
-fliplr  Retourne de gauche a droite.
+FLIPLR  Retourne de gauche à droite.
+    FLIPLR(A) inverse l'ordre des colonnes.
+
+    Syntaxe
+       B = fliplr(A)
+
+    Exemples
+       fliplr([1 2 3])                % [3 2 1]
+       fliplr(magic(3))
+
+    Voir aussi FLIPUD, FLIP, ROT90.
 ```
 
 ## `flipud`
 
 ```
-flipud  Retourne de haut en bas.
+FLIPUD  Retourne de haut en bas.
+    FLIPUD(A) inverse l'ordre des lignes.
+
+    Syntaxe
+       B = flipud(A)
+
+    Exemples
+       flipud([1;2;3])                % [3;2;1]
+       flipud(magic(3))
+
+    Voir aussi FLIPLR, FLIP, ROT90.
 ```
 
 ## `horzcat`
 
 ```
-horzcat  Concatenation horizontale.
+HORZCAT  Concaténation horizontale, l'opérateur « [A, B] ».
+
+    Syntaxe
+       C = horzcat(A,B,...)
+       C = [A, B]
+
+    Exemples
+       horzcat([1 2], [3 4])                  % [1 2 3 4]
+       [magic(2), ones(2,1)]
+
+    Voir aussi VERTCAT, CAT, REPMAT.
 ```
 
 ## `i`
@@ -171,7 +365,19 @@ i  Unite imaginaire.
 ## `ind2sub`
 
 ```
-ind2sub  Index lineaire vers indices.
+IND2SUB  Indices par dimension à partir de l'indice linéaire.
+    [I,J] = IND2SUB(TAILLE,K) est l'inverse de SUB2IND.
+
+    Syntaxe
+       [i,j] = ind2sub(taille,k)
+
+    Exemples
+       A = magic(4);
+       [~, k] = max(A(:));
+       [i,j] = ind2sub(size(A), k);   % où est le maximum
+       A(i,j) == max(A(:))
+
+    Voir aussi SUB2IND, FIND, SIZE, MAX.
 ```
 
 ## `inf`
@@ -189,7 +395,20 @@ int16  Entier signe 16 bits.
 ## `int32`
 
 ```
-int32  Entier signe 32 bits.
+INT32  Convertit en entier signé 32 bits.
+    INT32(X) arrondit X et le ramène dans [-2147483648, 2147483647] : le
+    calcul entier de MATLAB sature, il ne déborde pas.
+
+    Syntaxe
+       y = int32(x)
+
+    Exemples
+       int32(3.7)                 % 4
+       int32(-3.5)                % -4 — on arrondit en s'éloignant de zéro
+       int32(2^40)                % 2147483647, saturé
+       intmax('int32')
+
+    Voir aussi INT8, INT16, INT64, UINT32, INTMAX, INTMIN, CAST.
 ```
 
 ## `int64`
@@ -207,13 +426,40 @@ int8  Entier signe 8 bits.
 ## `intmax`
 
 ```
-intmax  Plus grand entier d'une classe.
+INTMAX  Plus grand entier d'une classe.
+    INTMAX rend le plus grand int32.
+    INTMAX('nom') le fait pour 'int8'..'int64', 'uint8'..'uint64'.
+
+    Syntaxe
+       m = intmax
+       m = intmax('nom')
+
+    Exemples
+       intmax
+       intmax('int8')             % 127
+       intmax('uint8')            % 255
+       intmax('int8') + int8(1)   % 127, saturé
+
+    Voir aussi INTMIN, REALMAX, FLINTMAX, INT32.
 ```
 
 ## `intmin`
 
 ```
-intmin  Plus petit entier d'une classe.
+INTMIN  Plus petit entier d'une classe.
+    INTMIN rend le plus petit int32.
+    INTMIN('nom') le fait pour les autres classes entières.
+
+    Syntaxe
+       m = intmin
+       m = intmin('nom')
+
+    Exemples
+       intmin
+       intmin('int8')             % -128
+       intmin('uint8')            % 0
+
+    Voir aussi INTMAX, REALMIN, INT32.
 ```
 
 ## `ipermute`
@@ -231,19 +477,55 @@ is_function_handle  Vrai pour une poignee de fonction.
 ## `isa`
 
 ```
-isa  Teste l'appartenance a une classe.
+ISA  La valeur est-elle de la classe donnée.
+    ISA(X,'nom') teste la classe exacte, mais accepte aussi les familles
+    'numeric', 'float' et 'integer'.
+
+    Syntaxe
+       tf = isa(x,'nom')
+
+    Exemples
+       isa(1,'double')            % 1
+       isa(int8(1),'integer')     % 1
+       isa(single(1),'float')     % 1
+       isa('abc','numeric')       % 0
+
+    Voir aussi CLASS, ISNUMERIC, ISFLOAT, ISINTEGER.
 ```
 
 ## `iscell`
 
 ```
-iscell  Vrai pour un tableau de cellules.
+ISCELL  La valeur est-elle un tableau de cellules.
+    ISCELL(X) rend vrai pour {1,'a'}.
+
+    Syntaxe
+       tf = iscell(x)
+
+    Exemples
+       iscell({1,'a'})            % 1
+       iscell([1 2])              % 0
+
+    Voir aussi ISCELLSTR, CELL, ISSTRUCT, CLASS.
 ```
 
 ## `ischar`
 
 ```
-ischar  Vrai pour un tableau de caracteres.
+ISCHAR  La valeur est-elle un tableau de caractères.
+    ISCHAR(X) rend vrai pour 'abc', faux pour "abc" — qui est une chaîne.
+
+    Syntaxe
+       tf = ischar(x)
+
+    Exemples
+       ischar('abc')              % 1
+       ischar(65)                 % 0
+       if ischar('bonjour')
+           disp('du texte');
+       end
+
+    Voir aussi ISSTRING, ISCELLSTR, CHAR, CLASS.
 ```
 
 ## `iscolumn`
@@ -255,13 +537,45 @@ iscolumn  Vrai pour un vecteur colonne.
 ## `isempty`
 
 ```
-isempty  Vrai si le tableau est vide.
+ISEMPTY  Le tableau est-il vide.
+    ISEMPTY(X) rend vrai si l'une des dimensions de X est nulle.
+
+    Syntaxe
+       tf = isempty(x)
+
+    Exemples
+       isempty([])                % 1
+       isempty('')                % 1
+       isempty(zeros(0,3))        % 1
+       isempty(0)                 % 0
+       C = {};
+       if isempty(C)
+           disp('rien à traiter');
+       end
+
+    Voir aussi SIZE, NUMEL, LENGTH, ISSCALAR.
 ```
 
 ## `isequal`
 
 ```
-isequal  Egalite de contenu.
+ISEQUAL  Les valeurs sont-elles identiques.
+    ISEQUAL(A,B) compare taille et contenu, et rend un seul booléen — à la
+    différence de « == », qui compare élément par élément.
+    ISEQUAL(A,B,C,...) compare toutes les valeurs entre elles.
+    Deux NaN ne sont jamais égaux : voir ISEQUALN.
+
+    Syntaxe
+       tf = isequal(a,b)
+       tf = isequal(a,b,c,...)
+
+    Exemples
+       isequal([1 2], [1 2])          % 1
+       isequal([1 2], [1 2 3])        % 0 — tailles différentes
+       isequal(struct('a',1), struct('a',1))   % 1
+       isequal(NaN, NaN)              % 0
+
+    Voir aussi ISEQUALN, EQ, STRCMP.
 ```
 
 ## `isequaln`
@@ -297,7 +611,20 @@ ismatrix  Vrai pour un tableau 2-D.
 ## `isnumeric`
 
 ```
-isnumeric  Vrai pour un tableau numerique.
+ISNUMERIC  La valeur est-elle numérique.
+    ISNUMERIC(X) rend vrai pour les doubles, les simples et les entiers,
+    faux pour les logiques, les caractères, les cellules et les structures.
+
+    Syntaxe
+       tf = isnumeric(x)
+
+    Exemples
+       isnumeric(1)               % 1
+       isnumeric(int8(1))         % 1
+       isnumeric(true)            % 0 — un logique n'est pas numérique
+       isnumeric('a')             % 0
+
+    Voir aussi ISA, CLASS, ISFLOAT, ISINTEGER, ISLOGICAL.
 ```
 
 ## `isobject`
@@ -321,7 +648,18 @@ isrow  Vrai pour un vecteur ligne.
 ## `isscalar`
 
 ```
-isscalar  Vrai pour un tableau 1x1.
+ISSCALAR  La valeur est-elle un scalaire, c'est-à-dire 1x1.
+
+    Syntaxe
+       tf = isscalar(x)
+
+    Exemples
+       isscalar(5)                % 1
+       isscalar([1 2])            % 0
+       isscalar('a')              % 1
+       isscalar('ab')             % 0
+
+    Voir aussi ISVECTOR, ISMATRIX, ISEMPTY, SIZE.
 ```
 
 ## `isstring`
@@ -333,13 +671,35 @@ isstring  Vrai pour un tableau string.
 ## `isstruct`
 
 ```
-isstruct  Vrai pour une structure.
+ISSTRUCT  La valeur est-elle une structure.
+    ISSTRUCT(X) rend vrai pour une structure ou un tableau de structures.
+
+    Syntaxe
+       tf = isstruct(x)
+
+    Exemples
+       s.a = 1;
+       isstruct(s)                % 1
+       isstruct([1 2])            % 0
+
+    Voir aussi ISFIELD, FIELDNAMES, STRUCT, CLASS.
 ```
 
 ## `isvector`
 
 ```
-isvector  Vrai pour un vecteur.
+ISVECTOR  La valeur est-elle un vecteur, ligne ou colonne.
+
+    Syntaxe
+       tf = isvector(x)
+
+    Exemples
+       isvector([1 2 3])          % 1
+       isvector([1;2;3])          % 1
+       isvector(magic(3))         % 0
+       isvector(5)                % 1 — un scalaire est un vecteur
+
+    Voir aussi ISSCALAR, ISROW, ISCOLUMN, ISMATRIX.
 ```
 
 ## `j`
@@ -390,7 +750,20 @@ LINSPACE  Vecteur de points régulièrement espacés.
 ## `logical`
 
 ```
-logical  Conversion logique.
+LOGICAL  Convertit en booléens.
+    LOGICAL(X) rend faux là où X vaut zéro, vrai ailleurs. Un tableau
+    logique sert de masque d'indexation.
+
+    Syntaxe
+       y = logical(x)
+
+    Exemples
+       logical([0 2 -1])          % [0 1 1]
+       x = 1:5;
+       x(logical([1 0 1 0 1]))    % [1 3 5]
+       class(x > 2)               % 'logical'
+
+    Voir aussi TRUE, FALSE, FIND, ANY, ALL.
 ```
 
 ## `logspace`
@@ -414,7 +787,23 @@ LOGSPACE  Vecteur de points espacés logarithmiquement.
 ## `meshgrid`
 
 ```
-meshgrid  Grille cartesienne.
+MESHGRID  Grille de coordonnées à partir de deux vecteurs.
+    [X,Y] = MESHGRID(x,y) rend deux matrices : X répète x en lignes, Y
+    répète y en colonnes. C'est ce qu'on donne à SURF, MESH ou CONTOUR.
+    [X,Y] = MESHGRID(x) vaut MESHGRID(x,x).
+
+    Syntaxe
+       [X,Y] = meshgrid(x,y)
+       [X,Y] = meshgrid(x)
+
+    Exemples
+       [X,Y] = meshgrid(1:3, 1:2);
+       X
+       Y
+       [X,Y] = meshgrid(-2:0.1:2);
+       surf(X, Y, X.^2 - Y.^2);
+
+    Voir aussi NDGRID, SURF, MESH, CONTOUR.
 ```
 
 ## `nan`
@@ -432,7 +821,19 @@ ndgrid  Grille en ordre tableau.
 ## `ndims`
 
 ```
-ndims  Nombre de dimensions (au moins 2).
+NDIMS  Nombre de dimensions.
+    NDIMS(A) vaut NUMEL(SIZE(A)), et jamais moins de 2 : en MATLAB, un
+    scalaire est une matrice 1x1.
+
+    Syntaxe
+       n = ndims(A)
+
+    Exemples
+       ndims(5)                               % 2
+       ndims(magic(3))                        % 2
+       ndims(ones(2,3,4))                     % 3
+
+    Voir aussi SIZE, NUMEL, LENGTH, SQUEEZE.
 ```
 
 ## `numel`
@@ -478,13 +879,37 @@ ONES  Tableau de uns.
 ## `permute`
 
 ```
-permute  Permute les dimensions.
+PERMUTE  Réordonne les dimensions d'un tableau.
+    PERMUTE(A,ORDRE) échange les dimensions selon ORDRE ; c'est la
+    transposée généralisée aux tableaux de plus de deux dimensions.
+
+    Syntaxe
+       B = permute(A,ordre)
+
+    Exemples
+       A = reshape(1:24, 2, 3, 4);
+       size(permute(A, [3 1 2]))      % [4 2 3]
+       isequal(permute(magic(3), [2 1]), magic(3)')
+
+    Voir aussi IPERMUTE, RESHAPE, SQUEEZE, TRANSPOSE.
 ```
 
 ## `pi`
 
 ```
-pi  3.14159265358979...
+PI  Le nombre π, 3.14159265358979.
+    PI rend l'approximation en double précision de π.
+
+    Syntaxe
+       pi
+
+    Exemples
+       pi
+       cos(pi)                    % -1
+       t = 0:0.01:2*pi;
+       plot(t, sin(t));
+
+    Voir aussi E, EPS, SIN, COS, EXP.
 ```
 
 ## `rand`
@@ -503,7 +928,9 @@ RAND  Nombres pseudo-aléatoires uniformes sur ]0,1[.
        X = rand(sz1,...,szN)
 
     Exemples
+
        rand(3)                    % matrice 3x3
+       a = -2;  b = 5;
        a + (b-a)*rand(1,100)      % 100 tirages entre a et b
        rng(0); rand(1,3)          % suite reproductible
 
@@ -513,7 +940,23 @@ RAND  Nombres pseudo-aléatoires uniformes sur ]0,1[.
 ## `randi`
 
 ```
-randi  Entiers uniformes.
+RANDI  Entiers pseudo-aléatoires.
+    RANDI(N) tire un entier entre 1 et N.
+    RANDI(N,M,K) rend une matrice M par K.
+    RANDI([A B],...) tire entre A et B.
+
+    Syntaxe
+       x = randi(n)
+       x = randi(n,m,k)
+       x = randi([a b],m,k)
+
+    Exemples
+       rng(0);
+       x = randi(6, 1, 10);           % dix lancers de dé
+       all(x >= 1 & x <= 6)
+       randi([10 20], 1, 5);
+
+    Voir aussi RAND, RANDN, RANDPERM, RNG.
 ```
 
 ## `randn`
@@ -527,7 +970,9 @@ RANDN  Nombres pseudo-aléatoires normaux, de moyenne 0 et d'écart-type 1.
        X = randn(sz1,...,szN)
 
     Exemples
+
        randn(1,1000)              % bruit blanc gaussien
+       mu = 10;  sigma = 2;  n = 5;
        mu + sigma*randn(1,n)      % loi normale de paramètres mu, sigma
 
     Voir aussi RAND, RANDI, RNG.
@@ -536,19 +981,54 @@ RANDN  Nombres pseudo-aléatoires normaux, de moyenne 0 et d'écart-type 1.
 ## `randperm`
 
 ```
-randperm  Permutation aleatoire.
+RANDPERM  Permutation aléatoire.
+    RANDPERM(N) rend une permutation des entiers 1 à N.
+    RANDPERM(N,K) en rend K, tirés sans remise.
+
+    Syntaxe
+       p = randperm(n)
+       p = randperm(n,k)
+
+    Exemples
+       rng(0);
+       p = randperm(5);
+       isequal(sort(p), 1:5)
+       x = 10:10:50;
+       x(randperm(numel(x)))          % mélanger un vecteur
+
+    Voir aussi RANDI, RAND, RNG, SORT.
 ```
 
 ## `realmax`
 
 ```
-realmax  Plus grand flottant.
+REALMAX  Plus grand double fini, 1.7977e+308.
+
+    Syntaxe
+       realmax
+       realmax('single')
+
+    Exemples
+       realmax
+       realmax * 2                % Inf — au-delà, c'est l'infini
+
+    Voir aussi REALMIN, INF, EPS, INTMAX.
 ```
 
 ## `realmin`
 
 ```
-realmin  Plus petit flottant normalise.
+REALMIN  Plus petit double normalisé positif, 2.2251e-308.
+
+    Syntaxe
+       realmin
+       realmin('single')
+
+    Exemples
+       realmin
+       realmin / 2                % encore représentable, dénormalisé
+
+    Voir aussi REALMAX, EPS, INF.
 ```
 
 ## `repmat`
@@ -565,7 +1045,9 @@ REPMAT  Répète un tableau en mosaïque.
        B = repmat(A,r)
 
     Exemples
+
        repmat([1 2], 2, 3)        % 2x6
+       x = [1; 2; 3];  n = 4;
        repmat(x, 1, n)            % n copies d'un vecteur colonne
 
     Voir aussi KRON, RESHAPE, CAT, MESHGRID.
@@ -587,8 +1069,10 @@ RESHAPE  Change la forme d'un tableau.
        B = reshape(A,sz)
 
     Exemples
+
        reshape(1:6, 2, 3)    % [1 3 5; 2 4 6]
        reshape(1:6, 2, [])   % même résultat
+       A = magic(3);
        reshape(A, 1, [])     % A en un vecteur ligne
 
     Voir aussi SIZE, PERMUTE, SQUEEZE, CIRCSHIFT.
@@ -619,13 +1103,37 @@ RNG  Fixe ou lit l'état du générateur aléatoire.
 ## `rot90`
 
 ```
-rot90  Rotation de 90 degres.
+ROT90  Rotation d'un quart de tour dans le sens direct.
+    ROT90(A) tourne A de 90 degrés.
+    ROT90(A,K) tourne de K quarts de tour.
+
+    Syntaxe
+       B = rot90(A)
+       B = rot90(A,k)
+
+    Exemples
+       rot90([1 2; 3 4])
+       isequal(rot90(magic(3), 4), magic(3))   % quatre quarts, on revient
+
+    Voir aussi FLIPLR, FLIPUD, FLIP, TRANSPOSE.
 ```
 
 ## `single`
 
 ```
-single  Conversion single.
+SINGLE  Convertit en simple précision.
+    SINGLE(X) convertit X en flottant 32 bits : deux fois moins de
+    mémoire, environ sept chiffres significatifs au lieu de seize.
+
+    Syntaxe
+       y = single(x)
+
+    Exemples
+       single(pi)
+       eps('single')
+       class(single(1) + 1)       % 'single' — la simple l'emporte
+
+    Voir aussi DOUBLE, CAST, EPS, CLASS.
 ```
 
 ## `size`
@@ -646,8 +1154,10 @@ SIZE  Dimensions d'un tableau.
        szdim = size(A,dim)
 
     Exemples
+
        size(zeros(2,3))      % [2 3]
        size(zeros(2,3), 2)   % 3
+       A = magic(4);
        [m,n] = size(A);
 
     Voir aussi NUMEL, LENGTH, NDIMS, RESHAPE.
@@ -656,25 +1166,80 @@ SIZE  Dimensions d'un tableau.
 ## `squeeze`
 
 ```
-squeeze  Retire les dimensions unitaires.
+SQUEEZE  Retire les dimensions de longueur 1.
+    SQUEEZE(A) supprime les dimensions singleton au-delà de la deuxième :
+    un tableau 1x1x5 devient un vecteur colonne de 5.
+
+    Syntaxe
+       B = squeeze(A)
+
+    Exemples
+       A = reshape(1:6, 1, 1, 6);
+       size(squeeze(A))               % [6 1]
+       size(squeeze(ones(2,1,3)))     % [2 3]
+
+    Voir aussi RESHAPE, PERMUTE, SIZE.
 ```
 
 ## `sub2ind`
 
 ```
-sub2ind  Indices vers index lineaire.
+SUB2IND  Indice linéaire à partir des indices par dimension.
+    SUB2IND(TAILLE,I,J) rend l'indice unique correspondant à (I,J) dans un
+    tableau de la taille donnée. MATLAB range par colonnes.
+
+    Syntaxe
+       k = sub2ind(taille,i,j)
+
+    Exemples
+       A = magic(3);
+       k = sub2ind(size(A), 2, 3);
+       A(k) == A(2,3)
+       sub2ind([3 3], 1, 2)           % 4
+
+    Voir aussi IND2SUB, SIZE, RESHAPE, FIND.
 ```
 
 ## `transpose`
 
 ```
-transpose  Transposition simple.
+TRANSPOSE  Transposée non conjuguée, l'opérateur « .' ».
+    TRANSPOSE(A) échange lignes et colonnes sans conjuguer. Sur du
+    complexe, c'est « .' » et non « ' ».
+
+    Syntaxe
+       B = transpose(A)
+       B = A.'
+
+    Exemples
+       transpose([1 2; 3 4])
+       z = [1+2i 3-1i];
+       z.'                        % transposée seule
+       z'                         % transposée conjuguée
+
+    Voir aussi CTRANSPOSE, PERMUTE, RESHAPE.
 ```
 
 ## `true`
 
 ```
-true  Tableau logique vrai.
+TRUE  Tableau logique de vrais.
+    TRUE rend le scalaire logique vrai.
+    TRUE(N) rend une matrice N par N de vrais.
+
+    Syntaxe
+       true
+       true(n)
+       true(m,n)
+
+    Exemples
+       true
+       masque = true(1,5);
+       masque(3) = false;
+       x = 10:10:50;
+       x(masque)
+
+    Voir aussi FALSE, LOGICAL, ANY, ALL.
 ```
 
 ## `uint16`
@@ -698,7 +1263,20 @@ uint64  Entier non signe 64 bits.
 ## `uint8`
 
 ```
-uint8  Entier non signe 8 bits.
+UINT8  Convertit en entier non signé 8 bits.
+    UINT8(X) arrondit X et le ramène dans [0, 255]. C'est la classe des
+    images en niveaux de gris et des canaux de couleur.
+
+    Syntaxe
+       y = uint8(x)
+
+    Exemples
+       uint8(200)                 % 200
+       uint8(300)                 % 255, saturé
+       uint8(-5)                  % 0, saturé
+       uint8(3.5)                 % 4
+
+    Voir aussi UINT16, INT8, INTMAX, IMAGE, CAST.
 ```
 
 ## `validateattributes`
@@ -710,7 +1288,17 @@ validateattributes  Verifie des attributs (tolerant).
 ## `vertcat`
 
 ```
-vertcat  Concatenation verticale.
+VERTCAT  Concaténation verticale, l'opérateur « [A; B] ».
+
+    Syntaxe
+       C = vertcat(A,B,...)
+       C = [A; B]
+
+    Exemples
+       vertcat([1 2], [3 4])                  % [1 2; 3 4]
+       [magic(2); ones(1,2)]
+
+    Voir aussi HORZCAT, CAT, REPMAT.
 ```
 
 ## `zeros`
@@ -732,9 +1320,11 @@ ZEROS  Tableau de zéros.
        X = zeros(___,classe)
 
     Exemples
+
        zeros(2)              % matrice 2x2 de zéros
        zeros(2,3)            % matrice 2x3
        zeros(1,4,'int8')     % vecteur d'entiers 8 bits
+       A = magic(4);
        zeros(size(A))        % de la taille de A
 
     Voir aussi ONES, EYE, NAN, RAND, SIZE.
