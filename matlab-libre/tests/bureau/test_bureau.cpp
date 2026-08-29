@@ -17,6 +17,9 @@
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTableWidget>
+#include <QTextBrowser>
+#include <QLineEdit>
+#include <QListWidget>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -30,6 +33,7 @@
 
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
+#include "FenetreAide.h"
 #include "FenetreFigure.h"
 #include "FenetreProfileur.h"
 #include "Icone.h"
@@ -210,6 +214,65 @@ int main(int argc, char** argv) {
             for (int x = 0; x < grande.width(); x += 2)
                 if (qGray(grande.pixel(x, y)) < 220) ++encreLarge;
         verifier(encreLarge > encre, "la figure se redessine quand on l'agrandit");
+    }
+
+    // --- la vie des fenetres de figure ------------------------------------
+    //
+    // Trois choses que MATLAB fait, et que le bureau ne faisait pas : une
+    // commande sans rapport ne remonte pas les figures au premier plan,
+    // « close all » les ferme vraiment, et une figure fermee a la main
+    // reste fermee au lieu de revenir a la commande suivante.
+    {
+        auto fenetresOuvertes = [&] {
+            int n = 0;
+            for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                if (!f->isHidden()) ++n;
+            return n;
+        };
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        verifier(fenetresOuvertes() == 1, "une figure est ouverte");
+
+        // Une commande qui ne trace rien ne doit pas toucher aux figures.
+        FenetreFigure* premiere = fenetre.findChild<FenetreFigure*>();
+        premiere->hide();
+        envoyer(fenetre, QStringLiteral("sansRapport = 1 + 1;"));
+        verifier(attendre([&] { return ligneDe(QStringLiteral("sansRapport")) >= 0; }),
+                 "la commande sans rapport passe");
+        verifier(premiere->isHidden(),
+                 "une commande sans trace ne rouvre pas la figure");
+
+        // Tracer dedans la ramene, comme sous MATLAB.
+        envoyer(fenetre, QStringLiteral("plot(1:10);"));
+        verifier(attendre([&] { return !premiere->isHidden(); }),
+                 "tracer dedans la ramene au premier plan");
+
+        // Fermer la fenetre ferme la figure : elle ne revient pas.
+        int numero = premiere->numero();
+        premiere->close();
+        QCoreApplication::processEvents();
+        envoyer(fenetre, QStringLiteral("encoreSansRapport = 2;"));
+        verifier(attendre([&] { return ligneDe(QStringLiteral("encoreSansRapport")) >= 0; }),
+                 "la commande suivante passe");
+        verifier(attendre([&] { return fenetresOuvertes() == 0; }, 4000),
+                 "une figure fermee a la main ne revient pas");
+        verifier(numero == 1, "c'etait bien la figure 1");
+
+        // Deux figures, puis « close all » : les deux fenetres s'en vont.
+        envoyer(fenetre, QStringLiteral("figure(1); plot(1:5); figure(2); plot(1:5);"));
+        verifier(attendre([&] { return fenetresOuvertes() == 2; }, 8000),
+                 "deux figures, deux fenetres");
+        envoyer(fenetre, QStringLiteral("close all"));
+        verifier(attendre([&] { return fenetresOuvertes() == 0; }, 8000),
+                 "« close all » ferme vraiment les fenetres");
+
+        // On repart d'une figure pour la suite des verifications.
+        envoyer(fenetre, QStringLiteral("figure(1); plot(x, y); title('deux signaux');"));
+        verifier(attendre([&] { return fenetresOuvertes() == 1; }, 8000),
+                 "on peut retracer apres « close all »");
+        vue = nullptr;
+        for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+            if (!f->isHidden()) vue = f->vue();
+        verifier(vue != nullptr, "la nouvelle figure a sa vue");
     }
 
     // L'application a son icone : sur le fichier comme sur la fenetre.
@@ -494,6 +557,93 @@ int main(int argc, char** argv) {
         QCoreApplication::processEvents();
     }
 
+    // --- le navigateur d'aide ----------------------------------------------
+    //
+    // MATLAB n'imprime pas « doc fft » dans la console : il ouvre une
+    // fenetre, avec la liste des fonctions, la page mise en forme, et des
+    // renvois cliquables. Ce qui suit verifie que c'est bien ce qui se
+    // passe — y compris pour une fonction ecrite par l'utilisateur.
+    {
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        envoyer(fenetre, QStringLiteral("doc fft"));
+        FenetreAide* aide = nullptr;
+        verifier(attendre([&] {
+                     aide = fenetre.findChild<FenetreAide*>();
+                     return aide && aide->page() &&
+                            aide->page()->toPlainText().contains(QLatin1String("Fourier"));
+                 }, 15000),
+                 "« doc fft » ouvre le navigateur d'aide sur la bonne page");
+        if (aide) {
+            QString texte = aide->page()->toPlainText();
+            verifier(texte.contains(QLatin1String("Syntaxe")),
+                     "la page montre la syntaxe");
+            verifier(texte.contains(QLatin1String("Exemples")),
+                     "la page montre des exemples");
+            verifier(texte.contains(QLatin1String("Voir aussi")),
+                     "la page montre les fonctions voisines");
+            verifier(aide->page()->toHtml().contains(QLatin1String("aide:ifft")),
+                     "les voisines sont des liens cliquables");
+            verifier(attendre([&] { return aide->liste()->count() > 300; }, 20000),
+                     "la liste des fonctions est remplie");
+
+            // La recherche filtre, comme la case de MATLAB.
+            aide->recherche()->setText(QStringLiteral("fft"));
+            QCoreApplication::processEvents();
+            int filtrees = aide->liste()->count();
+            verifier(filtrees > 0 && filtrees < 100,
+                     "la recherche reduit la liste aux fonctions qui collent");
+            aide->recherche()->clear();
+            QCoreApplication::processEvents();
+
+            // L'aide d'une fonction ecrite par l'utilisateur vient de son
+            // bloc de commentaires : c'est la regle de MATLAB.
+            QString fonctionAMoi = QDir::current().filePath(QStringLiteral("maFonctionAMoi.m"));
+            {
+                QFile f(fonctionAMoi);
+                if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                    f.write(
+                        "function y = maFonctionAMoi(x)\n"
+                        "%MAFONCTIONAMOI Double son argument, et rien de plus.\n"
+                        "%   Y = MAFONCTIONAMOI(X) rend 2*X.\n"
+                        "%\n"
+                        "%   Exemples\n"
+                        "%      maFonctionAMoi(21)   % 42\n"
+                        "%\n"
+                        "%   Voir aussi TIMES, PLUS.\n"
+                        "    y = 2 * x;\n"
+                        "end\n");
+            }
+            envoyer(fenetre, QStringLiteral("rehash"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le chemin est reindexe");
+            envoyer(fenetre, QStringLiteral("doc maFonctionAMoi"));
+            verifier(attendre([&] {
+                         return aide->page()->toPlainText().contains(
+                             QLatin1String("Double son argument"));
+                     }, 15000),
+                     "l'aide d'une fonction ecrite par l'utilisateur s'affiche");
+            QString mienne = aide->page()->toPlainText();
+            verifier(mienne.contains(QLatin1String("maFonctionAMoi(21)")),
+                     "ses exemples sont repris");
+            verifier(mienne.contains(QLatin1String("Voir aussi")),
+                     "ses renvois aussi");
+            verifier(mienne.contains(QLatin1String("maFonctionAMoi.m")),
+                     "la page dit dans quel fichier elle est definie");
+
+            // F1 sur un mot de l'editeur ouvre sa page.
+            if (editeur) {
+                editeur->setPlainText(QStringLiteral("y = fftshift(x);"));
+                QTextCursor curseur = editeur->textCursor();
+                curseur.setPosition(6);
+                editeur->setTextCursor(curseur);
+                QMetaObject::invokeMethod(&fenetre, "aideSurMotCourant");
+                verifier(attendre([&] {
+                             return aide->nomCourant() == QLatin1String("fftshift");
+                         }, 8000),
+                         "F1 ouvre l'aide du mot sous le curseur");
+            }
+        }
+    }
+
     // --- le profileur ------------------------------------------------------
     //
     // « Executer et chronometrer » de MATLAB : on mesure un script qui
@@ -617,6 +767,20 @@ int main(int argc, char** argv) {
         fenetre.render(&image);
         image.save(QString::fromLocal8Bit(sortie));
         std::printf("  capture ecrite dans %s\n", sortie);
+        // Le navigateur d'aide a sa fenetre : capture aussi.
+        if (auto* aide = fenetre.findChild<FenetreAide*>()) {
+            QString chemin = QString::fromLocal8Bit(sortie);
+            chemin.replace(QRegularExpression(QStringLiteral("\\.png$")),
+                           QStringLiteral("-aide.png"));
+            aide->resize(1000, 700);
+            QCoreApplication::processEvents();
+            QImage vue(aide->size(), QImage::Format_ARGB32);
+            vue.fill(Qt::white);
+            aide->render(&vue);
+            vue.save(chemin);
+            std::printf("  capture de l'aide ecrite dans %s\n",
+                        chemin.toLocal8Bit().constData());
+        }
         // Le profileur a sa fenetre : elle merite sa propre capture.
         if (auto* profileur = fenetre.findChild<FenetreProfileur*>()) {
             QString chemin = QString::fromLocal8Bit(sortie);

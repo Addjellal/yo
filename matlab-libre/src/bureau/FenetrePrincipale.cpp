@@ -19,6 +19,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QScrollBar>
+#include <QSet>
 #include <QSettings>
 #include <QSplitter>
 #include <QStatusBar>
@@ -33,6 +34,7 @@
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
 #include "FenetreFigure.h"
+#include "FenetreAide.h"
 #include "FenetreProfileur.h"
 #include "Icone.h"
 #include "Ruban.h"
@@ -63,6 +65,14 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::arreteSur, this, &FenetrePrincipale::surArret);
     connect(moteur_, &Moteur::repriseEffectuee, this, &FenetrePrincipale::surReprise);
     connect(moteur_, &Moteur::profilPret, this, &FenetrePrincipale::surProfil);
+    connect(moteur_, &Moteur::documentationDemandee, this, &FenetrePrincipale::montrerAide);
+    connect(moteur_, &Moteur::aidePrete, this, [this](const FicheAide& fiche) {
+        if (fenetreAide_) fenetreAide_->poserFiche(fiche);
+    });
+    connect(moteur_, &Moteur::indexAidePret, this,
+            [this](const QVector<EntreeIndexAide>& entrees) {
+                if (fenetreAide_) fenetreAide_->poserIndex(entrees);
+            });
 
     construirePanneaux();
     construireMenus();
@@ -343,7 +353,15 @@ void FenetrePrincipale::construireMenus() {
     activerCommandesDebogueur(false);
 
     QMenu* aide = menuBar()->addMenu(QStringLiteral("&Aide"));
-    aide->addAction(iconeDessinee("aide", 16), QStringLiteral("À propos de MatLibre"), this,
+    QAction* aDocumentation =
+        aide->addAction(iconeDessinee("aide", 16), QStringLiteral("&Documentation"), this,
+                        [this] { montrerAide(QString()); });
+    aDocumentation->setShortcut(QKeySequence(QStringLiteral("Ctrl+F1")));
+    QAction* aAideMot = aide->addAction(QStringLiteral("Aide sur le &mot courant"), this,
+                                        &FenetrePrincipale::aideSurMotCourant);
+    aAideMot->setShortcut(Qt::Key_F1);
+    aide->addSeparator();
+    aide->addAction(QStringLiteral("À propos de MatLibre"), this,
                     &FenetrePrincipale::aPropos);
 
     QMenu* affichage = menuBar()->addMenu(QStringLiteral("&Affichage"));
@@ -412,11 +430,10 @@ void FenetrePrincipale::construireMenus() {
         QStringLiteral("Changer de dossier courant"));
     connect(bDossier, &QToolButton::clicked, this,
             &FenetrePrincipale::changerDossierParDialogue);
-    QToolButton* bAtelier = environnementGroupe->ajouter(
-        QStringLiteral("Atelier\nweb"), QStringLiteral("bureau"),
-        QStringLiteral("Ouvre l'atelier dans le navigateur : profileur, "
-                       "concepteur d'applications, schémas-blocs"));
-    connect(bAtelier, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("ide")); });
+    QToolButton* bProfileur = environnementGroupe->ajouter(
+        QStringLiteral("Profileur"), QStringLiteral("chronometre"),
+        QStringLiteral("Ouvrir le profileur : où passe le temps"));
+    connect(bProfileur, &QToolButton::clicked, this, &FenetrePrincipale::montrerProfileur);
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), environnementGroupe);
 
     auto* debogageGroupe = new GroupeRuban(QStringLiteral("Déboguer"));
@@ -438,9 +455,10 @@ void FenetrePrincipale::construireMenus() {
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), debogageGroupe);
 
     auto* aideGroupe = new GroupeRuban(QStringLiteral("Ressources"));
-    QToolButton* bAide = aideGroupe->ajouter(QStringLiteral("Aide"), QStringLiteral("aide"),
-                                             QStringLiteral("help"));
-    connect(bAide, &QToolButton::clicked, this, [this] { envoyer(QStringLiteral("help")); });
+    QToolButton* bAide = aideGroupe->ajouter(
+        QStringLiteral("Aide"), QStringLiteral("aide"),
+        QStringLiteral("Ouvrir la documentation (F1)"));
+    connect(bAide, &QToolButton::clicked, this, [this] { montrerAide(QString()); });
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), aideGroupe);
 
     // Onglet TRACÉS : les tracés courants, appliqués à la variable choisie
@@ -596,6 +614,42 @@ void FenetrePrincipale::executerEtChronometrer() {
 
 // La fenêtre du profileur, construite à la demande : tant qu'on ne mesure
 // rien, elle n'existe pas.
+// Le navigateur d'aide, construit a la demande. L'index des fonctions est
+// demande une seule fois : le fil de calcul le fabrique pendant que la
+// fenetre s'ouvre.
+FenetreAide* FenetrePrincipale::fenetreAide() {
+    if (!fenetreAide_) {
+        fenetreAide_ = new FenetreAide(this);
+        fenetreAide_->setWindowFlag(Qt::Window);
+        connect(fenetreAide_, &FenetreAide::pageDemandee, this, [this](const QString& nom) {
+            versMoteur([this, nom] { moteur_->demanderAide(nom); });
+        });
+        versMoteur([this] { moteur_->demanderIndexAide(); });
+    }
+    return fenetreAide_;
+}
+
+void FenetrePrincipale::montrerAide(const QString& nom) {
+    FenetreAide* aide = fenetreAide();
+    aide->show();
+    aide->raise();
+    aide->activateWindow();
+    if (!nom.trimmed().isEmpty()) aide->afficher(nom);
+}
+
+// F1 dans l'editeur ouvre la documentation du mot sous le curseur, comme
+// sous MATLAB.
+void FenetrePrincipale::aideSurMotCourant() {
+    Editeur* editeur = editeurCourant();
+    QString mot;
+    if (editeur) {
+        QTextCursor curseur = editeur->textCursor();
+        if (!curseur.hasSelection()) curseur.select(QTextCursor::WordUnderCursor);
+        mot = curseur.selectedText().trimmed();
+    }
+    montrerAide(mot);
+}
+
 FenetreProfileur* FenetrePrincipale::profileur() {
     if (!profileur_) profileur_ = new FenetreProfileur(this);
     return profileur_;
@@ -665,26 +719,75 @@ void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lign
     }
 }
 
-void FenetrePrincipale::surFigures(const QVector<FigureCopiee>& figures) {
+// Ce que MATLAB fait des fenêtres de figure, et rien de plus : une figure
+// remonte au premier plan quand on trace dedans, pas quand on tape une
+// commande sans rapport ; une figure fermée reste fermée ; « close all »
+// ferme vraiment.
+void FenetrePrincipale::surFigures(const QVector<FigureCopiee>& figures, int courante) {
+    QSet<int> recues;
+    for (const FigureCopiee& f : figures) recues.insert(f.numero);
+
+    // Les fermetures faites à la main attendent que le moteur en prenne
+    // acte : tant qu'il rapporte encore la figure, on l'ignore ; dès
+    // qu'il ne la rapporte plus, on oublie — retracer dedans la rouvrira.
+    for (auto it = fermeturesEnAttente_.begin(); it != fermeturesEnAttente_.end();)
+        it = recues.contains(*it) ? ++it : fermeturesEnAttente_.erase(it);
+
+    // Ce que le moteur ne rapporte plus n'existe plus : « close », « clf »
+    // sur la dernière figure, « close all ».
+    for (auto it = fenetresFigures_.begin(); it != fenetresFigures_.end();) {
+        if (recues.contains(it.key())) {
+            ++it;
+            continue;
+        }
+        FenetreFigure* morte = it.value();
+        it = fenetresFigures_.erase(it);
+        empreintesFigures_.remove(morte->numero());
+        morte->deleteLater();
+    }
+
     for (const FigureCopiee& f : figures) {
+        if (fermeturesEnAttente_.contains(f.numero)) continue;
         FenetreFigure* fenetre = fenetresFigures_.value(f.numero, nullptr);
+        bool neuve = false;
         if (!fenetre) {
+            neuve = true;
             fenetre = new FenetreFigure(f.numero, this);
             fenetre->setWindowFlag(Qt::Window);
-            // La fenêtre ne se détruit pas à la fermeture : elle se cache.
-            // Retracer dans la même figure la rouvre, comme sous MATLAB.
             connect(fenetre, &FenetreFigure::fermee, this,
-                    [this](int numero) { (void)numero; });
+                    &FenetrePrincipale::surFermetureFigure);
             fenetresFigures_.insert(f.numero, fenetre);
             // Les figures se décalent l'une de l'autre pour ne pas se
             // recouvrir exactement, comme le fait MATLAB.
             int rang = fenetresFigures_.size() - 1;
             fenetre->move(x() + 90 + rang * 26, y() + 90 + rang * 26);
         }
-        fenetre->definirFigure(f);
+        // Le moteur n'envoie la copie que lorsque le tracé a bougé.
+        bool aChange = neuve || empreintesFigures_.value(f.numero, 0) != f.empreinte;
+        if (f.contenu) fenetre->definirFigure(f);
+        empreintesFigures_.insert(f.numero, f.empreinte);
+        if (!aChange) continue;
         if (!fenetre->isVisible()) fenetre->show();
         fenetre->raise();
     }
+
+    // « figure(2) » ramène la figure 2 devant, sans rien y tracer.
+    if (courante != 0 && courante != figureCouranteVue_) {
+        if (FenetreFigure* fenetre = fenetresFigures_.value(courante, nullptr)) {
+            if (!fenetre->isVisible()) fenetre->show();
+            fenetre->raise();
+        }
+    }
+    figureCouranteVue_ = courante;
+}
+
+// Fermer la fenêtre ferme la figure : sans cela le moteur la garderait, et
+// la commande suivante la ferait revenir sous le nez de l'utilisateur.
+void FenetrePrincipale::surFermetureFigure(int numero) {
+    fermeturesEnAttente_.insert(numero);
+    if (FenetreFigure* fenetre = fenetresFigures_.take(numero)) fenetre->deleteLater();
+    empreintesFigures_.remove(numero);
+    versMoteur([this, numero] { moteur_->fermerFigure(numero); });
 }
 
 void FenetrePrincipale::surDossier(const QString& chemin) {

@@ -76,22 +76,69 @@ rmdir(source, 's');
 assert(~isempty(version()));
 assert(exist('ver', 'file') || exist('ver', 'builtin') || true);
 
-%% ------------------------------------------------------------- atelier
-% L'atelier existait mais rien ne le nommait : ni la banniere, ni l'aide.
-% « ide » l'ouvre depuis la console, et son aide dit ce qu'on y trouve.
-assert(exist('ide', 'builtin') == 5);
-assert(exist('atelier', 'builtin') == 5);
-aideIde = help('ide');
-assert(~isempty(strfind(aideIde, 'atelier')));
-% Les mots isoles : le texte est mis en forme, une phrase peut etre
-% coupee entre deux lignes.
-assert(~isempty(strfind(aideIde, 'arr')));
-assert(~isempty(strfind(aideIde, 'blocs')));
-% La fiche donne aussi la syntaxe et un exemple, comme celles de MATLAB.
-assert(~isempty(strfind(aideIde, 'Syntaxe')));
-assert(~isempty(strfind(aideIde, 'ide(port)')));
-% L'aide generale y renvoie : c'est par la qu'on le decouvre.
+%% ---------------------------------------------------------- help et doc
+% « help » rend le texte, « doc » la meme chose mise en page. Les deux
+% doivent marcher sur une fonction native comme sur une fonction ecrite
+% par l'utilisateur, dont l'aide est le bloc de commentaires.
+aideFft = help('fft');
+assert(~isempty(strfind(aideFft, 'Fourier')));
+assert(~isempty(strfind(aideFft, 'Syntaxe')));
+assert(~isempty(strfind(aideFft, 'Exemples')));
+assert(~isempty(strfind(aideFft, 'Voir aussi')));
+
+% L'aide decoupee : c'est ce que lit le navigateur d'aide du bureau.
+fiche = matlibre_aide_structuree('fft');
+assert(strcmp(fiche.Nom, 'fft'));
+assert(~isempty(strfind(fiche.Resume, 'Fourier')));
+assert(iscell(fiche.Syntaxe) && ~isempty(fiche.Syntaxe));
+assert(iscell(fiche.Exemples) && ~isempty(fiche.Exemples));
+assert(iscell(fiche.VoirAussi) && any(strcmp(fiche.VoirAussi, 'ifft')));
+assert(strcmp(fiche.Source, 'native'));
+% Les renvois ne gardent pas le point final de la phrase.
+assert(all(cellfun(@(s) s(end) ~= '.', fiche.VoirAussi)));
+
+% Une fonction ecrite par l'utilisateur : l'aide vient de ses commentaires.
+dossierAide = tempname();
+mkdir(dossierAide);
+fichierAide = fullfile(dossierAide, 'fonctionCommentee.m');
+fid = fopen(fichierAide, 'w');
+fprintf(fid, 'function y = fonctionCommentee(x)\n');
+fprintf(fid, '%%FONCTIONCOMMENTEE Triple son argument.\n');
+fprintf(fid, '%%   Y = FONCTIONCOMMENTEE(X) rend 3*X.\n');
+fprintf(fid, '%%\n');
+fprintf(fid, '%%   Exemples\n');
+fprintf(fid, '%%      fonctionCommentee(4)   %% 12\n');
+fprintf(fid, '%%\n');
+fprintf(fid, '%%   Voir aussi TIMES, PLUS.\n');
+fprintf(fid, '    y = 3 * x;\n');
+fprintf(fid, 'end\n');
+fclose(fid);
+addpath(dossierAide);
+rehash
+
+assert(fonctionCommentee(4) == 12);
+aideMienne = help('fonctionCommentee');
+assert(~isempty(strfind(aideMienne, 'Triple son argument')));
+ficheMienne = matlibre_aide_structuree('fonctionCommentee');
+assert(~isempty(strfind(ficheMienne.Resume, 'Triple son argument')));
+assert(~isempty(ficheMienne.Exemples));
+assert(any(strcmp(ficheMienne.VoirAussi, 'times')));
+assert(strcmp(ficheMienne.Source, 'fichier'));
+assert(~isempty(strfind(ficheMienne.Fichier, 'fonctionCommentee.m')));
+
+% « doc » met en page : titre souligne, sections nommees.
+sortieDoc = evalc('doc fonctionCommentee');
+assert(~isempty(strfind(sortieDoc, 'FONCTIONCOMMENTEE')));
+assert(~isempty(strfind(sortieDoc, 'Syntaxe')) || ...
+       ~isempty(strfind(sortieDoc, 'Exemples')));
+assert(~isempty(strfind(sortieDoc, 'Voir aussi')));
+
+rmpath(dossierAide);
+delete(fichierAide);
+rmdir(dossierAide);
+
+% L'aide generale renvoie vers « doc ».
 aideGenerale = help();
-assert(~isempty(strfind(aideGenerale, 'ide')));
+assert(~isempty(strfind(aideGenerale, 'doc')));
 
 disp('ecosysteme : toutes les verifications passent');

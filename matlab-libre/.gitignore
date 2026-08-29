@@ -1,12 +1,20 @@
+# Arbres de construction : rien de ce que CMake produit n'a sa place ici.
 build/
 build-*/
+compile_commands.json
 *.o
+
+# Sorties que les tests et les exemples peuvent deposer.
 *.svg
+*.png
 *.wav
 *.pgm
 *.ppm
-compile_commands.json
-.atelier.pid
+*.mat
+
+# ... sauf les ressources du projet, qui, elles, sont versionnees.
+!ressources/*.png
+!ressources/*.svg
+
+# Outils
 node_modules/
-build-windows/
-build-ninja/

@@ -12,6 +12,14 @@ dossier = fullfile(matlibre_racine(), 'aide');
 fiches = dir(fullfile(dossier, '*.txt'));
 assert(~isempty(fiches));
 
+% Les exemples ecrivent : « saveas » depose une image, « fopen » un
+% fichier. Rien de tout cela n'a sa place dans l'arborescence du projet :
+% on travaille dans un dossier temporaire, qu'on efface a la fin.
+dossierAvant = pwd();
+bacASable = tempname();
+mkdir(bacASable);
+cd(bacASable);
+
 nombreFiches = 0;
 nombreExemples = 0;
 echecs = {};
@@ -60,6 +68,11 @@ assert(isempty(echecs));
 assert(nombreFiches >= 80);
 assert(nombreExemples >= 80);
 fprintf('  %d fiches, %d exemples executes\n', nombreFiches, nombreExemples);
+
+% On range derriere soi : le dossier de travail retrouve sa place, et le
+% bac a sable disparait avec ce qu'il contient.
+cd(dossierAvant);
+rmdir(bacASable, 's');
 
 disp('aide : toutes les verifications passent');
 

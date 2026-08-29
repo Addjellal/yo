@@ -1,11 +1,11 @@
 // Interface.cpp — le registre des composants d'interface.
 //
 // Une application MatLibre décrit son interface en appelant uifigure,
-// uibutton, uilabel… Chaque appel range un composant ici ; l'atelier lit ce
+// uibutton, uilabel… Chaque appel range un composant ici ; une interface
 // registre pour dessiner la fenêtre dans le navigateur, et renvoie les
 // événements, qui déclenchent les rappels dans l'interpréteur.
 //
-// Sans atelier, le registre reste consultable : une application peut être
+// Sans fenêtre, le registre reste consultable : une application peut être
 // pilotée en ligne de commande, ce qui la rend testable.
 #include <algorithm>
 #include <map>
@@ -124,7 +124,7 @@ FONCTION(fnSupprimer) {
     return {};
 }
 
-// Liste complète, telle que l'atelier la lit.
+// Liste complète, telle qu'une interface la lit.
 FONCTION(fnListe) {
     INUTILISE
     std::size_t n = it.composantsInterface.size();
@@ -160,7 +160,7 @@ FONCTION(fnListe) {
 }
 
 // Déclenche le rappel d'un composant, éventuellement après avoir posé une
-// nouvelle valeur : c'est ce que fait un clic dans l'atelier.
+// nouvelle valeur : c'est ce que fait un clic dans une interface.
 FONCTION(fnDeclencher) {
     INUTILISE
     if (args.empty()) erreur("MATLAB:minrhs", "matlibre_ui_declencher requires a handle.");

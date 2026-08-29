@@ -11,7 +11,7 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **617 fonctions natives** couvrant le MATLAB de base.
+- **616 fonctions natives** couvrant le MATLAB de base.
   Quatre-vingts d'entre elles — les plus consultées — ont une fiche
   d'aide complète : syntaxe, description, exemples et fonctions
   voisines, dans `toolbox/aide/`. Les autres gardent leur ligne de
@@ -37,9 +37,10 @@ mieux le lire avant de s'appuyer dessus.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Un atelier dans le navigateur** : éditeur avec coloration et points
-  d'arrêt, console, explorateur de variables, débogueur pas à pas,
-  profileur, concepteur d'applications et éditeur de schémas-blocs.
+- **Une documentation qui ne ment pas** : 489 fonctions ont leur fiche —
+  syntaxe, description, exemples, voisines —, le bureau les montre dans un
+  navigateur d'aide, et chaque exemple est exécuté à chaque passage des
+  tests.
 - **Les fonctions imbriquées** avec partage de l'espace de travail, ce qui
   rend les rappels d'application naturels.
 - **Une chaîne d'installation** : scripts de compilation pour Linux,
@@ -49,8 +50,9 @@ mieux le lire avant de s'appuyer dessus.
 - **Des tests** : 57 vérifications C++ sur le cœur, dix-sept suites en
   langage MATLAB — dont une qui contrôle un résultat exact par toolbox, une les
   types de données, une le calcul parallèle, une qui compile puis exécute
-  le C produit pour le comparer à l'interpréteur — et une vérification de
-  l'atelier menée par un vrai navigateur.
+  le C produit pour le comparer à l'interpréteur, une qui exécute les 489
+  exemples de l'aide — et 113 vérifications du bureau natif, pilotées sans
+  ouvrir de fenêtre.
 
 ## Ce qui n'est pas là
 
@@ -79,20 +81,18 @@ totalité.
    chronométrer » ouvre une fenêtre qui classe les fonctions par temps et
    montre le code de chacune ligne à ligne, les lignes chaudes teintées.
    Le ruban se replie quand la fenêtre rétrécit, comme celui de MATLAB,
-   plutôt que de rogner ses libellés. Manquent encore, côté bureau : le
-   concepteur d'applications et l'éditeur de schémas-blocs — ils
-   n'existent aujourd'hui que dans l'atelier du navigateur, qu'ouvre
-   `matlibre --ide`. Ce qui manque des deux côtés, par rapport au bureau
-   MATLAB : l'édition collaborative, les Live Scripts (cellules
-   exécutables mêlées au texte), la comparaison de fichiers, le repliement
-   de code et la recherche multi-fichiers.
-2. **Simulink se dessine et se simule ; Stateflow et Simscape restent des
-   solveurs.** L'atelier a un éditeur de schémas-blocs : on glisse les
-   dix-sept blocs du solveur, on tire les fils à la souris, et le modèle
-   part en `new_system` / `add_block` / `add_line`. La simulation est
-   réelle : pas fixe, tri topologique, blocs à état, analyse nodale
-   modifiée pour les circuits. Manquent : les sous-systèmes, les bus, le
-   pas variable, et les éditeurs graphiques de Stateflow et Simscape.
+   plutôt que de rogner ses libellés. `doc nom`, ou F1 sur un mot, ouvre
+   le navigateur d'aide. Manquent encore : le concepteur d'applications,
+   l'éditeur de schémas-blocs, l'édition collaborative, les Live Scripts
+   (cellules exécutables mêlées au texte), la comparaison de fichiers, le
+   repliement de code et la recherche multi-fichiers.
+2. **Simulink se simule, mais ne se dessine plus.** Le solveur est là :
+   dix-sept blocs, `new_system` / `add_block` / `add_line`, pas fixe, tri
+   topologique, blocs à état, analyse nodale modifiée pour les circuits.
+   L'éditeur graphique, lui, vivait dans l'atelier du navigateur, retiré
+   de la compilation : il reviendra dans le bureau natif. Manquent aussi :
+   les sous-systèmes, les bus, le pas variable, et les éditeurs graphiques
+   de Stateflow et Simscape.
 3. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et
@@ -289,8 +289,7 @@ totalité.
 ## Comment vérifier soi-même
 
 ```bash
-make test              # 57 vérifications C++ + 17 suites en langage MATLAB
-make verifier-atelier  # l'atelier, piloté par un vrai navigateur
+make test              # 57 vérifications C++ + les suites en langage MATLAB
 matlibre --test tests/scripts
 ```
 

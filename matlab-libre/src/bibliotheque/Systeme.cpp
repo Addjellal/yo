@@ -46,7 +46,7 @@ int identifiantProcessus() {
 }
 
 // Chemin de l'exécutable en cours. Sert à relancer MatLibre — pour ouvrir
-// l'atelier, par exemple — sans dépendre de ce qu'il y a dans le PATH.
+// le bureau, par exemple — sans dépendre de ce qu'il y a dans le PATH.
 std::string cheminExecutable() {
     std::error_code ec;
 #ifdef _WIN32
@@ -529,35 +529,6 @@ FONCTION(fnType) {
     return {};
 }
 
-// ide : ouvre l'atelier. Le serveur occupe le processus tant qu'il tourne,
-// on en lance donc un second, et cette console reste utilisable. Les deux
-// ont chacun leur espace de travail : c'est dit, plutot que decouvert.
-FONCTION(fnIde) {
-    INUTILISE
-    int port = 8421;
-    if (!args.empty()) port = (int)args[0].scal();
-    std::string exe = cheminExecutable();
-    if (exe.empty()) {
-        it.sortie() << "Ouvrez l'atelier avec : matlibre --ide " << port << "\n";
-        return {};
-    }
-    std::ostringstream commande;
-#ifdef _WIN32
-    commande << "start \"MatLibre\" \"" << exe << "\" --ide " << port;
-#else
-    commande << "\"" << exe << "\" --ide " << port << " >/dev/null 2>&1 &";
-#endif
-    int code = std::system(commande.str().c_str());
-    if (code != 0 && code != -1) {
-        it.sortie() << "Ouvrez l'atelier avec : matlibre --ide " << port << "\n";
-        return {};
-    }
-    it.sortie() << "Atelier ouvert sur http://127.0.0.1:" << port
-                << " — il a son propre espace de travail,\n"
-                   "separe de celui de cette console.\n";
-    return {};
-}
-
 // mexext : l'extension d'un fichier MEX sur cette plateforme. MatLibre ne
 // compile pas de MEX, mais la fonction existe et rend la bonne extension —
 // beaucoup de toolboxes s'en servent pour composer un chemin, et sans elle
@@ -636,6 +607,195 @@ std::string aideNative(Interpreteur& it, const std::string& nom, const EntreeNat
     return n ? n->aide : std::string();
 }
 
+// --- l'aide, decoupee en sections ----------------------------------------
+//
+// « help » rend le texte tel quel, comme MATLAB. Mais pour le presenter —
+// dans le navigateur d'aide du bureau, par exemple —, il faut savoir ou
+// commencent la syntaxe, les exemples et les fonctions voisines. Le
+// decoupage vaut pour les fiches natives comme pour le bloc de
+// commentaires d'une fonction ecrite par l'utilisateur : les deux suivent
+// la meme forme, celle de MATLAB.
+struct AideDecoupee {
+    std::string nom;
+    std::string resume;        // la premiere ligne, sans le nom en tete
+    std::string description;   // le corps, avant la premiere section
+    std::vector<std::string> syntaxe;
+    std::vector<std::string> exemples;
+    std::vector<std::string> voirAussi;
+    std::string texte;         // le tout, tel quel
+};
+
+// Retire l'indentation commune d'un bloc : les fiches indentent de quatre
+// espaces, les commentaires .m de deux ou trois.
+std::vector<std::string> desindenter(const std::vector<std::string>& lignes) {
+    std::size_t creux = std::string::npos;
+    for (const std::string& l : lignes) {
+        std::size_t k = l.find_first_not_of(" \t");
+        if (k == std::string::npos) continue;
+        creux = std::min(creux, k);
+    }
+    if (creux == std::string::npos || creux == 0) return lignes;
+    std::vector<std::string> sortie;
+    for (const std::string& l : lignes)
+        sortie.push_back(l.size() >= creux ? l.substr(creux) : std::string());
+    return sortie;
+}
+
+std::string sansBlancs(const std::string& s) {
+    std::size_t a = s.find_first_not_of(" \t\r\n");
+    if (a == std::string::npos) return std::string();
+    std::size_t b = s.find_last_not_of(" \t\r\n");
+    return s.substr(a, b - a + 1);
+}
+
+std::string enMinuscules(std::string s) {
+    for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
+}
+
+// Le nom d'une section, ou vide. On accepte le francais et l'anglais :
+// une fonction ecrite par l'utilisateur suit souvent MATLAB a la lettre.
+std::string sectionDe(const std::string& ligne) {
+    std::string t = enMinuscules(sansBlancs(ligne));
+    while (!t.empty() && (t.back() == ':' || t.back() == '.')) t.pop_back();
+    if (t == "syntaxe" || t == "syntax" || t == "syntaxes") return "syntaxe";
+    if (t == "exemple" || t == "exemples" || t == "example" || t == "examples")
+        return "exemples";
+    if (t == "description") return "description";
+    if (t == "entrees" || t == "entrées" || t == "arguments" || t == "input arguments")
+        return "description";
+    return std::string();
+}
+
+AideDecoupee decouperAide(const std::string& nom, const std::string& texte) {
+    AideDecoupee a;
+    a.nom = nom;
+    a.texte = texte;
+    std::vector<std::string> lignes;
+    std::istringstream flux(texte);
+    std::string ligne;
+    while (std::getline(flux, ligne)) {
+        if (!ligne.empty() && ligne.back() == '\r') ligne.pop_back();
+        lignes.push_back(ligne);
+    }
+    if (lignes.empty()) return a;
+
+    // La premiere ligne est le resume, precede du nom en majuscules.
+    std::string tete = sansBlancs(lignes[0]);
+    std::string majuscule = enMinuscules(nom);
+    std::size_t espace = tete.find_first_of(" \t");
+    if (espace != std::string::npos && enMinuscules(tete.substr(0, espace)) == majuscule)
+        a.resume = sansBlancs(tete.substr(espace));
+    else
+        a.resume = tete;
+
+    std::string courante = "description";
+    std::vector<std::string> description, syntaxe, exemples;
+    for (std::size_t k = 1; k < lignes.size(); ++k) {
+        const std::string& l = lignes[k];
+        std::string nette = sansBlancs(l);
+        std::string voirAussi = enMinuscules(nette);
+        if (voirAussi.rfind("voir aussi", 0) == 0 || voirAussi.rfind("see also", 0) == 0) {
+            std::size_t debut = nette.find_first_of(" ");
+            debut = nette.find_first_of(" ", debut + 1);
+            std::string liste = debut == std::string::npos ? std::string()
+                                                           : nette.substr(debut + 1);
+            // Le point sert dans « containers.Map », mais il finit aussi
+            // la phrase : on le garde au milieu, jamais au bout.
+            std::string mot;
+            auto poser = [&]() {
+                while (!mot.empty() && mot.back() == '.') mot.pop_back();
+                if (!mot.empty()) a.voirAussi.push_back(enMinuscules(mot));
+                mot.clear();
+            };
+            for (char c : liste) {
+                if (std::isalnum((unsigned char)c) || c == '_' || c == '.') mot += c;
+                else poser();
+            }
+            poser();
+            courante = "fin";
+            continue;
+        }
+        std::string section = sectionDe(l);
+        if (!section.empty()) {
+            courante = section;
+            continue;
+        }
+        if (courante == "description") description.push_back(l);
+        else if (courante == "syntaxe") syntaxe.push_back(l);
+        else if (courante == "exemples") exemples.push_back(l);
+    }
+    // Les lignes vides de fin ne servent a rien.
+    auto tailler = [](std::vector<std::string>& v) {
+        while (!v.empty() && sansBlancs(v.back()).empty()) v.pop_back();
+        while (!v.empty() && sansBlancs(v.front()).empty()) v.erase(v.begin());
+    };
+    tailler(description);
+    tailler(syntaxe);
+    tailler(exemples);
+    description = desindenter(description);
+    a.syntaxe = desindenter(syntaxe);
+    a.exemples = desindenter(exemples);
+    std::ostringstream corps;
+    for (std::size_t k = 0; k < description.size(); ++k) {
+        if (k) corps << "\n";
+        corps << description[k];
+    }
+    a.description = corps.str();
+    return a;
+}
+
+// Le texte d'aide d'un nom, quelle qu'en soit la source : fiche native,
+// commentaires d'un fichier .m, methode d'une classe. Rend aussi d'ou il
+// vient, pour que le navigateur d'aide le dise.
+std::string texteAide(Interpreteur& it, const std::string& nom, std::string* source,
+                      std::string* fichier) {
+    if (source) *source = std::string();
+    if (fichier) *fichier = std::string();
+    const EntreeNative* n = it.natif(nom);
+    if (n) {
+        if (source) *source = "native";
+        std::string t = aideNative(it, nom, n);
+        if (!t.empty()) return t;
+    }
+    auto f = it.fonctionFichier(nom);
+    if (f && !f->aide.empty()) {
+        if (source) *source = f->script ? "script" : "fichier";
+        if (fichier) *fichier = f->fichier;
+        return f->aide;
+    }
+    if (n) return n->aide;
+    return std::string();
+}
+
+// L'aide decoupee, rendue au langage : c'est ce que lit le navigateur
+// d'aide du bureau, et ce qui permet a un script de fabriquer sa propre
+// presentation.
+FONCTION(fnAideStructuree) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "matlibre_aide_structuree");
+    std::string nom = args[0].versTexte();
+    std::string source, fichier;
+    std::string texte = texteAide(it, nom, &source, &fichier);
+    AideDecoupee a = decouperAide(nom, texte);
+    Valeur s = Valeur::structureVide();
+    s.poserChamp("Nom", Valeur::texte(nom));
+    s.poserChamp("Resume", Valeur::texte(a.resume));
+    s.poserChamp("Description", Valeur::texte(a.description));
+    auto enCellule = [](const std::vector<std::string>& v) {
+        std::vector<Valeur> c;
+        for (const std::string& l : v) c.push_back(Valeur::texte(l));
+        return Valeur::celluleLigne(c);
+    };
+    s.poserChamp("Syntaxe", enCellule(a.syntaxe));
+    s.poserChamp("Exemples", enCellule(a.exemples));
+    s.poserChamp("VoirAussi", enCellule(a.voirAussi));
+    s.poserChamp("Texte", Valeur::texte(a.texte));
+    s.poserChamp("Source", Valeur::texte(source));
+    s.poserChamp("Fichier", Valeur::texte(fichier));
+    return {s};
+}
+
 FONCTION(fnHelp) {
     INUTILISE
     if (args.empty()) {
@@ -644,28 +804,78 @@ FONCTION(fnHelp) {
         general << "MatLibre " << MATLIBRE_VERSION
                 << " — tapez « help nom » pour l'aide d'une fonction,\n"
                    "« lookfor motif » pour chercher, « ver » pour la version.\n"
-                   "« ide » ouvre l'atelier : editeur de scripts, figures, "
-                   "debogueur,\nprofileur, concepteur d'applications et "
-                   "editeur de schemas-blocs.\n";
+                   "« doc nom » ouvre la documentation complete : syntaxe, "
+                   "description,\nexemples et fonctions voisines.\n";
         if (nargout > 0) return {Valeur::texte(general.str())};
         it.sortie() << general.str();
         return {};
     }
     std::string nom = args[0].versTexte();
-    const EntreeNative* n = it.natif(nom);
-    if (n) {
-        std::string texte = aideNative(it, nom, n);
-        if (nargout > 0) return {Valeur::texte(texte + "\n")};
-        it.sortie() << texte << "\n";
+    std::string source, fichier;
+    std::string texte = texteAide(it, nom, &source, &fichier);
+    if (!texte.empty()) {
+        if (!texte.empty() && texte.back() != '\n') texte += "\n";
+        if (nargout > 0) return {Valeur::texte(texte)};
+        it.sortie() << texte;
+        // Comme MATLAB, qui renvoie vers sa documentation en fin d'aide.
+        it.sortie() << "\n    Documentation : doc " << nom << "\n";
+        if (!fichier.empty()) it.sortie() << "    Defini dans : " << fichier << "\n";
         return {};
     }
-    auto f = it.fonctionFichier(nom);
-    if (f && !f->aide.empty()) {
-        if (nargout > 0) return {Valeur::texte(f->aide)};
-        it.sortie() << f->aide;
-        return {};
-    }
+    if (nargout > 0) return {Valeur::texte("")};
     it.sortie() << "'" << nom << "' not found.\n";
+    return {};
+}
+
+// « doc nom » : sous MATLAB, la documentation s'ouvre dans une fenetre. Le
+// bureau en pose une ; a la console, on affiche le meme texte, mais mis en
+// page — titre, syntaxe, exemples, voisines — au lieu du bloc brut.
+FONCTION(fnDoc) {
+    INUTILISE
+    if (args.empty()) {
+        if (it.crochetDocumentation) {
+            it.crochetDocumentation(std::string());
+            return {};
+        }
+        it.sortie() << "doc  Tapez « doc nom » pour la documentation d'une fonction.\n";
+        return {};
+    }
+    std::string nom = args[0].versTexte();
+    // Le bureau ouvre son navigateur d'aide ; sans lui, on imprime.
+    if (it.crochetDocumentation) {
+        it.crochetDocumentation(nom);
+        return {};
+    }
+    std::string source, fichier;
+    std::string texte = texteAide(it, nom, &source, &fichier);
+    if (texte.empty()) {
+        it.sortie() << "'" << nom << "' not found.\n";
+        return {};
+    }
+    AideDecoupee a = decouperAide(nom, texte);
+    std::string titre = nom;
+    for (auto& c : titre) c = (char)std::toupper((unsigned char)c);
+    it.sortie() << "\n" << titre << "\n" << std::string(titre.size(), '=') << "\n";
+    if (!a.resume.empty()) it.sortie() << a.resume << "\n";
+    if (!a.description.empty()) it.sortie() << "\n" << a.description << "\n";
+    if (!a.syntaxe.empty()) {
+        it.sortie() << "\nSyntaxe\n";
+        for (const std::string& l : a.syntaxe) it.sortie() << "   " << l << "\n";
+    }
+    if (!a.exemples.empty()) {
+        it.sortie() << "\nExemples\n";
+        for (const std::string& l : a.exemples) it.sortie() << "   " << l << "\n";
+    }
+    if (!a.voirAussi.empty()) {
+        it.sortie() << "\nVoir aussi";
+        for (std::size_t k = 0; k < a.voirAussi.size(); ++k)
+            it.sortie() << (k ? ", " : " ") << a.voirAussi[k];
+        it.sortie() << "\n";
+    }
+    if (source == "fichier" || source == "script")
+        it.sortie() << "\nDefini dans : " << fichier << "\n";
+    else
+        it.sortie() << "\nFonction native de MatLibre.\n";
     return {};
 }
 
@@ -834,14 +1044,6 @@ void enregistrerSysteme(Interpreteur& it) {
                    "mexext  Extension des fichiers MEX de cette plateforme.");
     it.enregistrer("version", fnVersion, "systeme", "version  Version de l'interpreteur.");
     it.enregistrer("ver", fnVer, "systeme", "ver  Version detaillee.");
-    it.enregistrer("ide", fnIde, "systeme",
-                   "ide  Ouvre l'atelier dans le navigateur : editeur de scripts avec\n"
-                   "     coloration et points d'arret, console, table des variables,\n"
-                   "     figures, profileur, concepteur d'applications et editeur de\n"
-                   "     schemas-blocs. « ide PORT » choisit le port (8421 par defaut).\n"
-                   "     L'atelier tourne dans un second processus et a son propre\n"
-                   "     espace de travail.");
-    it.enregistrer("atelier", fnIde, "systeme", "atelier  Synonyme de ide.");
     it.enregistrer("isunix", fnIsunix, "systeme", "isunix  Systeme de type UNIX ?");
     it.enregistrer("ispc", fnIspc, "systeme", "ispc  Systeme Windows ?");
     it.enregistrer("ismac", fnIsmac, "systeme", "ismac  Systeme macOS ?");
@@ -860,7 +1062,10 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("quit", fnExit, "systeme", "quit  Quitte l'interpreteur.");
     it.enregistrer("type", fnType, "systeme", "type  Affiche le source d'un fichier.");
     it.enregistrer("help", fnHelp, "systeme", "help  Aide d'une fonction.");
-    it.enregistrer("doc", fnHelp, "systeme", "doc  Aide d'une fonction.");
+    it.enregistrer("doc", fnDoc, "systeme",
+                   "doc  Documentation d'une fonction, mise en page.");
+    it.enregistrer("matlibre_aide_structuree", fnAideStructuree, "systeme",
+                   "matlibre_aide_structuree  Aide decoupee en sections.");
     it.enregistrer("lookfor", fnLookfor, "systeme", "lookfor  Cherche dans les aides.");
     it.enregistrer("matlibre_fonctions", fnDocFonctions, "systeme",
                    "matlibre_fonctions  Liste des fonctions natives et de leur groupe.");

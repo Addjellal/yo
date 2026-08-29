@@ -17,29 +17,6 @@ HELP  Aide d'une fonction.
 
     Voir aussi DOC, LOOKFOR, WHICH, VER, IDE.
 
-### ide
-IDE  Ouvre l'atelier dans le navigateur.
-    IDE ouvre l'atelier : éditeur de scripts avec coloration et points
-    d'arrêt, console, table des variables, figures, profileur, concepteur
-    d'applications et éditeur de schémas-blocs.
-    IDE(PORT) choisit le port ; 8421 par défaut.
-
-    L'atelier tourne dans un second processus et a son propre espace de
-    travail, séparé de celui de la console.
-
-    Pour un bureau natif — une fenêtre, pas un navigateur — lancer
-    « matlibre-bureau ».
-
-    Syntaxe
-       ide
-       ide(port)
-
-    Exemples
-       ide
-       ide(9000)
-
-    Voir aussi HELP, VER.
-
 ### which
 WHICH  Où se trouve une fonction.
     WHICH NOM affiche le chemin du fichier qui définit NOM, ou signale
@@ -1242,21 +1219,6 @@ MATLAB  Espace de noms des utilitaires du langage.
        matlab.lang.makeUniqueStrings({'a','a','b'})
 
     Voir aussi ISVARNAME, GENVARNAME, FIELDNAMES.
-
-### atelier
-ATELIER  Ouvre l'atelier de MatLibre dans le navigateur.
-    ATELIER, comme la commande IDE, lance le serveur local et ouvre
-    l'éditeur, le débogueur, le concepteur d'applications et l'éditeur de
-    schémas-blocs.
-
-    Syntaxe
-       atelier
-       ide
-
-    Exemples
-       % atelier                           % ouvre le navigateur
-
-    Voir aussi IDE, DOC, HELP, EDIT.
 
 ### runtests
 RUNTESTS  Exécute les scripts de test d'un dossier.

@@ -5,6 +5,7 @@
 
 #include <QMainWindow>
 #include <QMap>
+#include <QSet>
 #include <QVector>
 
 #include "Moteur.h"
@@ -22,6 +23,7 @@ class ConsoleCommandes;
 class VueFigure;
 class FenetreFigure;
 class FenetreProfileur;
+class FenetreAide;
 
 class FenetrePrincipale : public QMainWindow {
     Q_OBJECT
@@ -50,10 +52,13 @@ private slots:
     void executerSelection();
     void executerEtChronometrer();
     void montrerProfileur();
+    void montrerAide(const QString& nom);
+    void aideSurMotCourant();
     void surProfil(const QVector<LigneProfil>& entrees, double duree);
     void surSortie(const QString& texte);
     void surEspaceTravail(const QVector<LigneEspaceTravail>& lignes);
-    void surFigures(const QVector<FigureCopiee>& figures);
+    void surFigures(const QVector<FigureCopiee>& figures, int courante);
+    void surFermetureFigure(int numero);
     void surDossier(const QString& chemin);
     void surCommandeFinie();
     void changerDossierParDialogue();
@@ -87,6 +92,7 @@ private:
     void envoyer(const QString& commande);
     Editeur* editeurCourant() const;
     FenetreProfileur* profileur();
+    FenetreAide* fenetreAide();
     void rafraichirListeFichiers();
 
     QThread* filMoteur_;
@@ -99,7 +105,14 @@ private:
     QListWidget* listeFichiers_;
     QListWidget* historique_;
     QMap<int, FenetreFigure*> fenetresFigures_;
+    // Ce qui est deja peint, pour ne remonter une fenetre que lorsque son
+    // trace a change ; et les fermetures faites a la main, en attente que
+    // le moteur en prenne acte.
+    QMap<int, quint64> empreintesFigures_;
+    QSet<int> fermeturesEnAttente_;
+    int figureCouranteVue_ = 0;
     FenetreProfileur* profileur_ = nullptr;
+    FenetreAide* fenetreAide_ = nullptr;
     // Les commandes du débogueur : grisées tant que rien n'est arrêté.
     QAction* aContinuer_ = nullptr;
     QAction* aPasAPas_ = nullptr;

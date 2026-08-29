@@ -33,7 +33,7 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **617 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **616 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
@@ -53,10 +53,6 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Un atelier dans le navigateur** (`matlibre --ide`) : éditeur avec
-  coloration et points d'arrêt, console, explorateur de variables,
-  débogueur pas à pas, profileur, concepteur d'applications qui exécute
-  vraiment ce qu'il dessine, et éditeur de schémas-blocs qui simule.
 - **Une aide qui ne ment pas** : 491 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
@@ -122,9 +118,11 @@ par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
 la seule dépendance, et elle reste facultative — sans Qt, tout le reste se
 compile comme avant.
 
-**L'atelier** (`matlibre --ide`, ou la commande `ide`) reste disponible
-dans le navigateur, avec en plus le concepteur d'applications et l'éditeur
-de schémas-blocs.
+**La documentation** vit dans le bureau : `doc nom` — ou F1 sur un mot de
+l'éditeur — ouvre le navigateur d'aide, avec la liste des fonctions, la
+page mise en forme et des renvois cliquables. Elle marche aussi sur vos
+propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
+`function`, comme sous MATLAB.
 
 | Exemple | Ce qu'il montre |
 |---|---|
@@ -140,7 +138,6 @@ de schémas-blocs.
 |---|---|
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
 | [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
-| [`atelier.md`](documentation/atelier.md) | l'atelier : éditeur, débogueur, profileur, concepteur, schémas-blocs |
 | [`toolboxes.md`](documentation/toolboxes.md) | les 53 modules et leur correspondance MathWorks |
 | [`reference.md`](documentation/reference.md) | les 966 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |

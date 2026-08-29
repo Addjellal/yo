@@ -52,7 +52,7 @@ enum class Format { Court, Long, CourtE, LongE, CourtG, LongG, Hex, Rationnel, P
 struct Figure;  // Graphique.h
 
 // Un composant d'interface : ce que pose uifigure, uibutton, uislider…
-// L'atelier lit cette table pour dessiner la fenêtre, et renvoie les
+// Une interface lit cette table pour dessiner la fenêtre, et renvoie les
 // événements qui déclenchent les rappels.
 struct ComposantInterface {
     long long id = 0;
@@ -142,6 +142,9 @@ public:
     // Posé par une interface graphique : « clc » l'appelle au lieu
     // d'écrire une séquence ANSI que la fenêtre afficherait telle quelle.
     std::function<void()> effacerEcran;
+    // « doc nom » : le bureau ouvre son navigateur d'aide. Sans crochet,
+    // « doc » imprime la documentation dans la console.
+    std::function<void(const std::string& nom)> crochetDocumentation;
 
     std::ostream& sortie();
     std::ostream& erreurSortie();

@@ -58,11 +58,27 @@ else()
   add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 endif()
 
+# Un arbre de construction lisible : les executables dans bin/, les
+# bibliotheques dans lib/, et tout le reste — le cache de CMake, les
+# fichiers intermediaires, les sources engendrees par moc — la ou CMake
+# les met. On ouvre build/bin et l'on y trouve ce qu'on cherche.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# Les generateurs multi-configuration (Visual Studio, Xcode) ajoutent
+# sinon un sous-dossier par type de compilation.
+foreach(config ${CMAKE_CONFIGURATION_TYPES})
+  string(TOUPPER ${config} CONFIG_MAJ)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CONFIG_MAJ} ${CMAKE_BINARY_DIR}/bin)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_MAJ} ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${CONFIG_MAJ} ${CMAKE_BINARY_DIR}/lib)
+endforeach()
+
 file(GLOB_RECURSE MATLIBRE_SOURCES
      ${CMAKE_CURRENT_SOURCE_DIR}/src/coeur/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/src/bibliotheque/*.cpp
      ${CMAKE_CURRENT_SOURCE_DIR}/src/graphique/*.cpp
-     ${CMAKE_CURRENT_SOURCE_DIR}/src/ide/*.cpp)
+     )
 
 add_library(matlibre_coeur STATIC ${MATLIBRE_SOURCES})
 target_include_directories(matlibre_coeur PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -96,15 +112,6 @@ if(Threads_FOUND)
   target_link_libraries(matlibre_coeur PUBLIC Threads::Threads)
 endif()
 
-# Le serveur de l'atelier ouvre une prise réseau. Sous Windows, les
-# fonctions de Winsock vivent dans ws2_32 : sans cette ligne, MinGW
-# s'arrête à l'édition de liens sur des références indéfinies à socket,
-# bind et WSAStartup. Visual Studio ne s'en tire que grâce à un pragma,
-# qu'on ne veut pas dans le code portable.
-if(WIN32)
-  target_link_libraries(matlibre_coeur PUBLIC ws2_32)
-endif()
-
 add_executable(matlibre ${CMAKE_CURRENT_SOURCE_DIR}/src/console/Principal.cpp)
 target_link_libraries(matlibre PRIVATE matlibre_coeur)
 
@@ -113,8 +120,6 @@ include(GNUInstallDirs)
 install(TARGETS matlibre RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/toolbox/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre)
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ide/
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/matlibre-ide)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/documentation/
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
@@ -220,6 +225,7 @@ if(MATLIBRE_BUREAU)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Ruban.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreFigure.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreProfileur.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreAide.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Icone.cpp)
     target_link_libraries(matlibre_bureau PUBLIC matlibre_coeur Qt6::Widgets)
     target_include_directories(matlibre_bureau PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau)

@@ -6,6 +6,8 @@
 #include <QFileInfo>
 #include <QStringList>
 #include <ostream>
+#include <cstring>
+#include <functional>
 #include <sstream>
 #include <streambuf>
 
@@ -53,6 +55,92 @@ private:
     Moteur* moteur_;
     std::string attente_;
 };
+
+// Empreinte du contenu d'une figure : ce qui, en changeant, doit faire
+// repeindre et remonter la fenetre. On melange les nombres eux-memes, et
+// pas seulement les tailles : « ax.XTick = [...] » ne change aucune
+// dimension mais change bien l'image.
+std::uint64_t melanger(std::uint64_t graine, std::uint64_t valeur) {
+    graine ^= valeur + 0x9e3779b97f4a7c15ULL + (graine << 6) + (graine >> 2);
+    return graine;
+}
+
+std::uint64_t melangerReels(std::uint64_t graine, const std::vector<double>& v) {
+    graine = melanger(graine, v.size());
+    // Un tracé d'un million de points ne se relit pas en entier a chaque
+    // commande : on echantillonne, et l'on garde les deux bouts.
+    std::size_t pas = v.size() > 512 ? v.size() / 512 : 1;
+    for (std::size_t k = 0; k < v.size(); k += pas) {
+        std::uint64_t bits;
+        double x = v[k];
+        std::memcpy(&bits, &x, sizeof(bits));
+        graine = melanger(graine, bits);
+    }
+    if (!v.empty()) {
+        std::uint64_t bits;
+        double x = v.back();
+        std::memcpy(&bits, &x, sizeof(bits));
+        graine = melanger(graine, bits);
+    }
+    return graine;
+}
+
+std::uint64_t melangerTexte(std::uint64_t graine, const std::string& s) {
+    return melanger(graine, std::hash<std::string>{}(s));
+}
+
+std::uint64_t empreinteFigure(const Figure& f) {
+    std::uint64_t h = 1469598103934665603ULL;
+    h = melanger(h, (std::uint64_t)f.lignes);
+    h = melanger(h, (std::uint64_t)f.colonnes);
+    h = melanger(h, (std::uint64_t)f.largeur);
+    h = melanger(h, (std::uint64_t)f.hauteur);
+    h = melangerTexte(h, f.nom);
+    h = melanger(h, (std::uint64_t)f.axeCourant);
+    for (const auto& a : f.axes) {
+        if (!a) {
+            h = melanger(h, 0);
+            continue;
+        }
+        h = melangerTexte(h, a->titre);
+        h = melangerTexte(h, a->etiquetteX);
+        h = melangerTexte(h, a->etiquetteY);
+        h = melangerTexte(h, a->etiquetteZ);
+        h = melanger(h, (std::uint64_t)a->grille);
+        h = melanger(h, (std::uint64_t)a->tenir);
+        h = melanger(h, (std::uint64_t)a->logX);
+        h = melanger(h, (std::uint64_t)a->logY);
+        h = melanger(h, (std::uint64_t)a->boite);
+        h = melanger(h, (std::uint64_t)a->axesVisibles);
+        h = melanger(h, (std::uint64_t)a->proportions);
+        h = melanger(h, (std::uint64_t)a->position);
+        h = melanger(h, (std::uint64_t)a->rangee);
+        h = melanger(h, (std::uint64_t)a->colonne);
+        h = melanger(h, (std::uint64_t)a->limitesManuellesX);
+        h = melanger(h, (std::uint64_t)a->limitesManuellesY);
+        h = melangerReels(h, {a->xmin, a->xmax, a->ymin, a->ymax, a->taillePolice});
+        h = melangerReels(h, a->ticksX);
+        h = melangerReels(h, a->ticksY);
+        h = melanger(h, (std::uint64_t)a->legendeVisible);
+        for (const auto& e : a->legende) h = melangerTexte(h, e);
+        for (const auto& e : a->etiquettesTicksX) h = melangerTexte(h, e);
+        for (const auto& e : a->etiquettesTicksY) h = melangerTexte(h, e);
+        for (const auto& s : a->series) {
+            h = melanger(h, (std::uint64_t)s.genre);
+            h = melangerTexte(h, s.couleur);
+            h = melangerTexte(h, s.style);
+            h = melangerTexte(h, s.marqueur);
+            h = melangerTexte(h, s.etiquette);
+            h = melangerReels(h, {s.epaisseur});
+            h = melanger(h, (std::uint64_t)s.hauteurImage);
+            h = melanger(h, (std::uint64_t)s.largeurImage);
+            h = melangerReels(h, s.x);
+            h = melangerReels(h, s.y);
+            h = melangerReels(h, s.z);
+        }
+    }
+    return h;
+}
 
 QString dimensionsTexte(const Valeur& v) {
     QString s;
@@ -128,6 +216,10 @@ void Moteur::demarrer() {
     it_->modeInteractif = true;
     // « clc » efface la fenetre au lieu d'y ecrire « [2J[H ».
     it_->effacerEcran = [this] { emit effacementDemande(); };
+    // « doc nom » ouvre le navigateur d'aide au lieu d'imprimer.
+    it_->crochetDocumentation = [this](const std::string& nom) {
+        emit documentationDemandee(QString::fromStdString(nom));
+    };
 
     // Le crochet d'arret : appele par l'interpreteur avant l'instruction
     // ou se pose un point d'arret. Il rend la main quand l'utilisateur
@@ -313,6 +405,75 @@ void Moteur::libererPourFermeture() {
     reprendre((int)ActionDebogueur::Quitter);
 }
 
+// L'aide vient de l'interpreteur, dans son fil : « matlibre_aide_structuree »
+// fait tout le travail, on ne fait que traduire en Qt.
+void Moteur::demanderAide(const QString& nom) {
+    FicheAide fiche;
+    fiche.nom = nom;
+    if (!it_) {
+        emit aidePrete(fiche);
+        return;
+    }
+    auto texteDe = [](const Valeur& s, const char* champ) {
+        if (!s.aChamp(champ)) return QString();
+        return QString::fromStdString(s.champ(champ).versTexte());
+    };
+    auto listeDe = [](const Valeur& s, const char* champ) {
+        QStringList liste;
+        if (!s.aChamp(champ)) return liste;
+        Valeur v = s.champ(champ);
+        if (v.classe == Classe::Cellule)
+            for (const auto& c : v.cellules) liste << QString::fromStdString(c.versTexte());
+        return liste;
+    };
+    try {
+        std::vector<Valeur> args = {Valeur::texte(nom.toStdString())};
+        auto sortie = it_->appeler("matlibre_aide_structuree", args, 1);
+        if (!sortie.empty()) {
+            const Valeur& s = sortie[0];
+            fiche.resume = texteDe(s, "Resume");
+            fiche.description = texteDe(s, "Description");
+            fiche.texte = texteDe(s, "Texte");
+            fiche.source = texteDe(s, "Source");
+            fiche.fichier = texteDe(s, "Fichier");
+            fiche.syntaxe = listeDe(s, "Syntaxe");
+            fiche.exemples = listeDe(s, "Exemples");
+            fiche.voirAussi = listeDe(s, "VoirAussi");
+            fiche.trouvee = !fiche.texte.isEmpty();
+        }
+    } catch (...) {
+        // Une aide introuvable n'est pas une erreur : la fenetre le dira.
+    }
+    emit aidePrete(fiche);
+}
+
+void Moteur::demanderIndexAide() {
+    QVector<EntreeIndexAide> entrees;
+    if (!it_) {
+        emit indexAidePret(entrees);
+        return;
+    }
+    for (const auto& nom : it_->nomsNatifs()) {
+        // Les rouages internes ne sont pas de la documentation : MATLAB ne
+        // liste pas non plus ses fonctions privees.
+        if (nom.rfind("matlibre_", 0) == 0) continue;
+        EntreeIndexAide e;
+        e.nom = QString::fromStdString(nom);
+        const EntreeNative* n = it_->natif(nom);
+        e.groupe = n ? QString::fromStdString(n->groupe) : QString();
+        // Le resume est la premiere ligne de l'aide, nom retire.
+        std::vector<Valeur> args = {Valeur::texte(nom)};
+        try {
+            auto sortie = it_->appeler("matlibre_aide_structuree", args, 1);
+            if (!sortie.empty() && sortie[0].aChamp("Resume"))
+                e.resume = QString::fromStdString(sortie[0].champ("Resume").versTexte());
+        } catch (...) {
+        }
+        entrees.push_back(e);
+    }
+    emit indexAidePret(entrees);
+}
+
 void Moteur::reindexer() {
     // Un fichier qu'on vient d'ecrire doit etre visible tout de suite :
     // MATLAB reconstruit son index a l'enregistrement, on fait de meme.
@@ -335,17 +496,37 @@ void Moteur::publierEtat() {
     emit espaceTravailChange(lignes);
 
     QVector<FigureCopiee> figures;
+    std::map<int, std::uint64_t> presentes;
     for (const auto& kv : it_->figures) {
         if (!kv.second) continue;
         FigureCopiee f;
         f.numero = kv.first;
-        // Copie profonde : le fil graphique peint pendant que le calcul
-        // repart, et ne doit pas lire des axes en cours de modification.
-        f.figure = *kv.second;
-        f.figure.axes.clear();
-        for (const auto& a : kv.second->axes)
-            f.figure.axes.push_back(a ? std::make_shared<Axes>(*a) : nullptr);
+        f.empreinte = empreinteFigure(*kv.second);
+        presentes[f.numero] = f.empreinte;
+        auto ancienne = empreintesEnvoyees_.find(f.numero);
+        f.contenu = ancienne == empreintesEnvoyees_.end() || ancienne->second != f.empreinte;
+        if (f.contenu) {
+            // Copie profonde : le fil graphique peint pendant que le calcul
+            // repart, et ne doit pas lire des axes en cours de
+            // modification. On ne la paie que si le tracé a bougé.
+            f.figure = *kv.second;
+            f.figure.axes.clear();
+            for (const auto& a : kv.second->axes)
+                f.figure.axes.push_back(a ? std::make_shared<Axes>(*a) : nullptr);
+        }
         figures.push_back(f);
     }
-    emit figuresChangees(figures);
+    empreintesEnvoyees_.swap(presentes);
+    emit figuresChangees(figures, it_->figureCourante);
+}
+
+// La fenetre d'une figure fermee a la main : la figure quitte le moteur,
+// sinon la prochaine publication la ferait reapparaitre.
+void Moteur::fermerFigure(int numero) {
+    if (!it_) return;
+    it_->figures.erase(numero);
+    if (!it_->figures.count(it_->figureCourante))
+        it_->figureCourante = it_->figures.empty() ? 0 : it_->figures.begin()->first;
+    empreintesEnvoyees_.erase(numero);
+    publierEtat();
 }

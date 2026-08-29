@@ -37,20 +37,3 @@ jobs:
           name: matlibre-${{ matrix.systeme }}
           path: build/MatLibre-*
           if-no-files-found: ignore
-
-  atelier:
-    name: atelier (navigateur)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Compiler
-        run: ./outils/construire.sh
-      - name: Installer Playwright
-        run: |
-          npm install playwright
-          npx playwright install --with-deps chromium
-      - name: Vérifier l'atelier
-        run: make verifier-atelier

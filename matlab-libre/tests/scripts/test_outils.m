@@ -101,8 +101,19 @@ assert(~isempty(strfind(aideFft, 'Exemples')));
 assert(~isempty(strfind(aideFft, 'Voir aussi')));
 assert(~isempty(strfind(aideFft, 'Y = fft(X,n)')));
 
-% « doc » donne la meme fiche que « help ».
-assert(strcmp(help('sort'), doc('sort')));
+% « doc » ne rend pas de texte — comme sous MATLAB, il ouvre la
+% documentation. A la console, il l'imprime, mise en page : titre
+% souligne, sections nommees, renvois en fin de page.
+sortieDoc = evalc('doc sort');
+assert(~isempty(strfind(sortieDoc, 'SORT')));
+assert(~isempty(strfind(sortieDoc, '====')));
+assert(~isempty(strfind(sortieDoc, 'Syntaxe')));
+assert(~isempty(strfind(sortieDoc, 'Exemples')));
+assert(~isempty(strfind(sortieDoc, 'Voir aussi')));
+assert(~isempty(strfind(sortieDoc, 'Fonction native')));
+% Un nom inconnu le dit, sans lever d'erreur.
+sortieInconnue = evalc('doc nomQuiNExistePas');
+assert(~isempty(strfind(sortieInconnue, 'not found')));
 
 % Une fonction sans fiche garde sa ligne d'enregistrement : rien ne
 % disparait, l'aide riche s'ajoute la ou elle existe.

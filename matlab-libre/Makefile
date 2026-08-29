@@ -3,13 +3,14 @@
 # Tout passe par CMake ; ce fichier n'existe que pour taper moins.
 
 BUILD ?= build
+# Les binaires vivent dans build/bin : l'arbre de construction reste lisible.
+BIN   ?= $(BUILD)/bin
 TYPE  ?= Release
 PREFIX ?= /usr/local
 JOBS  ?= $(shell nproc 2>/dev/null || echo 4)
-PORT  ?= 8421
 
 .PHONY: aide tout configurer test tests doc install propre reference exemples \
-        atelier verifier-atelier windows ninja generateurs bureau
+        windows ninja generateurs bureau
 
 aide:
 	@echo "make tout        compile l'interpreteur"
@@ -17,8 +18,6 @@ aide:
 	@echo "make doc         regenere documentation/reference/ et les comptes"
 	@echo "make exemples    execute les scripts de exemples/"
 	@echo "make bureau      ouvre le bureau natif (fenetre Qt)"
-	@echo "make atelier     ouvre l'atelier dans le navigateur (port $(PORT))"
-	@echo "make verifier-atelier   pilote l'atelier avec un vrai navigateur"
 	@echo "make windows     verifie la compilation pour Windows (MinGW)"
 	@echo "make ninja       verifie la compilation avec le generateur Ninja"
 	@echo "make generateurs verifie Ninja et MinGW : les deux autres chemins"
@@ -32,59 +31,43 @@ configurer:
 	@cmake -S . -B $(BUILD) -DCMAKE_BUILD_TYPE=$(TYPE) > /dev/null
 
 test: tout
-	@$(BUILD)/matlibre_tests
-	@if [ -x $(BUILD)/matlibre_tests_bureau ]; then \
+	@$(BIN)/matlibre_tests
+	@if [ -x $(BIN)/matlibre_tests_bureau ]; then \
 	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox QT_QPA_PLATFORM=offscreen \
-	    $(BUILD)/matlibre_tests_bureau; \
+	    $(BIN)/matlibre_tests_bureau; \
 	fi
-	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/verifierDoublons.m
+	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre outils/verifierDoublons.m
 	@for f in tests/scripts/test_*.m; do \
 	  echo "--> $$f"; \
-	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre --path tests/scripts $$f || exit 1; \
+	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre --path tests/scripts $$f || exit 1; \
 	done
 	@echo "tous les tests passent"
 
 tests: test
 
 doc: tout
-	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/genererReference.m
-	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre outils/majComptes.m
+	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre outils/genererReference.m
+	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre outils/majComptes.m
 
 reference: doc
 
 exemples: tout
 	@for f in exemples/*.m; do \
 	  echo "--> $$f"; \
-	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre $$f || exit 1; \
+	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre $$f || exit 1; \
 	done
-
-atelier: tout
-	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox MATLIBRE_IDE=$(CURDIR)/ide \
-	  $(BUILD)/matlibre --ide $(PORT)
-
-# Vérification de bout en bout : l'atelier est lancé, un vrai navigateur le
-# pilote, puis tout est arrêté. Playwright est nécessaire ; sans lui la
-# vérification se déclare sautée plutôt qu'en échec.
-verifier-atelier: tout
-	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox MATLIBRE_IDE=$(CURDIR)/ide \
-	  $(BUILD)/matlibre --ide-sans-navigateur $(PORT) & echo $$! > .atelier.pid; \
-	  sleep 2; \
-	  NO_PROXY='*' node tests/ide/verifierAtelier.mjs http://127.0.0.1:$(PORT); \
-	  code=$$?; \
-	  kill `cat .atelier.pid` 2>/dev/null; rm -f .atelier.pid; \
-	  if [ $$code -eq 77 ]; then exit 0; fi; exit $$code
 
 # Compilation croisee pour Windows : elle ne sert pas a livrer, mais a
 # verifier la portabilite depuis la machine de developpement. Sans le
 # cross-compilateur, la cible le dit et s'arrete sans echouer.
 # Le bureau natif : un seul executable, une vraie fenetre.
 bureau: tout
-	@if [ ! -x $(BUILD)/matlibre-bureau ]; then \
+	@if [ ! -x $(BIN)/matlibre-bureau ]; then \
 	  echo "Le bureau n'a pas ete construit : Qt6 est absent."; \
 	  echo "  apt install qt6-base-dev   (Debian, Ubuntu)"; \
 	  exit 1; \
 	fi; \
-	MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BUILD)/matlibre-bureau
+	MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre-bureau
 
 windows:
 	@if ! command -v x86_64-w64-mingw32-g++ > /dev/null; then \
@@ -115,5 +98,7 @@ generateurs: ninja windows
 install: tout
 	@cmake --install $(BUILD) --prefix $(PREFIX)
 
+# Efface tout ce qu'une compilation a pu deposer : les trois arbres de
+# construction, et les fichiers que CMake laisse a la racine.
 propre:
-	@rm -rf $(BUILD) build-windows
+	@rm -rf $(BUILD) build build-windows build-ninja compile_commands.json

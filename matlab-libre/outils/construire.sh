@@ -51,17 +51,19 @@ if [ -f "$dossier/CMakeCache.txt" ]; then
 fi
 
 echo "MatLibre : configuration ($type) dans $dossier"
+# Les binaires sortent dans <dossier>/bin : l'arbre reste lisible.
+binaires="$dossier/bin"
 cmake -S "$racine" -B "$dossier" -DCMAKE_BUILD_TYPE="$type"
 echo "MatLibre : compilation sur $taches taches"
 cmake --build "$dossier" -j "$taches"
 
 if [ "$tests" -eq 1 ]; then
     echo "MatLibre : tests"
-    "$dossier/matlibre_tests"
-    MATLIBRE_TOOLBOX="$racine/toolbox" "$dossier/matlibre" "$racine/outils/verifierDoublons.m"
+    "$binaires/matlibre_tests"
+    MATLIBRE_TOOLBOX="$racine/toolbox" "$binaires/matlibre" "$racine/outils/verifierDoublons.m"
     for f in "$racine"/tests/scripts/test_*.m; do
         echo "--> $f"
-        MATLIBRE_TOOLBOX="$racine/toolbox" "$dossier/matlibre" --path "$racine/tests/scripts" "$f"
+        MATLIBRE_TOOLBOX="$racine/toolbox" "$binaires/matlibre" --path "$racine/tests/scripts" "$f"
     done
     echo "tous les tests passent"
 fi
@@ -77,10 +79,10 @@ if [ "$paquet" -eq 1 ]; then
     ls -1 "$dossier"/MatLibre-* 2>/dev/null || true
 fi
 
-echo "MatLibre : fini. L'executable est $dossier/matlibre"
-if [ -x "$dossier/matlibre-bureau" ]; then
-    echo "  $dossier/matlibre-bureau"
+echo "MatLibre : fini. L'executable est $binaires/matlibre"
+if [ -x "$binaires/matlibre-bureau" ]; then
+    echo "  $binaires/matlibre-bureau"
     echo "      le bureau : une fenetre, l'editeur, les figures, l'espace de travail"
 fi
-echo "  $dossier/matlibre --ide   ouvre l'atelier dans le navigateur"
-echo "  $dossier/matlibre         session interactive"
+echo "  $binaires/matlibre-bureau  ouvre le bureau (si Qt6 est present)"
+echo "  $binaires/matlibre         session interactive"

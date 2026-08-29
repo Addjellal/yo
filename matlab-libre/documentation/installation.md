@@ -46,15 +46,15 @@ cmake --preset linux && cmake --build build
 
 ```
 <préfixe>/bin/matlibre                  l'interpréteur
-<préfixe>/share/matlibre/               les toolboxes
-<préfixe>/share/matlibre-ide/           les fichiers de l'atelier
+<préfixe>/bin/matlibre-bureau           le bureau natif, si Qt6 est présent
+<préfixe>/share/matlibre/               les toolboxes et les fiches d'aide
 <préfixe>/share/doc/MatLibre/           la documentation
 ```
 
 L'exécutable trouve les toolboxes tout seul : il regarde
 `../share/matlibre`, puis `../toolbox`, puis `./toolbox`, et enfin la
-variable d'environnement `MATLIBRE_TOOLBOX`. L'atelier suit la même
-logique avec `MATLIBRE_IDE`.
+variable d'environnement `MATLIBRE_TOOLBOX`. Les fiches d'aide de `doc` et
+`help` vivent dans `toolbox/aide/`, et suivent donc le même chemin.
 
 ## Paquets
 
@@ -107,5 +107,4 @@ chemin de recherche.
 ## Intégration continue
 
 `.github/workflows/construire.yml` compile et teste sur Ubuntu, macOS et
-Windows, fabrique les archives, et fait passer la vérification de
-l'atelier dans un vrai navigateur.
+Windows, et fabrique les archives.

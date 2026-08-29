@@ -107,7 +107,11 @@ Verifier "la compilation"
 # Visual Studio range l'exécutable dans un sous-dossier par configuration,
 # Ninja et les Makefiles à la racine du dossier de construction.
 function Trouver($nom) {
-    foreach ($essai in @((Join-Path $Dossier "$nom.exe"),
+    # Les binaires sortent dans <dossier>\bin ; les anciens emplacements
+    # restent essayes, pour un arbre de construction deja en place.
+    foreach ($essai in @((Join-Path $Dossier "bin\$nom.exe"),
+                         (Join-Path $Dossier "bin\$nom"),
+                         (Join-Path $Dossier "$nom.exe"),
                          (Join-Path $Dossier "$type\$nom.exe"),
                          (Join-Path $Dossier "$nom"))) {
         if (Test-Path $essai) { return $essai }
@@ -161,7 +165,7 @@ if ($bureau -ne "") {
     Write-Host "  $bureau"
     Write-Host "      le bureau : une fenetre, l'editeur, les figures, l'espace de travail"
 }
-Write-Host "  $exe --ide   ouvre l'atelier dans le navigateur"
+Write-Host "  $exe-bureau  ouvre le bureau (si Qt6 est present)"
 Write-Host "  $exe         session interactive"
 if ($bureau -eq "") {
     Write-Host ""

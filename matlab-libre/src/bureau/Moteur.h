@@ -9,8 +9,11 @@
 #include <QObject>
 #include <QPair>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <atomic>
+#include <cstdint>
+#include <map>
 #include <condition_variable>
 #include <mutex>
 #include <memory>
@@ -40,10 +43,39 @@ struct LigneProfil {
     QVector<QPair<int, long long>> lignes;  // ligne -> passages
 };
 
+// Une fiche d'aide, découpée en sections : c'est ce que montre le
+// navigateur d'aide, et c'est ce que le fil de calcul en sait.
+struct FicheAide {
+    QString nom;
+    QString resume;
+    QString description;
+    QStringList syntaxe;
+    QStringList exemples;
+    QStringList voirAussi;
+    QString texte;
+    QString source;    // « native », « fichier », « script »
+    QString fichier;
+    bool trouvee = false;
+};
+
+// Une entrée de l'index : le nom, son groupe, et sa première ligne d'aide.
+struct EntreeIndexAide {
+    QString nom;
+    QString groupe;
+    QString resume;
+};
+
 // Une figure recopiée pour être peinte par le fil graphique : le fil de
 // calcul peut continuer sans que la peinture lise une structure qui bouge.
+//
+// L'empreinte résume le contenu. Le fil de calcul ne recopie une figure
+// que si son empreinte a changé : sans cela, chaque commande tapée dans
+// la console recopiait un tracé d'un million de points — et la fenêtre
+// remontait au premier plan alors que rien n'avait bougé.
 struct FigureCopiee {
     int numero = 1;
+    std::uint64_t empreinte = 0;
+    bool contenu = false;   // vrai quand « figure » porte la copie a jour
     matlibre::Figure figure;
 };
 
@@ -70,6 +102,13 @@ public slots:
     void executerEtChronometrer(const QString& texte);
     void changerDossier(const QString& chemin);
     void reindexer();                     // apres l'ecriture d'un fichier
+    // La fenêtre d'une figure vient d'être fermée à la main : la figure
+    // disparaît du moteur, sinon la commande suivante la ferait revenir.
+    void fermerFigure(int numero);
+    // Le navigateur d'aide demande une fiche, ou l'index complet ; le fil
+    // de calcul répond par un signal, sans jamais bloquer la fenêtre.
+    void demanderAide(const QString& nom);
+    void demanderIndexAide();
 
     // --- débogueur ------------------------------------------------------
     //
@@ -99,8 +138,12 @@ signals:
     void repriseEffectuee();
     void espaceTravailChange(const QVector<LigneEspaceTravail>& lignes);
     void effacementDemande();   // « clc »
+    void aidePrete(const FicheAide& fiche);
+    void indexAidePret(const QVector<EntreeIndexAide>& entrees);
+    // « doc nom » tapé dans la console : la fenêtre d'aide s'ouvre.
+    void documentationDemandee(const QString& nom);
     void profilPret(const QVector<LigneProfil>& entrees, double duree);
-    void figuresChangees(const QVector<FigureCopiee>& figures);
+    void figuresChangees(const QVector<FigureCopiee>& figures, int courante);
     void dossierChange(const QString& chemin);
     void pret();
 
@@ -119,6 +162,10 @@ private:
     QString aEvaluer_;
     std::atomic<bool> arrete_{false};
     std::atomic<bool> fermeture_{false};
+
+    // Ce qui a deja ete envoye au fil graphique, pour ne pas recopier deux
+    // fois la meme figure.
+    std::map<int, std::uint64_t> empreintesEnvoyees_;
 
     std::unique_ptr<matlibre::Interpreteur> it_;
     std::unique_ptr<std::streambuf> tampon_;
