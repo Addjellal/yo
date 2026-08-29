@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPair>
 #include <QString>
 #include <QVector>
 #include <atomic>
@@ -26,6 +27,17 @@ struct LigneEspaceTravail {
     QString taille;
     QString classe;
     QString valeur;
+};
+
+// Une entrée du profil, telle que la fenêtre du profileur la montre : la
+// même chose que « profile viewer » de MATLAB, plus le détail par ligne.
+struct LigneProfil {
+    QString nom;
+    QString fichier;
+    long long appels = 0;
+    double total = 0.0;    // secondes, appels imbriqués compris
+    double propre = 0.0;   // secondes, hors appels imbriqués
+    QVector<QPair<int, long long>> lignes;  // ligne -> passages
 };
 
 // Une figure recopiée pour être peinte par le fil graphique : le fil de
@@ -53,6 +65,9 @@ public:
 public slots:
     void demarrer();                      // construit l'interpréteur dans ce fil
     void executer(const QString& texte);  // évalue, puis publie l'état
+    // « Exécuter et chronométrer » du ruban de MATLAB : le profileur est
+    // allumé le temps de la commande, puis son relevé part vers la fenêtre.
+    void executerEtChronometrer(const QString& texte);
     void changerDossier(const QString& chemin);
     void reindexer();                     // apres l'ecriture d'un fichier
 
@@ -84,6 +99,7 @@ signals:
     void repriseEffectuee();
     void espaceTravailChange(const QVector<LigneEspaceTravail>& lignes);
     void effacementDemande();   // « clc »
+    void profilPret(const QVector<LigneProfil>& entrees, double duree);
     void figuresChangees(const QVector<FigureCopiee>& figures);
     void dossierChange(const QString& chemin);
     void pret();

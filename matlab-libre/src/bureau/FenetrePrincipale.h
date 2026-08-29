@@ -21,6 +21,7 @@ class Ruban;
 class ConsoleCommandes;
 class VueFigure;
 class FenetreFigure;
+class FenetreProfileur;
 
 class FenetrePrincipale : public QMainWindow {
     Q_OBJECT
@@ -47,6 +48,9 @@ private slots:
     void enregistrerSous();
     void executerScript();
     void executerSelection();
+    void executerEtChronometrer();
+    void montrerProfileur();
+    void surProfil(const QVector<LigneProfil>& entrees, double duree);
     void surSortie(const QString& texte);
     void surEspaceTravail(const QVector<LigneEspaceTravail>& lignes);
     void surFigures(const QVector<FigureCopiee>& figures);
@@ -82,6 +86,7 @@ private:
     void ecrire(const QString& texte, const QString& couleur = QString());
     void envoyer(const QString& commande);
     Editeur* editeurCourant() const;
+    FenetreProfileur* profileur();
     void rafraichirListeFichiers();
 
     QThread* filMoteur_;
@@ -94,6 +99,7 @@ private:
     QListWidget* listeFichiers_;
     QListWidget* historique_;
     QMap<int, FenetreFigure*> fenetresFigures_;
+    FenetreProfileur* profileur_ = nullptr;
     // Les commandes du débogueur : grisées tant que rien n'est arrêté.
     QAction* aContinuer_ = nullptr;
     QAction* aPasAPas_ = nullptr;

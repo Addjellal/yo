@@ -11,6 +11,7 @@
 #include <QDockWidget>
 #include <QElapsedTimer>
 #include <QImage>
+#include <QMenu>
 #include <QPlainTextEdit>
 #include <QFontMetrics>
 #include <QTabWidget>
@@ -18,6 +19,7 @@
 #include <QTableWidget>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -29,7 +31,9 @@
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
 #include "FenetreFigure.h"
+#include "FenetreProfileur.h"
 #include "Icone.h"
+#include "Ruban.h"
 #include "Theme.h"
 #include "FenetrePrincipale.h"
 #include "Moteur.h"
@@ -422,6 +426,154 @@ int main(int argc, char** argv) {
         verifier(!fenetre.enPause(), "et ne s'arrete pas");
     }
 
+    // --- le ruban qui se replie --------------------------------------------
+    //
+    // Quand la fenetre retrecit, MATLAB ne rogne pas les libelles : il
+    // replie les groupes en un bouton a menu. Ce qui suit verifie les deux
+    // sens — retrecir replie, elargir redeploie — et surtout qu'aucun
+    // libelle visible n'est jamais elide.
+    {
+        // Un libelle est elide si le bouton est plus etroit que son plus
+        // long mot : c'est exactement ce que l'oeil voit comme « ouveau
+        // scrip ».
+        auto aucunLibelleRogne = [&](FenetrePrincipale& f) {
+            for (GroupeRuban* g : f.findChildren<GroupeRuban*>()) {
+                if (g->compact()) continue;
+                for (QToolButton* b : g->findChildren<QToolButton*>()) {
+                    if (!b->isVisibleTo(g) || b->text().isEmpty()) continue;
+                    QFontMetrics metrique(b->font());
+                    int plusLong = 0;
+                    for (const QString& mot : b->text().split(QLatin1Char('\n')))
+                        plusLong = qMax(plusLong, metrique.horizontalAdvance(mot));
+                    if (b->width() < plusLong) return false;
+                }
+            }
+            return true;
+        };
+        auto nombreReplies = [&](FenetrePrincipale& f) {
+            int n = 0;
+            for (GroupeRuban* g : f.findChildren<GroupeRuban*>())
+                if (g->compact()) ++n;
+            return n;
+        };
+
+        QSize avant = fenetre.size();
+        fenetre.resize(1500, avant.height());
+        QCoreApplication::processEvents();
+        int repliesLarge = nombreReplies(fenetre);
+        verifier(aucunLibelleRogne(fenetre), "au large, aucun libelle du ruban n'est rogne");
+
+        fenetre.resize(760, avant.height());
+        QCoreApplication::processEvents();
+        int repliesEtroit = nombreReplies(fenetre);
+        verifier(repliesEtroit > repliesLarge,
+                 "a l'etroit, le ruban replie des groupes au lieu de rogner");
+        verifier(aucunLibelleRogne(fenetre), "et ce qui reste deploye reste lisible");
+
+        // Un groupe replie garde ses commandes : elles passent dans un menu.
+        GroupeRuban* replie = nullptr;
+        for (GroupeRuban* g : fenetre.findChildren<GroupeRuban*>())
+            if (g->compact() && !replie) replie = g;
+        verifier(replie != nullptr, "un groupe replie existe");
+        if (replie) {
+            QToolButton* bouton = nullptr;
+            for (QToolButton* b : replie->findChildren<QToolButton*>())
+                if (b->menu()) bouton = b;
+            verifier(bouton != nullptr && bouton->menu() &&
+                         !bouton->menu()->actions().isEmpty(),
+                     "il porte ses commandes dans un menu");
+        }
+
+        // Reelargir doit rendre exactement l'etat de depart : le repli est
+        // une fonction de la largeur, pas un chemin sans retour.
+        fenetre.resize(1500, avant.height());
+        verifier(attendre([&] { return nombreReplies(fenetre) == repliesLarge; }, 4000),
+                 "en reelargissant, le ruban se redeploie");
+        verifier(aucunLibelleRogne(fenetre), "et rien n'est rogne au retour");
+        fenetre.resize(avant);
+        QCoreApplication::processEvents();
+    }
+
+    // --- le profileur ------------------------------------------------------
+    //
+    // « Executer et chronometrer » de MATLAB : on mesure un script qui
+    // appelle une fonction chere, et on verifie que la fenetre du
+    // profileur nomme cette fonction, compte ses appels, et montre son
+    // code ligne a ligne avec le nombre de passages.
+    if (editeur) {
+        QString scriptProfil = QDir::current().filePath(QStringLiteral("essaiProfil.m"));
+        {
+            QFile f(scriptProfil);
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                f.write(
+                    "total = 0;\n"
+                    "for k = 1:40\n"
+                    "    total = total + coutDEssai(k);\n"
+                    "end\n");
+        }
+        {
+            QFile f(QDir::current().filePath(QStringLiteral("coutDEssai.m")));
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                f.write(
+                    "function r = coutDEssai(n)\n"
+                    "    r = 0;\n"
+                    "    for j = 1:200\n"
+                    "        r = r + j * n;\n"
+                    "    end\n"
+                    "end\n");
+        }
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        // Le dossier vient de changer de contenu : sans reindexation, la
+        // fonction reste introuvable — comme sous MATLAB.
+        envoyer(fenetre, QStringLiteral("rehash"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le chemin est reindexe");
+
+        editeur->definirFichier(scriptProfil);
+        editeur->setPlainText(QString::fromUtf8(
+            "total = 0;\nfor k = 1:40\n    total = total + coutDEssai(k);\nend\n"));
+        QMetaObject::invokeMethod(&fenetre, "enregistrer");
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le script mesure est ecrit");
+
+        QMetaObject::invokeMethod(&fenetre, "executerEtChronometrer");
+        verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                 "la mesure finit");
+
+        FenetreProfileur* profileur = fenetre.findChild<FenetreProfileur*>();
+        verifier(profileur != nullptr, "la fenetre du profileur s'ouvre d'elle-meme");
+        if (profileur) {
+            QTableWidget* mesures = profileur->tableFonctions();
+            int rangeeCout = -1;
+            for (int k = 0; k < mesures->rowCount(); ++k)
+                if (mesures->item(k, 0) &&
+                    mesures->item(k, 0)->text() == QLatin1String("coutDEssai"))
+                    rangeeCout = k;
+            verifier(rangeeCout >= 0, "le profil nomme la fonction mesuree");
+            if (rangeeCout >= 0) {
+                verifier(mesures->item(rangeeCout, 1)->text() == QLatin1String("40"),
+                         "il compte ses quarante appels");
+                // Le temps est mesure, pas invente : il est non nul.
+                verifier(!mesures->item(rangeeCout, 2)->text().isEmpty(),
+                         "il donne un temps total");
+                mesures->selectRow(rangeeCout);
+                QCoreApplication::processEvents();
+                QTableWidget* detail = profileur->tableLignes();
+                verifier(detail->rowCount() >= 6,
+                         "le detail montre le code de la fonction, ligne a ligne");
+                bool corpsCompte = false;
+                for (int k = 0; k < detail->rowCount(); ++k) {
+                    if (!detail->item(k, 2) || !detail->item(k, 1)) continue;
+                    if (detail->item(k, 2)->text().contains(QLatin1String("r + j * n")) &&
+                        detail->item(k, 1)->text().toLongLong() >= 8000)
+                        corpsCompte = true;
+                }
+                verifier(corpsCompte,
+                         "la ligne chaude porte ses 8000 passages, avec son code");
+            }
+            verifier(profileur->resume().contains(QLatin1String("fonction")),
+                     "le resume annonce ce qui a ete mesure");
+        }
+    }
+
     // Fermer le bureau pendant un arret : le fil de calcul dort dans le
     // crochet et n'entend plus rien. S'il n'est pas libere, Qt abandonne
     // le programme sur « QThread: Destroyed while thread is still
@@ -465,6 +617,18 @@ int main(int argc, char** argv) {
         fenetre.render(&image);
         image.save(QString::fromLocal8Bit(sortie));
         std::printf("  capture ecrite dans %s\n", sortie);
+        // Le profileur a sa fenetre : elle merite sa propre capture.
+        if (auto* profileur = fenetre.findChild<FenetreProfileur*>()) {
+            QString chemin = QString::fromLocal8Bit(sortie);
+            chemin.replace(QRegularExpression(QStringLiteral("\\.png$")),
+                           QStringLiteral("-profileur.png"));
+            QImage vue(profileur->size(), QImage::Format_ARGB32);
+            vue.fill(Qt::white);
+            profileur->render(&vue);
+            vue.save(chemin);
+            std::printf("  capture du profileur ecrite dans %s\n",
+                        chemin.toLocal8Bit().constData());
+        }
     }
 
     std::printf(echecs == 0 ? "bureau : toutes les verifications passent (%d)\n"

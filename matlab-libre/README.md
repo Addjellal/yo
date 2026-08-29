@@ -51,8 +51,8 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   compagnons répartissent le travail sur un pool de travailleurs, chacun
   portant son propre interpréteur.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
-  fenêtre de commandes, l'espace de travail et les figures dans un seul
-  exécutable.
+  fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
+  à pas et le profileur dans un seul exécutable.
 - **Un atelier dans le navigateur** (`matlibre --ide`) : éditeur avec
   coloration et points d'arrêt, console, explorateur de variables,
   débogueur pas à pas, profileur, concepteur d'applications qui exécute
@@ -110,12 +110,18 @@ de commandes en dessous où l'invite vit dans le texte, l'espace de travail
 et l'historique à droite. Chaque figure s'ouvre dans sa propre fenêtre,
 peinte directement à l'écran, et s'enregistre ou se copie depuis son menu.
 Le calcul tourne dans un fil à part : la fenêtre ne se fige pas, même sur
-un tracé d'un million de points. Qt6 est la seule dépendance, et elle
-reste facultative — sans Qt, tout le reste se compile comme avant.
+un tracé d'un million de points. Le débogueur est là : un clic dans la
+marge pose un point d'arrêt, l'exécution s'y arrête, l'invite passe à
+`K>>` — on lit et on modifie les variables sans reprendre —, puis pas à
+pas (F10), entrer (F11), sortir (Maj+F11), continuer (Maj+F5). « Exécuter
+et chronométrer » (Ctrl+F5) ouvre le profileur : les fonctions classées
+par temps, et le code de chacune ligne à ligne avec ses passages. Qt6 est
+la seule dépendance, et elle reste facultative — sans Qt, tout le reste se
+compile comme avant.
 
 **L'atelier** (`matlibre --ide`, ou la commande `ide`) reste disponible
-dans le navigateur, avec en plus le profileur, le concepteur
-d'applications, l'éditeur de schémas-blocs et le débogueur pas à pas.
+dans le navigateur, avec en plus le concepteur d'applications et l'éditeur
+de schémas-blocs.
 
 | Exemple | Ce qu'il montre |
 |---|---|

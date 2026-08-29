@@ -2,6 +2,7 @@
 #include "Moteur.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QStringList>
 #include <ostream>
@@ -12,6 +13,7 @@
 #include "matlibre/Bibliotheque.h"
 #include "matlibre/Erreur.h"
 #include "matlibre/Deboguage.h"
+#include "matlibre/Arbre.h"
 #include "matlibre/Interpreteur.h"
 
 using namespace matlibre;
@@ -210,6 +212,50 @@ void Moteur::executer(const QString& texte) {
     flux_->flush();
     occupe_ = false;
     publierEtat();
+    emit commandeFinie();
+}
+
+// « Exécuter et chronométrer » : profile on, la commande, profile off, et
+// le relevé part vers la fenêtre du profileur. MATLAB fait exactement
+// cela quand on presse « Run and Time ».
+void Moteur::executerEtChronometrer(const QString& texte) {
+    if (!it_) return;
+    occupe_ = true;
+    it_->profil.effacer();
+    it_->profil.demarrer();
+    QElapsedTimer chrono;
+    chrono.start();
+    try {
+        it_->executerTexte(texte.toStdString(), "<bureau>");
+    } catch (const ErreurMatlab& e) {
+        *flux_ << "Error: " << e.message << "\n";
+    } catch (const std::exception& e) {
+        *flux_ << "Error: " << e.what() << "\n";
+    } catch (...) {
+        *flux_ << "Error: interrompu.\n";
+    }
+    double duree = chrono.nsecsElapsed() / 1e9;
+    it_->profil.arreter();
+    flux_->flush();
+
+    QVector<LigneProfil> entrees;
+    for (const auto& e : it_->profil.classees()) {
+        LigneProfil l;
+        l.nom = QString::fromStdString(e.nom);
+        l.appels = e.appels;
+        l.total = e.tempsTotal;
+        l.propre = e.tempsPropre;
+        // Le fichier permet a la fenetre de montrer le code a cote des
+        // compteurs : c'est ce qui rend un profil utile.
+        if (auto f = it_->fonctionFichier(e.nom))
+            l.fichier = QString::fromStdString(f->fichier);
+        for (const auto& kv : e.lignes)
+            l.lignes.push_back(qMakePair(kv.first, kv.second));
+        entrees.push_back(l);
+    }
+    occupe_ = false;
+    publierEtat();
+    emit profilPret(entrees, duree);
     emit commandeFinie();
 }
 

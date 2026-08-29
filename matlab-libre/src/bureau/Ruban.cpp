@@ -1,7 +1,9 @@
 // Ruban.cpp — le bandeau, ses groupes, et ses icônes dessinées.
 #include "Ruban.h"
 
+#include <QAction>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QLabel>
 #include <QPainter>
 #include <QFontMetrics>
@@ -184,6 +186,109 @@ void dessiner(QPainter& p, const QString& nom, const QRectF& r) {
                           r.width() * 0.28, r.height() * 0.64));
         return;
     }
+    // --- le débogueur : les gestes de MATLAB, dessinés ----------------
+    //
+    // Un triangle qui repart, un pas au-dessus d'une barre, une flèche qui
+    // entre, une flèche qui sort, un carré qui arrête, une pastille rouge
+    // pour le point d'arrêt. Rien n'est repris : ce sont les formes
+    // ordinaires d'un débogueur, redessinées.
+    auto triangle = [&](const QColor& couleur, double gauche, double largeur) {
+        QPainterPath t;
+        double x = r.left() + r.width() * gauche;
+        t.moveTo(x, r.top() + r.height() * 0.18);
+        t.lineTo(x + r.width() * largeur, r.center().y());
+        t.lineTo(x, r.bottom() - r.height() * 0.18);
+        t.closeSubpath();
+        p.setPen(Qt::NoPen);
+        p.setBrush(couleur);
+        p.drawPath(t);
+    };
+    auto barre = [&](const QColor& couleur, double centre) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(couleur);
+        p.drawRect(QRectF(r.left() + r.width() * centre, r.top() + r.height() * 0.18,
+                          r.width() * 0.12, r.height() * 0.64));
+    };
+    if (nom == QLatin1String("continuer")) {
+        // Le « continuer » de MATLAB : la barre du point d'arrêt, puis on
+        // repart.
+        barre(vert.darker(120), 0.14);
+        triangle(vert, 0.36, 0.50);
+        return;
+    }
+    if (nom == QLatin1String("pasapas")) {
+        triangle(vert, 0.10, 0.44);
+        barre(gris, 0.68);
+        return;
+    }
+    if (nom == QLatin1String("entrer")) {
+        // Une flèche qui plonge vers la ligne appelée : on entre dedans.
+        p.setPen(QPen(vert, r.width() * 0.11, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(r.center().x(), r.top() + r.height() * 0.14),
+                   QPointF(r.center().x(), r.bottom() - r.height() * 0.42));
+        p.setPen(Qt::NoPen);
+        p.setBrush(vert);
+        QPainterPath pointe;
+        pointe.moveTo(r.center().x() - r.width() * 0.16, r.bottom() - r.height() * 0.46);
+        pointe.lineTo(r.center().x() + r.width() * 0.16, r.bottom() - r.height() * 0.46);
+        pointe.lineTo(r.center().x(), r.bottom() - r.height() * 0.22);
+        pointe.closeSubpath();
+        p.drawPath(pointe);
+        p.setPen(QPen(gris, r.width() * 0.08, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(r.left() + r.width() * 0.18, r.bottom() - r.height() * 0.12),
+                   QPointF(r.right() - r.width() * 0.18, r.bottom() - r.height() * 0.12));
+        return;
+    }
+    if (nom == QLatin1String("sortir")) {
+        p.setPen(QPen(orange, r.width() * 0.11, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(r.center().x(), r.bottom() - r.height() * 0.14),
+                   QPointF(r.center().x(), r.top() + r.height() * 0.36));
+        p.setPen(Qt::NoPen);
+        p.setBrush(orange);
+        QPainterPath pointe;
+        pointe.moveTo(r.center().x() - r.width() * 0.14, r.top() + r.height() * 0.44);
+        pointe.lineTo(r.center().x() + r.width() * 0.14, r.top() + r.height() * 0.44);
+        pointe.lineTo(r.center().x(), r.top() + r.height() * 0.20);
+        pointe.closeSubpath();
+        p.drawPath(pointe);
+        return;
+    }
+    if (nom == QLatin1String("arret")) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(rouge);
+        p.drawRoundedRect(r.adjusted(r.width() * 0.20, r.height() * 0.20,
+                                     -r.width() * 0.20, -r.height() * 0.20),
+                          r.width() * 0.08, r.width() * 0.08);
+        return;
+    }
+    if (nom == QLatin1String("pointarret")) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(rouge);
+        p.drawEllipse(r.adjusted(r.width() * 0.20, r.height() * 0.20, -r.width() * 0.20,
+                                 -r.height() * 0.20));
+        return;
+    }
+    if (nom == QLatin1String("chronometre")) {
+        // « Exécuter et chronométrer » : un chronomètre, aiguille en biais.
+        QRectF cadran = r.adjusted(r.width() * 0.14, r.height() * 0.22, -r.width() * 0.14,
+                                   -r.height() * 0.08);
+        p.setPen(QPen(gris, r.width() * 0.08));
+        p.setBrush(Qt::white);
+        p.drawEllipse(cadran);
+        p.setPen(QPen(gris, r.width() * 0.10, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(cadran.center().x() - cadran.width() * 0.16,
+                           cadran.top() - r.height() * 0.10),
+                   QPointF(cadran.center().x() + cadran.width() * 0.16,
+                           cadran.top() - r.height() * 0.10));
+        p.drawLine(QPointF(cadran.center().x(), cadran.top() - r.height() * 0.10),
+                   QPointF(cadran.center().x(), cadran.top()));
+        p.setPen(QPen(orange, r.width() * 0.08, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(cadran.center(),
+                   QPointF(cadran.center().x() + cadran.width() * 0.28,
+                           cadran.center().y() - cadran.height() * 0.26));
+        return;
+    }
+
     // Par défaut : un carré neutre, plutôt qu'un bouton sans image.
     p.setPen(QPen(gris, r.width() * 0.07));
     p.setBrush(Qt::NoBrush);
@@ -202,14 +307,18 @@ QIcon iconeDessinee(const QString& nom, int taille) {
     return QIcon(image);
 }
 
-GroupeRuban::GroupeRuban(const QString& titre, QWidget* parent) : QWidget(parent) {
+GroupeRuban::GroupeRuban(const QString& titre, QWidget* parent)
+    : QWidget(parent), titre_(titre) {
     auto* vertical = new QVBoxLayout(this);
     vertical->setContentsMargins(6, 3, 6, 2);
     vertical->setSpacing(1);
-    boutons_ = new QHBoxLayout;
+    // La rangée de boutons vit dans son propre widget : replier le groupe
+    // revient alors à la cacher et à montrer le bouton unique.
+    rangee_ = new QWidget;
+    boutons_ = new QHBoxLayout(rangee_);
     boutons_->setContentsMargins(0, 0, 0, 0);
     boutons_->setSpacing(1);
-    vertical->addLayout(boutons_, 1);
+    vertical->addWidget(rangee_, 1);
     auto* etiquette = new QLabel(titre.toUpper());
     QFont police = etiquette->font();
     police.setPointSizeF(police.pointSizeF() - 1.5);
@@ -237,14 +346,89 @@ QToolButton* GroupeRuban::ajouter(const QString& libelle, const QString& dessin,
         large = qMax(large, metrique.horizontalAdvance(mot));
     bouton->setMinimumWidth(qMax(58, large + 16));
     boutons_->addWidget(bouton);
+    liste_.push_back(bouton);
+    if (replie_) {
+        // Le groupe est déjà replié : la nouvelle commande doit entrer
+        // dans son menu, sinon elle serait injoignable.
+        delete replie_;
+        replie_ = nullptr;
+        if (compact_) definirCompact(true);
+    }
     return bouton;
 }
 
 void GroupeRuban::ajouterSeparateur() { boutons_->addSpacing(6); }
 
+// Largeur que le groupe demanderait déployé : la somme des boutons, plus
+// les marges. Mesurée ainsi et non par sizeHint(), qui vaudrait celle du
+// bouton replié quand le groupe l'est.
+int GroupeRuban::largeurDeployee() const {
+    int total = 12;  // marges gauche et droite
+    for (QToolButton* b : liste_)
+        total += qMax(b->minimumWidth(), b->sizeHint().width()) + boutons_->spacing();
+    QFontMetrics metrique(font());
+    return qMax(total, metrique.horizontalAdvance(titre_.toUpper()) + 20);
+}
+
+int GroupeRuban::largeurCompacte() const {
+    QFontMetrics metrique(font());
+    // Un groupe d'un seul bouton au libellé court est déjà plus étroit que
+    // son propre titre : le replier ne gagnerait rien, et coûterait un
+    // clic. On ne prétend donc jamais gagner de la place là où il n'y en a
+    // pas à gagner.
+    return qMin(largeurDeployee(), metrique.horizontalAdvance(titre_.toUpper()) + 52);
+}
+
+// Replier : un seul bouton, l'icône du premier, le titre du groupe, et un
+// menu qui porte toutes les commandes. C'est ce que fait MATLAB quand sa
+// fenêtre devient trop étroite — il ne rogne jamais un libellé.
+void GroupeRuban::definirCompact(bool compact) {
+    if (compact == compact_ && (!compact || replie_)) return;
+    compact_ = compact;
+    if (!compact) {
+        rangee_->setVisible(true);
+        if (replie_) replie_->setVisible(false);
+        setMaximumWidth(QWIDGETSIZE_MAX);
+        return;
+    }
+    if (!replie_) {
+        replie_ = new QToolButton(this);
+        replie_->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        replie_->setIconSize(QSize(28, 28));
+        replie_->setAutoRaise(true);
+        replie_->setPopupMode(QToolButton::InstantPopup);
+        replie_->setText(titre_);
+        if (!liste_.isEmpty()) replie_->setIcon(liste_.front()->icon());
+        auto* menu = new QMenu(replie_);
+        for (QToolButton* b : liste_) {
+            QString texte = b->text();
+            texte.replace(QLatin1Char('\n'), QLatin1Char(' '));
+            QAction* entree = menu->addAction(b->icon(), texte);
+            entree->setToolTip(b->toolTip());
+            connect(entree, &QAction::triggered, b, &QToolButton::click);
+        }
+        // Une commande grisée doit l'être aussi dans le menu : les
+        // commandes du débogueur ne s'allument qu'à l'arrêt.
+        connect(menu, &QMenu::aboutToShow, this, [this, menu] {
+            const QList<QAction*> entrees = menu->actions();
+            for (int k = 0; k < entrees.size() && k < liste_.size(); ++k)
+                entrees[k]->setEnabled(liste_[k]->isEnabled());
+        });
+        replie_->setMenu(menu);
+        // Il occupe la place de la rangée, dans la même disposition.
+        auto* vertical = qobject_cast<QVBoxLayout*>(layout());
+        if (vertical) vertical->insertWidget(0, replie_, 1);
+    }
+    rangee_->setVisible(false);
+    replie_->setVisible(true);
+    setMaximumWidth(largeurCompacte());
+}
+
 Ruban::Ruban(QWidget* parent) : QTabWidget(parent) {
     setDocumentMode(true);
-    setFixedHeight(112);
+    // Assez haut pour deux lignes de libellé sous l'icône : à 112, le
+    // jambage de « variables » était rogné.
+    setFixedHeight(118);
 }
 
 QWidget* Ruban::pageOnglet(const QString& nom) {
@@ -271,4 +455,50 @@ void Ruban::ajouterGroupe(const QString& onglet, GroupeRuban* groupe) {
         disposition->insertWidget(disposition->count() - 1, trait);
     }
     disposition->insertWidget(disposition->count() - 1, groupe);
+    groupes_[onglet].push_back(groupe);
+    ajusterGroupes();
+}
+
+void Ruban::resizeEvent(QResizeEvent* evenement) {
+    QTabWidget::resizeEvent(evenement);
+    ajusterGroupes();
+}
+
+// Ce que fait MATLAB quand la fenêtre rétrécit : plutôt que de rogner les
+// libellés, il replie les groupes, en commençant par la droite — les
+// commandes les plus courantes sont à gauche. On replie tant que ça ne
+// tient pas, et on redéploie dès qu'il y a de nouveau la place.
+void Ruban::ajusterGroupes() {
+    if (enAjustement_) return;
+    enAjustement_ = true;
+    const int disponible = width() - 32;  // marges de la page et du cadre
+    for (auto it = groupes_.begin(); it != groupes_.end(); ++it) {
+        const QVector<GroupeRuban*>& groupes = it.value();
+        // Largeur si tout est déployé, séparateurs compris.
+        int total = 8 * qMax(0, groupes.size() - 1);
+        for (GroupeRuban* g : groupes) total += g->largeurDeployee();
+        // On replie depuis la droite — les commandes les plus courantes
+        // sont à gauche — et seulement tant qu'il manque de la place. Un
+        // groupe qui ne gagnerait rien à être replié reste déployé.
+        QVector<bool> replie(groupes.size(), false);
+        for (int k = groupes.size() - 1; k >= 0 && total > disponible; --k) {
+            int gain = groupes[k]->largeurDeployee() - groupes[k]->largeurCompacte();
+            if (gain <= 0) continue;
+            replie[k] = true;
+            total -= gain;
+        }
+        // La passe précédente replie depuis la droite, et peut en replier
+        // un de trop : le dernier gain dépasse souvent ce qui manquait. On
+        // redéploie donc, en partant de la gauche, tout ce qui rentre
+        // encore — les groupes les plus utilisés retrouvent leurs boutons.
+        for (int k = 0; k < groupes.size(); ++k) {
+            if (!replie[k]) continue;
+            int gain = groupes[k]->largeurDeployee() - groupes[k]->largeurCompacte();
+            if (total + gain > disponible) continue;
+            replie[k] = false;
+            total += gain;
+        }
+        for (int k = 0; k < groupes.size(); ++k) groupes[k]->definirCompact(replie[k]);
+    }
+    enAjustement_ = false;
 }

@@ -33,6 +33,7 @@
 #include "ConsoleCommandes.h"
 #include "Editeur.h"
 #include "FenetreFigure.h"
+#include "FenetreProfileur.h"
 #include "Icone.h"
 #include "Ruban.h"
 #include "Theme.h"
@@ -61,6 +62,7 @@ FenetrePrincipale::FenetrePrincipale() {
             &FenetrePrincipale::effacerCommandes);
     connect(moteur_, &Moteur::arreteSur, this, &FenetrePrincipale::surArret);
     connect(moteur_, &Moteur::repriseEffectuee, this, &FenetrePrincipale::surReprise);
+    connect(moteur_, &Moteur::profilPret, this, &FenetrePrincipale::surProfil);
 
     construirePanneaux();
     construireMenus();
@@ -296,31 +298,48 @@ void FenetrePrincipale::construireMenus() {
                                               &FenetrePrincipale::executerSelection);
     aSelection->setShortcut(Qt::Key_F9);
 
+    // « Exécuter et chronométrer » vit dans le menu Exécuter, comme
+    // « Run and Time » vit dans l'onglet Éditeur de MATLAB.
+    executer->addSeparator();
+    QAction* aChronometrer =
+        executer->addAction(iconeDessinee("chronometre", 16),
+                            QStringLiteral("Exécuter et chronométrer"), this,
+                            &FenetrePrincipale::executerEtChronometrer);
+    aChronometrer->setShortcut(QKeySequence(QStringLiteral("Ctrl+F5")));
+
     QMenu* debogage = menuBar()->addMenu(QStringLiteral("&Déboguer"));
-    aContinuer_ = debogage->addAction(iconeDessinee("executer", 16),
+    aContinuer_ = debogage->addAction(iconeDessinee("continuer", 16),
                                       QStringLiteral("&Continuer"), this,
                                       &FenetrePrincipale::continuerExecution);
     aContinuer_->setShortcut(Qt::Key_F5 | Qt::ShiftModifier);
-    aPasAPas_ = debogage->addAction(QStringLiteral("&Pas à pas"), this,
+    aPasAPas_ = debogage->addAction(iconeDessinee("pasapas", 16),
+                                    QStringLiteral("&Pas à pas"), this,
                                     &FenetrePrincipale::pasAPas);
     aPasAPas_->setShortcut(Qt::Key_F10);
-    aEntrer_ = debogage->addAction(QStringLiteral("&Entrer dedans"), this,
+    aEntrer_ = debogage->addAction(iconeDessinee("entrer", 16),
+                                   QStringLiteral("&Entrer dedans"), this,
                                    &FenetrePrincipale::entrerDedans);
     aEntrer_->setShortcut(Qt::Key_F11);
-    aSortir_ = debogage->addAction(QStringLiteral("&Sortir de"), this,
+    aSortir_ = debogage->addAction(iconeDessinee("sortir", 16),
+                                   QStringLiteral("&Sortir de"), this,
                                    &FenetrePrincipale::sortirDe);
     aSortir_->setShortcut(Qt::Key_F11 | Qt::ShiftModifier);
-    aQuitterDebug_ = debogage->addAction(iconeDessinee("effacer", 16),
+    aQuitterDebug_ = debogage->addAction(iconeDessinee("arret", 16),
                                          QStringLiteral("&Arrêter le débogage"), this,
                                          &FenetrePrincipale::quitterDebogage);
     debogage->addSeparator();
-    debogage->addAction(QStringLiteral("Basculer un point d'arrêt"),
+    debogage->addAction(iconeDessinee("pointarret", 16),
+                        QStringLiteral("Basculer un point d'arrêt"),
                         QKeySequence(Qt::Key_F12), this, [this] {
                             if (Editeur* e = editeurCourant())
                                 e->basculerPointArret(e->textCursor().blockNumber() + 1);
                         });
     debogage->addAction(QStringLiteral("Retirer tous les points d'arrêt"), this,
                         &FenetrePrincipale::retirerTousPointsArret);
+    debogage->addSeparator();
+    debogage->addAction(iconeDessinee("chronometre", 16),
+                        QStringLiteral("Ouvrir le profileur"), this,
+                        &FenetrePrincipale::montrerProfileur);
     activerCommandesDebogueur(false);
 
     QMenu* aide = menuBar()->addMenu(QStringLiteral("&Aide"));
@@ -377,6 +396,10 @@ void FenetrePrincipale::construireMenus() {
     connect(codeGroupe->ajouter(QStringLiteral("Exécuter la\nsélection"), QStringLiteral("selection"),
                           QStringLiteral("Exécuter la sélection (F9)")),
             &QToolButton::clicked, aSelection, &QAction::trigger);
+    connect(codeGroupe->ajouter(QStringLiteral("Exécuter et\nchronométrer"),
+                                QStringLiteral("chronometre"),
+                                QStringLiteral("Mesurer le script ligne à ligne (Ctrl+F5)")),
+            &QToolButton::clicked, this, &FenetrePrincipale::executerEtChronometrer);
     QToolButton* bEffacer = codeGroupe->ajouter(QStringLiteral("Effacer les\ncommandes"),
                                                 QStringLiteral("effacer"),
                                                 QStringLiteral("clc"));
@@ -397,13 +420,19 @@ void FenetrePrincipale::construireMenus() {
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), environnementGroupe);
 
     auto* debogageGroupe = new GroupeRuban(QStringLiteral("Déboguer"));
-    connect(debogageGroupe->ajouter(QStringLiteral("Continuer"), QStringLiteral("executer"),
+    connect(debogageGroupe->ajouter(QStringLiteral("Continuer"), QStringLiteral("continuer"),
                                     QStringLiteral("Reprendre l'exécution (Maj+F5)")),
             &QToolButton::clicked, aContinuer_, &QAction::trigger);
-    connect(debogageGroupe->ajouter(QStringLiteral("Pas à\npas"), QStringLiteral("selection"),
+    connect(debogageGroupe->ajouter(QStringLiteral("Pas à\npas"), QStringLiteral("pasapas"),
                                     QStringLiteral("Exécuter la ligne suivante (F10)")),
             &QToolButton::clicked, aPasAPas_, &QAction::trigger);
-    connect(debogageGroupe->ajouter(QStringLiteral("Arrêter"), QStringLiteral("effacer"),
+    connect(debogageGroupe->ajouter(QStringLiteral("Entrer\ndedans"), QStringLiteral("entrer"),
+                                    QStringLiteral("Entrer dans l'appel (F11)")),
+            &QToolButton::clicked, aEntrer_, &QAction::trigger);
+    connect(debogageGroupe->ajouter(QStringLiteral("Sortir\nde"), QStringLiteral("sortir"),
+                                    QStringLiteral("Sortir de la fonction (Maj+F11)")),
+            &QToolButton::clicked, aSortir_, &QAction::trigger);
+    connect(debogageGroupe->ajouter(QStringLiteral("Arrêter"), QStringLiteral("arret"),
                                     QStringLiteral("Arrêter le débogage")),
             &QToolButton::clicked, aQuitterDebug_, &QAction::trigger);
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), debogageGroupe);
@@ -534,6 +563,53 @@ void FenetrePrincipale::executerScript() {
     QString chemin = QDir::toNativeSeparators(editeur->fichier());
     chemin.replace(QLatin1Char('\''), QStringLiteral("''"));
     envoyer(QStringLiteral("run('%1')").arg(chemin));
+}
+
+// « Exécuter et chronométrer » : le même script, mais mesuré. Le relevé
+// ouvre la fenêtre du profileur, comme « Run and Time » sous MATLAB.
+void FenetrePrincipale::executerEtChronometrer() {
+    Editeur* editeur = editeurCourant();
+    if (!editeur) return;
+    if (editeur->fichier().isEmpty()) {
+        enregistrerSous();
+        if (editeur->fichier().isEmpty()) return;
+    } else if (editeur->document()->isModified()) {
+        editeur->enregistrerFichier(editeur->fichier());
+    }
+    if (occupe_) {
+        ecrire(QStringLiteral("MatLibre est occupé ; attendez la fin du calcul.\n"),
+               theme::avertissement().name());
+        return;
+    }
+    QString chemin = QDir::toNativeSeparators(editeur->fichier());
+    chemin.replace(QLatin1Char('\''), QStringLiteral("''"));
+    QString commande = QStringLiteral("run('%1')").arg(chemin);
+    console_->poserInvite();
+    console_->ecrireSortie(commande + QStringLiteral("\n"), theme::texte());
+    historique_->addItem(commande);
+    historique_->scrollToBottom();
+    occupe_ = true;
+    etat_->setText(QStringLiteral("mesure en cours"));
+    QMetaObject::invokeMethod(moteur_, "executerEtChronometrer", Qt::QueuedConnection,
+                              Q_ARG(QString, commande));
+}
+
+// La fenêtre du profileur, construite à la demande : tant qu'on ne mesure
+// rien, elle n'existe pas.
+FenetreProfileur* FenetrePrincipale::profileur() {
+    if (!profileur_) profileur_ = new FenetreProfileur(this);
+    return profileur_;
+}
+
+void FenetrePrincipale::montrerProfileur() {
+    profileur()->show();
+    profileur()->raise();
+}
+
+void FenetrePrincipale::surProfil(const QVector<LigneProfil>& entrees, double duree) {
+    profileur()->definirProfil(entrees, duree);
+    profileur()->show();
+    profileur()->raise();
 }
 
 void FenetrePrincipale::executerSelection() {

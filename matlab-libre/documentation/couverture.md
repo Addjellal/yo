@@ -71,9 +71,16 @@ totalité.
    pour commenter, fenêtre de commandes où l'invite vit dans le texte
    comme sous MATLAB, espace de travail, historique, figures peintes
    directement avec QPainter. Le calcul tourne
-   dans un fil séparé : la fenêtre répond pendant qu'il tourne. Manquent
-   encore, côté bureau : les points d'arrêt et le pas à pas, le profileur,
-   le concepteur d'applications et l'éditeur de schémas-blocs — ils
+   dans un fil séparé : la fenêtre répond pendant qu'il tourne. Le
+   débogueur pas à pas y est complet — point d'arrêt posé dans la marge,
+   flèche sur la ligne arrêtée, invite `K>>` où l'on lit *et modifie* les
+   variables, pas à pas, entrer, sortir, continuer, arrêter, avec les
+   raccourcis de MATLAB — et le profileur aussi : « Exécuter et
+   chronométrer » ouvre une fenêtre qui classe les fonctions par temps et
+   montre le code de chacune ligne à ligne, les lignes chaudes teintées.
+   Le ruban se replie quand la fenêtre rétrécit, comme celui de MATLAB,
+   plutôt que de rogner ses libellés. Manquent encore, côté bureau : le
+   concepteur d'applications et l'éditeur de schémas-blocs — ils
    n'existent aujourd'hui que dans l'atelier du navigateur, qu'ouvre
    `matlibre --ide`. Ce qui manque des deux côtés, par rapport au bureau
    MATLAB : l'édition collaborative, les Live Scripts (cellules
