@@ -83,7 +83,20 @@ NZMAX  Place réservée aux non-nuls d'une matrice creuse.
 ## `spalloc`
 
 ```
-spalloc  Matrice creuse vide.
+SPALLOC  Matrice creuse vide, avec de la place réservée.
+    SPALLOC(M,N,NZ) crée une matrice M par N vide, en réservant la place
+    de NZ non-nuls : remplir devient moins coûteux.
+
+    Syntaxe
+       S = spalloc(m,n,nz)
+
+    Exemples
+       S = spalloc(100, 100, 300);
+       nnz(S)                             % 0 pour l'instant
+       S(1,1) = 5;
+       nnz(S)                             % 1
+
+    Voir aussi SPARSE, NZMAX, SPEYE.
 ```
 
 ## `sparse`
@@ -151,19 +164,54 @@ SPEYE  Identité creuse.
 ## `spones`
 
 ```
-spones  Motif de non-nuls, valeurs a 1.
+SPONES  Remplace les non-nuls par des uns.
+    SPONES(S) garde la structure de S et met 1 partout où elle n'est pas
+    nulle : c'est le motif d'occupation.
+
+    Syntaxe
+       R = spones(S)
+
+    Exemples
+       S = sparse([1 2],[1 2],[3 4]);
+       full(spones(S))
+       nnz(spones(S)) == nnz(S)
+
+    Voir aussi SPARSE, NNZ, SPY, FULL.
 ```
 
 ## `sprand`
 
 ```
-sprand  Matrice creuse uniforme.
+SPRAND  Matrice creuse aléatoire, uniforme.
+    SPRAND(M,N,DENSITE) rend une matrice M par N dont environ
+    DENSITE*M*N éléments sont non nuls.
+
+    Syntaxe
+       S = sprand(m,n,densite)
+
+    Exemples
+       rng(0);
+       S = sprand(50, 50, 0.05);
+       issparse(S)
+       nnz(S) < 50*50
+
+    Voir aussi SPRANDN, SPARSE, RAND, SPY.
 ```
 
 ## `sprandn`
 
 ```
-sprandn  Matrice creuse normale.
+SPRANDN  Matrice creuse aléatoire, normale.
+
+    Syntaxe
+       S = sprandn(m,n,densite)
+
+    Exemples
+       rng(0);
+       S = sprandn(20, 20, 0.1);
+       issparse(S)
+
+    Voir aussi SPRAND, SPARSE, RANDN.
 ```
 
 ## `spy`

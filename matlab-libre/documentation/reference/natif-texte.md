@@ -229,7 +229,21 @@ num2str_  Reserve.
 ## `pad`
 
 ```
-pad  Complete par des espaces.
+PAD  Complète des textes à la même longueur.
+    PAD(C) complète d'espaces jusqu'à la plus longue chaîne.
+    PAD(C,N) complète jusqu'à N caractères.
+    PAD(C,N,'left') complète à gauche.
+
+    Syntaxe
+       t = pad(c)
+       t = pad(c,n)
+       t = pad(c,n,cote)
+
+    Exemples
+       pad({'a','bbb'})
+       numel(pad('ab', 5))                % 5
+
+    Voir aussi STRJUST, BLANKS, STRTRIM, CHAR.
 ```
 
 ## `regexp`

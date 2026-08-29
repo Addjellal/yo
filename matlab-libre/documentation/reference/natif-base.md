@@ -5,7 +5,16 @@ Fonctions natives du groupe `base`.
 ## `I`
 
 ```
-I  Unite imaginaire.
+I  L'unité imaginaire, en majuscule ; synonyme de i.
+
+    Syntaxe
+       I
+
+    Exemples
+       I^2                                % -1
+       isequal(I, 1i)
+
+    Voir aussi I, J, COMPLEX, ABS.
 ```
 
 ## `Inf`
@@ -32,7 +41,16 @@ INF  L'infini de la virgule flottante.
 ## `J`
 
 ```
-J  Unite imaginaire.
+J  L'unité imaginaire, en majuscule ; synonyme de j.
+
+    Syntaxe
+       J
+
+    Exemples
+       J^2                                % -1
+       isequal(J, 1j)
+
+    Voir aussi J, I, COMPLEX, ABS.
 ```
 
 ## `NaN`
@@ -161,7 +179,19 @@ CLASS  Nom de la classe d'une valeur.
 ## `colon`
 
 ```
-colon  Equivalent fonctionnel de a:b:c.
+COLON  L'opérateur « : », sous forme de fonction.
+    COLON(A,B) vaut A:B ; COLON(A,PAS,B) vaut A:PAS:B.
+
+    Syntaxe
+       v = colon(a,b)
+       v = colon(a,pas,b)
+
+    Exemples
+       colon(1,5)                     % [1 2 3 4 5]
+       colon(0,2,10)                  % [0 2 4 6 8 10]
+       isequal(colon(1,5), 1:5)
+
+    Voir aussi LINSPACE, RESHAPE, END.
 ```
 
 ## `complex`
@@ -225,7 +255,17 @@ DOUBLE  Convertit en double précision.
 ## `e`
 
 ```
-e  2.71828182845905...
+E  Le nombre e, base du logarithme naturel, 2.71828182845905.
+
+    Syntaxe
+       e
+
+    Exemples
+       e
+       abs(e - exp(1)) < 1e-12
+       log(e)                         % 1
+
+    Voir aussi EXP, LOG, PI.
 ```
 
 ## `eps`
@@ -301,7 +341,20 @@ FALSE  Tableau logique de faux.
 ## `flintmax`
 
 ```
-flintmax  Plus grand entier exact.
+FLINTMAX  Plus grand entier représenté exactement en flottant.
+    FLINTMAX vaut 2^53 en double précision : au-delà, les entiers
+    consécutifs ne sont plus tous représentables.
+
+    Syntaxe
+       m = flintmax
+       m = flintmax('single')
+
+    Exemples
+       flintmax
+       flintmax + 1 == flintmax + 2   % vrai : la précision est perdue
+       flintmax == 2^53
+
+    Voir aussi INTMAX, REALMAX, EPS, INT64.
 ```
 
 ## `flip`
@@ -373,7 +426,22 @@ HORZCAT  Concaténation horizontale, l'opérateur « [A, B] ».
 ## `i`
 
 ```
-i  Unite imaginaire.
+I  L'unité imaginaire, racine de -1.
+    I vaut sqrt(-1). J en est le synonyme. Écrire « 3i » plutôt que « 3*i »
+    est plus sûr : le suffixe ne peut pas être masqué par une variable
+    nommée i — celle d'une boucle, par exemple.
+
+    Syntaxe
+       i
+       j
+
+    Exemples
+       i^2                            % -1
+       z = 3 + 4i;
+       abs(z)                         % 5
+       real(z)                        % 3
+
+    Voir aussi J, COMPLEX, REAL, IMAG, ABS, ANGLE.
 ```
 
 ## `ind2sub`
@@ -397,13 +465,34 @@ IND2SUB  Indices par dimension à partir de l'indice linéaire.
 ## `inf`
 
 ```
-inf  Tableau d'infinis.
+INF  Synonyme de Inf, l'infini de la virgule flottante.
+
+    Syntaxe
+       inf
+       inf(n)
+
+    Exemples
+       inf
+       1/0 == inf
+       size(inf(2,3))
+
+    Voir aussi INF, NAN, ISINF, ISFINITE.
 ```
 
 ## `int16`
 
 ```
-int16  Entier signe 16 bits.
+INT16  Convertit en entier signé 16 bits, dans [-32768, 32767].
+
+    Syntaxe
+       y = int16(x)
+
+    Exemples
+       int16(1000)
+       int16(40000)                   % 32767, saturé
+       intmin('int16')
+
+    Voir aussi INT8, INT32, INT64, UINT16, INTMAX.
 ```
 
 ## `int32`
@@ -428,13 +517,37 @@ INT32  Convertit en entier signé 32 bits.
 ## `int64`
 
 ```
-int64  Entier signe 64 bits.
+INT64  Convertit en entier signé 64 bits.
+    C'est la classe à prendre pour des entiers au-delà de FLINTMAX, que
+    le double ne représente plus exactement.
+
+    Syntaxe
+       y = int64(x)
+
+    Exemples
+       int64(2)^62
+       intmax('int64')
+       int64(9007199254740993)        % au-delà de flintmax
+
+    Voir aussi INT32, UINT64, FLINTMAX, INTMAX.
 ```
 
 ## `int8`
 
 ```
-int8  Entier signe 8 bits.
+INT8  Convertit en entier signé 8 bits, dans [-128, 127].
+    Le calcul entier de MATLAB sature : il ne déborde pas.
+
+    Syntaxe
+       y = int8(x)
+
+    Exemples
+       int8(100)
+       int8(200)                      % 127, saturé
+       int8(100) + int8(100)          % 127, saturé aussi
+       intmax('int8')
+
+    Voir aussi INT16, INT32, INT64, UINT8, INTMAX, CAST.
 ```
 
 ## `intmax`
@@ -719,7 +832,17 @@ ISNUMERIC  La valeur est-elle numérique.
 ## `isobject`
 
 ```
-isobject  Vrai pour un objet.
+ISOBJECT  La valeur est-elle un objet d'une classe définie par
+    l'utilisateur.
+
+    Syntaxe
+       tf = isobject(x)
+
+    Exemples
+       isobject(1)                    % 0
+       isobject(containers.Map())     % 1
+
+    Voir aussi CLASS, ISA, ISSTRUCT.
 ```
 
 ## `isreal`
@@ -830,7 +953,19 @@ ISVECTOR  La valeur est-elle un vecteur, ligne ou colonne.
 ## `j`
 
 ```
-j  Unite imaginaire.
+J  L'unité imaginaire, synonyme de I.
+    J vaut sqrt(-1) ; les électroniciens l'écrivent ainsi, i désignant
+    déjà un courant.
+
+    Syntaxe
+       j
+
+    Exemples
+       j^2                            % -1
+       1 + 2j
+       isequal(1i, 1j)
+
+    Voir aussi I, COMPLEX, ABS, ANGLE.
 ```
 
 ## `length`
@@ -934,7 +1069,18 @@ MESHGRID  Grille de coordonnées à partir de deux vecteurs.
 ## `nan`
 
 ```
-nan  Tableau de NaN.
+NAN  Synonyme de NaN, « Not a Number ».
+
+    Syntaxe
+       nan
+       nan(n)
+
+    Exemples
+       isnan(nan)                     % 1
+       size(nan(2,3))
+       nan == nan                     % 0
+
+    Voir aussi NAN, ISNAN, INF.
 ```
 
 ## `ndgrid`
@@ -1384,19 +1530,48 @@ TRUE  Tableau logique de vrais.
 ## `uint16`
 
 ```
-uint16  Entier non signe 16 bits.
+UINT16  Convertit en entier non signé 16 bits, dans [0, 65535].
+    C'est la classe des images en 16 bits par canal.
+
+    Syntaxe
+       y = uint16(x)
+
+    Exemples
+       uint16(70000)                  % 65535, saturé
+       uint16(-1)                     % 0, saturé
+       intmax('uint16')
+
+    Voir aussi UINT8, UINT32, INT16, INTMAX.
 ```
 
 ## `uint32`
 
 ```
-uint32  Entier non signe 32 bits.
+UINT32  Convertit en entier non signé 32 bits, dans [0, 4294967295].
+
+    Syntaxe
+       y = uint32(x)
+
+    Exemples
+       uint32(5e9)                    % saturé
+       intmax('uint32')
+
+    Voir aussi UINT16, UINT64, INT32, INTMAX.
 ```
 
 ## `uint64`
 
 ```
-uint64  Entier non signe 64 bits.
+UINT64  Convertit en entier non signé 64 bits.
+
+    Syntaxe
+       y = uint64(x)
+
+    Exemples
+       uint64(2)^63
+       intmax('uint64')
+
+    Voir aussi UINT32, INT64, FLINTMAX, INTMAX.
 ```
 
 ## `uint8`

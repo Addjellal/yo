@@ -1,0 +1,177 @@
+### parpool
+PARPOOL  Démarre un pool de travailleurs.
+    PARPOOL crée le pool par défaut ; PARPOOL(N) demande N travailleurs.
+    Chaque travailleur porte son propre interpréteur : les variables ne
+    sont pas partagées, elles voyagent.
+
+    Syntaxe
+       parpool
+       parpool(n)
+       p = parpool(n)
+
+    Exemples
+       p = gcp('nocreate');
+       if isempty(p)
+           parpool(2);
+       end
+       delete(gcp('nocreate'));
+
+    Voir aussi GCP, PARFOR, PARFEVAL, SPMD, DELETE.
+
+### gcp
+GCP  Le pool courant.
+    GCP rend le pool, en le créant si besoin.
+    GCP('nocreate') rend le pool existant, ou une valeur vide s'il n'y en
+    a pas — c'est la forme à écrire pour tester.
+
+    Syntaxe
+       p = gcp
+       p = gcp('nocreate')
+
+    Exemples
+       p = gcp('nocreate');
+       isempty(p) || isobject(p) || isstruct(p)
+
+    Voir aussi PARPOOL, PARFOR, PARFEVAL.
+
+### parfeval
+PARFEVAL  Lance une fonction sur un travailleur, sans attendre.
+    F = PARFEVAL(FONCTION,NSORTIES,ARGS...) rend tout de suite un objet
+    « future » ; FETCHOUTPUTS(F) attend le résultat.
+
+    Syntaxe
+       f = parfeval(fonction,nsorties,args...)
+       f = parfeval(pool,fonction,nsorties,args...)
+
+    Exemples
+       f = parfeval(@(x) x^2, 1, 7);
+       fetchOutputs(f)                    % 49
+
+    Voir aussi FETCHOUTPUTS, PARFOR, PARFEVALONALL, WAIT, CANCEL.
+
+### fetchOutputs
+FETCHOUTPUTS  Attend le résultat d'un calcul lancé par PARFEVAL.
+
+    Syntaxe
+       y = fetchOutputs(f)
+       [y1,y2] = fetchOutputs(f)
+
+    Exemples
+       f = parfeval(@(a,b) a+b, 1, 2, 3);
+       fetchOutputs(f)                    % 5
+
+    Voir aussi PARFEVAL, WAIT, CANCEL.
+
+### wait
+WAIT  Attend qu'un calcul lancé par PARFEVAL soit fini.
+    WAIT(F) bloque jusqu'à la fin, sans rendre le résultat.
+
+    Syntaxe
+       wait(f)
+
+    Exemples
+       f = parfeval(@() 1, 1);
+       wait(f);
+       fetchOutputs(f)
+
+    Voir aussi PARFEVAL, FETCHOUTPUTS, CANCEL.
+
+### cancel
+CANCEL  Annule un calcul lancé par PARFEVAL.
+
+    Syntaxe
+       cancel(f)
+
+    Exemples
+       f = parfeval(@() 1, 1);
+       cancel(f);
+
+    Voir aussi PARFEVAL, WAIT, FETCHOUTPUTS.
+
+### parfevalOnAll
+PARFEVALONALL  Lance une fonction sur tous les travailleurs.
+    Sert à préparer le terrain : ajouter un chemin, charger des données,
+    fixer une graine sur chaque travailleur.
+
+    Syntaxe
+       f = parfevalOnAll(fonction,nsorties,args...)
+
+    Exemples
+       f = parfevalOnAll(@() 1, 0);
+       wait(f);
+
+    Voir aussi PARFEVAL, PARPOOL, SPMD.
+
+### labindex
+LABINDEX  Numéro du travailleur courant, dans un bloc SPMD.
+    LABINDEX vaut 1 en dehors d'un bloc parallèle.
+
+    Syntaxe
+       k = labindex
+
+    Exemples
+       labindex                           % 1 hors d'un bloc spmd
+
+    Voir aussi NUMLABS, SPMD, PARFOR.
+
+### numlabs
+NUMLABS  Nombre de travailleurs du bloc SPMD courant.
+    NUMLABS vaut 1 en dehors d'un bloc parallèle.
+
+    Syntaxe
+       n = numlabs
+
+    Exemples
+       numlabs >= 1
+
+    Voir aussi LABINDEX, SPMD, PARPOOL.
+
+### maxNumCompThreads
+MAXNUMCOMPTHREADS  Nombre de fils de calcul utilisés.
+    N = MAXNUMCOMPTHREADS rend le nombre courant.
+    MAXNUMCOMPTHREADS(N) le fixe.
+
+    Syntaxe
+       n = maxNumCompThreads
+       maxNumCompThreads(n)
+
+    Exemples
+       n = maxNumCompThreads;
+       n >= 1
+
+    Voir aussi PARPOOL, NUMLABS, MEMORY.
+
+### ticBytes
+TICBYTES  Commence à compter les octets échangés avec les travailleurs.
+    TICBYTES(POOL) démarre le compteur, TOCBYTES(POOL) l'affiche : c'est
+    ainsi qu'on voit qu'une boucle parallèle passe son temps à recopier
+    des données au lieu de calculer.
+
+    Syntaxe
+       ticBytes(pool)
+       tocBytes(pool)
+
+    Exemples
+       p = gcp('nocreate');
+       if ~isempty(p)
+           ticBytes(p);
+           tocBytes(p);
+       end
+
+    Voir aussi TOCBYTES, PARFOR, PARPOOL, TIC.
+
+### tocBytes
+TOCBYTES  Affiche les octets échangés depuis TICBYTES.
+
+    Syntaxe
+       tocBytes(pool)
+       b = tocBytes(pool)
+
+    Exemples
+       p = gcp('nocreate');
+       if ~isempty(p)
+           ticBytes(p);
+           tocBytes(p);
+       end
+
+    Voir aussi TICBYTES, PARFOR, PARPOOL.

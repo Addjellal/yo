@@ -216,19 +216,50 @@ ODE23  Résout une équation différentielle, Runge-Kutta 2(3).
 ## `ode23s`
 
 ```
-ode23s  Solveur raide, Rosenbrock modifie (2,3).
+ODE23S  Résout une équation différentielle raide, ordre 2(3).
+    Solveur à un pas, utile quand la raideur est modérée et que la
+    tolérance demandée est lâche.
+
+    Syntaxe
+       [t,y] = ode23s(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23s(@(t,y) -50*y, [0 1], 1);
+       abs(y(end)) < 1e-3
+
+    Voir aussi ODE15S, ODE23T, ODE23TB, ODE45, ODESET.
 ```
 
 ## `ode23t`
 
 ```
-ode23t  Solveur peu raide, regle des trapezes.
+ODE23T  Résout une équation différentielle raide, règle du trapèze.
+    Sans amortissement numérique : c'est le solveur des problèmes
+    conservatifs modérément raides.
+
+    Syntaxe
+       [t,y] = ode23t(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23t(@(t,y) -10*y, [0 1], 1);
+       abs(y(end) - exp(-10)) < 1e-2
+
+    Voir aussi ODE15S, ODE23S, ODE23TB, ODESET.
 ```
 
 ## `ode23tb`
 
 ```
-ode23tb  Solveur raide, trapeze puis BDF2.
+ODE23TB  Résout une équation différentielle raide, trapèze puis BDF2.
+
+    Syntaxe
+       [t,y] = ode23tb(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23tb(@(t,y) -20*y, [0 1], 1);
+       abs(y(end)) < 1e-2
+
+    Voir aussi ODE15S, ODE23S, ODE23T, ODESET.
 ```
 
 ## `ode45`
@@ -329,7 +360,18 @@ OPTIMSET  Options des solveurs d'optimisation.
 ## `quad`
 
 ```
-quad  Quadrature de Simpson adaptative.
+QUAD  Intégrale définie, forme historique.
+    QUAD(F,A,B) intègre F de A à B. INTEGRAL lui est préférée dans du
+    code neuf.
+
+    Syntaxe
+       q = quad(f,a,b)
+
+    Exemples
+       abs(quad(@sin, 0, pi) - 2) < 1e-6
+       abs(quad(@(x) x.^2, 0, 3) - 9) < 1e-6
+
+    Voir aussi INTEGRAL, QUADGK, TRAPZ.
 ```
 
 ## `quadgk`

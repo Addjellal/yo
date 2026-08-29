@@ -66,7 +66,27 @@ CELLFUN  Applique une fonction à chaque case d'une cellule.
 ## `eval`
 
 ```
-eval  Evalue du code.
+EVAL  Exécute du code écrit dans un texte.
+    EVAL(TEXTE) exécute le texte.
+    X = EVAL(TEXTE) évalue une expression et rend sa valeur.
+    EVAL(TEXTE,SECOURS) exécute SECOURS si le premier échoue.
+
+    Le code écrit dans du texte échappe à toute vérification : quand une
+    autre voie existe — une poignée de fonction, un champ dynamique
+    « s.(nom) », une cellule —, elle est préférable.
+
+    Syntaxe
+       eval(texte)
+       x = eval(texte)
+       eval(texte,secours)
+
+    Exemples
+       eval('a = 1 + 1;');
+       a
+       x = eval('2^10')
+       eval('zzzInconnu', 'disp(''secours'')');
+
+    Voir aussi EVALC, EVALIN, ASSIGNIN, FEVAL, STR2FUNC.
 ```
 
 ## `evalc`
@@ -175,7 +195,20 @@ FUNC2STR  Rend le texte d'une poignée de fonction.
 ## `functions`
 
 ```
-functions  Information sur une poignee.
+FUNCTIONS  Renseignements sur une poignée de fonction.
+    FUNCTIONS(F) rend une structure : le nom, le type ('simple' ou
+    'anonymous'), et le fichier.
+
+    Syntaxe
+       s = functions(f)
+
+    Exemples
+       s = functions(@sin);
+       s.function
+       t = functions(@(x) x+1);
+       t.type
+
+    Voir aussi FUNC2STR, STR2FUNC, FEVAL, CLASS.
 ```
 
 ## `inputname`

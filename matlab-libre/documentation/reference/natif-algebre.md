@@ -147,25 +147,67 @@ INV  Inverse d'une matrice carrée.
 ## `isdiag`
 
 ```
-isdiag  Matrice diagonale ?
+ISDIAG  La matrice est-elle diagonale.
+
+    Syntaxe
+       tf = isdiag(A)
+
+    Exemples
+       isdiag(eye(3))                 % 1
+       isdiag(magic(3))               % 0
+       isdiag(diag([1 2 3]))          % 1
+
+    Voir aussi ISTRIL, ISTRIU, ISSYMMETRIC, DIAG.
 ```
 
 ## `issymmetric`
 
 ```
-issymmetric  Matrice symetrique ?
+ISSYMMETRIC  La matrice est-elle symétrique.
+    ISSYMMETRIC(A) teste A == A.' exactement ; sur du calcul flottant,
+    comparer NORM(A - A.') à une tolérance est souvent plus juste.
+
+    Syntaxe
+       tf = issymmetric(A)
+
+    Exemples
+       issymmetric(eye(3))            % 1
+       issymmetric(magic(3))          % 0
+       A = magic(3);
+       issymmetric(A + A')            % 1
+
+    Voir aussi ISDIAG, ISTRIL, CHOL, EIG, TRANSPOSE.
 ```
 
 ## `istril`
 
 ```
-istril  Triangulaire inferieure ?
+ISTRIL  La matrice est-elle triangulaire inférieure.
+
+    Syntaxe
+       tf = istril(A)
+
+    Exemples
+       istril(tril(magic(3)))         % 1
+       istril(eye(3))                 % 1 — une diagonale l'est aussi
+       istril(magic(3))               % 0
+
+    Voir aussi ISTRIU, ISDIAG, TRIL, LU.
 ```
 
 ## `istriu`
 
 ```
-istriu  Triangulaire superieure ?
+ISTRIU  La matrice est-elle triangulaire supérieure.
+
+    Syntaxe
+       tf = istriu(A)
+
+    Exemples
+       istriu(triu(magic(3)))         % 1
+       istriu(magic(3))               % 0
+
+    Voir aussi ISTRIL, ISDIAG, TRIU, QR.
 ```
 
 ## `linsolve`

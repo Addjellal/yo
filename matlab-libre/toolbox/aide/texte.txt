@@ -622,3 +622,34 @@ TOUPPER  Synonyme de UPPER, hérité du C.
        strcmp(toupper('oui'), upper('oui'))
 
     Voir aussi UPPER, LOWER, TOLOWER.
+
+### pad
+PAD  Complète des textes à la même longueur.
+    PAD(C) complète d'espaces jusqu'à la plus longue chaîne.
+    PAD(C,N) complète jusqu'à N caractères.
+    PAD(C,N,'left') complète à gauche.
+
+    Syntaxe
+       t = pad(c)
+       t = pad(c,n)
+       t = pad(c,n,cote)
+
+    Exemples
+       pad({'a','bbb'})
+       numel(pad('ab', 5))                % 5
+
+    Voir aussi STRJUST, BLANKS, STRTRIM, CHAR.
+
+### printf
+PRINTF  Affiche du texte formaté ; synonyme hérité du C.
+    PRINTF(FORMAT,...) écrit sur la sortie, comme FPRINTF sans numéro de
+    fichier.
+
+    Syntaxe
+       printf(format,...)
+
+    Exemples
+       printf('%d + %d = %d\n', 2, 3, 5);
+       printf('%s\n', 'texte');
+
+    Voir aussi FPRINTF, SPRINTF, DISP.

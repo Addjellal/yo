@@ -22,7 +22,17 @@ BINOPDF  Densité de la loi binomiale.
 ## `chi2pdf`
 
 ```
-chi2pdf  Densite du khi-deux.
+CHI2PDF  Densité de la loi du khi-deux.
+    CHI2PDF(X,NU) rend la densité à NU degrés de liberté.
+
+    Syntaxe
+       y = chi2pdf(x,nu)
+
+    Exemples
+       chi2pdf(1, 2) > 0
+       abs(chi2pdf(0, 4)) < 1e-12
+
+    Voir aussi NORMPDF, TPDF, EXPPDF.
 ```
 
 ## `corrcoef`
@@ -402,7 +412,17 @@ STD  Écart-type.
 ## `tpdf`
 
 ```
-tpdf  Densite de Student.
+TPDF  Densité de la loi de Student.
+    TPDF(X,NU) rend la densité à NU degrés de liberté.
+
+    Syntaxe
+       y = tpdf(x,nu)
+
+    Exemples
+       tpdf(0, 10) > 0
+       abs(tpdf(0, 1) - 1/pi) < 1e-12     % à 1 degré, c'est la loi de Cauchy
+
+    Voir aussi NORMPDF, CHI2PDF, PRCTILE.
 ```
 
 ## `unifrnd`

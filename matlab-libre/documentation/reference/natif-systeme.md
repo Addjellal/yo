@@ -25,13 +25,37 @@ ADDPATH  Ajoute un dossier au chemin de recherche.
 ## `atelier`
 
 ```
-atelier  Synonyme de ide.
+ATELIER  Ouvre l'atelier de MatLibre dans le navigateur.
+    ATELIER, comme la commande IDE, lance le serveur local et ouvre
+    l'éditeur, le débogueur, le concepteur d'applications et l'éditeur de
+    schémas-blocs.
+
+    Syntaxe
+       atelier
+       ide
+
+    Exemples
+       % atelier                           % ouvre le navigateur
+
+    Voir aussi IDE, DOC, HELP, EDIT.
 ```
 
 ## `beep`
 
 ```
-beep  Emet un bip.
+BEEP  Émet un signal sonore.
+    BEEP ON et BEEP OFF autorisent ou interdisent le signal.
+
+    Syntaxe
+       beep
+       beep on
+       beep off
+
+    Exemples
+       beep off
+       beep
+
+    Voir aussi DISP, WARNING, PAUSE.
 ```
 
 ## `cd`
@@ -211,13 +235,33 @@ DOC  Documentation d'une fonction.
 ## `dos`
 
 ```
-dos  Execute une commande du systeme.
+DOS  Exécute une commande de l'invite, sous Windows.
+    [ETAT,SORTIE] = DOS(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = dos(commande)
+       [etat,sortie] = dos(commande)
+
+    Exemples
+       if ispc
+           [etat, sortie] = dos('echo bonjour');
+       end
+
+    Voir aussi SYSTEM, UNIX, ISPC.
 ```
 
 ## `exit`
 
 ```
-exit  Quitte l'interpreteur.
+EXIT  Quitte MatLibre ; synonyme de QUIT.
+
+    Syntaxe
+       exit
+
+    Exemples
+       % exit                              % ferme la session
+
+    Voir aussi QUIT, CLEAR, DIARY.
 ```
 
 ## `fileparts`
@@ -292,7 +336,16 @@ GETENV  Lit une variable d'environnement.
 ## `getpid`
 
 ```
-getpid  Identifiant du processus.
+GETPID  Numéro du processus courant.
+
+    Syntaxe
+       p = getpid
+
+    Exemples
+       p = getpid;
+       p > 0
+
+    Voir aussi SYSTEM, COMPUTER, GETENV.
 ```
 
 ## `graphics_toolkit`
@@ -448,7 +501,20 @@ LOOKFOR  Cherche un mot dans la première ligne d'aide des fonctions.
 ## `ls`
 
 ```
-ls  Liste un dossier.
+LS  Liste les fichiers d'un dossier.
+    LS affiche le dossier courant ; S = LS le rend en texte.
+    LS(MOTIF) filtre.
+
+    Syntaxe
+       ls
+       s = ls
+       ls(motif)
+
+    Exemples
+       s = ls;
+       ischar(s) || iscell(s)
+
+    Voir aussi DIR, PWD, CD, EXIST.
 ```
 
 ## `matlibre_fonctions`
@@ -466,13 +532,36 @@ matlibre_racine  Dossier racine des toolboxes.
 ## `maxNumCompThreads`
 
 ```
-maxNumCompThreads  Nombre de fils de calcul.
+MAXNUMCOMPTHREADS  Nombre de fils de calcul utilisés.
+    N = MAXNUMCOMPTHREADS rend le nombre courant.
+    MAXNUMCOMPTHREADS(N) le fixe.
+
+    Syntaxe
+       n = maxNumCompThreads
+       maxNumCompThreads(n)
+
+    Exemples
+       n = maxNumCompThreads;
+       n >= 1
+
+    Voir aussi PARPOOL, NUMLABS, MEMORY.
 ```
 
 ## `memory`
 
 ```
-memory  Memoire disponible.
+MEMORY  Mémoire disponible.
+    MEMORY affiche l'état ; S = MEMORY le rend en structure.
+
+    Syntaxe
+       memory
+       s = memory
+
+    Exemples
+       s = memory;
+       isstruct(s)
+
+    Voir aussi WHOS, CLEAR, COMPUTER.
 ```
 
 ## `mexext`
@@ -532,7 +621,17 @@ MKDIR  Crée un dossier.
 ## `more`
 
 ```
-more  Pagination (sans effet).
+MORE  Pagination de l'affichage.
+    MORE ON coupe l'affichage page par page, MORE OFF le laisse défiler.
+
+    Syntaxe
+       more on
+       more off
+
+    Exemples
+       more off
+
+    Voir aussi DIARY, DISP, FORMAT.
 ```
 
 ## `movefile`
@@ -577,7 +676,18 @@ PATH  Chemin de recherche.
 ## `pathsep`
 
 ```
-pathsep  Separateur de liste de chemins.
+PATHSEP  Séparateur des dossiers dans le chemin de recherche.
+    PATHSEP rend « : » sous Unix et « ; » sous Windows.
+
+    Syntaxe
+       s = pathsep
+
+    Exemples
+       pathsep
+       dossiers = strsplit(path, pathsep);
+       numel(dossiers) >= 1
+
+    Voir aussi PATH, FILESEP, ADDPATH, FULLFILE.
 ```
 
 ## `pwd`
@@ -749,7 +859,20 @@ TYPE  Affiche le contenu d'un fichier.
 ## `unix`
 
 ```
-unix  Execute une commande du systeme.
+UNIX  Exécute une commande du shell, sous Linux et macOS.
+    [ETAT,SORTIE] = UNIX(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = unix(commande)
+       [etat,sortie] = unix(commande)
+
+    Exemples
+       if isunix
+           [etat, sortie] = unix('echo bonjour');
+           strtrim(sortie)
+       end
+
+    Voir aussi SYSTEM, DOS, ISUNIX, GETENV.
 ```
 
 ## `ver`

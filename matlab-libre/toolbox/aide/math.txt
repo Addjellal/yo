@@ -821,3 +821,83 @@ DEVAL  Évalue la solution d'une équation différentielle entre les pas.
        abs(y - exp(-1)) < 1e-4
 
     Voir aussi ODE45, ODE15S, INTERP1.
+
+### quad
+QUAD  Intégrale définie, forme historique.
+    QUAD(F,A,B) intègre F de A à B. INTEGRAL lui est préférée dans du
+    code neuf.
+
+    Syntaxe
+       q = quad(f,a,b)
+
+    Exemples
+       abs(quad(@sin, 0, pi) - 2) < 1e-6
+       abs(quad(@(x) x.^2, 0, 3) - 9) < 1e-6
+
+    Voir aussi INTEGRAL, QUADGK, TRAPZ.
+
+### tpdf
+TPDF  Densité de la loi de Student.
+    TPDF(X,NU) rend la densité à NU degrés de liberté.
+
+    Syntaxe
+       y = tpdf(x,nu)
+
+    Exemples
+       tpdf(0, 10) > 0
+       abs(tpdf(0, 1) - 1/pi) < 1e-12     % à 1 degré, c'est la loi de Cauchy
+
+    Voir aussi NORMPDF, CHI2PDF, PRCTILE.
+
+### chi2pdf
+CHI2PDF  Densité de la loi du khi-deux.
+    CHI2PDF(X,NU) rend la densité à NU degrés de liberté.
+
+    Syntaxe
+       y = chi2pdf(x,nu)
+
+    Exemples
+       chi2pdf(1, 2) > 0
+       abs(chi2pdf(0, 4)) < 1e-12
+
+    Voir aussi NORMPDF, TPDF, EXPPDF.
+
+### ode23s
+ODE23S  Résout une équation différentielle raide, ordre 2(3).
+    Solveur à un pas, utile quand la raideur est modérée et que la
+    tolérance demandée est lâche.
+
+    Syntaxe
+       [t,y] = ode23s(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23s(@(t,y) -50*y, [0 1], 1);
+       abs(y(end)) < 1e-3
+
+    Voir aussi ODE15S, ODE23T, ODE23TB, ODE45, ODESET.
+
+### ode23t
+ODE23T  Résout une équation différentielle raide, règle du trapèze.
+    Sans amortissement numérique : c'est le solveur des problèmes
+    conservatifs modérément raides.
+
+    Syntaxe
+       [t,y] = ode23t(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23t(@(t,y) -10*y, [0 1], 1);
+       abs(y(end) - exp(-10)) < 1e-2
+
+    Voir aussi ODE15S, ODE23S, ODE23TB, ODESET.
+
+### ode23tb
+ODE23TB  Résout une équation différentielle raide, trapèze puis BDF2.
+
+    Syntaxe
+       [t,y] = ode23tb(f,[t0 tf],y0)
+
+    Exemples
+       [t, y] = ode23tb(@(t,y) -20*y, [0 1], 1);
+       abs(y(end)) < 1e-2
+
+    Voir aussi ODE15S, ODE23S, ODE23T, ODESET.

@@ -1101,3 +1101,187 @@ RUN  Exécute un script désigné par son chemin.
        delete(f);
 
     Voir aussi ADDPATH, EVAL, TYPE, WHICH.
+
+### ls
+LS  Liste les fichiers d'un dossier.
+    LS affiche le dossier courant ; S = LS le rend en texte.
+    LS(MOTIF) filtre.
+
+    Syntaxe
+       ls
+       s = ls
+       ls(motif)
+
+    Exemples
+       s = ls;
+       ischar(s) || iscell(s)
+
+    Voir aussi DIR, PWD, CD, EXIST.
+
+### unix
+UNIX  Exécute une commande du shell, sous Linux et macOS.
+    [ETAT,SORTIE] = UNIX(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = unix(commande)
+       [etat,sortie] = unix(commande)
+
+    Exemples
+       if isunix
+           [etat, sortie] = unix('echo bonjour');
+           strtrim(sortie)
+       end
+
+    Voir aussi SYSTEM, DOS, ISUNIX, GETENV.
+
+### dos
+DOS  Exécute une commande de l'invite, sous Windows.
+    [ETAT,SORTIE] = DOS(COMMANDE) rend le code de retour et la sortie.
+
+    Syntaxe
+       etat = dos(commande)
+       [etat,sortie] = dos(commande)
+
+    Exemples
+       if ispc
+           [etat, sortie] = dos('echo bonjour');
+       end
+
+    Voir aussi SYSTEM, UNIX, ISPC.
+
+### pathsep
+PATHSEP  Séparateur des dossiers dans le chemin de recherche.
+    PATHSEP rend « : » sous Unix et « ; » sous Windows.
+
+    Syntaxe
+       s = pathsep
+
+    Exemples
+       pathsep
+       dossiers = strsplit(path, pathsep);
+       numel(dossiers) >= 1
+
+    Voir aussi PATH, FILESEP, ADDPATH, FULLFILE.
+
+### memory
+MEMORY  Mémoire disponible.
+    MEMORY affiche l'état ; S = MEMORY le rend en structure.
+
+    Syntaxe
+       memory
+       s = memory
+
+    Exemples
+       s = memory;
+       isstruct(s)
+
+    Voir aussi WHOS, CLEAR, COMPUTER.
+
+### more
+MORE  Pagination de l'affichage.
+    MORE ON coupe l'affichage page par page, MORE OFF le laisse défiler.
+
+    Syntaxe
+       more on
+       more off
+
+    Exemples
+       more off
+
+    Voir aussi DIARY, DISP, FORMAT.
+
+### beep
+BEEP  Émet un signal sonore.
+    BEEP ON et BEEP OFF autorisent ou interdisent le signal.
+
+    Syntaxe
+       beep
+       beep on
+       beep off
+
+    Exemples
+       beep off
+       beep
+
+    Voir aussi DISP, WARNING, PAUSE.
+
+### getpid
+GETPID  Numéro du processus courant.
+
+    Syntaxe
+       p = getpid
+
+    Exemples
+       p = getpid;
+       p > 0
+
+    Voir aussi SYSTEM, COMPUTER, GETENV.
+
+### exit
+EXIT  Quitte MatLibre ; synonyme de QUIT.
+
+    Syntaxe
+       exit
+
+    Exemples
+       % exit                              % ferme la session
+
+    Voir aussi QUIT, CLEAR, DIARY.
+
+### matlab
+MATLAB  Espace de noms des utilitaires du langage.
+    MATLAB.LANG.MAKEVALIDNAME transforme un texte en identifiant valide ;
+    MATLAB.LANG.MAKEUNIQUESTRINGS rend des noms distincts.
+
+    Syntaxe
+       matlab.lang.makeValidName(s)
+       matlab.lang.makeUniqueStrings(c)
+
+    Exemples
+       matlab.lang.makeValidName('mon nom')
+       matlab.lang.makeUniqueStrings({'a','a','b'})
+
+    Voir aussi ISVARNAME, GENVARNAME, FIELDNAMES.
+
+### atelier
+ATELIER  Ouvre l'atelier de MatLibre dans le navigateur.
+    ATELIER, comme la commande IDE, lance le serveur local et ouvre
+    l'éditeur, le débogueur, le concepteur d'applications et l'éditeur de
+    schémas-blocs.
+
+    Syntaxe
+       atelier
+       ide
+
+    Exemples
+       % atelier                           % ouvre le navigateur
+
+    Voir aussi IDE, DOC, HELP, EDIT.
+
+### runtests
+RUNTESTS  Exécute les scripts de test d'un dossier.
+    RUNTESTS(DOSSIER) exécute les fichiers « test_*.m » et rend le compte
+    rendu.
+
+    Syntaxe
+       resultats = runtests(dossier)
+
+    Exemples
+       % resultats = runtests('tests/scripts');
+       disp('runtests exécute une campagne entière');
+
+    Voir aussi ASSERT, ERROR, PROFILE.
+
+### weekday
+WEEKDAY  Jour de la semaine d'une date.
+    [N,NOM] = WEEKDAY(D) rend le numéro — 1 pour dimanche — et son nom.
+
+    Syntaxe
+       n = weekday(d)
+       [n,nom] = weekday(d)
+
+    Exemples
+       [n, nom] = weekday(datenum(2024,5,1));
+       n >= 1 && n <= 7
+
+    Voir aussi DATENUM, DATESTR, DATEVEC, NOW.

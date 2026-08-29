@@ -5,25 +5,66 @@ Fonctions natives du groupe `parallele`.
 ## `cancel`
 
 ```
-cancel  Annule un travail.
+CANCEL  Annule un calcul lancé par PARFEVAL.
+
+    Syntaxe
+       cancel(f)
+
+    Exemples
+       f = parfeval(@() 1, 1);
+       cancel(f);
+
+    Voir aussi PARFEVAL, WAIT, FETCHOUTPUTS.
 ```
 
 ## `fetchOutputs`
 
 ```
-fetchOutputs  Recupere le resultat d'un travail.
+FETCHOUTPUTS  Attend le résultat d'un calcul lancé par PARFEVAL.
+
+    Syntaxe
+       y = fetchOutputs(f)
+       [y1,y2] = fetchOutputs(f)
+
+    Exemples
+       f = parfeval(@(a,b) a+b, 1, 2, 3);
+       fetchOutputs(f)                    % 5
+
+    Voir aussi PARFEVAL, WAIT, CANCEL.
 ```
 
 ## `gcp`
 
 ```
-gcp  Pool courant, cree si besoin.
+GCP  Le pool courant.
+    GCP rend le pool, en le créant si besoin.
+    GCP('nocreate') rend le pool existant, ou une valeur vide s'il n'y en
+    a pas — c'est la forme à écrire pour tester.
+
+    Syntaxe
+       p = gcp
+       p = gcp('nocreate')
+
+    Exemples
+       p = gcp('nocreate');
+       isempty(p) || isobject(p) || isstruct(p)
+
+    Voir aussi PARPOOL, PARFOR, PARFEVAL.
 ```
 
 ## `labindex`
 
 ```
-labindex  Numero du laboratoire courant.
+LABINDEX  Numéro du travailleur courant, dans un bloc SPMD.
+    LABINDEX vaut 1 en dehors d'un bloc parallèle.
+
+    Syntaxe
+       k = labindex
+
+    Exemples
+       labindex                           % 1 hors d'un bloc spmd
+
+    Voir aussi NUMLABS, SPMD, PARFOR.
 ```
 
 ## `matlibre_fermerpool`
@@ -41,42 +82,131 @@ matlibre_futurepret  Vrai si le travail est termine.
 ## `numlabs`
 
 ```
-numlabs  Nombre de laboratoires du bloc spmd.
+NUMLABS  Nombre de travailleurs du bloc SPMD courant.
+    NUMLABS vaut 1 en dehors d'un bloc parallèle.
+
+    Syntaxe
+       n = numlabs
+
+    Exemples
+       numlabs >= 1
+
+    Voir aussi LABINDEX, SPMD, PARPOOL.
 ```
 
 ## `parfeval`
 
 ```
-parfeval  Lance une fonction sur un travailleur.
+PARFEVAL  Lance une fonction sur un travailleur, sans attendre.
+    F = PARFEVAL(FONCTION,NSORTIES,ARGS...) rend tout de suite un objet
+    « future » ; FETCHOUTPUTS(F) attend le résultat.
+
+    Syntaxe
+       f = parfeval(fonction,nsorties,args...)
+       f = parfeval(pool,fonction,nsorties,args...)
+
+    Exemples
+       f = parfeval(@(x) x^2, 1, 7);
+       fetchOutputs(f)                    % 49
+
+    Voir aussi FETCHOUTPUTS, PARFOR, PARFEVALONALL, WAIT, CANCEL.
 ```
 
 ## `parfevalOnAll`
 
 ```
-parfevalOnAll  Lance une fonction sur tous les travailleurs.
+PARFEVALONALL  Lance une fonction sur tous les travailleurs.
+    Sert à préparer le terrain : ajouter un chemin, charger des données,
+    fixer une graine sur chaque travailleur.
+
+    Syntaxe
+       f = parfevalOnAll(fonction,nsorties,args...)
+
+    Exemples
+       f = parfevalOnAll(@() 1, 0);
+       wait(f);
+
+    Voir aussi PARFEVAL, PARPOOL, SPMD.
 ```
 
 ## `parpool`
 
 ```
-parpool  Ouvre un pool de travailleurs.
+PARPOOL  Démarre un pool de travailleurs.
+    PARPOOL crée le pool par défaut ; PARPOOL(N) demande N travailleurs.
+    Chaque travailleur porte son propre interpréteur : les variables ne
+    sont pas partagées, elles voyagent.
+
+    Syntaxe
+       parpool
+       parpool(n)
+       p = parpool(n)
+
+    Exemples
+       p = gcp('nocreate');
+       if isempty(p)
+           parpool(2);
+       end
+       delete(gcp('nocreate'));
+
+    Voir aussi GCP, PARFOR, PARFEVAL, SPMD, DELETE.
 ```
 
 ## `ticBytes`
 
 ```
-ticBytes  Compteur d'octets echanges (nul ici).
+TICBYTES  Commence à compter les octets échangés avec les travailleurs.
+    TICBYTES(POOL) démarre le compteur, TOCBYTES(POOL) l'affiche : c'est
+    ainsi qu'on voit qu'une boucle parallèle passe son temps à recopier
+    des données au lieu de calculer.
+
+    Syntaxe
+       ticBytes(pool)
+       tocBytes(pool)
+
+    Exemples
+       p = gcp('nocreate');
+       if ~isempty(p)
+           ticBytes(p);
+           tocBytes(p);
+       end
+
+    Voir aussi TOCBYTES, PARFOR, PARPOOL, TIC.
 ```
 
 ## `tocBytes`
 
 ```
-tocBytes  Compteur d'octets echanges (nul ici).
+TOCBYTES  Affiche les octets échangés depuis TICBYTES.
+
+    Syntaxe
+       tocBytes(pool)
+       b = tocBytes(pool)
+
+    Exemples
+       p = gcp('nocreate');
+       if ~isempty(p)
+           ticBytes(p);
+           tocBytes(p);
+       end
+
+    Voir aussi TICBYTES, PARFOR, PARPOOL.
 ```
 
 ## `wait`
 
 ```
-wait  Attend la fin d'un travail.
+WAIT  Attend qu'un calcul lancé par PARFEVAL soit fini.
+    WAIT(F) bloque jusqu'à la fin, sans rendre le résultat.
+
+    Syntaxe
+       wait(f)
+
+    Exemples
+       f = parfeval(@() 1, 1);
+       wait(f);
+       fetchOutputs(f)
+
+    Voir aussi PARFEVAL, FETCHOUTPUTS, CANCEL.
 ```
 

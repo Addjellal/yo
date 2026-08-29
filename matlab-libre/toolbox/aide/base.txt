@@ -1419,3 +1419,414 @@ MAT2CELL  Découpe une matrice en blocs, dans une cellule.
        C{1,1}
 
     Voir aussi CELL2MAT, NUM2CELL, RESHAPE.
+
+### i
+I  L'unité imaginaire, racine de -1.
+    I vaut sqrt(-1). J en est le synonyme. Écrire « 3i » plutôt que « 3*i »
+    est plus sûr : le suffixe ne peut pas être masqué par une variable
+    nommée i — celle d'une boucle, par exemple.
+
+    Syntaxe
+       i
+       j
+
+    Exemples
+       i^2                            % -1
+       z = 3 + 4i;
+       abs(z)                         % 5
+       real(z)                        % 3
+
+    Voir aussi J, COMPLEX, REAL, IMAG, ABS, ANGLE.
+
+### j
+J  L'unité imaginaire, synonyme de I.
+    J vaut sqrt(-1) ; les électroniciens l'écrivent ainsi, i désignant
+    déjà un courant.
+
+    Syntaxe
+       j
+
+    Exemples
+       j^2                            % -1
+       1 + 2j
+       isequal(1i, 1j)
+
+    Voir aussi I, COMPLEX, ABS, ANGLE.
+
+### e
+E  Le nombre e, base du logarithme naturel, 2.71828182845905.
+
+    Syntaxe
+       e
+
+    Exemples
+       e
+       abs(e - exp(1)) < 1e-12
+       log(e)                         % 1
+
+    Voir aussi EXP, LOG, PI.
+
+### inf
+INF  Synonyme de Inf, l'infini de la virgule flottante.
+
+    Syntaxe
+       inf
+       inf(n)
+
+    Exemples
+       inf
+       1/0 == inf
+       size(inf(2,3))
+
+    Voir aussi INF, NAN, ISINF, ISFINITE.
+
+### nan
+NAN  Synonyme de NaN, « Not a Number ».
+
+    Syntaxe
+       nan
+       nan(n)
+
+    Exemples
+       isnan(nan)                     % 1
+       size(nan(2,3))
+       nan == nan                     % 0
+
+    Voir aussi NAN, ISNAN, INF.
+
+### flintmax
+FLINTMAX  Plus grand entier représenté exactement en flottant.
+    FLINTMAX vaut 2^53 en double précision : au-delà, les entiers
+    consécutifs ne sont plus tous représentables.
+
+    Syntaxe
+       m = flintmax
+       m = flintmax('single')
+
+    Exemples
+       flintmax
+       flintmax + 1 == flintmax + 2   % vrai : la précision est perdue
+       flintmax == 2^53
+
+    Voir aussi INTMAX, REALMAX, EPS, INT64.
+
+### colon
+COLON  L'opérateur « : », sous forme de fonction.
+    COLON(A,B) vaut A:B ; COLON(A,PAS,B) vaut A:PAS:B.
+
+    Syntaxe
+       v = colon(a,b)
+       v = colon(a,pas,b)
+
+    Exemples
+       colon(1,5)                     % [1 2 3 4 5]
+       colon(0,2,10)                  % [0 2 4 6 8 10]
+       isequal(colon(1,5), 1:5)
+
+    Voir aussi LINSPACE, RESHAPE, END.
+
+### int8
+INT8  Convertit en entier signé 8 bits, dans [-128, 127].
+    Le calcul entier de MATLAB sature : il ne déborde pas.
+
+    Syntaxe
+       y = int8(x)
+
+    Exemples
+       int8(100)
+       int8(200)                      % 127, saturé
+       int8(100) + int8(100)          % 127, saturé aussi
+       intmax('int8')
+
+    Voir aussi INT16, INT32, INT64, UINT8, INTMAX, CAST.
+
+### int16
+INT16  Convertit en entier signé 16 bits, dans [-32768, 32767].
+
+    Syntaxe
+       y = int16(x)
+
+    Exemples
+       int16(1000)
+       int16(40000)                   % 32767, saturé
+       intmin('int16')
+
+    Voir aussi INT8, INT32, INT64, UINT16, INTMAX.
+
+### int64
+INT64  Convertit en entier signé 64 bits.
+    C'est la classe à prendre pour des entiers au-delà de FLINTMAX, que
+    le double ne représente plus exactement.
+
+    Syntaxe
+       y = int64(x)
+
+    Exemples
+       int64(2)^62
+       intmax('int64')
+       int64(9007199254740993)        % au-delà de flintmax
+
+    Voir aussi INT32, UINT64, FLINTMAX, INTMAX.
+
+### uint16
+UINT16  Convertit en entier non signé 16 bits, dans [0, 65535].
+    C'est la classe des images en 16 bits par canal.
+
+    Syntaxe
+       y = uint16(x)
+
+    Exemples
+       uint16(70000)                  % 65535, saturé
+       uint16(-1)                     % 0, saturé
+       intmax('uint16')
+
+    Voir aussi UINT8, UINT32, INT16, INTMAX.
+
+### uint32
+UINT32  Convertit en entier non signé 32 bits, dans [0, 4294967295].
+
+    Syntaxe
+       y = uint32(x)
+
+    Exemples
+       uint32(5e9)                    % saturé
+       intmax('uint32')
+
+    Voir aussi UINT16, UINT64, INT32, INTMAX.
+
+### uint64
+UINT64  Convertit en entier non signé 64 bits.
+
+    Syntaxe
+       y = uint64(x)
+
+    Exemples
+       uint64(2)^63
+       intmax('uint64')
+
+    Voir aussi UINT32, INT64, FLINTMAX, INTMAX.
+
+### display
+DISPLAY  Affiche une valeur comme le fait l'invite.
+    DISPLAY(X) écrit « x = ... », nom compris — c'est ce qu'appelle
+    MATLAB quand on tape une expression sans point-virgule.
+
+    Syntaxe
+       display(x)
+
+    Exemples
+       x = 42;
+       display(x)
+       disp(x)                        % sans le nom
+
+    Voir aussi DISP, FPRINTF, FORMAT.
+
+### functions
+FUNCTIONS  Renseignements sur une poignée de fonction.
+    FUNCTIONS(F) rend une structure : le nom, le type ('simple' ou
+    'anonymous'), et le fichier.
+
+    Syntaxe
+       s = functions(f)
+
+    Exemples
+       s = functions(@sin);
+       s.function
+       t = functions(@(x) x+1);
+       t.type
+
+    Voir aussi FUNC2STR, STR2FUNC, FEVAL, CLASS.
+
+### isdiag
+ISDIAG  La matrice est-elle diagonale.
+
+    Syntaxe
+       tf = isdiag(A)
+
+    Exemples
+       isdiag(eye(3))                 % 1
+       isdiag(magic(3))               % 0
+       isdiag(diag([1 2 3]))          % 1
+
+    Voir aussi ISTRIL, ISTRIU, ISSYMMETRIC, DIAG.
+
+### istril
+ISTRIL  La matrice est-elle triangulaire inférieure.
+
+    Syntaxe
+       tf = istril(A)
+
+    Exemples
+       istril(tril(magic(3)))         % 1
+       istril(eye(3))                 % 1 — une diagonale l'est aussi
+       istril(magic(3))               % 0
+
+    Voir aussi ISTRIU, ISDIAG, TRIL, LU.
+
+### istriu
+ISTRIU  La matrice est-elle triangulaire supérieure.
+
+    Syntaxe
+       tf = istriu(A)
+
+    Exemples
+       istriu(triu(magic(3)))         % 1
+       istriu(magic(3))               % 0
+
+    Voir aussi ISTRIL, ISDIAG, TRIU, QR.
+
+### issymmetric
+ISSYMMETRIC  La matrice est-elle symétrique.
+    ISSYMMETRIC(A) teste A == A.' exactement ; sur du calcul flottant,
+    comparer NORM(A - A.') à une tolérance est souvent plus juste.
+
+    Syntaxe
+       tf = issymmetric(A)
+
+    Exemples
+       issymmetric(eye(3))            % 1
+       issymmetric(magic(3))          % 0
+       A = magic(3);
+       issymmetric(A + A')            % 1
+
+    Voir aussi ISDIAG, ISTRIL, CHOL, EIG, TRANSPOSE.
+
+### isobject
+ISOBJECT  La valeur est-elle un objet d'une classe définie par
+    l'utilisateur.
+
+    Syntaxe
+       tf = isobject(x)
+
+    Exemples
+       isobject(1)                    % 0
+       isobject(containers.Map())     % 1
+
+    Voir aussi CLASS, ISA, ISSTRUCT.
+
+### lasterr
+LASTERR  Message de la dernière erreur.
+    LASTERR rend le message de la dernière erreur capturée. Il est
+    préférable de lire le champ « message » d'un MException.
+
+    Syntaxe
+       s = lasterr
+
+    Exemples
+       try
+           error('rate');
+       catch
+       end
+       lasterr
+
+    Voir aussi ERROR, MEXCEPTION, RETHROW, TRY.
+
+### eval
+EVAL  Exécute du code écrit dans un texte.
+    EVAL(TEXTE) exécute le texte.
+    X = EVAL(TEXTE) évalue une expression et rend sa valeur.
+    EVAL(TEXTE,SECOURS) exécute SECOURS si le premier échoue.
+
+    Le code écrit dans du texte échappe à toute vérification : quand une
+    autre voie existe — une poignée de fonction, un champ dynamique
+    « s.(nom) », une cellule —, elle est préférable.
+
+    Syntaxe
+       eval(texte)
+       x = eval(texte)
+       eval(texte,secours)
+
+    Exemples
+       eval('a = 1 + 1;');
+       a
+       x = eval('2^10')
+       eval('zzzInconnu', 'disp(''secours'')');
+
+    Voir aussi EVALC, EVALIN, ASSIGNIN, FEVAL, STR2FUNC.
+
+### I
+I  L'unité imaginaire, en majuscule ; synonyme de i.
+
+    Syntaxe
+       I
+
+    Exemples
+       I^2                                % -1
+       isequal(I, 1i)
+
+    Voir aussi I, J, COMPLEX, ABS.
+
+### J
+J  L'unité imaginaire, en majuscule ; synonyme de j.
+
+    Syntaxe
+       J
+
+    Exemples
+       J^2                                % -1
+       isequal(J, 1j)
+
+    Voir aussi J, I, COMPLEX, ABS.
+
+### assertEqual
+ASSERTEQUAL  Vérifie l'égalité de deux valeurs, dans un test.
+    ASSERTEQUAL(A,B) lève une erreur si A et B diffèrent.
+
+    Syntaxe
+       assertEqual(a,b)
+
+    Exemples
+       assertEqual([1 2], [1 2]);
+       try
+           assertEqual(1, 2);
+       catch e
+           disp('différent, comme attendu');
+       end
+
+    Voir aussi ASSERT, ASSERTALMOSTEQUAL, ASSERTERROR, ISEQUAL.
+
+### assertAlmostEqual
+ASSERTALMOSTEQUAL  Vérifie l'égalité à une tolérance près.
+    ASSERTALMOSTEQUAL(A,B) accepte un écart de l'ordre de l'arrondi.
+    ASSERTALMOSTEQUAL(A,B,TOL) impose la tolérance.
+
+    C'est ce qu'il faut pour comparer des flottants : « 0.1+0.2 == 0.3 »
+    est faux.
+
+    Syntaxe
+       assertAlmostEqual(a,b)
+       assertAlmostEqual(a,b,tol)
+
+    Exemples
+       assertAlmostEqual(0.1 + 0.2, 0.3);
+       assertAlmostEqual(pi, 3.14159, 1e-4);
+
+    Voir aussi ASSERTEQUAL, ASSERT, EPS.
+
+### assertElementsAlmostEqual
+ASSERTELEMENTSALMOSTEQUAL  Compare deux tableaux, élément par élément, à
+    une tolérance près.
+
+    Syntaxe
+       assertElementsAlmostEqual(a,b)
+       assertElementsAlmostEqual(a,b,tol)
+
+    Exemples
+       assertElementsAlmostEqual([1 2] + 1e-14, [1 2]);
+
+    Voir aussi ASSERTALMOSTEQUAL, ASSERTEQUAL, ASSERT.
+
+### assertError
+ASSERTERROR  Vérifie qu'un appel lève bien une erreur.
+    ASSERTERROR(F) échoue si F ne lève rien.
+    ASSERTERROR(F,ID) exige en plus l'identifiant.
+
+    Syntaxe
+       assertError(f)
+       assertError(f,id)
+
+    Exemples
+       assertError(@() error('rate'));
+       assertError(@() error('Mon:id','rate'), 'Mon:id');
+
+    Voir aussi ASSERT, ERROR, MEXCEPTION, TRY.

@@ -222,6 +222,17 @@ TOC  Lit le chronomètre.
 ## `weekday`
 
 ```
-weekday  Jour de la semaine.
+WEEKDAY  Jour de la semaine d'une date.
+    [N,NOM] = WEEKDAY(D) rend le numéro — 1 pour dimanche — et son nom.
+
+    Syntaxe
+       n = weekday(d)
+       [n,nom] = weekday(d)
+
+    Exemples
+       [n, nom] = weekday(datenum(2024,5,1));
+       n >= 1 && n <= 7
+
+    Voir aussi DATENUM, DATESTR, DATEVEC, NOW.
 ```
 

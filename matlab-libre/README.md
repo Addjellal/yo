@@ -57,6 +57,9 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   coloration et points d'arrêt, console, explorateur de variables,
   débogueur pas à pas, profileur, concepteur d'applications qui exécute
   vraiment ce qu'il dessine, et éditeur de schémas-blocs qui simule.
+- **Une aide qui ne ment pas** : 491 fonctions ont leur fiche — syntaxe,
+  exemples, fonctions voisines —, et chaque exemple qu'elle montre est
+  exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
   taille fixe, tous les types entiers avec leur saturation, le produit
   matriciel et le contrôle de flux, en C qui n'alloue rien.

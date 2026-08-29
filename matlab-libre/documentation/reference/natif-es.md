@@ -84,7 +84,19 @@ DISP  Affiche une valeur, sans son nom.
 ## `display`
 
 ```
-display  Affiche une valeur avec son nom.
+DISPLAY  Affiche une valeur comme le fait l'invite.
+    DISPLAY(X) écrit « x = ... », nom compris — c'est ce qu'appelle
+    MATLAB quand on tape une expression sans point-virgule.
+
+    Syntaxe
+       display(x)
+
+    Exemples
+       x = 42;
+       display(x)
+       disp(x)                        % sans le nom
+
+    Voir aussi DISP, FPRINTF, FORMAT.
 ```
 
 ## `dlmread`
@@ -470,7 +482,21 @@ INT2STR  Arrondit et écrit en entier.
 ## `lasterr`
 
 ```
-lasterr  Dernier message d'erreur.
+LASTERR  Message de la dernière erreur.
+    LASTERR rend le message de la dernière erreur capturée. Il est
+    préférable de lire le champ « message » d'un MException.
+
+    Syntaxe
+       s = lasterr
+
+    Exemples
+       try
+           error('rate');
+       catch
+       end
+       lasterr
+
+    Voir aussi ERROR, MEXCEPTION, RETHROW, TRY.
 ```
 
 ## `mat2str`
@@ -521,7 +547,18 @@ NUM2STR  Convertit un nombre en texte.
 ## `printf`
 
 ```
-printf  Ecrit du texte formate (sortie standard).
+PRINTF  Affiche du texte formaté ; synonyme hérité du C.
+    PRINTF(FORMAT,...) écrit sur la sortie, comme FPRINTF sans numéro de
+    fichier.
+
+    Syntaxe
+       printf(format,...)
+
+    Exemples
+       printf('%d + %d = %d\n', 2, 3, 5);
+       printf('%s\n', 'texte');
+
+    Voir aussi FPRINTF, SPRINTF, DISP.
 ```
 
 ## `rethrow`

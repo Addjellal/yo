@@ -31,25 +31,76 @@ ASSERT  Vérifie une condition, et lève une erreur sinon.
 ## `assertAlmostEqual`
 
 ```
-assertAlmostEqual  Egalite a une tolerance pres.
+ASSERTALMOSTEQUAL  Vérifie l'égalité à une tolérance près.
+    ASSERTALMOSTEQUAL(A,B) accepte un écart de l'ordre de l'arrondi.
+    ASSERTALMOSTEQUAL(A,B,TOL) impose la tolérance.
+
+    C'est ce qu'il faut pour comparer des flottants : « 0.1+0.2 == 0.3 »
+    est faux.
+
+    Syntaxe
+       assertAlmostEqual(a,b)
+       assertAlmostEqual(a,b,tol)
+
+    Exemples
+       assertAlmostEqual(0.1 + 0.2, 0.3);
+       assertAlmostEqual(pi, 3.14159, 1e-4);
+
+    Voir aussi ASSERTEQUAL, ASSERT, EPS.
 ```
 
 ## `assertElementsAlmostEqual`
 
 ```
-assertElementsAlmostEqual  Egalite element par element.
+ASSERTELEMENTSALMOSTEQUAL  Compare deux tableaux, élément par élément, à
+    une tolérance près.
+
+    Syntaxe
+       assertElementsAlmostEqual(a,b)
+       assertElementsAlmostEqual(a,b,tol)
+
+    Exemples
+       assertElementsAlmostEqual([1 2] + 1e-14, [1 2]);
+
+    Voir aussi ASSERTALMOSTEQUAL, ASSERTEQUAL, ASSERT.
 ```
 
 ## `assertEqual`
 
 ```
-assertEqual  Egalite exacte.
+ASSERTEQUAL  Vérifie l'égalité de deux valeurs, dans un test.
+    ASSERTEQUAL(A,B) lève une erreur si A et B diffèrent.
+
+    Syntaxe
+       assertEqual(a,b)
+
+    Exemples
+       assertEqual([1 2], [1 2]);
+       try
+           assertEqual(1, 2);
+       catch e
+           disp('différent, comme attendu');
+       end
+
+    Voir aussi ASSERT, ASSERTALMOSTEQUAL, ASSERTERROR, ISEQUAL.
 ```
 
 ## `assertError`
 
 ```
-assertError  Verifie qu'une fonction leve une erreur.
+ASSERTERROR  Vérifie qu'un appel lève bien une erreur.
+    ASSERTERROR(F) échoue si F ne lève rien.
+    ASSERTERROR(F,ID) exige en plus l'identifiant.
+
+    Syntaxe
+       assertError(f)
+       assertError(f,id)
+
+    Exemples
+       assertError(@() error('rate'));
+       assertError(@() error('Mon:id','rate'), 'Mon:id');
+
+    Voir aussi ASSERT, ERROR, MEXCEPTION, TRY.
 ```
 
 ## `fail`
@@ -61,6 +112,17 @@ fail  Fait echouer un test.
 ## `runtests`
 
 ```
-runtests  Execute les fichiers de test d'un dossier.
+RUNTESTS  Exécute les scripts de test d'un dossier.
+    RUNTESTS(DOSSIER) exécute les fichiers « test_*.m » et rend le compte
+    rendu.
+
+    Syntaxe
+       resultats = runtests(dossier)
+
+    Exemples
+       % resultats = runtests('tests/scripts');
+       disp('runtests exécute une campagne entière');
+
+    Voir aussi ASSERT, ERROR, PROFILE.
 ```
 
