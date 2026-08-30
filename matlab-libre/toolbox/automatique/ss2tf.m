@@ -1,19 +1,20 @@
 function [num, den] = ss2tf(A, B, C, D, iu)
-%SS2TF Fonction de transfert d'un modèle d'état.
-%   [NUM,DEN] = SS2TF(A,B,C,D) applique H(s) = C (sI - A)^-1 B + D par
-%   l'algorithme de Leverrier-Faddeev : les matrices M_k de l'adjointe
-%   se calculent par récurrence, en même temps que les coefficients du
-%   dénominateur.
+%SS2TF Modèle d'état vers fonction de transfert.
+%   [NUM,DEN] = SS2TF(A,B,C,D) rend les coefficients de la transmittance
+%   C(sI-A)^{-1}B + D, du degré le plus haut au plus bas. Le dénominateur
+%   est le polynôme caractéristique de A.
 %
-%   Avec den(s) = s^n + a1 s^(n-1) + ... + an, l'adjointe vaut
-%   M_0 s^(n-1) + ... + M_(n-1) avec M_0 = I et M_k = A*M_(k-1) + a_k I.
-%   Le numérateur est donc de degré n, et son terme de tête vaut D.
+%   [NUM,DEN] = SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle qui en
+%   a plusieurs.
 %
-%   Exemple :
-%      [n, d] = ss2tf(-1, 1, -1, 1);   % n = [1 0], d = [1 1] : s/(s+1)
+%   Exemples :
+%      [num, den] = ss2tf(-1, 1, 1, 0);
+%      num                                  % 0  1
+%      den                                  % 1  1, soit 1/(s+1)
+%      [n2, d2] = ss2tf([0 1; -2 -3], [0; 1], [1 0], 0);
+%      max(abs(d2 - [1 3 2])) < 1e-12
 %
-%   SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle à plusieurs
-%   entrées : seule la colonne IU de B et de D est retenue.
+%   Voir aussi TF2SS, SSDATA, TFDATA, TF, SS.
     if nargin >= 5 && ~isempty(iu)
         B = B(:, iu);
         if ~isempty(D), D = D(:, iu); end

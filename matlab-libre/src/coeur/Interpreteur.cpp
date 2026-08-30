@@ -1,3 +1,5 @@
+#include <set>
+
 #include "matlibre/Interpreteur.h"
 #include "matlibre/Parallele.h"
 
@@ -1602,6 +1604,24 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
         bool chaineConsommee = false;
         for (const Valeur& base : courant) {
             if (base.classe == Classe::Objet) {
+                // « m.isKey('a') », « m.remove('a') » : l'appel de methode
+                // au point, que MATLAB accepte sur containers.Map comme
+                // sur toute classe.
+                if (estCarte(base) && e.genre == '.' && k + 1 < n->acces.size() &&
+                    n->acces[k + 1].genre == '(') {
+                    static const std::set<std::string> methodes = {
+                        "isKey", "remove", "keys", "values", "length", "Count"};
+                    if (methodes.count(e.nom)) {
+                        std::vector<Valeur> args = {base};
+                        for (Valeur& a : evaluerListe(n->acces[k + 1].args))
+                            args.push_back(std::move(a));
+                        auto r = appeler(e.nom, args, std::max(nargout, 1));
+                        for (auto& x : r) suivant.push_back(x);
+                        ++k;   // le « ( » vient d'etre consomme
+                        dernier = (k + 1 == n->acces.size());
+                        continue;
+                    }
+                }
                 if (estCarte(base) && e.genre == '(') {
                     auto args = evaluerListe(e.args);
                     if (args.size() != 1)

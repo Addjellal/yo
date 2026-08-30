@@ -43,7 +43,10 @@ function P = augw(G, W1, W2, W3)
     p1 = poids(W1, ny);
     p2 = poids(W2, nu);
     p3 = poids(W3, ny);
-    if isempty(p1.C) && isempty(p2.C) && isempty(p3.C)
+    % Une pondération est absente quand elle n'a aucune sortie ; regarder
+    % sa matrice C ne suffit pas : un gain statique n'a pas d'état, donc
+    % un C de zéro colonne, sans être vide pour autant.
+    if size(p1.D, 1) == 0 && size(p2.D, 1) == 0 && size(p3.D, 1) == 0
         error('Robust:design:augw:NoWeight', 'At least one weight must be given.');
     end
     n1 = size(p1.A, 1); n2 = size(p2.A, 1); n3 = size(p3.A, 1);

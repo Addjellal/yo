@@ -11,12 +11,12 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **621 fonctions natives** couvrant le MATLAB de base.
+- **620 fonctions natives** couvrant le MATLAB de base.
   Quatre-vingts d'entre elles — les plus consultées — ont une fiche
   d'aide complète : syntaxe, description, exemples et fonctions
   voisines, dans `toolbox/aide/`. Les autres gardent leur ligne de
   description ; les fiches s'ajoutent sans recompiler.
-- **1067 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1082 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -37,7 +37,7 @@ mieux le lire avant de s'appuyer dessus.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 491 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 605 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -47,13 +47,13 @@ mieux le lire avant de s'appuyer dessus.
   macOS et Windows, paquets `.tar.gz`, `.deb` et `.zip`, gestion des
   toolboxes depuis le langage, intégration continue sur les trois
   systèmes.
-- **Des tests** : 57 vérifications C++ sur le cœur, 21 suites écrites dans le langage
+- **Des tests** : 57 vérifications C++ sur le cœur, 22 suites écrites dans le langage
   — dont une qui contrôle un résultat exact par toolbox, une les types de
   données, une le calcul parallèle, une qui compile puis exécute le C
   produit pour le comparer à l'interpréteur, une qui exécute les 489
   exemples de l'aide — et 148 vérifications du bureau natif, pilotées sans
   ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en plus chacune
-  des 621 fonctions natives avec des arguments qu'elle n'attend pas — une
+  des 620 fonctions natives avec des arguments qu'elle n'attend pas — une
   cellule, une structure, une poignée, une taille absurde, une dimension
   négative — et vérifie qu'elle rend une erreur au lieu de tomber.
 
@@ -173,7 +173,7 @@ totalité.
    L'Image Processing Toolbox en compte 123 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
-   76 : construction et conversion des modèles dans les trois
+   84 : construction et conversion des modèles dans les trois
    représentations — `tf` et `ss` sont des classes, avec les opérateurs
    de MATLAB : `s = tf('s')`, `z = tf('z',Te)`, puis
    `G = 1/(s^2+2*s+1)` s'écrivent comme on les écrit à la main, et

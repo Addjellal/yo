@@ -5,7 +5,7 @@ Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 21 suites en langage MATLAB
+make test       # 57 verifications C++ + 22 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -43,11 +43,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **621 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **620 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **1067 fonctions de toolbox** en langage MATLAB, réparties en
+- **1082 fonctions de toolbox** en langage MATLAB, réparties en
   **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -63,7 +63,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Une aide qui ne ment pas** : 491 fonctions ont leur fiche — syntaxe,
+- **Une aide qui ne ment pas** : 605 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
@@ -190,7 +190,7 @@ make test
 ```
 
 57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 21 suites en langage MATLAB dont une qui
+et les messages d'erreur ; 22 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du

@@ -74,6 +74,49 @@ fprintf('  %d fiches, %d exemples executes\n', nombreFiches, nombreExemples);
 cd(dossierAvant);
 rmdir(bacASable, 's');
 
+%% ------------------------- les exemples des fonctions ecrites en .m
+% Les fiches des fonctions de toolbox suivent la meme regle : leur bloc
+% « Exemples » doit tourner. La verification porte sur les dossiers dont
+% toutes les fiches sont completes ; la liste s'allonge a mesure qu'on
+% les complete, et ce qui y entre ne peut plus en ressortir.
+dossiersVerifies = {'automatique', 'robuste'};
+bacM = tempname();
+mkdir(bacM);
+avant = pwd();
+cd(bacM);
+blocsM = 0;
+echecsM = {};
+for kd = 1:numel(dossiersVerifies)
+    dossierM = fullfile(matlibre_racine(), dossiersVerifies{kd});
+    fichiersM = dir(fullfile(dossierM, '*.m'));
+    for kf = 1:numel(fichiersM)
+        nomM = fichiersM(kf).name(1:end-2);
+        if strcmp(nomM, 'Contents') || strncmp(nomM, 'matlibre_', 9)
+            continue
+        end
+        ficheM = matlibre_aide_structuree(nomM);
+        if isempty(ficheM.Exemples)
+            echecsM{end+1} = [nomM ' : aucun exemple'];   %#ok<SAGROW>
+            continue
+        end
+        if isempty(ficheM.VoirAussi)
+            echecsM{end+1} = [nomM ' : aucun « voir aussi »'];   %#ok<SAGROW>
+        end
+        blocsM = blocsM + 1;
+        messageM = essayerExemple(strjoin(ficheM.Exemples, sprintf('\n')));
+        if ~isempty(messageM)
+            echecsM{end+1} = [nomM ' : ' messageM];   %#ok<SAGROW>
+        end
+    end
+end
+cd(avant);
+rmdir(bacM, 's');
+for k = 1:numel(echecsM)
+    fprintf('  exemple .m casse : %s\n', echecsM{k});
+end
+fprintf('  %d blocs .m executes\n', blocsM);
+assert(isempty(echecsM));
+
 disp('aide : toutes les verifications passent');
 
 % ---------------------------------------------------------------- fonctions
@@ -119,4 +162,16 @@ function code = joindreBloc(bloc)
         morceaux{k} = ligne;
     end
     code = strjoin(morceaux, sprintf('\n'));
+end
+
+% Un bloc d'exemple s'execute dans une portee a lui : sans cela, ce qu'il
+% ecrit ecraserait les variables du test — et un exemple qui pose « n »
+% fausserait le compte des exemples.
+function message = essayerExemple(bloc)
+    message = '';
+    try
+        evalc(bloc);
+    catch e
+        message = e.message;
+    end
 end

@@ -48,6 +48,27 @@
 AUTUMN Carte de couleurs rouge - jaune.
 ```
 
+## `blkdiag`
+
+```
+BLKDIAG Matrice diagonale par blocs.
+  M = BLKDIAG(A,B,...) place les matrices données sur la diagonale d'une
+  matrice plus grande et remplit le reste de zéros. La taille du
+  résultat est la somme des tailles : SUM(LIGNES) par SUM(COLONNES).
+
+  Les blocs n'ont pas à être carrés, ni de la même taille. Un bloc vide
+  n'ajoute rien. Un scalaire est un bloc 1x1.
+
+  Exemple :
+     blkdiag([1 2; 3 4], 5)
+     % ans =
+     %      1     2     0
+     %      3     4     0
+     %      0     0     5
+
+  Voir aussi DIAG, HORZCAT, VERTCAT, KRON, EYE.
+```
+
 ## `bone`
 
 ```
@@ -335,6 +356,33 @@ RAT Approximation rationnelle par fractions continues.
   S = RAT(X) rend la chaîne « n/d ».
 ```
 
+## `readmatrix`
+
+```
+READMATRIX Lit un fichier texte délimité et rend une matrice.
+  M = READMATRIX(FICHIER) lit les nombres d'un fichier délimité — .csv,
+  .txt, .dat — et les rend dans une matrice. Le séparateur est deviné
+  parmi la virgule, le point-virgule, la tabulation et l'espace ; les
+  lignes d'en-tête, celles qui ne portent aucun nombre, sont sautées ;
+  une case vide ou non numérique devient NaN.
+
+  M = READMATRIX(FICHIER,'Delimiter',D) impose le séparateur. D peut
+  être un caractère, ou l'un des noms 'comma', 'semi', 'tab', 'space'.
+
+  M = READMATRIX(FICHIER,'NumHeaderLines',N) saute N lignes en tête, au
+  lieu de les reconnaître.
+
+  M = READMATRIX(FICHIER,'Range','A2') commence à la ligne et à la
+  colonne indiquées, dans la notation des tableurs.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writematrix([1 2; 3 4], f);
+     readmatrix(f)      % [1 2; 3 4]
+
+  Voir aussi WRITEMATRIX, READTABLE, DLMREAD, LOAD.
+```
+
 ## `rescale`
 
 ```
@@ -414,6 +462,29 @@ VECNORM Norme de chaque vecteur d'un tableau.
 
 ```
 WINTER Carte de couleurs bleu - vert.
+```
+
+## `writematrix`
+
+```
+WRITEMATRIX Écrit une matrice dans un fichier texte délimité.
+  WRITEMATRIX(M,FICHIER) écrit la matrice, une ligne par ligne, les
+  valeurs séparées par des virgules. C'est le format .csv, que tout
+  tableur relit.
+
+  WRITEMATRIX(M,FICHIER,'Delimiter',D) impose le séparateur : un
+  caractère, ou l'un des noms 'comma', 'semi', 'tab', 'space'.
+
+  Les nombres sont écrits avec quinze chiffres significatifs, de quoi
+  les relire à l'identique. Un entier s'écrit sans décimales, un NaN
+  « NaN », un infini « Inf ».
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writematrix(magic(4), f);
+     isequal(readmatrix(f), magic(4))   % vrai
+
+  Voir aussi READMATRIX, WRITETABLE, DLMWRITE, SAVE.
 ```
 
 ## `zip`

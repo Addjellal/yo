@@ -72,7 +72,20 @@
 ## `acker`
 
 ```
-ACKER Placement de pôles (identique à PLACE pour une entrée unique).
+ACKER Placement de pôles par la formule d'Ackermann.
+  K = ACKER(A,B,P) rend le gain de retour d'état qui place les pôles de
+  A - B*K aux valeurs P. Le système doit avoir une seule entrée et être
+  commandable.
+
+  Pour plusieurs entrées, le placement n'est plus unique : c'est PLACE
+  qu'il faut, qui choisit alors le gain le mieux conditionné.
+
+  Exemple :
+     A = [0 1; 0 0]; B = [0; 1];
+     K = acker(A, B, [-2 -3]);
+     sort(eig(A - B*K))          % -3  -2
+
+  Voir aussi PLACE, LQR, CTRB, POLE, EIG.
 ```
 
 ## `allmargin`
@@ -164,29 +177,99 @@ BALRED Réduction d'ordre par troncature équilibrée.
 ## `bandwidth`
 
 ```
-BANDWIDTH Bande passante d'un système.
+BANDWIDTH Bande passante d'un modèle.
   W = BANDWIDTH(SYS) rend la première pulsation où le gain descend de
-  3 décibels sous sa valeur en continu. BANDWIDTH(SYS,CHUTE) choisit
-  une autre chute, en décibels (négative).
+  trois décibels sous sa valeur en continu : la limite au-delà de
+  laquelle le système ne suit plus.
 
-  Exemple :
-     bandwidth(tf(1, [1 1]))   % 1 rad/s
+  W = BANDWIDTH(SYS,CHUTE) choisit une autre chute, en décibels, donnée
+  négative.
+
+  Le gain statique doit être fini et non nul ; sinon la fonction rend
+  NaN, faute de référence à laquelle comparer.
+
+  Exemples :
+     bandwidth(tf(1, [1 1]))          % 1 rad/s
+     bandwidth(tf(1, [1 1]), -6)      % la pulsation a -6 dB
+
+  Voir aussi DCGAIN, BODE, MARGIN, STEPINFO.
 ```
 
 ## `bode`
 
 ```
-BODE Réponse fréquentielle : module et phase.
-  [MODULE,PHASE,W] = BODE(SYS) rend le module (linéaire) et la phase en
-  degrés. Sans sortie, la fonction trace les deux diagrammes.
+BODE Diagramme de Bode : module et phase de la réponse fréquentielle.
+  BODE(SYS) trace le gain en décibels et la phase en degrés du modèle
+  SYS en fonction de la pulsation, l'abscisse en échelle logarithmique.
+  Le gain occupe la moitié haute de la case courante, la phase la
+  moitié basse.
+
+  BODE(SYS,W) impose la grille de pulsations, en radians par seconde :
+  un vecteur, ou {WMIN,WMAX} pour n'en donner que les bornes.
+
+  BODE(SYS1,SYS2,...) superpose plusieurs modèles. Une chaîne de style
+  peut suivre chacun d'eux, comme dans PLOT :
+  BODE(SYS1,'b',SYS2,'r--',W).
+
+  [MODULE,PHASE] = BODE(SYS) ne trace rien et rend le module — linéaire,
+  pas en décibels — et la phase en degrés. [MODULE,PHASE,W] = BODE(SYS)
+  rend en plus la grille employée. Avec des sorties, un seul modèle est
+  accepté, comme dans MATLAB.
+
+  Pour un modèle échantillonné, la réponse est évaluée sur le cercle
+  unité, en exp(j*W*Ts) ; pour un modèle continu, en j*W.
+
+  Exemples :
+     bode(tf(1, [1 2 1]))
+     bode(tf(1, [1 1]), tf(1, [1 0.2 1]), logspace(-2, 2, 500))
+     [m, p] = bode(tf(1, [1 1]), 1);   % m = 0.7071, p = -45
+
+  Voir aussi BODEMAG, NICHOLS, NYQUIST, SIGMA, MARGIN, FREQRESP.
+```
+
+## `bodemag`
+
+```
+BODEMAG Diagramme de Bode du seul module.
+  BODEMAG(SYS) trace le gain en décibels du modèle SYS en fonction de
+  la pulsation, l'abscisse en échelle logarithmique. La phase n'est pas
+  dessinée : c'est le seul point qui sépare BODEMAG de BODE, et il tient
+  toute la case courante au lieu de la moitié.
+
+  BODEMAG(SYS,W) impose la grille de pulsations, en radians par
+  seconde : un vecteur, ou {WMIN,WMAX} pour n'en donner que les bornes.
+
+  BODEMAG(SYS1,SYS2,...,W) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT.
+
+  [MODULE,W] = BODEMAG(SYS) ne trace rien et rend le module linéaire et
+  la grille employée.
+
+  Exemple :
+     G = tf(1, [1 0.2 1]);
+     bodemag(feedback(G, 1), 'b', G, 'r--')
+
+  Voir aussi BODE, SIGMA, NICHOLS, FREQRESP.
 ```
 
 ## `c2d`
 
 ```
 C2D Discrétisation d'un modèle continu.
-  SYSD = C2D(SYS,TS) utilise le bloqueur d'ordre zéro.
-  SYSD = C2D(SYS,TS,'tustin') utilise la transformation bilinéaire.
+  SYSD = C2D(SYS,TS) échantillonne le modèle à la période TS par
+  bloqueur d'ordre zéro : l'entrée est supposée constante entre deux
+  instants, ce qui est le cas derrière un convertisseur numérique.
+
+  SYSD = C2D(SYS,TS,'tustin') emploie la transformation bilinéaire, qui
+  conserve mieux la réponse fréquentielle près de la fréquence de
+  Nyquist, au prix d'une légère distorsion.
+
+  Exemples :
+     d = c2d(tf(1, [1 1]), 0.1);
+     d.Ts                             % 0.1
+     abs(dcgain(d) - dcgain(tf(1, [1 1]))) < 1e-9    % le gain statique tient
+
+  Voir aussi D2C, D2D, TUSTIN, SS, TF.
 ```
 
 ## `canon`
@@ -216,20 +299,22 @@ CANON Formes canoniques d'un modèle d'état.
 
 ```
 CARE Équation de Riccati algébrique continue.
-  X = CARE(A,B,Q,R) résout A'X + XA - XBR^{-1}B'X + Q = 0.
-  [X,K,P] = CARE(...) rend aussi le gain K = R^{-1}B'X et les pôles de
-  la boucle fermée.
+  X = CARE(A,B,Q,R) résout A'X + XA - XBR^{-1}B'X + Q = 0 et rend la
+  solution stabilisante : celle qui rend A - B*R^{-1}B'X stable. C'est
+  elle qui donne le gain optimal de la commande linéaire quadratique.
 
-  La solution stabilisante s'obtient par la matrice hamiltonienne
-     H = [ A      -B R^{-1} B'
-          -Q      -A'        ]
-  dont le sous-espace propre stable, engendré par les colonnes
-  [X1; X2], donne X = X2 / X1. C'est la construction de Potter, exacte
-  dès que le problème admet une solution stabilisante.
+  [X,K,P] = CARE(...) rend en plus K = R^{-1}B'X et les pôles P de la
+  boucle fermée.
 
-  Exemple :
-     care(0, 1, 1, 1)     % 1
-     care([0 1; 0 0], [0; 1], eye(2), 1)
+  La solution vient du sous-espace propre stable de la matrice
+  hamiltonienne associée.
+
+  Exemples :
+     care(0, 1, 1, 1)                 % 1
+     [X, K] = care([0 1; 0 0], [0; 1], eye(2), 1);
+     max(real(eig([0 1; 0 0] - [0; 1] * K))) < 0     % la boucle est stable
+
+  Voir aussi DARE, LQR, LYAP, HINFSYN.
 ```
 
 ## `covar`
@@ -257,7 +342,19 @@ COVAR Covariance de la réponse à un bruit blanc.
 ## `ctrb`
 
 ```
-CTRB Matrice de commandabilité [B AB A^2B ...].
+CTRB Matrice de commandabilité.
+  M = CTRB(A,B) rend [B AB A^2B ... A^(n-1)B]. Le système est
+  commandable — on peut mener l'état où l'on veut — si et seulement si
+  cette matrice est de rang plein.
+
+  M = CTRB(SYS) prend les matrices du modèle.
+
+  Exemples :
+     rank(ctrb([0 1; 0 0], [0; 1]))       % 2 : commandable
+     rank(ctrb([1 0; 0 2], [1; 0]))       % 1 : le second etat ne bouge pas
+     size(ctrb(ss(-1, 1, 1, 0)))          % 1  1
+
+  Voir aussi OBSV, CTRBF, GRAM, MINREAL, RANK.
 ```
 
 ## `ctrbf`
@@ -288,7 +385,19 @@ CTRBF Forme échelonnée de commandabilité.
 ## `d2c`
 
 ```
-D2C Repasse un modèle discret en continu (logarithme matriciel).
+D2C Retour au continu d'un modèle échantillonné.
+  SYSC = D2C(SYSD) rend le modèle continu dont la discrétisation par
+  bloqueur d'ordre zéro redonne SYSD. C'est l'opération inverse de C2D,
+  au bruit numérique près.
+
+  SYSC = D2C(SYSD,'tustin') emploie la transformation bilinéaire.
+
+  Exemples :
+     d = c2d(tf(1, [1 1]), 0.05);
+     c = d2c(d);
+     abs(dcgain(c) - 1) < 1e-6            % le gain statique est rendu
+
+  Voir aussi C2D, D2D, SS, TF.
 ```
 
 ## `d2d`
@@ -313,38 +422,58 @@ D2D Rééchantillonnage d'un modèle discret.
 
 ```
 DAMP Pulsations propres et amortissements.
-  [WN,ZETA] = DAMP(SYS) rend, pour chaque pôle, la pulsation propre et
-  le coefficient d'amortissement.
+  [WN,ZETA] = DAMP(SYS) rend, pour chaque pôle, la pulsation propre WN
+  en radians par seconde et le coefficient d'amortissement ZETA. Un
+  ZETA sous 0.7 annonce un dépassement ; sous 0.3, des oscillations
+  marquées ; négatif, l'instabilité.
+
+  [WN,ZETA,P] = DAMP(SYS) rend aussi les pôles. Pour un modèle
+  échantillonné, ils sont d'abord ramenés au continu par log(z)/Ts.
+
+  Exemples :
+     [wn, zeta] = damp(tf(1, [1 0.4 1]));
+     wn(1)                                % 1 rad/s
+     zeta(1)                              % 0.2, peu amorti
+
+  Voir aussi POLE, PZMAP, STEPINFO, EIG.
 ```
 
 ## `dare`
 
 ```
 DARE Équation de Riccati algébrique discrète.
-  X = DARE(A,B,Q,R) résout A'XA - X - A'XB(B'XB+R)^{-1}B'XA + Q = 0.
-  [X,K] = DARE(...) rend le gain K = (B'XB+R)^{-1}B'XA.
-  [X,K,P] = DARE(...) rend en plus les pôles de la boucle fermée.
+  X = DARE(A,B,Q,R) résout A'XA - X - A'XB(B'XB+R)^{-1}B'XA + Q = 0 et
+  rend la solution stabilisante. C'est l'équation de la commande
+  linéaire quadratique à temps discret.
 
-  La solution stabilisante est lue sur le sous-espace invariant stable
-  de la matrice symplectique
+  [X,K,P] = DARE(...) rend en plus le gain K = (B'XB+R)^{-1}B'XA et les
+  pôles de la boucle fermée.
 
-     Z = [ A + B R^{-1} B' A^{-T} Q   -B R^{-1} B' A^{-T}
-          -A^{-T} Q                    A^{-T}            ]
+  Exemples :
+     X = dare(0.5, 1, 1, 1);
+     abs(0.5^2*X - X - 0.5^2*X^2/(X+1) + 1) < 1e-9   % l'equation est verifiee
+     [~, K] = dare(0.5, 1, 1, 1);
+     abs(0.5 - K) < 1                     % la boucle fermee est dans le cercle
 
-  dont les valeurs propres vont par paires (lambda, 1/lambda) : les n
-  qui sont dans le cercle unité engendrent [X1; X2], et X = X2/X1.
-  Quand A est singulière, cette construction n'existe pas et on retombe
-  sur l'itération de Riccati, qui converge linéairement.
-
-  Exemple :
-     dare(1, 1, 1, 1)   % (1 + sqrt(5)) / 2, le nombre d'or
+  Voir aussi CARE, DLQR, DLYAP, LQR.
 ```
 
 ## `dcgain`
 
 ```
 DCGAIN Gain statique d'un modèle.
-  Pour un modèle continu, c'est H(0) ; en discret, H(1).
+  K = DCGAIN(SYS) rend le gain que le modèle applique à une entrée
+  constante : H(0) en temps continu, H(1) en discret. C'est le rapport
+  entre la sortie et l'entrée une fois le régime établi.
+
+  Un intégrateur donne un gain infini ; un dérivateur, un gain nul.
+
+  Exemples :
+     dcgain(tf(10, [1 2]))                % 5
+     dcgain(tf(1, [1 0]))                 % Inf : un integrateur
+     dcgain(ss(-1, 1, 1, 0))              % 1
+
+  Voir aussi BANDWIDTH, STEPINFO, EVALFR, FREQRESP.
 ```
 
 ## `dlqr`
@@ -367,9 +496,20 @@ DLQR Commande linéaire quadratique en temps discret.
 ## `dlyap`
 
 ```
-DLYAP Équation de Lyapunov discrète : A*X*A' - X + Q = 0.
-  Exemple :
-     dlyap(0.5, 1)   % 1/(1-0.25) = 1.3333
+DLYAP Équation de Lyapunov discrète.
+  X = DLYAP(A,Q) résout A*X*A' - X + Q = 0. La solution existe et est
+  unique quand aucun produit de deux valeurs propres de A ne vaut 1 —
+  en particulier quand A est stable au sens discret.
+
+  Pour un système stable et Q = B*B', X est le grammien de
+  commandabilité : l'énergie que l'entrée peut mettre dans chaque état.
+
+  Exemples :
+     X = dlyap(0.5, 1);
+     abs(0.25*X - X + 1) < 1e-12          % l'equation est verifiee
+     X                                    % 1.3333
+
+  Voir aussi LYAP, DARE, GRAM.
 ```
 
 ## `dsort`
@@ -442,8 +582,25 @@ EVALFR Valeur de la transmittance en un point du plan complexe.
 
 ```
 FEEDBACK Boucle fermée.
-  SYS = FEEDBACK(G,H) rend G/(1+GH) : contre-réaction négative.
-  SYS = FEEDBACK(G,H,+1) rend G/(1-GH).
+  SYS = FEEDBACK(G,H) ferme la boucle sur une contre-réaction négative :
+  la sortie de G passe par H et se retranche de l'entrée. Pour un modèle
+  monovariable, c'est G/(1+GH).
+
+  SYS = FEEDBACK(G,H,+1) somme au lieu de retrancher : G/(1-GH).
+
+  SYS = FEEDBACK(G,1) referme la boucle sur un retour unitaire ; c'est
+  la forme la plus courante.
+
+  Les modèles à plusieurs entrées et sorties sont acceptés : le calcul
+  se fait alors dans l'espace d'état, avec la matrice I - S*D2*D1 qui
+  doit être inversible — sans quoi la boucle est algébrique, et le
+  message le dit.
+
+  Exemples :
+     T = feedback(tf(10, [1 1]), 1)          % 10/(s+11)
+     T = feedback(ss(-1,1,1,0), eye(1))      % en modèle d'état
+
+  Voir aussi SERIES, PARALLEL, LFT, APPEND, CONNECT.
 ```
 
 ## `filt`
@@ -511,11 +668,23 @@ GENSIG Signaux d'essai périodiques.
 
 ```
 GRAM Grammiens de commandabilité et d'observabilité.
-  W = GRAM(SYS,'c') résout A*W + W*A' + B*B' = 0 ;
-  W = GRAM(SYS,'o') résout A'*W + W*A + C'*C = 0.
+  W = GRAM(SYS,'c') résout A*W + W*A' + B*B' = 0 : le grammien de
+  commandabilité, qui mesure l'énergie qu'il faut pour atteindre chaque
+  direction de l'état.
 
-  Exemple :
-     gram(ss(-1, 1, 1, 0), 'c')   % 0.5
+  W = GRAM(SYS,'o') résout A'*W + W*A + C'*C = 0 : le grammien
+  d'observabilité, qui mesure l'énergie que chaque direction envoie
+  dans la sortie.
+
+  Les directions que les deux grammiens ignorent sont celles qu'on peut
+  retirer du modèle : c'est le principe de la réduction équilibrée.
+
+  Exemples :
+     gram(ss(-1, 1, 1, 0), 'c')           % 0.5
+     gram(ss(-1, 1, 1, 0), 'o')           % 0.5
+     det(gram(ss([-1 0; 0 -2], eye(2), eye(2), zeros(2)), 'c')) > 0
+
+  Voir aussi CTRB, OBSV, BALREAL, HSVD, LYAP.
 ```
 
 ## `hsvd`
@@ -542,17 +711,40 @@ HSVD Valeurs singulières de Hankel d'un modèle stable.
 
 ```
 IMPULSE Réponse impulsionnelle.
+  IMPULSE(SYS) trace la réponse du modèle SYS à une impulsion de Dirac,
+  obtenue en dérivant la réponse indicielle.
+
+  IMPULSE(SYS,TFINAL) impose l'horizon, en secondes ; IMPULSE(SYS,T)
+  impose la grille de temps.
+
+  IMPULSE(SYS1,SYS2,...,T) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT.
+
+  [Y,T] = IMPULSE(SYS) ne trace rien et rend la réponse et les instants.
+
+  Exemple :
+     impulse(tf(1, [1 0.4 1]))
+
+  Voir aussi STEP, LSIM, INITIAL.
 ```
 
 ## `initial`
 
 ```
-INITIAL Réponse libre d'un système d'état à une condition initiale.
-  [Y,T,X] = INITIAL(SYS,X0,TFINAL) intègre xdot = A x sans entrée.
+INITIAL Réponse libre à une condition initiale.
+  [Y,T,X] = INITIAL(SYS,X0) intègre xdot = A*x sans entrée, en partant
+  de l'état X0, et rend la sortie, les instants et la trajectoire de
+  l'état. Sans sortie demandée, la fonction trace la réponse.
 
-  Exemple :
+  [Y,T,X] = INITIAL(SYS,X0,TFINAL) impose l'horizon.
+
+  Exemples :
      s = ss(-1, 0, 1, 0);
-     y = initial(s, 1, 5);   % y(1) == 1, décroissance en exp(-t)
+     y = initial(s, 1, 5);
+     abs(y(1) - 1) < 1e-9                 % on part bien de x0
+     y(end) < 0.01                        % et l'on decroit en exp(-t)
+
+  Voir aussi STEP, IMPULSE, LSIM, SS.
 ```
 
 ## `isct`
@@ -613,24 +805,72 @@ ISSISO Le modèle a-t-il une entrée et une sortie ?
 ## `kalman`
 
 ```
-KALMAN Filtre de Kalman en régime permanent.
-  [EST,L,P] = KALMAN(SYS,Q,R) rend le gain L, la covariance P et le
-  système estimateur dont l'état suit celui de SYS.
+KALMAN Filtre de Kalman d'un modèle d'état.
+  [KEST,L,P] = KALMAN(SYS,QN,RN) rend l'estimateur optimal de l'état,
+  le gain L et la covariance P de l'erreur, pour un bruit d'état de
+  covariance QN et un bruit de mesure de covariance RN.
 
-  Le modèle est dx/dt = Ax + Bu + w, y = Cx + Du + v, avec w de
-  covariance Q et v de covariance R.
+  L'estimateur suit xchapeau' = A*xchapeau + B*u + L*(y - C*xchapeau) :
+  il corrige sa prédiction proportionnellement à l'écart constaté.
+
+  Exemples :
+     [kest, L] = kalman(ss(-1, 1, 1, 0), 1, 1);
+     L > 0                                % le gain corrige dans le bon sens
+     max(real(eig(-1 - L))) < 0           % l'observateur converge
+
+  Voir aussi LQE, LQR, LQG, CARE, ESTIM.
+```
+
+## `lft`
+
+```
+LFT Produit étoile de Redheffer : rebouclage partiel de deux modèles.
+  SYS = LFT(SYS1,SYS2) relie les dernières sorties de SYS1 aux premières
+  entrées de SYS2, et les premières sorties de SYS2 aux dernières
+  entrées de SYS1. Ce qui reste — les premières voies de SYS1 et les
+  dernières de SYS2 — devient l'entrée et la sortie du résultat.
+
+  Le nombre de voies reliées est le plus grand possible. Quand SYS2 est
+  le plus petit, tout SYS2 se referme et l'on obtient la boucle basse
+  F_l(SYS1,SYS2) — celle qui referme un correcteur sur un modèle
+  augmenté. Quand c'est SYS1, on obtient la boucle haute F_u(SYS2,SYS1)
+  — celle de l'analyse de robustesse, où l'incertitude referme le haut
+  du schéma.
+
+  SYS = LFT(SYS1,SYS2,NU,NY) impose le nombre de voies : NU sorties de
+  SYS1 vers SYS2, NY sorties de SYS2 vers SYS1.
+
+  En partitionnant SYS1 en [S11 S12 ; S21 S22] et SYS2 en
+  [T11 T12 ; T21 T22] selon ce découpage, et avec M = inv(I - T11*S22) :
+     R11 = S11 + S12*M*T11*S21     R12 = S12*M*T12
+     R21 = T21*(I + S22*M*T11)*S21 R22 = T22 + T21*S22*M*T12
+
+  Exemple :
+     P = augw(tf(1, [1 1]), 1, [], 1);
+     K = ss(-1, 1, 1, 0);
+     T = lft(P, K);            % la boucle fermée, pondérations comprises
+
+  Voir aussi FEEDBACK, SERIES, APPEND, HINFSYN, AUGW.
 ```
 
 ## `lqe`
 
 ```
-LQE Estimateur linéaire quadratique : le gain du filtre de Kalman.
-  [L,P] = LQE(A,G,C,Q,R) résout l'équation de Riccati duale et rend le
-  gain L = P*C'/R, où P est la covariance d'estimation en régime
-  permanent.
+LQE Gain d'un estimateur linéaire quadratique.
+  [L,P,E] = LQE(A,G,C,Q,R) rend le gain L de l'observateur qui minimise
+  la variance de l'erreur d'estimation, la solution P de l'équation de
+  Riccati et les pôles E de l'observateur. Q est la covariance du bruit
+  d'état, R celle du bruit de mesure.
 
-  Exemple :
-     L = lqe(0, 1, 1, 1, 1);   % 1
+  C'est le dual de LQR : plus le bruit de mesure est fort, plus le gain
+  est faible et l'estimateur prudent.
+
+  Exemples :
+     L = lqe(-1, 1, 1, 1, 1);
+     L > 0                                % vrai
+     max(real(eig(-1 - L * 1))) < -1      % l'observateur va plus vite
+
+  Voir aussi LQR, KALMAN, CARE, PLACE.
 ```
 
 ## `lqi`
@@ -724,43 +964,216 @@ LQRY Commande linéaire quadratique pondérée sur la sortie.
 ## `lsim`
 
 ```
-LSIM Réponse d'un modèle à une entrée quelconque.
-  [Y,T] = LSIM(SYS,U,T) simule la réponse à l'entrée U aux instants T.
-  La discrétisation se fait par bloqueur d'ordre zéro sur le pas moyen.
+LSIM Réponse à une entrée quelconque.
+  [Y,T,X] = LSIM(SYS,U,T) simule la réponse du modèle à l'entrée U
+  échantillonnée aux instants T. L'entrée est interpolée linéairement
+  entre deux instants ; le pas doit être assez fin devant les
+  constantes de temps du modèle.
+
+  [Y,T,X] = LSIM(SYS,U,T,X0) part d'une condition initiale.
+
+  Exemples :
+     t = linspace(0, 5, 200)';
+     y = lsim(tf(1, [1 1]), ones(size(t)), t);
+     abs(y(end) - 1) < 0.02               % la reponse indicielle converge vers 1
+     y2 = lsim(tf(1, [1 1]), sin(t), t);
+     max(abs(y2)) < 1                     % un premier ordre attenue
+
+  Voir aussi STEP, IMPULSE, INITIAL, GENSIG.
 ```
 
 ## `lyap`
 
 ```
 LYAP Équation de Lyapunov continue.
-  X = LYAP(A,Q) résout A*X + X*A' + Q = 0.
-  X = LYAP(A,B,C) résout A*X + X*B + C = 0 (Sylvester).
+  X = LYAP(A,Q) résout A*X + X*A' + Q = 0. La solution existe et est
+  unique quand aucune somme de deux valeurs propres de A n'est nulle —
+  en particulier quand A est stable.
 
-  La résolution passe par la forme vectorisée : le produit de
-  Kronecker transforme l'équation matricielle en système linéaire.
+  X = LYAP(A,B,C) résout l'équation de Sylvester A*X + X*B + C = 0.
 
-  Exemple :
-     lyap(-1, 1)   % 0.5
+  Pour A stable et Q définie positive, X définie positive prouve la
+  stabilité : c'est le théorème de Lyapunov, et la fonction V = x'Xx
+  décroît le long des trajectoires.
+
+  Exemples :
+     X = lyap(-1, 2);
+     abs(-X - X + 2) < 1e-12              % l'equation est verifiee
+     X                                    % 1
+     min(eig(lyap([-1 0; 0 -2], eye(2)))) > 0     % definie positive
+
+  Voir aussi DLYAP, CARE, GRAM, EIG.
 ```
 
 ## `margin`
 
 ```
 MARGIN Marges de gain et de phase.
-  [GM,PM,WGM,WPM] = MARGIN(SYS) rend la marge de gain (linéaire), la
-  marge de phase (degrés) et les pulsations correspondantes.
+  [GM,PM,WCG,WCP] = MARGIN(SYS) rend la marge de gain — linéaire, non en
+  décibels —, la marge de phase en degrés, et les deux pulsations où
+  elles se lisent : WCG là où la phase traverse -180 degrés, WCP là où
+  le gain traverse 0 dB.
+
+  [GM,PM,WCG,WCP] = MARGIN(MAG,PHASE,W) part d'une réponse déjà
+  calculée, telle que la rend BODE : MAG linéaire, PHASE en degrés.
+
+  MARGIN(SYS) sans sortie trace le diagramme de Bode et marque les deux
+  traversées, avec les marges en titre.
+
+  Une marge infinie signale que la traversée n'a pas lieu sur la grille
+  examinée : la phase ne descend jamais à -180 degrés, ou le gain ne
+  passe jamais sous 0 dB.
+
+  Exemple :
+     [gm, pm] = margin(tf(1, [1 2 1 0]));   % gm = 2, pm = 21.4 degrés
+
+  Voir aussi ALLMARGIN, BODE, NICHOLS, NYQUIST.
+```
+
+## `matlibre_arguments_lti`
+
+```
+MATLIBRE_ARGUMENTS_LTI Découpe la liste d'arguments d'un tracé LTI.
+  [MODELES,STYLES,W] = MATLIBRE_ARGUMENTS_LTI(ENTREES) sépare la liste
+  (SYS1,'STYLE1',SYS2,'STYLE2',...,W) que partagent BODE, BODEMAG,
+  SIGMA, STEP et les autres tracés de l'automatique.
+
+  ENTREES est le tableau de cellules des arguments reçus — VARARGIN.
+  MODELES rend les modèles dans l'ordre, STYLES la chaîne de style de
+  chacun — vide là où l'appelant n'en a pas donné —, et W le dernier
+  argument lorsqu'il vient après un modèle : la grille de pulsations
+  d'un tracé fréquentiel, l'horizon ou la grille de temps d'un tracé
+  temporel. Les bornes {WMIN,WMAX} sont acceptées et développées en
+  deux cents points logarithmiquement espacés, comme dans MATLAB.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi BODE, BODEMAG, SIGMA, STEP.
+```
+
+## `matlibre_cases_bode`
+
+```
+MATLIBRE_CASES_BODE Coupe la case courante en deux, pour un Bode.
+  [HAUT,BAS] = MATLIBRE_CASES_BODE() remplace l'axe courant par deux
+  axes qui se partagent sa place : le gain en haut, la phase en bas.
+  C'est ainsi que MATLAB dessine un diagramme de Bode dans une case de
+  SUBPLOT sans déranger les autres.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi BODE, MARGIN, SUBPLOT, AXES.
+```
+
+## `matlibre_est_siso_tf`
+
+```
+MATLIBRE_EST_SISO_TF Vrai si l'objet se met en polynômes sans perte.
+  Les interconnexions gardent la forme polynomiale tant que tout est
+  monovariable : le résultat s'écrit alors comme dans un cours, en
+  numérateur sur dénominateur. Dès qu'un modèle d'état à plusieurs
+  voies entre en jeu, le calcul passe dans l'espace d'état.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi FEEDBACK, SERIES, PARALLEL.
+```
+
+## `matlibre_grille_temps`
+
+```
+MATLIBRE_GRILLE_TEMPS Grille de temps d'une simulation.
+  T = MATLIBRE_GRILLE_TEMPS(SYS,TEMPS) rend la grille sur laquelle
+  simuler le modèle SYS. TEMPS vide la fait choisir d'après les pôles :
+  huit fois la constante de temps la plus lente, bornée entre une
+  seconde et mille, en quatre cents points. Un scalaire donne l'horizon,
+  un vecteur donne la grille elle-même.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi STEP, IMPULSE, LSIM.
+```
+
+## `matlibre_pulsations`
+
+```
+MATLIBRE_PULSATIONS Grille de pulsations automatique d'un modèle.
+  W = MATLIBRE_PULSATIONS(SYS) rend deux cents pulsations
+  logarithmiquement espacées, centrées sur la moyenne géométrique des
+  pôles et des zéros non nuls du modèle et couvrant deux décades de
+  part et d'autre. C'est la grille que choisissent BODE, SIGMA et
+  NYQUIST quand l'appelant n'en donne pas.
+
+  W = MATLIBRE_PULSATIONS(SYS,N) en rend N.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi BODE, LOGSPACE.
+```
+
+## `matlibre_riccati`
+
+```
+MATLIBRE_RICCATI Solution stabilisante d'une équation de Riccati.
+  [X,OK] = MATLIBRE_RICCATI(A,S,Q) résout
+
+     A'*X + X*A + X*S*X + Q = 0
+
+  et rend la solution stabilisante : celle qui rend A + S*X stable. OK
+  est faux quand elle n'existe pas — c'est ainsi que la synthèse
+  H-infini apprend qu'un GAMMA est trop petit.
+
+  La solution vient du sous-espace invariant stable de la matrice
+  hamiltonienne
+
+     H = [ A   S ; -Q  -A' ]
+
+  dont une base [U1; U2] donne X = U2/U1. Ce sous-espace est cherché de
+  deux façons, parce qu'aucune ne suffit seule :
+
+    - par les vecteurs propres, exacte quand les valeurs propres sont
+      distinctes, mise en défaut dès que deux pôles se confondent — un
+      modèle avec un pôle double en donne aussitôt ;
+    - par la fonction signe, dont l'itération de Newton
+      Z <- (Z + inv(Z))/2 converge vers une matrice dont (I - Z)/2
+      projette sur le sous-espace stable, pôles doubles ou non, mais qui
+      perd en précision sur une matrice mal conditionnée.
+
+  On garde celle des deux qui laisse le plus petit résidu, et l'on
+  vérifie qu'elle stabilise vraiment. Une solution qui ne passe ni l'un
+  ni l'autre contrôle est refusée : c'est le cas sans solution.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi CARE, DARE, HINFSYN.
 ```
 
 ## `minreal`
 
 ```
-MINREAL Réalisation minimale : supprime les pôles et zéros qui s'annulent.
-  SYS = MINREAL(SYS,TOL) compare les racines du numérateur et du
-  dénominateur, et retire les paires plus proches que TOL.
+MINREAL Réalisation minimale d'un modèle.
+  SYSR = MINREAL(SYS) retire les états que la commande n'atteint pas et
+  ceux que la sortie ne voit pas : le modèle rendu a la même
+  transmittance, avec le moins d'états possible.
 
-  Exemple :
-     s = minreal(tf(conv([1 2], [1 1]), conv([1 2], [1 3])));
-     s.den   % [1 3] : le pôle en -2 a disparu
+  SYSR = MINREAL(SYS,TOL) choisit la tolérance sous laquelle un mode
+  est jugé non commandable ou non observable.
+
+  C'est ce qu'il faut après un assemblage par produits et boucles, qui
+  empile des états sans s'occuper des redondances.
+
+  Exemples :
+     g = tf(conv([1 1], [1 2]), conv([1 1], [1 3]));
+     order(ss(minreal(g)))                % 1 : le pole en -1 s'est simplifie
+     abs(dcgain(minreal(g)) - dcgain(g)) < 1e-9
+
+  Voir aussi SSDATA, CTRB, OBSV, BALREAL, ZERO.
 ```
 
 ## `modred`
@@ -792,13 +1205,21 @@ MODRED Élimination d'états d'un modèle.
 
 ```
 NICHOLS Diagramme de Nichols : gain en décibels contre phase.
-  [MAG,PHASE,W] = NICHOLS(SYS) rend le module (linéaire) et la phase en
-  degrés, comme BODE. La différence est dans le tracé : sans sortie, la
-  fonction porte le gain en ordonnée et la phase en abscisse, ce qui
-  fait apparaître d'un coup les deux marges.
+  NICHOLS(SYS) porte le gain en ordonnée et la phase en abscisse : les
+  deux marges se lisent d'un coup sur la même courbe, autour du point
+  critique (-180 degrés, 0 dB).
+
+  NICHOLS(SYS,W) impose la grille de pulsations, en radians par seconde.
+
+  NICHOLS(SYS1,SYS2,...,W) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT.
+
+  [MAG,PHASE,W] = NICHOLS(SYS) ne trace rien et rend le module —
+  linéaire, pas en décibels —, la phase en degrés et la grille, comme
+  BODE.
 
   Exemple :
-     [m, p] = nichols(tf(1, [1 1 1]));
+     nichols(tf(1, [1 1 1]))
 
   Voir aussi BODE, NYQUIST, MARGIN.
 ```
@@ -807,12 +1228,41 @@ NICHOLS Diagramme de Nichols : gain en décibels contre phase.
 
 ```
 NYQUIST Lieu de Nyquist.
+  NYQUIST(SYS) trace, dans le plan complexe, la réponse fréquentielle du
+  modèle SYS quand la pulsation parcourt tout l'axe imaginaire : la
+  partie positive, puis son image par symétrie. Le point -1 dit la
+  stabilité de la boucle fermée — c'est le critère de Nyquist.
+
+  NYQUIST(SYS,W) impose la grille de pulsations, en radians par seconde.
+
+  NYQUIST(SYS1,SYS2,...,W) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT.
+
+  [RE,IM] = NYQUIST(SYS) ne trace rien et rend les parties réelle et
+  imaginaire ; [RE,IM,W] = NYQUIST(SYS) rend en plus la grille.
+
+  Exemple :
+     nyquist(tf(1, [1 1 1]))
+
+  Voir aussi BODE, NICHOLS, MARGIN.
 ```
 
 ## `obsv`
 
 ```
-OBSV Matrice d'observabilité [C; CA; CA^2; ...].
+OBSV Matrice d'observabilité.
+  M = OBSV(A,C) rend [C; CA; CA^2; ... ; CA^(n-1)]. Le système est
+  observable — l'état se reconstruit à partir de la sortie — si et
+  seulement si cette matrice est de rang plein.
+
+  M = OBSV(SYS) prend les matrices du modèle.
+
+  Exemples :
+     rank(obsv([0 1; 0 0], [1 0]))        % 2 : observable
+     rank(obsv([1 0; 0 2], [1 0]))        % 1 : le second etat reste cache
+     size(obsv(ss(-1, 1, 1, 0)))          % 1  1
+
+  Voir aussi CTRB, OBSVF, GRAM, KALMAN, RANK.
 ```
 
 ## `obsvf`
@@ -852,20 +1302,35 @@ ORDER Nombre d'états du modèle.
 ## `parallel`
 
 ```
-PARALLEL Mise en parallèle de deux modèles (somme des sorties).
+PARALLEL Mise en parallèle de deux modèles.
+  SYS = PARALLEL(SYS1,SYS2) fait entrer le même signal dans les deux
+  modèles et somme leurs sorties : c'est SYS1 + SYS2. À ne pas
+  confondre avec APPEND, qui les juxtapose sans rien relier.
+
+  Exemple :
+     parallel(tf(1, [1 1]), tf(1, [1 2]))
+
+  Voir aussi SERIES, FEEDBACK, APPEND.
 ```
 
 ## `pid`
 
 ```
-PID Correcteur proportionnel intégral dérivé.
-  C = PID(KP,KI,KD,TF) rend la fonction de transfert
-  KP + KI/s + KD*s/(TF*s+1). Avec TF nul, le terme dérivé est pur.
-  C = PID(...,TS) donne un correcteur échantillonné.
+PID Correcteur proportionnel, intégral et dérivé.
+  C = PID(KP,KI,KD) rend le correcteur KP + KI/s + KD*s, sous forme de
+  fonction de transfert.
 
-  Exemple :
-     c = pid(2, 1, 0);          % (2s + 1)/s
-     dcgain(pid(1, 0, 0))       % 1
+  C = PID(KP,KI,KD,TF) filtre l'action dérivée par 1/(TF*s+1), ce qu'il
+  faut toujours faire en pratique : un dérivateur pur amplifie le bruit
+  sans limite.
+
+  Exemples :
+     c = pid(2, 1, 0);
+     dcgain(c)                            % Inf : l'integrateur annule l'erreur
+     c2 = pid(1, 0, 0.1, 0.01);
+     isfinite(evalfr(c2, 1e6))            % vrai : la derivee est filtree
+
+  Voir aussi PIDSTD, PIDTUNE, TF, FEEDBACK, MARGIN.
 ```
 
 ## `pidstd`
@@ -929,24 +1394,55 @@ PIDTUNE Réglage d'un correcteur PID par la marge de phase.
 ## `place`
 
 ```
-PLACE Placement de pôles par la formule d'Ackermann.
-  K = PLACE(A,B,POLES) rend le retour d'état u = -Kx qui place les
-  valeurs propres de A-BK aux valeurs demandées (entrée unique).
+PLACE Placement de pôles par retour d'état.
+  K = PLACE(A,B,P) rend le gain tel que les valeurs propres de A - B*K
+  soient celles de P. Pour plusieurs entrées, le gain n'est pas unique :
+  la fonction choisit celui qui rend les vecteurs propres les mieux
+  conditionnés, ce qui limite la sensibilité du placement.
+
+  Les pôles complexes doivent aller par paires conjuguées, et le
+  système être commandable.
+
+  Exemples :
+     A = [0 1; 0 0]; B = [0; 1];
+     K = place(A, B, [-1 -2]);
+     sort(eig(A - B*K))                   % -2  -1
+     K2 = place(A, B, [-1+1i, -1-1i]);
+     max(real(eig(A - B*K2))) < 0         % vrai
+
+  Voir aussi ACKER, LQR, EIG, CTRB.
 ```
 
 ## `pole`
 
 ```
-POLE Pôles d'un modèle linéaire.
+POLE Pôles d'un modèle.
+  P = POLE(SYS) rend les pôles : les racines du dénominateur d'une
+  fonction de transfert, les valeurs propres de A pour un modèle
+  d'état. Ils disent la stabilité — partie réelle négative en temps
+  continu, module inférieur à un en discret — et la vitesse.
+
+  Exemples :
+     pole(tf(1, [1 3 2]))                 % -2  -1
+     max(real(pole(feedback(tf(1, [1 1]), 1)))) < 0   % boucle stable
+     abs(pole(ss(-3, 1, 1, 0)) + 3) < 1e-12
+
+  Voir aussi ZERO, PZMAP, DAMP, EIG, ROOTS.
 ```
 
 ## `pzmap`
 
 ```
 PZMAP Pôles et zéros d'un modèle.
-  [P,Z] = PZMAP(SYS) rend les pôles et les zéros en colonnes. Sans
-  sortie, la fonction les place dans le plan complexe : les pôles par
-  des croix, les zéros par des ronds.
+  PZMAP(SYS) place les pôles et les zéros du modèle dans le plan
+  complexe : les pôles par des croix, les zéros par des ronds. La
+  stabilité se lit à la position des croix — à gauche de l'axe
+  imaginaire en temps continu, dans le cercle unité en discret.
+
+  PZMAP(SYS1,SYS2,...) superpose plusieurs modèles.
+
+  [P,Z] = PZMAP(SYS) ne trace rien et rend les pôles et les zéros en
+  colonnes.
 
   Exemple :
      [p, z] = pzmap(tf([1 1], [1 3 2]));   % p = [-2;-1], z = -1
@@ -986,34 +1482,69 @@ REG Régulateur par retour d'état estimé.
 
 ```
 RLOCUS Lieu des racines de la boucle fermée.
-  [R,K] = RLOCUS(SYS) rend, pour une série de gains K, les pôles de
-  1 + K*SYS.
+  RLOCUS(SYS) trace, dans le plan complexe, le chemin que suivent les
+  pôles de la boucle 1 + K*SYS quand le gain K va de 0.01 à 1000. Les
+  branches partent des pôles de SYS et vont vers ses zéros.
+
+  RLOCUS(SYS,K) impose les gains à essayer.
+
+  RLOCUS(SYS1,SYS2,...,K) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT.
+
+  [R,K] = RLOCUS(SYS) ne trace rien et rend les racines — une ligne par
+  gain — et les gains employés.
+
+  Exemple :
+     rlocus(tf(1, [1 2 0]))
+
+  Voir aussi PZMAP, POLE, FEEDBACK, PLACE.
 ```
 
 ## `series`
 
 ```
 SERIES Mise en série de deux modèles.
-  SYS = SERIES(SYS1,SYS2) équivaut à SYS2 * SYS1.
+  SYS = SERIES(SYS1,SYS2) met SYS1 devant SYS2 : la sortie du premier
+  entre dans le second. C'est SYS2*SYS1, l'ordre des facteurs suivant
+  celui du produit matriciel et non celui du schéma.
+
+  Les modèles à plusieurs voies sont acceptés : SYS1 doit avoir autant
+  de sorties que SYS2 a d'entrées.
+
+  Exemple :
+     L = series(tf(1, [1 1]), tf(10, [1 0]))   % 10/(s^2+s)
+
+  Voir aussi FEEDBACK, PARALLEL, APPEND, LFT.
 ```
 
 ## `sigma`
 
 ```
 SIGMA Valeurs singulières de la réponse fréquentielle.
-  SV = SIGMA(SYS,W) rend, pour chaque pulsation, les valeurs
-  singulières de la matrice de transfert, rangées par ligne et
-  décroissantes. Pour un modèle monovariable, il n'y en a qu'une, égale
-  au module de la réponse : c'est le diagramme de gain.
+  SIGMA(SYS) trace, en décibels et en échelle logarithmique de
+  pulsation, les valeurs singulières de la matrice de transfert. Pour un
+  modèle monovariable il n'y en a qu'une, égale au module de la réponse :
+  le tracé est alors celui de BODEMAG.
 
-  [SV,W] = SIGMA(SYS) choisit lui-même la grille de pulsations.
+  SIGMA(SYS,W) impose la grille de pulsations, en radians par seconde :
+  un vecteur, ou {WMIN,WMAX} pour n'en donner que les bornes.
 
-  Sans sortie, la fonction trace les valeurs singulières en décibels.
+  SIGMA(SYS1,SYS2,...,W) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT :
+  SIGMA(S,'b',T,'r--',W).
+
+  SV = SIGMA(SYS,W) ne trace rien et rend les valeurs singulières,
+  rangées par ligne et décroissantes, une colonne par pulsation.
+  [SV,W] = SIGMA(SYS) rend en plus la grille employée.
+
+  La plus grande valeur singulière est le gain que le modèle peut donner
+  à cette pulsation ; son maximum sur toutes les pulsations est la norme
+  H-infini, que rend HINFNORM.
 
   Exemple :
      max(sigma(tf(1, [1 1])))   % 1 : le gain le plus fort est en zéro
 
-  Voir aussi FREQRESP, BODE, HINFNORM.
+  Voir aussi FREQRESP, BODE, BODEMAG, HINFNORM.
 ```
 
 ## `ss`
@@ -1057,21 +1588,22 @@ SS2SS Changement de base d'un modèle d'état.
 ## `ss2tf`
 
 ```
-SS2TF Fonction de transfert d'un modèle d'état.
-  [NUM,DEN] = SS2TF(A,B,C,D) applique H(s) = C (sI - A)^-1 B + D par
-  l'algorithme de Leverrier-Faddeev : les matrices M_k de l'adjointe
-  se calculent par récurrence, en même temps que les coefficients du
-  dénominateur.
+SS2TF Modèle d'état vers fonction de transfert.
+  [NUM,DEN] = SS2TF(A,B,C,D) rend les coefficients de la transmittance
+  C(sI-A)^{-1}B + D, du degré le plus haut au plus bas. Le dénominateur
+  est le polynôme caractéristique de A.
 
-  Avec den(s) = s^n + a1 s^(n-1) + ... + an, l'adjointe vaut
-  M_0 s^(n-1) + ... + M_(n-1) avec M_0 = I et M_k = A*M_(k-1) + a_k I.
-  Le numérateur est donc de degré n, et son terme de tête vaut D.
+  [NUM,DEN] = SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle qui en
+  a plusieurs.
 
-  Exemple :
-     [n, d] = ss2tf(-1, 1, -1, 1);   % n = [1 0], d = [1 1] : s/(s+1)
+  Exemples :
+     [num, den] = ss2tf(-1, 1, 1, 0);
+     num                                  % 0  1
+     den                                  % 1  1, soit 1/(s+1)
+     [n2, d2] = ss2tf([0 1; -2 -3], [0; 1], [1 0], 0);
+     max(abs(d2 - [1 3 2])) < 1e-12
 
-  SS2TF(A,B,C,D,IU) choisit l'entrée IU d'un modèle à plusieurs
-  entrées : seule la colonne IU de B et de D est retenue.
+  Voir aussi TF2SS, SSDATA, TFDATA, TF, SS.
 ```
 
 ## `ssdata`
@@ -1093,22 +1625,45 @@ SSDATA Matrices d'état d'un modèle.
 
 ```
 STEP Réponse indicielle.
-  [Y,T] = STEP(SYS) simule la réponse à un échelon unité.
-  [Y,T] = STEP(SYS,TFINAL) impose l'horizon de simulation.
+  STEP(SYS) trace la réponse du modèle SYS à un échelon unité, sur un
+  horizon choisi d'après ses pôles : huit fois la constante de temps la
+  plus lente, bornée entre une seconde et mille.
+
+  STEP(SYS,TFINAL) impose l'horizon, en secondes. STEP(SYS,T) où T est
+  un vecteur impose la grille de temps.
+
+  STEP(SYS1,SYS2,...,T) superpose plusieurs modèles ; une chaîne de
+  style peut suivre chacun d'eux, comme dans PLOT :
+  STEP(SYS,'b',SYSCORRIGE,'r--').
+
+  [Y,T] = STEP(SYS) ne trace rien et rend la réponse et les instants.
+
+  Exemple :
+     G = tf(1, [1 0.4 1]);
+     step(G, feedback(G, 1), 30)
+
+  Voir aussi IMPULSE, LSIM, INITIAL, STEPINFO.
 ```
 
 ## `stepinfo`
 
 ```
-STEPINFO Caractéristiques de la réponse indicielle.
-  S = STEPINFO(SYS) rend RiseTime, SettlingTime, Overshoot, Undershoot,
-  Peak et PeakTime, définis comme dans la documentation MathWorks :
-  temps de montée de 10 % à 90 %, temps d'établissement à 2 %,
-  dépassement en pourcentage de la valeur finale.
+STEPINFO Caractéristiques d'une réponse indicielle.
+  S = STEPINFO(SYS) rend une structure décrivant la réponse à un
+  échelon : RiseTime le temps de montée de 10 à 90 pour cent,
+  SettlingTime le temps d'établissement à 2 pour cent, Overshoot le
+  dépassement en pourcentage, Peak la valeur maximale et PeakTime
+  l'instant où elle est atteinte.
 
-  Exemple :
-     s = stepinfo(tf(1, [1 1]));   % premier ordre : pas de dépassement
-     s.Overshoot                   % 0
+  S = STEPINFO(Y,T) part d'une réponse déjà simulée.
+
+  Exemples :
+     s = stepinfo(tf(1, [1 1]));
+     s.Overshoot < 1                      % un premier ordre ne depasse pas
+     s2 = stepinfo(tf(1, [1 0.4 1]));
+     s2.Overshoot > 50                    % un second ordre peu amorti, si
+
+  Voir aussi STEP, LSIM, DAMP, BANDWIDTH.
 ```
 
 ## `tf`
@@ -1145,8 +1700,20 @@ TF Modèle sous forme de fonction de transfert.
 ## `tf2ss`
 
 ```
-TF2SS Forme compagne de commande d'une fonction de transfert.
-  [A,B,C,D] = TF2SS(NUM,DEN) rend la réalisation d'état canonique.
+TF2SS Fonction de transfert vers modèle d'état.
+  [A,B,C,D] = TF2SS(NUM,DEN) rend la forme compagne de commande : la
+  réalisation dont la matrice A porte les coefficients du dénominateur
+  sur sa première ligne. Le modèle obtenu est commandable par
+  construction ; il n'est observable que si la transmittance n'a pas de
+  simplification pôle-zéro.
+
+  Exemples :
+     [A, B, C, D] = tf2ss(1, [1 3 2]);
+     sort(eig(A))                         % -2  -1, les poles
+     D                                    % 0 : la transmittance est stricte
+     rank(ctrb(A, B))                     % 2 : commandable par construction
+
+  Voir aussi SS2TF, SS, TF, SSDATA, CANON.
 ```
 
 ## `tfdata`
@@ -1167,23 +1734,41 @@ TFDATA Numérateur et dénominateur d'un modèle.
 ## `tzero`
 
 ```
-TZERO Zéros de transmission d'un système d'état.
-  Z = TZERO(A,B,C,D) ou TZERO(SYS). Ce sont les valeurs de s pour
-  lesquelles la matrice de Rosenbrock [A-sI B; C D] perd son rang :
-  le transfert s'y annule, quelle que soit la direction d'entrée.
+TZERO Zéros de transmission d'un modèle.
+  Z = TZERO(SYS) rend les zéros de transmission : les valeurs de s pour
+  lesquelles le modèle ne transmet rien, quelle que soit l'entrée. Un
+  zéro à partie réelle positive — un zéro instable — limite ce qu'un
+  correcteur peut faire, quel qu'il soit.
 
-  Quand D est inversible, ces valeurs sont exactement les valeurs
-  propres de A - B*inv(D)*C : c'est le résultat classique, et c'est ce
-  qui est calculé ici. Sinon, on passe par la fonction de transfert.
+  Ils s'obtiennent comme les valeurs propres généralisées du faisceau
+  de Rosenbrock.
 
-  Exemple :
-     tzero(-1, 1, -1, 1)   % 0 : le transfert vaut s/(s+1)
+  Exemples :
+     tzero(tf([1 -1], [1 3 2]))           % 1 : un zero instable
+     isempty(tzero(tf(1, [1 1])))         % vrai : aucun zero
+     abs(tzero(ss(-1, 1, -1, 1)) - 0) < 1e-9
+
+  Voir aussi ZERO, POLE, PZMAP, MINREAL.
 ```
 
 ## `zero`
 
 ```
-ZERO Zéros d'un modèle linéaire.
+ZERO Zéros d'un modèle.
+  Z = ZERO(SYS) rend les zéros : les racines du numérateur d'une
+  fonction de transfert, les zéros de transmission d'un modèle d'état.
+  [Z,K] = ZERO(SYS) rend en plus le gain.
+
+  Un zéro dans le demi-plan droit fait partir la réponse indicielle du
+  mauvais côté avant de revenir : c'est le comportement à non-minimum
+  de phase, qu'aucun correcteur ne supprime.
+
+  Exemples :
+     zero(tf([1 2], [1 3 2]))             % -2
+     isempty(zero(tf(1, [1 1])))          % vrai
+     zero(tf([1 -1], [1 1]))              % 1 : a non-minimum de phase
+
+  Voir aussi POLE, TZERO, PZMAP, ROOTS.
 ```
 
 ## `zpk`

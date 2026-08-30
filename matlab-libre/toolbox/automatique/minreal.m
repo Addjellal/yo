@@ -1,11 +1,21 @@
 function sys = minreal(systeme, tolerance)
-%MINREAL Réalisation minimale : supprime les pôles et zéros qui s'annulent.
-%   SYS = MINREAL(SYS,TOL) compare les racines du numérateur et du
-%   dénominateur, et retire les paires plus proches que TOL.
+%MINREAL Réalisation minimale d'un modèle.
+%   SYSR = MINREAL(SYS) retire les états que la commande n'atteint pas et
+%   ceux que la sortie ne voit pas : le modèle rendu a la même
+%   transmittance, avec le moins d'états possible.
 %
-%   Exemple :
-%      s = minreal(tf(conv([1 2], [1 1]), conv([1 2], [1 3])));
-%      s.den   % [1 3] : le pôle en -2 a disparu
+%   SYSR = MINREAL(SYS,TOL) choisit la tolérance sous laquelle un mode
+%   est jugé non commandable ou non observable.
+%
+%   C'est ce qu'il faut après un assemblage par produits et boucles, qui
+%   empile des états sans s'occuper des redondances.
+%
+%   Exemples :
+%      g = tf(conv([1 1], [1 2]), conv([1 1], [1 3]));
+%      order(ss(minreal(g)))                % 1 : le pole en -1 s'est simplifie
+%      abs(dcgain(minreal(g)) - dcgain(g)) < 1e-9
+%
+%   Voir aussi SSDATA, CTRB, OBSV, BALREAL, ZERO.
     if nargin < 2 || isempty(tolerance), tolerance = 1e-8; end
     s = tf(systeme);
     num = s.num(:).';

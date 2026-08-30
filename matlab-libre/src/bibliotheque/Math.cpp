@@ -106,7 +106,25 @@ FONCTION(fnLog) {
                         [](const cplx& z) { return std::log(z); }, negatif)};
 }
 FONCTION(fnLog2) {
-    INUTILISE
+    exigerArguments(args, 1, 1, "log2");
+    // Avec deux sorties, log2 rend la forme normalisee du flottant :
+    // X = F * 2^E avec F dans [0.5, 1). C'est le « frexp » du C, que
+    // MATLAB expose sous ce nom.
+    if (nargout >= 2) {
+        exigerNumerique(args[0], "log2");
+        Valeur f = args[0];
+        Valeur e = args[0];
+        f.im.clear();
+        e.im.clear();
+        f.classe = Classe::Double;
+        e.classe = Classe::Double;
+        for (std::size_t k = 0; k < f.re.size(); ++k) {
+            int exposant = 0;
+            f.re[k] = std::frexp(args[0].re[k], &exposant);
+            e.re[k] = (double)exposant;
+        }
+        return {f, e};
+    }
     return {elementaire(args[0], [](double x) { return std::log2(x); },
                         [](const cplx& z) { return std::log(z) / std::log(cplx(2, 0)); },
                         negatif)};
@@ -358,8 +376,56 @@ FONCTION(fnIsfinite) {
 // -------------------------------------------------------- arithmétique entière
 
 FONCTION(fnGcd) {
-    INUTILISE
     exigerArguments(args, 2, 2, "gcd");
+    // [G,U,V] = GCD(A,B) rend en plus les coefficients de Bezout :
+    // U*A + V*B = G. L'algorithme d'Euclide etendu les donne sans frais.
+    if (nargout >= 2) {
+        exigerNumerique(args[0], "gcd");
+        exigerNumerique(args[1], "gcd");
+        auto bezout = [](double da, double db, double& u, double& v) {
+            long long a = (long long)da, b = (long long)db;
+            long long u0 = 1, u1 = 0, v0 = 0, v1 = 1;
+            long long x = a, y = b;
+            while (y != 0) {
+                long long q = x / y;
+                long long r = x - q * y;
+                x = y;
+                y = r;
+                long long ut = u0 - q * u1;
+                u0 = u1;
+                u1 = ut;
+                long long vt = v0 - q * v1;
+                v0 = v1;
+                v1 = vt;
+            }
+            if (x < 0) { x = -x; u0 = -u0; v0 = -v0; }
+            u = (double)u0;
+            v = (double)v0;
+            return (double)x;
+        };
+        Classe classe = classeResultat(args[0], args[1], "gcd");
+        Valeur g = diffuser(args[0], args[1],
+                            [&](double a, double b) {
+                                double u, v;
+                                return bezout(a, b, u, v);
+                            },
+                            classe);
+        Valeur u = diffuser(args[0], args[1],
+                            [&](double a, double b) {
+                                double cu, cv;
+                                bezout(a, b, cu, cv);
+                                return cu;
+                            },
+                            classe);
+        Valeur v = diffuser(args[0], args[1],
+                            [&](double a, double b) {
+                                double cu, cv;
+                                bezout(a, b, cu, cv);
+                                return cv;
+                            },
+                            classe);
+        return {g, u, v};
+    }
     return {diffuser(args[0], args[1],
                      [](double a, double b) {
                          long long x = (long long)std::llabs((long long)a);
@@ -512,20 +578,55 @@ FONCTION(fnBitxor) {
                      },
                      classeResultat(args[0], args[1], "bitxor"))};
 }
+// La largeur d'un type entier, en bits : c'est elle qui dit ou les bits
+// sortent. Un double porte cinquante-trois bits de mantisse, et c'est la
+// largeur que MATLAB lui donne pour les operations binaires.
+int largeurBits(Classe c) {
+    switch (c) {
+        case Classe::Int8:
+        case Classe::UInt8: return 8;
+        case Classe::Int16:
+        case Classe::UInt16: return 16;
+        case Classe::Int32:
+        case Classe::UInt32: return 32;
+        case Classe::Int64:
+        case Classe::UInt64: return 64;
+        default: return 53;
+    }
+}
+
+unsigned long long masqueBits(int largeur) {
+    return largeur >= 64 ? ~0ULL : ((1ULL << largeur) - 1ULL);
+}
+
 FONCTION(fnBitshift) {
     INUTILISE
+    exigerArguments(args, 2, 3, "bitshift");
+    // Le decalage se fait dans la largeur du type : les bits qui en
+    // sortent sont perdus. bitshift(uint8(255),1) vaut 254, non 255 —
+    // sans le masque, la saturation du type rendait le nombre inchange.
+    Classe classe = classeResultat(args[0], args[1], "bitshift");
+    int largeur = args.size() > 2 ? (int)args[2].scal() : largeurBits(classe);
+    unsigned long long masque = masqueBits(largeur);
     return {diffuser(args[0], args[1],
-                     [](double a, double n) {
-                         unsigned long long x = (unsigned long long)a;
+                     [masque](double a, double n) {
+                         unsigned long long x = (unsigned long long)(long long)a & masque;
                          int k = (int)n;
-                         return (double)(k >= 0 ? (x << k) : (x >> (-k)));
+                         if (k >= 64 || k <= -64) return 0.0;
+                         return (double)(k >= 0 ? ((x << k) & masque) : (x >> (-k)));
                      },
-                     classeResultat(args[0], args[1], "bitshift"))};
+                     classe)};
 }
+
 FONCTION(fnBitcmp) {
     INUTILISE
-    return {appliquerReel(args[0], [](double a) {
-        return (double)(~(unsigned long long)a & 0xFFFFFFFFFFFFFULL);
+    exigerArguments(args, 1, 1, "bitcmp");
+    exigerNumerique(args[0], "bitcmp");
+    // Le complement se prend lui aussi dans la largeur du type :
+    // bitcmp(uint8(15)) vaut 240, et bitcmp(0) vaut 2^53-1.
+    unsigned long long masque = masqueBits(largeurBits(args[0].classe));
+    return {appliquerReel(args[0], [masque](double a) {
+        return (double)(~((unsigned long long)(long long)a) & masque);
     })};
 }
 

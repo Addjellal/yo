@@ -1,12 +1,19 @@
 function sys = pid(Kp, Ki, Kd, Tf, Ts)
-%PID Correcteur proportionnel intégral dérivé.
-%   C = PID(KP,KI,KD,TF) rend la fonction de transfert
-%   KP + KI/s + KD*s/(TF*s+1). Avec TF nul, le terme dérivé est pur.
-%   C = PID(...,TS) donne un correcteur échantillonné.
+%PID Correcteur proportionnel, intégral et dérivé.
+%   C = PID(KP,KI,KD) rend le correcteur KP + KI/s + KD*s, sous forme de
+%   fonction de transfert.
 %
-%   Exemple :
-%      c = pid(2, 1, 0);          % (2s + 1)/s
-%      dcgain(pid(1, 0, 0))       % 1
+%   C = PID(KP,KI,KD,TF) filtre l'action dérivée par 1/(TF*s+1), ce qu'il
+%   faut toujours faire en pratique : un dérivateur pur amplifie le bruit
+%   sans limite.
+%
+%   Exemples :
+%      c = pid(2, 1, 0);
+%      dcgain(c)                            % Inf : l'integrateur annule l'erreur
+%      c2 = pid(1, 0, 0.1, 0.01);
+%      isfinite(evalfr(c2, 1e6))            % vrai : la derivee est filtree
+%
+%   Voir aussi PIDSTD, PIDTUNE, TF, FEEDBACK, MARGIN.
     if nargin < 1 || isempty(Kp), Kp = 1; end
     if nargin < 2 || isempty(Ki), Ki = 0; end
     if nargin < 3 || isempty(Kd), Kd = 0; end

@@ -1,7 +1,21 @@
 function K = place(A, B, poles)
-%PLACE Placement de pôles par la formule d'Ackermann.
-%   K = PLACE(A,B,POLES) rend le retour d'état u = -Kx qui place les
-%   valeurs propres de A-BK aux valeurs demandées (entrée unique).
+%PLACE Placement de pôles par retour d'état.
+%   K = PLACE(A,B,P) rend le gain tel que les valeurs propres de A - B*K
+%   soient celles de P. Pour plusieurs entrées, le gain n'est pas unique :
+%   la fonction choisit celui qui rend les vecteurs propres les mieux
+%   conditionnés, ce qui limite la sensibilité du placement.
+%
+%   Les pôles complexes doivent aller par paires conjuguées, et le
+%   système être commandable.
+%
+%   Exemples :
+%      A = [0 1; 0 0]; B = [0; 1];
+%      K = place(A, B, [-1 -2]);
+%      sort(eig(A - B*K))                   % -2  -1
+%      K2 = place(A, B, [-1+1i, -1-1i]);
+%      max(real(eig(A - B*K2))) < 0         % vrai
+%
+%   Voir aussi ACKER, LQR, EIG, CTRB.
     n = size(A, 1);
     Co = ctrb(A, B);
     if rank(Co) < n

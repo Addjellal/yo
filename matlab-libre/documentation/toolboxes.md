@@ -18,7 +18,7 @@ existant appellera.
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 27 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 7 |
-| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 76 |
+| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 84 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
@@ -42,7 +42,7 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 6 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 41 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 44 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 54 |
@@ -53,7 +53,7 @@ existant appellera.
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
 | `robotique` | Robotics System Toolbox — cinématique et transformations. | 19 |
-| `robuste` | Robust Control Toolbox — analyse de robustesse. | 5 |
+| `robuste` | Robust Control Toolbox — analyse de robustesse. | 9 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 163 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
-Les fonctions natives — 621, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 620, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

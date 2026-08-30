@@ -410,7 +410,26 @@ FLIPUD  Retourne de haut en bas.
 ## `float`
 
 ```
-float  Conversion en simple precision. Synonyme de single, propre a MatLibre : MATLAB ne connait que single.
+FLOAT  Conversion en nombre à virgule flottante simple.
+    FLOAT(X) rend X en simple précision : la classe « single », quatre
+    octets par nombre, sept chiffres significatifs. C'est le nom que
+    donnent le C et Octave à ce type ; MATLAB l'appelle SINGLE, et
+    MatLibre accepte les deux.
+
+    Attribuer une valeur à travers FLOAT change donc l'affichage : pi
+    s'écrit avec quinze décimales, float(pi) avec sept, puisqu'au-delà
+    les chiffres ne veulent plus rien dire.
+
+    Syntaxe
+       Y = float(X)
+
+    Exemples
+       class(float(pi))       % 'single'
+       float(pi)              % 3.1415927
+       double(float(1/3)) ~= 1/3      % vrai : la conversion perd des chiffres
+       whos                   % le tableau simple pese moitie moins
+
+    Voir aussi SINGLE, DOUBLE, CLASS, CAST, EPS.
 ```
 
 ## `horzcat`
@@ -615,7 +634,21 @@ IPERMUTE  Inverse de PERMUTE.
 ## `is_function_handle`
 
 ```
-is_function_handle  Vrai pour une poignee de fonction.
+IS_FUNCTION_HANDLE  Vrai pour une poignée de fonction.
+    IS_FUNCTION_HANDLE(X) rend vrai quand X est une poignée de fonction —
+    ce qu'écrit @sin ou @(x) x.^2. C'est le nom d'Octave ; MATLAB écrit
+    ISA(X,'function_handle'), que MatLibre accepte aussi.
+
+    Syntaxe
+       T = is_function_handle(X)
+
+    Exemples
+       is_function_handle(@sin)           % vrai
+       is_function_handle(@(x) x + 1)     % vrai
+       is_function_handle(3)              % faux
+       is_function_handle('sin')          % faux : un nom n'est pas une poignee
+
+    Voir aussi ISA, FUNC2STR, STR2FUNC, FEVAL, FUNCTIONS.
 ```
 
 ## `isa`
@@ -1491,6 +1524,61 @@ SUB2IND  Indice linéaire à partir des indices par dimension.
     Voir aussi IND2SUB, SIZE, RESHAPE, FIND.
 ```
 
+## `subsref`
+
+```
+SUBSREF  L'indexation, écrite comme une donnée.
+    SUBSREF(V,S) applique à V la chaîne d'accès décrite par S : une
+    structure 1xN de champs « type » et « subs », celle que fabrique
+    SUBSTRUCT. type vaut '()', '{}' ou '.', et subs les indices ou le nom
+    du champ.
+
+    C'est ce que reçoit la méthode SUBSREF d'une classe quand on indexe un
+    objet, et c'est la fonction qu'elle appelle pour poursuivre la chaîne
+    qu'elle n'a pas traitée elle-même. L'indexation faite ici est celle
+    par défaut : appeler SUBSREF sur un objet ne rappelle pas la méthode
+    de sa classe, ce qui boucler ait.
+
+    Syntaxe
+       V = subsref(A,S)
+
+    Exemples
+       A = [10 20 30];
+       subsref(A, substruct('()', {2}))       % 20
+       s.champ = 42;
+       subsref(s, substruct('.', 'champ'))    % 42
+       c = {1, 'deux'};
+       subsref(c, substruct('{}', {2}))       % 'deux'
+
+    Voir aussi SUBSTRUCT, SUBSASGN, ISOBJECT, CLASSDEF.
+```
+
+## `substruct`
+
+```
+SUBSTRUCT  Fabriquer la structure d'accès de SUBSREF.
+    SUBSTRUCT(TYPE1,SUBS1,TYPE2,SUBS2,...) rend le tableau 1xN de
+    structures que reçoivent SUBSREF et SUBSASGN : un champ « type »
+    valant '()', '{}' ou '.', et un champ « subs » portant les indices —
+    dans un tableau de cellules — ou le nom du champ.
+
+    C'est ainsi qu'on décrit une indexation sans l'écrire : « A(2).nom »
+    devient substruct('()', {2}, '.', 'nom').
+
+    Syntaxe
+       S = substruct(type1,subs1,...)
+
+    Exemples
+       s = substruct('()', {2});
+       subsref([10 20 30], s)             % 20
+       s2 = substruct('.', 'champ');
+       r.champ = 7;
+       subsref(r, s2)                     % 7
+       numel(substruct('()', {1}, '.', 'x'))   % 2 : deux niveaux
+
+    Voir aussi SUBSREF, SUBSASGN, CLASSDEF.
+```
+
 ## `transpose`
 
 ```
@@ -1536,7 +1624,24 @@ TRUE  Tableau logique de vrais.
 ## `typecast`
 
 ```
-typecast  Relit les octets d'une valeur dans une autre classe.
+TYPECAST  Réinterpréter les octets d'une valeur dans un autre type.
+    TYPECAST(X,TYPE) rend les mêmes octets, lus comme des nombres du type
+    demandé. Rien n'est converti : c'est la représentation binaire qu'on
+    relit autrement. Le nombre d'octets doit tomber juste.
+
+    C'est ainsi qu'on décortique un flottant, qu'on assemble des octets
+    reçus d'un port série, ou qu'on écrit un format de fichier binaire.
+
+    Syntaxe
+       Y = typecast(X,type)
+
+    Exemples
+       typecast(uint32(1), 'uint8')       % 1  0  0  0 en petit-boutien
+       typecast(single(1), 'uint32')      % 1065353216
+       numel(typecast(double(pi), 'uint8'))   % 8 octets
+       typecast(typecast(pi, 'uint8'), 'double')  % pi, inchange
+
+    Voir aussi CAST, CLASS, DOUBLE, FWRITE, BITSHIFT.
 ```
 
 ## `uint16`

@@ -34,6 +34,19 @@ function P = sysic()
 %   dans MATLAB. SYSOUTNAME, s'il existe, donne le nom sous lequel le
 %   résultat est rangé chez l'appelant.
 %
+%   Exemples :
+%      G = ss(tf(2, [1 1]));
+%      W = ss(tf(1, [1 0.1]));
+%      systemnames  = 'G W';
+%      inputvar     = '[ref]';
+%      outputvar    = '[W; G]';
+%      input_to_G   = '[ref]';
+%      input_to_W   = '[ref - G]';
+%      cleanupsysic = 'yes';
+%      P = sysic;
+%      size(P)                     % 2 sorties, 1 entree
+%      order(P)                    % 2 : un etat par bloc
+%
 %   Voir aussi CONNECT, APPEND, LFT, FEEDBACK, HINFSYN.
     % Les variables se lisent ici, dans le corps de SYSIC : « caller »
     % désigne l'appelant de la fonction où l'on écrit evalin, et une

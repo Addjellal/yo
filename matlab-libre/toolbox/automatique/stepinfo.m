@@ -1,13 +1,20 @@
 function s = stepinfo(systeme, varargin)
-%STEPINFO Caractéristiques de la réponse indicielle.
-%   S = STEPINFO(SYS) rend RiseTime, SettlingTime, Overshoot, Undershoot,
-%   Peak et PeakTime, définis comme dans la documentation MathWorks :
-%   temps de montée de 10 % à 90 %, temps d'établissement à 2 %,
-%   dépassement en pourcentage de la valeur finale.
+%STEPINFO Caractéristiques d'une réponse indicielle.
+%   S = STEPINFO(SYS) rend une structure décrivant la réponse à un
+%   échelon : RiseTime le temps de montée de 10 à 90 pour cent,
+%   SettlingTime le temps d'établissement à 2 pour cent, Overshoot le
+%   dépassement en pourcentage, Peak la valeur maximale et PeakTime
+%   l'instant où elle est atteinte.
 %
-%   Exemple :
-%      s = stepinfo(tf(1, [1 1]));   % premier ordre : pas de dépassement
-%      s.Overshoot                   % 0
+%   S = STEPINFO(Y,T) part d'une réponse déjà simulée.
+%
+%   Exemples :
+%      s = stepinfo(tf(1, [1 1]));
+%      s.Overshoot < 1                      % un premier ordre ne depasse pas
+%      s2 = stepinfo(tf(1, [1 0.4 1]));
+%      s2.Overshoot > 50                    % un second ordre peu amorti, si
+%
+%   Voir aussi STEP, LSIM, DAMP, BANDWIDTH.
     [y, t] = step(systeme);
     y = y(:);
     t = t(:);

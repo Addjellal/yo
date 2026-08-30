@@ -228,12 +228,6 @@ INPUTNAME  Nom de la variable passée en argument.
     Voir aussi MFILENAME, NARGIN, DBSTACK.
 ```
 
-## `is_function_handle_`
-
-```
-Reserve.
-```
-
 ## `isvarname`
 
 ```

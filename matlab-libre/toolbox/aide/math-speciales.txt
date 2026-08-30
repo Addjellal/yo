@@ -1,0 +1,360 @@
+### erf
+ERF  Fonction d'erreur.
+    ERF(X) rend (2/sqrt(pi)) * l'intégrale de exp(-t^2) de 0 à X. Elle va
+    de -1 à 1 et sert partout où une loi normale intervient : la
+    probabilité qu'une variable centrée réduite tombe dans [-a, a] vaut
+    erf(a/sqrt(2)).
+
+    Syntaxe
+       Y = erf(X)
+
+    Exemples
+       erf(0)                 % 0
+       erf(Inf)               % 1
+       erf(1)                 % 0.8427
+       abs(erf(1/sqrt(2)) - 0.682689492) < 1e-8   % les 68 % a un ecart-type
+
+    Voir aussi ERFC, ERFINV, ERFCINV, NORMCDF.
+
+### erfc
+ERFC  Fonction d'erreur complémentaire.
+    ERFC(X) rend 1 - ERF(X), mais sans la perte de précision de la
+    soustraction quand X est grand : erfc(10) vaut 2e-45, que 1-erf(10)
+    ne saurait donner.
+
+    Syntaxe
+       Y = erfc(X)
+
+    Exemples
+       erfc(0)                % 1
+       erfc(Inf)              % 0
+       erfc(10) > 0           % vrai, la ou 1 - erf(10) rend 0
+       abs(erfc(1) + erf(1) - 1) < 1e-15    % vrai
+
+    Voir aussi ERF, ERFCINV, ERFINV.
+
+### erfinv
+ERFINV  Réciproque de la fonction d'erreur.
+    ERFINV(Y) rend le X tel que ERF(X) = Y, pour Y dans ]-1, 1[. Aux
+    bornes, elle vaut ±Inf.
+
+    Syntaxe
+       X = erfinv(Y)
+
+    Exemples
+       erfinv(0)              % 0
+       abs(erfinv(erf(0.7)) - 0.7) < 1e-10   % vrai
+       erfinv(1)              % Inf
+       sqrt(2) * erfinv(0.95)   % 1.96, le quantile a 95 % de la loi normale
+
+    Voir aussi ERF, ERFC, ERFCINV, NORMINV.
+
+### erfcinv
+ERFCINV  Réciproque de la fonction d'erreur complémentaire.
+    ERFCINV(Y) rend le X tel que ERFC(X) = Y, pour Y dans ]0, 2[.
+
+    Syntaxe
+       X = erfcinv(Y)
+
+    Exemples
+       erfcinv(1)             % 0
+       abs(erfcinv(erfc(0.4)) - 0.4) < 1e-10   % vrai
+       erfcinv(0)             % Inf
+
+    Voir aussi ERFC, ERF, ERFINV.
+
+### gamma
+GAMMA  Fonction gamma d'Euler.
+    GAMMA(X) prolonge la factorielle aux réels : gamma(n) vaut (n-1)!
+    pour un entier positif. Elle a des pôles aux entiers négatifs ou nuls.
+
+    Syntaxe
+       Y = gamma(X)
+
+    Exemples
+       gamma(5)               % 24, soit 4!
+       gamma(1)               % 1
+       abs(gamma(0.5) - sqrt(pi)) < 1e-12    % vrai
+       gamma(6) == factorial(5)              % vrai
+
+    Voir aussi GAMMALN, GAMMAINC, FACTORIAL, BETA, PSI.
+
+### gammaln
+GAMMALN  Logarithme de la fonction gamma.
+    GAMMALN(X) rend log(gamma(X)) sans passer par gamma, qui déborde dès
+    X = 172. C'est la forme à employer dans un calcul de probabilités.
+
+    Syntaxe
+       Y = gammaln(X)
+
+    Exemples
+       gammaln(1)             % 0
+       abs(gammaln(5) - log(24)) < 1e-12     % vrai
+       gammaln(1000) > 0      % vrai, la ou gamma(1000) rend Inf
+       abs(gammaln(0.5) - log(sqrt(pi))) < 1e-12    % vrai
+
+    Voir aussi GAMMA, GAMMAINC, BETALN, FACTORIAL.
+
+### gammainc
+GAMMAINC  Fonction gamma incomplète, normalisée.
+    GAMMAINC(X,A) rend la part de l'intégrale de la loi gamma accumulée
+    jusqu'à X : une valeur entre 0 et 1. GAMMAINC(X,A,'upper') rend la
+    part qui reste, soit 1 moins la précédente.
+
+    Syntaxe
+       P = gammainc(X,A)
+       P = gammainc(X,A,'upper')
+
+    Exemples
+       gammainc(0, 1)         % 0
+       gammainc(Inf, 2)       % 1
+       abs(gammainc(1, 1) - (1 - exp(-1))) < 1e-12   % la loi exponentielle
+       abs(gammainc(2, 3) + gammainc(2, 3, 'upper') - 1) < 1e-12
+
+    Voir aussi GAMMA, GAMMALN, BETAINC, ERF.
+
+### beta
+BETA  Fonction bêta d'Euler.
+    BETA(Z,W) rend gamma(Z)*gamma(W)/gamma(Z+W). Pour des entiers, elle
+    s'exprime avec des factorielles et donne l'inverse d'un coefficient
+    binomial pondéré.
+
+    Syntaxe
+       B = beta(Z,W)
+
+    Exemples
+       beta(1, 1)             % 1
+       abs(beta(2, 3) - 1/12) < 1e-12        % vrai
+       abs(beta(0.5, 0.5) - pi) < 1e-12      % vrai
+       abs(beta(3, 4) - gamma(3)*gamma(4)/gamma(7)) < 1e-15
+
+    Voir aussi BETAINC, BETALN, GAMMA, NCHOOSEK.
+
+### betainc
+BETAINC  Fonction bêta incomplète, normalisée.
+    BETAINC(X,Z,W) rend la part de l'intégrale de la loi bêta accumulée
+    jusqu'à X, pour X dans [0, 1] : une valeur entre 0 et 1. C'est la
+    fonction de répartition de la loi bêta.
+
+    Syntaxe
+       P = betainc(X,Z,W)
+
+    Exemples
+       betainc(0, 2, 3)       % 0
+       betainc(1, 2, 3)       % 1
+       abs(betainc(0.5, 1, 1) - 0.5) < 1e-12   % la loi uniforme
+       betainc(0.5, 2, 2)     % 0.5, par symetrie
+
+    Voir aussi BETA, BETALN, GAMMAINC.
+
+### betaln
+BETALN  Logarithme de la fonction bêta.
+    BETALN(Z,W) rend log(BETA(Z,W)) sans calculer la bêta, qui déborde ou
+    s'annule pour de grands arguments.
+
+    Syntaxe
+       L = betaln(Z,W)
+
+    Exemples
+       betaln(1, 1)           % 0
+       abs(betaln(2, 3) - log(1/12)) < 1e-12    % vrai
+       betaln(500, 500) < 0   % vrai, la ou beta(500,500) rend 0
+
+    Voir aussi BETA, BETAINC, GAMMALN.
+
+### psi
+PSI  Fonction digamma, dérivée logarithmique de gamma.
+    PSI(X) rend la dérivée de log(gamma(X)). PSI(K,X) rend la K-ième
+    dérivée : la polygamma d'ordre K.
+
+    Syntaxe
+       Y = psi(X)
+       Y = psi(K,X)
+
+    Exemples
+       abs(psi(1) + 0.5772156649) < 1e-8     % l'oppose de la constante d'Euler
+       abs(psi(2) - (1 - 0.5772156649)) < 1e-8
+       psi(1, 1) > 0          % la trigamma est positive
+
+    Voir aussi GAMMA, GAMMALN.
+
+### besselj
+BESSELJ  Fonction de Bessel de première espèce.
+    BESSELJ(NU,Z) rend J_nu(Z), solution bornée en zéro de l'équation de
+    Bessel. Elle décrit les modes d'une membrane circulaire, la
+    diffraction par une ouverture ronde, les modes d'un guide d'ondes.
+
+    Syntaxe
+       J = besselj(nu,Z)
+
+    Exemples
+       besselj(0, 0)          % 1
+       besselj(1, 0)          % 0
+       abs(besselj(0, 2.404825557)) < 1e-6   % le premier zero de J0
+       besselj(0, [0 1 2])    % 1  0.7652  0.2239
+
+    Voir aussi BESSELY, BESSELI, BESSELK.
+
+### bessely
+BESSELY  Fonction de Bessel de seconde espèce.
+    BESSELY(NU,Z) rend Y_nu(Z), la seconde solution de l'équation de
+    Bessel. Elle diverge en zéro : c'est ce qui l'écarte des problèmes
+    posés sur un disque plein, et ce qui la rend nécessaire sur un anneau.
+
+    Syntaxe
+       Y = bessely(nu,Z)
+
+    Exemples
+       bessely(0, 1)          % 0.0883
+       bessely(0, 0)          % -Inf
+       bessely(0, [1 2 3])    % 0.0883  0.5104  0.3769
+
+    Voir aussi BESSELJ, BESSELI, BESSELK.
+
+### bitand
+BITAND  Et bit à bit.
+    BITAND(A,B) rend l'entier dont chaque bit vaut 1 quand il vaut 1 dans
+    A et dans B. Les arguments doivent être des entiers positifs, ou des
+    entiers d'un type entier.
+
+    Syntaxe
+       C = bitand(A,B)
+
+    Exemples
+       bitand(12, 10)         % 8, soit 1100 et 1010 -> 1000
+       bitand(255, 15)        % 15
+       bitand([12 7], [10 3]) % 8  3
+
+    Voir aussi BITOR, BITXOR, BITCMP, BITSHIFT, DEC2BIN.
+
+### bitor
+BITOR  Ou bit à bit.
+    BITOR(A,B) rend l'entier dont chaque bit vaut 1 quand il vaut 1 dans
+    A ou dans B.
+
+    Syntaxe
+       C = bitor(A,B)
+
+    Exemples
+       bitor(12, 10)          % 14, soit 1100 ou 1010 -> 1110
+       bitor(8, 1)            % 9
+       bitor([1 2], [4 8])    % 5  10
+
+    Voir aussi BITAND, BITXOR, BITCMP, BITSHIFT.
+
+### bitxor
+BITXOR  Ou exclusif bit à bit.
+    BITXOR(A,B) rend l'entier dont chaque bit vaut 1 quand il diffère
+    entre A et B. Appliqué deux fois avec la même clé, il rend le nombre
+    de départ — c'est le principe du chiffrement de Vernam.
+
+    Syntaxe
+       C = bitxor(A,B)
+
+    Exemples
+       bitxor(12, 10)         % 6, soit 1100 xor 1010 -> 0110
+       bitxor(5, 5)           % 0
+       bitxor(bitxor(42, 7), 7)   % 42 : deux fois la meme cle
+
+    Voir aussi BITAND, BITOR, BITCMP, XOR.
+
+### bitcmp
+BITCMP  Complément bit à bit.
+    BITCMP(A) retourne tous les bits de A, dans la largeur de son type :
+    pour un uint8, les huit bits ; pour un double, les cinquante-trois de
+    la mantisse.
+
+    Syntaxe
+       C = bitcmp(A)
+
+    Exemples
+       bitcmp(uint8(0))       % 255
+       bitcmp(uint8(15))      % 240
+       bitcmp(uint16(0))      % 65535
+       bitcmp(bitcmp(uint8(42)))  % 42
+
+    Voir aussi BITAND, BITOR, BITXOR, BITSHIFT.
+
+### bitshift
+BITSHIFT  Décalage de bits.
+    BITSHIFT(A,K) décale les bits de A de K rangs vers la gauche quand K
+    est positif — ce qui multiplie par 2^K —, vers la droite quand il est
+    négatif — ce qui divise, en perdant les bits sortis.
+
+    Syntaxe
+       C = bitshift(A,K)
+
+    Exemples
+       bitshift(1, 3)         % 8
+       bitshift(12, -2)       % 3
+       bitshift(uint8(255), 1)    % 254 : le bit sorti est perdu
+       bitshift([1 2 4], 2)   % 4  8  16
+
+    Voir aussi BITAND, BITOR, BITXOR, POW2, IDIVIDE.
+
+### dec2bin
+DEC2BIN  Entier vers texte binaire.
+    DEC2BIN(D) rend l'écriture binaire de D, dans une chaîne de
+    caractères. DEC2BIN(D,N) la complète à gauche par des zéros pour
+    atteindre N chiffres.
+
+    Syntaxe
+       S = dec2bin(D)
+       S = dec2bin(D,N)
+
+    Exemples
+       dec2bin(10)            % '1010'
+       dec2bin(5, 8)          % '00000101'
+       dec2bin(0)             % '0'
+       bin2dec(dec2bin(42))   % 42
+
+    Voir aussi BIN2DEC, DEC2HEX, HEX2DEC, BITSHIFT.
+
+### bin2dec
+BIN2DEC  Texte binaire vers entier.
+    BIN2DEC(S) lit une chaîne de 0 et de 1 et rend l'entier qu'elle
+    représente. Les espaces sont ignorés.
+
+    Syntaxe
+       D = bin2dec(S)
+
+    Exemples
+       bin2dec('1010')        % 10
+       bin2dec('11111111')    % 255
+       bin2dec('0')           % 0
+       dec2bin(bin2dec('1101'))   % '1101'
+
+    Voir aussi DEC2BIN, HEX2DEC, DEC2HEX.
+
+### dec2hex
+DEC2HEX  Entier vers texte hexadécimal.
+    DEC2HEX(D) rend l'écriture hexadécimale de D, en majuscules.
+    DEC2HEX(D,N) la complète à gauche par des zéros.
+
+    Syntaxe
+       S = dec2hex(D)
+       S = dec2hex(D,N)
+
+    Exemples
+       dec2hex(255)           % 'FF'
+       dec2hex(16, 4)         % '0010'
+       dec2hex(0)             % '0'
+       hex2dec(dec2hex(3735928559))   % 3735928559
+
+    Voir aussi HEX2DEC, DEC2BIN, BIN2DEC.
+
+### hex2dec
+HEX2DEC  Texte hexadécimal vers entier.
+    HEX2DEC(S) lit une chaîne de chiffres hexadécimaux, majuscules ou
+    minuscules, et rend l'entier qu'elle représente.
+
+    Syntaxe
+       D = hex2dec(S)
+
+    Exemples
+       hex2dec('FF')          % 255
+       hex2dec('ff')          % 255 : la casse est indifferente
+       hex2dec('10')          % 16
+       hex2dec('DEADBEEF')    % 3735928559
+
+    Voir aussi DEC2HEX, BIN2DEC, DEC2BIN.

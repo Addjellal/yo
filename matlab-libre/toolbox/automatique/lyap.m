@@ -1,13 +1,22 @@
 function X = lyap(A, Q, C)
 %LYAP Équation de Lyapunov continue.
-%   X = LYAP(A,Q) résout A*X + X*A' + Q = 0.
-%   X = LYAP(A,B,C) résout A*X + X*B + C = 0 (Sylvester).
+%   X = LYAP(A,Q) résout A*X + X*A' + Q = 0. La solution existe et est
+%   unique quand aucune somme de deux valeurs propres de A n'est nulle —
+%   en particulier quand A est stable.
 %
-%   La résolution passe par la forme vectorisée : le produit de
-%   Kronecker transforme l'équation matricielle en système linéaire.
+%   X = LYAP(A,B,C) résout l'équation de Sylvester A*X + X*B + C = 0.
 %
-%   Exemple :
-%      lyap(-1, 1)   % 0.5
+%   Pour A stable et Q définie positive, X définie positive prouve la
+%   stabilité : c'est le théorème de Lyapunov, et la fonction V = x'Xx
+%   décroît le long des trajectoires.
+%
+%   Exemples :
+%      X = lyap(-1, 2);
+%      abs(-X - X + 2) < 1e-12              % l'equation est verifiee
+%      X                                    % 1
+%      min(eig(lyap([-1 0; 0 -2], eye(2)))) > 0     % definie positive
+%
+%   Voir aussi DLYAP, CARE, GRAM, EIG.
     if nargin < 3
         n = size(A, 1);
         M = kron(eye(n), A) + kron(conj(A), eye(n));

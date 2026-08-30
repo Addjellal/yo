@@ -1,22 +1,19 @@
 function [X, K, poles] = dare(A, B, Q, R)
 %DARE Équation de Riccati algébrique discrète.
-%   X = DARE(A,B,Q,R) résout A'XA - X - A'XB(B'XB+R)^{-1}B'XA + Q = 0.
-%   [X,K] = DARE(...) rend le gain K = (B'XB+R)^{-1}B'XA.
-%   [X,K,P] = DARE(...) rend en plus les pôles de la boucle fermée.
+%   X = DARE(A,B,Q,R) résout A'XA - X - A'XB(B'XB+R)^{-1}B'XA + Q = 0 et
+%   rend la solution stabilisante. C'est l'équation de la commande
+%   linéaire quadratique à temps discret.
 %
-%   La solution stabilisante est lue sur le sous-espace invariant stable
-%   de la matrice symplectique
+%   [X,K,P] = DARE(...) rend en plus le gain K = (B'XB+R)^{-1}B'XA et les
+%   pôles de la boucle fermée.
 %
-%      Z = [ A + B R^{-1} B' A^{-T} Q   -B R^{-1} B' A^{-T}
-%           -A^{-T} Q                    A^{-T}            ]
+%   Exemples :
+%      X = dare(0.5, 1, 1, 1);
+%      abs(0.5^2*X - X - 0.5^2*X^2/(X+1) + 1) < 1e-9   % l'equation est verifiee
+%      [~, K] = dare(0.5, 1, 1, 1);
+%      abs(0.5 - K) < 1                     % la boucle fermee est dans le cercle
 %
-%   dont les valeurs propres vont par paires (lambda, 1/lambda) : les n
-%   qui sont dans le cercle unité engendrent [X1; X2], et X = X2/X1.
-%   Quand A est singulière, cette construction n'existe pas et on retombe
-%   sur l'itération de Riccati, qui converge linéairement.
-%
-%   Exemple :
-%      dare(1, 1, 1, 1)   % (1 + sqrt(5)) / 2, le nombre d'or
+%   Voir aussi CARE, DLQR, DLYAP, LQR.
     if nargin < 4 || isempty(R), R = eye(size(B, 2)); end
     n = size(A, 1);
     X = [];

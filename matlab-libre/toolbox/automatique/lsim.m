@@ -1,7 +1,20 @@
 function [y, t, x] = lsim(sys, u, t, x0)
-%LSIM Réponse d'un modèle à une entrée quelconque.
-%   [Y,T] = LSIM(SYS,U,T) simule la réponse à l'entrée U aux instants T.
-%   La discrétisation se fait par bloqueur d'ordre zéro sur le pas moyen.
+%LSIM Réponse à une entrée quelconque.
+%   [Y,T,X] = LSIM(SYS,U,T) simule la réponse du modèle à l'entrée U
+%   échantillonnée aux instants T. L'entrée est interpolée linéairement
+%   entre deux instants ; le pas doit être assez fin devant les
+%   constantes de temps du modèle.
+%
+%   [Y,T,X] = LSIM(SYS,U,T,X0) part d'une condition initiale.
+%
+%   Exemples :
+%      t = linspace(0, 5, 200)';
+%      y = lsim(tf(1, [1 1]), ones(size(t)), t);
+%      abs(y(end) - 1) < 0.02               % la reponse indicielle converge vers 1
+%      y2 = lsim(tf(1, [1 1]), sin(t), t);
+%      max(abs(y2)) < 1                     % un premier ordre attenue
+%
+%   Voir aussi STEP, IMPULSE, INITIAL, GENSIG.
     s = ss(sys);
     n = size(s.A, 1);
     if nargin < 4 || isempty(x0)

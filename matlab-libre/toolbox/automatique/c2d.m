@@ -1,7 +1,19 @@
 function sysd = c2d(sys, Ts, methode)
 %C2D Discrétisation d'un modèle continu.
-%   SYSD = C2D(SYS,TS) utilise le bloqueur d'ordre zéro.
-%   SYSD = C2D(SYS,TS,'tustin') utilise la transformation bilinéaire.
+%   SYSD = C2D(SYS,TS) échantillonne le modèle à la période TS par
+%   bloqueur d'ordre zéro : l'entrée est supposée constante entre deux
+%   instants, ce qui est le cas derrière un convertisseur numérique.
+%
+%   SYSD = C2D(SYS,TS,'tustin') emploie la transformation bilinéaire, qui
+%   conserve mieux la réponse fréquentielle près de la fréquence de
+%   Nyquist, au prix d'une légère distorsion.
+%
+%   Exemples :
+%      d = c2d(tf(1, [1 1]), 0.1);
+%      d.Ts                             % 0.1
+%      abs(dcgain(d) - dcgain(tf(1, [1 1]))) < 1e-9    % le gain statique tient
+%
+%   Voir aussi D2C, D2D, TUSTIN, SS, TF.
     if nargin < 3
         methode = 'zoh';
     end

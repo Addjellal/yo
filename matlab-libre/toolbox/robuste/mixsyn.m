@@ -14,7 +14,7 @@ function [K, CL, gamma, info] = mixsyn(G, W1, W2, W3, varargin)
 %
 %   Exemple :
 %      G = tf(200, [10 1]) * tf(1, [0.05 1])^2;
-%      [K, CL, gam] = mixsyn(G, tf([0.1 1], [1 1e-5]), 0.1, []);
+%      [K, CL, gam] = mixsyn(G, tf(10, [1 0.1]), 0.1, []);
 %
 %   Voir aussi HINFSYN, AUGW, HINFNORM, LFT.
     if nargin < 2, W1 = []; end

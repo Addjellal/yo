@@ -333,7 +333,21 @@ GETPID  Numéro du processus courant.
 ## `graphics_toolkit`
 
 ```
-graphics_toolkit  Moteur graphique utilise.
+GRAPHICS_TOOLKIT  Le moteur de rendu graphique employé.
+    GRAPHICS_TOOLKIT rend le nom du moteur qui dessine les figures. C'est
+    le nom d'Octave ; MatLibre le garde pour que les scripts qui
+    l'interrogent ne s'arrêtent pas. Le rendu se fait en SVG, un format
+    vectoriel qu'aucune bibliothèque externe n'est nécessaire pour
+    produire.
+
+    Syntaxe
+       nom = graphics_toolkit
+
+    Exemples
+       graphics_toolkit       % 'svg'
+       strcmp(graphics_toolkit(), 'svg')      % vrai
+
+    Voir aussi FIGURE, PRINT, SAVEAS, PLOT.
 ```
 
 ## `help`

@@ -718,6 +718,31 @@ FONCTION(fnInd2sub) {
 
 // ------------------------------------------------------------- classes
 
+// « substruct('()', {2}, '.', 'champ') » : la structure d'acces que
+// recoivent subsref et subsasgn, ecrite a la main.
+FONCTION(fnSubstruct) {
+    INUTILISE
+    if (args.size() % 2 != 0)
+        erreur("MATLAB:substruct:invalidNumInputs",
+               "SUBSTRUCT takes pairs of a type and its subscripts.");
+    std::size_t n = args.size() / 2;
+    Valeur s = Valeur::structureVide();
+    s.dims = {1, (int)n};
+    s.st = std::make_shared<ChampsStructure>();
+    s.st->ordre = {"type", "subs"};
+    s.st->champs["type"] = std::vector<Valeur>(n, Valeur::vide());
+    s.st->champs["subs"] = std::vector<Valeur>(n, Valeur::vide());
+    for (std::size_t k = 0; k < n; ++k) {
+        std::string genre = args[2 * k].versTexte();
+        if (genre != "()" && genre != "{}" && genre != ".")
+            erreur("MATLAB:substruct:badSubscriptType",
+                   "The subscript type must be '()', '{}' or '.'.");
+        s.st->champs["type"][k] = Valeur::texte(genre);
+        s.st->champs["subs"][k] = args[2 * k + 1];
+    }
+    return {s};
+}
+
 // « subsref(v, s) » : l'indexation ecrite comme une donnee.
 //
 // s est un tableau 1xN de structures « type » et « subs », celui que
@@ -1195,6 +1220,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("class", fnClass, "base", "class  Nom de la classe d'une valeur.");
     it.enregistrer("subsref", fnSubsref, "base",
                    "subsref  Indexation ecrite comme une donnee.");
+    it.enregistrer("substruct", fnSubstruct, "base",
+                   "substruct  Fabrique la structure d'acces de subsref.");
     it.enregistrer("isa", fnIsa, "base", "isa  Teste l'appartenance a une classe.");
     it.enregistrer("cast", fnCast, "base", "cast  Conversion vers une classe nommee.");
     it.enregistrer("double", fnConversion<Classe::Double>, "base", "double  Conversion double.");

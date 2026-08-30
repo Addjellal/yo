@@ -1,0 +1,385 @@
+### ceil
+CEIL  Arrondi vers le haut.
+    CEIL(X) rend le plus petit entier supérieur ou égal à X. Pour les
+    négatifs, cela veut dire vers zéro : ceil(-2.5) vaut -2.
+
+    Syntaxe
+       Y = ceil(X)
+
+    Exemples
+       ceil(2.1)              % 3
+       ceil(-2.1)             % -2
+       ceil([1.2 -1.2 3])     % 2  -1  3
+       ceil(2)                % 2 : un entier ne bouge pas
+
+    Voir aussi FLOOR, ROUND, FIX, IDIVIDE.
+
+### floor
+FLOOR  Arrondi vers le bas.
+    FLOOR(X) rend le plus grand entier inférieur ou égal à X. Pour les
+    négatifs, cela veut dire à l'opposé de zéro : floor(-2.5) vaut -3.
+
+    Syntaxe
+       Y = floor(X)
+
+    Exemples
+       floor(2.9)             % 2
+       floor(-2.1)            % -3
+       floor([1.8 -1.8 4])    % 1  -2  4
+       floor(7/2)             % 3
+
+    Voir aussi CEIL, ROUND, FIX, MOD.
+
+### fix
+FIX  Arrondi vers zéro.
+    FIX(X) retire la partie fractionnaire : c'est FLOOR pour les
+    positifs, CEIL pour les négatifs. La partie entière et le reste
+    gardent ainsi le même signe.
+
+    Syntaxe
+       Y = fix(X)
+
+    Exemples
+       fix(2.9)               % 2
+       fix(-2.9)              % -2
+       fix([2.7 -2.7])        % 2  -2
+       fix(7/2)               % 3
+
+    Voir aussi FLOOR, CEIL, ROUND, REM, IDIVIDE.
+
+### sign
+SIGN  Signe d'un nombre.
+    SIGN(X) rend 1 pour X > 0, -1 pour X < 0, et 0 pour X nul. Pour un
+    complexe, elle rend X/ABS(X) : le nombre ramené sur le cercle unité.
+
+    Syntaxe
+       Y = sign(X)
+
+    Exemples
+       sign(-3.2)             % -1
+       sign([2 0 -5])         % 1  0  -1
+       sign(0)                % 0
+       abs(sign(3 + 4i) - (0.6 + 0.8i)) < 1e-15    % vrai
+
+    Voir aussi ABS, SIGNUM, MAX, MIN.
+
+### log10
+LOG10  Logarithme décimal.
+    LOG10(X) rend le logarithme en base dix. Un argument négatif donne un
+    résultat complexe, comme dans MATLAB.
+
+    Syntaxe
+       Y = log10(X)
+
+    Exemples
+       log10(100)             % 2
+       log10(1)               % 0
+       log10([1 10 1000])     % 0  1  3
+       log10(0)               % -Inf
+
+    Voir aussi LOG, LOG2, EXP, SEMILOGX.
+
+### log2
+LOG2  Logarithme binaire.
+    LOG2(X) rend le logarithme en base deux. [F,E] = LOG2(X) rend la
+    forme normalisée d'un nombre en virgule flottante : X = F*2^E avec F
+    dans [0.5, 1).
+
+    Syntaxe
+       Y = log2(X)
+       [F,E] = log2(X)
+
+    Exemples
+       log2(8)                % 3
+       log2(1024)             % 10
+       [f, e] = log2(8);
+       f * 2^e                % 8 : la decomposition redonne le nombre
+
+    Voir aussi LOG, LOG10, POW2, NEXTPOW2.
+
+### log1p
+LOG1P  Logarithme de 1+X, précis près de zéro.
+    LOG1P(X) rend log(1+X) sans perdre les chiffres significatifs quand X
+    est petit : log(1+1e-16) rend zéro, log1p(1e-16) rend 1e-16.
+
+    Syntaxe
+       Y = log1p(X)
+
+    Exemples
+       log1p(0)               % 0
+       log1p(1e-16)           % 1e-16, la ou log(1+1e-16) rend 0
+       abs(log1p(1) - log(2)) < 1e-15    % vrai
+
+    Voir aussi LOG, EXPM1, LOG10.
+
+### expm1
+EXPM1  Exponentielle moins un, précise près de zéro.
+    EXPM1(X) rend exp(X)-1 sans la perte de précision de la soustraction
+    quand X est petit.
+
+    Syntaxe
+       Y = expm1(X)
+
+    Exemples
+       expm1(0)               % 0
+       expm1(1e-16)           % 1e-16, la ou exp(1e-16)-1 rend 0
+       abs(expm1(1) - (exp(1) - 1)) < 1e-15    % vrai
+
+    Voir aussi EXP, LOG1P.
+
+### nthroot
+NTHROOT  Racine n-ième réelle.
+    NTHROOT(X,N) rend la racine n-ième réelle de X. Contrairement à
+    X^(1/N), qui rend la racine complexe de plus petit argument, elle
+    accepte un X négatif quand N est impair.
+
+    Syntaxe
+       Y = nthroot(X,N)
+
+    Exemples
+       nthroot(27, 3)         % 3
+       nthroot(-8, 3)         % -2, la ou (-8)^(1/3) rend 1 + 1.7321i
+       nthroot(16, 4)         % 2
+       nthroot([8 27], 3)     % 2  3
+
+    Voir aussi SQRT, POWER, REALSQRT, CBRT.
+
+### hypot
+HYPOT  Hypoténuse, sans débordement.
+    HYPOT(X,Y) rend sqrt(X^2 + Y^2) en évitant le débordement : le calcul
+    direct échoue dès que X^2 dépasse le plus grand nombre représentable,
+    alors que le résultat, lui, tient.
+
+    Syntaxe
+       C = hypot(A,B)
+
+    Exemples
+       hypot(3, 4)            % 5
+       hypot(1e200, 1e200)    % 1.4142e200, la ou sqrt(x^2+y^2) rend Inf
+       hypot([3 5], [4 12])   % 5  13
+
+    Voir aussi ABS, NORM, SQRT.
+
+### real
+REAL  Partie réelle.
+    REAL(Z) rend la partie réelle de chaque élément.
+
+    Syntaxe
+       X = real(Z)
+
+    Exemples
+       real(3 + 4i)           % 3
+       real([1+2i, 5])        % 1  5
+       real(exp(1i*pi))       % -1
+
+    Voir aussi IMAG, CONJ, ABS, ANGLE, COMPLEX.
+
+### imag
+IMAG  Partie imaginaire.
+    IMAG(Z) rend la partie imaginaire de chaque élément : un nombre réel,
+    sans le i.
+
+    Syntaxe
+       Y = imag(Z)
+
+    Exemples
+       imag(3 + 4i)           % 4
+       imag([1+2i, 5])        % 2  0
+       imag(1i)               % 1
+
+    Voir aussi REAL, CONJ, ABS, ANGLE.
+
+### conj
+CONJ  Conjugué complexe.
+    CONJ(Z) change le signe de la partie imaginaire. Le produit d'un
+    nombre par son conjugué vaut le carré de son module.
+
+    Syntaxe
+       W = conj(Z)
+
+    Exemples
+       conj(3 + 4i)           % 3 - 4i
+       conj([1+1i, 2-2i])     % 1-1i  2+2i
+       (3+4i) * conj(3+4i)    % 25, soit abs(3+4i)^2
+
+    Voir aussi REAL, IMAG, ABS, CTRANSPOSE.
+
+### isfinite
+ISFINITE  Vrai pour les valeurs finies.
+    ISFINITE(X) rend un tableau de booléens, vrai là où l'élément n'est
+    ni infini ni NaN.
+
+    Syntaxe
+       T = isfinite(X)
+
+    Exemples
+       isfinite([1 Inf NaN -Inf])   % 1  0  0  0
+       all(isfinite([1 2 3]))       % vrai
+       sum(isfinite([1 NaN 3]))     % 2
+
+    Voir aussi ISINF, ISNAN, ISREAL, RMMISSING.
+
+### isinf
+ISINF  Vrai pour les infinis.
+    ISINF(X) rend un tableau de booléens, vrai là où l'élément vaut +Inf
+    ou -Inf. Un NaN n'est pas un infini.
+
+    Syntaxe
+       T = isinf(X)
+
+    Exemples
+       isinf([1 Inf NaN -Inf])      % 0  1  0  1
+       isinf(1/0)                   % vrai
+       any(isinf([1 2 3]))          % faux
+
+    Voir aussi ISFINITE, ISNAN, INF.
+
+### isnan
+ISNAN  Vrai pour les « pas un nombre ».
+    ISNAN(X) rend un tableau de booléens, vrai là où l'élément est NaN.
+    C'est le seul moyen de les reconnaître : NaN == NaN est faux, par
+    définition de la norme des flottants.
+
+    Syntaxe
+       T = isnan(X)
+
+    Exemples
+       isnan([1 NaN 3])       % 0  1  0
+       NaN == NaN             % faux : d'ou l'utilite d'isnan
+       isnan(0/0)             % vrai
+       sum(isnan([1 NaN NaN]))    % 2
+
+    Voir aussi ISFINITE, ISINF, NAN, RMMISSING, ISMISSING.
+
+### isprime
+ISPRIME  Vrai pour les nombres premiers.
+    ISPRIME(X) rend un tableau de booléens, vrai là où l'élément est un
+    entier premier. Les valeurs doivent être des entiers positifs.
+
+    Syntaxe
+       T = isprime(X)
+
+    Exemples
+       isprime(7)             % vrai
+       isprime([1 2 3 4 9])   % 0  1  1  0  0
+       sum(isprime(1:20))     % 8 : il y a huit premiers jusqu'a 20
+
+    Voir aussi PRIMES, FACTOR, GCD, NCHOOSEK.
+
+### primes
+PRIMES  Les nombres premiers jusqu'à N.
+    PRIMES(N) rend, en ligne, tous les nombres premiers inférieurs ou
+    égaux à N. Le calcul passe par le crible d'Ératosthène.
+
+    Syntaxe
+       P = primes(N)
+
+    Exemples
+       primes(20)             % 2  3  5  7  11  13  17  19
+       numel(primes(100))     % 25
+       max(primes(50))        % 47
+
+    Voir aussi ISPRIME, FACTOR, NCHOOSEK.
+
+### factor
+FACTOR  Décomposition en facteurs premiers.
+    FACTOR(N) rend, en ordre croissant, les facteurs premiers de N,
+    répétés autant de fois qu'ils divisent. Leur produit redonne N.
+
+    Syntaxe
+       F = factor(N)
+
+    Exemples
+       factor(12)             % 2  2  3
+       factor(97)             % 97 : un nombre premier n'a que lui-meme
+       prod(factor(360))      % 360
+       numel(factor(1024))    % 10, soit 2^10
+
+    Voir aussi PRIMES, ISPRIME, GCD, LCM.
+
+### factorial
+FACTORIAL  Factorielle.
+    FACTORIAL(N) rend le produit des entiers de 1 à N. Au-delà de 170, le
+    résultat dépasse ce qu'un flottant peut porter, et vaut Inf.
+
+    Syntaxe
+       F = factorial(N)
+
+    Exemples
+       factorial(5)           % 120
+       factorial(0)           % 1, par convention
+       factorial([3 4 5])     % 6  24  120
+       factorial(171)         % Inf : au-dela de ce que porte un double
+
+    Voir aussi NCHOOSEK, GAMMA, PROD, PERMS.
+
+### nchoosek
+NCHOOSEK  Coefficient binomial, ou combinaisons.
+    NCHOOSEK(N,K) rend le nombre de façons de choisir K éléments parmi N,
+    quand N est un scalaire. NCHOOSEK(V,K), avec V un vecteur, rend
+    toutes ces combinaisons, une par ligne.
+
+    Syntaxe
+       C = nchoosek(N,K)
+       C = nchoosek(V,K)
+
+    Exemples
+       nchoosek(5, 2)         % 10
+       nchoosek(6, 0)         % 1
+       nchoosek([1 2 3], 2)   % [1 2; 1 3; 2 3]
+       size(nchoosek(1:5, 3)) % 10  3
+
+    Voir aussi FACTORIAL, PERMS, COMBNK.
+
+### gcd
+GCD  Plus grand commun diviseur.
+    GCD(A,B) rend le plus grand entier qui divise A et B. [G,U,V] =
+    GCD(A,B) rend en plus les coefficients de Bézout : U*A + V*B = G.
+
+    Syntaxe
+       G = gcd(A,B)
+       [G,U,V] = gcd(A,B)
+
+    Exemples
+       gcd(12, 18)            % 6
+       gcd(7, 13)             % 1 : deux nombres premiers entre eux
+       gcd([12 15], [18 25])  % 6  5
+       [g, u, v] = gcd(12, 18);
+       u * 12 + v * 18        % 6, l'identite de Bezout
+
+    Voir aussi LCM, FACTOR, MOD, REM.
+
+### lcm
+LCM  Plus petit commun multiple.
+    LCM(A,B) rend le plus petit entier positif que divisent à la fois A
+    et B. Il vaut A*B/GCD(A,B).
+
+    Syntaxe
+       L = lcm(A,B)
+
+    Exemples
+       lcm(4, 6)              % 12
+       lcm(3, 5)              % 15
+       lcm([4 6], [6 8])      % 12  24
+       lcm(12, 18) * gcd(12, 18) == 12 * 18    % vrai
+
+    Voir aussi GCD, FACTOR, MOD.
+
+### idivide
+IDIVIDE  Division entière, avec la règle d'arrondi qu'on choisit.
+    IDIVIDE(A,B,MODE) divise deux tableaux d'entiers en arrondissant
+    comme MODE le demande : 'fix' vers zéro, 'floor' vers le bas, 'ceil'
+    vers le haut, 'round' au plus proche. Sans MODE, c'est 'fix' —
+    contrairement à A./B, qui arrondit au plus proche.
+
+    Syntaxe
+       C = idivide(A,B)
+       C = idivide(A,B,mode)
+
+    Exemples
+       idivide(int32(7), int32(2))              % 3
+       idivide(int32(7), int32(2), 'ceil')      % 4
+       idivide(int32(-7), int32(2), 'floor')    % -4
+       int32(7) / int32(2)                      % 4 : la division arrondit
+
+    Voir aussi RDIVIDE, FIX, FLOOR, CEIL, MOD.

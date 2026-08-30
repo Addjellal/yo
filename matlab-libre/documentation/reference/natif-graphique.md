@@ -2,6 +2,39 @@
 
 Fonctions natives du groupe `graphique`.
 
+## `axes`
+
+```
+AXES  Créer un axe, ou en désigner un.
+    AXES crée un axe neuf, qui occupe toute la figure et devient l'axe
+    courant.
+
+    AXES('Position',[G B L H]) le place où l'on veut : gauche, bas,
+    largeur, hauteur, en fractions de la figure, l'origine en bas à
+    gauche. Les axes que le nouveau recouvre disparaissent, comme dans
+    MATLAB.
+
+    AXES(H) rend courant l'axe de la poignée H : le tracé suivant ira
+    dedans.
+
+    Syntaxe
+       axes
+       h = axes('Position',[g b l h])
+       axes(h)
+
+    Exemples
+       figure
+       haut = axes('Position', [0.1 0.55 0.8 0.35]);
+       plot(1:10);
+       bas = axes('Position', [0.1 0.1 0.8 0.35]);
+       plot(sin(1:10));
+       axes(haut);            % on revient dans le premier
+       title('celui du haut');
+       close
+
+    Voir aussi SUBPLOT, GCA, FIGURE, CLA, SET.
+```
+
 ## `axis`
 
 ```

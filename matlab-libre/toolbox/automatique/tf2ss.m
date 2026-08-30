@@ -1,6 +1,18 @@
 function [A, B, C, D] = tf2ss(num, den)
-%TF2SS Forme compagne de commande d'une fonction de transfert.
-%   [A,B,C,D] = TF2SS(NUM,DEN) rend la réalisation d'état canonique.
+%TF2SS Fonction de transfert vers modèle d'état.
+%   [A,B,C,D] = TF2SS(NUM,DEN) rend la forme compagne de commande : la
+%   réalisation dont la matrice A porte les coefficients du dénominateur
+%   sur sa première ligne. Le modèle obtenu est commandable par
+%   construction ; il n'est observable que si la transmittance n'a pas de
+%   simplification pôle-zéro.
+%
+%   Exemples :
+%      [A, B, C, D] = tf2ss(1, [1 3 2]);
+%      sort(eig(A))                         % -2  -1, les poles
+%      D                                    % 0 : la transmittance est stricte
+%      rank(ctrb(A, B))                     % 2 : commandable par construction
+%
+%   Voir aussi SS2TF, SS, TF, SSDATA, CANON.
     num = num(:).';
     den = den(:).';
     if den(1) == 0

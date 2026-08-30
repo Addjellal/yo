@@ -1,15 +1,19 @@
 function z = tzero(a, b, c, d)
-%TZERO Zéros de transmission d'un système d'état.
-%   Z = TZERO(A,B,C,D) ou TZERO(SYS). Ce sont les valeurs de s pour
-%   lesquelles la matrice de Rosenbrock [A-sI B; C D] perd son rang :
-%   le transfert s'y annule, quelle que soit la direction d'entrée.
+%TZERO Zéros de transmission d'un modèle.
+%   Z = TZERO(SYS) rend les zéros de transmission : les valeurs de s pour
+%   lesquelles le modèle ne transmet rien, quelle que soit l'entrée. Un
+%   zéro à partie réelle positive — un zéro instable — limite ce qu'un
+%   correcteur peut faire, quel qu'il soit.
 %
-%   Quand D est inversible, ces valeurs sont exactement les valeurs
-%   propres de A - B*inv(D)*C : c'est le résultat classique, et c'est ce
-%   qui est calculé ici. Sinon, on passe par la fonction de transfert.
+%   Ils s'obtiennent comme les valeurs propres généralisées du faisceau
+%   de Rosenbrock.
 %
-%   Exemple :
-%      tzero(-1, 1, -1, 1)   % 0 : le transfert vaut s/(s+1)
+%   Exemples :
+%      tzero(tf([1 -1], [1 3 2]))           % 1 : un zero instable
+%      isempty(tzero(tf(1, [1 1])))         % vrai : aucun zero
+%      abs(tzero(ss(-1, 1, -1, 1)) - 0) < 1e-9
+%
+%   Voir aussi ZERO, POLE, PZMAP, MINREAL.
     if nargin == 1
         systeme = a;
         a = systeme.A;

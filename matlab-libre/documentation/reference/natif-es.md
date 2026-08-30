@@ -290,7 +290,22 @@ FILEREAD  Lit un fichier entier dans une chaîne.
 ## `filewrite`
 
 ```
-filewrite  Ecrit un fichier entier.
+FILEWRITE  Écrire une chaîne entière dans un fichier.
+    FILEWRITE(FICHIER,TEXTE) écrit le texte tel quel, sans rien ajouter,
+    et remplace le contenu du fichier s'il existait. C'est la réciproque
+    de FILEREAD, que MATLAB laisse à FOPEN et FPRINTF ; l'avoir sous la
+    main évite d'ouvrir et de fermer à la main pour trois lignes.
+
+    Syntaxe
+       filewrite(fichier,texte)
+
+    Exemples
+       f = [tempname() '.txt'];
+       filewrite(f, sprintf('une ligne\nune autre\n'));
+       numel(strsplit(strtrim(fileread(f)), sprintf('\n')))   % 2
+       delete(f);
+
+    Voir aussi FILEREAD, FOPEN, FPRINTF, FCLOSE, WRITEMATRIX.
 ```
 
 ## `fopen`

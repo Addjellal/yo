@@ -104,12 +104,6 @@ ENDSWITH  Le texte finit-il par le motif.
     Voir aussi STARTSWITH, CONTAINS, FILEPARTS.
 ```
 
-## `fliplr_str`
-
-```
-fliplr_str  Inverse un texte.
-```
-
 ## `iscellstr`
 
 ```
@@ -199,31 +193,88 @@ LOWER  Met le texte en minuscules.
 ## `matlab.lang.makeUniqueStrings`
 
 ```
-matlab.lang.makeUniqueStrings  Rend les noms uniques.
+MATLAB.LANG.MAKEUNIQUESTRINGS  Rendre uniques des noms qui se répètent.
+    MATLAB.LANG.MAKEUNIQUESTRINGS(C) ajoute un numéro aux doublons d'un
+    tableau de cellules de chaînes, jusqu'à ce que tous diffèrent. Le
+    premier de chaque groupe garde son nom.
+
+    Syntaxe
+       U = matlab.lang.makeUniqueStrings(C)
+
+    Exemples
+       matlab.lang.makeUniqueStrings({'a', 'a', 'b'})     % 'a'  'a_1'  'b'
+       numel(unique(matlab.lang.makeUniqueStrings({'x', 'x', 'x'})))   % 3
+       matlab.lang.makeUniqueStrings({'a', 'b'})          % inchange
+
+    Voir aussi UNIQUE, MATLAB.LANG.MAKEVALIDNAME, GENVARNAME.
 ```
 
 ## `matlab.lang.makeValidName`
 
 ```
-matlab.lang.makeValidName  Rend un identifiant valide.
+MATLAB.LANG.MAKEVALIDNAME  Rendre un texte utilisable comme nom de variable.
+    MATLAB.LANG.MAKEVALIDNAME(S) remplace ce qui ne peut pas figurer dans
+    un nom de variable — espaces, accents, ponctuation — par des
+    soulignés, et fait précéder d'un « x » un nom qui commencerait par un
+    chiffre. Le résultat est un nom que le langage accepte.
+
+    Syntaxe
+       N = matlab.lang.makeValidName(S)
+
+    Exemples
+       matlab.lang.makeValidName('mon nom')       % 'mon_nom'
+       matlab.lang.makeValidName('2eme')          % 'x2eme'
+       matlab.lang.makeValidName({'a-b', 'c d'})  % {'a_b', 'c_d'}
+       isvarname(matlab.lang.makeValidName('%!'))  % vrai
+
+    Voir aussi ISVARNAME, MATLAB.LANG.MAKEUNIQUESTRINGS, GENVARNAME.
 ```
 
 ## `natsort`
 
 ```
-natsort  Tri naturel (identite ici).
+NATSORT  Tri naturel : les nombres se comparent comme des nombres.
+    NATSORT(C) trie un tableau de cellules de chaînes en comparant les
+    suites de chiffres par leur valeur et non caractère par caractère :
+    « fichier2 » passe avant « fichier10 », que l'ordre alphabétique met
+    à l'envers. Les zéros de tête ne comptent pas.
+
+    [C,I] = NATSORT(C) rend aussi les indices, comme SORT.
+
+    Cette fonction n'existe pas dans MATLAB : c'est une contribution
+    connue du dépôt d'échange, que MatLibre fournit d'origine parce que
+    le besoin revient à chaque liste de fichiers.
+
+    Syntaxe
+       T = natsort(C)
+       [T,I] = natsort(C)
+
+    Exemples
+       natsort({'a10', 'a2', 'a1'})       % 'a1'  'a2'  'a10'
+       sort({'a10', 'a2', 'a1'})          % 'a1'  'a10'  'a2', l'ordre du texte
+       [t, i] = natsort({'v3', 'v1'});
+       i                                  % 2  1
+
+    Voir aussi SORT, SORTROWS, DIR, STRCMP.
 ```
 
 ## `newline`
 
 ```
-newline  Caractere de fin de ligne.
-```
+NEWLINE  Le caractère de fin de ligne.
+    NEWLINE rend le caractère de saut de ligne, celui que sprintf écrit
+    pour « \n ». Il sert à assembler du texte sans passer par SPRINTF.
 
-## `num2str_`
+    Syntaxe
+       c = newline
 
-```
-num2str_  Reserve.
+    Exemples
+       double(newline)        % 10
+       texte = ['premiere' newline 'seconde'];
+       numel(strsplit(texte, newline))    % 2
+       isequal(newline, sprintf('\n'))    % vrai
+
+    Voir aussi SPRINTF, STRSPLIT, STRJOIN, BLANKS, COMPOSE.
 ```
 
 ## `pad`

@@ -1,0 +1,498 @@
+### sin
+SIN  Sinus, l'angle en radians.
+    SIN(X) rend le sinus de chaque élément de X, l'angle étant compté en
+    radians. Pour un argument complexe, la fonction est prolongée par
+    sin(a+bi) = sin(a)cosh(b) + i cos(a)sinh(b).
+
+    Syntaxe
+       Y = sin(X)
+
+    Exemples
+       sin(0)                 % 0
+       sin(pi/2)              % 1
+       sin([0 pi/6 pi/2])     % 0  0.5  1
+       t = linspace(0, 2*pi, 5);
+       max(sin(t))            % 1
+
+    Voir aussi COS, TAN, ASIN, SIND, SINH, DEG2RAD.
+
+### cos
+COS  Cosinus, l'angle en radians.
+    COS(X) rend le cosinus de chaque élément de X, l'angle étant compté
+    en radians.
+
+    Syntaxe
+       Y = cos(X)
+
+    Exemples
+       cos(0)                 % 1
+       cos(pi)                % -1
+       cos([0 pi/3 pi])       % 1  0.5  -1
+       cos(pi/2)              % 6.1e-17 : le zero exact n'est pas atteint
+
+    Voir aussi SIN, TAN, ACOS, COSD, COSH.
+
+### tan
+TAN  Tangente, l'angle en radians.
+    TAN(X) rend la tangente, c'est-à-dire SIN(X)/COS(X). Elle n'est pas
+    définie aux multiples impairs de pi/2, où le calcul rend un très
+    grand nombre plutôt qu'un infini : pi/2 n'est pas représentable
+    exactement en virgule flottante.
+
+    Syntaxe
+       Y = tan(X)
+
+    Exemples
+       tan(0)                 % 0
+       tan(pi/4)              % 1
+       tan([0 pi/6 pi/4])     % 0  0.5774  1
+
+    Voir aussi SIN, COS, ATAN, ATAN2, TAND, TANH.
+
+### cot
+COT  Cotangente, l'angle en radians.
+    COT(X) rend 1/TAN(X) : le rapport du cosinus au sinus.
+
+    Syntaxe
+       Y = cot(X)
+
+    Exemples
+       cot(pi/4)              % 1
+       cot(pi/2)              % 6.1e-17, le zero au bruit pres
+       abs(cot(pi/6) - sqrt(3)) < 1e-12   % vrai
+
+    Voir aussi TAN, SEC, CSC, COTD, COTH.
+
+### sec
+SEC  Sécante, l'angle en radians.
+    SEC(X) rend 1/COS(X).
+
+    Syntaxe
+       Y = sec(X)
+
+    Exemples
+       sec(0)                 % 1
+       sec(pi/3)              % 2
+       abs(sec(pi/4) - sqrt(2)) < 1e-12   % vrai
+
+    Voir aussi COS, CSC, COT, SECD, SECH.
+
+### csc
+CSC  Cosécante, l'angle en radians.
+    CSC(X) rend 1/SIN(X).
+
+    Syntaxe
+       Y = csc(X)
+
+    Exemples
+       csc(pi/2)              % 1
+       csc(pi/6)              % 2
+       abs(csc(pi/4) - sqrt(2)) < 1e-12   % vrai
+
+    Voir aussi SIN, SEC, COT, CSCD, CSCH.
+
+### sind
+SIND  Sinus, l'angle en degrés.
+    SIND(X) rend le sinus de X degrés. Contrairement à SIN(X*pi/180),
+    la fonction rend exactement zéro aux multiples de 180 degrés : c'est
+    tout l'intérêt des variantes en degrés.
+
+    Syntaxe
+       Y = sind(X)
+
+    Exemples
+       sind(0)                % 0
+       sind(30)               % 0.5
+       sind(180)              % 0 exactement, la ou sin(pi) vaut 1.2e-16
+       sind([0 90 180 270])   % 0  1  0  -1
+
+    Voir aussi SIN, COSD, TAND, ASIND, DEG2RAD.
+
+### cosd
+COSD  Cosinus, l'angle en degrés.
+    COSD(X) rend le cosinus de X degrés, et exactement zéro aux multiples
+    impairs de 90 degrés.
+
+    Syntaxe
+       Y = cosd(X)
+
+    Exemples
+       cosd(0)                % 1
+       cosd(60)               % 0.5
+       cosd(90)               % 0 exactement
+       cosd([0 90 180])       % 1  0  -1
+
+    Voir aussi COS, SIND, TAND, ACOSD.
+
+### tand
+TAND  Tangente, l'angle en degrés.
+    TAND(X) rend la tangente de X degrés. Aux multiples impairs de 90
+    degrés, où la tangente n'existe pas, elle rend Inf — ce que TAN ne
+    peut pas faire, faute de pouvoir représenter pi/2 exactement.
+
+    Syntaxe
+       Y = tand(X)
+
+    Exemples
+       tand(45)               % 1
+       tand(0)                % 0
+       tand(90)               % Inf
+       abs(tand(60) - sqrt(3)) < 1e-12    % vrai
+
+    Voir aussi TAN, SIND, COSD, ATAND, ATAN2D.
+
+### cotd
+COTD  Cotangente, l'angle en degrés.
+    COTD(X) rend 1/TAND(X).
+
+    Syntaxe
+       Y = cotd(X)
+
+    Exemples
+       cotd(45)               % 1
+       cotd(90)               % 0
+       abs(cotd(30) - sqrt(3)) < 1e-12    % vrai
+
+    Voir aussi COT, TAND, SECD, CSCD.
+
+### secd
+SECD  Sécante, l'angle en degrés.
+    SECD(X) rend 1/COSD(X).
+
+    Syntaxe
+       Y = secd(X)
+
+    Exemples
+       secd(0)                % 1
+       secd(60)               % 2
+       secd(90)               % Inf
+
+    Voir aussi SEC, COSD, CSCD, COTD.
+
+### cscd
+CSCD  Cosécante, l'angle en degrés.
+    CSCD(X) rend 1/SIND(X).
+
+    Syntaxe
+       Y = cscd(X)
+
+    Exemples
+       cscd(90)               % 1
+       cscd(30)               % 2
+       cscd(180)              % Inf
+
+    Voir aussi CSC, SIND, SECD, COTD.
+
+### asin
+ASIN  Arc sinus, en radians.
+    ASIN(X) rend l'angle dont le sinus vaut X. Pour X dans [-1, 1], le
+    résultat est dans [-pi/2, pi/2] ; hors de cet intervalle, il est
+    complexe, comme dans MATLAB.
+
+    Syntaxe
+       Y = asin(X)
+
+    Exemples
+       asin(1)                % 1.5708, soit pi/2
+       asin(0.5)              % 0.5236, soit pi/6
+       asin(sin(0.3))         % 0.3, la fonction reciproque
+       real(asin(2)) > 0      % vrai : hors de [-1,1], le resultat est complexe
+
+    Voir aussi SIN, ACOS, ATAN, ASIND, ASINH.
+
+### acos
+ACOS  Arc cosinus, en radians.
+    ACOS(X) rend l'angle dont le cosinus vaut X, dans [0, pi] pour X dans
+    [-1, 1], complexe au-delà.
+
+    Syntaxe
+       Y = acos(X)
+
+    Exemples
+       acos(1)                % 0
+       acos(0)                % 1.5708, soit pi/2
+       acos(-1)               % 3.1416, soit pi
+       abs(acos(cos(0.7)) - 0.7) < 1e-12  % vrai
+
+    Voir aussi COS, ASIN, ATAN, ACOSD, ACOSH.
+
+### atan
+ATAN  Arc tangente, en radians.
+    ATAN(X) rend l'angle dont la tangente vaut X, dans ]-pi/2, pi/2[.
+    Pour retrouver le quadrant d'un point, il faut les deux coordonnées :
+    c'est ATAN2 qu'il faut alors.
+
+    Syntaxe
+       Y = atan(X)
+
+    Exemples
+       atan(1)                % 0.7854, soit pi/4
+       atan(0)                % 0
+       atan(Inf)              % 1.5708
+       atan(tan(0.4))         % 0.4
+
+    Voir aussi TAN, ATAN2, ASIN, ACOS, ATAND.
+
+### asind
+ASIND  Arc sinus, en degrés.
+    ASIND(X) rend l'angle en degrés dont le sinus vaut X : le résultat
+    est dans [-90, 90] pour X dans [-1, 1].
+
+    Syntaxe
+       Y = asind(X)
+
+    Exemples
+       asind(1)               % 90
+       asind(0.5)             % 30
+       asind([0 0.5 1])       % 0  30  90
+       asind(sind(20))        % 20
+
+    Voir aussi SIND, ACOSD, ATAND, ASIN.
+
+### acosd
+ACOSD  Arc cosinus, en degrés.
+    ACOSD(X) rend l'angle en degrés dont le cosinus vaut X : le résultat
+    est dans [0, 180] pour X dans [-1, 1]. Hors de cet intervalle il est
+    complexe, comme dans MATLAB.
+
+    Syntaxe
+       Y = acosd(X)
+
+    Exemples
+       acosd(0)               % 90
+       acosd(1)               % 0
+       acosd([1 0.5 0 -1])    % 0  60  90  180
+       acosd(cosd(30))        % 30
+
+    Voir aussi COSD, ASIND, ATAND, ACOS, RAD2DEG.
+
+### atand
+ATAND  Arc tangente, en degrés.
+    ATAND(X) rend l'angle en degrés dont la tangente vaut X, dans
+    ]-90, 90[.
+
+    Syntaxe
+       Y = atand(X)
+
+    Exemples
+       atand(1)               % 45
+       atand(0)               % 0
+       atand(Inf)             % 90
+       atand(tand(15))        % 15
+
+    Voir aussi TAND, ATAN, ATAN2D, ASIND.
+
+### atan2d
+ATAN2D  Arc tangente à quatre quadrants, en degrés.
+    ATAN2D(Y,X) rend l'angle en degrés, dans ]-180, 180], que fait le
+    point (X,Y) avec l'axe des abscisses. Les signes des deux arguments
+    donnent le quadrant, ce qu'ATAND ne peut pas savoir.
+
+    Syntaxe
+       A = atan2d(Y,X)
+
+    Exemples
+       atan2d(1, 1)           % 45
+       atan2d(1, -1)          % 135 : le deuxieme quadrant
+       atan2d(-1, -1)         % -135
+       atan2d(0, -1)          % 180
+
+    Voir aussi ATAN2, ATAND, ANGLE, CART2POL.
+
+### sinh
+SINH  Sinus hyperbolique.
+    SINH(X) rend (exp(X) - exp(-X))/2.
+
+    Syntaxe
+       Y = sinh(X)
+
+    Exemples
+       sinh(0)                % 0
+       sinh(1)                % 1.1752
+       abs(sinh(1) - (exp(1) - exp(-1))/2) < 1e-15   % vrai
+       sinh(-2) == -sinh(2)   % vrai : la fonction est impaire
+
+    Voir aussi COSH, TANH, ASINH, SIN.
+
+### cosh
+COSH  Cosinus hyperbolique.
+    COSH(X) rend (exp(X) + exp(-X))/2. C'est la forme que prend une
+    chaîne pesante suspendue par ses deux bouts — la chaînette.
+
+    Syntaxe
+       Y = cosh(X)
+
+    Exemples
+       cosh(0)                % 1
+       cosh(1)                % 1.5431
+       cosh(-2) == cosh(2)    % vrai : la fonction est paire
+       abs(cosh(1)^2 - sinh(1)^2 - 1) < 1e-12   % l'identite fondamentale
+
+    Voir aussi SINH, TANH, ACOSH, COS.
+
+### tanh
+TANH  Tangente hyperbolique.
+    TANH(X) rend SINH(X)/COSH(X), c'est-à-dire une valeur dans ]-1, 1[
+    qui tend vers ±1 aux grands arguments. C'est la fonction d'activation
+    classique des réseaux de neurones.
+
+    Syntaxe
+       Y = tanh(X)
+
+    Exemples
+       tanh(0)                % 0
+       tanh(1)                % 0.7616
+       tanh(20)               % 1 au bruit pres
+       all(abs(tanh([-3 0 3])) <= 1)    % vrai
+
+    Voir aussi SINH, COSH, ATANH, TAN.
+
+### coth
+COTH  Cotangente hyperbolique.
+    COTH(X) rend 1/TANH(X). Elle n'est pas définie en zéro.
+
+    Syntaxe
+       Y = coth(X)
+
+    Exemples
+       coth(1)                % 1.3130
+       abs(coth(1) - 1/tanh(1)) < 1e-12   % vrai
+       coth(20)               % 1 au bruit pres
+
+    Voir aussi TANH, SECH, CSCH, COT.
+
+### sech
+SECH  Sécante hyperbolique.
+    SECH(X) rend 1/COSH(X). Elle vaut 1 en zéro et décroît vers zéro des
+    deux côtés : c'est la forme du soliton.
+
+    Syntaxe
+       Y = sech(X)
+
+    Exemples
+       sech(0)                % 1
+       sech(1)                % 0.6481
+       sech(-1) == sech(1)    % vrai
+
+    Voir aussi COSH, CSCH, COTH, SEC.
+
+### csch
+CSCH  Cosécante hyperbolique.
+    CSCH(X) rend 1/SINH(X). Elle n'est pas définie en zéro.
+
+    Syntaxe
+       Y = csch(X)
+
+    Exemples
+       csch(1)                % 0.8509
+       abs(csch(1) - 1/sinh(1)) < 1e-12   % vrai
+       csch(-1) == -csch(1)   % vrai : la fonction est impaire
+
+    Voir aussi SINH, SECH, COTH, CSC.
+
+### asinh
+ASINH  Arc sinus hyperbolique.
+    ASINH(X) rend log(X + sqrt(X^2 + 1)) : la fonction réciproque de
+    SINH, définie sur tout l'axe réel.
+
+    Syntaxe
+       Y = asinh(X)
+
+    Exemples
+       asinh(0)               % 0
+       asinh(sinh(2))         % 2
+       abs(asinh(1) - log(1 + sqrt(2))) < 1e-12   % vrai
+
+    Voir aussi SINH, ACOSH, ATANH, ASIN.
+
+### acosh
+ACOSH  Arc cosinus hyperbolique.
+    ACOSH(X) rend log(X + sqrt(X^2 - 1)), défini pour X >= 1 ; en deçà,
+    le résultat est complexe.
+
+    Syntaxe
+       Y = acosh(X)
+
+    Exemples
+       acosh(1)               % 0
+       acosh(cosh(1.5))       % 1.5
+       imag(acosh(0)) ~= 0    % vrai : sous 1, le resultat est complexe
+
+    Voir aussi COSH, ASINH, ATANH, ACOS.
+
+### atanh
+ATANH  Arc tangente hyperbolique.
+    ATANH(X) rend log((1+X)/(1-X))/2, défini pour |X| < 1 ; aux bornes il
+    vaut ±Inf, au-delà il est complexe.
+
+    Syntaxe
+       Y = atanh(X)
+
+    Exemples
+       atanh(0)               % 0
+       atanh(tanh(0.6))       % 0.6
+       atanh(1)               % Inf
+       abs(atanh(0.5) - log(3)/2) < 1e-12    % vrai
+
+    Voir aussi TANH, ASINH, ACOSH, ATAN.
+
+### sinc
+SINC  Sinus cardinal.
+    SINC(X) rend sin(pi*X)/(pi*X), et 1 en zéro. C'est la réponse
+    impulsionnelle du filtre passe-bas idéal, et la transformée de
+    Fourier d'une fenêtre rectangulaire.
+
+    Syntaxe
+       Y = sinc(X)
+
+    Exemples
+       sinc(0)                % 1
+       sinc(1)                % 0 : la fonction s'annule aux entiers
+       sinc([0 1 2 0.5])      % 1  0  0  0.6366
+       abs(sinc(0.5) - 2/pi) < 1e-12    % vrai
+
+    Voir aussi SIN, FFT, FIR1.
+
+### deg2rad
+DEG2RAD  Degrés vers radians.
+    DEG2RAD(X) rend X*pi/180.
+
+    Syntaxe
+       R = deg2rad(D)
+
+    Exemples
+       deg2rad(180)           % 3.1416
+       deg2rad([0 90 180])    % 0  1.5708  3.1416
+       abs(sin(deg2rad(30)) - 0.5) < 1e-15   % vrai
+
+    Voir aussi RAD2DEG, SIND, COSD.
+
+### rad2deg
+RAD2DEG  Radians vers degrés.
+    RAD2DEG(X) rend X*180/pi.
+
+    Syntaxe
+       D = rad2deg(R)
+
+    Exemples
+       rad2deg(pi)            % 180
+       rad2deg(pi/2)          % 90
+       rad2deg(atan(1))       % 45
+
+    Voir aussi DEG2RAD, ATAND, ANGLE.
+
+### arg
+ARG  Argument d'un nombre complexe, en radians.
+    ARG(Z) rend l'angle que fait Z avec l'axe réel, dans ]-pi, pi]. C'est
+    le nom qu'Octave donne à ANGLE ; MatLibre accepte les deux.
+
+    Syntaxe
+       A = arg(Z)
+
+    Exemples
+       arg(1i)                % 1.5708
+       arg(-1)                % 3.1416
+       arg(1 + 1i)            % 0.7854
+       abs(arg(1+1i) - angle(1+1i)) < 1e-15   % vrai : c'est la meme chose
+
+    Voir aussi ANGLE, ABS, REAL, IMAG, ATAN2.

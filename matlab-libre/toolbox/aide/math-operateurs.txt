@@ -1,0 +1,317 @@
+### plus
+PLUS  Addition, sous forme de fonction.
+    PLUS(A,B) est ce qu'écrit A + B. Les deux termes doivent avoir la
+    même taille, ou l'un des deux être un scalaire ; les tailles se
+    complètent aussi par diffusion, une ligne contre une colonne donnant
+    une matrice.
+
+    Écrire l'opérateur sous forme de fonction sert à le passer à une
+    autre : ARRAYFUN, CELLFUN, ACCUMARRAY en prennent volontiers.
+
+    Syntaxe
+       C = plus(A,B)
+
+    Exemples
+       plus(2, 3)             % 5
+       plus([1 2], [10 20])   % 11  22
+       plus([1 2 3], 10)      % 11  12  13
+       plus([1; 2], [10 20])  % diffusion : matrice 2x2
+
+    Voir aussi MINUS, TIMES, SUM, BSXFUN.
+
+### minus
+MINUS  Soustraction, sous forme de fonction.
+    MINUS(A,B) est ce qu'écrit A - B.
+
+    Syntaxe
+       C = minus(A,B)
+
+    Exemples
+       minus(5, 3)            % 2
+       minus([10 20], [1 2])  % 9  18
+       minus(10, [1 2 3])     % 9  8  7
+
+    Voir aussi PLUS, UMINUS, TIMES, DIFF.
+
+### uminus
+UMINUS  Opposé, sous forme de fonction.
+    UMINUS(A) est ce qu'écrit -A.
+
+    Syntaxe
+       C = uminus(A)
+
+    Exemples
+       uminus(3)              % -3
+       uminus([1 -2 3])       % -1  2  -3
+       uminus(uminus(7))      % 7
+
+    Voir aussi UPLUS, MINUS, ABS, SIGN.
+
+### uplus
+UPLUS  Plus unaire, sous forme de fonction.
+    UPLUS(A) est ce qu'écrit +A : la valeur elle-même. La fonction existe
+    pour que les classes puissent la redéfinir, et pour la symétrie avec
+    UMINUS.
+
+    Syntaxe
+       C = uplus(A)
+
+    Exemples
+       uplus(3)               % 3
+       uplus([1 -2])          % 1  -2
+       isequal(uplus([1 2]), [1 2])   % vrai
+
+    Voir aussi UMINUS, PLUS.
+
+### times
+TIMES  Multiplication élément par élément, sous forme de fonction.
+    TIMES(A,B) est ce qu'écrit A .* B : chaque élément multiplié par
+    celui d'en face, sans produit matriciel.
+
+    Syntaxe
+       C = times(A,B)
+
+    Exemples
+       times([1 2 3], [4 5 6])    % 4  10  18
+       times([1 2], 10)           % 10  20
+       times([1 2; 3 4], [1 0; 0 1])  % [1 0; 0 4], non le produit matriciel
+
+    Voir aussi MTIMES, RDIVIDE, POWER, PROD.
+
+### mtimes
+MTIMES  Produit matriciel, sous forme de fonction.
+    MTIMES(A,B) est ce qu'écrit A * B : le produit des matrices, qui
+    demande que A ait autant de colonnes que B a de lignes. Un scalaire
+    multiplie tout.
+
+    Syntaxe
+       C = mtimes(A,B)
+
+    Exemples
+       mtimes([1 2; 3 4], [1; 1])     % [3; 7]
+       mtimes(2, [1 2 3])             % 2  4  6
+       mtimes([1 2], [3; 4])          % 11, le produit scalaire
+
+    Voir aussi TIMES, MRDIVIDE, MPOWER, DOT, CROSS.
+
+### rdivide
+RDIVIDE  Division élément par élément, sous forme de fonction.
+    RDIVIDE(A,B) est ce qu'écrit A ./ B.
+
+    Syntaxe
+       C = rdivide(A,B)
+
+    Exemples
+       rdivide([10 20], [2 5])    % 5  4
+       rdivide([1 2 3], 2)        % 0.5  1  1.5
+       rdivide(1, 0)              % Inf
+
+    Voir aussi LDIVIDE, MRDIVIDE, TIMES, IDIVIDE.
+
+### ldivide
+LDIVIDE  Division élément par élément à gauche, sous forme de fonction.
+    LDIVIDE(A,B) est ce qu'écrit A .\ B, c'est-à-dire B ./ A. La forme à
+    gauche existe surtout pour sa version matricielle, MLDIVIDE, qui
+    résout un système linéaire.
+
+    Syntaxe
+       C = ldivide(A,B)
+
+    Exemples
+       ldivide(2, [10 20])        % 5  10
+       ldivide([1 2], [10 20])    % 10  10
+       isequal(ldivide(2, 8), rdivide(8, 2))    % vrai
+
+    Voir aussi RDIVIDE, MLDIVIDE, TIMES.
+
+### mrdivide
+MRDIVIDE  Division matricielle à droite, sous forme de fonction.
+    MRDIVIDE(A,B) est ce qu'écrit A / B : la solution X de X*B = A. Pour
+    un scalaire, c'est la division ordinaire.
+
+    Syntaxe
+       C = mrdivide(A,B)
+
+    Exemples
+       mrdivide(6, 3)             % 2
+       mrdivide([2 4], 2)         % 1  2
+       X = mrdivide([1 2], [1 0; 0 2]);
+       max(abs(X * [1 0; 0 2] - [1 2])) < 1e-12    % vrai
+
+    Voir aussi MLDIVIDE, RDIVIDE, INV, LINSOLVE.
+
+### mpower
+MPOWER  Puissance matricielle, sous forme de fonction.
+    MPOWER(A,N) est ce qu'écrit A ^ N. Pour une matrice carrée et un
+    entier N, c'est le produit matriciel répété ; pour un scalaire, la
+    puissance ordinaire.
+
+    Syntaxe
+       C = mpower(A,N)
+
+    Exemples
+       mpower(2, 10)              % 1024
+       mpower([1 1; 0 1], 3)      % [1 3; 0 1]
+       isequal(mpower([2 0; 0 3], 2), [4 0; 0 9])   % vrai
+
+    Voir aussi POWER, MTIMES, EXPM, SQRTM.
+
+### power
+POWER  Puissance élément par élément, sous forme de fonction.
+    POWER(A,B) est ce qu'écrit A .^ B.
+
+    Syntaxe
+       C = power(A,B)
+
+    Exemples
+       power([1 2 3], 2)          % 1  4  9
+       power(2, [1 2 3])          % 2  4  8
+       power([1 2; 3 4], 0)       % que des uns
+
+    Voir aussi MPOWER, TIMES, EXP, NTHROOT.
+
+### eq
+EQ  Égalité, sous forme de fonction.
+    EQ(A,B) est ce qu'écrit A == B : un tableau de booléens, comparé
+    élément par élément. Pour comparer des tableaux entiers, ISEQUAL est
+    plus sûr — il compare aussi les tailles.
+
+    Syntaxe
+       T = eq(A,B)
+
+    Exemples
+       eq(3, 3)                   % vrai
+       eq([1 2 3], [1 5 3])       % 1  0  1
+       eq(NaN, NaN)               % faux : un NaN n'egale rien, pas meme lui
+
+    Voir aussi NE, ISEQUAL, LT, GT, STRCMP.
+
+### ne
+NE  Différence, sous forme de fonction.
+    NE(A,B) est ce qu'écrit A ~= B.
+
+    Syntaxe
+       T = ne(A,B)
+
+    Exemples
+       ne(3, 4)                   % vrai
+       ne([1 2 3], [1 5 3])       % 0  1  0
+       ne(NaN, NaN)               % vrai
+
+    Voir aussi EQ, ISEQUAL, NOT.
+
+### lt
+LT  Strictement inférieur, sous forme de fonction.
+    LT(A,B) est ce qu'écrit A < B.
+
+    Syntaxe
+       T = lt(A,B)
+
+    Exemples
+       lt(2, 3)                   % vrai
+       lt([1 5 3], 3)             % 1  0  0
+       sum(lt(rand(1, 10), 2))    % 10 : tous les tirages sont sous 2
+
+    Voir aussi LE, GT, GE, SORT, FIND.
+
+### le
+LE  Inférieur ou égal, sous forme de fonction.
+    LE(A,B) est ce qu'écrit A <= B.
+
+    Syntaxe
+       T = le(A,B)
+
+    Exemples
+       le(3, 3)                   % vrai
+       le([1 5 3], 3)             % 1  0  1
+       all(le([1 2 3], [1 2 3]))  % vrai
+
+    Voir aussi LT, GE, GT, EQ.
+
+### gt
+GT  Strictement supérieur, sous forme de fonction.
+    GT(A,B) est ce qu'écrit A > B.
+
+    Syntaxe
+       T = gt(A,B)
+
+    Exemples
+       gt(4, 3)                   % vrai
+       gt([1 5 3], 3)             % 0  1  0
+       nnz(gt([1 5 3 8], 3))      % 2
+
+    Voir aussi GE, LT, LE, FIND, MAX.
+
+### ge
+GE  Supérieur ou égal, sous forme de fonction.
+    GE(A,B) est ce qu'écrit A >= B.
+
+    Syntaxe
+       T = ge(A,B)
+
+    Exemples
+       ge(3, 3)                   % vrai
+       ge([1 5 3], 3)             % 0  1  1
+       all(ge([3 4 5], 3))        % vrai
+
+    Voir aussi GT, LE, LT, EQ.
+
+### and
+AND  Et logique, sous forme de fonction.
+    AND(A,B) est ce qu'écrit A & B : vrai là où les deux sont non nuls.
+    Contrairement à &&, l'opérateur travaille élément par élément et
+    évalue toujours ses deux arguments.
+
+    Syntaxe
+       T = and(A,B)
+
+    Exemples
+       and(true, false)           % faux
+       and([1 0 1], [1 1 0])      % 1  0  0
+       and([2 0], [3 3])          % 1  0 : tout non-nul est vrai
+
+    Voir aussi OR, NOT, XOR, ALL, ANY.
+
+### or
+OR  Ou logique, sous forme de fonction.
+    OR(A,B) est ce qu'écrit A | B : vrai là où l'un au moins est non nul.
+
+    Syntaxe
+       T = or(A,B)
+
+    Exemples
+       or(true, false)            % vrai
+       or([1 0 0], [0 1 0])       % 1  1  0
+       any(or([0 0], [0 1]))      % vrai
+
+    Voir aussi AND, NOT, XOR, ANY.
+
+### not
+NOT  Négation logique, sous forme de fonction.
+    NOT(A) est ce qu'écrit ~A : vrai là où A est nul.
+
+    Syntaxe
+       T = not(A)
+    
+    Exemples
+       not(false)                 % vrai
+       not([1 0 3])               % 0  1  0
+       isequal(not(not([1 0])), logical([1 0]))   % vrai
+
+    Voir aussi AND, OR, XOR, ANY, ALL.
+
+### xor
+XOR  Ou exclusif logique.
+    XOR(A,B) rend vrai là où l'un des deux est vrai, mais pas les deux.
+    À ne pas confondre avec BITXOR, qui travaille bit à bit sur des
+    entiers.
+
+    Syntaxe
+       T = xor(A,B)
+
+    Exemples
+       xor(true, false)           % vrai
+       xor(true, true)            % faux
+       xor([1 0 1 0], [1 1 0 0])  % 0  1  1  0
+
+    Voir aussi AND, OR, NOT, BITXOR.

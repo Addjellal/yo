@@ -1,0 +1,313 @@
+### float
+FLOAT  Conversion en nombre à virgule flottante simple.
+    FLOAT(X) rend X en simple précision : la classe « single », quatre
+    octets par nombre, sept chiffres significatifs. C'est le nom que
+    donnent le C et Octave à ce type ; MATLAB l'appelle SINGLE, et
+    MatLibre accepte les deux.
+
+    Attribuer une valeur à travers FLOAT change donc l'affichage : pi
+    s'écrit avec quinze décimales, float(pi) avec sept, puisqu'au-delà
+    les chiffres ne veulent plus rien dire.
+
+    Syntaxe
+       Y = float(X)
+
+    Exemples
+       class(float(pi))       % 'single'
+       float(pi)              % 3.1415927
+       double(float(1/3)) ~= 1/3      % vrai : la conversion perd des chiffres
+       whos                   % le tableau simple pese moitie moins
+
+    Voir aussi SINGLE, DOUBLE, CLASS, CAST, EPS.
+
+### is_function_handle
+IS_FUNCTION_HANDLE  Vrai pour une poignée de fonction.
+    IS_FUNCTION_HANDLE(X) rend vrai quand X est une poignée de fonction —
+    ce qu'écrit @sin ou @(x) x.^2. C'est le nom d'Octave ; MATLAB écrit
+    ISA(X,'function_handle'), que MatLibre accepte aussi.
+
+    Syntaxe
+       T = is_function_handle(X)
+
+    Exemples
+       is_function_handle(@sin)           % vrai
+       is_function_handle(@(x) x + 1)     % vrai
+       is_function_handle(3)              % faux
+       is_function_handle('sin')          % faux : un nom n'est pas une poignee
+
+    Voir aussi ISA, FUNC2STR, STR2FUNC, FEVAL, FUNCTIONS.
+
+### typecast
+TYPECAST  Réinterpréter les octets d'une valeur dans un autre type.
+    TYPECAST(X,TYPE) rend les mêmes octets, lus comme des nombres du type
+    demandé. Rien n'est converti : c'est la représentation binaire qu'on
+    relit autrement. Le nombre d'octets doit tomber juste.
+
+    C'est ainsi qu'on décortique un flottant, qu'on assemble des octets
+    reçus d'un port série, ou qu'on écrit un format de fichier binaire.
+
+    Syntaxe
+       Y = typecast(X,type)
+
+    Exemples
+       typecast(uint32(1), 'uint8')       % 1  0  0  0 en petit-boutien
+       typecast(single(1), 'uint32')      % 1065353216
+       numel(typecast(double(pi), 'uint8'))   % 8 octets
+       typecast(typecast(pi, 'uint8'), 'double')  % pi, inchange
+
+    Voir aussi CAST, CLASS, DOUBLE, FWRITE, BITSHIFT.
+
+### subsref
+SUBSREF  L'indexation, écrite comme une donnée.
+    SUBSREF(V,S) applique à V la chaîne d'accès décrite par S : une
+    structure 1xN de champs « type » et « subs », celle que fabrique
+    SUBSTRUCT. type vaut '()', '{}' ou '.', et subs les indices ou le nom
+    du champ.
+
+    C'est ce que reçoit la méthode SUBSREF d'une classe quand on indexe un
+    objet, et c'est la fonction qu'elle appelle pour poursuivre la chaîne
+    qu'elle n'a pas traitée elle-même. L'indexation faite ici est celle
+    par défaut : appeler SUBSREF sur un objet ne rappelle pas la méthode
+    de sa classe, ce qui boucler ait.
+
+    Syntaxe
+       V = subsref(A,S)
+
+    Exemples
+       A = [10 20 30];
+       subsref(A, substruct('()', {2}))       % 20
+       s.champ = 42;
+       subsref(s, substruct('.', 'champ'))    % 42
+       c = {1, 'deux'};
+       subsref(c, substruct('{}', {2}))       % 'deux'
+
+    Voir aussi SUBSTRUCT, SUBSASGN, ISOBJECT, CLASSDEF.
+
+### containers.Map
+CONTAINERS.MAP  Dictionnaire : une valeur par clé.
+    M = CONTAINERS.MAP() crée une table vide, dont les clés sont des
+    chaînes. M = CONTAINERS.MAP(CLES,VALEURS) la remplit d'emblée, à
+    partir de deux tableaux de cellules de même longueur.
+    M = CONTAINERS.MAP('KeyType',K,'ValueType',V) impose les types.
+
+    On lit et l'on écrit par la clé, entre parenthèses. La table est un
+    objet à référence : la passer à une fonction ne la copie pas, et ce
+    que la fonction y écrit se voit au retour.
+
+    Syntaxe
+       M = containers.Map()
+       M = containers.Map(cles,valeurs)
+       valeur = M(cle)
+       M(cle) = valeur
+
+    Exemples
+       m = containers.Map({'a', 'b'}, {1, 2});
+       m('a')                 % 1
+       m('c') = 3;
+       m.isKey('c')           % vrai
+       m.Count                % 3
+       sort(m.keys)           % {'a', 'b', 'c'}
+
+    Voir aussi ISKEY, KEYS, VALUES, REMOVE, STRUCT, DICTIONARY.
+
+### mapCount
+MAPCOUNT  Nombre d'entrées d'un dictionnaire.
+    MAPCOUNT(M) rend le nombre de clés que porte la table M. C'est ce que
+    rend la propriété M.Count, sous forme de fonction : utile pour la
+    passer à CELLFUN ou ARRAYFUN.
+
+    Syntaxe
+       N = mapCount(M)
+
+    Exemples
+       m = containers.Map({'a', 'b'}, {1, 2});
+       mapCount(m)            % 2
+       m('c') = 3;
+       mapCount(m)            % 3
+       mapCount(containers.Map())     % 0
+
+    Voir aussi CONTAINERS.MAP, KEYS, VALUES, ISKEY, NUMEL.
+
+### filewrite
+FILEWRITE  Écrire une chaîne entière dans un fichier.
+    FILEWRITE(FICHIER,TEXTE) écrit le texte tel quel, sans rien ajouter,
+    et remplace le contenu du fichier s'il existait. C'est la réciproque
+    de FILEREAD, que MATLAB laisse à FOPEN et FPRINTF ; l'avoir sous la
+    main évite d'ouvrir et de fermer à la main pour trois lignes.
+
+    Syntaxe
+       filewrite(fichier,texte)
+
+    Exemples
+       f = [tempname() '.txt'];
+       filewrite(f, sprintf('une ligne\nune autre\n'));
+       numel(strsplit(strtrim(fileread(f)), sprintf('\n')))   % 2
+       delete(f);
+
+    Voir aussi FILEREAD, FOPEN, FPRINTF, FCLOSE, WRITEMATRIX.
+
+### axes
+AXES  Créer un axe, ou en désigner un.
+    AXES crée un axe neuf, qui occupe toute la figure et devient l'axe
+    courant.
+
+    AXES('Position',[G B L H]) le place où l'on veut : gauche, bas,
+    largeur, hauteur, en fractions de la figure, l'origine en bas à
+    gauche. Les axes que le nouveau recouvre disparaissent, comme dans
+    MATLAB.
+
+    AXES(H) rend courant l'axe de la poignée H : le tracé suivant ira
+    dedans.
+
+    Syntaxe
+       axes
+       h = axes('Position',[g b l h])
+       axes(h)
+
+    Exemples
+       figure
+       haut = axes('Position', [0.1 0.55 0.8 0.35]);
+       plot(1:10);
+       bas = axes('Position', [0.1 0.1 0.8 0.35]);
+       plot(sin(1:10));
+       axes(haut);            % on revient dans le premier
+       title('celui du haut');
+       close
+
+    Voir aussi SUBPLOT, GCA, FIGURE, CLA, SET.
+
+### graphics_toolkit
+GRAPHICS_TOOLKIT  Le moteur de rendu graphique employé.
+    GRAPHICS_TOOLKIT rend le nom du moteur qui dessine les figures. C'est
+    le nom d'Octave ; MatLibre le garde pour que les scripts qui
+    l'interrogent ne s'arrêtent pas. Le rendu se fait en SVG, un format
+    vectoriel qu'aucune bibliothèque externe n'est nécessaire pour
+    produire.
+
+    Syntaxe
+       nom = graphics_toolkit
+
+    Exemples
+       graphics_toolkit       % 'svg'
+       strcmp(graphics_toolkit(), 'svg')      % vrai
+
+    Voir aussi FIGURE, PRINT, SAVEAS, PLOT.
+
+### fail
+FAIL  Faire échouer un test, avec un message.
+    FAIL(MESSAGE) lève une erreur d'identifiant
+    « MATLAB:assertion:failed ». C'est ce qu'on écrit dans la branche
+    d'un test qui n'aurait jamais dû être atteinte — là où ASSERT n'a
+    rien à comparer.
+
+    Syntaxe
+       fail(message)
+
+    Exemples
+       essai = false;
+       try
+           fail('cette branche ne devrait pas etre atteinte');
+       catch e
+           essai = strcmp(e.identifier, 'MATLAB:assertion:failed');
+       end
+       essai                  % vrai
+
+    Voir aussi ASSERT, ERROR, TRY, MEXCEPTION.
+
+### newline
+NEWLINE  Le caractère de fin de ligne.
+    NEWLINE rend le caractère de saut de ligne, celui que sprintf écrit
+    pour « \n ». Il sert à assembler du texte sans passer par SPRINTF.
+
+    Syntaxe
+       c = newline
+
+    Exemples
+       double(newline)        % 10
+       texte = ['premiere' newline 'seconde'];
+       numel(strsplit(texte, newline))    % 2
+       isequal(newline, sprintf('\n'))    % vrai
+
+    Voir aussi SPRINTF, STRSPLIT, STRJOIN, BLANKS, COMPOSE.
+
+### natsort
+NATSORT  Tri naturel : les nombres se comparent comme des nombres.
+    NATSORT(C) trie un tableau de cellules de chaînes en comparant les
+    suites de chiffres par leur valeur et non caractère par caractère :
+    « fichier2 » passe avant « fichier10 », que l'ordre alphabétique met
+    à l'envers. Les zéros de tête ne comptent pas.
+
+    [C,I] = NATSORT(C) rend aussi les indices, comme SORT.
+
+    Cette fonction n'existe pas dans MATLAB : c'est une contribution
+    connue du dépôt d'échange, que MatLibre fournit d'origine parce que
+    le besoin revient à chaque liste de fichiers.
+
+    Syntaxe
+       T = natsort(C)
+       [T,I] = natsort(C)
+
+    Exemples
+       natsort({'a10', 'a2', 'a1'})       % 'a1'  'a2'  'a10'
+       sort({'a10', 'a2', 'a1'})          % 'a1'  'a10'  'a2', l'ordre du texte
+       [t, i] = natsort({'v3', 'v1'});
+       i                                  % 2  1
+
+    Voir aussi SORT, SORTROWS, DIR, STRCMP.
+
+### matlab.lang.makeValidName
+MATLAB.LANG.MAKEVALIDNAME  Rendre un texte utilisable comme nom de variable.
+    MATLAB.LANG.MAKEVALIDNAME(S) remplace ce qui ne peut pas figurer dans
+    un nom de variable — espaces, accents, ponctuation — par des
+    soulignés, et fait précéder d'un « x » un nom qui commencerait par un
+    chiffre. Le résultat est un nom que le langage accepte.
+
+    Syntaxe
+       N = matlab.lang.makeValidName(S)
+
+    Exemples
+       matlab.lang.makeValidName('mon nom')       % 'mon_nom'
+       matlab.lang.makeValidName('2eme')          % 'x2eme'
+       matlab.lang.makeValidName({'a-b', 'c d'})  % {'a_b', 'c_d'}
+       isvarname(matlab.lang.makeValidName('%!'))  % vrai
+
+    Voir aussi ISVARNAME, MATLAB.LANG.MAKEUNIQUESTRINGS, GENVARNAME.
+
+### matlab.lang.makeUniqueStrings
+MATLAB.LANG.MAKEUNIQUESTRINGS  Rendre uniques des noms qui se répètent.
+    MATLAB.LANG.MAKEUNIQUESTRINGS(C) ajoute un numéro aux doublons d'un
+    tableau de cellules de chaînes, jusqu'à ce que tous diffèrent. Le
+    premier de chaque groupe garde son nom.
+
+    Syntaxe
+       U = matlab.lang.makeUniqueStrings(C)
+
+    Exemples
+       matlab.lang.makeUniqueStrings({'a', 'a', 'b'})     % 'a'  'a_1'  'b'
+       numel(unique(matlab.lang.makeUniqueStrings({'x', 'x', 'x'})))   % 3
+       matlab.lang.makeUniqueStrings({'a', 'b'})          % inchange
+
+    Voir aussi UNIQUE, MATLAB.LANG.MAKEVALIDNAME, GENVARNAME.
+
+### substruct
+SUBSTRUCT  Fabriquer la structure d'accès de SUBSREF.
+    SUBSTRUCT(TYPE1,SUBS1,TYPE2,SUBS2,...) rend le tableau 1xN de
+    structures que reçoivent SUBSREF et SUBSASGN : un champ « type »
+    valant '()', '{}' ou '.', et un champ « subs » portant les indices —
+    dans un tableau de cellules — ou le nom du champ.
+
+    C'est ainsi qu'on décrit une indexation sans l'écrire : « A(2).nom »
+    devient substruct('()', {2}, '.', 'nom').
+
+    Syntaxe
+       S = substruct(type1,subs1,...)
+
+    Exemples
+       s = substruct('()', {2});
+       subsref([10 20 30], s)             % 20
+       s2 = substruct('.', 'champ');
+       r.champ = 7;
+       subsref(r, s2)                     % 7
+       numel(substruct('()', {1}, '.', 'x'))   % 2 : deux niveaux
+
+    Voir aussi SUBSREF, SUBSASGN, CLASSDEF.

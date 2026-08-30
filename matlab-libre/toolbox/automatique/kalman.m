@@ -1,10 +1,18 @@
 function [estimateur, L, P] = kalman(systeme, Q, R)
-%KALMAN Filtre de Kalman en régime permanent.
-%   [EST,L,P] = KALMAN(SYS,Q,R) rend le gain L, la covariance P et le
-%   système estimateur dont l'état suit celui de SYS.
+%KALMAN Filtre de Kalman d'un modèle d'état.
+%   [KEST,L,P] = KALMAN(SYS,QN,RN) rend l'estimateur optimal de l'état,
+%   le gain L et la covariance P de l'erreur, pour un bruit d'état de
+%   covariance QN et un bruit de mesure de covariance RN.
 %
-%   Le modèle est dx/dt = Ax + Bu + w, y = Cx + Du + v, avec w de
-%   covariance Q et v de covariance R.
+%   L'estimateur suit xchapeau' = A*xchapeau + B*u + L*(y - C*xchapeau) :
+%   il corrige sa prédiction proportionnellement à l'écart constaté.
+%
+%   Exemples :
+%      [kest, L] = kalman(ss(-1, 1, 1, 0), 1, 1);
+%      L > 0                                % le gain corrige dans le bon sens
+%      max(real(eig(-1 - L))) < 0           % l'observateur converge
+%
+%   Voir aussi LQE, LQR, LQG, CARE, ESTIM.
     A = systeme.A;
     B = systeme.B;
     C = systeme.C;

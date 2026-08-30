@@ -33,7 +33,7 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
 %
 %   Exemple :
 %      G = tf(200, [10 1]) * tf(1, [0.05 1])^2;
-%      P = augw(G, tf([0.1 1], [1 1e-5]), 0.1, []);
+%      P = augw(G, tf(10, [1 0.1]), 0.1, []);
 %      [K, CL, gam] = hinfsyn(P, 1, 1);
 %
 %   Voir aussi AUGW, MIXSYN, LFT, HINFNORM, H2SYN.
@@ -87,6 +87,9 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
     Ay = A - (B1 * D21') * (R21 \ C2);
     Qy = B1 * (eye(nw) - D21' * (R21 \ D21)) * B1';
 
+    if afficher
+        fprintf('  gamma          X>=0  Y>=0  rho(XY)<g^2\n');
+    end
     % La borne haute doit passer : on la relève tant qu'elle ne passe pas.
     tours = 0;
     while ~faisable(gmax) && tours < 12
@@ -97,9 +100,6 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
         error('Robust:design:hinfsyn:NoSolution', ...
               ['No stabilizing controller was found up to gamma = %g. Check the ' ...
                'weights, or that the plant is stabilizable and detectable.'], gmax);
-    end
-    if afficher
-        fprintf('  gamma          X>=0  Y>=0  rho(XY)<g^2\n');
     end
     haut = gmax;
     bas = max(gmin, 0);

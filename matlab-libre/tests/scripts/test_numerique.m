@@ -267,6 +267,34 @@ assert(max(abs(ySansMotif(end, :) - yAvecMotif(end, :))) < 1e-12);
 solutionExacte = expm(matriceTridiagonale) * etatInitialTridiagonal;
 assert(max(abs(yAvecMotif(end, :)' - solutionExacte)) < 1e-7);
 
+%% ------------------------------------------------- operations binaires
+% Un decalage perd les bits qui sortent de la largeur du type, et le
+% complement se prend dans cette meme largeur : sans cela, la saturation
+% du type rendait bitshift(uint8(255),1) inchange et bitcmp(uint8(15))
+% egal a 255.
+assert(bitshift(uint8(255), 1) == 254);
+assert(bitshift(uint8(1), 7) == 128);
+assert(bitshift(uint8(1), 8) == 0);
+assert(bitcmp(uint8(0)) == 255);
+assert(bitcmp(uint8(15)) == 240);
+assert(bitcmp(uint16(0)) == 65535);
+assert(bitcmp(bitcmp(uint8(42))) == 42);
+assert(bitcmp(0) == 2^53 - 1);
+assert(bitshift(1, 3) == 8 && bitshift(12, -2) == 3);
+
+%% --------------------------------------------- log2 et gcd, deuxieme forme
+% [F,E] = LOG2(X) rend la forme normalisee du flottant.
+[f, e] = log2(8);
+assert(f == 0.5 && e == 4 && f * 2^e == 8);
+[f, e] = log2([1 2 3]);
+assert(max(abs(f .* 2.^e - [1 2 3])) < 1e-15);
+% [G,U,V] = GCD(A,B) rend les coefficients de Bezout.
+[g, u, v] = gcd(12, 18);
+assert(g == 6 && u * 12 + v * 18 == 6);
+[g, u, v] = gcd([12 15], [18 25]);
+assert(isequal(g, [6 5]));
+assert(isequal(u .* [12 15] + v .* [18 25], [6 5]));
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

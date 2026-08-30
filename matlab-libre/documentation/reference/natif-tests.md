@@ -106,7 +106,25 @@ ASSERTERROR  Vérifie qu'un appel lève bien une erreur.
 ## `fail`
 
 ```
-fail  Fait echouer un test.
+FAIL  Faire échouer un test, avec un message.
+    FAIL(MESSAGE) lève une erreur d'identifiant
+    « MATLAB:assertion:failed ». C'est ce qu'on écrit dans la branche
+    d'un test qui n'aurait jamais dû être atteinte — là où ASSERT n'a
+    rien à comparer.
+
+    Syntaxe
+       fail(message)
+
+    Exemples
+       essai = false;
+       try
+           fail('cette branche ne devrait pas etre atteinte');
+       catch e
+           essai = strcmp(e.identifier, 'MATLAB:assertion:failed');
+       end
+       essai                  % vrai
+
+    Voir aussi ASSERT, ERROR, TRY, MEXCEPTION.
 ```
 
 ## `runtests`

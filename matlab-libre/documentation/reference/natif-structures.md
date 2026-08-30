@@ -271,9 +271,3 @@ STRUCT2CELL  Les valeurs d'une structure, en cellule colonne.
     Voir aussi CELL2STRUCT, FIELDNAMES, STRUCT, NUM2CELL.
 ```
 
-## `structfun_aide`
-
-```
-structfun_aide  Reserve.
-```
-

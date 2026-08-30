@@ -1,19 +1,21 @@
 function [X, K, poles] = care(A, B, Q, R)
 %CARE Équation de Riccati algébrique continue.
-%   X = CARE(A,B,Q,R) résout A'X + XA - XBR^{-1}B'X + Q = 0.
-%   [X,K,P] = CARE(...) rend aussi le gain K = R^{-1}B'X et les pôles de
-%   la boucle fermée.
+%   X = CARE(A,B,Q,R) résout A'X + XA - XBR^{-1}B'X + Q = 0 et rend la
+%   solution stabilisante : celle qui rend A - B*R^{-1}B'X stable. C'est
+%   elle qui donne le gain optimal de la commande linéaire quadratique.
 %
-%   La solution stabilisante s'obtient par la matrice hamiltonienne
-%      H = [ A      -B R^{-1} B'
-%           -Q      -A'        ]
-%   dont le sous-espace propre stable, engendré par les colonnes
-%   [X1; X2], donne X = X2 / X1. C'est la construction de Potter, exacte
-%   dès que le problème admet une solution stabilisante.
+%   [X,K,P] = CARE(...) rend en plus K = R^{-1}B'X et les pôles P de la
+%   boucle fermée.
 %
-%   Exemple :
-%      care(0, 1, 1, 1)     % 1
-%      care([0 1; 0 0], [0; 1], eye(2), 1)
+%   La solution vient du sous-espace propre stable de la matrice
+%   hamiltonienne associée.
+%
+%   Exemples :
+%      care(0, 1, 1, 1)                 % 1
+%      [X, K] = care([0 1; 0 0], [0; 1], eye(2), 1);
+%      max(real(eig([0 1; 0 0] - [0; 1] * K))) < 0     % la boucle est stable
+%
+%   Voir aussi DARE, LQR, LYAP, HINFSYN.
     if nargin < 4 || isempty(R), R = eye(size(B, 2)); end
     n = size(A, 1);
     H = [A, -B * (R \ B'); -Q, -A'];
