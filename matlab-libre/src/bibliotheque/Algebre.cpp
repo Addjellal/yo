@@ -28,6 +28,7 @@ FONCTION(fnDet) {
 FONCTION(fnTrace) {
     INUTILISE
     exigerArguments(args, 1, 1, "trace");
+    exigerNumerique(args[0], "trace");
     return {traceMatrice(args[0])};
 }
 FONCTION(fnRank) {
@@ -219,6 +220,8 @@ FONCTION(fnHilb) {
 
 FONCTION(fnVander) {
     INUTILISE
+    exigerArguments(args, 1, 1, "vander");
+    exigerNumerique(args[0], "vander");
     const Valeur& v = args[0];
     int n = (int)v.nelem();
     Valeur r = Valeur::matrice(n, n);
@@ -232,6 +235,8 @@ FONCTION(fnVander) {
 FONCTION(fnToeplitz) {
     INUTILISE
     exigerArguments(args, 1, 2, "toeplitz");
+    exigerNumerique(args[0], "toeplitz");
+    if (args.size() > 1) exigerNumerique(args[1], "toeplitz");
     const Valeur& c = args[0];
     const Valeur& r = args.size() > 1 ? args[1] : args[0];
     int m = (int)c.nelem(), n = (int)r.nelem();

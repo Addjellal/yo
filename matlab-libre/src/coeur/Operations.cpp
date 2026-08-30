@@ -647,7 +647,10 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
         // c'est ce qui fait de [zeros(1,0), zeros(1,0)] un 1x0 et non un
         // 0x0 — et c'est ce dont vit l'algebre des modeles sans etat, ou
         // les matrices B et C ont zero colonne mais bien des lignes.
-        if (e.estVide() && e.classe != Classe::Cellule && !e.estStructure()) {
+        // MATLAB ecarte le vide « [] » — celui dont toutes les dimensions
+        // sont nulles —, quelle qu'en soit la classe : [{} ; {'a'}] vaut
+        // {'a'}. Un 1x0, lui, garde sa ligne.
+        if (e.nelem() == 0) {
             bool toutesNulles = true;
             for (int d : e.dims)
                 if (d != 0) toutesNulles = false;

@@ -404,6 +404,80 @@ effaceChezLAppelant('aEffacer');
 assert(exist('aEffacer', 'var') == 0);
 assert(exist('aGarder', 'var') ~= 0);
 
+%% --------------------------------- les arguments hostiles, deuxieme passe
+% Une fonction qui parcourt « re » d'une valeur qui n'en a pas — une
+% cellule, une structure, une poignee — lit hors du tableau et fait tomber
+% le programme. Le passage automatique en avait ferme deux cent
+% vingt-six ; en voici seize de plus, trouves par le meme moyen. Une
+% erreur MATLAB est le bon comportement, jamais un plantage.
+hostiles = {{1, 2}, struct(), struct('a', 1), @sin};
+fonctions = {'trace', 'triu', 'tril', 'trapz', 'vander', ...
+             'toeplitz', 'sub2ind', 'upsample', 'randsample', ...
+             'sparse', 'xlim', 'ylim'};
+for kf = 1:numel(fonctions)
+    for kh = 1:numel(hostiles)
+        leve = false;
+        try
+            switch fonctions{kf}
+                case {'sub2ind', 'upsample', 'randsample'}
+                    feval(fonctions{kf}, hostiles{kh}, 1);
+                case 'sparse'
+                    feval(fonctions{kf}, hostiles{kh}, 1, 1);
+                otherwise
+                    feval(fonctions{kf}, hostiles{kh});
+            end
+        catch
+            leve = true;
+        end
+        assert(leve, sprintf('%s aurait du refuser l''argument %d', fonctions{kf}, kh));
+    end
+end
+% « unique » accepte une cellule de chaines — c'est son usage courant —
+% et refuse ce qui n'a pas d'elements a comparer.
+assert(numel(unique({'b', 'a', 'b'})) == 2);
+for hostile = {struct(), @sin}
+    refuse = false;
+    try
+        unique(hostile{1});
+    catch
+        refuse = true;
+    end
+    assert(refuse);
+end
+
+% « transpose », lui, doit accepter une cellule — la transposer est
+% legitime — et refuser ce qui n'a pas de forme de tableau.
+assert(isequal(size(transpose({1, 2})), [2 1]));
+for hostile = {struct(), @sin}
+    refuse = false;
+    try
+        transpose(hostile{1});
+    catch
+        refuse = true;
+    end
+    assert(refuse);
+end
+
+% Melanger une cellule et des nombres dans une operation d'ensemble est
+% refuse : le resultat aurait des elements des deux, et l'un des deux n'a
+% rien a offrir a l'autre.
+for nom = {'union', 'intersect', 'setdiff'}
+    melange = false;
+    try
+        feval(nom{1}, {1, 2}, 1);
+    catch
+        melange = true;
+    end
+    assert(melange);
+end
+% Ce qui doit marcher marche toujours.
+assert(isequal(union([1 2], [2 3]), [1 2 3]));
+assert(isequal(intersect([1 2 3], [2 3 4]), [2 3]));
+assert(isequal(setdiff([1 2 3], [2]), [1 3]));
+assert(numel(union({'a', 'c'}, {'b'})) == 3);
+assert(trace([1 2; 3 4]) == 5);
+assert(isequal(triu([1 2; 3 4]), [1 2; 0 4]));
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

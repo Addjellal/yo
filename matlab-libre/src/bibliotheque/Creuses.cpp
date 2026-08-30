@@ -19,6 +19,8 @@ namespace {
 
 FONCTION(fnSparse) {
     INUTILISE
+    for (std::size_t k = 0; k < args.size(); ++k)
+        if (!args[k].estTexte() && !args[k].estChaine()) exigerNumerique(args[k], "sparse");
     if (args.empty()) return {creuxVide(0, 0)};
     if (args.size() == 1) {
         if (args[0].estCreux()) return {args[0]};

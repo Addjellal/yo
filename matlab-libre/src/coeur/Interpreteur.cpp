@@ -388,7 +388,7 @@ Valeur Interpreteur::concatenerObjets(const std::vector<std::vector<Valeur>>& ra
             // Seul le vide « [] » — toutes dimensions nulles — s'efface
             // d'une concatenation ; un 1x0 garde sa ligne, comme dans
             // MATLAB.
-            if (v.estVide() && v.classe == Classe::Double) {
+            if (v.nelem() == 0 && !v.estStructure()) {
                 bool toutesNulles = true;
                 for (int d : v.dims)
                     if (d != 0) toutesNulles = false;

@@ -744,6 +744,7 @@ FONCTION(fnCla) {
 FONCTION(fnXlim) {
     INUTILISE
     auto a = axesCourants(it);
+    if (!args.empty()) exigerNumerique(args[0], "xlim");
     if (args.empty() || args[0].nelem() < 2) {
         double xmin, xmax, ymin, ymax;
         limitesAxe(*a, xmin, xmax, ymin, ymax);
@@ -758,6 +759,7 @@ FONCTION(fnXlim) {
 FONCTION(fnYlim) {
     INUTILISE
     auto a = axesCourants(it);
+    if (!args.empty()) exigerNumerique(args[0], "ylim");
     if (args.empty() || args[0].nelem() < 2) {
         double xmin, xmax, ymin, ymax;
         limitesAxe(*a, xmin, xmax, ymin, ymax);

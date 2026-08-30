@@ -416,6 +416,8 @@ FONCTION(fnChi2pdf) {
 FONCTION(fnRandsample) {
     INUTILISE
     exigerArguments(args, 2, 4, "randsample");
+    exigerNumerique(args[0], "randsample");
+    exigerNumerique(args[1], "randsample");
     const Valeur& population = args[0];
     int k = (int)args[1].scal();
     std::vector<double> valeurs;

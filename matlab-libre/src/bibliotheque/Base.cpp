@@ -612,7 +612,12 @@ FONCTION(fnRot90) {
     return {v};
 }
 
-FONCTION(fnTranspose) { INUTILISE return {transposer(args[0], false)}; }
+FONCTION(fnTranspose) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "transpose");
+    exigerSansObjet(args[0], "transpose");
+    return {transposer(args[0], false)};
+}
 FONCTION(fnCtranspose) {
     INUTILISE
     exigerSansObjet(args[0], "ctranspose");
@@ -673,6 +678,7 @@ FONCTION(fnNdgrid) {
 FONCTION(fnSub2ind) {
     INUTILISE
     exigerArguments(args, 2, 0, "sub2ind");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "sub2ind");
     Dims d;
     for (std::size_t k = 0; k < args[0].nelem(); ++k) d.push_back((int)args[0].re[k]);
     std::size_t n = args[1].nelem();

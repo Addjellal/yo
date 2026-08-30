@@ -520,6 +520,8 @@ FONCTION(fnDownsample) {
 FONCTION(fnUpsample) {
     INUTILISE
     exigerArguments(args, 2, 3, "upsample");
+    exigerNumerique(args[0], "upsample");
+    exigerNumerique(args[1], "upsample");
     const Valeur& v = args[0];
     int n = (int)args[1].scal();
     std::vector<double> r(v.nelem() * (std::size_t)n, 0.0);

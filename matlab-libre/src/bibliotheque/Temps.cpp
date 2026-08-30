@@ -273,6 +273,7 @@ FONCTION(fnYmdVersNum) {
     INUTILISE
     if (args.size() < 3)
         erreur("MATLAB:minrhs", "matlibre_ymd2num requires at least three arguments.");
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "matlibre_ymd2num");
     Dims d = dimsCommunes(args);
     std::size_t n = produitDims(d);
     Valeur r = Valeur::matriceDims(d, 0.0);

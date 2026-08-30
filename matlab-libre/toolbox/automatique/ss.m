@@ -23,6 +23,12 @@ classdef ss
         B = []
         C = []
         D = []
+        % Les noms des voies et de l'état. Vides par défaut ; CONNECT s'en
+        % sert pour relier les blocs sans qu'on écrive une matrice.
+        InputName = {}
+        OutputName = {}
+        StateName = {}
+        Name = ''
     end
 
     methods
@@ -242,7 +248,8 @@ classdef ss
             end
             if strcmp(s(1).type, '.')
                 nom = s(1).subs;
-                if any(strcmp(nom, {'type', 'num', 'den', 'Ts', 'A', 'B', 'C', 'D'}))
+                if any(strcmp(nom, {'type', 'num', 'den', 'Ts', 'A', 'B', 'C', 'D', ...
+                                    'InputName', 'OutputName', 'StateName', 'Name'}))
                     valeur = sys.(nom);
                     if numel(s) > 1
                         [varargout{1:max(nargout, 1)}] = subsref(valeur, s(2:end));

@@ -626,6 +626,7 @@ std::vector<Valeur> uniqueParLignes(const Valeur& v, bool stable, int nargout) {
 FONCTION(fnUnique) {
     INUTILISE
     exigerArguments(args, 1, 3, "unique");
+    exigerSansObjet(args[0], "unique");
     const Valeur& v = args[0];
     bool stable = false;
     bool parLignes = false;
@@ -695,6 +696,13 @@ FONCTION(fnIsmember) {
 std::vector<Valeur> operationEnsemble(std::vector<Valeur>& args, int nargout, int genre) {
     const Valeur& a = args[0];
     const Valeur& b = args[1];
+    // Une cellule et un tableau de nombres ne se melangent pas : le
+    // resultat aurait des elements des deux, et l'un des deux n'a pas de
+    // cellules ou pas de reels a offrir. MATLAB le refuse aussi.
+    if ((a.classe == Classe::Cellule) != (b.classe == Classe::Cellule))
+        erreur("MATLAB:CELLFUN:NotACell",
+               "Inputs must be of the same class : either both cell arrays of character "
+               "vectors, or both numeric.");
     std::set<CleValeur> ensembleB;
     for (std::size_t k = 0; k < b.nelem(); ++k) ensembleB.insert(cleDe(b, k));
     std::set<CleValeur> ensembleA;
@@ -776,11 +784,15 @@ std::vector<Valeur> operationEnsemble(std::vector<Valeur>& args, int nargout, in
 FONCTION(fnUnion) {
     INUTILISE
     exigerArguments(args, 2, 3, "union");
+    exigerSansObjet(args[0], "union");
+    exigerSansObjet(args[1], "union");
     return operationEnsemble(args, nargout, 0);
 }
 FONCTION(fnIntersect) {
     INUTILISE
     exigerArguments(args, 2, 3, "intersect");
+    exigerSansObjet(args[0], "intersect");
+    exigerSansObjet(args[1], "intersect");
     return operationEnsemble(args, nargout, 1);
 }
 FONCTION(fnSetdiff) {
@@ -826,6 +838,7 @@ FONCTION(fnDiag) {
 FONCTION(fnTriu) {
     INUTILISE
     exigerArguments(args, 1, 2, "triu");
+    exigerNumerique(args[0], "triu");
     Valeur v = args[0];
     int k = args.size() > 1 ? (int)args[1].scal() : 0;
     int l = v.nlignes(), c = v.ncolonnes();
@@ -841,6 +854,7 @@ FONCTION(fnTriu) {
 FONCTION(fnTril) {
     INUTILISE
     exigerArguments(args, 1, 2, "tril");
+    exigerNumerique(args[0], "tril");
     Valeur v = args[0];
     int k = args.size() > 1 ? (int)args[1].scal() : 0;
     int l = v.nlignes(), c = v.ncolonnes();
@@ -966,6 +980,8 @@ FONCTION(fnCumtrapz) {
 FONCTION(fnTrapz) {
     INUTILISE
     exigerArguments(args, 1, 3, "trapz");
+    exigerNumerique(args[0], "trapz");
+    if (args.size() > 1) exigerNumerique(args[1], "trapz");
     const Valeur& y = enDouble(args.size() > 1 ? args[1] : args[0]);
     std::vector<double> x;
     if (args.size() > 1)
