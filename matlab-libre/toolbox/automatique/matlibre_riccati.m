@@ -39,8 +39,37 @@ function [X, ok] = matlibre_riccati(A, S, Q)
         ok = true;
         return
     end
+    echelle = max(1, norm(A, 'fro') + norm(S, 'fro') + norm(Q, 'fro'));
+    % Un cas fréquent et exact : quand Q est nulle et A stable, la
+    % solution stabilisante est la matrice nulle. Il arrive dès que la
+    % mesure porte toute la perturbation — D21 carrée inversible —, et le
+    % chercher par un sous-espace invariant serait le chercher sur une
+    % hamiltonienne triangulaire par blocs, dont la base numérique est
+    % mauvaise : la quatrième direction y pèse dix millions de fois moins
+    % que la première.
+    if norm(Q, 'fro') <= 1e-12 * echelle && estStable(A)
+        ok = true;
+        return
+    end
+
     H = [A, S; -Q, -A'];
+    % L'équilibrage diagonal avant tout : un modèle dont les pôles vont de
+    % 10^-5 à 20 donne une hamiltonienne dont les lignes diffèrent d'un
+    % facteur un million, et aucun des deux chemins ne trouve alors le
+    % sous-espace. La transformation est exacte — des puissances de deux —
+    % et se défait en multipliant la base par les mêmes facteurs.
+    [He, echelles] = matlibre_equilibrer(H);
     bases = {};
+    [base, trouve] = parVecteursPropres(He);
+    if trouve
+        bases{end+1} = diag(echelles) * base;    %#ok<AGROW>
+    end
+    [base, trouve] = parFonctionSigne(He);
+    if trouve
+        bases{end+1} = diag(echelles) * base;    %#ok<AGROW>
+    end
+    % Sans équilibrage aussi : sur une matrice déjà équilibrée, les deux
+    % chemins n'ont pas la même précision, et l'on garde le meilleur.
     [base, trouve] = parVecteursPropres(H);
     if trouve
         bases{end+1} = base;    %#ok<AGROW>
@@ -50,7 +79,6 @@ function [X, ok] = matlibre_riccati(A, S, Q)
         bases{end+1} = base;    %#ok<AGROW>
     end
 
-    echelle = max(1, norm(A, 'fro') + norm(S, 'fro') + norm(Q, 'fro'));
     meilleur = inf;
     for k = 1:numel(bases)
         U = bases{k};
@@ -66,7 +94,7 @@ function [X, ok] = matlibre_riccati(A, S, Q)
         end
         % La solution doit stabiliser : c'est ce qui distingue la bonne des
         % autres solutions de la même équation.
-        if max(real(eig(A + S * candidat))) > -1e-9 * echelle
+        if ~estStable(A + S * candidat)
             continue
         end
         residu = norm(A' * candidat + candidat * A + candidat * S * candidat + Q, 'fro');
@@ -81,6 +109,19 @@ function [X, ok] = matlibre_riccati(A, S, Q)
         ok = false;             % aucune des deux n'a vraiment résolu
         X = zeros(n);
     end
+end
+
+% Stable, à la précision près : la marge se mesure sur les valeurs propres
+% elles-mêmes, non sur la norme des matrices. Un pôle en -1e-5 dans un
+% modèle dont les coefficients montent à 1e5 est bien stable, et le juger
+% à l'aune de la norme le déclarerait douteux.
+function oui = estStable(A)
+    valeurs = eig(A);
+    if isempty(valeurs)
+        oui = true;
+        return
+    end
+    oui = max(real(valeurs)) < -1e-9 * max(1, max(abs(valeurs)));
 end
 
 function [base, ok] = parVecteursPropres(H)

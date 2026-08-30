@@ -27,9 +27,12 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
 %
 %   Le modèle doit satisfaire les hypothèses habituelles : (A,B2)
 %   stabilisable, (C2,A) détectable, D12 de rang plein en colonnes, D21 de
-%   rang plein en lignes. D22 non nul est ramené à zéro par décalage de
-%   boucle, puis rendu au correcteur. D11 non nul n'est pas traité : les
-%   pondérations d'un problème bien posé le laissent nul.
+%   rang plein en lignes.
+%
+%   D11 et D22 non nuls sont ramenés à zéro par décalage de boucle, à
+%   chaque GAMMA essayé, puis rendus au correcteur. Le gain du terme
+%   direct D11 borne par le bas ce qu'on peut demander : aucune boucle ne
+%   fait mieux que son propre gain à l'infini.
 %
 %   Exemple :
 %      G = tf(200, [10 1]) * tf(1, [0.05 1])^2;
@@ -46,7 +49,7 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
               'NMEAS and NCON must leave at least one performance channel.');
     end
 
-    [gmin, gmax, tol, afficher] = options(varargin);
+    [gmin, gmax, tol, afficher, gmaxImpose] = options(varargin);
 
     n = size(P.A, 1);
     A = P.A;
@@ -67,32 +70,15 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
         error('Robust:design:hinfsyn:D21', ...
               'D21 must have full row rank : each measurement must carry a disturbance.');
     end
-    if max(max(abs(D11))) > 1e-9
-        error('Robust:design:hinfsyn:D11', ...
-              ['D11 must be zero : this solver does not handle a direct path from ' ...
-               'the disturbances to the weighted outputs.']);
-    end
-
-    % D22 non nul : on résout à D22 = 0, et l'on rend le décalage au
-    % correcteur à la fin.
-    decalage = max(max(abs(D22))) > 0;
-    if decalage
-        P = ss(A, P.B, P.C, [P.D(1:nz, :); P.D(nz+1:end, 1:nw), zeros(nmeas, ncon)], P.Ts);
-    end
-
-    R12 = D12' * D12;
-    R21 = D21 * D21';
-    Ax = A - B2 * (R12 \ (D12' * C1));
-    Qx = C1' * (eye(nz) - D12 * (R12 \ D12')) * C1;
-    Ay = A - (B1 * D21') * (R21 \ C2);
-    Qy = B1 * (eye(nw) - D21' * (R21 \ D21)) * B1';
 
     if afficher
         fprintf('  gamma          X>=0  Y>=0  rho(XY)<g^2\n');
     end
     % La borne haute doit passer : on la relève tant qu'elle ne passe pas.
+    % Sauf si l'appelant l'a fixée lui-même — MATLAB ne va jamais au-delà
+    % du GMAX qu'on lui donne.
     tours = 0;
-    while ~faisable(gmax) && tours < 12
+    while ~gmaxImpose && ~faisable(gmax) && tours < 12
         gmax = gmax * 10;
         tours = tours + 1;
     end
@@ -102,7 +88,7 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
                'weights, or that the plant is stabilizable and detectable.'], gmax);
     end
     haut = gmax;
-    bas = max(gmin, 0);
+    bas = max(gmin, max(gmin, plusPetitGamma()));
     while (haut - bas) > tol * max(haut, 1)
         milieu = (haut + bas) / 2;
         if faisable(milieu)
@@ -113,24 +99,7 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
     end
     gamma = haut;
     [~, X, Y] = faisable(gamma);
-
-    F = -(R12 \ (B2' * X + D12' * C1));
-    L = -((Y * C2' + B1 * D21') / R21);
-    Z = inv(eye(n) - gamma^-2 * Y * X);
-    % L'observateur du pire cas : il estime l'etat, mais aussi la
-    % perturbation la plus defavorable, w = gamma^-2*B1'*X*x. Cette
-    % perturbation se voit dans la mesure a travers D21 : la sortie
-    % predite est (C2 + gamma^-2*D21*B1'*X)*x, et non C2*x. Le terme
-    % disparait dans le probleme normalise, ou B1*D21' est nul ; il ne
-    % disparait pas ici, et l'oublier faisait diverger le correcteur des
-    % que gamma approchait de son optimum.
-    C2chapeau = C2 + gamma^-2 * D21 * B1' * X;
-    Ac = A + gamma^-2 * B1 * B1' * X + B2 * F + Z * L * C2chapeau;
-    K = ss(Ac, -Z * L, F, zeros(ncon, nmeas), P.Ts);
-    if decalage
-        % Le correcteur du modèle décalé, ramené au modèle d'origine.
-        K = K * inv(eye(nmeas) + D22 * K);
-    end
+    K = correcteur(gamma, X, Y);
 
     CL = lft(P, K);
     atteint = hinfnorm(CL);
@@ -143,20 +112,81 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
     info = struct('gamma', gamma, 'X', X, 'Y', Y, ...
                   'rho', max(abs(eig(X * Y))), 'gmin', bas, 'gmax', gmax);
 
+    % --- le décalage de boucle, à gamma donné ------------------------------
+    %
+    % Les formules du correcteur central demandent D11 nul : aucun chemin
+    % direct des perturbations vers les signaux pondérés. Une pondération
+    % bipropre en donne un, et c'est le cas le plus courant.
+    %
+    % On s'y ramène exactement, sans rien perdre. La condition
+    % ||T||inf < GAMMA porte sur une contraction une fois divisée par
+    % GAMMA ; or toute contraction de terme constant DELTA s'écrit
+    %
+    %    That = DELTA + (I-DELTA*DELTA')^(1/2) Ttilde (I-DELTA'*Ttilde)^-1
+    %                                          (I-DELTA'*DELTA)^(1/2)
+    %
+    % avec ||Ttilde||inf < 1. Cette réécriture est un produit étoile par
+    % une matrice constante, qui ne touche qu'aux voies de performance :
+    % les voies u et y restent les mêmes, et le correcteur trouvé pour le
+    % modèle transformé est celui du modèle d'origine. Le prix est que le
+    % décalage dépend de GAMMA : il se refait à chaque essai.
+    function [d, ok] = decalage(g)
+        d = struct();
+        ok = false;
+        if ~(g > 0) || ~isfinite(g)
+            return
+        end
+        % Le terme direct borne ce qu'on peut demander : aucune boucle ne
+        % fait mieux que son propre gain a l'infini.
+        if max(svd(D11)) >= g * (1 - 1e-12)
+            return
+        end
+        Phi = inv(eye(nz) - (D11 * D11') / g^2);
+        S2 = matlibre_racine_carree(Phi);                        % (I-D11D11'/g^2)^(-1/2)
+        S3 = matlibre_racine_carree(inv(eye(nw) - (D11' * D11) / g^2));
+        Lshift = (D11' / g^2) * Phi;
+        d.A = A + B1 * Lshift * C1;
+        d.B1 = B1 * S3;
+        d.B2 = B2 + B1 * Lshift * D12;
+        d.C1 = S2 * C1;
+        d.C2 = C2 + D21 * Lshift * C1;
+        d.D12 = S2 * D12;
+        d.D21 = D21 * S3;
+        d.D22 = D22 + D21 * Lshift * D12;
+        d.R12 = d.D12' * d.D12;
+        d.R21 = d.D21 * d.D21';
+        if rcond(d.R12) < eps || rcond(d.R21) < eps
+            return
+        end
+        ok = true;
+    end
+
+    % La plus petite valeur que GAMMA puisse prendre : le gain du terme
+    % direct. En deçà, aucune boucle ne convient, et le décalage n'existe
+    % même pas.
+    function g = plusPetitGamma()
+        g = max(svd(D11));
+    end
+
     % --- le test de faisabilité, à gamma donné -----------------------------
     function [ok, X, Y] = faisable(g)
         X = zeros(n);
         Y = zeros(n);
         ok = false;
-        if ~(g > 0) || ~isfinite(g)
+        [d, prete] = decalage(g);
+        if ~prete
             return
         end
-        Sx = g^-2 * (B1 * B1') - B2 * (R12 \ B2');
+        Ax = d.A - d.B2 * (d.R12 \ (d.D12' * d.C1));
+        Qx = d.C1' * (eye(nz) - d.D12 * (d.R12 \ d.D12')) * d.C1;
+        Sx = g^-2 * (d.B1 * d.B1') - d.B2 * (d.R12 \ d.B2');
         [X, okX] = solutionRiccati(Ax, Sx, Qx);
         if ~okX
             return
         end
-        Sy = g^-2 * (C1' * C1) - C2' * (R21 \ C2);
+        Ay = d.A - (d.B1 * d.D21') * (d.R21 \ d.C2);
+        Qy = d.B1 * (eye(nw) - d.D21' * (d.R21 \ d.D21)) * d.B1';
+        Sy = g^-2 * (d.C1' * d.C1) - d.C2' * (d.R21 \ d.C2);
         [Y, okY] = solutionRiccati(Ay', Sy, Qy);
         if ~okY
             return
@@ -168,6 +198,30 @@ function [K, CL, gamma, info] = hinfsyn(P, nmeas, ncon, varargin)
                     oui(rho < g^2));
         end
     end
+
+    % --- le correcteur central, au gamma retenu ----------------------------
+    function K = correcteur(g, X, Y)
+        d = decalage(g);
+        F = -(d.R12 \ (d.B2' * X + d.D12' * d.C1));
+        L = -((Y * d.C2' + d.B1 * d.D21') / d.R21);
+        Z = inv(eye(n) - g^-2 * Y * X);
+        % L'observateur du pire cas estime l'état, mais aussi la
+        % perturbation la plus défavorable, w = g^-2*B1'*X*x. Celle-ci se
+        % voit dans la mesure à travers D21 : la sortie prédite est
+        % (C2 + g^-2*D21*B1'*X)*x. Le terme disparaît dans le problème
+        % normalisé, où B1*D21' est nul ; il ne disparaît pas ici, et
+        % l'oublier faisait diverger le correcteur dès que GAMMA
+        % approchait de son optimum.
+        C2chapeau = d.C2 + g^-2 * d.D21 * d.B1' * X;
+        Ac = d.A + g^-2 * d.B1 * d.B1' * X + d.B2 * F + Z * L * C2chapeau;
+        K = ss(Ac, -Z * L, F, zeros(ncon, nmeas), P.Ts);
+        % Le modèle transformé porte un terme direct de la commande vers
+        % la mesure : on le rend au correcteur, comme pour un D22 non nul.
+        if max(max(abs(d.D22))) > 0
+            K = K * inv(eye(nmeas) + d.D22 * K);
+        end
+    end
+
 end
 
 % La solution stabilisante, et la condition de positivité qui va avec :
@@ -191,12 +245,13 @@ function s = oui(v)
     end
 end
 
-function [gmin, gmax, tol, afficher] = options(liste)
+function [gmin, gmax, tol, afficher, gmaxImpose] = options(liste)
 %OPTIONS Les réglages, dans les deux écritures que MATLAB accepte.
     gmin = 0;
     gmax = 100;
     tol = 1e-3;
     afficher = false;
+    gmaxImpose = false;
     k = 1;
     while k <= numel(liste)
         courant = liste{k};
@@ -213,6 +268,7 @@ function [gmin, gmax, tol, afficher] = options(liste)
                     gmin = double(valeur);
                 case 'GMAX'
                     gmax = double(valeur);
+                    gmaxImpose = true;
                 case {'TOLGAM', 'TOL'}
                     tol = double(valeur);
             end
@@ -223,6 +279,7 @@ function [gmin, gmax, tol, afficher] = options(liste)
                 gmin = double(courant);
             elseif k == 2
                 gmax = double(courant);
+                gmaxImpose = true;
             else
                 tol = double(courant);
             end

@@ -107,14 +107,33 @@ assert(max(real(pole(boucle))) < 0);
 S = feedback(ss(1), series(K, ss(G)));
 assert(abs(hinfnorm(ss(tf(10, [1 0.1])) * S) - gamma) / gamma < 1e-2);
 
-% Un modèle augmenté dont D11 n'est pas nul est refusé, avec la raison.
-refus = '';
-try
-    hinfsyn(augw(G, tf([0.1 1], [1 1e-5]), 0.1, []), 1, 1);
-catch err
-    refus = err.identifier;
+%% ------------------------------- une ponderation bipropre : D11 non nul
+% Une ponderation bipropre donne un chemin direct des perturbations vers
+% les signaux ponderes. Les formules du correcteur central demandent D11
+% nul ; le decalage de boucle y ramene exactement, a chaque gamma. Le
+% controle est le meme : la boucle est stable et tient le gain annonce.
+Pbipropre = augw(G, tf([0.1 1], [1 1e-5]), 0.1, []);
+D11essai = Pbipropre.D(1:2, 1);
+assert(max(abs(D11essai)) > 0.05);          % le terme direct est bien la
+[Kb, CLb, gammaB] = hinfsyn(Pbipropre, 1, 1);
+assert(max(real(pole(CLb))) < 0);
+assert(abs(hinfnorm(CLb) - gammaB) / gammaB < 1e-3);
+% Et a tout gamma faisable, non seulement a l'optimum.
+for essai = [10 2 0.5]
+    [~, CLg] = hinfsyn(Pbipropre, 1, 1, 'GMIN', essai * 0.999, 'GMAX', essai, ...
+                       'TOLGAM', 1e-9);
+    assert(max(real(pole(CLg))) < 0);
+    assert(hinfnorm(CLg) <= essai);
 end
-assert(strcmp(refus, 'Robust:design:hinfsyn:D11'));
+% Le gain du terme direct borne ce qu'on peut demander : en deca, il n'y a
+% pas de solution, et la fonction le dit au lieu de rendre n'importe quoi.
+sousLeTermeDirect = '';
+try
+    hinfsyn(Pbipropre, 1, 1, 'GMIN', 0, 'GMAX', max(svd(D11essai)) / 2);
+catch err
+    sousLeTermeDirect = err.identifier;
+end
+assert(strcmp(sousLeTermeDirect, 'Robust:design:hinfsyn:NoSolution'));
 
 %% ------------------------------------------ l'équation de Riccati elle-même
 % La solution rendue doit annuler l'équation et stabiliser.
