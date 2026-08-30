@@ -26,6 +26,7 @@ class VueFigure;
 class FenetreFigure;
 class FenetreProfileur;
 class FenetreAide;
+class DialogueRecherche;
 
 class FenetrePrincipale : public QMainWindow {
     Q_OBJECT
@@ -48,6 +49,12 @@ public:
     // Relit le dossier courant. Public pour qu'un test puisse deposer des
     // fichiers et verifier ce que le panneau en montre.
     void rafraichirListeFichiers();
+    // Ctrl-F : « Rechercher et remplacer » sur ce qui a le regard —
+    // l'editeur courant, ou la console. Publiques pour la meme raison.
+    void ouvrirRecherche();
+    void chercherSuivant();
+    // Ouvre un onglet d'editeur vide, comme le bouton « Nouveau script ».
+    void ouvrirNouveauScript();
 
 protected:
     void closeEvent(QCloseEvent* evenement) override;
@@ -125,6 +132,9 @@ private:
     int figureCouranteVue_ = 0;
     FenetreProfileur* profileur_ = nullptr;
     FenetreAide* fenetreAide_ = nullptr;
+    // « Rechercher et remplacer » : une seule fenetre, qui suit le regard
+    // — l'editeur courant, ou la console.
+    DialogueRecherche* recherche_ = nullptr;
     // Les commandes du débogueur : grisées tant que rien n'est arrêté.
     QAction* aContinuer_ = nullptr;
     QAction* aPasAPas_ = nullptr;
@@ -136,6 +146,11 @@ private:
     QLabel* etat_;
     QLabel* etiquetteDossier_;
     QString dossierCourant_;
+    // Ce que la tabulation propose dans la console : les noms que le
+    // moteur connait, et ceux des variables de l'espace de travail.
+    QStringList nomsConnus_;
+    QStringList nomsVariables_;
+    QStringList completions(const QString& prefixe, bool fichiers) const;
     bool occupe_ = false;
     // « MatLibre est occupé » se dit une fois par calcul, pas a chaque
     // frappe : repeter la phrase noyait la console.

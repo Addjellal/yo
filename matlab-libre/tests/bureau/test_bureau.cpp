@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QKeyEvent>
 #include <QTemporaryDir>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -39,6 +40,7 @@
 #include "FenetreFigure.h"
 #include "FenetreProfileur.h"
 #include "Icone.h"
+#include "Recherche.h"
 #include "Ruban.h"
 #include "Theme.h"
 #include "FenetrePrincipale.h"
@@ -1002,6 +1004,122 @@ int main(int argc, char** argv) {
         sonde.setOption(QFileDialog::DontUseNativeDialog, true);
         verifier(!sonde.testOption(QFileDialog::ShowDirsOnly),
                  "le dialogue de dossier ne se limite pas aux dossiers");
+    }
+
+    // --- Ctrl-F : rechercher et remplacer ---------------------------------
+    //
+    // MATLAB ouvre une fenetre qui ne bloque pas, cherche dans les deux
+    // sens, boucle, et remplace. Elle vise l'editeur courant, ou la
+    // console — ou l'on ne remplace pas.
+    {
+        fenetre.ouvrirRecherche();
+        auto* recherche = fenetre.findChild<DialogueRecherche*>();
+        verifier(recherche != nullptr, "Ctrl-F ouvre « Rechercher et remplacer »");
+        if (recherche) {
+            verifier(recherche->isVisible(), "la fenetre de recherche s'affiche");
+            verifier(!recherche->isModal(), "elle ne bloque pas le reste");
+            verifier(recherche->cible() != nullptr, "elle vise une zone de texte");
+
+            // Un editeur avec du texte : on cherche, on remplace.
+            fenetre.ouvrirNouveauScript();
+            fenetre.ouvrirRecherche();
+            auto* editeur = qobject_cast<Editeur*>(recherche->cible());
+            verifier(editeur != nullptr, "un editeur s'ouvre pour la recherche");
+            if (editeur) {
+                editeur->setPlainText(QStringLiteral(
+                    "alpha = 1;\nbeta = alpha + 2;\ngamma = alpha * beta;\n"));
+                QTextCursor debut = editeur->textCursor();
+                debut.movePosition(QTextCursor::Start);
+                editeur->setTextCursor(debut);
+                recherche->definirRecherche(QStringLiteral("alpha"));
+                verifier(recherche->chercherSuivant(true), "la premiere occurrence est trouvee");
+                verifier(editeur->textCursor().selectedText() == QLatin1String("alpha"),
+                         "elle est selectionnee");
+                verifier(recherche->chercherSuivant(true), "la deuxieme aussi");
+                verifier(recherche->chercherSuivant(true), "la troisieme aussi");
+                // Boucler : la quatrieme recherche revient a la premiere.
+                verifier(recherche->chercherSuivant(true),
+                         "la recherche boucle au lieu de s'arreter");
+                recherche->definirRemplacement(QStringLiteral("delta"));
+                int faits = recherche->remplacerTout();
+                verifier(faits == 3, "les trois occurrences sont remplacees");
+                verifier(!editeur->toPlainText().contains(QLatin1String("alpha")),
+                         "il n'en reste aucune");
+                verifier(editeur->toPlainText().contains(QLatin1String("delta = 1;")),
+                         "le texte remplace est le bon");
+                recherche->definirRecherche(QStringLiteral("introuvableIci"));
+                verifier(!recherche->chercherSuivant(true),
+                         "ce qui n'y est pas n'est pas trouve");
+            }
+            recherche->close();
+        }
+    }
+
+    // --- la tabulation complete, comme dans MATLAB ------------------------
+    //
+    // Entre guillemets, MATLAB propose des fichiers coherents avec ce
+    // qu'on a deja ecrit : « load('K » ne doit proposer que ce qui
+    // commence par K. Ailleurs, ce sont les noms de fonctions et de
+    // variables.
+    {
+        QTemporaryDir bac;
+        verifier(bac.isValid(), "un dossier d'essai pour la completion");
+        QDir(bac.path()).mkdir(QStringLiteral("Fig"));
+        for (const char* nom : {"Khinf.mat", "Kbis.mat", "analyse.m"}) {
+            QFile f(QDir(bac.path()).filePath(QLatin1String(nom)));
+            f.open(QIODevice::WriteOnly);
+            f.write("1\n");
+            f.close();
+        }
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(bac.path()));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau a change de dossier");
+
+        QString prefixe;
+        bool fichiers = false;
+        QString ligne = QStringLiteral("load('K");
+        QStringList choix = console->completionsDe(ligne, ligne.size(), &prefixe, &fichiers);
+        verifier(fichiers, "entre guillemets, ce sont des fichiers qu'on propose");
+        verifier(prefixe == QLatin1String("K"), "le prefixe est ce qui suit le guillemet");
+        verifier(choix.contains(QStringLiteral("Khinf.mat")) &&
+                     choix.contains(QStringLiteral("Kbis.mat")),
+                 "les deux fichiers en K sont proposes");
+        verifier(!choix.contains(QStringLiteral("analyse.m")),
+                 "un fichier qui ne commence pas par K ne l'est pas");
+
+        // Un dossier se termine par une barre : on continue a taper dedans.
+        ligne = QStringLiteral("cd('F");
+        choix = console->completionsDe(ligne, ligne.size(), &prefixe, &fichiers);
+        verifier(choix.contains(QStringLiteral("Fig/")), "un dossier propose sa barre");
+
+        // Hors guillemets, ce sont les noms qu'on peut ecrire.
+        ligne = QStringLiteral("bodem");
+        choix = console->completionsDe(ligne, ligne.size(), &prefixe, &fichiers);
+        verifier(!fichiers, "hors guillemets, ce ne sont pas des fichiers");
+        verifier(choix.contains(QStringLiteral("bodemag")),
+                 "une fonction de toolbox est proposee");
+        // Les variables de l'espace de travail aussi, et en premier.
+        envoyer(fenetre, QStringLiteral("resultatDeLEssai = 42;"));
+        verifier(attendre([&] { return ligneDe(QStringLiteral("resultatDeLEssai")) >= 0; }),
+                 "la variable d'essai est creee");
+        ligne = QStringLiteral("resultatD");
+        choix = console->completionsDe(ligne, ligne.size(), &prefixe, &fichiers);
+        verifier(!choix.isEmpty() && choix.first() == QLatin1String("resultatDeLEssai"),
+                 "une variable de l'espace de travail est proposee la premiere");
+
+        // Et la touche elle-meme : une seule proposition s'ecrit d'emblee.
+        console->poserInvite();
+        for (QChar lettre : QStringLiteral("bodema")) {
+            QKeyEvent frappe(QEvent::KeyPress, 0, Qt::NoModifier, QString(lettre));
+            QCoreApplication::sendEvent(console, &frappe);
+        }
+        QKeyEvent tabulation(QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier,
+                             QStringLiteral("\t"));
+        QCoreApplication::sendEvent(console, &tabulation);
+        verifier(console->commandeEnCours() == QLatin1String("bodemag"),
+                 "la tabulation ecrit la seule proposition");
+        console->effacer();
+        envoyer(fenetre, QStringLiteral("clear resultatDeLEssai"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
     }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.

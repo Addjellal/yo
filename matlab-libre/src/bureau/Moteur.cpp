@@ -268,6 +268,7 @@ void Moteur::demarrer() {
     chargerToolboxes(*it_, racineToolboxes(cheminExecutable_.toStdString()));
     it_->definirSortie(flux_.get());
     it_->modeInteractif = true;
+    publierNoms();
     // « clc » efface la fenetre au lieu d'y ecrire « [2J[H ».
     it_->effacerEcran = [this] { emit effacementDemande(); };
     // « doc nom » ouvre le navigateur d'aide au lieu d'imprimer.
@@ -333,7 +334,8 @@ void Moteur::demarrer() {
     // c'est la premiere chose qu'on fait dans un bureau — ecrire un
     // fichier a cote, et l'executer.
     it_->ajouterChemin(QDir::currentPath().toStdString(), true);
-    emit dossierChange(QDir::currentPath());
+    dernierDossier_ = QDir::currentPath();
+    emit dossierChange(dernierDossier_);
     emit pret();
     publierEtat();
 }
@@ -448,7 +450,8 @@ void Moteur::changerDossier(const QString& chemin) {
     if (!it_) return;
     QDir::setCurrent(chemin);
     it_->ajouterChemin(chemin.toStdString(), true);
-    emit dossierChange(QDir::currentPath());
+    dernierDossier_ = QDir::currentPath();
+    emit dossierChange(dernierDossier_);
 }
 
 void Moteur::poserPointArret(const QString& fichier, int ligne) {
@@ -576,10 +579,39 @@ void Moteur::reindexer() {
     // MATLAB reconstruit son index a l'enregistrement, on fait de meme.
     if (!it_) return;
     it_->reindexerChemin();
+    publierNoms();
+}
+
+void Moteur::publierNoms() {
+    if (!it_) return;
+    QStringList noms;
+    for (const std::string& nom : it_->nomsNatifs()) {
+        if (nom.rfind("matlibre_", 0) == 0) continue;   // les rouages internes
+        noms << QString::fromStdString(nom);
+    }
+    for (const auto& entree : it_->indexFichiers())
+        noms << QString::fromStdString(entree.first);
+    static const char* motsCles[] = {
+        "break", "case", "catch", "classdef", "continue", "else", "elseif", "end",
+        "for", "function", "global", "if", "otherwise", "parfor", "persistent",
+        "return", "spmd", "switch", "try", "while"};
+    for (const char* mot : motsCles) noms << QLatin1String(mot);
+    noms.removeDuplicates();
+    noms.sort(Qt::CaseInsensitive);
+    emit nomsConnus(noms);
 }
 
 void Moteur::publierEtat() {
     if (!it_) return;
+    // « cd » tape dans la console change le dossier courant du processus
+    // sans que personne ne le dise a la fenetre : le panneau « Dossier
+    // courant » restait sur l'ancien, et la completion proposait les
+    // fichiers d'ailleurs. On compare a chaque commande.
+    QString dossier = QDir::currentPath();
+    if (dossier != dernierDossier_) {
+        dernierDossier_ = dossier;
+        emit dossierChange(dossier);
+    }
     QVector<LigneEspaceTravail> lignes;
     for (const auto& nom : it_->nomsVariables()) {
         Valeur v = it_->lireVariable(nom);

@@ -155,10 +155,16 @@ signals:
     void profilPret(const QVector<LigneProfil>& entrees, double duree);
     void figuresChangees(const QVector<FigureCopiee>& figures, int courante);
     void dossierChange(const QString& chemin);
+    // Tous les noms qu'on peut ecrire : fonctions natives, fichiers .m du
+    // chemin, classes et mots-cles. La console s'en sert pour completer a
+    // la tabulation.
+    void nomsConnus(const QStringList& noms);
     void pret();
 
 private:
     void publierEtat();
+    // Envoie a la fenetre la liste des noms qu'on peut ecrire.
+    void publierNoms();
     // Purge complète de la sortie en attente vers le fil graphique.
     void viderSortie();
     // Au plus ce nombre de paquets en vol vers la fenêtre. Huit paquets de
@@ -187,6 +193,9 @@ private:
 
     // Releve a la construction, dans le fil graphique.
     QString cheminExecutable_;
+    // Le dernier dossier annonce a la fenetre : « cd » dans la console doit
+    // remuer le panneau comme le bouton du ruban.
+    QString dernierDossier_;
 
     std::unique_ptr<matlibre::Interpreteur> it_;
     std::unique_ptr<std::streambuf> tampon_;

@@ -4,11 +4,60 @@
 #include <QAbstractTextDocumentLayout>
 #include <QFontDatabase>
 #include <QKeyEvent>
+#include <QListWidget>
 #include <QMouseEvent>
+#include <QCoreApplication>
 #include <QScrollBar>
 #include <QTextBlock>
 
+#include <algorithm>
+
 #include "Theme.h"
+
+namespace {
+
+bool caractereDeNom(QChar c) { return c.isLetterOrNumber() || c == QLatin1Char('_'); }
+
+// Vrai si la position donnee tombe dans une chaine de caracteres, et
+// donne alors le rang du premier caractere du texte de la chaine.
+//
+// L'apostrophe sert aussi de transposition en MATLAB ; on suit donc les
+// ouvertures et les fermetures dans l'ordre, le doublement « '' » valant
+// une apostrophe dans le texte. C'est assez pour savoir si l'on ecrit un
+// nom de fichier — le seul usage qu'on en fait.
+bool dansUneChaine(const QString& ligne, int position, int& debutTexte) {
+    bool dedans = false;
+    QChar delimiteur;
+    for (int k = 0; k < position && k < ligne.size(); ++k) {
+        QChar c = ligne.at(k);
+        if (!dedans) {
+            if (c == QLatin1Char('\'') || c == QLatin1Char('"')) {
+                dedans = true;
+                delimiteur = c;
+                debutTexte = k + 1;
+            }
+        } else if (c == delimiteur) {
+            if (k + 1 < position && ligne.at(k + 1) == delimiteur) ++k;   // « '' »
+            else dedans = false;
+        }
+    }
+    return dedans;
+}
+
+// Le plus long prefixe commun a toutes les propositions : ce que MATLAB
+// ecrit d'emblee avant de montrer la liste.
+QString prefixeCommun(const QStringList& choix) {
+    if (choix.isEmpty()) return QString();
+    QString commun = choix.first();
+    for (const QString& c : choix) {
+        int k = 0;
+        while (k < commun.size() && k < c.size() && commun.at(k) == c.at(k)) ++k;
+        commun.truncate(k);
+    }
+    return commun;
+}
+
+}  // namespace
 
 
 
@@ -21,6 +70,132 @@ ConsoleCommandes::ConsoleCommandes(QWidget* parent) : QPlainTextEdit(parent) {
     setLineWrapMode(QPlainTextEdit::WidgetWidth);
     setMaximumBlockCount(20000);   // la console ne doit pas grossir sans fin
     document()->setDefaultFont(police);
+}
+
+void ConsoleCommandes::definirCompletions(
+    std::function<QStringList(const QString&, bool)> fournisseur) {
+    fournisseurCompletions_ = std::move(fournisseur);
+}
+
+QStringList ConsoleCommandes::completionsDe(const QString& ligne, int position,
+                                           QString* prefixe, bool* fichiers) const {
+    int debutTexte = 0;
+    bool chaine = dansUneChaine(ligne, position, debutTexte);
+    QString mot;
+    if (chaine) {
+        // Entre guillemets, le prefixe est tout le texte deja ecrit : les
+        // chemins portent des barres et des espaces, qu'aucun decoupage en
+        // mots ne saurait respecter.
+        mot = ligne.mid(debutTexte, position - debutTexte);
+    } else {
+        int debut = position;
+        while (debut > 0 && caractereDeNom(ligne.at(debut - 1))) --debut;
+        mot = ligne.mid(debut, position - debut);
+    }
+    if (prefixe) *prefixe = mot;
+    if (fichiers) *fichiers = chaine;
+    if (!fournisseurCompletions_) return QStringList();
+    QStringList trouves = fournisseurCompletions_(mot, chaine);
+    trouves.removeDuplicates();
+    return trouves;
+}
+
+void ConsoleCommandes::completer() {
+    if (!inviteVisible_) return;
+    QString ligne = commandeEnCours();
+    int position = textCursor().position() - debutSaisie_;
+    if (position < 0 || position > ligne.size()) return;
+    QString prefixe;
+    bool fichiers = false;
+    QStringList choix = completionsDe(ligne, position, &prefixe, &fichiers);
+    if (choix.isEmpty()) {
+        fermerChoix();
+        return;
+    }
+    debutPrefixe_ = debutSaisie_ + position - prefixe.size();
+    if (choix.size() == 1) {
+        appliquerChoix(choix.first());
+        return;
+    }
+    // Plusieurs : on ecrit ce qu'elles ont en commun, puis on les montre.
+    QString commun = prefixeCommun(choix);
+    if (commun.size() > prefixe.size()) {
+        QTextCursor c = textCursor();
+        c.setPosition(debutPrefixe_);
+        c.setPosition(debutPrefixe_ + prefixe.size(), QTextCursor::KeepAnchor);
+        c.insertText(commun);
+        setTextCursor(c);
+    }
+    montrerChoix(choix);
+}
+
+void ConsoleCommandes::appliquerChoix(const QString& choix) {
+    QTextCursor c = textCursor();
+    int fin = c.position();
+    if (debutPrefixe_ < debutSaisie_ || debutPrefixe_ > fin) return;
+    c.setPosition(debutPrefixe_);
+    c.setPosition(fin, QTextCursor::KeepAnchor);
+    c.insertText(choix);
+    setTextCursor(c);
+    fermerChoix();
+}
+
+void ConsoleCommandes::montrerChoix(const QStringList& choix) {
+    if (!choix_) {
+        choix_ = new QListWidget(this);
+        choix_->setWindowFlags(Qt::Popup);
+        choix_->setFocusPolicy(Qt::NoFocus);
+        choix_->setFont(font());
+        choix_->installEventFilter(this);
+        connect(choix_, &QListWidget::itemClicked, this,
+                [this](QListWidgetItem* item) { appliquerChoix(item->text()); });
+    }
+    choix_->clear();
+    choix_->addItems(choix);
+    choix_->setCurrentRow(0);
+    // La liste s'ouvre sous le curseur, comme celle de MATLAB, et ne
+    // depasse pas une dizaine de lignes.
+    int lignes = std::min<int>((int)choix.size(), 10);
+    int hauteur = lignes * choix_->sizeHintForRow(0) + 8;
+    int largeur = 120;
+    for (const QString& c : choix)
+        largeur = std::max(largeur, fontMetrics().horizontalAdvance(c) + 40);
+    choix_->resize(std::min(largeur, 520), hauteur);
+    QRect r = cursorRect();
+    choix_->move(mapToGlobal(QPoint(r.left(), r.bottom() + 2)));
+    choix_->show();
+}
+
+void ConsoleCommandes::fermerChoix() {
+    if (choix_) choix_->hide();
+}
+
+bool ConsoleCommandes::eventFilter(QObject* objet, QEvent* evenement) {
+    if (objet == choix_ && evenement->type() == QEvent::KeyPress) {
+        auto* touche = static_cast<QKeyEvent*>(evenement);
+        switch (touche->key()) {
+            case Qt::Key_Escape:
+                fermerChoix();
+                return true;
+            case Qt::Key_Return:
+            case Qt::Key_Enter:
+            case Qt::Key_Tab:
+                if (choix_->currentItem()) appliquerChoix(choix_->currentItem()->text());
+                return true;
+            case Qt::Key_Up:
+            case Qt::Key_Down:
+            case Qt::Key_PageUp:
+            case Qt::Key_PageDown:
+                return false;   // la liste se deplace elle-meme
+            default:
+                // Toute autre frappe continue la saisie : la liste se
+                // ferme et la touche va a la console, comme dans MATLAB.
+                fermerChoix();
+                QCoreApplication::sendEvent(this, touche);
+                return true;
+        }
+    }
+    return QPlainTextEdit::eventFilter(objet, evenement);
 }
 
 void ConsoleCommandes::allerEnFin() {
@@ -130,6 +305,13 @@ void ConsoleCommandes::mousePressEvent(QMouseEvent* evenement) {
 void ConsoleCommandes::keyPressEvent(QKeyEvent* evenement) {
     const int touche = evenement->key();
     const bool controle = evenement->modifiers() & Qt::ControlModifier;
+
+    // La tabulation complete : un nom de fichier entre guillemets, un nom
+    // de fonction ou de variable ailleurs.
+    if (touche == Qt::Key_Tab && !controle) {
+        completer();
+        return;
+    }
 
     if (controle && touche == Qt::Key_C) {
         if (textCursor().hasSelection()) {

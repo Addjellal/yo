@@ -40,6 +40,7 @@
 #include "FenetreAide.h"
 #include "FenetreProfileur.h"
 #include "Icone.h"
+#include "Recherche.h"
 #include "Ruban.h"
 #include "Theme.h"
 #include "VueFigure.h"
@@ -119,6 +120,8 @@ FenetrePrincipale::FenetrePrincipale() {
             &FenetrePrincipale::surEspaceTravail);
     connect(moteur_, &Moteur::figuresChangees, this, &FenetrePrincipale::surFigures);
     connect(moteur_, &Moteur::dossierChange, this, &FenetrePrincipale::surDossier);
+    connect(moteur_, &Moteur::nomsConnus, this,
+            [this](const QStringList& noms) { nomsConnus_ = noms; });
     connect(moteur_, &Moteur::commandeFinie, this, &FenetrePrincipale::surCommandeFinie);
     connect(moteur_, &Moteur::effacementDemande, this,
             &FenetrePrincipale::effacerCommandes);
@@ -179,6 +182,11 @@ void FenetrePrincipale::construirePanneaux() {
     });
 
     console_ = new ConsoleCommandes;
+    // La tabulation complete, comme dans la fenetre de commandes de
+    // MATLAB : des fichiers entre guillemets, des noms ailleurs.
+    console_->definirCompletions([this](const QString& prefixe, bool fichiers) {
+        return completions(prefixe, fichiers);
+    });
     // Ctrl-C dans la console coupe le calcul, comme sous MATLAB.
     connect(console_, &ConsoleCommandes::interruptionDemandee, this,
             &FenetrePrincipale::interrompre);
@@ -370,6 +378,15 @@ void FenetrePrincipale::construireMenus() {
                        this, &FenetrePrincipale::commenterSelection);
     edition->addAction(QStringLiteral("Dé&commenter"), QKeySequence(QStringLiteral("Ctrl+T")),
                        this, &FenetrePrincipale::decommenterSelection);
+    edition->addSeparator();
+    // Ctrl-F : « Rechercher et remplacer », comme dans l'editeur de MATLAB.
+    // F3 continue la recherche sans rouvrir la fenetre.
+    edition->addAction(QStringLiteral("&Rechercher et remplacer…"),
+                       QKeySequence(QKeySequence::Find), this,
+                       &FenetrePrincipale::ouvrirRecherche);
+    edition->addAction(QStringLiteral("Rechercher le &suivant"),
+                       QKeySequence(QKeySequence::FindNext), this,
+                       &FenetrePrincipale::chercherSuivant);
     edition->addSeparator();
     edition->addAction(QStringLiteral("Effacer la fenêtre de commandes"),
                        QKeySequence(QStringLiteral("Ctrl+L")), this,
@@ -876,12 +893,63 @@ void FenetrePrincipale::surCommandeFinie() {
 void FenetrePrincipale::surEspaceTravail(const QVector<LigneEspaceTravail>& lignes) {
     if (enPause_) console_->poserInvite(QStringLiteral("K>> "));
     tableVariables_->setRowCount(lignes.size());
+    nomsVariables_.clear();
     for (int k = 0; k < lignes.size(); ++k) {
         tableVariables_->setItem(k, 0, new QTableWidgetItem(lignes[k].nom));
         tableVariables_->setItem(k, 1, new QTableWidgetItem(lignes[k].valeur));
         tableVariables_->setItem(k, 2, new QTableWidgetItem(lignes[k].taille));
         tableVariables_->setItem(k, 3, new QTableWidgetItem(lignes[k].classe));
+        nomsVariables_ << lignes[k].nom;
     }
+}
+
+// Ce que la tabulation propose dans la console.
+//
+// Entre guillemets, MATLAB propose des fichiers : c'est ce qu'on attend
+// apres « load(' » ou « run(' ». Le prefixe peut porter un dossier — on
+// cherche alors dedans, et l'on rend le chemin complet pour que le
+// remplacement soit direct. Ailleurs, ce sont les noms qu'on peut
+// ecrire : les variables d'abord, puis les fonctions et les mots-cles.
+QStringList FenetrePrincipale::completions(const QString& prefixe, bool fichiers) const {
+    QStringList trouves;
+    if (fichiers) {
+        QString debutChemin, base = prefixe;
+        int coupe = std::max(prefixe.lastIndexOf(QLatin1Char('/')),
+                             prefixe.lastIndexOf(QLatin1Char('\\')));
+        if (coupe >= 0) {
+            debutChemin = prefixe.left(coupe + 1);
+            base = prefixe.mid(coupe + 1);
+        }
+        QDir dossier(dossierCourant_);
+        if (!debutChemin.isEmpty()) {
+            QString absolu = QDir::isAbsolutePath(debutChemin)
+                                 ? debutChemin
+                                 : dossier.filePath(debutChemin);
+            dossier = QDir(absolu);
+        }
+        if (!dossier.exists()) return trouves;
+        const QFileInfoList entrees =
+            dossier.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo& info : entrees) {
+            if (!info.fileName().startsWith(base, Qt::CaseInsensitive)) continue;
+            // Un dossier se termine par une barre : on continue a taper
+            // dedans sans avoir a l'ajouter soi-meme.
+            trouves << debutChemin + info.fileName() +
+                           (info.isDir() ? QStringLiteral("/") : QString());
+        }
+        return trouves;
+    }
+    if (prefixe.isEmpty()) return trouves;
+    for (const QString& nom : nomsVariables_)
+        if (nom.startsWith(prefixe)) trouves << nom;
+    for (const QString& nom : nomsConnus_)
+        if (nom.startsWith(prefixe)) trouves << nom;
+    // MATLAB propose aussi les noms qui ne different que par la casse
+    // quand rien ne correspond exactement.
+    if (trouves.isEmpty())
+        for (const QString& nom : nomsConnus_)
+            if (nom.startsWith(prefixe, Qt::CaseInsensitive)) trouves << nom;
+    return trouves;
 }
 
 // Ce que MATLAB fait des fenêtres de figure, et rien de plus : une figure
@@ -953,6 +1021,37 @@ void FenetrePrincipale::surFermetureFigure(int numero) {
     if (FenetreFigure* fenetre = fenetresFigures_.take(numero)) fenetre->deleteLater();
     empreintesFigures_.remove(numero);
     versMoteur([this, numero] { moteur_->fermerFigure(numero); });
+}
+
+// Ctrl-F. La fenetre vise ce qui a le regard : l'editeur courant si
+// l'onglet en montre un, la console sinon — ou l'on cherche sans
+// remplacer, comme dans la fenetre de commandes de MATLAB.
+void FenetrePrincipale::ouvrirNouveauScript() { nouveauFichier(); }
+
+void FenetrePrincipale::ouvrirRecherche() {
+    if (!recherche_) recherche_ = new DialogueRecherche(this);
+    QPlainTextEdit* cible = editeurCourant();
+    if (!cible) cible = console_;
+    recherche_->viser(cible);
+    // Ce qui est selectionne remplit le champ : le geste habituel est de
+    // selectionner un mot puis de presser Ctrl-F.
+    QTextCursor c = cible->textCursor();
+    if (c.hasSelection() && !c.selectedText().contains(QChar(0x2029)))
+        recherche_->definirRecherche(c.selectedText());
+    recherche_->show();
+    recherche_->raise();
+    recherche_->activateWindow();
+}
+
+void FenetrePrincipale::chercherSuivant() {
+    if (!recherche_ || !recherche_->cible()) {
+        ouvrirRecherche();
+        return;
+    }
+    QPlainTextEdit* cible = editeurCourant();
+    if (!cible) cible = console_;
+    recherche_->viser(cible);
+    recherche_->chercherSuivant(true);
 }
 
 void FenetrePrincipale::surDossier(const QString& chemin) {

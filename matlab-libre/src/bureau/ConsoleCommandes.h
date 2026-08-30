@@ -10,6 +10,10 @@
 #include <QPlainTextEdit>
 #include <QStringList>
 
+#include <functional>
+
+class QListWidget;
+
 class ConsoleCommandes : public QPlainTextEdit {
     Q_OBJECT
 public:
@@ -26,6 +30,19 @@ public:
     QString commandeEnCours() const;
     const QStringList& historique() const { return historique_; }
 
+    // Ce que la tabulation propose. Le fournisseur rend les completions
+    // possibles du prefixe — chacune remplacera le prefixe entier.
+    // « fichiers » dit dans quel monde on cherche : entre guillemets, ce
+    // sont des noms de fichiers et de dossiers ; ailleurs, des noms de
+    // fonctions et de variables. C'est la distinction que fait MATLAB.
+    void definirCompletions(
+        std::function<QStringList(const QString& prefixe, bool fichiers)> fournisseur);
+
+    // Les completions du texte donne, curseur en « position ». Rendue
+    // publique pour que les tests puissent l'interroger sans clavier.
+    QStringList completionsDe(const QString& ligne, int position, QString* prefixe,
+                              bool* fichiers) const;
+
 signals:
     void commandeValidee(const QString& commande);
     void interruptionDemandee();
@@ -33,11 +50,22 @@ signals:
 protected:
     void keyPressEvent(QKeyEvent* evenement) override;
     void mousePressEvent(QMouseEvent* evenement) override;
+    bool eventFilter(QObject* objet, QEvent* evenement) override;
 
 private:
     void allerEnFin();
     bool curseurDansZoneModifiable() const;
     void remplacerSaisie(const QString& texte);
+
+    // --- completion ---
+    void completer();
+    void montrerChoix(const QStringList& choix);
+    void fermerChoix();
+    void appliquerChoix(const QString& choix);
+
+    std::function<QStringList(const QString&, bool)> fournisseurCompletions_;
+    QListWidget* choix_ = nullptr;
+    int debutPrefixe_ = 0;     // position, dans le document, du prefixe complete
 
     int debutSaisie_ = 0;      // position du premier caractère modifiable
     QString invite_ = QStringLiteral(">> ");
