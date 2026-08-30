@@ -459,6 +459,13 @@ FONCTION(fnGrid) {
     return {};
 }
 
+// « ishold » : l'etat de « hold », pour qu'une fonction qui trace par
+// dessus puisse le rendre comme elle l'a trouve.
+FONCTION(fnIshold) {
+    INUTILISE
+    return {Valeur::booleen(axesCourants(it)->tenir)};
+}
+
 FONCTION(fnHold) {
     INUTILISE
     auto a = axesCourants(it);
@@ -876,6 +883,7 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("legend", fnLegend, "graphique", "legend  Legende des courbes.");
     it.enregistrer("grid", fnGrid, "graphique", "grid  Affiche la grille.");
     it.enregistrer("hold", fnHold, "graphique", "hold  Conserve les traces precedents.");
+    it.enregistrer("ishold", fnIshold, "graphique", "ishold  L'etat de hold.");
     it.enregistrer("axis", fnAxis, "graphique", "axis  Regle les limites des axes.");
     it.enregistrer("xlim", fnXlim, "graphique", "xlim  Limites en x.");
     it.enregistrer("ylim", fnYlim, "graphique", "ylim  Limites en y.");

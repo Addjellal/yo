@@ -592,4 +592,101 @@ catch err
 end
 assert(strcmp(sansNoms, 'Control:connect:NoNames'));
 
+%% ---------------------------------------- retards, sensibilites, hasard
+% L'approximation de Pade doit garder le gain et rendre la bonne phase :
+% c'est tout ce qu'on lui demande.
+[numPade, denPade] = pade(0.1, 1);
+assert(max(abs(numPade - [-1 20])) < 1e-12);
+assert(max(abs(denPade - [1 20])) < 1e-12);
+retard = pade(0.5, 3);
+assert(abs(dcgain(retard) - 1) < 1e-9);
+for p = [0.5 1 2]
+    % La phase suit celle du retard exact tant qu'on reste sous l'ordre.
+    assert(abs(angle(freqresp(retard, p)) + 0.5 * p) < 1e-3);
+end
+assert(abs(abs(freqresp(retard, 3)) - 1) < 1e-9);   % le module reste unite
+
+% Les six sensibilites d'une boucle, comparees a l'ecriture a la main.
+Gs = tf(2, [1 1]);
+Ks = tf(10, [1 0]);
+L = loopsens(Gs, Ks);
+assert(L.Stable);
+for p = [0.1 1 10]
+    g = freqresp(ss(Gs), p);
+    k = freqresp(ss(Ks), p);
+    assert(abs(freqresp(L.So, p) - 1 / (1 + g * k)) < 1e-9);
+    assert(abs(freqresp(L.To, p) - g * k / (1 + g * k)) < 1e-9);
+    assert(abs(freqresp(L.CSo, p) - k / (1 + g * k)) < 1e-9);
+    assert(abs(freqresp(L.PSi, p) - g / (1 + k * g)) < 1e-9);
+end
+
+% Un modele tire au hasard est stable par construction.
+for essai = 1:5
+    assert(max(real(pole(rss(3)))) < 0);
+    assert(max(abs(pole(drss(3)))) < 1);
+end
+assert(isequal(size(rss(2, 3, 4)), [3 4]));
+assert(drss(2).Ts == 1);
+
+% L'etat ajoute aux sorties ne change pas la dynamique.
+base = ss([-1 0; 0 -2], [1; 1], [1 0], 0);
+augmente = augstate(base);
+assert(isequal(size(augmente), [3 1]));
+assert(isequal(augmente.A, base.A));
+
+% La separation stable / instable : la somme redonne le modele.
+mixte = ss([-1 0; 0 2], [1; 1], [1 1], 0);
+[partieStable, partieInstable] = stabsep(mixte);
+assert(order(partieStable) == 1 && order(partieInstable) == 1);
+assert(max(real(pole(partieStable))) < 0);
+assert(max(real(pole(partieInstable))) > 0);
+for p = [0.3 3]
+    assert(abs(freqresp(partieStable, p) + freqresp(partieInstable, p) ...
+               - freqresp(mixte, p)) < 1e-9);
+end
+
+% Le regulateur LQG, monte de deux facons, stabilise.
+Glqg = ss(-1, 1, 1, 0);
+[estimateur, gainL] = kalman(Glqg, 1, 1);          %#ok<ASGLU>
+gainK = lqr(Glqg.A, Glqg.B, 1, 1);
+regulateur = lqgreg(estimateur, gainK);
+assert(max(real(pole(feedback(Glqg, -regulateur)))) < 0);
+regulateur2 = lqg(Glqg, eye(2), eye(2));
+assert(max(real(pole(feedback(Glqg, -regulateur2)))) < 0);
+
+% La mise a l'echelle ne change ni les poles ni le gain.
+malFichu = ss([-1 1e6; 0 -2], [1; 1e6], [1 1e-6], 0);
+misALEchelle = prescale(malFichu);
+assert(max(abs(sort(real(pole(misALEchelle))) - sort(real(pole(malFichu))))) < 1e-6);
+assert(abs(dcgain(misALEchelle) - dcgain(malFichu)) / abs(dcgain(malFichu)) < 1e-9);
+
+% Le facteur de Cholesky du grammien.
+facteur = lyapchol([-1 0; 0 -2], eye(2));
+gramien = facteur' * facteur;
+assert(max(max(abs([-1 0; 0 -2] * gramien + gramien * [-1 0; 0 -2]' + eye(2)))) < 1e-12);
+
+% Les grilles ne changent pas les bornes de l'axe.
+figure
+rlocus(tf(1, [1 2 0]));
+bornesAvant = xlim();
+sgrid;
+assert(isequal(xlim(), bornesAvant));
+figure
+nichols(tf(1, [1 1 1]));
+bornesNichols = ylim();
+ngrid;
+assert(isequal(ylim(), bornesNichols));
+close all
+
+% Les caracteristiques d'une reponse quelconque.
+tLsim = linspace(0, 10, 500);
+reponse = 1 - exp(-tLsim);
+mesures = lsiminfo(reponse, tLsim);
+assert(mesures.SettlingTime > 3 && mesures.SettlingTime < 5);
+assert(abs(mesures.Max - reponse(end)) < 1e-9);
+
+% Les retards ne sont pas representes, et la fonction le dit sans mentir.
+assert(~hasdelay(tf(1, [1 1])));
+assert(isequal(totaldelay(tf(1, [1 1])), 0));
+
 disp('automatique : toutes les verifications passent');

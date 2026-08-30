@@ -5,23 +5,20 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
-| automatique | 81 | 27 | 75 % |
+| automatique | 98 | 10 | 91 % |
 | images | 57 | 15 | 79 % |
 | matlab-graphique | 62 | 64 | 49 % |
 | matlab-langage | 344 | 82 | 81 % |
 | optimisation | 26 | 6 | 81 % |
-| robuste | 7 | 62 | 10 % |
+| robuste | 8 | 61 | 12 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 118 | 98 | 55 % |
-| **ensemble** | **799** | **385** | **67 %** |
+| **ensemble** | **817** | **367** | **69 %** |
 
 ## automatique
 
-`augstate`, `bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `delayss`, `drss`
-`frd`, `getBlockValue`, `hasdelay`, `loopsens`, `lqg`, `lqgreg`, `lsiminfo`
-`lyapchol`, `ngrid`, `pade`, `pidtool`, `prescale`, `pzplot`, `rlocusplot`
-`sgrid`, `sisotool`, `stabsep`, `stepDataOptions`, `thiran`, `totaldelay`
-`zgrid`
+`bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `delayss`, `frd`, `getBlockValue`
+`pidtool`, `sisotool`, `stepDataOptions`, `thiran`
 
 ## images
 
@@ -66,8 +63,8 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 `actual2normalized`, `balancmr`, `bstmr`, `complexify`, `cmsclsyn`, `dksyn`
 `dmplot`, `frd`, `genss`, `genmat`, `gapmetric`, `getNominal`, `h2hinfsyn`
 `h2syn`, `hankelmr`, `hinfstruct`, `icsignal`, `iconnect`, `imp2ss`, `lncf`
-`loopmargin`, `loopsens`, `ltiarray2uss`, `makeweight`, `modreal`, `mkfilter`
-`musyn`, `mussv`, `ncfmargin`, `ncfsyn`, `normalized2actual`, `popov`, `randatom`
+`loopmargin`, `ltiarray2uss`, `makeweight`, `modreal`, `mkfilter`, `musyn`
+`mussv`, `ncfmargin`, `ncfsyn`, `normalized2actual`, `popov`, `randatom`
 `randumat`, `randuss`, `reduce`, `robgain`, `robstab`, `robuststab`, `schurmr`
 `sectf`, `sisobnds`, `skewdec`, `slowfast`, `stabproj`, `strans`, `sysbal`
 `ucomplex`, `ucomplexm`, `udyn`, `ultidyn`, `umat`, `uncertain`, `ureal`

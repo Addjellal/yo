@@ -9,12 +9,17 @@
 % Construction et conversion
 %   tf, ss, zpk       - Construction de modèles
 %   filt              - Modèle discret écrit en puissances de z^-1
+%   rss, drss         - Modèles stables tirés au hasard
 %   tf2ss, ss2tf      - Conversions entre les deux représentations
 %   ssdata, tfdata, zpkdata - Extraction des données d'un modèle
 %   c2d, d2c, d2d     - Passage continu / discret et rééchantillonnage
 %
 % Propriétés
 %   pole, zero, pzmap - Pôles et zéros
+%   pzplot, rlocusplot - Les mêmes, sous leur autre nom
+%   stabsep           - Sépare partie stable et partie instable
+%   hasdelay, totaldelay, pade - Retards et leur approximation
+%   prescale          - Met le modèle à l'échelle pour le calcul
 %   dcgain, damp      - Gain statique, pulsations et amortissements
 %   order             - Nombre d'états
 %   isstable, isproper, issiso, isct, isdt - Prédicats sur un modèle
@@ -27,6 +32,7 @@
 %   lsim              - Réponse à une entrée quelconque
 %   gensig            - Signaux d'essai périodiques
 %   stepinfo          - Montée, établissement, dépassement
+%   lsiminfo          - Les mêmes mesures, sur une réponse quelconque
 %   covar             - Covariance de la réponse à un bruit blanc
 %
 % Réponses fréquentielles
@@ -35,10 +41,13 @@
 %   freqresp, evalfr  - Réponse complexe, en pulsation ou en un point
 %   sigma             - Valeurs singulières de la matrice de transfert
 %   margin, allmargin - Marges de gain, de phase et de retard
+%   sgrid, zgrid, ngrid - Grilles d'amortissement et abaque de Nichols
 %   bandwidth         - Bande passante à -3 décibels
 %
 % Interconnexions
 %   feedback, series, parallel - Boucle, cascade, somme
+%   loopsens          - Les six sensibilités d'une boucle
+%   augstate          - Ajoute l'état aux sorties
 %   append            - Juxtaposition sans connexion
 %   lft               - Produit étoile : rebouclage partiel
 %   connect, sumblk   - Assemblage par les noms des signaux
@@ -57,12 +66,14 @@
 %   modred, balred    - Élimination d'états, troncature équilibrée
 %
 % Équations matricielles
+%   lyapchol          - Facteur de Cholesky de la solution de Lyapunov
 %   lyap, dlyap       - Lyapunov continue et discrète, Sylvester
 %   care, dare        - Riccati continue et discrète
 %
 % Synthèse
 %   place, acker      - Placement de pôles
 %   lqr, dlqr         - Commande linéaire quadratique
+%   lqg, lqgreg       - Régulateur linéaire quadratique gaussien
 %   lqry, lqi, lqrd   - Pondération sur la sortie, action intégrale,
 %                       commande discrète d'un procédé continu
 %   lqe, kalman       - Estimateur linéaire quadratique, filtre de Kalman
@@ -130,6 +141,27 @@ APPEND Mise en parallèle sans connexion : modèle bloc-diagonal.
      size(ssdata(s))   % 2 états
 
   Voir aussi PARALLEL, SERIES, FEEDBACK.
+```
+
+## `augstate`
+
+```
+AUGSTATE Ajoute l'état aux sorties d'un modèle.
+  SYSA = AUGSTATE(SYS) rend le modèle dont les sorties sont celles de
+  SYS suivies de son état tout entier. C'est ce qu'il faut pour observer
+  la trajectoire de l'état dans une simulation, ou pour poser un critère
+  qui porte sur lui.
+
+  Les états ajoutés ne se voient qu'à travers la matrice C : le modèle
+  garde exactement la même dynamique.
+
+  Exemples :
+     sys = ss([-1 0; 0 -2], [1; 1], [1 0], 0);
+     a = augstate(sys);
+     size(a)                          % 3 sorties, 1 entree
+     isequal(a.A, sys.A)              % vrai : la dynamique ne bouge pas
+
+  Voir aussi SS, LSIM, INITIAL, SSDATA.
 ```
 
 ## `balreal`
@@ -545,6 +577,23 @@ DLYAP Équation de Lyapunov discrète.
   Voir aussi LYAP, DARE, GRAM.
 ```
 
+## `drss`
+
+```
+DRSS Modèle d'état discret stable, tiré au hasard.
+  SYS = DRSS(N) rend un modèle discret d'ordre N dont tous les pôles
+  sont dans le cercle unité, à la période d'échantillonnage 1.
+
+  SYS = DRSS(N,NY) et SYS = DRSS(N,NY,NU) donnent plusieurs voies.
+
+  Exemples :
+     sys = drss(3);
+     max(abs(pole(sys))) < 1      % vrai : les poles sont dans le cercle
+     drss(2).Ts                   % 1
+
+  Voir aussi RSS, SS, C2D, POLE.
+```
+
 ## `dsort`
 
 ```
@@ -720,6 +769,24 @@ GRAM Grammiens de commandabilité et d'observabilité.
   Voir aussi CTRB, OBSV, BALREAL, HSVD, LYAP.
 ```
 
+## `hasdelay`
+
+```
+HASDELAY Vrai si le modèle porte un retard.
+  HASDELAY(SYS) dit si le modèle a un retard, en entrée, en sortie ou
+  dans la boucle.
+
+  MatLibre ne représente pas les retards autrement que par leur
+  approximation : la fonction rend donc toujours faux. Pour porter un
+  retard dans un calcul, PADE en donne une fonction de transfert.
+
+  Exemples :
+     hasdelay(tf(1, [1 1]))           % faux
+     hasdelay(ss(-1, 1, 1, 0))        % faux
+
+  Voir aussi PADE, TOTALDELAY, C2D.
+```
+
 ## `hsvd`
 
 ```
@@ -886,6 +953,38 @@ LFT Produit étoile de Redheffer : rebouclage partiel de deux modèles.
   Voir aussi FEEDBACK, SERIES, APPEND, HINFSYN, AUGW.
 ```
 
+## `loopsens`
+
+```
+LOOPSENS Toutes les fonctions de sensibilité d'une boucle.
+  S = LOOPSENS(G,K) rend, dans une structure, les six transmittances
+  d'une boucle à retour unitaire où G est le procédé et K le correcteur :
+
+     S.Si   sensibilité en entrée,      inv(I + K*G)
+     S.Ti   complémentaire en entrée,   I - Si
+     S.So   sensibilité en sortie,      inv(I + G*K)
+     S.To   complémentaire en sortie,   I - So
+     S.PSi  procédé fois sensibilité,   G*Si
+     S.CSo  correcteur fois sensibilité, K*So
+     S.Lo   boucle ouverte en sortie,   G*K
+     S.Li   boucle ouverte en entrée,   K*G
+     S.Poles pôles de la boucle fermée
+     S.Stable vrai si la boucle est stable
+
+  Ces six-là sont les seules que l'on ait à regarder : elles disent le
+  rejet des perturbations, le suivi de consigne, l'effort de commande et
+  la robustesse. Les tracer toutes, c'est ce que fait un ingénieur avant
+  de valider un correcteur.
+
+  Exemples :
+     L = loopsens(tf(2, [1 1]), tf(10, [1 0]));
+     L.Stable                         % vrai
+     abs(dcgain(L.So))  < 1e-9        % l'integrateur annule l'erreur
+     abs(dcgain(L.To) - 1) < 1e-9     % et fait suivre la consigne
+
+  Voir aussi FEEDBACK, SIGMA, MARGIN, HINFNORM, STABILITYMARGIN.
+```
+
 ## `lqe`
 
 ```
@@ -904,6 +1003,65 @@ LQE Gain d'un estimateur linéaire quadratique.
      max(real(eig(-1 - L * 1))) < -1      % l'observateur va plus vite
 
   Voir aussi LQR, KALMAN, CARE, PLACE.
+```
+
+## `lqg`
+
+```
+LQG Régulateur linéaire quadratique gaussien.
+  REG = LQG(SYS,QXU,QWV) assemble d'un coup le régulateur optimal d'un
+  procédé bruité : QXU pondère l'état et la commande dans le critère,
+  QWV décrit les covariances du bruit d'état et du bruit de mesure.
+
+  Les deux matrices sont bloc-diagonales par morceaux :
+     QXU = [Q  Nc ; Nc' R]  le coût, x'Qx + 2x'Nc*u + u'Ru
+     QWV = [Qn Nf ; Nf' Rn] les bruits, d'état puis de mesure
+
+  [REG,INFO] = LQG(...) rend en plus le gain de retour d'état, le gain
+  de l'estimateur et les deux solutions de Riccati.
+
+  C'est LQR et KALMAN réunis par LQGREG : le principe de séparation dit
+  que le régulateur ainsi obtenu est optimal.
+
+  Exemples :
+     G = ss(-1, 1, 1, 0);
+     C = lqg(G, eye(2), eye(2));
+     max(real(pole(feedback(G, -C)))) < 0     % la boucle est stable
+
+  Voir aussi LQR, KALMAN, LQGREG, CARE, H2SYN.
+```
+
+## `lqgreg`
+
+```
+LQGREG Assemble le régulateur LQG à partir de l'estimateur et du gain.
+  REG = LQGREG(KEST,K) réunit l'estimateur de Kalman KEST — celui que
+  rend KALMAN — et le gain de retour d'état K — celui que rend LQR — en
+  un seul correcteur qui prend la mesure Y et rend la commande U :
+
+     xchapeau' = (A - B*K - L*C) xchapeau + L y
+     u         = -K xchapeau
+
+  C'est le principe de séparation : on estime l'état comme si l'on
+  commandait parfaitement, on le commande comme si on l'observait
+  parfaitement, et la réunion est optimale.
+
+  REG = LQGREG(KEST,K,'current') emploie l'estimateur courant en
+  discret ; MatLibre ne fait pas la différence et rend le même
+  régulateur.
+
+  Le signe est celui de MATLAB : REG rend U, et se referme sur le
+  procédé par une contre-réaction positive — feedback(G, REG, +1) — ou,
+  ce qui revient au même, par -REG en contre-réaction négative.
+
+  Exemples :
+     G = ss(-1, 1, 1, 0);
+     [kest, L] = kalman(G, 1, 1);
+     K = lqr(G.A, G.B, 1, 1);
+     C = lqgreg(kest, K);
+     max(real(pole(feedback(G, -C)))) < 0     % la boucle est stable
+
+  Voir aussi KALMAN, LQR, LQG, ESTIM, REG.
 ```
 
 ## `lqi`
@@ -1015,6 +1173,31 @@ LSIM Réponse à une entrée quelconque.
   Voir aussi STEP, IMPULSE, INITIAL, GENSIG.
 ```
 
+## `lsiminfo`
+
+```
+LSIMINFO Caractéristiques d'une réponse quelconque.
+  S = LSIMINFO(Y,T) décrit la réponse Y observée aux instants T :
+  SettlingTime le temps au bout duquel elle reste à deux pour cent de sa
+  valeur finale, Min et Max ses extrêmes, MinTime et MaxTime les
+  instants où ils sont atteints.
+
+  S = LSIMINFO(Y,T,YFINAL) impose la valeur finale au lieu de prendre la
+  dernière.
+
+  C'est STEPINFO pour une entrée qui n'est pas un échelon : ni temps de
+  montée ni dépassement, qui n'auraient pas de sens, mais le reste.
+
+  Exemples :
+     t = linspace(0, 10, 500);
+     y = 1 - exp(-t);
+     s = lsiminfo(y, t);
+     s.SettlingTime > 3 && s.SettlingTime < 5      % environ 4 constantes
+     s.Max                                          % proche de 1
+
+  Voir aussi STEPINFO, LSIM, STEP, IMPULSE.
+```
+
 ## `lyap`
 
 ```
@@ -1036,6 +1219,26 @@ LYAP Équation de Lyapunov continue.
      min(eig(lyap([-1 0; 0 -2], eye(2)))) > 0     % definie positive
 
   Voir aussi DLYAP, CARE, GRAM, EIG.
+```
+
+## `lyapchol`
+
+```
+LYAPCHOL Facteur de Cholesky de la solution de Lyapunov.
+  R = LYAPCHOL(A,B) rend la matrice triangulaire supérieure R telle que
+  X = R'*R résolve A*X + X*A' + B*B' = 0. Travailler sur R plutôt que
+  sur X garde la positivité exacte et double la précision : c'est ce
+  qu'emploient les réductions de modèle.
+
+  A doit être stable.
+
+  Exemples :
+     R = lyapchol(-1, 1);
+     abs(R' * R - 0.5) < 1e-12        % X = 0.5 pour ce cas
+     X = lyapchol([-1 0; 0 -2], eye(2))' * lyapchol([-1 0; 0 -2], eye(2));
+     max(max(abs([-1 0; 0 -2] * X + X * [-1 0; 0 -2]' + eye(2)))) < 1e-12
+
+  Voir aussi LYAP, DLYAP, GRAM, BALREAL, CHOL.
 ```
 
 ## `margin`
@@ -1310,6 +1513,27 @@ MODRED Élimination d'états d'un modèle.
   Voir aussi BALREAL, BALRED, HSVD.
 ```
 
+## `ngrid`
+
+```
+NGRID Abaque de Nichols : les courbes de gain en boucle fermée.
+  NGRID trace, sur un diagramme de Nichols, les courbes le long
+  desquelles le gain en boucle fermée est constant. Là où la courbe de
+  la boucle ouverte frôle celle de +3 dB, la boucle fermée résonne ;
+  celle de 0 dB passe par le point critique.
+
+  Les courbes viennent de l'équation |L/(1+L)| = M : à phase donnée, le
+  module |L| est racine d'un trinôme, et l'on trace la solution.
+
+  Exemples :
+     figure
+     nichols(tf(1, [1 1 1]));
+     ngrid
+     close
+
+  Voir aussi NICHOLS, SGRID, ZGRID, MARGIN.
+```
+
 ## `nichols`
 
 ```
@@ -1406,6 +1630,34 @@ ORDER Nombre d'états du modèle.
      order(tf(1, [1 2 1]))   % 2
 
   Voir aussi MINREAL, SSDATA.
+```
+
+## `pade`
+
+```
+PADE Approximation d'un retard pur par une fonction de transfert.
+  [NUM,DEN] = PADE(T,N) rend l'approximation de Padé d'ordre N du retard
+  exp(-T*s) : le quotient de deux polynômes de degré N dont le
+  développement en série coïncide avec celui de l'exponentielle jusqu'à
+  l'ordre 2N.
+
+  SYS = PADE(T,N) rend directement le modèle. Sans sortie, la fonction
+  trace la réponse indicielle et compare à un retard exact.
+
+  Un retard est ce qui déstabilise une boucle sans qu'on le voie venir :
+  il ne change pas le gain, seulement la phase, et l'approximer permet
+  de le porter dans un calcul de marges ou une synthèse.
+
+  L'ordre 1 suffit rarement au-delà de la bande passante ; l'ordre 3 ou
+  4 tient jusqu'à environ deux radians de déphasage.
+
+  Exemples :
+     [num, den] = pade(0.1, 1);
+     num                          % [-1 20] : le zero instable du retard
+     G = pade(0.5, 3);
+     abs(dcgain(G) - 1) < 1e-9    % un retard ne change pas le gain statique
+
+  Voir aussi C2D, MARGIN, TF, EXP.
 ```
 
 ## `parallel`
@@ -1539,6 +1791,27 @@ POLE Pôles d'un modèle.
   Voir aussi ZERO, PZMAP, DAMP, EIG, ROOTS.
 ```
 
+## `prescale`
+
+```
+PRESCALE Met un modèle à l'échelle pour le calcul.
+  SYSP = PRESCALE(SYS) rend un modèle équivalent dont les états sont
+  remis à l'échelle : cela améliore le conditionnement des calculs de
+  pôles, de zéros et de réponses fréquentielles, sans changer ce que le
+  modèle représente.
+
+  La mise à l'échelle est diagonale, par puissances de deux : elle est
+  donc exacte en virgule flottante.
+
+  Exemples :
+     sys = ss([-1 1e6; 0 -2], [1; 1e6], [1 1e-6], 0);
+     p = prescale(sys);
+     max(abs(sort(pole(p)) - sort(pole(sys)))) < 1e-6      % memes poles
+     abs(dcgain(p) - dcgain(sys)) < 1e-9                   % meme gain
+
+  Voir aussi SS, BALREAL, POLE, MATLIBRE_EQUILIBRER.
+```
+
 ## `pzmap`
 
 ```
@@ -1557,6 +1830,24 @@ PZMAP Pôles et zéros d'un modèle.
      [p, z] = pzmap(tf([1 1], [1 3 2]));   % p = [-2;-1], z = -1
 
   Voir aussi POLE, ZERO, DAMP, RLOCUS.
+```
+
+## `pzplot`
+
+```
+PZPLOT Carte des pôles et des zéros.
+  PZPLOT(SYS) trace les pôles et les zéros dans le plan complexe. C'est
+  PZMAP, sous le nom que MATLAB donne à la version qui rend une poignée
+  de tracé ; les deux dessinent la même chose.
+
+  PZPLOT(SYS1,SYS2,...) superpose plusieurs modèles.
+
+  Exemples :
+     figure
+     pzplot(tf([1 1], [1 3 2]));
+     close
+
+  Voir aussi PZMAP, POLE, ZERO, RLOCUS, SGRID.
 ```
 
 ## `reg`
@@ -1609,6 +1900,43 @@ RLOCUS Lieu des racines de la boucle fermée.
   Voir aussi PZMAP, POLE, FEEDBACK, PLACE.
 ```
 
+## `rlocusplot`
+
+```
+RLOCUSPLOT Lieu des racines.
+  RLOCUSPLOT(SYS) trace le lieu des racines. C'est RLOCUS, sous le nom
+  que MATLAB donne à la version qui rend une poignée de tracé.
+
+  Exemples :
+     figure
+     rlocusplot(tf(1, [1 2 0]));
+     close
+
+  Voir aussi RLOCUS, PZMAP, SGRID, POLE.
+```
+
+## `rss`
+
+```
+RSS Modèle d'état continu stable, tiré au hasard.
+  SYS = RSS(N) rend un modèle d'ordre N, à une entrée et une sortie,
+  dont tous les pôles sont dans le demi-plan gauche. C'est ce qu'on
+  emploie pour éprouver un algorithme sur des modèles quelconques.
+
+  SYS = RSS(N,NY) donne NY sorties ; SYS = RSS(N,NY,NU) donne aussi NU
+  entrées.
+
+  Les pôles sont tirés sur une loi normale et leur partie réelle est
+  rendue négative : le modèle est stable par construction.
+
+  Exemples :
+     sys = rss(3);
+     max(real(pole(sys))) < 0     % vrai : le modele est stable
+     isequal(size(rss(2, 3, 4)), [3 4])
+
+  Voir aussi DRSS, SS, POLE, RAND.
+```
+
 ## `series`
 
 ```
@@ -1624,6 +1952,34 @@ SERIES Mise en série de deux modèles.
      L = series(tf(1, [1 1]), tf(10, [1 0]))   % 10/(s^2+s)
 
   Voir aussi FEEDBACK, PARALLEL, APPEND, LFT.
+```
+
+## `sgrid`
+
+```
+SGRID Grille d'amortissement et de pulsation propre, plan continu.
+  SGRID trace, sur la figure courante, les droites d'amortissement
+  constant et les arcs de pulsation propre constante du plan de Laplace.
+  C'est la grille que l'on lit sur un lieu des racines ou une carte des
+  pôles : un pôle sur la droite à 0.7 donne un dépassement de cinq pour
+  cent, un pôle sur l'arc à 10 rad/s une réponse de l'ordre de la demi-
+  seconde.
+
+  SGRID(ZETA,WN) ne trace que les valeurs demandées.
+
+  Les bornes de l'axe ne bougent pas : la grille s'y adapte.
+
+  Exemples :
+     figure
+     rlocus(tf(1, [1 2 0]));
+     sgrid
+     close
+     figure
+     pzmap(tf(1, [1 0.4 1]));
+     sgrid(0.2, 1);
+     close
+
+  Voir aussi ZGRID, NGRID, RLOCUS, PZMAP, DAMP.
 ```
 
 ## `sigma`
@@ -1728,6 +2084,30 @@ SSDATA Matrices d'état d'un modèle.
      [a, b, c, d] = ssdata(tf(1, [1 1]));   % a = -1, b = 1, c = 1, d = 0
 
   Voir aussi TFDATA, ZPKDATA, SS.
+```
+
+## `stabsep`
+
+```
+STABSEP Sépare la partie stable de la partie instable d'un modèle.
+  [GS,GNS] = STABSEP(SYS) découpe le modèle en deux : GS ne garde que
+  les modes stables, GNS que les autres, et leur somme redonne SYS.
+
+  C'est ce qu'il faut avant une réduction de modèle — on ne réduit que
+  ce qui est stable — et pour mesurer une norme H2 ou H-infini d'un
+  modèle qui ne l'est pas tout entier.
+
+  Le découpage passe par la forme diagonale : chaque mode va d'un côté
+  ou de l'autre selon le signe de sa partie réelle, ou son module en
+  discret.
+
+  Exemples :
+     [gs, gns] = stabsep(ss([-1 0; 0 2], [1; 1], [1 1], 0));
+     order(gs)                        % 1 : le mode en -1
+     order(gns)                       % 1 : le mode en +2
+     abs(dcgain(gs) + dcgain(gns) - dcgain(ss([-1 0; 0 2], [1;1], [1 1], 0))) < 1e-9
+
+  Voir aussi BALRED, MODRED, POLE, HSVD, EIG.
 ```
 
 ## `step`
@@ -1862,6 +2242,23 @@ TFDATA Numérateur et dénominateur d'un modèle.
   Voir aussi SSDATA, ZPKDATA, TF.
 ```
 
+## `totaldelay`
+
+```
+TOTALDELAY Retard total de chaque voie d'un modèle.
+  D = TOTALDELAY(SYS) rend la matrice des retards, une valeur par couple
+  entrée-sortie.
+
+  MatLibre ne représente pas les retards : la matrice est nulle. PADE
+  donne l'approximation d'un retard sous forme de transmittance.
+
+  Exemples :
+     totaldelay(tf(1, [1 1]))         % 0
+     isequal(size(totaldelay(ss(zeros(2), zeros(2), zeros(2), zeros(2)))), [2 2])
+
+  Voir aussi HASDELAY, PADE.
+```
+
 ## `tzero`
 
 ```
@@ -1900,6 +2297,29 @@ ZERO Zéros d'un modèle.
      zero(tf([1 -1], [1 1]))              % 1 : a non-minimum de phase
 
   Voir aussi POLE, TZERO, PZMAP, ROOTS.
+```
+
+## `zgrid`
+
+```
+ZGRID Grille d'amortissement et de pulsation propre, plan discret.
+  ZGRID trace, dans le plan des z, le cercle unité, les spirales
+  d'amortissement constant et les courbes de pulsation propre constante.
+  C'est la grille du lieu des racines d'un système échantillonné.
+
+  ZGRID(ZETA,WN) ne trace que les valeurs demandées ; WN est normalisée
+  par la fréquence d'échantillonnage, entre 0 et 1.
+
+  Un pôle discret se lit par son image continue : z = exp(s*Ts), d'où
+  les spirales.
+
+  Exemples :
+     figure
+     pzmap(c2d(tf(1, [1 0.4 1]), 0.1));
+     zgrid
+     close
+
+  Voir aussi SGRID, NGRID, RLOCUS, PZMAP, C2D.
 ```
 
 ## `zpk`

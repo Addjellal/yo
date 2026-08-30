@@ -501,6 +501,32 @@ IMAGESC  Affiche une matrice en étalant ses valeurs sur toute la palette.
     Voir aussi IMAGE, COLORMAP, COLORBAR, AXIS.
 ```
 
+## `ishold`
+
+```
+ISHOLD  L'état de « hold » sur l'axe courant.
+    ISHOLD rend vrai quand les tracés s'ajoutent au lieu de remplacer,
+    c'est-à-dire quand HOLD ON est en vigueur.
+
+    Une fonction qui dessine par-dessus une figure — une grille, un
+    repère — s'en sert pour laisser l'axe comme elle l'a trouvé : elle
+    note l'état, met HOLD ON, trace, puis le remet.
+
+    Syntaxe
+       t = ishold
+
+    Exemples
+       figure
+       plot(1:10);
+       ishold                 % faux
+       hold on
+       ishold                 % vrai
+       hold off
+       close
+
+    Voir aussi HOLD, CLA, PLOT, SGRID.
+```
+
 ## `legend`
 
 ```
