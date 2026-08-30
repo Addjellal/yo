@@ -234,4 +234,14 @@ axis off
 axis on
 close all
 
+%% ------------------------------------------------------------- blkdiag
+% Les blocs se posent sur la diagonale, le reste est nul. Ils n'ont pas a
+% etre carres ni de meme taille, et un bloc vide n'ajoute rien.
+assert(isequal(blkdiag([1 2; 3 4], 5), [1 2 0; 3 4 0; 0 0 5]));
+assert(isequal(blkdiag(1, 2, 3), diag([1 2 3])));
+assert(isequal(size(blkdiag([1 2 3], [4; 5])), [3 4]));
+assert(isequal(blkdiag([], [1 2]), [1 2]));
+assert(isempty(blkdiag([], [])));
+assert(isequal(blkdiag(eye(2)), eye(2)));
+
 disp('matrices : toutes les verifications passent');

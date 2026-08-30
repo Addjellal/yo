@@ -222,6 +222,13 @@ public:
     Valeur substruct(const std::vector<ElementAcces>& chaine, std::size_t debut,
                      const Valeur* base);
     Valeur lireProprieteObjet(const Valeur& objet, const std::string& nom);
+    // Indexation par defaut : celle qui a lieu quand la classe ne definit
+    // pas « subsref ». C'est ce que rend « builtin('subsref', …) » de
+    // MATLAB, et ce dont une methode « subsref » a besoin pour poursuivre
+    // la chaine qu'elle n'a pas traitee elle-meme.
+    Valeur indexerParDefaut(const Valeur& base, std::vector<Valeur>& idx, char genre);
+    std::vector<Valeur> indexerListeParDefaut(const Valeur& base, std::vector<Valeur>& idx,
+                                              char genre);
     Valeur ecrireProprieteObjet(Valeur objet, const std::string& nom, const Valeur& valeur);
     bool estCarte(const Valeur& v) const;
     std::shared_ptr<CarteAssociative> carteDe(const Valeur& v);

@@ -433,4 +433,113 @@ assert(abs(gmSys - gmRep) < 1e-12 && abs(pmSys - pmRep) < 1e-12);
 assert(abs(gmSys - 2) < 1e-3);
 close all
 
+%% ------------------------------- modeles a plusieurs entrees et sorties
+% L'algebre des schemas-blocs se fait dans l'espace d'etat : elle doit
+% donner, a chaque pulsation, exactement ce que donne l'algebre des
+% matrices sur les reponses frequentielles. C'est la seule verification
+% qui vaille — deux chemins independants vers le meme nombre.
+Am = [-1 0.5; 0 -2];
+G2 = ss(Am, [1 0; 0.3 1], [1 0; 0 1], zeros(2, 2));
+H2 = ss(-3 * eye(2), eye(2), [2 0; 0 1], 0.5 * eye(2));
+pulsations = [0.1 1 7];
+reponse = @(sys, p) freqresp(sys, p);
+
+for p = pulsations
+    a = reponse(G2, p);
+    b = reponse(H2, p);
+    assert(max(max(abs(reponse(G2 * H2, p) - a * b))) < 1e-10);
+    assert(max(max(abs(reponse(G2 + H2, p) - (a + b)))) < 1e-10);
+    assert(max(max(abs(reponse(G2 - H2, p) - (a - b)))) < 1e-10);
+    assert(max(max(abs(reponse(-G2, p) + a))) < 1e-10);
+    assert(max(max(abs(reponse(inv(H2), p) - inv(b)))) < 1e-10);
+    assert(max(max(abs(reponse(G2 / H2, p) - a / b))) < 1e-10);
+    assert(max(max(abs(reponse(H2 \ G2, p) - b \ a))) < 1e-10);
+    assert(max(max(abs(reponse(2 * G2, p) - 2 * a))) < 1e-10);
+    assert(max(max(abs(reponse(H2 ^ 2, p) - b * b))) < 1e-10);
+    % Serie, parallele et boucle fermee.
+    assert(max(max(abs(reponse(series(G2, H2), p) - b * a))) < 1e-10);
+    assert(max(max(abs(reponse(parallel(G2, H2), p) - (a + b)))) < 1e-10);
+    boucle = reponse(feedback(G2, H2), p);
+    assert(max(max(abs(boucle - (eye(2) + a * b) \ a))) < 1e-9);
+    positive = reponse(feedback(G2, H2, +1), p);
+    assert(max(max(abs(positive - (eye(2) - a * b) \ a))) < 1e-9);
+end
+
+% La taille d'un modele, c'est [sorties entrees].
+assert(isequal(size(G2), [2 2]));
+assert(size(G2, 1) == 2 && size(G2, 2) == 2);
+assert(order(G2) == 2);
+
+% Choisir des voies : SYS(I,J) va des entrees J aux sorties I.
+voie = G2(2, 1);
+assert(isequal(size(voie), [1 1]));
+for p = pulsations
+    complet = reponse(G2, p);
+    assert(abs(reponse(voie, p) - complet(2, 1)) < 1e-10);
+    demi = reponse(G2(:, 2), p);
+    assert(max(abs(demi - complet(:, 2))) < 1e-10);
+end
+horsVoie = false;
+try
+    G2(3, 1);   %#ok<VUNUS>
+catch err
+    horsVoie = strcmp(err.identifier, 'Control:ltiselect:IndexOutOfRange');
+end
+assert(horsVoie);
+
+% Assembler : [G1 G2] cote a cote, [G1; G2] l'un sur l'autre.
+cote = [G2, H2];
+empile = [G2; H2];
+assert(isequal(size(cote), [2 4]));
+assert(isequal(size(empile), [4 2]));
+for p = pulsations
+    assert(max(max(abs(reponse(cote, p) - [reponse(G2, p), reponse(H2, p)]))) < 1e-10);
+    assert(max(max(abs(reponse(empile, p) - [reponse(G2, p); reponse(H2, p)]))) < 1e-10);
+end
+
+% Une taille qui ne colle pas est refusee, avec le message de MATLAB.
+mauvaiseTaille = false;
+try
+    G2 * ss(-1, 1, 1, 0);   %#ok<VUNUS>
+catch err
+    mauvaiseTaille = strcmp(err.identifier, 'Control:combination:TimesSize');
+end
+assert(mauvaiseTaille);
+
+%% ------------------------------------------ le produit etoile de Redheffer
+% LFT : la meme verification, en comparant l'assemblage des modeles a
+% l'algebre des blocs sur les matrices de reponse.
+P4 = ss([-1 0.2; 0 -3], [1 0.5; 0 1], [1 0; 1 1], [0.1 0; 0 0.2]);
+K1 = ss(-2, 1, 1, 0.3);
+basse = lft(P4, K1);           % K1 referme la derniere voie
+for p = pulsations
+    S = reponse(P4, p);
+    T = reponse(K1, p);
+    attendu = S(1,1) + S(1,2) * T / (1 - S(2,2) * T) * S(2,1);
+    assert(abs(reponse(basse, p) - attendu) < 1e-9);
+end
+% Boucle haute : le petit modele vient en premier et referme les
+% PREMIERES voies du grand.
+haute = lft(K1, P4);
+for p = pulsations
+    S = reponse(P4, p);
+    T = reponse(K1, p);
+    attendu = S(2,2) + S(2,1) * T / (1 - S(1,1) * T) * S(1,2);
+    assert(abs(reponse(haute, p) - attendu) < 1e-9);
+end
+% Produit etoile general : une voie de chaque cote reste libre.
+G4 = ss(blkdiag(-1, -2), eye(2), eye(2), [0.2 0; 0.1 0.3]);
+H4 = ss(blkdiag(-4, -5), eye(2), eye(2), [0.4 0.1; 0 0.5]);
+etoile = lft(G4, H4, 1, 1);
+assert(isequal(size(etoile), [2 2]));
+for p = pulsations
+    S = reponse(G4, p);
+    T = reponse(H4, p);
+    M = 1 / (1 - T(1,1) * S(2,2));
+    R = [S(1,1) + S(1,2) * M * T(1,1) * S(2,1), S(1,2) * M * T(1,2); ...
+         T(2,1) * S(2,1) + T(2,1) * S(2,2) * M * T(1,1) * S(2,1), ...
+         T(2,2) + T(2,1) * S(2,2) * M * T(1,2)];
+    assert(max(max(abs(reponse(etoile, p) - R))) < 1e-9);
+end
+
 disp('automatique : toutes les verifications passent');

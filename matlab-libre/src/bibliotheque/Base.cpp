@@ -718,6 +718,53 @@ FONCTION(fnInd2sub) {
 
 // ------------------------------------------------------------- classes
 
+// « subsref(v, s) » : l'indexation ecrite comme une donnee.
+//
+// s est un tableau 1xN de structures « type » et « subs », celui que
+// fabrique SUBSTRUCT : type vaut '.', '()' ou '{}', subs le nom du champ
+// ou la cellule des indices. C'est ce que recoit la methode « subsref »
+// d'une classe, et ce dont elle a besoin pour poursuivre la chaine
+// qu'elle n'a pas traitee elle-meme.
+//
+// L'indexation faite ici est celle par defaut : appeler subsref sur un
+// objet ne rappelle pas la methode de sa classe, ce qui bouclerait. C'est
+// le comportement de « builtin('subsref', …) » de MATLAB.
+FONCTION(fnSubsref) {
+    exigerArguments(args, 2, 2, "subsref");
+    Valeur courant = args[0];
+    const Valeur& chaine = args[1];
+    std::size_t n = chaine.nelem();
+    if (!chaine.estStructure() || !chaine.aChamp("type") || !chaine.aChamp("subs"))
+        erreur("MATLAB:subsref:invalidSubscript",
+               "The second argument to subsref must be a substruct with fields "
+               "'type' and 'subs'.");
+    for (std::size_t k = 0; k < n; ++k) {
+        std::string genre = chaine.champ("type", k).versTexte();
+        const Valeur& subs = chaine.champ("subs", k);
+        if (genre == ".") {
+            std::string nom = subs.versTexte();
+            if (courant.classe == Classe::Objet)
+                courant = it.lireProprieteObjet(courant, nom);
+            else if (courant.estStructure())
+                courant = courant.champ(nom);
+            else
+                erreur("MATLAB:nonStrucReference",
+                       "Dot indexing is not supported for variables of this type.");
+            continue;
+        }
+        std::vector<Valeur> idx;
+        if (subs.classe == Classe::Cellule) idx = subs.cellules;
+        else idx.push_back(subs);
+        char lettre = genre == "{}" ? '{' : '(';
+        if (k + 1 == n && nargout > 1) {
+            auto liste = it.indexerListeParDefaut(courant, idx, lettre);
+            if ((int)liste.size() >= nargout) return liste;
+        }
+        courant = it.indexerParDefaut(courant, idx, lettre);
+    }
+    return {courant};
+}
+
 FONCTION(fnClass) {
     INUTILISE
     exigerArguments(args, 1, 1, "class");
@@ -1146,6 +1193,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("ind2sub", fnInd2sub, "base", "ind2sub  Index lineaire vers indices.");
 
     it.enregistrer("class", fnClass, "base", "class  Nom de la classe d'une valeur.");
+    it.enregistrer("subsref", fnSubsref, "base",
+                   "subsref  Indexation ecrite comme une donnee.");
     it.enregistrer("isa", fnIsa, "base", "isa  Teste l'appartenance a une classe.");
     it.enregistrer("cast", fnCast, "base", "cast  Conversion vers une classe nommee.");
     it.enregistrer("double", fnConversion<Classe::Double>, "base", "double  Conversion double.");

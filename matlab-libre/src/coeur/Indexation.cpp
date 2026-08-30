@@ -145,6 +145,17 @@ static void copierCase(Valeur& dst, std::size_t di, const Valeur& src, std::size
 
 // ------------------------------------------------------------------ lecture
 
+Valeur Interpreteur::indexerParDefaut(const Valeur& base, std::vector<Valeur>& idx,
+                                      char genre) {
+    return indexer(base, idx, genre);
+}
+
+std::vector<Valeur> Interpreteur::indexerListeParDefaut(const Valeur& base,
+                                                        std::vector<Valeur>& idx,
+                                                        char genre) {
+    return indexerListe(base, idx, genre);
+}
+
 Valeur Interpreteur::indexer(const Valeur& base, std::vector<Valeur>& idx, char genre) {
     auto liste = indexerListe(base, idx, genre);
     if (liste.empty()) {

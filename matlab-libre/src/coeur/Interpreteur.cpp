@@ -882,8 +882,8 @@ std::vector<std::size_t> Interpreteur::ciblesCellule(const NoeudPtr& cible) {
     const NoeudPtr& base = cible->enfants[0];
     if (base->type != TypeN::Ident) return vide;
     const Valeur* p = trouverVariable(base->texte);
-    if (!p) return vide;
     if (cible->acces[0].genre == '.') {
+        if (!p) return vide;
         // « [s.champ] = deal(...) » : autant de sorties que d'éléments du
         // tableau de structures.
         if (p->classe != Classe::Structure || p->nelem() <= 1) return vide;
@@ -892,11 +892,15 @@ std::vector<std::size_t> Interpreteur::ciblesCellule(const NoeudPtr& cible) {
         return toutes;
     }
     if (cible->acces[0].genre != '{') return vide;
-    if (p->classe != Classe::Cellule) return vide;
+    // La cellule peut ne pas exister encore : « [varargout{1:nargout}] = f() »
+    // la cree. Seul « c{:} » a besoin qu'elle existe, puisque le nombre de
+    // cibles vient alors de sa taille.
+    if (p && p->classe != Classe::Cellule) return vide;
     const auto& args = cible->acces[0].args;
     if (args.size() != 1) return vide;
     std::vector<std::size_t> positions;
     if (args[0] && args[0]->type == TypeN::DeuxPointsSeul) {
+        if (!p) return vide;
         for (std::size_t k = 1; k <= p->nelem(); ++k) positions.push_back(k);
     } else {
         // L'indice est évalué hors du contexte d'indexation : un « end »
@@ -1090,7 +1094,10 @@ void Interpreteur::executerInstruction(const NoeudPtr& n) {
                         continue;
                     }
                     const std::string& nom = n->cibles[k]->enfants[0]->texte;
-                    Valeur courante = lireVariable(nom);
+                    // « varargout » n'existe pas encore au moment ou on
+                    // l'ecrit : la cellule se cree ici.
+                    Valeur courante = existeVariable(nom) ? lireVariable(nom)
+                                                          : Valeur::celluleLigne({});
                     if (n->cibles[k]->acces[0].genre == '.') {
                         const std::string& champ = n->cibles[k]->acces[0].nom;
                         courante.detacherStructure();
