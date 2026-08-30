@@ -542,4 +542,54 @@ for p = pulsations
     assert(max(max(abs(reponse(etoile, p) - R))) < 1e-9);
 end
 
+%% ------------------------------ assembler par les noms : connect et sumblk
+% CONNECT doit donner exactement ce que donne l'ecriture a la main : c'est
+% la seule facon de verifier un assembleur.
+Gc = ss(tf(2, [1 1]));  Gc.InputName = 'u';  Gc.OutputName = 'y';
+Kc = ss(tf(10, [1 0])); Kc.InputName = 'e';  Kc.OutputName = 'u';
+Sc = sumblk('e = r - y');
+assert(isequal(Sc.D, [1 -1]));
+assert(isequal(Sc.InputName(:)', {'r', 'y'}));
+assert(isequal(Sc.OutputName(:)', {'e'}));
+Tc = connect(Gc, Kc, Sc, 'r', 'y');
+Tref = feedback(series(Kc, Gc), 1);
+for p = [0.1 1 10]
+    assert(abs(freqresp(Tc, p) - freqresp(Tref, p)) < 1e-12);
+end
+assert(order(Tc) == order(Gc) + order(Kc));
+assert(isequal(Tc.InputName(:)', {'r'}));
+
+% Plusieurs sorties : la boucle fermee et la commande.
+TU = connect(Gc, Kc, Sc, 'r', {'y', 'u'});
+assert(isequal(size(TU), [2 1]));
+for p = [0.5 5]
+    voies = freqresp(TU, p);
+    assert(abs(voies(1) - freqresp(Tref, p)) < 1e-12);
+    assert(abs(voies(2) - freqresp(feedback(Kc, Gc), p)) < 1e-12);
+end
+
+% Un gain dans le point de sommation, et un signal a plusieurs voies.
+S2 = sumblk('u = a - 2*b + c');
+assert(isequal(S2.D, [1 -2 1]));
+S3 = sumblk('e = r - y', 2);
+assert(isequal(size(S3.D), [2 4]));
+assert(isequal(S3.InputName(:)', {'r(1)', 'r(2)', 'y(1)', 'y(2)'}));
+
+% Un nom qui ne mene nulle part est signale, non ignore.
+inconnu = '';
+try
+    connect(Gc, Kc, Sc, 'r', 'z');
+catch err
+    inconnu = err.identifier;
+end
+assert(strcmp(inconnu, 'Control:connect:Unknown'));
+% Un bloc sans noms aussi.
+sansNoms = '';
+try
+    connect(ss(-1, 1, 1, 0), 'r', 'y');
+catch err
+    sansNoms = err.identifier;
+end
+assert(strcmp(sansNoms, 'Control:connect:NoNames'));
+
 disp('automatique : toutes les verifications passent');

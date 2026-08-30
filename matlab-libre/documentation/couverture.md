@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **632 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **1088 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1092 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -175,7 +175,7 @@ totalité.
    L'Image Processing Toolbox en compte 123 — filtrage avec
    remplissage des bords, gradient, morphologie complète, régions,
    texture, qualité (PSNR, SSIM). La Control System Toolbox en compte
-   86 : construction et conversion des modèles dans les trois
+   90 : construction et conversion des modèles dans les trois
    représentations — `tf` et `ss` sont des classes, avec les opérateurs
    de MATLAB : `s = tf('s')`, `z = tf('z',Te)`, puis
    `G = 1/(s^2+2*s+1)` s'écrivent comme on les écrit à la main, et

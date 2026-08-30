@@ -31,6 +31,7 @@
 %
 % Réponses fréquentielles
 %   bode, nyquist, nichols - Les trois diagrammes
+%   bodemag           - Diagramme de Bode du seul module
 %   freqresp, evalfr  - Réponse complexe, en pulsation ou en un point
 %   sigma             - Valeurs singulières de la matrice de transfert
 %   margin, allmargin - Marges de gain, de phase et de retard
@@ -39,6 +40,8 @@
 % Interconnexions
 %   feedback, series, parallel - Boucle, cascade, somme
 %   append            - Juxtaposition sans connexion
+%   lft               - Produit étoile : rebouclage partiel
+%   connect, sumblk   - Assemblage par les noms des signaux
 %
 % Structure et changements de base
 %   ctrb, obsv        - Matrices de commandabilité et d'observabilité
@@ -315,6 +318,36 @@ CARE Équation de Riccati algébrique continue.
      max(real(eig([0 1; 0 0] - [0; 1] * K))) < 0     % la boucle est stable
 
   Voir aussi DARE, LQR, LYAP, HINFSYN.
+```
+
+## `connect`
+
+```
+CONNECT Assemble un schéma-bloc en reliant les signaux par leur nom.
+  SYS = CONNECT(BLOC1,BLOC2,...,ENTREES,SORTIES) relie les blocs : une
+  entrée nommée « u » est branchée sur la sortie nommée « u », d'où
+  qu'elle vienne. ENTREES et SORTIES nomment ce qui reste ouvert — les
+  entrées et les sorties du modèle assemblé.
+
+  Chaque bloc doit nommer ses voies, par ses propriétés InputName et
+  OutputName ; SUMBLK fabrique les points de sommation. Un nom qui n'est
+  ni une sortie de bloc ni une entrée du schéma est signalé : c'est
+  presque toujours une faute de frappe.
+
+  CONNECT est la façon moderne d'écrire ce que SYSIC écrivait avec des
+  variables. Les deux mènent au même modèle.
+
+  Exemples :
+     G = ss(tf(2, [1 1]));  G.InputName = 'u';  G.OutputName = 'y';
+     K = ss(tf(10, [1 0])); K.InputName = 'e';  K.OutputName = 'u';
+     S = sumblk('e = r - y');
+     T = connect(G, K, S, 'r', 'y');
+     max(abs(pole(T) - pole(feedback(series(K, G), 1)))) < 1e-9
+     % Plusieurs sorties d'un coup : la boucle fermée et la commande.
+     TU = connect(G, K, S, 'r', {'y', 'u'});
+     size(TU)                   % 2 sorties, 1 entree
+
+  Voir aussi SUMBLK, SYSIC, APPEND, FEEDBACK, SERIES, LFT.
 ```
 
 ## `covar`
@@ -1120,6 +1153,43 @@ MATLIBRE_GRILLE_TEMPS Grille de temps d'une simulation.
   Voir aussi STEP, IMPULSE, LSIM.
 ```
 
+## `matlibre_liste_noms`
+
+```
+MATLIBRE_LISTE_NOMS Une liste de noms de signaux, quelle qu'en soit l'écriture.
+  NOMS = MATLIBRE_LISTE_NOMS(V) rend un tableau de cellules de chaînes,
+  que V soit une chaîne, un tableau de chaînes ou déjà un tableau de
+  cellules. C'est ce que CONNECT accepte pour ses listes d'entrées et de
+  sorties.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_liste_noms('u')            % {'u'}
+     matlibre_liste_noms({'a', 'b'})     % {'a', 'b'}
+
+  Voir aussi CONNECT, SUMBLK.
+```
+
+## `matlibre_noms_voies`
+
+```
+MATLIBRE_NOMS_VOIES Les noms d'un signal à plusieurs voies.
+  NOMS = MATLIBRE_NOMS_VOIES('u',3) rend {'u(1)';'u(2)';'u(3)'}, la
+  façon dont MATLAB nomme les voies d'un signal vectoriel. Pour une
+  seule voie, le nom reste tel quel.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_noms_voies('u', 2)      % {'u(1)'; 'u(2)'}
+     matlibre_noms_voies('e', 1)      % {'e'}
+
+  Voir aussi SUMBLK, CONNECT.
+```
+
 ## `matlibre_pulsations`
 
 ```
@@ -1703,6 +1773,28 @@ STEPINFO Caractéristiques d'une réponse indicielle.
      s2.Overshoot > 50                    % un second ordre peu amorti, si
 
   Voir aussi STEP, LSIM, DAMP, BANDWIDTH.
+```
+
+## `sumblk`
+
+```
+SUMBLK Point de sommation, décrit par une équation.
+  S = SUMBLK('e = r - y') rend un modèle statique dont la sortie
+  s'appelle « e » et les entrées « r » et « y », avec les signes de
+  l'équation. C'est le bloc qu'on met dans un CONNECT pour faire une
+  différence ou une somme, sans écrire de matrice.
+
+  S = SUMBLK('e = r - y',N) répète le point de sommation sur N voies :
+  les signaux s'appellent alors e(1), e(2), et ainsi de suite.
+
+  Les termes peuvent porter un gain : 'e = r - 2*y'.
+
+  Exemple :
+     S = sumblk('e = r - y');
+     S.InputName'        % {'r', 'y'}
+     S.D                 % [1 -1]
+
+  Voir aussi CONNECT, SS, APPEND, FEEDBACK.
 ```
 
 ## `tf`

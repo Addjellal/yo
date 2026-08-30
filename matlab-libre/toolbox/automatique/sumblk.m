@@ -69,6 +69,7 @@ function S = sumblk(expression, largeur)
 
     coefficients = signes .* gains;
     D = kron(coefficients, eye(largeur));
+    D(D == 0) = 0;      % pas de zéro négatif dans l'affichage
     S = ss(zeros(0, 0), zeros(0, numel(termes) * largeur), ...
            zeros(largeur, 0), D);
     S.OutputName = matlibre_noms_voies(sortie, largeur);

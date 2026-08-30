@@ -28,6 +28,7 @@
 %
 % Réponses fréquentielles
 %   bode, nyquist, nichols - Les trois diagrammes
+%   bodemag           - Diagramme de Bode du seul module
 %   freqresp, evalfr  - Réponse complexe, en pulsation ou en un point
 %   sigma             - Valeurs singulières de la matrice de transfert
 %   margin, allmargin - Marges de gain, de phase et de retard
@@ -36,6 +37,8 @@
 % Interconnexions
 %   feedback, series, parallel - Boucle, cascade, somme
 %   append            - Juxtaposition sans connexion
+%   lft               - Produit étoile : rebouclage partiel
+%   connect, sumblk   - Assemblage par les noms des signaux
 %
 % Structure et changements de base
 %   ctrb, obsv        - Matrices de commandabilité et d'observabilité

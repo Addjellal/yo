@@ -5,7 +5,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
-| automatique | 80 | 28 | 74 % |
+| automatique | 81 | 27 | 75 % |
 | images | 57 | 15 | 79 % |
 | matlab-graphique | 62 | 64 | 49 % |
 | matlab-langage | 344 | 82 | 81 % |
@@ -13,15 +13,15 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 7 | 62 | 10 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 118 | 98 | 55 % |
-| **ensemble** | **798** | **386** | **67 %** |
+| **ensemble** | **799** | **385** | **67 %** |
 
 ## automatique
 
-`augstate`, `bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `connect`, `delayss`
-`drss`, `frd`, `getBlockValue`, `hasdelay`, `loopsens`, `lqg`, `lqgreg`
-`lsiminfo`, `lyapchol`, `ngrid`, `pade`, `pidtool`, `prescale`, `pzplot`
-`rlocusplot`, `sgrid`, `sisotool`, `stabsep`, `stepDataOptions`, `thiran`
-`totaldelay`, `zgrid`
+`augstate`, `bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `delayss`, `drss`
+`frd`, `getBlockValue`, `hasdelay`, `loopsens`, `lqg`, `lqgreg`, `lsiminfo`
+`lyapchol`, `ngrid`, `pade`, `pidtool`, `prescale`, `pzplot`, `rlocusplot`
+`sgrid`, `sisotool`, `stabsep`, `stepDataOptions`, `thiran`, `totaldelay`
+`zgrid`
 
 ## images
 

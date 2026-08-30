@@ -42,6 +42,12 @@ classdef ss
                     sys.A = modele.A; sys.B = modele.B;
                     sys.C = modele.C; sys.D = modele.D;
                     sys.Ts = modele.Ts;
+                    % Les noms des voies suivent le modèle : CONNECT les
+                    % lit sur ce qu'on lui passe, converti ou non.
+                    sys.InputName = modele.InputName;
+                    sys.OutputName = modele.OutputName;
+                    sys.StateName = modele.StateName;
+                    sys.Name = modele.Name;
                     return
                 end
                 [a, b, c, d] = tf2ss(modele.num, modele.den);
