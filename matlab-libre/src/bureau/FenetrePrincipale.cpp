@@ -17,7 +17,11 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMenuBar>
+#include <QClipboard>
+#include <QInputDialog>
+#include <QMenu>
 #include <QMessageBox>
+#include <QShortcut>
 #include <QPlainTextEdit>
 #include <QRegularExpression>
 #include <QScrollBar>
@@ -254,6 +258,22 @@ void FenetrePrincipale::construirePanneaux() {
     listeFichiers_->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     listeFichiers_->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     listeFichiers_->setColumnWidth(0, 150);
+    // Le clic droit ouvre le menu du dossier courant, comme dans MATLAB :
+    // creer, renommer, supprimer, executer, copier le chemin.
+    listeFichiers_->setContextMenuPolicy(Qt::CustomContextMenu);
+    listeFichiers_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    connect(listeFichiers_, &QTreeWidget::customContextMenuRequested, this,
+            &FenetrePrincipale::menuDossierCourant);
+    // F2 renomme, Suppr supprime : les raccourcis de l'explorateur, que
+    // MATLAB reprend.
+    {
+        auto* renommer = new QShortcut(QKeySequence(Qt::Key_F2), listeFichiers_);
+        renommer->setContext(Qt::WidgetShortcut);
+        connect(renommer, &QShortcut::activated, this, [this] { renommerSelection(); });
+        auto* supprimer = new QShortcut(QKeySequence(QKeySequence::Delete), listeFichiers_);
+        supprimer->setContext(Qt::WidgetShortcut);
+        connect(supprimer, &QShortcut::activated, this, [this] { supprimerSelection(); });
+    }
     connect(listeFichiers_, &QTreeWidget::itemDoubleClicked, this,
             [this](QTreeWidgetItem*, int) { ouvrirDepuisListe(); });
     auto* dockFichiers = new QDockWidget(QStringLiteral("Dossier courant"), this);
@@ -1061,6 +1081,216 @@ void FenetrePrincipale::surDossier(const QString& chemin) {
     setWindowTitle(QStringLiteral("MatLibre %1").arg(QLatin1String(MATLIBRE_VERSION)));
     etiquetteDossier_->setText(QStringLiteral("  ") + QDir::toNativeSeparators(chemin));
     rafraichirListeFichiers();
+}
+
+// --- le menu du clic droit, dans le dossier courant ---------------------
+//
+// MATLAB y met ce qu'on fait d'un fichier sans quitter la fenêtre :
+// l'ouvrir, l'exécuter, le renommer, le supprimer, en copier le chemin,
+// et créer à côté. On reprend cela, avec les raccourcis de l'explorateur
+// — F2 renomme, Suppr supprime.
+
+QStringList FenetrePrincipale::selectionFichiers() const {
+    QStringList noms;
+    for (QTreeWidgetItem* item : listeFichiers_->selectedItems()) {
+        if (item->text(0) == QLatin1String("..")) continue;
+        noms << item->text(0);
+    }
+    return noms;
+}
+
+void FenetrePrincipale::menuDossierCourant(const QPoint& position) {
+    QTreeWidgetItem* item = listeFichiers_->itemAt(position);
+    if (item && !item->isSelected()) listeFichiers_->setCurrentItem(item);
+    const QStringList noms = selectionFichiers();
+    const bool unSeul = noms.size() == 1;
+    QFileInfo info(QDir(dossierCourant_).filePath(unSeul ? noms.first() : QString()));
+    const bool dossier = unSeul && info.isDir();
+    const QString suffixe = unSeul ? info.suffix().toLower() : QString();
+
+    QMenu menu(this);
+    if (unSeul) {
+        menu.addAction(iconeDessinee(QStringLiteral("ouvrir"), 16),
+                       dossier ? QStringLiteral("Ouvrir le dossier") : QStringLiteral("Ouvrir"),
+                       this, &FenetrePrincipale::ouvrirDepuisListe);
+        if (suffixe == QLatin1String("m")) {
+            QString cite = QDir::toNativeSeparators(info.absoluteFilePath());
+            cite.replace(QLatin1String("'"), QLatin1String("''"));
+            menu.addAction(iconeDessinee(QStringLiteral("executer"), 16),
+                           QStringLiteral("Exécuter"), this,
+                           [this, cite] { envoyer(QStringLiteral("run('%1')").arg(cite)); });
+            menu.addAction(QStringLiteral("Ouvrir dans l'éditeur"), this,
+                           [this, info] { ouvrirFichier(info.absoluteFilePath()); });
+        }
+        if (dossier) {
+            QString cite = QDir::toNativeSeparators(info.absoluteFilePath());
+            cite.replace(QLatin1String("'"), QLatin1String("''"));
+            menu.addAction(QStringLiteral("Ajouter au chemin"), this, [this, cite] {
+                envoyer(QStringLiteral("addpath('%1')").arg(cite));
+            });
+        }
+        menu.addSeparator();
+    }
+    if (!noms.isEmpty()) {
+        if (unSeul)
+            menu.addAction(QStringLiteral("Renommer\tF2"), this,
+                           [this] { renommerSelection(); });
+        menu.addAction(QStringLiteral("Supprimer\tSuppr"), this,
+                       [this] { supprimerSelection(); });
+        menu.addSeparator();
+        menu.addAction(QStringLiteral("Copier le nom"), this, [noms] {
+            QApplication::clipboard()->setText(noms.join(QLatin1Char('\n')));
+        });
+        menu.addAction(QStringLiteral("Copier le chemin complet"), this, [this, noms] {
+            QStringList chemins;
+            for (const QString& nom : noms)
+                chemins << QDir::toNativeSeparators(QDir(dossierCourant_).filePath(nom));
+            QApplication::clipboard()->setText(chemins.join(QLatin1Char('\n')));
+        });
+        menu.addSeparator();
+    }
+
+    QMenu* nouveau = menu.addMenu(iconeDessinee(QStringLiteral("nouveau"), 16),
+                                  QStringLiteral("Nouveau"));
+    nouveau->addAction(QStringLiteral("Script"), this,
+                       [this] { creerDansDossier(QStringLiteral("script")); });
+    nouveau->addAction(QStringLiteral("Fonction"), this,
+                       [this] { creerDansDossier(QStringLiteral("fonction")); });
+    nouveau->addAction(QStringLiteral("Classe"), this,
+                       [this] { creerDansDossier(QStringLiteral("classe")); });
+    nouveau->addSeparator();
+    nouveau->addAction(QStringLiteral("Dossier"), this,
+                       [this] { creerDansDossier(QStringLiteral("dossier")); });
+    menu.addAction(QStringLiteral("Actualiser"), this,
+                   &FenetrePrincipale::rafraichirListeFichiers);
+    menu.exec(listeFichiers_->viewport()->mapToGlobal(position));
+}
+
+void FenetrePrincipale::creerDansDossier(const QString& genre, const QString& nomImpose) {
+    // Le nom proposé est celui de MATLAB : « untitled », puis untitled2,
+    // untitled3… tant que le nom est pris.
+    const bool estDossier = genre == QLatin1String("dossier");
+    const QString extension = estDossier ? QString() : QStringLiteral(".m");
+    QDir dossier(dossierCourant_);
+    QString base = estDossier ? QStringLiteral("nouveau_dossier") : QStringLiteral("untitled");
+    QString nom = base + extension;
+    for (int k = 2; dossier.exists(nom); ++k) nom = base + QString::number(k) + extension;
+
+    if (nomImpose.isEmpty()) {
+        bool valide = false;
+        nom = QInputDialog::getText(this, QStringLiteral("Nouveau"),
+                                    estDossier ? QStringLiteral("Nom du dossier :")
+                                               : QStringLiteral("Nom du fichier :"),
+                                    QLineEdit::Normal, nom, &valide);
+        if (!valide || nom.trimmed().isEmpty()) return;
+    } else {
+        nom = nomImpose;
+    }
+    nom = nom.trimmed();
+    // Un nom impose vient d'un appel direct — un test : on ne lui montre
+    // aucune boite de dialogue, qui n'aurait personne pour la fermer.
+    const bool interactif = nomImpose.isEmpty();
+    const QString chemin = dossier.filePath(nom);
+    if (QFileInfo::exists(chemin)) {
+        if (interactif)
+            QMessageBox::warning(this, QStringLiteral("Nouveau"),
+                                 QStringLiteral("« %1 » existe déjà.").arg(nom));
+        return;
+    }
+    if (estDossier) {
+        if (!dossier.mkpath(nom) && interactif)
+            QMessageBox::warning(this, QStringLiteral("Nouveau"),
+                                 QStringLiteral("Le dossier n'a pas pu être créé."));
+        rafraichirListeFichiers();
+        return;
+    }
+    // Un fichier neuf porte déjà ce qu'on y écrirait de toute façon : une
+    // ligne de fonction, un bloc classdef, ou rien pour un script.
+    QString modele;
+    QString racine = QFileInfo(nom).completeBaseName();
+    if (genre == QLatin1String("fonction"))
+        modele = QStringLiteral("function sortie = %1(entree)\n"
+                                "%%%1 Résumé de la fonction, en une ligne.\n"
+                                "%%   Description plus longue.\n"
+                                "    sortie = entree;\nend\n")
+                     .arg(racine);
+    else if (genre == QLatin1String("classe"))
+        modele = QStringLiteral("classdef %1\n"
+                                "%%%1 Résumé de la classe, en une ligne.\n"
+                                "    properties\n    end\n\n"
+                                "    methods\n    end\nend\n")
+                     .arg(racine);
+    QFile fichier(chemin);
+    if (!fichier.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (interactif)
+            QMessageBox::warning(this, QStringLiteral("Nouveau"),
+                                 QStringLiteral("Le fichier n'a pas pu être créé."));
+        return;
+    }
+    fichier.write(modele.toUtf8());
+    fichier.close();
+    rafraichirListeFichiers();
+    versMoteur([this] { moteur_->reindexer(); });
+    if (interactif) ouvrirFichier(chemin);
+}
+
+void FenetrePrincipale::renommerSelection(const QString& nouveauNom) {
+    const QStringList noms = selectionFichiers();
+    if (noms.size() != 1) return;
+    const QString ancien = noms.first();
+    QString nouveau = nouveauNom;
+    if (nouveau.isEmpty()) {
+        bool valide = false;
+        nouveau = QInputDialog::getText(this, QStringLiteral("Renommer"),
+                                        QStringLiteral("Nouveau nom :"), QLineEdit::Normal,
+                                        ancien, &valide);
+        if (!valide) return;
+    }
+    if (nouveau.trimmed().isEmpty() || nouveau == ancien) return;
+    QDir dossier(dossierCourant_);
+    const bool interactif = nouveauNom.isEmpty();
+    if (QFileInfo::exists(dossier.filePath(nouveau.trimmed()))) {
+        if (interactif)
+            QMessageBox::warning(this, QStringLiteral("Renommer"),
+                                 QStringLiteral("« %1 » existe déjà.").arg(nouveau.trimmed()));
+        return;
+    }
+    if (!dossier.rename(ancien, nouveau.trimmed())) {
+        if (interactif)
+            QMessageBox::warning(this, QStringLiteral("Renommer"),
+                                 QStringLiteral("« %1 » n'a pas pu être renommé.").arg(ancien));
+        return;
+    }
+    rafraichirListeFichiers();
+    versMoteur([this] { moteur_->reindexer(); });
+}
+
+void FenetrePrincipale::supprimerSelection(bool confirme) {
+    const QStringList noms = selectionFichiers();
+    if (noms.isEmpty()) return;
+    if (!confirme) {
+        const QString question =
+            noms.size() == 1
+                ? QStringLiteral("Supprimer « %1 » ?").arg(noms.first())
+                : QStringLiteral("Supprimer ces %1 éléments ?").arg(noms.size());
+        if (QMessageBox::question(this, QStringLiteral("Supprimer"), question,
+                                  QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
+            return;
+    }
+    QDir dossier(dossierCourant_);
+    QStringList echecs;
+    for (const QString& nom : noms) {
+        QFileInfo info(dossier.filePath(nom));
+        bool fait = info.isDir() ? QDir(info.absoluteFilePath()).removeRecursively()
+                                 : QFile::remove(info.absoluteFilePath());
+        if (!fait) echecs << nom;
+    }
+    if (!echecs.isEmpty() && !confirme)
+        QMessageBox::warning(this, QStringLiteral("Supprimer"),
+                             QStringLiteral("Ceci n'a pas pu être supprimé :\n%1")
+                                 .arg(echecs.join(QLatin1Char('\n'))));
+    rafraichirListeFichiers();
+    versMoteur([this] { moteur_->reindexer(); });
 }
 
 // Ce que le panneau montre du dossier courant : tout ce qu'il contient,

@@ -53,6 +53,16 @@ public:
     // l'editeur courant, ou la console. Publiques pour la meme raison.
     void ouvrirRecherche();
     void chercherSuivant();
+    // Le menu contextuel du panneau « Dossier courant », et les gestes
+    // qu'il commande. Publics pour qu'un test les exerce sans souris.
+    void menuDossierCourant(const QPoint& position);
+    // Les trois gestes du menu. Sans nom impose, ils le demandent par une
+    // boite de dialogue ; avec, ils agissent tout de suite — c'est ainsi
+    // qu'un test les exerce sans clavier ni souris.
+    void creerDansDossier(const QString& genre, const QString& nomImpose = QString());
+    void renommerSelection(const QString& nouveauNom = QString());
+    void supprimerSelection(bool confirme = false);
+    QStringList selectionFichiers() const;
     // Ouvre un onglet d'editeur vide, comme le bouton « Nouveau script ».
     void ouvrirNouveauScript();
 

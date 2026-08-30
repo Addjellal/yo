@@ -1006,6 +1006,93 @@ int main(int argc, char** argv) {
                  "le dialogue de dossier ne se limite pas aux dossiers");
     }
 
+    // --- le clic droit dans le dossier courant -----------------------------
+    //
+    // MATLAB y met de quoi travailler sans quitter la fenetre : creer,
+    // renommer, supprimer, copier le chemin. On verifie le menu lui-meme,
+    // puis chacun des gestes sur un dossier d'essai.
+    {
+        QTemporaryDir bac;
+        verifier(bac.isValid(), "un dossier d'essai pour le menu contextuel");
+        envoyer(fenetre, QStringLiteral("cd('%1')").arg(bac.path()));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau y est alle");
+        fenetre.rafraichirListeFichiers();
+
+        // Creer : un script, une fonction, un dossier.
+        fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("essai_menu.m"));
+        fenetre.creerDansDossier(QStringLiteral("fonction"), QStringLiteral("ma_fonction.m"));
+        fenetre.creerDansDossier(QStringLiteral("dossier"), QStringLiteral("sous_dossier"));
+        verifier(QFile::exists(QDir(bac.path()).filePath(QStringLiteral("essai_menu.m"))),
+                 "le script est cree");
+        verifier(QDir(bac.path()).exists(QStringLiteral("sous_dossier")),
+                 "le dossier est cree");
+        // Une fonction neuve porte deja son en-tete.
+        QFile modele(QDir(bac.path()).filePath(QStringLiteral("ma_fonction.m")));
+        modele.open(QIODevice::ReadOnly | QIODevice::Text);
+        QString texteModele = QString::fromUtf8(modele.readAll());
+        modele.close();
+        verifier(texteModele.contains(QLatin1String("function sortie = ma_fonction")),
+                 "la fonction neuve porte sa ligne de definition");
+
+        // Le panneau les montre.
+        fenetre.rafraichirListeFichiers();
+        auto* liste = fenetre.findChild<QTreeWidget*>();
+        auto trouver = [&](const QString& nom) -> QTreeWidgetItem* {
+            for (int k = 0; k < liste->topLevelItemCount(); ++k)
+                if (liste->topLevelItem(k)->text(0) == nom) return liste->topLevelItem(k);
+            return nullptr;
+        };
+        verifier(trouver(QStringLiteral("essai_menu.m")) != nullptr,
+                 "le panneau montre le fichier cree");
+
+        // Le menu du clic droit : ce qu'il propose depend de ce qui est
+        // choisi.
+        QTreeWidgetItem* cible = trouver(QStringLiteral("essai_menu.m"));
+        liste->setCurrentItem(cible);
+        verifier(fenetre.selectionFichiers() == QStringList{QStringLiteral("essai_menu.m")},
+                 "la selection est celle qu'on croit");
+
+        // Renommer.
+        fenetre.renommerSelection(QStringLiteral("renomme.m"));
+        verifier(!QFile::exists(QDir(bac.path()).filePath(QStringLiteral("essai_menu.m"))) &&
+                     QFile::exists(QDir(bac.path()).filePath(QStringLiteral("renomme.m"))),
+                 "le fichier est renomme");
+
+        // Supprimer, y compris un dossier et son contenu.
+        fenetre.rafraichirListeFichiers();
+        liste->setCurrentItem(trouver(QStringLiteral("renomme.m")));
+        fenetre.supprimerSelection(true);
+        verifier(!QFile::exists(QDir(bac.path()).filePath(QStringLiteral("renomme.m"))),
+                 "le fichier est supprime");
+        fenetre.rafraichirListeFichiers();
+        liste->setCurrentItem(trouver(QStringLiteral("sous_dossier")));
+        fenetre.supprimerSelection(true);
+        verifier(!QDir(bac.path()).exists(QStringLiteral("sous_dossier")),
+                 "le dossier est supprime avec son contenu");
+
+        // Le dossier parent ne fait jamais partie d'une selection : on ne
+        // renomme ni ne supprime « .. ».
+        fenetre.rafraichirListeFichiers();
+        if (QTreeWidgetItem* parent = trouver(QStringLiteral(".."))) {
+            liste->setCurrentItem(parent);
+            verifier(fenetre.selectionFichiers().isEmpty(),
+                     "le dossier parent n'est pas une cible");
+        }
+
+        // Un nom deja pris ne remplace rien en silence.
+        fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
+        QFile pris(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
+        pris.open(QIODevice::WriteOnly | QIODevice::Text);
+        pris.write("% ne pas effacer\n");
+        pris.close();
+        fenetre.creerDansDossier(QStringLiteral("script"), QStringLiteral("unique.m"));
+        QFile relu(QDir(bac.path()).filePath(QStringLiteral("unique.m")));
+        relu.open(QIODevice::ReadOnly | QIODevice::Text);
+        verifier(QString::fromUtf8(relu.readAll()).contains(QLatin1String("ne pas effacer")),
+                 "un fichier existant n'est pas ecrase");
+        relu.close();
+    }
+
     // --- Ctrl-F : rechercher et remplacer ---------------------------------
     //
     // MATLAB ouvre une fenetre qui ne bloque pas, cherche dans les deux
