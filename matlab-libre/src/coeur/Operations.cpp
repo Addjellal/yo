@@ -641,8 +641,20 @@ static Valeur convertirPour(const Valeur& v, Classe c) {
 
 Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
     std::vector<Valeur> elements;
-    for (const auto& e : elementsBruts)
-        if (!(e.estVide() && e.classe != Classe::Cellule && !e.estStructure())) elements.push_back(e);
+    for (const auto& e : elementsBruts) {
+        // MATLAB n'ignore dans une concatenation que le vide « [] », celui
+        // dont toutes les dimensions sont nulles. Un 1x0 garde sa ligne :
+        // c'est ce qui fait de [zeros(1,0), zeros(1,0)] un 1x0 et non un
+        // 0x0 — et c'est ce dont vit l'algebre des modeles sans etat, ou
+        // les matrices B et C ont zero colonne mais bien des lignes.
+        if (e.estVide() && e.classe != Classe::Cellule && !e.estStructure()) {
+            bool toutesNulles = true;
+            for (int d : e.dims)
+                if (d != 0) toutesNulles = false;
+            if (toutesNulles) continue;
+        }
+        elements.push_back(e);
+    }
     if (elements.empty()) {
         for (const auto& e : elementsBruts)
             if (e.classe == Classe::Cellule) return Valeur::celluleDims({0, 0});

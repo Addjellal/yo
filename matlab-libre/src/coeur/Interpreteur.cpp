@@ -26,15 +26,27 @@ namespace matlibre {
 // dans MATLAB, un appel de méthode se résout sur la classe du premier
 // argument, sans quoi « numel(d.Secondes) » écrit dans la méthode numel
 // rappellerait cette méthode au lieu de la fonction du langage.
+// Les fonctions locales d'un fichier sont visibles de toutes les autres,
+// y compris depuis une fonction imbriquee : « voisines » descend donc
+// jusqu'au fond. Sans cela, une fonction imbriquee ne pouvait appeler
+// aucune des fonctions locales ecrites apres le « end » de sa parente.
+static void propagerVoisines(
+    const std::shared_ptr<FonctionUtilisateur>& f,
+    const std::map<std::string, std::shared_ptr<FonctionUtilisateur>>& voisines) {
+    if (!f) return;
+    f->voisines = voisines;
+    for (auto& kv : f->imbriquees) propagerVoisines(kv.second, voisines);
+}
+
 static void relierClasse(const std::shared_ptr<DefinitionClasse>& def,
                          const std::vector<std::shared_ptr<FonctionUtilisateur>>& locales) {
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
     for (const auto& f : locales) voisines[f->nom] = f;
     for (auto& kv : def->methodes) {
-        kv.second->voisines = voisines;
+        propagerVoisines(kv.second, voisines);
         kv.second->classeProprietaire = def->nom;
     }
-    for (const auto& f : locales) f->voisines = voisines;
+    for (const auto& f : locales) propagerVoisines(f, voisines);
 }
 
 
@@ -338,7 +350,7 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
     for (auto& f : u.fonctions) voisines[f->nom] = f;
     for (auto& f : u.fonctions) {
         f->fichier = it->second;
-        f->voisines = voisines;
+        propagerVoisines(f, voisines);
     }
     u.fonctions[0]->aide = aideDepuisSource(source);
     // Le nom du fichier prime sur celui écrit dans la première fonction ;
@@ -362,8 +374,18 @@ Valeur Interpreteur::concatenerObjets(const std::vector<std::vector<Valeur>>& ra
     std::vector<Valeur> lignes;
     for (const auto& r : rangees) {
         std::vector<Valeur> elements;
-        for (const auto& v : r)
-            if (!(v.estVide() && v.classe == Classe::Double)) elements.push_back(v);
+        for (const auto& v : r) {
+            // Seul le vide « [] » — toutes dimensions nulles — s'efface
+            // d'une concatenation ; un 1x0 garde sa ligne, comme dans
+            // MATLAB.
+            if (v.estVide() && v.classe == Classe::Double) {
+                bool toutesNulles = true;
+                for (int d : v.dims)
+                    if (d != 0) toutesNulles = false;
+                if (toutesNulles) continue;
+            }
+            elements.push_back(v);
+        }
         if (elements.empty()) continue;
         auto def = methodeUtile(elements, "horzcat");
         if (def && elements.size() > 1) {
@@ -797,7 +819,7 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
     if (!u.fonctions.empty()) {
         std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
         for (auto& f : u.fonctions) voisines[f->nom] = f;
-        for (auto& f : u.fonctions) f->voisines = voisines;
+        for (auto& f : u.fonctions) propagerVoisines(f, voisines);
         if (piles_.back()->fonction) {
             for (auto& kv : voisines) piles_.back()->fonction->voisines[kv.first] = kv.second;
         } else {
@@ -838,7 +860,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
         f->fichier = fichier;
         voisines[f->nom] = f;
     }
-    for (auto& f : u.fonctions) f->voisines = voisines;
+    for (auto& f : u.fonctions) propagerVoisines(f, voisines);
     if (u.script) {
         auto portee = piles_.back();
         if (!voisines.empty()) {

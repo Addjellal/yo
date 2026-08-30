@@ -45,35 +45,41 @@ function sys = lft(sys1, sys2, nu, ny)
     q2 = q - ny;      % sorties de SYS2 qui restent
     n2 = n - nu;      % entrées de SYS2 qui restent
 
-    S11 = sys1(1:p1, 1:m1);
-    S12 = sys1(1:p1, m1+1:m);
-    S21 = sys1(p1+1:p, 1:m1);
-    S22 = sys1(p1+1:p, m1+1:m);
-    T11 = sys2(1:ny, 1:nu);
-    T12 = sys2(1:ny, nu+1:n);
-    T21 = sys2(ny+1:q, 1:nu);
-    T22 = sys2(ny+1:q, nu+1:n);
+    % Les blocs, découpés dans les matrices : le résultat garde ainsi
+    % exactement les états des deux modèles. Un assemblage par produits et
+    % inverses en fabriquerait bien plus, et ses modes cachés — instables
+    % même quand la boucle ne l'est pas — fausseraient toute mesure de
+    % norme.
+    A1 = sys1.A; A2 = sys2.A;
+    n1etats = size(A1, 1);
+    n2etats = size(A2, 1);
+    B1w = sys1.B(:, 1:m1);            B1e = sys1.B(:, m1+1:m);
+    C1z = sys1.C(1:p1, :);            C1v = sys1.C(p1+1:p, :);
+    D1zw = sys1.D(1:p1, 1:m1);        D1ze = sys1.D(1:p1, m1+1:m);
+    D1vw = sys1.D(p1+1:p, 1:m1);      D1ve = sys1.D(p1+1:p, m1+1:m);
+    B2v = sys2.B(:, 1:nu);            B2w = sys2.B(:, nu+1:n);
+    C2e = sys2.C(1:ny, :);            C2z = sys2.C(ny+1:q, :);
+    D2ev = sys2.D(1:ny, 1:nu);        D2ew = sys2.D(1:ny, nu+1:n);
+    D2zv = sys2.D(ny+1:q, 1:nu);      D2zw = sys2.D(ny+1:q, nu+1:n);
 
-    boucle = eye(ny) - T11.D * S22.D;
+    boucle = eye(nu) - D1ve * D2ev;
     if rcond(boucle) < eps
         error('Control:combination:AlgebraicLoop', ...
-              'The interconnection is algebraic : I - T11.D*S22.D is singular.');
+              'The interconnection is algebraic : I - D1ve*D2ev is singular.');
     end
-    M = inv(eye(ny) - T11 * S22);
+    M = inv(boucle);
+    Vx1 = M * C1v;            Vx2 = M * D1ve * C2e;
+    Vw1 = M * D1vw;           Vw2 = M * D1ve * D2ew;
+    Ex1 = D2ev * Vx1;         Ex2 = C2e + D2ev * Vx2;
+    Ew1 = D2ev * Vw1;         Ew2 = D2ew + D2ev * Vw2;
 
-    % Les blocs vides — rien ne reste d'un côté — donnent une boucle
-    % fermée sans entrée ou sans sortie : on rend alors le seul bloc utile.
-    if p1 == 0 && m1 == 0
-        sys = T22 + T21 * S22 * M * T12;
-        return
-    end
-    if q2 == 0 && n2 == 0
-        sys = S11 + S12 * M * T11 * S21;
-        return
-    end
-    R11 = S11 + S12 * M * T11 * S21;
-    R12 = S12 * M * T12;
-    R21 = T21 * S21 + T21 * S22 * M * T11 * S21;
-    R22 = T22 + T21 * S22 * M * T12;
-    sys = [R11, R12; R21, R22];
+    A = [A1 + B1e * Ex1,   B1e * Ex2; ...
+         B2v * Vx1,        A2 + B2v * Vx2];
+    B = [B1w + B1e * Ew1,  B1e * Ew2; ...
+         B2v * Vw1,        B2w + B2v * Vw2];
+    C = [C1z + D1ze * Ex1, D1ze * Ex2; ...
+         D2zv * Vx1,       C2z + D2zv * Vx2];
+    D = [D1zw + D1ze * Ew1, D1ze * Ew2; ...
+         D2zv * Vw1,        D2zw + D2zv * Vw2];
+    sys = ss(A, B, C, D, ss.periode(sys1, sys2));
 end

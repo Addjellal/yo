@@ -247,6 +247,8 @@ public:
 
     // --- indexation (Indexation.cpp) ---
     Valeur indexer(const Valeur& base, std::vector<Valeur>& idx, char genre);
+    bool valeurIntermediaire(const Valeur& base, const std::vector<ElementAcces>& chaine,
+                             std::size_t debut, std::size_t fin, Valeur& sortie);
     std::vector<Valeur> indexerListe(const Valeur& base, std::vector<Valeur>& idx, char genre);
     Valeur ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Valeur& v, char genre);
     Valeur affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine, std::size_t k,

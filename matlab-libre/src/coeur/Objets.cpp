@@ -51,6 +51,60 @@ std::vector<Valeur> Interpreteur::appelerMethode(const Valeur& objet,
     return appelerUtilisateur(def->methodes[methode], complet, nargout);
 }
 
+// Vrai si l'expression porte un « end » quelque part : c'est la seule
+// raison de refaire le chemin d'accès pour trouver le contexte.
+static bool contientFin(const NoeudPtr& n) {
+    if (!n) return false;
+    if (n->type == TypeN::FinIndice) return true;
+    for (const NoeudPtr& enfant : n->enfants)
+        if (contientFin(enfant)) return true;
+    for (const ElementAcces& e : n->acces)
+        for (const NoeudPtr& a : e.args)
+            if (contientFin(a)) return true;
+    return false;
+}
+
+static bool contientFin(const std::vector<NoeudPtr>& args) {
+    for (const NoeudPtr& a : args)
+        if (contientFin(a)) return true;
+    return false;
+}
+
+// Ce que vaut la chaîne d'accès jusqu'à un certain rang, en indexation par
+// défaut. Rend faux si le chemin ne se refait pas — une méthode au point,
+// par exemple : « end » retombe alors sur ce qu'il avait avant.
+bool Interpreteur::valeurIntermediaire(const Valeur& base,
+                                       const std::vector<ElementAcces>& chaine,
+                                       std::size_t debut, std::size_t fin, Valeur& sortie) {
+    Valeur courant = base;
+    try {
+        for (std::size_t k = debut; k < fin; ++k) {
+            const ElementAcces& e = chaine[k];
+            if (e.genre == '.' || e.genre == '?') {
+                std::string nom = e.nom;
+                if (e.genre == '?') {
+                    auto args = evaluerListe(e.args);
+                    if (args.empty()) return false;
+                    nom = args[0].versTexte();
+                }
+                if (courant.classe == Classe::Objet)
+                    courant = lireProprieteObjet(courant, nom);
+                else if (courant.estStructure())
+                    courant = courant.champ(nom);
+                else
+                    return false;
+                continue;
+            }
+            auto idx = evaluerIndices(e.args, &courant, 0, (int)e.args.size());
+            courant = indexer(courant, idx, e.genre);
+        }
+    } catch (...) {
+        return false;
+    }
+    sortie = courant;
+    return true;
+}
+
 // La structure attendue par subsref : un tableau 1xN de champs « type » et
 // « subs ». type vaut '()', '{}' ou '.', subs une cellule d'indices ou le
 // nom du champ.
@@ -75,7 +129,17 @@ Valeur Interpreteur::substruct(const std::vector<ElementAcces>& chaine, std::siz
             s.st->champs["type"][k] = Valeur::texte(".");
             s.st->champs["subs"][k] = Valeur::texte(nom);
         } else {
-            auto idx = evaluerIndices(e.args, k == 0 ? base : nullptr, 0, (int)e.args.size());
+            // « end » se résout sur ce que vaut la chaîne à cet endroit :
+            // dans « P.D(1:end) », c'est la taille de D, non celle de P.
+            // Le premier élément a la base ; pour les suivants, on refait
+            // le chemin en indexation par défaut, ce qui ne coûte que
+            // lorsqu'un « end » l'exige.
+            const Valeur* contexte = k == 0 ? base : nullptr;
+            Valeur intermediaire;
+            if (k > 0 && base && contientFin(e.args) &&
+                valeurIntermediaire(*base, chaine, debut, debut + k, intermediaire))
+                contexte = &intermediaire;
+            auto idx = evaluerIndices(e.args, contexte, 0, (int)e.args.size());
             Valeur cellule = Valeur::celluleLigne(idx);
             s.st->champs["type"][k] = Valeur::texte(e.genre == '(' ? "()" : "{}");
             s.st->champs["subs"][k] = cellule;
