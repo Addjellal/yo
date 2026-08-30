@@ -38,7 +38,8 @@ enum : std::uint32_t {
 enum : std::uint8_t {
     mxCELL = 1, mxSTRUCT = 2, mxOBJECT = 3, mxCHAR = 4, mxSPARSE = 5, mxDOUBLE = 6,
     mxSINGLE = 7, mxINT8 = 8, mxUINT8 = 9, mxINT16 = 10, mxUINT16 = 11, mxINT32 = 12,
-    mxUINT32 = 13, mxINT64 = 14, mxUINT64 = 15
+    mxUINT32 = 13, mxINT64 = 14, mxUINT64 = 15, mxFONCTION = 16, mxOPAQUE = 17,
+    mxOBJET_NOUVEAU = 18
 };
 
 const std::uint32_t DRAPEAU_COMPLEXE = 0x0800;
@@ -57,8 +58,11 @@ std::uint8_t classeMx(Classe c) {
         case Classe::Logique: return mxUINT8;   // avec le drapeau « logique »
         case Classe::Caractere: return mxCHAR;
         case Classe::Cellule: return mxCELL;
-        case Classe::Structure:
-        case Classe::Objet: return mxSTRUCT;
+        case Classe::Structure: return mxSTRUCT;
+        // Un objet garde sa classe : le format la porte, dans la forme que
+        // MATLAB employait pour ses classes avant MCOS et qu'il relit
+        // toujours. La relire nous rend l'objet, et non une structure.
+        case Classe::Objet: return mxOBJECT;
         case Classe::Int8: return mxINT8;
         case Classe::Int16: return mxINT16;
         case Classe::Int32: return mxINT32;
@@ -193,6 +197,11 @@ void ecrireCorpsMatrice(Ecrivain& e, const std::string& nom, const Valeur& v, bo
 
     ecrireElement(e, miINT8, nom.data(), nom.size());
 
+    // Le nom de la classe suit celui de la variable, et lui seul : c'est ce
+    // qui distingue un objet d'une structure dans le format.
+    if (classe == (std::uint8_t)mxOBJECT)
+        ecrireElement(e, miINT8, v.nomObjet.data(), v.nomObjet.size());
+
     if (creux) {
         std::vector<std::int32_t> ir(v.creux->ligne.begin(), v.creux->ligne.end());
         std::vector<std::int32_t> jc(v.creux->debutColonne.begin(), v.creux->debutColonne.end());
@@ -303,6 +312,9 @@ public:
 
     bool inverse() const { return inverser_; }
 
+    // La taille du flux : elle borne ce qu'un element peut annoncer.
+    std::size_t total() const { return n_; }
+
     static std::uint32_t echanger32(std::uint32_t v) {
         return ((v & 0xFFu) << 24) | ((v & 0xFF00u) << 8) | ((v >> 8) & 0xFF00u) |
                ((v >> 24) & 0xFFu);
@@ -371,6 +383,28 @@ double lireNombre(const unsigned char* p, std::uint32_t type, std::size_t k, boo
     }
 }
 
+// Le nombre d'elements qu'annoncent les dimensions.
+//
+// Un fichier abime — ou un element qu'on a mal interprete, ce qui revient
+// au meme — donne des dimensions folles : « 1919251317 x 1214606444 »
+// demandait deux mille milliards d'elements, et le programme tombait sur
+// std::bad_alloc avant meme d'avoir lu la moindre valeur. Or aucun tableau
+// ne peut avoir plus d'elements que le flux n'a d'octets : le plus petit
+// des elements, un caractere ou un booleen, en occupe un. Au-dela, le
+// fichier ment.
+std::size_t nombreElements(const Dims& d, const Lecteur& l) {
+    std::size_t limite = l.total();
+    std::size_t elements = 1;
+    for (int x : d) {
+        if (x < 0) abime("a dimension is negative");
+        std::size_t n = (std::size_t)x;
+        if (n != 0 && elements > limite / n) abime("the dimensions exceed the file");
+        elements *= n;
+    }
+    if (elements > limite) abime("the dimensions exceed the file");
+    return elements;
+}
+
 std::size_t nombreDe(const Element& e) {
     std::size_t largeur = tailleType(e.type);
     return largeur ? e.octets / largeur : 0;
@@ -382,9 +416,11 @@ void remplir(std::vector<double>& v, const Element& e, bool inverser) {
     for (std::size_t k = 0; k < n; ++k) v[k] = lireNombre(e.donnees, e.type, k, inverser);
 }
 
-Valeur lireMatrice(Lecteur& l, std::string* nom, bool* globale);
+Valeur lireMatrice(Lecteur& l, std::string* nom, bool* globale,
+                   std::string* avertissement = nullptr);
 
-Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
+Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale,
+                        std::string* avertissement = nullptr) {
     Element drapeaux = lireElement(l);
     if (drapeaux.octets < 8) abime("array flags are too short");
     std::uint32_t mot;
@@ -394,6 +430,40 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
     bool complexe = (mot & DRAPEAU_COMPLEXE) != 0;
     bool logique = (mot & DRAPEAU_LOGIQUE) != 0;
     if (globale) *globale = (mot & DRAPEAU_GLOBAL) != 0;
+
+    // Un objet de classe MATLAB « nouveau style » (MCOS) n'a ni dimensions
+    // ni nom a cet endroit : viennent d'abord trois chaines — le nom de la
+    // variable, le systeme de types, le nom de la classe — puis une
+    // reference vers les donnees, rangees ailleurs dans le fichier. On lit
+    // cette structure pour ne pas se desaligner sur la suite, et on rend un
+    // temoin : MatLibre ne reconstruit pas encore l'objet.
+    if (classe == (std::uint8_t)mxOPAQUE) {
+        Element nomVariable = lireElement(l);
+        Element systeme = lireElement(l);
+        Element nomClasse = lireElement(l);
+        lireMatrice(l, nullptr, nullptr);   // la reference, dont on n'a que faire
+        std::string classeTexte((const char*)nomClasse.donnees, nomClasse.octets);
+        std::string systemeTexte((const char*)systeme.donnees, systeme.octets);
+        if (nom) nom->assign((const char*)nomVariable.donnees, nomVariable.octets);
+        Valeur v = Valeur::structureVide();
+        v.poserChamp("ClassName", Valeur::texte(classeTexte));
+        v.poserChamp("TypeSystem", Valeur::texte(systemeTexte));
+        if (avertissement)
+            *avertissement = "an object of class '" + classeTexte +
+                             "' was saved by MATLAB in its MCOS format, which MatLibre "
+                             "cannot rebuild yet; it was loaded as a placeholder "
+                             "structure. Re-save it as a structure — for a model, "
+                             "with SSDATA or TFDATA — to carry it over.";
+        return v;
+    }
+    // Une poignee de fonction : le corps est une matrice imbriquee.
+    if (classe == (std::uint8_t)mxFONCTION) {
+        Valeur corps = lireMatrice(l, nom, nullptr);
+        if (avertissement)
+            *avertissement = "a function handle was saved in this file; MatLibre "
+                             "loaded its description, not the handle itself.";
+        return corps;
+    }
 
     Element dims = lireElement(l);
     Dims d;
@@ -434,9 +504,10 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
     }
 
     if (classe == (std::uint8_t)mxCELL) {
+        nombreElements(d, l);
         Valeur v = Valeur::celluleDims(d);
         for (std::size_t k = 0; k < v.cellules.size() && !l.fini(); ++k)
-            v.cellules[k] = lireMatrice(l, nullptr, nullptr);
+            v.cellules[k] = lireMatrice(l, nullptr, nullptr, avertissement);
         return v;
     }
 
@@ -462,8 +533,7 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
         }
         Valeur v = Valeur::structureVide();
         v.dims = d;
-        std::size_t elements = 1;
-        for (int x : d) elements *= (std::size_t)(x < 0 ? 0 : x);
+        std::size_t elements = nombreElements(d, l);
         v.st = std::make_shared<ChampsStructure>();
         v.st->ordre = champs;
         for (const std::string& c : champs)
@@ -471,7 +541,7 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
         for (std::size_t i = 0; i < elements; ++i)
             for (const std::string& c : champs) {
                 if (l.fini()) break;
-                v.st->champs[c][i] = lireMatrice(l, nullptr, nullptr);
+                v.st->champs[c][i] = lireMatrice(l, nullptr, nullptr, avertissement);
             }
         if (classe == (std::uint8_t)mxOBJECT && !nomClasseObjet.empty()) {
             v.classe = Classe::Objet;
@@ -485,8 +555,7 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
     v.classe = classeDepuisMx(classe, logique);
     v.dims = d;
     remplir(v.re, pr, l.inverse());
-    std::size_t attendus = 1;
-    for (int x : d) attendus *= (std::size_t)(x < 0 ? 0 : x);
+    std::size_t attendus = nombreElements(d, l);
     v.re.resize(attendus, 0.0);
     if (complexe) {
         Element pi = lireElement(l);
@@ -496,14 +565,15 @@ Valeur lireCorpsMatrice(Lecteur& l, std::string* nom, bool* globale) {
     return v;
 }
 
-Valeur lireMatrice(Lecteur& l, std::string* nom, bool* globale) {
+Valeur lireMatrice(Lecteur& l, std::string* nom, bool* globale,
+                   std::string* avertissement) {
     Element e = lireElement(l);
     if (e.type != miMATRIX) {
         if (nom) nom->clear();
         return Valeur::vide();
     }
     Lecteur interne(e.donnees, e.octets, l.inverse());
-    return lireCorpsMatrice(interne, nom, globale);
+    return lireCorpsMatrice(interne, nom, globale, avertissement);
 }
 
 std::string lireFichier(const std::string& chemin) {
@@ -592,6 +662,18 @@ std::vector<VariableMat> lireContenu(const std::string& brut, bool inventaireSeu
     if (brut.size() < 4) abime("the file is empty");
     if (ressembleAuNiveau4(brut)) return lireNiveau4(brut);
     if (brut.size() < 128) abime("the header is truncated");
+    // Le niveau 7.3 n'est plus le format MAT : c'est un fichier HDF5, dont
+    // la signature suit l'en-tete de cinq cent douze octets que la norme
+    // reserve. On le dit clairement plutot que de lire du charabia.
+    static const char SIGNATURE_HDF5[8] = {'\x89', 'H', 'D', 'F', '\r', '\n', '\x1a', '\n'};
+    bool hdf5 = brut.size() >= 520 && std::memcmp(brut.data() + 512, SIGNATURE_HDF5, 8) == 0;
+    if (!hdf5) hdf5 = std::memcmp(brut.data(), SIGNATURE_HDF5, 8) == 0;
+    if (!hdf5) hdf5 = brut.compare(0, 116, std::string("MATLAB 7.3 MAT-file"), 0, 19) == 0;
+    if (hdf5)
+        erreur("MATLAB:load:unsupportedVersion",
+               "This is a version 7.3 MAT-file, which is an HDF5 file and not the "
+               "MAT format MatLibre reads. Save it again from MATLAB with "
+               "save('nom.mat', '-v7') and it will load.");
     // L'indicateur d'ordre des octets : « IM » quand le fichier est en
     // petit-boutien, « MI » sinon.
     bool inverser = brut[126] == 'M' && brut[127] == 'I';
@@ -610,7 +692,8 @@ std::vector<VariableMat> lireContenu(const std::string& brut, bool inventaireSeu
             Lecteur interne((const unsigned char*)clair.data(), clair.size(), inverser);
             while (!interne.fini() && interne.reste() >= 8) {
                 VariableMat variable;
-                variable.valeur = lireMatrice(interne, &variable.nom, &variable.globale);
+                variable.valeur = lireMatrice(interne, &variable.nom, &variable.globale,
+                                              &variable.avertissement);
                 if (variable.nom.empty()) break;
                 sortie.push_back(variable);
             }
@@ -622,7 +705,8 @@ std::vector<VariableMat> lireContenu(const std::string& brut, bool inventaireSeu
         }
         Lecteur interne(e.donnees, e.octets, inverser);
         VariableMat variable;
-        variable.valeur = lireCorpsMatrice(interne, &variable.nom, &variable.globale);
+        variable.valeur = lireCorpsMatrice(interne, &variable.nom, &variable.globale,
+                                           &variable.avertissement);
         if (!variable.nom.empty()) sortie.push_back(variable);
     }
     return sortie;

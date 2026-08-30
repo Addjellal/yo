@@ -293,6 +293,14 @@ FONCTION(fnLoad) {
         variables.swap(gardees);
     }
 
+    // Ce que la lecture a du signaler — un objet MCOS, une poignee de
+    // fonction — se dit une fois par variable, comme un avertissement
+    // MATLAB : le chargement, lui, a bien eu lieu.
+    for (const VariableMat& v : variables)
+        if (!v.avertissement.empty() && it.avertissementsActifs)
+            it.erreurSortie() << "Warning: variable '" << v.nom << "' : " << v.avertissement
+                              << "\n";
+
     if (nargout >= 1) {
         Valeur s = Valeur::structureVide();
         for (const VariableMat& v : variables) s.poserChamp(v.nom, v.valeur);

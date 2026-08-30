@@ -23,6 +23,11 @@ struct VariableMat {
     std::string nom;
     Valeur valeur;
     bool globale = false;
+    // Ce que la lecture a du signaler sans pouvoir s'arreter : un objet de
+    // classe MATLAB que MatLibre ne sait pas reconstruire, par exemple.
+    // Vide quand tout s'est bien passe ; « load » l'affiche alors comme un
+    // avertissement.
+    std::string avertissement;
 };
 
 // Rend les variables du fichier, dans l'ordre où elles y sont écrites.

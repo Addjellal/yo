@@ -159,6 +159,82 @@ catch
 end
 assert(casse || true);   % l'un ou l'autre, mais pas un plantage
 
+%% ------------------------------------------- un objet garde sa classe
+% Un objet sauve doit se relire comme un objet, et non comme une
+% structure : le format porte le nom de la classe.
+modele = tf(1, [1 2 1]);
+save('modele.mat', 'modele');
+clear modele
+load('modele.mat');
+assert(strcmp(class(modele), 'tf'));
+assert(max(abs(modele.den - [1 2 1])) < 1e-12);
+
+%% ------------------------------------ un objet MCOS n'arrete pas la lecture
+% MATLAB range ses objets de classe « nouveau style » dans une forme
+% opaque : trois chaines — le nom de la variable, le systeme de types, le
+% nom de la classe — puis une reference vers des donnees rangees
+% ailleurs. MatLibre ne sait pas les reconstruire, mais il doit lire le
+% fichier jusqu'au bout, nommer la variable et le dire — non tomber.
+entete = [double('MATLAB 5.0 MAT-file, objet opaque'), ...
+          32 * ones(1, 116 - 33), zeros(1, 8), 0, 1, double('IM')];
+reference = [motLong(6), motLong(8), motLong(13), motLong(0), ...      % mxUINT32
+             motLong(5), motLong(8), motLong(1), motLong(6), ...       % 1x6
+             motLong(1), motLong(0), ...                               % sans nom
+             motLong(6), motLong(24), ...
+             motLong(hex2dec('DD000000')), motLong(2), motLong(1), ...
+             motLong(1), motLong(1), motLong(1)];
+corpsOpaque = [motLong(6), motLong(8), motLong(17), motLong(0), ...    % mxOPAQUE
+               element(1, double('K')), ...
+               element(1, double('MCOS')), ...
+               element(1, double('ss')), ...
+               motLong(14), motLong(numel(reference)), reference];
+octets = [entete, motLong(14), motLong(numel(corpsOpaque)), corpsOpaque];
+fid = fopen('opaque.mat', 'w');
+fwrite(fid, octets, 'uint8');
+fclose(fid);
+opaque = load('opaque.mat');
+assert(isfield(opaque, 'K'));
+assert(strcmp(opaque.K.ClassName, 'ss'));
+assert(strcmp(opaque.K.TypeSystem, 'MCOS'));
+
+%% --------------------------------- des dimensions folles ne font pas tomber
+% Un fichier abime annonce des tableaux que la memoire ne peut pas
+% contenir. La lecture doit le dire, non demander mille milliards
+% d'elements et tomber sur std::bad_alloc.
+corpsFou = [motLong(6), motLong(8), motLong(6), motLong(0), ...
+            motLong(5), motLong(8), motLong(1000000), motLong(1000000), ...
+            motLong(1), motLong(1), double('z'), zeros(1, 7), ...
+            motLong(9), motLong(16), reel(1), reel(2)];
+octets = [entete, motLong(14), motLong(numel(corpsFou)), corpsFou];
+fid = fopen('fou.mat', 'w');
+fwrite(fid, octets, 'uint8');
+fclose(fid);
+dimensionsFolles = false;
+try
+    load('fou.mat');
+catch e
+    dimensionsFolles = strcmp(e.identifier, 'MATLAB:load:fichierAbime');
+end
+assert(dimensionsFolles);
+
+%% -------------------------------------------------- le niveau 7.3 se nomme
+% Un fichier « -v7.3 » est un HDF5 : la signature suit les cinq cent douze
+% octets que la norme reserve. Le message doit le dire et donner la
+% sortie — enregistrer de nouveau en « -v7 ».
+signature = [137, double('HDF'), 13, 10, 26, 10];
+octets = [double('MATLAB 7.3 MAT-file, Platform: PCWIN64'), ...
+          32 * ones(1, 512 - 38), signature, zeros(1, 64)];
+fid = fopen('sept3.mat', 'w');
+fwrite(fid, octets, 'uint8');
+fclose(fid);
+versionRefusee = '';
+try
+    load('sept3.mat');
+catch e
+    versionRefusee = e.identifier;
+end
+assert(strcmp(versionRefusee, 'MATLAB:load:unsupportedVersion'));
+
 cd(ancien);
 rmdir(dossier, 's');
 disp('fichiers MAT : toutes les verifications passent');
@@ -171,4 +247,16 @@ end
 
 function o = reel(x)
     o = double(typecast(double(x), 'uint8'));
+end
+
+% Un element du format : son type, sa longueur, ses octets, le tout
+% complete jusqu'au multiple de huit suivant.
+function o = element(type, donnees)
+    longueur = numel(donnees);
+    reste = mod(longueur, 8);
+    if reste > 0
+        donnees = [donnees, zeros(1, 8 - reste)];
+    end
+    o = [double(typecast(uint32(type), 'uint8')), ...
+         double(typecast(uint32(longueur), 'uint8')), donnees];
 end
