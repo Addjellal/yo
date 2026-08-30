@@ -710,14 +710,55 @@ FONCTION(fnSprintfChaine) {
     return {Valeur::chaine(s)};
 }
 
-FONCTION(fnStrtrimNombre) {
-    INUTILISE
-    return {args[0]};
+// Tri « naturel » : les suites de chiffres se comparent comme des
+// nombres, le reste caractere par caractere. « fichier2 » passe ainsi
+// avant « fichier10 », que l'ordre alphabetique met a l'envers.
+int comparerNaturel(const std::string& a, const std::string& b) {
+    std::size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        bool chiffreA = std::isdigit((unsigned char)a[i]) != 0;
+        bool chiffreB = std::isdigit((unsigned char)b[j]) != 0;
+        if (chiffreA && chiffreB) {
+            // Les zeros de tete ne comptent pas dans la valeur.
+            std::size_t da = i, db = j;
+            while (da < a.size() && a[da] == '0') ++da;
+            while (db < b.size() && b[db] == '0') ++db;
+            std::size_t fa = da, fb = db;
+            while (fa < a.size() && std::isdigit((unsigned char)a[fa])) ++fa;
+            while (fb < b.size() && std::isdigit((unsigned char)b[fb])) ++fb;
+            if (fa - da != fb - db) return (fa - da) < (fb - db) ? -1 : 1;
+            for (std::size_t k = 0; k < fa - da; ++k)
+                if (a[da + k] != b[db + k]) return a[da + k] < b[db + k] ? -1 : 1;
+            i = fa;
+            j = fb;
+            continue;
+        }
+        if (a[i] != b[j]) return (unsigned char)a[i] < (unsigned char)b[j] ? -1 : 1;
+        ++i;
+        ++j;
+    }
+    if (i < a.size()) return 1;
+    if (j < b.size()) return -1;
+    return 0;
 }
 
 FONCTION(fnNatsort) {
     INUTILISE
-    return {args[0]};
+    exigerArguments(args, 1, 1, "natsort");
+    ListeTextes l = listeDe(args[0]);
+    std::vector<std::size_t> ordre(l.valeurs.size());
+    for (std::size_t k = 0; k < ordre.size(); ++k) ordre[k] = k;
+    std::stable_sort(ordre.begin(), ordre.end(), [&](std::size_t x, std::size_t y) {
+        return comparerNaturel(l.valeurs[x], l.valeurs[y]) < 0;
+    });
+    std::vector<Valeur> tries;
+    for (std::size_t k : ordre) tries.push_back(Valeur::texte(l.valeurs[k]));
+    if (nargout >= 2) {
+        std::vector<double> indices;
+        for (std::size_t k : ordre) indices.push_back((double)(k + 1));
+        return {Valeur::celluleLigne(tries), Valeur::ligne(indices)};
+    }
+    return {Valeur::celluleLigne(tries)};
 }
 
 
@@ -824,7 +865,6 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("strsplit", fnStrsplit, "texte", "strsplit  Decoupe selon un separateur.");
     it.enregistrer("strjoin", fnStrjoin, "texte", "strjoin  Assemble avec un separateur.");
     it.enregistrer("strtok", fnStrtok, "texte", "strtok  Premier jeton et reste.");
-    it.enregistrer("fliplr_str", fnFliplrTexte, "texte", "fliplr_str  Inverse un texte.");
     it.enregistrer("reverse", fnFliplrTexte, "texte", "reverse  Inverse un texte.");
     it.enregistrer("blanks", fnBlanks, "texte", "blanks  Chaine de n espaces.");
     it.enregistrer("newline", fnNewline, "texte", "newline  Caractere de fin de ligne.");
@@ -847,7 +887,6 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("compose", fnSprintfChaine, "texte", "compose  Formate vers une string.");
     it.enregistrer("natsort", fnNatsort, "texte", "natsort  Tri naturel (identite ici).");
     it.enregistrer("strip", fnStrtrim, "texte", "strip  Retire les blancs aux deux bouts.");
-    it.enregistrer("num2str_", fnStrtrimNombre, "texte", "num2str_  Reserve.");
     it.enregistrer("matlab.lang.makeValidName", fnMakeValidName, "texte",
                    "matlab.lang.makeValidName  Rend un identifiant valide.");
     it.enregistrer("matlab.lang.makeUniqueStrings", fnMakeUniqueStrings, "texte",

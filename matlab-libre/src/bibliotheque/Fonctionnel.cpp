@@ -483,11 +483,6 @@ FONCTION(fnFunctions) {
     return {r};
 }
 
-FONCTION(fnIsHandle) {
-    INUTILISE
-    return {Valeur::booleen(args[0].classe == Classe::Fonction)};
-}
-
 }  // namespace
 
 void enregistrerFonctionnel(Interpreteur& it) {
@@ -512,7 +507,6 @@ void enregistrerFonctionnel(Interpreteur& it) {
                    "nargoutchk  Verifie le nombre de sorties.");
     it.enregistrer("inputname", fnInputname, "fonctionnel", "inputname  Nom de l'argument appelant.");
     it.enregistrer("functions", fnFunctions, "fonctionnel", "functions  Information sur une poignee.");
-    it.enregistrer("is_function_handle_", fnIsHandle, "fonctionnel", "Reserve.");
 }
 
 }  // namespace matlibre

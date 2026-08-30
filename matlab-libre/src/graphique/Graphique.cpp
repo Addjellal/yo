@@ -13,13 +13,20 @@
 
 namespace matlibre {
 
+std::shared_ptr<Axes> ajouterAxes(Figure& f) {
+    auto a = std::make_shared<Axes>();
+    a->identifiant = f.prochainIdentifiant++;
+    f.axes.push_back(a);
+    return a;
+}
+
 std::shared_ptr<Figure> figureCourante(Interpreteur& it) {
     if (it.figureCourante == 0 || !it.figures.count(it.figureCourante)) {
         int numero = it.figureCourante ? it.figureCourante : 1;
         while (it.figures.count(numero)) ++numero;
         auto f = std::make_shared<Figure>();
         f->numero = numero;
-        f->axes.push_back(std::make_shared<Axes>());
+        ajouterAxes(*f);
         it.figures[numero] = f;
         it.figureCourante = numero;
     }
@@ -28,7 +35,7 @@ std::shared_ptr<Figure> figureCourante(Interpreteur& it) {
 
 std::shared_ptr<Axes> axesCourants(Interpreteur& it) {
     auto f = figureCourante(it);
-    if (f->axes.empty()) f->axes.push_back(std::make_shared<Axes>());
+    if (f->axes.empty()) ajouterAxes(*f);
     if (f->axeCourant >= (int)f->axes.size()) f->axeCourant = 0;
     return f->axes[(std::size_t)f->axeCourant];
 }
@@ -144,11 +151,89 @@ std::string nombreCourt(double v) {
     return s;
 }
 
+// L'etiquette d'une graduation. Sur un axe logarithmique, MATLAB ecrit les
+// puissances de dix en exposant — 10 puissance moins deux, et non 0,01 ;
+// le SVG le rend avec un « tspan » releve.
+std::string etiquetteGraduation(double v, bool log) {
+    if (log && v > 0) {
+        double e = std::log10(v);
+        double arrondi = std::round(e);
+        if (std::fabs(e - arrondi) < 1e-9)
+            return "10<tspan baseline-shift=\"super\" font-size=\"9px\">" +
+                   formater("%d", (int)arrondi) + "</tspan>";
+    }
+    return echapperXml(nombreCourt(v));
+}
+
 }  // namespace
 
 // « axis square » d'abord — elle change la boite —, puis « axis equal »,
 // qui elargit les bornes de l'axe qui a trop de place pour que les deux
 // echelles aient le meme nombre d'unites par pixel.
+std::vector<double> graduationsAxe(double bas, double haut, int cible, bool log) {
+    if (!log) return graduations(bas, haut, cible);
+    std::vector<double> valeurs;
+    double lo = std::log10(std::max(bas, 1e-300));
+    double hi = std::log10(std::max(haut, 1e-300));
+    if (!(hi > lo)) return valeurs;
+    int premier = (int)std::ceil(lo - 1e-9), dernier = (int)std::floor(hi + 1e-9);
+    int decades = dernier - premier + 1;
+    if (decades >= 2) {
+        // Dix décades sur trois cents pixels : une graduation sur deux, sur
+        // trois… mais toujours des puissances de dix.
+        int pas = 1;
+        while ((decades + pas - 1) / pas > cible + 2) ++pas;
+        for (int k = premier; k <= dernier; k += pas) valeurs.push_back(std::pow(10.0, k));
+        return valeurs;
+    }
+    // Moins d'une décade : les 1, 2 et 5 qui tombent dans l'intervalle.
+    for (int k = premier - 2; k <= dernier + 1; ++k)
+        for (double m : {1.0, 2.0, 5.0}) {
+            double v = m * std::pow(10.0, k);
+            if (v >= bas * (1 - 1e-9) && v <= haut * (1 + 1e-9)) valeurs.push_back(v);
+        }
+    std::sort(valeurs.begin(), valeurs.end());
+    return valeurs;
+}
+
+bool bornesLog(double& bas, double& haut) {
+    if (haut <= 0) return false;
+    if (bas <= 0) bas = haut / 1000.0;
+    if (!(haut > bas)) { bas = haut / 10.0; }
+    return true;
+}
+
+void cadreAxes(const Axes& a, double& x, double& y, double& largeur, double& hauteur) {
+    if (a.positionManuelle) {
+        x = a.posGauche;
+        largeur = a.posLargeur;
+        hauteur = a.posHauteur;
+        // MATLAB compte la hauteur depuis le bas ; les deux rendus dessinent
+        // depuis le haut.
+        y = 1.0 - a.posBas - a.posHauteur;
+        return;
+    }
+    int lignes = std::max(1, a.rangee), colonnes = std::max(1, a.colonne);
+    int premiere = std::max(1, a.position);
+    int derniere = a.positionFin > 0 ? std::max(premiere, a.positionFin) : premiere;
+    int li0 = (premiere - 1) / colonnes, co0 = (premiere - 1) % colonnes;
+    int li1 = (derniere - 1) / colonnes, co1 = (derniere - 1) % colonnes;
+    if (co1 < co0 && li1 > li0) { co0 = 0; co1 = colonnes - 1; }
+    x = (double)co0 / colonnes;
+    largeur = (double)(co1 - co0 + 1) / colonnes;
+    y = (double)li0 / lignes;
+    hauteur = (double)(li1 - li0 + 1) / lignes;
+}
+
+bool axesSeRecouvrent(const Axes& a, const Axes& b) {
+    double ax, ay, al, ah, bx, by, bl, bh;
+    cadreAxes(a, ax, ay, al, ah);
+    cadreAxes(b, bx, by, bl, bh);
+    const double marge = 1e-6;
+    return ax < bx + bl - marge && bx < ax + al - marge && ay < by + bh - marge &&
+           by < ay + ah - marge;
+}
+
 void appliquerProportions(const Axes& a, int& gauche, int& droite, int& haut, int& bas,
                           double& xmin, double& xmax, double& ymin, double& ymax) {
     if (a.proportions == Axes::Proportions::Auto) return;
@@ -183,16 +268,21 @@ std::string rendreSVG(const Figure& figure) {
            ".titre{font-size:15px}.axe{stroke:#222;stroke-width:1;fill:none}"
            ".grille{stroke:#ccc;stroke-width:0.5}</style>\n";
 
-    int lignes = std::max(1, figure.lignes), colonnes = std::max(1, figure.colonnes);
+    int indiceAxe = 0;
     for (const auto& axesPtr : figure.axes) {
         const Axes& a = *axesPtr;
-        int position = std::max(1, a.position);
-        int li = (position - 1) / colonnes, co = (position - 1) % colonnes;
-        int largeurCase = L / colonnes, hauteurCase = H / lignes;
-        int gauche = co * largeurCase + 70;
-        int droite = (co + 1) * largeurCase - 30;
-        int haut = li * hauteurCase + 40;
-        int bas = (li + 1) * hauteurCase - 50;
+        ++indiceAxe;
+        double fx, fy, fl, fh;
+        cadreAxes(a, fx, fy, fl, fh);
+        // Les marges d'une case sont bornees par sa taille : une case
+        // haute de cent cinquante pixels — la moitie d'un Bode dans un
+        // quart de figure — ne peut pas en donner quatre-vingt-dix aux
+        // etiquettes.
+        double largeurCase = fl * L, hauteurCase = fh * H;
+        int gauche = (int)(fx * L + std::min(70.0, 0.22 * largeurCase));
+        int droite = (int)((fx + fl) * L - std::min(30.0, 0.10 * largeurCase));
+        int haut = (int)(fy * H + std::min(40.0, 0.16 * hauteurCase));
+        int bas = (int)((fy + fh) * H - std::min(50.0, 0.22 * hauteurCase));
         if (droite <= gauche + 10 || bas <= haut + 10) continue;
 
         // Bornes des données.
@@ -218,10 +308,31 @@ std::string rendreSVG(const Figure& figure) {
         ymax += margeY;
         if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
         if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
+        // Un axe logarithmique ne porte pas le zero : ses bornes sont
+        // ramenees dans les positifs, et la marge de cinq pour cent que le
+        // lineaire s'accorde n'a pas de sens ici.
+        bool logX = a.logX, logY = a.logY;
+        if (logX && !bornesLog(xmin, xmax)) logX = false;
+        if (logY) {
+            ymin = INFINITY;
+            ymax = -INFINITY;
+            for (const auto& s : a.series)
+                for (double v : s.y) {
+                    if (!std::isfinite(v) || v <= 0) continue;
+                    ymin = std::min(ymin, v);
+                    ymax = std::max(ymax, v);
+                }
+            if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
+            if (!std::isfinite(ymin) || !bornesLog(ymin, ymax)) {
+                logY = false;
+                ymin = 0;
+                ymax = 1;
+            }
+        }
         appliquerProportions(a, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
 
-        Echelle ex{xmin, xmax, gauche, droite, a.logX};
-        Echelle ey{ymin, ymax, bas, haut, a.logY};
+        Echelle ex{xmin, xmax, gauche, droite, logX};
+        Echelle ey{ymin, ymax, bas, haut, logY};
 
         // « axis off » : le cadre, les graduations et leurs nombres
         // disparaissent ; les courbes, elles, restent.
@@ -233,10 +344,10 @@ std::string rendreSVG(const Figure& figure) {
         // Les graduations imposees par « ax.XTick = [...] » l'emportent sur
         // celles qu'on choisirait.
         auto tx = a.axesVisibles
-                      ? (a.ticksX.empty() ? graduations(xmin, xmax, 6) : a.ticksX)
+                      ? (a.ticksX.empty() ? graduationsAxe(xmin, xmax, 6, logX) : a.ticksX)
                       : std::vector<double>{};
         auto ty = a.axesVisibles
-                      ? (a.ticksY.empty() ? graduations(ymin, ymax, 6) : a.ticksY)
+                      ? (a.ticksY.empty() ? graduationsAxe(ymin, ymax, 6, logY) : a.ticksY)
                       : std::vector<double>{};
         for (double v : tx) {
             double px = ex.versPixel(v);
@@ -247,7 +358,8 @@ std::string rendreSVG(const Figure& figure) {
             out << "<line class=\"axe\" x1=\"" << px << "\" y1=\"" << bas << "\" x2=\"" << px
                 << "\" y2=\"" << (bas - 4) << "\"/>\n";
             out << "<text x=\"" << px << "\" y=\"" << (bas + 16)
-                << "\" text-anchor=\"middle\">" << echapperXml(nombreCourt(v)) << "</text>\n";
+                << "\" text-anchor=\"middle\">" << etiquetteGraduation(v, logX)
+                << "</text>\n";
         }
         for (double v : ty) {
             double py = ey.versPixel(v);
@@ -258,13 +370,14 @@ std::string rendreSVG(const Figure& figure) {
             out << "<line class=\"axe\" x1=\"" << gauche << "\" y1=\"" << py << "\" x2=\""
                 << (gauche + 4) << "\" y2=\"" << py << "\"/>\n";
             out << "<text x=\"" << (gauche - 8) << "\" y=\"" << (py + 4)
-                << "\" text-anchor=\"end\">" << echapperXml(nombreCourt(v)) << "</text>\n";
+                << "\" text-anchor=\"end\">" << etiquetteGraduation(v, logY)
+                << "</text>\n";
         }
 
-        out << "<clipPath id=\"c" << position << "\"><rect x=\"" << gauche << "\" y=\"" << haut
+        out << "<clipPath id=\"c" << indiceAxe << "\"><rect x=\"" << gauche << "\" y=\"" << haut
             << "\" width=\"" << (droite - gauche) << "\" height=\"" << (bas - haut)
             << "\"/></clipPath>\n";
-        out << "<g clip-path=\"url(#c" << position << ")\">\n";
+        out << "<g clip-path=\"url(#c" << indiceAxe << ")\">\n";
 
         for (const auto& s : a.series) {
             std::size_t n = std::min(s.x.size(), s.y.size());

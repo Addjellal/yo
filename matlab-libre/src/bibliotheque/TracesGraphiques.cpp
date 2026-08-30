@@ -250,7 +250,7 @@ FONCTION(fnFigure) {
     if (!it.figures.count(numero)) {
         auto f = std::make_shared<Figure>();
         f->numero = numero;
-        f->axes.push_back(std::make_shared<Axes>());
+        ajouterAxes(*f);
         it.figures[numero] = f;
     }
     it.figureCourante = numero;
@@ -262,7 +262,7 @@ FONCTION(fnClf) {
     INUTILISE
     auto f = figureCourante(it);
     f->axes.clear();
-    f->axes.push_back(std::make_shared<Axes>());
+    ajouterAxes(*f);
     f->axeCourant = 0;
     f->lignes = 1;
     f->colonnes = 1;
@@ -288,34 +288,117 @@ FONCTION(fnClose) {
 }
 
 FONCTION(fnSubplot) {
-    INUTILISE
-    exigerArguments(args, 1, 3, "subplot");
-    int lignes, colonnes, position;
+    exigerArguments(args, 1, 4, "subplot");
+    int lignes, colonnes;
+    std::vector<int> cases;
     if (args.size() >= 3) {
         lignes = (int)args[0].scal();
         colonnes = (int)args[1].scal();
-        position = (int)args[2].scal();
+        for (double v : args[2].re) cases.push_back((int)v);
     } else {
         int code = (int)args[0].scal();
         lignes = code / 100;
         colonnes = (code / 10) % 10;
-        position = code % 10;
+        cases.push_back(code % 10);
     }
+    if (lignes < 1 || colonnes < 1)
+        erreur("MATLAB:subplot:InvalidGridSpec",
+               "The number of rows and columns must be positive integers.");
+    if (cases.empty()) erreur("MATLAB:minrhs", "Not enough input arguments.");
+    std::sort(cases.begin(), cases.end());
+    if (cases.front() < 1 || cases.back() > lignes * colonnes)
+        erreur("MATLAB:subplot:SubplotIndexTooLarge",
+               "Index exceeds number of subplots.");
+
     auto f = figureCourante(it);
     f->lignes = lignes;
     f->colonnes = colonnes;
-    for (std::size_t k = 0; k < f->axes.size(); ++k)
-        if (f->axes[k]->position == position) {
+    // Une case deja ouverte au meme endroit du meme decoupage est reprise :
+    // « subplot(2,2,1) » deux fois de suite revient au meme axe. Le
+    // decoupage compte : « subplot(2,1,1) » ne doit pas atterrir dans la
+    // premiere case d'un decoupage en quatre.
+    for (std::size_t k = 0; k < f->axes.size(); ++k) {
+        const Axes& a = *f->axes[k];
+        if (!a.positionManuelle && a.rangee == lignes && a.colonne == colonnes &&
+            a.position == cases.front() &&
+            (a.positionFin == 0 ? cases.front() : a.positionFin) == cases.back()) {
             f->axeCourant = (int)k;
-            return {};
+            return nargout > 0 ? std::vector<Valeur>{poigneeAxesCourants(it)}
+                               : std::vector<Valeur>{};
         }
+    }
+
     auto a = std::make_shared<Axes>();
+    a->identifiant = f->prochainIdentifiant++;
     a->rangee = lignes;
     a->colonne = colonnes;
-    a->position = position;
+    a->position = cases.front();
+    a->positionFin = cases.back();
+    // MATLAB efface les axes que la nouvelle case recouvre : c'est ainsi
+    // qu'un decoupage en deux remplace celui en quatre qu'il chevauche.
+    auto fin = std::remove_if(f->axes.begin(), f->axes.end(),
+                              [&](const std::shared_ptr<Axes>& autre) {
+                                  return autre && axesSeRecouvrent(*autre, *a);
+                              });
+    f->axes.erase(fin, f->axes.end());
     f->axes.push_back(a);
     f->axeCourant = (int)f->axes.size() - 1;
-    return {};
+    return nargout > 0 ? std::vector<Valeur>{poigneeAxesCourants(it)}
+                       : std::vector<Valeur>{};
+}
+
+// « axes » : creer un axe, ou en designer un.
+//
+//   axes                         un axe neuf, occupant toute la figure
+//   axes('Position',[g b l h])   un axe a l'endroit qu'on veut
+//   axes(h)                      rend courant l'axe de la poignee h
+//
+// La position est celle de MATLAB : gauche, bas, largeur, hauteur, en
+// fractions de la figure, l'origine en bas a gauche.
+FONCTION(fnAxes) {
+    if (!args.empty() && args[0].classe == Classe::Objet) {
+        const Valeur& p = args[0];
+        int numero = (int)p.champ("NumeroFigure", 0).scal();
+        int identifiant = (int)p.champ("NumeroAxe", 0).scal();
+        auto trouve = it.figures.find(numero);
+        if (trouve == it.figures.end() || !trouve->second)
+            erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+        auto& liste = trouve->second->axes;
+        for (std::size_t k = 0; k < liste.size(); ++k)
+            if (liste[k] && liste[k]->identifiant == identifiant) {
+                it.figureCourante = numero;
+                trouve->second->axeCourant = (int)k;
+                return nargout > 0 ? std::vector<Valeur>{poigneeAxesCourants(it)}
+                                   : std::vector<Valeur>{};
+            }
+        erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+    }
+    auto f = figureCourante(it);
+    auto a = std::make_shared<Axes>();
+    a->identifiant = f->prochainIdentifiant++;
+    for (std::size_t k = 0; k + 1 < args.size(); k += 2) {
+        std::string nom = args[k].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (nom == "position" || nom == "outerposition") {
+            const Valeur& r = args[k + 1];
+            if (r.re.size() != 4)
+                erreur("MATLAB:hg:shaped_arrays", "Position must have four elements.");
+            a->positionManuelle = true;
+            a->posGauche = r.re[0];
+            a->posBas = r.re[1];
+            a->posLargeur = r.re[2];
+            a->posHauteur = r.re[3];
+        }
+    }
+    auto fin = std::remove_if(f->axes.begin(), f->axes.end(),
+                              [&](const std::shared_ptr<Axes>& autre) {
+                                  return autre && axesSeRecouvrent(*autre, *a);
+                              });
+    f->axes.erase(fin, f->axes.end());
+    f->axes.push_back(a);
+    f->axeCourant = (int)f->axes.size() - 1;
+    return nargout > 0 ? std::vector<Valeur>{poigneeAxesCourants(it)}
+                       : std::vector<Valeur>{};
 }
 
 FONCTION(fnXlabel) {
@@ -585,6 +668,7 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("clf", fnClf, "graphique", "clf  Vide la figure courante.");
     it.enregistrer("close", fnClose, "graphique", "close  Ferme une figure.");
     it.enregistrer("subplot", fnSubplot, "graphique", "subplot  Decoupe la figure en cases.");
+    it.enregistrer("axes", fnAxes, "graphique", "axes  Cree un axe ou en designe un.");
     it.enregistrer("xlabel", fnXlabel, "graphique", "xlabel  Etiquette de l'axe des x.");
     it.enregistrer("ylabel", fnYlabel, "graphique", "ylabel  Etiquette de l'axe des y.");
     it.enregistrer("zlabel", fnZlabel, "graphique", "zlabel  Etiquette de l'axe des z.");

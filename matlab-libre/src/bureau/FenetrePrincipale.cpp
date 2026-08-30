@@ -19,6 +19,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QSet>
 #include <QSettings>
@@ -605,20 +606,62 @@ void FenetrePrincipale::ouvrirParDialogue() {
     if (!chemin.isEmpty()) ouvrirFichier(chemin);
 }
 
+// Double-clic dans le dossier courant : MATLAB n'ouvre pas tout dans
+// l'éditeur, il fait ce que le type de fichier appelle — un dossier s'y
+// entre, un .m s'édite, un .mat se charge, une image et une figure
+// s'affichent. C'est ce qu'on reproduit ici.
 void FenetrePrincipale::ouvrirDepuisListe() {
     QTreeWidgetItem* item = listeFichiers_->currentItem();
     if (!item) return;
     QString chemin = QDir(dossierCourant_).filePath(item->text(0));
-    if (QFileInfo(chemin).isDir()) {
+    QFileInfo info(chemin);
+    if (info.isDir()) {
         QMetaObject::invokeMethod(moteur_, "changerDossier", Qt::QueuedConnection,
                                   Q_ARG(QString, QDir(chemin).absolutePath()));
         return;
     }
-    // Un fichier binaire n'a rien à faire dans l'éditeur : on le dit, au
-    // lieu d'en déverser les octets.
+    const QString suffixe = info.suffix().toLower();
+    // Le chemin part dans une commande : les apostrophes s'y doublent.
+    QString cite = QDir::toNativeSeparators(info.absoluteFilePath());
+    cite.replace(QLatin1String("'"), QLatin1String("''"));
+
+    if (suffixe == QLatin1String("mat")) {
+        // MATLAB charge le fichier dans l'espace de travail.
+        envoyer(QStringLiteral("load('%1')").arg(cite));
+        return;
+    }
+    if (suffixe == QLatin1String("fig")) {
+        // Le .fig de MathWorks est un fichier MAT qui porte leur modèle
+        // d'objets graphiques ; MatLibre n'a pas ce modèle, et ne prétend
+        // pas le lire. On le dit plutôt que d'ouvrir une fenêtre vide.
+        etat_->setText(QStringLiteral("MatLibre ne lit pas les figures .fig de MATLAB ; "
+                                      "les figures s'enregistrent en SVG ou en PNG"));
+        return;
+    }
+    static const QStringList images = {QStringLiteral("png"),  QStringLiteral("jpg"),
+                                       QStringLiteral("jpeg"), QStringLiteral("bmp"),
+                                       QStringLiteral("gif"),  QStringLiteral("tif"),
+                                       QStringLiteral("tiff")};
+    if (images.contains(suffixe)) {
+        // « imshow » ouvre la figure, comme le visualiseur de MATLAB.
+        envoyer(QStringLiteral("figure; imshow(imread('%1')); title('%2')")
+                    .arg(cite, info.fileName()));
+        return;
+    }
+    if (suffixe == QLatin1String("csv")) {
+        // MATLAB propose l'outil d'importation ; à défaut, on lit le
+        // tableau dans une variable qui porte le nom du fichier.
+        QString nom = info.completeBaseName();
+        nom.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9_]")), QStringLiteral("_"));
+        if (nom.isEmpty() || nom[0].isDigit()) nom = QStringLiteral("X") + nom;
+        envoyer(QStringLiteral("%1 = readmatrix('%2')").arg(nom, cite));
+        return;
+    }
+    // Le reste s'édite, à condition d'être du texte : déverser les octets
+    // d'un binaire dans l'éditeur ne rend service à personne.
     if (!estFichierTexte(chemin)) {
         etat_->setText(QStringLiteral("%1 n'est pas un fichier texte")
-                           .arg(QFileInfo(chemin).fileName()));
+                           .arg(info.fileName()));
         return;
     }
     ouvrirFichier(chemin);
@@ -965,8 +1008,26 @@ void FenetrePrincipale::rafraichirListeFichiers() {
 }
 
 void FenetrePrincipale::changerDossierParDialogue() {
-    QString chemin = QFileDialog::getExistingDirectory(
-        this, QStringLiteral("Choisir le dossier courant"), dossierCourant_);
+    // Le dialogue montre les fichiers en plus des dossiers : on se repère
+    // à ce qu'un dossier contient, pas à son seul nom. « ShowDirsOnly »,
+    // que Qt pose par défaut, les cachait ; il faut aussi demander le
+    // dialogue de Qt, celui du système ignorant l'option.
+    QFileDialog dialogue(this, QStringLiteral("Choisir le dossier courant"),
+                         dossierCourant_);
+    dialogue.setFileMode(QFileDialog::Directory);
+    dialogue.setOption(QFileDialog::ShowDirsOnly, false);
+    dialogue.setOption(QFileDialog::DontUseNativeDialog, true);
+    // Les fichiers paraissent, mais ne se choisissent pas : c'est un
+    // dossier qu'on vient prendre.
+    dialogue.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs |
+                       QDir::Hidden);
+    if (dialogue.exec() != QDialog::Accepted) return;
+    QStringList choisis = dialogue.selectedFiles();
+    if (choisis.isEmpty()) return;
+    QString chemin = choisis.first();
+    // Un clic sur un fichier désigne le dossier qui le contient.
+    QFileInfo info(chemin);
+    if (info.exists() && !info.isDir()) chemin = info.absolutePath();
     if (chemin.isEmpty()) return;
     QMetaObject::invokeMethod(moteur_, "changerDossier", Qt::QueuedConnection,
                               Q_ARG(QString, chemin));

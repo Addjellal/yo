@@ -26,6 +26,8 @@ const char* CLASSE_FIGURE = "matlab.ui.Figure";
 Valeur poignee(const char* classe, int figure, int axe) {
     Valeur v = Valeur::structureVide();
     v.poserChamp("NumeroFigure", Valeur::scalaire(figure));
+    // Le champ porte l'identifiant de l'axe, pas son rang : « subplot » qui
+    // efface une case ne doit pas faire pointer une poignee ailleurs.
     v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
     v.classe = Classe::Objet;
     v.nomObjet = classe;
@@ -46,10 +48,10 @@ std::shared_ptr<Figure> figureDe(Interpreteur& it, const Valeur& p) {
 
 std::shared_ptr<Axes> axesDe(Interpreteur& it, const Valeur& p) {
     auto f = figureDe(it, p);
-    int indice = (int)p.champ("NumeroAxe", 0).scal();
-    if (indice < 0 || indice >= (int)f->axes.size() || !f->axes[(std::size_t)indice])
-        erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
-    return f->axes[(std::size_t)indice];
+    int identifiant = (int)p.champ("NumeroAxe", 0).scal();
+    for (const auto& a : f->axes)
+        if (a && a->identifiant == identifiant) return a;
+    erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
 }
 
 // Comparaison sans égard à la casse : MATLAB accepte « xtick », « XTick »
@@ -121,6 +123,17 @@ bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "XGrid") || memeNom(nom, "YGrid")) { a->grille = vraiDe(v); return true; }
     if (memeNom(nom, "Box")) { a->boite = vraiDe(v); return true; }
     if (memeNom(nom, "FontSize")) { a->taillePolice = v.scal(); return true; }
+    if (memeNom(nom, "Position") || memeNom(nom, "OuterPosition")) {
+        auto b = versVecteur(v);
+        if (b.size() != 4)
+            erreur("MATLAB:hg:shaped_arrays", "Position must have four elements.");
+        a->positionManuelle = true;
+        a->posGauche = b[0];
+        a->posBas = b[1];
+        a->posLargeur = b[2];
+        a->posHauteur = b[3];
+        return true;
+    }
     if (memeNom(nom, "Title")) { a->titre = v.versTexte(); return true; }
     if (memeNom(nom, "XLabel")) { a->etiquetteX = v.versTexte(); return true; }
     if (memeNom(nom, "YLabel")) { a->etiquetteY = v.versTexte(); return true; }
@@ -182,6 +195,14 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
     if (memeNom(nom, "XGrid") || memeNom(nom, "YGrid")) { sortie = marche(a->grille); return true; }
     if (memeNom(nom, "Box")) { sortie = marche(a->boite); return true; }
     if (memeNom(nom, "FontSize")) { sortie = Valeur::scalaire(a->taillePolice); return true; }
+    if (memeNom(nom, "Position") || memeNom(nom, "OuterPosition")) {
+        // La position est rendue a la façon de MATLAB : gauche, bas,
+        // largeur, hauteur, l'origine en bas a gauche de la figure.
+        double x, y, largeur, hauteur;
+        cadreAxes(*a, x, y, largeur, hauteur);
+        sortie = Valeur::ligne({x, 1.0 - y - hauteur, largeur, hauteur});
+        return true;
+    }
     if (memeNom(nom, "Title")) { sortie = Valeur::texte(a->titre); return true; }
     if (memeNom(nom, "XLabel")) { sortie = Valeur::texte(a->etiquetteX); return true; }
     if (memeNom(nom, "YLabel")) { sortie = Valeur::texte(a->etiquetteY); return true; }
@@ -234,9 +255,8 @@ FONCTION(fnGetPoignee) {
 }  // namespace
 
 Valeur poigneeAxesCourants(Interpreteur& it) {
-    auto f = figureCourante(it);
-    if (f->axes.empty()) axesCourants(it);
-    return poignee(CLASSE_AXES, f->numero, f->axeCourant);
+    auto a = axesCourants(it);
+    return poignee(CLASSE_AXES, figureCourante(it)->numero, a->identifiant);
 }
 
 Valeur poigneeFigureCourante(Interpreteur& it) {

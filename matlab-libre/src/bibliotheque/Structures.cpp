@@ -220,11 +220,6 @@ FONCTION(fnDeal) {
     return sorties;
 }
 
-FONCTION(fnStructfunAide) {
-    INUTILISE
-    return {};
-}
-
 }  // namespace
 
 void enregistrerStructures(Interpreteur& it) {
@@ -242,7 +237,6 @@ void enregistrerStructures(Interpreteur& it) {
     it.enregistrer("cell2mat", fnCell2mat, "structures", "cell2mat  Cellule -> tableau.");
     it.enregistrer("mat2cell", fnMat2cell, "structures", "mat2cell  Decoupe en blocs.");
     it.enregistrer("deal", fnDeal, "structures", "deal  Distribue des valeurs.");
-    it.enregistrer("structfun_aide", fnStructfunAide, "structures", "structfun_aide  Reserve.");
 }
 
 }  // namespace matlibre

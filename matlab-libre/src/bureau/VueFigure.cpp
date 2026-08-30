@@ -31,26 +31,51 @@ void bornes(const Axes& axes, double& xmin, double& xmax, double& ymin, double& 
         ymin -= marge;
         ymax += marge;
     }
+    // Un axe logarithmique ne porte ni le zero ni les negatifs : ses bornes
+    // sont celles des donnees strictement positives, sans la marge de cinq
+    // pour cent qui n'a de sens qu'en lineaire.
+    if (axes.logY && !axes.limitesManuellesY) {
+        double bas = 1e308, haut = -1e308;
+        bool vuPositif = false;
+        for (const auto& s : axes.series)
+            for (double v : s.y)
+                if (std::isfinite(v) && v > 0) {
+                    bas = std::min(bas, v);
+                    haut = std::max(haut, v);
+                    vuPositif = true;
+                }
+        if (vuPositif) { ymin = bas; ymax = haut; }
+    }
 }
 
-// Graduations « rondes » : pas de 1, 2 ou 5 fois une puissance de dix,
-// comme le fait MATLAB.
-std::vector<double> graduations(double bas, double haut, int cible) {
-    std::vector<double> valeurs;
-    if (!(haut > bas) || cible < 2) return valeurs;
-    double brut = (haut - bas) / cible;
-    double magnitude = std::pow(10.0, std::floor(std::log10(brut)));
-    double norme = brut / magnitude;
-    double pas = (norme < 1.5 ? 1 : norme < 3 ? 2 : norme < 7 ? 5 : 10) * magnitude;
-    double debut = std::ceil(bas / pas) * pas;
-    for (double v = debut; v <= haut + pas * 1e-9; v += pas) valeurs.push_back(v);
-    return valeurs;
-}
+// Les graduations — lineaires ou par decades — viennent de Graphique.h :
+// le rendu SVG et la fenetre doivent porter les memes.
 
 QString etiquetteNombre(double v) {
     if (std::fabs(v) < 1e-12) return QStringLiteral("0");
     QString s = QString::number(v, 'g', 6);
     return s;
+}
+
+// L'etiquette d'une graduation. Sur un axe logarithmique, MATLAB porte les
+// puissances de dix en exposant : 10 puissance moins cinq, et non 1e-05.
+QString etiquetteGraduation(double v, bool log) {
+    if (log && v > 0) {
+        double e = std::log10(v);
+        double arrondi = std::round(e);
+        if (std::fabs(e - arrondi) < 1e-9) {
+            static const char* chiffres[] = {"\u2070", "\u00b9", "\u00b2", "\u00b3",
+                                             "\u2074", "\u2075", "\u2076", "\u2077",
+                                             "\u2078", "\u2079"};
+            int n = (int)arrondi;
+            QString exposant;
+            for (QChar c : QString::number(std::abs(n)))
+                exposant += QString::fromUtf8(chiffres[c.digitValue()]);
+            if (n < 0) exposant.prepend(QString::fromUtf8("\u207b"));
+            return QStringLiteral("10") + exposant;
+        }
+    }
+    return etiquetteNombre(v);
 }
 
 QColor couleurDe(const std::string& texte, int rang) {
@@ -97,24 +122,24 @@ void VueFigure::paintEvent(QPaintEvent*) {
         peintre.drawText(rect(), Qt::AlignCenter, QStringLiteral("figure vide"));
         return;
     }
-    int lignes = std::max(1, figure_.figure.lignes);
-    int colonnes = std::max(1, figure_.figure.colonnes);
-    double largeurCase = width() / (double)colonnes;
-    double hauteurCase = height() / (double)lignes;
+    // Chaque axe porte son propre decoupage : deux « subplot » de grilles
+    // differentes coexistent dans la meme figure sans se deplacer.
     for (const auto& axes : figure_.figure.axes) {
         if (!axes) continue;
-        int position = std::max(1, axes->position);
-        int i = (position - 1) / colonnes;
-        int j = (position - 1) % colonnes;
-        QRectF cadre(j * largeurCase, i * hauteurCase, largeurCase, hauteurCase);
+        double fx, fy, fl, fh;
+        cadreAxes(*axes, fx, fy, fl, fh);
+        QRectF cadre(fx * width(), fy * height(), fl * width(), fh * height());
         peindreAxes(peintre, *axes, cadre);
     }
 }
 
 void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& cadre) {
     QFontMetricsF metrique(peintre.font());
-    double margeGauche = 62, margeDroite = 18, margeHaut = 30, margeBas = 44;
-    if (axes.titre.empty()) margeHaut = 16;
+    double margeGauche = std::min(62.0, 0.22 * cadre.width());
+    double margeDroite = std::min(18.0, 0.10 * cadre.width());
+    double margeHaut = std::min(30.0, 0.16 * cadre.height());
+    double margeBas = std::min(44.0, 0.22 * cadre.height());
+    if (axes.titre.empty()) margeHaut = std::min(16.0, margeHaut);
     QRectF trace(cadre.left() + margeGauche, cadre.top() + margeHaut,
                  cadre.width() - margeGauche - margeDroite,
                  cadre.height() - margeHaut - margeBas);
@@ -131,17 +156,33 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         trace = QRectF(gauche, haut, droite - gauche, bas - haut);
         if (trace.width() < 10 || trace.height() < 10) return;
     }
+    // « semilogx », « semilogy » et « loglog » : l'echelle est celle du
+    // logarithme decimal, et les bornes sont ramenees dans les positifs.
+    bool logX = axes.logX, logY = axes.logY;
+    if (logX && !bornesLog(xmin, xmax)) logX = false;
+    if (logY && !bornesLog(ymin, ymax)) logY = false;
+    auto place = [](double v, double bas, double haut, bool log) {
+        if (log) {
+            v = std::log10(std::max(v, 1e-300));
+            bas = std::log10(std::max(bas, 1e-300));
+            haut = std::log10(std::max(haut, 1e-300));
+        }
+        if (!(haut > bas)) return 0.5;
+        return (v - bas) / (haut - bas);
+    };
     auto versEcranX = [&](double x) {
-        return trace.left() + (x - xmin) / (xmax - xmin) * trace.width();
+        return trace.left() + place(x, xmin, xmax, logX) * trace.width();
     };
     auto versEcranY = [&](double y) {
-        return trace.bottom() - (y - ymin) / (ymax - ymin) * trace.height();
+        return trace.bottom() - place(y, ymin, ymax, logY) * trace.height();
     };
 
     // Grille et graduations.
     // « ax.XTick = [15 40 60] » l'emporte sur les graduations calculees.
-    std::vector<double> gx = axes.ticksX.empty() ? graduations(xmin, xmax, 6) : axes.ticksX;
-    std::vector<double> gy = axes.ticksY.empty() ? graduations(ymin, ymax, 6) : axes.ticksY;
+    std::vector<double> gx =
+        axes.ticksX.empty() ? graduationsAxe(xmin, xmax, 6, logX) : axes.ticksX;
+    std::vector<double> gy =
+        axes.ticksY.empty() ? graduationsAxe(ymin, ymax, 6, logY) : axes.ticksY;
     peintre.setPen(QPen(QColor("#d8d8d8"), 1));
     if (axes.grille) {
         for (double v : gx) peintre.drawLine(QPointF(versEcranX(v), trace.top()),
@@ -168,7 +209,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         peintre.drawLine(QPointF(x, trace.bottom()), QPointF(x, trace.bottom() - 5));
         QString texte = k < axes.etiquettesTicksX.size()
                             ? QString::fromStdString(axes.etiquettesTicksX[k])
-                            : etiquetteNombre(v);
+                            : etiquetteGraduation(v, logX);
         peintre.drawText(QRectF(x - 40, trace.bottom() + 4, 80, metrique.height() + 2),
                          Qt::AlignHCenter | Qt::AlignTop, texte);
     }
@@ -182,7 +223,7 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                          Qt::AlignRight | Qt::AlignVCenter,
                          k < axes.etiquettesTicksY.size()
                              ? QString::fromStdString(axes.etiquettesTicksY[k])
-                             : etiquetteNombre(v));
+                             : etiquetteGraduation(v, logY));
     }
 
     // Les séries. Le tracé est découpé au cadre : une limite manuelle ne

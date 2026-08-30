@@ -190,4 +190,79 @@ assert(numel(svgSans) < numel(svgAvec));
 axis on
 close all
 
+%% ------------------------------------------------ decoupages en cases
+% Chaque axe porte son propre decoupage : deux « subplot » de grilles
+% differentes coexistent, et le second efface seulement les cases qu'il
+% recouvre. C'est ce que fait MATLAB, et c'est ce qui empechait un
+% diagramme de Bode de deplacer les cases voisines.
+cases = @() numel(strfind(matlibre_svg(), 'fill="white" stroke="#222"'));
+figure
+subplot(2, 2, 1); plot(1:10);
+subplot(2, 2, 2); plot(1:10);
+assert(cases() == 2);
+subplot(2, 1, 2); plot(1:10);          % recouvre les cases 3 et 4, pas 1 ni 2
+assert(cases() == 3);
+subplot(1, 1, 1); plot(1:10);          % recouvre tout
+assert(cases() == 1);
+% Revenir sur une case deja ouverte la reprend, sans en creer une autre.
+figure
+subplot(2, 2, 1); plot(1:10);
+subplot(2, 2, 2); plot(1:10);
+subplot(2, 2, 1); plot(2:11);
+assert(cases() == 2);
+% Une case peut en couvrir plusieurs.
+figure
+subplot(2, 2, [1 2]); plot(1:10);
+subplot(2, 2, 3); plot(1:10);
+assert(cases() == 2);
+% Une case hors du decoupage est refusee.
+tropLoin = false;
+try
+    subplot(2, 2, 7);
+catch err
+    tropLoin = strcmp(err.identifier, 'MATLAB:subplot:SubplotIndexTooLarge');
+end
+assert(tropLoin);
+
+%% --------------------------------------------------- axes places a la main
+% « axes('Position',[g b l h]) » place un axe ou l'on veut, en fractions
+% de la figure, l'origine en bas a gauche.
+figure
+haut = axes('Position', [0.1 0.55 0.8 0.35]);
+bas = axes('Position', [0.1 0.1 0.8 0.35]);
+assert(cases() == 2);
+assert(max(abs(get(haut, 'Position') - [0.1 0.55 0.8 0.35])) < 1e-9);
+% « axes(h) » revient sur un axe : le trace suivant y va.
+axes(haut);
+plot(1:10);
+assert(max(abs(get(gca, 'Position') - [0.1 0.55 0.8 0.35])) < 1e-9);
+% Une poignee reste valide quand un autre axe disparait : elle porte
+% l'identifiant de son axe, pas son rang.
+figure
+premier = subplot(2, 2, 1);
+subplot(2, 2, 4);
+subplot(2, 1, 2);                      % efface les cases 3 et 4
+set(premier, 'YLim', [0 5]);
+assert(max(abs(get(premier, 'YLim') - [0 5])) < 1e-9);
+
+%% ------------------------------------------------- echelles logarithmiques
+% Un axe logarithmique porte ses graduations aux puissances de dix, et les
+% ecrit en exposant — 10 puissance moins deux, non 0.01.
+figure
+semilogx(logspace(-2, 3, 100), ones(1, 100));
+svgLog = matlibre_svg();
+assert(~isempty(strfind(svgLog, '10<tspan')));
+assert(~isempty(strfind(svgLog, '>-2</tspan>')));
+assert(~isempty(strfind(svgLog, '>3</tspan>')));
+% En lineaire, aucune puissance en exposant.
+figure
+plot(logspace(-2, 3, 100), ones(1, 100));
+assert(isempty(strfind(matlibre_svg(), '10<tspan')));
+% Un axe logarithmique en y ne tombe pas sur les valeurs negatives.
+figure
+semilogy([1 2 3], [-1 10 100]);
+svgY = matlibre_svg();
+assert(~isempty(strfind(svgY, '10<tspan')));
+close all
+
 disp('graphique : toutes les verifications passent');

@@ -8,6 +8,7 @@
 // chaine de caracteres.
 #include <QApplication>
 #include <QDir>
+#include <QFileDialog>
 #include <QDockWidget>
 #include <QElapsedTimer>
 #include <QImage>
@@ -215,6 +216,50 @@ int main(int argc, char** argv) {
             for (int x = 0; x < grande.width(); x += 2)
                 if (qGray(grande.pixel(x, y)) < 220) ++encreLarge;
         verifier(encreLarge > encre, "la figure se redessine quand on l'agrandit");
+    }
+
+    // --- l'echelle logarithmique se voit a l'ecran ------------------------
+    //
+    // « semilogx » doit dessiner une abscisse logarithmique dans la
+    // fenetre, comme il le fait deja dans le SVG. Le controle est celui
+    // qu'un oeil ferait : sur cinq decades, une droite y = x remplit la
+    // largeur ; en echelle lineaire elle serait ecrasee contre le bord
+    // gauche.
+    {
+        envoyer(fenetre, QStringLiteral("figure; w = logspace(-5, 5, 400); "
+                                        "semilogx(w, w); grid on;"));
+        VueFigure* vueLog = nullptr;
+        verifier(attendre([&] {
+                     for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                         if (!f->isHidden() &&
+                             f->windowTitle().startsWith(QLatin1String("Figure 2")))
+                             vueLog = f->vue();
+                     return vueLog != nullptr;
+                 }),
+                 "la figure de la courbe logarithmique s'ouvre");
+        if (vueLog) {
+            vueLog->resize(640, 480);
+            QCoreApplication::processEvents();
+            QImage image(640, 480, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            vueLog->render(&image);
+            int colonnesEncrees = 0;
+            for (int x = 0; x < image.width(); ++x) {
+                bool encre = false;
+                for (int y = 0; y < image.height() && !encre; ++y) {
+                    QColor c = image.pixelColor(x, y);
+                    if (c.blue() - c.red() > 60) encre = true;  // le bleu du trace
+                }
+                if (encre) ++colonnesEncrees;
+            }
+            verifier(colonnesEncrees > image.width() / 2,
+                     "l'abscisse logarithmique etale la courbe sur la largeur");
+            const char* capture = std::getenv("MATLIBRE_CAPTURE_FIGURE");
+            if (capture) image.save(QString::fromLocal8Bit(capture));
+        }
+        // Refermer la sienne : la suite compte les fenetres ouvertes.
+        envoyer(fenetre, QStringLiteral("close(2)"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
     }
 
     // --- la vie des fenetres de figure ------------------------------------
@@ -946,6 +991,17 @@ int main(int argc, char** argv) {
             QImage d = csv ? csv->icon(0).pixmap(16, 16).toImage() : QImage();
             verifier(!c.isNull() && c != d, "un dossier et un fichier non plus");
         }
+    }
+
+    // Le dialogue « Dossier courant » montre les fichiers en plus des
+    // dossiers : c'est a eux qu'on se repere. Qt les cache par defaut.
+    {
+        QFileDialog sonde(&fenetre, QStringLiteral("essai"), QDir::currentPath());
+        sonde.setFileMode(QFileDialog::Directory);
+        sonde.setOption(QFileDialog::ShowDirsOnly, false);
+        sonde.setOption(QFileDialog::DontUseNativeDialog, true);
+        verifier(!sonde.testOption(QFileDialog::ShowDirsOnly),
+                 "le dialogue de dossier ne se limite pas aux dossiers");
     }
 
     // Une capture, pour qu'un humain puisse regarder ce qui a ete construit.

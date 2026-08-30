@@ -371,4 +371,66 @@ texte = evalc('disp(tf(1, [1 2 1]))');
 assert(contains(texte, 's^2 + 2 s + 1'));
 assert(contains(texte, 'Continuous-time transfer function.'));
 
+%% --------------------------------------------------- les traces
+% Un trace sans sortie ne doit rien afficher : « bode(S, w) » dessine, il
+% n'ecrit pas des milliers de nombres dans la console.
+G = tf(1, [1 0.4 1]);
+T = feedback(series(G, tf(10, [1 0])), 1);
+grille = logspace(-2, 2, 50);
+figure
+assert(isempty(strtrim(evalc('bode(G, grille)'))));
+assert(isempty(strtrim(evalc('bodemag(G, grille)'))));
+assert(isempty(strtrim(evalc('sigma(G, grille)'))));
+assert(isempty(strtrim(evalc('step(G)'))));
+assert(isempty(strtrim(evalc('impulse(G)'))));
+assert(isempty(strtrim(evalc('nyquist(G)'))));
+assert(isempty(strtrim(evalc('nichols(G)'))));
+assert(isempty(strtrim(evalc('pzmap(G)'))));
+assert(isempty(strtrim(evalc('rlocus(G)'))));
+assert(isempty(strtrim(evalc('margin(G)'))));
+
+% Plusieurs modeles sur le meme trace, chacun avec son style.
+assert(isempty(strtrim(evalc('bode(G, ''b'', T, ''r--'', grille)'))));
+assert(isempty(strtrim(evalc('sigma(G, T, grille)'))));
+assert(isempty(strtrim(evalc('step(G, ''b'', T, ''r--'', 20)'))));
+assert(isempty(strtrim(evalc('bodemag(G, T, {0.01, 100})'))));
+
+% Avec des sorties, un seul modele — comme dans MATLAB.
+plusieurs = false;
+try
+    [m, p] = sigma(G, T, grille);   %#ok<ASGLU>
+catch err
+    plusieurs = strcmp(err.identifier, 'Control:analysis:MultipleModels');
+end
+assert(plusieurs);
+
+% « bode » coupe la case courante en deux : le gain en haut, la phase en
+% bas. Les cases voisines ne bougent pas.
+figure
+subplot(2, 2, 1); plot(1:10);
+subplot(2, 2, 2); bode(G, grille);
+boites = numel(strfind(matlibre_svg(), 'fill="white" stroke="#222"'));
+assert(boites == 3);                  % la case 1, plus les deux moities
+
+% Le module et la phase, sur une grille imposee.
+[m, p, w] = bode(tf(1, [1 1]), 1);
+assert(abs(m - 1 / sqrt(2)) < 1e-12);
+assert(abs(p + 45) < 1e-12);
+assert(w == 1);
+% « bodemag » rend le meme module que « bode ».
+[m2, w2] = bodemag(tf(1, [1 1]), 1);
+assert(abs(m2 - m) < 1e-15 && w2 == w);
+% Les bornes {WMIN,WMAX} developpent une grille de deux cents points.
+[~, ~, wBornes] = bode(G, {0.1, 10});
+assert(numel(wBornes) == 200);
+assert(abs(wBornes(1) - 0.1) < 1e-12 && abs(wBornes(end) - 10) < 1e-12);
+
+% « margin » accepte aussi une reponse deja calculee.
+[gmSys, pmSys] = margin(tf(1, [1 2 1 0]));
+[mm, pp, ww] = bode(tf(1, [1 2 1 0]), logspace(-4, 4, 4000).');
+[gmRep, pmRep] = margin(mm, pp, ww);
+assert(abs(gmSys - gmRep) < 1e-12 && abs(pmSys - pmRep) < 1e-12);
+assert(abs(gmSys - 2) < 1e-3);
+close all
+
 disp('automatique : toutes les verifications passent');
