@@ -150,4 +150,51 @@ ligneSingle = strtrim(evalc('disp(single([pi 1/3]))'));
 assert(~isempty(strfind(ligneSingle, '3.1415927')));
 assert(isempty(strfind(ligneSingle, '3.14159274')));
 
+%% ------------------------------------------- readmatrix et writematrix
+% Ce qu'on ecrit, on doit le relire a l'identique — c'est le seul controle
+% qui vaille pour un format de fichier.
+fichierCsv = [tempname() '.csv'];
+writematrix(magic(4), fichierCsv);
+assert(isequal(readmatrix(fichierCsv), magic(4)));
+% Les nombres a virgule survivent aussi, et NaN et Inf gardent leur nom.
+donnees = [1.5 -2.25; NaN Inf];
+writematrix(donnees, fichierCsv);
+relu = readmatrix(fichierCsv);
+assert(isnan(relu(2, 1)) && isinf(relu(2, 2)));
+assert(abs(relu(1, 1) - 1.5) < 1e-15 && abs(relu(1, 2) + 2.25) < 1e-15);
+% Un separateur impose.
+writematrix([1 2; 3 4], fichierCsv, 'Delimiter', 'semi');
+texteBrut = fileread(fichierCsv);
+assert(~isempty(strfind(texteBrut, '1;2')));
+assert(isequal(readmatrix(fichierCsv), [1 2; 3 4]));
+% Une ligne d'en-tete est reconnue toute seule ; « Range » commence ou
+% l'on veut.
+fid = fopen(fichierCsv, 'w');
+fprintf(fid, 'temps;mesure\n0;1.5\n1;2.5\n2;3.5\n');
+fclose(fid);
+assert(isequal(readmatrix(fichierCsv), [0 1.5; 1 2.5; 2 3.5]));
+assert(isequal(readmatrix(fichierCsv, 'Range', 'B2'), [2.5; 3.5]));
+avecEnTete = readmatrix(fichierCsv, 'NumHeaderLines', 0, 'Delimiter', ';');
+assert(isequal(size(avecEnTete), [4 2]));
+assert(all(isnan(avecEnTete(1, :))));      % la ligne de titres n'a pas de nombre
+assert(isequal(avecEnTete(2:end, :), [0 1.5; 1 2.5; 2 3.5]));
+% Une tabulation, devinee elle aussi.
+fid = fopen(fichierCsv, 'w');
+fprintf(fid, '1\t2\t3\n4\t5\t6\n');
+fclose(fid);
+assert(isequal(readmatrix(fichierCsv), [1 2 3; 4 5 6]));
+delete(fichierCsv);
+
+%% -------------------------------------------------- display et inputname
+% « display(x) » ecrit « x = ... » quand on lui passe une variable, et le
+% texte seul quand on lui passe une expression. C'est « inputname » qui
+% fait la difference.
+maVariable = 3;
+sortie = evalc('display(maVariable)');
+assert(~isempty(strfind(sortie, 'maVariable =')));
+sortie = evalc('display(''un message'')');
+assert(~isempty(strfind(sortie, 'un message')));
+assert(isempty(strfind(sortie, 'ans =')));
+assert(isempty(strfind(sortie, '''')));
+
 disp('texte et entrees-sorties : toutes les verifications passent');

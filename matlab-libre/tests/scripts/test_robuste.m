@@ -132,4 +132,60 @@ Ad = [-2 1; 0 -2];
 assert(okd);
 assert(norm(Ad' * Xd + Xd * Ad - Xd * (B * B') * Xd + Q, 'fro') < 1e-9);
 
+%% ------------------------------------------------------------- sysic
+% L'interconnexion decrite par des variables doit donner exactement le
+% schema qu'on ecrirait a la main.
+G = ss(tf(2, [1 1]));
+K = ss(tf(10, [1 0]));
+W1 = ss(tf(1, [1 0.1]));
+W2 = ss(0.5);
+systemnames  = 'G K W1 W2';
+inputvar     = '[ref; u]';
+outputvar    = '[W1; W2; G]';
+input_to_G   = '[u]';
+input_to_K   = '[ref - G]';
+input_to_W1  = '[ref - G]';
+input_to_W2  = '[u]';
+cleanupsysic = 'yes';
+P = sysic;
+assert(isequal(size(P), [3 2]));
+assert(order(P) == order(G) + order(K) + order(W1));
+for p = [0.1 1 10]
+    g = freqresp(G, p);
+    w1 = freqresp(W1, p);
+    attendu = [w1, -w1 * g; 0, 0.5; 0, g];
+    assert(max(max(abs(freqresp(P, p) - attendu))) < 1e-9);
+end
+% « cleanupsysic » efface les variables du montage.
+assert(exist('input_to_G', 'var') == 0);
+assert(exist('systemnames', 'var') == 0);
+
+% Les gains, les indices de voie et les entrees en groupe.
+GM = ss(-eye(2), eye(2), eye(2), zeros(2));
+systemnames = 'GM';
+inputvar    = '[d{2}]';
+outputvar   = '[2*GM(1) - GM(2); d(1)]';
+input_to_GM = '[d]';
+Q = sysic;
+assert(isequal(size(Q), [2 2]));
+for p = [0.2 3]
+    g = freqresp(GM, p);
+    attendu = [2 * g(1, 1) - g(2, 1), 2 * g(1, 2) - g(2, 2); 1, 0];
+    assert(max(max(abs(freqresp(Q, p) - attendu))) < 1e-9);
+end
+clear systemnames inputvar outputvar input_to_GM
+
+% Un bloc oublie est signale, avec son nom.
+systemnames = 'GM';
+inputvar    = '[d]';
+outputvar   = '[GM]';
+manque = '';
+try
+    sysic;
+catch err
+    manque = err.identifier;
+end
+assert(strcmp(manque, 'Robust:sysic:Missing'));
+clear systemnames inputvar outputvar
+
 disp('robuste : toutes les verifications passent');

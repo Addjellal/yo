@@ -314,10 +314,20 @@ FONCTION(fnDisp) {
     return {};
 }
 
+// « display(x) » ecrit « x = ... » ; « display('texte') » ecrit le texte
+// seul. MATLAB fait la difference par « inputname » : un argument qui est
+// une variable a un nom, une expression n'en a pas.
 FONCTION(fnDisplay) {
     INUTILISE
     exigerArguments(args, 1, 2, "display");
-    std::string nom = args.size() > 1 ? args[1].versTexte() : "ans";
+    std::string nom = args.size() > 1 ? args[1].versTexte() : it.nomArgument(0);
+    if (nom.empty()) {
+        // Sans nom, « display » vaut « disp » : c'est ce que fait MATLAB
+        // pour « display('texte') ».
+        std::vector<Valeur> seul{args[0]};
+        Arguments passage(seul);
+        return fnDisp(it, passage, 0);
+    }
     afficherResultat(it, nom, args[0]);
     return {};
 }

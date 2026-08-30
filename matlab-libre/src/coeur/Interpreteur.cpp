@@ -194,6 +194,14 @@ void Interpreteur::effacerVariable(const std::string& nom) {
     p.liensPersistants.erase(nom);
 }
 
+std::string Interpreteur::nomArgument(std::size_t k) const {
+    return k < nomsArgumentsAppel_.size() ? nomsArgumentsAppel_[k] : std::string();
+}
+
+void Interpreteur::poserNomsArguments(std::vector<std::string> noms) {
+    nomsArgumentsAppel_ = std::move(noms);
+}
+
 std::vector<std::string> Interpreteur::nomsVariables() const {
     std::vector<std::string> noms;
     for (const auto& kv : piles_.back()->variables) noms.push_back(kv.first);
@@ -696,6 +704,8 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
     }
     portee->nargin = (int)args.size();
     portee->nargout = nargout;
+    portee->nomsEntrees = std::move(nomsArgumentsAppel_);
+    nomsArgumentsAppel_.clear();
     GardePortee garde(*this, portee);
     auto sorties = evaluerMulti(f.corps, nargout);
     std::size_t demandees = (std::size_t)std::max(nargout, 1);
@@ -761,6 +771,8 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
     }
     portee->nargin = (int)args.size();
     portee->nargout = nargout;
+    portee->nomsEntrees = std::move(nomsArgumentsAppel_);
+    nomsArgumentsAppel_.clear();
     GardePortee garde(*this, portee);
     GardeCadre cadre(*this, f->nom, f->fichier);
     if (profil.actif) profil.entrerAppel(f->nom);
@@ -1561,6 +1573,12 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             int demandees = nargout < 0 ? 1 : nargout;
             if (!n->acces.empty() && n->acces[0].genre == '(') {
                 auto args = evaluerListe(n->acces[0].args);
+                // Les noms des arguments qui sont de simples variables :
+                // « inputname » les rend, « display » s'en sert.
+                std::vector<std::string> noms;
+                for (const NoeudPtr& a : n->acces[0].args)
+                    noms.push_back(a && a->type == TypeN::Ident ? a->texte : std::string());
+                poserNomsArguments(std::move(noms));
                 courant = appeler(nom, args, n->acces.size() > 1 ? 1 : demandees);
                 debut = 1;
             } else {

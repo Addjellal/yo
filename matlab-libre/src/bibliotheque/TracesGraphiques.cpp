@@ -402,13 +402,15 @@ FONCTION(fnAxes) {
 }
 
 FONCTION(fnXlabel) {
-    INUTILISE
     axesCourants(it)->etiquetteX = args.empty() ? "" : args[0].versTexte();
+    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
+    if (nargout > 0) return {poigneeTexteCourant(it, "xlabel")};
     return {};
 }
 FONCTION(fnYlabel) {
-    INUTILISE
     axesCourants(it)->etiquetteY = args.empty() ? "" : args[0].versTexte();
+    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
+    if (nargout > 0) return {poigneeTexteCourant(it, "ylabel")};
     return {};
 }
 FONCTION(fnZlabel) {
@@ -417,8 +419,9 @@ FONCTION(fnZlabel) {
     return {};
 }
 FONCTION(fnTitle) {
-    INUTILISE
     axesCourants(it)->titre = args.empty() ? "" : args[0].versTexte();
+    // MATLAB rend la poignee du texte : « z = title(...) ; set(z,...) ».
+    if (nargout > 0) return {poigneeTexteCourant(it, "title")};
     return {};
 }
 

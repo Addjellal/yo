@@ -387,7 +387,32 @@ assert(isequal(permute(ones(2, 3), [2 1]), ones(3, 2)));
 assert(isletter('a') && ~isletter('1'));
 assert(~isletter(NaN));       % isalpha(INT_MIN) lisait hors de sa table
 
+%% ------------------------------------------------------------ inputname
+% Le nom de la variable passee en argument, quand c'en etait une.
+maDonnee = [1 2 3];
+assert(strcmp(nomRecu(maDonnee), 'maDonnee'));
+assert(isempty(nomRecu([4 5 6])));
+assert(isempty(nomRecu(maDonnee + 1)));
+
+%% ------------------------------------------------ evalin efface aussi
+% « evalin('caller','clear x') » doit effacer x chez l'appelant : une
+% fusion des variables ecrites ne suffit pas, il faut reporter la table
+% entiere.
+aEffacer = 1;
+aGarder = 2;
+effaceChezLAppelant('aEffacer');
+assert(exist('aEffacer', 'var') == 0);
+assert(exist('aGarder', 'var') ~= 0);
+
 disp('langage : toutes les verifications passent');
+
+function nom = nomRecu(~)
+    nom = inputname(1);
+end
+
+function effaceChezLAppelant(nom)
+    evalin('caller', ['clear ' nom]);
+end
 
 % --------------------------------------------------------------- fonctions
 

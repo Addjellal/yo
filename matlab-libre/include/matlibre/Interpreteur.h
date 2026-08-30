@@ -38,6 +38,9 @@ struct Portee {
     std::set<std::string> globales;
     std::map<std::string, std::string> liensPersistants;  // nom local -> clé globale
     std::string nomFonction;
+    // Les noms des variables passees en arguments, quand elles en avaient :
+    // c'est ce que rend « inputname ».
+    std::vector<std::string> nomsEntrees;
     int nargin = 0;
     int nargout = 0;
     std::shared_ptr<FonctionUtilisateur> fonction;
@@ -129,6 +132,12 @@ public:
     void ecrireVariable(const std::string& nom, Valeur v);
     void effacerVariable(const std::string& nom);
     std::vector<std::string> nomsVariables() const;
+    // Le nom de la variable passee en k-ieme argument de l'appel en cours,
+    // vide quand l'argument n'etait pas une simple variable. C'est ce que
+    // rend « inputname », et ce dont « display » a besoin pour ecrire
+    // « x = 3 » quand on lui passe x, et « 3 » quand on lui passe 3.
+    std::string nomArgument(std::size_t k) const;
+    void poserNomsArguments(std::vector<std::string> noms);
     int profondeur() const { return (int)piles_.size(); }
 
     // --- table des fonctions ---
@@ -263,6 +272,7 @@ private:
     std::shared_ptr<Portee> trouverPortee(const Portee* brut) const;
     std::unordered_map<std::string, EntreeNative> natifs_;
     std::vector<std::string> chemin_;
+    std::vector<std::string> nomsArgumentsAppel_;
     std::map<std::string, std::string> indexM_;       // nom -> fichier
     std::map<std::string, std::string> indexClasses_; // nom -> fichier classdef
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> cacheFonctions_;

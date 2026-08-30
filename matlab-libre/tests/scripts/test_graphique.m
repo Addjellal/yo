@@ -118,8 +118,10 @@ assert(strcmp(ax.XScale, 'log'));
 ax.XScale = 'linear';
 ax.Box = 'off';
 assert(strcmp(ax.Box, 'off'));
+% « ax.Title = 'texte' » pose le titre ; le lire rend la poignee du
+% texte, comme dans MATLAB, et c'est sur elle qu'on lit la chaine.
 ax.Title = 'un titre';
-assert(strcmp(ax.Title, 'un titre'));
+assert(strcmp(get(ax.Title, 'String'), 'un titre'));
 
 % La forme historique marche aussi.
 set(ax, 'YTick', [-1 0 1], 'FontSize', 12);
@@ -263,6 +265,37 @@ figure
 semilogy([1 2 3], [-1 10 100]);
 svgY = matlibre_svg();
 assert(~isempty(strfind(svgY, '10<tspan')));
+close all
+
+%% ------------------------------------------- le titre est un objet
+% « z = title(...) » rend une poignee, sur laquelle on ecrit : c'est ce
+% que font les scripts qui grossissent leur titre.
+figure
+plot(1:10);
+z = title('un titre');
+assert(strcmp(class(z), 'matlab.graphics.primitive.Text'));
+assert(strcmp(get(z, 'String'), 'un titre'));
+set(z, 'FontSize', 16);
+assert(get(z, 'FontSize') == 16);
+svgTitre = matlibre_svg();
+assert(~isempty(strfind(svgTitre, 'font-size="16px"')));
+assert(~isempty(strfind(svgTitre, 'un titre')));
+% L'etiquette d'un axe aussi, et « gca » les rend.
+e = xlabel('temps');
+set(e, 'String', 't (s)');
+assert(strcmp(get(get(gca, 'XLabel'), 'String'), 't (s)'));
+assert(strcmp(get(get(gca, 'Title'), 'String'), 'un titre'));
+% Une propriete qu'on ne sait pas rendre est acceptee sans rien casser.
+set(z, 'Color', [1 0 0]);
+set(z, 'Interpreter', 'tex');
+% Une propriete qui n'existe pas est refusee, comme dans MATLAB.
+inconnue = false;
+try
+    set(z, 'CetteProprieteNExistePas', 1);
+catch err
+    inconnue = strcmp(err.identifier, 'MATLAB:hg:InvalidProperty');
+end
+assert(inconnue);
 close all
 
 disp('graphique : toutes les verifications passent');

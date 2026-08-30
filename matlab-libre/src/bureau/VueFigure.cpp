@@ -358,6 +358,8 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
     if (!axes.titre.empty()) {
         QFont gras = peintre.font();
         gras.setBold(true);
+        // « set(get(gca,'Title'),'FontSize',16) » : la taille imposée.
+        if (axes.taillePoliceTitre > 0) gras.setPointSizeF(axes.taillePoliceTitre);
         peintre.save();
         peintre.setFont(gras);
         peintre.drawText(QRectF(trace.left(), cadre.top() + 4, trace.width(), margeHaut - 6),

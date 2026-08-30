@@ -60,6 +60,9 @@ struct Axes {
     std::vector<std::string> etiquettesTicksX, etiquettesTicksY;
     bool boite = true;
     double taillePolice = 10;
+    // La taille du titre, quand « set(z,'FontSize',16) » l'impose ; zéro
+    // laisse celle du rendu.
+    double taillePoliceTitre = 0;
     // « axis equal » / « axis square » / « axis off ». MATLAB : equal
     // donne la meme echelle aux deux axes — un cercle est rond —, square
     // rend la boite carree, off cache le cadre, les graduations et les
@@ -126,6 +129,9 @@ std::vector<std::size_t> indicesVisibles(const std::vector<double>& x,
 
 // Poignées de MATLAB : « ax = gca » puis « ax.XTick = [...] ».
 Valeur poigneeAxesCourants(Interpreteur& it);
+// La poignee du titre ou d'une etiquette de l'axe courant : « title »,
+// « xlabel » et « ylabel » la rendent quand on la demande.
+Valeur poigneeTexteCourant(Interpreteur& it, const std::string& cible);
 Valeur poigneeFigureCourante(Interpreteur& it);
 
 // Ajoute un axe a une figure et lui donne son identifiant. Tout axe cree

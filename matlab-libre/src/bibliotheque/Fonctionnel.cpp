@@ -365,9 +365,13 @@ FONCTION(fnEvalin) {
     struct Reporter {
         Portee& cible;
         const std::shared_ptr<Portee>& source;
-        // Les variables creees ou modifiees repartent dans l'espace vise.
+        // L'espace vise recoit la table entiere, et non les seules
+        // variables ecrites : « evalin('caller','clear x') » doit effacer
+        // x chez l'appelant, ce qu'une fusion ne fait jamais.
         ~Reporter() {
-            for (const auto& kv : source->variables) cible.variables[kv.first] = kv.second;
+            cible.variables = source->variables;
+            cible.globales = source->globales;
+            cible.liensPersistants = source->liensPersistants;
         }
     } reporter{cible, sauvegarde};
     if (nargout > 0) {
@@ -461,9 +465,15 @@ FONCTION(fnNargoutchk) {
     return {};
 }
 
+// « inputname(k) » : le nom de la variable passee en k-ieme argument,
+// vide quand l'appelant a passe une expression.
 FONCTION(fnInputname) {
     INUTILISE
-    return {Valeur::texte("")};
+    exigerArguments(args, 1, 1, "inputname");
+    int k = (int)args[0].scal();
+    const auto& noms = it.portee().nomsEntrees;
+    if (k < 1 || k > (int)noms.size()) return {Valeur::texte("")};
+    return {Valeur::texte(noms[(std::size_t)k - 1])};
 }
 
 FONCTION(fnFunctions) {

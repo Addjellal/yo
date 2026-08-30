@@ -22,6 +22,9 @@ namespace {
 
 const char* CLASSE_AXES = "matlab.graphics.axis.Axes";
 const char* CLASSE_FIGURE = "matlab.ui.Figure";
+// Le titre et les etiquettes d'un axe sont des objets, dans MATLAB : on
+// leur donne une poignee, avec le nom du texte qu'elle designe.
+const char* CLASSE_TEXTE = "matlab.graphics.primitive.Text";
 
 Valeur poignee(const char* classe, int figure, int axe) {
     Valeur v = Valeur::structureVide();
@@ -31,6 +34,16 @@ Valeur poignee(const char* classe, int figure, int axe) {
     v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
     v.classe = Classe::Objet;
     v.nomObjet = classe;
+    return v;
+}
+
+Valeur poigneeTexte(int figure, int axe, const char* cible) {
+    Valeur v = Valeur::structureVide();
+    v.poserChamp("NumeroFigure", Valeur::scalaire(figure));
+    v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
+    v.poserChamp("Cible", Valeur::texte(cible));
+    v.classe = Classe::Objet;
+    v.nomObjet = CLASSE_TEXTE;
     return v;
 }
 
@@ -137,8 +150,62 @@ bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
     if (memeNom(nom, "Title")) { a->titre = v.versTexte(); return true; }
     if (memeNom(nom, "XLabel")) { a->etiquetteX = v.versTexte(); return true; }
     if (memeNom(nom, "YLabel")) { a->etiquetteY = v.versTexte(); return true; }
+    if (memeNom(nom, "TitleFontSize")) { a->taillePoliceTitre = v.scal(); return true; }
     erreur("MATLAB:hg:InvalidProperty",
            "Unrecognized property '" + nom + "' for class 'Axes'.");
+}
+
+// Le titre, l'etiquette en x, celle en y : trois textes, dont on peut
+// changer la chaine et la taille — c'est ce qu'on fait de « z =
+// title(...) ; set(z,'FontSize',16) ».
+bool ecrireTexte(Interpreteur& it, const Valeur& p, const std::string& nom,
+                 const Valeur& v) {
+    auto a = axesDe(it, p);
+    std::string cible = p.champ("Cible", 0).versTexte();
+    if (memeNom(nom, "String")) {
+        std::string texte = v.versTexte();
+        if (cible == "xlabel") a->etiquetteX = texte;
+        else if (cible == "ylabel") a->etiquetteY = texte;
+        else a->titre = texte;
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) {
+        if (cible == "title") a->taillePoliceTitre = v.scal();
+        else a->taillePolice = v.scal();
+        return true;
+    }
+    // Les autres proprietes d'un texte — couleur, police, interprete —
+    // sont acceptees sans effet : le rendu n'en a pas encore l'usage, et
+    // un script qui les pose ne doit pas s'arreter pour autant.
+    if (memeNom(nom, "Color") || memeNom(nom, "FontWeight") ||
+        memeNom(nom, "FontName") || memeNom(nom, "Interpreter") ||
+        memeNom(nom, "Rotation") || memeNom(nom, "HorizontalAlignment") ||
+        memeNom(nom, "VerticalAlignment") || memeNom(nom, "Position"))
+        return true;
+    erreur("MATLAB:hg:InvalidProperty",
+           "Unrecognized property '" + nom + "' for class 'Text'.");
+}
+
+bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
+    auto a = axesDe(it, p);
+    std::string cible = p.champ("Cible", 0).versTexte();
+    if (memeNom(nom, "String")) {
+        sortie = Valeur::texte(cible == "xlabel"   ? a->etiquetteX
+                               : cible == "ylabel" ? a->etiquetteY
+                                                   : a->titre);
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) {
+        double taille = cible == "title" && a->taillePoliceTitre > 0 ? a->taillePoliceTitre
+                                                                     : a->taillePolice;
+        sortie = Valeur::scalaire(taille);
+        return true;
+    }
+    if (memeNom(nom, "Type")) {
+        sortie = Valeur::texte("text");
+        return true;
+    }
+    return false;
 }
 
 bool ecrireFigure(Interpreteur& it, const Valeur& p, const std::string& nom,
@@ -203,9 +270,16 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
         sortie = Valeur::ligne({x, 1.0 - y - hauteur, largeur, hauteur});
         return true;
     }
-    if (memeNom(nom, "Title")) { sortie = Valeur::texte(a->titre); return true; }
-    if (memeNom(nom, "XLabel")) { sortie = Valeur::texte(a->etiquetteX); return true; }
-    if (memeNom(nom, "YLabel")) { sortie = Valeur::texte(a->etiquetteY); return true; }
+    // « get(gca,'Title') » rend la poignee du texte, comme MATLAB : c'est
+    // sur elle qu'on ecrit ensuite la taille de police.
+    if (memeNom(nom, "Title") || memeNom(nom, "XLabel") || memeNom(nom, "YLabel")) {
+        const char* cible = memeNom(nom, "XLabel")   ? "xlabel"
+                            : memeNom(nom, "YLabel") ? "ylabel"
+                                                     : "title";
+        sortie = poigneeTexte((int)p.champ("NumeroFigure", 0).scal(),
+                              (int)p.champ("NumeroAxe", 0).scal(), cible);
+        return true;
+    }
     if (memeNom(nom, "Type")) { sortie = Valeur::texte("axes"); return true; }
     return false;
 }
@@ -232,10 +306,12 @@ FONCTION(fnSetPoignee) {
     const Valeur& p = args[0];
     bool axes = estPoignee(p, CLASSE_AXES);
     bool figure = estPoignee(p, CLASSE_FIGURE);
-    if (!axes && !figure) return {};
+    bool texte = estPoignee(p, CLASSE_TEXTE);
+    if (!axes && !figure && !texte) return {};
     for (std::size_t k = 1; k + 1 < args.size(); k += 2) {
         std::string nom = args[k].versTexte();
         if (axes) ecrireAxes(it, p, nom, args[k + 1]);
+        else if (texte) ecrireTexte(it, p, nom, args[k + 1]);
         else ecrireFigure(it, p, nom, args[k + 1]);
     }
     return {};
@@ -248,6 +324,7 @@ FONCTION(fnGetPoignee) {
     std::string nom = args[1].versTexte();
     Valeur sortie;
     if (estPoignee(p, CLASSE_AXES) && lireAxes(it, p, nom, sortie)) return {sortie};
+    if (estPoignee(p, CLASSE_TEXTE) && lireTexte(it, p, nom, sortie)) return {sortie};
     if (estPoignee(p, CLASSE_FIGURE) && lireFigure(it, p, nom, sortie)) return {sortie};
     return {Valeur::vide()};
 }
@@ -259,6 +336,11 @@ Valeur poigneeAxesCourants(Interpreteur& it) {
     return poignee(CLASSE_AXES, figureCourante(it)->numero, a->identifiant);
 }
 
+Valeur poigneeTexteCourant(Interpreteur& it, const std::string& cible) {
+    auto a = axesCourants(it);
+    return poigneeTexte(figureCourante(it)->numero, a->identifiant, cible.c_str());
+}
+
 Valeur poigneeFigureCourante(Interpreteur& it) {
     auto f = figureCourante(it);
     return poignee(CLASSE_FIGURE, f->numero, 0);
@@ -268,12 +350,14 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
+        if (estPoignee(objet, CLASSE_TEXTE)) return ecrireTexte(moteur, objet, nom, valeur);
         if (estPoignee(objet, CLASSE_FIGURE)) return ecrireFigure(moteur, objet, nom, valeur);
         return false;
     };
     crochetLirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                               const std::string& nom, Valeur& sortie) {
         if (estPoignee(objet, CLASSE_AXES)) return lireAxes(moteur, objet, nom, sortie);
+        if (estPoignee(objet, CLASSE_TEXTE)) return lireTexte(moteur, objet, nom, sortie);
         if (estPoignee(objet, CLASSE_FIGURE)) return lireFigure(moteur, objet, nom, sortie);
         return false;
     };

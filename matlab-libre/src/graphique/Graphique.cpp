@@ -490,8 +490,11 @@ std::string rendreSVG(const Figure& figure) {
 
         if (!a.titre.empty())
             out << "<text class=\"titre\" x=\"" << ((gauche + droite) / 2) << "\" y=\""
-                << (haut - 14) << "\" text-anchor=\"middle\">" << echapperXml(a.titre)
-                << "</text>\n";
+                << (haut - 14) << "\" text-anchor=\"middle\""
+                << (a.taillePoliceTitre > 0
+                        ? " font-size=\"" + formater("%g", a.taillePoliceTitre) + "px\""
+                        : std::string())
+                << ">" << echapperXml(a.titre) << "</text>\n";
         // MATLAB garde le titre sous « axis off », mais pas les etiquettes
         // des axes : elles nomment ce qui n'est plus dessine.
         if (!a.etiquetteX.empty() && a.axesVisibles)
