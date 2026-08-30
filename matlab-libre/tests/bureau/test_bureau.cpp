@@ -264,6 +264,57 @@ int main(int argc, char** argv) {
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
     }
 
+    // --- une figure d'automatique, comme celles du BE ----------------------
+    //
+    // Quatre cases, un diagramme de Bode dans l'une d'elles : c'est la
+    // figure que produit un sujet de travaux pratiques. On verifie que
+    // chaque case porte de l'encre — donc que le Bode n'a pas deplace les
+    // autres — et que l'abscisse logarithmique s'etale.
+    {
+        envoyer(fenetre, QStringLiteral(
+                    "figure(7); G = tf(200, [10 1]) * tf(1, [0.05 1])^2; "
+                    "K = mixsyn(G, tf(10, [1 0.1]), 0.1, []); "
+                    "L = loopsens(G, K); w = logspace(-2, 3, 200); "
+                    "subplot(2,2,1), bodemag(L.So, w), title('sensibilite'); "
+                    "subplot(2,2,2), bodemag(L.To, w), title('complementaire'); "
+                    "subplot(2,2,3), step(feedback(series(K, ss(G)), 1)), title('indicielle'); "
+                    "subplot(2,2,4), bode(L.So, w);"));
+        VueFigure* vueBe = nullptr;
+        verifier(attendre([&] {
+                     for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                         if (!f->isHidden() &&
+                             f->windowTitle().startsWith(QLatin1String("Figure 7")))
+                             vueBe = f->vue();
+                     return vueBe != nullptr;
+                 }),
+                 "la figure du BE s'ouvre");
+        if (vueBe) {
+            vueBe->resize(900, 700);
+            QCoreApplication::processEvents();
+            QImage image(900, 700, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            vueBe->render(&image);
+            // Chaque quart de l'image doit porter de l'encre : c'est ce
+            // qui dit que les quatre cases sont dessinees, et qu'aucune
+            // n'a ete recouverte par le decoupage d'une autre.
+            auto encreDans = [&](int x0, int y0, int x1, int y1) {
+                int n = 0;
+                for (int y = y0; y < y1; y += 2)
+                    for (int x = x0; x < x1; x += 2)
+                        if (qGray(image.pixel(x, y)) < 220) ++n;
+                return n;
+            };
+            verifier(encreDans(0, 0, 450, 350) > 200, "la case en haut a gauche est dessinee");
+            verifier(encreDans(450, 0, 900, 350) > 200, "celle en haut a droite aussi");
+            verifier(encreDans(0, 350, 450, 700) > 200, "celle en bas a gauche aussi");
+            verifier(encreDans(450, 350, 900, 700) > 200, "celle en bas a droite aussi");
+            const char* capture = std::getenv("MATLIBRE_CAPTURE_BE");
+            if (capture) image.save(QString::fromLocal8Bit(capture));
+        }
+        envoyer(fenetre, QStringLiteral("close(7)"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+    }
+
     // --- la vie des fenetres de figure ------------------------------------
     //
     // Trois choses que MATLAB fait, et que le bureau ne faisait pas : une
