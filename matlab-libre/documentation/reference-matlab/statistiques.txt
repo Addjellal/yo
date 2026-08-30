@@ -1,0 +1,25 @@
+# Statistics and Machine Learning Toolbox.
+anova1 anova2 anovan betacdf betafit betainv betapdf betarnd betastat
+binocdf binoinv binopdf binornd binostat bootci bootstrp boxplot
+canoncorr cdf chi2cdf chi2gof chi2inv chi2pdf chi2rnd cluster clusterdata
+cophenet copulacdf corr corrcoef cov crosstab cvpartition dataset dendrogram
+discardSupportVectors ecdf evcdf expcdf expfit expinv exppdf exprnd expstat
+fcdf finv fitcecoc fitcknn fitclinear fitcnb fitcsvm fitctree fitdist fitglm
+fitlm fitlme fitrgp fitrlinear fitrsvm fitrtree fpdf friedman frnd fstat
+gamcdf gamfit gaminv gampdf gamrnd gamstat geocdf geoinv geopdf geornd
+gevcdf gmdistribution gname grp2idx grpstats harmmean histfit hmmdecode
+hmmgenerate hmmtrain hougen hygecdf iqr jbtest kmeans kruskalwallis ksdensity
+kstest kstest2 lasso lillietest linkage logncdf lognfit logninv lognpdf
+lognrnd lognstat mad mahal manova1 mdscale mle mnrfit multcompare mvncdf
+mvnpdf mvnrnd nancov nanmax nanmean nanmedian nanmin nanstd nansum nanvar
+nbincdf nbininv nbinpdf nbinrnd ncfcdf nctcdf ncx2cdf nlinfit nlparci
+nnmf normcdf normfit norminv normpdf normplot normrnd normspec normstat
+pca pcacov pdf pdist pdist2 pearsrnd perms poisscdf poissfit poissinv
+poisspdf poissrnd poisstat polyconf polytool prctile princomp probplot
+procrustes quantile randsample range ranksum raylcdf raylfit raylinv raylpdf
+raylrnd refcurve refline regress regstats relieff ridge robustfit rowexch
+runstest sequentialfs signrank signtest silhouette skewness slicesample
+sortrows squareform statset stepwise stepwisefit tabulate tcdf tinv tpdf
+trimmean trnd tstat ttest ttest2 unidcdf unidinv unidpdf unidrnd unifcdf
+unifinv unifit unifpdf unifrnd var vartest vartest2 wblcdf wblfit wblinv
+wblpdf wblrnd wblstat wishrnd zscore ztest

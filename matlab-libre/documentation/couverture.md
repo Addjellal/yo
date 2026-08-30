@@ -3,6 +3,10 @@
 Ce document dit ce que MatLibre fait et ce qu'il ne fait pas. Il vaut
 mieux le lire avant de s'appuyer dessus.
 
+Pour le détail, fonction par fonction, de ce que MatLibre a et de ce qui
+lui manque au regard de MATLAB, voir [`manques.md`](manques.md) : ce
+fichier est produit par mesure, non écrit à la main.
+
 ## Ce qui est là
 
 - **Le langage**, dans son usage courant : tous les types de données, les
@@ -11,11 +15,9 @@ mieux le lire avant de s'appuyer dessus.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **620 fonctions natives** couvrant le MATLAB de base.
-  Quatre-vingts d'entre elles — les plus consultées — ont une fiche
-  d'aide complète : syntaxe, description, exemples et fonctions
-  voisines, dans `toolbox/aide/`. Les autres gardent leur ligne de
-  description ; les fiches s'ajoutent sans recompiler.
+- **620 fonctions natives** couvrant le MATLAB de base, **toutes**
+  documentées : résumé, description, syntaxes, exemples exécutés par la
+  suite de tests et fonctions voisines, dans `toolbox/aide/`.
 - **1082 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,

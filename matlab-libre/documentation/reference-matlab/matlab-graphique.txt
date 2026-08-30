@@ -1,0 +1,13 @@
+# Graphique : figures, traces, annotations.
+alpha annotation area axes axis bar bar3 barh box boxchart brush caxis cla
+clabel clf close colorbar colormap comet compass contour contour3 contourf
+copyobj cylinder datacursormode datetick delete drawnow errorbar ezplot fill
+fill3 findobj fplot fsurf gca gcf getframe ginput gplot grid gtext heatmap
+hidden hist histogram hold image imagesc imshow legend light lighting line
+loglog material mesh meshc meshgrid meshz movie newplot nexttile pareto patch
+pcolor pie pie3 plot plot3 plotmatrix plotyy polar polarplot print quiver
+quiver3 rectangle refresh ribbon rose rotate savefig saveas scatter scatter3
+semilogx semilogy set shading slice sphere spy stackedplot stairs stem stem3
+subplot surf surfc surfl surfnorm text tiledlayout title trimesh trisurf
+uicontrol uifigure view voronoi waterfall xlabel xlim xline xticklabels xticks
+ylabel ylim yline yticklabels yticks zlabel zlim zoom

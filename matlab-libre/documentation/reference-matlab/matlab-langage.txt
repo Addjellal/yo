@@ -1,0 +1,49 @@
+# Fonctions du langage MATLAB et de sa bibliotheque de base.
+# Une ligne par nom ; « # » commence un commentaire.
+abs accumarray acos acosd acosh all allchild angle any arrayfun asin asind
+assert assignin atan atan2 atand attributes bin2dec bitand bitcmp bitor
+bitshift bitxor blanks break builtin cast cat ceil cell cell2mat cell2struct
+celldisp cellfun char circshift class clear clc clf colon compose cond conj
+containers.Map contains conv conv2 convn cos cosd cosh cot cross cumprod
+cumsum cummax cummin dec2base dec2bin dec2hex deal deblank del2 det diag
+diff disp display dot double eig empty end eps eq erf error eval evalc evalin
+exist exp expm eye factorial false fclose feof feval fft fftshift fgetl fgets
+fieldnames filter find fix fliplr flipud floor fopen fprintf fread fscanf
+full func2str function_handle functions fwrite gamma gcd genvarname get
+getfield gradient histcounts horzcat hypot idivide ifft imag ind2sub inf
+inputname inputParser int2str int8 int16 int32 int64 interp1 intersect inv
+ipermute iscell iscellstr ischar iscolumn isdiag isempty isequal isequaln
+isfield isfinite isfloat isinf isinteger islogical ismatrix ismember isnan
+isnumeric isreal isrow isscalar issorted isspace isstring isstruct isvector
+kron lcm ldivide length linsolve linspace log log2 log10 log1p logical
+logspace lower lu magic mat2str max mean median memoize meshgrid min minus
+mod mode mtimes nan nargin narginchk nargout nargoutchk ndgrid ndims ne
+nextpow2 nnz nonzeros norm normalize not now num2cell num2str numel numlock
+nthargout ones or pagemtimes permute pi pinv polyfit polyval power primes
+printf prod qr rand randi randn randperm rank rat rcond real realmax realmin
+regexp regexpi regexprep rem repelem repmat reshape rmfield round rot90
+setdiff setfield setxor shiftdim sign sin sind single sinh size sort sortrows
+sparse split sprintf sqrt squeeze stack std str2double str2func str2num
+strcat strcmp strcmpi strfind strjoin strjust strlength strncmp strncmpi
+strrep strsplit strtok strtrim struct struct2cell structfun sub2ind subsasgn
+subsref substruct sum svd swapbytes switch tan tand tanh tic toc trace
+transpose tril triu true typecast uint8 uint16 uint32 uint64 union unique
+upper validateattributes vertcat warning while who whos xor zeros
+# --- entrees-sorties et systeme
+addpath cd copyfile delete diary dir exist fileattrib filemarker fileparts
+filesep fullfile genpath importdata inputdlg isfile isfolder load matfile
+mkdir movefile path pathsep pwd readcell readmatrix readtable readvars
+rmdir rmpath save tempdir tempname type webread websave what which writecell
+writematrix writetable
+# --- dates et durees
+between calendarDuration calendar caldays calmonths calquarters calweeks
+calyears clock cputime date datenum datestr datetime datevec days duration
+etime hms hours isbetween juliandate milliseconds minutes months posixtime
+seconds timeofday timezones weeknum years yyyymmdd
+# --- tableaux structures modernes
+array2table categorical categories cell2table countcats discretize groupsummary
+head histogram2 innerjoin ismissing isordinal issortedrows join mergecats
+movmean movmedian movsum outerjoin pivot removecats renamecats renamevars
+rmmissing rowfun sortrows splitapply splitvars stack standardizeMissing
+struct2table summary table table2array table2cell table2struct tail timetable
+unstack varfun

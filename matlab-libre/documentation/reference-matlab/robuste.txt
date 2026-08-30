@@ -1,0 +1,9 @@
+# Robust Control Toolbox.
+actual2normalized augw balancmr bstmr complexify cmsclsyn dksyn dmplot
+frd genss genmat gapmetric getNominal h2hinfsyn h2norm h2syn hankelmr
+hinfnorm hinfstruct hinfsyn icsignal iconnect imp2ss lncf loopmargin
+loopsens ltiarray2uss makeweight mixsyn modreal mkfilter musyn mussv
+ncfmargin ncfsyn normalized2actual popov randatom randumat randuss reduce
+repmat robgain robstab robuststab schurmr sectf sisobnds skewdec slowfast
+stabproj strans sysbal sysic ucomplex ucomplexm udyn ultidyn umat uncertain
+ureal uss ussdata wcdiskmargin wcgain wcgopt wcnorm wcsens wcunc

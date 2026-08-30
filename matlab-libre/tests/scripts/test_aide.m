@@ -74,6 +74,29 @@ fprintf('  %d fiches, %d exemples executes\n', nombreFiches, nombreExemples);
 cd(dossierAvant);
 rmdir(bacASable, 's');
 
+%% ------------------------- toute fonction native a sa fiche complete
+% Une ligne de resume ne suffit pas : l'utilisateur qui tape « doc acosd »
+% attend la syntaxe, un exemple et les fonctions voisines. Le controle
+% porte sur toutes les natives, sans exception — c'est ce qui empeche
+% qu'une fonction ajoutee demain reparte avec une seule ligne.
+tableNatives = matlibre_fonctions();
+sansFiche = {};
+for kn = 1:size(tableNatives, 1)
+    nomNatif = tableNatives{kn, 1};
+    if strncmp(nomNatif, 'matlibre_', 9)
+        continue    % les rouages internes ne sont pas de la documentation
+    end
+    ficheNative = matlibre_aide_structuree(nomNatif);
+    if isempty(ficheNative.Syntaxe) || isempty(ficheNative.Exemples) || ...
+            isempty(ficheNative.VoirAussi)
+        sansFiche{end+1} = nomNatif;   %#ok<SAGROW>
+    end
+end
+for k = 1:numel(sansFiche)
+    fprintf('  fiche incomplete : %s\n', sansFiche{k});
+end
+assert(isempty(sansFiche));
+
 %% ------------------------- les exemples des fonctions ecrites en .m
 % Les fiches des fonctions de toolbox suivent la meme regle : leur bloc
 % « Exemples » doit tourner. La verification porte sur les dossiers dont

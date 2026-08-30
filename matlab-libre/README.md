@@ -182,6 +182,7 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |
+| [`manques.md`](documentation/manques.md) | l'inventaire compare a MATLAB, fonction par fonction — genere |
 
 ## Tests
 
