@@ -143,6 +143,28 @@ ELLIPKE Intégrales elliptiques complètes de première et seconde espèce.
      [K, E] = ellipke(0.5)   % 1.854074677301372 et 1.350643881047676
 ```
 
+## `errorbar`
+
+```
+ERRORBAR Courbe avec barres d'erreur.
+  ERRORBAR(Y,E) trace Y et, sur chaque point, une barre verticale allant
+  de Y-E à Y+E.
+
+  ERRORBAR(X,Y,E) place les points en X.
+
+  ERRORBAR(X,Y,BAS,HAUT) donne des écarts différents vers le bas et vers
+  le haut.
+
+  ERRORBAR(...,STYLE) prend une chaîne de style, comme PLOT.
+
+  Exemple :
+     x = 1:5;
+     y = [2 4 3 5 4];
+     errorbar(x, y, 0.4 * ones(size(y)), 'o-');
+
+  Voir aussi PLOT, BAR, STAIRS, STD.
+```
+
 ## `flag`
 
 ```
@@ -275,6 +297,10 @@ MATLABROOT Racine de l'installation de MatLibre.
   C'est le dossier qui contient les toolboxes.
 ```
 
+## `matlibre_cases`
+
+_Pas de bloc d'aide._
+
 ## `matlibre_racine_toolbox`
 
 ```
@@ -292,6 +318,25 @@ NEXTPOW2 Exposant de la puissance de deux immédiatement supérieure.
 
   Exemple :
      nextpow2(1000)   % 10
+```
+
+## `nexttile`
+
+```
+NEXTTILE Passe à la case suivante d'un TILEDLAYOUT.
+  NEXTTILE rend courante la case suivante du découpage préparé par
+  TILEDLAYOUT, et rend sa poignée.
+
+  NEXTTILE(K) va directement à la case K.
+
+  Sans TILEDLAYOUT préalable, la figure est découpée en une seule case.
+
+  Exemple :
+     tiledlayout(1, 2);
+     nexttile; plot(1:10); title('a gauche');
+     nexttile; plot(10:-1:1); title('a droite');
+
+  Voir aussi TILEDLAYOUT, SUBPLOT, AXES, GCA.
 ```
 
 ## `peaks`
@@ -422,6 +467,30 @@ SPRING Carte de couleurs magenta - jaune.
 
 ```
 SUMMER Carte de couleurs vert - jaune.
+```
+
+## `tiledlayout`
+
+```
+TILEDLAYOUT Découpe la figure en cases, comme SUBPLOT.
+  TILEDLAYOUT(M,N) prépare un découpage en M lignes et N colonnes. Les
+  cases se remplissent ensuite une à une par NEXTTILE, dans l'ordre de
+  lecture — c'est ce qui distingue cette disposition de SUBPLOT, où l'on
+  nomme la case à chaque fois.
+
+  TILEDLAYOUT('flow') laisse le nombre de cases se décider à mesure :
+  MatLibre prend alors trois colonnes.
+
+  Les options de MATLAB — 'TileSpacing', 'Padding' — sont acceptées et
+  sans effet : l'espacement des cases n'est pas réglable ici.
+
+  Exemple :
+     tiledlayout(2, 2);
+     nexttile; plot(1:10);
+     nexttile; plot(sin(1:10));
+     nexttile; bar([3 1 2]);
+
+  Voir aussi NEXTTILE, SUBPLOT, FIGURE, AXES.
 ```
 
 ## `uniquetol`

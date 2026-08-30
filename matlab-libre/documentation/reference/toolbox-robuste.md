@@ -132,9 +132,12 @@ HINFSYN Correcteur H-infini d'un modèle augmenté.
 
   Le modèle doit satisfaire les hypothèses habituelles : (A,B2)
   stabilisable, (C2,A) détectable, D12 de rang plein en colonnes, D21 de
-  rang plein en lignes. D22 non nul est ramené à zéro par décalage de
-  boucle, puis rendu au correcteur. D11 non nul n'est pas traité : les
-  pondérations d'un problème bien posé le laissent nul.
+  rang plein en lignes.
+
+  D11 et D22 non nuls sont ramenés à zéro par décalage de boucle, à
+  chaque GAMMA essayé, puis rendus au correcteur. Le gain du terme
+  direct D11 borne par le bas ce qu'on peut demander : aucune boucle ne
+  fait mieux que son propre gain à l'infini.
 
   Exemple :
      G = tf(200, [10 1]) * tf(1, [0.05 1])^2;

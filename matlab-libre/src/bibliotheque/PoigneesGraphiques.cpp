@@ -223,30 +223,13 @@ bool ecrireFigure(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 // --- lecture -------------------------------------------------------------
 
-// Les limites d'un axe qu'on n'a pas fixees sont celles des donnees : c'est
-// ce que rend MATLAB, et non les 0..1 d'un axe vide.
-void limitesDonnees(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax) {
-    xmin = ymin = 1e308;
-    xmax = ymax = -1e308;
-    bool vu = false;
-    for (const auto& serie : a.series) {
-        for (double v : serie.x) { xmin = std::min(xmin, v); xmax = std::max(xmax, v); vu = true; }
-        for (double v : serie.y) { ymin = std::min(ymin, v); ymax = std::max(ymax, v); vu = true; }
-    }
-    if (!vu) { xmin = 0; xmax = 1; ymin = 0; ymax = 1; }
-    if (!(xmax > xmin)) { xmin -= 0.5; xmax += 0.5; }
-    if (!(ymax > ymin)) { ymin -= 0.5; ymax += 0.5; }
-    if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
-    if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
-}
-
 bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     auto a = axesDe(it, p);
     if (memeNom(nom, "XTick")) { sortie = depuisVecteur(a->ticksX); return true; }
     if (memeNom(nom, "YTick")) { sortie = depuisVecteur(a->ticksY); return true; }
     if (memeNom(nom, "XLim") || memeNom(nom, "YLim")) {
         double xmin, xmax, ymin, ymax;
-        limitesDonnees(*a, xmin, xmax, ymin, ymax);
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
         sortie = memeNom(nom, "XLim") ? Valeur::ligne({xmin, xmax})
                                       : Valeur::ligne({ymin, ymax});
         return true;

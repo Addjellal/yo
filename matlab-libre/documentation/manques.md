@@ -7,13 +7,13 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 |---|---:|---:|---:|
 | automatique | 80 | 28 | 74 % |
 | images | 57 | 15 | 79 % |
-| matlab-graphique | 47 | 79 | 37 % |
+| matlab-graphique | 62 | 64 | 49 % |
 | matlab-langage | 344 | 82 | 81 % |
 | optimisation | 26 | 6 | 81 % |
 | robuste | 7 | 62 | 10 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 118 | 98 | 55 % |
-| **ensemble** | **783** | **401** | **66 %** |
+| **ensemble** | **798** | **386** | **67 %** |
 
 ## automatique
 
@@ -31,17 +31,15 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 ## matlab-graphique
 
-`alpha`, `annotation`, `area`, `bar3`, `barh`, `boxchart`, `brush`, `caxis`
-`cla`, `clabel`, `comet`, `compass`, `contour3`, `contourf`, `copyobj`, `cylinder`
-`datacursormode`, `datetick`, `errorbar`, `ezplot`, `fill`, `fill3`, `findobj`
-`fplot`, `fsurf`, `getframe`, `ginput`, `gplot`, `gtext`, `heatmap`, `hidden`
-`light`, `lighting`, `line`, `material`, `meshc`, `meshz`, `movie`, `newplot`
-`nexttile`, `pareto`, `patch`, `pie`, `pie3`, `plotmatrix`, `plotyy`, `polar`
-`polarplot`, `quiver`, `quiver3`, `rectangle`, `refresh`, `ribbon`, `rose`
-`rotate`, `savefig`, `scatter3`, `slice`, `sphere`, `stackedplot`, `stem3`
-`surfc`, `surfl`, `surfnorm`, `tiledlayout`, `trimesh`, `trisurf`, `uicontrol`
-`view`, `voronoi`, `waterfall`, `xline`, `xticklabels`, `xticks`, `yline`
-`yticklabels`, `yticks`, `zlim`, `zoom`
+`alpha`, `annotation`, `bar3`, `barh`, `boxchart`, `brush`, `caxis`, `clabel`
+`comet`, `compass`, `contour3`, `contourf`, `copyobj`, `cylinder`, `datacursormode`
+`datetick`, `ezplot`, `fill3`, `findobj`, `fplot`, `fsurf`, `getframe`, `ginput`
+`gplot`, `gtext`, `heatmap`, `hidden`, `light`, `lighting`, `material`, `meshc`
+`meshz`, `movie`, `newplot`, `pareto`, `patch`, `pie`, `pie3`, `plotmatrix`
+`plotyy`, `polar`, `polarplot`, `quiver`, `quiver3`, `rectangle`, `refresh`
+`ribbon`, `rose`, `rotate`, `savefig`, `scatter3`, `slice`, `sphere`, `stackedplot`
+`stem3`, `surfc`, `surfl`, `surfnorm`, `trimesh`, `trisurf`, `uicontrol`
+`voronoi`, `waterfall`, `zoom`
 
 ## matlab-langage
 

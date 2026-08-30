@@ -17,6 +17,8 @@ void bornes(const Axes& axes, double& xmin, double& xmax, double& ymin, double& 
     xmax = ymax = -1e308;
     bool vu = false;
     for (const auto& s : axes.series) {
+        // Une droite « xline » suit les bornes, elle ne les impose pas.
+        if (s.genre == GenreTrace::Constante) continue;
         for (double v : s.x) { xmin = std::min(xmin, v); xmax = std::max(xmax, v); vu = true; }
         for (double v : s.y) { ymin = std::min(ymin, v); ymax = std::max(ymax, v); vu = true; }
     }
@@ -237,6 +239,24 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         QPen crayon(couleur, serie.epaisseur);
         crayon.setStyle(styleDe(serie.style));
         switch (serie.genre) {
+            case GenreTrace::Constante: {
+                if (serie.x.empty()) break;
+                peintre.setPen(crayon);
+                if (serie.axeConstante == 'x') {
+                    double x = versEcranX(serie.x[0]);
+                    peintre.drawLine(QPointF(x, trace.top()), QPointF(x, trace.bottom()));
+                    if (!serie.legendeConstante.empty())
+                        peintre.drawText(QPointF(x + 4, trace.top() + 14),
+                                         QString::fromStdString(serie.legendeConstante));
+                } else {
+                    double y = versEcranY(serie.x[0]);
+                    peintre.drawLine(QPointF(trace.left(), y), QPointF(trace.right(), y));
+                    if (!serie.legendeConstante.empty())
+                        peintre.drawText(QPointF(trace.right() - 60, y - 4),
+                                         QString::fromStdString(serie.legendeConstante));
+                }
+                break;
+            }
             case GenreTrace::Barres: {
                 double largeur = n > 1 ? (versEcranX(serie.x[1]) - versEcranX(serie.x[0])) * 0.7
                                        : trace.width() / 3;
@@ -298,6 +318,21 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                     else { chemin.lineTo(x, chemin.currentPosition().y()); chemin.lineTo(x, y); }
                 }
                 peintre.drawPath(chemin);
+                break;
+            }
+            case GenreTrace::Polygone: {
+                if (n < 2) break;
+                QPainterPath chemin;
+                chemin.moveTo(versEcranX(serie.x[0]), versEcranY(serie.y[0]));
+                for (std::size_t k = 1; k < n; ++k)
+                    chemin.lineTo(versEcranX(serie.x[k]), versEcranY(serie.y[k]));
+                chemin.closeSubpath();
+                QColor remplissage = couleur;
+                remplissage.setAlphaF(0.4);
+                peintre.setPen(crayon);
+                peintre.setBrush(remplissage);
+                peintre.drawPath(chemin);
+                peintre.setBrush(Qt::NoBrush);
                 break;
             }
             case GenreTrace::Aire: {

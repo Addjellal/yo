@@ -18,7 +18,15 @@ namespace matlibre {
 
 class Interpreteur;
 
-enum class GenreTrace { Ligne, Barres, Points, Escalier, Tige, Aire, Image, Contour, Surface };
+enum class GenreTrace {
+    Ligne, Barres, Points, Escalier, Tige, Aire, Image, Contour, Surface,
+    // Un polygone ferme et rempli : « fill ».
+    Polygone,
+    // Une droite qui traverse tout l'axe : « xline » et « yline ». Elle
+    // suit les bornes au lieu de les imposer, ce qu'aucune serie
+    // ordinaire ne sait faire.
+    Constante
+};
 
 struct Serie {
     GenreTrace genre = GenreTrace::Ligne;
@@ -29,6 +37,11 @@ struct Serie {
     std::string marqueur;
     std::string etiquette;
     double epaisseur = 1.5;
+    // Pour une droite constante : 'x' pour une verticale — « xline » —,
+    // 'y' pour une horizontale. La valeur est dans x[0].
+    char axeConstante = 'x';
+    // Le texte pose le long de la droite, s'il y en a un.
+    std::string legendeConstante;
 };
 
 struct Axes {
@@ -79,6 +92,11 @@ struct Axes {
 // « subplot(2,2,1) » puis « subplot(2,1,2) » ne se déplacent pas l'un
 // l'autre, comme dans MATLAB.
 void cadreAxes(const Axes& a, double& x, double& y, double& largeur, double& hauteur);
+
+// Les bornes d'un axe : celles qu'on a fixées, ou celles des données.
+// C'est ce que rend « xlim » sans argument, et ce que lit « get(gca,
+// 'XLim') » — les deux doivent dire la même chose.
+void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax);
 
 // Vrai si les deux axes se recouvrent. MATLAB efface les axes qu'une
 // nouvelle case recouvre : c'est ce qui fait que « subplot(2,1,1) » après

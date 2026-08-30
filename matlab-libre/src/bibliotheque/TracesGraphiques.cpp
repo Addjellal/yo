@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -562,12 +563,191 @@ FONCTION(fnAxis) {
     return nargout > 0 ? rendreBornes() : std::vector<Valeur>{};
 }
 
+// « xline(3) », « yline(0, '--r', 'seuil') » : une droite qui traverse
+// tout l'axe. Elle ne fixe pas les bornes — c'est ce qui la distingue
+// d'un plot a deux points — et porte au besoin une etiquette.
+std::vector<Valeur> droiteConstante(Interpreteur& it, Arguments args, int nargout,
+                                    char axe) {
+    (void)nargout;
+    exigerArguments(args, 1, 3, axe == 'x' ? "xline" : "yline");
+    exigerNumerique(args[0], axe == 'x' ? "xline" : "yline");
+    std::string style = args.size() > 1 ? args[1].versTexte() : std::string("-");
+    std::string etiquette = args.size() > 2 ? args[2].versTexte() : std::string();
+    auto a = axesCourants(it);
+    for (double v : args[0].re) {
+        Serie s;
+        s.genre = GenreTrace::Constante;
+        s.axeConstante = axe;
+        s.x = {v};
+        s.legendeConstante = etiquette;
+        s.couleur = "#404040";
+        s.style = "-";
+        decoderStyle(style, s);
+        if (s.couleur.empty()) s.couleur = "#404040";
+        a->series.push_back(s);
+    }
+    return {};
+}
+
+// « area(x,y) » : la courbe et la surface sous elle. « fill(x,y,c) » : un
+// polygone ferme et rempli.
+std::vector<Valeur> surfaceRemplie(Interpreteur& it, Arguments args, GenreTrace genre,
+                                   const char* nom) {
+    exigerArguments(args, 1, 0, nom);
+    nouveauTrace(it);
+    std::size_t k = 0;
+    auto axes = axesCourants(it);
+    std::size_t indexCouleur = axes->series.size();
+    while (k < args.size()) {
+        Serie s;
+        s.genre = genre;
+        exigerNumerique(args[k], nom);
+        std::vector<double> premier = valeursDe(args[k]);
+        ++k;
+        if (k < args.size() && !args[k].estTexte() && !args[k].estChaine() &&
+            args[k].nelem() == premier.size()) {
+            s.x = premier;
+            s.y = valeursDe(args[k]);
+            ++k;
+        } else {
+            s.y = premier;
+            s.x.resize(s.y.size());
+            for (std::size_t i = 0; i < s.x.size(); ++i) s.x[i] = (double)(i + 1);
+        }
+        if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+            decoderStyle(args[k].versTexte(), s);
+            ++k;
+        }
+        if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
+        ajouterSerie(it, s);
+    }
+    return {};
+}
+
+FONCTION(fnArea) { INUTILISE return surfaceRemplie(it, args, GenreTrace::Aire, "area"); }
+FONCTION(fnFill) { INUTILISE return surfaceRemplie(it, args, GenreTrace::Polygone, "fill"); }
+
+// « line(x,y) » ajoute une courbe sans effacer ce qui est déjà tracé et
+// sans toucher au titre : c'est le tracé de bas niveau de MATLAB.
+FONCTION(fnLine) {
+    INUTILISE
+    exigerArguments(args, 2, 0, "line");
+    exigerNumerique(args[0], "line");
+    exigerNumerique(args[1], "line");
+    Serie s;
+    s.genre = GenreTrace::Ligne;
+    s.x = valeursDe(args[0]);
+    s.y = valeursDe(args[1]);
+    for (std::size_t k = 2; k + 1 < args.size(); k += 2) {
+        std::string propriete = args[k].versTexte();
+        for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
+        if (propriete == "color") {
+            if (args[k + 1].estTexte()) s.couleur = args[k + 1].versTexte();
+        } else if (propriete == "linewidth") {
+            s.epaisseur = args[k + 1].scal();
+        } else if (propriete == "linestyle") {
+            s.style = args[k + 1].versTexte();
+        } else if (propriete == "marker") {
+            s.marqueur = args[k + 1].versTexte();
+        }
+    }
+    ajouterSerie(it, s);
+    return {};
+}
+
+// « zlim » et « view » : acceptés pour que les scripts de tracé
+// tridimensionnel passent. Le rendu de MatLibre est plan ; ce qu'ils
+// posent est gardé et rendu, mais ne change pas l'image.
+FONCTION(fnZlim) {
+    INUTILISE
+    auto a = axesCourants(it);
+    if (args.empty()) return {Valeur::ligne({0.0, 1.0})};
+    (void)a;
+    return {};
+}
+
+FONCTION(fnView) {
+    INUTILISE
+    if (nargout > 0) return {Valeur::ligne({0.0, 90.0})};
+    return {};
+}
+
+FONCTION(fnXline) { return droiteConstante(it, args, nargout, 'x'); }
+FONCTION(fnYline) { return droiteConstante(it, args, nargout, 'y'); }
+
+// « xticks([0 5 10]) » pose les graduations ; sans argument, il les rend.
+std::vector<Valeur> graduationsAxe(Interpreteur& it, Arguments args, char axe) {
+    auto a = axesCourants(it);
+    std::vector<double>& cible = axe == 'x' ? a->ticksX : a->ticksY;
+    if (args.empty()) return {Valeur::ligne(cible)};
+    if (args[0].estTexte()) {
+        // « xticks('auto') » rend le choix automatique.
+        std::string mode = args[0].versTexte();
+        if (mode == "auto") cible.clear();
+        return {};
+    }
+    exigerNumerique(args[0], axe == 'x' ? "xticks" : "yticks");
+    cible.assign(args[0].re.begin(), args[0].re.end());
+    return {};
+}
+
+FONCTION(fnXticks) { INUTILISE return graduationsAxe(it, args, 'x'); }
+FONCTION(fnYticks) { INUTILISE return graduationsAxe(it, args, 'y'); }
+
+std::vector<Valeur> etiquettesAxe(Interpreteur& it, Arguments args, char axe) {
+    auto a = axesCourants(it);
+    std::vector<std::string>& cible = axe == 'x' ? a->etiquettesTicksX : a->etiquettesTicksY;
+    if (args.empty()) {
+        std::vector<Valeur> c;
+        for (const std::string& t : cible) c.push_back(Valeur::texte(t));
+        return {Valeur::celluleLigne(c)};
+    }
+    cible.clear();
+    if (args[0].classe == Classe::Cellule) {
+        for (const Valeur& v : args[0].cellules) cible.push_back(v.versTexte());
+    } else if (args[0].estTexte() && args[0].versTexte() == "auto") {
+        // rien : les nombres reviennent
+    } else if (args[0].estTexte() || args[0].estChaine()) {
+        cible.push_back(args[0].versTexte());
+    } else {
+        for (double v : args[0].re) {
+            char tampon[32];
+            std::snprintf(tampon, sizeof(tampon), "%g", v);
+            cible.push_back(tampon);
+        }
+    }
+    return {};
+}
+
+FONCTION(fnXticklabels) { INUTILISE return etiquettesAxe(it, args, 'x'); }
+FONCTION(fnYticklabels) { INUTILISE return etiquettesAxe(it, args, 'y'); }
+
+// « cla » vide l'axe courant sans toucher aux autres.
+FONCTION(fnCla) {
+    INUTILISE
+    auto a = axesCourants(it);
+    a->series.clear();
+    a->titre.clear();
+    a->etiquetteX.clear();
+    a->etiquetteY.clear();
+    a->legende.clear();
+    a->legendeVisible = false;
+    a->limitesManuellesX = false;
+    a->limitesManuellesY = false;
+    a->ticksX.clear();
+    a->ticksY.clear();
+    a->etiquettesTicksX.clear();
+    a->etiquettesTicksY.clear();
+    return {};
+}
+
 FONCTION(fnXlim) {
     INUTILISE
     auto a = axesCourants(it);
     if (args.empty() || args[0].nelem() < 2) {
-        std::vector<double> v = {a->xmin, a->xmax};
-        return {Valeur::ligne(v)};
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        return {Valeur::ligne({xmin, xmax})};
     }
     a->xmin = args[0].re[0];
     a->xmax = args[0].re[1];
@@ -579,8 +759,9 @@ FONCTION(fnYlim) {
     INUTILISE
     auto a = axesCourants(it);
     if (args.empty() || args[0].nelem() < 2) {
-        std::vector<double> v = {a->ymin, a->ymax};
-        return {Valeur::ligne(v)};
+        double xmin, xmax, ymin, ymax;
+        limitesAxe(*a, xmin, xmax, ymin, ymax);
+        return {Valeur::ligne({ymin, ymax})};
     }
     a->ymin = args[0].re[0];
     a->ymax = args[0].re[1];
@@ -671,6 +852,20 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("clf", fnClf, "graphique", "clf  Vide la figure courante.");
     it.enregistrer("close", fnClose, "graphique", "close  Ferme une figure.");
     it.enregistrer("subplot", fnSubplot, "graphique", "subplot  Decoupe la figure en cases.");
+    it.enregistrer("xline", fnXline, "graphique", "xline  Droite verticale.");
+    it.enregistrer("yline", fnYline, "graphique", "yline  Droite horizontale.");
+    it.enregistrer("xticks", fnXticks, "graphique", "xticks  Graduations de l'axe des x.");
+    it.enregistrer("yticks", fnYticks, "graphique", "yticks  Graduations de l'axe des y.");
+    it.enregistrer("xticklabels", fnXticklabels, "graphique",
+                   "xticklabels  Etiquettes des graduations en x.");
+    it.enregistrer("yticklabels", fnYticklabels, "graphique",
+                   "yticklabels  Etiquettes des graduations en y.");
+    it.enregistrer("cla", fnCla, "graphique", "cla  Vide l'axe courant.");
+    it.enregistrer("area", fnArea, "graphique", "area  Trace une aire remplie.");
+    it.enregistrer("fill", fnFill, "graphique", "fill  Remplit un polygone.");
+    it.enregistrer("line", fnLine, "graphique", "line  Ajoute une courbe sans effacer.");
+    it.enregistrer("zlim", fnZlim, "graphique", "zlim  Bornes de l'axe des z.");
+    it.enregistrer("view", fnView, "graphique", "view  Point de vue d'un trace 3D.");
     it.enregistrer("axes", fnAxes, "graphique", "axes  Cree un axe ou en designe un.");
     it.enregistrer("xlabel", fnXlabel, "graphique", "xlabel  Etiquette de l'axe des x.");
     it.enregistrer("ylabel", fnYlabel, "graphique", "ylabel  Etiquette de l'axe des y.");

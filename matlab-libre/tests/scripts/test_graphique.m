@@ -298,4 +298,88 @@ end
 assert(inconnue);
 close all
 
+%% ------------------------------------------ droites, graduations, aires
+% « xline » et « yline » traversent l'axe sans en changer les bornes :
+% c'est ce qui les distingue d'un trace a deux points.
+figure
+plot([1 2 3], [10 20 30]);
+avant = ylim();
+yline(1000);
+apres = ylim();
+assert(isequal(avant, apres));      % la droite n'a pas etire l'axe
+svgDroites = matlibre_svg();
+assert(~isempty(strfind(svgDroites, '<line')));
+xline(2, '--r', 'ici');
+assert(~isempty(strfind(matlibre_svg(), 'ici')));
+% Un vecteur donne autant de droites.
+figure
+plot(1:10);
+xline([2 4 6]);
+assert(numel(strfind(matlibre_svg(), 'stroke-width="1.5"')) >= 3);
+
+% Les graduations imposees, et leurs etiquettes.
+figure
+plot(1:10);
+xticks([1 5 10]);
+assert(isequal(xticks(), [1 5 10]));
+xticklabels({'debut', 'milieu', 'fin'});
+assert(numel(xticklabels()) == 3);
+svgEtiquettes = matlibre_svg();
+assert(~isempty(strfind(svgEtiquettes, 'milieu')));
+xticks('auto');
+assert(isempty(xticks()));
+yticks([0 5 10]);
+assert(isequal(yticks(), [0 5 10]));
+
+% « xlim » et « get(gca,'XLim') » disent la meme chose : les bornes des
+% donnees quand on ne les a pas fixees.
+figure
+plot([2 4 8], [1 2 3]);
+assert(isequal(xlim(), [2 8]));
+assert(isequal(get(gca, 'XLim'), [2 8]));
+xlim([0 10]);
+assert(isequal(xlim(), [0 10]));
+
+% « cla » vide l'axe courant, et lui seul.
+figure
+subplot(1, 2, 1); plot(1:10); title('a effacer');
+subplot(1, 2, 2); plot(10:-1:1); title('a garder');
+subplot(1, 2, 1); cla;
+svgApresCla = matlibre_svg();
+assert(isempty(strfind(svgApresCla, 'a effacer')));
+assert(~isempty(strfind(svgApresCla, 'a garder')));
+
+% Les aires et les polygones sont remplis.
+figure
+area(1:5, [1 3 2 4 3]);
+assert(~isempty(strfind(matlibre_svg(), 'fill-opacity')));
+figure
+fill([0 1 1 0], [0 0 1 1], 'r');
+assert(~isempty(strfind(matlibre_svg(), 'fill-opacity')));
+
+% « line » ajoute sans effacer.
+figure
+plot(1:10);
+line([1 10], [5 5], 'Color', '#D95319', 'LineWidth', 2);
+assert(numel(strfind(matlibre_svg(), '<path')) == 2);
+
+% « tiledlayout » et « nexttile » remplissent les cases dans l'ordre.
+figure
+tiledlayout(2, 2);
+nexttile; plot(1:10);
+nexttile; plot(sin(1:10));
+nexttile; bar([3 1 2]);
+assert(numel(strfind(matlibre_svg(), 'fill="white" stroke="#222"')) == 3);
+% Et l'on peut sauter a une case donnee.
+figure
+tiledlayout(1, 3);
+nexttile(3); plot(1:5);
+assert(numel(strfind(matlibre_svg(), 'fill="white" stroke="#222"')) == 1);
+
+% « errorbar » trace la courbe et ses barres.
+figure
+errorbar(1:5, [2 4 3 5 4], 0.4 * ones(1, 5));
+assert(numel(strfind(matlibre_svg(), '<path')) >= 2);
+close all
+
 disp('graphique : toutes les verifications passent');

@@ -151,6 +151,14 @@ std::string nombreCourt(double v) {
     return s;
 }
 
+// Le motif d'un trait : ce que le SVG appelle « stroke-dasharray ».
+std::string motifTrait(const std::string& style) {
+    if (style == "--") return " stroke-dasharray=\"8,4\"";
+    if (style == ":") return " stroke-dasharray=\"2,3\"";
+    if (style == "-.") return " stroke-dasharray=\"8,3,2,3\"";
+    return std::string();
+}
+
 // L'etiquette d'une graduation. Sur un axe logarithmique, MATLAB ecrit les
 // puissances de dix en exposant — 10 puissance moins deux, et non 0,01 ;
 // le SVG le rend avec un « tspan » releve.
@@ -201,6 +209,32 @@ bool bornesLog(double& bas, double& haut) {
     if (bas <= 0) bas = haut / 1000.0;
     if (!(haut > bas)) { bas = haut / 10.0; }
     return true;
+}
+
+void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax) {
+    xmin = ymin = INFINITY;
+    xmax = ymax = -INFINITY;
+    bool vu = false;
+    for (const auto& s : a.series) {
+        if (s.genre == GenreTrace::Constante) continue;
+        for (double v : s.x) {
+            if (!std::isfinite(v)) continue;
+            xmin = std::min(xmin, v);
+            xmax = std::max(xmax, v);
+            vu = true;
+        }
+        for (double v : s.y) {
+            if (!std::isfinite(v)) continue;
+            ymin = std::min(ymin, v);
+            ymax = std::max(ymax, v);
+            vu = true;
+        }
+    }
+    if (!vu || !std::isfinite(xmin)) { xmin = 0; xmax = 1; ymin = 0; ymax = 1; }
+    if (!(xmax > xmin)) { xmin -= 0.5; xmax += 0.5; }
+    if (!(ymax > ymin)) { ymin -= 0.5; ymax += 0.5; }
+    if (a.limitesManuellesX) { xmin = a.xmin; xmax = a.xmax; }
+    if (a.limitesManuellesY) { ymin = a.ymin; ymax = a.ymax; }
 }
 
 void cadreAxes(const Axes& a, double& x, double& y, double& largeur, double& hauteur) {
@@ -288,6 +322,8 @@ std::string rendreSVG(const Figure& figure) {
         // Bornes des données.
         double xmin = INFINITY, xmax = -INFINITY, ymin = INFINITY, ymax = -INFINITY;
         for (const auto& s : a.series) {
+            // Une droite « xline » suit les bornes, elle ne les impose pas.
+            if (s.genre == GenreTrace::Constante) continue;
             for (double v : s.x) {
                 if (!std::isfinite(v)) continue;
                 xmin = std::min(xmin, v);
@@ -349,6 +385,7 @@ std::string rendreSVG(const Figure& figure) {
         auto ty = a.axesVisibles
                       ? (a.ticksY.empty() ? graduationsAxe(ymin, ymax, 6, logY) : a.ticksY)
                       : std::vector<double>{};
+        std::size_t rangTick = 0;
         for (double v : tx) {
             double px = ex.versPixel(v);
             if (px < gauche - 1 || px > droite + 1) continue;
@@ -357,10 +394,15 @@ std::string rendreSVG(const Figure& figure) {
                     << px << "\" y2=\"" << bas << "\"/>\n";
             out << "<line class=\"axe\" x1=\"" << px << "\" y1=\"" << bas << "\" x2=\"" << px
                 << "\" y2=\"" << (bas - 4) << "\"/>\n";
+            // « xticklabels({'a','b'}) » l'emporte sur les nombres.
+            std::string texte = rangTick < a.etiquettesTicksX.size()
+                                    ? echapperXml(a.etiquettesTicksX[rangTick])
+                                    : etiquetteGraduation(v, logX);
+            ++rangTick;
             out << "<text x=\"" << px << "\" y=\"" << (bas + 16)
-                << "\" text-anchor=\"middle\">" << etiquetteGraduation(v, logX)
-                << "</text>\n";
+                << "\" text-anchor=\"middle\">" << texte << "</text>\n";
         }
+        rangTick = 0;
         for (double v : ty) {
             double py = ey.versPixel(v);
             if (py < haut - 1 || py > bas + 1) continue;
@@ -369,9 +411,12 @@ std::string rendreSVG(const Figure& figure) {
                     << "\" x2=\"" << droite << "\" y2=\"" << py << "\"/>\n";
             out << "<line class=\"axe\" x1=\"" << gauche << "\" y1=\"" << py << "\" x2=\""
                 << (gauche + 4) << "\" y2=\"" << py << "\"/>\n";
+            std::string texteY = rangTick < a.etiquettesTicksY.size()
+                                     ? echapperXml(a.etiquettesTicksY[rangTick])
+                                     : etiquetteGraduation(v, logY);
+            ++rangTick;
             out << "<text x=\"" << (gauche - 8) << "\" y=\"" << (py + 4)
-                << "\" text-anchor=\"end\">" << etiquetteGraduation(v, logY)
-                << "</text>\n";
+                << "\" text-anchor=\"end\">" << texteY << "</text>\n";
         }
 
         out << "<clipPath id=\"c" << indiceAxe << "\"><rect x=\"" << gauche << "\" y=\"" << haut
@@ -381,6 +426,52 @@ std::string rendreSVG(const Figure& figure) {
 
         for (const auto& s : a.series) {
             std::size_t n = std::min(s.x.size(), s.y.size());
+            if (s.genre == GenreTrace::Constante) {
+                if (s.x.empty()) continue;
+                double px = s.axeConstante == 'x' ? ex.versPixel(s.x[0]) : gauche;
+                double py = s.axeConstante == 'y' ? ey.versPixel(s.x[0]) : haut;
+                if (s.axeConstante == 'x')
+                    out << "<line x1=\"" << px << "\" y1=\"" << haut << "\" x2=\"" << px
+                        << "\" y2=\"" << bas << "\" stroke=\"" << s.couleur
+                        << "\" stroke-width=\"" << s.epaisseur << "\""
+                        << motifTrait(s.style) << "/>\n";
+                else
+                    out << "<line x1=\"" << gauche << "\" y1=\"" << py << "\" x2=\"" << droite
+                        << "\" y2=\"" << py << "\" stroke=\"" << s.couleur
+                        << "\" stroke-width=\"" << s.epaisseur << "\""
+                        << motifTrait(s.style) << "/>\n";
+                if (!s.legendeConstante.empty()) {
+                    double tx = s.axeConstante == 'x' ? px + 4 : droite - 4;
+                    double ty = s.axeConstante == 'x' ? haut + 14 : py - 4;
+                    out << "<text x=\"" << tx << "\" y=\"" << ty << "\" text-anchor=\""
+                        << (s.axeConstante == 'x' ? "start" : "end") << "\" fill=\""
+                        << s.couleur << "\">" << echapperXml(s.legendeConstante)
+                        << "</text>\n";
+                }
+                continue;
+            }
+            if (s.genre == GenreTrace::Aire || s.genre == GenreTrace::Polygone) {
+                if (n < 2) continue;
+                std::string chemin;
+                for (std::size_t k = 0; k < n; ++k) {
+                    chemin += (k ? " L " : "M ") + formater("%g", ex.versPixel(s.x[k])) + " " +
+                              formater("%g", ey.versPixel(s.y[k]));
+                }
+                if (s.genre == GenreTrace::Aire) {
+                    // On referme sur la ligne des zeros : c'est la surface
+                    // sous la courbe.
+                    double zero = ey.versPixel(std::max(ymin, std::min(ymax, 0.0)));
+                    chemin += " L " + formater("%g", ex.versPixel(s.x[n - 1])) + " " +
+                              formater("%g", zero);
+                    chemin += " L " + formater("%g", ex.versPixel(s.x[0])) + " " +
+                              formater("%g", zero);
+                }
+                chemin += " Z";
+                out << "<path d=\"" << chemin << "\" fill=\"" << s.couleur
+                    << "\" fill-opacity=\"0.4\" stroke=\"" << s.couleur
+                    << "\" stroke-width=\"" << s.epaisseur << "\"/>\n";
+                continue;
+            }
             if (s.genre == GenreTrace::Image) {
                 int lImage = s.hauteurImage, cImage = s.largeurImage;
                 if (lImage <= 0 || cImage <= 0) continue;

@@ -1067,6 +1067,28 @@ MATLIBRE_CASES_BODE Coupe la case courante en deux, pour un Bode.
   Voir aussi BODE, MARGIN, SUBPLOT, AXES.
 ```
 
+## `matlibre_equilibrer`
+
+```
+MATLIBRE_EQUILIBRER Équilibrage diagonal d'une matrice.
+  [B,D] = MATLIBRE_EQUILIBRER(A) rend B = diag(1./D) * A * diag(D), où D
+  ne porte que des puissances de deux : la transformation est donc
+  exacte en virgule flottante. B a des lignes et des colonnes de normes
+  voisines, ce qui améliore beaucoup le conditionnement des calculs de
+  valeurs propres et de sous-espaces invariants.
+
+  C'est l'algorithme de Parlett et Reinsch, celui qu'emploie tout
+  solveur de valeurs propres avant de travailler. Il sert ici aux
+  matrices hamiltoniennes des équations de Riccati : un modèle dont les
+  pôles vont de 10^-5 à 20 est autrement hors d'atteinte.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB, où BALANCE fait le même
+  travail.
+
+  Voir aussi BALANCE, EIG, MATLIBRE_RICCATI.
+```
+
 ## `matlibre_est_siso_tf`
 
 ```
@@ -1114,6 +1136,23 @@ MATLIBRE_PULSATIONS Grille de pulsations automatique d'un modèle.
   Automatique : elle n'existe pas dans MATLAB.
 
   Voir aussi BODE, LOGSPACE.
+```
+
+## `matlibre_racine_carree`
+
+```
+MATLIBRE_RACINE_CARREE Racine carrée d'une matrice symétrique positive.
+  R = MATLIBRE_RACINE_CARREE(M) rend la matrice symétrique R telle que
+  R*R = M, pour M symétrique définie positive. Elle passe par la
+  décomposition en valeurs propres : M = V*D*V', donc R = V*sqrt(D)*V'.
+
+  C'est ce dont le décalage de boucle de la synthèse H-infini a besoin,
+  là où SQRTM, qui traite le cas général, coûterait davantage.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi SQRTM, CHOL, EIG.
 ```
 
 ## `matlibre_riccati`

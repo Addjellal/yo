@@ -43,11 +43,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **620 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **632 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **1082 fonctions de toolbox** en langage MATLAB, réparties en
+- **1088 fonctions de toolbox** en langage MATLAB, réparties en
   **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -63,7 +63,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Une aide qui ne ment pas** : 605 fonctions ont leur fiche — syntaxe,
+- **Une aide qui ne ment pas** : 617 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de

@@ -1,0 +1,279 @@
+### xline
+XLINE  Droite verticale sur toute la hauteur de l'axe.
+    XLINE(X) trace une droite verticale à l'abscisse X. Elle traverse tout
+    l'axe et le suit : contrairement à un tracé de deux points, elle ne
+    change pas les bornes et reste entière quand elles bougent.
+
+    XLINE(X,STYLE) prend une chaîne de style, comme PLOT.
+    XLINE(X,STYLE,TEXTE) écrit une étiquette le long de la droite.
+
+    X peut être un vecteur : autant de droites.
+
+    Syntaxe
+       xline(x)
+       xline(x,style)
+       xline(x,style,texte)
+
+    Exemples
+       figure
+       plot(1:10);
+       xline(5);                       % la mediane
+       xline([2 8], ':k');             % deux reperes
+       xline(3, '--r', 'seuil');       % avec son nom
+       close
+
+    Voir aussi YLINE, PLOT, GRID, XLIM, LINE.
+
+### yline
+YLINE  Droite horizontale sur toute la largeur de l'axe.
+    YLINE(Y) trace une droite horizontale à l'ordonnée Y. Comme XLINE,
+    elle suit les bornes de l'axe au lieu de les imposer : c'est ce qu'il
+    faut pour marquer un seuil, une consigne, un zéro.
+
+    YLINE(Y,STYLE) et YLINE(Y,STYLE,TEXTE) comme pour XLINE.
+
+    Syntaxe
+       yline(y)
+       yline(y,style)
+       yline(y,style,texte)
+
+    Exemples
+       figure
+       plot(sin(linspace(0, 6, 100)));
+       yline(0);                       % l'axe des zeros
+       yline([-1 1], ':');             % les saturations
+       yline(0.7, '--r', 'consigne');
+       close
+
+    Voir aussi XLINE, PLOT, GRID, YLIM.
+
+### xticks
+XTICKS  Graduations de l'axe des abscisses.
+    XTICKS(V) place les graduations aux valeurs de V, au lieu de les
+    laisser choisir.
+
+    XTICKS sans argument rend les graduations en place ; il rend un
+    vecteur vide tant qu'on n'en a pas imposé, les graduations étant alors
+    calculées à chaque tracé.
+
+    XTICKS('auto') rend le choix automatique.
+
+    Syntaxe
+       xticks(v)
+       v = xticks
+       xticks('auto')
+
+    Exemples
+       figure
+       plot(1:10);
+       xticks([1 5 10]);
+       xticks                          % 1  5  10
+       xticks('auto');
+       close
+
+    Voir aussi YTICKS, XTICKLABELS, XLIM, GRID, SET.
+
+### yticks
+YTICKS  Graduations de l'axe des ordonnées.
+    YTICKS(V) place les graduations aux valeurs de V. YTICKS sans
+    argument les rend, YTICKS('auto') rend le choix automatique.
+
+    Syntaxe
+       yticks(v)
+       v = yticks
+       yticks('auto')
+
+    Exemples
+       figure
+       plot([0 5 10]);
+       yticks(0:2:10);
+       numel(yticks)                   % 6
+       close
+
+    Voir aussi XTICKS, YTICKLABELS, YLIM, GRID.
+
+### xticklabels
+XTICKLABELS  Étiquettes des graduations en abscisse.
+    XTICKLABELS(C) écrit les textes de C sous les graduations, dans
+    l'ordre, au lieu des nombres. C est un tableau de cellules de chaînes.
+
+    XTICKLABELS sans argument les rend. XTICKLABELS('auto') rend les
+    nombres.
+
+    Les étiquettes vont avec les graduations : poser les unes sans les
+    autres donne un axe qui ment. On écrit donc XTICKS puis XTICKLABELS.
+
+    Syntaxe
+       xticklabels(c)
+       c = xticklabels
+       xticklabels('auto')
+
+    Exemples
+       figure
+       bar([3 1 2]);
+       xticks([1 2 3]);
+       xticklabels({'lundi', 'mardi', 'mercredi'});
+       numel(xticklabels)              % 3
+       close
+
+    Voir aussi XTICKS, YTICKLABELS, BAR, SET.
+
+### yticklabels
+YTICKLABELS  Étiquettes des graduations en ordonnée.
+    YTICKLABELS(C) écrit les textes de C en regard des graduations.
+    YTICKLABELS sans argument les rend, YTICKLABELS('auto') rend les
+    nombres.
+
+    Syntaxe
+       yticklabels(c)
+       c = yticklabels
+       yticklabels('auto')
+
+    Exemples
+       figure
+       bar([1 2 3]);
+       yticks([1 2 3]);
+       yticklabels({'bas', 'milieu', 'haut'});
+       numel(yticklabels)              % 3
+       close
+
+    Voir aussi YTICKS, XTICKLABELS, YLIM.
+
+### cla
+CLA  Vide l'axe courant.
+    CLA efface les courbes, le titre, les étiquettes, la légende et les
+    graduations imposées de l'axe courant, sans toucher aux autres axes de
+    la figure ni à la figure elle-même. C'est ce qu'il faut pour redessiner
+    une case d'un SUBPLOT.
+
+    CLF, lui, vide toute la figure ; CLOSE la ferme.
+
+    Syntaxe
+       cla
+
+    Exemples
+       figure
+       subplot(1, 2, 1); plot(1:10); title('a effacer');
+       subplot(1, 2, 2); plot(10:-1:1); title('a garder');
+       subplot(1, 2, 1); cla;
+       close
+
+    Voir aussi CLF, CLOSE, HOLD, SUBPLOT.
+
+### area
+AREA  Aire sous une courbe.
+    AREA(Y) trace Y et remplit la surface entre la courbe et l'axe des
+    zéros. AREA(X,Y) place les points en X.
+
+    AREA(...,STYLE) prend une chaîne de style, comme PLOT : la couleur
+    sert au trait et au remplissage, qui est translucide.
+
+    Syntaxe
+       area(y)
+       area(x,y)
+       area(x,y,style)
+
+    Exemples
+       figure
+       area(1:5, [1 3 2 4 3]);
+       title('surface sous la courbe');
+       close
+       figure
+       area([1 3 2], 'r');
+       close
+
+    Voir aussi PLOT, BAR, FILL, STAIRS.
+
+### fill
+FILL  Polygone rempli.
+    FILL(X,Y,C) trace le polygone dont les sommets sont les points (X,Y),
+    le referme et le remplit de la couleur C — une lettre de couleur,
+    comme dans PLOT.
+
+    C'est ce qu'il faut pour marquer une zone, un domaine admissible, un
+    intervalle de confiance.
+
+    Syntaxe
+       fill(x,y,couleur)
+
+    Exemples
+       figure
+       fill([0 1 1 0], [0 0 1 1], 'b');       % un carre
+       close
+       figure
+       t = linspace(0, 2*pi, 60);
+       fill(cos(t), sin(t), 'r');             % un disque
+       axis equal
+       close
+
+    Voir aussi AREA, PLOT, PATCH, AXIS.
+
+### line
+LINE  Ajoute une courbe sans effacer ce qui est tracé.
+    LINE(X,Y) ajoute une courbe à l'axe courant. Contrairement à PLOT,
+    elle n'efface rien et ne touche ni au titre ni à la légende : c'est le
+    tracé de bas niveau, celui qu'on emploie pour ajouter un repère à une
+    figure déjà faite.
+
+    LINE(X,Y,'Nom',valeur) accepte 'Color', 'LineWidth', 'LineStyle' et
+    'Marker'.
+
+    Syntaxe
+       line(x,y)
+       line(x,y,'Nom',valeur,...)
+
+    Exemples
+       figure
+       plot(1:10);
+       line([1 10], [5 5], 'Color', '#D95319', 'LineWidth', 2);
+       line([5 5], [0 10], 'LineStyle', '--');
+       close
+
+    Voir aussi PLOT, XLINE, YLINE, HOLD, PATCH.
+
+### zlim
+ZLIM  Bornes de l'axe des cotes.
+    ZLIM(V) pose les bornes de l'axe des z ; ZLIM sans argument les rend.
+
+    Le rendu de MatLibre est plan : les surfaces sont dessinées par leurs
+    niveaux, sans perspective. La fonction est acceptée pour que les
+    scripts tridimensionnels passent sans être réécrits, mais elle ne
+    change pas l'image.
+
+    Syntaxe
+       zlim(v)
+       v = zlim
+
+    Exemples
+       figure
+       plot(1:10);
+       zlim([0 1]);
+       numel(zlim)                     % 2
+       close
+
+    Voir aussi XLIM, YLIM, AXIS, VIEW.
+
+### view
+VIEW  Point de vue d'un tracé tridimensionnel.
+    VIEW(AZ,EL) pose l'azimut et l'élévation ; VIEW(2) demande la vue de
+    dessus, VIEW(3) la vue standard. VIEW sans argument rend l'angle
+    courant.
+
+    Le rendu de MatLibre est plan : la fonction est acceptée pour que les
+    scripts tridimensionnels passent, et rend la vue de dessus, mais elle
+    ne change pas l'image.
+
+    Syntaxe
+       view(az,el)
+       view(2)
+       [az,el] = view
+
+    Exemples
+       figure
+       plot(1:10);
+       view(2);
+       angles = view;
+       angles(2)                       % 90 : la vue de dessus
+       close
+
+    Voir aussi ZLIM, SURF, MESH, AXIS.
