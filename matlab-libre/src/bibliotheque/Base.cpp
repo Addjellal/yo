@@ -637,8 +637,10 @@ FONCTION(fnMeshgrid) {
             X.re[(std::size_t)i + (std::size_t)j * ny] = x.re[(std::size_t)j];
             Y.re[(std::size_t)i + (std::size_t)j * ny] = y.re[(std::size_t)i];
         }
-    if (args.size() > 2 && nargout > 2) {
-        const Valeur& z = args[2];
+    // « [X,Y,Z] = meshgrid(x) » : le meme vecteur sert aux trois axes,
+    // comme dans MATLAB. Il fallait auparavant l'ecrire trois fois.
+    if (nargout > 2) {
+        const Valeur& z = args.size() > 2 ? args[2] : args[0];
         int nz = (int)z.nelem();
         Dims d{ny, nx, nz};
         Valeur X3 = Valeur::matriceDims(d), Y3 = Valeur::matriceDims(d), Z3 =
@@ -662,17 +664,33 @@ FONCTION(fnNdgrid) {
     INUTILISE
     exigerArguments(args, 1, 0, "ndgrid");
     for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], "ndgrid");
-    if (args.size() == 1) args.push_back(args[0]);
-    Valeur x = args[0], y = args[1];
-    int nx = (int)x.nelem(), ny = (int)y.nelem();
-    Valeur X = Valeur::matrice(nx, ny), Y = Valeur::matrice(nx, ny);
-    for (int j = 0; j < ny; ++j)
-        for (int i = 0; i < nx; ++i) {
-            X.re[(std::size_t)i + (std::size_t)j * nx] = x.re[(std::size_t)i];
-            Y.re[(std::size_t)i + (std::size_t)j * nx] = y.re[(std::size_t)j];
+    // « [X,Y,Z] = ndgrid(x) » repete le meme vecteur autant de fois qu'on
+    // demande de sorties ; MatLibre s'arretait a deux dimensions.
+    std::vector<Valeur> vecteurs(args.begin(), args.end());
+    std::size_t combien = std::max<std::size_t>(vecteurs.size(),
+                                                (std::size_t)std::max(nargout, 1));
+    if (vecteurs.size() == 1)
+        while (vecteurs.size() < combien) vecteurs.push_back(vecteurs[0]);
+    combien = vecteurs.size();
+    Dims d;
+    for (const auto& v : vecteurs) d.push_back((int)v.nelem());
+    while (d.size() < 2) d.push_back(1);
+    std::size_t total = produitDims(d);
+    std::vector<Valeur> sorties;
+    for (std::size_t axe = 0; axe < combien; ++axe) {
+        Valeur G = Valeur::matriceDims(d);
+        std::size_t interne = 1;
+        for (std::size_t k = 0; k < axe; ++k) interne *= (std::size_t)d[k];
+        std::size_t taille = (std::size_t)d[axe];
+        for (std::size_t p = 0; p < total; ++p) {
+            std::size_t coordonnee = (p / interne) % taille;
+            G.re[p] = vecteurs[axe].re[coordonnee];
         }
-    if (nargout <= 1) return {X};
-    return {X, Y};
+        sorties.push_back(G);
+    }
+    if (nargout <= 1) return {sorties[0]};
+    sorties.resize(std::max<std::size_t>(1, (std::size_t)nargout));
+    return sorties;
 }
 
 FONCTION(fnSub2ind) {

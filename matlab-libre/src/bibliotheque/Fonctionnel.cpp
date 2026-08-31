@@ -435,6 +435,22 @@ FONCTION(fnIsvarname) {
 FONCTION(fnNarginFn) {
     INUTILISE
     if (args.empty()) return {Valeur::scalaire(it.portee().nargin)};
+    // « nargin(f) » sur une poignee : ce que la fonction designee
+    // declare. Une anonyme compte ses parametres — MatLibre rendait -1,
+    // et l'on ne pouvait pas distinguer @(x) de @(x,y).
+    if (args[0].classe == Classe::Fonction && args[0].fn) {
+        const Fonction& f = *args[0].fn;
+        if (f.genre == Fonction::Anonyme)
+            return {Valeur::scalaire((double)f.parametres.size())};
+        if (f.genre == Fonction::Utilisateur && f.utilisateur)
+            return {Valeur::scalaire((double)f.utilisateur->entrees.size() *
+                                     (f.utilisateur->variadiqueEntree() ? -1 : 1))};
+        auto declaree = it.fonctionFichier(f.nom);
+        if (declaree)
+            return {Valeur::scalaire((double)declaree->entrees.size() *
+                                     (declaree->variadiqueEntree() ? -1 : 1))};
+        return {Valeur::scalaire(-1)};
+    }
     // nargin('nom') : nombre d'entrées déclarées.
     auto f = it.fonctionFichier(args[0].versTexte());
     if (!f) return {Valeur::scalaire(-1)};
@@ -444,6 +460,19 @@ FONCTION(fnNarginFn) {
 FONCTION(fnNargoutFn) {
     INUTILISE
     if (args.empty()) return {Valeur::scalaire(it.portee().nargout)};
+    if (args[0].classe == Classe::Fonction && args[0].fn) {
+        const Fonction& f = *args[0].fn;
+        // Une anonyme rend toujours une valeur.
+        if (f.genre == Fonction::Anonyme) return {Valeur::scalaire(1)};
+        if (f.genre == Fonction::Utilisateur && f.utilisateur)
+            return {Valeur::scalaire((double)f.utilisateur->sorties.size() *
+                                     (f.utilisateur->variadiqueSortie() ? -1 : 1))};
+        auto declaree = it.fonctionFichier(f.nom);
+        if (declaree)
+            return {Valeur::scalaire((double)declaree->sorties.size() *
+                                     (declaree->variadiqueSortie() ? -1 : 1))};
+        return {Valeur::scalaire(-1)};
+    }
     auto f = it.fonctionFichier(args[0].versTexte());
     if (!f) return {Valeur::scalaire(-1)};
     return {Valeur::scalaire((double)f->sorties.size() * (f->variadiqueSortie() ? -1 : 1))};

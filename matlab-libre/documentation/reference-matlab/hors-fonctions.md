@@ -46,13 +46,26 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 
 ### Graphique
 
-- **Rendu 3D avec éclairage** : `light`, `material`, `lighting`, et les
-  surfaces qui en dépendent.
-- **Objets graphiques de bas niveau** : `line`, `patch`, `rectangle`,
-  `annotation`, et le modèle de poignées complet qui va avec.
-- **`tiledlayout` / `nexttile`**, la disposition qui remplace `subplot`
-  depuis R2019b.
-- **Axes polaires**, `polarplot`, `compass`, `rose`.
+Les noms du tableau ci-dessus sont tous présents ; ce qui suit est ce
+qu'ils ne font pas encore comme MATLAB.
+
+- **Rendu tridimensionnel** : le rendu de MatLibre est plan. `surf`,
+  `mesh`, `plot3`, `contour3`, `scatter3` et leurs voisins tracent, mais
+  sans perspective ; `view`, `light`, `lighting`, `material` et `hidden`
+  sont acceptés sans effet. Chaque fiche d'aide le dit.
+- **Second axe des ordonnées** : `plotyy` et `yyaxis` remettent la
+  seconde courbe à l'échelle de la première au lieu de lui donner ses
+  propres graduations à droite.
+- **Axes polaires** : `polarplot`, `compass` et `rose` convertissent en
+  coordonnées cartésiennes et dessinent eux-mêmes cercles et rayons ; la
+  graduation angulaire du cadre manque.
+- **Transparence** (`alpha`) et **bandes de `contourf`** : le fond est
+  posé en champ continu, non découpé par niveau.
+- **Interaction à la souris** : `zoom`, `pan`, `rotate3d`, `brush`,
+  `datacursormode` sont acceptés sans effet, et `ginput` dit qu'il ne
+  peut pas ; les figures ne sont pas cliquables.
+- **Format `.fig`** : `savefig` écrit du SVG, `openfig` refuse le format
+  de MathWorks.
 
 ### Calcul
 

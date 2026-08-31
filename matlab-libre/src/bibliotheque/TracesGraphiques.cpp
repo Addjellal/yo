@@ -285,6 +285,7 @@ FONCTION(fnImagesc) {
     INUTILISE
     exigerArguments(args, 1, 3, "imagesc");
     const Valeur& z = args[args.size() - 1];
+    exigerNumerique(z, "imagesc");
     nouveauTrace(it);
     Serie s;
     s.genre = GenreTrace::Image;
@@ -293,20 +294,372 @@ FONCTION(fnImagesc) {
     s.z = valeursDe(z);
     s.x = {0.5, (double)s.largeurImage + 0.5};
     s.y = {0.5, (double)s.hauteurImage + 0.5};
-    ajouterSerie(it, s);
+    // « imagesc(x,y,Z) » : les deux premiers arguments donnent l'etendue
+    // reelle, et non les indices de colonne et de ligne.
+    if (args.size() >= 3 && args[0].nelem() >= 2 && args[1].nelem() >= 2) {
+        exigerNumerique(args[0], "imagesc");
+        exigerNumerique(args[1], "imagesc");
+        const Valeur& X = args[0];
+        const Valeur& Y = args[1];
+        s.x = {X.re.front(), X.re.back()};
+        s.y = {Y.re.front(), Y.re.back()};
+    }
+    int identifiant = ajouterSerie(it, s);
+    if (nargout > 0)
+        return {poigneeLigne(figureCourante(it)->numero, axesCourants(it)->identifiant,
+                             identifiant)};
     return {};
 }
 
 FONCTION(fnSurf) {
     INUTILISE
     exigerArguments(args, 1, 4, "surf");
-    std::vector<Valeur> a = {args[args.size() - 1]};
+    // « surf(X,Y,Z) » : on garde l'etendue de X et de Y, faute de quoi
+    // l'image serait graduee en indices de maille.
+    std::vector<Valeur> a;
+    if (args.size() >= 3 && args[0].nelem() >= 2 && args[1].nelem() >= 2 &&
+        !args[0].estTexte() && !args[1].estTexte()) {
+        exigerNumerique(args[0], "surf");
+        exigerNumerique(args[1], "surf");
+        const Valeur& X = args[0];
+        const Valeur& Y = args[1];
+        std::vector<double> bordsX, bordsY;
+        if (X.nlignes() > 1 && X.ncolonnes() > 1) {
+            bordsX = {X.re[0], X.re[(std::size_t)(X.ncolonnes() - 1) * X.nlignes()]};
+        } else {
+            bordsX = {X.re.front(), X.re.back()};
+        }
+        if (Y.nlignes() > 1 && Y.ncolonnes() > 1) {
+            bordsY = {Y.re[0], Y.re[(std::size_t)Y.nlignes() - 1]};
+        } else {
+            bordsY = {Y.re.front(), Y.re.back()};
+        }
+        a = {Valeur::ligne(bordsX), Valeur::ligne(bordsY), args[2]};
+    } else {
+        a = {args[args.size() - 1]};
+    }
     return fnImagesc(it, a, nargout);
+}
+
+// ---------------------------------------------------------- contours
+//
+// Marching squares : dans chaque maille, la ligne de niveau coupe les
+// aretes ou Z passe de part et d'autre du niveau. On interpole
+// lineairement le point de coupe, on relie les deux points de la maille,
+// puis on chaine les segments bout a bout pour en faire des polylignes —
+// c'est ce chainage qui permet un trait pointille continu et une
+// etiquette posee au milieu d'une courbe.
+
+struct Segment {
+    double x1, y1, x2, y2;
+};
+
+// Le point ou le niveau coupe l'arete entre (xa,za) et (xb,zb).
+double interpoler(double a, double b, double za, double zb, double niveau) {
+    double d = zb - za;
+    if (d == 0) return a;
+    double t = (niveau - za) / d;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return a + t * (b - a);
+}
+
+std::vector<Segment> segmentsNiveau(const std::vector<double>& x,
+                                    const std::vector<double>& y, const Valeur& Z,
+                                    double niveau) {
+    std::vector<Segment> segments;
+    int lignes = Z.nlignes(), colonnes = Z.ncolonnes();
+    auto valeur = [&](int i, int j) {
+        return Z.re[(std::size_t)i + (std::size_t)j * lignes];
+    };
+    for (int i = 0; i + 1 < lignes; ++i) {
+        for (int j = 0; j + 1 < colonnes; ++j) {
+            double z00 = valeur(i, j), z10 = valeur(i + 1, j);
+            double z01 = valeur(i, j + 1), z11 = valeur(i + 1, j + 1);
+            if (std::isnan(z00) || std::isnan(z10) || std::isnan(z01) || std::isnan(z11))
+                continue;
+            double x0 = x[(std::size_t)j], x1 = x[(std::size_t)j + 1];
+            double y0 = y[(std::size_t)i], y1 = y[(std::size_t)i + 1];
+            // Le code de la maille : un bit par sommet au-dessus du niveau.
+            int code = (z00 >= niveau ? 1 : 0) | (z01 >= niveau ? 2 : 0) |
+                       (z11 >= niveau ? 4 : 0) | (z10 >= niveau ? 8 : 0);
+            if (code == 0 || code == 15) continue;
+            // Les quatre points de coupe possibles, un par arete.
+            double hautX = interpoler(x0, x1, z00, z01, niveau), hautY = y0;
+            double droiteX = x1, droiteY = interpoler(y0, y1, z01, z11, niveau);
+            double basX = interpoler(x0, x1, z10, z11, niveau), basY = y1;
+            double gaucheX = x0, gaucheY = interpoler(y0, y1, z00, z10, niveau);
+            // Un sommet pose exactement sur le niveau fait coincider les
+            // deux points de coupe : le segment est de longueur nulle et
+            // n'appartient a aucune courbe. On l'ecarte, faute de quoi il
+            // ressort comme une courbe a deux points confondus.
+            double maille = std::max(std::fabs(x1 - x0), std::fabs(y1 - y0));
+            double minuscule = 1e-12 * std::max(maille, 1.0);
+            auto ajouter = [&](double ax, double ay, double bx, double by) {
+                if (std::fabs(ax - bx) <= minuscule && std::fabs(ay - by) <= minuscule)
+                    return;
+                segments.push_back({ax, ay, bx, by});
+            };
+            switch (code) {
+                case 1: case 14: ajouter(gaucheX, gaucheY, hautX, hautY); break;
+                case 2: case 13: ajouter(hautX, hautY, droiteX, droiteY); break;
+                case 3: case 12: ajouter(gaucheX, gaucheY, droiteX, droiteY); break;
+                case 4: case 11: ajouter(droiteX, droiteY, basX, basY); break;
+                case 6: case 9: ajouter(hautX, hautY, basX, basY); break;
+                case 8: case 7: ajouter(gaucheX, gaucheY, basX, basY); break;
+                case 5:
+                    // Point-selle : on tranche par la moyenne de la maille.
+                    if ((z00 + z01 + z11 + z10) / 4 >= niveau) {
+                        ajouter(gaucheX, gaucheY, hautX, hautY);
+                        ajouter(droiteX, droiteY, basX, basY);
+                    } else {
+                        ajouter(gaucheX, gaucheY, basX, basY);
+                        ajouter(hautX, hautY, droiteX, droiteY);
+                    }
+                    break;
+                case 10:
+                    if ((z00 + z01 + z11 + z10) / 4 >= niveau) {
+                        ajouter(hautX, hautY, gaucheX, gaucheY);
+                        ajouter(basX, basY, droiteX, droiteY);
+                    } else {
+                        ajouter(hautX, hautY, droiteX, droiteY);
+                        ajouter(gaucheX, gaucheY, basX, basY);
+                    }
+                    break;
+                default: break;
+            }
+        }
+    }
+    return segments;
+}
+
+// Les segments chaines bout a bout : chaque polyligne suit la ligne de
+// niveau aussi loin qu'elle va.
+std::vector<std::pair<std::vector<double>, std::vector<double>>> chainer(
+    std::vector<Segment> segments, double tolerance) {
+    std::vector<std::pair<std::vector<double>, std::vector<double>>> courbes;
+    std::vector<bool> pris(segments.size(), false);
+    auto proche = [tolerance](double ax, double ay, double bx, double by) {
+        return std::fabs(ax - bx) <= tolerance && std::fabs(ay - by) <= tolerance;
+    };
+    for (std::size_t depart = 0; depart < segments.size(); ++depart) {
+        if (pris[depart]) continue;
+        pris[depart] = true;
+        std::vector<double> px = {segments[depart].x1, segments[depart].x2};
+        std::vector<double> py = {segments[depart].y1, segments[depart].y2};
+        bool avance = true;
+        while (avance) {
+            avance = false;
+            for (std::size_t k = 0; k < segments.size(); ++k) {
+                if (pris[k]) continue;
+                const Segment& t = segments[k];
+                if (proche(px.back(), py.back(), t.x1, t.y1)) {
+                    px.push_back(t.x2); py.push_back(t.y2);
+                } else if (proche(px.back(), py.back(), t.x2, t.y2)) {
+                    px.push_back(t.x1); py.push_back(t.y1);
+                } else if (proche(px.front(), py.front(), t.x1, t.y1)) {
+                    px.insert(px.begin(), t.x2); py.insert(py.begin(), t.y2);
+                } else if (proche(px.front(), py.front(), t.x2, t.y2)) {
+                    px.insert(px.begin(), t.x1); py.insert(py.begin(), t.y1);
+                } else {
+                    continue;
+                }
+                pris[k] = true;
+                avance = true;
+            }
+        }
+        if (px.size() >= 2) courbes.push_back({px, py});
+    }
+    return courbes;
+}
+
+// Les niveaux choisis d'office : MATLAB en prend une dizaine, arrondis.
+std::vector<double> niveauxAutomatiques(const Valeur& Z, int combien) {
+    double bas = INFINITY, haut = -INFINITY;
+    for (double v : Z.re) {
+        if (!std::isfinite(v)) continue;
+        bas = std::min(bas, v);
+        haut = std::max(haut, v);
+    }
+    if (!std::isfinite(bas) || haut <= bas) return {};
+    std::vector<double> niveaux;
+    for (int k = 1; k <= combien; ++k)
+        niveaux.push_back(bas + (haut - bas) * k / (combien + 1.0));
+    return niveaux;
+}
+
+// Les arguments communs a contour, contourf, contour3 et contourc.
+void lireArgumentsContour(Interpreteur& it, std::vector<Valeur>& args, const char* nom,
+                          std::vector<double>& x, std::vector<double>& y, Valeur& Z,
+                          std::vector<double>& niveaux, std::string& style) {
+    (void)it;
+    exigerArguments(args, 1, 0, nom);
+    std::size_t k = 0;
+    // Style de trait eventuel, en dernier.
+    std::size_t fin = args.size();
+    while (fin > 0 && (args[fin - 1].estTexte() || args[fin - 1].estChaine())) {
+        style = args[fin - 1].versTexte();
+        --fin;
+    }
+    if (fin >= 3 && !args[2].estVide() && args[2].nlignes() > 1) {
+        exigerNumerique(args[0], nom);
+        exigerNumerique(args[1], nom);
+        exigerNumerique(args[2], nom);
+        // contour(X,Y,Z) : X et Y sont des vecteurs ou des grilles.
+        Z = versDouble(args[2]);
+        const Valeur& X = args[0];
+        const Valeur& Y = args[1];
+        if (X.nlignes() > 1 && X.ncolonnes() > 1)
+            for (int j = 0; j < X.ncolonnes(); ++j)
+                x.push_back(X.re[(std::size_t)j * X.nlignes()]);
+        else
+            for (double v : X.re) x.push_back(v);
+        if (Y.nlignes() > 1 && Y.ncolonnes() > 1)
+            for (int i = 0; i < Y.nlignes(); ++i) y.push_back(Y.re[(std::size_t)i]);
+        else
+            for (double v : Y.re) y.push_back(v);
+        k = 3;
+    } else {
+        exigerNumerique(args[0], nom);
+        Z = versDouble(args[0]);
+        for (int j = 0; j < Z.ncolonnes(); ++j) x.push_back(j + 1);
+        for (int i = 0; i < Z.nlignes(); ++i) y.push_back(i + 1);
+        k = 1;
+    }
+    if ((int)x.size() != Z.ncolonnes() || (int)y.size() != Z.nlignes())
+        erreur("MATLAB:contour:SizeMismatch",
+               "X and Y must match the size of Z.");
+    if (k < fin && args[k].estNumerique() && !args[k].estVide()) {
+        if (args[k].nelem() == 1) {
+            int combien = (int)args[k].scal();
+            if (combien < 1) combien = 1;
+            niveaux = niveauxAutomatiques(Z, combien);
+        } else {
+            for (double v : args[k].re) niveaux.push_back(v);
+        }
+    }
+    if (niveaux.empty()) niveaux = niveauxAutomatiques(Z, 9);
+    std::sort(niveaux.begin(), niveaux.end());
+}
+
+// La matrice de contours de MATLAB : pour chaque courbe, une colonne
+// [niveau ; nombre de points] puis les points, en x sur la premiere
+// ligne et en y sur la seconde.
+Valeur matriceContours(
+    const std::vector<std::pair<double,
+                                std::pair<std::vector<double>, std::vector<double>>>>& courbes) {
+    std::vector<double> ligne1, ligne2;
+    for (const auto& c : courbes) {
+        ligne1.push_back(c.first);
+        ligne2.push_back((double)c.second.first.size());
+        for (std::size_t k = 0; k < c.second.first.size(); ++k) {
+            ligne1.push_back(c.second.first[k]);
+            ligne2.push_back(c.second.second[k]);
+        }
+    }
+    Valeur r = Valeur::matrice(2, (int)ligne1.size());
+    for (std::size_t k = 0; k < ligne1.size(); ++k) {
+        r.re[(std::size_t)0 + k * 2] = ligne1[k];
+        r.re[(std::size_t)1 + k * 2] = ligne2[k];
+    }
+    return r;
+}
+
+std::vector<Valeur> tracerContours(Interpreteur& it, std::vector<Valeur>& args,
+                                   const char* nom, bool remplir, int nargout) {
+    std::vector<double> x, y, niveaux;
+    Valeur Z;
+    std::string style;
+    lireArgumentsContour(it, args, nom, x, y, Z, niveaux, style);
+    nouveauTrace(it);
+    auto axes = axesCourants(it);
+    if (remplir) {
+        // Le fond colore, puis les traits par-dessus : c'est ce que
+        // contourf montre. MatLibre ne decoupe pas de polygones par
+        // bande — le rendu est le meme a l'oeil, et rien n'est faux.
+        Serie fond;
+        fond.genre = GenreTrace::Image;
+        fond.hauteurImage = Z.nlignes();
+        fond.largeurImage = Z.ncolonnes();
+        fond.z = valeursDe(Z);
+        fond.x = {x.front(), x.back()};
+        fond.y = {y.front(), y.back()};
+        ajouterSerie(it, fond);
+    }
+    // La tolerance de chainage : bien plus petite qu'une maille.
+    double pasX = x.size() > 1 ? std::fabs(x[1] - x[0]) : 1.0;
+    double pasY = y.size() > 1 ? std::fabs(y[1] - y[0]) : 1.0;
+    double tolerance = 1e-9 * std::max(1.0, std::max(pasX, pasY));
+
+    std::vector<std::pair<double, std::pair<std::vector<double>, std::vector<double>>>>
+        courbes;
+    std::size_t indexCouleur = 0;
+    std::vector<int> identifiants;
+    for (double niveau : niveaux) {
+        auto segments = segmentsNiveau(x, y, Z, niveau);
+        if (segments.empty()) { ++indexCouleur; continue; }
+        auto polylignes = chainer(segments, tolerance);
+        std::string couleur = remplir ? std::string("#000000")
+                                      : std::string(palette(indexCouleur));
+        for (const auto& courbe : polylignes) {
+            Serie s;
+            s.genre = GenreTrace::Ligne;
+            s.x = courbe.first;
+            s.y = courbe.second;
+            s.couleur = couleur;
+            if (!style.empty()) decoderStyle(style, s);
+            s.etiquette = formater("%g", niveau);
+            identifiants.push_back(ajouterSerie(it, s));
+            courbes.push_back({niveau, courbe});
+        }
+        ++indexCouleur;
+    }
+    if (nargout <= 0) return {};
+    Valeur C = matriceContours(courbes);
+    if (nargout == 1) return {C};
+    if (identifiants.empty()) return {C, Valeur::vide()};
+    if (identifiants.size() == 1)
+        return {C, poigneeLigne(figureCourante(it)->numero, axes->identifiant,
+                                identifiants[0])};
+    return {C, poigneeLignes(figureCourante(it)->numero, axes->identifiant, identifiants)};
 }
 
 FONCTION(fnContour) {
     INUTILISE
-    return fnSurf(it, args, nargout);
+    return tracerContours(it, args, "contour", false, nargout);
+}
+
+FONCTION(fnContourf) {
+    INUTILISE
+    return tracerContours(it, args, "contourf", true, nargout);
+}
+
+// « contour3 » dessine les memes lignes ; le rendu de MatLibre est plan,
+// comme pour plot3 et surf.
+FONCTION(fnContour3) {
+    INUTILISE
+    return tracerContours(it, args, "contour3", false, nargout);
+}
+
+// « contourc » calcule sans tracer : il rend la seule matrice C.
+FONCTION(fnContourc) {
+    INUTILISE
+    std::vector<double> x, y, niveaux;
+    Valeur Z;
+    std::string style;
+    lireArgumentsContour(it, args, "contourc", x, y, Z, niveaux, style);
+    double pasX = x.size() > 1 ? std::fabs(x[1] - x[0]) : 1.0;
+    double pasY = y.size() > 1 ? std::fabs(y[1] - y[0]) : 1.0;
+    double tolerance = 1e-9 * std::max(1.0, std::max(pasX, pasY));
+    std::vector<std::pair<double, std::pair<std::vector<double>, std::vector<double>>>>
+        courbes;
+    for (double niveau : niveaux) {
+        auto segments = segmentsNiveau(x, y, Z, niveau);
+        if (segments.empty()) continue;
+        for (const auto& courbe : chainer(segments, tolerance))
+            courbes.push_back({niveau, courbe});
+    }
+    return {matriceContours(courbes)};
 }
 
 FONCTION(fnFigure) {
@@ -1016,6 +1369,12 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("image", fnImagesc, "graphique", "image  Affiche une matrice comme image.");
     it.enregistrer("surf", fnSurf, "graphique", "surf  Surface (rendue en carte de couleurs).");
     it.enregistrer("mesh", fnSurf, "graphique", "mesh  Maillage (rendu en carte de couleurs).");
+    it.enregistrer("contourf", fnContourf, "graphique",
+                   "contourf  Lignes de niveau, sur fond colore.");
+    it.enregistrer("contour3", fnContour3, "graphique",
+                   "contour3  Lignes de niveau (rendu plan).");
+    it.enregistrer("contourc", fnContourc, "graphique",
+                   "contourc  Matrice des lignes de niveau, sans tracer.");
     it.enregistrer("contour", fnContour, "graphique", "contour  Lignes de niveau.");
     it.enregistrer("pcolor", fnImagesc, "graphique", "pcolor  Damier colore.");
     it.enregistrer("figure", fnFigure, "graphique", "figure  Cree ou choisit une figure.");

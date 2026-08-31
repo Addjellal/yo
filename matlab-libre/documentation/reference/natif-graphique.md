@@ -231,20 +231,147 @@ COLORMAP  Palette de couleurs.
 
 ```
 CONTOUR  Lignes de niveau.
-    CONTOUR(Z) trace les lignes de niveau de Z.
-    CONTOUR(X,Y,Z) les place aux coordonnées (X,Y).
+    CONTOUR(Z) trace les lignes de niveau de Z, à neuf niveaux répartis
+    entre le minimum et le maximum.
+    CONTOUR(X,Y,Z) les place aux coordonnées (X,Y). X et Y sont des
+    vecteurs, ou les grilles que rend MESHGRID.
     CONTOUR(...,N) demande N niveaux.
+    CONTOUR(...,NIVEAUX) impose les niveaux, donnés en vecteur. Un seul
+    niveau s'écrit deux fois : CONTOUR(Z,[0 0]) trace la seule courbe
+    Z = 0.
+    CONTOUR(...,STYLE) prend une chaîne de style, comme PLOT.
+    C = CONTOUR(...) rend la matrice des contours ; [C,H] = CONTOUR(...)
+    rend en outre les poignées des courbes.
+
+    Les courbes sont extraites par « marching squares » : dans chaque
+    maille, la ligne coupe les arêtes où Z passe de part et d'autre du
+    niveau, le point de coupe est interpolé linéairement, et les segments
+    sont chaînés bout à bout. Une courbe fermée revient donc exactement
+    sur son premier point, et CLABEL peut poser son étiquette au milieu.
+
+    La matrice C est celle de MATLAB : pour chaque courbe, une colonne
+    [niveau ; nombre de points] puis les points, en x sur la première
+    ligne et en y sur la seconde.
 
     Syntaxe
        contour(Z)
        contour(X,Y,Z)
        contour(___,n)
+       contour(___,niveaux)
+       contour(___,style)
+       C = contour(___)
+       [C,h] = contour(___)
 
     Exemples
        [X, Y] = meshgrid(-3:0.1:3);
        contour(X, Y, X.^2 + Y.^2, 12);
 
-    Voir aussi SURF, MESH, PCOLOR, COLORBAR.
+       Z = X .* exp(-X.^2 - Y.^2);
+       [C, h] = contour(X, Y, Z, 10);
+       clabel(C);                        % les niveaux ecrits sur les courbes
+
+       contour(X, Y, X.^2 + Y.^2, [1 4 9]);   % trois cercles
+
+    Voir aussi CONTOURF, CONTOUR3, CONTOURC, CLABEL, SURF, MESH, PCOLOR.
+```
+
+## `contour3`
+
+```
+CONTOUR3  Lignes de niveau, dans l'espace.
+    CONTOUR3(Z) trace les lignes de niveau de Z en les plaçant, dans
+    MATLAB, à la hauteur de leur niveau.
+    CONTOUR3(X,Y,Z), CONTOUR3(...,N) et CONTOUR3(...,NIVEAUX) suivent la
+    même règle que CONTOUR.
+    C = CONTOUR3(...) rend la matrice des contours.
+
+    Le rendu de MatLibre est plan, comme pour PLOT3 et SURF : les courbes
+    sont dessinées à plat. Ce qu'elles valent se lit toujours ; ce qui
+    manque est la perspective.
+
+    Syntaxe
+       contour3(Z)
+       contour3(X,Y,Z)
+       contour3(___,n)
+       contour3(___,niveaux)
+       [C,h] = contour3(___)
+
+    Exemples
+       [X, Y] = meshgrid(-3:0.1:3);
+       contour3(X, Y, X.^2 - Y.^2, 15);
+
+    Voir aussi CONTOUR, CONTOURF, CONTOURC, SURFC, MESHC.
+```
+
+## `contourc`
+
+```
+CONTOURC  Matrice des lignes de niveau, sans rien tracer.
+    C = CONTOURC(Z) calcule les lignes de niveau de Z et rend la seule
+    matrice des contours.
+    C = CONTOURC(X,Y,Z), C = CONTOURC(...,N) et C = CONTOURC(...,NIVEAUX)
+    suivent la même règle que CONTOUR.
+
+    La matrice se lit ainsi : chaque courbe commence par une colonne
+    [niveau ; nombre de points], suivie d'autant de colonnes que de
+    points, x sur la première ligne et y sur la seconde. La boucle qui
+    la parcourt tient en quatre lignes :
+
+       k = 1;
+       while k <= size(C, 2)
+           n = C(2, k);
+           x = C(1, k+1:k+n);  y = C(2, k+1:k+n);
+           k = k + n + 1;
+       end
+
+    C'est la fonction à employer quand on veut les courbes elles-mêmes —
+    pour mesurer une aire, suivre une isobare, écrire un fichier — et non
+    un dessin.
+
+    Syntaxe
+       C = contourc(Z)
+       C = contourc(X,Y,Z)
+       C = contourc(___,n)
+       C = contourc(___,niveaux)
+
+    Exemples
+       [X, Y] = meshgrid(linspace(-2, 2, 41));
+       C = contourc(X, Y, X.^2 + Y.^2, [1 4]);
+       C(1, 1)                          % le premier niveau : 1
+       C(2, 1)                          % combien de points il porte
+
+    Voir aussi CONTOUR, CONTOURF, CONTOUR3, CLABEL.
+```
+
+## `contourf`
+
+```
+CONTOURF  Lignes de niveau, sur fond coloré.
+    CONTOURF(Z) trace les mêmes lignes que CONTOUR, sur le champ coloré
+    des valeurs de Z.
+    CONTOURF(X,Y,Z), CONTOURF(...,N) et CONTOURF(...,NIVEAUX) suivent la
+    même règle que CONTOUR.
+    C = CONTOURF(...) rend la matrice des contours ;
+    [C,H] = CONTOURF(...) rend en outre les poignées.
+
+    MATLAB remplit chaque bande entre deux niveaux d'une couleur unie.
+    MatLibre pose le champ coloré continu, puis les lignes par-dessus :
+    l'image est la même à l'œil, et rien n'y est faux — c'est le
+    découpage en bandes qui manque.
+
+    Syntaxe
+       contourf(Z)
+       contourf(X,Y,Z)
+       contourf(___,n)
+       contourf(___,niveaux)
+       [C,h] = contourf(___)
+
+    Exemples
+       [X, Y] = meshgrid(-3:0.1:3);
+       contourf(X, Y, X .* exp(-X.^2 - Y.^2), 12);
+       colorbar
+
+    Voir aussi CONTOUR, CONTOUR3, CONTOURC, CLABEL, PCOLOR, COLORBAR.
 ```
 
 ## `drawnow`

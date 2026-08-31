@@ -584,6 +584,11 @@ static Classe classeConcat(const std::vector<Valeur>& v) {
     bool simple = false, logique = true, fonction = false;
     Classe entier = Classe::Double;
     bool aEntier = false;
+    // Un tableau d'objets reste un tableau de sa classe : « [h; h] » sur
+    // deux poignees graphiques donnait une simple structure, et « class »
+    // ne rendait plus le nom de la classe.
+    bool tousObjets = true;
+    std::string nomCommun;
     for (const auto& x : v) {
         if (x.classe == Classe::Cellule) cellule = true;
         else if (x.classe == Classe::Chaine) chaine = true;
@@ -593,9 +598,15 @@ static Classe classeConcat(const std::vector<Valeur>& v) {
         else if (x.classe == Classe::Simple) simple = true;
         else if (classeEntiere(x.classe)) { entier = x.classe; aEntier = true; }
         if (x.classe != Classe::Logique) logique = false;
+        if (x.classe == Classe::Objet) {
+            if (nomCommun.empty()) nomCommun = x.nomObjet;
+            else if (nomCommun != x.nomObjet) tousObjets = false;
+        } else {
+            tousObjets = false;
+        }
     }
     if (cellule) return Classe::Cellule;
-    if (structure) return Classe::Structure;
+    if (structure) return tousObjets ? Classe::Objet : Classe::Structure;
     if (chaine) return Classe::Chaine;
     if (caractere) return Classe::Caractere;
     if (fonction) return Classe::Fonction;
@@ -702,7 +713,10 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
 
     Valeur r;
     r.classe = cible;
-    r.nomObjet = conv[0].nomObjet;
+    // Le nom de classe vient du premier element qui en porte un : « [] »
+    // en tete d'une concatenation ne doit pas l'effacer.
+    for (const auto& e : conv)
+        if (!e.nomObjet.empty()) { r.nomObjet = e.nomObjet; break; }
     r.dims = rd;
     std::size_t n = produitDims(rd);
     switch (cible) {

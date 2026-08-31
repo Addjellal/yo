@@ -6,6 +6,8 @@
 // l'interpreteur, la figure qui se peint, le fil de calcul qui ne bloque
 // pas l'interface, et la coloration qui distingue la transposee de la
 // chaine de caracteres.
+#include <algorithm>
+
 #include <QApplication>
 #include <QDir>
 #include <QFileDialog>
@@ -312,6 +314,68 @@ int main(int argc, char** argv) {
             if (capture) image.save(QString::fromLocal8Bit(capture));
         }
         envoyer(fenetre, QStringLiteral("close(7)"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+    }
+
+    // --- les traces neufs : contour, pie, quiver, texte --------------------
+    //
+    // Quatre cases, quatre familles de trace qui n'existaient pas : les
+    // lignes de niveau par marching squares, le diagramme circulaire fait
+    // de polygones, le champ de vecteurs, et un texte pose dans l'axe.
+    // On verifie que chaque case porte de l'encre, et que le texte est
+    // bien rendu par le peintre Qt — c'est lui, et non le SVG, qui montre
+    // ce que l'utilisateur voit.
+    {
+        envoyer(fenetre, QStringLiteral(
+                    "figure(8); [X, Y] = meshgrid(linspace(-3,3,60), linspace(-2,2,40)); "
+                    "Z = X .* exp(-X.^2 - Y.^2); "
+                    "subplot(2,2,1), contour(X, Y, Z, 10), title('lignes de niveau'); "
+                    "subplot(2,2,2), pie([3 1 1], [0 0 1], {'un','deux','trois'}); "
+                    "subplot(2,2,3), quiver(X(1:4:end,1:6:end), Y(1:4:end,1:6:end), "
+                    "  -Y(1:4:end,1:6:end), X(1:4:end,1:6:end)), title('champ'); "
+                    "subplot(2,2,4), plot(1:10, (1:10).^2), "
+                    "  text(3, 60, 'un texte pose'), title('texte');"));
+        VueFigure* vueTraces = nullptr;
+        verifier(attendre([&] {
+                     for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                         if (!f->isHidden() &&
+                             f->windowTitle().startsWith(QLatin1String("Figure 8")))
+                             vueTraces = f->vue();
+                     return vueTraces != nullptr;
+                 }),
+                 "la figure des traces neufs s'ouvre");
+        if (vueTraces) {
+            vueTraces->resize(900, 700);
+            QCoreApplication::processEvents();
+            QImage image(900, 700, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            vueTraces->render(&image);
+            auto encreDans = [&](int x0, int y0, int x1, int y1) {
+                int n = 0;
+                for (int y = y0; y < y1; y += 2)
+                    for (int x = x0; x < x1; x += 2)
+                        if (qGray(image.pixel(x, y)) < 220) ++n;
+                return n;
+            };
+            verifier(encreDans(0, 0, 450, 350) > 200, "les lignes de niveau sont dessinees");
+            verifier(encreDans(450, 0, 900, 350) > 200, "le diagramme circulaire aussi");
+            verifier(encreDans(0, 350, 450, 700) > 200, "le champ de vecteurs aussi");
+            verifier(encreDans(450, 350, 900, 700) > 200, "la courbe et son texte aussi");
+            // Le secteur decolle est colorie : la case du haut a droite
+            // porte des pixels franchement colores, non du seul trait noir.
+            int colores = 0;
+            for (int y = 20; y < 340; y += 2)
+                for (int x = 470; x < 880; x += 2) {
+                    QRgb p = image.pixel(x, y);
+                    int maximum = std::max(qRed(p), std::max(qGreen(p), qBlue(p)));
+                    int minimum = std::min(qRed(p), std::min(qGreen(p), qBlue(p)));
+                    if (maximum - minimum > 60) ++colores;
+                }
+            verifier(colores > 300, "les secteurs du camembert sont remplis");
+            const char* capture = std::getenv("MATLIBRE_CAPTURE_TRACES");
+            if (capture) image.save(QString::fromLocal8Bit(capture));
+        }
+        envoyer(fenetre, QStringLiteral("close(8)"));
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
     }
 
