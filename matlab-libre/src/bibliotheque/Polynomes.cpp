@@ -18,11 +18,54 @@ using cplx = std::complex<double>;
     std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 #define INUTILISE (void)it; (void)args; (void)nargout;
 
+// « [y,delta] = polyval(p,x,S) » : l'ecart type de l'erreur de
+// prediction, deduit du facteur triangulaire que rend POLYFIT.
+Valeur ecartPrediction(const Valeur& x, const Valeur& S, int degre) {
+    Valeur R = S.champ("R", 0);
+    double df = S.champ("df", 0).scal();
+    double normr = S.champ("normr", 0).scal();
+    int m = (int)x.nelem();
+    Valeur A = Valeur::matrice(m, degre + 1);
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j <= degre; ++j)
+            A.re[(std::size_t)i + (std::size_t)j * m] = std::pow(x.re[(std::size_t)i], degre - j);
+    Valeur E = divisionDroite(A, R);
+    Valeur d = x;
+    d.classe = Classe::Double;
+    d.im.clear();
+    for (int i = 0; i < m; ++i) {
+        double somme = 0;
+        for (int j = 0; j <= degre; ++j) {
+            double e = E.re[(std::size_t)i + (std::size_t)j * m];
+            somme += e * e;
+        }
+        d.re[(std::size_t)i] = df > 0 ? normr / std::sqrt(df) * std::sqrt(1 + somme) : INFINITY;
+    }
+    return d;
+}
+
 FONCTION(fnPolyval) {
     INUTILISE
     exigerArguments(args, 2, 4, "polyval");
     const Valeur& p = versDouble(args[0]);
-    const Valeur& x = versDouble(args[1]);
+    Valeur xBrut = versDouble(args[1]);
+    // « polyval(p,x,S,mu) » : le polynome a ete ajuste en variable
+    // centree reduite, il faut y ramener x avant de l'evaluer.
+    if (args.size() >= 4 && args[3].nelem() >= 2) {
+        double centre = args[3].re[0], echelle = args[3].re[1];
+        if (echelle == 0) echelle = 1;
+        for (std::size_t k = 0; k < xBrut.nelem(); ++k)
+            xBrut.re[k] = (xBrut.re[k] - centre) / echelle;
+    }
+    const Valeur& x = xBrut;
+    if (nargout >= 2 && args.size() >= 3 && args[2].classe == Classe::Structure) {
+        std::vector<Valeur> sorties;
+        std::vector<Valeur> seuls = {p, x};
+        Arguments reduits(seuls);
+        sorties.push_back(fnPolyval(it, reduits, 1)[0]);
+        sorties.push_back(ecartPrediction(x, args[2], (int)p.nelem() - 1));
+        return sorties;
+    }
     Valeur r = x;
     r.classe = Classe::Double;
     if (p.estComplexe() || x.estComplexe()) {
@@ -145,10 +188,34 @@ FONCTION(fnPoly) {
 FONCTION(fnPolyfit) {
     INUTILISE
     exigerArguments(args, 3, 3, "polyfit");
-    const Valeur& x = versDouble(args[0]);
+    exigerNumerique(args[0], "polyfit");
+    exigerNumerique(args[1], "polyfit");
+    Valeur x = versDouble(args[0]);
     const Valeur& y = versDouble(args[1]);
     int n = (int)args[2].scal();
+    if (n < 0) erreur("MATLAB:polyfit:BadDegree", "The degree must be nonnegative.");
     int m = (int)x.nelem();
+    if ((int)y.nelem() != m)
+        erreur("MATLAB:polyfit:XYSizeMismatch",
+               "X and Y must have the same number of elements.");
+    // « [p,S,mu] = polyfit(x,y,n) » : on ajuste alors en variable centree
+    // reduite, ce qui rend le systeme bien mieux conditionne pour un
+    // degre eleve.
+    double centre = 0, echelle = 1;
+    if (nargout >= 3) {
+        double somme = 0;
+        for (int i = 0; i < m; ++i) somme += x.re[(std::size_t)i];
+        centre = m ? somme / m : 0;
+        double carres = 0;
+        for (int i = 0; i < m; ++i) {
+            double d = x.re[(std::size_t)i] - centre;
+            carres += d * d;
+        }
+        echelle = m > 1 ? std::sqrt(carres / (m - 1)) : 1;
+        if (echelle == 0) echelle = 1;
+        for (int i = 0; i < m; ++i)
+            x.re[(std::size_t)i] = (x.re[(std::size_t)i] - centre) / echelle;
+    }
     Valeur A = Valeur::matrice(m, n + 1);
     for (int i = 0; i < m; ++i)
         for (int j = 0; j <= n; ++j)
@@ -156,12 +223,29 @@ FONCTION(fnPolyfit) {
     Valeur b = Valeur::colonne(std::vector<double>(y.re.begin(), y.re.end()));
     Valeur c = divisionGauche(A, b);
     Valeur r = transposer(c, false);
-    if (nargout >= 2) {
-        Valeur structure = Valeur::structureVide();
-        structure.poserChamp("normr", Valeur::scalaire(0));
-        return {r, structure};
+    if (nargout < 2) return {r};
+
+    // La structure de MATLAB : le facteur triangulaire de la matrice de
+    // Vandermonde, les degres de liberte, la norme des residus. C'est ce
+    // dont POLYCONF et POLYVAL a deux sorties ont besoin ; MatLibre y
+    // rangeait un zero, et l'intervalle de prediction etait faux.
+    Valeur q, R;
+    factorisationQR(A, q, R, true);
+    Valeur ajuste = produitMatrice(A, c);
+    double residu = 0;
+    for (std::size_t k = 0; k < b.re.size(); ++k) {
+        double d = b.re[k] - ajuste.re[k];
+        residu += d * d;
     }
-    return {r};
+    Valeur structure = Valeur::structureVide();
+    structure.poserChamp("R", R);
+    structure.poserChamp("df", Valeur::scalaire((double)std::max(0, m - (n + 1))));
+    structure.poserChamp("normr", Valeur::scalaire(std::sqrt(residu)));
+    if (nargout >= 3) {
+        Valeur mu = Valeur::colonne({centre, echelle});
+        return {r, structure, mu};
+    }
+    return {r, structure};
 }
 
 FONCTION(fnPolyder) {

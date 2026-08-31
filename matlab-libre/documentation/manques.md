@@ -12,8 +12,8 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | optimisation | 26 | 6 | 81 % |
 | robuste | 8 | 61 | 12 % |
 | signal | 104 | 31 | 77 % |
-| statistiques | 118 | 98 | 55 % |
-| **ensemble** | **817** | **367** | **69 %** |
+| statistiques | 187 | 29 | 87 % |
+| **ensemble** | **886** | **298** | **75 %** |
 
 ## automatique
 
@@ -81,21 +81,11 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 ## statistiques
 
-`anova2`, `anovan`, `bootci`, `boxplot`, `canoncorr`, `chi2gof`, `cluster`
-`clusterdata`, `cophenet`, `copulacdf`, `corr`, `dataset`, `dendrogram`
-`discardSupportVectors`, `ecdf`, `fitcecoc`, `fitclinear`, `fitcnb`, `fitcsvm`
-`fitdist`, `fitglm`, `fitlme`, `fitrgp`, `fitrlinear`, `fitrsvm`, `fitrtree`
-`friedman`, `gevcdf`, `gmdistribution`, `gname`, `grp2idx`, `grpstats`, `harmmean`
-`histfit`, `hmmdecode`, `hmmgenerate`, `hmmtrain`, `hougen`, `jbtest`, `kruskalwallis`
-`kstest2`, `lasso`, `lillietest`, `linkage`, `mahal`, `manova1`, `mdscale`
-`mle`, `mnrfit`, `multcompare`, `mvncdf`, `mvnpdf`, `mvnrnd`, `nancov`, `nanmax`
-`nanmean`, `nanmedian`, `nanmin`, `nanstd`, `nansum`, `nanvar`, `ncfcdf`
-`nctcdf`, `ncx2cdf`, `nlinfit`, `nlparci`, `nnmf`, `normplot`, `normspec`
-`pcacov`, `pdist`, `pdist2`, `pearsrnd`, `polyconf`, `polytool`, `princomp`
-`probplot`, `procrustes`, `refcurve`, `refline`, `regstats`, `relieff`, `ridge`
-`robustfit`, `rowexch`, `runstest`, `sequentialfs`, `signtest`, `slicesample`
-`squareform`, `statset`, `stepwise`, `stepwisefit`, `trimmean`, `vartest`
-`vartest2`, `wishrnd`, `ztest`
+`anovan`, `copulacdf`, `dataset`, `discardSupportVectors`, `fitcecoc`, `fitclinear`
+`fitcnb`, `fitcsvm`, `fitglm`, `fitlme`, `fitrgp`, `fitrlinear`, `fitrsvm`
+`fitrtree`, `gmdistribution`, `hmmdecode`, `hmmgenerate`, `hmmtrain`, `lasso`
+`manova1`, `mnrfit`, `nnmf`, `pearsrnd`, `polytool`, `relieff`, `rowexch`
+`sequentialfs`, `slicesample`, `stepwise`
 
 ## Ce qui manque au-delà des fonctions
 

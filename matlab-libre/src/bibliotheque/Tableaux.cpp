@@ -126,7 +126,7 @@ FONCTION(fnProd) {
     return {reductionSomme(args[0], dim, true, omettreNaN(args))};
 }
 
-Valeur cumulatif(const Valeur& brut, int dim, bool produit) {
+Valeur cumulatif(const Valeur& brut, int dim, bool produit, bool omettre = false) {
     Valeur v = enDouble(brut);
     Valeur r = v;
     r.classe = Classe::Double;
@@ -162,8 +162,13 @@ Valeur cumulatif(const Valeur& brut, int dim, bool produit) {
             double acc = produit ? 1.0 : 0.0;
             for (std::size_t i = 0; i < taille; ++i) {
                 std::size_t p = a * interne * taille + b + i * interne;
-                if (produit) acc *= v.re[p];
-                else acc += v.re[p];
+                // « omitnan » traite un NaN comme un terme neutre : le
+                // cumul reprend là où il en était au lieu de rester NaN
+                // jusqu'au bout de la colonne.
+                if (!(omettre && std::isnan(v.re[p]))) {
+                    if (produit) acc *= v.re[p];
+                    else acc += v.re[p];
+                }
                 r.re[p] = acc;
             }
         }
@@ -172,13 +177,15 @@ Valeur cumulatif(const Valeur& brut, int dim, bool produit) {
 
 FONCTION(fnCumsum) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "cumsum");
-    return {cumulatif(args[0], dimensionArgument(args, 1, args[0]), false)};
+    return {cumulatif(args[0], dimensionArgument(args, 1, args[0]), false, omettre)};
 }
 FONCTION(fnCumprod) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "cumprod");
-    return {cumulatif(args[0], dimensionArgument(args, 1, args[0]), true)};
+    return {cumulatif(args[0], dimensionArgument(args, 1, args[0]), true, omettre)};
 }
 
 // max / min : trois formes documentées.

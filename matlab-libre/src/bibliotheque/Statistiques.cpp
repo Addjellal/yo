@@ -54,30 +54,40 @@ double varianceDe(const std::vector<double>& t, int normalisation) {
 
 FONCTION(fnMean) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "mean");
     Valeur v = versDouble(args[0]);
     if (v.estVide()) return {Valeur::scalaire(NAN)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
-    return {reduire(v, dim, false, moyenneDe)};
+    return {reduire(v, dim, false, [omettre](const std::vector<double>& t) {
+        return moyenneDe(omettre ? sansNaN(t) : t);
+    })};
 }
 
 FONCTION(fnMedian) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "median");
     Valeur v = versDouble(args[0]);
     if (v.estVide()) return {Valeur::scalaire(NAN)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
-    return {reduire(v, dim, false, [](const std::vector<double>& t) { return medianeDe(t); })};
+    return {reduire(v, dim, false, [omettre](const std::vector<double>& t) {
+        return medianeDe(omettre ? sansNaN(t) : t);
+    })};
 }
 
 FONCTION(fnMode) {
     INUTILISE
+    optionOmettreNaN(args);
     exigerArguments(args, 1, 2, "mode");
     Valeur v = versDouble(args[0]);
     int dim = dimensionChoisie(args, 1, v);
-    return {reduire(v, dim, false, [](const std::vector<double>& t) {
+    // MODE écarte toujours les NaN, avec ou sans option : ils ne sont
+    // égaux à rien, pas même à eux-mêmes, donc ne peuvent dominer.
+    return {reduire(v, dim, false, [](const std::vector<double>& brut) {
+        std::vector<double> t = sansNaN(brut);
         std::map<double, int> compte;
         for (double x : t) ++compte[x];
         double meilleur = NAN;
@@ -93,24 +103,26 @@ FONCTION(fnMode) {
 
 FONCTION(fnVar) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "var");
     Valeur v = versDouble(args[0]);
     int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
     int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
     if (v.estVecteur() && args.size() <= 2) dim = dimensionParDefaut(v);
-    return {reduire(v, dim, false, [normalisation](const std::vector<double>& t) {
-        return varianceDe(t, normalisation);
+    return {reduire(v, dim, false, [normalisation, omettre](const std::vector<double>& t) {
+        return varianceDe(omettre ? sansNaN(t) : t, normalisation);
     })};
 }
 
 FONCTION(fnStd) {
     INUTILISE
+    bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "std");
     Valeur v = versDouble(args[0]);
     int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
     int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
-    return {reduire(v, dim, false, [normalisation](const std::vector<double>& t) {
-        return std::sqrt(varianceDe(t, normalisation));
+    return {reduire(v, dim, false, [normalisation, omettre](const std::vector<double>& t) {
+        return std::sqrt(varianceDe(omettre ? sansNaN(t) : t, normalisation));
     })};
 }
 

@@ -59,6 +59,12 @@ int dimensionParDefaut(const Valeur& v);
 // Vrai si l'un des arguments est l'option « all » : la réduction porte
 // alors sur tous les éléments, comme depuis MATLAB R2018b.
 bool optionToutesDimensions(const std::vector<Valeur>& args);
+// Vrai si l'un des arguments est « omitnan » ; l'option, quelle qu'elle
+// soit, est retirée de la liste au passage. Sans elle, un seul NaN suffit
+// à rendre NaN toute la colonne, comme dans MATLAB.
+bool optionOmettreNaN(std::vector<Valeur>& args);
+// Le même vecteur, privé de ses NaN.
+std::vector<double> sansNaN(const std::vector<double>& t);
 Valeur aplatirColonne(const Valeur& v);
 Classe classeDepuisNom(const std::string& nom, bool* trouve = nullptr);
 

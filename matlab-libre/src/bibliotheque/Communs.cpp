@@ -1,5 +1,6 @@
 // Communs.cpp — briques partagées par tous les modules de la bibliothèque.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -150,6 +151,35 @@ bool optionToutesDimensions(const std::vector<Valeur>& args) {
         if ((a.estTexte() || a.estChaine()) && a.versTexte() == "all") return true;
     }
     return false;
+}
+
+// « mean(x,'omitnan') » : MATLAB écarte alors les NaN au lieu de les
+// laisser contaminer toute la réduction. L'option est retirée de la
+// liste d'arguments, si bien que la suite — le contrôle d'arité, la
+// dimension — n'a pas à la connaître.
+bool optionOmettreNaN(std::vector<Valeur>& args) {
+    bool omettre = false;
+    for (std::size_t k = args.size(); k-- > 1;) {
+        const Valeur& a = args[k];
+        if (!(a.estTexte() || a.estChaine())) continue;
+        std::string t = a.versTexte();
+        for (char& c : t) c = (char)std::tolower((unsigned char)c);
+        if (t == "omitnan" || t == "omitmissing") {
+            omettre = true;
+            args.erase(args.begin() + (std::ptrdiff_t)k);
+        } else if (t == "includenan" || t == "includemissing") {
+            args.erase(args.begin() + (std::ptrdiff_t)k);
+        }
+    }
+    return omettre;
+}
+
+std::vector<double> sansNaN(const std::vector<double>& t) {
+    std::vector<double> r;
+    r.reserve(t.size());
+    for (double x : t)
+        if (!std::isnan(x)) r.push_back(x);
+    return r;
 }
 
 Valeur aplatirColonne(const Valeur& v) {

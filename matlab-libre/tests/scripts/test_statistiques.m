@@ -420,4 +420,295 @@ assert(abs(xSemi - 1.2) < 1e-3);
 assert(abs(vSemi - 1.44) < 1e-2);
 assert(pireSemi < 1e-6);
 
+% ---------------------------------------------------------------- omitnan
+% Un seul NaN rendait toute la colonne NaN : « omitnan » l'ecarte, comme
+% depuis R2015a. Les fonctions nan* de la boite a outils s'y ramenent.
+assert(abs(mean([1 2 NaN 4], 'omitnan') - 7/3) < 1e-12);
+assert(isnan(mean([1 2 NaN 4])));
+assert(isequal(mean([1 NaN; 3 4], 'omitnan'), [2 4]));
+assert(isequal(mean([1 NaN; 3 4], 2, 'omitnan'), [1; 3.5]));
+assert(abs(std([1 2 NaN 3], 'omitnan') - 1) < 1e-12);
+assert(abs(var([1 2 NaN 3], 1, 'omitnan') - 2/3) < 1e-12);
+assert(median([1 NaN 3 100], 'omitnan') == 3);
+assert(isequal(cumsum([1 NaN 3], 'omitnan'), [1 1 4]));
+assert(isequal(sum([1 NaN 3], 'omitnan'), 4));
+
+assert(abs(nanmean([1 2 NaN 4]) - 7/3) < 1e-12);
+assert(nansum([NaN NaN]) == 0);          % la somme d'aucun terme vaut zero
+assert(isnan(nanmean([NaN NaN])));       % la moyenne d'aucun terme, non
+assert(nanmedian([1 NaN 3 100]) == 3);
+assert(abs(nanstd([1 2 NaN 3]) - 1) < 1e-12);
+assert(abs(nanvar([1 2 NaN 3], 1) - 2/3) < 1e-12);
+[maxNaN, ouMax] = nanmax([1 NaN 5 2]);
+assert(maxNaN == 5 && ouMax == 3);
+[minNaN, ouMin] = nanmin([3 NaN 1 2]);
+assert(minNaN == 1 && ouMin == 3);
+covComplet = nancov([1 2; 3 5; NaN 9; 4 8]);
+assert(max(max(abs(covComplet - cov([1 2; 3 5; 4 8])))) < 1e-12);
+covPaires = nancov([1 2; 3 5; NaN 9; 4 8], 'pairwise');
+assert(abs(covPaires(2, 2) - var([2 5 9 8])) < 1e-12);
+assert(abs(covPaires(1, 1) - var([1 3 4])) < 1e-12);
+
+% ------------------------------------------------------- moyennes et rangs
+assert(abs(geomean([1 4 16]) - 4) < 1e-12);
+assert(abs(geomean([1.10 0.90]) - sqrt(0.99)) < 1e-12);
+assert(max(abs(geomean([1 2; 3 4]) - [sqrt(3) sqrt(8)])) < 1e-12);
+assert(abs(harmmean([30 60]) - 40) < 1e-12);
+assert(abs(harmmean([1 2 4]) - 12/7) < 1e-12);
+assert(harmmean([0 1 2]) == 0);
+% La moyenne elaguee ignore la valeur aberrante que la moyenne subit.
+assert(abs(trimmean([1 2 3 4 5 6 7 8 9 1000], 20) - 5.5) < 1e-12);
+assert(abs(trimmean(1:10, 0) - 5.5) < 1e-12);
+assert(isequal(tiedrank([10 20 20 40]), [1 2.5 2.5 4]));
+assert(isequal(tiedrank([3 1 2]), [3 1 2]));
+[rangsLies, correction] = tiedrank([1 1 1]);
+assert(isequal(rangsLies, [2 2 2]) && correction == 12);
+assert(isnan(tiedrank([1 NaN 2])) * [0;1;0] == 1);
+
+% corr : Pearson comme corrcoef, Spearman insensible a la courbure.
+xCorr = (1:10)';
+assert(abs(corr(xCorr, xCorr .^ 3, 'type', 'Spearman') - 1) < 1e-12);
+assert(abs(corr(xCorr, xCorr .^ 3, 'type', 'Kendall') - 1) < 1e-12);
+matriceCorr = [1 2; 3 5; 4 9; 2 3];
+assert(max(max(abs(corr(matriceCorr) - corrcoef(matriceCorr)))) < 1e-12);
+assert(isequal(size(corr(randn(20, 3), randn(20, 2))), [3 2]));
+[rhoCorr, pCorr] = corr(xCorr, [1 3 2 5 4 7 6 9 8 10]');
+assert(rhoCorr > 0.9 && pCorr < 0.001);
+
+% ---------------------------------------------------------- groupes
+[indicesGroupe, nomsGroupe] = grp2idx({'b', 'a', 'b'});
+assert(isequal(indicesGroupe, [2; 1; 2]));
+assert(isequal(nomsGroupe, {'a'; 'b'}));
+[indicesNombres, nomsNombres] = grp2idx([10 20 10 30]);
+assert(isequal(indicesNombres, [1; 2; 1; 3]));
+assert(strcmp(nomsNombres{3}, '30'));
+[moyennesGroupe, ecartsGroupe, effectifsGroupe] = ...
+    grpstats([1 2 3 10 11 12]', {'a','a','a','b','b','b'});
+assert(isequal(moyennesGroupe, [2; 11]));
+assert(max(abs(ecartsGroupe - [1; 1])) < 1e-12);
+assert(isequal(effectifsGroupe, [3; 3]));
+
+% ecdf : l'escalier part de zero a la plus petite observation.
+[hauteurs, abscisses] = ecdf([3 1 4 1 5]);
+assert(hauteurs(1) == 0 && abscisses(1) == 1);
+assert(abs(hauteurs(2) - 0.4) < 1e-12);
+assert(abs(hauteurs(end) - 1) < 1e-12);
+assert(abscisses(end) == 5);
+
+% ---------------------------------------------------------- distances
+nuage = [0 0; 3 4; 0 4];
+assert(isequal(pdist(nuage), [5 4 3]));
+assert(isequal(pdist(nuage, 'cityblock'), [7 4 3]));
+assert(isequal(pdist(nuage, 'chebychev'), [4 4 3]));
+assert(abs(pdist([1 0; 0 1], 'cosine') - 1) < 1e-12);
+carree = squareform(pdist(nuage));
+assert(isequal(carree, [0 5 4; 5 0 3; 4 3 0]));
+assert(isequal(squareform(carree), [5 4 3]));
+assert(isequal(pdist([1 1 0; 1 0 1], 'hamming'), 2/3));
+assert(abs(pdist([1 1 0; 1 0 1], 'jaccard') - 2/3) < 1e-12);
+distances2 = pdist2(nuage, [0 0; 1 1]);
+assert(isequal(size(distances2), [3 2]));
+assert(distances2(1, 1) == 0);
+[proches, ouProches] = pdist2([0 0; 3 4; 1 1], [0 0; 1 1], 'euclidean', 'Smallest', 1);
+assert(max(abs(proches)) < 1e-12);
+assert(isequal(ouProches, [1 3]));
+
+% mahal : la distance tient compte de la forme du nuage.
+rand('seed', 3);
+randn('seed', 3);
+nuageCorrele = randn(400, 2);
+assert(mahal([0 0], nuageCorrele) < 0.2);
+assert(mahal([4 4], nuageCorrele) > 10);
+
+% ------------------------------------------------- regroupement hierarchique
+donneesGrappes = [1 1; 1.2 1; 5 5; 5.1 5.2];
+arbre = linkage(donneesGrappes);
+assert(isequal(size(arbre), [3 3]));
+assert(abs(arbre(1, 3) - 0.2) < 1e-12);
+assert(abs(arbre(3, 3) - sqrt(3.8^2 + 4^2)) < 1e-12);   % plus proche voisin
+arbreComplet = linkage(donneesGrappes, 'complete');
+assert(abs(arbreComplet(3, 3) - sqrt(4.1^2 + 4.2^2)) < 1e-12);
+% Ward : la distance vaut racine(2*n1*n2/(n1+n2)) fois l'ecart des centres.
+arbreWard = linkage(donneesGrappes, 'ward');
+ecartCentres = norm([1.1 1] - [5.05 5.1]);
+assert(abs(arbreWard(3, 3) - sqrt(2) * ecartCentres) < 1e-10);
+assert(isequal(cluster(arbre, 'maxclust', 2), [1; 1; 2; 2]));
+assert(isequal(cluster(arbre, 'cutoff', 1), [1; 1; 2; 2]));
+assert(isequal(clusterdata(donneesGrappes, 2), [1; 1; 2; 2]));
+assert(cophenet(linkage(donneesGrappes, 'average'), pdist(donneesGrappes)) > 0.99);
+[traitsArbre, feuilleDe, ordreFeuilles] = dendrogram(linkage(donneesGrappes, 'average'));
+assert(numel(traitsArbre) == 3);
+assert(isequal(sort(ordreFeuilles), 1:4));
+assert(isequal(sort(feuilleDe'), 1:4));
+close('all');
+
+% ----------------------------------------------------- normale multivariee
+assert(abs(mvnpdf([0 0]) - 1 / (2 * pi)) < 1e-12);
+assert(abs(mvnpdf([0 0], [0 0], eye(2)) - 1 / (2 * pi)) < 1e-12);
+% (2*pi)^-1 * det^-0.5 * exp(-d/2), calcule a la main
+assert(abs(mvnpdf([1 1], [0 0], [2 1; 1 2]) - ...
+           exp(-1/3) / (2 * pi * sqrt(3))) < 1e-12);
+randn('seed', 11);
+tiragesNormale = mvnrnd([0 0], [1 0.8; 0.8 1], 20000);
+assert(max(max(abs(cov(tiragesNormale) - [1 0.8; 0.8 1]))) < 0.05);
+assert(max(abs(mean(tiragesNormale))) < 0.05);
+assert(abs(mvncdf([0 0]) - 0.25) < 1e-9);        % par symetrie
+assert(abs(mvncdf([0 0], [0 0], [1 0.5; 0.5 1]) - 1/3) < 1e-6);
+assert(abs(mvncdf(0) - 0.5) < 1e-12);
+assert(abs(mvncdf([Inf Inf]) - 1) < 1e-12);
+% Gauss-Legendre : les cinq noeuds de la table.
+[noeudsGL, poidsGL] = matlibre_gauss_legendre(5);
+assert(abs(noeudsGL(1) - 0.9061798459386640) < 1e-13);
+assert(abs(poidsGL(3) - 0.5688888888888889) < 1e-13);
+assert(abs(sum(poidsGL) - 2) < 1e-13);
+
+% --------------------------------------------------- analyse de la variance
+% Deux groupes bien separes : F = 37.5 a la main.
+[pAnova, tableauAnova] = anova1([5 6 7 10 11 12], [1 1 1 2 2 2]);
+assert(abs(tableauAnova.SSB - 37.5) < 1e-12);
+assert(abs(tableauAnova.SSW - 4) < 1e-12);
+assert(abs(tableauAnova.F - 37.5) < 1e-12);
+assert(abs(pAnova - (1 - fcdf(37.5, 1, 4))) < 1e-12);
+% La forme matricielle : une colonne par groupe.
+[pColonnes, tableauColonnes] = anova1([1 2; 2 3; 3 4]);
+assert(abs(tableauColonnes.F - 1.5) < 1e-12);
+assert(abs(pColonnes - (1 - fcdf(1.5, 1, 4))) < 1e-12);
+% anova2 sans repetition : SSE = SST - SSC - SSR.
+[pDeux, tableauDeux] = anova2([12 15 20; 13 16 22]);
+assert(numel(pDeux) == 2);
+assert(abs(tableauDeux.SSE - (tableauDeux.SST - tableauDeux.SSC - tableauDeux.SSR)) < 1e-10);
+assert(pDeux(1) < 0.01);
+% anova2 avec repetitions : trois probabilites, dont l'interaction.
+pInteraction = anova2([10 12; 11 13; 20 25; 21 24], 2);
+assert(numel(pInteraction) == 3);
+assert(pInteraction(2) < 0.001);
+% Kruskal-Wallis : trois contre trois entierement separes donnent 0.0495,
+% le plus petit que ce plan permette.
+assert(abs(kruskalwallis([1 2 3 100 101 102], [1 1 1 2 2 2]) - ...
+           (1 - chi2cdf(12/42 * 13.5, 1))) < 1e-12);
+% Friedman : quatre juges, trois vins, classement identique a chaque fois.
+assert(abs(friedman([3 5 8; 2 6 9; 4 5 7; 3 6 8]) - (1 - chi2cdf(8, 2))) < 1e-10);
+
+% La plage studentisee, comparee a la table de Tukey.
+assert(abs(matlibre_plage_studentisee(0.95, 3, 10) - 3.88) < 0.01);
+assert(abs(matlibre_plage_studentisee(0.95, 2, 10) - 3.15) < 0.01);
+assert(abs(matlibre_plage_studentisee(0.95, 5, Inf) - 3.86) < 0.01);
+[~, ~, statsAnova] = anova1([5 6 7 10 11 12 5.5 6.5 7.5], [1 1 1 2 2 2 3 3 3]);
+comparaisons = multcompare(statsAnova);
+assert(isequal(size(comparaisons), [3 6]));
+assert(comparaisons(1, 6) < 0.05);      % groupes 1 et 2
+assert(comparaisons(2, 6) > 0.5);       % groupes 1 et 3 : semblables
+assert(comparaisons(3, 6) < 0.05);      % groupes 2 et 3
+% L'intervalle de Bonferroni est plus large que celui de Tukey.
+comparaisonsBonferroni = multcompare(statsAnova, 'ctype', 'bonferroni');
+assert(comparaisonsBonferroni(1, 3) < comparaisons(1, 3));
+close('all');
+
+% ------------------------------------------------------------------- tests
+assert(abs(signtest([-2 -1 1 2]) - 1) < 1e-12);
+assert(abs(signtest([1 2 3 4 5 6 7 8]) - 2 * binocdf(0, 8, 0.5)) < 1e-12);
+assert(signtest([10 11 12], 11) == 1);
+[hZ, pZ, ciZ, zZ] = ztest([102 100 104 99 101], 100, 2);
+assert(hZ == 0);
+assert(abs(zZ - (mean([102 100 104 99 101]) - 100) / (2 / sqrt(5))) < 1e-12);
+assert(ciZ(1) < 100 && ciZ(2) > 100);
+% vartest sur des donnees dont la variance est connue exactement.
+donneesVariance = [1 2 3 4 5];        % variance 2.5
+[hVar, pVar, ciVar, statsVar] = vartest(donneesVariance, 2.5);
+assert(hVar == 0 && pVar > 0.8);
+assert(abs(statsVar.chisqstat - 4) < 1e-12);
+assert(ciVar(1) < 2.5 && ciVar(2) > 2.5);
+assert(vartest(donneesVariance, 0.01) == 1);
+[hVar2, pVar2, ciVar2, statsVar2] = vartest2([1 2 3 4 5], [1 2 3 4 5]);
+assert(hVar2 == 0 && abs(pVar2 - 1) < 1e-12);
+assert(abs(statsVar2.fstat - 1) < 1e-12);
+assert(ciVar2(1) < 1 && ciVar2(2) > 1);
+randn('seed', 5);
+assert(vartest2(randn(80, 1), randn(80, 1) * 4) == 1);
+
+% Kolmogorov-Smirnov a deux echantillons.
+[hKS, pKS, dKS] = kstest2([1 2 3 4 5], [11 12 13 14 15]);
+assert(hKS == 1 && dKS == 1);
+assert(kstest2([1 2 3 4 5], [1 2 3 4 5]) == 0);
+assert(abs(matlibre_kolmogorov_queue(0) - 1) < 1e-12);
+assert(matlibre_kolmogorov_queue(3) < 1e-7);
+
+% Jarque-Bera : la loi exponentielle est trop dissymetrique pour passer.
+randn('seed', 13);
+rand('seed', 13);
+assert(jbtest(randn(3000, 1)) == 0);
+assert(jbtest(exprnd(1, 400, 1)) == 1);
+[~, ~, statistiqueJB] = jbtest([1 2 3 4 5 6 7 8]);
+assert(statistiqueJB >= 0);
+
+% Lilliefors : la valeur critique retrouve la table, 0.886/racine(n).
+[hLil, ~, ~, critiqueLil] = lillietest(randn(200, 1));
+assert(hLil == 0);
+assert(abs(critiqueLil - 0.886 / sqrt(200)) < 0.005);
+assert(lillietest(exprnd(1, 200, 1)) == 1);
+
+% Le test des suites : l'alternance parfaite et la montee parfaite sont
+% toutes deux rejetees, le bruit ne l'est pas.
+[hSuites, pSuites, statsSuites] = runstest(repmat([1 -1], 1, 20));
+assert(hSuites == 1 && statsSuites.nruns == 40);
+assert(runstest(1:40) == 1);
+assert(runstest(randn(200, 1)) == 0);
+[~, pExact] = runstest(1:8, [], 'Method', 'exact');
+assert(pExact > 0.05 && pExact < 0.1);
+
+% Khi-deux d'adequation : le de a six faces bien equilibre.
+rand('seed', 21);
+[hDe, pDe, statsDe] = chi2gof(randi(6, 600, 1), 'Edges', 0.5:1:6.5, ...
+                              'Expected', repmat(100, 1, 6));
+assert(hDe == 0 && statsDe.df == 5);
+assert(abs(statsDe.chi2stat - sum((statsDe.O - 100) .^ 2) / 100) < 1e-12);
+assert(chi2gof(exprnd(1, 500, 1)) == 1);
+assert(chi2gof(exprnd(2, 500, 1), 'CDF', @(t) expcdf(t, 2)) == 0);
+
+% Les boites a moustaches : elles tracent sans rien casser.
+figure('Visible', 'off');
+boxplot([1 2 3 3 4 20 10 11 12 13], [1 1 1 1 1 1 2 2 2 2]);
+boxplot(randn(30, 3), 'Labels', {'a', 'b', 'c'});
+boxplot(randn(30, 2), 'Notch', 'on', 'Orientation', 'horizontal');
+close('all');
+
+% ------------------------------------------- poignees de courbes graphiques
+% « h = plot(...) » rend une poignee, comme dans MATLAB : c'est ce qui
+% manquait a set(h,...) et aux animations.
+figure('Visible', 'off');
+poigneeCourbe = plot([1 2 3], [4 5 6]);
+assert(strcmp(class(poigneeCourbe), 'matlab.graphics.chart.primitive.Line'));
+assert(strcmp(get(poigneeCourbe, 'Type'), 'line'));
+assert(isequal(get(poigneeCourbe, 'XData'), [1 2 3]));
+set(poigneeCourbe, 'LineWidth', 3, 'Color', 'r');
+assert(get(poigneeCourbe, 'LineWidth') == 3);
+assert(strcmp(get(poigneeCourbe, 'Color'), '#D95319'));
+poigneeCourbe.LineStyle = '--';
+assert(strcmp(poigneeCourbe.LineStyle, '--'));
+poigneeCourbe.YData = [9 8 7];
+assert(isequal(get(poigneeCourbe, 'YData'), [9 8 7]));
+% Une courbe par colonne : un tableau de poignees, et la palette part
+% bien de la premiere couleur.
+poigneesMultiples = plot((1:3)', [1 2; 3 4; 5 6]);
+assert(numel(poigneesMultiples) == 2);
+assert(strcmp(get(poigneesMultiples(1), 'Color'), '#0072BD'));
+assert(strcmp(get(poigneesMultiples(2), 'Color'), '#D95319'));
+assert(isequal(get(poigneesMultiples(2), 'YData'), [2 4 6]));
+set(poigneesMultiples, 'LineWidth', 2);
+assert(get(poigneesMultiples(1), 'LineWidth') == 2);
+% Le triplet de couleurs, et « Color » qui n'est plus pris pour un style.
+poigneeTriplet = plot([1 2], [1 2], 'Color', [0.85 0.55 0]);
+assert(strcmp(get(poigneeTriplet, 'Color'), '#D98C00'));
+assert(isempty(get(poigneeTriplet, 'Marker')) || ...
+       strcmp(get(poigneeTriplet, 'Marker'), 'none'));
+close('all');
+
+% [R,p] = chol(A) : une matrice non definie positive ne leve plus d'erreur.
+[facteur, defaut] = chol([4 2; 2 3]);
+assert(defaut == 0);
+assert(max(max(abs(facteur' * facteur - [4 2; 2 3]))) < 1e-12);
+[facteurPartiel, defautPartiel] = chol([1 2; 2 1]);
+assert(defautPartiel == 2);
+assert(isequal(size(facteurPartiel), [1 1]));
+
 disp('statistiques : toutes les verifications passent');

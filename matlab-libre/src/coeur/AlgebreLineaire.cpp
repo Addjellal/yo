@@ -338,16 +338,24 @@ void factorisationQR(const Valeur& a, Valeur& q, Valeur& r, bool economique) {
 
 // -------------------------------------------------------------- Cholesky
 
-Valeur cholesky(const Valeur& a, bool inferieure) {
+Valeur cholesky(const Valeur& a, bool inferieure, int* defaut) {
     if (!a.estCarree()) erreur("MATLAB:square", "Matrix must be square.");
     int n = a.nlignes();
     Mat<double> A = versReel(a);
     Mat<double> L(n, n);
+    // Ordre atteint sans rencontrer de pivot negatif : « [R,p] = chol(A) »
+    // rend le facteur de ce bloc de tete et p = ordre+1, au lieu d'une
+    // erreur. C'est ainsi que MATLAB fait tester la definie positivite
+    // sans avoir a l'attraper.
+    int ordre = n;
     for (int j = 0; j < n; ++j) {
         double s = A(j, j);
         for (int k = 0; k < j; ++k) s -= L(j, k) * L(j, k);
-        if (s <= 0)
-            erreur("MATLAB:posdef", "Matrix must be positive definite.");
+        if (s <= 0) {
+            if (!defaut) erreur("MATLAB:posdef", "Matrix must be positive definite.");
+            ordre = j;
+            break;
+        }
         L(j, j) = std::sqrt(s);
         for (int i = j + 1; i < n; ++i) {
             double t = A(i, j);
@@ -355,11 +363,11 @@ Valeur cholesky(const Valeur& a, bool inferieure) {
             L(i, j) = t / L(j, j);
         }
     }
-    if (inferieure) return depuis(L);
-    Mat<double> R(n, n);
-    for (int i = 0; i < n; ++i)
-        for (int j = 0; j < n; ++j) R(i, j) = L(j, i);
-    return depuis(R);
+    if (defaut) *defaut = (ordre == n) ? 0 : ordre + 1;
+    Mat<double> B(ordre, ordre);
+    for (int i = 0; i < ordre; ++i)
+        for (int j = 0; j < ordre; ++j) B(i, j) = inferieure ? L(i, j) : L(j, i);
+    return depuis(B);
 }
 
 // -------------------------------------------------------------------- SVD

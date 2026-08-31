@@ -25,10 +25,18 @@ enum class GenreTrace {
     // Une droite qui traverse tout l'axe : « xline » et « yline ». Elle
     // suit les bornes au lieu de les imposer, ce qu'aucune serie
     // ordinaire ne sait faire.
-    Constante
+    Constante,
+    // Un texte pose dans l'axe : « text(x,y,'ici') ». Comme la droite
+    // constante, il ne fixe pas les bornes — un mot ne dilate pas le
+    // dessin.
+    Texte
 };
 
 struct Serie {
+    // Identifiant stable dans son axe : « h = plot(...) » rend une
+    // poignee qui designe la courbe par lui, et non par son rang, ce qui
+    // la laisse valide quand une autre courbe est ajoutee ou retiree.
+    int identifiant = 0;
     GenreTrace genre = GenreTrace::Ligne;
     std::vector<double> x, y, z;
     int largeurImage = 0, hauteurImage = 0;
@@ -40,8 +48,13 @@ struct Serie {
     // Pour une droite constante : 'x' pour une verticale — « xline » —,
     // 'y' pour une horizontale. La valeur est dans x[0].
     char axeConstante = 'x';
-    // Le texte pose le long de la droite, s'il y en a un.
+    // Le texte pose le long de la droite, s'il y en a un ; pour une serie
+    // « Texte », c'est le texte lui-meme.
     std::string legendeConstante;
+    // Taille de police d'un texte pose ; zero veut dire celle de l'axe.
+    double taillePoliceTexte = 0;
+    // Alignement horizontal d'un texte pose : 'l', 'c' ou 'r'.
+    char alignement = 'l';
 };
 
 struct Axes {
@@ -50,6 +63,8 @@ struct Axes {
     // en efface un autre.
     int identifiant = 0;
     std::vector<Serie> series;
+    // Compteur des identifiants de courbes de cet axe.
+    int prochaineSerie = 0;
     std::string titre, etiquetteX, etiquetteY, etiquetteZ;
     bool grille = false;
     bool tenir = false;
@@ -151,6 +166,13 @@ Valeur poigneeAxesCourants(Interpreteur& it);
 // « xlabel » et « ylabel » la rendent quand on la demande.
 Valeur poigneeTexteCourant(Interpreteur& it, const std::string& cible);
 Valeur poigneeFigureCourante(Interpreteur& it);
+// La poignee d'une courbe : « h = plot(x,y) ; set(h,'LineWidth',2) ».
+Valeur poigneeLigne(int figure, int axe, int serie);
+// Plusieurs courbes d'un coup : « h = plot(x, Y) » rend une colonne.
+Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series);
+// Une couleur ecrite comme MATLAB l'accepte — 'r', 'red', '#D95319' ou
+// le triplet [0.85 0.55 0] — rendue sous forme hexadecimale.
+std::string couleurDepuisValeur(const Valeur& v);
 
 // Ajoute un axe a une figure et lui donne son identifiant. Tout axe cree
 // passe par la.

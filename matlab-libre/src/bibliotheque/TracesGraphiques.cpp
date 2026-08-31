@@ -41,6 +41,59 @@ std::string couleurDeLettre(char c) {
     }
 }
 
+}  // namespace
+
+// Une couleur écrite comme MATLAB l'accepte : la lettre 'r', le nom
+// « red », le code « #D95319 », ou le triplet [0.85 0.55 0]. Rendue sous
+// la forme hexadécimale, seule que garde une Serie.
+std::string couleurDepuisValeur(const Valeur& v) {
+    if (v.estTexte() || v.estChaine()) {
+        std::string t = v.versTexte();
+        if (t.empty()) return "";
+        if (t[0] == '#') return t;
+        std::string bas = t;
+        for (auto& c : bas) c = (char)std::tolower((unsigned char)c);
+        if (bas == "red") return "#D95319";
+        if (bas == "green") return "#77AC30";
+        if (bas == "blue") return "#0072BD";
+        if (bas == "cyan") return "#4DBEEE";
+        if (bas == "magenta") return "#7E2F8E";
+        if (bas == "yellow") return "#EDB120";
+        if (bas == "black") return "#000000";
+        if (bas == "white") return "#FFFFFF";
+        if (bas == "none") return "none";
+        if (t.size() == 1) return couleurDeLettre(t[0]);
+        return "";
+    }
+    if (v.classe == Classe::Cellule || v.classe == Classe::Structure ||
+        v.classe == Classe::Objet || v.classe == Classe::Fonction)
+        return "";
+    if (v.nelem() != 3) return "";
+    char tampon[8];
+    int composantes[3];
+    for (int k = 0; k < 3; ++k) {
+        double x = v.re[(std::size_t)k];
+        if (x < 0) x = 0;
+        if (x > 1) x = 1;
+        composantes[k] = (int)(x * 255.0 + 0.5);
+    }
+    std::snprintf(tampon, sizeof tampon, "#%02X%02X%02X", composantes[0], composantes[1],
+                  composantes[2]);
+    return tampon;
+}
+
+namespace {
+
+// Vrai si la chaine ne porte que des caracteres de style : « r--o » oui,
+// « Color » non, « LineWidth » non plus.
+bool estSpecificationStyle(const std::string& spec) {
+    static const char* permis = "-:.+o*xsd^v><phrgbcmykw";
+    if (spec.empty() || spec.size() > 4) return false;
+    for (char c : spec)
+        if (std::strchr(permis, c) == nullptr) return false;
+    return true;
+}
+
 // Décode une spécification « r--o » comme le fait plot.
 void decoderStyle(const std::string& spec, Serie& s) {
     std::string style;
@@ -71,11 +124,14 @@ std::vector<double> valeursDe(const Valeur& v) {
     return x;
 }
 
-void ajouterSerie(Interpreteur& it, Serie s) {
+int ajouterSerie(Interpreteur& it, Serie s) {
     auto a = axesCourants(it);
     if (!a->tenir && a->series.empty()) { /* premier tracé */ }
     if (s.couleur.empty()) s.couleur = palette(a->series.size());
+    s.identifiant = ++a->prochaineSerie;
+    int identifiant = s.identifiant;
     a->series.push_back(std::move(s));
+    return identifiant;
 }
 
 void nouveauTrace(Interpreteur& it) {
@@ -88,7 +144,7 @@ void nouveauTrace(Interpreteur& it) {
 }
 
 std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTrace genre,
-                           bool logX, bool logY) {
+                           bool logX, bool logY, int nargout) {
     exigerArguments(args, 1, 0, "plot");
     nouveauTrace(it);
     auto axes = axesCourants(it);
@@ -96,10 +152,16 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
     axes->logY = logY;
     std::size_t k = 0;
     std::size_t indexCouleur = axes->series.size();
+    // « h = plot(x,y) » rend une poignee par courbe tracee.
+    std::vector<int> identifiants;
     while (k < args.size()) {
         Serie s;
         s.genre = genre;
-        s.couleur = palette(indexCouleur++);
+        // La couleur est prise dans la palette au moment d'ajouter la
+        // serie, non ici : la branche « une courbe par colonne » abandonne
+        // ce « s », et lui reserver une couleur decalait toutes les
+        // autres — « plot(x,Y) » commencait au deuxieme ton.
+        s.couleur.clear();
         const Valeur& premier = args[k];
         if (premier.estTexte() || premier.estChaine()) break;
         if (k + 1 < args.size() && args[k + 1].estNumerique() && !args[k + 1].estVide()) {
@@ -114,7 +176,7 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
                     sc.x = valeursDe(X);
                     for (int i = 0; i < Y.nlignes(); ++i)
                         sc.y.push_back(Y.re[(std::size_t)i + (std::size_t)c * Y.nlignes()]);
-                    ajouterSerie(it, sc);
+                    identifiants.push_back(ajouterSerie(it, sc));
                 }
                 k += 2;
                 if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) ++k;
@@ -130,9 +192,12 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
         }
         if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
             std::string spec = args[k].versTexte();
-            // Les paires « nom, valeur » ne sont pas des styles.
-            if (spec.size() <= 5 && spec.find_first_of("-:.+o*xsdv^<>phrgbcmykw") !=
-                                        std::string::npos) {
+            // Une specification de style n'est faite que de caracteres de
+            // style : il ne suffit pas qu'elle en contienne un. « Color »
+            // en porte trois — 'o', 'o', 'r' — et etait pris pour un
+            // style rouge a marqueurs ronds, au lieu d'ouvrir la paire
+            // « 'Color', [r g b] ».
+            if (estSpecificationStyle(spec)) {
                 decoderStyle(spec, s);
                 ++k;
             }
@@ -142,8 +207,8 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
             std::string nom = args[k].versTexte();
             for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
             if (nom == "linewidth") s.epaisseur = args[k + 1].scal();
-            else if (nom == "color" && (args[k + 1].estTexte() || args[k + 1].estChaine())) {
-                std::string couleur = couleurDeLettre(args[k + 1].versTexte()[0]);
+            else if (nom == "color") {
+                std::string couleur = couleurDepuisValeur(args[k + 1]);
                 if (!couleur.empty()) s.couleur = couleur;
             } else if (nom == "displayname") {
                 s.etiquette = args[k + 1].versTexte();
@@ -154,20 +219,25 @@ std::vector<Valeur> tracer(Interpreteur& it, std::vector<Valeur>& args, GenreTra
             }
             k += 2;
         }
-        ajouterSerie(it, s);
+        if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
+        identifiants.push_back(ajouterSerie(it, s));
     }
-    return {};
+    if (nargout <= 0 || identifiants.empty()) return {};
+    int numeroFigure = figureCourante(it)->numero;
+    if (identifiants.size() == 1)
+        return {poigneeLigne(numeroFigure, axes->identifiant, identifiants[0])};
+    return {poigneeLignes(numeroFigure, axes->identifiant, identifiants)};
 }
 
-FONCTION(fnPlot) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, false); }
-FONCTION(fnSemilogx) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, false); }
-FONCTION(fnSemilogy) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, true); }
-FONCTION(fnLoglog) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, true); }
-FONCTION(fnBar) { INUTILISE return tracer(it, args, GenreTrace::Barres, false, false); }
-FONCTION(fnScatter) { INUTILISE return tracer(it, args, GenreTrace::Points, false, false); }
-FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false); }
-FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false); }
-FONCTION(fnPlot3) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, false); }
+FONCTION(fnPlot) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, false, nargout); }
+FONCTION(fnSemilogx) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, false, nargout); }
+FONCTION(fnSemilogy) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, true, nargout); }
+FONCTION(fnLoglog) { INUTILISE return tracer(it, args, GenreTrace::Ligne, true, true, nargout); }
+FONCTION(fnBar) { INUTILISE return tracer(it, args, GenreTrace::Barres, false, false, nargout); }
+FONCTION(fnScatter) { INUTILISE return tracer(it, args, GenreTrace::Points, false, false, nargout); }
+FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false, nargout); }
+FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false, nargout); }
+FONCTION(fnPlot3) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, false, nargout); }
 
 FONCTION(fnHistogramme) {
     INUTILISE
@@ -575,12 +645,12 @@ FONCTION(fnAxis) {
 // d'un plot a deux points — et porte au besoin une etiquette.
 std::vector<Valeur> droiteConstante(Interpreteur& it, Arguments args, int nargout,
                                     char axe) {
-    (void)nargout;
     exigerArguments(args, 1, 3, axe == 'x' ? "xline" : "yline");
     exigerNumerique(args[0], axe == 'x' ? "xline" : "yline");
     std::string style = args.size() > 1 ? args[1].versTexte() : std::string("-");
     std::string etiquette = args.size() > 2 ? args[2].versTexte() : std::string();
     auto a = axesCourants(it);
+    std::vector<int> identifiants;
     for (double v : args[0].re) {
         Serie s;
         s.genre = GenreTrace::Constante;
@@ -591,20 +661,26 @@ std::vector<Valeur> droiteConstante(Interpreteur& it, Arguments args, int nargou
         s.style = "-";
         decoderStyle(style, s);
         if (s.couleur.empty()) s.couleur = "#404040";
+        s.identifiant = ++a->prochaineSerie;
+        identifiants.push_back(s.identifiant);
         a->series.push_back(s);
     }
-    return {};
+    if (nargout <= 0 || identifiants.empty()) return {};
+    if (identifiants.size() == 1)
+        return {poigneeLigne(figureCourante(it)->numero, a->identifiant, identifiants[0])};
+    return {poigneeLignes(figureCourante(it)->numero, a->identifiant, identifiants)};
 }
 
 // « area(x,y) » : la courbe et la surface sous elle. « fill(x,y,c) » : un
 // polygone ferme et rempli.
 std::vector<Valeur> surfaceRemplie(Interpreteur& it, Arguments args, GenreTrace genre,
-                                   const char* nom) {
+                                   const char* nom, int nargout) {
     exigerArguments(args, 1, 0, nom);
     nouveauTrace(it);
     std::size_t k = 0;
     auto axes = axesCourants(it);
     std::size_t indexCouleur = axes->series.size();
+    std::vector<int> identifiants;
     while (k < args.size()) {
         Serie s;
         s.genre = genre;
@@ -621,18 +697,45 @@ std::vector<Valeur> surfaceRemplie(Interpreteur& it, Arguments args, GenreTrace 
             s.x.resize(s.y.size());
             for (std::size_t i = 0; i < s.x.size(); ++i) s.x[i] = (double)(i + 1);
         }
-        if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+        if (k < args.size() && (args[k].estTexte() || args[k].estChaine()) &&
+            estSpecificationStyle(args[k].versTexte())) {
             decoderStyle(args[k].versTexte(), s);
             ++k;
         }
+        // Les paires « nom, valeur » : « fill(x,y,'FaceColor',[0 0 1]) ».
+        while (k + 1 < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+            std::string nomPropriete = args[k].versTexte();
+            for (auto& c : nomPropriete) c = (char)std::tolower((unsigned char)c);
+            if (nomPropriete == "facecolor" || nomPropriete == "color") {
+                std::string couleur = couleurDepuisValeur(args[k + 1]);
+                if (!couleur.empty()) s.couleur = couleur;
+            } else if (nomPropriete == "linewidth") {
+                s.epaisseur = args[k + 1].scal();
+            } else if (nomPropriete == "displayname") {
+                s.etiquette = args[k + 1].versTexte();
+            } else if (nomPropriete == "linestyle") {
+                s.style = args[k + 1].versTexte();
+            }
+            k += 2;
+        }
         if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
-        ajouterSerie(it, s);
+        identifiants.push_back(ajouterSerie(it, s));
     }
-    return {};
+    if (nargout <= 0 || identifiants.empty()) return {};
+    int numeroFigure = figureCourante(it)->numero;
+    if (identifiants.size() == 1)
+        return {poigneeLigne(numeroFigure, axes->identifiant, identifiants[0])};
+    return {poigneeLignes(numeroFigure, axes->identifiant, identifiants)};
 }
 
-FONCTION(fnArea) { INUTILISE return surfaceRemplie(it, args, GenreTrace::Aire, "area"); }
-FONCTION(fnFill) { INUTILISE return surfaceRemplie(it, args, GenreTrace::Polygone, "fill"); }
+FONCTION(fnArea) {
+    INUTILISE
+    return surfaceRemplie(it, args, GenreTrace::Aire, "area", nargout);
+}
+FONCTION(fnFill) {
+    INUTILISE
+    return surfaceRemplie(it, args, GenreTrace::Polygone, "fill", nargout);
+}
 
 // « line(x,y) » ajoute une courbe sans effacer ce qui est déjà tracé et
 // sans toucher au titre : c'est le tracé de bas niveau de MATLAB.
@@ -649,7 +752,8 @@ FONCTION(fnLine) {
         std::string propriete = args[k].versTexte();
         for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
         if (propriete == "color") {
-            if (args[k + 1].estTexte()) s.couleur = args[k + 1].versTexte();
+            std::string couleur = couleurDepuisValeur(args[k + 1]);
+            if (!couleur.empty()) s.couleur = couleur;
         } else if (propriete == "linewidth") {
             s.epaisseur = args[k + 1].scal();
         } else if (propriete == "linestyle") {
@@ -658,7 +762,10 @@ FONCTION(fnLine) {
             s.marqueur = args[k + 1].versTexte();
         }
     }
-    ajouterSerie(it, s);
+    int identifiant = ajouterSerie(it, s);
+    if (nargout > 0)
+        return {poigneeLigne(figureCourante(it)->numero, axesCourants(it)->identifiant,
+                             identifiant)};
     return {};
 }
 
@@ -825,9 +932,63 @@ FONCTION(fnColorbar) { INUTILISE return {}; }
 FONCTION(fnBox) { INUTILISE return {}; }
 FONCTION(fnShading) { INUTILISE return {}; }
 
+// « text(x,y,'ici') » pose un texte dans l'axe, aux coordonnees des
+// donnees. Il ne dilate pas les bornes — un mot n'est pas une donnee —
+// et rend une poignee, sur laquelle on ecrit ensuite couleur et taille.
 FONCTION(fnText) {
     INUTILISE
-    return {};
+    exigerArguments(args, 3, 0, "text");
+    exigerNumerique(args[0], "text");
+    exigerNumerique(args[1], "text");
+    std::vector<double> xs = valeursDe(args[0]);
+    std::vector<double> ys = valeursDe(args[1]);
+    // Le troisieme argument : un texte, ou une cellule de textes, un par
+    // point.
+    std::vector<std::string> textes;
+    if (args[2].classe == Classe::Cellule)
+        for (const auto& c : args[2].cellules) textes.push_back(c.versTexte());
+    else if (args[2].estChaine() && args[2].nelem() > 1)
+        for (const auto& c : args[2].chaines) textes.push_back(c);
+    else
+        textes.push_back(args[2].versTexte());
+
+    std::string couleur = "#000000";
+    double taille = 0;
+    char alignement = 'l';
+    for (std::size_t k = 3; k + 1 < args.size(); k += 2) {
+        std::string propriete = args[k].versTexte();
+        for (auto& c : propriete) c = (char)std::tolower((unsigned char)c);
+        if (propriete == "color") {
+            std::string trouvee = couleurDepuisValeur(args[k + 1]);
+            if (!trouvee.empty()) couleur = trouvee;
+        } else if (propriete == "fontsize") {
+            taille = args[k + 1].scal();
+        } else if (propriete == "horizontalalignment") {
+            std::string a = args[k + 1].versTexte();
+            alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
+        }
+    }
+
+    auto axes = axesCourants(it);
+    std::vector<int> identifiants;
+    std::size_t combien = std::min(xs.size(), ys.size());
+    for (std::size_t k = 0; k < combien; ++k) {
+        Serie s;
+        s.genre = GenreTrace::Texte;
+        s.x = {xs[k]};
+        s.y = {ys[k]};
+        s.legendeConstante = textes[std::min(k, textes.size() - 1)];
+        s.couleur = couleur;
+        s.taillePoliceTexte = taille;
+        s.alignement = alignement;
+        s.identifiant = ++axes->prochaineSerie;
+        identifiants.push_back(s.identifiant);
+        axes->series.push_back(s);
+    }
+    if (nargout <= 0 || identifiants.empty()) return {};
+    if (identifiants.size() == 1)
+        return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiants[0])};
+    return {poigneeLignes(figureCourante(it)->numero, axes->identifiant, identifiants)};
 }
 
 FONCTION(fnFigureSVG) {

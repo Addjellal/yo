@@ -128,7 +128,13 @@ FONCTION(fnQr) {
 FONCTION(fnChol) {
     INUTILISE
     exigerArguments(args, 1, 2, "chol");
+    exigerNumerique(args[0], "chol");
     bool inferieure = args.size() > 1 && args[1].versTexte() == "lower";
+    if (nargout >= 2) {
+        int defaut = 0;
+        Valeur r = cholesky(args[0], inferieure, &defaut);
+        return {r, Valeur::scalaire(defaut)};
+    }
     return {cholesky(args[0], inferieure)};
 }
 

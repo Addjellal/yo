@@ -216,7 +216,7 @@ void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double&
     xmax = ymax = -INFINITY;
     bool vu = false;
     for (const auto& s : a.series) {
-        if (s.genre == GenreTrace::Constante) continue;
+        if (s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte) continue;
         for (double v : s.x) {
             if (!std::isfinite(v)) continue;
             xmin = std::min(xmin, v);
@@ -323,7 +323,7 @@ std::string rendreSVG(const Figure& figure) {
         double xmin = INFINITY, xmax = -INFINITY, ymin = INFINITY, ymax = -INFINITY;
         for (const auto& s : a.series) {
             // Une droite « xline » suit les bornes, elle ne les impose pas.
-            if (s.genre == GenreTrace::Constante) continue;
+            if (s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte) continue;
             for (double v : s.x) {
                 if (!std::isfinite(v)) continue;
                 xmin = std::min(xmin, v);
@@ -448,6 +448,18 @@ std::string rendreSVG(const Figure& figure) {
                         << s.couleur << "\">" << echapperXml(s.legendeConstante)
                         << "</text>\n";
                 }
+                continue;
+            }
+            if (s.genre == GenreTrace::Texte) {
+                if (s.x.empty() || s.y.empty()) continue;
+                double taille = s.taillePoliceTexte > 0 ? s.taillePoliceTexte : 11.0;
+                const char* ancre = s.alignement == 'c'   ? "middle"
+                                    : s.alignement == 'r' ? "end"
+                                                          : "start";
+                out << "<text x=\"" << ex.versPixel(s.x[0]) << "\" y=\""
+                    << ey.versPixel(s.y[0]) << "\" text-anchor=\"" << ancre
+                    << "\" font-size=\"" << taille << "\" fill=\"" << s.couleur << "\">"
+                    << echapperXml(s.legendeConstante) << "</text>\n";
                 continue;
             }
             if (s.genre == GenreTrace::Aire || s.genre == GenreTrace::Polygone) {

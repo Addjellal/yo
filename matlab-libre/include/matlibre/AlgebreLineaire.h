@@ -20,7 +20,10 @@ Valeur divisionDroite(const Valeur& a, const Valeur& b);   // a / b
 Valeur puissanceMatrice(const Valeur& a, const Valeur& p);
 Valeur inverseMatrice(const Valeur& a);
 Valeur determinantMatrice(const Valeur& a);
-Valeur cholesky(const Valeur& a, bool inferieure = false);
+// « [R,p] = chol(A) » : si « defaut » est fourni, une matrice qui n'est
+// pas definie positive ne provoque pas d'erreur — on y range l'ordre du
+// premier pivot fautif, et le facteur rendu est celui du bloc de tete.
+Valeur cholesky(const Valeur& a, bool inferieure = false, int* defaut = nullptr);
 void factorisationLU(const Valeur& a, Valeur& l, Valeur& u, Valeur& p);
 void factorisationQR(const Valeur& a, Valeur& q, Valeur& r, bool economique = false);
 void decompositionSVD(const Valeur& a, Valeur& u, Valeur& s, Valeur& v, bool economique = false);

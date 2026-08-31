@@ -25,6 +25,9 @@ const char* CLASSE_FIGURE = "matlab.ui.Figure";
 // Le titre et les etiquettes d'un axe sont des objets, dans MATLAB : on
 // leur donne une poignee, avec le nom du texte qu'elle designe.
 const char* CLASSE_TEXTE = "matlab.graphics.primitive.Text";
+// Une courbe : ce que rend « h = plot(x,y) ». Elle designe sa figure, son
+// axe et son identifiant de serie.
+const char* CLASSE_LIGNE = "matlab.graphics.chart.primitive.Line";
 
 Valeur poignee(const char* classe, int figure, int axe) {
     Valeur v = Valeur::structureVide();
@@ -47,6 +50,32 @@ Valeur poigneeTexte(int figure, int axe, const char* cible) {
     return v;
 }
 
+Valeur poigneeLigneInterne(int figure, int axe, int serie) {
+    Valeur v = Valeur::structureVide();
+    v.poserChamp("NumeroFigure", Valeur::scalaire(figure));
+    v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
+    v.poserChamp("NumeroSerie", Valeur::scalaire(serie));
+    v.classe = Classe::Objet;
+    v.nomObjet = CLASSE_LIGNE;
+    return v;
+}
+
+// Plusieurs courbes : « h = plot(x, Y) » rend un tableau de poignees en
+// colonne, comme MATLAB, et non une cellule — « h(2) » doit designer une
+// courbe, non une cellule qui en contient une.
+Valeur poigneeLignesInterne(int figure, int axe, const std::vector<int>& series) {
+    Valeur v = Valeur::structureVide();
+    v.dims = {(int)series.size(), 1};
+    for (std::size_t k = 0; k < series.size(); ++k) {
+        v.poserChamp("NumeroFigure", Valeur::scalaire(figure), k);
+        v.poserChamp("NumeroAxe", Valeur::scalaire(axe), k);
+        v.poserChamp("NumeroSerie", Valeur::scalaire(series[k]), k);
+    }
+    v.classe = Classe::Objet;
+    v.nomObjet = CLASSE_LIGNE;
+    return v;
+}
+
 bool estPoignee(const Valeur& v, const char* classe) {
     return v.classe == Classe::Objet && v.nomObjet == classe;
 }
@@ -64,6 +93,14 @@ std::shared_ptr<Axes> axesDe(Interpreteur& it, const Valeur& p) {
     int identifiant = (int)p.champ("NumeroAxe", 0).scal();
     for (const auto& a : f->axes)
         if (a && a->identifiant == identifiant) return a;
+    erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
+}
+
+Serie* serieDe(Interpreteur& it, const Valeur& p) {
+    auto a = axesDe(it, p);
+    int identifiant = (int)p.champ("NumeroSerie", 0).scal();
+    for (auto& s : a->series)
+        if (s.identifiant == identifiant) return &s;
     erreur("MATLAB:class:InvalidHandle", "Invalid or deleted object.");
 }
 
@@ -208,6 +245,83 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
     return false;
 }
 
+// Une courbe : ce que « set(h,'LineWidth',2) » et « h.Color = 'r' »
+// atteignent. Les donnees elles-memes — XData, YData — s'ecrivent aussi,
+// ce dont se servent les animations.
+bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
+                 const Valeur& v) {
+    Serie* s = serieDe(it, p);
+    if (memeNom(nom, "XData")) { s->x = versVecteur(v); return true; }
+    if (memeNom(nom, "YData")) { s->y = versVecteur(v); return true; }
+    if (memeNom(nom, "ZData")) { s->z = versVecteur(v); return true; }
+    if (memeNom(nom, "Color")) {
+        std::string couleur = couleurDepuisValeur(v);
+        if (!couleur.empty()) s->couleur = couleur;
+        return true;
+    }
+    if (memeNom(nom, "LineWidth")) { s->epaisseur = v.scal(); return true; }
+    if (memeNom(nom, "LineStyle")) { s->style = v.versTexte(); return true; }
+    if (memeNom(nom, "Marker")) { s->marqueur = v.versTexte(); return true; }
+    if (memeNom(nom, "DisplayName")) { s->etiquette = v.versTexte(); return true; }
+    // Un texte pose par « text(x,y,'ici') » : sa chaine et sa taille.
+    if (memeNom(nom, "String")) { s->legendeConstante = v.versTexte(); return true; }
+    if (memeNom(nom, "FontSize")) { s->taillePoliceTexte = v.scal(); return true; }
+    if (memeNom(nom, "Position")) {
+        auto b = versVecteur(v);
+        if (b.size() >= 2) { s->x = {b[0]}; s->y = {b[1]}; }
+        return true;
+    }
+    if (memeNom(nom, "HorizontalAlignment")) {
+        std::string a = v.versTexte();
+        s->alignement = a.empty() ? 'l' : (a[0] == 'c' ? 'c' : (a[0] == 'r' ? 'r' : 'l'));
+        return true;
+    }
+    // Ce que le rendu de MatLibre n'emploie pas encore, mais qu'un script
+    // pose couramment : accepte sans effet plutot que de s'arreter.
+    if (memeNom(nom, "MarkerSize") || memeNom(nom, "MarkerFaceColor") ||
+        memeNom(nom, "MarkerEdgeColor") || memeNom(nom, "Visible") ||
+        memeNom(nom, "Tag") || memeNom(nom, "UserData"))
+        return true;
+    erreur("MATLAB:hg:InvalidProperty",
+           "Unrecognized property '" + nom + "' for class 'Line'.");
+}
+
+bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
+    Serie* s = serieDe(it, p);
+    if (memeNom(nom, "XData")) { sortie = depuisVecteur(s->x); return true; }
+    if (memeNom(nom, "YData")) { sortie = depuisVecteur(s->y); return true; }
+    if (memeNom(nom, "ZData")) { sortie = depuisVecteur(s->z); return true; }
+    if (memeNom(nom, "Color")) { sortie = Valeur::texte(s->couleur); return true; }
+    if (memeNom(nom, "LineWidth")) { sortie = Valeur::scalaire(s->epaisseur); return true; }
+    if (memeNom(nom, "LineStyle")) { sortie = Valeur::texte(s->style); return true; }
+    if (memeNom(nom, "Marker")) {
+        sortie = Valeur::texte(s->marqueur.empty() ? "none" : s->marqueur);
+        return true;
+    }
+    if (memeNom(nom, "DisplayName")) { sortie = Valeur::texte(s->etiquette); return true; }
+    if (memeNom(nom, "String")) { sortie = Valeur::texte(s->legendeConstante); return true; }
+    if (memeNom(nom, "FontSize")) {
+        sortie = Valeur::scalaire(s->taillePoliceTexte > 0 ? s->taillePoliceTexte : 11.0);
+        return true;
+    }
+    if (memeNom(nom, "Position")) {
+        double x = s->x.empty() ? 0 : s->x[0];
+        double y = s->y.empty() ? 0 : s->y[0];
+        sortie = Valeur::ligne({x, y, 0.0});
+        return true;
+    }
+    if (memeNom(nom, "Type")) {
+        sortie = Valeur::texte(s->genre == GenreTrace::Texte ? "text" : "line");
+        return true;
+    }
+    if (memeNom(nom, "Parent")) {
+        sortie = poignee(CLASSE_AXES, (int)p.champ("NumeroFigure", 0).scal(),
+                         (int)p.champ("NumeroAxe", 0).scal());
+        return true;
+    }
+    return false;
+}
+
 bool ecrireFigure(Interpreteur& it, const Valeur& p, const std::string& nom,
                   const Valeur& v) {
     auto f = figureDe(it, p);
@@ -264,6 +378,16 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
         return true;
     }
     if (memeNom(nom, "Type")) { sortie = Valeur::texte("axes"); return true; }
+    // « get(gca,'Children') » : les courbes de l'axe, la derniere tracee
+    // en tete, comme MATLAB les empile.
+    if (memeNom(nom, "Children")) {
+        std::vector<int> series;
+        for (auto it2 = a->series.rbegin(); it2 != a->series.rend(); ++it2)
+            series.push_back(it2->identifiant);
+        sortie = poigneeLignesInterne((int)p.champ("NumeroFigure", 0).scal(),
+                                      (int)p.champ("NumeroAxe", 0).scal(), series);
+        return true;
+    }
     return false;
 }
 
@@ -290,12 +414,27 @@ FONCTION(fnSetPoignee) {
     bool axes = estPoignee(p, CLASSE_AXES);
     bool figure = estPoignee(p, CLASSE_FIGURE);
     bool texte = estPoignee(p, CLASSE_TEXTE);
-    if (!axes && !figure && !texte) return {};
-    for (std::size_t k = 1; k + 1 < args.size(); k += 2) {
-        std::string nom = args[k].versTexte();
-        if (axes) ecrireAxes(it, p, nom, args[k + 1]);
-        else if (texte) ecrireTexte(it, p, nom, args[k + 1]);
-        else ecrireFigure(it, p, nom, args[k + 1]);
+    bool ligne = estPoignee(p, CLASSE_LIGNE);
+    if (!axes && !figure && !texte && !ligne) return {};
+    // « set(h, ...) » sur un tableau de poignees ecrit sur chacune.
+    std::size_t combien = ligne ? std::max<std::size_t>(1, p.nelem()) : 1;
+    for (std::size_t e = 0; e < combien; ++e) {
+        Valeur cible = p;
+        if (ligne && combien > 1) {
+            cible = Valeur::structureVide();
+            cible.poserChamp("NumeroFigure", p.champ("NumeroFigure", e));
+            cible.poserChamp("NumeroAxe", p.champ("NumeroAxe", e));
+            cible.poserChamp("NumeroSerie", p.champ("NumeroSerie", e));
+            cible.classe = Classe::Objet;
+            cible.nomObjet = CLASSE_LIGNE;
+        }
+        for (std::size_t k = 1; k + 1 < args.size(); k += 2) {
+            std::string nom = args[k].versTexte();
+            if (axes) ecrireAxes(it, cible, nom, args[k + 1]);
+            else if (texte) ecrireTexte(it, cible, nom, args[k + 1]);
+            else if (ligne) ecrireLigne(it, cible, nom, args[k + 1]);
+            else ecrireFigure(it, cible, nom, args[k + 1]);
+        }
     }
     return {};
 }
@@ -308,6 +447,7 @@ FONCTION(fnGetPoignee) {
     Valeur sortie;
     if (estPoignee(p, CLASSE_AXES) && lireAxes(it, p, nom, sortie)) return {sortie};
     if (estPoignee(p, CLASSE_TEXTE) && lireTexte(it, p, nom, sortie)) return {sortie};
+    if (estPoignee(p, CLASSE_LIGNE) && lireLigne(it, p, nom, sortie)) return {sortie};
     if (estPoignee(p, CLASSE_FIGURE) && lireFigure(it, p, nom, sortie)) return {sortie};
     return {Valeur::vide()};
 }
@@ -329,11 +469,20 @@ Valeur poigneeFigureCourante(Interpreteur& it) {
     return poignee(CLASSE_FIGURE, f->numero, 0);
 }
 
+Valeur poigneeLigne(int figure, int axe, int serie) {
+    return poigneeLigneInterne(figure, axe, serie);
+}
+
+Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series) {
+    return poigneeLignesInterne(figure, axe, series);
+}
+
 void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
         if (estPoignee(objet, CLASSE_TEXTE)) return ecrireTexte(moteur, objet, nom, valeur);
+        if (estPoignee(objet, CLASSE_LIGNE)) return ecrireLigne(moteur, objet, nom, valeur);
         if (estPoignee(objet, CLASSE_FIGURE)) return ecrireFigure(moteur, objet, nom, valeur);
         return false;
     };
@@ -341,6 +490,7 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
                               const std::string& nom, Valeur& sortie) {
         if (estPoignee(objet, CLASSE_AXES)) return lireAxes(moteur, objet, nom, sortie);
         if (estPoignee(objet, CLASSE_TEXTE)) return lireTexte(moteur, objet, nom, sortie);
+        if (estPoignee(objet, CLASSE_LIGNE)) return lireLigne(moteur, objet, nom, sortie);
         if (estPoignee(objet, CLASSE_FIGURE)) return lireFigure(moteur, objet, nom, sortie);
         return false;
     };

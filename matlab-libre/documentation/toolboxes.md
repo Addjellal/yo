@@ -58,7 +58,7 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 127 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 228 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 14 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |

@@ -17,8 +17,9 @@ void bornes(const Axes& axes, double& xmin, double& xmax, double& ymin, double& 
     xmax = ymax = -1e308;
     bool vu = false;
     for (const auto& s : axes.series) {
-        // Une droite « xline » suit les bornes, elle ne les impose pas.
-        if (s.genre == GenreTrace::Constante) continue;
+        // Une droite « xline » suit les bornes, elle ne les impose pas ;
+        // un texte pose non plus.
+        if (s.genre == GenreTrace::Constante || s.genre == GenreTrace::Texte) continue;
         for (double v : s.x) { xmin = std::min(xmin, v); xmax = std::max(xmax, v); vu = true; }
         for (double v : s.y) { ymin = std::min(ymin, v); ymax = std::max(ymax, v); vu = true; }
     }
@@ -255,6 +256,23 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                         peintre.drawText(QPointF(trace.right() - 60, y - 4),
                                          QString::fromStdString(serie.legendeConstante));
                 }
+                break;
+            }
+            case GenreTrace::Texte: {
+                if (serie.x.empty() || serie.y.empty()) break;
+                peintre.setPen(QPen(couleur));
+                QFont police = peintre.font();
+                if (serie.taillePoliceTexte > 0)
+                    police.setPointSizeF(serie.taillePoliceTexte);
+                peintre.setFont(police);
+                QString texte = QString::fromStdString(serie.legendeConstante);
+                double x = versEcranX(serie.x[0]);
+                double y = versEcranY(serie.y[0]);
+                if (serie.alignement != 'l') {
+                    int largeur = peintre.fontMetrics().horizontalAdvance(texte);
+                    x -= serie.alignement == 'c' ? largeur / 2.0 : largeur;
+                }
+                peintre.drawText(QPointF(x, y), texte);
                 break;
             }
             case GenreTrace::Barres: {
