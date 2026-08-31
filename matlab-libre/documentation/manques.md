@@ -10,10 +10,10 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 346 | 80 | 81 % |
 | optimisation | 26 | 6 | 81 % |
-| robuste | 8 | 61 | 12 % |
+| robuste | 32 | 37 | 46 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 187 | 29 | 87 % |
-| **ensemble** | **952** | **232** | **80 %** |
+| **ensemble** | **976** | **208** | **82 %** |
 
 ## automatique
 
@@ -48,16 +48,12 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 ## robuste
 
-`actual2normalized`, `balancmr`, `bstmr`, `complexify`, `cmsclsyn`, `dksyn`
-`dmplot`, `frd`, `genss`, `genmat`, `gapmetric`, `getNominal`, `h2hinfsyn`
-`h2syn`, `hankelmr`, `hinfstruct`, `icsignal`, `iconnect`, `imp2ss`, `lncf`
-`loopmargin`, `ltiarray2uss`, `makeweight`, `modreal`, `mkfilter`, `musyn`
-`mussv`, `ncfmargin`, `ncfsyn`, `normalized2actual`, `popov`, `randatom`
-`randumat`, `randuss`, `reduce`, `robgain`, `robstab`, `robuststab`, `schurmr`
-`sectf`, `sisobnds`, `skewdec`, `slowfast`, `stabproj`, `strans`, `sysbal`
-`ucomplex`, `ucomplexm`, `udyn`, `ultidyn`, `umat`, `uncertain`, `ureal`
-`uss`, `ussdata`, `wcdiskmargin`, `wcgain`, `wcgopt`, `wcnorm`, `wcsens`
-`wcunc`
+`actual2normalized`, `complexify`, `cmsclsyn`, `dksyn`, `dmplot`, `frd`
+`genss`, `genmat`, `getNominal`, `hinfstruct`, `icsignal`, `iconnect`, `ltiarray2uss`
+`musyn`, `normalized2actual`, `randatom`, `randumat`, `randuss`, `robgain`
+`robstab`, `robuststab`, `sisobnds`, `ucomplex`, `ucomplexm`, `udyn`, `ultidyn`
+`umat`, `uncertain`, `ureal`, `uss`, `ussdata`, `wcdiskmargin`, `wcgain`
+`wcgopt`, `wcnorm`, `wcsens`, `wcunc`
 
 ## signal
 

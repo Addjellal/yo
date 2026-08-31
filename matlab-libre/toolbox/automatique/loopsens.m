@@ -36,8 +36,12 @@ function s = loopsens(G, K)
     s.Si = feedback(ss(eye(nu)), s.Li);
     s.To = feedback(s.Lo, ss(eye(ny)));
     s.Ti = feedback(s.Li, ss(eye(nu)));
-    s.PSi = G * s.Si;
-    s.CSo = K * s.So;
+    % « G * Si » et « K * So » se calculent par FEEDBACK, non par un
+    % produit : le produit garde les poles de G et de K en modes caches,
+    % et un procede instable rendait donc une PSi instable, alors que la
+    % boucle, elle, l'est.
+    s.PSi = feedback(G, K);
+    s.CSo = feedback(K, G);
     s.Poles = pole(s.So);
     if isempty(s.Poles)
         s.Stable = true;

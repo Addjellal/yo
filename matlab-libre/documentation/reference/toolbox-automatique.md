@@ -538,6 +538,10 @@ DCGAIN Gain statique d'un modèle.
      dcgain(tf(1, [1 0]))                 % Inf : un integrateur
      dcgain(ss(-1, 1, 1, 0))              % 1
 
+     % Une matrice de transferts : le gain est une matrice
+     G = [tf(1, [1 1]), tf(2, [1 2]); tf(3, [1 3]), tf(4, [1 4])];
+     dcgain(G)                            % [1 1; 1 1]
+
   Voir aussi BANDWIDTH, STEPINFO, EVALFR, FREQRESP.
 ```
 

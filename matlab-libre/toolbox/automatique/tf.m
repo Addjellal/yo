@@ -171,6 +171,27 @@ classdef tf
         function r = transpose(a), r = a; end
         function r = ctranspose(a), r = a; end
 
+        % « [G1, G2] » et « [G1 ; G2] » : une fonction de transfert de
+        % MatLibre ne porte qu'une voie, et le resultat est donc un
+        % modele d'etat. Sans ces deux methodes, les crochets faisaient
+        % un tableau d'objets tf, que rien ensuite ne savait lire — et
+        % l'on assemblait ainsi une matrice de transferts sans s'en
+        % apercevoir.
+        function r = horzcat(varargin)
+            modeles = cell(1, numel(varargin));
+            for k = 1:numel(varargin)
+                modeles{k} = ss(varargin{k});
+            end
+            r = horzcat(modeles{:});
+        end
+        function r = vertcat(varargin)
+            modeles = cell(1, numel(varargin));
+            for k = 1:numel(varargin)
+                modeles{k} = ss(varargin{k});
+            end
+            r = vertcat(modeles{:});
+        end
+
         % --- affichage ------------------------------------------------------
         function disp(sys)
             fprintf('%s', tf.texteModele(sys));

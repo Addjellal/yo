@@ -19,7 +19,11 @@ function [gamma, pulsation] = hinfnorm(sys, tolerance)
 %   hamiltonienne associée a des valeurs propres sur l'axe imaginaire.
 %   Ces valeurs propres donnent les pulsations où le gain vaut GAMMA ;
 %   entre deux d'entre elles il vaut davantage, et l'on recommence. La
-%   suite converge par le haut, en quelques tours.
+%   suite converge en quelques tours.
+%
+%   La valeur rendue est un gain réellement atteint, à la pulsation W :
+%   SIGMA(SYS,W) la redonne exactement. Elle minore donc la norme vraie,
+%   d'au plus TOL en relatif.
 %
 %   Exemple :
 %      hinfnorm(tf(1, [1 0.1 1]))   % environ 10 : la résonance
@@ -91,7 +95,11 @@ function [gamma, pulsation] = hinfnorm(sys, tolerance)
         gamma = nouveau;
         pulsation = milieux(j);
     end
-    gamma = (1 + tolerance) * gamma;
+    % On rend le gain mesure, non un majorant : « [g,w] = hinfnorm(sys) »
+    % doit verifier que le gain en w vaut bien g. Gonfler la valeur de la
+    % tolerance rendait un nombre que le modele n'atteignait nulle part,
+    % et faisait dépasser d'un millionième les bornes d'erreur que la
+    % réduction de modèle garantit.
 end
 
 function [g, k] = plusGrandGain(sys, w)
