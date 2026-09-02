@@ -5,19 +5,19 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
-| automatique | 98 | 10 | 91 % |
+| automatique | 99 | 9 | 92 % |
 | images | 57 | 15 | 79 % |
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 346 | 80 | 81 % |
 | optimisation | 26 | 6 | 81 % |
-| robuste | 32 | 37 | 46 % |
+| robuste | 69 | 0 | 100 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 187 | 29 | 87 % |
-| **ensemble** | **976** | **208** | **82 %** |
+| **ensemble** | **1014** | **170** | **86 %** |
 
 ## automatique
 
-`bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `delayss`, `frd`, `getBlockValue`
+`bodeoptions`, `chgFreqUnit`, `chgTimeUnit`, `delayss`, `getBlockValue`
 `pidtool`, `sisotool`, `stepDataOptions`, `thiran`
 
 ## images
@@ -45,15 +45,6 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 ## optimisation
 
 `coneprog`, `filterparse`, `optimproblem`, `optimvar`, `prob2struct`, `solve`
-
-## robuste
-
-`actual2normalized`, `complexify`, `cmsclsyn`, `dksyn`, `dmplot`, `frd`
-`genss`, `genmat`, `getNominal`, `hinfstruct`, `icsignal`, `iconnect`, `ltiarray2uss`
-`musyn`, `normalized2actual`, `randatom`, `randumat`, `randuss`, `robgain`
-`robstab`, `robuststab`, `sisobnds`, `ucomplex`, `ucomplexm`, `udyn`, `ultidyn`
-`umat`, `uncertain`, `ureal`, `uss`, `ussdata`, `wcdiskmargin`, `wcgain`
-`wcgopt`, `wcnorm`, `wcsens`, `wcunc`
 
 ## signal
 
@@ -139,6 +130,33 @@ qu'ils ne font pas encore comme MATLAB.
   peut pas ; les figures ne sont pas cliquables.
 - **Format `.fig`** : `savefig` écrit du SVG, `openfig` refuse le format
   de MathWorks.
+
+### Robustesse
+
+Les noms sont tous présents ; ce qui suit est ce que la représentation
+de MatLibre ne fait pas comme celle de MathWorks.
+
+- **Pas de forme LFT.** MATLAB range une incertitude en transformation
+  fractionnaire linéaire, ce qui rend l'analyse mu exacte. MatLibre garde
+  la dépendance elle-même — la fonction des paramètres —, ce qui accepte
+  une division ou une racine que la forme LFT ne représenterait qu'au
+  prix d'un développement. En contrepartie, `wcgain`, `robstab` et leurs
+  voisines balaient le domaine — sommets, tirages, descente locale — et
+  rendent donc un **minorant** du pire cas, exact quand la dépendance est
+  monotone, là où MATLAB rend un majorant par mu. Chaque fiche le dit.
+- **`mussv` borne, il ne calcule pas.** La borne haute vient de la mise à
+  l'échelle d'Osborne, la borne basse d'une recherche de phase ; elles se
+  rejoignent sur un bloc plein et sur une structure diagonale de trois
+  blocs au plus, non en général.
+- **`dksyn` à D constant.** L'itération D-K emploie une mise à l'échelle
+  constante en fréquence, non un ajustement rationnel de D : le
+  correcteur trouvé est un peu moins bon, et d'ordre plus bas.
+- **`hinfstruct` par le simplexe.** Le réglage d'un correcteur structuré
+  passe par Nelder-Mead sur les paramètres, non par la méthode non lisse
+  de MATLAB : plus lent, sans garantie d'optimum, mais applicable à
+  n'importe quelle structure.
+- **`iconnect` n'existe pas.** Les schémas s'assemblent par `sysic` ou
+  par `connect`.
 
 ### Calcul
 

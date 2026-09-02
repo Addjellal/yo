@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1332 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1386 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -44,7 +44,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 27 |
 | [`audio`](reference/toolbox-audio.md) | 7 |
-| [`automatique`](reference/toolbox-automatique.md) | 108 |
+| [`automatique`](reference/toolbox-automatique.md) | 109 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
@@ -80,7 +80,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |
 | [`rf`](reference/toolbox-rf.md) | 7 |
 | [`robotique`](reference/toolbox-robotique.md) | 19 |
-| [`robuste`](reference/toolbox-robuste.md) | 40 |
+| [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 163 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |

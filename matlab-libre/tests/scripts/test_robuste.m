@@ -411,4 +411,212 @@ Gmatrice = [tf(1, [1 1]), tf(2, [1 2]); tf(3, [1 3]), tf(4, [1 4])];
 assert(size(ss(Gmatrice).A, 1) == 4);
 assert(max(max(abs(dcgain(Gmatrice) - ones(2)))) < 1e-12);
 
+% --------------------------------------------------- objets incertains
+% UREAL : un parametre reel, ses bornes, et l'arithmetique qui le suit.
+parametre = ureal('p', 2);
+assert(max(abs(parametre.Range - [1.8 2.2])) < 1e-12);
+assert(abs(ureal('q', 10, 'Range', [8 15]).NominalValue - 10) < 1e-12);
+assert(max(abs(ureal('q', 4, 'PlusMinus', 1).Range - [3 5])) < 1e-12);
+assert(max(abs(ureal('q', 200, 'Percentage', 10).Range - [180 220])) < 1e-12);
+
+masse = ureal('m', 1200, 'Percentage', 10);
+raideur = ureal('k', 5e4, 'Range', [4e4 6e4]);
+pulsationPropre = sqrt(raideur / masse);
+assert(strcmp(class(pulsationPropre), 'umat'));
+assert(abs(NominalValue(pulsationPropre) - sqrt(5e4 / 1200)) < 1e-9);
+% Une division et une racine : ce qu'une forme LFT ne representerait
+% qu'au prix d'un developpement.
+matriceIncertaine = [0 1; -raideur / masse, -2];
+assert(isequal(size(matriceIncertaine), [2 2]));
+assert(abs(NominalValue(matriceIncertaine)(2, 1) + 5e4 / 1200) < 1e-9);
+assert(numel(Names(matriceIncertaine)) == 2);
+assert(uncertain(matriceIncertaine));
+assert(~uncertain(umat([1 2; 3 4])));
+
+% USS : un modele dont les matrices dependent des parametres.
+kIncertain = ureal('k', 4, 'Range', [3 5]);
+amortissement = ureal('z', 0.2, 'Range', [0.05 0.4]);
+modeleIncertain = uss([0 1; -kIncertain -amortissement], [0; 1], [1 0], 0);
+assert(strcmp(class(modeleIncertain), 'uss'));
+assert(modeleIncertain.Tailles(1) == 2);
+nominal = getNominal(modeleIncertain);
+assert(strcmp(class(nominal), 'ss'));
+assert(abs(nominal.A(2, 1) + 4) < 1e-12);
+% USUBS fixe ce qu'on nomme, laisse le reste au nominal.
+fixe = usubs(modeleIncertain, 'k', 5);
+assert(abs(fixe.A(2, 1) + 5) < 1e-12);
+assert(abs(fixe.A(2, 2) + 0.2) < 1e-12);
+[Aincertaine, Bincertaine, ~, ~, ~, listeParametres] = ussdata(modeleIncertain);
+assert(numel(listeParametres) == 2);
+assert(abs(getNominal(Aincertaine)(2, 1) + 4) < 1e-12);
+assert(isequal(getNominal(Bincertaine), [0; 1]));
+
+% USAMPLE tire dans les intervalles, et USUBS reprend le tirage.
+rand('seed', 17);
+[modeles, tirages] = usample(modeleIncertain, 12);
+assert(numel(modeles) == 12);
+for j = 1:12
+    assert(tirages{j}.k >= 3 && tirages{j}.k <= 5);
+    assert(tirages{j}.z >= 0.05 && tirages{j}.z <= 0.4);
+    assert(abs(modeles{j}.A(2, 1) + tirages{j}.k) < 1e-12);
+end
+assert(abs(usubs(modeleIncertain, tirages{1}).A(2, 1) + tirages{1}.k) < 1e-12);
+
+% La normalisation : le nominal sur zero, les bornes sur plus ou moins un.
+borne = ureal('p', 10, 'Range', [8 15]);
+assert(actual2normalized(borne, 10) == 0);
+assert(abs(actual2normalized(borne, 15) - 1) < 1e-12);
+assert(abs(actual2normalized(borne, 8) + 1) < 1e-12);
+assert(abs(actual2normalized(borne, 20) - 2) < 1e-12);
+assert(abs(normalized2actual(borne, actual2normalized(borne, 12)) - 12) < 1e-12);
+
+% Les autres atomes.
+complexeIncertain = ucomplex('d', 1, 'Radius', 0.3);
+assert(abs(complexeIncertain.Uncertainty{1}.Range(2) - 0.3) < 1e-12);
+for j = 1:20
+    assert(abs(usample(complexeIncertain) - 1) <= 0.3 + 1e-9);
+end
+assert(isequal(size(ucomplexm('D', eye(2), 'Radius', 0.2)), [2 2]));
+blocDynamique = ultidyn('dl', [1 1], 'Bound', 0.3);
+assert(strcmp(class(blocDynamique), 'uss'));
+for j = 1:10
+    assert(hinfnorm(usample(blocDynamique)) <= 0.3 + 1e-9);
+end
+assert(strcmp(class(udyn('du', [1 1])), 'uss'));
+assert(numel(complexify(kIncertain, 0.05).Uncertainty) == 2);
+assert(strcmp(class(randatom('ureal')), 'ureal'));
+assert(numel(randumat(2).Uncertainty) == 2);
+modeleTire = randuss(3);
+assert(modeleTire.Tailles(1) == 3);
+assert(max(real(pole(getNominal(modeleTire)))) < 0);
+
+% L'algebre des modeles incertains : le nominal ne bouge pas.
+bloc = ultidyn('db', [1 1], 'Bound', 1);
+ponderation = ss(tf([1 1], [1 10]));
+procede = ss(tf(1, [1 1]));
+incertain = (bloc * ponderation + 1) * procede;
+assert(strcmp(class(incertain), 'uss'));
+assert(hinfnorm(getNominal(incertain) - procede) < 1e-9);
+
+% ------------------------------------------------- analyse de robustesse
+% WCGAIN trouve le pire cas, et le pire cas se verifie a la main.
+options = wcgopt('Tirages', 40);
+[gainPire, valeursPires, infoGain] = wcgain(modeleIncertain, options);
+assert(abs(valeursPires.z - 0.05) < 1e-6);      % le moins amorti
+assert(abs(valeursPires.k - 3) < 1e-6);
+verification = hinfnorm(usubs(modeleIncertain, 'z', 0.05, 'k', 3));
+assert(abs(gainPire.LowerBound - verification) < 1e-6);
+assert(gainPire.LowerBound > infoGain.NominalGain);
+assert(gainPire.CriticalFrequency > 0);
+
+% WCNORM sur une matrice : le pire est aux sommets, et il se calcule.
+premiere = ureal('a', 1, 'Range', [0 2]);
+seconde = ureal('b', 1, 'Range', [-1 1]);
+[normePire, ouNorme] = wcnorm([premiere seconde; 0 premiere], options);
+assert(abs(normePire.LowerBound - max(svd([2 1; 0 2]))) < 1e-6);
+assert(abs(abs(ouNorme.b) - 1) < 1e-6);
+assert(abs(ouNorme.a - 2) < 1e-6);
+
+% ROBSTAB : le rayon de robustesse se calcule aussi a la main. Ici z
+% s'annule quand on dilate le domaine de 0.2/0.15.
+rayonStable = robstab(modeleIncertain, options);
+assert(abs(rayonStable.LowerBound - 0.2 / 0.15) < 1e-4);
+amortissementNegatif = ureal('z', 0.2, 'Range', [-0.1 0.5]);
+modeleFragile = uss([0 1; -4 -amortissementNegatif], [0; 1], [1 0], 0);
+[rayonFragile, ouFragile] = robstab(modeleFragile, options);
+assert(abs(rayonFragile.LowerBound - 0.2 / 0.3) < 1e-4);
+assert(abs(ouFragile.z) < 1e-3);                 % c'est z = 0 qui destabilise
+assert(robuststab(modeleFragile, options).LowerBound > 0);
+% Un modele certain : le rayon est infini s'il est stable.
+assert(isinf(robstab(uss(ss(tf(1, [1 1])))).LowerBound));
+assert(robstab(uss(ss(tf(1, [1 -1])))).LowerBound == 0);
+
+% ROBGAIN : la performance tient-elle sur le domaine ?
+assert(robgain(modeleIncertain, 15, options).LowerBound > 1);
+assert(robgain(modeleIncertain, 5, options).LowerBound < 1);
+
+% WCSENS et WCDISKMARGIN sur une boucle stabilisee.
+correcteurStable = ss(tf([1 1], [1 5]));
+sensibilitesPires = wcsens(modeleIncertain, correcteurStable, options);
+assert(sensibilitesPires.Stable);
+assert(sensibilitesPires.So.PeakGain >= ...
+       hinfnorm(loopsens(getNominal(modeleIncertain), correcteurStable).So) - 1e-6);
+[~, ~, margeDisquePire] = wcdiskmargin(modeleIncertain, correcteurStable, options);
+assert(margeDisquePire.DiskMargin > 0 && margeDisquePire.DiskMargin <= 1);
+assert(isfield(margeDisquePire, 'Values'));
+assert(isfield(wcunc(valeursPires), 'k'));
+
+% LTIARRAY2USS couvre une famille de modeles mesures.
+famille = {ss(tf(1, [1 0.8])), ss(tf(1.2, [1 1.3])), ss(tf(0.9, [1 1]))};
+[enveloppe, infoEnveloppe] = ltiarray2uss(ss(tf(1, [1 1])), famille);
+assert(numel(enveloppe.Uncertainty) == 1);
+assert(hinfnorm(getNominal(enveloppe) - ss(tf(1, [1 1]))) < 1e-9);
+assert(max(infoEnveloppe.Bound) > 0);
+
+% --------------------------------------------------------- synthese mu
+% CMSCLSYN : la mise a l'echelle ramene [1 100; 0.01 1] a une matrice de
+% norme 2, contre 100 avant.
+[echelle, apres, infoEchelle] = cmsclsyn([1 100; 0.01 1]);
+assert(abs(apres - 2) < 1e-6);
+assert(abs(infoEchelle.Before - max(svd([1 100; 0.01 1]))) < 1e-9);
+assert(abs(echelle(2, 2) / echelle(1, 1) - 100) < 1e-3);
+
+modeleAugmente = augw(ss(tf(1, [1 1])), tf(1, [1 0.1]), 0.1, []);
+[correcteurMu, boucleMu, valeurMu] = dksyn(modeleAugmente, 1, 1, struct('Tours', 2));
+assert(max(real(pole(boucleMu))) < 0);
+assert(valeurMu > 0 && isfinite(valeurMu));
+% MUSYN est le meme calcul que DKSYN, sous l'autre nom.
+[~, ~, valeurMuBis] = musyn(modeleAugmente, 1, 1, struct('Tours', 2));
+assert(abs(valeurMuBis - valeurMu) < 1e-9);
+
+% HINFSTRUCT regle un PI : il ne peut pas faire mieux que le plein ordre.
+gainProportionnel = ureal('kp', 1, 'Range', [0 20]);
+gainIntegral = ureal('ki', 1, 'Range', [0 20]);
+[correcteurPI, gammaStructure, infoStructure] = ...
+    hinfstruct(modeleAugmente, uss(0, 1, gainIntegral, gainProportionnel));
+[~, ~, gammaPleinOrdre] = hinfsyn(modeleAugmente, 1, 1);
+assert(gammaPleinOrdre <= gammaStructure + 1e-6);
+assert(gammaStructure < 1.5 * gammaPleinOrdre);
+assert(infoStructure.Values.kp >= 0 && infoStructure.Values.kp <= 20);
+assert(size(ss(correcteurPI).A, 1) == 1);        % c'est bien un PI
+
+% ------------------------------------------------------- reponses mesurees
+pulsations = logspace(-1, 2, 60);
+mesure = frd(freqresp(tf(1, [1 1]), pulsations), pulsations);
+assert(strcmp(class(mesure), 'frd'));
+assert(numel(mesure.Frequency) == 60);
+assert(abs(abs(mesure.ResponseData(1)) - 1 / sqrt(1 + 0.01)) < 1e-9);
+assert(abs(abs(inv(mesure).ResponseData(1)) - sqrt(1 + 0.01)) < 1e-9);
+echantillonne = frd(tf(1, [1 0.2 1]), pulsations);
+assert(norm(echantillonne, Inf) > 4);
+somme = mesure + echantillonne;
+assert(numel(somme.Frequency) == 60);
+assert(abs(somme.ResponseData(5) - ...
+           (mesure.ResponseData(5) + echantillonne.ResponseData(5))) < 1e-12);
+% L'interpolation, quand on demande d'autres pulsations.
+[moduleInterpole, ~] = bode(echantillonne, [1 10]);
+assert(numel(moduleInterpole) == 2);
+assert(moduleInterpole(1) > moduleInterpole(2));
+
+% ----------------------------------------------------------- QFT et disque
+bornesQft = sisobnds(2, ss(tf(1, [1 1])), 0.1, logspace(-1, 1, 5));
+assert(all(abs(bornesQft - 9) < 1e-9));          % |S| < 0.1 demande |L| > 9
+[gainsDisque, phasesDisque] = dmplot(0.3);
+assert(abs(max(gainsDisque) - 20 * log10(1.3)) < 1e-9);
+% La grille de 400 points ne tombe pas juste sur la tangente : l'ecart
+% est celui du pas, non une erreur de formule.
+assert(abs(max(phasesDisque) - asin(0.3) * 180 / pi) < 1e-3);
+
+% Ce que MatLibre ne fait pas le dit.
+erreurIconnect = '';
+try
+    iconnect();
+catch err
+    erreurIconnect = err.identifier;
+end
+assert(strcmp(erreurIconnect, 'Robust:iconnect:Unsupported'));
+assert(strcmp(class(genmat([1 2; 3 4])), 'umat'));
+assert(strcmp(class(genss(ss(-1, 1, 1, 0))), 'uss'));
+assert(strcmp(icsignal(1, 'e').Name, 'e'));
+
 disp('robuste : toutes les verifications passent');

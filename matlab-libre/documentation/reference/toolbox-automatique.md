@@ -709,6 +709,46 @@ FILT Modèle discret écrit en puissances de z^-1.
   Voir aussi TF, C2D.
 ```
 
+## `frd`
+
+```
+FRD Modèle de réponse fréquentielle.
+  SYS = FRD(REPONSE,FREQUENCES) crée un modèle qui ne porte que des
+  mesures : la valeur de la réponse à chaque fréquence, et rien
+  d'autre. C'est ce qu'on a quand on a mesuré un procédé au vibreur ou
+  à l'analyseur de spectre, sans en avoir tiré d'équations.
+
+  SYS = FRD(REPONSE,FREQUENCES,'Units','Hz') dit que les fréquences
+  sont en hertz ; sans cela, elles sont en radians par seconde.
+  SYS = FRD(SYS,FREQUENCES) échantillonne un modèle SS ou TF aux
+  fréquences données.
+
+  Les propriétés :
+     ResponseData   la réponse, un nombre complexe par fréquence ;
+     Frequency      les fréquences ;
+     FrequencyUnit  'rad/TimeUnit' ou 'Hz' ;
+     Ts             la période d'échantillonnage.
+
+  Les opérations + - * et INV sont définies : elles s'appliquent point
+  par point, les deux modèles devant porter les mêmes fréquences.
+  BODE, NYQUIST, SIGMA et NORM acceptent un FRD.
+
+  Un FRD ne se simule pas et n'a pas de pôles : il ne dit rien entre
+  deux points mesurés. C'est sa force — il ne suppose aucune structure —
+  et sa limite.
+
+  Exemples :
+     w = logspace(-1, 2, 50);
+     G = frd(freqresp(tf(1, [1 1]), w), w);
+     bode(G);
+     abs(G.ResponseData(1))
+
+     H = frd(tf(1, [1 0.2 1]), w);      % echantillonne un modele
+     norm(H, Inf)                        % le pic mesure
+
+  Voir aussi FREQRESP, BODE, NYQUIST, SIGMA, TF, SS, INTERP1.
+```
+
 ## `freqresp`
 
 ```
