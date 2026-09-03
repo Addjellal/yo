@@ -119,10 +119,43 @@
 %   pdist, pdist2, squareform, mahal   - Distances entre observations
 %   linkage, cluster, clusterdata      - Regroupement hiérarchique
 %   cophenet, dendrogram               - Fidélité de l'arbre, et son dessin
-%   knnsearch, fitcknn, predictknn     - Plus proches voisins
-%   fitctree, predicttree              - Arbre de décision
+%   knnsearch, fitcknn                 - Plus proches voisins
+%   fitctree, fitrtree                 - Arbres de décision et de régression
+%   fitcnb                             - Bayésien naïf
+%   fitcsvm, fitrsvm                   - Vecteurs de support
+%   discardSupportVectors              - Allège une SVM linéaire
+%   fitclinear, fitrlinear             - Modèles linéaires en grande dimension
+%   fitcecoc                           - Plusieurs classes par codes correcteurs
+%   fitrgp                             - Processus gaussien
+%   predict                            - Prédiction, quel que soit le modèle
+%   relieff, sequentialfs              - Choix de variables
 %   confusionmat                       - Matrice de confusion
 %   cvpartition                        - Découpage pour la validation croisée
+%
+% Modèles de régression
+%   fitglm                             - Modèle linéaire généralisé
+%   mnrfit, mnrval                     - Logistique multinomiale
+%   fitlme                             - Effets mixtes, intercept aléatoire
+%   lasso                              - Régression pénalisée en norme 1
+%   nnmf                               - Factorisation non négative
+%
+% Mélanges et modèles cachés
+%   gmdistribution, fitgmdist          - Mélange gaussien, ajusté par EM
+%   hmmgenerate, hmmdecode             - Modèle de Markov caché
+%   hmmviterbi, hmmestimate, hmmtrain  - Chemin, estimation, Baum-Welch
+%
+% Analyse de la variance et plans
+%   anovan                             - Plusieurs facteurs
+%   manova1                            - Analyse multivariée
+%   rowexch, x2fx                      - Plan D-optimal et matrice du modèle
+%   polytool, stepwise                 - Ajustement polynomial, pas à pas
+%
+% Copules et simulation
+%   copulacdf, copulapdf, copularnd    - Copules gaussienne, de Student,
+%                                        de Clayton, de Frank, de Gumbel
+%   pearsrnd                           - Loi du système de Pearson
+%   slicesample                        - Échantillonnage par tranches
+%   dataset                            - Tableau de données, ancienne forme
 %
 % Ajustement de lois
 %   mle, fitdist                       - Maximum de vraisemblance
@@ -146,6 +179,16 @@
 %   matlibre_nelder_mead                - Simplexe, sans dérivée
 %   matlibre_regression_isotone         - La suite croissante la plus proche
 %   matlibre_points_traces              - Les points déjà dessinés
+%   predictBayesNaif, predictSvm        - Rouages de PREDICT
+%   predictLineaire, predictEcoc        - Idem
+%   predictGp, predictArbreRegression   - Idem
+%   clusterMelange, tirerMelange        - Rouages des mélanges gaussiens
+%   lireOptionsSvm, noyauSvm            - Rouages des SVM
+%   standardiserSvm, resoudreSmo        - Idem
+%   lireOptionsLineaire, descenteLineaire - Rouages des modèles linéaires
+%   noyauGp                             - Covariance d'un processus gaussien
+%   normaliserLignes, lireNomsHmm       - Rouages des modèles cachés
+%   indicesSymboles                     - Idem
 ```
 
 ## `anova1`
@@ -228,6 +271,37 @@ ANOVA2 Analyse de variance à deux facteurs, plan équilibré.
      anova2(y, 2)
 
   Voir aussi ANOVA1, KRUSKALWALLIS, FRIEDMAN, MULTCOMPARE.
+```
+
+## `anovan`
+
+```
+ANOVAN Analyse de la variance à plusieurs facteurs.
+  P = ANOVAN(Y,GROUPES) découpe la variance de Y suivant plusieurs
+  facteurs à la fois et rend une p-valeur par facteur. GROUPES est un
+  tableau de cellules, un élément par facteur, chacun donnant le niveau
+  de chaque observation.
+
+  ANOVAN(...,'model','interaction') ajoute les interactions de deux
+  facteurs ; 'linear' (défaut) n'ajuste que les effets principaux.
+  ANOVAN(...,'varnames',N) nomme les facteurs.
+  ANOVAN(...,'display','off') n'affiche rien.
+
+  [P,TBL,STATS] = ANOVAN(...) rend le tableau d'analyse et de quoi
+  comparer les moyennes.
+
+  Les sommes de carrés sont celles du modèle emboîté — le type I de la
+  littérature : chaque terme est jugé sur ce qu'il ajoute aux
+  précédents. Le plan doit être équilibré pour que l'ordre n'y change
+  rien.
+
+  Exemple :
+     y = [1 2 3 4 5 6 7 8]';
+     g1 = {'a','a','a','a','b','b','b','b'};
+     g2 = {'x','x','y','y','x','x','y','y'};
+     p = anovan(y, {g1, g2}, 'display', 'off');
+
+  Voir aussi ANOVA1, ANOVA2, MANOVA1, MULTCOMPARE, FITLM.
 ```
 
 ## `betacdf`
@@ -570,6 +644,16 @@ CLUSTER Coupe un arbre de regroupement en groupes.
      cluster(Z, 'cutoff', 1)       % la meme coupure, par la hauteur
 
   Voir aussi LINKAGE, CLUSTERDATA, DENDROGRAM, COPHENET, KMEANS.
+Un mélange gaussien s'attribue autrement qu'un arbre : chaque point
+va à la composante la plus probable.
+```
+
+## `clusterMelange`
+
+```
+CLUSTERMELANGE Attribution des points aux composantes d'un mélange.
+  Employer CLUSTER ou PREDICT ; cette fonction est le rouage qu'ils
+  appellent.
 ```
 
 ## `clusterdata`
@@ -666,6 +750,60 @@ COPHENET Corrélation cophénétique : l'arbre est-il fidèle aux distances ?
   Voir aussi LINKAGE, PDIST, CLUSTER, DENDROGRAM, SQUAREFORM.
 ```
 
+## `copulacdf`
+
+```
+COPULACDF Fonction de répartition d'une copule.
+  P = COPULACDF('Gaussian',U,RHO) rend la répartition de la copule
+  gaussienne de corrélation RHO aux points U, dont chaque colonne est
+  une marge dans [0,1].
+  P = COPULACDF('t',U,RHO,NU) fait de même pour la copule de Student.
+  P = COPULACDF(FAMILLE,U,ALPHA) traite les copules archimédiennes
+  'Clayton', 'Frank' et 'Gumbel'.
+
+  Une copule décrit la dépendance entre variables indépendamment de
+  leurs lois marginales : c'est ce qui permet de coller n'importe
+  quelles marges sur une structure de dépendance donnée.
+
+  Exemple :
+     copulacdf('Clayton', [0.5 0.5], 2)
+     copulacdf('Gaussian', [0.5 0.5], 0.7)
+
+  Voir aussi COPULAPDF, COPULARND, MVNCDF, CORR.
+```
+
+## `copulapdf`
+
+```
+COPULAPDF Densité d'une copule.
+  Y = COPULAPDF('Gaussian',U,RHO) rend la densité de la copule
+  gaussienne ; 'Clayton', 'Frank' et 'Gumbel' sont traitées pour deux
+  variables.
+
+  Exemple :
+     copulapdf('Gaussian', [0.5 0.5], 0.7)
+
+  Voir aussi COPULACDF, COPULARND, MVNPDF.
+```
+
+## `copularnd`
+
+```
+COPULARND Tirages d'une copule.
+  U = COPULARND('Gaussian',RHO,N) tire N points de la copule
+  gaussienne ; chaque colonne est uniforme sur [0,1], et la dépendance
+  entre colonnes est celle de la copule.
+  U = COPULARND('t',RHO,NU,N) tire de la copule de Student.
+  U = COPULARND(FAMILLE,ALPHA,N) traite 'Clayton', 'Frank' et
+  'Gumbel' à deux variables.
+
+  Exemple :
+     u = copularnd('Gaussian', 0.8, 1000);
+     corr(u(:, 1), u(:, 2))      % proche de 0,8
+
+  Voir aussi COPULACDF, COPULAPDF, MVNRND.
+```
+
 ## `corr`
 
 ```
@@ -719,6 +857,24 @@ CVPARTITION Découpage d'un jeu de données pour la validation croisée.
   P = CVPARTITION(N,'KFold',K) découpe en K blocs.
 ```
 
+## `dataset`
+
+```
+DATASET Tableau de données, ancienne forme.
+  D = DATASET(X,Y,...) range des colonnes dans un tableau de données.
+  C'est la forme d'avant R2013b, remplacée depuis par TABLE : MatLibre
+  la fabrique donc comme une table, dont elle a toutes les propriétés.
+
+  D = DATASET({X,'nom'},{Y,'autre'}) nomme les variables ; sans nom,
+  elles s'appellent Var1, Var2…
+
+  Exemple :
+     d = dataset({[1;2;3], 'x'}, {[4;5;6], 'y'});
+     d.x
+
+  Voir aussi TABLE, ARRAY2TABLE, STRUCT2TABLE, READTABLE.
+```
+
 ## `dendrogram`
 
 ```
@@ -753,6 +909,36 @@ DENDROGRAM Dessine l'arbre de regroupement.
      dendrogram(Z, 'ColorThreshold', 1);   % les deux grappes colorees
 
   Voir aussi LINKAGE, CLUSTER, CLUSTERDATA, COPHENET, PDIST.
+```
+
+## `descenteLineaire`
+
+```
+DESCENTELINEAIRE Descente de gradient d'un modèle linéaire régularisé.
+  Le pas décroît en 1/(lambda*t), comme dans les méthodes de gradient
+  moyennées : c'est ce qui garantit la convergence sans réglage.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `discardSupportVectors`
+
+```
+DISCARDSUPPORTVECTORS Allège une SVM linéaire de ses points.
+  M = DISCARDSUPPORTVECTORS(M) retire d'un modèle à noyau linéaire les
+  vecteurs de support et leurs multiplicateurs : la frontière ne tient
+  qu'au vecteur de poids et au biais, que le modèle garde. C'est ce qui
+  permet d'embarquer un classifieur sans emporter les données
+  d'apprentissage.
+
+  Un modèle à noyau non linéaire refuse : ses points sont sa frontière.
+
+  Exemple :
+     m = fitcsvm(X, y);
+     m = discardSupportVectors(m);
+     isempty(m.SupportVectors)     % vrai
+
+  Voir aussi FITCSVM, PREDICT.
 ```
 
 ## `ecdf`
@@ -880,20 +1066,152 @@ FCDF Répartition de la loi de Fisher.
 FINV Quantile de la loi de Fisher, par dichotomie.
 ```
 
+## `fitcecoc`
+
+```
+FITCECOC Classification à plusieurs classes par codes correcteurs.
+  M = FITCECOC(X,Y) ramène un problème à K classes à une collection de
+  problèmes binaires : par défaut, un par paire de classes — K(K-1)/2
+  modèles —, et la classe retenue est celle qui gagne le plus de duels.
+
+  FITCECOC(...,'Coding','onevsall') n'apprend qu'un modèle par classe,
+  chacun opposant sa classe à toutes les autres : K modèles au lieu de
+  K(K-1)/2, plus rapide mais moins sûr quand les classes se
+  chevauchent.
+  FITCECOC(...,'Learners',F) choisit l'apprenant binaire : une poignée
+  de fonction prenant (X,Y) et rendant un modèle utilisable par
+  PREDICT. FITCSVM par défaut.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 4; randn(40, 2) + [0 5]];
+     y = [ones(40, 1); 2 * ones(40, 1); 3 * ones(40, 1)];
+     m = fitcecoc(X, y);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITCSVM, FITCNB, FITCTREE, MNRFIT.
+```
+
 ## `fitcknn`
 
 ```
 FITCKNN Classifieur par k plus proches voisins.
-  M = FITCKNN(X,Y) mémorise les données ; utiliser PREDICTKNN pour
-  classer de nouvelles observations.
+  M = FITCKNN(X,Y) mémorise les données ; PREDICT classe ensuite de
+  nouvelles observations. Il n'y a rien à apprendre : la règle est de
+  regarder les K voisins les plus proches, et le modèle n'est que les
+  données elles-mêmes.
+
+  Exemple :
+     X = [randn(30, 2); randn(30, 2) + 3];
+     y = [ones(30, 1); 2 * ones(30, 1)];
+     m = fitcknn(X, y, 'NumNeighbors', 3);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITCTREE, FITCNB, FITCSVM, KNNSEARCH.
+```
+
+## `fitclinear`
+
+```
+FITCLINEAR Classifieur linéaire pour données de grande dimension.
+  M = FITCLINEAR(X,Y) ajuste un classifieur binaire linéaire par
+  descente de gradient sur une perte régularisée. À la différence de
+  FITCSVM, rien n'est stocké des données : le modèle tient dans un
+  vecteur de poids, ce qui convient aux problèmes à beaucoup de
+  variables.
+
+  FITCLINEAR(...,'Learner','svm') minimise la perte charnière
+  (défaut) ; 'logistic' minimise la perte logistique et rend des
+  probabilités.
+  FITCLINEAR(...,'Regularization','ridge') pénalise la norme 2
+  (défaut) ; 'lasso' pénalise la norme 1 et met des poids à zéro.
+  FITCLINEAR(...,'Lambda',L) règle la pénalité, 'PassLimit',N le
+  nombre de passages, 'FitBias',false retire le biais.
+
+  Exemple :
+     rng(1);
+     X = [randn(100, 20); randn(100, 20) + 0.8];
+     y = [-ones(100, 1); ones(100, 1)];
+     m = fitclinear(X, y);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITRLINEAR, FITCSVM, LASSO, FITGLM.
+```
+
+## `fitcnb`
+
+```
+FITCNB Classifieur bayésien naïf.
+  M = FITCNB(X,Y) ajuste un classifieur qui suppose les variables
+  indépendantes à l'intérieur de chaque classe. C'est une hypothèse
+  fausse presque partout, et pourtant le classifieur qu'elle donne est
+  souvent bon : l'indépendance ne sert qu'à estimer les densités, et
+  l'erreur qu'elle introduit se compense entre classes.
+
+  FITCNB(...,'DistributionNames','normal') suppose des variables
+  gaussiennes (défaut) ; 'kernel' emploie une estimation à noyau, 'mn'
+  traite les colonnes comme des comptes multinomiaux.
+  FITCNB(...,'Prior',P) impose les probabilités a priori des classes.
+
+  PREDICT applique le modèle.
+
+  Exemple :
+     rng(1);
+     X = [randn(50, 2); randn(50, 2) + 3];
+     y = [ones(50, 1); 2 * ones(50, 1)];
+     m = fitcnb(X, y);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITCTREE, FITCKNN, FITCSVM, FITCECOC.
+```
+
+## `fitcsvm`
+
+```
+FITCSVM Machine à vecteurs de support, classification binaire.
+  M = FITCSVM(X,Y) cherche la frontière qui sépare les deux classes en
+  laissant la plus large marge possible. Y ne doit porter que deux
+  valeurs.
+
+  FITCSVM(...,'KernelFunction',K) choisit le noyau : 'linear' (défaut),
+  'rbf' (ou 'gaussian'), 'polynomial'.
+  FITCSVM(...,'BoxConstraint',C) règle la tolérance aux points mal
+  classés — C grand exige une séparation stricte, C petit accepte des
+  erreurs pour élargir la marge.
+  FITCSVM(...,'KernelScale',S) et 'PolynomialOrder',D règlent le noyau.
+  FITCSVM(...,'Standardize',true) centre et réduit les colonnes.
+
+  L'optimisation est celle de Platt — SMO — sur le problème dual :
+  deux multiplicateurs bougent à la fois, ce qui respecte la contrainte
+  d'égalité sans passer par un solveur général.
+
+  PREDICT applique le modèle ; DISCARDSUPPORTVECTORS allège un modèle
+  linéaire dont on n'a plus besoin des points.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [-ones(40, 1); ones(40, 1)];
+     m = fitcsvm(X, y);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITRSVM, FITCECOC, DISCARDSUPPORTVECTORS, FITCNB.
 ```
 
 ## `fitctree`
 
 ```
 FITCTREE Arbre de décision binaire (CART, critère de Gini).
-  T = FITCTREE(X,Y) construit un arbre ; PREDICTTREE l'utilise.
+  T = FITCTREE(X,Y) construit un arbre ; PREDICT l'utilise.
   Option 'MinLeafSize' (1 par défaut) et 'MaxDepth' (8 par défaut).
+
+  Exemple :
+     X = [randn(30, 2); randn(30, 2) + 3];
+     y = [ones(30, 1); 2 * ones(30, 1)];
+     t = fitctree(X, y);
+     mean(predict(t, X) == y)
+
+  Voir aussi PREDICT, FITRTREE, FITCKNN, FITCNB, FITCECOC.
 ```
 
 ## `fitdist`
@@ -937,12 +1255,229 @@ FITDIST Ajuste une loi de probabilité à des données.
   Voir aussi MLE, NORMFIT, PDF, CDF, ICDF, RANDOM, HISTFIT, PROBPLOT.
 ```
 
+## `fitglm`
+
+```
+FITGLM Modèle linéaire généralisé.
+  M = FITGLM(X,Y) ajuste un modèle linéaire ordinaire. L'intérêt de la
+  fonction est ailleurs : elle traite les réponses qui ne sont pas
+  gaussiennes.
+
+  M = FITGLM(X,Y,'Distribution','binomial') ajuste une régression
+  logistique — Y vaut 0 ou 1, et le modèle prédit une probabilité.
+  'poisson' ajuste un comptage, 'gamma' et 'inverse gaussian' des
+  durées ou des grandeurs positives.
+
+  FITGLM(...,'Link',L) change la fonction de lien : 'identity',
+  'log', 'logit', 'probit', 'loglog', 'reciprocal'. Chaque loi a son
+  lien canonique par défaut.
+  FITGLM(...,'Intercept',false) retire l'ordonnée à l'origine.
+  FITGLM(...,'Weights',W) pondère les observations, ce qui pour une
+  binomiale donne le nombre d'essais.
+
+  Le modèle rendu est une structure : Coefficients, SE, tStat, pValue,
+  Fitted, Residuals, Deviance, LogLikelihood, AIC, BIC, Link,
+  Distribution. MatLibre n'a pas d'objet GeneralizedLinearModel ; la
+  structure en porte les mêmes champs.
+
+  L'ajustement est par moindres carrés repondérés itérativement, la
+  méthode classique : à chaque tour, la réponse est linéarisée autour
+  de la prédiction courante et pondérée par la variance attendue.
+
+  Exemple :
+     rng(1);
+     X = randn(200, 1);
+     p = 1 ./ (1 + exp(-(0.5 + 2 * X)));
+     y = double(rand(200, 1) < p);
+     m = fitglm(X, y, 'Distribution', 'binomial');
+     m.Coefficients
+
+  Voir aussi FITLM, GLMFIT, MNRFIT, REGRESS, ROBUSTFIT.
+```
+
+## `fitgmdist`
+
+```
+FITGMDIST Ajuste un mélange gaussien par l'algorithme EM.
+  M = FITGMDIST(X,K) cherche K gaussiennes dont le mélange explique au
+  mieux X. L'algorithme alterne deux pas : estimer à quelle composante
+  chaque point appartient, puis réestimer les composantes d'après ces
+  appartenances. La vraisemblance ne peut que croître.
+
+  FITGMDIST(...,'Replicates',R) relance R fois depuis des départs
+  différents et garde le meilleur — EM converge vers un maximum local,
+  et le départ compte.
+  FITGMDIST(...,'CovarianceType','diagonal') suppose les variables
+  indépendantes dans chaque composante,
+  'SharedCovariance',true impose une covariance commune,
+  'RegularizationValue',R ajoute R à la diagonale, ce qui évite les
+  composantes qui s'effondrent sur un point,
+  'Start',S impose les appartenances de départ,
+  'Options',statset('MaxIter',N,'TolFun',T) règle l'arrêt.
+
+  Exemple :
+     rng(1);
+     X = [randn(200, 2); randn(200, 2) + 4];
+     m = fitgmdist(X, 2);
+     m.ComponentProportion
+
+  Voir aussi GMDISTRIBUTION, CLUSTER, KMEANS, PDF, RANDOM.
+```
+
 ## `fitlm`
 
 ```
 FITLM Modèle linéaire avec ordonnée à l'origine.
   M = FITLM(X,Y) ajuste Y = b0 + X*b et rend une structure décrivant le
   modèle : coefficients, R2, résidus, écarts types.
+```
+
+## `fitlme`
+
+```
+FITLME Modèle linéaire à effets mixtes.
+  M = FITLME(T,'y ~ 1 + x + (1|g)') ajuste un modèle où les effets de
+  x sont communs à toutes les observations — les effets fixes — tandis
+  que chaque niveau de g reçoit son propre décalage, tiré d'une loi
+  normale centrée : c'est l'effet aléatoire.
+
+  C'est ce qu'il faut quand les observations ne sont pas indépendantes
+  parce qu'elles se regroupent : plusieurs mesures par patient,
+  plusieurs élèves par classe. Un modèle ordinaire y sous-estimerait
+  les écarts types.
+
+  FITLME(...,'FitMethod','ML') estime par maximum de vraisemblance ;
+  'REML' (défaut) corrige le biais dû à l'estimation des effets fixes.
+
+  Le modèle rendu est une structure : Coefficients, SE, tStat, pValue,
+  Fitted, Residuals, SigmaB (écart type de l'effet aléatoire), Sigma
+  (écart type résiduel), LogLikelihood, AIC, BIC, RandomEffects.
+
+  MatLibre traite les intercepts aléatoires — la forme (1|g), la plus
+  courante —, avec un ou plusieurs facteurs de regroupement croisés.
+  Les pentes aléatoires, de la forme (x|g), ne sont pas ajustées.
+
+  L'estimation profile la vraisemblance sur le rapport des variances :
+  pour un rapport donné, les effets fixes s'obtiennent par moindres
+  carrés généralisés, et l'on cherche le rapport qui maximise ce qui
+  reste.
+
+  Exemple :
+     rng(1);
+     g = repmat((1:10)', 20, 1);
+     decalage = randn(10, 1) * 2;
+     x = randn(200, 1);
+     y = 1 + 3 * x + decalage(g) + 0.5 * randn(200, 1);
+     t = table(y, x, g);
+     m = fitlme(t, 'y ~ 1 + x + (1|g)');
+     m.SigmaB      % proche de 2
+
+  Voir aussi FITLM, FITGLM, ANOVAN, NLINFIT.
+```
+
+## `fitrgp`
+
+```
+FITRGP Régression par processus gaussien.
+  M = FITRGP(X,Y) ajuste un processus gaussien : au lieu de choisir une
+  forme de courbe, on suppose que deux points proches ont des valeurs
+  proches, et la prédiction est la moyenne conditionnelle qui en
+  découle. Elle passe par les points observés quand le bruit est
+  supposé nul, et s'accompagne d'une variance qui grandit là où l'on
+  n'a pas observé.
+
+  FITRGP(...,'KernelFunction',K) choisit la fonction de covariance :
+  'squaredexponential' (défaut), 'exponential', 'matern32',
+  'matern52'.
+  FITRGP(...,'KernelParameters',[L S]) donne la longueur
+  caractéristique et l'écart type du signal, 'Sigma',S l'écart type du
+  bruit, 'Standardize',true centre et réduit les colonnes.
+
+  [Y,VARIANCE] = PREDICT(M,X) rend la moyenne et la variance
+  prédictives.
+
+  Exemple :
+     rng(1);
+     X = linspace(0, 10, 30)';
+     y = sin(X) + 0.05 * randn(30, 1);
+     m = fitrgp(X, y, 'KernelParameters', [1 1], 'Sigma', 0.05);
+     [mu, variance] = predict(m, X);
+
+  Voir aussi PREDICT, FITRSVM, FITRTREE, FITLM.
+```
+
+## `fitrlinear`
+
+```
+FITRLINEAR Régression linéaire pour données de grande dimension.
+  M = FITRLINEAR(X,Y) ajuste une régression linéaire par descente de
+  gradient sur une perte régularisée, sans former la matrice normale :
+  c'est ce qui la rend praticable quand les variables se comptent par
+  milliers.
+
+  FITRLINEAR(...,'Learner','leastsquares') minimise l'erreur
+  quadratique (défaut) ; 'svm' minimise la perte epsilon-insensible.
+  Les options 'Regularization', 'Lambda', 'PassLimit' et 'FitBias' sont
+  celles de FITCLINEAR.
+
+  Exemple :
+     rng(1);
+     X = randn(200, 10);
+     y = X * (1:10)' + randn(200, 1);
+     m = fitrlinear(X, y, 'Lambda', 1e-6);
+     corr(predict(m, X), y) > 0.99
+
+  Voir aussi PREDICT, FITCLINEAR, FITLM, LASSO, RIDGE.
+```
+
+## `fitrsvm`
+
+```
+FITRSVM Régression par vecteurs de support.
+  M = FITRSVM(X,Y) ajuste une régression qui ne pénalise que les
+  erreurs dépassant une marge EPSILON : à l'intérieur du tube, un point
+  ne coûte rien. C'est ce qui rend la méthode peu sensible aux points
+  aberrants.
+
+  Les options sont celles de FITCSVM, plus 'Epsilon',E qui règle la
+  demi-largeur du tube — un dixième de l'écart type de Y par défaut.
+
+  L'optimisation ramène le problème dual de la régression à celui d'une
+  classification à 2N points : c'est la formulation classique, où le
+  multiplicateur de chaque point se dédouble en une part au-dessus et
+  une part au-dessous du tube.
+
+  Exemple :
+     rng(1);
+     X = linspace(-3, 3, 60)';
+     y = sin(X) + 0.05 * randn(60, 1);
+     m = fitrsvm(X, y, 'KernelFunction', 'rbf', 'KernelScale', 1);
+     max(abs(predict(m, X) - y)) < 0.5
+
+  Voir aussi FITCSVM, PREDICT, FITRGP, FITLM.
+```
+
+## `fitrtree`
+
+```
+FITRTREE Arbre de régression.
+  T = FITRTREE(X,Y) construit un arbre binaire qui prédit une valeur
+  numérique. À chaque nœud, la coupure choisie est celle qui réduit le
+  plus la somme des carrés des écarts — le critère qui remplace, en
+  régression, l'impureté de Gini de FITCTREE.
+
+  Options : 'MinLeafSize' (5 par défaut) et 'MaxDepth' (8 par défaut).
+
+  PREDICT applique l'arbre.
+
+  Exemple :
+     rng(1);
+     X = rand(200, 1) * 10;
+     y = sin(X) + 0.1 * randn(200, 1);
+     t = fitrtree(X, y, 'MinLeafSize', 5);
+     mean((predict(t, X) - y) .^ 2) < 0.05
+
+  Voir aussi FITCTREE, PREDICT, FITRSVM, FITRGP, FITLM.
 ```
 
 ## `fpdf`
@@ -1225,6 +1760,29 @@ GEVRND Tirages d'une loi généralisée des valeurs extrêmes.
   Voir aussi GEVCDF, GEVPDF, GEVINV, EVRND, WBLRND.
 ```
 
+## `gmdistribution`
+
+```
+GMDISTRIBUTION Mélange de lois gaussiennes.
+  M = GMDISTRIBUTION(MU,SIGMA) décrit un mélange dont MU donne les
+  moyennes — une ligne par composante — et SIGMA les covariances :
+  soit un tableau D×D×K de matrices pleines, soit un tableau 1×D×K de
+  variances si les composantes sont diagonales.
+
+  M = GMDISTRIBUTION(MU,SIGMA,P) donne le poids de chaque composante.
+  Sans P, elles pèsent également.
+
+  Le modèle rendu est une structure ; PDF, CDF, RANDOM et CLUSTER
+  l'acceptent, comme FITGMDIST qui l'ajuste sur des données.
+
+  Exemple :
+     m = gmdistribution([0 0; 3 3], cat(3, eye(2), eye(2)), [0.6 0.4]);
+     x = random(m, 500);
+     p = pdf(m, [0 0]);
+
+  Voir aussi FITGMDIST, PDF, RANDOM, CLUSTER, KMEANS, MVNPDF.
+```
+
 ## `gname`
 
 ```
@@ -1369,6 +1927,133 @@ HISTFIT Histogramme et densité ajustée.
   Voir aussi HISTOGRAM, NORMPLOT, PROBPLOT, KSDENSITY, NORMFIT.
 ```
 
+## `hmmdecode`
+
+```
+HMMDECODE Probabilités a posteriori des états d'un modèle caché.
+  PSTATES = HMMDECODE(SEQ,TR,E) rend, pour chaque instant, la
+  probabilité d'être dans chaque état sachant toute la suite observée.
+  C'est l'algorithme avant-arrière.
+
+  [PSTATES,LOGPSEQ] = HMMDECODE(...) rend en outre le logarithme de la
+  probabilité de la suite.
+  [PSTATES,LOGPSEQ,FORWARD,BACKWARD,S] = HMMDECODE(...) rend les
+  variables avant et arrière, mises à l'échelle par S : c'est cette
+  mise à l'échelle qui évite que les probabilités ne s'annulent sur une
+  longue suite.
+
+  Comme dans MATLAB, le modèle part de l'état 1 avant la première
+  émission.
+
+  Exemple :
+     tr = [0.9 0.1; 0.05 0.95];
+     e  = [1/6 1/6 1/6 1/6 1/6 1/6; 0.5 0.1 0.1 0.1 0.1 0.1];
+     seq = hmmgenerate(50, tr, e);
+     p = hmmdecode(seq, tr, e);
+     all(abs(sum(p, 1) - 1) < 1e-12)     % vrai
+
+  Voir aussi HMMVITERBI, HMMGENERATE, HMMTRAIN, HMMESTIMATE.
+```
+
+## `hmmestimate`
+
+```
+HMMESTIMATE Estime un modèle caché dont on connaît les états.
+  [TR,E] = HMMESTIMATE(SEQ,ETATS) compte les transitions et les
+  émissions observées, et en tire les deux matrices du modèle. C'est
+  l'estimation par maximum de vraisemblance quand les états sont
+  connus — le cas facile, dont HMMTRAIN se passe.
+
+  HMMESTIMATE(...,'Pseudotransitions',P) et 'Pseudoemissions' ajoutent
+  des comptes fictifs, ce qui évite les probabilités nulles.
+
+  Exemple :
+     tr = [0.9 0.1; 0.05 0.95];
+     e  = [1/6 1/6 1/6 1/6 1/6 1/6; 0.5 0.1 0.1 0.1 0.1 0.1];
+     [seq, etats] = hmmgenerate(5000, tr, e);
+     [trEstime, eEstime] = hmmestimate(seq, etats);
+
+  Voir aussi HMMTRAIN, HMMDECODE, HMMVITERBI, HMMGENERATE.
+```
+
+## `hmmgenerate`
+
+```
+HMMGENERATE Tire une suite d'un modèle de Markov caché.
+  [SEQ,ETATS] = HMMGENERATE(L,TR,E) tire une suite de L émissions du
+  modèle dont TR est la matrice de transition — TR(i,j) est la
+  probabilité de passer de l'état i à l'état j — et E la matrice
+  d'émission, E(i,k) étant la probabilité d'émettre le symbole k depuis
+  l'état i.
+
+  Comme dans MATLAB, le modèle part de l'état 1 avant la première
+  émission : la première transition a donc lieu avant le premier
+  symbole.
+
+  HMMGENERATE(...,'Symbols',S) nomme les symboles, HMMGENERATE(...,
+  'Statenames',N) nomme les états : la suite et les états sont alors
+  rendus sous ces noms.
+
+  Exemple :
+     tr = [0.9 0.1; 0.05 0.95];
+     e  = [1/6 1/6 1/6 1/6 1/6 1/6; 0.5 0.1 0.1 0.1 0.1 0.1];
+     [seq, etats] = hmmgenerate(100, tr, e);
+
+  Voir aussi HMMDECODE, HMMVITERBI, HMMTRAIN, HMMESTIMATE.
+```
+
+## `hmmtrain`
+
+```
+HMMTRAIN Estime un modèle caché dont on ne connaît pas les états.
+  [TR,E] = HMMTRAIN(SEQS,TRGUESS,EGUESS) part d'un modèle approché et
+  l'améliore par l'algorithme de Baum et Welch : chaque tour calcule
+  les probabilités a posteriori des états, puis réestime les deux
+  matrices comme si ces probabilités étaient des comptes. La
+  vraisemblance ne peut que croître.
+
+  SEQS est une suite, ou un tableau de cellules de suites.
+
+  HMMTRAIN(...,'Algorithm','Viterbi') réestime au contraire à partir du
+  seul chemin le plus probable.
+  HMMTRAIN(...,'Maxiterations',N) et 'Tolerance',T règlent l'arrêt
+  (500 et 1e-6 par défaut).
+
+  [TR,E,LOGV] = HMMTRAIN(...) rend en outre la log-vraisemblance à
+  chaque tour, ce qui permet de vérifier qu'elle croît bien.
+
+  Exemple :
+     tr = [0.95 0.05; 0.10 0.90];
+     e  = [1/6 1/6 1/6 1/6 1/6 1/6; 0.5 0.1 0.1 0.1 0.1 0.1];
+     seq = hmmgenerate(500, tr, e);
+     [trEstime, eEstime] = hmmtrain(seq, [0.9 0.1; 0.2 0.8], ...
+                                    [repmat(1/6, 1, 6); 0.4 0.12 0.12 0.12 0.12 0.12]);
+
+  Voir aussi HMMESTIMATE, HMMDECODE, HMMVITERBI, HMMGENERATE.
+```
+
+## `hmmviterbi`
+
+```
+HMMVITERBI Suite d'états la plus probable d'un modèle caché.
+  ETATS = HMMVITERBI(SEQ,TR,E) rend la suite d'états qui rend la suite
+  observée la plus probable — non pas l'état le plus probable à chaque
+  instant, que donne HMMDECODE, mais le chemin le plus probable dans
+  son ensemble.
+
+  Le calcul se fait en logarithmes : sur une longue suite, le produit
+  des probabilités descendrait sous le plus petit flottant.
+
+  Exemple :
+     tr = [0.95 0.05; 0.10 0.90];
+     e  = [1/6 1/6 1/6 1/6 1/6 1/6; 0.5 0.1 0.1 0.1 0.1 0.1];
+     [seq, vrais] = hmmgenerate(200, tr, e);
+     estimes = hmmviterbi(seq, tr, e);
+     mean(estimes == vrais) > 0.8
+
+  Voir aussi HMMDECODE, HMMGENERATE, HMMTRAIN, HMMESTIMATE.
+```
+
 ## `hougen`
 
 ```
@@ -1450,6 +2135,13 @@ ICDF Quantile d'une loi nommée.
   X = ICDF('name', P, A, B, C).
 
   Exemple :  icdf('Normal', 0.975, 0, 1)   % 1.9600
+```
+
+## `indicesSymboles`
+
+```
+INDICESSYMBOLES Traduit une suite de symboles en indices de colonne.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `iqr`
@@ -1672,6 +2364,38 @@ KSTEST2 Kolmogorov-Smirnov à deux échantillons.
 KURTOSIS Coefficient d'aplatissement (3 pour une loi normale).
 ```
 
+## `lasso`
+
+```
+LASSO Régression pénalisée par la norme 1.
+  B = LASSO(X,Y) ajuste Y = X*B en pénalisant la somme des valeurs
+  absolues des coefficients. La pénalité met exactement à zéro les
+  coefficients inutiles : le modèle choisit ses variables en même temps
+  qu'il les ajuste, ce que la régression ordinaire ne fait pas.
+
+  B a une colonne par valeur de la pénalité ; par défaut, cent valeurs
+  décroissantes depuis celle qui annule tous les coefficients.
+
+  [B,INFO] = LASSO(...) rend une structure décrivant chaque ajustement :
+  Lambda, Alpha, Intercept, DF (nombre de coefficients non nuls) et MSE.
+
+  LASSO(...,'Lambda',L) impose les pénalités,
+  LASSO(...,'Alpha',A) mélange norme 1 et norme 2 — A = 1 donne le
+  lasso, A proche de 0 la régression d'arête, entre les deux le filet
+  élastique.
+  LASSO(...,'NumLambda',N), 'LambdaRatio',R, 'Standardize',TF,
+  'MaxIter',N, 'RelTol',T règlent le reste.
+
+  Exemple :
+     rng(1);
+     X = randn(100, 10);
+     y = X(:, 1) * 3 - X(:, 2) * 2 + 0.1 * randn(100, 1);
+     [B, info] = lasso(X, y, 'Lambda', 0.1);
+     nnz(B)        % deux coefficients survivent
+
+  Voir aussi RIDGE, REGRESS, FITLM, STEPWISEFIT, LASSOGLM.
+```
+
 ## `lillietest`
 
 ```
@@ -1753,6 +2477,27 @@ LINKAGE Arbre de regroupement hiérarchique.
      cophenet(Z, pdist(X))           % proche de 1 : l'arbre est fidele
 
   Voir aussi PDIST, CLUSTER, CLUSTERDATA, COPHENET, DENDROGRAM, KMEANS.
+```
+
+## `lireNomsHmm`
+
+```
+LIRENOMSHMM Options « Symbols » et « Statenames » des fonctions HMM.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `lireOptionsLineaire`
+
+```
+LIREOPTIONSLINEAIRE Options de FITCLINEAR et FITRLINEAR.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `lireOptionsSvm`
+
+```
+LIREOPTIONSSVM Options communes à FITCSVM et FITRSVM.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `logncdf`
@@ -1857,6 +2602,34 @@ MAHAL Distance de Mahalanobis au nuage de référence.
      [mahal([1 1], X), mahal([1 -1], X)]
 
   Voir aussi PDIST, PDIST2, COV, CHOL, KNNSEARCH.
+```
+
+## `manova1`
+
+```
+MANOVA1 Analyse de variance multivariée à un facteur.
+  D = MANOVA1(X,GROUPE) teste si les vecteurs moyens des groupes sont
+  égaux. X porte une variable par colonne, GROUPE le groupe de chaque
+  ligne. D est la dimension de l'espace où les moyennes diffèrent :
+  0 si elles sont toutes confondues, 1 si elles s'alignent sur une
+  droite, et ainsi de suite.
+
+  [D,P] = MANOVA1(...) rend les p-valeurs des tests successifs, la
+  K-ième jugeant l'hypothèse « la dimension vaut au plus K-1 ».
+  [D,P,STATS] = MANOVA1(...) rend les matrices de dispersion, le
+  lambda de Wilks, les valeurs et vecteurs propres canoniques.
+
+  Le test est celui de Wilks, dont la statistique est le rapport des
+  déterminants de la dispersion intra-groupe et de la dispersion
+  totale, avec l'approximation de Bartlett en khi-deux.
+
+  Exemple :
+     rng(1);
+     X = [randn(20, 2); randn(20, 2) + 2];
+     g = [ones(20, 1); 2 * ones(20, 1)];
+     [d, p] = manova1(X, g);
+
+  Voir aussi ANOVA1, ANOVAN, CANONCORR, MVNPDF.
 ```
 
 ## `matlibre_arbre_reduit`
@@ -2144,6 +2917,53 @@ MLE Estimation par maximum de vraisemblance.
      mle([randn(300,1); randn(300,1)*4], 'pdf', f, 'start', [1 3])
 
   Voir aussi FITDIST, NORMFIT, EXPFIT, GAMFIT, WBLFIT, NLINFIT, STATSET.
+```
+
+## `mnrfit`
+
+```
+MNRFIT Régression logistique multinomiale.
+  B = MNRFIT(X,Y) ajuste un modèle qui prédit la catégorie de chaque
+  observation. Y donne la catégorie — un entier de 1 à K —, ou bien les
+  effectifs observés dans chaque catégorie, une colonne par catégorie.
+
+  B a K-1 colonnes : les coefficients de chaque catégorie face à la
+  dernière, qui sert de référence. La première ligne est l'ordonnée à
+  l'origine.
+
+  [B,DEV,STATS] = MNRFIT(...) rend la déviance et une structure
+  d'écarts types, de statistiques t et de p-valeurs.
+
+  MNRFIT(...,'Model','nominal') — le seul modèle traité — et
+  'Interactions', acceptés pour la compatibilité.
+
+  L'ajustement est par la méthode de Newton sur la log-vraisemblance,
+  avec division du pas quand elle ne croît pas.
+
+  Exemple :
+     rng(1);
+     X = randn(300, 2);
+     score = [X * [2; -1], X * [-1; 2], zeros(300, 1)];
+     [~, y] = max(score + 0.5 * randn(300, 3), [], 2);
+     B = mnrfit(X, y);
+
+  Voir aussi MNRVAL, FITGLM, FITCECOC, GLMFIT.
+```
+
+## `mnrval`
+
+```
+MNRVAL Probabilités prédites par un modèle multinomial.
+  P = MNRVAL(B,X) rend, pour chaque ligne de X, la probabilité de
+  chaque catégorie sous le modèle ajusté par MNRFIT. P a une colonne de
+  plus que B : la dernière est celle de la catégorie de référence.
+
+  Exemple :
+     B = mnrfit(X, y);
+     P = mnrval(B, X);
+     [~, predites] = max(P, [], 2);
+
+  Voir aussi MNRFIT, FITGLM.
 ```
 
 ## `multcompare`
@@ -2749,6 +3569,44 @@ NLPARCI Intervalles de confiance des paramètres d'un ajustement.
   Voir aussi NLINFIT, REGRESS, BOOTCI, TINV.
 ```
 
+## `nnmf`
+
+```
+NNMF Factorisation en matrices non négatives.
+  [W,H] = NNMF(A,K) cherche deux matrices non négatives W (n×K) et H
+  (K×p) dont le produit approche A au sens de la norme de Frobenius.
+  À la différence de la décomposition en valeurs singulières, aucun
+  terme n'est négatif : les parties s'additionnent au lieu de se
+  compenser, ce qui rend la décomposition lisible.
+
+  [W,H,D] = NNMF(...) rend en outre la racine de l'erreur quadratique
+  moyenne résiduelle.
+
+  NNMF(...,'Algorithm','mult') emploie les mises à jour
+  multiplicatives de Lee et Seung (défaut), 'als' les moindres carrés
+  alternés.
+  NNMF(...,'W0',W0,'H0',H0) impose le point de départ,
+  'Replicates',R relance R fois et garde le meilleur,
+  'MaxIter',N et 'TolFun',T règlent l'arrêt.
+
+  Exemple :
+     A = rand(20, 3) * rand(3, 10);      % de rang 3, non négative
+     [W, H, D] = nnmf(A, 3);
+     D < 1e-3
+
+  Voir aussi PCA, SVD, KMEANS, FACTORAN.
+```
+
+## `normaliserLignes`
+
+```
+NORMALISERLIGNES Chaque ligne d'une matrice de probabilités somme à un.
+  Une ligne entièrement nulle reste nulle : c'est un état dont on ne
+  sort pas, et le signaler vaut mieux que d'inventer une loi uniforme.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `normfit`
 
 ```
@@ -2857,6 +3715,20 @@ NORMSTAT Moyenne et variance de la loi normale.
   Exemple :  [m,v] = normstat(3, 2)   % 3 et 4
 ```
 
+## `noyauGp`
+
+```
+NOYAUGP Fonction de covariance d'un processus gaussien.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `noyauSvm`
+
+```
+NOYAUSVM Matrice de noyau entre deux jeux de points.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `pca`
 
 ```
@@ -2908,6 +3780,9 @@ PDF Densité ou probabilité d'une loi nommée.
   Y = PDF('name', X, A, B, C) appelle la fonction de densité de la loi
   nommée. Les noms suivent MATLAB : 'Normal', 'Poisson', 'Weibull',
   'Chisquare', 'Discrete Uniform'…, avec leurs abréviations.
+
+  Y = PDF(GM,X) rend la densité d'un mélange gaussien ajusté par
+  FITGMDIST ou décrit par GMDISTRIBUTION.
 
   Exemple :  pdf('Normal', 0, 0, 1)   % 0.3989
 ```
@@ -2982,6 +3857,39 @@ PDIST2 Distances entre deux jeux d'observations.
      % a la distance nulle, et I dit laquelle
 
   Voir aussi PDIST, SQUAREFORM, KNNSEARCH, MAHAL, KMEANS.
+```
+
+## `pearsrnd`
+
+```
+PEARSRND Tirages d'une loi du système de Pearson.
+  R = PEARSRND(MU,SIGMA,SKEW,KURT,M,N) tire dans la loi du système de
+  Pearson dont les quatre premiers moments sont ceux demandés :
+  moyenne, écart type, coefficient d'asymétrie et coefficient
+  d'aplatissement.
+
+  Le système de Pearson est l'ensemble des lois dont la densité vérifie
+
+     p'(x)/p(x) = -(a + x) / (c0 + c1 x + c2 x^2),
+
+  les quatre coefficients se lisant sur les quatre premiers moments.
+  Suivant les racines du dénominateur, on retrouve la normale, la
+  bêta, la gamma, la Student, la bêta de seconde espèce : sept familles
+  qui couvrent tout couple (asymétrie, aplatissement) admissible.
+
+  MatLibre intègre l'équation sur une grille et tire par inversion de
+  la répartition, ce qui traite les sept familles d'une seule façon ;
+  MATLAB choisit la famille et emploie un tirage propre à chacune. Les
+  moments obtenus sont les mêmes.
+
+  [R,TYPE] = PEARSRND(...) rend le numéro de la famille,
+  [R,TYPE,COEF] = PEARSRND(...) les coefficients de l'équation.
+
+  Exemple :
+     r = pearsrnd(0, 1, 0.75, 4, 20000, 1);
+     skewness(r)      % proche de 0,75
+
+  Voir aussi RANDOM, SKEWNESS, KURTOSIS, MLE, FITDIST.
 ```
 
 ## `poisscdf`
@@ -3073,6 +3981,99 @@ POLYCONF Évalue un polynôme ajusté et l'incertitude de la prédiction.
                                           % connue qu'une observation
 
   Voir aussi POLYFIT, POLYVAL, NLPARCI, REGRESS, FITLM.
+```
+
+## `polytool`
+
+```
+POLYTOOL Ajustement polynomial et bande de confiance.
+  POLYTOOL(X,Y,N) ajuste un polynôme de degré N et trace la courbe
+  avec sa bande de confiance.
+  POLYTOOL(X,Y,N,ALPHA) fixe le niveau, 0,05 par défaut.
+
+  [BETA,BORNES] = POLYTOOL(...) rend les coefficients et leur
+  intervalle de confiance, sans rien tracer.
+
+  MATLAB ouvre une fenêtre où l'on déplace le point d'évaluation à la
+  souris ; MatLibre n'a pas d'outil interactif dans ses figures, et
+  trace la courbe et sa bande d'un coup. C'est la même information,
+  sans le curseur.
+
+  Exemple :
+     x = (1:20)';
+     y = 3 + 2 * x - 0.1 * x .^ 2 + randn(20, 1);
+     [beta, bornes] = polytool(x, y, 2);
+
+  Voir aussi POLYFIT, POLYVAL, POLYCONF, FITLM, REGRESS.
+```
+
+## `predict`
+
+```
+PREDICT Prédiction d'un modèle ajusté.
+  Y = PREDICT(M,X) applique à X le modèle M, quel qu'il soit : arbre,
+  k plus proches voisins, bayésien naïf, machine à vecteurs de support,
+  modèle linéaire, code correcteur, processus gaussien.
+
+  [Y,SCORES] = PREDICT(M,X) rend en outre les scores : une colonne par
+  classe pour un classifieur, la variance de prédiction pour un
+  processus gaussien.
+
+  MatLibre décrit ses modèles par des structures portant un champ
+  « type » ; PREDICT s'y fie pour choisir la règle. MATLAB, lui,
+  emploie des objets à méthode.
+
+  Exemple :
+     m = fitcnb(X, y);
+     etiquettes = predict(m, Xnouveau);
+
+  Un réseau de neurones passe par le même nom : PREDICT le reconnaît à
+  ses couches et le confie à PREDICTRESEAU.
+
+  Voir aussi FITCTREE, FITCKNN, FITCNB, FITCSVM, FITCECOC, FITRGP,
+  PREDICTRESEAU.
+```
+
+## `predictArbreRegression`
+
+```
+PREDICTARBREREGRESSION Prédiction d'un arbre construit par FITRTREE.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictBayesNaif`
+
+```
+PREDICTBAYESNAIF Prédiction d'un classifieur bayésien naïf.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictEcoc`
+
+```
+PREDICTECOC Prédiction d'un modèle à codes correcteurs.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictGp`
+
+```
+PREDICTGP Prédiction d'un processus gaussien.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictLineaire`
+
+```
+PREDICTLINEAIRE Prédiction d'un modèle linéaire de grande dimension.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictSvm`
+
+```
+PREDICTSVM Prédiction d'une machine à vecteurs de support.
+  Employer PREDICT ; cette fonction est le rouage qu'il appelle.
 ```
 
 ## `predictknn`
@@ -3195,6 +4196,9 @@ PROCRUSTES Superposition de deux nuages de points.
 RANDOM Tirages d'une loi nommée.
   R = RANDOM('name', A, B, C, M, N) : les paramètres d'abord, les
   dimensions ensuite, comme pour les fonctions ...RND.
+
+  R = RANDOM(GM,N) tire N points d'un mélange gaussien : on tire
+  d'abord la composante, puis le point dans cette composante.
 
   Exemple :  random('Poisson', 4, 1, 5)   % cinq tirages
 ```
@@ -3358,6 +4362,45 @@ REGSTATS Régression linéaire et ses diagnostics.
   Voir aussi REGRESS, FITLM, ROBUSTFIT, POLYFIT, ANOVA1.
 ```
 
+## `relieff`
+
+```
+RELIEFF Classement des variables par la méthode ReliefF.
+  [RANGS,POIDS] = RELIEFF(X,Y,K) classe les variables par leur pouvoir
+  discriminant. Pour chaque observation, la méthode regarde ses K plus
+  proches voisins de la même classe et ses K plus proches voisins de
+  chaque autre classe : une variable qui sépare bien varie peu entre
+  voisins de même classe et beaucoup entre voisins de classes
+  différentes.
+
+  Contrairement à un test variable par variable, ReliefF voit les
+  dépendances : une variable qui n'est utile qu'en compagnie d'une
+  autre est repérée.
+
+  RELIEFF(...,'method','regression') traite une réponse continue.
+
+  Exemple :
+     rng(1);
+     X = randn(200, 5);
+     y = double(X(:, 1) + X(:, 2) > 0) + 1;
+     rangs = relieff(X, y, 10);
+     all(ismember([1 2], rangs(1:2)))
+
+  Voir aussi SEQUENTIALFS, FITCTREE, PCA, CORR.
+```
+
+## `resoudreSmo`
+
+```
+RESOUDRESMO Optimisation minimale séquentielle du dual d'une SVM.
+  Deux multiplicateurs bougent à la fois, ce qui garde la contrainte
+  somme(alpha_i y_i) = 0 sans passer par un solveur général. C'est
+  l'algorithme de Platt, dans sa version simplifiée : le second
+  multiplicateur est tiré au hasard parmi les autres.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `ridge`
 
 ```
@@ -3439,6 +4482,32 @@ ROBUSTFIT Régression linéaire robuste, par moindres carrés repondérés.
   Voir aussi REGRESS, FITLM, POLYFIT, RIDGE, LSCOV.
 ```
 
+## `rowexch`
+
+```
+ROWEXCH Plan d'expérience D-optimal par échange de lignes.
+  REGLAGES = ROWEXCH(K,N,MODELE) choisit N essais parmi les points d'un
+  plan candidat à K facteurs, de façon à rendre le déterminant de X'X
+  le plus grand possible : c'est le critère D, celui qui minimise le
+  volume de l'ellipsoïde de confiance des coefficients.
+
+  MODELE vaut 'linear' (défaut), 'interaction', 'quadratic' ou
+  'purequadratic'.
+
+  [REGLAGES,PLAN] = ROWEXCH(...) rend en outre la matrice du modèle.
+
+  ROWEXCH(...,'tries',T) relance T fois depuis un tirage différent
+  (5 par défaut) : l'échange de lignes converge vers un optimum local.
+  ROWEXCH(...,'levels',L) découpe chaque facteur en L niveaux (trois
+  par défaut, ce qui suffit à un modèle quadratique).
+
+  Exemple :
+     reglages = rowexch(2, 9, 'quadratic');
+     size(reglages)
+
+  Voir aussi CORDEXCH, X2FX, REGSTATS, FITLM.
+```
+
 ## `runstest`
 
 ```
@@ -3476,6 +4545,37 @@ RUNSTEST Test des suites : l'ordre des observations est-il quelconque ?
      s.nruns                           % 2
 
   Voir aussi SIGNTEST, KSTEST, AUTOCORR, MEDIAN.
+```
+
+## `sequentialfs`
+
+```
+SEQUENTIALFS Choix séquentiel de variables.
+  IN = SEQUENTIALFS(FUN,X,Y) ajoute les variables une à une, en
+  prenant chaque fois celle qui fait le plus baisser le critère, et
+  s'arrête quand plus aucune ne l'améliore. IN est un vecteur de
+  booléens désignant les variables retenues.
+
+  FUN est appelée FUN(XAPPRENTISSAGE,YAPPRENTISSAGE,XTEST,YTEST) et
+  rend le nombre d'erreurs — ou toute autre perte à minimiser.
+
+  SEQUENTIALFS(...,'direction','backward') part de toutes les
+  variables et en retire.
+  SEQUENTIALFS(...,'cv',K) évalue par validation croisée à K blocs
+  (10 par défaut ; 0 pour évaluer sur les données d'apprentissage).
+  SEQUENTIALFS(...,'nfeatures',N) s'arrête à N variables.
+
+  [IN,HISTOIRE] = SEQUENTIALFS(...) rend en outre le critère atteint à
+  chaque étape.
+
+  Exemple :
+     rng(1);
+     X = randn(100, 6);
+     y = double(X(:, 1) - X(:, 3) > 0);
+     f = @(Xa, ya, Xt, yt) sum(predict(fitcnb(Xa, ya), Xt) ~= yt);
+     in = sequentialfs(f, X, y);
+
+  Voir aussi RELIEFF, CVPARTITION, FITCTREE, LASSO.
 ```
 
 ## `signrank`
@@ -3530,6 +4630,33 @@ SILHOUETTE Indice de silhouette de chaque observation.
 SKEWNESS Coefficient d'asymétrie (moment d'ordre trois normalisé).
 ```
 
+## `slicesample`
+
+```
+SLICESAMPLE Échantillonnage par tranches.
+  X = SLICESAMPLE(X0,N,'pdf',F) tire N points d'une loi dont F donne la
+  densité, à une constante près. La méthode ne demande ni loi de
+  proposition ni réglage de pas : à chaque tour, on tire une hauteur
+  sous la densité, puis un point au hasard dans la tranche horizontale
+  qu'elle découpe.
+
+  X = SLICESAMPLE(X0,N,'logpdf',F) prend le logarithme de la densité,
+  ce qui évite les débordements.
+  SLICESAMPLE(...,'width',W) donne la largeur initiale de la tranche,
+  'burnin',B jette les B premiers points, 'thin',T n'en garde qu'un
+  sur T.
+
+  [X,NEVAL] = SLICESAMPLE(...) rend le nombre d'évaluations de la
+  densité.
+
+  Exemple :
+     rng(1);
+     x = slicesample(0, 5000, 'pdf', @(t) exp(-t.^2 / 2));
+     abs(mean(x)) < 0.1 && abs(std(x) - 1) < 0.1
+
+  Voir aussi MHSAMPLE, RANDOM, RANDSAMPLE, KSDENSITY.
+```
+
 ## `squareform`
 
 ```
@@ -3556,6 +4683,13 @@ SQUAREFORM Passe du vecteur des distances à la matrice carrée, et retour.
      squareform(S)                   % [5 4 3], on revient au vecteur
 
   Voir aussi PDIST, PDIST2, LINKAGE, TRIU.
+```
+
+## `standardiserSvm`
+
+```
+STANDARDISERSVM Centrage et réduction optionnels des colonnes.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `statAjuster`
@@ -3680,6 +4814,34 @@ STATSET Structure d'options des fonctions statistiques.
   Voir aussi STATGET, NLINFIT, MLE, KMEANS, OPTIMSET.
 ```
 
+## `stepwise`
+
+```
+STEPWISE Régression pas à pas.
+  STEPWISE(X,Y) ajoute et retire des variables une à une, en suivant
+  leur p-valeur, et affiche le modèle retenu.
+  STEPWISE(X,Y,IN) part du sous-ensemble IN.
+  STEPWISE(X,Y,IN,PENTER,PREMOVE) fixe les seuils d'entrée et de sortie
+  (0,05 et 0,10 par défaut).
+
+  [B,SE,P,IN,STATS] = STEPWISE(...) rend les coefficients, leurs écarts
+  types, leurs p-valeurs, les variables retenues et les statistiques du
+  modèle, sans rien afficher.
+
+  MATLAB ouvre une fenêtre où l'on ajoute et retire les variables à la
+  main ; MatLibre mène la procédure automatique et en rend le résultat,
+  comme le fait STEPWISEFIT.
+
+  Exemple :
+     rng(1);
+     X = randn(50, 4);
+     y = X(:, 2) * 3 + randn(50, 1);
+     [b, se, p, in] = stepwise(X, y);
+     find(in)      % la deuxième variable
+
+  Voir aussi STEPWISEFIT, FITLM, REGRESS, LASSO, SEQUENTIALFS.
+```
+
 ## `stepwisefit`
 
 ```
@@ -3776,6 +4938,13 @@ TIEDRANK Rangs, les valeurs égales recevant leur rang moyen.
 
 ```
 TINV Quantile de la loi de Student, par dichotomie sur TCDF.
+```
+
+## `tirerMelange`
+
+```
+TIRERMELANGE Tirage dans un mélange gaussien.
+  Employer RANDOM ; cette fonction est le rouage qu'il appelle.
 ```
 
 ## `trimmean`
@@ -4042,6 +5211,22 @@ WISHRND Tirage d'une matrice de Wishart.
      M / 4000
 
   Voir aussi IWISHRND, MVNRND, COV, CHOL, CHI2RND.
+```
+
+## `x2fx`
+
+```
+X2FX Matrice du modèle à partir d'une matrice de plan.
+  X = X2FX(D,MODELE) construit la matrice de régression : une colonne
+  de uns, puis les facteurs, puis ce que le modèle demande de plus.
+  MODELE vaut 'linear' (défaut), 'interaction', 'quadratic',
+  'purequadratic', ou une matrice d'exposants — une ligne par terme,
+  une colonne par facteur.
+
+  Exemple :
+     x2fx([1 2; 3 4], 'interaction')     % [1 1 2 2; 1 3 4 12]
+
+  Voir aussi ROWEXCH, REGRESS, REGSTATS, FITLM.
 ```
 
 ## `zscore`

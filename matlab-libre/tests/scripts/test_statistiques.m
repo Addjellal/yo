@@ -746,4 +746,271 @@ assert(isequal(movsum(matriceGlissante, 2, 2), [1 3; 3 7; 5 11]));
 assert(abs(movstd([1 2 3 4], 2) * [1; 0; 0; 0]) < 1e-12);
 assert(abs(movvar([1 2 3 4], 2) * [0; 1; 0; 0] - 0.5) < 1e-12);
 
+%% ------------------------------------------- modèles de Markov cachés
+rng(7);
+transitionsVraies = [0.9 0.1; 0.05 0.95];
+emissionsVraies = [repmat(1/6, 1, 6); 0.5 0.1 0.1 0.1 0.1 0.1];
+[suite, etatsVrais] = hmmgenerate(2000, transitionsVraies, emissionsVraies);
+assert(numel(suite) == 2000 && min(suite) >= 1 && max(suite) <= 6);
+% Les probabilités a posteriori d'un instant somment à un : c'est ce qui
+% distingue un avant-arrière juste d'un avant-arrière mal normalisé.
+posterieures = hmmdecode(suite(1:60), transitionsVraies, emissionsVraies);
+assert(max(abs(sum(posterieures, 1) - 1)) < 1e-12);
+[~, logVraisemblance] = hmmdecode(suite(1:60), transitionsVraies, emissionsVraies);
+assert(logVraisemblance < 0 && isfinite(logVraisemblance));
+% Viterbi retrouve la plupart des états cachés, et hmmestimate les
+% matrices quand on les lui donne.
+etatsEstimes = hmmviterbi(suite, transitionsVraies, emissionsVraies);
+assert(mean(etatsEstimes == etatsVrais) > 0.7);
+[transitionsEstimees, emissionsEstimees] = hmmestimate(suite, etatsVrais);
+assert(max(abs(transitionsEstimees(:) - transitionsVraies(:))) < 0.05);
+assert(max(abs(emissionsEstimees(:) - emissionsVraies(:))) < 0.05);
+% Baum-Welch fait croître la vraisemblance à chaque tour : c'est la
+% propriété qui définit l'algorithme.
+[~, ~, courbe] = hmmtrain(suite(1:800), [0.8 0.2; 0.2 0.8], ...
+                          [repmat(1/6, 1, 6); 0.4 0.12 0.12 0.12 0.12 0.12], ...
+                          'Maxiterations', 30);
+assert(all(diff(courbe) > -1e-9));
+
+%% ---------------------------------------- factorisation non négative
+rng(3);
+matricePositive = rand(20, 3) * rand(3, 10);
+[W, H, D] = nnmf(matricePositive, 3, 'Replicates', 3, 'MaxIter', 500);
+assert(all(W(:) >= 0) && all(H(:) >= 0));
+assert(D < 0.05);
+% Les colonnes de W sortent normées, comme dans MATLAB.
+assert(max(abs(sqrt(sum(W .^ 2, 1)) - 1)) < 1e-12);
+
+%% ------------------------------------------------- régression pénalisée
+rng(1);
+Xlasso = randn(100, 10);
+yLasso = Xlasso(:, 1) * 3 - Xlasso(:, 2) * 2 + 0.1 * randn(100, 1);
+Blasso = lasso(Xlasso, yLasso, 'Lambda', 0.1);
+% Le lasso met à zéro ce qui ne sert pas, et rétrécit le reste.
+assert(nnz(Blasso) == 2);
+assert(abs(Blasso(1)) < 3 && abs(Blasso(1)) > 2.5);
+% À pénalité nulle, il retrouve les moindres carrés.
+BsansPenalite = lasso(Xlasso, yLasso, 'Lambda', 1e-8);
+moindresCarres = [ones(100, 1), Xlasso] \ yLasso;
+assert(max(abs(BsansPenalite - moindresCarres(2:end))) < 1e-3);
+% Le chemin par défaut part de tout à zéro.
+[cheminLasso, infoLasso] = lasso(Xlasso, yLasso);
+assert(nnz(cheminLasso(:, 1)) == 0 && infoLasso.DF(1) == 0);
+
+%% --------------------------------------------- modèles linéaires généralisés
+rng(1);
+Xglm = randn(300, 1);
+probabilites = 1 ./ (1 + exp(-(0.5 + 2 * Xglm)));
+yBinaire = double(rand(300, 1) < probabilites);
+modeleLogit = fitglm(Xglm, yBinaire, 'Distribution', 'binomial');
+assert(abs(modeleLogit.Coefficients(1) - 0.5) < 3 * modeleLogit.SE(1));
+assert(abs(modeleLogit.Coefficients(2) - 2) < 3 * modeleLogit.SE(2));
+% Avec la loi normale et le lien identité, c'est exactement fitlm.
+Xnormal = randn(200, 2);
+yNormal = 1 + 2 * Xnormal(:, 1) - Xnormal(:, 2) + 0.1 * randn(200, 1);
+assert(max(abs(fitglm(Xnormal, yNormal).Coefficients - ...
+              fitlm(Xnormal, yNormal).Coefficients)) < 1e-10);
+% Poisson : le lien logarithmique retrouve les coefficients.
+yComptes = poissrnd(exp(0.5 + Xglm(1:200)));
+modelePoisson = fitglm(Xglm(1:200), yComptes, 'Distribution', 'poisson');
+assert(abs(modelePoisson.Coefficients(2) - 1) < 0.2);
+
+%% ------------------------------------------ logistique multinomiale
+rng(1);
+Xmnr = randn(400, 2);
+scoresVrais = [Xmnr * [2; -1], Xmnr * [-1; 2], zeros(400, 1)];
+[~, categories] = max(scoresVrais + 0.5 * randn(400, 3), [], 2);
+[Bmnr, deviance] = mnrfit(Xmnr, categories);
+assert(isequal(size(Bmnr), [3 2]));
+probabilitesMnr = mnrval(Bmnr, Xmnr);
+assert(max(abs(sum(probabilitesMnr, 2) - 1)) < 1e-12);
+[~, categoriesPredites] = max(probabilitesMnr, [], 2);
+assert(mean(categoriesPredites == categories) > 0.8);
+assert(deviance > 0);
+
+%% ------------------------------------------------- classifieurs
+rng(1);
+Xdeux = [randn(50, 2); randn(50, 2) + 3];
+yDeux = [ones(50, 1); 2 * ones(50, 1)];
+% Bayésien naïf : les scores sont des probabilités a posteriori.
+modeleBayes = fitcnb(Xdeux, yDeux);
+[etiquettes, scoresBayes] = predict(modeleBayes, Xdeux);
+assert(mean(etiquettes == yDeux) > 0.95);
+assert(max(abs(sum(scoresBayes, 2) - 1)) < 1e-12);
+assert(mean(predict(fitcnb(Xdeux, yDeux, 'DistributionNames', 'kernel'), Xdeux) == yDeux) > 0.95);
+
+% Vecteurs de support : le noyau gaussien sépare ce que le linéaire ne
+% peut pas — deux cercles concentriques.
+ySigne = [-ones(50, 1); ones(50, 1)];
+modeleSvm = fitcsvm(Xdeux, ySigne);
+assert(mean(predict(modeleSvm, Xdeux) == ySigne) > 0.95);
+assert(size(modeleSvm.SupportVectors, 1) < 50);
+angles = linspace(0, 2*pi, 80)';
+cercles = [cos(angles) sin(angles); 2.5*cos(angles) 2.5*sin(angles)] + 0.15 * randn(160, 2);
+yCercles = [ones(80, 1); -ones(80, 1)];
+assert(mean(predict(fitcsvm(cercles, yCercles), cercles) == yCercles) < 0.8);
+modeleRbf = fitcsvm(cercles, yCercles, 'KernelFunction', 'rbf', ...
+                    'KernelScale', 1, 'BoxConstraint', 10);
+assert(mean(predict(modeleRbf, cercles) == yCercles) > 0.98);
+% Le modèle allégé prédit la même chose sans ses points.
+modeleAllege = discardSupportVectors(modeleSvm);
+assert(isempty(modeleAllege.SupportVectors));
+assert(isequal(predict(modeleAllege, Xdeux), predict(modeleSvm, Xdeux)));
+refuseAllegement = false;
+try
+    discardSupportVectors(modeleRbf);
+catch
+    refuseAllegement = true;
+end
+assert(refuseAllegement);
+
+% Codes correcteurs : trois classes, quatre apprenants différents.
+Xtrois = [randn(40, 2); randn(40, 2) + 4; randn(40, 2) + [0 5]];
+yTrois = [ones(40, 1); 2 * ones(40, 1); 3 * ones(40, 1)];
+assert(mean(predict(fitcecoc(Xtrois, yTrois), Xtrois) == yTrois) > 0.9);
+assert(mean(predict(fitcecoc(Xtrois, yTrois, 'Coding', 'onevsall'), Xtrois) == yTrois) > 0.85);
+assert(mean(predict(fitcecoc(Xtrois, yTrois, 'Learners', 'tree'), Xtrois) == yTrois) > 0.95);
+
+%% --------------------------------------------------- régressions
+rng(1);
+Xsvr = linspace(-3, 3, 60)';
+ySvr = sin(Xsvr) + 0.05 * randn(60, 1);
+modeleSvr = fitrsvm(Xsvr, ySvr, 'KernelFunction', 'rbf', 'KernelScale', 1);
+assert(sqrt(mean((predict(modeleSvr, Xsvr) - ySvr) .^ 2)) < 0.1);
+% L'arbre de régression suit une fonction non linéaire.
+Xarbre = rand(200, 1) * 10;
+yArbre = sin(Xarbre) + 0.1 * randn(200, 1);
+assert(mean((predict(fitrtree(Xarbre, yArbre, 'MinLeafSize', 5) , Xarbre) - yArbre) .^ 2) < 0.05);
+% Un modèle linéaire de grande dimension.
+Xgrand = randn(200, 10);
+yGrand = Xgrand * (1:10)' + randn(200, 1);
+modeleLineaire = fitrlinear(Xgrand, yGrand, 'Learner', 'leastsquares', ...
+                            'Lambda', 1e-6, 'PassLimit', 2000);
+assert(corr(predict(modeleLineaire, Xgrand), yGrand) > 0.99);
+assert(mean(predict(fitclinear([randn(100, 20); randn(100, 20) + 0.8], ...
+                               [-ones(100, 1); ones(100, 1)]), ...
+                    [randn(100, 20); randn(100, 20) + 0.8]) == ...
+            [-ones(100, 1); ones(100, 1)]) > 0.7);
+
+% Processus gaussien : il passe près des points observés, et sa variance
+% remonte à la variance a priori loin d'eux.
+Xgp = linspace(0, 10, 30)';
+yGp = sin(Xgp) + 0.05 * randn(30, 1);
+modeleGp = fitrgp(Xgp, yGp, 'KernelParameters', [1 1], 'Sigma', 0.05);
+[moyenneGp, varianceGp] = predict(modeleGp, Xgp);
+assert(sqrt(mean((moyenneGp - yGp) .^ 2)) < 0.1);
+assert(mean(varianceGp) < 0.01);
+[~, varianceLoin] = predict(modeleGp, [20; 30]);
+assert(mean(varianceLoin) > 0.5);
+
+%% ------------------------------------------------- mélanges gaussiens
+rng(1);
+melange = gmdistribution([0 0; 4 4], cat(3, eye(2), eye(2)), [0.6 0.4]);
+assert(melange.NumComponents == 2);
+tirages = random(melange, 1000);
+assert(isequal(size(tirages), [1000 2]));
+% La densité au centre d'une composante vaut son poids sur 2*pi.
+assert(abs(pdf(melange, [0 0]) - 0.6 / (2 * pi)) < 1e-6);
+assert(numel(unique(cluster(melange, tirages))) == 2);
+% EM retrouve les deux composantes.
+melangeAjuste = fitgmdist(tirages, 2);
+assert(abs(max(melangeAjuste.ComponentProportion) - 0.6) < 0.1);
+assert(melangeAjuste.Converged);
+assert(fitgmdist(tirages, 2, 'CovarianceType', 'diagonal').NLogL > 0);
+
+%% ------------------------------------------------------------ copules
+rng(1);
+% La copule de Clayton a une forme close : on la vérifie exactement.
+assert(abs(copulacdf('Clayton', [0.5 0.5], 2) - 7 ^ (-0.5)) < 1e-12);
+% À paramètre nul, toutes les familles archimédiennes redonnent
+% l'indépendance.
+assert(abs(copulacdf('Frank', [0.5 0.5], 1e-8) - 0.25) < 1e-6);
+assert(abs(copulacdf('Gumbel', [0.5 0.5], 1) - 0.25) < 1e-12);
+tiragesCopule = copularnd('Gaussian', 0.8, 3000);
+assert(abs(corr(tiragesCopule(:, 1), tiragesCopule(:, 2)) - 0.8) < 0.05);
+assert(abs(mean(tiragesCopule(:, 1)) - 0.5) < 0.03);
+assert(copulapdf('Clayton', [0.5 0.5], 2) > 1);
+
+%% -------------------------------------------- lois et échantillonnage
+rng(1);
+% Le système de Pearson reproduit les quatre moments demandés.
+tirageP = pearsrnd(0, 1, 0.75, 4, 40000, 1);
+assert(abs(mean(tirageP)) < 1e-10 && abs(std(tirageP) - 1) < 1e-10);
+assert(abs(skewness(tirageP) - 0.75) < 0.1);
+assert(abs(kurtosis(tirageP) - 4) < 0.3);
+% L'échantillonnage par tranches sur une normale.
+tirageTranches = slicesample(0, 4000, 'pdf', @(t) exp(-t .^ 2 / 2));
+assert(abs(mean(tirageTranches)) < 0.1);
+assert(abs(std(tirageTranches) - 1) < 0.1);
+
+%% ------------------------------------------ variance et plans
+rng(1);
+facteurActif = repmat({'a', 'b', 'c'}, 1, 20)';
+facteurInerte = repmat({'u', 'v'}, 1, 30)';
+reponse = zeros(60, 1);
+for k = 1:60
+    reponse(k) = strcmp(facteurActif{k}, 'b') * 2 + 0.3 * randn();
+end
+pAnovan = anovan(reponse, {facteurActif, facteurInerte}, 'display', 'off');
+assert(pAnovan(1) < 0.001 && pAnovan(2) > 0.1);
+assert(numel(anovan(reponse, {facteurActif, facteurInerte}, ...
+                    'model', 'interaction', 'display', 'off')) == 3);
+% MANOVA : la dimension est nulle quand les moyennes coïncident.
+Xmanova = [randn(30, 2); randn(30, 2) + 2];
+groupeManova = [ones(30, 1); 2 * ones(30, 1)];
+[dimension, pManova] = manova1(Xmanova, groupeManova);
+assert(dimension == 1 && pManova(1) < 0.001);
+rng(5);
+[dimensionNulle, pNulle] = manova1([randn(30, 2); randn(30, 2)], groupeManova);
+assert(dimensionNulle == 0 && pNulle(1) > 0.05);
+% Le plan D-optimal et la matrice du modèle.
+assert(isequal(x2fx([1 2; 3 4], 'interaction'), [1 1 2 2; 1 3 4 12]));
+[reglages, planModele] = rowexch(2, 9, 'quadratic', 'tries', 2);
+assert(isequal(size(reglages), [9 2]));
+assert(det(planModele.' * planModele) > 0);
+
+%% ------------------------------------------- choix de variables
+rng(1);
+Xchoix = randn(300, 5);
+yChoix = double(Xchoix(:, 1) + Xchoix(:, 2) > 0) + 1;
+rangs = relieff(Xchoix, yChoix, 10);
+assert(all(ismember([1 2], rangs(1:2))));
+critere = @(Xa, ya, Xt, yt) sum(predict(fitcnb(Xa, ya), Xt) ~= yt);
+retenues = sequentialfs(critere, Xchoix(1:100, :), yChoix(1:100), 'cv', 5);
+assert(any(retenues));
+
+%% --------------------------------------------------- effets mixtes
+rng(1);
+groupeMixte = repmat((1:10)', 20, 1);
+decalages = randn(10, 1) * 2;
+xMixte = randn(200, 1);
+yMixte = 1 + 3 * xMixte + decalages(groupeMixte) + 0.5 * randn(200, 1);
+tableMixte = table(yMixte, xMixte, groupeMixte, ...
+                   'VariableNames', {'y', 'x', 'g'});
+modeleMixte = fitlme(tableMixte, 'y ~ 1 + x + (1|g)');
+assert(abs(modeleMixte.Coefficients(2) - 3) < 0.1);
+assert(abs(modeleMixte.Sigma - 0.5) < 0.1);
+assert(modeleMixte.SigmaB > 1);
+% REML corrige le biais de la variance : elle est plus grande qu'en ML.
+modeleML = fitlme(tableMixte, 'y ~ 1 + x + (1|g)', 'FitMethod', 'ML');
+assert(modeleMixte.SigmaB > modeleML.SigmaB);
+% table nomme ses colonnes comme les variables qu'on lui passe.
+colonnesNommees = table(xMixte, groupeMixte);
+assert(isequal(colonnesNommees.Properties.VariableNames, {'xMixte', 'groupeMixte'}));
+
+%% ------------------------------------------------- valeurs propres généralisées
+% eig(A,B) résout A x = lambda B x ; le second argument était accepté
+% puis ignoré, et MANOVA1 s'en trouvait faussé.
+A = [2 0; 0 1];
+B = [4 0; 0 2];
+assert(max(abs(sort(eig(A, B)) - [0.5; 0.5])) < 1e-12);
+rng(3);
+Mgen = randn(4);
+Sgen = Mgen.' * Mgen + eye(4);
+Kgen = randn(4);
+Kgen = Kgen.' * Kgen;
+[vecteursGen, valeursGen] = eig(Kgen, Sgen);
+assert(max(max(abs(Kgen * vecteursGen - Sgen * vecteursGen * valeursGen))) < 1e-10);
+assert(max(abs(sort(eig(Kgen, Sgen)) - sort(eig(inv(Sgen) * Kgen)))) < 1e-9);
+
 disp('statistiques : toutes les verifications passent');

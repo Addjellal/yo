@@ -22,6 +22,12 @@ function T = cluster(Z, critere, valeur)
 %      cluster(Z, 'cutoff', 1)       % la meme coupure, par la hauteur
 %
 %   Voir aussi LINKAGE, CLUSTERDATA, DENDROGRAM, COPHENET, KMEANS.
+    % Un mélange gaussien s'attribue autrement qu'un arbre : chaque point
+    % va à la composante la plus probable.
+    if isstruct(Z) && isfield(Z, 'type') && strcmp(Z.type, 'melange-gaussien')
+        T = clusterMelange(Z, critere);
+        return
+    end
     critere = lower(char(critere));
     n = size(Z, 1) + 1;
     if strcmp(critere, 'maxclust')

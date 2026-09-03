@@ -138,6 +138,10 @@ public:
     // « x = 3 » quand on lui passe x, et « 3 » quand on lui passe 3.
     std::string nomArgument(std::size_t k) const;
     void poserNomsArguments(std::vector<std::string> noms);
+    // Les noms des arguments de l'appel en cours, que « inputname » lit.
+    // Le constructeur d'une classe en a besoin comme toute fonction :
+    // « table(y,x) » nomme ses colonnes d'apres eux.
+    std::vector<std::string> prendreNomsArguments();
     int profondeur() const { return (int)piles_.size(); }
 
     // --- table des fonctions ---

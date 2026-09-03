@@ -12,8 +12,8 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | optimisation | 26 | 6 | 81 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
-| statistiques | 187 | 29 | 87 % |
-| **ensemble** | **1122** | **62** | **95 %** |
+| statistiques | 216 | 0 | 100 % |
+| **ensemble** | **1151** | **33** | **97 %** |
 
 ## automatique
 
@@ -37,14 +37,6 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 ## signal
 
 `maxflat`
-
-## statistiques
-
-`anovan`, `copulacdf`, `dataset`, `discardSupportVectors`, `fitcecoc`, `fitclinear`
-`fitcnb`, `fitcsvm`, `fitglm`, `fitlme`, `fitrgp`, `fitrlinear`, `fitrsvm`
-`fitrtree`, `gmdistribution`, `hmmdecode`, `hmmgenerate`, `hmmtrain`, `lasso`
-`manova1`, `mnrfit`, `nnmf`, `pearsrnd`, `polytool`, `relieff`, `rowexch`
-`sequentialfs`, `slicesample`, `stepwise`
 
 ## Ce qui manque au-delà des fonctions
 
@@ -120,6 +112,18 @@ qu'ils ne font pas encore comme MATLAB.
   peut pas ; les figures ne sont pas cliquables.
 - **Format `.fig`** : `savefig` écrit du SVG, `openfig` refuse le format
   de MathWorks.
+
+### Traitement du signal
+
+- **`maxflat`** : le filtre à module maximalement plat d'ordres
+  dissymétriques — N zéros en z = −1 et M pôles — n'est pas conçu. Le cas
+  N = M est exactement `butter`, qui est là.
+- **Objets `digitalFilter`** : `designfilt` et l'objet qu'il rend
+  n'existent pas. `lowpass` et ses voisines rendent les coefficients B et
+  A au lieu de l'objet.
+- **`intfilt`** en bande limitée résout les équations normales d'une
+  interpolation idéale, ce qui est la définition ; les coefficients
+  peuvent différer de MATLAB au dernier chiffre.
 
 ### Robustesse
 

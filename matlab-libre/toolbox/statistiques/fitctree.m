@@ -1,7 +1,15 @@
 function arbre = fitctree(X, y, varargin)
 %FITCTREE Arbre de décision binaire (CART, critère de Gini).
-%   T = FITCTREE(X,Y) construit un arbre ; PREDICTTREE l'utilise.
+%   T = FITCTREE(X,Y) construit un arbre ; PREDICT l'utilise.
 %   Option 'MinLeafSize' (1 par défaut) et 'MaxDepth' (8 par défaut).
+%
+%   Exemple :
+%      X = [randn(30, 2); randn(30, 2) + 3];
+%      y = [ones(30, 1); 2 * ones(30, 1)];
+%      t = fitctree(X, y);
+%      mean(predict(t, X) == y)
+%
+%   Voir aussi PREDICT, FITRTREE, FITCKNN, FITCNB, FITCECOC.
     tailleMin = 1;
     profondeurMax = 8;
     for i = 1:2:numel(varargin)-1
@@ -13,6 +21,9 @@ function arbre = fitctree(X, y, varargin)
         end
     end
     arbre = construire(X, y(:), tailleMin, profondeurMax, 1);
+    % La racine porte le genre du modèle : c'est ce que lit PREDICT pour
+    % savoir à quelle règle il a affaire.
+    arbre.type = 'arbre';
 end
 
 function noeud = construire(X, y, tailleMin, profondeurMax, profondeur)

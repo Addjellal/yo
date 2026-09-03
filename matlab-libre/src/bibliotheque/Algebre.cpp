@@ -138,10 +138,51 @@ FONCTION(fnChol) {
     return {cholesky(args[0], inferieure)};
 }
 
+// « eig(A,B) » : le probleme generalise A x = lambda B x. Le second
+// argument etait accepte puis ignore, si bien que MANOVA1 et l'analyse
+// discriminante travaillaient sur les valeurs propres de A seule.
+//
+// Quand B est symetrique definie positive — le cas des matrices de
+// dispersion —, la reduction de Cholesky ramene au probleme ordinaire
+// sans perdre la symetrie ; sinon on passe par B\A.
+void valeursPropresGeneralisees(const Valeur& a, const Valeur& b, Valeur& valeurs,
+                                Valeur* vecteurs) {
+    if (a.nlignes() != a.ncolonnes() || b.nlignes() != b.ncolonnes() ||
+        a.nlignes() != b.nlignes())
+        erreur("MATLAB:eig:matrixDimensionMismatch",
+               "Matrices must be square and of the same size.");
+    int defaut = 0;
+    Valeur L;
+    if (estSymetrique(b)) {
+        L = cholesky(b, true, &defaut);
+    } else {
+        defaut = 1;
+    }
+    if (defaut == 0) {
+        // C = L^-1 A L^-T, dont les vecteurs propres v donnent x = L^-T v.
+        Valeur Lt = transposer(L, true);
+        Valeur C = divisionGauche(L, a);
+        C = transposer(divisionGauche(L, transposer(C, true)), true);
+        valeursPropres(C, valeurs, vecteurs);
+        if (vecteurs) *vecteurs = divisionGauche(Lt, *vecteurs);
+        return;
+    }
+    Valeur C = divisionGauche(b, a);
+    valeursPropres(C, valeurs, vecteurs);
+}
+
 FONCTION(fnEig) {
     INUTILISE
     exigerArguments(args, 1, 2, "eig");
     Valeur valeurs, vecteurs;
+    if (args.size() >= 2 && !args[1].estVide()) {
+        if (nargout >= 2) {
+            valeursPropresGeneralisees(args[0], args[1], valeurs, &vecteurs);
+            return {vecteurs, valeurs};
+        }
+        valeursPropresGeneralisees(args[0], args[1], valeurs, nullptr);
+        return {valeurs};
+    }
     if (nargout >= 2) {
         valeursPropres(args[0], valeurs, &vecteurs);
         return {vecteurs, valeurs};

@@ -116,10 +116,43 @@
 %   pdist, pdist2, squareform, mahal   - Distances entre observations
 %   linkage, cluster, clusterdata      - Regroupement hiérarchique
 %   cophenet, dendrogram               - Fidélité de l'arbre, et son dessin
-%   knnsearch, fitcknn, predictknn     - Plus proches voisins
-%   fitctree, predicttree              - Arbre de décision
+%   knnsearch, fitcknn                 - Plus proches voisins
+%   fitctree, fitrtree                 - Arbres de décision et de régression
+%   fitcnb                             - Bayésien naïf
+%   fitcsvm, fitrsvm                   - Vecteurs de support
+%   discardSupportVectors              - Allège une SVM linéaire
+%   fitclinear, fitrlinear             - Modèles linéaires en grande dimension
+%   fitcecoc                           - Plusieurs classes par codes correcteurs
+%   fitrgp                             - Processus gaussien
+%   predict                            - Prédiction, quel que soit le modèle
+%   relieff, sequentialfs              - Choix de variables
 %   confusionmat                       - Matrice de confusion
 %   cvpartition                        - Découpage pour la validation croisée
+%
+% Modèles de régression
+%   fitglm                             - Modèle linéaire généralisé
+%   mnrfit, mnrval                     - Logistique multinomiale
+%   fitlme                             - Effets mixtes, intercept aléatoire
+%   lasso                              - Régression pénalisée en norme 1
+%   nnmf                               - Factorisation non négative
+%
+% Mélanges et modèles cachés
+%   gmdistribution, fitgmdist          - Mélange gaussien, ajusté par EM
+%   hmmgenerate, hmmdecode             - Modèle de Markov caché
+%   hmmviterbi, hmmestimate, hmmtrain  - Chemin, estimation, Baum-Welch
+%
+% Analyse de la variance et plans
+%   anovan                             - Plusieurs facteurs
+%   manova1                            - Analyse multivariée
+%   rowexch, x2fx                      - Plan D-optimal et matrice du modèle
+%   polytool, stepwise                 - Ajustement polynomial, pas à pas
+%
+% Copules et simulation
+%   copulacdf, copulapdf, copularnd    - Copules gaussienne, de Student,
+%                                        de Clayton, de Frank, de Gumbel
+%   pearsrnd                           - Loi du système de Pearson
+%   slicesample                        - Échantillonnage par tranches
+%   dataset                            - Tableau de données, ancienne forme
 %
 % Ajustement de lois
 %   mle, fitdist                       - Maximum de vraisemblance
@@ -143,3 +176,13 @@
 %   matlibre_nelder_mead                - Simplexe, sans dérivée
 %   matlibre_regression_isotone         - La suite croissante la plus proche
 %   matlibre_points_traces              - Les points déjà dessinés
+%   predictBayesNaif, predictSvm        - Rouages de PREDICT
+%   predictLineaire, predictEcoc        - Idem
+%   predictGp, predictArbreRegression   - Idem
+%   clusterMelange, tirerMelange        - Rouages des mélanges gaussiens
+%   lireOptionsSvm, noyauSvm            - Rouages des SVM
+%   standardiserSvm, resoudreSmo        - Idem
+%   lireOptionsLineaire, descenteLineaire - Rouages des modèles linéaires
+%   noyauGp                             - Covariance d'un processus gaussien
+%   normaliserLignes, lireNomsHmm       - Rouages des modèles cachés
+%   indicesSymboles                     - Idem

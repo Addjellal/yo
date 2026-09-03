@@ -51,7 +51,14 @@ classdef table
                     k = k + 2;
                 else
                     donnees{end + 1} = a; %#ok<AGROW>
-                    nomsAuto{end + 1} = sprintf('Var%d', numel(donnees)); %#ok<AGROW>
+                    % MATLAB nomme la variable comme celle qu'on lui
+                    % passe : « table(y,x) » donne les colonnes y et x.
+                    % Sans cela, une formule ne retrouvait pas ses noms.
+                    nomAppelant = inputname(k);
+                    if isempty(nomAppelant)
+                        nomAppelant = sprintf('Var%d', numel(donnees));
+                    end
+                    nomsAuto{end + 1} = nomAppelant; %#ok<AGROW>
                     k = k + 1;
                 end
             end

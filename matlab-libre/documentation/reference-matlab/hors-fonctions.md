@@ -85,6 +85,25 @@ qu'ils ne font pas encore comme MATLAB.
   interpolation idéale, ce qui est la définition ; les coefficients
   peuvent différer de MATLAB au dernier chiffre.
 
+### Statistiques et apprentissage
+
+- **Objets de modèle** : MATLAB rend des objets — `ClassificationSVM`,
+  `GeneralizedLinearModel`, `LinearMixedModel` — à méthodes. MatLibre
+  rend des structures portant les mêmes champs, et une fonction `predict`
+  commune qui reconnaît le modèle à son champ `type`.
+- **`fitlme`** n'ajuste que les intercepts aléatoires — la forme
+  `(1|g)` —, avec un ou plusieurs facteurs croisés. Les pentes
+  aléatoires, `(x|g)`, et les modèles emboîtés ne le sont pas.
+- **Formules de Wilkinson** : seul `fitlme` en lit une, et seulement les
+  termes séparés par `+`. `fitlm` et `fitglm` prennent une matrice.
+- **`polytool` et `stepwise`** ne sont pas interactifs : MatLibre mène la
+  procédure et rend le résultat, là où MATLAB ouvre une fenêtre où l'on
+  ajoute et retire les termes à la main.
+- **`eig(A,B)`** passe par la réduction de Cholesky quand B est
+  symétrique définie positive, et par `B\A` sinon : une matrice B
+  singulière — que MATLAB traite par la décomposition QZ, avec des
+  valeurs propres infinies — n'est pas admise.
+
 ### Robustesse
 
 Les noms sont tous présents ; ce qui suit est ce que la représentation

@@ -204,6 +204,12 @@ void Interpreteur::poserNomsArguments(std::vector<std::string> noms) {
     nomsArgumentsAppel_ = std::move(noms);
 }
 
+std::vector<std::string> Interpreteur::prendreNomsArguments() {
+    std::vector<std::string> noms = std::move(nomsArgumentsAppel_);
+    nomsArgumentsAppel_.clear();
+    return noms;
+}
+
 std::vector<std::string> Interpreteur::nomsVariables() const {
     std::vector<std::string> noms;
     for (const auto& kv : piles_.back()->variables) noms.push_back(kv.first);

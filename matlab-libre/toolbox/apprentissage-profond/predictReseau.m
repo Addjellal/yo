@@ -1,5 +1,7 @@
-function y = predict(reseau, X)
-%PREDICT Sortie d'un réseau appris.
+function y = predictReseau(reseau, X)
+%PREDICTRESEAU Sortie d'un réseau appris.
+%   C'est le rouage qu'appelle PREDICT quand on lui donne un réseau ;
+%   PREDICT est le nom commun à tous les modèles, comme dans MATLAB.
 %   Les couches qui se comportent autrement à l'apprentissage — abandon,
 %   normalisation par lot — sont ici en mode prédiction.
 %

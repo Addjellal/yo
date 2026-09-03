@@ -366,6 +366,9 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     auto portee = std::make_shared<Portee>();
     portee->nomFonction = f->nom;
     portee->fonction = f;
+    // Le constructeur voit les noms des variables qu'on lui passe, comme
+    // toute fonction : « table(y,x) » nomme ainsi ses colonnes.
+    portee->nomsEntrees = it.prendreNomsArguments();
     std::size_t fixes = f->entrees.size();
     if (f->variadiqueEntree()) fixes -= 1;
     for (std::size_t k = 0; k < fixes && k < args.size(); ++k)
