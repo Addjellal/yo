@@ -170,6 +170,8 @@ bool ecrireAxes(Interpreteur& it, const Valeur& p, const std::string& nom,
     }
     if (memeNom(nom, "XScale")) { a->logX = v.versTexte() == "log"; return true; }
     if (memeNom(nom, "YScale")) { a->logY = v.versTexte() == "log"; return true; }
+    if (memeNom(nom, "XDir")) { a->xInverse = v.versTexte() == "reverse"; return true; }
+    if (memeNom(nom, "YDir")) { a->yInverse = v.versTexte() == "reverse"; return true; }
     if (memeNom(nom, "XGrid") || memeNom(nom, "YGrid")) { a->grille = vraiDe(v); return true; }
     if (memeNom(nom, "Box")) { a->boite = vraiDe(v); return true; }
     if (memeNom(nom, "FontSize")) { a->taillePolice = v.scal(); return true; }
@@ -354,6 +356,14 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
     }
     if (memeNom(nom, "YScale")) {
         sortie = Valeur::texte(a->logY ? "log" : "linear");
+        return true;
+    }
+    if (memeNom(nom, "XDir")) {
+        sortie = Valeur::texte(a->xInverse ? "reverse" : "normal");
+        return true;
+    }
+    if (memeNom(nom, "YDir")) {
+        sortie = Valeur::texte(a->yInverse ? "reverse" : "normal");
         return true;
     }
     if (memeNom(nom, "XGrid") || memeNom(nom, "YGrid")) { sortie = marche(a->grille); return true; }

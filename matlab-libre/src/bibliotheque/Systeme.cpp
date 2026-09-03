@@ -770,6 +770,17 @@ std::string texteAide(Interpreteur& it, const std::string& nom, std::string* sou
             return c->aide;
         }
     }
+    // Une methode de classe : son bloc de commentaires est son aide,
+    // comme pour une fonction ordinaire.
+    if (auto c = it.classeDeMethode(nom)) {
+        auto methode = c->methodes.find(nom);
+        if (methode != c->methodes.end() && methode->second &&
+            !methode->second->aide.empty()) {
+            if (source) *source = "methode";
+            if (fichier) *fichier = c->fichier;
+            return methode->second->aide;
+        }
+    }
     if (n) return n->aide;
     return std::string();
 }

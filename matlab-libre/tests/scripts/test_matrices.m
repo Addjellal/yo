@@ -244,4 +244,93 @@ assert(isequal(blkdiag([], [1 2]), [1 2]));
 assert(isempty(blkdiag([], [])));
 assert(isequal(blkdiag(eye(2)), eye(2)));
 
+%% -------------------------------------------------------------- setxor
+% La difference symetrique : ce qui est dans l'un ou dans l'autre, jamais
+% dans les deux. Les positions rendues designent la source de chaque
+% valeur.
+assert(isequal(setxor([1 2 3 4], [3 4 5]), [1 2 5]));
+[cx, iax, ibx] = setxor([5 1 3], [3 9]);
+assert(isequal(cx, [1 5 9]));
+assert(isequal(sort(iax(:))', [1 2]));
+assert(isequal(ibx, 2));
+assert(isequal(setxor([1 2 3 4], [3 4 5], 'stable'), [1 2 5]));
+sx = setxor({'a','b'}, {'b','c'});
+assert(numel(sx) == 2 && strcmp(sx{1}, 'a') && strcmp(sx{2}, 'c'));
+% Deux ensembles egaux ne laissent rien.
+assert(isempty(setxor([1 2], [2 1])));
+
+%% ------------------------------------------------------------- repelem
+% Chaque element est repete sur place, ce qui n'est pas repmat : repmat
+% recopie le tableau entier, repelem etale chaque valeur.
+assert(isequal(repelem([1 2 3], 2), [1 1 2 2 3 3]));
+assert(isequal(repelem([1 2 3], [1 2 3]), [1 2 2 3 3 3]));
+assert(isequal(repelem([1 2; 3 4], 2, 3), ...
+               [1 1 1 2 2 2; 1 1 1 2 2 2; 3 3 3 4 4 4; 3 3 3 4 4 4]));
+assert(isequal(size(repelem(zeros(2, 3), [1 2], [2 0 1])), [3 3]));
+assert(isequal(repelem([1; 2], 3), [1; 1; 1; 2; 2; 2]));
+r = repelem({'a', 'b'}, 2);
+assert(numel(r) == 4 && strcmp(r{2}, 'a'));
+
+%% ------------------------------------------------------------ shiftdim
+a4 = ones(1, 1, 3, 2);
+[b4, n4] = shiftdim(a4);
+assert(isequal(size(b4), [3 2]) && n4 == 2);
+assert(isequal(size(shiftdim(ones(2, 3), 1)), [3 2]));
+assert(isequal(size(shiftdim(ones(2, 3), -2)), [1 1 2 3]));
+assert(shiftdim(5) == 5);
+c3 = reshape(1:12, [2 3 2]);
+d3 = shiftdim(c3, 1);
+assert(isequal(size(d3), [3 2 2]));
+assert(isequal(d3(:, :, 1), [1 7; 3 9; 5 11]));
+
+%% ------------------------------------------------------------ issorted
+assert(issorted([1 2 2 5]));
+assert(~issorted([1 2 2 5], 'strictascend'));
+assert(issorted([5 3 1], 'descend'));
+assert(issorted([5 3 1], 'monotonic'));
+assert(issorted({'a', 'b'}));
+assert(issortedrows([1 2; 1 3; 2 0]));
+assert(~issortedrows([1 2; 1 3; 2 0], -1));
+
+%% --------------------------------------------------------------- convn
+% La convolution a N dimensions. En deux dimensions elle doit rendre
+% exactement ce que rend conv2, sans quoi l'une des deux est fausse.
+assert(isequal(convn([1 2 3], [1 1]), [1 3 5 3]));
+assert(isequal(convn(magic(3), ones(2), 'same'), conv2(magic(3), ones(2), 'same')));
+v3 = convn(ones(3, 3, 3), ones(2, 2, 2), 'valid');
+assert(isequal(size(v3), [2 2 2]) && all(v3(:) == 8));
+assert(isequal(size(convn(ones(3, 3, 3), ones(2, 2, 2))), [4 4 4]));
+f3 = convn(reshape(1:8, 2, 2, 2), ones(1, 1, 2));
+assert(isequal(size(f3), [2 2 3]));
+assert(isequal(f3(:, :, 2), [6 10; 8 12]));
+
+%% ----------------------------------------------------------- pagemtimes
+ap = reshape(1:8, 2, 2, 2);
+cp = pagemtimes(ap, ap);
+assert(isequal(cp(:, :, 1), ap(:, :, 1) * ap(:, :, 1)));
+assert(isequal(cp(:, :, 2), ap(:, :, 2) * ap(:, :, 2)));
+bp = pagemtimes(ap, 'transpose', ap, 'none');
+assert(isequal(bp(:, :, 2), ap(:, :, 2)' * ap(:, :, 2)));
+% Une seule page sert a toutes les autres.
+dp = pagemtimes(ap, [1; 1]);
+assert(isequal(size(dp), [2 1 2]) && isequal(dp(:, :, 2)', [12 14]));
+assert(isequal(pagetranspose(ap), permute(ap, [2 1 3])));
+
+%% ------------------------------------------------------------ swapbytes
+assert(swapbytes(uint16(1)) == 256);
+assert(swapbytes(uint32(1)) == 16777216);
+% Deux inversions rendent la valeur de depart, quelle que soit la classe.
+assert(isequal(swapbytes(swapbytes(int16([-2 300]))), int16([-2 300])));
+assert(isequal(swapbytes(swapbytes(double(pi))), double(pi)));
+assert(isequal(swapbytes(uint8([1 2])), uint8([1 2])));
+
+%% ----------------------------------------------------------- discretize
+assert(isequal(discretize([1 2 3 4 5], [1 3 5]), [1 1 2 2 2]));
+assert(all(isnan(discretize([0 6], [1 3 5]))));
+[bd, ed] = discretize([1 2 3 4], 2);
+assert(isequal(bd, [1 1 2 2]) && isequal(ed, [1 2.5 4]));
+assert(isequal(discretize([1 3 5], [1 3 5], 'IncludedEdge', 'right'), [1 1 2]));
+nd = discretize([1 2 3 4 5], [1 3 5], {'bas', 'haut'});
+assert(strcmp(nd{1}, 'bas') && strcmp(nd{5}, 'haut'));
+
 disp('matrices : toutes les verifications passent');

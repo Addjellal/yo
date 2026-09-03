@@ -256,6 +256,8 @@ void Interpreteur::retirerChemin(const std::string& dossier) {
 void Interpreteur::reindexerChemin() {
     indexM_.clear();
     indexClasses_.clear();
+    indexMethodes_.clear();
+    indexMethodesPret_ = false;
     for (auto it = chemin_.rbegin(); it != chemin_.rend(); ++it) {
         std::error_code ec;
         if (!fs::is_directory(*it, ec)) continue;
@@ -450,6 +452,44 @@ std::string Interpreteur::fichierExecute() const {
     return fichierCourant;
 }
 
+// Les classes auxquelles « X.empty » a un sens : les fondamentales que
+// MatLibre sait representer, et toute classe declaree par un classdef.
+bool Interpreteur::classeVide(const std::string& nom) {
+    bool connue = false;
+    classeDepuisNom(nom, &connue);
+    if (connue) return true;
+    return classeDefinie(nom) != nullptr;
+}
+
+Valeur Interpreteur::valeurVideDeClasse(const std::string& nom, const Dims& d) {
+    bool connue = false;
+    Classe c = classeDepuisNom(nom, &connue);
+    if (connue) {
+        if (c == Classe::Cellule) return Valeur::celluleDims(d);
+        if (c == Classe::Structure) {
+            Valeur v = Valeur::structureVide();
+            v.dims = d;
+            return v;
+        }
+        Valeur v = Valeur::matriceDims(d);
+        v.classe = c;
+        return v;
+    }
+    Valeur v = Valeur::structureVide();
+    v.classe = Classe::Objet;
+    v.nomObjet = nom;
+    // Les proprietes sont posees, mais vides : une methode appelee sur
+    // le tableau vide — « isempty(duration.empty) » — les lit, et doit y
+    // trouver du vide, non la valeur par defaut d'un objet qui existe.
+    if (auto def = classeDefinie(nom)) {
+        for (const auto& propriete : def->ordreProprietes)
+            v.poserChamp(propriete, Valeur::vide());
+        v.poigneeObjet = def->poignee;
+    }
+    v.dims = d;
+    return v;
+}
+
 std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string& nom) {
     auto itc = cacheClasses_.find(nom);
     if (itc != cacheClasses_.end()) return itc->second;
@@ -478,6 +518,46 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
     u.classes[0]->fichier = it->second;
     cacheClasses_[nom] = u.classes[0];
     return u.classes[0];
+}
+
+// Toutes les methodes de toutes les classes du chemin, baties une fois.
+// On ne lit que les fichiers qui portent « classdef » : le mot est
+// cherche dans la source, ce qui coute une lecture par fichier, faite une
+// seule fois et seulement si l'on demande.
+std::shared_ptr<DefinitionClasse> Interpreteur::classeDeMethode(const std::string& nom) {
+    if (!indexMethodesPret_) {
+        indexMethodesPret_ = true;
+        std::vector<std::string> candidats;
+        for (const auto& entree : indexClasses_) candidats.push_back(entree.first);
+        for (const auto& entree : indexM_) {
+            // Un fichier de l'index peut avoir disparu, ou etre nomme
+            // relativement a un dossier qu'on a quitte depuis : « exist »
+            // n'a pas a echouer pour autant.
+            std::string source;
+            try {
+                source = lireFichier(entree.second);
+            } catch (...) {
+                continue;
+            }
+            if (source.find("classdef") == std::string::npos) continue;
+            candidats.push_back(entree.first);
+        }
+        for (const std::string& nomClasse : candidats) {
+            std::shared_ptr<DefinitionClasse> c;
+            try {
+                c = classeDefinie(nomClasse);
+            } catch (...) {
+                continue;
+            }
+            if (!c) continue;
+            for (const auto& methode : c->methodes)
+                if (!indexMethodes_.count(methode.first))
+                    indexMethodes_[methode.first] = nomClasse;
+        }
+    }
+    auto trouve = indexMethodes_.find(nom);
+    if (trouve == indexMethodes_.end()) return nullptr;
+    return classeDefinie(trouve->second);
 }
 
 bool Interpreteur::fonctionExiste(const std::string& nom) const {
@@ -1547,6 +1627,31 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
             }
             courant = appeler(compose, args,
                               debut < n->acces.size() ? 1 : std::max(nargout, 1));
+        } else if (!n->acces.empty() && n->acces[0].genre == '.' &&
+                   n->acces[0].nom == "empty" && classeVide(nom) &&
+                   !(classeDefinie(nom) && classeDefinie(nom)->aMethode("empty"))) {
+            // « double.empty(0,3) », « MaClasse.empty » : le tableau vide
+            // de la classe. C'est la seule methode statique que MATLAB
+            // donne a toute classe, y compris aux classes fondamentales.
+            Dims d = {0, 0};
+            debut = 1;
+            if (n->acces.size() > 1 && n->acces[1].genre == '(') {
+                auto args = evaluerListe(n->acces[1].args);
+                d.clear();
+                if (args.size() == 1 && args[0].nelem() > 1) {
+                    for (double x : args[0].re) d.push_back(std::max(0, (int)x));
+                } else {
+                    for (const auto& a : args) d.push_back(std::max(0, (int)a.scal()));
+                }
+                while (d.size() < 2) d.push_back(d.empty() ? 0 : d[0]);
+                debut = 2;
+            }
+            bool aZero = false;
+            for (int x : d) aZero = aZero || x == 0;
+            if (!aZero)
+                erreur("MATLAB:class:emptyMustBeZero",
+                       "At least one dimension must be zero for 'empty'.");
+            courant.push_back(valeurVideDeClasse(nom, d));
         } else if (!n->acces.empty() && n->acces[0].genre == '.' && classeDefinie(nom)) {
             // Méthode statique ou propriété constante d'une classe.
             auto def = classeDefinie(nom);

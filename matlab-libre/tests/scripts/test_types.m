@@ -393,4 +393,72 @@ catch
 end
 assert(erreurFuseau);
 
+%% ------------------------------------------------------ valeurs manquantes
+% ismissing reconnait le manquant propre a chaque type : NaN pour un
+% nombre, la chaine vide pour du texte.
+assert(isequal(ismissing([1 NaN 3]), [false true false]));
+assert(isequal(ismissing([1 2 -99], -99), [false false true]));
+assert(isequal(ismissing({'a', '', 'c'}), [false true false]));
+assert(isequal(ismissing(string({'a', '', 'c'})), [false true false]));
+assert(isequal(ismissing({'a', 'x', 'c'}, {'x'}), [false true false]));
+
+% rmmissing retire les valeurs d'un vecteur, les lignes d'une matrice.
+assert(isequal(rmmissing([1 NaN 3]), [1 3]));
+assert(isequal(rmmissing([1 NaN; 2 3]), [2 3]));
+assert(isequal(rmmissing([1 NaN; 2 3], 2), [1; 2]));
+[sansNaN, marque] = rmmissing([1 NaN 3]);
+assert(isequal(sansNaN, [1 3]) && isequal(marque(:)', [false true false]));
+
+% standardizeMissing traduit un code d'absence en vrai manquant, ce qui
+% permet ensuite a rmmissing de faire son travail.
+assert(isequaln(standardizeMissing([1 2 -99], -99), [1 2 NaN]));
+propre = standardizeMissing({'a', 'N/A'}, {'N/A'});
+assert(isempty(propre{2}));
+
+% Sur une table, le manquant se cherche variable par variable.
+tManque = table([1; NaN; 3], {'a'; 'b'; ''}, 'VariableNames', {'x', 'y'});
+assert(isequal(size(ismissing(tManque)), [3 2]));
+assert(height(rmmissing(tManque)) == 1);
+
+%% ------------------------------------------------- groupes et agregation
+[groupes, noms] = findgroups({'b', 'a', 'b'});
+assert(isequal(groupes, [2 1 2]));
+assert(strcmp(noms{1}, 'a') && strcmp(noms{2}, 'b'));
+% Deux classements croises donnent un groupe par couple.
+assert(isequal(findgroups([1 1 2], {'x', 'y', 'x'}), [1 2 3]));
+% Un manquant n'appartient a aucun groupe.
+assert(isnan(sum(findgroups([3 NaN 1]) .* [0 1 0])));
+
+assert(isequal(splitapply(@sum, [1 2 3 4], [1 1 2 2]), [3; 7]));
+assert(isequal(splitapply(@(v) [min(v) max(v)], [1 5 2 8], [1 1 2 2]), [1 5; 2 8]));
+[moyennes, ecarts] = splitapply(@(v) deal(mean(v), std(v)), [1 3 10 20], [1 1 2 2]);
+assert(isequal(moyennes, [2; 15]));
+assert(abs(ecarts(1) - sqrt(2)) < 1e-12);
+
+%% ------------------------------------------------------- tableau croise
+tCroise = table({'a'; 'a'; 'b'}, [1; 2; 1], [10; 20; 30], ...
+                'VariableNames', {'g', 'c', 'v'});
+croise = pivot(tCroise, 'Rows', 'g', 'Columns', 'c', ...
+               'DataVariable', 'v', 'Method', 'sum');
+assert(height(croise) == 2 && width(croise) == 3);
+assert(croise.x1(1) == 10 && croise.x2(1) == 20);
+% Sans variable de donnees, pivot compte les lignes.
+comptes = pivot(tCroise, 'Rows', 'g', 'Columns', 'c');
+assert(comptes.x1(2) == 1 && comptes.x2(2) == 0);
+
+%% --------------------------------------------------------------- X.empty
+% La seule methode statique que MATLAB donne a toute classe.
+assert(isequal(size(double.empty), [0 0]));
+assert(isequal(size(double.empty(0, 3)), [0 3]));
+assert(strcmp(class(cell.empty(0, 2)), 'cell'));
+assert(strcmp(class(int8.empty), 'int8'));
+assert(isempty(duration.empty));
+videRefuse = false;
+try
+    double.empty(2, 3);
+catch
+    videRefuse = true;
+end
+assert(videRefuse);
+
 disp('types : toutes les verifications passent');

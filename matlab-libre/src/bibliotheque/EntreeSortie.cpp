@@ -869,6 +869,36 @@ FONCTION(fnFread) {
     return {Valeur::colonne(octets)};
 }
 
+// « fscanf(fid, format) » : le meme decodage que sscanf, mais sur ce qui
+// reste du fichier. La position avance de ce qui a ete lu, si bien qu'un
+// second appel poursuit la lecture.
+FONCTION(fnFscanf) {
+    exigerArguments(args, 2, 3, "fscanf");
+    auto& f = fluxDe((int)args[0].scal());
+    std::string reste((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    f.clear();
+    std::vector<Valeur> passees;
+    passees.push_back(Valeur::texte(reste));
+    passees.push_back(args[1]);
+    if (args.size() > 2) passees.push_back(args[2]);
+    Arguments sousArgs(passees);
+    // Quatre sorties demandees : la quatrieme est la position atteinte,
+    // dont on a besoin pour replacer le curseur.
+    auto sorties = fnSscanf(it, sousArgs, 4);
+    // Ce que le format n'a pas consomme doit rester lisible : on replace
+    // le curseur juste apres la derniere position atteinte.
+    std::size_t consomme = reste.size();
+    if (sorties.size() >= 4) {
+        double position = sorties[3].scal();
+        if (position >= 1 && position <= (double)reste.size() + 1)
+            consomme = (std::size_t)position - 1;
+    }
+    f.clear();
+    f.seekg(-(std::streamoff)(reste.size() - consomme), std::ios::cur);
+    sorties.resize((std::size_t)std::max(nargout, 1));
+    return sorties;
+}
+
 FONCTION(fnFwrite) {
     INUTILISE
     exigerArguments(args, 2, 3, "fwrite");
@@ -1010,6 +1040,8 @@ void enregistrerEntreeSortie(Interpreteur& it) {
     it.enregistrer("display", fnDisplay, "es", "display  Affiche une valeur avec son nom.");
     it.enregistrer("sprintf", fnSprintf, "es", "sprintf  Formate dans une chaine.");
     it.enregistrer("sscanf", fnSscanf, "es", "sscanf  Lit des donnees depuis une chaine.");
+    it.enregistrer("fscanf", fnFscanf, "es",
+                   "fscanf  Lit des donnees formatees dans un fichier.");
     it.enregistrer("fprintf", fnFprintf, "es", "fprintf  Ecrit du texte formate.");
     it.enregistrer("printf", fnPrintf, "es", "printf  Ecrit du texte formate (sortie standard).");
     it.enregistrer("num2str", fnNum2str, "es", "num2str  Nombre vers texte.");

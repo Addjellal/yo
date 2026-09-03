@@ -42,7 +42,7 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 6 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 138 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 187 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 54 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
-Les fonctions natives — 636, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 646, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

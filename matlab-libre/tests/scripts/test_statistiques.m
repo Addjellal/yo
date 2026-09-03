@@ -711,4 +711,39 @@ assert(max(max(abs(facteur' * facteur - [4 2; 2 3]))) < 1e-12);
 assert(defautPartiel == 2);
 assert(isequal(size(facteurPartiel), [1 1]));
 
+%% --------------------------------------------- fonctions glissantes
+% La famille « mov… » : meme fenetre, meme traitement des bords, seul
+% l'agregat change. Les valeurs sont celles de la documentation MATLAB.
+serieGlissante = [4 8 6 -1 -2 -3 -1 3 4 5];
+assert(norm(movmean(serieGlissante, 3) - ...
+            [6 6 4+1/3 1 -2 -2 -1/3 2 4 4.5]) < 1e-12);
+assert(isequal(movsum(serieGlissante, 3), [12 18 13 3 -6 -6 -1 6 12 9]));
+assert(isequal(movmax(serieGlissante, 3), [8 8 8 6 -1 -1 3 4 5 5]));
+assert(isequal(movmin(serieGlissante, 3), [4 4 -1 -2 -3 -3 -3 -1 3 4]));
+assert(isequal(movprod([1 2 3 4], 2), [1 2 6 12]));
+assert(isequal(movmedian([1 2 100 4 5], 3), [1.5 2 4 5 4.5]));
+
+% Une fenetre paire penche du cote du passe : deux points avant, un
+% apres, comme dans MATLAB.
+assert(isequal(movsum(serieGlissante, 4), [12 18 17 11 0 -7 -3 3 11 12]));
+
+% Les bords : 'discard' ne rend que les fenetres pleines, une valeur
+% complete le tableau.
+assert(numel(movmean(serieGlissante, 3, 'Endpoints', 'discard')) == 8);
+assert(isequal(movsum(ones(1, 5), 3, 'Endpoints', 0), [2 3 3 3 2]));
+
+% Un NaN contamine sa fenetre, sauf si on l'ecarte.
+assert(all(isnan(movmean([1 NaN 3], 3))));
+assert(isequal(movmean([1 NaN 3], 3, 'omitnan'), [1 2 3]));
+
+% Sur une matrice, la fenetre glisse le long des colonnes, ou de la
+% dimension demandee.
+matriceGlissante = [1 2; 3 4; 5 6];
+assert(isequal(movsum(matriceGlissante, 2), [1 2; 4 6; 8 10]));
+assert(isequal(movsum(matriceGlissante, 2, 2), [1 3; 3 7; 5 11]));
+
+% L'ecart type glissant : nul sur une fenetre d'un seul point.
+assert(abs(movstd([1 2 3 4], 2) * [1; 0; 0; 0]) < 1e-12);
+assert(abs(movvar([1 2 3 4], 2) * [0; 1; 0; 0] - 0.5) < 1e-12);
+
 disp('statistiques : toutes les verifications passent');

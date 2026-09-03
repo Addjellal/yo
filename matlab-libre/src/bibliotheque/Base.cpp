@@ -360,9 +360,16 @@ FONCTION(fnLinspace) {
     int n = args.size() > 2 ? (int)args[2].scal() : 100;
     if (n < 1) return {Valeur::matrice(1, 0)};
     std::vector<double> v((std::size_t)n);
-    if (n == 1) v[0] = b;
-    else
+    if (n == 1) {
+        v[0] = b;
+    } else {
         for (int k = 0; k < n; ++k) v[(std::size_t)k] = a + (b - a) * k / (n - 1);
+        // MATLAB garantit les deux bouts exacts. Le calcul par le pas les
+        // manquait du dernier bit, et « discretize » rejetait alors le
+        // maximum des donnees, hors de la derniere classe.
+        v[0] = a;
+        v[(std::size_t)n - 1] = b;
+    }
     return {Valeur::ligne(v)};
 }
 
@@ -814,6 +821,57 @@ FONCTION(fnSubsref) {
     return {courant};
 }
 
+// « subsasgn(v, s, x) » : l'affectation indexee ecrite comme une donnee.
+// C'est le pendant de SUBSREF, et ce dont a besoin la methode subsasgn
+// d'une classe pour poursuivre la chaine qu'elle n'a pas traitee.
+//
+// Comme pour subsref, l'affectation faite ici est celle par defaut :
+// elle ne rappelle pas la methode de la classe, ce qui bouclerait.
+Valeur affecterChaine(Interpreteur& it, Valeur base, const Valeur& chaine, std::size_t k,
+                      const Valeur& v) {
+    std::size_t n = chaine.nelem();
+    if (k >= n) return v;
+    std::string genre = chaine.champ("type", k).versTexte();
+    const Valeur& subs = chaine.champ("subs", k);
+    if (genre == ".") {
+        std::string nom = subs.versTexte();
+        if (base.classe == Classe::Objet) {
+            Valeur sous = k + 1 < n ? it.lireProprieteObjet(base, nom) : Valeur();
+            return it.ecrireProprieteObjet(base, nom, affecterChaine(it, sous, chaine, k + 1, v));
+        }
+        if (!base.estStructure()) {
+            if (base.nelem() != 0)
+                erreur("MATLAB:index:expected_one_output_from_expression",
+                       "Dot indexing is not supported for variables of this type.");
+            base = Valeur::structureVide();
+        }
+        Valeur sous = base.aChamp(nom) ? base.champ(nom) : Valeur();
+        base.poserChamp(nom, affecterChaine(it, sous, chaine, k + 1, v));
+        return base;
+    }
+    std::vector<Valeur> idx;
+    if (subs.classe == Classe::Cellule) idx = subs.cellules;
+    else idx.push_back(subs);
+    char lettre = genre == "{}" ? '{' : '(';
+    Valeur nouvelle = v;
+    if (k + 1 < n) {
+        Valeur sous = it.indexerParDefaut(base, idx, lettre);
+        nouvelle = affecterChaine(it, sous, chaine, k + 1, v);
+    }
+    return it.ecrireIndex(base, idx, nouvelle, lettre);
+}
+
+FONCTION(fnSubsasgn) {
+    INUTILISE
+    exigerArguments(args, 3, 3, "subsasgn");
+    const Valeur& chaine = args[1];
+    if (!chaine.estStructure() || !chaine.aChamp("type") || !chaine.aChamp("subs"))
+        erreur("MATLAB:subsasgn:invalidSubscript",
+               "The second argument to subsasgn must be a substruct with fields "
+               "'type' and 'subs'.");
+    return {affecterChaine(it, args[0], chaine, 0, args[2])};
+}
+
 FONCTION(fnClass) {
     INUTILISE
     exigerArguments(args, 1, 1, "class");
@@ -1244,6 +1302,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("class", fnClass, "base", "class  Nom de la classe d'une valeur.");
     it.enregistrer("subsref", fnSubsref, "base",
                    "subsref  Indexation ecrite comme une donnee.");
+    it.enregistrer("subsasgn", fnSubsasgn, "base",
+                   "subsasgn  Affectation indexee ecrite comme une donnee.");
     it.enregistrer("substruct", fnSubstruct, "base",
                    "substruct  Fabrique la structure d'acces de subsref.");
     it.enregistrer("isa", fnIsa, "base", "isa  Teste l'appartenance a une classe.");

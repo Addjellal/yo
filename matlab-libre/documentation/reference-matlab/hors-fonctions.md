@@ -26,8 +26,12 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
   reconnues comme telles.
 - **Dossiers de paquet `+nom/`** : la notation `paquet.fonction` marche
   pour ce qui est enregistré sous ce nom, non par découverte de dossier.
-- **Classes poignées** (`handle`), événements et écouteurs (`events`,
-  `addlistener`, `notify`).
+- **Événements et écouteurs** (`events`, `addlistener`, `notify`) : les
+  `events` sont analysés, les écouteurs manquent. Les **classes poignées**
+  (`classdef X < handle`), elles, partagent bien leur état : une méthode
+  qui écrit dans l'objet se voit depuis toutes ses copies.
+- **Héritage** : `classdef X < Y` est analysé, mais seul `handle` a un
+  effet ; les méthodes et propriétés du parent ne sont pas héritées.
 - **Énumérations** (`enumeration`) dans un `classdef`.
 - **`matlab.unittest`** : le cadre de tests à classes. Les tests de
   MatLibre sont des scripts à `assert`.
@@ -61,6 +65,8 @@ qu'ils ne font pas encore comme MATLAB.
   graduation angulaire du cadre manque.
 - **Transparence** (`alpha`) et **bandes de `contourf`** : le fond est
   posé en champ continu, non découpé par niveau.
+- **`histogram2`** dessine le quadrillage en couleurs — le
+  `'DisplayStyle','tile'` de MATLAB — et non les barres en perspective.
 - **Interaction à la souris** : `zoom`, `pan`, `rotate3d`, `brush`,
   `datacursormode` sont acceptés sans effet, et `ginput` dit qu'il ne
   peut pas ; les figures ne sont pas cliquables.

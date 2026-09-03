@@ -346,6 +346,10 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     Valeur obj = Valeur::structureVide();
     obj.classe = Classe::Objet;
     obj.nomObjet = def->nom;
+    // « classdef X < handle » : l'objet partage son etat avec ses copies.
+    // Sans cela, « p.addParameter(...) » n'avait aucun effet visible,
+    // puisque la methode travaillait sur une copie.
+    obj.poigneeObjet = def->poignee;
     for (const auto& nom : def->ordreProprietes) {
         Valeur defaut = Valeur::vide();
         auto itd = def->defauts.find(nom);
@@ -393,6 +397,7 @@ Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>
     }
     obj.classe = Classe::Objet;
     obj.nomObjet = def->nom;
+    obj.poigneeObjet = def->poignee;
     return obj;
 }
 

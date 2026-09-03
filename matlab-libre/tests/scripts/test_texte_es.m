@@ -197,4 +197,151 @@ assert(~isempty(strfind(sortie, 'un message')));
 assert(isempty(strfind(sortie, 'ans =')));
 assert(isempty(strfind(sortie, '''')));
 
+%% ----------------------------------------------------------------- split
+% split rend du texte de la meme espece que celui qu'on lui donne : des
+% cellules pour un caractere, des chaines pour une chaine.
+morceaux = split('a,b,c', ',');
+assert(iscell(morceaux) && numel(morceaux) == 3 && strcmp(morceaux{2}, 'b'));
+assert(isstring(split(string('a,b'), ',')));
+grille = split(string({'a-b'; 'c-d'}), '-');
+assert(isequal(size(grille), [2 2]));
+assert(strcmp(char(grille(2, 1)), 'c'));
+[bouts, seps] = split('a1b2c', {'1', '2'});
+assert(numel(bouts) == 3 && strcmp(bouts{3}, 'c'));
+assert(numel(seps) == 2 && strcmp(seps{1}, '1'));
+% Sans separateur, ce sont les espaces qui coupent.
+assert(numel(split('a b c')) == 3);
+assert(numel(splitlines(sprintf('un\ndeux\ntrois'))) == 3);
+% Les trois fins de ligne se valent.
+assert(numel(splitlines(sprintf('un\r\ndeux'))) == 2);
+
+%% ------------------------------------------------------------------ JSON
+donnees = jsondecode('{"nom":"a","valeurs":[1,2,3]}');
+assert(strcmp(donnees.nom, 'a'));
+assert(isequal(donnees.valeurs(:)', [1 2 3]));
+assert(isequal(jsondecode('[[1,2],[3,4]]'), [1 2; 3 4]));
+assert(iscell(jsondecode('[1,"a"]')));
+assert(jsondecode('true'));
+assert(isempty(jsondecode('null')));
+assert(strcmp(jsonencode(struct('a', 1, 'b', 'deux')), '{"a":1,"b":"deux"}'));
+assert(strcmp(jsonencode([1 2; 3 4]), '[[1,2],[3,4]]'));
+assert(strcmp(jsonencode({1, 'a', true}), '[1,"a",true]'));
+% Le tour complet ne perd rien.
+tourJson = jsondecode(jsonencode(struct('x', [1 2 3], 't', 'oui')));
+assert(isequal(tourJson.x(:)', [1 2 3]) && strcmp(tourJson.t, 'oui'));
+% Un texte qui n'est pas du JSON est refuse, en le disant.
+jsonRefuse = false;
+try
+    jsondecode('{"a":}');
+catch
+    jsonRefuse = true;
+end
+assert(jsonRefuse);
+
+%% ------------------------------------------ lecture et ecriture de cases
+bac = tempdir();
+fCases = fullfile(bac, 'matlibre_cases.csv');
+writecell({'nom', 'valeur'; 'a', 1; 'b', 2.5}, fCases);
+cases = readcell(fCases);
+assert(isequal(size(cases), [3 2]));
+assert(strcmp(cases{2, 1}, 'a') && cases{3, 2} == 2.5);
+[colonneA, colonneB] = readvars(fCases);
+assert(numel(colonneA) == 2 && colonneB(2) == 2.5);
+
+% importdata reconnait le fichier a son extension et a sa forme.
+apportees = importdata(fCases);
+assert(isequal(apportees.data, [1; 2.5]));
+assert(strcmp(apportees.colheaders{2}, 'valeur'));
+fNombres = fullfile(bac, 'matlibre_nombres.csv');
+writematrix([1 2; 3 4], fNombres);
+assert(isequal(importdata(fNombres), [1 2; 3 4]));
+fMat = fullfile(bac, 'matlibre_apport.mat');
+valeurRangee = 7;
+save(fMat, 'valeurRangee');
+assert(importdata(fMat).valeurRangee == 7);
+delete(fCases); delete(fNombres); delete(fMat);
+
+%% --------------------------------------------------------------- matfile
+fLent = fullfile(bac, 'matlibre_matfile.mat');
+if isfile(fLent)
+    delete(fLent);
+end
+depot = matfile(fLent, 'Writable', true);
+depot.x = magic(4);
+depot.y = 'coucou';
+assert(isequal(depot.x, magic(4)));
+assert(isequal(depot.x(1, :), [16 2 3 13]));
+% Une ecriture partielle ne detruit ni le reste de la matrice ni les
+% autres variables du fichier.
+depot.x(1, 1) = 99;
+assert(depot.x(1, 1) == 99 && depot.x(2, 2) == 11);
+assert(strcmp(depot.y, 'coucou'));
+assert(numel(who(depot)) == 2);
+% Sans « Writable », le fichier est en lecture seule.
+lecture = matfile(fLent);
+assert(~lecture.Properties.Writable);
+matfileRefuse = false;
+try
+    lecture.z = 1;
+catch
+    matfileRefuse = true;
+end
+assert(matfileRefuse);
+delete(fLent);
+
+%% ---------------------------------------------------------------- fscanf
+fLu = fullfile(bac, 'matlibre_fscanf.txt');
+fid = fopen(fLu, 'w');
+fprintf(fid, '1 2 3 4 5 6');
+fclose(fid);
+fid = fopen(fLu, 'r');
+assert(isequal(fscanf(fid, '%d')', [1 2 3 4 5 6]));
+fclose(fid);
+% La lecture s'arrete ou on le demande, et reprend la ou elle s'etait
+% arretee : c'est ce qui distingue fscanf de sscanf.
+fid = fopen(fLu, 'r');
+premiers = fscanf(fid, '%d', 3);
+suivants = fscanf(fid, '%d');
+fclose(fid);
+assert(isequal(premiers(:)', [1 2 3]));
+assert(isequal(suivants(:)', [4 5 6]));
+fid = fopen(fLu, 'r');
+grilleLue = fscanf(fid, '%d', [2 3]);
+fclose(fid);
+assert(isequal(grilleLue, [1 3 5; 2 4 6]));
+delete(fLu);
+
+%% -------------------------------------------------------- chemins et dir
+% genpath descend dans les sous-dossiers et laisse de cote ceux que
+% MATLAB reserve.
+chemins = genpath(fullfile(matlabroot(), 'aide'));
+assert(~isempty(strfind(chemins, 'aide')));
+assert(chemins(end) == pathsep());
+inventaire = what(fullfile(matlabroot(), 'matlab'));
+assert(numel(inventaire.m) > 100);
+% fileattrib decrit un fichier existant et refuse ce qui n'existe pas.
+fAttribut = fullfile(bac, 'matlibre_attribut.txt');
+fid = fopen(fAttribut, 'w');
+fclose(fid);
+[trouve, ~, attributs] = fileattrib(fAttribut);
+assert(trouve && attributs.UserRead == 1 && attributs.directory == 0);
+delete(fAttribut);
+assert(~fileattrib(fullfile(bac, 'matlibre_absent_xyz.txt')));
+
+%% ------------------------------------------------------------- calendrier
+assert(eomday(2024, 2) == 29);
+assert(eomday(2023, 2) == 28);
+assert(eomday(2024, 4) == 30);
+fevrier = calendar(2024, 2);
+assert(isequal(size(fevrier), [6 7]));
+assert(fevrier(1, 5) == 1);          % le 1er fevrier 2024 est un jeudi
+assert(max(fevrier(:)) == 29);
+assert(weeknum(datenum(2024, 1, 8)) == 2);
+assert(yyyymmdd(datetime(2024, 2, 3)) == 20240203);
+assert(months('31-mar-2024', '30-apr-2024') == 1);
+assert(months(datenum(2024, 1, 15), datenum(2024, 3, 14)) == 1);
+% datestr ecrit « 31-Mar-2024 » : datenum doit savoir le relire.
+assert(datenum('31-Mar-2024') == datenum(2024, 3, 31));
+assert(strcmp(datestr(datenum('31-Mar-2024 13:45:00')), '31-Mar-2024 13:45:00'));
+
 disp('texte et entrees-sorties : toutes les verifications passent');

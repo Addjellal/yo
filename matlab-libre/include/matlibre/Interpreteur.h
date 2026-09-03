@@ -148,6 +148,14 @@ public:
     std::shared_ptr<FonctionUtilisateur> fonctionFichier(const std::string& nom);
     const std::map<std::string, std::string>& indexFichiers() const { return indexM_; }
     std::shared_ptr<DefinitionClasse> classeDefinie(const std::string& nom);
+    // La classe qui declare la methode nommee, s'il y en a une. « head »
+    // et « height » ne sont des fonctions que par cette voie : sans elle,
+    // « exist » et « help » ne les trouvaient pas, alors que « head(t) »
+    // marchait deja.
+    std::shared_ptr<DefinitionClasse> classeDeMethode(const std::string& nom);
+    // « X.empty » : la seule methode statique que toute classe possede.
+    bool classeVide(const std::string& nom);
+    Valeur valeurVideDeClasse(const std::string& nom, const Dims& d);
 
     // --- sorties ---
     // Posé par une interface graphique : « clc » l'appelle au lieu
@@ -275,6 +283,9 @@ private:
     std::vector<std::string> nomsArgumentsAppel_;
     std::map<std::string, std::string> indexM_;       // nom -> fichier
     std::map<std::string, std::string> indexClasses_; // nom -> fichier classdef
+    // methode -> classe qui la declare, batie a la premiere demande.
+    std::map<std::string, std::string> indexMethodes_;
+    bool indexMethodesPret_ = false;
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> cacheFonctions_;
     std::map<std::string, std::shared_ptr<DefinitionClasse>> cacheClasses_;
     std::string racineToolbox_;

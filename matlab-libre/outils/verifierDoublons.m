@@ -25,12 +25,15 @@ for k = 1:numel(dossiers)
         ou{end + 1} = fullfile(chemin, nom);       %#ok<SAGROW>
     end
 end
+% Les noms triés mettent les doublons côte à côte : la comparaison de
+% chaque paire coûtait le carré du nombre de fichiers, et dépassait la
+% minute une fois les toolboxes remplies.
 doublons = {};
-for k = 1:numel(noms)
-    for j = k + 1:numel(noms)
-        if strcmp(noms{k}, noms{j})
-            doublons{end + 1} = sprintf('%s :\n    %s\n    %s', noms{k}, ou{k}, ou{j}); %#ok<SAGROW>
-        end
+[tries, ordre] = sort(noms);
+for k = 2:numel(tries)
+    if strcmp(tries{k}, tries{k - 1})
+        doublons{end + 1} = sprintf('%s :\n    %s\n    %s', tries{k}, ...
+                                    ou{ordre(k - 1)}, ou{ordre(k)});    %#ok<SAGROW>
     end
 end
 % Un fichier .m qui porte le nom d'une fonction native la masque : le C++

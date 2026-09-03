@@ -1524,6 +1524,36 @@ SUB2IND  Indice linéaire à partir des indices par dimension.
     Voir aussi IND2SUB, SIZE, RESHAPE, FIND.
 ```
 
+## `subsasgn`
+
+```
+SUBSASGN  L'affectation indexée, écrite comme une donnée.
+    B = SUBSASGN(A,S,X) écrit X dans A à l'emplacement décrit par S : une
+    structure 1xN de champs « type » et « subs », celle que fabrique
+    SUBSTRUCT. C'est le pendant de SUBSREF.
+
+    C'est ce que reçoit la méthode SUBSASGN d'une classe quand on écrit
+    dans un objet, et c'est la fonction qu'elle appelle pour poursuivre la
+    chaîne qu'elle n'a pas traitée elle-même. L'affectation faite ici est
+    celle par défaut : elle ne rappelle pas la méthode de la classe, ce
+    qui boucler ait.
+
+    Syntaxe
+       B = subsasgn(A,S,X)
+
+    Exemples
+       A = [10 20 30];
+       subsasgn(A, substruct('()', {2}), 99)      % [10 99 30]
+       s.champ = 1;
+       r = subsasgn(s, substruct('.', 'champ'), 42);
+       r.champ                                    % 42
+       c = {1, 'deux'};
+       d = subsasgn(c, substruct('{}', {1}), 'un');
+       d{1}                                       % 'un'
+
+    Voir aussi SUBSREF, SUBSTRUCT, CLASSDEF.
+```
+
 ## `subsref`
 
 ```

@@ -281,8 +281,11 @@ FONCTION(fnHist) {
     return {comptes[0], Valeur::ligne(centres)};
 }
 
-FONCTION(fnImagesc) {
-    INUTILISE
+// Le corps commun de « imagesc », « image », « pcolor » et « surf ».
+// « sensMatrice » dit si la premiere ligne va en haut — c'est le cas
+// d'une image, ce ne l'est pas d'une surface, dont les ordonnees montent.
+std::vector<Valeur> traceImage(Interpreteur& it, Arguments args, int nargout,
+                               bool sensMatrice) {
     exigerArguments(args, 1, 3, "imagesc");
     const Valeur& z = args[args.size() - 1];
     exigerNumerique(z, "imagesc");
@@ -304,11 +307,26 @@ FONCTION(fnImagesc) {
         s.x = {X.re.front(), X.re.back()};
         s.y = {Y.re.front(), Y.re.back()};
     }
+    // MATLAB : une image se lit comme une matrice, la premiere ligne en
+    // haut. C'est l'axe qui est retourne, pas l'image.
+    axesCourants(it)->yInverse = sensMatrice;
     int identifiant = ajouterSerie(it, s);
     if (nargout > 0)
         return {poigneeLigne(figureCourante(it)->numero, axesCourants(it)->identifiant,
                              identifiant)};
     return {};
+}
+
+FONCTION(fnImagesc) {
+    INUTILISE
+    return traceImage(it, args, nargout, true);
+}
+
+// « pcolor » suit les ordonnees croissantes vers le haut, comme une
+// surface vue de dessus, et non comme une image.
+FONCTION(fnPcolor) {
+    INUTILISE
+    return traceImage(it, args, nargout, false);
 }
 
 FONCTION(fnSurf) {
@@ -338,7 +356,7 @@ FONCTION(fnSurf) {
     } else {
         a = {args[args.size() - 1]};
     }
-    return fnImagesc(it, a, nargout);
+    return traceImage(it, a, nargout, false);
 }
 
 // ---------------------------------------------------------- contours
@@ -529,6 +547,12 @@ void lireArgumentsContour(Interpreteur& it, std::vector<Valeur>& args, const cha
     if ((int)x.size() != Z.ncolonnes() || (int)y.size() != Z.nlignes())
         erreur("MATLAB:contour:SizeMismatch",
                "X and Y must match the size of Z.");
+    // MATLAB veut au moins deux lignes et deux colonnes : une maille ne
+    // se decoupe pas autrement. Sans ce controle, « contourf([]) »
+    // lisait le premier element d'un vecteur vide et tombait.
+    if (Z.nlignes() < 2 || Z.ncolonnes() < 2)
+        erreur("MATLAB:contour:ZMustBeAtLeast2x2",
+               "Z must be at least a 2x2 matrix.");
     if (k < fin && args[k].estNumerique() && !args[k].estVide()) {
         if (args[k].nelem() == 1) {
             int combien = (int)args[k].scal();
@@ -966,6 +990,12 @@ FONCTION(fnAxis) {
             a->proportions = Axes::Proportions::Carre;
         } else if (s == "normal") {
             a->proportions = Axes::Proportions::Auto;
+        } else if (s == "xy") {
+            a->yInverse = false;
+        } else if (s == "ij") {
+            // MATLAB : « axis ij » met l'origine en haut a gauche, comme
+            // les lignes et colonnes d'une matrice.
+            a->yInverse = true;
         } else if (s == "off") {
             a->axesVisibles = false;
         } else if (s == "on") {
@@ -1376,7 +1406,7 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("contourc", fnContourc, "graphique",
                    "contourc  Matrice des lignes de niveau, sans tracer.");
     it.enregistrer("contour", fnContour, "graphique", "contour  Lignes de niveau.");
-    it.enregistrer("pcolor", fnImagesc, "graphique", "pcolor  Damier colore.");
+    it.enregistrer("pcolor", fnPcolor, "graphique", "pcolor  Damier colore.");
     it.enregistrer("figure", fnFigure, "graphique", "figure  Cree ou choisit une figure.");
     it.enregistrer("clf", fnClf, "graphique", "clf  Vide la figure courante.");
     it.enregistrer("close", fnClose, "graphique", "close  Ferme une figure.");

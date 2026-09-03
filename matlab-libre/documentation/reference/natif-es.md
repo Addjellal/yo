@@ -434,6 +434,36 @@ FREWIND  Revient au début du fichier.
     Voir aussi FSEEK, FTELL, FOPEN, FEOF.
 ```
 
+## `fscanf`
+
+```
+FSCANF  Lit des données formatées dans un fichier.
+    A = FSCANF(FID,FORMAT) lit ce qui reste du fichier en appliquant le
+    format, comme le fait SSCANF sur une chaîne, et rend les valeurs dans
+    une colonne. Le curseur avance de ce qui a été lu : un second appel
+    reprend là où le premier s'est arrêté.
+
+    A = FSCANF(FID,FORMAT,N) s'arrête après N valeurs.
+    A = FSCANF(FID,FORMAT,[L C]) range les valeurs dans une matrice de L
+    lignes, colonne par colonne.
+    [A,COMPTE] = FSCANF(...) rend aussi le nombre de valeurs lues.
+
+    Syntaxe
+       a = fscanf(fid,format)
+       a = fscanf(fid,format,taille)
+
+    Exemples
+       f = fullfile(tempdir, 'essai_fscanf.txt');
+       fid = fopen(f, 'w');  fprintf(fid, '1 2 3 4 5 6');  fclose(fid);
+       fid = fopen(f, 'r');
+       debut = fscanf(fid, '%d', 3);      % [1;2;3]
+       suite = fscanf(fid, '%d');         % [4;5;6]
+       fclose(fid);
+       delete(f);
+
+    Voir aussi SSCANF, FGETL, FREAD, FPRINTF, TEXTSCAN.
+```
+
 ## `fwrite`
 
 ```

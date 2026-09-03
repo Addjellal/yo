@@ -31,6 +31,23 @@ FONCTION(fnFeval) {
     return it.appeler(args[0].versTexte(), reste, std::max(nargout, 1));
 }
 
+// « builtin » court-circuite toute surcharge : c'est la fonction native
+// elle-meme qui est appelee, meme si une methode de classe ou un fichier
+// .m porte le meme nom.
+FONCTION(fnBuiltin) {
+    exigerArguments(args, 1, 0, "builtin");
+    std::string nom = args[0].classe == Classe::Fonction && args[0].fn
+                          ? args[0].fn->nom
+                          : args[0].versTexte();
+    const EntreeNative* n = it.natif(nom);
+    if (!n || !n->fonction)
+        erreur("MATLAB:builtin:badFunction",
+               "'" + nom + "' n'est pas une fonction native.");
+    std::vector<Valeur> reste(args.begin() + 1, args.end());
+    Arguments passees(reste);
+    return n->fonction(it, passees, std::max(nargout, 1));
+}
+
 FONCTION(fnFunc2str) {
     INUTILISE
     exigerArguments(args, 1, 1, "func2str");
@@ -416,8 +433,28 @@ FONCTION(fnExist) {
     if (genre.empty() || genre == "class") {
         if (it.classeDefinie(nom)) return {Valeur::scalaire(8)};
     }
+    // Une classe fondamentale sans fonction de construction — c'est le
+    // cas de « function_handle » : MATLAB la donne pour une classe.
+    if (genre.empty() || genre == "class") {
+        bool connue = false;
+        classeDepuisNom(nom, &connue);
+        if ((connue || nom == "function_handle") && !it.natif(nom))
+            return {Valeur::scalaire(8)};
+    }
     if (genre.empty() || genre == "builtin") {
         if (it.natif(nom)) return {Valeur::scalaire(5)};
+        // Les mots du langage — « if », « while », « switch », « break »
+        // — sont, comme dans MATLAB, des constructions natives : sans
+        // cela « exist('while') » disait qu'il n'y a rien.
+        if (estMotCle(nom)) return {Valeur::scalaire(5)};
+    }
+    // Une methode de classe : « head », « height », « table2array » sont
+    // des fonctions du point de vue de l'utilisateur, meme si leur code
+    // vit dans un classdef. Le controle vient apres celui des natives :
+    // « double » est une fonction native, meme si des classes en font
+    // aussi une methode.
+    if (genre.empty() || genre == "file") {
+        if (it.classeDeMethode(nom)) return {Valeur::scalaire(2)};
     }
     return {Valeur::scalaire(0)};
 }
@@ -526,6 +563,8 @@ FONCTION(fnFunctions) {
 
 void enregistrerFonctionnel(Interpreteur& it) {
     it.enregistrer("feval", fnFeval, "fonctionnel", "feval  Appelle une fonction nommee.");
+    it.enregistrer("builtin", fnBuiltin, "fonctionnel",
+                   "builtin  Appelle la fonction native, sans surcharge.");
     it.enregistrer("func2str", fnFunc2str, "fonctionnel", "func2str  Poignee -> texte.");
     it.enregistrer("str2func", fnStr2func, "fonctionnel", "str2func  Texte -> poignee.");
     it.enregistrer("cellfun", fnCellfun, "fonctionnel", "cellfun  Applique a chaque case.");

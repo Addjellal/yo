@@ -1,4 +1,5 @@
 // Temps.cpp — horloges, dates, chronomètres.
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -126,6 +127,21 @@ FONCTION(fnClock) {
     return {Valeur::ligne(v)};
 }
 
+// Le numero d'un mois d'apres son nom anglais, abrege ou entier : c'est
+// ce qu'ecrit DATESTR, et ce que MATLAB relit.
+int moisDepuisNom(const std::string& nom) {
+    static const char* noms[] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                 "jul", "aug", "sep", "oct", "nov", "dec"};
+    std::string court;
+    for (char c : nom) {
+        if (court.size() >= 3) break;
+        court += (char)std::tolower((unsigned char)c);
+    }
+    for (int k = 0; k < 12; ++k)
+        if (court == noms[k]) return k + 1;
+    return 0;
+}
+
 FONCTION(fnDatenum) {
     INUTILISE
     if (args.empty()) {
@@ -145,10 +161,20 @@ FONCTION(fnDatenum) {
             (int)v.re[0], (int)v.re[1], (int)v.re[2], v.nelem() > 3 ? (int)v.re[3] : 0,
             v.nelem() > 4 ? (int)v.re[4] : 0, v.nelem() > 5 ? v.re[5] : 0.0))};
     }
-    // Texte « aaaa-mm-jj » ou « jj/mm/aaaa ».
+    // Texte « aaaa-mm-jj », « mm/jj/aaaa » ou « jj-mmm-aaaa » — cette
+    // derniere forme est celle que DATESTR ecrit : sans elle, le
+    // parcours datestr puis datenum ne revenait pas a son point de
+    // depart.
     std::string s = args[0].versTexte();
     int a = 0, m = 0, j = 0, h = 0, mi = 0;
     double se = 0;
+    char nomMois[32] = {0};
+    if (std::sscanf(s.c_str(), "%d-%31[A-Za-z]-%d %d:%d:%lf", &j, nomMois, &a, &h, &mi, &se) >= 3) {
+        m = moisDepuisNom(nomMois);
+        if (m > 0) return {Valeur::scalaire(versDatenum(a, m, j, h, mi, se))};
+    }
+    h = mi = 0;
+    se = 0;
     if (std::sscanf(s.c_str(), "%d-%d-%d %d:%d:%lf", &a, &m, &j, &h, &mi, &se) >= 3)
         return {Valeur::scalaire(versDatenum(a, m, j, h, mi, se))};
     if (std::sscanf(s.c_str(), "%d/%d/%d", &m, &j, &a) == 3)

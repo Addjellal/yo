@@ -97,6 +97,10 @@ struct Axes {
     // etiquettes sans toucher aux courbes.
     enum class Proportions { Auto, Egales, Carre };
     Proportions proportions = Proportions::Auto;
+    // Sens des axes : « axis ij » et « set(gca,'YDir','reverse') » font
+    // descendre les ordonnees, ce qu'attend toute image affichee par
+    // « imagesc » — la ligne 1 en haut.
+    bool xInverse = false, yInverse = false;
     bool axesVisibles = true;
 };
 
@@ -123,6 +127,12 @@ bool axesSeRecouvrent(const Axes& a, const Axes& b);
 // 10 —, avec un repli sur les 1-2-5 de la décade quand l'intervalle en
 // couvre moins d'une. C'est ce que montre MATLAB.
 std::vector<double> graduationsAxe(double bas, double haut, int cible, bool log);
+
+// La couleur d'une valeur normalisee dans [0,1], suivant la carte des
+// couleurs employee par « imagesc » et « surf ». Les deux rendus — le SVG
+// et la fenetre — passent par la, faute de quoi la meme figure sortait
+// bleue d'un cote et verte de l'autre.
+void couleurCarte(double t, int& r, int& v, int& b);
 
 // Bornes d'un axe logarithmique : les valeurs nulles ou négatives n'y ont
 // pas de place. Rend faux si aucune donnée ne peut être portée.

@@ -173,11 +173,17 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
         if (!(haut > bas)) return 0.5;
         return (v - bas) / (haut - bas);
     };
+    // Un axe inverse retourne la fraction, et rien d'autre : le trace,
+    // les graduations et la grille suivent tous versEcran.
     auto versEcranX = [&](double x) {
-        return trace.left() + place(x, xmin, xmax, logX) * trace.width();
+        double f = place(x, xmin, xmax, logX);
+        if (axes.xInverse) f = 1 - f;
+        return trace.left() + f * trace.width();
     };
     auto versEcranY = [&](double y) {
-        return trace.bottom() - place(y, ymin, ymax, logY) * trace.height();
+        double f = place(y, ymin, ymax, logY);
+        if (axes.yInverse) f = 1 - f;
+        return trace.bottom() - f * trace.height();
     };
 
     // Grille et graduations.
@@ -351,6 +357,38 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 peintre.setBrush(remplissage);
                 peintre.drawPath(chemin);
                 peintre.setBrush(Qt::NoBrush);
+                break;
+            }
+            case GenreTrace::Image: {
+                // Sans ce cas, une image tombait dans le trace par
+                // defaut : la fenetre montrait une diagonale la ou le
+                // SVG montrait la carte.
+                int lImage = serie.hauteurImage, cImage = serie.largeurImage;
+                if (lImage <= 0 || cImage <= 0) break;
+                double mn = 1e308, mx = -1e308;
+                for (double v : serie.z) {
+                    mn = std::min(mn, v);
+                    mx = std::max(mx, v);
+                }
+                if (!std::isfinite(mn) || mx == mn) { mn = 0; mx = 1; }
+                double x0 = serie.x.size() > 1 ? serie.x[0] : 0.5;
+                double x1 = serie.x.size() > 1 ? serie.x[1] : cImage + 0.5;
+                double y0 = serie.y.size() > 1 ? serie.y[0] : 0.5;
+                double y1 = serie.y.size() > 1 ? serie.y[1] : lImage + 0.5;
+                for (int i = 0; i < lImage; ++i)
+                    for (int j = 0; j < cImage; ++j) {
+                        double v = serie.z[(std::size_t)i + (std::size_t)j * lImage];
+                        int r, vert, b;
+                        couleurCarte((v - mn) / (mx - mn), r, vert, b);
+                        double gx0 = versEcranX(x0 + (x1 - x0) * j / cImage);
+                        double gx1 = versEcranX(x0 + (x1 - x0) * (j + 1) / cImage);
+                        double gy0 = versEcranY(y0 + (y1 - y0) * i / lImage);
+                        double gy1 = versEcranY(y0 + (y1 - y0) * (i + 1) / lImage);
+                        QRectF case_(QPointF(std::min(gx0, gx1), std::min(gy0, gy1)),
+                                     QSizeF(std::fabs(gx1 - gx0) + 0.5,
+                                            std::fabs(gy1 - gy0) + 0.5));
+                        peintre.fillRect(case_, QColor(r, vert, b));
+                    }
                 break;
             }
             case GenreTrace::Aire: {

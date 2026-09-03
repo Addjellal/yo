@@ -53,6 +53,29 @@ end
 % Les suites de test ecrites dans le langage.
 suites = numel(dir(fullfile(racine, 'tests', 'scripts', 'test_*.m')));
 
+% Les exemples de l'aide : un bloc « Exemples » par fiche qui en porte
+% un. C'est ce que compte test_aide en les executant, et le nombre
+% vieillissait dans le texte.
+exemples = 0;
+for k = 1:numel(fichesTrouvees)
+    lignesFiche = strsplit(fileread(fullfile(racine, 'toolbox', 'aide', ...
+                                             fichesTrouvees(k).name)), sprintf('\n'));
+    for j = 1:numel(lignesFiche)
+        if ~isempty(regexp(lignesFiche{j}, '^\s+Exemples\s*$', 'once'))
+            exemples = exemples + 1;
+        end
+    end
+end
+
+% Les verifications des deux binaires de test : on les lit dans ce
+% qu'ils affichent, faute de quoi le texte finit par citer un chiffre
+% que plus rien ne produit. Un binaire absent laisse le texte en place.
+verifsCoeur = compterVerifications(fullfile(racine, 'build', 'bin', 'matlibre_tests'), ...
+                                   '(\d+) / \d+ verifications passees');
+verifsBureau = compterVerifications(fullfile(racine, 'build', 'bin', ...
+                                             'matlibre_tests_bureau'), ...
+                                    'verifications passent \((\d+)\)');
+
 fprintf('%d fonctions natives, %d fonctions de toolbox, %d modules\n', ...
         natives, total, modules);
 fprintf('%d fiches d''aide, %d suites de test\n', fiches, suites);
@@ -123,7 +146,17 @@ motifs = {'\d+ fonctions natives', sprintf('%d fonctions natives', natives)
           '\d+ fonctions ont leur fiche', sprintf('%d fonctions ont leur fiche', fiches)
           '\d+ suites en langage MATLAB', sprintf('%d suites en langage MATLAB', suites)
           '\d+ suites écrites dans le langage', ...
-              sprintf('%d suites écrites dans le langage', suites)};
+              sprintf('%d suites écrites dans le langage', suites)
+          'les \d+ exemples de l''aide', ...
+              sprintf('les %d exemples de l''aide', exemples)};
+if verifsCoeur > 0
+    motifs(end + 1, :) = {'\d+ vérifications C\+\+ sur le cœur', ...
+                          sprintf('%d vérifications C++ sur le cœur', verifsCoeur)};
+end
+if verifsBureau > 0
+    motifs(end + 1, :) = {'\d+ vérifications du bureau natif', ...
+                          sprintf('%d vérifications du bureau natif', verifsBureau)};
+end
 for f = 1:numel(fichiers)
     texte = fileread(fichiers{f});
     avant = texte;
@@ -150,4 +183,22 @@ function ecrireLignes(chemin, lignes)
         end
     end
     fclose(fid);
+end
+
+function n = compterVerifications(binaire, motif)
+%COMPTERVERIFICATIONS Le nombre annoncé par un binaire de test.
+%   Zéro quand le binaire n'est pas là : la documentation garde alors le
+%   chiffre qu'elle avait, plutôt que d'en inventer un.
+    n = 0;
+    if ~isfile(binaire)
+        return
+    end
+    [etat, sortie] = system(['"' binaire '" 2>&1']);
+    if etat ~= 0
+        return
+    end
+    trouve = regexp(sortie, motif, 'tokens');
+    if ~isempty(trouve)
+        n = str2double(trouve{end}{1});
+    end
 end

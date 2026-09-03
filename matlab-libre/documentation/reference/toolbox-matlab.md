@@ -37,9 +37,93 @@
 %   convhull    - Enveloppe convexe d'un nuage de points
 %   inpolygon   - Points intérieurs à un polygone
 %
+% Tableaux : formes, ensembles, répétitions
+%   repelem       - Répétition élément par élément
+%   setxor        - Différence symétrique de deux ensembles
+%   shiftdim      - Décalage des dimensions
+%   issorted      - Le tableau est-il trié ?
+%   issortedrows  - Les lignes sont-elles triées ?
+%   convn         - Convolution à N dimensions
+%   pagemtimes    - Produit matriciel page par page
+%   pagetranspose, pagectranspose - Transposée de chaque page
+%   swapbytes     - Inversion de l'ordre des octets
+%   celldisp      - Affiche le contenu d'un tableau de cellules
+%   namelengthmax - Longueur maximale d'un nom
+%   genvarname    - Fabrique des noms de variables valides
+%   nthargout     - Ne garder qu'une sortie d'une fonction
+%
+% Données : classes, groupes, manquants
+%   discretize    - Range des valeurs dans des classes
+%   histcounts2   - Comptage sur un quadrillage à deux dimensions
+%   histogram2    - Histogramme à deux dimensions
+%   ismissing     - Repère les valeurs manquantes
+%   rmmissing     - Retire les valeurs manquantes
+%   standardizeMissing - Traduit un code d'absence en vrai manquant
+%   findgroups    - Numérote les groupes d'un classement
+%   splitapply    - Applique une fonction groupe par groupe
+%   pivot         - Tableau croisé d'une table
+%
+% Texte et JSON
+%   split, splitlines - Découpe du texte
+%   jsonencode, jsondecode - Écriture et lecture du JSON
+%
+% Fichiers et web
+%   readcell, writecell - Fichier délimité et tableau de cellules
+%   readvars      - Les colonnes d'un fichier, une par sortie
+%   importdata    - Charge un fichier sans dire de quel genre il est
+%   matfile       - Accès à un fichier .mat variable par variable
+%   genpath       - Chemin d'un dossier et de ses sous-dossiers
+%   what          - Inventaire des fichiers MATLAB d'un dossier
+%   fileattrib    - Attributs d'un fichier
+%   webread, websave - Lecture d'une adresse
+%   filemarker    - Séparateur d'un fichier et de sa sous-fonction
+%
+% Dates
+%   eomday        - Dernier jour du mois
+%   calendar      - Calendrier d'un mois
+%   weeknum       - Numéro de la semaine
+%   yyyymmdd      - Date écrite AAAAMMJJ
+%   months        - Nombre de mois entre deux dates
+%
+% Appels et interface
+%   inputParser   - Contrôle des arguments d'une fonction
+%   memoize       - Garde les résultats d'une fonction
+%   MemoizedFunction - L'objet que rend memoize
+%   inputdlg      - Demande des valeurs à l'utilisateur
+%   allchild      - Enfants d'un objet graphique, cachés compris
+%   numlock       - État du verrouillage numérique
+%
 % Cartes de couleurs
 %   gray, hot, cool, spring, summer, autumn, winter, bone, copper,
 %   pink, jet, hsv, flag, prism
+```
+
+## `MemoizedFunction`
+
+```
+MEMOIZEDFUNCTION Fonction qui retient ses résultats.
+  C'est l'objet que rend MEMOIZE. Il s'appelle comme la fonction
+  d'origine ; les arguments déjà vus ne sont pas recalculés.
+
+  Voir aussi MEMOIZE, CLEARCACHE, STATS.
+```
+
+## `allchild`
+
+```
+ALLCHILD Enfants d'un objet graphique, y compris les cachés.
+  E = ALLCHILD(H) rend les objets dont H est le parent. À la
+  différence de get(H,'Children'), les objets marqués cachés y
+  figurent aussi.
+
+  Avec plusieurs poignées, E est un tableau de cellules, un par
+  poignée.
+
+  Exemple :
+     plot(1:3);
+     numel(allchild(gca))     % 1
+
+  Voir aussi FINDOBJ, GET, GCA, GCF, FINDALL.
 ```
 
 ## `alpha`
@@ -241,6 +325,25 @@ BRUSH Sélection de points à la souris (acceptée, sans effet).
   Voir aussi DATACURSORMODE, ZOOM, PAN, FINDOBJ.
 ```
 
+## `calendar`
+
+```
+CALENDAR Calendrier d'un mois.
+  C = CALENDAR(A,M) rend une matrice 6x7 : une colonne par jour de la
+  semaine, dimanche en premier, une ligne par semaine. Les cases hors
+  du mois valent zéro.
+
+  C = CALENDAR(D) prend le mois de la date D, donnée en numéro de
+  série ou en texte. Sans argument, c'est le mois courant.
+
+  Sans sortie, le calendrier s'affiche.
+
+  Exemple :
+     calendar(2024, 2)
+
+  Voir aussi EOMDAY, WEEKDAY, DATENUM, DATESTR.
+```
+
 ## `caxis`
 
 ```
@@ -266,6 +369,19 @@ CAXIS Bornes de l'échelle de couleurs.
      % les deux images se comparent maintenant couleur pour couleur
 
   Voir aussi CLIM, COLORMAP, COLORBAR, IMAGESC, XLIM, YLIM.
+```
+
+## `celldisp`
+
+```
+CELLDISP Affiche le contenu d'un tableau de cellules.
+  CELLDISP(C) affiche chaque élément de C précédé de son indice.
+  CELLDISP(C,NOM) emploie NOM au lieu du nom de la variable.
+
+  Exemple :
+     celldisp({1, 'deux'})
+
+  Voir aussi DISP, CELL.
 ```
 
 ## `clabel`
@@ -403,6 +519,22 @@ CONVHULL Enveloppe convexe d'un nuage de points du plan.
 
   Exemple :
      k = convhull([0 1 1 0 0.5], [0 0 1 1 0.5]);   % le carré
+```
+
+## `convn`
+
+```
+CONVN Convolution à N dimensions.
+  C = CONVN(A,B) rend la convolution complète de A par B : sa taille
+  est size(A)+size(B)-1 suivant chaque dimension.
+  C = CONVN(A,B,'same') rend la partie centrale, de la taille de A.
+  C = CONVN(A,B,'valid') ne rend que la part calculée sans dépassement.
+
+  Exemple :
+     a = ones(3,3,3);
+     c = convn(a, ones(2,2,2), 'valid');   % 2x2x2 de valeur 8
+
+  Voir aussi CONV, CONV2, FILTER.
 ```
 
 ## `cool`
@@ -592,6 +724,32 @@ DELAUNAY Triangulation de Delaunay.
   Voir aussi TRIMESH, TRISURF, VORONOI, CONVHULL, GRIDDATA.
 ```
 
+## `discretize`
+
+```
+DISCRETIZE Range des valeurs dans des classes.
+  BINS = DISCRETIZE(X,BORDS) rend, pour chaque valeur de X, le numéro
+  de la classe qui la contient : BINS(i) vaut j quand BORDS(j) <= X(i)
+  < BORDS(j+1). La dernière classe est fermée des deux côtés. Une
+  valeur hors des bords donne NaN.
+
+  BINS = DISCRETIZE(X,N) découpe l'étendue de X en N classes égales.
+
+  BINS = DISCRETIZE(X,BORDS,VALEURS) rend la valeur associée à la
+  classe au lieu de son numéro ; VALEURS peut être un tableau de
+  cellules de noms.
+
+  DISCRETIZE(...,'IncludedEdge','right') ferme les classes à droite.
+  DISCRETIZE(...,'categorical',NOMS) rend un tableau catégoriel.
+
+  [BINS,BORDS] = DISCRETIZE(...) rend aussi les bords employés.
+
+  Exemple :
+     discretize([1 2 3 4 5], [1 3 5])    % [1 1 2 2 2]
+
+  Voir aussi HISTCOUNTS, HISTOGRAM, INTERP1, CATEGORICAL.
+```
+
 ## `divergence`
 
 ```
@@ -663,6 +821,19 @@ ELLIPSOID Coordonnées d'un ellipsoïde.
      size(X)                          % 11 par 11
 
   Voir aussi SPHERE, CYLINDER, SURF, MESH, COV.
+```
+
+## `eomday`
+
+```
+EOMDAY Dernier jour du mois.
+  D = EOMDAY(A,M) rend le numéro du dernier jour du mois M de l'année
+  A : 28 ou 29 pour février selon que l'année est bissextile.
+
+  Exemple :
+     eomday(2024, 2)     % 29
+
+  Voir aussi CALENDAR, DATENUM, WEEKDAY, DAYSACT.
 ```
 
 ## `errorbar`
@@ -820,6 +991,40 @@ FEATHER Flèches réparties le long de l'axe des abscisses.
   Voir aussi COMPASS, QUIVER, POLARPLOT, PLOT.
 ```
 
+## `fileattrib`
+
+```
+FILEATTRIB Lit ou change les attributs d'un fichier.
+  [OK,MSG,A] = FILEATTRIB(F) rend une structure décrivant F : son nom
+  complet, s'il est un dossier, et les droits de lecture, d'écriture et
+  d'exécution de l'utilisateur.
+
+  FILEATTRIB(F,MODE) change les droits. MODE s'écrit comme dans un
+  terminal : '+w' donne le droit d'écriture, '-w' le retire, '+x'
+  rend exécutable.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.txt');
+     fid = fopen(f, 'w'); fclose(fid);
+     [ok, ~, a] = fileattrib(f);
+
+  Voir aussi DIR, EXIST, ISFILE, ISFOLDER, DELETE.
+```
+
+## `filemarker`
+
+```
+FILEMARKER Le caractère qui sépare un fichier de sa sous-fonction.
+  M = FILEMARKER rend le caractère employé dans les noms qualifiés du
+  genre « monfichier>masousfonction », que rendent WHICH et les piles
+  d'erreurs.
+
+  Exemple :
+     ['essai' filemarker() 'aide']     % 'essai>aide'
+
+  Voir aussi WHICH, PATHSEP, FILESEP, DBSTACK.
+```
+
 ## `fill3`
 
 ```
@@ -864,6 +1069,25 @@ FIMPLICIT Courbe implicite F(x,y) = 0.
      fimplicit(@(x, y) y.^2 - x.^3 + x, [-2 3]);      % une cubique
 
   Voir aussi FCONTOUR, CONTOUR, FPLOT, EZPLOT, FSURF.
+```
+
+## `findgroups`
+
+```
+FINDGROUPS Numérote les groupes d'un tableau de classement.
+  G = FINDGROUPS(A) rend, pour chaque élément de A, le numéro de son
+  groupe : les valeurs distinctes de A sont numérotées dans l'ordre
+  croissant. Une valeur manquante donne NaN.
+
+  [G,ID] = FINDGROUPS(A) rend en outre la valeur qui définit chaque
+  groupe.
+
+  [G,ID1,ID2] = FINDGROUPS(A1,A2) croise deux classements.
+
+  Exemple :
+     [g, noms] = findgroups({'b','a','b'})   % g = [2 1 2]
+
+  Voir aussi SPLITAPPLY, UNIQUE, ACCUMARRAY, GROUPSUMMARY.
 ```
 
 ## `findobj`
@@ -979,6 +1203,41 @@ FSURF Trace une surface donnée par une poignée.
      fsurf(@(x, y) sin(x) .* cos(y), [-pi pi -pi pi]);
 
   Voir aussi SURF, FCONTOUR, FMESH, FPLOT, EZSURF, MESHGRID.
+```
+
+## `genpath`
+
+```
+GENPATH Chemin d'un dossier et de tous ses sous-dossiers.
+  P = GENPATH(D) rend, séparés par PATHSEP, D et tous ses
+  sous-dossiers. Les dossiers que MATLAB réserve — ceux dont le nom
+  commence par un point, par « @ » ou par « + », et « private » — n'y
+  figurent pas : ils ne s'ajoutent pas au chemin de recherche.
+
+  Sans argument, GENPATH part du dossier courant.
+
+  Exemple :
+     addpath(genpath(fullfile(matlabroot, 'toolbox', 'monlot')));
+
+  Voir aussi PATH, ADDPATH, PATHSEP, DIR.
+```
+
+## `genvarname`
+
+```
+GENVARNAME Fabrique des noms de variables valides.
+  N = GENVARNAME(C) transforme C — une chaîne ou un tableau de
+  cellules de chaînes — en noms de variables acceptables : les
+  caractères interdits deviennent leur code, un nom vide ou commençant
+  par un chiffre reçoit un préfixe, un mot réservé reçoit un suffixe.
+
+  N = GENVARNAME(C,EXCLUS) évite en outre les noms de la liste EXCLUS
+  en ajoutant un numéro.
+
+  Exemple :
+     genvarname({'a b', 'end', 'a b'})   % {'a_0x20_b', 'end1', 'a_0x20_b1'}
+
+  Voir aussi ISVARNAME, MATLAB.LANG.MAKEVALIDNAME, ISKEYWORD.
 ```
 
 ## `getframe`
@@ -1161,6 +1420,50 @@ HIDDEN Élimination des parties cachées (acceptée, sans effet).
   Voir aussi MESH, SURF, SHADING, LIGHTING.
 ```
 
+## `histcounts2`
+
+```
+HISTCOUNTS2 Comptage sur un quadrillage à deux dimensions.
+  N = HISTCOUNTS2(X,Y) compte les couples (X,Y) tombant dans chaque
+  case d'un quadrillage automatique. N(i,j) compte la case de la
+  i-ième classe en X et de la j-ième en Y.
+
+  N = HISTCOUNTS2(X,Y,NBINS) impose le nombre de classes : un scalaire
+  pour les deux axes, ou [NX NY].
+  N = HISTCOUNTS2(X,Y,BORDSX,BORDSY) impose les bords.
+
+  [N,BORDSX,BORDSY] = HISTCOUNTS2(...) rend aussi les bords employés.
+
+  Exemple :
+     [n, bx, by] = histcounts2([1 2 3], [1 1 2], [0 2 4], [0 1.5 3]);
+
+  Voir aussi HISTCOUNTS, HISTOGRAM2, ACCUMARRAY.
+```
+
+## `histogram2`
+
+```
+HISTOGRAM2 Histogramme à deux dimensions.
+  HISTOGRAM2(X,Y) compte les couples (X,Y) par case d'un quadrillage
+  et trace le résultat.
+
+  HISTOGRAM2(X,Y,NBINS) impose le nombre de classes, HISTOGRAM2(X,Y,
+  BORDSX,BORDSY) les bords.
+
+  [N,BORDSX,BORDSY] = HISTOGRAM2(...) rend les effectifs et les bords.
+
+  Le rendu de MatLibre est le quadrillage en couleurs — le
+  'DisplayStyle','tile' de MATLAB — plutôt que les barres en
+  perspective : sur une densité, les barres du fond se cachent entre
+  elles.
+
+  Exemple :
+     x = randn(1, 500);  y = x + 0.5 * randn(1, 500);
+     histogram2(x, y, [12 12]);
+
+  Voir aussi HISTCOUNTS2, HISTOGRAM, IMAGESC, HEATMAP.
+```
+
 ## `hot`
 
 ```
@@ -1184,6 +1487,33 @@ HUMPS Fonction d'essai à deux pics, utilisée par les démonstrations.
   Y = HUMPS(X) évalue 1/((x-0.3)^2+0.01) + 1/((x-0.9)^2+0.04) - 6.
 ```
 
+## `importdata`
+
+```
+IMPORTDATA Charge un fichier sans dire de quel genre il est.
+  A = IMPORTDATA(FICHIER) reconnaît le fichier à son extension :
+     .mat            rend une structure des variables enregistrées ;
+     image           rend la matrice des pixels ;
+     texte délimité  rend les nombres, ou une structure quand le
+                     fichier porte aussi du texte.
+
+  A = IMPORTDATA(FICHIER,SEP) impose le séparateur, A =
+  IMPORTDATA(FICHIER,SEP,N) le nombre de lignes d'en-tête.
+
+  [A,SEP,N] = IMPORTDATA(...) rend en outre le séparateur reconnu et le
+  nombre de lignes d'en-tête sautées.
+
+  Quand le fichier porte un en-tête, A est une structure de champs
+  « data », « textdata » et « colheaders », comme dans MATLAB.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writecell({'x','y'; 1, 2; 3, 4}, f);
+     a = importdata(f);       % a.data, a.colheaders
+
+  Voir aussi READMATRIX, READTABLE, READCELL, LOAD, IMREAD.
+```
+
 ## `inpolygon`
 
 ```
@@ -1201,6 +1531,62 @@ INPOLYGON Points intérieurs à un polygone.
      inpolygon(0.5, 0.5, [0 1 1 0], [0 0 1 1])   % vrai
 ```
 
+## `inputParser`
+
+```
+INPUTPARSER Contrôle des arguments d'une fonction.
+  P = INPUTPARSER fabrique un analyseur. On lui déclare les arguments
+  attendus, puis on lui donne ceux reçus ; il les range dans P.Results
+  et refuse ce qui ne convient pas.
+
+  Déclarations :
+     addRequired(P,NOM,VALIDATEUR)        argument obligatoire
+     addOptional(P,NOM,DEFAUT,VALIDATEUR) argument facultatif, par rang
+     addParameter(P,NOM,DEFAUT,VALIDATEUR) paire nom-valeur
+     addSwitch(P,NOM)                     drapeau, vrai s'il est là
+
+  Analyse :
+     parse(P,ARGS{:})
+     P.Results        structure des valeurs retenues
+     P.UsingDefaults  noms restés à leur valeur par défaut
+     P.Unmatched      paires non déclarées, si KeepUnmatched est vrai
+
+  Un validateur est une fonction qui rend faux ou lève une erreur quand
+  la valeur ne convient pas — @isnumeric, @(x) x > 0.
+
+  Exemple :
+     p = inputParser;
+     addRequired(p, 'x', @isnumeric);
+     addParameter(p, 'Ordre', 2, @(v) v > 0);
+     parse(p, 3, 'Ordre', 5);
+     p.Results.Ordre        % 5
+
+  Voir aussi VALIDATEATTRIBUTES, NARGINCHK, VARARGIN, PARSE.
+```
+
+## `inputdlg`
+
+```
+INPUTDLG Demande des valeurs à l'utilisateur.
+  R = INPUTDLG(INVITES) pose une question par invite et rend les
+  réponses dans un tableau de cellules de chaînes. Une réponse vide
+  garde la valeur par défaut ; une interruption rend un tableau vide,
+  comme le bouton Annuler de MATLAB.
+
+  R = INPUTDLG(INVITES,TITRE,LIGNES,DEFAUTS) donne un titre, un nombre
+  de lignes par réponse — sans effet ici — et les valeurs proposées.
+
+  MatLibre pose les questions dans la console plutôt que dans une
+  fenêtre : l'interpréteur n'a pas de boucle d'événements modale, et
+  une fausse fenêtre qui rendrait la main aussitôt tromperait le
+  programme qui attend la réponse.
+
+  Exemple :
+     r = inputdlg({'Nom', 'Âge'}, 'Fiche', 1, {'', '30'});
+
+  Voir aussi INPUT, LISTDLG, UIEDITFIELD, KEYBOARD.
+```
+
 ## `iskeyword`
 
 ```
@@ -1215,6 +1601,59 @@ ISKEYWORD Mot réservé du langage ?
 ISMEMBERTOL Appartenance à un ensemble, à une tolérance près.
 ```
 
+## `ismissing`
+
+```
+ISMISSING Repère les valeurs manquantes.
+  TF = ISMISSING(A) rend un tableau de booléens marquant les valeurs
+  absentes : NaN pour un nombre, '' pour une cellule de texte, la
+  chaîne manquante pour un tableau de chaînes, <undefined> pour une
+  catégorie, NaT pour une date.
+
+  TF = ISMISSING(A,IND) traite en outre comme manquantes les valeurs
+  énumérées dans IND.
+
+  Pour une table, TF a une colonne par variable.
+
+  Exemple :
+     ismissing([1 NaN 3])          % [false true false]
+     ismissing([1 2 -99], -99)     % [false false true]
+
+  Voir aussi RMMISSING, STANDARDIZEMISSING, ISNAN, ISNAT.
+```
+
+## `issorted`
+
+```
+ISSORTED Vrai si le tableau est trié.
+  TF = ISSORTED(A) est vrai si A est trié par ordre croissant.
+  ISSORTED(A,SENS) teste 'ascend', 'descend', 'monotonic',
+  'strictascend', 'strictdescend' ou 'strictmonotonic'.
+  ISSORTED(A,'rows') teste les lignes d'une matrice ; voir ISSORTEDROWS.
+
+  Exemples :
+     issorted([1 2 2 5])                  % true
+     issorted([1 2 2 5], 'strictascend')  % false
+
+  Voir aussi SORT, ISSORTEDROWS, SORTROWS.
+```
+
+## `issortedrows`
+
+```
+ISSORTEDROWS Vrai si les lignes sont triées.
+  TF = ISSORTEDROWS(A) est vrai si les lignes de A sont classées par
+  ordre croissant, la première colonne d'abord.
+  ISSORTEDROWS(A,COL) ne regarde que les colonnes COL, dans l'ordre
+  donné ; une colonne négative se lit en ordre décroissant.
+  ISSORTEDROWS(A,COL,SENS) impose 'ascend' ou 'descend'.
+
+  Exemple :
+     issortedrows([1 2; 1 3; 2 0])   % true
+
+  Voir aussi SORTROWS, ISSORTED.
+```
+
 ## `jet`
 
 ```
@@ -1224,6 +1663,45 @@ JET Carte de couleurs bleu - cyan - jaune - rouge.
 
   Exemple :
      c = jet(64);   % c(1,:) vaut [0 0 0.5], c(end,:) vaut [0.5 0 0]
+```
+
+## `jsondecode`
+
+```
+JSONDECODE Lit du JSON et rend la valeur MATLAB correspondante.
+  V = JSONDECODE(TEXTE) traduit un document JSON :
+     un objet        devient une structure ;
+     un tableau      devient une matrice colonne s'il ne porte que des
+                     nombres de même forme, un tableau de cellules
+                     sinon ;
+     une chaîne      devient du texte ;
+     true, false     deviennent des booléens ;
+     null            devient [].
+
+  Les noms de champs qui ne sont pas des noms de variables valides sont
+  corrigés comme le fait MATLAB, par GENVARNAME.
+
+  Exemple :
+     s = jsondecode('{"nom":"a","valeurs":[1,2,3]}');
+     s.valeurs(2)      % 2
+
+  Voir aussi JSONENCODE, WEBREAD, READSTRUCT.
+```
+
+## `jsonencode`
+
+```
+JSONENCODE Écrit une valeur MATLAB en JSON.
+  T = JSONENCODE(V) rend le texte JSON de V : une structure devient un
+  objet, un tableau de cellules un tableau, une matrice un tableau de
+  tableaux, du texte une chaîne, [] la valeur null.
+
+  JSONENCODE(V,'PrettyPrint',true) met en forme sur plusieurs lignes.
+
+  Exemple :
+     jsonencode(struct('a', 1, 'b', 'deux'))
+
+  Voir aussi JSONDECODE, WEBWRITE.
 ```
 
 ## `light`
@@ -1281,6 +1759,31 @@ MATERIAL Propriétés de réflexion d'une surface (acceptées, sans effet).
      surf(peaks(30)); material('dull');
 
   Voir aussi LIGHT, LIGHTING, SHADING, SURFL.
+```
+
+## `matfile`
+
+```
+MATFILE Accès à un fichier .mat sans tout charger.
+  M = MATFILE(F) ouvre le fichier F et rend un objet dont chaque
+  propriété est une variable du fichier : M.x lit la variable x, et
+  M.x = 3 l'écrit sans toucher aux autres.
+
+  M = MATFILE(F,'Writable',true) autorise l'écriture ; par défaut,
+  comme dans MATLAB, un fichier existant s'ouvre en lecture seule et
+  un fichier absent s'ouvre en écriture.
+
+  MatLibre relit le fichier à chaque accès plutôt que d'en indexer le
+  contenu : la syntaxe est celle de MATLAB, la lecture partielle
+  d'une grande matrice — M.x(1:10,:) — coûte la lecture entière.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.mat');
+     m = matfile(f, 'Writable', true);
+     m.x = magic(4);
+     m.x(1,:)
+
+  Voir aussi LOAD, SAVE, WHOS, WHO.
 ```
 
 ## `matlab.addons.installedAddons`
@@ -1431,6 +1934,30 @@ MATLIBRE_RACINE_TOOLBOX Dossier qui contient les toolboxes.
   d'environnement MATLIBRE_TOOLBOX le remplace quand elle est posée.
 ```
 
+## `memoize`
+
+```
+MEMOIZE Garde les résultats d'une fonction.
+  MF = MEMOIZE(F) rend un objet qui s'appelle comme F mais retient ce
+  qu'il a déjà calculé : le même jeu d'arguments n'est calculé qu'une
+  fois. C'est utile pour une fonction lente et pure — dont le résultat
+  ne dépend que de ses arguments.
+
+  Sur l'objet rendu :
+     MF.Enabled     mettre à false pour recalculer chaque fois
+     MF.CacheSize   nombre de jeux d'arguments retenus (10 par défaut)
+     clearCache(MF) vide le cache
+     stats(MF)      compte les appels, les trouvailles et les calculs
+
+  Exemple :
+     lent = @(n) sum(primes(n));
+     rapide = memoize(lent);
+     rapide(100000);      % calculé
+     rapide(100000);      % retrouvé
+
+  Voir aussi FUNCTION_HANDLE, CONTAINERS.MAP, TIC, TOC.
+```
+
 ## `meshc`
 
 ```
@@ -1473,6 +2000,23 @@ MESHZ Maillage d'une surface, avec un rideau sur les bords.
   Voir aussi MESH, MESHC, SURF, WATERFALL.
 ```
 
+## `months`
+
+```
+MONTHS Nombre de mois entre deux dates.
+  N = MONTHS(D1,D2) rend le nombre de mois entiers écoulés de D1 à D2.
+  Il est négatif quand D2 précède D1.
+
+  N = MONTHS(D1,D2,0) ne compte un mois que si le jour du mois de D2
+  atteint celui de D1 ; avec 1, valeur par défaut, deux dates en fin de
+  mois comptent un mois plein.
+
+  Exemple :
+     months('31-mar-2024', '30-apr-2024')     % 1
+
+  Voir aussi CALMONTHS, BETWEEN, DAYSACT, DATENUM.
+```
+
 ## `movie`
 
 ```
@@ -1493,6 +2037,16 @@ MOVIE Rejoue une animation (acceptée, sans effet).
      movie(F, 2);          % accepte, sans effet
 
   Voir aussi GETFRAME, COMET, DRAWNOW, ANIMATEDLINE.
+```
+
+## `namelengthmax`
+
+```
+NAMELENGTHMAX Longueur maximale d'un nom.
+  N = NAMELENGTHMAX rend le nombre de caractères qu'un nom de
+  variable, de fonction ou de champ peut compter.
+
+  Voir aussi ISVARNAME, GENVARNAME.
 ```
 
 ## `newplot`
@@ -1544,6 +2098,38 @@ NEXTTILE Passe à la case suivante d'un TILEDLAYOUT.
   Voir aussi TILEDLAYOUT, SUBPLOT, AXES, GCA.
 ```
 
+## `nthargout`
+
+```
+NTHARGOUT Ne garder qu'une sortie d'une fonction.
+  V = NTHARGOUT(N,F,ARG1,...) appelle F avec les arguments donnés en
+  demandant N sorties, et ne rend que la N-ième.
+
+  V = NTHARGOUT([N1 N2 ...],F,...) rend, dans un tableau de cellules,
+  les sorties demandées.
+
+  Exemple :
+     nthargout(2, @max, [3 9 4])   % 2, la position du maximum
+
+  Voir aussi FEVAL, DEAL, NARGOUT.
+```
+
+## `numlock`
+
+```
+NUMLOCK État de la touche de verrouillage numérique.
+  NUMLOCK('on') et NUMLOCK('off') demandent l'allumage ou l'extinction
+  du verrouillage numérique ; E = NUMLOCK rend l'état courant, 'on' ou
+  'off'.
+
+  La touche appartient au serveur graphique. Là où MatLibre ne peut pas
+  l'atteindre — une session sans écran, ou un système qui ne l'expose
+  pas —, l'état rendu est 'off' et la demande reste sans effet, sans
+  erreur.
+
+  Voir aussi INPUT, KEYBOARD.
+```
+
 ## `openfig`
 
 ```
@@ -1557,6 +2143,44 @@ OPENFIG Rouvre une figure enregistrée (indisponible).
   du SVG, qu'un navigateur ou un éditeur d'images rouvre.
 
   Voir aussi SAVEFIG, SAVEAS, OPEN, FIGURE.
+```
+
+## `pagectranspose`
+
+```
+PAGECTRANSPOSE Transposée conjuguée de chaque page d'un tableau.
+  B = PAGECTRANSPOSE(A) échange les deux premières dimensions de A et
+  conjugue les valeurs.
+
+  Voir aussi PAGETRANSPOSE, PAGEMTIMES.
+```
+
+## `pagemtimes`
+
+```
+PAGEMTIMES Produit matriciel page par page.
+  C = PAGEMTIMES(A,B) multiplie chaque page A(:,:,k) par la page
+  B(:,:,k) correspondante. Une entrée n'ayant qu'une page sert à
+  toutes les pages de l'autre.
+
+  C = PAGEMTIMES(A,TA,B,TB) transpose au passage : TA et TB valent
+  'none', 'transpose' ou 'ctranspose'.
+
+  Exemple :
+     a = reshape(1:8, 2, 2, 2);
+     c = pagemtimes(a, a);
+
+  Voir aussi MTIMES, PAGETRANSPOSE, PAGEMLDIVIDE.
+```
+
+## `pagetranspose`
+
+```
+PAGETRANSPOSE Transposée de chaque page d'un tableau.
+  B = PAGETRANSPOSE(A) échange les deux premières dimensions de A, les
+  suivantes restant en place.
+
+  Voir aussi PAGECTRANSPOSE, PAGEMTIMES, PERMUTE.
 ```
 
 ## `pan`
@@ -1720,6 +2344,30 @@ PIE3 Diagramme circulaire en perspective.
 
 ```
 PINK Carte de couleurs pastel, pour les images en sépia.
+```
+
+## `pivot`
+
+```
+PIVOT Tableau croisé d'une table.
+  P = PIVOT(T,'Columns',C,'Rows',R) compte les lignes de T pour chaque
+  couple de valeurs des variables R et C : une ligne de P par valeur
+  de R, une colonne par valeur de C.
+
+  P = PIVOT(T,'Columns',C,'Rows',R,'DataVariable',D) agrège la
+  variable D au lieu de compter.
+  PIVOT(...,'Method',M) choisit l'agrégation : 'count' par défaut,
+  'sum', 'mean', 'median', 'max', 'min', ou une fonction.
+  PIVOT(...,'IncludeTotals',true) ajoute une ligne et une colonne de
+  totaux.
+
+  Exemple :
+     t = table({'a';'a';'b'}, [1;2;1], [10;20;30], ...
+               'VariableNames', {'g', 'c', 'v'});
+     pivot(t, 'Rows', 'g', 'Columns', 'c', ...
+           'DataVariable', 'v', 'Method', 'sum')
+
+  Voir aussi GROUPSUMMARY, FINDGROUPS, SPLITAPPLY, UNSTACK.
 ```
 
 ## `plotmatrix`
@@ -1914,6 +2562,26 @@ RAT Approximation rationnelle par fractions continues.
   S = RAT(X) rend la chaîne « n/d ».
 ```
 
+## `readcell`
+
+```
+READCELL Lit un fichier délimité dans un tableau de cellules.
+  C = READCELL(FICHIER) lit un fichier texte délimité — .csv, .txt —
+  et rend un tableau de cellules : une case numérique donne un nombre,
+  les autres donnent du texte. Rien n'est sauté : la ligne d'en-tête
+  est la première ligne de C.
+
+  C = READCELL(FICHIER,'Delimiter',D) impose le séparateur, par son
+  caractère ou par l'un des noms 'comma', 'semi', 'tab', 'space'.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writecell({'nom', 'valeur'; 'a', 1}, f);
+     readcell(f)
+
+  Voir aussi WRITECELL, READMATRIX, READTABLE, READVARS.
+```
+
 ## `readmatrix`
 
 ```
@@ -1939,6 +2607,21 @@ READMATRIX Lit un fichier texte délimité et rend une matrice.
      readmatrix(f)      % [1 2; 3 4]
 
   Voir aussi WRITEMATRIX, READTABLE, DLMREAD, LOAD.
+```
+
+## `readvars`
+
+```
+READVARS Lit les colonnes d'un fichier, une par sortie.
+  [A,B,C] = READVARS(FICHIER) lit le fichier comme READTABLE et rend
+  chaque variable dans sa propre sortie, dans l'ordre des colonnes.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writecell({'x','y'; 1, 2; 3, 4}, f);
+     [x, y] = readvars(f);
+
+  Voir aussi READTABLE, READMATRIX, READCELL.
 ```
 
 ## `rectangle`
@@ -1987,6 +2670,26 @@ REFRESH Redessine une figure.
      plot(1:10); refresh;
 
   Voir aussi DRAWNOW, FIGURE, CLF, SHG.
+```
+
+## `repelem`
+
+```
+REPELEM Répétition élément par élément.
+  B = REPELEM(V,N) répète chaque élément du vecteur V. N est un
+  scalaire, ou un vecteur donnant le nombre de copies de chaque
+  élément.
+
+  B = REPELEM(A,M,N) répète chaque élément de la matrice A en un bloc
+  de M lignes et N colonnes ; M et N peuvent être des vecteurs donnant
+  la hauteur de chaque ligne et la largeur de chaque colonne.
+
+  Exemples :
+     repelem([1 2 3], 2)        % [1 1 2 2 3 3]
+     repelem([1 2 3], [1 2 3])  % [1 2 2 3 3 3]
+     repelem([1 2; 3 4], 2, 3)
+
+  Voir aussi REPMAT, KRON, RESHAPE.
 ```
 
 ## `rescale`
@@ -2039,6 +2742,29 @@ RIBBON Colonnes dessinées en rubans côte à côte.
      ribbon([sin(t), sin(2*t), sin(3*t)]);
 
   Voir aussi WATERFALL, AREA, MESH, SURF, PLOT3.
+```
+
+## `rmmissing`
+
+```
+RMMISSING Retire les valeurs manquantes.
+  B = RMMISSING(A) retire d'un vecteur les valeurs manquantes, et
+  d'une matrice ou d'une table les lignes qui en contiennent une.
+
+  B = RMMISSING(A,DIM) travaille suivant la dimension DIM : 2 retire
+  les colonnes.
+
+  RMMISSING(...,'MinNumMissing',N) ne retire une ligne que si elle
+  compte au moins N valeurs manquantes.
+  RMMISSING(...,'DataVariables',V) ne regarde, dans une table, que les
+  variables nommées.
+
+  [B,MARQUE] = RMMISSING(A) rend en outre les positions retirées.
+
+  Exemple :
+     rmmissing([1 NaN 3])          % [1 3]
+
+  Voir aussi ISMISSING, STANDARDIZEMISSING, FILLMISSING, RMOUTLIERS.
 ```
 
 ## `rose`
@@ -2147,6 +2873,43 @@ SCATTER3 Nuage de points dans l'espace.
   Voir aussi SCATTER, PLOT3, STEM3, QUIVER3.
 ```
 
+## `setxor`
+
+```
+SETXOR Différence symétrique de deux ensembles.
+  C = SETXOR(A,B) rend, triées et sans répétition, les valeurs qui
+  figurent dans A ou dans B mais pas dans les deux.
+
+  [C,IA,IB] = SETXOR(A,B) rend en outre les positions telles que la
+  part de C venue de A soit A(IA) et celle venue de B soit B(IB).
+
+  SETXOR(A,B,'stable') garde l'ordre de première apparition : d'abord
+  ce qui vient de A, puis ce qui vient de B.
+
+  Exemple :
+     setxor([1 2 3 4], [3 4 5])   % [1 2 5]
+
+  Voir aussi UNION, INTERSECT, SETDIFF, ISMEMBER.
+```
+
+## `shiftdim`
+
+```
+SHIFTDIM Décalage des dimensions d'un tableau.
+  B = SHIFTDIM(X,N) décale les dimensions de X de N crans : pour N
+  positif, les N premières dimensions passent à la fin ; pour N
+  négatif, N dimensions de taille 1 sont ajoutées devant.
+
+  [B,NSHIFTS] = SHIFTDIM(X) supprime les dimensions de tête de taille 1
+  et rend leur nombre.
+
+  Exemple :
+     a = ones(1,1,3,2);
+     [b,n] = shiftdim(a);   % size(b) = [3 2], n = 2
+
+  Voir aussi PERMUTE, RESHAPE, SQUEEZE.
+```
+
 ## `slice`
 
 ```
@@ -2198,6 +2961,59 @@ SPHERE Coordonnées d'une sphère.
   Voir aussi CYLINDER, ELLIPSOID, SURF, MESH, PEAKS.
 ```
 
+## `split`
+
+```
+SPLIT Découpe du texte en morceaux.
+  C = SPLIT(S) découpe S aux espaces.
+  C = SPLIT(S,SEP) découpe au séparateur donné ; SEP peut être un
+  tableau de séparateurs, tous reconnus.
+  C = SPLIT(S,SEP,DIM) range les morceaux suivant la dimension DIM.
+
+  [C,SEP] = SPLIT(...) rend en outre les séparateurs rencontrés.
+
+  La sortie est un tableau de chaînes quand l'entrée en est un, et un
+  tableau de cellules sinon. Toutes les entrées doivent donner le même
+  nombre de morceaux, comme dans MATLAB.
+
+  Exemples :
+     split('a,b,c', ',')
+     split(string({'a-b'; 'c-d'}), '-')
+
+  Voir aussi STRSPLIT, JOIN, SPLITLINES, STRTRIM, EXTRACTBEFORE.
+```
+
+## `splitapply`
+
+```
+SPLITAPPLY Applique une fonction groupe par groupe.
+  Y = SPLITAPPLY(F,X,G) découpe X suivant les numéros de groupe G —
+  ceux que rend FINDGROUPS — et applique F à chaque morceau. Les
+  résultats sont empilés dans Y, un par groupe.
+
+  Y = SPLITAPPLY(F,X1,X2,...,G) passe un morceau de chaque tableau.
+  [Y1,Y2,...] = SPLITAPPLY(...) récupère plusieurs sorties.
+
+  Exemple :
+     x = [1 2 3 4];  g = [1 1 2 2];
+     splitapply(@sum, x, g)     % [3; 7]
+
+  Voir aussi FINDGROUPS, ACCUMARRAY, ARRAYFUN, GROUPSUMMARY.
+```
+
+## `splitlines`
+
+```
+SPLITLINES Découpe du texte à chaque saut de ligne.
+  C = SPLITLINES(S) rend une ligne par ligne de S. Les trois fins de
+  ligne — LF, CR, CRLF — sont reconnues.
+
+  Exemple :
+     splitlines(sprintf('un\ndeux'))
+
+  Voir aussi SPLIT, STRSPLIT, JOIN.
+```
+
 ## `spring`
 
 ```
@@ -2226,6 +3042,24 @@ STACKEDPLOT Plusieurs signaux empilés, une échelle chacun.
      stackedplot(t, Y, 'DisplayLabels', {'sin', 'exp', 'carre'});
 
   Voir aussi PLOT, SUBPLOT, TILEDLAYOUT, PLOTYY, YYAXIS.
+```
+
+## `standardizeMissing`
+
+```
+STANDARDIZEMISSING Remplace des valeurs par la marque de manquant.
+  B = STANDARDIZEMISSING(A,IND) remplace par la valeur manquante
+  propre au type — NaN, '', <undefined>, NaT — toutes les valeurs
+  énumérées dans IND. C'est le pas à faire avant RMMISSING quand un
+  fichier code l'absence par -99 ou par 'N/A'.
+
+  STANDARDIZEMISSING(T,IND,'DataVariables',V) ne touche, dans une
+  table, que les variables nommées.
+
+  Exemple :
+     standardizeMissing([1 2 -99], -99)    % [1 2 NaN]
+
+  Voir aussi ISMISSING, RMMISSING, FILLMISSING.
 ```
 
 ## `stem3`
@@ -2325,6 +3159,20 @@ SURFNORM Normales d'une surface.
      surfnorm(X, Y, Z);
 
   Voir aussi GRADIENT, SURF, QUIVER3, MESH.
+```
+
+## `swapbytes`
+
+```
+SWAPBYTES Inverse l'ordre des octets.
+  Y = SWAPBYTES(X) rend X avec, pour chaque élément, les octets pris à
+  l'envers : c'est le passage d'un boutisme à l'autre. X doit être d'un
+  type entier ou flottant de taille connue ; la classe est conservée.
+
+  Exemple :
+     swapbytes(uint16(1))    % 256
+
+  Voir aussi TYPECAST, CAST, CLASS.
 ```
 
 ## `tiledlayout`
@@ -2509,10 +3357,104 @@ WATERFALL Surface dessinée en lignes, une par rangée.
   Voir aussi RIBBON, MESH, SURF, PLOT3, STACKEDPLOT.
 ```
 
+## `webread`
+
+```
+WEBREAD Lit le contenu d'une adresse.
+  C = WEBREAD(URL) télécharge l'adresse et rend son contenu. Un
+  document JSON est décodé en structure ou en tableau de cellules ; un
+  fichier délimité est lu comme une matrice ; le reste est rendu tel
+  quel, en texte.
+
+  C = WEBREAD(URL,NOM1,VAL1,...) ajoute des paramètres à la requête.
+
+  Le téléchargement passe par curl, qui doit être installé. Aucune
+  donnée n'est envoyée que celles de l'appel.
+
+  Exemple :
+     s = webread('https://example.com');
+
+  Voir aussi WEBSAVE, JSONDECODE, URLREAD.
+```
+
+## `websave`
+
+```
+WEBSAVE Enregistre le contenu d'une adresse dans un fichier.
+  F = WEBSAVE(FICHIER,URL) télécharge l'adresse et l'écrit dans
+  FICHIER ; F est le chemin complet du fichier écrit.
+
+  F = WEBSAVE(FICHIER,URL,NOM1,VAL1,...) ajoute des paramètres à la
+  requête, comme le fait MATLAB : websave(f, url, 'q', 'chat') demande
+  URL?q=chat.
+
+  Le téléchargement passe par curl, qui doit être installé. Aucune
+  donnée n'est envoyée que celles de l'appel.
+
+  Exemple :
+     f = websave(fullfile(tempdir, 'page.html'), 'https://example.com');
+
+  Voir aussi WEBREAD, URLREAD, FILEREAD.
+```
+
+## `weeknum`
+
+```
+WEEKNUM Numéro de la semaine dans l'année.
+  N = WEEKNUM(D) rend le numéro de la semaine où tombe la date D : la
+  semaine 1 est celle du 1er janvier, et les semaines commencent le
+  dimanche.
+
+  N = WEEKNUM(D,J) fait commencer la semaine au jour J (1 pour
+  dimanche, 2 pour lundi, …).
+
+  N = WEEKNUM(D,J,1) suit la règle européenne (ISO 8601) : la semaine
+  1 est celle qui contient le premier jeudi de l'année.
+
+  Exemple :
+     weeknum(datenum(2024, 1, 8))     % 2
+
+  Voir aussi WEEKDAY, CALENDAR, DATENUM, DAY.
+```
+
+## `what`
+
+```
+WHAT Inventaire des fichiers MATLAB d'un dossier.
+  S = WHAT(D) rend une structure décrivant le contenu de D : les
+  fichiers .m, .mat, .mlx, .mex, les classes (@) et les paquets (+).
+  Sans sortie, l'inventaire s'affiche.
+
+  Sans argument, WHAT décrit le dossier courant.
+
+  Exemple :
+     s = what(fullfile(matlabroot, 'toolbox', 'matlab'));
+     numel(s.m)
+
+  Voir aussi DIR, WHICH, EXIST, LS.
+```
+
 ## `winter`
 
 ```
 WINTER Carte de couleurs bleu - vert.
+```
+
+## `writecell`
+
+```
+WRITECELL Écrit un tableau de cellules dans un fichier délimité.
+  WRITECELL(C,FICHIER) écrit une ligne par rangée de C, les cases
+  séparées par des virgules. Un nombre s'écrit en clair, une chaîne
+  telle quelle.
+
+  WRITECELL(C,FICHIER,'Delimiter',D) impose le séparateur.
+
+  Exemple :
+     f = fullfile(tempdir, 'essai.csv');
+     writecell({'nom', 'valeur'; 'a', 1}, f);
+
+  Voir aussi READCELL, WRITEMATRIX, WRITETABLE.
 ```
 
 ## `writematrix`
@@ -2536,6 +3478,20 @@ WRITEMATRIX Écrit une matrice dans un fichier texte délimité.
      isequal(readmatrix(f), magic(4))   % vrai
 
   Voir aussi READMATRIX, WRITETABLE, DLMWRITE, SAVE.
+```
+
+## `yyyymmdd`
+
+```
+YYYYMMDD Date écrite comme un nombre AAAAMMJJ.
+  N = YYYYMMDD(D) rend la date sous la forme du nombre entier
+  AAAAMMJJ : le 3 février 2024 devient 20240203. D est une date, un
+  numéro de série ou du texte.
+
+  Exemple :
+     yyyymmdd(datetime(2024, 2, 3))     % 20240203
+
+  Voir aussi DATENUM, DATESTR, DATEVEC, YEAR, MONTH, DAY.
 ```
 
 ## `zip`

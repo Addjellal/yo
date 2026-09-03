@@ -38,6 +38,28 @@ ASSIGNIN  Écrit une variable dans un autre espace de travail.
     Voir aussi EVALIN, EVAL, GLOBAL.
 ```
 
+## `builtin`
+
+```
+BUILTIN  Appelle la fonction native, sans passer par les surcharges.
+    BUILTIN(NOM,ARG1,...) appelle la fonction native NOM même si une
+    méthode de classe ou un fichier .m du chemin porte le même nom. C'est
+    ce qu'écrit une méthode qui veut le comportement de base du type
+    qu'elle surcharge — un SUBSREF de classe, par exemple, qui délègue au
+    SUBSREF ordinaire ce qu'il ne traite pas lui-même.
+
+    [A,B,...] = BUILTIN(...) rend plusieurs sorties, comme l'appel direct.
+
+    Syntaxe
+       y = builtin(nom,arg1,...)
+
+    Exemples
+       builtin('size', ones(2,3))       % [2 3]
+       builtin(@max, [1 5 2])           % 5
+
+    Voir aussi FEVAL, SUBSREF, SUBSASGN, WHICH, EXIST.
+```
+
 ## `cellfun`
 
 ```

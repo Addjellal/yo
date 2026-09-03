@@ -188,23 +188,151 @@ MODE  Valeur la plus fréquente.
     Voir aussi MEDIAN, MEAN, HISTCOUNTS, UNIQUE.
 ```
 
+## `movmax`
+
+```
+MOVMAX  Maximum glissant.
+    MOVMAX(X,K) rend le maximum sur une fenêtre de K points : c'est la
+    dilatation du traitement d'images, en une dimension.
+
+    Syntaxe
+       y = movmax(x,k)
+
+    Exemples
+       movmax([4 8 6 -1 -2], 3)           % [8 8 8 6 -1]
+
+    Voir aussi MOVMIN, MAX, CUMMAX.
+```
+
 ## `movmean`
 
 ```
 MOVMEAN  Moyenne glissante.
     MOVMEAN(X,K) rend la moyenne sur une fenêtre de K points centrée sur
-    chaque élément ; aux bords, la fenêtre se raccourcit.
+    chaque élément ; aux bords, la fenêtre se raccourcit. Pour un K pair,
+    la fenêtre penche du côté du passé.
+
+    MOVMEAN(X,[NB NA]) prend NB points avant et NA points après.
+    MOVMEAN(X,K,DIM) glisse le long de la dimension DIM.
+    MOVMEAN(...,'omitnan') laisse les NaN de côté.
+    MOVMEAN(...,'Endpoints',E) dit quoi faire aux bords : 'shrink'
+    raccourcit la fenêtre, 'discard' ne rend que les fenêtres pleines,
+    'fill' complète par des NaN, une valeur complète par elle.
 
     Syntaxe
        y = movmean(x,k)
+       y = movmean(x,[nb na],dim,'omitnan')
 
     Exemples
        movmean([1 2 3 4 5], 3)
+       movmean([4 8 6 -1 -2], 3, 'Endpoints', 'discard')
        x = sin(linspace(0,2*pi,100)) + 0.3*randn(1,100);
        lisse = movmean(x, 9);
        std(lisse) < std(x)
 
-    Voir aussi MEAN, FILTER, CONV, CUMSUM.
+    Voir aussi MOVMEDIAN, MOVSUM, MOVSTD, MEAN, FILTER, CONV.
+```
+
+## `movmedian`
+
+```
+MOVMEDIAN  Médiane glissante.
+    MOVMEDIAN(X,K) rend la médiane sur une fenêtre de K points. Elle
+    ignore une valeur aberrante isolée là où la moyenne la laisse
+    passer : c'est le filtre à choisir contre le bruit impulsionnel.
+
+    Elle prend les mêmes options que MOVMEAN.
+
+    Syntaxe
+       y = movmedian(x,k)
+
+    Exemples
+       movmedian([1 2 100 4 5], 3)        % [1.5 2 4 5 4.5]
+       movmedian([1 NaN 3 4], 3, 'omitnan')
+
+    Voir aussi MOVMEAN, MEDIAN, MEDFILT1.
+```
+
+## `movmin`
+
+```
+MOVMIN  Minimum glissant.
+    MOVMIN(X,K) rend le minimum sur une fenêtre de K points : c'est
+    l'érosion, en une dimension.
+
+    Syntaxe
+       y = movmin(x,k)
+
+    Exemples
+       movmin([4 8 6 -1 -2], 3)           % [4 4 -1 -2 -2]
+
+    Voir aussi MOVMAX, MIN, CUMMIN.
+```
+
+## `movprod`
+
+```
+MOVPROD  Produit glissant.
+    MOVPROD(X,K) rend le produit sur une fenêtre de K points.
+
+    Syntaxe
+       y = movprod(x,k)
+
+    Exemples
+       movprod([1 2 3 4], 2)              % [1 2 6 12]
+
+    Voir aussi MOVSUM, PROD, CUMPROD.
+```
+
+## `movstd`
+
+```
+MOVSTD  Écart type glissant.
+    MOVSTD(X,K) rend l'écart type sur une fenêtre de K points, normalisé
+    par N-1. Il mesure l'agitation locale d'un signal.
+
+    Syntaxe
+       y = movstd(x,k)
+
+    Exemples
+       movstd([1 1 1 5 1 1], 3)
+
+    Voir aussi MOVVAR, STD, MOVMEAN.
+```
+
+## `movsum`
+
+```
+MOVSUM  Somme glissante.
+    MOVSUM(X,K) rend la somme sur une fenêtre de K points. C'est la
+    convolution par une fenêtre rectangulaire, bords compris.
+
+    Elle prend les mêmes options que MOVMEAN.
+
+    Syntaxe
+       y = movsum(x,k)
+
+    Exemples
+       movsum([4 8 6 -1 -2 -3 -1 3 4 5], 3)
+       movsum(ones(1,5), 3, 'Endpoints', 0)
+
+    Voir aussi MOVMEAN, MOVPROD, SUM, CUMSUM, CONV.
+```
+
+## `movvar`
+
+```
+MOVVAR  Variance glissante.
+    MOVVAR(X,K) rend la variance sur une fenêtre de K points, normalisée
+    par N-1.
+
+    Syntaxe
+       y = movvar(x,k)
+
+    Exemples
+       movvar([1 1 1 5 1 1], 3)
+
+    Voir aussi MOVSTD, VAR, MOVMEAN.
 ```
 
 ## `normalize`

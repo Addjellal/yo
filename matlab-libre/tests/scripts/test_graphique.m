@@ -702,4 +702,59 @@ cla; plot(datesEssai, 1:30);
 datetick('x', 'dd/mm');
 close('all');
 
+%% ------------------------------------------------- sens des axes
+% « axis ij » et YDir retournent l'axe des ordonnees : c'est ce dont a
+% besoin toute image, dont la premiere ligne se lit en haut.
+figure('Visible', 'off');
+plot(1:3, [1 2 3]);
+axis('ij');
+assert(strcmp(get(gca, 'YDir'), 'reverse'));
+set(gca, 'YDir', 'normal');
+assert(strcmp(get(gca, 'YDir'), 'normal'));
+set(gca, 'XDir', 'reverse');
+assert(strcmp(get(gca, 'XDir'), 'reverse'));
+axis('xy');
+assert(strcmp(get(gca, 'YDir'), 'normal'));
+
+% imagesc retourne l'axe de lui-meme, surf ne le fait pas : une image se
+% lit comme une matrice, une surface se voit de dessus.
+cla; imagesc([1 2; 3 4]);
+assert(strcmp(get(gca, 'YDir'), 'reverse'));
+cla; [grilleX, grilleY] = meshgrid(1:5, 1:4);
+surf(grilleX, grilleY, grilleY);
+assert(strcmp(get(gca, 'YDir'), 'normal'));
+cla; pcolor(magic(4));
+assert(strcmp(get(gca, 'YDir'), 'normal'));
+
+%% ------------------------------------------------- histogramme a deux axes
+[comptes, bordsX, bordsY] = histcounts2([1 2 3], [1 1 2], [0 2 4], [0 1.5 3]);
+assert(isequal(comptes, [1 0; 1 1]));
+assert(isequal(bordsX, [0 2 4]) && isequal(bordsY, [0 1.5 3]));
+[comptesAuto, ~, ~] = histcounts2(randn(1, 100), randn(1, 100));
+assert(isequal(size(comptesAuto), [10 10]));
+assert(sum(comptesAuto(:)) == 100);
+cla; histogram2(randn(1, 200), randn(1, 200), [8 8]);
+
+%% --------------------------------------------- contour : entrees refusees
+% Une grille de moins de deux lignes ou deux colonnes ne se decoupe pas.
+% MatLibre lisait le premier element d'un vecteur vide et tombait.
+for entree = {[], 1, zeros(1, 5)}
+    contourRefuse = false;
+    try
+        contour(entree{1});
+    catch
+        contourRefuse = true;
+    end
+    assert(contourRefuse);
+end
+contourRefuse = false;
+try
+    contourf('');
+catch
+    contourRefuse = true;
+end
+assert(contourRefuse);
+cla; contourf(peaks(10));
+close('all');
+
 disp('graphique : toutes les verifications passent');

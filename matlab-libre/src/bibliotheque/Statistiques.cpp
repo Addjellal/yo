@@ -1,5 +1,7 @@
 // Statistiques.cpp — statistiques descriptives et lois usuelles.
 #include <algorithm>
+#include <cctype>
+#include <limits>
 #include <cmath>
 #include <map>
 #include <numeric>
@@ -449,21 +451,179 @@ FONCTION(fnRandsample) {
     return {Valeur::colonne(sortie)};
 }
 
-FONCTION(fnMovmean) {
-    INUTILISE
-    exigerArguments(args, 2, 2, "movmean");
-    Valeur v = versDouble(args[0]);
-    int f = (int)args[1].scal();
-    Valeur r = v;
-    int n = (int)v.nelem();
-    for (int i = 0; i < n; ++i) {
-        int debut = std::max(0, i - (f - 1) / 2);
-        int fin = std::min(n - 1, i + f / 2);
-        double s = 0;
-        for (int k = debut; k <= fin; ++k) s += v.re[(std::size_t)k];
-        r.re[(std::size_t)i] = s / (fin - debut + 1);
+// ---------------------------------------------------- fonctions glissantes
+
+// Les huit fonctions « mov… » ne different que par ce qu'elles font
+// d'une fenetre ; tout le reste — la largeur, la dimension, les bords,
+// les NaN — leur est commun.
+enum class Glisse { Moyenne, Mediane, Somme, Produit, Maximum, Minimum, EcartType, Variance };
+
+double agregerFenetre(Glisse g, std::vector<double>& f) {
+    if (f.empty()) {
+        switch (g) {
+            case Glisse::Somme: return 0;
+            case Glisse::Produit: return 1;
+            default: return std::numeric_limits<double>::quiet_NaN();
+        }
+    }
+    switch (g) {
+        case Glisse::Moyenne: return moyenneDe(f);
+        case Glisse::Mediane: {
+            std::sort(f.begin(), f.end());
+            std::size_t n = f.size();
+            return n % 2 ? f[n / 2] : 0.5 * (f[n / 2 - 1] + f[n / 2]);
+        }
+        case Glisse::Somme: return std::accumulate(f.begin(), f.end(), 0.0);
+        case Glisse::Produit: {
+            double p = 1;
+            for (double x : f) p *= x;
+            return p;
+        }
+        case Glisse::Maximum: return *std::max_element(f.begin(), f.end());
+        case Glisse::Minimum: return *std::min_element(f.begin(), f.end());
+        case Glisse::EcartType: return std::sqrt(varianceDe(f, 0));
+        case Glisse::Variance: return varianceDe(f, 0);
+    }
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
+// « Endpoints » dit ce qu'on fait la ou la fenetre deborde : la
+// retrecir (defaut), ne rendre que les fenetres pleines, ou completer
+// le tableau par NaN ou par une valeur donnee.
+enum class Bords { Retrecir, Jeter, Completer };
+
+std::string enMinuscules(std::string s) {
+    for (char& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
+}
+
+std::vector<Valeur> glissante(Arguments args, const char* nom, Glisse g) {
+    exigerArguments(args, 2, 8, nom);
+    std::vector<Valeur>& liste = args;
+    bool omettre = optionOmettreNaN(liste);
+    Bords bords = Bords::Retrecir;
+    double remplissage = std::numeric_limits<double>::quiet_NaN();
+    for (std::size_t k = 2; k + 1 < liste.size();) {
+        if ((liste[k].estTexte() || liste[k].estChaine()) &&
+            enMinuscules(liste[k].versTexte()) == "endpoints") {
+            const Valeur& mode = liste[k + 1];
+            if (mode.estTexte() || mode.estChaine()) {
+                std::string m = enMinuscules(mode.versTexte());
+                if (m == "shrink") bords = Bords::Retrecir;
+                else if (m == "discard") bords = Bords::Jeter;
+                else if (m == "fill") bords = Bords::Completer;
+                else erreur("MATLAB:movfun:badEndpoints",
+                            std::string(nom) + " : bord inconnu « " + m + " ».");
+            } else {
+                bords = Bords::Completer;
+                remplissage = mode.scal();
+            }
+            liste.erase(liste.begin() + (std::ptrdiff_t)k,
+                        liste.begin() + (std::ptrdiff_t)k + 2);
+        } else {
+            ++k;
+        }
+    }
+    exigerNumerique(liste[0], nom);
+    Valeur v = versDouble(liste[0]);
+    exigerNumerique(liste[1], nom);
+    const Valeur& fenetre = liste[1];
+    long avant = 0, apres = 0;
+    if (fenetre.nelem() == 1) {
+        long k = (long)fenetre.scal();
+        if (k < 1) erreur("MATLAB:movfun:badWindow",
+                          std::string(nom) + " : la fenetre doit valoir au moins 1.");
+        // Fenetre impaire : centree. Fenetre paire : elle penche du cote
+        // du passe, comme dans MATLAB.
+        avant = k % 2 ? (k - 1) / 2 : k / 2;
+        apres = k % 2 ? (k - 1) / 2 : k / 2 - 1;
+    } else if (fenetre.nelem() == 2) {
+        avant = (long)fenetre.re[0];
+        apres = (long)fenetre.re[1];
+        if (avant < 0 || apres < 0)
+            erreur("MATLAB:movfun:badWindow",
+                   std::string(nom) + " : les deux largeurs doivent etre positives.");
+    } else {
+        erreur("MATLAB:movfun:badWindow",
+               std::string(nom) + " : la fenetre est un scalaire ou deux largeurs.");
+    }
+    int dimension = liste.size() > 2 ? (int)liste[2].scal() - 1 : dimensionParDefaut(v);
+    exigerDimension(dimension);
+
+    Dims d = v.dims;
+    while ((int)d.size() <= dimension) d.push_back(1);
+    std::size_t interne = 1;
+    for (int k = 0; k < dimension; ++k) interne *= (std::size_t)d[(std::size_t)k];
+    long taille = (long)d[(std::size_t)dimension];
+    std::size_t externe = taille ? v.nelem() / (interne * (std::size_t)taille) : 0;
+    long premier = 0, dernier = taille - 1;
+    if (bords == Bords::Jeter) {
+        premier = avant;
+        dernier = taille - 1 - apres;
+        if (dernier < premier) { premier = 0; dernier = -1; }
+    }
+    long garde = dernier - premier + 1;
+    if (garde < 0) garde = 0;
+    Dims rd = d;
+    rd[(std::size_t)dimension] = (int)garde;
+    Valeur r = Valeur::matriceDims(rd);
+    r.normaliserDims();
+    std::vector<double> f;
+    for (std::size_t a = 0; a < externe; ++a) {
+        for (std::size_t b = 0; b < interne; ++b) {
+            std::size_t base = a * interne * (std::size_t)taille + b;
+            std::size_t baseSortie = a * interne * (std::size_t)garde + b;
+            for (long i = premier; i <= dernier; ++i) {
+                f.clear();
+                bool deborde = false;
+                for (long j = i - avant; j <= i + apres; ++j) {
+                    if (j < 0 || j >= taille) { deborde = true; continue; }
+                    f.push_back(v.re[base + (std::size_t)j * interne]);
+                }
+                if (deborde && bords == Bords::Completer) {
+                    long manquants = (avant + apres + 1) - (long)f.size();
+                    for (long j = 0; j < manquants; ++j) f.push_back(remplissage);
+                }
+                if (omettre) f = sansNaN(f);
+                std::size_t position = baseSortie + (std::size_t)(i - premier) * interne;
+                if (position < r.re.size()) r.re[position] = agregerFenetre(g, f);
+            }
+        }
     }
     return {r};
+}
+
+FONCTION(fnMovmean) {
+    INUTILISE
+    return glissante(args, "movmean", Glisse::Moyenne);
+}
+FONCTION(fnMovmedian) {
+    INUTILISE
+    return glissante(args, "movmedian", Glisse::Mediane);
+}
+FONCTION(fnMovsum) {
+    INUTILISE
+    return glissante(args, "movsum", Glisse::Somme);
+}
+FONCTION(fnMovprod) {
+    INUTILISE
+    return glissante(args, "movprod", Glisse::Produit);
+}
+FONCTION(fnMovmax) {
+    INUTILISE
+    return glissante(args, "movmax", Glisse::Maximum);
+}
+FONCTION(fnMovmin) {
+    INUTILISE
+    return glissante(args, "movmin", Glisse::Minimum);
+}
+FONCTION(fnMovstd) {
+    INUTILISE
+    return glissante(args, "movstd", Glisse::EcartType);
+}
+FONCTION(fnMovvar) {
+    INUTILISE
+    return glissante(args, "movvar", Glisse::Variance);
 }
 
 FONCTION(fnNormalize) {
@@ -504,6 +664,13 @@ void enregistrerStatistiques(Interpreteur& it) {
     it.enregistrer("chi2pdf", fnChi2pdf, "statistiques", "chi2pdf  Densite du khi-deux.");
     it.enregistrer("randsample", fnRandsample, "statistiques", "randsample  Tirage dans un ensemble.");
     it.enregistrer("movmean", fnMovmean, "statistiques", "movmean  Moyenne glissante.");
+    it.enregistrer("movmedian", fnMovmedian, "statistiques", "movmedian  Mediane glissante.");
+    it.enregistrer("movsum", fnMovsum, "statistiques", "movsum  Somme glissante.");
+    it.enregistrer("movprod", fnMovprod, "statistiques", "movprod  Produit glissant.");
+    it.enregistrer("movmax", fnMovmax, "statistiques", "movmax  Maximum glissant.");
+    it.enregistrer("movmin", fnMovmin, "statistiques", "movmin  Minimum glissant.");
+    it.enregistrer("movstd", fnMovstd, "statistiques", "movstd  Ecart type glissant.");
+    it.enregistrer("movvar", fnMovvar, "statistiques", "movvar  Variance glissante.");
     it.enregistrer("normalize", fnNormalize, "statistiques", "normalize  Centrage et reduction.");
 }
 

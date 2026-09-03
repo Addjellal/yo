@@ -211,6 +211,14 @@ bool bornesLog(double& bas, double& haut) {
     return true;
 }
 
+void couleurCarte(double t, int& r, int& v, int& b) {
+    if (!(t >= 0)) t = 0;
+    if (t > 1) t = 1;
+    r = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 3))));
+    v = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 2))));
+    b = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 1))));
+}
+
 void limitesAxe(const Axes& a, double& xmin, double& xmax, double& ymin, double& ymax) {
     xmin = ymin = INFINITY;
     xmax = ymax = -INFINITY;
@@ -367,8 +375,12 @@ std::string rendreSVG(const Figure& figure) {
         }
         appliquerProportions(a, gauche, droite, haut, bas, xmin, xmax, ymin, ymax);
 
-        Echelle ex{xmin, xmax, gauche, droite, logX};
-        Echelle ey{ymin, ymax, bas, haut, logY};
+        // Un axe inverse n'echange pas ses bornes mais les pixels ou
+        // elles tombent : tout le reste du trace suit sans le savoir.
+        Echelle ex{xmin, xmax, a.xInverse ? droite : gauche,
+                   a.xInverse ? gauche : droite, logX};
+        Echelle ey{ymin, ymax, a.yInverse ? haut : bas,
+                   a.yInverse ? bas : haut, logY};
 
         // « axis off » : le cadre, les graduations et leurs nombres
         // disparaissent ; les courbes, elles, restent.
@@ -493,18 +505,27 @@ std::string rendreSVG(const Figure& figure) {
                     mx = std::max(mx, v);
                 }
                 if (!std::isfinite(mn) || mx == mn) { mn = 0; mx = 1; }
-                double dx = (double)(droite - gauche) / cImage;
-                double dy = (double)(bas - haut) / lImage;
+                // L'image occupe l'etendue que la serie declare, et non
+                // toute la boite : « imagesc(x,y,Z) » se pose au bon
+                // endroit, et un axe inverse la retourne comme le reste.
+                double x0 = s.x.size() > 1 ? s.x[0] : 0.5;
+                double x1 = s.x.size() > 1 ? s.x[1] : cImage + 0.5;
+                double y0 = s.y.size() > 1 ? s.y[0] : 0.5;
+                double y1 = s.y.size() > 1 ? s.y[1] : lImage + 0.5;
                 for (int i = 0; i < lImage; ++i)
                     for (int j = 0; j < cImage; ++j) {
                         double v = s.z[(std::size_t)i + (std::size_t)j * lImage];
-                        double t = (v - mn) / (mx - mn);
-                        int r = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 3))));
-                        int g = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 2))));
-                        int b = (int)(255 * std::min(1.0, std::max(0.0, 1.5 - std::fabs(4 * t - 1))));
-                        out << "<rect x=\"" << (gauche + j * dx) << "\" y=\"" << (haut + i * dy)
-                            << "\" width=\"" << (dx + 0.5) << "\" height=\"" << (dy + 0.5)
-                            << "\" fill=\"rgb(" << r << "," << g << "," << b << ")\"/>\n";
+                        int r, vert, b;
+                        couleurCarte((v - mn) / (mx - mn), r, vert, b);
+                        double gx0 = ex.versPixel(x0 + (x1 - x0) * j / cImage);
+                        double gx1 = ex.versPixel(x0 + (x1 - x0) * (j + 1) / cImage);
+                        double gy0 = ey.versPixel(y0 + (y1 - y0) * i / lImage);
+                        double gy1 = ey.versPixel(y0 + (y1 - y0) * (i + 1) / lImage);
+                        out << "<rect x=\"" << std::min(gx0, gx1) << "\" y=\""
+                            << std::min(gy0, gy1) << "\" width=\""
+                            << (std::fabs(gx1 - gx0) + 0.5) << "\" height=\""
+                            << (std::fabs(gy1 - gy0) + 0.5) << "\" fill=\"rgb(" << r << ","
+                            << vert << "," << b << ")\"/>\n";
                     }
                 continue;
             }

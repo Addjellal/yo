@@ -8,12 +8,12 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | automatique | 99 | 9 | 92 % |
 | images | 57 | 15 | 79 % |
 | matlab-graphique | 126 | 0 | 100 % |
-| matlab-langage | 346 | 80 | 81 % |
+| matlab-langage | 424 | 2 | 100 % |
 | optimisation | 26 | 6 | 81 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 104 | 31 | 77 % |
 | statistiques | 187 | 29 | 87 % |
-| **ensemble** | **1014** | **170** | **86 %** |
+| **ensemble** | **1092** | **92** | **92 %** |
 
 ## automatique
 
@@ -28,19 +28,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 ## matlab-langage
 
-`allchild`, `attributes`, `break`, `builtin`, `celldisp`, `convn`, `empty`
-`end`, `fscanf`, `function_handle`, `genvarname`, `inputParser`, `issorted`
-`memoize`, `numlock`, `nthargout`, `pagemtimes`, `repelem`, `setxor`, `shiftdim`
-`split`, `stack`, `subsasgn`, `swapbytes`, `switch`, `while`, `fileattrib`
-`filemarker`, `genpath`, `importdata`, `inputdlg`, `matfile`, `readcell`
-`readvars`, `webread`, `websave`, `what`, `writecell`, `between`, `calendar`
-`hms`, `isbetween`, `juliandate`, `months`, `posixtime`, `timeofday`, `weeknum`
-`yyyymmdd`, `categories`, `countcats`, `discretize`, `groupsummary`, `head`
-`histogram2`, `innerjoin`, `ismissing`, `isordinal`, `issortedrows`, `join`
-`mergecats`, `movmedian`, `movsum`, `outerjoin`, `pivot`, `removecats`, `renamecats`
-`renamevars`, `rmmissing`, `rowfun`, `splitapply`, `splitvars`, `stack`
-`standardizeMissing`, `summary`, `table2array`, `table2cell`, `table2struct`
-`tail`, `unstack`, `varfun`
+`attributes`, `empty`
 
 ## optimisation
 
