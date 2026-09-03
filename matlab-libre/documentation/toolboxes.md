@@ -32,7 +32,7 @@ existant appellera.
 | `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 8 |
 | `edp` | Partial Differential Equation Toolbox — équations aux dérivées partielles. | 5 |
 | `finance` | Financial Toolbox — finance quantitative. | 16 |
-| `flou` | Fuzzy Logic Toolbox — logique floue. | 42 |
+| `flou` | Fuzzy Logic Toolbox — logique floue. | 70 |
 | `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 4 |
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 5 |
 | `identification` | System Identification Toolbox — identification de modèles. | 6 |

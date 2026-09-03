@@ -1,8 +1,12 @@
 function [sortie, forces, agregats, sortiesRegles] = evalfis(entrees, fis, resolution)
 %EVALFIS Inférence floue, Mamdani ou Sugeno.
-%   Y = EVALFIS(X,FIS) évalue le système. X est un vecteur d'entrées, ou
+%   Y = EVALFIS(FIS,X) évalue le système. X est un vecteur d'entrées, ou
 %   une matrice dont chaque ligne est un jeu d'entrées ; Y a alors une
 %   ligne par jeu et une colonne par sortie.
+%
+%   L'ordre inverse, EVALFIS(X,FIS), est celui de l'ancienne interface :
+%   il reste accepté, le système se reconnaissant à ce qu'il est une
+%   structure.
 %
 %   Y = EVALFIS(X,FIS,N) fixe le nombre de points de la grille de
 %   défuzzification, 101 par défaut.
@@ -30,10 +34,19 @@ function [sortie, forces, agregats, sortiesRegles] = evalfis(entrees, fis, resol
 %      fis = addmf(fis, 'output', 1, 'petit', 'trimf', [0 0 0.5]);
 %      fis = addmf(fis, 'output', 1, 'grand', 'trimf', [0.5 1 1]);
 %      fis = addrule(fis, [1 1 1 1; 2 2 1 1]);
-%      evalfis(5, fis)
+%      evalfis(fis, 5)
 %
 %   Voir aussi NEWFIS, ADDRULE, DEFUZZ, GENSURF.
     if nargin < 3 || isempty(resolution), resolution = 101; end
+    if isstruct(entrees) && ~isstruct(fis)
+        echange = entrees;
+        entrees = fis;
+        fis = echange;
+    end
+    if ~isstruct(fis)
+        error('fuzzy:evalfis:Systeme', ...
+              'EVALFIS demande un système d''inférence floue.');
+    end
     if ~isfield(fis, 'type'), fis.type = 'mamdani'; end
     fis = completerOperateurs(fis);
     nEntrees = numel(fis.entrees);

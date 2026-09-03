@@ -1,0 +1,12 @@
+# Fuzzy Logic Toolbox. Les noms qu'un utilisateur rencontre : fonctions
+# d'appartenance, construction et lecture d'un systeme, inference,
+# classification et apprentissage.
+addInput addMF addOutput addRule addmf addrule addvar anfis anfisOptions
+convertToSugeno defuzz dsigmf evalfis evalfisOptions evalmf fcm
+fcmOptions findcluster fuzarith gauss2mf gaussmf gbellmf genfis genfis1
+genfis2 genfis3 genfisOptions gensurf gensurfOptions getFISCodeGenerationData
+getTunableSettings getTunableValues linsmf linzmf mamfis newfis pimf
+plotfis plotmf probor psigmf readfis removeInput removeMF removeOutput
+removeRule rmmf rmvar setTunableValues setfis getfis showrule sigmf smf
+subclust subclustOptions sugfis trapmf trimf tunefis tunefisOptions
+writefis zmf

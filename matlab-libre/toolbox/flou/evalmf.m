@@ -2,7 +2,8 @@ function y = evalmf(x, type, parametres)
 %EVALMF Évalue une fonction d'appartenance par son nom.
 %   Y = EVALMF(X,TYPE,PARAMS) où TYPE vaut 'trimf', 'trapmf', 'gaussmf',
 %   'gauss2mf', 'gbellmf', 'sigmf', 'dsigmf', 'psigmf', 'zmf', 'smf',
-%   'pimf', ou, pour une sortie de Sugeno, 'constant' ou 'linear'.
+%   'pimf', 'linsmf', 'linzmf', ou, pour une sortie de Sugeno,
+%   'constant' ou 'linear'.
 %
 %   Exemple :
 %      evalmf(0:4, 'trimf', [0 2 4])   % [0 0.5 1 0.5 0]
@@ -31,6 +32,10 @@ function y = evalmf(x, type, parametres)
             y = smf(x, parametres);
         case 'pimf'
             y = pimf(x, parametres);
+        case 'linsmf'
+            y = linsmf(x, parametres);
+        case 'linzmf'
+            y = linzmf(x, parametres);
         case 'constant'
             y = repmat(parametres(1), size(x));
         case 'linear'

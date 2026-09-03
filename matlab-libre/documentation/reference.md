@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1622 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1650 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -58,7 +58,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`econometrie`](reference/toolbox-econometrie.md) | 8 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 16 |
-| [`flou`](reference/toolbox-flou.md) | 42 |
+| [`flou`](reference/toolbox-flou.md) | 70 |
 | [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
 | [`identification`](reference/toolbox-identification.md) | 6 |

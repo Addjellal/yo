@@ -1106,9 +1106,167 @@ fisSansVar = rmvar(fisPourboire, 'input', 2);
 assert(numel(fisSansVar.entrees) == 1);
 assert(size(fisSansVar.regles, 2) == size(fisPourboire.regles, 2) - 1);
 
+
+% ------------------------------------- ecriture moderne d'un systeme flou
+% Les deux courbes lineaires : complementaires et bornees.
+assert(isequal(linsmf([0 2 5 8 10], [2 8]), [0 0 0.5 1 1]));
+assert(isequal(linzmf([0 2 5 8 10], [2 8]), [1 1 0.5 0 0]));
+assert(max(abs(linsmf(0:10, [2 8]) + linzmf(0:10, [2 8]) - 1)) < 1e-15);
+assert(isequal(evalmf(0:10, 'linsmf', [2 8]), linsmf(0:10, [2 8])));
+assert(isequal(linsmf([1 3 5], [3 3]), [0 1 1]));
+
+% ADDINPUT pose une partition reguliere dont les modalites somment a un.
+fisModerne = addInput(mamfis('Name', 'moderne'), [0 10], ...
+                      'Name', 'service', 'NumMFs', 3);
+fisModerne = addOutput(fisModerne, [0 30], 'Name', 'pourboire', 'NumMFs', 3);
+assert(numel(fisModerne.entrees{1}.mf) == 3);
+assert(strcmp(fisModerne.entrees{1}.nom, 'service'));
+grilleMf = 0:0.5:10;
+sommeMf = zeros(size(grilleMf));
+for kMf = 1:3
+    modalite = fisModerne.entrees{1}.mf{kMf};
+    sommeMf = sommeMf + evalmf(grilleMf, modalite.type, modalite.parametres);
+end
+assert(max(abs(sommeMf - 1)) < 1e-12);
+for typeMf = {'trapmf', 'gaussmf', 'gbellmf'}
+    assert(numel(addInput(mamfis, [0 1], 'NumMFs', 4, ...
+                          'MFType', typeMf{1}).entrees{1}.mf) == 4);
+end
+assert(strcmp(addInput(mamfis, [0 1]).entrees{1}.nom, 'input1'));
+
+% Les regles s'ecrivent en clair, en francais comme en anglais.
+fisEcrit = addInput(mamfis('Name', 'ecrit'), [0 10], 'Name', 'service', 'NumMFs', 2);
+fisEcrit = addOutput(fisEcrit, [0 30], 'Name', 'pourboire', 'NumMFs', 2);
+fisEcrit = addRule(fisEcrit, {'si service est mf1 alors pourboire est mf1', ...
+                              'si service est mf2 alors pourboire est mf2'});
+assert(size(fisEcrit.regles, 1) == 2);
+assert(isequal(fisEcrit.regles(1, 1:2), [1 1]));
+assert(isequal(fisEcrit.regles(2, 1:2), [2 2]));
+assert(evalfis(fisEcrit, 10) > evalfis(fisEcrit, 0));
+fisAnglais = addInput(mamfis, [0 1], 'Name', 'a', 'NumMFs', 2);
+fisAnglais = addInput(fisAnglais, [0 1], 'Name', 'b', 'NumMFs', 2);
+fisAnglais = addOutput(fisAnglais, [0 1], 'Name', 'c', 'NumMFs', 2);
+fisAnglais = addRule(fisAnglais, {'if a is mf1 or b is mf2 then c is mf1'});
+assert(fisAnglais.regles(1, end) == 2);
+% EVALFIS accepte les deux ordres d'arguments.
+assert(abs(evalfis(fisMamdani, 5) - evalfis(5, fisMamdani)) < 1e-15);
+
+% ADDMF par nom, et l'ancienne forme a genre et rang.
+fisNomme = addMF(addInput(mamfis, [0 10], 'Name', 'service'), ...
+                 'service', 'trimf', [0 0 5], 'Name', 'faible');
+assert(strcmp(fisNomme.entrees{1}.mf{1}.nom, 'faible'));
+fisAncien = addMF(addvar(newfis('x'), 'input', 'a', [0 1]), ...
+                  'input', 1, 'basse', 'trimf', [0 0 0.5]);
+assert(strcmp(fisAncien.entrees{1}.mf{1}.nom, 'basse'));
+
+% Les retraits tiennent les regles a jour.
+fisRetrait = addInput(mamfis('Name', 'r'), [0 1], 'Name', 'a', 'NumMFs', 2);
+fisRetrait = addInput(fisRetrait, [0 1], 'Name', 'b', 'NumMFs', 2);
+fisRetrait = addOutput(fisRetrait, [0 1], 'Name', 'c', 'NumMFs', 2);
+fisRetrait = addRule(fisRetrait, [1 1 1 1 1; 2 2 2 1 1]);
+sansPremiere = removeInput(fisRetrait, 'a');
+assert(numel(sansPremiere.entrees) == 1 && strcmp(sansPremiere.entrees{1}.nom, 'b'));
+assert(size(sansPremiere.regles, 2) == size(fisRetrait.regles, 2) - 1);
+assert(numel(removeOutput(fisRetrait, 'c').sorties) == 0);
+% Retirer une modalite renumerote celles qui la suivaient.
+fisTrois = addInput(mamfis, [0 1], 'Name', 'a', 'NumMFs', 3);
+fisTrois = addOutput(fisTrois, [0 1], 'Name', 'b', 'NumMFs', 2);
+fisTrois = addRule(fisTrois, [1 1 1 1; 3 2 1 1]);
+fisDeux = removeMF(fisTrois, 'a', 'mf2');
+assert(numel(fisDeux.entrees{1}.mf) == 2);
+assert(fisDeux.regles(2, 1) == 2);
+assert(size(removeRule(fisTrois, 1).regles, 1) == 1);
+refuseRegle = false;
+try
+    removeRule(fisTrois, 5);
+catch
+    refuseRegle = true;
+end
+assert(refuseRegle);
+
+% Les structures d'options : chaque champ se pose, et une faute de frappe
+% est refusee plutot qu'ignoree.
+assert(gensurfOptions('NumGridPoints', 31).NumGridPoints == 31);
+assert(evalfisOptions('NumSamplePoints', 501).NumSamplePoints == 501);
+optionsFcm = genfisOptions('FCMClustering', 'NumClusters', 4);
+assert(strcmp(optionsFcm.Methode, 'fcm') && optionsFcm.NumClusters == 4);
+assert(genfisOptions('GridPartition').NumMembershipFunctions == 2);
+assert(genfisOptions('SubtractiveClustering').ClusterInfluenceRange == 0.5);
+assert(anfisOptions('EpochNumber', 40).EpochNumber == 40);
+assert(subclustOptions('ClusterInfluenceRange', 0.3).ClusterInfluenceRange == 0.3);
+assert(fcmOptions('Exponent', 1.5).Exponent == 1.5);
+assert(strcmp(tunefisOptions('Method', 'anfis').Method, 'anfis'));
+refuseOption = false;
+try
+    gensurfOptions('Toto', 1);
+catch
+    refuseOption = true;
+end
+assert(refuseOption);
+
+% La surface de reponse se calcule sur les champs du systeme.
+fisSurface = addInput(mamfis, [0 10], 'Name', 'a', 'NumMFs', 2);
+fisSurface = addInput(fisSurface, [0 10], 'Name', 'b', 'NumMFs', 2);
+fisSurface = addOutput(fisSurface, [0 1], 'Name', 'c', 'NumMFs', 2);
+fisSurface = addRule(fisSurface, [1 1 1 1 1; 2 2 2 1 1]);
+[grilleA, grilleB, surface] = gensurf(fisSurface);
+assert(isequal(size(surface), [15 15]));
+assert(isequal(size(grilleA), size(grilleB)));
+assert(surface(end, end) > surface(1, 1));
+[~, ~, surfaceFine] = gensurf(fisSurface, gensurfOptions('NumGridPoints', 9));
+assert(isequal(size(surfaceFine), [9 9]));
+
+% Parametres reglables : aller-retour sans perte, bornes respectees.
+[reglagesEntree, reglagesSortie, reglagesRegles] = getTunableSettings(fisEcrit);
+assert(numel(reglagesEntree) == 2 && numel(reglagesSortie) == 2);
+assert(numel(reglagesRegles) == 2);
+valeursDepart = getTunableValues(fisEcrit, reglagesEntree);
+assert(numel(valeursDepart) == 6);
+fisRepose = setTunableValues(fisEcrit, reglagesEntree, valeursDepart);
+assert(max(abs(getTunableValues(fisRepose, reglagesEntree) - valeursDepart)) < 1e-15);
+assert(abs(evalfis(fisRepose, 5) - evalfis(fisEcrit, 5)) < 1e-12);
+fisForce = setTunableValues(fisEcrit, reglagesEntree, [100 -100 0, 0 0 0]);
+parametresForces = fisForce.entrees{1}.mf{1}.parametres;
+assert(issorted(parametresForces));
+assert(all(parametresForces >= reglagesEntree(1).Minimum - 1e-12));
+assert(all(parametresForces <= reglagesEntree(1).Maximum + 1e-12));
+
+% TUNEFIS ne degrade jamais le systeme de depart.
+abscissesReglage = (0:0.25:10)';
+[fisRegle, infoReglage] = tunefis(genfis1([abscissesReglage, sin(abscissesReglage)], 4), ...
+                                  [], abscissesReglage, sin(abscissesReglage));
+assert(infoReglage.ErreurFinale <= infoReglage.ErreurInitiale);
+assert(infoReglage.Evaluations > 0);
+
+% La traduction en Sugeno remplace chaque modalite par son centre.
+fisSugeneTraduit = convertToSugeno(fisEcrit);
+assert(strcmp(fisSugeneTraduit.type, 'sugeno'));
+assert(strcmp(fisSugeneTraduit.sorties{1}.mf{1}.type, 'constant'));
+assert(evalfis(fisSugeneTraduit, 10) > evalfis(fisSugeneTraduit, 0));
+assert(strcmp(convertToSugeno(fisSugeneTraduit).type, 'sugeno'));
+
+% La forme brute pour la generation de code : rien que des nombres.
+donneesCode = getFISCodeGenerationData(fisEcrit);
+assert(donneesCode.nEntrees == 1 && donneesCode.nSorties == 1);
+assert(isequal(size(donneesCode.parametresEntrees), [2 3]));
+assert(numel(donneesCode.operateurs) == 5);
+assert(isequal(donneesCode.regles, fisEcrit.regles));
+
 % Classification floue : deux groupes bien séparés se retrouvent.
 rng(11);
 nuage = [randn(60, 2) * 0.4; randn(60, 2) * 0.4 + 6];
+% FINDCLUSTER mene aux memes classes, par l'une ou l'autre methode.
+[centresTrouves, appartenancesTrouvees] = findcluster(nuage, 2);
+assert(size(centresTrouves, 1) == 2);
+assert(max(abs(sum(appartenancesTrouvees, 1) - 1)) < 1e-9);
+assert(size(findcluster(nuage, 0.4, 'subtractive'), 1) == 2);
+refuseMethode = false;
+try
+    findcluster(nuage, 2, 'inconnue');
+catch
+    refuseMethode = true;
+end
+assert(refuseMethode);
 [centresFcm, appartenances, critere] = fcm(nuage, 2);
 centresFcm = sortrows(centresFcm);
 assert(max(max(abs(centresFcm - [0 0; 6 6]))) < 0.4);

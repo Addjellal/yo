@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **649 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **1622 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1650 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -198,7 +198,7 @@ totalité.
    rendement k/n —, les codes en blocs cycliques avec leur table de
    syndromes, les trois familles d'entrelaceurs, et les taux d'erreur
    théoriques sur canal gaussien comme sur canal de Rayleigh avec
-   diversité. La logique floue en compte 42 : les onze
+   diversité. La logique floue en compte 70 : les onze
    fonctions d'appartenance, l'inférence de Mamdani comme celle de
    Sugeno — plusieurs sorties, conclusions constantes ou affines, les
    cinq opérateurs configurables, la négation dans les prémisses —, la

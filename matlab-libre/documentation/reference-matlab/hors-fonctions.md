@@ -196,6 +196,27 @@ qu'ils ne font pas encore comme MATLAB.
   `wavemngr` — la gestion d'une base d'ondelettes personnelles — n'a pas
   de sens ici, les familles étant construites plutôt que déclarées.
 
+### Logique floue
+
+- **Un système est une structure**, non un objet : `entrees` et `sorties`
+  sont des cellules de variables, `regles` la matrice d'indices. Les
+  fonctions modernes — `addInput`, `addMF`, `getTunableSettings` — la
+  prennent telle quelle, mais la notation à points de MATLAB
+  (`fis.Inputs(1).MembershipFunctions(2).Parameters`) n'existe pas.
+- **`evalfis`** accepte les deux ordres d'arguments, le système se
+  reconnaissant à ce qu'il est une structure.
+- **`tunefis`** ne connaît que le simplexe de Nelder-Mead sur le vecteur
+  des paramètres. La recherche par motifs, le recuit et les algorithmes
+  génétiques de MATLAB savent sortir d'un minimum local ; celui-ci non.
+  Il ne rend jamais un système plus mauvais que celui de départ.
+- **`convertToSugeno`** remplace chaque modalité de sortie par son
+  centre défuzzifié : la traduction est fidèle règle par règle, non point
+  par point, et la sortie diffère donc de celle du Mamdani.
+- **Pas de logique floue de type 2** : `mamfistype2`, `sugfistype2` et
+  `convertToType2` manquent, ainsi que les arbres `fistree`.
+- **`findcluster`** calcule et trace au lieu d'ouvrir une application ;
+  `fuzzyLogicDesigner`, `ruleedit` et `mfedit` n'ont pas d'équivalent.
+
 ### Statistiques et apprentissage
 
 - **Objets de modèle** : MATLAB rend des objets — `ClassificationSVM`,

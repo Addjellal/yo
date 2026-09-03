@@ -6,6 +6,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
 | automatique | 108 | 0 | 100 % |
+| flou | 63 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 424 | 2 | 100 % |
@@ -14,7 +15,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1283** | **13** | **99 %** |
+| **ensemble** | **1346** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -219,6 +220,17 @@ qu'ils ne font pas encore comme MATLAB.
 - **`wvarchg`** choisit le nombre de ruptures avec une pénalité de
   4 log(n), deux fois celle du critère bayésien : celle-ci laissait
   passer une découpe de temps en temps sur du bruit pur.
+- **Arbres de paquets** : MATLAB rend un objet `wptree` à méthodes ;
+  MatLibre rend une structure de champ `type` valant `'wptree'`, dont
+  `donnees` porte un nœud par case et `noeuds` la liste de ceux qui
+  existent. Les fonctions de MATLAB — `wpcoef`, `wpsplt`, `leaves` — la
+  prennent telle quelle ; `read`, `write`, `plot` et `drawtree` n'ont pas
+  d'équivalent.
+- **Bancs de filtres objets** : `cwtfilterbank` et `dwtfilterbank`
+  n'existent pas ; `cwt` et `wavedec` prennent le nom de l'ondelette.
+  `wcoherence`, `wsst`, `dualtree` et `dtfilters` manquent aussi, et
+  `wavemngr` — la gestion d'une base d'ondelettes personnelles — n'a pas
+  de sens ici, les familles étant construites plutôt que déclarées.
 
 ### Statistiques et apprentissage
 
