@@ -13,7 +13,36 @@
 %   cheb1ord    - Ordre minimal d'un Chebyshev I
 %   cheb2ord    - Ordre minimal d'un Chebyshev II
 %   kaiserord   - Ordre et bêta d'un RIF fenêtré par Kaiser
+%   ellip       - Filtre elliptique, ou de Cauer
+%   ellipord    - Ordre minimal d'un elliptique
+%   besself     - Filtre analogique de Bessel
+%   maxflat     - (absent) filtre à module maximalement plat
 %   prototypeVersNumerique - Prototype analogique -> filtre numérique
+%
+% Prototypes analogiques et transformations
+%   buttap      - Prototype de Butterworth
+%   cheb1ap     - Prototype de Chebyshev de type I
+%   cheb2ap     - Prototype de Chebyshev de type II
+%   ellipap     - Prototype elliptique
+%   besselap    - Prototype de Bessel
+%   bilinear    - Transformation bilinéaire, avec prédistorsion
+%   impinvar    - Transformation par invariance impulsionnelle
+%
+% Filtrage direct d'un signal
+%   lowpass     - Passe-bas appliqué à un signal
+%   highpass    - Passe-haut appliqué à un signal
+%   bandpass    - Passe-bande appliqué à un signal
+%   bandstop    - Coupe-bande appliqué à un signal
+%   filtic      - Conditions initiales d'un filtre
+%   latcfilt    - Filtrage par une structure en treillis
+%   intfilt     - Filtre d'interpolation
+%
+% Modèles rationnels
+%   prony       - Modèle rationnel d'une réponse impulsionnelle
+%   stmcb       - Modèle par la méthode de Steiglitz-McBride
+%   invfreqz    - Filtre numérique ajusté sur une réponse en fréquence
+%   invfreqs    - Filtre analogique ajusté sur une réponse en fréquence
+%   rlevinson   - Levinson-Durbin à l'envers
 %
 % Structures de filtres
 %   tf2zp / zp2tf   - Fonction de transfert <-> zéros, pôles, gain
@@ -21,6 +50,21 @@
 %   zp2sos          - Zéros et pôles -> sections du second ordre
 %   sosfilt         - Filtrage en cascade de sections
 %   polystab        - Replie les racines dans le disque unité
+%   tf2zpk          - Transfert numérique -> zéros, pôles, gain
+%   tf2latc / latc2tf - Fonction de transfert <-> treillis
+%   convmtx         - Matrice de convolution
+%   eqtflength      - Met numérateur et dénominateur à la même longueur
+%   polyscale       - Déplace les racines vers l'origine
+%
+% Mesures et conversions
+%   pow2db / db2pow - Puissance <-> décibels
+%   mag2db / db2mag - Amplitude <-> décibels
+%   detrend         - Retire la tendance d'un signal
+%   discretize      - (MATLAB de base) classes d'un vecteur
+%   uencode / udecode - Quantification uniforme
+%   bitrevorder     - Ordre des bits inversés
+%   parzen          - Fenêtre de Parzen, comme parzenwin
+%   strips          - Trace un signal en bandes superposées
 %
 % Réponses
 %   impz        - Réponse impulsionnelle

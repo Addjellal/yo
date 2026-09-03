@@ -7,14 +7,32 @@ function b = fir1(n, Wn, varargin)
 %   B = FIR1(N,[W1 W2]) conçoit un passe-bande.
 %   B = FIR1(N,[W1 W2],'stop') conçoit un coupe-bande.
 %
+%   B = FIR1(...,FENETRE) emploie la fenêtre donnée au lieu de celle de
+%   Hamming, et B = FIR1(...,'noscale') laisse le gain tel que le
+%   fenêtrage le donne, sans le ramener à l'unité dans la bande passante.
+%
 %   La fenêtre de Hamming est appliquée par défaut, comme dans la
 %   documentation MathWorks.
+%
+%   Exemples :
+%      b = fir1(20, 0.3);
+%      b = fir1(20, [0.2 0.4], kaiser(21, 5), 'noscale');
+%
+%   Voir aussi FIR2, FIRLS, FIRPM, KAISERORD, FREQZ, FILTER.
     genre = 'low';
     fenetreChoisie = [];
+    normaliser = true;
     for k = 1:numel(varargin)
         a = varargin{k};
         if ischar(a) || isstring(a)
-            genre = lower(char(a));
+            mot = lower(char(a));
+            if strcmp(mot, 'noscale')
+                normaliser = false;
+            elseif strcmp(mot, 'scale')
+                normaliser = true;
+            else
+                genre = mot;
+            end
         elseif isnumeric(a)
             fenetreChoisie = a(:).';
         end
@@ -46,6 +64,9 @@ function b = fir1(n, Wn, varargin)
             error('signal:fir1:InvalidType', 'Unknown filter type ''%s''.', genre);
     end
     b = h .* w;
+    if ~normaliser
+        return
+    end
     % Gain unité dans la bande passante.
     switch genre
         case {'low', 'lowpass', 'stop', 'bandstop'}

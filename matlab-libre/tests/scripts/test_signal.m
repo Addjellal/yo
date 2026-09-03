@@ -850,4 +850,228 @@ assert(isstable(by2, ay2));
 assert(min(abs(hy2(fy3 <= 0.5))) > 0.8);
 assert(max(abs(hy2(fy3 >= 0.7))) < 0.2);
 
+%% ----------------------------------------- prototypes analogiques
+% Chaque prototype est vérifié sur la propriété qui le définit, non sur
+% des coefficients recopiés : c'est ce qui distingue un filtre juste
+% d'un filtre qui y ressemble.
+reponseAnalogique = @(z, p, k, s) k * prod(s - z) / prod(s - p);
+
+[zButt, pButt, kButt] = buttap(4);
+assert(isempty(zButt) && numel(pButt) == 4);
+assert(abs(abs(reponseAnalogique(zButt, pButt, kButt, 0)) - 1) < 1e-12);
+% Le Butterworth est à -3 dB en omega = 1.
+assert(abs(abs(reponseAnalogique(zButt, pButt, kButt, 1i)) - 1/sqrt(2)) < 1e-12);
+
+[zC1, pC1, kC1] = cheb1ap(4, 1);
+% Un Chebyshev de type I d'ordre pair part du bas de l'ondulation et
+% atteint la même valeur au bord de bande.
+assert(abs(abs(reponseAnalogique(zC1, pC1, kC1, 0)) - 10^(-1/20)) < 1e-12);
+assert(abs(abs(reponseAnalogique(zC1, pC1, kC1, 1i)) - 10^(-1/20)) < 1e-12);
+[zC1i, pC1i, kC1i] = cheb1ap(3, 1);
+assert(abs(abs(reponseAnalogique(zC1i, pC1i, kC1i, 0)) - 1) < 1e-12);
+
+[zC2, pC2, kC2] = cheb2ap(4, 40);
+assert(abs(abs(reponseAnalogique(zC2, pC2, kC2, 0)) - 1) < 1e-12);
+assert(abs(abs(reponseAnalogique(zC2, pC2, kC2, 1i)) - 0.01) < 1e-12);
+% Un ordre impair n'a que N-1 zéros finis : celui du milieu part à
+% l'infini.
+assert(numel(cheb2ap(3, 40)) == 2);
+
+[zEl, pEl, kEl] = ellipap(4, 1, 40);
+assert(abs(abs(reponseAnalogique(zEl, pEl, kEl, 1i)) - 10^(-1/20)) < 1e-12);
+
+[zBe, pBe, kBe] = besselap(3);
+assert(abs(abs(reponseAnalogique(zBe, pBe, kBe, 0)) - 1) < 1e-12);
+assert(abs(kBe - 15) < 1e-9);      % s^3+6s^2+15s+15
+
+%% -------------------------------------- filtres à bande, et bilinéaire
+% Un passe-bande atteint sa spécification exactement aux deux bords :
+% c'est la prédistorsion qui le garantit.
+bordsBande = [0.2 0.4];
+[bBande, aBande] = cheby1(3, 1, bordsBande);
+hBande = freqz(bBande, aBande, bordsBande * pi);
+assert(max(abs(abs(hBande) - 10^(-1/20))) < 1e-9);
+[bC2b, aC2b] = cheby2(3, 40, bordsBande);
+assert(max(abs(abs(freqz(bC2b, aC2b, bordsBande * pi)) - 0.01)) < 1e-9);
+[bButtB, aButtB] = butter(2, bordsBande);
+assert(numel(aButtB) == 5);        % l'ordre double
+assert(max(abs(abs(freqz(bButtB, aButtB, bordsBande * pi)) - 1/sqrt(2))) < 1e-9);
+% Un coupe-bande laisse passer le continu et Nyquist.
+[bStop, aStop] = cheby1(3, 1, bordsBande, 'stop');
+hStop = freqz(bStop, aStop, [0 pi]);
+assert(max(abs(abs(hStop) - 1)) < 1e-9);
+
+% La bilinéaire refait le chemin de butter : les deux doivent tomber sur
+% les mêmes coefficients.
+[zb, pb, kb] = buttap(4);
+coupure = 2 * pi * 0.4;
+[zd, pd, kd] = bilinear(zb, pb * coupure, kb * coupure^4, 2, 0.4);
+[bBil, aBil] = zp2tf(zd, pd, kd);
+[bRef, aRef] = butter(4, 0.4);
+assert(max(abs(real(bBil) / real(bBil(1)) - bRef / bRef(1))) < 1e-12);
+assert(max(abs(real(aBil) / real(aBil(1)) - aRef / aRef(1))) < 1e-12);
+
+%% ------------------------------------------- invariance impulsionnelle
+% La réponse impulsionnelle du filtre numérique est celle de
+% l'analogique, échantillonnée et divisée par Fs. On le vérifie sur un
+% pôle simple, un pôle double, un pôle triple et une paire complexe.
+[bImp, aImp] = impinvar(1, [1 1], 10);
+assert(abs(bImp - 0.1) < 1e-12 && abs(aImp(2) + exp(-0.1)) < 1e-12);
+[bImp2, aImp2] = impinvar(1, [1 2 1], 10);
+tImp = (0:7)' / 10;
+assert(max(abs(impz(bImp2, aImp2, 8) - tImp .* exp(-tImp) / 10)) < 1e-12);
+[bImp3, aImp3] = impinvar(1, conv(conv([1 1], [1 1]), [1 1]), 4);
+tImp3 = (0:9)' / 4;
+assert(max(abs(impz(bImp3, aImp3, 10) - tImp3.^2 .* exp(-tImp3) / 2 / 4)) < 1e-12);
+denominateurComplexe = conv([1 0.4 1], [1 1]);
+[bImp4, aImp4] = impinvar([1 0], denominateurComplexe, 8);
+[rImp, pImp] = residue([1 0], denominateurComplexe);
+tImp4 = (0:39)' / 8;
+attendu = zeros(40, 1);
+for kImp = 1:numel(pImp)
+    attendu = attendu + rImp(kImp) * exp(pImp(kImp) * tImp4);
+end
+assert(max(abs(impz(bImp4, aImp4, 40) - real(attendu) / 8)) < 1e-12);
+
+%% ------------------------------------------------ état d'un filtrage
+% filter rend et reprend son état : filtrer par morceaux doit donner
+% exactement le même résultat que filtrer d'un coup.
+[bEtat, aEtat] = butter(3, 0.4);
+signalEtat = sin(0.3 * (1:100)) + 0.1 * cos(1.7 * (1:100));
+entier = filter(bEtat, aEtat, signalEtat);
+[premier, etat] = filter(bEtat, aEtat, signalEtat(1:50));
+second = filter(bEtat, aEtat, signalEtat(51:100), etat);
+assert(max(abs([premier second] - entier)) < 1e-12);
+% filtic reconstruit ce même état à partir du passé du signal.
+etatReconstruit = filtic(bEtat, aEtat, entier(end:-1:end-2), signalEtat(end:-1:end-2));
+[~, etatFinal] = filter(bEtat, aEtat, signalEtat);
+assert(max(abs(etatReconstruit(:) - etatFinal(:))) < 1e-12);
+% Une matrice se filtre colonne par colonne, et non à plat.
+assert(isequal(filter([1 1], 1, [1 10; 2 20; 3 30]), [1 10; 3 30; 5 50]));
+assert(isequal(filter([1 1], 1, [1 10; 2 20; 3 30], [], 2), [1 11; 2 22; 3 33]));
+
+%% ------------------------------------------- modèles rationnels
+% Prony reproduit exactement un filtre dont on lui donne la réponse.
+[bModele, aModele] = butter(3, 0.4);
+hModele = impz(bModele, aModele, 30);
+[bProny, aProny] = prony(hModele, 3, 3);
+assert(max(abs(bProny - bModele)) < 1e-12 && max(abs(aProny - aModele)) < 1e-12);
+% Steiglitz-McBride aussi, et il retrouve un filtre depuis son
+% entrée et sa sortie.
+[bStm, aStm] = stmcb(hModele, 3, 3);
+assert(max(abs(impz(bStm, aStm, 30) - hModele)) < 1e-10);
+entreeStm = sin(1:200)' + cos(0.3 * (1:200))';
+sortieStm = filter([1 0.5], [1 -0.3], entreeStm);
+[bStm2, aStm2] = stmcb(sortieStm, entreeStm, 1, 1);
+assert(max(abs(bStm2 - [1 0.5])) < 1e-10 && max(abs(aStm2 - [1 -0.3])) < 1e-10);
+% invfreqs retrouve un filtre analogique depuis sa réponse.
+[bBes, aBes] = besself(3, 1);
+wAnalogique = logspace(-1, 1, 100);
+[bInv, aInv] = invfreqs(freqs(bBes, aBes, wAnalogique), wAnalogique, 0, 3);
+assert(max(abs(bInv - bBes)) < 1e-9 && max(abs(aInv - aBes)) < 1e-9);
+% Levinson à l'envers rend son autocorrélation au modèle.
+autocorrelation = [5 4 3 2]';
+[aLev, eLev] = levinson(autocorrelation, 3);
+[rLev, ~, krLev] = rlevinson(aLev, eLev);
+assert(max(abs(rLev(:) - autocorrelation)) < 1e-12);
+assert(max(abs(krLev(:) - poly2rc(aLev)(:))) < 1e-12);
+
+%% ------------------------------------------------------- treillis
+[bTreillis, aTreillis] = butter(3, 0.4);
+[kTreillis, vTreillis] = tf2latc(bTreillis, aTreillis);
+assert(all(abs(kTreillis) < 1));
+[bRetour, aRetour] = latc2tf(kTreillis, vTreillis);
+assert(max(abs(bRetour - bTreillis)) < 1e-12);
+assert(max(abs(aRetour - aTreillis)) < 1e-12);
+% Le treillis à réponse finie filtre comme la forme directe.
+bFini = poly([0.2 0.3 -0.4]);
+kFini = tf2latc(bFini);
+signalTreillis = cos(0.4 * (1:100)) + sin(1.1 * (1:100));
+assert(max(abs(latcfilt(kFini, signalTreillis) - filter(bFini, 1, signalTreillis))) < 1e-12);
+assert(max(abs(latc2tf(kFini, 'fir') - bFini)) < 1e-12);
+[~, aAllPole] = latc2tf(tf2latc(1, aTreillis), 'allpole');
+assert(max(abs(aAllPole - aTreillis)) < 1e-12);
+assert(max(abs(latcfilt(kTreillis, vTreillis, signalTreillis) - ...
+                filter(bTreillis, aTreillis, signalTreillis))) < 1e-12);
+
+%% ------------------------------------------ filtrage direct d'un signal
+tBande = (0:999)' / 1000;
+signalBande = sin(2*pi*10*tBande) + sin(2*pi*300*tBande);
+garde = 200:800;
+sortieBasse = lowpass(signalBande, 100, 1000);
+assert(norm(sortieBasse(garde) - sin(2*pi*10*tBande(garde))) / ...
+       norm(signalBande(garde)) < 0.05);
+sortieHaute = highpass(signalBande, 100, 1000);
+assert(norm(sortieHaute(garde) - sin(2*pi*300*tBande(garde))) / ...
+       norm(signalBande(garde)) < 0.05);
+troisTons = sin(2*pi*10*tBande) + sin(2*pi*100*tBande) + sin(2*pi*400*tBande);
+sortieBande = bandpass(troisTons, [50 200], 1000);
+assert(norm(sortieBande(garde) - sin(2*pi*100*tBande(garde))) / ...
+       norm(troisTons(garde)) < 0.05);
+sortieCoupe = bandstop(troisTons, [50 200], 1000);
+assert(norm(sortieCoupe(garde) - (sin(2*pi*10*tBande(garde)) + ...
+                                  sin(2*pi*400*tBande(garde)))) / ...
+       norm(troisTons(garde)) < 0.05);
+% La variante à réponse finie isole tout aussi bien.
+sortieFir = lowpass(signalBande, 100, 1000, 'ImpulseResponse', 'fir');
+assert(norm(sortieFir(300:700) - sin(2*pi*10*tBande(300:700))) / ...
+       norm(signalBande(300:700)) < 0.01);
+
+%% ------------------------------------------------- outils du domaine
+assert(abs(pow2db(100) - 20) < 1e-12);
+assert(abs(db2pow(20) - 100) < 1e-12);
+assert(abs(mag2db(10) - 20) < 1e-12);
+assert(abs(db2mag(20) - 10) < 1e-12);
+% La matrice de convolution transforme la convolution en produit.
+noyau = [1 2 3];
+assert(isequal(convmtx(noyau', 4) * (1:4)', conv(noyau, 1:4)'));
+assert(isequal((1:4) * convmtx(noyau, 4), conv(1:4, noyau)));
+% detrend retire exactement le polynôme qu'on lui désigne.
+tendance = (0:9)';
+assert(max(abs(detrend(3 + 0.5 * tendance))) < 1e-12);
+assert(max(abs(detrend([1 2 3 4 5], 'constant') - [-2 -1 0 1 2])) < 1e-12);
+assert(max(abs(detrend((1:10)'.^2, 2))) < 1e-12);
+% Les longueurs s'égalisent, zéros communs de queue retirés.
+[bEq, aEq] = eqtflength([1 2], [1 2 3 0]);
+assert(isequal(bEq, [1 2 0]) && isequal(aEq, [1 2 3]));
+% tf2zpk garde les pôles dans le disque unité.
+[bZpk, aZpk] = butter(3, 0.4);
+[zZpk, pZpk, kZpk] = tf2zpk(bZpk, aZpk);
+assert(all(abs(pZpk) < 1) && numel(zZpk) == 3);
+assert(abs(kZpk - bZpk(1)) < 1e-12);
+% polyscale ramène les racines vers l'origine.
+assert(abs(max(abs(roots(polyscale(poly([0.9, -0.95]), 0.5)))) - 0.475) < 1e-12);
+% L'ordre des bits inversés, et son aller-retour.
+assert(isequal(bitrevorder(0:7), [0 4 2 6 1 5 3 7]));
+assert(isequal(bitrevorder(bitrevorder(0:7)), 0:7));
+% La fenêtre de Parzen est bien celle de parzenwin.
+assert(isequal(parzen(32), parzenwin(32)));
+% Quantification uniforme : l'exemple de la documentation.
+assert(isequal(double(uencode(-1:0.5:1, 3)), [0 2 4 6 7]));
+assert(max(abs(udecode(uencode(-1:0.5:1, 3), 3) - [-1 -0.5 0 0.5 0.75])) < 1e-12);
+assert(strcmp(class(uencode(1, 3)), 'uint8'));
+assert(strcmp(class(uencode(1, 3, 1, 'signed')), 'int8'));
+
+%% --------------------------------------------- filtre d'interpolation
+bInterp = intfilt(4, 3, 1);
+assert(numel(bInterp) == 2 * 3 * 4 - 1);
+assert(abs(bInterp(12) - 1) < 1e-12);          % la phase nulle est une impulsion
+assert(max(abs(bInterp - fliplr(bInterp))) < 1e-12);   % phase linéaire
+% Un signal bien à l'intérieur de la bande est interpolé fidèlement.
+bInterp2 = intfilt(4, 4, 0.4);
+signalInterp = sin(2*pi*0.03*(0:199));
+sortieInterp = filter(bInterp2, 1, upsample(signalInterp, 4));
+retard = 4 * 4 - 1;
+sortieInterp = sortieInterp((retard+1):end);
+attenduInterp = sin(2*pi*0.03*(0:numel(sortieInterp)-1)/4);
+assert(max(abs(sortieInterp(40:end-40) - attenduInterp(40:end-40))) < 1e-4);
+% La variante de Lagrange fait mieux encore sur un signal très lisse.
+bLagrange = intfilt(4, 5, 'Lagrange');
+signalLisse = sin(2*pi*0.01*(0:199));
+sortieLagrange = filter(bLagrange, 1, upsample(signalLisse, 4));
+retardLagrange = (numel(bLagrange) - 1) / 2;
+sortieLagrange = sortieLagrange((retardLagrange+1):end);
+attenduLagrange = sin(2*pi*0.01*(0:numel(sortieLagrange)-1)/4);
+assert(max(abs(sortieLagrange(30:end-30) - attenduLagrange(30:end-30))) < 1e-8);
+
 disp('signal : toutes les verifications passent');

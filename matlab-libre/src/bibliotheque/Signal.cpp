@@ -303,29 +303,70 @@ FONCTION(fnConv2) {
     return {plein};
 }
 
+// La forme directe II transposee, celle de MATLAB : l'etat qu'elle porte
+// est celui que rendent « [y,zf] = filter(...) » et FILTIC, et qu'accepte
+// « filter(b,a,x,zi) ». Sans lui, un filtrage par morceaux repartait de
+// zero a chaque bloc et laissait un transitoire a chaque raccord.
 FONCTION(fnFilter) {
     INUTILISE
-    exigerArguments(args, 3, 4, "filter");
+    exigerArguments(args, 3, 5, "filter");
     const Valeur& b = versDouble(args[0]);
     const Valeur& a = versDouble(args[1]);
     const Valeur& x = versDouble(args[2]);
     if (a.nelem() == 0 || (a.re[0] == 0 && !(a.estComplexe() && a.im[0] != 0)))
         erreur("MATLAB:filter:zeroLeadingCoefficient",
                "First denominator filter coefficient must be non-zero.");
-    std::vector<cplx> vb = versVecteurComplexe(b), va = versVecteurComplexe(a),
-                      vx = versVecteurComplexe(x);
+    std::vector<cplx> vb = versVecteurComplexe(b), va = versVecteurComplexe(a);
     cplx a0 = va[0];
-    std::size_t n = vx.size();
-    std::vector<cplx> y(n, cplx(0.0, 0.0));
-    for (std::size_t i = 0; i < n; ++i) {
-        cplx s(0.0, 0.0);
-        for (std::size_t k = 0; k < vb.size(); ++k)
-            if (i >= k) s += vb[k] * vx[i - k];
-        for (std::size_t k = 1; k < va.size(); ++k)
-            if (i >= k) s -= va[k] * y[i - k];
-        y[i] = s / a0;
+    for (auto& c : vb) c /= a0;
+    for (auto& c : va) c /= a0;
+    std::size_t ordre = std::max(vb.size(), va.size());
+    vb.resize(ordre, cplx(0.0, 0.0));
+    va.resize(ordre, cplx(0.0, 0.0));
+    std::size_t etats = ordre > 0 ? ordre - 1 : 0;
+
+    std::vector<cplx> zi(etats, cplx(0.0, 0.0));
+    if (args.size() > 3 && !args[3].estVide()) {
+        std::vector<cplx> donne = versVecteurComplexe(versDouble(args[3]));
+        for (std::size_t k = 0; k < etats && k < donne.size(); ++k) zi[k] = donne[k];
     }
-    return {depuisVecteurComplexe(y, x.estColonne() && !x.estScalaire())};
+    // MATLAB filtre le long de la premiere dimension non singleton : une
+    // matrice se filtre colonne par colonne, et non a plat.
+    int dimension = args.size() > 4 ? (int)args[4].scal() - 1 : dimensionParDefaut(x);
+    exigerDimension(dimension);
+    Dims d = x.dims;
+    while ((int)d.size() <= dimension) d.push_back(1);
+    std::size_t interne = 1;
+    for (int k = 0; k < dimension; ++k) interne *= (std::size_t)d[(std::size_t)k];
+    std::size_t taille = (std::size_t)d[(std::size_t)dimension];
+    std::size_t total = x.nelem();
+    std::size_t externe = taille ? total / (interne * taille) : 0;
+
+    std::vector<cplx> vx = versVecteurComplexe(x);
+    std::vector<cplx> y(total, cplx(0.0, 0.0));
+    std::vector<cplx> zf;
+    for (std::size_t bloc = 0; bloc < externe; ++bloc) {
+        for (std::size_t interieur = 0; interieur < interne; ++interieur) {
+            std::vector<cplx> z = zi;
+            std::size_t base = bloc * interne * taille + interieur;
+            for (std::size_t i = 0; i < taille; ++i) {
+                std::size_t position = base + i * interne;
+                cplx entree = vx[position];
+                cplx sortie = vb[0] * entree + (etats ? z[0] : cplx(0.0, 0.0));
+                y[position] = sortie;
+                for (std::size_t k = 0; k + 1 < etats; ++k)
+                    z[k] = vb[k + 1] * entree + z[k + 1] - va[k + 1] * sortie;
+                if (etats)
+                    z[etats - 1] = vb[etats] * entree - va[etats] * sortie;
+            }
+            if (zf.empty()) zf = z;
+        }
+    }
+    Valeur sortie = depuisVecteurComplexe(y, false);
+    sortie.dims = x.dims;
+    sortie.normaliserDims();
+    if (nargout < 2) return {sortie};
+    return {sortie, depuisVecteurComplexe(zf, true)};
 }
 
 FONCTION(fnFiltfilt) {

@@ -99,12 +99,17 @@ end
 
 function [uniques, multiplicites] = regrouper(poles)
 %REGROUPER Rassemble les pôles égaux, à la tolérance de MATLAB près.
+%   La tolérance est celle de MPOLES : un millième en relatif. Un pôle
+%   triple sort de ROOTS avec une erreur en racine cubique de l'epsilon
+%   machine — trois millionièmes —, si bien qu'une tolérance plus serrée
+%   le prenait pour trois pôles distincts et faisait exploser les
+%   résidus.
     uniques = [];
     multiplicites = [];
     reste = poles(:);
     while ~isempty(reste)
         courant = reste(1);
-        tolerance = 1e-6 * max(1, abs(courant));
+        tolerance = 1e-3 * max(1, abs(courant));
         proches = abs(reste - courant) <= tolerance;
         uniques(end + 1, 1) = mean(reste(proches));   %#ok<AGROW>
         multiplicites(end + 1, 1) = sum(proches);     %#ok<AGROW>

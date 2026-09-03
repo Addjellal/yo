@@ -73,6 +73,18 @@ qu'ils ne font pas encore comme MATLAB.
 - **Format `.fig`** : `savefig` écrit du SVG, `openfig` refuse le format
   de MathWorks.
 
+### Traitement du signal
+
+- **`maxflat`** : le filtre à module maximalement plat d'ordres
+  dissymétriques — N zéros en z = −1 et M pôles — n'est pas conçu. Le cas
+  N = M est exactement `butter`, qui est là.
+- **Objets `digitalFilter`** : `designfilt` et l'objet qu'il rend
+  n'existent pas. `lowpass` et ses voisines rendent les coefficients B et
+  A au lieu de l'objet.
+- **`intfilt`** en bande limitée résout les équations normales d'une
+  interpolation idéale, ce qui est la définition ; les coefficients
+  peuvent différer de MATLAB au dernier chiffre.
+
 ### Robustesse
 
 Les noms sont tous présents ; ce qui suit est ce que la représentation

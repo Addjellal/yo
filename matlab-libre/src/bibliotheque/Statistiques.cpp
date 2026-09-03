@@ -3,6 +3,7 @@
 #include <cctype>
 #include <limits>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <numeric>
 #include <random>
@@ -39,11 +40,116 @@ double moyenneDe(const std::vector<double>& t) {
     return s / (double)t.size();
 }
 
+double varianceDe(const std::vector<double>& t, int normalisation);
+
 double medianeDe(std::vector<double> t) {
     if (t.empty()) return NAN;
     std::sort(t.begin(), t.end());
     std::size_t n = t.size();
     return (n % 2) ? t[n / 2] : 0.5 * (t[n / 2 - 1] + t[n / 2]);
+}
+
+// « reduire » ne parcourt que la partie reelle : une valeur complexe y
+// perdait son imaginaire en silence, et « mean([1+2i 3+4i]) » rendait 2
+// au lieu de 2+3i. Ces deux passerelles rendent la reduction complete.
+//
+// La premiere applique la meme reduction aux deux parties et recolle ;
+// la seconde donne les deux parties d'une meme tranche a la fonction,
+// pour ce qui les melange — la variance, la mediane.
+Valeur reduireDeuxParties(const Valeur& v, int dimension,
+                          const std::function<double(const std::vector<double>&)>& f) {
+    Valeur reelle = reduire(v, dimension, false, f);
+    if (!v.estComplexe()) return reelle;
+    Valeur imaginaire = v;
+    imaginaire.re = v.im;
+    imaginaire.im.clear();
+    Valeur partie = reduire(imaginaire, dimension, false, f);
+    reelle.assurerImaginaire();
+    for (std::size_t k = 0; k < reelle.im.size() && k < partie.re.size(); ++k)
+        reelle.im[k] = partie.re[k];
+    return reelle;
+}
+
+Valeur reduirePaires(
+    const Valeur& v, int dimension,
+    const std::function<double(const std::vector<double>&, const std::vector<double>&)>& f) {
+    Dims d = v.dims;
+    while ((int)d.size() <= dimension) d.push_back(1);
+    Dims rd = d;
+    rd[(std::size_t)dimension] = 1;
+    Valeur r = Valeur::matriceDims(rd);
+    r.normaliserDims();
+    std::vector<std::vector<double>> tranchesImaginaires;
+    if (v.estComplexe()) {
+        Valeur imaginaire = v;
+        imaginaire.re = v.im;
+        imaginaire.im.clear();
+        parcourirTranches(imaginaire, dimension,
+                          [&](std::vector<double>& t, std::size_t k) {
+                              if (tranchesImaginaires.size() <= k)
+                                  tranchesImaginaires.resize(k + 1);
+                              tranchesImaginaires[k] = t;
+                          });
+    }
+    parcourirTranches(v, dimension, [&](std::vector<double>& t, std::size_t k) {
+        std::vector<double> zeros(t.size(), 0.0);
+        if (k < r.re.size())
+            r.re[k] = f(t, k < tranchesImaginaires.size() ? tranchesImaginaires[k] : zeros);
+    });
+    return r;
+}
+
+// Les paires (reel, imaginaire) privees de celles ou l'un des deux est
+// NaN : c'est ce que veut dire « omitnan » pour une valeur complexe.
+void sansNaNPaires(std::vector<double>& re, std::vector<double>& im) {
+    std::vector<double> gr, gi;
+    for (std::size_t k = 0; k < re.size(); ++k) {
+        double partieIm = k < im.size() ? im[k] : 0.0;
+        if (std::isnan(re[k]) || std::isnan(partieIm)) continue;
+        gr.push_back(re[k]);
+        gi.push_back(partieIm);
+    }
+    re = gr;
+    im = gi;
+}
+
+// La variance d'un echantillon complexe : la moyenne des carres des
+// modules des ecarts, c'est-a-dire la somme des variances des deux
+// parties. Elle est reelle, comme dans MATLAB.
+double varianceComplexeDe(std::vector<double> re, std::vector<double> im, int normalisation,
+                          bool omettre) {
+    if (omettre) sansNaNPaires(re, im);
+    if (re.size() < 2) return normalisation == 1 ? 0.0 : (re.empty() ? NAN : 0.0);
+    bool complexe = false;
+    for (double x : im)
+        if (x != 0.0) complexe = true;
+    double v = varianceDe(re, normalisation);
+    if (complexe) v += varianceDe(im, normalisation);
+    return v;
+}
+
+// La mediane d'un echantillon complexe : on classe par module, puis par
+// argument, comme le fait le « sort » de MATLAB, et l'on rend la partie
+// demandee du terme du milieu — la demi-somme des deux, en nombre pair.
+double medianeComplexe(std::vector<double> re, std::vector<double> im, bool omettre,
+                       bool partieReelle) {
+    if (omettre) sansNaNPaires(re, im);
+    if (re.empty()) return NAN;
+    std::vector<std::size_t> ordre(re.size());
+    for (std::size_t k = 0; k < ordre.size(); ++k) ordre[k] = k;
+    std::sort(ordre.begin(), ordre.end(), [&](std::size_t a, std::size_t b) {
+        double ma = std::hypot(re[a], im.size() > a ? im[a] : 0.0);
+        double mb = std::hypot(re[b], im.size() > b ? im[b] : 0.0);
+        if (ma != mb) return ma < mb;
+        return std::atan2(im.size() > a ? im[a] : 0.0, re[a]) <
+               std::atan2(im.size() > b ? im[b] : 0.0, re[b]);
+    });
+    auto partie = [&](std::size_t k) {
+        std::size_t i = ordre[k];
+        return partieReelle ? re[i] : (im.size() > i ? im[i] : 0.0);
+    };
+    std::size_t n = ordre.size();
+    return (n % 2) ? partie(n / 2) : 0.5 * (partie(n / 2 - 1) + partie(n / 2));
 }
 
 double varianceDe(const std::vector<double>& t, int normalisation) {
@@ -62,7 +168,7 @@ FONCTION(fnMean) {
     if (v.estVide()) return {Valeur::scalaire(NAN)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
-    return {reduire(v, dim, false, [omettre](const std::vector<double>& t) {
+    return {reduireDeuxParties(v, dim, [omettre](const std::vector<double>& t) {
         return moyenneDe(omettre ? sansNaN(t) : t);
     })};
 }
@@ -75,9 +181,24 @@ FONCTION(fnMedian) {
     if (v.estVide()) return {Valeur::scalaire(NAN)};
     if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
-    return {reduire(v, dim, false, [omettre](const std::vector<double>& t) {
-        return medianeDe(omettre ? sansNaN(t) : t);
-    })};
+    if (!v.estComplexe())
+        return {reduire(v, dim, false, [omettre](const std::vector<double>& t) {
+            return medianeDe(omettre ? sansNaN(t) : t);
+        })};
+    // MATLAB classe les complexes par module, puis par argument : la
+    // mediane d'un echantillon complexe suit ce meme ordre.
+    Valeur partieReelle = reduirePaires(
+        v, dim, [omettre](const std::vector<double>& re, const std::vector<double>& im) {
+            return medianeComplexe(re, im, omettre, true);
+        });
+    Valeur partieImaginaire = reduirePaires(
+        v, dim, [omettre](const std::vector<double>& re, const std::vector<double>& im) {
+            return medianeComplexe(re, im, omettre, false);
+        });
+    partieReelle.assurerImaginaire();
+    for (std::size_t k = 0; k < partieReelle.im.size() && k < partieImaginaire.re.size(); ++k)
+        partieReelle.im[k] = partieImaginaire.re[k];
+    return {partieReelle};
 }
 
 FONCTION(fnMode) {
@@ -111,9 +232,11 @@ FONCTION(fnVar) {
     int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
     int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
     if (v.estVecteur() && args.size() <= 2) dim = dimensionParDefaut(v);
-    return {reduire(v, dim, false, [normalisation, omettre](const std::vector<double>& t) {
-        return varianceDe(omettre ? sansNaN(t) : t, normalisation);
-    })};
+    return {reduirePaires(v, dim,
+                          [normalisation, omettre](const std::vector<double>& re,
+                                                   const std::vector<double>& im) {
+                              return varianceComplexeDe(re, im, normalisation, omettre);
+                          })};
 }
 
 FONCTION(fnStd) {
@@ -123,9 +246,11 @@ FONCTION(fnStd) {
     Valeur v = versDouble(args[0]);
     int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
     int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
-    return {reduire(v, dim, false, [normalisation, omettre](const std::vector<double>& t) {
-        return std::sqrt(varianceDe(omettre ? sansNaN(t) : t, normalisation));
-    })};
+    return {reduirePaires(v, dim,
+                          [normalisation, omettre](const std::vector<double>& re,
+                                                   const std::vector<double>& im) {
+                              return std::sqrt(varianceComplexeDe(re, im, normalisation, omettre));
+                          })};
 }
 
 FONCTION(fnRange) {

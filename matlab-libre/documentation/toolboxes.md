@@ -54,7 +54,7 @@ existant appellera.
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
 | `robotique` | Robotics System Toolbox — cinématique et transformations. | 19 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
-| `signal` | Signal Processing Toolbox — traitement du signal. | 163 |
+| `signal` | Signal Processing Toolbox — traitement du signal. | 200 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |

@@ -16,7 +16,36 @@
 %   cheb1ord    - Ordre minimal d'un Chebyshev I
 %   cheb2ord    - Ordre minimal d'un Chebyshev II
 %   kaiserord   - Ordre et bêta d'un RIF fenêtré par Kaiser
+%   ellip       - Filtre elliptique, ou de Cauer
+%   ellipord    - Ordre minimal d'un elliptique
+%   besself     - Filtre analogique de Bessel
+%   maxflat     - (absent) filtre à module maximalement plat
 %   prototypeVersNumerique - Prototype analogique -> filtre numérique
+%
+% Prototypes analogiques et transformations
+%   buttap      - Prototype de Butterworth
+%   cheb1ap     - Prototype de Chebyshev de type I
+%   cheb2ap     - Prototype de Chebyshev de type II
+%   ellipap     - Prototype elliptique
+%   besselap    - Prototype de Bessel
+%   bilinear    - Transformation bilinéaire, avec prédistorsion
+%   impinvar    - Transformation par invariance impulsionnelle
+%
+% Filtrage direct d'un signal
+%   lowpass     - Passe-bas appliqué à un signal
+%   highpass    - Passe-haut appliqué à un signal
+%   bandpass    - Passe-bande appliqué à un signal
+%   bandstop    - Coupe-bande appliqué à un signal
+%   filtic      - Conditions initiales d'un filtre
+%   latcfilt    - Filtrage par une structure en treillis
+%   intfilt     - Filtre d'interpolation
+%
+% Modèles rationnels
+%   prony       - Modèle rationnel d'une réponse impulsionnelle
+%   stmcb       - Modèle par la méthode de Steiglitz-McBride
+%   invfreqz    - Filtre numérique ajusté sur une réponse en fréquence
+%   invfreqs    - Filtre analogique ajusté sur une réponse en fréquence
+%   rlevinson   - Levinson-Durbin à l'envers
 %
 % Structures de filtres
 %   tf2zp / zp2tf   - Fonction de transfert <-> zéros, pôles, gain
@@ -24,6 +53,21 @@
 %   zp2sos          - Zéros et pôles -> sections du second ordre
 %   sosfilt         - Filtrage en cascade de sections
 %   polystab        - Replie les racines dans le disque unité
+%   tf2zpk          - Transfert numérique -> zéros, pôles, gain
+%   tf2latc / latc2tf - Fonction de transfert <-> treillis
+%   convmtx         - Matrice de convolution
+%   eqtflength      - Met numérateur et dénominateur à la même longueur
+%   polyscale       - Déplace les racines vers l'origine
+%
+% Mesures et conversions
+%   pow2db / db2pow - Puissance <-> décibels
+%   mag2db / db2mag - Amplitude <-> décibels
+%   detrend         - Retire la tendance d'un signal
+%   discretize      - (MATLAB de base) classes d'un vecteur
+%   uencode / udecode - Quantification uniforme
+%   bitrevorder     - Ordre des bits inversés
+%   parzen          - Fenêtre de Parzen, comme parzenwin
+%   strips          - Trace un signal en bandes superposées
 %
 % Réponses
 %   impz        - Réponse impulsionnelle
@@ -190,6 +234,13 @@ ALIGNSIGNALS Aligne deux signaux en compensant leur retard.
   avance, de sorte que les deux se superposent.
 ```
 
+## `appliquerBande`
+
+```
+APPLIQUERBANDE Filtrage à phase nulle des fonctions lowpass et voisines.
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `arSpectre`
 
 ```
@@ -244,6 +295,26 @@ ARYULE Modèle autorégressif par les équations de Yule-Walker.
      a = aryule(filter(1, [1 -0.9], randn(1000,1)), 1);
 ```
 
+## `bandpass`
+
+```
+BANDPASS Filtre passe-bande appliqué à un signal.
+  Y = BANDPASS(X,[W1 W2]) ne laisse passer que ce qui se trouve entre
+  W1 et W2, fréquences normalisées entre 0 et 1.
+  Y = BANDPASS(X,[F1 F2],FS) donne les fréquences en hertz.
+
+  Les options sont celles de LOWPASS.
+
+  [Y,B,A] = BANDPASS(...) rend aussi les coefficients du filtre.
+
+  Exemple :
+     t = (0:999)' / 1000;
+     x = sin(2*pi*10*t) + sin(2*pi*100*t) + sin(2*pi*400*t);
+     y = bandpass(x, [50 200], 1000);
+
+  Voir aussi BANDSTOP, LOWPASS, HIGHPASS, ELLIP, FILTFILT.
+```
+
 ## `bandpower`
 
 ```
@@ -256,10 +327,47 @@ BANDPOWER Puissance moyenne d'un signal, éventuellement dans une bande.
      bandpower([1 -1 1 -1])   % 1
 ```
 
+## `bandstop`
+
+```
+BANDSTOP Filtre coupe-bande appliqué à un signal.
+  Y = BANDSTOP(X,[W1 W2]) retire ce qui se trouve entre W1 et W2,
+  fréquences normalisées entre 0 et 1.
+  Y = BANDSTOP(X,[F1 F2],FS) donne les fréquences en hertz.
+
+  Les options sont celles de LOWPASS.
+
+  [Y,B,A] = BANDSTOP(...) rend aussi les coefficients du filtre.
+
+  Exemple :
+     t = (0:999)' / 1000;
+     x = sin(2*pi*10*t) + sin(2*pi*100*t);
+     y = bandstop(x, [50 200], 1000);
+
+  Voir aussi BANDPASS, LOWPASS, HIGHPASS, ELLIP, FILTFILT.
+```
+
 ## `barthannwin`
 
 ```
 BARTHANNWIN Fenêtre de Bartlett-Hann.
+```
+
+## `besselap`
+
+```
+BESSELAP Prototype analogique de Bessel.
+  [Z,P,K] = BESSELAP(N) rend les zéros, les pôles et le gain du
+  passe-bas analogique de Bessel d'ordre N, normalisé pour un retard
+  de groupe de 1 seconde en continu.
+
+  Il n'a aucun zéro fini ; ses pôles sont les racines du polynôme de
+  Bessel inverse, et le gain vaut 1 en continu.
+
+  Exemple :
+     [z, p, k] = besselap(3);
+
+  Voir aussi BESSELF, BUTTAP, CHEB1AP.
 ```
 
 ## `besself`
@@ -282,6 +390,52 @@ BESSELF Filtre analogique de Bessel.
      [b, a] = besself(2, 1);   % a = [1 3 3], b = 3
 
   Voir aussi BUTTER, CHEBY1, ELLIP.
+```
+
+## `bilinear`
+
+```
+BILINEAR Transformation bilinéaire d'un filtre analogique.
+  [ZD,PD,KD] = BILINEAR(Z,P,K,FS) transporte les zéros, les pôles et le
+  gain d'un filtre analogique dans le plan des z par la substitution
+
+     s = 2*FS*(z-1)/(z+1),
+
+  qui envoie le demi-plan gauche dans le disque unité : un filtre
+  analogique stable donne un filtre numérique stable.
+
+  [BD,AD] = BILINEAR(B,A,FS) fait de même sur les coefficients de la
+  fonction de transfert.
+
+  [...] = BILINEAR(...,FP) prédistord la fréquence : la réponse
+  numérique à FP hertz est alors exactement celle de l'analogique à FP,
+  ce qui compense la compression de l'axe des fréquences.
+
+  Exemple :
+     [z, p, k] = buttap(4);
+     [zd, pd, kd] = bilinear(z, p, k, 1, 0.2);
+
+  Voir aussi IMPINVAR, BUTTER, BUTTAP, ZP2TF, FREQZ.
+```
+
+## `bitrevorder`
+
+```
+BITREVORDER Range un vecteur en ordre de bits inversés.
+  Y = BITREVORDER(X) permute X de sorte que l'élément d'indice K se
+  retrouve à l'indice obtenu en lisant les bits de K-1 à l'envers.
+  C'est l'ordre dans lequel une transformée de Fourier rapide en
+  entrelacement temporel lit ses données.
+
+  [Y,I] = BITREVORDER(X) rend en outre la permutation, telle que
+  Y = X(I).
+
+  La longueur de X doit être une puissance de deux.
+
+  Exemple :
+     bitrevorder(0:7)     % [0 4 2 6 1 5 3 7]
+
+  Voir aussi FFT, DIGITREVORDER, FFTSHIFT.
 ```
 
 ## `blackmanharris`
@@ -309,6 +463,24 @@ BUFFER Découpe un signal en colonnes de longueur fixe.
      buffer(1:6, 3)   % [1 4; 2 5; 3 6]
 ```
 
+## `buttap`
+
+```
+BUTTAP Prototype analogique de Butterworth.
+  [Z,P,K] = BUTTAP(N) rend les zéros, les pôles et le gain du filtre
+  passe-bas analogique de Butterworth d'ordre N, normalisé : sa
+  fréquence de coupure à −3 dB vaut 1 radian par seconde.
+
+  Il n'a aucun zéro fini ; ses N pôles sont régulièrement répartis sur
+  le demi-cercle unité gauche, et le gain vaut 1 en continu.
+
+  Exemple :
+     [z, p, k] = buttap(4);
+     abs(prod(-p))       % 1 : le gain en continu
+
+  Voir aussi BUTTER, CHEB1AP, CHEB2AP, ELLIPAP, BESSELAP, ZP2TF.
+```
+
 ## `butter`
 
 ```
@@ -316,10 +488,22 @@ BUTTER Filtre numérique de Butterworth.
   [B,A] = BUTTER(N,WN) conçoit un passe-bas d'ordre N de fréquence de
   coupure normalisée WN (0 < WN < 1, 1 = Nyquist).
   [B,A] = BUTTER(N,WN,'high') conçoit un passe-haut.
+  [B,A] = BUTTER(N,[W1 W2]) conçoit un passe-bande d'ordre 2N, et
+  BUTTER(N,[W1 W2],'stop') un coupe-bande.
+
+  Le filtre de Butterworth est le seul dont le module est monotone dans
+  les deux bandes : il n'ondule nulle part, au prix d'une transition
+  plus douce qu'un Chebyshev de même ordre.
 
   Le prototype analogique est transposé par transformation bilinéaire
   avec pré-distorsion de la fréquence, comme le fait la fonction de
   référence.
+
+  Exemples :
+     [b, a] = butter(4, 0.3);
+     [b, a] = butter(2, [0.2 0.5]);      % passe-bande d'ordre 4
+
+  Voir aussi BUTTAP, BUTTORD, CHEBY1, CHEBY2, ELLIP, FILTFILT.
 ```
 
 ## `buttord`
@@ -359,12 +543,45 @@ CCONV Convolution circulaire.
      cconv([1 2], [1 1], 2)   % [3 3]
 ```
 
+## `cheb1ap`
+
+```
+CHEB1AP Prototype analogique de Chebyshev de type I.
+  [Z,P,K] = CHEB1AP(N,RP) rend les zéros, les pôles et le gain du
+  passe-bas analogique d'ordre N qui ondule de RP décibels dans sa
+  bande passante ; le bord de bande est en 1 radian par seconde.
+
+  Il n'a aucun zéro fini : ses pôles sont sur une ellipse.
+
+  Exemple :
+     [z, p, k] = cheb1ap(4, 1);
+
+  Voir aussi CHEBY1, BUTTAP, CHEB2AP, ELLIPAP.
+```
+
 ## `cheb1ord`
 
 ```
 CHEB1ORD Ordre minimal d'un filtre de Chebyshev de type I.
   [N,WN] = CHEB1ORD(WP,WS,RP,RS). WN vaut WP : la bande passante est
   fixée par l'ondulation.
+```
+
+## `cheb2ap`
+
+```
+CHEB2AP Prototype analogique de Chebyshev de type II.
+  [Z,P,K] = CHEB2AP(N,RS) rend les zéros, les pôles et le gain du
+  passe-bas analogique d'ordre N dont la bande atténuée descend à RS
+  décibels ; le bord de bande atténuée est en 1 radian par seconde.
+
+  Contrairement au type I, il porte des zéros sur l'axe imaginaire :
+  c'est ce qui creuse sa bande coupée.
+
+  Exemple :
+     [z, p, k] = cheb2ap(4, 40);
+
+  Voir aussi CHEBY2, BUTTAP, CHEB1AP, ELLIPAP.
 ```
 
 ## `cheb2ord`
@@ -426,6 +643,34 @@ CHIRP Sinusoïde à fréquence instantanée variable.
   Y = CHIRP(T,F0,T1,F1,'quadratic') fait un balayage quadratique.
 ```
 
+## `concevoirBande`
+
+```
+CONCEVOIRBANDE Filtre d'ordre minimal pour lowpass et ses voisines.
+  La bande de transition est déduite de la raideur : à raideur S, elle
+  occupe la fraction 1-S de ce qui sépare le bord de bande du bord du
+  spectre. C'est la même idée que dans MATLAB, où S vaut 0,85 par
+  défaut.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `convmtx`
+
+```
+CONVMTX Matrice de convolution.
+  A = CONVMTX(H,N) rend la matrice qui transforme une convolution en
+  produit matriciel : pour un vecteur X de N éléments, CONVMTX(H,N)*X
+  vaut CONV(H,X) — en colonne si H est une colonne, en ligne si H est
+  une ligne, auquel cas c'est X*CONVMTX(H,N) qu'il faut écrire.
+
+  Exemple :
+     h = [1 2 3];
+     isequal(convmtx(h, 4) * (1:4)', conv(h, 1:4)')   % vrai... en colonne
+
+  Voir aussi CONV, CORRMTX, TOEPLITZ, FILTER.
+```
+
 ## `corrmtx`
 
 ```
@@ -461,6 +706,30 @@ CZT Transformée en Z sur une spirale (algorithme de Bluestein).
      n = 8; norm(czt(1:n) - fft((1:n)')) < 1e-10
 ```
 
+## `db2mag`
+
+```
+DB2MAG Décibels en amplitude.
+  Y = DB2MAG(X) rend 10^(X/20).
+
+  Exemple :
+     db2mag(20)      % 10
+
+  Voir aussi MAG2DB, DB2POW, POW2DB.
+```
+
+## `db2pow`
+
+```
+DB2POW Décibels en puissance.
+  Y = DB2POW(X) rend 10^(X/10).
+
+  Exemple :
+     db2pow(20)      % 100
+
+  Voir aussi POW2DB, MAG2DB, DB2MAG.
+```
+
 ## `dct`
 
 ```
@@ -489,6 +758,26 @@ DEMOD Démodulation, réciproque de MODULATE.
   X = DEMOD(Y,FC,FS,METHODE). La démodulation d'amplitude multiplie par
   la porteuse puis filtre passe-bas ; celle de phase et de fréquence
   passe par la transformée de Hilbert.
+```
+
+## `detrend`
+
+```
+DETREND Retire la tendance d'un signal.
+  Y = DETREND(X) retire la droite des moindres carrés.
+  Y = DETREND(X,'constant') ou DETREND(X,0) ne retire que la moyenne.
+  Y = DETREND(X,'linear') ou DETREND(X,1) retire la droite.
+  Y = DETREND(X,N) retire le polynôme de degré N.
+  Y = DETREND(X,1,POINTS) ajuste une droite par morceaux, les ruptures
+  étant aux indices POINTS : la tendance retirée est continue.
+
+  Une matrice est traitée colonne par colonne.
+
+  Exemple :
+     t = (0:99)';
+     y = detrend(3 + 0.5 * t + sin(t));   % il ne reste que le sinus
+
+  Voir aussi POLYFIT, FILTER, MOVMEAN.
 ```
 
 ## `dftmtx`
@@ -571,6 +860,23 @@ ELLIP Filtre elliptique, ou filtre de Cauer.
   Voir aussi ELLIPORD, BUTTER, CHEBY1, CHEBY2, BESSELF.
 ```
 
+## `ellipap`
+
+```
+ELLIPAP Prototype analogique elliptique, ou de Cauer.
+  [Z,P,K] = ELLIPAP(N,RP,RS) rend les zéros, les pôles et le gain du
+  passe-bas analogique d'ordre N qui ondule de RP décibels en bande
+  passante et descend à RS décibels en bande atténuée ; le bord de
+  bande passante est en 1 radian par seconde.
+
+  À ordre égal, c'est la transition la plus raide qu'on puisse obtenir.
+
+  Exemple :
+     [z, p, k] = ellipap(4, 1, 40);
+
+  Voir aussi ELLIP, BUTTAP, CHEB1AP, CHEB2AP.
+```
+
 ## `ellipord`
 
 ```
@@ -610,11 +916,55 @@ ENVELOPE Enveloppes supérieure et inférieure d'un signal.
   [H,B] = ENVELOPE(X) utilise le module du signal analytique.
 ```
 
+## `eqtflength`
+
+```
+EQTFLENGTH Met deux polynômes de transfert à la même longueur.
+  [B,A] = EQTFLENGTH(NUM,DEN) complète le plus court par des zéros en
+  queue, de sorte que B et A aient le même nombre de coefficients :
+  c'est ce qu'attendent les fonctions qui travaillent sur B et A pris
+  ensemble. Les zéros de queue en trop, communs aux deux, sont retirés.
+
+  [B,A,NB,NA] = EQTFLENGTH(...) rend en outre les degrés effectifs.
+
+  Exemple :
+     [b, a] = eqtflength([1 2], [1 2 3 0]);
+     % b = [1 2 0], a = [1 2 3]
+
+  Voir aussi TF2ZP, FILTER, IMPZ.
+```
+
 ## `falltime`
 
 ```
 FALLTIME Temps de descente d'un signal à deux états.
   Symétrique de RISETIME : de 90 % à 10 % sur chaque front descendant.
+```
+
+## `filtic`
+
+```
+FILTIC Conditions initiales d'un filtre, d'après son passé.
+  Z = FILTIC(B,A,Y,X) rend le vecteur d'état que FILTER attend pour
+  reprendre un filtrage déjà commencé : Y porte les sorties passées,
+  Y(1) valant y(-1), Y(2) valant y(-2), et X les entrées passées de la
+  même façon. Les vecteurs trop courts sont complétés par des zéros.
+
+  Z = FILTIC(B,A,Y) suppose les entrées passées nulles.
+
+  L'état est celui de la forme directe II transposée, celle qu'emploie
+  FILTER :
+
+     Z(m) = somme_{i>m} [ B(i) X(i-m) - A(i) Y(i-m) ].
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     x = randn(1, 100);
+     [y, zf] = filter(b, a, x);
+     z = filtic(b, a, y(end:-1:end-2), x(end:-1:end-2));
+     % z reproduit zf
+
+  Voir aussi FILTER, FILTFILT, IMPZ.
 ```
 
 ## `finddelay`
@@ -648,8 +998,18 @@ FIR1 Filtre à réponse impulsionnelle finie, par fenêtrage.
   B = FIR1(N,[W1 W2]) conçoit un passe-bande.
   B = FIR1(N,[W1 W2],'stop') conçoit un coupe-bande.
 
+  B = FIR1(...,FENETRE) emploie la fenêtre donnée au lieu de celle de
+  Hamming, et B = FIR1(...,'noscale') laisse le gain tel que le
+  fenêtrage le donne, sans le ramener à l'unité dans la bande passante.
+
   La fenêtre de Hamming est appliquée par défaut, comme dans la
   documentation MathWorks.
+
+  Exemples :
+     b = fir1(20, 0.3);
+     b = fir1(20, [0.2 0.4], kaiser(21, 5), 'noscale');
+
+  Voir aussi FIR2, FIRLS, FIRPM, KAISERORD, FREQZ, FILTER.
 ```
 
 ## `fir2`
@@ -796,6 +1156,27 @@ GRPDELAY Temps de propagation de groupe d'un filtre numérique.
   pondération des coefficients par leur indice.
 ```
 
+## `highpass`
+
+```
+HIGHPASS Filtre passe-haut appliqué à un signal.
+  Y = HIGHPASS(X,WPASS) filtre X par un passe-haut dont la bande
+  passante commence à WPASS, fréquence normalisée entre 0 et 1.
+  Y = HIGHPASS(X,FPASS,FS) donne la fréquence en hertz.
+
+  Les options sont celles de LOWPASS : 'Steepness',
+  'StopbandAttenuation' et 'ImpulseResponse'.
+
+  [Y,B,A] = HIGHPASS(...) rend aussi les coefficients du filtre.
+
+  Exemple :
+     t = (0:999)' / 1000;
+     x = sin(2*pi*10*t) + sin(2*pi*300*t);
+     y = highpass(x, 100, 1000);
+
+  Voir aussi LOWPASS, BANDPASS, BANDSTOP, ELLIP, FILTFILT.
+```
+
 ## `hilbert`
 
 ```
@@ -836,6 +1217,30 @@ IFWHT Transformée de Walsh-Hadamard inverse.
      ifwht(fwht([1 2 3 4]))   % [1 2 3 4]
 ```
 
+## `impinvar`
+
+```
+IMPINVAR Transformation par invariance impulsionnelle.
+  [BZ,AZ] = IMPINVAR(B,A,FS) rend le filtre numérique dont la réponse
+  impulsionnelle est celle du filtre analogique B(s)/A(s) échantillonnée
+  à FS hertz : hz(n) = h(n/FS)/FS.
+
+  Contrairement à la transformation bilinéaire, elle ne déforme pas
+  l'axe des fréquences — mais elle replie tout ce que le filtre
+  analogique laisse passer au-delà de FS/2. Elle demande donc un filtre
+  analogique déjà bien atténué à la moitié de la fréquence
+  d'échantillonnage, et refuse un filtre qui n'est pas strictement
+  propre.
+
+  FS vaut 1 par défaut.
+
+  Exemple :
+     [b, a] = butter(4, 0.3, 's');
+     [bz, az] = impinvar(b, a, 10);
+
+  Voir aussi BILINEAR, RESIDUE, IMPZ.
+```
+
 ## `impz`
 
 ```
@@ -855,6 +1260,61 @@ INTERP Augmente la fréquence d'échantillonnage d'un facteur entier.
   Y = INTERP(X,R) insère R-1 zéros entre les échantillons puis filtre
   passe-bas ; le résultat a R fois plus de points, et le gain est
   compensé pour que l'amplitude soit conservée.
+```
+
+## `intfilt`
+
+```
+INTFILT Filtre d'interpolation.
+  B = INTFILT(L,P,ALPHA) conçoit le filtre à phase linéaire qui
+  interpole idéalement une séquence intercalée de L-1 zéros, en
+  s'appuyant sur les 2*P échantillons non nuls les plus proches. ALPHA
+  est la largeur de bande du signal d'origine, en fraction de la
+  fréquence de Nyquist : ALPHA = 1 suppose le signal occupant toute la
+  bande, une valeur plus petite laisse de la marge et donne un filtre
+  plus doux.
+
+  B = INTFILT(L,N,'Lagrange') interpole par un polynôme de degré N au
+  lieu d'une bande limitée.
+
+  Le filtre est long de 2*P*L-1 coefficients et laisse passer les
+  échantillons d'origine sans les changer : B(L:L:end) est une
+  impulsion.
+
+  Exemple :
+     b = intfilt(4, 3, 0.8);
+     x = sin(2*pi*0.05*(0:99));
+     y = filter(b, 1, upsample(x, 4));
+
+  Voir aussi INTERP, RESAMPLE, UPFIRDN, DECIMATE, SINC.
+```
+
+## `invfreqs`
+
+```
+INVFREQS Filtre analogique ajusté sur une réponse en fréquence complexe.
+  [B,A] = INVFREQS(H,W,NB,NA) cherche le numérateur d'ordre NB et le
+  dénominateur d'ordre NA, en puissances décroissantes de s, dont la
+  réponse aux pulsations W approche au mieux H au sens des moindres
+  carrés.
+
+  [B,A] = INVFREQS(H,W,NB,NA,WT) pondère chaque point.
+  [B,A] = INVFREQS(H,W,NB,NA,WT,ITER,TOL) demande ITER itérations de
+  Steiglitz et McBride, arrêtées quand les coefficients bougent de
+  moins de TOL.
+
+  C'est le pendant analogique d'INVFREQZ : le premier passage minimise
+  l'erreur d'équation |B - H A|, linéaire en les coefficients ; les
+  itérations suivantes divisent par |A| trouvé au tour précédent, ce
+  qui converge vers l'erreur de sortie |B/A - H|.
+
+  Exemple :
+     [bt, at] = besself(3, 1);
+     w = logspace(-1, 1, 100);
+     h = freqs(bt, at, w);
+     [b, a] = invfreqs(h, w, 0, 3);   % retrouve bt et at
+
+  Voir aussi INVFREQZ, FREQS, PRONY, STMCB.
 ```
 
 ## `invfreqz`
@@ -946,6 +1406,54 @@ KAISERORD Ordre et paramètre d'un filtre RIF fenêtré par Kaiser.
      [n, Wn, beta] = kaiserord([1000 1200], [1 0], [0.05 0.01], 8000);
 ```
 
+## `latc2tf`
+
+```
+LATC2TF Treillis -> fonction de transfert.
+  [B,A] = LATC2TF(K,V) rend le filtre que réalise le treillis-échelle
+  de coefficients de réflexion K et d'échelle V.
+  B = LATC2TF(K,'fir') rend le filtre à réponse finie du treillis K.
+  [B,A] = LATC2TF(K,'allpole') rend le filtre tout-pôle 1/A(z).
+  Sans second argument, le treillis est pris pour un tout-pôle.
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     [k, v] = tf2latc(b, a);
+     max(abs(latc2tf(k, v) - b))     % nul aux arrondis près
+
+  Voir aussi TF2LATC, LATCFILT, RC2POLY.
+```
+
+## `latcfilt`
+
+```
+LATCFILT Filtrage par une structure en treillis.
+  [F,G] = LATCFILT(K,X) filtre X par le treillis à réponse finie de
+  coefficients de réflexion K : F porte la sortie directe, G la sortie
+  rétrograde.
+
+  [F,G] = LATCFILT(K,V,X) emploie le treillis-échelle de coefficients
+  K et V : F est alors la sortie du filtre récursif.
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     k = tf2latc(b / b(1));
+     x = randn(1, 100);
+     max(abs(latcfilt(k, x) * b(1) - filter(b, 1, x)))
+
+  Voir aussi TF2LATC, LATC2TF, FILTER.
+```
+
+## `lireOptionsBande`
+
+```
+LIREOPTIONSBANDE Arguments communs à lowpass, highpass, bandpass, bandstop.
+  Rend les fréquences normalisées et une structure d'options :
+  Steepness, StopbandAttenuation et ImpulseResponse.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `lireOptionsSousEspace`
 
 ```
@@ -955,12 +1463,59 @@ LIREOPTIONSSOUSESPACE Analyse les arguments communs aux méthodes sous-espace.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `lowpass`
+
+```
+LOWPASS Filtre passe-bas appliqué à un signal.
+  Y = LOWPASS(X,WPASS) filtre X par un passe-bas dont la bande passante
+  va jusqu'à WPASS, fréquence normalisée entre 0 et 1, 1 valant la
+  moitié de la fréquence d'échantillonnage.
+
+  Y = LOWPASS(X,FPASS,FS) donne la fréquence en hertz, FS étant la
+  fréquence d'échantillonnage.
+
+  Y = LOWPASS(...,'Steepness',S) règle la raideur de la transition, S
+  entre 0,5 et 1 (0,85 par défaut) : plus S est proche de 1, plus la
+  transition est courte et l'ordre du filtre élevé.
+  Y = LOWPASS(...,'StopbandAttenuation',A) impose A décibels
+  d'atténuation en bande coupée (60 par défaut).
+  Y = LOWPASS(...,'ImpulseResponse','fir') emploie un filtre à réponse
+  impulsionnelle finie au lieu du filtre récursif.
+
+  [Y,B,A] = LOWPASS(...) rend aussi les coefficients du filtre. MATLAB
+  rend un objet digitalFilter ; MatLibre n'en a pas, et rend le couple
+  qui le décrit.
+
+  Le filtrage est à phase nulle — FILTFILT —, comme dans MATLAB : la
+  forme des transitoires du signal est préservée.
+
+  Exemple :
+     t = (0:999)' / 1000;
+     x = sin(2*pi*10*t) + sin(2*pi*300*t);
+     y = lowpass(x, 100, 1000);
+
+  Voir aussi HIGHPASS, BANDPASS, BANDSTOP, ELLIP, FILTFILT, DESIGNFILT.
+```
+
 ## `lsf2poly`
 
 ```
 LSF2POLY Polynôme de prédiction à partir des fréquences de raies.
   Inverse de POLY2LSF : les racines de rangs pairs reconstituent Q,
   celles de rangs impairs P, et A = (P + Q)/2.
+```
+
+## `mag2db`
+
+```
+MAG2DB Amplitude en décibels.
+  Y = MAG2DB(X) rend 20*log10(X) : c'est la conversion d'une amplitude,
+  non d'une puissance.
+
+  Exemple :
+     mag2db(10)      % 20
+
+  Voir aussi DB2MAG, POW2DB, DB2POW.
 ```
 
 ## `meanfreq`
@@ -1044,6 +1599,25 @@ PAPILLONHADAMARD Transformée de Hadamard rapide, ordre naturel.
   construction de Sylvester appliquée en place, en N log2 N additions.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `parzen`
+
+```
+PARZEN Fenêtre de Parzen.
+  W = PARZEN(N) rend la fenêtre de Parzen de N points, aussi appelée
+  fenêtre de de La Vallée Poussin : c'est la convolution de deux
+  fenêtres triangulaires, donc un B-spline cubique. Son spectre décroît
+  en 1/f^4, plus vite que celui de toute autre fenêtre polynomiale de
+  même largeur, au prix d'un lobe principal plus large.
+
+  C'est la même fenêtre que rend PARZENWIN.
+
+  Exemple :
+     w = parzen(64);
+     sum(w) / 64          % environ 0,375
+
+  Voir aussi PARZENWIN, BARTHANNWIN, TRIANG, WINDOW.
 ```
 
 ## `parzenwin`
@@ -1198,6 +1772,25 @@ POLY2RC Coefficients de réflexion d'un polynôme de prédiction.
      k = poly2rc([1 0.6149 0.9899 0 0.0031 -0.0082]);
 ```
 
+## `polyscale`
+
+```
+POLYSCALE Déplace les racines d'un polynôme vers l'origine.
+  B = POLYSCALE(A,ALPHA) rend le polynôme dont les racines sont celles
+  de A multipliées par ALPHA. C'est le changement de variable z -> z/ALPHA :
+  B(k) = A(k) * ALPHA^(n-k+1).
+
+  Avec 0 < ALPHA < 1, les racines rentrent vers l'origine — c'est ainsi
+  qu'on stabilise un filtre dont un pôle a débordé du cercle unité, ou
+  qu'on élargit les formants d'un modèle de parole.
+
+  Exemple :
+     a = poly([0.9, -0.95]);
+     max(abs(roots(polyscale(a, 0.5))))     % 0.475
+
+  Voir aussi POLYSTAB, ROOTS, POLY, LPC.
+```
+
 ## `polystab`
 
 ```
@@ -1205,6 +1798,40 @@ POLYSTAB Stabilise un polynôme en repliant ses racines dans le disque.
   B = POLYSTAB(A) remplace chaque racine de module supérieur à 1 par son
   inverse conjugué : le module de la réponse est conservé, mais le
   polynôme devient à phase minimale.
+```
+
+## `pow2db`
+
+```
+POW2DB Puissance en décibels.
+  Y = POW2DB(X) rend 10*log10(X). Une puissance nulle donne −Inf, une
+  puissance négative n'a pas de sens et donne NaN.
+
+  Exemple :
+     pow2db(100)     % 20
+
+  Voir aussi DB2POW, MAG2DB, DB2MAG, BANDPOWER.
+```
+
+## `prony`
+
+```
+PRONY Modèle rationnel d'une réponse impulsionnelle.
+  [B,A] = PRONY(H,NB,NA) rend le filtre d'ordre NB au numérateur et NA
+  au dénominateur dont la réponse impulsionnelle commence par H : les
+  NB+1 premiers échantillons sont reproduits exactement, et les
+  suivants au sens des moindres carrés.
+
+  La méthode de Prony sépare le problème en deux : les équations qui ne
+  font intervenir que le dénominateur se résolvent d'abord, le
+  numérateur s'en déduit par convolution.
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     h = impz(b, a, 30);
+     [bb, aa] = prony(h, 3, 3);      % retrouve b et a
+
+  Voir aussi STMCB, LEVINSON, LPC, IMPZ.
 ```
 
 ## `prototypeElliptique`
@@ -1234,12 +1861,20 @@ PROTOTYPEELLIPTIQUE Pôles et zéros du prototype passe-bas de Cauer.
 
 ```
 PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
-  Applique la transformation passe-bas ou passe-haut puis la
-  transformation bilinéaire, avec pré-distorsion de la fréquence :
-  omega = 2*tan(pi*Wn/2), comme le veut la conception de MATLAB.
-  GAINREFERENCE est le module attendu en continu (passe-bas) ou à
-  Nyquist (passe-haut) ; il vaut 1 par défaut, mais un Chebyshev de
-  type I d'ordre pair descend à 10^(-RP/20).
+  Applique la transformation de bande — passe-bas, passe-haut,
+  passe-bande ou coupe-bande — puis la transformation bilinéaire, avec
+  prédistorsion de la fréquence : omega = 2*tan(pi*Wn/2), comme le veut
+  la conception de MATLAB.
+
+  WN scalaire donne un passe-bas ou un passe-haut ; WN à deux éléments
+  donne un passe-bande, ou un coupe-bande si GENRE vaut 'stop'. Dans
+  les deux derniers cas l'ordre du filtre obtenu est le double de celui
+  du prototype, comme dans MATLAB.
+
+  GAINREFERENCE est le module attendu à la fréquence de référence — le
+  continu pour un passe-bas, Nyquist pour un passe-haut, le centre de
+  la bande pour un passe-bande ; il vaut 1 par défaut, mais un
+  Chebyshev de type I d'ordre pair descend à 10^(-RP/20).
 ```
 
 ## `puissancesSousEspace`
@@ -1409,6 +2044,26 @@ RISETIME Temps de montée d'un signal à deux états.
 
   Exemple :
      risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+```
+
+## `rlevinson`
+
+```
+RLEVINSON Levinson-Durbin à l'envers.
+  R = RLEVINSON(A,EFINAL) rend l'autocorrélation dont LEVINSON aurait
+  tiré le polynôme de prédiction A et l'erreur finale EFINAL. C'est le
+  chemin inverse de LEVINSON : il rend au modèle son autocorrélation.
+
+  [R,U,KR,E] = RLEVINSON(A,EFINAL) rend en outre la matrice U des
+  polynômes de prédiction de tous les ordres, les coefficients de
+  réflexion KR et les erreurs de prédiction E de chaque ordre.
+
+  Exemple :
+     r = [5 4 3 2]';
+     [a, e] = levinson(r, 3);
+     max(abs(rlevinson(a, e) - r))     % nul aux arrondis près
+
+  Voir aussi LEVINSON, POLY2RC, RC2POLY, POLY2AC, AC2POLY.
 ```
 
 ## `rms`
@@ -1729,6 +2384,50 @@ STEPZ Réponse indicielle d'un filtre numérique.
   [H,T] = STEPZ(B,A,N) : la réponse à un échelon unité.
 ```
 
+## `stmcb`
+
+```
+STMCB Modèle rationnel par la méthode de Steiglitz-McBride.
+  [B,A] = STMCB(H,NB,NA) rend le filtre d'ordre NB au numérateur et NA
+  au dénominateur dont la réponse impulsionnelle approche H au sens des
+  moindres carrés. Contrairement à PRONY, l'erreur minimisée est celle
+  de la sortie, non celle de l'équation : le modèle obtenu est en
+  général meilleur.
+
+  [B,A] = STMCB(Y,X,NB,NA) modélise le filtre qui transforme l'entrée X
+  en la sortie Y.
+  [B,A] = STMCB(...,NITER) fait NITER itérations (5 par défaut).
+  [B,A] = STMCB(...,NITER,AI) part du dénominateur AI.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     h = impz(b, a, 60);
+     [bb, aa] = stmcb(h, 4, 4);
+     max(abs(impz(bb, aa, 60) - h))     % très petit
+
+  Voir aussi PRONY, LEVINSON, LPC, INVFREQZ.
+```
+
+## `strips`
+
+```
+STRIPS Trace un signal en bandes superposées.
+  STRIPS(X) découpe X en bandes de 250 points et les trace les unes
+  sous les autres : c'est la façon de voir d'un coup d'œil un signal
+  long, dont la période saute alors aux yeux.
+
+  STRIPS(X,N) met N points par bande.
+  STRIPS(X,SD,FS) met SD secondes par bande, FS étant la fréquence
+  d'échantillonnage.
+  STRIPS(X,SD,FS,ECHELLE) multiplie l'amplitude par ECHELLE avant le
+  tracé.
+
+  Exemple :
+     strips(sin(2*pi*(0:999)/50));
+
+  Voir aussi PLOT, SPECTROGRAM, BUFFER.
+```
+
 ## `taylorwin`
 
 ```
@@ -1743,6 +2442,30 @@ TAYLORWIN Fenêtre de Taylor.
 
   Exemple :
      w = taylorwin(64, 5, -35);
+```
+
+## `tf2latc`
+
+```
+TF2LATC Transfert -> structure en treillis.
+  K = TF2LATC(B) rend les coefficients de réflexion du treillis qui
+  réalise le filtre à réponse finie B. B est normalisé par son premier
+  coefficient.
+
+  K = TF2LATC(1,A) rend le treillis tout-pôle du filtre 1/A(z).
+  [K,V] = TF2LATC(B,A) rend en outre les coefficients de l'échelle, qui
+  ajoutent les zéros : c'est la structure treillis-échelle.
+
+  Un treillis se prête mieux qu'une forme directe à l'arithmétique en
+  virgule fixe : la stabilité s'y lit sur les coefficients, tous de
+  module inférieur à 1, et un arrondi ne la détruit pas.
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     [k, v] = tf2latc(b, a);
+     all(abs(k) < 1)      % le filtre est stable
+
+  Voir aussi LATC2TF, LATCFILT, POLY2RC, RC2POLY, TF2SOS.
 ```
 
 ## `tf2sos`
@@ -1763,6 +2486,26 @@ TF2ZP Fonction de transfert vers zéros, pôles et gain.
 
   Exemple :
      [z, p, k] = tf2zp([1 -1], [1 -0.5]);   % z = 1, p = 0.5, k = 1
+```
+
+## `tf2zpk`
+
+```
+TF2ZPK Transfert numérique -> zéros, pôles et gain.
+  [Z,P,K] = TF2ZPK(B,A) rend les zéros, les pôles et le gain du filtre
+  numérique de fonction de transfert B(z)/A(z), les polynômes étant
+  écrits en puissances décroissantes de z.
+
+  C'est le pendant de TF2ZP pour les filtres numériques : les zéros de
+  tête de B, qui ne sont que des retards, sont écartés au lieu de
+  devenir des zéros à l'infini.
+
+  Exemple :
+     [b, a] = butter(3, 0.4);
+     [z, p, k] = tf2zpk(b, a);
+     all(abs(p) < 1)        % le filtre est stable
+
+  Voir aussi TF2ZP, ZP2TF, ZPLANE, TF2SOS.
 ```
 
 ## `tfestimate`
@@ -1841,6 +2584,43 @@ TUKEYWIN Fenêtre de Tukey, cosinus surélevé à rapport réglable.
 
   Exemple :
      isequal(tukeywin(8, 0), rectwin(8))   % vrai
+```
+
+## `udecode`
+
+```
+UDECODE Reconstruit un signal à partir de ses codes entiers.
+  Y = UDECODE(U,N) est l'inverse d'UENCODE : il ramène les codes sur N
+  bits dans l'intervalle [-1, 1[.
+  Y = UDECODE(U,N,V) ramène dans [-V, V[.
+  Y = UDECODE(U,N,V,'wrap') fait boucler les codes hors bornes au lieu
+  de les saturer.
+
+  Exemple :
+     codes = uencode(-1:0.5:1, 3);
+     udecode(codes, 3)
+
+  Voir aussi UENCODE, QUANTIZ, CAST.
+```
+
+## `uencode`
+
+```
+UENCODE Quantification uniforme d'un signal.
+  Y = UENCODE(U,N) quantifie U sur 2^N niveaux entre -1 et 1 et rend
+  les codes entiers non signés, de 0 à 2^N-1. Ce qui déborde est écrêté.
+
+  Y = UENCODE(U,N,V) quantifie entre -V et V.
+  Y = UENCODE(U,N,V,'signed') rend des codes signés, de -2^(N-1) à
+  2^(N-1)-1.
+
+  La classe du résultat est le plus petit entier qui contient les
+  codes : uint8, uint16 ou uint32, signés le cas échéant.
+
+  Exemple :
+     uencode(-1:0.5:1, 3)     % [0 2 4 6 7]
+
+  Voir aussi UDECODE, QUANTIZ, ROUND, CAST.
 ```
 
 ## `undershoot`

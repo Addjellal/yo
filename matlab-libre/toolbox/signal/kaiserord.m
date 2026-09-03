@@ -19,12 +19,26 @@ function [n, Wn, beta, genre] = kaiserord(f, a, ondulation, fs)
     else
         beta = 0;
     end
-    largeur = 2 * pi * (f(2) - f(1)) / fs;
-    n = ceil((attenuation - 8) / (2.285 * largeur));
-    Wn = (f(1) + f(2)) / fs;
-    if a(1) > a(end)
+    % Les transitions vont par paires de fréquences : la plus étroite
+    % commande l'ordre, et chaque paire donne une fréquence de coupure.
+    transitions = reshape(f, 2, []).';
+    largeurs = 2 * pi * (transitions(:, 2) - transitions(:, 1)) / fs;
+    n = ceil((attenuation - 8) / (2.285 * min(largeurs)));
+    Wn = mean(transitions, 2).' / (fs / 2);
+    if numel(Wn) >= 2
+        % Trois bandes : passe-bande si la bande du milieu passe,
+        % coupe-bande sinon.
+        if a(2) > a(1)
+            genre = 'bandpass';
+        else
+            genre = 'stop';
+        end
+    elseif a(1) > a(end)
         genre = 'low';
     else
         genre = 'high';
+    end
+    if numel(Wn) == 1
+        Wn = Wn(1);
     end
 end

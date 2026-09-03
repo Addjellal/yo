@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **646 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **1435 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1472 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -155,7 +155,7 @@ totalité.
    est refusée. Ce qui n'est pas traduisible est refusé avec le numéro de
    ligne, jamais approximé.
 6. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   La Signal Processing Toolbox compte 163 fonctions — conception de
+   La Signal Processing Toolbox compte 200 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
    cohérence, rééchantillonnage, cepstres réel et complexe,
