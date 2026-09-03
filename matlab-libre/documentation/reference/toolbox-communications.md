@@ -40,6 +40,20 @@
 %   syndtable           - Table de décodage par syndrome
 %   encode, decode      - Codage et correction
 %
+% Corps de Galois
+%   gfadd, gfsub        - Somme et différence de polynômes
+%   gfmul, gfdiv        - Produit et quotient terme à terme
+%   gfconv, gfdeconv    - Produit et division de polynômes
+%   gftrunc             - Retrait des zéros de tête
+%   gfprimck            - Irréductible ? primitif ?
+%   gfprimdf, gfprimfd  - Polynôme primitif par défaut, recherche
+%   gftable             - Table d'un corps d'extension
+%   gfcosets, cosets    - Classes cyclotomiques
+%   gfroots             - Racines dans une extension, polynômes minimaux
+%   gfrank              - Rang d'une matrice sur un corps fini
+%   gfweight            - Distance minimale d'un code linéaire
+%   gffilter            - Filtrage dans un corps fini
+%
 % Entrelacement
 %   intrlv, deintrlv    - Permutation donnée
 %   randintrlv, randdeintrlv - Permutation pseudo-aléatoire reproductible
@@ -55,6 +69,32 @@
 %   dec2base, base2dec  - Changements de base
 %   oct2dec, dec2oct    - Octal, pour les polynômes générateurs
 %   vec2mat             - Découpage d'un vecteur en matrice
+```
+
+## `alignerPolynomes`
+
+```
+ALIGNERPOLYNOMES Complète de zéros le plus court de deux polynômes.
+  Les coefficients étant rangés par puissances croissantes, compléter
+  se fait à droite : on ajoute des termes de plus haut degré, nuls.
+
+  Un scalaire est ici le polynôme constant, non un terme à répandre sur
+  tous les autres : sans cela l'identité de la division euclidienne ne
+  tiendrait pas, le reste étant souvent de degré zéro.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `alignerTermes`
+
+```
+ALIGNERTERMES Met deux tableaux à la même taille, terme à terme.
+  À la différence d'ALIGNERPOLYNOMES, un scalaire se répand ici sur
+  tout le tableau : c'est ce qu'attendent les opérations terme à terme,
+  GFMUL et GFDIV, où l'on multiplie souvent tout un vecteur par une
+  même valeur.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `amdemod`
@@ -210,6 +250,14 @@ BSC Canal binaire symétrique.
   Voir aussi AWGN, BITERR.
 ```
 
+## `completerLongueur`
+
+```
+COMPLETERLONGUEUR Complète un polynôme de zéros, ou le tronque.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `convenc`
 
 ```
@@ -254,6 +302,26 @@ CONVERTSNR Conversion entre les trois mesures de rapport signal sur bruit.
      convertSNR(10, 'ebno', 'snr', 'BitsPerSymbol', 4)   % 16.0206
 
   Voir aussi AWGN, BERAWGN.
+```
+
+## `cosets`
+
+```
+COSETS Classes cyclotomiques de GF(2^M), rangées par classe.
+  C = COSETS(M) rend une cellule : chaque case porte les exposants
+  d'une classe cyclotomique de GF(2^M), la première étant celle de
+  l'élément un.
+
+  MATLAB rend les éléments eux-mêmes, sous forme d'un tableau de corps
+  de Galois ; MatLibre rend leurs exposants, la table du corps se
+  lisant par GFTABLE.
+
+  Exemple :
+     c = cosets(3);
+     numel(c)                       % 3 classes
+     c{2}                           % [1 2 4]
+
+  Voir aussi GFCOSETS, GFTABLE, GFPRIMDF, GFROOTS.
 ```
 
 ## `cyclgen`
@@ -392,6 +460,17 @@ ENCODE Codage en blocs linéaires.
      c = encode([1 0 1 1], 7, 4, 'hamming/fmt');
 ```
 
+## `exigerPremier`
+
+```
+EXIGERPREMIER Refuse un ordre de corps qui n'est pas premier.
+  Les corps de Galois d'ordre non premier se construisent par extension
+  et ne se réduisent pas à l'arithmétique modulaire : accepter un p
+  composé donnerait des résultats faux sans le dire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `eyediagram`
 
 ```
@@ -499,6 +578,356 @@ GENQAMMOD Modulation sur une constellation quelconque.
      genqammod([0 1 2 3], c)   % [1 1i -1 -1i]
 
   Voir aussi GENQAMDEMOD, QAMMOD, MODNORM.
+```
+
+## `gfadd`
+
+```
+GFADD Somme dans un corps de Galois.
+  C = GFADD(A,B) additionne dans GF(2) : c'est le ou exclusif.
+  C = GFADD(A,B,P) additionne dans GF(P), P premier : chaque terme est
+  la somme modulo P.
+  C = GFADD(A,B,P,LEN) complète le résultat de zéros jusqu'à LEN.
+
+  Employée sur des vecteurs, elle additionne des polynômes écrits par
+  puissances croissantes ; le plus court est complété de zéros.
+
+  Dans un corps de Galois, l'addition est sa propre inverse quand P
+  vaut deux : ajouter deux fois la même chose ne change rien.
+
+  Exemple :
+     gfadd([1 1 0 1], [1 0 1])      % [0 1 1 1] : dans GF(2)
+     gfadd([2 3], [4 4], 5)         % [1 2]
+
+  Voir aussi GFSUB, GFMUL, GFCONV, GFTRUNC.
+```
+
+## `gfconv`
+
+```
+GFCONV Produit de deux polynômes dans un corps de Galois.
+  C = GFCONV(A,B,P) multiplie les polynômes A et B dans GF(P), P
+  premier. Les coefficients sont rangés par puissances croissantes :
+  A(1) est le terme constant.
+  C = GFCONV(A,B) le fait dans GF(2).
+
+  Le produit se calcule comme la convolution ordinaire, puis se réduit
+  modulo P : c'est ce qui distingue le corps fini des réels.
+
+  Exemple :
+     gfconv([1 1], [1 1])           % [1 0 1] : (1+x)^2 = 1+x^2 dans GF(2)
+     gfconv([1 1], [1 1], 3)        % [1 2 1]
+
+  Voir aussi GFDECONV, GFMUL, GFADD, GFTRUNC.
+```
+
+## `gfcosets`
+
+```
+GFCOSETS Classes cyclotomiques d'un corps de Galois.
+  C = GFCOSETS(M) rend les classes cyclotomiques de GF(2^M) : une ligne
+  par classe, complétée de NaN. La classe d'un exposant K est
+  l'ensemble des K*P^J modulo P^M - 1, c'est-à-dire les exposants dont
+  les éléments partagent le même polynôme minimal.
+
+  C = GFCOSETS(M,P) le fait pour GF(P^M).
+
+  Ces classes commandent la construction des codes cycliques : le
+  polynôme générateur d'un BCH est le produit des polynômes minimaux
+  des classes qu'on veut annuler.
+
+  Exemple :
+     gfcosets(3)
+     % [0 NaN NaN; 1 2 4; 3 6 5]
+
+  Voir aussi COSETS, GFPRIMDF, GFTABLE, GFROOTS.
+```
+
+## `gfdeconv`
+
+```
+GFDECONV Division de deux polynômes dans un corps de Galois.
+  [Q,R] = GFDECONV(A,B,P) divise le polynôme A par B dans GF(P), P
+  premier : A = GFADD(GFCONV(Q,B,P),R,P), le degré de R étant plus
+  petit que celui de B. Les coefficients vont par puissances
+  croissantes.
+  [Q,R] = GFDECONV(A,B) le fait dans GF(2).
+
+  La division est possible parce que tout coefficient non nul d'un
+  corps a un inverse : c'est lui qui sert de pivot à chaque étape.
+
+  Exemple :
+     [q, r] = gfdeconv([1 0 1], [1 1]);   % q = [1 1], r = 0
+     gfconv(q, [1 1])                     % [1 0 1] : on retombe sur A
+
+  Voir aussi GFCONV, GFDIV, GFADD, GFTRUNC.
+```
+
+## `gfdiv`
+
+```
+GFDIV Quotient terme à terme dans un corps de Galois.
+  C = GFDIV(A,B,P) divise élément par élément dans GF(P), P premier :
+  chaque terme est multiplié par l'inverse modulaire du diviseur.
+  [C,VALIDE] = GFDIV(...) rend un booléen par terme, faux là où le
+  diviseur est nul ; C y vaut -1, comme dans MATLAB.
+
+  Tout élément non nul d'un corps a un inverse : c'est ce qui
+  distingue un corps d'un anneau, et ce qui rend la division possible.
+
+  Exemple :
+     gfdiv([1 4 2], [3 3 3], 5)     % [2 3 4]
+     gfdiv(1, 0, 5)                 % -1 : pas d'inverse de zéro
+
+  Voir aussi GFMUL, GFDECONV, GFADD, GFSUB.
+```
+
+## `gffilter`
+
+```
+GFFILTER Filtrage dans un corps de Galois.
+  Y = GFFILTER(B,A,X,P) filtre le signal X par le filtre de
+  coefficients B et A dans GF(P), P premier :
+
+     A(1) Y(n) = B(1)X(n) + ... + B(k)X(n-k+1)
+                 - A(2)Y(n-1) - ... - A(m)Y(n-m+1),
+
+  toutes les opérations se faisant modulo P. Les coefficients vont par
+  puissances croissantes, comme partout dans la famille GF.
+  Y = GFFILTER(B,A,X) travaille dans GF(2).
+
+  C'est le rouage des registres à décalage bouclés : un filtre à
+  réaction dans GF(2) engendre une suite pseudo-aléatoire, de période
+  maximale quand A est primitif.
+
+  Exemple :
+     % Registre de trois cellules, bouclé par 1+x+x^3 : la suite
+     % engendrée est de période sept.
+     y = gffilter(1, [1 1 0 1], [1 zeros(1, 13)]);
+     isequal(y(1:7), y(8:14))       % vrai
+
+  Voir aussi GFCONV, GFDECONV, GFPRIMDF, FILTER.
+```
+
+## `gfmul`
+
+```
+GFMUL Produit terme à terme dans un corps de Galois.
+  C = GFMUL(A,B,P) multiplie élément par élément dans GF(P), P premier.
+  C = GFMUL(A,B) le fait dans GF(2), où c'est le et logique.
+
+  Ce n'est pas le produit de polynômes : celui-là est GFCONV.
+
+  Exemple :
+     gfmul([2 3 4], [3 3 3], 5)     % [1 4 2]
+     gfmul([1 0 1], [1 1 0])        % [1 0 0]
+
+  Voir aussi GFDIV, GFCONV, GFADD, GFDECONV.
+```
+
+## `gfprimck`
+
+```
+GFPRIMCK Nature d'un polynôme sur un corps de Galois.
+  CK = GFPRIMCK(A) examine le polynôme A, écrit par puissances
+  croissantes, sur GF(2) ; GFPRIMCK(A,P) le fait sur GF(P).
+
+  CK vaut :
+    -1  A n'est pas irréductible
+     0  A est irréductible, mais pas primitif
+     1  A est primitif
+
+  Un polynôme de degré M est primitif quand x engendre, par ses
+  puissances, tous les P^M - 1 éléments non nuls du corps qu'il
+  définit : c'est ce qui permet d'indexer le corps par un exposant.
+  Tout primitif est irréductible, la réciproque étant fausse.
+
+  Exemple :
+     gfprimck([1 1 0 0 1])          % 1 : 1 + x + x^4 est primitif
+     gfprimck([1 1 1 1 1])          % 0 : irréductible, non primitif
+     gfprimck([1 0 1])              % -1 : (1+x)^2 dans GF(2)
+
+  Voir aussi GFPRIMDF, GFPRIMFD, GFCONV, GFDECONV.
+```
+
+## `gfprimdf`
+
+```
+GFPRIMDF Polynôme primitif par défaut d'un corps de Galois.
+  POL = GFPRIMDF(M) rend le polynôme primitif de degré M que MatLibre
+  emploie par défaut pour GF(2^M) ; GFPRIMDF(M,P) le fait pour GF(P^M).
+  Les coefficients vont par puissances croissantes.
+
+  C'est le premier primitif dans l'ordre des codes croissants : 1+x
+  pour M = 1, puis 1+x+x^2, 1+x+x^3, 1+x+x^4, 1+x^2+x^5, 1+x+x^6,
+  1+x+x^7, 1+x^2+x^3+x^4+x^8.
+
+  MATLAB lit les siens dans une table, qui coïncide avec cette
+  recherche partout sauf au degré sept, où il retient 1+x^3+x^7 quand
+  celle-ci trouve d'abord 1+x+x^7 — les deux étant primitifs. Le choix
+  du polynôme change la représentation du corps : pour que deux calculs
+  se comparent, donnez-le explicitement plutôt que de vous fier au
+  défaut.
+
+  Exemple :
+     gfprimdf(3)                    % [1 1 0 1]
+     gfprimck(gfprimdf(8))          % 1
+
+  Voir aussi GFPRIMFD, GFPRIMCK, GFCOSETS.
+```
+
+## `gfprimfd`
+
+```
+GFPRIMFD Recherche de polynômes primitifs.
+  POL = GFPRIMFD(M) rend le premier polynôme primitif de degré M sur
+  GF(2), coefficients par puissances croissantes.
+  POL = GFPRIMFD(M,OPT,P) cherche sur GF(P). OPT vaut :
+    'min'  le premier trouvé, dans l'ordre des codes croissants (défaut)
+    'max'  le dernier
+    'all'  tous, une ligne par polynôme
+    un entier N : le N-ième
+
+  La recherche est exhaustive : on parcourt les polynômes unitaires de
+  degré M et l'on garde ceux que GFPRIMCK déclare primitifs. Le nombre
+  de primitifs de degré M sur GF(P) vaut phi(P^M - 1) / M.
+
+  Exemple :
+     gfprimfd(4)                    % [1 1 0 0 1]
+     size(gfprimfd(5, 'all'), 1)    % 6
+
+  Voir aussi GFPRIMDF, GFPRIMCK, GFCOSETS, GFROOTS.
+```
+
+## `gfrank`
+
+```
+GFRANK Rang d'une matrice sur un corps de Galois.
+  R = GFRANK(A,P) rend le rang de A sur GF(P), P premier, par
+  élimination de Gauss avec pivots dans le corps.
+  R = GFRANK(A) le fait sur GF(2).
+
+  Le rang d'un corps fini n'est pas celui des réels : une matrice
+  inversible sur les réels peut être singulière modulo P, et
+  réciproquement.
+
+  Exemple :
+     gfrank([1 1; 1 1])             % 1
+     gfrank([1 0; 0 1])             % 2
+     gfrank([2 4; 1 2], 5)          % 1 : la seconde ligne est la
+                                    % première divisée par deux
+
+  Voir aussi GFDIV, GFADD, GFWEIGHT, RANK.
+```
+
+## `gfroots`
+
+```
+GFROOTS Racines d'un polynôme dans un corps de Galois d'extension.
+  R = GFROOTS(F,M,P) cherche les racines du polynôme F — coefficients
+  par puissances croissantes, à valeurs dans GF(P) — parmi les éléments
+  de GF(P^M). Les racines sont rendues sous forme d'exposants : la
+  valeur K désigne l'élément x^K, et -Inf l'élément nul.
+
+  R = GFROOTS(F,M) travaille sur GF(2^M) ; GFROOTS(F,PRIM,P) emploie le
+  polynôme primitif PRIM au lieu du polynôme par défaut.
+
+  [R,MIN] = GFROOTS(...) rend en outre, pour chaque racine, le polynôme
+  minimal de la classe cyclotomique à laquelle elle appartient.
+
+  Un polynôme de degré D a au plus D racines dans une extension ; il
+  les a toutes dès que l'extension est assez grande.
+
+  Exemple :
+     gfroots([1 1 1], 2)            % [1; 2] : les deux éléments
+                                    % d'ordre trois de GF(4)
+
+  Voir aussi GFPRIMDF, GFTABLE, GFCOSETS, GFDECONV.
+```
+
+## `gfsub`
+
+```
+GFSUB Différence dans un corps de Galois.
+  C = GFSUB(A,B) soustrait dans GF(2), où c'est la même chose
+  qu'additionner.
+  C = GFSUB(A,B,P) soustrait dans GF(P), P premier.
+  C = GFSUB(A,B,P,LEN) complète le résultat de zéros jusqu'à LEN.
+
+  Exemple :
+     gfsub([1 1 0 1], [1 0 1])      % [0 1 1 1]
+     gfsub([1 2], [4 4], 5)         % [2 3]
+
+  Voir aussi GFADD, GFMUL, GFDIV, GFCONV.
+```
+
+## `gftable`
+
+```
+GFTABLE Table d'un corps de Galois d'extension.
+  T = GFTABLE(M) rend la table de GF(2^M) : une ligne par élément, dans
+  l'ordre des exposants. La ligne K donne les coefficients du polynôme
+  qui représente x^(K-2), par puissances croissantes ; la première
+  ligne est l'élément nul.
+
+  T = GFTABLE(M,PRIM) emploie le polynôme primitif donné,
+  GFTABLE(M,PRIM,P) travaille sur GF(P^M).
+
+  C'est la table qui rend l'arithmétique du corps praticable :
+  multiplier revient à additionner des exposants, et additionner à
+  ajouter les polynômes lus dans la table. MATLAB range la sienne dans
+  un fichier ; MatLibre la rend, ce qui évite un état caché.
+
+  Exemple :
+     t = gftable(3);
+     size(t)                        % 8x3 : huit éléments de GF(8)
+     t(2, :)                        % [1 0 0] : l'élément un
+
+  Voir aussi GFPRIMDF, GFCOSETS, GFROOTS, GFADD.
+```
+
+## `gftrunc`
+
+```
+GFTRUNC Retire les zéros de tête d'un polynôme de corps de Galois.
+  B = GFTRUNC(A) où A porte les coefficients par puissances
+  croissantes : A(1) est le terme constant. Les zéros qui suivent le
+  coefficient de plus haut degré non nul sont retirés, ce qui donne le
+  degré réel du polynôme.
+
+  Un polynôme entièrement nul est rendu comme le seul coefficient zéro.
+
+  Exemple :
+     gftrunc([1 0 1 0 0])           % [1 0 1]
+     gftrunc([0 0 0])               % 0
+
+  Voir aussi GFADD, GFCONV, GFDECONV, GFPRIMCK.
+```
+
+## `gfweight`
+
+```
+GFWEIGHT Distance minimale d'un code linéaire en bloc.
+  D = GFWEIGHT(GEN) où GEN est la matrice génératrice d'un code
+  binaire : D est le plus petit poids de Hamming d'un mot de code non
+  nul. C'est aussi la distance minimale du code, celui-ci étant
+  linéaire : la différence de deux mots est un mot.
+
+  D = GFWEIGHT(GEN,'gen') dit explicitement que GEN est génératrice ;
+  GFWEIGHT(PAR,'par') qu'il s'agit d'une matrice de contrôle ;
+  GFWEIGHT(POL,N) que POL est le polynôme générateur d'un code cyclique
+  de longueur N.
+
+  La distance minimale dit tout du pouvoir du code : il corrige
+  FLOOR((D-1)/2) erreurs et en détecte D-1.
+
+  Exemple :
+     gfweight(hammgen(3))           % 3 : le code de Hamming corrige
+                                    % une erreur
+     gfweight([1 1 0 1], 7)         % 3 : par le polynôme générateur
+                                    % du même code
+
+  Voir aussi HAMMGEN, CYCLPOLY, GEN2PAR, BITERR.
 ```
 
 ## `gray2bin`

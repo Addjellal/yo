@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **649 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **1650 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1671 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -191,7 +191,7 @@ totalité.
    réglage de PID par la marge de phase. Les deux équations de Riccati
    sont résolues par sous-espace invariant, hamiltonien en continu et
    symplectique en discret, et non par itération. La Communications en
-   compte 67 : les modulations numériques usuelles avec leurs
+   compte 88 : les modulations numériques usuelles avec leurs
    constellations, de Gray comme binaires, les trois modulations
    analogiques, le codage convolutif complet — treillis construit depuis
    les polynômes, décodage de Viterbi à décision dure ou souple, jusqu'au

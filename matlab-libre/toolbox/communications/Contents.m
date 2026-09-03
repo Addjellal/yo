@@ -37,6 +37,20 @@
 %   syndtable           - Table de décodage par syndrome
 %   encode, decode      - Codage et correction
 %
+% Corps de Galois
+%   gfadd, gfsub        - Somme et différence de polynômes
+%   gfmul, gfdiv        - Produit et quotient terme à terme
+%   gfconv, gfdeconv    - Produit et division de polynômes
+%   gftrunc             - Retrait des zéros de tête
+%   gfprimck            - Irréductible ? primitif ?
+%   gfprimdf, gfprimfd  - Polynôme primitif par défaut, recherche
+%   gftable             - Table d'un corps d'extension
+%   gfcosets, cosets    - Classes cyclotomiques
+%   gfroots             - Racines dans une extension, polynômes minimaux
+%   gfrank              - Rang d'une matrice sur un corps fini
+%   gfweight            - Distance minimale d'un code linéaire
+%   gffilter            - Filtrage dans un corps fini
+%
 % Entrelacement
 %   intrlv, deintrlv    - Permutation donnée
 %   randintrlv, randdeintrlv - Permutation pseudo-aléatoire reproductible

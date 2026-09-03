@@ -246,6 +246,10 @@ FONCTION(fnMod) {
                          if (y == 0) return x;
                          double r = std::fmod(x, y);
                          if (r != 0 && ((r < 0) != (y < 0))) r += y;
+                         // fmod(-4, 2) rend le zero negatif : MATLAB rend
+                         // le zero tout court, et 1/mod(-4,2) vaut donc
+                         // plus l'infini, non moins.
+                         if (r == 0) return 0.0;
                          return r;
                      },
                      classeResultat(args[0], args[1], "mod"))};
@@ -257,7 +261,9 @@ FONCTION(fnRem) {
     return {diffuser(numerique(args[0]), numerique(args[1]),
                      [](double x, double y) {
                          if (y == 0) return std::nan("");
-                         return std::fmod(x, y);
+                         double r = std::fmod(x, y);
+                         if (r == 0) return 0.0;   // jamais le zero negatif
+                         return r;
                      },
                      classeResultat(args[0], args[1], "rem"))};
 }

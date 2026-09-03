@@ -219,6 +219,167 @@ assert(abs(convertSNR(10, 'snr', 'esno', 'SamplesPerSymbol', 8) - (10 + 10 * log
 assert(abs(convertSNR(convertSNR(10, 'ebno', 'snr', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8), ...
                       'snr', 'ebno', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8) - 10) < 1e-12);
 
+%% ------------------------------------------ corps de Galois
+% L'arithmetique modulaire, verifiee sur ce qui la definit.
+assert(isequal(gftrunc([1 0 1 0 0]), [1 0 1]));
+assert(isequal(gftrunc([0 0 0]), 0));
+assert(isequal(gfadd([1 1 0 1], [1 0 1]), [0 1 1 1]));
+assert(isequal(gfadd([2 3], [4 4], 5), [1 2]));
+assert(isequal(gfsub([1 2], [4 4], 5), [2 3]));
+assert(isequal(gfadd([1 1], [1 0], 2, 5), [0 1 0 0 0]));
+% Dans GF(2) l'addition est sa propre inverse.
+motGalois = [1 0 1 1 0];
+autreGalois = [0 1 1 0 1];
+assert(isequal(gfadd(gfadd(motGalois, autreGalois), autreGalois), motGalois));
+% Associativite, commutativite, et la soustraction qui defait la somme.
+unGalois = [1 2 3]; deuxGalois = [4 0 2]; troisGalois = [3 3 1];
+assert(isequal(gfadd(gfadd(unGalois, deuxGalois, 5), troisGalois, 5), ...
+               gfadd(unGalois, gfadd(deuxGalois, troisGalois, 5), 5)));
+assert(isequal(gfadd(unGalois, deuxGalois, 5), gfadd(deuxGalois, unGalois, 5)));
+assert(isequal(gfsub(gfadd(unGalois, deuxGalois, 5), deuxGalois, 5), unGalois));
+% Un ordre de corps non premier est refuse plutot que calcule de travers.
+refuseCorps = false;
+try
+    gfadd(1, 1, 4);
+catch
+    refuseCorps = true;
+end
+assert(refuseCorps);
+
+% Produit et quotient terme a terme : la division defait la
+% multiplication partout ou le diviseur n'est pas nul.
+assert(isequal(gfmul([2 3 4], [3 3 3], 5), [1 4 2]));
+assert(isequal(gfdiv([1 4 2], [3 3 3], 5), [2 3 4]));
+assert(gfdiv(1, 0, 5) == -1);
+[~, valideGalois] = gfdiv([1 2], [0 3], 5);
+assert(isequal(valideGalois, [false true]));
+for ordreGalois = [2 3 5 7 11]
+    aGalois = mod(1:20, ordreGalois);
+    bGalois = mod((1:20) + 3, ordreGalois);
+    [quotientGalois, okGalois] = gfdiv(gfmul(aGalois, bGalois, ordreGalois), ...
+                                       bGalois, ordreGalois);
+    assert(isequal(quotientGalois(okGalois), aGalois(okGalois)));
+end
+
+% Polynomes : la division euclidienne se recompose exactement.
+assert(isequal(gfconv([1 1], [1 1]), [1 0 1]));
+assert(isequal(gfconv([1 1], [1 1], 3), [1 2 1]));
+for ordreGalois = [2 3 5]
+    for essaiGalois = 1:15
+        aPoly = mod(round(rand(1, 7) * 10), ordreGalois);
+        bPoly = mod(round(rand(1, 3) * 10), ordreGalois);
+        if all(bPoly == 0), bPoly(1) = 1; end
+        [qPoly, rPoly] = gfdeconv(aPoly, bPoly, ordreGalois);
+        assert(isequal(gftrunc(gfadd(gfconv(qPoly, bPoly, ordreGalois), rPoly, ordreGalois)), ...
+                       gftrunc(aPoly)));
+        assert(numel(gftrunc(rPoly)) < numel(gftrunc(bPoly)) || isequal(gftrunc(rPoly), 0));
+    end
+end
+
+% Polynomes primitifs : le comptage connu phi(p^m-1)/m les valide tous.
+assert(gfprimck([1 1 0 0 1]) == 1);
+assert(gfprimck([1 1 1 1 1]) == 0);
+assert(gfprimck([1 0 1]) == -1);
+assert(gfprimck([0 1 1]) == -1);
+for degreGalois = 2:6
+    comptePrimitifs = size(gfprimfd(degreGalois, 'all'), 1);
+    ordreCyclique = 2 ^ degreGalois - 1;
+    indicateur = ordreCyclique;
+    resteIndicateur = ordreCyclique;
+    diviseur = 2;
+    while diviseur * diviseur <= resteIndicateur
+        if mod(resteIndicateur, diviseur) == 0
+            indicateur = indicateur / diviseur * (diviseur - 1);
+            while mod(resteIndicateur, diviseur) == 0
+                resteIndicateur = resteIndicateur / diviseur;
+            end
+        end
+        diviseur = diviseur + 1;
+    end
+    if resteIndicateur > 1
+        indicateur = indicateur / resteIndicateur * (resteIndicateur - 1);
+    end
+    assert(comptePrimitifs == indicateur / degreGalois, sprintf('degre %d', degreGalois));
+end
+for degreGalois = 1:8
+    assert(gfprimck(gfprimdf(degreGalois)) == 1);
+end
+assert(isequal(gfprimdf(4), [1 1 0 0 1]));
+assert(isequal(gfprimdf(5), [1 0 1 0 0 1]));
+assert(isequal(gfprimdf(8), [1 0 1 1 1 0 0 0 1]));
+assert(gfprimck(gfprimdf(2, 3), 3) == 1);
+assert(isequal(gfprimfd(4, 2), gfprimfd(4, 'max')));
+
+% Table du corps : chaque element non nul y figure une fois et une seule.
+tableGalois = gftable(3);
+assert(isequal(size(tableGalois), [8 3]));
+assert(isequal(tableGalois(1, :), [0 0 0]) && isequal(tableGalois(2, :), [1 0 0]));
+assert(numel(unique(tableGalois(2:end, :) * [1; 2; 4])) == 7);
+tableSeize = gftable(4);
+assert(numel(unique(tableSeize(2:end, :) * [1; 2; 4; 8])) == 15);
+refuseTable = false;
+try
+    gftable(3, [1 1 1 1]);   % pas primitif
+catch
+    refuseTable = true;
+end
+assert(refuseTable);
+
+% Classes cyclotomiques : elles partagent exactement les exposants.
+classesGalois = gfcosets(3);
+assert(classesGalois(1, 1) == 0);
+listeClasses = cosets(3);
+assert(numel(listeClasses) == 3 && isequal(listeClasses{2}, [1 2 4]));
+assert(sum(sum(~isnan(gfcosets(4)))) == 15);
+
+% Rang sur un corps fini : ce n'est pas celui des reels.
+assert(gfrank([1 1; 1 1]) == 1);
+assert(gfrank([1 0; 0 1]) == 2);
+assert(gfrank([2 4; 1 2], 5) == 1);
+assert(rank([1 1; 1 3]) == 2 && gfrank([1 1; 1 3], 2) == 1);
+
+% Racines dans une extension, et polynome minimal.
+assert(isequal(gfroots([1 1 1], 2), [1; 2]));
+racinesGalois = gfroots([1 1 0 1], 3);
+assert(numel(racinesGalois) == 3);
+racinesAvecZero = gfroots([0 1 1], 2);
+assert(any(isinf(racinesAvecZero)) && any(racinesAvecZero == 0));
+[~, minimauxGalois] = gfroots([1 1 0 1], 3);
+assert(isequal(gftrunc(minimauxGalois{1}), [1 1 0 1]));
+
+% Distance minimale d'un code : elle dit ce qu'il corrige.
+[controleHamming, generatriceHamming] = hammgen(3);
+assert(gfweight(generatriceHamming) == 3);
+assert(gfweight(controleHamming, 'par') == 3);
+assert(gfweight([1 1 0 1], 7) == 3);
+assert(gfweight(ones(1, 5)) == 5);
+assert(gfweight([eye(3), ones(3, 1)]) == 2);
+
+% Filtrage dans GF(2) : boucle par un primitif, la suite est de periode
+% maximale.
+suiteGalois = gffilter(1, [1 1 0 1], [1 zeros(1, 20)]);
+assert(isequal(suiteGalois(1:7), suiteGalois(8:14)));
+assert(isequal(suiteGalois(8:14), suiteGalois(15:21)));
+assert(sum(suiteGalois(1:7)) > 0);
+suiteCourte = gffilter(1, [1 1 1], [1 zeros(1, 12)]);
+assert(isequal(suiteCourte(1:3), suiteCourte(4:6)));
+assert(isequal(gffilter([1 2], 1, [1 0 0 0], 5), [1 2 0 0]));
+refuseFiltre = false;
+try
+    gffilter(1, [0 1], [1 0]);
+catch
+    refuseFiltre = true;
+end
+assert(refuseFiltre);
+
+% Le zero du modulo ne doit pas etre negatif : sinon 1/mod(-4,2) vaudrait
+% moins l'infini, et le signe se propagerait dans tout un calcul en corps
+% fini.
+assert(1 / mod(-4, 2) == Inf);
+assert(1 / mod(-3, 3) == Inf);
+assert(1 / rem(-4, 2) == Inf);
+assert(mod(-4.5, 2) == 1.5);
+
 %% -------------------------------------------------------- ondelettes
 % Bancs de filtres : les valeurs de db2 sont celles que publie la
 % documentation, au signe près qui est celui de MATLAB.

@@ -1,0 +1,18 @@
+# Communications Toolbox. Les noms qu'un utilisateur rencontre :
+# modulation, codage de canal, entrelacement, mesures d'erreur et
+# conversions de base.
+alignsignals amdemod ammod awgn bchdec bchenc bchgenpoly berawgn
+bercoding berconfint berfading bersync biterr bi2de bin2gray bsc
+convenc convertSNR cosets cyclgen cyclpoly de2bi
+decode deintrlv distspec dpskdemod dpskmod dvbsapskdemod dvbsapskmod
+encode eyediagram finddelay fmdemod fmmod fskdemod fskmod gen2par
+genqamdemod genqammod gf gfadd gfconv gfcosets gfdeconv gfdiv gffilter
+gfmul gfprimck gfprimdf gfprimfd gfrank gfroots gfsub gftable gftrunc
+gfweight gray2bin hammgen helscanintrlv helscandeintrlv huffmandeco
+huffmandict huffmanenco intdump intrlv iscatastrophic istrellis lloyds
+lteZadoffChuSeq matdeintrlv matintrlv modnorm mskdemod mskmod muxdeintrlv
+muxintrlv nrCRCEncode oct2dec ossdec ossenc pamdemod pammod pmdemod pmmod
+poly2trellis pskdemod pskmod qamdemod qammod qfunc qfuncinv quantiz
+randdeintrlv randintrlv randerr rcosdesign rsdec rsenc rsgenpoly
+scatterplot semianalytic shift2mask symerr syndtable vec2mat vitdec
+wgn zadoffChuSeq
