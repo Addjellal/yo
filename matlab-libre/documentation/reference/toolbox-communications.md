@@ -39,8 +39,13 @@
 %   gen2par             - Génératrice vers contrôle, et retour
 %   syndtable           - Table de décodage par syndrome
 %   encode, decode      - Codage et correction
+%   bchgenpoly          - Générateur d'un code BCH
+%   bchenc, bchdec      - Codage et décodage BCH
+%   rsgenpoly           - Générateur d'un code de Reed-Solomon
+%   rsenc, rsdec        - Codage et décodage de Reed-Solomon
 %
 % Corps de Galois
+%   gf                  - Tableau d'éléments de GF(2^m), opérateurs compris
 %   gfadd, gfsub        - Somme et différence de polynômes
 %   gfmul, gfdiv        - Produit et quotient terme à terme
 %   gfconv, gfdeconv    - Produit et division de polynômes
@@ -153,6 +158,93 @@ AWGN Ajoute un bruit blanc gaussien pour atteindre un rapport donné.
 
 ```
 BASE2DEC Chaîne dans une base quelconque vers entier.
+```
+
+## `bchdec`
+
+```
+BCHDEC Décodage BCH.
+  MSG = BCHDEC(CODE,N,K) décode le tableau CODE, de N colonnes, en
+  messages de K colonnes. Les erreurs, jusqu'à la capacité du code,
+  sont corrigées.
+
+  [MSG,NERR] = BCHDEC(...) rend le nombre d'erreurs corrigées par mot ;
+  il vaut -1 quand le décodage a échoué, le mot reçu étant trop loin de
+  tout mot de code.
+  [MSG,NERR,CODECORRIGE] = BCHDEC(...) rend aussi le mot corrigé.
+  BCHDEC(...,'end'|'beg'|'none') dit où le message se trouve dans le
+  mot, comme pour BCHENC.
+
+  Le décodage suit les trois étapes classiques : les syndromes, que le
+  mot reçu donne en l'évaluant aux racines du générateur ; le polynôme
+  localisateur d'erreurs, trouvé par l'algorithme de Berlekamp et
+  Massey ; et la recherche de Chien, qui essaie toutes les positions.
+
+  Exemple :
+     msg = gf([1 0 1 1 0 0 1], 1);
+     code = bchenc(msg, 15, 7);
+     recu = code;
+     recu(3) = recu(3) + 1;         % une erreur
+     [sortie, nerr] = bchdec(recu, 15, 7);
+     nerr                           % 1
+     isequal(double(sortie), double(msg))   % vrai
+
+  Voir aussi BCHENC, BCHGENPOLY, RSDEC, DECODE.
+```
+
+## `bchenc`
+
+```
+BCHENC Codage BCH.
+  CODE = BCHENC(MSG,N,K) code le message MSG, tableau de corps GF(2) à
+  K colonnes, en un code BCH de longueur N. Chaque ligne est un mot :
+  CODE a N colonnes.
+
+  Le codage est systématique : le message se retrouve tel quel dans les
+  K dernières colonnes, précédé des N-K bits de contrôle. C'est ce qui
+  permet de lire le message sans décoder quand la transmission s'est
+  bien passée.
+
+  CODE = BCHENC(MSG,N,K,'end') est cette forme ; 'beg' met le message
+  en tête, 'none' ne le sépare pas — le mot est alors le produit du
+  message par le générateur.
+
+  Exemple :
+     msg = gf([1 0 1 1 0 0 1], 1);
+     code = bchenc(msg, 15, 7);
+     isequal(double(code(9:15)), double(msg))   % vrai : systématique
+
+  Voir aussi BCHDEC, BCHGENPOLY, RSENC, ENCODE.
+```
+
+## `bchgenpoly`
+
+```
+BCHGENPOLY Polynôme générateur d'un code BCH.
+  GENPOLY = BCHGENPOLY(N,K) rend le polynôme générateur du code BCH de
+  longueur N et de dimension K, sous forme d'un tableau GF(2) dont les
+  coefficients vont par puissances décroissantes — la convention de
+  MATLAB pour cette fonction.
+
+  N doit valoir 2^M - 1 pour un M entre 3 et 16, et K être une
+  dimension admissible pour cette longueur.
+
+  GENPOLY = BCHGENPOLY(N,K,PRIM) emploie le polynôme primitif PRIM.
+  [GENPOLY,T] = BCHGENPOLY(...) rend en outre la capacité de
+  correction : le code corrige T erreurs.
+  BCHGENPOLY(...,'double') rend les coefficients en nombres ordinaires
+  plutôt qu'en tableau de corps.
+
+  Le générateur est le plus petit commun multiple des polynômes
+  minimaux de alpha, alpha^2, ..., alpha^(2T) : annuler ces racines
+  force la distance minimale à 2T+1.
+
+  Exemple :
+     [g, t] = bchgenpoly(15, 5);
+     t                              % 3 : le code corrige trois erreurs
+     numel(g.x) - 1                 % 10 = 15 - 5
+
+  Voir aussi BCHENC, BCHDEC, RSGENPOLY, GFPRIMDF, GFROOTS.
 ```
 
 ## `berawgn`
@@ -578,6 +670,34 @@ GENQAMMOD Modulation sur une constellation quelconque.
      genqammod([0 1 2 3], c)   % [1 1i -1 -1i]
 
   Voir aussi GENQAMDEMOD, QAMMOD, MODNORM.
+```
+
+## `gf`
+
+```
+GF Tableau d'éléments d'un corps de Galois.
+  X = GF(V) range les valeurs V dans GF(2) : chacune vaut zéro ou un.
+  X = GF(V,M) les range dans GF(2^M), les valeurs allant de 0 à 2^M-1.
+  X = GF(V,M,PRIM) emploie le polynôme primitif PRIM, donné comme
+  entier — sa forme binaire, poids fort en tête —, au lieu du défaut
+  de GFPRIMDF.
+
+  Les opérations ordinaires s'appliquent : +, -, .*, ./, .^, * et ^ y
+  travaillent dans le corps. L'addition y est le ou exclusif, si bien
+  qu'ajouter deux fois la même chose ne change rien ; la
+  multiplication passe par les logarithmes discrets.
+
+  Un tableau de corps ne se mélange pas à un autre d'ordre différent :
+  l'opération est refusée plutôt que faite dans le mauvais corps.
+
+  Exemple :
+     a = gf([1 2 3], 3);
+     a + a                          % tous nuls : la caractéristique
+                                    % vaut deux
+     a .* a                         % les carrés dans GF(8)
+     a ./ a                         % que des uns
+
+  Voir aussi GFTABLE, GFPRIMDF, BCHENC, RSENC, GFADD.
 ```
 
 ## `gfadd`
@@ -1025,6 +1145,253 @@ MATINTRLV Entrelacement matriciel.
   Voir aussi MATDEINTRLV, INTRLV.
 ```
 
+## `matlibre_bch_coder`
+
+```
+MATLIBRE_BCH_CODER Un mot de code, systématique ou non.
+  Le reste de la division de x^(n-k) fois le message par le générateur
+  donne les bits de contrôle : le mot obtenu est bien multiple du
+  générateur, ce qui est la définition d'un mot de code.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_bch_corriger`
+
+```
+MATLIBRE_BCH_CORRIGER Corrige un mot BCH reçu.
+  Syndromes, puis Berlekamp-Massey, puis recherche de Chien.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_bch_extraire`
+
+```
+MATLIBRE_BCH_EXTRAIRE Le message contenu dans des mots systématiques.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_bch_generateur`
+
+```
+MATLIBRE_BCH_GENERATEUR Générateur d'un code BCH, par puissances
+  décroissantes.
+  On accumule les polynômes minimaux de alpha, alpha^2, ... jusqu'à ce
+  que le degré du produit atteigne n-k. La capacité de correction est
+  le nombre de racines consécutives ainsi annulées, divisé par deux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_bch_message`
+
+```
+MATLIBRE_BCH_MESSAGE Ramène un message à une matrice de lignes de K bits.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_berlekamp`
+
+```
+MATLIBRE_BERLEKAMP Polynôme localisateur d'erreurs, par Berlekamp-Massey.
+  Le polynôme rendu est à coefficients dans GF(2^m), par puissances
+  croissantes, de terme constant un. Ses racines inverses désignent les
+  positions en erreur.
+
+  L'algorithme construit le plus court registre à décalage qui engendre
+  la suite des syndromes : c'est cette longueur minimale qui garantit
+  qu'on ne corrige pas plus d'erreurs qu'il n'y en a.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_chien`
+
+```
+MATLIBRE_CHIEN Recherche de Chien : les positions en erreur.
+  On évalue le localisateur en chaque alpha^(-i) : une racine désigne
+  la position i. C'est un parcours exhaustif, mais la seule façon sûre
+  de trouver toutes les racines dans un corps fini.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_derivee_formelle`
+
+```
+MATLIBRE_DERIVEE_FORMELLE Dérivée d'un polynôme de caractéristique deux.
+  Les coefficients vont par puissances croissantes. Dans un corps de
+  caractéristique deux, dériver garde un terme sur deux : les termes de
+  degré pair disparaissent, deux fois quoi que ce soit valant zéro.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf2_conv`
+
+```
+MATLIBRE_GF2_CONV Produit de deux polynômes binaires.
+  Les coefficients vont par puissances croissantes ; l'addition étant
+  le ou exclusif, le produit se calcule sans retenue.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_concat`
+
+```
+MATLIBRE_GF_CONCAT Concatène des tableaux de corps de Galois.
+  Tous doivent appartenir au même corps ; un tableau ordinaire est
+  admis et pris dans le corps des autres.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_convolution`
+
+```
+MATLIBRE_GF_CONVOLUTION Produit de deux polynômes de GF(2^M).
+  Coefficients par puissances croissantes ; l'addition étant le ou
+  exclusif, il n'y a pas de retenue.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_div`
+
+```
+MATLIBRE_GF_DIV Quotient terme à terme dans GF(2^M).
+  La division par zéro n'a pas de sens dans un corps : elle est
+  refusée, non rendue comme l'infini.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_etendre`
+
+```
+MATLIBRE_GF_ETENDRE Répand un scalaire sur la taille de l'autre tableau.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_evaluer`
+
+```
+MATLIBRE_GF_EVALUER Valeur d'un polynôme en alpha^exposant.
+  Le polynôme est donné par puissances croissantes, à coefficients dans
+  GF(2^M).
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_journal`
+
+```
+MATLIBRE_GF_JOURNAL Tables du logarithme discret d'un corps de Galois.
+  [LOG,EXP] = MATLIBRE_GF_JOURNAL(M,PRIM) rend deux tables de GF(2^M) :
+  LOG(V+1) est l'exposant de la valeur V — non défini pour zéro, où il
+  vaut -Inf —, et EXP(K+1) la valeur de alpha^K.
+
+  Multiplier revient alors à additionner des exposants modulo 2^M-1 :
+  c'est ce qui rend l'arithmétique du corps rapide.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_minimal`
+
+```
+MATLIBRE_GF_MINIMAL Polynôme minimal d'une classe cyclotomique.
+  Le produit des (x - alpha^k) sur toute la classe est à coefficients
+  dans GF(2) : c'est le polynôme minimal, rendu par puissances
+  croissantes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_mul`
+
+```
+MATLIBRE_GF_MUL Produit terme à terme dans GF(2^M).
+  Le produit passe par les logarithmes discrets : leur somme modulo
+  2^M-1 donne l'exposant du résultat. Un facteur nul donne zéro.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_paire`
+
+```
+MATLIBRE_GF_PAIRE Ramène deux opérandes au même corps et à la même taille.
+  Un nombre ordinaire est admis comme élément du corps de l'autre ;
+  deux tableaux de corps différents sont refusés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_pow`
+
+```
+MATLIBRE_GF_POW Puissance terme à terme dans GF(2^M).
+  Un exposant négatif prend l'inverse, ce qui a un sens dans un corps
+  tant que la base n'est pas nulle. Zéro puissance zéro vaut un, comme
+  partout dans MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_primitif`
+
+```
+MATLIBRE_GF_PRIMITIF Polynôme primitif par défaut, sous forme d'entier.
+  L'entier porte les coefficients en binaire, poids fort en tête : le
+  polynôme 1+x+x^3 vaut donc 11.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_gf_valeurs`
+
+```
+MATLIBRE_GF_VALEURS Les valeurs entières d'un tableau de corps.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_rs_coder`
+
+```
+MATLIBRE_RS_CODER Un mot de Reed-Solomon systématique.
+  Le reste de la division de x^(n-k) fois le message par le générateur
+  donne les symboles de contrôle.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_rs_corriger`
+
+```
+MATLIBRE_RS_CORRIGER Corrige un mot de Reed-Solomon reçu.
+  Syndromes, Berlekamp-Massey, recherche de Chien pour les positions,
+  puis formule de Forney pour la valeur de chaque erreur.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_rs_generateur`
+
+```
+MATLIBRE_RS_GENERATEUR Générateur d'un code de Reed-Solomon.
+  Produit des (x - alpha^(b+i)) pour i de zéro à n-k-1, rendu par
+  puissances décroissantes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `modnorm`
 
 ```
@@ -1310,6 +1677,88 @@ RANDINTRLV Entrelacement par une permutation pseudo-aléatoire.
 RCOSDESIGN Filtre en cosinus surélevé, ou sa racine.
   H = RCOSDESIGN(BETA,SPAN,SPS,'sqrt') rend la racine du cosinus
   surélevé, normalisée en énergie.
+```
+
+## `rsdec`
+
+```
+RSDEC Décodage de Reed-Solomon.
+  MSG = RSDEC(CODE,N,K) décode le tableau CODE, de N colonnes et à
+  valeurs dans GF(2^M), en messages de K colonnes.
+
+  [MSG,NERR] = RSDEC(...) rend le nombre de symboles corrigés par mot ;
+  il vaut -1 quand le décodage a échoué.
+  [MSG,NERR,CODECORRIGE] = RSDEC(...) rend aussi le mot corrigé.
+  RSDEC(CODE,N,K,GENPOLY) emploie un générateur donné,
+  RSDEC(...,GENPOLY,PARPOS) dit où sont les symboles de contrôle.
+
+  Le décodage ajoute une étape à celui d'un code binaire : trouver les
+  positions ne suffit pas, il faut aussi la valeur de chaque erreur.
+  Elle vient de la formule de Forney, qui la tire du polynôme
+  d'évaluation et de la dérivée du localisateur.
+
+  Exemple :
+     msg = gf([1 2 3 4 5 6 7 8 9 10 11], 4);
+     code = rsenc(msg, 15, 11);
+     recu = code;
+     recu(3) = recu(3) + 7;         % un symbole abîmé
+     [sortie, nerr] = rsdec(recu, 15, 11);
+     nerr                           % 1
+     isequal(double(sortie), double(msg))   % vrai
+
+  Voir aussi RSENC, RSGENPOLY, BCHDEC, GF.
+```
+
+## `rsenc`
+
+```
+RSENC Codage de Reed-Solomon.
+  CODE = RSENC(MSG,N,K) code le message MSG, tableau de corps GF(2^M)
+  à K colonnes, en un code RS de longueur N. Le codage est
+  systématique : le message se retrouve dans les K premières colonnes,
+  suivi des N-K symboles de contrôle.
+
+  CODE = RSENC(MSG,N,K,GENPOLY) emploie un générateur donné,
+  RSENC(MSG,N,K,GENPOLY,PARPOS) place les symboles de contrôle en tête
+  si PARPOS vaut 'beg'.
+
+  Un symbole vaut M bits : le code corrige (N-K)/2 symboles, donc
+  jusqu'à M fois plus de bits s'ils sont groupés. C'est ce qui le rend
+  bon contre les rafales d'erreurs — une rayure sur un disque, un
+  évanouissement radio.
+
+  Exemple :
+     msg = gf([1 2 3 4 5 6 7 8 9 10 11], 4);
+     code = rsenc(msg, 15, 11);
+     isequal(double(code(1:11)), double(msg))   % vrai
+
+  Voir aussi RSDEC, RSGENPOLY, BCHENC, GF.
+```
+
+## `rsgenpoly`
+
+```
+RSGENPOLY Polynôme générateur d'un code de Reed-Solomon.
+  GENPOLY = RSGENPOLY(N,K) rend le générateur du code RS(N,K), tableau
+  de corps GF(2^M) dont les coefficients vont par puissances
+  décroissantes. N doit valoir 2^M - 1.
+
+  GENPOLY = RSGENPOLY(N,K,PRIM) emploie le polynôme primitif PRIM,
+  RSGENPOLY(N,K,PRIM,B) part de alpha^B au lieu d'alpha.
+  [GENPOLY,T] = RSGENPOLY(...) rend la capacité de correction,
+  (N-K)/2 arrondi vers le bas.
+  RSGENPOLY(...,'double') rend des nombres ordinaires.
+
+  Le générateur est le produit des (x - alpha^(B+i)) pour i allant de
+  zéro à N-K-1. Un code de Reed-Solomon corrige des symboles entiers,
+  non des bits : c'est ce qui le rend bon contre les rafales.
+
+  Exemple :
+     [g, t] = rsgenpoly(15, 11);
+     t                              % 2
+     numel(g.x) - 1                 % 4 = 15 - 11
+
+  Voir aussi RSENC, RSDEC, BCHGENPOLY, GF.
 ```
 
 ## `scatterplot`

@@ -380,6 +380,192 @@ assert(1 / mod(-3, 3) == Inf);
 assert(1 / rem(-4, 2) == Inf);
 assert(mod(-4.5, 2) == 1.5);
 
+%% -------------------------------- tableaux de corps et codes correcteurs
+% Le corps GF(16) au complet : associativite, distributivite, inverses.
+for iCorps = 0:15
+    xCorps = gf(iCorps, 4);
+    for jCorps = 0:15
+        yCorps = gf(jCorps, 4);
+        for kCorps = 0:3
+            zCorps = gf(kCorps, 4);
+            assert(double((xCorps + yCorps) + zCorps) == double(xCorps + (yCorps + zCorps)));
+            assert(double((xCorps .* yCorps) .* zCorps) == double(xCorps .* (yCorps .* zCorps)));
+            assert(double(xCorps .* (yCorps + zCorps)) == ...
+                   double(xCorps .* yCorps + xCorps .* zCorps));
+        end
+    end
+    if iCorps > 0
+        assert(double(xCorps .* (gf(1, 4) ./ xCorps)) == 1);
+    end
+end
+% La caracteristique vaut deux : ajouter deux fois ne change rien.
+tableauCorps = gf([1 2 3], 3);
+assert(all(double(tableauCorps + tableauCorps) == 0));
+assert(all(double(tableauCorps ./ tableauCorps) == 1));
+% L'ordre du groupe multiplicatif de GF(16) est quinze.
+assert(double(gf(2, 4) .^ 15) == 1);
+assert(double(gf(2, 4) .^ 0) == 1);
+assert(double(gf(2, 4) .^ -1) == double(gf(1, 4) ./ gf(2, 4)));
+assert(log(gf(1, 4)) == 0 && log(gf(2, 4)) == 1);
+% Produit matriciel, concatenation, indexation.
+matriceCorps = gf([1 2; 3 4], 4);
+autreCorps = gf([5 6; 7 8], 4);
+assert(double(matriceCorps(1, 1) .* autreCorps(1, 1) + ...
+              matriceCorps(1, 2) .* autreCorps(2, 1)) == ...
+       double(subsref(matriceCorps * autreCorps, substruct('()', {1, 1}))));
+assert(isequal(double((matriceCorps * autreCorps) * matriceCorps), ...
+               double(matriceCorps * (autreCorps * matriceCorps))));
+assert(isequal(double(matriceCorps * gf(eye(2), 4)), double(matriceCorps)));
+assert(isequal(size([matriceCorps, autreCorps]), [2 4]));
+assert(isequal(size([matriceCorps; autreCorps]), [4 2]));
+assert(isequal(double(matriceCorps.'), double(matriceCorps).'));
+matriceCorps(1, 1) = gf(9, 4);
+assert(double(matriceCorps(1, 1)) == 9);
+matriceCorps(2, 2) = 11;
+assert(double(matriceCorps(2, 2)) == 11);
+assert(numel(matriceCorps) == 4 && ~isempty(matriceCorps) && isempty(gf([], 4)));
+% Deux corps differents ne se melangent pas.
+refuseMelange = false;
+try
+    gf(1, 3) + gf(1, 4);
+catch
+    refuseMelange = true;
+end
+assert(refuseMelange);
+assert(double(gf(3, 4) + 1) == 2);
+
+% BCH : le generateur divise x^n - 1, et la distance vaut au moins 2t+1.
+for specBch = {[15 11], [15 7], [15 5], [31 26], [31 21], [63 57], [7 4]}
+    nBch = specBch{1}(1);
+    kBch = specBch{1}(2);
+    [genBch, tBch] = bchgenpoly(nBch, kBch, [], 'double');
+    assert(numel(genBch) - 1 == nBch - kBch);
+    [~, resteBch] = gfdeconv([1, zeros(1, nBch - 1), 1], fliplr(genBch), 2);
+    assert(isequal(gftrunc(resteBch), 0), sprintf('BCH(%d,%d)', nBch, kBch));
+    assert(tBch >= 1);
+end
+assert(gfweight(fliplr(bchgenpoly(15, 7, [], 'double')), 15) >= 5);
+assert(isa(bchgenpoly(15, 5), 'gf'));
+
+% Le codage BCH est systematique, et tout mot non nul pese au moins la
+% distance minimale.
+messageBch = gf([1 0 1 1 0 0 1], 1);
+motBch = bchenc(messageBch, 15, 7);
+assert(isequal(double(motBch(9:15)), double(messageBch)));
+for formeBch = {'end', 'beg', 'none'}
+    [~, resteForme] = gfdeconv(fliplr(double(bchenc(messageBch, 15, 7, formeBch{1}))), ...
+                               fliplr(bchgenpoly(15, 7, [], 'double')), 2);
+    assert(isequal(gftrunc(resteForme), 0), formeBch{1});
+end
+motDebut = bchenc(messageBch, 15, 7, 'beg');
+assert(isequal(double(motDebut(1:7)), double(messageBch)));
+assert(isequal(size(bchenc(gf([1 0 1 1 0 0 1; 0 1 1 0 1 0 1], 1), 15, 7)), [2 15]));
+for codeBch = 0:63
+    bitsBch = zeros(1, 7);
+    resteBits = codeBch;
+    for bBch = 1:7
+        bitsBch(bBch) = mod(resteBits, 2);
+        resteBits = floor(resteBits / 2);
+    end
+    motEssai = double(bchenc(gf(bitsBch, 1), 15, 7));
+    if any(bitsBch)
+        assert(sum(motEssai) >= 5);
+    else
+        assert(all(motEssai == 0));
+    end
+end
+
+% Le decodage BCH corrige toutes les configurations jusqu'a t erreurs.
+[sortieBch, erreursBch] = bchdec(motBch, 15, 7);
+assert(erreursBch == 0 && isequal(double(sortieBch), double(messageBch)));
+for posBch = 1:15
+    recuBch = double(motBch);
+    recuBch(posBch) = 1 - recuBch(posBch);
+    [sortieBch, erreursBch] = bchdec(gf(recuBch, 1), 15, 7);
+    assert(erreursBch == 1 && isequal(double(sortieBch), double(messageBch)));
+end
+compteBch = 0;
+for p1Bch = 1:15
+    for p2Bch = (p1Bch + 1):15
+        recuBch = double(motBch);
+        recuBch(p1Bch) = 1 - recuBch(p1Bch);
+        recuBch(p2Bch) = 1 - recuBch(p2Bch);
+        [sortieBch, erreursBch] = bchdec(gf(recuBch, 1), 15, 7);
+        if erreursBch == 2 && isequal(double(sortieBch), double(messageBch))
+            compteBch = compteBch + 1;
+        end
+    end
+end
+assert(compteBch == 105);
+for specBch = {[15 5 3], [31 21 2], [63 51 2], [7 4 1]}
+    nBch = specBch{1}(1);
+    kBch = specBch{1}(2);
+    tBch = specBch{1}(3);
+    for essaiBch = 1:10
+        msgBch = gf(double(rand(1, kBch) > 0.5), 1);
+        recuBch = double(bchenc(msgBch, nBch, kBch));
+        posBch = randperm(nBch);
+        posBch = posBch(1:tBch);
+        recuBch(posBch) = 1 - recuBch(posBch);
+        [sortieBch, erreursBch] = bchdec(gf(recuBch, 1), nBch, kBch);
+        assert(erreursBch == tBch && isequal(double(sortieBch), double(msgBch)), ...
+               sprintf('BCH(%d,%d)', nBch, kBch));
+    end
+end
+
+% Reed-Solomon : les syndromes d'un mot de code sont tous nuls.
+messageRs = gf([1 2 3 4 5 6 7 8 9 10 11], 4);
+motRs = rsenc(messageRs, 15, 11);
+assert(isequal(double(motRs(1:11)), double(messageRs)));
+[journalRs, exposantsRs] = matlibre_gf_journal(4, motRs.prim_poly);
+for iRs = 1:4
+    sommeRs = 0;
+    for posRs = 1:15
+        if double(motRs(posRs)) ~= 0
+            eRs = mod(iRs * (15 - posRs), 15);
+            sommeRs = bitxor(sommeRs, ...
+                matlibre_gf_mul(double(motRs(posRs)), exposantsRs(eRs + 1), 4, motRs.prim_poly));
+        end
+    end
+    assert(sommeRs == 0, sprintf('syndrome %d', iRs));
+end
+for specRs = {[7 3], [15 9], [31 21], [63 55]}
+    [genRs, tRs] = rsgenpoly(specRs{1}(1), specRs{1}(2));
+    assert(tRs == (specRs{1}(1) - specRs{1}(2)) / 2);
+    assert(numel(double(genRs)) - 1 == specRs{1}(1) - specRs{1}(2));
+end
+
+% Le decodage corrige un symbole quelconque, a n'importe quelle position.
+[sortieRs, erreursRs] = rsdec(motRs, 15, 11);
+assert(erreursRs == 0 && isequal(double(sortieRs), double(messageRs)));
+for posRs = 1:15
+    for valeurRs = 1:15
+        recuRs = double(motRs);
+        recuRs(posRs) = bitxor(recuRs(posRs), valeurRs);
+        [sortieRs, erreursRs] = rsdec(gf(recuRs, 4), 15, 11);
+        assert(erreursRs == 1 && isequal(double(sortieRs), double(messageRs)), ...
+               sprintf('position %d valeur %d', posRs, valeurRs));
+    end
+end
+for specRs = {[7 3], [15 9], [31 21]}
+    nRs = specRs{1}(1);
+    kRs = specRs{1}(2);
+    mRs = round(log2(nRs + 1));
+    tRs = (nRs - kRs) / 2;
+    for essaiRs = 1:10
+        msgRs = gf(floor(rand(1, kRs) * 2 ^ mRs), mRs);
+        recuRs = double(rsenc(msgRs, nRs, kRs));
+        posRs = randperm(nRs);
+        posRs = posRs(1:tRs);
+        for jRs = 1:tRs
+            recuRs(posRs(jRs)) = bitxor(recuRs(posRs(jRs)), 1 + floor(rand * (2 ^ mRs - 1)));
+        end
+        [sortieRs, erreursRs] = rsdec(gf(recuRs, mRs), nRs, kRs);
+        assert(erreursRs == tRs && isequal(double(sortieRs), double(msgRs)), ...
+               sprintf('RS(%d,%d)', nRs, kRs));
+    end
+end
+
 %% -------------------------------------------------------- ondelettes
 % Bancs de filtres : les valeurs de db2 sont celles que publie la
 % documentation, au signe près qui est celui de MATLAB.

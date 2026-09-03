@@ -6,7 +6,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
 | automatique | 108 | 0 | 100 % |
-| communications | 75 | 33 | 69 % |
+| communications | 82 | 25 | 77 % |
 | flou | 63 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
@@ -16,16 +16,15 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1421** | **46** | **97 %** |
+| **ensemble** | **1428** | **38** | **97 %** |
 
 ## communications
 
-`bchdec`, `bchenc`, `bchgenpoly`, `bercoding`, `berconfint`, `bersync`, `distspec`
-`dvbsapskdemod`, `dvbsapskmod`, `gf`, `helscanintrlv`, `helscandeintrlv`
-`huffmandeco`, `huffmandict`, `huffmanenco`, `intdump`, `iscatastrophic`
-`lloyds`, `lteZadoffChuSeq`, `muxdeintrlv`, `muxintrlv`, `nrCRCEncode`, `ossdec`
-`ossenc`, `quantiz`, `randerr`, `rsdec`, `rsenc`, `rsgenpoly`, `semianalytic`
-`shift2mask`, `wgn`, `zadoffChuSeq`
+`bercoding`, `berconfint`, `bersync`, `distspec`, `dvbsapskdemod`, `dvbsapskmod`
+`helscanintrlv`, `helscandeintrlv`, `huffmandeco`, `huffmandict`, `huffmanenco`
+`intdump`, `iscatastrophic`, `lloyds`, `muxdeintrlv`, `muxintrlv`, `nrCRCEncode`
+`ossdec`, `ossenc`, `quantiz`, `randerr`, `semianalytic`, `shift2mask`, `wgn`
+`zadoffChuSeq`
 
 ## matlab-langage
 
@@ -192,6 +191,31 @@ qu'ils ne font pas encore comme MATLAB.
 - **`linprog` et `quadprog`** minimisent une barrière logarithmique par
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
+
+### Communications
+
+- **`gf` est une classe, non un objet natif** : les opérateurs y sont
+  surchargés — `+`, `.*`, `./`, `.^`, `*`, l'indexation, la
+  concaténation — mais un tableau de corps ne passe pas dans les
+  fonctions natives qui attendent des nombres. `double(x)` en donne les
+  valeurs.
+- **`gfprimdf`** cherche le premier polynôme primitif dans l'ordre des
+  codes croissants. Il coïncide avec la table de MATLAB partout sauf au
+  degré sept, où MathWorks retient 1+x^3+x^7 quand la recherche trouve
+  d'abord 1+x+x^7 ; les deux sont primitifs. Donnez le polynôme
+  explicitement pour que deux calculs se comparent.
+- **`gfadd` et `gfsub`** traitent un scalaire comme le polynôme
+  constant, non comme un terme à répandre : sans cela l'identité de la
+  division euclidienne ne tiendrait pas. `gfmul` et `gfdiv`, qui
+  travaillent terme à terme, répandent bien le scalaire.
+- **Les fonctions `gf*` d'extension** (`gfadd(a,b,field)` où le troisième
+  argument est une table de corps) ne sont pas gérées : elles n'acceptent
+  qu'un ordre premier. Le corps d'extension passe par la classe `gf`, ou
+  par `gftable` pour lire sa table.
+- **`bchdec` et `rsdec`** décodent par syndrome, Berlekamp-Massey et
+  recherche de Chien, avec Forney pour les valeurs d'erreur en
+  Reed-Solomon. Le décodage par effacements (`erasures`) et le décodage
+  raccourci ne sont pas gérés.
 
 ### Ondelettes
 

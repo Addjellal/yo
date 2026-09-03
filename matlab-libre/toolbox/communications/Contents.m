@@ -36,8 +36,13 @@
 %   gen2par             - Génératrice vers contrôle, et retour
 %   syndtable           - Table de décodage par syndrome
 %   encode, decode      - Codage et correction
+%   bchgenpoly          - Générateur d'un code BCH
+%   bchenc, bchdec      - Codage et décodage BCH
+%   rsgenpoly           - Générateur d'un code de Reed-Solomon
+%   rsenc, rsdec        - Codage et décodage de Reed-Solomon
 %
 % Corps de Galois
+%   gf                  - Tableau d'éléments de GF(2^m), opérateurs compris
 %   gfadd, gfsub        - Somme et différence de polynômes
 %   gfmul, gfdiv        - Produit et quotient terme à terme
 %   gfconv, gfdeconv    - Produit et division de polynômes

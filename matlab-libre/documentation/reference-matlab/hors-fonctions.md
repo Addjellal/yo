@@ -147,6 +147,31 @@ qu'ils ne font pas encore comme MATLAB.
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
 
+### Communications
+
+- **`gf` est une classe, non un objet natif** : les opérateurs y sont
+  surchargés — `+`, `.*`, `./`, `.^`, `*`, l'indexation, la
+  concaténation — mais un tableau de corps ne passe pas dans les
+  fonctions natives qui attendent des nombres. `double(x)` en donne les
+  valeurs.
+- **`gfprimdf`** cherche le premier polynôme primitif dans l'ordre des
+  codes croissants. Il coïncide avec la table de MATLAB partout sauf au
+  degré sept, où MathWorks retient 1+x^3+x^7 quand la recherche trouve
+  d'abord 1+x+x^7 ; les deux sont primitifs. Donnez le polynôme
+  explicitement pour que deux calculs se comparent.
+- **`gfadd` et `gfsub`** traitent un scalaire comme le polynôme
+  constant, non comme un terme à répandre : sans cela l'identité de la
+  division euclidienne ne tiendrait pas. `gfmul` et `gfdiv`, qui
+  travaillent terme à terme, répandent bien le scalaire.
+- **Les fonctions `gf*` d'extension** (`gfadd(a,b,field)` où le troisième
+  argument est une table de corps) ne sont pas gérées : elles n'acceptent
+  qu'un ordre premier. Le corps d'extension passe par la classe `gf`, ou
+  par `gftable` pour lire sa table.
+- **`bchdec` et `rsdec`** décodent par syndrome, Berlekamp-Massey et
+  recherche de Chien, avec Forney pour les valeurs d'erreur en
+  Reed-Solomon. Le décodage par effacements (`erasures`) et le décodage
+  raccourci ne sont pas gérés.
+
 ### Ondelettes
 
 - **Familles construites, non recopiées** : `dbaux`, `symaux` et

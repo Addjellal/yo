@@ -24,7 +24,7 @@ existant appellera.
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
 | `cartographie` | Mapping Toolbox — géodésie et cartographie. | 4 |
 | `coder` | MATLAB Coder — génération de code C. | 4 |
-| `communications` | Communications Toolbox — transmissions numériques. | 88 |
+| `communications` | Communications Toolbox — transmissions numériques. | 119 |
 | `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 6 |
 | `compilateur` | MATLAB Compiler — distribution d'un programme. | 2 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |

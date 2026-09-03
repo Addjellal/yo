@@ -10,7 +10,7 @@ genqamdemod genqammod gf gfadd gfconv gfcosets gfdeconv gfdiv gffilter
 gfmul gfprimck gfprimdf gfprimfd gfrank gfroots gfsub gftable gftrunc
 gfweight gray2bin hammgen helscanintrlv helscandeintrlv huffmandeco
 huffmandict huffmanenco intdump intrlv iscatastrophic istrellis lloyds
-lteZadoffChuSeq matdeintrlv matintrlv modnorm mskdemod mskmod muxdeintrlv
+matdeintrlv matintrlv modnorm mskdemod mskmod muxdeintrlv
 muxintrlv nrCRCEncode oct2dec ossdec ossenc pamdemod pammod pmdemod pmmod
 poly2trellis pskdemod pskmod qamdemod qammod qfunc qfuncinv quantiz
 randdeintrlv randintrlv randerr rcosdesign rsdec rsenc rsgenpoly

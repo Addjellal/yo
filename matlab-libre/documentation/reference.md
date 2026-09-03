@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1671 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1702 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -50,7 +50,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
 | [`coder`](reference/toolbox-coder.md) | 4 |
-| [`communications`](reference/toolbox-communications.md) | 88 |
+| [`communications`](reference/toolbox-communications.md) | 119 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
