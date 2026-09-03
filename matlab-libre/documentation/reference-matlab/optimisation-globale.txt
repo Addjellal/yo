@@ -1,0 +1,5 @@
+# Global Optimization Toolbox. Les noms qu'un utilisateur rencontre :
+# solveurs stochastiques et sans derivee, fronts de Pareto, options.
+GlobalSearch MultiStart createOptimProblem ga gamultiobj gaoptimset
+multistart optimoptions paretosearch particleswarm
+patternsearch psoptimset saoptimset simulannealbnd surrogateopt

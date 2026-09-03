@@ -385,6 +385,60 @@ xContraint = patternsearch(@(p) -(p(1)+p(2)), [0 0], [1 1], 1, [], [], [0 0], [1
 assert(abs(sum(xContraint) - 1) < 1e-6);
 assert(all(xContraint >= -1e-9));
 
+% Departs multiples : la ou un solveur local reste dans le premier creux
+% venu, ils trouvent le bon. La fonction x^4-3x^2+x a son minimum global
+% en x = -1.3 et un creux local en x = 1.13 ; partir de 2 y mene tout
+% droit.
+rng(3);
+fonctionDeuxCreux = @(v) v ^ 4 - 3 * v ^ 2 + v;
+problemeGlobal = createOptimProblem('fminunc', 'objective', fonctionDeuxCreux, ...
+                                    'x0', 2, 'lb', -3, 'ub', 3);
+assert(abs(fminunc(fonctionDeuxCreux, 2) - 1.13) < 0.05);
+[xDeparts, valeurDeparts] = run(MultiStart('Display', 'off'), problemeGlobal, 20);
+assert(abs(xDeparts + 1.3) < 0.1);
+assert(valeurDeparts < fonctionDeuxCreux(1.13));
+[xRecherche, valeurRecherche] = run(GlobalSearch('Display', 'off'), problemeGlobal);
+assert(abs(xRecherche + 1.3) < 0.1);
+assert(abs(valeurRecherche - valeurDeparts) < 1e-4);
+% createOptimProblem refuse un solveur ou une option qu'il ne connait
+% pas, et exige une fonction objectif.
+for essaiProbleme = {@() createOptimProblem('toto', 'objective', @(x) x), ...
+                     @() createOptimProblem('fmincon', 'toto', 1), ...
+                     @() createOptimProblem('fmincon', 'x0', 1)}
+    refuseProbleme = false;
+    try
+        essaiProbleme{1}();
+    catch
+        refuseProbleme = true;
+    end
+    assert(refuseProbleme);
+end
+
+% Les trois structures d'options : chaque champ se pose, une structure
+% existante se complete, et une faute de frappe est refusee.
+assert(gaoptimset().PopulationSize == 50 && gaoptimset().Generations == 100);
+optionsGenetique = gaoptimset('PopulationSize', 200, 'Generations', 300);
+assert(optionsGenetique.PopulationSize == 200);
+assert(gaoptimset(optionsGenetique, 'EliteCount', 5).PopulationSize == 200);
+assert(gaoptimset(optionsGenetique, 'EliteCount', 5).EliteCount == 5);
+assert(psoptimset('MaxIter', 500).MaxIter == 500);
+assert(psoptimset('MeshTolerance', 1e-9).MeshTolerance == 1e-9);
+assert(saoptimset('InitialTemperature', 50).InitialTemperature == 50);
+assert(saoptimset('InitialTemperature', 50).MaxIter == 1000);
+for essaiOption = {@() gaoptimset('Toto', 1), @() psoptimset('Toto', 1), ...
+                   @() saoptimset('Toto', 1)}
+    refuseOption = false;
+    try
+        essaiOption{1}();
+    catch
+        refuseOption = true;
+    end
+    assert(refuseOption);
+end
+% Le solveur accepte la structure d'options.
+assert(norm(ga(@(v) sum(v .^ 2), 2, [-5 -5], [5 5], ...
+               gaoptimset('PopulationSize', 40, 'Generations', 60))) < 0.5);
+
 % Front de Pareto de [x^2, (x-2)^2] : les solutions sont x dans [0,2].
 rand('seed', 3);
 deuxObjectifs = @(x) [x(1)^2, (x(1)-2)^2];

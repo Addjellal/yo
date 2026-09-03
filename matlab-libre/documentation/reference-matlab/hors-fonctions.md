@@ -147,6 +147,22 @@ qu'ils ne font pas encore comme MATLAB.
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
 
+### Optimisation globale
+
+- **`GlobalSearch` et `MultiStart`** relancent le solveur local depuis
+  des points tirés dans les bornes ; `GlobalSearch` évalue d'abord un
+  large échantillon et ne raffine que les meilleurs. MATLAB emploie une
+  analyse de bassins d'attraction et un filtre sur les points de départ,
+  ce qui lui fait économiser des appels — le résultat est le même, le
+  budget diffère.
+- **`createOptimProblem`** rend une structure, non un objet ; les
+  solveurs locaux acceptés sont `fmincon`, `fminunc`, `lsqnonlin` et
+  `lsqcurvefit`.
+- **Options** : `gaoptimset`, `psoptimset` et `saoptimset` rendent des
+  structures dont les champs sont ceux que MatLibre lit réellement. Les
+  fonctions personnalisables de MATLAB — `MutationFcn`, `CrossoverFcn`,
+  `SearchFcn`, `AnnealingFcn` — sont acceptées et sans effet.
+
 ### Calcul formel
 
 - **Une expression, pas un tableau** : un `sym` porte une seule
