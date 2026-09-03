@@ -23,7 +23,13 @@
 %   awgn                - Bruit blanc gaussien
 %   bsc                 - Canal binaire symétrique
 %   biterr, symerr      - Taux d'erreur binaire et symbole
+%   wgn                 - Bruit blanc de puissance donnée
+%   randerr             - Motifs d'erreurs binaires
 %   berawgn, berfading  - Taux d'erreur théoriques, gaussien et Rayleigh
+%   bercoding           - Borne d'un système codé
+%   bersync             - Effet d'un défaut de synchronisation
+%   berconfint          - Intervalle de confiance d'un taux mesuré
+%   semianalytic        - Taux d'erreur par la méthode semi-analytique
 %   qfunc, qfuncinv     - Fonction Q et sa réciproque
 %   convertSNR          - Conversions entre SNR, Eb/No et Es/No
 %
@@ -32,6 +38,9 @@
 %   istrellis           - Vérification d'un treillis
 %   convenc             - Codage
 %   vitdec              - Décodage de Viterbi, décision dure ou souple
+%   distspec            - Spectre des distances, distance libre
+%   iscatastrophic      - Le codeur est-il catastrophique
+%   shift2mask          - Masque d'un décalage de registre
 %
 % Codes en blocs
 %   hammgen             - Matrices d'un code de Hamming
@@ -63,9 +72,19 @@
 %   intrlv, deintrlv    - Permutation donnée
 %   randintrlv, randdeintrlv - Permutation pseudo-aléatoire reproductible
 %   matintrlv, matdeintrlv   - Entrelacement matriciel
+%   muxintrlv, muxdeintrlv   - Entrelacement convolutif, dit de Forney
+%   helscanintrlv, helscandeintrlv - Balayage hélicoïdal
 %
 % Mise en forme et représentation
 %   rcosdesign          - Racine de cosinus surélevé
+%   intdump             - Intégration et vidage
+%   zadoffChuSeq        - Suite de Zadoff-Chu
+%
+% Quantification et codage de source
+%   quantiz             - Quantification scalaire
+%   lloyds              - Quantificateur optimal
+%   huffmandict         - Dictionnaire de Huffman
+%   huffmanenco, huffmandeco - Codage et décodage
 %   eyediagram          - Diagramme de l'œil
 %   scatterplot         - Constellation reçue
 %
@@ -254,6 +273,56 @@ BERAWGN Taux d'erreur binaire théorique sur canal gaussien.
   BER = BERAWGN(EBNO,'psk',M) ou BERAWGN(EBNO,'qam',M).
 ```
 
+## `bercoding`
+
+```
+BERCODING Borne du taux d'erreur d'un système codé.
+  BER = BERCODING(EBNO,'conv',DECISION,DFREE,SPECTRE) borne le taux
+  d'erreur binaire d'un code convolutif de rendement R sur canal
+  gaussien. DECISION vaut 'hard' ou 'soft', DFREE la distance libre,
+  SPECTRE le poids d'information des chemins de poids DFREE,
+  DFREE+1, ...
+
+  BER = BERCODING(EBNO,'block',DECISION,N,K,DMIN) borne celui d'un code
+  en bloc (N,K) de distance minimale DMIN.
+
+  Ce sont des bornes de l'union : la vraie courbe passe en dessous, et
+  d'autant plus près que le rapport signal sur bruit est grand. Au delà
+  de un, la borne est rendue telle quelle et n'a plus de sens.
+
+  Exemple :
+     s = distspec(poly2trellis(3, [7 5]), 4);
+     ber = bercoding(0:8, 'conv', 'soft', 1/2, s.dfree, s.weight);
+     all(diff(ber) < 0)             % vrai : elle décroît
+
+  Voir aussi BERAWGN, DISTSPEC, BERFADING, BERCONFINT.
+```
+
+## `berconfint`
+
+```
+BERCONFINT Intervalle de confiance d'un taux d'erreur mesuré.
+  [INT,BER] = BERCONFINT(NERR,NESSAIS) rend l'intervalle de confiance à
+  95 % du taux d'erreur binaire estimé à NERR/NESSAIS, et l'estimation
+  elle-même.
+
+  BERCONFINT(NERR,NESSAIS,NIVEAU) choisit le niveau, entre zéro et un.
+
+  L'intervalle est celui de Clopper et Pearson, exact : ses bornes sont
+  les probabilités pour lesquelles la loi binomiale donne exactement la
+  masse voulue au-delà et en deçà du nombre d'erreurs observé. Il ne
+  suppose ni grand nombre d'essais ni taux éloigné de zéro, là où
+  l'approximation gaussienne rendrait une borne basse négative dès
+  qu'on observe peu d'erreurs.
+
+  Exemple :
+     [int, ber] = berconfint(10, 10000);
+     ber                            % 0.001
+     int                            % environ [4.8e-4 1.8e-3]
+
+  Voir aussi BERAWGN, BITERR, BERFADING, BINOCDF.
+```
+
 ## `berfading`
 
 ```
@@ -281,6 +350,32 @@ BERFADING Taux d'erreur binaire théorique sur canal de Rayleigh.
      berfading(10, 'psk', 2, 2)   % 0.0016
 
   Voir aussi BERAWGN, AWGN.
+```
+
+## `bersync`
+
+```
+BERSYNC Taux d'erreur avec un défaut de synchronisation.
+  BER = BERSYNC(EBNO,TAU,'timing') donne le taux d'erreur binaire d'une
+  modulation à deux états sur canal gaussien lorsque l'instant
+  d'échantillonnage est décalé de TAU, fraction de la durée d'un
+  symbole entre zéro et un demi.
+
+  BER = BERSYNC(EBNO,PHI,'carrier') traite un défaut de phase de la
+  porteuse, PHI en radians.
+
+  Le décalage d'échantillonnage réduit l'amplitude utile d'un facteur
+  1-2|TAU| — ce que le filtre adapté laisse passer du symbole voulu —,
+  et le défaut de phase d'un facteur COS(PHI). Le taux d'erreur suit :
+
+     BER = Q( facteur * sqrt(2 Eb/No) ).
+
+  Exemple :
+     sansDefaut = bersync(0:8, 0, 'timing');
+     avecDefaut = bersync(0:8, 0.2, 'timing');
+     all(avecDefaut > sansDefaut)   % vrai : le défaut coûte
+
+  Voir aussi BERAWGN, BERFADING, BERCODING, BERCONFINT.
 ```
 
 ## `bi2de`
@@ -520,6 +615,41 @@ DEINTRLV Désentrelacement, réciproque de INTRLV.
      deintrlv(intrlv([10 20 30 40], [3 1 4 2]), [3 1 4 2])   % inchangé
 
   Voir aussi INTRLV, RANDDEINTRLV, MATDEINTRLV.
+```
+
+## `distspec`
+
+```
+DISTSPEC Spectre des distances d'un codeur convolutif.
+  SPECT = DISTSPEC(TRELLIS) rend une structure à deux champs :
+    dfree     la distance libre, plus petit poids d'un chemin qui
+              quitte l'état zéro et y revient
+    weight    le poids d'information total des chemins de ce poids
+
+  SPECT = DISTSPEC(TRELLIS,N) rend les N premiers termes : dfree porte
+  alors la distance libre, et weight un vecteur de N nombres pour les
+  poids dfree, dfree+1, ..., dfree+N-1.
+
+  La distance libre commande le pouvoir du code : il corrige
+  FLOOR((DFREE-1)/2) erreurs sur un canal sans mémoire.
+
+  La recherche parcourt les chemins par poids croissant. Les
+  transitions de sortie nulle ne changent pas de niveau : il faut les
+  propager jusqu'au point fixe avant de passer au poids suivant, faute
+  de quoi un chemin qui les emprunte à contre-courant de l'ordre des
+  états passerait inaperçu. C'est bien ce qui manquait quand le codeur
+  (17,13) octal ressortait avec une distance libre de sept au lieu de
+  six. L'absence de cycle de sortie nulle — c'est-à-dire le fait que le
+  codeur ne soit pas catastrophique — garantit que ce point fixe
+  existe.
+
+  Exemple :
+     s = distspec(poly2trellis(3, [7 5]));
+     s.dfree                        % 5
+     s = distspec(poly2trellis(7, [171 133]));
+     s.dfree                        % 10
+
+  Voir aussi POLY2TRELLIS, ISCATASTROPHIC, VITDEC, GFWEIGHT.
 ```
 
 ## `dpskdemod`
@@ -1078,12 +1208,131 @@ HAMMGEN Matrices d'un code de Hamming.
      [H, G, n, k] = hammgen(3);   % n = 7, k = 4
 ```
 
+## `helscandeintrlv`
+
+```
+HELSCANDEINTRLV Désentrelacement par balayage hélicoïdal.
+  Y = HELSCANDEINTRLV(X,NLIGNES,NCOLONNES,PAS) défait exactement ce que
+  HELSCANINTRLV a fait, la permutation étant inversée.
+
+  Exemple :
+     y = helscanintrlv(1:12, 3, 4, 1);
+     isequal(helscandeintrlv(y, 3, 4, 1), 1:12)   % vrai
+
+  Voir aussi HELSCANINTRLV, MATDEINTRLV, MUXDEINTRLV, DEINTRLV.
+```
+
+## `helscanintrlv`
+
+```
+HELSCANINTRLV Entrelacement par balayage hélicoïdal.
+  Y = HELSCANINTRLV(X,NLIGNES,NCOLONNES,PAS) range X dans une matrice
+  ligne par ligne, puis la lit en diagonale : la lecture part du coin
+  supérieur gauche et descend d'une ligne à chaque colonne, en avançant
+  de PAS colonnes à chaque ligne.
+
+  Le nombre d'éléments doit valoir NLIGNES*NCOLONNES.
+
+  Le balayage hélicoïdal disperse mieux qu'un entrelacement matriciel
+  simple : deux symboles voisins à l'entrée se retrouvent séparés à la
+  fois en ligne et en colonne.
+
+  Exemple :
+     y = helscanintrlv(1:12, 3, 4, 1);
+     x = helscandeintrlv(y, 3, 4, 1);
+     isequal(x, 1:12)               % vrai
+
+  Voir aussi HELSCANDEINTRLV, MATINTRLV, MUXINTRLV, INTRLV.
+```
+
+## `huffmandeco`
+
+```
+HUFFMANDECO Décodage de Huffman.
+  SIG = HUFFMANDECO(CODE,DICT) retrouve les symboles à partir de la
+  suite de chiffres CODE et du dictionnaire DICT.
+
+  Le décodage lit les chiffres un à un jusqu'à reconnaître un mot du
+  dictionnaire : le code étant préfixe, aucune ambiguïté n'est
+  possible. Une suite qui ne se décompose pas en mots est refusée
+  plutôt que tronquée en silence.
+
+  Exemple :
+     d = huffmandict([1 2 3], [0.5 0.25 0.25]);
+     huffmandeco(huffmanenco([1 2 3 1], d), d)   % [1 2 3 1]
+
+  Voir aussi HUFFMANDICT, HUFFMANENCO.
+```
+
+## `huffmandict`
+
+```
+HUFFMANDICT Dictionnaire de Huffman.
+  DICT = HUFFMANDICT(SYMBOLES,P) construit le code de Huffman des
+  symboles donnés, de probabilités P. DICT est une cellule à deux
+  colonnes : le symbole, puis son mot de code, vecteur de chiffres.
+
+  [DICT,L] = HUFFMANDICT(...) rend en outre la longueur moyenne du
+  code, somme des P(i) fois la longueur du mot i.
+
+  HUFFMANDICT(...,N) construit un code en base N (deux par défaut).
+
+  Le code est construit en réunissant à chaque tour les deux symboles
+  les moins probables : le plus rare écope du mot le plus long. C'est
+  le code préfixe de longueur moyenne minimale, laquelle reste entre
+  l'entropie et l'entropie plus un.
+
+  Exemple :
+     [d, l] = huffmandict({'a','b','c'}, [0.5 0.25 0.25]);
+     l                              % 1.5 : l'entropie exactement
+     d{1, 2}                        % le mot du symbole le plus probable
+
+  Voir aussi HUFFMANENCO, HUFFMANDECO, QUANTIZ.
+```
+
+## `huffmanenco`
+
+```
+HUFFMANENCO Codage de Huffman.
+  CODE = HUFFMANENCO(SIG,DICT) remplace chaque symbole de SIG par son
+  mot de code, tiré du dictionnaire que rend HUFFMANDICT, et met le
+  tout bout à bout.
+
+  Le code étant préfixe — aucun mot n'en commence un autre —, la suite
+  se décode sans séparateur : c'est ce qui fait tenir la compression.
+
+  Exemple :
+     d = huffmandict([1 2 3], [0.5 0.25 0.25]);
+     code = huffmanenco([1 2 1 3], d);
+     isequal(huffmandeco(code, d), [1 2 1 3])   % vrai
+
+  Voir aussi HUFFMANDICT, HUFFMANDECO.
+```
+
 ## `instants`
 
 ```
 INSTANTS Vecteur des instants d'échantillonnage, à la forme de X.
   T = INSTANTS(X,FS) rend (0:n-1)'/FS répété autant de fois que X a de
   colonnes. Les fonctions de modulation analogique s'en servent toutes.
+```
+
+## `intdump`
+
+```
+INTDUMP Intégration et vidage.
+  Y = INTDUMP(X,N) découpe X en tranches de N échantillons et rend la
+  moyenne de chacune : c'est le filtre adapté d'une impulsion
+  rectangulaire, celui qu'on met en bout de chaîne quand chaque symbole
+  a été suréchantillonné d'un facteur N.
+
+  X peut être une matrice : chaque colonne est traitée à part. Le
+  nombre de lignes doit être un multiple de N.
+
+  Exemple :
+     intdump([1 1 1 1 3 3 3 3], 4)   % [1 3]
+
+  Voir aussi RCOSDESIGN, PAMDEMOD, UPSAMPLE, DOWNSAMPLE.
 ```
 
 ## `intrlv`
@@ -1103,6 +1352,26 @@ INTRLV Entrelacement par une permutation donnée.
   Voir aussi DEINTRLV, RANDINTRLV, MATINTRLV.
 ```
 
+## `iscatastrophic`
+
+```
+ISCATASTROPHIC Le codeur convolutif est-il catastrophique.
+  OK = ISCATASTROPHIC(TRELLIS) est vrai quand le codeur peut produire
+  une suite de sortie de poids fini à partir d'une suite d'entrée de
+  poids infini : une poignée d'erreurs de canal donne alors une
+  infinité d'erreurs après décodage. Un tel codeur est inutilisable.
+
+  Le critère est structurel : le codeur est catastrophique quand le
+  graphe des états comporte un cycle, hors de l'état zéro, dont toutes
+  les sorties sont nulles et dont au moins une entrée ne l'est pas.
+
+  Exemple :
+     iscatastrophic(poly2trellis(3, [7 5]))   % faux : bon codeur
+     iscatastrophic(poly2trellis(3, [6 5]))   % vrai : catastrophique
+
+  Voir aussi POLY2TRELLIS, ISTRELLIS, DISTSPEC, CONVENC.
+```
+
 ## `istrellis`
 
 ```
@@ -1115,6 +1384,33 @@ ISTRELLIS Vérification d'une structure de treillis.
      istrellis(poly2trellis(3, [7 5]))   % vrai
 
   Voir aussi POLY2TRELLIS, CONVENC, VITDEC.
+```
+
+## `lloyds`
+
+```
+LLOYDS Quantificateur optimal, par l'algorithme de Lloyd.
+  [PARTITION,CODEBOOK] = LLOYDS(X,N) cherche le quantificateur à N
+  niveaux qui minimise la distorsion sur le signal X. PARTITION porte
+  les N-1 seuils, CODEBOOK les N valeurs.
+
+  [PARTITION,CODEBOOK] = LLOYDS(X,CODEBOOK0) part d'un dictionnaire
+  donné plutôt que d'une partition régulière.
+  LLOYDS(X,N,TOL) fixe le seuil d'arrêt (1e-7 par défaut).
+  [P,C,D] = LLOYDS(...) rend la distorsion atteinte, et un quatrième
+  argument la distorsion relative au dernier tour.
+
+  L'algorithme alterne deux conditions d'optimalité : chaque valeur va
+  au niveau le plus proche, et chaque niveau se place au barycentre de
+  ce qu'il reçoit. La distorsion baisse à chaque tour et converge vers
+  un minimum local.
+
+  Exemple :
+     x = randn(1, 1000);
+     [p, c, d] = lloyds(x, 4);
+     numel(c)                       % 4
+
+  Voir aussi QUANTIZ, DPCMOPT, KMEANS.
 ```
 
 ## `matdeintrlv`
@@ -1215,6 +1511,18 @@ MATLIBRE_CHIEN Recherche de Chien : les positions en erreur.
   On évalue le localisateur en chaque alpha^(-i) : une racine désigne
   la position i. C'est un parcours exhaustif, mais la seule façon sûre
   de trouver toutes les racines dans un corps fini.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_clopper`
+
+```
+MATLIBRE_CLOPPER Une borne de l'intervalle de Clopper-Pearson.
+  La borne basse est le p tel que P(X >= erreurs) = alpha, la borne
+  haute celui tel que P(X <= erreurs) = alpha, X suivant la binomiale
+  de paramètres (essais, p). La fonction est monotone en p : une
+  dichotomie suffit, et converge à la précision machine.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
@@ -1362,6 +1670,25 @@ MATLIBRE_GF_VALEURS Les valeurs entières d'un tableau de corps.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_helice`
+
+```
+MATLIBRE_HELICE Permutation du balayage hélicoïdal.
+  La matrice est remplie ligne par ligne, puis lue en diagonale : à la
+  colonne j, on lit la ligne (j-1) modulo NLIGNES, décalée de PAS fois
+  le numéro du tour. Chaque case est lue une fois et une seule.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_poids_binaire`
+
+```
+MATLIBRE_POIDS_BINAIRE Nombre de bits à un d'un entier.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `matlibre_rs_coder`
 
 ```
@@ -1452,6 +1779,58 @@ MSKMOD Modulation par déplacement minimal.
      max(abs(abs(y) - 1))   % nul : l'enveloppe est constante
 
   Voir aussi MSKDEMOD, FSKMOD, PSKMOD.
+```
+
+## `muxdeintrlv`
+
+```
+MUXDEINTRLV Désentrelacement multiplexé.
+  Y = MUXDEINTRLV(X,RETARDS) défait ce que MUXINTRLV a fait : les
+  retards y sont pris à l'envers, si bien que chaque symbole subit au
+  total le même retard et retrouve sa place.
+
+  [Y,ETAT] = MUXDEINTRLV(...) rend l'état final des registres,
+  MUXDEINTRLV(X,RETARDS,ETAT) repart d'un état donné.
+
+  Chaque symbole subit au total MAX(RETARDS) pas de registre, et un pas
+  vaut N positions puisque les voies se relaient : le retard est donc
+  de N fois MAX(RETARDS) symboles. Les premiers symboles rendus sont
+  ceux que les registres portaient au départ, des zéros. C'est le prix
+  de l'entrelacement convolutif.
+
+  Exemple :
+     y = muxintrlv(1:20, [0 2 4]);
+     x = muxdeintrlv(y, [0 2 4]);
+     isequal(x(13:20), 1:8)         % vrai : après douze symboles
+
+  Voir aussi MUXINTRLV, HELSCANDEINTRLV, MATDEINTRLV.
+```
+
+## `muxintrlv`
+
+```
+MUXINTRLV Entrelacement multiplexé, dit de Forney.
+  Y = MUXINTRLV(X,RETARDS) fait passer les symboles par un jeu de
+  registres à décalage de longueurs RETARDS, un par voie, pris à tour
+  de rôle. Le symbole d'indice k entre dans la voie MOD(k-1,N)+1 et en
+  ressort RETARDS(voie) symboles plus tard.
+
+  [Y,ETAT] = MUXINTRLV(...) rend l'état à la fin — le contenu des
+  registres et la voie où l'on s'est arrêté —, ce qui permet
+  d'enchaîner deux blocs ; MUXINTRLV(X,RETARDS,ETAT) repart de cet
+  état. Sans lui, le second bloc recommencerait par la première voie et
+  la rotation serait rompue.
+
+  L'entrelaceur convolutif étale une rafale sans découper le flux en
+  blocs : il coûte moins de mémoire qu'un entrelaceur matriciel de même
+  pouvoir, et n'impose pas d'attendre un bloc entier.
+
+  Exemple :
+     y = muxintrlv(1:12, [0 2 4]);
+     x = muxdeintrlv(y, [0 2 4]);   % les premiers symboles sont
+                                    % encore dans les registres
+
+  Voir aussi MUXDEINTRLV, HELSCANINTRLV, MATINTRLV, INTRLV.
 ```
 
 ## `oct2dec`
@@ -1644,6 +2023,31 @@ QFUNCINV Réciproque de la fonction Q.
      qfuncinv(qfunc(1.3))       % 1.3
 ```
 
+## `quantiz`
+
+```
+QUANTIZ Quantification scalaire d'un signal.
+  INDICES = QUANTIZ(X,PARTITION) rend, pour chaque valeur de X, le
+  nombre d'éléments de PARTITION qu'elle dépasse strictement : l'indice
+  vaut zéro quand X ne dépasse pas le premier seuil, et M quand
+  PARTITION(M) < X <= PARTITION(M+1). Il va donc de zéro à
+  NUMEL(PARTITION), et les seuils vont en ordre croissant.
+
+  [INDICES,Q] = QUANTIZ(X,PARTITION,CODEBOOK) rend en outre les valeurs
+  quantifiées : Q(k) vaut CODEBOOK(INDICES(k)+1). CODEBOOK compte un
+  élément de plus que PARTITION.
+
+  [INDICES,Q,D] = QUANTIZ(...) rend la distorsion, erreur quadratique
+  moyenne entre X et Q.
+
+  Exemple :
+     [i, q, d] = quantiz([-2 -1 0 1 2], [-1 0 1], [-1.5 -0.5 0.5 1.5]);
+     i                              % [0 0 1 2 3] : le seuil appartient
+                                    % à l'intervalle du dessous
+
+  Voir aussi LLOYDS, DPCMENCO, HUFFMANDICT.
+```
+
 ## `randdeintrlv`
 
 ```
@@ -1653,6 +2057,29 @@ RANDDEINTRLV Désentrelacement pseudo-aléatoire, réciproque de RANDINTRLV.
      isequal(randdeintrlv(randintrlv(1:8, 42), 42), 1:8)   % vrai
 
   Voir aussi RANDINTRLV, DEINTRLV.
+```
+
+## `randerr`
+
+```
+RANDERR Motifs d'erreurs binaires tirés au hasard.
+  OUT = RANDERR(M) rend une matrice M par M dont chaque ligne porte un
+  seul un, placé au hasard.
+  OUT = RANDERR(M,N) rend une matrice M par N, un seul un par ligne.
+  OUT = RANDERR(M,N,ERR) règle le nombre d'uns : un scalaire l'impose,
+  un vecteur donne les nombres possibles — tirés également —, et une
+  matrice à deux lignes donne les nombres et leurs probabilités.
+
+  C'est de quoi éprouver un code correcteur : on ajoute le motif au mot
+  de code, modulo deux, et l'on regarde si le décodage retombe sur ses
+  pieds.
+
+  Exemple :
+     motif = randerr(4, 15, 2);
+     sum(motif, 2)'                 % [2 2 2 2]
+     motifs = randerr(100, 10, [0 1 2; 0.5 0.3 0.2]);
+
+  Voir aussi BSC, WGN, BITERR, BCHDEC.
 ```
 
 ## `randintrlv`
@@ -1781,6 +2208,32 @@ SCATTERPLOT Tracé de la constellation reçue.
   Voir aussi EYEDIAGRAM, QAMMOD.
 ```
 
+## `semianalytic`
+
+_Pas de bloc d'aide._
+
+## `shift2mask`
+
+```
+SHIFT2MASK Masque d'un registre à décalage, d'après le décalage voulu.
+  MASK = SHIFT2MASK(PRIM,SHIFT) rend le masque qui, appliqué à un
+  registre à décalage bouclé par le polynôme PRIM, avance la suite
+  engendrée de SHIFT positions.
+
+  PRIM est le polynôme de rebouclage, par puissances décroissantes ;
+  MASK est rendu de même. Un décalage négatif recule.
+
+  Le masque est le reste de x^SHIFT modulo PRIM : appliquer le masque
+  revient à multiplier l'état par x^SHIFT dans le corps que PRIM
+  définit, donc à sauter SHIFT pas d'un coup.
+
+  Exemple :
+     m = shift2mask([1 0 0 1 1], 3);   % 1+x^3+x^4, décalage de trois
+     numel(m)                          % 4 : le degré du polynôme
+
+  Voir aussi GFFILTER, GFPRIMDF, GFDECONV.
+```
+
 ## `symerr`
 
 ```
@@ -1886,5 +2339,52 @@ VITDEC Décodage de Viterbi.
      isequal(vitdec(convenc(m, t), t, 5, 'term', 'hard'), m)   % vrai
 
   Voir aussi CONVENC, POLY2TRELLIS.
+```
+
+## `wgn`
+
+```
+WGN Bruit blanc gaussien de puissance donnée.
+  Y = WGN(M,N,P) rend une matrice M par N de bruit blanc gaussien de
+  puissance P décibels par rapport au watt, sur une impédance d'un ohm.
+
+  Y = WGN(M,N,P,IMP) donne l'impédance en ohms.
+  Y = WGN(...,'linear') lit P en watts au lieu de décibels ;
+  'dBW' (défaut), 'dBm' et 'dBW' choisissent l'unité.
+  Y = WGN(...,'complex') rend un bruit complexe, la puissance étant
+  également partagée entre les deux voies.
+
+  Exemple :
+     y = wgn(1, 100000, 0);         % puissance un watt
+     abs(10 * log10(mean(y .^ 2)))  % voisin de zéro
+
+  Voir aussi AWGN, RANDN, RANDERR.
+```
+
+## `zadoffChuSeq`
+
+```
+ZADOFFCHUSEQ Suite de Zadoff-Chu.
+  SEQ = ZADOFFCHUSEQ(R,N) rend la suite de Zadoff-Chu de racine R et de
+  longueur N, en colonne :
+
+     seq(m) = exp(-i pi R m (m+1) / N),   m = 0 .. N-1.
+
+  N doit être impair, et R premier avec N.
+
+  Ces suites sont de module constant et d'autocorrélation parfaite :
+  décalée d'un cran, une suite de Zadoff-Chu est orthogonale à
+  elle-même. C'est ce qui en fait le préambule des systèmes cellulaires
+  — on y reconnaît un utilisateur et l'on mesure son retard du même
+  coup.
+
+  Exemple :
+     s = zadoffChuSeq(25, 139);
+     max(abs(abs(s) - 1))           % nul : module constant
+     c = ifft(fft(s) .* conj(fft(s)));
+     abs(c(2)) / abs(c(1))          % négligeable : autocorrélation
+                                    % parfaite
+
+  Voir aussi PSKMOD, RCOSDESIGN, XCORR.
 ```
 

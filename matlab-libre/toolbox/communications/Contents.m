@@ -20,7 +20,13 @@
 %   awgn                - Bruit blanc gaussien
 %   bsc                 - Canal binaire symétrique
 %   biterr, symerr      - Taux d'erreur binaire et symbole
+%   wgn                 - Bruit blanc de puissance donnée
+%   randerr             - Motifs d'erreurs binaires
 %   berawgn, berfading  - Taux d'erreur théoriques, gaussien et Rayleigh
+%   bercoding           - Borne d'un système codé
+%   bersync             - Effet d'un défaut de synchronisation
+%   berconfint          - Intervalle de confiance d'un taux mesuré
+%   semianalytic        - Taux d'erreur par la méthode semi-analytique
 %   qfunc, qfuncinv     - Fonction Q et sa réciproque
 %   convertSNR          - Conversions entre SNR, Eb/No et Es/No
 %
@@ -29,6 +35,9 @@
 %   istrellis           - Vérification d'un treillis
 %   convenc             - Codage
 %   vitdec              - Décodage de Viterbi, décision dure ou souple
+%   distspec            - Spectre des distances, distance libre
+%   iscatastrophic      - Le codeur est-il catastrophique
+%   shift2mask          - Masque d'un décalage de registre
 %
 % Codes en blocs
 %   hammgen             - Matrices d'un code de Hamming
@@ -60,9 +69,19 @@
 %   intrlv, deintrlv    - Permutation donnée
 %   randintrlv, randdeintrlv - Permutation pseudo-aléatoire reproductible
 %   matintrlv, matdeintrlv   - Entrelacement matriciel
+%   muxintrlv, muxdeintrlv   - Entrelacement convolutif, dit de Forney
+%   helscanintrlv, helscandeintrlv - Balayage hélicoïdal
 %
 % Mise en forme et représentation
 %   rcosdesign          - Racine de cosinus surélevé
+%   intdump             - Intégration et vidage
+%   zadoffChuSeq        - Suite de Zadoff-Chu
+%
+% Quantification et codage de source
+%   quantiz             - Quantification scalaire
+%   lloyds              - Quantificateur optimal
+%   huffmandict         - Dictionnaire de Huffman
+%   huffmanenco, huffmandeco - Codage et décodage
 %   eyediagram          - Diagramme de l'œil
 %   scatterplot         - Constellation reçue
 %

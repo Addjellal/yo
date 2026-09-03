@@ -219,6 +219,223 @@ assert(abs(convertSNR(10, 'snr', 'esno', 'SamplesPerSymbol', 8) - (10 + 10 * log
 assert(abs(convertSNR(convertSNR(10, 'ebno', 'snr', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8), ...
                       'snr', 'ebno', 'BitsPerSymbol', 4, 'SamplesPerSymbol', 8) - 10) < 1e-12);
 
+%% ------------------------------ quantification, source, entrelacement
+% Le seuil appartient a l'intervalle du dessous.
+[indicesQuant, valeursQuant, distorsionQuant] = ...
+    quantiz([-2 -1 0 1 2], [-1 0 1], [-1.5 -0.5 0.5 1.5]);
+assert(isequal(indicesQuant, [0 0 1 2 3]));
+assert(isequal(valeursQuant, [-1.5 -1.5 -0.5 0.5 1.5]));
+assert(abs(distorsionQuant - mean(([-2 -1 0 1 2] - valeursQuant) .^ 2)) < 1e-15);
+
+% Lloyd : les deux conditions d'optimalite tiennent, et la distorsion
+% baisse quand on ajoute des niveaux.
+donneesQuant = cos((1:1500) / 7) + 0.4 * sin((1:1500) / 3);
+distorsionPrecedente = Inf;
+for niveauxQuant = [2 4 8]
+    [seuilsQuant, dictionnaireQuant, distorsionQuant] = lloyds(donneesQuant, niveauxQuant);
+    assert(numel(dictionnaireQuant) == niveauxQuant);
+    assert(numel(seuilsQuant) == niveauxQuant - 1);
+    assert(distorsionQuant < distorsionPrecedente);
+    distorsionPrecedente = distorsionQuant;
+    % Chaque niveau est le barycentre de sa cellule.
+    indicesQuant = quantiz(donneesQuant, seuilsQuant);
+    for jQuant = 1:niveauxQuant
+        dedansQuant = indicesQuant == jQuant - 1;
+        if sum(dedansQuant) > 0
+            assert(abs(mean(donneesQuant(dedansQuant)) - dictionnaireQuant(jQuant)) < 1e-5);
+        end
+    end
+    % Chaque seuil est au milieu de deux niveaux.
+    assert(max(abs(seuilsQuant - (dictionnaireQuant(1:end-1) + ...
+                                  dictionnaireQuant(2:end)) / 2)) < 1e-12);
+end
+% Lloyd bat le quantificateur uniforme de meme taille.
+[seuilsLloyd, dictionnaireLloyd, distorsionLloyd] = lloyds(donneesQuant, 8);
+bornesUniformes = linspace(min(donneesQuant), max(donneesQuant), 9);
+[~, ~, distorsionUniforme] = quantiz(donneesQuant, bornesUniformes(2:end-1), ...
+    (bornesUniformes(1:end-1) + bornesUniformes(2:end)) / 2);
+assert(distorsionLloyd < distorsionUniforme);
+
+% Huffman : longueur moyenne entre l'entropie et l'entropie plus un, code
+% prefixe, et aller-retour exact.
+[dictionnaireHuffman, longueurHuffman] = huffmandict({'a', 'b', 'c'}, [0.5 0.25 0.25]);
+assert(abs(longueurHuffman - 1.5) < 1e-12);
+for essaiHuffman = 1:10
+    nHuffman = 2 + floor(rand * 8);
+    probabilites = rand(1, nHuffman);
+    probabilites = probabilites / sum(probabilites);
+    [dictHuffman, longueur] = huffmandict(1:nHuffman, probabilites);
+    entropie = -sum(probabilites(probabilites > 0) .* log2(probabilites(probabilites > 0)));
+    assert(longueur >= entropie - 1e-9 && longueur <= entropie + 1 + 1e-9);
+    for aHuffman = 1:nHuffman
+        for bHuffman = 1:nHuffman
+            if aHuffman ~= bHuffman
+                motA = dictHuffman{aHuffman, 2};
+                motB = dictHuffman{bHuffman, 2};
+                if numel(motA) <= numel(motB)
+                    assert(~isequal(motA, motB(1:numel(motA))));
+                end
+            end
+        end
+    end
+    signalHuffman = zeros(1, 40);
+    for kHuffman = 1:40
+        signalHuffman(kHuffman) = find(cumsum(probabilites) >= rand, 1);
+    end
+    assert(isequal(huffmandeco(huffmanenco(signalHuffman, dictHuffman), dictHuffman), ...
+                   signalHuffman));
+end
+% Base trois : les chiffres vont de zero a deux.
+dictionnaireTernaire = huffmandict(1:5, [0.4 0.2 0.2 0.1 0.1], 3);
+for kHuffman = 1:5
+    assert(all(dictionnaireTernaire{kHuffman, 2} >= 0));
+    assert(all(dictionnaireTernaire{kHuffman, 2} <= 2));
+end
+assert(isequal(huffmandeco(huffmanenco([1 2 3 4 5 1 1], dictionnaireTernaire), ...
+                           dictionnaireTernaire), [1 2 3 4 5 1 1]));
+
+% Bruit blanc de puissance donnee, et motifs d'erreurs.
+bruitMesure = wgn(1, 200000, 0);
+assert(abs(10 * log10(mean(bruitMesure .^ 2))) < 0.1);
+assert(abs(10 * log10(mean(wgn(1, 200000, 3) .^ 2)) - 3) < 0.1);
+assert(abs(10 * log10(mean(wgn(1, 200000, 30, 'dBm') .^ 2))) < 0.1);
+assert(abs(mean(wgn(1, 200000, 4, 'linear') .^ 2) - 4) < 0.2);
+assert(abs(10 * log10(mean(wgn(1, 200000, 0, 50) .^ 2) / 50)) < 0.1);
+bruitComplexe = wgn(1, 200000, 0, 'complex');
+assert(~isreal(bruitComplexe));
+assert(abs(10 * log10(mean(abs(bruitComplexe) .^ 2))) < 0.1);
+assert(all(sum(randerr(4, 15, 2), 2) == 2));
+assert(all(sum(randerr(5, 10), 2) == 1));
+assert(isequal(size(randerr(3)), [3 3]));
+assert(all(ismember(sum(randerr(300, 10, [0 1 3]), 2), [0 1 3])));
+assert(abs(mean(sum(randerr(4000, 10, [0 2; 0.25 0.75]), 2) == 2) - 0.75) < 0.05);
+
+% Entrelaceurs helicoidal et multiplexe.
+for specHelice = {[3 4 1], [4 5 2], [2 6 1], [5 5 3]}
+    lignesHelice = specHelice{1}(1);
+    colonnesHelice = specHelice{1}(2);
+    pasHelice = specHelice{1}(3);
+    suiteHelice = 1:(lignesHelice * colonnesHelice);
+    entrelaceeHelice = helscanintrlv(suiteHelice, lignesHelice, colonnesHelice, pasHelice);
+    assert(numel(unique(entrelaceeHelice)) == numel(suiteHelice));
+    assert(isequal(helscandeintrlv(entrelaceeHelice, lignesHelice, colonnesHelice, ...
+                                   pasHelice), suiteHelice));
+end
+retardsMux = [0 2 4];
+suiteMux = 1:40;
+sortieMux = muxdeintrlv(muxintrlv(suiteMux, retardsMux), retardsMux);
+retardTotal = max(retardsMux) * numel(retardsMux);
+assert(all(sortieMux(1:retardTotal) == 0));
+assert(isequal(sortieMux((retardTotal + 1):end), suiteMux(1:(end - retardTotal))));
+% L'etat permet d'enchainer deux blocs sans rompre la rotation des voies.
+[premierBloc, etatMux] = muxintrlv(1:20, retardsMux);
+secondBloc = muxintrlv(21:40, retardsMux, etatMux);
+assert(isequal([premierBloc, secondBloc], muxintrlv(1:40, retardsMux)));
+
+% Spectre des distances : les valeurs connues des codes convolutifs.
+for specConv = {{3, [7 5], 5}, {4, [17 13], 6}, {5, [35 23], 7}, ...
+                {6, [75 53], 8}, {7, [171 133], 10}}
+    treillisConv = poly2trellis(specConv{1}{1}, specConv{1}{2});
+    spectreConv = distspec(treillisConv, 3);
+    assert(spectreConv.dfree == specConv{1}{3}, mat2str(specConv{1}{2}));
+end
+% Et la verification par enumeration, sur deux d'entre eux.
+for specConv = {{3, [7 5]}, {4, [17 13]}}
+    treillisConv = poly2trellis(specConv{1}{1}, specConv{1}{2});
+    poidsMinimal = Inf;
+    for codeConv = 1:(2 ^ 10 - 1)
+        bitsConv = zeros(1, 10);
+        resteConv = codeConv;
+        for bConv = 1:10
+            bitsConv(bConv) = mod(resteConv, 2);
+            resteConv = floor(resteConv / 2);
+        end
+        poidsConv = sum(convenc([bitsConv, zeros(1, specConv{1}{1} - 1)], treillisConv));
+        if poidsConv > 0 && poidsConv < poidsMinimal
+            poidsMinimal = poidsConv;
+        end
+    end
+    assert(distspec(treillisConv).dfree == poidsMinimal, mat2str(specConv{1}{2}));
+end
+% Le spectre du code (7,5) est celui des livres.
+spectreClassique = distspec(poly2trellis(3, [7 5]), 3);
+assert(isequal(spectreClassique.weight, [1 4 12]));
+% Un codeur catastrophique est reconnu comme tel.
+assert(~iscatastrophic(poly2trellis(3, [7 5])));
+assert(iscatastrophic(poly2trellis(3, [6 5])));
+
+% Masque de decalage, integration et vidage, suite de Zadoff-Chu.
+polynomeMasque = [1 0 0 1 1];
+assert(isequal(shift2mask(polynomeMasque, 0), [0 0 0 1]));
+for decalageMasque = [1 2 5 9]
+    [~, resteMasque] = gfdeconv([zeros(1, decalageMasque), 1], fliplr(polynomeMasque), 2);
+    assert(isequal(shift2mask(polynomeMasque, decalageMasque), ...
+                   fliplr(completerLongueur(gftrunc(resteMasque), 4))));
+end
+assert(isequal(intdump([1 1 1 1 3 3 3 3], 4), [1 3]));
+assert(isequal(intdump((1:8)', 2), [1.5; 3.5; 5.5; 7.5]));
+assert(isequal(size(intdump(ones(8, 3), 4)), [2 3]));
+suiteZadoff = zadoffChuSeq(25, 139);
+assert(max(abs(abs(suiteZadoff) - 1)) < 1e-12);
+autocorrelation = ifft(fft(suiteZadoff) .* conj(fft(suiteZadoff)));
+assert(max(abs(autocorrelation(2:end))) / abs(autocorrelation(1)) < 1e-10);
+assert(abs(abs(sum(suiteZadoff .* conj(zadoffChuSeq(34, 139)))) / 139 - 1 / sqrt(139)) < 1e-9);
+for essaiZadoff = {{25, 138}, {0, 139}, {139, 139}, {5, 25}}
+    refuseZadoff = false;
+    try
+        zadoffChuSeq(essaiZadoff{1}{1}, essaiZadoff{1}{2});
+    catch
+        refuseZadoff = true;
+    end
+    assert(refuseZadoff);
+end
+
+% Intervalle de confiance exact d'un taux d'erreur mesure.
+[intervalleBer, tauxBer] = berconfint(10, 10000);
+assert(abs(tauxBer - 0.001) < 1e-12);
+assert(intervalleBer(1) < tauxBer && intervalleBer(2) > tauxBer);
+assert(abs(1 - binocdf(9, 10000, intervalleBer(1)) - 0.025) < 1e-6);
+assert(abs(binocdf(10, 10000, intervalleBer(2)) - 0.025) < 1e-6);
+intervalleVide = berconfint(0, 1000);
+assert(intervalleVide(1) == 0);
+assert(abs(intervalleVide(2) - (1 - 0.025 ^ (1 / 1000))) < 1e-9);
+intervalleLarge = berconfint(10, 10000, 0.99);
+intervalleEtroit = berconfint(10, 10000, 0.90);
+assert(intervalleLarge(1) < intervalleEtroit(1));
+assert(intervalleLarge(2) > intervalleEtroit(2));
+
+% Bornes des systemes codes : la decision douce vaut mieux que la dure,
+% et le codage mieux que rien.
+spectreBorne = distspec(poly2trellis(3, [7 5]), 4);
+for decisionBorne = {'soft', 'hard'}
+    courbeBorne = bercoding(0:8, 'conv', decisionBorne{1}, 1/2, ...
+                            spectreBorne.dfree, spectreBorne.weight);
+    assert(all(diff(courbeBorne) < 0));
+end
+assert(bercoding(6, 'conv', 'soft', 1/2, spectreBorne.dfree, spectreBorne.weight) < ...
+       bercoding(6, 'conv', 'hard', 1/2, spectreBorne.dfree, spectreBorne.weight));
+assert(bercoding(6, 'conv', 'soft', 1/2, spectreBorne.dfree, spectreBorne.weight) < ...
+       berawgn(6, 'psk', 2));
+assert(all(diff(bercoding(0:8, 'block', 'hard', 15, 7, 5)) < 0));
+assert(bercoding(6, 'block', 'soft', 15, 7, 5) < bercoding(6, 'block', 'hard', 15, 7, 5));
+
+% Defauts de synchronisation : sans defaut, on retombe sur la theorie.
+assert(max(abs(bersync(0:8, 0, 'timing') - berawgn(0:8, 'psk', 2))) < 1e-12);
+assert(all(bersync(0:8, 0.2, 'timing') > bersync(0:8, 0, 'timing')));
+assert(all(bersync(0:8, pi/6, 'carrier') > bersync(0:8, 0, 'carrier')));
+assert(abs(bersync(20, pi/2, 'carrier') - 0.5) < 1e-9);
+
+% Methode semi-analytique : sur un canal parfait, elle rend exactement la
+% courbe theorique, sans avoir tire un seul echantillon de bruit.
+symbolesBpsk = pskmod(randi([0 1], 400, 1), 2);
+assert(max(abs(semianalytic(symbolesBpsk, symbolesBpsk, 'psk', 2, 1, 1, 1, 0:2:10) - ...
+               berawgn(0:2:10, 'psk', 2))) < 1e-12);
+% Une attenuation uniforme ne change rien, une distorsion degrade.
+assert(abs(semianalytic(symbolesBpsk, 0.7 * symbolesBpsk, 'psk', 2, 1, 1, 1, 6) - ...
+           semianalytic(symbolesBpsk, symbolesBpsk, 'psk', 2, 1, 1, 1, 6)) < 1e-12);
+assert(semianalytic(symbolesBpsk, filter([1 0.3], 1, symbolesBpsk), 'psk', 2, 1, 1, 1, 6) > ...
+       semianalytic(symbolesBpsk, symbolesBpsk, 'psk', 2, 1, 1, 1, 6));
+
 %% ------------------------------------------ corps de Galois
 % L'arithmetique modulaire, verifiee sur ce qui la definit.
 assert(isequal(gftrunc([1 0 1 0 0]), [1 0 1]));

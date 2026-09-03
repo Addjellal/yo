@@ -171,6 +171,19 @@ qu'ils ne font pas encore comme MATLAB.
   recherche de Chien, avec Forney pour les valeurs d'erreur en
   Reed-Solomon. Le décodage par effacements (`erasures`) et le décodage
   raccourci ne sont pas gérés.
+- **Modulations de norme** : `dvbsapskmod` et `dvbsapskdemod` demandent
+  les tables de rayons de la norme ETSI EN 302 307, une par rendement de
+  code. MatLibre ne les reproduit pas : une constellation APSK
+  quelconque s'écrit avec `genqammod`.
+- **`semianalytic`** ramène le signal reçu à une énergie moyenne d'un, le
+  rapport signal sur bruit étant défini à la réception : une atténuation
+  uniforme ne change donc rien au résultat, une distorsion le dégrade.
+  Sur canal parfait elle redonne exactement `berawgn` ; en modulation
+  d'amplitude en quadrature, le compte des frontières la place à un
+  facteur un et demi de la formule exacte.
+- **`bercoding`** rend des bornes de l'union : la vraie courbe passe en
+  dessous, et d'autant plus près que le rapport signal sur bruit est
+  grand.
 
 ### Ondelettes
 

@@ -6,7 +6,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
 | automatique | 108 | 0 | 100 % |
-| communications | 82 | 25 | 77 % |
+| communications | 102 | 0 | 100 % |
 | flou | 63 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
@@ -16,15 +16,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1428** | **38** | **97 %** |
-
-## communications
-
-`bercoding`, `berconfint`, `bersync`, `distspec`, `dvbsapskdemod`, `dvbsapskmod`
-`helscanintrlv`, `helscandeintrlv`, `huffmandeco`, `huffmandict`, `huffmanenco`
-`intdump`, `iscatastrophic`, `lloyds`, `muxdeintrlv`, `muxintrlv`, `nrCRCEncode`
-`ossdec`, `ossenc`, `quantiz`, `randerr`, `semianalytic`, `shift2mask`, `wgn`
-`zadoffChuSeq`
+| **ensemble** | **1448** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -216,6 +208,19 @@ qu'ils ne font pas encore comme MATLAB.
   recherche de Chien, avec Forney pour les valeurs d'erreur en
   Reed-Solomon. Le décodage par effacements (`erasures`) et le décodage
   raccourci ne sont pas gérés.
+- **Modulations de norme** : `dvbsapskmod` et `dvbsapskdemod` demandent
+  les tables de rayons de la norme ETSI EN 302 307, une par rendement de
+  code. MatLibre ne les reproduit pas : une constellation APSK
+  quelconque s'écrit avec `genqammod`.
+- **`semianalytic`** ramène le signal reçu à une énergie moyenne d'un, le
+  rapport signal sur bruit étant défini à la réception : une atténuation
+  uniforme ne change donc rien au résultat, une distorsion le dégrade.
+  Sur canal parfait elle redonne exactement `berawgn` ; en modulation
+  d'amplitude en quadrature, le compte des frontières la place à un
+  facteur un et demi de la formule exacte.
+- **`bercoding`** rend des bornes de l'union : la vraie courbe passe en
+  dessous, et d'autant plus près que le rapport signal sur bruit est
+  grand.
 
 ### Ondelettes
 
