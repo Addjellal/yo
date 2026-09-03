@@ -2,7 +2,7 @@ function x = imodwt(w, nom)
 %IMODWT Transformée à chevauchement maximal inverse.
 %   Reconstruction exacte : la MODWT est un cadre ajusté de constante 1.
     if nargin < 2 || isempty(nom), nom = 'haar'; end
-    [~, ~, Lo_D, Hi_D] = wfilters(nom);
+    [Lo_D, Hi_D] = wfilters(nom, 'r');
     bas = Lo_D / sqrt(2);
     haut = Hi_D / sqrt(2);
     niveaux = size(w, 1) - 1;

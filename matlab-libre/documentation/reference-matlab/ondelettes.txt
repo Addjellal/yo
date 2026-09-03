@@ -13,4 +13,4 @@ wavenames waverec waverec2 wcodemat wconv1 wconv2 wcoherence wden wdencmp
 wdenoise wdenoise2 wenergy wenergy2 wextend wfbm wfbmesti wfilters wkeep
 wmaxlev wnoise wnoisest wpcoef wpdec wpdec2 wpdencmp wpfun wpjoin wprcoef
 wprec wprec2 wpsplt wpthcoef wrcoef wrcoef2 wrev wsst wthcoef wthcoef2
-wthresh wvarchg
+wentropy wthresh wvarchg

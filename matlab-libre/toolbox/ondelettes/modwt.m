@@ -13,7 +13,9 @@ function w = modwt(x, nom, niveaux)
     x = double(x(:)).';
     n = numel(x);
     if nargin < 3 || isempty(niveaux), niveaux = floor(log2(n)); end
-    [~, ~, Lo_D, Hi_D] = wfilters(nom);
+    [analyseBas, analyseHaut] = wfilters(nom, 'd');
+    Lo_D = analyseBas(end:-1:1);
+    Hi_D = analyseHaut(end:-1:1);
     % Normalisation MODWT : les filtres sont divisés par racine de deux.
     bas = Lo_D / sqrt(2);
     haut = Hi_D / sqrt(2);

@@ -81,6 +81,22 @@
 %   wnoise            - Signaux d'essai de Donoho et Johnstone
 %   measerr           - Mesures de qualité : PSNR, erreur, énergie gardée
 %
+% Paquets d'ondelettes
+%   wpdec, wprec      - Décomposition et reconstruction d'un signal
+%   wpdec2, wprec2    - Les mêmes, pour une image
+%   wpcoef, wprcoef   - Coefficients d'un nœud, composante d'un nœud
+%   wpsplt, wpjoin    - Scinder une feuille, refermer une branche
+%   leaves, tnodes    - Nœuds terminaux
+%   ntnode, treedpth  - Nombre de feuilles, profondeur de l'arbre
+%   depo2ind, ind2depo - Indice d'un nœud et son couple profondeur-place
+%   wentropy          - Entropie d'un bloc de coefficients
+%   besttree          - Meilleure base au sens de l'entropie
+%   wpthcoef          - Seuillage des coefficients de l'arbre
+%   wpdencmp          - Débruitage ou compression par paquets
+%   wpfun             - Fonctions de paquets W0, W1, W2, ...
+%   modwpt, imodwpt   - Paquets à chevauchement maximal, en ordre de
+%                       séquence
+%
 % Séries longue mémoire
 %   wfbm              - Mouvement brownien fractionnaire
 %   wfbmesti          - Estimation du paramètre de Hurst

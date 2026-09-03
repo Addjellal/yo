@@ -667,6 +667,165 @@ for hurstRefuse = [0 1 1.5]
     assert(refuse);
 end
 
+
+% ------------------------------------------------ paquets d'ondelettes
+% Les indices de noeuds : aller-retour sur tout un arbre.
+assert(depo2ind(2, [0 0]) == 0 && depo2ind(2, [3 5]) == 12);
+assert(isequal(ind2depo(2, [1 2 3]), [1 0; 1 1; 2 0]));
+for ordreArbre = [2 4]
+    for indiceEssai = 0:60
+        assert(depo2ind(ordreArbre, ind2depo(ordreArbre, indiceEssai)) == indiceEssai);
+    end
+end
+refuseIndice = false;
+try
+    depo2ind(2, [2 4]);
+catch
+    refuseIndice = true;
+end
+assert(refuseIndice);
+
+% Un arbre complet de profondeur trois : huit feuilles, reconstruction
+% exacte, et la somme des composantes des feuilles redonne le signal.
+signalPaquet = cos((1:64) / 5) + (1:64) / 40;
+for nomPaquet = {'haar', 'db2', 'db4', 'sym4', 'bior2.2'}
+    arbrePaquet = wpdec(signalPaquet, 3, nomPaquet{1});
+    assert(ntnode(arbrePaquet) == 8 && treedpth(arbrePaquet) == 3, nomPaquet{1});
+    assert(max(abs(wprec(arbrePaquet) - signalPaquet)) < 1e-9, nomPaquet{1});
+    sommeFeuilles = zeros(1, 64);
+    listeFeuilles = leaves(arbrePaquet);
+    for kFeuille = 1:numel(listeFeuilles)
+        sommeFeuilles = sommeFeuilles + wprcoef(arbrePaquet, listeFeuilles(kFeuille));
+    end
+    assert(max(abs(sommeFeuilles - signalPaquet)) < 1e-9, nomPaquet{1});
+end
+arbrePaquet = wpdec(signalPaquet, 3, 'db2');
+assert(isequal(leaves(arbrePaquet)', 7:14));
+assert(isequal(leaves(arbrePaquet, 'dp'), [3 * ones(8, 1), (0:7)']));
+assert(isequal(tnodes(arbrePaquet), leaves(arbrePaquet)));
+[~, taillesFeuilles] = leaves(arbrePaquet);
+assert(all(taillesFeuilles(:, 2) == 8));
+assert(isequal(wpcoef(arbrePaquet, 5), wpcoef(arbrePaquet, [2 2])));
+
+% Scinder et refermer : l'arbre change de forme sans rien perdre.
+arbreUn = wpsplt(wpdec(signalPaquet, 1, 'db2'), 1);
+assert(isequal(leaves(arbreUn)', [2 3 4]));
+arbreReferme = wpjoin(arbrePaquet, 1);
+assert(isequal(leaves(arbreReferme)', [1 11 12 13 14]));
+assert(max(abs(wprec(arbreReferme) - signalPaquet)) < 1e-9);
+assert(isequal(leaves(wpjoin(arbreReferme, 2))', [1 2]));
+assert(max(abs(wprec(wpjoin(arbreReferme, 2)) - signalPaquet)) < 1e-9);
+
+% Paquets d'image : quatre enfants par noeud.
+imagePaquet = magic(16) + 0.1 * (1:16)' * (1:16);
+for nomPaquet = {'haar', 'db2', 'sym4', 'bior2.2'}
+    arbreImage = wpdec2(imagePaquet, 2, nomPaquet{1});
+    assert(ntnode(arbreImage) == 16, nomPaquet{1});
+    assert(max(max(abs(wprec2(arbreImage) - imagePaquet))) < 1e-9, nomPaquet{1});
+end
+arbreImage = wpdec2(imagePaquet, 2, 'db2');
+sommeImage = zeros(16, 16);
+feuillesImage = leaves(arbreImage);
+for kFeuille = 1:numel(feuillesImage)
+    sommeImage = sommeImage + wprcoef(arbreImage, feuillesImage(kFeuille));
+end
+assert(max(max(abs(sommeImage - imagePaquet))) < 1e-9);
+assert(ntnode(wpjoin(wpsplt(wpdec2(imagePaquet, 1, 'db2'), 2), 2)) == 4);
+
+% L'entropie est additive : c'est ce dont BESTTREE a besoin.
+assert(abs(wentropy([1 0 0 0], 'shannon')) < 1e-15);
+assert(abs(wentropy([1 1 1 1] / 2, 'shannon') - log(4)) < 1e-12);
+assert(wentropy([3 1 0.1], 'threshold', 0.5) == 2);
+assert(abs(wentropy([3 4], 'norm', 2) - 25) < 1e-12);
+vecteurEntropie = cos((1:64) / 3);
+assert(abs(wentropy(vecteurEntropie, 'shannon') - ...
+           wentropy(vecteurEntropie(1:32), 'shannon') - ...
+           wentropy(vecteurEntropie(33:64), 'shannon')) < 1e-10);
+refuseEntropie = false;
+try
+    wentropy([1 2], 'norm');
+catch
+    refuseEntropie = true;
+end
+assert(refuseEntropie);
+
+% BESTTREE elague sans jamais empirer l'entropie ni casser la
+% reconstruction.
+signalBest = sin((1:256) / 3) + 0.3 * cos((1:256) / 17);
+arbreComplet = wpdec(signalBest, 4, 'db2');
+[arbreMeilleur, entropiesRetenues, entropiesPropres] = besttree(arbreComplet);
+assert(ntnode(arbreMeilleur) <= ntnode(arbreComplet));
+assert(entropiesRetenues(1) <= entropiesPropres(1) + 1e-12);
+assert(max(abs(wprec(arbreMeilleur) - signalBest)) < 1e-9);
+arbreImageMeilleur = besttree(wpdec2(magic(16), 2, 'haar'));
+assert(max(max(abs(wprec2(arbreImageMeilleur) - magic(16)))) < 1e-9);
+
+% Seuillage des paquets : l'approximation est epargnee quand on le
+% demande, et pas autrement.
+arbreSeuil = wpdec(1:64, 3, 'db2');
+approximationAvant = wpcoef(arbreSeuil, 7);
+assert(max(abs(wpcoef(wpthcoef(arbreSeuil, 1, 's', 2), 7) - approximationAvant)) < 1e-15);
+assert(max(abs(wpcoef(wpthcoef(arbreSeuil, 0, 's', 2), 7) - approximationAvant)) > 0);
+
+% Debruitage par paquets : la meilleure base est cherchee avant de
+% seuiller.
+[proprePaquet, bruitePaquet] = wnoise(3, 10, 7, 5);
+distancePaquet = norm(bruitePaquet - proprePaquet);
+for typeSeuilPaquet = {'s', 'h'}
+    [debruitePaquet, ~, part0, partL2] = wpdencmp(bruitePaquet, typeSeuilPaquet{1}, ...
+                                                  4, 'db4', 'shannon', 0, 1);
+    assert(norm(debruitePaquet - proprePaquet) < distancePaquet);
+    assert(part0 > 50 && partL2 > 90);
+end
+assert(norm(wpdencmp(bruitePaquet, 's', 4, 'db4', 'threshold', 3, 1) - proprePaquet) ...
+       < distancePaquet);
+arbreDeja = wpdec(bruitePaquet, 4, 'db4');
+assert(max(abs(wpdencmp(arbreDeja, 's', 'shannon', 0, 1) - ...
+                wpdencmp(bruitePaquet, 's', 4, 'db4', 'shannon', 0, 1))) < 1e-12);
+% Sur une image lisse, le debruitage par paquets gagne aussi.
+imageLisse = 40 * exp(-(maillageX .^ 2 + maillageY .^ 2) / 4);
+imageLisseBruitee = imageLisse + 3 * randn(64);
+assert(norm(wpdencmp(imageLisseBruitee, 's', 3, 'sym4', 'shannon', 0, 1) - imageLisse, 'fro') ...
+       < norm(imageLisseBruitee - imageLisse, 'fro'));
+
+% Fonctions de paquets : W0 est la fonction d'echelle, les autres sont de
+% moyenne nulle, toutes sont d'energie un et orthogonales entre elles.
+[fonctionsPaquet, grillePaquet] = wpfun('db2', 3, 8);
+assert(size(fonctionsPaquet, 1) == 4);
+assert(abs(trapz(grillePaquet, fonctionsPaquet(1, :)) - 1) < 0.02);
+for kFonction = 1:4
+    assert(abs(trapz(grillePaquet, fonctionsPaquet(kFonction, :) .^ 2) - 1) < 0.02);
+    if kFonction > 1
+        assert(abs(trapz(grillePaquet, fonctionsPaquet(kFonction, :))) < 0.02);
+    end
+end
+for a = 1:4
+    for b = (a + 1):4
+        assert(abs(trapz(grillePaquet, fonctionsPaquet(a, :) .* fonctionsPaquet(b, :))) < 5e-3);
+    end
+end
+
+% Paquets a chevauchement maximal : reconstruction exacte, energie
+% conservee, et les bandes rangees par frequence croissante.
+signalModwpt = cos((1:256) / 7) + 0.4 * sin((1:256) / 2);
+for nomModwpt = {'haar', 'db2', 'sym4'}
+    for niveauModwpt = [2 3]
+        bandes = modwpt(signalModwpt, nomModwpt{1}, niveauModwpt);
+        assert(size(bandes, 1) == 2 ^ niveauModwpt);
+        assert(max(abs(imodwpt(bandes, nomModwpt{1}) - signalModwpt)) < 1e-9);
+    end
+end
+[bandes, energiesBandes] = modwpt(signalModwpt, 'sym4', 3);
+assert(abs(sum(energiesBandes) - 1) < 1e-12);
+assert(abs(sum(sum(bandes .^ 2)) - sum(signalModwpt .^ 2)) < 1e-6);
+tempsModwpt = (0:1023) / 1024;
+for frequenceEssai = [40 150 300 450]
+    [~, energiesEssai] = modwpt(sin(2 * pi * frequenceEssai * tempsModwpt), 'sym4', 3);
+    [~, bandeTrouvee] = max(energiesEssai);
+    assert(bandeTrouvee == floor(frequenceEssai / 1024 * 16) + 1, ...
+           sprintf('f=%d', frequenceEssai));
+end
+
 % Ruptures de variance : la programmation dynamique les trouve
 % exactement, et n'en invente pas sur du bruit homogene.
 serieRompue = [randn(1, 200), 4 * randn(1, 200), randn(1, 200)];

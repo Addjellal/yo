@@ -84,6 +84,22 @@
 %   wnoise            - Signaux d'essai de Donoho et Johnstone
 %   measerr           - Mesures de qualité : PSNR, erreur, énergie gardée
 %
+% Paquets d'ondelettes
+%   wpdec, wprec      - Décomposition et reconstruction d'un signal
+%   wpdec2, wprec2    - Les mêmes, pour une image
+%   wpcoef, wprcoef   - Coefficients d'un nœud, composante d'un nœud
+%   wpsplt, wpjoin    - Scinder une feuille, refermer une branche
+%   leaves, tnodes    - Nœuds terminaux
+%   ntnode, treedpth  - Nombre de feuilles, profondeur de l'arbre
+%   depo2ind, ind2depo - Indice d'un nœud et son couple profondeur-place
+%   wentropy          - Entropie d'un bloc de coefficients
+%   besttree          - Meilleure base au sens de l'entropie
+%   wpthcoef          - Seuillage des coefficients de l'arbre
+%   wpdencmp          - Débruitage ou compression par paquets
+%   wpfun             - Fonctions de paquets W0, W1, W2, ...
+%   modwpt, imodwpt   - Paquets à chevauchement maximal, en ordre de
+%                       séquence
+%
 % Séries longue mémoire
 %   wfbm              - Mouvement brownien fractionnaire
 %   wfbmesti          - Estimation du paramètre de Hurst
@@ -110,6 +126,33 @@ APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
 ```
 APPCOEF2 Coefficients d'approximation d'une image décomposée.
   A = APPCOEF2(C,S,NOM,N) reconstruit l'approximation du niveau N.
+```
+
+## `besttree`
+
+```
+BESTTREE Meilleur arbre de paquets au sens de l'entropie.
+  T = BESTTREE(T) élague l'arbre : un nœud garde ses enfants si leur
+  entropie totale est plus petite que la sienne, sinon ils sont
+  supprimés. La base retenue est celle qui concentre le plus l'énergie
+  du signal, ce qui est exactement ce qu'on veut pour comprimer ou
+  débruiter.
+
+  La recherche remonte des feuilles vers la racine : chaque nœud est
+  comparé au meilleur de ses descendants, si bien que le résultat est
+  optimal sur tout l'arbre, non seulement de proche en proche.
+
+  [T,E,E0] = BESTTREE(T) rend aussi l'entropie retenue et l'entropie
+  propre de chaque nœud, indexées comme « donnees ».
+
+  Le critère est celui que WPDEC a enregistré ; WENTROPY les décrit.
+
+  Exemple :
+     t = wpdec(sin((1:256) / 3), 4, 'db2');
+     meilleur = besttree(t);
+     ntnode(meilleur) <= ntnode(t)  % vrai : l'arbre est élagué
+
+  Voir aussi WENTROPY, WPDEC, WPDEC2, LEAVES, WPJOIN.
 ```
 
 ## `biorfilt`
@@ -388,6 +431,29 @@ DDENCMP Réglages par défaut du débruitage ou de la compression.
   Voir aussi WDENCMP, THSELECT, WNOISEST.
 ```
 
+## `depo2ind`
+
+```
+DEPO2IND Indice d'un nœud d'arbre, à partir de sa profondeur et de sa place.
+  N = DEPO2IND(ORD,[D P]) rend l'indice du nœud de profondeur D et de
+  position P dans un arbre d'ordre ORD — deux pour un signal, quatre
+  pour une image :
+
+     N = (ORD^D - 1) / (ORD - 1) + P.
+
+  La racine porte l'indice zéro. Les indices numérotent l'arbre en
+  largeur : tous les nœuds d'une profondeur avant ceux de la suivante.
+
+  [D P] peut avoir plusieurs lignes ; N en a alors autant.
+
+  Exemple :
+     depo2ind(2, [0 0])             % 0 : la racine
+     depo2ind(2, [1 1])             % 2
+     depo2ind(2, [3 5])             % 12
+
+  Voir aussi IND2DEPO, WPDEC, LEAVES, TNODES.
+```
+
 ## `detcoef`
 
 ```
@@ -654,11 +720,54 @@ IDWT2 Reconstruction bidimensionnelle, un niveau.
      max(max(abs(idwt2(a,h,v,d,'db2') - magic(4))))   % nul
 ```
 
+## `imodwpt`
+
+```
+IMODWPT Paquets d'ondelettes à chevauchement maximal, inverse.
+  X = IMODWPT(W) reconstruit le signal à partir des paquets que rend
+  MODWPT. X = IMODWPT(W,NOM) nomme l'ondelette ('sym4' par défaut).
+
+  La reconstruction est exacte : la transformée est un cadre ajusté de
+  constante un, comme la MODWT dont elle sort.
+
+  Exemple :
+     x = cos((1:256) / 7);
+     max(abs(imodwpt(modwpt(x, 3), 'sym4') - x))   % nul
+
+  Voir aussi MODWPT, IMODWT, WPREC.
+```
+
 ## `imodwt`
 
 ```
 IMODWT Transformée à chevauchement maximal inverse.
   Reconstruction exacte : la MODWT est un cadre ajusté de constante 1.
+```
+
+## `ind2depo`
+
+```
+IND2DEPO Profondeur et place d'un nœud, à partir de son indice.
+  [D P] = IND2DEPO(ORD,N) est l'inverse de DEPO2IND : la profondeur D
+  est le plus grand entier tel que (ORD^D - 1)/(ORD - 1) ne dépasse pas
+  N, et P ce qui reste.
+
+  N peut être un vecteur ; le résultat a alors une ligne par nœud.
+
+  Exemple :
+     ind2depo(2, 0)                 % [0 0]
+     ind2depo(2, 12)                % [3 5]
+     ind2depo(2, [1 2 3])           % [1 0; 1 1; 2 0]
+
+  Voir aussi DEPO2IND, WPDEC, LEAVES, TREEDPTH.
+```
+
+## `indiceDeNoeud`
+
+```
+INDICEDENOEUD Indice d'un nœud donné par son numéro ou par [D P].
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `iswt`
@@ -692,6 +801,37 @@ ISWT2 Transformée stationnaire inverse d'une image.
      max(max(abs(iswt2(a, h, v, d, 'haar') - magic(8))))   % nul
 
   Voir aussi SWT2, ISWT, WAVEREC2, IDWT2.
+```
+
+## `leaves`
+
+```
+LEAVES Nœuds terminaux d'un arbre de paquets d'ondelettes.
+  N = LEAVES(T) rend, en colonne et par indice croissant, les nœuds que
+  l'arbre ne scinde pas : ce sont eux qui portent la décomposition.
+
+  N = LEAVES(T,'dp') les rend sous la forme [profondeur position].
+  N = LEAVES(T,'sort') les trie par profondeur puis par position, ce
+  qui revient au même que par indice.
+  N = LEAVES(T,'sortdp') combine les deux.
+
+  [N,TAILLES] = LEAVES(T) rend aussi la taille des coefficients de
+  chaque feuille.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     leaves(t)'                     % 7 8 9 10 11 12 13 14
+     leaves(t, 'dp')                % huit lignes [3 0] .. [3 7]
+
+  Voir aussi TNODES, NTNODE, TREEDPTH, WPDEC, BESTTREE.
+```
+
+## `lireNoeud`
+
+```
+LIRENOEUD Coefficients d'un nœud, vides s'il n'est pas dans l'arbre.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `measerr`
@@ -793,6 +933,36 @@ MEYERAUX Fonction auxiliaire de l'ondelette de Meyer.
      meyeraux(0.5) + meyeraux(0.5)  % 1
 
   Voir aussi MEYER, MORLET, MEXIHAT.
+```
+
+## `modwpt`
+
+```
+MODWPT Paquets d'ondelettes à chevauchement maximal.
+  W = MODWPT(X) décompose X en paquets sans décimation, jusqu'au niveau
+  quatre : W a 2^4 lignes, toutes de la longueur du signal, rangées par
+  bande de fréquence croissante.
+
+  W = MODWPT(X,NIVEAU) impose le niveau ; W = MODWPT(X,NOM) ou
+  MODWPT(X,NOM,NIVEAU) choisit l'ondelette ('fk18' n'existe pas ici ;
+  'sym4' est le défaut).
+
+  [W,E] = MODWPT(...) rend en outre l'énergie relative de chaque bande.
+  Leur somme vaut un : comme la MODWT, la transformée conserve
+  l'énergie.
+
+  Les lignes sont en ordre de séquence, non en ordre naturel : à chaque
+  scission, un nœud de rang impair échange ses deux voies, ce qui remet
+  les bandes dans l'ordre des fréquences. Sans cette permutation, la
+  ligne K ne correspondrait pas à la K-ième bande.
+
+  Exemple :
+     t = (0:1023) / 1024;
+     x = sin(2 * pi * 100 * t);
+     [w, e] = modwpt(x, 3);
+     [~, k] = max(e);               % la bande qui porte le ton
+
+  Voir aussi IMODWPT, MODWT, WPDEC, MODWTMRA.
 ```
 
 ## `modwt`
@@ -923,6 +1093,21 @@ NORMALISERSOMME Met un filtre d'échelle à la somme demandée.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `ntnode`
+
+```
+NTNODE Nombre de nœuds terminaux d'un arbre.
+  N = NTNODE(T) compte les feuilles. Pour un arbre complet de
+  profondeur D et d'ordre ORD, c'est ORD^D ; un arbre élagué en compte
+  moins.
+
+  Exemple :
+     ntnode(wpdec(1:64, 3, 'db2'))  % 8
+     ntnode(wpdec2(magic(16), 2, 'haar'))   % 16
+
+  Voir aussi LEAVES, TNODES, TREEDPTH, BESTTREE.
+```
+
 ## `ordreDeNom`
 
 ```
@@ -961,6 +1146,14 @@ ORTHFILT Banc de filtres orthogonal à partir du filtre d'échelle.
      hid    % [-0.7071 0.7071]
 
   Voir aussi WFILTERS, QMF.
+```
+
+## `poserNoeud`
+
+```
+POSERNOEUD Range les coefficients d'un nœud dans l'arbre.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `qmf`
@@ -1016,6 +1209,17 @@ SCAL2FRQ Conversion des échelles en fréquences.
 
   Exemple :
      scal2frq(1:8, 'db4', 0.001)
+```
+
+## `scinderNoeud`
+
+```
+SCINDERNOEUD Coupe un nœud d'un arbre de paquets en ses enfants.
+  C'est le rouage commun de WPDEC et de WPSPLT. Le nœud est filtré par
+  le banc — deux voies en une dimension, quatre en deux —, et les
+  enfants prennent les indices que DEPO2IND leur donne.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `shanwavf`
@@ -1150,6 +1354,38 @@ THSELECT Choix d'un seuil de débruitage.
 
   Exemple :
      thselect(randn(1, 1024), 'sqtwolog')   % environ 3.7
+```
+
+## `tnodes`
+
+```
+TNODES Nœuds terminaux d'un arbre — l'autre nom de LEAVES.
+  N = TNODES(T) rend les nœuds que l'arbre ne scinde pas.
+  N = TNODES(T,'deppos') les rend sous la forme [profondeur position].
+
+  C'est le nom d'origine ; LEAVES est le nom récent. Les deux rendent
+  la même chose.
+
+  Exemple :
+     t = wpdec(1:64, 2, 'haar');
+     tnodes(t)'                     % 3 4 5 6
+
+  Voir aussi LEAVES, NTNODE, TREEDPTH, WPDEC.
+```
+
+## `treedpth`
+
+```
+TREEDPTH Profondeur d'un arbre de paquets d'ondelettes.
+  D = TREEDPTH(T) rend la profondeur du nœud le plus profond, c'est à
+  dire le nombre de scissions du chemin le plus long.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     treedpth(t)                    % 3
+     treedpth(wpjoin(t, 1))         % 3 : l'autre branche est intacte
+
+  Voir aussi LEAVES, NTNODE, WPDEC, WPSPLT, WPJOIN.
 ```
 
 ## `upcoef`
@@ -1510,6 +1746,34 @@ WENERGY2 Répartition de l'énergie d'une image décomposée.
   Voir aussi WENERGY, WAVEDEC2, DETCOEF2, APPCOEF2.
 ```
 
+## `wentropy`
+
+```
+WENTROPY Entropie d'un vecteur ou d'une matrice de coefficients.
+  E = WENTROPY(X,T) mesure la concentration de X selon le critère T :
+    'shannon'     - somme(-s log s), s = x^2 ; nulle si toute
+                    l'énergie est sur un seul coefficient, maximale si
+                    elle est répartie également
+    'log energy'  - somme(log(x^2))
+    'threshold'   - nombre de coefficients dépassant P en module
+    'sure'        - estimateur sans biais du risque de Stein, seuil P
+    'norm'        - somme(|x|^P)
+
+  E = WENTROPY(X,T,P) donne le paramètre, obligatoire pour
+  'threshold', 'sure' et 'norm'.
+
+  Ces critères sont additifs : l'entropie d'un vecteur est la somme de
+  celles de ses morceaux. C'est ce qui permet à BESTTREE de comparer un
+  nœud à ses enfants et de choisir la meilleure base.
+
+  Exemple :
+     wentropy([1 0 0 0], 'shannon')   % 0 : toute l'énergie en un point
+     wentropy([1 1 1 1] / 2, 'shannon')   % log(4) : elle est répartie
+     wentropy([3 1 0.1], 'threshold', 0.5)  % 2
+
+  Voir aussi BESTTREE, WPDEC, WPTHCOEF, WPDENCMP.
+```
+
 ## `wextend`
 
 ```
@@ -1683,6 +1947,238 @@ WNOISEST Estimation de l'écart type du bruit par les détails.
   Exemple :
      [c, l] = wavedec(randn(1, 1024), 3, 'db2');
      wnoisest(c, l, 1)   % proche de 1
+```
+
+## `wpcoef`
+
+```
+WPCOEF Coefficients d'un nœud d'un arbre de paquets.
+  C = WPCOEF(T,N) rend les coefficients du nœud N, désigné par son
+  indice ou par [profondeur position].
+  C = WPCOEF(T) rend ceux de la racine, c'est-à-dire le signal.
+
+  Exemple :
+     t = wpdec(1:64, 2, 'db2');
+     numel(wpcoef(t, 3))            % 16
+     numel(wpcoef(t, [2 0]))        % 16 : le même nœud
+
+  Voir aussi WPRCOEF, WPDEC, LEAVES, WPSPLT.
+```
+
+## `wpdec`
+
+```
+WPDEC Décomposition en paquets d'ondelettes.
+  T = WPDEC(X,N,NOM) décompose le signal X sur N niveaux en paquets
+  d'ondelettes : à la différence de WAVEDEC, qui ne redécompose que
+  l'approximation, chaque nœud est scindé en deux — approximation et
+  détail —, ce qui donne un arbre complet de 2^N feuilles.
+
+  L'intérêt est la résolution en fréquence : un signal dont l'énergie
+  est dans les hautes fréquences, qu'une décomposition en ondelettes
+  laisserait dans un seul détail large, se trouve ici finement découpé.
+
+  T = WPDEC(X,N,NOM,ENT,PAR) donne le critère d'entropie que BESTTREE
+  emploiera : 'shannon' (défaut), 'threshold' avec son seuil, 'norm'
+  avec sa puissance, 'log energy', 'sure' avec son seuil.
+
+  L'arbre rendu est une structure : « type » vaut 'wptree', « donnees »
+  porte un nœud par case — la racine à l'indice zéro, les enfants du
+  nœud N aux indices 2N+1 et 2N+2 —, et « noeuds » la liste de ceux qui
+  existent.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     numel(leaves(t))               % 8
+     max(abs(wprec(t) - (1:64)))    % nul : la reconstruction est exacte
+
+  Voir aussi WPREC, WPCOEF, WPRCOEF, WPSPLT, WPJOIN, BESTTREE, WPDEC2.
+```
+
+## `wpdec2`
+
+```
+WPDEC2 Décomposition d'une image en paquets d'ondelettes.
+  T = WPDEC2(X,N,NOM) décompose l'image X sur N niveaux : chaque nœud
+  est scindé en quatre — approximation et trois détails —, ce qui donne
+  un arbre complet de 4^N feuilles.
+
+  T = WPDEC2(X,N,NOM,ENT,PAR) donne le critère d'entropie que BESTTREE
+  emploiera.
+
+  L'arbre est de même forme qu'en une dimension, l'ordre valant quatre :
+  les enfants du nœud N portent les indices 4N+1 à 4N+4.
+
+  Exemple :
+     t = wpdec2(magic(16), 2, 'haar');
+     ntnode(t)                      % 16
+     max(max(abs(wprec2(t) - magic(16))))   % nul
+
+  Voir aussi WPREC2, WPDEC, WPCOEF, WPRCOEF, BESTTREE.
+```
+
+## `wpdencmp`
+
+```
+WPDENCMP Débruitage ou compression par paquets d'ondelettes.
+  [XD,T,PERF0,PERFL2] = WPDENCMP(X,SORH,N,NOM,CRIT,PAR,KEEPAPP)
+  décompose X en paquets sur N niveaux, cherche la meilleure base au
+  sens du critère CRIT de paramètre PAR, seuille, puis reconstruit.
+  PERF0 est le pourcentage de coefficients annulés, PERFL2 la part de
+  l'énergie gardée.
+
+  WPDENCMP(T,SORH,CRIT,PAR,KEEPAPP) part d'un arbre déjà construit.
+
+  Le seuil est celui du critère : pour 'threshold' et 'sure', c'est PAR
+  lui-même ; pour les autres, le seuil universel sigma racine de deux
+  log n, sigma étant estimé sur les coefficients les plus fins.
+
+  Chercher d'abord la meilleure base fait la différence avec WDENCMP :
+  un signal dont l'énergie est en haute fréquence y est mieux
+  concentré, donc mieux débruité.
+
+  Exemple :
+     [propre, bruite] = wnoise(3, 10, 7, 5);
+     xd = wpdencmp(bruite, 's', 4, 'db4', 'shannon', 0, 1);
+     norm(xd - propre) < norm(bruite - propre)   % vrai
+
+  Voir aussi WDENCMP, WPTHCOEF, BESTTREE, WPDEC, WENTROPY.
+```
+
+## `wpfun`
+
+```
+WPFUN Fonctions de paquets d'ondelettes.
+  [WPWS,X] = WPFUN(NOM,NUM,ITER) rend les fonctions W0 à WNUM de la
+  famille de paquets de l'ondelette NOM, une par ligne, échantillonnées
+  sur la grille X.
+
+  Les fonctions se construisent par récurrence, en descendant l'arbre
+  avec les deux filtres :
+
+     W(2n)(x)   = sqrt(2) somme_k Lo_R(k) W(n)(2x - k)
+     W(2n+1)(x) = sqrt(2) somme_k Hi_R(k) W(n)(2x - k)
+
+  W0 est la fonction d'échelle, W1 l'ondelette ; les suivantes
+  oscillent de plus en plus, chacune occupant sa propre bande.
+
+  Exemple :
+     [w, x] = wpfun('db2', 3, 7);
+     size(w, 1)                     % 4 : W0 à W3
+     trapz(x, w(1, :))              % 1 : W0 est la fonction d'échelle
+     abs(trapz(x, w(2, :)))         % nul : W1 est l'ondelette
+
+  Voir aussi WAVEFUN, WPDEC, WPCOEF, WFILTERS.
+```
+
+## `wpjoin`
+
+```
+WPJOIN Réunit les descendants d'un nœud d'un arbre de paquets.
+  T = WPJOIN(T,N) supprime tout ce qui pend sous le nœud N : celui-ci
+  redevient une feuille, et ses coefficients sont recalculés de ses
+  descendants pour rester cohérents.
+
+  [T,C] = WPJOIN(T,N) rend aussi ces coefficients.
+
+  C'est l'opération inverse de WPSPLT : les deux servent à façonner un
+  arbre à la main, ou à élaguer celui que BESTTREE a choisi.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     t = wpjoin(t, 1);              % la branche basse est refermée
+     leaves(t)'                     % 1 11 12 13 14 : l'autre branche
+                                    % garde sa profondeur
+
+  Voir aussi WPSPLT, WPDEC, LEAVES, BESTTREE.
+```
+
+## `wprcoef`
+
+```
+WPRCOEF Reconstruction de la seule composante d'un nœud.
+  X = WPRCOEF(T,N) reconstruit le signal en ne gardant que le nœud N :
+  tous les autres sont mis à zéro. On voit ainsi ce que cette bande de
+  fréquence apporte au signal.
+
+  La somme des WPRCOEF de toutes les feuilles redonne le signal : c'est
+  la décomposition que l'arbre représente.
+
+  Exemple :
+     t = wpdec(1:64, 2, 'db2');
+     somme = zeros(1, 64);
+     for n = leaves(t)', somme = somme + wprcoef(t, n); end
+     max(abs(somme - (1:64)))       % nul
+
+  Voir aussi WPREC, WPCOEF, WPDEC, LEAVES.
+```
+
+## `wprec`
+
+```
+WPREC Reconstruction à partir d'un arbre de paquets d'ondelettes.
+  X = WPREC(T) recompose le signal en remontant l'arbre : chaque nœud
+  scindé est refait de ses enfants, jusqu'à la racine.
+
+  La reconstruction est exacte, aux erreurs d'arrondi près, quel que
+  soit l'élagage de l'arbre : c'est ce qui permet d'annuler ou de
+  seuiller quelques feuilles et de revenir au signal.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     max(abs(wprec(t) - (1:64)))    % nul
+
+  Voir aussi WPDEC, WPRCOEF, WPREC2, WPTHCOEF.
+```
+
+## `wprec2`
+
+```
+WPREC2 Reconstruction d'une image à partir de son arbre de paquets.
+  X = WPREC2(T) recompose l'image en remontant l'arbre : chaque nœud
+  scindé est refait de ses quatre enfants, jusqu'à la racine.
+
+  Exemple :
+     t = wpdec2(magic(16), 2, 'db2');
+     max(max(abs(wprec2(t) - magic(16))))   % nul
+
+  Voir aussi WPDEC2, WPREC, WPRCOEF, WPTHCOEF.
+```
+
+## `wpsplt`
+
+```
+WPSPLT Scinde un nœud terminal d'un arbre de paquets.
+  T = WPSPLT(T,N) coupe la feuille N en ses enfants : deux pour un
+  signal, quatre pour une image. C'est ainsi qu'on affine un arbre là
+  où le signal le demande, au lieu de le décomposer partout.
+
+  [T,CA,CD] = WPSPLT(T,N) rend en outre les coefficients des enfants.
+
+  Exemple :
+     t = wpdec(1:64, 1, 'db2');
+     t = wpsplt(t, 1);              % on affine la seule branche basse
+     leaves(t)'                     % 2 3 4
+
+  Voir aussi WPJOIN, WPDEC, LEAVES, BESTTREE.
+```
+
+## `wpthcoef`
+
+```
+WPTHCOEF Seuillage des coefficients d'un arbre de paquets.
+  T = WPTHCOEF(T,KEEPAPP,SORH,THR) seuille les coefficients de toutes
+  les feuilles au seuil THR, par seuillage doux ('s') ou dur ('h').
+  KEEPAPP non nul laisse intacte la feuille d'approximation — celle
+  qu'on atteint en ne prenant que des passe-bas —, dont les
+  coefficients portent la forme générale du signal.
+
+  Exemple :
+     t = wpdec(1:64, 3, 'db2');
+     ts = wpthcoef(t, 1, 's', 2);
+     norm(wprec(ts) - (1:64)) > 0   % le signal a changé
+
+  Voir aussi WTHRESH, WPDENCMP, BESTTREE, WPDEC.
 ```
 
 ## `wrcoef`

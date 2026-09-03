@@ -184,6 +184,17 @@ qu'ils ne font pas encore comme MATLAB.
 - **`wvarchg`** choisit le nombre de ruptures avec une pénalité de
   4 log(n), deux fois celle du critère bayésien : celle-ci laissait
   passer une découpe de temps en temps sur du bruit pur.
+- **Arbres de paquets** : MATLAB rend un objet `wptree` à méthodes ;
+  MatLibre rend une structure de champ `type` valant `'wptree'`, dont
+  `donnees` porte un nœud par case et `noeuds` la liste de ceux qui
+  existent. Les fonctions de MATLAB — `wpcoef`, `wpsplt`, `leaves` — la
+  prennent telle quelle ; `read`, `write`, `plot` et `drawtree` n'ont pas
+  d'équivalent.
+- **Bancs de filtres objets** : `cwtfilterbank` et `dwtfilterbank`
+  n'existent pas ; `cwt` et `wavedec` prennent le nom de l'ondelette.
+  `wcoherence`, `wsst`, `dualtree` et `dtfilters` manquent aussi, et
+  `wavemngr` — la gestion d'une base d'ondelettes personnelles — n'a pas
+  de sens ici, les familles étant construites plutôt que déclarées.
 
 ### Statistiques et apprentissage
 
