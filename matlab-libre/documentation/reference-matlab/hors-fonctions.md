@@ -147,6 +147,35 @@ qu'ils ne font pas encore comme MATLAB.
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
 
+### Calcul formel
+
+- **Une expression, pas un tableau** : un `sym` porte une seule
+  expression. Les tableaux symboliques de MATLAB — une matrice de `sym`,
+  `A\b` en formel — n'existent pas ; `jacobian` et `hessian` rendent des
+  cellules.
+- **`simplify` regroupe, il ne factorise pas.** Il réduit les cas
+  triviaux et, quand l'expression est polynomiale en une variable, la
+  réécrit à partir de ses coefficients — ce qui regroupe les termes
+  semblables. Les identités trigonométriques, la mise en facteur et la
+  réduction des radicaux ne sont pas faites ; `factor`, `collect`,
+  `horner`, `partfrac`, `numden` et `rewrite` manquent.
+- **`solve` ne résout que le polynomial**, par `roots` sur les
+  coefficients : une équation transcendante est refusée, et les systèmes
+  ne sont pas gérés.
+- **`int` ne fait que les formes élémentaires** : constantes, puissances
+  de la variable, sinus, cosinus, exponentielle, et leurs sommes.
+  L'intégration par parties, le changement de variable et les fractions
+  rationnelles ne sont pas faits.
+- **`limit` est numérique**, par extrapolation de Richardson sur des pas
+  géométriquement décroissants : une dizaine de chiffres justes sur les
+  limites usuelles, mais aucune preuve. Une forme indéterminée que
+  l'échantillonnage ne voit pas passe inaperçue.
+- **`vpa` n'a pas de précision variable** : MatLibre calcule en double
+  précision puis arrondit au nombre de chiffres demandé. Au-delà de
+  quinze, les chiffres rendus ne sont pas justes.
+- **Pas de transformées** : `laplace`, `ilaplace`, `fourier`, `ztrans` et
+  `dsolve` n'existent pas.
+
 ### Communications
 
 - **`gf` est une classe, non un objet natif** : les opérateurs y sont

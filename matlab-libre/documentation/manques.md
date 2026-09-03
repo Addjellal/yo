@@ -16,7 +16,8 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1448** | **13** | **99 %** |
+| symbolique | 23 | 0 | 100 % |
+| **ensemble** | **1471** | **13** | **99 %** |
 
 ## matlab-langage
 

@@ -1,0 +1,6 @@
+# Symbolic Math Toolbox. Les noms qu'un utilisateur rencontre : objet
+# symbolique, calcul differentiel et integral, algebre elementaire,
+# ecriture et passage au numerique.
+char diff double expand hessian int jacobian latex limit matlabFunction
+poly2sym pretty simplify solve subs sym syms sym2poly symprod symsum
+symvar taylor vpa

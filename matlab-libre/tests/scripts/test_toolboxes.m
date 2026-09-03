@@ -218,10 +218,92 @@ solution = fem1D(@(x) 1, 1, 20);
 assert(abs(max(solution) - 0.125) < 1e-2);
 
 % Symbolic Math
-x = symvar('x');
+x = matlibre_sym_variable('x');
 f = sympow(x, symnum(3));
 assert(abs(symeval(symdiff(f, 'x'), {'x'}, 2) - 12) < 1e-12);
 assert(strcmp(symstr(symint(x, 'x')), '((x ^ 2) / 2)'));
+
+% L'objet symbolique : les operateurs construisent l'expression, et les
+% fonctions de MATLAB la manipulent.
+syms t u
+assert(strcmp(class(t), 'sym'));
+expressionSym = t ^ 3 - 2 * t;
+assert(strcmp(char(diff(expressionSym)), '((3 * (t ^ 2)) - 2)'));
+assert(strcmp(char(diff(expressionSym, t, 2)), '(6 * t)'));
+assert(double(subs(expressionSym, t, 2)) == 4);
+assert(abs(double(int(expressionSym, t, 0, 1)) + 0.75) < 1e-12);
+% Le developpement et les coefficients.
+assert(isequal(sym2poly(expand((t + 1) * (t - 1))), [1 0 -1]));
+assert(isequal(sym2poly(expand((t + 2) ^ 3)), [1 6 12 8]));
+assert(strcmp(char(simplify(t - t)), '0'));
+assert(strcmp(char(simplify(t + t)), '(2 * t)'));
+% POLY2SYM et SYM2POLY se defont l'un l'autre.
+assert(isequal(sym2poly(poly2sym([1 0 -4])), [1 0 -4]));
+assert(isequal(sym2poly(poly2sym([2 -3 0 5], u), u), [2 -3 0 5]));
+% Les racines d'une equation polynomiale.
+racinesSym = solve(t ^ 2 - 4);
+assert(numel(racinesSym) == 2);
+assert(abs(double(racinesSym{1}) + 2) < 1e-12);
+assert(abs(double(racinesSym{2}) - 2) < 1e-12);
+assert(abs(double(solve(3 * t - 6)) - 2) < 1e-12);
+% La variable sous-entendue est la plus proche de x.
+syms a x
+assert(strcmp(char(symvar(a * x ^ 2, 1)), 'x'));
+assert(strcmp(char(diff(a * x ^ 2)), '((a * 2) * x)') || ...
+       strcmp(char(diff(a * x ^ 2)), '(2 * (a * x))') || ...
+       abs(double(subs(subs(diff(a * x ^ 2), a, 3), x, 2)) - 12) < 1e-12);
+% Les derivees des fonctions elementaires.
+assert(strcmp(char(diff(sin(x))), 'cos(x)'));
+assert(abs(double(subs(diff(exp(2 * x)), x, 0)) - 2) < 1e-12);
+assert(abs(double(subs(diff(log(x)), x, 2)) - 0.5) < 1e-12);
+
+% Taylor : les coefficients sont ceux des derivees successives.
+coefficientsTaylor = fliplr(sym2poly(taylor(exp(x), x, 0, 5)));
+for kTaylor = 0:4
+    assert(abs(coefficientsTaylor(kTaylor + 1) - 1 / factorial(kTaylor)) < 1e-12);
+end
+serieDecalee = taylor(exp(x), x, 1, 3);
+assert(abs(double(subs(serieDecalee, x, 1)) - exp(1)) < 1e-12);
+% Le developpement de sin n'a que des termes impairs.
+coefficientsSinus = fliplr(sym2poly(taylor(sin(x), x, 0, 6)));
+assert(abs(coefficientsSinus(1)) < 1e-15 && abs(coefficientsSinus(3)) < 1e-15);
+assert(abs(coefficientsSinus(2) - 1) < 1e-12);
+assert(abs(coefficientsSinus(4) + 1/6) < 1e-12);
+
+% Limites : les cas d'ecole, y compris ceux qu'une substitution directe
+% ne donne pas.
+assert(abs(double(limit(sin(x) / x, x, 0)) - 1) < 1e-6);
+assert(abs(double(limit((1 - cos(x)) / x ^ 2, x, 0)) - 0.5) < 1e-5);
+assert(abs(double(limit(log(1 + x) / x, x, 0)) - 1) < 1e-6);
+assert(abs(double(limit((1 + 1 / x) ^ x, x, Inf)) - exp(1)) < 1e-3);
+assert(double(limit(x ^ 2, x, 3)) == 9);
+
+% Jacobienne, hessienne, et le theoreme de Schwarz.
+jacobienneSym = jacobian({x * a, x + a}, {x, a});
+assert(strcmp(char(jacobienneSym{1, 1}), 'a'));
+assert(strcmp(char(jacobienneSym{1, 2}), 'x'));
+assert(strcmp(char(jacobienneSym{2, 1}), '1'));
+hessienneSym = hessian(x ^ 2 * a, {x, a});
+assert(strcmp(char(hessienneSym{1, 2}), char(hessienneSym{2, 1})));
+assert(abs(double(subs(subs(hessienneSym{1, 1}, x, 5), a, 3)) - 6) < 1e-12);
+
+% Le passage au numerique : la poignee accepte un vecteur.
+poigneeSym = matlabFunction(diff(x ^ 3));
+assert(poigneeSym(2) == 12);
+assert(isequal(matlabFunction(x ^ 2 + 1)([1 2 3]), [2 5 10]));
+assert(matlabFunction(x - a, 'Vars', {a, x})(1, 5) == 4);
+
+% Sommes et produits sur un intervalle d'entiers.
+syms k
+assert(double(symsum(k, k, 1, 100)) == 5050);
+assert(abs(double(symsum(1 / k ^ 2, k, 1, 1000)) - pi ^ 2 / 6) < 1e-3);
+assert(double(symprod(k, k, 1, 6)) == 720);
+
+% Ecritures : lisible, LaTeX, et arrondie.
+assert(strcmp(pretty(x ^ 2 + 3 * x - 1), 'x^2 + 3 * x - 1'));
+assert(strcmp(latex((x + 1) / (x ^ 2)), '\frac{x + 1}{x^{2}}'));
+assert(strcmp(char(vpa(sym(1) / 3, 6)), '0.333333'));
+assert(abs(double(vpa(sym(2) ^ 10)) - 1024) < 1e-12);
 
 % Parallel Computing
 futur = parfeval(@(a, b) a + b, 1, 2, 3);

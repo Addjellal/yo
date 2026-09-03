@@ -4,12 +4,12 @@ function primitive = symint(e, variable)
     operateur = e{1};
     switch operateur
         case 'num'
-            primitive = symmul(e, symvar(variable));
+            primitive = symmul(e, matlibre_sym_variable(variable));
         case 'var'
             if strcmp(e{2}, variable)
                 primitive = symdiv(sympow(e, symnum(2)), symnum(2));
             else
-                primitive = symmul(e, symvar(variable));
+                primitive = symmul(e, matlibre_sym_variable(variable));
             end
         case '+'
             primitive = symadd(symint(e{2}, variable), symint(e{3}, variable));

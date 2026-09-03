@@ -10,7 +10,15 @@ function s = symstr(e)
             end
         case 'var'
             s = e{2};
-        case {'+', '-', '*', '/', '^'}
+        case '+'
+            % Ajouter un nombre negatif s'ecrit comme une soustraction :
+            % « x + -1 » se lit mal, « x - 1 » se lit.
+            if strcmp(e{3}{1}, 'num') && e{3}{2} < 0
+                s = ['(' symstr(e{2}) ' - ' symstr(symnum(-e{3}{2})) ')'];
+            else
+                s = ['(' symstr(e{2}) ' + ' symstr(e{3}) ')'];
+            end
+        case {'-', '*', '/', '^'}
             s = ['(' symstr(e{2}) ' ' operateur ' ' symstr(e{3}) ')'];
         otherwise
             s = [operateur '(' symstr(e{2}) ')'];
