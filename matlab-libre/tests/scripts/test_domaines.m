@@ -417,6 +417,44 @@ end
 assert(numel(wavenames) == numel(wavenames('orthogonal')) + ...
        numel(wavenames('biorthogonal')) + numel(wavenames('continuous')));
 
+% Mesures de qualite : elles se verifient sur des ecarts connus.
+[psnrEssai, mseEssai, maxEssai, ratioEssai] = measerr(0:255, (0:255) + 0.5);
+assert(abs(mseEssai - 0.25) < 1e-12 && abs(maxEssai - 0.5) < 1e-12);
+assert(abs(psnrEssai - 10 * log10(255 ^ 2 / 0.25)) < 1e-12);
+assert(ratioEssai > 1);
+assert(isinf(measerr(0:255, 0:255)));
+
+% Le mode de prolongement se lit et se pose ; MatLibre n'analyse qu'en
+% periodique, et refuse les autres au lieu de faire semblant.
+assert(strcmp(dwtmode('status'), 'per'));
+dwtmode('per', 'nodisp');
+for modeRefuse = {'sym', 'zpd', 'inconnu'}
+    refuse = false;
+    try
+        dwtmode(modeRefuse{1});
+    catch
+        refuse = true;
+    end
+    assert(refuse, modeRefuse{1});
+end
+
+% Debruitage par l'interface d'origine : les quatre regles et les deux
+% seuillages ramenent tous le bruit.
+[propreW, bruiteW] = wnoise(3, 10, 7, 5);
+distanceDepart = norm(bruiteW - propreW);
+for regleSeuil = {'sqtwolog', 'rigrsure', 'heursure', 'minimaxi'}
+    for typeSeuil = {'s', 'h'}
+        debruite = wden(bruiteW, regleSeuil{1}, typeSeuil{1}, 'sln', 4, 'db4');
+        assert(norm(debruite - propreW) < distanceDepart, regleSeuil{1});
+    end
+end
+for echelleBruit = {'one', 'sln', 'mln'}
+    assert(numel(wden(bruiteW, 'sqtwolog', 's', echelleBruit{1}, 4, 'sym4')) == numel(bruiteW));
+end
+[cBruit, lBruit] = wavedec(bruiteW, 4, 'db4');
+assert(max(abs(wden(cBruit, lBruit, 'sqtwolog', 's', 'sln', 4, 'db4') - ...
+                wden(bruiteW, 'sqtwolog', 's', 'sln', 4, 'db4'))) < 1e-12);
+
 % Somme des reconstructions partielles : a3 + d3 + d2 + d1 == signal.
 [cc, ll] = wavedec(signal, 3, 'db4');
 recomposition = wrcoef('a', cc, ll, 'db4', 3);
@@ -456,6 +494,92 @@ for nom = {'haar', 'db2', 'sym4'}
     [hd, vd, dd] = detcoef2('all', c2, s2, 1);
     assert(isequal(size(hd), [8 8]) && isequal(size(vd), [8 8]) && isequal(size(dd), [8 8]));
 end
+% Energie d'une image decomposee : elle se repartit et somme a cent.
+[cEnergie, sEnergie] = wavedec2(image16, 2, 'haar');
+[energieA, energieD] = wenergy2(cEnergie, sEnergie);
+assert(isequal(size(energieD), [2 3]));
+assert(abs(energieA + sum(energieD(:)) - 100) < 1e-9);
+[energieA4, energieH, energieV, energieDia] = wenergy2(cEnergie, sEnergie);
+assert(abs(energieA4 - energieA) < 1e-12);
+assert(abs(energieA + sum(energieH) + sum(energieV) + sum(energieDia) - 100) < 1e-9);
+
+% Reconstruction directe d'un coefficient d'image : un detail remonte
+% garde sa moyenne nulle, une approximation son integrale.
+motif = upcoef2('h', 1, 'haar', 2);
+assert(isequal(size(motif), [4 4]) && abs(sum(motif(:))) < 1e-12);
+assert(abs(sum(sum(upcoef2('a', 1, 'haar', 2))) - 4) < 1e-12);
+
+% Remonter d'un niveau ne change pas ce que la decomposition represente.
+[cTrois, sTrois] = wavedec2(image16, 3, 'db2');
+[cDeux, sDeux, approximationRemontee] = upwlev2(cTrois, sTrois, 'db2');
+assert(size(sDeux, 1) == size(sTrois, 1) - 1);
+assert(isequal(size(approximationRemontee), sDeux(1, :)));
+assert(max(max(abs(waverec2(cDeux, sDeux, 'db2') - ...
+                   waverec2(cTrois, sTrois, 'db2')))) < 1e-9);
+
+% Seuillage des coefficients d'image : annuler un bloc retire sa seule
+% energie, attenuer le divise exactement.
+[cSeuil, sSeuil] = wavedec2(image16, 2, 'db2');
+sansH = wthcoef2('h', cSeuil, sSeuil, 1);
+[~, energieAvant] = wenergy2(cSeuil, sSeuil);
+[~, energieApres] = wenergy2(sansH, sSeuil);
+assert(energieAvant(1, 1) > 0 && energieApres(1, 1) < 1e-12);
+assert(sum(cSeuil ~= sansH) == prod(sSeuil(3, :)));
+attenue = wthcoef2('v', cSeuil, sSeuil, 2, 0.5);
+change = find(cSeuil ~= attenue);
+assert(~isempty(change) && max(abs(attenue(change) * 2 - cSeuil(change))) < 1e-12);
+assert(all(abs(wthcoef2('t', cSeuil, sSeuil, 1:2, 3, 's')) <= abs(cSeuil) + 1e-12));
+sansApproximation = wthcoef2('a', cSeuil, sSeuil);
+assert(all(sansApproximation(1:prod(sSeuil(1, :))) == 0));
+
+% Transformee stationnaire d'image : redondante, inversible, invariante
+% par translation.
+imageSwt = magic(16) + 0.1 * (1:16)' * (1:16);
+for nomSwt = {'haar', 'db2', 'sym4', 'bior2.2'}
+    [sa, sh, sv, sd] = swt2(imageSwt, 2, nomSwt{1});
+    assert(isequal(size(sa), [16 16 2]), nomSwt{1});
+    assert(max(max(abs(iswt2(sa, sh, sv, sd, nomSwt{1}) - imageSwt))) < 1e-9, nomSwt{1});
+end
+[saUn, ~, ~, ~] = swt2(imageSwt, 1, 'db2');
+[saDecale, ~, ~, ~] = swt2(circshift(imageSwt, [3 5]), 1, 'db2');
+assert(max(max(abs(circshift(saUn, [3 5]) - saDecale))) < 1e-12);
+% La stationnaire a une dimension marche aussi pour les biorthogonales.
+signalSwt = cos((1:64) / 5) + (1:64) / 40;
+for nomSwt = {'haar', 'db4', 'bior2.2', 'bior4.4', 'rbio2.2'}
+    [sa1, sd1] = swt(signalSwt, 3, nomSwt{1});
+    assert(max(abs(iswt(sa1, sd1, nomSwt{1}) - signalSwt)) < 1e-9, nomSwt{1});
+end
+
+% Fonctions bidimensionnelles : ce sont les produits des fonctions a une
+% dimension, et le detail garde sa moyenne nulle.
+[phiDeux, psiH, psiV, psiD, grille] = wavefun2('db2', 6);
+pasGrille = grille(2) - grille(1);
+assert(isequal(size(phiDeux), [numel(grille) numel(grille)]));
+assert(abs(sum(phiDeux(:)) * pasGrille ^ 2 - 1) < 1e-6);
+for detailDeux = {psiH, psiV, psiD}
+    assert(abs(sum(detailDeux{1}(:)) * pasGrille ^ 2) < 1e-6);
+end
+[phiUn, psiUn] = wavefun('db2', 6);
+assert(max(max(abs(psiD - psiUn(:) * psiUn(:).'))) < 1e-15);
+
+% Debruitage d'image : les quatre regles ramenent le bruit.
+grilleX = linspace(-3, 3, 64);
+[maillageX, maillageY] = meshgrid(grilleX);
+imagePropre = 40 * exp(-(maillageX .^ 2 + maillageY .^ 2) / 4) + 10 * (maillageX > 0);
+imageBruitee = imagePropre + 3 * randn(64);
+distanceImage = norm(imageBruitee - imagePropre, 'fro');
+for methodeImage = {'Bayes', 'UniversalThreshold', 'SURE', 'Minimax'}
+    debruitee = wdenoise2(imageBruitee, 'DenoisingMethod', methodeImage{1});
+    assert(norm(debruitee - imagePropre, 'fro') < distanceImage, methodeImage{1});
+end
+autreReglage = wdenoise2(imageBruitee, 3, 'Wavelet', 'sym4', ...
+                         'ThresholdRule', 'Hard', 'NoiseEstimate', 'LevelDependent');
+assert(isequal(size(autreReglage), size(imageBruitee)));
+assert(norm(autreReglage - imagePropre, 'fro') < distanceImage);
+imageCouleur = wdenoise2(cat(3, imageBruitee, imageBruitee, imageBruitee));
+assert(isequal(size(imageCouleur), [64 64 3]));
+assert(max(max(abs(imageCouleur(:, :, 1) - imageCouleur(:, :, 3)))) < 1e-12);
+
 [c2, s2] = wavedec2(image16, 2, 'sym4');
 somme2 = wrcoef2('a', c2, s2, 'sym4', 2);
 for niveau = 1:2
@@ -478,6 +602,82 @@ assert(size(w, 1) == 5);
 assert(abs(sum(sum(w .^ 2)) - sum(signal .^ 2)) < 1e-8);
 assert(max(abs(imodwt(w, 'db2') - signal)) < 1e-10);
 assert(max(abs(sum(modwtmra(w, 'db2'), 1) - signal)) < 1e-10);
+
+% Variance et correlation par echelle : la MODWT conserve l'energie, si
+% bien que les variances d'echelle somment a celle du signal.
+marche = cumsum(randn(1, 1024));
+wMarche = modwt(marche, 'db2', 4);
+variancesEchelle = modwtvar(wMarche);
+assert(abs(sum(variancesEchelle) - sum(marche .^ 2) / 1024) < 1e-9);
+varianceBords = modwtvar(wMarche, 'db2');
+assert(numel(varianceBords) == numel(variancesEchelle));
+[~, bornesVariance] = modwtvar(wMarche, 'db2', 0.95);
+assert(all(bornesVariance(:, 1) <= varianceBords) && ...
+       all(bornesVariance(:, 2) >= varianceBords));
+% Un signal est parfaitement correle avec lui-meme, a toutes les echelles.
+assert(max(abs(modwtcorr(wMarche, wMarche, 'db2') - 1)) < 1e-12);
+[~, bornesCorrelation] = modwtcorr(wMarche, modwt(cumsum(randn(1, 1024)), 'db2', 4), 'db2');
+assert(isequal(size(bornesCorrelation), [5 2]));
+% La correlation croisee retrouve le decalage.
+[croisee, decalages] = modwtxcorr(modwt(marche, 'db2', 3), ...
+                                  modwt(circshift(marche, [0 8]), 'db2', 3), 'db2', 30);
+[~, iCroisee] = max(croisee{4});
+assert(abs(abs(decalages(iCroisee)) - 8) <= 1);
+
+% Transformee continue inverse : le filtre que forment analyse et somme
+% est mesure puis inverse, ce qui rend le signal a quelques centiemes.
+tempsCwt = (0:1023) / 1024;
+echellesCwt = 2 .^ (0:0.125:7);
+centreCwt = 300:724;
+for essaiCwt = {sin(2 * pi * 32 * tempsCwt), ...
+                sin(2 * pi * 16 * tempsCwt) + 0.5 * cos(2 * pi * 64 * tempsCwt)}
+    for nomCwt = {'morl', 'mexh'}
+        reconstruit = icwt(cwt(essaiCwt{1}, echellesCwt, nomCwt{1}), echellesCwt, nomCwt{1});
+        rapport = norm(reconstruit(centreCwt) - essaiCwt{1}(centreCwt)) / ...
+                  norm(essaiCwt{1}(centreCwt));
+        assert(rapport < 0.05, nomCwt{1});
+    end
+end
+
+% Mouvement brownien fractionnaire : la variance des increments croit
+% comme k^(2H), et les trois estimateurs retrouvent H.
+for hurst = [0.3 0.5 0.7 0.9]
+    trajectoire = wfbm(hurst, 8192);
+    pas = 2 .^ (0:9);
+    variancesPas = zeros(size(pas));
+    for kPas = 1:numel(pas)
+        ecartPas = trajectoire(1 + pas(kPas):end) - trajectoire(1:end - pas(kPas));
+        variancesPas(kPas) = var(ecartPas);
+    end
+    penteIncrements = polyfit(log2(pas), log2(variancesPas), 1);
+    assert(abs(penteIncrements(1) / 2 - hurst) < 0.1, sprintf('H=%g', hurst));
+    estimationsHurst = wfbmesti(trajectoire);
+    assert(numel(estimationsHurst) == 3);
+    assert(max(abs(estimationsHurst - hurst)) < 0.1, sprintf('esti H=%g', hurst));
+end
+[trajectoire, increments] = wfbm(0.6, 512);
+assert(max(abs(cumsum(increments) - trajectoire)) < 1e-9);
+for hurstRefuse = [0 1 1.5]
+    refuse = false;
+    try
+        wfbm(hurstRefuse, 100);
+    catch
+        refuse = true;
+    end
+    assert(refuse);
+end
+
+% Ruptures de variance : la programmation dynamique les trouve
+% exactement, et n'en invente pas sur du bruit homogene.
+serieRompue = [randn(1, 200), 4 * randn(1, 200), randn(1, 200)];
+[ruptures, nombreRuptures] = wvarchg(serieRompue, 4);
+assert(nombreRuptures == 2);
+assert(abs(ruptures(1) - 200) < 25 && abs(ruptures(2) - 400) < 25);
+[rupturesVides, aucune] = wvarchg(randn(1, 600), 4);
+assert(aucune == 0 && isempty(rupturesVides));
+[uneRupture, compte] = wvarchg([randn(1, 150), 5 * randn(1, 150)], 3);
+assert(compte == 1 && abs(uneRupture - 150) < 25);
+
 
 % Fonctions d'échelle et d'ondelette. Haar est connue analytiquement.
 [phi, psi, xval] = wavefun('db1', 8);

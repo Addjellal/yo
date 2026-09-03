@@ -6,7 +6,7 @@ coifwavf cwt cwtfilterbank cwtfreqbounds dbaux dbwavf ddencmp depo2ind
 detcoef detcoef2 dtfilters dualtree dwt dwt2 dwtfilterbank dwtmode dyaddown
 dyadup fbspwavf gauswavf icwt idwt idwt2 imodwt imodwpt ind2depo iswt iswt2
 leaves measerr meyer meyeraux mexihat modwpt modwt modwtcorr modwtmra
-modwtvar modwtxcorr morlet mra ntnode orthfilt qmf rbiowavf scal2frq
+modwtvar modwtxcorr morlet ntnode orthfilt qmf rbiowavf scal2frq
 shanwavf swt swt2 symaux symwavf thselect tnodes treedpth upcoef upcoef2
 upwlev upwlev2 wavedec wavedec2 wavefun wavefun2 waveinfo wavemngr
 wavenames waverec waverec2 wcodemat wconv1 wconv2 wcoherence wden wdencmp

@@ -12,6 +12,7 @@
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
 %   wavenames         - Liste des ondelettes disponibles
+%   dwtmode           - Mode de prolongement des bords
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
 %   scal2frq          - Conversion échelle vers fréquence
@@ -40,11 +41,28 @@
 %   upwlev            - Remontée d'un niveau dans la décomposition
 %   wenergy           - Répartition de l'énergie par niveau
 %
+% Transformée stationnaire et à chevauchement maximal
+%   swt, iswt         - Transformée stationnaire d'un signal
+%   swt2, iswt2       - La même, pour une image
+%   modwt, imodwt     - Transformée à chevauchement maximal
+%   modwtmra          - Analyse multirésolution correspondante
+%   modwtvar          - Variance par échelle
+%   modwtcorr         - Corrélation par échelle entre deux signaux
+%   modwtxcorr        - Corrélation croisée par échelle
+%
+% Transformée continue
+%   cwt, icwt         - Transformée continue et son inverse
+%
 % Transformée discrète, deux dimensions
 %   dwt2, idwt2       - Transformée à un niveau et son inverse
 %   wavedec2, waverec2 - Décomposition et reconstruction multiniveaux
 %   appcoef2, detcoef2 - Extraction des coefficients d'un niveau
 %   wrcoef2           - Reconstruction d'un seul niveau
+%   upcoef2           - Reconstruction directe d'un bloc de coefficients
+%   upwlev2           - Remontée d'un niveau dans la décomposition
+%   wenergy2          - Répartition de l'énergie par niveau
+%   wthcoef2          - Seuillage ou atténuation par bloc
+%   wavefun2          - Les quatre fonctions de la base bidimensionnelle
 %   wcodemat          - Mise à l'échelle pour l'affichage
 %
 % Transformées redondantes
@@ -61,7 +79,15 @@
 %   ddencmp           - Réglages par défaut du débruitage
 %   wdencmp           - Débruitage ou compression par seuillage
 %   wdenoise          - Débruitage par seuillage universel
+%   wdenoise2         - Le même, pour une image
+%   wden              - Débruitage automatique, interface d'origine
 %   wnoise            - Signaux d'essai de Donoho et Johnstone
+%   measerr           - Mesures de qualité : PSNR, erreur, énergie gardée
+%
+% Séries longue mémoire
+%   wfbm              - Mouvement brownien fractionnaire
+%   wfbmesti          - Estimation du paramètre de Hurst
+%   wvarchg           - Détection de ruptures de variance
 %
 % Outils sur les signaux
 %   wextend           - Prolongement aux bords (9 modes)
@@ -430,6 +456,30 @@ DWT2 Transformée en ondelettes discrète bidimensionnelle, un niveau.
      [a, h, v, d] = dwt2(ones(4), 'db1');   % a = 2*ones(2), h = v = d = 0
 ```
 
+## `dwtmode`
+
+```
+DWTMODE Mode de prolongement des bords de la transformée discrète.
+  DWTMODE affiche le mode courant.
+  DWTMODE(MODE) le change. MODE vaut 'per' (périodique), 'zpd'
+  (zéros), 'sym' (symétrie), 'spd' (prolongement affine), 'sp0'
+  (répétition du bord), 'ppd' (périodique sans ajustement de parité).
+  ST = DWTMODE('status') rend le mode courant sans rien afficher.
+  DWTMODE(MODE,'nodisp') change le mode sans l'annoncer.
+
+  MatLibre ne sait analyser qu'en périodique : DWT, WAVEDEC et leurs
+  voisines prolongent le signal par périodicité, ce qui garde le nombre
+  de coefficients égal à celui des échantillons. Le mode est donc lu et
+  conservé, mais seul 'per' est accepté ; demander autre chose lève une
+  erreur au lieu d'analyser autrement que promis.
+
+  Exemple :
+     dwtmode('status')              % 'per'
+     dwtmode('per', 'nodisp');
+
+  Voir aussi DWT, WAVEDEC, WEXTEND.
+```
+
 ## `dyaddown`
 
 ```
@@ -535,6 +585,45 @@ GAUSWAVF Ondelettes gaussiennes : les dérivées de exp(-x^2).
   Voir aussi MEXIHAT, MORLET, CWT.
 ```
 
+## `icwt`
+
+```
+ICWT Transformée en ondelettes continue inverse.
+  X = ICWT(C,ECHELLES,NOM) reconstruit le signal à partir des
+  coefficients que rend CWT, par la formule de reconstruction à une
+  seule somme :
+
+     X(b) = (1/K) somme_a Re C(a,b) da / a^(3/2)
+
+  où da est le pas local entre échelles : la somme approche ainsi
+  l'intégrale, que les échelles soient réparties linéairement ou par
+  octaves.
+
+  K n'est pas une constante tabulée, ni même une constante : analyse
+  puis somme forment un filtre, qu'on mesure en transformant une
+  impulsion, et qu'on inverse dans la bande où il a du gain. Diviser
+  par une seule constante laisserait plusieurs dixièmes d'erreur, le
+  gain n'étant pas plat ; inverser le filtre les efface.
+
+  Ce que les échelles ne couvrent pas n'est pas reconstruit : la
+  composante continue et tout ce qui sort de la bande sont perdus, et
+  c'est fidèle à ce que la transformée a réellement gardé. Les bords
+  restent approchés, la transformée continue y étant tronquée.
+
+  X = ICWT(...,'Constante') emploie au lieu de cela le gain moyen dans
+  la bande, comme la formule de reconstruction d'usage : plus grossier,
+  mais sans repli possible.
+
+  Exemple :
+     t = (0:511) / 512;
+     x = sin(2 * pi * 8 * t);
+     echelles = 2 .^ (0:0.25:6);
+     y = icwt(cwt(x, echelles, 'morl'), echelles, 'morl');
+     norm(y - x) / norm(x)          % quelques centièmes
+
+  Voir aussi CWT, CENTFRQ, SCAL2FRQ.
+```
+
 ## `idwt`
 
 ```
@@ -583,6 +672,54 @@ ISWT Transformée en ondelettes stationnaire inverse.
   Exemple :
      [a, d] = swt(1:8, 2, 'haar');
      max(abs(iswt(a, d, 'haar') - (1:8)))   % nul
+
+  Voir aussi SWT, ISWT2, IMODWT, IDWT.
+```
+
+## `iswt2`
+
+```
+ISWT2 Transformée stationnaire inverse d'une image.
+  X = ISWT2(A,H,V,D,NOM) reconstruit l'image à partir des quatre
+  familles que rend SWT2.
+
+  La transformée étant redondante, chaque niveau se reconstruit en
+  moyennant les décimations possibles : le facteur est un quart en deux
+  dimensions, contre un demi en une.
+
+  Exemple :
+     [a, h, v, d] = swt2(magic(8), 2, 'haar');
+     max(max(abs(iswt2(a, h, v, d, 'haar') - magic(8))))   % nul
+
+  Voir aussi SWT2, ISWT, WAVEREC2, IDWT2.
+```
+
+## `measerr`
+
+```
+MEASERR Mesures de qualité entre un signal et son approximation.
+  [PSNR,MSE,MAXERR,L2RAT] = MEASERR(X,XAPP) compare l'approximation
+  XAPP à l'original X et rend :
+    PSNR    rapport signal sur bruit de crête, en décibels
+    MSE     erreur quadratique moyenne
+    MAXERR  plus grand écart en valeur absolue
+    L2RAT   rapport des énergies, XAPP sur X
+
+  MEASERR(X,XAPP,BPS) donne le nombre de bits par échantillon, dont
+  dépend la valeur de crête : 2^BPS - 1. Par défaut, huit bits.
+
+  Le PSNR est la mesure d'usage pour juger une compression : il
+  rapporte l'erreur à la dynamique du codage, non au signal lui-même,
+  ce qui le rend comparable d'une image à l'autre.
+
+  Exemple :
+     x = double(0:255);
+     approx = x + 0.5;
+     [p, m, e, r] = measerr(x, approx);
+     m                              % 0.25
+     e                              % 0.5
+
+  Voir aussi WDENCMP, WDENOISE, WTHRESH, WPDENCMP.
 ```
 
 ## `mexihat`
@@ -673,6 +810,29 @@ MODWT Transformée en ondelettes à chevauchement maximal.
      abs(sum(sum(w.^2)) - sum((1:8).^2))   % nul
 ```
 
+## `modwtcorr`
+
+```
+MODWTCORR Corrélation par échelle entre deux signaux.
+  R = MODWTCORR(W1,W2) rend le coefficient de corrélation entre les
+  deux transformées, échelle par échelle. On voit ainsi à quelle
+  échelle deux séries se ressemblent : deux signaux peuvent être liés
+  sur le long terme et indépendants d'un jour à l'autre.
+
+  R = MODWTCORR(W1,W2,NOM) écarte les coefficients atteints par le
+  repli circulaire, comme MODWTVAR.
+
+  [R,BORNES] = MODWTCORR(...,P) rend l'intervalle de confiance au
+  niveau P (0,95 par défaut), par la transformation de Fisher.
+
+  Exemple :
+     x = cumsum(randn(1, 1024));
+     r = modwtcorr(modwt(x, 'db2', 4), modwt(x, 'db2', 4), 'db2');
+     max(abs(r - 1))                % nul : un signal avec lui-même
+
+  Voir aussi MODWTVAR, MODWTXCORR, MODWT, CORRCOEF.
+```
+
 ## `modwtmra`
 
 ```
@@ -683,6 +843,53 @@ MODWTMRA Analyse multirésolution issue d'une MODWT.
   Exemple :
      w = modwt(1:8, 'haar', 2);
      max(abs(sum(modwtmra(w, 'haar')) - (1:8)))   % nul
+```
+
+## `modwtvar`
+
+```
+MODWTVAR Variance par échelle d'une transformée à chevauchement maximal.
+  V = MODWTVAR(W) rend la variance portée par chaque ligne de W, c'est
+  à dire par chaque échelle. La somme des variances vaut celle du
+  signal : la MODWT conserve l'énergie, ce qui fait de cette
+  décomposition un vrai partage de la variance.
+
+  V = MODWTVAR(W,NOM) nomme l'ondelette, ce qui permet d'écarter les
+  coefficients atteints par le repli circulaire aux bords : seuls les
+  coefficients dits « non touchés » entrent alors dans le compte.
+
+  [V,BORNES] = MODWTVAR(W,NOM,P) rend en outre l'intervalle de
+  confiance au niveau P (0,95 par défaut), par l'approximation
+  gaussienne sur le nombre de coefficients non touchés.
+
+  Exemple :
+     w = modwt(cumsum(randn(1, 1024)), 'db2', 5);
+     v = modwtvar(w, 'db2');
+     numel(v)                       % 6 : cinq détails et l'approximation
+
+  Voir aussi MODWT, MODWTMRA, MODWTCORR, MODWTXCORR.
+```
+
+## `modwtxcorr`
+
+```
+MODWTXCORR Corrélation croisée par échelle entre deux signaux.
+  C = MODWTXCORR(W1,W2) rend, dans une cellule, la corrélation croisée
+  normalisée de chaque échelle : C{K} porte les valeurs pour tous les
+  décalages. Le maximum dit de combien la seconde série est en retard
+  sur la première, à cette échelle-là.
+
+  [C,DECALAGES] = MODWTXCORR(...) rend aussi le vecteur des décalages.
+  MODWTXCORR(W1,W2,NOM,MAXDEC) borne le décalage.
+
+  Exemple :
+     x = cumsum(randn(1, 512));
+     y = circshift(x, 8);
+     [c, d] = modwtxcorr(modwt(x, 'db2', 3), modwt(y, 'db2', 3));
+     [~, i] = max(c{3});
+     d(i)                           % environ 8
+
+  Voir aussi MODWTCORR, MODWTVAR, XCORR, MODWT.
 ```
 
 ## `morlet`
@@ -866,6 +1073,30 @@ SWT Transformée en ondelettes stationnaire, sans sous-échantillonnage.
 
   Exemple :
      [a, d] = swt(1:8, 2, 'haar');
+
+  Voir aussi ISWT, SWT2, MODWT, DWT.
+```
+
+## `swt2`
+
+```
+SWT2 Transformée stationnaire d'une image.
+  [A,H,V,D] = SWT2(X,N,NOM) rend, pour chacun des N niveaux, une image
+  de la taille de X : approximation, détails horizontal, vertical et
+  diagonal. Le niveau K occupe A(:,:,K) et ses voisins.
+
+  Comme en une dimension, rien n'est décimé : ce sont les filtres qui
+  sont dilatés d'un niveau à l'autre. Le résultat est donc invariant
+  par translation, ce qui vaut pour la détection de contours et le
+  débruitage — au prix de quatre fois plus de coefficients par niveau.
+
+  Les deux dimensions de X doivent être des multiples de 2^N.
+
+  Exemple :
+     [a, h, v, d] = swt2(magic(8), 2, 'haar');
+     size(a)                        % 8x8x2
+
+  Voir aussi ISWT2, SWT, WAVEDEC2, DWT2.
 ```
 
 ## `symaux`
@@ -932,6 +1163,26 @@ UPCOEF Reconstruction directe de coefficients sur plusieurs niveaux.
      upcoef('a', 1, 'haar', 1)   % [0.7071 0.7071]
 ```
 
+## `upcoef2`
+
+```
+UPCOEF2 Reconstruction directe de coefficients d'image.
+  Y = UPCOEF2('a',X,NOM,N) remonte X comme une approximation sur N
+  niveaux, les détails étant nuls ; 'h', 'v' et 'd' font de même pour
+  les trois détails.
+  Y = UPCOEF2(...,TAILLE) recadre le résultat au centre.
+
+  C'est l'équivalent bidimensionnel d'UPCOEF : on voit ainsi la forme
+  qu'un seul coefficient prend une fois remonté, c'est-à-dire
+  l'ondelette elle-même à l'échelle voulue.
+
+  Exemple :
+     motif = upcoef2('h', 1, 'haar', 2);
+     size(motif)                    % 4x4
+
+  Voir aussi UPCOEF, IDWT2, WRCOEF2, WAVEDEC2.
+```
+
 ## `upwlev`
 
 ```
@@ -939,6 +1190,22 @@ UPWLEV Remonte d'un niveau une décomposition en ondelettes.
   [NC,NL,CA] = UPWLEV(C,L,NOM) fusionne l'approximation la plus
   grossière avec son détail : la décomposition perd un niveau, et CA
   rend l'approximation reconstruite.
+```
+
+## `upwlev2`
+
+```
+UPWLEV2 Remonte d'un niveau une décomposition d'image.
+  [NC,NS,CA] = UPWLEV2(C,S,NOM) fusionne l'approximation la plus
+  grossière avec ses trois détails : la décomposition perd un niveau,
+  et CA rend l'approximation reconstruite.
+
+  Exemple :
+     [c, s] = wavedec2(magic(16), 3, 'haar');
+     [nc, ns, ca] = upwlev2(c, s, 'haar');
+     size(ns, 1) == size(s, 1) - 1  % 1 : un niveau de moins
+
+  Voir aussi UPWLEV, WAVEDEC2, APPCOEF2, IDWT2.
 ```
 
 ## `wavedec`
@@ -995,6 +1262,32 @@ WAVEFUN Fonctions d'échelle et d'ondelette, par l'algorithme en cascade.
   effectif.
 
   Voir aussi WFILTERS, CENTFRQ, UPCOEF, MEXIHAT, MORLET, GAUSWAVF.
+```
+
+## `wavefun2`
+
+```
+WAVEFUN2 Fonctions d'échelle et d'ondelettes en deux dimensions.
+  [PHI,PSIH,PSIV,PSID,XYVAL] = WAVEFUN2(NOM,ITER) approche les quatre
+  fonctions de la base bidimensionnelle, obtenues par produit des
+  fonctions à une dimension :
+
+     phi(x,y)  = phi(x) phi(y)      approximation
+     psiH(x,y) = phi(x) psi(y)      détail horizontal
+     psiV(x,y) = psi(x) phi(y)      détail vertical
+     psiD(x,y) = psi(x) psi(y)      détail diagonal
+
+  La séparabilité est ce qui rend la transformée d'image aussi rapide
+  que celle d'un signal : on filtre les lignes, puis les colonnes.
+
+  XYVAL est la grille commune, celle que rend WAVEFUN.
+
+  Exemple :
+     [phi, ph, pv, pd, xy] = wavefun2('db2', 6);
+     size(phi)
+     abs(sum(pd(:)))                % nul : le détail est de moyenne nulle
+
+  Voir aussi WAVEFUN, WFILTERS, DWT2, WAVEDEC2.
 ```
 
 ## `waveinfo`
@@ -1072,6 +1365,34 @@ WCONV1 Convolution monodimensionnelle, orientation conservée.
 WCONV2 Convolution bidimensionnelle.
 ```
 
+## `wden`
+
+```
+WDEN Débruitage automatique par seuillage des coefficients.
+  XD = WDEN(X,TPTR,SORH,SCAL,N,NOM) décompose X sur N niveaux avec
+  l'ondelette NOM, seuille les détails, puis reconstruit.
+    TPTR   règle du seuil : 'rigrsure', 'heursure', 'sqtwolog',
+           'minimaxi'
+    SORH   's' pour un seuillage doux, 'h' pour un seuillage dur
+    SCAL   'one'  le bruit est d'écart type un
+           'sln'  écart type estimé une fois, sur le premier niveau
+           'mln'  écart type estimé niveau par niveau
+
+  [XD,C,L] = WDEN(...) rend aussi la décomposition débruitée.
+  WDEN(C,L,TPTR,SORH,SCAL,N,NOM) part d'une décomposition déjà faite.
+
+  C'est l'interface d'origine, celle de Donoho et Johnstone. WDENOISE
+  est plus récente et offre davantage de règles ; WDEN reste là parce
+  que beaucoup de code l'emploie.
+
+  Exemple :
+     [propre, bruite] = wnoise(3, 10, 7, 5);
+     xd = wden(bruite, 'sqtwolog', 's', 'sln', 3, 'db4');
+     norm(xd - propre) < norm(bruite - propre)   % vrai
+
+  Voir aussi WDENOISE, WDENCMP, THSELECT, WNOISEST, WTHRESH.
+```
+
 ## `wdencmp`
 
 ```
@@ -1129,10 +1450,64 @@ WDENOISE Débruitage d'un signal par seuillage des coefficients d'ondelettes.
   Voir aussi WDENCMP, THSELECT, WNOISEST, WTHRESH.
 ```
 
+## `wdenoise2`
+
+```
+WDENOISE2 Débruitage d'une image par seuillage des coefficients.
+  XD = WDENOISE2(X) débruite l'image X en la décomposant sur bior4.4,
+  au niveau le plus profond que sa taille permette, puis en seuillant
+  les détails par la règle bayésienne empirique.
+
+  XD = WDENOISE2(X,NIVEAU) impose le niveau.
+
+  XD = WDENOISE2(...,'Wavelet',NOM) change d'ondelette,
+  'DenoisingMethod',M la règle du seuil — 'Bayes' (défaut),
+  'UniversalThreshold', 'SURE' ou 'Minimax' —, 'ThresholdRule',R le
+  seuillage — 'Soft' (défaut) ou 'Hard' —, 'NoiseEstimate',E
+  l'estimation du bruit — 'LevelIndependent' (défaut) ou
+  'LevelDependent'.
+
+  [XD,CD,CO] = WDENOISE2(...) rend aussi les coefficients débruités et
+  ceux d'origine, au format de WAVEDEC2.
+
+  Une image couleur est traitée plan par plan.
+
+  Exemple :
+     propre = double(magic(64));
+     bruite = propre + 3 * randn(64);
+     xd = wdenoise2(bruite);
+     norm(xd - propre, 'fro') < norm(bruite - propre, 'fro')   % vrai
+
+  Voir aussi WDENOISE, WDENCMP, WTHCOEF2, WNOISEST, WTHRESH.
+```
+
 ## `wenergy`
 
 ```
 WENERGY Répartition de l'énergie entre approximation et détails.
+```
+
+## `wenergy2`
+
+```
+WENERGY2 Répartition de l'énergie d'une image décomposée.
+  [EA,EH,EV,ED] = WENERGY2(C,S) rend le pourcentage d'énergie porté par
+  l'approximation, puis, du niveau un au niveau le plus grossier, celui
+  des détails horizontaux, verticaux et diagonaux.
+
+  [EA,ED] = WENERGY2(C,S) range les trois familles de détails dans une
+  matrice à trois colonnes, un niveau par ligne, comme MATLAB.
+
+  L'énergie se conserve pour une ondelette orthogonale : les
+  pourcentages somment alors exactement à cent. Pour une biorthogonale
+  ils somment à peu près, le banc n'étant pas orthogonal.
+
+  Exemple :
+     [c, s] = wavedec2(magic(16), 2, 'haar');
+     [ea, ed] = wenergy2(c, s);
+     ea + sum(ed(:))                % 100
+
+  Voir aussi WENERGY, WAVEDEC2, DETCOEF2, APPCOEF2.
 ```
 
 ## `wextend`
@@ -1163,6 +1538,63 @@ WEXTEND Prolonge un signal ou une image aux bords.
      wextend('1D', 'ppd',   [1 2 3], 2)   % [2 3 1 2 3 1 2]
 
   Voir aussi WKEEP, DWT.
+```
+
+## `wfbm`
+
+```
+WFBM Mouvement brownien fractionnaire.
+  FBM = WFBM(H,L) tire un mouvement brownien fractionnaire de L points,
+  de paramètre de Hurst H compris strictement entre zéro et un.
+
+  H = 0,5 donne le mouvement brownien ordinaire, à accroissements
+  indépendants. Au-dessus, les accroissements sont corrélés
+  positivement : la trajectoire persiste dans sa direction. En dessous,
+  ils s'opposent : elle revient sans cesse sur ses pas.
+
+  [FBM,BRUIT] = WFBM(H,L) rend en outre le bruit gaussien
+  fractionnaire, dont FBM est la somme cumulée.
+
+  La synthèse est celle de Davies et Harte : le bruit fractionnaire est
+  engendré par plongement circulant de sa matrice de covariance, ce qui
+  donne des échantillons de covariance exacte — et non approchée.
+  MATLAB emploie une synthèse par ondelettes ; les deux tirent la même
+  loi.
+
+  Exemple :
+     x = wfbm(0.7, 1024);
+     wfbmesti(x)                    % trois estimations, voisines de 0,7
+
+  Voir aussi WFBMESTI, WNOISE, RANDN, CUMSUM.
+```
+
+## `wfbmesti`
+
+```
+WFBMESTI Estimation du paramètre de Hurst d'un mouvement fractionnaire.
+  H = WFBMESTI(X) rend trois estimations, dans un vecteur :
+    H(1)  par la variance des différences secondes discrètes
+    H(2)  par la pente du logarithme de la variance des détails
+          d'ondelettes en fonction du niveau
+    H(3)  par la même pente, pondérée par le nombre de coefficients
+          de chaque niveau
+
+  Les trois reposent sur la même propriété : le mouvement
+  fractionnaire est auto-similaire, si bien que ce qu'on mesure à
+  l'échelle 2^j croît comme 2^(j(2H+1)). Elles ne se trompent pas de la
+  même façon, ce qui rend leur écart instructif.
+
+  Sur quatre mille points, comptez quelques centièmes d'erreur au
+  dessus de H = 0,5, davantage en dessous : les estimations par
+  ondelettes sous-estiment alors d'environ cinq centièmes, la relation
+  d'échelle ne s'établissant qu'aux niveaux assez grossiers.
+
+  Exemple :
+     x = wfbm(0.7, 4096);
+     h = wfbmesti(x);
+     abs(h - 0.7) < 0.1             % vrai, aux trois
+
+  Voir aussi WFBM, MODWTVAR, WAVEDEC.
 ```
 
 ## `wfilters`
@@ -1302,10 +1734,70 @@ WTHCOEF Annule, atténue ou seuille les coefficients d'une décomposition.
   Voir aussi WTHRESH, WDENCMP, WAVEDEC.
 ```
 
+## `wthcoef2`
+
+```
+WTHCOEF2 Annule, atténue ou seuille les coefficients d'une image.
+  NC = WTHCOEF2('h',C,S) annule tous les détails horizontaux ; 'v' et
+  'd' font de même pour les verticaux et les diagonaux, 'a' pour
+  l'approximation.
+  NC = WTHCOEF2(GENRE,C,S,N) n'agit que sur les niveaux nommés par N.
+  NC = WTHCOEF2(GENRE,C,S,N,P) multiplie le niveau N(i) par P(i).
+  NC = WTHCOEF2('t',C,S,N,T,SORH) seuille les trois détails du niveau
+  N(i) au seuil T(i), par seuillage dur ('h', défaut) ou doux ('s').
+
+  Exemple :
+     [c, s] = wavedec2(magic(16), 2, 'db2');
+     nc = wthcoef2('h', c, s, 1);         % le détail horizontal fin part
+     nc = wthcoef2('t', c, s, 1:2, 5, 's');
+
+  Voir aussi WTHCOEF, WTHRESH, WDENCMP, WAVEDEC2.
+```
+
 ## `wthresh`
 
 ```
 WTHRESH Seuillage des coefficients d'ondelettes.
   Y = WTHRESH(X,'s',T) applique le seuillage doux, 'h' le seuillage dur.
+```
+
+## `wvarchg`
+
+```
+WVARCHG Détection de ruptures de variance.
+  [PTS,KOPT] = WVARCHG(Y,K,D) cherche jusqu'à K instants où la variance
+  du signal Y change. D est le nombre minimal d'échantillons entre deux
+  ruptures (dix par défaut) ; K vaut six par défaut.
+
+  [PTS,KOPT,CONTRASTES] = WVARCHG(...) rend en outre, pour chaque
+  nombre de ruptures de zéro à K, la valeur du contraste et les
+  instants trouvés : CONTRASTES(J+1) va avec la ligne J+1 de la
+  cellule PTS.
+
+  La recherche est exacte, non gloutonne : une programmation dynamique
+  parcourt toutes les découpes possibles et garde celle qui minimise
+
+     somme_segments n_i log(variance_i),
+
+  c'est-à-dire l'opposé de la vraisemblance gaussienne. Le nombre de
+  ruptures est choisi par pénalisation : on retient le plus grand K
+  dont l'ajout fait encore baisser le contraste d'au moins 4 log(n).
+  Une rupture ajoute deux paramètres — sa position et une variance —,
+  ce que le critère bayésien facturerait 2 log(n) ; sur du bruit pur ce
+  seuil laisse encore passer une découpe de temps en temps, et le
+  doubler l'écarte sans manquer les vraies ruptures, qui gagnent
+  d'ordinaire cent fois plus.
+
+  Appliquée aux détails d'ondelettes plutôt qu'au signal, elle détecte
+  les changements de régime d'une série dont la moyenne bouge aussi :
+  les détails effacent la tendance.
+
+  Exemple :
+     y = [randn(1, 200), 4 * randn(1, 200), randn(1, 200)];
+     [pts, k] = wvarchg(y, 3);
+     k                              % 2 : deux ruptures
+     sort(pts)                      % voisins de 200 et 400
+
+  Voir aussi WNOISEST, MODWTVAR, WDEN.
 ```
 

@@ -11,9 +11,15 @@ function [swa, swd] = swt(x, niveaux, nom)
 %
 %   Exemple :
 %      [a, d] = swt(1:8, 2, 'haar');
+%
+%   Voir aussi ISWT, SWT2, MODWT, DWT.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
-    % L'analyse corrèle avec les filtres de reconstruction, comme DWT.
-    [~, ~, Lo_D, Hi_D] = wfilters(nom);
+    % L'analyse corrèle avec les filtres d'analyse renversés, comme DWT.
+    % Pour une ondelette orthogonale c'est la synthèse ; pour une
+    % biorthogonale, les deux diffèrent.
+    [analyseBas, analyseHaut] = wfilters(nom, 'd');
+    Lo_D = analyseBas(end:-1:1);
+    Hi_D = analyseHaut(end:-1:1);
     x = double(x(:)).';
     n = numel(x);
     if mod(n, 2 ^ niveaux) ~= 0

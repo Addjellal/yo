@@ -168,6 +168,22 @@ qu'ils ne font pas encore comme MATLAB.
 - **`meyer`** échantillonne par transformée de Fourier inverse sur une
   grille dont le nombre de points doit être une puissance de deux ;
   MATLAB accepte n'importe quelle longueur.
+- **Un seul mode de prolongement.** `dwt`, `wavedec` et leurs voisines
+  analysent en périodique. `dwtmode` lit et pose le mode, mais refuse
+  tout ce qui n'est pas `'per'` au lieu d'analyser autrement que promis ;
+  `wextend`, lui, connaît les neuf prolongements.
+- **`icwt`** ne rend que ce que les échelles demandées couvrent : la
+  composante continue et le hors-bande sont perdus, ce qui est fidèle à
+  ce que la transformée a gardé. Là où MATLAB emploie un banc de filtres
+  analytique, MatLibre mesure le filtre que forment analyse et somme,
+  puis l'inverse dans sa bande — quelques centièmes d'erreur relative
+  loin des bords.
+- **`wfbmesti`** sous-estime H d'environ cinq centièmes en dessous de
+  0,5 : la relation d'échelle ne s'établit qu'aux niveaux grossiers, et
+  la régression ne garde que les octaves du milieu.
+- **`wvarchg`** choisit le nombre de ruptures avec une pénalité de
+  4 log(n), deux fois celle du critère bayésien : celle-ci laissait
+  passer une découpe de temps en temps sur du bruit pur.
 
 ### Statistiques et apprentissage
 

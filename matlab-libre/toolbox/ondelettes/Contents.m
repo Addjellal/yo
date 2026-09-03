@@ -9,6 +9,7 @@
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
 %   wavenames         - Liste des ondelettes disponibles
+%   dwtmode           - Mode de prolongement des bords
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
 %   scal2frq          - Conversion échelle vers fréquence
@@ -37,11 +38,28 @@
 %   upwlev            - Remontée d'un niveau dans la décomposition
 %   wenergy           - Répartition de l'énergie par niveau
 %
+% Transformée stationnaire et à chevauchement maximal
+%   swt, iswt         - Transformée stationnaire d'un signal
+%   swt2, iswt2       - La même, pour une image
+%   modwt, imodwt     - Transformée à chevauchement maximal
+%   modwtmra          - Analyse multirésolution correspondante
+%   modwtvar          - Variance par échelle
+%   modwtcorr         - Corrélation par échelle entre deux signaux
+%   modwtxcorr        - Corrélation croisée par échelle
+%
+% Transformée continue
+%   cwt, icwt         - Transformée continue et son inverse
+%
 % Transformée discrète, deux dimensions
 %   dwt2, idwt2       - Transformée à un niveau et son inverse
 %   wavedec2, waverec2 - Décomposition et reconstruction multiniveaux
 %   appcoef2, detcoef2 - Extraction des coefficients d'un niveau
 %   wrcoef2           - Reconstruction d'un seul niveau
+%   upcoef2           - Reconstruction directe d'un bloc de coefficients
+%   upwlev2           - Remontée d'un niveau dans la décomposition
+%   wenergy2          - Répartition de l'énergie par niveau
+%   wthcoef2          - Seuillage ou atténuation par bloc
+%   wavefun2          - Les quatre fonctions de la base bidimensionnelle
 %   wcodemat          - Mise à l'échelle pour l'affichage
 %
 % Transformées redondantes
@@ -58,7 +76,15 @@
 %   ddencmp           - Réglages par défaut du débruitage
 %   wdencmp           - Débruitage ou compression par seuillage
 %   wdenoise          - Débruitage par seuillage universel
+%   wdenoise2         - Le même, pour une image
+%   wden              - Débruitage automatique, interface d'origine
 %   wnoise            - Signaux d'essai de Donoho et Johnstone
+%   measerr           - Mesures de qualité : PSNR, erreur, énergie gardée
+%
+% Séries longue mémoire
+%   wfbm              - Mouvement brownien fractionnaire
+%   wfbmesti          - Estimation du paramètre de Hurst
+%   wvarchg           - Détection de ruptures de variance
 %
 % Outils sur les signaux
 %   wextend           - Prolongement aux bords (9 modes)

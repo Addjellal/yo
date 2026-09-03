@@ -9,12 +9,12 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 424 | 2 | 100 % |
-| ondelettes | 64 | 48 | 57 % |
+| ondelettes | 82 | 29 | 74 % |
 | optimisation | 31 | 1 | 97 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1244** | **52** | **96 %** |
+| **ensemble** | **1262** | **33** | **97 %** |
 
 ## matlab-langage
 
@@ -23,12 +23,10 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 ## ondelettes
 
 `besttree`, `coifwavf`, `cwtfilterbank`, `cwtfreqbounds`, `depo2ind`, `dtfilters`
-`dualtree`, `dwtfilterbank`, `dwtmode`, `icwt`, `imodwpt`, `ind2depo`, `iswt2`
-`leaves`, `measerr`, `modwpt`, `modwtcorr`, `modwtvar`, `modwtxcorr`, `mra`
-`ntnode`, `swt2`, `tnodes`, `treedpth`, `upcoef2`, `upwlev2`, `wavefun2`
-`wavemngr`, `wcoherence`, `wden`, `wdenoise2`, `wenergy2`, `wfbm`, `wfbmesti`
-`wpcoef`, `wpdec`, `wpdec2`, `wpdencmp`, `wpfun`, `wpjoin`, `wprcoef`, `wprec`
-`wprec2`, `wpsplt`, `wpthcoef`, `wsst`, `wthcoef2`, `wvarchg`
+`dualtree`, `dwtfilterbank`, `imodwpt`, `ind2depo`, `leaves`, `modwpt`, `ntnode`
+`tnodes`, `treedpth`, `wavemngr`, `wcoherence`, `wpcoef`, `wpdec`, `wpdec2`
+`wpdencmp`, `wpfun`, `wpjoin`, `wprcoef`, `wprec`, `wprec2`, `wpsplt`, `wpthcoef`
+`wsst`
 
 ## optimisation
 
@@ -186,6 +184,28 @@ qu'ils ne font pas encore comme MATLAB.
 - **`linprog` et `quadprog`** minimisent une barrière logarithmique par
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
+
+### Ondelettes
+
+- **Familles construites, non recopiées** : `dbaux`, `symaux` et
+  `biorwavf` sortent d'une factorisation spectrale, non d'une table.
+  L'accord avec MATLAB est celui de la construction elle-même : exact
+  pour les splines biorthogonales, et à la précision machine pour dbN et
+  symN jusqu'à l'ordre vingt environ.
+- **`bior5.5` et `bior6.8`** ne sont pas des splines : MATLAB les tire
+  d'un ajustement au plus près de l'orthonormalité, que MatLibre ne
+  reproduit pas. Ces deux noms sont refusés plutôt qu'approchés ; les
+  treize autres, `bior4.4` — le couple 9/7 de JPEG 2000 — compris, sont
+  là. `coifwavf` et les coiflets manquent pour la même raison.
+- **Zéros de complètement** : MATLAB centre les filtres biorthogonaux
+  dans un tableau de longueur commune. MatLibre les place là où
+  l'alignement des deux filtres l'exige — un décalage impair changerait
+  la parité du demi-bande et le repliement ne s'annulerait plus. Les
+  coefficients non nuls sont les mêmes, leur position dans le tableau
+  peut différer d'un rang.
+- **`meyer`** échantillonne par transformée de Fourier inverse sur une
+  grille dont le nombre de points doit être une puissance de deux ;
+  MATLAB accepte n'importe quelle longueur.
 
 ### Statistiques et apprentissage
 

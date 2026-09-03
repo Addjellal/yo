@@ -7,8 +7,10 @@ function x = iswt(swa, swd, nom)
 %   Exemple :
 %      [a, d] = swt(1:8, 2, 'haar');
 %      max(abs(iswt(a, d, 'haar') - (1:8)))   % nul
+%
+%   Voir aussi SWT, ISWT2, IMODWT, IDWT.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
-    [~, ~, Lo_D, Hi_D] = wfilters(nom);
+    [Lo_D, Hi_D] = wfilters(nom, 'r');
     niveaux = size(swd, 1);
     if isvector(swa)
         courant = swa(:)';
