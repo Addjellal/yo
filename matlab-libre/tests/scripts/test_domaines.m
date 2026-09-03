@@ -300,6 +300,123 @@ for nom = {'haar', 'db2', 'db4', 'db6', 'sym4', 'sym8'}
     [unNiveauA, unNiveauD] = dwt(signal, nom{1});
     assert(max(abs(idwt(unNiveauA, unNiveauD, nom{1}) - signal)) < 1e-10);
 end
+% Les familles de filtres se construisent au lieu d'etre recopiees, et
+% chacune se verifie sur ce qui la definit.
+for N = 1:8
+    filtreDb = dbaux(N);
+    assert(numel(filtreDb) == 2 * N && abs(sum(filtreDb) - 1) < 1e-12);
+    assert(abs(sum(dbaux(N, 0) .^ 2) - 1) < 1e-10);
+    filtreSym = symaux(N);
+    assert(numel(filtreSym) == 2 * N && abs(sum(filtreSym) - 1) < 1e-12);
+end
+assert(isequal(dbwavf('haar'), dbwavf('db1')));
+assert(max(abs(dbwavf('db4') - dbaux(4))) < 1e-15);
+assert(max(abs(symwavf('sym4') - symaux(4))) < 1e-15);
+% Les moments nuls de dbN : la somme alternee ponderee par n^k s'annule
+% pour k jusqu'a N-1. C'est ce qui definit l'ondelette.
+filtreOrtho = dbaux(5, 0);
+rangs = 0:(numel(filtreOrtho) - 1);
+for k = 0:4
+    assert(abs(sum((-1) .^ rangs .* rangs .^ k .* filtreOrtho)) < 1e-8);
+end
+% Le symlet est plus symetrique que la Daubechies de meme ordre.
+asymetrie = @(h) sum((h - fliplr(h)) .^ 2);
+assert(asymetrie(symaux(6, 0)) < asymetrie(dbaux(6, 0)));
+
+% Biorthogonales : la reconstruction est parfaite et le repliement
+% s'annule, ce qui ne va pas de soi puisque le banc n'est pas orthogonal.
+famille = {'haar', 'db4', 'sym6', 'bior1.1', 'bior1.3', 'bior1.5', ...
+           'bior2.2', 'bior2.4', 'bior2.6', 'bior2.8', 'bior3.1', ...
+           'bior3.3', 'bior3.5', 'bior3.7', 'bior3.9', 'bior4.4', ...
+           'rbio1.3', 'rbio2.2', 'rbio4.4'};
+signalLong = cos((1:128) / 7) + (1:128) / 90;
+for k = 1:numel(famille)
+    [lod, hid, lor, hir] = wfilters(famille{k});
+    alterne = (-1) .^ (0:(numel(lod) - 1));
+    distorsion = conv(lod, lor) + conv(hid, hir);
+    repliement = conv(lod .* alterne, lor) + conv(hid .* alterne, hir);
+    [~, pic] = max(abs(distorsion));
+    assert(abs(distorsion(pic) - 2) < 1e-10, famille{k});
+    assert(max(abs(distorsion([1:pic-1, pic+1:end]))) < 1e-10, famille{k});
+    assert(max(abs(repliement)) < 1e-10, famille{k});
+    [aUn, dUn] = dwt(signalLong, famille{k});
+    assert(max(abs(idwt(aUn, dUn, famille{k}) - signalLong)) < 1e-9, famille{k});
+    [cBior, lBior] = wavedec(signalLong, 3, famille{k});
+    assert(max(abs(waverec(cBior, lBior, famille{k}) - signalLong)) < 1e-9, famille{k});
+end
+% Les filtres biorthogonaux sont symetriques ; aucun filtre orthogonal a
+% support compact ne l'est, sauf Haar. Les zeros de complement, eux, ne
+% sont pas repartis symetriquement : c'est l'alignement des deux filtres
+% qui commande leur place, non l'esthetique.
+utile = @(v) v(find(abs(v) > 1e-12, 1):find(abs(v) > 1e-12, 1, 'last'));
+[rfBior, dfBior] = biorwavf('bior2.2');
+assert(max(abs(utile(rfBior) - fliplr(utile(rfBior)))) < 1e-15);
+assert(max(abs(utile(dfBior) - fliplr(utile(dfBior)))) < 1e-15);
+assert(numel(utile(rfBior)) == 3 && numel(utile(dfBior)) == 5);
+% bior4.4 est le couple 9/7 de JPEG 2000 : neuf et sept coefficients.
+[rf44, df44] = biorwavf('bior4.4');
+assert(sum(abs(rf44) > 1e-12) == 7 && sum(abs(df44) > 1e-12) == 9);
+% rbio echange les deux roles.
+[rfR, dfR] = rbiowavf('rbio2.2');
+assert(max(abs(rfR - dfBior)) < 1e-15 && max(abs(dfR - rfBior)) < 1e-15);
+% Les deux noms que la construction spline ne donne pas sont refuses.
+for nomRefuse = {'bior5.5', 'bior6.8'}
+    refuse = false;
+    try
+        biorwavf(nomRefuse{1});
+    catch
+        refuse = true;
+    end
+    assert(refuse, nomRefuse{1});
+end
+% IDWT sait tronquer a la longueur voulue.
+[aImpair, dImpair] = dwt(1:7, 'db2');
+assert(numel(idwt(aImpair, dImpair, 'db2', 7)) == 7);
+
+% Meyer : sa fonction auxiliaire est le polynome plat aux deux bouts.
+assert(abs(meyeraux(0)) < 1e-15 && abs(meyeraux(1) - 1) < 1e-15);
+for t = [0.1 0.3 0.5 0.7 0.9]
+    assert(abs(meyeraux(t) + meyeraux(1 - t) - 1) < 1e-12);
+end
+[psiMeyer, xMeyer] = meyer(-8, 8, 1024);
+assert(abs(trapz(xMeyer, psiMeyer)) < 1e-4);
+assert(abs(trapz(xMeyer, psiMeyer .^ 2) - 1) < 1e-2);
+[phiMeyer, xPhi] = meyer(-8, 8, 1024, 'phi');
+assert(abs(trapz(xPhi, phiMeyer) - 1) < 1e-2);
+
+% Ondelettes continues complexes : energie unite et moyenne nulle a tout
+% ordre, spectre centre sur la frequence demandee.
+for ordre = 1:8
+    [psiC, xC] = cgauwavf(-8, 8, 4001, ordre);
+    assert(abs(trapz(xC, abs(psiC) .^ 2) - 1) < 1e-6);
+    assert(abs(trapz(xC, psiC)) < 1e-6);
+end
+psiMorlet = cmorwavf(-16, 16, 4096, 1, 2);
+spectre = fftshift(abs(fft(psiMorlet)));
+frequences = (-2048:2047) / 32;
+[~, iPic] = max(spectre);
+assert(abs(frequences(iPic) - 2) < 0.05);
+% Shannon : le spectre occupe exactement [fc-fb/2, fc+fb/2].
+psiShannon = shanwavf(-64, 64, 8192, 1, 1.5);
+spectreShannon = fftshift(abs(fft(psiShannon)));
+fShannon = (-4096:4095) / 128;
+dans = spectreShannon > 0.3 * max(spectreShannon);
+assert(abs(min(fShannon(dans)) - 1) < 0.05 && abs(max(fShannon(dans)) - 2) < 0.05);
+% L'ondelette spline d'ordre un est celle de Shannon.
+assert(max(abs(fbspwavf(-20, 20, 1000, 1, 1, 1.5) - ...
+                shanwavf(-20, 20, 1000, 1, 1.5))) < 1e-14);
+
+% La liste des noms couvre ce que WFILTERS sait construire.
+assert(numel(wavenames('orthogonal')) == 91);
+nomsBior = wavenames('biorthogonal');
+assert(any(strcmp(nomsBior, 'bior4.4')) && any(strcmp(nomsBior, 'rbio4.4')));
+for k = 1:numel(nomsBior)
+    [loBanc, ~, ~, ~] = wfilters(nomsBior{k});
+    assert(abs(sum(loBanc) - sqrt(2)) < 1e-10, nomsBior{k});
+end
+assert(numel(wavenames) == numel(wavenames('orthogonal')) + ...
+       numel(wavenames('biorthogonal')) + numel(wavenames('continuous')));
+
 % Somme des reconstructions partielles : a3 + d3 + d2 + d1 == signal.
 [cc, ll] = wavedec(signal, 3, 'db4');
 recomposition = wrcoef('a', cc, ll, 'db4', 3);

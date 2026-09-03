@@ -9,15 +9,26 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 424 | 2 | 100 % |
+| ondelettes | 64 | 48 | 57 % |
 | optimisation | 31 | 1 | 97 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
-| **ensemble** | **1180** | **4** | **100 %** |
+| **ensemble** | **1244** | **52** | **96 %** |
 
 ## matlab-langage
 
 `attributes`, `empty`
+
+## ondelettes
+
+`besttree`, `coifwavf`, `cwtfilterbank`, `cwtfreqbounds`, `depo2ind`, `dtfilters`
+`dualtree`, `dwtfilterbank`, `dwtmode`, `icwt`, `imodwpt`, `ind2depo`, `iswt2`
+`leaves`, `measerr`, `modwpt`, `modwtcorr`, `modwtvar`, `modwtxcorr`, `mra`
+`ntnode`, `swt2`, `tnodes`, `treedpth`, `upcoef2`, `upwlev2`, `wavefun2`
+`wavemngr`, `wcoherence`, `wden`, `wdenoise2`, `wenergy2`, `wfbm`, `wfbmesti`
+`wpcoef`, `wpdec`, `wpdec2`, `wpdencmp`, `wpfun`, `wpjoin`, `wprcoef`, `wprec`
+`wprec2`, `wpsplt`, `wpthcoef`, `wsst`, `wthcoef2`, `wvarchg`
 
 ## optimisation
 

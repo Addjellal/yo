@@ -256,7 +256,16 @@ FONCTION(fnPolyder) {
     if (n <= 1) return {Valeur::scalaire(0)};
     std::vector<double> d;
     for (int k = 0; k < n - 1; ++k) d.push_back(p.re[(std::size_t)k] * (n - 1 - k));
-    return {Valeur::ligne(d)};
+    Valeur sortie = Valeur::ligne(d);
+    // Un polynome a coefficients complexes se derive coefficient par
+    // coefficient comme un autre : ne deriver que la partie reelle
+    // rendait faux tout calcul sur un polynome complexe.
+    if (p.estComplexe()) {
+        std::vector<double> di;
+        for (int k = 0; k < n - 1; ++k) di.push_back(p.im[(std::size_t)k] * (n - 1 - k));
+        sortie.im = di;
+    }
+    return {sortie};
 }
 
 FONCTION(fnPolyint) {
@@ -267,7 +276,14 @@ FONCTION(fnPolyint) {
     std::vector<double> d;
     for (int k = 0; k < n; ++k) d.push_back(p.re[(std::size_t)k] / (n - k));
     d.push_back(args.size() > 1 ? args[1].scal() : 0.0);
-    return {Valeur::ligne(d)};
+    Valeur sortie = Valeur::ligne(d);
+    if (p.estComplexe()) {
+        std::vector<double> di;
+        for (int k = 0; k < n; ++k) di.push_back(p.im[(std::size_t)k] / (n - k));
+        di.push_back(args.size() > 1 && args[1].estComplexe() ? args[1].im[0] : 0.0);
+        sortie.im = di;
+    }
+    return {sortie};
 }
 
 FONCTION(fnDeconv) {

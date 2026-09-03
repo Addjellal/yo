@@ -981,7 +981,17 @@ FONCTION(fnCumtrapz) {
     std::vector<double> r(y.nelem(), 0.0);
     for (std::size_t k = 1; k < y.nelem(); ++k)
         r[k] = r[k - 1] + 0.5 * (x[k] - x[k - 1]) * (y.re[k] + y.re[k - 1]);
-    return {y.estColonne() ? Valeur::colonne(r) : Valeur::ligne(r)};
+    Valeur sortie = y.estColonne() ? Valeur::colonne(r) : Valeur::ligne(r);
+    // La partie imaginaire s'integre comme la reelle : l'oublier rendait
+    // muette l'integration d'un signal analytique ou d'une ondelette
+    // complexe.
+    if (y.estComplexe()) {
+        std::vector<double> ri(y.nelem(), 0.0);
+        for (std::size_t k = 1; k < y.nelem(); ++k)
+            ri[k] = ri[k - 1] + 0.5 * (x[k] - x[k - 1]) * (y.im[k] + y.im[k - 1]);
+        sortie.im = ri;
+    }
+    return {sortie};
 }
 
 FONCTION(fnTrapz) {
@@ -998,7 +1008,11 @@ FONCTION(fnTrapz) {
     double s = 0;
     for (std::size_t k = 1; k < y.nelem(); ++k)
         s += 0.5 * (x[k] - x[k - 1]) * (y.re[k] + y.re[k - 1]);
-    return {Valeur::scalaire(s)};
+    if (!y.estComplexe()) return {Valeur::scalaire(s)};
+    double si = 0;
+    for (std::size_t k = 1; k < y.nelem(); ++k)
+        si += 0.5 * (x[k] - x[k - 1]) * (y.im[k] + y.im[k - 1]);
+    return {Valeur::complexe(s, si)};
 }
 
 FONCTION(fnMagic) {

@@ -4,17 +4,31 @@
 % Wavelet Toolbox — analyse en ondelettes.
 %
 % Bancs de filtres
-%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar)
+%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar,
+%                       biorNr.Nd, rbioNd.Nr)
 %   orthfilt          - Banc orthogonal à partir du filtre d'échelle
+%   biorfilt          - Banc biorthogonal à partir des deux filtres
 %   daubechiesFiltre  - Filtre de Daubechies par factorisation spectrale
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
-%   mexihat           - Chapeau mexicain
-%   morlet            - Ondelette de Morlet réelle
-%   gauswavf          - Dérivées de la gaussienne, ordres 1 à 8
+%   wavenames         - Liste des ondelettes disponibles
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
 %   scal2frq          - Conversion échelle vers fréquence
+%
+% Familles d'ondelettes
+%   dbaux, dbwavf     - Filtre d'échelle de Daubechies, par ordre ou par nom
+%   symaux, symwavf   - Filtre d'échelle d'un symlet
+%   biorwavf          - Couple biorthogonal spline
+%   rbiowavf          - Le même, analyse et synthèse échangées
+%   meyer, meyeraux   - Ondelette de Meyer et sa fonction de transition
+%   mexihat           - Chapeau mexicain
+%   morlet            - Ondelette de Morlet réelle
+%   gauswavf          - Dérivées de la gaussienne, ordres 1 à 8
+%   cgauwavf          - Les mêmes, modulées : gaussiennes complexes
+%   cmorwavf          - Morlet complexe
+%   shanwavf          - Ondelette de Shannon
+%   fbspwavf          - Spline en fréquence
 %
 % Transformée discrète, une dimension
 %   dwt, idwt         - Transformée à un niveau et son inverse
@@ -72,6 +86,79 @@ APPCOEF2 Coefficients d'approximation d'une image décomposée.
   A = APPCOEF2(C,S,NOM,N) reconstruit l'approximation du niveau N.
 ```
 
+## `biorfilt`
+
+```
+BIORFILT Banc de filtres biorthogonal à partir des deux filtres d'échelle.
+  [LO_D,HI_D,LO_R,HI_R] = BIORFILT(DF,RF) construit le banc à partir du
+  filtre d'échelle d'analyse DF et de celui de synthèse RF, que rend
+  BIORWAVF.
+
+  Les relations sont celles du banc biorthogonal :
+
+     Lo_D[n] = DF[N+1-n],       Lo_R[n] = RF[n],
+     Hi_D[n] = (-1)^n Lo_R[n],  Hi_R[n] = (-1)^(n+1) Lo_D[n],
+
+  chaque filtre d'échelle étant d'abord normalisé à une somme de racine
+  de deux. Le passe-haut d'analyse se lit sur le passe-bas de synthèse,
+  et le passe-haut de synthèse sur le passe-bas d'analyse : c'est là
+  toute la différence avec l'orthogonal, où un seul filtre suffit. Le
+  croisement est ce qui fait que
+
+     conv(Lo_D,Lo_R) + conv(Hi_D,Hi_R)
+
+  vaut deux au centre et zéro partout ailleurs — la reconstruction
+  parfaite.
+
+  Ces relations donnent Hi_D(z) = -Lo_R(-z) et Hi_R(z) = Lo_D(-z) :
+  c'est ce qui annule le repliement, la partie du signal que le
+  sous-échantillonnage a repliée. Encore faut-il que les deux filtres
+  d'échelle soient alignés à un décalage pair près, faute de quoi le
+  demi-bande change de parité et le repliement subsiste — la distorsion
+  restant nulle, l'erreur ne se voit qu'à la reconstruction. C'est
+  pourquoi les zéros de complètement s'ajoutent par paires à gauche.
+
+  Exemple :
+     [df, rf] = biorwavf('bior2.2');
+     [lod, hid, lor, hir] = biorfilt(df, rf);
+     max(abs(conv(lod, lor) + conv(hid, hir) - ...
+             [zeros(1, numel(lod) - 1), 2, zeros(1, numel(lod) - 1)]))
+
+  Voir aussi BIORWAVF, RBIOWAVF, ORTHFILT, WFILTERS.
+```
+
+## `biorwavf`
+
+```
+BIORWAVF Filtres d'une ondelette biorthogonale spline.
+  [RF,DF] = BIORWAVF('biorNr.Nd') rend le filtre d'échelle de synthèse
+  RF et celui d'analyse DF, tous deux de somme un et complétés de zéros
+  pour avoir la même longueur — c'est la convention de MATLAB.
+
+  La construction est celle de Cohen, Daubechies et Feauveau : le
+  filtre de synthèse est le spline d'ordre Nr, c'est-à-dire le binôme
+  (1+z)^Nr ; le produit des deux filtres doit être le demi-bande de
+  Daubechies d'ordre L = (Nr+Nd)/2, ce qui détermine l'analyse. Nr+Nd
+  doit donc être pair.
+
+  L'intérêt du biorthogonal est la symétrie : aucune ondelette
+  orthogonale à support compact ne l'est, sauf Haar. On la retrouve en
+  séparant analyse et synthèse.
+
+  Les noms reconnus sont bior1.1, 1.3, 1.5, 2.2, 2.4, 2.6, 2.8, 3.1,
+  3.3, 3.5, 3.7, 3.9 et 4.4 — cette dernière étant le couple 9/7 de
+  JPEG 2000. bior5.5 et bior6.8 de MATLAB ne sont pas des splines mais
+  des couples ajustés au plus près de l'orthonormalité : ils ne sortent
+  pas de cette construction, et sont refusés plutôt qu'approchés.
+
+  Exemple :
+     [rf, df] = biorwavf('bior2.2');
+     sum(rf)                        % 1
+     max(abs(rf - fliplr(rf)))      % 0 : le filtre est symétrique
+
+  Voir aussi BIORFILT, RBIOWAVF, WFILTERS, DBWAVF.
+```
+
 ## `centfrq`
 
 ```
@@ -100,6 +187,53 @@ CENTFRQ Fréquence centrale d'une ondelette.
      centfrq('morl')   % 0.8125 = 13/16
 
   Voir aussi SCAL2FRQ, WAVEFUN.
+```
+
+## `cgauwavf`
+
+```
+CGAUWAVF Ondelette gaussienne complexe.
+  [PSI,X] = CGAUWAVF(LB,UB,N,P) échantillonne sur N points de [LB,UB]
+  la dérivée P-ième de exp(-i x) exp(-x^2), normalisée à une norme deux
+  unitaire. P va de 1 à 8.
+
+  La modulation par exp(-i x) rend l'ondelette complexe : sa
+  transformée ne couvre que les pulsations positives, si bien que la
+  transformée continue en rend module et phase séparément — ce qu'une
+  ondelette réelle ne permet pas.
+
+  La dérivée se calcule par récurrence sur le polynôme qui multiplie
+  l'exponentielle : P_0 = 1, P_{k+1} = P_k' + (-2x - i) P_k.
+
+  Exemple :
+     [psi, x] = cgauwavf(-5, 5, 1000, 1);
+     trapz(x, abs(psi) .^ 2)        % un
+     abs(trapz(x, psi))             % nul : moyenne nulle
+
+  Voir aussi GAUSWAVF, CMORWAVF, SHANWAVF, MEXIHAT, CWT.
+```
+
+## `cmorwavf`
+
+```
+CMORWAVF Ondelette de Morlet complexe.
+  [PSI,X] = CMORWAVF(LB,UB,N,FB,FC) échantillonne sur N points de
+  [LB,UB] l'ondelette
+
+     psi(x) = 1/sqrt(pi FB) exp(2 i pi FC x) exp(-x^2 / FB),
+
+  où FB est le paramètre de largeur de bande (un par défaut) et FC la
+  fréquence centrale (un par défaut).
+
+  C'est une gaussienne modulée : sa transformée est une gaussienne
+  centrée sur FC. Plus FB est grand, plus l'ondelette est étalée en
+  temps et fine en fréquence — c'est le réglage du compromis.
+
+  Exemple :
+     [psi, x] = cmorwavf(-8, 8, 1000, 1.5, 1);
+     trapz(x, abs(psi) .^ 2)        % 1/sqrt(2 pi FB) : la norme deux
+
+  Voir aussi MORLET, CGAUWAVF, SHANWAVF, FBSPWAVF, CWT.
 ```
 
 ## `convolutionCirculaire`
@@ -163,6 +297,45 @@ DAUBECHIESFILTRE Filtre d'échelle de Daubechies à N moments nuls.
   PHASE vaut 'minimale' (par défaut) ou 'symetrique'.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `dbaux`
+
+```
+DBAUX Filtre d'échelle de Daubechies d'ordre N.
+  W = DBAUX(N) rend le filtre d'échelle de l'ondelette dbN, de longueur
+  2N et de somme un.
+  W = DBAUX(N,SOMME) le normalise à la somme donnée ; SOMME nulle
+  demande la normalisation en norme deux, c'est-à-dire une somme de
+  racine de deux — celle du banc orthonormé.
+
+  Le filtre n'est pas lu dans une table : il vient de la factorisation
+  spectrale du polynôme de Daubechies, et existe donc à tout ordre.
+
+  Exemple :
+     w = dbaux(2);
+     sum(w)                         % 1
+     norme = dbaux(2, 0);
+     sum(norme .^ 2)                % 1 : le filtre orthonormé
+
+  Voir aussi DBWAVF, SYMAUX, WFILTERS, ORTHFILT.
+```
+
+## `dbwavf`
+
+```
+DBWAVF Filtre d'échelle d'une ondelette de Daubechies.
+  F = DBWAVF('dbN') rend le filtre d'échelle de dbN, de longueur 2N et
+  de somme un. C'est DBAUX(N), pris par le nom de l'ondelette.
+
+  'db1' et 'haar' désignent la même ondelette.
+
+  Exemple :
+     F = dbwavf('db4');
+     numel(F)                       % 8
+     sum(F)                         % 1
+
+  Voir aussi DBAUX, SYMWAVF, WFILTERS, WAVEINFO.
 ```
 
 ## `ddencmp`
@@ -229,14 +402,20 @@ DWT Transformée en ondelettes discrète, un niveau.
   NUMEL(X)/2 échantillons.
 
   L'analyse convolue le signal par les filtres de décomposition, ce qui
-  revient à le corréler avec les filtres de reconstruction :
+  revient à le corréler avec ces mêmes filtres renversés :
 
-     A(k) = somme_j Lo_R(j) X(2k-2+j)
-     D(k) = somme_j Hi_R(j) X(2k-2+j)
+     A(k) = somme_j Lo_D(N+1-j) X(2k-2+j)
+     D(k) = somme_j Hi_D(N+1-j) X(2k-2+j)
+
+  Pour une ondelette orthogonale, Lo_D renversé est Lo_R : c'est la
+  forme habituelle. Pour une biorthogonale les deux diffèrent, et c'est
+  bien le filtre d'analyse qu'il faut employer ici.
 
   Exemple :
      [a, d] = dwt([1 2 3 4], 'haar')   % a = [2.1213 4.9497]
                                        % d = [-0.7071 -0.7071]
+
+  Voir aussi IDWT, WAVEDEC, WFILTERS, SWT, MODWT.
 ```
 
 ## `dwt2`
@@ -274,6 +453,67 @@ DYADUP Suréchantillonnage dyadique : un zéro entre deux échantillons.
      dyadup([1 2 3], 0)   % [0 1 0 2 0 3 0]
 ```
 
+## `fbspwavf`
+
+```
+FBSPWAVF Ondelette spline en fréquence.
+  [PSI,X] = FBSPWAVF(LB,UB,N,M,FB,FC) échantillonne sur N points de
+  [LB,UB] l'ondelette
+
+     psi(x) = sqrt(FB) sinc(FB x / M)^M exp(2 i pi FC x),
+
+  où M est l'ordre du spline (entier au moins un, deux par défaut), FB
+  la largeur de bande (un par défaut) et FC la fréquence centrale (un
+  par défaut).
+
+  Élever le sinus cardinal à la puissance M revient à convoler la porte
+  avec elle-même M fois : la transformée est le spline d'ordre M, donc
+  toujours à support borné, mais de bords adoucis. M vaut un pour
+  l'ondelette de Shannon.
+
+  Exemple :
+     [psi, x] = fbspwavf(-20, 20, 1000, 2, 1, 1.5);
+     [shan, ~] = fbspwavf(-20, 20, 1000, 1, 1, 1.5);
+     max(abs(shan - shanwavf(-20, 20, 1000, 1, 1.5)))   % nul
+
+  Voir aussi SHANWAVF, CMORWAVF, CGAUWAVF, CWT.
+```
+
+## `filtresSplines`
+
+```
+FILTRESSPLINES Couple de filtres biorthogonaux splines.
+  [RF,DF] = FILTRESSPLINES(NR,ND) construit le couple de Cohen,
+  Daubechies et Feauveau : RF est le binôme d'ordre NR, DF le filtre
+  d'ordre ND qui complète le demi-bande.
+
+  Le produit RF(z) DF(1/z) doit valoir le demi-bande de Daubechies
+
+     H(w) = 2 (1-y)^L P(y),   y = sin(w/2)^2,   L = (Nr+Nd)/2,
+     P(y) = somme_{k<L} C(L-1+k,k) y^k,
+
+  qui est le seul polynôme de ce degré à annuler ses L premières
+  dérivées aux deux bouts.
+
+  Reste à répartir P entre les deux filtres. Jusqu'à l'ordre trois,
+  tout P va du côté de l'analyse : la synthèse est alors le spline pur,
+  ce qui est la famille « bior » de Cohen, Daubechies et Feauveau — le
+  5/3 de bior2.2, le 8/4 de bior3.3. À l'ordre quatre, ce partage
+  donnerait un filtre de cinq coefficients contre un de onze ; on
+  partage alors les racines en deux groupes de longueurs aussi voisines
+  que possible, ce qui donne pour bior4.4 une analyse de neuf
+  coefficients et une synthèse de sept — le couple 9/7 de JPEG 2000.
+
+  Un groupe de racines n'est pas séparable : il réunit une racine, sa
+  conjuguée, son inverse et l'inverse de sa conjuguée. C'est ce qui
+  garde chaque filtre réel et symétrique.
+
+  Les deux filtres sortent de même longueur, complétés de zéros comme
+  le fait MATLAB, et de somme un.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `gauswavf`
 
 ```
@@ -299,14 +539,19 @@ GAUSWAVF Ondelettes gaussiennes : les dérivées de exp(-x^2).
 
 ```
 IDWT Reconstruction à partir de l'approximation et du détail.
-  X = IDWT(A,D,NOM) inverse DWT. Le banc étant orthogonal et
-  l'extension périodique, l'inverse est l'adjoint de l'analyse : on
-  redistribue chaque coefficient sur les positions que la corrélation
-  avait lues.
+  X = IDWT(A,D,NOM) inverse DWT. L'extension étant périodique,
+  l'inverse redistribue chaque coefficient sur les positions que
+  l'analyse avait lues, cette fois avec les filtres de synthèse.
+
+  X = IDWT(A,D,NOM,L) ne garde que les L premiers échantillons : c'est
+  ce qu'il faut quand le signal analysé était de longueur impaire, DWT
+  l'ayant alors prolongé d'un point.
 
   Exemple :
      [a, d] = dwt(1:8, 'db2');
      max(abs(idwt(a, d, 'db2') - (1:8)))   % nul à l'arrondi près
+
+  Voir aussi DWT, WAVEREC, WFILTERS.
 ```
 
 ## `idwt2`
@@ -361,6 +606,58 @@ MEXIHAT Ondelette « chapeau mexicain ».
   Voir aussi MORLET, GAUSWAVF, CWT.
 ```
 
+## `meyer`
+
+```
+MEYER Ondelette et fonction d'échelle de Meyer.
+  [PSI,X] = MEYER(LB,UB,N) échantillonne l'ondelette de Meyer sur N
+  points de [LB,UB]. N doit être une puissance de deux.
+  [PHI,X] = MEYER(LB,UB,N,'phi') rend la fonction d'échelle ;
+  'psi' (défaut) rend l'ondelette.
+
+  L'ondelette de Meyer est définie par sa transformée de Fourier, à
+  support borné et infiniment dérivable :
+
+     phi(w) = 1                          si |w| <= 2 pi/3,
+     phi(w) = cos(pi/2 nu(3|w|/(2pi)-1)) si 2 pi/3 <= |w| <= 4 pi/3,
+     phi(w) = 0                          au-delà,
+
+  où nu est MEYERAUX. L'ondelette s'en déduit par la relation
+  habituelle du banc de filtres. Elle n'est pas à support compact, mais
+  décroît plus vite que toute puissance : c'est le compromis inverse de
+  celui des Daubechies.
+
+  Exemple :
+     [psi, x] = meyer(-8, 8, 1024);
+     abs(trapz(x, psi))             % nul : moyenne nulle
+
+  Voir aussi MEYERAUX, MORLET, MEXIHAT, WAVEFUN.
+```
+
+## `meyeraux`
+
+```
+MEYERAUX Fonction auxiliaire de l'ondelette de Meyer.
+  Y = MEYERAUX(X) évalue
+
+     nu(x) = 35 x^4 - 84 x^5 + 70 x^6 - 20 x^7.
+
+  C'est le polynôme de plus bas degré qui vaut zéro en zéro, un en un,
+  et dont les trois premières dérivées s'annulent aux deux bouts. Il
+  sert de transition douce dans la fenêtre de Meyer : c'est cette
+  platitude qui donne à l'ondelette sa décroissance rapide.
+
+  La fonction complémentaire vérifie nu(x) + nu(1-x) = 1, ce qui fait
+  de la fenêtre une partition de l'unité.
+
+  Exemple :
+     meyeraux(0)                    % 0
+     meyeraux(1)                    % 1
+     meyeraux(0.5) + meyeraux(0.5)  % 1
+
+  Voir aussi MEYER, MORLET, MEXIHAT.
+```
+
 ## `modwt`
 
 ```
@@ -407,6 +704,37 @@ MORLET Ondelette de Morlet réelle.
   Voir aussi MEXIHAT, GAUSWAVF, CWT.
 ```
 
+## `normaliserSomme`
+
+```
+NORMALISERSOMME Met un filtre d'échelle à la somme demandée.
+  W = NORMALISERSOMME(W,SOMME) met la somme de W à SOMME. Une somme
+  nulle veut dire « norme deux unitaire », ce qui pour un filtre
+  d'échelle revient à une somme de racine de deux : c'est la convention
+  de DBAUX et SYMAUX.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `ordreDeNom`
+
+```
+ORDREDENOM Ordre lu dans le nom d'une ondelette.
+  ORDRE = ORDREDENOM('db4','db') rend 4. 'haar' vaut 'db1'.
+  Le nom est refusé s'il n'appartient pas à la famille demandée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `ordresBior`
+
+```
+ORDRESBIOR Les deux ordres lus dans un nom « biorNr.Nd ».
+  [NR,ND] = ORDRESBIOR('bior2.4','bior') rend 2 et 4.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `orthfilt`
 
 ```
@@ -439,6 +767,38 @@ QMF Miroir en quadrature d'un filtre.
      qmf([1 2 3 4])   % [4 -3 2 -1]
 ```
 
+## `rbiowavf`
+
+```
+RBIOWAVF Filtres d'une biorthogonale spline inversée.
+  [RF,DF] = RBIOWAVF('rbioNd.Nr') est BIORWAVF('biorNr.Nd') avec les
+  deux filtres échangés : ce qui servait à l'analyse sert à la
+  synthèse. C'est utile quand on veut la régularité du côté de
+  l'analyse plutôt que de la reconstruction.
+
+  Les noms reconnus sont ceux de BIORWAVF, dans l'ordre inversé :
+  rbio1.1, 1.3, 1.5, 2.2, 2.4, 2.6, 2.8, 3.1, 3.3, 3.5, 3.7, 3.9, 4.4.
+
+  Exemple :
+     [rf, df] = rbiowavf('rbio2.2');
+     [rf2, df2] = biorwavf('bior2.2');
+     max(abs(rf - df2))             % 0 : les rôles sont échangés
+
+  Voir aussi BIORWAVF, BIORFILT, WFILTERS.
+```
+
+## `refuserHorsSpline`
+
+```
+REFUSERHORSSPLINE Écarte les biorthogonales qui ne sont pas des splines.
+  MATLAB nomme « bior5.5 » et « bior6.8 » deux couples de Cohen et
+  Daubechies ajustés au plus près de l'orthonormalité, non des splines :
+  ils ne sortent pas de la construction de FILTRESSPLINES, et rendre
+  autre chose sous leur nom tromperait l'appelant.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `scal2frq`
 
 ```
@@ -449,6 +809,29 @@ SCAL2FRQ Conversion des échelles en fréquences.
 
   Exemple :
      scal2frq(1:8, 'db4', 0.001)
+```
+
+## `shanwavf`
+
+```
+SHANWAVF Ondelette de Shannon complexe.
+  [PSI,X] = SHANWAVF(LB,UB,N,FB,FC) échantillonne sur N points de
+  [LB,UB] l'ondelette
+
+     psi(x) = sqrt(FB) sinc(FB x) exp(2 i pi FC x),
+
+  où sinc(x) = sin(pi x) / (pi x). FB est la largeur de bande (un par
+  défaut), FC la fréquence centrale (un par défaut).
+
+  Sa transformée est une porte : le support en fréquence est exactement
+  [FC - FB/2, FC + FB/2]. En échange elle décroît lentement en temps,
+  comme 1/x — c'est l'exact opposé de la gaussienne.
+
+  Exemple :
+     [psi, x] = shanwavf(-20, 20, 1000, 1, 1.5);
+     max(abs(imag(psi)))            % non nul : l'ondelette est complexe
+
+  Voir aussi FBSPWAVF, CMORWAVF, CGAUWAVF, CWT.
 ```
 
 ## `supportOndeletteContinue`
@@ -483,6 +866,43 @@ SWT Transformée en ondelettes stationnaire, sans sous-échantillonnage.
 
   Exemple :
      [a, d] = swt(1:8, 2, 'haar');
+```
+
+## `symaux`
+
+```
+SYMAUX Filtre d'échelle d'un symlet d'ordre N.
+  W = SYMAUX(N) rend le filtre d'échelle de l'ondelette symN, de
+  longueur 2N et de somme un.
+  W = SYMAUX(N,SOMME) le normalise à la somme donnée ; SOMME nulle
+  demande la normalisation en norme deux.
+
+  Le symlet a les mêmes moments nuls que dbN : c'est l'autre
+  factorisation spectrale du même polynôme, celle dont la phase
+  s'écarte le moins de la linéarité — d'où un filtre presque
+  symétrique.
+
+  Exemple :
+     w = symaux(4);
+     sum(w)                         % 1
+     numel(w)                       % 8
+
+  Voir aussi SYMWAVF, DBAUX, WFILTERS, ORTHFILT.
+```
+
+## `symwavf`
+
+```
+SYMWAVF Filtre d'échelle d'un symlet.
+  F = SYMWAVF('symN') rend le filtre d'échelle de symN, de longueur 2N
+  et de somme un. C'est SYMAUX(N), pris par le nom de l'ondelette.
+
+  Exemple :
+     F = symwavf('sym4');
+     numel(F)                       % 8
+     sum(F)                         % 1
+
+  Voir aussi SYMAUX, DBWAVF, WFILTERS, WAVEINFO.
 ```
 
 ## `thselect`
@@ -582,8 +1002,11 @@ WAVEFUN Fonctions d'échelle et d'ondelette, par l'algorithme en cascade.
 ```
 WAVEINFO Renseignements sur une ondelette ou une famille d'ondelettes.
   WAVEINFO affiche la liste des familles disponibles.
-  WAVEINFO(FAMILLE) décrit la famille : 'haar', 'db', 'sym'.
-  WAVEINFO(NOM) décrit une ondelette précise : 'db4', 'sym8'.
+  WAVEINFO(FAMILLE) décrit la famille : 'haar', 'db', 'sym', 'bior',
+  'rbio', 'meyr', 'mexh', 'morl', 'gaus', 'cgau', 'cmor', 'shan',
+  'fbsp'.
+  WAVEINFO(NOM) décrit une ondelette précise : 'db4', 'sym8',
+  'bior4.4'.
   T = WAVEINFO(...) rend le texte au lieu de l'afficher.
 
   Exemples :
@@ -592,6 +1015,27 @@ WAVEINFO Renseignements sur une ondelette ou une famille d'ondelettes.
      waveinfo('db4')
 
   Voir aussi WFILTERS, WAVEFUN, CENTFRQ.
+```
+
+## `wavenames`
+
+```
+WAVENAMES Noms des ondelettes disponibles.
+  NOMS = WAVENAMES rend, dans une cellule, le nom de toutes les
+  ondelettes que MatLibre sait construire.
+  NOMS = WAVENAMES('orthogonal') ne rend que les orthogonales,
+  'biorthogonal' que les biorthogonales, 'continuous' que celles de la
+  transformée continue, 'all' toutes.
+
+  Les familles dbN et symN existent à tout ordre : la liste s'arrête à
+  quarante-cinq, comme celle de MATLAB, mais WFILTERS accepte au-delà.
+
+  Exemple :
+     noms = wavenames('biorthogonal');
+     numel(noms)
+     any(strcmp(noms, 'bior4.4'))   % 1 : le 9/7 de JPEG 2000
+
+  Voir aussi WFILTERS, WAVEINFO, BIORWAVF, DBWAVF.
 ```
 
 ## `waverec`
@@ -725,12 +1169,18 @@ WEXTEND Prolonge un signal ou une image aux bords.
 
 ```
 WFILTERS Bancs de filtres d'analyse et de synthèse.
-  [LO_D,HI_D,LO_R,HI_R] = WFILTERS(NOM) où NOM vaut 'haar', 'dbN' ou
-  'symN'. Les coefficients ne sont pas recopiés d'une table : ils sont
-  construits par factorisation spectrale du polynôme de Daubechies, ce
-  qui les rend disponibles à n'importe quel ordre. L'orthogonalité du
-  banc reste au niveau de la précision machine jusqu'à db20 environ, et
-  meilleure que 1e-9 jusqu'à db45.
+  [LO_D,HI_D,LO_R,HI_R] = WFILTERS(NOM) où NOM vaut 'haar', 'dbN',
+  'symN', 'biorNr.Nd' ou 'rbioNd.Nr'. Les coefficients ne sont pas
+  recopiés d'une table : ils sont construits par factorisation
+  spectrale du polynôme de Daubechies, ce qui les rend disponibles à
+  n'importe quel ordre. L'orthogonalité du banc reste au niveau de la
+  précision machine jusqu'à db20 environ, et meilleure que 1e-9 jusqu'à
+  db45.
+
+  Une biorthogonale n'est pas orthogonale : son banc vient de BIORFILT,
+  et c'est la reconstruction qui est parfaite, non l'orthogonalité. En
+  échange, les filtres sont symétriques — ce qu'aucune orthogonale à
+  support compact n'est, sauf Haar.
 
   WFILTERS(NOM,'d') ne rend que les filtres d'analyse, 'r' que ceux de
   synthèse, 'l' les passe-bas, 'h' les passe-haut ; les deux sorties
@@ -739,8 +1189,9 @@ WFILTERS Bancs de filtres d'analyse et de synthèse.
   Exemple :
      [lod, hid, lor, hir] = wfilters('db4');
      [lod, hid] = wfilters('db4', 'd');
+     [lod, hid, lor, hir] = wfilters('bior2.2');
 
-  Voir aussi DWT, WAVEDEC, ORTHFILT.
+  Voir aussi DWT, WAVEDEC, ORTHFILT, BIORFILT, WAVENAMES.
 ```
 
 ## `wkeep`

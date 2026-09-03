@@ -147,6 +147,28 @@ qu'ils ne font pas encore comme MATLAB.
   Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
   duales ni analyse de sensibilité.
 
+### Ondelettes
+
+- **Familles construites, non recopiées** : `dbaux`, `symaux` et
+  `biorwavf` sortent d'une factorisation spectrale, non d'une table.
+  L'accord avec MATLAB est celui de la construction elle-même : exact
+  pour les splines biorthogonales, et à la précision machine pour dbN et
+  symN jusqu'à l'ordre vingt environ.
+- **`bior5.5` et `bior6.8`** ne sont pas des splines : MATLAB les tire
+  d'un ajustement au plus près de l'orthonormalité, que MatLibre ne
+  reproduit pas. Ces deux noms sont refusés plutôt qu'approchés ; les
+  treize autres, `bior4.4` — le couple 9/7 de JPEG 2000 — compris, sont
+  là. `coifwavf` et les coiflets manquent pour la même raison.
+- **Zéros de complètement** : MATLAB centre les filtres biorthogonaux
+  dans un tableau de longueur commune. MatLibre les place là où
+  l'alignement des deux filtres l'exige — un décalage impair changerait
+  la parité du demi-bande et le repliement ne s'annulerait plus. Les
+  coefficients non nuls sont les mêmes, leur position dans le tableau
+  peut différer d'un rang.
+- **`meyer`** échantillonne par transformée de Fourier inverse sur une
+  grille dont le nombre de points doit être une puissance de deux ;
+  MATLAB accepte n'importe quelle longueur.
+
 ### Statistiques et apprentissage
 
 - **Objets de modèle** : MATLAB rend des objets — `ClassificationSVM`,

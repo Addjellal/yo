@@ -1,17 +1,31 @@
 % Wavelet Toolbox — analyse en ondelettes.
 %
 % Bancs de filtres
-%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar)
+%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar,
+%                       biorNr.Nd, rbioNd.Nr)
 %   orthfilt          - Banc orthogonal à partir du filtre d'échelle
+%   biorfilt          - Banc biorthogonal à partir des deux filtres
 %   daubechiesFiltre  - Filtre de Daubechies par factorisation spectrale
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
-%   mexihat           - Chapeau mexicain
-%   morlet            - Ondelette de Morlet réelle
-%   gauswavf          - Dérivées de la gaussienne, ordres 1 à 8
+%   wavenames         - Liste des ondelettes disponibles
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
 %   scal2frq          - Conversion échelle vers fréquence
+%
+% Familles d'ondelettes
+%   dbaux, dbwavf     - Filtre d'échelle de Daubechies, par ordre ou par nom
+%   symaux, symwavf   - Filtre d'échelle d'un symlet
+%   biorwavf          - Couple biorthogonal spline
+%   rbiowavf          - Le même, analyse et synthèse échangées
+%   meyer, meyeraux   - Ondelette de Meyer et sa fonction de transition
+%   mexihat           - Chapeau mexicain
+%   morlet            - Ondelette de Morlet réelle
+%   gauswavf          - Dérivées de la gaussienne, ordres 1 à 8
+%   cgauwavf          - Les mêmes, modulées : gaussiennes complexes
+%   cmorwavf          - Morlet complexe
+%   shanwavf          - Ondelette de Shannon
+%   fbspwavf          - Spline en fréquence
 %
 % Transformée discrète, une dimension
 %   dwt, idwt         - Transformée à un niveau et son inverse

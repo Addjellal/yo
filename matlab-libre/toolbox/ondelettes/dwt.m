@@ -6,18 +6,26 @@ function [approximation, detail] = dwt(x, nom)
 %   NUMEL(X)/2 échantillons.
 %
 %   L'analyse convolue le signal par les filtres de décomposition, ce qui
-%   revient à le corréler avec les filtres de reconstruction :
+%   revient à le corréler avec ces mêmes filtres renversés :
 %
-%      A(k) = somme_j Lo_R(j) X(2k-2+j)
-%      D(k) = somme_j Hi_R(j) X(2k-2+j)
+%      A(k) = somme_j Lo_D(N+1-j) X(2k-2+j)
+%      D(k) = somme_j Hi_D(N+1-j) X(2k-2+j)
+%
+%   Pour une ondelette orthogonale, Lo_D renversé est Lo_R : c'est la
+%   forme habituelle. Pour une biorthogonale les deux diffèrent, et c'est
+%   bien le filtre d'analyse qu'il faut employer ici.
 %
 %   Exemple :
 %      [a, d] = dwt([1 2 3 4], 'haar')   % a = [2.1213 4.9497]
 %                                        % d = [-0.7071 -0.7071]
+%
+%   Voir aussi IDWT, WAVEDEC, WFILTERS, SWT, MODWT.
     if nargin < 2
         nom = 'haar';
     end
-    [~, ~, Lo_R, Hi_R] = wfilters(nom);
+    [Lo_D, Hi_D] = wfilters(nom, 'd');
+    Lo_R = Lo_D(end:-1:1);
+    Hi_R = Hi_D(end:-1:1);
     x = x(:).';
     n = numel(x);
     if mod(n, 2) == 1
