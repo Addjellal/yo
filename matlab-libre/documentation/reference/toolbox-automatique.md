@@ -19,6 +19,8 @@
 %   pzplot, rlocusplot - Les mêmes, sous leur autre nom
 %   stabsep           - Sépare partie stable et partie instable
 %   hasdelay, totaldelay, pade - Retards et leur approximation
+%   thiran            - Retard fractionnaire par un passe-tout
+%   delayss           - Modèle d'état à retards internes
 %   prescale          - Met le modèle à l'échelle pour le calcul
 %   dcgain, damp      - Gain statique, pulsations et amortissements
 %   order             - Nombre d'états
@@ -44,6 +46,12 @@
 %   sgrid, zgrid, ngrid - Grilles d'amortissement et abaque de Nichols
 %   bandwidth         - Bande passante à -3 décibels
 %
+% Unités et options de tracé
+%   chgTimeUnit       - Change l'unité de temps d'un modèle
+%   chgFreqUnit       - Change l'unité de fréquence d'un modèle
+%   bodeoptions       - Options d'un diagramme de Bode
+%   stepDataOptions   - Niveaux de l'échelon d'une réponse indicielle
+%
 % Interconnexions
 %   feedback, series, parallel - Boucle, cascade, somme
 %   loopsens          - Les six sensibilités d'une boucle
@@ -51,6 +59,7 @@
 %   append            - Juxtaposition sans connexion
 %   lft               - Produit étoile : rebouclage partiel
 %   connect, sumblk   - Assemblage par les noms des signaux
+%   getBlockValue     - Valeur d'un bloc réglable d'un assemblage
 %
 % Structure et changements de base
 %   ctrb, obsv        - Matrices de commandabilité et d'observabilité
@@ -81,6 +90,14 @@
 %   pid, pidstd       - Correcteur PID, formes parallèle et standard
 %   pidtune           - Réglage d'un PID par la marge de phase
 %   rlocus            - Lieu des racines
+%
+% Vues d'ensemble
+%   pidtool           - Règle un PID et montre la boucle obtenue
+%   sisotool          - Lieu des racines, Bode et réponse indicielle
+%
+% Les applications interactives de MATLAB — PIDTOOL, SISOTOOL — sont ici
+% des fonctions qui calculent et tracent une fois : il n'y a pas de
+% curseur à déplacer.
 ```
 
 ## `acker`
@@ -254,12 +271,17 @@ BODE Diagramme de Bode : module et phase de la réponse fréquentielle.
   Pour un modèle échantillonné, la réponse est évaluée sur le cercle
   unité, en exp(j*W*Ts) ; pour un modèle continu, en j*W.
 
+  BODE(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé :
+  FreqUnits, MagUnits, PhaseUnits, Grid, XLim, YLim, Title, XLabel et
+  YLabel sont suivis.
+
   Exemples :
      bode(tf(1, [1 2 1]))
      bode(tf(1, [1 1]), tf(1, [1 0.2 1]), logspace(-2, 2, 500))
      [m, p] = bode(tf(1, [1 1]), 1);   % m = 0.7071, p = -45
 
-  Voir aussi BODEMAG, NICHOLS, NYQUIST, SIGMA, MARGIN, FREQRESP.
+  Voir aussi BODEMAG, NICHOLS, NYQUIST, SIGMA, MARGIN, FREQRESP,
+  BODEOPTIONS.
 ```
 
 ## `bodemag`
@@ -280,11 +302,36 @@ BODEMAG Diagramme de Bode du seul module.
   [MODULE,W] = BODEMAG(SYS) ne trace rien et rend le module linéaire et
   la grille employée.
 
+  BODEMAG(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé,
+  comme pour BODE.
+
   Exemple :
      G = tf(1, [1 0.2 1]);
      bodemag(feedback(G, 1), 'b', G, 'r--')
 
-  Voir aussi BODE, SIGMA, NICHOLS, FREQRESP.
+  Voir aussi BODE, SIGMA, NICHOLS, FREQRESP, BODEOPTIONS.
+```
+
+## `bodeoptions`
+
+```
+BODEOPTIONS Options d'un diagramme de Bode.
+  O = BODEOPTIONS rend une structure d'options de tracé, que BODE
+  accepte comme dernier argument : unités, grille, plages, titres.
+  O = BODEOPTIONS('cstprefs') part des préférences enregistrées ;
+  MatLibre n'en garde pas, et rend les mêmes valeurs par défaut.
+
+  Champs traités par MatLibre : FreqUnits, MagUnits, PhaseUnits, Grid,
+  XLim, YLim, Title, XLabel, YLabel. Les autres sont acceptés et
+  conservés, pour que le code écrit pour MATLAB s'exécute.
+
+  Exemple :
+     o = bodeoptions;
+     o.FreqUnits = 'Hz';
+     o.Grid = 'on';
+     bode(tf(1, [1 1]), o);
+
+  Voir aussi BODE, BODEMAG, NICHOLS, NYQUIST, STEPDATAOPTIONS.
 ```
 
 ## `c2d`
@@ -350,6 +397,41 @@ CARE Équation de Riccati algébrique continue.
      max(real(eig([0 1; 0 0] - [0; 1] * K))) < 0     % la boucle est stable
 
   Voir aussi DARE, LQR, LYAP, HINFSYN.
+```
+
+## `chgFreqUnit`
+
+```
+CHGFREQUNIT Change l'unité de fréquence d'un modèle.
+  SYS = CHGFREQUNIT(SYS,UNITE) réécrit un modèle de réponse en
+  fréquence dans une autre unité, sans changer ce qu'il décrit.
+  UNITE vaut 'rad/TimeUnit', 'cycles/TimeUnit', 'rad/s', 'Hz', 'kHz',
+  'MHz', 'GHz' ou 'rpm'.
+
+  Exemple :
+     reponse = frd([1 0.5], [1 10]);
+     enHertz = chgFreqUnit(reponse, 'Hz');
+
+  Voir aussi CHGTIMEUNIT, FRD, BODE.
+```
+
+## `chgTimeUnit`
+
+```
+CHGTIMEUNIT Change l'unité de temps d'un modèle.
+  SYS = CHGTIMEUNIT(SYS,UNITE) réécrit le modèle dans une autre unité
+  de temps, sans changer ce qu'il décrit : les constantes de temps sont
+  converties, si bien qu'une réponse tracée dans la nouvelle unité a la
+  même forme.
+
+  UNITE vaut 'nanoseconds', 'microseconds', 'milliseconds', 'seconds',
+  'minutes', 'hours', 'days', 'weeks', 'months' ou 'years'.
+
+  Exemple :
+     sys = tf(1, [1 1]);              % une constante de temps d'une seconde
+     lent = chgTimeUnit(sys, 'minutes');
+
+  Voir aussi CHGFREQUNIT, TF, SS, ZPK.
 ```
 
 ## `connect`
@@ -543,6 +625,27 @@ DCGAIN Gain statique d'un modèle.
      dcgain(G)                            % [1 1; 1 1]
 
   Voir aussi BANDWIDTH, STEPINFO, EVALFR, FREQRESP.
+```
+
+## `delayss`
+
+```
+DELAYSS Modèle d'état à retards internes.
+  SYS = DELAYSS(A,B,C,D,DELTA) construit un modèle d'état dont
+  certaines voies sont retardées. DELTA est une matrice dont chaque
+  ligne décrit un retard : [SORTIE, ENTREE, TEMPS], le terme concerné
+  étant retardé de TEMPS secondes.
+
+  MatLibre n'a pas de modèle à retards internes : le retard est rendu
+  par l'approximation de Padé d'ordre 3, ce qui donne un modèle
+  rationnel du même comportement en basse fréquence. MATLAB, lui,
+  garde le retard exact. Ce que le modèle rendu perd, c'est la
+  justesse de la phase au-delà de quelques radians par seconde.
+
+  Exemple :
+     sys = delayss(-1, 1, 1, 0, [1 1 0.5]);   % retard d'une demi-seconde
+
+  Voir aussi SS, PADE, THIRAN, TOTALDELAY, HASDELAY.
 ```
 
 ## `dlqr`
@@ -788,6 +891,25 @@ GENSIG Signaux d'essai périodiques.
      y = lsim(tf(1, [1 1]), u, t);
 
   Voir aussi LSIM, STEP, IMPULSE.
+```
+
+## `getBlockValue`
+
+```
+GETBLOCKVALUE Valeur d'un bloc réglable d'un modèle.
+  V = GETBLOCKVALUE(M,NOM) rend le bloc nommé d'un modèle assemblé par
+  CONNECT ou par une structure de blocs : c'est ainsi qu'on récupère le
+  correcteur d'une boucle une fois réglé.
+
+  MATLAB range les blocs réglables dans un modèle « genss » ; MatLibre
+  n'en a pas, et lit le nom dans une structure de blocs — celle qu'on
+  se donne pour décrire une boucle — ou le nom d'un modèle.
+
+  Exemple :
+     blocs = struct('C', pid(1, 2), 'G', tf(1, [1 1]));
+     C = getBlockValue(blocs, 'C');
+
+  Voir aussi CONNECT, SUMBLK, PID, PIDTUNE, LOOPSENS.
 ```
 
 ## `gram`
@@ -1326,10 +1448,16 @@ MATLIBRE_ARGUMENTS_LTI Découpe la liste d'arguments d'un tracé LTI.
   temporel. Les bornes {WMIN,WMAX} sont acceptées et développées en
   deux cents points logarithmiquement espacés, comme dans MATLAB.
 
+  [MODELES,STYLES,W,OPTIONS] rend en outre la structure d'options
+  passée en dernier — celle que rendent BODEOPTIONS ou
+  STEPDATAOPTIONS —, vide s'il n'y en a pas. Un modèle est un objet
+  (« tf », « ss », « zpk », « frd ») ; une structure nue en dernière
+  place est donc sans ambiguïté un jeu d'options.
+
   Cette fonction est un utilitaire interne de la boîte à outils
   Automatique : elle n'existe pas dans MATLAB.
 
-  Voir aussi BODE, BODEMAG, SIGMA, STEP.
+  Voir aussi BODE, BODEMAG, SIGMA, STEP, BODEOPTIONS, STEPDATAOPTIONS.
 ```
 
 ## `matlibre_cases_bode`
@@ -1470,6 +1598,22 @@ MATLIBRE_RACINE_CARREE Racine carrée d'une matrice symétrique positive.
   Automatique : elle n'existe pas dans MATLAB.
 
   Voir aussi SQRTM, CHOL, EIG.
+```
+
+## `matlibre_reglages_bode`
+
+```
+MATLIBRE_REGLAGES_BODE Ce qu'un tracé retient d'une structure d'options.
+  R = MATLIBRE_REGLAGES_BODE(OPTIONS) lit la structure que rend
+  BODEOPTIONS et en tire ce dont BODE et BODEMAG ont besoin : le
+  diviseur qui porte la pulsation dans l'unité demandée, le choix des
+  décibels, le facteur de phase, la grille, les bornes et les libellés.
+  OPTIONS vide rend les valeurs par défaut.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Voir aussi BODE, BODEMAG, BODEOPTIONS.
 ```
 
 ## `matlibre_riccati`
@@ -1760,6 +1904,29 @@ PIDSTD Correcteur PID sous forme standard.
      tfdata(c)   % [2 2] / [1 0] : 2 + 2/s
 
   Voir aussi PID, PIDTUNE.
+```
+
+## `pidtool`
+
+```
+PIDTOOL Réglage d'un correcteur PID.
+  PIDTOOL(SYS) règle un PID sur le procédé SYS et trace la réponse
+  indicielle de la boucle fermée, avec celle du procédé seul.
+  PIDTOOL(SYS,TYPE) choisit la forme : 'p', 'pi', 'pd', 'pid' ou un
+  correcteur de départ.
+
+  [C,INFO] = PIDTOOL(...) rend le correcteur et les marges obtenues,
+  sans rien tracer.
+
+  MATLAB ouvre une application où l'on déplace deux curseurs — rapidité
+  et robustesse — et voit la réponse changer. MatLibre n'a pas
+  d'application interactive : il règle le correcteur comme le fait
+  PIDTUNE et montre le résultat.
+
+  Exemple :
+     C = pidtool(tf(1, [1 3 3 1]), 'pid');
+
+  Voir aussi PIDTUNE, PID, PIDSTD, MARGIN, STEP.
 ```
 
 ## `pidtune`
@@ -2056,6 +2223,25 @@ SIGMA Valeurs singulières de la réponse fréquentielle.
   Voir aussi FREQRESP, BODE, BODEMAG, HINFNORM.
 ```
 
+## `sisotool`
+
+```
+SISOTOOL Analyse d'une boucle à une entrée et une sortie.
+  SISOTOOL(SYS) trace ensemble le lieu des racines, le diagramme de
+  Bode et la réponse indicielle en boucle fermée : les trois vues qui
+  servent à régler un correcteur.
+  SISOTOOL(SYS,C) place le correcteur C dans la boucle.
+
+  MATLAB ouvre une application où l'on déplace les pôles et les zéros
+  du correcteur à la souris. MatLibre n'a pas d'application
+  interactive : il montre les mêmes vues, calculées une fois.
+
+  Exemple :
+     sisotool(tf(1, [1 3 3 1]));
+
+  Voir aussi RLOCUS, BODE, STEP, MARGIN, PIDTOOL.
+```
+
 ## `ss`
 
 ```
@@ -2171,11 +2357,32 @@ STEP Réponse indicielle.
 
   [Y,T] = STEP(SYS) ne trace rien et rend la réponse et les instants.
 
+  STEP(...,OPTIONS) où OPTIONS vient de STEPDATAOPTIONS part du niveau
+  InputOffset et monte de StepAmplitude, au lieu de l'échelon unité.
+
   Exemple :
      G = tf(1, [1 0.4 1]);
      step(G, feedback(G, 1), 30)
 
-  Voir aussi IMPULSE, LSIM, INITIAL, STEPINFO.
+  Voir aussi IMPULSE, LSIM, INITIAL, STEPINFO, STEPDATAOPTIONS.
+```
+
+## `stepDataOptions`
+
+```
+STEPDATAOPTIONS Options d'une réponse indicielle.
+  O = STEPDATAOPTIONS rend une structure d'options que STEP accepte :
+  elle sert surtout à donner les niveaux de l'échelon.
+
+  O = STEPDATAOPTIONS('InputOffset',U0,'StepAmplitude',A) part du
+  niveau U0 et monte de A : la réponse rendue est alors celle du saut
+  de U0 à U0+A, et non celle du saut unité.
+
+  Exemple :
+     o = stepDataOptions('StepAmplitude', 5);
+     y = step(tf(1, [1 1]), 0:0.1:5, o);
+
+  Voir aussi STEP, STEPINFO, BODEOPTIONS, GENSIG.
 ```
 
 ## `stepinfo`
@@ -2284,6 +2491,33 @@ TFDATA Numérateur et dénominateur d'un modèle.
      [n, d] = tfdata(ss(-1, 1, 1, 0));   % n = [0 1], d = [1 1]
 
   Voir aussi SSDATA, ZPKDATA, TF.
+```
+
+## `thiran`
+
+```
+THIRAN Filtre passe-tout à retard fractionnaire.
+  SYS = THIRAN(RETARD,TS) approche un retard de RETARD secondes par un
+  filtre numérique passe-tout de période d'échantillonnage TS. Le
+  retard n'a pas à être un multiple de TS : la partie fractionnaire est
+  rendue par un passe-tout dont le retard de groupe est maximalement
+  plat en zéro, ce qui est la construction de Thiran.
+
+  Un passe-tout ne change aucun module : seule la phase bouge, comme
+  pour un vrai retard. C'est ce qui le distingue d'une approximation
+  par troncature, qui déforme la réponse.
+
+  Les coefficients viennent de la formule de Thiran :
+
+     a(k) = (-1)^k C(N,k) prod_{i=0..N} (D - N + i) / (D - N + k + i)
+
+  où D est le retard en périodes et N l'ordre du filtre.
+
+  Exemple :
+     sys = thiran(0.25, 0.1);         % 2,5 périodes
+     [~, ~, ~] = zpkdata(sys);
+
+  Voir aussi PADE, C2D, D2D, DELAYSS, ABSORBDELAY.
 ```
 
 ## `totaldelay`

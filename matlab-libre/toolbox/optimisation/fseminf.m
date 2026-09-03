@@ -16,6 +16,8 @@ function [x, valeur, contrainteMax] = fseminf(fonction, x0, nContraintes, semi, 
 %      f = @(x) x(1)^2;
 %      s = @(x, s) deal([], [], x(1) - (0:0.05:1)' - 0.2, s);
 %      x = fseminf(f, 1, 1, s);
+%
+%   Voir aussi FMINCON, FMINIMAX, FGOALATTAIN, OPTIMOPTIONS.
     if nargin < 5, A = []; end
     if nargin < 6, b = []; end
     if nargin < 7, Aeq = []; end

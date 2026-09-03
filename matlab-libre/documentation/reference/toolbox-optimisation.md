@@ -9,6 +9,10 @@
 %   intlinprog  - Variables entières, par séparation et évaluation
 %   bintprog    - Variables binaires
 %
+% Programmation conique
+%   secondordercone - Contrainte ||A*x-b|| <= d'x - gamma
+%   coneprog        - Minimise une forme linéaire sur des cônes
+%
 % Optimisation non linéaire
 %   fmincon     - Minimisation sous contraintes
 %   fminimax    - Minimise le pire des critères
@@ -17,6 +21,14 @@
 %   lsqlin      - Moindres carrés linéaires sous contraintes
 %   lsqcurvefit - Ajustement de courbe
 %   lsqnonlin   - Moindres carrés non linéaires (Levenberg-Marquardt)
+%
+% Écriture par problème
+%   optimvar     - Variable nommée, bornée, éventuellement entière
+%   optimexpr    - Expression linéaire ou quadratique de variables
+%   optimconstr  - Contrainte née d'une comparaison d'expressions
+%   optimproblem - Problème : objectif, sens et contraintes nommées
+%   prob2struct  - Traduit le problème en matrices pour les solveurs
+%   solve        - Résout, en choisissant le solveur selon la forme
 %
 % Réglages
 %   optimoptions - Options d'un solveur, noms modernes et anciens
@@ -35,6 +47,47 @@
 BINTPROG Programmation linéaire en variables binaires, par énumération.
   X = BINTPROG(F,A,B) minimise f'*x sous A*x <= b, x dans {0,1}^n.
   L'énumération est exhaustive : à réserver aux petits problèmes.
+  Vingt-deux variables au plus — au-delà, l'appel est refusé plutôt
+  que laissé tourner ; INTLINPROG, qui coupe l'arbre, prend le relais.
+
+  [X,VAL] = BINTPROG(...) rend aussi la valeur atteinte.
+
+  Exemple :
+     % Un sac à dos : deux objets de valeurs 1 et 2, une seule place.
+     [x, val] = bintprog([-1; -2], [1 1], 1);
+     x                              % [0; 1] : on prend le meilleur
+     val                            % -2
+
+  Voir aussi INTLINPROG, LINPROG, QUADPROG, OPTIMPROBLEM.
+```
+
+## `coneprog`
+
+```
+CONEPROG Programmation sur cône du second ordre.
+  X = CONEPROG(F,CONES) minimise F'*X sous les contraintes de cône
+  décrites par SECONDORDERCONE : chacune impose ||A*x - b|| <= d'x - g.
+  X = CONEPROG(F,CONES,A,B,AEQ,BEQ,LB,UB) ajoute les contraintes
+  linéaires et les bornes.
+
+  Le cône du second ordre couvre bien plus que la programmation
+  linéaire : une contrainte sur la norme d'un vecteur, un compromis
+  entre coût et risque, une distance minimale, s'y écrivent
+  directement — et le problème reste convexe.
+
+  [X,VAL,DRAPEAU] = CONEPROG(...) rend la valeur et l'état.
+
+  MATLAB emploie un algorithme de point intérieur propre aux cônes ;
+  MatLibre traite la contrainte de cône comme une contrainte non
+  linéaire ordinaire et passe par FMINCON. La solution est la même à la
+  précision près, la convergence est plus lente.
+
+  Exemple :
+     % Le point du disque unité le plus loin dans la direction (1,1)
+     c = secondordercone(eye(2), [0; 0], [0; 0], -1);
+     x = coneprog([-1; -1], c);
+
+  Voir aussi SECONDORDERCONE, QUADPROG, LINPROG, FMINCON.
 ```
 
 ## `fgoalattain`
@@ -54,6 +107,8 @@ FGOALATTAIN Atteinte d'objectifs multiples.
   Exemple :
      f = @(x) [x(1)^2, (x(1)-2)^2];
      [x, v, g] = fgoalattain(f, 0, [1 1], [1 1]);
+
+  Voir aussi FMINIMAX, FMINCON, FSEMINF, OPTIMOPTIONS.
 ```
 
 ## `fmincon`
@@ -61,8 +116,27 @@ FGOALATTAIN Atteinte d'objectifs multiples.
 ```
 FMINCON Minimisation sous contraintes, par pénalisation extérieure.
   X = FMINCON(F,X0,A,B) minimise F sous A*x <= b.
-  Les contraintes non linéaires sont données par une fonction rendant
-  [c, ceq] : c <= 0 et ceq == 0.
+  X = FMINCON(F,X0,A,B,AEQ,BEQ,LB,UB,NONLIN) ajoute les égalités, les
+  bornes et les contraintes non linéaires : NONLIN rend [c, ceq], avec
+  c <= 0 et ceq == 0.
+
+  [X,VAL] = FMINCON(...) rend aussi la valeur atteinte.
+
+  La méthode est la pénalisation extérieure : on minimise le critère
+  augmenté du carré des violations, avec un poids qu'on multiplie par
+  quatre à chaque tour. La solution s'approche donc de la frontière
+  par l'extérieur, et une contrainte peut rester violée d'un
+  millième.
+
+  Exemple :
+     % Le point du demi-plan x+y >= 2 le plus proche de l'origine :
+     % c'est (1,1), sur la frontière.
+     f = @(v) v(1)^2 + v(2)^2;
+     x = fmincon(f, [2; 0], [-1 -1], -2);
+     round(x, 2)                    % [1; 1]
+
+  Voir aussi FMINUNC, FMINSEARCH, LINPROG, QUADPROG, CONEPROG,
+  FMINIMAX, OPTIMOPTIONS.
 ```
 
 ## `fminimax`
@@ -70,6 +144,20 @@ FMINCON Minimisation sous contraintes, par pénalisation extérieure.
 ```
 FMINIMAX Minimise le maximum d'un ensemble de fonctions.
   X = FMINIMAX(F,X0) où F(x) rend un vecteur : on minimise max(F(x)).
+  C'est le critère du pire cas : on ne cherche pas la meilleure moyenne
+  mais la plus petite des plus grandes valeurs, ce qui protège du
+  critère le plus mal servi.
+
+  [X,VAL] = FMINIMAX(...) rend en outre la valeur atteinte par ce
+  maximum.
+
+  Exemple :
+     % Deux droites qui se croisent : le maximum est le plus bas là
+     % où elles se coupent, en x = 1.
+     f = @(x) [x - 1; 1 - x];
+     x = fminimax(f, 0)             % 1
+
+  Voir aussi FMINCON, FGOALATTAIN, FMINSEARCH, LSQNONLIN.
 ```
 
 ## `fseminf`
@@ -92,6 +180,8 @@ FSEMINF Minimisation sous contraintes semi-infinies.
      f = @(x) x(1)^2;
      s = @(x, s) deal([], [], x(1) - (0:0.05:1)' - 0.2, s);
      x = fseminf(f, 1, 1, s);
+
+  Voir aussi FMINCON, FMINIMAX, FGOALATTAIN, OPTIMOPTIONS.
 ```
 
 ## `intlinprog`
@@ -108,6 +198,8 @@ INTLINPROG Programmation linéaire en nombres entiers.
 
   Exemple :
      x = intlinprog([-1; -2], [1 2], [1 1], 4, [], [], [0; 0], []);
+
+  Voir aussi LINPROG, QUADPROG, BINTPROG, OPTIMPROBLEM, SOLVE.
 ```
 
 ## `linprog`
@@ -119,7 +211,18 @@ LINPROG Programmation linéaire : minimise f'*x sous A*x <= b.
   une suite décroissante de mu, ce qui converge vers l'optimum du
   problème contraint.
 
-  Les contraintes d'égalité sont traitées par pénalisation quadratique.
+  [X,VAL] = LINPROG(F,A,B,AEQ,BEQ,LB,UB) ajoute les contraintes
+  d'égalité, traitées par pénalisation quadratique, et les bornes. Une
+  borne infinie est reconnue comme telle : elle ne contraint rien.
+
+  Exemple :
+     % Deux ressources, deux produits : on maximise 1*x + 2*y, donc on
+     % minimise l'opposé.
+     [x, val] = linprog([-1; -2], [1 1; 1 3], [4; 6], [], [], [0; 0], []);
+     x                              % [3; 1]
+     val                            % -5
+
+  Voir aussi QUADPROG, INTLINPROG, CONEPROG, LSQLIN, OPTIMPROBLEM.
 ```
 
 ## `lsqcurvefit`
@@ -127,7 +230,21 @@ LINPROG Programmation linéaire : minimise f'*x sous A*x <= b.
 ```
 LSQCURVEFIT Ajustement non linéaire au sens des moindres carrés.
   P = LSQCURVEFIT(MODELE,P0,X,Y) minimise la somme des carrés des écarts
-  entre MODELE(P,X) et Y.
+  entre MODELE(P,X) et Y. P0 est le point de départ ; le modèle prend
+  les paramètres d'abord, l'abscisse ensuite — c'est ce qui distingue
+  LSQCURVEFIT de LSQNONLIN, où l'on écrit soi-même la différence.
+
+  P = LSQCURVEFIT(MODELE,P0,X,Y,LB,UB) borne les paramètres.
+
+  Exemple :
+     % Une exponentielle décroissante, retrouvée à partir de ses
+     % propres valeurs.
+     t = (0:0.5:3)';
+     y = 3 * exp(-0.5 * t);
+     p = lsqcurvefit(@(p, t) p(1) * exp(p(2) * t), [1; -1], t, y);
+     round(p, 3)                    % [3; -0.5]
+
+  Voir aussi LSQNONLIN, LSQLIN, FMINSEARCH, POLYFIT.
 ```
 
 ## `lsqlin`
@@ -135,6 +252,20 @@ LSQCURVEFIT Ajustement non linéaire au sens des moindres carrés.
 ```
 LSQLIN Moindres carrés linéaires avec contraintes de bornes.
   X = LSQLIN(C,D) minimise ||C*x - d||.
+  X = LSQLIN(C,D,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et les
+  bornes. Sans contrainte, la solution est celle de C\D ; les
+  contraintes sont ce qui distingue LSQLIN de l'antislash.
+
+  Exemple :
+     % Le moindres carrés ordinaire, puis le même borné par le haut.
+     C = [1 0; 0 1; 1 1];
+     d = [1; 2; 4];
+     x = lsqlin(C, d);
+     round(x, 3)
+     borne = lsqlin(C, d, [], [], [], [], [], [1; 1]);
+     round(borne, 3)                % chaque terme au plus 1
+
+  Voir aussi LSQNONNEG, LSQNONLIN, LINPROG, QUADPROG, MLDIVIDE.
 ```
 
 ## `lsqnonlin`
@@ -152,6 +283,45 @@ LSQNONLIN Moindres carrés non linéaires.
      % Ajustement de a*exp(b*t) sur des données exactes.
      t = (0:0.5:2)';  y = 3 * exp(-0.5 * t);
      p = lsqnonlin(@(p) p(1) * exp(p(2) * t) - y, [1; -1]);
+
+  Voir aussi LSQCURVEFIT, LSQLIN, FSOLVE, FMINSEARCH.
+```
+
+## `optimconstr`
+
+```
+OPTIMCONSTR Contrainte d'un problème d'optimisation.
+  Une contrainte naît d'une comparaison entre expressions : x + y <= 4
+  en est une. Elle garde l'expression ramenée à zéro et le sens de la
+  comparaison.
+
+  On ne l'écrit pas à la main : les opérateurs <=, >= et == la
+  fabriquent.
+
+  Exemple :
+     x = optimvar('x', 2);
+     c = sum(x) <= 4;
+
+  Voir aussi OPTIMVAR, OPTIMPROBLEM, SOLVE.
+```
+
+## `optimexpr`
+
+```
+OPTIMEXPR Expression linéaire ou quadratique de variables d'optimisation.
+  Un OPTIMEXPR naît d'un calcul sur des OPTIMVAR : 3*x + 2*y - 1 en est
+  un. Il garde le coefficient de chaque variable, les termes croisés
+  s'il y en a, et la constante — de quoi assembler, le moment venu, les
+  matrices que le solveur attend.
+
+  On ne l'écrit pas à la main : OPTIMVAR et les opérateurs le
+  fabriquent.
+
+  Exemple :
+     x = optimvar('x', 3);
+     e = sum(x) + 2;          % un optimexpr
+
+  Voir aussi OPTIMVAR, OPTIMPROBLEM, OPTIMCONSTR, SOLVE.
 ```
 
 ## `optimoptions`
@@ -160,18 +330,162 @@ LSQNONLIN Moindres carrés non linéaires.
 OPTIMOPTIONS Options d'un solveur d'optimisation.
   OPTIONS = OPTIMOPTIONS('fmincon','Display','iter','MaxIterations',100)
   rend une structure d'options. Les noms modernes et les anciens sont
-  acceptés : MaxIterations ou MaxIter, OptimalityTolerance ou TolFun,
-  StepTolerance ou TolX.
+  acceptés, en écriture comme en lecture : MaxIterations ou MaxIter,
+  MaxFunctionEvaluations ou MaxFunEvals, OptimalityTolerance ou TolFun,
+  StepTolerance ou TolX, ConstraintTolerance ou TolCon. La structure
+  rendue porte les deux orthographes, tenues égales : le code écrit
+  pour l'une ou pour l'autre lit la même valeur.
 
-  Voir aussi OPTIMSET.
+  Exemple :
+     o = optimoptions('fmincon', 'MaxIterations', 100);
+     o.MaxIterations                % 100
+     ancien = optimoptions('fminunc', 'TolFun', 1e-8);
+     ancien.OptimalityTolerance     % 1e-8 : les deux noms se rejoignent
+
+  Voir aussi OPTIMSET, OPTIMGET, FMINCON, LINPROG, LSQNONLIN.
+```
+
+## `optimproblem`
+
+```
+OPTIMPROBLEM Problème d'optimisation décrit par ses expressions.
+  PROB = OPTIMPROBLEM crée un problème vide, à minimiser.
+  PROB = OPTIMPROBLEM('Objective',E) donne l'objectif,
+  OPTIMPROBLEM('ObjectiveSense','maximize') le sens.
+
+  Les contraintes s'ajoutent par leur nom :
+     prob.Constraints.budget = sum(x) <= 100;
+
+  SOLVE résout le problème, PROB2STRUCT rend les matrices que les
+  solveurs classiques attendent.
+
+  Cette écriture dit ce qu'on veut plutôt que comment le ranger : les
+  matrices A, b, Aeq, beq sont assemblées pour vous, dans le bon ordre.
+
+  Exemple :
+     x = optimvar('x', 2, 'LowerBound', 0);
+     prob = optimproblem('Objective', -x(1) - 2*x(2));
+     prob.Constraints.c1 = x(1) + x(2) <= 4;
+     prob.Constraints.c2 = x(1) + 3*x(2) <= 6;
+     sol = solve(prob);
+     sol.x
+
+  Voir aussi OPTIMVAR, SOLVE, PROB2STRUCT, LINPROG, QUADPROG, INTLINPROG.
+```
+
+## `optimvar`
+
+```
+OPTIMVAR Variable d'un problème d'optimisation.
+  X = OPTIMVAR('x') crée une variable scalaire nommée x.
+  X = OPTIMVAR('x',N) crée un vecteur de N variables.
+  X = OPTIMVAR('x',N,'LowerBound',0,'UpperBound',10) les borne.
+  X = OPTIMVAR('x',N,'Type','integer') les rend entières.
+
+  Une variable ne porte aucune valeur : elle sert à écrire le problème.
+  Les opérateurs +, -, * et SUM fabriquent des expressions, et les
+  comparaisons des contraintes. C'est l'écriture « par problème » de
+  MATLAB, où l'on décrit ce qu'on veut au lieu d'assembler des
+  matrices.
+
+  Exemple :
+     x = optimvar('x', 2, 'LowerBound', 0);
+     prob = optimproblem('Objective', -x(1) - 2*x(2));
+     prob.Constraints.c = x(1) + x(2) <= 4;
+     sol = solve(prob);
+
+  Voir aussi OPTIMPROBLEM, OPTIMEXPR, SOLVE, PROB2STRUCT, LINPROG.
+```
+
+## `prob2struct`
+
+```
+PROB2STRUCT Traduit un problème en matrices pour les solveurs.
+  S = PROB2STRUCT(PROB) rend une structure portant f, H, Aineq, bineq,
+  Aeq, beq, lb, ub, intcon, solver et objectivesense : ce que LINPROG,
+  QUADPROG ou INTLINPROG attendent.
+
+  C'est le passage de l'écriture par expressions à l'écriture par
+  matrices ; SOLVE l'emploie, et l'on peut s'en servir pour voir
+  exactement ce que le solveur reçoit.
+
+  La structure porte en outre « variables », la liste des variables
+  dans l'ordre où elles sont empilées : c'est ce qui permet de relire
+  la solution.
+
+  Exemple :
+     x = optimvar('x', 2, 'LowerBound', 0);
+     prob = optimproblem('Objective', x(1) + x(2));
+     s = prob2struct(prob);
+     s.f
+
+  Voir aussi OPTIMPROBLEM, OPTIMVAR, SOLVE, LINPROG.
 ```
 
 ## `quadprog`
 
 ```
 QUADPROG Programmation quadratique : minimise 0.5*x'Hx + f'x.
+  X = QUADPROG(H,F) minimise sans contrainte : c'est -H\F.
+  X = QUADPROG(H,F,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et
+  les bornes.
+
   Les contraintes d'inégalité et les bornes sont traitées par
   pénalisation ; le minimum est cherché par Nelder-Mead à partir de la
   solution non contrainte.
+
+  Exemple :
+     % Le point le plus proche de [1;1], puis le même sous x1+x2 <= 1.
+     x = quadprog(2 * eye(2), [-2; -2]);
+     round(x, 3)                    % [1; 1]
+     borne = quadprog(2 * eye(2), [-2; -2], [1 1], 1);
+     round(sum(borne), 3)           % 1 : la contrainte est saturée
+
+  Voir aussi LINPROG, INTLINPROG, CONEPROG, LSQLIN, FMINCON.
+```
+
+## `secondordercone`
+
+```
+SECONDORDERCONE Contrainte de cône du second ordre.
+  C = SECONDORDERCONE(A,B,D,GAMMA) décrit la contrainte
+
+     ||A*x - B|| <= D'*x - GAMMA,
+
+  c'est-à-dire l'appartenance au cône du second ordre. Elle contient
+  comme cas particuliers la boule (D nul), le demi-espace (A nul) et la
+  contrainte de norme d'un vecteur d'écarts.
+
+  CONEPROG minimise une forme linéaire sous de telles contraintes.
+
+  Exemple :
+     c = secondordercone(eye(2), [0; 0], [0; 0], -1);   % ||x|| <= 1
+
+  Voir aussi CONEPROG, QUADPROG, FMINCON, OPTIMPROBLEM.
+```
+
+## `solve`
+
+```
+SOLVE Résout un problème écrit par expressions.
+  SOL = SOLVE(PROB) choisit le solveur d'après la forme du problème —
+  LINPROG pour un objectif linéaire, QUADPROG pour un objectif
+  quadratique, INTLINPROG dès qu'une variable est entière — et rend une
+  structure portant la valeur de chaque variable.
+
+  [SOL,VAL,DRAPEAU] = SOLVE(PROB) rend en outre la valeur de l'objectif
+  et le drapeau du solveur.
+
+  SOLVE(...,'Solver',NOM) impose le solveur.
+
+  Exemple :
+     x = optimvar('x', 2, 'LowerBound', 0);
+     prob = optimproblem('Objective', -x(1) - 2*x(2), ...
+                         'ObjectiveSense', 'minimize');
+     prob.Constraints.c1 = x(1) + x(2) <= 4;
+     sol = solve(prob);
+     sol.x
+
+  Voir aussi OPTIMPROBLEM, OPTIMVAR, PROB2STRUCT, LINPROG, QUADPROG.
 ```
 

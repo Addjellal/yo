@@ -1,8 +1,21 @@
 function [x, valeur] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
 %QUADPROG Programmation quadratique : minimise 0.5*x'Hx + f'x.
+%   X = QUADPROG(H,F) minimise sans contrainte : c'est -H\F.
+%   X = QUADPROG(H,F,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et
+%   les bornes.
+%
 %   Les contraintes d'inégalité et les bornes sont traitées par
 %   pénalisation ; le minimum est cherché par Nelder-Mead à partir de la
 %   solution non contrainte.
+%
+%   Exemple :
+%      % Le point le plus proche de [1;1], puis le même sous x1+x2 <= 1.
+%      x = quadprog(2 * eye(2), [-2; -2]);
+%      round(x, 3)                    % [1; 1]
+%      borne = quadprog(2 * eye(2), [-2; -2], [1 1], 1);
+%      round(sum(borne), 3)           % 1 : la contrainte est saturée
+%
+%   Voir aussi LINPROG, INTLINPROG, CONEPROG, LSQLIN, FMINCON.
     if nargin < 3, A = []; end
     if nargin < 4, b = []; end
     if nargin < 5, Aeq = []; end

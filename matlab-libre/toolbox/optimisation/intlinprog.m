@@ -10,6 +10,8 @@ function [x, fval, exitflag] = intlinprog(f, entieres, A, b, Aeq, beq, lb, ub)
 %
 %   Exemple :
 %      x = intlinprog([-1; -2], [1 2], [1 1], 4, [], [], [0; 0], []);
+%
+%   Voir aussi LINPROG, QUADPROG, BINTPROG, OPTIMPROBLEM, SOLVE.
     if nargin < 3, A = []; end
 
     if nargin < 4, b = []; end

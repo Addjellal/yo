@@ -59,6 +59,14 @@ void Analyseur::exigerOp(const char* s) {
         erreurSyntaxe(std::string("Expected '") + s + "' but found '" + jeton().texte + "'.");
 }
 
+// « properties », « methods », « events » et « enumeration » ne sont des
+// mots du langage que dans un classdef : ailleurs ce sont des fonctions
+// ordinaires — « properties(objet) » doit s'analyser comme un appel.
+// Le lexeur ne les distingue donc pas, et c'est ici qu'on les reconnait.
+bool Analyseur::motDeClasse(const char* s) const {
+    return jeton().genre == Genre::Ident && jeton().texte == s;
+}
+
 bool Analyseur::motFin() const {
     const Jeton& t = jeton();
     if (t.genre != Genre::MotCle) return false;
@@ -702,7 +710,7 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
     }
     sauterSeparateurs();
     while (!fini() && !motFin()) {
-        if (jeton().estMot("properties")) {
+        if (motDeClasse("properties")) {
             avancer();
             std::vector<std::string> attributs;
             if (accepterOp("(")) {
@@ -738,7 +746,7 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
                 sauterSeparateurs();
             }
             exigerMotFin();
-        } else if (jeton().estMot("methods")) {
+        } else if (motDeClasse("methods")) {
             avancer();
             bool statiques = false;
             if (accepterOp("(")) {
@@ -759,7 +767,7 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
                 sauterSeparateurs();
             }
             exigerMotFin();
-        } else if (jeton().estMot("events")) {
+        } else if (motDeClasse("events")) {
             avancer();
             sauterSeparateurs();
             while (!fini() && !motFin()) {
@@ -768,7 +776,7 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
                 sauterSeparateurs();
             }
             exigerMotFin();
-        } else if (jeton().estMot("enumeration")) {
+        } else if (motDeClasse("enumeration")) {
             avancer();
             sauterSeparateurs();
             while (!fini() && !motFin()) avancer();

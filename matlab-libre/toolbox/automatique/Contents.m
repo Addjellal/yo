@@ -16,6 +16,8 @@
 %   pzplot, rlocusplot - Les mêmes, sous leur autre nom
 %   stabsep           - Sépare partie stable et partie instable
 %   hasdelay, totaldelay, pade - Retards et leur approximation
+%   thiran            - Retard fractionnaire par un passe-tout
+%   delayss           - Modèle d'état à retards internes
 %   prescale          - Met le modèle à l'échelle pour le calcul
 %   dcgain, damp      - Gain statique, pulsations et amortissements
 %   order             - Nombre d'états
@@ -41,6 +43,12 @@
 %   sgrid, zgrid, ngrid - Grilles d'amortissement et abaque de Nichols
 %   bandwidth         - Bande passante à -3 décibels
 %
+% Unités et options de tracé
+%   chgTimeUnit       - Change l'unité de temps d'un modèle
+%   chgFreqUnit       - Change l'unité de fréquence d'un modèle
+%   bodeoptions       - Options d'un diagramme de Bode
+%   stepDataOptions   - Niveaux de l'échelon d'une réponse indicielle
+%
 % Interconnexions
 %   feedback, series, parallel - Boucle, cascade, somme
 %   loopsens          - Les six sensibilités d'une boucle
@@ -48,6 +56,7 @@
 %   append            - Juxtaposition sans connexion
 %   lft               - Produit étoile : rebouclage partiel
 %   connect, sumblk   - Assemblage par les noms des signaux
+%   getBlockValue     - Valeur d'un bloc réglable d'un assemblage
 %
 % Structure et changements de base
 %   ctrb, obsv        - Matrices de commandabilité et d'observabilité
@@ -78,3 +87,11 @@
 %   pid, pidstd       - Correcteur PID, formes parallèle et standard
 %   pidtune           - Réglage d'un PID par la marge de phase
 %   rlocus            - Lieu des racines
+%
+% Vues d'ensemble
+%   pidtool           - Règle un PID et montre la boucle obtenue
+%   sisotool          - Lieu des racines, Bode et réponse indicielle
+%
+% Les applications interactives de MATLAB — PIDTOOL, SISOTOOL — sont ici
+% des fonctions qui calculent et tracent une fois : il n'y a pas de
+% curseur à déplacer.

@@ -28,13 +28,21 @@ FONCTION(fnStruct) {
     if (args.size() % 2 != 0)
         erreur("MATLAB:struct:NoValueForField",
                "Incorrect number of arguments: fields require values.");
-    // Une valeur en cellule fabrique un tableau de structures.
+    // Une valeur en cellule fabrique un tableau de structures, de la
+    // taille de la cellule. Une cellule vide donne donc un tableau vide :
+    // « struct('a',{},'b',{}) » est l'idiome qui declare les champs sans
+    // creer d'element, et l'on y ajoute ensuite par « s(end+1) ».
     std::size_t n = 1;
+    bool vide = false;
     for (std::size_t k = 1; k < args.size(); k += 2)
-        if (args[k].classe == Classe::Cellule) n = std::max(n, args[k].nelem());
+        if (args[k].classe == Classe::Cellule) {
+            if (args[k].nelem() == 0) vide = true;
+            n = std::max(n, args[k].nelem());
+        }
+    if (vide) n = 0;
     Valeur r;
     r.classe = Classe::Structure;
-    r.dims = {1, (int)n};
+    r.dims = {n == 0 ? 0 : 1, (int)n};
     if (n == 1) r.dims = {1, 1};
     r.st = std::make_shared<ChampsStructure>();
     for (std::size_t k = 0; k + 1 < args.size(); k += 2) {
@@ -52,6 +60,79 @@ FONCTION(fnStruct) {
         r.st->champs[nom] = colonne;
     }
     return {r};
+}
+
+// « properties », « isprop » et « ismethod » : ce qu'un objet expose.
+// Sans elles, on ne pouvait pas demander a une classe ce qu'elle porte,
+// et le code qui s'adapte a l'objet qu'on lui donne devait deviner.
+std::vector<std::string> proprietesDe(Interpreteur& it, const Valeur& v) {
+    std::vector<std::string> noms;
+    if (v.classe == Classe::Objet) {
+        auto def = it.classeDefinie(v.nomObjet);
+        if (def) {
+            for (const auto& nom : def->ordreProprietes) noms.push_back(nom);
+            for (const auto& nom : def->dependantes) {
+                bool deja = false;
+                for (const auto& autre : noms) deja = deja || autre == nom;
+                if (!deja) noms.push_back(nom);
+            }
+            return noms;
+        }
+    }
+    // Un objet sans classdef — une poignee graphique, une carte — n'a
+    // que ses champs a montrer.
+    if (v.estStructure() || v.classe == Classe::Objet)
+        for (const auto& nom : v.champs())
+            if (nom.compare(0, 2, "__") != 0) noms.push_back(nom);
+    return noms;
+}
+
+FONCTION(fnProperties) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "properties");
+    Valeur cible = args[0];
+    if (cible.estTexte() || cible.estChaine()) {
+        // « properties('maClasse') » : on interroge la classe elle-meme.
+        auto def = it.classeDefinie(cible.versTexte());
+        if (!def)
+            erreur("MATLAB:class:InvalidArgument",
+                   "'" + cible.versTexte() + "' n'est pas une classe connue.");
+        std::vector<std::string> noms = def->ordreProprietes;
+        for (const auto& nom : def->dependantes) {
+            bool deja = false;
+            for (const auto& autre : noms) deja = deja || autre == nom;
+            if (!deja) noms.push_back(nom);
+        }
+        Valeur r = Valeur::celluleDims({(int)noms.size(), 1});
+        for (std::size_t k = 0; k < noms.size(); ++k) r.cellules[k] = Valeur::texte(noms[k]);
+        return {r};
+    }
+    std::vector<std::string> noms = proprietesDe(it, cible);
+    Valeur r = Valeur::celluleDims({(int)noms.size(), 1});
+    for (std::size_t k = 0; k < noms.size(); ++k) r.cellules[k] = Valeur::texte(noms[k]);
+    return {r};
+}
+
+FONCTION(fnIsprop) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "isprop");
+    std::string cherche = args[1].versTexte();
+    for (const auto& nom : proprietesDe(it, args[0]))
+        if (nom == cherche) return {Valeur::booleen(true)};
+    return {Valeur::booleen(false)};
+}
+
+FONCTION(fnIsmethod) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "ismethod");
+    std::string cherche = args[1].versTexte();
+    std::string nomClasse;
+    if (args[0].estTexte() || args[0].estChaine()) nomClasse = args[0].versTexte();
+    else if (args[0].classe == Classe::Objet) nomClasse = args[0].nomObjet;
+    if (nomClasse.empty()) return {Valeur::booleen(false)};
+    auto def = it.classeDefinie(nomClasse);
+    if (!def) return {Valeur::booleen(false)};
+    return {Valeur::booleen(def->aMethode(cherche))};
 }
 
 FONCTION(fnFieldnames) {
@@ -225,6 +306,10 @@ FONCTION(fnDeal) {
 void enregistrerStructures(Interpreteur& it) {
     it.enregistrer("cell", fnCell, "structures", "cell  Tableau de cellules vide.");
     it.enregistrer("struct", fnStruct, "structures", "struct  Construit une structure.");
+    it.enregistrer("properties", fnProperties, "structures",
+                   "properties  Proprietes d'un objet ou d'une classe.");
+    it.enregistrer("isprop", fnIsprop, "structures", "isprop  L'objet a-t-il cette propriete.");
+    it.enregistrer("ismethod", fnIsmethod, "structures", "ismethod  La classe a-t-elle cette methode.");
     it.enregistrer("fieldnames", fnFieldnames, "structures", "fieldnames  Noms des champs.");
     it.enregistrer("isfield", fnIsfield, "structures", "isfield  Le champ existe-t-il.");
     it.enregistrer("rmfield", fnRmfield, "structures", "rmfield  Retire un champ.");

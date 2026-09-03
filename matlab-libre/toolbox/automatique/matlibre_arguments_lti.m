@@ -1,4 +1,4 @@
-function [modeles, styles, w] = matlibre_arguments_lti(entrees)
+function [modeles, styles, w, options] = matlibre_arguments_lti(entrees)
 %MATLIBRE_ARGUMENTS_LTI Découpe la liste d'arguments d'un tracé LTI.
 %   [MODELES,STYLES,W] = MATLIBRE_ARGUMENTS_LTI(ENTREES) sépare la liste
 %   (SYS1,'STYLE1',SYS2,'STYLE2',...,W) que partagent BODE, BODEMAG,
@@ -12,13 +12,27 @@ function [modeles, styles, w] = matlibre_arguments_lti(entrees)
 %   temporel. Les bornes {WMIN,WMAX} sont acceptées et développées en
 %   deux cents points logarithmiquement espacés, comme dans MATLAB.
 %
+%   [MODELES,STYLES,W,OPTIONS] rend en outre la structure d'options
+%   passée en dernier — celle que rendent BODEOPTIONS ou
+%   STEPDATAOPTIONS —, vide s'il n'y en a pas. Un modèle est un objet
+%   (« tf », « ss », « zpk », « frd ») ; une structure nue en dernière
+%   place est donc sans ambiguïté un jeu d'options.
+%
 %   Cette fonction est un utilitaire interne de la boîte à outils
 %   Automatique : elle n'existe pas dans MATLAB.
 %
-%   Voir aussi BODE, BODEMAG, SIGMA, STEP.
+%   Voir aussi BODE, BODEMAG, SIGMA, STEP, BODEOPTIONS, STEPDATAOPTIONS.
     modeles = {};
     styles = {};
     w = [];
+    options = [];
+    entrees = entrees(:).';
+    % Les options viennent en dernier ; on les retire avant de lire le
+    % reste, pour que la grille reste « le dernier argument numérique ».
+    if numel(entrees) > 1 && isstruct(entrees{end})
+        options = entrees{end};
+        entrees(end) = [];
+    end
     n = numel(entrees);
     for k = 1:n
         a = entrees{k};

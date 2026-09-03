@@ -18,7 +18,7 @@ existant appellera.
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 27 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 7 |
-| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 109 |
+| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 119 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
@@ -37,7 +37,7 @@ existant appellera.
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 5 |
 | `identification` | System Identification Toolbox — identification de modèles. | 6 |
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
-| `images` | Image Processing Toolbox — traitement d'images. | 123 |
+| `images` | Image Processing Toolbox — traitement d'images. | 138 |
 | `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 4 |
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 6 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
@@ -46,7 +46,7 @@ existant appellera.
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 54 |
-| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 12 |
+| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 20 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 9 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |
 
-Les fonctions natives — 646, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 649, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

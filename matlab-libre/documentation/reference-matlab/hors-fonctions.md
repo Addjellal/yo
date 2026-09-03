@@ -35,6 +35,12 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 - **Énumérations** (`enumeration`) dans un `classdef`.
 - **`matlab.unittest`** : le cadre de tests à classes. Les tests de
   MatLibre sont des scripts à `assert`.
+- **Mots-clés de `classdef`** : `properties`, `methods`, `events` et
+  `enumeration` sont sensibles au contexte, comme dans MATLAB — ce sont
+  des mots-clés dans un `classdef`, des identificateurs partout ailleurs,
+  si bien que `properties(sys)` appelle bien la fonction. En revanche les
+  attributs entre parenthèses (`properties (Access = private)`) sont
+  analysés et ignorés : rien n'est privé.
 - **Interfaces externes** : MEX, appel de Java, de Python, de C++.
 
 ### Bureau
@@ -84,6 +90,62 @@ qu'ils ne font pas encore comme MATLAB.
 - **`intfilt`** en bande limitée résout les équations normales d'une
   interpolation idéale, ce qui est la définition ; les coefficients
   peuvent différer de MATLAB au dernier chiffre.
+
+### Images
+
+- **Pas d'objets ni de classes d'image** : une image est une matrice.
+  `imref2d`, les objets `roi` (`drawcircle`, `images.roi.*`) et les
+  applications interactives — `imtool`, `Color Thresholder`, `Image
+  Segmenter` — n'existent pas ; `impixel` et `roipoly` prennent leurs
+  points en argument au lieu de les faire cliquer.
+- **`edge` façon Canny** : le seuil haut automatique est lu sur
+  l'histogramme du gradient — celui qui laisse sept dixièmes des points
+  du côté « pas un contour » —, le seuil bas en vaut quatre dixièmes.
+  C'est la règle publiée ; les contours peuvent différer d'un pixel de
+  ceux de MATLAB sur une image bruitée.
+- **`imfindcircles`** ne cherche que par accumulation à deux étapes :
+  `'Method'` et `'FilterSize'` sont reçus sans effet, et le mode
+  `'PhaseCode'` de MATLAB n'est pas là. Les pics sont retenus au-dessus
+  de huit dixièmes du maximum de l'accumulateur, puis dédoublonnés au
+  rayon près.
+- **`activecontour`** mène l'évolution par différences finies sur une
+  fonction de niveau, sans réinitialisation de la distance signée : sur
+  un très grand nombre d'itérations le contour peut se figer là où
+  MATLAB continue d'avancer.
+- **`montage`** assemble et rend l'image assemblée ; la navigation entre
+  vignettes n'existe pas.
+
+### Systèmes asservis
+
+- **Pas de retards internes** : MATLAB garde le retard exact dans un
+  modèle d'état (`InternalDelay`). `delayss` l'approche par Padé d'ordre
+  trois, ce qui est juste en basse fréquence et s'écarte au-delà.
+  `thiran`, lui, est exact au sens du retard de groupe plat en zéro.
+- **`pidtool` et `sisotool`** ne sont pas interactifs : MatLibre règle le
+  correcteur — comme `pidtune` — et trace les vues une fois, là où MATLAB
+  ouvre une application à curseurs.
+- **Pas de modèle `genss`** : `getBlockValue` lit le bloc dans une
+  structure de blocs ou dans un modèle nommé, non dans un modèle à blocs
+  réglables.
+- **`bodeoptions` et `stepDataOptions`** sont des structures : les champs
+  que MatLibre traite sont énumérés dans leur aide, les autres sont
+  gardés sans effet pour que le code écrit pour MATLAB s'exécute.
+
+### Optimisation
+
+- **Écriture par problème** : `optimvar`, `optimexpr`, `optimconstr` et
+  `optimproblem` couvrent le linéaire, le quadratique et les variables
+  entières. Les expressions non linéaires — un produit de trois
+  variables, un logarithme — ne sont pas représentées, et `solve` ne sait
+  donc pas déléguer à `fmincon` un problème écrit ainsi.
+- **`solve` ne rend pas d'objet de sortie** : la solution est une
+  structure à un champ par variable, non un `OptimizationResult`.
+- **`coneprog`** ramène les contraintes de cône à `fmincon` par
+  pénalisation, au lieu d'employer un point intérieur conique : la
+  solution est bonne à quelques millièmes, non à la précision machine.
+- **`linprog` et `quadprog`** minimisent une barrière logarithmique par
+  Nelder-Mead : pas de simplexe, pas de base optimale, donc ni variables
+  duales ni analyse de sensibilité.
 
 ### Statistiques et apprentissage
 

@@ -30,11 +30,29 @@
 %
 % Gradient et contours
 %   imgradientxy, imgradient - Gradient, amplitude et direction
-%   edge        - Détection de contours
+%   edge        - Détection de contours : Sobel, Prewitt, Roberts,
+%                 laplacien du gaussien, et Canny à double seuil
+%   hough       - Transformée de Hough d'une image binaire
+%   houghpeaks  - Pics de l'accumulateur
+%   houghlines  - Segments de droite d'après les pics
+%   imfindcircles - Cercles, par la transformée de Hough circulaire
+%   normxcorr2  - Corrélation croisée normalisée
 %
 % Histogramme et contraste
 %   imhist, histeq, imadjust, stretchlim
+%   adapthisteq - Égalisation adaptative à contraste limité
+%   mat2gray    - Remise dans [0,1]
 %   graythresh, imbinarize, multithresh, imquantize
+%   im2bw       - Seuillage, ancienne forme d'IMBINARIZE
+%
+% Régions
+%   poly2mask   - Masque des points intérieurs à un polygone
+%   roicolor    - Sélection par intensité
+%   roifilt2    - Filtrage à l'intérieur d'une région
+%   activecontour - Segmentation par contour actif (Chan-Vese)
+%   impixel     - Valeurs de pixels choisis
+%   imoverlay   - Pose un masque coloré sur une image
+%   montage     - Plusieurs images en mosaïque
 %
 % Morphologie
 %   strel       - Élément structurant

@@ -406,4 +406,192 @@ assert(~inpolygon(1.5, 0.5, [0 1 1 0], [0 0 1 1]));
 assert(isequal(dedans, [true true false]));
 assert(isequal(surLeBord, [true false false]));
 
+%% ------------------------------------------------ mise a l'echelle
+% mat2gray ramene une matrice quelconque dans [0,1].
+grise = mat2gray(magic(4));
+assert(abs(min(grise(:))) < 1e-12 && abs(max(grise(:)) - 1) < 1e-12);
+assert(isequal(size(grise), [4 4]));
+% Bornes imposees : ce qui deborde est ecrete.
+serree = mat2gray([0 5 10], [2 8]);
+assert(serree(1) == 0 && serree(3) == 1);
+% Une image constante ne divise pas par zero.
+assert(all(isfinite(reshape(mat2gray(ones(3)), 1, [])))); 
+
+%% ------------------------------------------------------ seuillage
+carreBinaire = im2bw(grise, 0.5);
+assert(islogical(carreBinaire));
+assert(sum(carreBinaire(:)) == sum(grise(:) > 0.5));
+assert(islogical(im2bw(grise)));
+% roicolor selectionne par intensite, par intervalle ou par liste.
+assert(sum(sum(roicolor(magic(5), 10, 20))) == 11);
+assert(sum(sum(roicolor(magic(5), [1 2 3]))) == 3);
+
+%% -------------------------------------------------------- polygones
+masquePoly = poly2mask([2 8 8 2], [2 2 8 8], 10, 10);
+assert(islogical(masquePoly));
+assert(sum(masquePoly(:)) == 36);          % les pixels 3..8 dans les deux sens
+assert(masquePoly(5, 5) && ~masquePoly(1, 1));
+% Un triangle couvre a peu pres la moitie du carre.
+triangle = poly2mask([1 20 1], [1 1 20], 20, 20);
+assert(sum(triangle(:)) > 150 && sum(triangle(:)) < 210);
+
+%% ------------------------------------------ filtrage d'une region
+imageLisse = mat2gray(peaks(50));
+region = poly2mask([10 40 40 10], [10 10 40 40], 50, 50);
+filtree = roifilt2(fspecial('average', 5), imageLisse, region);
+assert(isequal(size(filtree), [50 50]));
+% Hors de la region, l'image n'a pas bouge.
+assert(max(max(abs(filtree(~region) - imageLisse(~region)))) < 1e-12);
+% Dedans, elle a bouge.
+assert(max(max(abs(filtree(region) - imageLisse(region)))) > 1e-6);
+% La forme fonction marche aussi.
+doublee = roifilt2(imageLisse, region, @(x) x * 2);
+assert(max(max(abs(doublee(region) - 2 * imageLisse(region)))) < 1e-12);
+
+%% ------------------------------------------------ pixels et calques
+valeurs = impixel(grise, [1 4], [1 4]);
+assert(isequal(size(valeurs), [2 3]));
+assert(abs(valeurs(1, 1) - grise(1, 1)) < 1e-12);
+% Une image grise donne trois composantes egales.
+assert(abs(valeurs(1, 1) - valeurs(1, 3)) < 1e-12);
+calque = imoverlay(imageLisse, imageLisse > 0.7, 'red');
+assert(size(calque, 3) == 3);
+marques = imageLisse > 0.7;
+rouge = calque(:, :, 1);
+vert = calque(:, :, 2);
+assert(all(rouge(marques) == 1) && all(vert(marques) == 0));
+
+%% ------------------------------------- correlation normalisee
+motif = imageLisse(20:30, 25:35);
+correlation = normxcorr2(motif, imageLisse);
+assert(isequal(size(correlation), size(imageLisse) + size(motif) - 1));
+% Le motif se retrouve exactement, et le maximum est en son coin
+% bas-droit.
+[valeurMax, position] = max(correlation(:));
+[ligneMax, colonneMax] = ind2sub(size(correlation), position);
+assert(abs(valeurMax - 1) < 1e-9);
+assert(ligneMax == 30 && colonneMax == 35);
+assert(min(correlation(:)) >= -1 && max(correlation(:)) <= 1);
+
+%% ------------------------------------------- contours de Canny
+disque = zeros(100, 100);
+[grilleX, grilleY] = meshgrid(1:100, 1:100);
+disque((grilleX - 50) .^ 2 + (grilleY - 50) .^ 2 < 400) = 1;
+contourCanny = edge(disque, 'canny');
+[lignesContour, colonnesContour] = find(contourCanny);
+distances = hypot(colonnesContour - 50, lignesContour - 50);
+% Le contour suit le bord du disque, et non son interieur : c'est ce
+% que le seuil automatique doit garantir.
+assert(min(distances) > 15);
+assert(abs(mean(distances) - 20) < 2);
+% Canny donne un trait plus fin que Sobel.
+assert(sum(contourCanny(:)) < sum(sum(edge(disque, 'sobel'))));
+assert(sum(sum(edge(disque, 'roberts'))) > 0);
+
+%% --------------------------------------------- transformee de Hough
+lignesTest = false(50, 50);
+lignesTest(20, 5:45) = true;
+lignesTest(10:40, 30) = true;
+[accumulateur, anglesHough, distancesHough] = hough(lignesTest);
+assert(size(accumulateur, 2) == numel(anglesHough));
+assert(size(accumulateur, 1) == numel(distancesHough));
+picsHough = houghpeaks(accumulateur, 2);
+assert(isequal(size(picsHough), [2 2]));
+% Les deux droites sont retrouvees : l'horizontale en y = 20, la
+% verticale en x = 30.
+anglesTrouves = sort(anglesHough(picsHough(:, 2)));
+assert(isequal(anglesTrouves, [-90 0]));
+segments = houghlines(lignesTest, anglesHough, distancesHough, picsHough, ...
+                      'MinLength', 10);
+assert(numel(segments) == 2);
+longueurs = zeros(1, numel(segments));
+for k = 1:numel(segments)
+    longueurs(k) = hypot(segments(k).point2(1) - segments(k).point1(1), ...
+                         segments(k).point2(2) - segments(k).point1(2));
+end
+assert(abs(max(longueurs) - 40) < 1e-9);
+% Une diagonale se retrouve a -45 degres.
+diagonale = false(60, 60);
+for k = 1:50
+    diagonale(k + 5, k + 5) = true;
+end
+[accDiag, angleDiag, distDiag] = hough(diagonale);
+picDiag = houghpeaks(accDiag, 1);
+assert(angleDiag(picDiag(2)) == -45);
+
+%% ------------------------------------------------------ cercles
+[centresTrouves, rayonsTrouves] = imfindcircles(disque, [15 25]);
+assert(size(centresTrouves, 1) == 1);
+assert(all(abs(centresTrouves - [50 50]) <= 2));
+assert(abs(rayonsTrouves(1) - 20) <= 2);
+
+%% -------------------------------------------- egalisation adaptative
+sombre = mat2gray(peaks(100)) * 0.3;
+rehaussee = adapthisteq(sombre);
+assert(isequal(size(rehaussee), size(sombre)));
+assert(min(rehaussee(:)) >= 0 && max(rehaussee(:)) <= 1);
+% Elle ecarte les valeurs d'une image terne.
+assert(std(rehaussee(:)) > std(sombre(:)));
+% L'ecretage regle la force du rehaussement.
+assert(std(reshape(adapthisteq(sombre, 'ClipLimit', 1), 1, [])) > ...
+       std(reshape(adapthisteq(sombre, 'ClipLimit', 0.005), 1, [])));
+% Les trois lois de sortie donnent trois images differentes, chacune
+% encore dans [0,1] : l'exponentielle assombrit, la loi de Rayleigh
+% eclaircit, relativement a l'uniforme.
+uniforme = adapthisteq(sombre, 'Distribution', 'uniform');
+rayleigh = adapthisteq(sombre, 'Distribution', 'rayleigh');
+exponentielle = adapthisteq(sombre, 'Distribution', 'exponential');
+assert(min(rayleigh(:)) >= 0 && max(rayleigh(:)) <= 1);
+assert(min(exponentielle(:)) >= 0 && max(exponentielle(:)) <= 1);
+assert(norm(rayleigh - uniforme, 'fro') > 1e-6);
+assert(norm(exponentielle - uniforme, 'fro') > 1e-6);
+assert(mean(exponentielle(:)) < mean(uniforme(:)));
+assert(mean(rayleigh(:)) > mean(uniforme(:)));
+% Les trois tables sont croissantes : une image plus claire le reste.
+croissante = @(image) all(all(diff(sort(image(:))) >= -1e-12));
+assert(croissante(rayleigh) && croissante(exponentielle));
+% Alpha agit sur les lois qui le portent, et sur elles seules.
+assert(norm(adapthisteq(sombre, 'Distribution', 'rayleigh', 'Alpha', 0.1) - rayleigh, 'fro') > 1e-6);
+assert(isequal(adapthisteq(sombre, 'Alpha', 0.1), uniforme));
+% Le decoupage en tuiles n'est pas ignore.
+assert(norm(adapthisteq(sombre, 'NumTiles', [2 2]) - uniforme, 'fro') > 1e-6);
+% 'Range','original' garde l'etendue de l'image de depart, la ou le
+% reglage par defaut l'etale sur tout [0,1] : c'est l'indexation de la
+% table qui suit l'etendue retenue, non l'intervalle unite.
+etroite = 0.25 + 0.5 * sombre;
+gardee = adapthisteq(etroite, 'Range', 'original');
+assert(min(gardee(:)) >= min(etroite(:)) - 1e-9);
+assert(max(gardee(:)) <= max(etroite(:)) + 1e-9);
+assert(norm(gardee - etroite, 'fro') > 1e-6);
+etalee = adapthisteq(etroite);
+assert(min(etalee(:)) < min(etroite(:)) - 1e-3);
+assert(max(etalee(:)) > max(etroite(:)) + 1e-3);
+% Une loi inconnue est refusee plutot qu'ignoree.
+essai = false;
+try
+    adapthisteq(sombre, 'Distribution', 'poisson');
+catch
+    essai = true;
+end
+assert(essai);
+
+%% ------------------------------------------------- contour actif
+disquePetit = zeros(60, 60);
+[petitX, petitY] = meshgrid(1:60, 1:60);
+disquePetit((petitX - 30) .^ 2 + (petitY - 30) .^ 2 < 225) = 1;
+depart = false(60, 60);
+depart(22:38, 22:38) = true;
+segmente = activecontour(disquePetit, depart, 60);
+recouvrement = sum(sum(segmente & disquePetit > 0)) / sum(sum(segmente | disquePetit > 0));
+assert(recouvrement > 0.85);
+
+%% ---------------------------------------------------------- mosaique
+figure('Visible', 'off');
+mosaique = montage(cat(4, mat2gray(peaks(20)), mat2gray(magic(20))));
+assert(isequal(size(mosaique), [20 40]));
+mosaiqueBordee = montage({mat2gray(peaks(10)), mat2gray(magic(10))}, ...
+                         'Size', [2 1], 'BorderSize', 2);
+assert(isequal(size(mosaiqueBordee), [22 10]));
+close('all');
+
 disp('images : toutes les verifications passent');

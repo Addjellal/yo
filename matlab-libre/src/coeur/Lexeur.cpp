@@ -13,8 +13,7 @@ static const std::set<std::string>& motsCles() {
     static const std::set<std::string> m = {
         "if", "elseif", "else", "end", "for", "parfor", "while", "do", "until",
         "switch", "case", "otherwise", "break", "continue", "return", "function",
-        "try", "catch", "global", "persistent", "classdef", "properties",
-        "methods", "events", "enumeration", "spmd", "endif",
+        "try", "catch", "global", "persistent", "classdef", "spmd", "endif",
         "endfor", "endwhile", "endfunction", "endswitch", "end_try_catch",
         "unwind_protect", "unwind_protect_cleanup", "end_unwind_protect"
     };

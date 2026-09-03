@@ -14,12 +14,15 @@ function [module, w] = bodemag(varargin)
 %   [MODULE,W] = BODEMAG(SYS) ne trace rien et rend le module linéaire et
 %   la grille employée.
 %
+%   BODEMAG(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé,
+%   comme pour BODE.
+%
 %   Exemple :
 %      G = tf(1, [1 0.2 1]);
 %      bodemag(feedback(G, 1), 'b', G, 'r--')
 %
-%   Voir aussi BODE, SIGMA, NICHOLS, FREQRESP.
-    [modeles, styles, w] = matlibre_arguments_lti(varargin);
+%   Voir aussi BODE, SIGMA, NICHOLS, FREQRESP, BODEOPTIONS.
+    [modeles, styles, w, options] = matlibre_arguments_lti(varargin);
     if isempty(modeles)
         error('MATLAB:minrhs', 'Not enough input arguments.');
     end
@@ -32,17 +35,24 @@ function [module, w] = bodemag(varargin)
         [module, ~, w] = bode(modeles{1}, w);
         return;
     end
+    reglage = matlibre_reglages_bode(options);
     courbes = {};
     for k = 1:numel(modeles)
         [m, ~, wk] = bode(modeles{k}, w);
-        courbes{end+1} = wk;              %#ok<AGROW>
-        courbes{end+1} = 20 * log10(m);   %#ok<AGROW>
+        courbes{end+1} = wk / reglage.diviseurW;   %#ok<AGROW>
+        if reglage.enDecibels
+            courbes{end+1} = 20 * log10(m);        %#ok<AGROW>
+        else
+            courbes{end+1} = m;                    %#ok<AGROW>
+        end
         if ~isempty(styles{k})
             courbes{end+1} = styles{k};   %#ok<AGROW>
         end
     end
     semilogx(courbes{:});
-    grid on;
-    xlabel('Pulsation (rad/s)');
-    ylabel('Gain (dB)');
+    grid(reglage.grille);
+    xlabel(reglage.nomPulsation);
+    ylabel(reglage.nomGain);
+    if ~isempty(reglage.xlim), xlim(reglage.xlim / reglage.diviseurW); end
+    if ~isempty(reglage.ylim), ylim(reglage.ylim); end
 end

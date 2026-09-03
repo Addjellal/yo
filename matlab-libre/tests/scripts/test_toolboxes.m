@@ -307,4 +307,74 @@ assert(~isempty(strfind(resultat.source, 'double carreDeTest(double x)')));
 assert(~isempty(strfind(resultat.source, 'return')));
 assert(~isempty(strfind(resultat.entete, 'double carreDeTest(double x);')));
 
+%% ------------------------------------ optimisation par expressions
+% L'écriture par problème : on décrit ce qu'on veut, les matrices sont
+% assemblées pour nous. On vérifie l'assemblage, puis la solution.
+variable = optimvar('x', 2, 'LowerBound', 0);
+probleme = optimproblem('Objective', -variable(1) - 2 * variable(2));
+probleme.Constraints.c1 = variable(1) + variable(2) <= 4;
+probleme.Constraints.c2 = variable(1) + 3 * variable(2) <= 6;
+assemblage = prob2struct(probleme);
+assert(strcmp(assemblage.solver, 'linprog'));
+assert(isequal(assemblage.f, [-1; -2]));
+assert(isequal(assemblage.Aineq, [1 1; 1 3]));
+assert(isequal(assemblage.bineq, [4; 6]));
+[solution, valeur] = solve(probleme);
+assert(max(abs(solution.x - [3; 1])) < 1e-3);
+assert(abs(valeur + 5) < 1e-3);
+% Le sens « maximize » rend bien le maximum.
+problemeMax = optimproblem('Objective', variable(1) + 2 * variable(2), ...
+                           'ObjectiveSense', 'maximize');
+problemeMax.Constraints.c1 = variable(1) + variable(2) <= 4;
+problemeMax.Constraints.c2 = variable(1) + 3 * variable(2) <= 6;
+[~, valeurMax] = solve(problemeMax);
+assert(abs(valeurMax - 5) < 1e-3);
+% Une variable entière change de solveur.
+entiere = optimvar('y', 2, 'LowerBound', 0, 'Type', 'integer');
+problemeEntier = optimproblem('Objective', -entiere(1) - 2 * entiere(2));
+problemeEntier.Constraints.c = entiere(1) + 3 * entiere(2) <= 7;
+problemeEntier.Constraints.d = entiere(1) + entiere(2) <= 4;
+assert(strcmp(prob2struct(problemeEntier).solver, 'intlinprog'));
+[solutionEntiere, valeurEntiere] = solve(problemeEntier);
+assert(max(abs(solutionEntiere.y - round(solutionEntiere.y))) < 1e-6);
+assert(abs(valeurEntiere + 5) < 1e-6);
+% Un produit de deux expressions donne un objectif quadratique.
+scalaire = optimvar('z', 1);
+problemeCarre = optimproblem('Objective', (scalaire - 3) * (scalaire - 3));
+assemblageCarre = prob2struct(problemeCarre);
+assert(strcmp(assemblageCarre.solver, 'quadprog'));
+assert(abs(assemblageCarre.H - 2) < 1e-12 && abs(assemblageCarre.f + 6) < 1e-12);
+assert(abs(assemblageCarre.constante - 9) < 1e-12);
+solutionCarre = solve(problemeCarre);
+assert(abs(solutionCarre.z - 3) < 1e-3);
+% Une égalité se range du bon côté.
+positive = optimvar('w', 2, 'LowerBound', 0);
+problemeEgalite = optimproblem('Objective', positive(1) + positive(2));
+problemeEgalite.Constraints.e = positive(1) + 2 * positive(2) == 4;
+assemblageEgalite = prob2struct(problemeEgalite);
+assert(isequal(assemblageEgalite.Aeq, [1 2]) && isequal(assemblageEgalite.beq, 4));
+[~, valeurEgalite] = solve(problemeEgalite);
+assert(abs(valeurEgalite - 2) < 1e-2);
+
+%% --------------------------------------------- cônes du second ordre
+% Le point du disque unité le plus loin dans la direction (1,1) : c'est
+% la bissectrice, à la distance racine de deux.
+disque = secondordercone(eye(2), [0; 0], [0; 0], -1);
+[pointCone, valeurCone, drapeauCone] = coneprog([-1; -1], disque);
+assert(abs(norm(pointCone) - 1) < 1e-3);
+assert(abs(valeurCone + sqrt(2)) < 1e-3);
+assert(drapeauCone == 1);
+% Le cône de Lorentz : minimiser x3 sous ||(x1,x2)|| <= x3 et x1 = 1.
+lorentz = secondordercone([1 0 0; 0 1 0], [0; 0], [0; 0; 1], 0);
+pointLorentz = coneprog([0; 0; 1], lorentz, [], [], [1 0 0], 1);
+assert(abs(pointLorentz(3) - 1) < 1e-2);
+
+%% ------------------------------- bornes infinies en programmation
+% Une borne infinie n'en est pas une : la barrière logarithmique la
+% prenait au mot et figeait la descente.
+[pointBorne, valeurBorne] = linprog([-1; -2], [1 1; 1 3], [4; 6], ...
+                                    zeros(0, 2), zeros(0, 1), [0; 0], [Inf; Inf]);
+assert(max(abs(pointBorne(:) - [3; 1])) < 1e-3);
+assert(abs(valeurBorne + 5) < 1e-3);
+
 disp('toolboxes : toutes les verifications passent');

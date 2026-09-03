@@ -41,6 +41,9 @@ private:
     void exigerOp(const char* s);
     void exigerMotFin();
     bool motFin() const;
+    // Les mots reserves au seul classdef : « properties », « methods »,
+    // « events », « enumeration ». Ailleurs ce sont des fonctions.
+    bool motDeClasse(const char* s) const;
     void sauterSeparateurs();
     void sauterFinsLignes();
     [[noreturn]] void erreurSyntaxe(const std::string& msg) const;

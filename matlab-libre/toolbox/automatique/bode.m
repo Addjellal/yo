@@ -20,13 +20,18 @@ function [module, phase, w] = bode(varargin)
 %   Pour un modèle échantillonné, la réponse est évaluée sur le cercle
 %   unité, en exp(j*W*Ts) ; pour un modèle continu, en j*W.
 %
+%   BODE(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé :
+%   FreqUnits, MagUnits, PhaseUnits, Grid, XLim, YLim, Title, XLabel et
+%   YLabel sont suivis.
+%
 %   Exemples :
 %      bode(tf(1, [1 2 1]))
 %      bode(tf(1, [1 1]), tf(1, [1 0.2 1]), logspace(-2, 2, 500))
 %      [m, p] = bode(tf(1, [1 1]), 1);   % m = 0.7071, p = -45
 %
-%   Voir aussi BODEMAG, NICHOLS, NYQUIST, SIGMA, MARGIN, FREQRESP.
-    [modeles, styles, w] = matlibre_arguments_lti(varargin);
+%   Voir aussi BODEMAG, NICHOLS, NYQUIST, SIGMA, MARGIN, FREQRESP,
+%   BODEOPTIONS.
+    [modeles, styles, w, options] = matlibre_arguments_lti(varargin);
     if isempty(modeles)
         error('MATLAB:minrhs', 'Not enough input arguments.');
     end
@@ -40,14 +45,19 @@ function [module, phase, w] = bode(varargin)
         return;
     end
 
+    reglage = matlibre_reglages_bode(options);
     gain = {};
     dephasage = {};
     for k = 1:numel(modeles)
         [m, p, wk] = reponseBode(modeles{k}, w);
-        gain{end+1} = wk;               %#ok<AGROW>
-        gain{end+1} = 20 * log10(m);    %#ok<AGROW>
-        dephasage{end+1} = wk;          %#ok<AGROW>
-        dephasage{end+1} = p;           %#ok<AGROW>
+        gain{end+1} = wk / reglage.diviseurW;   %#ok<AGROW>
+        if reglage.enDecibels
+            gain{end+1} = 20 * log10(m);        %#ok<AGROW>
+        else
+            gain{end+1} = m;                    %#ok<AGROW>
+        end
+        dephasage{end+1} = wk / reglage.diviseurW;  %#ok<AGROW>
+        dephasage{end+1} = p * reglage.facteurPhase; %#ok<AGROW>
         if ~isempty(styles{k})
             gain{end+1} = styles{k};        %#ok<AGROW>
             dephasage{end+1} = styles{k};   %#ok<AGROW>
@@ -57,14 +67,17 @@ function [module, phase, w] = bode(varargin)
     [haut, bas] = matlibre_cases_bode();
     axes(haut);
     semilogx(gain{:});
-    grid on;
-    ylabel('Gain (dB)');
-    title('Diagramme de Bode');
+    grid(reglage.grille);
+    ylabel(reglage.nomGain);
+    title(reglage.titre);
+    if ~isempty(reglage.xlim), xlim(reglage.xlim / reglage.diviseurW); end
+    if ~isempty(reglage.ylim), ylim(reglage.ylim); end
     axes(bas);
     semilogx(dephasage{:});
-    grid on;
-    xlabel('Pulsation (rad/s)');
-    ylabel('Phase (deg)');
+    grid(reglage.grille);
+    xlabel(reglage.nomPulsation);
+    ylabel(reglage.nomPhase);
+    if ~isempty(reglage.xlim), xlim(reglage.xlim / reglage.diviseurW); end
     axes(bas);
 end
 

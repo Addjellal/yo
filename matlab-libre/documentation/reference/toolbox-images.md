@@ -33,11 +33,29 @@
 %
 % Gradient et contours
 %   imgradientxy, imgradient - Gradient, amplitude et direction
-%   edge        - Détection de contours
+%   edge        - Détection de contours : Sobel, Prewitt, Roberts,
+%                 laplacien du gaussien, et Canny à double seuil
+%   hough       - Transformée de Hough d'une image binaire
+%   houghpeaks  - Pics de l'accumulateur
+%   houghlines  - Segments de droite d'après les pics
+%   imfindcircles - Cercles, par la transformée de Hough circulaire
+%   normxcorr2  - Corrélation croisée normalisée
 %
 % Histogramme et contraste
 %   imhist, histeq, imadjust, stretchlim
+%   adapthisteq - Égalisation adaptative à contraste limité
+%   mat2gray    - Remise dans [0,1]
 %   graythresh, imbinarize, multithresh, imquantize
+%   im2bw       - Seuillage, ancienne forme d'IMBINARIZE
+%
+% Régions
+%   poly2mask   - Masque des points intérieurs à un polygone
+%   roicolor    - Sélection par intensité
+%   roifilt2    - Filtrage à l'intérieur d'une région
+%   activecontour - Segmentation par contour actif (Chan-Vese)
+%   impixel     - Valeurs de pixels choisis
+%   imoverlay   - Pose un masque coloré sur une image
+%   montage     - Plusieurs images en mosaïque
 %
 % Morphologie
 %   strel       - Élément structurant
@@ -104,6 +122,36 @@
 %   adapterBlanc, voisinageConnexite
 ```
 
+## `activecontour`
+
+```
+ACTIVECONTOUR Segmentation par contour actif.
+  BW = ACTIVECONTOUR(I,MASQUE) fait évoluer le contour initial MASQUE
+  jusqu'à épouser la région de l'image. Le contour se déplace de
+  lui-même vers un équilibre entre deux exigences : que l'intérieur et
+  l'extérieur soient chacun homogènes, et que le contour reste court.
+
+  BW = ACTIVECONTOUR(I,MASQUE,N) fait N itérations (100 par défaut).
+  BW = ACTIVECONTOUR(I,MASQUE,N,'edge') attire au contraire le contour
+  vers les forts gradients ; 'Chan-Vese' (défaut) ne regarde que les
+  moyennes des deux régions, ce qui marche même sur une image floue,
+  où il n'y a pas de contour net à suivre.
+
+  ACTIVECONTOUR(...,'SmoothFactor',S) pèse la longueur du contour
+  (0,5 par défaut) ; 'ContractionBias',B le fait se resserrer quand B
+  est positif, s'étendre quand il est négatif.
+
+  Exemple :
+     I = zeros(80, 80);
+     [X, Y] = meshgrid(1:80, 1:80);
+     I((X - 40) .^ 2 + (Y - 40) .^ 2 < 400) = 1;
+     masque = false(80, 80);
+     masque(30:50, 30:50) = true;
+     BW = activecontour(I, masque, 150);
+
+  Voir aussi IMSEGKMEANS, IMBINARIZE, WATERSHED, BWBOUNDARIES, EDGE.
+```
+
 ## `adapterBlanc`
 
 ```
@@ -113,6 +161,39 @@ ADAPTERBLANC Adaptation chromatique de von Kries, en coordonnées XYZ.
   pour les conversions entre illuminants.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `adapthisteq`
+
+```
+ADAPTHISTEQ Égalisation d'histogramme adaptative à contraste limité.
+  J = ADAPTHISTEQ(I) découpe l'image en tuiles, égalise l'histogramme
+  de chacune, puis interpole entre les tuiles voisines pour effacer
+  les coutures. Contrairement à HISTEQ, qui traite l'image entière,
+  elle révèle le détail des zones sombres sans écraser les zones
+  claires.
+
+  L'histogramme de chaque tuile est écrêté avant égalisation — c'est
+  le « contraste limité » —, faute de quoi le bruit d'une zone uniforme
+  serait amplifié jusqu'à devenir visible.
+
+  ADAPTHISTEQ(...,'NumTiles',[L C]) donne le découpage (8 par 8 par
+  défaut), 'ClipLimit',C l'écrêtage entre 0 et 1 (0,01 par défaut),
+  'NBins',N le nombre de niveaux (256), 'Range','original' garde
+  l'étendue de l'image au lieu de l'étaler.
+
+  ADAPTHISTEQ(...,'Distribution',D) choisit la forme visée par
+  l'histogramme de sortie : 'uniform' (défaut), 'rayleigh' ou
+  'exponential', et 'Alpha',A en règle le paramètre (0,4 par défaut).
+  L'uniforme aplatit l'histogramme ; la loi de Rayleigh lui donne une
+  forme en cloche, ce qui relève les tons sombres ; l'exponentielle
+  les concentre vers le bas et assombrit l'image.
+
+  Exemple :
+     I = mat2gray(peaks(128));
+     J = adapthisteq(I, 'ClipLimit', 0.02);
+
+  Voir aussi HISTEQ, IMADJUST, IMHIST, IMLOCALBRIGHTEN, STRETCHLIM.
 ```
 
 ## `appliquerMatriceCouleur`
@@ -380,7 +461,26 @@ DCT2 Transformée en cosinus discrète bidimensionnelle.
 ```
 EDGE Détection de contours.
   C = EDGE(X) applique Sobel avec un seuil automatique.
-  C = EDGE(X,'sobel'|'prewitt'|'log',SEUIL) choisit la méthode.
+  C = EDGE(X,'sobel'|'prewitt'|'roberts'|'log'|'canny',SEUIL) choisit
+  la méthode.
+
+  La méthode de Canny est celle qui donne des contours d'un pixel
+  d'épaisseur : elle lisse l'image, cherche le maximum du gradient dans
+  la direction où il pointe — les autres points sont écartés —, puis
+  suit les contours par un double seuil, ce qui garde les traits
+  faibles rattachés à un trait fort.
+
+  C = EDGE(X,'canny',[BAS HAUT]) donne les deux seuils, entre 0 et 1.
+  C = EDGE(X,'canny',SEUIL,SIGMA) règle le lissage (racine de 2 par
+  défaut).
+
+  [C,SEUIL] = EDGE(...) rend aussi le seuil employé.
+
+  Exemple :
+     I = mat2gray(peaks(100));
+     C = edge(I, 'canny');
+
+  Voir aussi IMGRADIENT, FSPECIAL, IMFILTER, HOUGH, BWMORPH.
 ```
 
 ## `entropyfilt`
@@ -454,6 +554,75 @@ GRAYTHRESH Seuil global par la méthode d'Otsu.
 HISTEQ Égalisation d'histogramme.
 ```
 
+## `hough`
+
+```
+HOUGH Transformée de Hough d'une image binaire.
+  [H,THETA,RHO] = HOUGH(BW) rend l'accumulateur de Hough : chaque point
+  allumé de BW vote pour toutes les droites qui passent par lui, et
+  H(i,j) compte les votes de la droite d'angle THETA(j) et de distance
+  RHO(i). Une droite de l'image apparaît alors comme un pic.
+
+  Une droite s'écrit x cos(theta) + y sin(theta) = rho, ce qui la
+  décrit sans cas particulier — la forme y = ax+b ne sait pas dire
+  « verticale ».
+
+  HOUGH(...,'Theta',T) donne les angles en degrés (-90 à 89 par pas
+  d'un degré par défaut), 'RhoResolution',R le pas des distances.
+
+  Exemple :
+     BW = false(50, 50);
+     BW(20, 5:45) = true;                % une droite horizontale
+     [H, theta, rho] = hough(BW);
+     pics = houghpeaks(H, 1);
+
+  Voir aussi HOUGHPEAKS, HOUGHLINES, EDGE, IMFINDCIRCLES, RADON.
+```
+
+## `houghlines`
+
+```
+HOUGHLINES Segments de droite d'après les pics de Hough.
+  DROITES = HOUGHLINES(BW,THETA,RHO,PICS) rend, pour chaque pic, les
+  segments effectivement présents dans l'image : les points alignés
+  sont regroupés, les trous courts comblés, et les segments trop courts
+  écartés.
+
+  Chaque élément porte point1, point2, theta et rho. Les points sont
+  donnés en [x y], c'est-à-dire [colonne ligne].
+
+  HOUGHLINES(...,'FillGap',G) comble les trous de moins de G pixels
+  (20 par défaut), 'MinLength',L écarte les segments plus courts que L
+  (40 par défaut).
+
+  Exemple :
+     [H, theta, rho] = hough(BW);
+     pics = houghpeaks(H, 3);
+     droites = houghlines(BW, theta, rho, pics, 'MinLength', 10);
+
+  Voir aussi HOUGH, HOUGHPEAKS, EDGE, REGIONPROPS.
+```
+
+## `houghpeaks`
+
+```
+HOUGHPEAKS Pics de l'accumulateur de Hough.
+  PICS = HOUGHPEAKS(H,N) rend au plus N pics, une ligne par pic donnant
+  sa ligne et sa colonne dans H. Après chaque pic retenu, son voisinage
+  est mis à zéro : sans cela, un même pic large serait compté
+  plusieurs fois.
+
+  HOUGHPEAKS(...,'Threshold',T) ignore les pics sous T (la moitié du
+  maximum par défaut), 'NHoodSize',[L C] donne la taille du voisinage
+  effacé.
+
+  Exemple :
+     [H, theta, rho] = hough(BW);
+     pics = houghpeaks(H, 3);
+
+  Voir aussi HOUGH, HOUGHLINES, IMREGIONALMAX.
+```
+
 ## `hsv2rgb`
 
 ```
@@ -466,6 +635,24 @@ HSV2RGB Teinte, saturation, valeur vers RVB.
 
 ```
 IDCT2 Transformée en cosinus discrète inverse bidimensionnelle.
+```
+
+## `im2bw`
+
+```
+IM2BW Convertit une image en noir et blanc par seuillage.
+  BW = IM2BW(I,SEUIL) rend une image binaire : vrai là où I dépasse
+  SEUIL, qui s'exprime entre 0 et 1 quelle que soit la classe de I.
+  BW = IM2BW(I) emploie le seuil d'Otsu, que rend GRAYTHRESH.
+  BW = IM2BW(X,CARTE,SEUIL) convertit d'abord une image indexée.
+
+  Cette fonction est l'ancienne forme ; IMBINARIZE la remplace depuis
+  R2016a et offre le seuillage adaptatif.
+
+  Exemple :
+     BW = im2bw(mat2gray(magic(8)), 0.5);
+
+  Voir aussi IMBINARIZE, GRAYTHRESH, MULTITHRESH, IMQUANTIZE.
 ```
 
 ## `im2col`
@@ -634,6 +821,36 @@ IMFILTER Filtrage linéaire d'une image.
      imfilter(ones(3), ones(3)/9, 'replicate')   % que des 1
 ```
 
+## `imfindcircles`
+
+```
+IMFINDCIRCLES Cherche des cercles par la transformée de Hough.
+  [CENTRES,RAYONS] = IMFINDCIRCLES(I,[RMIN RMAX]) cherche les cercles
+  dont le rayon est compris entre RMIN et RMAX. CENTRES a une ligne par
+  cercle, en [x y].
+
+  [CENTRES,RAYONS] = IMFINDCIRCLES(I,R) cherche les cercles de rayon R.
+  [CENTRES,RAYONS,FORCES] = IMFINDCIRCLES(...) rend la force de chaque
+  détection, entre 0 et 1.
+
+  Chaque point de contour vote pour les centres possibles — ceux qui
+  sont à la distance R de lui —, et un cercle apparaît là où les votes
+  se rassemblent.
+
+  IMFINDCIRCLES(...,'Sensitivity',S) abaisse le seuil de détection
+  quand S monte vers 1 (0,85 par défaut) ; 'EdgeThreshold',T règle le
+  seuil du gradient ; 'ObjectPolarity','dark' cherche des objets
+  sombres sur fond clair.
+
+  Exemple :
+     I = zeros(100, 100);
+     [X, Y] = meshgrid(1:100, 1:100);
+     I((X - 50) .^ 2 + (Y - 50) .^ 2 < 400) = 1;
+     [centres, rayons] = imfindcircles(I, [15 25]);
+
+  Voir aussi HOUGH, HOUGHPEAKS, EDGE, REGIONPROPS, VISCIRCLES.
+```
+
 ## `imgaussfilt`
 
 ```
@@ -743,6 +960,45 @@ IMNOISE Ajoute du bruit à une image.
 
 ```
 IMOPEN Ouverture morphologique : érosion puis dilatation.
+```
+
+## `imoverlay`
+
+```
+IMOVERLAY Pose un masque coloré sur une image.
+  J = IMOVERLAY(I,BW) rend une image en couleurs où les points de BW
+  sont peints en jaune, le reste gardant l'image d'origine. C'est la
+  façon de montrer ce qu'une segmentation a trouvé.
+
+  J = IMOVERLAY(I,BW,COULEUR) choisit la couleur : un triplet RVB entre
+  0 et 1, ou un nom — 'red', 'green', 'blue', 'yellow', 'cyan',
+  'magenta', 'white', 'black'.
+
+  Exemple :
+     I = mat2gray(peaks(60));
+     J = imoverlay(I, I > 0.7, 'red');
+
+  Voir aussi LABEL2RGB, IMSHOW, IMFUSE, BWPERIM.
+```
+
+## `impixel`
+
+```
+IMPIXEL Valeurs de pixels choisis.
+  P = IMPIXEL(I,X,Y) rend, une ligne par point, les composantes des
+  pixels aux colonnes X et aux lignes Y. Une image en niveaux de gris
+  donne trois composantes égales, comme dans MATLAB.
+
+  [R,V,B] = IMPIXEL(...) rend les trois composantes séparément.
+
+  MATLAB permet aussi de cliquer les points dans la figure ; MatLibre
+  n'a pas de figure cliquable, et demande donc les coordonnées.
+
+  Exemple :
+     I = mat2gray(magic(8));
+     p = impixel(I, [1 8], [1 8]);
+
+  Voir aussi IMSHOW, IMCROP, IMPROFILE, GINPUT.
 ```
 
 ## `impyramid`
@@ -930,6 +1186,25 @@ LIN2RGB Applique la correction gamma de sRGB.
      lin2rgb(0.214)   % 0.4999
 ```
 
+## `mat2gray`
+
+```
+MAT2GRAY Ramène une matrice dans l'intervalle [0,1].
+  I = MAT2GRAY(A) rend une image d'intensité : le minimum de A devient
+  0, le maximum 1, et le reste s'échelonne linéairement entre les deux.
+  C'est ce qu'il faut pour montrer une matrice quelconque comme une
+  image.
+
+  I = MAT2GRAY(A,[BAS HAUT]) fixe les deux bornes : ce qui est en
+  dessous de BAS devient 0, ce qui est au-dessus de HAUT devient 1.
+
+  Exemple :
+     I = mat2gray(magic(4));
+     [min(I(:)) max(I(:))]     % [0 1]
+
+  Voir aussi IMADJUST, IM2DOUBLE, IMSHOW, RESCALE, STRETCHLIM.
+```
+
 ## `matriceRVBversXYZ`
 
 ```
@@ -950,6 +1225,29 @@ MEAN2 Moyenne de tous les éléments d'une matrice.
 
 ```
 MEDFILT2 Filtre médian bidimensionnel.
+```
+
+## `montage`
+
+```
+MONTAGE Affiche plusieurs images en mosaïque.
+  MONTAGE(I) affiche côte à côte les images d'un tableau à quatre
+  dimensions — hauteur, largeur, canaux, nombre — ou d'un tableau de
+  cellules d'images.
+
+  MONTAGE(...,'Size',[L C]) impose le découpage ; sans lui, la
+  mosaïque est aussi carrée que possible.
+  MONTAGE(...,'BorderSize',B) sépare les vignettes de B pixels,
+  'BackgroundColor',C donne la couleur du fond, 'DisplayRange',[A B]
+  l'étendue des valeurs.
+
+  H = MONTAGE(...) rend l'image assemblée.
+
+  Exemple :
+     images = cat(4, mat2gray(peaks(40)), mat2gray(magic(40)));
+     montage(images);
+
+  Voir aussi IMSHOW, IMTILE, SUBPLOT, IMSHOWPAIR.
 ```
 
 ## `morphologie`
@@ -985,6 +1283,32 @@ NLFILTER Filtre défini par une fonction du voisinage.
      nlfilter(magic(4), [3 3], @(x) max(x(:)))
 ```
 
+## `normxcorr2`
+
+```
+NORMXCORR2 Corrélation croisée normalisée.
+  C = NORMXCORR2(MOTIF,IMAGE) rend la corrélation du motif avec
+  l'image, normalisée en chaque position par les écarts types locaux :
+  le résultat est entre -1 et 1, et vaut 1 là où le motif se retrouve
+  exactement, à un facteur d'échelle et un décalage près.
+
+  C'est ce qui distingue la corrélation normalisée de la corrélation
+  ordinaire : celle-ci répond fort partout où l'image est claire, sans
+  égard à la forme.
+
+  C a la taille de l'image augmentée du motif moins un ; le maximum se
+  trouve au coin bas-droit de la position du motif.
+
+  Exemple :
+     I = mat2gray(peaks(60));
+     motif = I(20:30, 25:35);
+     C = normxcorr2(motif, I);
+     [~, k] = max(C(:));
+     [ligne, colonne] = ind2sub(size(C), k);   % 30 et 35
+
+  Voir aussi XCORR2, CORR2, IMFILTER, CONV2, IMREGCORR.
+```
+
 ## `ntsc2rgb`
 
 ```
@@ -1017,6 +1341,25 @@ PADARRAY Ajoute une bordure à un tableau.
 
   Exemple :
      padarray([1 2; 3 4], [1 1])   % entouré de zéros
+```
+
+## `poly2mask`
+
+```
+POLY2MASK Masque des points intérieurs à un polygone.
+  BW = POLY2MASK(X,Y,M,N) rend une image binaire de M lignes et N
+  colonnes, vraie aux pixels dont le centre est à l'intérieur du
+  polygone de sommets (X,Y). Le polygone est refermé sur lui-même.
+
+  Le test d'appartenance est celui du nombre de traversées : une
+  demi-droite partant du point coupe un nombre impair de côtés si et
+  seulement si le point est dedans.
+
+  Exemple :
+     BW = poly2mask([2 8 8 2], [2 2 8 8], 10, 10);
+     sum(BW(:))
+
+  Voir aussi ROIPOLY, INPOLYGON, ROIFILT2, ROICOLOR, REGIONPROPS.
 ```
 
 ## `psnr`
@@ -1145,6 +1488,40 @@ RGB2YCBCR Couleurs RVB vers luminance et chrominances.
   Y = RGB2YCBCR(IMAGE) applique la matrice de la recommandation
   ITU-R BT.601, avec les plages 16..235 et 16..240 de MATLAB pour les
   entiers 8 bits, et les mêmes valeurs ramenées à [0,1] pour un double.
+```
+
+## `roicolor`
+
+```
+ROICOLOR Sélectionne une région par son intensité.
+  BW = ROICOLOR(A,BAS,HAUT) rend le masque des points dont la valeur
+  est comprise entre BAS et HAUT.
+  BW = ROICOLOR(A,V) rend le masque des points dont la valeur figure
+  dans le vecteur V.
+
+  Exemple :
+     BW = roicolor(magic(5), 10, 20);
+
+  Voir aussi ROIFILT2, POLY2MASK, IMBINARIZE, IMQUANTIZE.
+```
+
+## `roifilt2`
+
+```
+ROIFILT2 Filtre une image à l'intérieur d'une région seulement.
+  J = ROIFILT2(H,I,BW) filtre I par le noyau H, mais ne garde le
+  résultat que là où BW est vrai : ailleurs, l'image d'origine est
+  conservée.
+
+  J = ROIFILT2(I,BW,F) applique la fonction F à l'image entière et n'en
+  garde que la région.
+
+  Exemple :
+     I = mat2gray(peaks(50));
+     BW = poly2mask([10 40 40 10], [10 10 40 40], 50, 50);
+     J = roifilt2(fspecial('average', 5), I, BW);
+
+  Voir aussi IMFILTER, POLY2MASK, ROICOLOR, NLFILTER, BLOCKPROC.
 ```
 
 ## `ssim`

@@ -5,7 +5,18 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
 %   une suite décroissante de mu, ce qui converge vers l'optimum du
 %   problème contraint.
 %
-%   Les contraintes d'égalité sont traitées par pénalisation quadratique.
+%   [X,VAL] = LINPROG(F,A,B,AEQ,BEQ,LB,UB) ajoute les contraintes
+%   d'égalité, traitées par pénalisation quadratique, et les bornes. Une
+%   borne infinie est reconnue comme telle : elle ne contraint rien.
+%
+%   Exemple :
+%      % Deux ressources, deux produits : on maximise 1*x + 2*y, donc on
+%      % minimise l'opposé.
+%      [x, val] = linprog([-1; -2], [1 1; 1 3], [4; 6], [], [], [0; 0], []);
+%      x                              % [3; 1]
+%      val                            % -5
+%
+%   Voir aussi QUADPROG, INTLINPROG, CONEPROG, LSQLIN, OPTIMPROBLEM.
     if nargin < 4, Aeq = []; end
     if nargin < 5, beq = []; end
     if nargin < 6, bas = []; end
@@ -26,11 +37,13 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
     end
     if ~isempty(bas)
         bas = bas(:);
-        x = max(x, bas + 0.01);
+        fini = isfinite(bas);
+        x(fini) = max(x(fini), bas(fini) + 0.01);
     end
     if ~isempty(haut)
         haut = haut(:);
-        x = min(x, haut - 0.01);
+        fini = isfinite(haut);
+        x(fini) = min(x(fini), haut(fini) - 0.01);
     end
     mu = 1;
     for tour = 1:30
@@ -38,8 +51,14 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
         x = fminsearch(objectif, x);
         mu = mu * 0.45;
     end
-    if ~isempty(bas), x = max(x, bas); end
-    if ~isempty(haut), x = min(x, haut); end
+    if ~isempty(bas)
+        fini = isfinite(bas);
+        x(fini) = max(x(fini), bas(fini));
+    end
+    if ~isempty(haut)
+        fini = isfinite(haut);
+        x(fini) = min(x(fini), haut(fini));
+    end
     valeur = f' * x;
     drapeau = 1;
 end
@@ -62,10 +81,16 @@ function v = barriere(x, f, A, b, Aeq, beq, bas, haut, mu)
         e = Aeq * x - beq(:);
         penalite = penalite + 1e4 * sum(e .^ 2);
     end
+    % Une borne infinie n'en est pas une : son logarithme vaudrait
+    % l'infini et emporterait toute la barrière, ce qui figeait la
+    % descente au point de départ.
     if ~isempty(bas)
         d = x - bas(:);
+        fini = isfinite(bas(:));
         for k = 1:numel(d)
-            if d(k) <= 0
+            if ~fini(k)
+                continue
+            elseif d(k) <= 0
                 penalite = penalite + 1e6 * (1 - d(k));
             else
                 penalite = penalite - mu * log(d(k));
@@ -74,8 +99,11 @@ function v = barriere(x, f, A, b, Aeq, beq, bas, haut, mu)
     end
     if ~isempty(haut)
         d = haut(:) - x;
+        fini = isfinite(haut(:));
         for k = 1:numel(d)
-            if d(k) <= 0
+            if ~fini(k)
+                continue
+            elseif d(k) <= 0
                 penalite = penalite + 1e6 * (1 - d(k));
             else
                 penalite = penalite - mu * log(d(k));

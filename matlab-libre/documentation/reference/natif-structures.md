@@ -143,6 +143,47 @@ ISFIELD  La structure a-t-elle ce champ.
     Voir aussi FIELDNAMES, RMFIELD, ISSTRUCT, STRUCT.
 ```
 
+## `ismethod`
+
+```
+ISMETHOD  La classe a-t-elle cette méthode.
+    ISMETHOD(X,NOM) rend vrai si la classe de l'objet X définit la
+    méthode NOM. Le premier argument peut être un objet ou le nom d'une
+    classe.
+
+    Une valeur qui n'est pas d'une classe définie par l'utilisateur rend
+    faux : les fonctions natives ne sont pas des méthodes.
+
+    Syntaxe
+       tf = ismethod(x,nom)
+       tf = ismethod('nomDeClasse',nom)
+
+    Exemples
+       ismethod(1,'plus')             % 0 : double n'est pas un classdef
+       ismethod('inexistante','toto')  % 0
+
+    Voir aussi PROPERTIES, ISPROP, METHODS, CLASS.
+```
+
+## `isprop`
+
+```
+ISPROP  L'objet a-t-il cette propriété.
+    ISPROP(X,NOM) rend vrai si NOM est l'une des propriétés de X, au sens
+    de PROPERTIES : propriété déclarée pour un objet d'une classe
+    définie par l'utilisateur, champ pour une structure.
+
+    Syntaxe
+       tf = isprop(x,nom)
+
+    Exemples
+       s.largeur = 3;
+       isprop(s,'largeur')            % 1
+       isprop(s,'hauteur')            % 0
+
+    Voir aussi PROPERTIES, ISMETHOD, ISFIELD, CLASS.
+```
+
 ## `mat2cell`
 
 ```
@@ -194,6 +235,35 @@ ORDERFIELDS  Range les champs d'une structure par ordre alphabétique.
        fieldnames(t)
 
     Voir aussi FIELDNAMES, RMFIELD, STRUCT, SORT.
+```
+
+## `properties`
+
+```
+PROPERTIES  Propriétés d'un objet ou d'une classe.
+    PROPERTIES(X) rend, dans une cellule, le nom des propriétés de
+    l'objet X : celles déclarées dans le bloc « properties » de son
+    classdef, dépendantes comprises.
+    PROPERTIES('nom') interroge la classe au lieu d'un objet.
+
+    Une valeur qui n'est pas d'une classe définie par l'utilisateur —
+    une structure, une carte, une poignée graphique — montre ses champs,
+    à l'exception de ceux réservés à l'usage interne.
+
+    « properties » n'est un mot-clé que dans un classdef : ailleurs c'est
+    cette fonction, si bien que PROPERTIES(SYS) s'écrit sans détour.
+
+    Syntaxe
+       c = properties(x)
+       c = properties('nomDeClasse')
+
+    Exemples
+       s.largeur = 3;
+       s.hauteur = 4;
+       properties(s)                  % {'largeur'; 'hauteur'}
+       numel(properties(s))           % 2
+
+    Voir aussi ISPROP, ISMETHOD, FIELDNAMES, METHODS, CLASS.
 ```
 
 ## `rmfield`

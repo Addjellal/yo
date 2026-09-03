@@ -102,7 +102,7 @@ assert(isempty(sansFiche));
 % « Exemples » doit tourner. La verification porte sur les dossiers dont
 % toutes les fiches sont completes ; la liste s'allonge a mesure qu'on
 % les complete, et ce qui y entre ne peut plus en ressortir.
-dossiersVerifies = {'automatique', 'robuste'};
+dossiersVerifies = {'automatique', 'robuste', 'optimisation'};
 bacM = tempname();
 mkdir(bacM);
 avant = pwd();

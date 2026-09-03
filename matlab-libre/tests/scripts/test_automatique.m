@@ -689,4 +689,125 @@ assert(abs(mesures.Max - reponse(end)) < 1e-9);
 assert(~hasdelay(tf(1, [1 1])));
 assert(isequal(totaldelay(tf(1, [1 1])), 0));
 
+%% ------------------------------------------------ retards
+% Un passe-tout de Thiran ne change aucun module : seule la phase
+% bouge, comme pour un vrai retard.
+filtreRetard = thiran(0.25, 0.1);
+[numRetard, denRetard] = tfdata(filtreRetard);
+assert(max(abs(numRetard - denRetard(end:-1:1))) < 1e-12);
+pulsations = linspace(0.01, pi, 30) / 0.1;
+reponseRetard = freqresp(filtreRetard, pulsations);
+assert(max(abs(abs(reponseRetard(:)) - 1)) < 1e-9);
+% Un retard multiple de la période est un simple décalage.
+[numEntier, denEntier] = tfdata(thiran(0.3, 0.1));
+assert(numel(numEntier) == 4 && abs(numEntier(end) - 1) < 1e-12);
+assert(abs(numEntier(1)) < 1e-12 && isequal(denEntier, 1));
+% delayss approche le retard par Padé : l'ordre grandit d'autant.
+assert(order(delayss(-1, 1, 1, 0, [1 1 0.5])) == 4);
+assert(order(delayss(-1, 1, 1, 0, [])) == 1);
+
+%% ----------------------------------------------------- unités
+% Changer l'unité de temps ne change pas ce que le modèle décrit : le
+% gain en continu reste le même, et la constante de temps se convertit.
+enMinutes = chgTimeUnit(tf(1, [1 1]), 'minutes');
+[~, denMinutes] = tfdata(enMinutes);
+assert(abs(denMinutes(1) - 1/60) < 1e-12);
+assert(abs(dcgain(enMinutes) - 1) < 1e-12);
+assert(strcmp(enMinutes.TimeUnit, 'minutes'));
+% L'aller-retour rend le modèle de départ.
+[numRetour, denRetour] = tfdata(chgTimeUnit(enMinutes, 'seconds'));
+assert(max(abs(denRetour - [1 1])) < 1e-9 && abs(numRetour - 1) < 1e-9);
+% Une réponse en fréquence change d'unité de la même façon.
+enHertz = chgFreqUnit(frd([1 0.5], [1 10]), 'Hz');
+assert(max(abs(enHertz.Frequency(:) - [1; 10] / (2 * pi))) < 1e-12);
+assert(strcmp(enHertz.FrequencyUnit, 'Hz'));
+
+%% ------------------------------------------------- options et blocs
+optionsBode = bodeoptions;
+assert(strcmp(optionsBode.FreqUnits, 'rad/s') && strcmp(optionsBode.MagUnits, 'dB'));
+optionsEchelon = stepDataOptions('StepAmplitude', 5, 'InputOffset', 1);
+assert(optionsEchelon.StepAmplitude == 5 && optionsEchelon.InputOffset == 1);
+% STEP suit ces niveaux : le premier gain statique fois l'offset, le
+% dernier fois offset + amplitude. Un modele de gain statique un le
+% montre directement.
+premierOrdre = tf(1, [1 1]);
+[yEchelon, ~] = step(premierOrdre, 0:0.05:12, optionsEchelon);
+assert(abs(yEchelon(1) - 1) < 1e-6);
+assert(abs(yEchelon(end) - 6) < 1e-3);
+% Sans options, l'echelon reste unite : rien n'a bouge pour l'appelant
+% qui n'en donne pas.
+[yUnite, tUnite] = step(premierOrdre, 0:0.05:12);
+assert(abs(yUnite(1)) < 1e-9 && abs(yUnite(end) - 1) < 1e-3);
+% Un gain statique double double les deux niveaux.
+[yDouble, ~] = step(tf(2, [1 1]), 0:0.05:12, optionsEchelon);
+assert(abs(yDouble(1) - 2) < 1e-6 && abs(yDouble(end) - 12) < 2e-3);
+% La reponse est bien affine en les deux reglages.
+[yCinq, ~] = step(premierOrdre, 0:0.05:12, stepDataOptions('StepAmplitude', 5));
+assert(norm(yCinq - 5 * yUnite) < 1e-9);
+% Un integrateur n'a pas de gain statique : l'offset est refuse plutot
+% que rendu faux.
+offsetRefuse = false;
+try
+    step(tf(1, [1 0]), 0:0.1:5, stepDataOptions('InputOffset', 1));
+catch
+    offsetRefuse = true;
+end
+assert(offsetRefuse);
+% BODE accepte les options sans se meprendre sur la grille.
+figure('Visible', 'off');
+optionsTrace = bodeoptions;
+optionsTrace.FreqUnits = 'Hz';
+optionsTrace.Grid = 'on';
+optionsTrace.MagUnits = 'abs';
+optionsTrace.PhaseUnits = 'rad';
+optionsTrace.XLim = {[0.01 100]};
+optionsTrace.Title.String = 'Essai';
+bode(premierOrdre, optionsTrace);
+bode(premierOrdre, logspace(-2, 2, 60), optionsTrace);
+bode(premierOrdre, 'b', tf(1, [1 0.2 1]), 'r--', optionsTrace);
+bodemag(premierOrdre, optionsTrace);
+bodemag(premierOrdre, logspace(-2, 2, 60), optionsTrace);
+close('all');
+% Les reglages lus sont bien ceux demandes.
+reglageHz = matlibre_reglages_bode(optionsTrace);
+assert(abs(reglageHz.diviseurW - 2 * pi) < 1e-12);
+assert(~reglageHz.enDecibels);
+assert(abs(reglageHz.facteurPhase - pi / 180) < 1e-15);
+assert(strcmp(reglageHz.grille, 'on') && strcmp(reglageHz.titre, 'Essai'));
+assert(isequal(reglageHz.xlim, [0.01 100]));
+% Une structure vide rend les valeurs par defaut.
+reglageNu = matlibre_reglages_bode([]);
+assert(reglageNu.diviseurW == 1 && reglageNu.enDecibels);
+assert(reglageNu.facteurPhase == 1 && isempty(reglageNu.xlim));
+% Avec des sorties, les options ne changent pas le calcul : le module et
+% la phase restent ceux de la definition.
+[moduleUn, phaseUn] = bode(premierOrdre, 1);
+assert(abs(moduleUn - 1 / sqrt(2)) < 1e-12 && abs(phaseUn + 45) < 1e-12);
+blocs = struct('C', pid(1, 2), 'G', tf(1, [1 1]));
+assert(isa(getBlockValue(blocs, 'C'), 'tf'));
+blocRefuse = false;
+try
+    getBlockValue(blocs, 'inconnu');
+catch
+    blocRefuse = true;
+end
+assert(blocRefuse);
+
+%% ------------------------------------------- reglage et vues
+[correcteur, infoReglage] = pidtool(tf(1, [1 3 3 1]), 'pid');
+assert(isa(correcteur, 'tf'));
+assert(infoReglage.PhaseMargin > 30);
+figure('Visible', 'off');
+sisotool(tf(1, [1 3 3 1]));
+close('all');
+
+%% -------------------------------------- proprietes d'un objet
+% isprop, ismethod et properties disent ce qu'un modèle porte.
+modeleTest = tf(1, [1 1]);
+assert(isprop(modeleTest, 'num') && ~isprop(modeleTest, 'inexistant'));
+assert(ismethod(modeleTest, 'horzcat'));
+assert(~ismethod(modeleTest, 'inexistant'));
+assert(numel(properties(modeleTest)) >= 5);
+assert(numel(properties('duration')) >= 2);
+
 disp('automatique : toutes les verifications passent');

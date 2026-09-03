@@ -11,6 +11,8 @@ function [x, resnorm, residual, exitflag, output] = lsqnonlin(fonction, x0, born
 %      % Ajustement de a*exp(b*t) sur des données exactes.
 %      t = (0:0.5:2)';  y = 3 * exp(-0.5 * t);
 %      p = lsqnonlin(@(p) p(1) * exp(p(2) * t) - y, [1; -1]);
+%
+%   Voir aussi LSQCURVEFIT, LSQLIN, FSOLVE, FMINSEARCH.
     if nargin < 3, bornesBasses = []; end
     if nargin < 4, bornesHautes = []; end
     if nargin < 5, options = struct(); end

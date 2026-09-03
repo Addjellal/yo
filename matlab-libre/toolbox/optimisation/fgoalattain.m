@@ -13,6 +13,8 @@ function [x, valeurs, atteinte] = fgoalattain(fonction, x0, buts, poids, A, b, A
 %   Exemple :
 %      f = @(x) [x(1)^2, (x(1)-2)^2];
 %      [x, v, g] = fgoalattain(f, 0, [1 1], [1 1]);
+%
+%   Voir aussi FMINIMAX, FMINCON, FSEMINF, OPTIMOPTIONS.
     if nargin < 4 || isempty(poids), poids = ones(size(buts)); end
     if nargin < 5, A = []; end
     if nargin < 6, b = []; end

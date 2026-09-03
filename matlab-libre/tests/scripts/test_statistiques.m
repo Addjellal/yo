@@ -109,6 +109,17 @@ assert(strcmp(o.Display, 'off'));
 o2 = optimoptions(o, 'TolX', 1e-3);
 assert(abs(o2.TolX - 1e-3) < 1e-15);
 assert(o2.MaxIter == 50);
+% La structure se lit sous les deux orthographes : le code ecrit pour
+% MATLAB demande les noms longs, les solveurs de MatLibre les courts.
+assert(o.MaxIterations == 50);
+assert(o2.StepTolerance == 1e-3 && o2.MaxIterations == 50);
+o3 = optimoptions('fminunc', 'TolFun', 1e-8, 'MaxFunEvals', 300, 'TolCon', 1e-5);
+assert(o3.OptimalityTolerance == 1e-8 && o3.TolFun == 1e-8);
+assert(o3.MaxFunctionEvaluations == 300 && o3.MaxFunEvals == 300);
+assert(o3.ConstraintTolerance == 1e-5 && o3.TolCon == 1e-5);
+% Un nom long pose seul remplit aussi le court.
+o4 = optimoptions('fmincon', 'StepTolerance', 1e-4);
+assert(o4.TolX == 1e-4);
 
 % Programmation en nombres entiers : optima connus.
 x = intlinprog([-1; -2], [1 2], [1 1], 4, [], [], [0; 0], [10; 10]);

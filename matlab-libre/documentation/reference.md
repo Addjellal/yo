@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-646 fonctions ecrites en C++, reparties en 22 groupes.
+649 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1527 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1560 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -44,7 +44,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`antennes`](reference/toolbox-antennes.md) | 5 |
 | [`apprentissage-profond`](reference/toolbox-apprentissage-profond.md) | 27 |
 | [`audio`](reference/toolbox-audio.md) | 7 |
-| [`automatique`](reference/toolbox-automatique.md) | 109 |
+| [`automatique`](reference/toolbox-automatique.md) | 119 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
@@ -63,7 +63,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
 | [`identification`](reference/toolbox-identification.md) | 6 |
 | [`imagerie-medicale`](reference/toolbox-imagerie-medicale.md) | 5 |
-| [`images`](reference/toolbox-images.md) | 123 |
+| [`images`](reference/toolbox-images.md) | 138 |
 | [`instruments`](reference/toolbox-instruments.md) | 4 |
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 6 |
 | [`interface`](reference/toolbox-interface.md) | 15 |
@@ -73,7 +73,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 54 |
-| [`optimisation`](reference/toolbox-optimisation.md) | 12 |
+| [`optimisation`](reference/toolbox-optimisation.md) | 20 |
 | [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 9 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
