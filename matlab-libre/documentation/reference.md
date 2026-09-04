@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1753 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1838 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -55,7 +55,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
 | [`dsp`](reference/toolbox-dsp.md) | 6 |
-| [`econometrie`](reference/toolbox-econometrie.md) | 8 |
+| [`econometrie`](reference/toolbox-econometrie.md) | 84 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
 | [`finance`](reference/toolbox-finance.md) | 16 |
 | [`flou`](reference/toolbox-flou.md) | 70 |
@@ -74,7 +74,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 116 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 20 |
-| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 9 |
+| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 17 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |
@@ -85,7 +85,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 283 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 284 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 42 |
 | [`types`](reference/toolbox-types.md) | 38 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |

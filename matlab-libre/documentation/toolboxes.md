@@ -29,7 +29,7 @@ existant appellera.
 | `compilateur` | MATLAB Compiler — distribution d'un programme. | 2 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |
 | `dsp` | DSP System Toolbox — traitement du signal en temps réel. | 6 |
-| `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 8 |
+| `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 84 |
 | `edp` | Partial Differential Equation Toolbox — équations aux dérivées partielles. | 5 |
 | `finance` | Financial Toolbox — finance quantitative. | 16 |
 | `flou` | Fuzzy Logic Toolbox — logique floue. | 70 |
@@ -47,7 +47,7 @@ existant appellera.
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 116 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 20 |
-| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 9 |
+| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |
@@ -58,7 +58,7 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 283 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 284 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |

@@ -7,6 +7,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 |---|---:|---:|---:|
 | automatique | 108 | 0 | 100 % |
 | communications | 102 | 0 | 100 % |
+| econometrie | 33 | 0 | 100 % |
 | flou | 63 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
@@ -18,7 +19,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
-| **ensemble** | **1486** | **13** | **99 %** |
+| **ensemble** | **1519** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -201,6 +202,42 @@ qu'ils ne font pas encore comme MATLAB.
   structures dont les champs sont ceux que MatLibre lit réellement. Les
   fonctions personnalisables de MATLAB — `MutationFcn`, `CrossoverFcn`,
   `SearchFcn`, `AnnealingFcn` — sont acceptées et sans effet.
+
+### Économétrie
+
+- **`arima` et `garch` sont des `classdef`**, non des objets MATLAB
+  complets : les propriétés se lisent et s'écrivent, mais il n'y a ni
+  validation à l'affectation ni affichage tabulaire. `ESTIMATE`,
+  `SIMULATE`, `FORECAST`, `INFER` et `SUMMARIZE` sont des fonctions
+  ordinaires qui reconnaissent le type de leur premier argument.
+- **La vraisemblance est conditionnelle**, non exacte : les valeurs
+  antérieures à l'échantillon sont prises à la moyenne du modèle et les
+  innovations correspondantes à zéro. MATLAB emploie un filtre de Kalman
+  qui les traite comme des inconnues à lisser ; l'écart s'efface quand
+  l'échantillon grandit, mais sur deux cents points il se voit.
+- **Les innovations sont gaussiennes.** La propriété `Distribution` est
+  conservée et affichée, mais `'t'` n'est pas encore estimée.
+- **Modèles saisonniers** : `Seasonality` applique une différence
+  saisonnière, et `SARLags`/`SMALags` posent des coefficients aux retards
+  voulus. Il n'y a pas de raccourci qui développe automatiquement un
+  modèle multiplicatif complet.
+- **`FORECAST` d'un GARCH rend les variances**, non des niveaux : le
+  niveau d'un GARCH pur n'est pas prévisible.
+- **`JCITEST` rend des vecteurs et un tableau de cellules**, non des
+  tables MATLAB ; `MLES{r+1}` porte les valeurs propres, la matrice `B`
+  des relations, la matrice `A` des vitesses d'ajustement et la
+  log-vraisemblance du rang `r`.
+- **Les valeurs critiques** des tests de racine unitaire, de Johansen et
+  d'Engle-Granger ont été obtenues par simulation — huit mille tirages
+  pour les premiers, six mille pour Johansen — plutôt que recopiées.
+  Elles s'accordent aux tables publiées à quelques centièmes près, mais
+  ce sont des estimations : sur la troisième décimale, elles diffèrent de
+  celles de MATLAB.
+- **`COLLINTEST`** écrit son tableau mais ne trace rien ; l'option
+  `'plot'` est acceptée et sans effet.
+- **`EGCITEST`** accepte `'creg'` valant `'nc'`, `'c'`, `'ct'` ou
+  `'ctt'` ; les valeurs critiques tabulées vont jusqu'à cinq régresseurs,
+  et `'ctt'` emploie celles de `'ct'`.
 
 ### Calcul formel
 

@@ -601,7 +601,11 @@ CHI2GOF Test du khi-deux d'adéquation.
 
 ```
 CHI2INV Quantile du khi-deux, par dichotomie sur la répartition.
-  Exemple :  chi2inv(0.95, 1)   % 3.8415
+  Les deux arguments se diffusent : un scalaire prend la taille de
+  l'autre.
+
+  Exemple :  chi2inv(0.95, 1)      % 3.8415
+             chi2inv(0.95, 1:3)    % 3.8415  5.9915  7.8147
 ```
 
 ## `chi2rnd`
@@ -1064,6 +1068,10 @@ FCDF Répartition de la loi de Fisher.
 
 ```
 FINV Quantile de la loi de Fisher, par dichotomie.
+  Les trois arguments se diffusent : un scalaire prend la taille des
+  autres.
+
+  Exemple :  finv(0.95, 2, 30)     % 3.3158
 ```
 
 ## `fitcecoc`
@@ -2639,6 +2647,16 @@ MATLIBRE_ARBRE_REDUIT L'arbre des GARDE derniers groupes seulement.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
   DENDROGRAM s'en sert pour ne dessiner que le haut de l'arbre quand
   les observations sont trop nombreuses pour tenir sur un axe.
+```
+
+## `matlibre_diffuser_deux`
+
+```
+MATLIBRE_DIFFUSER_DEUX Met deux arguments à la même taille par diffusion.
+  Un scalaire prend la taille de l'autre ; deux tableaux de même taille
+  passent tels quels ; toute autre combinaison est refusée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `matlibre_distance`
@@ -4938,6 +4956,10 @@ TIEDRANK Rangs, les valeurs égales recevant leur rang moyen.
 
 ```
 TINV Quantile de la loi de Student, par dichotomie sur TCDF.
+  Les deux arguments se diffusent : un scalaire prend la taille de
+  l'autre.
+
+  Exemple :  tinv(0.975, 10)       % 2.2281
 ```
 
 ## `tirerMelange`

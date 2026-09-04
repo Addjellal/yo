@@ -1,0 +1,7 @@
+# Econometrics Toolbox. Les noms qu'un utilisateur rencontre : series
+# temporelles, tests de racine unitaire et d'autocorrelation, modeles
+# ARMA et GARCH, diagnostics.
+adftest aicbic archtest arima autocorr collintest corrcoef crosscorr
+egcitest estimate filter forecast garch gctest hurst infer jcitest
+kpsstest lagmatrix lbqtest lmctest lratiotest ols parcorr pptest price2ret
+ret2price ret2tick simulate summarize tick2ret vratiotest waldtest

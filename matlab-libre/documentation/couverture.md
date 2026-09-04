@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **649 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **1753 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **1838 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -233,7 +233,7 @@ totalité.
    chapeau mexicain, Morlet réelle et les huit dérivées de la
    gaussienne, avec les fréquences centrales publiées — 0.25, 0.8125,
    0.2 — retrouvées exactement.
-   La Statistics and Machine Learning Toolbox en compte 283 : dix-huit
+   La Statistics and Machine Learning Toolbox en compte 284 : dix-huit
    lois de probabilité complètes — densité, répartition, quantile,
    tirages, moments, estimation — plus les accès génériques `pdf`,
    `cdf`, `icdf` et `random` par nom de loi. Les quantiles continus
