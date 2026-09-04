@@ -1,0 +1,17 @@
+# Types de donnees de MATLAB. Les noms qu'un utilisateur rencontre :
+# tableaux nommes, series datees, categories, dates et durees, conteneurs
+# associatifs, et les fonctions qui les manipulent.
+addvars array2table cell2table categorical categories cellstr
+calendarDuration caldays calmonths calquarters calweeks calyears
+containers.Map convertvars countcats datetime datenum datestr datevec
+days dateshift duration exceltime groupsummary head hms hours
+innerjoin iscalendarduration iscategorical isdatetime isduration
+ismember isnat isordinal isprotected isregular isrow issorted istable
+istimetable join juliandate mergecats milliseconds minutes movevars
+nominal NaT ordinal outerjoin posixtime readtable removecats
+removevars renamecats renamevars reordercats retime rmmissing
+rowfun seconds setcats sortrows splitapply splitvars stack struct2table
+summary synchronize table table2array table2cell table2struct
+table2timetable tail timetable timetable2table timerange timeofday
+timezones tzoffset unstack varfun vartype week withtol writetable
+years ymd

@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **649 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **2141 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **2222 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -207,7 +207,7 @@ totalité.
    classification soustractive de Chiu, les trois générateurs de systèmes
    à partir de données, et l'apprentissage hybride d'ANFIS, qui résout
    exactement la moitié linéaire du problème par moindres carrés.
-   La Computer Vision en compte 33 : points
+   La Computer Vision en compte 112 : points
    d'intérêt de Harris, de Shi et Tomasi et FAST, descripteurs HOG et
    LBP, images intégrales et filtrage par boîtes, géométrie épipolaire
    complète — matrice fondamentale par les huit points normalisés ou par

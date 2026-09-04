@@ -306,6 +306,50 @@ MINUTES Durée en minutes, ou minutes d'une durée.
   X = MINUTES(D) rend le nombre de minutes d'une durée.
 ```
 
+## `nominal`
+
+```
+NOMINAL Tableau de catégories non ordonnées.
+  C = NOMINAL(A) transforme un tableau en catégories sans ordre : deux
+  catégories peuvent être égales ou différentes, jamais l'une avant
+  l'autre. C = NOMINAL(A,NOMS) leur donne d'autres noms,
+  NOMINAL(A,NOMS,ENSEMBLE) impose la liste et l'ordre de lecture.
+
+  C'est l'ancien type de MATLAB, remplacé par CATEGORICAL ; il en est
+  ici un synonyme, la propriété d'ordre étant simplement laissée à
+  faux.
+
+  Exemple :
+     couleurs = nominal({'rouge','vert','rouge'})
+     categories(couleurs)
+
+  Voir aussi ORDINAL, CATEGORICAL, CATEGORIES, ISCATEGORICAL.
+```
+
+## `ordinal`
+
+```
+ORDINAL Tableau de catégories ordonnées.
+  C = ORDINAL(A) transforme un tableau en catégories rangées : les
+  comparaisons < <= > >= deviennent licites, l'ordre étant celui de la
+  liste des catégories. C = ORDINAL(A,NOMS) leur donne d'autres noms,
+  ORDINAL(A,NOMS,ENSEMBLE) impose la liste, donc l'ordre.
+
+  La différence avec NOMINAL n'est pas de forme mais de sens : dire
+  qu'une taille est « petite », « moyenne » ou « grande » autorise à
+  les comparer, dire qu'une couleur est « rouge » ou « verte » ne
+  l'autorise pas.
+
+  C'est l'ancien type de MATLAB, remplacé par CATEGORICAL avec
+  l'option 'Ordinal'.
+
+  Exemple :
+     tailles = ordinal({'moyen','petit','grand'}, [], {'petit','moyen','grand'});
+     tailles > 'petit'
+
+  Voir aussi NOMINAL, CATEGORICAL, CATEGORIES, ISORDINAL.
+```
+
 ## `readtable`
 
 ```

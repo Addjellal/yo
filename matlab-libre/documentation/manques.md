@@ -22,7 +22,9 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | signal | 134 | 1 | 99 % |
 | statistiques | 218 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
-| **ensemble** | **1755** | **13** | **99 %** |
+| types | 90 | 0 | 100 % |
+| vision | 59 | 0 | 100 % |
+| **ensemble** | **1904** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -256,7 +258,9 @@ qu'ils ne font pas encore comme MATLAB.
   `creditDefaultCopula`, `creditMigrationCopula`, `varbacktest`,
   `esbacktest` et `creditscorecard` exposent leurs propriétés en clair, et
   les méthodes s'appellent en fonctions — `portfolioRisk(c)`,
-  `runtests(v)`, `score(sc)`.
+  `runtests(v)`, `score(sc)`. `RUNTESTS` reste une méthode et non une
+  fonction de fichier : le nom appartient déjà au lanceur de tests de
+  MatLibre, et une fonction de fichier le masquerait.
 - **Les résultats sont des structures ou des tableaux de cellules**, non
   des tables MATLAB : `runtests` rend une cellule par test, `bininfo` une
   structure de colonnes.

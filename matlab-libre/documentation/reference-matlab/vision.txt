@@ -1,0 +1,19 @@
+# Computer Vision Toolbox. Les noms qu'un utilisateur rencontre :
+# detection et appariement de points d'interet, geometrie de la camera,
+# stereovision, nuages de points, flot optique, boites englobantes et
+# annotation d'images.
+assignDetectionsToTracks bbox2points bboxOverlapRatio bboxPrecisionRecall
+bboxresize cameraIntrinsics cameraMatrix cameraParameters
+detectBRISKFeatures detectFASTFeatures detectHarrisFeatures
+detectMinEigenFeatures detectORBFeatures detectSURFFeatures
+disparityBM disparitySGM epipolarLine estimateFundamentalMatrix
+estimateGeometricTransform estimateGeometricTransform2D
+estimateUncalibratedRectification extractFeatures extractHOGFeatures
+extractLBPFeatures generateCheckerboardPoints houghLines insertMarker
+insertObjectAnnotation insertShape insertText integralFilter
+integralImage labeloverlay matchFeatures opticalFlowFarneback opticalFlowHS
+opticalFlowLK pcdenoise pcdownsample pcfitplane pcmerge pcnormals
+pcregistericp pcsegdist pctransform pointCloud pointsToWorld
+reconstructScene rectifyStereoImages rotationMatrixToVector
+rotationVectorToMatrix selectStrongest selectStrongestBbox selectUniform
+stereoAnaglyph superpixels triangulate undistortPoints worldToImage
