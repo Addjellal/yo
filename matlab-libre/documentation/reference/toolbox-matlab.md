@@ -96,6 +96,11 @@
 % Cartes de couleurs
 %   gray, hot, cool, spring, summer, autumn, winter, bone, copper,
 %   pink, jet, hsv, flag, prism
+%
+% Interpolation et texte
+%   griddata            - Interpolation de donnees dispersees
+%   isstrprop           - Nature de chaque caractere d'un texte
+%   vectorize           - Rend une expression applicable terme a terme
 ```
 
 ## `MemoizedFunction`
@@ -1353,6 +1358,35 @@ GRAY Carte de couleurs en niveaux de gris.
      carte = gray(4)   % [0 0 0; 1/3 1/3 1/3; 2/3 2/3 2/3; 1 1 1]
 ```
 
+## `griddata`
+
+```
+GRIDDATA Interpolation de données dispersées.
+  VQ = GRIDDATA(X,Y,V,XQ,YQ) interpole les valeurs V connues aux points
+  dispersés (X,Y) et les évalue en (XQ,YQ). Les points sont d'abord
+  triangulés ; chaque point demandé est situé dans un triangle, et sa
+  valeur lue par interpolation barycentrique.
+
+  VQ = GRIDDATA(...,METHODE) où METHODE vaut :
+    'linear'   le défaut : plan par triangle, continu mais anguleux
+    'nearest'  la valeur du point de données le plus proche
+    'natural'  moyenne pondérée par la distance inverse, lissée
+    'cubic'    interpolation par plaque mince, lisse et exacte aux
+               points de données
+    'v4'       comme 'cubic'
+
+  Un point demandé hors de l'enveloppe convexe des données reçoit NaN,
+  sauf avec 'nearest' : au-delà des données, il n'y a rien à
+  interpoler, et extrapoler serait inventer.
+
+  Exemple :
+     [x, y] = meshgrid(0:0.25:1, 0:0.25:1);
+     z = 2 * x - 3 * y;
+     abs(griddata(x(:), y(:), z(:), 0.3, 0.7) - (0.6 - 2.1)) < 1e-12
+
+  Voir aussi DELAUNAY, INTERP2, INTERP1, SCATTEREDINTERPOLANT.
+```
+
 ## `gtext`
 
 ```
@@ -1654,6 +1688,26 @@ ISSORTEDROWS Vrai si les lignes sont triées.
   Voir aussi SORTROWS, ISSORTED.
 ```
 
+## `isstrprop`
+
+```
+ISSTRPROP Nature de chaque caractère d'un texte.
+  M = ISSTRPROP(TEXTE,PROPRIETE) rend un tableau logique de la taille du
+  texte, vrai là où le caractère a la propriété demandée.
+
+  Propriétés reconnues : 'alpha', 'alphanum', 'digit', 'xdigit',
+  'lower', 'upper', 'punct', 'wspace', 'cntrl', 'graphic', 'print'.
+
+  TEXTE peut être un tableau de caractères, un tableau de cellules de
+  chaînes — le résultat est alors une cellule de masques — ou un
+  tableau de nombres, lus comme des codes de caractères.
+
+  Exemple :
+     isstrprop('a1 ', 'digit')      % 0 1 0
+
+  Voir aussi ISLETTER, ISSPACE, REGEXP.
+```
+
 ## `jet`
 
 ```
@@ -1843,6 +1897,23 @@ MATLIBRE_ARGUMENTS_BARRES Décode les arguments de BARH et de PARETO.
   pour que les diagrammes en barres de MatLibre s'accordent tous.
 ```
 
+## `matlibre_barycentriques`
+
+```
+MATLIBRE_BARYCENTRIQUES Coordonnées barycentriques dans un triangle.
+  P = MATLIBRE_BARYCENTRIQUES(XS,YS,X,Y) rend les trois poids qui
+  écrivent le point comme moyenne des sommets. Ils somment à un ; ils
+  sont tous positifs exactement quand le point est dans le triangle.
+
+  Un triangle dégénéré — trois sommets alignés — n'en a pas : le
+  résultat est alors vide.
+
+  Exemple :
+     matlibre_barycentriques([0 1 0], [0 0 1], 0.25, 0.25)      % 0.5 0.25 0.25
+
+  Voir aussi MATLIBRE_GRILLE_LINEAIRE, GRIDDATA.
+```
+
 ## `matlibre_cases`
 
 _Pas de bloc d'aide._
@@ -1863,6 +1934,21 @@ MATLIBRE_COULEUR_SECTEUR La k-ième couleur de la palette des secteurs.
   Fonction interne : elle n'existe pas dans MATLAB. PIE, PIE3 et ROSE
   s'en servent pour que deux secteurs voisins se distinguent, sans
   dépendre de la palette des courbes, qui n'a que sept tons.
+```
+
+## `matlibre_distance_inverse`
+
+```
+MATLIBRE_DISTANCE_INVERSE Moyenne pondérée par l'inverse du carré de la distance.
+  VQ = MATLIBRE_DISTANCE_INVERSE(X,Y,V,XQ,YQ) rend, en chaque point
+  demandé, la moyenne des valeurs pondérée par l'inverse du carré de la
+  distance. La surface obtenue passe par les points de données et est
+  définie partout.
+
+  Exemple :
+     matlibre_distance_inverse([0;1], [0;0], [0;1], 0.5, 0)      % 0.5
+
+  Voir aussi GRIDDATA.
 ```
 
 ## `matlibre_evaluer_grille`
@@ -1894,6 +1980,41 @@ MATLIBRE_FLECHE Le tracé d'une flèche, hampe et pointe d'un seul trait.
   ce qui la fait tenir en une courbe et non en trois.
 ```
 
+## `matlibre_grille_lineaire`
+
+```
+MATLIBRE_GRILLE_LINEAIRE Interpolation linéaire sur une triangulation.
+  VQ = MATLIBRE_GRILLE_LINEAIRE(X,Y,V,XQ,YQ) triangule les points, situe
+  chaque point demandé dans un triangle, et y interpole linéairement par
+  les coordonnées barycentriques.
+
+  Les coordonnées barycentriques d'un point sont les poids qui
+  l'écrivent comme moyenne des trois sommets ; elles sont toutes
+  positives si et seulement si le point est dans le triangle, ce qui
+  sert à la fois à le situer et à l'interpoler.
+
+  Hors de l'enveloppe des données, la valeur est NaN.
+
+  Exemple :
+     [x, y] = meshgrid(0:1, 0:1);
+     matlibre_grille_lineaire(x(:), y(:), x(:), 0.5, 0.5)      % 0.5
+
+  Voir aussi GRIDDATA, DELAUNAY.
+```
+
+## `matlibre_grille_plus_proche`
+
+```
+MATLIBRE_GRILLE_PLUS_PROCHE Valeur du point de données le plus proche.
+  VQ = MATLIBRE_GRILLE_PLUS_PROCHE(X,Y,V,XQ,YQ) rend, pour chaque point
+  demandé, la valeur du point de données dont il est le plus près.
+
+  Exemple :
+     matlibre_grille_plus_proche([0;1], [0;0], [10;20], 0.9, 0)      % 20
+
+  Voir aussi GRIDDATA.
+```
+
 ## `matlibre_grille_polaire`
 
 ```
@@ -1903,6 +2024,20 @@ MATLIBRE_GRILLE_POLAIRE Les cercles et les rayons d'un tracé polaire.
   que les rayons se lisent.
 ```
 
+## `matlibre_noyau_plaque`
+
+```
+MATLIBRE_NOYAU_PLAQUE Noyau radial de la plaque mince.
+  K = MATLIBRE_NOYAU_PLAQUE(X,Y,XQ,YQ) rend la matrice des r²log(r)
+  entre les points demandés et les points de données. La valeur en zéro
+  est zéro, prolongée par continuité.
+
+  Exemple :
+     matlibre_noyau_plaque(0, 0, 1, 0)      % 0, car log(1) est nul
+
+  Voir aussi MATLIBRE_PLAQUE_MINCE.
+```
+
 ## `matlibre_pas_grille`
 
 ```
@@ -1910,6 +2045,30 @@ MATLIBRE_PAS_GRILLE La distance typique entre deux points voisins.
   Fonction interne : elle n'existe pas dans MATLAB. QUIVER s'en sert
   pour mettre les flèches à l'échelle, de sorte que la plus longue
   tienne dans une maille sans empiéter sur la voisine.
+```
+
+## `matlibre_plaque_mince`
+
+```
+MATLIBRE_PLAQUE_MINCE Interpolation lisse par plaque mince.
+  VQ = MATLIBRE_PLAQUE_MINCE(X,Y,V,XQ,YQ) construit la surface qui passe
+  par tous les points et minimise l'énergie de flexion d'une plaque
+  mince — l'intégrale du carré des dérivées secondes.
+
+  La solution s'écrit comme une somme de fonctions radiales r²log(r),
+  plus un plan. Les coefficients sortent d'un système linéaire, avec
+  trois conditions d'orthogonalité qui empêchent la partie radiale
+  d'absorber le plan.
+
+  Contrairement à l'interpolation par triangles, la surface obtenue est
+  lisse partout, et elle s'étend hors de l'enveloppe des données.
+
+  Exemple :
+     [x, y] = meshgrid(0:0.5:1, 0:0.5:1);
+     z = 2 * x - 3 * y;
+     abs(matlibre_plaque_mince(x(:), y(:), z(:), 0.3, 0.7) - (0.6 - 2.1)) < 1e-8
+
+  Voir aussi GRIDDATA, MATLIBRE_GRILLE_LINEAIRE.
 ```
 
 ## `matlibre_poignee_depuis_texte`
@@ -3299,6 +3458,26 @@ VECNORM Norme de chaque vecteur d'un tableau.
   N = VECNORM(A) rend la norme 2 de chaque colonne.
   N = VECNORM(A,P) utilise la norme P.
   N = VECNORM(A,P,DIM) travaille le long de la dimension DIM.
+```
+
+## `vectorize`
+
+```
+VECTORIZE Rend une expression applicable terme à terme.
+  S = VECTORIZE(EXPRESSION) insère un point devant les opérateurs de
+  multiplication, de division et de puissance : l'expression s'applique
+  alors à des tableaux entiers plutôt qu'à des scalaires.
+
+  Un point déjà présent n'est pas redoublé.
+
+  EXPRESSION peut être une chaîne, un tableau de cellules de chaînes ou
+  une poignée de fonction anonyme ; le résultat est du même genre, sauf
+  pour une poignée, rendue sous forme de chaîne comme dans MATLAB.
+
+  Exemple :
+     vectorize('a*x^2 + b/c')      % a.*x.^2 + b./c
+
+  Voir aussi STR2FUNC, FUNC2STR, INLINE.
 ```
 
 ## `voronoi`

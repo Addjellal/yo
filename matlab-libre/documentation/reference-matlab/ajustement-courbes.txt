@@ -1,0 +1,10 @@
+# Curve Fitting Toolbox. Les noms qu'un utilisateur rencontre :
+# ajustement par modele nomme ou par expression, objets d'ajustement et
+# ce qu'on leur demande, splines d'interpolation et de lissage,
+# preparation et exclusion des donnees.
+argnames cfit coeffnames coeffvalues confint csape csaps
+dependnames differentiate excludedata feval fit fitoptions fittype
+fnbrk fnder fnint fnplt fnval formula indepnames integrate islinear
+numargs numcoeffs plot ppval predint prepareCurveData
+prepareSurfaceData probnames probvalues setoptions sfit smooth spap2
+spaps spline type

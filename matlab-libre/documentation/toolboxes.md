@@ -13,7 +13,7 @@ existant appellera.
 |---|---|---|
 | `acquisition` | Data Acquisition Toolbox — acquisition simulée. | 5 |
 | `aerospatial` | Aerospace Toolbox — atmosphère, repères et grandeurs de vol. | 6 |
-| `ajustement-courbes` | Curve Fitting Toolbox — ajustement de courbes et de surfaces. | 4 |
+| `ajustement-courbes` | Curve Fitting Toolbox — ajustement de courbes et de surfaces. | 96 |
 | `analyse-de-texte` | Text Analytics Toolbox — analyse de textes. | 8 |
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
@@ -42,11 +42,11 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 187 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 196 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 116 |
-| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 24 |
+| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 26 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |

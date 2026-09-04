@@ -227,25 +227,7 @@ LINPROG Programmation linéaire : minimise f'*x sous A*x <= b.
 
 ## `lsqcurvefit`
 
-```
-LSQCURVEFIT Ajustement non linéaire au sens des moindres carrés.
-  P = LSQCURVEFIT(MODELE,P0,X,Y) minimise la somme des carrés des écarts
-  entre MODELE(P,X) et Y. P0 est le point de départ ; le modèle prend
-  les paramètres d'abord, l'abscisse ensuite — c'est ce qui distingue
-  LSQCURVEFIT de LSQNONLIN, où l'on écrit soi-même la différence.
-
-  P = LSQCURVEFIT(MODELE,P0,X,Y,LB,UB) borne les paramètres.
-
-  Exemple :
-     % Une exponentielle décroissante, retrouvée à partir de ses
-     % propres valeurs.
-     t = (0:0.5:3)';
-     y = 3 * exp(-0.5 * t);
-     p = lsqcurvefit(@(p, t) p(1) * exp(p(2) * t), [1; -1], t, y);
-     round(p, 3)                    % [3; -0.5]
-
-  Voir aussi LSQNONLIN, LSQLIN, FMINSEARCH, POLYFIT.
-```
+_Pas de bloc d'aide._
 
 ## `lsqlin`
 
@@ -307,6 +289,22 @@ MATLIBRE_DEFINIE_POSITIVE La matrice est-elle symétrique définie positive ?
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_jacobienne_residu`
+
+```
+MATLIBRE_JACOBIENNE_RESIDU Jacobienne d'un vecteur de résidus.
+  J = MATLIBRE_JACOBIENNE_RESIDU(FONCTION,P,RESIDU) rend la matrice des
+  dérivées de chaque résidu par rapport à chaque paramètre, par
+  différence centrée. C'est elle qui donne la covariance des paramètres
+  ajustés, donc leurs intervalles de confiance.
+
+  Exemple :
+     J = matlibre_jacobienne_residu(@(p) p(1) * [1; 2], 1, [1; 2]);
+     J      % [1; 2]
+
+  Voir aussi LSQCURVEFIT, LSQNONLIN, NLPARCI.
+```
+
 ## `matlibre_lp_exact`
 
 ```
@@ -320,6 +318,23 @@ MATLIBRE_LP_EXACT Programme linéaire résolu par régularisation quadratique.
   continue de s'améliorer : à la limite, la solution est le sommet.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_multiplicateurs_bornes`
+
+```
+MATLIBRE_MULTIPLICATEURS_BORNES Bornes actives au point trouvé.
+  M = MATLIBRE_MULTIPLICATEURS_BORNES(P,BAS,HAUT) rend une structure de
+  deux champs, « lower » et « upper », valant un là où la solution
+  touche la borne et zéro ailleurs.
+
+  Un multiplicateur non nul signale que la borne retient la solution :
+  sans elle, le critère continuerait de décroître dans cette direction.
+
+  Exemple :
+     matlibre_multiplicateurs_bornes([0; 5], [0; -inf], []).lower
+
+  Voir aussi LSQCURVEFIT, LSQNONLIN.
 ```
 
 ## `matlibre_qp_actif`

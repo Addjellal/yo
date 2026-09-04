@@ -5,6 +5,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 
 | domaine | présentes | manquantes | couverture |
 |---|---:|---:|---:|
+| ajustement-courbes | 39 | 0 | 100 % |
 | apprentissage-profond | 78 | 0 | 100 % |
 | automatique | 108 | 0 | 100 % |
 | communications | 102 | 0 | 100 % |
@@ -25,7 +26,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 23 | 0 | 100 % |
 | types | 90 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **1982** | **13** | **99 %** |
+| **ensemble** | **2021** | **13** | **99 %** |
 
 ## matlab-langage
 

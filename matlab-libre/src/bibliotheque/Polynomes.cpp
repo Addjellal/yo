@@ -463,20 +463,54 @@ FONCTION(fnSpline) {
         std::vector<Valeur> a = {args[0], args[1], args.size() > 2 ? args[2] : Valeur::vide()};
         return fnInterp1(it, a, 1);
     }
-    std::vector<double> h(n - 1), alpha(n, 0.0), l(n, 1.0), mu(n, 0.0), z(n, 0.0), c(n, 0.0),
-        b(n - 1), d(n - 1);
-    for (std::size_t i = 0; i + 1 < n; ++i) h[i] = x[i + 1] - x[i];
-    for (std::size_t i = 1; i + 1 < n; ++i)
-        alpha[i] = 3.0 * ((y[i + 1] - y[i]) / h[i] - (y[i] - y[i - 1]) / h[i - 1]);
-    for (std::size_t i = 1; i + 1 < n; ++i) {
-        l[i] = 2 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-        mu[i] = h[i] / l[i];
-        z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+    // Conditions « not-a-knot », celles de MATLAB : la derivee troisieme
+    // est continue au deuxieme et a l'avant-dernier noeud, ce qui revient
+    // a dire que ces noeuds n'en sont pas. La spline reproduit alors
+    // exactement tout polynome de degre trois — ce qu'une spline
+    // naturelle, qui annule la courbure aux bords, ne fait pas.
+    //
+    // Le systeme porte sur les pentes aux noeuds ; il est tridiagonal,
+    // et se resout par l'algorithme de Thomas.
+    std::vector<double> h(n - 1), dy(n - 1);
+    for (std::size_t i = 0; i + 1 < n; ++i) {
+        h[i] = x[i + 1] - x[i];
+        dy[i] = y[i + 1] - y[i];
     }
-    for (std::size_t i = n - 1; i-- > 0;) {
-        c[i] = z[i] - mu[i] * c[i + 1];
-        b[i] = (y[i + 1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2 * c[i]) / 3.0;
-        d[i] = (c[i + 1] - c[i]) / (3.0 * h[i]);
+    std::vector<double> sousDiag(n, 0.0), diag(n, 0.0), surDiag(n, 0.0), second(n, 0.0);
+    diag[0] = h[1];
+    surDiag[0] = h[0] + h[1];
+    second[0] = ((h[0] + 2.0 * (h[0] + h[1])) * h[1] * dy[0] / h[0] +
+                 h[0] * h[0] * dy[1] / h[1]) /
+                (h[0] + h[1]);
+    for (std::size_t i = 1; i + 1 < n; ++i) {
+        sousDiag[i] = h[i];
+        diag[i] = 2.0 * (h[i - 1] + h[i]);
+        surDiag[i] = h[i - 1];
+        second[i] = 3.0 * (h[i] * dy[i - 1] / h[i - 1] + h[i - 1] * dy[i] / h[i]);
+    }
+    std::size_t dernier = n - 1;
+    double hA = h[n - 3], hB = h[n - 2];
+    sousDiag[dernier] = hB + hA;
+    diag[dernier] = hA;
+    second[dernier] = (hB * hB * dy[n - 3] / hA +
+                       (2.0 * (hA + hB) + hB) * hA * dy[n - 2] / hB) /
+                      (hA + hB);
+    std::vector<double> pente(n, 0.0), gamma(n, 0.0), delta(n, 0.0);
+    gamma[0] = surDiag[0] / diag[0];
+    delta[0] = second[0] / diag[0];
+    for (std::size_t i = 1; i < n; ++i) {
+        double pivot = diag[i] - sousDiag[i] * gamma[i - 1];
+        gamma[i] = surDiag[i] / pivot;
+        delta[i] = (second[i] - sousDiag[i] * delta[i - 1]) / pivot;
+    }
+    pente[n - 1] = delta[n - 1];
+    for (std::size_t i = n - 1; i-- > 0;) pente[i] = delta[i] - gamma[i] * pente[i + 1];
+    std::vector<double> b(n - 1), c(n - 1), d(n - 1);
+    for (std::size_t i = 0; i + 1 < n; ++i) {
+        double pentePlate = dy[i] / h[i];
+        b[i] = pente[i];
+        c[i] = (3.0 * pentePlate - 2.0 * pente[i] - pente[i + 1]) / h[i];
+        d[i] = (pente[i] + pente[i + 1] - 2.0 * pentePlate) / (h[i] * h[i]);
     }
     if (args.size() < 3) {
         // Renvoie la structure « pp » de MATLAB.

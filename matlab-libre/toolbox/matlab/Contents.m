@@ -93,3 +93,8 @@
 % Cartes de couleurs
 %   gray, hot, cool, spring, summer, autumn, winter, bone, copper,
 %   pink, jet, hsv, flag, prism
+%
+% Interpolation et texte
+%   griddata            - Interpolation de donnees dispersees
+%   isstrprop           - Nature de chaque caractere d'un texte
+%   vectorize           - Rend une expression applicable terme a terme
