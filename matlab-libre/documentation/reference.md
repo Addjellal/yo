@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-1838 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+1998 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -57,7 +57,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`dsp`](reference/toolbox-dsp.md) | 6 |
 | [`econometrie`](reference/toolbox-econometrie.md) | 84 |
 | [`edp`](reference/toolbox-edp.md) | 5 |
-| [`finance`](reference/toolbox-finance.md) | 16 |
+| [`finance`](reference/toolbox-finance.md) | 172 |
 | [`flou`](reference/toolbox-flou.md) | 70 |
 | [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
 | [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
@@ -73,7 +73,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 116 |
-| [`optimisation`](reference/toolbox-optimisation.md) | 20 |
+| [`optimisation`](reference/toolbox-optimisation.md) | 24 |
 | [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 17 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |

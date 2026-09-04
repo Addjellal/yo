@@ -1,0 +1,22 @@
+# Financial Toolbox. Les noms qu'un utilisateur rencontre : dates de
+# marche, valeur temporelle de l'argent, obligations, options, portefeuilles,
+# mesures de performance et indicateurs techniques.
+acrubond acrudisc adline adosc amortize annurate annuterm beytbill
+blsdelta blsgamma blsimpv blslambda blsprice blsrho blstheta blsvega
+bndconvp bndconvy bnddurp bnddury bndprice bndspread bndyield bolling
+bollinger busdate cfamounts cfconv cfdates cfdur cfprice cfyield
+chaikosc chaikvolat corr2cov cov2corr cur2frac cur2str datemnth
+datewrkdy days360 days360e days360isda days360psa days365 daysact
+daysdif dec2thirtytwo depfixdb depgendb deprdv depsoyd depstln
+disc2zero discrate effrr elpm emaxdrawdown ewstats fbusdate fpctkd
+frac2cur frontcon fvdisc fvfix fvvar fwd2zero hhigh highlow
+holdings2weights holidays inforatio irr isbusday lbusdate llow lpm
+lweekdate m2xdate macd maxdrawdown medprice mirr movavg negvolidx nomrr
+npv nweekdate onbalvol opprofit payadv payodd payper payuni pcalims
+pcglims pcpval pointfig portalloc portalpha portcons portopt portrand
+portsim portstats portvar portvrisk posvolidx prbyzero prcroc prdisc
+prmat prtbill pvfix pvtrend pvvar pyld2zero ratetimes ret2tick rsindex
+sharpe spctkd stochosc thirdwednesday thirtytwo2dec tick2ret
+totalreturnprice tsaccel tsmom typprice volroc wclose weights2holdings
+williamsad willpctr wrkdydif x2mdate yearfrac ylddisc yldmat yldtbill
+zbtprice zbtyield zero2disc zero2fwd zero2pyld

@@ -31,11 +31,28 @@ function [x, valeur] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
             x0 = zeros(n, 1);
         end
     end
-    objectif = @(v) 0.5 * v(:)' * H * v(:) + f' * v(:) + penalite(v(:), A, b, Aeq, beq, bas, haut);
-    x = fminsearch(objectif, x0(:));
-    x = x(:);
-    if ~isempty(bas), x = max(x, bas(:)); end
-    if ~isempty(haut), x = min(x, haut(:)); end
+    % Quand la forme quadratique est définie positive, le problème se
+    % résout exactement par la méthode des contraintes actives : les
+    % contraintes y sont satisfaites au chiffre près, là où une
+    % pénalisation ne fait que s'en approcher. On ne retombe sur
+    % Nelder-Mead que si la matrice est singulière ou le système mal
+    % conditionné.
+    x = [];
+    if matlibre_definie_positive(H)
+        [Ac, bc] = matlibre_bornes_en_contraintes(A, b, bas, haut, n);
+        [candidat, reussi] = matlibre_qp_actif(H, f, Ac, bc, Aeq, beq);
+        if reussi
+            x = candidat;
+        end
+    end
+    if isempty(x)
+        objectif = @(v) 0.5 * v(:)' * H * v(:) + f' * v(:) + ...
+                        penalite(v(:), A, b, Aeq, beq, bas, haut);
+        x = fminsearch(objectif, x0(:));
+        x = x(:);
+        if ~isempty(bas), x = max(x, bas(:)); end
+        if ~isempty(haut), x = min(x, haut(:)); end
+    end
     valeur = 0.5 * x' * H * x + f' * x;
 end
 

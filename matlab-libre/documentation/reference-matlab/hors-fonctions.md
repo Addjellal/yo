@@ -163,6 +163,50 @@ qu'ils ne font pas encore comme MATLAB.
   fonctions personnalisables de MATLAB — `MutationFcn`, `CrossoverFcn`,
   `SearchFcn`, `AnnealingFcn` — sont acceptées et sans effet.
 
+### Finance
+
+- **Les fonctions rendent des valeurs, elles ne tracent pas.**
+  `HIGHLOW` rend les extrémités des barres, `POINTFIG` les colonnes et
+  leurs symboles ; le tracé se fait ensuite avec `PLOT`. `COLLINTEST` et
+  `PORTRAND` écrivent ou rendent, sans figure.
+- **`EMAXDRAWDOWN`** repose sur une table à six décimales, obtenue en
+  simulant quarante mille trajectoires de quatre mille pas par point de
+  grille, avec la correction de continuité. À dérive nulle la table
+  reprend la valeur exacte, racine de pi sur deux. Ailleurs, l'écart avec
+  la valeur vraie est de l'ordre du millième.
+- **Conventions de comptage** : les quatorze bases de `YEARFRAC` sont
+  implémentées, les variantes ISMA se ramenant aux conventions
+  correspondantes. La base 13, jours ouvrés sur 252, emploie le
+  calendrier américain de `HOLIDAYS`.
+- **`HOLIDAYS`** calcule les jours fériés du marché de New York à partir
+  des règles — jour de l'an, Martin Luther King, Washington, vendredi
+  saint, Souvenir, Juneteenth depuis 2022, fête nationale, travail,
+  Thanksgiving, Noël — et non d'une table. Les fermetures
+  exceptionnelles, funérailles nationales ou événements, n'y sont pas.
+- **`CFAMOUNTS`** rend des vecteurs et non une table ; les drapeaux
+  valent 0 pour l'intérêt couru, 1 pour un coupon, 3 pour le dernier
+  flux.
+- **`PORTOPT` et `FRONTCON`** résolvent un programme quadratique par
+  point de la frontière, par la méthode des contraintes actives : les
+  contraintes sont satisfaites exactement. Il n'y a pas d'objet
+  `Portfolio`.
+- **`PORTALPHA`** implémente `'xs'`, `'sml'`, `'capm'`, `'ml'`, `'gh1'`
+  et `'gh2'`.
+- **Indicateurs techniques** : les moyennes exponentielles emploient le
+  facteur usuel, deux divisé par la période plus un ; `RSINDEX` emploie
+  le lissage de Wilder, un sur la période. Les premières valeurs, tant
+  que la fenêtre n'est pas pleine, valent NaN dans `RSINDEX` et
+  `BOLLING`, et sont calculées sur la fenêtre partielle ailleurs.
+- **`LINPROG` et `QUADPROG`** ont gagné une résolution exacte : quand la
+  forme quadratique est définie positive, `QUADPROG` passe par la méthode
+  des contraintes actives, et `LINPROG` termine sa barrière par une
+  régularisation quadratique décroissante qui l'amène sur le sommet. La
+  pénalisation reste le recours quand la matrice est singulière.
+- **`DATENUM`, `DATEVEC`, `DATESTR` et `WEEKDAY`** acceptent désormais
+  des tableaux : une matrice de dates par ligne, des composantes
+  diffusées, un tableau de cellules de textes. `DATESTR` rend une
+  matrice de caractères, une ligne par date.
+
 ### Économétrie
 
 - **`arima` et `garch` sont des `classdef`**, non des objets MATLAB

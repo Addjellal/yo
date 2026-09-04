@@ -287,6 +287,63 @@ LSQNONLIN Moindres carrés non linéaires.
   Voir aussi LSQCURVEFIT, LSQLIN, FSOLVE, FMINSEARCH.
 ```
 
+## `matlibre_bornes_en_contraintes`
+
+```
+MATLIBRE_BORNES_EN_CONTRAINTES Ajoute les bornes aux inégalités.
+  Une borne inférieure x >= bas s'écrit -x <= -bas ; une borne
+  supérieure s'écrit telle quelle. Les bornes infinies sont ignorées.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_definie_positive`
+
+```
+MATLIBRE_DEFINIE_POSITIVE La matrice est-elle symétrique définie positive ?
+  La factorisation de Cholesky échoue exactement dans le cas contraire ;
+  c'est le test le moins coûteux et le plus sûr.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_lp_exact`
+
+```
+MATLIBRE_LP_EXACT Programme linéaire résolu par régularisation quadratique.
+  Un programme linéaire atteint son optimum sur un sommet du polyèdre,
+  où une méthode de point intérieur ne se rend jamais tout à fait :
+  elle en approche sans l'atteindre. En ajoutant un terme quadratique
+  minuscule au critère, le problème devient un programme quadratique
+  strictement convexe, que la méthode des contraintes actives résout
+  exactement. Le terme est ensuite réduit tant que le critère linéaire
+  continue de s'améliorer : à la limite, la solution est le sommet.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_qp_actif`
+
+```
+MATLIBRE_QP_ACTIF Programme quadratique convexe, par contraintes actives.
+  Minimise 0,5*x'Hx + f'x sous A*x <= b et Aeq*x = beq, H étant définie
+  positive.
+
+  La méthode tient en une remarque : à l'optimum, chaque contrainte
+  d'inégalité est soit saturée, soit sans effet. Si l'on savait
+  lesquelles sont saturées, il ne resterait qu'un problème à
+  contraintes d'égalité, que les conditions de Lagrange résolvent d'un
+  seul système linéaire. On devine donc cet ensemble, on résout, et
+  l'on corrige : une contrainte violée y entre, une contrainte dont le
+  multiplicateur est négatif en sort. Le nombre d'ensembles étant fini
+  et le critère décroissant, le procédé s'arrête.
+
+  REUSSI vaut faux quand le système devient singulier : l'appelant
+  revient alors à une méthode moins exigeante.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `optimconstr`
 
 ```

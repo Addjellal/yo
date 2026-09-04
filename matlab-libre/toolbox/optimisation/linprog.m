@@ -59,8 +59,33 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
         fini = isfinite(haut);
         x(fini) = min(x(fini), haut(fini));
     end
+    % Finition : la barrière approche le sommet sans l'atteindre. Une
+    % régularisation quadratique décroissante, résolue exactement par la
+    % méthode des contraintes actives, y mène — et l'on ne garde le
+    % résultat que s'il respecte les contraintes et améliore le critère.
+    [Ac, bc] = matlibre_bornes_en_contraintes(A, b, bas, haut, n);
+    [poli, reussi] = matlibre_lp_exact(f, Ac, bc, Aeq, beq);
+    if reussi && admissible(poli, Ac, bc, Aeq, beq)
+        % Le point de la barrière peut violer légèrement une égalité, ce
+        % qui lui donne un critère plus bas que l'optimum vrai : on ne
+        % compare les critères que si lui aussi est admissible.
+        if ~admissible(x, Ac, bc, Aeq, beq) || f' * poli <= f' * x + 1e-9
+            x = poli;
+        end
+    end
     valeur = f' * x;
     drapeau = 1;
+end
+
+function bon = admissible(x, A, b, Aeq, beq)
+    bon = true;
+    tolerance = 1e-8;
+    if ~isempty(A) && any(A * x - b(:) > tolerance * max(1, max(abs(b))))
+        bon = false;
+    end
+    if bon && ~isempty(Aeq) && any(abs(Aeq * x - beq(:)) > tolerance * max(1, max(abs(beq))))
+        bon = false;
+    end
 end
 
 function v = barriere(x, f, A, b, Aeq, beq, bas, haut, mu)

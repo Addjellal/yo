@@ -31,7 +31,7 @@ existant appellera.
 | `dsp` | DSP System Toolbox — traitement du signal en temps réel. | 6 |
 | `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 84 |
 | `edp` | Partial Differential Equation Toolbox — équations aux dérivées partielles. | 5 |
-| `finance` | Financial Toolbox — finance quantitative. | 16 |
+| `finance` | Financial Toolbox — finance quantitative. | 172 |
 | `flou` | Fuzzy Logic Toolbox — logique floue. | 70 |
 | `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 4 |
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 5 |
@@ -46,7 +46,7 @@ existant appellera.
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 116 |
-| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 20 |
+| `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 24 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |

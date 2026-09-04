@@ -142,6 +142,43 @@ int moisDepuisNom(const std::string& nom) {
     return 0;
 }
 
+// Une date ecrite : « aaaa-mm-jj », « mm/jj/aaaa » ou « jj-mmm-aaaa ».
+// Cette derniere forme est celle que DATESTR ecrit ; sans elle, le
+// parcours datestr puis datenum ne revenait pas a son point de depart.
+bool lireDateTexte(const std::string& s, double& sortie) {
+    int a = 0, m = 0, j = 0, h = 0, mi = 0;
+    double se = 0;
+    char nomMois[32] = {0};
+    if (std::sscanf(s.c_str(), "%d-%31[A-Za-z]-%d %d:%d:%lf", &j, nomMois, &a, &h, &mi, &se) >= 3) {
+        m = moisDepuisNom(nomMois);
+        if (m > 0) {
+            sortie = versDatenum(a, m, j, h, mi, se);
+            return true;
+        }
+    }
+    h = mi = 0;
+    se = 0;
+    if (std::sscanf(s.c_str(), "%d-%d-%d %d:%d:%lf", &a, &m, &j, &h, &mi, &se) >= 3) {
+        sortie = versDatenum(a, m, j, h, mi, se);
+        return true;
+    }
+    a = m = j = 0;
+    if (std::sscanf(s.c_str(), "%d/%d/%d", &m, &j, &a) == 3) {
+        sortie = versDatenum(a, m, j, 0, 0, 0);
+        return true;
+    }
+    return false;
+}
+
+// La valeur d'un argument diffuse : un scalaire vaut pour toutes les
+// positions, un tableau donne sa case. C'est la regle de MATLAB pour
+// DATENUM(Y,M,D), ou l'annee peut etre unique et les jours nombreux.
+double caseDiffusee(const Valeur& v, std::size_t k) {
+    if (v.nelem() == 0) return 0.0;
+    if (v.nelem() == 1) return v.re[0];
+    return v.re[k];
+}
+
 FONCTION(fnDatenum) {
     INUTILISE
     if (args.empty()) {
@@ -149,45 +186,133 @@ FONCTION(fnDatenum) {
         return fnNow(it, aucun, 1);
     }
     if (args.size() >= 3) {
-        int annee = (int)args[0].scal(), mois = (int)args[1].scal(), jour = (int)args[2].scal();
-        int heure = args.size() > 3 ? (int)args[3].scal() : 0;
-        int minute = args.size() > 4 ? (int)args[4].scal() : 0;
-        double seconde = args.size() > 5 ? args[5].scal() : 0.0;
-        return {Valeur::scalaire(versDatenum(annee, mois, jour, heure, minute, seconde))};
+        // Les six champs se diffusent : la forme du resultat est celle du
+        // plus grand d'entre eux.
+        std::size_t n = 1;
+        Dims forme{1, 1};
+        for (std::size_t k = 0; k < args.size() && k < 6; ++k) {
+            exigerNumerique(args[k], "datenum");
+            if (args[k].nelem() > n) {
+                n = args[k].nelem();
+                forme = args[k].dims;
+            }
+        }
+        for (std::size_t k = 0; k < args.size() && k < 6; ++k)
+            if (args[k].nelem() != 1 && args[k].nelem() != n)
+                erreur("MATLAB:datenum:InputSizeMismatch",
+                       "DATENUM inputs must be scalars or of the same size.");
+        Valeur sortie = Valeur::matriceDims(forme);
+        for (std::size_t k = 0; k < n; ++k)
+            sortie.re[k] = versDatenum(
+                (int)caseDiffusee(args[0], k), (int)caseDiffusee(args[1], k),
+                (int)caseDiffusee(args[2], k),
+                args.size() > 3 ? (int)caseDiffusee(args[3], k) : 0,
+                args.size() > 4 ? (int)caseDiffusee(args[4], k) : 0,
+                args.size() > 5 ? caseDiffusee(args[5], k) : 0.0);
+        return {sortie};
     }
-    if (args[0].nelem() >= 3 && args[0].estNumerique()) {
+    // Un tableau de textes : une date par cellule, rangee en colonne.
+    if (args[0].estCellule() || args[0].estChaine()) {
         const Valeur& v = args[0];
+        std::size_t n = v.nelem();
+        Valeur sortie = Valeur::matrice((int)n, 1);
+        for (std::size_t k = 0; k < n; ++k) {
+            std::string s = v.estCellule() ? v.cellules[k].versTexte() : v.chaines[k];
+            if (!lireDateTexte(s, sortie.re[k]))
+                erreur("MATLAB:datenum:ConvertDateString",
+                       "Unable to convert the date string.");
+        }
+        if (n == 1) return {Valeur::scalaire(sortie.re[0])};
+        return {sortie};
+    }
+    if (args[0].estNumerique() && args[0].nelem() >= 3) {
+        const Valeur& v = args[0];
+        int lignes = v.nlignes();
+        int colonnes = v.ncolonnes();
+        // Une matrice de plusieurs lignes porte une date par ligne ; un
+        // simple vecteur porte une seule date.
+        if (v.ndims() == 2 && lignes > 1 && (colonnes == 3 || colonnes == 6)) {
+            Valeur sortie = Valeur::matrice(lignes, 1);
+            for (int l = 0; l < lignes; ++l) {
+                auto champ = [&](int c) {
+                    return c < colonnes ? v.re[(std::size_t)c * lignes + l] : 0.0;
+                };
+                sortie.re[l] = versDatenum((int)champ(0), (int)champ(1), (int)champ(2),
+                                           (int)champ(3), (int)champ(4), champ(5));
+            }
+            return {sortie};
+        }
         return {Valeur::scalaire(versDatenum(
             (int)v.re[0], (int)v.re[1], (int)v.re[2], v.nelem() > 3 ? (int)v.re[3] : 0,
             v.nelem() > 4 ? (int)v.re[4] : 0, v.nelem() > 5 ? v.re[5] : 0.0))};
     }
-    // Texte « aaaa-mm-jj », « mm/jj/aaaa » ou « jj-mmm-aaaa » — cette
-    // derniere forme est celle que DATESTR ecrit : sans elle, le
-    // parcours datestr puis datenum ne revenait pas a son point de
-    // depart.
-    std::string s = args[0].versTexte();
-    int a = 0, m = 0, j = 0, h = 0, mi = 0;
-    double se = 0;
-    char nomMois[32] = {0};
-    if (std::sscanf(s.c_str(), "%d-%31[A-Za-z]-%d %d:%d:%lf", &j, nomMois, &a, &h, &mi, &se) >= 3) {
-        m = moisDepuisNom(nomMois);
-        if (m > 0) return {Valeur::scalaire(versDatenum(a, m, j, h, mi, se))};
-    }
-    h = mi = 0;
-    se = 0;
-    if (std::sscanf(s.c_str(), "%d-%d-%d %d:%d:%lf", &a, &m, &j, &h, &mi, &se) >= 3)
-        return {Valeur::scalaire(versDatenum(a, m, j, h, mi, se))};
-    if (std::sscanf(s.c_str(), "%d/%d/%d", &m, &j, &a) == 3)
-        return {Valeur::scalaire(versDatenum(a, m, j, 0, 0, 0))};
+    double resultat = 0.0;
+    if (lireDateTexte(args[0].versTexte(), resultat)) return {Valeur::scalaire(resultat)};
     erreur("MATLAB:datenum:ConvertDateString", "Unable to convert the date string.");
+}
+
+// Une date mise en forme, selon le modele de MATLAB ou le format donne.
+std::string ecrireDate(double n, const std::string& format) {
+    int annee, mois, jour, heure, minute;
+    double seconde;
+    depuisDatenum(n, annee, mois, jour, heure, minute, seconde);
+    static const char* moisCourt[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    if (format.empty())
+        return formater("%02d-%s-%04d %02d:%02d:%02d", jour,
+                        moisCourt[std::max(0, std::min(11, mois - 1))], annee, heure, minute,
+                        (int)std::round(seconde));
+    std::string r;
+    for (std::size_t k = 0; k < format.size();) {
+        if (format.compare(k, 4, "yyyy") == 0) { r += formater("%04d", annee); k += 4; }
+        else if (format.compare(k, 3, "mmm") == 0) {
+            r += moisCourt[std::max(0, std::min(11, mois - 1))];
+            k += 3;
+        }
+        else if (format.compare(k, 2, "mm") == 0) { r += formater("%02d", mois); k += 2; }
+        else if (format.compare(k, 2, "dd") == 0) { r += formater("%02d", jour); k += 2; }
+        else if (format.compare(k, 2, "HH") == 0) { r += formater("%02d", heure); k += 2; }
+        else if (format.compare(k, 2, "MM") == 0) { r += formater("%02d", minute); k += 2; }
+        else if (format.compare(k, 2, "SS") == 0) {
+            r += formater("%02d", (int)std::round(seconde));
+            k += 2;
+        } else {
+            r += format[k++];
+        }
+    }
+    return r;
 }
 
 FONCTION(fnDatestr) {
     INUTILISE
+    // Plusieurs dates donnent une matrice de caracteres, une ligne par
+    // date : c'est ce que rend MATLAB, et ce dont les echeanciers ont
+    // besoin.
+    if (!args.empty() && args[0].estNumerique() && args[0].nelem() > 1) {
+        std::string format;
+        if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
+            format = args[1].versTexte();
+        std::vector<std::string> lignes;
+        std::size_t largeur = 0;
+        for (std::size_t k = 0; k < args[0].nelem(); ++k) {
+            lignes.push_back(ecrireDate(args[0].re[k], format));
+            largeur = std::max(largeur, lignes.back().size());
+        }
+        Valeur sortie = Valeur::matrice((int)lignes.size(), (int)largeur, (double)' ');
+        sortie.classe = Classe::Caractere;
+        for (std::size_t l = 0; l < lignes.size(); ++l)
+            for (std::size_t c = 0; c < lignes[l].size(); ++c)
+                sortie.re[c * lignes.size() + l] = (double)(unsigned char)lignes[l][c];
+        return {sortie};
+    }
     double n;
     if (args.empty()) {
         std::vector<Valeur> aucun;
         n = fnNow(it, aucun, 1)[0].scal();
+    } else if (args[0].estTexte() || args[0].estChaine() || args[0].estCellule()) {
+        std::vector<Valeur> un{args[0]};
+        Arguments passe(un);
+        n = fnDatenum(it, passe, 1)[0].scal();
     } else {
         n = args[0].scal();
     }
@@ -199,36 +324,39 @@ FONCTION(fnDatestr) {
     std::string sortie = formater("%02d-%s-%04d %02d:%02d:%02d", jour,
                                   moisCourt[std::max(0, std::min(11, mois - 1))], annee, heure,
                                   minute, (int)std::round(seconde));
-    if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine())) {
-        std::string f = args[1].versTexte();
-        std::string r;
-        for (std::size_t k = 0; k < f.size();) {
-            if (f.compare(k, 4, "yyyy") == 0) { r += formater("%04d", annee); k += 4; }
-            else if (f.compare(k, 2, "mm") == 0) { r += formater("%02d", mois); k += 2; }
-            else if (f.compare(k, 2, "dd") == 0) { r += formater("%02d", jour); k += 2; }
-            else if (f.compare(k, 2, "HH") == 0) { r += formater("%02d", heure); k += 2; }
-            else if (f.compare(k, 2, "MM") == 0) { r += formater("%02d", minute); k += 2; }
-            else if (f.compare(k, 2, "SS") == 0) {
-                r += formater("%02d", (int)std::round(seconde));
-                k += 2;
-            } else {
-                r += f[k++];
-            }
-        }
-        sortie = r;
-    }
+    if (args.size() > 1 && (args[1].estTexte() || args[1].estChaine()))
+        sortie = ecrireDate(n, args[1].versTexte());
     return {Valeur::texte(sortie)};
 }
 
 FONCTION(fnDatevec) {
     INUTILISE
     exigerArguments(args, 1, 1, "datevec");
-    int annee, mois, jour, heure, minute;
-    double seconde;
-    depuisDatenum(args[0].scal(), annee, mois, jour, heure, minute, seconde);
-    std::vector<double> v = {(double)annee, (double)mois,  (double)jour,
-                             (double)heure, (double)minute, seconde};
-    return {Valeur::ligne(v)};
+    // Un vecteur de numeros de serie donne une ligne par date : c'est ce
+    // qu'attendent les fonctions financieres, qui travaillent sur des
+    // echeanciers entiers.
+    std::vector<double> numeros;
+    if (args[0].estTexte() || args[0].estChaine() || args[0].estCellule()) {
+        std::vector<Valeur> un{args[0]};
+        Arguments passe(un);
+        std::vector<Valeur> r = fnDatenum(it, passe, 1);
+        numeros.assign(r[0].re.begin(), r[0].re.end());
+    } else {
+        exigerNumerique(args[0], "datevec");
+        numeros.assign(args[0].re.begin(), args[0].re.end());
+    }
+    int n = (int)numeros.size();
+    if (n == 0) return {Valeur::matrice(0, 6)};
+    Valeur sortie = Valeur::matrice(n, 6);
+    for (int k = 0; k < n; ++k) {
+        int annee, mois, jour, heure, minute;
+        double seconde;
+        depuisDatenum(numeros[k], annee, mois, jour, heure, minute, seconde);
+        double champs[6] = {(double)annee, (double)mois,   (double)jour,
+                            (double)heure, (double)minute, seconde};
+        for (int c = 0; c < 6; ++c) sortie.re[(std::size_t)c * n + k] = champs[c];
+    }
+    return {sortie};
 }
 
 FONCTION(fnDate) {
@@ -269,12 +397,36 @@ FONCTION(fnPause) {
 FONCTION(fnWeekday) {
     INUTILISE
     exigerArguments(args, 1, 1, "weekday");
-    long long jours = (long long)std::floor(args[0].scal());
-    int jour = (int)(((jours + 5) % 7) + 1);
     static const char* noms[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    if (nargout >= 2)
-        return {Valeur::scalaire(jour), Valeur::texte(noms[(jour - 1) % 7])};
-    return {Valeur::scalaire(jour)};
+    std::vector<double> numeros;
+    if (args[0].estTexte() || args[0].estChaine() || args[0].estCellule()) {
+        std::vector<Valeur> un{args[0]};
+        Arguments passe(un);
+        std::vector<Valeur> r = fnDatenum(it, passe, 1);
+        numeros.assign(r[0].re.begin(), r[0].re.end());
+    } else {
+        exigerNumerique(args[0], "weekday");
+        numeros.assign(args[0].re.begin(), args[0].re.end());
+    }
+    Dims forme = args[0].estNumerique() ? args[0].dims : Dims{(int)numeros.size(), 1};
+    Valeur sortie = Valeur::matriceDims(forme);
+    for (std::size_t k = 0; k < numeros.size(); ++k) {
+        long long jours = (long long)std::floor(numeros[k]);
+        sortie.re[k] = (double)(((jours + 5) % 7) + 1);
+    }
+    if (nargout >= 2) {
+        // Les noms sont empiles en lignes, comme la matrice de caracteres
+        // que rend MATLAB.
+        int n = (int)numeros.size();
+        Valeur lettres = Valeur::matrice(n, 3);
+        lettres.classe = Classe::Caractere;
+        for (int k = 0; k < n; ++k) {
+            const char* nom = noms[((int)sortie.re[k] - 1) % 7];
+            for (int c = 0; c < 3; ++c) lettres.re[(std::size_t)c * n + k] = (double)nom[c];
+        }
+        return {sortie, lettres};
+    }
+    return {sortie};
 }
 
 
