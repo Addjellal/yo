@@ -1241,7 +1241,12 @@ SIMULATE Tire des trajectoires d'un modèle de série temporelle.
      y = simulate(m, 1000);
      abs(var(y) - 1 / (1 - 0.64)) < 0.5      % variance theorique
 
-  Voir aussi ARIMA, GARCH, ESTIMATE, FORECAST, INFER.
+  SIMULATE d'un modèle de portefeuille de crédit rend l'objet enrichi
+  de ses scénarios de pertes, que PORTFOLIORISK et RISKCONTRIBUTION
+  exploitent ensuite.
+
+  Voir aussi ARIMA, GARCH, ESTIMATE, FORECAST, INFER,
+  CREDITDEFAULTCOPULA.
 ```
 
 ## `summarize`

@@ -34,7 +34,7 @@ existant appellera.
 | `finance` | Financial Toolbox — finance quantitative. | 172 |
 | `flou` | Fuzzy Logic Toolbox — logique floue. | 70 |
 | `fusion-capteurs` | Sensor Fusion and Tracking Toolbox — fusion de capteurs. | 4 |
-| `gestion-risques` | Risk Management Toolbox — mesures de risque. | 5 |
+| `gestion-risques` | Risk Management Toolbox — mesures de risque. | 69 |
 | `identification` | System Identification Toolbox — identification de modèles. | 6 |
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
 | `images` | Image Processing Toolbox — traitement d'images. | 138 |
@@ -58,7 +58,7 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 284 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 287 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 33 |

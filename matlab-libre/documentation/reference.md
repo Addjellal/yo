@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2074 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+2141 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -60,7 +60,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`finance`](reference/toolbox-finance.md) | 172 |
 | [`flou`](reference/toolbox-flou.md) | 70 |
 | [`fusion-capteurs`](reference/toolbox-fusion-capteurs.md) | 4 |
-| [`gestion-risques`](reference/toolbox-gestion-risques.md) | 5 |
+| [`gestion-risques`](reference/toolbox-gestion-risques.md) | 69 |
 | [`identification`](reference/toolbox-identification.md) | 6 |
 | [`imagerie-medicale`](reference/toolbox-imagerie-medicale.md) | 5 |
 | [`images`](reference/toolbox-images.md) | 138 |
@@ -85,7 +85,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 284 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 287 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 42 |
 | [`types`](reference/toolbox-types.md) | 38 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |

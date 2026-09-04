@@ -1768,6 +1768,47 @@ GEVRND Tirages d'une loi généralisée des valeurs extrêmes.
   Voir aussi GEVCDF, GEVPDF, GEVINV, EVRND, WBLRND.
 ```
 
+## `glmfit`
+
+```
+GLMFIT Ajustement d'un modèle linéaire généralisé.
+  B = GLMFIT(X,Y,LOI) rend les coefficients, l'ordonnée à l'origine en
+  première position. LOI vaut 'normal', 'binomial', 'poisson', 'gamma'
+  ou 'inverse gaussian'.
+
+  [B,DEV,STATS] = GLMFIT(...) rend la déviance et une structure portant
+  les écarts types, les statistiques t et les valeurs p.
+
+  GLMFIT(...,'link',L) change la fonction de lien, 'constant','off'
+  retire l'ordonnée à l'origine, 'weights',W pondère les observations.
+
+  C'est l'interface historique ; FITGLM rend un modèle complet.
+
+  Exemple :
+     b = glmfit(X, y, 'binomial');
+     p = glmval(b, X, 'logit');
+
+  Voir aussi GLMVAL, FITGLM, FITLM, MNRFIT.
+```
+
+## `glmval`
+
+```
+GLMVAL Prédiction d'un modèle linéaire généralisé.
+  Y = GLMVAL(B,X,LIEN) applique les coefficients aux prédicteurs et
+  inverse le lien : c'est la prédiction sur l'échelle de la réponse, non
+  sur celle du prédicteur linéaire.
+
+  GLMVAL(...,'constant','off') suppose qu'il n'y a pas d'ordonnée à
+  l'origine dans B.
+
+  Exemple :
+     b = glmfit(X, y, 'binomial');
+     p = glmval(b, X, 'logit');       % probabilites entre zero et un
+
+  Voir aussi GLMFIT, FITGLM.
+```
+
 ## `gmdistribution`
 
 ```
@@ -2699,6 +2740,16 @@ MATLIBRE_KOLMOGOROV_QUEUE Queue de la loi de Kolmogorov.
   la probabilité que la statistique de Kolmogorov-Smirnov normalisée
   dépasse L. C'est la limite quand l'effectif grandit ; elle est déjà
   bonne à quelques dizaines d'observations.
+```
+
+## `matlibre_lien_inverse`
+
+```
+MATLIBRE_LIEN_INVERSE Réciproque d'une fonction de lien.
+  Le lien transforme la moyenne en prédicteur linéaire ; sa réciproque
+  ramène une prédiction linéaire sur l'échelle de la réponse.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
 ## `matlibre_marge_comparaison`

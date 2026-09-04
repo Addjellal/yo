@@ -10,6 +10,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | econometrie | 33 | 0 | 100 % |
 | finance | 146 | 0 | 100 % |
 | flou | 63 | 0 | 100 % |
+| gestion-risques | 33 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
@@ -19,9 +20,9 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | optimisation | 31 | 1 | 97 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 134 | 1 | 99 % |
-| statistiques | 216 | 0 | 100 % |
+| statistiques | 218 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
-| **ensemble** | **1720** | **13** | **99 %** |
+| **ensemble** | **1755** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -248,6 +249,40 @@ qu'ils ne font pas encore comme MATLAB.
   des tableaux : une matrice de dates par ligne, des composantes
   diffusées, un tableau de cellules de textes. `DATESTR` rend une
   matrice de caractères, une ligne par date.
+
+### Gestion des risques
+
+- **Les objets sont des `classdef` MatLibre**, non les objets de MATLAB :
+  `creditDefaultCopula`, `creditMigrationCopula`, `varbacktest`,
+  `esbacktest` et `creditscorecard` exposent leurs propriétés en clair, et
+  les méthodes s'appellent en fonctions — `portfolioRisk(c)`,
+  `runtests(v)`, `score(sc)`.
+- **Les résultats sont des structures ou des tableaux de cellules**, non
+  des tables MATLAB : `runtests` rend une cellule par test, `bininfo` une
+  structure de colonnes.
+- **`esbacktest`** obtient ses valeurs critiques en simulant cinq mille
+  fois la statistique sous l'hypothèse nulle, à graine fixée, avec mise en
+  cache : deux appels identiques rendent le même verdict, mais la valeur
+  diffère de celle de MATLAB à la troisième décimale. `esbacktestbysim`
+  et les tests conditionnels manquent.
+- **`varbacktest`** implémente les huit tests. Le test de Kupiec
+  sur-rejette en petit échantillon quand les dépassements sont rares —
+  c'est une propriété connue du test, non un défaut de calcul.
+- **`transprob`** prend une matrice à trois colonnes — identifiant, date,
+  notation — et non une table ; les notations sont des entiers, la
+  première étant la meilleure.
+- **`creditscorecard`** découpe les variables numériques par quantiles et
+  les variables de texte par catégorie ; les découpages supervisés de
+  MATLAB — monotone, arbre, khi-deux — manquent, de même que
+  `modifybins`. La sélection pas à pas pénalise chaque candidate par les
+  degrés de liberté que son découpage a déjà consommés, sans quoi une
+  variable de bruit découpée finement passerait.
+- **`concentrationIndices`** rend une structure et non une table ; les
+  indices sont normalisés par défaut, entre zéro pour des expositions
+  égales et un pour une exposition unique.
+- **`asrf`** accepte `'CorrelationType','basel'`, qui applique la formule
+  de corrélation des expositions d'entreprise ; les formules propres aux
+  autres classes d'actifs manquent.
 
 ### Instruments financiers
 
