@@ -5,7 +5,7 @@ Un interpréteur libre du langage MATLAB, écrit de zéro en C++17, avec
 
 ```bash
 make            # compile — aucune dépendance obligatoire
-make test       # 57 verifications C++ + 24 suites en langage MATLAB
+make test       # 57 verifications C++ + 25 suites en langage MATLAB
 ./build/bin/matlibre
 ```
 
@@ -47,7 +47,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **1998 fonctions de toolbox** en langage MATLAB, réparties en
+- **2074 fonctions de toolbox** en langage MATLAB, réparties en
   **53 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -191,7 +191,7 @@ make test
 ```
 
 57 vérifications C++ sur le lexeur, l'analyseur, l'indexation, l'algèbre
-et les messages d'erreur ; 24 suites en langage MATLAB dont une qui
+et les messages d'erreur ; 25 suites en langage MATLAB dont une qui
 contrôle **un résultat exact par toolbox** : `blsprice(100,100,0.05,1,0.2)`
 doit rendre 10,4506 ; `butter(2,0.2)` les coefficients de la référence ;
 `atmosisa(0)` 288,15 K et 101 325 Pa ; l'encodeur convolutif suivi du

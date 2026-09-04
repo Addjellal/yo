@@ -11,6 +11,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | finance | 146 | 0 | 100 % |
 | flou | 63 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
+| instruments-financiers | 55 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
 | matlab-langage | 424 | 2 | 100 % |
 | ondelettes | 103 | 9 | 92 % |
@@ -20,7 +21,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | signal | 134 | 1 | 99 % |
 | statistiques | 216 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
-| **ensemble** | **1665** | **13** | **99 %** |
+| **ensemble** | **1720** | **13** | **99 %** |
 
 ## matlab-langage
 
@@ -247,6 +248,34 @@ qu'ils ne font pas encore comme MATLAB.
   des tableaux : une matrice de dates par ligne, des composantes
   diffusées, un tableau de cellules de textes. `DATESTR` rend une
   matrice de caractères, une ligne par date.
+
+### Instruments financiers
+
+- **Pas d'arbres de taux courts** : les modèles de Hull et White, de
+  Black, Derman et Toy, de Black et Karasinski, ainsi que le cadre de
+  Heath, Jarrow et Morton, ne sont pas là. Les plafonds, planchers et
+  options sur échange se valorisent par le modèle de Black, les options
+  sur action par formule fermée ou par arbre binomial.
+- **`CRRTREE`** ne traite qu'un actif à volatilité constante et à
+  dividende continu ; `BINPRICE`, lui, accepte des dividendes en espèces
+  par le modèle du dividende séquestré, qui garde l'arbre recombinant.
+  Les arbres d'Equal Probabilities, implicites et trinomiaux manquent.
+- **`CRRPRICE` et `CRRSENS`** ne valorisent que les instruments
+  `'OptStock'` d'un jeu.
+- **Le jeu d'instruments** est une structure MatLibre, non l'objet de
+  MATLAB : les champs `Type`, `FieldName`, `FieldClass`, `FieldData` et
+  `Index` sont lisibles directement. Les types reconnus par `INSTADD`
+  sont `'Bond'`, `'CashFlow'`, `'Fixed'`, `'Float'`, `'Swap'`,
+  `'OptStock'`, `'Barrier'`, `'Lookback'`, `'Asian'`, `'Cap'`,
+  `'Floor'` et `'Swaption'` ; `INSTADDFIELD` en crée d'autres.
+  `INTENVPRICE` valorise les cinq premiers.
+- **`LOOKBACKBYBLS`** prend l'extremum déjà observé égal au cours du
+  jour ; il n'y a pas de champ pour un extremum antérieur.
+- **`ASIANBYLEVY`** est une approximation par les deux premiers moments,
+  comme dans MATLAB : l'erreur croît avec la volatilité.
+- **Le contrat de protection** suppose des taux de hasard constants par
+  morceaux entre les échéances cotées, la prime courue à la date de
+  défaut comptée pour une demi-période, et pas de paiement initial.
 
 ### Économétrie
 

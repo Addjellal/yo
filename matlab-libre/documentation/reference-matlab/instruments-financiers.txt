@@ -1,0 +1,13 @@
+# Financial Instruments Toolbox. Les noms qu'un utilisateur rencontre :
+# jeux d'instruments, environnement de taux, valorisation sur courbe
+# zero-coupon, modele de Black, formes fermees de Black et Scholes,
+# arbres binomiaux et derives de credit.
+asianbykv asianbylevy assetbybls barrierbybls binprice blkimpv blkprice
+bondbyzero bondconvexity bonddur bondprice bondyield capbyblk cashbybls
+cdsbootstrap cdsprice cdsspread cfbyzero chooserbybls crrprice crrsens
+crrtimespec crrtree date2time discountfactor fixedbyzero floatbyzero
+floorbyblk forwardrate gapbybls instadd instaddfield instdelete
+instdisp instfields instget instgetcell instlength instselect
+instsetfield insttypes intenvget intenvprice intenvsens intenvset
+lookbackbybls optstockbybls optstocksensbybls stockspec supersharebybls
+swapbyzero swaptionbyblk time2date zeroprice zeroyield

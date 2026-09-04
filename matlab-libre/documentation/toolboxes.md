@@ -39,7 +39,7 @@ existant appellera.
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
 | `images` | Image Processing Toolbox — traitement d'images. | 138 |
 | `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 4 |
-| `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 6 |
+| `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
 | `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 187 |
