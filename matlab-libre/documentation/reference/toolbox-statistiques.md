@@ -725,7 +725,25 @@ CMDSCALE Positionnement multidimensionnel métrique.
 
 ```
 CONFUSIONMAT Matrice de confusion.
-  M(i,j) compte les observations de la classe i classées en j.
+  M = CONFUSIONMAT(VRAI,PREDIT) compte, en M(i,j), les observations de
+  la classe i classées en j. La diagonale porte les bonnes réponses ;
+  chaque case hors diagonale dit quelle classe a été prise pour quelle
+  autre — ce que la seule justesse ne dit pas.
+
+  [M,CLASSES] = CONFUSIONMAT(...) rend aussi la liste des classes, dans
+  l'ordre des lignes et des colonnes.
+
+  CONFUSIONMAT(...,'Order',C) impose cet ordre, et permet de faire
+  figurer une classe qu'aucune observation ne porte.
+
+  Les étiquettes peuvent être des nombres, des chaînes rangées en
+  tableau de cellules, un tableau de caractères, ou un tableau
+  catégoriel.
+
+  Exemple :
+     confusionmat({'a','b','a'}, {'a','b','b'})      % [1 1; 0 1]
+
+  Voir aussi CONFUSIONCHART, CROSSTAB, ACCURACY.
 ```
 
 ## `cophenet`
@@ -2707,6 +2725,39 @@ MATLIBRE_DISTANCE Distance entre deux observations, selon la métrique nommée.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
   PDIST et PDIST2 s'en servent pour n'écrire qu'une fois chacune des
   distances qu'ils proposent.
+```
+
+## `matlibre_etiquettes_communes`
+
+```
+MATLIBRE_ETIQUETTES_COMMUNES Numérote deux jeux d'étiquettes ensemble.
+  [I,C] = MATLIBRE_ETIQUETTES_COMMUNES(E,AUTRES,ORDRE) rend le numéro de
+  classe de chaque étiquette de E et la liste des classes, prise sur la
+  réunion de E et de AUTRES — sans quoi une classe absente d'un des deux
+  jeux décalerait les lignes par rapport aux colonnes.
+
+  ORDRE, s'il est donné, impose la liste et son ordre.
+
+  Exemple :
+     [i, c] = matlibre_etiquettes_communes({'b'}, {'a'}, {});
+     i      % 2
+
+  Voir aussi CONFUSIONMAT.
+```
+
+## `matlibre_etiquettes_texte`
+
+```
+MATLIBRE_ETIQUETTES_TEXTE Étiquettes ramenées à des chaînes.
+  T = MATLIBRE_ETIQUETTES_TEXTE(E) accepte des nombres, un tableau de
+  cellules de chaînes, un tableau de caractères ou un tableau
+  catégoriel, et rend un tableau de cellules de chaînes. Comparer des
+  chaînes traite tous les cas d'un coup.
+
+  Exemple :
+     matlibre_etiquettes_texte([1 2])      % {'1', '2'}
+
+  Voir aussi CONFUSIONMAT.
 ```
 
 ## `matlibre_gauss_legendre`

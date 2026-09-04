@@ -1,0 +1,21 @@
+# Deep Learning Toolbox. Les noms qu'un utilisateur rencontre : couches,
+# graphes de couches, apprentissage, derivation automatique sur dlarray,
+# solveurs, et les fonctions de perte. Les reseaux pre-entraines, qui
+# supposent le telechargement de poids, n'y figurent pas.
+activations additionLayer adamupdate analyzeNetwork assembleNetwork
+averagePooling1dLayer averagePooling2dLayer batchNormalizationLayer
+batchnorm bilstmLayer classificationLayer classify clippedReluLayer
+concatenationLayer confusionchart convolution1dLayer convolution2dLayer
+crossChannelNormalizationLayer crossentropy depthConcatenationLayer
+dlarray dlconv dlfeval dlgradient dlnetwork dropoutLayer eluLayer
+extractdata featureInputLayer finddim flattenLayer fullyConnectedLayer
+fullyconnect geluLayer globalAveragePooling1dLayer
+globalAveragePooling2dLayer globalMaxPooling2dLayer groupNormalizationLayer
+groupnorm gruLayer huber imageInputLayer initialize l1loss l2loss
+layerGraph layerNormalizationLayer layernorm leakyReluLayer leakyrelu
+lstmLayer maxPooling1dLayer maxPooling2dLayer minibatchqueue mse
+multiplicationLayer onehotdecode onehotencode predict
+predictAndUpdateState regressionLayer relu reluLayer resetState
+rmspropupdate sequenceInputLayer sgdmupdate sigmoid sigmoidLayer softmax
+softmaxLayer softplusLayer stripdims swishLayer tanhLayer
+transposedConv2dLayer trainNetwork trainingOptions

@@ -395,7 +395,13 @@ FONCTION(fnColon) {
 FONCTION(fnRepmat) {
     INUTILISE
     exigerArguments(args, 2, 0, "repmat");
-    exigerSansObjet(args[0], "repmat");
+    // Les structures sont admises — MATLAB repete un tableau de
+    // structures comme n'importe quel autre, et le corps ci-dessous sait
+    // le faire ; seuls un objet et une poignee de fonction sont refuses.
+    if (args[0].classe == Classe::Objet || args[0].classe == Classe::Fonction)
+        erreur("MATLAB:UndefinedFunction",
+               formater("Undefined function '%s' for input arguments of type '%s'.",
+                        "repmat", args[0].classeNom().c_str()));
     const Valeur& v = args[0];
     Dims rep = dimsDepuisArguments(args, 1, args.size());
     std::size_t nd = std::max(v.dims.size(), rep.size());

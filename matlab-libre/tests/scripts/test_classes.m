@@ -156,4 +156,18 @@ catch
 end
 assert(natifRefuse);
 
+% Une classe qui definit « subsasgn » decide de ses affectations, y
+% compris quand l'objet est range dans une cellule ou une structure.
+% Auparavant l'affectation cherchait une propriete du meme nom et
+% n'ecrivait rien.
+t = table({'a'}, {[1 2]}, 'VariableNames', {'Nom', 'Valeur'});
+paquet = repmat({t}, 1, 2);
+paquet{1}.Valeur = {[9 9]};
+assert(isequal(paquet{1}.Valeur{1}, [9 9]));
+assert(isequal(paquet{2}.Valeur{1}, [1 2]));
+enveloppe.contenu = t;
+enveloppe.contenu.Valeur = {[7 7]};
+assert(isequal(enveloppe.contenu.Valeur{1}, [7 7]));
+assert(isequal(t.Valeur{1}, [1 2]));
+
 disp('classes : toutes les verifications passent');

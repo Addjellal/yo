@@ -10,5 +10,5 @@ function c = maxPooling2dLayer(taille, varargin)
             if numel(pas) < 2, pas = [pas pas]; end
         end
     end
-    c = struct('type', 'maxpool', 'taille', taille(:)', 'pas', pas(:)');
+    c = struct('type', 'maxpool', 'taille', taille(:)', 'pas', pas(:)', 'nom', matlibre_couche_nom(varargin));
 end

@@ -1,5 +1,6 @@
 function couche = sigmoidLayer(varargin)
 %SIGMOIDLAYER Couche sigmoïde logistique.
     couche = struct('type', 'sigmoid', 'sorties', 0, 'W', [], 'b', [], ...
-                    'entree', [], 'sortie', []);
+                    'entree', [], 'sortie', [], ...
+                    'nom', matlibre_couche_nom(varargin));
 end

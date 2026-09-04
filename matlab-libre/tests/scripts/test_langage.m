@@ -478,6 +478,35 @@ assert(numel(union({'a', 'c'}, {'b'})) == 3);
 assert(trace([1 2; 3 4]) == 5);
 assert(isequal(triu([1 2; 3 4]), [1 2; 0 4]));
 
+% Une structure copiee ne partage pas ses champs : ecrire dans une copie
+% ne touche pas les autres. Les champs sont partages tant que personne
+% n'y ecrit, ce qui economise la copie ; c'est l'ecriture qui doit
+% detacher. Sans cela, « repmat({s}, 1, 3) » rendait trois cases qui
+% pointaient les memes champs.
+modele = struct('valeur', 0);
+cases = repmat({modele}, 1, 3);
+for k = 1:3
+    cases{k}.valeur = 10 * k;
+end
+assert(isequal([cases{1}.valeur, cases{2}.valeur, cases{3}.valeur], [10 20 30]));
+% Meme chose avec un indice explicite dans la chaine d'affectation.
+cases = repmat({modele}, 1, 3);
+for k = 1:3
+    cases{k}(1).valeur = k;
+end
+assert(isequal([cases{1}.valeur, cases{2}.valeur, cases{3}.valeur], [1 2 3]));
+% Et dans un tableau de structures.
+tableau = repmat(modele, 1, 3);
+for k = 1:3
+    tableau(k).valeur = k * k;
+end
+assert(isequal([tableau.valeur], [1 4 9]));
+% Une structure rangee dans un champ d'une autre est aussi une copie.
+englobante.a = modele;
+englobante.b = englobante.a;
+englobante.a.valeur = 5;
+assert(englobante.b.valeur == 0);
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

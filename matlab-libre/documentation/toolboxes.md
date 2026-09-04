@@ -16,7 +16,7 @@ existant appellera.
 | `ajustement-courbes` | Curve Fitting Toolbox — ajustement de courbes et de surfaces. | 4 |
 | `analyse-de-texte` | Text Analytics Toolbox — analyse de textes. | 8 |
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
-| `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 27 |
+| `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 7 |
 | `automatique` | Control System Toolbox — systèmes asservis linéaires. | 119 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
@@ -58,7 +58,7 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 287 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 289 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |

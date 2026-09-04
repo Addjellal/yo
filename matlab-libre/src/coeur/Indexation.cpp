@@ -444,6 +444,15 @@ static Valeur ecrire(Valeur base, std::vector<Valeur>& idx, const Valeur& valeur
     if (!v.im.empty() && base.im.empty() && !base.re.empty()) base.assurerImaginaire();
     if (base.im.empty() && !v.im.empty()) base.assurerImaginaire();
 
+    // Les champs d'une structure sont partages entre ses copies tant que
+    // personne n'y ecrit ; c'est ici qu'on ecrit, donc c'est ici qu'il faut
+    // detacher. Sans cela, « c = repmat({s}, 1, 3) » puis une ecriture dans
+    // c{2} changeait aussi c{1} et c{3} : les trois cases pointaient les
+    // memes champs. Une classe « handle » n'est pas detachee, c'est
+    // « detacherStructure » qui le sait.
+    if (base.classe == Classe::Structure || base.classe == Classe::Objet)
+        base.detacherStructure();
+
     Dims bd = base.dims;
     bd.resize(std::max<std::size_t>(bd.size(), 2), 1);
 
@@ -535,6 +544,29 @@ Valeur Interpreteur::ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Va
 Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine,
                                    std::size_t k, const Valeur& v, bool suppression) {
     if (k >= chaine.size()) return v;
+
+    // Une classe qui definit « subsasgn » decide elle-meme de ce que veut
+    // dire une affectation indexee. La regle vaut aussi quand l'objet est
+    // niche dans une cellule ou une structure : « c{1}.Var = x » sur une
+    // table doit passer par sa methode, comme « t.Var = x ». Sans ce
+    // detour, l'affectation cherchait une propriete du meme nom et
+    // n'ecrivait rien.
+    if (base.classe == Classe::Objet && !estCarte(base) &&
+        !dansMethodeDe(base.nomObjet)) {
+        auto def = classeDe(base);
+        if (def && def->aMethode("subsasgn")) {
+            Valeur s = substruct(chaine, k, &base);
+            auto r = appelerMethode(base, "subsasgn", {s, v}, 1);
+            if (!r.empty()) {
+                Valeur o = r[0];
+                o.classe = Classe::Objet;
+                o.nomObjet = base.nomObjet;
+                o.poigneeObjet = base.poigneeObjet;
+                return o;
+            }
+            return base;
+        }
+    }
     const ElementAcces& e = chaine[k];
 
     if (e.genre == '.' || e.genre == '?') {

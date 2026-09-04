@@ -23,5 +23,6 @@ function c = convolution2dLayer(taille, filtres, varargin)
     end
     if numel(pas) < 2, pas = [pas pas]; end
     c = struct('type', 'conv2d', 'taille', taille(:)', 'filtres', filtres, ...
-               'pas', pas(:)', 'marge', marge, 'W', [], 'b', []);
+               'pas', pas(:)', 'marge', marge, 'W', [], 'b', [], ...
+               'nom', matlibre_couche_nom(varargin));
 end

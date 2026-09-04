@@ -9,5 +9,5 @@ function c = imageInputLayer(taille, varargin)
 %                 reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
 %                 fullyConnectedLayer(2), softmaxLayer()};
     if numel(taille) < 3, taille(3) = 1; end
-    c = struct('type', 'imageinput', 'taille', taille(:)');
+    c = struct('type', 'imageinput', 'taille', taille(:)', 'nom', matlibre_couche_nom(varargin));
 end
