@@ -13,6 +13,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | finance | 146 | 0 | 100 % |
 | flou | 63 | 0 | 100 % |
 | gestion-risques | 33 | 0 | 100 % |
+| identification | 40 | 0 | 100 % |
 | images | 72 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
@@ -26,7 +27,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | symbolique | 23 | 0 | 100 % |
 | types | 90 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2021** | **13** | **99 %** |
+| **ensemble** | **2061** | **13** | **99 %** |
 
 ## matlab-langage
 

@@ -1,36 +1,28 @@
-function modele = arx(donnees, ordres)
+function modele = arx(donnees, ordres, varargin)
 %ARX Estimation d'un modèle ARX par moindres carrés.
-%   MODELE = ARX(DONNEES,[na nb nk]) ajuste
-%      y(t) + a1 y(t-1) + ... = b1 u(t-nk) + ...
-    na = ordres(1);
-    nb = ordres(2);
-    if numel(ordres) > 2
-        nk = ordres(3);
-    else
-        nk = 1;
-    end
-    y = donnees.y;
-    u = donnees.u;
-    N = numel(y);
-    debut = max(na, nb + nk - 1) + 1;
-    lignes = N - debut + 1;
-    Phi = zeros(lignes, na + nb);
-    Y = zeros(lignes, 1);
-    for t = debut:N
-        i = t - debut + 1;
-        for k = 1:na
-            Phi(i, k) = -y(t - k);
-        end
-        for k = 1:nb
-            Phi(i, na + k) = u(t - nk - k + 1);
-        end
-        Y(i) = y(t);
-    end
-    theta = Phi \ Y;
-    modele = struct();
-    modele.A = [1; theta(1:na)].';
-    modele.B = [zeros(1, nk), theta(na+1:end).'];
-    modele.Ts = donnees.Ts;
-    modele.residus = Y - Phi * theta;
-    modele.variance = var(modele.residus);
+%   M = ARX(Z,[na nb nk]) ajuste le modèle
+%
+%      y(t) + a1 y(t-1) + ... + ana y(t-na)
+%          = b1 u(t-nk) + ... + bnb u(t-nk-nb+1) + e(t)
+%
+%   où Z est un IDDATA. Le modèle est linéaire en ses coefficients : la
+%   solution est directe, c'est le minimum global, et il n'y a ni point de
+%   départ ni itération. C'est pourquoi ARX sert de départ aux autres
+%   estimateurs, dont aucun n'a cette propriété.
+%
+%   Le prix de cette simplicité est que le bruit est supposé entrer par le
+%   même dénominateur que l'entrée : quand ce n'est pas le cas, ARX rend
+%   des coefficients biaisés, que ARMAX, OE ou BJ corrigent.
+%
+%   M = ARX(Z,ORDRES,'na',...) accepte les réglages de POLYEST.
+%
+%   Exemple :
+%      z = iddata(filter([0 0.5], [1 -0.8], ones(200, 1)), ones(200, 1));
+%      m = arx(z, [1 1 1]);
+%      m.A      % 1 -0.8
+%
+%   Voir aussi ARMAX, OE, BJ, POLYEST, IV4, AR, COMPARE.
+    ordres = matlibre_id_ordres(ordres, [1 1 0 0 0 1]);
+    ordres(3:5) = 0;
+    modele = matlibre_id_moindres_carres(donnees, ordres, 'arx');
 end

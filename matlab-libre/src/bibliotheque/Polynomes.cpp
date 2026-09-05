@@ -363,6 +363,26 @@ FONCTION(fnInterp1) {
         for (std::size_t k = 0; k < y.size(); ++k) x.push_back((double)(k + 1));
         decalage = 1;
     }
+    // Une ordonnee complexe s'interpole partie par partie : l'operation
+    // est lineaire, donc interpoler les deux parties puis les recombiner
+    // rend le meme resultat qu'interpoler le complexe. Sans cela, la
+    // partie imaginaire disparaissait en silence.
+    if (!args[decalage - 1].im.empty()) {
+        std::vector<Valeur> reels(args.begin(), args.end());
+        std::vector<Valeur> imaginaires(args.begin(), args.end());
+        reels[decalage - 1].im.clear();
+        Valeur partieIm = args[decalage - 1];
+        partieIm.re = partieIm.im;
+        partieIm.im.clear();
+        imaginaires[decalage - 1] = partieIm;
+        Valeur partieReelle = fnInterp1(it, reels, 1)[0];
+        Valeur partieImaginaire = fnInterp1(it, imaginaires, 1)[0];
+        partieReelle.assurerImaginaire();
+        for (std::size_t k = 0; k < partieReelle.im.size() &&
+                                k < partieImaginaire.re.size(); ++k)
+            partieReelle.im[k] = partieImaginaire.re[k];
+        return {partieReelle};
+    }
     const Valeur& cible = args[decalage];
     std::string methode = "linear";
     bool extrapoler = false;

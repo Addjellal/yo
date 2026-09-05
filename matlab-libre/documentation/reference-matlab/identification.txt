@@ -1,0 +1,8 @@
+# System Identification Toolbox. Les noms qu'un utilisateur rencontre :
+# jeux de donnees entree-sortie, modeles polynomiaux et d'etat,
+# estimateurs par erreur de prediction et par sous-espaces, analyse
+# spectrale, et ce qu'on demande a un modele estime.
+advice aic ar armax arx bj compare detrend etfe forecast fpe getpvec
+goodnessOfFit iddata idfrd idinput idpoly idproc idss idtf impulseest
+iv4 merge misdata n4sid nkshift oe pem polydata polyest predict procest
+resid resample retrend setpvec sim spa ssest tfest

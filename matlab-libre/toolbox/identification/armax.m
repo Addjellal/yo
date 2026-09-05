@@ -1,46 +1,24 @@
-function modele = armax(donnees, ordres, iterations)
-%ARMAX Estimation ARMAX par la méthode pseudo-linéaire.
-%   MODELE = ARMAX(DONNEES,[na nb nc nk]) alterne estimation des
-%   paramètres et reconstruction du bruit.
-    if nargin < 3
-        iterations = 20;
-    end
-    na = ordres(1); nb = ordres(2); nc = ordres(3);
-    if numel(ordres) > 3
-        nk = ordres(4);
-    else
-        nk = 1;
-    end
-    y = donnees.y;
-    u = donnees.u;
-    N = numel(y);
-    e = zeros(N, 1);
-    debut = max([na, nb + nk - 1, nc]) + 1;
-    theta = [];
-    for tour = 1:iterations
-        lignes = N - debut + 1;
-        Phi = zeros(lignes, na + nb + nc);
-        Y = zeros(lignes, 1);
-        for t = debut:N
-            i = t - debut + 1;
-            for k = 1:na
-                Phi(i, k) = -y(t - k);
-            end
-            for k = 1:nb
-                Phi(i, na + k) = u(t - nk - k + 1);
-            end
-            for k = 1:nc
-                Phi(i, na + nb + k) = e(t - k);
-            end
-            Y(i) = y(t);
-        end
-        theta = Phi \ Y;
-        residus = Y - Phi * theta;
-        e(debut:N) = residus;
-    end
-    modele = struct();
-    modele.A = [1; theta(1:na)].';
-    modele.B = [zeros(1, nk), theta(na+1:na+nb).'];
-    modele.C = [1; theta(na+nb+1:end)].';
-    modele.Ts = donnees.Ts;
+function modele = armax(donnees, ordres, varargin)
+%ARMAX Estimation d'un modèle ARMAX.
+%   M = ARMAX(Z,[na nb nc nk]) ajuste
+%
+%      A(q) y(t) = B(q) u(t-nk) + C(q) e(t)
+%
+%   Le polynôme C décrit la couleur du bruit. C'est ce qui distingue
+%   ARMAX de ARX : ce dernier suppose que le bruit entre par le même
+%   dénominateur que l'entrée, ce qui est rarement vrai et biaise ses
+%   coefficients. ARMAX laisse au bruit son propre numérateur, au prix
+%   d'un critère qui n'est plus quadratique.
+%
+%   Exemple :
+%      rng(1);
+%      u = sign(randn(600, 1));
+%      e = 0.1 * randn(600, 1);
+%      y = filter([0 0.5], [1 -0.8], u) + filter([1 0.6], [1 -0.8], e);
+%      m = armax(iddata(y, u), [1 1 1 1]);
+%      m.C      % environ 1 0.6
+%
+%   Voir aussi ARX, OE, BJ, POLYEST, PEM.
+    ordres = matlibre_id_ordres_famille(ordres, 'armax');
+    modele = matlibre_id_estimer(donnees, ordres, 'armax', varargin);
 end
