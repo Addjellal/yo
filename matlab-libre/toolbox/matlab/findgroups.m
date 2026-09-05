@@ -31,6 +31,26 @@ function [g, varargout] = findgroups(varargin)
         manque = manque | m(:);
     end
     [distinctes, ~, position] = unique(cles(~manque));
+    % Une catégorielle porte l'ordre de ses catégories : les groupes le
+    % suivent, plutôt que l'ordre alphabétique des noms. C'est ce que
+    % MATLAB fait, et c'est le seul ordre qui ait un sens pour des
+    % modalités ordonnées comme « bas », « moyen », « haut ».
+    if numel(varargin) == 1 && isa(varargin{1}, 'categorical')
+        ordreCategories = cellstr(categories(varargin{1}));
+        rang = zeros(numel(distinctes), 1);
+        for k = 1:numel(distinctes)
+            place = find(strcmp(ordreCategories, distinctes{k}), 1);
+            if isempty(place)
+                place = numel(ordreCategories) + k;
+            end
+            rang(k) = place;
+        end
+        [~, permutation] = sort(rang);
+        inverse = zeros(size(permutation));
+        inverse(permutation) = 1:numel(permutation);
+        distinctes = distinctes(permutation);
+        position = inverse(position);
+    end
     g = NaN(n, 1);
     g(~manque) = position;
     if isrow(varargin{1})

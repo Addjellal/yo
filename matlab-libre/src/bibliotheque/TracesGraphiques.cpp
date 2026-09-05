@@ -1277,15 +1277,40 @@ FONCTION(fnGca) {
     return {poigneeAxesCourants(it)};
 }
 
+// MatLibre dessine en SVG, et seulement en SVG : le trace est vectoriel
+// de bout en bout, sans matriceur. Demander un PNG doit donc le dire, non
+// deposer en silence un fichier « x.png.svg » que l'appelant ne trouvera
+// jamais a l'endroit ou il l'attend.
+static std::string extensionDe(const std::string& nom) {
+    auto point = nom.find_last_of('.');
+    auto barre = nom.find_last_of("/\\");
+    if (point == std::string::npos) return "";
+    if (barre != std::string::npos && point < barre) return "";
+    std::string ext = nom.substr(point + 1);
+    for (char& c : ext) c = (char)std::tolower((unsigned char)c);
+    return ext;
+}
+
 FONCTION(fnPrint) {
     INUTILISE
     std::string fichier = "figure.svg";
+    std::string format;
     for (const auto& a : args)
         if (a.estTexte() || a.estChaine()) {
             std::string s = a.versTexte();
-            if (!s.empty() && s[0] != '-') fichier = s;
+            if (s.size() > 2 && s[0] == '-' && s[1] == 'd') {
+                format = s.substr(2);
+                for (char& c : format) c = (char)std::tolower((unsigned char)c);
+            } else if (!s.empty() && s[0] != '-') {
+                fichier = s;
+            }
         }
-    if (fichier.size() < 4 || fichier.substr(fichier.size() - 4) != ".svg") fichier += ".svg";
+    std::string extension = format.empty() ? extensionDe(fichier) : format;
+    if (!extension.empty() && extension != "svg")
+        erreur("MATLAB:print:UnsupportedFormat",
+               "MatLibre n'enregistre les figures qu'en SVG ; '" + extension +
+                   "' n'est pas geré. Donnez un nom en .svg.");
+    if (extension.empty()) fichier += ".svg";
     std::ofstream f(fichier);
     if (!f) erreur("MATLAB:print:CannotOpen", "Unable to write '" + fichier + "'.");
     f << rendreSVG(*figureCourante(it));
@@ -1296,6 +1321,10 @@ FONCTION(fnSaveas) {
     INUTILISE
     exigerArguments(args, 2, 3, "saveas");
     std::vector<Valeur> a = {args[1]};
+    // « saveas(h, nom, format) » : le format explicite prime, et PRINT
+    // l'attend prefixe par -d.
+    if (args.size() > 2 && (args[2].estTexte() || args[2].estChaine()))
+        a.push_back(Valeur::texte("-d" + args[2].versTexte()));
     return fnPrint(it, a, nargout);
 }
 

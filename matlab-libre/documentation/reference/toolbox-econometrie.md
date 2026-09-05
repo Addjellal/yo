@@ -198,6 +198,25 @@ ARSIM Simulation d'un processus autorégressif.
 
 ```
 AUTOCORR Fonction d'autocorrélation empirique.
+  [RHO,RETARDS] = AUTOCORR(Y) rend l'autocorrélation de Y aux retards
+  zéro à vingt. RHO(1) vaut toujours un.
+  [RHO,RETARDS] = AUTOCORR(Y,N) va jusqu'au retard N.
+  [RHO,RETARDS,BORNES] = AUTOCORR(...) rend en outre les bornes de
+  confiance sous l'hypothèse d'un bruit blanc : plus ou moins deux
+  écarts types, soit 2/racine(N).
+  AUTOCORR(Y,N,K) emploie K écarts types au lieu de deux.
+
+  Les bornes ne disent pas que la série est un bruit blanc : elles
+  disent où tomberaient les autocorrélations si elle l'était. Une seule
+  valeur qui dépasse ne prouve rien — sur vingt retards, une par
+  hasard est attendue. C'est le nombre de dépassements qui compte, et
+  LBQTEST le teste proprement.
+
+  Exemple :
+     [r, ~, b] = autocorr(randn(500, 1), 20);
+     sum(abs(r(2:end)) > b(1))       % quelques-unes au plus
+
+  Voir aussi PARCORR, LBQTEST, CROSSCORR.
 ```
 
 ## `collintest`
@@ -330,8 +349,9 @@ ESTIMATE Ajuste un modèle de série temporelle à des données.
 
 ```
 FORECAST Prolonge une série observée par le modèle.
-  [Y,YMSE] = FORECAST(MDL,H,'Y0',DONNEES) rend la prévision à H pas et
-  la variance de l'erreur de prévision, pas par pas.
+  [Y,YMSE] = FORECAST(MDL,H,DONNEES) rend la prévision à H pas et la
+  variance de l'erreur de prévision, pas par pas. La série observée
+  peut aussi se donner par le couple 'Y0',DONNEES.
 
   La prévision optimale au sens de l'erreur quadratique est
   l'espérance conditionnelle : on prolonge la récurrence du modèle en
@@ -343,9 +363,12 @@ FORECAST Prolonge une série observée par le modèle.
   Exemple :
      m = arima('Constant', 0, 'AR', {0.8}, 'Variance', 1);
      y = simulate(m, 200);
-     [p, e] = forecast(m, 10, 'Y0', y);
+     [p, e] = forecast(m, 10, y);
+     [p, e] = forecast(m, 10, 'Y0', y);      % la meme chose
 
   Voir aussi ARIMA, GARCH, ESTIMATE, SIMULATE, INFER.
+La série peut venir en troisième argument, comme dans MATLAB, ou
+par le couple 'Y0',DONNEES : les deux formes se rencontrent.
 ```
 
 ## `garch`
@@ -1151,6 +1174,24 @@ OLS Moindres carrés ordinaires, avec diagnostics.
 
 ```
 PARCORR Autocorrélation partielle, par les équations de Yule-Walker.
+  [PHI,RETARDS] = PARCORR(Y) rend l'autocorrélation partielle de Y.
+  [PHI,RETARDS,BORNES] = PARCORR(...) rend en outre les bornes de
+  confiance sous l'hypothèse d'un bruit blanc.
+
+  L'autocorrélation ordinaire mesure le lien entre y(t) et y(t-k), lien
+  qui passe en partie par les retards intermédiaires : un AR(1) a une
+  autocorrélation non nulle à tous les retards, alors qu'un seul compte
+  vraiment. L'autocorrélation partielle ôte cet effet indirect, si bien
+  qu'un AR(p) la voit s'annuler après le retard p — c'est ainsi qu'on
+  lit l'ordre d'un modèle autorégressif sur ses données.
+
+  Exemple :
+     y = filter(1, [1 -0.7], randn(500, 1));
+     p = parcorr(y, 10);
+     p(2)                            % voisin de 0.7
+     max(abs(p(3:end)))              % petit : l'ordre est un
+
+  Voir aussi AUTOCORR, ARFIT, ARIMA.
 ```
 
 ## `pptest`

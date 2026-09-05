@@ -403,24 +403,65 @@ FONCTION(fnFiltfilt) {
     return {r};
 }
 
+// « xcorr(x) », « xcorr(x,y) », « xcorr(...,maxlag) » et
+// « xcorr(...,option) ». Les deux derniers arguments sont optionnels et
+// se reconnaissent a leur nature : un texte nomme la normalisation, un
+// scalaire borne les decalages.
 FONCTION(fnXcorr) {
     INUTILISE
-    exigerArguments(args, 1, 3, "xcorr");
+    exigerArguments(args, 1, 4, "xcorr");
     const Valeur& x = versDouble(args[0]);
-    const Valeur& y = args.size() > 1 && args[1].nelem() > 1 ? versDouble(args[1]) : x;
+    std::size_t suivant = 1;
+    bool avecY = args.size() > 1 && !args[1].estTexte() && !args[1].estChaine() &&
+                 args[1].nelem() > 1;
+    const Valeur& y = avecY ? versDouble(args[1]) : x;
+    if (avecY) suivant = 2;
+    int maxDemande = -1;
+    std::string option = "none";
+    for (std::size_t k = suivant; k < args.size(); ++k) {
+        if (args[k].estTexte() || args[k].estChaine()) {
+            option = args[k].versTexte();
+            for (char& c : option) c = (char)std::tolower((unsigned char)c);
+        } else if (!args[k].estVide()) {
+            maxDemande = (int)args[k].scal();
+        }
+    }
     int n = (int)x.nelem(), m = (int)y.nelem();
     int maxDecalage = std::max(n, m) - 1;
+    if (maxDemande >= 0) maxDecalage = maxDemande;
+    // Les normalisations : « biased » divise par N, « unbiased » par le
+    // nombre de termes effectivement sommes — elle est non biaisee mais
+    // sa variance explose aux grands decalages, ou peu de termes
+    // subsistent —, « coeff » ramene l'autocorrelation a un en zero.
+    double energieX = 0, energieY = 0;
+    for (int i = 0; i < n; ++i) energieX += x.re[(std::size_t)i] * x.re[(std::size_t)i];
+    for (int j = 0; j < m; ++j) energieY += y.re[(std::size_t)j] * y.re[(std::size_t)j];
+    double normeCoeff = std::sqrt(energieX * energieY);
     std::vector<double> r;
+    std::vector<double> decalages;
     for (int d = -maxDecalage; d <= maxDecalage; ++d) {
         double s = 0;
+        int termes = 0;
         for (int i = 0; i < n; ++i) {
             int j = i - d;
-            if (j >= 0 && j < m) s += x.re[(std::size_t)i] * y.re[(std::size_t)j];
+            if (j >= 0 && j < m) {
+                s += x.re[(std::size_t)i] * y.re[(std::size_t)j];
+                ++termes;
+            }
+        }
+        if (option == "biased") {
+            s /= (double)std::max(n, m);
+        } else if (option == "unbiased") {
+            s = termes > 0 ? s / (double)termes : 0.0;
+        } else if (option == "coeff" || option == "normalized") {
+            s = normeCoeff > 0 ? s / normeCoeff : 0.0;
+        } else if (option != "none") {
+            erreur("MATLAB:xcorr:UnknownOption",
+                   "Normalisation inconnue : '" + option + "'.");
         }
         r.push_back(s);
+        decalages.push_back(d);
     }
-    std::vector<double> decalages;
-    for (int d = -maxDecalage; d <= maxDecalage; ++d) decalages.push_back(d);
     if (nargout >= 2) return {Valeur::ligne(r), Valeur::ligne(decalages)};
     return {Valeur::ligne(r)};
 }

@@ -98,4 +98,72 @@ assert(strcmp(app.etiquette.Text, '5'));    % 2 + 3
 closeApp(app.figure);
 assert(isempty(matlibre_ui_liste()));
 
+
+% Les constructeurs acceptent aussi la forme nom-valeur de MATLAB.
+fenetreNommee = uifigure('Name', 'Reglages', 'Position', [10 20 300 200]);
+assert(strcmp(fenetreNommee.Name, 'Reglages'));
+assert(strcmp(fenetreNommee.Text, 'Reglages'), 'Name et Text designent le meme texte');
+assert(isequal(fenetreNommee.Position, [10 20 300 200]));
+etiquetteNommee = uilabel(fenetreNommee, 'Text', 'Amplitude', 'Position', [5 5 80 22]);
+assert(strcmp(etiquetteNommee.Text, 'Amplitude'));
+curseurNomme = uislider(fenetreNommee, 'Limits', [0 10], 'Value', 3);
+assert(curseurNomme.Value == 3 && isequal(curseurNomme.Limits, [0 10]));
+% Un curseur borne sa valeur : hors limites, il refuse.
+refuseCurseur = false;
+try
+    curseurNomme.Value = 50;
+catch
+    refuseCurseur = true;
+end
+assert(refuseCurseur);
+assert(curseurNomme.Value == 3, 'et garde la valeur precedente');
+% Une liste n'accepte que ses elements.
+listeNommee = uidropdown(fenetreNommee, 'Items', {'a', 'b'}, 'Value', 'b');
+assert(strcmp(listeNommee.Value, 'b'));
+refuseListe = false;
+try
+    listeNommee.Value = 'z';
+catch
+    refuseListe = true;
+end
+assert(refuseListe);
+% Sans choix explicite, c'est le premier element.
+assert(strcmp(uidropdown(fenetreNommee, 'Items', {'x', 'y'}).Value, 'x'));
+% Le rappel se pose sous son nom MATLAB.
+boutonNomme = uibutton(fenetreNommee, 'Text', 'Appliquer', ...
+                       'ButtonPushedFcn', @(s, e) 1);
+assert(~isempty(boutonNomme.ButtonPushedFcn));
+assert(~isempty(boutonNomme.Callback), 'les deux noms designent le meme rappel');
+% Un tableau porte ses donnees et ses en-tetes.
+tableauNomme = uitable(fenetreNommee, 'Data', magic(3), ...
+                       'ColumnName', {'a', 'b', 'c'});
+assert(isequal(tableauNomme.Data, magic(3)));
+assert(isequal(tableauNomme.ColumnName, {'a', 'b', 'c'}));
+tableauNomme.Data = eye(2);
+assert(isequal(tableauNomme.Data, eye(2)));
+% Le parent est une poignee, et les enfants se parcourent.
+panneauNomme = uipanel(fenetreNommee, 'Title', 'Options', 'Position', [5 5 100 80]);
+caseInterne = uicheckbox(panneauNomme, 'Text', 'Journaliser');
+assert(strcmp(panneauNomme.Title, 'Options'));
+assert(caseInterne.Parent == panneauNomme);
+assert(numel(panneauNomme.Children) == 1);
+assert(panneauNomme.Children(1) == caseInterne);
+% Une fenetre n'a pas de parent.
+assert(isempty(fenetreNommee.Parent));
+% Les composants poses sur la fenetre s'y retrouvent.
+assert(numel(fenetreNommee.Children) >= 5);
+% Un champ numerique convertit ce qu'on lui donne.
+champNumerique = uieditfield(fenetreNommee, 'numeric', 'Value', 1.5);
+assert(champNumerique.Value == 1.5);
+assert(uieditfield(fenetreNommee, '42', [0 0 10 10], 'numeric').Value == 42);
+refuseTexte = false;
+try
+    uieditfield(fenetreNommee, 'abc', [0 0 10 10], 'numeric');
+catch
+    refuseTexte = true;
+end
+assert(refuseTexte, 'un texte qui ne designe aucun nombre est refuse');
+closeApp(fenetreNommee);
+disp('forme nom-valeur : ok');
+
 disp('interface : toutes les verifications passent');

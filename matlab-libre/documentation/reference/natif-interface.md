@@ -14,6 +14,12 @@ matlibre_ui_creer  Cree un composant d'interface.
 matlibre_ui_declencher  Declenche le rappel d'un composant.
 ```
 
+## `matlibre_ui_enfants`
+
+```
+matlibre_ui_enfants  Numeros des composants enfants.
+```
+
 ## `matlibre_ui_figure`
 
 ```

@@ -2,8 +2,15 @@ function tf = ismissing(a, indicateurs)
 %ISMISSING Repère les valeurs manquantes.
 %   TF = ISMISSING(A) rend un tableau de booléens marquant les valeurs
 %   absentes : NaN pour un nombre, '' pour une cellule de texte, la
-%   chaîne manquante pour un tableau de chaînes, <undefined> pour une
+%   chaîne vide pour un tableau de chaînes, <undefined> pour une
 %   catégorie, NaT pour une date.
+%
+%   Une différence avec MATLAB, qui se voit sur les chaînes : MATLAB
+%   distingue la chaîne vide "" — qui n'est pas manquante — de la chaîne
+%   manquante <missing>, qui l'est. MatLibre n'a pas de chaîne manquante
+%   distincte de la chaîne vide, et traite donc "" comme absente. Sur des
+%   données où la chaîne vide est une valeur légitime, il faut employer
+%   ISMISSING(A,IND) avec un indicateur propre.
 %
 %   TF = ISMISSING(A,IND) traite en outre comme manquantes les valeurs
 %   énumérées dans IND.

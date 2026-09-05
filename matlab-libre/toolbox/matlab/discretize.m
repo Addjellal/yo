@@ -92,7 +92,11 @@ function [bins, bords] = discretize(x, repartition, varargin)
                 noms{i} = char(valeurs{bins(i)});
             end
         end
-        bins = categorical(noms);
+        % Les intervalles sont ordonnés par construction : la catégorielle
+        % rendue l'est aussi, et ses catégories gardent l'ordre des bornes
+        % plutôt que l'ordre alphabétique. Sans cela « bas », « moyen »,
+        % « haut » se rangeraient bas, haut, moyen.
+        bins = categorical(noms, valeurs, 'Ordinal', true);
     elseif ~isempty(valeurs)
         sortie = valeurs;
         if iscell(valeurs)

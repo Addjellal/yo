@@ -567,6 +567,78 @@ end
 assert(refuseComble);
 disp('fillmissing : ok');
 
+
+% ISOUTLIER et compagnie : reperer, remplacer, retirer.
+assert(isequal(isoutlier([1 2 3 4 100]), [false false false false true]));
+% Le critere par defaut emploie la mediane, non la moyenne : une seule
+% valeur tres eloignee deplace la moyenne et l'ecart type au point de se
+% cacher elle-meme.
+assert(~any(isoutlier([1 2 3 4 100], 'mean')), ...
+       'la moyenne se laisse masquer par l''aberrante elle-meme');
+assert(isequal(isoutlier([1 2 3 4 100], 'quartiles'), [false false false false true]));
+% Les seuils et le centre sont rendus.
+[~, seuilBas, seuilHaut, centreAberrantes] = isoutlier([1 2 3 4 100]);
+assert(centreAberrantes == 3, 'le centre est la mediane');
+assert(seuilBas < 1 && seuilHaut > 4 && seuilHaut < 100);
+% Le facteur se regle.
+assert(sum(isoutlier([1 2 3 4 100], 'median', 'ThresholdFactor', 100)) == 0);
+% Une matrice est traitee colonne par colonne.
+assert(isequal(isoutlier([1 2; 3 4; 100 5]), [false false; false false; true false]));
+% FILLOUTLIERS garde la longueur, RMOUTLIERS la reduit.
+assert(isequal(filloutliers([1 2 3 100 5], 'linear'), [1 2 3 4 5]));
+assert(isequal(filloutliers([1 2 3 100 5], 'center'), [1 2 3 3 5]));
+seuille = filloutliers([1 2 3 100 5], 'clip');
+assert(seuille(4) < 100 && seuille(4) > 5, 'clip ramene au seuil');
+assert(isequal(rmoutliers([1 2 3 100 5]), [1 2 3 5]));
+assert(isequal(rmoutliers([1 2; 3 4; 100 5]), [1 2; 3 4]));
+% Les manquantes ne sont pas des aberrantes : deux notions distinctes.
+assert(~any(isoutlier([1 2 NaN 4])));
+% Le test de Grubbs retire une valeur a la fois.
+assert(isequal(find(isoutlier([1 2 3 4 5 6 7 8 9 100], 'grubbs')), 10));
+disp('valeurs aberrantes : ok');
+
+% JOIN et STRINGS.
+assert(strcmp(join(["a" "b" "c"]), "a b c"));
+assert(strcmp(join(["a"; "b"], "-"), "a-b"));
+% Une matrice donne une chaine par ligne.
+parLignes = join(["x" "y"; "z" "w"], ", ");
+assert(numel(parLignes) == 2);
+assert(strcmp(parLignes(1), "x, y") && strcmp(parLignes(2), "z, w"));
+% JOIN est l'inverse de SPLIT.
+assert(isequal(split(join(["a" "b" "c"], "-"), "-")', ["a" "b" "c"]));
+% Un separateur par intervalle est accepte.
+assert(strcmp(join(["a" "b" "c"], ["-" "+"]), "a-b+c"));
+% Une cellule ressort en cellule.
+enCellule = join({'p', 'q'}, '+');
+assert(iscell(enCellule) && strcmp(enCellule{1}, 'p+q'));
+% STRINGS preallouee des chaines vides, non des manquantes.
+prealloue = strings(1, 3);
+assert(isequal(size(prealloue), [1 3]));
+assert(isequal(strlength(prealloue), [0 0 0]));
+% MatLibre n'a pas de chaine manquante distincte de la chaine vide :
+% ISMISSING marque donc les cases fraichement preallouees. C'est une
+% difference avec MATLAB, documentee dans ISMISSING.
+assert(all(ismissing(prealloue)));
+assert(isequal(size(strings(2)), [2 2]));
+assert(isequal(size(strings()), [1 1]));
+disp('join et strings : ok');
+
+% DISCRETIZE en categorielle : l'ordre est celui des bornes, non
+% l'alphabet, et FINDGROUPS le respecte.
+tranchesEssai = discretize([1 5 9 2], [0 3 6 12], 'categorical', ...
+                           {'bas', 'moyen', 'haut'});
+assert(isequal(cellstr(categories(tranchesEssai))', {'bas', 'moyen', 'haut'}));
+assert(tranchesEssai(1) < tranchesEssai(2), 'les tranches sont ordonnees');
+[groupesEssai, nomsEssai] = findgroups(tranchesEssai);
+assert(isequal(cellstr(nomsEssai), {'bas', 'moyen', 'haut'}));
+assert(isequal(groupesEssai, [1 2 3 1]));
+% Sur une catégorielle non ordonnee, l'ordre reste celui des categories.
+libre = categorical({'zeta', 'alpha', 'zeta'}, {'zeta', 'alpha'});
+[gLibre, nLibre] = findgroups(libre);
+assert(isequal(cellstr(nLibre), {'zeta', 'alpha'}));
+assert(isequal(gLibre, [1 2 1]));
+disp('ordre des categories : ok');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

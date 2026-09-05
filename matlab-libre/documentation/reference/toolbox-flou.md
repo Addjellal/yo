@@ -1029,11 +1029,22 @@ SETFIS Écriture d'un champ d'un système d'inférence floue.
 ```
 SHOWRULE Affiche les règles d'un système flou, en clair.
   SHOWRULE(FIS) écrit toutes les règles ; TEXTE = SHOWRULE(FIS) les
-  rend en cellule de chaînes.
+  rend dans une cellule de chaînes.
+  SHOWRULE(FIS,INDICES) n'écrit que celles-là.
+
+  Une règle est stockée sous forme de nombres — un indice de modalité
+  par variable, un poids, un opérateur — parce que l'inférence n'a
+  besoin que de cela. Mais ce qui fait l'intérêt de la logique floue
+  est qu'on puisse la relire en français : c'est ce que rend cette
+  fonction, et c'est le seul endroit où les noms des modalités servent.
 
   Exemple :
-     fis = newfis('essai');
+     fis = addInput(mamfis, [0 10], 'Name', 'service', 'NumMFs', 2);
+     fis = addOutput(fis, [0 30], 'Name', 'pourboire', 'NumMFs', 2);
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      showrule(fis)
+
+  Voir aussi ADDRULE, EVALFIS, GETFIS, PLOTFIS.
 ```
 
 ## `sigmf`

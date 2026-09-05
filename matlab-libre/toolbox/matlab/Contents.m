@@ -56,6 +56,9 @@
 %   ismissing     - Repère les valeurs manquantes
 %   rmmissing     - Retire les valeurs manquantes
 %   fillmissing   - Comble les valeurs manquantes
+%   isoutlier     - Repere les valeurs aberrantes
+%   filloutliers  - Les remplace
+%   rmoutliers    - Les retire
 %   standardizeMissing - Traduit un code d'absence en vrai manquant
 %   findgroups    - Numérote les groupes d'un classement
 %   splitapply    - Applique une fonction groupe par groupe

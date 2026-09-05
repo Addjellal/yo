@@ -435,9 +435,27 @@ for essaiOption = {@() gaoptimset('Toto', 1), @() psoptimset('Toto', 1), ...
     end
     assert(refuseOption);
 end
-% Le solveur accepte la structure d'options.
-assert(norm(ga(@(v) sum(v .^ 2), 2, [-5 -5], [5 5], ...
+% GA suit l'ordre d'arguments de MATLAB : contraintes lineaires, puis
+% egalites, puis bornes, puis contraintes non lineaires et options.
+assert(norm(ga(@(v) sum(v .^ 2), 2, [], [], [], [], [-5 -5], [5 5], [], ...
                gaoptimset('PopulationSize', 40, 'Generations', 60))) < 0.5);
+% Sans contrainte du tout, il travaille sur un domaine par defaut.
+assert(norm(ga(@(v) sum((v - 1) .^ 2), 2)) > 0);
+% Les bornes sont respectees.
+xBorne = ga(@(v) sum(v .^ 2), 2, [], [], [], [], [2 2], [4 4]);
+assert(all(xBorne >= 2 - 1e-9) && all(xBorne <= 4 + 1e-9));
+% Une contrainte lineaire est prise en compte par penalisation : la
+% solution s'en approche par l'interieur.
+rng(17);
+xContrainte = ga(@(v) sum((v - 5) .^ 2), 2, [1 1], 2, [], [], [-5 -5], [5 5], [], ...
+                 gaoptimset('PopulationSize', 60, 'Generations', 120));
+fprintf('ga sous contrainte x1+x2<=2 : %s, somme %.4f\n', ...
+        mat2str(round(xContrainte, 3)), sum(xContrainte));
+assert(sum(xContrainte) < 2.2, 'la contrainte doit etre presque respectee');
+% Le score rendu est celui de la fonction, non celui penalise.
+[~, valeurContrainte] = ga(@(v) sum((v - 5) .^ 2), 2, [1 1], 2, [], [], ...
+                           [-5 -5], [5 5]);
+assert(valeurContrainte < 1e5, 'la penalite ne doit pas apparaitre dans le score');
 
 % Front de Pareto de [x^2, (x-2)^2] : les solutions sont x dans [0,2].
 rand('seed', 3);

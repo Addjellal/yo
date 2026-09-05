@@ -107,10 +107,7 @@ CREATEOPTIMPROBLEM Description d'un problème pour un solveur global.
 
 ## `ga`
 
-```
-GA Algorithme génétique à codage réel.
-  [X,F] = GA(FONCTION,N,BAS,HAUT) minimise FONCTION sur l'hypercube.
-```
+_Pas de bloc d'aide._
 
 ## `gamultiobj`
 
@@ -166,6 +163,19 @@ MATLIBRE_DEPARTS_MULTIPLES Rouage commun de MULTISTART et GLOBALSEARCH.
   distingue GlobalSearch de MultiStart.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_ga_violation`
+
+```
+MATLIBRE_GA_VIOLATION Somme des violations de contraintes en un point.
+  Rend zéro quand toutes les contraintes sont satisfaites, et la somme
+  de leurs dépassements sinon. Une inégalité A x <= b viole de
+  max(0, A x - b) ; une égalité viole de sa valeur absolue.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi GA, GAMULTIOBJ.
 ```
 
 ## `matlibre_options_globales`

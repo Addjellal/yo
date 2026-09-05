@@ -459,4 +459,31 @@ assert(abs(pointLorentz(3) - 1) < 1e-2);
 assert(max(abs(pointBorne(:) - [3; 1])) < 1e-3);
 assert(abs(valeurBorne + 5) < 1e-3);
 
+
+% FFTFILT garde l'orientation, et donne exactement FILTER.
+rng(31);
+signalFft = randn(2048, 1);
+filtreFft = fir1(48, 0.35);
+assert(iscolumn(fftfilt(filtreFft, signalFft)));
+assert(isrow(fftfilt(filtreFft, signalFft.')));
+assert(max(abs(fftfilt(filtreFft, signalFft) - filter(filtreFft, 1, signalFft))) < 1e-10);
+% LPC rend la variance de l'erreur, non sa somme : elle ne doit pas
+% dependre de la longueur du signal.
+rng(32);
+courtLpc = filter(1, [1 -1.5 0.7], randn(500, 1));
+longLpc = filter(1, [1 -1.5 0.7], randn(4000, 1));
+[aCourt, eCourt] = lpc(courtLpc, 2);
+[aLong, eLong] = lpc(longLpc, 2);
+assert(max(abs(aCourt - [1 -1.5 0.7])) < 0.1);
+assert(abs(eCourt - var(filter(aCourt, 1, courtLpc))) / eCourt < 0.15);
+assert(abs(eLong / eCourt - 1) < 0.3, ...
+       'la variance de l''erreur ne depend pas de la longueur');
+% Le predicteur rendu par Levinson est toujours stable.
+assert(all(abs(roots(aLong)) < 1));
+% LPC n'est que LEVINSON sur l'autocorrelation.
+nLpc = numel(courtLpc);
+autocorrLpc = arrayfun(@(k) sum(courtLpc(1:nLpc-k) .* courtLpc(1+k:nLpc)) / nLpc, 0:2);
+assert(max(abs(levinson(autocorrLpc, 2) - aCourt)) < 1e-10);
+disp('fftfilt et lpc : ok');
+
 disp('toolboxes : toutes les verifications passent');

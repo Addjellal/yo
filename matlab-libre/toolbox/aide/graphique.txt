@@ -760,7 +760,12 @@ DRAWNOW  Force le rafraîchissement des figures.
 SAVEAS  Enregistre une figure dans un fichier.
     SAVEAS(F,NOM) enregistre la figure F sous le nom donné ; le format se
     déduit de l'extension.
-    SAVEAS(F,NOM,FORMAT) impose le format : 'png', 'svg', 'pdf'.
+    SAVEAS(F,NOM,FORMAT) impose le format.
+
+    MatLibre dessine en SVG de bout en bout : le tracé est vectoriel,
+    sans matriceur. Le seul format écrit est donc 'svg', et demander un
+    autre format lève une erreur plutôt que de déposer le fichier
+    ailleurs en silence. Un nom sans extension reçoit '.svg'.
 
     Syntaxe
        saveas(f,nom)
@@ -768,23 +773,27 @@ SAVEAS  Enregistre une figure dans un fichier.
 
     Exemples
        plot(1:10);
-       saveas(gcf, 'courbe.png');
+       saveas(gcf, 'courbe.svg');
        saveas(gcf, 'courbe', 'svg');
 
     Voir aussi PRINT, FIGURE, GCF.
 
 ### print
-PRINT  Enregistre ou imprime une figure.
-    PRINT(NOM,PILOTE) enregistre la figure courante ; le pilote est
-    '-dpng', '-dsvg', '-dpdf'.
+PRINT  Enregistre une figure.
+    PRINT(NOM) enregistre la figure courante sous le nom donné.
+    PRINT(NOM,PILOTE) impose le pilote ; seul '-dsvg' est géré.
+
+    Comme SAVEAS, PRINT n'écrit que du SVG : demander '-dpng' ou '-dpdf'
+    lève une erreur. Un nom sans extension reçoit '.svg'.
 
     Syntaxe
+       print(nom)
        print(nom,pilote)
-       print -dpng nom
 
     Exemples
        plot(1:10);
-       print('figure.png', '-dpng');
+       print('figure.svg');
+       print('figure', '-dsvg');
 
     Voir aussi SAVEAS, FIGURE.
 

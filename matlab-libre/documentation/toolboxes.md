@@ -42,17 +42,17 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 198 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 204 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 26 |
-| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
+| `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 18 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
-| `robotique` | Robotics System Toolbox — cinématique et transformations. | 19 |
+| `robotique` | Robotics System Toolbox — cinématique et transformations. | 47 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 201 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
 
-Les fonctions natives — 649, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 650, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

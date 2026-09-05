@@ -1152,4 +1152,71 @@ end
 assert(refuseWelch, 'un recouvrement egal a la longueur doit etre refuse');
 disp('pwelch : ok');
 
+
+% XCORR : le nombre de decalages et la normalisation, comme dans MATLAB.
+serieCorr = filter(1, [1 -0.8], randn(500, 1));
+[correlationsBornees, decalagesBornes] = xcorr(serieCorr, 5);
+assert(numel(decalagesBornes) == 11, 'maxlag borne bien les decalages');
+assert(isequal(decalagesBornes, -5:5));
+% Sans bornes, tous les decalages sont rendus.
+assert(numel(xcorr(serieCorr)) == 2 * numel(serieCorr) - 1);
+% « biased » divise par N, « unbiased » par le nombre de termes sommes.
+nCorr = numel(serieCorr);
+brute = xcorr(serieCorr, 3);
+biaisee = xcorr(serieCorr, 3, 'biased');
+nonBiaisee = xcorr(serieCorr, 3, 'unbiased');
+assert(max(abs(biaisee - brute / nCorr)) < 1e-10);
+termes = nCorr - abs(-3:3);
+assert(max(abs(nonBiaisee - brute ./ termes)) < 1e-10);
+% « coeff » ramene l'autocorrelation a un au decalage nul.
+normalisee = xcorr(serieCorr, 3, 'coeff');
+assert(abs(normalisee(4) - 1) < 1e-12);
+assert(all(abs(normalisee) <= 1 + 1e-12), 'elle ne peut pas depasser un');
+% La correlation croisee accepte aussi les deux options.
+[croisee, decalagesCroises] = xcorr([1 2 3], [0 1 0], 1);
+assert(isequal(decalagesCroises, -1:1));
+assert(isequal(croisee, [1 2 3]));
+% Une normalisation inconnue est refusee.
+refuseNorme = false;
+try
+    xcorr(serieCorr, 3, 'inconnue');
+catch
+    refuseNorme = true;
+end
+assert(refuseNorme);
+disp('xcorr : ok');
+
+% FIRLS : phase lineaire, bandes ajustees, transitions libres.
+for ordreFirls = [40 41]
+    filtreFirls = firls(ordreFirls, [0 0.3 0.4 1], [1 1 0 0]);
+    assert(numel(filtreFirls) == ordreFirls + 1);
+    % La symetrie donne la phase lineaire, quelle que soit la parite.
+    assert(max(abs(filtreFirls - fliplr(filtreFirls))) < 1e-12);
+    [gainFirls, pulsationsFirls] = freqz(filtreFirls, 1, 1024);
+    module = abs(gainFirls);
+    assert(min(module(pulsationsFirls / pi < 0.3)) > 0.9);
+    assert(max(module(pulsationsFirls / pi > 0.4)) < 0.1);
+end
+% Ponderer une bande l'ameliore au detriment de l'autre.
+sansPoids = firls(40, [0 0.3 0.4 1], [1 1 0 0]);
+avecPoids = firls(40, [0 0.3 0.4 1], [1 1 0 0], [1 100]);
+[gSans, wFirls] = freqz(sansPoids, 1, 1024);
+gAvec = freqz(avecPoids, 1, 1024);
+horsFirls = wFirls / pi > 0.4;
+assert(max(abs(gAvec(horsFirls))) < max(abs(gSans(horsFirls))));
+% Un gabarit non constant : le derivateur.
+derivateurFirls = firls(30, [0 0.9], [0 0.9]);
+[gDeriv, wDeriv] = freqz(derivateurFirls, 1, 512);
+dansDeriv = wDeriv / pi < 0.8;
+assert(max(abs(abs(gDeriv(dansDeriv)) - wDeriv(dansDeriv) / pi)) < 0.05);
+% Un gabarit mal forme est refuse.
+refuseGabarit = false;
+try
+    firls(20, [0 0.3 0.5], [1 1 0]);
+catch
+    refuseGabarit = true;
+end
+assert(refuseGabarit, 'les bandes se donnent par paires');
+disp('firls : ok');
+
 disp('signal : toutes les verifications passent');

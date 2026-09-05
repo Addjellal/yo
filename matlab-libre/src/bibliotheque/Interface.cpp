@@ -50,7 +50,8 @@ FONCTION(fnPoser) {
     ComposantInterface* c = trouver(it, (long long)args[0].scal());
     std::string nom = texteDe(args[1]);
     const Valeur& v = args[2];
-    if (nom == "Text" || nom == "Title" || nom == "Label") c->texte = texteDe(v);
+    if (nom == "Text" || nom == "Title" || nom == "Label" || nom == "Name")
+        c->texte = texteDe(v);
     else if (nom == "Position") {
         c->position.clear();
         for (std::size_t k = 0; k < v.nelem(); ++k) c->position.push_back(v.re[k]);
@@ -84,7 +85,8 @@ FONCTION(fnLire) {
     ComposantInterface* c = trouver(it, (long long)args[0].scal());
     std::string nom = texteDe(args[1]);
     if (nom == "Type") return {Valeur::texte(c->type)};
-    if (nom == "Text" || nom == "Title" || nom == "Label") return {Valeur::texte(c->texte)};
+    if (nom == "Text" || nom == "Title" || nom == "Label" || nom == "Name")
+        return {Valeur::texte(c->texte)};
     if (nom == "Parent") return {Valeur::scalaire((double)c->parent)};
     if (nom == "Position") return {Valeur::ligne(c->position)};
     if (nom == "Limits") return {Valeur::ligne({c->minimum, c->maximum})};
@@ -100,6 +102,20 @@ FONCTION(fnLire) {
     auto p = c->autres.find(nom);
     if (p != c->autres.end()) return {p->second};
     return {Valeur::vide()};
+}
+
+// Les enfants d'un composant : ceux dont il est le parent, dans l'ordre
+// ou ils ont ete crees. C'est ce que MATLAB rend sous « Children », et
+// c'est ce qui permet de parcourir une interface sans la connaitre.
+FONCTION(fnEnfants) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "matlibre_ui_enfants");
+    long long id = (long long)args[0].scal();
+    std::vector<double> ids;
+    for (const auto& kv : it.composantsInterface)
+        if (kv.second.parent == id) ids.push_back((double)kv.first);
+    std::sort(ids.begin(), ids.end());
+    return {Valeur::ligne(ids)};
 }
 
 FONCTION(fnSupprimer) {
@@ -189,6 +205,8 @@ FONCTION(fnFigureCourante) {
 }  // namespace
 
 void enregistrerInterface(Interpreteur& it) {
+    it.enregistrer("matlibre_ui_enfants", fnEnfants, "interface",
+                   "matlibre_ui_enfants  Numeros des composants enfants.");
     it.enregistrer("matlibre_ui_creer", fnCreer, "interface",
                    "matlibre_ui_creer  Cree un composant d'interface.");
     it.enregistrer("matlibre_ui_poser", fnPoser, "interface",

@@ -3,6 +3,24 @@ function y = fftfilt(b, x, nfft)
 %   Y = FFTFILT(B,X) donne le même résultat que FILTER(B,1,X), mais en
 %   passant par la transformée de Fourier : c'est plus rapide dès que le
 %   filtre est long.
+%   Y = FFTFILT(B,X,NFFT) impose la taille des blocs.
+%
+%   La méthode est celle du recouvrement et de l'addition : le signal est
+%   découpé, chaque bloc est convolué par transformée, et les morceaux se
+%   recouvrent de la longueur du filtre moins un. C'est ce recouvrement
+%   qui rend le résultat exactement égal à celui de FILTER, et non
+%   seulement voisin.
+%
+%   L'orientation de X est préservée, comme dans MATLAB : un vecteur
+%   colonne rend un vecteur colonne.
+%
+%   Exemple :
+%      x = randn(4096, 1);
+%      b = fir1(64, 0.3);
+%      max(abs(fftfilt(b, x) - filter(b, 1, x)))     % de l'ordre de 1e-15
+%
+%   Voir aussi FILTER, CONV, UPFIRDN, FIR1.
+    colonne = iscolumn(x) && numel(x) > 1;
     b = b(:).';
     x = x(:).';
     nb = numel(b);
@@ -23,4 +41,7 @@ function y = fftfilt(b, x, nfft)
         debut = fin + 1;
     end
     y = y(1:nx);
+    if colonne
+        y = y.';
+    end
 end

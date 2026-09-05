@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-649 fonctions ecrites en C++, reparties en 22 groupes.
+650 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2562 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+2599 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -66,20 +66,20 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`images`](reference/toolbox-images.md) | 138 |
 | [`instruments`](reference/toolbox-instruments.md) | 4 |
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 82 |
-| [`interface`](reference/toolbox-interface.md) | 15 |
+| [`interface`](reference/toolbox-interface.md) | 17 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 198 |
+| [`matlab`](reference/toolbox-matlab.md) | 204 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |
 | [`optimisation`](reference/toolbox-optimisation.md) | 26 |
-| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 17 |
+| [`optimisation-globale`](reference/toolbox-optimisation-globale.md) | 18 |
 | [`radar`](reference/toolbox-radar.md) | 7 |
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |
 | [`rf`](reference/toolbox-rf.md) | 7 |
-| [`robotique`](reference/toolbox-robotique.md) | 19 |
+| [`robotique`](reference/toolbox-robotique.md) | 47 |
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 201 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |

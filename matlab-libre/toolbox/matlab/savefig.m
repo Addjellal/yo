@@ -5,10 +5,11 @@ function savefig(varargin)
 %
 %   MATLAB écrit un fichier .fig, qui est un fichier MAT portant son
 %   modèle d'objets graphiques. MatLibre n'a pas ce modèle : il
-%   enregistre la figure sous la forme que dit l'extension du nom —
-%   .svg, .png, .pdf —, et prend le SVG quand le nom n'en porte aucune.
-%   Le dessin est conservé ; ce qui ne l'est pas est la possibilité de
-%   rouvrir la figure pour la modifier.
+%   enregistre le dessin en SVG, seul format qu'il sache écrire. Un nom
+%   en .fig ou sans extension devient donc un .svg ; un nom portant une
+%   autre extension est refusé par SAVEAS. Le dessin est conservé ; ce
+%   qui ne l'est pas est la possibilité de rouvrir la figure pour la
+%   modifier.
 %
 %   Exemples :
 %      plot(1:10);

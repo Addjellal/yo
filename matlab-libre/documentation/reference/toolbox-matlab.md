@@ -59,6 +59,9 @@
 %   ismissing     - Repère les valeurs manquantes
 %   rmmissing     - Retire les valeurs manquantes
 %   fillmissing   - Comble les valeurs manquantes
+%   isoutlier     - Repere les valeurs aberrantes
+%   filloutliers  - Les remplace
+%   rmoutliers    - Les retire
 %   standardizeMissing - Traduit un code d'absence en vrai manquant
 %   findgroups    - Numérote les groupes d'un classement
 %   splitapply    - Applique une fonction groupe par groupe
@@ -1124,6 +1127,10 @@ FILLMISSING Comble les valeurs manquantes.
   Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
 ```
 
+## `filloutliers`
+
+_Pas de bloc d'aide._
+
 ## `fimplicit`
 
 ```
@@ -1713,8 +1720,15 @@ ISMEMBERTOL Appartenance à un ensemble, à une tolérance près.
 ISMISSING Repère les valeurs manquantes.
   TF = ISMISSING(A) rend un tableau de booléens marquant les valeurs
   absentes : NaN pour un nombre, '' pour une cellule de texte, la
-  chaîne manquante pour un tableau de chaînes, <undefined> pour une
+  chaîne vide pour un tableau de chaînes, <undefined> pour une
   catégorie, NaT pour une date.
+
+  Une différence avec MATLAB, qui se voit sur les chaînes : MATLAB
+  distingue la chaîne vide "" — qui n'est pas manquante — de la chaîne
+  manquante <missing>, qui l'est. MatLibre n'a pas de chaîne manquante
+  distincte de la chaîne vide, et traite donc "" comme absente. Sur des
+  données où la chaîne vide est une valeur légitime, il faut employer
+  ISMISSING(A,IND) avec un indicateur propre.
 
   TF = ISMISSING(A,IND) traite en outre comme manquantes les valeurs
   énumérées dans IND.
@@ -1726,6 +1740,40 @@ ISMISSING Repère les valeurs manquantes.
      ismissing([1 2 -99], -99)     % [false false true]
 
   Voir aussi RMMISSING, STANDARDIZEMISSING, ISNAN, ISNAT.
+```
+
+## `isoutlier`
+
+```
+ISOUTLIER Repère les valeurs aberrantes.
+  M = ISOUTLIER(A) marque les éléments qui s'écartent de plus de trois
+  écarts absolus médians de la médiane.
+  M = ISOUTLIER(A,METHODE) choisit le critère :
+     'median'    trois écarts absolus médians (défaut)
+     'mean'      trois écarts types autour de la moyenne
+     'quartiles' hors de [Q1 - 1.5 IQR, Q3 + 1.5 IQR]
+     'grubbs'    test de Grubbs, une valeur à la fois
+     'percentiles' hors des centiles donnés en troisième argument
+  M = ISOUTLIER(A,METHODE,'ThresholdFactor',F) règle le facteur.
+
+  [M,BAS,HAUT,CENTRE] = ISOUTLIER(...) rend en outre les deux seuils et
+  le centre employés.
+
+  Le critère par défaut n'emploie ni la moyenne ni l'écart type : une
+  seule valeur très éloignée les déplace tous les deux, si bien qu'elle
+  se cache elle-même. La médiane et l'écart absolu médian, eux, ne
+  bougent pas — c'est ce qu'on appelle un estimateur robuste, et c'est
+  la seule raison de les préférer ici.
+
+  Le facteur 1.4826 qui apparaît dans l'écart absolu médian n'est pas
+  arbitraire : c'est celui qui le rend égal à l'écart type quand les
+  données sont gaussiennes.
+
+  Exemple :
+     isoutlier([1 2 3 4 100])        % [0 0 0 0 1]
+     isoutlier([1 2 3 4 100], 'mean')
+
+  Voir aussi FILLOUTLIERS, RMOUTLIERS, ISMISSING, MEDIAN.
 ```
 
 ## `issorted`
@@ -1789,6 +1837,38 @@ JET Carte de couleurs bleu - cyan - jaune - rouge.
 
   Exemple :
      c = jet(64);   % c(1,:) vaut [0 0 0.5], c(end,:) vaut [0.5 0 0]
+```
+
+## `join`
+
+```
+JOIN Réunit des éléments de texte en une seule chaîne.
+  S = JOIN(TEXTE) réunit les éléments de TEXTE — un tableau de chaînes
+  ou une cellule de textes — en les séparant par une espace.
+  S = JOIN(TEXTE,SEPARATEUR) emploie le séparateur donné.
+  S = JOIN(TEXTE,SEPARATEUR,DIM) réunit suivant la dimension DIM.
+
+  La réunion se fait suivant la dernière dimension non singleton : un
+  vecteur donne une chaîne unique, une matrice donne une colonne de
+  chaînes, une par ligne.
+
+  Le séparateur peut être unique, ou en compter un de moins que les
+  éléments à réunir — un séparateur différent entre chaque paire.
+
+  JOIN est l'inverse de SPLIT : réunir puis découper avec le même
+  séparateur rend le tableau de départ, tant que le séparateur
+  n'apparaît pas dans les éléments.
+
+  Sur des tables, JOIN désigne tout autre chose — la jointure de deux
+  tables par une clé — et c'est la méthode de la classe qui s'applique.
+
+  Exemple :
+     join(["a" "b" "c"])                 % "a b c"
+     join(["a"; "b"], "-")               % "a-b"
+     join(["x" "y"; "z" "w"], ", ")      % ["x, y"; "z, w"]
+     split(join(["a" "b" "c"], "-"), "-")
+
+  Voir aussi SPLIT, STRJOIN, STRSPLIT, PLUS.
 ```
 
 ## `jsondecode`
@@ -1959,6 +2039,10 @@ MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
 MATLABROOT Racine de l'installation de MatLibre.
   C'est le dossier qui contient les toolboxes.
 ```
+
+## `matlibre_aberrantes`
+
+_Pas de bloc d'aide._
 
 ## `matlibre_arguments_barres`
 
@@ -2998,6 +3082,26 @@ RMMISSING Retire les valeurs manquantes.
   Voir aussi ISMISSING, STANDARDIZEMISSING, FILLMISSING, RMOUTLIERS.
 ```
 
+## `rmoutliers`
+
+```
+RMOUTLIERS Retire les valeurs aberrantes.
+  B = RMOUTLIERS(A) retire d'un vecteur les valeurs aberrantes, et
+  d'une matrice les lignes qui en contiennent une.
+  B = RMOUTLIERS(A,METHODE,...) choisit le critère, comme ISOUTLIER.
+
+  [B,MARQUE] = RMOUTLIERS(A) rend aussi ce qui a été retiré.
+
+  Retirer change la longueur : sur une série mesurée, cela décale tout
+  ce qui suit et rompt l'alignement avec le temps. FILLOUTLIERS, qui
+  remplace, est souvent préférable.
+
+  Exemple :
+     rmoutliers([1 2 3 100 5])       % [1 2 3 5]
+
+  Voir aussi ISOUTLIER, FILLOUTLIERS, RMMISSING.
+```
+
 ## `rose`
 
 ```
@@ -3069,10 +3173,11 @@ SAVEFIG Enregistre une figure dans un fichier.
 
   MATLAB écrit un fichier .fig, qui est un fichier MAT portant son
   modèle d'objets graphiques. MatLibre n'a pas ce modèle : il
-  enregistre la figure sous la forme que dit l'extension du nom —
-  .svg, .png, .pdf —, et prend le SVG quand le nom n'en porte aucune.
-  Le dessin est conservé ; ce qui ne l'est pas est la possibilité de
-  rouvrir la figure pour la modifier.
+  enregistre le dessin en SVG, seul format qu'il sache écrire. Un nom
+  en .fig ou sans extension devient donc un .svg ; un nom portant une
+  autre extension est refusé par SAVEAS. Le dessin est conservé ; ce
+  qui ne l'est pas est la possibilité de rouvrir la figure pour la
+  modifier.
 
   Exemples :
      plot(1:10);
@@ -3313,6 +3418,31 @@ STEM3 Tiges dans l'espace.
      stem3(rand(4, 4));
 
   Voir aussi STEM, PLOT3, SCATTER3, BAR3.
+```
+
+## `strings`
+
+```
+STRINGS Tableau de chaînes vides.
+  S = STRINGS(N) rend un tableau N sur N de chaînes vides.
+  S = STRINGS(M,N) rend un tableau M sur N.
+  S = STRINGS(SIZE) accepte aussi un vecteur de dimensions.
+  S = STRINGS() rend une seule chaîne vide.
+
+  Une chaîne vide n'est pas une chaîne manquante : "" a une longueur
+  nulle, alors que MISSING n'a pas de valeur. C'est pourquoi STRINGS
+  sert à préallouer — les cases sont utilisables telles quelles — là où
+  un tableau de manquantes signalerait qu'il reste du travail.
+
+  Préallouer avant une boucle évite de réallouer à chaque tour, ce qui
+  coûte cher dès que le tableau devient grand.
+
+  Exemple :
+     s = strings(1, 3);
+     strlength(s)                    % [0 0 0]
+     s(2) = "milieu";
+
+  Voir aussi STRING, BLANKS, CELL, ZEROS, ISMISSING.
 ```
 
 ## `summer`
