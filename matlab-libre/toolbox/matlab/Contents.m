@@ -98,3 +98,4 @@
 %   griddata            - Interpolation de donnees dispersees
 %   isstrprop           - Nature de chaque caractere d'un texte
 %   vectorize           - Rend une expression applicable terme a terme
+%   empty               - Tableau vide d'une classe donnee

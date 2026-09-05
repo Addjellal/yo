@@ -1,14 +1,16 @@
 % Wavelet Toolbox — analyse en ondelettes.
 %
 % Bancs de filtres
-%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar,
-%                       biorNr.Nd, rbioNd.Nr)
+%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, coifN,
+%                       haar, biorNr.Nd, rbioNd.Nr)
 %   orthfilt          - Banc orthogonal à partir du filtre d'échelle
 %   biorfilt          - Banc biorthogonal à partir des deux filtres
 %   daubechiesFiltre  - Filtre de Daubechies par factorisation spectrale
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
 %   wavenames         - Liste des ondelettes disponibles
+%   wavemngr          - Gestion des familles : lire, ajouter, retirer
+%   dwtfilterbank     - Banc discret : réponses, repère, facteur de qualité
 %   dwtmode           - Mode de prolongement des bords
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
@@ -17,6 +19,8 @@
 % Familles d'ondelettes
 %   dbaux, dbwavf     - Filtre d'échelle de Daubechies, par ordre ou par nom
 %   symaux, symwavf   - Filtre d'échelle d'un symlet
+%   coifwavf          - Filtre d'échelle d'une coiflette
+%   coifletFiltre     - La coiflette par ses conditions, sans table
 %   biorwavf          - Couple biorthogonal spline
 %   rbiowavf          - Le même, analyse et synthèse échangées
 %   meyer, meyeraux   - Ondelette de Meyer et sa fonction de transition
@@ -48,7 +52,17 @@
 %   modwtxcorr        - Corrélation croisée par échelle
 %
 % Transformée continue
-%   cwt, icwt         - Transformée continue et son inverse
+%   cwt, icwt            - Transformée continue et son inverse
+%   cwtfilterbank        - Banc continu : coefficients, fréquences, cône
+%   cwtfreqbounds        - Bornes de fréquence utiles pour N points
+%   ondeletteAnalytique  - Morse, Morlet analytique et bosse, en fréquence
+%   wsst                 - Transformée synchronisée
+%   wcoherence           - Cohérence en ondelettes de deux signaux
+%
+% Arbre double, ondelettes complexes
+%   dualtree, idualtree  - Transformée par arbre double et son inverse
+%   dtfilters            - Filtres des deux arbres
+%   qshiftFiltre         - Filtre de quart de retard, par ses conditions
 %
 % Transformée discrète, deux dimensions
 %   dwt2, idwt2       - Transformée à un niveau et son inverse

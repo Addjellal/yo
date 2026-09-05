@@ -24,6 +24,9 @@ function noms = wavenames(genre)
     for k = 1:45
         orthogonales{end+1} = sprintf('sym%d', k);  %#ok<AGROW>
     end
+    for k = 1:5
+        orthogonales{end+1} = sprintf('coif%d', k);  %#ok<AGROW>
+    end
     couples = {'1.1', '1.3', '1.5', '2.2', '2.4', '2.6', '2.8', ...
                '3.1', '3.3', '3.5', '3.7', '3.9', '4.4'};
     biorthogonales = {};

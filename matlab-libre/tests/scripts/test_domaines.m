@@ -970,8 +970,18 @@ assert(abs(min(fShannon(dans)) - 1) < 0.05 && abs(max(fShannon(dans)) - 2) < 0.0
 assert(max(abs(fbspwavf(-20, 20, 1000, 1, 1, 1.5) - ...
                 shanwavf(-20, 20, 1000, 1, 1.5))) < 1e-14);
 
-% La liste des noms couvre ce que WFILTERS sait construire.
-assert(numel(wavenames('orthogonal')) == 91);
+% La liste des noms couvre ce que WFILTERS sait construire :
+% haar, db1 a db45, sym1 a sym45 et coif1 a coif5.
+nomsOrtho = wavenames('orthogonal');
+assert(numel(nomsOrtho) == 1 + 45 + 45 + 5);
+assert(any(strcmp(nomsOrtho, 'haar')));
+for k = 1:45
+    assert(any(strcmp(nomsOrtho, sprintf('db%d', k))));
+    assert(any(strcmp(nomsOrtho, sprintf('sym%d', k))));
+end
+for k = 1:5
+    assert(any(strcmp(nomsOrtho, sprintf('coif%d', k))));
+end
 nomsBior = wavenames('biorthogonal');
 assert(any(strcmp(nomsBior, 'bior4.4')) && any(strcmp(nomsBior, 'rbio4.4')));
 for k = 1:numel(nomsBior)

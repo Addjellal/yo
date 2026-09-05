@@ -1074,4 +1074,51 @@ sortieLagrange = sortieLagrange((retardLagrange+1):end);
 attenduLagrange = sin(2*pi*0.01*(0:numel(sortieLagrange)-1)/4);
 assert(max(abs(sortieLagrange(30:end-30) - attenduLagrange(30:end-30))) < 1e-8);
 
+
+% MAXFLAT : filtre le plus plat possible. Sa propriete definitoire est le
+% gain a la coupure, la platitude etant imposee par construction.
+gainDe = @(b, a, w) abs(polyval(b, exp(-1i * w)) ./ polyval(a, exp(-1i * w)));
+for essai = {[4 4 0.3], [10 2 0.2], [6 3 0.3], [2 8 0.4]}
+    degreB = essai{1}(1);
+    degreA = essai{1}(2);
+    coupure = essai{1}(3);
+    [b, a] = maxflat(degreB, degreA, coupure);
+    assert(numel(b) == degreB + 1);
+    assert(numel(a) == degreA + 1);
+    assert(abs(gainDe(b, a, 0) - 1) < 1e-10);
+    assert(abs(gainDe(b, a, pi * coupure) - 1 / sqrt(2)) < 1e-10);
+    assert(gainDe(b, a, pi) < 1e-12);
+    % Le filtre est stable : ses poles sont dans le disque unite.
+    assert(all(abs(roots(a)) < 1));
+end
+% Pour des degres egaux, c'est le filtre de Butterworth ordinaire.
+[bMaxflat, aMaxflat] = maxflat(4, 4, 0.3);
+[bButter, aButter] = butter(4, 0.3);
+fprintf('maxflat(4,4,0.3) contre butter(4,0.3) : ecart %.2e\n', ...
+        max(max(abs(bMaxflat - bButter)), max(abs(aMaxflat - aButter))));
+assert(max(abs(bMaxflat - bButter)) < 1e-12);
+assert(max(abs(aMaxflat - aButter)) < 1e-12);
+% La forme symetrique : la coupure y est le point a mi-amplitude.
+for essai = {[4 0.5], [8 0.5], [12 0.35], [16 0.7]}
+    ordre = essai{1}(1);
+    coupure = essai{1}(2);
+    b = maxflat(ordre, 'sym', coupure);
+    assert(numel(b) == ordre + 1);
+    assert(max(abs(b - b(end:-1:1))) < 1e-12);
+    assert(abs(gainDe(b, 1, 0) - 1) < 1e-10);
+    assert(abs(gainDe(b, 1, pi * coupure) - 0.5) < 1e-10);
+    assert(gainDe(b, 1, pi) < 1e-12);
+end
+% Une coupure irrealisable est refusee, avec l'intervalle possible.
+refuse = false;
+try
+    maxflat(6, 3, 0.5);
+catch erreur
+    refuse = contains(erreur.message, 'coupure');
+end
+assert(refuse);
+[~, ~, b1, b2] = maxflat(6, 3, 0.3);
+assert(max(abs(conv(b1, b2) - maxflat(6, 3, 0.3))) < 1e-12);
+disp('maxflat : ok');
+
 disp('signal : toutes les verifications passent');

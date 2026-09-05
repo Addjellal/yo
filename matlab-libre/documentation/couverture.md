@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **649 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **2541 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **2556 fonctions de toolbox** réparties en 53 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -155,7 +155,7 @@ totalité.
    est refusée. Ce qui n'est pas traduisible est refusé avec le numéro de
    ligne, jamais approximé.
 6. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   La Signal Processing Toolbox compte 200 fonctions — conception de
+   La Signal Processing Toolbox compte 201 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
    cohérence, rééchantillonnage, cepstres réel et complexe,
@@ -217,7 +217,7 @@ totalité.
    détections à des pistes par l'algorithme hongrois. Les autres modules
    offrent entre 4 et 19 fonctions, choisies pour être celles qu'on
    appelle d'abord.
-   La Wavelet Toolbox en compte 116. Les filtres de Daubechies et les
+   La Wavelet Toolbox en compte 129. Les filtres de Daubechies et les
    symlets sont construits par factorisation spectrale du polynôme de
    Daubechies, à n'importe quel ordre : `wfilters('db4')` rend la table
    publiée à 4e-13 près, et le signe du passe-haut est celui de MATLAB.

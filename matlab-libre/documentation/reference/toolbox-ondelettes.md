@@ -4,14 +4,16 @@
 % Wavelet Toolbox — analyse en ondelettes.
 %
 % Bancs de filtres
-%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, haar,
-%                       biorNr.Nd, rbioNd.Nr)
+%   wfilters          - Filtres d'analyse et de synthèse (dbN, symN, coifN,
+%                       haar, biorNr.Nd, rbioNd.Nr)
 %   orthfilt          - Banc orthogonal à partir du filtre d'échelle
 %   biorfilt          - Banc biorthogonal à partir des deux filtres
 %   daubechiesFiltre  - Filtre de Daubechies par factorisation spectrale
 %   qmf               - Miroir en quadrature d'un filtre
 %   wavefun           - Fonctions d'échelle et d'ondelette (cascade)
 %   wavenames         - Liste des ondelettes disponibles
+%   wavemngr          - Gestion des familles : lire, ajouter, retirer
+%   dwtfilterbank     - Banc discret : réponses, repère, facteur de qualité
 %   dwtmode           - Mode de prolongement des bords
 %   waveinfo          - Renseignements sur une famille d'ondelettes
 %   centfrq           - Fréquence centrale d'une ondelette
@@ -20,6 +22,8 @@
 % Familles d'ondelettes
 %   dbaux, dbwavf     - Filtre d'échelle de Daubechies, par ordre ou par nom
 %   symaux, symwavf   - Filtre d'échelle d'un symlet
+%   coifwavf          - Filtre d'échelle d'une coiflette
+%   coifletFiltre     - La coiflette par ses conditions, sans table
 %   biorwavf          - Couple biorthogonal spline
 %   rbiowavf          - Le même, analyse et synthèse échangées
 %   meyer, meyeraux   - Ondelette de Meyer et sa fonction de transition
@@ -51,7 +55,17 @@
 %   modwtxcorr        - Corrélation croisée par échelle
 %
 % Transformée continue
-%   cwt, icwt         - Transformée continue et son inverse
+%   cwt, icwt            - Transformée continue et son inverse
+%   cwtfilterbank        - Banc continu : coefficients, fréquences, cône
+%   cwtfreqbounds        - Bornes de fréquence utiles pour N points
+%   ondeletteAnalytique  - Morse, Morlet analytique et bosse, en fréquence
+%   wsst                 - Transformée synchronisée
+%   wcoherence           - Cohérence en ondelettes de deux signaux
+%
+% Arbre double, ondelettes complexes
+%   dualtree, idualtree  - Transformée par arbre double et son inverse
+%   dtfilters            - Filtres des deux arbres
+%   qshiftFiltre         - Filtre de quart de retard, par ses conditions
 %
 % Transformée discrète, deux dimensions
 %   dwt2, idwt2       - Transformée à un niveau et son inverse
@@ -305,6 +319,66 @@ CMORWAVF Ondelette de Morlet complexe.
   Voir aussi MORLET, CGAUWAVF, SHANWAVF, FBSPWAVF, CWT.
 ```
 
+## `coifletFiltre`
+
+```
+COIFLETFILTRE Filtre d'échelle d'une coiflette, par ses conditions.
+  H = COIFLETFILTRE(N) rend le filtre d'échelle de coifN, de longueur
+  6N et de somme racine de deux, dans l'ordre de synthèse : c'est
+  celui de MATLAB, où le plus gros coefficient tombe à l'indice 4N-1.
+
+  Aucune table n'est recopiée : le filtre est la solution du système
+  qui définit une coiflette. Avec j l'indice de 0 à 6N-1, m = 2N le
+  centre et n = (j-m)/2N l'abscisse centrée et réduite :
+
+     somme                  sum_j h[j] = sqrt(2)
+     orthogonalité          sum_j h[j] h[j+2k] = delta_k, k = 0..3N-1
+     moments de l'ondelette sum_j (-1)^j n^k h[j] = 0,    k = 0..2N-1
+     moments de l'échelle   sum_j n^k h[j] = 0,           k = 1..2N-1
+
+  Les moments de la fonction d'échelle sont ce qui distingue une
+  coiflette d'une ondelette de Daubechies : celle-ci n'annule que les
+  moments de l'ondelette. Comme la fonction d'échelle est alors elle
+  aussi aveugle aux polynômes de degré inférieur à 2N, les coefficients
+  d'approximation d'un signal polynomial sont, à un facteur près, les
+  échantillons du signal — ce qui n'est vrai d'aucune dbN.
+
+  Le système est écrit sur le filtre d'analyse, renversé du filtre
+  rendu : renverser échange les rôles des deux, comme le fait ORTHFILT,
+  et déplace le centre de 2N à 4N-1 sans rien changer aux conditions.
+
+  Le système compte 7N-1 équations pour 6N inconnues ; il n'a de
+  solution que parce que certaines conditions dépendent des autres.
+  Un solveur parti de la symlette y trouve un minimum local dès N = 3 :
+  la solution est donc atteinte par continuation, coifN partant de
+  coif(N-1) prolongée de zéros, avec relances au hasard si besoin.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi COIFWAVF, DAUBECHIESFILTRE, WFILTERS.
+```
+
+## `coifwavf`
+
+```
+COIFWAVF Filtre d'échelle d'une coiflette.
+  F = COIFWAVF('coifN') rend le filtre d'échelle de coifN, de longueur
+  6N et de somme un, pour N de 1 à 5.
+
+  Une coiflette annule les 2N premiers moments de l'ondelette comme une
+  dbN, mais aussi les 2N-1 premiers moments de la fonction d'échelle.
+  L'approximation d'un polynôme de degré inférieur à 2N y est donc,
+  à un facteur près, l'échantillonnage du polynôme lui-même.
+
+  Exemple :
+     F = coifwavf('coif2');
+     numel(F)                       % 12
+     sum(F)                         % 1
+     [lod, hid, lor, hir] = wfilters('coif2');
+
+  Voir aussi DBWAVF, SYMWAVF, WFILTERS, ORTHFILT.
+```
+
 ## `convolutionCirculaire`
 
 ```
@@ -344,6 +418,91 @@ CWT Transformée en ondelettes continue.
      f(k)     % voisin de 60 Hz
 
   Voir aussi CENTFRQ, SCAL2FRQ, MEXIHAT, MORLET, GAUSWAVF.
+```
+
+## `cwtfilterbank`
+
+```
+CWTFILTERBANK Banc de filtres d'une transformée en ondelettes continue.
+  FB = CWTFILTERBANK() construit le banc par défaut : ondelette de
+  Morse, mille vingt-quatre points, dix voix par octave.
+  FB = CWTFILTERBANK('Nom',valeur,...) le règle.
+
+  Options :
+     'Wavelet'            'Morse' (défaut), 'amor' ou 'bump'
+     'SignalLength'       1024
+     'SamplingFrequency'  en hertz ; les fréquences rendues le sont
+     'SamplingPeriod'     durée entre échantillons, exclut la précédente
+     'FrequencyLimits'    [fmin fmax] ; par défaut CWTFREQBOUNDS
+     'VoicesPerOctave'    10, entre 1 et 48
+     'TimeBandwidth'      produit temps-fréquence de Morse, 60
+     'WaveletParameters'  [gamma beta] de Morse
+     'Boundary'           'reflection' (défaut) ou 'periodic'
+
+  Un banc de filtres est la bonne façon de voir la transformée
+  continue : une même ondelette dilatée en une suite d'échelles, chacune
+  devenant un filtre passe-bande. Les calculer une fois pour toutes fait
+  la différence quand on analyse plusieurs signaux de même longueur.
+
+  Méthodes :
+     WT                 coefficients, fréquences, cône d'influence
+     FREQZ              réponse en fréquence de chaque filtre
+     CENTERFREQUENCIES  fréquence centrale de chaque filtre
+     CENTERPERIODS      périodes correspondantes
+     SCALES             échelles
+     WAVELETS           ondelettes en temps
+     QFACTOR            facteur de qualité
+     TIMESPECTRUM       spectre moyenné sur les échelles
+     SCALESPECTRUM      spectre moyenné sur le temps
+
+  Exemple :
+     fb = cwtfilterbank('SignalLength', 1024, 'SamplingFrequency', 1000);
+     t = (0:1023) / 1000;
+     [cfs, f] = wt(fb, cos(2 * pi * 100 * t));
+     [~, k] = max(mean(abs(cfs), 2));
+     f(k)                        % voisin de 100
+
+  Voir aussi CWT, CWTFREQBOUNDS, WSST, WCOHERENCE, ONDELETTEANALYTIQUE.
+```
+
+## `cwtfreqbounds`
+
+```
+CWTFREQBOUNDS Bornes de fréquence utiles d'une transformée continue.
+  [MINFREQ,MAXFREQ] = CWTFREQBOUNDS(N) rend, en cycles par échantillon,
+  les fréquences extrêmes qu'une transformée en ondelettes continue
+  peut mesurer sur un signal de N points.
+
+  [MINFREQ,MAXFREQ] = CWTFREQBOUNDS(N,FS) les rend en hertz pour une
+  fréquence d'échantillonnage FS.
+  [MINPERIOD,MAXPERIOD] = CWTFREQBOUNDS(N,TS) où TS est une durée rend
+  des périodes.
+
+  Options par couples nom-valeur :
+     'Wavelet'           'Morse' (défaut), 'amor' ou 'bump'
+     'TimeBandwidth'     produit temps-fréquence de Morse, 60 par défaut
+     'WaveletParameters' [gamma beta] de Morse
+     'CutOff'            pourcentage du sommet toléré à Nyquist,
+                         50 pour Morse, 10 sinon
+
+  Les deux bornes ne viennent pas du même empêchement.
+
+  En haut, c'est le repliement : à l'échelle la plus fine l'ondelette
+  déborde sur Nyquist. On demande que son module y soit retombé à
+  CutOff pour cent de son sommet, ce qui fixe l'échelle la plus petite
+  utilisable, donc la fréquence la plus haute.
+
+  En bas, c'est la longueur du signal : à l'échelle la plus grossière
+  l'ondelette ne tient plus dans les données. On demande que deux
+  écarts types de sa durée y tiennent, ce qui fixe l'échelle la plus
+  grande, donc la fréquence la plus basse. C'est aussi pourquoi la
+  borne basse dépend de N et la borne haute non.
+
+  Exemple :
+     [fmin, fmax] = cwtfreqbounds(1024)
+     [fmin, fmax] = cwtfreqbounds(2048, 1000)     % en hertz
+
+  Voir aussi CWTFILTERBANK, CWT, ONDELETTEANALYTIQUE.
 ```
 
 ## `daubechiesFiltre`
@@ -484,6 +643,76 @@ DILATERFILTRES Insère 2^niveau - 1 zéros entre les coefficients.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `dtfilters`
+
+```
+DTFILTERS Filtres de l'arbre double.
+  DF = DTFILTERS(NOM) rend une cellule de deux éléments, un par arbre.
+  Chaque élément est une matrice à quatre colonnes : Lo_D, Hi_D, Lo_R,
+  Hi_R.
+
+  [DF1,DF2] = DTFILTERS('dtfN') rend d'un coup les filtres du premier
+  étage et ceux des étages suivants, dans la même forme.
+
+  NOM vaut :
+     'farras', 'fsfarras'  premier étage : les deux arbres sont le même
+                           filtre décalé d'un échantillon
+     'qshift1'..'qshift4'  étages suivants, longueurs 10, 14, 16, 18 :
+                           le second arbre est le premier renversé
+     'dtf1', 'dtf2', 'dtf3' les deux étages ensemble
+
+  L'arbre double doit sa raison d'être à un défaut de la transformée
+  discrète ordinaire : décimer rend ses coefficients dépendants du
+  décalage du signal, si bien qu'une même forme, translatée d'un
+  échantillon, ne donne pas les mêmes coefficients. Deux arbres décalés
+  d'un demi-échantillon donnent deux ondelettes conjuguées de Hilbert,
+  dont la somme complexe est analytique : son module ne dépend plus du
+  décalage, comme celui d'une transformée de Fourier.
+
+  Le décalage demandé n'est pas le même aux deux étages. Au premier, le
+  signal n'a pas encore été décimé : il faut un échantillon entier. Aux
+  suivants, la décimation a déjà divisé la cadence par deux : un demi
+  suffit, et c'est ce que le quart de retard de QSHIFTFILTRE procure.
+
+  Exemple :
+     df = dtfilters('qshift2');
+     size(df{1})                    % 14 4
+     isequal(df{2}(:, 1), flipud(df{1}(:, 1)))   % 1
+
+  Voir aussi DUALTREE, QSHIFTFILTRE, WFILTERS.
+```
+
+## `dualtree`
+
+```
+DUALTREE Transformée en ondelettes complexes par arbre double.
+  [A,D] = DUALTREE(X) décompose X sur deux arbres décalés d'un demi
+  échantillon. A rend les coefficients d'échelle du dernier niveau, une
+  colonne par arbre ; D est une cellule de matrices complexes, une par
+  niveau, dont la partie réelle vient du premier arbre et la partie
+  imaginaire du second.
+
+  [A,D] = DUALTREE(X,'Level',J) fixe le nombre de niveaux.
+  [A,D] = DUALTREE(X,'FilterLength',L) choisit la longueur des filtres
+  des étages suivants, 10, 14, 16 ou 18.
+
+  Le module de D{j} ne dépend presque plus du décalage du signal, ce
+  qu'aucune transformée discrète décimée ne sait faire : c'est ce que
+  les deux arbres achètent, au prix d'un facteur deux de redondance.
+
+  La reconstruction par IDUALTREE est exacte : chaque arbre est un banc
+  orthonormal, et rien n'est jeté entre les deux.
+
+  La longueur de X doit être divisible par deux puissance J.
+
+  Exemple :
+     x = randn(256, 1);
+     [a, d] = dualtree(x, 'Level', 4);
+     max(abs(idualtree(a, d) - x))          % de l'ordre de 1e-15
+
+  Voir aussi IDUALTREE, DTFILTERS, QSHIFTFILTRE, DWT.
+```
+
 ## `dwt`
 
 ```
@@ -520,6 +749,57 @@ DWT2 Transformée en ondelettes discrète bidimensionnelle, un niveau.
 
   Exemple :
      [a, h, v, d] = dwt2(ones(4), 'db1');   % a = 2*ones(2), h = v = d = 0
+```
+
+## `dwtfilterbank`
+
+```
+DWTFILTERBANK Banc de filtres d'une transformée en ondelettes discrète.
+  FB = DWTFILTERBANK() construit le banc par défaut : 'db4', mille
+  vingt-quatre points, autant de niveaux que la longueur en permet.
+  FB = DWTFILTERBANK('Nom',valeur,...) le règle.
+
+  Options :
+     'Wavelet'            'db4' par défaut, tout nom que WFILTERS connaît
+     'SignalLength'       1024, au moins deux
+     'Level'              nombre de niveaux, WMAXLEV par défaut
+     'SamplingFrequency'  en hertz
+     'SamplingPeriod'     durée entre échantillons, exclut la précédente
+     'FilterType'         'Analysis' (défaut) ou 'Synthesis'
+     'Boundary'           'reflection' (défaut) ou 'periodic'
+
+  La transformée discrète décime : à chaque niveau le signal est filtré
+  puis pris un point sur deux. On peut cependant regarder ce que
+  l'ensemble fait à un signal sans jamais décimer, en remontant les
+  filtres dans le domaine des fréquences :
+
+     PHI_0(w) = 1
+     PHI_j(w) = PHI_{j-1}(w) LO(2^{j-1} w) / sqrt(2)
+     PSI_j(w) = PHI_{j-1}(w) HI(2^{j-1} w) / sqrt(2)
+
+  Ce sont les filtres équivalents. Pour une ondelette orthogonale ils
+  forment une partition exacte de l'énergie :
+
+     somme_j |PSI_j(w)|^2 + |PHI_J(w)|^2 = 1  pour tout w
+
+  ce que FRAMEBOUNDS vérifie en rendant deux bornes égales à un.
+
+  Méthodes :
+     FREQZ             réponse en fréquence des filtres équivalents
+     WAVELETS          ondelettes en temps, une par niveau
+     SCALINGFUNCTIONS  fonctions d'échelle
+     FRAMEBOUNDS       bornes inférieure et supérieure du repère
+     CENTERFREQUENCIES fréquence centrale de chaque niveau
+     CENTERPERIODS     périodes correspondantes
+     QFACTOR           facteur de qualité de chaque niveau
+     POWERBW           largeur de bande à mi-puissance
+
+  Exemple :
+     fb = dwtfilterbank('Wavelet', 'sym4', 'SignalLength', 1024);
+     [a, b] = framebounds(fb)      % 1 et 1 : le banc est orthogonal
+     f = centerfrequencies(fb);
+
+  Voir aussi DWT, WAVEDEC, WFILTERS, CWTFILTERBANK, MODWT.
 ```
 
 ## `dwtmode`
@@ -688,6 +968,28 @@ ICWT Transformée en ondelettes continue inverse.
      norm(y - x) / norm(x)          % quelques centièmes
 
   Voir aussi CWT, CENTFRQ, SCAL2FRQ.
+```
+
+## `idualtree`
+
+```
+IDUALTREE Reconstruction d'une transformée par arbre double.
+  X = IDUALTREE(A,D) reconstruit le signal à partir des coefficients
+  d'échelle et des détails complexes rendus par DUALTREE.
+  X = IDUALTREE(A,D,'FilterLength',L) doit reprendre la longueur de
+  filtre employée à l'analyse.
+
+  Chaque arbre est reconstruit séparément — le premier avec la partie
+  réelle des détails, le second avec la partie imaginaire —, puis les
+  deux reconstructions sont moyennées. Comme chacune est déjà exacte,
+  la moyenne l'est aussi.
+
+  Exemple :
+     x = randn(256, 1);
+     [a, d] = dualtree(x);
+     max(abs(idualtree(a, d) - x))
+
+  Voir aussi DUALTREE, DTFILTERS.
 ```
 
 ## `idwt`
@@ -1108,6 +1410,40 @@ NTNODE Nombre de nœuds terminaux d'un arbre.
   Voir aussi LEAVES, TNODES, TREEDPTH, BESTTREE.
 ```
 
+## `ondeletteAnalytique`
+
+```
+ONDELETTEANALYTIQUE Ondelette analytique, dans le domaine des fréquences.
+  PSI = ONDELETTEANALYTIQUE(NOM,PARAMETRES,OMEGA) rend la transformée
+  de Fourier de l'ondelette aux pulsations OMEGA, en radians par
+  échantillon. Une ondelette analytique est nulle aux pulsations
+  négatives : c'est ce qui rend le module de ses coefficients lisible
+  comme une enveloppe et leur argument comme une phase.
+
+  NOM vaut :
+     'morse'  ondelette de Morse généralisée, PARAMETRES = [gamma beta],
+              [3 20] par défaut, soit un produit temps-fréquence
+              gamma*beta de soixante
+              psi(w) = a w^beta exp(-w^gamma) pour w > 0,
+              avec a = 2 (e gamma / beta)^(beta/gamma), ce qui porte le
+              sommet à deux.
+     'amor'   Morlet analytique, PARAMETRES = w0 (six par défaut)
+              psi(w) = 2 exp(-(w - w0)^2 / 2) pour w > 0.
+     'bump'   ondelette bosse, PARAMETRES = [mu sigma]
+              psi(w) = 2 exp(1 - 1/(1 - ((w-mu)/sigma)^2)) sur son
+              support, nulle ailleurs : elle est à support borné en
+              fréquence, donc infiniment étalée en temps.
+
+  [PSI,PIC,SIGMAT,SIGMAW] = ONDELETTEANALYTIQUE(...) rend aussi la
+  pulsation du sommet et les écarts types en temps et en fréquence,
+  obtenus par quadrature sur la définition, non par une formule
+  particulière à chaque famille.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi CWTFILTERBANK, CWTFREQBOUNDS, WSST, WCOHERENCE.
+```
+
 ## `ordreDeNom`
 
 ```
@@ -1165,6 +1501,42 @@ QMF Miroir en quadrature d'un filtre.
 
   Exemple :
      qmf([1 2 3 4])   % [4 -3 2 -1]
+```
+
+## `qshiftFiltre`
+
+```
+QSHIFTFILTRE Filtre de quart de retard pour l'arbre double.
+  H = QSHIFTFILTRE(L,K) rend un filtre d'échelle orthonormal de
+  longueur L paire, à K moments nuls, dont le retard de groupe vaut
+  (L-1)/2 - 1/4 au lieu de (L-1)/2.
+
+  C'est ce quart de retard qui fait tout. Le second arbre prend le
+  filtre renversé : renverser un filtre de longueur L change son retard
+  d en L-1-d, donc l'écart entre les deux arbres vaut
+
+     (L-1) - 2 [(L-1)/2 - 1/4] = 1/2
+
+  soit exactement le demi-échantillon qui rend les deux ondelettes
+  conjuguées de Hilbert l'une de l'autre, et leur somme complexe
+  analytique. Un banc orthogonal ordinaire, à phase linéaire ou
+  minimale, ne donne pas cet écart.
+
+  Le filtre est la solution de :
+     orthonormalité   sum_n h[n] h[n+2k] = delta_k,  k = 0..L/2-1
+     moments nuls     sum_n (-1)^n n^k h[n] = 0,     k = 0..K-1
+     retard           Im( H(w) exp(i d w) ) = 0 sur la bande passante
+
+  les deux premières familles exactement, la troisième au sens des
+  moindres carrés — un filtre à support fini ne peut pas avoir un
+  retard fractionnaire exact. Le poids du retard est réduit par paliers
+  jusqu'à zéro : la forme du filtre est fixée aux premiers paliers, et
+  le dernier ramène l'orthonormalité à la précision machine sans
+  quitter la solution trouvée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi DTFILTERS, DUALTREE, WFILTERS.
 ```
 
 ## `rbiowavf`
@@ -1546,6 +1918,47 @@ WAVEINFO Renseignements sur une ondelette ou une famille d'ondelettes.
   Voir aussi WFILTERS, WAVEFUN, CENTFRQ.
 ```
 
+## `wavemngr`
+
+```
+WAVEMNGR Gestion des familles d'ondelettes.
+  WAVEMNGR('read') affiche les familles connues.
+  T = WAVEMNGR('read') les rend dans une chaîne.
+  T = WAVEMNGR('read',1) y ajoute le nom de chaque ondelette.
+
+  WAVEMNGR('add',NOM,ABREGE,TYPE,ORDRES,FICHIER) ajoute une famille.
+     NOM       nom complet, par exemple 'MonOndelette'
+     ABREGE    préfixe des noms, par exemple 'mond'
+     TYPE      1 orthogonale, 2 biorthogonale, 3 à fonction d'échelle
+               sans orthogonalité, 4 sans fonction d'échelle,
+               5 complexe sans fonction d'échelle
+     ORDRES    liste des ordres, '1 2 3' ou '**' pour tout entier
+     FICHIER   nom d'une fonction rendant le filtre d'échelle, appelée
+               comme FICHIER(NOM) ; pour un type 2 elle rend deux
+               filtres, décomposition puis reconstruction
+
+  WAVEMNGR('del',ABREGE) retire une famille ajoutée.
+  WAVEMNGR('restore') revient aux seules familles d'origine.
+  T = WAVEMNGR('type',NOM) rend le type de l'ondelette NOM.
+  S = WAVEMNGR('fields',NOM) rend, dans une structure, le nom complet,
+  l'abrégé, le type, les ordres et le fichier de la famille à laquelle
+  NOM appartient ; [F,A,T,O,FI] = WAVEMNGR('fields',NOM) les rend
+  séparément.
+  A = WAVEMNGR('tfsn') rend les abrégés de toutes les familles.
+
+  Les familles d'origine ne sont pas des tables de coefficients : leurs
+  filtres sont construits à la demande, ce qui les rend disponibles à
+  tout ordre. Une famille ajoutée, elle, n'est qu'un nom associé à la
+  fonction qui sait fabriquer son filtre.
+
+  Exemple :
+     wavemngr('read')
+     wavemngr('type', 'db4')                % 1
+     [f, a, t, o] = wavemngr('fields', 'bior2.2');
+
+  Voir aussi WFILTERS, WAVENAMES, WAVEINFO.
+```
+
 ## `wavenames`
 
 ```
@@ -1587,6 +2000,49 @@ WCODEMAT Met une matrice à l'échelle des indices de couleur.
   Y = WCODEMAT(X,NBCODES) ramène X dans 1..NBCODES.
 
   Exemple :  wcodemat([0 1], 4)   % [1 4]
+```
+
+## `wcoherence`
+
+```
+WCOHERENCE Cohérence en ondelettes de deux signaux.
+  [WCOH,WCS,F,COI] = WCOHERENCE(X,Y) rend la cohérence de X et Y en
+  fonction du temps et de l'échelle, le spectre croisé, les fréquences
+  en cycles par échantillon et le cône d'influence.
+  [...] = WCOHERENCE(X,Y,FS) rend les fréquences en hertz.
+  [...] = WCOHERENCE(X,Y,TS) où TS est une durée rend des périodes.
+
+  Options par couples nom-valeur :
+     'VoicesPerOctave'      12 par défaut, entre 10 et 48 et pair
+     'NumScalesToSmooth'    largeur du lissage en échelle,
+                            VoicesPerOctave/2 par défaut
+     'NumOctaves'           nombre d'octaves analysées
+
+  La cohérence répond à une question que la corrélation ne sait pas
+  poser : à quel moment, et dans quelle bande, deux signaux
+  avancent-ils ensemble ? Le rapport
+
+     WCOH = |S(Wx conj(Wy) / a)|^2 / [ S(|Wx|^2/a) S(|Wy|^2/a) ]
+
+  vaut un partout si on ne lisse pas, quels que soient les signaux :
+  c'est l'inégalité de Cauchy-Schwarz, saturée par un seul terme. Le
+  lissage S, en temps puis en échelle, est donc ce qui donne son sens à
+  la mesure — il moyenne sur un voisinage, et seule une relation de
+  phase stable sur ce voisinage survit.
+
+  L'argument de WCS donne le décalage de phase entre les deux signaux
+  là où la cohérence est forte.
+
+  Exemple :
+     t = (0:1023)' / 200;
+     x = cos(2 * pi * 10 * t);
+     y = cos(2 * pi * 10 * t + pi / 4) + 0.2 * randn(size(t));
+     [wc, wcs, f] = wcoherence(x, y, 200);
+     [~, k] = min(abs(f - 10));
+     mean(wc(k, 200:800))                       % proche de un
+     mean(angle(wcs(k, 200:800))) * 180 / pi    % voisin de -45 degrés
+
+  Voir aussi CWT, CWTFILTERBANK, WSST, ONDELETTEANALYTIQUE.
 ```
 
 ## `wconv1`
@@ -1866,7 +2322,7 @@ WFBMESTI Estimation du paramètre de Hurst d'un mouvement fractionnaire.
 ```
 WFILTERS Bancs de filtres d'analyse et de synthèse.
   [LO_D,HI_D,LO_R,HI_R] = WFILTERS(NOM) où NOM vaut 'haar', 'dbN',
-  'symN', 'biorNr.Nd' ou 'rbioNd.Nr'. Les coefficients ne sont pas
+  'symN', 'coifN', 'biorNr.Nd' ou 'rbioNd.Nr'. Les coefficients ne sont pas
   recopiés d'une table : ils sont construits par factorisation
   spectrale du polynôme de Daubechies, ce qui les rend disponibles à
   n'importe quel ordre. L'orthogonalité du banc reste au niveau de la
@@ -2206,6 +2662,43 @@ WRCOEF2 Reconstruit une composante d'une décomposition d'image.
 
 ```
 WREV Renverse l'ordre des éléments d'un vecteur.
+```
+
+## `wsst`
+
+```
+WSST Transformée en ondelettes synchronisée.
+  [SST,F] = WSST(X) rend la transformée synchronisée de X et les
+  fréquences, en cycles par échantillon.
+  [SST,F] = WSST(X,FS) les rend en hertz.
+  [SST,F] = WSST(X,TS) où TS est une durée les rend par période.
+  [SST,...] = WSST(...,ONDELETTE) où ONDELETTE vaut 'amor' (défaut) ou
+  'bump'.
+  [SST,...] = WSST(...,'VoicesPerOctave',NV) règle le nombre de voix
+  par octave, 32 par défaut, entre 10 et 48 et pair.
+
+  Une transformée en ondelettes étale l'énergie d'une sinusoïde sur
+  toutes les échelles voisines : la lecture en est floue. Or la phase,
+  elle, ne ment pas — la fréquence instantanée
+
+     w(a,b) = -i / (2 pi) * dW/db (a,b) / W(a,b)
+
+  est la même pour toutes les échelles où le coefficient est
+  appréciable. La synchronisation consiste à reporter chaque
+  coefficient non pas à son échelle mais à cette fréquence-là, ce qui
+  rassemble en une ligne nette ce que la transformée avait étalé.
+
+  L'opération conserve l'énergie du signal, puisqu'elle ne fait que
+  déplacer des coefficients : elle reste inversible.
+
+  Exemple :
+     t = (0:2047)' / 1000;
+     x = cos(2 * pi * 50 * t) + cos(2 * pi * 180 * t);
+     [s, f] = wsst(x, 1000);
+     [~, k] = sort(mean(abs(s), 2), 'descend');
+     sort(f(k(1:2)))            % voisin de 50 et 180
+
+  Voir aussi CWT, CWTFILTERBANK, WCOHERENCE, ONDELETTEANALYTIQUE.
 ```
 
 ## `wthcoef`

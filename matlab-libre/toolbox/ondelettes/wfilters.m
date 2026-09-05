@@ -1,7 +1,7 @@
 function [Lo_D, Hi_D, Lo_R, Hi_R] = wfilters(nom, genre)
 %WFILTERS Bancs de filtres d'analyse et de synthèse.
 %   [LO_D,HI_D,LO_R,HI_R] = WFILTERS(NOM) où NOM vaut 'haar', 'dbN',
-%   'symN', 'biorNr.Nd' ou 'rbioNd.Nr'. Les coefficients ne sont pas
+%   'symN', 'coifN', 'biorNr.Nd' ou 'rbioNd.Nr'. Les coefficients ne sont pas
 %   recopiés d'une table : ils sont construits par factorisation
 %   spectrale du polynôme de Daubechies, ce qui les rend disponibles à
 %   n'importe quel ordre. L'orthogonalité du banc reste au niveau de la
@@ -34,7 +34,9 @@ function [Lo_D, Hi_D, Lo_R, Hi_R] = wfilters(nom, genre)
         [RF, DF] = rbiowavf(nom);
         [Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(DF, RF);
     else
-        if numel(nom) > 2 && strcmp(nom(1:2), 'db')
+        if numel(nom) > 4 && strcmp(nom(1:4), 'coif')
+            Lo_R = coifletFiltre(ordreDeNom(nom, 'coif'));
+        elseif numel(nom) > 2 && strcmp(nom(1:2), 'db')
             ordre = str2double(nom(3:end));
             if isnan(ordre) || ordre < 1
                 error('wavelet:wfilters:unknown', 'Unknown wavelet ''%s''.', nom);

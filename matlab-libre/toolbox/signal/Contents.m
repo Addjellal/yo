@@ -16,7 +16,8 @@
 %   ellip       - Filtre elliptique, ou de Cauer
 %   ellipord    - Ordre minimal d'un elliptique
 %   besself     - Filtre analogique de Bessel
-%   maxflat     - (absent) filtre à module maximalement plat
+%   maxflat     - Butterworth généralisé, degrés numérateur et
+%                 dénominateur séparés, ou RIF symétrique
 %   prototypeVersNumerique - Prototype analogique -> filtre numérique
 %
 % Prototypes analogiques et transformations

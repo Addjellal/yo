@@ -19,7 +19,8 @@
 %   ellip       - Filtre elliptique, ou de Cauer
 %   ellipord    - Ordre minimal d'un elliptique
 %   besself     - Filtre analogique de Bessel
-%   maxflat     - (absent) filtre à module maximalement plat
+%   maxflat     - Butterworth généralisé, degrés numérateur et
+%                 dénominateur séparés, ou RIF symétrique
 %   prototypeVersNumerique - Prototype analogique -> filtre numérique
 %
 % Prototypes analogiques et transformations
@@ -1516,6 +1517,51 @@ MAG2DB Amplitude en décibels.
      mag2db(10)      % 20
 
   Voir aussi DB2MAG, POW2DB, DB2POW.
+```
+
+## `maxflat`
+
+```
+MAXFLAT Filtre passe-bas à réponse la plus plate possible.
+  [B,A] = MAXFLAT(N,M,WN) rend un filtre de Butterworth généralisé de
+  degré N au numérateur et M au dénominateur, de fréquence de coupure
+  WN normalisée entre 0 et 1, 1 valant Nyquist. Le gain y vaut
+  1/racine de deux.
+
+  B = MAXFLAT(N,'sym',WN) rend un filtre à réponse impulsionnelle finie
+  et symétrique, d'ordre N pair. WN n'est alors atteignable que dans un
+  sous-intervalle de [0,1] : les degrés de platitude sont entiers, donc
+  les coupures possibles sont en nombre fini.
+
+  [B,A,B1,B2] = MAXFLAT(...) sépare le numérateur en ses deux facteurs :
+  B1 porte les N zéros en z = -1, B2 le reste.
+
+  MAXFLAT(...,'design') affiche ce que le filtre obtenu vérifie.
+
+  « Le plus plat possible » a un sens précis. En posant
+  x = sin(w/2)^2, le module au carré s'écrit
+
+     |H|^2 = (1-x)^N / D(x),   D de degré M, D(0) = 1
+
+  La forme (1-x)^N impose N zéros en x = 1, c'est-à-dire à Nyquist :
+  la bande coupée est aussi plate que le degré le permet. Restent M
+  coefficients libres dans D. On en dépense M-1 à annuler les M-1
+  premières dérivées de |H|^2 en x = 0, ce qui donne
+
+     D(x) = somme_{k<M} C(N,k) (-1)^k x^k + beta x^M
+
+  et le dernier, beta, à placer la coupure là où on la veut. C'est tout
+  le filtre : rien n'est optimisé, tout est imposé.
+
+  Pour N = M on retrouve exactement le filtre de Butterworth ordinaire,
+  dont BUTTER donne les mêmes coefficients.
+
+  Exemple :
+     [b, a] = maxflat(10, 2, 0.2);
+     [b, a] = maxflat(4, 4, 0.3);        % identique à butter(4, 0.3)
+     b = maxflat(8, 'sym', 0.5);
+
+  Voir aussi BUTTER, FIRLS, FIRPM, FREQZ.
 ```
 
 ## `meanfreq`

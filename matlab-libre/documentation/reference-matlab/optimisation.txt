@@ -1,5 +1,5 @@
 # Optimization Toolbox et Global Optimization Toolbox.
-bintprog coneprog fgoalattain filterparse fmincon fminbnd fminimax fminsearch
+bintprog coneprog fgoalattain fmincon fminbnd fminimax fminsearch
 fminunc fseminf fsolve fzero ga gamultiobj intlinprog linprog lsqcurvefit
 lsqlin lsqnonlin lsqnonneg optimget optimoptions optimproblem optimset
 optimvar particleswarm patternsearch prob2struct quadprog simulannealbnd

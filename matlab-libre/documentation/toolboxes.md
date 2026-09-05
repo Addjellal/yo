@@ -42,10 +42,10 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 196 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 197 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
-| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 116 |
+| `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
 | `optimisation` | Optimization Toolbox — optimisation sous contraintes. | 26 |
 | `optimisation-globale` | Global Optimization Toolbox — optimisation globale. | 17 |
 | `radar` | Radar Toolbox — équation du radar et traitement d'impulsions. | 7 |
@@ -54,7 +54,7 @@ existant appellera.
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
 | `robotique` | Robotics System Toolbox — cinématique et transformations. | 19 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
-| `signal` | Signal Processing Toolbox — traitement du signal. | 200 |
+| `signal` | Signal Processing Toolbox — traitement du signal. | 201 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |

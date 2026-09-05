@@ -507,6 +507,31 @@ englobante.b = englobante.a;
 englobante.a.valeur = 5;
 assert(englobante.b.valeur == 0);
 
+
+% EMPTY : un tableau vide a une classe et des dimensions.
+assert(isempty(empty()));
+assert(isa(empty(), 'double'));
+assert(isequal(size(empty()), [0 0]));
+assert(isequal(size(empty('double', 0, 3)), [0 3]));
+assert(isa(empty('single', 0, 3), 'single'));
+assert(isa(empty('cell', 2, 0), 'cell'));
+assert(isequal(size(empty('cell', 2, 0)), [2 0]));
+assert(isa(empty('char'), 'char'));
+assert(isa(empty('logical'), 'logical'));
+nomDeClasse = 'int16';
+assert(isa(empty(nomDeClasse), 'int16'));
+% La forme MATLAB, methode statique de la classe, marche aussi.
+assert(isequal(size(double.empty), [0 0]));
+assert(isequal(size(double.empty(0, 3)), [0 3]));
+refuse = false;
+try
+    empty('double', 2, 3);
+catch
+    refuse = true;
+end
+assert(refuse);
+disp('empty : ok');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)
