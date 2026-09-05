@@ -325,4 +325,36 @@ assert(mean(predites == vraies) > 0.9);
 assert(height(net.State) == 2);
 disp('reseau convolutif : ok');
 
+
+% Un tableau de couches — la notation « [c1; c2; c3] » — doit etre
+% eclate : c'est la facon naturelle d'empiler des couches, et sans cela
+% les trois n'en feraient qu'une.
+tableauCouches = [
+    featureInputLayer(4)
+    fullyConnectedLayer(8)
+    reluLayer
+    fullyConnectedLayer(2)
+    softmaxLayer];
+assert(isstruct(tableauCouches) && numel(tableauCouches) == 5);
+grapheTableau = layerGraph(tableauCouches);
+assert(numel(grapheTableau.Layers) == 5);
+assert(numel(unique(grapheTableau.Names)) == 5, 'chaque couche porte son nom');
+% Les couches se suivent dans l'ordre donne.
+typesAttendus = {'input', 'fc', 'relu', 'fc', 'softmax'};
+for indiceCouche = 1:5
+    assert(strcmp(grapheTableau.Layers{indiceCouche}.type, typesAttendus{indiceCouche}));
+end
+% Et elles sont raccordees en chaine.
+assert(height(grapheTableau.Connections) == 4);
+% La meme chose en cellule donne le meme graphe.
+grapheCellule = layerGraph({featureInputLayer(4), fullyConnectedLayer(8), ...
+                            reluLayer, fullyConnectedLayer(2), softmaxLayer});
+assert(isequal(grapheCellule.Names, grapheTableau.Names));
+% ADDLAYERS accepte aussi le tableau.
+grapheVide = addLayers(layerGraph(), [reluLayer('Name', 'a'); reluLayer('Name', 'b')]);
+assert(isequal(grapheVide.Names, {'a', 'b'}));
+% Une couche seule reste acceptee.
+assert(numel(layerGraph(reluLayer).Layers) == 1);
+disp('tableaux de couches : ok');
+
 disp('apprentissage profond : toutes les verifications passent');

@@ -206,6 +206,7 @@ FONCTION(fnMode) {
     optionOmettreNaN(args);
     exigerArguments(args, 1, 2, "mode");
     Valeur v = versDouble(args[0]);
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
     // MODE écarte toujours les NaN, avec ou sans option : ils ne sont
     // égaux à rien, pas même à eux-mêmes, donc ne peuvent dominer.
@@ -229,8 +230,15 @@ FONCTION(fnVar) {
     bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "var");
     Valeur v = versDouble(args[0]);
-    int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
-    int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
+    // « var(x,w,'all') » : tout le tableau d'un coup. Aplatir en colonne
+    // revient au même et laisse la réduction inchangée.
+    bool tout = optionToutesDimensions(args);
+    if (tout) v = aplatirColonne(v);
+    int normalisation = args.size() > 1 && !args[1].estVide() &&
+                                !(args[1].estTexte() || args[1].estChaine())
+                            ? (int)args[1].scal()
+                            : 0;
+    int dim = tout ? 0 : dimensionChoisie(args, 2, v);
     if (v.estVecteur() && args.size() <= 2) dim = dimensionParDefaut(v);
     return {reduirePaires(v, dim,
                           [normalisation, omettre](const std::vector<double>& re,
@@ -244,8 +252,13 @@ FONCTION(fnStd) {
     bool omettre = optionOmettreNaN(args);
     exigerArguments(args, 1, 3, "std");
     Valeur v = versDouble(args[0]);
-    int normalisation = args.size() > 1 && !args[1].estVide() ? (int)args[1].scal() : 0;
-    int dim = args.size() > 2 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
+    bool tout = optionToutesDimensions(args);
+    if (tout) v = aplatirColonne(v);
+    int normalisation = args.size() > 1 && !args[1].estVide() &&
+                                !(args[1].estTexte() || args[1].estChaine())
+                            ? (int)args[1].scal()
+                            : 0;
+    int dim = tout ? 0 : dimensionChoisie(args, 2, v);
     return {reduirePaires(v, dim,
                           [normalisation, omettre](const std::vector<double>& re,
                                                    const std::vector<double>& im) {
@@ -256,6 +269,7 @@ FONCTION(fnStd) {
 FONCTION(fnRange) {
     INUTILISE
     Valeur v = versDouble(args[0]);
+    if (optionToutesDimensions(args)) v = aplatirColonne(v);
     int dim = dimensionChoisie(args, 1, v);
     return {reduire(v, dim, false, [](const std::vector<double>& t) -> double {
         if (t.empty()) return NAN;

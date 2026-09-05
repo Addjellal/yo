@@ -1121,4 +1121,35 @@ assert(refuse);
 assert(max(abs(conv(b1, b2) - maxflat(6, 3, 0.3))) < 1e-12);
 disp('maxflat : ok');
 
+
+% PWELCH accepte une longueur de segment ou directement la fenetre.
+rng(12);
+signalWelch = sin(2 * pi * 0.1 * (0:2047)') + 0.5 * randn(2048, 1);
+[parLongueur, fWelch] = pwelch(signalWelch, 256, 128, 512, 1000);
+parFenetre = pwelch(signalWelch, hamming(256), 128, 512, 1000);
+assert(max(abs(parLongueur - parFenetre)) < 1e-12, ...
+       'une longueur vaut la fenetre de Hamming de cette longueur');
+% Une autre fenetre donne un autre resultat, et reste du meme ordre.
+parHann = pwelch(signalWelch, hann(256), 128, 512, 1000);
+assert(~isequal(parHann, parFenetre));
+assert(abs(sum(parHann) / sum(parFenetre) - 1) < 0.2);
+% Le pic tombe a la bonne frequence : 0.1 cycle par echantillon a 1000 Hz.
+[~, kWelch] = max(parLongueur);
+assert(abs(fWelch(kWelch) - 100) < 5);
+% Moyenner reduit la variance : c'est tout l'objet de la methode.
+[unSeul, ~] = periodogram(signalWelch, hamming(2048), 4096, 1000);
+varianceWelch = std(log(parLongueur(2:end)));
+varianceSimple = std(log(unSeul(2:end)));
+fprintf('pwelch : dispersion %.3f contre %.3f pour un periodogramme\n', ...
+        varianceWelch, varianceSimple);
+assert(varianceWelch < varianceSimple);
+refuseWelch = false;
+try
+    pwelch(signalWelch, 128, 128);
+catch
+    refuseWelch = true;
+end
+assert(refuseWelch, 'un recouvrement egal a la longueur doit etre refuse');
+disp('pwelch : ok');
+
 disp('signal : toutes les verifications passent');

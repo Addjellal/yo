@@ -765,7 +765,23 @@ std::vector<Valeur> Interpreteur::appelerValeur(const Valeur& poignee, std::vect
         erreur("MATLAB:UndefinedFunction", "Value is not a function handle.");
     }
     const Fonction& f = *poignee.fn;
-    if (f.genre == Fonction::Native) return f.native(*this, args, nargout);
+    if (f.genre == Fonction::Native) {
+        // « cellfun(@double, ...) » doit atteindre la méthode double de la
+        // classe, comme « double(x) » l'atteint. Une poignée native saute
+        // sinon l'aiguillage : elle appelle directement le natif, qui ne
+        // sait pas convertir un objet. On repasse donc par appeler() dès
+        // qu'un argument est un objet dont la classe porte ce nom.
+        if (!f.nom.empty()) {
+            for (const auto& a : args) {
+                if (a.classe != Classe::Objet) continue;
+                auto def = classeDefinie(a.nomObjet);
+                if (def && def->methodes.count(f.nom))
+                    return appeler(f.nom, args, nargout);
+                break;  // le premier objet décide, comme dans appeler()
+            }
+        }
+        return f.native(*this, args, nargout);
+    }
     if (f.genre == Fonction::Utilisateur) {
         if (f.porteeEnglobante) englobanteEnAttente_ = f.porteeEnglobante;
         return appelerUtilisateur(f.utilisateur, args, nargout);

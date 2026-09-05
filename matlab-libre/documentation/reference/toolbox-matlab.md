@@ -58,6 +58,7 @@
 %   histogram2    - Histogramme à deux dimensions
 %   ismissing     - Repère les valeurs manquantes
 %   rmmissing     - Retire les valeurs manquantes
+%   fillmissing   - Comble les valeurs manquantes
 %   standardizeMissing - Traduit un code d'absence en vrai manquant
 %   findgroups    - Numérote les groupes d'un classement
 %   splitapply    - Applique une fonction groupe par groupe
@@ -1080,6 +1081,47 @@ FILL3 Polygones remplis dans l'espace.
      fill3([0 1 0.5], [0 0 1], [0 0 1], [0.9 0.7 0.2]);
 
   Voir aussi FILL, PATCH, PLOT3, SURF, AREA.
+```
+
+## `fillmissing`
+
+```
+FILLMISSING Comble les valeurs manquantes.
+  B = FILLMISSING(A,METHODE) remplace les valeurs manquantes de A —
+  NaN pour un tableau numérique, la chaîne vide pour du texte, la
+  catégorie indéfinie pour une catégorielle.
+
+  METHODE vaut :
+     'constant'   remplace par la valeur donnée en troisième argument
+     'previous'   reprend la dernière valeur connue
+     'next'       prend la prochaine valeur connue
+     'nearest'    prend la plus proche des deux
+     'linear'     interpole entre les deux voisines connues
+     'spline'     interpole par une spline cubique
+     'pchip'      interpole en préservant la monotonie
+     'movmean'    moyenne mobile de la fenêtre donnée
+     'movmedian'  médiane mobile de la fenêtre donnée
+
+  B = FILLMISSING(A,'constant',V) donne la constante ; V peut porter
+  une valeur par colonne.
+  B = FILLMISSING(A,'movmean',K) donne la largeur de fenêtre.
+  B = FILLMISSING(...,'EndValues',E) dit quoi faire des trous en bout,
+  là où l'interpolation n'a pas de voisin des deux côtés : 'extrap'
+  (défaut) prolonge, 'none' les laisse, ou une constante les comble.
+
+  [B,MARQUE] = FILLMISSING(...) rend aussi les positions comblées.
+
+  Un trou en bout n'est pas un trou comme un autre : il n'est pas
+  encadré. C'est pourquoi il a son option à lui — et pourquoi la
+  prolongation qu'on en fait est toujours une extrapolation, c'est-à-dire
+  une hypothèse, non une mesure.
+
+  Exemple :
+     fillmissing([1 NaN 3], 'linear')        % [1 2 3]
+     fillmissing([1 NaN 3], 'constant', 0)   % [1 0 3]
+     fillmissing([NaN 2 3], 'previous')      % [NaN 2 3] : rien avant
+
+  Voir aussi ISMISSING, RMMISSING, STANDARDIZEMISSING, INTERP1.
 ```
 
 ## `fimplicit`

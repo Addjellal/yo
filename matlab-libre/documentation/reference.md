@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2556 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+2562 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -50,7 +50,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
 | [`coder`](reference/toolbox-coder.md) | 4 |
-| [`communications`](reference/toolbox-communications.md) | 142 |
+| [`communications`](reference/toolbox-communications.md) | 145 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
 | [`compilateur`](reference/toolbox-compilateur.md) | 2 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
@@ -69,7 +69,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`interface`](reference/toolbox-interface.md) | 15 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 197 |
+| [`matlab`](reference/toolbox-matlab.md) | 198 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |
@@ -85,7 +85,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 289 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 291 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 42 |
 | [`types`](reference/toolbox-types.md) | 40 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |

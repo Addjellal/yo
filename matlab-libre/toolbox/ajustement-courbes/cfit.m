@@ -57,9 +57,26 @@ classdef cfit
                 else
                     varargout{1} = valeur;
                 end
-            else
-                [varargout{1:nargout}] = builtin('subsref', obj, s);
+                return
             end
+            % Un coefficient se lit par son nom, comme dans MATLAB :
+            % f.a rend le premier coefficient du modele. C'est la
+            % notation qu'on emploie neuf fois sur dix apres un
+            % ajustement, et elle prime sur les proprietes internes.
+            if strcmp(s(1).type, '.') && ischar(s(1).subs)
+                noms = coeffnames(obj);
+                position = find(strcmp(noms, s(1).subs), 1);
+                if ~isempty(position) && position <= numel(obj.Coefficients)
+                    valeur = obj.Coefficients(position);
+                    if numel(s) > 1
+                        [varargout{1:nargout}] = subsref(valeur, s(2:end));
+                    else
+                        varargout{1} = valeur;
+                    end
+                    return
+                end
+            end
+            [varargout{1:nargout}] = builtin('subsref', obj, s);
         end
 
         function y = feval(obj, x)

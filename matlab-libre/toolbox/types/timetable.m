@@ -52,7 +52,15 @@ classdef timetable
                     k = k + 1;
                 else
                     donnees{end + 1} = a; %#ok<AGROW>
-                    nomsAuto{end + 1} = sprintf('Var%d', numel(donnees)); %#ok<AGROW>
+                    % MATLAB nomme la variable comme celle qu'on lui
+                    % passe : « timetable(t,mesures) » donne la colonne
+                    % mesures. TABLE le fait déjà ; sans cela les deux
+                    % types ne se comportaient pas pareil.
+                    nomAppelant = inputname(k);
+                    if isempty(nomAppelant)
+                        nomAppelant = sprintf('Var%d', numel(donnees));
+                    end
+                    nomsAuto{end + 1} = nomAppelant; %#ok<AGROW>
                     k = k + 1;
                 end
             end
@@ -231,12 +239,29 @@ classdef timetable
             tt = timetable.extraire(tt, {i, ':'}, false);
         end
 
-        function s = retime(tt, nouveauxTemps, methode)
+        function s = retime(tt, nouveauxTemps, methode, varargin)
             %RETIME Ré-échantillonne une timetable sur de nouveaux instants.
+            %   S = RETIME(TT,INSTANTS,METHODE) rééchantillonne sur les
+            %   instants donnés.
+            %   S = RETIME(TT,'regular',METHODE,'TimeStep',PAS) construit
+            %   une grille régulière de ce pas, du premier au dernier
+            %   instant.
+            %   S = RETIME(TT,CADENCE,METHODE) où CADENCE vaut 'secondly',
+            %   'minutely', 'hourly', 'daily', 'weekly', 'monthly' ou
+            %   'yearly' emploie le pas correspondant.
+            %
             %   Méthodes : 'fillwithmissing' (défaut), 'previous', 'next',
             %   'nearest', 'linear', 'spline', et les agrégations 'sum',
             %   'mean', 'min', 'max', 'count'.
+            %
+            %   Une agrégation range chaque ancien instant dans l'intervalle
+            %   qui commence à un nouvel instant : les bornes sont fermées
+            %   à gauche et ouvertes à droite, si bien qu'aucun point n'est
+            %   compté deux fois.
             if nargin < 3, methode = 'fillwithmissing'; end
+            if ischar(nouveauxTemps) || isstring(nouveauxTemps)
+                nouveauxTemps = timetable.grilleReguliere(tt, char(nouveauxTemps), varargin);
+            end
             ancien = timetable.axe(tt.Temps);
             nouveau = timetable.axe(nouveauxTemps);
             colonnes = cell(1, width(tt));
@@ -352,6 +377,49 @@ classdef timetable
     end
 
     methods (Static)
+        function instants = grilleReguliere(tt, cadence, options)
+        %GRILLEREGULIERE Grille d'instants régulièrement espacés.
+        %   Le pas vient soit de l'option TimeStep, soit du nom de la
+        %   cadence. La grille part du premier instant et ne dépasse pas
+        %   le dernier.
+            pas = [];
+            for k = 1:2:numel(options)
+                if strcmpi(char(options{k}), 'timestep')
+                    pas = options{k + 1};
+                end
+            end
+            if isempty(pas)
+                switch lower(cadence)
+                    case 'secondly', pas = seconds(1);
+                    case 'minutely', pas = minutes(1);
+                    case 'hourly',   pas = hours(1);
+                    case 'daily',    pas = days(1);
+                    case 'weekly',   pas = days(7);
+                    case 'monthly',  pas = calmonths(1);
+                    case 'yearly',   pas = calyears(1);
+                    case 'regular'
+                        error('MATLAB:timetable:PasManquant', ...
+                              'RETIME(...,''regular'',...) demande l''option TimeStep.');
+                    otherwise
+                        error('MATLAB:timetable:Cadence', ...
+                              'Cadence inconnue : %s.', cadence);
+                end
+            end
+            debut = tt.Temps(1);
+            fin = tt.Temps(end);
+            instants = debut;
+            courant = debut;
+            garde = 0;
+            while garde < 1e6
+                courant = courant + pas;
+                if courant > fin
+                    break
+                end
+                instants(end + 1) = courant;   %#ok<AGROW>
+                garde = garde + 1;
+            end
+        end
+
         function v = axe(temps)
             if isa(temps, 'datetime')
                 v = temps.Serie(:);

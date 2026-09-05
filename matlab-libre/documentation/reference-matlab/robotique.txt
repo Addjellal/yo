@@ -1,0 +1,28 @@
+# Robotics System Toolbox. Les noms qu'un utilisateur rencontre :
+# rotations et transformations homogenes, arbres de corps rigides,
+# cinematique directe et inverse, dynamique, generation de trajectoires,
+# cinematique des robots mobiles et suivi de chemin.
+# --- rotations, quaternions, transformations
+angdiff axang2quat axang2rotm axang2tform eul2quat eul2rotm eul2tform
+quat2axang quat2eul quat2rotm quat2tform quatconj quatdivide quatinv
+quatmultiply quatnormalize quatrotate rotm2axang rotm2eul rotm2quat
+rotm2tform rotx roty rotz tform2axang tform2eul tform2quat tform2rotm
+tform2trvec trvec2tform
+# --- arbre de corps rigides
+rigidBody rigidBodyJoint rigidBodyTree addBody removeBody replaceBody
+showdetails homeConfiguration randomConfiguration getTransform
+geometricJacobian centerOfMass massMatrix velocityProduct gravityTorque
+inverseDynamics forwardDynamics externalForce importrobot loadrobot
+# --- cinematique inverse
+inverseKinematics generalizedInverseKinematics constraintPoseTarget
+constraintPositionTarget constraintOrientationTarget
+constraintCartesianBounds constraintJointBounds constraintAiming
+constraintDistanceBounds
+# --- trajectoires
+cubicpolytraj quinticpolytraj trapveltraj bsplinepolytraj rottraj
+transformtraj
+# --- robots mobiles et suivi de chemin
+ackermannKinematics bicycleKinematics differentialDriveKinematics
+unicycleKinematics controllerPurePursuit controllerVFH
+# --- cartes d'occupation
+binaryOccupancyMap occupancyMap

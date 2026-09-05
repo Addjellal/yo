@@ -810,4 +810,42 @@ assert(~ismethod(modeleTest, 'inexistant'));
 assert(numel(properties(modeleTest)) >= 5);
 assert(numel(properties('duration')) >= 2);
 
+
+% STEPINFO part aussi d'une reponse deja simulee.
+modeleInfo = tf(1, [1 0.4 1]);
+% La meme grille des deux cotes : STEPINFO(SYS) choisit la sienne, et
+% deux grilles differentes ne donnent pas le meme sommet au pixel pres.
+[reponseInfo, instantsInfo] = step(modeleInfo);
+depuisModele = stepinfo(modeleInfo);
+depuisReponse = stepinfo(reponseInfo, instantsInfo);
+assert(abs(depuisModele.Overshoot - depuisReponse.Overshoot) < 1e-9);
+assert(abs(depuisModele.Peak - depuisReponse.Peak) < 1e-9);
+% Un second ordre peu amorti depasse : zeta = 0.2 donne environ 53 %.
+assert(abs(depuisReponse.Overshoot - 100 * exp(-pi * 0.2 / sqrt(1 - 0.04))) < 2);
+% La valeur finale peut etre imposee quand la simulation s'arrete tot.
+courte = stepinfo(reponseInfo(1:60), instantsInfo(1:60), 1);
+assert(isfinite(courte.Overshoot));
+refuseInfo = false;
+try
+    stepinfo(reponseInfo);
+catch
+    refuseInfo = true;
+end
+assert(refuseInfo, 'STEPINFO(Y) sans les instants doit etre refuse');
+
+% RLOCUS rend une ligne par pole et une colonne par gain, comme MATLAB.
+modeleLieu = tf(1, [1 3 2]);
+[racinesLieu, gainsLieu] = rlocus(modeleLieu);
+assert(size(racinesLieu, 1) == numel(pole(modeleLieu)));
+assert(size(racinesLieu, 2) == numel(gainsLieu));
+% Au gain le plus faible, les branches partent des poles du modele.
+assert(max(abs(sort(real(racinesLieu(:, 1))) - sort(pole(modeleLieu)))) < 0.05);
+% Chaque colonne est bien l'ensemble des poles de la boucle fermee.
+for essaiLieu = [1 50 numel(gainsLieu)]
+    attenduLieu = sort(pole(feedback(gainsLieu(essaiLieu) * modeleLieu, 1)));
+    obtenuLieu = sort(racinesLieu(:, essaiLieu));
+    assert(max(abs(sort(real(obtenuLieu)) - sort(real(attenduLieu)))) < 1e-8);
+end
+disp('stepinfo et rlocus : ok');
+
 disp('automatique : toutes les verifications passent');

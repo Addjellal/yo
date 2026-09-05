@@ -1,8 +1,9 @@
 function [etiquettes, scores] = predict(modele, X)
 %PREDICT Prédiction d'un modèle ajusté.
 %   Y = PREDICT(M,X) applique à X le modèle M, quel qu'il soit : arbre,
-%   k plus proches voisins, bayésien naïf, machine à vecteurs de support,
-%   modèle linéaire, code correcteur, processus gaussien.
+%   k plus proches voisins, bayésien naïf, analyse discriminante, machine
+%   à vecteurs de support, modèle linéaire, code correcteur, processus
+%   gaussien.
 %
 %   [Y,SCORES] = PREDICT(M,X) rend en outre les scores : une colonne par
 %   classe pour un classifieur, la variance de prédiction pour un
@@ -19,8 +20,8 @@ function [etiquettes, scores] = predict(modele, X)
 %   Un réseau de neurones passe par le même nom : PREDICT le reconnaît à
 %   ses couches et le confie à PREDICTRESEAU.
 %
-%   Voir aussi FITCTREE, FITCKNN, FITCNB, FITCSVM, FITCECOC, FITRGP,
-%   PREDICTRESEAU.
+%   Voir aussi FITCTREE, FITCKNN, FITCNB, FITCDISCR, FITCSVM, FITCECOC,
+%   FITRGP, PREDICTRESEAU.
     if isstruct(modele) && isfield(modele, 'couches')
         % Un réseau de neurones : PREDICT est le nom commun, comme dans
         % MATLAB, et c'est le réseau qui décide de la suite.
@@ -42,6 +43,8 @@ function [etiquettes, scores] = predict(modele, X)
             etiquettes = predictknn(modele, X);
         case 'bayes-naif'
             [etiquettes, scores] = predictBayesNaif(modele, X);
+        case 'discriminant'
+            [etiquettes, scores] = predictDiscriminant(modele, X);
         case 'svm'
             [etiquettes, scores] = predictSvm(modele, X);
         case 'svm-regression'

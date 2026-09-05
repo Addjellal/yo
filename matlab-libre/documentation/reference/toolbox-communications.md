@@ -598,10 +598,21 @@ DECODE Décodage en blocs linéaires, avec correction d'une erreur.
   [MSG,ERR] = DECODE(CODE,N,K,'hamming/fmt') corrige une erreur par
   bloc grâce au syndrome, puis extrait les K bits d'information.
 
+  La forme de la sortie suit celle de l'entrée : une matrice de N
+  colonnes rend une matrice de K colonnes, un vecteur rend un vecteur.
+
+  Un code de Hamming corrige une erreur par bloc, jamais deux : sa
+  distance minimale vaut trois, et corriger t erreurs demande une
+  distance d'au moins 2t+1. Avec deux erreurs, le syndrome désigne une
+  troisième position, et le décodage rend un mot faux — ce n'est pas un
+  défaut de la mise en œuvre, c'est la limite du code.
+
   Exemple :
      c = encode([1 0 1 1], 7, 4, 'hamming/fmt');
      c(3) = 1 - c(3);
      isequal(decode(c, 7, 4, 'hamming/fmt'), [1 0 1 1])   % vrai
+
+  Voir aussi ENCODE, HAMMGEN, SYNDTABLE.
 ```
 
 ## `deintrlv`
@@ -678,8 +689,15 @@ ENCODE Codage en blocs linéaires.
   par la matrice génératrice, modulo 2.
   CODE = ENCODE(MSG,N,K,'hamming/fmt') utilise le code de Hamming.
 
+  La forme de la sortie suit celle de l'entrée, comme dans MATLAB : une
+  matrice de K colonnes — un mot par ligne — rend une matrice de N
+  colonnes ; un vecteur rend un vecteur de même orientation.
+
   Exemple :
      c = encode([1 0 1 1], 7, 4, 'hamming/fmt');
+     C = encode([1 0 1 1; 0 1 1 0], 7, 4, 'hamming/binary');   % 2 x 7
+
+  Voir aussi DECODE, HAMMGEN, GEN2PAR.
 ```
 
 ## `exigerPremier`
@@ -1527,6 +1545,49 @@ MATLIBRE_CLOPPER Une borne de l'intervalle de Clopper-Pearson.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_comm_position`
+
+```
+MATLIBRE_COMM_POSITION Place d'un symbole dans la constellation.
+  P = MATLIBRE_COMM_POSITION(S,M,ORDRE) rend la position occupée par le
+  symbole S. En ordre binaire c'est S lui-même ; en ordre de Gray c'est
+  la place P telle que le code de Gray de P vaille S.
+
+  Le code de Gray d'un entier p est p XOR (p décalé d'un bit à droite).
+  La suite des codes de Gray parcourt tous les entiers en ne changeant
+  qu'un bit à chaque pas : c'est la seule propriété qui compte ici.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi PSKMOD, QAMMOD, MATLIBRE_COMM_SYMBOLE.
+```
+
+## `matlibre_comm_symbole`
+
+```
+MATLIBRE_COMM_SYMBOLE Symbole porté par une position de la constellation.
+  S = MATLIBRE_COMM_SYMBOLE(P,M,ORDRE) est l'inverse de
+  MATLIBRE_COMM_POSITION : en ordre de Gray, la position P porte le
+  symbole dont le code de Gray vaut P.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi PSKDEMOD, QAMDEMOD, MATLIBRE_COMM_POSITION.
+```
+
+## `matlibre_comm_table_gray`
+
+```
+MATLIBRE_COMM_TABLE_GRAY Codes de Gray des entiers de 0 à M-1.
+  T = MATLIBRE_COMM_TABLE_GRAY(M) rend T(k+1) = k XOR (k >> 1), le code
+  de Gray de k. Deux entiers consécutifs ont des codes qui ne diffèrent
+  que d'un bit.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Voir aussi MATLIBRE_COMM_POSITION, MATLIBRE_COMM_SYMBOLE.
+```
+
 ## `matlibre_derivee_formelle`
 
 ```
@@ -1980,6 +2041,17 @@ POLY2TRELLIS Treillis d'un codeur convolutif.
 
 ```
 PSKDEMOD Démodulation de phase à M états, par décision du plus proche.
+  X = PSKDEMOD(Y,M) rend le symbole dont le point est le plus proche.
+  X = PSKDEMOD(Y,M,PHASE,ORDRE) reprend la phase et l'ordre employés à
+  la modulation ; ORDRE vaut 'bin' (défaut) ou 'gray'.
+
+  La décision est celle du plus proche voisin : sur un cercle, cela
+  revient à arrondir l'angle au multiple de 2 pi / M le plus proche.
+
+  Exemple :
+     x = pskdemod(pskmod([0 1 2 3], 4, pi / 4, 'gray'), 4, pi / 4, 'gray')
+
+  Voir aussi PSKMOD, QAMDEMOD.
 ```
 
 ## `pskmod`
@@ -1987,20 +2059,68 @@ PSKDEMOD Démodulation de phase à M états, par décision du plus proche.
 ```
 PSKMOD Modulation de phase à M états.
   Y = PSKMOD(X,M) associe au symbole k le point exp(2i pi k / M).
+  Y = PSKMOD(X,M,PHASE) fait tourner la constellation de PHASE radians.
+  Y = PSKMOD(X,M,PHASE,ORDRE) où ORDRE vaut 'bin' (défaut) ou 'gray'.
+
+  Tous les points sont sur le cercle unité : l'information est dans la
+  phase seule, si bien qu'un amplificateur saturé ne déforme pas le
+  signal — c'est la raison d'être de cette modulation.
+
+  En ordre binaire, le symbole k occupe la k-ième position autour du
+  cercle. En ordre de Gray, les positions successives portent des
+  valeurs qui ne diffèrent que d'un bit : une erreur entre deux points
+  voisins ne coûte alors qu'un bit faux au lieu de deux, ce qui divise
+  le taux d'erreur binaire sans rien coûter.
+
+  Exemple :
+     y = pskmod([0 1 2 3], 4, pi / 4, 'gray');
+     abs(y)                          % 1 partout
+
+  Voir aussi PSKDEMOD, QAMMOD, DE2BI.
 ```
 
 ## `qamdemod`
 
 ```
 QAMDEMOD Démodulation QAM par décision sur la grille.
+  X = QAMDEMOD(Y,M) rend le symbole du point de la grille le plus
+  proche.
+  X = QAMDEMOD(Y,M,ORDRE) reprend l'ordre employé à la modulation ;
+  ORDRE vaut 'gray' (défaut) ou 'bin'.
+
+  La grille étant un produit de deux axes, la décision se prend axe par
+  axe : arrondir la partie réelle et la partie imaginaire suffit, et
+  aucune recherche du plus proche point n'est nécessaire.
+
+  Exemple :
+     qamdemod(qammod(0:15, 16), 16)      % 0:15
+
+  Voir aussi QAMMOD, PSKDEMOD, GENQAMDEMOD.
 ```
 
 ## `qammod`
 
 ```
 QAMMOD Modulation d'amplitude en quadrature à M états (M carré).
-  La constellation est celle de la documentation : grille carrée
-  centrée, d'espacement 2.
+  Y = QAMMOD(X,M) place le symbole X sur une grille carrée centrée,
+  d'espacement deux.
+  Y = QAMMOD(X,M,ORDRE) où ORDRE vaut 'gray' (défaut, comme MATLAB) ou
+  'bin'.
+
+  Contrairement à une modulation de phase, l'amplitude porte ici de
+  l'information : on gagne des points, donc des bits par symbole, mais
+  on les rapproche, donc on perd en résistance au bruit. C'est
+  l'arbitrage qui décide de la modulation d'un lien.
+
+  Le codage de Gray s'applique à chaque axe séparément : deux points
+  voisins de la grille, en abscisse comme en ordonnée, ne diffèrent que
+  d'un bit.
+
+  Exemple :
+     c = qammod(0:15, 16);
+     mean(abs(c) .^ 2)               % energie moyenne
+
+  Voir aussi QAMDEMOD, PSKMOD, GENQAMMOD, MODNORM.
 ```
 
 ## `qfunc`

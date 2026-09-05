@@ -1978,9 +1978,24 @@ PULSTRAN Train d'impulsions.
 
 ```
 PWELCH Densité spectrale par la méthode de Welch.
-  [PXX,F] = PWELCH(X,LONGUEUR,RECOUVREMENT,NFFT,FS) découpe X en
+  [PXX,F] = PWELCH(X,FENETRE,RECOUVREMENT,NFFT,FS) découpe X en
   segments qui se recouvrent, fenêtre chacun, et moyenne les
   périodogrammes.
+
+  FENETRE vaut soit une longueur de segment — la fenêtre est alors une
+  Hamming de cette longueur — soit directement le vecteur de la
+  fenêtre à employer. Vide, la longueur est le huitième du signal.
+
+  Un périodogramme seul a une variance qui ne décroît pas avec la
+  longueur du signal : allonger l'enregistrement affine la grille de
+  fréquences sans rien calmer. Moyenner plusieurs périodogrammes, eux,
+  divise la variance par leur nombre — c'est tout l'objet de la
+  méthode, et le recouvrement sert à en obtenir davantage.
+
+  Exemple :
+     [p, f] = pwelch(randn(1024, 1), hamming(256), 128, 512, 1000);
+
+  Voir aussi PERIODOGRAM, SPECTROGRAM, FFT, HAMMING.
 ```
 
 ## `pyulear`

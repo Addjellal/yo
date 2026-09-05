@@ -5,7 +5,7 @@ canoncorr cdf chi2cdf chi2gof chi2inv chi2pdf chi2rnd cluster
 clusterdata cophenet copulacdf corr corrcoef cov crosstab cvpartition
 dataset dendrogram discardSupportVectors ecdf evcdf expcdf expfit
 expinv exppdf exprnd expstat fcdf finv fitcecoc fitcknn fitclinear
-fitcnb fitcsvm fitctree fitdist fitglm fitlm fitlme fitrgp fitrlinear
+fitcdiscr fitcnb fitcsvm fitctree fitdist fitglm fitlm fitlme fitrgp fitrlinear
 fitrsvm fitrtree fpdf friedman frnd fstat gamcdf gamfit gaminv gampdf
 gamrnd gamstat geocdf geoinv geopdf geornd gevcdf glmfit glmval
 gmdistribution gname grp2idx grpstats harmmean histfit hmmdecode

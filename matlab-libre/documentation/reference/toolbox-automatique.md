@@ -2102,8 +2102,10 @@ RLOCUS Lieu des racines de la boucle fermée.
   RLOCUS(SYS1,SYS2,...,K) superpose plusieurs modèles ; une chaîne de
   style peut suivre chacun d'eux, comme dans PLOT.
 
-  [R,K] = RLOCUS(SYS) ne trace rien et rend les racines — une ligne par
-  gain — et les gains employés.
+  [R,K] = RLOCUS(SYS) ne trace rien et rend les racines et les gains
+  employés. R porte une ligne par pôle et une colonne par gain, comme
+  dans MATLAB : R(i,j) est le i-ème pôle de la boucle fermée au gain
+  K(j), si bien que PLOT(R.') dessine les branches.
 
   Exemple :
      rlocus(tf(1, [1 2 0]))
@@ -2395,7 +2397,10 @@ STEPINFO Caractéristiques d'une réponse indicielle.
   dépassement en pourcentage, Peak la valeur maximale et PeakTime
   l'instant où elle est atteinte.
 
-  S = STEPINFO(Y,T) part d'une réponse déjà simulée.
+  S = STEPINFO(Y,T) part d'une réponse déjà simulée, et
+  S = STEPINFO(Y,T,YFINAL) impose la valeur finale au lieu de la lire
+  sur le dernier point — utile quand la simulation s'arrête avant que
+  la réponse ne se soit établie.
 
   Exemples :
      s = stepinfo(tf(1, [1 1]));

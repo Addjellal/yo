@@ -170,4 +170,25 @@ enveloppe.contenu.Valeur = {[7 7]};
 assert(isequal(enveloppe.contenu.Valeur{1}, [7 7]));
 assert(isequal(t.Valeur{1}, [1 2]));
 
+
+% Une poignee vers un nom natif doit atteindre la methode de la classe,
+% comme l'atteindrait un appel direct. Sans cela « cellfun(@double, ...) »
+% appelait le natif, qui ne sait pas convertir un objet.
+syms xPoignee
+valeurSymbolique = sym(3);
+assert(double(valeurSymbolique) == 3);
+poigneeDouble = @double;
+assert(poigneeDouble(valeurSymbolique) == 3);
+poigneeChar = @char;
+assert(strcmp(poigneeChar(valeurSymbolique), '3'));
+assert(feval('double', valeurSymbolique) == 3);
+% Et a travers CELLFUN et ARRAYFUN, qui est l'usage courant.
+lot = {sym(1), sym(2), sym(4)};
+assert(isequal(cellfun(@double, lot), [1 2 4]));
+assert(isequal(cellfun(@char, lot, 'UniformOutput', false), {'1', '2', '4'}));
+% Un objet sans la methode demandee laisse le natif faire son travail.
+assert(poigneeDouble(int8(7)) == 7);
+assert(poigneeDouble([1 2 3]) == [1 2 3]);
+disp('poignees vers les methodes : ok');
+
 disp('classes : toutes les verifications passent');

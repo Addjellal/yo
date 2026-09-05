@@ -119,6 +119,8 @@
 %   knnsearch, fitcknn                 - Plus proches voisins
 %   fitctree, fitrtree                 - Arbres de décision et de régression
 %   fitcnb                             - Bayésien naïf
+%   fitcdiscr                          - Analyse discriminante, linéaire
+%                                        ou quadratique
 %   fitcsvm, fitrsvm                   - Vecteurs de support
 %   discardSupportVectors              - Allège une SVM linéaire
 %   fitclinear, fitrlinear             - Modèles linéaires en grande dimension

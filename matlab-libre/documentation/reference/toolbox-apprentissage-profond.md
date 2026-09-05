@@ -121,6 +121,11 @@ ADDLAYERS Ajoute des couches à un graphe, sans les raccorder.
      lg = addLayers(lg, {reluLayer('Name', 'relu1')});
 
   Voir aussi LAYERGRAPH, CONNECTLAYERS, DLNETWORK.
+Les couches arrivent sous trois formes : une couche seule, une
+cellule de couches, ou le tableau de structures que « [c1; c2] »
+produit — la notation naturelle en MATLAB. Le tableau doit être
+éclaté, sans quoi la suite prendrait ses champs pour une liste
+d'arguments.
 ```
 
 ## `additionLayer`

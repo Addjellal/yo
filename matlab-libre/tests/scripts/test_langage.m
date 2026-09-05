@@ -532,6 +532,41 @@ end
 assert(refuse);
 disp('empty : ok');
 
+
+% FILLMISSING : combler, et savoir ce qu'on a comble.
+assert(isequal(fillmissing([1 NaN 3], 'linear'), [1 2 3]));
+assert(isequal(fillmissing([1 NaN NaN 4], 'linear'), [1 2 3 4]));
+assert(isequal(fillmissing([1 NaN 3], 'constant', 0), [1 0 3]));
+% L'orientation est preservee.
+assert(isrow(fillmissing([1 NaN 3], 'constant', 0)));
+assert(iscolumn(fillmissing([1; NaN; 3], 'constant', 0)));
+% Les bouts n'ont pas de voisin des deux cotes : par defaut on prolonge,
+% « none » les laisse.
+assert(isequal(fillmissing([NaN 2 3], 'previous'), [2 2 3]));
+manquantEnBout = fillmissing([NaN 2 3], 'previous', 'EndValues', 'none');
+assert(isnan(manquantEnBout(1)));
+assert(isequal(fillmissing([NaN 2 3], 'previous', 'EndValues', 0), [0 2 3]));
+% Les positions comblees sont rendues.
+[rempli, ou] = fillmissing([1 NaN 3], 'linear');
+assert(isequal(ou, [false true false]));
+assert(isequal(rempli, [1 2 3]));
+% Une matrice se comble colonne par colonne.
+combleeMatrice = fillmissing([1 NaN; NaN 4; 3 6], 'linear');
+assert(isequal(combleeMatrice, [1 4; 2 4; 3 6]));
+% Les methodes mobiles moyennent le voisinage.
+assert(isequal(fillmissing([1 NaN 3 NaN 5], 'movmean', 3), [1 2 3 4 5]));
+% Rien a combler : le tableau ressort intact.
+assert(isequal(fillmissing([1 2 3], 'linear'), [1 2 3]));
+% Une methode inconnue est refusee.
+refuseComble = false;
+try
+    fillmissing([1 NaN 3], 'inconnue');
+catch
+    refuseComble = true;
+end
+assert(refuseComble);
+disp('fillmissing : ok');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

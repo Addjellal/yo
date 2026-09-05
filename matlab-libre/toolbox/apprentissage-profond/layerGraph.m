@@ -22,7 +22,13 @@ function lg = layerGraph(couches)
     if nargin < 1
         couches = {};
     end
-    if ~iscell(couches)
+    % « [c1; c2; c3] » donne un tableau de structures : c'est la notation
+    % naturelle pour empiler des couches, et il faut l'éclater avant de
+    % l'envoyer plus loin, sans quoi les trois couches n'en feraient
+    % qu'une.
+    if isstruct(couches) && numel(couches) > 1
+        couches = arrayfun(@(c) c, couches, 'UniformOutput', false);
+    elseif ~iscell(couches)
         couches = {couches};
     end
     lg = struct('Layers', {{}}, 'Names', {{}}, ...

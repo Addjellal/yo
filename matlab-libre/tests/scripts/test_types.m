@@ -461,4 +461,61 @@ catch
 end
 assert(videRefuse);
 
+
+% CATEGORICAL accepte les couples nom-valeur apres l'ensemble des
+% categories, et les catégorielles ordonnees se comparent.
+niveaux = categorical({'faible', 'moyen', 'fort', 'moyen'}, ...
+                      {'faible', 'moyen', 'fort'}, 'Ordinal', true);
+assert(niveaux(1) < niveaux(2));
+assert(niveaux(3) > niveaux(2));
+assert(strcmp(char(max(niveaux)), 'fort'));
+assert(strcmp(char(min(niveaux)), 'faible'));
+[~, positionMax] = max(niveaux);
+assert(positionMax == 3);
+% Les noms affiches restent acceptes en troisieme position.
+renommees = categorical({'a', 'b'}, {'a', 'b'}, {'Alpha', 'Beta'});
+assert(isequal(cellstr(categories(renommees))', {'Alpha', 'Beta'}));
+% Une catégorielle non ordonnee refuse MAX : « plus grand » n'a pas de
+% sens sans ordre.
+refuseMax = false;
+try
+    max(categorical({'x', 'y'}));
+catch
+    refuseMax = true;
+end
+assert(refuseMax);
+% Un appel a un seul argument marche toujours.
+assert(numel(categories(categorical({'x', 'y', 'x'}))) == 2);
+disp('categorielles ordonnees : ok');
+
+% TIMETABLE nomme ses variables comme le fait TABLE, et RETIME sait
+% construire une grille reguliere.
+instantsEssai = datetime(2024, 1, 1) + hours(0:11)';
+mesuresEssai = 20 + (0:11)';
+serieEssai = timetable(instantsEssai, mesuresEssai);
+assert(isequal(serieEssai.Properties.VariableNames, {'mesuresEssai'}));
+% « end » se resout sur ce que la chaine vaut a cet endroit, meme quand
+% la propriete passe par SUBSREF.
+assert(serieEssai.Time(end) == instantsEssai(end));
+assert(serieEssai.mesuresEssai(end) == 31);
+agregee = retime(serieEssai, 'regular', 'mean', 'TimeStep', hours(4));
+assert(height(agregee) == 3);
+assert(isequal(agregee.Properties.VariableNames, {'mesuresEssai'}));
+% Trois tranches de quatre points : les moyennes sont celles des tranches.
+assert(max(abs(agregee.mesuresEssai' - [21.5 25.5 29.5])) < 1e-12);
+% La moyenne des moyennes redonne la moyenne generale, les tranches
+% etant de meme taille.
+assert(abs(mean(agregee.mesuresEssai) - mean(mesuresEssai)) < 1e-12);
+% La cadence peut aussi se nommer.
+parHeure = retime(serieEssai, 'hourly', 'mean');
+assert(height(parHeure) == height(serieEssai));
+refuseGrille = false;
+try
+    retime(serieEssai, 'regular', 'mean');
+catch
+    refuseGrille = true;
+end
+assert(refuseGrille, '''regular'' sans TimeStep doit etre refuse');
+disp('timetable : ok');
+
 disp('types : toutes les verifications passent');

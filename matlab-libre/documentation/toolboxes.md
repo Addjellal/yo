@@ -24,7 +24,7 @@ existant appellera.
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
 | `cartographie` | Mapping Toolbox — géodésie et cartographie. | 4 |
 | `coder` | MATLAB Coder — génération de code C. | 4 |
-| `communications` | Communications Toolbox — transmissions numériques. | 142 |
+| `communications` | Communications Toolbox — transmissions numériques. | 145 |
 | `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 6 |
 | `compilateur` | MATLAB Compiler — distribution d'un programme. | 2 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |
@@ -42,7 +42,7 @@ existant appellera.
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |
 | `maintenance-predictive` | Predictive Maintenance Toolbox — pronostic et santé des équipements. | 4 |
-| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 197 |
+| `matlab` | MATLAB de base — fonctions écrites dans le langage lui-même. | 198 |
 | `mpc` | Model Predictive Control Toolbox — commande prédictive. | 3 |
 | `navigation` | Navigation Toolbox — localisation et planification. | 5 |
 | `ondelettes` | Wavelet Toolbox — analyse en ondelettes. | 129 |
@@ -58,7 +58,7 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 289 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 291 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |

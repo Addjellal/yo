@@ -71,7 +71,7 @@ doc: tout
 reference: doc
 
 exemples: tout
-	@for f in exemples/*.m; do \
+	@for f in exemples/*.m exemples/toolboxes/*.m; do \
 	  echo "--> $$f"; \
 	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre $$f || exit 1; \
 	done

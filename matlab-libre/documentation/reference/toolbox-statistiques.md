@@ -122,6 +122,8 @@
 %   knnsearch, fitcknn                 - Plus proches voisins
 %   fitctree, fitrtree                 - Arbres de décision et de régression
 %   fitcnb                             - Bayésien naïf
+%   fitcdiscr                          - Analyse discriminante, linéaire
+%                                        ou quadratique
 %   fitcsvm, fitrsvm                   - Vecteurs de support
 %   discardSupportVectors              - Allège une SVM linéaire
 %   fitclinear, fitrlinear             - Modèles linéaires en grande dimension
@@ -1090,6 +1092,46 @@ FINV Quantile de la loi de Fisher, par dichotomie.
   autres.
 
   Exemple :  finv(0.95, 2, 30)     % 3.3158
+```
+
+## `fitcdiscr`
+
+```
+FITCDISCR Analyse discriminante.
+  M = FITCDISCR(X,Y) ajuste un classifieur par analyse discriminante
+  linéaire : chaque classe est supposée gaussienne, et toutes partagent
+  la même matrice de covariance.
+
+  FITCDISCR(...,'DiscrimType','quadratic') laisse à chaque classe sa
+  propre covariance ; la frontière entre deux classes devient une
+  quadrique au lieu d'un hyperplan.
+  FITCDISCR(...,'Prior',P) impose les probabilités a priori ;
+  'uniform' les égalise.
+  FITCDISCR(...,'Gamma',G) régularise la covariance en la rapprochant
+  d'une diagonale, ce qui la rend inversible quand les variables sont
+  peu nombreuses devant les dimensions.
+
+  PREDICT applique le modèle.
+
+  La règle est celle de Bayes, écrite pour des gaussiennes : on classe
+  x dans la classe qui maximise
+
+     log P(classe) + log densite(x | classe)
+
+  Quand les covariances sont communes, les termes quadratiques en x se
+  simplifient entre classes et il ne reste qu'une fonction affine — le
+  discriminant linéaire de Fisher. C'est ce qui distingue les deux
+  variantes : ce n'est pas le modèle qui change de nature, seulement ce
+  qui survit à la soustraction.
+
+  Exemple :
+     rng(1);
+     X = [randn(50, 2); randn(50, 2) + 3];
+     y = [ones(50, 1); 2 * ones(50, 1)];
+     m = fitcdiscr(X, y);
+     mean(predict(m, X) == y)
+
+  Voir aussi PREDICT, FITCNB, FITCSVM, FITCKNN, PCA.
 ```
 
 ## `fitcecoc`
@@ -4132,8 +4174,9 @@ POLYTOOL Ajustement polynomial et bande de confiance.
 ```
 PREDICT Prédiction d'un modèle ajusté.
   Y = PREDICT(M,X) applique à X le modèle M, quel qu'il soit : arbre,
-  k plus proches voisins, bayésien naïf, machine à vecteurs de support,
-  modèle linéaire, code correcteur, processus gaussien.
+  k plus proches voisins, bayésien naïf, analyse discriminante, machine
+  à vecteurs de support, modèle linéaire, code correcteur, processus
+  gaussien.
 
   [Y,SCORES] = PREDICT(M,X) rend en outre les scores : une colonne par
   classe pour un classifieur, la variance de prédiction pour un
@@ -4150,8 +4193,8 @@ PREDICT Prédiction d'un modèle ajusté.
   Un réseau de neurones passe par le même nom : PREDICT le reconnaît à
   ses couches et le confie à PREDICTRESEAU.
 
-  Voir aussi FITCTREE, FITCKNN, FITCNB, FITCSVM, FITCECOC, FITRGP,
-  PREDICTRESEAU.
+  Voir aussi FITCTREE, FITCKNN, FITCNB, FITCDISCR, FITCSVM, FITCECOC,
+  FITRGP, PREDICTRESEAU.
 ```
 
 ## `predictArbreRegression`
@@ -4166,6 +4209,28 @@ PREDICTARBREREGRESSION Prédiction d'un arbre construit par FITRTREE.
 ```
 PREDICTBAYESNAIF Prédiction d'un classifieur bayésien naïf.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+```
+
+## `predictDiscriminant`
+
+```
+PREDICTDISCRIMINANT Prédiction d'une analyse discriminante.
+  [Y,S] = PREDICTDISCRIMINANT(M,X) rend la classe la plus probable et,
+  dans S, les probabilités a posteriori — une colonne par classe.
+
+  Le score d'une classe est le logarithme de sa densité gaussienne
+  ajouté à celui de sa probabilité a priori :
+
+     s_c(x) = log P(c) - 1/2 log|Sigma_c| - 1/2 (x-mu_c)' inv(Sigma_c) (x-mu_c)
+
+  Les scores sont ramenés à des probabilités par l'exponentielle
+  normalisée, en soustrayant d'abord leur maximum : sans cela
+  l'exponentielle déborderait dès que les classes sont bien séparées.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
+  où PREDICT est une méthode du modèle.
+
+  Voir aussi FITCDISCR, PREDICT.
 ```
 
 ## `predictEcoc`

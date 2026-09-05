@@ -6,7 +6,10 @@ function s = stepinfo(systeme, varargin)
 %   dépassement en pourcentage, Peak la valeur maximale et PeakTime
 %   l'instant où elle est atteinte.
 %
-%   S = STEPINFO(Y,T) part d'une réponse déjà simulée.
+%   S = STEPINFO(Y,T) part d'une réponse déjà simulée, et
+%   S = STEPINFO(Y,T,YFINAL) impose la valeur finale au lieu de la lire
+%   sur le dernier point — utile quand la simulation s'arrête avant que
+%   la réponse ne se soit établie.
 %
 %   Exemples :
 %      s = stepinfo(tf(1, [1 1]));
@@ -15,10 +18,29 @@ function s = stepinfo(systeme, varargin)
 %      s2.Overshoot > 50                    % un second ordre peu amorti, si
 %
 %   Voir aussi STEP, LSIM, DAMP, BANDWIDTH.
-    [y, t] = step(systeme);
-    y = y(:);
-    t = t(:);
-    finale = y(end);
+    if isnumeric(systeme)
+        if isempty(varargin)
+            error('control:stepinfo:Arguments', ...
+                  'STEPINFO(Y,T) demande aussi les instants.');
+        end
+        y = double(systeme(:));
+        t = double(varargin{1});
+        t = t(:);
+        if numel(t) ~= numel(y)
+            error('control:stepinfo:Longueurs', ...
+                  'Y et T doivent avoir le même nombre de points.');
+        end
+        if numel(varargin) > 1 && ~isempty(varargin{2})
+            finale = double(varargin{2});
+        else
+            finale = y(end);
+        end
+    else
+        [y, t] = step(systeme);
+        y = y(:);
+        t = t(:);
+        finale = y(end);
+    end
     s = struct('RiseTime', NaN, 'SettlingTime', NaN, 'SettlingMin', NaN, ...
                'SettlingMax', NaN, 'Overshoot', 0, 'Undershoot', 0, ...
                'Peak', 0, 'PeakTime', 0);

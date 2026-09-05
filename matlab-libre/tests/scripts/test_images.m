@@ -594,4 +594,43 @@ mosaiqueBordee = montage({mat2gray(peaks(10)), mat2gray(magic(10))}, ...
 assert(isequal(size(mosaiqueBordee), [22 10]));
 close('all');
 
+
+% IMROTATE : la rotation se juge sur ce qu'elle preserve.
+motif = mat2gray(peaks(60));
+% Zero degre ne change rien, quelle que soit l'interpolation.
+for methode = {'nearest', 'bilinear', 'bicubic'}
+    assert(max(max(abs(imrotate(motif, 0, methode{1}, 'crop') - motif))) < 1e-12);
+end
+% Un quart de tour est exact : la grille se retrouve sur elle-meme.
+assert(max(max(abs(imrotate(motif, 90, 'nearest', 'crop') - rot90(motif)))) < 1e-12);
+assert(max(max(abs(imrotate(motif, 180, 'nearest', 'crop') - rot90(motif, 2)))) < 1e-12);
+% Le cadre : « crop » garde la taille, « loose » l'agrandit assez pour
+% contenir les quatre coins tournes.
+assert(isequal(size(imrotate(motif, 30, 'crop')), size(motif)));
+grandi = size(imrotate(motif, 30));
+attendu = ceil(60 * (abs(cosd(30)) + abs(sind(30))));
+assert(isequal(grandi, [attendu attendu]));
+assert(all(grandi > size(motif)));
+% Aller-retour : l'ecart diminue quand l'interpolation monte en ordre.
+coeur = 20:40;
+ecarts = zeros(1, 3);
+methodes = {'nearest', 'bilinear', 'bicubic'};
+for k = 1:3
+    aller = imrotate(motif, 30, methodes{k}, 'crop');
+    retour = imrotate(aller, -30, methodes{k}, 'crop');
+    ecarts(k) = max(max(abs(retour(coeur, coeur) - motif(coeur, coeur))));
+end
+fprintf('imrotate aller-retour : %s\n', mat2str(round(ecarts, 4)));
+assert(ecarts(2) < ecarts(1) / 3, 'le bilineaire doit battre le plus proche voisin');
+assert(ecarts(3) < ecarts(2), 'le bicubique doit battre le bilineaire');
+% Les images en couleur gardent leurs trois plans.
+couleur = cat(3, motif, motif * 0.5, motif * 0.2);
+tournee = imrotate(couleur, 20);
+assert(size(tournee, 3) == 3);
+% Chaque plan tourne comme il tournerait seul.
+assert(max(max(abs(tournee(:, :, 2) - imrotate(motif * 0.5, 20)))) < 1e-12);
+% Une image entiere reste entiere.
+assert(isa(imrotate(uint8(motif * 255), 45), 'uint8'));
+disp('imrotate : ok');
+
 disp('images : toutes les verifications passent');

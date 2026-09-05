@@ -1893,4 +1893,58 @@ assert(isequal(size(courbesMf), [181 7]));
 assert(abs(grilleMf(1)) < 1e-12 && abs(grilleMf(end) - 10) < 1e-12);
 assert(~isempty(plotfis(fisGrille)));
 
+
+% Ordre des symboles : PSKMOD et QAMMOD acceptent 'bin' et 'gray'.
+% Le codage de Gray est defini par une propriete : deux points voisins de
+% la constellation ne different que d'un bit.
+pointsGray = pskmod((0:3)', 4, pi / 4, 'gray');
+pointsBinaire = pskmod((0:3)', 4, pi / 4, 'bin');
+assert(max(abs(abs(pointsGray) - 1)) < 1e-12, 'la MDP est sur le cercle unite');
+assert(isequal(pskdemod(pointsGray, 4, pi / 4, 'gray'), (0:3)'));
+assert(isequal(pskdemod(pointsBinaire, 4, pi / 4, 'bin'), (0:3)'));
+% Les deux constellations occupent les memes points, dans un autre ordre.
+assert(max(abs(sort(mod(angle(pointsGray), 2 * pi)) - ...
+                sort(mod(angle(pointsBinaire), 2 * pi)))) < 1e-12);
+ecartsGray = matlibre_essai_voisins(pointsGray);
+ecartsBinaire = matlibre_essai_voisins(pointsBinaire);
+assert(all(ecartsGray == 1), 'deux voisins de Gray ne different que d''un bit');
+assert(any(ecartsBinaire > 1), 'le codage binaire en change parfois deux');
+% Meme chose pour la MAQ, ou Gray s'applique axe par axe.
+assert(isequal(qamdemod(qammod(0:15, 16), 16), 0:15));
+assert(isequal(qamdemod(qammod(0:15, 16, 'bin'), 16, 'bin'), 0:15));
+% Les deux ordres placent les memes points.
+assert(max(abs(sort(real(qammod(0:15, 16))) - sort(real(qammod(0:15, 16, 'bin'))))) < 1e-12);
+
+% ENCODE et DECODE gardent la forme de leur entree, comme dans MATLAB.
+motsHamming = [1 0 1 1; 0 1 1 0; 1 1 1 1];
+codesHamming = encode(motsHamming, 7, 4, 'hamming/binary');
+assert(isequal(size(codesHamming), [3 7]));
+assert(isequal(decode(codesHamming, 7, 4, 'hamming/binary'), motsHamming));
+% Un vecteur reste un vecteur, dans son orientation.
+assert(isrow(encode([1 0 1 1], 7, 4, 'hamming/binary')));
+assert(iscolumn(encode([1; 0; 1; 1], 7, 4, 'hamming/binary')));
+assert(isequal(decode(encode([1 0 1 1], 7, 4, 'hamming/binary'), 7, 4, ...
+                      'hamming/binary'), [1 0 1 1]));
+% Une erreur par bloc est corrigee ; deux ne le sont pas, la distance
+% minimale du code valant trois.
+uneErreur = codesHamming;
+uneErreur(2, 5) = 1 - uneErreur(2, 5);
+assert(isequal(decode(uneErreur, 7, 4, 'hamming/binary'), motsHamming));
+deuxErreurs = codesHamming;
+deuxErreurs(2, [3 5]) = 1 - deuxErreurs(2, [3 5]);
+assert(~isequal(decode(deuxErreurs, 7, 4, 'hamming/binary'), motsHamming));
+disp('modulation et codage : ok');
+
 disp('domaines : toutes les verifications passent');
+
+function ecarts = matlibre_essai_voisins(points)
+%MATLIBRE_ESSAI_VOISINS Bits differents entre points consecutifs du cercle.
+    [~, ordre] = sort(mod(angle(points), 2 * pi));
+    valeurs = ordre - 1;
+    n = numel(valeurs);
+    ecarts = zeros(1, n);
+    for k = 1:n
+        suivant = mod(k, n) + 1;
+        ecarts(k) = sum(de2bi(valeurs(k), 2) ~= de2bi(valeurs(suivant), 2));
+    end
+end

@@ -1082,6 +1082,29 @@ IMRESIZE Redimensionnement par interpolation bilinéaire.
 
 ```
 IMROTATE Rotation d'une image, en degrés, autour de son centre.
+  Y = IMROTATE(X,ANGLE) tourne X de ANGLE degrés dans le sens direct,
+  par plus proche voisin, et agrandit l'image pour que rien n'en sorte.
+
+  Y = IMROTATE(X,ANGLE,METHODE) où METHODE vaut 'nearest' (défaut),
+  'bilinear' ou 'bicubic'.
+  Y = IMROTATE(X,ANGLE,METHODE,CADRE) où CADRE vaut 'loose' (défaut,
+  l'image grandit) ou 'crop' (même taille, les coins sortent).
+  Y = IMROTATE(X,ANGLE,CADRE) accepte aussi le cadre seul.
+
+  La rotation se calcule à l'envers : pour chaque pixel de la sortie on
+  cherche d'où il vient dans l'entrée, et on y interpole. Faire
+  l'inverse — envoyer chaque pixel d'entrée vers sa place de sortie —
+  laisserait des trous, puisqu'une rotation ne fait pas correspondre
+  les grilles.
+
+  Les points qui viennent de l'extérieur de l'image sont mis à zéro.
+
+  Exemple :
+     I = mat2gray(peaks(100));
+     J = imrotate(I, 30, 'bilinear');
+     K = imrotate(I, 30, 'bilinear', 'crop');   % meme taille que I
+
+  Voir aussi IMRESIZE, IMTRANSLATE, IMCROP, IMWARP.
 ```
 
 ## `imsharpen`

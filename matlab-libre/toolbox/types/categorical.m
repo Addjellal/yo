@@ -29,6 +29,18 @@ classdef categorical
             ordinal = false;
             protege = false;
             reste = varargin;
+            if nargin < 2, ensemble = []; end
+            if nargin < 3, noms = []; end
+            % « categorical(a, ensemble, 'Ordinal', true) » : le troisième
+            % argument n'est pas toujours la liste des noms affichés, il
+            % peut ouvrir les couples nom-valeur. On le reconnaît à ce
+            % qu'il nomme une option, et on le rend au reste.
+            if ~isempty(noms) && (ischar(noms) || isstring(noms)) ...
+                    && isscalar(string(noms)) ...
+                    && any(strcmpi(char(noms), {'Ordinal', 'Protected'}))
+                reste = [{noms}, reste];
+                noms = [];
+            end
             k = 1;
             while k + 1 <= numel(reste)
                 switch lower(char(reste{k}))
@@ -41,13 +53,13 @@ classdef categorical
                 c = a; c.Ordinal = ordinal; return
             end
             valeurs = categorical.enTextes(a);
-            if nargin >= 2 && ~isempty(ensemble)
+            if ~isempty(ensemble)
                 liste = categorical.enTextes(ensemble);
                 liste = liste(:)';
             else
                 liste = categorical.trierUniques(valeurs);
             end
-            if nargin >= 3 && ~isempty(noms)
+            if ~isempty(noms)
                 affiches = categorical.enTextes(noms);
                 affiches = affiches(:)';
                 if numel(affiches) ~= numel(liste)
@@ -217,6 +229,17 @@ classdef categorical
             cle(cle == 0) = numel(c.Noms) + 1;    % les indéfinis en dernier
             [~, i] = sort(cle, varargin{:});
             r = categorical.avec(c.Codes(i), c.Noms, c.Ordinal);
+        end
+        function [r, i] = max(c, varargin)
+        %MAX Plus grande catégorie, pour une catégorielle ordonnée.
+        %   Elle n'a de sens que si les catégories sont ordonnées : sans
+        %   ordre, « plus grand » ne veut rien dire, et MATLAB le refuse
+        %   comme ici.
+            [r, i] = categorical.extremum(c, 'max', varargin);
+        end
+        function [r, i] = min(c, varargin)
+        %MIN Plus petite catégorie, pour une catégorielle ordonnée.
+            [r, i] = categorical.extremum(c, 'min', varargin);
         end
         function [r, i, j] = unique(c)
             [u, i, j] = unique(c.Codes);
@@ -449,6 +472,35 @@ classdef categorical
             end
             c.Codes = codes;
             c.Noms = c.Noms(logical(garde));
+        end
+
+        function [r, i] = extremum(c, sens, options)
+        %EXTREMUM Plus grande ou plus petite catégorie.
+        %   Les indéfinis sont écartés : ils ne se comparent à rien.
+            if ~c.Ordinal
+                error('MATLAB:categorical:NotOrdinal', ...
+                      ['Undefined function ''' sens ''' for input arguments ' ...
+                       'of type ''categorical''. Seules les categorielles ' ...
+                       'ordonnees admettent MIN et MAX.']);
+            end
+            if ~isempty(options)
+                error('MATLAB:categorical:TooManyInputs', ...
+                      'MIN et MAX sur une catégorielle ne prennent pas d''option.');
+            end
+            codes = c.Codes(:);
+            valides = find(codes > 0);
+            if isempty(valides)
+                r = categorical.avec(0, c.Noms, c.Ordinal);
+                i = [];
+                return
+            end
+            if strcmp(sens, 'max')
+                [~, position] = max(codes(valides));
+            else
+                [~, position] = min(codes(valides));
+            end
+            i = valides(position);
+            r = categorical.avec(codes(i), c.Noms, c.Ordinal);
         end
 
         function r = comparer(a, b, op)

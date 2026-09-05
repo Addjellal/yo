@@ -87,9 +87,26 @@ bool Interpreteur::valeurIntermediaire(const Valeur& base,
                     if (args.empty()) return false;
                     nom = args[0].versTexte();
                 }
-                if (courant.classe == Classe::Objet)
-                    courant = lireProprieteObjet(courant, nom);
-                else if (courant.estStructure())
+                if (courant.classe == Classe::Objet) {
+                    // Une classe qui définit subsref décide elle-même de
+                    // ce que « .nom » désigne : timetable rend ses
+                    // instants sous « .Time » sans porter de propriété de
+                    // ce nom. Sans passer par là, « S.Time(end) » ne
+                    // trouvait pas la bonne longueur et « end » retombait
+                    // sur la taille de l'objet entier.
+                    auto def = classeDefinie(courant.nomObjet);
+                    if (def && def->aMethode("subsref") && !dansMethodeDe(courant.nomObjet)) {
+                        std::vector<ElementAcces> pas(1);
+                        pas[0].genre = '.';
+                        pas[0].nom = nom;
+                        Valeur s = substruct(pas, 0, &courant);
+                        auto r = appelerMethode(courant, "subsref", {s}, 1);
+                        if (r.empty()) return false;
+                        courant = r[0];
+                    } else {
+                        courant = lireProprieteObjet(courant, nom);
+                    }
+                } else if (courant.estStructure())
                     courant = courant.champ(nom);
                 else
                     return false;

@@ -1078,4 +1078,53 @@ Kgen = Kgen.' * Kgen;
 assert(max(max(abs(Kgen * vecteursGen - Sgen * vecteursGen * valeursGen))) < 1e-10);
 assert(max(abs(sort(eig(Kgen, Sgen)) - sort(eig(inv(Sgen) * Kgen)))) < 1e-9);
 
+
+% FITCDISCR : analyse discriminante. Sa propriete definitoire est la
+% frontiere — affine quand les classes partagent leur covariance,
+% quadratique sinon.
+rng(5);
+nuage = [randn(60, 2); randn(60, 2) + 4];
+etiquettesNuage = [ones(60, 1); 2 * ones(60, 1)];
+modeleLineaire = fitcdiscr(nuage, etiquettesNuage);
+[predites, aposteriori] = predict(modeleLineaire, nuage);
+assert(mean(predites == etiquettesNuage) > 0.95);
+assert(isequal(size(aposteriori), [120 2]));
+assert(max(abs(sum(aposteriori, 2) - 1)) < 1e-12);
+% Deux classes de meme covariance : la frontiere passe par le milieu des
+% deux moyennes, et elle est perpendiculaire a la droite qui les joint
+% seulement si la covariance est isotrope — c'est le cas ici.
+milieu = mean(modeleLineaire.Mu, 1);
+[~, scoreMilieu] = predict(modeleLineaire, milieu);
+assert(abs(scoreMilieu(1) - 0.5) < 0.05, 'le milieu doit etre indecis');
+% La variante quadratique donne un modele par classe.
+modeleQuadratique = fitcdiscr(nuage, etiquettesNuage, 'DiscrimType', 'quadratic');
+assert(mean(predict(modeleQuadratique, nuage) == etiquettesNuage) > 0.95);
+assert(~isequal(modeleQuadratique.Sigma{1}, modeleQuadratique.Sigma{2}));
+assert(isequal(modeleLineaire.Sigma{1}, modeleLineaire.Sigma{2}));
+% Sur des classes de formes tres differentes, la quadratique fait mieux :
+% c'est la seule des deux qui peut plier sa frontiere.
+rng(6);
+etroite = [randn(200, 1) * 0.3, randn(200, 1) * 3];
+large = randn(200, 2) * 1.2;
+melange = [etroite; large];
+appartenance = [ones(200, 1); 2 * ones(200, 1)];
+justesseLineaire = mean(predict(fitcdiscr(melange, appartenance), melange) == appartenance);
+justesseQuadratique = mean(predict(fitcdiscr(melange, appartenance, ...
+    'DiscrimType', 'quadratic'), melange) == appartenance);
+fprintf('discriminant : lineaire %.3f, quadratique %.3f\n', ...
+        justesseLineaire, justesseQuadratique);
+assert(justesseQuadratique > justesseLineaire);
+% Les a priori imposes deplacent la frontiere. Il faut des classes qui se
+% recouvrent pour le voir : deux nuages bien separes ne changent pas
+% d'avis, quel que soit l'a priori.
+rng(9);
+proches = [randn(150, 2); randn(150, 2) + 1];
+voisinage = [ones(150, 1); 2 * ones(150, 1)];
+sansBiais = predict(fitcdiscr(proches, voisinage), proches);
+avecBiais = predict(fitcdiscr(proches, voisinage, 'Prior', [0.95 0.05]), proches);
+fprintf('discriminant : classe 1 predite %d fois, %d avec a priori\n', ...
+        sum(sansBiais == 1), sum(avecBiais == 1));
+assert(sum(avecBiais == 1) > sum(sansBiais == 1));
+disp('fitcdiscr : ok');
+
 disp('statistiques : toutes les verifications passent');

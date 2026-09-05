@@ -55,6 +55,7 @@
 %   histogram2    - Histogramme à deux dimensions
 %   ismissing     - Repère les valeurs manquantes
 %   rmmissing     - Retire les valeurs manquantes
+%   fillmissing   - Comble les valeurs manquantes
 %   standardizeMissing - Traduit un code d'absence en vrai manquant
 %   findgroups    - Numérote les groupes d'un classement
 %   splitapply    - Applique une fonction groupe par groupe

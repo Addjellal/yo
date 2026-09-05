@@ -10,7 +10,14 @@ function lg = addLayers(lg, couches)
 %      lg = addLayers(lg, {reluLayer('Name', 'relu1')});
 %
 %   Voir aussi LAYERGRAPH, CONNECTLAYERS, DLNETWORK.
-    if ~iscell(couches)
+    % Les couches arrivent sous trois formes : une couche seule, une
+    % cellule de couches, ou le tableau de structures que « [c1; c2] »
+    % produit — la notation naturelle en MATLAB. Le tableau doit être
+    % éclaté, sans quoi la suite prendrait ses champs pour une liste
+    % d'arguments.
+    if isstruct(couches) && numel(couches) > 1
+        couches = arrayfun(@(c) c, couches, 'UniformOutput', false);
+    elseif ~iscell(couches)
         couches = {couches};
     end
     for k = 1:numel(couches)

@@ -9,8 +9,10 @@ function [racines, gains] = rlocus(varargin)
 %   RLOCUS(SYS1,SYS2,...,K) superpose plusieurs modèles ; une chaîne de
 %   style peut suivre chacun d'eux, comme dans PLOT.
 %
-%   [R,K] = RLOCUS(SYS) ne trace rien et rend les racines — une ligne par
-%   gain — et les gains employés.
+%   [R,K] = RLOCUS(SYS) ne trace rien et rend les racines et les gains
+%   employés. R porte une ligne par pôle et une colonne par gain, comme
+%   dans MATLAB : R(i,j) est le i-ème pôle de la boucle fermée au gain
+%   K(j), si bien que PLOT(R.') dessine les branches.
 %
 %   Exemple :
 %      rlocus(tf(1, [1 2 0]))
@@ -29,7 +31,7 @@ function [racines, gains] = rlocus(varargin)
                   ['The command RLOCUS(SYS1,SYS2,...) with output ' ...
                    'arguments is not supported.']);
         end
-        racines = lieu(modeles{1}, gains);
+        racines = lieu(modeles{1}, gains).';
         return;
     end
     courbes = {};

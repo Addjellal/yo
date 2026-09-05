@@ -44,6 +44,6 @@ seconds timeofday timezones weeknum years yyyymmdd
 array2table categorical categories cell2table countcats discretize groupsummary
 head histogram2 innerjoin ismissing isordinal issortedrows join mergecats
 movmean movmedian movsum outerjoin pivot removecats renamecats renamevars
-rmmissing rowfun sortrows splitapply splitvars stack standardizeMissing
+fillmissing rmmissing rowfun sortrows splitapply splitvars stack standardizeMissing
 struct2table summary table table2array table2cell table2struct tail timetable
 unstack varfun
