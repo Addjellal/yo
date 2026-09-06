@@ -1,4 +1,4 @@
-function [b, a] = ellip(n, rp, rs, Wn, genre)
+function [b, a, k] = ellip(n, rp, rs, Wn, genre)
 %ELLIP Filtre elliptique, ou filtre de Cauer.
 %   [B,A] = ELLIP(N,RP,RS,WN) conçoit un passe-bas d'ordre N dont
 %   l'ondulation en bande passante vaut RP décibels et l'atténuation en
@@ -21,5 +21,12 @@ function [b, a] = ellip(n, rp, rs, Wn, genre)
     else
         reference = 1;
     end
-    [b, a] = prototypeVersNumerique(p, z, 1, Wn, genre, reference);
+    [b, a, zNum, pNum, kNum] = prototypeVersNumerique(p, z, 1, Wn, genre, reference);
+    % Trois sorties : MATLAB rend alors la forme zéros-pôles-gain, dont la
+    % conception numérique est plus stable que celle des coefficients.
+    if nargout > 2
+        b = zNum;
+        a = pNum;
+        k = kNum;
+    end
 end

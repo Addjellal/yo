@@ -1,4 +1,4 @@
-function [b, a] = cheby1(n, rp, Wn, genre)
+function [b, a, k] = cheby1(n, rp, Wn, genre)
 %CHEBY1 Filtre de Chebyshev de type I.
 %   [B,A] = CHEBY1(N,RP,WN) conçoit un passe-bas d'ordre N dont
 %   l'ondulation en bande passante vaut RP décibels ; WN est la fréquence
@@ -31,5 +31,12 @@ function [b, a] = cheby1(n, rp, Wn, genre)
     else
         reference = 1;
     end
-    [b, a] = prototypeVersNumerique(poles, [], gain, Wn, genre, reference);
+    [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, [], gain, Wn, genre, reference);
+    % Trois sorties : MATLAB rend alors la forme zéros-pôles-gain, dont la
+    % conception numérique est plus stable que celle des coefficients.
+    if nargout > 2
+        b = zNum;
+        a = pNum;
+        k = kNum;
+    end
 end

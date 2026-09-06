@@ -1,4 +1,4 @@
-function [b, a] = cheby2(n, rs, Wn, genre)
+function [b, a, k] = cheby2(n, rs, Wn, genre)
 %CHEBY2 Filtre de Chebyshev de type II, ondulation en bande atténuée.
 %   [B,A] = CHEBY2(N,RS,WN) : RS est l'atténuation minimale en décibels
 %   dans la bande coupée.
@@ -18,5 +18,12 @@ function [b, a] = cheby2(n, rs, Wn, genre)
         zeros_ = 1i ./ cos(theta(garde));
     end
     gain = real(prod(-poles) / prod(-zeros_));
-    [b, a] = prototypeVersNumerique(poles, zeros_, gain, Wn, genre);
+    [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, zeros_, gain, Wn, genre);
+    % Trois sorties : MATLAB rend alors la forme zéros-pôles-gain, dont la
+    % conception numérique est plus stable que celle des coefficients.
+    if nargout > 2
+        b = zNum;
+        a = pNum;
+        k = kNum;
+    end
 end

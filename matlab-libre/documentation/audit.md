@@ -8,11 +8,11 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 |---|---:|---:|---:|---:|
 | acquisition | 5 | 100 % | 100 % | 100 % |
 | aerospatial | 6 | 100 % | 100 % | 100 % |
-| ajustement-courbes | 23 | 91 % | 83 % | 87 % |
+| ajustement-courbes | 23 | 100 % | 91 % | 87 % |
 | analyse-de-texte | 8 | 100 % | 100 % | 100 % |
 | antennes | 5 | 100 % | 100 % | 100 % |
 | apprentissage-profond | 76 | 83 % | 67 % | 72 % |
-| audio | 7 | 43 % | 43 % | 100 % |
+| audio | 7 | 100 % | 100 % | 100 % |
 | automatique | 108 | 100 % | 100 % | 96 % |
 | base-de-donnees | 8 | 100 % | 100 % | 100 % |
 | bioinformatique | 8 | 100 % | 100 % | 100 % |
@@ -23,7 +23,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | communications-sans-fil | 6 | 100 % | 100 % | 100 % |
 | compilateur | 2 | 100 % | 100 % | 100 % |
 | conduite-automatisee | 4 | 100 % | 100 % | 100 % |
-| dsp | 6 | 83 % | 67 % | 100 % |
+| dsp | 6 | 100 % | 83 % | 100 % |
 | econometrie | 31 | 87 % | 84 % | 94 % |
 | edp | 5 | 100 % | 100 % | 100 % |
 | finance | 148 | 92 % | 88 % | 90 % |
@@ -35,7 +35,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | images | 138 | 78 % | 43 % | 86 % |
 | instruments | 4 | 100 % | 100 % | 75 % |
 | instruments-financiers | 55 | 91 % | 89 % | 91 % |
-| interface | 15 | 87 % | 73 % | 80 % |
+| interface | 15 | 100 % | 87 % | 80 % |
 | lidar | 4 | 100 % | 100 % | 100 % |
 | maintenance-predictive | 4 | 100 % | 100 % | 100 % |
 | matlab | 186 | 95 % | 79 % | 83 % |
@@ -43,208 +43,186 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | navigation | 5 | 100 % | 100 % | 100 % |
 | ondelettes | 129 | 96 % | 78 % | 86 % |
 | optimisation | 20 | 95 % | 95 % | 85 % |
-| optimisation-globale | 15 | 73 % | 67 % | 87 % |
+| optimisation-globale | 15 | 93 % | 87 % | 87 % |
 | radar | 7 | 100 % | 100 % | 100 % |
 | renforcement | 5 | 100 % | 100 % | 100 % |
 | reseaux-antennes | 4 | 100 % | 100 % | 100 % |
 | rf | 7 | 100 % | 100 % | 100 % |
-| robotique | 62 | 79 % | 74 % | 74 % |
+| robotique | 62 | 100 % | 95 % | 74 % |
 | robuste | 73 | 100 % | 100 % | 96 % |
 | signal | 201 | 94 % | 54 % | 88 % |
 | simscape | 9 | 100 % | 78 % | 89 % |
 | simulink | 6 | 100 % | 83 % | 83 % |
 | stateflow | 4 | 100 % | 75 % | 100 % |
 | statistiques | 272 | 88 % | 65 % | 72 % |
-| symbolique | 27 | 67 % | 52 % | 74 % |
-| types | 40 | 72 % | 30 % | 88 % |
+| symbolique | 27 | 100 % | 85 % | 74 % |
+| types | 40 | 100 % | 55 % | 88 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 98 % | 78 % | 95 % |
-| **ensemble** | **2079** | **91 %** | **75 %** | **86 %** |
+| **ensemble** | **2079** | **93 %** | **77 %** | **86 %** |
 
 ## Ce qui reste à faire
 
-191 fonctions n'ont qu'une ligne d'aide. Une ligne dit ce que fait la fonction, non comment elle se comporte aux bords ni ce qu'elle refuse.
+146 fonctions n'ont qu'une ligne d'aide. Une ligne dit ce que fait la fonction, non comment elle se comporte aux bords ni ce qu'elle refuse.
 
-`ajustement-courbes/fitSurface`, `ajustement-courbes/goodnessOfFit`, `apprentissage-profond/adamupdate`, `apprentissage-profond/averagePooling2dLayer`
-`apprentissage-profond/classify`, `apprentissage-profond/crossentropy`, `apprentissage-profond/featureInputLayer`, `apprentissage-profond/mse`
-`apprentissage-profond/relu`, `apprentissage-profond/reluLayer`, `apprentissage-profond/rmspropupdate`, `apprentissage-profond/sigmoid`
-`apprentissage-profond/sigmoidLayer`, `apprentissage-profond/softmaxLayer`, `apprentissage-profond/tanhLayer`, `audio/audioread`
-`audio/audiowrite`, `audio/dbfs`, `audio/spectralCentroid`, `communications/base2dec`
-`communications/biterr`, `communications/dec2base`, `communications/dpskdemod`, `communications/fskdemod`
-`communications/semianalytic`, `communications/symerr`, `communications/verifierPermutation`, `dsp/upfirdn`
-`econometrie/arsim`, `econometrie/hurst`, `econometrie/lagmatrix`, `econometrie/ols`
-`finance/blsdelta`, `finance/effrr`, `finance/fv`, `finance/irr`
-`finance/maxdrawdown`, `finance/movavg`, `finance/nomrr`, `finance/npv`
-`finance/portstats`, `finance/pv`, `finance/ret2tick`, `finance/sharpe`
-`flou/addmf`, `flou/gaussmf`, `flou/gbellmf`, `flou/poserVariables`
-`flou/sigmf`, `flou/variablesDe`, `gestion-risques/drawdownSeries`, `gestion-risques/expectedShortfall`
-`identification/impulseest`, `identification/predictArx`, `images/bwarea`, `images/gray2rgb`
-`images/histeq`, `images/idct2`, `images/im2double`, `images/im2uint8`
-`images/imabsdiff`, `images/imadd`, `images/imbinarize`, `images/imclose`
-`images/imcrop`, `images/imdilate`, `images/imdivide`, `images/imerode`
-`images/imextendedmax`, `images/imextendedmin`, `images/imgaussfilt`, `images/imhist`
-`images/imhmin`, `images/immse`, `images/immultiply`, `images/imopen`
-`images/imread`, `images/imsubtract`, `images/ind2rgb`, `images/lab2rgb`
-`images/mean2`, `images/medfilt2`, `images/ntsc2rgb`, `images/std2`
-`images/ycbcr2rgb`, `instruments-financiers/bondconvexity`, `instruments-financiers/bonddur`, `instruments-financiers/bondyield`
-`instruments-financiers/discountfactor`, `instruments-financiers/forwardrate`, `interface/closeApp`, `interface/uiresume`
-`matlab/autumn`, `matlab/cool`, `matlab/copper`, `matlab/filloutliers`
-`matlab/ismembertol`, `matlab/pink`, `matlab/prism`, `matlab/spring`
-`matlab/summer`, `matlab/winter`, `ondelettes/waverec`, `ondelettes/wconv1`
-`ondelettes/wconv2`, `ondelettes/wenergy`, `ondelettes/wrev`, `optimisation-globale/ga`
-`optimisation-globale/multistart`, `optimisation-globale/particleswarm`, `optimisation-globale/simulannealbnd`, `optimisation/lsqcurvefit`
-`robotique/jacobian2R`, `robotique/quat2rotm`, `robotique/quatconj`, `robotique/quatmultiply`
-`robotique/quatnormalize`, `robotique/rotm2quat`, `robotique/rotm2tform`, `robotique/rotx`
-`robotique/roty`, `robotique/rotz`, `robotique/tform2rotm`, `robotique/tform2trvec`
-`robotique/trvec2tform`, `signal/barthannwin`, `signal/bohmanwin`, `signal/idct`
-`signal/medfreq`, `signal/parzenwin`, `signal/pcov`, `signal/pmcov`
-`signal/rms`, `signal/sos2ss`, `signal/sos2tf`, `signal/ss2sos`
-`signal/zp2ss`, `statistiques/chi2cdf`, `statistiques/evinv`, `statistiques/evrnd`
-`statistiques/expstat`, `statistiques/fpdf`, `statistiques/gamcdf`, `statistiques/geoinv`
-`statistiques/geornd`, `statistiques/hygeinv`, `statistiques/iqr`, `statistiques/kurtosis`
-`statistiques/logncdf`, `statistiques/lognrnd`, `statistiques/mad`, `statistiques/nbininv`
-`statistiques/nlinfit`, `statistiques/poisstat`, `statistiques/predictknn`, `statistiques/predicttree`
-`statistiques/raylcdf`, `statistiques/raylrnd`, `statistiques/silhouette`, `statistiques/skewness`
-`statistiques/ttest2`, `statistiques/unidcdf`, `statistiques/unidinv`, `statistiques/unidrnd`
-`statistiques/unifcdf`, `statistiques/unifinv`, `statistiques/unifpdf`, `statistiques/wblcdf`
-`statistiques/wblrnd`, `statistiques/zscore`, `symbolique/symadd`, `symbolique/symdiv`
-`symbolique/symmul`, `symbolique/symnum`, `symbolique/sympow`, `symbolique/symsimplify`
-`symbolique/symstr`, `symbolique/symsub`, `symbolique/symsubs`, `types/assignerReste`
-`types/caldays`, `types/calweeks`, `types/iscalendarduration`, `types/iscategorical`
-`types/isdatetime`, `types/isduration`, `types/isnat`, `types/istable`
-`types/istimetable`, `types/time`, `vision/assignDetectionsToTracks`
-
-529 fonctions ne portent pas d'exemple dans leur aide.
-
-`ajustement-courbes/fitCurve`, `ajustement-courbes/fitSurface`, `ajustement-courbes/goodnessOfFit`, `ajustement-courbes/smoothSpline`
-`apprentissage-profond/adamupdate`, `apprentissage-profond/averagePooling2dLayer`, `apprentissage-profond/batchNormalizationLayer`, `apprentissage-profond/classificationLayer`
-`apprentissage-profond/classify`, `apprentissage-profond/couchesConvolution`, `apprentissage-profond/crossentropy`, `apprentissage-profond/dropoutLayer`
-`apprentissage-profond/eluLayer`, `apprentissage-profond/featureInputLayer`, `apprentissage-profond/flattenLayer`, `apprentissage-profond/fullyConnectedLayer`
-`apprentissage-profond/leakyReluLayer`, `apprentissage-profond/maxPooling2dLayer`, `apprentissage-profond/mse`, `apprentissage-profond/predictReseau`
-`apprentissage-profond/regressionLayer`, `apprentissage-profond/relu`, `apprentissage-profond/reluLayer`, `apprentissage-profond/rmspropupdate`
-`apprentissage-profond/sigmoid`, `apprentissage-profond/sigmoidLayer`, `apprentissage-profond/softmaxLayer`, `apprentissage-profond/tanhLayer`
-`apprentissage-profond/trainingOptions`, `audio/audioread`, `audio/audiowrite`, `audio/dbfs`
-`audio/spectralCentroid`, `coder/codegenBuild`, `communications/alignerPolynomes`, `communications/alignerTermes`
-`communications/awgn`, `communications/base2dec`, `communications/berawgn`, `communications/biterr`
-`communications/completerLongueur`, `communications/dec2base`, `communications/dpskdemod`, `communications/exigerPremier`
-`communications/eyediagram`, `communications/fskdemod`, `communications/instants`, `communications/permutationAleatoire`
-`communications/permutationMatricielle`, `communications/rcosdesign`, `communications/semianalytic`, `communications/symerr`
-`communications/tableGray`, `communications/tailleEntrelacement`, `communications/verifierFrequences`, `communications/verifierPermutation`
-`dsp/levinson`, `dsp/upfirdn`, `econometrie/arfit`, `econometrie/arsim`
-`econometrie/hurst`, `econometrie/lagmatrix`, `econometrie/ols`, `finance/blsdelta`
-`finance/blsprice`, `finance/bndconvp`, `finance/days360isda`, `finance/days360psa`
-`finance/effrr`, `finance/fv`, `finance/irr`, `finance/maxdrawdown`
-`finance/movavg`, `finance/nomrr`, `finance/npv`, `finance/portalloc`
-`finance/portstats`, `finance/pv`, `finance/ret2tick`, `finance/sharpe`
-`finance/tick2ret`, `flou/addmf`, `flou/addrule`, `flou/addvar`
-`flou/ajouterVariable`, `flou/defuzz`, `flou/dsigmf`, `flou/estEntree`
-`flou/gauss2mf`, `flou/gaussmf`, `flou/gbellmf`, `flou/poserOptions`
-`flou/poserVariables`, `flou/psigmf`, `flou/rangDansGenre`, `flou/sigmf`
-`flou/trouverVariable`, `flou/variablesDe`, `gestion-risques/creditTransition`, `gestion-risques/drawdownSeries`
-`gestion-risques/expectedShortfall`, `gestion-risques/valueAtRisk`, `identification/compareFit`, `identification/impulseest`
-`identification/predictArx`, `images/adapterBlanc`, `images/appliquerMatriceCouleur`, `images/bwarea`
-`images/bwareafilt`, `images/bwconncomp`, `images/bwconvhull`, `images/bweuler`
-`images/bwhitmiss`, `images/bwlabel`, `images/bwlabeln`, `images/bwpropfilt`
-`images/bwselect`, `images/bwtraceboundary`, `images/col2im`, `images/dct2`
-`images/entropyfilt`, `images/fspecial`, `images/gray2rgb`, `images/graycoprops`
-`images/graythresh`, `images/histeq`, `images/hsv2rgb`, `images/idct2`
-`images/im2double`, `images/im2gray`, `images/im2uint8`, `images/imabsdiff`
-`images/imadd`, `images/imadjust`, `images/imapprox`, `images/imbinarize`
-`images/imbothat`, `images/imboxfilt`, `images/imclose`, `images/imcomplement`
-`images/imcrop`, `images/imdilate`, `images/imdivide`, `images/imerode`
-`images/imextendedmax`, `images/imextendedmin`, `images/imgaussfilt`, `images/imgradient`
+`apprentissage-profond/adamupdate`, `apprentissage-profond/averagePooling2dLayer`, `apprentissage-profond/classify`, `apprentissage-profond/crossentropy`
+`apprentissage-profond/featureInputLayer`, `apprentissage-profond/mse`, `apprentissage-profond/relu`, `apprentissage-profond/reluLayer`
+`apprentissage-profond/rmspropupdate`, `apprentissage-profond/sigmoid`, `apprentissage-profond/sigmoidLayer`, `apprentissage-profond/softmaxLayer`
+`apprentissage-profond/tanhLayer`, `communications/base2dec`, `communications/biterr`, `communications/dec2base`
+`communications/dpskdemod`, `communications/fskdemod`, `communications/semianalytic`, `communications/symerr`
+`communications/verifierPermutation`, `econometrie/arsim`, `econometrie/hurst`, `econometrie/lagmatrix`
+`econometrie/ols`, `finance/blsdelta`, `finance/effrr`, `finance/fv`
+`finance/irr`, `finance/maxdrawdown`, `finance/movavg`, `finance/nomrr`
+`finance/npv`, `finance/portstats`, `finance/pv`, `finance/ret2tick`
+`finance/sharpe`, `flou/addmf`, `flou/gaussmf`, `flou/gbellmf`
+`flou/poserVariables`, `flou/sigmf`, `flou/variablesDe`, `gestion-risques/drawdownSeries`
+`gestion-risques/expectedShortfall`, `identification/impulseest`, `identification/predictArx`, `images/bwarea`
+`images/gray2rgb`, `images/histeq`, `images/idct2`, `images/im2double`
+`images/im2uint8`, `images/imabsdiff`, `images/imadd`, `images/imbinarize`
+`images/imclose`, `images/imcrop`, `images/imdilate`, `images/imdivide`
+`images/imerode`, `images/imextendedmax`, `images/imextendedmin`, `images/imgaussfilt`
 `images/imhist`, `images/imhmin`, `images/immse`, `images/immultiply`
-`images/imnoise`, `images/imopen`, `images/impyramid`, `images/imquantize`
-`images/imread`, `images/imregionalmin`, `images/imresize`, `images/imsharpen`
-`images/imshow`, `images/imsubtract`, `images/imtophat`, `images/imtranslate`
-`images/imwrite`, `images/ind2gray`, `images/ind2rgb`, `images/lab2rgb`
-`images/lab2xyz`, `images/label2rgb`, `images/matriceRVBversXYZ`, `images/mean2`
-`images/medfilt2`, `images/morphologie`, `images/ntsc2rgb`, `images/rgb2gray`
-`images/rgb2ycbcr`, `images/std2`, `images/stdfilt`, `images/stretchlim`
-`images/voisinageConnexite`, `images/xyz2rgb`, `images/ycbcr2rgb`, `instruments-financiers/bondconvexity`
-`instruments-financiers/bonddur`, `instruments-financiers/bondprice`, `instruments-financiers/bondyield`, `instruments-financiers/discountfactor`
-`instruments-financiers/forwardrate`, `interface/closeApp`, `interface/identifiantParent`, `interface/uiresume`
-`interface/uiwait`, `matlab/MemoizedFunction`, `matlab/autumn`, `matlab/bone`
-`matlab/bounds`, `matlab/cool`, `matlab/copper`, `matlab/filloutliers`
-`matlab/flag`, `matlab/ginput`, `matlab/hot`, `matlab/hsv`
-`matlab/humps`, `matlab/iskeyword`, `matlab/ismembertol`, `matlab/matlab.addons.toolbox.packageToolbox`
-`matlab/matlab.addons.toolbox.uninstallToolbox`, `matlab/matlabroot`, `matlab/namelengthmax`, `matlab/numlock`
-`matlab/openfig`, `matlab/pagectranspose`, `matlab/pagetranspose`, `matlab/peaks`
-`matlab/perms`, `matlab/pink`, `matlab/pow2`, `matlab/prism`
-`matlab/rampeCarte`, `matlab/rat`, `matlab/rescale`, `matlab/spring`
-`matlab/summer`, `matlab/uicontrol`, `matlab/uniquetol`, `matlab/unzip`
-`matlab/validatestring`, `matlab/vecnorm`, `matlab/winter`, `matlab/zip`
-`ondelettes/appcoef`, `ondelettes/appcoef2`, `ondelettes/coifletFiltre`, `ondelettes/convolutionCirculaire`
-`ondelettes/daubechiesFiltre`, `ondelettes/detcoef2`, `ondelettes/dilaterFiltres`, `ondelettes/filtresSplines`
-`ondelettes/imodwt`, `ondelettes/indiceDeNoeud`, `ondelettes/lireNoeud`, `ondelettes/normaliserSomme`
-`ondelettes/ondeletteAnalytique`, `ondelettes/ordreDeNom`, `ondelettes/ordresBior`, `ondelettes/poserNoeud`
-`ondelettes/qshiftFiltre`, `ondelettes/refuserHorsSpline`, `ondelettes/scinderNoeud`, `ondelettes/upwlev`
-`ondelettes/wavedec`, `ondelettes/waverec`, `ondelettes/waverec2`, `ondelettes/wconv1`
-`ondelettes/wconv2`, `ondelettes/wenergy`, `ondelettes/wrcoef2`, `ondelettes/wrev`
-`ondelettes/wthresh`, `optimisation-globale/champOptimisation`, `optimisation-globale/ga`, `optimisation-globale/multistart`
-`optimisation-globale/particleswarm`, `optimisation-globale/simulannealbnd`, `optimisation/lsqcurvefit`, `robotique/dhTransform`
-`robotique/fkine2R`, `robotique/ikine2R`, `robotique/jacobian2R`, `robotique/quat2rotm`
-`robotique/quatconj`, `robotique/quatmultiply`, `robotique/quatnormalize`, `robotique/rotm2quat`
-`robotique/rotm2tform`, `robotique/rotx`, `robotique/roty`, `robotique/rotz`
-`robotique/tform2rotm`, `robotique/tform2trvec`, `robotique/trvec2tform`, `signal/ac2rc`
-`signal/alignsignals`, `signal/appliquerBande`, `signal/arSpectre`, `signal/arcov`
-`signal/armcov`, `signal/barthannwin`, `signal/blackmanharris`, `signal/bohmanwin`
-`signal/cheb1ord`, `signal/cheb2ord`, `signal/cheby2`, `signal/chirp`
-`signal/concevoirBande`, `signal/cpsd`, `signal/dct`, `signal/demod`
-`signal/dftmtx`, `signal/envelope`, `signal/falltime`, `signal/findpeaks`
-`signal/firtype`, `signal/flattopwin`, `signal/gausswin`, `signal/grpdelay`
-`signal/hilbert`, `signal/icceps`, `signal/idct`, `signal/idst`
-`signal/interp`, `signal/islinphase`, `signal/ismaxphase`, `signal/isminphase`
-`signal/isstable`, `signal/lireOptionsBande`, `signal/lireOptionsSousEspace`, `signal/lsf2poly`
-`signal/meanfreq`, `signal/medfilt1`, `signal/medfreq`, `signal/mscohere`
-`signal/nuttallwin`, `signal/papillonHadamard`, `signal/parzenwin`, `signal/pburg`
-`signal/pcov`, `signal/peig`, `signal/periodogram`, `signal/permutationWalsh`
-`signal/phasedelay`, `signal/phasez`, `signal/pmcov`, `signal/poly2ac`
-`signal/polystab`, `signal/prototypeElliptique`, `signal/prototypeVersNumerique`, `signal/puissancesSousEspace`
-`signal/pulseperiod`, `signal/pulsesep`, `signal/pulsewidth`, `signal/rangerWalsh`
-`signal/rangerWalshInverse`, `signal/rc2ac`, `signal/rc2poly`, `signal/resample`
-`signal/rms`, `signal/rooteig`, `signal/sawtooth`, `signal/settlingtime`
-`signal/sgolayfilt`, `signal/signalLobe`, `signal/signalMatriceCorrelation`, `signal/signalNiveaux`
-`signal/signalSommet`, `signal/signalSpectrePuissance`, `signal/signalTransitions`, `signal/signalTraverses`
-`signal/snr`, `signal/sos2ss`, `signal/sos2tf`, `signal/sos2zp`
-`signal/sosfilt`, `signal/square`, `signal/ss2sos`, `signal/ss2zp`
-`signal/stepz`, `signal/tf2sos`, `signal/tfestimate`, `signal/undershoot`
-`signal/zp2sos`, `signal/zp2ss`, `signal/zp2tf`, `signal/zplane`
-`simscape/solveDC`, `simscape/solveTransient`, `simulink/sim`, `stateflow/sfrun`
-`statistiques/betacdf`, `statistiques/betafit`, `statistiques/betalike`, `statistiques/betarnd`
-`statistiques/binofit`, `statistiques/binornd`, `statistiques/chi2cdf`, `statistiques/chi2rnd`
-`statistiques/clusterMelange`, `statistiques/cvpartition`, `statistiques/descenteLineaire`, `statistiques/evinv`
-`statistiques/evrnd`, `statistiques/exprnd`, `statistiques/expstat`, `statistiques/fcdf`
-`statistiques/fitlm`, `statistiques/fpdf`, `statistiques/frnd`, `statistiques/gamcdf`
-`statistiques/gamfit`, `statistiques/gamrnd`, `statistiques/geoinv`, `statistiques/geornd`
-`statistiques/hygecdf`, `statistiques/hygeinv`, `statistiques/hygernd`, `statistiques/indicesSymboles`
-`statistiques/iqr`, `statistiques/kmeans`, `statistiques/knnsearch`, `statistiques/kstest`
-`statistiques/kurtosis`, `statistiques/lireNomsHmm`, `statistiques/lireOptionsLineaire`, `statistiques/lireOptionsSvm`
-`statistiques/logncdf`, `statistiques/lognfit`, `statistiques/lognpdf`, `statistiques/lognrnd`
-`statistiques/mad`, `statistiques/nbincdf`, `statistiques/nbininv`, `statistiques/nbinrnd`
-`statistiques/nlinfit`, `statistiques/normaliserLignes`, `statistiques/normlike`, `statistiques/noyauGp`
-`statistiques/noyauSvm`, `statistiques/pca`, `statistiques/poissinv`, `statistiques/poissrnd`
-`statistiques/poisstat`, `statistiques/predictArbreRegression`, `statistiques/predictBayesNaif`, `statistiques/predictDiscriminant`
-`statistiques/predictEcoc`, `statistiques/predictGp`, `statistiques/predictLineaire`, `statistiques/predictSvm`
-`statistiques/predictknn`, `statistiques/predicttree`, `statistiques/raylcdf`, `statistiques/raylfit`
-`statistiques/raylpdf`, `statistiques/raylrnd`, `statistiques/regress`, `statistiques/resoudreSmo`
-`statistiques/signrank`, `statistiques/silhouette`, `statistiques/skewness`, `statistiques/standardiserSvm`
-`statistiques/statAjuster`, `statistiques/statEtendre`, `statistiques/statForme`, `statistiques/statPrefixeLoi`
-`statistiques/statQuantileDiscret`, `statistiques/tabulate`, `statistiques/tcdf`, `statistiques/tirerMelange`
-`statistiques/trnd`, `statistiques/tstat`, `statistiques/ttest`, `statistiques/ttest2`
+`images/imopen`, `images/imread`, `images/imsubtract`, `images/ind2rgb`
+`images/lab2rgb`, `images/mean2`, `images/medfilt2`, `images/ntsc2rgb`
+`images/std2`, `images/ycbcr2rgb`, `instruments-financiers/bondconvexity`, `instruments-financiers/bonddur`
+`instruments-financiers/bondyield`, `instruments-financiers/discountfactor`, `instruments-financiers/forwardrate`, `matlab/autumn`
+`matlab/cool`, `matlab/copper`, `matlab/filloutliers`, `matlab/ismembertol`
+`matlab/pink`, `matlab/prism`, `matlab/spring`, `matlab/summer`
+`matlab/winter`, `ondelettes/waverec`, `ondelettes/wconv1`, `ondelettes/wconv2`
+`ondelettes/wenergy`, `ondelettes/wrev`, `optimisation-globale/ga`, `optimisation/lsqcurvefit`
+`signal/barthannwin`, `signal/bohmanwin`, `signal/idct`, `signal/medfreq`
+`signal/parzenwin`, `signal/pcov`, `signal/pmcov`, `signal/rms`
+`signal/sos2ss`, `signal/sos2tf`, `signal/ss2sos`, `signal/zp2ss`
+`statistiques/chi2cdf`, `statistiques/evinv`, `statistiques/evrnd`, `statistiques/expstat`
+`statistiques/fpdf`, `statistiques/gamcdf`, `statistiques/geoinv`, `statistiques/geornd`
+`statistiques/hygeinv`, `statistiques/iqr`, `statistiques/kurtosis`, `statistiques/logncdf`
+`statistiques/lognrnd`, `statistiques/mad`, `statistiques/nbininv`, `statistiques/nlinfit`
+`statistiques/poisstat`, `statistiques/predictknn`, `statistiques/predicttree`, `statistiques/raylcdf`
+`statistiques/raylrnd`, `statistiques/silhouette`, `statistiques/skewness`, `statistiques/ttest2`
 `statistiques/unidcdf`, `statistiques/unidinv`, `statistiques/unidrnd`, `statistiques/unifcdf`
-`statistiques/unifinv`, `statistiques/unifit`, `statistiques/unifpdf`, `statistiques/wblcdf`
-`statistiques/wblfit`, `statistiques/wblrnd`, `statistiques/zscore`, `symbolique/symadd`
-`symbolique/symdiff`, `symbolique/symdiv`, `symbolique/symeval`, `symbolique/symfun`
-`symbolique/symint`, `symbolique/symmul`, `symbolique/symnum`, `symbolique/sympow`
-`symbolique/symsimplify`, `symbolique/symstr`, `symbolique/symsub`, `symbolique/symsubs`
-`types/NaT`, `types/appliquerReste`, `types/array2table`, `types/assignerReste`
-`types/caldays`, `types/calmonths`, `types/calquarters`, `types/calweeks`
+`statistiques/unifinv`, `statistiques/unifpdf`, `statistiques/wblcdf`, `statistiques/wblrnd`
+`statistiques/zscore`, `vision/assignDetectionsToTracks`
+
+485 fonctions ne portent pas d'exemple dans leur aide.
+
+`ajustement-courbes/fitCurve`, `ajustement-courbes/smoothSpline`, `apprentissage-profond/adamupdate`, `apprentissage-profond/averagePooling2dLayer`
+`apprentissage-profond/batchNormalizationLayer`, `apprentissage-profond/classificationLayer`, `apprentissage-profond/classify`, `apprentissage-profond/couchesConvolution`
+`apprentissage-profond/crossentropy`, `apprentissage-profond/dropoutLayer`, `apprentissage-profond/eluLayer`, `apprentissage-profond/featureInputLayer`
+`apprentissage-profond/flattenLayer`, `apprentissage-profond/fullyConnectedLayer`, `apprentissage-profond/leakyReluLayer`, `apprentissage-profond/maxPooling2dLayer`
+`apprentissage-profond/mse`, `apprentissage-profond/predictReseau`, `apprentissage-profond/regressionLayer`, `apprentissage-profond/relu`
+`apprentissage-profond/reluLayer`, `apprentissage-profond/rmspropupdate`, `apprentissage-profond/sigmoid`, `apprentissage-profond/sigmoidLayer`
+`apprentissage-profond/softmaxLayer`, `apprentissage-profond/tanhLayer`, `apprentissage-profond/trainingOptions`, `coder/codegenBuild`
+`communications/alignerPolynomes`, `communications/alignerTermes`, `communications/awgn`, `communications/base2dec`
+`communications/berawgn`, `communications/biterr`, `communications/completerLongueur`, `communications/dec2base`
+`communications/dpskdemod`, `communications/exigerPremier`, `communications/eyediagram`, `communications/fskdemod`
+`communications/instants`, `communications/permutationAleatoire`, `communications/permutationMatricielle`, `communications/rcosdesign`
+`communications/semianalytic`, `communications/symerr`, `communications/tableGray`, `communications/tailleEntrelacement`
+`communications/verifierFrequences`, `communications/verifierPermutation`, `dsp/levinson`, `econometrie/arfit`
+`econometrie/arsim`, `econometrie/hurst`, `econometrie/lagmatrix`, `econometrie/ols`
+`finance/blsdelta`, `finance/blsprice`, `finance/bndconvp`, `finance/days360isda`
+`finance/days360psa`, `finance/effrr`, `finance/fv`, `finance/irr`
+`finance/maxdrawdown`, `finance/movavg`, `finance/nomrr`, `finance/npv`
+`finance/portalloc`, `finance/portstats`, `finance/pv`, `finance/ret2tick`
+`finance/sharpe`, `finance/tick2ret`, `flou/addmf`, `flou/addrule`
+`flou/addvar`, `flou/ajouterVariable`, `flou/defuzz`, `flou/dsigmf`
+`flou/estEntree`, `flou/gauss2mf`, `flou/gaussmf`, `flou/gbellmf`
+`flou/poserOptions`, `flou/poserVariables`, `flou/psigmf`, `flou/rangDansGenre`
+`flou/sigmf`, `flou/trouverVariable`, `flou/variablesDe`, `gestion-risques/creditTransition`
+`gestion-risques/drawdownSeries`, `gestion-risques/expectedShortfall`, `gestion-risques/valueAtRisk`, `identification/compareFit`
+`identification/impulseest`, `identification/predictArx`, `images/adapterBlanc`, `images/appliquerMatriceCouleur`
+`images/bwarea`, `images/bwareafilt`, `images/bwconncomp`, `images/bwconvhull`
+`images/bweuler`, `images/bwhitmiss`, `images/bwlabel`, `images/bwlabeln`
+`images/bwpropfilt`, `images/bwselect`, `images/bwtraceboundary`, `images/col2im`
+`images/dct2`, `images/entropyfilt`, `images/fspecial`, `images/gray2rgb`
+`images/graycoprops`, `images/graythresh`, `images/histeq`, `images/hsv2rgb`
+`images/idct2`, `images/im2double`, `images/im2gray`, `images/im2uint8`
+`images/imabsdiff`, `images/imadd`, `images/imadjust`, `images/imapprox`
+`images/imbinarize`, `images/imbothat`, `images/imboxfilt`, `images/imclose`
+`images/imcomplement`, `images/imcrop`, `images/imdilate`, `images/imdivide`
+`images/imerode`, `images/imextendedmax`, `images/imextendedmin`, `images/imgaussfilt`
+`images/imgradient`, `images/imhist`, `images/imhmin`, `images/immse`
+`images/immultiply`, `images/imnoise`, `images/imopen`, `images/impyramid`
+`images/imquantize`, `images/imread`, `images/imregionalmin`, `images/imresize`
+`images/imsharpen`, `images/imshow`, `images/imsubtract`, `images/imtophat`
+`images/imtranslate`, `images/imwrite`, `images/ind2gray`, `images/ind2rgb`
+`images/lab2rgb`, `images/lab2xyz`, `images/label2rgb`, `images/matriceRVBversXYZ`
+`images/mean2`, `images/medfilt2`, `images/morphologie`, `images/ntsc2rgb`
+`images/rgb2gray`, `images/rgb2ycbcr`, `images/std2`, `images/stdfilt`
+`images/stretchlim`, `images/voisinageConnexite`, `images/xyz2rgb`, `images/ycbcr2rgb`
+`instruments-financiers/bondconvexity`, `instruments-financiers/bonddur`, `instruments-financiers/bondprice`, `instruments-financiers/bondyield`
+`instruments-financiers/discountfactor`, `instruments-financiers/forwardrate`, `interface/identifiantParent`, `interface/uiwait`
+`matlab/MemoizedFunction`, `matlab/autumn`, `matlab/bone`, `matlab/bounds`
+`matlab/cool`, `matlab/copper`, `matlab/filloutliers`, `matlab/flag`
+`matlab/ginput`, `matlab/hot`, `matlab/hsv`, `matlab/humps`
+`matlab/iskeyword`, `matlab/ismembertol`, `matlab/matlab.addons.toolbox.packageToolbox`, `matlab/matlab.addons.toolbox.uninstallToolbox`
+`matlab/matlabroot`, `matlab/namelengthmax`, `matlab/numlock`, `matlab/openfig`
+`matlab/pagectranspose`, `matlab/pagetranspose`, `matlab/peaks`, `matlab/perms`
+`matlab/pink`, `matlab/pow2`, `matlab/prism`, `matlab/rampeCarte`
+`matlab/rat`, `matlab/rescale`, `matlab/spring`, `matlab/summer`
+`matlab/uicontrol`, `matlab/uniquetol`, `matlab/unzip`, `matlab/validatestring`
+`matlab/vecnorm`, `matlab/winter`, `matlab/zip`, `ondelettes/appcoef`
+`ondelettes/appcoef2`, `ondelettes/coifletFiltre`, `ondelettes/convolutionCirculaire`, `ondelettes/daubechiesFiltre`
+`ondelettes/detcoef2`, `ondelettes/dilaterFiltres`, `ondelettes/filtresSplines`, `ondelettes/imodwt`
+`ondelettes/indiceDeNoeud`, `ondelettes/lireNoeud`, `ondelettes/normaliserSomme`, `ondelettes/ondeletteAnalytique`
+`ondelettes/ordreDeNom`, `ondelettes/ordresBior`, `ondelettes/poserNoeud`, `ondelettes/qshiftFiltre`
+`ondelettes/refuserHorsSpline`, `ondelettes/scinderNoeud`, `ondelettes/upwlev`, `ondelettes/wavedec`
+`ondelettes/waverec`, `ondelettes/waverec2`, `ondelettes/wconv1`, `ondelettes/wconv2`
+`ondelettes/wenergy`, `ondelettes/wrcoef2`, `ondelettes/wrev`, `ondelettes/wthresh`
+`optimisation-globale/champOptimisation`, `optimisation-globale/ga`, `optimisation/lsqcurvefit`, `robotique/dhTransform`
+`robotique/fkine2R`, `robotique/ikine2R`, `signal/ac2rc`, `signal/alignsignals`
+`signal/appliquerBande`, `signal/arSpectre`, `signal/arcov`, `signal/armcov`
+`signal/barthannwin`, `signal/blackmanharris`, `signal/bohmanwin`, `signal/cheb1ord`
+`signal/cheb2ord`, `signal/cheby2`, `signal/chirp`, `signal/concevoirBande`
+`signal/cpsd`, `signal/dct`, `signal/demod`, `signal/dftmtx`
+`signal/envelope`, `signal/falltime`, `signal/findpeaks`, `signal/firtype`
+`signal/flattopwin`, `signal/gausswin`, `signal/grpdelay`, `signal/hilbert`
+`signal/icceps`, `signal/idct`, `signal/idst`, `signal/interp`
+`signal/islinphase`, `signal/ismaxphase`, `signal/isminphase`, `signal/isstable`
+`signal/lireOptionsBande`, `signal/lireOptionsSousEspace`, `signal/lsf2poly`, `signal/meanfreq`
+`signal/medfilt1`, `signal/medfreq`, `signal/mscohere`, `signal/nuttallwin`
+`signal/papillonHadamard`, `signal/parzenwin`, `signal/pburg`, `signal/pcov`
+`signal/peig`, `signal/periodogram`, `signal/permutationWalsh`, `signal/phasedelay`
+`signal/phasez`, `signal/pmcov`, `signal/poly2ac`, `signal/polystab`
+`signal/prototypeElliptique`, `signal/prototypeVersNumerique`, `signal/puissancesSousEspace`, `signal/pulseperiod`
+`signal/pulsesep`, `signal/pulsewidth`, `signal/rangerWalsh`, `signal/rangerWalshInverse`
+`signal/rc2ac`, `signal/rc2poly`, `signal/resample`, `signal/rms`
+`signal/rooteig`, `signal/sawtooth`, `signal/settlingtime`, `signal/sgolayfilt`
+`signal/signalLobe`, `signal/signalMatriceCorrelation`, `signal/signalNiveaux`, `signal/signalSommet`
+`signal/signalSpectrePuissance`, `signal/signalTransitions`, `signal/signalTraverses`, `signal/snr`
+`signal/sos2ss`, `signal/sos2tf`, `signal/sos2zp`, `signal/sosfilt`
+`signal/square`, `signal/ss2sos`, `signal/ss2zp`, `signal/stepz`
+`signal/tf2sos`, `signal/tfestimate`, `signal/undershoot`, `signal/zp2sos`
+`signal/zp2ss`, `signal/zp2tf`, `signal/zplane`, `simscape/solveDC`
+`simscape/solveTransient`, `simulink/sim`, `stateflow/sfrun`, `statistiques/betacdf`
+`statistiques/betafit`, `statistiques/betalike`, `statistiques/betarnd`, `statistiques/binofit`
+`statistiques/binornd`, `statistiques/chi2cdf`, `statistiques/chi2rnd`, `statistiques/clusterMelange`
+`statistiques/cvpartition`, `statistiques/descenteLineaire`, `statistiques/evinv`, `statistiques/evrnd`
+`statistiques/exprnd`, `statistiques/expstat`, `statistiques/fcdf`, `statistiques/fitlm`
+`statistiques/fpdf`, `statistiques/frnd`, `statistiques/gamcdf`, `statistiques/gamfit`
+`statistiques/gamrnd`, `statistiques/geoinv`, `statistiques/geornd`, `statistiques/hygecdf`
+`statistiques/hygeinv`, `statistiques/hygernd`, `statistiques/indicesSymboles`, `statistiques/iqr`
+`statistiques/kmeans`, `statistiques/knnsearch`, `statistiques/kstest`, `statistiques/kurtosis`
+`statistiques/lireNomsHmm`, `statistiques/lireOptionsLineaire`, `statistiques/lireOptionsSvm`, `statistiques/logncdf`
+`statistiques/lognfit`, `statistiques/lognpdf`, `statistiques/lognrnd`, `statistiques/mad`
+`statistiques/nbincdf`, `statistiques/nbininv`, `statistiques/nbinrnd`, `statistiques/nlinfit`
+`statistiques/normaliserLignes`, `statistiques/normlike`, `statistiques/noyauGp`, `statistiques/noyauSvm`
+`statistiques/pca`, `statistiques/poissinv`, `statistiques/poissrnd`, `statistiques/poisstat`
+`statistiques/predictArbreRegression`, `statistiques/predictBayesNaif`, `statistiques/predictDiscriminant`, `statistiques/predictEcoc`
+`statistiques/predictGp`, `statistiques/predictLineaire`, `statistiques/predictSvm`, `statistiques/predictknn`
+`statistiques/predicttree`, `statistiques/raylcdf`, `statistiques/raylfit`, `statistiques/raylpdf`
+`statistiques/raylrnd`, `statistiques/regress`, `statistiques/resoudreSmo`, `statistiques/signrank`
+`statistiques/silhouette`, `statistiques/skewness`, `statistiques/standardiserSvm`, `statistiques/statAjuster`
+`statistiques/statEtendre`, `statistiques/statForme`, `statistiques/statPrefixeLoi`, `statistiques/statQuantileDiscret`
+`statistiques/tabulate`, `statistiques/tcdf`, `statistiques/tirerMelange`, `statistiques/trnd`
+`statistiques/tstat`, `statistiques/ttest`, `statistiques/ttest2`, `statistiques/unidcdf`
+`statistiques/unidinv`, `statistiques/unidrnd`, `statistiques/unifcdf`, `statistiques/unifinv`
+`statistiques/unifit`, `statistiques/unifpdf`, `statistiques/wblcdf`, `statistiques/wblfit`
+`statistiques/wblrnd`, `statistiques/zscore`, `symbolique/symdiff`, `symbolique/symeval`
+`symbolique/symfun`, `symbolique/symint`, `types/NaT`, `types/appliquerReste`
+`types/array2table`, `types/assignerReste`, `types/calmonths`, `types/calquarters`
 `types/calyears`, `types/cell2table`, `types/days`, `types/hours`
-`types/iscalendarduration`, `types/iscategorical`, `types/isdatetime`, `types/isduration`
-`types/isnat`, `types/istable`, `types/istimetable`, `types/milliseconds`
-`types/minutes`, `types/readtable`, `types/seconds`, `types/struct2table`
-`types/table2timetable`, `types/time`, `types/writetable`, `types/years`
+`types/milliseconds`, `types/minutes`, `types/readtable`, `types/seconds`
+`types/struct2table`, `types/table2timetable`, `types/writetable`, `types/years`
 `vision/assignDetectionsToTracks`, `vision/bboxOverlapRatio`, `vision/bboxOverlapRatioMatrix`, `vision/detectFASTFeatures`
 `vision/detectHarrisFeatures`, `vision/estimateGeometricTransform`, `vision/extractFeatures`, `vision/houghLines`
 `vision/insertMarker`, `vision/insertShape`, `vision/matchFeatures`, `vision/opticalFlowLK`

@@ -1,4 +1,4 @@
-function [b, a] = prototypeVersNumerique(poles, zeros_, gain, Wn, genre, gainReference)
+function [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, zeros_, gain, Wn, genre, gainReference)
 %PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
 %   Applique la transformation de bande — passe-bas, passe-haut,
 %   passe-bande ou coupe-bande — puis la transformation bilinéaire, avec
@@ -81,6 +81,12 @@ function [b, a] = prototypeVersNumerique(poles, zeros_, gain, Wn, genre, gainRef
         b = b * gainReference * abs(denominateur / numerateur);
     end
     gain = gain;   %#ok<ASGSL,NASGU>
+    % La forme zéros-pôles-gain, que MATLAB rend quand on demande trois
+    % sorties. Le numérateur vaut k fois un polynôme unitaire : k est donc
+    % son coefficient de tête, une fois le gain normalisé.
+    zNum = zerosNumeriques;
+    pNum = polesNumeriques;
+    kNum = b(1);
 end
 
 function [p, z] = transformerPasseBande(poles, zeros_, largeur, centre2)

@@ -1191,21 +1191,126 @@ Valeur exponentielleMatrice(const Valeur& a) {
     return F;
 }
 
-Valeur racineMatrice(const Valeur& a) { return puissanceMatrice(a, Valeur::scalaire(0.5)); }
+static Valeur identiteCarree(int n) {
+    Valeur I = Valeur::matrice(n, n);
+    for (int i = 0; i < n; ++i) I.re[(std::size_t)i + (std::size_t)i * n] = 1.0;
+    return I;
+}
+
+static double ecartMaximal(const Valeur& a) {
+    double e = 0;
+    for (std::size_t i = 0; i < a.re.size(); ++i) {
+        double re = a.re[i];
+        double im = a.im.empty() ? 0.0 : a.im[i];
+        e = std::max(e, std::hypot(re, im));
+    }
+    return e;
+}
+
+// Racine carrée principale par l'itération de Denman et Beavers.
+//
+// La décomposition en éléments propres ne convient pas : une matrice
+// défective — dont une valeur propre est multiple sans autant de vecteurs
+// propres — n'a pas de base de vecteurs propres, et le produit V D V^-1
+// rend alors n'importe quoi. L'itération, elle, n'emploie que des
+// inversions, et converge quadratiquement pour toute matrice sans valeur
+// propre sur le demi-axe réel négatif.
+static Valeur racinePrincipale(const Valeur& a, bool& ok) {
+    int n = a.nlignes();
+    Valeur Y = a;
+    Valeur Z = identiteCarree(n);
+    ok = false;
+    for (int k = 0; k < 60; ++k) {
+        Valeur Ys = operationBinaire("+", Y, inverseMatrice(Z));
+        Valeur Zs = operationBinaire("+", Z, inverseMatrice(Y));
+        Y = operationBinaire(".*", Ys, Valeur::scalaire(0.5));
+        Z = operationBinaire(".*", Zs, Valeur::scalaire(0.5));
+        // Le critère d'arrêt : Y Z doit tendre vers l'identité.
+        Valeur ecart = operationBinaire("-", produitMatrice(Y, Z), identiteCarree(n));
+        if (ecartMaximal(ecart) < 1e-14) { ok = true; break; }
+    }
+    return Y;
+}
+
+Valeur racineMatrice(const Valeur& a) {
+    if (!a.estCarree()) erreur("MATLAB:square", "Matrix must be square.");
+    bool ok = false;
+    Valeur r = racinePrincipale(a, ok);
+    if (ok) {
+        r.compacter();
+        return r;
+    }
+    // L'itération n'a pas convergé — valeur propre sur le demi-axe réel
+    // négatif, ou matrice singulière : on retombe sur la voie spectrale,
+    // qui traite ces cas au prix de la précision sur les défectives.
+    return puissanceMatrice(a, Valeur::scalaire(0.5));
+}
 
 Valeur logarithmeMatrice(const Valeur& a) {
-    Valeur V, D;
-    valeursPropres(a, D, &V);
-    int m = D.nlignes();
-    Valeur Dl = D;
-    Dl.assurerImaginaire();
-    for (int i = 0; i < m; ++i) {
-        std::size_t k = (std::size_t)i + (std::size_t)i * m;
-        cplx z = std::log(cplx(D.re[k], D.im.empty() ? 0 : D.im[k]));
-        Dl.re[k] = z.real();
-        Dl.im[k] = z.imag();
+    if (!a.estCarree()) erreur("MATLAB:square", "Matrix must be square.");
+    int n = a.nlignes();
+    // Mise à l'échelle inverse : on prend des racines carrées jusqu'à
+    // approcher l'identité, où la série du logarithme converge vite, puis
+    // on remultiplie par deux puissance le nombre de racines prises.
+    //
+    // Là encore, passer par les éléments propres serait faux sur une
+    // matrice défective : le logarithme d'un bloc de Jordan n'est pas
+    // diagonal, et la voie spectrale le rendait pourtant tel.
+    Valeur X = a;
+    int racines = 0;
+    bool utilisable = true;
+    for (; racines < 40; ++racines) {
+        double ecart = 0;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j) {
+                std::size_t k = (std::size_t)i + (std::size_t)j * n;
+                double re = X.re[k] - (i == j ? 1.0 : 0.0);
+                double im = X.im.empty() ? 0.0 : X.im[k];
+                ecart += re * re + im * im;
+            }
+        if (std::sqrt(ecart) < 0.25) break;
+        bool ok = false;
+        Valeur suivant = racinePrincipale(X, ok);
+        if (!ok) { utilisable = false; break; }
+        X = suivant;
     }
-    Valeur r = produitMatrice(produitMatrice(V, Dl), inverseMatrice(V));
+    if (!utilisable || racines >= 40) {
+        // Voie spectrale de secours, pour ce que l'itération ne sait pas
+        // traiter : une valeur propre réelle négative, par exemple.
+        Valeur V, D;
+        valeursPropres(a, D, &V);
+        int m = D.nlignes();
+        Valeur Dl = D;
+        Dl.assurerImaginaire();
+        for (int i = 0; i < m; ++i) {
+            std::size_t k = (std::size_t)i + (std::size_t)i * m;
+            cplx z = std::log(cplx(D.re[k], D.im.empty() ? 0 : D.im[k]));
+            Dl.re[k] = z.real();
+            Dl.im[k] = z.imag();
+        }
+        Valeur r = produitMatrice(produitMatrice(V, Dl), inverseMatrice(V));
+        r.compacter();
+        return r;
+    }
+    // log(X) = 2 atanh((X-I)(X+I)^-1), développé en série impaire : elle
+    // converge d'autant plus vite que X est proche de l'identité, ce que
+    // les racines carrées ont assuré.
+    Valeur I = identiteCarree(n);
+    Valeur T = produitMatrice(operationBinaire("-", X, I),
+                              inverseMatrice(operationBinaire("+", X, I)));
+    Valeur T2 = produitMatrice(T, T);
+    Valeur somme = T;
+    Valeur terme = T;
+    for (int k = 1; k < 60; ++k) {
+        terme = produitMatrice(terme, T2);
+        double poids = 1.0 / (2.0 * k + 1.0);
+        Valeur ajout = operationBinaire(".*", terme, Valeur::scalaire(poids));
+        double norme = ecartMaximal(ajout);
+        somme = operationBinaire("+", somme, ajout);
+        if (norme < 1e-18) break;
+    }
+    Valeur r = operationBinaire(".*", somme,
+                                Valeur::scalaire(2.0 * std::pow(2.0, (double)racines)));
     r.compacter();
     return r;
 }
