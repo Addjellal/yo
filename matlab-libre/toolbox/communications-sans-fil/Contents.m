@@ -1,7 +1,13 @@
-% Wireless (5G / LTE / WLAN) — couche physique.
+% WLAN / LTE Toolbox — communications sans fil.
 %
-%   ofdmMod, ofdmDemod - Modulation OFDM
-%   pathLoss           - Affaiblissement de parcours
-%   rayleighChannel    - Canal de Rayleigh
-%   evm                - Amplitude du vecteur d'erreur
-%   throughputShannon  - Débit théorique de Shannon
+% Propagation
+%   pathLoss          - Affaiblissement de parcours, exposant réglable
+%   rayleighChannel   - Canal à évanouissements, plat ou sélectif
+%
+% Modulation multiporteuse
+%   ofdmMod           - Modulation OFDM, avec préfixe cyclique
+%   ofdmDemod         - Démodulation
+%
+% Mesures
+%   evm               - Amplitude du vecteur d'erreur
+%   throughputShannon - Capacité du canal : la borne que rien ne franchit

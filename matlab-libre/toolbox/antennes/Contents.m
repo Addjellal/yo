@@ -1,7 +1,14 @@
-% Antenna Toolbox — rayonnement et réseaux.
+% Antenna Toolbox — diagrammes, directivité, bilans.
 %
-%   dipolePattern - Diagramme d'un dipôle
-%   arrayFactor   - Facteur de réseau linéaire
-%   friis         - Bilan de liaison
-%   directivity   - Directivité à partir d'un diagramme
-%   beamwidth     - Ouverture à -3 dB
+% Éléments
+%   dipolePattern - Diagramme d'un dipôle, de longueur quelconque
+%
+% Réseaux
+%   arrayFactor   - Facteur d'un réseau linéaire uniforme, avec balayage
+%
+% Mesures sur un diagramme
+%   beamwidth     - Ouverture à mi-puissance
+%   directivity   - Directivité, rapportée à l'isotrope
+%
+% Bilan de liaison
+%   friis         - Puissance reçue en espace libre
