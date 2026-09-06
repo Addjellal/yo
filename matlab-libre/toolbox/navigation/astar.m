@@ -1,6 +1,24 @@
 function [chemin, cout] = astar(grille, depart, arrivee)
 %ASTAR Plus court chemin sur une grille d'occupation (0 libre, 1 occupé).
-%   [CHEMIN,COUT] = ASTAR(GRILLE,[i j],[i j]) rend la suite des cases.
+%   [CHEMIN,COUT] = ASTAR(GRILLE,[i j],[i j]) rend la suite des cases
+%   parcourues, une par ligne, et le coût total. Sans chemin, il rend une
+%   liste vide et un coût infini — ce qui est un résultat, non une erreur.
+%
+%   A* est Dijkstra guidé par une estimation de ce qui reste à parcourir.
+%   L'heuristique employée ici est la distance de Manhattan, qui ne
+%   surestime jamais le coût restant sur une grille à quatre voisins :
+%   c'est ce qui garantit que le chemin trouvé est le plus court, et non
+%   seulement un chemin court.
+%
+%   Sans obstacle, le coût est exactement la distance de Manhattan entre
+%   les deux cases : c'est la vérification à faire.
+%
+%   Exemple :
+%      grille = zeros(12); grille(4:9, 6) = 1;
+%      [chemin, cout] = astar(grille, [1 1], [12 12]);
+%      size(chemin, 1)                 % le nombre de cases
+%
+%   Voir aussi PUREPURSUIT, BINARYOCCUPANCYMAP.
     [h, l] = size(grille);
     ouverts = depart;
     g = inf(h, l);

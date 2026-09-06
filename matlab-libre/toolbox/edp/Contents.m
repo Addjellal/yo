@@ -1,7 +1,11 @@
 % Partial Differential Equation Toolbox — équations aux dérivées partielles.
 %
-%   poisson2D  - Équation de Poisson sur un rectangle (différences finies)
-%   heat1D     - Équation de la chaleur en 1-D (Crank-Nicolson)
-%   wave1D     - Équation des ondes en 1-D (différences centrées)
-%   laplace2D  - Équation de Laplace avec conditions de Dirichlet
-%   fem1D      - Éléments finis P1 en 1-D
+% Problèmes stationnaires
+%   laplace2D  - Laplacien nul, bords à valeurs constantes
+%   poisson2D  - Laplacien avec terme source, bords nuls
+%   fem1D      - Éléments finis P1 en une dimension
+%
+% Problèmes d'évolution
+%   heat1D     - Chaleur, par Crank-Nicolson : diffusion, inconditionnel
+%   wave1D     - Ondes, par différences centrées : transport, condition
+%                de Courant à respecter
