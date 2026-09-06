@@ -552,6 +552,20 @@ CDF Fonction de répartition d'une loi nommée.
 
 ```
 CHI2CDF Répartition du khi-deux : gamma incomplète régularisée.
+  P = CHI2CDF(X,V) rend la probabilité qu'une variable du khi-deux à V
+  degrés de liberté soit inférieure à X.
+
+  Le khi-deux est la somme des carrés de V normales centrées réduites :
+  c'est de là que viennent tous ses emplois — test d'ajustement, test
+  d'indépendance, intervalle sur une variance.
+
+  Sa moyenne vaut V et sa variance 2V : il s'étale donc beaucoup quand
+  les degrés de liberté croissent, et tend vers une normale.
+
+  Exemple :
+     chi2cdf(3.84, 1)                % 0.95 : le seuil du test a 5 %
+
+  Voir aussi CHI2PDF, CHI2INV, GAMCDF, NCX2CDF.
 ```
 
 ## `chi2gof`
@@ -1039,6 +1053,23 @@ EVCDF Répartition de la loi des valeurs extrêmes.
 
 ```
 EVINV Quantile de la loi des valeurs extrêmes.
+  X = EVINV(P,MU,SIGMA) rend le quantile de la loi de Gumbel de type I
+  pour les minima.
+
+  Elle décrit la limite du minimum d'un grand nombre de tirages, comme
+  la normale décrit celle de leur somme : c'est le théorème des valeurs
+  extrêmes, et c'est ce qui la rend incontournable en fiabilité et en
+  hydrologie — on y dimensionne sur des crues centennales, non sur des
+  moyennes.
+
+  Attention à la convention : MATLAB nomme « extreme value » la loi des
+  minima. Pour les maxima, il faut changer le signe.
+
+  Exemple :
+     evinv(0.5, 0, 1)                % la mediane
+     evcdf(evinv(0.7, 0, 1), 0, 1)   % 0.7
+
+  Voir aussi EVCDF, EVPDF, EVRND, GEVINV.
 ```
 
 ## `evpdf`
@@ -1055,6 +1086,16 @@ EVPDF Densité de la loi des valeurs extrêmes.
 
 ```
 EVRND Tirages d'une loi des valeurs extrêmes.
+  R = EVRND(MU,SIGMA,M,N) rend une matrice M sur N de tirages.
+
+  Le tirage se fait par inversion : appliquer la fonction quantile à un
+  tirage uniforme. C'est exact, et cela ne demande aucun rejet.
+
+  Exemple :
+     r = evrnd(0, 1, 10000, 1);
+     abs(median(r) - evinv(0.5, 0, 1)) < 0.05    % true
+
+  Voir aussi EVINV, EVCDF, GEVRND.
 ```
 
 ## `evstat`
@@ -1109,6 +1150,17 @@ EXPRND Tirages d'une loi exponentielle de moyenne MU.
 
 ```
 EXPSTAT Moyenne et variance de la loi exponentielle.
+  [M,V] = EXPSTAT(MU) rend MU et MU au carré.
+
+  L'égalité de la moyenne et de l'écart type est la signature de
+  l'exponentielle : un coefficient de variation de un. Sur des données
+  réelles, il dit immédiatement si le modèle sans mémoire tient.
+
+  Exemple :
+     [m, v] = expstat(3);            % 3 et 9
+     sqrt(v) / m                     % 1 : le coefficient de variation
+
+  Voir aussi EXPCDF, EXPPDF, POISSTAT.
 ```
 
 ## `fcdf`
@@ -1586,6 +1638,21 @@ FITRTREE Arbre de régression.
 
 ```
 FPDF Densité de la loi de Fisher.
+  Y = FPDF(X,V1,V2) rend la densité de la loi de Fisher à V1 et V2
+  degrés de liberté.
+
+  La loi de Fisher est le rapport de deux khi-deux réduits : c'est ce qui
+  en fait la loi de toutes les comparaisons de variances, donc de
+  l'analyse de la variance et des tests de significativité globale d'une
+  régression.
+
+  Elle est définie sur les x positifs, très asymétrique, et son inverse
+  suit une loi de Fisher aux degrés de liberté échangés.
+
+  Exemple :
+     fpdf(1, 10, 10)                 % le mode est proche de un
+
+  Voir aussi FCDF, FINV, NCFCDF, CHI2PDF.
 ```
 
 ## `friedman`
@@ -1640,6 +1707,21 @@ FSTAT Moyenne et variance de la loi de Fisher-Snedecor.
 
 ```
 GAMCDF Répartition de la loi gamma : la gamma incomplète régularisée.
+  P = GAMCDF(X,A,B) rend la probabilité qu'une variable gamma de forme A
+  et d'échelle B soit inférieure à X.
+
+  La gamma est la somme de A exponentielles indépendantes quand A est
+  entier : c'est le temps d'attente de la A-ième panne d'un processus
+  sans mémoire. Elle englobe l'exponentielle (A = 1) et le khi-deux
+  (A = V/2, B = 2).
+
+  Le paramètre de forme décide de l'allure : au-dessous de un la densité
+  diverge en zéro, au-dessus elle a un mode.
+
+  Exemple :
+     gamcdf(1, 1, 1)                 % 1 - exp(-1) : l'exponentielle
+
+  Voir aussi GAMPDF, GAMINV, CHI2CDF, EXPCDF.
 ```
 
 ## `gamfit`
@@ -1702,6 +1784,18 @@ GEOCDF Répartition de la loi géométrique.
 
 ```
 GEOINV Quantile de la loi géométrique.
+  X = GEOINV(P,PROB) rend le nombre d'échecs avant le premier succès
+  au-dessous duquel on reste avec la probabilité P.
+
+  La loi géométrique est sans mémoire : après dix échecs, la loi du
+  nombre d'essais restants est la même qu'au départ. C'est la seule loi
+  discrète qui ait cette propriété, comme l'exponentielle est la seule
+  continue.
+
+  Exemple :
+     geoinv(0.5, 0.5)                % 0 : une chance sur deux au premier essai
+
+  Voir aussi GEOCDF, GEOPDF, GEORND.
 ```
 
 ## `geomean`
@@ -1741,6 +1835,18 @@ GEOPDF Probabilité de la loi géométrique.
 
 ```
 GEORND Tirages d'une loi géométrique.
+  R = GEORND(P,M,N) rend le nombre d'échecs avant le premier succès,
+  pour une probabilité de succès P.
+
+  Sa moyenne vaut (1-P)/P : à une chance sur dix, on attend neuf échecs
+  en moyenne. Sa variance est bien plus grande encore, ce qui rend
+  l'attente très irrégulière — c'est la loi sans mémoire.
+
+  Exemple :
+     r = geornd(0.5, 10000, 1);
+     abs(mean(r) - 1) < 0.1          % true : (1-0.5)/0.5 = 1
+
+  Voir aussi GEOCDF, GEOINV, NBINRND.
 ```
 
 ## `geostat`
@@ -2240,6 +2346,26 @@ HYGECDF Répartition de la loi hypergéométrique.
 
 ```
 HYGEINV Quantile de la loi hypergéométrique.
+  X = HYGEINV(P,M,K,N) rend le plus petit entier dont la fonction de
+  répartition hypergéométrique atteint P : on tire N objets sans remise
+  dans une population de M dont K possèdent le caractère cherché, et X
+  est le quantile du nombre d'objets marqués obtenus.
+
+  Sans remise : c'est tout ce qui la sépare de la binomiale. Chaque
+  tirage modifie la composition de l'urne, si bien que les tirages sont
+  négativement corrélés et la variance plus faible que celle de la
+  binomiale, dans le rapport (M-N)/(M-1) — le facteur de population
+  finie. Quand M devient grand devant N, ce facteur tend vers un et les
+  deux lois se confondent.
+
+  La loi étant discrète, la fonction de répartition est en escalier :
+  X est le plus petit entier tel que HYGECDF(X,M,K,N) >= P, cherché par
+  dichotomie entre 0 et min(K,N). Un P hors de [0,1] rend NaN.
+
+  Exemple :
+     hygeinv(0.5, 50, 10, 5)
+
+  Voir aussi HYGECDF, HYGEPDF, HYGERND, BINOINV.
 ```
 
 ## `hygepdf`
@@ -2291,6 +2417,22 @@ INDICESSYMBOLES Traduit une suite de symboles en indices de colonne.
 
 ```
 IQR Écart interquartile.
+  R = IQR(X) rend la différence entre le troisième et le premier
+  quartile : l'étendue de la moitié centrale des données.
+
+  C'est une mesure de dispersion robuste : déplacer un quart des données
+  à l'infini ne la change pas, là où l'écart type deviendrait infini.
+  C'est pourquoi elle sert à définir les valeurs aberrantes — au-delà
+  d'un quartile plus ou moins une fois et demie l'écart interquartile.
+
+  Pour une loi normale, elle vaut 1,349 fois l'écart type : c'est le
+  facteur qui permet de comparer les deux.
+
+  Exemple :
+     iqr([1 2 3 4 100])              % insensible a l'aberrant
+     abs(iqr(randn(100000,1)) - 1.349) < 0.02
+
+  Voir aussi MAD, STD, PRCTILE, ISOUTLIER.
 ```
 
 ## `iwishrnd`
@@ -2505,6 +2647,24 @@ KSTEST2 Kolmogorov-Smirnov à deux échantillons.
 
 ```
 KURTOSIS Coefficient d'aplatissement (3 pour une loi normale).
+  K = KURTOSIS(X) rend le moment centré d'ordre quatre divisé par le
+  carré de la variance.
+
+  Il vaut trois pour une loi normale : c'est la référence. Au-dessus, la
+  loi a des queues plus lourdes — les valeurs extrêmes y sont plus
+  fréquentes qu'une normale ne le prévoit, ce qui est le cas de presque
+  tous les rendements financiers. Au-dessous, elle est plus plate ;
+  l'uniforme vaut 1,8.
+
+  Sur un signal, il mesure l'impulsivité : un sinus vaut 1,5, un signal
+  à chocs bien davantage. C'est le descripteur de l'écaillage de
+  roulement.
+
+  Exemple :
+     abs(kurtosis(randn(100000,1)) - 3) < 0.1        % true
+     kurtosis(sin(linspace(0, 20*pi, 10000)))        % 1.5
+
+  Voir aussi SKEWNESS, STD, FAULTFEATURES.
 ```
 
 ## `lasso`
@@ -2647,6 +2807,22 @@ LIREOPTIONSSVM Options communes à FITCSVM et FITRSVM.
 
 ```
 LOGNCDF Répartition de la loi log-normale.
+  P = LOGNCDF(X,MU,SIGMA) rend la probabilité qu'une variable dont le
+  logarithme est normal de moyenne MU et d'écart type SIGMA soit
+  inférieure à X.
+
+  Elle décrit ce qui résulte d'un produit de facteurs indépendants,
+  comme la normale décrit ce qui résulte d'une somme : d'où son emploi
+  pour les revenus, les tailles de particules, les cours de bourse.
+
+  MU et SIGMA sont ceux du logarithme, non de la variable : la moyenne
+  de la variable vaut exp(MU + SIGMA^2/2), et sa médiane exp(MU). Les
+  confondre est l'erreur la plus commune.
+
+  Exemple :
+     logncdf(1, 0, 1)                % 0.5 : la mediane est exp(0) = 1
+
+  Voir aussi LOGNPDF, LOGNINV, LOGNRND, NORMCDF.
 ```
 
 ## `lognfit`
@@ -2677,6 +2853,18 @@ LOGNPDF Densité de la loi log-normale.
 
 ```
 LOGNRND Tirages d'une loi log-normale.
+  R = LOGNRND(MU,SIGMA,M,N) rend exp(MU + SIGMA * randn), donc des
+  valeurs strictement positives.
+
+  MU et SIGMA sont ceux du logarithme : la médiane du tirage vaut
+  exp(MU), non MU, et sa moyenne exp(MU + SIGMA^2/2).
+
+  Exemple :
+     r = lognrnd(0, 1, 10000, 1);
+     abs(median(r) - 1) < 0.05       % true : exp(0)
+     all(r > 0)                      % true : toujours positif
+
+  Voir aussi LOGNCDF, LOGNINV, NORMRND.
 ```
 
 ## `lognstat`
@@ -2710,6 +2898,23 @@ LSLINE Ajoute la droite des moindres carrés à un nuage de points.
 
 ```
 MAD Écart absolu moyen, ou médian si le second argument vaut 1.
+  R = MAD(X) rend la moyenne des écarts absolus à la moyenne.
+  R = MAD(X,1) rend la médiane des écarts absolus à la médiane.
+
+  La seconde forme est celle qui compte : c'est l'estimateur de
+  dispersion le plus robuste qui soit, son point de rupture étant de
+  cinquante pour cent — il faut corrompre la moitié des données pour le
+  fausser. La première forme, elle, se laisse tirer par un seul point
+  aberrant.
+
+  Pour une loi normale, la version médiane vaut 0,6745 fois l'écart
+  type : diviser par ce facteur donne un écart type robuste.
+
+  Exemple :
+     mad([1 2 3 4 100])              % la version moyenne : tiree
+     mad([1 2 3 4 100], 1)           % la version mediane : stable
+
+  Voir aussi IQR, STD, ISOUTLIER, ROBUSTFIT.
 ```
 
 ## `mahal`
@@ -3515,6 +3720,18 @@ NBINCDF Répartition de la loi binomiale négative.
 
 ```
 NBININV Quantile de la loi binomiale négative.
+  X = NBININV(P,R,PROB) rend le nombre d'échecs au-dessous duquel on
+  reste avec la probabilité P, avant le R-ième succès.
+
+  Elle généralise la géométrique — qui en est le cas R = 1 — et sert de
+  loi de comptage surdispersée : là où Poisson impose variance égale à
+  la moyenne, elle laisse la variance libre. C'est pourquoi on l'emploie
+  dès que les données sont plus dispersées que Poisson ne l'admet.
+
+  Exemple :
+     nbininv(0.5, 1, 0.5)            % le cas geometrique
+
+  Voir aussi NBINCDF, NBINPDF, GEOINV, POISSINV.
 ```
 
 ## `nbinpdf`
@@ -4164,6 +4381,18 @@ POISSRND Tirages d'une loi de Poisson.
 
 ```
 POISSTAT Moyenne et variance de la loi de Poisson : toutes deux LAMBDA.
+  [M,V] = POISSTAT(LAMBDA) rend LAMBDA et LAMBDA.
+
+  Cette égalité est la contrainte forte de la loi de Poisson, et sa
+  principale limite : des comptages réels sont presque toujours plus
+  dispersés que cela. Le rapport variance sur moyenne — l'indice de
+  dispersion — mesure l'écart, et au-delà de un il faut une binomiale
+  négative.
+
+  Exemple :
+     [m, v] = poisstat(4);           % 4 et 4
+
+  Voir aussi POISSCDF, POISSRND, NBININV, EXPSTAT.
 ```
 
 ## `polyconf`
@@ -4320,12 +4549,57 @@ PREDICTSVM Prédiction d'une machine à vecteurs de support.
 
 ```
 PREDICTKNN Prédiction d'un classifieur k plus proches voisins.
+  ETIQUETTES = PREDICTKNN(MODELE,XNOUVEAU) classe chaque ligne de
+  XNOUVEAU par vote majoritaire de ses K plus proches voisins dans les
+  données mémorisées par FITCKNN.
+
+  Il n'y a pas eu d'apprentissage : tout le coût est reporté sur la
+  prédiction, qui cherche les voisins dans l'ensemble d'entraînement à
+  chaque appel. C'est ce qui rend la méthode immédiate à mettre en
+  oeuvre et coûteuse à l'usage.
+
+  La distance est euclidienne, donc dominée par la variable de plus
+  grande amplitude : mesurer une longueur en millimètres plutôt qu'en
+  mètres change les voisins et donc la réponse. Normaliser les colonnes
+  avant d'appeler FITCKNN n'est pas un raffinement mais une nécessité.
+
+  Un K pair peut donner une égalité de voix, tranchée ici par MODE, qui
+  retient la plus petite étiquette : un K impair l'évite en deux classes.
+
+  Exemple :
+     X = [randn(30, 2); randn(30, 2) + 3];
+     y = [ones(30, 1); 2 * ones(30, 1)];
+     m = fitcknn(X, y, 'NumNeighbors', 3);
+     mean(predictknn(m, X) == y)
+
+  Voir aussi FITCKNN, KNNSEARCH, PREDICT, PREDICTTREE.
 ```
 
 ## `predicttree`
 
 ```
 PREDICTTREE Prédiction d'un arbre construit par FITCTREE.
+  Y = PREDICTTREE(ARBRE,X) descend chaque ligne de X dans l'arbre
+  construit par FITCTREE et rend l'étiquette de la feuille atteinte.
+
+  À chaque noeud, une seule variable est comparée à un seuil : la
+  descente ne fait que des coupes parallèles aux axes. C'est ce qui rend
+  l'arbre lisible — le chemin d'une observation s'énonce en français —
+  et ce qui le rend malhabile sur une frontière oblique, qu'il approche
+  par un escalier.
+
+  La prédiction est constante par morceaux : un arbre ne peut extrapoler
+  au-delà de ce qu'il a vu, et rend pour une observation lointaine
+  l'étiquette de la région la plus proche. C'est un défaut ou une
+  sécurité, selon ce qu'on attend.
+
+  Exemple :
+     X = [randn(30, 2); randn(30, 2) + 3];
+     y = [ones(30, 1); 2 * ones(30, 1)];
+     t = fitctree(X, y);
+     mean(predicttree(t, X) == y)
+
+  Voir aussi FITCTREE, PREDICT, PREDICTKNN.
 ```
 
 ## `princomp`
@@ -4459,6 +4733,18 @@ RANKSUM Test de Wilcoxon-Mann-Whitney sur deux échantillons.
 
 ```
 RAYLCDF Répartition de la loi de Rayleigh.
+  P = RAYLCDF(X,B) rend 1 - exp(-X^2/(2 B^2)).
+
+  C'est la loi du module d'un vecteur gaussien à deux dimensions
+  centré : d'où son omniprésence en radio, où l'amplitude d'un signal
+  somme de nombreux trajets la suit exactement.
+
+  Sa médiane vaut B racine de 2 ln 2, et sa moyenne B racine de pi/2.
+
+  Exemple :
+     raylcdf(1, 1)                   % 1 - exp(-0.5)
+
+  Voir aussi RAYLPDF, RAYLINV, RAYLRND, RAYLEIGHCHANNEL.
 ```
 
 ## `raylfit`
@@ -4486,6 +4772,17 @@ RAYLPDF Densité de la loi de Rayleigh de paramètre B.
 
 ```
 RAYLRND Tirages d'une loi de Rayleigh.
+  R = RAYLRND(B,M,N) rend le module d'un vecteur gaussien à deux
+  dimensions d'écart type B.
+
+  Sa moyenne vaut B racine de pi/2, sa médiane B racine de 2 ln 2 : deux
+  repères qui vérifient un tirage en deux lignes.
+
+  Exemple :
+     r = raylrnd(1, 20000, 1);
+     abs(mean(r) - sqrt(pi/2)) < 0.02        % true
+
+  Voir aussi RAYLCDF, RAYLINV, RANDN.
 ```
 
 ## `raylstat`
@@ -4862,12 +5159,50 @@ SIGNTEST Test du signe sur la médiane.
 
 ```
 SILHOUETTE Indice de silhouette de chaque observation.
+  S = SILHOUETTE(X,ETIQUETTES) rend, pour chaque observation, l'indice
+  (b-a)/max(a,b) où a est sa distance moyenne aux membres de sa propre
+  classe et b sa distance moyenne aux membres de la classe étrangère la
+  plus proche.
+
+  L'indice vit dans [-1,1]. Proche de un, l'observation est bien plus
+  près des siens que de tout autre groupe ; proche de zéro, elle est
+  à la frontière ; négatif, elle est plus près d'un autre groupe que du
+  sien — elle est mal classée. Une observation seule dans sa classe rend
+  zéro, faute de a définissable.
+
+  La moyenne des indices sert à choisir le nombre de groupes : on relance
+  la classification pour plusieurs valeurs de K et on retient celle qui
+  la maximise. C'est un critère purement géométrique, qui ne dit rien de
+  la pertinence des groupes trouvés ; il favorise les groupes compacts et
+  sphériques, ce qui le rend injuste envers un groupe allongé.
+
+  Exemple :
+     X = [randn(20, 2); randn(20, 2) + 5];
+     s = silhouette(X, [ones(20, 1); 2 * ones(20, 1)]);
+     mean(s)
+
+  Voir aussi KMEANS, PDIST, LINKAGE, EVALCLUSTERS.
 ```
 
 ## `skewness`
 
 ```
 SKEWNESS Coefficient d'asymétrie (moment d'ordre trois normalisé).
+  S = SKEWNESS(X) rend le moment centré d'ordre trois divisé par le cube
+  de l'écart type.
+
+  Il vaut zéro pour toute loi symétrique. Positif, la queue s'étire vers
+  la droite — c'est le cas des revenus et des durées ; négatif, vers la
+  gauche.
+
+  Une asymétrie non nulle interdit de résumer les données par leur
+  moyenne : la médiane dit alors bien mieux ce qui est typique.
+
+  Exemple :
+     abs(skewness(randn(100000,1))) < 0.05           % true
+     skewness(exprnd(1, 100000, 1))                  % proche de 2
+
+  Voir aussi KURTOSIS, MEDIAN, MEAN.
 ```
 
 ## `slicesample`
@@ -5243,18 +5578,58 @@ TTEST Test de Student sur la moyenne d'un échantillon.
 
 ```
 TTEST2 Test de Student sur deux échantillons indépendants.
+  [H,P] = TTEST2(X,Y) teste l'égalité des moyennes de deux échantillons
+  indépendants. H vaut un quand l'hypothèse d'égalité est rejetée au
+  seuil de cinq pour cent.
+
+  Le test suppose les deux échantillons normaux et de même variance. La
+  normalité importe peu au-delà de quelques dizaines d'observations —
+  le théorème central limite s'en charge —, mais l'égalité des variances
+  compte, et c'est le test de Welch qu'il faut quand elle n'est pas
+  tenue.
+
+  Ne pas rejeter n'est pas prouver l'égalité : c'est ne pas avoir assez
+  de données pour conclure. Un P grand se lit ainsi, et pas autrement.
+
+  Exemple :
+     [h, p] = ttest2(randn(50,1), randn(50,1) + 2);
+     h                               % 1 : les moyennes different
+     [h, p] = ttest2(randn(50,1), randn(50,1));
+     h                               % 0 le plus souvent
+
+  Voir aussi TTEST, ANOVA1, TCDF.
 ```
 
 ## `unidcdf`
 
 ```
 UNIDCDF Répartition de la loi uniforme discrète sur 1..N.
+  P = UNIDCDF(X,N) rend floor(X)/N, borné à un.
+
+  C'est la loi du dé : N issues équiprobables. Sa répartition est un
+  escalier, non une droite — la confondre avec la loi uniforme continue
+  décale tous les quantiles d'un demi.
+
+  Exemple :
+     unidcdf(3, 6)                   % 0.5 : la moitie des faces
+
+  Voir aussi UNIDINV, UNIDRND, UNIFCDF.
 ```
 
 ## `unidinv`
 
 ```
 UNIDINV Quantile de la loi uniforme discrète sur 1..N.
+  X = UNIDINV(P,N) rend le plus petit entier k tel que k/N >= P.
+
+  Le quantile d'une loi discrète est un entier : la fonction ne rend
+  jamais une valeur intermédiaire, et son inverse ne redonne donc pas
+  exactement P.
+
+  Exemple :
+     unidinv(0.5, 6)                 % 3
+
+  Voir aussi UNIDCDF, UNIDRND.
 ```
 
 ## `unidpdf`
@@ -5268,6 +5643,27 @@ UNIDPDF Probabilité de la loi uniforme discrète sur 1..N.
 
 ```
 UNIDRND Tirages d'une loi uniforme discrète sur 1..N.
+  R = UNIDRND(N) tire un entier au hasard, uniformément dans 1..N.
+  R = UNIDRND(N,M) rend une matrice M par M de tirages, et
+  R = UNIDRND(N,M,K) une matrice M par K ; N peut aussi être un tableau,
+  auquel cas chaque tirage suit sa propre borne.
+
+  Le tirage se fait par CEIL(N.*RAND) : RAND vivant dans [0,1[, le
+  produit couvre [0,N[ et le plafond donne 1..N avec des probabilités
+  égales. La borne inférieure est ramenée à un pour le cas, de
+  probabilité nulle mais non impossible, où RAND rend exactement zéro.
+
+  Un N non entier ou inférieur à un rend NaN : la loi n'est pas définie
+  sur un support vide ou fractionnaire.
+
+  C'est la loi du dé, et la brique du tirage avec remise : RANDSAMPLE
+  avec remise et RANDPERM en dérivent, le second en tirant sans remise.
+
+  Exemple :
+     rng(1);
+     r = unidrnd(6, 1, 5);
+
+  Voir aussi UNIDCDF, UNIDINV, RANDI, RANDPERM, RANDSAMPLE.
 ```
 
 ## `unidstat`
@@ -5281,12 +5677,34 @@ UNIDSTAT Moyenne et variance de la loi uniforme discrète.
 
 ```
 UNIFCDF Répartition de la loi uniforme continue sur [A,B].
+  P = UNIFCDF(X,A,B) croît linéairement de zéro en A à un en B.
+
+  C'est la loi de l'ignorance sur un intervalle borné : celle qui
+  maximise l'entropie quand on ne sait rien de plus que les bornes.
+
+  C'est aussi la brique de tout tirage aléatoire : toute autre loi
+  s'obtient d'un tirage uniforme par sa fonction quantile.
+
+  Exemple :
+     unifcdf(0.5, 0, 1)              % 0.5
+
+  Voir aussi UNIFPDF, UNIFINV, UNIDCDF, RAND.
 ```
 
 ## `unifinv`
 
 ```
 UNIFINV Quantile de la loi uniforme continue sur [A,B].
+  X = UNIFINV(P,A,B) rend A + P (B - A).
+
+  C'est la réciproque exacte d'UNIFCDF, et la plus simple illustration de
+  la méthode d'inversion : appliquer la fonction quantile à un tirage
+  uniforme donne la loi voulue.
+
+  Exemple :
+     unifinv(0.25, 0, 4)             % 1
+
+  Voir aussi UNIFCDF, UNIFPDF, RAND.
 ```
 
 ## `unifit`
@@ -5300,6 +5718,15 @@ UNIFIT Estimation des bornes d'une loi uniforme continue.
 
 ```
 UNIFPDF Densité de la loi uniforme continue sur [A,B].
+  Y = UNIFPDF(X,A,B) vaut 1/(B-A) dans l'intervalle, zéro dehors.
+
+  La densité peut dépasser un : c'est une densité, non une probabilité.
+  Sur [0, 0.1] elle vaut dix, et son intégrale vaut bien un.
+
+  Exemple :
+     unifpdf(0.5, 0, 0.1)            % 0 : hors de l'intervalle
+
+  Voir aussi UNIFCDF, UNIFINV, RAND.
 ```
 
 ## `unifstat`
@@ -5378,6 +5805,21 @@ VARTEST2 Test de Fisher sur l'égalité de deux variances.
 
 ```
 WBLCDF Répartition de la loi de Weibull.
+  P = WBLCDF(X,A,B) rend 1 - exp(-(X/A)^B), où A est l'échelle et B la
+  forme.
+
+  Le paramètre de forme décide de tout : au-dessous de un le taux de
+  panne décroît — mortalité infantile —, à un il est constant — pannes
+  accidentelles, c'est l'exponentielle —, au-dessus il croît — usure.
+  C'est ce qui en fait la loi de la fiabilité.
+
+  La courbe en baignoire d'un équipement se décrit par trois Weibull
+  superposées, une par phase de vie.
+
+  Exemple :
+     wblcdf(1, 1, 1)                 % 1 - exp(-1) : l'exponentielle
+
+  Voir aussi WBLPDF, WBLINV, WBLRND, EXPCDF.
 ```
 
 ## `wblfit`
@@ -5410,6 +5852,14 @@ WBLPDF Densité de la loi de Weibull, d'échelle A et de forme B.
 
 ```
 WBLRND Tirages d'une loi de Weibull.
+  R = WBLRND(A,B,M,N) rend A * (-log(U))^(1/B) pour U uniforme : le
+  tirage se fait par inversion, exactement.
+
+  Exemple :
+     r = wblrnd(1, 1, 10000, 1);
+     abs(mean(r) - 1) < 0.05         % true : c'est l'exponentielle
+
+  Voir aussi WBLCDF, WBLINV, EXPRND.
 ```
 
 ## `wblstat`
@@ -5477,6 +5927,23 @@ X2FX Matrice du modèle à partir d'une matrice de plan.
 
 ```
 ZSCORE Centrage et réduction colonne par colonne.
+  Z = ZSCORE(X) retranche la moyenne et divise par l'écart type de
+  chaque colonne : le résultat est de moyenne nulle et d'écart type un.
+
+  C'est le préalable de toute méthode qui compare des variables
+  d'unités différentes — analyse en composantes principales,
+  classification, régression pénalisée. Sans lui, la variable exprimée
+  en millimètres écrase celle exprimée en mètres.
+
+  Une colonne constante a un écart type nul : la division la laisse à
+  zéro plutôt que de rendre des infinis.
+
+  Exemple :
+     z = zscore([1 100; 2 200; 3 300]);
+     max(abs(mean(z)))               % 0
+     std(z)                          % [1 1]
+
+  Voir aussi NORMALIZE, PCA, STD.
 ```
 
 ## `ztest`

@@ -16,8 +16,13 @@ classdef creditMigrationCopula
 %
 %   Exemple :
 %      valeurs = [100 98 95 60; 100 98 95 60];
-%      c = creditMigrationCopula(valeurs, [1; 2], transition, [0.4; 0.4], poids);
-%      c = simulate(c, 20000);
+%      transition = [0.90 0.07 0.02 0.01;
+%                    0.05 0.85 0.07 0.03;
+%                    0.01 0.10 0.80 0.09;
+%                    0    0    0    1];
+%      c = creditMigrationCopula(valeurs, [1; 2], transition, [0.4; 0.4], ...
+%                                repmat([0.6 0.8], 2, 1));
+%      c = simulate(c, 2000);
 %      portfolioRisk(c)
 %
 %   Voir aussi CREDITDEFAULTCOPULA, TRANSPROBTOTHRESHOLDS, TRANSPROB.

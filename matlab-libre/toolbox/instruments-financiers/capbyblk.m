@@ -12,6 +12,9 @@ function [prix, prixCaplets] = capbyblk(courbe, exercice, reglement, echeance, v
 %   fixé, ne compte pas.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      capbyblk(courbe, 0.04, '01-Jan-2024', '01-Jan-2029', 0.2, 4)
 %
 %   Voir aussi FLOORBYBLK, SWAPTIONBYBLK, BLKPRICE.

@@ -8,6 +8,8 @@ function c = addComponent(c, type, n1, n2, valeur)
 %   c'est ainsi qu'il connaît sa taille, sans qu'on ait à la déclarer.
 %
 %   Exemple :
+%      c = circuit('diviseur');
+%      c = addVoltageSource(c, 1, 0, 10);
 %      c = addComponent(c, 'r', 1, 2, 1000);   % equivaut a addResistor
 %
 %   Voir aussi ADDRESISTOR, ADDCAPACITOR, ADDINDUCTOR, CIRCUIT.

@@ -6,7 +6,9 @@ function indicateur = willpctr(haut, bas, cloture, periode)
 %   défaut.
 %
 %   Exemple :
-%      willpctr(hauts, bas, clotures, 14)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      willpctr(clotures + 1, clotures - 1, clotures, 14)
 %
 %   Voir aussi STOCHOSC, HHIGH, LLOW, RSINDEX.
     if nargin < 4 || isempty(periode), periode = 14; end

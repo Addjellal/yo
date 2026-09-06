@@ -5,6 +5,9 @@ function varargout = intenvget(courbe, varargin)
 %   sorties.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      taux = intenvget(courbe, 'Rates');
 %
 %   Voir aussi INTENVSET, INTENVPRICE.

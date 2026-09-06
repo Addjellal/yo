@@ -11,6 +11,9 @@ classdef idtf
 %   Report.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      m = tfest(z, 2, 1);
 %      [num, den] = tfdata(m, 'v');
 %

@@ -205,6 +205,26 @@ AVERAGEPOOLING1DLAYER Agrégation par la moyenne, en une dimension.
 
 ```
 AVERAGEPOOLING2DLAYER Sous-échantillonnage par la moyenne.
+  C = AVERAGEPOOLING2DLAYER(TAILLE) découpe l'entrée en fenêtres de
+  TAILLE et remplace chacune par sa moyenne. TAILLE scalaire vaut pour
+  une fenêtre carrée. Par défaut le pas égale la taille : les fenêtres
+  ne se recouvrent pas et la carte est réduite d'autant.
+
+  C = AVERAGEPOOLING2DLAYER(TAILLE,'Stride',PAS) impose le pas, et
+  'Name' le nom de la couche.
+
+  Moyenner ou prendre le maximum ne dit pas la même chose. La moyenne
+  conserve le niveau général de la région et efface les pointes : elle
+  floute. Le maximum ne retient que la réponse la plus forte : il
+  répond « ce motif est présent quelque part ici », sans dire où. D'où
+  l'usage : moyenne quand l'intensité d'ensemble compte, maximum quand
+  c'est la présence d'un motif qui compte.
+
+  Exemple :
+     couche = averagePooling2dLayer(2);
+     couche = averagePooling2dLayer([3 3], 'Stride', 2);
+
+  Voir aussi MAXPOOLING2DLAYER, GLOBALAVERAGEPOOLING2DLAYER, AVGPOOL.
 ```
 
 ## `avgpool`
@@ -306,6 +326,22 @@ CLASSIFICATIONLAYER Couche de sortie pour la classification.
 
 ```
 CLASSIFY Classe de plus forte probabilité pour chaque observation.
+  C = CLASSIFY(RESEAU,X) rend, pour chaque observation de X, l'indice de
+  la classe de plus fort score. C est une colonne, une entrée par
+  observation.
+
+  [C,SCORES] = CLASSIFY(RESEAU,X) rend en plus les scores complets, une
+  colonne par observation. Il faut les regarder : l'indice seul ne
+  distingue pas une réponse à 0,99 d'une réponse à 0,34 contre 0,33 et
+  0,33, alors que la première est une décision et la seconde un tirage
+  au sort. Un seuil sur le score maximal permet de refuser de conclure.
+
+  Exemple :
+     couches = [featureInputLayer(2); fullyConnectedLayer(3); softmaxLayer()];
+     reseau = assembleNetwork(couches);
+     [c, s] = classify(reseau, [0.2; 0.7]);
+
+  Voir aussi PREDICTRESEAU, SOFTMAXLAYER, CONFUSIONCHART.
 ```
 
 ## `clippedReluLayer`
@@ -457,6 +493,27 @@ CROSSCHANNELNORMALIZATIONLAYER Normalisation locale entre canaux.
 
 ```
 CROSSENTROPY Entropie croisée moyenne par observation.
+  C = CROSSENTROPY(PREDIT,CIBLE) rend -somme(CIBLE .* log(PREDIT))
+  divisée par le nombre d'observations, c'est-à-dire les colonnes de
+  CIBLE. CIBLE est codée un-parmi-N : une seule ligne vaut 1 par
+  observation, et l'entropie croisée se réduit alors à -log de la
+  probabilité accordée à la bonne réponse. Minimiser l'entropie croisée,
+  c'est maximiser la vraisemblance des étiquettes.
+
+  C'est ce qui la distingue de l'erreur quadratique pour classer. Se
+  tromper avec assurance coûte arbitrairement cher, puisque log tend
+  vers moins l'infini ; et derrière une sigmoïde saturée le gradient de
+  l'erreur quadratique s'annule alors même que la réponse est fausse,
+  tandis que celui de l'entropie croisée reste proportionnel à l'écart.
+
+  PREDIT est borné à 1e-12 près de zéro et de un : sans cette borne une
+  probabilité nulle sur la bonne classe rendrait l'infini.
+
+  Exemple :
+     cible = [1 0; 0 1];
+     crossentropy([0.9 0.2; 0.1 0.8], cible)
+
+  Voir aussi MSE, L1LOSS, L2LOSS, SOFTMAXLAYER.
 ```
 
 ## `depthConcatenationLayer`
@@ -648,6 +705,22 @@ ELULAYER Couche ELU : linéaire pour les positifs, exponentielle sinon.
 
 ```
 FEATUREINPUTLAYER Couche d'entrée pour des vecteurs de caractéristiques.
+  C = FEATUREINPUTLAYER(N) déclare une entrée de N caractéristiques
+  numériques, une observation par colonne. C'est l'entrée d'un réseau
+  qui travaille sur des mesures déjà extraites — âge, tension, débit —
+  et non sur une image dont la disposition spatiale importe.
+
+  C = FEATUREINPUTLAYER(N,'Name',NOM) nomme la couche.
+
+  Le choix de la couche d'entrée n'est pas cosmétique : IMAGEINPUTLAYER
+  annonce aux couches suivantes une grille à deux dimensions, sur
+  laquelle une convolution a un sens ; FEATUREINPUTLAYER annonce un
+  vecteur, dont l'ordre des composantes est arbitraire.
+
+  Exemple :
+     couches = [featureInputLayer(4); fullyConnectedLayer(3); softmaxLayer()];
+
+  Voir aussi IMAGEINPUTLAYER, SEQUENCEINPUTLAYER, FULLYCONNECTEDLAYER.
 ```
 
 ## `flattenLayer`
@@ -2188,6 +2261,20 @@ MINIBATCHQUEUE Découpe des données en lots successifs.
 
 ```
 MSE Erreur quadratique moyenne.
+  E = MSE(PREDIT,CIBLE) rend la moyenne des carrés des écarts, sur tous
+  les éléments. C'est le coût habituel d'une régression : sa dérivée est
+  proportionnelle à l'écart, donc simple, et son minimum est la moyenne
+  conditionnelle — un réseau entraîné à cette perte prédit l'espérance
+  de la cible, non sa médiane.
+
+  Le carré est aussi ce qui la rend sensible aux valeurs aberrantes :
+  un écart dix fois plus grand pèse cent fois plus. HUBER et L1LOSS
+  servent quand les données en contiennent.
+
+  Exemple :
+     mse([1 2 3], [1 2 4])
+
+  Voir aussi HUBER, L1LOSS, L2LOSS, CROSSENTROPY.
 ```
 
 ## `multiplicationLayer`
@@ -2270,12 +2357,40 @@ REGRESSIONLAYER Couche de sortie pour la régression.
 
 ```
 RELU Redresseur linéaire : max(0,x).
+  Y = RELU(X) rend max(X,0) terme à terme, pour un tableau ordinaire ou
+  un DLARRAY.
+
+  Sa dérivée vaut 0 ou 1 : le gradient traverse une unité active sans
+  être atténué, là où la sigmoïde le multiplie par au plus 0,25 à chaque
+  couche. C'est la raison pour laquelle les réseaux profonds
+  s'entraînent avec le redresseur et non avec la sigmoïde.
+
+  Le prix est l'unité morte : une unité dont l'entrée reste négative
+  rend zéro, donc un gradient nul, donc ne se corrige plus jamais.
+  LEAKYRELULAYER laisse passer une petite pente négative pour cela.
+
+  Exemple :
+     relu([-2 -1 0 1 2])
+
+  Voir aussi RELULAYER, LEAKYRELU, SIGMOID, SOFTMAX.
 ```
 
 ## `reluLayer`
 
 ```
 RELULAYER Couche de redressement : max(0,x).
+  C = RELULAYER() rend la couche qui applique max(0,x) terme à terme.
+  C = RELULAYER('Name',NOM) la nomme.
+
+  Elle n'a aucun paramètre à apprendre : son seul rôle est de rompre la
+  linéarité. Sans elle, empiler des couches pleinement connectées
+  reviendrait à une seule, puisque le produit de matrices est une
+  matrice.
+
+  Exemple :
+     couches = [featureInputLayer(3); fullyConnectedLayer(5); reluLayer()];
+
+  Voir aussi RELU, LEAKYRELULAYER, ELULAYER, TANHLAYER.
 ```
 
 ## `rmspropupdate`
@@ -2324,12 +2439,38 @@ SGDMUPDATE Un pas de descente de gradient à inertie.
 
 ```
 SIGMOID Sigmoïde logistique 1/(1+exp(-x)).
+  Y = SIGMOID(X) rend 1./(1+exp(-X)) terme à terme, pour un tableau
+  ordinaire ou un DLARRAY. La sortie est dans ]0,1[ et se lit donc comme
+  une probabilité, ce qui en fait la sortie naturelle d'une décision
+  binaire.
+
+  Sa dérivée vaut y(1-y), au plus 0,25 en zéro et pratiquement nulle
+  dès que |X| dépasse 5. D'où l'évanouissement du gradient : dans une
+  pile profonde de sigmoïdes, le gradient est multiplié par un facteur
+  inférieur à un quart à chaque couche et n'atteint plus les premières.
+
+  Exemple :
+     sigmoid([-2 0 2])
+
+  Voir aussi SIGMOIDLAYER, SOFTMAX, RELU, TANH.
 ```
 
 ## `sigmoidLayer`
 
 ```
 SIGMOIDLAYER Couche sigmoïde logistique.
+  C = SIGMOIDLAYER() rend la couche qui applique 1/(1+exp(-x)) terme à
+  terme. C = SIGMOIDLAYER('Name',NOM) la nomme.
+
+  En sortie de réseau, elle sert à la classification multi-étiquette :
+  chaque sortie est une probabilité indépendante, et plusieurs peuvent
+  valoir 1 à la fois. C'est ce qui la distingue de SOFTMAXLAYER, dont
+  les sorties somment à un et s'excluent donc mutuellement.
+
+  Exemple :
+     couches = [featureInputLayer(3); fullyConnectedLayer(1); sigmoidLayer()];
+
+  Voir aussi SIGMOID, SOFTMAXLAYER, TANHLAYER.
 ```
 
 ## `softmax`
@@ -2358,6 +2499,23 @@ SOFTMAX Normalisation exponentielle, colonne par colonne.
 
 ```
 SOFTMAXLAYER Couche softmax : sorties positives de somme 1.
+  C = SOFTMAXLAYER() rend la couche qui exponentie ses entrées puis les
+  normalise : les sorties sont positives et somment à un.
+  C = SOFTMAXLAYER('Name',NOM) la nomme.
+
+  Seuls les écarts entre entrées comptent : ajouter une constante à
+  toutes les entrées laisse la sortie inchangée. C'est cette invariance
+  qui permet de retrancher le maximum avant d'exponentier, et donc de
+  calculer la couche sans débordement même sur de grandes entrées.
+
+  Ses sorties s'excluent : monter la probabilité d'une classe abaisse
+  nécessairement celles des autres. Elle va donc avec une décision
+  à une classe parmi N, et se place juste avant l'entropie croisée.
+
+  Exemple :
+     couches = [featureInputLayer(4); fullyConnectedLayer(3); softmaxLayer()];
+
+  Voir aussi SOFTMAX, SIGMOIDLAYER, CROSSENTROPY, CLASSIFY.
 ```
 
 ## `softplusLayer`
@@ -2392,6 +2550,23 @@ SWISHLAYER Activation X fois sigmoïde de X.
 
 ```
 TANHLAYER Couche à tangente hyperbolique.
+  C = TANHLAYER() rend la couche qui applique tanh terme à terme.
+  C = TANHLAYER('Name',NOM) la nomme.
+
+  La tangente hyperbolique est une sigmoïde redressée : tanh(x) vaut
+  2*sigmoid(2*x)-1, donc la même courbe portée sur ]-1,1[ et centrée en
+  zéro. Ce centrage est son intérêt — les activations transmises à la
+  couche suivante ont une moyenne proche de zéro, ce qui évite que tous
+  les gradients d'un même neurone partagent le même signe.
+
+  Elle sature comme la sigmoïde, et perd donc son gradient de la même
+  façon dans une pile profonde ; c'est dans les réseaux récurrents,
+  où la borne sur la sortie tient l'état, qu'elle reste employée.
+
+  Exemple :
+     couches = [featureInputLayer(3); fullyConnectedLayer(4); tanhLayer()];
+
+  Voir aussi RELULAYER, SIGMOIDLAYER, LSTMLAYER.
 ```
 
 ## `trainNetwork`

@@ -222,6 +222,18 @@ BLOCKPROC Applique une fonction bloc par bloc.
 
 ```
 BWAREA Aire d'une région binaire, en pixels.
+  A = BWAREA(BW) rend l'aire des pixels vrais, pondérée pour mieux
+  estimer l'aire de la forme continue sous-jacente qu'un simple compte.
+
+  Un simple compte surestime les diagonales : un segment en escalier
+  compte autant de pixels qu'un segment droit deux fois plus court. La
+  pondération corrige cela en regardant les motifs de deux par deux.
+
+  Exemple :
+     bw = false(10); bw(3:7, 3:7) = true;
+     bwarea(bw)                      % proche de 25
+
+  Voir aussi BWLABEL, REGIONPROPS, IMBINARIZE.
 ```
 
 ## `bwareafilt`
@@ -518,6 +530,19 @@ GRAY2IND Image en niveaux de gris vers image indexée.
 
 ```
 GRAY2RGB Réplique une image en niveaux de gris sur trois canaux.
+  RGB = GRAY2RGB(G) recopie le plan de gris sur les trois canaux.
+
+  L'image obtenue est toujours grise : la conversion n'invente aucune
+  couleur, elle change seulement la représentation. Elle sert à
+  superposer un tracé en couleur sur un fond en gris, ce qu'un tableau à
+  deux dimensions ne permet pas.
+
+  Exemple :
+     rgb = gray2rgb(rand(8));
+     size(rgb)                       % 8 8 3
+     max(max(abs(rgb(:,:,1) - rgb(:,:,3))))    % 0 : toujours du gris
+
+  Voir aussi RGB2GRAY, IND2RGB, IM2DOUBLE.
 ```
 
 ## `graycomatrix`
@@ -552,6 +577,25 @@ GRAYTHRESH Seuil global par la méthode d'Otsu.
 
 ```
 HISTEQ Égalisation d'histogramme.
+  Y = HISTEQ(X,N) étale les niveaux de gris pour que leur histogramme
+  soit à peu près plat sur N casiers, 64 par défaut.
+
+  Le principe : appliquer à l'image sa propre fonction de répartition
+  cumulée. Une image dont tous les pixels sont entassés dans une plage
+  étroite s'étale alors sur toute la dynamique, et son contraste
+  apparent augmente beaucoup.
+
+  Le procédé est brutal : il amplifie le bruit des zones uniformes
+  autant que le signal des zones utiles, et il change les rapports de
+  luminance. L'égalisation locale — CLAHE — corrige le premier défaut,
+  pas le second.
+
+  Exemple :
+     terne = 0.4 + 0.2 * rand(64);
+     clair = histeq(terne);
+     std(clair(:)) > std(terne(:))   % true : le contraste augmente
+
+  Voir aussi IMADJUST, IMHIST, IMBINARIZE.
 ```
 
 ## `hough`
@@ -635,6 +679,20 @@ HSV2RGB Teinte, saturation, valeur vers RVB.
 
 ```
 IDCT2 Transformée en cosinus discrète inverse bidimensionnelle.
+  X = IDCT2(Y) reconstruit l'image à partir de ses coefficients.
+
+  La DCT est ce qui fait JPEG : elle concentre l'énergie d'un bloc
+  d'image dans quelques coefficients de basse fréquence, et jeter les
+  autres se voit peu. IDCT2 refait le chemin inverse.
+
+  L'aller-retour est exact à la précision machine, tant qu'on ne jette
+  rien.
+
+  Exemple :
+     image = magic(8);
+     max(max(abs(idct2(dct2(image)) - image)))    % ~1e-13
+
+  Voir aussi DCT2, FFT2, IMWRITE.
 ```
 
 ## `im2bw`
@@ -670,6 +728,19 @@ IM2COL Réarrange les blocs d'une image en colonnes.
 
 ```
 IM2DOUBLE Convertit une image en double dans [0,1].
+  Y = IM2DOUBLE(X) ramène une image entière sur l'intervalle [0,1] en
+  divisant par la valeur maximale de son type — 255 pour uint8, 65535
+  pour uint16. Une image déjà flottante est rendue telle quelle.
+
+  Toute la boîte à outils travaille en flottant : c'est ce qui évite les
+  dépassements et les troncatures au milieu d'un calcul. IM2UINT8 refait
+  le chemin inverse au moment d'écrire.
+
+  Exemple :
+     im2double(uint8([0 128 255]))   % [0 0.502 1]
+     im2double([0.2 0.8])            % inchange
+
+  Voir aussi IM2UINT8, MAT2GRAY, IMREAD.
 ```
 
 ## `im2gray`
@@ -683,18 +754,56 @@ IM2GRAY Rend une image en niveaux de gris, quelle que soit l'entrée.
 
 ```
 IM2UINT8 Convertit une image en uint8 (0 à 255).
+  Y = IM2UINT8(X) multiplie une image flottante par 255 et arrondit.
+  Ce qui sort de [0,1] est écrêté, non mis à l'échelle.
+
+  La conversion perd de l'information : deux valeurs distantes de moins
+  de 1/255 deviennent identiques. C'est pourquoi on ne convertit qu'à la
+  fin, pour écrire ou pour afficher.
+
+  Exemple :
+     im2uint8([0 0.5 1])             % [0 128 255]
+     im2uint8(im2double(uint8(42)))  % 42 : l'aller-retour est exact
+
+  Voir aussi IM2DOUBLE, IMWRITE.
 ```
 
 ## `imabsdiff`
 
 ```
 IMABSDIFF Différence absolue de deux images, sans dépassement.
+  Z = IMABSDIFF(X,Y) rend la valeur absolue de la différence : elle ne
+  sature jamais, contrairement à IMSUBTRACT, puisque le résultat tient
+  toujours dans le type. C'est ce qui en fait l'outil de la détection de
+  mouvement entre deux images.
+
+  Les opérations arithmétiques sur images saturent au lieu de déborder :
+  sur des entiers, 200 + 100 vaut 255 et non 44. C'est ce qui les
+  distingue de l'arithmétique ordinaire, et c'est presque toujours ce
+  qu'on veut d'une image.
+
+  Exemple :
+     imabsdiff(uint8(50), uint8(100))    % 50, dans les deux sens
+
+  Voir aussi IMSUBTRACT, IMMSE, IMADD.
 ```
 
 ## `imadd`
 
 ```
 IMADD Somme de deux images, avec saturation pour les entiers.
+  Z = IMADD(X,Y) additionne deux images de même taille, ou une image et
+  une constante.
+
+  Les opérations arithmétiques sur images saturent au lieu de déborder :
+  sur des entiers, 200 + 100 vaut 255 et non 44. C'est ce qui les
+  distingue de l'arithmétique ordinaire, et c'est presque toujours ce
+  qu'on veut d'une image.
+
+  Exemple :
+     imadd(uint8(200), uint8(100))   % 255, non 44
+
+  Voir aussi IMSUBTRACT, IMMULTIPLY, IMDIVIDE, IMABSDIFF.
 ```
 
 ## `imadjust`
@@ -716,6 +825,21 @@ IMAPPROX Réduit le nombre de couleurs d'une image indexée.
 
 ```
 IMBINARIZE Seuillage d'une image en niveaux de gris.
+  BW = IMBINARIZE(X) seuille par la méthode d'Otsu, qui choisit le seuil
+  maximisant la variance entre les deux classes.
+  BW = IMBINARIZE(X,SEUIL) impose le seuil.
+
+  Otsu ne suppose rien de l'image sinon que son histogramme est
+  bimodal : il cherche la séparation qui rend les deux groupes les plus
+  distincts possible. Sur une image dont l'éclairage varie, il échoue —
+  le seuil global ne convient alors nulle part, et il faut seuiller
+  localement.
+
+  Exemple :
+     bw = imbinarize([0.1 0.2; 0.8 0.9]);
+     sum(bw(:))                      % 2 : les deux clairs
+
+  Voir aussi HISTEQ, IMHIST, BWAREA, IMADJUST.
 ```
 
 ## `imbothat`
@@ -748,6 +872,18 @@ IMCLEARBORDER Supprime les objets qui touchent le bord de l'image.
 
 ```
 IMCLOSE Fermeture morphologique : dilatation puis érosion.
+  Y = IMCLOSE(X,ELEMENT) bouche les trous plus petits que l'élément
+  structurant, puis rend aux formes leur taille.
+
+  La fermeture est elle aussi idempotente, et duale de l'ouverture : la
+  fermeture du complément est le complément de l'ouverture. Elle ne peut
+  qu'ajouter — le résultat contient l'original.
+
+  Exemple :
+     troue = true(20); troue(10, 10) = false;
+     imclose(troue, true(3))(10, 10)    % true : le trou est bouche
+
+  Voir aussi IMOPEN, IMDILATE, IMERODE.
 ```
 
 ## `imcomplement`
@@ -786,30 +922,98 @@ IMCROP Découpe un rectangle dans une image.
 
 ```
 IMDILATE Dilatation morphologique.
+  Y = IMDILATE(X,ELEMENT) remplace chaque pixel par le maximum de son
+  voisinage, défini par l'élément structurant.
+
+  La dilatation ne peut qu'agrandir : le résultat contient toujours
+  l'original. Elle bouche les trous, relie ce qui est presque connexe,
+  et grossit tout d'autant.
+
+  Elle est duale de l'érosion par complémentation : dilater le
+  complément revient à éroder puis complémenter. C'est ce qui permet de
+  n'implanter qu'une des deux.
+
+  Exemple :
+     bw = false(9); bw(5, 5) = true;
+     sum(sum(imdilate(bw, true(3))))    % 9 : un point devient un carre
+
+  Voir aussi IMERODE, IMOPEN, IMCLOSE.
 ```
 
 ## `imdivide`
 
 ```
 IMDIVIDE Quotient terme à terme de deux images.
+  Z = IMDIVIDE(X,Y) divise terme à terme. La division par zéro rend la
+  valeur maximale du type plutôt qu'un infini, qui n'a pas de sens dans
+  une image entière.
+
+  Les opérations arithmétiques sur images saturent au lieu de déborder :
+  sur des entiers, 200 + 100 vaut 255 et non 44. C'est ce qui les
+  distingue de l'arithmétique ordinaire, et c'est presque toujours ce
+  qu'on veut d'une image.
+
+  Exemple :
+     imdivide(uint8(100), 2)         % 50
+
+  Voir aussi IMMULTIPLY, IMADD, IMSUBTRACT.
 ```
 
 ## `imerode`
 
 ```
 IMERODE Érosion morphologique.
+  Y = IMERODE(X,ELEMENT) remplace chaque pixel par le minimum de son
+  voisinage.
+
+  L'érosion ne peut que rétrécir : le résultat est contenu dans
+  l'original. Elle efface ce qui est plus petit que l'élément
+  structurant, ce qui en fait un filtre de taille — c'est ainsi qu'on
+  supprime le bruit poivre et sel sans toucher aux grandes formes.
+
+  Éroder ce qu'on vient de dilater ne rend pas l'original en général :
+  la composition est la fermeture, qui bouche les trous. C'est
+  l'inverse pour l'ouverture.
+
+  Exemple :
+     bw = false(9); bw(5, 5) = true;
+     sum(sum(imerode(bw, true(3))))     % 0 : un point isole disparait
+
+  Voir aussi IMDILATE, IMOPEN, IMCLOSE.
 ```
 
 ## `imextendedmax`
 
 ```
 IMEXTENDEDMAX Maxima étendus : les sommets d'au moins H de hauteur.
+  BW = IMEXTENDEDMAX(X,H) marque les sommets qui dominent leur entourage
+  d'au moins H. C'est le dual d'IMEXTENDEDMIN, sur la surface retournée.
+
+  Exemple :
+     relief = zeros(20); relief(5, 5) = 0.1; relief(15, 15) = 0.8;
+     hauts = imextendedmax(relief, 0.5);
+     hauts(15, 15) && ~hauts(5, 5)   % true
+
+  Voir aussi IMEXTENDEDMIN, IMHMIN.
 ```
 
 ## `imextendedmin`
 
 ```
 IMEXTENDEDMIN Minima étendus : les cuvettes d'au moins H de profondeur.
+  BW = IMEXTENDEDMIN(X,H) marque les régions qui sont des minima
+  régionaux de la surface une fois comblée de H.
+
+  « Étendu » veut dire qu'un plateau entier est marqué, non un seul
+  pixel : un minimum régional n'est pas forcément ponctuel, et ne
+  retenir qu'un point y serait arbitraire.
+
+  Exemple :
+     relief = ones(20); relief(5, 5) = 0.9; relief(15, 15) = 0.2;
+     profonds = imextendedmin(relief, 0.5);
+     profonds(15, 15) && ~profonds(5, 5)     % true
+
+  Voir aussi IMEXTENDEDMAX, IMHMIN, WATERSHED.
 ```
 
 ## `imfill`
@@ -873,6 +1077,22 @@ IMFINDCIRCLES Cherche des cercles par la transformée de Hough.
 
 ```
 IMGAUSSFILT Lissage gaussien d'une image.
+  Y = IMGAUSSFILT(X,SIGMA) convolue par une gaussienne d'écart type
+  SIGMA, 0,5 par défaut.
+
+  La gaussienne est le seul noyau séparable et isotrope à la fois : on
+  peut donc filtrer les lignes puis les colonnes, ce qui coûte 2N au
+  lieu de N carré. C'est aussi le seul qui ne crée aucun extremum
+  nouveau — d'où son emploi comme base des espaces d'échelle.
+
+  Le support effectif vaut environ trois écarts types de part et
+  d'autre : au-delà, la gaussienne est négligeable.
+
+  Exemple :
+     lisse = imgaussfilt(rand(64), 2);
+     std(lisse(:)) < std(rand(64))   % true : le lissage reduit l'ecart
+
+  Voir aussi IMFILTER, FSPECIAL, MEDFILT2.
 ```
 
 ## `imgradient`
@@ -905,6 +1125,23 @@ IMGRADIENTXY Composantes horizontale et verticale du gradient.
 
 ```
 IMHIST Histogramme d'une image.
+  [COMPTE,POSITIONS] = IMHIST(X,N) compte les pixels par casier de
+  niveau, sur N casiers — 256 pour une image entière, 64 pour une image
+  flottante par défaut.
+
+  La somme des comptes est le nombre de pixels, toujours : c'est la
+  vérification qui prouve qu'aucun n'a été perdu ni compté deux fois.
+
+  La forme de l'histogramme dit ce qu'on peut faire de l'image : deux
+  bosses séparées se seuillent, une seule bosse étroite se contraste,
+  une bosse contre un bord est saturée et ne se rattrape pas.
+
+  Exemple :
+     [n, x] = imhist(uint8([0 0 128 255]));
+     sum(n)                          % 4 : tous les pixels
+     n(1)                            % 2 : deux pixels a zero
+
+  Voir aussi HISTEQ, IMADJUST, IMBINARIZE.
 ```
 
 ## `imhmax`
@@ -922,6 +1159,21 @@ IMHMAX Supprime les maxima de hauteur inférieure à H.
 
 ```
 IMHMIN Comble les minima de profondeur inférieure à H.
+  Y = IMHMIN(X,H) relève les cuvettes dont la profondeur n'atteint pas
+  H, et laisse les autres.
+
+  C'est l'outil qui rend la ligne de partage des eaux utilisable : sans
+  lui, chaque petite cuvette du bruit devient un bassin, et la
+  segmentation éclate en centaines de régions. Combler les minima peu
+  profonds fusionne ces bassins avant même de commencer.
+
+  Exemple :
+     relief = ones(20); relief(5, 5) = 0.9; relief(15, 15) = 0.2;
+     comble = imhmin(relief, 0.5);
+     comble(5, 5) == 1               % true : la cuvette peu marquee
+     comble(15, 15) < 1              % true : la profonde reste
+
+  Voir aussi IMEXTENDEDMIN, IMEXTENDEDMAX, WATERSHED.
 ```
 
 ## `imimposemin`
@@ -958,12 +1210,40 @@ IMLINCOMB Combinaison linéaire d'images.
 
 ```
 IMMSE Erreur quadratique moyenne entre deux images.
+  E = IMMSE(A,B) rend la moyenne des carrés des écarts, pixel à pixel.
+
+  Elle vaut zéro pour deux images identiques et croît avec l'écart. Elle
+  ne dit rien de la ressemblance perçue : deux images d'erreur
+  quadratique égale peuvent être l'une très acceptable et l'autre
+  inregardable, selon que l'erreur est répartie ou concentrée. C'est ce
+  que les mesures perceptuelles — SSIM — cherchent à corriger.
+
+  Le rapport signal à bruit de crête s'en déduit : PSNR = 10 log10(1/E)
+  pour des images dans [0,1].
+
+  Exemple :
+     immse(ones(4), ones(4))         % 0
+     immse(zeros(4), ones(4))        % 1
+
+  Voir aussi PSNR, SSIM, IMABSDIFF.
 ```
 
 ## `immultiply`
 
 ```
 IMMULTIPLY Produit terme à terme de deux images.
+  Z = IMMULTIPLY(X,Y) multiplie terme à terme, ou par une constante.
+  C'est ainsi qu'on applique un masque ou qu'on module une luminosité.
+
+  Les opérations arithmétiques sur images saturent au lieu de déborder :
+  sur des entiers, 200 + 100 vaut 255 et non 44. C'est ce qui les
+  distingue de l'arithmétique ordinaire, et c'est presque toujours ce
+  qu'on veut d'une image.
+
+  Exemple :
+     immultiply(uint8(200), 2)       % 255 : sature
+
+  Voir aussi IMDIVIDE, IMADD, IMSUBTRACT.
 ```
 
 ## `imnoise`
@@ -978,6 +1258,22 @@ IMNOISE Ajoute du bruit à une image.
 
 ```
 IMOPEN Ouverture morphologique : érosion puis dilatation.
+  Y = IMOPEN(X,ELEMENT) efface ce qui est plus petit que l'élément
+  structurant, puis rend aux formes restantes leur taille.
+
+  L'ouverture est idempotente : l'appliquer deux fois ne change rien de
+  plus. C'est la propriété qui en fait un filtre au sens propre, et
+  c'est ce qui la distingue d'une érosion suivie d'une dilatation
+  quelconques.
+
+  Elle ne peut que retirer : le résultat est contenu dans l'original.
+
+  Exemple :
+     bruite = false(20); bruite(5:15, 5:15) = true; bruite(2, 2) = true;
+     propre = imopen(bruite, true(3));
+     propre(2, 2)                    % false : le point isole a disparu
+
+  Voir aussi IMCLOSE, IMERODE, IMDILATE.
 ```
 
 ## `imoverlay`
@@ -1175,6 +1471,17 @@ IMSPLIT Sépare les plans d'une image en autant de sorties.
 
 ```
 IMSUBTRACT Différence de deux images, avec saturation pour les entiers.
+  Z = IMSUBTRACT(X,Y) soustrait terme à terme.
+
+  Les opérations arithmétiques sur images saturent au lieu de déborder :
+  sur des entiers, 200 + 100 vaut 255 et non 44. C'est ce qui les
+  distingue de l'arithmétique ordinaire, et c'est presque toujours ce
+  qu'on veut d'une image.
+
+  Exemple :
+     imsubtract(uint8(50), uint8(100))   % 0, non 206
+
+  Voir aussi IMADD, IMABSDIFF, IMMULTIPLY.
 ```
 
 ## `imtophat`
@@ -1213,12 +1520,41 @@ IND2GRAY Image indexée vers niveaux de gris.
 
 ```
 IND2RGB Image indexée vers image en couleurs.
+  RGB = IND2RGB(X,CARTE) remplace chaque indice par la couleur qu'il
+  désigne dans la palette.
+
+  Une image indexée sépare la géométrie de la couleur : la même image
+  change entièrement d'aspect quand on change de palette, sans qu'aucun
+  pixel ne bouge. C'est ce qui rend les fausses couleurs si commodes
+  pour lire une carte de valeurs.
+
+  Exemple :
+     rgb = ind2rgb(round(rand(8) * 63) + 1, jet(64));
+     size(rgb)                       % 8 8 3
+
+  Voir aussi GRAY2RGB, RGB2GRAY, COLORMAP.
 ```
 
 ## `lab2rgb`
 
 ```
 LAB2RGB Passage de L*a*b* à sRGB.
+  RGB = LAB2RGB(LAB) convertit depuis l'espace perceptuel CIE L*a*b*,
+  où L est la clarté de 0 à 100, a et b les deux axes chromatiques.
+
+  L'intérêt de L*a*b* est que la distance euclidienne y correspond à peu
+  près à l'écart perçu : deux couleurs à même distance y paraissent
+  également différentes, ce qui n'est pas du tout le cas en RVB. C'est
+  pourquoi on y calcule les différences de couleur et les segmentations.
+
+  Il est aussi bien plus vaste que le sRGB : une conversion peut sortir
+  de l'intervalle [0,1], et il faut alors écrêter.
+
+  Exemple :
+     lab2rgb([100 0 0])              % blanc
+     lab2rgb([0 0 0])                % noir
+
+  Voir aussi RGB2LAB, YCBCR2RGB, NTSC2RGB.
 ```
 
 ## `lab2xyz`
@@ -1280,12 +1616,40 @@ MATRICERVBVERSXYZ Matrice sRGB linéaire vers XYZ, blanc D65.
 
 ```
 MEAN2 Moyenne de tous les éléments d'une matrice.
+  M = MEAN2(A) est un raccourci pour MEAN(A(:)) : la moyenne de toute la
+  matrice, non celle de chaque colonne.
+
+  C'est la confusion la plus fréquente sur une image : MEAN(image) rend
+  une ligne de moyennes par colonne, ce qui n'est presque jamais ce
+  qu'on veut.
+
+  Exemple :
+     mean2(magic(4))                 % 8.5
+     mean(magic(4))                  % [8.5 8.5 8.5 8.5] : par colonne
+
+  Voir aussi STD2, MEAN, IMHIST.
 ```
 
 ## `medfilt2`
 
 ```
 MEDFILT2 Filtre médian bidimensionnel.
+  Y = MEDFILT2(X,[M N]) remplace chaque pixel par la médiane de son
+  voisinage, de taille 3 sur 3 par défaut.
+
+  La médiane n'est pas une moyenne : elle efface complètement un point
+  isolé aberrant, là où la moyenne l'étale sur tout le voisinage. C'est
+  pourquoi elle est le remède au bruit poivre et sel, et pourquoi elle
+  conserve les contours francs qu'un lissage gaussien émousserait.
+
+  Elle n'est pas linéaire : la médiane d'une somme n'est pas la somme
+  des médianes, et aucune analyse en fréquence ne la décrit.
+
+  Exemple :
+     image = ones(9); image(5, 5) = 100;
+     medfilt2(image)(5, 5)           % 1 : l'aberrant a disparu
+
+  Voir aussi IMGAUSSFILT, IMFILTER, MEDIAN.
 ```
 
 ## `montage`
@@ -1374,6 +1738,22 @@ NORMXCORR2 Corrélation croisée normalisée.
 
 ```
 NTSC2RGB Passage de YIQ à RVB.
+  RGB = NTSC2RGB(YIQ) convertit depuis l'espace de la télévision
+  analogique : Y la luminance, I et Q les deux axes de chrominance.
+
+  Le choix des axes I et Q n'est pas arbitraire : ils sont orientés
+  selon les directions où l'œil discrimine le mieux et le moins bien,
+  ce qui permettait de leur donner des bandes passantes différentes.
+  C'est la même idée que le sous-échantillonnage de la chrominance en
+  numérique, née trente ans plus tôt.
+
+  Le canal Y seul donne une image en niveaux de gris compatible avec un
+  téléviseur noir et blanc : c'est ce qui a permis la transition.
+
+  Exemple :
+     ntsc2rgb([1 0 0])               % blanc : chrominance nulle
+
+  Voir aussi RGB2NTSC, YCBCR2RGB, RGB2GRAY.
 ```
 
 ## `ordfilt2`
@@ -1620,6 +2000,17 @@ SSIM Indice de similarité structurelle.
 
 ```
 STD2 Écart-type de tous les éléments d'une matrice.
+  S = STD2(A) est un raccourci pour STD(A(:)).
+
+  Sur une image, il mesure le contraste global : une image uniforme a un
+  écart type nul, une image très contrastée un écart type proche de la
+  moitié de sa dynamique.
+
+  Exemple :
+     std2(ones(8))                   % 0 : aucune variation
+     std2(magic(4)) > 0              % true
+
+  Voir aussi MEAN2, STD, HISTEQ.
 ```
 
 ## `stdfilt`
@@ -1714,5 +2105,21 @@ XYZ2RGB Passage de l'espace XYZ à sRGB.
 
 ```
 YCBCR2RGB Luminance et chrominances vers RVB.
+  RGB = YCBCR2RGB(YCBCR) convertit depuis l'espace de la télévision et
+  de la compression : Y la luminance, Cb et Cr les deux différences de
+  couleur.
+
+  La séparation n'est pas décorative : l'œil est bien plus sensible à la
+  luminance qu'à la chrominance, si bien que JPEG et la vidéo
+  sous-échantillonnent Cb et Cr sans que cela se voie. C'est là que la
+  moitié du gain de compression se fait.
+
+  Une entrée entière est traitée dans les plages de la vidéo — 16 à 235
+  pour Y, 16 à 240 pour Cb et Cr — et une entrée flottante dans [0,1].
+
+  Exemple :
+     ycbcr2rgb([1 0.5 0.5])          % blanc : chrominance neutre
+
+  Voir aussi RGB2YCBCR, NTSC2RGB, LAB2RGB.
 ```
 

@@ -17,6 +17,9 @@ classdef varbacktest
 %   RUNTESTS les passe tous, SUMMARY compte.
 %
 %   Exemple :
+%      rng(1);
+%      rendements = 0.01 * randn(500, 1);
+%      valeursEnRisque = 0.023 * ones(500, 1);
 %      v = varbacktest(rendements, valeursEnRisque, 'VaRLevel', 0.99);
 %      runtests(v)
 %

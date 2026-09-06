@@ -8,7 +8,9 @@ function volatilite = chaikvolat(haut, bas, periode, decalage)
 %   une amplitude qui se resserre, une phase calme.
 %
 %   Exemple :
-%      chaikvolat(hauts, bas, 10, 10)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      chaikvolat(clotures + 1, clotures - 1, 10, 10)
 %
 %   Voir aussi CHAIKOSC, ADLINE, PRCROC.
     if nargin < 3 || isempty(periode),  periode = 10;  end

@@ -10,7 +10,9 @@ function indicateur = williamsad(haut, bas, cloture)
 %   ce genre que ses utilisateurs guettent.
 %
 %   Exemple :
-%      williamsad(hauts, bas, clotures)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      williamsad(clotures + 1, clotures - 1, clotures)
 %
 %   Voir aussi ADLINE, ADOSC, ONBALVOL.
     if nargin < 2

@@ -6,8 +6,9 @@ function [hautes, basses] = highlow(haut, bas, cloture, ouverture)
 %   avec PLOT.
 %
 %   Exemple :
-%      [h, b] = highlow(hauts, bas, clotures, ouvertures);
-%      plot([1:numel(h); 1:numel(h)], [h.'; b.']);
+%      rng(1);
+%      clotures = 100 + cumsum(randn(20, 1));
+%      [h, b] = highlow(clotures + 1, clotures - 1, clotures, clotures + 0.2);
 %
 %   Voir aussi CANDLE, POINTFIG, MEDPRICE.
     if nargin < 2

@@ -13,6 +13,9 @@ function [probabiliteDefaut, distanceDefaut, valeurActif, volatiliteActif] = mer
 %   Le résultat porte sur la dernière date de la série.
 %
 %   Exemple :
+%      rng(1);
+%      capitalisations = 100 * exp(cumsum(0.02 * randn(60, 1)));
+%      dettes = 80 * ones(60, 1);
 %      [pd, dd] = mertonByTimeSeries(capitalisations, dettes, 0.03, 1)
 %
 %   Voir aussi MERTONMODEL, ASRF.

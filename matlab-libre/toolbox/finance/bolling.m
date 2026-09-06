@@ -12,7 +12,10 @@ function [milieu, haute, basse] = bolling(actif, echantillons, alpha, largeur)
 %   l'écartement soudain qui se remarque.
 %
 %   Exemple :
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
 %      [m, h, b] = bolling(clotures, 20, 0, 2);
+%      all(h(20:end) >= m(20:end))       % 1 : la bande haute est au-dessus
 %
 %   Voir aussi BOLLINGER, MOVAVG, CHAIKVOLAT.
     if nargin < 2 || isempty(echantillons), echantillons = 20; end

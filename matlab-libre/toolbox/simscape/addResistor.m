@@ -8,7 +8,12 @@ function c = addResistor(c, n1, n2, R)
 %   les lui dire.
 %
 %   Exemple :
+%      c = circuit('diviseur');
+%      c = addVoltageSource(c, 1, 0, 10);
 %      c = addResistor(c, 1, 2, 1000);
+%      c = addResistor(c, 2, 0, 2000);
+%      v = solveDC(c);
+%      abs(v(2) - 20 / 3) < 1e-9        % 1 : le pont diviseur
 %
 %   Voir aussi ADDCAPACITOR, ADDINDUCTOR, SOLVEDC.
     c = addComponent(c, 'r', n1, n2, R);

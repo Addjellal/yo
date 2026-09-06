@@ -9,6 +9,7 @@ function c = addCurrentSource(c, n1, n2, I)
 %   dans la loi des nœuds, contrairement à une source de tension.
 %
 %   Exemple :
+%      c = circuit('source');
 %      c = addCurrentSource(c, 0, 1, 0.005);
 %      c = addResistor(c, 1, 0, 1000);
 %      solveDC(c)                      % 5 V : R I

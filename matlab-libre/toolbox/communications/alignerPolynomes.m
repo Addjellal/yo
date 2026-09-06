@@ -8,6 +8,9 @@ function [a, b] = alignerPolynomes(a, b)
 %   tiendrait pas, le reste étant souvent de degré zéro.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [a, b] = alignerPolynomes([1 2], [1 2 3 4]);   % a devient [1 2 0 0]
     a = double(a);
     b = double(b);
     if isequal(size(a), size(b))

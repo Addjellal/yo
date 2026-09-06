@@ -11,10 +11,14 @@ function e = symdiv(a, b)
 %   Ces constructeurs ne calculent rien : ils assemblent. C'est
 %   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
 %
+%   A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+%   variable : chacun est converti en arbre au passage, si bien que
+%   SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
+%
 %   Exemple :
 %      x = sym('x');
 %      symstr(symsimplify(symdiv(x, symnum(1))))
 %
 %   Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
-    e = {'/', a, b};
+    e = {'/', matlibre_sym_arbre(a), matlibre_sym_arbre(b)};
 end

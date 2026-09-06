@@ -13,8 +13,10 @@ function [bandes, nombres] = confidenceBands(modele, varargin)
 %   l'intervalle (0,95), 'NumPoints',P le nombre de points (100).
 %
 %   Exemple :
+%      c = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+%                              repmat([0.6 0.8], 2, 1));
+%      c = simulate(c, 2000);
 %      [b, n] = confidenceBands(c, 'RiskMeasure', 'VaR');
-%      plot(n, b);
 %
 %   Voir aussi PORTFOLIORISK, RISKCONTRIBUTION, CREDITDEFAULTCOPULA.
     mesure = 'EL';

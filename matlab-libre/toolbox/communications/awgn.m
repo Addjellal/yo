@@ -2,6 +2,10 @@ function y = awgn(x, snrdB, puissanceSignal)
 %AWGN Ajoute un bruit blanc gaussien pour atteindre un rapport donné.
 %   Y = AWGN(X,SNR) ajoute du bruit tel que le rapport signal sur bruit
 %   vaille SNR décibels, la puissance du signal étant mesurée sur X.
+%
+%   Exemple :
+%      rng(1);
+%            y = awgn(sin(2*pi*(0:999)/100), 20, 'measured');
     if nargin < 3 || (ischar(puissanceSignal) && strcmpi(puissanceSignal, 'measured'))
         puissanceSignal = mean(abs(x(:)) .^ 2);
     end

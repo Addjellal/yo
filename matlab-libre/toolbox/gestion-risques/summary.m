@@ -5,6 +5,9 @@ function resume = summary(modele)
 %   est écrit.
 %
 %   Exemple :
+%      rng(1);
+%      rendements = 0.01 * randn(500, 1);
+%      valeursEnRisque = 0.023 * ones(500, 1);
 %      summary(varbacktest(rendements, valeursEnRisque))
 %
 %   Voir aussi VARBACKTEST, ESBACKTEST, RUNTESTS.

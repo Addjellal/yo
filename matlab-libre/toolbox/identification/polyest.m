@@ -17,6 +17,9 @@ function modele = polyest(donnees, ordres, varargin)
 %   Options : 'MaxIter' (200) et 'Tolerance' (1e-10).
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      m = polyest(z, [2 2 1 0 0 1]);      % un ARMAX
 %
 %   Voir aussi ARX, ARMAX, OE, BJ, PEM, IDPOLY.

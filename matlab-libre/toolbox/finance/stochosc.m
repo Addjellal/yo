@@ -9,7 +9,9 @@ function [pourcentK, pourcentD] = stochosc(haut, bas, cloture, periodeK, periode
 %   s'il a monté d'autant : c'est ce que l'indicateur mesure.
 %
 %   Exemple :
-%      [k, d] = stochosc(hauts, bas, clotures);
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      [k, d] = stochosc(clotures + 1, clotures - 1, clotures);
 %
 %   Voir aussi FPCTKD, SPCTKD, WILLPCTR, RSINDEX.
     if nargin < 4, periodeK = []; end

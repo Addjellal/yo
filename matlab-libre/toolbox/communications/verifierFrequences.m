@@ -3,6 +3,9 @@ function verifierFrequences(Fc, Fs)
 %   La porteuse doit tenir sous la moitié de la fréquence
 %   d'échantillonnage, sinon elle se replie et la modulation n'a plus de
 %   sens.
+%
+%   Exemple :
+%      verifierFrequences(100, 1000);    % passe : 100 Hz est sous Nyquist
     if Fs <= 2 * Fc
         error('comm:modulation:BadFs', ...
               'FS doit dépasser deux fois FC (FS = %g, FC = %g).', Fs, Fc);

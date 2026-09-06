@@ -4,7 +4,8 @@ function acceleration = tsaccel(serie, periode)
 %   du cours, mesurée à la grosse. N vaut 12 par défaut.
 %
 %   Exemple :
-%      tsaccel(clotures, 12)
+%      rng(1);
+%      tsaccel(100 + cumsum(randn(60, 1)), 12)
 %
 %   Voir aussi TSMOM, PRCROC, MACD.
     if nargin < 2 || isempty(periode), periode = 12; end

@@ -2,6 +2,11 @@ function segments = eyediagram(x, n)
 %EYEDIAGRAM Découpe un signal en segments de N échantillons.
 %   SEGMENTS = EYEDIAGRAM(X,N) rend une matrice dont chaque ligne est une
 %   trace ; sans sortie, la fonction les trace superposées.
+%
+%   Exemple :
+%      rng(1);
+%            eyediagram(rcosdesign(0.25, 4, 8) , 16);
+%            close all;
     x = x(:).';
     m = floor(numel(x) / n);
     segments = reshape(x(1:m*n), n, m).';

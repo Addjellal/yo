@@ -10,7 +10,8 @@ function moment = lpm(donnees, seuil, ordre)
 %   semi-variance.
 %
 %   Exemple :
-%      lpm(rendements, 0, 2)      % semi-variance sous zero
+%      rng(1);
+%      lpm(0.01 * randn(200, 1), 0, 2)      % semi-variance sous zero
 %
 %   Voir aussi ELPM, MAXDRAWDOWN, SHARPE, INFORATIO.
     if nargin < 2 || isempty(seuil), seuil = 0; end

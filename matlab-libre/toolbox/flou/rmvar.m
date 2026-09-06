@@ -4,7 +4,16 @@ function fis = rmvar(fis, genre, indiceVariable)
 %   colonne correspondante de la matrice des règles.
 %
 %   Exemple :
+%      fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+%      fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+%      fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+%      fis = addOutput(fis, [0 1], 'Name', 'commande');
+%      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+%      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+%      fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
+%      fis = addInput(fis, [0 1], 'Name', 'derivee');
 %      fis = rmvar(fis, 'input', 2);
+%      numel(variablesDe(fis, true))     % 1 : il n'en reste qu'une
 %
 %   Voir aussi ADDVAR, RMMF.
     entree = estEntree(genre);

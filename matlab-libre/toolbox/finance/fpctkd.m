@@ -5,7 +5,10 @@ function [rapideK, rapideD] = fpctkd(haut, bas, cloture, periodeK, periodeD)
 %   mobile sur M séances. N vaut 10 par défaut, M vaut 3.
 %
 %   Exemple :
-%      [k, d] = fpctkd(hauts, bas, clotures);
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      [k, d] = fpctkd(clotures + 1, clotures - 1, clotures);
+%      all(k >= 0 & k <= 100)            % 1 : c'est un pourcentage
 %
 %   Voir aussi SPCTKD, STOCHOSC, WILLPCTR.
     if nargin < 4 || isempty(periodeK), periodeK = 10; end

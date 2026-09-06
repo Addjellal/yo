@@ -5,7 +5,7 @@ function prix = medprice(haut, bas)
 %   l'ouverture, le plus haut, le plus bas et la clôture.
 %
 %   Exemple :
-%      medprice([12 10; 14 11])       % [11; 12.5]
+%      medprice([12; 14], [10; 11])       % [11; 12.5]
 %
 %   Voir aussi TYPPRICE, WCLOSE, HHIGH, LLOW.
     if nargin < 2, reste = {}; else, reste = {bas}; end

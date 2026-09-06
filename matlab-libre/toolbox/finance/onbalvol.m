@@ -8,7 +8,9 @@ function volumeCumule = onbalvol(cloture, volume)
 %   entre les deux annoncerait un retournement.
 %
 %   Exemple :
-%      onbalvol(clotures, volumes)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(40, 1));
+%      onbalvol(clotures, 1000 * ones(40, 1))
 %
 %   Voir aussi ADLINE, NEGVOLIDX, POSVOLIDX, PVTREND.
     if nargin < 2

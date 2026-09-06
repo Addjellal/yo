@@ -10,6 +10,9 @@ function critere = aic(modele, genre)
 %   liste, ce que le critère d'Akaike ne garantit pas.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u), u);
 %      aic(arx(z, [2 2 1]))
 %
 %   Voir aussi FPE, ARX, POLYEST.

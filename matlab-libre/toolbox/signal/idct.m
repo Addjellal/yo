@@ -1,5 +1,23 @@
 function x = idct(y, n)
 %IDCT Transformée en cosinus discrète inverse.
+%   X = IDCT(Y) rend la transformée en cosinus discrète inverse de Y :
+%   IDCT(DCT(X)) restitue X. La transformée est orthonormée, donc
+%   l'inverse est la transposée, et l'énergie se conserve.
+%
+%   X = IDCT(Y,N) tronque ou complète Y par des zéros à N points avant de
+%   transformer. Annuler les derniers coefficients est exactement ce que
+%   fait une compression : les coefficients de rang élevé portent les
+%   variations rapides, et les supprimer lisse le signal sans le déplacer.
+%
+%   C'est cette concentration de l'énergie dans les premiers coefficients,
+%   pour un signal corrélé, qui explique l'emploi de la DCT en JPEG et en
+%   MP3 plutôt que celui de la transformée de Fourier.
+%
+%   Exemple :
+%      x = [1 2 3 4 5]';
+%      max(abs(idct(dct(x)) - x)) < 1e-12
+%
+%   Voir aussi DCT, FFT, IFFT.
     y = y(:);
     if nargin > 1 && ~isempty(n)
         if numel(y) > n

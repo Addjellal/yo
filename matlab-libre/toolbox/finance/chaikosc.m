@@ -9,7 +9,9 @@ function oscillateur = chaikosc(haut, bas, cloture, volume)
 %   plus en plus.
 %
 %   Exemple :
-%      chaikosc(hauts, bas, clotures, volumes)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      chaikosc(clotures + 1, clotures - 1, clotures, 1000 * ones(60, 1))
 %
 %   Voir aussi ADLINE, ADOSC, CHAIKVOLAT, MACD.
     if nargin < 2

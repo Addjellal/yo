@@ -10,6 +10,13 @@ function [courbes, grille] = plotmf(fis, genre, indice, resolution)
 %   colonne par fonction.
 %
 %   Exemple :
+%      fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+%      fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+%      fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+%      fis = addOutput(fis, [0 1], 'Name', 'commande');
+%      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+%      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+%      fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
 %      [y, x] = plotmf(fis, 'input', 1);
 %      max(sum(y, 2))   % somme des appartenances au point le plus couvert
 %

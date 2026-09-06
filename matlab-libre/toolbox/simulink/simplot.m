@@ -5,9 +5,17 @@ function simplot(resultat, noms)
 %   quelques-uns, désignés par leur nom de bloc.
 %
 %   Exemple :
-%      r = sim(modele, 5, 0.001);
+%      m = new_system('boucle');
+%      m = add_block(m, 'constant', 'consigne', 'Value', 1);
+%      m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+%      m = add_block(m, 'gain', 'gain', 'Gain', 2);
+%      m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
+%      m = add_line(m, 'consigne', 'erreur', 1);
+%      m = add_line(m, 'sortie', 'erreur', 2);
+%      m = add_line(m, 'erreur', 'gain');
+%      m = add_line(m, 'gain', 'sortie');
+%      r = sim(m, 5, 0.01);
 %      simplot(r, {'consigne', 'sortie'});
-%      legend('consigne', 'sortie');
 %
 %   Voir aussi SIM, PLOT, LEGEND.
     if nargin < 2

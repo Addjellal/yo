@@ -1984,6 +1984,28 @@ WAVENAMES Noms des ondelettes disponibles.
 
 ```
 WAVEREC Reconstruction d'une décomposition multiniveaux.
+  X = WAVEREC(C,L) reconstruit le signal à partir de la décomposition
+  multiniveaux rendue par WAVEDEC, avec l'ondelette de Haar.
+  X = WAVEREC(C,L,NOM) emploie l'ondelette NOM, qui doit être celle de
+  la décomposition — reconstruire avec une autre ne rend pas le signal.
+
+  La remontée est symétrique de la descente : on part de l'approximation
+  la plus grossière, on lui adjoint le détail du niveau le plus profond
+  par IDWT, et le résultat sert d'approximation au niveau suivant.
+
+  La reconstruction est exacte à l'arrondi près pour un banc de filtres
+  à reconstruction parfaite, ce qui est la propriété qui définit une
+  ondelette orthogonale ou biorthogonale : les erreurs de repliement
+  introduites par la décimation d'un demi-canal sont exactement annulées
+  par celles de l'autre. Une longueur impaire fait produire à IDWT un
+  point de trop, retiré grâce à L(end) qui garde la longueur d'origine.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 3, 'db2');
+     max(abs(waverec(c, l, 'db2') - x)) < 1e-10
+
+  Voir aussi WAVEDEC, IDWT, DWT, WENERGY.
 ```
 
 ## `waverec2`
@@ -2049,6 +2071,25 @@ WCOHERENCE Cohérence en ondelettes de deux signaux.
 
 ```
 WCONV1 Convolution monodimensionnelle, orientation conservée.
+  Y = WCONV1(X,F) convole X par F et rend le résultat avec la même
+  orientation que X, ligne ou colonne. Y = WCONV1(X,F,FORME) choisit
+  'full' (par défaut), 'same' ou 'valid'.
+
+  C'est CONV muni de deux garanties que CONV n'offre pas : les entrées
+  sont converties en double, et l'orientation du résultat suit celle de
+  l'entrée. La seconde compte plus qu'il n'y paraît — un filtrage qui
+  rend une colonne là où l'appelant attend une ligne transforme
+  silencieusement une soustraction terme à terme en une matrice de
+  différences, et l'erreur ne se voit que bien plus loin.
+
+  'same' garde la longueur de X en centrant, 'valid' ne garde que les
+  points où les deux suites se recouvrent entièrement — les seuls que ne
+  contamine aucun effet de bord.
+
+  Exemple :
+     wconv1([1 2 3], [1 1], 'same')
+
+  Voir aussi CONV, WCONV2, WKEEP, DWT.
 ```
 
 ## `wconv2`
@@ -2200,6 +2241,28 @@ WDENOISE2 Débruitage d'une image par seuillage des coefficients.
 
 ```
 WENERGY Répartition de l'énergie entre approximation et détails.
+  [EA,ED] = WENERGY(C,L) rend la part d'énergie, en pour cent, portée
+  par l'approximation et par chacun des détails d'une décomposition
+  rendue par WAVEDEC. Les détails sont donnés du plus profond au plus
+  fin, dans l'ordre où ils figurent dans C.
+
+  La somme des pour cent vaut cent parce que la transformation est
+  orthogonale : elle conserve la norme, et l'énergie du signal se
+  répartit entre les sous-bandes sans se créer ni se perdre. C'est le
+  théorème de Parseval appliqué à un banc de filtres.
+
+  Cette répartition est un résumé utile : un signal lisse concentre
+  presque tout dans l'approximation, un signal bruité verse l'essentiel
+  dans les détails les plus fins. Le seuil de débruitage se choisit à
+  partir de là — retirer un niveau de détail qui ne porte qu'un pour
+  cent de l'énergie ne change presque rien au signal.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 3, 'db2');
+     [ea, ed] = wenergy(c, l);
+
+  Voir aussi WAVEDEC, WAVEREC, WDENOISE.
 ```
 
 ## `wenergy2`
@@ -2685,6 +2748,22 @@ WRCOEF2 Reconstruit une composante d'une décomposition d'image.
 
 ```
 WREV Renverse l'ordre des éléments d'un vecteur.
+  Y = WREV(X) renverse l'ordre des éléments de X, en conservant son
+  orientation, et convertit en double.
+
+  Le renversement n'est pas un utilitaire de confort : c'est l'opération
+  qui relie les quatre filtres d'un banc à reconstruction parfaite. Le
+  filtre de synthèse est le filtre d'analyse renversé, et le filtre
+  passe-haut s'obtient du passe-bas par renversement suivi d'une
+  alternance de signes — c'est la construction en miroir en quadrature.
+
+  Renverser un filtre revient aussi à passer de la convolution à la
+  corrélation : conv(x, wrev(f)) est la corrélation de x avec f.
+
+  Exemple :
+     wrev([1 2 3 4])
+
+  Voir aussi FLIPLR, FLIPUD, WCONV1, ORTHFILT.
 ```
 
 ## `wsst`

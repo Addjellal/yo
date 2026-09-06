@@ -5,7 +5,9 @@ function tendance = pvtrend(cloture, volume)
 %   l'ampleur du mouvement plutôt que par son seul signe.
 %
 %   Exemple :
-%      pvtrend(clotures, volumes)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(40, 1));
+%      pvtrend(clotures, 1000 * ones(40, 1))
 %
 %   Voir aussi ONBALVOL, NEGVOLIDX, POSVOLIDX, ADLINE.
     if nargin < 2

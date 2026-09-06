@@ -12,6 +12,9 @@ function prix = chooserbybls(courbe, actif, reglement, echeance, exercice, dateC
 %   La formule est celle de Rubinstein.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      chooserbybls(c, s, '01-Jan-2024', '01-Jan-2025', 100, '01-Jul-2024')
 %
 %   Voir aussi OPTSTOCKBYBLS, BARRIERBYBLS.

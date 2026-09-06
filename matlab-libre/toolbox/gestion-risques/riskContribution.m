@@ -15,7 +15,9 @@ function [contributions, risque] = riskContribution(entree, covariance)
 %
 %   Exemple :
 %      riskContribution([0.5 0.5], [0.04 0.01; 0.01 0.09])
-%      riskContribution(simulate(copule, 20000))
+%      copule = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+%                                   repmat([0.6 0.8], 2, 1));
+%      riskContribution(simulate(copule, 2000))
 %
 %   Voir aussi PORTFOLIORISK, CONFIDENCEBANDS, CREDITDEFAULTCOPULA.
     if matlibre_est_copule(entree)

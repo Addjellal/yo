@@ -8,6 +8,9 @@ function [prix, prixFloorlets] = floorbyblk(courbe, exercice, reglement, echeanc
 %   de fixe : c'est la parité achat-vente, appliquée période par période.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      floorbyblk(courbe, 0.04, '01-Jan-2024', '01-Jan-2029', 0.2, 4)
 %
 %   Voir aussi CAPBYBLK, SWAPTIONBYBLK, BLKPRICE.

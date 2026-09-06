@@ -9,7 +9,12 @@ function ligne = adline(haut, bas, cloture, volume)
 %   dit avec quelle force.
 %
 %   Exemple :
-%      adline(hauts, bas, clotures, volumes)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      hauts = clotures + 1;
+%      bas = clotures - 1;
+%      volumes = 1000 * ones(60, 1);
+%      ligne = adline(hauts, bas, clotures, volumes);
 %
 %   Voir aussi ADOSC, CHAIKOSC, ONBALVOL, WILLIAMSAD.
     if nargin < 2

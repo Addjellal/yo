@@ -8,7 +8,9 @@ function [lentK, lentD] = spctkd(rapideK, rapideD, periode)
 %   les moins informatifs.
 %
 %   Exemple :
-%      [k, d] = fpctkd(hauts, bas, clotures);
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      [k, d] = fpctkd(clotures + 1, clotures - 1, clotures);
 %      [kl, dl] = spctkd(k, d);
 %
 %   Voir aussi FPCTKD, STOCHOSC.

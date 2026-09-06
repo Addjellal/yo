@@ -56,6 +56,12 @@ classdef dlnetwork
             end
             if iscell(entree)
                 graphe = layerGraph(entree);
+            elseif isstruct(entree) && ~isfield(entree, 'Layers')
+                % Un tableau de couches, tel que [couche1; couche2] le
+                % construit : c'est l'ecriture usuelle de MATLAB pour un
+                % reseau en chaine. On le ramene a la liste que
+                % LAYERGRAPH attend.
+                graphe = layerGraph(num2cell(entree(:)'));
             else
                 graphe = entree;
             end

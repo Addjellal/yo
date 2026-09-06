@@ -138,6 +138,28 @@ ADDRULE Ajoute des règles à un système flou.
 
 ```
 ADDMF Ajoute une fonction d'appartenance à une variable.
+  FIS = ADDMF(FIS,GENRE,INDICE,NOM,TYPE,PARAMETRES) ajoute à la variable
+  numéro INDICE — d'entrée si GENRE vaut 'input', de sortie sinon — une
+  fonction d'appartenance nommée NOM, de forme TYPE ('trimf', 'trapmf',
+  'gaussmf', 'gbellmf', 'sigmf') et de paramètres PARAMETRES.
+
+  Une fonction d'appartenance est ce qui remplace le seuil : au lieu de
+  décider qu'au-delà de 25 degrés il fait chaud, elle donne à chaque
+  température un degré d'appartenance à « chaud », entre zéro et un. Un
+  même point appartient donc à plusieurs ensembles à la fois, et c'est
+  ce recouvrement qui rend continue la sortie du contrôleur : sans lui,
+  la commande sauterait au franchissement de chaque seuil.
+
+  Les fonctions d'une même variable doivent se recouvrir sans laisser de
+  trou, faute de quoi aucune règle ne se déclenche dans l'intervalle
+  découvert et la sortie est indéterminée.
+
+  Exemple :
+     fis = mamfis('Name', 'exemple');
+     fis = addInput(fis, [0 40], 'Name', 'temperature');
+     fis = addmf(fis, 'input', 1, 'chaud', 'gaussmf', [5 30]);
+
+  Voir aussi ADDINPUT, ADDOUTPUT, ADDRULE, GAUSSMF, TRIMF.
 ```
 
 ## `addrule`
@@ -446,12 +468,51 @@ GAUSS2MF Deux demi-gaussiennes raccordées par un plateau.
 
 ```
 GAUSSMF Fonction d'appartenance gaussienne de paramètres [sigma centre].
+  Y = GAUSSMF(X,[SIGMA CENTRE]) rend exp(-(X-CENTRE)^2/(2*SIGMA^2)),
+  c'est-à-dire une cloche valant un au centre et décroissant
+  symétriquement.
+
+  L'ordre des paramètres est celui de la logique floue, largeur d'abord
+  et centre ensuite — l'inverse de l'usage en probabilité, et une source
+  d'erreur classique. La fonction n'est pas normalisée : c'est un degré
+  d'appartenance, dont le maximum vaut un, non une densité dont
+  l'intégrale vaudrait un.
+
+  Son intérêt sur la fonction triangulaire est d'être partout dérivable,
+  ce qui rend la surface de commande lisse et permet d'ajuster les
+  paramètres par descente de gradient, comme le fait ANFIS. Elle ne
+  s'annule jamais tout à fait : toutes les règles restent actives, avec
+  des poids infimes loin du centre.
+
+  Exemple :
+     gaussmf([25 30 35], [5 30])
+
+  Voir aussi GBELLMF, SIGMF, TRIMF, TRAPMF, EVALFIS.
 ```
 
 ## `gbellmf`
 
 ```
 GBELLMF Cloche généralisée de paramètres [a b c].
+  Y = GBELLMF(X,[A B C]) rend 1/(1+|(X-C)/A|^(2*B)) : une cloche centrée
+  en C, de demi-largeur A à mi-hauteur, dont B règle la raideur des
+  flancs.
+
+  La valeur en C±A vaut exactement un demi quel que soit B, ce qui fait
+  de A une largeur lisible directement. B grand rapproche la courbe d'un
+  créneau — la logique floue redevient booléenne à la limite ; B petit
+  l'étale.
+
+  C'est sa souplesse qui la distingue de la gaussienne : trois
+  paramètres au lieu de deux, dont un qui découple la largeur du plateau
+  de la raideur des bords. Elle décroît en puissance et non en
+  exponentielle, donc ses queues sont plus lourdes et le recouvrement
+  entre ensembles éloignés plus marqué.
+
+  Exemple :
+     gbellmf([25 30 35], [5 2 30])
+
+  Voir aussi GAUSSMF, SIGMF, TRIMF, EVALFIS.
 ```
 
 ## `genfis`
@@ -837,6 +898,23 @@ POSEROPTIONS Applique des couples nom-valeur à une structure d'options.
 
 ```
 POSERVARIABLES Remplace la liste des entrées ou celle des sorties.
+  FIS = POSERVARIABLES(FIS,ENTREE,VARIABLES) remplace la liste des
+  variables d'entrée du système si ENTREE est vrai, celle des variables
+  de sortie sinon.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Elle existe en pendant de VARIABLESDE, pour que les fonctions qui
+  modifient une variable — ajouter une fonction d'appartenance, changer
+  une borne — n'aient pas à savoir dans quel champ de la structure les
+  entrées et les sorties sont rangées. Toute la connaissance de cette
+  disposition tient dans ces deux fonctions.
+
+  Exemple :
+     fis = mamfis();
+     fis = poserVariables(fis, true, {});
+
+  Voir aussi VARIABLESDE, ADDINPUT, ADDOUTPUT.
 ```
 
 ## `probor`
@@ -1051,6 +1129,23 @@ SHOWRULE Affiche les règles d'un système flou, en clair.
 
 ```
 SIGMF Fonction d'appartenance sigmoïde de paramètres [pente centre].
+  Y = SIGMF(X,[PENTE CENTRE]) rend 1/(1+exp(-PENTE*(X-CENTRE))) : une
+  courbe en S allant de zéro à un, valant un demi au centre.
+
+  Contrairement à la gaussienne et à la cloche, elle est monotone : elle
+  ne décrit pas « autour de », mais « au-delà de ». C'est la forme qui
+  convient aux ensembles ouverts d'un côté — « grand », « chaud » — dont
+  l'appartenance ne redescend pas quand on s'éloigne encore.
+
+  Une pente négative retourne la courbe et décrit « en deçà de ». Plus
+  la pente est grande en valeur absolue, plus la transition est courte ;
+  à la limite on retrouve le seuil net, et avec lui la discontinuité de
+  commande que la logique floue est faite d'éviter.
+
+  Exemple :
+     sigmf([20 30 40], [0.5 30])
+
+  Voir aussi GAUSSMF, GBELLMF, TRIMF, TRAPMF.
 ```
 
 ## `smf`
@@ -1234,6 +1329,22 @@ TUNEFISOPTIONS Options du réglage d'un système flou.
 
 ```
 VARIABLESDE Liste des variables d'entrée ou de sortie d'un système flou.
+  VARIABLES = VARIABLESDE(FIS,ENTREE) rend la liste des variables
+  d'entrée du système flou si ENTREE est vrai, celle des variables de
+  sortie sinon.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Avec POSERVARIABLES, elle isole la disposition interne de la structure
+  FIS : le reste de la boîte à outils parcourt les variables sans savoir
+  qu'elles sont rangées dans deux champs distincts, et un changement de
+  représentation ne touche que ces deux fonctions.
+
+  Exemple :
+     fis = mamfis();
+     numel(variablesDe(fis, true))
+
+  Voir aussi POSERVARIABLES, ADDINPUT, ADDOUTPUT, EVALFIS.
 ```
 
 ## `writefis`

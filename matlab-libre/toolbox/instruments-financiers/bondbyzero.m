@@ -10,6 +10,9 @@ function prix = bondbyzero(courbe, tauxCoupon, reglement, echeance, periode, bas
 %   quand elles sont valorisées sur la même courbe.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      bondbyzero(courbe, 0.05, '01-Jan-2024', '01-Jan-2029')
 %
 %   Voir aussi CFBYZERO, FIXEDBYZERO, SWAPBYZERO, BNDPRICE, INTENVPRICE.

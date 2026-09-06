@@ -4,7 +4,8 @@ function taux = volroc(volume, periode)
 %   N séances. N vaut 12 par défaut.
 %
 %   Exemple :
-%      volroc(volumes, 12)
+%      rng(1);
+%      volroc(1000 + 100 * randn(40, 1), 12)
 %
 %   Voir aussi PRCROC, CHAIKVOLAT, ONBALVOL.
     if nargin < 2 || isempty(periode), periode = 12; end

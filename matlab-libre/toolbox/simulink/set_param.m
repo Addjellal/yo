@@ -13,9 +13,18 @@ function modele = set_param(modele, nom, varargin)
 %   personne.
 %
 %   Exemple :
+%      m = new_system('boucle');
+%      m = add_block(m, 'constant', 'consigne', 'Value', 1);
+%      m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+%      m = add_block(m, 'gain', 'gain', 'Gain', 2);
+%      m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
+%      m = add_line(m, 'consigne', 'erreur', 1);
+%      m = add_line(m, 'sortie', 'erreur', 2);
+%      m = add_line(m, 'erreur', 'gain');
+%      m = add_line(m, 'gain', 'sortie');
 %      for K = [1 2 5]
 %          m = set_param(m, 'gain', 'Gain', K);
-%          r = sim(m, 5, 0.001);
+%          r = sim(m, 5, 0.01);
 %      end
 %
 %   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.

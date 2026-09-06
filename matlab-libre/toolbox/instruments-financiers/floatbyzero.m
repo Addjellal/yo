@@ -11,6 +11,9 @@ function [prix, flux, dates] = floatbyzero(courbe, ecart, reglement, echeance, f
 %   à chaque fixation.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      floatbyzero(courbe, 0, '01-Jan-2024', '01-Jan-2029', 4)
 %
 %   Voir aussi FIXEDBYZERO, SWAPBYZERO.

@@ -8,7 +8,9 @@ function indice = negvolidx(cloture, volume, depart)
 %   n'agit pas dans la foule.
 %
 %   Exemple :
-%      negvolidx(clotures, volumes)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(40, 1));
+%      negvolidx(clotures, 1000 + 100 * randn(40, 1))
 %
 %   Voir aussi POSVOLIDX, ONBALVOL, PVTREND.
     if nargin < 3 || isempty(depart), depart = 100; end

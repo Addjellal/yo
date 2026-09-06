@@ -9,7 +9,9 @@ function oscillateur = adosc(ouverture, haut, bas, cloture)
 %   plus haut, zéro dans le cas contraire.
 %
 %   Exemple :
-%      adosc(ouvertures, hauts, bas, clotures)
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
+%      adosc(clotures + 0.2, clotures + 1, clotures - 1, clotures)
 %
 %   Voir aussi ADLINE, CHAIKOSC, WILLIAMSAD.
     if nargin < 2

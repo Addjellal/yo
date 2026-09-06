@@ -9,14 +9,14 @@ function [Y, E, V] = simulate(modele, nombre, varargin)
 %   pour que l'effet du départ ait disparu : la série rendue suit la loi
 %   stationnaire du modèle.
 %
+%   SIMULATE d'un modèle de portefeuille de crédit rend, lui, l'objet
+%   enrichi de ses scénarios de pertes, que PORTFOLIORISK et
+%   RISKCONTRIBUTION exploitent ensuite.
+%
 %   Exemple :
 %      m = arima('Constant', 0, 'AR', {0.8}, 'Variance', 1);
 %      y = simulate(m, 1000);
 %      abs(var(y) - 1 / (1 - 0.64)) < 0.5      % variance theorique
-%
-%   SIMULATE d'un modèle de portefeuille de crédit rend l'objet enrichi
-%   de ses scénarios de pertes, que PORTFOLIORISK et RISKCONTRIBUTION
-%   exploitent ensuite.
 %
 %   Voir aussi ARIMA, GARCH, ESTIMATE, FORECAST, INFER,
 %   CREDITDEFAULTCOPULA.

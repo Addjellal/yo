@@ -2,6 +2,9 @@ function v = completerLongueur(v, longueur)
 %COMPLETERLONGUEUR Complète un polynôme de zéros, ou le tronque.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      completerLongueur([1 2 3], 5)     % [1 2 3 0 0]
     longueur = round(longueur);
     if isvector(v)
         % Un scalaire est à la fois ligne et colonne : le rendre en

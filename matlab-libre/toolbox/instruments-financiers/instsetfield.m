@@ -5,6 +5,7 @@ function jeu = instsetfield(jeu, varargin)
 %   instruments par leur type.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
 %      jeu = instsetfield(jeu, 'Index', 1, 'FieldName', 'CouponRate', ...
 %                         'Data', 0.06);
 %

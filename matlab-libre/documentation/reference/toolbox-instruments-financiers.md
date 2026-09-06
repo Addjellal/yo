@@ -219,12 +219,53 @@ BONDBYZERO Prix d'une obligation, sur une courbe zéro-coupon.
 
 ```
 BONDCONVEXITY Convexité d'une obligation.
+  C = BONDCONVEXITY(TAUX,COUPON,ECHEANCE,NOMINAL,FREQUENCE) rend la
+  convexité d'une obligation : la dérivée seconde du prix par rapport au
+  taux, divisée par le prix. NOMINAL vaut 100 et FREQUENCE 1 par défaut.
+
+  La duration donne la pente de la courbe prix-taux, la convexité sa
+  courbure. Le développement au second ordre s'écrit
+  dP/P = -Dm*dr + C*dr^2/2 : la duration seule surestime toujours la
+  perte quand les taux montent et sous-estime le gain quand ils
+  baissent, et la convexité corrige cet écart.
+
+  Elle est positive pour une obligation ordinaire, ce qui est une bonne
+  nouvelle pour son détenteur : à duration égale, l'obligation la plus
+  convexe gagne plus et perd moins. Cet avantage se paie — les titres
+  très convexes se négocient à un taux légèrement inférieur.
+
+  Exemple :
+     bondconvexity(0.05, 0.06, 10)
+
+  Voir aussi BONDDUR, BONDPRICE, BONDYIELD.
 ```
 
 ## `bonddur`
 
 ```
 BONDDUR Durations de Macaulay et modifiée.
+  [MACAULAY,MODIFIEE] = BONDDUR(TAUX,COUPON,ECHEANCE,NOMINAL,FREQUENCE)
+  rend la duration de Macaulay, en années, et la duration modifiée.
+  NOMINAL vaut 100 et FREQUENCE 1 par défaut.
+
+  La duration de Macaulay est la date moyenne des flux, pondérée par
+  leur valeur actuelle : le centre de gravité de l'échéancier. Une
+  obligation sans coupon a une duration égale à sa maturité ; les
+  coupons, qui rendent de l'argent plus tôt, la raccourcissent.
+
+  La duration modifiée en est la conséquence pratique : elle vaut
+  Macaulay/(1+TAUX/FREQUENCE) et donne directement la sensibilité
+  relative du prix — une hausse d'un point de taux fait perdre environ
+  MODIFIEE pour cent. C'est l'unité de mesure du risque de taux, et
+  celle dans laquelle se couvre un portefeuille obligataire.
+
+  L'approximation n'est que du premier ordre : pour de fortes variations
+  de taux, il faut y ajouter le terme de convexité.
+
+  Exemple :
+     [m, mo] = bonddur(0.05, 0.06, 10);
+
+  Voir aussi BONDCONVEXITY, BONDPRICE, BONDYIELD.
 ```
 
 ## `bondprice`
@@ -238,6 +279,27 @@ BONDPRICE Prix d'une obligation à coupons constants.
 
 ```
 BONDYIELD Taux actuariel d'une obligation, par dichotomie.
+  TAUX = BONDYIELD(PRIX,COUPON,ECHEANCE,NOMINAL,FREQUENCE) rend le taux
+  actuariel : celui qui, appliqué à tous les flux, redonne exactement
+  PRIX. NOMINAL vaut 100 et FREQUENCE 1 par défaut. Le zéro est cherché
+  entre -99 % et 1000 %.
+
+  Le prix est une fonction strictement décroissante du taux, ce qui rend
+  le taux actuariel unique et le calcul par dichotomie sûr — à la
+  différence du taux de rendement interne d'un projet quelconque, dont
+  les flux changent plusieurs fois de signe.
+
+  C'est le taux de rendement effectif si l'obligation est portée jusqu'à
+  l'échéance et si les coupons sont replacés à ce même taux. Cette
+  seconde hypothèse est rarement vérifiée, et l'écart entre le rendement
+  annoncé et le rendement réalisé vient d'elle. Une obligation cotée
+  au-dessus du pair a un taux actuariel inférieur à son coupon, et
+  inversement.
+
+  Exemple :
+     bondyield(bondprice(0.05, 0.06, 10), 0.06, 10)
+
+  Voir aussi BONDPRICE, BONDDUR, BONDCONVEXITY.
 ```
 
 ## `capbyblk`
@@ -477,6 +539,24 @@ DATE2TIME Durée entre deux dates, comptée en périodes.
 
 ```
 DISCOUNTFACTOR Facteurs d'actualisation d'une courbe de taux.
+  D = DISCOUNTFACTOR(TAUX,ECHEANCES) rend les facteurs d'actualisation
+  1./(1+TAUX).^ECHEANCES, un par couple taux-échéance. TAUX est le taux
+  zéro-coupon propre à chaque échéance, non un taux unique.
+
+  Un facteur d'actualisation est le prix d'aujourd'hui pour un euro reçu
+  à l'échéance. Une fois cette courbe connue, tout instrument à flux
+  certains s'évalue par un simple produit scalaire entre son échéancier
+  et les facteurs : la valorisation ne demande plus aucune hypothèse.
+
+  Les facteurs décroissent avec l'échéance dès que les taux sont
+  positifs, et valent un à l'instant zéro. Ce sont eux, et non les taux,
+  qui s'interpolent proprement : interpoler des taux peut engendrer des
+  taux à terme négatifs entre deux points de la courbe.
+
+  Exemple :
+     discountfactor([0.02 0.025 0.03], [1 2 3])'
+
+  Voir aussi FORWARDRATE, BONDPRICE, PV.
 ```
 
 ## `fixedbyzero`
@@ -537,6 +617,25 @@ FLOORBYBLK Prix d'un plancher de taux, modèle de Black.
 
 ```
 FORWARDRATE Taux à terme implicite entre deux échéances.
+  F = FORWARDRATE(TAUX1,T1,TAUX2,T2) rend le taux à terme implicite
+  entre les échéances T1 et T2, déduit des deux taux zéro-coupon :
+  ((1+TAUX2)^T2/(1+TAUX1)^T1)^(1/(T2-T1)) - 1.
+
+  Ce taux n'est pas une prévision, c'est une contrainte d'arbitrage.
+  Placer à T2 directement, ou placer à T1 puis replacer au taux à terme,
+  doit rapporter la même chose ; sinon il existerait un gain sans risque
+  à emprunter d'un côté pour prêter de l'autre. C'est l'égalité des deux
+  chemins qui détermine F, quelles que soient les anticipations.
+
+  Une courbe de taux croissante donne des taux à terme supérieurs aux
+  taux comptants, et une courbe inversée des taux à terme inférieurs —
+  ce qui se lit souvent comme une anticipation de baisse, à la prime de
+  terme près.
+
+  Exemple :
+     forwardrate(0.02, 1, 0.03, 2)
+
+  Voir aussi DISCOUNTFACTOR, BONDYIELD, PV.
 ```
 
 ## `gapbybls`

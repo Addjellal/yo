@@ -14,6 +14,9 @@ function prix = asianbykv(courbe, actif, typeOption, exercice, reglement, echean
 %   est moins volatile que le cours final.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      asianbykv(c, s, 'call', 100, '01-Jan-2024', '01-Jan-2025')
 %
 %   Voir aussi ASIANBYLEVY, LOOKBACKBYBLS, OPTSTOCKBYBLS.

@@ -2,7 +2,8 @@ function c = circuit(nom)
 %CIRCUIT Crée un circuit vide.
 %   C = CIRCUIT(NOM) rend un circuit sans composant. Le nœud 0 est la
 %   masse, et les autres se numérotent librement : le circuit compte comme
-%   nœuds tous ceux qu'un composant nomme.
+%   nœuds tous ceux qu'un composant nomme. CIRCUIT() rend un circuit sans
+%   nom, ce qui suffit quand on n'en manipule qu'un.
 %
 %   Décrire un circuit, non les équations qui le régissent : c'est le
 %   propos. On pose des composants entre des nœuds, et SOLVEDC ou
@@ -17,6 +18,9 @@ function c = circuit(nom)
 %
 %   Voir aussi ADDRESISTOR, ADDCAPACITOR, ADDINDUCTOR, ADDVOLTAGESOURCE,
 %   ADDCURRENTSOURCE, SOLVEDC, SOLVETRANSIENT.
+    if nargin < 1
+        nom = '';
+    end
     c = struct();
     c.nom = nom;
     c.composants = {};

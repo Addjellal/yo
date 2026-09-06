@@ -10,6 +10,8 @@ function [ligne, signal] = macd(cloture, courte, longue, lissage)
 %   guettent ses utilisateurs.
 %
 %   Exemple :
+%      rng(1);
+%      clotures = 100 + cumsum(randn(100, 1));
 %      [l, s] = macd(clotures);
 %
 %   Voir aussi MOVAVG, RSINDEX, TSMOM, CHAIKOSC.

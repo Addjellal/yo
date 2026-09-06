@@ -10,6 +10,9 @@ function prix = cashbybls(courbe, actif, reglement, echeance, typeOption, exerci
 %   signifie.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      cashbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 100, 10)
 %
 %   Voir aussi ASSETBYBLS, GAPBYBLS, SUPERSHAREBYBLS.

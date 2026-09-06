@@ -200,6 +200,21 @@ ANNOTATION Flèche, trait, rectangle ou texte posé sur la figure.
 
 ```
 AUTUMN Carte de couleurs rouge - jaune.
+  CARTE = AUTUMN() rend une carte de 256 couleurs allant du rouge au
+  jaune. CARTE = AUTUMN(M) en rend M. Chaque ligne est un triplet
+  rouge-vert-bleu dans [0,1].
+
+  Le rouge reste à un, le vert monte de zéro à un, le bleu est nul. La
+  luminance croît donc de façon monotone d'un bout à l'autre : la carte
+  garde un ordre lisible même imprimée en niveaux de gris, ce qui n'est
+  pas le cas de toutes. Elle n'atteint ni le noir ni le blanc, si bien
+  que les deux extrêmes restent visibles sur un fond blanc.
+
+  Exemple :
+     carte = autumn(8);
+     size(carte)
+
+  Voir aussi SPRING, SUMMER, WINTER, COLORMAP, PARULA.
 ```
 
 ## `bar3`
@@ -585,12 +600,45 @@ CONVN Convolution à N dimensions.
 
 ```
 COOL Carte de couleurs cyan - magenta.
+  CARTE = COOL() rend une carte de 256 couleurs allant du cyan au
+  magenta. CARTE = COOL(M) en rend M.
+
+  Le rouge monte de zéro à un, le vert descend de un à zéro, le bleu
+  reste à un. La somme des trois canaux est constante : la carte varie
+  presque uniquement en teinte, et très peu en luminance. C'est ce qui
+  la rend agréable à l'écran et impropre à l'impression en niveaux de
+  gris, où elle s'aplatit ; elle est également difficile à lire pour
+  une vision déficiente au rouge et au vert.
+
+  Exemple :
+     carte = cool(8);
+     sum(carte(1, :)) - sum(carte(end, :))
+
+  Voir aussi AUTUMN, WINTER, COLORMAP, PARULA.
 ```
 
 ## `copper`
 
 ```
 COPPER Carte de couleurs noir - cuivre.
+  CARTE = COPPER() rend une carte de 256 couleurs allant du noir au
+  cuivre. CARTE = COPPER(M) en rend M.
+
+  Les trois canaux montent proportionnellement à la même rampe, dans le
+  rapport 1,25 / 0,7812 / 0,4975 : la teinte ne change jamais, seule la
+  clarté augmente. Le rouge sature à un aux quatre cinquièmes du
+  parcours, ce qui donne le reflet métallique du haut de l'échelle.
+
+  Une carte à teinte fixe et clarté monotone est celle qui trahit le
+  moins : elle ne crée aucune frontière là où les données varient
+  régulièrement, contrairement aux cartes arc-en-ciel dont les brusques
+  changements de teinte font croire à des paliers.
+
+  Exemple :
+     carte = copper(8);
+     carte(end, :)
+
+  Voir aussi BONE, PINK, GRAY, HOT, COLORMAP.
 ```
 
 ## `copyobj`
@@ -1801,6 +1849,25 @@ ISKEYWORD Mot réservé du langage ?
 
 ```
 ISMEMBERTOL Appartenance à un ensemble, à une tolérance près.
+  TF = ISMEMBERTOL(A,S) rend, pour chaque élément de A, vrai s'il existe
+  dans S un élément dont il s'écarte de moins de 1e-6 fois l'échelle des
+  données. TF = ISMEMBERTOL(A,S,TOL) impose la tolérance.
+
+  L'échelle est le plus grand module rencontré dans A et dans S, borné
+  par en dessous à un : la tolérance est donc relative, et une même
+  valeur de TOL a le même sens sur des données en mètres et sur les
+  mêmes en kilomètres.
+
+  C'est ISMEMBER rendu utilisable sur des flottants. 0.1+0.2 n'est pas
+  0.3 en binaire, et l'égalité exacte répond non là où toute autre
+  considération dit oui. La contrepartie est que la relation
+  « proche à TOL près » n'est pas transitive : elle ne partage pas les
+  données en classes, et le résultat peut dépendre de l'ordre de S.
+
+  Exemple :
+     ismembertol(0.1 + 0.2, [0.3 0.5])
+
+  Voir aussi ISMEMBER, UNIQUETOL, EPS.
 ```
 
 ## `ismissing`
@@ -2788,6 +2855,22 @@ PIE3 Diagramme circulaire en perspective.
 
 ```
 PINK Carte de couleurs pastel, pour les images en sépia.
+  CARTE = PINK() rend une carte de 256 couleurs pastel, dans les tons
+  sépia. CARTE = PINK(M) en rend M.
+
+  Elle vaut sqrt((2*GRAY + HOT)/3). La racine est une correction de
+  gamma : elle relève les valeurs basses, si bien que la clarté perçue
+  croît à peu près linéairement le long de l'échelle, alors qu'elle
+  croîtrait trop lentement dans l'ombre sans elle.
+
+  D'où son usage sur les photographies en noir et blanc, qu'elle teinte
+  sans détruire l'ordre des niveaux : la carte reste monotone en clarté.
+
+  Exemple :
+     carte = pink(8);
+     carte(1, :)
+
+  Voir aussi GRAY, HOT, BONE, COPPER, COLORMAP.
 ```
 
 ## `pivot`
@@ -2930,6 +3013,25 @@ POW2 Puissance de deux, ou mantisse mise à l'échelle.
 
 ```
 PRISM Carte de couleurs répétant les six couleurs du prisme.
+  CARTE = PRISM() rend une carte de 256 couleurs répétant en boucle les
+  six couleurs du prisme : rouge, orange, jaune, vert, bleu, violet.
+  CARTE = PRISM(M) en rend M.
+
+  Elle est délibérément discontinue : deux niveaux voisins reçoivent des
+  couleurs sans rapport, et le motif recommence tous les six niveaux.
+  Elle ne représente donc aucun ordre, et employée sur un champ continu
+  elle fabrique des bandes qui n'existent pas dans les données.
+
+  Son usage est ailleurs : distinguer des régions étiquetées, des lignes
+  de niveau successives, des composantes connexes — tout ce qui est
+  nominal et non ordonné, où le contraste maximal entre voisins est
+  justement ce qu'on cherche.
+
+  Exemple :
+     carte = prism(12);
+     isequal(carte(1:6, :), carte(7:12, :))
+
+  Voir aussi COLORMAP, LINES, PARULA, HSV.
 ```
 
 ## `quiver`
@@ -3483,6 +3585,20 @@ SPLITLINES Découpe du texte à chaque saut de ligne.
 
 ```
 SPRING Carte de couleurs magenta - jaune.
+  CARTE = SPRING() rend une carte de 256 couleurs allant du magenta au
+  jaune. CARTE = SPRING(M) en rend M.
+
+  Le rouge reste à un, le vert monte de zéro à un et le bleu descend de
+  un à zéro : la carte parcourt le bord du cube des couleurs à rouge
+  maximal. Comme COOL, elle varie surtout en teinte, la luminance
+  augmentant peu ; elle sert quand on veut du contraste coloré sans
+  éclaircir le fond.
+
+  Exemple :
+     carte = spring(8);
+     carte(end, :)
+
+  Voir aussi AUTUMN, SUMMER, WINTER, COLORMAP.
 ```
 
 ## `stackedplot`
@@ -3578,6 +3694,22 @@ STRINGS Tableau de chaînes vides.
 
 ```
 SUMMER Carte de couleurs vert - jaune.
+  CARTE = SUMMER() rend une carte de 256 couleurs allant du vert au
+  jaune. CARTE = SUMMER(M) en rend M.
+
+  Le rouge monte de zéro à un, le vert de 0,5 à un, le bleu reste à 0,4.
+  Le bleu constant, non nul, désature l'ensemble : aucune couleur n'est
+  pure, ce qui adoucit la carte et évite les teintes criardes des cartes
+  à canaux saturés.
+
+  La clarté croît de façon monotone, donc l'ordre des valeurs reste
+  lisible en niveaux de gris.
+
+  Exemple :
+     carte = summer(8);
+     carte(:, 3)'
+
+  Voir aussi AUTUMN, SPRING, WINTER, COLORMAP.
 ```
 
 ## `surfc`
@@ -3970,6 +4102,22 @@ WILKINSON Matrice d'essai de Wilkinson.
 
 ```
 WINTER Carte de couleurs bleu - vert.
+  CARTE = WINTER() rend une carte de 256 couleurs allant du bleu au
+  vert. CARTE = WINTER(M) en rend M.
+
+  Le rouge est nul, le vert monte de zéro à un, le bleu descend de un à
+  0,5 sans jamais s'annuler. La carte reste donc froide d'un bout à
+  l'autre, et le bleu résiduel empêche le vert pur en fin d'échelle.
+
+  L'absence de rouge la rend lisible pour la forme la plus répandue de
+  déficience de la vision des couleurs, qui confond le rouge et le vert :
+  c'est ce qui la distingue des cartes arc-en-ciel.
+
+  Exemple :
+     carte = winter(8);
+     all(carte(:, 1) == 0)
+
+  Voir aussi AUTUMN, SPRING, SUMMER, COLORMAP, PARULA.
 ```
 
 ## `writecell`

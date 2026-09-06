@@ -11,8 +11,10 @@ function options = subclustOptions(varargin)
 %     Verbose                affichage, 0
 %
 %   Exemple :
-%      o = subclustOptions('ClusterInfluenceRange', 0.3);
-%      c = subclust(donnees, o);
+%      rng(1);
+%      donnees = [randn(30, 2); randn(30, 2) + 8];
+%      o = subclustOptions('ClusterInfluenceRange', 0.5);
+%      c = subclust(donnees, o.ClusterInfluenceRange);
 %
 %   Voir aussi SUBCLUST, GENFISOPTIONS, FCM.
     options = struct('ClusterInfluenceRange', 0.5, 'DataScale', 'auto', ...

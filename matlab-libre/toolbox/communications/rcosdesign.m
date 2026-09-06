@@ -2,6 +2,10 @@ function h = rcosdesign(beta, symboles, echantillons, forme)
 %RCOSDESIGN Filtre en cosinus surélevé, ou sa racine.
 %   H = RCOSDESIGN(BETA,SPAN,SPS,'sqrt') rend la racine du cosinus
 %   surélevé, normalisée en énergie.
+%
+%   Exemple :
+%      h = rcosdesign(0.25, 6, 4);
+%            abs(sum(h .^ 2) - 1) < 1e-10      % 1 : energie unite
     if nargin < 4
         forme = 'sqrt';
     end

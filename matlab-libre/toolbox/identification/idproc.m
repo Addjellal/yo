@@ -17,6 +17,9 @@ classdef idproc
 %   Propriétés : Type, K, Tp1, Tp2, Tz, Td, Ts, NoiseVariance, Report.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      m = procest(z, 'P1D');
 %      m.K, m.Tp1, m.Td
 %

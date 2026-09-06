@@ -441,6 +441,32 @@ IDTF Fonction de transfert estimée.
 
 ```
 IMPULSEEST Réponse impulsionnelle estimée par moindres carrés.
+  H = IMPULSEEST(DONNEES) estime les 20 premiers points de la réponse
+  impulsionnelle du système dont DONNEES porte l'entrée U et la sortie Y.
+  H = IMPULSEEST(DONNEES,N) en estime N.
+
+  La sortie est écrite comme la convolution de l'entrée par la réponse
+  cherchée, ce qui donne un système linéaire en les coefficients de
+  celle-ci, résolu au sens des moindres carrés. Aucune structure n'est
+  supposée : ni ordre, ni pôles, ni retard — c'est un modèle non
+  paramétrique, et il sert surtout à découvrir ces éléments avant de
+  choisir une structure paramétrique.
+
+  Le retard pur se lit directement : les premiers coefficients sont
+  nuls, et leur nombre donne le retard en périodes d'échantillonnage.
+
+  L'entrée doit être suffisamment riche. Une entrée en échelon, ou une
+  sinusoïde unique, rend la matrice de régression mal conditionnée et
+  l'estimation instable : il faut une séquence binaire pseudo-aléatoire
+  ou du bruit blanc, qui excitent toutes les fréquences.
+
+  Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 1 0.5], 1, u), u);
+     h = impulseest(z, 5);      % 0, 1, 0.5, 0, 0
+
+  Voir aussi ARX, PREDICTARX, IMPULSE, IDDATA.
 ```
 
 ## `iv4`
@@ -1785,6 +1811,29 @@ POLYEST Estimation d'un modèle polynomial quelconque.
 
 ```
 PREDICTARX Prédiction à un pas d'un modèle ARX.
+  YHAT = PREDICTARX(MODELE,DONNEES) rend la prédiction à un pas d'un
+  modèle ARX : A(q)y(t) = B(q)u(t), la sortie prédite au temps t étant
+  calculée à partir des sorties et des entrées mesurées jusqu'à t-1.
+
+  Prédire à un pas n'est pas simuler. Ici les sorties passées employées
+  sont les vraies, mesurées ; une simulation réinjecterait ses propres
+  prédictions et laisserait l'erreur s'accumuler. C'est pourquoi un
+  modèle peut prédire excellemment à un pas et diverger en simulation :
+  le premier exercice est presque toujours facile dès que la sortie est
+  régulière, et ne prouve pas grand-chose.
+
+  Les termes antérieurs au début de l'enregistrement sont pris nuls, ce
+  qui fausse les premiers points ; ils sont à écarter avant tout calcul
+  d'erreur d'ajustement.
+
+  Exemple :
+     rng(1);
+     u = randn(200, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u), u);
+     m = arx(z, [1 1 1]);
+     yhat = predictArx(m, z);
+
+  Voir aussi ARX, IMPULSEEST, COMPARE, IDDATA.
 ```
 
 ## `procest`

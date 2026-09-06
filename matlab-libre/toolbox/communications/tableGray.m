@@ -3,6 +3,10 @@ function correspondance = tableGray(modulation, M)
 %   CORRESPONDANCE(k+1) est le numéro de Gray du symbole binaire k. Pour
 %   les constellations à une dimension c'est le code de Gray usuel ; pour
 %   'qam' carrée, le code s'applique à chacune des deux coordonnées.
+%
+%   Exemple :
+%      table = tableGray('psk', 8);
+%            isequal(sort(table(:)'), 0:7)               % 1
     modulation = lower(char(modulation));
     M = double(M);
     if M < 2 || abs(log2(M) - round(log2(M))) > 0

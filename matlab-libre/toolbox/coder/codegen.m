@@ -24,9 +24,12 @@ function sortie = codegen(varargin)
 %   structure matlibre_cplx de deux double, définie dans l'en-tête.
 %
 %   Exemple :
-%      codegen('carreDeTest', '-args', {0}, '-report')
-%      codegen('produitTest', '-args', {zeros(3,3), zeros(3,1)})
-%      codegen('filtreTest',  '-args', {complex(zeros(1,8))})
+%      % La fonction a traduire doit exister sur le chemin : on l'ecrit.
+%      f = fopen('carreDeTest.m', 'w');
+%      fprintf(f, 'function y = carreDeTest(x)\n  y = x * x;\nend\n');
+%      fclose(f);
+%      r = codegen('carreDeTest', '-args', {0}, '-report');
+%      contains(r.source, 'double carreDeTest(double x)')     % 1
 %
 %   Voir aussi CODEGENBUILD, CODER.TYPEOF.
     if isempty(varargin)

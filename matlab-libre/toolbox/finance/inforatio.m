@@ -10,7 +10,9 @@ function [ratio, erreurSuivi] = inforatio(actif, reference)
 %   mandat est de battre un indice.
 %
 %   Exemple :
-%      inforatio(actif, indice)
+%      rng(1);
+%      indice = 0.001 + 0.01 * randn(120, 1);
+%      inforatio(indice + 0.002, indice)
 %
 %   Voir aussi SHARPE, PORTALPHA, MAXDRAWDOWN.
     actif = double(actif);

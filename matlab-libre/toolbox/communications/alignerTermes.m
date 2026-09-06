@@ -6,6 +6,9 @@ function [a, b] = alignerTermes(a, b)
 %   même valeur.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [a, b] = alignerTermes(5, [1 2 3]);   % a devient [5 5 5]
     a = double(a);
     b = double(b);
     if isequal(size(a), size(b))

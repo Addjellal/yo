@@ -605,6 +605,20 @@ unsigned long long masqueBits(int largeur) {
     return largeur >= 64 ? ~0ULL : ((1ULL << largeur) - 1ULL);
 }
 
+// bitget et bitset acceptent un dernier argument nommant le type suppose,
+// « uint8 » par exemple : c'est lui qui borne alors le rang admissible.
+int largeurBitsDeNom(const Valeur& v, const char* fonction) {
+    std::string nom = v.versTexte();
+    if (nom == "int8" || nom == "uint8") return 8;
+    if (nom == "int16" || nom == "uint16") return 16;
+    if (nom == "int32" || nom == "uint32") return 32;
+    if (nom == "int64" || nom == "uint64") return 64;
+    if (nom == "double") return 53;
+    if (nom == "single") return 24;
+    throw ErreurMatlab(std::string("MATLAB:") + fonction + ":InvalidType",
+                          "Type suppose inconnu : " + nom + ".");
+}
+
 FONCTION(fnBitshift) {
     INUTILISE
     exigerArguments(args, 2, 3, "bitshift");
@@ -620,6 +634,77 @@ FONCTION(fnBitshift) {
                          int k = (int)n;
                          if (k >= 64 || k <= -64) return 0.0;
                          return (double)(k >= 0 ? ((x << k) & masque) : (x >> (-k)));
+                     },
+                     classe)};
+}
+
+// Le rang d'un bit se compte a partir de un, pour le bit de poids
+// faible : bitget(5,1) vaut 1 et bitget(5,3) vaut 1, puisque cinq s'ecrit
+// 101. Un rang hors de la largeur du type est refuse, sans quoi le
+// decalage serait indefini et rendrait n'importe quoi.
+FONCTION(fnBitget) {
+    INUTILISE
+    exigerArguments(args, 2, 3, "bitget");
+    exigerNumerique(args[0], "bitget");
+    exigerNumerique(args[1], "bitget");
+    Classe classe = args[0].classe;
+    int largeur = args.size() > 2 ? largeurBitsDeNom(args[2], "bitget")
+                                  : largeurBits(classe);
+    return {diffuser(args[0], args[1],
+                     [largeur](double a, double rang) {
+                         int k = (int)rang;
+                         if (k < 1 || k > largeur || k != rang)
+                             throw ErreurMatlab(
+                                 "MATLAB:bitget:InvalidBitIndex",
+                                 "Le rang du bit doit etre un entier entre 1 et la "
+                                 "largeur du type.");
+                         unsigned long long x = (unsigned long long)(long long)a;
+                         return (double)((x >> (k - 1)) & 1ULL);
+                     },
+                     classe)};
+}
+
+// bitset(A,RANG) met le bit a un ; bitset(A,RANG,V) lui donne la valeur V,
+// qui ne peut valoir que zero ou un. Le type du resultat est celui de A :
+// poser un bit ne change pas la classe de ce qu'on modifie.
+FONCTION(fnBitset) {
+    INUTILISE
+    exigerArguments(args, 2, 4, "bitset");
+    exigerNumerique(args[0], "bitset");
+    exigerNumerique(args[1], "bitset");
+    Classe classe = args[0].classe;
+    bool aValeur = args.size() > 2 && args[2].classe != Classe::Caractere && args[2].classe != Classe::Chaine;
+    int indiceType = aValeur ? 3 : 2;
+    int largeur = (int)args.size() > indiceType
+                      ? largeurBitsDeNom(args[(size_t)indiceType], "bitset")
+                      : largeurBits(classe);
+    Valeur valeurs = aValeur ? args[2] : Valeur::scalaire(1.0);
+    Valeur pose = diffuser(args[1], valeurs,
+                           [](double rang, double v) {
+                               if (v != 0.0 && v != 1.0)
+                                   throw ErreurMatlab(
+                                       "MATLAB:bitset:InvalidBitValue",
+                                       "La valeur d'un bit vaut zero ou un.");
+                               return rang * 2.0 + v;
+                           },
+                           Classe::Double);
+    return {diffuser(args[0], pose,
+                     [largeur](double a, double code) {
+                         double v = std::fmod(code, 2.0);
+                         double rang = (code - v) / 2.0;
+                         int k = (int)rang;
+                         if (k < 1 || k > largeur || k != rang)
+                             throw ErreurMatlab(
+                                 "MATLAB:bitset:InvalidBitIndex",
+                                 "Le rang du bit doit etre un entier entre 1 et la "
+                                 "largeur du type.");
+                         unsigned long long x = (unsigned long long)(long long)a;
+                         unsigned long long masque = 1ULL << (k - 1);
+                         if (v != 0.0)
+                             x |= masque;
+                         else
+                             x &= ~masque;
+                         return (double)x;
                      },
                      classe)};
 }
@@ -1053,6 +1138,8 @@ void enregistrerMath(Interpreteur& it) {
         {"bitand", fnBitand, "bitand  Et binaire."},
         {"bitor", fnBitor, "bitor  Ou binaire."},
         {"bitxor", fnBitxor, "bitxor  Ou exclusif binaire."},
+        {"bitget", fnBitget, "bitget  Valeur d'un bit, rang compte depuis le poids faible."},
+        {"bitset", fnBitset, "bitset  Pose un bit a zero ou a un."},
         {"bitshift", fnBitshift, "bitshift  Decalage binaire."},
         {"bitcmp", fnBitcmp, "bitcmp  Complement binaire."},
         {"dec2bin", fnDec2bin, "dec2bin  Entier vers chaine binaire."},

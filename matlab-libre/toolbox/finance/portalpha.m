@@ -17,7 +17,9 @@ function [alpha, rendementAjuste] = portalpha(actif, reference, liquidites, choi
 %   risque pris passivement.
 %
 %   Exemple :
-%      portalpha(actif, indice, 0.0002, 'sml')
+%      rng(1);
+%      indice = 0.001 + 0.02 * randn(120, 1);
+%      portalpha(1.1 * indice + 0.001, indice, 0.0002, 'sml')
 %
 %   Voir aussi SHARPE, INFORATIO, PORTSTATS.
     if nargin < 3 || isempty(liquidites), liquidites = 0;    end

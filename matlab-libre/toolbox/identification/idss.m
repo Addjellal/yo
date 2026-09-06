@@ -16,6 +16,9 @@ classdef idss
 %   résidus.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      m = n4sid(z, 2);
 %      [A, B, C, D] = ssdata(m);
 %

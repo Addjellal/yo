@@ -9,6 +9,12 @@ function [delta, gamma, vega, prix] = crrsens(arbre, jeu)
 %   demande, lui, de rebâtir l'arbre à volatilité déplacée.
 %
 %   Exemple :
+%      s = stockspec(0.2, 100);
+%      c = intenvset('Rates', 0.05, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2025', 'Compounding', -1);
+%      arbre = crrtree(s, c, crrtimespec('01-Jan-2024', '01-Jan-2025', 50));
+%      jeu = instadd('OptStock', 'call', 100, '01-Jan-2024', ...
+%                    '01-Jan-2025', 1);
 %      [d, g, v, p] = crrsens(arbre, jeu)
 %
 %   Voir aussi CRRPRICE, CRRTREE, BLSDELTA, BLSGAMMA.

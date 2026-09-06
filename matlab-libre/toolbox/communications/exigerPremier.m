@@ -5,6 +5,10 @@ function exigerPremier(p, nomFonction)
 %   composé donnerait des résultats faux sans le dire.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      exigerPremier(7, 'gf');    % passe
+%      %      % exigerPremier(4, 'gf') leve comm:gf:NotPrime
     p = double(p);
     if ~isscalar(p) || p < 2 || p ~= round(p) || ~isprime(p)
         error('comm:gf:Premier', ...

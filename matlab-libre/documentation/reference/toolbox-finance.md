@@ -239,6 +239,29 @@ BEYTBILL Rendement d'un bon du Trésor, équivalent obligataire.
 
 ```
 BLSDELTA Sensibilité du prix au cours du sous-jacent.
+  [DC,DP] = BLSDELTA(S,K,R,T,SIGMA) rend la dérivée du prix Black-Scholes
+  par rapport au cours du sous-jacent, pour l'option d'achat et pour
+  l'option de vente. S est le cours, K le prix d'exercice, R le taux sans
+  risque continu, T l'échéance en années, SIGMA la volatilité annuelle.
+  [DC,DP] = BLSDELTA(S,K,R,T,SIGMA,Q) tient compte d'un rendement de
+  dividende continu Q.
+
+  Le delta d'un achat va de 0 à exp(-Q*T) : très en dehors de la monnaie
+  l'option ne bouge plus, très en dedans elle suit le sous-jacent
+  quasiment un pour un. Delta se lit donc comme le nombre d'actions à
+  détenir pour neutraliser le risque de première grandeur — c'est la
+  couverture en delta, et c'est en la répliquant en continu que la
+  formule de Black-Scholes se démontre.
+
+  Les deux deltas diffèrent exactement de exp(-Q*T), ce qui n'est autre
+  que la parité achat-vente dérivée une fois : détenir un achat et vendre
+  une vente équivaut à détenir le sous-jacent.
+
+  Exemple :
+     [dc, dp] = blsdelta(100, 100, 0.05, 1, 0.2);
+     dc - dp
+
+  Voir aussi BLSPRICE, BLSGAMMA, BLSVEGA, BLSIMPV.
 ```
 
 ## `blsgamma`
@@ -988,6 +1011,24 @@ DISCRATE Taux d'escompte d'un titre.
 
 ```
 EFFRR Taux effectif annuel à partir du taux nominal.
+  R = EFFRR(NOMINAL,PERIODES) rend le taux effectif annuel correspondant
+  au taux nominal annuel NOMINAL composé PERIODES fois par an :
+  (1+NOMINAL/PERIODES)^PERIODES - 1.
+
+  Le taux nominal ne se compare pas d'un contrat à l'autre parce qu'il
+  ne dit rien de la fréquence de capitalisation : 12 % capitalisés
+  mensuellement rendent 12,68 % l'an, trimestriellement 12,55 %. Le taux
+  effectif ramène tout à une année et rend la comparaison possible ;
+  c'est à ce titre qu'il est réglementairement affiché.
+
+  Quand PERIODES tend vers l'infini, l'effectif tend vers exp(NOMINAL)-1,
+  la capitalisation continue — borne que le composé discret n'atteint
+  jamais.
+
+  Exemple :
+     effrr(0.12, 12)
+
+  Voir aussi NOMRR, FV, PV.
 ```
 
 ## `elpm`
@@ -1131,6 +1172,25 @@ FRONTCON Frontière efficiente avec bornes par actif et par groupe.
 
 ```
 FV Valeur future d'un placement à versements constants.
+  V = FV(TAUX,N,VERSEMENT) rend la valeur au bout de N périodes d'une
+  suite de N versements constants placés au taux TAUX par période, le
+  versement ayant lieu en fin de période.
+  V = FV(TAUX,N,VERSEMENT,VALEURINITIALE) ajoute un capital placé dès le
+  départ.
+
+  Le résultat vaut VALEURINITIALE*(1+TAUX)^N + VERSEMENT*((1+TAUX)^N-1)/
+  TAUX : le premier terme est la croissance du capital, le second la
+  somme d'une suite géométrique, chaque versement étant capitalisé sur
+  le temps qui lui reste. À taux nul la formule dégénère en une somme
+  simple, cas traité à part parce que la division ne l'est pas.
+
+  La convention de signe est celle des flux : un versement positif et un
+  résultat positif décrivent tous deux de l'argent reçu.
+
+  Exemple :
+     fv(0.05, 10, 100)
+
+  Voir aussi PV, NPV, IRR, EFFRR.
 ```
 
 ## `fvdisc`
@@ -1283,6 +1343,26 @@ INFORATIO Ratio d'information d'un portefeuille.
 
 ```
 IRR Taux de rendement interne : le taux qui annule la valeur nette.
+  R = IRR(FLUX) rend le taux qui annule la valeur actuelle nette de la
+  suite de flux, le premier étant daté de zéro et donc non actualisé.
+  Le zéro est cherché entre -99,99 % et 1000 %.
+
+  Le taux de rendement interne est le taux d'actualisation auquel le
+  projet est tout juste équilibré ; on le compare au coût du capital,
+  et on retient le projet si le premier dépasse le second. Son intérêt
+  est de ne dépendre d'aucun taux extérieur, sa faiblesse d'en supposer
+  un implicitement : il fait comme si les flux intermédiaires étaient
+  replacés à ce même taux, ce qui est rarement le cas.
+
+  Il n'existe et n'est unique que si la suite change de signe une seule
+  fois — la règle de Descartes. Un projet qui exige une remise en état
+  finale change deux fois de signe et peut avoir deux taux également
+  valables, ou aucun : la valeur actuelle nette, elle, tranche toujours.
+
+  Exemple :
+     irr([-100 30 40 50])
+
+  Voir aussi NPV, PV, FV.
 ```
 
 ## `isbusday`
@@ -1626,6 +1706,26 @@ MATLIBRE_TAUX_VERS_ESCOMPTE Facteurs d'actualisation d'une courbe de taux.
 
 ```
 MAXDRAWDOWN Perte maximale depuis un sommet.
+  PERTE = MAXDRAWDOWN(COURS) rend la plus forte baisse relative subie
+  entre un sommet et un creux postérieur, en fraction du sommet.
+  [PERTE,DEBUT,FIN] = MAXDRAWDOWN(COURS) rend en plus les indices du
+  sommet et du creux qui la réalisent.
+
+  Le parcours se fait en une passe : on tient le maximum courant, et la
+  baisse mesurée depuis lui. C'est bien la plus grande perte qu'aurait
+  subie quelqu'un entré au pire moment et sorti au pire moment suivant —
+  l'ordre compte, un creux antérieur au sommet ne compte pas.
+
+  L'écart type traite symétriquement hausses et baisses ; cette mesure
+  ne regarde que le mauvais côté, et dit combien il aurait fallu de
+  sang-froid pour tenir. Une stratégie de rendement moyen honorable mais
+  de perte maximale de 60 % est en pratique intenable, quel que soit son
+  ratio de Sharpe.
+
+  Exemple :
+     [p, d, f] = maxdrawdown([100 120 90 95 130]);
+
+  Voir aussi SHARPE, RET2TICK, PORTSTATS.
 ```
 
 ## `medprice`
@@ -1667,6 +1767,25 @@ MIRR Taux de rendement interne modifié.
 
 ```
 MOVAVG Moyennes mobiles courte et longue.
+  [COURTE,LONGUE] = MOVAVG(COURS,N1,N2) rend les moyennes mobiles de
+  COURS sur N1 et sur N2 points. [COURTE,LONGUE] = MOVAVG(COURS,N1) rend
+  deux fois la même.
+
+  La moyenne est prise sur la fenêtre qui précède, jamais sur celle qui
+  suit : au rang k elle porte sur les min(k,N) derniers points. Elle est
+  donc causale — calculable au fil de l'eau — et retardée d'environ N/2
+  points, retard qui est le prix du lissage et non un défaut réparable.
+
+  Le croisement des deux moyennes est le signal le plus ancien de
+  l'analyse technique : la courte passant au-dessus de la longue marque
+  un renversement de tendance. Toutes deux étant retardées, le
+  croisement l'est aussi, ce qui explique qu'il déclenche tard sur un
+  vrai retournement et à tort sur une oscillation.
+
+  Exemple :
+     [c, l] = movavg([1 2 3 4 5 6 7 8], 2, 4);
+
+  Voir aussi MOVMEAN, FILTER, MAXDRAWDOWN.
 ```
 
 ## `negvolidx`
@@ -1690,12 +1809,48 @@ NEGVOLIDX Indice des jours de volume en baisse.
 
 ```
 NOMRR Taux nominal à partir du taux effectif.
+  R = NOMRR(EFFECTIF,PERIODES) rend le taux nominal annuel qui, composé
+  PERIODES fois par an, produit le taux effectif annuel EFFECTIF :
+  PERIODES*((1+EFFECTIF)^(1/PERIODES) - 1).
+
+  C'est l'inverse exact de EFFRR : NOMRR(EFFRR(X,P),P) rend X. Le sens
+  pratique est celui de la mensualité — connaissant le coût annuel réel
+  d'un crédit, retrouver le taux périodique à appliquer à chaque
+  échéance.
+
+  Le nominal est toujours inférieur à l'effectif dès que PERIODES
+  dépasse un, l'écart mesurant ce qu'apporte la capitalisation des
+  intérêts en cours d'année.
+
+  Exemple :
+     nomrr(0.1268, 12)
+
+  Voir aussi EFFRR, FV, PV.
 ```
 
 ## `npv`
 
 ```
 NPV Valeur actuelle nette : le premier flux est à la date zéro.
+  V = NPV(TAUX,FLUX) rend la valeur actuelle nette : FLUX(1) compte pour
+  sa valeur nominale — il est daté de zéro — et FLUX(k) est divisé par
+  (1+TAUX)^(k-1).
+
+  C'est le critère de décision d'un investissement : positive, la valeur
+  actuelle nette dit que le projet rapporte plus que le placement au
+  taux retenu ; négative, qu'il rapporte moins. Contrairement au taux de
+  rendement interne elle existe toujours, elle est unique, et elle
+  s'additionne d'un projet à l'autre.
+
+  Tout dépend du taux choisi, qui est le coût du capital et non une
+  donnée du projet : un flux lointain est écrasé par l'actualisation, si
+  bien qu'un même projet est bon à 3 % et mauvais à 10 %. C'est là que
+  se joue la décision, plus que dans le calcul.
+
+  Exemple :
+     npv(0.1, [-100 50 60])
+
+  Voir aussi PV, IRR, FV.
 ```
 
 ## `nweekdate`
@@ -2005,6 +2160,27 @@ PORTSIM Simulation de rendements corrélés.
 
 ```
 PORTSTATS Rendement et écart type d'un portefeuille.
+  [RENDEMENT,RISQUE] = PORTSTATS(RENDEMENTS,COVARIANCE,POIDS) rend
+  l'espérance de rendement du portefeuille, w'*mu, et son écart type,
+  sqrt(w'*C*w).
+
+  Les deux formules ne se ressemblent pas, et c'est tout le propos de
+  Markowitz : le rendement est linéaire en les poids, le risque ne
+  l'est pas. Deux actifs de même rendement et de même écart type, mal
+  corrélés, donnent un portefeuille de même rendement et d'écart type
+  moindre — la diversification ne coûte rien en espérance et retire du
+  risque, ce qui n'arrive qu'à cause de ce terme croisé.
+
+  La covariance doit être symétrique et semi-définie positive, faute de
+  quoi la racine porte sur un nombre négatif. POIDS n'est pas normalisé
+  ici : leur somme vaut un pour un portefeuille pleinement investi, plus
+  pour un portefeuille à effet de levier.
+
+  Exemple :
+     C = [0.04 0.01; 0.01 0.09];
+     [r, s] = portstats([0.08 0.12], C, [0.5 0.5]);
+
+  Voir aussi SHARPE, PORTALLOC, MAXDRAWDOWN.
 ```
 
 ## `portvar`
@@ -2142,6 +2318,23 @@ PRTBILL Prix d'un bon du Trésor.
 
 ```
 PV Valeur actuelle d'une suite de flux, le premier à la période 1.
+  V = PV(TAUX,FLUX) rend la valeur actuelle d'une suite de flux dont le
+  premier tombe à la fin de la période 1 : chaque FLUX(k) est divisé par
+  (1+TAUX)^k.
+
+  La différence avec NPV tient à cette seule convention de date, et elle
+  change le résultat d'un facteur (1+TAUX) : NPV sert quand un
+  décaissement a lieu aujourd'hui, PV quand tous les flux sont à venir —
+  le prix d'une rente, celui d'une obligation.
+
+  Une suite infinie de flux constants converge vers FLUX/TAUX : c'est
+  la rente perpétuelle, et la raison pour laquelle un actif de rendement
+  fixe vaut d'autant moins que les taux montent.
+
+  Exemple :
+     pv(0.05, [100 100 100])
+
+  Voir aussi NPV, FV, IRR.
 ```
 
 ## `pvfix`
@@ -2230,6 +2423,24 @@ RATETIMES Change les intervalles auxquels s'appliquent des taux.
 
 ```
 RET2TICK Reconstruit une série de cours à partir des rendements.
+  COURS = RET2TICK(RENDEMENTS) reconstruit la série des cours à partir
+  des rendements simples, en partant de 1.
+  COURS = RET2TICK(RENDEMENTS,DEPART) part de DEPART.
+
+  Le cumul est multiplicatif : COURS(k+1) = COURS(k)*(1+R(k)). La série
+  rendue a un point de plus que celle des rendements, le cours initial
+  n'étant le rendement de rien.
+
+  C'est l'inverse de TICK2RET, et c'est là que se voit pourquoi les
+  rendements ne se moyennent pas arithmétiquement : +50 % puis -50 %
+  ramènent à 0,75, non à 1. La moyenne qui a un sens sur des rendements
+  composés est géométrique, et elle est toujours inférieure à
+  l'arithmétique dès que la série varie.
+
+  Exemple :
+     ret2tick([0.5 -0.5])
+
+  Voir aussi TICK2RET, MAXDRAWDOWN, SHARPE.
 ```
 
 ## `rsindex`
@@ -2257,6 +2468,30 @@ RSINDEX Indice de force relative.
 
 ```
 SHARPE Ratio de Sharpe d'une série de rendements.
+  S = SHARPE(RENDEMENTS) rend la moyenne des rendements divisée par leur
+  écart type. S = SHARPE(RENDEMENTS,SANSRISQUE) retranche d'abord le
+  taux sans risque, et mesure donc l'excès de rendement par unité de
+  risque.
+
+  C'est le rendement payé pour un point de volatilité : il permet de
+  comparer deux stratégies d'échelles différentes, puisque multiplier
+  par deux la mise multiplie par deux la moyenne et l'écart type, et
+  laisse le ratio inchangé.
+
+  Le ratio rendu est celui de la période des données. Pour l'annualiser,
+  multiplier par la racine du nombre de périodes par an — sqrt(252) sur
+  des rendements quotidiens — parce que la moyenne croît comme le temps
+  et l'écart type comme sa racine.
+
+  L'écart type traite une hausse brusque comme une baisse brusque, ce
+  qui pénalise une stratégie qui ne surprend qu'à la hausse ; et il ne
+  voit rien d'un risque rare et catastrophique. Un écart type nul rend
+  zéro plutôt que l'infini.
+
+  Exemple :
+     sharpe([0.01 0.02 -0.005 0.015], 0.001)
+
+  Voir aussi PORTSTATS, MAXDRAWDOWN, TICK2RET.
 ```
 
 ## `spctkd`

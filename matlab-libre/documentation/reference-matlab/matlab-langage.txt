@@ -2,7 +2,7 @@
 # Une ligne par nom ; « # » commence un commentaire.
 abs accumarray acos acosd acosh all allchild angle any arrayfun asin asind
 assert assignin atan atan2 atand bin2dec bitand bitcmp bitor
-bitshift bitxor blanks break builtin cast cat ceil cell cell2mat cell2struct
+bitget bitset bitshift bitxor blanks break builtin cast cat ceil cell cell2mat cell2struct
 celldisp cellfun char circshift class clear clc clf colon compose cond conj
 containers.Map contains conv conv2 convn cos cosd cosh cot cross cumprod
 cumsum cummax cummin dec2base dec2bin dec2hex deal deblank del2 det diag

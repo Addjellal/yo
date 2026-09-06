@@ -5,7 +5,7 @@ function prix = typprice(haut, bas, cloture)
 %   derniers échanges.
 %
 %   Exemple :
-%      typprice([12 10 11], [14 11 13])
+%      typprice([14; 15], [10; 11], [12; 13])       % la moyenne des trois
 %
 %   Voir aussi MEDPRICE, WCLOSE, STOCHOSC.
     if nargin < 2, reste = {}; else, reste = {bas, cloture}; end

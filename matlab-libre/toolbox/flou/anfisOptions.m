@@ -12,8 +12,11 @@ function options = anfisOptions(varargin)
 %     DisplayFinalResults     affichages, tous à 1 dans MATLAB
 %
 %   Exemple :
-%      o = anfisOptions('EpochNumber', 40, 'InitialStepSize', 0.05);
-%      fis = anfis([x, y], o);
+%      x = (0:0.05:10)';
+%      donnees = [x, sin(x)];
+%      o = anfisOptions('EpochNumber', 20, 'InitialStepSize', 0.05);
+%      [fis, e] = anfis(donnees, genfis1(donnees, 7), o.EpochNumber, o.InitialStepSize);
+%      e(end) < e(1)      % vrai : l'apprentissage a servi
 %
 %   Voir aussi ANFIS, GENFISOPTIONS, TUNEFISOPTIONS.
     options = struct('InitialFIS', 2, 'EpochNumber', 10, ...

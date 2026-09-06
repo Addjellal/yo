@@ -5,6 +5,9 @@ function prix = cfbyzero(courbe, montants, dates, reglement, base)
 %   donnent par lignes.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      cfbyzero(courbe, [5 5 105], {'01-Jan-2025','01-Jan-2026','01-Jan-2027'}, ...
 %               '01-Jan-2024')
 %

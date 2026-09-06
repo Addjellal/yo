@@ -13,6 +13,10 @@ function [delta, gamma, prix] = intenvsens(courbe, jeu)
 %   courbe déplacée.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
 %      [d, g, p] = intenvsens(courbe, jeu)
 %
 %   Voir aussi INTENVPRICE, BNDDURP, INSTADD.

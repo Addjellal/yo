@@ -13,9 +13,15 @@ function modele = add_line(modele, source, destination, entree)
 %   topologique n'a pas de solution.
 %
 %   Exemple :
+%      m = new_system('boucle');
+%      m = add_block(m, 'constant', 'consigne', 'Value', 1);
+%      m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+%      m = add_block(m, 'gain', 'gain', 'Gain', 2);
+%      m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
 %      m = add_line(m, 'consigne', 'erreur', 1);
 %      m = add_line(m, 'sortie', 'erreur', 2);   % le retour
 %      m = add_line(m, 'erreur', 'gain');
+%      m = add_line(m, 'gain', 'sortie');
 %
 %   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
     if nargin < 4

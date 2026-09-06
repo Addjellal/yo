@@ -146,6 +146,11 @@ fprintf('  ecrit : %s\n', chemin);
 
 function aide = blocAide(texte)
 % Le bloc de commentaires qui suit la ligne « function » ou « classdef ».
+%
+% Une signature peut tenir sur plusieurs lignes, reliees par « ... ». Les
+% sauter fait partie du reperage : sans cela le bloc d'aide d'une fonction
+% a longue signature passe pour vide, et l'audit la compte a tort parmi
+% les indocumentees.
     lignes = strsplit(texte, sprintf('\n'));
     aide = {};
     commence = false;
@@ -154,7 +159,12 @@ function aide = blocAide(texte)
         if ~commence
             if startsWith(ligne, 'function') || startsWith(ligne, 'classdef')
                 commence = true;
+                suite = endsWith(ligne, '...');
             end
+            continue
+        end
+        if suite
+            suite = endsWith(ligne, '...');
             continue
         end
         if isempty(ligne)

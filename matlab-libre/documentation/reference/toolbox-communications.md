@@ -177,6 +177,24 @@ AWGN Ajoute un bruit blanc gaussien pour atteindre un rapport donné.
 
 ```
 BASE2DEC Chaîne dans une base quelconque vers entier.
+  D = BASE2DEC(CHAINE,BASE) interprète CHAINE comme l'écriture d'un
+  entier en base BASE et rend sa valeur. Les chiffres au-delà de neuf
+  s'écrivent avec les lettres, A valant dix ; la casse est indifférente
+  et les espaces de tête et de queue sont ignorés.
+
+  La lecture se fait par la méthode de Horner, du chiffre de poids fort
+  vers celui de poids faible : d = d*BASE + chiffre. Elle ne demande
+  aucune puissance, donc aucun arrondi, et reste exacte tant que le
+  résultat tient dans les 53 bits de mantisse d'un double.
+
+  Aucun contrôle n'est fait que les chiffres appartiennent bien à la
+  base : c'est l'appelant qui garantit la cohérence.
+
+  Exemple :
+     base2dec('FF', 16)
+     base2dec('1010', 2)
+
+  Voir aussi DEC2BASE, DEC2BIN, BIN2DEC, HEX2DEC.
 ```
 
 ## `bchdec`
@@ -417,6 +435,28 @@ BIN2GRAY Numérotation binaire vers numérotation de Gray.
 
 ```
 BITERR Nombre et taux d'erreurs binaires entre deux suites d'entiers.
+  NOMBRE = BITERR(A,B) compte les bits qui diffèrent entre les entiers de
+  A et ceux de B, après les avoir écrits sur un même nombre de bits.
+  [NOMBRE,TAUX] = BITERR(A,B) rend en plus le taux, c'est-à-dire ce
+  nombre divisé par le total des bits comparés.
+  [...] = BITERR(A,B,BITS) impose la largeur d'écriture ; par défaut
+  elle est le minimum qui suffit à représenter la plus grande valeur.
+
+  Le taux d'erreur binaire est la mesure de référence d'une chaîne de
+  transmission, parce qu'il se compare directement à la théorie : pour
+  une modulation à deux états dans un bruit gaussien il vaut
+  Q(sqrt(2*Eb/N0)), et l'écart à cette courbe mesure ce que coûte la
+  mise en oeuvre réelle.
+
+  Il ne se confond pas avec le taux d'erreur symbole de SYMERR : un
+  symbole faux porte au moins un bit faux, souvent un seul si le codage
+  est celui de Gray, et tous s'il ne l'est pas. Le rapport entre les
+  deux taux mesure donc la qualité du codage des symboles en bits.
+
+  Exemple :
+     [n, t] = biterr([0 1 2 3], [0 1 3 3]);
+
+  Voir aussi SYMERR, DE2BI, BERAWGN.
 ```
 
 ## `bsc`
@@ -576,6 +616,25 @@ DE2BI Entiers vers vecteurs de chiffres.
 
 ```
 DEC2BASE Entier vers chaîne dans une base quelconque.
+  S = DEC2BASE(D,BASE) rend l'écriture de l'entier D en base BASE, sous
+  forme de chaîne. Les chiffres au-delà de neuf s'écrivent A, B, C… ce
+  qui borne BASE à 36. Zéro s'écrit '0'.
+  S = DEC2BASE(D,BASE,LONGUEUR) complète à gauche par des zéros jusqu'à
+  LONGUEUR caractères ; une écriture plus longue n'est pas tronquée.
+
+  Les chiffres sortent par divisions successives, donc du poids faible
+  vers le poids fort, et sont empilés à gauche au fur et à mesure. D est
+  arrondi : la fonction ne représente que des entiers.
+
+  Le remplissage à longueur fixe sert à aligner des mots binaires — une
+  trame se lit à colonnes constantes, et un mot plus court qu'un autre
+  la décale tout entière.
+
+  Exemple :
+     dec2base(255, 16)
+     dec2base(5, 2, 8)
+
+  Voir aussi BASE2DEC, DEC2BIN, DEC2HEX.
 ```
 
 ## `dec2oct`
@@ -667,6 +726,31 @@ DISTSPEC Spectre des distances d'un codeur convolutif.
 
 ```
 DPSKDEMOD Démodulation par déplacement de phase différentiel.
+  X = DPSKDEMOD(Y,M) démodule un signal à déplacement de phase
+  différentiel à M états : le symbole n'est pas porté par la phase
+  absolue de chaque échantillon, mais par l'écart de phase avec
+  l'échantillon précédent. X = DPSKDEMOD(Y,M,PHASE) donne la phase de
+  référence du premier symbole, nulle par défaut.
+
+  L'écart est arrondi au multiple le plus proche de 2*pi/M, et le
+  résultat ramené dans 0..M-1.
+
+  Tout l'intérêt du différentiel est là : une rotation constante de la
+  constellation — un décalage de fréquence résiduel, une phase de canal
+  inconnue — s'annule dans la différence de deux symboles successifs. Le
+  récepteur n'a donc pas à récupérer la porteuse en phase, ce qui le
+  simplifie beaucoup.
+
+  Le prix est un doublement des erreurs : chaque symbole reçu sert de
+  référence au suivant, si bien qu'un bruit qui fausse un symbole en
+  fausse deux. À rapport signal sur bruit égal, le différentiel perd
+  environ 3 dB sur le cohérent.
+
+  Exemple :
+     y = dpskmod([0 1 2 3], 4);
+     dpskdemod(y, 4)'
+
+  Voir aussi DPSKMOD, PSKDEMOD, PSKMOD.
 ```
 
 ## `dpskmod`
@@ -759,6 +843,28 @@ FMMOD Modulation de fréquence.
 
 ```
 FSKDEMOD Démodulation par déplacement de fréquence, par corrélation.
+  X = FSKDEMOD(Y,M,ECART,NECHANTILLONS) démodule un signal à déplacement
+  de fréquence à M états, chaque symbole occupant NECHANTILLONS points et
+  les tons étant espacés de ECART. X = FSKDEMOD(Y,M,ECART,NECHANTILLONS,
+  FS) donne la fréquence d'échantillonnage, égale à un par défaut.
+
+  Le récepteur corrèle chaque bloc avec les M tons possibles et retient
+  celui de plus forte corrélation. Le module est pris avant comparaison :
+  la phase n'intervient pas, la détection est donc non cohérente et ne
+  demande aucune synchronisation de porteuse — seulement celle des
+  symboles.
+
+  Deux tons sont orthogonaux sur la durée d'un symbole si leur écart est
+  un multiple de la moitié de la cadence symbole en détection cohérente,
+  de la cadence entière en détection non cohérente. Un écart plus faible
+  fait déborder les corrélations les unes sur les autres, et le
+  démodulateur confond les tons voisins même sans bruit.
+
+  Exemple :
+     y = fskmod([0 1 2 3], 4, 2, 8, 16);
+     fskdemod(y, 4, 2, 8, 16)'
+
+  Voir aussi FSKMOD, PSKDEMOD, DPSKDEMOD.
 ```
 
 ## `fskmod`
@@ -2358,6 +2464,25 @@ SHIFT2MASK Masque d'un registre à décalage, d'après le décalage voulu.
 
 ```
 SYMERR Nombre et taux d'erreurs symbole.
+  NOMBRE = SYMERR(A,B) compte les positions où A et B diffèrent.
+  [NOMBRE,TAUX] = SYMERR(A,B) rend en plus ce nombre divisé par le
+  nombre de symboles comparés.
+
+  La comparaison est faite symbole par symbole, sans regarder de quelle
+  valeur ils diffèrent : c'est ce qu'il faut pour mesurer une chaîne de
+  transmission, où une erreur est une erreur, quelle que soit sa
+  grandeur.
+
+  Le taux symbole est toujours supérieur ou égal au taux binaire de
+  BITERR, et vaut au plus BITS fois celui-ci. Un codage de Gray, qui
+  fait différer d'un seul bit deux symboles voisins de la constellation,
+  rapproche le taux binaire de TAUX/BITS ; sans lui, une erreur entre
+  voisins peut faire basculer tous les bits à la fois.
+
+  Exemple :
+     [n, t] = symerr([0 1 2 3], [0 1 3 3]);
+
+  Voir aussi BITERR, PSKDEMOD, QAMDEMOD.
 ```
 
 ## `syndtable`
@@ -2430,6 +2555,22 @@ VERIFIERFREQUENCES Contrôle du critère de Shannon pour la porteuse.
 
 ```
 VERIFIERPERMUTATION Contrôle qu'un vecteur est bien une permutation.
+  VERIFIERPERMUTATION(P) ne fait rien si P contient une fois et une
+  seule chacun des entiers de 1 à NUMEL(P), et lève l'erreur
+  comm:intrlv:BadPermutation sinon.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Elle garde les entrelaceurs. Un entrelaceur doit être inversible :
+  c'est ce qui permet au désentrelaceur de restituer l'ordre d'origine.
+  Un vecteur qui répète un indice ou en oublie un ne l'est pas, et le
+  désentrelacement perdrait des symboles en silence — d'où le contrôle
+  avant plutôt que le dégât après.
+
+  Exemple :
+     verifierPermutation([3 1 2]);
+
+  Voir aussi INTRLV, DEINTRLV, RANDPERM.
 ```
 
 ## `vitdec`

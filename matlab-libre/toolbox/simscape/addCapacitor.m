@@ -9,6 +9,9 @@ function c = addCapacitor(c, n1, n2, C)
 %   conductance en parallèle avec une source de courant.
 %
 %   Exemple :
+%      c = circuit('diviseur');
+%      c = addVoltageSource(c, 1, 0, 10);
+%      c = addResistor(c, 1, 2, 1000);
 %      c = addCapacitor(c, 2, 0, 1e-6);
 %      [t, v] = solveTransient(c, 0.01, 1e-5);
 %

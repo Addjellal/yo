@@ -14,6 +14,9 @@ function modele = spa(donnees, M, pulsations)
 %   G = SPA(Z,M) impose cette largeur ; G = SPA(Z,M,W) les pulsations.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      g = spa(z, 40);
 %      bode(g);
 %

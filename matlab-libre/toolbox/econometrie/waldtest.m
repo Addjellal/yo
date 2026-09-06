@@ -22,10 +22,14 @@ function [rejet, pValeur, statistique, valeurCritique] = waldtest(ecarts, jacobi
 %   alors mené pour chaque triplet.
 %
 %   Exemple :
-%      % Le second coefficient d'une régression est-il nul ?
+%      % Le second coefficient d'une regression est-il nul ?
+%      rng(1);
+%      X = [(1:50)', randn(50, 1)];
+%      y = 2 + 3 * X(:, 1) + randn(50, 1);
 %      m = ols(y, X);
+%      Xc = [ones(50, 1), X];
 %      A = [0 1 0];
-%      waldtest(A * m.beta, A, m.sigma2 * inv(X' * X))
+%      waldtest(A * m.beta, A, m.sigma2 * inv(Xc' * Xc))
 %
 %   Voir aussi LRATIOTEST, OLS, GCTEST.
     if nargin < 3

@@ -352,6 +352,25 @@ BANDSTOP Filtre coupe-bande appliqué à un signal.
 
 ```
 BARTHANNWIN Fenêtre de Bartlett-Hann.
+  W = BARTHANNWIN(N) rend la fenêtre de N points, en colonne.
+
+  Elle mêle une triangulaire de Bartlett et une cosinusoïde de Hann :
+  0,62 - 0,48*|k-1/2| + 0,38*cos(2*pi*(k-1/2)) avec k de 0 à 1. La
+  partie triangulaire abaisse le premier lobe secondaire, la partie
+  cosinusoïdale accélère la décroissance des suivants. Le résultat tient
+  le milieu entre les deux : premier lobe secondaire vers -35 dB, contre
+  -31 dB pour Bartlett et -13 dB pour la fenêtre rectangulaire.
+
+  Comme toute fenêtre non rectangulaire, elle échange de la résolution
+  contre de la dynamique : le lobe principal s'élargit, donc deux raies
+  proches se confondent plus tôt, mais une raie faible cesse d'être
+  noyée dans les lobes d'une raie forte.
+
+  Exemple :
+     w = barthannwin(64);
+     max(w)
+
+  Voir aussi BARTLETT, HANN, BOHMANWIN, PARZENWIN.
 ```
 
 ## `besselap`
@@ -450,6 +469,24 @@ BLACKMANHARRIS Fenêtre de Blackman-Harris à quatre termes.
 
 ```
 BOHMANWIN Fenêtre de Bohman.
+  W = BOHMANWIN(N) rend la fenêtre de N points, en colonne.
+
+  C'est la convolution de deux demi-cosinusoïdes, ce qui lui donne une
+  propriété que les fenêtres polynomiales n'ont pas : la fenêtre et sa
+  dérivée s'annulent aux deux bords. Le raccord avec le silence se fait
+  sans rupture de pente, et les lobes secondaires décroissent d'autant
+  plus vite — en 1/f^4, soit 24 dB par octave, contre 6 dB pour une
+  fenêtre rectangulaire dont le raccord est brutal.
+
+  Premier lobe secondaire à -46 dB environ, pour un lobe principal deux
+  fois plus large que celui de Hann. Elle sert quand il faut voir une
+  composante très faible loin d'une composante forte.
+
+  Exemple :
+     w = bohmanwin(64);
+     [w(1) w(end)]
+
+  Voir aussi PARZENWIN, BARTHANNWIN, BLACKMAN, HANN.
 ```
 
 ## `buffer`
@@ -1246,6 +1283,24 @@ ICCEPS Cepstre complexe inverse.
 
 ```
 IDCT Transformée en cosinus discrète inverse.
+  X = IDCT(Y) rend la transformée en cosinus discrète inverse de Y :
+  IDCT(DCT(X)) restitue X. La transformée est orthonormée, donc
+  l'inverse est la transposée, et l'énergie se conserve.
+
+  X = IDCT(Y,N) tronque ou complète Y par des zéros à N points avant de
+  transformer. Annuler les derniers coefficients est exactement ce que
+  fait une compression : les coefficients de rang élevé portent les
+  variations rapides, et les supprimer lisse le signal sans le déplacer.
+
+  C'est cette concentration de l'énergie dans les premiers coefficients,
+  pour un signal corrélé, qui explique l'emploi de la DCT en JPEG et en
+  MP3 plutôt que celui de la transformée de Fourier.
+
+  Exemple :
+     x = [1 2 3 4 5]';
+     max(abs(idct(dct(x)) - x)) < 1e-12
+
+  Voir aussi DCT, FFT, IFFT.
 ```
 
 ## `idst`
@@ -1631,6 +1686,26 @@ MEDFILT1 Filtre médian glissant d'ordre N.
 
 ```
 MEDFREQ Fréquence médiane : celle qui coupe la puissance en deux.
+  F = MEDFREQ(X) rend la fréquence qui partage en deux parts égales la
+  puissance du signal, avec une fréquence d'échantillonnage de 1.
+  F = MEDFREQ(X,FS) donne FS en hertz et rend F en hertz.
+
+  La densité spectrale est estimée par périodogramme, puis intégrée ;
+  la fréquence médiane est celle où l'intégrale atteint la moitié de sa
+  valeur finale, obtenue par interpolation linéaire entre les deux
+  points qui l'encadrent.
+
+  Comme toute médiane, elle résiste à ce qui se passe dans les queues :
+  une raie parasite loin de la bande utile la déplace à peine, là où la
+  fréquence moyenne MEANFREQ, qui pondère par la fréquence, s'en trouve
+  tirée. C'est pourquoi le suivi de fatigue musculaire en
+  électromyographie, où le spectre glisse vers le bas, se fait sur elle.
+
+  Exemple :
+     t = (0:1023)' / 1000;
+     f = medfreq(sin(2*pi*50*t), 1000);
+
+  Voir aussi MEANFREQ, BANDPOWER, PERIODOGRAM, OBW.
 ```
 
 ## `midcross`
@@ -1718,6 +1793,25 @@ PARZEN Fenêtre de Parzen.
 
 ```
 PARZENWIN Fenêtre de Parzen, ou de de la Vallée Poussin.
+  W = PARZENWIN(N) rend la fenêtre de N points, en colonne.
+
+  C'est la B-spline cubique : la convolution de quatre fenêtres
+  rectangulaires, d'où deux morceaux de polynômes de degré trois
+  raccordés à mi-pente. Chaque convolution multiplie le spectre par un
+  sinus cardinal, donc quatre convolutions font décroître les lobes
+  secondaires en 1/f^4, et la fenêtre est partout positive — son spectre
+  ne change jamais de signe, ce qu'aucune fenêtre de la famille cosinus
+  ne garantit.
+
+  Une densité spectrale estimée avec elle est donc toujours positive.
+  Le prix est le lobe principal, le plus large des fenêtres usuelles ;
+  ses lobes secondaires descendent en contrepartie à -53 dB.
+
+  Exemple :
+     w = parzenwin(64);
+     all(w >= 0)
+
+  Voir aussi BOHMANWIN, BARTLETT, BLACKMAN, HANN.
 ```
 
 ## `pburg`
@@ -1732,6 +1826,29 @@ PBURG Densité spectrale par la méthode de Burg.
 
 ```
 PCOV Densité spectrale par la méthode de la covariance.
+  PXX = PCOV(X,P) estime la densité spectrale de X par un modèle
+  autorégressif d'ordre P ajusté par la méthode de la covariance, puis
+  évalue le spectre de ce modèle.
+  [PXX,F] = PCOV(X,P,NFFT,FS) donne le nombre de points de la grille
+  (256 par défaut) et la fréquence d'échantillonnage, et rend l'axe des
+  fréquences.
+
+  La méthode de la covariance minimise l'erreur de prédiction avant sur
+  les seuls échantillons où elle est calculable, sans supposer le signal
+  nul en dehors de la fenêtre observée. Elle ne fenêtre donc pas les
+  données — c'est ce qui la sépare de la méthode de Yule-Walker, dont
+  l'hypothèse implicite d'extension par des zéros élargit les raies sur
+  un enregistrement court.
+
+  La contrepartie est qu'elle ne garantit pas un modèle stable : un pôle
+  peut sortir du cercle unité. Le spectre reste lisible, mais le modèle
+  ne s'utilise pas tel quel pour synthétiser.
+
+  Exemple :
+     x = filter(1, [1 -0.9], randn(256, 1));
+     [pxx, f] = pcov(x, 4, 128, 1);
+
+  Voir aussi PMCOV, PYULEAR, PBURG, ARCOV.
 ```
 
 ## `peak2peak`
@@ -1797,6 +1914,28 @@ PHASEZ Réponse en phase déroulée d'un filtre numérique.
 
 ```
 PMCOV Densité spectrale par la méthode de la covariance modifiée.
+  PXX = PMCOV(X,P) estime la densité spectrale de X par un modèle
+  autorégressif d'ordre P ajusté par la méthode de la covariance
+  modifiée, puis évalue le spectre de ce modèle.
+  [PXX,F] = PMCOV(X,P,NFFT,FS) donne le nombre de points de la grille
+  (256 par défaut) et la fréquence d'échantillonnage.
+
+  « Modifiée » veut dire que l'ajustement minimise à la fois l'erreur de
+  prédiction avant et l'erreur arrière. Un signal stationnaire ayant les
+  mêmes statistiques lu à l'endroit et à l'envers, exiger les deux double
+  les équations sans ajouter d'inconnue : l'estimation est plus stable
+  sur un enregistrement court, et la résolution en fréquence meilleure.
+
+  C'est la méthode qui sépare le mieux deux sinusoïdes proches noyées
+  dans du bruit, quand on connaît l'ordre du modèle. Elle reste sensible
+  au choix de P : trop bas, les raies fusionnent ; trop haut, le bruit
+  engendre de fausses raies.
+
+  Exemple :
+     x = filter(1, [1 -0.9], randn(256, 1));
+     [pxx, f] = pmcov(x, 4, 128, 1);
+
+  Voir aussi PCOV, PBURG, PYULEAR, ARMCOV.
 ```
 
 ## `pmtm`
@@ -2198,6 +2337,23 @@ RLEVINSON Levinson-Durbin à l'envers.
 
 ```
 RMS Valeur efficace (racine de la moyenne des carrés).
+  R = RMS(X) rend la racine de la moyenne des carrés de tous les
+  éléments de X. R = RMS(X,DIM) opère le long de la dimension DIM.
+
+  C'est la valeur d'un continu qui dissiperait la même puissance : le
+  carré de la valeur efficace est la puissance moyenne, et c'est à ce
+  titre qu'elle mesure un signal quelconque. Pour une sinusoïde
+  d'amplitude A elle vaut A/sqrt(2), pour un carré d'amplitude A elle
+  vaut A — deux signaux de même crête n'ont pas la même valeur efficace.
+
+  Elle ne se confond pas avec l'écart type : celui-ci retranche d'abord
+  la moyenne. Les deux coïncident sur un signal centré, et diffèrent dès
+  qu'une composante continue s'ajoute.
+
+  Exemple :
+     rms(sin(2*pi*(0:999)/1000))
+
+  Voir aussi STD, PEAK2RMS, BANDPOWER, MEAN.
 ```
 
 ## `rooteig`
@@ -2427,12 +2583,51 @@ SNR Rapport signal sur bruit, en décibels.
 
 ```
 SOS2SS Représentation d'état d'un enchaînement de sections du second ordre.
+  [A,B,C,D] = SOS2SS(SOS) rend une représentation d'état équivalente à
+  l'enchaînement des sections du second ordre décrites par les lignes de
+  SOS, chacune de la forme [b0 b1 b2 a0 a1 a2].
+  [A,B,C,D] = SOS2SS(SOS,G) applique en plus le gain global G.
+
+  Le passage se fait par la fonction de transfert développée, donc par
+  la forme compagne. Cette forme est celle qui souffre le plus des
+  erreurs d'arrondi sur les coefficients : c'est précisément pour
+  l'éviter qu'on garde un filtre en sections du second ordre. Convertir
+  n'a donc d'intérêt que pour raisonner sur l'état, pas pour filtrer.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [sos, g] = tf2sos(b, a);
+     [A, B, C, D] = sos2ss(sos, g);
+
+  Voir aussi SS2SOS, SOS2TF, TF2SS, TF2SOS.
 ```
 
 ## `sos2tf`
 
 ```
 SOS2TF Sections du second ordre vers fonction de transfert.
+  [B,A] = SOS2TF(SOS) développe l'enchaînement des sections du second
+  ordre en une seule fonction de transfert B(z)/A(z), en convoluant les
+  numérateurs entre eux et les dénominateurs entre eux.
+  [B,A] = SOS2TF(SOS,G) multiplie le numérateur par le gain global G.
+
+  Chaque ligne de SOS vaut [b0 b1 b2 a0 a1 a2]. Les zéros de tête du
+  résultat sont retirés : un coefficient de tête nul ne décrit pas un
+  degré, seulement un retard.
+
+  Le développement est exact en arithmétique réelle et fragile en
+  virgule flottante : sur un filtre d'ordre élevé, les coefficients
+  développés s'étendent sur plusieurs ordres de grandeur et de petites
+  erreurs relatives déplacent beaucoup les racines. C'est pour cela
+  qu'on filtre en sections plutôt qu'avec B et A.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [sos, g] = tf2sos(b, a);
+     [b2, a2] = sos2tf(sos, g);
+     max(abs(b2 - b)) < 1e-10
+
+  Voir aussi TF2SOS, SOS2ZP, SOS2SS, ZP2SOS.
 ```
 
 ## `sos2zp`
@@ -2479,6 +2674,27 @@ SQUARE Signal carré de période 2*pi.
 
 ```
 SS2SOS Sections du second ordre d'une représentation d'état.
+  [SOS,G] = SS2SOS(A,B,C,D) rend les sections du second ordre
+  équivalentes à la représentation d'état donnée, et le gain global G.
+  [SOS,G] = SS2SOS(A,B,C,D,IU) choisit l'entrée numéro IU quand le
+  système en a plusieurs ; par défaut la première.
+
+  Le chemin passe par la fonction de transfert, puis par le groupement
+  des pôles et zéros conjugués en sections du second ordre. Un filtre
+  d'ordre impair donne une section du premier ordre, complétée par des
+  coefficients nuls.
+
+  L'intérêt de la forme d'arrivée est numérique : chaque section n'a que
+  deux pôles, dont la position ne dépend que de deux coefficients, si
+  bien qu'un arrondi de quantification ne déplace jamais un pôle plus
+  loin que dans sa propre section.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [A, B, C, D] = tf2ss(b, a);
+     [sos, g] = ss2sos(A, B, C, D);
+
+  Voir aussi SOS2SS, TF2SOS, ZP2SOS, SS2TF.
 ```
 
 ## `ss2zp`
@@ -2845,6 +3061,24 @@ ZP2SOS Zéros et pôles vers sections du second ordre.
 
 ```
 ZP2SS Représentation d'état à partir des zéros, pôles et gain.
+  [A,B,C,D] = ZP2SS(Z,P,K) rend une représentation d'état ayant les
+  zéros Z, les pôles P et le gain K.
+
+  Les valeurs propres de A sont les pôles : la conversion place la
+  dynamique dans la matrice d'état, et les zéros dans le couplage C et
+  D. Un système strictement propre — plus de pôles que de zéros — a D
+  nul, et un zéro autant de pôles qu'il en faut pour que D ne le soit
+  pas.
+
+  Le passage emprunte la fonction de transfert développée, donc la forme
+  compagne : sur un ordre élevé, mieux vaut convertir en sections du
+  second ordre par ZP2SOS que raisonner sur cette forme d'état.
+
+  Exemple :
+     [A, B, C, D] = zp2ss([], [-1 -2], 1);
+     sort(eig(A))'
+
+  Voir aussi ZP2TF, ZP2SOS, SS2ZP, TF2SS.
 ```
 
 ## `zp2tf`

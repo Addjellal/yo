@@ -4,6 +4,8 @@ function [milieu, haute, basse] = bollinger(actif, fenetre, largeur, alpha)
 %   BOLLING, les deux derniers arguments étant échangés.
 %
 %   Exemple :
+%      rng(1);
+%      clotures = 100 + cumsum(randn(60, 1));
 %      [m, h, b] = bollinger(clotures, 20, 2);
 %
 %   Voir aussi BOLLING, MOVAVG.

@@ -5,7 +5,16 @@ function fis = readfis(nomFichier)
 %   fichiers écrits par des versions plus récentes.
 %
 %   Exemple :
-%      fis = readfis('pilote.fis');
+%      fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+%      fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+%      fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+%      fis = addOutput(fis, [0 1], 'Name', 'commande');
+%      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+%      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+%      fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
+%      writefis(fis, 'pilote.fis');
+%      relu = readfis('pilote.fis');
+%      numel(relu.entrees)      % 1
 %
 %   Voir aussi WRITEFIS, NEWFIS.
     nomFichier = char(nomFichier);

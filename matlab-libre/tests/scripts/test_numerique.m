@@ -282,6 +282,46 @@ assert(bitcmp(bitcmp(uint8(42))) == 42);
 assert(bitcmp(0) == 2^53 - 1);
 assert(bitshift(1, 3) == 8 && bitshift(12, -2) == 3);
 
+% BITGET lit un bit, BITSET en pose un : poser puis lire redonne ce qu'on
+% a pose, et l'ecriture binaire complete se relit rang par rang.
+assert(bitget(5, 1) == 1 && bitget(5, 2) == 0 && bitget(5, 3) == 1);
+assert(isequal(bitget(5, 1:3), [1 0 1]));
+assert(isequal(bitget(uint8(160), 1:8), uint8([0 0 0 0 0 1 0 1])));
+assert(bitset(4, 1) == 5);
+assert(bitset(5, 1, 0) == 4);
+assert(bitset(5, 1, 1) == 5, 'poser un bit deja pose ne change rien');
+assert(isequal(bitset(0, 1:4), [1 2 4 8]));
+for rang = 1:8
+    assert(bitget(bitset(0, rang), rang) == 1, 'on relit ce qu''on a pose');
+    assert(bitget(bitset(255, rang, 0), rang) == 0);
+end
+% Le resultat garde la classe de son premier argument.
+assert(isa(bitget(uint8(5), 1), 'uint8'));
+assert(isa(bitset(uint8(4), 1), 'uint8'));
+% Un rang hors de la largeur du type est refuse, non rendu nul : un
+% decalage au-dela de la largeur n'a pas de valeur definie.
+leve = false;
+try
+    bitget(uint8(1), 9);
+catch
+    leve = true;
+end
+assert(leve, 'le neuvieme bit d''un uint8 n''existe pas');
+leve = false;
+try
+    bitset(1, 2, 3);
+catch
+    leve = true;
+end
+assert(leve, 'un bit vaut zero ou un');
+% Le type suppose peut etre impose.
+assert(bitget(255, 8, 'uint8') == 1);
+% BITGET et DEC2BIN disent la meme chose, dans l'ordre inverse.
+for n = [0 1 5 42 255]
+    ecriture = dec2bin(n, 8);
+    assert(isequal(bitget(n, 8:-1:1), double(ecriture) - double('0')));
+end
+
 %% --------------------------------------------- log2 et gcd, deuxieme forme
 % [F,E] = LOG2(X) rend la forme normalisee du flottant.
 [f, e] = log2(8);

@@ -12,7 +12,9 @@ function indice = rsindex(cloture, periode)
 %   un sur N, non deux sur N plus un.
 %
 %   Exemple :
-%      rsindex(clotures, 14)
+%      rng(1);
+%      indice = rsindex(100 + cumsum(randn(60, 1)), 14);
+%      all(indice(15:end) >= 0 & indice(15:end) <= 100)   % 1 : c'est un pourcentage
 %
 %   Voir aussi WILLPCTR, STOCHOSC, MACD.
     if nargin < 2 || isempty(periode), periode = 14; end

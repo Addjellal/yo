@@ -11,6 +11,9 @@ function ecart = cdsspread(donneesTaux, probabilites, reglement, echeance, recup
 %   payée tant qu'il n'y a pas défaut.
 %
 %   Exemple :
+%      taux = [datenum('01-Jan-2029') 0.03];
+%      marche = [datenum('01-Jan-2029') 150];
+%      [probabilites, h] = cdsbootstrap(taux, marche, '01-Jan-2024');
 %      cdsspread(taux, probabilites, '01-Jan-2024', '01-Jan-2029')
 %
 %   Voir aussi CDSBOOTSTRAP, CDSPRICE.

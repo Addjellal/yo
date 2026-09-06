@@ -19,6 +19,10 @@ classdef esbacktest
 %   SUMMARY compte les dépassements.
 %
 %   Exemple :
+%      rng(1);
+%      rendements = 0.01 * randn(500, 1);
+%      valeursEnRisque = 0.023 * ones(500, 1);
+%      pertesMoyennes = 0.028 * ones(500, 1);
 %      e = esbacktest(rendements, valeursEnRisque, pertesMoyennes);
 %      runtests(e)
 %

@@ -8,7 +8,11 @@ function [risqueGlobal, intervalles] = portfolioRisk(modele, niveaux)
 %   disent combien on peut se fier au résultat.
 %
 %   Exemple :
-%      c = simulate(creditDefaultCopula(pd, lgd, ead, poids), 20000);
+%      pd = [0.01; 0.02; 0.05];
+%      lgd = [0.4; 0.4; 0.5];
+%      ead = [100; 200; 150];
+%      poids = repmat([0.6 0.8], 3, 1);       % somme des carres : 1
+%      c = simulate(creditDefaultCopula(pd, lgd, ead, poids), 2000);
 %      portfolioRisk(c)
 %
 %   Voir aussi CREDITDEFAULTCOPULA, RISKCONTRIBUTION, CONFIDENCEBANDS.

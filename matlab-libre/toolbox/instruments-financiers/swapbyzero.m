@@ -13,6 +13,9 @@ function [prix, tauxEchange, prixFixe, prixVariable] = swapbyzero(courbe, tauxBr
 %   FREQUENCES vaut [fixe variable], 1 et 1 par défaut.
 %
 %   Exemple :
+%      courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+%                         'StartDates', '01-Jan-2024', ...
+%                         'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
 %      [p, t] = swapbyzero(courbe, [0.04 0], '01-Jan-2024', '01-Jan-2029')
 %
 %   Voir aussi FIXEDBYZERO, FLOATBYZERO, BONDBYZERO.

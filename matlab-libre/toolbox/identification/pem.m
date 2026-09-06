@@ -12,6 +12,9 @@ function modele = pem(donnees, initial, varargin)
 %   par la façon de démarrer.
 %
 %   Exemple :
+%      rng(1);
+%      u = randn(300, 1);
+%      z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
 %      m = pem(z, [2 2 2 0 0 1]);
 %
 %   Voir aussi POLYEST, SSEST, ARX, ARMAX, OE, BJ.

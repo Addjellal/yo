@@ -11,6 +11,9 @@ function [prix, primeCourue] = cdsprice(donneesTaux, probabilites, reglement, ec
 %   d'une prime unitaire.
 %
 %   Exemple :
+%      taux = [datenum('01-Jan-2029') 0.03];
+%      marche = [datenum('01-Jan-2029') 150];
+%      [probabilites, h] = cdsbootstrap(taux, marche, '01-Jan-2024');
 %      cdsprice(taux, probabilites, '01-Jan-2024', '01-Jan-2029', 100)
 %
 %   Voir aussi CDSSPREAD, CDSBOOTSTRAP.

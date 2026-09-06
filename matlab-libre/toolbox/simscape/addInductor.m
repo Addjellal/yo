@@ -8,7 +8,11 @@ function c = addInductor(c, n1, n2, L)
 %   ensemble donnent le second ordre — donc les oscillations.
 %
 %   Exemple :
-%      c = addInductor(c, 2, 3, 1e-3);
+%      c = circuit('RL');
+%      c = addVoltageSource(c, 1, 0, 5);
+%      c = addInductor(c, 1, 2, 1e-3);
+%      c = addResistor(c, 2, 0, 100);
+%      [t, v] = solveTransient(c, 1e-4, 1e-7);
 %
 %   Voir aussi ADDCAPACITOR, ADDRESISTOR, SOLVETRANSIENT.
     c = addComponent(c, 'l', n1, n2, L);

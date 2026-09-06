@@ -10,8 +10,18 @@ function [matrice, totaux] = transprobbytotals(totauxEntree, varargin)
 %   sans relire les migrations.
 %
 %   Exemple :
-%      [~, t] = transprob(donnees);
-%      transprobbytotals(t)
+%      rng(1);
+%      P = [0.9 0.1; 0.2 0.8];
+%      donnees = zeros(0, 3);
+%      for e = 1:200
+%          etat = 1 + (rand < 0.5);
+%          for annee = 0:4
+%              donnees(end+1, :) = [e, datenum(2015 + annee, 1, 1), etat];
+%              etat = find(rand <= cumsum(P(etat, :)), 1);
+%          end
+%      end
+%      [estimee, totaux] = transprob(donnees);
+%      max(max(abs(transprobbytotals(totaux) - estimee))) < 1e-12   % 1
 %
 %   Voir aussi TRANSPROB, TRANSPROBTOTHRESHOLDS.
     intervalle = 1;

@@ -14,6 +14,9 @@ function prix = barrierbybls(courbe, actif, typeOption, exercice, reglement, ech
 %   redonne l'option ordinaire — c'est ce qui la vérifie.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      barrierbybls(c, s, 'call', 100, '01-Jan-2024', '01-Jan-2025', 'DO', 90, 0)
 %
 %   Voir aussi OPTSTOCKBYBLS, LOOKBACKBYBLS, ASIANBYKV.

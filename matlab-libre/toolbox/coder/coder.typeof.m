@@ -8,7 +8,11 @@ function t = coder.typeof(exemple, tailles, variables) %#ok<*STOUT>
 %   puis ignoré, et un avertissement le signale.
 %
 %   Exemple :
-%      codegen('f', '-args', {coder.typeof(int32(0), [3 3])})
+%      f = fopen('doubleDeTest.m', 'w');
+%      fprintf(f, 'function y = doubleDeTest(x)\n  y = x + x;\nend\n');
+%      fclose(f);
+%      r = codegen('doubleDeTest', '-args', {coder.typeof(int32(0), [3 3])}, '-report');
+%      contains(r.entete, 'doubleDeTest')      % 1
     if nargin >= 3 && any(variables(:))
         warning('coder:typeof:VariableSizeIgnored', ...
                 ['MatLibre Coder produces fixed-size arrays: the variable-size ' ...

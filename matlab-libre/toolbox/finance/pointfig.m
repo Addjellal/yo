@@ -12,7 +12,8 @@ function [colonnes, symboles] = pointfig(actif, boite)
 %   Le renversement se fait à trois boîtes, comme le veut l'usage.
 %
 %   Exemple :
-%      [c, s] = pointfig(clotures, 1);
+%      rng(1);
+%      [c, s] = pointfig(100 + cumsum(randn(60, 1)), 1);
 %
 %   Voir aussi HIGHLOW, CANDLE, MOVAVG.
     series = matlibre_colonnes_marche(actif, {}, {'cloture'});

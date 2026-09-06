@@ -10,6 +10,9 @@ function options = genfisOptions(methode, varargin)
 %                            MinImprovement
 %
 %   Exemple :
+%      rng(1);
+%      x = linspace(0, 1, 60)';
+%      y = sin(2 * pi * x);
 %      o = genfisOptions('FCMClustering', 'NumClusters', 4);
 %      fis = genfis(x, y, o);
 %

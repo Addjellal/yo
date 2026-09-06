@@ -9,7 +9,8 @@ function serie = totalreturnprice(prix, dividendes, datesDividendes, dates)
 %   corrige cela.
 %
 %   Exemple :
-%      s = totalreturnprice(prix, [1.2 1.3], datesVersement, dates);
+%      prix = [100; 101; 99; 103; 105];
+%      s = totalreturnprice(prix, [1.2 1.3], [2 4], (1:5)');
 %
 %   Voir aussi RET2TICK, TICK2RET, PRICE2RET.
     prix = double(prix(:));

@@ -10,6 +10,18 @@ function [bareme, minimum, maximum] = displaypoints(grille)
 %   dossier revient exactement à évaluer la régression logistique.
 %
 %   Exemple :
+%      rng(1);
+%      n = 500;
+%      revenu = 20000 + 40000 * rand(n, 1);
+%      age = round(20 + 45 * rand(n, 1));
+%      risque = -1 + 3 * (revenu - 40000) / 20000;
+%      defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+%      donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+%                       'defaut', defaut);
+%      sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+%                           'GoodLabel', 0);
+%      sc = autobinning(sc);
+%      sc = fitmodel(sc);
 %      [b, bas, haut] = displaypoints(sc);
 %
 %   Voir aussi FORMATPOINTS, SCORE, PROBDEFAULT, FITMODEL.
