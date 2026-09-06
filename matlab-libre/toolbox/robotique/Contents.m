@@ -38,3 +38,44 @@
 %   trapveltraj         - Profil de vitesse trapézoïdal
 %   rottraj             - Interpolation sphérique entre orientations
 %   transformtraj       - Interpolation entre transformations homogènes
+%
+% Arbres de corps rigides
+%   rigidBodyTree       - L'arbre : corps, liaisons, pesanteur
+%   rigidBody           - Un corps : masse, centre de masse, inertie
+%   rigidBodyJoint      - Une liaison : type, axe, butées
+%   setFixedTransform   - Transformations fixes, par Denavit-Hartenberg
+%   addBody, removeBody, replaceBody - Construire l'arbre
+%   showdetails         - Afficher sa structure
+%   homeConfiguration, randomConfiguration - Configurations
+%   importrobot         - Lire un fichier URDF
+%   loadrobot           - Charger un modèle du catalogue
+%
+% Cinématique et dynamique de l'arbre
+%   getTransform        - Pose d'un corps dans le repère d'un autre
+%   geometricJacobian   - Jacobienne géométrique
+%   centerOfMass        - Centre de masse de l'ensemble
+%   massMatrix          - Matrice d'inertie articulaire
+%   velocityProduct     - Couples de Coriolis et centrifuges
+%   gravityTorque       - Couples de pesanteur
+%   inverseDynamics     - Couples d'un mouvement donné
+%   forwardDynamics     - Accélérations sous des couples donnés
+%   externalForce       - Matrice des efforts extérieurs
+%
+% Cinématique inverse
+%   inverseKinematics   - Atteindre une pose
+%   generalizedInverseKinematics - Satisfaire plusieurs contraintes
+%   constraintPoseTarget, constraintPositionTarget
+%   constraintOrientationTarget, constraintCartesianBounds
+%   constraintJointBounds, constraintAiming, constraintDistanceBounds
+%
+% Mobiles à roues
+%   unicycleKinematics  - L'unicycle
+%   differentialDriveKinematics - Deux roues motrices
+%   bicycleKinematics   - Direction avant
+%   ackermannKinematics - Le braquage devenant un état
+%   controllerPurePursuit - Suivi de chemin
+%   controllerVFH       - Évitement d'obstacles
+%
+% Cartes d'occupation
+%   binaryOccupancyMap  - Occupation binaire
+%   occupancyMap        - Occupation probabiliste

@@ -40,24 +40,86 @@ DISTRIBUTED Tableau distribué (identité sur une seule machine).
 GATHER Rapatrie un tableau distribué (identité ici).
 ```
 
+## `matlibre_par_appliquer`
+
+```
+MATLIBRE_PAR_APPLIQUER Corps commun de PARARRAYFUN et PARCELLFUN.
+  SORTIES = MATLIBRE_PAR_APPLIQUER(F,ENTREES,OPTIONS,EXTRAIRE,N) applique
+  F à chaque élément, en parallèle, et rend N sorties dans une cellule.
+  EXTRAIRE est la poignée qui prend le i-ème élément d'une entrée : elle
+  seule diffère entre un tableau et une cellule.
+
+  OPTIONS est une structure à deux champs : uniforme, et gestionnaire —
+  la poignée d'ErrorHandler, vide s'il n'y en a pas.
+
+  Les tâches partent toutes avant qu'on en attende aucune : c'est ce qui
+  les rend simultanées. Les résultats se relisent ensuite dans l'ordre
+  des indices, si bien que le résultat ne dépend pas de l'ordre où les
+  travailleurs finissent.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_par_options`
+
+```
+MATLIBRE_PAR_OPTIONS Sépare les entrées des options nommées.
+  [ENTREES,OPTIONS] = MATLIBRE_PAR_OPTIONS(ARGUMENTS,RECONNUES) retire
+  des arguments les paires nom-valeur dont le nom figure dans RECONNUES,
+  et rend une structure à deux champs : uniforme et gestionnaire.
+
+  Une option ne se reconnaît qu'en fin de liste et suivie d'une valeur :
+  une cellule de chaînes passée comme donnée ne doit pas être prise pour
+  un nom d'option.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `pararrayfun`
 
 ```
 PARARRAYFUN Équivalent parallèle d'ARRAYFUN.
-  Chaque élément part sur un travailleur du pool ; les résultats
-  reviennent dans l'ordre des indices.
+  V = PARARRAYFUN(F,A) applique F à chaque élément de A, chacun sur un
+  travailleur du pool, et rend les résultats dans l'ordre des indices.
+  PARARRAYFUN(F,A,B,...) apparie les tableaux élément par élément.
+
+  Options, comme ARRAYFUN :
+     'UniformOutput'  false pour rendre une cellule
+     'ErrorHandler'   une poignée appelée quand F échoue
+
+  [X,Y,...] = PARARRAYFUN(...) rend autant de sorties que F en donne.
+
+  Le résultat est exactement celui d'ARRAYFUN : c'est la garantie qui
+  fait tout l'intérêt de la fonction, et elle interdit à F de dépendre
+  de l'ordre d'exécution ou d'un état partagé. Une fonction qui
+  accumule dans une variable extérieure, ou qui tire au sort, ne se
+  parallélise pas ainsi.
 
   Exemple :
-     v = pararrayfun(@(x) x^2, 1:4)      % [1 4 9 16]
+     pararrayfun(@(x) x^2, 1:4)                    % [1 4 9 16]
+     pararrayfun(@(n) ones(1,n), 1:3, 'UniformOutput', false)
+
+  Voir aussi PARCELLFUN, ARRAYFUN, PARFEVAL, DISTRIBUTED.
 ```
 
 ## `parcellfun`
 
 ```
 PARCELLFUN Équivalent parallèle de CELLFUN.
-  Chaque case part sur un travailleur du pool.
+  V = PARCELLFUN(F,C) applique F au contenu de chaque case de C, chacune
+  sur un travailleur du pool.
+  PARCELLFUN(F,C,D,...) apparie les cellules case par case.
+
+  Options, comme CELLFUN :
+     'UniformOutput'  false pour rendre une cellule
+     'ErrorHandler'   une poignée appelée quand F échoue
+
+  [X,Y,...] = PARCELLFUN(...) rend autant de sorties que F en donne.
 
   Exemple :
-     v = parcellfun(@numel, {'a', 'bb', 'ccc'})   % [1 2 3]
+     parcellfun(@numel, {'a', 'bb', 'ccc'})        % [1 2 3]
+     parcellfun(@upper, {'a','b'}, 'UniformOutput', false)
+
+  Voir aussi PARARRAYFUN, CELLFUN, PARFEVAL.
 ```
 

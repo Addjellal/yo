@@ -21,12 +21,12 @@ existant appellera.
 | `automatique` | Control System Toolbox — systèmes asservis linéaires. | 119 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
-| `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 4 |
+| `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 6 |
 | `cartographie` | Mapping Toolbox — géodésie et cartographie. | 4 |
 | `coder` | MATLAB Coder — génération de code C. | 4 |
 | `communications` | Communications Toolbox — transmissions numériques. | 145 |
 | `communications-sans-fil` | Wireless (5G / LTE / WLAN) — couche physique. | 6 |
-| `compilateur` | MATLAB Compiler — distribution d'un programme. | 2 |
+| `compilateur` | MATLAB Compiler — distribution d'un programme. | 3 |
 | `conduite-automatisee` | Automated Driving Toolbox — aide à la conduite. | 4 |
 | `dsp` | DSP System Toolbox — traitement du signal en temps réel. | 6 |
 | `econometrie` | Econometrics Toolbox — séries temporelles et économétrie. | 84 |
@@ -52,7 +52,7 @@ existant appellera.
 | `renforcement` | Reinforcement Learning Toolbox — apprentissage par renforcement. | 5 |
 | `reseaux-antennes` | Phased Array System Toolbox — réseaux d'antennes. | 4 |
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
-| `robotique` | Robotics System Toolbox — cinématique et transformations. | 47 |
+| `robotique` | Robotics System Toolbox — cinématique et transformations. | 74 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 201 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
@@ -63,7 +63,7 @@ existant appellera.
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
 
-Les fonctions natives — 650, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 651, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

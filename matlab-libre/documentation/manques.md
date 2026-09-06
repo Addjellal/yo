@@ -21,27 +21,14 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
 | optimisation | 31 | 0 | 100 % |
-| robotique | 36 | 37 | 49 % |
+| robotique | 73 | 0 | 100 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 135 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
 | types | 90 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2114** | **37** | **98 %** |
-
-## robotique
-
-`rigidBody`, `rigidBodyJoint`, `rigidBodyTree`, `addBody`, `removeBody`
-`replaceBody`, `showdetails`, `homeConfiguration`, `randomConfiguration`
-`getTransform`, `geometricJacobian`, `centerOfMass`, `massMatrix`, `velocityProduct`
-`gravityTorque`, `inverseDynamics`, `forwardDynamics`, `externalForce`, `importrobot`
-`loadrobot`, `inverseKinematics`, `generalizedInverseKinematics`, `constraintPoseTarget`
-`constraintPositionTarget`, `constraintOrientationTarget`, `constraintCartesianBounds`
-`constraintJointBounds`, `constraintAiming`, `constraintDistanceBounds`
-`ackermannKinematics`, `bicycleKinematics`, `differentialDriveKinematics`
-`unicycleKinematics`, `controllerPurePursuit`, `controllerVFH`, `binaryOccupancyMap`
-`occupancyMap`
+| **ensemble** | **2151** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 

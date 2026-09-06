@@ -721,15 +721,50 @@ FONCTION(fnError) {
     erreur("", formatMatlab(premier, args, 1));
 }
 
+// L'état d'un avertissement, sous la forme que « warning » rend et
+// reprend : une structure à deux champs, identifier et state.
+static Valeur etatAvertissement(const Interpreteur& it, const std::string& cible) {
+    Valeur e = Valeur::structureVide();
+    e.poserChamp("identifier", Valeur::texte(cible));
+    bool actif = (cible == "all") ? it.avertissementsActifs
+                                  : (it.avertissementsActifs &&
+                                     !it.avertissementsEteints.count(cible));
+    e.poserChamp("state", Valeur::texte(actif ? "on" : "off"));
+    return e;
+}
+
 FONCTION(fnWarning) {
     INUTILISE
     if (args.empty()) return {};
+    // « warning(etat) » reprend l'état rendu par un appel précédent : c'est
+    // ainsi qu'on éteint un avertissement le temps d'un calcul, puis qu'on
+    // rétablit exactement ce qui était en place — sans supposer que tout
+    // était allumé au départ.
+    if (args[0].estStructure() && args[0].aChamp("identifier") && args[0].aChamp("state")) {
+        std::size_t n = std::max<std::size_t>(1, args[0].nelem());
+        for (std::size_t k = 0; k < n; ++k) {
+            std::string cible = args[0].champ("identifier", k).versTexte();
+            bool allumer = args[0].champ("state", k).versTexte() == "on";
+            if (cible == "all") it.avertissementsActifs = allumer;
+            else if (allumer) it.avertissementsEteints.erase(cible);
+            else it.avertissementsEteints.insert(cible);
+        }
+        return {};
+    }
     std::string premier = args[0].versTexte();
+    if (premier == "query") {
+        std::string cible = args.size() > 1 ? args[1].versTexte() : "all";
+        return {etatAvertissement(it, cible)};
+    }
     if (premier == "off" || premier == "on") {
         std::string cible = args.size() > 1 ? args[1].versTexte() : "all";
+        // L'état d'avant se lit avant de changer quoi que ce soit : c'est
+        // lui que l'appelant recevra s'il demande une sortie.
+        Valeur avant = etatAvertissement(it, cible);
         if (cible == "all") it.avertissementsActifs = (premier == "on");
         else if (premier == "off") it.avertissementsEteints.insert(cible);
         else it.avertissementsEteints.erase(cible);
+        if (nargout >= 1) return {avant};
         return {};
     }
     std::string id, message;

@@ -240,4 +240,227 @@ assert(abs(angdiff(deg2rad(179), deg2rad(-179)) - deg2rad(2)) < 1e-12, ...
 assert(all(abs(angdiff([0 pi/2 pi]) - pi/2) < 1e-12), ...
        'et sur un vecteur, les differences successives');
 
+%% 8. L'arbre de corps rigides
+% Le bras 2R écrit à la main plus haut se décrit aussi comme un arbre :
+% des corps, des liaisons, des paramètres de Denavit-Hartenberg. On y
+% gagne la dynamique, la cinématique inverse et les robots du catalogue.
+robot = rigidBodyTree('DataFormat', 'row');
+robot.Gravity = [0 -9.81 0];
+longueurs = [l1 l2];
+masses = [2 1.5];
+noms = {'segment1', 'segment2'};
+for k = 1:2
+    corps = rigidBody(noms{k});
+    corps.Joint = rigidBodyJoint(sprintf('axe%d', k), 'revolute');
+    setFixedTransform(corps.Joint, [longueurs(k) 0 0 0], 'dh');
+    % Une masse ponctuelle au bout du segment : le repère du corps est
+    % précisément là, en convention de Denavit-Hartenberg.
+    corps.Mass = masses(k);
+    corps.CenterOfMass = [0 0 0];
+    corps.Inertia = zeros(1, 6);
+    if k == 1
+        parent = 'base';
+    else
+        parent = noms{k - 1};
+    end
+    addBody(robot, corps, parent);
+end
+fprintf('\nLe meme bras monte en arbre de corps rigides :\n');
+fprintf('  %d corps, %d degres de liberte\n', robot.NumBodies, matlibre_nddl(robot));
+
+% L'arbre retrouve exactement la cinématique écrite à la main.
+T = getTransform(robot, q, 'segment2');
+fprintf('  effecteur en (%.4f, %.4f), contre (%.4f, %.4f)\n', ...
+        T(1,4), T(2,4), x, y);
+assert(abs(T(1,4) - x) < 1e-12 && abs(T(2,4) - y) < 1e-12, ...
+       'l''arbre retrouve fkine2R');
+Jarbre = geometricJacobian(robot, q, 'segment2');
+assert(norm(Jarbre(4:5, :) - J) < 1e-12, 'et jacobian2R');
+fprintf('  jacobienne identique a %.1e pres\n', norm(Jarbre(4:5, :) - J));
+
+% Ce qu'on gagne : la dynamique, qu'on vérifie contre la forme fermée du
+% bras à deux masses ponctuelles — celle de tous les cours.
+m1 = masses(1); m2 = masses(2); g = 9.81;
+M = massMatrix(robot, q);
+c2 = cos(q(2));
+Mattendue = [(m1+m2)*l1^2 + m2*l2^2 + 2*m2*l1*l2*c2, m2*l2^2 + m2*l1*l2*c2; ...
+              m2*l2^2 + m2*l1*l2*c2,                  m2*l2^2];
+fprintf('  matrice d''inertie : [%.4f %.4f ; %.4f %.4f]\n', ...
+        M(1,1), M(1,2), M(2,1), M(2,2));
+fprintf('  forme fermee du cours : ecart %.1e\n', norm(M - Mattendue));
+assert(norm(M - Mattendue) < 1e-12, 'la matrice d''inertie est celle du cours');
+assert(norm(M - M.') < 1e-14, 'elle est symetrique');
+assert(all(eig(M) > 0), 'et definie positive : c''est une energie cinetique');
+
+% Elle dépend de la configuration — un bras replié a moins d'inertie
+% qu'un bras tendu, et c'est ce qui rend sa commande difficile.
+tendu = massMatrix(robot, [0 0])(1,1);
+replie = massMatrix(robot, [0 pi])(1,1);
+fprintf('  inertie du premier axe : %.4f bras tendu, %.4f bras replie (x%.2f)\n', ...
+        tendu, replie, tendu / replie);
+assert(tendu > 2.5 * replie, ...
+       'l''inertie vue du premier axe varie de plus du double');
+
+% Les couples de pesanteur, eux aussi en forme fermée.
+G = gravityTorque(robot, q);
+Gattendue = [(m1+m2)*g*l1*cos(q(1)) + m2*g*l2*cos(q(1)+q(2)), ...
+             m2*g*l2*cos(q(1)+q(2))];
+fprintf('  couples de pesanteur : [%.4f %.4f] N.m, ecart %.1e\n', ...
+        G(1), G(2), norm(G - Gattendue));
+assert(norm(G - Gattendue) < 1e-12, 'les couples de pesanteur sont ceux du cours');
+% Bras à la verticale : rien à tenir.
+assert(norm(gravityTorque(robot, [pi/2 0])) < 1e-12, ...
+       'a la verticale, la pesanteur ne fait aucun couple');
+
+% Dynamique directe et inverse s'annulent l'une l'autre : c'est la seule
+% vérification qui les éprouve toutes les deux à la fois.
+qPoint = [0.7 -1.1];
+qPointPoint = [0.3 -0.2];
+couples = inverseDynamics(robot, q, qPoint, qPointPoint);
+retour = forwardDynamics(robot, q, qPoint, couples);
+fprintf('  couples [%.4f %.4f] -> accelerations retrouvees a %.1e pres\n', ...
+        couples(1), couples(2), norm(retour - qPointPoint));
+assert(norm(retour - qPointPoint) < 1e-10, ...
+       'la dynamique directe annule l''inverse');
+
+% Un effort extérieur sur l'effecteur se transmet aux axes par la
+% transposée de la jacobienne : c'est le principe des travaux virtuels,
+% et il se vérifie sans rien connaître de l'algorithme.
+robot.Gravity = [0 0 0];
+torseur = [0; 0; 0; 3; -2; 0];
+efforts = externalForce(robot, 'segment2', torseur);
+tauExterieur = inverseDynamics(robot, q, [0 0], [0 0], efforts);
+fprintf('  effort [3 -2] N sur l''effecteur : couples [%.4f %.4f] N.m\n', ...
+        -tauExterieur(1), -tauExterieur(2));
+assert(norm(tauExterieur + (Jarbre.' * torseur).') < 1e-10, ...
+       'un effort exterieur se transmet par J transposee');
+robot.Gravity = [0 -9.81 0];
+
+%% 9. La cinématique inverse d'un vrai robot
+% Le catalogue donne des modèles montés d'après les tables publiées par
+% les constructeurs. La cinématique inverse d'un six-axes n'a pas de
+% forme fermée simple ; on la résout par moindres carrés amortis.
+ur5 = loadrobot('universalUR5', 'DataFormat', 'row');
+fprintf('\nUR5 du catalogue : %d axes\n', matlibre_nddl(ur5));
+assert(matlibre_nddl(ur5) == 6, 'l''UR5 a six axes');
+
+qConnu = [0.3 -0.7 1.2 -0.4 0.5 0.1];
+cible = getTransform(ur5, qConnu, 'outil');
+solveur = inverseKinematics('RigidBodyTree', ur5);
+[trouve, renseignements] = solveur('outil', cible, ones(1, 6), zeros(1, 6));
+atteinte = getTransform(ur5, trouve, 'outil');
+fprintf('  pose visee (%.4f, %.4f, %.4f)\n', cible(1,4), cible(2,4), cible(3,4));
+fprintf('  pose atteinte (%.4f, %.4f, %.4f)\n', ...
+        atteinte(1,4), atteinte(2,4), atteinte(3,4));
+fprintf('  %s en %d iterations, %d reprise(s), erreur %.1e\n', ...
+        renseignements.Status, renseignements.Iterations, ...
+        renseignements.NumRandomRestarts, renseignements.PoseErrorNorm);
+assert(renseignements.ExitFlag == 1, 'la cinematique inverse aboutit');
+assert(norm(atteinte - cible) < 1e-5, 'et atteint la pose demandee');
+% Rien ne garantit qu'on retombe sur la configuration de départ : un
+% six-axes en a jusqu'à huit qui donnent la même pose, et le solveur rend
+% celle vers laquelle il a convergé. C'est donc la pose qu'il faut
+% vérifier, jamais les angles.
+fprintf('  ecart aux angles de depart : %.4f rad — ce n''est pas ce qu''on verifie\n', ...
+        norm(trouve - qConnu));
+
+% Sous contraintes, on choisit laquelle. Les butées d'un seul axe
+% suffisent à trancher entre coude haut et coude bas d'un bras plan.
+plan = loadrobot('planarArm2R', 'DataFormat', 'row');
+ciblePlan = getTransform(plan, [0.4 0.9], 'outil');
+gik = generalizedInverseKinematics('RigidBodyTree', plan, ...
+        'ConstraintInputs', {'position', 'joint'});
+point = constraintPositionTarget('outil');
+point.TargetPosition = ciblePlan(1:3, 4).';
+butees = constraintJointBounds(plan);
+butees.Bounds(2, :) = [0 pi];
+coudeHaut = gik([0.1 0.1], point, butees);
+butees.Bounds(2, :) = [-pi 0];
+coudeBas = gik([0.1 -0.1], point, butees);
+fprintf('  contraintes : coude haut q2 = %+.4f, coude bas q2 = %+.4f\n', ...
+        coudeHaut(2), coudeBas(2));
+assert(coudeHaut(2) > 0 && coudeBas(2) < 0, 'les butees choisissent le coude');
+hautAtteint = getTransform(plan, coudeHaut, 'outil');
+basAtteint = getTransform(plan, coudeBas, 'outil');
+assert(norm(hautAtteint(1:3,4) - ciblePlan(1:3,4)) < 1e-5 && ...
+       norm(basAtteint(1:3,4) - ciblePlan(1:3,4)) < 1e-5, ...
+       'et les deux atteignent le meme point');
+
+%% 10. Les mobiles à roues
+% Quatre modèles, du plus simple au plus contraint. Ce qui les distingue
+% tient en une question : que peut faire le mobile sur place ?
+fprintf('\nModeles de mobiles, commande de un metre par seconde :\n');
+mobile = unicycleKinematics();
+fprintf('  unicycle, omega = 0.5 : %s\n', ...
+        mat2str(round(derivative(mobile, [0 0 0], [1 0.5]).', 4)));
+assert(norm(derivative(mobile, [0 0 0], [1 0.5]).' - [1 0 0.5]) < 1e-14, ...
+       'l''unicycle prend directement vitesse et rotation');
+
+deuxRoues = differentialDriveKinematics('WheelRadius', 0.1, 'TrackWidth', 0.5);
+fprintf('  deux roues a la meme vitesse : %s\n', ...
+        mat2str(round(derivative(deuxRoues, [0 0 0], [1 1]).', 4)));
+fprintf('  deux roues en sens contraire : %s\n', ...
+        mat2str(round(derivative(deuxRoues, [0 0 0], [-1 1]).', 4)));
+assert(abs(derivative(deuxRoues, [0 0 0], [1 1])(3)) < 1e-14, ...
+       'roues egales : aucune rotation');
+assert(abs(derivative(deuxRoues, [0 0 0], [-1 1])(1)) < 1e-14, ...
+       'roues opposees : aucune avance — il tourne sur place');
+
+velo = bicycleKinematics('WheelBase', 2.7);
+d = derivative(velo, [0 0 0], [10 deg2rad(10)]);
+fprintf('  bicyclette, braquage 10 deg : rayon %.4f m (Ackermann %.4f)\n', ...
+        10 / d(3), 2.7 / tan(deg2rad(10)));
+assert(abs(10 / d(3) - 2.7 / tan(deg2rad(10))) < 1e-9, ...
+       'le rayon suit la formule d''Ackermann');
+% Et il ne peut pas tourner sur place : à vitesse nulle, rien ne tourne.
+assert(norm(derivative(velo, [0 0 0], [0 deg2rad(30)])) < 1e-14, ...
+       'a l''arret, un vehicule a direction avant ne tourne pas');
+
+%% 11. Cartes d'occupation
+% Une carte binaire dit occupé ou libre ; une carte probabiliste dit avec
+% quelle confiance, ce qui lui permet de se corriger.
+carte = binaryOccupancyMap(10, 10, 2);
+setOccupancy(carte, [5 5], 1);
+fprintf('\nCarte binaire %s a %g cellule/m :\n', ...
+        mat2str(carte.GridSize), carte.Resolution);
+% Une cellule fait un demi-metre de cote : (5,5) et (5.6,5) sont donc
+% deux cellules voisines, non la meme.
+fprintf('  obstacle pose en (5,5) : occupation %g, voisine (5.6,5) : %g\n', ...
+        getOccupancy(carte, [5 5]), getOccupancy(carte, [5.6 5]));
+assert(getOccupancy(carte, [5 5]) == 1, 'la cellule est occupee');
+assert(getOccupancy(carte, [5.6 5]) == 0, 'sa voisine non');
+inflate(carte, 0.5);
+fprintf('  apres epaississement de 0.5 m : la voisine passe a %g\n', ...
+        getOccupancy(carte, [5.6 5]));
+assert(getOccupancy(carte, [5.6 5]) == 1, ...
+       'epaissir l''obstacle permet de planifier le robot comme un point');
+assert(checkOccupancy(carte, [50 50]) == -1, 'hors carte : inconnu, non libre');
+
+probable = occupancyMap(10, 10, 2);
+fprintf('  carte probabiliste : cellule jamais vue a %.2f, verdict %d\n', ...
+        getOccupancy(probable, [5 5]), checkOccupancy(probable, [5 5]));
+assert(checkOccupancy(probable, [5 5]) == -1, 'inconnue au depart');
+for k = 1:5
+    updateOccupancy(probable, [5 5], true);
+end
+fprintf('  apres cinq observations d''obstacle : %.4f, verdict %d\n', ...
+        getOccupancy(probable, [5 5]), checkOccupancy(probable, [5 5]));
+assert(checkOccupancy(probable, [5 5]) == 1, 'cinq observations suffisent a trancher');
+for k = 1:20
+    updateOccupancy(probable, [5 5], false);
+end
+fprintf('  puis vingt observations contraires : %.4f, verdict %d\n', ...
+        getOccupancy(probable, [5 5]), checkOccupancy(probable, [5 5]));
+assert(checkOccupancy(probable, [5 5]) == 0, ...
+       'une carte probabiliste sait revenir sur ce qu''elle croyait');
+
+% Un relevé télémétrique complet : chaque rayon libère ce qu'il traverse
+% et occupe là où il s'arrête.
+releve = occupancyMap(10, 10, 2);
+insertRay(releve, [1 1 0], 3, 0, 5);
+fprintf('  un rayon de 3 m : point d''arret a %.2f, cellule traversee a %.2f\n', ...
+        getOccupancy(releve, [4 1]), getOccupancy(releve, [2.5 1]));
+assert(getOccupancy(releve, [4 1]) > 0.5, 'le rayon marque ou il s''arrete');
+assert(getOccupancy(releve, [2.5 1]) < 0.5, 'et libere ce qu''il traverse');
+
 fprintf('\nToutes les verifications passent.\n');

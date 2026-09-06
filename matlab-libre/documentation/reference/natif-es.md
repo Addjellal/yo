@@ -812,15 +812,30 @@ WARNING  Signale un avertissement, sans arrêter.
     WARNING(MESSAGE) affiche l'avertissement.
     WARNING(IDENTIFIANT,FORMAT,...) lui donne un identifiant.
     WARNING('off',IDENTIFIANT) éteint cet avertissement ; 'on' le rallume.
+    S = WARNING('off',IDENTIFIANT) rend en plus l'état d'avant, sous
+    forme d'une structure à deux champs, identifier et state.
+    S = WARNING('query',IDENTIFIANT) lit cet état sans rien changer.
+    WARNING(S) rétablit un état ainsi obtenu.
+
+    Éteindre puis rallumer n'est pas la même chose que rétablir : si
+    l'avertissement était déjà éteint, le rallumer change le réglage de
+    l'appelant. Passer par l'état rendu évite cette erreur.
 
     Syntaxe
        warning(message)
        warning(identifiant,format,...)
        warning('off',identifiant)
+       s = warning('off',identifiant)
+       s = warning('query',identifiant)
+       warning(s)
 
     Exemples
        warning('résultat approché');
        warning('off', 'MATLAB:singularMatrix');
+
+       avant = warning('off', 'MATLAB:singularMatrix');
+       x = [1 1; 1 1] \ [1; 1];      % sans l'avertissement
+       warning(avant);               % l'état d'avant, quel qu'il fût
 
     Voir aussi ERROR, TRY, ASSERT, LASTWARN.
 ```

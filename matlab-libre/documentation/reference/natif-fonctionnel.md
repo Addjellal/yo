@@ -162,6 +162,10 @@ EXIST  Ce que désigne un nom.
     E = EXIST(NOM,GENRE) restreint la recherche : 'var', 'file', 'dir',
     'builtin', 'class'.
 
+    Un dossier rend 7 et non 2 : c'est ce qui distingue un fichier d'un
+    dossier de même nom, et EXIST(NOM,'file') ne répond donc pas pour un
+    dossier.
+
     Syntaxe
        e = exist(nom)
        e = exist(nom,genre)
@@ -175,8 +179,11 @@ EXIST  Ce que désigne un nom.
        if exist('donnees.mat','file') == 2
            disp('le fichier est là');
        end
+       if exist(tempdir,'dir') == 7
+           disp('le dossier est là');
+       end
 
-    Voir aussi WHICH, ISFIELD, ISVARNAME.
+    Voir aussi WHICH, ISFIELD, ISVARNAME, ISFOLDER, ISFILE.
 ```
 
 ## `feval`

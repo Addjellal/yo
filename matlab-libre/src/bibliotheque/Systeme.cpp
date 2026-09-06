@@ -46,14 +46,15 @@ FONCTION(fnPwd) {
 
 FONCTION(fnCd) {
     INUTILISE
-    if (args.empty()) {
-        std::error_code ec;
-        return {Valeur::texte(fs::current_path(ec).string())};
-    }
     std::error_code ec;
+    std::string avant = fs::current_path(ec).string();
+    if (args.empty()) return {Valeur::texte(avant)};
     fs::current_path(args[0].versTexte(), ec);
     if (ec) erreur("MATLAB:cd:NonExistentDirectory",
                    "Unable to change to directory '" + args[0].versTexte() + "'.");
+    // Avec une sortie, cd rend le dossier d'où l'on vient : c'est ce qui
+    // permet d'y revenir sans l'avoir noté d'avance.
+    if (nargout >= 1) return {Valeur::texte(avant)};
     return {};
 }
 
@@ -369,18 +370,25 @@ FONCTION(fnWhich) {
     exigerArguments(args, 1, 2, "which");
     std::string nom = args[0].versTexte();
     std::string reponse;
+    bool trouve = true;
     if (it.existeVariable(nom)) reponse = nom + " is a variable.";
     else {
         auto index = it.indexFichiers();
         auto f = index.find(nom);
+        std::string courant = it.fichierDossierCourant(nom);
         if (f != index.end()) reponse = f->second;
+        else if (!courant.empty()) reponse = courant;
         else if (it.natif(nom)) reponse = "built-in (" + nom + ")";
-        else reponse = "'" + nom + "' not found.";
+        else { reponse = "'" + nom + "' not found."; trouve = false; }
     }
     if (nargout == 0) {
         it.sortie() << reponse << "\n";
         return {};
     }
+    // Avec une sortie, un nom introuvable rend une chaîne vide : c'est ce
+    // qu'attend « if isempty(which(nom)) », la façon habituelle de poser
+    // la question. Le message n'est bon qu'à l'affichage.
+    if (!trouve) return {Valeur::texte("")};
     return {Valeur::texte(reponse)};
 }
 
@@ -1027,6 +1035,25 @@ FONCTION(fnRacineToolbox) {
     return {Valeur::texte(it.racineToolbox())};
 }
 
+FONCTION(fnExecutable) {
+    INUTILISE
+    // Le chemin de l'interpréteur lui-même. MCC en a besoin : un lanceur
+    // qui écrit « exec matlibre » ne marche que si l'interpréteur est dans
+    // le PATH, ce qu'on ne peut pas supposer.
+    std::error_code ec;
+#if defined(_WIN32)
+    char tampon[32768];
+    DWORD n = GetModuleFileNameA(nullptr, tampon, (DWORD)sizeof(tampon));
+    if (n > 0 && n < sizeof(tampon)) return {Valeur::texte(std::string(tampon, n))};
+#else
+    fs::path lien = fs::read_symlink("/proc/self/exe", ec);
+    if (!ec && !lien.empty()) return {Valeur::texte(lien.string())};
+    lien = fs::read_symlink("/proc/curproc/file", ec);
+    if (!ec && !lien.empty()) return {Valeur::texte(lien.string())};
+#endif
+    return {Valeur::texte("matlibre")};
+}
+
 }  // namespace
 
 void enregistrerSysteme(Interpreteur& it) {
@@ -1040,6 +1067,8 @@ void enregistrerSysteme(Interpreteur& it) {
     it.enregistrer("isfolder", fnIsfolder, "systeme", "isfolder  Vrai pour un dossier.");
     it.enregistrer("matlibre_racine", fnRacineToolbox, "systeme",
                    "matlibre_racine  Dossier racine des toolboxes.");
+    it.enregistrer("matlibre_executable", fnExecutable, "systeme",
+                   "matlibre_executable  Chemin de l'interpreteur en cours.");
     it.enregistrer("isfile", fnIsfile, "systeme", "isfile  Vrai pour un fichier ordinaire.");
     it.enregistrer("mfilename", fnMfilename, "systeme",
                    "mfilename  Nom du fichier en cours d'execution.");

@@ -332,23 +332,40 @@ std::string aideDepuisSource(const std::string& source) {
     return aide;
 }
 
+std::string Interpreteur::fichierDossierCourant(const std::string& nom) const {
+    if (nom.empty() || nom.find('/') != std::string::npos ||
+        nom.find('\\') != std::string::npos)
+        return {};
+    std::error_code ec;
+    fs::path candidat = fs::current_path(ec) / (nom + ".m");
+    if (ec || !fs::is_regular_file(candidat, ec)) return {};
+    return candidat.string();
+}
+
 std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::string& nom) {
     auto itc = cacheFonctions_.find(nom);
     if (itc != cacheFonctions_.end()) return itc->second;
     auto it = indexM_.find(nom);
-    if (it == indexM_.end()) return nullptr;
-    std::string source = lireFichier(it->second);
-    UniteCompilee u = compiler(source, it->second);
+    std::string chemin;
+    // Un fichier du dossier courant ne se met pas en cache : le dossier
+    // courant change, et une fonction retenue d'un dossier qu'on a quitté
+    // serait appelée à la place de celle qui la remplace ici.
+    bool cacheable = it != indexM_.end();
+    if (cacheable) chemin = it->second;
+    else chemin = fichierDossierCourant(nom);
+    if (chemin.empty()) return nullptr;
+    std::string source = lireFichier(chemin);
+    UniteCompilee u = compiler(source, chemin);
     if (!u.classes.empty()) {
         // C'est un fichier de classe, pas de fonction : on le retient comme
         // tel et l'on ne rend rien.
         for (auto& c : u.classes) {
             relierClasse(c, u.fonctions);
             c->aide = aideDepuisSource(source);
-            c->fichier = it->second;
+            c->fichier = chemin;
             cacheClasses_[c->nom] = c;
         }
-        cacheFonctions_[nom] = nullptr;
+        if (cacheable) cacheFonctions_[nom] = nullptr;
         return nullptr;
     }
     if (u.fonctions.empty()) {
@@ -356,24 +373,24 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         auto f = std::make_shared<FonctionUtilisateur>();
         f->nom = nom;
         f->corps = u.script ? u.script : Noeud::creer(TypeN::Bloc);
-        f->fichier = it->second;
+        f->fichier = chemin;
         f->aide = aideDepuisSource(source);
         f->entrees.clear();
         f->sorties.clear();
         f->script = true;
-        cacheFonctions_[nom] = f;
+        if (cacheable) cacheFonctions_[nom] = f;
         return f;
     }
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
     for (auto& f : u.fonctions) voisines[f->nom] = f;
     for (auto& f : u.fonctions) {
-        f->fichier = it->second;
+        f->fichier = chemin;
         propagerVoisines(f, voisines);
     }
     u.fonctions[0]->aide = aideDepuisSource(source);
     // Le nom du fichier prime sur celui écrit dans la première fonction ;
     // les suivantes restent privées au fichier, visibles par « voisines ».
-    cacheFonctions_[nom] = u.fonctions[0];
+    if (cacheable) cacheFonctions_[nom] = u.fonctions[0];
     return u.fonctions[0];
 }
 
@@ -572,7 +589,7 @@ bool Interpreteur::fonctionExiste(const std::string& nom) const {
     if (indexClasses_.count(nom)) return true;
     const Portee& p = *piles_.back();
     if (p.fonction && p.fonction->voisines.count(nom)) return true;
-    return false;
+    return !fichierDossierCourant(nom).empty();
 }
 
 std::shared_ptr<Fonction> Interpreteur::resoudrePoignee(const std::string& nom) {

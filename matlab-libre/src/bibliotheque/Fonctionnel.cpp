@@ -423,12 +423,21 @@ FONCTION(fnExist) {
     if ((genre.empty() || genre == "var") && it.existeVariable(nom))
         return {Valeur::scalaire(1)};
     if (genre == "var") return {Valeur::scalaire(0)};
+    // Un dossier vaut 7, un fichier 2 : MATLAB les distingue, et
+    // « exist(d,'dir') » est la façon habituelle de vérifier un dossier.
+    if ((genre.empty() || genre == "dir") && !nom.empty()) {
+        std::error_code ec;
+        if (std::filesystem::is_directory(nom, ec)) return {Valeur::scalaire(7)};
+    }
+    if (genre == "dir") return {Valeur::scalaire(0)};
     if ((genre.empty() || genre == "file") && !nom.empty()) {
         std::error_code ec;
-        if (std::filesystem::exists(nom, ec)) return {Valeur::scalaire(2)};
+        if (std::filesystem::exists(nom, ec) && !std::filesystem::is_directory(nom, ec))
+            return {Valeur::scalaire(2)};
     }
     if (genre.empty() || genre == "file") {
         if (it.indexFichiers().count(nom)) return {Valeur::scalaire(2)};
+        if (!it.fichierDossierCourant(nom).empty()) return {Valeur::scalaire(2)};
     }
     if (genre.empty() || genre == "class") {
         if (it.classeDefinie(nom)) return {Valeur::scalaire(8)};

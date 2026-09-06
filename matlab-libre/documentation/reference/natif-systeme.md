@@ -47,15 +47,21 @@ CD  Change de dossier.
     CD(CHEMIN) va dans le dossier donné.
     CD .. remonte d'un cran.
     P = CD rend le dossier courant sans en changer.
+    AVANT = CD(CHEMIN) change de dossier et rend celui d'où l'on vient,
+    ce qui évite de le noter séparément avant de se déplacer.
 
     Syntaxe
        cd(chemin)
        cd ..
        p = cd
+       avant = cd(chemin)
 
     Exemples
        avant = pwd;
        cd(tempdir);
+       cd(avant);
+
+       avant = cd(tempdir);           % les deux d'un coup
        cd(avant);
 
     Voir aussi PWD, DIR, LS, ADDPATH.
@@ -491,6 +497,12 @@ LS  Liste les fichiers d'un dossier.
 
 ```
 matlibre_aide_structuree  Aide decoupee en sections.
+```
+
+## `matlibre_executable`
+
+```
+matlibre_executable  Chemin de l'interpreteur en cours.
 ```
 
 ## `matlibre_fonctions`

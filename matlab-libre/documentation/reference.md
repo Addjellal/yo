@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-650 fonctions ecrites en C++, reparties en 22 groupes.
+651 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2599 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+2629 fonctions ecrites dans le langage, reparties en 53 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -47,12 +47,12 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`automatique`](reference/toolbox-automatique.md) | 119 |
 | [`base-de-donnees`](reference/toolbox-base-de-donnees.md) | 8 |
 | [`bioinformatique`](reference/toolbox-bioinformatique.md) | 8 |
-| [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 4 |
+| [`calcul-parallele`](reference/toolbox-calcul-parallele.md) | 6 |
 | [`cartographie`](reference/toolbox-cartographie.md) | 4 |
 | [`coder`](reference/toolbox-coder.md) | 4 |
 | [`communications`](reference/toolbox-communications.md) | 145 |
 | [`communications-sans-fil`](reference/toolbox-communications-sans-fil.md) | 6 |
-| [`compilateur`](reference/toolbox-compilateur.md) | 2 |
+| [`compilateur`](reference/toolbox-compilateur.md) | 3 |
 | [`conduite-automatisee`](reference/toolbox-conduite-automatisee.md) | 4 |
 | [`dsp`](reference/toolbox-dsp.md) | 6 |
 | [`econometrie`](reference/toolbox-econometrie.md) | 84 |
@@ -79,7 +79,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`renforcement`](reference/toolbox-renforcement.md) | 5 |
 | [`reseaux-antennes`](reference/toolbox-reseaux-antennes.md) | 4 |
 | [`rf`](reference/toolbox-rf.md) | 7 |
-| [`robotique`](reference/toolbox-robotique.md) | 47 |
+| [`robotique`](reference/toolbox-robotique.md) | 74 |
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 201 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
