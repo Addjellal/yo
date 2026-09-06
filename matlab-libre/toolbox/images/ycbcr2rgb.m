@@ -1,5 +1,21 @@
 function r = ycbcr2rgb(image)
 %YCBCR2RGB Luminance et chrominances vers RVB.
+%   RGB = YCBCR2RGB(YCBCR) convertit depuis l'espace de la télévision et
+%   de la compression : Y la luminance, Cb et Cr les deux différences de
+%   couleur.
+%
+%   La séparation n'est pas décorative : l'œil est bien plus sensible à la
+%   luminance qu'à la chrominance, si bien que JPEG et la vidéo
+%   sous-échantillonnent Cb et Cr sans que cela se voie. C'est là que la
+%   moitié du gain de compression se fait.
+%
+%   Une entrée entière est traitée dans les plages de la vidéo — 16 à 235
+%   pour Y, 16 à 240 pour Cb et Cr — et une entrée flottante dans [0,1].
+%
+%   Exemple :
+%      ycbcr2rgb([1 0.5 0.5])          % blanc : chrominance neutre
+%
+%   Voir aussi RGB2YCBCR, NTSC2RGB, LAB2RGB.
     estEntier = isa(image, 'uint8');
     x = im2double(image);
     Y = x(:, :, 1) * 255; Cb = x(:, :, 2) * 255; Cr = x(:, :, 3) * 255;
