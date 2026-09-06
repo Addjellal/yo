@@ -1,43 +1,59 @@
 # Toolbox `calcul-parallele`
 
 ```
-% Parallel Computing Toolbox — exécution parallèle.
+% Parallel Computing Toolbox — calcul distribué.
 %
-% « parfor » et « spmd » s'exécutent réellement en parallèle : chaque
-% travailleur est un interpréteur complet, avec son propre espace de
-% travail, et rien n'est partagé. Le résultat est celui de la boucle
-% séquentielle ; le temps, lui, se divise par le nombre de cœurs.
+% Ce qui se parallélise est ce qui ne communique pas : chaque élément
+% traité seul, sans dépendre de ce que les autres deviennent.
 %
-% Pool
-%   parpool     - Ouvre un pool de N travailleurs (natif)
-%   gcp         - Pool courant, créé au besoin (natif)
-%   delete      - Ferme le pool passé en argument (natif)
+% Application élément par élément
+%   pararrayfun  - Équivalent parallèle d'ARRAYFUN
+%   parcellfun   - Équivalent parallèle de CELLFUN
 %
-% Travaux asynchrones
-%   parfeval      - Lance une fonction sur un travailleur (natif)
-%   parfevalOnAll - La lance sur tous les travailleurs (natif)
-%   fetchOutputs  - Récupère le résultat (natif)
-%   wait, cancel  - Attend, annule (natif)
-%
-% Dans un bloc spmd
-%   labindex, numlabs - Numéro du travailleur et taille du pool
-%
-% Tableaux
-%   distributed, gather - Tableaux distribués (identité sur une machine)
-%   pararrayfun         - arrayfun réparti sur le pool
-%   parcellfun          - cellfun réparti sur le pool
+% Données
+%   distributed  - Marque un tableau comme distribué
+%   gather       - Le rapatrie : l'appel qui coûte, sur un vrai pool
 ```
 
 ## `distributed`
 
 ```
-DISTRIBUTED Tableau distribué (identité sur une seule machine).
+DISTRIBUTED Tableau distribué.
+  Y = DISTRIBUTED(X) marque un tableau comme distribué sur le pool. Sur
+  une seule machine, c'est l'identité.
+
+  Ce n'est pas décoratif pour autant : DISTRIBUTED et GATHER marquent
+  dans le code les endroits où les données passeraient d'une machine à
+  l'autre. Un programme écrit avec eux tourne sans changement sur un
+  vrai pool, et sa lecture dit où sont les communications — qui coûtent
+  toujours plus cher que le calcul.
+
+  Exemple :
+     d = distributed(magic(4));
+     isequal(gather(d), magic(4))    % true
+
+  Voir aussi GATHER, PARARRAYFUN, PARCELLFUN.
 ```
 
 ## `gather`
 
 ```
-GATHER Rapatrie un tableau distribué (identité ici).
+GATHER Rapatrie un tableau distribué.
+  Y = GATHER(X) ramène un tableau distribué dans l'espace de travail
+  local. Sur une seule machine, c'est l'identité.
+
+  GATHER annule exactement DISTRIBUTED, sur un tableau vide comme sur du
+  texte. C'est le contrat, et il tient quel que soit le contenu.
+
+  Sur un vrai pool, c'est l'appel qui coûte : il rassemble sur une seule
+  machine ce qui était réparti. Le placer dans une boucle est la façon
+  la plus sûre de perdre tout le bénéfice du parallélisme.
+
+  Exemple :
+     gather(distributed([]))         % []
+     gather(distributed('texte'))    % 'texte'
+
+  Voir aussi DISTRIBUTED, PARARRAYFUN.
 ```
 
 ## `matlibre_par_appliquer`

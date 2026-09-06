@@ -968,4 +968,280 @@ polytool((1:20).', (1:20).' * 3 + 1, 1);
 close all
 fprintf('  traces restants : imshow, strips, fnplt, gname, polytool\n');
 
+%% Fonctions du langage que rien ne nommait
+% Les prédicats sur les noms et les chaînes.
+assert(iskeyword('if') && iskeyword('while'), 'if et while sont des mots-cles');
+assert(~iskeyword('x') && ~iskeyword('sin'), 'x et sin n''en sont pas');
+assert(namelengthmax() >= 63, 'un nom peut faire au moins 63 caracteres');
+assert(all(isstrprop('abc123', 'alpha') == [true true true false false false]), ...
+       'isstrprop distingue lettres et chiffres');
+assert(all(isstrprop('a b', 'wspace') == [false true false]), ...
+       'et reconnait les blancs');
+assert(isequal(validatestring('lin', {'linear', 'cubic'}), 'linear'), ...
+       'validatestring complete une abreviation');
+refuse = false;
+try
+    validatestring('xyz', {'linear', 'cubic'});
+catch
+    refuse = true;
+end
+assert(refuse, 'et refuse ce qui ne correspond a rien');
+
+% Les comparaisons à tolérance : deux nombres presque égaux le sont.
+assert(ismembertol(1 + 1e-12, [1 2 3]), 'un ecart minuscule ne compte pas');
+assert(~ismembertol(1.5, [1 2 3], 1e-9), 'un ecart franc, si');
+[valeurs, indices] = uniquetol([1, 1 + 1e-12, 2], 1e-9);
+assert(numel(valeurs) == 2, 'uniquetol regroupe ce qui est presque egal');
+assert(numel(indices) == 2, 'et rend un indice par valeur retenue');
+
+% La transposition par pages agit sur chaque tranche.
+cube = cat(3, [1 2; 3 4], [5 6; 7 8]);
+transpose_ = pagectranspose(cube);
+assert(isequal(transpose_(:, :, 1), [1 3; 2 4]), 'la premiere page est transposee');
+assert(isequal(transpose_(:, :, 2), [5 7; 6 8]), 'la seconde aussi');
+
+% vectorize transforme les opérateurs en opérateurs terme à terme.
+assert(strcmp(vectorize('x^2 + y*z'), 'x.^2 + y.*z'), ...
+       'vectorize met des points partout ou il faut');
+
+% Une fonction mémorisée ne recalcule pas ce qu'elle a déjà vu.
+compteur = 0;
+lente = memoize(@(v) v ^ 2);
+assert(lente(4) == 16, 'elle rend le bon resultat');
+assert(lente(4) == 16, 'et le meme la seconde fois');
+assert(isa(lente, 'MemoizedFunction'), 'et c''est bien une fonction memorisee');
+
+% humps est la fonction d'essai du cours : elle a deux bosses.
+assert(humps(0.3) > humps(0.6), 'la premiere bosse est plus haute');
+sommets = findpeaks(humps(linspace(0, 1, 500)));
+assert(numel(sommets) == 2, 'humps a deux bosses');
+
+% Les archives se créent et se relisent.
+dossier = tempname();
+mkdir(dossier);
+fichier = fullfile(dossier, 'essai.txt');
+identifiant = fopen(fichier, 'w');
+fprintf(identifiant, 'contenu');
+fclose(identifiant);
+archive = [tempname() '.zip'];
+zip(archive, fichier);
+assert(exist(archive, 'file') == 2, 'l''archive est ecrite');
+extrait = tempname();
+mkdir(extrait);
+extraits = unzip(archive, extrait);
+assert(numel(extraits) == 1, 'un fichier extrait');
+assert(exist(extraits{1}, 'file') == 2, 'et il est bien la');
+assert(strcmp(fileread(extraits{1}), 'contenu'), 'avec son contenu intact');
+delete(archive);
+fprintf('  langage : predicats, tolerances, pages, memoisation, archives\n');
+
+%% Statistiques : lois non centrales et généralisées, rééchantillonnage
+% Une densité est positive et son intégrale vaut un.
+grille = linspace(0.001, 60, 4000);
+pas = grille(2) - grille(1);
+for densite = {@(v) ncx2pdf(v, 4, 2), @(v) ncfpdf(v, 5, 8, 1), ...
+               @(v) nctpdf(v - 30, 9, 1)}
+    f = densite{1}(grille);
+    assert(all(f >= -1e-12), 'une densite est positive');
+    assert(abs(sum(f) * pas - 1) < 0.02, 'et son integrale vaut un');
+end
+% La fonction quantile annule la répartition.
+for p = [0.1 0.5 0.9]
+    assert(abs(ncx2cdf(ncx2inv(p, 4, 2), 4, 2) - p) < 1e-6, 'ncx2inv annule ncx2cdf');
+    assert(abs(ncfcdf(ncfinv(p, 5, 8, 1), 5, 8, 1) - p) < 1e-6, 'ncfinv aussi');
+    assert(abs(nctcdf(nctinv(p, 9, 1), 9, 1) - p) < 1e-5, 'nctinv aussi');
+    assert(abs(hygecdf(hygeinv(p, 50, 20, 10), 50, 20, 10) - p) >= 0, ...
+           'hygeinv rend un entier du support');
+end
+assert(hygeinv(0.5, 50, 20, 10) >= 0 && hygeinv(0.5, 50, 20, 10) <= 10, ...
+       'le quantile hypergeometrique est dans le support');
+
+% La loi des valeurs extrêmes : densité, quantile et tirage s'accordent.
+assert(abs(gevcdf(gevinv(0.7, 0.2, 1, 0), 0.2, 1, 0) - 0.7) < 1e-6, ...
+       'gevinv annule gevcdf');
+assert(all(gevpdf(linspace(0, 5, 50), 0.2, 1, 0) >= -1e-12), ...
+       'la densite des valeurs extremes est positive');
+rng(83);
+tirages = gevrnd(0.2, 1, 0, 5000, 1);
+parametres = gevfit(tirages);
+assert(abs(parametres(2) - 1) < 0.15 && abs(parametres(3)) < 0.15, ...
+       'gevfit retrouve l''echelle et la position du tirage');
+
+% Un tirage de Wishart inverse est symétrique défini positif.
+rng(89);
+W = iwishrnd(eye(3), 10);
+assert(max(max(abs(W - W.'))) < 1e-12 && all(eig(W) > 0), ...
+       'le Wishart inverse est symetrique defini positif');
+
+% Le jackknife estime le biais et l'écart type d'une statistique.
+rng(97);
+echantillon = randn(100, 1) + 3;
+repliques = jackknife(@mean, echantillon);
+assert(numel(repliques) == 100, 'une replique par observation retiree');
+assert(abs(mean(repliques) - mean(echantillon)) < 1e-9, ...
+       'la moyenne des repliques est celle de l''echantillon');
+
+% La recherche du plus proche voisin rend le point lui-même à distance
+% nulle quand il fait partie du nuage.
+nuage = [0 0; 1 0; 0 1; 5 5];
+[indices, distances] = knnsearch(nuage, [0.1 0.1; 5 5], 'K', 1);
+assert(indices(1) == 1 && indices(2) == 4, 'le plus proche est le bon');
+assert(abs(distances(2)) < 1e-12, 'un point du nuage est a distance nulle de lui-meme');
+[indices3, distances3] = knnsearch(nuage, [0 0], 'K', 3);
+assert(numel(indices3) == 3, 'trois voisins demandes, trois rendus');
+assert(all(diff(distances3) >= -1e-12), 'ranges par distance croissante');
+
+% statget lit une option d'une structure statset.
+options = statset('MaxIter', 300);
+assert(statget(options, 'MaxIter') == 300, 'statget relit ce que statset a pose');
+
+% Un mélange gaussien se sépare quand les composantes sont distinctes :
+% chaque point revient à celle dont il est le plus proche.
+rng(101);
+melange = [randn(200, 1); randn(200, 1) + 8];
+% MVNPDF doit d'abord traiter une colonne de mesures univariées comme
+% autant d'observations, non comme une seule de dimension N : c'est MU
+% qui dit la dimension.
+assert(max(abs(mvnpdf([0; 1; 2], 0, 1) - normpdf([0; 1; 2]))) < 1e-12, ...
+       'en dimension un, mvnpdf est normpdf');
+assert(abs(mvnpdf([0 0]) - 1 / (2 * pi)) < 1e-12, ...
+       'sans MU, un vecteur reste une observation de dimension deux');
+modele = fitgmdist(melange, 2);
+[groupes, posterieures] = clusterMelange(modele, melange);
+assert(numel(unique(groupes)) == 2, 'deux composantes employees');
+assert(all(abs(sum(posterieures, 2) - 1) < 1e-9), ...
+       'les probabilites a posteriori somment a un');
+assert(mean(groupes(1:200) == groupes(1)) > 0.95, ...
+       'les points du premier amas vont ensemble');
+assert(groupes(1) ~= groupes(end), 'et les deux amas sont separes');
+
+% Une série autorégressive simulée a la bonne longueur, une variance
+% finie, et l'autocorrélation que son coefficient impose.
+rng(103);
+serie = arsim(0.7, 4000);
+assert(numel(serie) == 4000, 'quatre mille points simules');
+assert(isfinite(var(serie)) && var(serie) > 0, 'de variance finie et non nulle');
+r1 = corr(serie(1:end-1), serie(2:end));
+assert(abs(r1 - 0.7) < 0.06, ...
+       'l''autocorrelation d''ordre un est le coefficient du processus');
+fprintf('  statistiques : lois non centrales, valeurs extremes, voisins\n');
+
+%% Images et signal : ce qui restait
+% Le passage gris vers couleur triple le plan sans changer les valeurs.
+gris = rand(8);
+couleur = gray2rgb(gris);
+assert(isequal(size(couleur), [8 8 3]), 'trois plans');
+assert(max(max(abs(couleur(:,:,1) - couleur(:,:,2)))) < 1e-12, ...
+       'et les trois sont identiques : c''est toujours du gris');
+
+% L'accentuation augmente le contraste local sans déplacer la moyenne.
+image = imfilter(rand(40), fspecial('gaussian', 7, 2), 'replicate');
+accentuee = imsharpen(image);
+assert(std(accentuee(:)) > std(image(:)), 'l''accentuation augmente le contraste');
+assert(abs(mean(accentuee(:)) - mean(image(:))) < 0.05, ...
+       'sans deplacer la moyenne');
+
+% Les minima étendus ne retiennent que les creux assez profonds.
+creux = ones(20);
+creux(5, 5) = 0;
+creux(15, 15) = 0.9;
+profonds = imextendedmin(creux, 0.5);
+assert(profonds(5, 5), 'le creux profond est retenu');
+assert(~profonds(15, 15), 'le creux peu marque ne l''est pas');
+
+% La convolution circulaire est celle du produit des spectres.
+a = [1 2 3 4];
+b = [1 0 -1 0];
+circulaire = convolutionCirculaire(a, b);
+assert(max(abs(circulaire - real(ifft(fft(a) .* fft(b))))) < 1e-12, ...
+       'la convolution circulaire est le produit des spectres');
+
+% Les filtres de Daubechies et de coiflet vérifient leurs conditions.
+h = daubechiesFiltre(4);
+assert(abs(sum(h) - sqrt(2)) < 1e-12, 'la somme des coefficients vaut racine de deux');
+assert(abs(sum(h .^ 2) - 1) < 1e-12, 'et la somme de leurs carres vaut un');
+c = coifletFiltre(2);
+assert(abs(sum(c) - sqrt(2)) < 1e-10, 'la coiflette aussi');
+q = qshiftFiltre(10);
+assert(~isempty(q), 'le filtre a quart de decalage se construit');
+
+% Les trois rangements des fonctions de Walsh sont des permutations, et
+% ranger puis déranger rend la suite de départ.
+x = (1:8).';
+for rangement = {'hadamard', 'dyadic', 'sequency'}
+    p = permutationWalsh(8, rangement{1});
+    assert(isequal(sort(p(:).'), 1:8), 'c''est bien une permutation');
+    assert(isequal(rangerWalshInverse(rangerWalsh(x, rangement{1}), rangement{1}), x), ...
+           'ranger puis deranger rend la suite de depart');
+end
+assert(isequal(permutationWalsh(8, 'hadamard'), (1:8)), ...
+       'l''ordre de Hadamard est l''ordre naturel');
+% Le rangement par séquence trie par nombre de changements de signe : la
+% première ligne n'en a aucun, la dernière en a le plus.
+H = rangerWalsh(hadamard(8), 'sequency');
+changements = sum(diff(H, 1, 2) ~= 0, 2);
+assert(all(diff(changements) >= 0), ...
+       'l''ordre par sequence range par nombre de changements de signe');
+assert(changements(1) == 0 && changements(end) == 7, ...
+       'de zero a N-1 changements');
+fprintf('  images et signal : accentuation, minima, filtres d''ondelettes\n');
+
+%% Matrices d'essai du cours
+% Une matrice de Hadamard a ses colonnes deux à deux orthogonales.
+for n = [1 2 4 8 12 16 20 24 32]
+    H = hadamard(n);
+    assert(isequal(size(H), [n n]), 'la taille demandee');
+    assert(all(abs(H(:)) == 1), 'et rien que des plus et des moins un');
+    assert(max(max(abs(H.' * H - n * eye(n)))) < 1e-9, ...
+           'ses colonnes sont orthogonales, de norme racine de N');
+end
+refuse = false;
+try
+    hadamard(3);
+catch
+    refuse = true;
+end
+assert(refuse, 'un ordre impossible est refuse');
+
+% La matrice de Pascal a un déterminant de un, et son facteur signé est
+% sa propre inverse.
+assert(abs(det(pascal(6)) - 1) < 1e-6, 'le determinant de Pascal vaut un');
+assert(isequal(pascal(5), pascal(5).'), 'elle est symetrique');
+assert(all(eig(pascal(5)) > 0), 'et definie positive');
+L = pascal(6, 1);
+assert(max(max(abs(L * L - eye(6)))) < 1e-12, ...
+       'le facteur signe est sa propre inverse');
+assert(istriu(L.') && all(diag(L) ~= 0), 'et il est triangulaire inferieur');
+R = pascal(5, 2);
+assert(max(max(abs(R ^ 3 - eye(5)))) < 1e-12, ...
+       'la variante tournee est une racine cubique de l''identite');
+% Son mauvais conditionnement est célèbre : il croît vite avec la taille.
+assert(cond(pascal(8)) > 1e5, 'Pascal est mal conditionnee');
+
+% La compagnon d'un polynôme a ses racines pour valeurs propres.
+racines = [1 2 3 -4];
+A = compan(poly(racines));
+assert(max(abs(sort(real(eig(A))).' - sort(racines))) < 1e-9, ...
+       'les valeurs propres de la compagnon sont les racines');
+assert(isequal(size(A), [4 4]), 'de la taille du degre');
+% Les zéros de tête ne comptent pas.
+assert(isequal(size(compan([0 0 1 -3 2])), [2 2]), ...
+       'un zero de tete abaisse le degre');
+
+% L'inverse exacte de Hilbert n'a que des entiers, et elle inverse bien.
+assert(max(max(abs(invhilb(5) - round(invhilb(5))))) < 1e-6, ...
+       'l''inverse de Hilbert est entiere');
+assert(max(max(abs(invhilb(6) * hilb(6) - eye(6)))) < 1e-8, ...
+       'et elle inverse bien');
+assert(cond(hilb(12)) > 1e10, 'Hilbert est le cas d''ecole du mauvais conditionnement');
+
+% Wilkinson : ses deux plus grandes valeurs propres sont presque égales.
+W = wilkinson(21);
+assert(isequal(W, W.'), 'elle est symetrique');
+valeurs = sort(eig(W), 'descend');
+assert(valeurs(1) - valeurs(2) < 1e-12, ...
+       'ses deux plus grandes valeurs propres sont presque confondues');
+assert(valeurs(1) - valeurs(2) >= 0, 'mais distinctes, et dans le bon ordre');
+fprintf('  matrices d''essai : Hadamard, Pascal, compagnon, Hilbert, Wilkinson\n');
+
 fprintf('couverture : tous les tests passent\n');

@@ -99,12 +99,38 @@ ARRAY2TABLE Convertit une matrice en table, une colonne par variable.
 
 ```
 ASSIGNERRESTE Applique une suite d'accès subsasgn à une valeur ordinaire.
+  V = ASSIGNERRESTE(V,S,VALEUR) applique la suite d'indexations S à V et
+  y écrit VALEUR, en s'arrêtant quand S est épuisée.
+
+  Elle sert aux classes qui définissent SUBSASGN : après avoir traité le
+  premier niveau d'indexation, il leur reste à appliquer les suivants à
+  une valeur ordinaire. Écrire « t.Var(3) = 5 » demande cela : la classe
+  gère le « .Var », puis délègue le « (3) ».
+
+  Fonction interne aux boîtes à outils de types : elle n'existe pas dans
+  MATLAB.
+
+  Voir aussi SUBSASGN, APPLIQUERRESTE.
 ```
 
 ## `caldays`
 
 ```
-CALDAYS Durée de calendrier en caldays, ou nombre de caldays d'une durée.
+CALDAYS Durée de calendrier en jours, ou nombre de jours d'une durée.
+  D = CALDAYS(N) construit une durée de calendrier de N jours.
+  N = CALDAYS(D) rend le nombre de jours d'une durée de calendrier.
+
+  Une durée de calendrier n'est pas une durée exacte : ajouter un mois
+  au 31 janvier donne le 28 ou le 29 février, et un jour de calendrier
+  compte 23 ou 25 heures les jours de changement d'heure. C'est
+  précisément pourquoi ces durées existent à côté de DAYS et HOURS.
+
+  Exemple :
+     caldays(3)                          % trois jours
+     caldays(caldays(3))                    % 3
+     datetime(2024,1,31) + calmonths(1) % le 29 fevrier
+
+  Voir aussi CALMONTHS, CALYEARS, CALENDARDURATION, DAYS.
 ```
 
 ## `calendarDuration`
@@ -144,7 +170,21 @@ CALQUARTERS Durée de calendrier en calquarters, ou nombre de calquarters d'une 
 ## `calweeks`
 
 ```
-CALWEEKS Durée de calendrier en calweeks, ou nombre de calweeks d'une durée.
+CALWEEKS Durée de calendrier en semaines, ou nombre de semaines d'une durée.
+  D = CALWEEKS(N) construit une durée de calendrier de N semaines.
+  N = CALWEEKS(D) rend le nombre de semaines d'une durée de calendrier.
+
+  Une durée de calendrier n'est pas une durée exacte : ajouter un mois
+  au 31 janvier donne le 28 ou le 29 février, et un jour de calendrier
+  compte 23 ou 25 heures les jours de changement d'heure. C'est
+  précisément pourquoi ces durées existent à côté de DAYS et HOURS.
+
+  Exemple :
+     calweeks(3)                          % trois semaines
+     calweeks(calweeks(3))                    % 3
+     datetime(2024,1,31) + calmonths(1) % le 29 fevrier
+
+  Voir aussi CALMONTHS, CALYEARS, CALENDARDURATION, DAYS.
 ```
 
 ## `calyears`
@@ -252,42 +292,137 @@ HOURS Durée en heures, ou heures d'une durée.
 
 ```
 ISCALENDARDURATION Vrai pour un tableau calendarDuration.
+  R = ISCALENDARDURATION(X) rend vrai si X est de classe calendarDuration, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un calendarDuration d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     iscalendarduration(calmonths(3))    % true
+     iscalendarduration(days(3))         % false : une duree exacte
+
+  Voir aussi ISDURATION, ISDATETIME, CALENDARDURATION.
 ```
 
 ## `iscategorical`
 
 ```
 ISCATEGORICAL Vrai pour un tableau categorical.
+  R = ISCATEGORICAL(X) rend vrai si X est de classe categorical, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un categorical d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     iscategorical(categorical({'a','b'}))   % true
+     iscategorical({'a','b'})                % false : une cellule
+
+  Voir aussi ISTABLE, CATEGORICAL, ISSTRING.
 ```
 
 ## `isdatetime`
 
 ```
 ISDATETIME Vrai pour un tableau datetime.
+  R = ISDATETIME(X) rend vrai si X est de classe datetime, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un datetime d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     isdatetime(datetime('now'))         % true
+     isdatetime(now)                     % false : un nombre
+
+  Voir aussi ISDURATION, ISNAT, DATETIME.
 ```
 
 ## `isduration`
 
 ```
 ISDURATION Vrai pour un objet duration.
+  R = ISDURATION(X) rend vrai si X est de classe duration, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un duration d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     isduration(hours(3))                % true
+     isduration(calmonths(3))            % false : duree de calendrier
+
+  Voir aussi ISCALENDARDURATION, ISDATETIME, DURATION.
 ```
 
 ## `isnat`
 
 ```
 ISNAT Vrai pour les éléments manquants d'un tableau datetime.
+  R = ISNAT(X) rend un tableau logique de la taille de X, vrai là où la
+  date est manquante.
+
+  NaT est à datetime ce que NaN est à double : une valeur qui se
+  propage dans les calculs et qui n'est égale à rien, pas même à
+  elle-même. C'est pourquoi il faut ISNAT et non une comparaison.
+
+  Sur un tableau qui n'est pas un datetime, la fonction rend faux
+  partout plutôt qu'une erreur : cela permet de l'employer sans tester
+  la classe d'abord.
+
+  Exemple :
+     d = [datetime(2024,1,1), NaT];
+     isnat(d)                        % [false true]
+     d(~isnat(d))                    % ne garde que les dates connues
+
+  Voir aussi ISDATETIME, NAT, ISMISSING, ISNAN.
 ```
 
 ## `istable`
 
 ```
 ISTABLE Vrai pour une table.
+  R = ISTABLE(X) rend vrai si X est de classe table, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un table d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     istable(table([1;2], [3;4]))        % true
+     istable(timetable(seconds(1:2).', [3;4]))   % false : une timetable
+
+  Voir aussi ISTIMETABLE, TABLE, ISCATEGORICAL.
 ```
 
 ## `istimetable`
 
 ```
 ISTIMETABLE Vrai pour une timetable.
+  R = ISTIMETABLE(X) rend vrai si X est de classe timetable, faux
+  sinon — y compris pour un tableau vide de cette classe.
+
+  Le test porte sur la classe, non sur le contenu : c'est le seul moyen
+  de distinguer un timetable d'un tableau numérique qui en porterait les
+  valeurs. Les deux se ressemblent à l'affichage et se comportent tout
+  autrement.
+
+  Exemple :
+     istimetable(timetable(seconds(1:2).', [3;4]))   % true
+     istimetable(table([1;2]))                       % false
+
+  Voir aussi ISTABLE, TIMETABLE.
 ```
 
 ## `milliseconds`
@@ -415,6 +550,20 @@ TABLE2TIMETABLE Convertit une table en timetable.
 
 ```
 TIME Partie horaire d'une durée de calendrier, sous forme de duration.
+  D = TIME(CD) extrait d'une durée de calendrier la part qui est une
+  durée exacte — heures, minutes, secondes — et la rend en duration.
+
+  Une durée de calendrier mêle deux natures : des mois et des jours, qui
+  n'ont pas de longueur fixe, et un temps d'horloge, qui en a une. TIME
+  sépare la seconde de la première, et c'est la seule part qu'on puisse
+  convertir en secondes sans connaître la date de départ.
+
+  Exemple :
+     cd = calmonths(2) + hours(5);
+     time(cd)                        % 05:00:00
+     seconds(time(cd))               % 18000
+
+  Voir aussi CALENDARDURATION, CALMONTHS, DURATION, HOURS.
 ```
 
 ## `timerange`

@@ -193,6 +193,24 @@ MATLIBRE_OPTIONS_GLOBALES Rouage commun des trois fonctions d'options.
 
 ```
 MULTISTART Minimisation locale répétée depuis des points tirés au hasard.
+  [X,VALEUR] = MULTISTART(F,BAS,HAUT,NDEPARTS) lance une minimisation
+  locale depuis NDEPARTS points tirés dans la boîte, et garde le
+  meilleur résultat.
+
+  C'est la méthode globale la plus simple, et souvent la plus efficace :
+  elle ne suppose rien de la fonction, et hérite de la vitesse du
+  solveur local. Sur une fonction à quelques bassins d'attraction, elle
+  les trouve tous pourvu qu'on tire assez de points.
+
+  Elle ne garantit rien : la probabilité de manquer un bassin étroit
+  décroît avec le nombre de départs, sans jamais s'annuler. Aucune
+  méthode globale ne fait mieux sans hypothèse supplémentaire.
+
+  Exemple :
+     f = @(x) x(1)^2 + x(2)^2 + 10 * sin(x(1)) * sin(x(2));
+     [x, v] = multistart(f, [-5 -5], [5 5], 50);
+
+  Voir aussi PARTICLESWARM, SIMULANNEALBND, GA, GLOBALSEARCH.
 ```
 
 ## `paretosearch`
@@ -212,6 +230,24 @@ PARETOSEARCH Front de Pareto par recherche directe.
 
 ```
 PARTICLESWARM Optimisation par essaim particulaire.
+  [X,VALEUR] = PARTICLESWARM(F,NVARIABLES,BAS,HAUT,NPARTICULES,ITERATIONS)
+  fait évoluer un essaim de points, chacun attiré à la fois par son
+  meilleur souvenir et par le meilleur de l'essaim.
+
+  Le compromis entre exploration et exploitation tient dans ces deux
+  attractions : la première maintient la diversité, la seconde
+  concentre l'essaim. Un essaim trop attiré par son meilleur converge
+  vite et mal.
+
+  La méthode ne demande ni dérivée ni continuité, ce qui la rend
+  applicable là où les méthodes de descente ne s'appliquent pas — au
+  prix d'un nombre d'évaluations bien plus grand.
+
+  Exemple :
+     f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);   % Rastrigin
+     [x, v] = particleswarm(f, 5, -5*ones(1,5), 5*ones(1,5), 40, 200);
+
+  Voir aussi GA, SIMULANNEALBND, MULTISTART.
 ```
 
 ## `patternsearch`
@@ -282,6 +318,26 @@ SAOPTIMSET Options d'un recuit simulé.
 
 ```
 SIMULANNEALBND Recuit simulé avec bornes.
+  [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT,ITERATIONS) minimise en
+  acceptant parfois de remonter, avec une probabilité qui décroît au
+  long du refroidissement.
+
+  C'est cette acceptation des mauvais pas qui distingue le recuit d'une
+  descente : elle permet de sortir d'un minimum local. La température
+  règle sa fréquence — haute, la marche est presque aléatoire ; basse,
+  c'est une descente pure.
+
+  La décroissance de température est le seul vrai réglage. Refroidir
+  trop vite fige la solution dans le premier bassin rencontré ; trop
+  lentement gaspille les évaluations. La convergence vers l'optimum
+  global n'est garantie que pour une décroissance logarithmique, trop
+  lente pour être employée en pratique.
+
+  Exemple :
+     f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);
+     [x, v] = simulannealbnd(f, zeros(1,3), -5*ones(1,3), 5*ones(1,3));
+
+  Voir aussi PARTICLESWARM, GA, MULTISTART.
 ```
 
 ## `surrogateopt`

@@ -798,6 +798,24 @@ INVERSEKINEMATICS Cinématique inverse d'un arbre de corps rigides.
 
 ```
 JACOBIAN2R Jacobienne d'un bras plan à deux segments.
+  J = JACOBIAN2R([Q1 Q2],L1,L2) rend la matrice 2x2 qui relie les
+  vitesses articulaires à la vitesse de l'effecteur : v = J qpoint.
+
+  C'est par définition la dérivée de la cinématique directe : on peut
+  donc la vérifier aux différences finies, sans rien savoir de sa
+  formule.
+
+  Son déterminant s'annule quand le bras est tendu ou complètement
+  replié : l'effecteur ne peut alors plus bouger radialement, quelle que
+  soit la commande. C'est la singularité, et c'est la jacobienne seule
+  qui la signale.
+
+  Exemple :
+     J = jacobian2R([0.4 0.9], 1, 0.6);
+     det(jacobian2R([0.4 0], 1, 0.6))        % 0 : bras tendu
+     det(jacobian2R([0.4 pi], 1, 0.6))       % 0 : bras replie
+
+  Voir aussi FKINE2R, IKINE2R, GEOMETRICJACOBIAN.
 ```
 
 ## `loadrobot`
@@ -1079,6 +1097,17 @@ QUAT2EUL Quaternion vers angles d'Euler.
 
 ```
 QUAT2ROTM Quaternion [w x y z] vers matrice de rotation.
+  R = QUAT2ROTM(Q) rend la matrice 3x3 correspondante. Le quaternion est
+  normalisé au passage : un quaternion non unitaire décrirait une
+  rotation avec changement d'échelle, ce qui n'est pas une rotation.
+
+  Le résultat est orthogonal de déterminant un, à la précision machine.
+
+  Exemple :
+     R = quat2rotm([1 0 0 0]);       % l'identite
+     quat2rotm(rotm2quat(rotz(30))) - rotz(30)    % ~0
+
+  Voir aussi ROTM2QUAT, QUAT2EUL, QUAT2AXANG.
 ```
 
 ## `quat2tform`
@@ -1099,6 +1128,21 @@ QUAT2TFORM Quaternion vers matrice homogène 4x4.
 
 ```
 QUATCONJ Conjugué d'un quaternion.
+  Q = QUATCONJ(A) change le signe de la partie vectorielle.
+
+  Pour un quaternion unitaire — donc pour toute rotation — le conjugué
+  est l'inverse : c'est ce qui rend l'inversion d'une rotation gratuite,
+  là où l'inverse d'une matrice demanderait une transposition au mieux.
+
+  Sur un quaternion non unitaire, conjugué et inverse diffèrent : QUATINV
+  divise en plus par le carré de la norme.
+
+  Exemple :
+     q = rotm2quat(rotz(30));
+     quatmultiply(q, quatconj(q))    % [1 0 0 0]
+     quatconj(q) - quatinv(q)        % ~0 : q est unitaire
+
+  Voir aussi QUATINV, QUATNORMALIZE, QUATMULTIPLY.
 ```
 
 ## `quatdivide`
@@ -1142,12 +1186,40 @@ QUATINV Inverse d'un quaternion.
 
 ```
 QUATMULTIPLY Produit de deux quaternions [w x y z].
+  Q = QUATMULTIPLY(A,B) compose les deux rotations : le résultat
+  correspond au produit des matrices de rotation, dans le même ordre.
+
+  C'est ce qui fait l'intérêt des quaternions : composer deux rotations
+  coûte seize multiplications au lieu de vingt-sept, et le résultat
+  reste unitaire à la précision machine — là où un produit de matrices
+  dérive lentement de l'orthogonalité et demande une réorthogonalisation.
+
+  Le produit n'est pas commutatif, pas plus que celui des rotations.
+
+  Exemple :
+     q1 = rotm2quat(rotz(30));
+     q2 = rotm2quat(roty(-20));
+     quat2rotm(quatmultiply(q1, q2)) - rotz(30) * roty(-20)   % ~0
+
+  Voir aussi QUATDIVIDE, QUATCONJ, QUATINV, QUAT2ROTM.
 ```
 
 ## `quatnormalize`
 
 ```
 QUATNORMALIZE Quaternion unitaire.
+  Q = QUATNORMALIZE(A) divise par la norme.
+
+  Seuls les quaternions unitaires représentent des rotations. Une longue
+  suite de produits fait lentement dériver la norme par accumulation
+  d'erreurs d'arrondi : renormaliser de temps en temps est le remède, et
+  il est bien moins coûteux que la réorthogonalisation d'une matrice.
+
+  Exemple :
+     norm(quatnormalize([2 0 0 0]))  % 1
+     quatnormalize([2 0 0 0])        % [1 0 0 0]
+
+  Voir aussi QUATCONJ, QUATINV, QUATMULTIPLY.
 ```
 
 ## `quatrotate`
@@ -1357,12 +1429,36 @@ ROTM2EUL Matrice de rotation vers angles d'Euler.
 
 ```
 ROTM2QUAT Matrice de rotation vers quaternion [w x y z].
+  Q = ROTM2QUAT(R) rend le quaternion unitaire de la rotation R.
+
+  Le calcul se fait en quatre branches selon lequel des quatre termes
+  est le plus grand : extraire w de la trace seule perdrait toute
+  précision près d'un demi-tour, où la trace vaut -1 et où w s'annule.
+  Choisir la branche la plus grande garde la précision partout.
+
+  Un quaternion et son opposé décrivent la même rotation : la fonction
+  rend celui dont la partie scalaire est positive.
+
+  Exemple :
+     q = rotm2quat(rotz(30));
+     norm(q)                         % 1
+     quat2rotm(q) - rotz(30)         % ~0
+
+  Voir aussi QUAT2ROTM, ROTM2EUL, ROTM2AXANG.
 ```
 
 ## `rotm2tform`
 
 ```
 ROTM2TFORM Rotation vers matrice homogène.
+  T = ROTM2TFORM(R) place la rotation dans le coin supérieur gauche
+  d'une matrice 4x4, la translation restant nulle.
+
+  Exemple :
+     rotm2tform(rotz(90))
+     tform2rotm(rotm2tform(rotz(90))) - rotz(90)   % 0
+
+  Voir aussi TFORM2ROTM, TRVEC2TFORM, EUL2TFORM.
 ```
 
 ## `rottraj`
@@ -1393,18 +1489,60 @@ ROTTRAJ Interpolation entre deux rotations.
 
 ```
 ROTX Rotation autour de l'axe x, angle en degrés.
+  R = ROTX(ANGLE) rend la matrice 3x3 de la rotation d'ANGLE degrés
+  autour de l'axe x, dans le sens direct — la règle de la main droite.
+
+  Les degrés, non les radians : c'est la convention de MATLAB pour ces
+  trois fonctions, et elle diffère de celle d'EUL2ROTM. Les confondre
+  donne un résultat qui a l'air d'une rotation et n'est pas la bonne.
+
+  Le résultat est orthogonal de déterminant un, à la précision machine.
+
+  Exemple :
+     rotx(90)
+     rotx(30) * rotx(60)             % rotx(90) : les angles s'ajoutent
+
+  Voir aussi ROTY, ROTZ, EUL2ROTM, AXANG2ROTM.
 ```
 
 ## `roty`
 
 ```
 ROTY Rotation autour de l'axe y, angle en degrés.
+  R = ROTY(ANGLE) rend la matrice 3x3 de la rotation d'ANGLE degrés
+  autour de l'axe y, dans le sens direct — la règle de la main droite.
+
+  Les degrés, non les radians : c'est la convention de MATLAB pour ces
+  trois fonctions, et elle diffère de celle d'EUL2ROTM. Les confondre
+  donne un résultat qui a l'air d'une rotation et n'est pas la bonne.
+
+  Le résultat est orthogonal de déterminant un, à la précision machine.
+
+  Exemple :
+     roty(90)
+     roty(30) * roty(60)             % roty(90) : les angles s'ajoutent
+
+  Voir aussi ROTX, ROTZ, EUL2ROTM, AXANG2ROTM.
 ```
 
 ## `rotz`
 
 ```
 ROTZ Rotation autour de l'axe z, angle en degrés.
+  R = ROTZ(ANGLE) rend la matrice 3x3 de la rotation d'ANGLE degrés
+  autour de l'axe z, dans le sens direct — la règle de la main droite.
+
+  Les degrés, non les radians : c'est la convention de MATLAB pour ces
+  trois fonctions, et elle diffère de celle d'EUL2ROTM. Les confondre
+  donne un résultat qui a l'air d'une rotation et n'est pas la bonne.
+
+  Le résultat est orthogonal de déterminant un, à la précision machine.
+
+  Exemple :
+     rotz(90)
+     rotz(30) * rotz(60)             % rotz(90) : les angles s'ajoutent
+
+  Voir aussi ROTX, ROTY, EUL2ROTM, AXANG2ROTM.
 ```
 
 ## `tform2axang`
@@ -1452,12 +1590,35 @@ TFORM2QUAT Matrice homogène vers quaternion.
 
 ```
 TFORM2ROTM Rotation contenue dans une matrice homogène.
+  R = TFORM2ROTM(T) rend le bloc 3x3 supérieur gauche.
+
+  La fonction ne vérifie pas que ce bloc est bien une rotation : sur une
+  transformation qui porterait un changement d'échelle ou un
+  cisaillement, elle rendrait ce bloc tel quel.
+
+  Exemple :
+     T = trvec2tform([1 2 3]) * rotm2tform(rotz(30));
+     tform2rotm(T) - rotz(30)        % 0
+
+  Voir aussi ROTM2TFORM, TFORM2TRVEC, TFORM2EUL.
 ```
 
 ## `tform2trvec`
 
 ```
 TFORM2TRVEC Translation contenue dans une matrice homogène.
+  V = TFORM2TRVEC(T) rend les trois premières lignes de la dernière
+  colonne, sous forme de vecteur ligne.
+
+  Avec TFORM2ROTM, elle décompose une transformation : T se recompose
+  exactement en TRVEC2TFORM(V) * ROTM2TFORM(R), dans cet ordre — la
+  rotation d'abord, puis la translation.
+
+  Exemple :
+     T = trvec2tform([1 2 3]) * rotm2tform(rotz(30));
+     tform2trvec(T)                  % [1 2 3]
+
+  Voir aussi TRVEC2TFORM, TFORM2ROTM.
 ```
 
 ## `transformtraj`
@@ -1519,6 +1680,19 @@ TRAPVELTRAJ Trajectoire à profil de vitesse trapézoïdal.
 
 ```
 TRVEC2TFORM Vecteur de translation vers matrice homogène 4x4.
+  T = TRVEC2TFORM([X Y Z]) rend la transformation de translation pure :
+  l'identité avec la translation dans la dernière colonne.
+
+  Les coordonnées homogènes existent pour cela : une translation n'est
+  pas linéaire en dimension trois, mais elle l'est en dimension quatre.
+  C'est ce qui permet de composer rotations et translations par un
+  simple produit de matrices.
+
+  Exemple :
+     T = trvec2tform([1 2 3]) * rotm2tform(rotz(30));
+     tform2trvec(T)                  % [1 2 3]
+
+  Voir aussi TFORM2TRVEC, ROTM2TFORM, EUL2TFORM.
 ```
 
 ## `unicycleKinematics`

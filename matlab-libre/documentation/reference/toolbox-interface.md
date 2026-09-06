@@ -61,6 +61,19 @@ UICOMPOSANT Poignée vers un composant d'interface.
 
 ```
 CLOSEAPP Ferme une fenêtre d'application et tous ses composants.
+  CLOSEAPP(F) supprime la fenêtre et, avec elle, l'arbre entier de ses
+  composants. F est une UIComposant ou un identifiant numérique.
+
+  Supprimer les enfants avec le parent est ce qui évite les composants
+  orphelins : le registre d'interface les garderait sinon indéfiniment,
+  et leurs rappels resteraient déclenchables.
+
+  Exemple :
+     f = uifigure('Name', 'essai');
+     uibutton(f, 'Text', 'ok');
+     closeApp(f);
+
+  Voir aussi UIFIGURE, UIBUTTON, UIRESUME.
 ```
 
 ## `identifiantParent`
@@ -259,7 +272,21 @@ UIPANEL Panneau qui groupe des composants.
 ## `uiresume`
 
 ```
-UIRESUME Reprend après UIWAIT. Sans effet ici : UIWAIT ne bloque pas.
+UIRESUME Reprend après UIWAIT.
+  UIRESUME(F) débloque un programme arrêté par UIWAIT.
+
+  Elle est sans effet ici : l'interface de MatLibre n'a pas de boucle
+  d'événements bloquante, si bien qu'UIWAIT rend la main aussitôt et
+  qu'il n'y a rien à reprendre. La fonction existe pour qu'un programme
+  écrit pour MATLAB s'exécute sans modification — elle ne fait pas
+  semblant d'attendre, elle ne bloque simplement jamais.
+
+  Exemple :
+     f = uifigure();
+     uiwait(f);                      % rend la main aussitot
+     uiresume(f);                    % sans effet
+
+  Voir aussi UIWAIT, UIFIGURE, CLOSEAPP.
 ```
 
 ## `uislider`

@@ -488,6 +488,10 @@ BUTTAP Prototype analogique de Butterworth.
 BUTTER Filtre numérique de Butterworth.
   [B,A] = BUTTER(N,WN) conçoit un passe-bas d'ordre N de fréquence de
   coupure normalisée WN (0 < WN < 1, 1 = Nyquist).
+  [Z,P,K] = BUTTER(...) rend la forme zéros-pôles-gain, dont la
+  conception est numériquement plus stable que celle des coefficients :
+  au-delà de l'ordre huit environ, les coefficients d'un polynôme
+  perdent leurs chiffres significatifs, pas les racines.
   [B,A] = BUTTER(N,WN,'high') conçoit un passe-haut.
   [B,A] = BUTTER(N,[W1 W2]) conçoit un passe-bande d'ordre 2N, et
   BUTTER(N,[W1 W2],'stop') un coupe-bande.
@@ -503,6 +507,7 @@ BUTTER Filtre numérique de Butterworth.
   Exemples :
      [b, a] = butter(4, 0.3);
      [b, a] = butter(2, [0.2 0.5]);      % passe-bande d'ordre 4
+     [z, p, k] = butter(4, 0.3);         % zeros, poles et gain
 
   Voir aussi BUTTAP, BUTTORD, CHEBY1, CHEBY2, ELLIP, FILTFILT.
 ```
@@ -914,7 +919,28 @@ ENBW Largeur de bande de bruit équivalente d'une fenêtre.
 
 ```
 ENVELOPE Enveloppes supérieure et inférieure d'un signal.
-  [H,B] = ENVELOPE(X) utilise le module du signal analytique.
+  [H,B] = ENVELOPE(X) rend les deux enveloppes, calculées comme le
+  module du signal analytique de part et d'autre de la valeur moyenne.
+
+  L'enveloppe encadre le signal : H le majore, B le minore, partout sauf
+  aux tout premiers et derniers échantillons, où l'effet de bord de la
+  transformée de Hilbert la fait dévier. C'est une propriété du calcul
+  en fréquence, non un défaut de mise en œuvre — la transformée suppose
+  le signal périodique.
+
+  Le retrait de la moyenne avant le calcul permet de traiter un signal
+  qui porte une composante continue : sans lui, l'enveloppe d'un signal
+  décalé serait fausse des deux côtés.
+
+  L'orientation est conservée : une ligne rend deux lignes.
+
+  Exemple :
+     t = (0:999) / 1000;
+     x = sin(2*pi*50*t) .* (1 + 0.5 * sin(2*pi*2*t));
+     [h, b] = envelope(x);
+     all(h(20:end-20) >= x(20:end-20))    % true : elle majore
+
+  Voir aussi HILBERT, RMS, FINDPEAKS.
 ```
 
 ## `eqtflength`
@@ -1184,6 +1210,28 @@ HIGHPASS Filtre passe-haut appliqué à un signal.
 HILBERT Signal analytique par transformée de Hilbert.
   Y = HILBERT(X) rend un signal complexe dont la partie réelle est X et
   la partie imaginaire sa transformée de Hilbert.
+  Y = HILBERT(X,N) emploie N points : X est tronqué ou complété de zéros.
+
+  Le calcul se fait en fréquence : annuler les fréquences négatives et
+  doubler les positives. C'est la définition même du signal analytique,
+  et cela explique ses effets de bord — la transformée de Fourier
+  suppose le signal périodique, si bien que le début et la fin
+  s'influencent.
+
+  Le module du signal analytique est l'enveloppe du signal, et la
+  dérivée de sa phase la fréquence instantanée. C'est à cela qu'il sert.
+
+  L'orientation est conservée : une ligne rend une ligne, une colonne
+  une colonne. Une matrice est traitée colonne par colonne, comme dans
+  MATLAB.
+
+  Exemple :
+     x = sin(2 * pi * 50 * (0:999) / 1000);
+     a = hilbert(x);
+     max(abs(real(a) - x))           % 0 : la partie reelle est x
+     abs(a(100:900))                 % 1 : l'enveloppe d'un sinus
+
+  Voir aussi ENVELOPE, FFT, ANGLE, UNWRAP.
 ```
 
 ## `icceps`
@@ -2072,8 +2120,27 @@ RECTPULS Impulsion rectangulaire de largeur W centrée en zéro.
 
 ```
 RESAMPLE Rééchantillonnage d'un facteur rationnel P/Q.
-  Y = RESAMPLE(X,P,Q) interpole linéairement le signal sur la nouvelle
-  grille temporelle.
+  Y = RESAMPLE(X,P,Q) rend le signal rééchantillonné à P/Q fois sa
+  cadence, par interpolation sur la nouvelle grille temporelle.
+  [Y,T] = RESAMPLE(...) rend aussi les instants correspondants, en
+  échantillons de la grille d'origine.
+
+  Le nombre d'échantillons rendus est floor(N P / Q) : monter la cadence
+  en produit plus, la descendre moins.
+
+  L'orientation est conservée : une ligne rend une ligne.
+
+  L'interpolation est linéaire, non par filtre polyphasé : c'est plus
+  simple et suffisant quand le signal est déjà bien suréchantillonné,
+  mais cela ne protège pas du repliement quand on décime. Filtrer avant
+  de descendre en cadence reste nécessaire — UPFIRDN le fait d'un coup.
+
+  Exemple :
+     x = sin(2 * pi * 0.01 * (0:99));
+     numel(resample(x, 3, 2))        % 149
+     isrow(resample(x, 3, 2))        % true
+
+  Voir aussi UPFIRDN, DECIMATE, INTERP, INTERP1.
 ```
 
 ## `residuez`

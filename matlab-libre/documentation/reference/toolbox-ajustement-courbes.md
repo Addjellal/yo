@@ -230,6 +230,24 @@ FITCURVE Ajustement par un modèle nommé.
 
 ```
 FITSURFACE Ajustement polynomial d'une surface z = f(x,y).
+  [COEFFICIENTS,MODELE] = FITSURFACE(X,Y,Z,DEGRE) ajuste un polynôme à
+  deux variables du degré total demandé, au sens des moindres carrés.
+  DEGRE vaut un par défaut, soit un plan.
+
+  Le nombre de coefficients croît vite : (D+1)(D+2)/2, soit trois pour
+  un plan, six au degré deux, dix au degré trois. Il faut au moins
+  autant de points que de coefficients, et de préférence bien plus,
+  sans quoi l'ajustement interpole le bruit.
+
+  Les points doivent aussi être répartis : tous alignés, ils ne
+  déterminent pas une surface, et le système devient singulier.
+
+  Exemple :
+     [x, y] = meshgrid(linspace(0, 1, 10));
+     z = 2 * x + 3 * y + 1;
+     c = fitSurface(x(:), y(:), z(:), 1);        % [1 2 3] a l'ordre pres
+
+  Voir aussi FIT, SFIT, GOODNESSOFFIT, POLYFIT.
 ```
 
 ## `fitoptions`
@@ -387,6 +405,25 @@ FNVAL Évalue une fonction par morceaux.
 
 ```
 GOODNESSOFFIT Indicateurs de qualité d'un ajustement.
+  STATS = GOODNESSOFFIT(Y,YHAT) rend une structure : la somme des carrés
+  des résidus, l'erreur quadratique moyenne, le coefficient de
+  détermination et sa version ajustée.
+
+  Le R2 dit quelle part de la variance est expliquée, mais il ne peut
+  que croître quand on ajoute des paramètres — même inutiles. C'est
+  pourquoi le R2 ajusté existe : il pénalise le nombre de paramètres, et
+  peut donc décroître quand on en ajoute un qui n'apporte rien.
+
+  Un R2 élevé ne dit pas que le modèle est juste : il peut être élevé
+  sur un modèle faux et bas sur un modèle correct mais bruité. Regarder
+  les résidus vaut mieux que regarder le R2.
+
+  Exemple :
+     stats = goodnessOfFit(y, modele(x));
+     stats.rsquare
+     stats.rmse
+
+  Voir aussi FIT, FITSURFACE, CONFINT.
 ```
 
 ## `matlibre_ajuster_lineaire`

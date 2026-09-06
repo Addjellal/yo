@@ -25,15 +25,37 @@ function y = mvnpdf(X, mu, Sigma)
 %      mvnpdf([0 0], [0 0], [1 0; 0 1])     % la meme chose
 %      mvnpdf([1 1; 0 0], [0 0], [2 1; 1 2])
 %
+%      % Un vecteur est ambigu : MU et SIGMA disent la dimension. Avec un
+%      % MU scalaire, une colonne compte pour autant d'observations.
+%      mvnpdf([0; 1; 2], 0, 1)              % trois densites
+%      mvnpdf([0 1 2], [0 0 0], eye(3))     % une seule
+%
 %      % La densite le long d'une ligne, pour une loi correlee :
 %      x = linspace(-3, 3, 7)';
 %      mvnpdf([x, x], [0 0], [1 0.8; 0.8 1])
 %
 %   Voir aussi NORMPDF, MVNRND, MVNCDF, MAHAL, CHOL.
-    if isvector(X) && size(X, 1) == 1
-        % Une seule observation : MATLAB l'accepte en ligne.
-    elseif isvector(X) && size(X, 2) == 1
-        X = X';
+    % Un vecteur est ambigu : c'est soit une observation de dimension P,
+    % soit P observations d'une variable. MU et SIGMA tranchent, quand ils
+    % sont donnés — c'est la règle de MATLAB, et l'ignorer transformait
+    % une colonne de N mesures univariées en une seule observation de
+    % dimension N.
+    if isvector(X) && ~isscalar(X)
+        dimension = 0;
+        if nargin >= 2 && ~isempty(mu) && isvector(mu)
+            dimension = numel(mu);
+        elseif nargin >= 3 && ~isempty(Sigma)
+            dimension = size(Sigma, 1);
+        end
+        if dimension == 1
+            % Une variable, plusieurs observations : une colonne.
+            X = X(:);
+        elseif dimension == 0 || dimension == numel(X)
+            % Une seule observation, de dimension numel(X) : une ligne.
+            X = X(:).';
+        else
+            X = X(:).';
+        end
     end
     p = size(X, 2);
     if nargin < 2 || isempty(mu)

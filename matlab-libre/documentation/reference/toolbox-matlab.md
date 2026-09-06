@@ -21,6 +21,15 @@
 %   matlabroot    - Racine de l'installation
 %   peaks         - Surface d'essai à trois bosses
 %   humps         - Fonction d'essai à deux pics
+%
+% Matrices d'essai
+%   hadamard      - Colonnes orthogonales de plus et moins un
+%   pascal        - Coefficients binomiaux ; déterminant un, très mal
+%                   conditionnée
+%   compan        - Compagnon d'un polynôme : ses valeurs propres en sont
+%                   les racines
+%   invhilb       - Inverse exacte de Hilbert, en entiers
+%   wilkinson     - Valeurs propres presque confondues deux à deux
 %   fliplr2       - (interne) inversion utilisée par les démonstrations
 %
 % Gestion des toolboxes
@@ -489,6 +498,31 @@ COMET3 Trace une courbe de l'espace comme si elle se dessinait.
      comet3(cos(t), sin(t), t);
 
   Voir aussi COMET, PLOT3, ANIMATEDLINE.
+```
+
+## `compan`
+
+```
+COMPAN Matrice compagnon d'un polynôme.
+  A = COMPAN(P) rend la matrice dont le polynôme caractéristique est P,
+  donné par ses coefficients du degré le plus haut au plus bas. Ses
+  valeurs propres sont donc les racines de P.
+
+  C'est ainsi que ROOTS trouve les racines : plutôt que de chercher les
+  zéros du polynôme, il calcule les valeurs propres de sa compagnon.
+  Le détour paraît absurde et ne l'est pas — les algorithmes de valeurs
+  propres sont bien plus stables que la recherche directe de racines,
+  qui perd toute précision dès que deux racines sont proches.
+
+  Le polynôme est normalisé par son coefficient de tête : un polynôme
+  dont ce coefficient est nul n'a pas de compagnon de cette taille.
+
+  Exemple :
+     p = poly([1 2 3]);              % (x-1)(x-2)(x-3)
+     compan(p)
+     sort(eig(compan(p)).')          % [1 2 3]
+
+  Voir aussi ROOTS, POLY, EIG, PASCAL.
 ```
 
 ## `compass`
@@ -1487,6 +1521,37 @@ GTEXT Pose un texte sur la figure.
   Voir aussi TEXT, TITLE, XLABEL, ANNOTATION, GNAME.
 ```
 
+## `hadamard`
+
+```
+HADAMARD Matrice de Hadamard.
+  H = HADAMARD(N) rend une matrice N sur N de plus ou moins un dont les
+  colonnes sont deux à deux orthogonales : H' H vaut N fois l'identité.
+
+  Une telle matrice n'existe que pour N valant 1, 2, ou un multiple de
+  quatre — et l'existence pour tout multiple de quatre reste une
+  conjecture ouverte. La construction employée ici est celle de
+  Sylvester : elle double la taille à chaque étape, si bien qu'elle ne
+  donne que les puissances de deux, ainsi que 12 et 20 par les
+  constructions de Paley qui les complètent.
+
+  Les matrices de Hadamard servent partout où l'on veut des codes
+  orthogonaux : étalement de spectre, plans d'expérience, transformée de
+  Walsh-Hadamard. Leur intérêt tient à ce qu'elles n'emploient que des
+  additions et des soustractions — aucune multiplication.
+
+  La première ligne et la première colonne ne comptent que des uns :
+  c'est la forme normalisée, que la construction de Sylvester donne
+  d'elle-même.
+
+  Exemple :
+     H = hadamard(8);
+     H' * H                          % 8 * eye(8)
+     unique(H(:))                    % -1 et 1, rien d'autre
+
+  Voir aussi FWHT, IFWHT, MAGIC, TOEPLITZ.
+```
+
 ## `heatmap`
 
 ```
@@ -1698,6 +1763,30 @@ INPUTDLG Demande des valeurs à l'utilisateur.
      r = inputdlg({'Nom', 'Âge'}, 'Fiche', 1, {'', '30'});
 
   Voir aussi INPUT, LISTDLG, UIEDITFIELD, KEYBOARD.
+```
+
+## `invhilb`
+
+```
+INVHILB Inverse exacte de la matrice de Hilbert.
+  H = INVHILB(N) rend l'inverse de HILB(N), calculée par sa formule
+  fermée en coefficients binomiaux plutôt que par inversion numérique.
+
+  La matrice de Hilbert est le cas d'école du mauvais
+  conditionnement : son nombre de conditionnement croît comme e^(3,5 N),
+  si bien qu'à N = 13 l'inversion numérique n'a plus un seul chiffre
+  juste. La formule fermée, elle, reste exacte tant que les entiers
+  qu'elle produit tiennent dans un double — jusqu'à N = 13 environ.
+
+  Tous ses termes sont des entiers, alternés en signe. C'est ce qui
+  permet de mesurer l'erreur d'un solveur : la vraie réponse est connue.
+
+  Exemple :
+     norm(invhilb(6) * hilb(6) - eye(6))     % petit
+     max(max(abs(invhilb(5) - round(invhilb(5)))))   % 0 : des entiers
+     cond(hilb(12))                          % plus de 1e16
+
+  Voir aussi HILB, PASCAL, COND.
 ```
 
 ## `iskeyword`
@@ -2180,6 +2269,17 @@ MATLIBRE_GRILLE_POLAIRE Les cercles et les rayons d'un tracé polaire.
   que les rayons se lisent.
 ```
 
+## `matlibre_hadamard_noyau`
+
+```
+MATLIBRE_HADAMARD_NOYAU Noyaux de la construction de Hadamard.
+  Les ordres 1 et 2 sont immédiats ; 12 et 20 viennent des
+  constructions de Paley, qui bordent une matrice circulante bâtie sur
+  les résidus quadratiques modulo un nombre premier.
+
+  Fonction interne : elle n'existe pas dans MATLAB.
+```
+
 ## `matlibre_noyau_plaque`
 
 ```
@@ -2541,6 +2641,35 @@ PARETO Diagramme de Pareto : les causes rangées par importance.
      pareto(defauts, {}, 0.8);
 
   Voir aussi BAR, BARH, SORT, CUMSUM, HISTOGRAM.
+```
+
+## `pascal`
+
+```
+PASCAL Matrice de Pascal.
+  P = PASCAL(N) rend la matrice symétrique définie positive dont les
+  termes sont les coefficients binomiaux : P(i,j) = C(i+j-2, i-1).
+  Sa première ligne et sa première colonne ne comptent que des uns, et
+  chaque autre terme est la somme de celui du dessus et de celui de
+  gauche.
+  P = PASCAL(N,1) rend le facteur triangulaire inférieur, qui est sa
+  propre inverse au signe près.
+  P = PASCAL(N,2) rend une rotation de ce facteur, dont le cube vaut
+  l'identité.
+
+  Son déterminant vaut un, quelle que soit sa taille : c'est ce qui en
+  fait un cas d'école du mauvais conditionnement, car ses valeurs
+  propres s'écartent énormément tout en gardant un produit égal à un.
+  Elle sert à éprouver un solveur linéaire.
+
+  Exemple :
+     pascal(4)
+     det(pascal(6))                  % 1, malgre des termes jusqu'a 252
+     cond(pascal(6))                 % enorme : mal conditionnee
+     L = pascal(4, 1);
+     L * L                           % l'identite : L est son inverse
+
+  Voir aussi HADAMARD, MAGIC, HILB, TOEPLITZ.
 ```
 
 ## `patch`
@@ -3813,6 +3942,28 @@ WHAT Inventaire des fichiers MATLAB d'un dossier.
      numel(s.m)
 
   Voir aussi DIR, WHICH, EXIST, LS.
+```
+
+## `wilkinson`
+
+```
+WILKINSON Matrice d'essai de Wilkinson.
+  W = WILKINSON(N) rend une matrice tridiagonale symétrique dont la
+  diagonale décroît puis recroît symétriquement, et dont les deux
+  sous-diagonales ne comptent que des uns.
+
+  Son intérêt tient à ses valeurs propres : les plus grandes vont par
+  paires presque égales, séparées de moins de 1e-14 pour N = 21. C'est
+  le cas d'école qui éprouve un algorithme de valeurs propres, car
+  distinguer deux valeurs si proches demande toute la précision de la
+  machine.
+
+  Exemple :
+     wilkinson(7)
+     v = sort(eig(wilkinson(21)), 'descend');
+     v(1) - v(2)                     % moins de 1e-13
+
+  Voir aussi EIG, PASCAL, HILB, HADAMARD.
 ```
 
 ## `winter`

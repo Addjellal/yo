@@ -4,20 +4,20 @@
 % Simulink — simulation de schémas-blocs.
 %
 % Un modèle est une structure : une liste de blocs et une liste de liens.
-% La simulation est à pas fixe, l'ordre d'exécution est déterminé par tri
-% topologique des blocs sans état ; les intégrateurs et les retards
-% fournissent la mémoire, ce qui casse les boucles algébriques.
+% La simulation est à pas fixe et l'ordre d'exécution vient d'un tri
+% topologique, si bien qu'une entrée est toujours calculée avant la sortie
+% qui l'emploie. Les intégrateurs et les retards fournissent la mémoire,
+% et cassent donc les boucles algébriques.
 %
-%   new_system   - Modèle vide
-%   add_block    - Ajout d'un bloc
-%   add_line     - Connexion d'une sortie à une entrée
-%   set_param    - Réglage d'un paramètre de bloc
-%   sim          - Simulation
-%   simplot      - Tracé des signaux relevés
+% Modèle
+%   new_system  - Crée un modèle vide
+%   add_block   - Ajoute un bloc, avec ses paramètres
+%   add_line    - Relie une sortie à une entrée
+%   set_param   - Change les paramètres d'un bloc
 %
-% Blocs disponibles : constant, step, ramp, sine, gain, sum, product,
-% integrator, derivative, transferfcn, statespace, saturation, delay,
-% relay, abs, math, mux, scope, terminator.
+% Simulation
+%   sim         - Simule à pas fixe ; rend temps et signaux
+%   simplot     - Trace les signaux relevés
 ```
 
 ## `add_block`
@@ -45,20 +45,74 @@ ADD_BLOCK Ajoute un bloc au modèle.
 
 ```
 ADD_LINE Relie la sortie d'un bloc à l'entrée d'un autre.
-  MODELE = ADD_LINE(MODELE,'source','destination') ou
-  ADD_LINE(MODELE,'source','destination',NUMERO) pour choisir l'entrée.
+  MODELE = ADD_LINE(MODELE,'source','destination') relie la sortie du
+  premier bloc à la première entrée du second.
+  ADD_LINE(MODELE,'source','destination',NUMERO) choisit l'entrée, ce
+  qui importe pour un bloc de somme dont les signes diffèrent.
+
+  Une sortie peut alimenter plusieurs entrées : il suffit de plusieurs
+  liens. Une entrée, non : le dernier lien posé l'emporterait.
+
+  Une boucle est permise pourvu qu'un bloc à état — intégrateur ou
+  retard — la coupe. Sans cela, la boucle est algébrique et le tri
+  topologique n'a pas de solution.
+
+  Exemple :
+     m = add_line(m, 'consigne', 'erreur', 1);
+     m = add_line(m, 'sortie', 'erreur', 2);   % le retour
+     m = add_line(m, 'erreur', 'gain');
+
+  Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
 ```
 
 ## `new_system`
 
 ```
 NEW_SYSTEM Crée un modèle Simulink vide.
+  MODELE = NEW_SYSTEM(NOM) rend un modèle sans bloc ni lien. On le
+  remplit par ADD_BLOCK, on le câble par ADD_LINE, on le règle par
+  SET_PARAM, et on le simule par SIM.
+
+  Le modèle est une structure à trois champs : NOM, BLOCS et LIENS.
+  C'est une valeur, non une référence : chaque fonction en rend une
+  nouvelle et laisse l'ancienne intacte.
+
+  Les modèles se décrivent ici en appelant ces fonctions ; les fichiers
+  .slx de MathWorks, dont le format n'est pas public, ne se lisent pas.
+
+  Exemple :
+     m = new_system('rampe');
+     m = add_block(m, 'constant', 'un', 'Value', 2);
+     m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
+     m = add_line(m, 'un', 'integ');
+     r = sim(m, 5, 0.001);
+
+  Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
 ```
 
 ## `set_param`
 
 ```
 SET_PARAM Modifie les paramètres d'un bloc.
+  MODELE = SET_PARAM(MODELE,NOM,'Param',VALEUR,...) change un ou
+  plusieurs paramètres du bloc nommé, sans toucher aux autres ni au
+  câblage.
+
+  C'est ainsi qu'on balaie un réglage : construire le modèle une fois,
+  puis le simuler pour chaque valeur d'un gain ou d'une condition
+  initiale.
+
+  Les noms de paramètres reconnus sont ceux qu'ADD_BLOCK décrit, par
+  type de bloc. Un nom inconnu est simplement ajouté ; il ne sera lu par
+  personne.
+
+  Exemple :
+     for K = [1 2 5]
+         m = set_param(m, 'gain', 'Gain', K);
+         r = sim(m, 5, 0.001);
+     end
+
+  Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
 ```
 
 ## `sim`
@@ -94,5 +148,15 @@ SIM Simule un modèle à pas fixe.
 
 ```
 SIMPLOT Trace les signaux relevés par SIM.
+  SIMPLOT(RESULTAT) trace tous les signaux du résultat sur le même axe,
+  en fonction du temps. SIMPLOT(RESULTAT,NOMS) n'en trace que
+  quelques-uns, désignés par leur nom de bloc.
+
+  Exemple :
+     r = sim(modele, 5, 0.001);
+     simplot(r, {'consigne', 'sortie'});
+     legend('consigne', 'sortie');
+
+  Voir aussi SIM, PLOT, LEGEND.
 ```
 

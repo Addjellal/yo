@@ -372,6 +372,22 @@ SYM Expression symbolique.
 
 ```
 SYMADD Somme de deux expressions.
+  E = SYMADD(A,B) construit l'arbre {'+', A, B} sans rien
+  évaluer.
+
+  Les expressions se représentent par des arbres, sous forme de
+  cellules : le premier élément est l'opérateur, les suivants ses
+  opérandes. C'est la représentation la plus simple qui permette de
+  dériver, de substituer et de simplifier sans jamais évaluer.
+
+  Ces constructeurs ne calculent rien : ils assemblent. C'est
+  SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symadd(symnum(0), x)))
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
 ```
 
 ## `symdiff`
@@ -386,6 +402,22 @@ SYMDIFF Dérivée symbolique d'une expression.
 
 ```
 SYMDIV Quotient de deux expressions.
+  E = SYMDIV(A,B) construit l'arbre {'/', A, B} sans rien
+  évaluer.
+
+  Les expressions se représentent par des arbres, sous forme de
+  cellules : le premier élément est l'opérateur, les suivants ses
+  opérandes. C'est la représentation la plus simple qui permette de
+  dériver, de substituer et de simplifier sans jamais évaluer.
+
+  Ces constructeurs ne calculent rien : ils assemblent. C'est
+  SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symdiv(x, symnum(1))))
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
 ```
 
 ## `symeval`
@@ -413,18 +445,62 @@ SYMINT Primitive des formes polynomiales et élémentaires.
 
 ```
 SYMMUL Produit de deux expressions.
+  E = SYMMUL(A,B) construit l'arbre {'*', A, B} sans rien
+  évaluer.
+
+  Les expressions se représentent par des arbres, sous forme de
+  cellules : le premier élément est l'opérateur, les suivants ses
+  opérandes. C'est la représentation la plus simple qui permette de
+  dériver, de substituer et de simplifier sans jamais évaluer.
+
+  Ces constructeurs ne calculent rien : ils assemblent. C'est
+  SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symmul(symnum(1), x)))
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
 ```
 
 ## `symnum`
 
 ```
 SYMNUM Feuille « constante ».
+  E = SYMNUM(VALEUR) construit la feuille {'num', VALEUR} : c'est ainsi
+  qu'un nombre entre dans une expression symbolique.
+
+  Sans elle, un nombre nu ne se distinguerait pas d'un opérateur dans
+  l'arbre. Les constructeurs qui acceptent un nombre l'enveloppent
+  d'eux-mêmes.
+
+  Exemple :
+     symstr(symadd(symnum(2), symnum(3)))    % '2 + 3', non '5'
+     symstr(symsimplify(symadd(symnum(2), symnum(3))))   % '5'
+
+  Voir aussi SYMADD, SYMSIMPLIFY, SYMSTR.
 ```
 
 ## `sympow`
 
 ```
 SYMPOW Puissance : A élevé à B.
+  E = SYMPOW(A,B) construit l'arbre {'^', A, B} sans rien
+  évaluer.
+
+  Les expressions se représentent par des arbres, sous forme de
+  cellules : le premier élément est l'opérateur, les suivants ses
+  opérandes. C'est la représentation la plus simple qui permette de
+  dériver, de substituer et de simplifier sans jamais évaluer.
+
+  Ces constructeurs ne calculent rien : ils assemblent. C'est
+  SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(sympow(x, symnum(1))))
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
 ```
 
 ## `symprod`
@@ -464,25 +540,90 @@ SYMS Déclare des variables symboliques.
 ## `symsimplify`
 
 ```
-SYMSIMPLIFY Simplification des cas triviaux (0, 1, constantes).
+SYMSIMPLIFY Simplification des cas triviaux.
+  S = SYMSIMPLIFY(E) réduit ce qui se réduit sans ruse : les constantes
+  se calculent, l'addition de zéro et la multiplication par un
+  disparaissent, la multiplication par zéro annule, la puissance zéro
+  ou un se résout.
+
+  Elle ne factorise pas, ne développe pas et ne reconnaît pas les
+  identités remarquables : la simplification symbolique complète est un
+  problème difficile, et une simplification partielle honnête vaut mieux
+  qu'une simplification approximative.
+
+  Elle est appliquée récursivement, des feuilles vers la racine : une
+  simplification en profondeur peut donc en déclencher une au-dessus.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symmul(symnum(1), x)))           % 'x'
+     symstr(symsimplify(symadd(symnum(2), symnum(3))))   % '5'
+     symstr(symsimplify(symmul(symnum(0), x)))           % '0'
+
+  Voir aussi SYMSTR, SYMSUBS, SIMPLIFY.
 ```
 
 ## `symstr`
 
 ```
 SYMSTR Écriture lisible d'une expression symbolique.
+  S = SYMSTR(E) rend l'expression sous forme de texte, avec les
+  parenthèses qu'impose la priorité des opérateurs — ni plus ni moins.
+
+  C'est la seule fonction qui regarde l'arbre pour le rendre à un
+  lecteur : toutes les autres le transforment. Un arbre non simplifié
+  s'écrit tel quel, ce qui permet de voir ce que SYMSIMPLIFY a fait.
+
+  Exemple :
+     x = sym('x');
+     symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
+
+  Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.
 ```
 
 ## `symsub`
 
 ```
 SYMSUB Différence de deux expressions.
+  E = SYMSUB(A,B) construit l'arbre {'-', A, B} sans rien
+  évaluer.
+
+  Les expressions se représentent par des arbres, sous forme de
+  cellules : le premier élément est l'opérateur, les suivants ses
+  opérandes. C'est la représentation la plus simple qui permette de
+  dériver, de substituer et de simplifier sans jamais évaluer.
+
+  Ces constructeurs ne calculent rien : ils assemblent. C'est
+  SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symsub(x, x)))
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SYMSUBS, SYMNUM.
 ```
 
 ## `symsubs`
 
 ```
 SYMSUBS Substitution d'une variable par une expression ou un nombre.
+  R = SYMSUBS(E,VARIABLE,VALEUR) remplace toutes les occurrences de la
+  variable nommée par VALEUR, qui peut être un nombre ou une autre
+  expression.
+
+  La substitution ne simplifie pas : remplacer x par 2 dans x + x donne
+  « 2 + 2 », non « 4 ». C'est voulu — SYMSIMPLIFY fait ce travail, et
+  les séparer permet de voir ce que chaque étape produit.
+
+  Substituer une expression, non un nombre, est ce qui permet de
+  composer des fonctions symboliquement.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsubs(symadd(x, x), 'x', 2))       % '2 + 2'
+     symstr(symsimplify(symsubs(symadd(x, x), 'x', 2)))   % '4'
+
+  Voir aussi SYMSIMPLIFY, SYMSTR, SUBS.
 ```
 
 ## `symsum`

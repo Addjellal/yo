@@ -257,8 +257,32 @@ CREDITMIGRATIONCOPULA Modèle de portefeuille de crédit à migrations.
 
 ```
 CREDITTRANSITION Matrice de transition estimée sur des trajectoires.
-  P = CREDITTRANSITION(N) où N est une matrice dont chaque ligne est la
-  trajectoire de notation d'un émetteur.
+  [P,ETATS] = CREDITTRANSITION(N) où N a une ligne par émetteur et une
+  colonne par date : N(i,t) est la notation de l'émetteur i à la date t.
+  P(a,b) est la proportion des passages de l'état a vers l'état b, et
+  ETATS donne les états dans l'ordre des lignes et des colonnes.
+
+  Les notations peuvent être des nombres, des chaînes ou des
+  catégories : les états sont alors les valeurs distinctes, rangées
+  dans l'ordre où UNIQUE les met.
+
+  Chaque ligne somme à un, sauf celle d'un état d'où l'on n'est jamais
+  parti — un état absorbant observé une seule fois, par exemple — qui
+  reste nulle. C'est la propriété qui valide l'estimation : une matrice
+  de transition est stochastique par ligne.
+
+  L'estimateur est celui du maximum de vraisemblance pour une chaîne de
+  Markov d'ordre un : compter les passages et diviser. Il suppose donc
+  que la probabilité de transition ne dépend que de l'état courant, ce
+  que les notations réelles démentent — une note récemment dégradée se
+  dégrade plus souvent qu'une note stable de même niveau.
+
+  Exemple :
+     trajectoires = [1 1 2; 2 2 3; 1 2 2];
+     [P, etats] = creditTransition(trajectoires);
+     sum(P, 2)                       % un par ligne visitee
+
+  Voir aussi DRAWDOWNSERIES, PORTVRISK.
 ```
 
 ## `creditscorecard`

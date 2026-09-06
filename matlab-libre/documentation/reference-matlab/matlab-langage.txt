@@ -47,3 +47,8 @@ movmean movmedian movsum outerjoin pivot removecats renamecats renamevars
 fillmissing filloutliers isoutlier rmmissing rmoutliers rowfun sortrows splitapply splitvars stack standardizeMissing
 struct2table summary table table2array table2cell table2struct tail timetable
 unstack varfun
+hadamard
+pascal
+compan
+invhilb
+wilkinson

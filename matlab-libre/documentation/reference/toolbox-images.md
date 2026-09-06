@@ -761,7 +761,25 @@ IMCOMPLEMENT Négatif d'une image.
 ## `imcrop`
 
 ```
-IMCROP Découpe un rectangle [x y largeur hauteur] dans une image.
+IMCROP Découpe un rectangle dans une image.
+  Y = IMCROP(X,[XMIN YMIN LARGEUR HAUTEUR]) rend la partie de l'image
+  comprise dans le rectangle. XMIN et YMIN sont la colonne et la ligne
+  du coin supérieur gauche.
+
+  La taille rendue est HAUTEUR+1 sur LARGEUR+1, non HAUTEUR sur
+  LARGEUR : le rectangle décrit une étendue spatiale, du bord gauche du
+  premier pixel au bord droit du dernier, et non un compte de pixels.
+  C'est la convention de MATLAB, et elle surprend toujours.
+
+  Un rectangle qui déborde est ramené dans l'image : la fonction ne
+  complète pas, elle tronque.
+
+  Exemple :
+     image = reshape(1:100, 10, 10);
+     size(imcrop(image, [3 2 3 4]))       % [5 4] : hauteur+1, largeur+1
+     imcrop(image, [3 2 3 4])(1, 1)       % image(2, 3)
+
+  Voir aussi IMRESIZE, IMROTATE, IMADJUST.
 ```
 
 ## `imdilate`
@@ -1024,7 +1042,27 @@ IMQUANTIZE Quantifie une image selon des seuils.
 ## `imread`
 
 ```
-IMREAD Lit une image aux formats PGM/PPM en texte (P2 et P3).
+IMREAD Lit une image aux formats PGM et PPM en texte (P2 et P3).
+  X = IMREAD(FICHIER) rend une matrice de niveaux de gris pour un P2,
+  un tableau à trois plans pour un P3.
+
+  La classe rendue suit la valeur maximale déclarée dans le fichier :
+  uint8 jusqu'à 255, uint16 au-delà. C'est la convention de MATLAB, et
+  elle importe : une image entière et une image flottante ne se
+  traitent pas de la même façon, et IM2DOUBLE existe pour passer de
+  l'une à l'autre.
+
+  Seuls les deux formats en texte sont lus. Les formats compressés —
+  PNG, JPEG, TIFF — demandent une bibliothèque externe, que MatLibre
+  n'emporte pas. Les commentaires, introduits par un dièse, sont
+  ignorés.
+
+  Exemple :
+     imwrite(uint8(magic(8) * 4), 'essai.pgm');
+     x = imread('essai.pgm');
+     class(x)                        % uint8
+
+  Voir aussi IMWRITE, IM2DOUBLE, IMSHOW.
 ```
 
 ## `imreconstruct`
@@ -1425,7 +1463,26 @@ REGIONPROPS Mesures sur les régions d'une image étiquetée.
 ```
 RGB2GRAY Luminance d'une image couleur.
   G = RGB2GRAY(RGB) applique la pondération de la recommandation
-  ITU-R BT.601 : 0.2989 R + 0.5870 V + 0.1140 B.
+  ITU-R BT.601 : environ 0,299 R + 0,587 V + 0,114 B.
+
+  Les trois poids ne sont pas égaux parce que l'œil ne l'est pas : il
+  est bien plus sensible au vert qu'au bleu. Une moyenne arithmétique
+  des trois canaux donnerait une image grise, mais pas la bonne — les
+  verts y paraîtraient trop sombres et les bleus trop clairs.
+
+  Les coefficients sont donnés à leur pleine précision, celle de
+  l'inversion de la matrice de la recommandation : ils somment
+  exactement à un, si bien qu'un gris reste ce qu'il est. Les valeurs
+  arrondies à quatre décimales, elles, somment à 0,9999 et assombrissent
+  imperceptiblement toute l'image.
+
+  Une image déjà en niveaux de gris est rendue telle quelle.
+
+  Exemple :
+     gris = repmat(0.5, 2, 2, 3);
+     max(max(abs(rgb2gray(gris) - 0.5)))  % 0 : le gris est conserve
+
+  Voir aussi IM2DOUBLE, IMADJUST, IMHIST.
 ```
 
 ## `rgb2hsv`

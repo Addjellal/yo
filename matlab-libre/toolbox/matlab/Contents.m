@@ -18,6 +18,15 @@
 %   matlabroot    - Racine de l'installation
 %   peaks         - Surface d'essai à trois bosses
 %   humps         - Fonction d'essai à deux pics
+%
+% Matrices d'essai
+%   hadamard      - Colonnes orthogonales de plus et moins un
+%   pascal        - Coefficients binomiaux ; déterminant un, très mal
+%                   conditionnée
+%   compan        - Compagnon d'un polynôme : ses valeurs propres en sont
+%                   les racines
+%   invhilb       - Inverse exacte de Hilbert, en entiers
+%   wilkinson     - Valeurs propres presque confondues deux à deux
 %   fliplr2       - (interne) inversion utilisée par les démonstrations
 %
 % Gestion des toolboxes

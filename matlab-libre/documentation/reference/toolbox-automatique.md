@@ -537,12 +537,26 @@ D2C Retour au continu d'un modèle échantillonné.
   bloqueur d'ordre zéro redonne SYSD. C'est l'opération inverse de C2D,
   au bruit numérique près.
 
-  SYSC = D2C(SYSD,'tustin') emploie la transformation bilinéaire.
+  SYSC = D2C(SYSD,'tustin') emploie la transformation bilinéaire, et
+  inverse alors exactement ce que C2D(...,'tustin') a fait.
+
+  La méthode doit être celle qui a servi à discrétiser : les deux
+  transformations ne donnent pas le même modèle continu, et les mélanger
+  ne rend rien de sensé.
+
+  Le retour par bloqueur passe par le logarithme de matrice, qui n'est
+  pas toujours réel : un système discret dont un pôle est réel négatif
+  n'a pas d'équivalent continu réel. La partie imaginaire est alors
+  écartée, et le modèle rendu n'est plus un inverse exact — c'est une
+  limite de l'opération, non du calcul.
 
   Exemples :
      d = c2d(tf(1, [1 1]), 0.05);
      c = d2c(d);
      abs(dcgain(c) - 1) < 1e-6            % le gain statique est rendu
+
+     d = c2d(tf(1, [1 2 1]), 0.05, 'tustin');
+     pole(d2c(d, 'tustin'))               % -1 et -1, les poles d'origine
 
   Voir aussi C2D, D2D, SS, TF.
 ```

@@ -15,18 +15,70 @@
 
 ```
 AUDIOREAD Lit un fichier WAV PCM 16 bits monophonique.
+  [Y,FS] = AUDIOREAD(FICHIER) rend les échantillons, ramenés entre -1 et
+  1, et la fréquence d'échantillonnage.
+
+  Seul le WAV PCM 16 bits mono est lu : ni compression, ni stéréo, ni
+  flottant. Les formats compressés — MP3, AAC, Ogg — demandent un codec,
+  et les intégrer signifierait une dépendance externe.
+
+  La normalisation entre -1 et 1 est la convention de MATLAB : elle rend
+  le traitement indépendant du nombre de bits, et c'est AUDIOWRITE qui
+  refait la conversion en sens inverse.
+
+  Exemple :
+     audiowrite('essai.wav', sin(2*pi*440*(0:8000)/8000), 8000);
+     [y, fs] = audioread('essai.wav');
+     max(abs(y))                     % proche de 1
+
+  Voir aussi AUDIOWRITE, DBFS, SPECTRALCENTROID.
 ```
 
 ## `audiowrite`
 
 ```
 AUDIOWRITE Écrit un fichier WAV PCM 16 bits monophonique.
+  AUDIOWRITE(FICHIER,Y,FS) écrit les échantillons Y, supposés entre -1
+  et 1, à la fréquence FS.
+
+  Ce qui sort de l'intervalle est écrêté, non mis à l'échelle : un signal
+  qui dépasse est donc distordu, et il vaut mieux le normaliser
+  soi-même avant d'écrire. L'écrêtage est la façon dont un convertisseur
+  réel se comporte, et le silence ferait pire.
+
+  La quantification sur seize bits introduit un bruit d'environ -96 dBFS :
+  l'aller-retour par AUDIOREAD n'est donc pas exact, mais fidèle à
+  1/32768 près.
+
+  Exemple :
+     audiowrite('essai.wav', 0.5 * sin(2*pi*440*(0:8000)/8000), 8000);
+     [y, fs] = audioread('essai.wav');
+
+  Voir aussi AUDIOREAD, DBFS.
 ```
 
 ## `dbfs`
 
 ```
 DBFS Niveau en décibels pleine échelle.
+  D = DBFS(X) rend vingt fois le logarithme décimal de la valeur
+  efficace du signal.
+
+  Zéro dBFS est la pleine échelle : un signal qui l'atteint sature. Tous
+  les niveaux sont donc négatifs, et c'est la convention de tout
+  l'audionumérique — contrairement au dBm, qui est une puissance
+  absolue.
+
+  Un sinus d'amplitude un vaut -3,01 dBFS, non zéro : sa valeur efficace
+  est son amplitude divisée par racine de deux. C'est la confusion la
+  plus fréquente entre niveau crête et niveau efficace.
+
+  Exemple :
+     dbfs(ones(1, 100))              % 0 : pleine echelle continue
+     dbfs(sin(2*pi*(0:999)/100))     % -3.01 : un sinus de pointe a 1
+     dbfs(0.1 * ones(1, 100))        % -20
+
+  Voir aussi AUDIOREAD, RMS, SPECTRALCENTROID.
 ```
 
 ## `melFilterBank`
@@ -106,6 +158,24 @@ MFCCSIMPLE Coefficients cepstraux sur l'échelle de Mel.
 
 ```
 SPECTRALCENTROID Centre de gravité du spectre, en hertz.
+  C = SPECTRALCENTROID(X,FS) rend la moyenne des fréquences pondérée par
+  l'amplitude du spectre. FS vaut un par défaut, auquel cas le résultat
+  est une fréquence réduite.
+
+  C'est le descripteur qui correspond le mieux à la « brillance »
+  perçue d'un son : un son grave a un centroïde bas, un son clair un
+  centroïde haut. Il sert dans presque toute classification de timbre.
+
+  Les repères : le centroïde d'un sinus pur est sa fréquence ; celui
+  d'un bruit blanc tombe au quart de la fréquence d'échantillonnage,
+  c'est-à-dire au milieu de la bande utile.
+
+  Exemple :
+     fs = 8000; t = (0:fs-1) / fs;
+     spectralCentroid(sin(2*pi*1000*t), fs)      % 1000
+     spectralCentroid(randn(1, fs), fs)          % environ fs/4
+
+  Voir aussi DBFS, MFCCSIMPLE, MELFILTERBANK.
 ```
 
 ## `zerocrossrate`

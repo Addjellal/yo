@@ -877,8 +877,42 @@ CROSSTAB Table de contingence de deux variables discrètes.
 
 ```
 CVPARTITION Découpage d'un jeu de données pour la validation croisée.
+  P = CVPARTITION(N,'KFold',K) découpe N observations en K blocs de
+  tailles aussi égales que possible.
   P = CVPARTITION(N,'HoldOut',F) réserve une fraction F pour le test.
-  P = CVPARTITION(N,'KFold',K) découpe en K blocs.
+  P = CVPARTITION(N,'Resubstitution') apprend et teste sur tout.
+  P = CVPARTITION(GROUPES,'KFold',K) stratifie : chaque bloc garde à peu
+  près les proportions de chaque groupe.
+
+  Propriétés :
+     NumObservations  le nombre d'observations
+     NumTestSets      le nombre de découpages
+     TrainSize        la taille d'apprentissage de chacun
+     TestSize         leur taille de test
+     Type             'kfold', 'holdout' ou 'resubstitution'
+
+  Méthodes :
+     TEST(P,K)      les observations de test du K-ième découpage
+     TRAINING(P,K)  celles d'apprentissage
+     REPARTITION(P) un nouveau tirage, même forme
+
+  Le découpage est aléatoire mais complet : chaque observation est
+  testée une fois et une seule sur l'ensemble des K blocs. C'est ce qui
+  distingue la validation croisée d'un simple tirage répété, où certaines
+  observations ne seraient jamais testées et d'autres plusieurs fois.
+
+  La stratification importe dès que les classes sont déséquilibrées :
+  sans elle, un bloc peut ne contenir aucun exemple d'une classe rare,
+  et l'erreur mesurée sur ce bloc ne veut plus rien dire.
+
+  Exemple :
+     p = cvpartition(50, 'KFold', 5);
+     for k = 1:p.NumTestSets
+         apprentissage = training(p, k);
+         essai = test(p, k);
+     end
+
+  Voir aussi CROSSVAL, FITCKNN, FITCDISCR.
 ```
 
 ## `dataset`
@@ -2994,6 +3028,17 @@ MATLIBRE_REGRESSION_ISOTONE La suite croissante la plus proche.
   approcher.
 ```
 
+## `matlibre_stat_indicesGroupes`
+
+```
+MATLIBRE_STAT_INDICESGROUPES Numérote les groupes d'une liste quelconque.
+  Une liste de nombres, de chaînes ou de catégories devient une liste
+  d'entiers, un par valeur distincte. C'est ce qu'il faut pour
+  stratifier un découpage sans se soucier du type des étiquettes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
 ## `mdscale`
 
 ```
@@ -3235,11 +3280,21 @@ MVNPDF Densité de la loi normale multivariée.
      mvnpdf([0 0], [0 0], [1 0; 0 1])     % la meme chose
      mvnpdf([1 1; 0 0], [0 0], [2 1; 1 2])
 
+     % Un vecteur est ambigu : MU et SIGMA disent la dimension. Avec un
+     % MU scalaire, une colonne compte pour autant d'observations.
+     mvnpdf([0; 1; 2], 0, 1)              % trois densites
+     mvnpdf([0 1 2], [0 0 0], eye(3))     % une seule
+
      % La densite le long d'une ligne, pour une loi correlee :
      x = linspace(-3, 3, 7)';
      mvnpdf([x, x], [0 0], [1 0.8; 0.8 1])
 
   Voir aussi NORMPDF, MVNRND, MVNCDF, MAHAL, CHOL.
+Un vecteur est ambigu : c'est soit une observation de dimension P,
+soit P observations d'une variable. MU et SIGMA tranchent, quand ils
+sont donnés — c'est la règle de MATLAB, et l'ignorer transformait
+une colonne de N mesures univariées en une seule observation de
+dimension N.
 ```
 
 ## `mvnrnd`
