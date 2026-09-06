@@ -1,8 +1,13 @@
 % Aerospace Toolbox — atmosphère, repères et grandeurs de vol.
 %
-%   atmosisa    - Atmosphère type internationale
-%   angle2dcm   - Angles d'Euler vers matrice de cosinus directeurs
-%   dcm2angle   - Réciproque
-%   machnumber  - Nombre de Mach
-%   dpressure   - Pression dynamique
-%   geodetic2ecef - Coordonnées géodésiques vers repère terrestre
+% Atmosphère
+%   atmosisa      - Atmosphère type internationale, jusqu'à 20 km
+%   dpressure     - Pression dynamique, qui fixe les efforts
+%   machnumber    - Nombre de Mach, qui fixe l'aérodynamique
+%
+% Attitude
+%   angle2dcm     - Angles d'Euler vers matrice de cosinus directeurs
+%   dcm2angle     - Réciproque
+%
+% Position
+%   geodetic2ecef - Latitude, longitude, altitude vers repère terrestre

@@ -1,17 +1,17 @@
 % Simulink — simulation de schémas-blocs.
 %
 % Un modèle est une structure : une liste de blocs et une liste de liens.
-% La simulation est à pas fixe, l'ordre d'exécution est déterminé par tri
-% topologique des blocs sans état ; les intégrateurs et les retards
-% fournissent la mémoire, ce qui casse les boucles algébriques.
+% La simulation est à pas fixe et l'ordre d'exécution vient d'un tri
+% topologique, si bien qu'une entrée est toujours calculée avant la sortie
+% qui l'emploie. Les intégrateurs et les retards fournissent la mémoire,
+% et cassent donc les boucles algébriques.
 %
-%   new_system   - Modèle vide
-%   add_block    - Ajout d'un bloc
-%   add_line     - Connexion d'une sortie à une entrée
-%   set_param    - Réglage d'un paramètre de bloc
-%   sim          - Simulation
-%   simplot      - Tracé des signaux relevés
+% Modèle
+%   new_system  - Crée un modèle vide
+%   add_block   - Ajoute un bloc, avec ses paramètres
+%   add_line    - Relie une sortie à une entrée
+%   set_param   - Change les paramètres d'un bloc
 %
-% Blocs disponibles : constant, step, ramp, sine, gain, sum, product,
-% integrator, derivative, transferfcn, statespace, saturation, delay,
-% relay, abs, math, mux, scope, terminator.
+% Simulation
+%   sim         - Simule à pas fixe ; rend temps et signaux
+%   simplot     - Trace les signaux relevés

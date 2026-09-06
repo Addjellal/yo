@@ -1,10 +1,16 @@
 % Data Acquisition Toolbox — acquisition simulée.
 %
-% Aucune carte n'est pilotée : les canaux produisent des signaux calculés,
-% ce qui permet d'écrire et de tester une chaîne d'acquisition complète
-% sans matériel.
+% Aucune carte n'est pilotée : les voies d'entrée produisent des signaux
+% calculés, ce qui permet d'écrire et d'éprouver une chaîne d'acquisition
+% complète — cadence, repliement, moyennage — sans matériel.
 %
-%   daq          - Crée une session
-%   addAnalogInput, addAnalogOutput - Ajout de voies
-%   readData     - Lecture d'un bloc d'échantillons
-%   writeData    - Écriture (mémorisée)
+% Session
+%   daq              - Crée une session, à une fréquence donnée
+%
+% Voies
+%   addAnalogInput   - Ajoute une entrée, décrite par son générateur
+%   addAnalogOutput  - Ajoute une sortie
+%
+% Échanges
+%   readData         - Lit un bloc sur toutes les entrées, aux mêmes instants
+%   writeData        - Écrit un bloc sur les sorties

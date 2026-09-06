@@ -1,6 +1,21 @@
 function dcm = angle2dcm(r1, r2, r3, ordre)
 %ANGLE2DCM Angles d'Euler (radians) vers matrice de cosinus directeurs.
-%   L'ordre par défaut est ZYX, comme dans la documentation.
+%   DCM = ANGLE2DCM(R1,R2,R3) rend la matrice qui passe du repère de
+%   référence au repère du mobile, dans l'ordre ZYX — lacet, tangage,
+%   roulis. ANGLE2DCM(R1,R2,R3,ORDRE) emploie une autre séquence.
+%
+%   Attention au sens : la matrice de cosinus directeurs de
+%   l'aéronautique va du repère fixe vers le repère mobile, alors que
+%   EUL2ROTM rend la rotation inverse, du mobile vers le fixe. Les deux
+%   sont transposées l'une de l'autre, et les confondre inverse tous les
+%   signes.
+%
+%   Exemple :
+%      dcm = angle2dcm(deg2rad(30), 0, 0);
+%      [r1, r2, r3] = dcm2angle(dcm);
+%      rad2deg(r1)                         % 30
+%
+%   Voir aussi DCM2ANGLE, EUL2ROTM, ROTM2EUL.
     if nargin < 4
         ordre = 'ZYX';
     end
