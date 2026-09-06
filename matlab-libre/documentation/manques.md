@@ -17,34 +17,31 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | images | 72 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
 | matlab-graphique | 126 | 0 | 100 % |
-| matlab-langage | 426 | 0 | 100 % |
+| matlab-langage | 430 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
 | optimisation | 31 | 0 | 100 % |
-| robotique | 15 | 58 | 21 % |
+| robotique | 36 | 37 | 49 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 135 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
 | types | 90 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2089** | **58** | **97 %** |
+| **ensemble** | **2114** | **37** | **98 %** |
 
 ## robotique
 
-`angdiff`, `axang2quat`, `axang2rotm`, `axang2tform`, `eul2tform`, `quat2axang`
-`quat2eul`, `quat2tform`, `quatdivide`, `quatinv`, `quatrotate`, `rotm2axang`
-`tform2axang`, `tform2eul`, `tform2quat`, `rigidBody`, `rigidBodyJoint`
-`rigidBodyTree`, `addBody`, `removeBody`, `replaceBody`, `showdetails`, `homeConfiguration`
-`randomConfiguration`, `getTransform`, `geometricJacobian`, `centerOfMass`
-`massMatrix`, `velocityProduct`, `gravityTorque`, `inverseDynamics`, `forwardDynamics`
-`externalForce`, `importrobot`, `loadrobot`, `inverseKinematics`, `generalizedInverseKinematics`
-`constraintPoseTarget`, `constraintPositionTarget`, `constraintOrientationTarget`
-`constraintCartesianBounds`, `constraintJointBounds`, `constraintAiming`
-`constraintDistanceBounds`, `cubicpolytraj`, `quinticpolytraj`, `trapveltraj`
-`bsplinepolytraj`, `rottraj`, `transformtraj`, `ackermannKinematics`, `bicycleKinematics`
-`differentialDriveKinematics`, `unicycleKinematics`, `controllerPurePursuit`
-`controllerVFH`, `binaryOccupancyMap`, `occupancyMap`
+`rigidBody`, `rigidBodyJoint`, `rigidBodyTree`, `addBody`, `removeBody`
+`replaceBody`, `showdetails`, `homeConfiguration`, `randomConfiguration`
+`getTransform`, `geometricJacobian`, `centerOfMass`, `massMatrix`, `velocityProduct`
+`gravityTorque`, `inverseDynamics`, `forwardDynamics`, `externalForce`, `importrobot`
+`loadrobot`, `inverseKinematics`, `generalizedInverseKinematics`, `constraintPoseTarget`
+`constraintPositionTarget`, `constraintOrientationTarget`, `constraintCartesianBounds`
+`constraintJointBounds`, `constraintAiming`, `constraintDistanceBounds`
+`ackermannKinematics`, `bicycleKinematics`, `differentialDriveKinematics`
+`unicycleKinematics`, `controllerPurePursuit`, `controllerVFH`, `binaryOccupancyMap`
+`occupancyMap`
 
 ## Ce qui manque au-delà des fonctions
 
