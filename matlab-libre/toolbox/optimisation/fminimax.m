@@ -15,6 +15,11 @@ function [x, valeur] = fminimax(fonctions, x0)
 %      x = fminimax(f, 0)             % 1
 %
 %   Voir aussi FMINCON, FGOALATTAIN, FMINSEARCH, LSQNONLIN.
+    if ~isa(fonctions, 'function_handle')
+        error('optim:fminimax:PoigneeAttendue', ...
+              ['FMINIMAX attend une seule poignee rendant un vecteur, non ' ...
+               'une liste de fonctions : ecrivez @(x) [f1(x); f2(x)].']);
+    end
     objectif = @(v) max(fonctions(v));
     x = fminsearch(objectif, x0);
     valeur = max(fonctions(x));

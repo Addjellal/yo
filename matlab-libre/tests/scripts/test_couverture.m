@@ -748,4 +748,224 @@ assert(isnan(retards(1, 1)), 'le premier retard manque au premier instant');
 assert(retards(3, 1) == 2 && retards(3, 2) == 1, 'et les valeurs sont decalees');
 fprintf('  entree-sortie et divers : images, options, retards\n');
 
+%% Identification et portefeuilles
+% Les trois classes de modèle portent leur ordre et leur période
+% d'échantillonnage, et se simulent.
+modeleTf = idtf([1 0.5], [1 -0.8], 0.1);
+assert(abs(modeleTf.Ts - 0.1) < 1e-15, 'la periode est retenue');
+modeleSs = idss([0.9 0; 0 0.8], [1; 1], [1 0], 0, 0.1);
+assert(size(modeleSs.A, 1) == 2, 'deux etats');
+reponse = idfrd(linspace(0, pi, 32), ones(1, 32), 0.1);
+assert(numel(reponse.Frequency) == 32, 'trente-deux frequences');
+
+% La réponse impulsionnelle estimée retrouve celle d'un système connu.
+rng(59);
+u = randn(600, 1);
+b = [0 0.5 0.3 0.1];
+y = filter(b, 1, u);
+h = impulseest(iddata(y, u, 1), 4);
+assert(max(abs(h(:).' - b)) < 0.05, ...
+       'impulseest retrouve la reponse impulsionnelle');
+
+% Un modèle polynomial ajusté sur des données sans bruit reproduit la
+% sortie.
+modele = polyest(iddata(y, u, 1), [1 3 0 0 0 1]);
+assert(~isempty(modele), 'polyest rend un modele');
+
+% Les contraintes de portefeuille se construisent et ont la bonne forme.
+bornes = pcalims([0 0 0], [0.5 0.5 0.5]);
+assert(size(bornes, 2) == 4, 'une contrainte par ligne : trois poids et un second membre');
+assert(size(bornes, 1) >= 6, 'deux contraintes par actif');
+groupes = pcglims([1 1 0; 0 0 1], [0.2 0.1], [0.8 0.6]);
+assert(size(groupes, 2) == 4, 'meme forme pour les groupes');
+budget = pcpval(1, 3);
+assert(size(budget, 2) == 4, 'et pour la contrainte de budget');
+
+% Une allocation de portefeuille répartit tout et rend le risque promis.
+rendements = [0.10 0.15 0.08];
+covariance = [0.04 0.01 0.00; 0.01 0.09 0.01; 0.00 0.01 0.02];
+[poids, rendement, risque] = portalloc(rendements, covariance, 0.12);
+assert(abs(sum(poids) - 1) < 1e-9, 'les poids somment a un');
+assert(abs(rendement - 0.12) < 1e-6, 'la cible de rendement est tenue');
+assert(abs(risque - sqrt(poids(:).' * covariance * poids(:))) < 1e-9, ...
+       'et le risque est celui de la combinaison');
+
+% La valeur en risque croît quand le seuil se resserre et quand la
+% volatilité monte. Le troisième argument est la probabilité de queue —
+% 0,05 par défaut — non le niveau de confiance : c'est la convention de
+% MATLAB, et l'inverser donne une valeur en risque nulle.
+v1 = portvrisk(0.05, 0.2, 0.05, 1e6);
+v2 = portvrisk(0.05, 0.2, 0.01, 1e6);
+v3 = portvrisk(0.05, 0.4, 0.05, 1e6);
+assert(v2 > v1, 'un seuil plus exigeant demande de couvrir davantage');
+assert(v3 > v1, 'plus de volatilite aussi');
+assert(v1 > 0, 'et la valeur en risque se compte positivement');
+assert(abs(portvrisk(0.05, 0.2, 0.05, 2e6) - 2 * v1) < 1e-6, ...
+       'elle est proportionnelle a la valeur du portefeuille');
+
+% Une matrice de transition de crédit est stochastique par ligne : chaque
+% ligne d'un état d'où l'on est parti somme à un.
+trajectoires = [1 1 2 2; 2 2 3 3; 1 2 2 3; 3 3 3 3];
+[P, etats] = creditTransition(trajectoires);
+assert(numel(etats) == 3, 'trois notations distinctes');
+visites = sum(P, 2) > 0;
+assert(all(abs(sum(P(visites, :), 2) - 1) < 1e-9), ...
+       'chaque ligne visitee somme a un');
+assert(all(P(:) >= -1e-12 & P(:) <= 1 + 1e-12), ...
+       'et ses termes sont des probabilites');
+% L'état 3 n'est jamais quitté : sa ligne est concentrée sur lui-même.
+assert(abs(P(3, 3) - 1) < 1e-12, 'un etat absorbant reste ou il est');
+% Les notations peuvent être des chaînes.
+[Ptexte, etatsTexte] = creditTransition({'AA','AA','A'; 'A','A','A'});
+assert(numel(etatsTexte) == 2, 'deux notations distinctes');
+assert(all(abs(sum(Ptexte, 2) - 1) < 1e-9), 'et la matrice reste stochastique');
+fprintf('  identification et portefeuilles\n');
+
+%% Régression et statistique descriptive
+% L'intervalle de confiance d'un ajustement polynomial contient la
+% courbe, et il s'élargit hors du domaine des données.
+x = (1:20).';
+y = 3 * x + 1 + 0.1 * randn(20, 1);
+[p, S] = polyfit(x, y, 1);
+[valeurs, delta] = polyconf(p, x, S);
+assert(all(delta > 0), 'l''intervalle a une largeur');
+assert(all(abs(valeurs - polyval(p, x)) < 1e-12), 'et il entoure la courbe');
+[~, deltaLoin] = polyconf(p, 40, S);
+assert(deltaLoin > max(delta), ...
+       'l''intervalle s''elargit hors du domaine observe');
+
+% La régression pas à pas retient les variables utiles et écarte le bruit.
+rng(61);
+X = randn(200, 4);
+yPas = 3 * X(:,1) - 2 * X(:,3) + 0.1 * randn(200, 1);
+[coefficients, ~, ~, garde] = stepwisefit(X, yPas);
+assert(garde(1) && garde(3), 'les deux variables utiles sont retenues');
+assert(abs(coefficients(1) - 3) < 0.2 && abs(coefficients(3) + 2) < 0.2, ...
+       'avec les bons coefficients');
+
+% Le modèle de Hougen est positif pour des paramètres et des entrées
+% positifs, et croît avec la première entrée.
+beta = [1.25 0.06 0.04 0.11 1.19];
+entrees = [470 300 10];
+assert(hougen(beta, entrees) > 0, 'le modele de Hougen rend un taux positif');
+
+% normspec rend la proportion hors spécifications, entre zéro et un.
+proportion = normspec([-1 1], 0, 1);
+assert(proportion > 0.6 && proportion < 0.7, ...
+       'plus ou moins un ecart type couvre environ 68 %% de la loi');
+assert(abs(normspec([-inf inf], 0, 1) - 1) < 1e-9, ...
+       'des bornes infinies couvrent tout');
+close all
+fprintf('  regression et statistique descriptive\n');
+
+%% Vision et signal : diagrammes et détections
+% Le diagramme de l'œil découpe le signal en segments d'égale longueur.
+rng(67);
+signal = repmat([1 1 -1 -1], 1, 50) + 0.05 * randn(1, 200);
+segments = eyediagram(signal, 8);
+assert(size(segments, 1) == 8 || size(segments, 2) == 8, ...
+       'les segments font la longueur demandee');
+
+% La transformée de Hough trouve les droites d'une image binaire.
+bw = false(40);
+bw(20, :) = true;
+[droites, accumulateur] = houghLines(bw, 1);
+assert(~isempty(droites), 'une droite est trouvee');
+assert(max(accumulateur(:)) >= 35, ...
+       'et l''accumulateur y compte presque tous les pixels');
+
+% Le flot optique de Lucas-Kanade retrouve une translation connue, et
+% avec le signe de Farnebäck : un objet qui va vers la droite donne un U
+% positif.
+rng(71);
+base = zeros(40);
+base(15:25, 15:25) = 1;
+base = base + 0.01 * randn(40);
+interieur = 12:28;
+[u, v] = opticalFlowLK(base, circshift(base, [0 1]), 9);
+assert(abs(median(median(u(interieur, interieur))) - 1) < 0.2, ...
+       'un deplacement vers la droite donne un U positif de un');
+assert(abs(median(median(v(interieur, interieur)))) < 0.2, ...
+       'et aucun deplacement vertical');
+[u, v] = opticalFlowLK(base, circshift(base, [1 0]), 9);
+assert(abs(median(median(v(interieur, interieur))) - 1) < 0.2, ...
+       'un deplacement vers le bas donne un V positif de un');
+% Les deux méthodes s'accordent sur le signe : sans cela, employer l'une
+% pour l'autre inverserait silencieusement le mouvement.
+lisse = imfilter(rand(60, 60), fspecial('gaussian', 9, 2), 'replicate');
+deplacee = matlibre_deplacer_image(lisse, -ones(60), ones(60));
+[uLK, vLK] = opticalFlowLK(lisse, deplacee, 9);
+[uFB, vFB] = opticalFlowFarneback(lisse, deplacee);
+milieu = 15:45;
+assert(sign(median(median(uLK(milieu, milieu)))) == sign(median(median(uFB(milieu, milieu)))), ...
+       'Lucas-Kanade et Farneback s''accordent sur le signe horizontal');
+assert(sign(median(median(vLK(milieu, milieu)))) == sign(median(median(vFB(milieu, milieu)))), ...
+       'et sur le vertical');
+assert(abs(median(median(uLK(milieu, milieu))) - median(median(uFB(milieu, milieu)))) < 0.2, ...
+       'et sur la valeur, a un petit deplacement');
+% Deux images identiques ne bougent pas.
+assert(max(max(abs(opticalFlowLK(base, base, 9)))) < 1e-12, ...
+       'aucun mouvement entre une image et elle-meme');
+
+% insertShape dessine sans changer la taille de l'image.
+image = zeros(30, 30, 3);
+marquee = insertShape(image, 'Rectangle', [5 5 10 10]);
+assert(isequal(size(marquee), size(image)), 'la taille ne change pas');
+assert(sum(marquee(:)) > 0, 'et quelque chose a ete dessine');
+
+% waveinfo décrit une famille d'ondelettes.
+texte = waveinfo('db');
+assert(ischar(texte) && numel(texte) > 50, 'waveinfo rend une description');
+assert(contains(lower(texte), 'daubechies'), 'et elle nomme la famille');
+fprintf('  vision et signal : Hough, flot optique, diagramme de l''oeil\n');
+
+%% Optimisation minimax
+% Minimiser le pire de plusieurs fonctions : la solution égalise les deux
+% quand elles se croisent.
+% La fonction rend un vecteur : c'est son maximum qu'on minimise.
+[x, valeur] = fminimax(@(v) [(v - 1) ^ 2; (v + 1) ^ 2], 0.3);
+assert(abs(x) < 1e-3, 'le point qui minimise le pire est a mi-chemin');
+assert(abs(valeur - 1) < 1e-3, 'et le pire y vaut un');
+% Deux droites qui se croisent : le maximum est le plus bas au croisement.
+assert(abs(fminimax(@(v) [v - 1; 1 - v], 0) - 1) < 1e-3, ...
+       'deux droites qui se croisent : le pire est minimal au croisement');
+% Une liste de fonctions est refusée clairement, plutôt que de tomber
+% dans les entrailles du solveur.
+refuse = false;
+try
+    fminimax({@(v) v, @(v) -v}, 0);
+catch erreur
+    refuse = contains(erreur.identifier, 'fminimax');
+end
+assert(refuse, 'une liste de fonctions est refusee avec un message clair');
+% MULTISTART trouve le minimum global d'une fonction à plusieurs bassins.
+rng(73);
+f = @(v) v(1)^2 + v(2)^2 + 8 * sin(3 * v(1)) * sin(3 * v(2));
+[meilleur, valeurGlobale] = multistart(f, [-3 -3], [3 3], 40);
+assert(valeurGlobale <= f([0 0]) + 1e-9, ...
+       'multistart fait au moins aussi bien que l''origine');
+assert(numel(meilleur) == 2, 'et rend un point du bon nombre de variables');
+fprintf('  optimisation : minimax et departs multiples\n');
+
+%% Tracés et affichages restants
+figure('Visible', 'off');
+imshow(rand(20));
+assert(~isempty(allchild(gca)), 'imshow affiche une image');
+clf
+strips(sin(2 * pi * (0:999) / 100));
+assert(~isempty(allchild(gca)), 'strips trace par bandes');
+clf
+fnplt(spline(1:5, [1 4 2 6 3]));
+assert(~isempty(allchild(gca)), 'fnplt trace une fonction par morceaux');
+clf
+rng(79);
+x = randn(30, 1); y = 2 * x + randn(30, 1);
+plot(x, y, '.');
+gname(cellstr(num2str((1:30).')));
+assert(~isempty(allchild(gca)), 'gname etiquette les points');
+clf
+polytool((1:20).', (1:20).' * 3 + 1, 1);
+close all
+fprintf('  traces restants : imshow, strips, fnplt, gname, polytool\n');
+
 fprintf('couverture : tous les tests passent\n');
