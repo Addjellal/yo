@@ -1,5 +1,20 @@
 function y = fpdf(x, d1, d2)
 %FPDF Densité de la loi de Fisher.
+%   Y = FPDF(X,V1,V2) rend la densité de la loi de Fisher à V1 et V2
+%   degrés de liberté.
+%
+%   La loi de Fisher est le rapport de deux khi-deux réduits : c'est ce qui
+%   en fait la loi de toutes les comparaisons de variances, donc de
+%   l'analyse de la variance et des tests de significativité globale d'une
+%   régression.
+%
+%   Elle est définie sur les x positifs, très asymétrique, et son inverse
+%   suit une loi de Fisher aux degrés de liberté échangés.
+%
+%   Exemple :
+%      fpdf(1, 10, 10)                 % le mode est proche de un
+%
+%   Voir aussi FCDF, FINV, NCFCDF, CHI2PDF.
     y = zeros(size(x));
     for k = 1:numel(x)
         v = x(k);
