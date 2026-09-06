@@ -1,5 +1,25 @@
 function s = symsimplify(e)
-%SYMSIMPLIFY Simplification des cas triviaux (0, 1, constantes).
+%SYMSIMPLIFY Simplification des cas triviaux.
+%   S = SYMSIMPLIFY(E) réduit ce qui se réduit sans ruse : les constantes
+%   se calculent, l'addition de zéro et la multiplication par un
+%   disparaissent, la multiplication par zéro annule, la puissance zéro
+%   ou un se résout.
+%
+%   Elle ne factorise pas, ne développe pas et ne reconnaît pas les
+%   identités remarquables : la simplification symbolique complète est un
+%   problème difficile, et une simplification partielle honnête vaut mieux
+%   qu'une simplification approximative.
+%
+%   Elle est appliquée récursivement, des feuilles vers la racine : une
+%   simplification en profondeur peut donc en déclencher une au-dessus.
+%
+%   Exemple :
+%      x = sym('x');
+%      symstr(symsimplify(symmul(symnum(1), x)))           % 'x'
+%      symstr(symsimplify(symadd(symnum(2), symnum(3))))   % '5'
+%      symstr(symsimplify(symmul(symnum(0), x)))           % '0'
+%
+%   Voir aussi SYMSTR, SYMSUBS, SIMPLIFY.
     operateur = e{1};
     if strcmp(operateur, 'num') || strcmp(operateur, 'var')
         s = e;
