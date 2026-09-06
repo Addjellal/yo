@@ -1,14 +1,11 @@
 # Les toolboxes
-
 Un dossier par toolbox, sous `toolbox/`. Chaque dossier porte un
 `Contents.m` qui nomme la toolbox MathWorks correspondante et liste ses
 fonctions. Tout est écrit dans le langage MATLAB lui-même : c'est lisible,
 modifiable sans recompiler, et cela met l'interpréteur à l'épreuve.
-
 Le nom du dossier est en français, comme le reste du dépôt ; le nom des
 fonctions est celui de MathWorks, puisque c'est lui qu'un programme
 existant appellera.
-
 | Dossier | Toolbox | Fonctions |
 |---|---|---|
 | `acquisition` | Data Acquisition Toolbox — acquisition simulée. | 5 |
@@ -58,23 +55,19 @@ existant appellera.
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 291 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 292 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
-
 Les fonctions natives — 651, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par
 `outils/genererReference.m`.
-
 ## Comment lire une toolbox
-
 Prenons `automatique/` (Control System Toolbox). Un modèle y est une
 structure : `tf` porte `num`/`den`, `ss` porte `A`/`B`/`C`/`D`, et le champ
 `Ts` vaut 0 pour un modèle continu.
-
 ```matlab
 G = tf(1, [1 2 1]);          % 1/(s+1)^2
 step(G);                     % réponse indicielle, tracée
@@ -82,14 +75,11 @@ step(G);                     % réponse indicielle, tracée
 F = feedback(G, tf(1, 1));   % boucle fermée
 K = place(A, B, [-2 -3]);    % placement de pôles
 ```
-
 Les valeurs rendues sont celles de la théorie : `dcgain(G)` vaut 1,
 `bode(G, 1)` rend 0,5 et -90 degrés, `place` place effectivement les pôles.
 C'est ce que vérifie `tests/scripts/test_toolboxes.m`, qui contrôle au
 moins un résultat exact par toolbox.
-
 ## Ce que couvre chaque module
-
 Chaque `Contents.m` liste ses fonctions avec une ligne de description. Le
 détail — signature, options, exemple — est dans le bloc d'aide de chaque
 fichier, que `help nom` affiche et que la référence reprend.

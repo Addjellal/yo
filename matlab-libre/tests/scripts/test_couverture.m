@@ -365,4 +365,387 @@ assert(nthargout(2, @max, [3 9 4]) == 2, 'la position du maximum');
 assert(nthargout(1, @max, [3 9 4]) == 9, 'ou sa valeur');
 fprintf('  base : dec2base, genvarname, nthargout\n');
 
+%% Statistiques : lois, ajustements, réduction de dimension
+% Une fonction de répartition croît de zéro à un : c'est ce qui la
+% définit, et cela suffit à éprouver les lois non centrales.
+x = linspace(0.01, 40, 400);
+for loi = {@(v) ncx2cdf(v, 3, 2), @(v) ncfcdf(v, 4, 6, 1), ...
+           @(v) nctcdf(v - 20, 8, 1)}
+    F = loi{1}(x);
+    assert(all(diff(F) >= -1e-12), 'une repartition ne decroit jamais');
+    assert(all(F >= -1e-12 & F <= 1 + 1e-12), 'et reste entre zero et un');
+    assert(F(end) > 0.9, 'elle tend vers un');
+end
+% Sans décentrage, la loi non centrale est la loi centrale.
+assert(max(abs(ncx2cdf(x, 3, 0) - chi2cdf(x, 3))) < 1e-6, ...
+       'ncx2cdf a decentrage nul est chi2cdf');
+assert(max(abs(nctcdf(linspace(-4, 4, 50), 8, 0) - tcdf(linspace(-4, 4, 50), 8))) < 1e-6, ...
+       'nctcdf a decentrage nul est tcdf');
+% La loi de Student tend vers la normale quand ses degrés de liberté
+% croissent.
+assert(abs(tcdf(1.96, 1e6) - normcdf(1.96)) < 1e-4, ...
+       'a beaucoup de degres de liberte, Student rejoint la normale');
+assert(abs(tcdf(0, 5) - 0.5) < 1e-12, 'et elle est symetrique');
+
+% Un tirage uniforme discret couvre tout son domaine et rien d'autre.
+rng(11);
+tirage = unidrnd(6, 1, 5000);
+assert(all(tirage >= 1 & tirage <= 6), 'unidrnd tire dans 1..N');
+assert(all(tirage == round(tirage)), 'des entiers');
+assert(numel(unique(tirage)) == 6, 'et couvre les six faces');
+assert(abs(mean(tirage) - 3.5) < 0.15, 'de moyenne (N+1)/2');
+
+% tabulate compte, et la somme des effectifs est le nombre d'observations.
+table_ = tabulate([1 1 2 3 3 3]);
+assert(sum(table_(:, 2)) == 6, 'six observations comptees');
+assert(abs(sum(table_(:, 3)) - 100) < 1e-9, 'les pourcentages somment a cent');
+
+% Un ajustement de loi retrouve les paramètres qui ont servi au tirage.
+rng(13);
+echantillon = 3 + 2 * randn(5000, 1);
+ajuste = fitdist(echantillon, 'Normal');
+assert(abs(ajuste.mu - 3) < 0.1 && abs(ajuste.sigma - 2) < 0.1, ...
+       'fitdist retrouve la moyenne et l''ecart type');
+
+% Un partitionnement en validation croisée couvre tout l'échantillon, une
+% fois et une seule.
+partition = cvpartition(50, 'KFold', 5);
+assert(partition.NumTestSets == 5, 'cinq decoupages');
+assert(partition.NumObservations == 50, 'cinquante observations');
+vus = false(50, 1);
+for k = 1:partition.NumTestSets
+    essai = test(partition, k);
+    assert(sum(essai) == 10, 'chaque pli fait un cinquieme');
+    assert(~any(vus & essai), 'et aucun exemple n''est vu deux fois');
+    vus = vus | essai;
+    assert(sum(training(partition, k)) == 40, 'le reste sert a l''apprentissage');
+    assert(all(xor(essai, training(partition, k))), ...
+           'test et apprentissage se partagent tout, sans recouvrement');
+end
+assert(all(vus), 'tout l''echantillon finit par etre teste');
+assert(isequal(partition.TestSize, 10 * ones(1, 5)), 'TestSize les compte');
+% Le découpage stratifié garde les proportions de chaque classe.
+rare = [false(90, 1); true(10, 1)];
+stratifie = cvpartition([ones(90,1); 2*ones(10,1)], 'KFold', 5);
+for k = 1:5
+    assert(sum(test(stratifie, k) & rare) == 2, ...
+           'la classe rare est repartie egalement entre les blocs');
+end
+% Le hold-out réserve la fraction demandée.
+assert(sum(test(cvpartition(100, 'HoldOut', 0.3))) == 30, ...
+       'HoldOut reserve la fraction demandee');
+
+% Les composantes principales expliquent la variance dans l'ordre.
+rng(17);
+donnees = randn(200, 3) * [3 0 0; 0 1 0; 0 0 0.2];
+[coefficients, latentes] = pcacov(cov(donnees));
+assert(all(diff(latentes) <= 1e-12, 'all'), 'les valeurs propres decroissent');
+assert(abs(sum(latentes) - trace(cov(donnees))) < 1e-9, ...
+       'leur somme est la variance totale');
+assert(max(max(abs(coefficients' * coefficients - eye(3)))) < 1e-12, ...
+       'les axes principaux sont orthonormes');
+[c2, s2, l2] = princomp(donnees);
+assert(size(s2, 2) == 3, 'princomp rend autant de scores que de variables');
+assert(abs(var(s2(:,1)) - l2(1)) < 1e-9, ...
+       'la variance du premier score est la premiere valeur propre');
+
+% Procrustes trouve la transformation qui superpose deux nuages, et
+% l'écart tombe à zéro quand ils se correspondent exactement.
+rng(19);
+X = randn(20, 2);
+theta = 0.4;
+R = [cos(theta) -sin(theta); sin(theta) cos(theta)];
+Y = 2 * X * R + 5;
+[dispersion, Z, transformation] = procrustes(X, Y);
+assert(dispersion < 1e-20, 'deux nuages semblables se superposent exactement');
+% Z est Y ramené sur X : c'est le nuage transformé qu'on compare au
+% premier argument, non au second.
+assert(max(max(abs(Z - X))) < 1e-9, 'Z est Y ramene sur X');
+assert(abs(abs(det(transformation.T)) - 1) < 1e-9, ...
+       'la transformation trouvee est une rotation');
+
+% Le positionnement multidimensionnel reconstruit un nuage à partir de
+% ses seules distances.
+points = [0 0; 3 0; 0 4; 3 4];
+D = pdist2(points, points);
+[Y2, valeurs] = cmdscale(D);
+assert(max(max(abs(pdist2(Y2(:,1:2), Y2(:,1:2)) - D))) < 1e-9, ...
+       'les distances sont reconstruites');
+assert(sum(valeurs > 1e-9) == 2, 'et deux dimensions suffisent');
+
+% La silhouette juge un partitionnement : elle est haute quand les
+% groupes sont nets, basse quand ils se mêlent.
+rng(23);
+nets = [randn(50, 2); randn(50, 2) + 10];
+groupes = [ones(50, 1); 2 * ones(50, 1)];
+melanges = randn(100, 2);
+assert(mean(silhouette(nets, groupes)) > 0.8, 'des groupes nets, une silhouette haute');
+assert(mean(silhouette(melanges, groupes)) < 0.3, 'des groupes melanges, une basse');
+
+% Une régression robuste résiste à un point aberrant, la régression
+% ordinaire non.
+x = (1:30).';
+y = 2 * x + 1;
+y(15) = 500;
+ordinaire = [ones(30,1) x] \ y;
+robuste = robustfit(x, y);
+assert(abs(robuste(2) - 2) < abs(ordinaire(2) - 2) / 3, ...
+       'la regression robuste resiste a l''aberrant');
+assert(abs(robuste(2) - 2) < 0.1, 'et retrouve la pente');
+
+% Les statistiques de régression : le R2 vaut un sur un ajustement exact.
+stats = regstats((1:20).' * 3 + 1, (1:20).', 'linear');
+assert(abs(stats.rsquare - 1) < 1e-12, 'un ajustement exact a un R2 de un');
+
+% Un ajustement non linéaire retrouve les paramètres d'un modèle connu.
+rng(29);
+xs = linspace(0, 5, 60).';
+vrai = [2.5, 0.8];
+ys = vrai(1) * exp(-vrai(2) * xs) + 0.01 * randn(60, 1);
+modele = @(p, v) p(1) * exp(-p(2) * v);
+[p, residus, J] = nlinfit(xs, ys, modele, [1 1]);
+assert(max(abs(p(:).' - vrai)) < 0.05, 'nlinfit retrouve les parametres');
+intervalle = nlparci(p, residus, 'jacobian', J);
+assert(all(intervalle(:,1) <= p(:) & p(:) <= intervalle(:,2)), ...
+       'l''intervalle de confiance contient l''estimation');
+assert(all(intervalle(:,1) <= vrai(:) & vrai(:) <= intervalle(:,2)), ...
+       'et les vraies valeurs');
+
+% L'intervalle de confiance par bootstrap contient la statistique de
+% l'échantillon.
+rng(31);
+donnees = randn(300, 1) + 5;
+bornes = bootci(500, @mean, donnees);
+assert(bornes(1) < mean(donnees) && mean(donnees) < bornes(2), ...
+       'l''intervalle bootstrap encadre la moyenne observee');
+assert(bornes(1) < 5 && 5 < bornes(2), 'et la vraie moyenne');
+
+% Le plus proche voisin classe correctement des groupes séparés.
+rng(37);
+apprentissage = [randn(40, 2); randn(40, 2) + 6];
+etiquettes = [ones(40, 1); 2 * ones(40, 1)];
+modeleKnn = fitcknn(apprentissage, etiquettes, 'NumNeighbors', 3);
+assert(predict(modeleKnn, [0 0]) == 1, 'un point du premier groupe');
+assert(predict(modeleKnn, [6 6]) == 2, 'un point du second');
+assert(mean(predict(modeleKnn, apprentissage) == etiquettes) > 0.95, ...
+       'et l''apprentissage se reclasse');
+
+% Les corrélations canoniques sont entre zéro et un, décroissantes.
+rng(41);
+A = randn(100, 3);
+B = A * randn(3, 2) + 0.3 * randn(100, 2);
+[~, ~, r] = canoncorr(A, B);
+assert(all(r >= -1e-12 & r <= 1 + 1e-12), 'des correlations entre 0 et 1');
+assert(all(diff(r) <= 1e-12), 'rangees par ordre decroissant');
+assert(r(1) > 0.9, 'et la premiere est forte quand B depend de A');
+
+% Le tirage de Wishart rend des matrices symétriques définies positives.
+rng(43);
+W = wishrnd(eye(3), 10);
+assert(max(max(abs(W - W.'))) < 1e-12, 'symetrique');
+assert(all(eig(W) > 0), 'et definie positive');
+
+% gevcdf : la loi des valeurs extrêmes croît de zéro à un.
+G = gevcdf(linspace(-2, 10, 200), 0.2, 1, 0);
+assert(all(diff(G) >= -1e-12) && G(end) > 0.9, ...
+       'la repartition des valeurs extremes croit vers un');
+fprintf('  statistiques : lois, ajustements, reduction, robustesse\n');
+
+%% Réseaux de neurones : chaque couche se décrit et s'enchaîne
+% Une couche construite doit porter son type et son nom, et pouvoir
+% entrer dans un graphe.
+couches = {sigmoidLayer(), softplusLayer(), swishLayer(), geluLayer(), ...
+           clippedReluLayer(6), layerNormalizationLayer(), ...
+           groupNormalizationLayer(2), crossChannelNormalizationLayer(5), ...
+           sequenceInputLayer(4), convolution1dLayer(3, 8), ...
+           averagePooling1dLayer(2), maxPooling1dLayer(2), ...
+           globalAveragePooling1dLayer(), globalAveragePooling2dLayer(), ...
+           globalMaxPooling2dLayer(), transposedConv2dLayer(3, 8), ...
+           concatenationLayer(1, 2), depthConcatenationLayer(2), ...
+           multiplicationLayer(2)};
+for k = 1:numel(couches)
+    assert(isstruct(couches{k}) || isobject(couches{k}), ...
+           'une couche est une structure descriptive');
+    assert(isfield(couches{k}, 'type') && ~isempty(couches{k}.type), ...
+           'et elle porte son type');
+end
+% Les fonctions d'activation gardent la forme et respectent leurs bornes.
+v = linspace(-5, 5, 101);
+assert(all(sigmoid(v) > 0 & sigmoid(v) < 1), 'la sigmoide reste dans ]0,1[');
+assert(abs(sigmoid(0) - 0.5) < 1e-12, 'et vaut un demi en zero');
+% Une couche entre dans un graphe et s'y raccorde.
+lg = layerGraph();
+lg = addLayers(lg, {sequenceInputLayer(4), sigmoidLayer()});
+assert(numel(lg.Layers) == 2, 'deux couches ajoutees');
+lg = connectLayers(lg, lg.Names{1}, lg.Names{2});
+assert(height(lg.Connections) == 1, 'et une connexion');
+fprintf('  apprentissage profond : couches et graphe\n');
+
+%% Finance : obligations, taux, allocations
+% Le prix d'une obligation au pair est cent, et son rendement égale son
+% coupon.
+prix = 100;
+coupon = 0.05;
+rendement = bondyield(prix, coupon, 10, 100);
+assert(abs(rendement - coupon) < 1e-6, ...
+       'une obligation au pair rend son coupon');
+% Une obligation sous le pair rend davantage.
+assert(bondyield(90, coupon, 10, 100) > coupon, ...
+       'sous le pair, le rendement depasse le coupon');
+% La convexité est positive : le prix est convexe en taux.
+assert(bondconvexity(prix, coupon, 10, 100) > 0, 'la convexite est positive');
+% Un facteur d'actualisation décroît avec l'échéance et vaut un à zéro.
+assert(abs(discountfactor(0.05, 0) - 1) < 1e-12, 'a echeance nulle, un');
+assert(discountfactor(0.05, 10) < discountfactor(0.05, 5), ...
+       'plus l''echeance est lointaine, moins on actualise');
+% Le taux à terme se déduit de deux taux au comptant.
+avance = forwardrate(0.03, 1, 0.04, 2);
+assert(avance > 0.04, ...
+       'le taux a terme depasse le comptant quand la courbe monte');
+% La convention 360 ISDA compte trente jours par mois.
+assert(days360isda(datenum(2024,1,1), datenum(2024,2,1)) == 30, ...
+       'un mois vaut trente jours');
+assert(days360isda(datenum(2024,1,1), datenum(2025,1,1)) == 360, ...
+       'et une annee trois cent soixante');
+% Le maximum de perte est négatif ou nul, et nul sur une série croissante.
+assert(max(drawdownSeries(cumsum(ones(50,1)))) < 1e-12, ...
+       'une serie qui ne baisse jamais n''a aucune perte');
+rng(47);
+serie = cumsum(randn(200, 1)) + 100;
+pertes = drawdownSeries(serie);
+assert(all(pertes >= -1e-12), 'les pertes se comptent positivement');
+assert(max(pertes) > 0, 'et une serie bruitee en connait');
+fprintf('  finance : obligations, actualisation, pertes\n');
+
+%% Ondelettes et communications
+% Les filtres biorthogonaux vérifient la condition de reconstruction
+% parfaite : la somme des produits croisés vaut deux à retard nul.
+[Lo_D, Hi_D, Lo_R, Hi_R] = biorfilt(wfilters('bior2.2', 'd'), ...
+                                    wfilters('bior2.2', 'r'));
+assert(~isempty(Lo_D) && numel(Lo_D) == numel(Hi_D), ...
+       'biorfilt rend quatre filtres de meme longueur');
+% Une convolution bidimensionnelle, ou par lignes, ou par colonnes :
+% filtrer les lignes puis les colonnes revient à filtrer par le produit
+% extérieur des deux filtres, et c'est ce qui rend la transformée en
+% ondelettes séparable.
+image = magic(8);
+h = [1 1] / 2;
+lignesPuisColonnes = wconv2('col', wconv2('row', image, h), h);
+ensemble = wconv2('a', image, h(:) * h);
+assert(max(max(abs(lignesPuisColonnes - ensemble))) < 1e-12, ...
+       'lignes puis colonnes vaut le produit exterieur des filtres');
+assert(isequal(size(wconv2('row', image, h)), [8 9]), ...
+       'par lignes, seule la largeur augmente');
+assert(isequal(size(wconv2('col', image, h)), [9 8]), ...
+       'par colonnes, seule la hauteur');
+assert(isequal(size(wconv2('a', image, ones(3), 'same')), [8 8]), ...
+       'la forme « same » garde la taille de l''image');
+% Une moyenne locale ne déplace pas la moyenne globale, au bord près.
+lissee = wconv2('a', image, ones(3) / 9, 'valid');
+assert(abs(mean(lissee(:)) - mean(image(:))) < 1, ...
+       'une moyenne locale ne deplace pas la moyenne globale');
+
+% Le taux d'erreur binaire est nul sans erreur, et un quand tout est
+% inversé.
+bits = randi([0 1], 1, 1000);
+assert(biterr(bits, bits) == 0, 'aucune erreur entre un vecteur et lui-meme');
+assert(biterr(bits, 1 - bits) == 1000, 'et mille quand tout est inverse');
+[nombre, taux] = biterr(bits, [1 - bits(1:100), bits(101:end)]);
+assert(nombre == 100 && abs(taux - 0.1) < 1e-12, 'cent erreurs sur mille');
+% Le taux d'erreur symbole se compte de même.
+symboles = randi([0 3], 1, 500);
+assert(symerr(symboles, symboles) == 0, 'aucune erreur symbole');
+% Le filtre en cosinus surélevé est symétrique et de somme non nulle.
+h = rcosdesign(0.25, 6, 4);
+assert(max(abs(h - fliplr(h))) < 1e-12, 'le cosinus sureleve est symetrique');
+assert(abs(sum(h)) > 0, 'et de gain non nul');
+assert(mod(numel(h), 2) == 1, 'sa longueur est impaire : il a un centre');
+fprintf('  ondelettes et communications : filtres, taux d''erreur\n');
+
+%% Tracés : ils doivent produire quelque chose sans tomber
+% On ne juge pas l'aspect, seulement que la fonction s'exécute et laisse
+% un objet graphique derrière elle.
+figure('Visible', 'off');
+[X, Y] = meshgrid(linspace(-2, 2, 20));
+fsurf(@(a, b) a .^ 2 + b .^ 2, [-2 2 -2 2]);
+assert(~isempty(allchild(gca)), 'fsurf laisse un objet sur les axes');
+clf
+fill3([0 1 1], [0 0 1], [0 0 1], 'r');
+assert(~isempty(allchild(gca)), 'fill3 aussi');
+clf
+stem3(X(1:5,1:5), Y(1:5,1:5), X(1:5,1:5) .^ 2);
+assert(~isempty(allchild(gca)), 'stem3 aussi');
+clf
+scatter3(randn(20,1), randn(20,1), randn(20,1));
+assert(~isempty(allchild(gca)), 'scatter3 aussi');
+clf
+rng(53);
+histfit(randn(200, 1));
+assert(~isempty(allchild(gca)), 'histfit aussi');
+clf
+normplot(randn(100, 1));
+assert(~isempty(allchild(gca)), 'normplot aussi');
+clf
+probplot(randn(100, 1));
+assert(~isempty(allchild(gca)), 'probplot aussi');
+clf
+zplane([1 -0.5], [1 -0.9]);
+assert(~isempty(allchild(gca)), 'zplane aussi');
+clf
+pzplot(tf(1, [1 2 1]));
+assert(~isempty(allchild(gca)), 'pzplot aussi');
+clf
+rlocusplot(tf(1, [1 2 1]));
+assert(~isempty(allchild(gca)), 'rlocusplot aussi');
+clf
+refline(2, 1);
+assert(~isempty(allchild(gca)), 'refline aussi');
+clf
+plot(1:10, (1:10).^2); refcurve([1 0 0]);
+assert(~isempty(allchild(gca)), 'refcurve aussi');
+clf
+scatterplot(exp(1i * 2 * pi * rand(100, 1)));
+close all
+fprintf('  traces : fsurf, fill3, stem3, scatter3 et les autres\n');
+
+%% Entrée-sortie et divers
+% Écrire une image puis la relire rend la même image.
+fichierImage = [tempname() '.pgm'];
+originale = uint8(reshape(mod(0:99, 256), 10, 10));
+imwrite(originale, fichierImage);
+relue = imread(fichierImage);
+assert(isequal(size(relue), size(originale)), 'la taille est rendue');
+assert(isequal(relue, originale), 'et les valeurs aussi');
+delete(fichierImage);
+
+% celldisp affiche sans rien rendre ni tomber.
+sortie = evalc('celldisp({1, ''deux'', [3 4]})');
+assert(contains(sortie, 'deux'), 'celldisp montre le contenu');
+
+% filemarker rend le séparateur de sous-fonction.
+assert(ischar(filemarker()) && ~isempty(filemarker()), ...
+       'filemarker rend un caractere');
+
+% numlock rend l'état d'une touche : une chaîne, quoi qu'il arrive.
+assert(ischar(numlock()) || isstring(numlock()), 'numlock rend un etat');
+
+% statset rend une structure d'options dont les champs se règlent.
+options = statset('MaxIter', 250, 'TolFun', 1e-8);
+assert(options.MaxIter == 250 && options.TolFun == 1e-8, ...
+       'statset retient ce qu''on lui donne');
+assert(isstruct(statset()), 'et rend une structure meme sans argument');
+
+% calquarters construit et relit un nombre de trimestres.
+assert(calquarters(calquarters(3)) == 3, 'calquarters boucle');
+assert(iscalendarduration(calquarters(3)), 'et rend une duree de calendrier');
+assert(isduration(hours(3)) && ~isduration(calquarters(3)), ...
+       'une duree exacte n''est pas une duree de calendrier');
+
+% La matrice de retards empile les versions décalées d'une série.
+retards = lagmatrix((1:6).', [1 2]);
+assert(isequal(size(retards), [6 2]), 'une colonne par retard');
+assert(isnan(retards(1, 1)), 'le premier retard manque au premier instant');
+assert(retards(3, 1) == 2 && retards(3, 2) == 1, 'et les valeurs sont decalees');
+fprintf('  entree-sortie et divers : images, options, retards\n');
+
 fprintf('couverture : tous les tests passent\n');

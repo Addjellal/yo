@@ -298,35 +298,86 @@ FONCTION(fnStrrep) {
 
 FONCTION(fnStrsplit) {
     INUTILISE
-    exigerArguments(args, 1, 2, "strsplit");
+    exigerArguments(args, 1, 6, "strsplit");
     std::string texte = args[0].versTexte();
     std::vector<std::string> separateurs;
+    // « CollapseDelimiters » vaut vrai par défaut, comme dans MATLAB :
+    // deux séparateurs qui se suivent n'engendrent pas de case vide au
+    // milieu. Sans cela, découper un texte sur les espaces rendrait une
+    // case vide chaque fois que deux espaces se suivent.
+    bool regrouper = true;
+    std::size_t k = 1;
+    if (args.size() > 1 && args[1].classe != Classe::Caractere &&
+        args[1].classe != Classe::Chaine && args[1].classe != Classe::Cellule) {
+        erreur("MATLAB:strsplit:InvalidDelimiter",
+               "The delimiter must be a character vector, a string, or a cell array.");
+    }
+    bool separateurDonne = false;
     if (args.size() > 1) {
-        if (args[1].classe == Classe::Cellule)
-            for (const auto& c : args[1].cellules) separateurs.push_back(c.versTexte());
-        else separateurs.push_back(args[1].versTexte());
-    } else {
-        separateurs.push_back(" ");
+        std::string premier = args[1].classe == Classe::Cellule
+                                  ? std::string()
+                                  : args[1].versTexte();
+        bool estOption = args.size() > 2 &&
+                         (premier == "CollapseDelimiters" || premier == "Delimiter");
+        if (!estOption) {
+            separateurDonne = true;
+            if (args[1].classe == Classe::Cellule)
+                for (const auto& c : args[1].cellules) separateurs.push_back(c.versTexte());
+            else separateurs.push_back(premier);
+            k = 2;
+        }
+    }
+    for (; k + 1 < args.size(); k += 2) {
+        std::string nom = args[k].versTexte();
+        if (nom == "CollapseDelimiters") regrouper = args[k + 1].vrai();
+        else if (nom == "Delimiter") {
+            separateurs.clear();
+            separateurDonne = true;
+            if (args[k + 1].classe == Classe::Cellule)
+                for (const auto& c : args[k + 1].cellules)
+                    separateurs.push_back(c.versTexte());
+            else separateurs.push_back(args[k + 1].versTexte());
+        }
+    }
+    if (!separateurDonne) {
+        // Le séparateur par défaut est l'espace au sens large : espace,
+        // tabulation, saut de ligne, retour chariot, saut de page,
+        // tabulation verticale.
+        for (char c : std::string(" \t\n\r\f\v")) separateurs.push_back(std::string(1, c));
     }
     std::vector<std::string> morceaux;
     std::string courant;
-    std::size_t k = 0;
-    while (k < texte.size()) {
-        bool coupe = false;
-        for (const auto& sep : separateurs) {
-            if (!sep.empty() && texte.compare(k, sep.size(), sep) == 0) {
-                morceaux.push_back(courant);
-                courant.clear();
-                k += sep.size();
-                coupe = true;
+    std::size_t i = 0;
+    while (i < texte.size()) {
+        std::size_t taille = 0;
+        for (const auto& sep : separateurs)
+            if (!sep.empty() && texte.compare(i, sep.size(), sep) == 0) {
+                taille = sep.size();
                 break;
             }
+        if (taille == 0) {
+            courant += texte[i++];
+            continue;
         }
-        if (!coupe) courant += texte[k++];
+        morceaux.push_back(courant);
+        courant.clear();
+        i += taille;
+        if (!regrouper) continue;
+        // On avale les séparateurs qui suivent immédiatement.
+        bool encore = true;
+        while (encore && i < texte.size()) {
+            encore = false;
+            for (const auto& sep : separateurs)
+                if (!sep.empty() && texte.compare(i, sep.size(), sep) == 0) {
+                    i += sep.size();
+                    encore = true;
+                    break;
+                }
+        }
     }
     morceaux.push_back(courant);
     Valeur r = Valeur::celluleDims({1, (int)morceaux.size()});
-    for (std::size_t i = 0; i < morceaux.size(); ++i) r.cellules[i] = Valeur::texte(morceaux[i]);
+    for (std::size_t j = 0; j < morceaux.size(); ++j) r.cellules[j] = Valeur::texte(morceaux[j]);
     return {r};
 }
 
