@@ -1,6 +1,9 @@
-% Mapping Toolbox — géodésie et cartographie.
+% Mapping Toolbox — géodésie et projections.
 %
-%   distanceGC   - Distance orthodromique en degrés ou en mètres
-%   reckon       - Point atteint depuis un cap et une distance
-%   deg2utm      - Projection UTM
-%   areaint      - Aire d'un polygone sphérique
+% Sur la sphère
+%   distanceGC  - Distance orthodromique et cap initial
+%   reckon      - Point atteint en suivant un cap sur une distance
+%   areaint     - Aire d'un polygone, en projection équivalente
+%
+% Projections
+%   deg2utm     - Transverse universelle de Mercator, par fuseau

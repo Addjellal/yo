@@ -1,6 +1,11 @@
-% Automated Driving Toolbox — aide à la conduite.
+% Automated Driving Toolbox — perception de voie et suivi de trajectoire.
 %
-%   timeToCollision - Temps avant collision
-%   purePursuit     - Loi de poursuite pure
-%   smoothPath      - Lissage d'une trajectoire
-%   laneOffset      - Écart latéral à la voie
+% Voie
+%   laneOffset      - Écart signé au centre de la voie
+%
+% Sécurité
+%   timeToCollision - Temps avant collision, non distance
+%
+% Trajectoire
+%   smoothPath      - Arrondit les angles d'un chemin de grille
+%   purePursuit     - Suivi de chemin par poursuite pure

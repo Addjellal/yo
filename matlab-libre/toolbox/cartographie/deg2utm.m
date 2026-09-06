@@ -1,5 +1,26 @@
 function [x, y, fuseau] = deg2utm(latitude, longitude)
 %DEG2UTM Projection transverse universelle de Mercator (WGS84).
+%   [X,Y,FUSEAU] = DEG2UTM(LAT,LON) projette des coordonnées géodésiques,
+%   en degrés, vers des mètres est et nord dans le fuseau UTM qui contient
+%   le point.
+%
+%   L'UTM découpe le monde en soixante fuseaux de six degrés de longitude,
+%   chacun avec sa propre projection. C'est ce qui limite la déformation à
+%   moins d'un pour mille — mais deux points de fuseaux différents ne se
+%   comparent pas : leurs coordonnées ne sont pas dans le même repère.
+%
+%   La projection est conforme : elle conserve les angles, donc les
+%   formes locales, au prix des aires. C'est le choix qui convient à la
+%   navigation et au cadastre, non à une carte de densités.
+%
+%   L'ordonnée est comptée depuis l'équateur ; l'abscisse depuis le
+%   méridien central du fuseau, décalée de 500 km pour rester positive.
+%
+%   Exemple :
+%      [x, y, fuseau] = deg2utm(48.8566, 2.3522);   % Paris, fuseau 31
+%      fuseau
+%
+%   Voir aussi DISTANCEGC, RECKON, AREAINT.
     a = 6378137.0;
     f = 1/298.257223563;
     e2 = f*(2-f);

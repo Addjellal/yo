@@ -1,10 +1,17 @@
-% Text Analytics Toolbox — analyse de textes.
+% Text Analytics Toolbox — analyse de texte.
 %
-%   tokenizedDocument - Découpe un texte en mots
-%   removeStopWords   - Retire les mots vides
-%   normalizeWords    - Racinisation simple
-%   bagOfWords        - Sac de mots (matrice d'effectifs)
-%   tfidf             - Pondération TF-IDF
-%   splitSentences    - Découpe en phrases
-%   wordFrequency     - Fréquences triées
-%   editDistance      - Distance de Levenshtein
+% Découpage
+%   tokenizedDocument - Texte vers mots, en minuscules
+%   splitSentences    - Texte vers phrases
+%
+% Nettoyage
+%   removeStopWords   - Retire les mots qui ne distinguent rien
+%   normalizeWords    - Racinisation par suffixes
+%
+% Représentation
+%   bagOfWords        - Matrice d'effectifs mot par document
+%   tfidf             - Pondération par la spécificité au corpus
+%   wordFrequency     - Fréquences, du plus fréquent au moins
+%
+% Comparaison
+%   editDistance      - Distance de Levenshtein entre deux chaînes

@@ -2,6 +2,31 @@ function [score, alignement] = nwalign(a, b, correspondance, difference, trou)
 %NWALIGN Alignement global par l'algorithme de Needleman-Wunsch.
 %   [SCORE,ALIGNEMENT] = NWALIGN(A,B) rend le score optimal et les deux
 %   séquences alignées, empilées sur deux lignes.
+%
+%   [SCORE,ALIGNEMENT] = NWALIGN(A,B,CORRESPONDANCE,DIFFERENCE,TROU)
+%   impose les trois coûts : le gain d'une correspondance, la pénalité
+%   d'une différence, celle d'un trou.
+%
+%   Needleman-Wunsch est un alignement *global* : il aligne les séquences
+%   sur toute leur longueur, quitte à ouvrir des trous aux extrémités.
+%   C'est ce qu'on veut pour comparer deux gènes homologues de longueur
+%   voisine, et ce qu'on ne veut pas pour chercher un motif court dans une
+%   longue séquence — Smith-Waterman est fait pour cela.
+%
+%   La programmation dynamique le rend exact : contrairement à une
+%   heuristique, il trouve l'alignement optimal, pas seulement un bon.
+%   Le prix en est un coût en O(n m), en temps comme en mémoire.
+%
+%   Contrairement à la distance de Hamming, l'alignement sait traiter les
+%   insertions et les suppressions : deux séquences identiques à une
+%   insertion près lui paraissent proches, alors que SEQDIST les dit
+%   totalement différentes.
+%
+%   Exemple :
+%      [score, alignement] = nwalign('ACGTACGT', 'ACGACGT');
+%      disp(alignement)                % le trou apparait
+%
+%   Voir aussi SWALIGN, SEQDIST, EDITDISTANCE.
     if nargin < 3, correspondance = 1; end
     if nargin < 4, difference = -1; end
     if nargin < 5, trou = -2; end
