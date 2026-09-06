@@ -1,5 +1,23 @@
 function [meilleur, valeur] = particleswarm(fonction, nVariables, bas, haut, nParticules, iterations)
 %PARTICLESWARM Optimisation par essaim particulaire.
+%   [X,VALEUR] = PARTICLESWARM(F,NVARIABLES,BAS,HAUT,NPARTICULES,ITERATIONS)
+%   fait évoluer un essaim de points, chacun attiré à la fois par son
+%   meilleur souvenir et par le meilleur de l'essaim.
+%
+%   Le compromis entre exploration et exploitation tient dans ces deux
+%   attractions : la première maintient la diversité, la seconde
+%   concentre l'essaim. Un essaim trop attiré par son meilleur converge
+%   vite et mal.
+%
+%   La méthode ne demande ni dérivée ni continuité, ce qui la rend
+%   applicable là où les méthodes de descente ne s'appliquent pas — au
+%   prix d'un nombre d'évaluations bien plus grand.
+%
+%   Exemple :
+%      f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);   % Rastrigin
+%      [x, v] = particleswarm(f, 5, -5*ones(1,5), 5*ones(1,5), 40, 200);
+%
+%   Voir aussi GA, SIMULANNEALBND, MULTISTART.
     if nargin < 5, nParticules = 30; end
     if nargin < 6, iterations = 100; end
     bas = bas(:).';

@@ -2,6 +2,30 @@ function [meilleur, valeur, drapeau, sortie] = ga(fonction, nVariables, A, b, ..
                                                  Aeq, beq, bas, haut, ...
                                                  nonlineaires, options)
 %GA Algorithme génétique à codage réel.
+%   [X,VALEUR,DRAPEAU,SORTIE] = GA(F,NVARIABLES,A,B,AEQ,BEQ,BAS,HAUT,
+%   NONLINEAIRES,OPTIONS) minimise F sur une population qu'il fait
+%   évoluer : sélection, croisement, mutation.
+%
+%   Les contraintes linéaires A x <= b et Aeq x = beq, les bornes et les
+%   contraintes non linéaires sont traitées par pénalisation : un individu
+%   qui les viole reçoit une valeur dégradée proportionnelle à sa
+%   violation. C'est ce qui permet de les respecter sans projeter, mais
+%   cela n'interdit pas formellement de les franchir.
+%
+%   L'algorithme n'exige ni dérivée ni continuité, et supporte les
+%   optima multiples. Il est en revanche lent, stochastique — deux
+%   exécutions ne donnent pas le même résultat — et sans garantie
+%   d'optimalité.
+%
+%   Sur un problème lisse et sans contrainte, FMINCON ou FMINUNC font
+%   bien mieux et bien plus vite : l'algorithme génétique est un dernier
+%   recours, non un premier choix.
+%
+%   Exemple :
+%      f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);
+%      [x, v] = ga(f, 3, [], [], [], [], -5*ones(1,3), 5*ones(1,3));
+%
+%   Voir aussi PARTICLESWARM, SIMULANNEALBND, MULTISTART, FMINCON.
 %   [X,F] = GA(FONCTION,N) minimise FONCTION de N variables.
 %   [X,F] = GA(FONCTION,N,A,B) impose A X <= B.
 %   [X,F] = GA(FONCTION,N,A,B,AEQ,BEQ) ajoute AEQ X = BEQ.

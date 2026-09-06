@@ -1,5 +1,22 @@
 function [y, fs] = audioread(nomFichier)
 %AUDIOREAD Lit un fichier WAV PCM 16 bits monophonique.
+%   [Y,FS] = AUDIOREAD(FICHIER) rend les échantillons, ramenés entre -1 et
+%   1, et la fréquence d'échantillonnage.
+%
+%   Seul le WAV PCM 16 bits mono est lu : ni compression, ni stéréo, ni
+%   flottant. Les formats compressés — MP3, AAC, Ogg — demandent un codec,
+%   et les intégrer signifierait une dépendance externe.
+%
+%   La normalisation entre -1 et 1 est la convention de MATLAB : elle rend
+%   le traitement indépendant du nombre de bits, et c'est AUDIOWRITE qui
+%   refait la conversion en sens inverse.
+%
+%   Exemple :
+%      audiowrite('essai.wav', sin(2*pi*440*(0:8000)/8000), 8000);
+%      [y, fs] = audioread('essai.wav');
+%      max(abs(y))                     % proche de 1
+%
+%   Voir aussi AUDIOWRITE, DBFS, SPECTRALCENTROID.
     fid = fopen(nomFichier, 'r');
     if fid < 0
         error('audio:audioread:cannotOpen', 'Cannot open ''%s''.', nomFichier);

@@ -1,5 +1,22 @@
 function audiowrite(nomFichier, y, fs)
 %AUDIOWRITE Écrit un fichier WAV PCM 16 bits monophonique.
+%   AUDIOWRITE(FICHIER,Y,FS) écrit les échantillons Y, supposés entre -1
+%   et 1, à la fréquence FS.
+%
+%   Ce qui sort de l'intervalle est écrêté, non mis à l'échelle : un signal
+%   qui dépasse est donc distordu, et il vaut mieux le normaliser
+%   soi-même avant d'écrire. L'écrêtage est la façon dont un convertisseur
+%   réel se comporte, et le silence ferait pire.
+%
+%   La quantification sur seize bits introduit un bruit d'environ -96 dBFS :
+%   l'aller-retour par AUDIOREAD n'est donc pas exact, mais fidèle à
+%   1/32768 près.
+%
+%   Exemple :
+%      audiowrite('essai.wav', 0.5 * sin(2*pi*440*(0:8000)/8000), 8000);
+%      [y, fs] = audioread('essai.wav');
+%
+%   Voir aussi AUDIOREAD, DBFS.
     y = y(:);
     y = max(min(y, 1), -1);
     n = numel(y);
