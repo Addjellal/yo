@@ -1,13 +1,15 @@
-% Database Toolbox — stockage tabulaire.
+% Database Toolbox — tables, requêtes, persistance.
 %
-% Le magasin est un fichier CSV ; les requêtes portent sur des structures
-% en mémoire. C'est assez pour les usages courants d'un script : lire,
-% filtrer, agréger, écrire.
+% Structure
+%   dbTable     - Crée une table, colonnes nommées
+%   dbInsert    - Ajoute une ligne
 %
-%   dbTable      - Crée une table
-%   dbInsert     - Ajoute une ligne
-%   dbSelect     - Sélection avec prédicat
-%   dbUpdate     - Mise à jour conditionnelle
-%   dbDelete     - Suppression conditionnelle
-%   dbSave, dbLoad - Persistance en CSV
-%   dbGroupSum   - Agrégation par colonne
+% Requêtes
+%   dbSelect    - Les lignes qui vérifient un prédicat
+%   dbUpdate    - Écrit une colonne, pour les lignes retenues
+%   dbDelete    - Retire les lignes retenues
+%   dbGroupSum  - Somme d'une colonne, groupée par une autre
+%
+% Persistance
+%   dbSave      - Écrit la table en CSV
+%   dbLoad      - La relit, en rétablissant les types

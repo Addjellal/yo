@@ -1,5 +1,18 @@
 function dbSave(t, nomFichier)
 %DBSAVE Écrit la table dans un fichier CSV.
+%   DBSAVE(T,FICHIER) écrit la table : une première ligne d'en-tête avec
+%   les noms de colonnes, puis une ligne par enregistrement, les champs
+%   séparés par des virgules.
+%
+%   Le CSV est le seul format qu'à peu près tout sait lire. Il ne porte
+%   pas les types : c'est DBLOAD qui les rétablit, en reconnaissant ce qui
+%   se convertit en nombre.
+%
+%   Exemple :
+%      dbSave(t, 'personnel.csv');
+%      relue = dbLoad('personnel.csv');
+%
+%   Voir aussi DBLOAD, DBTABLE.
     fid = fopen(nomFichier, 'w');
     for k = 1:numel(t.colonnes)
         if k > 1

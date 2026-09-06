@@ -1,9 +1,9 @@
-% Instrument Control Toolbox — pilotage d'instruments (simulé).
+% Instrument Control Toolbox — pilotage d'instruments programmables.
 %
-%   visadev, fopen, fclose - Connexion à un instrument
-%   writeline, readline    - Dialogue SCPI
-%   query                  - Écriture puis lecture
+% Liaison
+%   visadev    - Ouvre une liaison vers un instrument, par adresse VISA
 %
-% L'instrument simulé répond aux commandes SCPI usuelles (*IDN?,
-% MEAS:VOLT?, MEAS:CURR?), ce qui suffit à mettre au point un script de
-% banc avant de le brancher sur le vrai matériel.
+% Échange
+%   writeline  - Envoie une commande SCPI
+%   readline   - Lit la réponse, sous forme de texte
+%   query      - Envoie et lit d'un coup : la forme à préférer

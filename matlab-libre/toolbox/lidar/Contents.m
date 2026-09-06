@@ -1,6 +1,11 @@
-% Lidar Toolbox — nuages de points.
+% Lidar Toolbox — nuages de points télémétriques.
 %
-%   pointCloudFromRanges - Nuage à partir de distances et d'angles
-%   voxelDownsample      - Sous-échantillonnage par voxels
-%   fitPlaneRansac       - Plan dominant par RANSAC
-%   icpRegister          - Recalage par ICP (2-D)
+% Acquisition
+%   pointCloudFromRanges - Du balayage polaire au nuage cartésien
+%
+% Préparation
+%   voxelDownsample      - Un point par cellule, au barycentre
+%
+% Modèles et recalage
+%   fitPlaneRansac       - Droite ou plan dominant, malgré les parasites
+%   icpRegister          - Recalage rigide de deux relevés
