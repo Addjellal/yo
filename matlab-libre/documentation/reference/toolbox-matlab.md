@@ -546,6 +546,27 @@ CLIM Bornes de l'échelle de couleurs.
   Voir aussi CAXIS, COLORMAP, COLORBAR, IMAGESC.
 ```
 
+## `colamd`
+
+```
+COLAMD Renumérotation des colonnes par degré minimal.
+  P = COLAMD(A) rend une permutation des colonnes qui réduit le
+  remplissage de la factorisation LU de A(:,P), sans supposer A
+  symétrique ni carrée.
+
+  L'ordre est celui du degré minimal appliqué au graphe de A'*A, dont la
+  structure est exactement celle qui gouverne le remplissage de la
+  factorisation par colonnes. On ne forme pas A'*A pour ses valeurs,
+  seulement pour son motif.
+
+  Exemple :
+     A = [1 1 1; 1 0 0; 1 0 0; 0 1 0];
+     p = colamd(A);
+     isequal(sort(p), 1:3)                    % 1 : c'est une permutation
+
+  Voir aussi SYMAMD, SYMRCM, LU, QR.
+```
+
 ## `comet`
 
 ```
@@ -2034,6 +2055,74 @@ HUMPS Fonction d'essai à deux pics, utilisée par les démonstrations.
   Voir aussi PEAKS.
 ```
 
+## `ichol`
+
+```
+ICHOL Factorisation de Cholesky incomplète.
+  L = ICHOL(A) rend une matrice triangulaire inférieure telle que L*L'
+  approche A, en ne remplissant que les positions déjà non nulles de A.
+  A doit être symétrique définie positive.
+  L = ICHOL(A,OPTIONS) accepte les champs 'type' ('nofill' seul est
+  traité), 'diagcomp' et 'shape'.
+
+  Le mot « incomplète » désigne ce qu'on abandonne : la factorisation
+  exacte crée des coefficients là où A n'en avait pas — le remplissage —
+  et sur une grande matrice creuse ce remplissage est ce qui coûte tout.
+  On l'interdit, et la factorisation n'est plus exacte : L*L' ne vaut
+  plus A, seulement quelque chose de proche.
+
+  Cette approximation ne sert pas à résoudre, elle sert à
+  préconditionner : PCG appliqué à A avec le préconditionneur L*L'
+  converge en bien moins d'itérations, parce que le conditionnement
+  de L\A/L' est bien meilleur que celui de A.
+
+  L'option 'diagcomp' ajoute ALPHA*DIAG(A) avant de factoriser. Elle
+  sert quand la factorisation échoue sur une racine négative : décaler
+  la diagonale rend la matrice plus dominante, donc factorisable.
+
+  Exemple :
+     n = 30;
+     A = full(spdiags([-ones(n,1), 2*ones(n,1), -ones(n,1)], -1:1, n, n));
+     L = ichol(A);
+     istril(L)                                % 1 : elle est triangulaire
+     b = ones(n, 1);
+     [~, ~, ~, sans] = pcg(A, b, 1e-10, 200);
+     [~, ~, ~, avec] = pcg(A, b, 1e-10, 200, L * L');
+     avec <= sans                             % le preconditionneur aide
+
+  Voir aussi ILU, CHOL, PCG, MLDIVIDE.
+```
+
+## `ilu`
+
+```
+ILU Factorisation LU incomplète.
+  [L,U] = ILU(A) rend deux matrices triangulaires dont le produit
+  approche A, en ne remplissant que les positions déjà non nulles de A.
+  [L,U,P] = ILU(A) rend en outre la permutation, ici l'identité :
+  l'option 'nofill' n'en emploie pas.
+  [...] = ILU(A,OPTIONS) accepte le champ 'type' ('nofill').
+
+  C'est le pendant non symétrique d'ICHOL, et il sert à la même chose :
+  préconditionner une méthode de Krylov. Sans remplissage, L et U ont
+  exactement le motif de A, donc le même coût mémoire — et c'est cela
+  qu'on achète en renonçant à l'exactitude.
+
+  La diagonale de L vaut un, celle de U porte les pivots. Un pivot nul
+  arrête la factorisation : sans permutation, rien ne peut le sauver, et
+  c'est la limite de la variante sans remplissage.
+
+  Exemple :
+     n = 20;
+     A = full(spdiags([-ones(n,1), 4*ones(n,1), -ones(n,1)], -1:1, n, n));
+     [L, U] = ilu(A);
+     istril(L) && istriu(U)                   % 1
+     max(max(abs(diag(L) - 1))) < 1e-12       % la diagonale de L vaut un
+     norm(A - L * U) < norm(A)                % l'approximation est proche
+
+  Voir aussi ICHOL, LU, GMRES, BICG, PCG.
+```
+
 ## `importdata`
 
 ```
@@ -2758,6 +2847,23 @@ MATLIBRE_COULEUR_SECTEUR La k-ième couleur de la palette des secteurs.
   dépendre de la palette des courbes, qui n'a que sept tons.
 ```
 
+## `matlibre_degre_minimal`
+
+```
+MATLIBRE_DEGRE_MINIMAL Ordre d'élimination par degré minimal exact.
+  À chaque pas on élimine le nœud de plus petit degré et l'on relie
+  entre eux ses voisins : c'est exactement ce que fait un pas de
+  factorisation, et le graphe suffit à prévoir le remplissage.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     p = matlibre_degre_minimal(ones(3));
+     isequal(sort(p), 1:3)          % 1
+
+  Voir aussi SYMAMD, COLAMD, SYMRCM.
+```
+
 ## `matlibre_distance_inverse`
 
 ```
@@ -3134,6 +3240,22 @@ MATLIBRE_KRYLOV_PRODUIT Le produit A*v, que A soit une matrice ou une poignée.
      matlibre_krylov_produit(eye(2), [1; 2])         % [1; 2]
 
   Voir aussi PCG, BICG, GMRES.
+```
+
+## `matlibre_largeur_bande`
+
+```
+MATLIBRE_LARGEUR_BANDE Distance maximale d'un coefficient non nul à la diagonale.
+  C'est la quantité que SYMRCM cherche à réduire : la factorisation
+  d'une matrice de bande B coûte O(N*B^2) et n'en sort jamais.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_largeur_bande(eye(4))       % 0
+     matlibre_largeur_bande(ones(4))      % 3
+
+  Voir aussi SYMRCM, SYMAMD, BANDWIDTH.
 ```
 
 ## `matlibre_noyau_plaque`
@@ -5412,6 +5534,68 @@ SWAPBYTES Inverse l'ordre des octets.
      swapbytes(uint16(1))    % 256
 
   Voir aussi TYPECAST, CAST, CLASS.
+```
+
+## `symamd`
+
+```
+SYMAMD Renumérotation par degré minimal, matrice symétrique.
+  P = SYMAMD(A) rend une permutation qui réduit le remplissage de la
+  factorisation de Cholesky de A(P,P).
+
+  L'algorithme élimine à chaque pas le nœud de plus petit degré dans le
+  graphe d'élimination, puis relie entre eux tous ses voisins — c'est ce
+  que fait la factorisation, et simuler le graphe suffit à prévoir le
+  remplissage sans calculer la moindre valeur.
+
+  MATLAB emploie ici l'approximation d'Amestoy, Davis et Duff, qui
+  majore le degré au lieu de le recalculer ; MatLibre calcule le degré
+  exact. Le résultat est du même ordre et le coût plus élevé, ce qui
+  compte sur une très grande matrice et pas sur une petite.
+
+  Réduire le remplissage n'est pas la même chose que réduire la bande :
+  SYMRCM range les coefficients près de la diagonale, SYMAMD ne s'occupe
+  que de ce que la factorisation va créer. Sur une matrice issue d'un
+  maillage, le degré minimal l'emporte largement.
+
+  Exemple :
+     A = [1 1 1 1; 1 1 0 0; 1 0 1 0; 1 0 0 1];
+     p = symamd(A);
+     isequal(sort(p), 1:4)                    % 1 : c'est une permutation
+     find(p == 1) > 1                         % le noeud le plus lie attend
+
+  Voir aussi SYMRCM, COLAMD, CHOL.
+```
+
+## `symrcm`
+
+```
+SYMRCM Renumérotation de Cuthill-McKee inverse.
+  P = SYMRCM(A) rend une permutation qui, appliquée à A, en réduit la
+  largeur de bande : A(P,P) a ses coefficients non nuls plus près de la
+  diagonale.
+
+  L'algorithme parcourt le graphe d'adjacence en largeur depuis un nœud
+  périphérique, en visitant les voisins par degré croissant, puis
+  renverse l'ordre obtenu. Le renversement n'est pas un ornement : il
+  déplace les nœuds de fort degré vers la fin, ce qui réduit encore le
+  remplissage de la factorisation.
+
+  Une bande étroite fait deux choses : la factorisation de Cholesky ne
+  remplit que dans la bande, donc coûte O(n*b^2) au lieu de O(n^3), et
+  le stockage suit. C'est la raison d'être de la renumérotation.
+
+  Le nœud de départ est choisi de plus petit degré : c'est
+  l'heuristique usuelle pour approcher un nœud périphérique sans
+  calculer l'excentricité de tous.
+
+  Exemple :
+     A = [1 0 1 0; 0 1 0 1; 1 0 1 0; 0 1 0 1];
+     p = symrcm(A);
+     isequal(sort(p), 1:4)                    % 1 : c'est une permutation
+     matlibre_largeur_bande(A(p, p)) <= matlibre_largeur_bande(A)
+
+  Voir aussi SYMAMD, COLAMD, CHOL, LU.
 ```
 
 ## `tensorprod`

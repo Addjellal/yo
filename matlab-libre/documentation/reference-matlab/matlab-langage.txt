@@ -67,3 +67,4 @@ mustBeInteger mustBeLessThan mustBeLessThanOrEqual mustBeMember mustBeNegative
 mustBeNonNan mustBeNonempty mustBeNonnegative mustBeNonpositive mustBeNonzero
 mustBeNonzeroLengthText mustBeNumeric mustBeNumericOrLogical mustBePositive
 mustBeReal mustBeScalarOrEmpty mustBeText mustBeTextScalar mustBeVector
+colamd ichol ilu symamd symrcm

@@ -459,4 +459,60 @@ assert(isequal(valeurs(:, :, 2)', [5 2]), 'les valeurs sortent decroissantes');
 [Up, Sp, Vp] = pagesvd(P3);
 assert(max(max(max(abs(pagemtimes(pagemtimes(Up, Sp), pagetranspose(Vp)) - P3)))) < 1e-12);
 
+%% ------------------------- factorisations incompletes et renumerotations
+% « Incomplete » designe ce qu'on abandonne : le remplissage. L et L' ne
+% valent plus A, mais le motif ne s'etend pas, et c'est ce qu'on achete.
+n = 30;
+T = full(spdiags([-ones(n, 1), 2 * ones(n, 1), -ones(n, 1)], -1:1, n, n));
+Li = ichol(T);
+assert(istril(Li), 'la factorisation rend une triangulaire inferieure');
+assert(nnz(Li) <= nnz(tril(T)), 'et ne remplit rien de neuf');
+% Sur une tridiagonale, il n'y a rien a remplir : la factorisation
+% incomplete est alors exacte, et le preconditionneur parfait.
+assert(norm(T - Li * Li') < 1e-10);
+bb = ones(n, 1);
+[~, ~, ~, sansPrecond] = pcg(T, bb, 1e-10, 200);
+[~, ~, ~, avecPrecond] = pcg(T, bb, 1e-10, 200, Li * Li');
+assert(avecPrecond <= sansPrecond, 'le preconditionneur ne peut pas nuire');
+assert(avecPrecond == 1, 'et ici il resout d''un coup');
+% La diagonale decalee sauve une matrice que la factorisation refuse.
+assert(istril(ichol(T, struct('diagcomp', 0.1))));
+
+m = 20;
+Q = full(spdiags([-ones(m, 1), 4 * ones(m, 1), -ones(m, 1)], -1:1, m, m));
+[Lq, Uq] = ilu(Q);
+assert(istril(Lq) && istriu(Uq));
+assert(max(abs(diag(Lq) - 1)) < 1e-12, 'la diagonale de L vaut un');
+assert(norm(Q - Lq * Uq) < 1e-10, 'sans remplissage a faire, c''est exact');
+% Un pivot nul arrete la factorisation sans permutation : le dire vaut
+% mieux que rendre des infinis.
+leve = false;
+try
+    ilu([0 1; 1 0]);
+catch
+    leve = true;
+end
+assert(leve);
+
+% SYMRCM range les coefficients pres de la diagonale.
+C = [1 0 1 0; 0 1 0 1; 1 0 1 0; 0 1 0 1];
+pr = symrcm(C);
+assert(isequal(sort(pr), 1:4), 'c''est une permutation');
+assert(matlibre_largeur_bande(C(pr, pr)) <= matlibre_largeur_bande(C));
+% Sur une matrice deja bandee, il ne peut pas faire pire.
+B5 = full(spdiags(ones(5, 3), -1:1, 5, 5));
+p5 = symrcm(B5);
+assert(matlibre_largeur_bande(B5(p5, p5)) <= 1);
+
+% SYMAMD et COLAMD reduisent le remplissage, non la bande : ce sont deux
+% objectifs differents. Le noeud le plus lie n'est pas elimine en premier.
+D4 = [1 1 1 1; 1 1 0 0; 1 0 1 0; 1 0 0 1];
+pa = symamd(D4);
+assert(isequal(sort(pa), 1:4));
+assert(find(pa == 1) > 1, 'le noeud de degre trois attend son tour');
+E4 = [1 1 1; 1 0 0; 1 0 0; 0 1 0];
+pc = colamd(E4);
+assert(isequal(sort(pc), 1:3), 'une permutation des colonnes');
+assert(isequal(sort(symamd(eye(4))), 1:4), 'une diagonale se permute aussi');
+
 disp('matrices : toutes les verifications passent');
