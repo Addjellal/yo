@@ -1773,6 +1773,84 @@ GRIDDATA Interpolation de données dispersées.
   Voir aussi DELAUNAY, INTERP2, INTERP1, SCATTEREDINTERPOLANT.
 ```
 
+## `groupfilter`
+
+```
+GROUPFILTER Ne garde que les groupes qui satisfont une condition.
+  Y = GROUPFILTER(X,G,CONDITION) applique CONDITION à chaque groupe et
+  ne garde que les éléments de ceux pour lesquels elle est vraie.
+  CONDITION est une poignée de fonction recevant les valeurs du groupe.
+  [Y,GARDE] = GROUPFILTER(...) rend en outre le masque des éléments
+  gardés.
+
+  Le filtre porte sur le groupe entier, non sur l'élément : un groupe
+  passe ou ne passe pas, et tous ses éléments avec lui. C'est ce qui la
+  distingue d'une simple indexation logique — écarter les catégories
+  trop peu peuplées, garder celles dont la moyenne dépasse un seuil.
+
+  Exemple :
+     x = [1 2 3 40]';
+     g = {'a'; 'a'; 'b'; 'b'};
+     groupfilter(x, g, @(v) mean(v) > 10)'      % 3 40
+     groupfilter(x, g, @(v) numel(v) >= 2)'     % tous : deux par groupe
+
+  Voir aussi GROUPSUMMARY, GROUPTRANSFORM, FINDGROUPS.
+```
+
+## `groupsummary`
+
+```
+GROUPSUMMARY Résume un tableau groupe par groupe.
+  R = GROUPSUMMARY(X,G) compte les éléments de chaque groupe défini par
+  G. R = GROUPSUMMARY(X,G,METHODE) applique la méthode nommée à chaque
+  groupe : 'sum', 'mean', 'median', 'min', 'max', 'std', 'var',
+  'numel', 'nnz', 'all', 'any', ou une poignée de fonction.
+  [R,G,ID] = GROUPSUMMARY(...) rend en outre les numéros de groupe et
+  la valeur qui définit chacun.
+
+  G peut être un tableau de classement — les valeurs distinctes forment
+  les groupes — ou une cellule de plusieurs, qui se croisent.
+
+  C'est FINDGROUPS suivi de SPLITAPPLY, réunis en un appel. La
+  différence avec ACCUMARRAY est que les groupes n'ont pas à être des
+  entiers consécutifs : n'importe quelle valeur les définit, texte
+  compris.
+
+  Exemple :
+     x = [1 2 3 4];
+     g = {'a', 'b', 'a', 'b'};
+     groupsummary(x, g, 'sum')'          % 4 6
+     groupsummary(x, g)'                 % 2 2 : les effectifs
+     groupsummary(x, g, @max)'           % 3 4
+
+  Voir aussi FINDGROUPS, SPLITAPPLY, ACCUMARRAY, GROUPTRANSFORM.
+```
+
+## `grouptransform`
+
+```
+GROUPTRANSFORM Transforme un tableau groupe par groupe.
+  Y = GROUPTRANSFORM(X,G,METHODE) applique la méthode à chaque groupe et
+  rend un tableau de la taille de X : chaque élément reçoit la valeur
+  calculée sur son groupe. METHODE vaut 'zscore', 'norm', 'center',
+  'meanfill', ou une poignée de fonction rendant autant de valeurs
+  qu'elle en reçoit.
+
+  C'est ce qui la sépare de GROUPSUMMARY : celle-ci réduit chaque groupe
+  à une valeur, celle-là le transforme sans changer sa taille. Centrer
+  par groupe, normaliser par groupe, combler les manquants par la
+  moyenne du groupe : ce sont les trois usages, et ils demandent tous
+  que la sortie garde la forme de l'entrée.
+
+  Exemple :
+     x = [1 3 10 20]';
+     g = {'a'; 'a'; 'b'; 'b'};
+     grouptransform(x, g, 'center')'     % -1 1 -5 5
+     grouptransform(x, g, @(v) v / sum(v))'
+
+  Voir aussi GROUPSUMMARY, GROUPFILTER, FINDGROUPS, SPLITAPPLY.
+```
+
 ## `gtext`
 
 ```
@@ -3010,6 +3088,22 @@ MATLIBRE_GRILLE_POLAIRE Les cercles et les rayons d'un tracé polaire.
   que les rayons se lisent.
 ```
 
+## `matlibre_groupe_fonction`
+
+```
+MATLIBRE_GROUPE_FONCTION Traduit un nom de méthode en poignée de fonction.
+  GROUPSUMMARY, GROUPTRANSFORM et GROUPFILTER acceptent les mêmes noms ;
+  la traduction se fait ici une fois pour toutes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     f = matlibre_groupe_fonction('sum');
+     f([1 2 3])                      % 6
+
+  Voir aussi GROUPSUMMARY, GROUPTRANSFORM, GROUPFILTER.
+```
+
 ## `matlibre_hadamard_noyau`
 
 ```
@@ -3578,6 +3672,30 @@ PAGEMTIMES Produit matriciel page par page.
      c = pagemtimes(a, a);
 
   Voir aussi MTIMES, PAGETRANSPOSE, PAGEMLDIVIDE.
+```
+
+## `pagesvd`
+
+```
+PAGESVD Décomposition en valeurs singulières de chaque page.
+  S = PAGESVD(A) rend, pour chaque page, ses valeurs singulières en
+  colonne.
+  [U,S,V] = PAGESVD(A) rend la décomposition complète : chaque page
+  vérifie A(:,:,k) = U(:,:,k)*S(:,:,k)*V(:,:,k)'.
+  [...] = PAGESVD(A,'econ') rend la forme économique.
+
+  Comme toutes les fonctions PAGE..., elle traite les pages
+  séparément : il n'y a pas de décomposition commune, et une page n'a
+  aucune influence sur une autre.
+
+  Exemple :
+     A = cat(3, diag([3 1]), diag([2 5]));
+     s = pagesvd(A);
+     s(:, :, 1)'                         % 3 1
+     [U, S, V] = pagesvd(A);
+     max(max(max(abs(pagemtimes(pagemtimes(U, S), pagetranspose(V)) - A)))) < 1e-12
+
+  Voir aussi SVD, PAGEMTIMES, PAGEINV, PAGETRANSPOSE, SVDS.
 ```
 
 ## `pagetranspose`
@@ -4642,6 +4760,30 @@ SPRING Carte de couleurs magenta - jaune.
   Voir aussi AUTUMN, SUMMER, WINTER, COLORMAP.
 ```
 
+## `sprintfc`
+
+```
+SPRINTFC Formate chaque valeur dans sa propre cellule.
+  C = SPRINTFC(FORMAT,VALEURS) applique le format à chaque élément de
+  VALEURS et rend un tableau de cellules de même taille, une chaîne par
+  élément.
+
+  SPRINTF, lui, recycle le format sur toutes les valeurs et rend une
+  seule chaîne : SPRINTF('%d ', 1:3) donne '1 2 3 ', là où SPRINTFC rend
+  trois cellules. C'est la différence entre concaténer et étiqueter.
+
+  La fonction n'est pas documentée par MathWorks, mais elle existe
+  depuis longtemps et sert à fabriquer des étiquettes d'axes ou de
+  légende, où l'on veut une chaîne par élément.
+
+  Exemple :
+     sprintfc('%d', [1 2 3])             % {'1'  '2'  '3'}
+     sprintfc('point %d', 1:2)           % {'point 1'  'point 2'}
+     numel(sprintfc('%.2f', rand(2, 3))) % 6 : la forme est gardee
+
+  Voir aussi SPRINTF, COMPOSE, NUM2STR, CELLSTR.
+```
+
 ## `stackedplot`
 
 ```
@@ -4918,6 +5060,39 @@ TILEDLAYOUT Découpe la figure en cases, comme SUBPLOT.
      nexttile; bar([3 1 2]);
 
   Voir aussi NEXTTILE, SUBPLOT, FIGURE, AXES.
+```
+
+## `timeit`
+
+```
+TIMEIT Mesure le temps d'exécution d'une fonction.
+  T = TIMEIT(F) appelle F plusieurs fois et rend la médiane des temps
+  mesurés, en secondes. F ne prend aucun argument : pour mesurer un
+  appel avec arguments, on l'enveloppe — TIMEIT(@() sort(x)).
+  T = TIMEIT(F,NSORTIES) demande NSORTIES sorties à chaque appel.
+
+  La médiane, non la moyenne : une mesure de temps est bornée par le
+  bas — l'exécution ne peut pas être plus rapide que ce que la machine
+  permet — et polluée par le haut, dès qu'un autre processus prend la
+  main. La distribution est donc dissymétrique, et la moyenne suit les
+  valeurs hautes qui ne disent rien de la fonction.
+
+  Le nombre d'appels s'adapte : une fonction rapide est appelée en
+  rafale jusqu'à ce que le total soit mesurable, et le temps rendu est
+  celui d'un appel. Sans cela, la résolution de l'horloge dominerait le
+  résultat.
+
+  Un premier appel est fait et jeté : il paie le chargement du fichier,
+  l'allocation initiale et le remplissage des caches, qu'on ne veut pas
+  compter.
+
+  Exemple :
+     t = timeit(@() sum(1:1000));
+     t > 0 && t < 1
+     x = rand(1, 1000);
+     timeit(@() sort(x)) > 0
+
+  Voir aussi TIC, TOC, PROFILE, CPUTIME.
 ```
 
 ## `topkrows`

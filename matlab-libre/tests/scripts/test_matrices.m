@@ -450,4 +450,13 @@ assert(max(abs(svds(F, 2) - valeursSing(1:2))) < 1e-10);
 assert(abs(norm(F - Us * Ss * Vs') - valeursSing(2)) < 1e-9, ...
        'Eckart-Young : l''erreur de rang un est la valeur singuliere suivante');
 
+% PAGESVD decompose chaque page separement : aucune page n'influence une
+% autre, et la reconstruction se verifie page par page.
+P3 = cat(3, diag([3 1]), diag([2 5]));
+valeurs = pagesvd(P3);
+assert(isequal(valeurs(:, :, 1)', [3 1]));
+assert(isequal(valeurs(:, :, 2)', [5 2]), 'les valeurs sortent decroissantes');
+[Up, Sp, Vp] = pagesvd(P3);
+assert(max(max(max(abs(pagemtimes(pagemtimes(Up, Sp), pagetranspose(Vp)) - P3)))) < 1e-12);
+
 disp('matrices : toutes les verifications passent');

@@ -518,4 +518,55 @@ end
 assert(refuseGrille, '''regular'' sans TimeStep doit etre refuse');
 disp('timetable : ok');
 
+%% ----------------------------------------- resumer, transformer, filtrer
+% GROUPSUMMARY reduit chaque groupe a une valeur ; GROUPTRANSFORM garde la
+% taille ; GROUPFILTER garde ou jette des groupes entiers. Les trois
+% partagent le meme classement.
+x = [1 2 3 4];
+g = {'a', 'b', 'a', 'b'};
+assert(isequal(groupsummary(x, g, 'sum')', [4 6]));
+assert(isequal(groupsummary(x, g)', [2 2]), 'sans methode, les effectifs');
+assert(isequal(groupsummary(x, g, @max)', [3 4]));
+assert(isequal(groupsummary(x, g, 'mean')', [2 3]));
+[~, ~, identifiants] = groupsummary(x, g, 'sum');
+assert(isequal(identifiants(:)', {'a', 'b'}));
+% La somme des sommes par groupe est la somme totale : rien ne se perd.
+assert(abs(sum(groupsummary(x, g, 'sum')) - sum(x)) < 1e-12);
+
+y = [1 3 10 20]';
+h = {'a'; 'a'; 'b'; 'b'};
+assert(isequal(grouptransform(y, h, 'center')', [-1 1 -5 5]));
+assert(isequal(size(grouptransform(y, h, 'center')), size(y)), ...
+       'la transformation garde la forme');
+% Centrer par groupe annule la moyenne de chaque groupe, non la moyenne
+% totale : c'est toute la difference avec un centrage global.
+centre = grouptransform(y, h, 'center');
+assert(abs(mean(centre(1:2))) < 1e-12 && abs(mean(centre(3:4))) < 1e-12);
+assert(max(abs(grouptransform(y, h, @(v) v / sum(v)) - [0.25; 0.75; 1/3; 2/3])) < 1e-12);
+% Combler les manquants par la moyenne du groupe, non par celle de tout.
+avecTrou = [1; NaN; 10; 20];
+comble = grouptransform(avecTrou, h, 'meanfill');
+assert(abs(comble(2) - 1) < 1e-12, 'la moyenne du groupe a, non de tout');
+
+z = [1 2 3 40]';
+assert(isequal(groupfilter(z, h, @(v) mean(v) > 10)', [3 40]));
+assert(numel(groupfilter(z, h, @(v) numel(v) >= 2)) == 4, 'les deux groupes passent');
+assert(isempty(groupfilter(z, h, @(v) false)));
+[~, garde] = groupfilter(z, h, @(v) mean(v) > 10);
+assert(isequal(garde(:)', [false false true true]), ...
+       'le filtre porte sur le groupe entier, non sur l''element');
+
+% SPRINTFC etiquette element par element, la ou SPRINTF concatene.
+assert(isequal(sprintfc('%d', [1 2 3]), {'1', '2', '3'}));
+assert(isequal(sprintfc('point %d', 1:2), {'point 1', 'point 2'}));
+assert(isequal(size(sprintfc('%.2f', zeros(2, 3))), [2 3]));
+assert(strcmp(sprintf('%d ', 1:3), '1 2 3 '), 'SPRINTF, lui, recycle le format');
+
+% TIMEIT : un temps positif, et une fonction lente mesuree plus longue
+% qu'une rapide.
+t = timeit(@() sum(1:100));
+assert(t > 0 && t < 1);
+assert(timeit(@() sum(1:100000)) > timeit(@() sum(1:10)), ...
+       'plus de travail, plus de temps');
+
 disp('types : toutes les verifications passent');
