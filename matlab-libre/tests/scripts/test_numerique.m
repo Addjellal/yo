@@ -335,6 +335,62 @@ assert(g == 6 && u * 12 + v * 18 == 6);
 assert(isequal(g, [6 5]));
 assert(isequal(u .* [12 15] + v .* [18 25], [6 5]));
 
+%% ------------------------------- extrema locaux, ruptures, fenetres
+% ISLOCALMAX marque les points strictement plus hauts que leurs deux
+% voisins ; les extremites n'en sont jamais, faute d'un voisin d'un cote.
+assert(isequal(islocalmax([1 3 2 5 4]), logical([0 1 0 1 0])));
+assert(isequal(islocalmin([3 1 2 0 4]), logical([0 1 0 1 0])));
+assert(~any(islocalmax([1 2 3 4])), 'une montee n''a pas de sommet');
+assert(~any(islocalmax([1 2])), 'deux points n''en ont pas non plus');
+% Un plateau ne compte que pour un maximum, pose sur son premier point.
+assert(isequal(islocalmax([1 2 2 1]), logical([0 1 0 0])));
+% La proeminence : hauteur au-dessus du col le plus haut qui separe d'un
+% sommet plus eleve. Le grand pic domine le petit.
+[marque, proeminence] = islocalmax([0 1 0 5 0]);
+assert(isequal(marque, logical([0 1 0 1 0])));
+assert(proeminence(4) == 5 && proeminence(2) == 1);
+assert(all(proeminence(~marque) == 0), 'ailleurs elle est nulle');
+% Un seuil de proeminence ecarte les ondulations.
+assert(~any(islocalmax([1 3 2 5 4], 'MinProminence', 2)));
+assert(sum(islocalmax([1 5 1 4 1], 'MaxNumExtrema', 1)) == 1);
+% Un minimum de A est un maximum de -A : rien d'autre ne les separe.
+rng(3);
+bruit = randn(1, 60);
+assert(isequal(islocalmin(bruit), islocalmax(-bruit)));
+
+% ISCHANGE decoupe la serie au moindre cout, penalise : le decoupage est
+% optimal, non glouton.
+assert(isequal(find(ischange([ones(1, 20), 5 * ones(1, 20)])), 21));
+assert(isequal(find(ischange([ones(1, 10), 5 * ones(1, 10), ones(1, 10)])), [11 21]));
+assert(isequal(find(ischange([1:20, 20:-1:1], 'linear')), 21), ...
+       'la rupture de pente est au sommet du toit');
+% Sur du bruit pur, il ne trouve rien : c'est la penalite qui l'en empeche.
+rng(2);
+assert(~any(ischange(randn(1, 80))));
+% Une marche noyee dans le bruit se retrouve quand meme.
+rng(1);
+assert(isequal(find(ischange([randn(1, 60), randn(1, 60) + 4])), 61));
+% Les parametres de segment suivent le modele choisi.
+[~, s1] = ischange([ones(1, 10), 5 * ones(1, 10)]);
+assert(s1(1) == 1 && s1(20) == 5);
+[~, ~, s2] = ischange([1:10, 30:-1:21], 'linear');
+assert(abs(s2(1) - 1) < 1e-10 && abs(s2(end) + 1) < 1e-10);
+assert(sum(ischange([ones(1, 20), 5 * ones(1, 20)], 'MaxNumChanges', 1)) == 1);
+
+% MOVMAD : l'ecart absolu median glissant ne bouge pas pour une valeur
+% isolee, la ou l'ecart type glissant s'envole.
+assert(max(movmad([1 1 1 100 1 1 1], 3)) < max(movstd([1 1 1 100 1 1 1], 3)));
+assert(all(movmad(ones(1, 10), 3) == 0), 'un plateau n''a pas de dispersion');
+assert(numel(movmad(1:10, 3, 'Endpoints', 'discard')) == 8);
+
+% TOPKROWS : le sommet du tri, sans trier plus qu'il ne faut.
+assert(isequal(topkrows([3 1; 1 2; 2 3], 2), [3 1; 2 3]));
+assert(isequal(topkrows([3 1; 1 2; 2 3], 2, 2), [2 3; 1 2]));
+assert(isequal(topkrows([3 1; 1 2; 2 3], 2, 1, 'ascend'), [1 2; 2 3]));
+[dessus, rangs] = topkrows([3 1; 1 2; 2 3], 1);
+assert(rangs == 1 && isequal(dessus, [3 1]));
+assert(size(topkrows([3 1; 1 2], 10), 1) == 2, 'K trop grand rend tout');
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

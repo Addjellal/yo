@@ -344,4 +344,59 @@ assert(months(datenum(2024, 1, 15), datenum(2024, 3, 14)) == 1);
 assert(datenum('31-Mar-2024') == datenum(2024, 3, 31));
 assert(strcmp(datestr(datenum('31-Mar-2024 13:45:00')), '31-Mar-2024 13:45:00'));
 
+%% ------------------------------- la famille moderne des chaines
+% ERASE, REPLACE, INSERTAFTER, INSERTBEFORE, EXTRACT* et COUNT : toutes
+% acceptent un texte, une cellule ou un tableau string, et rendent la
+% forme qu'on leur donne.
+assert(strcmp(erase('bonjour le monde', 'le '), 'bonjour monde'));
+assert(isequal(erase({'a1b', 'a2b'}, 'a'), {'1b', '2b'}));
+assert(strcmp(erase('abc', ''), 'abc'), 'un motif vide ne retire rien');
+
+% REPLACE prend plusieurs motifs a la fois, la ou STRREP n'en prend qu'un.
+assert(strcmp(replace('a-b-c', '-', '+'), 'a+b+c'));
+assert(strcmp(replace('abc', {'a', 'c'}, {'x', 'y'}), 'xby'));
+assert(strcmp(replace('aXa', 'a', 'b'), 'bXb'));
+assert(isequal(replace({'aa', 'ba'}, 'a', 'Z'), {'ZZ', 'bZ'}));
+
+% L'insertion se fait a chaque occurrence, non seulement a la premiere.
+assert(strcmp(insertAfter('abc', 'b', 'X'), 'abXc'));
+assert(strcmp(insertAfter('a,b,c', ',', ' '), 'a, b, c'));
+assert(strcmp(insertBefore('abc', 'b', 'X'), 'aXbc'));
+assert(strcmp(insertBefore('fichier.txt', '.', '_v2'), 'fichier_v2.txt'));
+
+% Un motif absent rend la chaine vide, non une erreur : c'est ce qui
+% permet d'enchainer sans tester.
+assert(strcmp(extractAfter('bonjour monde', 'bonjour '), 'monde'));
+assert(strcmp(extractBefore('bonjour monde', ' monde'), 'bonjour'));
+assert(isempty(extractAfter('abc', 'z')));
+assert(isempty(extractBefore('abc', 'z')));
+assert(strcmp(extractAfter('abcdef', 3), 'def'));
+assert(strcmp(extractBefore('abcdef', 4), 'abc'));
+assert(strcmp(extractBetween('<a>texte</a>', '<a>', '</a>'), 'texte'));
+assert(strcmp(extractBetween('abcdef', 2, 4), 'bcd'));
+assert(strcmp(extractBetween('<a>x</a>', '<a>', '</a>', ...
+                             'Boundaries', 'inclusive'), '<a>x</a>'));
+
+% COUNT compte sans recouvrement : « aaa » ne contient qu'une fois « aa ».
+assert(count('abcabc', 'abc') == 2);
+assert(count('aaa', 'aa') == 1);
+assert(isequal(count({'aa', 'aaa'}, 'a'), [2 3]));
+assert(count('ABC', 'abc', 'IgnoreCase', true) == 1);
+
+% MATCHES exige l'egalite entiere, la ou CONTAINS se contente d'une
+% occurrence.
+assert(matches('abc', 'abc'));
+assert(~matches('abc', 'ab'));
+assert(contains('abc', 'ab'), 'CONTAINS, lui, dit oui');
+assert(isequal(matches({'a', 'b'}, 'a'), [true false]));
+assert(matches('ABC', 'abc', 'IgnoreCase', true));
+
+% REGEXPTRANSLATE rend un texte cherchable litteralement : sans lui, le
+% point d'« a.b » serait un joker et trouverait aussi « axb ».
+assert(strcmp(regexptranslate('escape', 'a.b*c'), ['a\' '.b\' '*c']));
+assert(strcmp(regexptranslate('wildcard', '*.txt'), ['.*\' '.txt']));
+assert(~isempty(regexp('a.b', regexptranslate('escape', 'a.b'), 'once')));
+assert(isempty(regexp('axb', regexptranslate('escape', 'a.b'), 'once')), ...
+       'echappe, le point ne joue plus le joker');
+
 disp('texte et entrees-sorties : toutes les verifications passent');

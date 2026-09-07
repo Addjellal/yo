@@ -4,6 +4,7 @@
 #include <cmath>
 #include <regex>
 #include <set>
+#include <cstring>
 #include <sstream>
 
 #include "matlibre/Bibliotheque.h"
@@ -292,6 +293,284 @@ FONCTION(fnStrrep) {
             s = sortie;
         }
         r.push_back(s);
+    }
+    return {reconstituer(l, r)};
+}
+
+// ---------------------------------------------------- extraction et insertion
+//
+// La famille moderne des chaines de MATLAB : erase, replace, insertAfter,
+// insertBefore, extractAfter, extractBefore, extractBetween, count et
+// matches. Toutes acceptent un texte, une cellule de textes ou un tableau
+// string, et rendent la meme forme que ce qu'on leur donne.
+
+// Remplace toutes les occurrences d un motif. Un motif vide ne remplace
+// rien : sans cette garde, la boucle ne finirait jamais.
+std::string remplacerTout(const std::string& s, const std::string& ancien,
+                          const std::string& nouveau_) {
+    if (ancien.empty()) return s;
+    std::string sortie;
+    std::size_t p = 0;
+    for (;;) {
+        std::size_t q = s.find(ancien, p);
+        if (q == std::string::npos) {
+            sortie += s.substr(p);
+            return sortie;
+        }
+        sortie += s.substr(p, q - p) + nouveau_;
+        p = q + ancien.size();
+    }
+}
+
+FONCTION(fnErase) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "erase");
+    ListeTextes l = listeDe(args[0]);
+    ListeTextes m = listeDe(args[1]);
+    std::vector<std::string> r;
+    for (auto s : l.valeurs) {
+        for (const auto& motif : m.valeurs) s = remplacerTout(s, motif, "");
+        r.push_back(s);
+    }
+    return {reconstituer(l, r)};
+}
+
+// replace accepte plusieurs motifs a la fois, appliques dans l ordre : c est
+// ce qui la distingue de strrep, qui n en prend qu un.
+FONCTION(fnReplace) {
+    INUTILISE
+    exigerArguments(args, 3, 3, "replace");
+    ListeTextes l = listeDe(args[0]);
+    ListeTextes anciens = listeDe(args[1]);
+    ListeTextes nouveaux = listeDe(args[2]);
+    if (nouveaux.valeurs.size() != 1 && nouveaux.valeurs.size() != anciens.valeurs.size())
+        throw ErreurMatlab("MATLAB:replace:SizeMismatch",
+                           "Il faut un remplacement, ou autant que de motifs.");
+    std::vector<std::string> r;
+    for (auto s : l.valeurs) {
+        for (std::size_t k = 0; k < anciens.valeurs.size(); ++k) {
+            const std::string& n =
+                nouveaux.valeurs.size() == 1 ? nouveaux.valeurs[0] : nouveaux.valeurs[k];
+            s = remplacerTout(s, anciens.valeurs[k], n);
+        }
+        r.push_back(s);
+    }
+    return {reconstituer(l, r)};
+}
+
+// insertAfter et insertBefore posent le texte a chaque occurrence du motif,
+// non seulement a la premiere : c est la regle de MATLAB.
+Valeur inserer(const Arguments& args, bool apres, const char* nom) {
+    ListeTextes l = listeDe(args[0]);
+    std::string motif = args[1].versTexte();
+    std::string ajout = args[2].versTexte();
+    std::vector<std::string> r;
+    for (const auto& s : l.valeurs) {
+        if (motif.empty()) {
+            r.push_back(s);
+            continue;
+        }
+        std::string sortie;
+        std::size_t p = 0;
+        for (;;) {
+            std::size_t q = s.find(motif, p);
+            if (q == std::string::npos) {
+                sortie += s.substr(p);
+                break;
+            }
+            if (apres)
+                sortie += s.substr(p, q - p + motif.size()) + ajout;
+            else
+                sortie += s.substr(p, q - p) + ajout + motif;
+            p = q + motif.size();
+        }
+        r.push_back(sortie);
+    }
+    (void)nom;
+    return reconstituer(l, r);
+}
+
+FONCTION(fnInsertAfter) {
+    INUTILISE
+    exigerArguments(args, 3, 3, "insertAfter");
+    return {inserer(args, true, "insertAfter")};
+}
+
+FONCTION(fnInsertBefore) {
+    INUTILISE
+    exigerArguments(args, 3, 3, "insertBefore");
+    return {inserer(args, false, "insertBefore")};
+}
+
+// extractAfter et extractBefore rendent une chaine vide quand le motif est
+// absent : c est ce que fait MATLAB, et cela evite d avoir a tester avant.
+Valeur extraire(const Arguments& args, bool apres) {
+    ListeTextes l = listeDe(args[0]);
+    std::vector<std::string> r;
+    bool parPosition = args[1].estNumerique();
+    std::string motif = parPosition ? std::string() : args[1].versTexte();
+    for (const auto& s : l.valeurs) {
+        if (parPosition) {
+            std::size_t n = (std::size_t)args[1].scal();
+            if (apres)
+                r.push_back(n >= s.size() ? std::string() : s.substr(n));
+            else
+                r.push_back(n == 0 ? std::string()
+                                   : s.substr(0, std::min(n - 1, s.size())));
+            continue;
+        }
+        std::size_t q = s.find(motif);
+        if (q == std::string::npos || motif.empty()) {
+            r.push_back(std::string());
+        } else if (apres) {
+            r.push_back(s.substr(q + motif.size()));
+        } else {
+            r.push_back(s.substr(0, q));
+        }
+    }
+    return reconstituer(l, r);
+}
+
+FONCTION(fnExtractAfter) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "extractAfter");
+    return {extraire(args, true)};
+}
+
+FONCTION(fnExtractBefore) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "extractBefore");
+    return {extraire(args, false)};
+}
+
+// extractBetween rend ce qui separe deux motifs. « Boundaries » decide si
+// les motifs eux-memes font partie du resultat.
+FONCTION(fnExtractBetween) {
+    INUTILISE
+    exigerArguments(args, 3, 5, "extractBetween");
+    ListeTextes l = listeDe(args[0]);
+    bool inclusif = false;
+    for (std::size_t k = 3; k + 1 < args.size(); k += 2)
+        if (minuscules(args[k].versTexte()) == "boundaries")
+            inclusif = minuscules(args[k + 1].versTexte()) == "inclusive";
+    bool parPosition = args[1].estNumerique() && args[2].estNumerique();
+    std::vector<std::string> r;
+    for (const auto& s : l.valeurs) {
+        if (parPosition) {
+            std::size_t a = (std::size_t)args[1].scal();
+            std::size_t b = (std::size_t)args[2].scal();
+            if (a < 1 || b < a || a > s.size()) {
+                r.push_back(std::string());
+            } else {
+                b = std::min(b, s.size());
+                r.push_back(s.substr(a - 1, b - a + 1));
+            }
+            continue;
+        }
+        std::string debut = args[1].versTexte();
+        std::string fin = args[2].versTexte();
+        std::size_t p = s.find(debut);
+        if (p == std::string::npos || debut.empty() || fin.empty()) {
+            r.push_back(std::string());
+            continue;
+        }
+        std::size_t q = s.find(fin, p + debut.size());
+        if (q == std::string::npos) {
+            r.push_back(std::string());
+            continue;
+        }
+        if (inclusif)
+            r.push_back(s.substr(p, q + fin.size() - p));
+        else
+            r.push_back(s.substr(p + debut.size(), q - p - debut.size()));
+    }
+    return {reconstituer(l, r)};
+}
+
+// count compte les occurrences sans se recouvrir : « aaa » contient une
+// seule fois « aa », comme dans MATLAB.
+FONCTION(fnCount) {
+    INUTILISE
+    exigerArguments(args, 2, 4, "count");
+    ListeTextes l = listeDe(args[0]);
+    ListeTextes m = listeDe(args[1]);
+    bool ignorerCasse = false;
+    for (std::size_t k = 2; k + 1 < args.size(); k += 2)
+        if (minuscules(args[k].versTexte()) == "ignorecase") ignorerCasse = args[k + 1].vrai();
+    std::vector<double> r;
+    for (const auto& s0 : l.valeurs) {
+        std::string s = ignorerCasse ? minuscules(s0) : s0;
+        double total = 0;
+        for (const auto& p0 : m.valeurs) {
+            std::string p = ignorerCasse ? minuscules(p0) : p0;
+            if (p.empty()) continue;
+            std::size_t q = s.find(p);
+            while (q != std::string::npos) {
+                total += 1;
+                q = s.find(p, q + p.size());
+            }
+        }
+        r.push_back(total);
+    }
+    // La forme suit celle de la liste, non celle du tableau de caracteres :
+    // « aaa » est un seul texte, non trois.
+    Valeur v = Valeur::matriceDims(l.multiple ? l.dims : Dims{1, 1});
+    v.re = r;
+    if (!l.multiple) v.dims = {1, 1};
+    return {v};
+}
+
+// matches demande l egalite entiere, la ou contains se contente d une
+// occurrence : c est la difference entre « est-ce ce mot » et « ce mot y
+// est-il ».
+FONCTION(fnMatches) {
+    INUTILISE
+    exigerArguments(args, 2, 4, "matches");
+    ListeTextes l = listeDe(args[0]);
+    ListeTextes m = listeDe(args[1]);
+    bool ignorerCasse = false;
+    for (std::size_t k = 2; k + 1 < args.size(); k += 2)
+        if (minuscules(args[k].versTexte()) == "ignorecase") ignorerCasse = args[k + 1].vrai();
+    std::vector<bool> r;
+    for (const auto& s : l.valeurs) {
+        bool trouve = false;
+        for (const auto& p : m.valeurs) {
+            if (ignorerCasse ? (minuscules(s) == minuscules(p)) : (s == p)) trouve = true;
+        }
+        r.push_back(trouve);
+    }
+    return {logiqueComme(l, r)};
+}
+
+// regexptranslate rend un texte utilisable comme motif : « escape » protege
+// les caracteres speciaux, « wildcard » traduit les jokers du shell.
+FONCTION(fnRegexptranslate) {
+    INUTILISE
+    exigerArguments(args, 2, 2, "regexptranslate");
+    std::string mode = minuscules(args[0].versTexte());
+    ListeTextes l = listeDe(args[1]);
+    std::vector<std::string> r;
+    for (const auto& s : l.valeurs) {
+        std::string sortie;
+        if (mode == "escape") {
+            for (char c : s) {
+                if (std::strchr("$.?[]^*+|()\\{}", c)) sortie += '\\';
+                sortie += c;
+            }
+        } else if (mode == "wildcard") {
+            for (char c : s) {
+                if (c == '*') sortie += ".*";
+                else if (c == '?') sortie += '.';
+                else if (std::strchr("$.[]^+|()\\{}", c)) { sortie += '\\'; sortie += c; }
+                else sortie += c;
+            }
+        } else if (mode == "flexible") {
+            sortie = s;
+        } else {
+            throw ErreurMatlab("MATLAB:regexptranslate:InvalidOperation",
+                               "Operation inconnue : " + mode + ".");
+        }
+        r.push_back(sortie);
     }
     return {reconstituer(l, r)};
 }
@@ -944,6 +1223,17 @@ void enregistrerTexte(Interpreteur& it) {
                    "matlab.lang.makeUniqueStrings  Rend les noms uniques.");
     it.enregistrer("isvarname", fnIsValidName, "texte",
                    "isvarname  Vrai si le texte est un nom de variable valide.");
+    it.enregistrer("erase", fnErase, "texte", "erase  Retire toutes les occurrences d'un motif.");
+    it.enregistrer("replace", fnReplace, "texte", "replace  Remplace un ou plusieurs motifs.");
+    it.enregistrer("insertAfter", fnInsertAfter, "texte", "insertAfter  Insere apres chaque motif.");
+    it.enregistrer("insertBefore", fnInsertBefore, "texte", "insertBefore  Insere avant chaque motif.");
+    it.enregistrer("extractAfter", fnExtractAfter, "texte", "extractAfter  Ce qui suit le motif.");
+    it.enregistrer("extractBefore", fnExtractBefore, "texte", "extractBefore  Ce qui precede le motif.");
+    it.enregistrer("extractBetween", fnExtractBetween, "texte", "extractBetween  Ce qui separe deux motifs.");
+    it.enregistrer("count", fnCount, "texte", "count  Nombre d'occurrences d'un motif.");
+    it.enregistrer("matches", fnMatches, "texte", "matches  Le texte est-il exactement le motif.");
+    it.enregistrer("regexptranslate", fnRegexptranslate, "texte",
+                   "regexptranslate  Rend un texte utilisable comme motif.");
 }
 
 }  // namespace matlibre
