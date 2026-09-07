@@ -70,3 +70,5 @@ mustBeReal mustBeScalarOrEmpty mustBeText mustBeTextScalar mustBeVector
 colamd ichol ilu symamd symrcm
 decomposition isIllConditioned ode89
 bvp4c bvpinit bvpset pdepe pdeval
+polyarea rectint convhulln boundary triangulation delaunayTriangulation
+alphaShape scatteredInterpolant griddedInterpolant pchip makima superclasses

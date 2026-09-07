@@ -158,6 +158,9 @@ public:
     // appel de fonction, ce qui se paierait sur tout le reste.
     std::string fichierDossierCourant(const std::string& nom) const;
     std::shared_ptr<DefinitionClasse> classeDefinie(const std::string& nom);
+    // Verse dans une classe ce qu'elle tient de ses parents : proprietes,
+    // methodes, constantes. Ce qu'elle definit elle-meme l'emporte.
+    void heriterParents(const std::shared_ptr<DefinitionClasse>& def);
     // La classe qui declare la methode nommee, s'il y en a une. « head »
     // et « height » ne sont des fonctions que par cette voie : sans elle,
     // « exist » et « help » ne les trouvaient pas, alors que « head(t) »

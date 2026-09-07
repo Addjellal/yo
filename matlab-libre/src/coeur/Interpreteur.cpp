@@ -365,6 +365,7 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
             c->fichier = chemin;
             cacheClasses_[c->nom] = c;
         }
+        for (auto& c : u.classes) heriterParents(c);
         if (cacheable) cacheFonctions_[nom] = nullptr;
         return nullptr;
     }
@@ -518,6 +519,61 @@ Valeur Interpreteur::valeurVideDeClasse(const std::string& nom, const Dims& d) {
     return v;
 }
 
+// Une classe derivee tient de ses parents tout ce qu'elle ne redefinit
+// pas : proprietes, methodes, constantes, evenements. On verse une fois
+// pour toutes, a la premiere resolution de la classe, plutot que de
+// remonter la chaine a chaque appel — une methode heritee coute alors
+// exactement le prix d'une methode propre.
+//
+// Ce qui est defini dans la classe l'emporte sur ce qui vient du parent :
+// c'est la redefinition, et c'est le seul cas ou l'ordre compte.
+void Interpreteur::heriterParents(const std::shared_ptr<DefinitionClasse>& def) {
+    if (!def || def->heritageFait) return;
+    def->heritageFait = true;   // pose avant la descente : coupe les cycles
+    for (const auto& nomParent : def->parents) {
+        if (nomParent == "handle") continue;
+        auto parent = classeDefinie(nomParent);
+        if (!parent || parent.get() == def.get()) continue;
+        heriterParents(parent);
+
+        def->ancetres.push_back(nomParent);
+        for (const auto& a : parent->ancetres) def->ancetres.push_back(a);
+        if (parent->poignee) def->poignee = true;
+
+        // Les proprietes du parent viennent en tete : c'est l'ordre dans
+        // lequel un objet derive s'affiche sous MATLAB.
+        std::vector<std::string> ordre;
+        for (const auto& nomP : parent->ordreProprietes) {
+            bool deja = false;
+            for (const auto& q : def->ordreProprietes) deja = deja || q == nomP;
+            if (!deja) ordre.push_back(nomP);
+        }
+        for (const auto& q : def->ordreProprietes) ordre.push_back(q);
+        def->ordreProprietes = ordre;
+        for (const auto& kv : parent->defauts)
+            if (!def->defauts.count(kv.first)) def->defauts[kv.first] = kv.second;
+
+        // Le constructeur du parent ne s'herite pas : il porte le nom du
+        // parent, et construire une derivee n'est pas construire un parent.
+        for (const auto& kv : parent->methodes) {
+            if (kv.first == parent->nom) continue;
+            if (!def->methodes.count(kv.first)) def->methodes[kv.first] = kv.second;
+        }
+        auto reunir = [](std::vector<std::string>& cible,
+                         const std::vector<std::string>& source) {
+            for (const auto& n : source) {
+                bool deja = false;
+                for (const auto& q : cible) deja = deja || q == n;
+                if (!deja) cible.push_back(n);
+            }
+        };
+        reunir(def->constantes, parent->constantes);
+        reunir(def->dependantes, parent->dependantes);
+        reunir(def->statiques, parent->statiques);
+        reunir(def->evenements, parent->evenements);
+    }
+}
+
 std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string& nom) {
     auto itc = cacheClasses_.find(nom);
     if (itc != cacheClasses_.end()) return itc->second;
@@ -536,6 +592,7 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
         u.classes[0]->aide = aideDepuisSource(source);
         u.classes[0]->fichier = itm->second;
         cacheClasses_[nom] = u.classes[0];
+        heriterParents(u.classes[0]);
         return u.classes[0];
     }
     std::string source = lireFichier(it->second);
@@ -545,6 +602,7 @@ std::shared_ptr<DefinitionClasse> Interpreteur::classeDefinie(const std::string&
     u.classes[0]->aide = aideDepuisSource(source);
     u.classes[0]->fichier = it->second;
     cacheClasses_[nom] = u.classes[0];
+    heriterParents(u.classes[0]);
     return u.classes[0];
 }
 
@@ -967,6 +1025,7 @@ void Interpreteur::executerTexte(const std::string& source, const std::string& o
         relierClasse(c, u.fonctions);
         cacheClasses_[c->nom] = c;
     }
+    for (auto& c : u.classes) heriterParents(c);
     if (!u.fonctions.empty()) {
         std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
         for (auto& f : u.fonctions) voisines[f->nom] = f;
@@ -1006,6 +1065,7 @@ void Interpreteur::executerFichier(const std::string& fichier) {
     UniteCompilee u = compiler(source, fichier);
     for (auto& c : u.classes) cacheClasses_[c->nom] = c;
     for (auto& c : u.classes) relierClasse(c, u.fonctions);
+    for (auto& c : u.classes) heriterParents(c);
     std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
     for (auto& f : u.fonctions) {
         f->fichier = fichier;

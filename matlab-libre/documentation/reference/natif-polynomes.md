@@ -65,6 +65,18 @@ INTERP2  Interpolation sur une grille à deux dimensions.
     Voir aussi INTERP1, MESHGRID, SURF, SPLINE.
 ```
 
+## `makima`
+
+```
+makima  Interpolation d'Akima modifiee.
+```
+
+## `pchip`
+
+```
+pchip  Interpolation cubique qui preserve la forme.
+```
+
 ## `poly`
 
 ```

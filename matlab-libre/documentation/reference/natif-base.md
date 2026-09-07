@@ -1609,6 +1609,12 @@ SUBSTRUCT  Fabriquer la structure d'accès de SUBSREF.
     Voir aussi SUBSREF, SUBSASGN, CLASSDEF.
 ```
 
+## `superclasses`
+
+```
+superclasses  Les classes dont une classe descend.
+```
+
 ## `transpose`
 
 ```

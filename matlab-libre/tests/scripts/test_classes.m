@@ -191,4 +191,38 @@ assert(poigneeDouble(int8(7)) == 7);
 assert(poigneeDouble([1 2 3]) == [1 2 3]);
 disp('poignees vers les methodes : ok');
 
+%% --------------------------------------------------------- HERITAGE
+% Une derivee recoit de son parent ses proprietes et ses methodes ; ce
+% qu'elle redefinit l'emporte, et ISA la reconnait des deux classes.
+d = FormeDerivee(3, 5);
+assert(d.cote == 3);                       % la propriete du parent, posee
+assert(d.hauteur == 5);                    % la sienne
+assert(strcmp(d.nomDeBase, 'base'));       % avec sa valeur par defaut
+assert(aire(d) == 9);                      % methode heritee
+assert(perimetre(d) == 12);                % heritee aussi
+assert(volume(d) == 45);                   % la sienne, qui appelle l'heritee
+assert(strcmp(quiSuisJe(d), 'derivee'));   % la redefinition l'emporte
+assert(strcmp(quiSuisJe(FormeDeBase(1)), 'base'));
+
+% ISA remonte la chaine : un objet est de la classe de chacun de ses
+% ancetres, c'est tout le propos de l'heritage.
+assert(isa(d, 'FormeDerivee'));
+assert(isa(d, 'FormeDeBase'));
+assert(~isa(d, 'double'));
+assert(~isa(FormeDeBase(1), 'FormeDerivee'));
+assert(strcmp(class(d), 'FormeDerivee'));
+assert(any(strcmp(superclasses(d), 'FormeDeBase')));
+assert(any(strcmp(superclasses('FormeDerivee'), 'FormeDeBase')));
+assert(isempty(superclasses('FormeDeBase')));
+
+% Le constructeur du parent, appele sans argument, laisse les valeurs par
+% defaut : « obj@Parent(...) » construit la part de parent, rien de plus.
+sansArgument = FormeDerivee(7);
+assert(sansArgument.cote == 7 && sansArgument.hauteur == 2);
+
+% Le constructeur du parent ne s'herite pas : appeler FormeDerivee ne doit
+% pas construire un FormeDeBase.
+assert(strcmp(class(FormeDerivee(1)), 'FormeDerivee'));
+disp('heritage : ok');
+
 disp('classes : toutes les verifications passent');

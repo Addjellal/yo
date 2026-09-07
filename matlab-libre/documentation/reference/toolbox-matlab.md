@@ -169,6 +169,33 @@ ALPHA Transparence (acceptée, sans effet).
   Voir aussi SHADING, COLORMAP, LIGHTING, PATCH, FILL.
 ```
 
+## `alphaShape`
+
+```
+ALPHASHAPE Forme alpha d'un nuage de points du plan.
+  SHP = ALPHASHAPE(X,Y) construit la forme alpha des points, avec un
+  rayon choisi tout seul. SHP = ALPHASHAPE(X,Y,ALPHA) impose le rayon.
+  SHP = ALPHASHAPE(P,...) où P a deux colonnes fait la même chose.
+
+  Une forme alpha est ce qu'on obtient en triangulant le nuage, puis en
+  retirant les triangles dont le cercle circonscrit dépasse le rayon
+  ALPHA. Elle interpole entre le nuage lui-même — ALPHA nul, plus rien
+  ne reste — et son enveloppe convexe — ALPHA infini, tout reste. Entre
+  les deux, elle épouse le nuage, et peut y creuser des baies et des
+  trous que l'enveloppe convexe ne voit pas.
+
+  Ce qu'on lui demande : AREA, PERIMETER, BOUNDARYFACETS, INSHAPE,
+  ALPHATRIANGULATION, CRITICALALPHA, NUMREGIONS.
+
+  Exemple :
+     t = linspace(0, 2*pi, 41)'; t(end) = [];
+     shp = alphaShape(cos(t), sin(t), 2);
+     abs(area(shp) - polyarea(cos(t), sin(t))) < 1e-9
+     inShape(shp, 0, 0)              % 1 : le centre est dedans
+
+  Voir aussi BOUNDARY, CONVHULL, DELAUNAY, POLYAREA.
+```
+
 ## `annotation`
 
 ```
@@ -346,6 +373,36 @@ BONE Carte de couleurs gris à reflet bleuté.
      size(carte)                 % 8 3
 
   Voir aussi GRAY, PINK, COPPER.
+```
+
+## `boundary`
+
+```
+BOUNDARY Contour d'un nuage de points, plus ou moins serré.
+  K = BOUNDARY(X,Y) rend les indices des points du contour, le premier
+  répété à la fin. K = BOUNDARY(X,Y,S) règle le serrage : S = 0 donne
+  l'enveloppe convexe, S = 1 le contour le plus serré qui enferme encore
+  tous les points. Par défaut S vaut 0,5.
+  K = BOUNDARY(P,...) où P a deux colonnes fait la même chose.
+
+  [K,A] = BOUNDARY(...) rend aussi l'aire enfermée.
+
+  Le contour est celui d'une forme alpha : on triangule les points,
+  puis on retire les triangles trop étirés — ceux dont le cercle
+  circonscrit est plus grand qu'un seuil —, et le bord de ce qui reste
+  est le contour. Le seuil vient de S : à S = 0 il est infini, donc
+  aucun triangle ne part et le bord est l'enveloppe convexe ; plus S
+  monte, plus le contour épouse le nuage et peut y creuser des baies.
+
+  Exemple :
+     t = linspace(0, 2*pi, 41)'; t(end) = [];
+     x = cos(t); y = sin(t);
+     k = boundary(x, y, 0);
+     isequal(unique(k), unique(convhull(x, y)))   % a zero, c'est l'enveloppe
+     [~, a] = boundary(x, y, 0);
+     abs(a - polyarea(x, y)) < 1e-12
+
+  Voir aussi ALPHASHAPE, CONVHULL, DELAUNAY, POLYAREA.
 ```
 
 ## `bounds`
@@ -806,6 +863,36 @@ CONVHULL Enveloppe convexe d'un nuage de points du plan.
   Voir aussi INPOLYGON, DELAUNAY.
 ```
 
+## `convhulln`
+
+```
+CONVHULLN Enveloppe convexe en dimension quelconque.
+  K = CONVHULLN(P) rend les facettes de l'enveloppe convexe du nuage P,
+  une ligne par facette portant les indices de ses sommets. En dimension
+  deux les facettes sont des segments, en dimension trois des triangles.
+
+  [K,V] = CONVHULLN(...) rend aussi le volume enfermé — l'aire en
+  dimension deux.
+
+  La méthode est celle du cadeau enveloppé (« gift wrapping ») : on
+  part d'une facette du bord, et l'on fait pivoter un hyperplan autour
+  de chacune de ses arêtes jusqu'à rencontrer le point le plus extérieur.
+  Elle est plus lente qu'un balayage incrémental, mais elle ne dépend
+  d'aucun ordre et ne se trompe pas sur les points alignés.
+
+  En dimension deux, CONVHULL est plus rapide et rend un contour fermé
+  plutôt que des segments.
+
+  Exemple :
+     P = [0 0; 1 0; 1 1; 0 1; 0.5 0.5];
+     K = convhulln(P);
+     size(K, 1)                      % 4 cotes : le point du milieu est dedans
+     [~, aire] = convhulln(P);
+     abs(aire - 1) < 1e-12
+
+  Voir aussi CONVHULL, DELAUNAY, DELAUNAYTRIANGULATION, INPOLYGON.
+```
+
 ## `convn`
 
 ```
@@ -1078,6 +1165,40 @@ DELAUNAY Triangulation de Delaunay.
      T = delaunay([0 1 1 0], [0 0 1 1])     % deux triangles
 
   Voir aussi TRIMESH, TRISURF, VORONOI, CONVHULL, GRIDDATA.
+```
+
+## `delaunayTriangulation`
+
+```
+DELAUNAYTRIANGULATION Triangulation de Delaunay, avec ses requêtes.
+  DT = DELAUNAYTRIANGULATION(P) triangule les points P, une ligne par
+  point. DT = DELAUNAYTRIANGULATION(X,Y) accepte les coordonnées
+  séparées.
+
+  C'est la triangulation dont aucun cercle circonscrit ne contient de
+  point — la propriété du cercle vide. Elle maximise le plus petit
+  angle, ce qui évite les triangles étirés, et c'est pour cela qu'elle
+  sert de base à l'interpolation et au maillage.
+
+  La classe dérive de TRIANGULATION : EDGES, FREEBOUNDARY, NEIGHBORS,
+  CIRCUMCENTER, INCENTER et les autres s'appliquent telles quelles. Elle
+  y ajoute ce qu'on ne peut demander qu'à une triangulation de Delaunay :
+  CONVEXHULL rend l'enveloppe convexe, POINTLOCATION dit dans quel
+  triangle tombe un point, NEARESTNEIGHBOR quel sommet en est le plus
+  proche.
+
+  Le bord libre d'une triangulation de Delaunay est l'enveloppe convexe
+  des points : c'est une conséquence directe de la propriété du cercle
+  vide, et les tests s'en servent pour la vérifier.
+
+  Exemple :
+     P = [0 0; 1 0; 1 1; 0 1; 0.5 0.5];
+     dt = delaunayTriangulation(P);
+     size(dt.ConnectivityList, 1)    % quatre triangles
+     isa(dt, 'triangulation')        % 1 : elle en derive
+     pointLocation(dt, [0.6 0.4])    % le triangle qui contient ce point
+
+  Voir aussi TRIANGULATION, DELAUNAY, CONVHULL, VORONOI.
 ```
 
 ## `digraph`
@@ -2008,6 +2129,36 @@ GRIDDATA Interpolation de données dispersées.
      abs(griddata(x(:), y(:), z(:), 0.3, 0.7) - (0.6 - 2.1)) < 1e-12
 
   Voir aussi DELAUNAY, INTERP2, INTERP1, SCATTEREDINTERPOLANT.
+```
+
+## `griddedInterpolant`
+
+```
+GRIDDEDINTERPOLANT Interpolation sur une grille.
+  F = GRIDDEDINTERPOLANT(X,V) construit un interpolant des valeurs V aux
+  abscisses X, croissantes. F = GRIDDEDINTERPOLANT(X,Y,V) fait de même
+  sur une grille du plan, V étant de taille NUMEL(X) par NUMEL(Y) —
+  l'ordre de NDGRID, non celui de MESHGRID.
+  F = GRIDDEDINTERPOLANT(...,METHODE) choisit 'linear' (par défaut),
+  'nearest', 'spline' ou 'pchip'. Une seconde chaîne donne le
+  prolongement : 'none' (NaN) ou 'linear'.
+
+  La différence avec SCATTEREDINTERPOLANT tient à la grille : les points
+  étant rangés, retrouver la maille qui contient la question est une
+  recherche dichotomique, non un parcours de triangles. C'est pour cela
+  qu'un interpolant de grille est bien plus rapide, et c'est la seule
+  raison de le distinguer.
+
+  Quel que soit le procédé, l'interpolant repasse exactement par les
+  valeurs données : c'est ce qui distingue interpoler d'ajuster.
+
+  Exemple :
+     x = linspace(0, 1, 11);
+     F = griddedInterpolant(x, 3 * x + 1);
+     abs(F(0.35) - (3 * 0.35 + 1)) < 1e-12    % exacte sur l'affine
+     max(abs(F(x) - (3 * x + 1))) < 1e-12     % et sur les noeuds
+
+  Voir aussi SCATTEREDINTERPOLANT, INTERP1, INTERP2, NDGRID.
 ```
 
 ## `groupfilter`
@@ -3062,6 +3213,23 @@ MATLIBRE_ASPECT_GEOGRAPHIQUE Corrige le rapport d'aspect d'une carte plane.
   Voir aussi GEOPLOT, GEOSCATTER, DASPECT.
 ```
 
+## `matlibre_bary_poids`
+
+```
+MATLIBRE_BARY_POIDS Coordonnées barycentriques d'un point dans un triangle.
+  Les trois poids somment à un et sont tous positifs précisément quand
+  le point est dans le triangle, bord compris. C'est le test
+  d'appartenance le plus sûr : il ne dépend pas de l'orientation.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     p = matlibre_bary_poids([0 0; 1 0; 0 1], [0.25 0.25]);
+     abs(sum(p) - 1) < 1e-12
+
+  Voir aussi DELAUNAYTRIANGULATION, TRIANGULATION, INPOLYGON.
+```
+
 ## `matlibre_barycentriques`
 
 ```
@@ -3082,6 +3250,50 @@ MATLIBRE_BARYCENTRIQUES Coordonnées barycentriques dans un triangle.
 ## `matlibre_cases`
 
 _Pas de bloc d'aide._
+
+## `matlibre_chainer_aretes`
+
+```
+MATLIBRE_CHAINER_ARETES Chaîne les arêtes de bord en un contour fermé.
+  On part de la première arête et l'on suit : à chaque pas, l'arête
+  restante qui touche le point courant donne le point suivant. Le
+  contour est rendu premier point répété à la fin.
+
+  Les arêtes sont traitées comme non orientées. C'est nécessaire : les
+  triangles d'une triangulation ne tournent pas tous dans le même sens,
+  donc l'arête de bord peut être rangée dans un sens ou dans l'autre, et
+  suivre l'orientation ferait s'arrêter le contour au premier
+  changement.
+
+  Si le bord a plusieurs composantes — un nuage en deux amas —, seule
+  celle qui part de la première arête est rendue.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     k = matlibre_chainer_aretes([1 2; 3 2; 3 1]);
+     isequal(k([1 end]), [1; 1])     % le contour se referme
+     numel(k)                        % 4 : trois sommets et le retour
+
+  Voir aussi BOUNDARY, ALPHASHAPE, FREEBOUNDARY.
+```
+
+## `matlibre_composantes_triangles`
+
+```
+MATLIBRE_COMPOSANTES_TRIANGLES Nombre de morceaux d'un ensemble de triangles.
+  Deux triangles sont du même morceau s'ils partagent au moins un
+  sommet, et de proche en proche. On parcourt en largeur depuis chaque
+  triangle non encore visité, et l'on compte les départs.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_composantes_triangles([1 2 3; 2 3 4])   % 1 : ils se touchent
+     matlibre_composantes_triangles([1 2 3; 4 5 6])   % 2 : separes
+
+  Voir aussi ALPHASHAPE, BOUNDARY.
+```
 
 ## `matlibre_contient_variable`
 
@@ -3190,6 +3402,33 @@ MATLIBRE_DISTANCE_INVERSE Moyenne pondérée par l'inverse du carré de la dista
   Voir aussi GRIDDATA.
 ```
 
+## `matlibre_enveloppe3d`
+
+```
+MATLIBRE_ENVELOPPE3D Facettes de l'enveloppe convexe d'un nuage de l'espace.
+  La construction est incrémentale. On part d'un tétraèdre formé de
+  quatre points non coplanaires, puis on ajoute les points un à un :
+  celui qui est à l'extérieur voit certaines facettes — celles dont il
+  est du côté de la normale —, on les retire, et le trou laissé est un
+  contour fermé, l'horizon, que l'on referme en reliant chacune de ses
+  arêtes au nouveau point.
+
+  Un point posé exactement sur le plan d'une facette ne la voit pas : il
+  ne change donc rien à l'enveloppe, ce qui est juste, et c'est ainsi
+  que les points coplanaires — les quatre coins d'une face de cube — ne
+  produisent pas de facettes qui se recouvrent.
+
+  Chaque facette est orientée vers l'extérieur.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     F = matlibre_enveloppe3d([0 0 0; 1 0 0; 0 1 0; 0 0 1]);
+     size(F, 1)                      % 4 : le tetraedre a quatre faces
+
+  Voir aussi CONVHULLN, CONVHULL.
+```
+
 ## `matlibre_essaimer`
 
 ```
@@ -3250,6 +3489,24 @@ MATLIBRE_FLECHE Le tracé d'une flèche, hampe et pointe d'un seul trait.
   Fonction interne : elle n'existe pas dans MATLAB. QUIVER, COMPASS et
   FEATHER s'en servent ; la flèche est rendue comme une seule polyligne,
   ce qui la fait tenir en une courbe et non en trois.
+```
+
+## `matlibre_forme_alpha`
+
+```
+MATLIBRE_FORME_ALPHA Contour fermé de la forme alpha d'un nuage.
+  On triangule, on garde les triangles dont le cercle circonscrit tient
+  sous le seuil, puis on suit le bord de ce qui reste : les arêtes qui
+  n'appartiennent qu'à un triangle. Ces arêtes se chaînent en un
+  contour, rendu premier point répété à la fin.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     k = matlibre_forme_alpha([0 1 1 0]', [0 0 1 1]', inf);
+     numel(k)                        % 5 : quatre coins et le retour
+
+  Voir aussi BOUNDARY, ALPHASHAPE, DELAUNAY.
 ```
 
 ## `matlibre_gbs_pas`
@@ -3575,6 +3832,65 @@ MATLIBRE_HADAMARD_NOYAU Noyaux de la construction de Hadamard.
   Fonction interne : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_heriter`
+
+```
+MATLIBRE_HERITER Appelle le constructeur d'un parent et en verse la part.
+  C'est ce que « obj@Parent(args) » veut dire dans le constructeur d'une
+  classe dérivée : construire la part de parent, puis la déposer dans
+  l'objet en cours. L'analyseur réécrit la ligne en un appel à cette
+  fonction ; on ne l'écrit pas soi-même.
+
+  Les propriétés que le parent a fixées sont copiées ; celles qu'il ne
+  connaît pas restent telles quelles. C'est pour cela que l'appel se
+  place en tête du constructeur : ce qui vient après l'emporte.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     s = matlibre_heriter(struct('a', 0), 'struct');
+     s.a                             % 0 : rien a verser
+
+  Voir aussi CLASSDEF, ISA, PROPERTIES.
+```
+
+## `matlibre_interp_arguments`
+
+```
+MATLIBRE_INTERP_ARGUMENTS Démêle les arguments d'un interpolant dispersé.
+  Les points peuvent venir en une matrice ou en coordonnées séparées, et
+  les deux dernières places peuvent porter la méthode et le mode de
+  prolongement. On reconnaît ces derniers à ce qu'ils sont du texte.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [P, v] = matlibre_interp_arguments({[0 0; 1 1], [3; 4]});
+     isequal(v, [3; 4])
+
+  Voir aussi SCATTEREDINTERPOLANT, GRIDDEDINTERPOLANT.
+```
+
+## `matlibre_interp_disperse`
+
+```
+MATLIBRE_INTERP_DISPERSE Valeur interpolée en un point, données dispersées.
+  En linéaire, on cherche le triangle de Delaunay qui contient le point
+  et l'on y prend la combinaison barycentrique des trois valeurs. En
+  'nearest', la valeur du point de donnée le plus proche.
+
+  Hors de l'enveloppe convexe, aucun triangle ne contient le point : la
+  valeur est NaN, sauf si le prolongement demandé est 'nearest'.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     F = scatteredInterpolant([0;1;0], [0;0;1], [1;2;3]);
+     abs(matlibre_interp_disperse(F, [0.5 0]) - 1.5) < 1e-12
+
+  Voir aussi SCATTEREDINTERPOLANT.
+```
+
 ## `matlibre_krylov`
 
 _Pas de bloc d'aide._
@@ -3699,6 +4015,100 @@ MATLIBRE_POIGNEE_DEPUIS_TEXTE Une poignée bâtie sur une expression écrite.
 MATLIBRE_RACINE_TOOLBOX Dossier qui contient les toolboxes.
   C'est celui que l'interpréteur a trouvé au démarrage ; la variable
   d'environnement MATLIBRE_TOOLBOX le remplace quand elle est posée.
+```
+
+## `matlibre_rayon_circonscrit`
+
+```
+MATLIBRE_RAYON_CIRCONSCRIT Rayon du cercle circonscrit d'un triangle.
+  R = abc / 4A, où a, b et c sont les côtés et A l'aire. Un triangle
+  aplati a une aire qui tend vers zéro et donc un rayon qui explose :
+  c'est ce qui permet de reconnaître les triangles étirés et de les
+  retirer d'une forme alpha.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     r = matlibre_rayon_circonscrit([0 0; 1 0; 0 1]);
+     abs(r - sqrt(2)/2) < 1e-12      % le cercle passe par les trois
+
+  Voir aussi BOUNDARY, ALPHASHAPE, CIRCUMCENTER.
+```
+
+## `matlibre_seuil_alpha`
+
+```
+MATLIBRE_SEUIL_ALPHA Rayon au-delà duquel un triangle est retiré.
+  Le serrage S va de zéro — aucun triangle retiré, donc l'enveloppe
+  convexe — à un — le contour le plus serré qui enferme encore tous les
+  points. Entre les deux, le seuil descend depuis l'infini jusqu'au
+  plus grand rayon circonscrit qu'on peut retirer sans perdre un point.
+
+  Le seuil est pris sur les quantiles des rayons circonscrits : c'est ce
+  qui rend le réglage indépendant de l'échelle du nuage.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     x = [0 1 1 0]'; y = [0 0 1 1]';
+     isinf(matlibre_seuil_alpha(x, y, 0))     % 1 : a zero, rien ne part
+
+  Voir aussi BOUNDARY, ALPHASHAPE.
+```
+
+## `matlibre_tri_aretes`
+
+```
+MATLIBRE_TRI_ARETES Les faces de chaque élément, une ligne par face.
+  Pour un triangle, la face opposée au sommet J est l'arête formée par
+  les deux autres ; pour un tétraèdre, c'est le triangle des trois
+  autres. Les faces sont rangées élément par élément, dans l'ordre des
+  sommets opposés — ce qui fait correspondre la ligne K de la sortie à
+  la colonne de NEIGHBORS.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     A = matlibre_tri_aretes([1 2 3]);
+     size(A)                         % 3 aretes de 2 sommets
+
+  Voir aussi TRIANGULATION, FREEBOUNDARY.
+```
+
+## `matlibre_tri_centres`
+
+```
+MATLIBRE_TRI_CENTRES Centre circonscrit ou inscrit de chaque triangle.
+  Le centre circonscrit est équidistant des trois sommets : il se
+  trouve en résolvant les deux équations de médiatrice. Le centre
+  inscrit est équidistant des trois côtés : c'est le barycentre des
+  sommets pondérés par les longueurs des côtés opposés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     tr = triangulation([1 2 3], [0 0; 1 0; 0 1]);
+     c = matlibre_tri_centres(tr, 1, 'circonscrit');
+     max(abs(c - [0.5 0.5])) < 1e-12
+
+  Voir aussi TRIANGULATION, CIRCUMCENTER, INCENTER.
+```
+
+## `matlibre_triangles_alpha`
+
+```
+MATLIBRE_TRIANGLES_ALPHA Triangles de Delaunay assez ramassés pour être gardés.
+  Un triangle est gardé si le rayon de son cercle circonscrit ne dépasse
+  pas le seuil. Un triangle étiré a un grand rayon : c'est exactement
+  celui qui relie deux amas éloignés, et le retirer creuse la forme.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     T = matlibre_triangles_alpha([0 1 1 0]', [0 0 1 1]', inf);
+     size(T, 1)                      % 2 : le carre fait deux triangles
+
+  Voir aussi ALPHASHAPE, BOUNDARY, DELAUNAY.
 ```
 
 ## `matlibre_valider`
@@ -5120,6 +5530,37 @@ POLARPLOT Courbe en coordonnées polaires.
   Voir aussi POLAR, COMPASS, ROSE, PLOT, POL2CART.
 ```
 
+## `polyarea`
+
+```
+POLYAREA Aire d'un polygone.
+  A = POLYAREA(X,Y) rend l'aire du polygone dont les sommets sont
+  (X,Y), pris dans l'ordre. Le contour se referme tout seul : il n'est
+  pas nécessaire de répéter le premier sommet.
+  A = POLYAREA(X,Y,DIM) travaille suivant la dimension DIM ; par défaut
+  la première non singleton, ce qui traite une matrice comme un
+  polygone par colonne.
+
+  La formule est celle du lacet : l'aire vaut la moitié de la somme des
+  produits croisés des sommets consécutifs. Elle se lit comme la somme
+  des aires signées des triangles formés avec l'origine — ceux qui
+  débordent comptent en négatif et se compensent exactement, quelle que
+  soit l'origine choisie et que le polygone soit convexe ou non.
+
+  L'aire rendue est positive : le sens de parcours ne change que le
+  signe, et POLYAREA en prend la valeur absolue.
+
+  Un polygone qui se recoupe n'a pas d'aire bien définie ; la formule en
+  rend une, mais elle compte les régions selon leur enlacement.
+
+  Exemple :
+     polyarea([0 1 1 0], [0 0 1 1])           % 1 : le carre unite
+     polyarea([0 4 4 0], [0 0 3 3])           % 12
+     abs(polyarea(cos(0:0.01:2*pi), sin(0:0.01:2*pi)) - pi) < 1e-3
+
+  Voir aussi INPOLYGON, CONVHULL, BOUNDARY, TRAPZ.
+```
+
 ## `pow2`
 
 ```
@@ -5338,6 +5779,27 @@ RECTANGLE Rectangle, éventuellement arrondi ou elliptique.
      axis('equal');
 
   Voir aussi PATCH, FILL, LINE, PLOT, AXIS.
+```
+
+## `rectint`
+
+```
+RECTINT Aire d'intersection de rectangles.
+  A = RECTINT(A,B) rend une matrice dont l'élément (I,J) est l'aire
+  commune au rectangle I de A et au rectangle J de B. Chaque rectangle
+  est une ligne [X Y LARGEUR HAUTEUR], le coin étant le plus bas à
+  gauche.
+
+  L'intersection de deux rectangles alignés sur les axes est un
+  rectangle, et son côté suivant chaque axe est le recouvrement des deux
+  intervalles : c'est ce qui rend le calcul immédiat, et nul dès que
+  l'un des deux recouvrements l'est.
+
+  Exemple :
+     rectint([0 0 2 2], [1 1 2 2])            % 1 : ils se recouvrent d'un carre
+     rectint([0 0 1 1], [3 3 1 1])            % 0 : disjoints
+
+  Voir aussi POLYAREA, INPOLYGON, RECTANGLE.
 ```
 
 ## `refresh`
@@ -5584,6 +6046,40 @@ SCATTER3 Nuage de points dans l'espace.
      scatter3(cos(t), sin(t), t, 20, 'r');
 
   Voir aussi SCATTER, PLOT3, STEM3, QUIVER3.
+```
+
+## `scatteredInterpolant`
+
+```
+SCATTEREDINTERPOLANT Interpolation de données dispersées.
+  F = SCATTEREDINTERPOLANT(X,Y,V) construit un interpolant des valeurs V
+  aux points (X,Y), qui n'ont pas à former une grille. F(XQ,YQ) évalue
+  ensuite où l'on veut.
+  F = SCATTEREDINTERPOLANT(P,V) où P a deux colonnes fait la même chose.
+  F = SCATTEREDINTERPOLANT(...,METHODE) choisit 'linear' (par défaut) ou
+  'nearest'. F = SCATTEREDINTERPOLANT(...,METHODE,PROLONGEMENT) choisit
+  ce qui se passe hors de l'enveloppe convexe : 'none' (NaN, par défaut)
+  ou 'nearest'.
+
+  L'interpolation linéaire s'appuie sur la triangulation de Delaunay :
+  le point interrogé tombe dans un triangle, et sa valeur est la moyenne
+  des trois sommets pondérée par les coordonnées barycentriques. Deux
+  conséquences qui font tout l'intérêt du procédé : l'interpolant repasse
+  exactement par les données, et il est exact sur toute fonction affine —
+  trois points définissent un plan, et le barycentre y reste.
+
+  Hors de l'enveloppe convexe il n'y a pas de triangle, donc pas
+  d'interpolation : c'est de l'extrapolation, et elle est refusée par
+  défaut plutôt que devinée.
+
+  Exemple :
+     x = [0; 1; 0; 1; 0.5];  y = [0; 0; 1; 1; 0.5];
+     v = 2 * x + 3 * y + 1;             % un plan
+     F = scatteredInterpolant(x, y, v);
+     abs(F(0.25, 0.75) - (2*0.25 + 3*0.75 + 1)) < 1e-12
+     isnan(F(5, 5))                     % dehors : pas d'extrapolation
+
+  Voir aussi GRIDDEDINTERPOLANT, GRIDDATA, DELAUNAYTRIANGULATION, INTERP2.
 ```
 
 ## `setxor`
@@ -6230,6 +6726,33 @@ TOPKROWS Les K premières lignes dans l'ordre du tri.
      i                                     % 1 : la premiere ligne
 
   Voir aussi SORTROWS, SORT, MAXK, MINK.
+```
+
+## `triangulation`
+
+```
+TRIANGULATION Maillage de triangles ou de tétraèdres.
+  TR = TRIANGULATION(T,P) réunit une liste de connectivité T — une
+  ligne par élément, portant les indices de ses sommets — et les points
+  P, une ligne par point. C'est la façon dont MATLAB range un maillage :
+  les coordonnées d'un côté, la topologie de l'autre, ce qui permet de
+  déplacer les points sans refaire la connectivité.
+
+  TR = TRIANGULATION(T,X,Y) et TRIANGULATION(T,X,Y,Z) acceptent les
+  coordonnées séparées.
+
+  Ce qu'on lui demande : FREEBOUNDARY, EDGES, NEIGHBORS, CIRCUMCENTER,
+  INCENTER, FACENORMAL, VERTEXATTACHMENTS, EDGEATTACHMENTS, SIZE,
+  ISCONNECTED, BARYCENTRICTOCARTESIAN, CARTESIANTOBARYCENTRIC.
+
+  Exemple :
+     P = [0 0; 1 0; 1 1; 0 1];
+     T = [1 2 3; 1 3 4];
+     tr = triangulation(T, P);
+     size(freeBoundary(tr), 1)       % 4 : le carre a quatre cotes
+     size(edges(tr), 1)              % 5 : quatre cotes et la diagonale
+
+  Voir aussi DELAUNAYTRIANGULATION, DELAUNAY, FREEBOUNDARY, CONVHULL.
 ```
 
 ## `trimesh`

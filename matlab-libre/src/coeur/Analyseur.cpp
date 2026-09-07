@@ -390,6 +390,55 @@ NoeudPtr Analyseur::instruction() {
     }
     if (ressembleCommande()) return instructionCommande();
 
+    // « obj@Parent(args) » : l'appel au constructeur du parent, qui n'est
+    // ni une expression ni une affectation ordinaire. On le reecrit en
+    // « obj = matlibre_heriter(obj, 'Parent', args) », ce qui dit
+    // exactement ce qu'il fait : construire la part de parent et la
+    // verser dans l'objet en cours de construction.
+    if (t.genre == Genre::Ident && jeton(1).estOp("@") && !jeton(1).espaceAvant &&
+        jeton(2).genre == Genre::Ident && jeton(3).estOp("(")) {
+        int ligneParent = t.ligne;
+        std::string nomObjet = t.texte;
+        avancer();   // l'objet
+        avancer();   // @
+        std::string nomParent = jeton().texte;
+        avancer();   // le parent
+        auto appel = Noeud::creer(TypeN::Acces);
+        appel->ligne = ligneParent;
+        auto cible = Noeud::creer(TypeN::Ident);
+        cible->texte = "matlibre_heriter";
+        cible->ligne = ligneParent;
+        appel->enfants = {cible};
+        ElementAcces element;
+        element.genre = '(';
+        auto premier = Noeud::creer(TypeN::Ident);
+        premier->texte = nomObjet;
+        premier->ligne = ligneParent;
+        auto nom = Noeud::creer(TypeN::Litteral);
+        nom->texte = nomParent;
+        nom->ligne = ligneParent;
+        element.args = {premier, nom};
+        exigerOp("(");
+        if (!jeton().estOp(")")) {
+            for (;;) {
+                element.args.push_back(expression());
+                if (!accepterOp(",")) break;
+            }
+        }
+        exigerOp(")");
+        appel->acces = {element};
+        auto affectation = Noeud::creer(TypeN::Affectation);
+        affectation->ligne = ligneParent;
+        auto gaucheParent = Noeud::creer(TypeN::Ident);
+        gaucheParent->texte = nomObjet;
+        gaucheParent->ligne = ligneParent;
+        affectation->cibles = {gaucheParent};
+        affectation->enfants = {appel};
+        noterVariable(gaucheParent);
+        terminer(affectation);
+        return affectation;
+    }
+
     int ligne = t.ligne;
     NoeudPtr gauche = expression();
 

@@ -35,50 +35,64 @@ function T = delaunay(x, y)
     if n < 3
         return;
     end
-    % Un triangle englobant, tres grand devant le nuage.
-    milieuX = (max(x) + min(x)) / 2;
-    milieuY = (max(y) + min(y)) / 2;
-    rayon = max(max(x) - min(x), max(y) - min(y));
-    if rayon == 0
+    % On ramene le nuage dans le carre unite. Une similitude envoie les
+    % cercles sur des cercles, donc ne change pas la triangulation ; mais
+    % elle rend le determinant du test du cercle comparable a une
+    % tolerance fixe, ce qui compte quand les points sont cocycliques.
+    etendue = max(max(x) - min(x), max(y) - min(y));
+    if etendue == 0
         return;
     end
-    rayon = rayon * 100;
-    px = [x; milieuX - rayon; milieuX + rayon; milieuX];
-    py = [y; milieuY - rayon; milieuY - rayon; milieuY + rayon];
+    x = (x - min(x)) / etendue;
+    y = (y - min(y)) / etendue;
+    tolerance = 1e-12;
+
+    % Un triangle englobant, tres grand devant le nuage.
+    px = [x; -100; 101; 0.5];
+    py = [y; -100; -100; 150];
     triangles = [n + 1, n + 2, n + 3];
 
     for k = 1:n
-        % Les triangles dont le cercle circonscrit contient le point.
         mauvais = false(size(triangles, 1), 1);
         for t = 1:size(triangles, 1)
             mauvais(t) = dansCercle(px(triangles(t, :)), py(triangles(t, :)), ...
-                                    px(k), py(k));
+                                    px(k), py(k), tolerance);
         end
         if ~any(mauvais)
             continue;
         end
+        % La cavite doit etre d'un seul tenant et vue entierement depuis le
+        % nouveau point : sinon son bord n'est pas un contour simple, et la
+        % retriangulation produit des triangles qui se recouvrent. Quand
+        % les points sont cocycliques, le test du cercle rend des reponses
+        % que l'arrondi decide, et c'est exactement ce qui arrive.
+        %
+        % On part donc du triangle qui contient le point, et l'on n'ajoute
+        % un triangle mauvais que s'il touche la cavite par une arete.
+        mauvais = cavite(triangles, mauvais, px, py, k);
+
         % Le bord du trou : les aretes qui n'appartiennent qu'a un seul
         % des triangles supprimes.
-        aretes = [];
         indices = find(mauvais);
-        for t = indices'
-            s = triangles(t, :);
-            aretes = [aretes; s(1) s(2); s(2) s(3); s(3) s(1)];   %#ok<AGROW>
+        aretes = zeros(3 * numel(indices), 2);
+        for i = 1:numel(indices)
+            s = triangles(indices(i), :);
+            aretes(3*i-2:3*i, :) = [s(1) s(2); s(2) s(3); s(3) s(1)];
         end
-        garde = true(size(aretes, 1), 1);
-        for a = 1:size(aretes, 1)
-            for b = a + 1:size(aretes, 1)
-                if (aretes(a, 1) == aretes(b, 2) && aretes(a, 2) == aretes(b, 1)) || ...
-                   (aretes(a, 1) == aretes(b, 1) && aretes(a, 2) == aretes(b, 2))
-                    garde(a) = false;
-                    garde(b) = false;
-                end
-            end
-        end
-        aretes = aretes(garde, :);
+        [~, ~, position] = unique(sort(aretes, 2), 'rows');
+        compte = accumarray(position(:), 1);
+        aretes = aretes(compte(position) == 1, :);
+
         triangles = triangles(~mauvais, :);
         for a = 1:size(aretes, 1)
-            triangles = [triangles; aretes(a, 1), aretes(a, 2), k];   %#ok<AGROW>
+            % Une arete vue de profil depuis le point ne fait pas un
+            % triangle : on la laisse, plutot que d'ajouter une lamelle
+            % d'aire nulle qui fausserait tout ce qui suit.
+            aire = (px(aretes(a, 2)) - px(aretes(a, 1))) * (py(k) - py(aretes(a, 1))) - ...
+                   (px(k) - px(aretes(a, 1))) * (py(aretes(a, 2)) - py(aretes(a, 1)));
+            if abs(aire) > tolerance
+                triangles = [triangles; aretes(a, 1), aretes(a, 2), k];   %#ok<AGROW>
+            end
         end
     end
 
@@ -97,10 +111,53 @@ function T = delaunay(x, y)
     T = triangles;
 end
 
-function dedans = dansCercle(xs, ys, x, y)
-%DANSCERCLE Le point est-il dans le cercle circonscrit au triangle ?
+function garde = cavite(triangles, mauvais, px, py, k)
+%CAVITE La partie de la cavite qui touche le point, d'un seul tenant.
+%   On part du triangle qui contient le point — a defaut, du premier
+%   mauvais —, et l'on n'y agrege un triangle mauvais que s'il partage une
+%   arete avec ce qu'on a deja. Ce qui reste dehors n'est pas retire.
+    garde = false(size(mauvais));
+    depart = 0;
+    for t = find(mauvais)'
+        if dansTriangle(px(triangles(t, :)), py(triangles(t, :)), px(k), py(k))
+            depart = t;
+            break;
+        end
+    end
+    if depart == 0
+        depart = find(mauvais, 1);
+    end
+    garde(depart) = true;
+    change = true;
+    while change
+        change = false;
+        for t = find(mauvais & ~garde)'
+            for u = find(garde)'
+                if numel(intersect(triangles(t, :), triangles(u, :))) == 2
+                    garde(t) = true;
+                    change = true;
+                    break;
+                end
+            end
+        end
+    end
+end
+
+function dedans = dansTriangle(xs, ys, x, y)
+%DANSTRIANGLE Le point est-il dans le triangle, bord compris ?
+    d1 = (xs(2) - xs(1)) * (y - ys(1)) - (x - xs(1)) * (ys(2) - ys(1));
+    d2 = (xs(3) - xs(2)) * (y - ys(2)) - (x - xs(2)) * (ys(3) - ys(2));
+    d3 = (xs(1) - xs(3)) * (y - ys(3)) - (x - xs(3)) * (ys(1) - ys(3));
+    dedans = (d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0);
+end
+
+function dedans = dansCercle(xs, ys, x, y, tolerance)
+%DANSCERCLE Le point est-il strictement dans le cercle circonscrit ?
 %   Le determinant classique : positif quand le point est a l'interieur,
-%   les sommets etant donnes dans le sens direct.
+%   les sommets etant donnes dans le sens direct. Un point pose sur le
+%   cercle rend zero, et compte comme dehors : c'est la seule facon de
+%   traiter les points cocycliques sans que l'arrondi decide a notre
+%   place, chaque triangle d'un cote different.
     aire = (xs(2) - xs(1)) * (ys(3) - ys(1)) - (xs(3) - xs(1)) * (ys(2) - ys(1));
     if aire == 0
         dedans = false;
@@ -116,5 +173,5 @@ function dedans = dansCercle(xs, ys, x, y)
     determinant = (ax * ax + ay * ay) * (bx * cy - cx * by) - ...
                   (bx * bx + by * by) * (ax * cy - cx * ay) + ...
                   (cx * cx + cy * cy) * (ax * by - bx * ay);
-    dedans = determinant > 0;
+    dedans = determinant > tolerance;
 end

@@ -13,22 +13,23 @@ documentation publique et vérifiée sur la propriété qui la définit.
 
 | partie | contenu | lignes |
 |---|---|---:|
-| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 9 914 |
-| `src/bibliotheque` | 665 fonctions natives, en C++ | 18 748 |
+| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 023 |
+| `src/bibliotheque` | 668 fonctions natives, en C++ | 18 970 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 802 fichiers `.m`, dont 2 161 fonctions publiques | 126 525 |
-| `tests` | 37 scripts `.m` et 2 fichiers C++ | 19 310 |
+| `toolbox` | 2 824 fichiers `.m`, dont 2 170 fonctions publiques | 128 057 |
+| `tests` | 38 scripts `.m` et 2 fichiers C++ | 19 721 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 274
+documentation MathWorks est complète : `outils/manques.m` compte **2 286
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
-pas, et quatre-vingt-neuf ont été ajoutées de cette façon — la famille
+pas, et cent une ont été ajoutées de cette façon — la famille
 moderne des chaînes, les extrema locaux et les ruptures, les méthodes de
 Krylov, les estimations de norme et de conditionnement, les graphes, les
 résumés par groupe, les vingt-quatre validateurs d'arguments, les solveurs d'équations aux
-dérivées partielles et de problèmes aux limites.
+dérivées partielles et de problèmes aux limites, la géométrie de calcul et
+les interpolants.
 
 ## 2. Ce qui est vérifié, et comment
 
@@ -82,6 +83,13 @@ suivant en donne quelques-unes, prises dans les tests.
 | volumes finis (`pdepe`) | à flux nul aux deux bouts, l'intégrale de u se conserve à 1e-6 |
 | problème aux limites (`bvp4c`) | sin retrouvé à 1e-6 ; x³ exactement, la formule étant d'ordre quatre |
 | interpolation de `pdeval` | exacte sur les paraboles, valeurs et dérivées, maillage inégal compris |
+| triangulation de Delaunay | aucun point dans un cercle circonscrit, à 1e-9 ; les triangles pavent exactement l'enveloppe convexe |
+| enveloppe convexe de l'espace | Euler V − E + F = 2 ; 2n − 4 facettes quand tous les points y sont ; volume exact du cube et du tétraèdre |
+| forme alpha | à rayon infini, l'aire est celle de l'enveloppe convexe ; deux amas éloignés font deux régions |
+| interpolant dispersé | exact sur tout plan, et repasse par les données |
+| `pchip` contre `spline` | sur une marche, l'un ne dépasse jamais, l'autre ondule de 0,128 |
+| `makima` contre `akima` | sur un palier suivi d'une pente, l'un reste plat, l'autre ondule de 0,074 |
+| héritage de classe | une dérivée reçoit propriétés et méthodes, la redéfinition l'emporte, `isa` remonte la chaîne |
 
 ## 3. État par boîte à outils
 
@@ -93,7 +101,7 @@ distingue une boîte complète d'une boîte esquissée.
 |---|---:|---|
 | statistiques | 272 | complète : lois, tests, régression, classification, mélanges, HMM |
 | signal | 205 | complète : conception RIF et RII, analogique et numérique, spectres, mesures d'impulsion |
-| matlab | 263 | noyau du langage, en complément des 665 natives |
+| matlab | 272 | noyau du langage, en complément des 668 natives |
 | finance | 148 | complète : indicateurs techniques, portefeuille, actualisation |
 | images | 138 | complète : morphologie, filtres, couleur, segmentation, texture |
 | ondelettes | 129 | complète : DWT, paquets, MODWT, CWT, débruitage |
@@ -127,11 +135,12 @@ programme d'école qui montre à quoi il sert.
 | Simulink | schémas-blocs à solveur explicite, pas de boucle algébrique | solveur implicite, sous-systèmes, blocs à état discret |
 | Simscape | circuits électriques linéaires, continu et transitoire | composants non linéaires, autres domaines physiques |
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
-| Symbolique | dérivation, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, sortie LaTeX ; la simplification ne réduit que les cas triviaux | factorisation, développement, résolution d'équations |
+| Symbolique | dérivation, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, développement des produits et des puissances, résolution des équations polynomiales, sortie LaTeX ; la simplification ne réduit que les cas triviaux et les polynômes d'une variable | factorisation, décomposition en éléments simples, résolution des équations non polynomiales, arithmétique rationnelle exacte |
 | Calcul parallèle | `parfor`, `spmd` et `parfeval` s'exécutent vraiment sur un pool de fils ; chaque travailleur est un interpréteur neuf, sans mémoire partagée | tableaux distribués sur plusieurs machines, GPU |
 | Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice ; ICHOL et ILU préconditionnent, SYMRCM, SYMAMD et COLAMD réordonnent | factorisations creuses complètes — LU et Cholesky creux avec leur permutation |
 | Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF, qui demandent une bibliothèque externe |
 | Équations aux dérivées partielles | `pdepe` résout le cas parabolique et elliptique en 1-D, en plan, cylindrique et sphérique, par volumes finis et méthode des lignes ; `bvp4c` les problèmes aux limites par collocation d'ordre quatre | maillage adaptatif dans `bvp4c`, qui garde celui qu'on lui donne ; `bvp5c`, `ode15i`, les EDP en deux et trois dimensions |
+| Classes | `classdef` complet : propriétés, méthodes, opérateurs surchargés, `subsref`/`subsasgn`, méthodes statiques, événements, et l'héritage simple et multiple avec appel au constructeur du parent | `metaclass` et l'introspection `meta.*`, les classes `handle` avec `delete`, les attributs d'accès (`Access`, `SetAccess`) |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |
 | Durée des tests | la suite complète tient en quarante minutes | paralléliser l'exécution des scripts |

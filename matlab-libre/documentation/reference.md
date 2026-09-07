@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-665 fonctions ecrites en C++, reparties en 22 groupes.
+668 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2748 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+2770 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -70,7 +70,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 310 |
+| [`matlab`](reference/toolbox-matlab.md) | 332 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |

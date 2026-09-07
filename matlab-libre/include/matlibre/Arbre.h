@@ -94,6 +94,10 @@ struct DefinitionClasse {
     std::vector<std::string> dependantes;   // propriétés calculées par get.
     std::vector<std::string> statiques;     // méthodes appelables sans objet
     std::vector<std::string> evenements;    // noms déclarés par « events »
+    // Les ancetres transitifs, parents des parents compris. « isa » les
+    // consulte : un objet est de la classe de chacun d'eux.
+    std::vector<std::string> ancetres;
+    bool heritageFait = false;
     std::string aide;
     std::string fichier;   // d'où elle vient, pour « help » et le navigateur
     bool aMethode(const std::string& nom) const { return methodes.count(nom) > 0; }

@@ -349,6 +349,117 @@ double interpolerLineaire(const std::vector<double>& x, const std::vector<double
     return y[k] + t * (y[k + 1] - y[k]);
 }
 
+std::vector<Valeur> fnSpline(Interpreteur& it, Arguments args, int nargout);
+
+// Les pentes aux noeuds d'une interpolation d'Hermite cubique qui
+// preserve la forme : Fritsch et Carlson. Le principe tient en une
+// phrase — la ou les deux pentes voisines changent de signe, le noeud est
+// un extremum, et la pente y est nulle. C'est ce qui empeche la courbe de
+// depasser les donnees, ce qu'une spline fait volontiers.
+static std::vector<double> pentesPchip(const std::vector<double>& x,
+                                       const std::vector<double>& y) {
+    std::size_t n = x.size();
+    std::vector<double> d(n, 0.0);
+    if (n < 2) return d;
+    std::vector<double> h(n - 1), delta(n - 1);
+    for (std::size_t i = 0; i + 1 < n; ++i) {
+        h[i] = x[i + 1] - x[i];
+        delta[i] = (y[i + 1] - y[i]) / h[i];
+    }
+    if (n == 2) {
+        d[0] = d[1] = delta[0];
+        return d;
+    }
+    for (std::size_t i = 1; i + 1 < n; ++i) {
+        if (delta[i - 1] * delta[i] > 0.0) {
+            // La moyenne harmonique ponderee : elle reste entre les deux
+            // pentes, et s'annule des que l'une d'elles s'annule.
+            double w1 = 2.0 * h[i] + h[i - 1];
+            double w2 = h[i] + 2.0 * h[i - 1];
+            d[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+        } else {
+            d[i] = 0.0;
+        }
+    }
+    auto bout = [](double h1, double h2, double d1, double d2) {
+        double p = ((2.0 * h1 + h2) * d1 - h1 * d2) / (h1 + h2);
+        if (p * d1 <= 0.0) return 0.0;
+        if (d1 * d2 <= 0.0 && std::fabs(p) > std::fabs(3.0 * d1)) return 3.0 * d1;
+        return p;
+    };
+    d[0] = bout(h[0], h[1], delta[0], delta[1]);
+    d[n - 1] = bout(h[n - 2], h[n - 3], delta[n - 2], delta[n - 3]);
+    return d;
+}
+
+// Les pentes d'Akima, et sa version modifiee. Akima pondere les deux
+// pentes voisines par l'ecart des pentes d'a cote : la ou le voisinage
+// est droit, la pente suit, et une donnee lointaine n'influence pas.
+// La modification de 2019 ajoute la demi-somme au poids, ce qui evite la
+// division par zero quand deux pentes voisines sont egales, et supprime
+// l'ondulation que l'Akima d'origine produit sur un palier.
+static std::vector<double> pentesAkima(const std::vector<double>& x,
+                                       const std::vector<double>& y, bool modifie) {
+    std::size_t n = x.size();
+    std::vector<double> d(n, 0.0);
+    if (n < 2) return d;
+    std::vector<double> delta(n - 1);
+    for (std::size_t i = 0; i + 1 < n; ++i) delta[i] = (y[i + 1] - y[i]) / (x[i + 1] - x[i]);
+    if (n == 2) {
+        d[0] = d[1] = delta[0];
+        return d;
+    }
+    // Deux pentes fictives de chaque cote, prolongees par la regle
+    // d'Akima : m(0) = 2 m(1) - m(2).
+    std::vector<double> m(n + 3);
+    for (std::size_t i = 0; i + 1 < n; ++i) m[i + 2] = delta[i];
+    m[1] = 2.0 * m[2] - m[3];
+    m[0] = 2.0 * m[1] - m[2];
+    m[n + 1] = 2.0 * m[n] - m[n - 1];
+    m[n + 2] = 2.0 * m[n + 1] - m[n];
+    for (std::size_t i = 0; i < n; ++i) {
+        double w1 = std::fabs(m[i + 3] - m[i + 2]);
+        double w2 = std::fabs(m[i + 1] - m[i]);
+        if (modifie) {
+            w1 += std::fabs(m[i + 3] + m[i + 2]) / 2.0;
+            w2 += std::fabs(m[i + 1] + m[i]) / 2.0;
+        }
+        // Les poids sont croises : la pente de gauche est ponderee par la
+        // variation de droite, et reciproquement. C'est ce qui fait
+        // qu'un voisinage droit d'un cote impose sa pente, et c'est tout
+        // l'interet de la formule d'Akima.
+        if (w1 + w2 == 0.0) d[i] = (m[i + 1] + m[i + 2]) / 2.0;
+        else d[i] = (w1 * m[i + 1] + w2 * m[i + 2]) / (w1 + w2);
+    }
+    return d;
+}
+
+// Le polynome d'Hermite de la maille qui contient xi : il prend aux deux
+// bouts la valeur et la pente donnees, ce qui rend la courbe continue et
+// derivable, et la fait passer exactement par les donnees.
+static double evaluerHermite(const std::vector<double>& x, const std::vector<double>& y,
+                             const std::vector<double>& d, double xi) {
+    std::size_t n = x.size();
+    if (n == 0) return NAN;
+    if (n == 1) return y[0];
+    std::size_t k;
+    if (xi <= x.front()) k = 0;
+    else if (xi >= x.back()) k = n - 2;
+    else {
+        auto position = std::upper_bound(x.begin(), x.end(), xi);
+        k = (std::size_t)(position - x.begin()) - 1;
+        if (k >= n - 1) k = n - 2;
+    }
+    double h = x[k + 1] - x[k];
+    double t = (xi - x[k]) / h;
+    double t2 = t * t, t3 = t2 * t;
+    double h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+    double h10 = t3 - 2.0 * t2 + t;
+    double h01 = -2.0 * t3 + 3.0 * t2;
+    double h11 = t3 - t2;
+    return h00 * y[k] + h10 * h * d[k] + h01 * y[k + 1] + h11 * h * d[k + 1];
+}
+
 FONCTION(fnInterp1) {
     INUTILISE
     exigerArguments(args, 2, 5, "interp1");
@@ -402,6 +513,9 @@ FONCTION(fnInterp1) {
     }
     double borneBasse = x.empty() ? NAN : x.front();
     double borneHaute = x.empty() ? NAN : x.back();
+    // Les pentes d'une interpolation d'Hermite ne dependent pas du point
+    // interroge : on les calcule une fois pour tous.
+    std::vector<double> pentes;
     Valeur r = versDouble(cible);
     for (std::size_t k = 0; k < cible.nelem(); ++k) {
         double xi = cible.re[k];
@@ -430,11 +544,83 @@ FONCTION(fnInterp1) {
             for (std::size_t i = x.size(); i-- > 0;)
                 if (x[i] >= xi) v = y[i];
             r.re[k] = v;
-        } else {
+        } else if (methode == "linear") {
             r.re[k] = interpolerLineaire(x, y, xi, extrapoler);
+        } else if (methode == "spline") {
+            std::vector<Valeur> a = {Valeur::ligne(x), Valeur::ligne(y),
+                                     Valeur::scalaire(xi)};
+            r.re[k] = fnSpline(it, a, 1)[0].re[0];
+        } else if (methode == "pchip" || methode == "cubic" || methode == "v5cubic" ||
+                   methode == "makima" || methode == "akima") {
+            if (pentes.empty()) {
+                if (methode == "makima" || methode == "akima")
+                    pentes = pentesAkima(x, y, methode == "makima");
+                else
+                    pentes = pentesPchip(x, y);
+            }
+            r.re[k] = evaluerHermite(x, y, pentes, xi);
+        } else {
+            // Une methode inconnue ne doit pas se replier en silence sur
+            // l'interpolation lineaire : le resultat serait faux sans
+            // que rien ne le dise.
+            erreur("MATLAB:interp1:InvalidMethod",
+                   "Unrecognized interpolation method '" + methode + "'.");
         }
     }
     return {r};
+}
+
+// PCHIP et MAKIMA rendent, comme SPLINE, soit les valeurs interpolees
+// soit la forme par morceaux quand on ne leur donne pas de points.
+static std::vector<Valeur> hermitePublique(Arguments args, const char* nom,
+                                           bool akima, bool modifie) {
+    exigerArguments(args, 2, 3, nom);
+    for (std::size_t k = 0; k < args.size(); ++k) exigerNumerique(args[k], nom);
+    std::vector<double> x(args[0].re.begin(), args[0].re.end());
+    std::vector<double> y(args[1].re.begin(), args[1].re.end());
+    if (x.size() != y.size())
+        erreur("MATLAB:pchip:Tailles", "Il faut autant d'ordonnees que d'abscisses.");
+    if (x.size() < 2)
+        erreur("MATLAB:pchip:Points", "Il faut au moins deux points.");
+    std::vector<double> d = akima ? pentesAkima(x, y, modifie) : pentesPchip(x, y);
+    if (args.size() > 2) {
+        Valeur r = versDouble(args[2]);
+        for (std::size_t k = 0; k < r.nelem(); ++k)
+            r.re[k] = evaluerHermite(x, y, d, args[2].re[k]);
+        return {r};
+    }
+    // La forme « pp » : quatre coefficients par maille, du cube au terme
+    // constant, comme SPLINE et PPVAL les attendent.
+    std::size_t n = x.size();
+    Valeur pp = Valeur::structureVide();
+    pp.poserChamp("form", Valeur::texte("pp"));
+    pp.poserChamp("breaks", Valeur::ligne(x));
+    Valeur coefs = Valeur::matrice((int)n - 1, 4);
+    for (std::size_t i = 0; i + 1 < n; ++i) {
+        double h = x[i + 1] - x[i];
+        double pente = (y[i + 1] - y[i]) / h;
+        double c = (3.0 * pente - 2.0 * d[i] - d[i + 1]) / h;
+        double e = (d[i] + d[i + 1] - 2.0 * pente) / (h * h);
+        coefs.re[i + 0 * (n - 1)] = e;
+        coefs.re[i + 1 * (n - 1)] = c;
+        coefs.re[i + 2 * (n - 1)] = d[i];
+        coefs.re[i + 3 * (n - 1)] = y[i];
+    }
+    pp.poserChamp("coefs", coefs);
+    pp.poserChamp("pieces", Valeur::scalaire((double)(n - 1)));
+    pp.poserChamp("order", Valeur::scalaire(4.0));
+    pp.poserChamp("dim", Valeur::scalaire(1.0));
+    return {pp};
+}
+
+FONCTION(fnPchip) {
+    INUTILISE
+    return hermitePublique(args, "pchip", false, false);
+}
+
+FONCTION(fnMakima) {
+    INUTILISE
+    return hermitePublique(args, "makima", true, true);
 }
 
 FONCTION(fnInterp2) {
@@ -599,6 +785,10 @@ void enregistrerPolynomes(Interpreteur& it) {
     it.enregistrer("interp1", fnInterp1, "polynomes", "interp1  Interpolation 1-D.");
     it.enregistrer("interp2", fnInterp2, "polynomes", "interp2  Interpolation 2-D bilineaire.");
     it.enregistrer("spline", fnSpline, "polynomes", "spline  Spline cubique.");
+    it.enregistrer("pchip", fnPchip, "polynomes",
+                   "pchip  Interpolation cubique qui preserve la forme.");
+    it.enregistrer("makima", fnMakima, "polynomes",
+                   "makima  Interpolation d'Akima modifiee.");
     it.enregistrer("ppval", fnPpval, "polynomes", "ppval  Evalue une spline par morceaux.");
 }
 

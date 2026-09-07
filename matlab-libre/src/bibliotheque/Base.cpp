@@ -890,12 +890,42 @@ FONCTION(fnIsa) {
     std::string cible = args[1].versTexte();
     std::string reelle = args[0].classeNom();
     if (cible == reelle) return {Valeur::booleen(true)};
+    // Un objet est aussi de la classe de chacun de ses ancetres : c'est
+    // tout le propos de l'heritage, et « isa » est la ou on le lit.
+    if (args[0].classe == Classe::Objet) {
+        auto def = it.classeDefinie(reelle);
+        if (def)
+            for (const auto& ancetre : def->ancetres)
+                if (ancetre == cible) return {Valeur::booleen(true)};
+    }
     if (cible == "numeric") return {Valeur::booleen(args[0].estNumerique())};
     if (cible == "float")
         return {Valeur::booleen(args[0].classe == Classe::Double ||
                                 args[0].classe == Classe::Simple)};
     if (cible == "integer") return {Valeur::booleen(classeEntiere(args[0].classe))};
     return {Valeur::booleen(false)};
+}
+
+// Les classes dont une classe descend, la plus proche d'abord. MATLAB
+// rend les ancetres transitifs, pas seulement les parents immediats.
+FONCTION(fnSuperclasses) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "superclasses");
+    std::string nom = args[0].classe == Classe::Caractere || args[0].classe == Classe::Chaine
+                          ? args[0].versTexte()
+                          : args[0].classeNom();
+    auto def = it.classeDefinie(nom);
+    Valeur r = Valeur::celluleDims({0, 1});
+    if (!def) return {r};
+    std::vector<std::string> vus;
+    for (const auto& ancetre : def->ancetres) {
+        bool deja = false;
+        for (const auto& q : vus) deja = deja || q == ancetre;
+        if (!deja) vus.push_back(ancetre);
+    }
+    r = Valeur::celluleDims({vus.size(), 1});
+    for (std::size_t k = 0; k < vus.size(); ++k) r.cellules[k] = Valeur::texte(vus[k]);
+    return {r};
 }
 
 Valeur convertirVers(const Valeur& v, Classe c) {
@@ -1313,6 +1343,8 @@ void enregistrerBase(Interpreteur& it) {
     it.enregistrer("substruct", fnSubstruct, "base",
                    "substruct  Fabrique la structure d'acces de subsref.");
     it.enregistrer("isa", fnIsa, "base", "isa  Teste l'appartenance a une classe.");
+    it.enregistrer("superclasses", fnSuperclasses, "base",
+                   "superclasses  Les classes dont une classe descend.");
     it.enregistrer("cast", fnCast, "base", "cast  Conversion vers une classe nommee.");
     it.enregistrer("double", fnConversion<Classe::Double>, "base", "double  Conversion double.");
     it.enregistrer("typecast", fnTypecast, "base",
