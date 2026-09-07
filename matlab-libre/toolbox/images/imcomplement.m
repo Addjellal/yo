@@ -6,6 +6,8 @@ function c = imcomplement(image)
 %   Exemple :
 %      imcomplement([0 0.25 1])    % 1 0.75 0
 %      imcomplement(uint8([0 255]))    % 255 0
+%
+%   Voir aussi IMLINCOMB, IMADJUST, IMBINARIZE.
     if islogical(image)
         c = ~image;
     elseif isa(image, 'uint8')

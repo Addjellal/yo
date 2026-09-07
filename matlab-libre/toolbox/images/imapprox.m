@@ -6,6 +6,8 @@ function [indices, carte] = imapprox(indicesEntree, carteEntree, n)
 %      rng(1);
 %      [i, c] = imapprox(randi(64, 10, 10), rand(64, 3), 8);
 %      size(c, 1)                  % 8 : la palette est reduite
+%
+%   Voir aussi RGB2IND, IND2GRAY.
     rgb = ind2rgb(indicesEntree, carteEntree);
     [indices, carte] = rgb2ind(rgb, n);
 end

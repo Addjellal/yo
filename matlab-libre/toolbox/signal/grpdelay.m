@@ -11,6 +11,8 @@ function [gd, w] = grpdelay(b, a, n, fs)
 %      [b, a] = butter(4, 0.3);
 %      [gd, w] = grpdelay(b, a, 128);
 %      all(gd > 0)                 % 1 : un filtre causal retarde
+%
+%   Voir aussi PHASEZ, PHASEDELAY.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3 || isempty(n), n = 512; end
     b = b(:).';

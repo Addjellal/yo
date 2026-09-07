@@ -6,5 +6,7 @@ function lab = rgb2lab(rgb, varargin)
 %
 %   Exemple :
 %      rgb2lab([1 1 1])   % [100 0 0]
+%
+%   Voir aussi LAB2RGB, RGB2XYZ, XYZ2LAB.
     lab = xyz2lab(rgb2xyz(rgb), varargin{:});
 end

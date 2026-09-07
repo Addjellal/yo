@@ -6,6 +6,8 @@ function [h, t] = impz(b, a, n, fs)
 %
 %   Exemple :
 %      impz(1, [1 -0.5], 4)'   % [1 0.5 0.25 0.125]
+%
+%   Voir aussi STEPZ.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3 || isempty(n)
         if numel(a) > 1

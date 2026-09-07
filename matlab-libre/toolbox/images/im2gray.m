@@ -5,6 +5,8 @@ function g = im2gray(image)
 %   Exemple :
 %      max(abs(im2gray(reshape([0.2 0.4 0.6], 1, 1, 3)) - rgb2gray(reshape([0.2 0.4 0.6], 1, 1, 3)))) < 1e-12
 %      isequal(im2gray(rand(4)), im2gray(rand(4)) * 1)   % une image grise passe telle quelle
+%
+%   Voir aussi RGB2GRAY, IMSPLIT.
     if ndims(image) == 3 && size(image, 3) == 3
         g = rgb2gray(image);
     else

@@ -15,6 +15,8 @@ function y = predictReseau(reseau, X)
 %      reseau = trainNetwork(X, Y, {fullyConnectedLayer(4), reluLayer(), ...
 %               fullyConnectedLayer(2), softmaxLayer()}, trainingOptions('sgdm'));
 %      max(abs(sum(predictReseau(reseau, X), 1) - 1)) < 1e-10     % un softmax somme a un
+%
+%   Voir aussi TRAINNETWORK, PREDICT, CLASSIFY.
     y = X;
     couches = reseau.couches;
     for k = 1:numel(couches)

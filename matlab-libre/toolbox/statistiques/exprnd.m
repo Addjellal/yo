@@ -5,6 +5,8 @@ function r = exprnd(mu, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(exprnd(3, 1, 10000))            % proche de 3 : la moyenne est mu
+%
+%   Voir aussi EXPINV, EXPSTAT, EXPFIT, PDF, CDF, ICDF.
     if nargin < 1, mu = 1; end
     forme = statForme(size(mu), varargin);
     mu = statEtendre(mu, forme);

@@ -7,6 +7,8 @@ function [x, valeurs, drapeau, sortie] = paretosearch(fonction, nVariables, A, b
 %   Exemple :
 %      f = @(x) [x(1)^2, (x(1)-2)^2];
 %      [x, v] = paretosearch(f, 1, [], [], [], [], -2, 4);
+%
+%   Voir aussi GAMULTIOBJ, PATTERNSEARCH.
     if nargin < 3, A = []; end
     if nargin < 4, b = []; end
     if nargin < 5, Aeq = []; end

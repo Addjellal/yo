@@ -6,6 +6,8 @@ function seuil = graythresh(x)
 %      x = [zeros(50, 1); ones(50, 1)];
 %      seuil = graythresh(x);
 %      seuil > 0 && seuil < 1      % Otsu separe les deux modes
+%
+%   Voir aussi MULTITHRESH, IMBINARIZE, IMQUANTIZE.
     x = im2double(x);
     v = x(:);
     n = 256;

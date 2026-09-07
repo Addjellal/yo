@@ -9,6 +9,8 @@ function [largeur, debut, fin] = pulsewidth(x, fs, varargin)
 %      t = (0:0.001:0.5)';
 %      l = pulsewidth(double(sin(2*pi*10*t) > 0), 1000);
 %      abs(mean(l) - 0.05) < 0.01  % un rapport cyclique de moitie
+%
+%   Voir aussi PULSEPERIOD, PULSESEP, DUTYCYCLE.
     if nargin < 2 || isempty(fs), fs = 1; end
     positive = true;
     for k = 1:2:numel(varargin) - 1

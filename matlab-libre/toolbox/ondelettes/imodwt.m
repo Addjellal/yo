@@ -6,6 +6,8 @@ function x = imodwt(w, nom)
 %      x = sin((1:64) / 8);
 %      w = modwt(x, 'haar', 3);
 %      max(abs(imodwt(w, 'haar') - x)) < 1e-10    % la reconstruction est exacte
+%
+%   Voir aussi MODWT, MODWTMRA, WAVEREC.
     if nargin < 2 || isempty(nom), nom = 'haar'; end
     [Lo_D, Hi_D] = wfilters(nom, 'r');
     bas = Lo_D / sqrt(2);

@@ -2,6 +2,8 @@ function [m, v] = binostat(n, pr)
 %BINOSTAT Moyenne et variance de la loi binomiale.
 %   Exemple :
 %      [m,v] = binostat(10, 0.5)   % 5 et 2.5
+%
+%   Voir aussi BINOCDF, BINOINV, BINORND, BINOFIT, PDF, CDF.
     [n, pr] = statAjuster(n, pr);
     m = n .* pr;
     v = n .* pr .* (1 - pr);

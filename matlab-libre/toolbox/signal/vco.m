@@ -7,6 +7,8 @@ function y = vco(x, fc, fs)
 %
 %   Exemple :
 %      fs = 1e4;  t = (0:fs-1)'/fs;  y = vco(sin(2*pi*t), 1e3, fs);
+%
+%   Voir aussi CHIRP, MODULATE, DEMOD.
     if nargin < 2 || isempty(fc), fc = 1000; end
     if nargin < 3 || isempty(fs), fs = 10000; end
     x = double(x);

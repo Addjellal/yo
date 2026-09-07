@@ -5,6 +5,8 @@ function [ahat, bhat] = unifit(x)
 %   Exemple :
 %      [a, b] = unifit([2 3 5 7]);
 %      [a b]                       % 2 7 : les bornes observees
+%
+%   Voir aussi UNIFCDF, UNIFPDF, UNIFINV.
     x = double(x(:));
     ahat = min(x);
     bhat = max(x);

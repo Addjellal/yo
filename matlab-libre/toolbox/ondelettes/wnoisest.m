@@ -9,6 +9,8 @@ function sigma = wnoisest(C, L, niveaux)
 %   Exemple :
 %      [c, l] = wavedec(randn(1, 1024), 3, 'db2');
 %      wnoisest(c, l, 1)   % proche de 1
+%
+%   Voir aussi THSELECT, WDENCMP, WTHRESH.
     if nargin < 3 || isempty(niveaux), niveaux = 1; end
     sigma = zeros(1, numel(niveaux));
     for k = 1:numel(niveaux)

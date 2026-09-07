@@ -8,6 +8,8 @@ function [droites, accumulateur, theta, rho] = houghLines(bw, nombre)
 %      bw(20, 5:35) = true;
 %      droites = houghLines(bw, 1);
 %      size(droites, 1)            % 1 : une droite trouvee
+%
+%   Voir aussi HOUGH, HOUGHPEAKS, HOUGHLINES.
     if nargin < 2
         nombre = 5;
     end

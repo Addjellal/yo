@@ -8,6 +8,8 @@ function w = gausswin(n, alpha)
 %   Exemple :
 %      w = gausswin(64);
 %      abs(w(32) - max(w)) < 0.01  % le sommet est au milieu
+%
+%   Voir aussi KAISER, CHEBWIN, WINDOW.
     if nargin < 2, alpha = 2.5; end
     n = round(n);
     if n <= 1, w = ones(max(n, 0), 1); return, end

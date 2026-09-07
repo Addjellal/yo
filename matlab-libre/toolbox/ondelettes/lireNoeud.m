@@ -7,6 +7,8 @@ function donnees = lireNoeud(arbre, indice)
 %      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
 %      numel(lireNoeud(arbre, 0))      % 64 : la racine porte le signal
 %      isempty(lireNoeud(arbre, 999))  % 1 : un noeud absent rend vide
+%
+%   Voir aussi POSERNOEUD, INDICEDENOEUD, WPCOEF.
     if indice + 1 > numel(arbre.donnees) || ~any(arbre.noeuds == indice)
         donnees = [];
     else

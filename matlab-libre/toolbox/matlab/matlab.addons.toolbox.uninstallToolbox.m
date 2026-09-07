@@ -8,6 +8,8 @@ function matlab.addons.toolbox.uninstallToolbox(identifiant)
 %          matlab.addons.toolbox.uninstallToolbox('inconnue');
 %      catch
 %      end
+%
+%   Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX.
     racine = matlibre_racine_toolbox();
     cible = fullfile(racine, char(identifiant));
     if ~isfolder(cible)

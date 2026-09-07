@@ -9,6 +9,8 @@ function [x, q] = demod(y, fc, fs, methode, opt)
 %      porteuse = cos(2 * pi * 100 * t) .* (1 + 0.5 * cos(2 * pi * 5 * t));
 %      x = demod(porteuse, 100, 1000, 'am');
 %      numel(x)                    % 1000
+%
+%   Voir aussi MODULATE, HILBERT, ENVELOPE.
     if nargin < 3 || isempty(fs), fs = 1; end
     if nargin < 4 || isempty(methode), methode = 'am'; end
     y = double(y);

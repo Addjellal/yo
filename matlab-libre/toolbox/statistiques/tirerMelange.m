@@ -7,6 +7,8 @@ function [X, composantes] = tirerMelange(modele, n, varargin)
 %      m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
 %      [x, composantes] = tirerMelange(m, 500);
 %      all(composantes >= 1 & composantes <= 2)
+%
+%   Voir aussi FITGMDIST, RANDOM, CLUSTERMELANGE.
     if nargin < 2 || isempty(n)
         n = 1;
     end

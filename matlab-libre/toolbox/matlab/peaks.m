@@ -14,6 +14,8 @@ function [X, Y, Z] = peaks(a, b)
 %   Exemple :
 %      [X, Y, Z] = peaks(20);
 %      size(Z)                     % 20 20
+%
+%   Voir aussi SURF, CONTOUR, MESHGRID.
     if nargin == 0
         a = 49;
     end

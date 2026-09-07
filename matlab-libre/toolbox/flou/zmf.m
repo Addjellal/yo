@@ -5,6 +5,8 @@ function y = zmf(x, params)
 %
 %   Exemple :
 %      zmf(0, [2 8])   % 1
+%
+%   Voir aussi SMF, PIMF, SIGMF.
     a = params(1);
     b = params(2);
     x = double(x);

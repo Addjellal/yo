@@ -2,6 +2,8 @@ function y = wblpdf(x, a, b)
 %WBLPDF Densité de la loi de Weibull, d'échelle A et de forme B.
 %   Exemple :
 %      wblpdf(1, 1, 1)   % exp(-1)
+%
+%   Voir aussi WBLCDF, WBLINV, WBLRND, WBLSTAT, PDF, CDF.
     if nargin < 2, a = 1; end
     if nargin < 3, b = 1; end
     x = double(x);

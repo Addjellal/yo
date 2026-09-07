@@ -19,6 +19,8 @@ function [b, a] = invfreqz(h, w, nb, na, wt, iter, tol)
 %      [bt, at] = butter(4, 0.3);
 %      [h, w] = freqz(bt, at, 256);
 %      [b, a] = invfreqz(h, w, 4, 4);   % retrouve bt et at
+%
+%   Voir aussi PRONY, INVFREQS.
     if nargin < 5 || isempty(wt), wt = ones(numel(w), 1); end
     if nargin < 6 || isempty(iter), iter = 30; end
     if nargin < 7 || isempty(tol), tol = 1e-10; end

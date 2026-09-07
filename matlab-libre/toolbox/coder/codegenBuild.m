@@ -11,6 +11,8 @@ function [ok, message, sortie] = codegenBuild(nomFonction, varargin)
 %      fclose(f);
 %      r = codegen('carreDeTest', '-args', {0}, '-report');
 %      contains(r.source, 'carreDeTest')      % 1
+%
+%   Voir aussi CODEGEN, CODER.TYPEOF.
     dossier = tempdir();
     executable = false;
     options = {};

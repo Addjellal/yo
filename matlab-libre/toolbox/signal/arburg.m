@@ -11,6 +11,8 @@ function [a, e, k] = arburg(x, p)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      [a, e] = arburg(x, 4);
 %      all(abs(roots(a)) < 1) % 1 : Burg garantit un modele stable
+%
+%   Voir aussi ARYULE, ARCOV, ARMCOV, PBURG.
     x = double(x(:));
     n = numel(x);
     avant = x;

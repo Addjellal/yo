@@ -8,6 +8,8 @@ function [descripteurs, positionsValides] = extractFeatures(I, positions, taille
 %      I = rand(40);
 %      [d, p] = extractFeatures(I, [10 10; 20 20], 5);
 %      size(d, 1)                  % 2 : un descripteur par point
+%
+%   Voir aussi DETECTHARRISFEATURES, MATCHFEATURES, SELECTSTRONGEST.
     if nargin < 3
         taille = 5;
     end

@@ -8,6 +8,8 @@ function [positions, reponses] = detectHarrisFeatures(I, varargin)
 %      I(15:25, 15:25) = 1;
 %      [p, r] = detectHarrisFeatures(I);
 %      size(p, 2)                  % 2
+%
+%   Voir aussi DETECTFASTFEATURES, EXTRACTFEATURES, MATCHFEATURES.
     qualiteMin = 0.01;
     for k = 1:2:numel(varargin)-1
         if strcmpi(char(varargin{k}), 'minquality')

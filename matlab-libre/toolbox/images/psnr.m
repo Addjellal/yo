@@ -7,6 +7,8 @@ function [p, snrValeur] = psnr(a, reference, maximum)
 %      x = rand(32, 32);
 %      psnr(x, x)                  % Inf : deux images identiques
 %      psnr(x, x + 0.01 * randn(32, 32)) > 30
+%
+%   Voir aussi SSIM, IMMSE, IMNOISE.
     if nargin < 3 || isempty(maximum)
         if isa(a, 'uint8'), maximum = 255;
         elseif isa(a, 'uint16'), maximum = 65535;

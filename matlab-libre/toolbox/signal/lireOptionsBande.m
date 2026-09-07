@@ -8,6 +8,8 @@ function [w, options] = lireOptionsBande(w, varargin)
 %   Exemple :
 %      [w, o] = lireOptionsBande(200, 1000, 'Steepness', 0.9);
 %      w                           % 0.4 : 200 Hz a 1 kHz
+%
+%   Voir aussi LOWPASS, HIGHPASS, CONCEVOIRBANDE.
     options = struct('Steepness', 0.85, 'StopbandAttenuation', 60, ...
                      'ImpulseResponse', 'iir');
     w = double(w(:)).';

@@ -5,6 +5,8 @@ function x = finv(p, d1, d2)
 %
 %   Exemple :
 %      finv(0.95, 2, 30)     % 3.3158
+%
+%   Voir aussi FPDF, FCDF, FRND, FSTAT, PDF, CDF.
     [p, d1] = matlibre_diffuser_deux(p, d1, 'finv');
     [p, d2] = matlibre_diffuser_deux(p, d2, 'finv');
     [d1, d2] = matlibre_diffuser_deux(d1, d2, 'finv');

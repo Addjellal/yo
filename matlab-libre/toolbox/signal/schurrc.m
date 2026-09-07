@@ -7,6 +7,8 @@ function [k, e] = schurrc(r)
 %
 %   Exemple :
 %      k = schurrc([1 0.5 0.25]);   % [-0.5 0]
+%
+%   Voir aussi POLY2RC, LEVINSON, AC2RC.
     r = double(r(:)).';
     p = numel(r) - 1;
     k = zeros(p, 1);

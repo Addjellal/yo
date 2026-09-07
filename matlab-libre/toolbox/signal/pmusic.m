@@ -11,6 +11,8 @@ function [S, f] = pmusic(x, p, nfft, fs)
 %      [S, f] = pmusic(x, 4, 1024, 1000);
 %      [~, k] = max(S);
 %      abs(f(k) - 100) < 5      % 1 : le sous-espace signal trouve la raie
+%
+%   Voir aussi PEIG, ROOTMUSIC, PBURG.
     if nargin < 3 || isempty(nfft), nfft = 256; end
     if nargin < 4 || isempty(fs), fs = 1; end
     [R, m] = signalMatriceCorrelation(x, p, false);

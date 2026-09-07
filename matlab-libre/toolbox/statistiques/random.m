@@ -12,6 +12,8 @@ function r = random(nom, varargin)
 %      random('Poisson', 4, 1, 5)              % cinq tirages
 %      pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
 %      size(random(pd, 1, 10))                 % 1 10
+%
+%   Voir aussi PDF, CDF, ICDF, FITDIST.
     if isstruct(nom) && isfield(nom, 'type') && strcmp(nom.type, 'melange-gaussien')
         r = tirerMelange(nom, varargin{:});
         return

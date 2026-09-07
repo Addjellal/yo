@@ -5,6 +5,8 @@ function y = humps(x)
 %   Exemple :
 %      humps(0.3)                  % environ 96 : le sommet de la courbe
 %      fzero(@humps, [1 2]) > 1        % elle change de signe entre 1 et 2
+%
+%   Voir aussi PEAKS.
     if nargin < 1
         x = linspace(0, 1, 101);
     end

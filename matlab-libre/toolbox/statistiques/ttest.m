@@ -7,6 +7,8 @@ function [h, p, ci, stats] = ttest(x, mu, alpha)
 %      rng(1);
 %      [h, p] = ttest(normrnd(0, 1, 100, 1));
 %      h                           % 0 : on ne rejette pas la moyenne nulle
+%
+%   Voir aussi TTEST2, SIGNRANK, KSTEST, ANOVA1.
     if nargin < 2 || isempty(mu)
         mu = 0;
     end

@@ -15,6 +15,8 @@ function sortie = bwmorph(bw, operation, n)
 %   Exemple :
 %      bw = false(5); bw(3,3) = true;
 %      bwmorph(bw, 'clean')   % le pixel isolé disparaît
+%
+%   Voir aussi BWSKEL, BWPERIM, BWHITMISS, STREL.
     if nargin < 3 || isempty(n), n = 1; end
     bw = logical(bw);
     operation = lower(char(operation));

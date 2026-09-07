@@ -5,6 +5,8 @@ function sortie = nlfilter(image, voisinage, fonction)
 %
 %   Exemple :
 %      nlfilter(magic(4), [3 3], @(x) max(x(:)))
+%
+%   Voir aussi COLFILT, BLOCKPROC, IMFILTER.
     image = double(image);
     [h, l] = size(image);
     m = voisinage(1);

@@ -8,6 +8,8 @@ function options = poserOptions(options, nomFonction, varargin)
 %   Exemple :
 %      o = poserOptions(struct('Alpha', 1), 'essai', 'Alpha', 3);
 %      o.Alpha                     % 3
+%
+%   Voir aussi ANFISOPTIONS, EVALFISOPTIONS, FCMOPTIONS.
     if numel(varargin) == 1 && isstruct(varargin{1})
         fournies = varargin{1};
         noms = fieldnames(fournies);

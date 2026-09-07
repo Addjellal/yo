@@ -5,6 +5,8 @@ function r = bboxOverlapRatio(a, b)
 %   Exemple :
 %      bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
 %      bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
+%
+%   Voir aussi BBOXOVERLAPRATIOMATRIX, SELECTSTRONGESTBBOX, BBOX2POINTS.
     r = zeros(size(a, 1), size(b, 1));
     for i = 1:size(a, 1)
         for j = 1:size(b, 1)

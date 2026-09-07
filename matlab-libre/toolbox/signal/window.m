@@ -5,6 +5,8 @@ function w = window(fonction, n, varargin)
 %
 %   Exemple :
 %      w = window(@kaiser, 64, 5);
+%
+%   Voir aussi KAISER.
     if ischar(fonction) || isstring(fonction)
         fonction = str2func(char(fonction));
     end

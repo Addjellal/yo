@@ -7,6 +7,8 @@ function [boites, scores, indices] = selectStrongestBbox(boites, scores, seuil)
 %   Exemple :
 %      b = [1 1 10 10; 2 2 10 10; 50 50 10 10];
 %      size(selectStrongestBbox(b, [0.9; 0.8; 0.7]), 1)   % 2
+%
+%   Voir aussi SELECTSTRONGEST, BBOXOVERLAPRATIO.
     if nargin < 3 || isempty(seuil), seuil = 0.5; end
     [~, ordre] = sort(scores(:), 'descend');
     gardes = [];

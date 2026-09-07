@@ -6,6 +6,8 @@ function g = czt(x, m, w, a)
 %
 %   Exemple :
 %      n = 8; norm(czt(1:n) - fft((1:n)')) < 1e-10
+%
+%   Voir aussi DFTMTX, GOERTZEL.
     x = x(:);
     n = numel(x);
     if nargin < 2 || isempty(m), m = n; end

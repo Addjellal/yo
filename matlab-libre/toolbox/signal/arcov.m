@@ -9,6 +9,8 @@ function [a, e] = arcov(x, p)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      [a, e] = arcov(x, 4);
 %      numel(a)                    % 5 : un modele d'ordre quatre
+%
+%   Voir aussi ARMCOV, ARBURG, ARYULE, PCOV.
     x = double(x(:));
     n = numel(x);
     if p >= n

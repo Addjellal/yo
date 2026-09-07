@@ -11,4 +11,6 @@ function uiwait(~, ~)
 %      uiwait(f, 0.01);            % rend la main aussitot : les rappels sont deja passes
 %      uiresume(f);
 %      close all;
+%
+%   Voir aussi UIRESUME, UIFIGURE.
 end

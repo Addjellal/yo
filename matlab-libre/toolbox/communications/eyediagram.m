@@ -7,6 +7,8 @@ function segments = eyediagram(x, n)
 %      rng(1);
 %            eyediagram(rcosdesign(0.25, 4, 8) , 16);
 %            close all;
+%
+%   Voir aussi SCATTERPLOT, RCOSDESIGN, PSKMOD.
     x = x(:).';
     m = floor(numel(x) / n);
     segments = reshape(x(1:m*n), n, m).';

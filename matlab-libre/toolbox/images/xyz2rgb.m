@@ -6,6 +6,8 @@ function rgb = xyz2rgb(xyz, varargin)
 %   Exemple :
 %      rgb = xyz2rgb([0.9504 1 1.0888]);
 %      max(abs(rgb - [1 1 1])) < 1e-2      % le blanc D65 donne du blanc
+%
+%   Voir aussi RGB2XYZ, XYZ2LAB, MATRICERVBVERSXYZ.
     blanc = [];
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

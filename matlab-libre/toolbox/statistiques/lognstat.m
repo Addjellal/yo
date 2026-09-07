@@ -4,6 +4,8 @@ function [m, v] = lognstat(mu, sigma)
 %
 %   Exemple :
 %      [m,v] = lognstat(0, 1)   % exp(0.5) et e(e-1)
+%
+%   Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
     if nargin < 1, mu = 0; end
     if nargin < 2, sigma = 1; end
     [mu, sigma] = statAjuster(mu, sigma);

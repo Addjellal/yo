@@ -10,6 +10,8 @@ function b = fir2(n, f, m, fenetre)
 %
 %   Exemple :
 %      b = fir2(20, [0 0.5 0.5 1], [1 1 0 0]);
+%
+%   Voir aussi FIR1, FIRLS, FIRPM.
     if nargin < 4 || isempty(fenetre), fenetre = hamming(n + 1); end
     f = f(:).';
     m = m(:).';

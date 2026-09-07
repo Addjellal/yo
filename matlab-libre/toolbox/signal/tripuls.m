@@ -5,6 +5,8 @@ function y = tripuls(t, w, s)
 %
 %   Exemple :
 %      tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
+%
+%   Voir aussi RECTPULS, GAUSPULS, PULSTRAN.
     if nargin < 2 || isempty(w), w = 1; end
     if nargin < 3 || isempty(s), s = 0; end
     if s < -1 || s > 1

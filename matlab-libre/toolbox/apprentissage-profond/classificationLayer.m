@@ -7,5 +7,7 @@ function c = classificationLayer(varargin)
 %      couches = {featureInputLayer(3), fullyConnectedLayer(2), ...
 %                 softmaxLayer(), classificationLayer()};
 %      numel(couches)              % 4
+%
+%   Voir aussi SOFTMAXLAYER, CROSSENTROPY, REGRESSIONLAYER.
     c = struct('type', 'classification', 'nom', matlibre_couche_nom(varargin));
 end

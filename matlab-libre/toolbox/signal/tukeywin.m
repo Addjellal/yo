@@ -5,6 +5,8 @@ function w = tukeywin(n, r)
 %
 %   Exemple :
 %      isequal(tukeywin(8, 0), rectwin(8))   % vrai
+%
+%   Voir aussi WINDOW.
     if nargin < 2, r = 0.5; end
     n = round(n);
     if n <= 1, w = ones(max(n, 0), 1); return, end

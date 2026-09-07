@@ -7,6 +7,8 @@ function [h, v, d] = detcoef2(genre, C, S, niveau)
 %      [C, S] = wavedec2(magic(8), 2, 'haar');
 %      [h, v, d] = detcoef2('all', C, S, 1);
 %      size(h)                     % les details horizontaux du premier niveau
+%
+%   Voir aussi APPCOEF2, WAVEDEC2, WRCOEF2.
     niveauMax = size(S, 1) - 2;
     if niveau > niveauMax || niveau < 1
         error('wavelet:detcoef2:BadLevel', 'Niveau hors de la décomposition.');

@@ -12,6 +12,8 @@ function transitions = signalTransitions(x, t, basPct, hautPct)
 %      tr = signalTransitions(double(t >= 0.05), t, 10, 90);
 %      size(tr, 2)                 % 5 colonnes
 %      tr(1, 4)                    % 1 : la transition est montante
+%
+%   Voir aussi SIGNALTRAVERSES, SIGNALNIVEAUX, RISETIME.
     if nargin < 3 || isempty(basPct), basPct = 10; end
     if nargin < 4 || isempty(hautPct), hautPct = 90; end
     x = double(x(:));

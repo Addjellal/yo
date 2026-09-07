@@ -11,6 +11,8 @@ function y = fwht(x, n, ordre)
 %
 %   Exemple :
 %      fwht([1 0 0 0])   % [0.25 0.25 0.25 0.25]
+%
+%   Voir aussi IFWHT, PAPILLONHADAMARD.
     if nargin < 3, ordre = 'sequency'; end
     x = double(x);
     ligne = isrow(x);

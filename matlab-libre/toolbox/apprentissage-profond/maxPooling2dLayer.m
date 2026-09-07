@@ -6,6 +6,8 @@ function c = maxPooling2dLayer(taille, varargin)
 %   Exemple :
 %      c = maxPooling2dLayer(2);
 %      c.taille                    % 2 2 : une fenetre carree
+%
+%   Voir aussi AVERAGEPOOLING2DLAYER, MAXPOOL, CONVOLUTION2DLAYER.
     if numel(taille) < 2, taille = [taille taille]; end
     pas = taille;
     for k = 1:2:numel(varargin) - 1

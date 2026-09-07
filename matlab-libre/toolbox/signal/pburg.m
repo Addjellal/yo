@@ -8,6 +8,8 @@ function [pxx, f] = pburg(x, p, nfft, fs)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      [pxx, f] = pburg(x, 4, 128, 1);
 %      numel(pxx) == numel(f)      % 1
+%
+%   Voir aussi PYULEAR, PCOV, PMCOV, ARBURG.
     if nargin < 3 || isempty(nfft), nfft = 256; end
     if nargin < 4 || isempty(fs), fs = 1; end
     [a, e] = arburg(x, p);

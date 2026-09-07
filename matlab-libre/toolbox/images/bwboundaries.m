@@ -12,6 +12,8 @@ function [contours, etiquettes, nombre, adjacence] = bwboundaries(bw, connexite,
 %   Exemple :
 %      bw = false(5); bw(2:4, 2:4) = true;
 %      b = bwboundaries(bw);   % un contour de huit points plus le retour
+%
+%   Voir aussi BWTRACEBOUNDARY, BWPERIM, BWLABEL.
     if nargin < 2 || isempty(connexite), connexite = 8; end
     if nargin < 3, options = 'holes'; end
     if ischar(connexite) || isstring(connexite)

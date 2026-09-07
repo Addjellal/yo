@@ -6,6 +6,8 @@ function seuils = multithresh(image, n)
 %
 %   Exemple :
 %      multithresh([zeros(1,50) ones(1,50)], 1)   % proche de 0,5
+%
+%   Voir aussi GRAYTHRESH, IMQUANTIZE, IMBINARIZE.
     if nargin < 2, n = 1; end
     x = im2double(image);
     x = x(:);

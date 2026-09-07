@@ -5,6 +5,8 @@ function [m, v] = fstat(v1, v2)
 %
 %   Exemple :
 %      [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
+%
+%   Voir aussi FPDF, FCDF, FINV, FRND, PDF, CDF.
     [v1, v2] = statAjuster(v1, v2);
     m = NaN(size(v1));
     v = NaN(size(v1));

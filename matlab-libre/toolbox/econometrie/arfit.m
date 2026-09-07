@@ -8,6 +8,8 @@ function [phi, bruit, constante] = arfit(y, p)
 %      y = arsim(0.7, 500);
 %      p = arfit(y, 1);
 %      abs(p(1) - 0.7) < 0.15
+%
+%   Voir aussi ARSIM, ARYULE, ARIMA, ESTIMATE.
     y = y(:);
     m = mean(y);
     z = y - m;

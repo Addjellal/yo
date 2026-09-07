@@ -5,5 +5,7 @@ function y = dsigmf(x, params)
 %   Exemple :
 %      y = dsigmf([0 5 10], [2 2 2 8]);
 %      all(y >= 0 & y <= 1)        % 1 : c'est une appartenance
+%
+%   Voir aussi SIGMF, PSIGMF, GAUSSMF.
     y = sigmf(x, params(1:2)) - sigmf(x, params(3:4));
 end

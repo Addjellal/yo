@@ -7,6 +7,8 @@ function [etiquettes, scores] = predictBayesNaif(modele, X)
 %      X = [randn(40, 2); randn(40, 2) + 3];
 %      y = [ones(40, 1); 2 * ones(40, 1)];
 %      mean(predictBayesNaif(fitcnb(X, y), X) == y) > 0.9
+%
+%   Voir aussi FITCNB, PREDICT.
     X = double(X);
     n = size(X, 1);
     k = numel(modele.Classes);

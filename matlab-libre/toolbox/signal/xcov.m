@@ -5,6 +5,8 @@ function [c, decalages] = xcov(x, y, maxDecalage, echelle)
 %
 %   Exemple :
 %      c = xcov([1 2 3 4], 'coeff');   % c(4) == 1
+%
+%   Voir aussi CORRMTX.
     if nargin < 2 || (ischar(y) || isstring(y))
         if nargin >= 2, echelle = y; end
         y = x;

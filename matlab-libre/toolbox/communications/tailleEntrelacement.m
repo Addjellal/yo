@@ -6,6 +6,8 @@ function n = tailleEntrelacement(donnees)
 %   Exemple :
 %      tailleEntrelacement((1:10)')      % 10
 %            tailleEntrelacement(zeros(6, 3))  % 6 : une matrice s'entrelace par lignes
+%
+%   Voir aussi INTRLV, DEINTRLV, VERIFIERPERMUTATION.
     if isvector(donnees)
         n = numel(donnees);
     else

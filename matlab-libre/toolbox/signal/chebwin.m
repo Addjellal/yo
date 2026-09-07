@@ -11,6 +11,8 @@ function w = chebwin(n, r)
 %
 %   Exemple :
 %      w = chebwin(51, 60);   % lobes secondaires à -60 dB
+%
+%   Voir aussi TAYLORWIN, KAISER, WINDOW.
     if nargin < 2, r = 100; end
     n = round(n);
     if n <= 1

@@ -7,6 +7,8 @@ function [n, Wn] = buttord(Wp, Ws, Rp, Rs)
 %
 %   Exemple :
 %      [n, Wn] = buttord(0.2, 0.4, 1, 40);   % n = 8
+%
+%   Voir aussi BUTTER, CHEB1ORD, CHEB2ORD, ELLIPORD.
     wp = tan(pi * Wp / 2);
     ws = tan(pi * Ws / 2);
     numerateur = log10((10^(Rs / 10) - 1) / (10^(Rp / 10) - 1));

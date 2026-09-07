@@ -5,6 +5,8 @@ function d = years(x)
 %
 %   Exemple :
 %      days(years(1))              % 365.2425 : l'annee moyenne du calendrier gregorien
+%
+%   Voir aussi DAYS, CALYEARS, DURATION.
     if isa(x, 'duration')
         d = x.Secondes / 31556952;
     elseif isa(x, 'calendarDuration')

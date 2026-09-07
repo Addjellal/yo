@@ -19,6 +19,8 @@ function [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, zeros_, gain, 
 %      [z0, p0, k0] = buttap(4);
 %      [b, a] = prototypeVersNumerique(p0, z0, k0, 0.3, 'low');
 %      numel(a) - 1                % 4 : l'ordre est conserve en passe-bas
+%
+%   Voir aussi BUTTER, BILINEAR, BUTTAP.
     if nargin < 6, gainReference = 1; end
     poles = poles(:);
     zeros_ = zeros_(:);

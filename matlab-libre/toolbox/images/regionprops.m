@@ -9,6 +9,8 @@ function s = regionprops(entree, varargin)
 %   Exemple :
 %      s = regionprops(bwlabel([1 1 0; 1 1 0; 0 0 1]));
 %      s(1).Area   % 4
+%
+%   Voir aussi BWLABEL, BWCONNCOMP, BWAREAFILT.
     if islogical(entree)
         [etiquettes, nombre] = bwlabel(entree, 8);
     else

@@ -7,6 +7,8 @@ function [premier, second] = ordresBior(nom, prefixe)
 %   Exemple :
 %      [nr, nd] = ordresBior('bior2.4', 'bior');
 %      [nr nd]                     % 2 4
+%
+%   Voir aussi ORDREDENOM, WFILTERS, BIORFILT.
     nom = lower(strtrim(char(nom)));
     n = numel(prefixe);
     if numel(nom) <= n || ~strcmp(nom(1:n), prefixe)

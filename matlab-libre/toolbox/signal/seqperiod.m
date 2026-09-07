@@ -5,6 +5,8 @@ function [p, erreur_] = seqperiod(x)
 %
 %   Exemple :
 %      seqperiod([1 2 1 2 1 2])   % 2
+%
+%   Voir aussi BUFFER, FINDPEAKS.
     x = x(:);
     n = numel(x);
     meilleur = n;

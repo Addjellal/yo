@@ -15,6 +15,8 @@ function [r, p, k] = residue(b, a, varargin)
 %
 %   Exemple :
 %      [r,p,k] = residue([1 0], [1 3 2])   % 1/(s+1) et -... sur s+2
+%
+%   Voir aussi RESIDUEZ.
     if nargin >= 3 && ~isempty(varargin)
         [r, p] = recomposer(b, a, varargin{1});
         k = [];

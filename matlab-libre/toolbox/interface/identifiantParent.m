@@ -6,6 +6,8 @@ function id = identifiantParent(parent)
 %   Exemple :
 %      f = uifigure();
 %      identifiantParent(f) == identifiantParent(f)      % 1
+%
+%   Voir aussi UIFIGURE, UIPANEL.
     if nargin < 1 || isempty(parent)
         id = matlibre_ui_figure();
     elseif isa(parent, 'UIComposant')

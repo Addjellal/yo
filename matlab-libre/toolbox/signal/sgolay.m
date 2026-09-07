@@ -10,6 +10,8 @@ function [b, g] = sgolay(ordre, longueur, poids)
 %
 %   Exemple :
 %      b = sgolay(2, 5);   % lissage quadratique sur cinq points
+%
+%   Voir aussi SGOLAYFILT.
     if mod(longueur, 2) ~= 1
         error('signal:sgolay:EvenFrameLength', 'La longueur doit être impaire.');
     end

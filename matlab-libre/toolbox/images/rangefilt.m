@@ -5,6 +5,8 @@ function r = rangefilt(image, voisinage)
 %
 %   Exemple :
 %      rangefilt([1 2; 3 4])(1, 1)   % 3
+%
+%   Voir aussi STDFILT, ENTROPYFILT, ORDFILT2.
     if nargin < 2, voisinage = ones(3); end
     n = sum(sum(logical(voisinage)));
     haut = ordfilt2(image, n, voisinage, 'symmetric');

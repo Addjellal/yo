@@ -9,6 +9,8 @@ function [indices, carte] = rgb2ind(rgb, n)
 %
 %   Exemple :
 %      [x, map] = rgb2ind(cat(3, [0 1], [0 1], [0 1]), 2);
+%
+%   Voir aussi IND2RGB, IMAPPROX, GRAY2IND.
     rgb = im2double(rgb);
     d = size(rgb);
     pixels = reshape(rgb, [], 3);

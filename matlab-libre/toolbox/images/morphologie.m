@@ -9,6 +9,8 @@ function y = morphologie(x, element, operation)
 %      bw = false(10);
 %      bw(5, 5) = true;
 %      sum(sum(morphologie(double(bw), ones(3), 'dilate')))   % 9 : le point s'epaissit
+%
+%   Voir aussi IMERODE, IMDILATE, IMOPEN, STREL.
     x = double(x);
     [h, l] = size(x);
     [he, le] = size(element);

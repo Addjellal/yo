@@ -4,6 +4,8 @@ function x = poissinv(p, lambda)
 %
 %   Exemple :
 %      poissinv(0.5, 4)            % 4 : la mediane d'une loi de Poisson de moyenne 4
+%
+%   Voir aussi POISSCDF, POISSRND, POISSFIT, PDF, CDF, ICDF.
     [p, lambda] = statAjuster(p, lambda);
     x = zeros(size(p));
     for k = 1:numel(p)

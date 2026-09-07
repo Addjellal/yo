@@ -5,6 +5,8 @@ function y = upcoef(genre, x, nom, niveaux, longueur)
 %
 %   Exemple :
 %      upcoef('a', 1, 'haar', 1)   % [0.7071 0.7071]
+%
+%   Voir aussi WRCOEF, IDWT, WAVEDEC.
     if nargin < 4 || isempty(niveaux), niveaux = 1; end
     x = double(x(:)).';
     for k = 1:niveaux

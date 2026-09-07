@@ -10,6 +10,8 @@ function [niveaux, histogramme, bornes] = statelevels(x, nbins, methode, limites
 %
 %   Exemple :
 %      statelevels([zeros(1,50) ones(1,50)])   % [0 1]
+%
+%   Voir aussi MIDCROSS, RISETIME, SIGNALNIVEAUX.
     if nargin < 2 || isempty(nbins), nbins = 100; end
     if nargin < 3 || isempty(methode), methode = 'mode'; end
     x = double(x(:));

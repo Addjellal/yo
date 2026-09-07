@@ -5,6 +5,8 @@ function d = finddelay(x, y, maxDecalage)
 %
 %   Exemple :
 %      x = [1 2 3 0 0]; y = [0 0 1 2 3]; finddelay(x, y)   % 2
+%
+%   Voir aussi ALIGNSIGNALS.
     x = x(:);
     y = y(:);
     if nargin < 3 || isempty(maxDecalage)

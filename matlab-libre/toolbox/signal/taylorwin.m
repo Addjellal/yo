@@ -10,6 +10,8 @@ function w = taylorwin(n, nbar, sll)
 %
 %   Exemple :
 %      w = taylorwin(64, 5, -35);
+%
+%   Voir aussi CHEBWIN, KAISER, WINDOW.
     if nargin < 2 || isempty(nbar), nbar = 4; end
     if nargin < 3 || isempty(sll), sll = -30; end
     n = round(n);

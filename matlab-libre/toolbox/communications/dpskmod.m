@@ -6,6 +6,8 @@ function y = dpskmod(x, M, phase)
 %
 %   Exemple :
 %      y = dpskmod([0 1 0], 2);   % [1 -1 -1] : la phase bascule au 1
+%
+%   Voir aussi DPSKDEMOD, PSKMOD, PSKDEMOD.
     if nargin < 3, phase = 0; end
     x = x(:);
     n = numel(x);

@@ -9,6 +9,8 @@ function M = normaliserLignes(M)
 %      M = normaliserLignes([1 3; 0 0; 2 2]);
 %      sum(M(1, :))                % 1
 %      all(M(2, :) == 0)           % 1 : une ligne nulle le reste
+%
+%   Voir aussi HMMTRAIN, HMMGENERATE, TRANSPROB.
     sommes = sum(M, 2);
     for k = 1:numel(sommes)
         if sommes(k) > 0

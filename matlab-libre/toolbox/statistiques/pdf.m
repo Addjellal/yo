@@ -15,6 +15,8 @@ function y = pdf(nom, x, varargin)
 %      pdf('Normal', 0, 0, 1)                  % 0.3989
 %      pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
 %      abs(pdf(pd, pd.mu) - normpdf(pd.mu, pd.mu, pd.sigma)) < 1e-12
+%
+%   Voir aussi CDF, ICDF, RANDOM, FITDIST.
     if isstruct(nom) && isfield(nom, 'type') && strcmp(nom.type, 'melange-gaussien')
         [~, ~, y] = clusterMelange(nom, x);
         return

@@ -9,6 +9,8 @@ function c = convolution2dLayer(taille, filtres, varargin)
 %
 %   Exemple :
 %      c = convolution2dLayer(3, 8, 'Padding', 'same');
+%
+%   Voir aussi MAXPOOLING2DLAYER, RELULAYER, DLCONV.
     if numel(taille) < 2, taille = [taille taille]; end
     pas = 1;
     marge = 0;

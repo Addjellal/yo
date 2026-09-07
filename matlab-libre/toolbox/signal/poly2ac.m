@@ -7,6 +7,8 @@ function r = poly2ac(a, efinal)
 %      a = [1 -0.5 0.2];
 %      r = poly2ac(a, 1);
 %      max(abs(ac2poly(r) - a)) < 1e-10       % l'aller-retour
+%
+%   Voir aussi AC2POLY, POLY2RC, LEVINSON.
     [k, e] = poly2rc(a, efinal);
     if isempty(k)
         r = efinal;

@@ -4,6 +4,8 @@ function [moy, v] = hygestat(m, k, n)
 %
 %   Exemple :
 %      [m,v] = hygestat(10, 4, 3)   % 1.2 et 0.56
+%
+%   Voir aussi HYGEPDF, HYGECDF, HYGEINV, HYGERND, PDF, CDF.
     [m, k, n] = statAjuster(m, k, n);
     moy = n .* k ./ m;
     v = n .* (k ./ m) .* ((m - k) ./ m) .* ((m - n) ./ (m - 1));

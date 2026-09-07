@@ -5,6 +5,8 @@ function r = calquarters(x)
 %
 %   Exemple :
 %      calquarters(1) == calmonths(3)     % 1 : un trimestre fait trois mois
+%
+%   Voir aussi CALMONTHS, CALYEARS, DATETIME.
     if isa(x, 'calendarDuration')
         r = fix(x.Mois / 3);
     else

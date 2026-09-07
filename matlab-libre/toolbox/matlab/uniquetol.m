@@ -6,6 +6,8 @@ function [u, ia] = uniquetol(x, tol)
 %   Exemple :
 %      u = uniquetol([1 1 + 1e-9 2], 1e-6);
 %      numel(u)                    % 2 : les deux premiers se confondent
+%
+%   Voir aussi ISMEMBERTOL.
     if nargin < 2
         tol = 1e-6;
     end

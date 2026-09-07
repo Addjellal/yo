@@ -12,6 +12,8 @@ function [S, f] = signalSpectrePuissance(x, fs)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      [S, f] = signalSpectrePuissance(x, 1);
 %      numel(S) == numel(f)        % 1
+%
+%   Voir aussi PERIODOGRAM, SNR, THD.
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     n = numel(x);

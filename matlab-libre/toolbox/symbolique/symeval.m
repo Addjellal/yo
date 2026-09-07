@@ -5,6 +5,8 @@ function v = symeval(e, variables, valeurs)
 %   Exemple :
 %      x = sym('x');
 %      symeval(symadd(x, symnum(1)), {'x'}, {2})     % 3
+%
+%   Voir aussi SYMSUBS, SYMSIMPLIFY, SYMSTR.
     e = matlibre_sym_arbre(e);
     if nargin >= 3
         if ~iscell(variables)

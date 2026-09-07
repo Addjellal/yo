@@ -10,6 +10,8 @@ function [xd, Cd, Ld, perf0, perfl2] = wdencmp(option, varargin)
 %   Exemple :
 %      x = wnoise(3, 10, 7);
 %      xd = wdencmp('gbl', x, 'db4', 3, 2, 's', 1);
+%
+%   Voir aussi WTHRESH, THSELECT, WDENOISE, WNOISEST.
     if numel(varargin) >= 7 && isnumeric(varargin{2})
         % Forme avec décomposition fournie.
         C = varargin{1};

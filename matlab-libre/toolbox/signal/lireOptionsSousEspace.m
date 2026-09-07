@@ -7,6 +7,8 @@ function [fs, estCorrelation] = lireOptionsSousEspace(arguments)
 %   Exemple :
 %      [fs, corr] = lireOptionsSousEspace({1000, 'corr'});
 %      [fs corr]                   % 1000 et vrai
+%
+%   Voir aussi PMUSIC, PEIG, ROOTMUSIC.
     fs = [];
     estCorrelation = false;
     for k = 1:numel(arguments)

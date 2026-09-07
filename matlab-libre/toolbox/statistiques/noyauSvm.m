@@ -6,6 +6,8 @@ function K = noyauSvm(A, B, options)
 %      o = lireOptionsSvm('KernelFunction', 'linear');
 %      K = noyauSvm([1 0; 0 1], [1 0; 0 1], o);
 %      max(max(abs(K - K'))) < 1e-12          % un noyau est symetrique
+%
+%   Voir aussi FITCSVM, RESOUDRESMO, STANDARDISERSVM.
     switch options.KernelFunction
         case 'linear'
             K = (A * B.') / options.KernelScale ^ 2;

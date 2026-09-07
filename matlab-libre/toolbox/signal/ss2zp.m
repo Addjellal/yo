@@ -8,6 +8,8 @@ function [z, p, k] = ss2zp(A, B, C, D, iu)
 %      [A, B, C, D] = tf2ss(b, a);
 %      [z, p, k] = ss2zp(A, B, C, D);
 %      all(abs(p) < 1)             % 1
+%
+%   Voir aussi ZP2SS, SS2SOS, TF2ZP.
     if nargin < 5, iu = 1; end
     [num, den] = ss2tf(A, B, C, D, iu);
     p = eig(A);

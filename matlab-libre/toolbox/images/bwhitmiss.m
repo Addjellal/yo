@@ -9,6 +9,8 @@ function sortie = bwhitmiss(bw, se1, se2)
 %      bw(4:6, 4:6) = true;
 %      sortie = bwhitmiss(bw, ones(3), zeros(3));
 %      sum(sortie(:))              % 1 : le seul centre de carre plein
+%
+%   Voir aussi BWMORPH, IMERODE, IMDILATE, STREL.
     bw = logical(bw);
     if nargin < 3
         intervalle = double(se1);

@@ -7,6 +7,8 @@ function y = chirp(t, f0, t1, f1, methode)
 %      t = (0:1023)' / 1024;
 %      y = chirp(t, 0, 1, 100);
 %      numel(y)                    % 1024 : un point par instant
+%
+%   Voir aussi GAUSPULS, SAWTOOTH, SQUARE, VCO.
     if nargin < 5
         methode = 'linear';
     end

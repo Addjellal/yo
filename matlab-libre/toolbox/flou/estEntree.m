@@ -6,6 +6,8 @@ function oui = estEntree(genre)
 %   Exemple :
 %      estEntree('input')          % 1
 %      estEntree('output')         % 0
+%
+%   Voir aussi VARIABLESDE, TROUVERVARIABLE, ADDINPUT.
     mot = lower(char(genre));
     if any(strcmp(mot, {'input', 'in'}))
         oui = true;

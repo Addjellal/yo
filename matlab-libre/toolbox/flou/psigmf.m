@@ -5,5 +5,7 @@ function y = psigmf(x, params)
 %   Exemple :
 %      y = psigmf([0 5 10], [2 2 -2 8]);
 %      all(y >= 0 & y <= 1)        % 1
+%
+%   Voir aussi SIGMF, DSIGMF, GBELLMF.
     y = sigmf(x, params(1:2)) .* sigmf(x, params(3:4));
 end

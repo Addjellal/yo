@@ -12,6 +12,8 @@ function [k, aire] = convhull(x, y, varargin)
 %
 %   Exemple :
 %      k = convhull([0 1 1 0 0.5], [0 0 1 1 0.5]);   % le carré
+%
+%   Voir aussi INPOLYGON, DELAUNAY.
     if nargin == 1
         p = double(x);
         y = p(:, 2);

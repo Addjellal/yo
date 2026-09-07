@@ -4,6 +4,8 @@ function p = poisscdf(x, lambda)
 %
 %   Exemple :
 %      poisscdf(2, 1)   % 0.919698602928
+%
+%   Voir aussi POISSINV, POISSRND, POISSFIT, PDF, CDF, ICDF.
     [x, lambda] = statAjuster(x, lambda);
     k = floor(x);
     p = zeros(size(x));

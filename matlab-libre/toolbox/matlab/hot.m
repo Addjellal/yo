@@ -6,6 +6,8 @@ function carte = hot(m)
 %   Exemple :
 %      carte = hot(8);
 %      all(diff(sum(carte, 2)) > 0)    % la clarte croit d'un bout a l'autre
+%
+%   Voir aussi COOL, JET, AUTUMN.
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     n = fix(3 * m / 8);

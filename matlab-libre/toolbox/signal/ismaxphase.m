@@ -4,6 +4,8 @@ function tf = ismaxphase(b, a)
 %
 %   Exemple :
 %      ismaxphase([1 -2], 1)       % 1 : le zero est hors du cercle unite
+%
+%   Voir aussi ISMINPHASE, ISLINPHASE, ISSTABLE.
     if nargin < 2, a = 1; end
     z = racinesFiltre(b);
     tf = isstable(1, a) && ~isempty(z) && all(abs(z) > 1);

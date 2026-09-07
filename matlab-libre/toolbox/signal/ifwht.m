@@ -4,6 +4,8 @@ function x = ifwht(y, n, ordre)
 %
 %   Exemple :
 %      ifwht(fwht([1 2 3 4]))   % [1 2 3 4]
+%
+%   Voir aussi FWHT, PAPILLONHADAMARD.
     if nargin < 3, ordre = 'sequency'; end
     y = double(y);
     ligne = isrow(y);

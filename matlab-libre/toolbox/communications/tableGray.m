@@ -7,6 +7,8 @@ function correspondance = tableGray(modulation, M)
 %   Exemple :
 %      table = tableGray('psk', 8);
 %            isequal(sort(table(:)'), 0:7)               % 1
+%
+%   Voir aussi PSKMOD, QAMMOD, BIN2GRAY.
     modulation = lower(char(modulation));
     M = double(M);
     if M < 2 || abs(log2(M) - round(log2(M))) > 0

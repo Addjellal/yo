@@ -8,6 +8,8 @@ function [C, L] = wavedec(x, niveaux, nom)
 %      [c, l] = wavedec(x, 3, 'db2');
 %      sum(l(1:end-1)) == numel(c)     % 1 : tous les coefficients y sont
 %      max(abs(waverec(c, l, 'db2') - x)) < 1e-10
+%
+%   Voir aussi WAVEREC, APPCOEF, DETCOEF, WRCOEF.
     if nargin < 3
         nom = 'haar';
     end

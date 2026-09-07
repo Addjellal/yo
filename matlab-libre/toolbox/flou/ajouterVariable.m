@@ -6,6 +6,8 @@ function fis = ajouterVariable(fis, entree, intervalle, varargin)
 %   Exemple :
 %      fis = ajouterVariable(mamfis(), true, [0 10], 'Name', 'erreur');
 %      numel(variablesDe(fis, true))      % 1
+%
+%   Voir aussi ADDINPUT, ADDOUTPUT, VARIABLESDE.
     variables = variablesDe(fis, entree);
     if entree
         nom = sprintf('input%d', numel(variables) + 1);

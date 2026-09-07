@@ -10,6 +10,8 @@ function [s, f, t] = spectrogram(x, fenetre, recouvrement, nfft, fs)
 %
 %   Exemple :
 %      [s, f, t] = spectrogram(sin(2*pi*50*(0:999)/1000), 128, 64, 128, 1000);
+%
+%   Voir aussi PWELCH, PERIODOGRAM.
     x = x(:);
     n = numel(x);
     if nargin < 2 || isempty(fenetre), fenetre = hamming(min(256, n)); end

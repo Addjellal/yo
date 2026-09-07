@@ -4,6 +4,8 @@ function r = matlabroot()
 %
 %   Exemple :
 %      isfolder(matlabroot())      % 1 : la racine existe
+%
+%   Voir aussi PATH, WHICH, EXIST.
     r = matlibre_racine();
     if isempty(r)
         r = getenv('MATLIBRE_TOOLBOX');

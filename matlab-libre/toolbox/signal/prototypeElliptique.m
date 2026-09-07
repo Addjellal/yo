@@ -21,6 +21,8 @@ function [z, p, k] = prototypeElliptique(n, rp, rs)
 %   Exemple :
 %      [z, p, k] = prototypeElliptique(4, 1, 40);
 %      all(real(p) < 0)            % 1 : un prototype stable a ses poles a gauche
+%
+%   Voir aussi ELLIP, ELLIPAP, ELLIPKE.
     epsilonP = sqrt(10 ^ (rp / 10) - 1);
     epsilonS = sqrt(10 ^ (rs / 10) - 1);
     k1 = epsilonP / epsilonS;

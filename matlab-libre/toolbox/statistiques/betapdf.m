@@ -5,6 +5,8 @@ function y = betapdf(x, a, b)
 %
 %   Exemple :
 %      betapdf(0.5, 1, 1)   % 1 : la loi uniforme
+%
+%   Voir aussi BETACDF, BETAINV, BETARND, BETASTAT, PDF, CDF.
     x = double(x);
     y = zeros(size(x));
     dedans = x >= 0 & x <= 1;

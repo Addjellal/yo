@@ -14,6 +14,8 @@ function indice = rangDansGenre(fis, variable, entree)
 %      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
 %      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
 %      rangDansGenre(fis, 'erreur', true)     % 1
+%
+%   Voir aussi TROUVERVARIABLE, VARIABLESDE, GETFIS.
     variables = variablesDe(fis, entree);
     if isnumeric(variable)
         indice = round(variable);

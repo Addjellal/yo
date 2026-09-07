@@ -8,6 +8,8 @@ function a = appcoef(c, l, ondelette, niveau)
 %      [c, l] = wavedec(x, 3, 'db2');
 %      a = appcoef(c, l, 'db2');
 %      numel(a) == l(1)            % 1 : l'approximation la plus grossiere
+%
+%   Voir aussi DETCOEF, WAVEDEC, WAVEREC, WRCOEF.
     if nargin < 4 || isempty(niveau), niveau = numel(l) - 2; end
     maximum = numel(l) - 2;
     a = c(1:l(1));

@@ -5,6 +5,8 @@ function options = lireOptionsLineaire(n, varargin)
 %   Exemple :
 %      o = lireOptionsLineaire(3, 'Lambda', 0.01);
 %      o.Lambda
+%
+%   Voir aussi FITCLINEAR, FITRLINEAR, DESCENTELINEAIRE.
     options = struct('Learner', 'svm', 'Regularization', 'ridge', ...
                      'Lambda', 1 / max(n, 1), 'PassLimit', 200, ...
                      'FitBias', true, 'Epsilon', 0.1, 'Pas', 0.1);

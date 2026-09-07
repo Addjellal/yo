@@ -4,6 +4,8 @@ function y = lognpdf(x, mu, sigma)
 %
 %   Exemple :
 %      lognpdf(1, 0, 1)            % 0.3989 : en x = 1, log x vaut zero
+%
+%   Voir aussi LOGNCDF, LOGNINV, LOGNRND, LOGNSTAT, PDF, CDF.
     if nargin < 2, mu = 0; end
     if nargin < 3, sigma = 1; end
     x = double(x);

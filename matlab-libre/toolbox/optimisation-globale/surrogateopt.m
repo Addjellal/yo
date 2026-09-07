@@ -10,6 +10,8 @@ function [x, valeur, drapeau, sortie] = surrogateopt(fonction, bas, haut, option
 %
 %   Exemple :
 %      x = surrogateopt(@(v) (v(1)-0.3)^2 + (v(2)+0.7)^2, [-1 -1], [1 1]);
+%
+%   Voir aussi GA, PARTICLESWARM, PATTERNSEARCH.
     if nargin < 4, options = struct(); end
     bas = double(bas(:))';
     haut = double(haut(:))';

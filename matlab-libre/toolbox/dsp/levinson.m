@@ -8,6 +8,8 @@ function [a, e] = levinson(r, p)
 %      r = [1 0.5 0.2];
 %      [a, e] = levinson(r, 2);
 %      all(abs(roots(a)) < 1)      % 1 : Levinson rend un modele stable
+%
+%   Voir aussi LPC, ARYULE, AC2POLY, POLY2AC.
     r = r(:).';
     if nargin < 2
         p = numel(r) - 1;

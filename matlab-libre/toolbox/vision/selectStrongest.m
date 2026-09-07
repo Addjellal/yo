@@ -6,6 +6,8 @@ function [choisis, indices] = selectStrongest(points, metrique, n)
 %   Exemple :
 %      [choisis, indices] = selectStrongest([1 1; 2 2; 3 3], [0.1; 0.9; 0.5], 2);
 %      indices'                    % 2 3 : les deux plus fortes reponses
+%
+%   Voir aussi SELECTSTRONGESTBBOX, DETECTHARRISFEATURES, MATCHFEATURES.
     [~, ordre] = sort(metrique(:), 'descend');
     n = min(n, numel(ordre));
     indices = ordre(1:n);

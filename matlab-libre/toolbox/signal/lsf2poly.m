@@ -6,6 +6,8 @@ function a = lsf2poly(lsf)
 %   Exemple :
 %      a = poly([0.5 -0.3]);
 %      max(abs(lsf2poly(poly2lsf(a)) - a)) < 1e-10
+%
+%   Voir aussi POLY2LSF, LPC, AC2POLY.
     lsf = double(lsf(:));
     p = numel(lsf);
     % Les LSF s'entrelacent : une racine sur deux appartient à P.

@@ -4,6 +4,8 @@ function varargout = imsplit(image)
 %
 %   Exemple :
 %      [r, v, b] = imsplit(zeros(4, 4, 3));
+%
+%   Voir aussi IM2GRAY, RGB2GRAY.
     image = double(image);
     d = size(image);
     if numel(d) < 3

@@ -6,6 +6,8 @@ function [pourcentage, valeur, instant] = overshoot(x, fs)
 %
 %   Exemple :
 %      overshoot([0 0 1.2 1 1 1], 1)   % 20 %
+%
+%   Voir aussi UNDERSHOOT, SETTLINGTIME, RISETIME.
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     t = (0:numel(x) - 1)' / fs;

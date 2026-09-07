@@ -6,6 +6,8 @@ function [n, Wn] = cheb1ord(Wp, Ws, Rp, Rs)
 %   Exemple :
 %      [n, Wn] = cheb1ord(0.2, 0.3, 1, 40);
 %      n                           % l'ordre minimal qui tient le gabarit
+%
+%   Voir aussi CHEBY1, BUTTORD, CHEB2ORD, ELLIPORD.
     wp = tan(pi * Wp / 2);
     ws = tan(pi * Ws / 2);
     numerateur = acosh(sqrt((10^(Rs / 10) - 1) / (10^(Rp / 10) - 1)));

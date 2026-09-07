@@ -7,6 +7,8 @@ function [etiquettes, scores] = predictEcoc(modele, X)
 %      X = [randn(40, 2); randn(40, 2) + 3];
 %      y = [ones(40, 1); 2 * ones(40, 1)];
 %      mean(predictEcoc(fitcecoc(X, y), X) == y) > 0.9
+%
+%   Voir aussi FITCECOC, PREDICT, PREDICTSVM.
     X = double(X);
     n = size(X, 1);
     k = numel(modele.Classes);

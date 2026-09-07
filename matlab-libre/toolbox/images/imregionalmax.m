@@ -11,6 +11,8 @@ function bw = imregionalmax(image, connexite)
 %
 %   Exemple :
 %      imregionalmax([1 2 1; 2 3 2; 1 2 1])   % le centre seulement
+%
+%   Voir aussi IMREGIONALMIN, IMHMAX, FINDPEAKS.
     if nargin < 2 || isempty(connexite), connexite = 8; end
     image = double(image);
     [~, ~, rangs] = unique(image(:));

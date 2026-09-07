@@ -5,6 +5,8 @@ function r = calyears(x)
 %
 %   Exemple :
 %      datetime(2024, 2, 29) + calyears(1)      % le 28 fevrier 2025 : l'annee suivante n'est pas bissextile
+%
+%   Voir aussi CALMONTHS, CALQUARTERS, DATETIME.
     if isa(x, 'calendarDuration')
         r = fix(x.Mois / 12);
     else

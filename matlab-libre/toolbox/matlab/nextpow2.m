@@ -5,6 +5,8 @@ function p = nextpow2(n)
 %
 %   Exemple :
 %      nextpow2(1000)   % 10
+%
+%   Voir aussi POW2.
     n = abs(double(n));
     p = zeros(size(n));
     for k = 1:numel(n)

@@ -5,6 +5,8 @@ function b = enbw(fenetre, fs)
 %
 %   Exemple :
 %      enbw(rectwin(10))   % 1
+%
+%   Voir aussi WINDOW, PERIODOGRAM, BANDPOWER.
     w = fenetre(:);
     n = numel(w);
     b = n * sum(w.^2) / sum(w)^2;

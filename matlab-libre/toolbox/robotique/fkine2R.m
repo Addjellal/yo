@@ -5,6 +5,8 @@ function [x, y, coude] = fkine2R(q, l1, l2)
 %   Exemple :
 %      [x, y] = fkine2R([0 0], 1, 1);
 %      [x y]                       % 2 0 : le bras est tendu
+%
+%   Voir aussi IKINE2R, DHTRANSFORM.
     if nargin < 2, l1 = 1; end
     if nargin < 3, l2 = 1; end
     coude = [l1 * cos(q(1)), l1 * sin(q(1))];

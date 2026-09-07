@@ -6,6 +6,8 @@ function carte = hsv(m)
 %   Exemple :
 %      carte = hsv(6);
 %      size(carte)                 % 6 3
+%
+%   Voir aussi JET, PRISM.
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     if m <= 0

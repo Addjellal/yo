@@ -6,6 +6,8 @@ function y = decimate(x, r, n)
 %
 %   Exemple :
 %      numel(decimate(1:100, 4))   % 25
+%
+%   Voir aussi INTERP, RESAMPLE.
     if nargin < 3 || isempty(n), n = 30; end
     ligne = isrow(x);
     x = x(:);

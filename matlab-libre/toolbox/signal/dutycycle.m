@@ -5,6 +5,8 @@ function [rapport, debut, fin] = dutycycle(x, fs, varargin)
 %
 %   Exemple :
 %      dutycycle([0 1 1 0 0 1 1 0 0 1], 1)   % environ 0.5
+%
+%   Voir aussi PULSEWIDTH, PULSEPERIOD, PULSESEP.
     if nargin < 2 || isempty(fs), fs = 1; end
     largeurs = pulsewidth(x, fs, varargin{:});
     [periodes, debut, fin] = pulseperiod(x, fs, varargin{:});

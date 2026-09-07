@@ -5,6 +5,8 @@ function v = completerLongueur(v, longueur)
 %
 %   Exemple :
 %      completerLongueur([1 2 3], 5)     % [1 2 3 0 0]
+%
+%   Voir aussi ALIGNERPOLYNOMES, PADARRAY.
     longueur = round(longueur);
     if isvector(v)
         % Un scalaire est à la fois ligne et colonne : le rendre en

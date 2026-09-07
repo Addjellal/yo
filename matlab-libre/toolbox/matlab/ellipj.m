@@ -11,6 +11,8 @@ function [sn, cn, dn] = ellipj(u, m, tol)
 %
 %   Exemple :
 %      [s, c, d] = ellipj(0.5, 0);   % sin(0.5), cos(0.5), 1
+%
+%   Voir aussi ELLIPKE, PROTOTYPEELLIPTIQUE.
     if nargin < 3 || isempty(tol), tol = eps; end
     u = double(u);
     m = double(m);

@@ -6,6 +6,8 @@ function y = rescale(x, bas, haut)
 %   Exemple :
 %      rescale([2 4 6])            % 0 0.5 1
 %      rescale([2 4 6], 10, 20)    % 10 15 20
+%
+%   Voir aussi NORMALIZE, MIN, MAX.
     if nargin < 2
         bas = 0;
     end

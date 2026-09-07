@@ -9,6 +9,8 @@ function forme = statForme(defaut, args)
 %   Exemple :
 %      statForme([1 1], {2, 5})             % 2 5
 %      statForme([1 1], {3})                % 3 3 : une dimension seule fait un carre
+%
+%   Voir aussi STATETENDRE, STATAJUSTER.
     if isempty(args)
         forme = defaut;
     elseif numel(args) == 1

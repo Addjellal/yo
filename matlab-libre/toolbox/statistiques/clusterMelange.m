@@ -8,6 +8,8 @@ function [indices, posterieures, densites] = clusterMelange(modele, X)
 %      m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
 %      [indices, post] = clusterMelange(m, [0; 8]);
 %      numel(unique(indices))               % 2 : les deux modes se distinguent
+%
+%   Voir aussi FITGMDIST, GMDISTRIBUTION, CLUSTER, KMEANS.
     X = double(X);
     n = size(X, 1);
     k = modele.NumComponents;

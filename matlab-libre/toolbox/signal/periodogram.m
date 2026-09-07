@@ -10,6 +10,8 @@ function [Pxx, f] = periodogram(x, fenetre, nfft, fs)
 %      [pxx, f] = periodogram(x, [], 512, 1);
 %      [~, k] = max(pxx);
 %      abs(f(k) - 0.1) < 0.02
+%
+%   Voir aussi PWELCH, PMTM, BANDPOWER.
     x = x(:);
     n = numel(x);
     if nargin < 2 || isempty(fenetre)

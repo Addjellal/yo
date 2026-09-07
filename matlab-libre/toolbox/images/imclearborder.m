@@ -5,6 +5,8 @@ function sortie = imclearborder(image, connexite)
 %   Exemple :
 %      bw = false(5); bw(1,1) = true; bw(3,3) = true;
 %      imclearborder(bw)   % il ne reste que le point du centre
+%
+%   Voir aussi IMFILL, IMRECONSTRUCT, BWAREAOPEN.
     if nargin < 2 || isempty(connexite), connexite = 8; end
     estLogique = islogical(image);
     image = double(image);

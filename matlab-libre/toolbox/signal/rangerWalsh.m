@@ -6,6 +6,8 @@ function y = rangerWalsh(x, ordre)
 %   Exemple :
 %      y = rangerWalsh((1:8)', 'sequency');
 %      numel(y)                    % 8
+%
+%   Voir aussi RANGERWALSHINVERSE, PERMUTATIONWALSH, FWHT.
     p = permutationWalsh(size(x, 1), ordre);
     y = x(p, :);
 end

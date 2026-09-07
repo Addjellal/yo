@@ -6,6 +6,8 @@ function c = cconv(a, b, n)
 %
 %   Exemple :
 %      cconv([1 2], [1 1], 2)   % [3 3]
+%
+%   Voir aussi CONVOLUTIONCIRCULAIRE.
     ligne = isrow(a) || isrow(b);
     a = a(:);
     b = b(:);

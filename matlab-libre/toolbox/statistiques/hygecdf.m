@@ -4,6 +4,8 @@ function p = hygecdf(x, m, k, n)
 %
 %   Exemple :
 %      hygecdf(5, 50, 10, 5)       % 1 : on ne peut pas tirer plus de cinq marques
+%
+%   Voir aussi HYGEPDF, HYGEINV, HYGERND, HYGESTAT, PDF, CDF.
     [x, m, k, n] = statAjuster(x, m, k, n);
     p = zeros(size(x));
     for indice = 1:numel(x)

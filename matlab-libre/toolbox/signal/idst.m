@@ -6,6 +6,8 @@ function x = idst(y, n)
 %   Exemple :
 %      x = [1 2 3 4]';
 %      max(abs(idst(dst(x)) - x)) < 1e-12
+%
+%   Voir aussi DST, IDCT.
     y = double(y);
     ligne = isrow(y);
     if ligne, y = y(:); end

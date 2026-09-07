@@ -9,6 +9,8 @@ function y = sgolayfilt(x, ordre, longueur)
 %      x = sin(2 * pi * 0.01 * (1:200)') + 0.1 * randn(200, 1);
 %      y = sgolayfilt(x, 3, 21);
 %      std(diff(y, 2)) < std(diff(x, 2))       % 1 : le lissage reduit la courbure
+%
+%   Voir aussi SGOLAY, MEDFILT1.
     x = x(:).';
     m = numel(x);
     demi = floor(longueur / 2);

@@ -8,6 +8,8 @@ function r = imsharpen(image, varargin)
 %      rng(1);
 %      x = imboxfilt(rand(30), 5);
 %      std(reshape(imsharpen(x), [], 1)) > std(x(:))   % l'accentuation releve le contraste
+%
+%   Voir aussi IMGAUSSFILT, IMFILTER, FSPECIAL.
     rayon = 1;
     montant = 0.8;
     for k = 1:2:numel(varargin) - 1

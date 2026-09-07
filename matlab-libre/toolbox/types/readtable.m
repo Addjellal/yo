@@ -12,6 +12,8 @@ function t = readtable(nomFichier, varargin)
 %      fclose(f);
 %      t = readtable('essai.csv');
 %      height(t)                   % 2
+%
+%   Voir aussi WRITETABLE, TABLE, ARRAY2TABLE.
     delimiteur = '';
     entete = true;
     k = 1;

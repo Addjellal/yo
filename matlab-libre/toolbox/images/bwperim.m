@@ -5,6 +5,8 @@ function p = bwperim(bw)
 %
 %   Exemple :
 %      sum(sum(bwperim(true(3))))   % 8 : tout sauf le centre
+%
+%   Voir aussi BWBOUNDARIES, BWMORPH, EDGE.
     bw = logical(bw);
     interieur = bw;
     voisins = padarray(bw, [1 1], 0);

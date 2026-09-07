@@ -13,6 +13,8 @@ function t = coder.typeof(exemple, tailles, variables) %#ok<*STOUT>
 %      fclose(f);
 %      r = codegen('doubleDeTest', '-args', {coder.typeof(int32(0), [3 3])}, '-report');
 %      contains(r.entete, 'doubleDeTest')      % 1
+%
+%   Voir aussi CODEGEN, CODEGENBUILD.
     if nargin >= 3 && any(variables(:))
         warning('coder:typeof:VariableSizeIgnored', ...
                 ['MatLibre Coder produces fixed-size arrays: the variable-size ' ...

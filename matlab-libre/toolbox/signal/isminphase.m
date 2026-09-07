@@ -4,6 +4,8 @@ function tf = isminphase(b, a)
 %
 %   Exemple :
 %      isminphase([1 -0.5], 1)     % 1 : le zero est dans le cercle unite
+%
+%   Voir aussi ISMAXPHASE, ISLINPHASE, ISSTABLE.
     if nargin < 2, a = 1; end
     tf = isstable(1, a) && all(abs(racines(b)) < 1);
 end

@@ -8,6 +8,8 @@ function [H, G, n, k] = hammgen(m)
 %
 %   Exemple :
 %      [H, G, n, k] = hammgen(3);   % n = 7, k = 4
+%
+%   Voir aussi ENCODE, DECODE, GF.
     n = 2^m - 1;
     k = n - m;
     % Colonnes : d'abord les k colonnes non triviales, puis l'identité.

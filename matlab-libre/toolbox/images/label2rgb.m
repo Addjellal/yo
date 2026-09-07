@@ -7,6 +7,8 @@ function couleurs = label2rgb(etiquettes, carte, fond)
 %   Exemple :
 %      couleurs = label2rgb([0 1; 2 0]);
 %      size(couleurs)              % 2 2 3 : une image couleur
+%
+%   Voir aussi BWLABEL, IMQUANTIZE.
     if nargin < 3 || isempty(fond), fond = [1 1 1]; end
     n = max(1, max(etiquettes(:)));
     if nargin < 2 || isempty(carte) || ischar(carte)

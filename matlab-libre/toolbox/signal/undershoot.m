@@ -7,6 +7,8 @@ function [pourcentage, valeur, instant] = undershoot(x, fs)
 %      t = (0:0.001:0.2)';
 %      [p, v, instant] = undershoot(exp(-30*t) .* sin(2*pi*30*t) + double(t > 0), 1000);
 %      p >= 0                      % 1
+%
+%   Voir aussi OVERSHOOT, SETTLINGTIME, FALLTIME.
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     t = (0:numel(x) - 1)' / fs;

@@ -14,6 +14,8 @@ function [x, valeur, drapeau, sortie] = patternsearch(fonction, x0, A, b, Aeq, b
 %
 %   Exemple :
 %      x = patternsearch(@(v) (v(1)-1)^2 + (v(2)+2)^2, [0 0]);
+%
+%   Voir aussi GA, SIMULANNEALBND.
     if nargin < 3, A = []; end
     if nargin < 4, b = []; end
     if nargin < 5, Aeq = []; end

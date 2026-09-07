@@ -6,6 +6,8 @@ function verifierFrequences(Fc, Fs)
 %
 %   Exemple :
 %      verifierFrequences(100, 1000);    % passe : 100 Hz est sous Nyquist
+%
+%   Voir aussi PSKMOD, FSKMOD, MODULATE.
     if Fs <= 2 * Fc
         error('comm:modulation:BadFs', ...
               'FS doit dépasser deux fois FC (FS = %g, FC = %g).', Fs, Fc);

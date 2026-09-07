@@ -6,6 +6,8 @@ function [h, t] = stepz(b, a, n, fs)
 %      [b, a] = butter(4, 0.3);
 %      [h, t] = stepz(b, a, 100);
 %      abs(h(end) - 1) < 0.01      % la reponse indicielle tend vers le gain continu
+%
+%   Voir aussi IMPZ.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3 || isempty(n)
         [~, ti] = impz(b, a);

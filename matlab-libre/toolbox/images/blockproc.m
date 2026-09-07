@@ -6,6 +6,8 @@ function sortie = blockproc(image, taille, fonction, varargin)
 %
 %   Exemple :
 %      blockproc(magic(4), [2 2], @(b) mean(b.data(:)) * ones(2))
+%
+%   Voir aussi NLFILTER, COLFILT, IM2COL.
     image = double(image);
     [h, l] = size(image);
     m = taille(1);

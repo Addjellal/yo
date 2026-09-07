@@ -8,6 +8,8 @@ function [etiquettes, centres, inerties] = kmeans(X, k, varargin)
 %      X = [randn(50, 2); randn(50, 2) + 6];
 %      [etiquettes, centres] = kmeans(X, 2);
 %      norm(sort(centres(:, 1)) - [0; 6]) < 1
+%
+%   Voir aussi FITGMDIST, SILHOUETTE, LINKAGE, PDIST.
     maxIterations = 100;
     centres = [];
     for i = 1:2:numel(varargin)-1

@@ -4,5 +4,7 @@ function y = smf(x, params)
 %
 %   Exemple :
 %      smf(10, [2 8])   % 1
+%
+%   Voir aussi ZMF, PIMF, SIGMF.
     y = 1 - zmf(x, params);
 end

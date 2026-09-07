@@ -5,6 +5,8 @@ function lab = xyz2lab(xyz, varargin)
 %
 %   Exemple :
 %      xyz2lab(whitepoint('d65'))   % [100 0 0], le blanc parfait
+%
+%   Voir aussi LAB2XYZ, RGB2LAB, WHITEPOINT.
     blanc = whitepoint('d65');
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

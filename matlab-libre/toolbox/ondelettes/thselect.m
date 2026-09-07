@@ -10,6 +10,8 @@ function seuil = thselect(x, methode)
 %
 %   Exemple :
 %      thselect(randn(1, 1024), 'sqtwolog')   % environ 3.7
+%
+%   Voir aussi WTHRESH, WDENCMP, WNOISEST.
     x = double(x(:)).';
     n = numel(x);
     if n == 0

@@ -9,6 +9,8 @@ function [puissance, plage] = signalLobe(S, k)
 %      S = [1 3 2 0.5 4 1];
 %      [p, plage] = signalLobe(S, 2);
 %      p > 0                       % 1
+%
+%   Voir aussi SIGNALSOMMET, FINDPEAKS, SFDR.
     n = numel(S);
     k = max(1, min(n, k));
     gauche = k;

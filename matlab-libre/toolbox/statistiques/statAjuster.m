@@ -10,6 +10,8 @@ function varargout = statAjuster(varargin)
 %   Exemple :
 %      [a, b] = statAjuster([1 2 3], 5);
 %      numel(b)                    % 3 : le scalaire s'est repandu
+%
+%   Voir aussi STATETENDRE, STATFORME.
     forme = [1 1];
     for k = 1:numel(varargin)
         d = size(varargin{k});

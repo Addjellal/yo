@@ -6,6 +6,8 @@ function d = days(x)
 %   Exemple :
 %      days(1.5)                   % une duree d'un jour et demi
 %      hours(days(1))              % 24
+%
+%   Voir aussi HOURS, MINUTES, SECONDS, YEARS, DURATION.
     if isa(x, 'duration')
         d = x.Secondes / 86400;
     elseif isa(x, 'calendarDuration')

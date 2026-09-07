@@ -7,6 +7,8 @@ function n = wmaxlev(taille, ondelette)
 %
 %   Exemple :
 %      wmaxlev(64, 'db2')   % 4
+%
+%   Voir aussi WAVEDEC, WFILTERS, DWT.
     if nargin < 2, ondelette = 'db1'; end
     if numel(taille) > 1, taille = min(taille); end
     [bas, ~] = wfilters(ondelette);

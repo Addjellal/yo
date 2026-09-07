@@ -7,6 +7,8 @@ function y = statEtendre(v, forme)
 %
 %   Exemple :
 %      size(statEtendre(4, [2 3]))          % 2 3
+%
+%   Voir aussi STATAJUSTER, STATFORME.
     v = double(v);
     if numel(v) == 1
         y = repmat(v, forme);

@@ -6,6 +6,8 @@ function imwrite(x, nomFichier, format)
 %   Exemple :
 %      imwrite(uint8(magic(8) * 4), 'essai.pgm');
 %      max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
+%
+%   Voir aussi IMREAD, IMSHOW.
     if nargin < 3
         format = '';
     end

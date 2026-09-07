@@ -6,6 +6,8 @@ function r = imlincomb(varargin)
 %
 %   Exemple :
 %      imlincomb(0.5, [1 2], 0.5, [3 4])   % [2 3]
+%
+%   Voir aussi IMADD, IMCOMPLEMENT, IMABSDIFF.
     r = 0;
     classeCible = '';
     k = 1;

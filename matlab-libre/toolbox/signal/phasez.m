@@ -7,6 +7,8 @@ function [phi, w] = phasez(b, a, n)
 %      [b, a] = butter(4, 0.3);
 %      [phi, w] = phasez(b, a, 128);
 %      abs(phi(1)) < 1e-12         % la phase est nulle au continu
+%
+%   Voir aussi PHASEDELAY, GRPDELAY, ZEROPHASE.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3, n = 512; end
     [h, w] = freqz(b, a, n);

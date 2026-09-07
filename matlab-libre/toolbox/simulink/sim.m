@@ -31,6 +31,8 @@ function resultat = sim(modele, tFinal, pas)
 %      m = add_line(m, 'un', 'integ');
 %      r = sim(m, 5, 0.001);
 %      abs(r.signaux.integ(end) - 10) < 0.01     % l'integrale de 2 sur 5 s
+%
+%   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIMPLOT.
     if nargin < 2, tFinal = 10; end
     if nargin < 3, pas = 0.01; end
     if ischar(modele) || isstring(modele)

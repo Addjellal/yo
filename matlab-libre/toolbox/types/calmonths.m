@@ -6,6 +6,8 @@ function r = calmonths(x)
 %   Exemple :
 %      d = calmonths(3);
 %      datetime(2024, 1, 31) + calmonths(1)     % le 29 fevrier : les mois n'ont pas la meme longueur
+%
+%   Voir aussi CALYEARS, CALQUARTERS, CALDAYS, DATETIME.
     if isa(x, 'calendarDuration')
         r = fix(x.Mois / 1);
     else

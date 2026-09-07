@@ -5,6 +5,8 @@ function points = bbox2points(bbox)
 %
 %   Exemple :
 %      bbox2points([1 2 10 20])   % [1 2; 11 2; 11 22; 1 22]
+%
+%   Voir aussi BBOXOVERLAPRATIO, INSERTSHAPE.
     n = size(bbox, 1);
     if n == 1
         x = bbox(1); y = bbox(2); l = bbox(3); h = bbox(4);

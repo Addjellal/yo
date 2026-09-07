@@ -4,6 +4,8 @@ function y = dst(x, n)
 %
 %   Exemple :
 %      dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
+%
+%   Voir aussi IDST, DCT.
     x = double(x);
     ligne = isrow(x);
     if ligne, x = x(:); end

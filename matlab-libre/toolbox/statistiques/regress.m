@@ -9,6 +9,8 @@ function [b, bint, r, rint, stats] = regress(y, X)
 %      x = (1:50)';
 %      [b, bint] = regress(2 + 3 * x + randn(50, 1), [ones(50, 1), x]);
 %      bint(2, 1) < 3 && 3 < bint(2, 2)     % la vraie pente est dans l'intervalle
+%
+%   Voir aussi FITLM, ROBUSTFIT, ANOVA1.
     y = y(:);
     b = X \ y;
     r = y - X * b;

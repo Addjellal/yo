@@ -15,6 +15,8 @@ function [entree, indice] = trouverVariable(fis, nom)
 %      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
 %      [entree, indice] = trouverVariable(fis, 'erreur');
 %      [entree indice]             % 1 1
+%
+%   Voir aussi RANGDANSGENRE, VARIABLESDE, GETFIS.
     if isnumeric(nom)
         indice = round(nom);
         if indice <= numel(fis.entrees)

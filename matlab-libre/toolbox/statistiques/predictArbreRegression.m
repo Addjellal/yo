@@ -8,6 +8,8 @@ function y = predictArbreRegression(arbre, X)
 %      z = X(:, 1) * 2 - X(:, 2);
 %      m = fitrtree(X, z);
 %      rms(predictArbreRegression(m, X) - z) < rms(z - mean(z))
+%
+%   Voir aussi FITRTREE, PREDICT, PREDICTTREE.
     X = double(X);
     y = zeros(size(X, 1), 1);
     for i = 1:size(X, 1)

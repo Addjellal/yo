@@ -6,6 +6,8 @@ function sortie = colfilt(image, voisinage, genre, fonction)
 %
 %   Exemple :
 %      colfilt(magic(4), [3 3], 'sliding', @max)
+%
+%   Voir aussi NLFILTER, BLOCKPROC, IM2COL.
     image = double(image);
     [h, l] = size(image);
     m = voisinage(1);

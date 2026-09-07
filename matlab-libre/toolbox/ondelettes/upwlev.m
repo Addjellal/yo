@@ -9,6 +9,8 @@ function [Cnouveau, Lnouveau, coefficients] = upwlev(C, L, nom)
 %      [c, l] = wavedec(x, 3, 'db2');
 %      [c2, l2] = upwlev(c, l, 'db2');
 %      numel(l2) == numel(l) - 1   % 1 : un niveau de moins
+%
+%   Voir aussi WAVEDEC, APPCOEF, WAVEREC.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     a = C(1:L(1));
     d = C(L(1) + (1:L(2)));

@@ -6,6 +6,8 @@ function x = icceps(xhat, nd)
 %   Exemple :
 %      x = [1 0.5 0.25 0.125]';
 %      max(abs(icceps(cceps(x), 0) - x)) < 1e-6
+%
+%   Voir aussi CCEPS, RCEPS.
     if nargin < 2, nd = 0; end
     xhat = double(xhat(:));
     n = numel(xhat);

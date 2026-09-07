@@ -7,6 +7,8 @@ function g = rampeCarte(m)
 %   Exemple :
 %      g = rampeCarte(5);
 %      g'                          % 0 0.25 0.5 0.75 1
+%
+%   Voir aussi AUTUMN.
     m = round(m);
     if m <= 1
         g = zeros(max(m, 0), 1);

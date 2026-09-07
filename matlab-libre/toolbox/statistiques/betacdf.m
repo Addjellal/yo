@@ -4,6 +4,8 @@ function p = betacdf(x, a, b)
 %
 %   Exemple :
 %      betacdf(0.5, 2, 2)          % 0.5 : la loi est symetrique pour a = b
+%
+%   Voir aussi BETAPDF, BETAINV, BETARND, BETASTAT, PDF, CDF.
     x = double(x);
     p = zeros(size(x));
     p(x >= 1) = 1;

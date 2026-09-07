@@ -5,6 +5,8 @@ function y = qmf(x, p)
 %
 %   Exemple :
 %      qmf([1 2 3 4])   % [4 -3 2 -1]
+%
+%   Voir aussi WFILTERS, ORTHFILT, WREV.
     if nargin < 2 || isempty(p), p = 0; end
     x = double(x);
     ligne = isrow(x);

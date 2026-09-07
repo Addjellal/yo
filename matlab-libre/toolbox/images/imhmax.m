@@ -5,6 +5,8 @@ function sortie = imhmax(image, h, connexite)
 %
 %   Exemple :
 %      imhmax([1 3 1], 5)   % [1 1 1] : le sommet ne fait que 2
+%
+%   Voir aussi IMRECONSTRUCT, IMREGIONALMAX, WATERSHED.
     if nargin < 3 || isempty(connexite), connexite = 8; end
     image = double(image);
     sortie = imreconstruct(image - h, image, connexite);

@@ -7,6 +7,8 @@ function t = array2table(a, varargin)
 %   Exemple :
 %      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
 %      height(t)                   % 2
+%
+%   Voir aussi TABLE, CELL2TABLE, STRUCT2TABLE.
     noms = {}; lignes = {};
     k = 1;
     while k + 1 <= numel(varargin)

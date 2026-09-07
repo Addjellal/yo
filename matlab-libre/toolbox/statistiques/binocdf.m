@@ -6,6 +6,8 @@ function p = binocdf(x, n, pr)
 %
 %   Exemple :
 %      binocdf(5, 10, 0.5)   % 0.623046875
+%
+%   Voir aussi BINOINV, BINORND, BINOSTAT, BINOFIT, PDF, CDF.
     [x, n, pr] = statAjuster(x, n, pr);
     p = zeros(size(x));
     k = floor(x);

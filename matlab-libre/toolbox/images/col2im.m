@@ -6,6 +6,8 @@ function image = col2im(colonnes, blocs, taille, genre)
 %   Exemple :
 %      colonnes = im2col(magic(4), [2 2], 'distinct');
 %      max(max(abs(col2im(colonnes, [2 2], [4 4], 'distinct') - magic(4))))   % 0
+%
+%   Voir aussi IM2COL, BLOCKPROC.
     if nargin < 4 || isempty(genre), genre = 'sliding'; end
     colonnes = double(colonnes);
     m = blocs(1);

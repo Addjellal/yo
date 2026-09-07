@@ -5,6 +5,8 @@ function t = instants(x, Fs)
 %
 %   Exemple :
 %      instants(100, 10)                 % les instants d'echantillonnage
+%
+%   Voir aussi MODULATE, DEMOD.
     if isrow(x) && size(x, 1) == 1
         t = (0:numel(x) - 1) / Fs;
     else

@@ -8,6 +8,8 @@ function v = appliquerReste(v, s)
 %   Exemple :
 %      s = struct('type', '()', 'subs', {{2}});
 %      appliquerReste([10 20 30], s)      % 20
+%
+%   Voir aussi ASSIGNERRESTE.
     for k = 1:numel(s)
         switch s(k).type
             case '()'

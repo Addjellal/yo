@@ -9,6 +9,8 @@ function ylisse = smoothSpline(x, y, lambda)
 %      y = sin(2 * pi * x) + 0.2 * randn(60, 1);
 %      lisse = smoothSpline(x, y, 1);
 %      sum(diff(lisse, 2) .^ 2) < sum(diff(y, 2) .^ 2)     % lisser diminue la courbure
+%
+%   Voir aussi FITCURVE, GOODNESSOFFIT.
     if nargin < 3
         lambda = 1;
     end

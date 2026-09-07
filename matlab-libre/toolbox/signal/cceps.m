@@ -6,6 +6,8 @@ function [xhat, nd] = cceps(x)
 %
 %   Exemple :
 %      xhat = cceps([1 0 0 0 0.5 0 0 0]);
+%
+%   Voir aussi ICCEPS, RCEPS, HILBERT.
     x = double(x(:));
     n = numel(x);
     spectre = fft(x);

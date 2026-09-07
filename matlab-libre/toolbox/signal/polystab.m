@@ -7,6 +7,8 @@ function b = polystab(a)
 %   Exemple :
 %      b = polystab([1 -1.5]);
 %      all(abs(roots(b)) <= 1 + 1e-12)        % 1 : les racines rentrent
+%
+%   Voir aussi ISMINPHASE.
     a = a(:).';
     if numel(a) <= 1, b = a; return, end
     r = roots(a);

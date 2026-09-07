@@ -5,6 +5,8 @@ function f = meanfreq(x, fs)
 %   Exemple :
 %      t = (0:1023)' / 1000;
 %      abs(meanfreq(sin(2*pi*50*t), 1000) - 50) < 10
+%
+%   Voir aussi MEDFREQ, BANDPOWER.
     if nargin < 2, fs = 1; end
     x = x(:);
     [pxx, freq] = periodogram(x, [], numel(x), fs);

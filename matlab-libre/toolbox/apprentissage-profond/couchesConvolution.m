@@ -19,6 +19,8 @@ function varargout = couchesConvolution(action, varargin)
 %   Exemple :
 %      c = convolution2dLayer(3, 2);
 %      c.type                      % 'conv2d'
+%
+%   Voir aussi CONVOLUTION2DLAYER, MAXPOOLING2DLAYER, FLATTENLAYER.
     switch lower(char(action))
         case 'avant'
             [varargout{1}, varargout{2}] = avant(varargin{:});

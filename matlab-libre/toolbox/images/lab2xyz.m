@@ -5,6 +5,8 @@ function xyz = lab2xyz(lab, varargin)
 %   Exemple :
 %      xyz = lab2xyz([100 0 0]);
 %      max(abs(xyz - [0.9504 1 1.0888])) < 1e-3   % L = 100 : le blanc D65
+%
+%   Voir aussi XYZ2LAB, LAB2RGB, WHITEPOINT.
     blanc = whitepoint('d65');
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

@@ -6,6 +6,8 @@ function y = sawtooth(t, largeur)
 %   Exemple :
 %      y = sawtooth(linspace(0, 4 * pi, 100));
 %      [min(y) max(y)]             % -1 et 1
+%
+%   Voir aussi SQUARE, CHIRP.
     if nargin < 2
         largeur = 1;
     end

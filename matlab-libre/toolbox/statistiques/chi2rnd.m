@@ -5,6 +5,8 @@ function r = chi2rnd(v, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(chi2rnd(4, 1, 10000))           % proche de 4 : la moyenne est nu
+%
+%   Voir aussi CHI2CDF, CHI2INV, CHI2STAT, PDF, CDF, ICDF.
     forme = statForme(size(v), varargin);
     v = statEtendre(v, forme);
     r = gamrnd(v / 2, 2 * ones(forme));

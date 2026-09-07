@@ -21,6 +21,8 @@ function reseau = trainNetwork(X, Y, couches, options)
 %      reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
 %      [~, classes] = max(predict(reseau, X));
 %      mean(classes == [ones(1, 30), 2 * ones(1, 30)]) > 0.9
+%
+%   Voir aussi TRAININGOPTIONS, PREDICT, CLASSIFY, DLNETWORK.
     if nargin < 4
         options = trainingOptions('sgdm');
     end

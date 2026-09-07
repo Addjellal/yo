@@ -7,6 +7,8 @@ function decalages = voisinageConnexite(connexite)
 %   Exemple :
 %      size(voisinageConnexite(4), 1)     % 4 decalages
 %      size(voisinageConnexite(8), 1)     % 8
+%
+%   Voir aussi CONNDEF, BWCONNCOMP, BWLABEL.
     if numel(connexite) == 1
         if connexite == 4
             decalages = [-1 0; 1 0; 0 -1; 0 1];

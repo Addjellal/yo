@@ -7,6 +7,8 @@ function [a, e, k] = aryule(x, p)
 %
 %   Exemple :
 %      a = aryule(filter(1, [1 -0.9], randn(1000,1)), 1);
+%
+%   Voir aussi ARBURG, ARCOV, LEVINSON, PYULEAR.
     x = double(x(:));
     n = numel(x);
     r = zeros(p + 1, 1);

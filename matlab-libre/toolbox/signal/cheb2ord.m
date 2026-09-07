@@ -5,6 +5,8 @@ function [n, Wn] = cheb2ord(Wp, Ws, Rp, Rs)
 %   Exemple :
 %      [n, Wn] = cheb2ord(0.2, 0.3, 1, 40);
 %      n
+%
+%   Voir aussi CHEBY2, CHEB1ORD, BUTTORD, ELLIPORD.
     [n, ~] = cheb1ord(Wp, Ws, Rp, Rs);
     Wn = Ws;
 end

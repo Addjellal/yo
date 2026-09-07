@@ -4,5 +4,7 @@ function q = qfunc(x)
 %
 %   Exemple :
 %      qfunc(0)   % 0.5
+%
+%   Voir aussi QFUNCINV, BERAWGN.
     q = 0.5 * erfc(x / sqrt(2));
 end

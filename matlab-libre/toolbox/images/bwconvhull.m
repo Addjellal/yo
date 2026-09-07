@@ -7,6 +7,8 @@ function sortie = bwconvhull(bw, methode, connexite)
 %      bw = false(20, 20);
 %      bw(5, 5) = true; bw(15, 5) = true; bw(10, 15) = true;
 %      sum(sum(bwconvhull(bw))) > 3        % l'enveloppe remplit le triangle
+%
+%   Voir aussi BWPERIM, REGIONPROPS, CONVHULL.
     if nargin < 2 || isempty(methode), methode = 'union'; end
     if nargin < 3 || isempty(connexite), connexite = 8; end
     bw = logical(bw);

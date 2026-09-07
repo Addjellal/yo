@@ -7,6 +7,8 @@ function r = iskeyword(nom)
 %      iskeyword('for')            % 1
 %      iskeyword('toto')           % 0
 %      numel(iskeyword()) > 10     % la liste des mots reserves
+%
+%   Voir aussi GENVARNAME.
     mots = {'break','case','catch','classdef','continue','else','elseif', ...
             'end','for','function','global','if','otherwise','parfor', ...
             'persistent','return','spmd','switch','try','while'};

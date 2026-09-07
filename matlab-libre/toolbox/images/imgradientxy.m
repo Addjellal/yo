@@ -11,6 +11,8 @@ function [gx, gy] = imgradientxy(image, methode)
 %      [gx, gy] = imgradientxy([1 2 3; 4 5 6; 7 8 9]);
 %      gx(2, 2)   % 8, la réponse de Sobel sur une rampe horizontale
 %      gy(2, 2)   % 24, la rampe verticale est trois fois plus raide
+%
+%   Voir aussi IMGRADIENT, EDGE, IMFILTER.
     if nargin < 2, methode = 'sobel'; end
     x = double(image);
     switch lower(char(methode))

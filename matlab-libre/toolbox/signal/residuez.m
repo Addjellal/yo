@@ -12,6 +12,8 @@ function [r, p, k] = residuez(b, a)
 %
 %   Exemple :
 %      [r,p] = residuez(1, [1 -0.5])   % r = 1, p = 0.5
+%
+%   Voir aussi RESIDUE, TF2ZP, IMPZ.
     b = double(b(:)).';
     a = double(a(:)).';
     if isempty(a) || a(1) == 0

@@ -6,6 +6,8 @@ function t = struct2table(s, varargin)
 %   Exemple :
 %      t = struct2table(struct('a', {1; 2}, 'b', {3; 4}));
 %      height(t)                   % 2
+%
+%   Voir aussi TABLE, ARRAY2TABLE, CELL2TABLE.
     champs = fieldnames(s);
     n = numel(s);
     colonnes = cell(1, numel(champs));

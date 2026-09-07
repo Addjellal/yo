@@ -2,6 +2,8 @@ function [m, v] = geostat(p)
 %GEOSTAT Moyenne et variance de la loi géométrique.
 %   Exemple :
 %      [m,v] = geostat(0.25)   % 3 et 12
+%
+%   Voir aussi GEOPDF, GEOCDF, GEOINV, GEORND, PDF, CDF.
     p = double(p);
     m = (1 - p) ./ p;
     v = (1 - p) ./ p .^ 2;

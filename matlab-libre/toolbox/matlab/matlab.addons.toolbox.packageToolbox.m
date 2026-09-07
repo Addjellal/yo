@@ -12,6 +12,8 @@ function fichier = matlab.addons.toolbox.packageToolbox(dossier, nomArchive)
 %      fclose(f);
 %      fichier = matlab.addons.toolbox.packageToolbox(dossier, 'ma.zip');
 %      isfile(fichier)             % 1
+%
+%   Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX, ZIP.
     if nargin < 2 || isempty(nomArchive)
         [~, nom] = fileparts(dossier);
         nomArchive = [nom '.zip'];

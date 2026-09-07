@@ -7,6 +7,8 @@ function [base, sens] = optionsChiffres(arguments)
 %
 %   Exemple :
 %      [b, s] = optionsChiffres({8, 'left-msb'})   % 8, 'left-msb'
+%
+%   Voir aussi DE2BI, BI2DE, DEC2BASE.
     base = 2;
     sens = 'right-msb';
     for k = 1:numel(arguments)

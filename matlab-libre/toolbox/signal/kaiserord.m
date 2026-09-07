@@ -6,6 +6,8 @@ function [n, Wn, beta, genre] = kaiserord(f, a, ondulation, fs)
 %
 %   Exemple :
 %      [n, Wn, beta] = kaiserord([1000 1200], [1 0], [0.05 0.01], 8000);
+%
+%   Voir aussi KAISER, FIR1.
     if nargin < 4 || isempty(fs), fs = 2; end
     f = f(:).';
     a = a(:).';

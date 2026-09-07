@@ -11,6 +11,8 @@ function [bas, haut, famille, ordre] = supportOndeletteContinue(nom)
 %
 %   Exemple :
 %      [lb, ub] = supportOndeletteContinue('mexh')   % -8, 8
+%
+%   Voir aussi CWT, WAVEFUN, ONDELETTEANALYTIQUE.
     nom = lower(strtrim(char(nom)));
     bas = [];
     haut = [];

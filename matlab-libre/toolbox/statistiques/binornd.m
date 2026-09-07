@@ -6,6 +6,8 @@ function r = binornd(n, pr, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(binornd(10, 0.3, 1, 10000))     % proche de 3 = n p
+%
+%   Voir aussi BINOCDF, BINOINV, BINOSTAT, BINOFIT, PDF, CDF.
     forme = statForme(size(n + pr), varargin);
     n = statEtendre(n, forme);
     pr = statEtendre(pr, forme);

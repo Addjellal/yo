@@ -7,6 +7,8 @@ function y = imadjust(x, entree, sortie, gamma)
 %      x = [0.2 0.5 0.8];
 %      y = imadjust(x, [0.2 0.8], [0 1]);
 %      [y(1) y(end)]               % 0 et 1 : les bornes s'etirent
+%
+%   Voir aussi STRETCHLIM, HISTEQ, IMCOMPLEMENT.
     x = im2double(x);
     if nargin < 2 || isempty(entree)
         entree = [min(x(:)), max(x(:))];

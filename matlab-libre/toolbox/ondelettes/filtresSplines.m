@@ -33,6 +33,8 @@ function [RF, DF] = filtresSplines(Nr, Nd)
 %   Exemple :
 %      [RF, DF] = filtresSplines(2, 4);
 %      numel(RF) > 0 && numel(DF) > 0
+%
+%   Voir aussi WFILTERS, BIORFILT, REFUSERHORSSPLINE.
     if mod(Nr + Nd, 2) ~= 0
         error('wavelet:filtresSplines:Parite', ...
               'La somme des deux ordres doit être paire.');

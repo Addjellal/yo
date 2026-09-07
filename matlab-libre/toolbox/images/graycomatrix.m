@@ -7,6 +7,8 @@ function [glcm, niveauxUtilises] = graycomatrix(image, varargin)
 %
 %   Exemple :
 %      graycomatrix([1 1 1; 1 1 1; 1 1 1], 'NumLevels', 2)
+%
+%   Voir aussi GRAYCOPROPS, ENTROPYFILT.
     niveaux = 8;
     limites = [];
     decalages = [0 1];

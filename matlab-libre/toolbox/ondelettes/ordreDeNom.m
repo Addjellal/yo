@@ -8,6 +8,8 @@ function ordre = ordreDeNom(nom, prefixe)
 %   Exemple :
 %      ordreDeNom('db4', 'db')     % 4
 %      ordreDeNom('haar', 'db')    % 1 : haar est db1
+%
+%   Voir aussi WFILTERS, ORDRESBIOR, WAVEFUN.
     nom = lower(strtrim(char(nom)));
     if strcmp(nom, 'haar') && strcmp(prefixe, 'db')
         ordre = 1;

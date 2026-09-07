@@ -5,6 +5,8 @@ function [m, v] = wblstat(a, b)
 %
 %   Exemple :
 %      [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
+%
+%   Voir aussi WBLPDF, WBLCDF, WBLINV, WBLRND, PDF, CDF.
     if nargin < 1, a = 1; end
     if nargin < 2, b = 1; end
     [a, b] = statAjuster(a, b);

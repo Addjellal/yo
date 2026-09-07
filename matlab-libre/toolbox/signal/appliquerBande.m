@@ -8,6 +8,8 @@ function y = appliquerBande(x, b, a)
 %      t = (0:255)' / 256;
 %      y = appliquerBande(sin(2*pi*5*t) + 0.5*sin(2*pi*90*t), b, a);
 %      rms(y - sin(2*pi*5*t)) < 0.3
+%
+%   Voir aussi LOWPASS, CONCEVOIRBANDE.
     if numel(a) == 1 && a == 1
         y = filtfilt(b, 1, x);
     else

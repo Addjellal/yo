@@ -4,6 +4,8 @@ function x = binoinv(y, n, pr)
 %
 %   Exemple :
 %      binoinv(0.5, 10, 0.5)   % 5
+%
+%   Voir aussi BINOCDF, BINORND, BINOSTAT, BINOFIT, PDF, CDF.
     [y, n, pr] = statAjuster(y, n, pr);
     x = zeros(size(y));
     for k = 1:numel(y)

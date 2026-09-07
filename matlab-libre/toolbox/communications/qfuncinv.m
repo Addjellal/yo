@@ -5,5 +5,7 @@ function x = qfuncinv(q)
 %   Exemple :
 %      qfuncinv(0.5)              % 0
 %      qfuncinv(qfunc(1.3))       % 1.3
+%
+%   Voir aussi QFUNC.
     x = sqrt(2) * erfcinv(2 * q);
 end

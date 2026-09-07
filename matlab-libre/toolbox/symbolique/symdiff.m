@@ -6,6 +6,8 @@ function d = symdiff(e, variable)
 %   Exemple :
 %      x = sym('x');
 %      symstr(symsimplify(symdiff(sympow(x, symnum(2)), 'x')))     % la derivee de x au carre
+%
+%   Voir aussi SYMINT, SYMSIMPLIFY, SYMSTR.
     e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur

@@ -10,6 +10,8 @@ function [pxx, f] = pyulear(x, p, nfft, fs)
 %      [pxx, f] = pyulear(x, 8, 512, 1000);
 %      [~, k] = max(pxx);
 %      abs(f(k) - 100) < 10
+%
+%   Voir aussi PBURG, PCOV, ARYULE.
     if nargin < 3 || isempty(nfft), nfft = 256; end
     if nargin < 4 || isempty(fs), fs = 1; end
     [a, e] = aryule(x, p);

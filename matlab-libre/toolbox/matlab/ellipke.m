@@ -7,6 +7,8 @@ function [K, E] = ellipke(m, tol)
 %
 %   Exemple :
 %      [K, E] = ellipke(0.5)   % 1.854074677301372 et 1.350643881047676
+%
+%   Voir aussi ELLIPJ, PROTOTYPEELLIPTIQUE.
     if nargin < 2 || isempty(tol), tol = eps; end
     m = double(m);
     K = zeros(size(m));

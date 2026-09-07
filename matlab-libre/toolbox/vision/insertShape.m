@@ -6,6 +6,8 @@ function J = insertShape(I, forme, position)
 %   Exemple :
 %      J = insertShape(zeros(20), 'rectangle', [5 5 8 8]);
 %      sum(J(:)) > 0               % 1
+%
+%   Voir aussi INSERTMARKER, INSERTTEXT.
     J = im2double(I);
     [h, l] = size(J);
     switch lower(char(forme))

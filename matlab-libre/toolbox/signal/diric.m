@@ -8,6 +8,8 @@ function y = diric(x, n)
 %
 %   Exemple :
 %      diric(0, 5)   % 1
+%
+%   Voir aussi SQUARE, CHIRP.
     if n <= 0 || n ~= round(n)
         error('signal:diric:BadOrder', 'N doit être un entier positif.');
     end

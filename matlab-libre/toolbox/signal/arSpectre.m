@@ -8,6 +8,8 @@ function [pxx, f] = arSpectre(a, e, nfft, fs, unilateral)
 %   Exemple :
 %      [pxx, f] = arSpectre([1 -0.5], 1, 512, 1);
 %      pxx(1) > pxx(end)           % 1 : un pole reel positif est passe-bas
+%
+%   Voir aussi PYULEAR, PBURG, PCOV.
     if nargin < 5, unilateral = true; end
     a = double(a(:)).';
     n = nfft;

@@ -6,5 +6,7 @@ function c = flattenLayer(varargin)
 %   Exemple :
 %      couches = {imageInputLayer([8 8 1]), flattenLayer(), fullyConnectedLayer(2)};
 %      numel(couches)              % 3
+%
+%   Voir aussi FULLYCONNECTEDLAYER, CONVOLUTION2DLAYER, MAXPOOLING2DLAYER.
     c = struct('type', 'flatten', 'forme', [], 'nom', matlibre_couche_nom(varargin));
 end

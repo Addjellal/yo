@@ -6,6 +6,8 @@ function [pente, debut, fin] = slewrate(x, fs, varargin)
 %
 %   Exemple :
 %      slewrate([0 0 1 1], 1)   % 0.8/0.8 = 1 par seconde
+%
+%   Voir aussi RISETIME, FALLTIME, MIDCROSS.
     if nargin < 2 || isempty(fs), fs = 1; end
     pourcentages = [10 90];
     for k = 1:2:numel(varargin) - 1

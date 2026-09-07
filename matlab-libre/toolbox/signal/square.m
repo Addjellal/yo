@@ -6,6 +6,8 @@ function y = square(t, rapport)
 %   Exemple :
 %      y = square(linspace(0, 4 * pi, 100));
 %      unique(y)                   % -1 et 1
+%
+%   Voir aussi SAWTOOTH, CHIRP, PULSTRAN.
     if nargin < 2
         rapport = 50;
     end

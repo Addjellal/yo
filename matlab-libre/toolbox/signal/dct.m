@@ -7,6 +7,8 @@ function y = dct(x, n)
 %   Exemple :
 %      x = [1 2 3 4 5]';
 %      max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
+%
+%   Voir aussi IDCT, DST.
     x = x(:);
     if nargin > 1 && ~isempty(n)
         if numel(x) > n

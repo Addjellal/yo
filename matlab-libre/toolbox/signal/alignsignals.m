@@ -7,6 +7,8 @@ function [xa, ya, d] = alignsignals(x, y, maxDecalage)
 %      x = [0 0 1 2 3 0];
 %      [xa, ya, d] = alignsignals(x, [1 2 3 0 0 0]);
 %      d                           % le decalage retrouve
+%
+%   Voir aussi FINDDELAY.
     if nargin < 3, maxDecalage = []; end
     d = finddelay(x, y, maxDecalage);
     x = x(:);

@@ -13,6 +13,8 @@ function [r, puissances, frequences] = thd(x, fs, nharm)
 %      t = (0:999)'/1000;
 %      x = cos(2*pi*50*t) + 0.1*cos(2*pi*100*t);
 %      thd(x)      % -20 dB : l'harmonique est dix fois plus petite
+%
+%   Voir aussi SNR, SINAD, SFDR.
     if nargin < 2 || isempty(fs), fs = 1; end
     if nargin < 3 || isempty(nharm), nharm = 6; end
     [S, f] = signalSpectrePuissance(x, fs);

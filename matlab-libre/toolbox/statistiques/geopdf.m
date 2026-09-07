@@ -5,6 +5,8 @@ function y = geopdf(x, p)
 %
 %   Exemple :
 %      geopdf(2, 0.5)   % 0.125
+%
+%   Voir aussi GEOCDF, GEOINV, GEORND, GEOSTAT, PDF, CDF.
     [x, p] = statAjuster(x, p);
     y = zeros(size(x));
     dedans = x >= 0 & x == round(x) & p > 0 & p <= 1;

@@ -9,6 +9,8 @@ function y = imfilter(x, h, varargin)
 %
 %   Exemple :
 %      imfilter(ones(3), ones(3)/9, 'replicate')   % que des 1
+%
+%   Voir aussi FSPECIAL, IMBOXFILT, IMGAUSSFILT.
     convolution = false;
     forme = 'same';
     remplissage = 0;

@@ -8,6 +8,8 @@ function xyz = rgb2xyz(rgb, varargin)
 %
 %   Exemple :
 %      rgb2xyz([1 1 1])   % le blanc D65
+%
+%   Voir aussi XYZ2RGB, RGB2LAB, MATRICERVBVERSXYZ.
     blanc = [];
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

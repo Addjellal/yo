@@ -5,6 +5,8 @@ function x = waverec2(C, S, nom)
 %   Exemple :
 %      [C, S] = wavedec2(magic(8), 2, 'haar');
 %      max(max(abs(waverec2(C, S, 'haar') - magic(8)))) < 1e-10
+%
+%   Voir aussi WAVEDEC2, APPCOEF2, WRCOEF2.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     niveaux = size(S, 1) - 2;
     courant = reshape(C(1:prod(S(1, :))), S(1, :));

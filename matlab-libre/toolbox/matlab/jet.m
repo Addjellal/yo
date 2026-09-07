@@ -5,6 +5,8 @@ function carte = jet(m)
 %
 %   Exemple :
 %      c = jet(64);   % c(1,:) vaut [0 0 0.5], c(end,:) vaut [0.5 0 0]
+%
+%   Voir aussi HSV, HOT.
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     if m <= 1

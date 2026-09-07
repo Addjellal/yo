@@ -7,6 +7,8 @@ function T = estimateGeometricTransform(points1, points2, genre)
 %      p1 = [0 0; 1 0; 0 1; 1 1];
 %      T = estimateGeometricTransform(p1, p1 + 3, 'similarity');
 %      size(T)                     % 3 3 : une matrice homogene
+%
+%   Voir aussi MATCHFEATURES, ESTIMATEFUNDAMENTALMATRIX.
     if nargin < 3
         genre = 'affine';
     end

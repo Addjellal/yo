@@ -5,6 +5,8 @@ function y = fskmod(x, M, ecart, nEchantillons, fs)
 %
 %   Exemple :
 %      y = fskmod([0 1], 2, 100, 8, 1000);   % 16 échantillons
+%
+%   Voir aussi FSKDEMOD, PSKMOD, QAMMOD.
     if nargin < 5, fs = 1; end
     x = x(:);
     n = numel(x);

@@ -8,6 +8,8 @@ function paires = matchFeatures(d1, d2, varargin)
 %      d1 = [1 0; 0 1];
 %      paires = matchFeatures(d1, d1);
 %      isequal(paires, [1 1; 2 2])     % chaque descripteur se retrouve
+%
+%   Voir aussi EXTRACTFEATURES, ESTIMATEGEOMETRICTRANSFORM, SELECTSTRONGEST.
     rapportMax = 0.7;
     for k = 1:2:numel(varargin)-1
         if strcmpi(char(varargin{k}), 'maxratio')

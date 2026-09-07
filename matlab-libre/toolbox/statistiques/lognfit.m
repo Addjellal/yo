@@ -6,6 +6,8 @@ function [muhat, sigmahat] = lognfit(x)
 %      rng(1);
 %      [mu, sigma] = lognfit(lognrnd(1, 0.5, 5000, 1));
 %      abs(mu - 1) < 0.05 && abs(sigma - 0.5) < 0.05
+%
+%   Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0)
         error('stats:lognfit:BadData', 'Les données doivent être strictement positives.');

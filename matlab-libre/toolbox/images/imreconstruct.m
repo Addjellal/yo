@@ -13,6 +13,8 @@ function sortie = imreconstruct(marqueur, masque, connexite)
 %   Exemple :
 %      m = zeros(5); m(3,3) = 1;
 %      imreconstruct(m, ones(5))   % tout à 1 : le masque est connexe
+%
+%   Voir aussi IMFILL, IMHMAX, IMIMPOSEMIN.
     if nargin < 3 || isempty(connexite), connexite = 8; end
     marqueur = double(marqueur);
     masque = double(masque);

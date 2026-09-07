@@ -10,6 +10,8 @@ function arbre = scinderNoeud(arbre, indice)
 %      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
 %      arbre = scinderNoeud(arbre, 1);
 %      numel(lireNoeud(arbre, indiceDeNoeud(arbre, [2 0]))) > 0
+%
+%   Voir aussi WPSPLT, WPDEC, POSERNOEUD.
     ordre = arbre.ordre;
     donnees = lireNoeud(arbre, indice);
     if isempty(donnees)

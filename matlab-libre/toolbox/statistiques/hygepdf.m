@@ -6,6 +6,8 @@ function y = hygepdf(x, m, k, n)
 %
 %   Exemple :
 %      hygepdf(2, 10, 4, 3)   % 0.3
+%
+%   Voir aussi HYGECDF, HYGEINV, HYGERND, HYGESTAT, PDF, CDF.
     [x, m, k, n] = statAjuster(x, m, k, n);
     y = zeros(size(x));
     for indice = 1:numel(x)

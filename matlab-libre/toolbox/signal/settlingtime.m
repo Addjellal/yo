@@ -9,6 +9,8 @@ function [duree, debut, fin] = settlingtime(x, fs, d)
 %      t = (0:0.001:1)';
 %      d = settlingtime(1 - exp(-20 * t), 1000);
 %      d > 0                       % 1
+%
+%   Voir aussi RISETIME, OVERSHOOT, UNDERSHOOT.
     if nargin < 2 || isempty(fs), fs = 1; end
     if nargin < 3 || isempty(d), d = 2; end
     x = double(x(:));

@@ -4,6 +4,8 @@ function x = betainv(p, a, b)
 %
 %   Exemple :
 %      betainv(0.5, 1, 1)   % 0.5, la loi uniforme
+%
+%   Voir aussi BETAPDF, BETACDF, BETARND, BETASTAT, PDF, CDF.
     [p, a, b] = statAjuster(p, a, b);
     x = zeros(size(p));
     for k = 1:numel(p)

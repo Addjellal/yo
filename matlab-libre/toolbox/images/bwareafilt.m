@@ -9,6 +9,8 @@ function [sortie, aires] = bwareafilt(bw, n, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      garde = bwareafilt(bw, 1);
 %      sum(garde(:))               % 81 : seule la plus grande reste
+%
+%   Voir aussi BWPROPFILT, BWAREAOPEN, BWLABEL, REGIONPROPS.
     if nargin < 3 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     [etiquettes, nombre] = bwlabeln(bw, connexite);

@@ -5,6 +5,8 @@ function x = logninv(p, mu, sigma)
 %
 %   Exemple :
 %      logninv(0.5, 0, 1)   % 1
+%
+%   Voir aussi LOGNPDF, LOGNCDF, LOGNRND, LOGNSTAT, PDF, CDF.
     if nargin < 2, mu = 0; end
     if nargin < 3, sigma = 1; end
     [p, mu, sigma] = statAjuster(p, mu, sigma);

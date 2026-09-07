@@ -7,6 +7,8 @@ function primitive = symint(e, variable)
 %      primitive = symint(x, 'x');
 %      symeval(symdiff(primitive, 'x'), {'x'}, {3})     % 3 : deriver annule integrer
 %      symeval(primitive, {'x'}, {2})                   % 2 : l'aire sous x de 0 a 2
+%
+%   Voir aussi SYMDIFF, SYMSIMPLIFY, SYMSTR.
     e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur

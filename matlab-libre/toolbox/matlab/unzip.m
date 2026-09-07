@@ -9,6 +9,8 @@ function fichiers = unzip(archive, dossier)
 %      delete('a.txt');
 %      unzip('archive.zip');
 %      fileread('a.txt')           % 'bonjour'
+%
+%   Voir aussi ZIP.
     if nargin < 2 || isempty(dossier), dossier = pwd(); end
     [codeVersion, ~] = system('unzip -v');
     if codeVersion ~= 0

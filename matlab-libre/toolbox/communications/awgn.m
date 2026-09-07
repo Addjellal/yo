@@ -6,6 +6,8 @@ function y = awgn(x, snrdB, puissanceSignal)
 %   Exemple :
 %      rng(1);
 %            y = awgn(sin(2*pi*(0:999)/100), 20, 'measured');
+%
+%   Voir aussi BERAWGN, SNR.
     if nargin < 3 || (ischar(puissanceSignal) && strcmpi(puissanceSignal, 'measured'))
         puissanceSignal = mean(abs(x(:)) .^ 2);
     end

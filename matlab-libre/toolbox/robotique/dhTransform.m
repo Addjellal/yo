@@ -7,6 +7,8 @@ function T = dhTransform(a, alpha, d, theta)
 %   Exemple :
 %      T = dhTransform(1, 0, 0, 0);
 %      T(1, 4)                     % 1 : une translation d'un metre le long de x
+%
+%   Voir aussi FKINE2R, IKINE2R.
     ct = cos(theta); st = sin(theta);
     ca = cos(alpha); sa = sin(alpha);
     T = [ct, -st*ca,  st*sa, a*ct;

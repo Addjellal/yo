@@ -6,6 +6,8 @@ function y = gauss2mf(x, params)
 %   Exemple :
 %      y = gauss2mf([0 5 10], [1 2 1 8]);
 %      y(2) > 0.9                  % le plateau entre les deux gaussiennes
+%
+%   Voir aussi GAUSSMF, GBELLMF, TRAPMF.
     s1 = params(1); c1 = params(2);
     s2 = params(3); c2 = params(4);
     x = double(x);

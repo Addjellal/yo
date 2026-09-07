@@ -5,6 +5,8 @@ function [a, e] = ac2poly(r)
 %
 %   Exemple :
 %      [a, e] = ac2poly([1 0.5 0.25]);   % a = [1 -0.5 0]
+%
+%   Voir aussi POLY2AC, AC2RC, LEVINSON, LPC.
     r = double(r(:));
     p = numel(r) - 1;
     a = 1;

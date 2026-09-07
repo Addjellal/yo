@@ -5,6 +5,8 @@ function imshow(x, varargin)
 %   Exemple :
 %      imshow(rand(16));
 %      close all;
+%
+%   Voir aussi IMREAD.
     imagesc(im2double(x));
     axis([0.5, size(x,2)+0.5, 0.5, size(x,1)+0.5]);
 end

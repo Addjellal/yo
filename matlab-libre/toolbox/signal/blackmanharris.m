@@ -5,6 +5,8 @@ function w = blackmanharris(n)
 %   Exemple :
 %      w = blackmanharris(64);
 %      max(w)                      % 1 : la fenetre est normalisee a son sommet
+%
+%   Voir aussi NUTTALLWIN, FLATTOPWIN, WINDOW.
     n = round(n);
     if n <= 1, w = ones(max(n, 0), 1); return, end
     k = (0:n-1)' / (n - 1);

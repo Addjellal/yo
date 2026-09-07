@@ -7,6 +7,8 @@ function s = strel(forme, parametre)
 %
 %   Exemple :
 %      strel('square', 3)   % 3x3 de vrais
+%
+%   Voir aussi IMERODE, IMDILATE, BWMORPH, MORPHOLOGIE.
     if nargin < 2, parametre = 3; end
     switch lower(char(forme))
         case 'square'

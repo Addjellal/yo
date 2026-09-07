@@ -6,6 +6,8 @@ function u = rgb2lin(v, varargin)
 %
 %   Exemple :
 %      rgb2lin(0.5)   % 0.2140
+%
+%   Voir aussi LIN2RGB, RGB2XYZ.
     v = im2double(v);
     seuil = 0.04045;
     u = zeros(size(v));

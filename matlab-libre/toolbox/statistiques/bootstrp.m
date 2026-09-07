@@ -5,6 +5,8 @@ function statistiques = bootstrp(n, fonction, varargin)
 %
 %   Exemple :
 %      s = bootstrp(100, @mean, randn(50, 1));
+%
+%   Voir aussi BOOTCI, JACKKNIFE.
     donnees = varargin;
     m = size(donnees{1}, 1);
     statistiques = [];

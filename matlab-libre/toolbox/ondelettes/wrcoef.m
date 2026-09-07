@@ -7,6 +7,8 @@ function y = wrcoef(genre, C, L, nom, niveau)
 %   Exemple :
 %      [c, l] = wavedec(1:8, 2, 'haar');
 %      a2 = wrcoef('a', c, l, 'haar', 2);
+%
+%   Voir aussi WAVEDEC, APPCOEF, DETCOEF.
     if nargin < 4 || isempty(nom), nom = 'haar'; end
     niveauMax = numel(L) - 2;
     if nargin < 5 || isempty(niveau), niveau = niveauMax; end

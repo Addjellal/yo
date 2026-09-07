@@ -9,6 +9,8 @@ function [X, R] = corrmtx(x, m, methode)
 %
 %   Exemple :
 %      [X, R] = corrmtx(randn(100,1), 4, 'modified');
+%
+%   Voir aussi PMUSIC, PEIG.
     if nargin < 3 || isempty(methode), methode = 'autocorrelation'; end
     x = double(x(:));
     n = numel(x);

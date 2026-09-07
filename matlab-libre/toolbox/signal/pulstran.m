@@ -8,6 +8,8 @@ function y = pulstran(t, d, fonction, varargin)
 %
 %   Exemple :
 %      t = 0:1/1e3:1;  y = pulstran(t, 0:0.1:1, @rectpuls, 0.02);
+%
+%   Voir aussi RECTPULS, TRIPULS, GAUSPULS.
     t = double(t);
     d = double(d);
     if size(d, 2) == 1

@@ -5,6 +5,8 @@ function x = idwt2(ca, ch, cv, cd, nom)
 %   Exemple :
 %      [a,h,v,d] = dwt2(magic(4), 'db2');
 %      max(max(abs(idwt2(a,h,v,d,'db2') - magic(4))))   % nul
+%
+%   Voir aussi DWT2, WAVEREC2, IDWT.
     if nargin < 5 || isempty(nom), nom = 'haar'; end
     ligneA = remonterColonnes(ca, ch, nom);
     ligneD = remonterColonnes(cv, cd, nom);

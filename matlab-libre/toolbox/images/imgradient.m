@@ -7,6 +7,8 @@ function [amplitude, direction] = imgradient(a, b)
 %   Exemple :
 %      [amplitude, direction] = imgradient(repmat((1:10), 10, 1));
 %      abs(mean(mean(direction(2:9, 2:9)))) < 1e-9   % la pente est horizontale
+%
+%   Voir aussi IMGRADIENTXY, EDGE, IMFILTER.
     if nargin == 2 && isnumeric(b) && ~ischar(b)
         gx = a; gy = b;
     elseif nargin == 2

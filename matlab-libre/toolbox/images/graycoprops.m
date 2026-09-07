@@ -7,6 +7,8 @@ function s = graycoprops(glcm, proprietes)
 %      glcm = graycomatrix(uint8(magic(8)));
 %      s = graycoprops(glcm, {'Contrast', 'Energy'});
 %      s.Energy > 0                % 1
+%
+%   Voir aussi GRAYCOMATRIX, ENTROPYFILT.
     if nargin < 2 || isempty(proprietes)
         proprietes = {'Contrast', 'Correlation', 'Energy', 'Homogeneity'};
     elseif ischar(proprietes) || isstring(proprietes)

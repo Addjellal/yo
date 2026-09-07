@@ -8,6 +8,8 @@ function M = matriceRVBversXYZ()
 %   Exemple :
 %      M = matriceRVBversXYZ();
 %      max(abs(M * [1; 1; 1] - [0.95047; 1; 1.08883])) < 1e-3   % le blanc va sur D65
+%
+%   Voir aussi RGB2XYZ, XYZ2RGB, APPLIQUERMATRICECOULEUR.
     M = [0.4124564 0.3575761 0.1804375
          0.2126729 0.7151522 0.0721750
          0.0193339 0.1191920 0.9503041];

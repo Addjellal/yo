@@ -9,6 +9,8 @@ function sortie = impyramid(image, direction)
 %   Exemple :
 %      size(impyramid(ones(32), 'reduce'))    % 16 16 : la taille est divisee par deux
 %      size(impyramid(ones(16), 'expand'))    % 31 31
+%
+%   Voir aussi IMRESIZE, IMFILTER.
     noyau = [1 4 6 4 1] / 16;
     image = double(image);
     if strncmpi(char(direction), 'red', 3)

@@ -14,6 +14,8 @@ function [alpha, biais] = resoudreSmo(K, cible, C, tolerance, maxIter)
 %      K = X * X';
 %      [alpha, biais] = resoudreSmo(K, cible, 1, 1e-3, 200);
 %      abs(sum(alpha .* cible)) < 1e-6      % la contrainte d'egalite est tenue
+%
+%   Voir aussi FITCSVM, NOYAUSVM, PREDICTSVM.
     n = numel(cible);
     alpha = zeros(n, 1);
     biais = 0;

@@ -9,6 +9,8 @@ function [sortie, indices] = bwselect(bw, c, r, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      [sortie, indices] = bwselect(bw, 4, 4);
 %      sum(sortie(:))              % 16 : la composante qui contient (4,4)
+%
+%   Voir aussi BWLABEL, IMFILL, BWCONNCOMP.
     if nargin < 4 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     [etiquettes, ~] = bwlabeln(bw, connexite);

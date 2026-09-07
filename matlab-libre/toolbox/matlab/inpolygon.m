@@ -11,6 +11,8 @@ function [dedans, sur] = inpolygon(xq, yq, xv, yv)
 %
 %   Exemple :
 %      inpolygon(0.5, 0.5, [0 1 1 0], [0 0 1 1])   % vrai
+%
+%   Voir aussi CONVHULL.
     xq = double(xq);
     yq = double(yq);
     xv = double(xv(:));

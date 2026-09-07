@@ -9,6 +9,8 @@ function w = normaliserSomme(w, sumf)
 %
 %   Exemple :
 %      sum(normaliserSomme([1 1 1 1], 2))     % 2
+%
+%   Voir aussi WFILTERS, ORTHFILT, DAUBECHIESFILTRE.
     w = double(w(:))';
     total = sum(w);
     if total == 0

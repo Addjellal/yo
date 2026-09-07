@@ -5,6 +5,8 @@ function d = milliseconds(x)
 %
 %   Exemple :
 %      seconds(milliseconds(1500))     % 1.5
+%
+%   Voir aussi SECONDS, MINUTES, HOURS, DURATION.
     if isa(x, 'duration')
         d = x.Secondes * 1000;
     else

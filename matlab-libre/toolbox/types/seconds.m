@@ -6,6 +6,8 @@ function d = seconds(x)
 %   Exemple :
 %      seconds(90)                 % une minute et demie
 %      minutes(seconds(90))        % 1.5
+%
+%   Voir aussi MINUTES, HOURS, MILLISECONDS, DURATION.
     if isa(x, 'duration')
         d = x.Secondes / 1;
     elseif isa(x, 'calendarDuration')

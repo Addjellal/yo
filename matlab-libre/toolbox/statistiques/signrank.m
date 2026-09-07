@@ -7,6 +7,8 @@ function [p, h, statistiques] = signrank(x, y, alpha)
 %      rng(1);
 %      p = signrank(randn(100, 1));
 %      p > 0.01                    % on ne rejette pas la mediane nulle
+%
+%   Voir aussi RANKSUM, TTEST, KSTEST.
     if nargin < 2 || isempty(y), y = zeros(size(x)); end
     if nargin < 3, alpha = 0.05; end
     d = x(:) - y(:);

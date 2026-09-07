@@ -7,6 +7,8 @@ function arbre = poserNoeud(arbre, indice, donnees)
 %      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
 %      arbre = poserNoeud(arbre, 500, [1 2 3]);
 %      lireNoeud(arbre, 500)       % 1 2 3
+%
+%   Voir aussi LIRENOEUD, INDICEDENOEUD, SCINDERNOEUD.
     if indice + 1 > numel(arbre.donnees)
         arbre.donnees{indice + 1} = [];
     end

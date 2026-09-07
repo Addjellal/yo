@@ -6,6 +6,8 @@ function couche = fullyConnectedLayer(sorties, varargin)
 %   Exemple :
 %      c = fullyConnectedLayer(5);
 %      c.sorties                   % 5
+%
+%   Voir aussi FULLYCONNECT, RELULAYER, SOFTMAXLAYER.
     couche = struct('type', 'fc', 'sorties', sorties, 'W', [], 'b', [], ...
                     'entree', [], 'sortie', [], ...
                     'nom', matlibre_couche_nom(varargin));

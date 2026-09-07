@@ -7,6 +7,8 @@ function r = trnd(v, varargin)
 %      rng(1);
 %      x = trnd(10, 1, 5000);
 %      abs(mean(x)) < 0.1          % la loi de Student est centree
+%
+%   Voir aussi TCDF, TINV, TSTAT, PDF, CDF, ICDF.
     forme = statForme(size(v), varargin);
     v = statEtendre(v, forme);
     r = randn(forme) ./ sqrt(chi2rnd(v) ./ v);

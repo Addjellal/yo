@@ -12,6 +12,8 @@ function r = gamrnd(a, b, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(gamrnd(3, 2, 1, 10000))         % proche de 6 = a b
+%
+%   Voir aussi GAMPDF, GAMCDF, GAMINV, GAMSTAT, PDF, CDF.
     if nargin < 2, b = 1; end
     forme = statForme(size(a + b), varargin);
     a = statEtendre(a, forme);

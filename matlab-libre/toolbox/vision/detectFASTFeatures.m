@@ -9,6 +9,8 @@ function positions = detectFASTFeatures(I, seuil)
 %      I(15:25, 15:25) = 1;        % un carre clair
 %      p = detectFASTFeatures(I, 0.1);
 %      size(p, 2)                  % 2 : ligne et colonne par point
+%
+%   Voir aussi DETECTHARRISFEATURES, EXTRACTFEATURES, MATCHFEATURES.
     if nargin < 2
         seuil = 0.1;
     end

@@ -8,6 +8,8 @@ function [y, ym] = rceps(x)
 %
 %   Exemple :
 %      y = rceps([1 0 0 0 0.5 0 0 0]);   % un écho à l'échantillon 5
+%
+%   Voir aussi CCEPS, ICCEPS.
     x = double(x(:));
     n = numel(x);
     spectre = fft(x);

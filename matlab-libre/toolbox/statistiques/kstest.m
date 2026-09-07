@@ -9,6 +9,8 @@ function [h, p, ksstat, cv] = kstest(x, alpha)
 %      rng(1);
 %      [h, p] = kstest(randn(500, 1));
 %      h                           % 0 : on ne rejette pas la normalite
+%
+%   Voir aussi TTEST, SIGNRANK, RANKSUM, CHI2GOF.
     if nargin < 2 || isempty(alpha), alpha = 0.05; end
     x = sort(x(:));
     n = numel(x);

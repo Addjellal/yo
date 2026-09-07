@@ -2,6 +2,8 @@ function [m, v] = unifstat(a, b)
 %UNIFSTAT Moyenne et variance de la loi uniforme continue.
 %   Exemple :
 %      [m,v] = unifstat(0, 1)   % 0.5 et 1/12
+%
+%   Voir aussi UNIFPDF, UNIFCDF, UNIFINV, PDF, CDF, ICDF.
     if nargin < 1, a = 0; end
     if nargin < 2, b = 1; end
     [a, b] = statAjuster(a, b);

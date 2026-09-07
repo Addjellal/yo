@@ -9,6 +9,8 @@ function sortie = appliquerMatriceCouleur(entree, M)
 %      M = matriceRVBversXYZ();
 %      sortie = appliquerMatriceCouleur([1 0 0; 0 1 0], M);
 %      size(sortie)                % 2 3 : la forme de l'entree est gardee
+%
+%   Voir aussi MATRICERVBVERSXYZ, RGB2XYZ, ADAPTERBLANC.
     entree = double(entree);
     d = size(entree);
     if numel(d) == 2 && d(2) == 3

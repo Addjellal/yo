@@ -5,6 +5,8 @@ function y = evpdf(x, mu, sigma)
 %
 %   Exemple :
 %      evpdf(0, 0, 1)   % exp(-1) = 0.3679
+%
+%   Voir aussi EVCDF, EVINV, EVRND, EVSTAT, PDF, CDF.
     if nargin < 2, mu = 0; end
     if nargin < 3, sigma = 1; end
     [x, mu, sigma] = statAjuster(x, mu, sigma);

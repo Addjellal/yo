@@ -6,6 +6,8 @@ function indice = indiceDeNoeud(arbre, noeud)
 %   Exemple :
 %      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
 %      indiceDeNoeud(arbre, [1 0])     % 1 : le premier enfant de la racine
+%
+%   Voir aussi DEPO2IND, LIRENOEUD, POSERNOEUD, WPDEC.
     noeud = double(noeud);
     if numel(noeud) == 2
         indice = depo2ind(arbre.ordre, noeud(:).');

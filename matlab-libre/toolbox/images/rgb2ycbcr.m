@@ -6,6 +6,8 @@ function y = rgb2ycbcr(image)
 %
 %   Exemple :
 %      max(abs(ycbcr2rgb(rgb2ycbcr([0.2 0.4 0.6])) - [0.2 0.4 0.6])) < 1e-5   % l'aller-retour
+%
+%   Voir aussi YCBCR2RGB, RGB2HSV, RGB2NTSC.
     estEntier = isa(image, 'uint8');
     % Une matrice N x 3 est une liste de couleurs, non une image de trois
     % colonnes : c'est ainsi que MATLAB lit une palette.

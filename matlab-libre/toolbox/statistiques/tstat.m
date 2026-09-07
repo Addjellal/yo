@@ -6,6 +6,8 @@ function [m, v] = tstat(nu)
 %      [m, v] = tstat(10);
 %      m                           % 0 : elle est centree des que nu > 1
 %      v                           % 1.25 = nu/(nu-2)
+%
+%   Voir aussi TCDF, TINV, TRND, PDF, CDF, ICDF.
     nu = double(nu);
     m = NaN(size(nu));
     v = NaN(size(nu));

@@ -16,6 +16,8 @@ function [temps, tensions] = solveTransient(c, tFinal, pas, sourceTemps)
 %      c = addCapacitor(c, 2, 0, 1e-6);
 %      [t, v] = solveTransient(c, 0.01, 1e-5);
 %      abs(v(end, 2) - 5) < 0.1    % le condensateur finit par se charger
+%
+%   Voir aussi SOLVEDC, CIRCUIT, ADDCAPACITOR.
     if nargin < 4
         sourceTemps = [];
     end

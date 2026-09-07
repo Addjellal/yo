@@ -6,6 +6,8 @@ function t = NaT(varargin)
 %   Exemple :
 %      t = NaT();
 %      isnat(t)                    % 1 : la date manquante des datetime
+%
+%   Voir aussi DATETIME, ISNAT.
     if isempty(varargin)
         d = [1 1];
     elseif numel(varargin) == 1

@@ -7,6 +7,8 @@ function [sos, g] = zp2sos(z, p, k)
 %      [z, p, k] = butter(4, 0.3);
 %      [sos, g] = zp2sos(z, p, k);
 %      size(sos, 2)                % 6 colonnes par section
+%
+%   Voir aussi SOS2ZP, TF2SOS, ZP2TF.
     if nargin < 3, k = 1; end
     z = z(:);
     p = p(:);

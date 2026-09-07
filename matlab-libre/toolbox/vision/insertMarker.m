@@ -7,6 +7,8 @@ function sortie = insertMarker(image, positions, forme, varargin)
 %   Exemple :
 %      J = insertMarker(zeros(20), [10 10], 'circle');
 %      sum(J(:)) > 0               % 1 : le marqueur a ete dessine
+%
+%   Voir aussi INSERTSHAPE, INSERTTEXT.
     if nargin < 3 || isempty(forme), forme = 'plus'; end
     couleur = [1 1 1];
     taille = 3;

@@ -12,6 +12,8 @@ function [amplitude, w, phi] = zerophase(b, a, n)
 %
 %   Exemple :
 %      [hr, w] = zerophase([1 1]);   % hr = 2 cos(w/2), jamais négatif
+%
+%   Voir aussi PHASEZ, ZPLANE.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3, n = 512; end
     b = double(b(:)).';

@@ -6,6 +6,8 @@ function [indices, carte] = gray2ind(image, n)
 %
 %   Exemple :
 %      [x, map] = gray2ind([0 0.5 1], 4);   % x = [0 1 3]
+%
+%   Voir aussi IND2GRAY, RGB2IND, LABEL2RGB.
     if nargin < 2 || isempty(n), n = 64; end
     image = im2double(image);
     indices = round(image * (n - 1));

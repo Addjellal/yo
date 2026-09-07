@@ -6,6 +6,8 @@ function t = cell2table(c, varargin)
 %   Exemple :
 %      t = cell2table({1, 'a'; 2, 'b'}, 'VariableNames', {'n', 'lettre'});
 %      height(t)                   % 2
+%
+%   Voir aussi TABLE, ARRAY2TABLE, STRUCT2TABLE.
     noms = {}; lignes = {};
     k = 1;
     while k + 1 <= numel(varargin)

@@ -6,6 +6,8 @@ function out = nbinrnd(r, p, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(nbinrnd(3, 0.5, 1, 10000))      % proche de 3 = r(1-p)/p
+%
+%   Voir aussi NBINPDF, NBINCDF, NBININV, NBINSTAT, PDF, CDF.
     forme = statForme(size(r + p), varargin);
     r = statEtendre(r, forme);
     p = statEtendre(p, forme);

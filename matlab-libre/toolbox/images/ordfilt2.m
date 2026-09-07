@@ -8,6 +8,8 @@ function r = ordfilt2(image, ordre, domaine, remplissage)
 %
 %   Exemple :
 %      ordfilt2(magic(4), 9, ones(3))   % maximum sur 3x3
+%
+%   Voir aussi MEDFILT2, RANGEFILT, NLFILTER.
     x = double(image);
     [m, n] = size(x);
     [dm, dn] = size(domaine);

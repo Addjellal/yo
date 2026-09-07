@@ -6,6 +6,8 @@ function correspondance = validatestring(chaine, options, varargin)
 %
 %   Exemple :
 %      validatestring('lin', {'linear', 'cubic'})     % 'linear' : l'abrege suffit
+%
+%   Voir aussi INPUTPARSER.
     chaine = lower(strtrim(char(chaine)));
     trouves = {};
     for k = 1:numel(options)

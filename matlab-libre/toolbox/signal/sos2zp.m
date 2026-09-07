@@ -8,6 +8,8 @@ function [z, p, k] = sos2zp(sos, g)
 %      [sos, g] = tf2sos(b, a);
 %      [z, p, k] = sos2zp(sos, g);
 %      all(abs(p) < 1)             % 1 : le filtre est stable
+%
+%   Voir aussi ZP2SOS, SOS2TF, TF2SOS.
     if nargin < 2, g = 1; end
     z = [];
     p = [];

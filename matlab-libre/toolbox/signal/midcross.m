@@ -5,6 +5,8 @@ function [instants, niveauMilieu] = midcross(x, fs)
 %
 %   Exemple :
 %      midcross([0 0 1 1], 1)   % 1.5 : la moitié est franchie là
+%
+%   Voir aussi STATELEVELS, RISETIME, FALLTIME.
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     t = (0:numel(x) - 1)' / fs;

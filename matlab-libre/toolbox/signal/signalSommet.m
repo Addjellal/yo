@@ -6,6 +6,8 @@ function k = signalSommet(S, autour, rayon)
 %   Exemple :
 %      S = exp(-((1:100) - 40) .^ 2 / 50);
 %      signalSommet(S, 42, 10)     % 40 : le sommet le plus proche
+%
+%   Voir aussi FINDPEAKS, SIGNALLOBE.
     n = numel(S);
     debut = max(1, autour - rayon);
     fin = min(n, autour + rayon);

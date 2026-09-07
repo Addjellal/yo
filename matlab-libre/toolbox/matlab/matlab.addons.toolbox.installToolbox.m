@@ -15,6 +15,9 @@ function identifiant = matlab.addons.toolbox.installToolbox(source, varargin)
 %      fclose(f);
 %      identifiant = matlab.addons.toolbox.installToolbox(dossier);
 %      matlab.addons.toolbox.uninstallToolbox(identifiant);
+%
+%   Voir aussi MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX,
+%   MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX.
     if ~isfolder(source)
         error('MATLAB:addons:NotAFolder', ...
               'The toolbox source ''%s'' is not a folder.', source);

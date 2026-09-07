@@ -10,6 +10,8 @@ function sortie = adapterBlanc(xyz, blancSource, blancCible)
 %      D65 = [0.95047 1 1.08883];
 %      A = [1.0985 1 0.3558];
 %      max(abs(adapterBlanc(D65, D65, A) - A)) < 1e-9   % le blanc source devient le blanc cible
+%
+%   Voir aussi WHITEPOINT, XYZ2LAB, APPLIQUERMATRICECOULEUR.
     facteurs = blancCible(:)' ./ blancSource(:)';
     sortie = appliquerMatriceCouleur(xyz, diag(facteurs));
 end

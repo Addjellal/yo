@@ -8,6 +8,8 @@ function r = poissrnd(lambda, varargin)
 %   Exemple :
 %      rng(1);
 %      mean(poissrnd(4, 1, 10000))          % proche de 4 : moyenne et variance
+%
+%   Voir aussi POISSCDF, POISSINV, POISSFIT, PDF, CDF, ICDF.
     forme = statForme(size(lambda), varargin);
     lambda = statEtendre(lambda, forme);
     r = zeros(forme);

@@ -9,6 +9,8 @@ function [bas, haut] = dilaterFiltres(Lo, Hi, niveau)
 %      [Lo, Hi] = wfilters('db2', 'd');
 %      [bas, haut] = dilaterFiltres(Lo, Hi, 1);
 %      numel(bas) == 2 * numel(Lo) - 1     % 1 : un zero entre deux coefficients
+%
+%   Voir aussi SWT, WFILTERS, MODWT.
     facteur = 2 ^ niveau;
     if facteur == 1
         bas = Lo;

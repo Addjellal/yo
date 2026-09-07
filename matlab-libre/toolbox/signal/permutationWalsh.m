@@ -10,6 +10,8 @@ function ordreLignes = permutationWalsh(N, ordre)
 %   Exemple :
 %      p = permutationWalsh(8, 'sequency');
 %      isequal(sort(p(:)'), 1:8)   % 1 : c'est une permutation
+%
+%   Voir aussi FWHT, RANGERWALSH, RANGERWALSHINVERSE.
     bits = round(log2(N));
     switch lower(char(ordre))
         case 'hadamard'

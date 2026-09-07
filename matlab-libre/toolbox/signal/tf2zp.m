@@ -5,6 +5,8 @@ function [z, p, k] = tf2zp(b, a)
 %
 %   Exemple :
 %      [z, p, k] = tf2zp([1 -1], [1 -0.5]);   % z = 1, p = 0.5, k = 1
+%
+%   Voir aussi ZP2TF, TF2SOS, SS2ZP.
     b = b(:).';
     a = a(:).';
     if isempty(a) || a(1) == 0

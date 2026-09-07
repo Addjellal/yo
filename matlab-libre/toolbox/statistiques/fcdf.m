@@ -4,6 +4,8 @@ function p = fcdf(x, d1, d2)
 %
 %   Exemple :
 %      fcdf(1, 10, 10)             % 0.5 : a degres egaux, la mediane est en un
+%
+%   Voir aussi FPDF, FINV, FRND, FSTAT, PDF, CDF.
     p = zeros(size(x));
     for k = 1:numel(x)
         v = x(k);

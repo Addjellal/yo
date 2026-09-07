@@ -7,6 +7,8 @@ function [phat, pci] = binofit(x, n, alpha)
 %   Exemple :
 %      [p, ci] = binofit(30, 100);
 %      ci(1) < p && p < ci(2)      % 1 : l'intervalle encadre l'estimation
+%
+%   Voir aussi BINOCDF, BINOINV, BINORND, BINOSTAT, PDF, CDF.
     if nargin < 3, alpha = 0.05; end
     x = double(x(:));
     n = double(n);

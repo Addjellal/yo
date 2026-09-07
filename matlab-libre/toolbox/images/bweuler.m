@@ -7,6 +7,8 @@ function e = bweuler(bw, connexite)
 %      bw(5:15, 5:15) = true;
 %      bw(8:12, 8:12) = false;     % un carre troue
 %      bweuler(bw)                 % 0 : un objet moins un trou
+%
+%   Voir aussi BWLABEL, BWPERIM, REGIONPROPS.
     if nargin < 2, connexite = 8; end
     bw = logical(bw);
     [~, regions] = bwlabel(bw, connexite);

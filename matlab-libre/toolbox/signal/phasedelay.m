@@ -7,6 +7,8 @@ function [pd, w] = phasedelay(b, a, n)
 %      [b, a] = butter(4, 0.3);
 %      [pd, w] = phasedelay(b, a, 128);
 %      numel(pd) == numel(w)       % 1
+%
+%   Voir aussi PHASEZ, GRPDELAY.
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3, n = 512; end
     [phi, w] = phasez(b, a, n);

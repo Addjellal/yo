@@ -9,6 +9,8 @@ function y = sosfilt(sos, x, g)
 %      rng(1);
 %      x = randn(100, 1);
 %      max(abs(sosfilt(sos, x, g) - filter(b, a, x))) < 1e-10
+%
+%   Voir aussi TF2SOS.
     if nargin < 3, g = 1; end
     ligne = isrow(x);
     y = x(:) * g;

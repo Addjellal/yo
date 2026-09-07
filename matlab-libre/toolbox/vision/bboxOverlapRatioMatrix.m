@@ -6,6 +6,8 @@ function r = bboxOverlapRatioMatrix(a, b)
 %   Exemple :
 %      r = bboxOverlapRatioMatrix([0 0 10 10; 5 5 10 10], [0 0 10 10]);
 %      size(r)                     % 2 1 : une ligne par boite de A
+%
+%   Voir aussi BBOXOVERLAPRATIO, SELECTSTRONGESTBBOX.
     na = size(a, 1);
     nb = size(b, 1);
     r = zeros(na, nb);

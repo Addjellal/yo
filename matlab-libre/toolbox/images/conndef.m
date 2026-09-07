@@ -5,6 +5,8 @@ function c = conndef(n, type)
 %
 %   Exemple :
 %      conndef(2, 'minimal')   % [0 1 0; 1 1 1; 0 1 0]
+%
+%   Voir aussi BWCONNCOMP, BWLABEL, VOISINAGECONNEXITE.
     if nargin < 2 || isempty(type), type = 'maximal'; end
     n = round(n);
     dimensions = repmat(3, 1, max(n, 2));

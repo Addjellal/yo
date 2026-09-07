@@ -7,6 +7,8 @@ function phat = betafit(x)
 %      rng(1);
 %      p = betafit(betarnd(2, 5, 2000, 1));
 %      max(abs(p - [2 5])) < 0.4
+%
+%   Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0) || any(x >= 1)
         error('stats:betafit:BadData', 'Les données doivent être dans ]0,1[.');

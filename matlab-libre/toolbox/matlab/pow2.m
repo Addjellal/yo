@@ -6,6 +6,8 @@ function y = pow2(f, e)
 %   Exemple :
 %      pow2(3)                     % 8
 %      pow2(0.5, 4)                % 8 : mantisse et exposant
+%
+%   Voir aussi NEXTPOW2.
     if nargin == 1
         y = 2 .^ f;
     else

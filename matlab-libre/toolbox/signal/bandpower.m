@@ -6,6 +6,8 @@ function p = bandpower(x, fs, bande)
 %
 %   Exemple :
 %      bandpower([1 -1 1 -1])   % 1
+%
+%   Voir aussi PERIODOGRAM, PWELCH, MEANFREQ.
     if nargin < 2
         p = sum(abs(x(:)).^2) / numel(x);
         return

@@ -9,6 +9,8 @@ function [c, f] = mscohere(x, y, fenetre, recouvrement, nfft, fs)
 %      x = randn(1024, 1);
 %      [c, f] = mscohere(x, filter(1, [1 -0.8], x), [], [], 256, 1);
 %      all(c >= -1e-12 & c <= 1 + 1e-12)     % 1 : c'est une coherence
+%
+%   Voir aussi CPSD, TFESTIMATE, PWELCH.
     if nargin < 3, fenetre = []; end
     if nargin < 4, recouvrement = []; end
     if nargin < 5, nfft = []; end

@@ -9,6 +9,8 @@ function [historique, contexte] = sfrun(machine, entrees, contexte)
 %      m = sfstate(m, 'ouvert');
 %      m = sftransition(m, 'verrouille', 'ouvert', @(c,e) strcmp(e, 'piece'));
 %      sfrun(m, {'pousse', 'piece'})     % 'ouvert'
+%
+%   Voir aussi SFCHART, SFSTATE, SFTRANSITION.
     if nargin < 3
         contexte = struct();
     end

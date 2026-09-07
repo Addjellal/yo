@@ -5,6 +5,8 @@ function x = tinv(p, nu)
 %
 %   Exemple :
 %      tinv(0.975, 10)       % 2.2281
+%
+%   Voir aussi TCDF, TRND, TSTAT, PDF, CDF, ICDF.
     [p, nu] = matlibre_diffuser_deux(p, nu, 'tinv');
     x = zeros(size(p));
     for k = 1:numel(p)

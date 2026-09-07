@@ -11,6 +11,8 @@ function [a, b] = alignerPolynomes(a, b)
 %
 %   Exemple :
 %      [a, b] = alignerPolynomes([1 2], [1 2 3 4]);   % a devient [1 2 0 0]
+%
+%   Voir aussi ALIGNERTERMES, GF.
     a = double(a);
     b = double(b);
     if isequal(size(a), size(b))

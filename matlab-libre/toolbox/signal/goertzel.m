@@ -9,6 +9,8 @@ function y = goertzel(x, indices)
 %
 %   Exemple :
 %      x = [1 2 3 4]; abs(goertzel(x, 1) - sum(x)) < 1e-12
+%
+%   Voir aussi CZT, DFTMTX.
     x = x(:);
     n = numel(x);
     if nargin < 2 || isempty(indices), indices = 1:n; end

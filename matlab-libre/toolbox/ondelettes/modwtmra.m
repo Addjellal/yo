@@ -6,6 +6,8 @@ function mra = modwtmra(w, nom)
 %   Exemple :
 %      w = modwt(1:8, 'haar', 2);
 %      max(abs(sum(modwtmra(w, 'haar')) - (1:8)))   % nul
+%
+%   Voir aussi MODWT, IMODWT.
     if nargin < 2 || isempty(nom), nom = 'haar'; end
     lignes = size(w, 1);
     mra = zeros(size(w));

@@ -8,6 +8,8 @@ function v = valueAtRisk(rendements, niveau, methode)
 %      rng(1);
 %      v = valueAtRisk(0.01 * randn(2000, 1), 0.95);
 %      v > 0                       % 1 : la perte est comptee positivement
+%
+%   Voir aussi EXPECTEDSHORTFALL, VARBACKTEST, MAXDRAWDOWN.
     if nargin < 2, niveau = 0.95; end
     if nargin < 3, methode = 'historical'; end
     r = rendements(:);

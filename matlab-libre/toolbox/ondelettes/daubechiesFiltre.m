@@ -21,6 +21,8 @@ function Lo_R = daubechiesFiltre(N, phase)
 %      h = daubechiesFiltre(2);
 %      abs(sum(h) - sqrt(2)) < 1e-10
 %      abs(sum(h .^ 2) - 1) < 1e-10    % et son energie vaut un
+%
+%   Voir aussi WFILTERS, COIFLETFILTRE, ORTHFILT.
     if nargin < 2 || isempty(phase), phase = 'minimale'; end
     N = round(N);
     if N < 1

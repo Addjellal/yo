@@ -18,6 +18,8 @@ function [w, pow] = rootmusic(x, p, varargin)
 %      n = (0:99)';
 %      x = 2*cos(0.4*pi*n) + cos(0.6*pi*n) + 0.1*randn(100,1);
 %      w = rootmusic(x, 4);
+%
+%   Voir aussi ROOTEIG, PMUSIC, PEIG.
     [fs, estCorrelation] = lireOptionsSousEspace(varargin);
     [R, m] = signalMatriceCorrelation(x, p, estCorrelation);
     [vecteurs, valeurs] = eig(R);

@@ -7,6 +7,8 @@ function n = vecnorm(A, p, dim)
 %   Exemple :
 %      vecnorm([3 4]')             % 5 : la norme de la colonne
 %      vecnorm([3 4; 0 0], 2, 2)'  % 5 0 : par ligne
+%
+%   Voir aussi NORM, SUM, HYPOT.
     if nargin < 2 || isempty(p)
         p = 2;
     end

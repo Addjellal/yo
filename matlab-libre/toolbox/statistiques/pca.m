@@ -9,6 +9,8 @@ function [coefficients, scores, valeurs, expliquee] = pca(X)
 %      X = randn(200, 2) * [2 0; 0 0.1];
 %      [c, s, v, expliquee] = pca(X);
 %      expliquee(1) > 95           % le premier axe porte presque tout
+%
+%   Voir aussi PCACOV, CMDSCALE, CANONCORR.
     [n, p] = size(X);
     mu = mean(X);
     Xc = X - repmat(mu, n, 1);

@@ -5,6 +5,8 @@ function xyz = whitepoint(nom)
 %
 %   Exemple :
 %      whitepoint('d65')   % [0.9504 1.0000 1.0888]
+%
+%   Voir aussi XYZ2LAB, ADAPTERBLANC, RGB2XYZ.
     if nargin < 1 || isempty(nom), nom = 'ICC'; end
     switch lower(char(nom))
         case {'icc', 'd50'}

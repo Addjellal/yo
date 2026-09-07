@@ -11,6 +11,8 @@ function [tensions, courants] = solveDC(c)
 %      c = addResistor(c, 1, 2, 1000);
 %      c = addResistor(c, 2, 0, 2000);
 %      abs(solveDC(c)(2) - 20 / 3) < 1e-9     % deux tiers de dix volts
+%
+%   Voir aussi SOLVETRANSIENT, CIRCUIT, ADDRESISTOR.
     n = c.noeuds;
     sourcesTension = [];
     for k = 1:numel(c.composants)

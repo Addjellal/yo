@@ -4,6 +4,8 @@ function indices = indicesSymboles(seq, symboles, m)
 %
 %   Exemple :
 %      indicesSymboles([2 1 2], [1 2], 2)     % 2 1 2
+%
+%   Voir aussi HMMDECODE, HMMVITERBI, HMMTRAIN.
     if isempty(symboles)
         indices = round(double(seq(:)).');
         if any(indices < 1) || any(indices > m)

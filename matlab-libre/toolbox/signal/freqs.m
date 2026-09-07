@@ -5,6 +5,8 @@ function [h, w] = freqs(b, a, w)
 %
 %   Exemple :
 %      abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
+%
+%   Voir aussi BODE, LP2LP.
     b = double(b(:)).';
     a = double(a(:)).';
     if nargin < 3 || isempty(w)

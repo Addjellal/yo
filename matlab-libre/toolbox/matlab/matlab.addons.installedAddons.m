@@ -7,6 +7,9 @@ function t = matlab.addons.installedAddons()
 %   Exemple :
 %      t = matlab.addons.installedAddons;
 %      height(t)
+%
+%   Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX,
+%   MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX.
     racine = matlibre_racine_toolbox();
     if isempty(racine) || ~isfolder(racine)
         t = table(cell(0, 1), cell(0, 1), false(0, 1), cell(0, 1), ...

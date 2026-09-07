@@ -4,6 +4,8 @@ function y = raylpdf(x, b)
 %
 %   Exemple :
 %      raylpdf(1, 1)               % 0.6065 : le mode est en sigma
+%
+%   Voir aussi RAYLCDF, RAYLINV, RAYLRND, RAYLSTAT, PDF, CDF.
     if nargin < 2, b = 1; end
     x = double(x);
     y = zeros(size(x));

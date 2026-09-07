@@ -7,6 +7,8 @@ function zplane(b, a)
 %      [b, a] = butter(4, 0.3);
 %      zplane(b, a);
 %      close all;
+%
+%   Voir aussi TF2ZP, ISSTABLE.
     if nargin < 2, a = 1; end
     if numel(b) > 1 && numel(a) > 1 && ~isreal(b(:)') || iscolumn(b)
         z = b; p = a;

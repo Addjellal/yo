@@ -9,6 +9,8 @@ function [w, pow] = rooteig(x, p, varargin)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      w = rooteig(x, 2);
 %      abs(min(abs(w)) / (2 * pi) - 0.1) < 0.02
+%
+%   Voir aussi ROOTMUSIC, PEIG, PMUSIC.
     [fs, estCorrelation] = lireOptionsSousEspace(varargin);
     [R, m] = signalMatriceCorrelation(x, p, estCorrelation);
     [vecteurs, valeurs] = eig(R);

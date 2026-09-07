@@ -14,6 +14,8 @@ function refuserHorsSpline(Nr, Nd, famille)
 %      catch e
 %          e.identifier
 %      end
+%
+%   Voir aussi FILTRESSPLINES, WFILTERS, BIORFILT.
     horsSpline = [5 5; 6 8];
     for k = 1:size(horsSpline, 1)
         if Nr == horsSpline(k, 1) && Nd == horsSpline(k, 2)

@@ -5,6 +5,8 @@ function [table_, khi2, p, etiquettes] = crosstab(x, y)
 %
 %   Exemple :
 %      crosstab([1 1 2 2], [1 2 1 2])   % [1 1; 1 1]
+%
+%   Voir aussi TABULATE.
     x = x(:);
     y = y(:);
     vx = unique(x);

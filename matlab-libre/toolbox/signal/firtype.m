@@ -6,6 +6,8 @@ function t = firtype(b)
 %   Exemple :
 %      firtype([1 2 3 2 1])        % 1 : symetrique, longueur impaire
 %      firtype([1 2 2 1])          % 2 : symetrique, longueur paire
+%
+%   Voir aussi FIR1, ISLINPHASE, GRPDELAY.
     b = double(b(:)).';
     tolerance = 1e-10 * max(1, max(abs(b)));
     symetrique = all(abs(b - fliplr(b)) <= tolerance);

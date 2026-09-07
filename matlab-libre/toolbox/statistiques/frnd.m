@@ -6,6 +6,8 @@ function r = frnd(v1, v2, varargin)
 %      rng(1);
 %      x = frnd(10, 10, 1, 1000);
 %      all(x > 0)                  % 1 : un rapport de carres est positif
+%
+%   Voir aussi FPDF, FCDF, FINV, FSTAT, PDF, CDF.
     forme = statForme(size(v1 + v2), varargin);
     v1 = statEtendre(v1, forme);
     v2 = statEtendre(v2, forme);

@@ -6,6 +6,8 @@ function d = detcoef(c, l, niveau)
 %   Exemple :
 %      [c, l] = wavedec(1:8, 2, 'db1');
 %      numel(detcoef(c, l, 1))   % 4
+%
+%   Voir aussi APPCOEF, WAVEDEC, WRCOEF.
     maximum = numel(l) - 2;
     if nargin < 3 || isempty(niveau), niveau = maximum; end
     if niveau < 1 || niveau > maximum

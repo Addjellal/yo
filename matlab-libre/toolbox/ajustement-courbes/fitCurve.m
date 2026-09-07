@@ -10,6 +10,8 @@ function [parametres, modele] = fitCurve(x, y, type, degre)
 %      abs(c(1) - 2) < 0.1         % la pente est retrouvee
 %      [c, modele] = fitCurve(x, 3 * exp(1.5 * x), 'exp');
 %      max(abs(c - [3 1.5])) < 0.1
+%
+%   Voir aussi FITSURFACE, GOODNESSOFFIT, SMOOTHSPLINE.
     x = x(:);
     y = y(:);
     if nargin < 4

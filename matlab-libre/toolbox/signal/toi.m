@@ -13,6 +13,8 @@ function [oip3, fondamentaux, intermodulations] = toi(x, fs)
 %      x = cos(2*pi*1000*t) + cos(2*pi*1100*t) + 0.001*cos(2*pi*900*t) ...
 %          + 0.001*cos(2*pi*1200*t);
 %      toi(x, 1e4)
+%
+%   Voir aussi SNR, SINAD, SFDR.
     if nargin < 2 || isempty(fs), fs = 1; end
     [S, f] = signalSpectrePuissance(x, fs);
     [~, plageContinue] = signalLobe(S, 1);

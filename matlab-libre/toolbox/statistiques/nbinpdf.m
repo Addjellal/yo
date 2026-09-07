@@ -4,6 +4,8 @@ function y = nbinpdf(x, r, p)
 %
 %   Exemple :
 %      nbinpdf(2, 3, 0.5)   % 0.1875
+%
+%   Voir aussi NBINCDF, NBININV, NBINRND, NBINSTAT, PDF, CDF.
     [x, r, p] = statAjuster(x, r, p);
     y = zeros(size(x));
     dedans = x >= 0 & x == round(x) & r > 0 & p > 0 & p <= 1;

@@ -6,6 +6,8 @@ function y = defuzz(x, mf, methode)
 %      x = linspace(0, 10, 101);
 %      mf = trimf(x, [2 5 8]);
 %      abs(defuzz(x, mf, 'centroid') - 5) < 0.1     % le centre de gravite d'un triangle
+%
+%   Voir aussi EVALFIS, EVALMF, GENSURF.
     if nargin < 3
         methode = 'centroid';
     end

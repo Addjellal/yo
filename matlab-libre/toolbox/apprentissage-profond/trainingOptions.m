@@ -6,6 +6,8 @@ function options = trainingOptions(solveur, varargin)
 %   Exemple :
 %      o = trainingOptions('sgdm', 'MaxEpochs', 50, 'InitialLearnRate', 0.02);
 %      o.MaxEpochs                 % 50
+%
+%   Voir aussi TRAINNETWORK, ADAMUPDATE, SGDMUPDATE.
     options = struct('solveur', lower(char(solveur)), 'MaxEpochs', 100, ...
                      'InitialLearnRate', 0.01, 'MiniBatchSize', 16, ...
                      'Momentum', 0.9, 'Verbose', 0, 'Loss', 'auto');

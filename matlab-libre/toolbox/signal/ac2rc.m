@@ -7,6 +7,8 @@ function [k, r0] = ac2rc(r)
 %      r = [1 0.5 0.2];
 %      [k, r0] = ac2rc(r);
 %      all(abs(k) < 1)             % 1 : une autocorrelation valide donne |k| < 1
+%
+%   Voir aussi RC2AC, AC2POLY, POLY2RC, LEVINSON.
     r = double(r(:));
     r0 = r(1);
     a = ac2poly(r);

@@ -5,6 +5,8 @@ function colonnes = im2col(image, blocs, genre)
 %
 %   Exemple :
 %      im2col(magic(4), [2 2], 'distinct')   % quatre colonnes de quatre
+%
+%   Voir aussi COL2IM, BLOCKPROC, COLFILT.
     if nargin < 3 || isempty(genre), genre = 'sliding'; end
     image = double(image);
     [h, l] = size(image);

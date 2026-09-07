@@ -6,6 +6,8 @@ function r = entropyfilt(image, voisinage)
 %      rng(1);
 %      r = entropyfilt(rand(20));
 %      all(r(:) >= 0)              % 1 : une entropie est positive
+%
+%   Voir aussi STDFILT, RANGEFILT, GRAYCOMATRIX.
     if nargin < 2, voisinage = ones(9); end
     x = double(image);
     if max(x(:)) <= 1, x = x * 255; end

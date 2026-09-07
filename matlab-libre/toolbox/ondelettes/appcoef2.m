@@ -6,6 +6,8 @@ function a = appcoef2(C, S, nom, niveau)
 %      [C, S] = wavedec2(magic(8), 2, 'haar');
 %      a = appcoef2(C, S, 'haar');
 %      size(a, 1) == S(1, 1)       % 1
+%
+%   Voir aussi DETCOEF2, WAVEDEC2, WAVEREC2, WRCOEF2.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     niveauMax = size(S, 1) - 2;
     if nargin < 4 || isempty(niveau), niveau = niveauMax; end

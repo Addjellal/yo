@@ -6,6 +6,8 @@ function h = rcosdesign(beta, symboles, echantillons, forme)
 %   Exemple :
 %      h = rcosdesign(0.25, 6, 4);
 %            abs(sum(h .^ 2) - 1) < 1e-10      % 1 : energie unite
+%
+%   Voir aussi EYEDIAGRAM, FIR1.
     if nargin < 4
         forme = 'sqrt';
     end

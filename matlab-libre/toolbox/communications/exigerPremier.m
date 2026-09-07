@@ -9,6 +9,8 @@ function exigerPremier(p, nomFonction)
 %   Exemple :
 %      exigerPremier(7, 'gf');    % passe
 %      %      % exigerPremier(4, 'gf') leve comm:gf:NotPrime
+%
+%   Voir aussi GF.
     p = double(p);
     if ~isscalar(p) || p < 2 || p ~= round(p) || ~isprime(p)
         error('comm:gf:Premier', ...

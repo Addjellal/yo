@@ -6,6 +6,8 @@ function [y, reste] = buffer(x, n, p, opt)
 %
 %   Exemple :
 %      buffer(1:6, 3)   % [1 4; 2 5; 3 6]
+%
+%   Voir aussi SPECTROGRAM, SEQPERIOD.
     if nargin < 3 || isempty(p), p = 0; end
     x = x(:);
     nx = numel(x);

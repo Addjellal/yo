@@ -5,6 +5,8 @@ function b = bboxresize(bbox, echelle)
 %
 %   Exemple :
 %      bboxresize([1 1 10 20], 2)   % [2 2 20 40]
+%
+%   Voir aussi BBOXOVERLAPRATIO, INSERTSHAPE.
     if isscalar(echelle), echelle = [echelle echelle]; end
     b = bbox;
     b(:, 1) = bbox(:, 1) * echelle(2);

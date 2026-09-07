@@ -5,5 +5,7 @@ function y = pimf(x, params)
 %
 %   Exemple :
 %      pimf(5, [1 4 6 9])   % 1
+%
+%   Voir aussi SMF, ZMF, TRAPMF.
     y = smf(x, params(1:2)) .* zmf(x, params(3:4));
 end

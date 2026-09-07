@@ -13,6 +13,8 @@ function etiquettes = watershed(relief, connexite)
 %   Exemple :
 %      relief = [1 2 3 2 1];
 %      watershed(relief)   % deux bassins séparés par le sommet
+%
+%   Voir aussi IMIMPOSEMIN, BWDIST, BWLABEL.
     if nargin < 2 || isempty(connexite), connexite = 8; end
     relief = double(relief);
     [h, l] = size(relief);

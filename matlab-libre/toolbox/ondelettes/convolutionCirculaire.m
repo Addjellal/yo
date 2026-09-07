@@ -8,6 +8,8 @@ function y = convolutionCirculaire(x, h)
 %   Exemple :
 %      y = convolutionCirculaire([1 2 3 4], [1 1 0 0]);
 %      numel(y)                    % 4 : la longueur est conservee
+%
+%   Voir aussi CCONV, MODWT.
     x = x(:)';
     h = h(:)';
     n = numel(x);

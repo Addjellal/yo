@@ -6,6 +6,8 @@ function y = wkeep(x, longueur, varargin)
 %
 %   Exemple :
 %      wkeep([1 2 3 4 5], 3)   % [2 3 4]
+%
+%   Voir aussi WEXTEND, WCONV1, IDWT.
     x = double(x);
     if ~isvector(x)
         if numel(longueur) == 1, longueur = [longueur longueur]; end

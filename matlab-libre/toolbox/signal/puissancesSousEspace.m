@@ -12,6 +12,8 @@ function pow = puissancesSousEspace(R, w, valeurs, p)
 %      [R, m] = signalMatriceCorrelation(x, 2, false);
 %      pow = puissancesSousEspace(R, 2 * pi * 0.1, eig(R), 2);
 %      all(isfinite(pow))
+%
+%   Voir aussi PMUSIC, PEIG, ROOTMUSIC.
     m = size(R, 1);
     sigma2 = mean(valeurs(p+1:end));
     A = zeros(m, numel(w));

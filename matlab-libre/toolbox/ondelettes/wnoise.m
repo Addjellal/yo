@@ -14,6 +14,8 @@ function [x, xbruite] = wnoise(fonction, puissance, rapport, germe)
 %
 %   Exemple :
 %      [x, xn] = wnoise('doppler', 10, 7);
+%
+%   Voir aussi WDENCMP, WNOISEST, WDENOISE.
     if nargin < 3 || isempty(rapport), rapport = 1; end
     n = 2 ^ puissance;
     t = (1:n) / n;

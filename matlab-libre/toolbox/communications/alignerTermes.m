@@ -9,6 +9,8 @@ function [a, b] = alignerTermes(a, b)
 %
 %   Exemple :
 %      [a, b] = alignerTermes(5, [1 2 3]);   % a devient [5 5 5]
+%
+%   Voir aussi ALIGNERPOLYNOMES.
     a = double(a);
     b = double(b);
     if isequal(size(a), size(b))

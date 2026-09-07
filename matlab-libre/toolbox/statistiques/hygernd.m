@@ -8,6 +8,8 @@ function r = hygernd(m, k, n, varargin)
 %      rng(1);
 %      x = hygernd(50, 10, 5, 1, 1000);
 %      all(x >= 0 & x <= 5)        % 1 : au plus le nombre de tirages
+%
+%   Voir aussi HYGEPDF, HYGECDF, HYGEINV, HYGESTAT, PDF, CDF.
     forme = statForme(size(m + k + n), varargin);
     m = statEtendre(m, forme);
     k = statEtendre(k, forme);

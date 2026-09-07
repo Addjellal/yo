@@ -11,6 +11,8 @@ function fichier = zip(nomArchive, fichiers, racine)
 %      f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
 %      fichier = zip('archive.zip', {'b.txt'});
 %      isfile(fichier)             % 1
+%
+%   Voir aussi UNZIP.
     if nargin < 3, racine = pwd(); end
     if ischar(fichiers) || isstring(fichiers)
         fichiers = {char(fichiers)};

@@ -5,6 +5,8 @@ function carte = gray(m)
 %
 %   Exemple :
 %      carte = gray(4)   % [0 0 0; 1/3 1/3 1/3; 2/3 2/3 2/3; 1 1 1]
+%
+%   Voir aussi BONE, PINK.
     if nargin < 1 || isempty(m), m = 256; end
     g = rampeCarte(m);
     carte = [g g g];

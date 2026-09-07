@@ -4,6 +4,8 @@ function y = rectpuls(t, w)
 %
 %   Exemple :
 %      rectpuls([-1 -0.4 0 0.4 1])   % [0 1 1 1 0]
+%
+%   Voir aussi TRIPULS, GAUSPULS, PULSTRAN.
     if nargin < 2, w = 1; end
     t = double(t);
     y = double(t >= -w / 2 & t < w / 2);

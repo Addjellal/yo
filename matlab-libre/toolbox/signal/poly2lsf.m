@@ -9,6 +9,8 @@ function lsf = poly2lsf(a)
 %
 %   Exemple :
 %      lsf = poly2lsf([1 -0.5]);
+%
+%   Voir aussi LSF2POLY, POLY2RC, LPC.
     a = double(a(:)).';
     if a(1) == 0
         error('signal:poly2lsf:ZeroLeading', ...

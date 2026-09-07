@@ -5,6 +5,8 @@ function [bas, haut] = bounds(x, dim)
 %   Exemple :
 %      [bas, haut] = bounds([3 1 4 1 5]);
 %      [bas haut]                  % 1 5
+%
+%   Voir aussi MIN, MAX, RANGE.
     if nargin < 2
         bas = min(x(:));
         haut = max(x(:));

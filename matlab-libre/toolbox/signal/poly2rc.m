@@ -10,6 +10,8 @@ function [k, e] = poly2rc(a, efinal)
 %
 %   Exemple :
 %      k = poly2rc([1 0.6149 0.9899 0 0.0031 -0.0082]);
+%
+%   Voir aussi RC2POLY, POLY2AC, AC2RC, SCHURRC.
     if nargin < 2 || isempty(efinal), efinal = 0; end
     a = double(a(:)).';
     if a(1) == 0

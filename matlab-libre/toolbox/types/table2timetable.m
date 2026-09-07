@@ -9,6 +9,8 @@ function tt = table2timetable(t, varargin)
 %      t.Time = datetime(2024, 1, (1:3)');
 %      tt = table2timetable(t, 'RowTimes', 'Time');
 %      height(tt)                  % 3
+%
+%   Voir aussi TIMETABLE, TABLE.
     temps = [];
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'RowTimes'), temps = varargin{k + 1}; end

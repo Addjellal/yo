@@ -6,6 +6,8 @@ function r = stdfilt(image, voisinage)
 %   Exemple :
 %      r = stdfilt(ones(10));
 %      max(r(:)) < 1e-12           % un plateau n'a pas d'ecart type
+%
+%   Voir aussi ENTROPYFILT, RANGEFILT, IMBOXFILT.
     if nargin < 2, voisinage = ones(3); end
     x = double(image);
     masque = double(logical(voisinage));

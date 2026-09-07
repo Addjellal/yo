@@ -5,6 +5,8 @@ function w = triang(n)
 %
 %   Exemple :
 %      triang(4)'   % [0.25 0.75 0.75 0.25]
+%
+%   Voir aussi WINDOW, PARZENWIN.
     n = round(n);
     if n <= 0, w = zeros(0, 1); return, end
     k = (1:n)';

@@ -7,6 +7,8 @@ function [indices, distances] = knnsearch(X, Y, varargin)
 %      X = [0 0; 1 0; 0 1];
 %      [i, d] = knnsearch(X, [0.1 0.1], 'K', 2);
 %      i(1)                        % 1 : le plus proche est l'origine
+%
+%   Voir aussi FITCKNN, PDIST2.
     k = 1;
     for i = 1:2:numel(varargin)-1
         if strcmpi(char(varargin{i}), 'k')

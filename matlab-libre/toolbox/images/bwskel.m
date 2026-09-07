@@ -9,6 +9,8 @@ function sortie = bwskel(bw, varargin)
 %   Exemple :
 %      bw = false(9); bw(4:6, 2:8) = true;
 %      s = bwskel(bw);   % un segment horizontal
+%
+%   Voir aussi BWMORPH, BWPERIM, BWDIST.
     longueurMini = 0;
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'MinBranchLength')

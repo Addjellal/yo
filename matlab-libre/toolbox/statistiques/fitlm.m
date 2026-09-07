@@ -8,6 +8,8 @@ function modele = fitlm(X, y)
 %      x = (1:50)';
 %      m = fitlm(x, 2 + 3 * x + randn(50, 1));
 %      abs(m.Coefficients(2) - 3) < 0.1
+%
+%   Voir aussi REGRESS, ROBUSTFIT, STEPWISEFIT, ANOVA1.
     X = X(:, :);
     y = y(:);
     A = [ones(size(X, 1), 1), X];

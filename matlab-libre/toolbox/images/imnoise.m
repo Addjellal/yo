@@ -7,6 +7,8 @@ function y = imnoise(x, genre, parametre)
 %      rng(1);
 %      x = 0.5 * ones(50);
 %      std(reshape(imnoise(x, 'gaussian', 0.01), [], 1)) > 0.05   % du bruit a ete ajoute
+%
+%   Voir aussi IMGAUSSFILT, MEDFILT2, PSNR.
     x = im2double(x);
     if nargin < 2, genre = 'gaussian'; end
     if nargin < 3, parametre = 0.01; end

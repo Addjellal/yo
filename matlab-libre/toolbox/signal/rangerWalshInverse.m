@@ -6,6 +6,8 @@ function y = rangerWalshInverse(x, ordre)
 %   Exemple :
 %      x = (1:8)';
 %      max(abs(rangerWalshInverse(rangerWalsh(x, 'sequency'), 'sequency') - x)) < 1e-12
+%
+%   Voir aussi RANGERWALSH, PERMUTATIONWALSH, IFWHT.
     p = permutationWalsh(size(x, 1), ordre);
     y = zeros(size(x));
     y(p, :) = x;

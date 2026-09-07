@@ -6,6 +6,8 @@ function tf = islinphase(b, a)
 %   Exemple :
 %      islinphase([1 2 3 2 1], 1)  % 1 : un RIF symetrique est a phase lineaire
 %      islinphase([1 2 3], 1)      % 0
+%
+%   Voir aussi FIRTYPE, ISMINPHASE, ISMAXPHASE.
     if nargin < 2, a = 1; end
     a = double(a(:)).';
     b = double(b(:)).';

@@ -5,6 +5,8 @@ function image = ind2gray(indices, carte)
 %   Exemple :
 %      g = ind2gray([1 2 3], [0 0 0; 0.5 0.5 0.5; 1 1 1]);
 %      g                           % 0 0.5 1
+%
+%   Voir aussi GRAY2IND, IND2RGB, IMAPPROX.
     indices = double(indices);
     carte = double(carte);
     if max(indices(:)) <= size(carte, 1) - 1 && min(indices(:)) >= 0

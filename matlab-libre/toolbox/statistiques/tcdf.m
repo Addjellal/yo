@@ -6,6 +6,8 @@ function p = tcdf(t, nu)
 %
 %   Exemple :
 %      tcdf(0, 10)                 % 0.5 : la loi de Student est symetrique
+%
+%   Voir aussi TINV, TRND, TSTAT, PDF, CDF, ICDF.
     p = zeros(size(t));
     for k = 1:numel(t)
         x = t(k);

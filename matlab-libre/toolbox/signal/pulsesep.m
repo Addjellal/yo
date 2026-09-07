@@ -7,6 +7,8 @@ function [separation, debut, fin] = pulsesep(x, fs, varargin)
 %      t = (0:0.001:0.5)';
 %      s = pulsesep(double(sin(2*pi*10*t) > 0), 1000);
 %      all(s > 0)                  % 1
+%
+%   Voir aussi PULSEPERIOD, PULSEWIDTH, DUTYCYCLE.
     if nargin < 2 || isempty(fs), fs = 1; end
     positive = true;
     for k = 1:2:numel(varargin) - 1

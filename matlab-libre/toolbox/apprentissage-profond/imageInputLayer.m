@@ -8,6 +8,8 @@ function c = imageInputLayer(taille, varargin)
 %      couches = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4), ...
 %                 reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
 %                 fullyConnectedLayer(2), softmaxLayer()};
+%
+%   Voir aussi FEATUREINPUTLAYER, SEQUENCEINPUTLAYER, CONVOLUTION2DLAYER.
     if numel(taille) < 3, taille(3) = 1; end
     c = struct('type', 'imageinput', 'taille', taille(:)', 'nom', matlibre_couche_nom(varargin));
 end

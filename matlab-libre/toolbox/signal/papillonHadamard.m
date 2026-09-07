@@ -10,6 +10,8 @@ function y = papillonHadamard(x)
 %      y = papillonHadamard(x);
 %      abs(y(1) - sum(x)) < 1e-12  % le premier coefficient est la somme
 %      max(abs(papillonHadamard(y) / 8 - x)) < 1e-12   % involutive au facteur N
+%
+%   Voir aussi FWHT, IFWHT, RANGERWALSH.
     y = double(x);
     N = size(y, 1);
     pas = 1;

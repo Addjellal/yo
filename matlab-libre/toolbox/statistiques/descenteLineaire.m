@@ -12,6 +12,8 @@ function [poids, biais] = descenteLineaire(X, y, options, regression)
 %      o = lireOptionsLineaire(2, 'Lambda', 0.01);
 %      [poids, biais] = descenteLineaire(X, cible, o, false);
 %      mean(sign(X * poids(:) + biais) == cible) > 0.9
+%
+%   Voir aussi FITCLINEAR, FITRLINEAR, PREDICTLINEAIRE.
     [n, p] = size(X);
     poids = zeros(p, 1);
     biais = 0;

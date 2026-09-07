@@ -6,6 +6,8 @@ function r = hsv2rgb(h, s, v)
 %   Exemple :
 %      max(abs(hsv2rgb([0 1 1]) - [1 0 0])) < 1e-12   % teinte nulle : du rouge pur
 %      max(abs(hsv2rgb([0 0 0.5]) - [0.5 0.5 0.5])) < 1e-12   % saturation nulle : du gris
+%
+%   Voir aussi RGB2HSV, RGB2YCBCR.
     if nargin == 3
         image = cat(3, h, s, v);
     else

@@ -10,6 +10,8 @@ function prefixe = statPrefixeLoi(nom)
 %   Exemple :
 %      statPrefixeLoi('Normal')             % 'norm'
 %      statPrefixeLoi('Poisson')            % 'poiss'
+%
+%   Voir aussi PDF, CDF, ICDF, RANDOM.
     table = {
         'beta',              'beta'
         'binomial',          'bino'

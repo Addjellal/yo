@@ -7,6 +7,8 @@ function y = wrcoef2(genre, C, S, nom, niveau)
 %      [C, S] = wavedec2(magic(8), 2, 'haar');
 %      y = wrcoef2('a', C, S, 'haar', 1);
 %      size(y)                     % 8 8 : la reconstruction garde la taille
+%
+%   Voir aussi WAVEDEC2, APPCOEF2, DETCOEF2.
     if nargin < 4 || isempty(nom), nom = 'haar'; end
     niveauMax = size(S, 1) - 2;
     if nargin < 5 || isempty(niveau), niveau = niveauMax; end

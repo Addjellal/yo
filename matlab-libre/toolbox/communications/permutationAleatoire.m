@@ -6,6 +6,8 @@ function permutation = permutationAleatoire(n, germe)
 %   Exemple :
 %      p = permutationAleatoire(20, 3);
 %            isequal(p, permutationAleatoire(20, 3))     % 1 : meme germe
+%
+%   Voir aussi INTRLV, VERIFIERPERMUTATION.
     etat = rng;
     rng(germe);
     permutation = randperm(n);

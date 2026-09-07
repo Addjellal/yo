@@ -7,6 +7,8 @@ function [y, t] = modulate(x, fc, fs, methode, opt)
 %   Exemple :
 %      fs = 1e4;  x = sin(2*pi*10*(0:999)'/fs);
 %      y = modulate(x, 1e3, fs, 'am');
+%
+%   Voir aussi DEMOD, VCO, HILBERT.
     if nargin < 3 || isempty(fs), fs = 1; end
     if nargin < 4 || isempty(methode), methode = 'am'; end
     x = double(x);

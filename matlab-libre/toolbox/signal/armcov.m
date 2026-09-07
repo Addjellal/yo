@@ -8,6 +8,8 @@ function [a, e] = armcov(x, p)
 %      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
 %      [a, e] = armcov(x, 4);
 %      all(abs(roots(a)) < 1.2)
+%
+%   Voir aussi ARCOV, ARBURG, PMCOV.
     x = double(x(:));
     n = numel(x);
     if p >= n

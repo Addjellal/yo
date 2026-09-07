@@ -10,6 +10,8 @@ function cc = bwconncomp(bw, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      cc = bwconncomp(bw);
 %      cc.NumObjects               % 2
+%
+%   Voir aussi BWLABEL, REGIONPROPS.
     if nargin < 2, connexite = 8; end
     bw = logical(bw);
     [etiquettes, nombre] = bwlabel(bw, connexite);

@@ -8,6 +8,8 @@ function b = padarray(a, taille, valeur, direction)
 %
 %   Exemple :
 %      padarray([1 2; 3 4], [1 1])   % entouré de zéros
+%
+%   Voir aussi IMFILTER, IMRESIZE, IMTRANSLATE.
     if nargin < 3 || isempty(valeur), valeur = 0; end
     if nargin < 4 || isempty(direction), direction = 'both'; end
     taille = taille(:)';

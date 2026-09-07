@@ -11,6 +11,8 @@ function [x, valeurs, drapeau, sortie] = gamultiobj(fonction, nVariables, A, b, 
 %   Exemple :
 %      f = @(x) [x(1)^2, (x(1)-2)^2];
 %      [x, v] = gamultiobj(f, 1, [], [], [], [], -2, 4);
+%
+%   Voir aussi GA, PARETOSEARCH, GAOPTIMSET.
     if nargin < 3, A = []; end
     if nargin < 4, b = []; end
     if nargin < 5, Aeq = []; end

@@ -5,6 +5,8 @@ function c = eluLayer(alpha, varargin)
 %   Exemple :
 %      c = eluLayer();
 %      c.type                      % 'elu'
+%
+%   Voir aussi RELULAYER, LEAKYRELULAYER, GELULAYER.
     if nargin < 1 || isempty(alpha), alpha = 1; end
     c = struct('type', 'elu', 'alpha', alpha, 'nom', matlibre_couche_nom(varargin));
 end

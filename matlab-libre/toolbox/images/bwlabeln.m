@@ -9,6 +9,8 @@ function [etiquettes, nombre] = bwlabeln(bw, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      [etiquettes, n] = bwlabeln(bw);
 %      n                           % 2
+%
+%   Voir aussi BWLABEL, BWCONNCOMP, REGIONPROPS.
     if nargin < 2 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     if numel(connexite) == 1

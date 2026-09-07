@@ -6,6 +6,8 @@ function [ca, ch, cv, cd] = dwt2(x, ondelette)
 %
 %   Exemple :
 %      [a, h, v, d] = dwt2(ones(4), 'db1');   % a = 2*ones(2), h = v = d = 0
+%
+%   Voir aussi IDWT2, WAVEDEC2, DWT.
     x = double(x);
     [m, n] = size(x);
     % Lignes.

@@ -6,6 +6,8 @@ function y = dyadup(x, varargin)
 %   Exemple :
 %      dyadup([1 2 3])      % [1 0 2 0 3]
 %      dyadup([1 2 3], 0)   % [0 1 0 2 0 3 0]
+%
+%   Voir aussi DYADDOWN, IDWT.
     parite = 1;
     if ~isempty(varargin) && ~isempty(varargin{1}) && isnumeric(varargin{1})
         parite = varargin{1};

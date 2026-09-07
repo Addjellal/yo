@@ -6,6 +6,8 @@ function carte = flag(m)
 %   Exemple :
 %      carte = flag(8);
 %      size(carte)                 % 8 3
+%
+%   Voir aussi PRISM.
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     base = [1 0 0; 1 1 1; 0 0 1; 0 0 0];

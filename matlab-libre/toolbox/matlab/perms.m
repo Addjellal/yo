@@ -6,6 +6,8 @@ function P = perms(v)
 %   Exemple :
 %      P = perms([1 2 3]);
 %      size(P, 1)                  % 6 : trois factorielle
+%
+%   Voir aussi NCHOOSEK, RANDPERM, FACTORIAL.
     v = v(:).';
     n = numel(v);
     if n == 0

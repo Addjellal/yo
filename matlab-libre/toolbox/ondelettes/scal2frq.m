@@ -6,6 +6,8 @@ function frequences = scal2frq(echelles, nom, delta)
 %
 %   Exemple :
 %      scal2frq(1:8, 'db4', 0.001)
+%
+%   Voir aussi CWT, CENTFRQ, ONDELETTEANALYTIQUE.
     if nargin < 3 || isempty(delta), delta = 1; end
     fc = centfrq(nom);
     frequences = fc ./ (double(echelles) * delta);

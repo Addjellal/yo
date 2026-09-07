@@ -6,6 +6,8 @@ function r = imfill(bw, mode)
 %
 %   Exemple :
 %      a = true(5); a(3,3) = false; sum(sum(imfill(a,'holes')))   % 25
+%
+%   Voir aussi IMRECONSTRUCT, IMCLEARBORDER, BWSELECT.
     if nargin < 2, mode = 'holes'; end
     bw = logical(bw);
     if ~strcmpi(mode, 'holes')

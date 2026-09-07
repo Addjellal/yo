@@ -5,6 +5,8 @@ function c = leakyReluLayer(pente, varargin)
 %   Exemple :
 %      c = leakyReluLayer(0.01);
 %      c.pente                     % 0.01 : la pente du cote negatif
+%
+%   Voir aussi RELULAYER, LEAKYRELU, ELULAYER.
     if nargin < 1 || isempty(pente), pente = 0.01; end
     c = struct('type', 'leakyrelu', 'pente', pente, 'nom', matlibre_couche_nom(varargin));
 end

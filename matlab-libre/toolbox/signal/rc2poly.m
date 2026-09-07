@@ -9,6 +9,8 @@ function [a, e] = rc2poly(k, r0)
 %   Exemple :
 %      [a, e] = rc2poly([0.5 0.2], 1);
 %      all(abs(roots(a)) < 1)      % 1 : |k| < 1 donne un modele stable
+%
+%   Voir aussi POLY2RC, RC2AC, LATC2TF.
     k = double(k(:));
     a = 1;
     for m = 1:numel(k)

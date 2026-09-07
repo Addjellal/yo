@@ -4,6 +4,8 @@ function sortie = bwareaopen(bw, p, connexite)
 %   Exemple :
 %      bw = false(5); bw(2,2) = true; bw(4:5,4:5) = true;
 %      bwareaopen(bw, 2)   % le point isolé disparaît
+%
+%   Voir aussi BWAREAFILT, BWLABEL, BWMORPH.
     if nargin < 3 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     [etiquettes, nombre] = bwlabeln(bw, connexite);

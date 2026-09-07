@@ -5,6 +5,8 @@ function [symboles, nomsEtats] = lireNomsHmm(varargin)
 %   Exemple :
 %      [symboles, etats] = lireNomsHmm('Symbols', {'a','b'}, 'Statenames', {'s1','s2'});
 %      numel(symboles)             % 2
+%
+%   Voir aussi HMMDECODE, HMMVITERBI, HMMGENERATE.
     symboles = [];
     nomsEtats = [];
     k = 1;

@@ -8,6 +8,8 @@ function [n, d] = rat(x, tol)
 %      [n, d] = rat(0.75);
 %      [n d]                       % 3 4
 %      abs(n / d - 0.75) < 1e-12
+%
+%   Voir aussi GCD, FORMAT.
     if nargin < 2
         tol = 1e-6 * max(abs(x(:)));
         if tol == 0

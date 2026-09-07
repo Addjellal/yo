@@ -11,6 +11,8 @@ function [b, a] = concevoirBande(w, genre, options)
 %      [w, o] = lireOptionsBande(0.3);
 %      [b, a] = concevoirBande(w, 'low', o);
 %      abs(abs(polyval(b, 1) / polyval(a, 1)) - 1) < 0.2   % le continu passe
+%
+%   Voir aussi LOWPASS, HIGHPASS, BANDPASS, APPLIQUERBANDE.
     marge = 1 - options.Steepness;
     ondulation = 0.1;
     attenuation = options.StopbandAttenuation;

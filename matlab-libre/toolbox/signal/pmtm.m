@@ -13,6 +13,8 @@ function [pxx, f] = pmtm(x, nw, nfft, fs)
 %      [pxx, f] = pmtm(x, 4, 512, 1000);
 %      [~, k] = max(pxx);
 %      abs(f(k) - 100) < 5      % 1 : la raie est a 0,1 fois 1000 Hz
+%
+%   Voir aussi PERIODOGRAM, PWELCH, DPSS.
     if nargin < 2 || isempty(nw), nw = 4; end
     x = double(x(:));
     n = numel(x);

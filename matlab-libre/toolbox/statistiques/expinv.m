@@ -2,6 +2,8 @@ function x = expinv(p, mu)
 %EXPINV Quantile de la loi exponentielle de moyenne MU.
 %   Exemple :
 %      expinv(0.5, 1)   % log(2) = 0.6931
+%
+%   Voir aussi EXPRND, EXPSTAT, EXPFIT, PDF, CDF, ICDF.
     if nargin < 2, mu = 1; end
     [p, mu] = statAjuster(p, mu);
     x = -mu .* log(1 - p);

@@ -6,6 +6,8 @@ function d = hours(x)
 %   Exemple :
 %      hours(1) + minutes(30)      % une heure et demie
 %      minutes(hours(2))           % 120
+%
+%   Voir aussi DAYS, MINUTES, SECONDS, DURATION.
     if isa(x, 'duration')
         d = x.Secondes / 3600;
     elseif isa(x, 'calendarDuration')

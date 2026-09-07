@@ -6,6 +6,8 @@ function nlogL = betalike(params, data)
 %      rng(1);
 %      x = betarnd(2, 5, 500, 1);
 %      betalike([2 5], x) < betalike([1 1], x)     % vrai : les bons parametres
+%
+%   Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
     a = params(1);
     b = params(2);
     x = double(data(:));

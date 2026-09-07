@@ -16,6 +16,8 @@ function [n, Wn] = ellipord(Wp, Ws, Rp, Rs, domaine)
 %
 %   Exemple :
 %      [n, Wn] = ellipord(0.2, 0.3, 1, 40)   % n = 5
+%
+%   Voir aussi ELLIP, BUTTORD, CHEB1ORD.
     if nargin < 5, domaine = 'z'; end
     analogique = strncmpi(char(domaine), 's', 1);
     Wp = double(Wp);

@@ -11,6 +11,8 @@ function phat = wblfit(x)
 %      rng(1);
 %      p = wblfit(wblrnd(2, 3, 5000, 1));
 %      max(abs(p - [2 3]) ./ [2 3]) < 0.1
+%
+%   Voir aussi WBLPDF, WBLCDF, WBLINV, WBLRND, PDF, CDF.
     x = double(x(:));
     if any(x <= 0)
         error('stats:wblfit:BadData', 'Les données doivent être strictement positives.');

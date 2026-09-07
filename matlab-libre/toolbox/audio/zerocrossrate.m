@@ -5,6 +5,8 @@ function r = zerocrossrate(x)
 %
 %   Exemple :
 %      zerocrossrate([1 -1 1 -1])   % 0.75
+%
+%   Voir aussi RMS, SPECTRALCENTROID, MFCC.
     x = x(:);
     signes = sign(x);
     signes(signes == 0) = 1;

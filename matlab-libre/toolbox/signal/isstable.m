@@ -12,6 +12,8 @@ function stable = isstable(b, a)
 %   Exemple :
 %      isstable(1, [1 -0.5])       % 1 : le pole est dans le cercle unite
 %      isstable(1, [1 -1.5])       % 0
+%
+%   Voir aussi ISMINPHASE, ZPLANE.
     if nargin < 2 && (isa(b, 'tf') || isa(b, 'ss') || ...
                       (isstruct(b) && isfield(b, 'type')))
         % Modèle linéaire de la Control System Toolbox : la stabilité se

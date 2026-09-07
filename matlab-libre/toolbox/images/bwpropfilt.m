@@ -10,6 +10,8 @@ function sortie = bwpropfilt(bw, propriete, n, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      garde = bwpropfilt(bw, 'Area', 1);
 %      sum(garde(:))               % 81 : la plus grande aire
+%
+%   Voir aussi BWAREAFILT, REGIONPROPS, BWLABEL.
     if nargin < 4 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     [etiquettes, nombre] = bwlabeln(bw, connexite);

@@ -11,6 +11,8 @@ function [yi, yq, ye] = gauspuls(t, fc, bw, bwr)
 %
 %   Exemple :
 %      t = -1e-3:1e-6:1e-3;  y = gauspuls(t, 1e4, 0.6);
+%
+%   Voir aussi CHIRP, TRIPULS, RECTPULS.
     if nargin < 2 || isempty(fc), fc = 1000; end
     if nargin < 3 || isempty(bw), bw = 0.5; end
     if nargin < 4 || isempty(bwr), bwr = -6; end

@@ -7,6 +7,8 @@ function r = rc2ac(k, r0)
 %      k = [0.5 0.2];
 %      r = rc2ac(k, 1);
 %      max(abs(ac2rc(r) - k(:))) < 1e-10      % l'aller-retour
+%
+%   Voir aussi AC2RC, RC2POLY, LEVINSON.
     k = double(k(:));
     r = r0;
     a = 1;

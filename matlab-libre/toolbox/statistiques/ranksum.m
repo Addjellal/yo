@@ -6,6 +6,8 @@ function [p, h, statistiques] = ranksum(x, y, alpha)
 %
 %   Exemple :
 %      ranksum(1:10, 11:20)   % très petite : les deux groupes diffèrent
+%
+%   Voir aussi SIGNRANK, TTEST2, KSTEST.
     if nargin < 3, alpha = 0.05; end
     x = x(:);
     y = y(:);

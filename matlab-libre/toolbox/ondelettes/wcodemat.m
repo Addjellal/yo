@@ -4,6 +4,8 @@ function y = wcodemat(x, nbcodes, mode, absolu)
 %
 %   Exemple :
 %      wcodemat([0 1], 4)   % [1 4]
+%
+%   Voir aussi WAVEDEC2.
     if nargin < 2 || isempty(nbcodes), nbcodes = 16; end
     if nargin < 3 || isempty(mode), mode = 'mat'; end
     if nargin < 4 || isempty(absolu), absolu = 1; end

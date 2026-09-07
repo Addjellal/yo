@@ -10,6 +10,8 @@ function x = statQuantileDiscret(repartition, p, depart, maximum)
 %
 %   Exemple :
 %      statQuantileDiscret(@(t) binocdf(t, 10, 0.5), 0.5, 0, 10)
+%
+%   Voir aussi BINOINV, POISSINV, HYGEINV.
     x = max(0, floor(depart));
     if x > maximum, x = maximum; end
     if repartition(x) >= p

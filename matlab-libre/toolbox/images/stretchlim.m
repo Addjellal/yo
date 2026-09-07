@@ -7,6 +7,8 @@ function limites = stretchlim(image, tolerance)
 %   Exemple :
 %      limites = stretchlim([0.2 0.5 0.8]);
 %      limites(1) < limites(2)     % 1 : la borne basse precede la haute
+%
+%   Voir aussi IMADJUST, HISTEQ, GRAYTHRESH.
     if nargin < 2 || isempty(tolerance), tolerance = [0.01 0.99]; end
     if isscalar(tolerance), tolerance = [tolerance, 1 - tolerance]; end
     x = im2double(image);

@@ -12,6 +12,8 @@ function sortie = imimposemin(image, marqueurs, connexite)
 %      relief = [3 3 3; 3 1 3; 3 3 3];
 %      m = false(3); m(1,1) = true;
 %      imregionalmin(imimposemin(relief, m))   % le seul minimum est en (1,1)
+%
+%   Voir aussi IMRECONSTRUCT, IMREGIONALMIN, WATERSHED.
     if nargin < 3 || isempty(connexite), connexite = 8; end
     image = double(image);
     marqueurs = logical(marqueurs);

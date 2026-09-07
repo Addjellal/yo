@@ -7,6 +7,8 @@ function [duree, debut, fin] = risetime(x, fs, varargin)
 %
 %   Exemple :
 %      risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+%
+%   Voir aussi FALLTIME, SLEWRATE, OVERSHOOT.
     if nargin < 2 || isempty(fs), fs = 1; end
     pourcentages = lireSeuils(varargin, [10 90]);
     x = double(x(:));

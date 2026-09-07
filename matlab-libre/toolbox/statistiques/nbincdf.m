@@ -4,6 +4,8 @@ function c = nbincdf(x, r, p)
 %
 %   Exemple :
 %      nbincdf(10, 3, 0.5)         % la probabilite d'au plus dix echecs
+%
+%   Voir aussi NBINPDF, NBININV, NBINRND, NBINSTAT, PDF, CDF.
     [x, r, p] = statAjuster(x, r, p);
     k = floor(x);
     c = zeros(size(x));

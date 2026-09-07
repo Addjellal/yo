@@ -9,6 +9,8 @@ function [etiquettes, nombre] = bwlabel(bw, connexite)
 %      bw(10:18, 10:18) = true;    % un autre de 81
 %      [etiquettes, n] = bwlabel(bw);
 %      n                           % 2 : deux composantes connexes
+%
+%   Voir aussi BWLABELN, BWCONNCOMP, REGIONPROPS, LABEL2RGB.
     if nargin < 2
         connexite = 8;
     end

@@ -8,6 +8,8 @@ function [C, S] = wavedec2(x, niveaux, nom)
 %   Exemple :
 %      [c, s] = wavedec2(magic(8), 2, 'haar');
 %      a = appcoef2(c, s, 'haar', 2);
+%
+%   Voir aussi WAVEREC2, APPCOEF2, DETCOEF2.
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     x = double(x);
     courant = x;

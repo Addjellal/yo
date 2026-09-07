@@ -7,6 +7,8 @@ function [etiquettes, scores] = predictLineaire(modele, X)
 %      X = [randn(40, 2); randn(40, 2) + 3];
 %      y = [ones(40, 1); 2 * ones(40, 1)];
 %      mean(predictLineaire(fitclinear(X, y), X) == y) > 0.8
+%
+%   Voir aussi FITCLINEAR, FITRLINEAR, PREDICT.
     X = double(X);
     marges = X * modele.Beta + modele.Bias;
     if modele.Regression

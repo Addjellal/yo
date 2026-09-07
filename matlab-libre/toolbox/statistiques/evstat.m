@@ -4,6 +4,8 @@ function [m, v] = evstat(mu, sigma)
 %
 %   Exemple :
 %      [m,v] = evstat(0, 1)   % -0.5772 et 1.6449
+%
+%   Voir aussi EVPDF, EVCDF, EVINV, EVRND, PDF, CDF.
     if nargin < 1, mu = 0; end
     if nargin < 2, sigma = 1; end
     [mu, sigma] = statAjuster(mu, sigma);

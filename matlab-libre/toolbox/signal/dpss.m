@@ -13,6 +13,8 @@ function [E, V] = dpss(n, nw, k)
 %
 %   Exemple :
 %      [E, V] = dpss(128, 4, 7);   % sept fenêtres, V proches de 1
+%
+%   Voir aussi PMTM, WINDOW, PERIODOGRAM.
     if nargin < 3 || isempty(k), k = 2 * nw - 1; end
     k = max(1, round(k));
     n = round(n);

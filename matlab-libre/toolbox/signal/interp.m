@@ -8,6 +8,8 @@ function y = interp(x, r, l, alpha)
 %      x = sin(2 * pi * 0.05 * (0:63)');
 %      y = interp(x, 4);
 %      numel(y)                    % 256 : quatre fois plus de points
+%
+%   Voir aussi DECIMATE, RESAMPLE.
     if nargin < 3 || isempty(l), l = 4; end
     if nargin < 4 || isempty(alpha), alpha = 0.5; end
     ligne = isrow(x);

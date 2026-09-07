@@ -5,6 +5,8 @@ function y = medfilt1(x, n)
 %
 %   Exemple :
 %      medfilt1([1 100 2 3], 3)    % la valeur aberrante disparait
+%
+%   Voir aussi SGOLAYFILT, MEDFILT2.
     if nargin < 2
         n = 3;
     end

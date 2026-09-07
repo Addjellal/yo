@@ -8,6 +8,8 @@ function writetable(t, nomFichier, varargin)
 %      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
 %      writetable(t, 'sortie.csv');
 %      height(readtable('sortie.csv'))     % 2 : l'aller-retour
+%
+%   Voir aussi READTABLE, TABLE.
     if nargin < 2, nomFichier = 'table.txt'; end
     delimiteur = ',';
     entete = true;

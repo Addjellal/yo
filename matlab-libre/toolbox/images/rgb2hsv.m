@@ -6,6 +6,8 @@ function h = rgb2hsv(r, g, b)
 %
 %   Exemple :
 %      c = rgb2hsv(cat(3, 1, 0, 0));   % rouge pur : teinte 0, S = V = 1
+%
+%   Voir aussi HSV2RGB, RGB2YCBCR.
     if nargin == 3
         image = cat(3, r, g, b);
     else

@@ -8,6 +8,8 @@ function [mu, variance] = predictGp(modele, X)
 %      z = X(:, 1) * 2 - X(:, 2);
 %      [mu, variance] = predictGp(fitrgp(X, z), X);
 %      all(variance >= -1e-9)      % une variance ne peut pas etre negative
+%
+%   Voir aussi FITRGP, NOYAUGP, PREDICT.
     X = double(X);
     X = (X - repmat(modele.Centre, size(X, 1), 1)) ./ ...
         repmat(modele.Echelle, size(X, 1), 1);

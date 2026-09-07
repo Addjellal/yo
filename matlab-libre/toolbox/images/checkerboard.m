@@ -7,6 +7,8 @@ function image = checkerboard(n, p, q)
 %
 %   Exemple :
 %      imshow(checkerboard(10));
+%
+%   Voir aussi IMRESIZE, IMSHOW.
     if nargin < 1 || isempty(n), n = 10; end
     if nargin < 2 || isempty(p), p = 4; end
     if nargin < 3 || isempty(q), q = p; end

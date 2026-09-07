@@ -9,6 +9,8 @@ function w = modwt(x, nom, niveaux)
 %   Exemple :
 %      w = modwt(1:8, 'haar', 2);
 %      abs(sum(sum(w.^2)) - sum((1:8).^2))   % nul
+%
+%   Voir aussi IMODWT, MODWTMRA, WAVEDEC.
     if nargin < 2 || isempty(nom), nom = 'haar'; end
     x = double(x(:)).';
     n = numel(x);

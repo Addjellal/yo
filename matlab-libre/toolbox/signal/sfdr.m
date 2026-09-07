@@ -6,6 +6,8 @@ function [r, frequenceParasite] = sfdr(x, fs)
 %   Exemple :
 %      t = (0:999)'/1000;
 %      sfdr(cos(2*pi*50*t) + 0.01*cos(2*pi*130*t))   % environ 40 dB
+%
+%   Voir aussi SNR, SINAD, THD.
     if nargin < 2 || isempty(fs), fs = 1; end
     [S, f] = signalSpectrePuissance(x, fs);
     [~, plageContinue] = signalLobe(S, 1);

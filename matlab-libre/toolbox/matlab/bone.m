@@ -5,6 +5,8 @@ function carte = bone(m)
 %   Exemple :
 %      carte = bone(8);
 %      size(carte)                 % 8 3
+%
+%   Voir aussi GRAY, PINK, COPPER.
     if nargin < 1 || isempty(m), m = 256; end
     chaud = hot(m);
     carte = (7 * gray(m) + chaud(:, [3 2 1])) / 8;

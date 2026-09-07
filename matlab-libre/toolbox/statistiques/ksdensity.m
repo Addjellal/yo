@@ -6,6 +6,8 @@ function [f, xi] = ksdensity(x, points, varargin)
 %
 %   Exemple :
 %      [f, xi] = ksdensity(randn(1000, 1));
+%
+%   Voir aussi FITDIST, PDF.
     x = x(:);
     x = x(~isnan(x));
     n = numel(x);

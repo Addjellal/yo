@@ -6,6 +6,8 @@ function [d, indices] = bwdist(bw)
 %
 %   Exemple :
 %      a = false(3); a(2,2) = true; bwdist(a)(1,1)   % sqrt(2)
+%
+%   Voir aussi WATERSHED, BWMORPH, IMRECONSTRUCT.
     bw = logical(bw);
     [m, n] = size(bw);
     d = inf(m, n);

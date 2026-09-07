@@ -5,6 +5,8 @@ function x = gaminv(p, a, b)
 %
 %   Exemple :
 %      gaminv(0.5, 1, 1)   % log(2) = 0.6931
+%
+%   Voir aussi GAMPDF, GAMCDF, GAMRND, GAMSTAT, PDF, CDF.
     if nargin < 2, a = 1; end
     if nargin < 3, b = 1; end
     [p, a, b] = statAjuster(p, a, b);

@@ -7,6 +7,8 @@ function [indices, valeurs] = imquantize(image, seuils, niveaux)
 %   Exemple :
 %      indices = imquantize([0.1 0.4 0.9], [0.3 0.6]);
 %      indices                     % 1 2 3 : trois classes pour deux seuils
+%
+%   Voir aussi MULTITHRESH, GRAYTHRESH, LABEL2RGB.
     x = double(image);
     indices = ones(size(x));
     for k = 1:numel(seuils)

@@ -6,6 +6,8 @@ function [call, put] = blsprice(S, K, r, T, sigma, q)
 %   Exemple :
 %      [c, p] = blsprice(100, 100, 0.05, 1, 0.2);
 %      abs(c - p - (100 - 100 * exp(-0.05))) < 1e-9   % la parite achat-vente
+%
+%   Voir aussi BLSDELTA, BLSGAMMA, BLSVEGA, BLSIMPV.
     if nargin < 6
         q = 0;
     end

@@ -8,6 +8,8 @@ function [sos, g] = tf2sos(b, a)
 %      [b, a] = butter(4, 0.3);
 %      [sos, g] = tf2sos(b, a);
 %      size(sos, 1)                % 2 sections pour un ordre 4
+%
+%   Voir aussi SOS2TF, ZP2SOS, SOS2ZP, TF2ZP.
     [z, p, k] = tf2zp(b, a);
     [sos, g] = zp2sos(z, p, k);
 end

@@ -6,6 +6,8 @@ function nlogL = normlike(params, data)
 %      rng(1);
 %      x = normrnd(5, 2, 500, 1);
 %      normlike([5 2], x) < normlike([0 1], x)     % vrai
+%
+%   Voir aussi NORMSTAT, NORMFIT, PDF, CDF, ICDF, RANDOM.
     mu = params(1);
     sigma = params(2);
     x = double(data(:));

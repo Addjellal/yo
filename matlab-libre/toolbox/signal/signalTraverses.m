@@ -9,6 +9,8 @@ function [instants, montantes] = signalTraverses(x, t, seuil)
 %      t = (0:0.001:0.1)';
 %      [instants, montantes] = signalTraverses(double(t >= 0.05), t, 0.5);
 %      abs(instants(1) - 0.05) < 2e-3
+%
+%   Voir aussi SIGNALNIVEAUX, SIGNALTRANSITIONS, MIDCROSS.
     x = x(:);
     t = t(:);
     instants = [];

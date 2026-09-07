@@ -6,6 +6,8 @@ function x = chi2inv(p, v)
 %   Exemple :
 %      chi2inv(0.95, 1)      % 3.8415
 %              chi2inv(0.95, 1:3)    % 3.8415  5.9915  7.8147
+%
+%   Voir aussi CHI2CDF, CHI2RND, CHI2STAT, PDF, CDF, ICDF.
     [p, v] = matlibre_diffuser_deux(p, v, 'chi2inv');
     x = zeros(size(p));
     for k = 1:numel(p)
