@@ -12,6 +12,7 @@ function s = symstr(e)
 %      symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
 %
 %   Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.
+    e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur
         case 'num'

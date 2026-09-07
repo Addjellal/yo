@@ -512,6 +512,18 @@ assert(strcmp(symstr(symsimplify(symmul(x, symnum(0)))), '0'));
 % Substituer puis simplifier : 2*x + 2 en x = 1 fait 4.
 e = symadd(symmul(symnum(2), x), symnum(2));
 assert(strcmp(symstr(symsimplify(symsubs(e, 'x', 1))), '4'));
+% Toutes les fonctions symboliques acceptent aussi bien un arbre qu'un
+% objet SYM : sans cela, TAYLOR — qui rend un SYM — ne pouvait pas etre
+% ecrit par SYMSTR ni simplifie.
+assert(strcmp(symstr(x), 'x'));
+assert(strcmp(symstr(symsimplify(x)), 'x'));
+assert(strcmp(symstr(symsubs(x, 'x', 3)), '3'));
+serie = taylor(symfun('sin', x), 'x', 0, 5);
+assert(isa(serie, 'sym'));
+assert(~isempty(symstr(serie)), 'une serie de Taylor s''ecrit');
+assert(abs(symeval(symdiff(sympow(x, symnum(3)), 'x'), {'x'}, {2}) - 12) < 1e-12, ...
+       'la derivee de x au cube vaut 3 x carre');
+
 % Un operande peut etre un nombre ou un nom : il est converti au passage.
 assert(strcmp(symstr(symsimplify(symmul('x', 1))), 'x'));
 assert(strcmp(symstr(symsimplify(sympow(x, 1))), 'x'));

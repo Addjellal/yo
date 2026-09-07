@@ -20,6 +20,7 @@ function r = symsubs(e, variable, valeur)
     if ~iscell(valeur)
         valeur = symnum(valeur);
     end
+    e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur
         case 'num'

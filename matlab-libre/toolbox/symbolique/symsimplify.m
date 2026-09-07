@@ -20,6 +20,7 @@ function s = symsimplify(e)
 %      symstr(symsimplify(symmul(symnum(0), x)))           % '0'
 %
 %   Voir aussi SYMSTR, SYMSUBS, SIMPLIFY.
+    e = matlibre_sym_arbre(e);
     operateur = e{1};
     if strcmp(operateur, 'num') || strcmp(operateur, 'var')
         s = e;

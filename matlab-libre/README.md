@@ -183,6 +183,8 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |
 | [`manques.md`](documentation/manques.md) | l'inventaire compare a MATLAB, fonction par fonction — genere |
+| [`etat.md`](documentation/etat.md) | l'état des lieux : ce qui est fait, comment on le sait, ce qui reste |
+| [`audit.md`](documentation/audit.md) | aide, exemples et couverture des tests, boîte par boîte — généré |
 
 ## Tests
 
