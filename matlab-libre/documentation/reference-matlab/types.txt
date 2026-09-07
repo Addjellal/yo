@@ -15,3 +15,4 @@ summary synchronize table table2array table2cell table2struct
 table2timetable tail timetable timetable2table timerange timeofday
 timezones tzoffset unstack varfun vartype week withtol writetable
 years ymd
+dictionary entries insert isConfigured isKey keys lookup numEntries remove values

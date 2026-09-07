@@ -308,6 +308,39 @@ DAYS Durée en jours, ou jours d'une durée.
   Voir aussi HOURS, MINUTES, SECONDS, YEARS, DURATION.
 ```
 
+## `dictionary`
+
+```
+DICTIONARY Association de clés à des valeurs.
+  D = DICTIONARY(CLES,VALEURS) construit un dictionnaire à partir de
+  deux tableaux de même longueur. D = DICTIONARY() en construit un vide.
+  D(CLE) lit la valeur associée ; D(CLE) = VALEUR l'écrit, en créant
+  l'entrée si elle n'existe pas.
+
+  Les clés peuvent être numériques ou textuelles, mais pas les deux à la
+  fois : le type est fixé à la première insertion, et une clé d'un autre
+  type est refusée. C'est ce qui distingue un dictionnaire d'une
+  structure, dont les champs sont forcément des noms valides.
+
+  Ce qu'on lui fait : KEYS, VALUES, LOOKUP, INSERT, REMOVE, ISKEY,
+  NUMENTRIES, ENTRIES, ISCONFIGURED.
+
+  Le dictionnaire a remplacé CONTAINERS.MAP en R2022b. Les différences
+  qui comptent : il se copie par valeur — modifier une copie ne touche
+  pas l'original, là où CONTAINERS.MAP est une poignée —, et il accepte
+  l'indexation par un tableau de clés, qui rend autant de valeurs.
+
+  Exemple :
+     d = dictionary(["a", "b"], [1 2]);
+     d("a")                          % 1
+     d("c") = 3;
+     numEntries(d)                   % 3
+     isKey(d, "b")                   % 1
+     keys(d)'                        % "a"  "b"  "c"
+
+  Voir aussi CONTAINERS.MAP, KEYS, VALUES, ISKEY, STRUCT.
+```
+
 ## `duration`
 
 ```
@@ -479,6 +512,58 @@ ISTIMETABLE Vrai pour une timetable.
      istimetable(table([1;2]))                       % false
 
   Voir aussi ISTABLE, TIMETABLE.
+```
+
+## `matlibre_dict_cles`
+
+```
+MATLIBRE_DICT_CLES Normalise des clés de dictionnaire en cellule.
+  Les clés arrivent sous toutes les formes du texte ou en numérique ;
+  cette fonction les ramène à une cellule et dit si elles sont
+  textuelles, ce dont le dictionnaire a besoin pour refuser un mélange.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [l, t] = matlibre_dict_cles(["a", "b"]);
+     numel(l)                        % 2
+     t                               % 1 : elles sont textuelles
+
+  Voir aussi DICTIONARY, KEYS, ISKEY.
+```
+
+## `matlibre_dict_trouver`
+
+```
+MATLIBRE_DICT_TROUVER Rang d'une clé dans un dictionnaire, vide si absente.
+  La recherche est linéaire. Sur un dictionnaire de quelques milliers
+  d'entrées cela suffit ; au-delà, une table de hachage s'imposerait.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     d = dictionary(["a", "b"], [1 2]);
+     matlibre_dict_trouver(d, 'b')   % 2
+
+  Voir aussi DICTIONARY, ISKEY, LOOKUP.
+```
+
+## `matlibre_dict_valeurs`
+
+```
+MATLIBRE_DICT_VALEURS Normalise des valeurs de dictionnaire en cellule.
+  Une valeur peut être n'importe quoi ; ce qui compte est de savoir si
+  l'appelant en donne une ou plusieurs. Un tableau numérique en donne
+  autant qu'il a d'éléments, une cellule autant qu'elle a de cases, et
+  tout le reste compte pour une seule.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numel(matlibre_dict_valeurs([1 2 3]))     % 3
+     numel(matlibre_dict_valeurs({[1 2]}))     % 1
+
+  Voir aussi DICTIONARY, VALUES, INSERT.
 ```
 
 ## `milliseconds`

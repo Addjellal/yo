@@ -56,10 +56,10 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | stateflow | 4 | 100 % | 100 % | 100 % |
 | statistiques | 272 | 100 % | 100 % | 100 % |
 | symbolique | 27 | 100 % | 100 % | 100 % |
-| types | 40 | 100 % | 100 % | 100 % |
+| types | 41 | 100 % | 100 % | 100 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 100 % | 100 % | 100 % |
-| **ensemble** | **2152** | **100 %** | **100 %** | **100 %** |
+| **ensemble** | **2153** | **100 %** | **100 %** | **100 %** |
 
 ## Ce qui reste à faire
 

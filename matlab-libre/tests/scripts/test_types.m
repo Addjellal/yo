@@ -569,4 +569,61 @@ assert(t > 0 && t < 1);
 assert(timeit(@() sum(1:100000)) > timeit(@() sum(1:10)), ...
        'plus de travail, plus de temps');
 
+%% ------------------------------------------------ dictionnaires
+% Un dictionnaire se copie par valeur : c'est ce qui le separe de
+% CONTAINERS.MAP, qui est une poignee et se partage.
+d = dictionary(["a", "b"], [1 2]);
+assert(d("a") == 1 && d("b") == 2);
+assert(numEntries(d) == 2);
+d("c") = 3;
+assert(numEntries(d) == 3 && d("c") == 3);
+% Ecrire sur une cle existante remplace, sans ajouter d'entree.
+d("a") = 10;
+assert(numEntries(d) == 3 && d("a") == 10);
+
+copie = remove(d, "a");
+assert(numEntries(copie) == 2, 'la copie a perdu l''entree');
+assert(numEntries(d) == 3, 'et l''original l''a gardee : c''est une valeur');
+
+assert(isKey(d, "b") && ~isKey(d, "z"));
+assert(isequal(sort(keys(d))', sort(["a", "b", "c"])));
+assert(numel(values(d)) == 3);
+
+% Une cle absente leve, sauf si l'on donne un repli.
+leve = false;
+try
+    d("z");
+catch
+    leve = true;
+end
+assert(leve);
+assert(lookup(d, "z", 'FallbackValue', -1) == -1);
+
+% Les cles numeriques marchent aussi, mais on ne melange pas les types :
+% la premiere insertion fixe le type, et c'est ce qui distingue un
+% dictionnaire d'une structure.
+n = dictionary([1 2], [10 20]);
+assert(n(2) == 20);
+assert(isKey(n, 1));
+leve = false;
+try
+    m = dictionary("a", 1);
+    m(3) = 5;
+catch
+    leve = true;
+end
+assert(leve, 'une cle d''un autre type doit etre refusee');
+
+% Un dictionnaire vide n'est pas encore configure.
+vide = dictionary();
+assert(numEntries(vide) == 0);
+assert(~isConfigured(vide));
+vide("x") = 1;
+assert(isConfigured(vide) && numEntries(vide) == 1);
+
+% Les valeurs peuvent etre de n'importe quel type.
+melange = dictionary(["t", "v"], {'texte', [1 2 3]});
+assert(strcmp(melange("t"), 'texte'));
+assert(isequal(melange("v"), [1 2 3]));
+
 disp('types : toutes les verifications passent');

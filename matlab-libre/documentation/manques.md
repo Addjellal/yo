@@ -26,9 +26,9 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | signal | 139 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
 | symbolique | 23 | 0 | 100 % |
-| types | 90 | 0 | 100 % |
+| types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2256** | **0** | **100 %** |
+| **ensemble** | **2266** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 
