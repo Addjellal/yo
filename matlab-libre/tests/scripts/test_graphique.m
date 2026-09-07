@@ -757,4 +757,45 @@ assert(contourRefuse);
 cla; contourf(peaks(10));
 close('all');
 
+%% ------------------------------- nuages modernes et cartes
+% SWARMCHART ecarte lateralement les points de meme abscisse : c'est la
+% densite qu'on rend visible, sans choisir de largeur de classe.
+ecartes = matlibre_essaimer([1; 1; 1], [1; 2; 3]);
+assert(numel(unique(ecartes)) == 3, 'aucun ne cache plus l''autre');
+assert(abs(mean(ecartes) - 1) < 1e-12, ...
+       'l''ecartement est symetrique : la moyenne ne bouge pas');
+% L'ecartement est deterministe : deux appels donnent le meme dessin.
+assert(isequal(matlibre_essaimer([1; 1; 1], [1; 2; 3]), ecartes));
+% Un point seul sur son abscisse ne bouge pas.
+assert(isequal(matlibre_essaimer([1; 2], [1; 2]), [1; 2]));
+
+figure();
+groupes = [ones(1, 20), 2 * ones(1, 20)];
+swarmchart(groupes, [randn(1, 20), randn(1, 20) + 3]);
+close all;
+
+% BUBBLECHART code la donnee dans l'aire et non dans le rayon : l'oeil
+% compare des surfaces, et coder le rayon rendrait la lecture quadratique.
+figure();
+bubblechart(1:5, rand(1, 5), [1 4 9 16 25]);
+close all;
+
+% La projection geographique corrige le cosinus de la latitude : sans
+% cela une trajectoire parait etiree des qu'on quitte l'equateur.
+figure();
+geoplot([48.85 43.30 45.76], [2.35 5.37 4.83]);
+close all;
+figure();
+geoscatter([48.85 43.30], [2.35 5.37]);
+close all;
+
+% EXPORTGRAPHICS ecrit vraiment un fichier.
+figure();
+plot(1:10);
+fichierExport = [tempname() '.svg'];
+exportgraphics(gca, fichierExport);
+assert(isfile(fichierExport));
+delete(fichierExport);
+close all;
+
 disp('graphique : toutes les verifications passent');

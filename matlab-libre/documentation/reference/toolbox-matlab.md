@@ -403,6 +403,33 @@ BRUSH Sélection de points à la souris (acceptée, sans effet).
   Voir aussi DATACURSORMODE, ZOOM, PAN, FINDOBJ.
 ```
 
+## `bubblechart`
+
+```
+BUBBLECHART Nuage de points dont la taille porte une troisième variable.
+  BUBBLECHART(X,Y,TAILLES) dessine un disque en chaque point, dont
+  l'aire suit TAILLES. BUBBLECHART(X,Y,TAILLES,COULEUR) donne les
+  couleurs. Les propriétés de SCATTER sont acceptées.
+  H = BUBBLECHART(...) rend la poignée.
+
+  L'aire, non le rayon : l'œil compare des surfaces, et coder la donnée
+  dans le rayon la ferait paraître quadratique. C'est la faute la plus
+  commune des graphiques à bulles, et la raison pour laquelle cette
+  fonction existe à côté de SCATTER, qui prend une aire en points carrés
+  sans rien normaliser.
+
+  Les tailles sont ramenées à une plage lisible : la plus petite donnée
+  devient un petit disque, la plus grande un gros, et les autres entre
+  les deux proportionnellement à la donnée.
+
+  Exemple :
+     figure();
+     bubblechart(1:5, rand(1, 5), [1 4 9 16 25]);
+     close all;
+
+  Voir aussi SCATTER, BUBBLELEGEND, SWARMCHART, PLOT.
+```
+
 ## `calendar`
 
 ```
@@ -1169,6 +1196,32 @@ ERRORBAR Courbe avec barres d'erreur.
   Voir aussi PLOT, BAR, STAIRS, STD.
 ```
 
+## `exportgraphics`
+
+```
+EXPORTGRAPHICS Enregistre un graphique dans un fichier.
+  EXPORTGRAPHICS(OBJET,FICHIER) écrit le contenu de l'axe ou de la
+  figure donnée dans FICHIER, dont l'extension choisit le format.
+  EXPORTGRAPHICS(FICHIER) exporte la figure courante.
+  EXPORTGRAPHICS(...,'Resolution',R) et les autres propriétés sont
+  acceptées.
+
+  Elle a remplacé PRINT et SAVEAS depuis R2020a. La différence tient à
+  ce qui est exporté : SAVEAS enregistre la figure entière, avec ses
+  marges ; EXPORTGRAPHICS n'exporte que le contenu, rogné au plus près.
+  C'est ce qu'on veut pour insérer une figure dans un document.
+
+  Exemple :
+     figure();
+     plot(1:10);
+     fichier = [tempname() '.svg'];
+     exportgraphics(gca, fichier);
+     isfile(fichier)                 % 1
+     close all;
+
+  Voir aussi SAVEAS, PRINT, FIGURE, GCA.
+```
+
 ## `ezcontour`
 
 ```
@@ -1600,6 +1653,52 @@ GENVARNAME Fabrique des noms de variables valides.
      genvarname({'a b', 'end', 'a b'})   % {'a_0x20_b', 'end1', 'a_0x20_b1'}
 
   Voir aussi ISVARNAME, MATLAB.LANG.MAKEVALIDNAME, ISKEYWORD.
+```
+
+## `geoplot`
+
+```
+GEOPLOT Trace une trajectoire sur des coordonnées géographiques.
+  GEOPLOT(LAT,LON) trace la ligne joignant les points donnés en degrés.
+  GEOPLOT(LAT,LON,STYLE) accepte le style de PLOT.
+  H = GEOPLOT(...) rend la poignée.
+
+  MATLAB dessine ici un fond de carte ; MatLibre n'en emporte pas et
+  trace la longitude en abscisse, la latitude en ordonnée, avec un
+  rapport d'aspect corrigé par le cosinus de la latitude moyenne. Cette
+  correction est ce qui empêche une trajectoire de paraître étirée : un
+  degré de longitude vaut cos(latitude) degré de latitude en distance,
+  et l'ignorer déforme tout dès qu'on quitte l'équateur.
+
+  La projection est donc une équirectangulaire locale. Elle est fausse
+  sur une grande étendue, comme toute projection plane, et l'aide le dit
+  plutôt que de laisser croire à une carte exacte.
+
+  Exemple :
+     figure();
+     geoplot([48.85 43.30 45.76], [2.35 5.37 4.83]);
+     close all;
+
+  Voir aussi GEOSCATTER, PLOT, AXIS.
+```
+
+## `geoscatter`
+
+```
+GEOSCATTER Nuage de points sur des coordonnées géographiques.
+  GEOSCATTER(LAT,LON) place un point par couple. GEOSCATTER(LAT,LON,
+  TAILLE,COULEUR) suit la syntaxe de SCATTER.
+  H = GEOSCATTER(...) rend la poignée.
+
+  Comme GEOPLOT, la projection est une équirectangulaire locale, dont le
+  rapport d'aspect corrige le cosinus de la latitude moyenne.
+
+  Exemple :
+     figure();
+     geoscatter([48.85 43.30], [2.35 5.37]);
+     close all;
+
+  Voir aussi GEOPLOT, SCATTER, BUBBLECHART.
 ```
 
 ## `getframe`
@@ -2808,6 +2907,25 @@ MATLIBRE_ARGUMENTS_BARRES Décode les arguments de BARH et de PARETO.
   pour que les diagrammes en barres de MatLibre s'accordent tous.
 ```
 
+## `matlibre_aspect_geographique`
+
+```
+MATLIBRE_ASPECT_GEOGRAPHIQUE Corrige le rapport d'aspect d'une carte plane.
+  Un degré de longitude vaut cos(latitude) degré de latitude en
+  distance : sans cette correction, une trajectoire paraît étirée dès
+  qu'on quitte l'équateur, et d'autant plus qu'on s'en éloigne.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure();
+     plot([2 5], [48 43]);
+     matlibre_aspect_geographique([48 43]);
+     close all;
+
+  Voir aussi GEOPLOT, GEOSCATTER, DASPECT.
+```
+
 ## `matlibre_barycentriques`
 
 ```
@@ -2877,6 +2995,24 @@ MATLIBRE_DISTANCE_INVERSE Moyenne pondérée par l'inverse du carré de la dista
      matlibre_distance_inverse([0;1], [0;0], [0;1], 0.5, 0)      % 0.5
 
   Voir aussi GRIDDATA.
+```
+
+## `matlibre_essaimer`
+
+```
+MATLIBRE_ESSAIMER Écarte latéralement les points de même abscisse.
+  Les points partageant une abscisse sont répartis symétriquement autour
+  d'elle, dans l'ordre de leur ordonnée. L'écartement est déterministe :
+  deux appels sur les mêmes données donnent le même dessin, ce qu'un
+  tirage aléatoire ne garantirait pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     xs = matlibre_essaimer([1; 1; 1], [1; 2; 3]);
+     numel(unique(xs))               % 3 : ils ne se recouvrent plus
+
+  Voir aussi SWARMCHART, SCATTER.
 ```
 
 ## `matlibre_evaluer_grille`
@@ -5534,6 +5670,35 @@ SWAPBYTES Inverse l'ordre des octets.
      swapbytes(uint16(1))    % 256
 
   Voir aussi TYPECAST, CAST, CLASS.
+```
+
+## `swarmchart`
+
+```
+SWARMCHART Nuage de points dispersés par catégorie.
+  SWARMCHART(X,Y) dessine les points (X,Y) en écartant latéralement ceux
+  qui partagent la même abscisse, de sorte qu'aucun n'en cache un autre.
+  SWARMCHART(X,Y,TAILLE) et SWARMCHART(X,Y,TAILLE,COULEUR) suivent la
+  syntaxe de SCATTER.
+  SWARMCHART(...,'XJitter',...) et les autres propriétés sont acceptées.
+  H = SWARMCHART(...) rend la poignée.
+
+  Un nuage ordinaire superpose les points de même abscisse : sur des
+  données groupées, on ne voit plus qu'un trait vertical et l'effectif
+  disparaît. L'écartement rend visible la densité — c'est la même
+  information qu'un histogramme, mais sans choisir de largeur de classe.
+
+  L'écart est déterministe, non tiré au hasard : les points d'un même
+  groupe sont répartis symétriquement autour de leur abscisse, ce qui
+  redonne le même dessin d'un appel à l'autre.
+
+  Exemple :
+     figure();
+     x = [ones(1, 20), 2 * ones(1, 20)];
+     swarmchart(x, [randn(1, 20), randn(1, 20) + 3]);
+     close all;
+
+  Voir aussi SCATTER, BOXCHART, HISTOGRAM, PLOT.
 ```
 
 ## `symamd`
