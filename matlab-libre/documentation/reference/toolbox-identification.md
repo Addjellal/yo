@@ -211,6 +211,8 @@ COMPAREFIT Qualité d'ajustement, en pour cent (critère de MathWorks).
      y = (1:10)';
      compareFit(y, y)            % 100 : un ajustement parfait
      compareFit(y, mean(y) * ones(10, 1)) < 1e-10     % predire la moyenne fait zero
+
+  Voir aussi ARX, AIC.
 ```
 
 ## `etfe`

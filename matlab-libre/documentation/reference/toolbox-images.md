@@ -166,6 +166,8 @@ ADAPTERBLANC Adaptation chromatique de von Kries, en coordonnées XYZ.
      D65 = [0.95047 1 1.08883];
      A = [1.0985 1 0.3558];
      max(abs(adapterBlanc(D65, D65, A) - A)) < 1e-9   % le blanc source devient le blanc cible
+
+  Voir aussi WHITEPOINT, XYZ2LAB, APPLIQUERMATRICECOULEUR.
 ```
 
 ## `adapthisteq`
@@ -214,6 +216,8 @@ APPLIQUERMATRICECOULEUR Combine linéairement les trois plans d'une image.
      M = matriceRVBversXYZ();
      sortie = appliquerMatriceCouleur([1 0 0; 0 1 0], M);
      size(sortie)                % 2 3 : la forme de l'entree est gardee
+
+  Voir aussi MATRICERVBVERSXYZ, RGB2XYZ, ADAPTERBLANC.
 ```
 
 ## `blockproc`
@@ -226,6 +230,8 @@ BLOCKPROC Applique une fonction bloc par bloc.
 
   Exemple :
      blockproc(magic(4), [2 2], @(b) mean(b.data(:)) * ones(2))
+
+  Voir aussi NLFILTER, COLFILT, IM2COL.
 ```
 
 ## `bwarea`
@@ -259,6 +265,8 @@ BWAREAFILT Ne garde que les composantes de l'aire voulue.
      bw(10:18, 10:18) = true;    % un autre de 81
      garde = bwareafilt(bw, 1);
      sum(garde(:))               % 81 : seule la plus grande reste
+
+  Voir aussi BWPROPFILT, BWAREAOPEN, BWLABEL, REGIONPROPS.
 ```
 
 ## `bwareaopen`
@@ -269,6 +277,8 @@ BWAREAOPEN Retire les composantes de moins de P pixels.
   Exemple :
      bw = false(5); bw(2,2) = true; bw(4:5,4:5) = true;
      bwareaopen(bw, 2)   % le point isolé disparaît
+
+  Voir aussi BWAREAFILT, BWLABEL, BWMORPH.
 ```
 
 ## `bwboundaries`
@@ -287,6 +297,8 @@ BWBOUNDARIES Contours des objets d'une image binaire.
   Exemple :
      bw = false(5); bw(2:4, 2:4) = true;
      b = bwboundaries(bw);   % un contour de huit points plus le retour
+
+  Voir aussi BWTRACEBOUNDARY, BWPERIM, BWLABEL.
 ```
 
 ## `bwconncomp`
@@ -303,6 +315,8 @@ BWCONNCOMP Composantes connexes d'une image binaire.
      bw(10:18, 10:18) = true;    % un autre de 81
      cc = bwconncomp(bw);
      cc.NumObjects               % 2
+
+  Voir aussi BWLABEL, REGIONPROPS.
 ```
 
 ## `bwconvhull`
@@ -316,6 +330,8 @@ BWCONVHULL Enveloppe convexe des objets d'une image binaire.
      bw = false(20, 20);
      bw(5, 5) = true; bw(15, 5) = true; bw(10, 15) = true;
      sum(sum(bwconvhull(bw))) > 3        % l'enveloppe remplit le triangle
+
+  Voir aussi BWPERIM, REGIONPROPS, CONVHULL.
 ```
 
 ## `bwdist`
@@ -328,6 +344,8 @@ BWDIST Distance euclidienne au pixel vrai le plus proche.
 
   Exemple :
      a = false(3); a(2,2) = true; bwdist(a)(1,1)   % sqrt(2)
+
+  Voir aussi WATERSHED, BWMORPH, IMRECONSTRUCT.
 ```
 
 ## `bweuler`
@@ -341,6 +359,8 @@ BWEULER Nombre d'Euler : régions moins trous.
      bw(5:15, 5:15) = true;
      bw(8:12, 8:12) = false;     % un carre troue
      bweuler(bw)                 % 0 : un objet moins un trou
+
+  Voir aussi BWLABEL, BWPERIM, REGIONPROPS.
 ```
 
 ## `bwhitmiss`
@@ -356,6 +376,8 @@ BWHITMISS Transformation tout ou rien.
      bw(4:6, 4:6) = true;
      sortie = bwhitmiss(bw, ones(3), zeros(3));
      sum(sortie(:))              % 1 : le seul centre de carre plein
+
+  Voir aussi BWMORPH, IMERODE, IMDILATE, STREL.
 ```
 
 ## `bwlabel`
@@ -371,6 +393,8 @@ BWLABEL Étiquetage des composantes connexes d'une image binaire.
      bw(10:18, 10:18) = true;    % un autre de 81
      [etiquettes, n] = bwlabel(bw);
      n                           % 2 : deux composantes connexes
+
+  Voir aussi BWLABELN, BWCONNCOMP, REGIONPROPS, LABEL2RGB.
 ```
 
 ## `bwlabeln`
@@ -386,6 +410,8 @@ BWLABELN Étiquetage des composantes connexes, connexité quelconque.
      bw(10:18, 10:18) = true;    % un autre de 81
      [etiquettes, n] = bwlabeln(bw);
      n                           % 2
+
+  Voir aussi BWLABEL, BWCONNCOMP, REGIONPROPS.
 ```
 
 ## `bwmorph`
@@ -407,6 +433,8 @@ BWMORPH Opérations morphologiques sur une image binaire.
   Exemple :
      bw = false(5); bw(3,3) = true;
      bwmorph(bw, 'clean')   % le pixel isolé disparaît
+
+  Voir aussi BWSKEL, BWPERIM, BWHITMISS, STREL.
 ```
 
 ## `bwperim`
@@ -418,6 +446,8 @@ BWPERIM Contour d'une région binaire.
 
   Exemple :
      sum(sum(bwperim(true(3))))   % 8 : tout sauf le centre
+
+  Voir aussi BWBOUNDARIES, BWMORPH, EDGE.
 ```
 
 ## `bwpropfilt`
@@ -434,6 +464,8 @@ BWPROPFILT Ne garde que les composantes classées par une propriété.
      bw(10:18, 10:18) = true;    % un autre de 81
      garde = bwpropfilt(bw, 'Area', 1);
      sum(garde(:))               % 81 : la plus grande aire
+
+  Voir aussi BWAREAFILT, REGIONPROPS, BWLABEL.
 ```
 
 ## `bwselect`
@@ -449,6 +481,8 @@ BWSELECT Garde les objets qui contiennent les points désignés.
      bw(10:18, 10:18) = true;    % un autre de 81
      [sortie, indices] = bwselect(bw, 4, 4);
      sum(sortie(:))              % 16 : la composante qui contient (4,4)
+
+  Voir aussi BWLABEL, IMFILL, BWCONNCOMP.
 ```
 
 ## `bwskel`
@@ -464,6 +498,8 @@ BWSKEL Squelette d'une image binaire.
   Exemple :
      bw = false(9); bw(4:6, 2:8) = true;
      s = bwskel(bw);   % un segment horizontal
+
+  Voir aussi BWMORPH, BWPERIM, BWDIST.
 ```
 
 ## `bwtraceboundary`
@@ -483,6 +519,8 @@ BWTRACEBOUNDARY Suit le contour d'un objet à partir d'un point.
      bw(3:7, 3:7) = true;
      c = bwtraceboundary(bw, [3 3], 'E');
      size(c, 2)                  % 2 : ligne et colonne par point
+
+  Voir aussi BWBOUNDARIES, BWPERIM, BWLABEL.
 ```
 
 ## `checkerboard`
@@ -496,6 +534,8 @@ CHECKERBOARD Damier d'essai pour les transformations géométriques.
 
   Exemple :
      imshow(checkerboard(10));
+
+  Voir aussi IMRESIZE, IMSHOW.
 ```
 
 ## `col2im`
@@ -508,6 +548,8 @@ COL2IM Réassemble une image à partir de colonnes de blocs.
   Exemple :
      colonnes = im2col(magic(4), [2 2], 'distinct');
      max(max(abs(col2im(colonnes, [2 2], [4 4], 'distinct') - magic(4))))   % 0
+
+  Voir aussi IM2COL, BLOCKPROC.
 ```
 
 ## `colfilt`
@@ -520,6 +562,8 @@ COLFILT Filtre par colonnes : la fonction voit tous les blocs à la fois.
 
   Exemple :
      colfilt(magic(4), [3 3], 'sliding', @max)
+
+  Voir aussi NLFILTER, BLOCKPROC, IM2COL.
 ```
 
 ## `conndef`
@@ -531,6 +575,8 @@ CONNDEF Tableau de connexité par défaut.
 
   Exemple :
      conndef(2, 'minimal')   % [0 1 0; 1 1 1; 0 1 0]
+
+  Voir aussi BWCONNCOMP, BWLABEL, VOISINAGECONNEXITE.
 ```
 
 ## `corr2`
@@ -539,6 +585,8 @@ CONNDEF Tableau de connexité par défaut.
 CORR2 Coefficient de corrélation entre deux matrices de même taille.
   Exemple :
      corr2(magic(4), magic(4))   % 1
+
+  Voir aussi SSIM, PSNR.
 ```
 
 ## `dct2`
@@ -550,6 +598,8 @@ DCT2 Transformée en cosinus discrète bidimensionnelle.
   Exemple :
      x = magic(4);
      max(max(abs(idct2(dct2(x)) - x))) < 1e-10   % la transformee est orthonormee
+
+  Voir aussi IDCT2, DCT.
 ```
 
 ## `edge`
@@ -589,6 +639,8 @@ ENTROPYFILT Entropie locale, en bits.
      rng(1);
      r = entropyfilt(rand(20));
      all(r(:) >= 0)              % 1 : une entropie est positive
+
+  Voir aussi STDFILT, RANGEFILT, GRAYCOMATRIX.
 ```
 
 ## `fspecial`
@@ -606,6 +658,8 @@ FSPECIAL Noyaux de filtrage usuels.
      h = fspecial('gaussian', 5, 1);
      abs(sum(h(:)) - 1) < 1e-12  % un lissage conserve la moyenne
      abs(sum(sum(fspecial('laplacian')))) < 1e-12   % un derivateur annule le continu
+
+  Voir aussi IMFILTER, IMGAUSSFILT, IMSHARPEN.
 ```
 
 ## `gray2ind`
@@ -618,6 +672,8 @@ GRAY2IND Image en niveaux de gris vers image indexée.
 
   Exemple :
      [x, map] = gray2ind([0 0.5 1], 4);   % x = [0 1 3]
+
+  Voir aussi IND2GRAY, RGB2IND, LABEL2RGB.
 ```
 
 ## `gray2rgb`
@@ -650,6 +706,8 @@ GRAYCOMATRIX Matrice de cooccurrence des niveaux de gris.
 
   Exemple :
      graycomatrix([1 1 1; 1 1 1; 1 1 1], 'NumLevels', 2)
+
+  Voir aussi GRAYCOPROPS, ENTROPYFILT.
 ```
 
 ## `graycoprops`
@@ -663,6 +721,8 @@ GRAYCOPROPS Descripteurs d'une matrice de cooccurrence.
      glcm = graycomatrix(uint8(magic(8)));
      s = graycoprops(glcm, {'Contrast', 'Energy'});
      s.Energy > 0                % 1
+
+  Voir aussi GRAYCOMATRIX, ENTROPYFILT.
 ```
 
 ## `graythresh`
@@ -675,6 +735,8 @@ GRAYTHRESH Seuil global par la méthode d'Otsu.
      x = [zeros(50, 1); ones(50, 1)];
      seuil = graythresh(x);
      seuil > 0 && seuil < 1      % Otsu separe les deux modes
+
+  Voir aussi MULTITHRESH, IMBINARIZE, IMQUANTIZE.
 ```
 
 ## `histeq`
@@ -786,6 +848,8 @@ HSV2RGB Teinte, saturation, valeur vers RVB.
   Exemple :
      max(abs(hsv2rgb([0 1 1]) - [1 0 0])) < 1e-12   % teinte nulle : du rouge pur
      max(abs(hsv2rgb([0 0 0.5]) - [0.5 0.5 0.5])) < 1e-12   % saturation nulle : du gris
+
+  Voir aussi RGB2HSV, RGB2YCBCR.
 ```
 
 ## `idct2`
@@ -835,6 +899,8 @@ IM2COL Réarrange les blocs d'une image en colonnes.
 
   Exemple :
      im2col(magic(4), [2 2], 'distinct')   % quatre colonnes de quatre
+
+  Voir aussi COL2IM, BLOCKPROC, COLFILT.
 ```
 
 ## `im2double`
@@ -865,6 +931,8 @@ IM2GRAY Rend une image en niveaux de gris, quelle que soit l'entrée.
   Exemple :
      max(abs(im2gray(reshape([0.2 0.4 0.6], 1, 1, 3)) - rgb2gray(reshape([0.2 0.4 0.6], 1, 1, 3)))) < 1e-12
      isequal(im2gray(rand(4)), im2gray(rand(4)) * 1)   % une image grise passe telle quelle
+
+  Voir aussi RGB2GRAY, IMSPLIT.
 ```
 
 ## `im2uint8`
@@ -934,6 +1002,8 @@ IMADJUST Étirement de contraste.
      x = [0.2 0.5 0.8];
      y = imadjust(x, [0.2 0.8], [0 1]);
      [y(1) y(end)]               % 0 et 1 : les bornes s'etirent
+
+  Voir aussi STRETCHLIM, HISTEQ, IMCOMPLEMENT.
 ```
 
 ## `imapprox`
@@ -946,6 +1016,8 @@ IMAPPROX Réduit le nombre de couleurs d'une image indexée.
      rng(1);
      [i, c] = imapprox(randi(64, 10, 10), rand(64, 3), 8);
      size(c, 1)                  % 8 : la palette est reduite
+
+  Voir aussi RGB2IND, IND2GRAY.
 ```
 
 ## `imbinarize`
@@ -980,6 +1052,8 @@ IMBOTHAT Chapeau bas de forme : la fermeture moins l'image.
      bw(5:15, 5:15) = true;
      bw(9:11, 9:11) = false;     % un trou
      sum(sum(imbothat(double(bw), ones(3)))) > 0   % le chapeau noir voit le trou
+
+  Voir aussi IMTOPHAT, IMOPEN, IMCLOSE, STREL.
 ```
 
 ## `imboxfilt`
@@ -992,6 +1066,8 @@ IMBOXFILT Filtre moyenneur, à noyau carré.
   Exemple :
      r = imboxfilt(ones(10), 3);
      abs(r(5, 5) - 1) < 1e-12    % une moyenne d'uns vaut un
+
+  Voir aussi IMGAUSSFILT, IMFILTER, STDFILT.
 ```
 
 ## `imclearborder`
@@ -1003,6 +1079,8 @@ IMCLEARBORDER Supprime les objets qui touchent le bord de l'image.
   Exemple :
      bw = false(5); bw(1,1) = true; bw(3,3) = true;
      imclearborder(bw)   % il ne reste que le point du centre
+
+  Voir aussi IMFILL, IMRECONSTRUCT, BWAREAOPEN.
 ```
 
 ## `imclose`
@@ -1033,6 +1111,8 @@ IMCOMPLEMENT Négatif d'une image.
   Exemple :
      imcomplement([0 0.25 1])    % 1 0.75 0
      imcomplement(uint8([0 255]))    % 255 0
+
+  Voir aussi IMLINCOMB, IMADJUST, IMBINARIZE.
 ```
 
 ## `imcrop`
@@ -1167,6 +1247,8 @@ IMFILL Bouche les trous d'une image binaire.
 
   Exemple :
      a = true(5); a(3,3) = false; sum(sum(imfill(a,'holes')))   % 25
+
+  Voir aussi IMRECONSTRUCT, IMCLEARBORDER, BWSELECT.
 ```
 
 ## `imfilter`
@@ -1182,6 +1264,8 @@ IMFILTER Filtrage linéaire d'une image.
 
   Exemple :
      imfilter(ones(3), ones(3)/9, 'replicate')   % que des 1
+
+  Voir aussi FSPECIAL, IMBOXFILT, IMGAUSSFILT.
 ```
 
 ## `imfindcircles`
@@ -1247,6 +1331,8 @@ IMGRADIENT Amplitude et direction du gradient.
   Exemple :
      [amplitude, direction] = imgradient(repmat((1:10), 10, 1));
      abs(mean(mean(direction(2:9, 2:9)))) < 1e-9   % la pente est horizontale
+
+  Voir aussi IMGRADIENTXY, EDGE, IMFILTER.
 ```
 
 ## `imgradientxy`
@@ -1264,6 +1350,8 @@ IMGRADIENTXY Composantes horizontale et verticale du gradient.
      [gx, gy] = imgradientxy([1 2 3; 4 5 6; 7 8 9]);
      gx(2, 2)   % 8, la réponse de Sobel sur une rampe horizontale
      gy(2, 2)   % 24, la rampe verticale est trois fois plus raide
+
+  Voir aussi IMGRADIENT, EDGE, IMFILTER.
 ```
 
 ## `imhist`
@@ -1298,6 +1386,8 @@ IMHMAX Supprime les maxima de hauteur inférieure à H.
 
   Exemple :
      imhmax([1 3 1], 5)   % [1 1 1] : le sommet ne fait que 2
+
+  Voir aussi IMRECONSTRUCT, IMREGIONALMAX, WATERSHED.
 ```
 
 ## `imhmin`
@@ -1337,6 +1427,8 @@ IMIMPOSEMIN Force les minima régionaux à se trouver là où on le dit.
      relief = [3 3 3; 3 1 3; 3 3 3];
      m = false(3); m(1,1) = true;
      imregionalmin(imimposemin(relief, m))   % le seul minimum est en (1,1)
+
+  Voir aussi IMRECONSTRUCT, IMREGIONALMIN, WATERSHED.
 ```
 
 ## `imlincomb`
@@ -1349,6 +1441,8 @@ IMLINCOMB Combinaison linéaire d'images.
 
   Exemple :
      imlincomb(0.5, [1 2], 0.5, [3 4])   % [2 3]
+
+  Voir aussi IMADD, IMCOMPLEMENT, IMABSDIFF.
 ```
 
 ## `immse`
@@ -1402,6 +1496,8 @@ IMNOISE Ajoute du bruit à une image.
      rng(1);
      x = 0.5 * ones(50);
      std(reshape(imnoise(x, 'gaussian', 0.01), [], 1)) > 0.05   % du bruit a ete ajoute
+
+  Voir aussi IMGAUSSFILT, MEDFILT2, PSNR.
 ```
 
 ## `imopen`
@@ -1478,6 +1574,8 @@ IMPYRAMID Un étage de pyramide gaussienne, vers le haut ou vers le bas.
   Exemple :
      size(impyramid(ones(32), 'reduce'))    % 16 16 : la taille est divisee par deux
      size(impyramid(ones(16), 'expand'))    % 31 31
+
+  Voir aussi IMRESIZE, IMFILTER.
 ```
 
 ## `imquantize`
@@ -1491,6 +1589,8 @@ IMQUANTIZE Quantifie une image selon des seuils.
   Exemple :
      indices = imquantize([0.1 0.4 0.9], [0.3 0.6]);
      indices                     % 1 2 3 : trois classes pour deux seuils
+
+  Voir aussi MULTITHRESH, GRAYTHRESH, LABEL2RGB.
 ```
 
 ## `imread`
@@ -1536,6 +1636,8 @@ IMRECONSTRUCT Reconstruction morphologique par dilatation géodésique.
   Exemple :
      m = zeros(5); m(3,3) = 1;
      imreconstruct(m, ones(5))   % tout à 1 : le masque est connexe
+
+  Voir aussi IMFILL, IMHMAX, IMIMPOSEMIN.
 ```
 
 ## `imregionalmax`
@@ -1553,6 +1655,8 @@ IMREGIONALMAX Maxima régionaux d'une image.
 
   Exemple :
      imregionalmax([1 2 1; 2 3 2; 1 2 1])   % le centre seulement
+
+  Voir aussi IMREGIONALMIN, IMHMAX, FINDPEAKS.
 ```
 
 ## `imregionalmin`
@@ -1564,6 +1668,8 @@ IMREGIONALMIN Minima régionaux d'une image.
   Exemple :
      x = [3 3 3; 3 1 3; 3 3 3];
      sum(sum(imregionalmin(x)))  % 1 : un seul minimum regional
+
+  Voir aussi IMREGIONALMAX, IMIMPOSEMIN, WATERSHED.
 ```
 
 ## `imresize`
@@ -1576,6 +1682,8 @@ IMRESIZE Redimensionnement par interpolation bilinéaire.
   Exemple :
      size(imresize(ones(10), 2))     % 20 20
      size(imresize(ones(10), 0.5))   % 5 5
+
+  Voir aussi IMROTATE, IMCROP, IMPYRAMID.
 ```
 
 ## `imrotate`
@@ -1619,6 +1727,8 @@ IMSHARPEN Accentue les contours par masque flou.
      rng(1);
      x = imboxfilt(rand(30), 5);
      std(reshape(imsharpen(x), [], 1)) > std(x(:))   % l'accentuation releve le contraste
+
+  Voir aussi IMGAUSSFILT, IMFILTER, FSPECIAL.
 ```
 
 ## `imshow`
@@ -1630,6 +1740,8 @@ IMSHOW Affiche une image dans les axes courants.
   Exemple :
      imshow(rand(16));
      close all;
+
+  Voir aussi IMREAD.
 ```
 
 ## `imsplit`
@@ -1640,6 +1752,8 @@ IMSPLIT Sépare les plans d'une image en autant de sorties.
 
   Exemple :
      [r, v, b] = imsplit(zeros(4, 4, 3));
+
+  Voir aussi IM2GRAY, RGB2GRAY.
 ```
 
 ## `imsubtract`
@@ -1670,6 +1784,8 @@ IMTOPHAT Chapeau haut de forme : l'image moins son ouverture.
      bw = zeros(20);
      bw(10, 10) = 1;             % un point isole
      sum(sum(imtophat(bw, ones(3)))) > 0   % le chapeau haut de forme le voit
+
+  Voir aussi IMBOTHAT, IMOPEN, IMCLOSE, STREL.
 ```
 
 ## `imtranslate`
@@ -1683,6 +1799,8 @@ IMTRANSLATE Décale une image d'un nombre entier de pixels.
   Exemple :
      r = imtranslate([1 2 3; 4 5 6; 7 8 9], [1 0]);
      r(1, :)                     % 0 1 2 : tout a glisse d'une colonne
+
+  Voir aussi IMRESIZE, IMROTATE, PADARRAY.
 ```
 
 ## `imwrite`
@@ -1695,6 +1813,8 @@ IMWRITE Écrit une image au format PGM (gris) ou PPM (couleur).
   Exemple :
      imwrite(uint8(magic(8) * 4), 'essai.pgm');
      max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
+
+  Voir aussi IMREAD, IMSHOW.
 ```
 
 ## `ind2gray`
@@ -1706,6 +1826,8 @@ IND2GRAY Image indexée vers niveaux de gris.
   Exemple :
      g = ind2gray([1 2 3], [0 0 0; 0.5 0.5 0.5; 1 1 1]);
      g                           % 0 0.5 1
+
+  Voir aussi GRAY2IND, IND2RGB, IMAPPROX.
 ```
 
 ## `ind2rgb`
@@ -1758,6 +1880,8 @@ LAB2XYZ Passage de L*a*b* à XYZ.
   Exemple :
      xyz = lab2xyz([100 0 0]);
      max(abs(xyz - [0.9504 1 1.0888])) < 1e-3   % L = 100 : le blanc D65
+
+  Voir aussi XYZ2LAB, LAB2RGB, WHITEPOINT.
 ```
 
 ## `label2rgb`
@@ -1771,6 +1895,8 @@ LABEL2RGB Colorie une image étiquetée.
   Exemple :
      couleurs = label2rgb([0 1; 2 0]);
      size(couleurs)              % 2 2 3 : une image couleur
+
+  Voir aussi BWLABEL, IMQUANTIZE.
 ```
 
 ## `lin2rgb`
@@ -1781,6 +1907,8 @@ LIN2RGB Applique la correction gamma de sRGB.
 
   Exemple :
      lin2rgb(0.214)   % 0.4999
+
+  Voir aussi RGB2LIN, XYZ2RGB.
 ```
 
 ## `mat2gray`
@@ -1814,6 +1942,8 @@ MATRICERVBVERSXYZ Matrice sRGB linéaire vers XYZ, blanc D65.
   Exemple :
      M = matriceRVBversXYZ();
      max(abs(M * [1; 1; 1] - [0.95047; 1; 1.08883])) < 1e-3   % le blanc va sur D65
+
+  Voir aussi RGB2XYZ, XYZ2RGB, APPLIQUERMATRICECOULEUR.
 ```
 
 ## `mean2`
@@ -1892,6 +2022,8 @@ MORPHOLOGIE Noyau commun de l'érosion et de la dilatation.
      bw = false(10);
      bw(5, 5) = true;
      sum(sum(morphologie(double(bw), ones(3), 'dilate')))   % 9 : le point s'epaissit
+
+  Voir aussi IMERODE, IMDILATE, IMOPEN, STREL.
 ```
 
 ## `multithresh`
@@ -1904,6 +2036,8 @@ MULTITHRESH Seuils d'Otsu multiples.
 
   Exemple :
      multithresh([zeros(1,50) ones(1,50)], 1)   % proche de 0,5
+
+  Voir aussi GRAYTHRESH, IMQUANTIZE, IMBINARIZE.
 ```
 
 ## `nlfilter`
@@ -1915,6 +2049,8 @@ NLFILTER Filtre défini par une fonction du voisinage.
 
   Exemple :
      nlfilter(magic(4), [3 3], @(x) max(x(:)))
+
+  Voir aussi COLFILT, BLOCKPROC, IMFILTER.
 ```
 
 ## `normxcorr2`
@@ -1977,6 +2113,8 @@ ORDFILT2 Filtre de rang : le ORDRE-ième plus petit du voisinage.
 
   Exemple :
      ordfilt2(magic(4), 9, ones(3))   % maximum sur 3x3
+
+  Voir aussi MEDFILT2, RANGEFILT, NLFILTER.
 ```
 
 ## `padarray`
@@ -1991,6 +2129,8 @@ PADARRAY Ajoute une bordure à un tableau.
 
   Exemple :
      padarray([1 2; 3 4], [1 1])   % entouré de zéros
+
+  Voir aussi IMFILTER, IMRESIZE, IMTRANSLATE.
 ```
 
 ## `poly2mask`
@@ -2023,6 +2163,8 @@ PSNR Rapport signal sur bruit de crête, en décibels.
      x = rand(32, 32);
      psnr(x, x)                  % Inf : deux images identiques
      psnr(x, x + 0.01 * randn(32, 32)) > 30
+
+  Voir aussi SSIM, IMMSE, IMNOISE.
 ```
 
 ## `rangefilt`
@@ -2034,6 +2176,8 @@ RANGEFILT Étendue locale : maximum moins minimum du voisinage.
 
   Exemple :
      rangefilt([1 2; 3 4])(1, 1)   % 3
+
+  Voir aussi STDFILT, ENTROPYFILT, ORDFILT2.
 ```
 
 ## `regionprops`
@@ -2049,6 +2193,8 @@ REGIONPROPS Mesures sur les régions d'une image étiquetée.
   Exemple :
      s = regionprops(bwlabel([1 1 0; 1 1 0; 0 0 1]));
      s(1).Area   % 4
+
+  Voir aussi BWLABEL, BWCONNCOMP, BWAREAFILT.
 ```
 
 ## `rgb2gray`
@@ -2088,6 +2234,8 @@ RGB2HSV Couleurs RVB vers teinte, saturation, valeur.
 
   Exemple :
      c = rgb2hsv(cat(3, 1, 0, 0));   % rouge pur : teinte 0, S = V = 1
+
+  Voir aussi HSV2RGB, RGB2YCBCR.
 ```
 
 ## `rgb2ind`
@@ -2103,6 +2251,8 @@ RGB2IND Image en couleurs vers image indexée.
 
   Exemple :
      [x, map] = rgb2ind(cat(3, [0 1], [0 1], [0 1]), 2);
+
+  Voir aussi IND2RGB, IMAPPROX, GRAY2IND.
 ```
 
 ## `rgb2lab`
@@ -2115,6 +2265,8 @@ RGB2LAB Passage de sRGB à L*a*b*.
 
   Exemple :
      rgb2lab([1 1 1])   % [100 0 0]
+
+  Voir aussi LAB2RGB, RGB2XYZ, XYZ2LAB.
 ```
 
 ## `rgb2lin`
@@ -2127,6 +2279,8 @@ RGB2LIN Défait la correction gamma d'une image sRGB.
 
   Exemple :
      rgb2lin(0.5)   % 0.2140
+
+  Voir aussi LIN2RGB, RGB2XYZ.
 ```
 
 ## `rgb2ntsc`
@@ -2138,6 +2292,8 @@ RGB2NTSC Passage de RVB à l'espace YIQ de la télévision NTSC.
 
   Exemple :
      rgb2ntsc([1 1 1])   % [1 0 0]
+
+  Voir aussi NTSC2RGB, RGB2YCBCR.
 ```
 
 ## `rgb2xyz`
@@ -2152,6 +2308,8 @@ RGB2XYZ Passage de sRGB à l'espace XYZ de la CIE.
 
   Exemple :
      rgb2xyz([1 1 1])   % le blanc D65
+
+  Voir aussi XYZ2RGB, RGB2LAB, MATRICERVBVERSXYZ.
 ```
 
 ## `rgb2ycbcr`
@@ -2164,6 +2322,8 @@ RGB2YCBCR Couleurs RVB vers luminance et chrominances.
 
   Exemple :
      max(abs(ycbcr2rgb(rgb2ycbcr([0.2 0.4 0.6])) - [0.2 0.4 0.6])) < 1e-5   % l'aller-retour
+
+  Voir aussi YCBCR2RGB, RGB2HSV, RGB2NTSC.
 ```
 
 ## `roicolor`
@@ -2214,6 +2374,8 @@ SSIM Indice de similarité structurelle.
      x = rand(32, 32);
      ssim(x, x)                  % 1 : la ressemblance parfaite
      ssim(x, x + 0.1 * randn(32, 32)) < 1
+
+  Voir aussi PSNR, IMMSE, IMGAUSSFILT.
 ```
 
 ## `std2`
@@ -2243,6 +2405,8 @@ STDFILT Écart-type local.
   Exemple :
      r = stdfilt(ones(10));
      max(r(:)) < 1e-12           % un plateau n'a pas d'ecart type
+
+  Voir aussi ENTROPYFILT, RANGEFILT, IMBOXFILT.
 ```
 
 ## `strel`
@@ -2256,6 +2420,8 @@ STREL Élément structurant pour la morphologie.
 
   Exemple :
      strel('square', 3)   % 3x3 de vrais
+
+  Voir aussi IMERODE, IMDILATE, BWMORPH, MORPHOLOGIE.
 ```
 
 ## `stretchlim`
@@ -2269,6 +2435,8 @@ STRETCHLIM Bornes de contraste, pour IMADJUST.
   Exemple :
      limites = stretchlim([0.2 0.5 0.8]);
      limites(1) < limites(2)     % 1 : la borne basse precede la haute
+
+  Voir aussi IMADJUST, HISTEQ, GRAYTHRESH.
 ```
 
 ## `voisinageConnexite`
@@ -2282,6 +2450,8 @@ VOISINAGECONNEXITE Décalages [di dj] d'une connexité 2-D.
   Exemple :
      size(voisinageConnexite(4), 1)     % 4 decalages
      size(voisinageConnexite(8), 1)     % 8
+
+  Voir aussi CONNDEF, BWCONNCOMP, BWLABEL.
 ```
 
 ## `watershed`
@@ -2301,6 +2471,8 @@ WATERSHED Ligne de partage des eaux.
   Exemple :
      relief = [1 2 3 2 1];
      watershed(relief)   % deux bassins séparés par le sommet
+
+  Voir aussi IMIMPOSEMIN, BWDIST, BWLABEL.
 ```
 
 ## `whitepoint`
@@ -2312,6 +2484,8 @@ WHITEPOINT Coordonnées XYZ d'un blanc de référence.
 
   Exemple :
      whitepoint('d65')   % [0.9504 1.0000 1.0888]
+
+  Voir aussi XYZ2LAB, ADAPTERBLANC, RGB2XYZ.
 ```
 
 ## `xyz2lab`
@@ -2323,6 +2497,8 @@ XYZ2LAB Passage de XYZ à L*a*b*.
 
   Exemple :
      xyz2lab(whitepoint('d65'))   % [100 0 0], le blanc parfait
+
+  Voir aussi LAB2XYZ, RGB2LAB, WHITEPOINT.
 ```
 
 ## `xyz2rgb`
@@ -2335,6 +2511,8 @@ XYZ2RGB Passage de l'espace XYZ à sRGB.
   Exemple :
      rgb = xyz2rgb([0.9504 1 1.0888]);
      max(abs(rgb - [1 1 1])) < 1e-2      % le blanc D65 donne du blanc
+
+  Voir aussi RGB2XYZ, XYZ2LAB, MATRICERVBVERSXYZ.
 ```
 
 ## `ycbcr2rgb`

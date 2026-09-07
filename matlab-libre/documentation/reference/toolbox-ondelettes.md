@@ -139,6 +139,8 @@ APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
      [c, l] = wavedec(x, 3, 'db2');
      a = appcoef(c, l, 'db2');
      numel(a) == l(1)            % 1 : l'approximation la plus grossiere
+
+  Voir aussi DETCOEF, WAVEDEC, WAVEREC, WRCOEF.
 ```
 
 ## `appcoef2`
@@ -151,6 +153,8 @@ APPCOEF2 Coefficients d'approximation d'une image décomposée.
      [C, S] = wavedec2(magic(8), 2, 'haar');
      a = appcoef2(C, S, 'haar');
      size(a, 1) == S(1, 1)       % 1
+
+  Voir aussi DETCOEF2, WAVEDEC2, WAVEREC2, WRCOEF2.
 ```
 
 ## `besttree`
@@ -406,6 +410,8 @@ CONVOLUTIONCIRCULAIRE Corrélation périodique, longueur conservée.
   Exemple :
      y = convolutionCirculaire([1 2 3 4], [1 1 0 0]);
      numel(y)                    % 4 : la longueur est conservee
+
+  Voir aussi CCONV, MODWT.
 ```
 
 ## `cwt`
@@ -549,6 +555,8 @@ DAUBECHIESFILTRE Filtre d'échelle de Daubechies à N moments nuls.
      h = daubechiesFiltre(2);
      abs(sum(h) - sqrt(2)) < 1e-10
      abs(sum(h .^ 2) - 1) < 1e-10    % et son energie vaut un
+
+  Voir aussi WFILTERS, COIFLETFILTRE, ORTHFILT.
 ```
 
 ## `dbaux`
@@ -647,6 +655,8 @@ DETCOEF Coefficients de détail d'un niveau donné.
   Exemple :
      [c, l] = wavedec(1:8, 2, 'db1');
      numel(detcoef(c, l, 1))   % 4
+
+  Voir aussi APPCOEF, WAVEDEC, WRCOEF.
 ```
 
 ## `detcoef2`
@@ -660,6 +670,8 @@ DETCOEF2 Coefficients de détail d'une image décomposée.
      [C, S] = wavedec2(magic(8), 2, 'haar');
      [h, v, d] = detcoef2('all', C, S, 1);
      size(h)                     % les details horizontaux du premier niveau
+
+  Voir aussi APPCOEF2, WAVEDEC2, WRCOEF2.
 ```
 
 ## `dilaterFiltres`
@@ -675,6 +687,8 @@ DILATERFILTRES Insère 2^niveau - 1 zéros entre les coefficients.
      [Lo, Hi] = wfilters('db2', 'd');
      [bas, haut] = dilaterFiltres(Lo, Hi, 1);
      numel(bas) == 2 * numel(Lo) - 1     % 1 : un zero entre deux coefficients
+
+  Voir aussi SWT, WFILTERS, MODWT.
 ```
 
 ## `dtfilters`
@@ -783,6 +797,8 @@ DWT2 Transformée en ondelettes discrète bidimensionnelle, un niveau.
 
   Exemple :
      [a, h, v, d] = dwt2(ones(4), 'db1');   % a = 2*ones(2), h = v = d = 0
+
+  Voir aussi IDWT2, WAVEDEC2, DWT.
 ```
 
 ## `dwtfilterbank`
@@ -869,6 +885,8 @@ DYADDOWN Sous-échantillonnage dyadique : un échantillon sur deux.
   Exemple :
      dyaddown([1 2 3 4 5])      % [2 4]
      dyaddown([1 2 3 4 5], 1)   % [1 3 5]
+
+  Voir aussi DYADUP, DWT.
 ```
 
 ## `dyadup`
@@ -881,6 +899,8 @@ DYADUP Suréchantillonnage dyadique : un zéro entre deux échantillons.
   Exemple :
      dyadup([1 2 3])      % [1 0 2 0 3]
      dyadup([1 2 3], 0)   % [0 1 0 2 0 3 0]
+
+  Voir aussi DYADDOWN, IDWT.
 ```
 
 ## `fbspwavf`
@@ -946,6 +966,8 @@ FILTRESSPLINES Couple de filtres biorthogonaux splines.
   Exemple :
      [RF, DF] = filtresSplines(2, 4);
      numel(RF) > 0 && numel(DF) > 0
+
+  Voir aussi WFILTERS, BIORFILT, REFUSERHORSSPLINE.
 ```
 
 ## `gauswavf`
@@ -1058,6 +1080,8 @@ IDWT2 Reconstruction bidimensionnelle, un niveau.
   Exemple :
      [a,h,v,d] = dwt2(magic(4), 'db2');
      max(max(abs(idwt2(a,h,v,d,'db2') - magic(4))))   % nul
+
+  Voir aussi DWT2, WAVEREC2, IDWT.
 ```
 
 ## `imodwpt`
@@ -1087,6 +1111,8 @@ IMODWT Transformée à chevauchement maximal inverse.
      x = sin((1:64) / 8);
      w = modwt(x, 'haar', 3);
      max(abs(imodwt(w, 'haar') - x)) < 1e-10    % la reconstruction est exacte
+
+  Voir aussi MODWT, MODWTMRA, WAVEREC.
 ```
 
 ## `ind2depo`
@@ -1117,6 +1143,8 @@ INDICEDENOEUD Indice d'un nœud donné par son numéro ou par [D P].
   Exemple :
      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
      indiceDeNoeud(arbre, [1 0])     % 1 : le premier enfant de la racine
+
+  Voir aussi DEPO2IND, LIRENOEUD, POSERNOEUD, WPDEC.
 ```
 
 ## `iswt`
@@ -1186,6 +1214,8 @@ LIRENOEUD Coefficients d'un nœud, vides s'il n'est pas dans l'arbre.
      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
      numel(lireNoeud(arbre, 0))      % 64 : la racine porte le signal
      isempty(lireNoeud(arbre, 999))  % 1 : un noeud absent rend vide
+
+  Voir aussi POSERNOEUD, INDICEDENOEUD, WPCOEF.
 ```
 
 ## `measerr`
@@ -1332,6 +1362,8 @@ MODWT Transformée en ondelettes à chevauchement maximal.
   Exemple :
      w = modwt(1:8, 'haar', 2);
      abs(sum(sum(w.^2)) - sum((1:8).^2))   % nul
+
+  Voir aussi IMODWT, MODWTMRA, WAVEDEC.
 ```
 
 ## `modwtcorr`
@@ -1367,6 +1399,8 @@ MODWTMRA Analyse multirésolution issue d'une MODWT.
   Exemple :
      w = modwt(1:8, 'haar', 2);
      max(abs(sum(modwtmra(w, 'haar')) - (1:8)))   % nul
+
+  Voir aussi MODWT, IMODWT.
 ```
 
 ## `modwtvar`
@@ -1448,6 +1482,8 @@ NORMALISERSOMME Met un filtre d'échelle à la somme demandée.
 
   Exemple :
      sum(normaliserSomme([1 1 1 1], 2))     % 2
+
+  Voir aussi WFILTERS, ORTHFILT, DAUBECHIESFILTRE.
 ```
 
 ## `ntnode`
@@ -1515,6 +1551,8 @@ ORDREDENOM Ordre lu dans le nom d'une ondelette.
   Exemple :
      ordreDeNom('db4', 'db')     % 4
      ordreDeNom('haar', 'db')    % 1 : haar est db1
+
+  Voir aussi WFILTERS, ORDRESBIOR, WAVEFUN.
 ```
 
 ## `ordresBior`
@@ -1528,6 +1566,8 @@ ORDRESBIOR Les deux ordres lus dans un nom « biorNr.Nd ».
   Exemple :
      [nr, nd] = ordresBior('bior2.4', 'bior');
      [nr nd]                     % 2 4
+
+  Voir aussi ORDREDENOM, WFILTERS, BIORFILT.
 ```
 
 ## `orthfilt`
@@ -1562,6 +1602,8 @@ POSERNOEUD Range les coefficients d'un nœud dans l'arbre.
      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
      arbre = poserNoeud(arbre, 500, [1 2 3]);
      lireNoeud(arbre, 500)       % 1 2 3
+
+  Voir aussi LIRENOEUD, INDICEDENOEUD, SCINDERNOEUD.
 ```
 
 ## `qmf`
@@ -1573,6 +1615,8 @@ QMF Miroir en quadrature d'un filtre.
 
   Exemple :
      qmf([1 2 3 4])   % [4 -3 2 -1]
+
+  Voir aussi WFILTERS, ORTHFILT, WREV.
 ```
 
 ## `qshiftFiltre`
@@ -1653,6 +1697,8 @@ REFUSERHORSSPLINE Écarte les biorthogonales qui ne sont pas des splines.
      catch e
          e.identifier
      end
+
+  Voir aussi FILTRESSPLINES, WFILTERS, BIORFILT.
 ```
 
 ## `scal2frq`
@@ -1665,6 +1711,8 @@ SCAL2FRQ Conversion des échelles en fréquences.
 
   Exemple :
      scal2frq(1:8, 'db4', 0.001)
+
+  Voir aussi CWT, CENTFRQ, ONDELETTEANALYTIQUE.
 ```
 
 ## `scinderNoeud`
@@ -1681,6 +1729,8 @@ SCINDERNOEUD Coupe un nœud d'un arbre de paquets en ses enfants.
      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
      arbre = scinderNoeud(arbre, 1);
      numel(lireNoeud(arbre, indiceDeNoeud(arbre, [2 0]))) > 0
+
+  Voir aussi WPSPLT, WPDEC, POSERNOEUD.
 ```
 
 ## `shanwavf`
@@ -1721,6 +1771,8 @@ SUPPORTONDELETTECONTINUE Support effectif d'une ondelette continue.
 
   Exemple :
      [lb, ub] = supportOndeletteContinue('mexh')   % -8, 8
+
+  Voir aussi CWT, WAVEFUN, ONDELETTEANALYTIQUE.
 ```
 
 ## `swt`
@@ -1815,6 +1867,8 @@ THSELECT Choix d'un seuil de débruitage.
 
   Exemple :
      thselect(randn(1, 1024), 'sqtwolog')   % environ 3.7
+
+  Voir aussi WTHRESH, WDENCMP, WNOISEST.
 ```
 
 ## `tnodes`
@@ -1858,6 +1912,8 @@ UPCOEF Reconstruction directe de coefficients sur plusieurs niveaux.
 
   Exemple :
      upcoef('a', 1, 'haar', 1)   % [0.7071 0.7071]
+
+  Voir aussi WRCOEF, IDWT, WAVEDEC.
 ```
 
 ## `upcoef2`
@@ -1893,6 +1949,8 @@ UPWLEV Remonte d'un niveau une décomposition en ondelettes.
      [c, l] = wavedec(x, 3, 'db2');
      [c2, l2] = upwlev(c, l, 'db2');
      numel(l2) == numel(l) - 1   % 1 : un niveau de moins
+
+  Voir aussi WAVEDEC, APPCOEF, WAVEREC.
 ```
 
 ## `upwlev2`
@@ -1923,6 +1981,8 @@ WAVEDEC Décomposition multiniveaux en ondelettes.
      [c, l] = wavedec(x, 3, 'db2');
      sum(l(1:end-1)) == numel(c)     % 1 : tous les coefficients y sont
      max(abs(waverec(c, l, 'db2') - x)) < 1e-10
+
+  Voir aussi WAVEREC, APPCOEF, DETCOEF, WRCOEF.
 ```
 
 ## `wavedec2`
@@ -1937,6 +1997,8 @@ WAVEDEC2 Décomposition multiniveaux d'une image en ondelettes.
   Exemple :
      [c, s] = wavedec2(magic(8), 2, 'haar');
      a = appcoef2(c, s, 'haar', 2);
+
+  Voir aussi WAVEREC2, APPCOEF2, DETCOEF2.
 ```
 
 ## `wavefun`
@@ -2119,6 +2181,8 @@ WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
   Exemple :
      [C, S] = wavedec2(magic(8), 2, 'haar');
      max(max(abs(waverec2(C, S, 'haar') - magic(8)))) < 1e-10
+
+  Voir aussi WAVEDEC2, APPCOEF2, WRCOEF2.
 ```
 
 ## `wcodemat`
@@ -2129,6 +2193,8 @@ WCODEMAT Met une matrice à l'échelle des indices de couleur.
 
   Exemple :
      wcodemat([0 1], 4)   % [1 4]
+
+  Voir aussi WAVEDEC2.
 ```
 
 ## `wcoherence`
@@ -2270,6 +2336,8 @@ WDENCMP Débruitage ou compression par seuillage des coefficients.
   Exemple :
      x = wnoise(3, 10, 7);
      xd = wdencmp('gbl', x, 'db4', 3, 2, 's', 1);
+
+  Voir aussi WTHRESH, THSELECT, WDENOISE, WNOISEST.
 ```
 
 ## `wdenoise`
@@ -2549,6 +2617,8 @@ WKEEP Garde la partie centrale d'un vecteur ou d'une image.
 
   Exemple :
      wkeep([1 2 3 4 5], 3)   % [2 3 4]
+
+  Voir aussi WEXTEND, WCONV1, IDWT.
 ```
 
 ## `wmaxlev`
@@ -2562,6 +2632,8 @@ WMAXLEV Niveau de décomposition maximal utile.
 
   Exemple :
      wmaxlev(64, 'db2')   % 4
+
+  Voir aussi WAVEDEC, WFILTERS, DWT.
 ```
 
 ## `wnoise`
@@ -2582,6 +2654,8 @@ WNOISE Signaux d'essai de Donoho et Johnstone.
 
   Exemple :
      [x, xn] = wnoise('doppler', 10, 7);
+
+  Voir aussi WDENCMP, WNOISEST, WDENOISE.
 ```
 
 ## `wnoisest`
@@ -2597,6 +2671,8 @@ WNOISEST Estimation de l'écart type du bruit par les détails.
   Exemple :
      [c, l] = wavedec(randn(1, 1024), 3, 'db2');
      wnoisest(c, l, 1)   % proche de 1
+
+  Voir aussi THSELECT, WDENCMP, WTHRESH.
 ```
 
 ## `wpcoef`
@@ -2842,6 +2918,8 @@ WRCOEF Reconstruit une composante d'une décomposition monodimensionnelle.
   Exemple :
      [c, l] = wavedec(1:8, 2, 'haar');
      a2 = wrcoef('a', c, l, 'haar', 2);
+
+  Voir aussi WAVEDEC, APPCOEF, DETCOEF.
 ```
 
 ## `wrcoef2`
@@ -2855,6 +2933,8 @@ WRCOEF2 Reconstruit une composante d'une décomposition d'image.
      [C, S] = wavedec2(magic(8), 2, 'haar');
      y = wrcoef2('a', C, S, 'haar', 1);
      size(y)                     % 8 8 : la reconstruction garde la taille
+
+  Voir aussi WAVEDEC2, APPCOEF2, DETCOEF2.
 ```
 
 ## `wrev`
@@ -2967,6 +3047,8 @@ WTHRESH Seuillage des coefficients d'ondelettes.
   Exemple :
      wthresh([-3 -1 0 1 3], 'h', 2)     % -3 0 0 0 3 : le seuillage dur
      wthresh([-3 -1 0 1 3], 's', 2)     % -1 0 0 0 1 : le seuillage doux
+
+  Voir aussi WDENCMP, THSELECT, WNOISEST.
 ```
 
 ## `wvarchg`

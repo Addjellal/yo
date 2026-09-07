@@ -180,6 +180,8 @@ ADDRULE Ajoute des règles.
      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
      fis = addrule(fis, [1 1 1 1; 2 2 1 1]);
      numel(fis.regles)           % 2
+
+  Voir aussi ADDMF, ADDINPUT, ADDOUTPUT, SHOWRULE.
 ```
 
 ## `addvar`
@@ -191,6 +193,8 @@ ADDVAR Ajoute une variable d'entrée ou de sortie.
   Exemple :
      fis = addvar(mamfis(), 'input', 'erreur', [0 10]);
      numel(variablesDe(fis, true))      % 1
+
+  Voir aussi ADDINPUT, ADDOUTPUT, ADDMF, RMVAR.
 ```
 
 ## `ajouterVariable`
@@ -203,6 +207,8 @@ AJOUTERVARIABLE Rouage commun d'ADDINPUT et d'ADDOUTPUT.
   Exemple :
      fis = ajouterVariable(mamfis(), true, [0 10], 'Name', 'erreur');
      numel(variablesDe(fis, true))      % 1
+
+  Voir aussi ADDINPUT, ADDOUTPUT, VARIABLESDE.
 ```
 
 ## `anfis`
@@ -295,6 +301,8 @@ DEFUZZ Défuzzification d'un ensemble flou.
      x = linspace(0, 10, 101);
      mf = trimf(x, [2 5 8]);
      abs(defuzz(x, mf, 'centroid') - 5) < 0.1     % le centre de gravite d'un triangle
+
+  Voir aussi EVALFIS, EVALMF, GENSURF.
 ```
 
 ## `dsigmf`
@@ -306,6 +314,8 @@ DSIGMF Différence de deux sigmoïdes.
   Exemple :
      y = dsigmf([0 5 10], [2 2 2 8]);
      all(y >= 0 & y <= 1)        % 1 : c'est une appartenance
+
+  Voir aussi SIGMF, PSIGMF, GAUSSMF.
 ```
 
 ## `estEntree`
@@ -318,6 +328,8 @@ ESTENTREE Le mot-clé désigne-t-il une entrée ?
   Exemple :
      estEntree('input')          % 1
      estEntree('output')         % 0
+
+  Voir aussi VARIABLESDE, TROUVERVARIABLE, ADDINPUT.
 ```
 
 ## `evalfis`
@@ -513,6 +525,8 @@ GAUSS2MF Deux demi-gaussiennes raccordées par un plateau.
   Exemple :
      y = gauss2mf([0 5 10], [1 2 1 8]);
      y(2) > 0.9                  % le plateau entre les deux gaussiennes
+
+  Voir aussi GAUSSMF, GBELLMF, TRAPMF.
 ```
 
 ## `gaussmf`
@@ -919,6 +933,8 @@ PIMF Fonction d'appartenance en Pi : montée en S puis descente en Z.
 
   Exemple :
      pimf(5, [1 4 6 9])   % 1
+
+  Voir aussi SMF, ZMF, TRAPMF.
 ```
 
 ## `plotfis`
@@ -982,6 +998,8 @@ POSEROPTIONS Applique des couples nom-valeur à une structure d'options.
   Exemple :
      o = poserOptions(struct('Alpha', 1), 'essai', 'Alpha', 3);
      o.Alpha                     % 3
+
+  Voir aussi ANFISOPTIONS, EVALFISOPTIONS, FCMOPTIONS.
 ```
 
 ## `poserVariables`
@@ -1034,6 +1052,8 @@ PSIGMF Produit de deux sigmoïdes.
   Exemple :
      y = psigmf([0 5 10], [2 2 -2 8]);
      all(y >= 0 & y <= 1)        % 1
+
+  Voir aussi SIGMF, DSIGMF, GBELLMF.
 ```
 
 ## `rangDansGenre`
@@ -1054,6 +1074,8 @@ RANGDANSGENRE Rang d'une variable parmi les entrées ou parmi les sorties.
      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
      rangDansGenre(fis, 'erreur', true)     % 1
+
+  Voir aussi TROUVERVARIABLE, VARIABLESDE, GETFIS.
 ```
 
 ## `readfis`
@@ -1294,6 +1316,8 @@ SMF Fonction d'appartenance en S : croît de 0 à 1.
 
   Exemple :
      smf(10, [2 8])   % 1
+
+  Voir aussi ZMF, PIMF, SIGMF.
 ```
 
 ## `subclust`
@@ -1423,6 +1447,8 @@ TROUVERVARIABLE Repère une variable par son nom, entrée ou sortie.
      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
      [entree, indice] = trouverVariable(fis, 'erreur');
      [entree indice]             % 1 1
+
+  Voir aussi RANGDANSGENRE, VARIABLESDE, GETFIS.
 ```
 
 ## `tunefis`
@@ -1537,5 +1563,7 @@ ZMF Fonction d'appartenance en Z : décroît de 1 à 0.
 
   Exemple :
      zmf(0, [2 8])   % 1
+
+  Voir aussi SMF, PIMF, SIGMF.
 ```
 

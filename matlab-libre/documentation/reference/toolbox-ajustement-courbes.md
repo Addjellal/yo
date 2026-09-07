@@ -232,6 +232,8 @@ FITCURVE Ajustement par un modèle nommé.
      abs(c(1) - 2) < 0.1         % la pente est retrouvee
      [c, modele] = fitCurve(x, 3 * exp(1.5 * x), 'exp');
      max(abs(c - [3 1.5])) < 0.1
+
+  Voir aussi FITSURFACE, GOODNESSOFFIT, SMOOTHSPLINE.
 ```
 
 ## `fitSurface`
@@ -1713,6 +1715,8 @@ SMOOTHSPLINE Lissage par pénalisation de la dérivée seconde.
      y = sin(2 * pi * x) + 0.2 * randn(60, 1);
      lisse = smoothSpline(x, y, 1);
      sum(diff(lisse, 2) .^ 2) < sum(diff(y, 2) .^ 2)     % lisser diminue la courbure
+
+  Voir aussi FITCURVE, GOODNESSOFFIT.
 ```
 
 ## `spap2`

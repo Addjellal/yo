@@ -95,6 +95,8 @@ BBOX2POINTS Coins d'une boîte englobante.
 
   Exemple :
      bbox2points([1 2 10 20])   % [1 2; 11 2; 11 22; 1 22]
+
+  Voir aussi BBOXOVERLAPRATIO, INSERTSHAPE.
 ```
 
 ## `bboxOverlapRatio`
@@ -106,6 +108,8 @@ BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
   Exemple :
      bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
      bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
+
+  Voir aussi BBOXOVERLAPRATIOMATRIX, SELECTSTRONGESTBBOX, BBOX2POINTS.
 ```
 
 ## `bboxOverlapRatioMatrix`
@@ -118,6 +122,8 @@ BBOXOVERLAPRATIOMATRIX Recouvrement de toutes les paires de boîtes.
   Exemple :
      r = bboxOverlapRatioMatrix([0 0 10 10; 5 5 10 10], [0 0 10 10]);
      size(r)                     % 2 1 : une ligne par boite de A
+
+  Voir aussi BBOXOVERLAPRATIO, SELECTSTRONGESTBBOX.
 ```
 
 ## `bboxPrecisionRecall`
@@ -153,6 +159,8 @@ BBOXRESIZE Redimensionne des boîtes englobantes.
 
   Exemple :
      bboxresize([1 1 10 20], 2)   % [2 2 20 40]
+
+  Voir aussi BBOXOVERLAPRATIO, INSERTSHAPE.
 ```
 
 ## `cameraIntrinsics`
@@ -264,6 +272,8 @@ DETECTFASTFEATURES Coins FAST (cercle de Bresenham de rayon 3).
      I(15:25, 15:25) = 1;        % un carre clair
      p = detectFASTFeatures(I, 0.1);
      size(p, 2)                  % 2 : ligne et colonne par point
+
+  Voir aussi DETECTHARRISFEATURES, EXTRACTFEATURES, MATCHFEATURES.
 ```
 
 ## `detectHarrisFeatures`
@@ -278,6 +288,8 @@ DETECTHARRISFEATURES Points d'intérêt par le détecteur de Harris.
      I(15:25, 15:25) = 1;
      [p, r] = detectHarrisFeatures(I);
      size(p, 2)                  % 2
+
+  Voir aussi DETECTFASTFEATURES, EXTRACTFEATURES, MATCHFEATURES.
 ```
 
 ## `detectMinEigenFeatures`
@@ -523,6 +535,8 @@ ESTIMATEGEOMETRICTRANSFORM Transformation entre deux jeux de points.
      p1 = [0 0; 1 0; 0 1; 1 1];
      T = estimateGeometricTransform(p1, p1 + 3, 'similarity');
      size(T)                     % 3 3 : une matrice homogene
+
+  Voir aussi MATCHFEATURES, ESTIMATEFUNDAMENTALMATRIX.
 ```
 
 ## `estimateGeometricTransform2D`
@@ -601,6 +615,8 @@ EXTRACTFEATURES Descripteurs par imagette normalisée autour de chaque point.
      I = rand(40);
      [d, p] = extractFeatures(I, [10 10; 20 20], 5);
      size(d, 1)                  % 2 : un descripteur par point
+
+  Voir aussi DETECTHARRISFEATURES, MATCHFEATURES, SELECTSTRONGEST.
 ```
 
 ## `extractHOGFeatures`
@@ -702,6 +718,8 @@ HOUGHLINES Détection de droites par transformée de Hough.
      bw(20, 5:35) = true;
      droites = houghLines(bw, 1);
      size(droites, 1)            % 1 : une droite trouvee
+
+  Voir aussi HOUGH, HOUGHPEAKS, HOUGHLINES.
 ```
 
 ## `insertMarker`
@@ -715,6 +733,8 @@ INSERTMARKER Dessine des marqueurs sur une image.
   Exemple :
      J = insertMarker(zeros(20), [10 10], 'circle');
      sum(J(:)) > 0               % 1 : le marqueur a ete dessine
+
+  Voir aussi INSERTSHAPE, INSERTTEXT.
 ```
 
 ## `insertObjectAnnotation`
@@ -758,6 +778,8 @@ INSERTSHAPE Dessine un rectangle ou une ligne dans une image.
   Exemple :
      J = insertShape(zeros(20), 'rectangle', [5 5 8 8]);
      sum(J(:)) > 0               % 1
+
+  Voir aussi INSERTMARKER, INSERTTEXT.
 ```
 
 ## `insertText`
@@ -877,6 +899,8 @@ MATCHFEATURES Appariement de descripteurs par plus proche voisin.
      d1 = [1 0; 0 1];
      paires = matchFeatures(d1, d1);
      isequal(paires, [1 1; 2 2])     % chaque descripteur se retrouve
+
+  Voir aussi EXTRACTFEATURES, ESTIMATEGEOMETRICTRANSFORM, SELECTSTRONGEST.
 ```
 
 ## `matlibre_agreger_sgm`
@@ -2130,6 +2154,8 @@ SELECTSTRONGEST Garde les N points les plus forts.
   Exemple :
      [choisis, indices] = selectStrongest([1 1; 2 2; 3 3], [0.1; 0.9; 0.5], 2);
      indices'                    % 2 3 : les deux plus fortes reponses
+
+  Voir aussi SELECTSTRONGESTBBOX, DETECTHARRISFEATURES, MATCHFEATURES.
 ```
 
 ## `selectStrongestBbox`
@@ -2143,6 +2169,8 @@ SELECTSTRONGESTBBOX Suppression des non-maxima sur des boîtes.
   Exemple :
      b = [1 1 10 10; 2 2 10 10; 50 50 10 10];
      size(selectStrongestBbox(b, [0.9; 0.8; 0.7]), 1)   % 2
+
+  Voir aussi SELECTSTRONGEST, BBOXOVERLAPRATIO.
 ```
 
 ## `selectUniform`

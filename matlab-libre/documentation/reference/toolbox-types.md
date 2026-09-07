@@ -78,6 +78,8 @@ NAT Date manquante (« Not-a-Time »).
   Exemple :
      t = NaT();
      isnat(t)                    % 1 : la date manquante des datetime
+
+  Voir aussi DATETIME, ISNAT.
 ```
 
 ## `appliquerReste`
@@ -92,6 +94,8 @@ APPLIQUERRESTE Applique une suite d'accès subsref à une valeur ordinaire.
   Exemple :
      s = struct('type', '()', 'subs', {{2}});
      appliquerReste([10 20 30], s)      % 20
+
+  Voir aussi ASSIGNERRESTE.
 ```
 
 ## `array2table`
@@ -105,6 +109,8 @@ ARRAY2TABLE Convertit une matrice en table, une colonne par variable.
   Exemple :
      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
      height(t)                   % 2
+
+  Voir aussi TABLE, CELL2TABLE, STRUCT2TABLE.
 ```
 
 ## `assignerReste`
@@ -177,6 +183,8 @@ CALMONTHS Durée de calendrier en calmonths, ou nombre de calmonths d'une durée
   Exemple :
      d = calmonths(3);
      datetime(2024, 1, 31) + calmonths(1)     % le 29 fevrier : les mois n'ont pas la meme longueur
+
+  Voir aussi CALYEARS, CALQUARTERS, CALDAYS, DATETIME.
 ```
 
 ## `calquarters`
@@ -188,6 +196,8 @@ CALQUARTERS Durée de calendrier en calquarters, ou nombre de calquarters d'une 
 
   Exemple :
      calquarters(1) == calmonths(3)     % 1 : un trimestre fait trois mois
+
+  Voir aussi CALMONTHS, CALYEARS, DATETIME.
 ```
 
 ## `calweeks`
@@ -219,6 +229,8 @@ CALYEARS Durée de calendrier en calyears, ou nombre de calyears d'une durée.
 
   Exemple :
      datetime(2024, 2, 29) + calyears(1)      % le 28 fevrier 2025 : l'annee suivante n'est pas bissextile
+
+  Voir aussi CALMONTHS, CALQUARTERS, DATETIME.
 ```
 
 ## `categorical`
@@ -254,6 +266,8 @@ CELL2TABLE Convertit une cellule à deux dimensions en table.
   Exemple :
      t = cell2table({1, 'a'; 2, 'b'}, 'VariableNames', {'n', 'lettre'});
      height(t)                   % 2
+
+  Voir aussi TABLE, ARRAY2TABLE, STRUCT2TABLE.
 ```
 
 ## `datetime`
@@ -290,6 +304,8 @@ DAYS Durée en jours, ou jours d'une durée.
   Exemple :
      days(1.5)                   % une duree d'un jour et demi
      hours(days(1))              % 24
+
+  Voir aussi HOURS, MINUTES, SECONDS, YEARS, DURATION.
 ```
 
 ## `duration`
@@ -324,6 +340,8 @@ HOURS Durée en heures, ou heures d'une durée.
   Exemple :
      hours(1) + minutes(30)      % une heure et demie
      minutes(hours(2))           % 120
+
+  Voir aussi DAYS, MINUTES, SECONDS, DURATION.
 ```
 
 ## `iscalendarduration`
@@ -472,6 +490,8 @@ MILLISECONDS Durée en millisecondes, ou millisecondes d'une durée.
 
   Exemple :
      seconds(milliseconds(1500))     % 1.5
+
+  Voir aussi SECONDS, MINUTES, HOURS, DURATION.
 ```
 
 ## `minutes`
@@ -483,6 +503,8 @@ MINUTES Durée en minutes, ou minutes d'une durée.
 
   Exemple :
      seconds(minutes(2))         % 120
+
+  Voir aussi SECONDS, HOURS, DAYS, DURATION.
 ```
 
 ## `nominal`
@@ -545,6 +567,8 @@ READTABLE Lit un fichier texte délimité et rend une table.
      fclose(f);
      t = readtable('essai.csv');
      height(t)                   % 2
+
+  Voir aussi WRITETABLE, TABLE, ARRAY2TABLE.
 ```
 
 ## `seconds`
@@ -557,6 +581,8 @@ SECONDS Durée en secondes, ou secondes d'une durée.
   Exemple :
      seconds(90)                 % une minute et demie
      minutes(seconds(90))        % 1.5
+
+  Voir aussi MINUTES, HOURS, MILLISECONDS, DURATION.
 ```
 
 ## `struct2table`
@@ -569,6 +595,8 @@ STRUCT2TABLE Convertit un tableau de structures en table.
   Exemple :
      t = struct2table(struct('a', {1; 2}, 'b', {3; 4}));
      height(t)                   % 2
+
+  Voir aussi TABLE, ARRAY2TABLE, CELL2TABLE.
 ```
 
 ## `table`
@@ -609,6 +637,8 @@ TABLE2TIMETABLE Convertit une table en timetable.
      t.Time = datetime(2024, 1, (1:3)');
      tt = table2timetable(t, 'RowTimes', 'Time');
      height(tt)                  % 3
+
+  Voir aussi TIMETABLE, TABLE.
 ```
 
 ## `time`
@@ -752,6 +782,8 @@ WRITETABLE Écrit une table dans un fichier texte délimité.
      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
      writetable(t, 'sortie.csv');
      height(readtable('sortie.csv'))     % 2 : l'aller-retour
+
+  Voir aussi READTABLE, TABLE.
 ```
 
 ## `years`
@@ -763,5 +795,7 @@ YEARS Durée en années (365,2425 jours), ou années d'une durée.
 
   Exemple :
      days(years(1))              % 365.2425 : l'annee moyenne du calendrier gregorien
+
+  Voir aussi DAYS, CALYEARS, DURATION.
 ```
 

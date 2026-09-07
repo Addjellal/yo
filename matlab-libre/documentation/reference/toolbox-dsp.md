@@ -106,6 +106,8 @@ LEVINSON Récursion de Levinson-Durbin.
      r = [1 0.5 0.2];
      [a, e] = levinson(r, 2);
      all(abs(roots(a)) < 1)      % 1 : Levinson rend un modele stable
+
+  Voir aussi LPC, ARYULE, AC2POLY, POLY2AC.
 ```
 
 ## `lpc`

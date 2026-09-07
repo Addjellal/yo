@@ -291,6 +291,8 @@ BONDPRICE Prix d'une obligation à coupons constants.
 
   Exemple :
      abs(bondprice(0.06, 0.06, 10) - 100) < 1e-9     % au pair quand coupon et taux coincident
+
+  Voir aussi BONDYIELD, BONDDUR, BONDCONVEXITY.
 ```
 
 ## `bondyield`

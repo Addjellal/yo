@@ -187,5 +187,7 @@ ZEROCROSSRATE Proportion de passages par zéro.
 
   Exemple :
      zerocrossrate([1 -1 1 -1])   % 0.75
+
+  Voir aussi RMS, SPECTRALCENTROID, MFCC.
 ```
 

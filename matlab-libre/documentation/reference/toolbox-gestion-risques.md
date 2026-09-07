@@ -1267,6 +1267,8 @@ VALUEATRISK Valeur en risque d'une série de rendements.
      rng(1);
      v = valueAtRisk(0.01 * randn(2000, 1), 0.95);
      v > 0                       % 1 : la perte est comptee positivement
+
+  Voir aussi EXPECTEDSHORTFALL, VARBACKTEST, MAXDRAWDOWN.
 ```
 
 ## `varbacktest`

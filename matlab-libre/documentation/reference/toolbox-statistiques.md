@@ -314,6 +314,8 @@ BETACDF Fonction de répartition de la loi bêta.
 
   Exemple :
      betacdf(0.5, 2, 2)          % 0.5 : la loi est symetrique pour a = b
+
+  Voir aussi BETAPDF, BETAINV, BETARND, BETASTAT, PDF, CDF.
 ```
 
 ## `betafit`
@@ -327,6 +329,8 @@ BETAFIT Estimation des paramètres d'une loi bêta.
      rng(1);
      p = betafit(betarnd(2, 5, 2000, 1));
      max(abs(p - [2 5])) < 0.4
+
+  Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
 ```
 
 ## `betainv`
@@ -337,6 +341,8 @@ BETAINV Quantile de la loi bêta.
 
   Exemple :
      betainv(0.5, 1, 1)   % 0.5, la loi uniforme
+
+  Voir aussi BETAPDF, BETACDF, BETARND, BETASTAT, PDF, CDF.
 ```
 
 ## `betalike`
@@ -349,6 +355,8 @@ BETALIKE Opposé de la log-vraisemblance d'une loi bêta.
      rng(1);
      x = betarnd(2, 5, 500, 1);
      betalike([2 5], x) < betalike([1 1], x)     % vrai : les bons parametres
+
+  Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
 ```
 
 ## `betapdf`
@@ -360,6 +368,8 @@ BETAPDF Densité de la loi bêta.
 
   Exemple :
      betapdf(0.5, 1, 1)   % 1 : la loi uniforme
+
+  Voir aussi BETACDF, BETAINV, BETARND, BETASTAT, PDF, CDF.
 ```
 
 ## `betarnd`
@@ -373,6 +383,8 @@ BETARND Tirages d'une loi bêta.
      rng(1);
      x = betarnd(2, 5, 1, 1000);
      all(x > 0 & x < 1)          % 1 : la loi vit dans ]0,1[
+
+  Voir aussi BETAPDF, BETACDF, BETAINV, BETASTAT, PDF, CDF.
 ```
 
 ## `betastat`
@@ -381,6 +393,8 @@ BETARND Tirages d'une loi bêta.
 BETASTAT Moyenne et variance de la loi bêta.
   Exemple :
      [m,v] = betastat(1, 1)   % 0.5 et 1/12
+
+  Voir aussi BETAPDF, BETACDF, BETAINV, BETARND, PDF, CDF.
 ```
 
 ## `binocdf`
@@ -393,6 +407,8 @@ BINOCDF Répartition de la loi binomiale.
 
   Exemple :
      binocdf(5, 10, 0.5)   % 0.623046875
+
+  Voir aussi BINOINV, BINORND, BINOSTAT, BINOFIT, PDF, CDF.
 ```
 
 ## `binofit`
@@ -406,6 +422,8 @@ BINOFIT Estimation de la probabilité d'une loi binomiale.
   Exemple :
      [p, ci] = binofit(30, 100);
      ci(1) < p && p < ci(2)      % 1 : l'intervalle encadre l'estimation
+
+  Voir aussi BINOCDF, BINOINV, BINORND, BINOSTAT, PDF, CDF.
 ```
 
 ## `binoinv`
@@ -416,6 +434,8 @@ BINOINV Quantile de la loi binomiale.
 
   Exemple :
      binoinv(0.5, 10, 0.5)   % 5
+
+  Voir aussi BINOCDF, BINORND, BINOSTAT, BINOFIT, PDF, CDF.
 ```
 
 ## `binornd`
@@ -428,6 +448,8 @@ BINORND Tirages d'une loi binomiale.
   Exemple :
      rng(1);
      mean(binornd(10, 0.3, 1, 10000))     % proche de 3 = n p
+
+  Voir aussi BINOCDF, BINOINV, BINOSTAT, BINOFIT, PDF, CDF.
 ```
 
 ## `binostat`
@@ -436,6 +458,8 @@ BINORND Tirages d'une loi binomiale.
 BINOSTAT Moyenne et variance de la loi binomiale.
   Exemple :
      [m,v] = binostat(10, 0.5)   % 5 et 2.5
+
+  Voir aussi BINOCDF, BINOINV, BINORND, BINOFIT, PDF, CDF.
 ```
 
 ## `bootci`
@@ -488,6 +512,8 @@ BOOTSTRP Rééchantillonnage bootstrap.
 
   Exemple :
      s = bootstrp(100, @mean, randn(50, 1));
+
+  Voir aussi BOOTCI, JACKKNIFE.
 ```
 
 ## `boxplot`
@@ -584,6 +610,8 @@ CDF Fonction de répartition d'une loi nommée.
      cdf('Poisson', 2, 1)                    % 0.9197
      pd = fitdist(normrnd(0, 1, 500, 1), 'Normal');
      abs(cdf(pd, pd.mu) - 0.5) < 1e-12       % la mediane d'une gaussienne
+
+  Voir aussi PDF, ICDF, RANDOM, FITDIST.
 ```
 
 ## `chi2cdf`
@@ -661,6 +689,8 @@ CHI2INV Quantile du khi-deux, par dichotomie sur la répartition.
   Exemple :
      chi2inv(0.95, 1)      % 3.8415
              chi2inv(0.95, 1:3)    % 3.8415  5.9915  7.8147
+
+  Voir aussi CHI2CDF, CHI2RND, CHI2STAT, PDF, CDF, ICDF.
 ```
 
 ## `chi2rnd`
@@ -672,6 +702,8 @@ CHI2RND Tirages d'un khi-deux à V degrés de liberté.
   Exemple :
      rng(1);
      mean(chi2rnd(4, 1, 10000))           % proche de 4 : la moyenne est nu
+
+  Voir aussi CHI2CDF, CHI2INV, CHI2STAT, PDF, CDF, ICDF.
 ```
 
 ## `chi2stat`
@@ -680,6 +712,8 @@ CHI2RND Tirages d'un khi-deux à V degrés de liberté.
 CHI2STAT Moyenne et variance du khi-deux.
   Exemple :
      [m,v] = chi2stat(4)   % 4 et 8
+
+  Voir aussi CHI2CDF, CHI2INV, CHI2RND, PDF, CDF, ICDF.
 ```
 
 ## `cluster`
@@ -724,6 +758,8 @@ CLUSTERMELANGE Attribution des points aux composantes d'un mélange.
      m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
      [indices, post] = clusterMelange(m, [0; 8]);
      numel(unique(indices))               % 2 : les deux modes se distinguent
+
+  Voir aussi FITGMDIST, GMDISTRIBUTION, CLUSTER, KMEANS.
 ```
 
 ## `clusterdata`
@@ -935,6 +971,8 @@ CROSSTAB Table de contingence de deux variables discrètes.
 
   Exemple :
      crosstab([1 1 2 2], [1 2 1 2])   % [1 1; 1 1]
+
+  Voir aussi TABULATE.
 ```
 
 ## `cvpartition`
@@ -1049,6 +1087,8 @@ DESCENTELINEAIRE Descente de gradient d'un modèle linéaire régularisé.
      o = lireOptionsLineaire(2, 'Lambda', 0.01);
      [poids, biais] = descenteLineaire(X, cible, o, false);
      mean(sign(X * poids(:) + biais) == cible) > 0.9
+
+  Voir aussi FITCLINEAR, FITRLINEAR, PREDICTLINEAIRE.
 ```
 
 ## `discardSupportVectors`
@@ -1109,6 +1149,8 @@ ECDF Fonction de répartition empirique.
 EVCDF Répartition de la loi des valeurs extrêmes.
   Exemple :
      evcdf(0, 0, 1)   % 1 - exp(-1) = 0.6321
+
+  Voir aussi EVPDF, EVINV, EVRND, EVSTAT, PDF, CDF.
 ```
 
 ## `evinv`
@@ -1143,6 +1185,8 @@ EVPDF Densité de la loi des valeurs extrêmes.
 
   Exemple :
      evpdf(0, 0, 1)   % exp(-1) = 0.3679
+
+  Voir aussi EVCDF, EVINV, EVRND, EVSTAT, PDF, CDF.
 ```
 
 ## `evrnd`
@@ -1169,6 +1213,8 @@ EVSTAT Moyenne et variance de la loi des valeurs extrêmes.
 
   Exemple :
      [m,v] = evstat(0, 1)   % -0.5772 et 1.6449
+
+  Voir aussi EVPDF, EVCDF, EVINV, EVRND, PDF, CDF.
 ```
 
 ## `expfit`
@@ -1202,6 +1248,8 @@ EXPFIT Estimation du paramètre d'une loi exponentielle.
 EXPINV Quantile de la loi exponentielle de moyenne MU.
   Exemple :
      expinv(0.5, 1)   % log(2) = 0.6931
+
+  Voir aussi EXPRND, EXPSTAT, EXPFIT, PDF, CDF, ICDF.
 ```
 
 ## `exprnd`
@@ -1213,6 +1261,8 @@ EXPRND Tirages d'une loi exponentielle de moyenne MU.
   Exemple :
      rng(1);
      mean(exprnd(3, 1, 10000))            % proche de 3 : la moyenne est mu
+
+  Voir aussi EXPINV, EXPSTAT, EXPFIT, PDF, CDF, ICDF.
 ```
 
 ## `expstat`
@@ -1240,6 +1290,8 @@ FCDF Répartition de la loi de Fisher.
 
   Exemple :
      fcdf(1, 10, 10)             % 0.5 : a degres egaux, la mediane est en un
+
+  Voir aussi FPDF, FINV, FRND, FSTAT, PDF, CDF.
 ```
 
 ## `finv`
@@ -1251,6 +1303,8 @@ FINV Quantile de la loi de Fisher, par dichotomie.
 
   Exemple :
      finv(0.95, 2, 30)     % 3.3158
+
+  Voir aussi FPDF, FCDF, FRND, FSTAT, PDF, CDF.
 ```
 
 ## `fitcdiscr`
@@ -1563,6 +1617,8 @@ FITLM Modèle linéaire avec ordonnée à l'origine.
      x = (1:50)';
      m = fitlm(x, 2 + 3 * x + randn(50, 1));
      abs(m.Coefficients(2) - 3) < 0.1
+
+  Voir aussi REGRESS, ROBUSTFIT, STEPWISEFIT, ANOVA1.
 ```
 
 ## `fitlme`
@@ -1775,6 +1831,8 @@ FRND Tirages d'une loi de Fisher-Snedecor.
      rng(1);
      x = frnd(10, 10, 1, 1000);
      all(x > 0)                  % 1 : un rapport de carres est positif
+
+  Voir aussi FPDF, FCDF, FINV, FSTAT, PDF, CDF.
 ```
 
 ## `fstat`
@@ -1786,6 +1844,8 @@ FSTAT Moyenne et variance de la loi de Fisher-Snedecor.
 
   Exemple :
      [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
+
+  Voir aussi FPDF, FCDF, FINV, FRND, PDF, CDF.
 ```
 
 ## `gamcdf`
@@ -1823,6 +1883,8 @@ GAMFIT Estimation des paramètres d'une loi gamma.
      rng(1);
      p = gamfit(gamrnd(3, 2, 5000, 1));
      max(abs(p - [3 2]) ./ [3 2]) < 0.15
+
+  Voir aussi GAMPDF, GAMCDF, GAMINV, GAMRND, PDF, CDF.
 ```
 
 ## `gaminv`
@@ -1834,6 +1896,8 @@ GAMINV Quantile de la loi gamma de forme A et d'échelle B.
 
   Exemple :
      gaminv(0.5, 1, 1)   % log(2) = 0.6931
+
+  Voir aussi GAMPDF, GAMCDF, GAMRND, GAMSTAT, PDF, CDF.
 ```
 
 ## `gampdf`
@@ -1842,6 +1906,8 @@ GAMINV Quantile de la loi gamma de forme A et d'échelle B.
 GAMPDF Densité de la loi gamma, de forme A et d'échelle B.
   Exemple :
      gampdf(1, 1, 1)   % exp(-1), la loi exponentielle
+
+  Voir aussi GAMCDF, GAMINV, GAMRND, GAMSTAT, PDF, CDF.
 ```
 
 ## `gamrnd`
@@ -1860,6 +1926,8 @@ GAMRND Tirages d'une loi gamma de forme A et d'échelle B.
   Exemple :
      rng(1);
      mean(gamrnd(3, 2, 1, 10000))         % proche de 6 = a b
+
+  Voir aussi GAMPDF, GAMCDF, GAMINV, GAMSTAT, PDF, CDF.
 ```
 
 ## `gamstat`
@@ -1868,6 +1936,8 @@ GAMRND Tirages d'une loi gamma de forme A et d'échelle B.
 GAMSTAT Moyenne et variance de la loi gamma.
   Exemple :
      [m,v] = gamstat(2, 3)   % 6 et 18
+
+  Voir aussi GAMPDF, GAMCDF, GAMINV, GAMRND, PDF, CDF.
 ```
 
 ## `geocdf`
@@ -1876,6 +1946,8 @@ GAMSTAT Moyenne et variance de la loi gamma.
 GEOCDF Répartition de la loi géométrique.
   Exemple :
      geocdf(2, 0.5)   % 0.875
+
+  Voir aussi GEOPDF, GEOINV, GEORND, GEOSTAT, PDF, CDF.
 ```
 
 ## `geoinv`
@@ -1928,6 +2000,8 @@ GEOPDF Probabilité de la loi géométrique.
 
   Exemple :
      geopdf(2, 0.5)   % 0.125
+
+  Voir aussi GEOCDF, GEOINV, GEORND, GEOSTAT, PDF, CDF.
 ```
 
 ## `geornd`
@@ -1954,6 +2028,8 @@ GEORND Tirages d'une loi géométrique.
 GEOSTAT Moyenne et variance de la loi géométrique.
   Exemple :
      [m,v] = geostat(0.25)   % 3 et 12
+
+  Voir aussi GEOPDF, GEOCDF, GEOINV, GEORND, PDF, CDF.
 ```
 
 ## `gevcdf`
@@ -2451,6 +2527,8 @@ HYGECDF Répartition de la loi hypergéométrique.
 
   Exemple :
      hygecdf(5, 50, 10, 5)       % 1 : on ne peut pas tirer plus de cinq marques
+
+  Voir aussi HYGEPDF, HYGEINV, HYGERND, HYGESTAT, PDF, CDF.
 ```
 
 ## `hygeinv`
@@ -2489,6 +2567,8 @@ HYGEPDF Probabilité de la loi hypergéométrique.
 
   Exemple :
      hygepdf(2, 10, 4, 3)   % 0.3
+
+  Voir aussi HYGECDF, HYGEINV, HYGERND, HYGESTAT, PDF, CDF.
 ```
 
 ## `hygernd`
@@ -2503,6 +2583,8 @@ HYGERND Tirages d'une loi hypergéométrique.
      rng(1);
      x = hygernd(50, 10, 5, 1, 1000);
      all(x >= 0 & x <= 5)        % 1 : au plus le nombre de tirages
+
+  Voir aussi HYGEPDF, HYGECDF, HYGEINV, HYGESTAT, PDF, CDF.
 ```
 
 ## `hygestat`
@@ -2513,6 +2595,8 @@ HYGESTAT Moyenne et variance de la loi hypergéométrique.
 
   Exemple :
      [m,v] = hygestat(10, 4, 3)   % 1.2 et 0.56
+
+  Voir aussi HYGEPDF, HYGECDF, HYGEINV, HYGERND, PDF, CDF.
 ```
 
 ## `icdf`
@@ -2527,6 +2611,8 @@ ICDF Quantile d'une loi nommée.
      icdf('Normal', 0.975, 0, 1)             % 1.9600
      pd = fitdist(normrnd(0, 1, 500, 1), 'Normal');
      abs(cdf(pd, icdf(pd, 0.3)) - 0.3) < 1e-10   % l'aller-retour
+
+  Voir aussi PDF, CDF, RANDOM, FITDIST.
 ```
 
 ## `indicesSymboles`
@@ -2537,6 +2623,8 @@ INDICESSYMBOLES Traduit une suite de symboles en indices de colonne.
 
   Exemple :
      indicesSymboles([2 1 2], [1 2], 2)     % 2 1 2
+
+  Voir aussi HMMDECODE, HMMVITERBI, HMMTRAIN.
 ```
 
 ## `iqr`
@@ -2672,6 +2760,8 @@ KMEANS Partition en k classes par l'algorithme de Lloyd.
      X = [randn(50, 2); randn(50, 2) + 6];
      [etiquettes, centres] = kmeans(X, 2);
      norm(sort(centres(:, 1)) - [0; 6]) < 1
+
+  Voir aussi FITGMDIST, SILHOUETTE, LINKAGE, PDIST.
 ```
 
 ## `knnsearch`
@@ -2685,6 +2775,8 @@ KNNSEARCH Plus proches voisins par recherche exhaustive.
      X = [0 0; 1 0; 0 1];
      [i, d] = knnsearch(X, [0.1 0.1], 'K', 2);
      i(1)                        % 1 : le plus proche est l'origine
+
+  Voir aussi FITCKNN, PDIST2.
 ```
 
 ## `kruskalwallis`
@@ -2733,6 +2825,8 @@ KSDENSITY Estimation de densité par noyau.
 
   Exemple :
      [f, xi] = ksdensity(randn(1000, 1));
+
+  Voir aussi FITDIST, PDF.
 ```
 
 ## `kstest`
@@ -2748,6 +2842,8 @@ KSTEST Test de Kolmogorov-Smirnov contre la loi normale centrée réduite.
      rng(1);
      [h, p] = kstest(randn(500, 1));
      h                           % 0 : on ne rejette pas la normalite
+
+  Voir aussi TTEST, SIGNRANK, RANKSUM, CHI2GOF.
 ```
 
 ## `kstest2`
@@ -2933,6 +3029,8 @@ LIRENOMSHMM Options « Symbols » et « Statenames » des fonctions HMM.
   Exemple :
      [symboles, etats] = lireNomsHmm('Symbols', {'a','b'}, 'Statenames', {'s1','s2'});
      numel(symboles)             % 2
+
+  Voir aussi HMMDECODE, HMMVITERBI, HMMGENERATE.
 ```
 
 ## `lireOptionsLineaire`
@@ -2944,6 +3042,8 @@ LIREOPTIONSLINEAIRE Options de FITCLINEAR et FITRLINEAR.
   Exemple :
      o = lireOptionsLineaire(3, 'Lambda', 0.01);
      o.Lambda
+
+  Voir aussi FITCLINEAR, FITRLINEAR, DESCENTELINEAIRE.
 ```
 
 ## `lireOptionsSvm`
@@ -2955,6 +3055,8 @@ LIREOPTIONSSVM Options communes à FITCSVM et FITRSVM.
   Exemple :
      o = lireOptionsSvm('KernelFunction', 'rbf', 'BoxConstraint', 10);
      o.BoxConstraint             % 10
+
+  Voir aussi FITCSVM, FITRSVM, NOYAUSVM.
 ```
 
 ## `logncdf`
@@ -2989,6 +3091,8 @@ LOGNFIT Estimation des paramètres d'une loi log-normale.
      rng(1);
      [mu, sigma] = lognfit(lognrnd(1, 0.5, 5000, 1));
      abs(mu - 1) < 0.05 && abs(sigma - 0.5) < 0.05
+
+  Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
 ```
 
 ## `logninv`
@@ -3000,6 +3104,8 @@ LOGNINV Quantile de la loi log-normale.
 
   Exemple :
      logninv(0.5, 0, 1)   % 1
+
+  Voir aussi LOGNPDF, LOGNCDF, LOGNRND, LOGNSTAT, PDF, CDF.
 ```
 
 ## `lognpdf`
@@ -3010,6 +3116,8 @@ LOGNPDF Densité de la loi log-normale.
 
   Exemple :
      lognpdf(1, 0, 1)            % 0.3989 : en x = 1, log x vaut zero
+
+  Voir aussi LOGNCDF, LOGNINV, LOGNRND, LOGNSTAT, PDF, CDF.
 ```
 
 ## `lognrnd`
@@ -3038,6 +3146,8 @@ LOGNSTAT Moyenne et variance de la loi log-normale.
 
   Exemple :
      [m,v] = lognstat(0, 1)   % exp(0.5) et e(e-1)
+
+  Voir aussi LOGNPDF, LOGNCDF, LOGNINV, LOGNRND, PDF, CDF.
 ```
 
 ## `lsline`
@@ -3900,6 +4010,8 @@ NBINCDF Répartition de la loi binomiale négative.
 
   Exemple :
      nbincdf(10, 3, 0.5)         % la probabilite d'au plus dix echecs
+
+  Voir aussi NBINPDF, NBININV, NBINRND, NBINSTAT, PDF, CDF.
 ```
 
 ## `nbininv`
@@ -3928,6 +4040,8 @@ NBINPDF Probabilité de la loi binomiale négative.
 
   Exemple :
      nbinpdf(2, 3, 0.5)   % 0.1875
+
+  Voir aussi NBINCDF, NBININV, NBINRND, NBINSTAT, PDF, CDF.
 ```
 
 ## `nbinrnd`
@@ -3940,6 +4054,8 @@ NBINRND Tirages d'une loi binomiale négative.
   Exemple :
      rng(1);
      mean(nbinrnd(3, 0.5, 1, 10000))      % proche de 3 = r(1-p)/p
+
+  Voir aussi NBINPDF, NBINCDF, NBININV, NBINSTAT, PDF, CDF.
 ```
 
 ## `nbinstat`
@@ -3948,6 +4064,8 @@ NBINRND Tirages d'une loi binomiale négative.
 NBINSTAT Moyenne et variance de la loi binomiale négative.
   Exemple :
      [m,v] = nbinstat(3, 0.5)   % 3 et 6
+
+  Voir aussi NBINPDF, NBINCDF, NBININV, NBINRND, PDF, CDF.
 ```
 
 ## `ncfcdf`
@@ -4236,6 +4354,8 @@ NORMALISERLIGNES Chaque ligne d'une matrice de probabilités somme à un.
      M = normaliserLignes([1 3; 0 0; 2 2]);
      sum(M(1, :))                % 1
      all(M(2, :) == 0)           % 1 : une ligne nulle le reste
+
+  Voir aussi HMMTRAIN, HMMGENERATE, TRANSPROB.
 ```
 
 ## `normfit`
@@ -4277,6 +4397,8 @@ NORMLIKE Opposé de la log-vraisemblance d'une loi normale.
      rng(1);
      x = normrnd(5, 2, 500, 1);
      normlike([5 2], x) < normlike([0 1], x)     % vrai
+
+  Voir aussi NORMSTAT, NORMFIT, PDF, CDF, ICDF, RANDOM.
 ```
 
 ## `normplot`
@@ -4350,6 +4472,8 @@ NORMSPEC Densité normale, avec la région entre deux tolérances.
 NORMSTAT Moyenne et variance de la loi normale.
   Exemple :
      [m,v] = normstat(3, 2)   % 3 et 4
+
+  Voir aussi NORMFIT, NORMLIKE, PDF, CDF, ICDF, RANDOM.
 ```
 
 ## `noyauGp`
@@ -4361,6 +4485,8 @@ NOYAUGP Fonction de covariance d'un processus gaussien.
   Exemple :
      K = noyauGp([0; 1; 2], [0; 1; 2], 'squaredexponential', 1, 1);
      max(abs(diag(K) - 1)) < 1e-12          % la variance a distance nulle
+
+  Voir aussi FITRGP, PREDICTGP.
 ```
 
 ## `noyauSvm`
@@ -4373,6 +4499,8 @@ NOYAUSVM Matrice de noyau entre deux jeux de points.
      o = lireOptionsSvm('KernelFunction', 'linear');
      K = noyauSvm([1 0; 0 1], [1 0; 0 1], o);
      max(max(abs(K - K'))) < 1e-12          % un noyau est symetrique
+
+  Voir aussi FITCSVM, RESOUDRESMO, STANDARDISERSVM.
 ```
 
 ## `pca`
@@ -4388,6 +4516,8 @@ PCA Analyse en composantes principales.
      X = randn(200, 2) * [2 0; 0 0.1];
      [c, s, v, expliquee] = pca(X);
      expliquee(1) > 95           % le premier axe porte presque tout
+
+  Voir aussi PCACOV, CMDSCALE, CANONCORR.
 ```
 
 ## `pcacov`
@@ -4444,6 +4574,8 @@ PDF Densité ou probabilité d'une loi nommée.
      pdf('Normal', 0, 0, 1)                  % 0.3989
      pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
      abs(pdf(pd, pd.mu) - normpdf(pd.mu, pd.mu, pd.sigma)) < 1e-12
+
+  Voir aussi CDF, ICDF, RANDOM, FITDIST.
 ```
 
 ## `pdist`
@@ -4559,6 +4691,8 @@ POISSCDF Répartition de la loi de Poisson.
 
   Exemple :
      poisscdf(2, 1)   % 0.919698602928
+
+  Voir aussi POISSINV, POISSRND, POISSFIT, PDF, CDF, ICDF.
 ```
 
 ## `poissfit`
@@ -4594,6 +4728,8 @@ POISSINV Quantile de la loi de Poisson.
 
   Exemple :
      poissinv(0.5, 4)            % 4 : la mediane d'une loi de Poisson de moyenne 4
+
+  Voir aussi POISSCDF, POISSRND, POISSFIT, PDF, CDF, ICDF.
 ```
 
 ## `poissrnd`
@@ -4608,6 +4744,8 @@ POISSRND Tirages d'une loi de Poisson.
   Exemple :
      rng(1);
      mean(poissrnd(4, 1, 10000))          % proche de 4 : moyenne et variance
+
+  Voir aussi POISSCDF, POISSINV, POISSFIT, PDF, CDF, ICDF.
 ```
 
 ## `poisstat`
@@ -4730,6 +4868,8 @@ PREDICTARBREREGRESSION Prédiction d'un arbre construit par FITRTREE.
      z = X(:, 1) * 2 - X(:, 2);
      m = fitrtree(X, z);
      rms(predictArbreRegression(m, X) - z) < rms(z - mean(z))
+
+  Voir aussi FITRTREE, PREDICT, PREDICTTREE.
 ```
 
 ## `predictBayesNaif`
@@ -4743,6 +4883,8 @@ PREDICTBAYESNAIF Prédiction d'un classifieur bayésien naïf.
      X = [randn(40, 2); randn(40, 2) + 3];
      y = [ones(40, 1); 2 * ones(40, 1)];
      mean(predictBayesNaif(fitcnb(X, y), X) == y) > 0.9
+
+  Voir aussi FITCNB, PREDICT.
 ```
 
 ## `predictDiscriminant`
@@ -4784,6 +4926,8 @@ PREDICTECOC Prédiction d'un modèle à codes correcteurs.
      X = [randn(40, 2); randn(40, 2) + 3];
      y = [ones(40, 1); 2 * ones(40, 1)];
      mean(predictEcoc(fitcecoc(X, y), X) == y) > 0.9
+
+  Voir aussi FITCECOC, PREDICT, PREDICTSVM.
 ```
 
 ## `predictGp`
@@ -4798,6 +4942,8 @@ PREDICTGP Prédiction d'un processus gaussien.
      z = X(:, 1) * 2 - X(:, 2);
      [mu, variance] = predictGp(fitrgp(X, z), X);
      all(variance >= -1e-9)      % une variance ne peut pas etre negative
+
+  Voir aussi FITRGP, NOYAUGP, PREDICT.
 ```
 
 ## `predictLineaire`
@@ -4811,6 +4957,8 @@ PREDICTLINEAIRE Prédiction d'un modèle linéaire de grande dimension.
      X = [randn(40, 2); randn(40, 2) + 3];
      y = [ones(40, 1); 2 * ones(40, 1)];
      mean(predictLineaire(fitclinear(X, y), X) == y) > 0.8
+
+  Voir aussi FITCLINEAR, FITRLINEAR, PREDICT.
 ```
 
 ## `predictSvm`
@@ -4824,6 +4972,8 @@ PREDICTSVM Prédiction d'une machine à vecteurs de support.
      X = [randn(40, 2); randn(40, 2) + 3];
      y = [ones(40, 1); 2 * ones(40, 1)];
      mean(predictSvm(fitcsvm(X, y), X) == y) > 0.9
+
+  Voir aussi FITCSVM, RESOUDRESMO, PREDICT.
 ```
 
 ## `predictknn`
@@ -5001,6 +5151,8 @@ RANDOM Tirages d'une loi nommée.
      random('Poisson', 4, 1, 5)              % cinq tirages
      pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
      size(random(pd, 1, 10))                 % 1 10
+
+  Voir aussi PDF, CDF, ICDF, FITDIST.
 ```
 
 ## `ranksum`
@@ -5013,6 +5165,8 @@ RANKSUM Test de Wilcoxon-Mann-Whitney sur deux échantillons.
 
   Exemple :
      ranksum(1:10, 11:20)   % très petite : les deux groupes diffèrent
+
+  Voir aussi SIGNRANK, TTEST2, KSTEST.
 ```
 
 ## `raylcdf`
@@ -5042,6 +5196,8 @@ RAYLFIT Estimation du paramètre d'une loi de Rayleigh.
   Exemple :
      rng(1);
      abs(raylfit(raylrnd(2, 5000, 1)) - 2) < 0.1
+
+  Voir aussi RAYLPDF, RAYLCDF, RAYLINV, RAYLRND, PDF, CDF.
 ```
 
 ## `raylinv`
@@ -5050,6 +5206,8 @@ RAYLFIT Estimation du paramètre d'une loi de Rayleigh.
 RAYLINV Quantile de la loi de Rayleigh de paramètre B.
   Exemple :
      raylinv(0.5, 1)   % sqrt(2 log 2) = 1.1774
+
+  Voir aussi RAYLPDF, RAYLCDF, RAYLRND, RAYLSTAT, PDF, CDF.
 ```
 
 ## `raylpdf`
@@ -5060,6 +5218,8 @@ RAYLPDF Densité de la loi de Rayleigh de paramètre B.
 
   Exemple :
      raylpdf(1, 1)               % 0.6065 : le mode est en sigma
+
+  Voir aussi RAYLCDF, RAYLINV, RAYLRND, RAYLSTAT, PDF, CDF.
 ```
 
 ## `raylrnd`
@@ -5085,6 +5245,8 @@ RAYLRND Tirages d'une loi de Rayleigh.
 RAYLSTAT Moyenne et variance de la loi de Rayleigh.
   Exemple :
      [m,v] = raylstat(1)   % sqrt(pi/2) et 2 - pi/2
+
+  Voir aussi RAYLPDF, RAYLCDF, RAYLINV, RAYLRND, PDF, CDF.
 ```
 
 ## `refcurve`
@@ -5147,6 +5309,8 @@ REGRESS Régression linéaire multiple par moindres carrés.
      x = (1:50)';
      [b, bint] = regress(2 + 3 * x + randn(50, 1), [ones(50, 1), x]);
      bint(2, 1) < 3 && 3 < bint(2, 2)     % la vraie pente est dans l'intervalle
+
+  Voir aussi FITLM, ROBUSTFIT, ANOVA1.
 ```
 
 ## `regstats`
@@ -5245,6 +5409,8 @@ RESOUDRESMO Optimisation minimale séquentielle du dual d'une SVM.
      K = X * X';
      [alpha, biais] = resoudreSmo(K, cible, 1, 1e-3, 200);
      abs(sum(alpha .* cible)) < 1e-6      % la contrainte d'egalite est tenue
+
+  Voir aussi FITCSVM, NOYAUSVM, PREDICTSVM.
 ```
 
 ## `ridge`
@@ -5435,6 +5601,8 @@ SIGNRANK Test des rangs signés de Wilcoxon, sur échantillons appariés.
      rng(1);
      p = signrank(randn(100, 1));
      p > 0.01                    % on ne rejette pas la mediane nulle
+
+  Voir aussi RANKSUM, TTEST, KSTEST.
 ```
 
 ## `signtest`
@@ -5583,6 +5751,8 @@ STANDARDISERSVM Centrage et réduction optionnels des colonnes.
   Exemple :
      [Xs, centre, echelle] = standardiserSvm([1 10; 2 20; 3 30], true);
      max(abs(mean(Xs))) < 1e-12  % centrer met la moyenne a zero
+
+  Voir aussi FITCSVM, ZSCORE, NOYAUSVM.
 ```
 
 ## `statAjuster`
@@ -5599,6 +5769,8 @@ STATAJUSTER Étend les arguments à une taille commune.
   Exemple :
      [a, b] = statAjuster([1 2 3], 5);
      numel(b)                    % 3 : le scalaire s'est repandu
+
+  Voir aussi STATETENDRE, STATFORME.
 ```
 
 ## `statEtendre`
@@ -5612,6 +5784,8 @@ STATETENDRE Répète un paramètre scalaire à la taille demandée.
 
   Exemple :
      size(statEtendre(4, [2 3]))          % 2 3
+
+  Voir aussi STATAJUSTER, STATFORME.
 ```
 
 ## `statForme`
@@ -5627,6 +5801,8 @@ STATFORME Taille demandée à un générateur aléatoire.
   Exemple :
      statForme([1 1], {2, 5})             % 2 5
      statForme([1 1], {3})                % 3 3 : une dimension seule fait un carre
+
+  Voir aussi STATETENDRE, STATAJUSTER.
 ```
 
 ## `statPrefixeLoi`
@@ -5643,6 +5819,8 @@ STATPREFIXELOI Préfixe des fonctions d'une loi nommée.
   Exemple :
      statPrefixeLoi('Normal')             % 'norm'
      statPrefixeLoi('Poisson')            % 'poiss'
+
+  Voir aussi PDF, CDF, ICDF, RANDOM.
 ```
 
 ## `statQuantileDiscret`
@@ -5659,6 +5837,8 @@ STATQUANTILEDISCRET Plus petit entier dont la répartition atteint P.
 
   Exemple :
      statQuantileDiscret(@(t) binocdf(t, 10, 0.5), 0.5, 0, 10)
+
+  Voir aussi BINOINV, POISSINV, HYGEINV.
 ```
 
 ## `statget`
@@ -5812,6 +5992,8 @@ TABULATE Effectifs et fréquences des valeurs distinctes.
   Exemple :
      t = tabulate([1 1 2 3 3 3]);
      sum(t(:, 2))                % 6 : le total des effectifs
+
+  Voir aussi CROSSTAB.
 ```
 
 ## `tcdf`
@@ -5824,6 +6006,8 @@ TCDF Fonction de répartition de la loi de Student.
 
   Exemple :
      tcdf(0, 10)                 % 0.5 : la loi de Student est symetrique
+
+  Voir aussi TINV, TRND, TSTAT, PDF, CDF, ICDF.
 ```
 
 ## `tiedrank`
@@ -5864,6 +6048,8 @@ TINV Quantile de la loi de Student, par dichotomie sur TCDF.
 
   Exemple :
      tinv(0.975, 10)       % 2.2281
+
+  Voir aussi TCDF, TRND, TSTAT, PDF, CDF, ICDF.
 ```
 
 ## `tirerMelange`
@@ -5877,6 +6063,8 @@ TIRERMELANGE Tirage dans un mélange gaussien.
      m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
      [x, composantes] = tirerMelange(m, 500);
      all(composantes >= 1 & composantes <= 2)
+
+  Voir aussi FITGMDIST, RANDOM, CLUSTERMELANGE.
 ```
 
 ## `trimmean`
@@ -5915,6 +6103,8 @@ TRND Tirages d'une loi de Student à V degrés de liberté.
      rng(1);
      x = trnd(10, 1, 5000);
      abs(mean(x)) < 0.1          % la loi de Student est centree
+
+  Voir aussi TCDF, TINV, TSTAT, PDF, CDF, ICDF.
 ```
 
 ## `tstat`
@@ -5927,6 +6117,8 @@ TSTAT Moyenne et variance de la loi de Student.
      [m, v] = tstat(10);
      m                           % 0 : elle est centree des que nu > 1
      v                           % 1.25 = nu/(nu-2)
+
+  Voir aussi TCDF, TINV, TRND, PDF, CDF, ICDF.
 ```
 
 ## `ttest`
@@ -5940,6 +6132,8 @@ TTEST Test de Student sur la moyenne d'un échantillon.
      rng(1);
      [h, p] = ttest(normrnd(0, 1, 100, 1));
      h                           % 0 : on ne rejette pas la moyenne nulle
+
+  Voir aussi TTEST2, SIGNRANK, KSTEST, ANOVA1.
 ```
 
 ## `ttest2`
@@ -6006,6 +6200,8 @@ UNIDINV Quantile de la loi uniforme discrète sur 1..N.
 UNIDPDF Probabilité de la loi uniforme discrète sur 1..N.
   Exemple :
      unidpdf(3, 6)   % 1/6, un dé
+
+  Voir aussi UNIDCDF, UNIDINV, UNIDRND, UNIDSTAT, PDF, CDF.
 ```
 
 ## `unidrnd`
@@ -6041,6 +6237,8 @@ UNIDRND Tirages d'une loi uniforme discrète sur 1..N.
 UNIDSTAT Moyenne et variance de la loi uniforme discrète.
   Exemple :
      [m,v] = unidstat(6)   % 3.5 et 35/12, un dé
+
+  Voir aussi UNIDPDF, UNIDCDF, UNIDINV, UNIDRND, PDF, CDF.
 ```
 
 ## `unifcdf`
@@ -6086,6 +6284,8 @@ UNIFIT Estimation des bornes d'une loi uniforme continue.
   Exemple :
      [a, b] = unifit([2 3 5 7]);
      [a b]                       % 2 7 : les bornes observees
+
+  Voir aussi UNIFCDF, UNIFPDF, UNIFINV.
 ```
 
 ## `unifpdf`
@@ -6109,6 +6309,8 @@ UNIFPDF Densité de la loi uniforme continue sur [A,B].
 UNIFSTAT Moyenne et variance de la loi uniforme continue.
   Exemple :
      [m,v] = unifstat(0, 1)   % 0.5 et 1/12
+
+  Voir aussi UNIFPDF, UNIFCDF, UNIFINV, PDF, CDF, ICDF.
 ```
 
 ## `vartest`
@@ -6212,6 +6414,8 @@ WBLFIT Estimation des paramètres d'une loi de Weibull.
      rng(1);
      p = wblfit(wblrnd(2, 3, 5000, 1));
      max(abs(p - [2 3]) ./ [2 3]) < 0.1
+
+  Voir aussi WBLPDF, WBLCDF, WBLINV, WBLRND, PDF, CDF.
 ```
 
 ## `wblinv`
@@ -6220,6 +6424,8 @@ WBLFIT Estimation des paramètres d'une loi de Weibull.
 WBLINV Quantile de la loi de Weibull d'échelle A et de forme B.
   Exemple :
      wblinv(1 - exp(-1), 1, 1)   % 1
+
+  Voir aussi WBLPDF, WBLCDF, WBLRND, WBLSTAT, PDF, CDF.
 ```
 
 ## `wblpdf`
@@ -6228,6 +6434,8 @@ WBLINV Quantile de la loi de Weibull d'échelle A et de forme B.
 WBLPDF Densité de la loi de Weibull, d'échelle A et de forme B.
   Exemple :
      wblpdf(1, 1, 1)   % exp(-1)
+
+  Voir aussi WBLCDF, WBLINV, WBLRND, WBLSTAT, PDF, CDF.
 ```
 
 ## `wblrnd`
@@ -6253,6 +6461,8 @@ WBLSTAT Moyenne et variance de la loi de Weibull.
 
   Exemple :
      [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
+
+  Voir aussi WBLPDF, WBLCDF, WBLINV, WBLRND, PDF, CDF.
 ```
 
 ## `wishrnd`

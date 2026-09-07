@@ -217,6 +217,8 @@ AC2POLY Polynôme de prédiction d'une suite d'autocorrélation.
 
   Exemple :
      [a, e] = ac2poly([1 0.5 0.25]);   % a = [1 -0.5 0]
+
+  Voir aussi POLY2AC, AC2RC, LEVINSON, LPC.
 ```
 
 ## `ac2rc`
@@ -230,6 +232,8 @@ AC2RC Coefficients de réflexion d'une suite d'autocorrélation.
      r = [1 0.5 0.2];
      [k, r0] = ac2rc(r);
      all(abs(k) < 1)             % 1 : une autocorrelation valide donne |k| < 1
+
+  Voir aussi RC2AC, AC2POLY, POLY2RC, LEVINSON.
 ```
 
 ## `alignsignals`
@@ -243,6 +247,8 @@ ALIGNSIGNALS Aligne deux signaux en compensant leur retard.
      x = [0 0 1 2 3 0];
      [xa, ya, d] = alignsignals(x, [1 2 3 0 0 0]);
      d                           % le decalage retrouve
+
+  Voir aussi FINDDELAY.
 ```
 
 ## `appliquerBande`
@@ -257,6 +263,8 @@ APPLIQUERBANDE Filtrage à phase nulle des fonctions lowpass et voisines.
      t = (0:255)' / 256;
      y = appliquerBande(sin(2*pi*5*t) + 0.5*sin(2*pi*90*t), b, a);
      rms(y - sin(2*pi*5*t)) < 0.3
+
+  Voir aussi LOWPASS, CONCEVOIRBANDE.
 ```
 
 ## `arSpectre`
@@ -271,6 +279,8 @@ ARSPECTRE Densité spectrale d'un modèle autorégressif.
   Exemple :
      [pxx, f] = arSpectre([1 -0.5], 1, 512, 1);
      pxx(1) > pxx(end)           % 1 : un pole reel positif est passe-bas
+
+  Voir aussi PYULEAR, PBURG, PCOV.
 ```
 
 ## `arburg`
@@ -288,6 +298,8 @@ ARBURG Modèle autorégressif par la méthode de Burg.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [a, e] = arburg(x, 4);
      all(abs(roots(a)) < 1) % 1 : Burg garantit un modele stable
+
+  Voir aussi ARYULE, ARCOV, ARMCOV, PBURG.
 ```
 
 ## `arcov`
@@ -303,6 +315,8 @@ ARCOV Modèle autorégressif par la méthode de la covariance.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [a, e] = arcov(x, 4);
      numel(a)                    % 5 : un modele d'ordre quatre
+
+  Voir aussi ARMCOV, ARBURG, ARYULE, PCOV.
 ```
 
 ## `armcov`
@@ -317,6 +331,8 @@ ARMCOV Modèle autorégressif par la covariance modifiée.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [a, e] = armcov(x, 4);
      all(abs(roots(a)) < 1.2)
+
+  Voir aussi ARCOV, ARBURG, PMCOV.
 ```
 
 ## `aryule`
@@ -330,6 +346,8 @@ ARYULE Modèle autorégressif par les équations de Yule-Walker.
 
   Exemple :
      a = aryule(filter(1, [1 -0.9], randn(1000,1)), 1);
+
+  Voir aussi ARBURG, ARCOV, LEVINSON, PYULEAR.
 ```
 
 ## `bandpass`
@@ -362,6 +380,8 @@ BANDPOWER Puissance moyenne d'un signal, éventuellement dans une bande.
 
   Exemple :
      bandpower([1 -1 1 -1])   % 1
+
+  Voir aussi PERIODOGRAM, PWELCH, MEANFREQ.
 ```
 
 ## `bandstop`
@@ -503,6 +523,8 @@ BLACKMANHARRIS Fenêtre de Blackman-Harris à quatre termes.
   Exemple :
      w = blackmanharris(64);
      max(w)                      % 1 : la fenetre est normalisee a son sommet
+
+  Voir aussi NUTTALLWIN, FLATTOPWIN, WINDOW.
 ```
 
 ## `bohmanwin`
@@ -539,6 +561,8 @@ BUFFER Découpe un signal en colonnes de longueur fixe.
 
   Exemple :
      buffer(1:6, 3)   % [1 4; 2 5; 3 6]
+
+  Voir aussi SPECTROGRAM, SEQPERIOD.
 ```
 
 ## `buttap`
@@ -606,6 +630,8 @@ BUTTORD Ordre minimal d'un filtre de Butterworth.
 
   Exemple :
      [n, Wn] = buttord(0.2, 0.4, 1, 40);   % n = 8
+
+  Voir aussi BUTTER, CHEB1ORD, CHEB2ORD, ELLIPORD.
 ```
 
 ## `cceps`
@@ -618,6 +644,8 @@ CCEPS Cepstre complexe.
 
   Exemple :
      xhat = cceps([1 0 0 0 0.5 0 0 0]);
+
+  Voir aussi ICCEPS, RCEPS, HILBERT.
 ```
 
 ## `cconv`
@@ -630,6 +658,8 @@ CCONV Convolution circulaire.
 
   Exemple :
      cconv([1 2], [1 1], 2)   % [3 3]
+
+  Voir aussi CONVOLUTIONCIRCULAIRE.
 ```
 
 ## `cheb1ap`
@@ -658,6 +688,8 @@ CHEB1ORD Ordre minimal d'un filtre de Chebyshev de type I.
   Exemple :
      [n, Wn] = cheb1ord(0.2, 0.3, 1, 40);
      n                           % l'ordre minimal qui tient le gabarit
+
+  Voir aussi CHEBY1, BUTTORD, CHEB2ORD, ELLIPORD.
 ```
 
 ## `cheb2ap`
@@ -686,6 +718,8 @@ CHEB2ORD Ordre minimal d'un filtre de Chebyshev de type II.
   Exemple :
      [n, Wn] = cheb2ord(0.2, 0.3, 1, 40);
      n
+
+  Voir aussi CHEBY2, CHEB1ORD, BUTTORD, ELLIPORD.
 ```
 
 ## `chebwin`
@@ -703,6 +737,8 @@ CHEBWIN Fenêtre de Dolph-Tchebychev.
 
   Exemple :
      w = chebwin(51, 60);   % lobes secondaires à -60 dB
+
+  Voir aussi TAYLORWIN, KAISER, WINDOW.
 ```
 
 ## `cheby1`
@@ -774,6 +810,8 @@ CHIRP Sinusoïde à fréquence instantanée variable.
      t = (0:1023)' / 1024;
      y = chirp(t, 0, 1, 100);
      numel(y)                    % 1024 : un point par instant
+
+  Voir aussi GAUSPULS, SAWTOOTH, SQUARE, VCO.
 ```
 
 ## `concevoirBande`
@@ -791,6 +829,8 @@ CONCEVOIRBANDE Filtre d'ordre minimal pour lowpass et ses voisines.
      [w, o] = lireOptionsBande(0.3);
      [b, a] = concevoirBande(w, 'low', o);
      abs(abs(polyval(b, 1) / polyval(a, 1)) - 1) < 0.2   % le continu passe
+
+  Voir aussi LOWPASS, HIGHPASS, BANDPASS, APPLIQUERBANDE.
 ```
 
 ## `convmtx`
@@ -825,6 +865,8 @@ CORRMTX Matrice de données pour l'estimation de la corrélation.
 
   Exemple :
      [X, R] = corrmtx(randn(100,1), 4, 'modified');
+
+  Voir aussi PMUSIC, PEIG.
 ```
 
 ## `cpsd`
@@ -839,6 +881,8 @@ CPSD Densité interspectrale de puissance, par la méthode de Welch.
      x = randn(1024, 1);
      [p, f] = cpsd(x, filter(1, [1 -0.8], x), [], [], 256, 1);
      numel(p) == numel(f)        % 1
+
+  Voir aussi PWELCH, MSCOHERE, TFESTIMATE.
 ```
 
 ## `czt`
@@ -851,6 +895,8 @@ CZT Transformée en Z sur une spirale (algorithme de Bluestein).
 
   Exemple :
      n = 8; norm(czt(1:n) - fft((1:n)')) < 1e-10
+
+  Voir aussi DFTMTX, GOERTZEL.
 ```
 
 ## `db2mag`
@@ -888,6 +934,8 @@ DCT Transformée en cosinus discrète de type II, normalisée.
   Exemple :
      x = [1 2 3 4 5]';
      max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
+
+  Voir aussi IDCT, DST.
 ```
 
 ## `decimate`
@@ -900,6 +948,8 @@ DECIMATE Réduit la fréquence d'échantillonnage d'un facteur entier.
 
   Exemple :
      numel(decimate(1:100, 4))   % 25
+
+  Voir aussi INTERP, RESAMPLE.
 ```
 
 ## `demod`
@@ -915,6 +965,8 @@ DEMOD Démodulation, réciproque de MODULATE.
      porteuse = cos(2 * pi * 100 * t) .* (1 + 0.5 * cos(2 * pi * 5 * t));
      x = demod(porteuse, 100, 1000, 'am');
      numel(x)                    % 1000
+
+  Voir aussi MODULATE, HILBERT, ENVELOPE.
 ```
 
 ## `detrend`
@@ -947,6 +999,8 @@ DFTMTX Matrice de la transformée de Fourier discrète.
   Exemple :
      F = dftmtx(4);
      max(abs(F * [1 0 0 0]' - ones(4, 1))) < 1e-12   % 1 : l'impulsion donne du plat
+
+  Voir aussi CZT, FWHT.
 ```
 
 ## `diric`
@@ -961,6 +1015,8 @@ DIRIC Fonction de Dirichlet, ou sinus cardinal périodique.
 
   Exemple :
      diric(0, 5)   % 1
+
+  Voir aussi SQUARE, CHIRP.
 ```
 
 ## `dpss`
@@ -980,6 +1036,8 @@ DPSS Suites sphéroïdales aplaties discrètes, ou fenêtres de Slepian.
 
   Exemple :
      [E, V] = dpss(128, 4, 7);   % sept fenêtres, V proches de 1
+
+  Voir aussi PMTM, WINDOW, PERIODOGRAM.
 ```
 
 ## `dst`
@@ -990,6 +1048,8 @@ DST Transformée en sinus discrète, première espèce.
 
   Exemple :
      dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
+
+  Voir aussi IDST, DCT.
 ```
 
 ## `dutycycle`
@@ -1001,6 +1061,8 @@ DUTYCYCLE Rapport cyclique des impulsions.
 
   Exemple :
      dutycycle([0 1 1 0 0 1 1 0 0 1], 1)   % environ 0.5
+
+  Voir aussi PULSEWIDTH, PULSEPERIOD, PULSESEP.
 ```
 
 ## `ellip`
@@ -1065,6 +1127,8 @@ ELLIPORD Ordre minimal d'un filtre elliptique.
 
   Exemple :
      [n, Wn] = ellipord(0.2, 0.3, 1, 40)   % n = 5
+
+  Voir aussi ELLIP, BUTTORD, CHEB1ORD.
 ```
 
 ## `enbw`
@@ -1076,6 +1140,8 @@ ENBW Largeur de bande de bruit équivalente d'une fenêtre.
 
   Exemple :
      enbw(rectwin(10))   % 1
+
+  Voir aussi WINDOW, PERIODOGRAM, BANDPOWER.
 ```
 
 ## `envelope`
@@ -1134,6 +1200,8 @@ FALLTIME Temps de descente d'un signal à deux états.
      t = (0:0.001:0.1)';
      [d, debut, fin] = falltime(double(t < 0.05), 1000);
      d > 0                       % 1 : la descente prend un temps fini
+
+  Voir aussi RISETIME, SLEWRATE, SETTLINGTIME.
 ```
 
 ## `filtic`
@@ -1171,6 +1239,8 @@ FINDDELAY Retard entre deux signaux, par corrélation croisée.
 
   Exemple :
      x = [1 2 3 0 0]; y = [0 0 1 2 3]; finddelay(x, y)   % 2
+
+  Voir aussi ALIGNSIGNALS.
 ```
 
 ## `findpeaks`
@@ -1184,6 +1254,8 @@ FINDPEAKS Maxima locaux d'un signal.
   Exemple :
      [pics, positions] = findpeaks([0 1 0 3 0 2 0]);
      positions                   % 2 4 6
+
+  Voir aussi SIGNALSOMMET.
 ```
 
 ## `fir1`
@@ -1225,6 +1297,8 @@ FIR2 Filtre RIF défini par un gabarit de réponse en fréquence.
 
   Exemple :
      b = fir2(20, [0 0.5 0.5 1], [1 1 0 0]);
+
+  Voir aussi FIR1, FIRLS, FIRPM.
 ```
 
 ## `firpm`
@@ -1268,6 +1342,8 @@ FIRTYPE Type d'un filtre RIF à phase linéaire, de 1 à 4.
   Exemple :
      firtype([1 2 3 2 1])        % 1 : symetrique, longueur impaire
      firtype([1 2 2 1])          % 2 : symetrique, longueur paire
+
+  Voir aussi FIR1, ISLINPHASE, GRPDELAY.
 ```
 
 ## `flattopwin`
@@ -1280,6 +1356,8 @@ FLATTOPWIN Fenêtre à sommet plat, pour la mesure d'amplitude.
   Exemple :
      w = flattopwin(64);
      max(w)                      % 1 : elle sert a mesurer une amplitude
+
+  Voir aussi BLACKMANHARRIS, NUTTALLWIN, WINDOW.
 ```
 
 ## `freqs`
@@ -1291,6 +1369,8 @@ FREQS Réponse en fréquence d'un filtre analogique.
 
   Exemple :
      abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
+
+  Voir aussi BODE, LP2LP.
 ```
 
 ## `fwht`
@@ -1308,6 +1388,8 @@ FWHT Transformée de Walsh-Hadamard rapide.
 
   Exemple :
      fwht([1 0 0 0])   % [0.25 0.25 0.25 0.25]
+
+  Voir aussi IFWHT, PAPILLONHADAMARD.
 ```
 
 ## `gauspuls`
@@ -1325,6 +1407,8 @@ GAUSPULS Impulsion sinusoïdale à enveloppe gaussienne.
 
   Exemple :
      t = -1e-3:1e-6:1e-3;  y = gauspuls(t, 1e4, 0.6);
+
+  Voir aussi CHIRP, TRIPULS, RECTPULS.
 ```
 
 ## `gausswin`
@@ -1339,6 +1423,8 @@ GAUSSWIN Fenêtre gaussienne.
   Exemple :
      w = gausswin(64);
      abs(w(32) - max(w)) < 0.01  % le sommet est au milieu
+
+  Voir aussi KAISER, CHEBWIN, WINDOW.
 ```
 
 ## `goertzel`
@@ -1354,6 +1440,8 @@ GOERTZEL Composantes choisies de la transformée de Fourier discrète.
 
   Exemple :
      x = [1 2 3 4]; abs(goertzel(x, 1) - sum(x)) < 1e-12
+
+  Voir aussi CZT, DFTMTX.
 ```
 
 ## `grpdelay`
@@ -1371,6 +1459,8 @@ GRPDELAY Temps de propagation de groupe d'un filtre numérique.
      [b, a] = butter(4, 0.3);
      [gd, w] = grpdelay(b, a, 128);
      all(gd > 0)                 % 1 : un filtre causal retarde
+
+  Voir aussi PHASEZ, PHASEDELAY.
 ```
 
 ## `highpass`
@@ -1434,6 +1524,8 @@ ICCEPS Cepstre complexe inverse.
   Exemple :
      x = [1 0.5 0.25 0.125]';
      max(abs(icceps(cceps(x), 0) - x)) < 1e-6
+
+  Voir aussi CCEPS, RCEPS.
 ```
 
 ## `idct`
@@ -1470,6 +1562,8 @@ IDST Transformée en sinus discrète inverse.
   Exemple :
      x = [1 2 3 4]';
      max(abs(idst(dst(x)) - x)) < 1e-12
+
+  Voir aussi DST, IDCT.
 ```
 
 ## `ifwht`
@@ -1480,6 +1574,8 @@ IFWHT Transformée de Walsh-Hadamard inverse.
 
   Exemple :
      ifwht(fwht([1 2 3 4]))   % [1 2 3 4]
+
+  Voir aussi FWHT, PAPILLONHADAMARD.
 ```
 
 ## `impinvar`
@@ -1518,6 +1614,8 @@ IMPZ Réponse impulsionnelle d'un filtre numérique.
 
   Exemple :
      impz(1, [1 -0.5], 4)'   % [1 0.5 0.25 0.125]
+
+  Voir aussi STEPZ.
 ```
 
 ## `interp`
@@ -1532,6 +1630,8 @@ INTERP Augmente la fréquence d'échantillonnage d'un facteur entier.
      x = sin(2 * pi * 0.05 * (0:63)');
      y = interp(x, 4);
      numel(y)                    % 256 : quatre fois plus de points
+
+  Voir aussi DECIMATE, RESAMPLE.
 ```
 
 ## `intfilt`
@@ -1612,6 +1712,8 @@ INVFREQZ Filtre numérique ajusté sur une réponse en fréquence complexe.
      [bt, at] = butter(4, 0.3);
      [h, w] = freqz(bt, at, 256);
      [b, a] = invfreqz(h, w, 4, 4);   % retrouve bt et at
+
+  Voir aussi PRONY, INVFREQS.
 ```
 
 ## `islinphase`
@@ -1624,6 +1726,8 @@ ISLINPHASE Le filtre est-il à phase linéaire ?
   Exemple :
      islinphase([1 2 3 2 1], 1)  % 1 : un RIF symetrique est a phase lineaire
      islinphase([1 2 3], 1)      % 0
+
+  Voir aussi FIRTYPE, ISMINPHASE, ISMAXPHASE.
 ```
 
 ## `ismaxphase`
@@ -1634,6 +1738,8 @@ ISMAXPHASE Le filtre est-il à phase maximale ?
 
   Exemple :
      ismaxphase([1 -2], 1)       % 1 : le zero est hors du cercle unite
+
+  Voir aussi ISMINPHASE, ISLINPHASE, ISSTABLE.
 ```
 
 ## `isminphase`
@@ -1644,6 +1750,8 @@ ISMINPHASE Le filtre est-il à phase minimale ?
 
   Exemple :
      isminphase([1 -0.5], 1)     % 1 : le zero est dans le cercle unite
+
+  Voir aussi ISMAXPHASE, ISLINPHASE, ISSTABLE.
 ```
 
 ## `isstable`
@@ -1662,6 +1770,8 @@ ISSTABLE Le filtre est-il stable ?
   Exemple :
      isstable(1, [1 -0.5])       % 1 : le pole est dans le cercle unite
      isstable(1, [1 -1.5])       % 0
+
+  Voir aussi ISMINPHASE, ZPLANE.
 ```
 
 ## `kaiser`
@@ -1690,6 +1800,8 @@ KAISERORD Ordre et paramètre d'un filtre RIF fenêtré par Kaiser.
 
   Exemple :
      [n, Wn, beta] = kaiserord([1000 1200], [1 0], [0.05 0.01], 8000);
+
+  Voir aussi KAISER, FIR1.
 ```
 
 ## `latc2tf`
@@ -1745,6 +1857,8 @@ LIREOPTIONSBANDE Arguments communs à lowpass, highpass, bandpass, bandstop.
   Exemple :
      [w, o] = lireOptionsBande(200, 1000, 'Steepness', 0.9);
      w                           % 0.4 : 200 Hz a 1 kHz
+
+  Voir aussi LOWPASS, HIGHPASS, CONCEVOIRBANDE.
 ```
 
 ## `lireOptionsSousEspace`
@@ -1758,6 +1872,8 @@ LIREOPTIONSSOUSESPACE Analyse les arguments communs aux méthodes sous-espace.
   Exemple :
      [fs, corr] = lireOptionsSousEspace({1000, 'corr'});
      [fs corr]                   % 1000 et vrai
+
+  Voir aussi PMUSIC, PEIG, ROOTMUSIC.
 ```
 
 ## `lowpass`
@@ -1910,6 +2026,8 @@ LSF2POLY Polynôme de prédiction à partir des fréquences de raies.
   Exemple :
      a = poly([0.5 -0.3]);
      max(abs(lsf2poly(poly2lsf(a)) - a)) < 1e-10
+
+  Voir aussi POLY2LSF, LPC, AC2POLY.
 ```
 
 ## `mag2db`
@@ -2034,6 +2152,8 @@ MEANFREQ Fréquence moyenne, pondérée par la puissance spectrale.
   Exemple :
      t = (0:1023)' / 1000;
      abs(meanfreq(sin(2*pi*50*t), 1000) - 50) < 10
+
+  Voir aussi MEDFREQ, BANDPOWER.
 ```
 
 ## `medfilt1`
@@ -2045,6 +2165,8 @@ MEDFILT1 Filtre médian glissant d'ordre N.
 
   Exemple :
      medfilt1([1 100 2 3], 3)    % la valeur aberrante disparait
+
+  Voir aussi SGOLAYFILT, MEDFILT2.
 ```
 
 ## `medfreq`
@@ -2082,6 +2204,8 @@ MIDCROSS Instants de traversée du niveau médian.
 
   Exemple :
      midcross([0 0 1 1], 1)   % 1.5 : la moitié est franchie là
+
+  Voir aussi STATELEVELS, RISETIME, FALLTIME.
 ```
 
 ## `modulate`
@@ -2095,6 +2219,8 @@ MODULATE Modulation d'un signal en bande de base.
   Exemple :
      fs = 1e4;  x = sin(2*pi*10*(0:999)'/fs);
      y = modulate(x, 1e3, fs, 'am');
+
+  Voir aussi DEMOD, VCO, HILBERT.
 ```
 
 ## `mscohere`
@@ -2110,6 +2236,8 @@ MSCOHERE Cohérence quadratique moyenne entre deux signaux.
      x = randn(1024, 1);
      [c, f] = mscohere(x, filter(1, [1 -0.8], x), [], [], 256, 1);
      all(c >= -1e-12 & c <= 1 + 1e-12)     % 1 : c'est une coherence
+
+  Voir aussi CPSD, TFESTIMATE, PWELCH.
 ```
 
 ## `nuttallwin`
@@ -2121,6 +2249,8 @@ NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
   Exemple :
      w = nuttallwin(64);
      max(w)                      % 1
+
+  Voir aussi BLACKMANHARRIS, FLATTOPWIN, WINDOW.
 ```
 
 ## `overshoot`
@@ -2133,6 +2263,8 @@ OVERSHOOT Dépassement après chaque transition, en pourcentage.
 
   Exemple :
      overshoot([0 0 1.2 1 1 1], 1)   % 20 %
+
+  Voir aussi UNDERSHOOT, SETTLINGTIME, RISETIME.
 ```
 
 ## `papillonHadamard`
@@ -2149,6 +2281,8 @@ PAPILLONHADAMARD Transformée de Hadamard rapide, ordre naturel.
      y = papillonHadamard(x);
      abs(y(1) - sum(x)) < 1e-12  % le premier coefficient est la somme
      max(abs(papillonHadamard(y) / 8 - x)) < 1e-12   % involutive au facteur N
+
+  Voir aussi FWHT, IFWHT, RANGERWALSH.
 ```
 
 ## `parzen`
@@ -2207,6 +2341,8 @@ PBURG Densité spectrale par la méthode de Burg.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [pxx, f] = pburg(x, 4, 128, 1);
      numel(pxx) == numel(f)      % 1
+
+  Voir aussi PYULEAR, PCOV, PMCOV, ARBURG.
 ```
 
 ## `pcov`
@@ -2244,6 +2380,8 @@ PCOV Densité spectrale par la méthode de la covariance.
 PEAK2PEAK Écart entre le maximum et le minimum.
   Exemple :
      peak2peak([1 5 2])   % 4
+
+  Voir aussi PEAK2RMS, RMS, RSSQ.
 ```
 
 ## `peak2rms`
@@ -2252,6 +2390,8 @@ PEAK2PEAK Écart entre le maximum et le minimum.
 PEAK2RMS Rapport entre la valeur crête et la valeur efficace.
   Exemple :
      peak2rms([1 -1 1 -1])   % 1
+
+  Voir aussi PEAK2PEAK, RMS, RSSQ.
 ```
 
 ## `peig`
@@ -2267,6 +2407,8 @@ PEIG Pseudospectre par la méthode des vecteurs propres.
      [S, f] = peig(x, 2, 256, 1);
      [~, k] = max(S);
      abs(f(k) - 0.1) < 0.02      % la raie est retrouvee
+
+  Voir aussi PMUSIC, ROOTEIG, ROOTMUSIC.
 ```
 
 ## `periodogram`
@@ -2283,6 +2425,8 @@ PERIODOGRAM Densité spectrale de puissance par périodogramme.
      [pxx, f] = periodogram(x, [], 512, 1);
      [~, k] = max(pxx);
      abs(f(k) - 0.1) < 0.02
+
+  Voir aussi PWELCH, PMTM, BANDPOWER.
 ```
 
 ## `permutationWalsh`
@@ -2299,6 +2443,8 @@ PERMUTATIONWALSH Rangement des fonctions de Walsh.
   Exemple :
      p = permutationWalsh(8, 'sequency');
      isequal(sort(p(:)'), 1:8)   % 1 : c'est une permutation
+
+  Voir aussi FWHT, RANGERWALSH, RANGERWALSHINVERSE.
 ```
 
 ## `phasedelay`
@@ -2312,6 +2458,8 @@ PHASEDELAY Retard de phase d'un filtre numérique.
      [b, a] = butter(4, 0.3);
      [pd, w] = phasedelay(b, a, 128);
      numel(pd) == numel(w)       % 1
+
+  Voir aussi PHASEZ, GRPDELAY.
 ```
 
 ## `phasez`
@@ -2325,6 +2473,8 @@ PHASEZ Réponse en phase déroulée d'un filtre numérique.
      [b, a] = butter(4, 0.3);
      [phi, w] = phasez(b, a, 128);
      abs(phi(1)) < 1e-12         % la phase est nulle au continu
+
+  Voir aussi PHASEDELAY, GRPDELAY, ZEROPHASE.
 ```
 
 ## `pmcov`
@@ -2372,6 +2522,8 @@ PMTM Densité spectrale par la méthode multi-fenêtres de Thomson.
      [pxx, f] = pmtm(x, 4, 512, 1000);
      [~, k] = max(pxx);
      abs(f(k) - 100) < 5      % 1 : la raie est a 0,1 fois 1000 Hz
+
+  Voir aussi PERIODOGRAM, PWELCH, DPSS.
 ```
 
 ## `pmusic`
@@ -2389,6 +2541,8 @@ PMUSIC Pseudospectre par la méthode MUSIC.
      [S, f] = pmusic(x, 4, 1024, 1000);
      [~, k] = max(S);
      abs(f(k) - 100) < 5      % 1 : le sous-espace signal trouve la raie
+
+  Voir aussi PEIG, ROOTMUSIC, PBURG.
 ```
 
 ## `poly2ac`
@@ -2402,6 +2556,8 @@ POLY2AC Autocorrélation d'un polynôme de prédiction.
      a = [1 -0.5 0.2];
      r = poly2ac(a, 1);
      max(abs(ac2poly(r) - a)) < 1e-10       % l'aller-retour
+
+  Voir aussi AC2POLY, POLY2RC, LEVINSON.
 ```
 
 ## `poly2lsf`
@@ -2417,6 +2573,8 @@ POLY2LSF Fréquences spectrales de raies d'un polynôme de prédiction.
 
   Exemple :
      lsf = poly2lsf([1 -0.5]);
+
+  Voir aussi LSF2POLY, POLY2RC, LPC.
 ```
 
 ## `poly2rc`
@@ -2433,6 +2591,8 @@ POLY2RC Coefficients de réflexion d'un polynôme de prédiction.
 
   Exemple :
      k = poly2rc([1 0.6149 0.9899 0 0.0031 -0.0082]);
+
+  Voir aussi RC2POLY, POLY2AC, AC2RC, SCHURRC.
 ```
 
 ## `polyscale`
@@ -2465,6 +2625,8 @@ POLYSTAB Stabilise un polynôme en repliant ses racines dans le disque.
   Exemple :
      b = polystab([1 -1.5]);
      all(abs(roots(b)) <= 1 + 1e-12)        % 1 : les racines rentrent
+
+  Voir aussi ISMINPHASE.
 ```
 
 ## `pow2db`
@@ -2526,6 +2688,8 @@ PROTOTYPEELLIPTIQUE Pôles et zéros du prototype passe-bas de Cauer.
   Exemple :
      [z, p, k] = prototypeElliptique(4, 1, 40);
      all(real(p) < 0)            % 1 : un prototype stable a ses poles a gauche
+
+  Voir aussi ELLIP, ELLIPAP, ELLIPKE.
 ```
 
 ## `prototypeVersNumerique`
@@ -2551,6 +2715,8 @@ PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
      [z0, p0, k0] = buttap(4);
      [b, a] = prototypeVersNumerique(p0, z0, k0, 0.3, 'low');
      numel(a) - 1                % 4 : l'ordre est conserve en passe-bas
+
+  Voir aussi BUTTER, BILINEAR, BUTTAP.
 ```
 
 ## `puissancesSousEspace`
@@ -2569,6 +2735,8 @@ PUISSANCESSOUSESPACE Puissance de chaque composante sinusoïdale.
      [R, m] = signalMatriceCorrelation(x, 2, false);
      pow = puissancesSousEspace(R, 2 * pi * 0.1, eig(R), 2);
      all(isfinite(pow))
+
+  Voir aussi PMUSIC, PEIG, ROOTMUSIC.
 ```
 
 ## `pulseperiod`
@@ -2582,6 +2750,8 @@ PULSEPERIOD Période des impulsions.
      t = (0:0.001:0.5)';
      p = pulseperiod(double(sin(2*pi*10*t) > 0), 1000);
      abs(mean(p) - 0.1) < 0.01   % dix hertz : une periode de 0,1 s
+
+  Voir aussi PULSEWIDTH, PULSESEP, DUTYCYCLE.
 ```
 
 ## `pulsesep`
@@ -2595,6 +2765,8 @@ PULSESEP Séparation entre impulsions.
      t = (0:0.001:0.5)';
      s = pulsesep(double(sin(2*pi*10*t) > 0), 1000);
      all(s > 0)                  % 1
+
+  Voir aussi PULSEPERIOD, PULSEWIDTH, DUTYCYCLE.
 ```
 
 ## `pulsewidth`
@@ -2610,6 +2782,8 @@ PULSEWIDTH Largeur des impulsions à mi-hauteur.
      t = (0:0.001:0.5)';
      l = pulsewidth(double(sin(2*pi*10*t) > 0), 1000);
      abs(mean(l) - 0.05) < 0.01  % un rapport cyclique de moitie
+
+  Voir aussi PULSEPERIOD, PULSESEP, DUTYCYCLE.
 ```
 
 ## `pulstran`
@@ -2624,6 +2798,8 @@ PULSTRAN Train d'impulsions.
 
   Exemple :
      t = 0:1/1e3:1;  y = pulstran(t, 0:0.1:1, @rectpuls, 0.02);
+
+  Voir aussi RECTPULS, TRIPULS, GAUSPULS.
 ```
 
 ## `pwelch`
@@ -2664,6 +2840,8 @@ PYULEAR Densité spectrale par un modèle autorégressif de Yule-Walker.
      [pxx, f] = pyulear(x, 8, 512, 1000);
      [~, k] = max(pxx);
      abs(f(k) - 100) < 10
+
+  Voir aussi PBURG, PCOV, ARYULE.
 ```
 
 ## `rangerWalsh`
@@ -2676,6 +2854,8 @@ RANGERWALSH Passe de l'ordre naturel à l'ordre demandé.
   Exemple :
      y = rangerWalsh((1:8)', 'sequency');
      numel(y)                    % 8
+
+  Voir aussi RANGERWALSHINVERSE, PERMUTATIONWALSH, FWHT.
 ```
 
 ## `rangerWalshInverse`
@@ -2688,6 +2868,8 @@ RANGERWALSHINVERSE Revient de l'ordre demandé à l'ordre naturel.
   Exemple :
      x = (1:8)';
      max(abs(rangerWalshInverse(rangerWalsh(x, 'sequency'), 'sequency') - x)) < 1e-12
+
+  Voir aussi RANGERWALSH, PERMUTATIONWALSH, IFWHT.
 ```
 
 ## `rc2ac`
@@ -2701,6 +2883,8 @@ RC2AC Autocorrélation à partir des coefficients de réflexion.
      k = [0.5 0.2];
      r = rc2ac(k, 1);
      max(abs(ac2rc(r) - k(:))) < 1e-10      % l'aller-retour
+
+  Voir aussi AC2RC, RC2POLY, LEVINSON.
 ```
 
 ## `rc2poly`
@@ -2716,6 +2900,8 @@ RC2POLY Polynôme de prédiction à partir des coefficients de réflexion.
   Exemple :
      [a, e] = rc2poly([0.5 0.2], 1);
      all(abs(roots(a)) < 1)      % 1 : |k| < 1 donne un modele stable
+
+  Voir aussi POLY2RC, RC2AC, LATC2TF.
 ```
 
 ## `rceps`
@@ -2730,6 +2916,8 @@ RCEPS Cepstre réel.
 
   Exemple :
      y = rceps([1 0 0 0 0.5 0 0 0]);   % un écho à l'échantillon 5
+
+  Voir aussi CCEPS, ICCEPS.
 ```
 
 ## `rectpuls`
@@ -2740,6 +2928,8 @@ RECTPULS Impulsion rectangulaire de largeur W centrée en zéro.
 
   Exemple :
      rectpuls([-1 -0.4 0 0.4 1])   % [0 1 1 1 0]
+
+  Voir aussi TRIPULS, GAUSPULS, PULSTRAN.
 ```
 
 ## `resample`
@@ -2785,6 +2975,8 @@ RESIDUEZ Éléments simples d'une fraction en z^-1.
 
   Exemple :
      [r,p] = residuez(1, [1 -0.5])   % r = 1, p = 0.5
+
+  Voir aussi RESIDUE, TF2ZP, IMPZ.
 ```
 
 ## `risetime`
@@ -2798,6 +2990,8 @@ RISETIME Temps de montée d'un signal à deux états.
 
   Exemple :
      risetime([0 0 0.5 1 1], 1)   % 0.8 : de 10 % à 90 %
+
+  Voir aussi FALLTIME, SLEWRATE, OVERSHOOT.
 ```
 
 ## `rlevinson`
@@ -2856,6 +3050,8 @@ ROOTEIG Fréquences par la méthode des vecteurs propres.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      w = rooteig(x, 2);
      abs(min(abs(w)) / (2 * pi) - 0.1) < 0.02
+
+  Voir aussi ROOTMUSIC, PEIG, PMUSIC.
 ```
 
 ## `rootmusic`
@@ -2880,6 +3076,8 @@ ROOTMUSIC Fréquences par la méthode MUSIC, racines du polynôme du bruit.
      n = (0:99)';
      x = 2*cos(0.4*pi*n) + cos(0.6*pi*n) + 0.1*randn(100,1);
      w = rootmusic(x, 4);
+
+  Voir aussi ROOTEIG, PMUSIC, PEIG.
 ```
 
 ## `rssq`
@@ -2888,6 +3086,8 @@ ROOTMUSIC Fréquences par la méthode MUSIC, racines du polynôme du bruit.
 RSSQ Racine de la somme des carrés.
   Exemple :
      rssq([3 4])   % 5
+
+  Voir aussi RMS, PEAK2RMS, BANDPOWER.
 ```
 
 ## `sawtooth`
@@ -2900,6 +3100,8 @@ SAWTOOTH Signal en dents de scie de période 2*pi.
   Exemple :
      y = sawtooth(linspace(0, 4 * pi, 100));
      [min(y) max(y)]             % -1 et 1
+
+  Voir aussi SQUARE, CHIRP.
 ```
 
 ## `schurrc`
@@ -2913,6 +3115,8 @@ SCHURRC Coefficients de réflexion par l'algorithme de Schur.
 
   Exemple :
      k = schurrc([1 0.5 0.25]);   % [-0.5 0]
+
+  Voir aussi POLY2RC, LEVINSON, AC2RC.
 ```
 
 ## `seqperiod`
@@ -2924,6 +3128,8 @@ SEQPERIOD Période la plus courte qui explique une séquence.
 
   Exemple :
      seqperiod([1 2 1 2 1 2])   % 2
+
+  Voir aussi BUFFER, FINDPEAKS.
 ```
 
 ## `settlingtime`
@@ -2939,6 +3145,8 @@ SETTLINGTIME Temps d'établissement après chaque transition.
      t = (0:0.001:1)';
      d = settlingtime(1 - exp(-20 * t), 1000);
      d > 0                       % 1
+
+  Voir aussi RISETIME, OVERSHOOT, UNDERSHOOT.
 ```
 
 ## `sfdr`
@@ -2951,6 +3159,8 @@ SFDR Plage dynamique libre de parasites, en décibels.
   Exemple :
      t = (0:999)'/1000;
      sfdr(cos(2*pi*50*t) + 0.01*cos(2*pi*130*t))   % environ 40 dB
+
+  Voir aussi SNR, SINAD, THD.
 ```
 
 ## `sgolay`
@@ -2967,6 +3177,8 @@ SGOLAY Matrice de lissage de Savitzky-Golay.
 
   Exemple :
      b = sgolay(2, 5);   % lissage quadratique sur cinq points
+
+  Voir aussi SGOLAYFILT.
 ```
 
 ## `sgolayfilt`
@@ -2982,6 +3194,8 @@ SGOLAYFILT Lissage polynomial de Savitzky-Golay.
      x = sin(2 * pi * 0.01 * (1:200)') + 0.1 * randn(200, 1);
      y = sgolayfilt(x, 3, 21);
      std(diff(y, 2)) < std(diff(x, 2))       % 1 : le lissage reduit la courbure
+
+  Voir aussi SGOLAY, MEDFILT1.
 ```
 
 ## `signalLobe`
@@ -2997,6 +3211,8 @@ SIGNALLOBE Puissance d'un lobe spectral autour de la raie K.
      S = [1 3 2 0.5 4 1];
      [p, plage] = signalLobe(S, 2);
      p > 0                       % 1
+
+  Voir aussi SIGNALSOMMET, FINDPEAKS, SFDR.
 ```
 
 ## `signalMatriceCorrelation`
@@ -3015,6 +3231,8 @@ SIGNALMATRICECORRELATION Matrice d'autocorrélation pour les méthodes sous-espa
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [R, m] = signalMatriceCorrelation(x, 2, false);
      max(max(abs(R - R'))) < 1e-8           % 1 : elle est symetrique
+
+  Voir aussi CORRMTX, PMUSIC, PEIG.
 ```
 
 ## `signalNiveaux`
@@ -3030,6 +3248,8 @@ SIGNALNIVEAUX Niveaux d'état et seuils de référence d'un signal.
      t = (0:0.001:0.1)';
      [bas, haut, seuils] = signalNiveaux(double(t >= 0.05), [10 90 50]);
      seuils(1) < seuils(3) && seuils(3) < seuils(2)     % 1
+
+  Voir aussi STATELEVELS, SIGNALTRAVERSES, SIGNALTRANSITIONS.
 ```
 
 ## `signalSommet`
@@ -3042,6 +3262,8 @@ SIGNALSOMMET Indice du maximum local le plus proche de AUTOUR.
   Exemple :
      S = exp(-((1:100) - 40) .^ 2 / 50);
      signalSommet(S, 42, 10)     % 40 : le sommet le plus proche
+
+  Voir aussi FINDPEAKS, SIGNALLOBE.
 ```
 
 ## `signalSpectrePuissance`
@@ -3060,6 +3282,8 @@ SIGNALSPECTREPUISSANCE Spectre de puissance unilatéral, fenêtre de Kaiser.
      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [S, f] = signalSpectrePuissance(x, 1);
      numel(S) == numel(f)        % 1
+
+  Voir aussi PERIODOGRAM, SNR, THD.
 ```
 
 ## `signalTransitions`
@@ -3078,6 +3302,8 @@ SIGNALTRANSITIONS Découpe le signal en transitions et les mesure.
      tr = signalTransitions(double(t >= 0.05), t, 10, 90);
      size(tr, 2)                 % 5 colonnes
      tr(1, 4)                    % 1 : la transition est montante
+
+  Voir aussi SIGNALTRAVERSES, SIGNALNIVEAUX, RISETIME.
 ```
 
 ## `signalTraverses`
@@ -3093,6 +3319,8 @@ SIGNALTRAVERSES Instants de traversée d'un seuil, par interpolation.
      t = (0:0.001:0.1)';
      [instants, montantes] = signalTraverses(double(t >= 0.05), t, 0.5);
      abs(instants(1) - 0.05) < 2e-3
+
+  Voir aussi SIGNALNIVEAUX, SIGNALTRANSITIONS, MIDCROSS.
 ```
 
 ## `sinad`
@@ -3105,6 +3333,8 @@ SINAD Rapport signal sur bruit et distorsion, en décibels.
   Exemple :
      t = (0:999)'/1000;
      sinad(cos(2*pi*50*t) + 0.1*cos(2*pi*100*t))   % environ 20 dB
+
+  Voir aussi SNR, THD, SFDR.
 ```
 
 ## `slewrate`
@@ -3117,6 +3347,8 @@ SLEWRATE Vitesse de balayage d'un signal à deux états.
 
   Exemple :
      slewrate([0 0 1 1], 1)   % 0.8/0.8 = 1 par seconde
+
+  Voir aussi RISETIME, FALLTIME, MIDCROSS.
 ```
 
 ## `snr`
@@ -3129,6 +3361,8 @@ SNR Rapport signal sur bruit, en décibels.
      rng(1);
      signal = sin(2 * pi * 0.05 * (0:999)');
      abs(snr(signal, 0.1 * randn(1000, 1)) - 20 * log10(rms(signal) / 0.1)) < 1
+
+  Voir aussi SINAD, THD, SFDR, TOI.
 ```
 
 ## `sos2ss`
@@ -3194,6 +3428,8 @@ SOS2ZP Zéros, pôles et gain d'un enchaînement de sections du second ordre.
      [sos, g] = tf2sos(b, a);
      [z, p, k] = sos2zp(sos, g);
      all(abs(p) < 1)             % 1 : le filtre est stable
+
+  Voir aussi ZP2SOS, SOS2TF, TF2SOS.
 ```
 
 ## `sosfilt`
@@ -3209,6 +3445,8 @@ SOSFILT Filtre par sections du second ordre, en cascade.
      rng(1);
      x = randn(100, 1);
      max(abs(sosfilt(sos, x, g) - filter(b, a, x))) < 1e-10
+
+  Voir aussi TF2SOS.
 ```
 
 ## `spectrogram`
@@ -3225,6 +3463,8 @@ SPECTROGRAM Transformée de Fourier à court terme.
 
   Exemple :
      [s, f, t] = spectrogram(sin(2*pi*50*(0:999)/1000), 128, 64, 128, 1000);
+
+  Voir aussi PWELCH, PERIODOGRAM.
 ```
 
 ## `square`
@@ -3237,6 +3477,8 @@ SQUARE Signal carré de période 2*pi.
   Exemple :
      y = square(linspace(0, 4 * pi, 100));
      unique(y)                   % -1 et 1
+
+  Voir aussi SAWTOOTH, CHIRP, PULSTRAN.
 ```
 
 ## `ss2sos`
@@ -3278,6 +3520,8 @@ SS2ZP Zéros, pôles et gain d'une représentation d'état.
      [A, B, C, D] = tf2ss(b, a);
      [z, p, k] = ss2zp(A, B, C, D);
      all(abs(p) < 1)             % 1
+
+  Voir aussi ZP2SS, SS2SOS, TF2ZP.
 ```
 
 ## `statelevels`
@@ -3294,6 +3538,8 @@ STATELEVELS Niveaux bas et haut d'un signal à deux états.
 
   Exemple :
      statelevels([zeros(1,50) ones(1,50)])   % [0 1]
+
+  Voir aussi MIDCROSS, RISETIME, SIGNALNIVEAUX.
 ```
 
 ## `stepz`
@@ -3306,6 +3552,8 @@ STEPZ Réponse indicielle d'un filtre numérique.
      [b, a] = butter(4, 0.3);
      [h, t] = stepz(b, a, 100);
      abs(h(end) - 1) < 0.01      % la reponse indicielle tend vers le gain continu
+
+  Voir aussi IMPZ.
 ```
 
 ## `stmcb`
@@ -3366,6 +3614,8 @@ TAYLORWIN Fenêtre de Taylor.
 
   Exemple :
      w = taylorwin(64, 5, -35);
+
+  Voir aussi CHEBWIN, KAISER, WINDOW.
 ```
 
 ## `tf2latc`
@@ -3404,6 +3654,8 @@ TF2SOS Fonction de transfert vers sections du second ordre.
      [b, a] = butter(4, 0.3);
      [sos, g] = tf2sos(b, a);
      size(sos, 1)                % 2 sections pour un ordre 4
+
+  Voir aussi SOS2TF, ZP2SOS, SOS2ZP, TF2ZP.
 ```
 
 ## `tf2zp`
@@ -3415,6 +3667,8 @@ TF2ZP Fonction de transfert vers zéros, pôles et gain.
 
   Exemple :
      [z, p, k] = tf2zp([1 -1], [1 -0.5]);   % z = 1, p = 0.5, k = 1
+
+  Voir aussi ZP2TF, TF2SOS, SS2ZP.
 ```
 
 ## `tf2zpk`
@@ -3449,6 +3703,8 @@ TFESTIMATE Estimation de la fonction de transfert entre deux signaux.
      x = randn(4096, 1);
      [h, f] = tfestimate(x, filter(1, [1 -0.8], x), [], [], 256, 1);
      abs(abs(h(1)) - 5) < 1      % 1/(1-0.8) = 5 au continu
+
+  Voir aussi CPSD, MSCOHERE, PWELCH.
 ```
 
 ## `thd`
@@ -3468,6 +3724,8 @@ THD Distorsion harmonique totale, en décibels.
      t = (0:999)'/1000;
      x = cos(2*pi*50*t) + 0.1*cos(2*pi*100*t);
      thd(x)      % -20 dB : l'harmonique est dix fois plus petite
+
+  Voir aussi SNR, SINAD, SFDR.
 ```
 
 ## `toi`
@@ -3487,6 +3745,8 @@ TOI Point d'interception d'ordre trois.
      x = cos(2*pi*1000*t) + cos(2*pi*1100*t) + 0.001*cos(2*pi*900*t) ...
          + 0.001*cos(2*pi*1200*t);
      toi(x, 1e4)
+
+  Voir aussi SNR, SINAD, SFDR.
 ```
 
 ## `triang`
@@ -3498,6 +3758,8 @@ TRIANG Fenêtre triangulaire.
 
   Exemple :
      triang(4)'   % [0.25 0.75 0.75 0.25]
+
+  Voir aussi WINDOW, PARZENWIN.
 ```
 
 ## `tripuls`
@@ -3509,6 +3771,8 @@ TRIPULS Impulsion triangulaire de largeur W et d'asymétrie S.
 
   Exemple :
      tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
+
+  Voir aussi RECTPULS, GAUSPULS, PULSTRAN.
 ```
 
 ## `tukeywin`
@@ -3520,6 +3784,8 @@ TUKEYWIN Fenêtre de Tukey, cosinus surélevé à rapport réglable.
 
   Exemple :
      isequal(tukeywin(8, 0), rectwin(8))   % vrai
+
+  Voir aussi WINDOW.
 ```
 
 ## `udecode`
@@ -3570,6 +3836,8 @@ UNDERSHOOT Creux avant chaque transition, en pourcentage.
      t = (0:0.001:0.2)';
      [p, v, instant] = undershoot(exp(-30*t) .* sin(2*pi*30*t) + double(t > 0), 1000);
      p >= 0                      % 1
+
+  Voir aussi OVERSHOOT, SETTLINGTIME, FALLTIME.
 ```
 
 ## `vco`
@@ -3583,6 +3851,8 @@ VCO Oscillateur commandé en tension.
 
   Exemple :
      fs = 1e4;  t = (0:fs-1)'/fs;  y = vco(sin(2*pi*t), 1e3, fs);
+
+  Voir aussi CHIRP, MODULATE, DEMOD.
 ```
 
 ## `window`
@@ -3594,6 +3864,8 @@ WINDOW Fabrique une fenêtre par son nom ou sa poignée.
 
   Exemple :
      w = window(@kaiser, 64, 5);
+
+  Voir aussi KAISER.
 ```
 
 ## `xcov`
@@ -3605,6 +3877,8 @@ XCOV Covariance croisée : la corrélation des signaux centrés.
 
   Exemple :
      c = xcov([1 2 3 4], 'coeff');   % c(4) == 1
+
+  Voir aussi CORRMTX.
 ```
 
 ## `yulewalk`
@@ -3644,6 +3918,8 @@ ZEROPHASE Réponse en amplitude à phase nulle.
 
   Exemple :
      [hr, w] = zerophase([1 1]);   % hr = 2 cos(w/2), jamais négatif
+
+  Voir aussi PHASEZ, ZPLANE.
 ```
 
 ## `zp2sos`
@@ -3657,6 +3933,8 @@ ZP2SOS Zéros et pôles vers sections du second ordre.
      [z, p, k] = butter(4, 0.3);
      [sos, g] = zp2sos(z, p, k);
      size(sos, 2)                % 6 colonnes par section
+
+  Voir aussi SOS2ZP, TF2SOS, ZP2TF.
 ```
 
 ## `zp2ss`
@@ -3692,6 +3970,8 @@ ZP2TF Zéros, pôles et gain vers fonction de transfert.
   Exemple :
      [b, a] = zp2tf([], [-1 -2], 1);
      a                           % 1 3 2 : (s+1)(s+2)
+
+  Voir aussi TF2ZP, ZP2SOS, ZP2SS.
 ```
 
 ## `zplane`
@@ -3705,5 +3985,7 @@ ZPLANE Trace les zéros et les pôles dans le plan complexe.
      [b, a] = butter(4, 0.3);
      zplane(b, a);
      close all;
+
+  Voir aussi TF2ZP, ISSTABLE.
 ```
 

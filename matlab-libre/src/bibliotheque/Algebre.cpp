@@ -45,7 +45,31 @@ FONCTION(fnPinv) {
 FONCTION(fnCond) {
     INUTILISE
     exigerArguments(args, 1, 2, "cond");
-    return {conditionnement(args[0])};
+    // COND(A) est le rapport des valeurs singulieres extremes. COND(A,P)
+    // est ||A||_P * ||inv(A)||_P, qui n'est pas le meme nombre : pour la
+    // matrice de Hilbert d'ordre six, 1,5e7 en norme 2 et 2,9e7 en norme 1.
+    // Ignorer P rendait donc une valeur fausse en silence.
+    if (args.size() < 2) return {conditionnement(args[0])};
+    bool deux = false;
+    if (args[1].estNumerique() && args[1].estScalaire())
+        deux = args[1].scal() == 2.0;
+    if (deux) return {conditionnement(args[0])};
+    const Valeur& a = args[0];
+    if (a.estVide()) return {Valeur::scalaire(0.0)};
+    if (a.nlignes() != a.ncolonnes())
+        erreur("MATLAB:square", "Matrix must be square.");
+    Valeur na = normeMatrice(a, args[1]);
+    double normeDirecte = na.nelem() ? na.re[0] : 0.0;
+    if (normeDirecte == 0.0) return {Valeur::scalaire(INFINITY)};
+    Valeur inv;
+    try {
+        inv = inverseMatrice(a);
+    } catch (...) {
+        return {Valeur::scalaire(INFINITY)};
+    }
+    Valeur ni = normeMatrice(inv, args[1]);
+    double normeInverse = ni.nelem() ? ni.re[0] : 0.0;
+    return {Valeur::scalaire(normeDirecte * normeInverse)};
 }
 
 FONCTION(fnRcond) {
@@ -303,7 +327,7 @@ void enregistrerAlgebre(Interpreteur& it) {
     it.enregistrer("trace", fnTrace, "algebre", "trace  Somme de la diagonale.");
     it.enregistrer("rank", fnRank, "algebre", "rank  Rang numerique.");
     it.enregistrer("pinv", fnPinv, "algebre", "pinv  Pseudo-inverse de Moore-Penrose.");
-    it.enregistrer("cond", fnCond, "algebre", "cond  Conditionnement en norme 2.");
+    it.enregistrer("cond", fnCond, "algebre", "cond  Conditionnement : norme 2 par defaut, COND(A,P) en norme P.");
     it.enregistrer("rcond", fnRcond, "algebre",
                    "rcond  Estimation de l'inverse du conditionnement.");
     it.enregistrer("norm", fnNorm, "algebre", "norm  Norme d'un vecteur ou d'une matrice.");

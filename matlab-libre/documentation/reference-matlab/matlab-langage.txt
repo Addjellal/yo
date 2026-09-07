@@ -55,3 +55,5 @@ wilkinson
 
 erase extractAfter extractBefore extractBetween insertAfter insertBefore matches regexptranslate replace
 ischange islocalmax islocalmin movmad topkrows
+bicg cgs condest eigs gmres lsqminnorm maxk mink minres normest normest1
+pageinv pagemldivide pcg svds tensorprod

@@ -100,6 +100,8 @@ CODEGENBUILD Génère le C puis le compile avec le compilateur du système.
      fclose(f);
      r = codegen('carreDeTest', '-args', {0}, '-report');
      contains(r.source, 'carreDeTest')      % 1
+
+  Voir aussi CODEGEN, CODER.TYPEOF.
 ```
 
 ## `coder.typeof`
@@ -119,6 +121,8 @@ CODER.TYPEOF Décrit le type et la taille d'une entrée pour CODEGEN.
      fclose(f);
      r = codegen('doubleDeTest', '-args', {coder.typeof(int32(0), [3 3])}, '-report');
      contains(r.entete, 'doubleDeTest')      % 1
+
+  Voir aussi CODEGEN, CODEGENBUILD.
 ```
 
 ## `compilateurC`

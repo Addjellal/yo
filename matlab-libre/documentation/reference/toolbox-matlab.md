@@ -287,6 +287,33 @@ BARH Diagramme en barres horizontales.
   Voir aussi BAR, BAR3, PARETO, STAIRS, FILL, YTICKLABELS.
 ```
 
+## `bicg`
+
+```
+BICG Résolution itérative par méthode de Krylov.
+  X = BICG(A,B) résout A*X = B. X = BICG(A,B,TOL,MAXIT) impose la
+  tolérance relative — 1e-6 par défaut — et le nombre maximal
+  d'itérations. X = BICG(A,B,TOL,MAXIT,M1,M2,X0) ajoute un
+  préconditionneur et un point de départ. A peut être une poignée de
+  fonction rendant A*x.
+
+  [X,DRAPEAU,RES,K,RESIDUS] = BICG(...) rend le drapeau de sortie, le
+  résidu relatif, le nombre d'itérations et leur historique.
+
+  Contrairement à PCG, la matrice n'a pas à être définie positive : ces
+  méthodes valent pour un système quelconque. Le prix est la garantie —
+  le gradient conjugué converge de façon monotone en norme A, celles-ci
+  peuvent stagner ou osciller.
+
+  Exemple :
+     A = [4 1 0; 1 3 1; 0 1 2];
+     b = [1; 2; 3];
+     x = bicg(A, b, 1e-10, 50);
+     norm(A * x - b) / norm(b) < 1e-9
+
+  Voir aussi PCG, GMRES, MINRES, BICG, MLDIVIDE.
+```
+
 ## `blkdiag`
 
 ```
@@ -317,6 +344,8 @@ BONE Carte de couleurs gris à reflet bleuté.
   Exemple :
      carte = bone(8);
      size(carte)                 % 8 3
+
+  Voir aussi GRAY, PINK, COPPER.
 ```
 
 ## `bounds`
@@ -328,6 +357,8 @@ BOUNDS Minimum et maximum en un seul appel.
   Exemple :
      [bas, haut] = bounds([3 1 4 1 5]);
      [bas haut]                  % 1 5
+
+  Voir aussi MIN, MAX, RANGE.
 ```
 
 ## `boxchart`
@@ -429,6 +460,33 @@ CELLDISP Affiche le contenu d'un tableau de cellules.
      celldisp({1, 'deux'})
 
   Voir aussi DISP, CELL.
+```
+
+## `cgs`
+
+```
+CGS Résolution itérative par méthode de Krylov.
+  X = CGS(A,B) résout A*X = B. X = CGS(A,B,TOL,MAXIT) impose la
+  tolérance relative — 1e-6 par défaut — et le nombre maximal
+  d'itérations. X = CGS(A,B,TOL,MAXIT,M1,M2,X0) ajoute un
+  préconditionneur et un point de départ. A peut être une poignée de
+  fonction rendant A*x.
+
+  [X,DRAPEAU,RES,K,RESIDUS] = CGS(...) rend le drapeau de sortie, le
+  résidu relatif, le nombre d'itérations et leur historique.
+
+  Contrairement à PCG, la matrice n'a pas à être définie positive : ces
+  méthodes valent pour un système quelconque. Le prix est la garantie —
+  le gradient conjugué converge de façon monotone en norme A, celles-ci
+  peuvent stagner ou osciller.
+
+  Exemple :
+     A = [4 1 0; 1 3 1; 0 1 2];
+     b = [1; 2; 3];
+     x = cgs(A, b, 1e-10, 50);
+     norm(A * x - b) / norm(b) < 1e-9
+
+  Voir aussi PCG, GMRES, MINRES, BICG, MLDIVIDE.
 ```
 
 ## `clabel`
@@ -575,6 +633,32 @@ COMPASS Flèches partant de l'origine.
   Voir aussi FEATHER, QUIVER, POLARPLOT, ROSE, PLOT.
 ```
 
+## `condest`
+
+```
+CONDEST Estime le conditionnement en norme 1.
+  C = CONDEST(A) rend NORM(A,1) multiplié par une estimation de
+  NORM(INV(A),1), obtenue par l'algorithme de Hager sans former
+  l'inverse : chaque produit par l'inverse est une résolution.
+  [C,V] = CONDEST(A) rend en outre un vecteur qui témoigne du mauvais
+  conditionnement quand il y en a un.
+
+  Le conditionnement mesure de combien une erreur relative sur les
+  données peut être amplifiée dans le résultat : résoudre A*x = b avec
+  un conditionnement de 1e8 fait perdre huit chiffres significatifs sur
+  les seize que porte un double.
+
+  L'estimation est une borne inférieure. C'est ce qu'on veut : elle ne
+  promet jamais un conditionnement meilleur qu'il n'est.
+
+  Exemple :
+     condest(eye(3))                    % 1 : le mieux possible
+     condest(hilb(6)) > 1e6             % la matrice de Hilbert est infame
+     c = condest(magic(4));             % singuliere : c est enorme
+
+  Voir aussi COND, NORMEST1, NORM, RCOND.
+```
+
 ## `convhull`
 
 ```
@@ -591,6 +675,8 @@ CONVHULL Enveloppe convexe d'un nuage de points du plan.
 
   Exemple :
      k = convhull([0 1 1 0 0.5], [0 0 1 1 0.5]);   % le carré
+
+  Voir aussi INPOLYGON, DELAUNAY.
 ```
 
 ## `convn`
@@ -874,6 +960,40 @@ DIVERGENCE Divergence d'un champ de vecteurs.
   Voir aussi GRADIENT, CURL, DEL2, QUIVER.
 ```
 
+## `eigs`
+
+```
+EIGS Quelques valeurs propres seulement.
+  D = EIGS(A) rend les six valeurs propres de plus grand module.
+  D = EIGS(A,K) en rend K. D = EIGS(A,K,CHOIX) précise lesquelles :
+     'largestabs'   plus grand module (défaut)
+     'smallestabs'  plus petit module
+     'largestreal'  plus grande partie réelle
+     'smallestreal' plus petite partie réelle
+  [V,D] = EIGS(...) rend les vecteurs propres en colonnes et les valeurs
+  propres sur la diagonale de D.
+
+  MATLAB emploie ici une méthode de Krylov, qui ne demande que des
+  produits matrice-vecteur et convient donc aux très grandes matrices
+  creuses. MatLibre calcule la décomposition complète et en retient ce
+  qui est demandé : le résultat est le même, mais le coût est celui de
+  EIG. Sur une matrice de quelques milliers de lignes, cela reste
+  praticable ; au-delà, c'est la limite à connaître.
+
+  Le tri par module est celui qui compte pour la stabilité : la
+  dynamique d'un système discret est gouvernée par sa valeur propre de
+  plus grand module, et c'est elle qu'on demande d'abord.
+
+  Exemple :
+     A = diag([1 2 3 10]);
+     eigs(A, 2)'                         % 10 3
+     eigs(A, 2, 'smallestabs')'          % 1 2
+     [V, D] = eigs(A, 1);
+     norm(A * V - V * D) < 1e-12
+
+  Voir aussi EIG, SVDS, NORMEST, CONDEST.
+```
+
 ## `ellipj`
 
 ```
@@ -889,6 +1009,8 @@ ELLIPJ Fonctions elliptiques de Jacobi.
 
   Exemple :
      [s, c, d] = ellipj(0.5, 0);   % sin(0.5), cos(0.5), 1
+
+  Voir aussi ELLIPKE, PROTOTYPEELLIPTIQUE.
 ```
 
 ## `ellipke`
@@ -902,6 +1024,8 @@ ELLIPKE Intégrales elliptiques complètes de première et seconde espèce.
 
   Exemple :
      [K, E] = ellipke(0.5)   % 1.854074677301372 et 1.350643881047676
+
+  Voir aussi ELLIPJ, PROTOTYPEELLIPTIQUE.
 ```
 
 ## `ellipsoid`
@@ -1309,6 +1433,8 @@ FLAG Carte de couleurs alternant rouge, blanc, bleu et noir.
   Exemple :
      carte = flag(8);
      size(carte)                 % 8 3
+
+  Voir aussi PRISM.
 ```
 
 ## `fmesh`
@@ -1472,6 +1598,10 @@ GINPUT Lecture de points à la souris (indisponible).
   Voir aussi INPUT, DATACURSORMODE, GTEXT, WAITFORBUTTONPRESS.
 ```
 
+## `gmres`
+
+_Pas de bloc d'aide._
+
 ## `gplot`
 
 ```
@@ -1543,6 +1673,8 @@ GRAY Carte de couleurs en niveaux de gris.
 
   Exemple :
      carte = gray(4)   % [0 0 0; 1/3 1/3 1/3; 2/3 2/3 2/3; 1 1 1]
+
+  Voir aussi BONE, PINK.
 ```
 
 ## `griddata`
@@ -1726,6 +1858,8 @@ HOT Carte de couleurs noir - rouge - jaune - blanc.
   Exemple :
      carte = hot(8);
      all(diff(sum(carte, 2)) > 0)    % la clarte croit d'un bout a l'autre
+
+  Voir aussi COOL, JET, AUTUMN.
 ```
 
 ## `hsv`
@@ -1738,6 +1872,8 @@ HSV Carte de couleurs parcourant le cercle des teintes.
   Exemple :
      carte = hsv(6);
      size(carte)                 % 6 3
+
+  Voir aussi JET, PRISM.
 ```
 
 ## `humps`
@@ -1749,6 +1885,8 @@ HUMPS Fonction d'essai à deux pics, utilisée par les démonstrations.
   Exemple :
      humps(0.3)                  % environ 96 : le sommet de la courbe
      fzero(@humps, [1 2]) > 1        % elle change de signe entre 1 et 2
+
+  Voir aussi PEAKS.
 ```
 
 ## `importdata`
@@ -1793,6 +1931,8 @@ INPOLYGON Points intérieurs à un polygone.
 
   Exemple :
      inpolygon(0.5, 0.5, [0 1 1 0], [0 0 1 1])   % vrai
+
+  Voir aussi CONVHULL.
 ```
 
 ## `inputParser`
@@ -1875,6 +2015,51 @@ INVHILB Inverse exacte de la matrice de Hilbert.
   Voir aussi HILB, PASCAL, COND.
 ```
 
+## `ischange`
+
+```
+ISCHANGE Repère les ruptures dans une série.
+  TF = ISCHANGE(A) marque les points où la moyenne change brusquement.
+  TF = ISCHANGE(A,'linear') cherche les ruptures de pente : chaque
+  segment est ajusté par une droite au lieu d'une constante.
+  TF = ISCHANGE(A,'variance') cherche les ruptures de dispersion.
+
+  TF = ISCHANGE(...,'MaxNumChanges',K) impose au plus K ruptures.
+  TF = ISCHANGE(...,'Threshold',T) fixe la pénalité : une rupture n'est
+  retenue que si elle fait gagner plus de T sur le coût. Par défaut la
+  pénalité vaut 3*sigma^2*log(N) — la forme du critère de Schwarz, avec
+  les trois paramètres qu'ajoute une rupture : sa position et les deux
+  moyennes de part et d'autre —, où
+  sigma est estimé sur les différences successives — 1,4826 fois leur
+  écart absolu médian, divisé par racine de deux. Cet estimateur ne voit
+  pas les marches, puisqu'une marche ne touche qu'une seule différence,
+  et c'est ce qui l'empêche de confondre le saut avec le bruit.
+
+  [TF,S1,S2] = ISCHANGE(...) rend en outre, pour chaque point, les
+  paramètres du segment auquel il appartient : la moyenne dans S1 et
+  zéro dans S2 en mode 'mean', l'ordonnée à l'origine et la pente en
+  mode 'linear'.
+
+  Le découpage est optimal, non glouton : une programmation dynamique
+  parcourt tous les découpages possibles et retient celui de moindre
+  coût. C'est ce qui la distingue d'un seuillage sur la dérivée, qui
+  voit une rupture partout où le bruit est fort et nulle part où la
+  marche est lente.
+
+  Le coût d'un segment est la somme des carrés des écarts au modèle. La
+  pénalité empêche la solution triviale — une rupture par point, de coût
+  nul — et c'est elle, et non le calcul, qui décide du nombre de
+  ruptures trouvées.
+
+  Exemple :
+     x = [ones(1, 20), 5 * ones(1, 20)];
+     find(ischange(x))                   % 21 : la marche
+     x = [1:20, 20:-1:1];
+     find(ischange(x, 'linear'))         % le sommet du toit
+
+  Voir aussi ISLOCALMAX, ISOUTLIER, FINDCHANGEPTS, MOVMEAN.
+```
+
 ## `iskeyword`
 
 ```
@@ -1886,6 +2071,67 @@ ISKEYWORD Mot réservé du langage ?
      iskeyword('for')            % 1
      iskeyword('toto')           % 0
      numel(iskeyword()) > 10     % la liste des mots reserves
+
+  Voir aussi GENVARNAME.
+```
+
+## `islocalmax`
+
+```
+ISLOCALMAX Repère les maxima locaux d'un vecteur.
+  M = ISLOCALMAX(A) rend un tableau logique de la taille de A, vrai aux
+  maxima locaux : les points strictement plus grands que leurs deux
+  voisins. Les extrémités ne sont jamais des maxima locaux, faute d'un
+  voisin de chaque côté.
+
+  M = ISLOCALMAX(A,'MinProminence',P) n'en garde que ceux dont la
+  proéminence atteint P. La proéminence d'un sommet est sa hauteur
+  au-dessus du col le plus haut qui le sépare d'un sommet plus élevé :
+  c'est ce qui distingue un vrai pic d'une ondulation posée sur un
+  flanc, et c'est la seule mesure qui ne dépende pas de l'échelle
+  verticale choisie.
+
+  M = ISLOCALMAX(A,'MinSeparation',S) impose une distance minimale entre
+  deux maxima retenus ; le plus proéminent l'emporte.
+  M = ISLOCALMAX(A,'MaxNumExtrema',N) n'en garde que les N plus
+  proéminents.
+
+  [M,P] = ISLOCALMAX(...) rend en outre la proéminence de chaque point,
+  nulle là où il n'y a pas de maximum local.
+
+  Un plateau ne compte que pour un maximum, placé sur son premier point :
+  sans cette règle, un signal quantifié en produirait autant que le
+  plateau a d'échantillons.
+
+  Exemple :
+     islocalmax([1 3 2 5 4])             % [0 1 0 1 0]
+     islocalmax([1 3 2 5 4], 'MinProminence', 2)
+     [m, p] = islocalmax([0 1 0 5 0]);
+     p(4)                                % 5 : le grand pic dominate
+
+  Voir aussi ISLOCALMIN, FINDPEAKS, ISCHANGE, MAX.
+```
+
+## `islocalmin`
+
+```
+ISLOCALMIN Repère les minima locaux d'un vecteur.
+  M = ISLOCALMIN(A) rend un tableau logique vrai aux minima locaux :
+  les points strictement plus petits que leurs deux voisins.
+
+  Les options sont celles d'ISLOCALMAX — 'MinProminence',
+  'MinSeparation' et 'MaxNumExtrema' — appliquées au signal retourné :
+  un minimum de A est un maximum de -A, et il n'y a pas d'autre
+  différence entre les deux fonctions.
+
+  [M,P] = ISLOCALMIN(...) rend en outre la proéminence, comptée vers le
+  bas.
+
+  Exemple :
+     islocalmin([3 1 2 0 4])             % [0 1 0 1 0]
+     islocalmin([3 1 2 0 4], 'MinProminence', 2)
+
+  Voir aussi ISLOCALMAX, FINDPEAKS, ISCHANGE, MIN.
 ```
 
 ## `ismembertol`
@@ -2036,6 +2282,8 @@ JET Carte de couleurs bleu - cyan - jaune - rouge.
 
   Exemple :
      c = jet(64);   % c(1,:) vaut [0 0 0.5], c(end,:) vaut [0.5 0 0]
+
+  Voir aussi HSV, HOT.
 ```
 
 ## `join`
@@ -2150,6 +2398,40 @@ LIGHTING Modèle d'éclairage (accepté, sans effet).
   Voir aussi LIGHT, MATERIAL, SHADING, SURFL.
 ```
 
+## `lsqminnorm`
+
+```
+LSQMINNORM Solution de moindre norme au sens des moindres carrés.
+  X = LSQMINNORM(A,B) rend, parmi toutes les solutions qui minimisent
+  NORM(A*X-B), celle de plus petite norme. X = LSQMINNORM(A,B,TOL)
+  impose le seuil sous lequel une valeur singulière est tenue pour nulle.
+
+  Quand A est de rang plein en colonnes, il n'y a qu'une solution et
+  LSQMINNORM rend la même chose que l'antislash. La différence apparaît
+  quand A est déficiente : l'antislash rend alors une solution à
+  coefficients épars, obtenue par la décomposition QR, tandis que
+  LSQMINNORM rend celle de norme minimale, qui est unique. La première
+  met des zéros là où la seconde répartit.
+
+  Aucune des deux n'est meilleure en soi. La solution de moindre norme
+  est la seule continue en A : une perturbation infime des données ne la
+  déplace que d'autant, alors qu'elle peut faire sauter la solution
+  éparse d'un jeu de colonnes à un autre.
+
+  Le seuil par défaut est max(size(A))*eps(norm(A)) : c'est celui qui
+  sépare les valeurs singulières nulles de celles que l'arrondi a
+  simplement rendues petites.
+
+  Exemple :
+     A = [1 1; 1 1];
+     b = [2; 2];
+     x = lsqminnorm(A, b);              % [1; 1], de norme minimale
+     norm(A * x - b) < 1e-12
+     norm(x) <= norm(A \ b) + 1e-12     % jamais plus grande
+
+  Voir aussi PINV, MLDIVIDE, RANK, SVD.
+```
+
 ## `material`
 
 ```
@@ -2202,6 +2484,9 @@ MATLAB.ADDONS.INSTALLEDADDONS Liste les toolboxes installées.
   Exemple :
      t = matlab.addons.installedAddons;
      height(t)
+
+  Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX,
+  MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX.
 ```
 
 ## `matlab.addons.toolbox.installToolbox`
@@ -2223,6 +2508,9 @@ MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX Installe une toolbox.
      fclose(f);
      identifiant = matlab.addons.toolbox.installToolbox(dossier);
      matlab.addons.toolbox.uninstallToolbox(identifiant);
+
+  Voir aussi MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX,
+  MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX.
 ```
 
 ## `matlab.addons.toolbox.packageToolbox`
@@ -2241,6 +2529,8 @@ MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX Empaquette une toolbox.
      fclose(f);
      fichier = matlab.addons.toolbox.packageToolbox(dossier, 'ma.zip');
      isfile(fichier)             % 1
+
+  Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX, ZIP.
 ```
 
 ## `matlab.addons.toolbox.uninstallToolbox`
@@ -2255,6 +2545,8 @@ MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
          matlab.addons.toolbox.uninstallToolbox('inconnue');
      catch
      end
+
+  Voir aussi MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX.
 ```
 
 ## `matlabroot`
@@ -2265,6 +2557,8 @@ MATLABROOT Racine de l'installation de MatLibre.
 
   Exemple :
      isfolder(matlabroot())      % 1 : la racine existe
+
+  Voir aussi PATH, WHICH, EXIST.
 ```
 
 ## `matlibre_aberrantes`
@@ -2354,6 +2648,21 @@ MATLIBRE_EVALUER_SUR Évalue une fonction sur un vecteur, vectorisée ou non.
   par point plutôt que d'echouer.
 ```
 
+## `matlibre_extrema_locaux`
+
+```
+MATLIBRE_EXTREMA_LOCAUX Rouage commun d'ISLOCALMAX et d'ISLOCALMIN.
+  Un minimum de A est un maximum de -A : la fonction ne traite que le
+  cas du maximum, et le retournement suffit pour l'autre.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_extrema_locaux([1 3 2], {}, true)     % [0 1 0]
+
+  Voir aussi ISLOCALMAX, ISLOCALMIN.
+```
+
 ## `matlibre_fleche`
 
 ```
@@ -2361,6 +2670,26 @@ MATLIBRE_FLECHE Le tracé d'une flèche, hampe et pointe d'un seul trait.
   Fonction interne : elle n'existe pas dans MATLAB. QUIVER, COMPASS et
   FEATHER s'en servent ; la flèche est rendue comme une seule polyligne,
   ce qui la fait tenir en une courbe et non en trois.
+```
+
+## `matlibre_glissant`
+
+```
+MATLIBRE_GLISSANT Applique une fonction sur une fenêtre glissante.
+  Y = MATLIBRE_GLISSANT(X,K,OPTIONS,F) parcourt X avec une fenêtre de K
+  points et applique F à chacune. K peut valoir [AVANT APRES].
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Les fonctions MOV... natives sont écrites en C++ ; celle-ci sert aux
+  quelques-unes qui demandent un calcul non incrémental — l'écart absolu
+  médian en est une, puisqu'une médiane ne se met pas à jour d'un point
+  à l'autre.
+
+  Exemple :
+     matlibre_glissant(1:5, 3, {}, @max)     % 2 3 4 5 5
+
+  Voir aussi MOVMAD, MOVMEAN, MOVMEDIAN.
 ```
 
 ## `matlibre_grille_lineaire`
@@ -2416,6 +2745,27 @@ MATLIBRE_HADAMARD_NOYAU Noyaux de la construction de Hadamard.
   les résidus quadratiques modulo un nombre premier.
 
   Fonction interne : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_krylov`
+
+_Pas de bloc d'aide._
+
+## `matlibre_krylov_produit`
+
+```
+MATLIBRE_KRYLOV_PRODUIT Le produit A*v, que A soit une matrice ou une poignée.
+  Les méthodes de Krylov ne demandent jamais la matrice, seulement son
+  action sur un vecteur : c'est ce qui leur permet de résoudre un système
+  dont la matrice ne tiendrait pas en mémoire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_krylov_produit(@(v) 2 * v, [1; 2])     % [2; 4]
+     matlibre_krylov_produit(eye(2), [1; 2])         % [1; 2]
+
+  Voir aussi PCG, BICG, GMRES.
 ```
 
 ## `matlibre_noyau_plaque`
@@ -2487,6 +2837,30 @@ MATLIBRE_RACINE_TOOLBOX Dossier qui contient les toolboxes.
   d'environnement MATLIBRE_TOOLBOX le remplace quand elle est posée.
 ```
 
+## `maxk`
+
+```
+MAXK Les K plus grands éléments.
+  B = MAXK(A,K) rend les K plus grands éléments, en ordre décroissant.
+  Pour une matrice, l'opération se fait colonne par colonne.
+  B = MAXK(A,K,DIM) opère le long de la dimension DIM.
+  [B,I] = MAXK(...) rend en outre leurs indices.
+
+  Si K dépasse le nombre d'éléments, tous sont rendus.
+
+  C'est SORT suivi d'une troncature, et c'est ainsi qu'on l'écrit ici ;
+  l'intérêt du nom est de dire l'intention — on ne veut pas l'ordre
+  complet, seulement le sommet.
+
+  Exemple :
+     maxk([3 1 4 1 5], 2)                % 5 4
+     [b, i] = maxk([3 1 4 1 5], 2);
+     i                                   % 5 3
+     maxk([1 2; 3 4], 1)                 % 3 4 : par colonne
+
+  Voir aussi MINK, SORT, TOPKROWS, MAX.
+```
+
 ## `memoize`
 
 ```
@@ -2553,6 +2927,51 @@ MESHZ Maillage d'une surface, avec un rideau sur les bords.
   Voir aussi MESH, MESHC, SURF, WATERFALL.
 ```
 
+## `mink`
+
+```
+MINK Les K plus petits éléments.
+  B = MINK(A,K) rend les K plus petits éléments, en ordre croissant.
+  Pour une matrice, l'opération se fait colonne par colonne.
+  B = MINK(A,K,DIM) opère le long de la dimension DIM.
+  [B,I] = MINK(...) rend en outre leurs indices.
+
+  Exemple :
+     mink([3 1 4 1 5], 2)                % 1 1
+     [b, i] = mink([3 1 4 1 5], 2);
+     i                                   % 2 4
+     isequal(mink([3 1 4], 3), sort([3 1 4]))     % 1
+
+  Voir aussi MAXK, SORT, TOPKROWS, MIN.
+```
+
+## `minres`
+
+```
+MINRES Résolution itérative par méthode de Krylov.
+  X = MINRES(A,B) résout A*X = B. X = MINRES(A,B,TOL,MAXIT) impose la
+  tolérance relative — 1e-6 par défaut — et le nombre maximal
+  d'itérations. X = MINRES(A,B,TOL,MAXIT,M1,M2,X0) ajoute un
+  préconditionneur et un point de départ. A peut être une poignée de
+  fonction rendant A*x.
+
+  [X,DRAPEAU,RES,K,RESIDUS] = MINRES(...) rend le drapeau de sortie, le
+  résidu relatif, le nombre d'itérations et leur historique.
+
+  Contrairement à PCG, la matrice n'a pas à être définie positive : ces
+  méthodes valent pour un système quelconque. Le prix est la garantie —
+  le gradient conjugué converge de façon monotone en norme A, celles-ci
+  peuvent stagner ou osciller.
+
+  Exemple :
+     A = [4 1 0; 1 3 1; 0 1 2];
+     b = [1; 2; 3];
+     x = minres(A, b, 1e-10, 50);
+     norm(A * x - b) / norm(b) < 1e-9
+
+  Voir aussi PCG, GMRES, MINRES, BICG, MLDIVIDE.
+```
+
 ## `months`
 
 ```
@@ -2590,6 +3009,36 @@ MOVIE Rejoue une animation (acceptée, sans effet).
      movie(F, 2);          % accepte, sans effet
 
   Voir aussi GETFRAME, COMET, DRAWNOW, ANIMATEDLINE.
+```
+
+## `movmad`
+
+```
+MOVMAD Écart absolu médian glissant.
+  Y = MOVMAD(X,K) rend, pour chaque point, l'écart absolu médian sur une
+  fenêtre de K points centrée sur lui. Aux bords, la fenêtre se réduit à
+  ce qui existe.
+  Y = MOVMAD(X,[AVANT APRES]) donne une fenêtre asymétrique : AVANT
+  points en arrière et APRES en avant.
+  Y = MOVMAD(...,'Endpoints','discard') n'écrit que les points dont la
+  fenêtre est entière ; la série rendue est alors plus courte.
+
+  L'écart absolu médian est à l'écart type ce que la médiane est à la
+  moyenne : il ne bouge pas quand une valeur isolée s'éloigne. Son point
+  de rupture est de cinquante pour cent — il faut fausser la moitié des
+  données pour le fausser — là où une seule valeur suffit à emporter
+  l'écart type.
+
+  Il vaut 0,6745 fois l'écart type sur des données gaussiennes ; c'est
+  l'inverse de ce facteur, 1,4826, qui sert à le convertir quand on veut
+  comparer les deux.
+
+  Exemple :
+     movmad([1 1 1 10 1 1 1], 3)     % la valeur aberrante ne perturbe
+                                     % que trois points
+     movmad(1:10, 3)                 % 1 partout au centre
+
+  Voir aussi MOVMEAN, MOVMEDIAN, MOVSTD, MAD, ISOUTLIER.
 ```
 
 ## `namelengthmax`
@@ -2633,6 +3082,8 @@ NEXTPOW2 Exposant de la puissance de deux immédiatement supérieure.
 
   Exemple :
      nextpow2(1000)   % 10
+
+  Voir aussi POW2.
 ```
 
 ## `nexttile`
@@ -2652,6 +3103,66 @@ NEXTTILE Passe à la case suivante d'un TILEDLAYOUT.
      nexttile; plot(10:-1:1); title('a droite');
 
   Voir aussi TILEDLAYOUT, SUBPLOT, AXES, GCA.
+```
+
+## `normest`
+
+```
+NORMEST Estime la norme spectrale par la méthode de la puissance.
+  N = NORMEST(A) estime la plus grande valeur singulière de A à 1e-6
+  près. N = NORMEST(A,TOL) impose la tolérance relative.
+  [N,K] = NORMEST(...) rend en outre le nombre d'itérations.
+
+  L'itération est celle de la puissance appliquée à A'*A : partant d'un
+  vecteur quelconque, on alterne x <- A*x et x <- A'*x en normalisant, et
+  la norme du résultat converge vers la plus grande valeur singulière.
+  La convergence est géométrique, de raison le carré du rapport entre la
+  deuxième et la première valeur singulière : rapide quand la première
+  domine, lente quand deux sont proches.
+
+  Elle ne demande que des produits matrice-vecteur, jamais la matrice
+  entière : c'est ce qui la rend utilisable sur une grande matrice
+  creuse, là où SVD demanderait de la remplir.
+
+  Le résultat est une estimation par le bas — l'itération monte vers la
+  vraie valeur sans jamais la dépasser.
+
+  Exemple :
+     A = magic(5);
+     abs(normest(A) - norm(A)) / norm(A) < 1e-6
+     normest(eye(4))                    % 1
+
+  Voir aussi NORM, COND, CONDEST, SVD.
+```
+
+## `normest1`
+
+```
+NORMEST1 Estime la norme 1 par l'algorithme de Hager.
+  N = NORMEST1(A) estime la plus grande somme des modules d'une colonne.
+  [N,V,W] = NORMEST1(A) rend en outre un vecteur V tel que W = A*V et
+  NORM(W,1) = N*NORM(V,1) : le témoin de l'estimation.
+  [N,V,W,K] = NORMEST1(...) rend le nombre d'itérations.
+
+  La norme 1 d'une matrice est le maximum de ||A*x||_1 sur les x de norme
+  1. Ce maximum est atteint en un sommet du cube unité — un vecteur de
+  plus ou moins un — et l'algorithme de Hager cherche ce sommet en
+  suivant le gradient du signe : partant de x, on calcule A*x, on prend
+  son signe, on calcule A'*signe, et l'on saute au sommet indiqué par sa
+  plus grande composante.
+
+  L'estimation est toujours une borne inférieure, et elle est presque
+  toujours exacte. Elle ne demande que des produits par A et par A',
+  ce qui la rend applicable là où l'on ne veut pas parcourir toutes les
+  colonnes.
+
+  Exemple :
+     A = magic(5);
+     normest1(A) == norm(A, 1)          % 1 : exacte ici
+     [n, v, w] = normest1(magic(4));
+     abs(norm(w, 1) - n * norm(v, 1)) < 1e-10
+
+  Voir aussi NORM, NORMEST, CONDEST.
 ```
 
 ## `nthargout`
@@ -2726,6 +3237,55 @@ PAGECTRANSPOSE Transposée conjuguée de chaque page d'un tableau.
      b(1, 2, 1)                  % 0 : la transposition conjugue aussi
 
   Voir aussi PAGETRANSPOSE, PAGEMTIMES.
+```
+
+## `pageinv`
+
+```
+PAGEINV Inverse chaque page d'un tableau.
+  B = PAGEINV(A) inverse séparément chacune des pages A(:,:,k,...), qui
+  doivent être carrées. La forme du tableau est conservée.
+
+  Une page est une tranche à deux dimensions d'un tableau qui en a
+  davantage. Les fonctions PAGE... traitent chacune comme une matrice
+  indépendante : c'est la façon d'appliquer une opération matricielle à
+  une pile de matrices sans écrire de boucle, et sans mélanger les pages
+  entre elles comme le ferait une multiplication ordinaire.
+
+  Comme INV, elle avertit et rend des infinis sur une page singulière.
+  Inverser pour résoudre reste une mauvaise idée : PAGEMLDIVIDE est plus
+  précis et plus rapide.
+
+  Exemple :
+     A = cat(3, [2 0; 0 4], [1 1; 0 1]);
+     B = pageinv(A);
+     B(:, :, 1)                          % [0.5 0; 0 0.25]
+     max(max(abs(pagemtimes(A, B) - cat(3, eye(2), eye(2))))) < 1e-12
+
+  Voir aussi PAGEMLDIVIDE, PAGEMTIMES, PAGETRANSPOSE, INV.
+```
+
+## `pagemldivide`
+
+```
+PAGEMLDIVIDE Résout un système par page.
+  X = PAGEMLDIVIDE(A,B) résout A(:,:,k)*X(:,:,k) = B(:,:,k) pour chaque
+  page. Si l'un des deux n'a qu'une page, elle sert pour toutes : c'est
+  la même règle de diffusion que PAGEMTIMES.
+
+  Résoudre page par page n'est pas la même chose que résoudre le grand
+  système bloc-diagonal qu'elles forment ensemble : ici les pages ne
+  communiquent pas, et c'est justement ce qu'on veut quand elles
+  décrivent des instants, des essais ou des capteurs distincts.
+
+  Exemple :
+     A = cat(3, [2 0; 0 4], [1 1; 0 1]);
+     B = cat(3, [2; 4], [3; 1]);
+     X = pagemldivide(A, B);
+     X(:, :, 1)                          % [1; 1]
+     max(max(abs(pagemtimes(A, X) - B))) < 1e-12
+
+  Voir aussi PAGEMTIMES, PAGEINV, MLDIVIDE, PAGETRANSPOSE.
 ```
 
 ## `pagemtimes`
@@ -2869,6 +3429,48 @@ PATCH Polygones remplis.
   Voir aussi FILL, RECTANGLE, TRIMESH, TRISURF, LINE, AREA.
 ```
 
+## `pcg`
+
+```
+PCG Gradient conjugué préconditionné.
+  X = PCG(A,B) résout A*X = B pour une matrice symétrique définie
+  positive. X = PCG(A,B,TOL,MAXIT) impose la tolérance relative — 1e-6
+  par défaut — et le nombre maximal d'itérations.
+  X = PCG(A,B,TOL,MAXIT,M1,M2,X0) donne un préconditionneur M1*M2 et un
+  point de départ. A peut aussi être une poignée de fonction rendant
+  A*x.
+
+  [X,DRAPEAU,RES,K,RESIDUS] = PCG(...) rend le drapeau de sortie — 0 si
+  la tolérance est atteinte, 1 si le nombre d'itérations est épuisé —,
+  le résidu relatif final, le nombre d'itérations et l'historique.
+
+  La méthode construit une suite de directions conjuguées : chaque
+  direction est orthogonale aux précédentes au sens du produit scalaire
+  défini par A. C'est cette orthogonalité qui garantit la convergence en
+  au plus N itérations en arithmétique exacte, et qui fait qu'aucune
+  direction n'est jamais reprise.
+
+  Le nombre d'itérations utile est gouverné par le conditionnement :
+  l'erreur décroît d'un facteur (sqrt(k)-1)/(sqrt(k)+1) par itération,
+  où k est le conditionnement. C'est toute la raison d'être du
+  préconditionneur, qui vise à rapprocher M de A pour rendre k petit.
+
+  La symétrie n'est pas vérifiée : appliqué à une matrice qui ne l'est
+  pas, l'algorithme ne converge simplement pas. BICG et GMRES existent
+  pour ce cas.
+
+  Exemple :
+     % La matrice du laplacien discret : symetrique, definie positive.
+     n = 20;
+     A = full(spdiags([-ones(n,1), 2*ones(n,1), -ones(n,1)], -1:1, n, n));
+     b = ones(n, 1);
+     [x, drapeau, residu, k] = pcg(A, b, 1e-10, 100);
+     drapeau                             % 0 : la tolerance est atteinte
+     norm(A * x - b) / norm(b) < 1e-9
+
+  Voir aussi BICG, CGS, MINRES, GMRES, MLDIVIDE.
+```
+
 ## `peaks`
 
 ```
@@ -2887,6 +3489,8 @@ PEAKS Surface d'essai à trois bosses et trois creux.
   Exemple :
      [X, Y, Z] = peaks(20);
      size(Z)                     % 20 20
+
+  Voir aussi SURF, CONTOUR, MESHGRID.
 ```
 
 ## `perms`
@@ -2899,6 +3503,8 @@ PERMS Toutes les permutations des éléments d'un vecteur.
   Exemple :
      P = perms([1 2 3]);
      size(P, 1)                  % 6 : trois factorielle
+
+  Voir aussi NCHOOSEK, RANDPERM, FACTORIAL.
 ```
 
 ## `pie`
@@ -3115,6 +3721,8 @@ POW2 Puissance de deux, ou mantisse mise à l'échelle.
   Exemple :
      pow2(3)                     % 8
      pow2(0.5, 4)                % 8 : mantisse et exposant
+
+  Voir aussi NEXTPOW2.
 ```
 
 ## `prism`
@@ -3209,6 +3817,8 @@ RAMPECARTE Rampe de 0 à 1 sur M points, colonne.
   Exemple :
      g = rampeCarte(5);
      g'                          % 0 0.25 0.5 0.75 1
+
+  Voir aussi AUTUMN.
 ```
 
 ## `rat`
@@ -3223,6 +3833,8 @@ RAT Approximation rationnelle par fractions continues.
      [n, d] = rat(0.75);
      [n d]                       % 3 4
      abs(n / d - 0.75) < 1e-12
+
+  Voir aussi GCD, FORMAT.
 ```
 
 ## `readcell`
@@ -3365,6 +3977,8 @@ RESCALE Remise à l'échelle linéaire d'un tableau.
   Exemple :
      rescale([2 4 6])            % 0 0.5 1
      rescale([2 4 6], 10, 20)    % 10 15 20
+
+  Voir aussi NORMALIZE, MIN, MAX.
 ```
 
 ## `residue`
@@ -3386,6 +4000,8 @@ RESIDUE Décomposition en éléments simples d'une fraction rationnelle.
 
   Exemple :
      [r,p,k] = residue([1 0], [1 3 2])   % 1/(s+1) et -... sur s+2
+
+  Voir aussi RESIDUEZ.
 ```
 
 ## `ribbon`
@@ -3904,6 +4520,36 @@ SURFNORM Normales d'une surface.
   Voir aussi GRADIENT, SURF, QUIVER3, MESH.
 ```
 
+## `svds`
+
+```
+SVDS Quelques valeurs singulières seulement.
+  S = SVDS(A) rend les six plus grandes valeurs singulières.
+  S = SVDS(A,K) en rend K. S = SVDS(A,K,'smallest') rend les K plus
+  petites.
+  [U,S,V] = SVDS(...) rend la décomposition tronquée : A est approchée
+  par U*S*V', et c'est la meilleure approximation de rang K au sens de
+  la norme de Frobenius comme de la norme spectrale — c'est le théorème
+  d'Eckart-Young.
+
+  Comme EIGS, MATLAB emploie une méthode de Krylov et MatLibre la
+  décomposition complète tronquée : même résultat, coût de SVD.
+
+  La troncature est le fondement de l'analyse en composantes
+  principales et de la compression : garder les K premières valeurs
+  singulières, c'est garder la part d'énergie qu'elles portent, et
+  l'erreur commise est exactement la valeur singulière suivante.
+
+  Exemple :
+     A = magic(4);
+     svds(A, 2)'                         % les deux plus grandes
+     [U, S, V] = svds(A, 1);
+     s = svd(A);
+     abs(norm(A - U * S * V') - s(2)) < 1e-10   % Eckart-Young
+
+  Voir aussi SVD, EIGS, PCA, RANK, NORMEST.
+```
+
 ## `swapbytes`
 
 ```
@@ -3916,6 +4562,34 @@ SWAPBYTES Inverse l'ordre des octets.
      swapbytes(uint16(1))    % 256
 
   Voir aussi TYPECAST, CAST, CLASS.
+```
+
+## `tensorprod`
+
+```
+TENSORPROD Produit tensoriel avec contraction de dimensions.
+  C = TENSORPROD(A,B) rend le produit extérieur : C a pour dimensions
+  celles de A suivies de celles de B, et C(i,...,j,...) = A(i,...)*B(j,...).
+  C = TENSORPROD(A,B,DIMA,DIMB) contracte les dimensions DIMA de A avec
+  les dimensions DIMB de B, qui doivent être de mêmes tailles : on
+  somme sur ces indices, et ils disparaissent du résultat.
+  C = TENSORPROD(A,B,'all') contracte toutes les dimensions et rend un
+  scalaire, à condition que A et B aient la même taille.
+
+  C'est la généralisation du produit matriciel : contracter la deuxième
+  dimension de A avec la première de B redonne A*B. Le produit scalaire,
+  la trace d'un produit, le produit extérieur en sont d'autres cas
+  particuliers — ce qui les distingue n'est que le choix des indices
+  sommés.
+
+  Exemple :
+     A = [1 2; 3 4];
+     B = [5 6; 7 8];
+     max(max(abs(tensorprod(A, B, 2, 1) - A * B))) < 1e-12
+     tensorprod([1 2 3], [4 5 6], 2, 2)      % 32 : le produit scalaire
+     size(tensorprod(ones(2, 3), ones(4, 5)))   % 2 3 4 5
+
+  Voir aussi PAGEMTIMES, KRON, DOT, MTIMES, PERMUTE.
 ```
 
 ## `tiledlayout`
@@ -3940,6 +4614,35 @@ TILEDLAYOUT Découpe la figure en cases, comme SUBPLOT.
      nexttile; bar([3 1 2]);
 
   Voir aussi NEXTTILE, SUBPLOT, FIGURE, AXES.
+```
+
+## `topkrows`
+
+```
+TOPKROWS Les K premières lignes dans l'ordre du tri.
+  B = TOPKROWS(A,K) rend les K lignes de A qui viennent en tête d'un tri
+  décroissant, colonne par colonne de gauche à droite : la première
+  colonne décide, la deuxième départage, et ainsi de suite.
+  B = TOPKROWS(A,K,COL) trie sur les colonnes données, dans cet ordre.
+  Une colonne négative se trie en ordre croissant.
+  B = TOPKROWS(A,K,COL,SENS) impose 'ascend' ou 'descend'.
+  [B,I] = TOPKROWS(...) rend en outre les rangs des lignes retenues
+  dans A.
+
+  C'est SORTROWS suivi d'une troncature, mais l'intention est autre :
+  on ne veut pas l'ordre complet, seulement le sommet. La différence
+  compte dès que le tableau est grand — K lignes sur un million ne
+  demandent pas de trier le million.
+
+  Si K dépasse le nombre de lignes, toutes sont rendues.
+
+  Exemple :
+     topkrows([3 1; 1 2; 2 3], 2)          % [3 1; 2 3]
+     topkrows([3 1; 1 2; 2 3], 2, 2)       % trie sur la deuxieme colonne
+     [b, i] = topkrows([3 1; 1 2; 2 3], 1);
+     i                                     % 1 : la premiere ligne
+
+  Voir aussi SORTROWS, SORT, MAXK, MINK.
 ```
 
 ## `trimesh`
@@ -4029,6 +4732,8 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
   Exemple :
      u = uniquetol([1 1 + 1e-9 2], 1e-6);
      numel(u)                    % 2 : les deux premiers se confondent
+
+  Voir aussi ISMEMBERTOL.
 ```
 
 ## `unzip`
@@ -4044,6 +4749,8 @@ UNZIP Extrait une archive ZIP.
      delete('a.txt');
      unzip('archive.zip');
      fileread('a.txt')           % 'bonjour'
+
+  Voir aussi ZIP.
 ```
 
 ## `validatestring`
@@ -4056,6 +4763,8 @@ VALIDATESTRING Complète une option textuelle parmi une liste.
 
   Exemple :
      validatestring('lin', {'linear', 'cubic'})     % 'linear' : l'abrege suffit
+
+  Voir aussi INPUTPARSER.
 ```
 
 ## `vecnorm`
@@ -4069,6 +4778,8 @@ VECNORM Norme de chaque vecteur d'un tableau.
   Exemple :
      vecnorm([3 4]')             % 5 : la norme de la colonne
      vecnorm([3 4; 0 0], 2, 2)'  % 5 0 : par ligne
+
+  Voir aussi NORM, SUM, HYPOT.
 ```
 
 ## `vectorize`
@@ -4337,6 +5048,8 @@ ZIP Fabrique une archive ZIP.
      f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
      fichier = zip('archive.zip', {'b.txt'});
      isfile(fichier)             % 1
+
+  Voir aussi UNZIP.
 ```
 
 ## `zoom`

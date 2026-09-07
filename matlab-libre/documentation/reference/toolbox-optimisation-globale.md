@@ -85,6 +85,8 @@ CHAMPOPTIMISATION Lit une option, ou rend la valeur par défaut.
   Exemple :
      champOptimisation(struct('PopulationSize', 30), 'PopulationSize', 50)     % 30
      champOptimisation(struct(), 'PopulationSize', 50)                        % 50
+
+  Voir aussi GAOPTIMSET, SAOPTIMSET, PSOPTIMSET.
 ```
 
 ## `createOptimProblem`
@@ -128,6 +130,8 @@ GAMULTIOBJ Algorithme génétique multiobjectif.
   Exemple :
      f = @(x) [x(1)^2, (x(1)-2)^2];
      [x, v] = gamultiobj(f, 1, [], [], [], [], -2, 4);
+
+  Voir aussi GA, PARETOSEARCH, GAOPTIMSET.
 ```
 
 ## `gaoptimset`
@@ -230,6 +234,8 @@ PARETOSEARCH Front de Pareto par recherche directe.
   Exemple :
      f = @(x) [x(1)^2, (x(1)-2)^2];
      [x, v] = paretosearch(f, 1, [], [], [], [], -2, 4);
+
+  Voir aussi GAMULTIOBJ, PATTERNSEARCH.
 ```
 
 ## `particleswarm`
@@ -274,6 +280,8 @@ PATTERNSEARCH Recherche directe par motif généralisé.
 
   Exemple :
      x = patternsearch(@(v) (v(1)-1)^2 + (v(2)+2)^2, [0 0]);
+
+  Voir aussi GA, SIMULANNEALBND.
 ```
 
 ## `psoptimset`
@@ -369,5 +377,7 @@ SURROGATEOPT Optimisation par modèle de substitution.
 
   Exemple :
      x = surrogateopt(@(v) (v(1)-0.3)^2 + (v(2)+0.7)^2, [-1 -1], [1 1]);
+
+  Voir aussi GA, PARTICLESWARM, PATTERNSEARCH.
 ```
 

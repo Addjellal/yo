@@ -191,6 +191,8 @@ SOLVEDC Point de fonctionnement continu par analyse nodale modifiée.
      c = addResistor(c, 1, 2, 1000);
      c = addResistor(c, 2, 0, 2000);
      abs(solveDC(c)(2) - 20 / 3) < 1e-9     % deux tiers de dix volts
+
+  Voir aussi SOLVETRANSIENT, CIRCUIT, ADDRESISTOR.
 ```
 
 ## `solveTransient`
@@ -213,5 +215,7 @@ SOLVETRANSIENT Réponse temporelle par Euler implicite.
      c = addCapacitor(c, 2, 0, 1e-6);
      [t, v] = solveTransient(c, 0.01, 1e-5);
      abs(v(end, 2) - 5) < 0.1    % le condensateur finit par se charger
+
+  Voir aussi SOLVEDC, CIRCUIT, ADDCAPACITOR.
 ```
 

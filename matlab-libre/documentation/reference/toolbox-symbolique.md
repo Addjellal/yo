@@ -404,6 +404,8 @@ SYMDIFF Dérivée symbolique d'une expression.
   Exemple :
      x = sym('x');
      symstr(symsimplify(symdiff(sympow(x, symnum(2)), 'x')))     % la derivee de x au carre
+
+  Voir aussi SYMINT, SYMSIMPLIFY, SYMSTR.
 ```
 
 ## `symdiv`
@@ -441,6 +443,8 @@ SYMEVAL Évaluation numérique d'une expression.
   Exemple :
      x = sym('x');
      symeval(symadd(x, symnum(1)), {'x'}, {2})     % 3
+
+  Voir aussi SYMSUBS, SYMSIMPLIFY, SYMSTR.
 ```
 
 ## `symfun`
@@ -477,6 +481,8 @@ SYMINT Primitive des formes polynomiales et élémentaires.
      primitive = symint(x, 'x');
      symeval(symdiff(primitive, 'x'), {'x'}, {3})     % 3 : deriver annule integrer
      symeval(primitive, {'x'}, {2})                   % 2 : l'aire sous x de 0 a 2
+
+  Voir aussi SYMDIFF, SYMSIMPLIFY, SYMSTR.
 ```
 
 ## `symmul`

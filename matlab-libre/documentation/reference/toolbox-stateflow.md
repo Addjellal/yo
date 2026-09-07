@@ -53,6 +53,8 @@ SFRUN Exécute la machine sur une suite d'entrées.
      m = sfstate(m, 'ouvert');
      m = sftransition(m, 'verrouille', 'ouvert', @(c,e) strcmp(e, 'piece'));
      sfrun(m, {'pousse', 'piece'})     % 'ouvert'
+
+  Voir aussi SFCHART, SFSTATE, SFTRANSITION.
 ```
 
 ## `sfstate`

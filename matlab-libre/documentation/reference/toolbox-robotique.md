@@ -582,6 +582,8 @@ DHTRANSFORM Matrice de passage de Denavit-Hartenberg.
   Exemple :
      T = dhTransform(1, 0, 0, 0);
      T(1, 4)                     % 1 : une translation d'un metre le long de x
+
+  Voir aussi FKINE2R, IKINE2R.
 ```
 
 ## `differentialDriveKinematics`
@@ -691,6 +693,8 @@ FKINE2R Cinématique directe d'un bras plan à deux segments.
   Exemple :
      [x, y] = fkine2R([0 0], 1, 1);
      [x y]                       % 2 0 : le bras est tendu
+
+  Voir aussi IKINE2R, DHTRANSFORM.
 ```
 
 ## `generalizedInverseKinematics`
@@ -751,6 +755,8 @@ IKINE2R Cinématique inverse d'un bras plan à deux segments.
      q = ikine2R(1, 1, 1, 1, true);
      [x, y] = fkine2R(q, 1, 1);
      max(abs([x y] - [1 1])) < 1e-9     % la cinematique inverse annule la directe
+
+  Voir aussi FKINE2R, DHTRANSFORM, INVERSEKINEMATICS.
 ```
 
 ## `importrobot`

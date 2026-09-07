@@ -70,6 +70,28 @@ CONTAINS  Le texte contient-il le motif.
     Voir aussi STRFIND, STARTSWITH, ENDSWITH, REGEXP.
 ```
 
+## `count`
+
+```
+COUNT  Nombre d'occurrences d'un motif.
+    N = COUNT(TEXTE,MOTIF) compte les occurrences sans recouvrement :
+    « aaa » ne contient qu'une fois « aa », la seconde occurrence
+    chevauchant la première. MOTIF peut être une cellule ; les comptes
+    s'additionnent.
+
+    N = COUNT(...,'IgnoreCase',true) ne distingue pas la casse.
+
+    Syntaxe
+       n = count(str,motif)
+
+    Exemples
+       count('abcabc', 'abc')          % 2
+       count('aaa', 'aa')              % 1 : sans recouvrement
+       count({'aa','aaa'}, 'a')        % [2 3]
+
+    Voir aussi CONTAINS, STRFIND, MATCHES, NUMEL.
+```
+
 ## `deblank`
 
 ```
@@ -102,6 +124,128 @@ ENDSWITH  Le texte finit-il par le motif.
        noms(endsWith(noms, '.m'))
 
     Voir aussi STARTSWITH, CONTAINS, FILEPARTS.
+```
+
+## `erase`
+
+```
+ERASE  Retire du texte.
+    S = ERASE(TEXTE,MOTIF) supprime toutes les occurrences du motif. MOTIF
+    peut être une cellule de motifs, tous retirés à la suite.
+
+    C'est REPLACE avec un remplacement vide, et c'est ainsi qu'on nettoie
+    un texte de ses marques sans avoir à écrire la chaîne vide.
+
+    Syntaxe
+       newStr = erase(str,motif)
+
+    Exemples
+       erase('bonjour le monde', 'le ')     % 'bonjour monde'
+       erase({'a1b','a2b'}, 'a')            % {'1b'  '2b'}
+       erase('a-b-c', '-')                  % 'abc'
+
+    Voir aussi REPLACE, STRREP, INSERTAFTER, EXTRACTBEFORE.
+```
+
+## `extractAfter`
+
+```
+EXTRACTAFTER  Ce qui suit un motif.
+    S = EXTRACTAFTER(TEXTE,MOTIF) rend ce qui vient après la première
+    occurrence du motif, et la chaîne vide si le motif est absent.
+    S = EXTRACTAFTER(TEXTE,N) rend ce qui suit le N-ième caractère.
+
+    Rendre une chaîne vide plutôt qu'une erreur permet d'enchaîner sans
+    tester : c'est le comportement de MATLAB.
+
+    Syntaxe
+       newStr = extractAfter(str,motif)
+       newStr = extractAfter(str,n)
+
+    Exemples
+       extractAfter('bonjour monde', 'bonjour ')   % 'monde'
+       extractAfter('abcdef', 3)                   % 'def'
+       extractAfter('abc', 'z')                    % ''
+
+    Voir aussi EXTRACTBEFORE, EXTRACTBETWEEN, ERASE, STRFIND.
+```
+
+## `extractBefore`
+
+```
+EXTRACTBEFORE  Ce qui précède un motif.
+    S = EXTRACTBEFORE(TEXTE,MOTIF) rend ce qui vient avant la première
+    occurrence du motif, et la chaîne vide si le motif est absent.
+    S = EXTRACTBEFORE(TEXTE,N) rend les N-1 premiers caractères.
+
+    Syntaxe
+       newStr = extractBefore(str,motif)
+       newStr = extractBefore(str,n)
+
+    Exemples
+       extractBefore('bonjour monde', ' monde')    % 'bonjour'
+       extractBefore('abcdef', 4)                  % 'abc'
+       extractBefore('fichier.txt', '.')           % 'fichier'
+
+    Voir aussi EXTRACTAFTER, EXTRACTBETWEEN, ERASE.
+```
+
+## `extractBetween`
+
+```
+EXTRACTBETWEEN  Ce qui sépare deux motifs.
+    S = EXTRACTBETWEEN(TEXTE,DEBUT,FIN) rend ce qui se trouve entre la
+    première occurrence de DEBUT et la première occurrence de FIN qui la
+    suit. S = EXTRACTBETWEEN(TEXTE,A,B) rend les caractères de rang A à B.
+
+    S = EXTRACTBETWEEN(...,'Boundaries','inclusive') garde les deux motifs
+    dans le résultat ; par défaut ils en sont exclus.
+
+    Syntaxe
+       newStr = extractBetween(str,debut,fin)
+       newStr = extractBetween(str,a,b)
+
+    Exemples
+       extractBetween('<a>texte</a>', '<a>', '</a>')      % 'texte'
+       extractBetween('abcdef', 2, 4)                     % 'bcd'
+       extractBetween('<a>x</a>', '<a>', '</a>', 'Boundaries', 'inclusive')
+
+    Voir aussi EXTRACTAFTER, EXTRACTBEFORE, REGEXP.
+```
+
+## `insertAfter`
+
+```
+INSERTAFTER  Insère du texte après un motif.
+    S = INSERTAFTER(TEXTE,MOTIF,AJOUT) pose AJOUT après chaque occurrence
+    du motif, non seulement après la première.
+
+    Syntaxe
+       newStr = insertAfter(str,motif,ajout)
+
+    Exemples
+       insertAfter('abc', 'b', 'X')        % 'abXc'
+       insertAfter('a,b,c', ',', ' ')      % 'a, b, c'
+       insertAfter({'ab','cb'}, 'b', '!')  % {'ab!'  'cb!'}
+
+    Voir aussi INSERTBEFORE, ERASE, REPLACE, EXTRACTAFTER.
+```
+
+## `insertBefore`
+
+```
+INSERTBEFORE  Insère du texte avant un motif.
+    S = INSERTBEFORE(TEXTE,MOTIF,AJOUT) pose AJOUT avant chaque occurrence
+    du motif.
+
+    Syntaxe
+       newStr = insertBefore(str,motif,ajout)
+
+    Exemples
+       insertBefore('abc', 'b', 'X')       % 'aXbc'
+       insertBefore('fichier.txt', '.', '_v2')   % 'fichier_v2.txt'
+
+    Voir aussi INSERTAFTER, ERASE, REPLACE, EXTRACTBEFORE.
 ```
 
 ## `iscellstr`
@@ -188,6 +332,31 @@ LOWER  Met le texte en minuscules.
        end
 
     Voir aussi UPPER, STRCMPI.
+```
+
+## `matches`
+
+```
+MATCHES  Le texte est-il exactement le motif.
+    TF = MATCHES(TEXTE,MOTIF) est vrai quand le texte est égal au motif
+    tout entier. MOTIF peut être une cellule : vrai si l'un d'eux
+    correspond.
+
+    C'est la différence entre « est-ce ce mot » et « ce mot y est-il » :
+    CONTAINS se contente d'une occurrence, MATCHES exige l'égalité.
+
+    TF = MATCHES(...,'IgnoreCase',true) ne distingue pas la casse.
+
+    Syntaxe
+       tf = matches(str,motif)
+
+    Exemples
+       matches('abc', 'abc')           % 1
+       matches('abc', 'ab')            % 0 : CONTAINS dirait 1
+       matches({'a','b'}, 'a')         % [1 0]
+       matches('ABC', 'abc', 'IgnoreCase', true)   % 1
+
+    Voir aussi CONTAINS, STRCMP, STARTSWITH, ENDSWITH.
 ```
 
 ## `matlab.lang.makeUniqueStrings`
@@ -356,6 +525,55 @@ REGEXPREP  Remplace par expression régulière.
        regexprep('  trop   d''espaces ', '\s+', ' ')
 
     Voir aussi REGEXP, STRREP, REGEXPI.
+```
+
+## `regexptranslate`
+
+```
+REGEXPTRANSLATE  Rend un texte utilisable comme motif.
+    S = REGEXPTRANSLATE('escape',TEXTE) protège les caractères qui ont un
+    sens dans une expression régulière, de sorte que le texte se cherche
+    littéralement.
+    S = REGEXPTRANSLATE('wildcard',TEXTE) traduit les jokers du shell :
+    l'astérisque devient « .* » et le point d'interrogation « . ».
+    S = REGEXPTRANSLATE('flexible',TEXTE) rend le texte tel quel.
+
+    Sans « escape », chercher « a.b » trouverait aussi « axb » : le point
+    est un joker en expression régulière, et l'oubli est une source
+    classique de faux positifs.
+
+    Syntaxe
+       s = regexptranslate(op,str)
+
+    Exemples
+       regexptranslate('escape', 'a.b*c')      % 'a\.b\*c'
+       regexptranslate('wildcard', '*.txt')    % '.*\.txt'
+       regexp('a.b', regexptranslate('escape', 'a.b'), 'once')
+
+    Voir aussi REGEXP, REGEXPREP, STRFIND, CONTAINS.
+```
+
+## `replace`
+
+```
+REPLACE  Remplace un ou plusieurs motifs.
+    S = REPLACE(TEXTE,ANCIEN,NOUVEAU) remplace toutes les occurrences.
+    ANCIEN peut être une cellule de motifs ; NOUVEAU est alors soit unique,
+    soit de même longueur, et chaque motif reçoit son remplacement.
+
+    C'est ce qui la distingue de STRREP, qui ne prend qu'un motif. Les
+    remplacements s'appliquent dans l'ordre donné : un motif qui apparaît
+    dans le résultat d'un précédent sera lui aussi remplacé.
+
+    Syntaxe
+       newStr = replace(str,ancien,nouveau)
+
+    Exemples
+       replace('a-b-c', '-', '+')                 % 'a+b+c'
+       replace('abc', {'a','c'}, {'x','y'})       % 'xby'
+       replace({'aa','ba'}, 'a', 'Z')             % {'ZZ'  'bZ'}
+
+    Voir aussi ERASE, STRREP, REGEXPREP, INSERTAFTER.
 ```
 
 ## `reverse`

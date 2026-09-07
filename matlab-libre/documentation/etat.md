@@ -14,15 +14,19 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 9 890 |
-| `src/bibliotheque` | 653 fonctions natives, en C++ | 18 356 |
+| `src/bibliotheque` | 663 fonctions natives, en C++ | 18 700 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 644 fichiers `.m`, dont 2 088 fonctions publiques | 121 665 |
+| `toolbox` | 2 669 fichiers `.m`, dont 2 109 fonctions publiques | 124 000 |
 | `tests` | 34 scripts `.m` et 2 fichiers C++ | 19 860 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 162
-fonctions attendues, 0 manquante**.
+documentation MathWorks est complète : `outils/manques.m` compte **2 193
+fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
+fonction courante qui n'y figurait pas est une fonction qui n'existait
+pas, et trente et une ont été ajoutées de cette façon — la famille
+moderne des chaînes, les extrema locaux et les ruptures, les méthodes de
+Krylov, les estimations de norme et de conditionnement.
 
 ## 2. Ce qui est vérifié, et comment
 
@@ -118,7 +122,7 @@ programme d'école qui montre à quoi il sert.
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
 | Symbolique | dérivation, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, sortie LaTeX ; la simplification ne réduit que les cas triviaux | factorisation, développement, résolution d'équations |
 | Calcul parallèle | `parfor`, `spmd` et `parfeval` s'exécutent vraiment sur un pool de fils ; chaque travailleur est un interpréteur neuf, sans mémoire partagée | tableaux distribués sur plusieurs machines, GPU |
-| Grandes matrices creuses | stockage et opérations de base | factorisations creuses, solveurs itératifs |
+| Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice | factorisations creuses — ICHOL, ILU —, réordonnancements |
 | Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF, qui demandent une bibliothèque externe |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |

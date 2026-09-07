@@ -341,6 +341,8 @@ BLSPRICE Prix d'options européennes par la formule de Black-Scholes.
   Exemple :
      [c, p] = blsprice(100, 100, 0.05, 1, 0.2);
      abs(c - p - (100 - 100 * exp(-0.05))) < 1e-9   % la parite achat-vente
+
+  Voir aussi BLSDELTA, BLSGAMMA, BLSVEGA, BLSIMPV.
 ```
 
 ## `blsrho`
@@ -2094,6 +2096,8 @@ PORTALLOC Portefeuille de variance minimale pour un rendement cible.
      C = [0.04 0.01; 0.01 0.09];
      [poids, r, risque] = portalloc([0.08 0.12], C, 0.10);
      abs(sum(poids) - 1) < 1e-9      % le portefeuille est pleinement investi
+
+  Voir aussi PORTSTATS, SHARPE, MAXDRAWDOWN.
 ```
 
 ## `portalpha`
@@ -2630,6 +2634,8 @@ TICK2RET Rendements à partir d'une série de cours.
      r = tick2ret([100 110 99]);
      max(abs(r(:)' - [0.1 -0.1])) < 1e-12
      max(abs(ret2tick(r, 100)' - [100 110 99])) < 1e-10   % l'aller-retour
+
+  Voir aussi RET2TICK, PRICE2RET, MAXDRAWDOWN.
 ```
 
 ## `totalreturnprice`

@@ -86,6 +86,8 @@ IDENTIFIANTPARENT Numéro du composant parent, quelle qu'en soit la forme.
   Exemple :
      f = uifigure();
      identifiantParent(f) == identifiantParent(f)      % 1
+
+  Voir aussi UIFIGURE, UIPANEL.
 ```
 
 ## `matlibre_ui_appliquer`
@@ -345,5 +347,7 @@ UIWAIT Attend la fermeture d'une fenêtre.
      uiwait(f, 0.01);            % rend la main aussitot : les rappels sont deja passes
      uiresume(f);
      close all;
+
+  Voir aussi UIRESUME, UIFIGURE.
 ```
 

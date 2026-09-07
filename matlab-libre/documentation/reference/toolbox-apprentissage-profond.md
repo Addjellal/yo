@@ -259,6 +259,8 @@ BATCHNORMALIZATIONLAYER Normalisation par lot.
      couches = {featureInputLayer(3), fullyConnectedLayer(4), ...
                 batchNormalizationLayer(), reluLayer()};
      numel(couches)              % 4
+
+  Voir aussi BATCHNORM, LAYERNORMALIZATIONLAYER, RELULAYER.
 ```
 
 ## `batchnorm`
@@ -330,6 +332,8 @@ CLASSIFICATIONLAYER Couche de sortie pour la classification.
      couches = {featureInputLayer(3), fullyConnectedLayer(2), ...
                 softmaxLayer(), classificationLayer()};
      numel(couches)              % 4
+
+  Voir aussi SOFTMAXLAYER, CROSSENTROPY, REGRESSIONLAYER.
 ```
 
 ## `classify`
@@ -467,6 +471,8 @@ CONVOLUTION2DLAYER Couche de convolution bidimensionnelle.
 
   Exemple :
      c = convolution2dLayer(3, 8, 'Padding', 'same');
+
+  Voir aussi MAXPOOLING2DLAYER, RELULAYER, DLCONV.
 ```
 
 ## `couchesConvolution`
@@ -492,6 +498,8 @@ COUCHESCONVOLUTION Propagation avant et arrière des couches spatiales.
   Exemple :
      c = convolution2dLayer(3, 2);
      c.type                      % 'conv2d'
+
+  Voir aussi CONVOLUTION2DLAYER, MAXPOOLING2DLAYER, FLATTENLAYER.
 ```
 
 ## `crossChannelNormalizationLayer`
@@ -717,6 +725,8 @@ DROPOUTLAYER Couche d'abandon : éteint des unités pendant l'apprentissage.
   Exemple :
      c = dropoutLayer(0.5);
      c.probabilite               % 0.5 : une unite sur deux est ecartee a l'apprentissage
+
+  Voir aussi BATCHNORMALIZATIONLAYER, RELULAYER, TRAININGOPTIONS.
 ```
 
 ## `eluLayer`
@@ -728,6 +738,8 @@ ELULAYER Couche ELU : linéaire pour les positifs, exponentielle sinon.
   Exemple :
      c = eluLayer();
      c.type                      % 'elu'
+
+  Voir aussi RELULAYER, LEAKYRELULAYER, GELULAYER.
 ```
 
 ## `featureInputLayer`
@@ -762,6 +774,8 @@ FLATTENLAYER Aplatit un lot d'images en vecteurs.
   Exemple :
      couches = {imageInputLayer([8 8 1]), flattenLayer(), fullyConnectedLayer(2)};
      numel(couches)              % 3
+
+  Voir aussi FULLYCONNECTEDLAYER, CONVOLUTION2DLAYER, MAXPOOLING2DLAYER.
 ```
 
 ## `fullyConnectedLayer`
@@ -774,6 +788,8 @@ FULLYCONNECTEDLAYER Couche entièrement connectée de N sorties.
   Exemple :
      c = fullyConnectedLayer(5);
      c.sorties                   % 5
+
+  Voir aussi FULLYCONNECT, RELULAYER, SOFTMAXLAYER.
 ```
 
 ## `fullyconnect`
@@ -959,6 +975,8 @@ IMAGEINPUTLAYER Couche d'entrée pour des images.
      couches = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4), ...
                 reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
                 fullyConnectedLayer(2), softmaxLayer()};
+
+  Voir aussi FEATUREINPUTLAYER, SEQUENCEINPUTLAYER, CONVOLUTION2DLAYER.
 ```
 
 ## `l1loss`
@@ -1077,6 +1095,8 @@ LEAKYRELULAYER Couche ReLU à fuite : pente non nulle pour les négatifs.
   Exemple :
      c = leakyReluLayer(0.01);
      c.pente                     % 0.01 : la pente du cote negatif
+
+  Voir aussi RELULAYER, LEAKYRELU, ELULAYER.
 ```
 
 ## `leakyrelu`
@@ -2236,6 +2256,8 @@ MAXPOOLING2DLAYER Sous-échantillonnage par le maximum.
   Exemple :
      c = maxPooling2dLayer(2);
      c.taille                    % 2 2 : une fenetre carree
+
+  Voir aussi AVERAGEPOOLING2DLAYER, MAXPOOL, CONVOLUTION2DLAYER.
 ```
 
 ## `maxpool`
@@ -2397,6 +2419,8 @@ PREDICTRESEAU Sortie d'un réseau appris.
      reseau = trainNetwork(X, Y, {fullyConnectedLayer(4), reluLayer(), ...
               fullyConnectedLayer(2), softmaxLayer()}, trainingOptions('sgdm'));
      max(abs(sum(predictReseau(reseau, X), 1) - 1)) < 1e-10     % un softmax somme a un
+
+  Voir aussi TRAINNETWORK, PREDICT, CLASSIFY.
 ```
 
 ## `regressionLayer`
@@ -2408,6 +2432,8 @@ REGRESSIONLAYER Couche de sortie pour la régression.
   Exemple :
      couches = {featureInputLayer(3), fullyConnectedLayer(1), regressionLayer()};
      numel(couches)              % 3
+
+  Voir aussi CLASSIFICATIONLAYER, MSE, FULLYCONNECTEDLAYER.
 ```
 
 ## `relu`
@@ -2651,6 +2677,8 @@ TRAINNETWORK Apprentissage d'un réseau par rétropropagation.
      reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
      [~, classes] = max(predict(reseau, X));
      mean(classes == [ones(1, 30), 2 * ones(1, 30)]) > 0.9
+
+  Voir aussi TRAININGOPTIONS, PREDICT, CLASSIFY, DLNETWORK.
 ```
 
 ## `trainingOptions`
@@ -2663,6 +2691,8 @@ TRAININGOPTIONS Réglages de l'apprentissage.
   Exemple :
      o = trainingOptions('sgdm', 'MaxEpochs', 50, 'InitialLearnRate', 0.02);
      o.MaxEpochs                 % 50
+
+  Voir aussi TRAINNETWORK, ADAMUPDATE, SGDMUPDATE.
 ```
 
 ## `transposedConv2dLayer`

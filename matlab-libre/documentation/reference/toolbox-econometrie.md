@@ -155,6 +155,8 @@ ARFIT Estimation d'un modèle autorégressif par Yule-Walker.
      y = arsim(0.7, 500);
      p = arfit(y, 1);
      abs(p(1) - 0.7) < 0.15
+
+  Voir aussi ARSIM, ARYULE, ARIMA, ESTIMATE.
 ```
 
 ## `arima`

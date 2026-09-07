@@ -110,6 +110,8 @@ ALIGNERPOLYNOMES Complète de zéros le plus court de deux polynômes.
 
   Exemple :
      [a, b] = alignerPolynomes([1 2], [1 2 3 4]);   % a devient [1 2 0 0]
+
+  Voir aussi ALIGNERTERMES, GF.
 ```
 
 ## `alignerTermes`
@@ -125,6 +127,8 @@ ALIGNERTERMES Met deux tableaux à la même taille, terme à terme.
 
   Exemple :
      [a, b] = alignerTermes(5, [1 2 3]);   % a devient [5 5 5]
+
+  Voir aussi ALIGNERPOLYNOMES.
 ```
 
 ## `amdemod`
@@ -181,6 +185,8 @@ AWGN Ajoute un bruit blanc gaussien pour atteindre un rapport donné.
   Exemple :
      rng(1);
            y = awgn(sin(2*pi*(0:999)/100), 20, 'measured');
+
+  Voir aussi BERAWGN, SNR.
 ```
 
 ## `base2dec`
@@ -533,6 +539,8 @@ COMPLETERLONGUEUR Complète un polynôme de zéros, ou le tronque.
 
   Exemple :
      completerLongueur([1 2 3], 5)     % [1 2 3 0 0]
+
+  Voir aussi ALIGNERPOLYNOMES, PADARRAY.
 ```
 
 ## `convenc`
@@ -813,6 +821,8 @@ DPSKMOD Modulation par déplacement de phase différentiel.
 
   Exemple :
      y = dpskmod([0 1 0], 2);   % [1 -1 -1] : la phase bascule au 1
+
+  Voir aussi DPSKDEMOD, PSKMOD, PSKDEMOD.
 ```
 
 ## `encode`
@@ -847,6 +857,8 @@ EXIGERPREMIER Refuse un ordre de corps qui n'est pas premier.
   Exemple :
      exigerPremier(7, 'gf');    % passe
      %      % exigerPremier(4, 'gf') leve comm:gf:NotPrime
+
+  Voir aussi GF.
 ```
 
 ## `eyediagram`
@@ -860,6 +872,8 @@ EYEDIAGRAM Découpe un signal en segments de N échantillons.
      rng(1);
            eyediagram(rcosdesign(0.25, 4, 8) , 16);
            close all;
+
+  Voir aussi SCATTERPLOT, RCOSDESIGN, PSKMOD.
 ```
 
 ## `fmdemod`
@@ -935,6 +949,8 @@ FSKMOD Modulation par déplacement de fréquence.
 
   Exemple :
      y = fskmod([0 1], 2, 100, 8, 1000);   % 16 échantillons
+
+  Voir aussi FSKDEMOD, PSKMOD, QAMMOD.
 ```
 
 ## `gen2par`
@@ -1389,6 +1405,8 @@ HAMMGEN Matrices d'un code de Hamming.
 
   Exemple :
      [H, G, n, k] = hammgen(3);   % n = 7, k = 4
+
+  Voir aussi ENCODE, DECODE, GF.
 ```
 
 ## `helscandeintrlv`
@@ -1501,6 +1519,8 @@ INSTANTS Vecteur des instants d'échantillonnage, à la forme de X.
 
   Exemple :
      instants(100, 10)                 % les instants d'echantillonnage
+
+  Voir aussi MODULATE, DEMOD.
 ```
 
 ## `intdump`
@@ -2088,6 +2108,8 @@ OPTIONSCHIFFRES Démêle la base et le sens de lecture de DE2BI et BI2DE.
 
   Exemple :
      [b, s] = optionsChiffres({8, 'left-msb'})   % 8, 'left-msb'
+
+  Voir aussi DE2BI, BI2DE, DEC2BASE.
 ```
 
 ## `pamdemod`
@@ -2137,6 +2159,8 @@ PERMUTATIONALEATOIRE Permutation reproductible de 1 à N.
   Exemple :
      p = permutationAleatoire(20, 3);
            isequal(p, permutationAleatoire(20, 3))     % 1 : meme germe
+
+  Voir aussi INTRLV, VERIFIERPERMUTATION.
 ```
 
 ## `permutationMatricielle`
@@ -2148,6 +2172,8 @@ PERMUTATIONMATRICIELLE Ordre de lecture colonne par colonne d'une
   Exemple :
      p = permutationMatricielle(3, 4);
            isequal(sort(p(:))', 1:12)                  % 1 : c'est une permutation
+
+  Voir aussi INTRLV, DEINTRLV.
 ```
 
 ## `pmdemod`
@@ -2307,6 +2333,8 @@ QFUNC Fonction Q : probabilité qu'une normale centrée réduite dépasse X.
 
   Exemple :
      qfunc(0)   % 0.5
+
+  Voir aussi QFUNCINV, BERAWGN.
 ```
 
 ## `qfuncinv`
@@ -2318,6 +2346,8 @@ QFUNCINV Réciproque de la fonction Q.
   Exemple :
      qfuncinv(0.5)              % 0
      qfuncinv(qfunc(1.3))       % 1.3
+
+  Voir aussi QFUNC.
 ```
 
 ## `quantiz`
@@ -2405,6 +2435,8 @@ RCOSDESIGN Filtre en cosinus surélevé, ou sa racine.
   Exemple :
      h = rcosdesign(0.25, 6, 4);
            abs(sum(h .^ 2) - 1) < 1e-10      % 1 : energie unite
+
+  Voir aussi EYEDIAGRAM, FIR1.
 ```
 
 ## `rsdec`
@@ -2595,6 +2627,8 @@ TABLEGRAY Table de renumérotation de Gray d'une constellation.
   Exemple :
      table = tableGray('psk', 8);
            isequal(sort(table(:)'), 0:7)               % 1
+
+  Voir aussi PSKMOD, QAMMOD, BIN2GRAY.
 ```
 
 ## `tailleEntrelacement`
@@ -2607,6 +2641,8 @@ TAILLEENTRELACEMENT Nombre d'éléments qu'un entrelaceur doit permuter.
   Exemple :
      tailleEntrelacement((1:10)')      % 10
            tailleEntrelacement(zeros(6, 3))  % 6 : une matrice s'entrelace par lignes
+
+  Voir aussi INTRLV, DEINTRLV, VERIFIERPERMUTATION.
 ```
 
 ## `vec2mat`
@@ -2635,6 +2671,8 @@ VERIFIERFREQUENCES Contrôle du critère de Shannon pour la porteuse.
 
   Exemple :
      verifierFrequences(100, 1000);    % passe : 100 Hz est sous Nyquist
+
+  Voir aussi PSKMOD, FSKMOD, MODULATE.
 ```
 
 ## `verifierPermutation`

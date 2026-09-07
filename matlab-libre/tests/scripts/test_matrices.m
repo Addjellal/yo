@@ -333,4 +333,121 @@ assert(isequal(discretize([1 3 5], [1 3 5], 'IncludedEdge', 'right'), [1 1 2]));
 nd = discretize([1 2 3 4 5], [1 3 5], {'bas', 'haut'});
 assert(strcmp(nd{1}, 'bas') && strcmp(nd{5}, 'haut'));
 
+%% -------------------------------- estimations de norme et de conditionnement
+% NORMEST monte vers la norme spectrale par la methode de la puissance :
+% l'estimation est une borne inferieure, atteinte a la tolerance pres.
+A = magic(5);
+assert(abs(normest(A) - norm(A)) / norm(A) < 1e-6);
+assert(normest(A) <= norm(A) * (1 + 1e-9), 'jamais au-dessus');
+assert(abs(normest(eye(4)) - 1) < 1e-12);
+assert(normest(zeros(3)) == 0, 'la matrice nulle a une norme nulle');
+
+% NORMEST1 cherche le sommet du cube unite ou la norme 1 est atteinte, et
+% rend le temoin de son estimation.
+assert(abs(normest1(magic(5)) - norm(magic(5), 1)) < 1e-10);
+[estimation, v, w] = normest1(magic(4));
+assert(abs(norm(w, 1) - estimation * norm(v, 1)) < 1e-10, ...
+       'le temoin verifie l''estimation');
+assert(estimation <= norm(magic(4), 1) * (1 + 1e-9), 'borne inferieure');
+
+% COND(A,P) n'est pas COND(A) : pour la matrice de Hilbert d'ordre six,
+% 1,5e7 en norme 2 et 2,9e7 en norme 1. Ignorer P rendait une valeur
+% fausse en silence.
+H = hilb(6);
+assert(abs(cond(H, 1) - norm(H, 1) * norm(inv(H), 1)) / cond(H, 1) < 1e-10);
+assert(abs(cond(H, inf) - norm(H, inf) * norm(inv(H), inf)) / cond(H, inf) < 1e-10);
+assert(abs(cond(H, 2) - cond(H)) < 1e-6 * cond(H));
+assert(cond(H, 1) > 1.5 * cond(H, 2), 'les deux normes ne disent pas la meme chose');
+assert(abs(cond(eye(3), 1) - 1) < 1e-12);
+
+% CONDEST estime la norme 1 de l'inverse sans former l'inverse : chaque
+% produit devient une resolution. C'est une borne inferieure.
+assert(abs(condest(eye(3)) - 1) < 1e-12);
+assert(condest(H) <= cond(H, 1) * (1 + 1e-9));
+assert(condest(H) > 1e6, 'la matrice de Hilbert est infame');
+assert(abs(condest([2 0; 0 1]) - 2) < 1e-12);
+
+%% -------------------------------------------- methodes de Krylov
+% Les quatre convergent a la precision machine sur un systeme bien pose.
+A = [4 1 0; 1 3 1; 0 1 2];
+b = [1; 2; 3];
+for f = {@pcg, @bicg, @cgs, @minres}
+    [x, drapeau, ~, iterations] = f{1}(A, b, 1e-12, 50);
+    assert(drapeau == 0, 'la tolerance doit etre atteinte');
+    assert(norm(A * x - b) / norm(b) < 1e-11);
+    assert(iterations <= 3, 'au plus N iterations en arithmetique exacte');
+end
+% La matrice n'est jamais demandee, seulement son action sur un vecteur.
+x = pcg(@(v) A * v, b, 1e-12, 50);
+assert(norm(A * x - b) < 1e-11);
+% BICG et CGS ne demandent pas la definie positivite.
+B = [2 1; 5 7];
+c = [11; 13];
+assert(norm(B * bicg(B, c, 1e-12, 50) - c) < 1e-10);
+
+% GMRES minimise le residu a chaque pas : il ne peut que decroitre. C'est
+% ce qu'aucune methode a recurrence courte ne garantit sur une matrice non
+% symetrique.
+C = [2 1 0; 5 7 1; 0 1 3];
+d = [11; 13; 5];
+[x, drapeau, ~, compteur] = gmres(C, d, [], 1e-12, 20);
+assert(drapeau == 0 && norm(C * x - d) / norm(d) < 1e-11);
+assert(compteur(2) <= 3, 'exact en N pas');
+rng(1);
+G = randn(20) + 20 * eye(20);
+g = randn(20, 1);
+[x, drapeau, ~, ~, historique] = gmres(G, g, [], 1e-12, 30);
+assert(drapeau == 0 && norm(G * x - g) / norm(g) < 1e-10);
+assert(all(diff(historique) <= 1e-14), 'le residu de GMRES est monotone');
+% Le redemarrage borne la memoire et converge encore ici.
+assert(norm(C * gmres(C, d, 2, 1e-12, 40) - d) / norm(d) < 1e-10);
+
+%% ------------------------------------- moindre norme, pages, tenseurs
+% LSQMINNORM rend, parmi les solutions equivalentes, celle de plus petite
+% norme ; l'antislash en rend une autre, a coefficients epars.
+M = [1 1; 1 1];
+v = [2; 2];
+x = lsqminnorm(M, v);
+assert(norm(M * x - v) < 1e-12, 'c''est bien une solution des moindres carres');
+assert(norm(x) <= norm(M \ v) + 1e-12, 'et de norme minimale');
+% Sur une matrice de rang plein, les deux coincident.
+D = [1 2; 3 4];
+assert(norm(lsqminnorm(D, [5; 6]) - D \ [5; 6]) < 1e-10);
+
+% Les operations par page ne melangent pas les pages.
+P = cat(3, [2 0; 0 4], [1 1; 0 1]);
+Q = pageinv(P);
+assert(max(max(max(abs(pagemtimes(P, Q) - cat(3, eye(2), eye(2)))))) < 1e-12);
+R = cat(3, [2; 4], [3; 1]);
+X = pagemldivide(P, R);
+assert(max(max(max(abs(pagemtimes(P, X) - R)))) < 1e-12);
+
+% TENSORPROD contracte les indices qu'on lui dit : contracter la deuxieme
+% dimension de A avec la premiere de B redonne le produit matriciel.
+assert(max(max(abs(tensorprod(D, [5 6; 7 8], 2, 1) - D * [5 6; 7 8]))) < 1e-12);
+assert(abs(tensorprod([1 2 3], [4 5 6], 2, 2) - 32) < 1e-12);
+assert(isequal(size(tensorprod(ones(2, 3), ones(4, 5))), [2 3 4 5]));
+assert(abs(tensorprod(D, D, 'all') - sum(sum(D .* D))) < 1e-12);
+
+% MAXK, MINK, EIGS et SVDS : le sommet, sans trier plus qu'il ne faut.
+assert(isequal(maxk([3 1 4 1 5], 2), [5 4]));
+[dessus, rangs] = maxk([3 1 4 1 5], 2);
+assert(isequal(rangs, [5 3]));
+assert(isequal(mink([3 1 4 1 5], 2), [1 1]));
+assert(isequal(mink([3 1 4], 3), sort([3 1 4])), 'tout prendre, c''est trier');
+assert(isequal(maxk([1 2; 3 4], 1), [3 4]), 'par colonne');
+
+E = diag([1 2 3 10]);
+assert(isequal(eigs(E, 2)', [10 3]));
+assert(isequal(eigs(E, 2, 'smallestabs')', [1 2]));
+[vecteurs, valeurs] = eigs(E, 1);
+assert(norm(E * vecteurs - vecteurs * valeurs) < 1e-12);
+
+F = magic(4);
+valeursSing = svd(F);
+assert(max(abs(svds(F, 2) - valeursSing(1:2))) < 1e-10);
+[Us, Ss, Vs] = svds(F, 1);
+assert(abs(norm(F - Us * Ss * Vs') - valeursSing(2)) < 1e-9, ...
+       'Eckart-Young : l''erreur de rang un est la valeur singuliere suivante');
+
 disp('matrices : toutes les verifications passent');
