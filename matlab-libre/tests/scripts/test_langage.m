@@ -639,6 +639,83 @@ assert(isequal(cellstr(nLibre), {'zeta', 'alpha'}));
 assert(isequal(gLibre, [1 2 1]));
 disp('ordre des categories : ok');
 
+%% ------------------------------------------------ les validateurs
+% Un validateur ne rend rien : il se tait quand tout va bien et leve une
+% erreur sinon. C'est ce contrat qu'on verifie des deux cotes.
+passants = {@() mustBeNumeric(3), @() mustBeNumericOrLogical(true), ...
+            @() mustBeReal(3), @() mustBeFinite([1 2]), ...
+            @() mustBeNonNan([1 Inf]), @() mustBeNonempty(1), ...
+            @() mustBePositive(3), @() mustBeNonnegative(0), ...
+            @() mustBeNegative(-3), @() mustBeNonpositive(0), ...
+            @() mustBeNonzero(3), @() mustBeInteger(3), ...
+            @() mustBeInteger(int8(5)), @() mustBeMember('a', {'a', 'b'}), ...
+            @() mustBeGreaterThan(3, 1), @() mustBeLessThan(0, 1), ...
+            @() mustBeGreaterThanOrEqual(1, 1), @() mustBeLessThanOrEqual(1, 1), ...
+            @() mustBeText('abc'), @() mustBeTextScalar({'abc'}), ...
+            @() mustBeNonzeroLengthText('a'), @() mustBeVector(5), ...
+            @() mustBeScalarOrEmpty([]), @() mustBeA(3, 'double'), ...
+            @() mustBeInRange(0.5, 0, 1)};
+for k = 1:numel(passants)
+    passants{k}();      % aucun ne doit lever
+end
+
+refuses = {@() mustBeNumeric('a'), @() mustBeReal(1i), @() mustBeFinite(Inf), ...
+           @() mustBeNonNan(NaN), @() mustBeNonempty([]), ...
+           @() mustBePositive(-1), @() mustBeNonnegative(-1), ...
+           @() mustBeNegative(1), @() mustBeNonpositive(1), ...
+           @() mustBeNonzero(0), @() mustBeInteger(1.5), ...
+           @() mustBeMember('x', {'a'}), @() mustBeGreaterThan(0, 1), ...
+           @() mustBeLessThan(2, 1), @() mustBeGreaterThanOrEqual(0, 1), ...
+           @() mustBeLessThanOrEqual(2, 1), @() mustBeText(3), ...
+           @() mustBeTextScalar({'a', 'b'}), @() mustBeNonzeroLengthText(''), ...
+           @() mustBeVector(magic(3)), @() mustBeScalarOrEmpty([1 2]), ...
+           @() mustBeA(3, 'int8'), @() mustBeInRange(2, 0, 1)};
+for k = 1:numel(refuses)
+    leve = false;
+    try
+        refuses{k}();
+    catch
+        leve = true;
+    end
+    assert(leve, sprintf('le validateur %d aurait du refuser', k));
+end
+
+% Un logique n'est pas numerique, mais MUSTBENUMERICORLOGICAL l'accepte :
+% c'est toute la raison d'etre de la seconde.
+leve = false;
+try
+    mustBeNumeric(true);
+catch
+    leve = true;
+end
+assert(leve);
+mustBeNumericOrLogical(true);
+
+% Le controle porte sur tous les elements : un seul intrus suffit.
+mustBePositive([1 2 3]);
+leve = false;
+try
+    mustBePositive([1 -2 3]);
+catch
+    leve = true;
+end
+assert(leve, 'un seul element negatif fait echouer tout le tableau');
+
+% MUSTBEINRANGE : les bornes ouvertes ne sont pas un detail — une
+% probabilite vit dans [0,1] ferme, un pas d'apprentissage dans ]0,1[.
+mustBeInRange(0, 0, 1);
+leve = false;
+try
+    mustBeInRange(0, 0, 1, 'exclusive');
+catch
+    leve = true;
+end
+assert(leve);
+
+% MUSTBEA suit l'heritage, la ou une comparaison de CLASS ne le ferait pas.
+mustBeA(int8(3), {'int8', 'int16'});
+mustBeA('abc', 'char');
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

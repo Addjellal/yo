@@ -62,3 +62,8 @@ indegree laplacian minspantree neighbors numedges numnodes outdegree predecessor
 shortestpath subgraph successors toposort
 integral3 quad2d
 groupfilter groupsummary grouptransform pagesvd sprintfc timeit
+mustBeA mustBeFinite mustBeGreaterThan mustBeGreaterThanOrEqual mustBeInRange
+mustBeInteger mustBeLessThan mustBeLessThanOrEqual mustBeMember mustBeNegative
+mustBeNonNan mustBeNonempty mustBeNonnegative mustBeNonpositive mustBeNonzero
+mustBeNonzeroLengthText mustBeNumeric mustBeNumericOrLogical mustBePositive
+mustBeReal mustBeScalarOrEmpty mustBeText mustBeTextScalar mustBeVector

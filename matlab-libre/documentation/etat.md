@@ -14,19 +14,20 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 9 890 |
-| `src/bibliotheque` | 663 fonctions natives, en C++ | 18 700 |
+| `src/bibliotheque` | 665 fonctions natives, en C++ | 19 000 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 684 fichiers `.m`, dont 2 112 fonctions publiques | 126 000 |
+| `toolbox` | 2 716 fichiers `.m`, dont 2 142 fonctions publiques | 128 000 |
 | `tests` | 34 scripts `.m` et 2 fichiers C++ | 19 860 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 214
+documentation MathWorks est complète : `outils/manques.m` compte **2 246
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
-pas, et cinquante-deux ont été ajoutées de cette façon — la famille
+pas, et quatre-vingt-quatre ont été ajoutées de cette façon — la famille
 moderne des chaînes, les extrema locaux et les ruptures, les méthodes de
-Krylov, les estimations de norme et de conditionnement, les graphes.
+Krylov, les estimations de norme et de conditionnement, les graphes, les
+résumés par groupe, les vingt-quatre validateurs d'arguments.
 
 ## 2. Ce qui est vérifié, et comment
 

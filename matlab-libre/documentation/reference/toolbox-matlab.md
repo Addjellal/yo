@@ -3205,6 +3205,22 @@ MATLIBRE_RACINE_TOOLBOX Dossier qui contient les toolboxes.
   d'environnement MATLIBRE_TOOLBOX le remplace quand elle est posée.
 ```
 
+## `matlibre_valider`
+
+```
+MATLIBRE_VALIDER Lève l'erreur d'un validateur quand la condition échoue.
+  Les fonctions MUSTBE... ne rendent rien : elles se taisent quand tout
+  va bien et lèvent une erreur sinon. C'est ce contrat que cette
+  fonction tient, avec l'identifiant que MATLAB emploie.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_valider(true, 'MATLAB:essai', 'jamais vu');
+
+  Voir aussi MUSTBENUMERIC, MUSTBEPOSITIVE, VALIDATEATTRIBUTES.
+```
+
 ## `maxk`
 
 ```
@@ -3407,6 +3423,394 @@ MOVMAD Écart absolu médian glissant.
      movmad(1:10, 3)                 % 1 partout au centre
 
   Voir aussi MOVMEAN, MOVMEDIAN, MOVSTD, MAD, ISOUTLIER.
+```
+
+## `mustBeA`
+
+```
+MUSTBEA Exige une valeur d'une classe donnée.
+  MUSTBEA(A,CLASSE) lève une erreur si A n'est pas de la classe nommée,
+  ni d'une classe qui en dérive. CLASSE peut être une cellule de
+  plusieurs, et il suffit alors d'en satisfaire une.
+
+  Le contrôle passe par ISA, donc l'héritage compte : une sous-classe
+  satisfait le validateur de sa classe mère. C'est ce qu'on veut d'un
+  contrôle de type, et ce qui le sépare d'une comparaison de CLASS.
+
+  Exemple :
+     mustBeA(3, 'double');                    % passe
+     mustBeA(int8(3), {'int8', 'int16'});     % passe
+
+  Voir aussi ISA, CLASS, MUSTBENUMERIC, VALIDATEATTRIBUTES.
+```
+
+## `mustBeFinite`
+
+```
+MUSTBEFINITE Exige des valeurs finies.
+  MUSTBEFINITE(A) lève une erreur si A contient un infini ou un NaN.
+
+  Exemple :
+     mustBeFinite([1 2 3]);         % passe
+     mustBeFinite(0);               % passe
+
+  Voir aussi MUSTBENONNAN, MUSTBEREAL, ISFINITE.
+```
+
+## `mustBeGreaterThan`
+
+```
+MUSTBEGREATERTHAN Exige une valeur strictement supérieure à une borne.
+  MUSTBEGREATERTHAN(A,BORNE) lève une erreur si un élément de A ne l'est pas.
+  La comparaison se fait terme à terme, et un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeGreaterThan(3, 1);       % passe
+     mustBeGreaterThan([2 5], 1);   % passe
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBEMEMBER, VALIDATEATTRIBUTES.
+```
+
+## `mustBeGreaterThanOrEqual`
+
+```
+MUSTBEGREATERTHANOREQUAL Exige une valeur supérieure ou égale à une borne.
+  MUSTBEGREATERTHANOREQUAL(A,BORNE) lève une erreur si un élément de A ne l'est pas.
+  La comparaison se fait terme à terme, et un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeGreaterThanOrEqual(1, 1);      % passe : l'egalite est admise
+     mustBeGreaterThanOrEqual([1 2], 1);
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBEMEMBER, VALIDATEATTRIBUTES.
+```
+
+## `mustBeInRange`
+
+```
+MUSTBEINRANGE Exige une valeur dans un intervalle.
+  MUSTBEINRANGE(A,BAS,HAUT) refuse tout élément hors de [BAS,HAUT],
+  bornes comprises.
+  MUSTBEINRANGE(A,BAS,HAUT,'exclude-lower') ouvre la borne basse ;
+  'exclude-upper' ouvre la haute ; 'exclusive' ouvre les deux.
+
+  Le choix des bornes ouvertes ou fermées n'est pas un détail : une
+  probabilité vit dans [0,1] fermé, un taux d'apprentissage dans ]0,1[
+  ouvert — zéro n'apprend rien et un diverge.
+
+  Exemple :
+     mustBeInRange(0.5, 0, 1);                        % passe
+     mustBeInRange(0, 0, 1);                          % passe : borne fermee
+     mustBeInRange(0.5, 0, 1, 'exclusive');           % passe
+
+  Voir aussi MUSTBEGREATERTHAN, MUSTBELESSTHAN, MUSTBEPOSITIVE.
+```
+
+## `mustBeInteger`
+
+```
+MUSTBEINTEGER Exige des valeurs entières.
+  MUSTBEINTEGER(A) lève une erreur si un élément de A n'est pas un
+  entier. Le contrôle porte sur la valeur, non sur la classe : 3 en
+  double passe, 3,5 non.
+
+  Un NaN ou un infini est refusé : ni l'un ni l'autre n'est un entier.
+
+  Exemple :
+     mustBeInteger(3);              % passe, bien que ce soit un double
+     mustBeInteger([1 2 3]);        % passe
+     mustBeInteger(int8(5));        % passe
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBEFINITE, ROUND, ISINTEGER.
+```
+
+## `mustBeLessThan`
+
+```
+MUSTBELESSTHAN Exige une valeur strictement inférieure à une borne.
+  MUSTBELESSTHAN(A,BORNE) lève une erreur si un élément de A ne l'est pas.
+  La comparaison se fait terme à terme, et un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeLessThan(0, 1);          % passe
+     mustBeLessThan([-1 0], 1);     % passe
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBEMEMBER, VALIDATEATTRIBUTES.
+```
+
+## `mustBeLessThanOrEqual`
+
+```
+MUSTBELESSTHANOREQUAL Exige une valeur inférieure ou égale à une borne.
+  MUSTBELESSTHANOREQUAL(A,BORNE) lève une erreur si un élément de A ne l'est pas.
+  La comparaison se fait terme à terme, et un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeLessThanOrEqual(1, 1);         % passe : l'egalite est admise
+     mustBeLessThanOrEqual([0 1], 1);
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBEMEMBER, VALIDATEATTRIBUTES.
+```
+
+## `mustBeMember`
+
+```
+MUSTBEMEMBER Exige une valeur prise dans un ensemble.
+  MUSTBEMEMBER(A,ENSEMBLE) lève une erreur si un élément de A n'est pas
+  dans ENSEMBLE. C'est le validateur des paramètres à choix fermé — un
+  nom de méthode, un mode, une unité.
+
+  Le message nomme les valeurs admises : c'est la moitié de son utilité,
+  puisqu'il évite d'aller lire le code pour savoir quoi écrire.
+
+  Exemple :
+     mustBeMember('linear', {'linear', 'cubic'});     % passe
+     mustBeMember([1 2], [1 2 3]);                    % passe
+
+  Voir aussi ISMEMBER, VALIDATESTRING, MUSTBETEXT.
+```
+
+## `mustBeNegative`
+
+```
+MUSTBENEGATIVE Exige une valeur strictement négative.
+  MUSTBENEGATIVE(A) lève une erreur si un seul élément de A ne l'est pas.
+  Le contrôle porte sur tous les éléments : un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeNegative(-3);            % passe
+     mustBeNegative([-1 -2]);       % passe
+
+  Voir aussi MUSTBENONPOSITIVE, MUSTBEPOSITIVE, VALIDATEATTRIBUTES.
+```
+
+## `mustBeNonNan`
+
+```
+MUSTBENONNAN Refuse les valeurs manquantes.
+  MUSTBENONNAN(A) lève une erreur si A contient un NaN. Un infini passe,
+  à la différence de MUSTBEFINITE : l'infini est une valeur, le NaN est
+  l'absence de valeur.
+
+  Exemple :
+     mustBeNonNan([1 Inf 3]);       % passe : l'infini est une valeur
+     mustBeNonNan(0);               % passe
+
+  Voir aussi MUSTBEFINITE, ISNAN, ISMISSING.
+```
+
+## `mustBeNonempty`
+
+```
+MUSTBENONEMPTY Refuse une valeur vide.
+  MUSTBENONEMPTY(A) lève une erreur si A est vide.
+
+  Exemple :
+     mustBeNonempty([1 2]);         % passe
+     mustBeNonempty('a');           % passe
+
+  Voir aussi MUSTBEVECTOR, ISEMPTY, MUSTBENUMERIC.
+```
+
+## `mustBeNonnegative`
+
+```
+MUSTBENONNEGATIVE Exige une valeur positive ou nulle.
+  MUSTBENONNEGATIVE(A) lève une erreur si un seul élément de A ne l'est pas.
+  Le contrôle porte sur tous les éléments : un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeNonnegative(0);          % passe : zero est admis
+     mustBeNonnegative([0 1 2]);    % passe
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBENONPOSITIVE, VALIDATEATTRIBUTES.
+```
+
+## `mustBeNonpositive`
+
+```
+MUSTBENONPOSITIVE Exige une valeur négative ou nulle.
+  MUSTBENONPOSITIVE(A) lève une erreur si un seul élément de A ne l'est pas.
+  Le contrôle porte sur tous les éléments : un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeNonpositive(0);          % passe : zero est admis
+     mustBeNonpositive([-1 0]);     % passe
+
+  Voir aussi MUSTBENEGATIVE, MUSTBENONNEGATIVE, VALIDATEATTRIBUTES.
+```
+
+## `mustBeNonzero`
+
+```
+MUSTBENONZERO Exige une valeur non nulle.
+  MUSTBENONZERO(A) lève une erreur si un seul élément de A ne l'est pas.
+  Le contrôle porte sur tous les éléments : un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBeNonzero(3);              % passe
+     mustBeNonzero([-1 1]);         % passe
+
+  Voir aussi MUSTBEPOSITIVE, MUSTBENONEMPTY, VALIDATEATTRIBUTES.
+```
+
+## `mustBeNonzeroLengthText`
+
+```
+MUSTBENONZEROLENGTHTEXT Exige du texte non vide.
+  MUSTBENONZEROLENGTHTEXT(A) refuse la chaîne vide, qui passe pourtant
+  MUSTBETEXT : une chaîne vide est du texte, elle n'est simplement pas
+  utilisable comme nom, comme motif ou comme clé.
+
+  Exemple :
+     mustBeNonzeroLengthText('abc');    % passe
+     mustBeNonzeroLengthText({'a'});    % passe
+
+  Voir aussi MUSTBETEXT, MUSTBETEXTSCALAR, ISEMPTY.
+```
+
+## `mustBeNumeric`
+
+```
+MUSTBENUMERIC Exige une valeur numérique.
+  MUSTBENUMERIC(A) ne fait rien si A est numérique, et lève une erreur
+  sinon. Un logique n'est pas numérique ici : MUSTBENUMERICORLOGICAL
+  existe pour l'accepter.
+
+  Les validateurs ne rendent rien. C'est leur contrat : ils se taisent
+  quand tout va bien, et l'appelant n'a donc rien à tester. Ils servent
+  dans un bloc « arguments », où le nom du validateur suit le nom du
+  paramètre.
+
+  Exemple :
+     mustBeNumeric(3);              % passe
+     mustBeNumeric([1 2; 3 4]);     % passe aussi
+
+  Voir aussi MUSTBEREAL, MUSTBEFINITE, MUSTBEINTEGER, VALIDATEATTRIBUTES.
+```
+
+## `mustBeNumericOrLogical`
+
+```
+MUSTBENUMERICORLOGICAL Exige une valeur numérique ou logique.
+  MUSTBENUMERICORLOGICAL(A) accepte ce qu'accepte MUSTBENUMERIC, plus
+  les tableaux logiques.
+
+  La distinction compte : un logique se comporte comme un numérique dans
+  presque tous les calculs, mais pas dans l'indexation, où il désigne des
+  positions au lieu de valoir des rangs.
+
+  Exemple :
+     mustBeNumericOrLogical(true);      % passe
+     mustBeNumericOrLogical(3);         % passe
+
+  Voir aussi MUSTBENUMERIC, MUSTBEREAL, ISLOGICAL.
+```
+
+## `mustBePositive`
+
+```
+MUSTBEPOSITIVE Exige une valeur strictement positive.
+  MUSTBEPOSITIVE(A) lève une erreur si un seul élément de A ne l'est pas.
+  Le contrôle porte sur tous les éléments : un tableau ne passe que s'il
+  passe entièrement.
+
+  Exemple :
+     mustBePositive(3);             % passe
+     mustBePositive([1 2 3]);       % passe
+
+  Voir aussi MUSTBENONNEGATIVE, MUSTBENEGATIVE, MUSTBENONZERO, VALIDATEATTRIBUTES.
+```
+
+## `mustBeReal`
+
+```
+MUSTBEREAL Exige une valeur réelle.
+  MUSTBEREAL(A) lève une erreur si A a une partie imaginaire non nulle.
+
+  Un complexe dont la partie imaginaire est exactement nulle passe :
+  c'est ISREAL qui décide, et il regarde le stockage, non la valeur.
+
+  Exemple :
+     mustBeReal(3);                 % passe
+     mustBeReal([1 2 3]);           % passe
+
+  Voir aussi MUSTBENUMERIC, MUSTBEFINITE, ISREAL, COMPLEX.
+```
+
+## `mustBeScalarOrEmpty`
+
+```
+MUSTBESCALAROREMPTY Exige un scalaire ou un vide.
+  MUSTBESCALAROREMPTY(A) accepte un seul élément ou aucun, et refuse
+  deux ou davantage.
+
+  C'est le validateur d'un paramètre facultatif : vide veut dire « non
+  fourni », et une seule valeur veut dire « celle-ci ».
+
+  Exemple :
+     mustBeScalarOrEmpty(3);        % passe
+     mustBeScalarOrEmpty([]);       % passe
+
+  Voir aussi MUSTBEVECTOR, MUSTBENONEMPTY, ISSCALAR, ISEMPTY.
+```
+
+## `mustBeText`
+
+```
+MUSTBETEXT Exige du texte.
+  MUSTBETEXT(A) accepte un tableau de caractères, un tableau string ou
+  une cellule de textes, et refuse tout le reste.
+
+  Les trois formes du texte en MATLAB se valent ici : c'est justement
+  l'intérêt du validateur, qui laisse l'appelant écrire 'abc', "abc" ou
+  {'abc'} sans que la fonction ait à s'en soucier.
+
+  Exemple :
+     mustBeText('abc');             % passe
+     mustBeText({'a', 'b'});        % passe
+
+  Voir aussi MUSTBETEXTSCALAR, MUSTBEMEMBER, ISCELLSTR, ISSTRING.
+```
+
+## `mustBeTextScalar`
+
+```
+MUSTBETEXTSCALAR Exige un seul texte.
+  MUSTBETEXTSCALAR(A) accepte une ligne de caractères, une string
+  scalaire ou une cellule d'un seul texte, et refuse un tableau de
+  plusieurs.
+
+  Exemple :
+     mustBeTextScalar('abc');       % passe
+     mustBeTextScalar({'abc'});     % passe
+
+  Voir aussi MUSTBETEXT, MUSTBENONZEROLENGTHTEXT, ISSCALAR.
+```
+
+## `mustBeVector`
+
+```
+MUSTBEVECTOR Exige un vecteur.
+  MUSTBEVECTOR(A) refuse une matrice et un tableau vide.
+  MUSTBEVECTOR(A,'allow-all-empties') accepte un vide.
+
+  Un scalaire est un vecteur : c'est la convention de MATLAB, et elle
+  évite d'avoir à traiter à part le cas d'un seul élément.
+
+  Exemple :
+     mustBeVector([1 2 3]);         % passe
+     mustBeVector(5);               % passe : un scalaire est un vecteur
+
+  Voir aussi MUSTBESCALAROREMPTY, MUSTBENONEMPTY, ISVECTOR, ISSCALAR.
 ```
 
 ## `namelengthmax`
