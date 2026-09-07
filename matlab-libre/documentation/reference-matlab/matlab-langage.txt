@@ -60,3 +60,4 @@ pageinv pagemldivide pcg svds tensorprod
 adjacency bfsearch conncomp degree dfsearch digraph distances graph incidence
 indegree laplacian minspantree neighbors numedges numnodes outdegree predecessors
 shortestpath subgraph successors toposort
+integral3 quad2d

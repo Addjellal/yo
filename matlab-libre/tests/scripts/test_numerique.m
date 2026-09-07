@@ -391,6 +391,28 @@ assert(isequal(topkrows([3 1; 1 2; 2 3], 2, 1, 'ascend'), [1 2; 2 3]));
 assert(rangs == 1 && isequal(dessus, [3 1]));
 assert(size(topkrows([3 1; 1 2], 10), 1) == 2, 'K trop grand rend tout');
 
+%% ------------------------------------------- quadrature en dimension
+% La regle de Gauss-Legendre a n points integre exactement tout polynome
+% de degre 2n-1 : c'est la propriete qui la definit, et elle se verifie
+% directement.
+assert(abs(integral2(@(x, y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-10);
+assert(abs(integral2(@(x, y) x .* y, 0, 1, 0, 1) - 0.25) < 1e-12);
+assert(abs(integral2(@(x, y) x .^ 5 .* y .^ 5, 0, 1, 0, 1) - 1/36) < 1e-12, ...
+       'un polynome de degre cinq passe exactement');
+assert(abs(integral2(@(x, y) sin(x) .* cos(y), 0, pi, 0, pi/2) - 2) < 1e-10);
+% L'integrale d'une gaussienne sur un grand carre approche pi.
+assert(abs(integral2(@(x, y) exp(-(x.^2 + y.^2)), -6, 6, -6, 6) - pi) < 1e-8);
+
+assert(abs(integral3(@(x, y, z) ones(size(x)), 0, 1, 0, 1, 0, 1) - 1) < 1e-10);
+assert(abs(integral3(@(x, y, z) x .* y .* z, 0, 1, 0, 1, 0, 1) - 0.125) < 1e-12);
+assert(abs(integral3(@(x, y, z) x + y + z, 0, 1, 0, 1, 0, 1) - 1.5) < 1e-10);
+% Le volume d'un pave se lit dans les bornes.
+assert(abs(integral3(@(x, y, z) ones(size(x)), 0, 2, 0, 3, 0, 4) - 24) < 1e-9);
+
+% QUAD2D est l'ancien nom d'INTEGRAL2 : les deux doivent coincider.
+assert(abs(quad2d(@(x, y) x .* y, 0, 1, 0, 1) - ...
+           integral2(@(x, y) x .* y, 0, 1, 0, 1)) < 1e-14);
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

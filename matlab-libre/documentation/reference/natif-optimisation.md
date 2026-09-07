@@ -135,14 +135,50 @@ INTEGRAL  Intégrale définie d'une fonction.
 INTEGRAL2  Intégrale double.
     INTEGRAL2(F,A,B,C,D) intègre F(x,y) sur le rectangle [A,B]x[C,D].
 
+    La règle est celle de Gauss-Legendre à dix points, appliquée sur une
+    grille de douze panneaux par côté. Les nœuds sont les racines du
+    polynôme de Legendre, calculées par la méthode de Newton et non
+    recopiées d'une table ; les poids s'en déduisent. Une telle règle
+    intègre exactement tout polynôme de degré dix-neuf, ce qui est deux
+    fois mieux qu'une règle à pas fixe du même coût.
+
+    Le découpage en panneaux rattrape ce que la règle seule ne peut pas :
+    une fonction qui varie vite sur l'intervalle entier n'est bien
+    approchée par un polynôme que morceau par morceau.
+
     Syntaxe
        q = integral2(f,a,b,c,d)
 
     Exemples
-       abs(integral2(@(x,y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-8
-       abs(integral2(@(x,y) x.*y, 0, 1, 0, 1) - 0.25) < 1e-8
+       abs(integral2(@(x,y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-10
+       abs(integral2(@(x,y) x.*y, 0, 1, 0, 1) - 0.25) < 1e-12
+       abs(integral2(@(x,y) sin(x).*cos(y), 0, pi, 0, pi/2) - 2) < 1e-10
 
-    Voir aussi INTEGRAL, TRAPZ, QUAD2D.
+    Voir aussi INTEGRAL, INTEGRAL3, QUAD2D, TRAPZ.
+```
+
+## `integral3`
+
+```
+INTEGRAL3  Intégrale triple.
+    INTEGRAL3(F,A,B,C,D,E,G) intègre F(x,y,z) sur le pavé
+    [A,B]x[C,D]x[E,G], par la même règle de Gauss-Legendre tensorielle
+    qu'INTEGRAL2, à huit points et six panneaux par côté.
+
+    Le coût croît comme la puissance trois du nombre de points : c'est la
+    malédiction de la dimension, et la raison pour laquelle une intégrale
+    en dimension supérieure à trois ou quatre se calcule par méthode de
+    Monte-Carlo plutôt que par règle tensorielle.
+
+    Syntaxe
+       q = integral3(f,a,b,c,d,e,g)
+
+    Exemples
+       abs(integral3(@(x,y,z) ones(size(x)), 0, 1, 0, 1, 0, 1) - 1) < 1e-10
+       abs(integral3(@(x,y,z) x.*y.*z, 0, 1, 0, 1, 0, 1) - 0.125) < 1e-12
+       abs(integral3(@(x,y,z) x+y+z, 0, 1, 0, 1, 0, 1) - 1.5) < 1e-10
+
+    Voir aussi INTEGRAL, INTEGRAL2, QUAD2D.
 ```
 
 ## `lsqnonneg`
@@ -372,6 +408,23 @@ QUAD  Intégrale définie, forme historique.
        abs(quad(@(x) x.^2, 0, 3) - 9) < 1e-6
 
     Voir aussi INTEGRAL, QUADGK, TRAPZ.
+```
+
+## `quad2d`
+
+```
+QUAD2D  Intégrale double, nom historique.
+    QUAD2D(F,A,B,C,D) fait ce que fait INTEGRAL2 : c'est le nom d'avant
+    R2012a, gardé pour les programmes qui l'emploient encore.
+
+    Syntaxe
+       q = quad2d(f,a,b,c,d)
+
+    Exemples
+       abs(quad2d(@(x,y) x.*y, 0, 1, 0, 1) - 0.25) < 1e-12
+       abs(quad2d(@(x,y) ones(size(x)), 0, 2, 0, 3) - 6) < 1e-10
+
+    Voir aussi INTEGRAL2, INTEGRAL3, INTEGRAL.
 ```
 
 ## `quadgk`

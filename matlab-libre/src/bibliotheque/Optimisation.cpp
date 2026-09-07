@@ -385,24 +385,98 @@ FONCTION(fnQuadgk) {
     return fnIntegral(it, args, nargout);
 }
 
+// Noeuds et poids de Gauss-Legendre sur [-1,1], calcules et non recopies :
+// les noeuds sont les racines du polynome de Legendre de degre n, trouvees
+// par Newton depuis l'approximation de Tchebychev, et le poids en chaque
+// racine vaut 2/((1-x^2) P'(x)^2). Une regle a n points integre exactement
+// tout polynome de degre 2n-1 : c'est deux fois mieux qu'une regle a pas
+// fixe du meme cout, et c'est toute la raison de la construire.
+void gaussLegendre(int n, std::vector<double>& x, std::vector<double>& w) {
+    x.assign((std::size_t)n, 0.0);
+    w.assign((std::size_t)n, 0.0);
+    for (int i = 0; i < n; ++i) {
+        double z = std::cos(M_PI * (i + 0.75) / (n + 0.5));
+        double pp = 0;
+        for (int iteration = 0; iteration < 100; ++iteration) {
+            double p0 = 1, p1 = 0;
+            for (int j = 0; j < n; ++j) {
+                double p2 = p1;
+                p1 = p0;
+                p0 = ((2 * j + 1) * z * p1 - j * p2) / (j + 1);
+            }
+            pp = n * (z * p0 - p1) / (z * z - 1);
+            double dz = p0 / pp;
+            z -= dz;
+            if (std::fabs(dz) < 1e-15) break;
+        }
+        x[(std::size_t)i] = z;
+        w[(std::size_t)i] = 2.0 / ((1 - z * z) * pp * pp);
+    }
+}
+
+// La regle tensorielle sur une grille de panneaux : chaque panneau recoit
+// la regle de Gauss, et le decoupage rattrape ce que la regle seule ne
+// peut pas — une fonction qui varie vite sur l'intervalle entier.
+double integrerTensoriel(Interpreteur& it, const Valeur& f,
+                         const std::vector<double>& bornes, int dimensions,
+                         int points, int panneaux) {
+    std::vector<double> noeuds, poids;
+    gaussLegendre(points, noeuds, poids);
+    std::vector<double> pas((std::size_t)dimensions);
+    for (int d = 0; d < dimensions; ++d)
+        pas[(std::size_t)d] =
+            (bornes[(std::size_t)(2 * d + 1)] - bornes[(std::size_t)(2 * d)]) / panneaux;
+    long long total = 1;
+    for (int d = 0; d < dimensions; ++d) total *= (long long)panneaux * points;
+    double somme = 0;
+    std::vector<int> compteurs((std::size_t)dimensions, 0);
+    for (long long k = 0; k < total; ++k) {
+        long long reste = k;
+        double produit = 1;
+        std::vector<Valeur> arguments;
+        for (int d = 0; d < dimensions; ++d) {
+            int index = (int)(reste % ((long long)panneaux * points));
+            reste /= (long long)panneaux * points;
+            int panneau = index / points;
+            int point = index % points;
+            double a = bornes[(std::size_t)(2 * d)] + panneau * pas[(std::size_t)d];
+            double milieu = a + pas[(std::size_t)d] / 2;
+            double demi = pas[(std::size_t)d] / 2;
+            arguments.push_back(
+                Valeur::scalaire(milieu + demi * noeuds[(std::size_t)point]));
+            produit *= poids[(std::size_t)point] * demi;
+        }
+        auto r = it.appelerValeur(f, arguments, 1);
+        double v = r.empty() || r[0].re.empty() ? 0.0 : r[0].re[0];
+        somme += produit * v;
+    }
+    (void)compteurs;
+    return somme;
+}
+
 FONCTION(fnIntegral2) {
     INUTILISE
     exigerArguments(args, 5, 5, "integral2");
-    Valeur f = args[0];
-    double ax = args[1].scal(), bx = args[2].scal();
-    double ay = args[3].scal(), by = args[4].scal();
-    const int n = 200;
-    double hx = (bx - ax) / n, hy = (by - ay) / n;
-    double somme = 0;
-    for (int i = 0; i < n; ++i)
-        for (int j = 0; j < n; ++j) {
-            double x = ax + (i + 0.5) * hx;
-            double y = ay + (j + 0.5) * hy;
-            std::vector<Valeur> a = {Valeur::scalaire(x), Valeur::scalaire(y)};
-            auto r = it.appelerValeur(f, a, 1);
-            somme += r.empty() || r[0].re.empty() ? 0.0 : r[0].re[0];
-        }
-    return {Valeur::scalaire(somme * hx * hy)};
+    std::vector<double> bornes = {args[1].scal(), args[2].scal(),
+                                  args[3].scal(), args[4].scal()};
+    return {Valeur::scalaire(integrerTensoriel(it, args[0], bornes, 2, 10, 12))};
+}
+
+FONCTION(fnIntegral3) {
+    INUTILISE
+    exigerArguments(args, 7, 7, "integral3");
+    std::vector<double> bornes = {args[1].scal(), args[2].scal(),
+                                  args[3].scal(), args[4].scal(),
+                                  args[5].scal(), args[6].scal()};
+    return {Valeur::scalaire(integrerTensoriel(it, args[0], bornes, 3, 8, 6))};
+}
+
+FONCTION(fnQuad2d) {
+    INUTILISE
+    exigerArguments(args, 5, 5, "quad2d");
+    std::vector<double> bornes = {args[1].scal(), args[2].scal(),
+                                  args[3].scal(), args[4].scal()};
+    return {Valeur::scalaire(integrerTensoriel(it, args[0], bornes, 2, 10, 12))};
 }
 
 // Resolution d'un systeme dense, definie plus bas avec les methodes
@@ -1636,6 +1710,10 @@ void enregistrerOptimisation(Interpreteur& it) {
     it.enregistrer("quad", fnQuad, "optimisation", "quad  Quadrature de Simpson adaptative.");
     it.enregistrer("quadgk", fnQuadgk, "optimisation", "quadgk  Quadrature adaptative.");
     it.enregistrer("integral2", fnIntegral2, "optimisation", "integral2  Integrale double.");
+    it.enregistrer("integral3", fnIntegral3, "optimisation",
+                   "integral3  Integrale triple sur un pave.");
+    it.enregistrer("quad2d", fnQuad2d, "optimisation",
+                   "quad2d  Integrale double, nom historique d'integral2.");
     it.enregistrer("ode45", fnOde45, "optimisation", "ode45  Runge-Kutta Dormand-Prince 4(5).");
     it.enregistrer("ode23", fnOde23, "optimisation", "ode23  Runge-Kutta d'ordre 2(3).");
     it.enregistrer("ode113", fnOde45, "optimisation", "ode113  Solveur a pas variable.");
