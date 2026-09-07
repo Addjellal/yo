@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2734 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+2742 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -70,7 +70,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 296 |
+| [`matlab`](reference/toolbox-matlab.md) | 304 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |

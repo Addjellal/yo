@@ -515,4 +515,50 @@ pc = colamd(E4);
 assert(isequal(sort(pc), 1:3), 'une permutation des colonnes');
 assert(isequal(sort(symamd(eye(4))), 1:4), 'une diagonale se permute aussi');
 
+%% ------------------------------------- factorisation gardee
+% DECOMPOSITION factorise une fois et substitue ensuite : le resultat est
+% celui de l'antislash, obtenu sans refactoriser.
+Asdp = [4 1; 1 3];
+dA = decomposition(Asdp);
+assert(strcmp(dA.Type, 'chol'), 'symetrique definie positive : Cholesky');
+assert(norm(dA \ [1; 2] - Asdp \ [1; 2]) < 1e-12);
+% Le choix suit la matrice, et il compte : Cholesky coute moitie moins
+% que LU, et ne s'applique qu'aux definies positives.
+assert(strcmp(decomposition([1 2; 3 4]).Type, 'lu'));
+assert(strcmp(decomposition([1 2; 3 4; 5 6]).Type, 'qr'));
+% Sur un systeme rectangulaire, la factorisation QR rend les moindres
+% carres, comme l'antislash.
+Arect = [1 2; 3 4; 5 6];
+assert(norm(decomposition(Arect) \ [1; 2; 3] - Arect \ [1; 2; 3]) < 1e-10);
+% Une meme factorisation sert plusieurs seconds membres.
+for k = 1:3
+    bk = [k; k + 1];
+    assert(norm(dA \ bk - Asdp \ bk) < 1e-12);
+end
+% Le mauvais conditionnement se lit dans les pivots, non dans le
+% resultat : c'est ce que l'objet retient.
+assert(~isIllConditioned(dA));
+assert(isIllConditioned(decomposition(hilb(12), 'lu')));
+assert(~isIllConditioned(decomposition(hilb(6), 'lu')), ...
+       'six chiffres perdus sur seize, ce n''est pas encore la moitie');
+assert(isequal(size(dA), [2 2]));
+
+%% ------------------------------------- integration a tres haute precision
+% ODE89 par extrapolation : l'erreur de la regle du point milieu est une
+% serie en puissances paires du sous-pas, et chaque niveau d'extrapolation
+% en supprime un terme. L'ordre monte deux par deux.
+[te, ye] = ode89(@(t, y) -y, [0 1], 1);
+assert(abs(ye(end) - exp(-1)) < 1e-11, 'la decroissance exponentielle');
+assert(numel(te) < 50, 'et en peu de pas : c''est l''interet de l''ordre eleve');
+% L'oscillateur harmonique referme son cercle : l'energie se conserve.
+[~, yo] = ode89(@(t, y) [y(2); -y(1)], [0 2*pi], [1; 0]);
+assert(abs(yo(end, 1) - 1) < 1e-9 && abs(yo(end, 2)) < 1e-9);
+% Un pas isole est deja exact a la precision machine.
+[unPas, ~] = matlibre_gbs_pas(@(t, v) -v, 0, 1, 0.1);
+assert(abs(unPas - exp(-0.1)) < 1e-14);
+% Les instants demandes sont rendus exactement.
+[tf, yf] = ode89(@(t, y) -y, [0 0.5 1], 1);
+assert(numel(tf) == 3 && abs(tf(2) - 0.5) < 1e-15);
+assert(abs(yf(2) - exp(-0.5)) < 1e-8);
+
 disp('matrices : toutes les verifications passent');

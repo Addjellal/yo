@@ -900,6 +900,44 @@ DATETICK Gradue un axe en dates.
   Voir aussi DATENUM, DATESTR, XTICKS, XTICKLABELS, DATETIME.
 ```
 
+## `decomposition`
+
+```
+DECOMPOSITION Factorisation gardée, pour résoudre plusieurs fois.
+  DA = DECOMPOSITION(A) factorise A une fois pour toutes ; DA\B résout
+  ensuite aussi vite qu'une substitution, sans refactoriser.
+  DA = DECOMPOSITION(A,TYPE) impose la factorisation : 'lu', 'chol',
+  'qr', 'ldl' ou 'auto' (défaut).
+
+  Résoudre A\B coûte deux choses : factoriser, en N cube sur trois, et
+  substituer, en N carré. Quand on résout dix fois avec la même matrice,
+  l'antislash refait dix fois la factorisation ; DECOMPOSITION la fait
+  une fois. Le gain est le rapport N sur trois — dix fois sur une
+  matrice de trente lignes, cent sur une de trois cents.
+
+  Le choix automatique suit la matrice : Cholesky si elle est
+  symétrique définie positive, LDL si elle est symétrique, QR si elle
+  n'est pas carrée, LU sinon. Cholesky coûte moitié moins que LU et
+  c'est la raison de le préférer quand il s'applique.
+
+  Propriétés : MatrixSize, Type, IsReal.
+
+  ISILLCONDITIONED(DA) dit si la factorisation a rencontré un rapport de
+  pivots négligeable. C'est la seule information que la substitution ne
+  peut plus retrouver : une fois factorisé, le mauvais conditionnement
+  ne se voit plus dans le résultat, il se voit dans les pivots.
+
+  Exemple :
+     A = [4 1; 1 3];
+     dA = decomposition(A);
+     x = dA \ [1; 2];
+     norm(A * x - [1; 2]) < 1e-12
+     dA.Type                         % 'chol' : A est definie positive
+     isIllConditioned(dA)            % 0
+
+  Voir aussi MLDIVIDE, LU, CHOL, QR, LDL, ISILLCONDITIONED.
+```
+
 ## `del2`
 
 ```
@@ -2348,6 +2386,25 @@ INVHILB Inverse exacte de la matrice de Hilbert.
   Voir aussi HILB, PASCAL, COND.
 ```
 
+## `isIllConditioned`
+
+```
+ISILLCONDITIONED La factorisation a-t-elle rencontré un pivot minuscule.
+  TF = ISILLCONDITIONED(D) dit si la factorisation gardée par D a
+  rencontré un pivot négligeable devant la norme de la matrice.
+
+  C'est la seule information que la substitution ne peut plus retrouver :
+  une fois la factorisation faite, le mauvais conditionnement ne se voit
+  plus dans le résultat, il se voit dans les pivots. La retenir est
+  l'intérêt de l'objet.
+
+  Exemple :
+     isIllConditioned(decomposition([4 1; 1 3]))       % 0
+     isIllConditioned(decomposition(hilb(12), 'lu'))   % 1
+
+  Voir aussi DECOMPOSITION, COND, CONDEST, RCOND.
+```
+
 ## `ischange`
 
 ```
@@ -2965,6 +3022,63 @@ MATLIBRE_COULEUR_SECTEUR La k-ième couleur de la palette des secteurs.
   dépendre de la palette des courbes, qui n'a que sept tons.
 ```
 
+## `matlibre_decomp_choisir`
+
+```
+MATLIBRE_DECOMP_CHOISIR Choisit la factorisation la mieux adaptée.
+  Cholesky si la matrice est symétrique définie positive — il coûte
+  moitié moins que LU —, LDL si elle est symétrique sans être définie,
+  QR si elle n'est pas carrée, LU sinon.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_decomp_choisir([4 1; 1 3])       % 'chol'
+     matlibre_decomp_choisir([1 2; 3 4])       % 'lu'
+
+  Voir aussi DECOMPOSITION, CHOL, LU, QR, LDL.
+```
+
+## `matlibre_decomp_factoriser`
+
+```
+MATLIBRE_DECOMP_FACTORISER Calcule et range la factorisation demandée.
+  Le drapeau « malConditionne » retient ce que la factorisation a vu
+  passer : le rapport du plus petit pivot au plus grand. C'est une
+  estimation du conditionnement qui ne coûte rien, et c'est la seule
+  information que la substitution ne peut plus retrouver ensuite.
+
+  Le seuil est la racine de la précision machine, soit 1,5e-8 : un
+  rapport plus petit signifie que plus de la moitié des chiffres
+  significatifs sont perdus, ce qui est le moment de prévenir.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     f = matlibre_decomp_factoriser([4 1; 1 3], 'chol');
+     f.malConditionne                % 0
+     matlibre_decomp_factoriser(hilb(12), 'lu').malConditionne     % 1
+
+  Voir aussi DECOMPOSITION, ISILLCONDITIONED.
+```
+
+## `matlibre_decomp_resoudre`
+
+```
+MATLIBRE_DECOMP_RESOUDRE Substitution dans une factorisation gardée.
+  Chaque type se résout par ses propres substitutions : deux
+  triangulaires pour LU et Cholesky, une projection puis une
+  triangulaire pour QR.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     d = decomposition([4 1; 1 3]);
+     norm(matlibre_decomp_resoudre(d, [1; 2]) - [4 1; 1 3] \ [1; 2]) < 1e-12
+
+  Voir aussi DECOMPOSITION, MLDIVIDE.
+```
+
 ## `matlibre_degre_minimal`
 
 ```
@@ -3057,6 +3171,31 @@ MATLIBRE_FLECHE Le tracé d'une flèche, hampe et pointe d'un seul trait.
   Fonction interne : elle n'existe pas dans MATLAB. QUIVER, COMPASS et
   FEATHER s'en servent ; la flèche est rendue comme une seule polyligne,
   ce qui la fait tenir en une courbe et non en trois.
+```
+
+## `matlibre_gbs_pas`
+
+```
+MATLIBRE_GBS_PAS Un pas de Gragg-Bulirsch-Stoer.
+  On traverse le pas H avec 2, 4, 6, 8 puis 10 sous-pas par la règle du
+  point milieu modifiée, et l'on extrapole les cinq résultats vers un
+  sous-pas nul par le tableau d'Aitken-Neville.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  L'erreur de la règle du point milieu modifiée est une série en
+  puissances paires du sous-pas. C'est ce qui rend l'extrapolation
+  efficace : chaque colonne du tableau supprime le terme suivant de la
+  série, et l'ordre monte de deux à chaque fois au lieu d'un.
+
+  L'écart entre les deux dernières colonnes estime l'erreur : c'est le
+  procédé habituel, celui qui évite de calculer une seconde solution.
+
+  Exemple :
+     [y, e] = matlibre_gbs_pas(@(t, v) -v, 0, 1, 0.1);
+     abs(y - exp(-0.1)) < 1e-12
+
+  Voir aussi ODE89, ODE113, ODE45.
 ```
 
 ## `matlibre_glissant`
@@ -3406,6 +3545,22 @@ MATLIBRE_NOYAU_PLAQUE Noyau radial de la plaque mince.
      matlibre_noyau_plaque(0, 0, 1, 0)      % 0, car log(1) est nul
 
   Voir aussi MATLIBRE_PLAQUE_MINCE.
+```
+
+## `matlibre_ode_option`
+
+```
+MATLIBRE_ODE_OPTION Lit une option d'ODESET, ou rend la valeur par défaut.
+  Les structures d'ODESET portent des champs absents quand l'option
+  n'est pas posée, et parfois vides quand elle l'est sans valeur : les
+  deux cas retombent sur le défaut.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_ode_option(struct('RelTol', 1e-8), 'RelTol', 1e-6)
+
+  Voir aussi ODESET, ODEGET, ODE89.
 ```
 
 ## `matlibre_pas_grille`
@@ -4229,6 +4384,43 @@ NUMLOCK État de la touche de verrouillage numérique.
      ischar(etat) || islogical(etat)
 
   Voir aussi INPUT, KEYBOARD.
+```
+
+## `ode89`
+
+```
+ODE89 Intégration à très haute précision par extrapolation.
+  [T,Y] = ODE89(F,[T0 TF],Y0) intègre y' = F(t,y) de T0 à TF depuis Y0.
+  [T,Y] = ODE89(F,TSPAN,Y0) avec TSPAN de plus de deux éléments intègre
+  d'un instant au suivant et tombe exactement dessus : interpoler entre
+  les pas d'une méthode d'ordre huit coûterait toute la précision
+  qu'elle a gagnée.
+  [T,Y] = ODE89(...,OPTIONS) accepte les réglages d'ODESET : 'RelTol',
+  'AbsTol', 'MaxStep'.
+
+  MATLAB emploie ici une paire de Runge-Kutta d'ordre huit et neuf de
+  Verner. MatLibre emploie l'extrapolation de Gragg-Bulirsch-Stoer, qui
+  atteint la même précision par un chemin plus court à expliquer : on
+  avance sur un même pas avec un nombre croissant de sous-pas — deux,
+  quatre, six, huit —, et l'on extrapole le résultat vers un sous-pas
+  nul par le procédé d'Aitken-Neville.
+
+  Ce qui rend l'extrapolation possible est que l'erreur de la règle du
+  point milieu est une série en puissances paires du sous-pas : chaque
+  niveau d'extrapolation supprime le terme suivant, et l'ordre monte
+  deux par deux. Quatre niveaux suffisent à dépasser l'ordre huit.
+
+  Elle convient aux problèmes lisses et non raides, où l'on veut une
+  précision proche de celle de la machine. Sur un problème raide,
+  ODE15S reste le bon choix.
+
+  Exemple :
+     [t, y] = ode89(@(t, y) -y, [0 1], 1);
+     abs(y(end) - exp(-1)) < 1e-11
+     [t, y] = ode89(@(t, y) [y(2); -y(1)], [0 2*pi], [1; 0]);
+     abs(y(end, 1) - 1) < 1e-10           % le cercle se referme
+
+  Voir aussi ODE45, ODE113, ODE15S, ODESET, DEVAL.
 ```
 
 ## `openfig`
