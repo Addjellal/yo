@@ -915,6 +915,38 @@ DELAUNAY Triangulation de Delaunay.
   Voir aussi TRIMESH, TRISURF, VORONOI, CONVHULL, GRIDDATA.
 ```
 
+## `digraph`
+
+```
+DIGRAPH Graphe orienté.
+  G = DIGRAPH(S,T) construit le graphe dont les arcs vont de S(k) vers
+  T(k). G = DIGRAPH(S,T,W) leur donne des poids.
+  G = DIGRAPH(A) prend une matrice d'adjacence : A(i,j) non nul décrit
+  un arc de i vers j, et la matrice n'a pas à être symétrique.
+  G = DIGRAPH(S,T,W,NOMS) nomme les nœuds.
+
+  L'orientation change tout ce qui suit. Un chemin de 1 vers 4 n'est pas
+  un chemin de 4 vers 1 ; la connexité se décline en forte et faible ;
+  un tri topologique n'existe que s'il n'y a pas de cycle. C'est pour
+  cela que DIGRAPH et GRAPH sont deux classes et non une seule avec un
+  drapeau.
+
+  Propriétés : Edges, une table des arcs et de leurs poids ; Nodes, une
+  table des nœuds.
+
+  Ce qu'on lui fait : NUMNODES, NUMEDGES, ADJACENCY, INDEGREE, OUTDEGREE,
+  SUCCESSORS, PREDECESSORS, SHORTESTPATH, DISTANCES, CONNCOMP, TOPOSORT,
+  BFSEARCH, DFSEARCH, ADDEDGE, ADDNODE, RMEDGE, RMNODE, SUBGRAPH, PLOT.
+
+  Exemple :
+     g = digraph([1 2 3], [2 3 4]);
+     shortestpath(g, 1, 4)           % 1 2 3 4
+     isempty(shortestpath(g, 4, 1))  % 1 : on ne remonte pas un arc
+     toposort(g)                     % 1 2 3 4
+
+  Voir aussi GRAPH, SHORTESTPATH, TOPOSORT, CONNCOMP.
+```
+
 ## `discretize`
 
 ```
@@ -1662,6 +1694,41 @@ GRADIENT Gradient numérique.
      contour(X, Y, Z); hold on; quiver(X, Y, dx, dy); hold off
 
   Voir aussi DIFF, DEL2, DIVERGENCE, CURL, SURFNORM, CONTOUR.
+```
+
+## `graph`
+
+```
+GRAPH Graphe non orienté.
+  G = GRAPH(S,T) construit le graphe dont les arêtes relient les nœuds
+  S(k) et T(k). G = GRAPH(S,T,W) leur donne des poids.
+  G = GRAPH(A) prend une matrice d'adjacence carrée et symétrique ; les
+  valeurs non nulles deviennent les poids.
+  G = GRAPH(S,T,W,NOMS) nomme les nœuds ; S et T peuvent alors être des
+  noms au lieu de numéros.
+
+  Un graphe non orienté n'a pas de sens de parcours : l'arête entre 1 et
+  2 est la même que celle entre 2 et 1, et la matrice d'adjacence est
+  symétrique. C'est tout ce qui le sépare de DIGRAPH, mais cela change
+  les algorithmes — un cycle, une composante connexe, un arbre couvrant
+  ne veulent pas dire la même chose dans les deux cas.
+
+  Propriétés : Edges, une table des arêtes et de leurs poids ; Nodes,
+  une table des nœuds et de leurs noms.
+
+  Ce qu'on lui fait : NUMNODES, NUMEDGES, ADJACENCY, DEGREE, NEIGHBORS,
+  SHORTESTPATH, SHORTESTPATHTREE, DISTANCES, CONNCOMP, MINSPANTREE,
+  BFSEARCH, DFSEARCH, ADDEDGE, ADDNODE, RMEDGE, RMNODE, SUBGRAPH,
+  LAPLACIAN, INCIDENCE, PLOT.
+
+  Exemple :
+     g = graph([1 2 3], [2 3 4]);
+     numnodes(g)                     % 4
+     numedges(g)                     % 3
+     shortestpath(g, 1, 4)           % 1 2 3 4
+     degree(g)'                      % 1 2 2 1
+
+  Voir aussi DIGRAPH, SHORTESTPATH, CONNCOMP, MINSPANTREE, ADJACENCY.
 ```
 
 ## `gray`
@@ -2690,6 +2757,213 @@ MATLIBRE_GLISSANT Applique une fonction sur une fenêtre glissante.
      matlibre_glissant(1:5, 3, {}, @max)     % 2 3 4 5 5
 
   Voir aussi MOVMAD, MOVMEAN, MOVMEDIAN.
+```
+
+## `matlibre_graphe_composantes`
+
+```
+MATLIBRE_GRAPHE_COMPOSANTES Composantes connexes d'un graphe.
+  Sur un GRAPH, la connexité est unique. Sur un DIGRAPH il y en a deux :
+  forte — chaque nœud atteint chaque autre en suivant le sens des arcs —
+  et faible, où l'on ignore l'orientation. La forte est celle par
+  défaut, comme dans MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  La composante forte se trouve par la double accessibilité : deux nœuds
+  sont dans la même si chacun atteint l'autre. C'est plus lent que
+  Tarjan, mais c'est la définition même, et l'on voit ce qu'on calcule.
+
+  Exemple :
+     matlibre_graphe_composantes(graph([1 3], [2 4]), {})   % 1 1 2 2
+
+  Voir aussi CONNCOMP, GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_construire`
+
+```
+MATLIBRE_GRAPHE_CONSTRUIRE Lit les arguments de GRAPH et de DIGRAPH.
+  Les deux classes acceptent les mêmes formes : deux listes de nœuds,
+  avec ou sans poids, ou une matrice d'adjacence. Le seul écart tient à
+  l'orientation : sur un graphe non orienté, une matrice d'adjacence ne
+  donne qu'une arête par couple, la moitié supérieure suffisant.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [a, p, n, m] = matlibre_graphe_construire({[1 2], [2 3]}, false);
+     m                               % 3
+
+  Voir aussi GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_dijkstra`
+
+```
+MATLIBRE_GRAPHE_DIJKSTRA Plus court chemin par l'algorithme de Dijkstra.
+  L'algorithme retient à chaque pas le nœud non visité le plus proche de
+  la source et le déclare définitif. Ce raisonnement n'est valable que
+  pour des poids positifs : un poids négatif pourrait rendre plus court,
+  plus tard, un chemin déjà tenu pour optimal.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = graph([1 2], [2 3]);
+     matlibre_graphe_dijkstra(g, 1, 3, {})     % 1 2 3
+
+  Voir aussi SHORTESTPATH, DISTANCES, GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_distances`
+
+```
+MATLIBRE_GRAPHE_DISTANCES Longueur du plus court chemin entre tous les couples.
+  Un Dijkstra par source. Sur un graphe dense, Floyd-Warshall serait
+  préférable ; sur un graphe creux, c'est l'inverse — et un graphe est
+  presque toujours creux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     D = matlibre_graphe_distances(graph([1 2], [2 3]), {});
+     D(1, 3)                         % 2
+
+  Voir aussi DISTANCES, SHORTESTPATH.
+```
+
+## `matlibre_graphe_indices`
+
+```
+MATLIBRE_GRAPHE_INDICES Traduit des noms de nœuds en numéros.
+  Un nœud se désigne par son rang ou par son nom ; toutes les méthodes
+  des graphes acceptent les deux, et c'est ici que la traduction se fait.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = graph([1 2], [2 3]);
+     matlibre_graphe_indices(g, 2)      % 2
+
+  Voir aussi GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_parcours`
+
+```
+MATLIBRE_GRAPHE_PARCOURS Parcours en largeur ou en profondeur.
+  Les deux ne diffèrent que par la structure d'attente : une file pour
+  la largeur, une pile pour la profondeur. C'est tout, et cela suffit à
+  changer complètement l'ordre de visite — la largeur trouve les plus
+  courts chemins en nombre d'arêtes, la profondeur descend d'abord.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_parcours(graph([1 1], [2 3]), 1, true)     % 1 2 3
+
+  Voir aussi BFSEARCH, DFSEARCH, GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_prim`
+
+```
+MATLIBRE_GRAPHE_PRIM Arbre couvrant de poids minimal.
+  L'algorithme de Prim fait croître un arbre depuis un nœud, en lui
+  ajoutant chaque fois l'arête la moins chère qui mène hors de lui.
+  Le choix glouton est ici optimal : c'est la propriété de coupe — la
+  plus légère arête traversant une coupe appartient à un arbre minimal.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [t, c] = matlibre_graphe_prim(graph([1 2 1], [2 3 3], [1 1 5]));
+     c                               % 2 : la grande arete est evitee
+
+  Voir aussi MINSPANTREE, GRAPH.
+```
+
+## `matlibre_graphe_retirer`
+
+```
+MATLIBRE_GRAPHE_RETIRER Retire des nœuds et renumérote les autres.
+  Retirer un nœud décale tous ceux qui le suivent : c'est la partie
+  délicate, et la seule raison pour laquelle cette fonction existe.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numnodes(matlibre_graphe_retirer(graph([1 2], [2 3]), 3))   % 2
+
+  Voir aussi RMNODE, SUBGRAPH.
+```
+
+## `matlibre_graphe_sous`
+
+```
+MATLIBRE_GRAPHE_SOUS Sous-graphe induit par un ensemble de nœuds.
+  Ne sont gardées que les arêtes dont les deux extrémités survivent, et
+  les nœuds restants sont renumérotés dans l'ordre où ils sont donnés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numedges(matlibre_graphe_sous(graph([1 2], [2 3]), [1 2]))   % 1
+
+  Voir aussi SUBGRAPH, RMNODE.
+```
+
+## `matlibre_graphe_toposort`
+
+```
+MATLIBRE_GRAPHE_TOPOSORT Tri topologique par l'algorithme de Kahn.
+  On retire à chaque pas un nœud sans prédécesseur. S'il n'en reste
+  aucun alors que des nœuds subsistent, c'est qu'il y a un cycle — et un
+  graphe cyclique n'admet aucun ordre topologique.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_toposort(digraph([1 2], [2 3]))'     % 1 2 3
+
+  Voir aussi TOPOSORT, DIGRAPH, CONNCOMP.
+```
+
+## `matlibre_graphe_tracer`
+
+```
+MATLIBRE_GRAPHE_TRACER Dessine un graphe, les nœuds répartis sur un cercle.
+  La disposition circulaire n'est pas un choix esthétique : elle est
+  déterministe et sans paramètre, là où les dispositions par forces
+  dépendent d'un tirage et d'une convergence. Un même graphe se dessine
+  donc toujours pareil.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure();
+     matlibre_graphe_tracer(graph([1 2], [2 3]), {});
+     close all;
+
+  Voir aussi PLOT, GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_voisins`
+
+```
+MATLIBRE_GRAPHE_VOISINS Nœuds atteignables depuis N, et le coût pour y aller.
+  Sur un GRAPH, une arête se parcourt dans les deux sens ; sur un
+  DIGRAPH, seulement dans le sien. AREBOURS remonte les arcs, ce dont a
+  besoin la recherche de composantes fortement connexes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = digraph([1 2], [2 3]);
+     matlibre_graphe_voisins(g, 1, false)'     % 2
+
+  Voir aussi GRAPH, DIGRAPH, SHORTESTPATH.
 ```
 
 ## `matlibre_grille_lineaire`
@@ -4212,6 +4486,36 @@ SHIFTDIM Décalage des dimensions d'un tableau.
      [b,n] = shiftdim(a);   % size(b) = [3 2], n = 2
 
   Voir aussi PERMUTE, RESHAPE, SQUEEZE.
+```
+
+## `shortestpath`
+
+```
+SHORTESTPATH Plus court chemin entre deux nœuds d'un graphe.
+  CHEMIN = SHORTESTPATH(G,S,T) rend la suite des nœuds du plus court
+  chemin de S vers T, ou un tableau vide s'il n'y en a aucun.
+  [CHEMIN,LONGUEUR] = SHORTESTPATH(...) rend en outre sa longueur, somme
+  des poids traversés.
+  [...] = SHORTESTPATH(...,'Method','unweighted') ignore les poids et
+  compte les arêtes.
+
+  Sur un DIGRAPH, le chemin suit le sens des arcs : il peut exister de S
+  vers T et non de T vers S. Sur un GRAPH, les deux sens se valent.
+
+  L'algorithme est celui de Dijkstra, qui suppose des poids positifs.
+  Avec un poids négatif il rendrait un résultat faux sans le dire :
+  son raisonnement est qu'un nœud une fois atteint au moindre coût ne
+  peut plus être amélioré, ce qu'un arc négatif dément.
+
+  Exemple :
+     g = graph([1 2 1], [2 3 3], [1 1 5]);
+     [c, l] = shortestpath(g, 1, 3);
+     c                               % 1 2 3 : le detour est moins cher
+     l                               % 2
+     d = digraph([1 2 3], [2 3 4]);
+     isempty(shortestpath(d, 4, 1))  % 1 : on ne remonte pas un arc
+
+  Voir aussi GRAPH, DIGRAPH, DISTANCES, CONNCOMP, MINSPANTREE.
 ```
 
 ## `slice`

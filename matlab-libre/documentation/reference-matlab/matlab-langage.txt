@@ -57,3 +57,6 @@ erase extractAfter extractBefore extractBetween insertAfter insertBefore matches
 ischange islocalmax islocalmin movmad topkrows
 bicg cgs condest eigs gmres lsqminnorm maxk mink minres normest normest1
 pageinv pagemldivide pcg svds tensorprod
+adjacency bfsearch conncomp degree dfsearch digraph distances graph incidence
+indegree laplacian minspantree neighbors numedges numnodes outdegree predecessors
+shortestpath subgraph successors toposort
