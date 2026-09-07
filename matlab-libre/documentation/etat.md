@@ -13,21 +13,22 @@ documentation publique et vérifiée sur la propriété qui la définit.
 
 | partie | contenu | lignes |
 |---|---|---:|
-| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 9 890 |
-| `src/bibliotheque` | 665 fonctions natives, en C++ | 19 000 |
+| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 9 914 |
+| `src/bibliotheque` | 665 fonctions natives, en C++ | 18 748 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 716 fichiers `.m`, dont 2 142 fonctions publiques | 128 000 |
-| `tests` | 34 scripts `.m` et 2 fichiers C++ | 19 860 |
+| `toolbox` | 2 802 fichiers `.m`, dont 2 161 fonctions publiques | 126 525 |
+| `tests` | 37 scripts `.m` et 2 fichiers C++ | 19 310 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 246
+documentation MathWorks est complète : `outils/manques.m` compte **2 274
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
-pas, et quatre-vingt-quatre ont été ajoutées de cette façon — la famille
+pas, et quatre-vingt-neuf ont été ajoutées de cette façon — la famille
 moderne des chaînes, les extrema locaux et les ruptures, les méthodes de
 Krylov, les estimations de norme et de conditionnement, les graphes, les
-résumés par groupe, les vingt-quatre validateurs d'arguments.
+résumés par groupe, les vingt-quatre validateurs d'arguments, les solveurs d'équations aux
+dérivées partielles et de problèmes aux limites.
 
 ## 2. Ce qui est vérifié, et comment
 
@@ -76,6 +77,11 @@ suivant en donne quelques-unes, prises dans les tests.
 | entrelaceur | refuse ce qui n'est pas une permutation |
 | Kalman | l'incertitude décroît en prédiction, décroît encore en correction |
 | navigation à l'estime | l'erreur croît linéairement ; le filtre la borne |
+| chaleur en 1-D (`pdepe`) | le mode propre sin(πx)e^(−π²t) retrouvé ; l'écart divisé par quatre quand les mailles doublent |
+| symétries cylindrique et sphérique | les modes exacts J₀(j₀r)e^(−j₀²t) et sin(πr)/r e^(−π²t), à l'ordre deux |
+| volumes finis (`pdepe`) | à flux nul aux deux bouts, l'intégrale de u se conserve à 1e-6 |
+| problème aux limites (`bvp4c`) | sin retrouvé à 1e-6 ; x³ exactement, la formule étant d'ordre quatre |
+| interpolation de `pdeval` | exacte sur les paraboles, valeurs et dérivées, maillage inégal compris |
 
 ## 3. État par boîte à outils
 
@@ -87,7 +93,7 @@ distingue une boîte complète d'une boîte esquissée.
 |---|---:|---|
 | statistiques | 272 | complète : lois, tests, régression, classification, mélanges, HMM |
 | signal | 205 | complète : conception RIF et RII, analogique et numérique, spectres, mesures d'impulsion |
-| matlab | 191 | noyau du langage, en complément des 653 natives |
+| matlab | 263 | noyau du langage, en complément des 665 natives |
 | finance | 148 | complète : indicateurs techniques, portefeuille, actualisation |
 | images | 138 | complète : morphologie, filtres, couleur, segmentation, texture |
 | ondelettes | 129 | complète : DWT, paquets, MODWT, CWT, débruitage |
@@ -123,8 +129,9 @@ programme d'école qui montre à quoi il sert.
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
 | Symbolique | dérivation, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, sortie LaTeX ; la simplification ne réduit que les cas triviaux | factorisation, développement, résolution d'équations |
 | Calcul parallèle | `parfor`, `spmd` et `parfeval` s'exécutent vraiment sur un pool de fils ; chaque travailleur est un interpréteur neuf, sans mémoire partagée | tableaux distribués sur plusieurs machines, GPU |
-| Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice | factorisations creuses — ICHOL, ILU —, réordonnancements |
+| Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice ; ICHOL et ILU préconditionnent, SYMRCM, SYMAMD et COLAMD réordonnent | factorisations creuses complètes — LU et Cholesky creux avec leur permutation |
 | Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF, qui demandent une bibliothèque externe |
+| Équations aux dérivées partielles | `pdepe` résout le cas parabolique et elliptique en 1-D, en plan, cylindrique et sphérique, par volumes finis et méthode des lignes ; `bvp4c` les problèmes aux limites par collocation d'ordre quatre | maillage adaptatif dans `bvp4c`, qui garde celui qu'on lui donne ; `bvp5c`, `ode15i`, les EDP en deux et trois dimensions |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |
 | Durée des tests | la suite complète tient en quarante minutes | paralléliser l'exécution des scripts |

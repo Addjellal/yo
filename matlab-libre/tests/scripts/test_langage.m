@@ -189,6 +189,21 @@ assert(~isempty(strfind(sortieCmd, 'un texte|seul')));
 sortieCmd = evalc('commandeDEssai -verbose');
 assert(~isempty(strfind(sortieCmd, '-verbose')));
 
+% Une barre oblique collee au mot aussi : sans cela « addpath /usr/lib »
+% et « cd /tmp » se liraient comme des divisions, et un chemin absolu ne
+% s'ecrit pas autrement.
+sortieCmd = evalc('commandeDEssai /usr/local/lib');
+assert(~isempty(strfind(sortieCmd, '/usr/local/lib')));
+sortieCmd = evalc('commandeDEssai /a/b-c-5bbd/d');
+assert(~isempty(strfind(sortieCmd, '/a/b-c-5bbd/d')));
+sortieCmd = evalc('commandeDEssai \\serveur\\part');
+assert(~isempty(strfind(sortieCmd, '\\serveur\\part')));
+% Une variable, elle, se divise toujours : les espaces ne changent rien.
+sixDivise = 6; troisDivise = 3;
+assert(sixDivise /troisDivise == 2);
+assert(sixDivise / troisDivise == 2);
+assert(sixDivise/troisDivise == 2);
+
 % Un mot-cle en argument reste un mot : « dbstop if error » est une
 % commande, pas un « if ». Le premier jeton, lui, ne peut pas etre un
 % mot-cle, donc « if x > 1 » reste un vrai if.
@@ -286,6 +301,20 @@ assert(marqueRetour == 1);
 % continue : c'est le sens de « programme appelant ».
 assert(lanceurDeScript(true) == 42);
 assert(lanceurDeScript(false) == 42);
+
+% Un script peut porter ses propres fonctions locales. Ce qui fait un
+% script, c'est d'avoir des instructions au plus haut niveau, pas d'etre
+% depourvu de fonctions : un fichier qui commence par du code et finit par
+% des « function » reste un script, et ses locales lui appartiennent.
+clear marqueLocale marqueChainee
+scriptAFonctionsLocales;
+assert(marqueLocale == 42);                     % la locale a recu son argument
+assert(strcmp(marqueChainee, 'essai : 5'));     % et une locale en appelle une autre
+% Les variables du script restent dans l'espace de l'appelant, comme
+% toujours -- porter des fonctions n'y change rien.
+assert(exist('marqueLocale', 'var') == 1);
+% Mais les fonctions locales, elles, n'en sortent pas.
+assert(exist('doubler', 'file') == 0 && exist('doubler', 'builtin') == 0);
 
 % Ce qui ne porte pas de nombre ne se convertit pas. Convertir une
 % structure, un objet ou une poignee rendait une valeur numerique sans

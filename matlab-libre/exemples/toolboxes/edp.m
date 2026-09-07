@@ -151,4 +151,97 @@ assert(abs(uf(1)) < 1e-12 && abs(uf(end)) < 1e-12);
 fprintf('  maximum %.10f (exact 0.125)\n', max(uf));
 assert(abs(max(uf) - 0.125) < 1e-9);
 
+%% 6. Le solveur general : PDEPE
+% Les quatre premieres sections ecrivent leur schema a la main, ce qui les
+% rend lisibles mais les enferme dans une equation. PDEPE prend l'equation
+% en argument : on lui donne les trois fonctions c, f et s de
+%
+%     c(x,t,u,u_x) u_t = x^-m (x^m f(x,t,u,u_x))_x + s(x,t,u,u_x)
+%
+% et il s'occupe du reste. Sur la chaleur, c = 1, f = u_x, s = 0.
+chaleurPde = @(x, t, u, dudx) deal(1, dudx, 0);
+bordsNuls = @(xl, ul, xr, ur, t) deal(ul, 0, ur, 0);
+xp = linspace(0, 1, 41);
+tp = linspace(0, 0.1, 6);
+solPde = pdepe(0, chaleurPde, @(x) sin(pi * x), bordsNuls, xp, tp);
+
+% sin(pi x) est un mode propre : il ne change pas de forme, il ne fait que
+% decroitre en e^{-pi^2 t}. C'est la solution exacte, pour toujours.
+exactePde = sin(pi * xp) * exp(-pi^2 * tp(end));
+fprintf('\nPDEPE sur la chaleur, mode propre sin(pi x) :\n');
+fprintf('  ecart a sin(pi x) e^{-pi^2 t} : %.3e\n', ...
+        max(abs(solPde(end, :) - exactePde)));
+assert(max(abs(solPde(end, :) - exactePde)) < 5e-4);
+
+% Le meme calcul sur deux fois moins de mailles doit etre quatre fois plus
+% faux : le schema est d'ordre deux, et c'est ce qui le definit.
+xGros = linspace(0, 1, 21);
+solGros = pdepe(0, chaleurPde, @(x) sin(pi * x), bordsNuls, xGros, tp);
+ecartGros = max(abs(solGros(end, :) - sin(pi * xGros) * exp(-pi^2 * tp(end))));
+ecartFin = max(abs(solPde(end, :) - exactePde));
+fprintf('  ordre observe : %.2f (deux attendu)\n', log2(ecartGros / ecartFin));
+assert(abs(log2(ecartGros / ecartFin) - 2) < 0.3);
+
+% La geometrie change tout. Avec m = 1 le probleme est cylindrique, avec
+% m = 2 spherique : la surface par laquelle la chaleur s'echappe croit
+% avec le rayon, donc le centre se refroidit plus vite.
+centreQuiRefroidit = @(m) refroidissement(m, chaleurPde);
+fprintf('\nLa geometrie decide de la vitesse :\n');
+tauxPlan = centreQuiRefroidit(0);
+tauxCyl = centreQuiRefroidit(1);
+tauxSph = centreQuiRefroidit(2);
+fprintf('  plan %.2f, cylindrique %.2f, spherique %.2f\n', ...
+        tauxPlan, tauxCyl, tauxSph);
+assert(tauxPlan < tauxCyl && tauxCyl < tauxSph);
+
+% PDEVAL interpole entre les noeuds, valeur et derivee ensemble.
+[uInterp, duInterp] = pdeval(0, xp, solPde(end, :), 0.3);
+fprintf('\nPDEVAL en x = 0.3 : u = %.6f (exact %.6f)\n', ...
+        uInterp, sin(pi * 0.3) * exp(-pi^2 * 0.1));
+fprintf('                  du/dx = %.6f (exact %.6f)\n', ...
+        duInterp, pi * cos(pi * 0.3) * exp(-pi^2 * 0.1));
+assert(abs(uInterp - sin(pi * 0.3) * exp(-pi^2 * 0.1)) < 5e-4);
+assert(abs(duInterp - pi * cos(pi * 0.3) * exp(-pi^2 * 0.1)) < 5e-3);
+
+%% 7. Un probleme aux limites : BVP4C
+% Une equation differentielle dont on ne connait pas tout l'etat d'un
+% bout : on ne peut donc pas l'integrer en partant de la. La collocation
+% discretise tout l'intervalle a la fois et resout le systeme entier.
+%
+% y'' + y = 0 avec y(0) = 0 et y(pi/2) = 1 : c'est sin, et rien d'autre.
+sol = bvp4c(@(x, y) [y(2); -y(1)], @(ya, yb) [ya(1); yb(1) - 1], ...
+            bvpinit(linspace(0, pi/2, 11), [0 1]));
+fprintf('\nBVP4C sur y'''' + y = 0, y(0) = 0, y(pi/2) = 1 :\n');
+fprintf('  ecart a sin : %.3e sur 11 points\n', ...
+        max(abs(sol.y(1, :) - sin(sol.x))));
+assert(max(abs(sol.y(1, :) - sin(sol.x))) < 1e-6);
+% La derivee aussi est juste : c'est cos, la seconde composante du systeme.
+assert(max(abs(sol.y(2, :) - cos(sol.x))) < 1e-5);
+
+% La formule est d'ordre quatre : sur un polynome de degre trois, elle est
+% exacte. y'' = 6x avec y(0) = 0 et y(1) = 1 donne x^3.
+cubique = bvp4c(@(x, y) [y(2); 6*x], @(ya, yb) [ya(1); yb(1) - 1], ...
+                bvpinit(linspace(0, 1, 11), [0 1]));
+fprintf('  ecart a x^3 : %.3e — la formule est exacte sur les cubiques\n', ...
+        max(abs(cubique.y(1, :) - cubique.x .^ 3)));
+assert(max(abs(cubique.y(1, :) - cubique.x .^ 3)) < 1e-8);
+
+% Et sur un probleme non lineaire, que rien de tout cela ne resolvait :
+% y'' = 2 y^3 avec y(1) = 1/2 et y(2) = 1/3 a pour solution 1/(x+1).
+courbe = bvp4c(@(x, y) [y(2); 2 * y(1)^3], ...
+               @(ya, yb) [ya(1) - 1/2; yb(1) - 1/3], ...
+               bvpinit(linspace(1, 2, 21), [0.4 -0.2]));
+fprintf('  non lineaire y'''' = 2y^3 : ecart a 1/(x+1) = %.3e\n', ...
+        max(abs(courbe.y(1, :) - 1 ./ (courbe.x + 1))));
+assert(max(abs(courbe.y(1, :) - 1 ./ (courbe.x + 1))) < 1e-6);
+
 fprintf('\nToutes les verifications passent.\n');
+
+function taux = refroidissement(m, equation)
+% La vitesse a laquelle le centre se vide, depuis le meme profil initial :
+% flux nul au centre par symetrie, temperature nulle au bord.
+    r = linspace(0, 1, 21);
+    s = pdepe(m, equation, @(r) 1 - r .^ 2, ...
+              @(xl, ul, xr, ur, t) deal(0, 1, ur, 0), r, [0 0.05 0.1]);
+    taux = -log(s(end, 1) / s(1, 1)) / 0.1;
+end

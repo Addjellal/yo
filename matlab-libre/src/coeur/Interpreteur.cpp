@@ -368,7 +368,17 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         if (cacheable) cacheFonctions_[nom] = nullptr;
         return nullptr;
     }
-    if (u.fonctions.empty()) {
+    // Ce qui fait un script, c'est d'avoir des instructions au plus haut
+    // niveau — pas d'etre depourvu de fonctions. Un script peut porter ses
+    // propres fonctions locales, qui ne sont visibles que de lui : elles
+    // vont dans « voisines », et le corps du script les y trouve.
+    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
+    for (auto& f : u.fonctions) voisines[f->nom] = f;
+    for (auto& f : u.fonctions) {
+        f->fichier = chemin;
+        propagerVoisines(f, voisines);
+    }
+    if (u.script || u.fonctions.empty()) {
         // Un script : on l'enveloppe dans une fonction sans argument.
         auto f = std::make_shared<FonctionUtilisateur>();
         f->nom = nom;
@@ -378,14 +388,9 @@ std::shared_ptr<FonctionUtilisateur> Interpreteur::fonctionFichier(const std::st
         f->entrees.clear();
         f->sorties.clear();
         f->script = true;
+        f->voisines = voisines;
         if (cacheable) cacheFonctions_[nom] = f;
         return f;
-    }
-    std::map<std::string, std::shared_ptr<FonctionUtilisateur>> voisines;
-    for (auto& f : u.fonctions) voisines[f->nom] = f;
-    for (auto& f : u.fonctions) {
-        f->fichier = chemin;
-        propagerVoisines(f, voisines);
     }
     u.fonctions[0]->aide = aideDepuisSource(source);
     // Le nom du fichier prime sur celui écrit dans la première fonction ;
@@ -856,6 +861,19 @@ std::vector<Valeur> Interpreteur::appelerUtilisateur(
             ~Restaurer() { cible = valeur; }
         } restaurer{fichierCourant, precedent};
         GardeCadre cadre(*this, f->nom, f->fichier);
+        // Le script s'execute dans l'espace de travail de l'appelant, mais
+        // ce sont ses fonctions locales a lui qu'il doit voir, pas celles
+        // de l'appelant : on prete la portee au temps du corps, et on la
+        // rend ensuite -- les variables, elles, restent bien celles de
+        // l'appelant.
+        auto portee = piles_.back();
+        auto fonctionPrecedente = portee->fonction;
+        struct RendrePortee {
+            std::shared_ptr<Portee> portee;
+            std::shared_ptr<FonctionUtilisateur> fonction;
+            ~RendrePortee() { portee->fonction = fonction; }
+        } rendre{portee, fonctionPrecedente};
+        if (!f->voisines.empty()) portee->fonction = f;
         // « return » dans un script rend la main a ce qui l'a lance : il
         // arrete le script, il ne quitte pas la fonction appelante.
         try {

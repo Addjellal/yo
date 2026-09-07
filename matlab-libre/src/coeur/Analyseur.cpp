@@ -264,8 +264,14 @@ bool Analyseur::ressembleCommande() const {
     // « f -option », « f +x », « f ~x » : l'opérateur collé au mot qui suit
     // fait partie de l'argument. Avec une espace de part et d'autre, c'est
     // une opération.
+    //
+    // « / » et « \ » sont là pour les chemins : « addpath /usr/local/lib »
+    // et « cd \serveur\part » sont des commandes, et un chemin absolu ne
+    // s'écrit pas autrement. Le risque de confusion avec une division est
+    // écarté plus haut : un nom déjà vu comme variable ne se commande pas.
     if (s.genre == Genre::Operateur && !s.espaceApres &&
-        (s.texte == "-" || s.texte == "+" || s.texte == "~" || s.texte == "@"))
+        (s.texte == "-" || s.texte == "+" || s.texte == "~" || s.texte == "@" ||
+         s.texte == "/" || s.texte == "\\"))
         return true;
     return false;
 }

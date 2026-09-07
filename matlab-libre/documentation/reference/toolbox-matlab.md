@@ -430,6 +430,85 @@ BUBBLECHART Nuage de points dont la taille porte une troisième variable.
   Voir aussi SCATTER, BUBBLELEGEND, SWARMCHART, PLOT.
 ```
 
+## `bvp4c`
+
+```
+BVP4C Problème aux limites en deux points, par collocation.
+  SOL = BVP4C(ODEFUN,BCFUN,SOLINIT) résout y' = ODEFUN(x,y) sous les
+  conditions BCFUN(ya,yb) = 0, en partant de la devinette SOLINIT que
+  rend BVPINIT.
+  SOL = BVP4C(...,OPTIONS) accepte 'RelTol' et 'NMax' via BVPSET.
+
+  SOL porte le maillage dans SOL.X et la solution dans SOL.Y, une
+  colonne par point. DEVAL l'évalue entre les points.
+
+  Un problème aux limites ne s'intègre pas : on ne connaît pas tout
+  l'état d'un bout, donc on ne peut pas partir. La méthode discrétise
+  tout l'intervalle à la fois et résout le grand système non linéaire
+  qui en résulte — d'où le nom de collocation.
+
+  La formule employée est celle de Lobatto IIIa à trois points, d'ordre
+  quatre : sur chaque maille on impose que la solution vérifie
+  l'équation aux deux bouts et au milieu, le point milieu étant lui-même
+  déduit d'un développement d'Hermite. C'est la formule de MATLAB, et
+  c'est ce que le « 4c » du nom désigne — ordre quatre, collocation.
+
+  Le système est résolu par la méthode de Newton, dont la jacobienne est
+  calculée par différences finies. Une devinette trop lointaine fait
+  diverger : un problème aux limites peut avoir plusieurs solutions, et
+  c'est la devinette qui choisit.
+
+  Exemple :
+     % y'' + y = 0, y(0) = 0, y(pi/2) = 1 : la solution est sin.
+     f = @(x, y) [y(2); -y(1)];
+     cl = @(ya, yb) [ya(1); yb(1) - 1];
+     sol = bvp4c(f, cl, bvpinit(linspace(0, pi/2, 11), [0 1]));
+     max(abs(sol.y(1, :) - sin(sol.x))) < 1e-6
+
+  Voir aussi BVPINIT, BVPSET, DEVAL, ODE45.
+```
+
+## `bvpinit`
+
+```
+BVPINIT Devinette initiale pour BVP4C.
+  SOLINIT = BVPINIT(X,YINIT) construit la structure que BVP4C attend :
+  un maillage X et une première estimation de la solution. YINIT peut
+  être un vecteur constant — la même valeur partout — ou une poignée de
+  fonction rendant la valeur en un point.
+  SOLINIT = BVPINIT(X,YINIT,PARAMETRES) ajoute des paramètres inconnus.
+
+  Un problème aux limites n'a pas toujours une solution, et peut en
+  avoir plusieurs. La devinette n'est donc pas un détail de mise en
+  route : c'est elle qui décide vers laquelle des solutions le solveur
+  converge, et si le poutre flambé se courbe d'un côté ou de l'autre.
+
+  Exemple :
+     solinit = bvpinit(linspace(0, 1, 11), [0 0]);
+     size(solinit.y)                 % 2 11
+     s2 = bvpinit(linspace(0, pi, 5), @(x) [sin(x); cos(x)]);
+
+  Voir aussi BVP4C, DEVAL, ODE45.
+```
+
+## `bvpset`
+
+```
+BVPSET Réglages de BVP4C.
+  OPTIONS = BVPSET('Nom',VALEUR,...) construit la structure de réglages.
+  Reconnus : 'RelTol' (1e-6), 'AbsTol' (1e-6), 'NMax' (nombre maximal
+  d'itérations de Newton, 50), 'Stats'.
+  OPTIONS = BVPSET(ANCIENNES,'Nom',VALEUR,...) part d'une structure.
+
+  Exemple :
+     o = bvpset('RelTol', 1e-8);
+     o.RelTol                        % 1e-08
+     o2 = bvpset(o, 'NMax', 100);
+     o2.RelTol                       % 1e-08 : l'ancienne valeur est gardee
+
+  Voir aussi BVP4C, BVPINIT, ODESET.
+```
+
 ## `calendar`
 
 ```
@@ -3572,6 +3651,10 @@ MATLIBRE_PAS_GRILLE La distance typique entre deux points voisins.
   tienne dans une maille sans empiéter sur la voisine.
 ```
 
+## `matlibre_pdepe_derivee`
+
+_Pas de bloc d'aide._
+
 ## `matlibre_plaque_mince`
 
 ```
@@ -4715,6 +4798,86 @@ PCG Gradient conjugué préconditionné.
      norm(A * x - b) / norm(b) < 1e-9
 
   Voir aussi BICG, CGS, MINRES, GMRES, MLDIVIDE.
+```
+
+## `pdepe`
+
+```
+PDEPE Équation aux dérivées partielles parabolique ou elliptique en 1-D.
+  SOL = PDEPE(M,PDEFUN,ICFUN,BCFUN,XMESH,TSPAN) résout
+
+     c(x,t,u,du/dx) du/dt = x^-m d/dx ( x^m f(x,t,u,du/dx) ) + s(...)
+
+  où M vaut 0 en géométrie plane, 1 en cylindrique et 2 en sphérique.
+  PDEFUN rend [C,F,S] ; ICFUN rend la condition initiale en un point ;
+  BCFUN rend [PL,QL,PR,QR] pour les conditions P + Q*F = 0 aux deux
+  bouts. SOL est un tableau TSPAN par XMESH par composante.
+
+  La méthode est celle des lignes : on discrétise l'espace, ce qui
+  change l'équation aux dérivées partielles en un système d'équations
+  différentielles ordinaires en temps, puis on l'intègre par ODE15S. Le
+  système est raide — la raideur croît comme le carré du nombre de
+  points — et c'est pour cela qu'un solveur explicite n'y suffit pas.
+
+  La discrétisation en espace est en volumes finis : le flux F est
+  évalué aux milieux de mailles, et la divergence prise entre eux. Cette
+  écriture conserve exactement la quantité intégrée, ce qu'une
+  différence finie centrée ne fait pas — et c'est ce qui compte pour une
+  équation de conservation.
+
+  Le terme x^m traite la symétrie : en cylindrique et en sphérique,
+  l'aire de la surface traversée croît avec le rayon, et c'est ce
+  facteur qui l'exprime.
+
+  Une condition de Dirichlet — Q nul — n'est pas une équation
+  différentielle : la valeur au bord est déterminée à chaque instant en
+  résolvant P = 0, non intégrée.
+
+  Exemple :
+     % Equation de la chaleur sur [0,1], bords a zero, creneau initial.
+     f = @(x, t, u, dudx) deal(1, dudx, 0);
+     ic = @(x) sin(pi * x);
+     bc = @(xl, ul, xr, ur, t) deal(ul, 0, ur, 0);
+     x = linspace(0, 1, 21);
+     t = linspace(0, 0.1, 6);
+     sol = pdepe(0, f, ic, bc, x, t);
+     % La solution exacte est sin(pi x) exp(-pi^2 t).
+     max(abs(sol(end, :)' - sin(pi * x)' * exp(-pi^2 * 0.1))) < 5e-3
+
+  Voir aussi ODE15S, BVP4C, PDEVAL, INTERP1.
+```
+
+## `pdeval`
+
+```
+PDEVAL Évalue la solution de PDEPE entre les points du maillage.
+  UOUT = PDEVAL(M,XMESH,UI,XOUT) interpole en XOUT la composante UI de
+  la solution rendue par PDEPE sur le maillage XMESH.
+  [UOUT,DUOUTDX] = PDEVAL(...) rend aussi la dérivée en espace.
+
+  L'interpolation est cubique d'Hermite : sur chaque maille, le
+  polynôme prend aux deux bouts la valeur du nœud et une pente déduite
+  de la parabole passant par lui et ses deux voisins. Deux conséquences
+  qui font tout l'intérêt du procédé : la dérivée rendue est celle de la
+  fonction rendue — elles ne peuvent pas se contredire —, et l'ensemble
+  est exact sur les paraboles, donc d'ordre deux en dérivée comme la
+  discrétisation dont la solution vient.
+
+  Une interpolation affine, elle, donnerait une dérivée constante par
+  morceaux, discontinue aux nœuds et d'ordre un : elle perdrait la
+  précision que PDEPE a mise à obtenir.
+
+  M ne sert pas au calcul : il est accepté pour que l'appel ait la même
+  forme que celui de PDEPE, dont la solution vient.
+
+  Exemple :
+     x = linspace(0, 1, 21);
+     u = sin(pi * x);
+     [v, dv] = pdeval(0, x, u, 0.25);
+     abs(v - sin(pi * 0.25)) < 1e-3
+     abs(dv - pi * cos(pi * 0.25)) < 1e-2
+
+  Voir aussi PDEPE, INTERP1, DEVAL, PCHIP.
 ```
 
 ## `peaks`

@@ -140,9 +140,14 @@ fichiers = {fullfile(racine, 'README.md'), ...
 motifs = {'\d+ fonctions natives', sprintf('%d fonctions natives', natives)
           '\d+ fonctions de toolbox', sprintf('%d fonctions de toolbox', total)
           'fonctions natives — \d+,', sprintf('fonctions natives — %d,', natives)
-          'réparties en \*\*\d+ modules\*\*', sprintf('réparties en **%d modules**', modules)
-          'réparties en \d+ modules', sprintf('réparties en %d modules', modules)
+          % Le compte peut se trouver a la ligne suivante : on garde
+          % l'espacement tel quel plutot que de recoller le paragraphe.
+          'réparties en(\s*)\*\*\d+ modules\*\*', ...
+              sprintf('réparties en$1**%d modules**', modules)
+          'réparties en(\s*)\d+ modules', sprintf('réparties en$1%d modules', modules)
           'les \d+ modules et leur', sprintf('les %d modules et leur', modules)
+          'les \d+ fonctions, avec leur aide', ...
+              sprintf('les %d fonctions, avec leur aide', natives + total)
           '\d+ fonctions ont leur fiche', sprintf('%d fonctions ont leur fiche', fiches)
           '\d+ suites en langage MATLAB', sprintf('%d suites en langage MATLAB', suites)
           '\d+ suites écrites dans le langage', ...
