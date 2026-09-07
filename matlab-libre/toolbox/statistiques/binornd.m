@@ -2,6 +2,10 @@ function r = binornd(n, pr, varargin)
 %BINORND Tirages d'une loi binomiale.
 %   Somme de N indicatrices de Bernoulli quand N est petit, inversion de
 %   la répartition sinon.
+%
+%   Exemple :
+%      rng(1);
+%      mean(binornd(10, 0.3, 1, 10000))     % proche de 3 = n p
     forme = statForme(size(n + pr), varargin);
     n = statEtendre(n, forme);
     pr = statEtendre(pr, forme);

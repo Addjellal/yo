@@ -1,6 +1,11 @@
 function nlogL = betalike(params, data)
 %BETALIKE Opposé de la log-vraisemblance d'une loi bêta.
 %   PARAMS vaut [A B] ; les données doivent être dans ]0,1[.
+%
+%   Exemple :
+%      rng(1);
+%      x = betarnd(2, 5, 500, 1);
+%      betalike([2 5], x) < betalike([1 1], x)     % vrai : les bons parametres
     a = params(1);
     b = params(2);
     x = double(data(:));

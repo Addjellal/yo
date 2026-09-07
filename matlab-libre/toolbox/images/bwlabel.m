@@ -2,6 +2,13 @@ function [etiquettes, nombre] = bwlabel(bw, connexite)
 %BWLABEL Étiquetage des composantes connexes d'une image binaire.
 %   [L,N] = BWLABEL(BW) numérote les régions de pixels vrais.
 %   CONNEXITE vaut 4 ou 8 (8 par défaut).
+%
+%   Exemple :
+%      bw = false(20, 20);
+%      bw(3:6, 3:6) = true;        % un carre de 16 pixels
+%      bw(10:18, 10:18) = true;    % un autre de 81
+%      [etiquettes, n] = bwlabel(bw);
+%      n                           % 2 : deux composantes connexes
     if nargin < 2
         connexite = 8;
     end

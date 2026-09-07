@@ -5,6 +5,13 @@ function t = readtable(nomFichier, varargin)
 %   noms de variables.
 %   READTABLE(...,'Delimiter',D) impose le séparateur.
 %   READTABLE(...,'ReadVariableNames',false) numérote les colonnes.
+%
+%   Exemple :
+%      f = fopen('essai.csv', 'w');
+%      fprintf(f, 'a,b\n1,2\n3,4\n');
+%      fclose(f);
+%      t = readtable('essai.csv');
+%      height(t)                   % 2
     delimiteur = '';
     entete = true;
     k = 1;

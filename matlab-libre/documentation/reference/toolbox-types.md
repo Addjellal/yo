@@ -74,6 +74,10 @@
 NAT Date manquante (« Not-a-Time »).
   T = NAT construit un scalaire manquant ; NAT(N) une matrice N x N,
   NAT(M,N) une matrice M x N.
+
+  Exemple :
+     t = NaT();
+     isnat(t)                    % 1 : la date manquante des datetime
 ```
 
 ## `appliquerReste`
@@ -84,6 +88,10 @@ APPLIQUERRESTE Applique une suite d'accès subsref à une valeur ordinaire.
   documentation de subsref : champs « type » et « subs ». Les classes de
   ce dossier s'en servent pour traiter la fin d'une chaîne d'accès une
   fois leur propre premier accès résolu.
+
+  Exemple :
+     s = struct('type', '()', 'subs', {{2}});
+     appliquerReste([10 20 30], s)      % 20
 ```
 
 ## `array2table`
@@ -93,6 +101,10 @@ ARRAY2TABLE Convertit une matrice en table, une colonne par variable.
   T = ARRAY2TABLE(A) nomme les variables A1, A2, ...
   T = ARRAY2TABLE(A,'VariableNames',NOMS) impose les noms,
   T = ARRAY2TABLE(A,'RowNames',NOMS) nomme les lignes.
+
+  Exemple :
+     t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
+     height(t)                   % 2
 ```
 
 ## `assignerReste`
@@ -109,6 +121,10 @@ ASSIGNERRESTE Applique une suite d'accès subsasgn à une valeur ordinaire.
 
   Fonction interne aux boîtes à outils de types : elle n'existe pas dans
   MATLAB.
+
+  Exemple :
+     s = struct('type', '()', 'subs', {{2}});
+     assignerReste([10 20 30], s, 99)   % 10 99 30
 
   Voir aussi SUBSASGN, APPLIQUERRESTE.
 ```
@@ -157,6 +173,10 @@ CALENDARDURATION Durée exprimée en unités de calendrier.
 CALMONTHS Durée de calendrier en calmonths, ou nombre de calmonths d'une durée.
   CD = CALMONTHS(N) construit une durée de calendrier.
   N = CALMONTHS(CD) rend le nombre entier correspondant.
+
+  Exemple :
+     d = calmonths(3);
+     datetime(2024, 1, 31) + calmonths(1)     % le 29 fevrier : les mois n'ont pas la meme longueur
 ```
 
 ## `calquarters`
@@ -165,6 +185,9 @@ CALMONTHS Durée de calendrier en calmonths, ou nombre de calmonths d'une durée
 CALQUARTERS Durée de calendrier en calquarters, ou nombre de calquarters d'une durée.
   CD = CALQUARTERS(N) construit une durée de calendrier.
   N = CALQUARTERS(CD) rend le nombre entier correspondant.
+
+  Exemple :
+     calquarters(1) == calmonths(3)     % 1 : un trimestre fait trois mois
 ```
 
 ## `calweeks`
@@ -193,6 +216,9 @@ CALWEEKS Durée de calendrier en semaines, ou nombre de semaines d'une durée.
 CALYEARS Durée de calendrier en calyears, ou nombre de calyears d'une durée.
   CD = CALYEARS(N) construit une durée de calendrier.
   N = CALYEARS(CD) rend le nombre entier correspondant.
+
+  Exemple :
+     datetime(2024, 2, 29) + calyears(1)      % le 28 fevrier 2025 : l'annee suivante n'est pas bissextile
 ```
 
 ## `categorical`
@@ -224,6 +250,10 @@ CATEGORICAL Tableau de valeurs prises dans un ensemble fini de catégories.
 CELL2TABLE Convertit une cellule à deux dimensions en table.
   Chaque colonne devient une variable : numérique si toutes ses cases le
   sont, cellule de textes sinon.
+
+  Exemple :
+     t = cell2table({1, 'a'; 2, 'b'}, 'VariableNames', {'n', 'lettre'});
+     height(t)                   % 2
 ```
 
 ## `datetime`
@@ -256,6 +286,10 @@ DATETIME Point dans le temps, avec date et heure.
 DAYS Durée en jours, ou jours d'une durée.
   D = DAYS(X) construit une durée dont le format d'affichage est 'd'.
   X = DAYS(D) rend le nombre de jours d'une durée.
+
+  Exemple :
+     days(1.5)                   % une duree d'un jour et demi
+     hours(days(1))              % 24
 ```
 
 ## `duration`
@@ -286,6 +320,10 @@ DURATION Durée, longueur de temps sans origine.
 HOURS Durée en heures, ou heures d'une durée.
   D = HOURS(X) construit une durée dont le format d'affichage est 'h'.
   X = HOURS(D) rend le nombre de heures d'une durée.
+
+  Exemple :
+     hours(1) + minutes(30)      % une heure et demie
+     minutes(hours(2))           % 120
 ```
 
 ## `iscalendarduration`
@@ -431,6 +469,9 @@ ISTIMETABLE Vrai pour une timetable.
 MILLISECONDS Durée en millisecondes, ou millisecondes d'une durée.
   D = MILLISECONDS(X) construit une durée affichée en secondes.
   X = MILLISECONDS(D) rend le nombre de millisecondes d'une durée.
+
+  Exemple :
+     seconds(milliseconds(1500))     % 1.5
 ```
 
 ## `minutes`
@@ -439,6 +480,9 @@ MILLISECONDS Durée en millisecondes, ou millisecondes d'une durée.
 MINUTES Durée en minutes, ou minutes d'une durée.
   D = MINUTES(X) construit une durée dont le format d'affichage est 'm'.
   X = MINUTES(D) rend le nombre de minutes d'une durée.
+
+  Exemple :
+     seconds(minutes(2))         % 120
 ```
 
 ## `nominal`
@@ -494,6 +538,13 @@ READTABLE Lit un fichier texte délimité et rend une table.
   noms de variables.
   READTABLE(...,'Delimiter',D) impose le séparateur.
   READTABLE(...,'ReadVariableNames',false) numérote les colonnes.
+
+  Exemple :
+     f = fopen('essai.csv', 'w');
+     fprintf(f, 'a,b\n1,2\n3,4\n');
+     fclose(f);
+     t = readtable('essai.csv');
+     height(t)                   % 2
 ```
 
 ## `seconds`
@@ -502,6 +553,10 @@ READTABLE Lit un fichier texte délimité et rend une table.
 SECONDS Durée en secondes, ou secondes d'une durée.
   D = SECONDS(X) construit une durée dont le format d'affichage est 's'.
   X = SECONDS(D) rend le nombre de secondes d'une durée.
+
+  Exemple :
+     seconds(90)                 % une minute et demie
+     minutes(seconds(90))        % 1.5
 ```
 
 ## `struct2table`
@@ -510,6 +565,10 @@ SECONDS Durée en secondes, ou secondes d'une durée.
 STRUCT2TABLE Convertit un tableau de structures en table.
   Chaque champ devient une variable ; un tableau 1x1 dont les champs sont
   des colonnes est accepté également.
+
+  Exemple :
+     t = struct2table(struct('a', {1; 2}, 'b', {3; 4}));
+     height(t)                   % 2
 ```
 
 ## `table`
@@ -544,6 +603,12 @@ TABLE2TIMETABLE Convertit une table en timetable.
   TT = TABLE2TIMETABLE(T) utilise la première variable datetime ou
   duration comme axe de temps. TABLE2TIMETABLE(T,'RowTimes',T0) impose
   un autre vecteur d'instants.
+
+  Exemple :
+     t = table((1:3)', 'VariableNames', {'v'});
+     t.Time = datetime(2024, 1, (1:3)');
+     tt = table2timetable(t, 'RowTimes', 'Time');
+     height(tt)                  % 3
 ```
 
 ## `time`
@@ -682,6 +747,11 @@ WRITETABLE Écrit une table dans un fichier texte délimité.
   WRITETABLE(T,FICHIER) écrit un fichier CSV avec une ligne d'en-tête.
   WRITETABLE(...,'Delimiter',D) choisit le séparateur,
   WRITETABLE(...,'WriteVariableNames',false) supprime l'en-tête.
+
+  Exemple :
+     t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
+     writetable(t, 'sortie.csv');
+     height(readtable('sortie.csv'))     % 2 : l'aller-retour
 ```
 
 ## `years`
@@ -690,5 +760,8 @@ WRITETABLE Écrit une table dans un fichier texte délimité.
 YEARS Durée en années (365,2425 jours), ou années d'une durée.
   D = YEARS(X) construit une durée dont le format d'affichage est 'y'.
   X = YEARS(D) rend le nombre de années d'une durée.
+
+  Exemple :
+     days(years(1))              % 365.2425 : l'annee moyenne du calendrier gregorien
 ```
 

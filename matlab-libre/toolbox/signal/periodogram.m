@@ -3,6 +3,13 @@ function [Pxx, f] = periodogram(x, fenetre, nfft, fs)
 %   [PXX,F] = PERIODOGRAM(X) estime la densité spectrale de X.
 %   [PXX,F] = PERIODOGRAM(X,FENETRE,NFFT,FS) précise la fenêtre, la taille
 %   de la transformée et la fréquence d'échantillonnage.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [pxx, f] = periodogram(x, [], 512, 1);
+%      [~, k] = max(pxx);
+%      abs(f(k) - 0.1) < 0.02
     x = x(:);
     n = numel(x);
     if nargin < 2 || isempty(fenetre)

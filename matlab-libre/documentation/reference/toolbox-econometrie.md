@@ -149,6 +149,12 @@ ARCHTEST Test d'hétéroscédasticité conditionnelle.
 ARFIT Estimation d'un modèle autorégressif par Yule-Walker.
   [PHI,SIGMA2,C] = ARFIT(Y,P) rend les coefficients, la variance du
   bruit et la constante.
+
+  Exemple :
+     rng(1);
+     y = arsim(0.7, 500);
+     p = arfit(y, 1);
+     abs(p(1) - 0.7) < 0.15
 ```
 
 ## `arima`
@@ -1373,14 +1379,14 @@ SIMULATE Tire des trajectoires d'un modèle de série temporelle.
   pour que l'effet du départ ait disparu : la série rendue suit la loi
   stationnaire du modèle.
 
+  SIMULATE d'un modèle de portefeuille de crédit rend, lui, l'objet
+  enrichi de ses scénarios de pertes, que PORTFOLIORISK et
+  RISKCONTRIBUTION exploitent ensuite.
+
   Exemple :
      m = arima('Constant', 0, 'AR', {0.8}, 'Variance', 1);
      y = simulate(m, 1000);
      abs(var(y) - 1 / (1 - 0.64)) < 0.5      % variance theorique
-
-  SIMULATE d'un modèle de portefeuille de crédit rend l'objet enrichi
-  de ses scénarios de pertes, que PORTFOLIORISK et RISKCONTRIBUTION
-  exploitent ensuite.
 
   Voir aussi ARIMA, GARCH, ESTIMATE, FORECAST, INFER,
   CREDITDEFAULTCOPULA.
@@ -1397,6 +1403,8 @@ SUMMARIZE Résumé d'un modèle, ajusté ou non.
   S = SUMMARIZE(MDL) rend la structure au lieu de l'écrire.
 
   Exemple :
+     rng(1);
+     y = simulate(arima('Constant', 0, 'AR', {0.7}, 'Variance', 1), 400);
      ajuste = estimate(arima(1, 0, 0), y, 'Display', 'off');
      summarize(ajuste)
 
@@ -1462,10 +1470,14 @@ WALDTEST Test de Wald sur des restrictions paramétriques.
   alors mené pour chaque triplet.
 
   Exemple :
-     % Le second coefficient d'une régression est-il nul ?
+     % Le second coefficient d'une regression est-il nul ?
+     rng(1);
+     X = [(1:50)', randn(50, 1)];
+     y = 2 + 3 * X(:, 1) + randn(50, 1);
      m = ols(y, X);
+     Xc = [ones(50, 1), X];
      A = [0 1 0];
-     waldtest(A * m.beta, A, m.sigma2 * inv(X' * X))
+     waldtest(A * m.beta, A, m.sigma2 * inv(Xc' * Xc))
 
   Voir aussi LRATIOTEST, OLS, GCTEST.
 ```

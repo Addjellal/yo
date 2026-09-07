@@ -5,6 +5,11 @@ function phat = gamfit(x)
 %   l'approximation de Thom, puis l'échelle suit.
 %
 %   PHAT vaut [A B] : forme et échelle.
+%
+%   Exemple :
+%      rng(1);
+%      p = gamfit(gamrnd(3, 2, 5000, 1));
+%      max(abs(p - [3 2]) ./ [3 2]) < 0.15
     x = double(x(:));
     if any(x <= 0)
         error('stats:gamfit:BadData', 'Les données doivent être strictement positives.');

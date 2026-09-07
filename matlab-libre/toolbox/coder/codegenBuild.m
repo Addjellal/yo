@@ -4,6 +4,13 @@ function [ok, message, sortie] = codegenBuild(nomFonction, varargin)
 %   temporaire puis les compile en objet.
 %   CODEGENBUILD('f','-args',{...},'-d',DOSSIER) accepte les mêmes options
 %   que CODEGEN, plus '-exe' pour produire un exécutable de démonstration.
+%
+%   Exemple :
+%      f = fopen('carreDeTest.m', 'w');
+%      fprintf(f, 'function y = carreDeTest(x)\n  y = x * x;\nend\n');
+%      fclose(f);
+%      r = codegen('carreDeTest', '-args', {0}, '-report');
+%      contains(r.source, 'carreDeTest')      % 1
     dossier = tempdir();
     executable = false;
     options = {};

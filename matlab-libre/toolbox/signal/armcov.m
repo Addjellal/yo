@@ -2,6 +2,12 @@ function [a, e] = armcov(x, p)
 %ARMCOV Modèle autorégressif par la covariance modifiée.
 %   Moindres carrés sur les erreurs de prédiction avant et arrière à la
 %   fois : c'est la méthode qui résout le mieux deux sinusoïdes proches.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [a, e] = armcov(x, 4);
+%      all(abs(roots(a)) < 1.2)
     x = double(x(:));
     n = numel(x);
     if p >= n

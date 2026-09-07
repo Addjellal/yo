@@ -9,6 +9,9 @@ function prix = supersharebybls(courbe, actif, reglement, echeance, borneBasse, 
 %   reproduit une fonction par des indicatrices.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      supersharebybls(c, s, '01-Jan-2024', '01-Jan-2025', 90, 110)
 %
 %   Voir aussi CASHBYBLS, ASSETBYBLS, GAPBYBLS.

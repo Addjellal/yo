@@ -1,6 +1,11 @@
 function r = entropyfilt(image, voisinage)
 %ENTROPYFILT Entropie locale, en bits.
 %   L'histogramme est calculé sur 256 niveaux, comme dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      r = entropyfilt(rand(20));
+%      all(r(:) >= 0)              % 1 : une entropie est positive
     if nargin < 2, voisinage = ones(9); end
     x = double(image);
     if max(x(:)) <= 1, x = x * 255; end

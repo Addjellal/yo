@@ -563,4 +563,53 @@ assert(leve, 'OPENFIG doit signaler qu''il ne sait pas faire');
 reponses = inputdlg({});
 assert(iscell(reponses) && isempty(reponses), 'aucune invite, aucune question');
 
+%% ------------------------------------------------ ce qui restait orphelin
+% RAMPECARTE est la rampe dont vivent toutes les cartes de couleurs.
+g = rampeCarte(5);
+assert(max(abs(g' - [0 0.25 0.5 0.75 1])) < 1e-15);
+assert(isempty(rampeCarte(0)));
+assert(isequal(rampeCarte(1), 0), 'une seule couleur vaut zero, comme dans MATLAB');
+
+% INSTGETCELL rend en cellules ce qu'INSTGET rend en tableaux : c'est ce
+% qui permet de melanger des champs de types differents.
+jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
+[donnees, noms] = instgetcell(jeu, 'FieldList', {'CouponRate', 'Maturity'});
+assert(numel(donnees) == numel(noms));
+assert(any(strcmpi(noms, 'CouponRate')));
+
+% READLINE rend ce que la derniere commande a prepare.
+instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
+instrument = writeline(instrument, '*IDN?');
+reponse = readline(instrument);
+assert(ischar(reponse) || isstring(reponse));
+assert(~isempty(char(reponse)), 'une identification n''est pas vide');
+
+% Empaqueter une toolbox rend une archive lisible.
+dossier = tempname();
+mkdir(dossier);
+fid = fopen(fullfile(dossier, 'Contents.m'), 'w');
+fprintf(fid, '%% Ma toolbox\n');
+fclose(fid);
+archive = matlab.addons.toolbox.packageToolbox(dossier, [tempname() '.zip']);
+assert(isfile(archive), 'l''archive existe');
+
+% WEBREAD et WEBSAVE demandent le reseau : on ne verifie ici que ce qui ne
+% depend pas de lui — une adresse mal formee doit etre refusee, non
+% silencieusement transformee en fichier vide.
+leve = false;
+try
+    webread('pas-une-adresse');
+catch
+    leve = true;
+end
+assert(leve, 'une adresse invalide doit etre signalee');
+leve = false;
+try
+    websave(tempname(), 'pas-une-adresse');
+catch
+    leve = true;
+end
+assert(leve);
+
 fprintf('  rouages : toutes les verifications passent\n');

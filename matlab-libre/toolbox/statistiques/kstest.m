@@ -4,6 +4,11 @@ function [h, p, ksstat, cv] = kstest(x, alpha)
 %   la loi normale standard. H vaut 1 quand l'hypothèse est rejetée.
 %
 %   La p-valeur vient de la série de Kolmogorov, tronquée à cent termes.
+%
+%   Exemple :
+%      rng(1);
+%      [h, p] = kstest(randn(500, 1));
+%      h                           % 0 : on ne rejette pas la normalite
     if nargin < 2 || isempty(alpha), alpha = 0.05; end
     x = sort(x(:));
     n = numel(x);

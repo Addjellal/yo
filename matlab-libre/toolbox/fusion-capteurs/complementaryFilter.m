@@ -21,10 +21,14 @@ function angle = complementaryFilter(angleAccel, vitesseGyro, dt, alpha, anglePr
 %   d'un modèle qu'il faut écrire.
 %
 %   Exemple :
+%      rng(1);
+%      mesure = 30 + 2 * randn(100, 1);       % accelerometre, bruite
+%      gyro = zeros(100, 1);                  % gyrometre, sans vitesse
 %      angle = 0;
 %      for k = 1:100
 %          angle = complementaryFilter(mesure(k), gyro(k), 0.01, 0.98, angle);
 %      end
+%      abs(angle - 30) < 5                    % 1 : il converge vers la mesure
 %
 %   Voir aussi KALMANFILTER, MADGWICKUPDATE.
     if nargin < 4, alpha = 0.98; end

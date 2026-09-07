@@ -224,6 +224,14 @@ FIT Ajuste un modèle à des données.
 FITCURVE Ajustement par un modèle nommé.
   TYPE vaut 'poly', 'exp' (a e^{bx}), 'power' (a x^b), 'log' (a + b ln x)
   ou 'gauss' (a exp(-((x-b)/c)^2)).
+
+  Exemple :
+     rng(1);
+     x = linspace(0, 1, 40)';
+     [c, modele] = fitCurve(x, 2 * x + 1 + 0.02 * randn(40, 1), 'poly', 1);
+     abs(c(1) - 2) < 0.1         % la pente est retrouvee
+     [c, modele] = fitCurve(x, 3 * exp(1.5 * x), 'exp');
+     max(abs(c - [3 1.5])) < 0.1
 ```
 
 ## `fitSurface`
@@ -405,9 +413,18 @@ FNVAL Évalue une fonction par morceaux.
 
 ```
 GOODNESSOFFIT Indicateurs de qualité d'un ajustement.
-  STATS = GOODNESSOFFIT(Y,YHAT) rend une structure : la somme des carrés
-  des résidus, l'erreur quadratique moyenne, le coefficient de
-  détermination et sa version ajustée.
+  STATS = GOODNESSOFFIT(Y,YHAT) rend une structure portant la somme des
+  carrés des résidus, l'erreur quadratique moyenne et le coefficient de
+  détermination. Chaque grandeur y figure sous deux noms : celui de la
+  structure GOF de MATLAB — sse, rmse, rsquare — et sa forme en
+  majuscules, SSE, RMSE, R2. Les deux désignent la même valeur ; les
+  premiers permettent de reprendre un programme écrit pour MATLAB sans
+  le retoucher.
+
+  STATS = GOODNESSOFFIT(Y,YHAT,NPARAMETRES) ajoute les degrés de liberté
+  résiduels dfe = N - NPARAMETRES et le coefficient ajusté adjrsquare.
+  Il faut donner ce nombre : les résidus seuls ne disent pas combien de
+  paramètres ont été ajustés pour les obtenir.
 
   Le R2 dit quelle part de la variance est expliquée, mais il ne peut
   que croître quand on ajoute des paramètres — même inutiles. C'est
@@ -419,9 +436,13 @@ GOODNESSOFFIT Indicateurs de qualité d'un ajustement.
   les résidus vaut mieux que regarder le R2.
 
   Exemple :
-     stats = goodnessOfFit(y, modele(x));
+     rng(1);
+     x = linspace(0, 1, 40)';
+     y = 2 * x + 1 + 0.05 * randn(40, 1);
+     stats = goodnessOfFit(y, polyval(polyfit(x, y, 1), x));
      stats.rsquare
      stats.rmse
+     goodnessOfFit(y, polyval(polyfit(x, y, 1), x), 2).adjrsquare
 
   Voir aussi FIT, FITSURFACE, CONFINT.
 ```
@@ -1685,6 +1706,13 @@ SMOOTH Lissage d'une suite de données.
 SMOOTHSPLINE Lissage par pénalisation de la dérivée seconde.
   YLISSE = SMOOTHSPLINE(X,Y,LAMBDA) minimise
      sum (y - f)^2 + lambda * sum (f'')^2
+
+  Exemple :
+     rng(1);
+     x = linspace(0, 1, 60)';
+     y = sin(2 * pi * x) + 0.2 * randn(60, 1);
+     lisse = smoothSpline(x, y, 1);
+     sum(diff(lisse, 2) .^ 2) < sum(diff(y, 2) .^ 2)     % lisser diminue la courbure
 ```
 
 ## `spap2`

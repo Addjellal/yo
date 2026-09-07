@@ -6,6 +6,10 @@ function prefixe = statPrefixeLoi(nom)
 %   ...CDF, ...INV et ...RND.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      statPrefixeLoi('Normal')             % 'norm'
+%      statPrefixeLoi('Poisson')            % 'poiss'
     table = {
         'beta',              'beta'
         'binomial',          'bino'

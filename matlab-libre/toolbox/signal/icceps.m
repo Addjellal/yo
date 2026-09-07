@@ -2,6 +2,10 @@ function x = icceps(xhat, nd)
 %ICCEPS Cepstre complexe inverse.
 %   X = ICCEPS(XHAT,ND) reconstitue le signal à partir de son cepstre
 %   complexe et du retard ND rendu par CCEPS.
+%
+%   Exemple :
+%      x = [1 0.5 0.25 0.125]';
+%      max(abs(icceps(cceps(x), 0) - x)) < 1e-6
     if nargin < 2, nd = 0; end
     xhat = double(xhat(:));
     n = numel(xhat);

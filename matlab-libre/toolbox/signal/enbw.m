@@ -3,7 +3,8 @@ function b = enbw(fenetre, fs)
 %   B = ENBW(W) rend N*sum(w.^2)/sum(w)^2, en bacs de la transformée.
 %   ENBW(W,FS) la donne en hertz.
 %
-%   Exemple :  enbw(rectwin(10))   % 1
+%   Exemple :
+%      enbw(rectwin(10))   % 1
     w = fenetre(:);
     n = numel(w);
     b = n * sum(w.^2) / sum(w)^2;

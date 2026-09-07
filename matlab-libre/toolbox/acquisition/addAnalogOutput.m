@@ -5,6 +5,8 @@ function session = addAnalogOutput(session, nom)
 %   qui permet de vérifier qu'on a bien envoyé ce qu'on croyait.
 %
 %   Exemple :
+%      s = daq();
+%      s.frequence = 1000;
 %      s = addAnalogOutput(s, 'ao0');
 %      s = writeData(s, linspace(0, 5, 500).');
 %      numel(s.ecrit)                  % 500

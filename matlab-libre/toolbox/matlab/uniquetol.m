@@ -2,6 +2,10 @@ function [u, ia] = uniquetol(x, tol)
 %UNIQUETOL Valeurs distinctes à une tolérance près.
 %   U = UNIQUETOL(X,TOL) regroupe les valeurs dont l'écart relatif est
 %   inférieur à TOL (1e-6 par défaut).
+%
+%   Exemple :
+%      u = uniquetol([1 1 + 1e-9 2], 1e-6);
+%      numel(u)                    % 2 : les deux premiers se confondent
     if nargin < 2
         tol = 1e-6;
     end

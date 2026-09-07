@@ -2,6 +2,10 @@ function fis = ajouterVariable(fis, entree, intervalle, varargin)
 %AJOUTERVARIABLE Rouage commun d'ADDINPUT et d'ADDOUTPUT.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      fis = ajouterVariable(mamfis(), true, [0 10], 'Name', 'erreur');
+%      numel(variablesDe(fis, true))      % 1
     variables = variablesDe(fis, entree);
     if entree
         nom = sprintf('input%d', numel(variables) + 1);

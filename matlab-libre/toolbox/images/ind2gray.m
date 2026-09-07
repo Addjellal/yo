@@ -1,6 +1,10 @@
 function image = ind2gray(indices, carte)
 %IND2GRAY Image indexée vers niveaux de gris.
 %   La luminance suit la même pondération que RGB2GRAY.
+%
+%   Exemple :
+%      g = ind2gray([1 2 3], [0 0 0; 0.5 0.5 0.5; 1 1 1]);
+%      g                           % 0 0.5 1
     indices = double(indices);
     carte = double(carte);
     if max(indices(:)) <= size(carte, 1) - 1 && min(indices(:)) >= 0

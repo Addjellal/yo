@@ -2,7 +2,8 @@ function x = betainv(p, a, b)
 %BETAINV Quantile de la loi bêta.
 %   Inversion par dichotomie de la bêta incomplète régularisée sur [0,1].
 %
-%   Exemple :  betainv(0.5, 1, 1)   % 0.5, la loi uniforme
+%   Exemple :
+%      betainv(0.5, 1, 1)   % 0.5, la loi uniforme
     [p, a, b] = statAjuster(p, a, b);
     x = zeros(size(p));
     for k = 1:numel(p)

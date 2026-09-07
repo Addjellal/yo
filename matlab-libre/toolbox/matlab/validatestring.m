@@ -3,6 +3,9 @@ function correspondance = validatestring(chaine, options, varargin)
 %   S = VALIDATESTRING(CHAINE,OPTIONS) rend l'élément de OPTIONS dont
 %   CHAINE est un préfixe, sans distinction de casse. Une erreur est levée
 %   si aucun ou plusieurs éléments correspondent.
+%
+%   Exemple :
+%      validatestring('lin', {'linear', 'cubic'})     % 'linear' : l'abrege suffit
     chaine = lower(strtrim(char(chaine)));
     trouves = {};
     for k = 1:numel(options)

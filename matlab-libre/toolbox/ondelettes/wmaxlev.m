@@ -5,7 +5,8 @@ function n = wmaxlev(taille, ondelette)
 %
 %   N = floor(log2(L / (Lf - 1))) où Lf est la longueur du filtre.
 %
-%   Exemple :  wmaxlev(64, 'db2')   % 4
+%   Exemple :
+%      wmaxlev(64, 'db2')   % 4
     if nargin < 2, ondelette = 'db1'; end
     if numel(taille) > 1, taille = min(taille); end
     [bas, ~] = wfilters(ondelette);

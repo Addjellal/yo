@@ -51,15 +51,15 @@ existant appellera.
 | `rf` | RF Toolbox — grandeurs de radiofréquence. | 7 |
 | `robotique` | Robotics System Toolbox — cinématique et transformations. | 74 |
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
-| `signal` | Signal Processing Toolbox — traitement du signal. | 201 |
+| `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
 | `simulink` | Simulink — simulation de schémas-blocs. | 6 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
-| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 292 |
+| `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 293 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 42 |
 | `vehicule` | Vehicle Dynamics / Powertrain — dynamique du véhicule. | 4 |
 | `vision` | Computer Vision Toolbox — vision par ordinateur. | 112 |
-Les fonctions natives — 651, écrites en C++ — couvrent le MATLAB de base :
+Les fonctions natives — 653, écrites en C++ — couvrent le MATLAB de base :
 tableaux, mathématiques élémentaires, algèbre linéaire, Fourier, chaînes,
 cellules et structures, entrées-sorties, graphique, temps, système. Elles
 sont documentées dans [`reference.md`](reference.md), généré par

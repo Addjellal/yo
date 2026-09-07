@@ -2,6 +2,10 @@ function carte = hsv(m)
 %HSV Carte de couleurs parcourant le cercle des teintes.
 %   La saturation et la valeur restent à 1 : seule la teinte tourne, du
 %   rouge au rouge en passant par tout le spectre.
+%
+%   Exemple :
+%      carte = hsv(6);
+%      size(carte)                 % 6 3
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     if m <= 0

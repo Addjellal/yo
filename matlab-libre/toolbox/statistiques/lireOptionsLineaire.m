@@ -1,6 +1,10 @@
 function options = lireOptionsLineaire(n, varargin)
 %LIREOPTIONSLINEAIRE Options de FITCLINEAR et FITRLINEAR.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      o = lireOptionsLineaire(3, 'Lambda', 0.01);
+%      o.Lambda
     options = struct('Learner', 'svm', 'Regularization', 'ridge', ...
                      'Lambda', 1 / max(n, 1), 'PassLimit', 200, ...
                      'FitBias', true, 'Epsilon', 0.1, 'Pas', 0.1);

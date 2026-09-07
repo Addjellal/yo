@@ -254,6 +254,11 @@ BATCHNORMALIZATIONLAYER Normalisation par lot.
   Centre et réduit chaque composante sur le lot, puis applique un gain
   et un décalage appris. Les moyennes glissantes servent à la
   prédiction.
+
+  Exemple :
+     couches = {featureInputLayer(3), fullyConnectedLayer(4), ...
+                batchNormalizationLayer(), reluLayer()};
+     numel(couches)              % 4
 ```
 
 ## `batchnorm`
@@ -320,6 +325,11 @@ BILSTMLAYER Couche récurrente à mémoire longue, dans les deux sens.
 CLASSIFICATIONLAYER Couche de sortie pour la classification.
   Elle déclare que le coût est l'entropie croisée ; elle n'a pas de
   paramètre et ne transforme pas la sortie.
+
+  Exemple :
+     couches = {featureInputLayer(3), fullyConnectedLayer(2), ...
+                softmaxLayer(), classificationLayer()};
+     numel(couches)              % 4
 ```
 
 ## `classify`
@@ -336,10 +346,15 @@ CLASSIFY Classe de plus forte probabilité pour chaque observation.
   0,33, alors que la première est une décision et la seconde un tirage
   au sort. Un seuil sur le score maximal permet de refuser de conclure.
 
+  RESEAU est un réseau appris par TRAINNETWORK.
+
   Exemple :
-     couches = [featureInputLayer(2); fullyConnectedLayer(3); softmaxLayer()];
-     reseau = assembleNetwork(couches);
-     [c, s] = classify(reseau, [0.2; 0.7]);
+     X = [randn(2, 30), randn(2, 30) + 3];
+     Y = [repmat([1; 0], 1, 30), repmat([0; 1], 1, 30)];
+     couches = {fullyConnectedLayer(4), reluLayer(), ...
+                fullyConnectedLayer(2), softmaxLayer()};
+     reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
+     [c, s] = classify(reseau, X);
 
   Voir aussi PREDICTRESEAU, SOFTMAXLAYER, CONFUSIONCHART.
 ```
@@ -408,7 +423,11 @@ CONNECTLAYERS Raccorde la sortie d'une couche à l'entrée d'une autre.
   concaténation — reçoit ses arêtes dans l'ordre où on les pose.
 
   Exemple :
-     lg = connectLayers(lg, 'conv1', 'somme');
+     lg = layerGraph();
+     lg = addLayers(lg, featureInputLayer(3, 'Name', 'entree'));
+     lg = addLayers(lg, fullyConnectedLayer(2, 'Name', 'dense'));
+     lg = connectLayers(lg, 'entree', 'dense');
+     size(lg.Connections, 1)      % 1
 
   Voir aussi LAYERGRAPH, ADDLAYERS, DLNETWORK.
 ```
@@ -469,6 +488,10 @@ COUCHESCONVOLUTION Propagation avant et arrière des couches spatiales.
   portant d'un coup toutes les positions, tous les plans et toutes les
   images. C'est la transposition du produit par une matrice de Toeplitz,
   et cela évite les boucles sur les pixels.
+
+  Exemple :
+     c = convolution2dLayer(3, 2);
+     c.type                      % 'conv2d'
 ```
 
 ## `crossChannelNormalizationLayer`
@@ -557,12 +580,12 @@ DLARRAY Tableau qui retient d'où il vient, pour être dérivé.
      finddim      - la position d'une étiquette
 
   Exemple :
-     function [v, g] = carre(x)
-         v = sum(x .^ 2);
-         g = dlgradient(v, x);
-     end
-     [v, g] = dlfeval(@carre, dlarray([1 2 3]));
-     extractdata(g)      % 2 4 6
+     x = dlarray([1 2 3]);
+     extractdata(x + 1)                  % 2 3 4
+     % La derivee de la somme des carres vaut deux fois x.
+     carre = @(v) deal(sum(v .^ 2), dlgradient(sum(v .^ 2), v));
+     [v, g] = dlfeval(carre, x);
+     extractdata(g)                      % 2 4 6
 
   Voir aussi DLFEVAL, DLGRADIENT, DLNETWORK, EXTRACTDATA.
 ```
@@ -614,11 +637,9 @@ DLFEVAL Évalue une fonction en enregistrant de quoi la dériver.
   pourra demander la dérivée.
 
   Exemple :
-     function [perte, gradient] = coutQuadratique(x, cible)
-         perte = sum((x - cible) .^ 2);
-         gradient = dlgradient(perte, x);
-     end
-     [p, g] = dlfeval(@coutQuadratique, dlarray([1 2]), [0 0]);
+     cout = @(x, cible) deal(sum((x - cible) .^ 2), ...
+                             dlgradient(sum((x - cible) .^ 2), x));
+     [p, g] = dlfeval(cout, dlarray([1 2]), [0 0]);
      extractdata(g)      % 2 4
 
   Voir aussi DLARRAY, DLGRADIENT, ADAMUPDATE.
@@ -692,6 +713,10 @@ DROPOUTLAYER Couche d'abandon : éteint des unités pendant l'apprentissage.
   C = DROPOUTLAYER(P) éteint chaque unité avec la probabilité P et
   divise le reste par 1-P, de sorte que l'espérance ne change pas.
   À la prédiction, la couche est transparente.
+
+  Exemple :
+     c = dropoutLayer(0.5);
+     c.probabilite               % 0.5 : une unite sur deux est ecartee a l'apprentissage
 ```
 
 ## `eluLayer`
@@ -699,6 +724,10 @@ DROPOUTLAYER Couche d'abandon : éteint des unités pendant l'apprentissage.
 ```
 ELULAYER Couche ELU : linéaire pour les positifs, exponentielle sinon.
   C = ELULAYER(ALPHA) ; ALPHA vaut 1 par défaut.
+
+  Exemple :
+     c = eluLayer();
+     c.type                      % 'elu'
 ```
 
 ## `featureInputLayer`
@@ -729,6 +758,10 @@ FEATUREINPUTLAYER Couche d'entrée pour des vecteurs de caractéristiques.
 FLATTENLAYER Aplatit un lot d'images en vecteurs.
   Un tableau H x L x P x N devient une matrice (H*L*P) x N, prête pour
   les couches entièrement connectées.
+
+  Exemple :
+     couches = {imageInputLayer([8 8 1]), flattenLayer(), fullyConnectedLayer(2)};
+     numel(couches)              % 3
 ```
 
 ## `fullyConnectedLayer`
@@ -737,6 +770,10 @@ FLATTENLAYER Aplatit un lot d'images en vecteurs.
 FULLYCONNECTEDLAYER Couche entièrement connectée de N sorties.
   Les poids sont initialisés par la règle de Glorot une fois la taille
   d'entrée connue, au premier appel de TRAINNETWORK.
+
+  Exemple :
+     c = fullyConnectedLayer(5);
+     c.sorties                   % 5
 ```
 
 ## `fullyconnect`
@@ -1036,6 +1073,10 @@ LAYERNORM Normalisation par couche.
 ```
 LEAKYRELULAYER Couche ReLU à fuite : pente non nulle pour les négatifs.
   C = LEAKYRELULAYER(PENTE) ; PENTE vaut 0,01 par défaut.
+
+  Exemple :
+     c = leakyReluLayer(0.01);
+     c.pente                     % 0.01 : la pente du cote negatif
 ```
 
 ## `leakyrelu`
@@ -2191,6 +2232,10 @@ MAXPOOLING1DLAYER Agrégation par le maximum, en une dimension.
 MAXPOOLING2DLAYER Sous-échantillonnage par le maximum.
   C = MAXPOOLING2DLAYER(TAILLE) ; le pas vaut la taille par défaut,
   comme dans MATLAB. Option : 'Stride'.
+
+  Exemple :
+     c = maxPooling2dLayer(2);
+     c.taille                    % 2 2 : une fenetre carree
 ```
 
 ## `maxpool`
@@ -2344,6 +2389,14 @@ PREDICTRESEAU Sortie d'un réseau appris.
 
   Pour un réseau à couches spatiales, X est un tableau H x L x P x N ;
   la sortie reste une matrice, une colonne par observation.
+
+  Exemple :
+     rng(1);
+     X = [randn(2, 30), randn(2, 30) + 4];
+     Y = [repmat([1; 0], 1, 30), repmat([0; 1], 1, 30)];
+     reseau = trainNetwork(X, Y, {fullyConnectedLayer(4), reluLayer(), ...
+              fullyConnectedLayer(2), softmaxLayer()}, trainingOptions('sgdm'));
+     max(abs(sum(predictReseau(reseau, X), 1) - 1)) < 1e-10     % un softmax somme a un
 ```
 
 ## `regressionLayer`
@@ -2351,6 +2404,10 @@ PREDICTRESEAU Sortie d'un réseau appris.
 ```
 REGRESSIONLAYER Couche de sortie pour la régression.
   Elle déclare que le coût est l'erreur quadratique moyenne.
+
+  Exemple :
+     couches = {featureInputLayer(3), fullyConnectedLayer(1), regressionLayer()};
+     numel(couches)              % 3
 ```
 
 ## `relu`
@@ -2586,10 +2643,14 @@ TRAINNETWORK Apprentissage d'un réseau par rétropropagation.
   l'erreur quadratique sinon. La descente est stochastique avec inertie.
 
   Exemple :
-     couches = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4), ...
-                reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
+     rng(1);
+     X = [randn(2, 30), randn(2, 30) + 4];
+     Y = [repmat([1; 0], 1, 30), repmat([0; 1], 1, 30)];
+     couches = {fullyConnectedLayer(4), reluLayer(), ...
                 fullyConnectedLayer(2), softmaxLayer()};
-     reseau = trainNetwork(images, etiquettes, couches, options);
+     reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
+     [~, classes] = max(predict(reseau, X));
+     mean(classes == [ones(1, 30), 2 * ones(1, 30)]) > 0.9
 ```
 
 ## `trainingOptions`
@@ -2598,6 +2659,10 @@ TRAINNETWORK Apprentissage d'un réseau par rétropropagation.
 TRAININGOPTIONS Réglages de l'apprentissage.
   OPT = TRAININGOPTIONS('sgdm','MaxEpochs',N,'InitialLearnRate',R, ...
                         'MiniBatchSize',B,'Momentum',M,'Verbose',V)
+
+  Exemple :
+     o = trainingOptions('sgdm', 'MaxEpochs', 50, 'InitialLearnRate', 0.02);
+     o.MaxEpochs                 % 50
 ```
 
 ## `transposedConv2dLayer`

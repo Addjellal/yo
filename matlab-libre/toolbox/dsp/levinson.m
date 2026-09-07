@@ -3,6 +3,11 @@ function [a, e] = levinson(r, p)
 %   [A,E] = LEVINSON(R,P) résout les équations de Yule-Walker pour la
 %   suite d'autocorrélation R et l'ordre P. A(1) vaut toujours 1 et E est
 %   la puissance de l'erreur de prédiction.
+%
+%   Exemple :
+%      r = [1 0.5 0.2];
+%      [a, e] = levinson(r, 2);
+%      all(abs(roots(a)) < 1)      % 1 : Levinson rend un modele stable
     r = r(:).';
     if nargin < 2
         p = numel(r) - 1;

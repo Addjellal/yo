@@ -2,6 +2,11 @@ function y = imadjust(x, entree, sortie, gamma)
 %IMADJUST Étirement de contraste.
 %   Y = IMADJUST(X,[BAS HAUT],[NBAS NHAUT],GAMMA) applique la transformation
 %   affine par morceaux suivie de la correction gamma.
+%
+%   Exemple :
+%      x = [0.2 0.5 0.8];
+%      y = imadjust(x, [0.2 0.8], [0 1]);
+%      [y(1) y(end)]               % 0 et 1 : les bornes s'etirent
     x = im2double(x);
     if nargin < 2 || isempty(entree)
         entree = [min(x(:)), max(x(:))];

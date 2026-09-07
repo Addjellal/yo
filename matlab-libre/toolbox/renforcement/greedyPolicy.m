@@ -8,6 +8,8 @@ function politique = greedyPolicy(Q)
 %   appliquée à une table nulle, elle rend partout la première action.
 %
 %   Exemple :
+%      rng(1);
+%      env = gridworld(5, 5, [5 5], [2 3; 3 3]);
 %      Q = qlearning(env, 500);
 %      politique = greedyPolicy(Q);
 %      politique(1)                    % l'action a prendre dans l'etat 1

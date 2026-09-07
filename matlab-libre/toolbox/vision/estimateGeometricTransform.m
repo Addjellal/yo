@@ -2,6 +2,11 @@ function T = estimateGeometricTransform(points1, points2, genre)
 %ESTIMATEGEOMETRICTRANSFORM Transformation entre deux jeux de points.
 %   T = ESTIMATEGEOMETRICTRANSFORM(P1,P2,'affine') rend la matrice 3x3 qui
 %   envoie P1 sur P2 au sens des moindres carrés.
+%
+%   Exemple :
+%      p1 = [0 0; 1 0; 0 1; 1 1];
+%      T = estimateGeometricTransform(p1, p1 + 3, 'similarity');
+%      size(T)                     % 3 3 : une matrice homogene
     if nargin < 3
         genre = 'affine';
     end

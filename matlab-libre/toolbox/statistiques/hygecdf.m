@@ -1,6 +1,9 @@
 function p = hygecdf(x, m, k, n)
 %HYGECDF Répartition de la loi hypergéométrique.
 %   Le support est fini : la somme directe des probabilités est exacte.
+%
+%   Exemple :
+%      hygecdf(5, 50, 10, 5)       % 1 : on ne peut pas tirer plus de cinq marques
     [x, m, k, n] = statAjuster(x, m, k, n);
     p = zeros(size(x));
     for indice = 1:numel(x)

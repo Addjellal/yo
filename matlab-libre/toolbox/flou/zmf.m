@@ -3,7 +3,8 @@ function y = zmf(x, params)
 %   Y = ZMF(X,[A B]) vaut 1 avant A, 0 après B, avec deux arcs de
 %   parabole raccordés au milieu — la courbe est donc dérivable.
 %
-%   Exemple :  zmf(0, [2 8])   % 1
+%   Exemple :
+%      zmf(0, [2 8])   % 1
     a = params(1);
     b = params(2);
     x = double(x);

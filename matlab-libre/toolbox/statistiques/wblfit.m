@@ -6,6 +6,11 @@ function phat = wblfit(x)
 %   par (sum(x^b)/n)^(1/b).
 %
 %   PHAT vaut [A B] : échelle et forme.
+%
+%   Exemple :
+%      rng(1);
+%      p = wblfit(wblrnd(2, 3, 5000, 1));
+%      max(abs(p - [2 3]) ./ [2 3]) < 0.1
     x = double(x(:));
     if any(x <= 0)
         error('stats:wblfit:BadData', 'Les données doivent être strictement positives.');

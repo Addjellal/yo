@@ -22,7 +22,9 @@ function [x, P] = kalmanFilter(x, P, z, A, H, Q, R, u, B)
 %      A = [1 0.1; 0 1]; H = [1 0];
 %      Q = diag([1e-4 1e-3]); R = 0.5;
 %      x = [0; 0]; P = eye(2);
+%      mesure = 1.2;
 %      [x, P] = kalmanFilter(x, P, mesure, A, H, Q, R);
+%      trace(P) < 2                       % 1 : la mesure a reduit l'incertitude
 %
 %   Voir aussi COMPLEMENTARYFILTER, EKFPREDICT, EKFUPDATE, TRACKASSIGN.
     if nargin < 8, u = 0; end

@@ -2,6 +2,12 @@ function [etiquettes, centres, inerties] = kmeans(X, k, varargin)
 %KMEANS Partition en k classes par l'algorithme de Lloyd.
 %   [IDX,C] = KMEANS(X,K) partitionne les lignes de X en K classes.
 %   Options : 'MaxIter' (100), 'Start' (matrice des centres initiaux).
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(50, 2); randn(50, 2) + 6];
+%      [etiquettes, centres] = kmeans(X, 2);
+%      norm(sort(centres(:, 1)) - [0; 6]) < 1
     maxIterations = 100;
     centres = [];
     for i = 1:2:numel(varargin)-1

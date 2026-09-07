@@ -7,6 +7,9 @@ function x = statQuantileDiscret(repartition, p, depart, maximum)
 %   répartition que celle exportée, si bien que l'aller-retour est exact.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      statQuantileDiscret(@(t) binocdf(t, 10, 0.5), 0.5, 0, 10)
     x = max(0, floor(depart));
     if x > maximum, x = maximum; end
     if repartition(x) >= p

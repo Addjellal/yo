@@ -25,9 +25,14 @@ function [T1, T2] = estimateUncalibratedRectification(F, points1, points2, taill
 %   ne rompt pas l'alignement des lignes.
 %
 %   Exemple :
+%      rng(1);
+%      % Deux vues d'un meme nuage de points, decalees lateralement.
+%      p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+%      p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+%      n = size(p1, 1);
+%      I1 = uint8(200 * rand(200, 200));
 %      F = estimateFundamentalMatrix(p1, p2);
 %      [T1, T2] = estimateUncalibratedRectification(F, p1, p2, size(I1));
-%      [J1, J2] = rectifyStereoImages(I1, I2, T1, T2);
 %
 %   Voir aussi ESTIMATEFUNDAMENTALMATRIX, RECTIFYSTEREOIMAGES, EPIPOLARLINE.
     F = double(F);

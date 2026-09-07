@@ -1,6 +1,9 @@
 function indices = indicesSymboles(seq, symboles, m)
 %INDICESSYMBOLES Traduit une suite de symboles en indices de colonne.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      indicesSymboles([2 1 2], [1 2], 2)     % 2 1 2
     if isempty(symboles)
         indices = round(double(seq(:)).');
         if any(indices < 1) || any(indices > m)

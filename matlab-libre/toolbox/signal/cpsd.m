@@ -2,6 +2,12 @@ function [pxy, f] = cpsd(x, y, fenetre, recouvrement, nfft, fs)
 %CPSD Densité interspectrale de puissance, par la méthode de Welch.
 %   [PXY,F] = CPSD(X,Y,...) : même découpage que PWELCH, mais le produit
 %   croisé X conjugué par Y.
+%
+%   Exemple :
+%      rng(1);
+%      x = randn(1024, 1);
+%      [p, f] = cpsd(x, filter(1, [1 -0.8], x), [], [], 256, 1);
+%      numel(p) == numel(f)        % 1
     if nargin < 3, fenetre = []; end
     if nargin < 4, recouvrement = []; end
     if nargin < 5, nfft = []; end

@@ -3,7 +3,8 @@ function x = gaminv(p, a, b)
 %   L'inversion se fait par dichotomie sur GAMMAINC, la gamma incomplète
 %   régularisée : la répartition vaut gammainc(x/b, a).
 %
-%   Exemple :  gaminv(0.5, 1, 1)   % log(2) = 0.6931
+%   Exemple :
+%      gaminv(0.5, 1, 1)   % log(2) = 0.6931
     if nargin < 2, a = 1; end
     if nargin < 3, b = 1; end
     [p, a, b] = statAjuster(p, a, b);

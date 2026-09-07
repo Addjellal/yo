@@ -2,6 +2,10 @@ function carte = flag(m)
 %FLAG Carte de couleurs alternant rouge, blanc, bleu et noir.
 %   Utile pour faire ressortir les lignes de niveau : deux valeurs
 %   voisines y prennent des couleurs très différentes.
+%
+%   Exemple :
+%      carte = flag(8);
+%      size(carte)                 % 8 3
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     base = [1 0 0; 1 1 1; 0 0 1; 0 0 0];

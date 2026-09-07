@@ -5,6 +5,9 @@ function varargout = optstocksensbybls(courbe, actif, reglement, echeance, typeO
 %   'Vega', 'Lambda', 'Rho', 'Theta' ; par défaut, le prix seul.
 %
 %   Exemple :
+%      c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+%                    'EndDates', '01-Jan-2026');
+%      s = stockspec(0.2, 100);
 %      optstocksensbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 95, ...
 %                        {'Price', 'Delta', 'Gamma'})
 %

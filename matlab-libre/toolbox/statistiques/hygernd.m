@@ -3,6 +3,11 @@ function r = hygernd(m, k, n, varargin)
 %   Le support est fini et petit : quand les trois paramètres sont les
 %   mêmes partout — le cas courant — la répartition est tabulée une fois
 %   puis inversée d'un bloc.
+%
+%   Exemple :
+%      rng(1);
+%      x = hygernd(50, 10, 5, 1, 1000);
+%      all(x >= 0 & x <= 5)        % 1 : au plus le nombre de tirages
     forme = statForme(size(m + k + n), varargin);
     m = statEtendre(m, forme);
     k = statEtendre(k, forme);

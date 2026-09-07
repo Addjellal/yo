@@ -3,7 +3,8 @@ function x = chi2inv(p, v)
 %   Les deux arguments se diffusent : un scalaire prend la taille de
 %   l'autre.
 %
-%   Exemple :  chi2inv(0.95, 1)      % 3.8415
+%   Exemple :
+%      chi2inv(0.95, 1)      % 3.8415
 %              chi2inv(0.95, 1:3)    % 3.8415  5.9915  7.8147
     [p, v] = matlibre_diffuser_deux(p, v, 'chi2inv');
     x = zeros(size(p));

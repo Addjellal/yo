@@ -9,6 +9,10 @@ function etat = numlock(nouvelEtat)
 %   pas —, l'état rendu est 'off' et la demande reste sans effet, sans
 %   erreur.
 %
+%   Exemple :
+%      etat = numlock();
+%      ischar(etat) || islogical(etat)
+%
 %   Voir aussi INPUT, KEYBOARD.
     persistent demande
     if isempty(demande)

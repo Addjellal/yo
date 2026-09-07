@@ -10,8 +10,11 @@ function pics = houghpeaks(H, nombre, varargin)
 %   effacé.
 %
 %   Exemple :
+%      BW = false(60, 60);
+%      BW(20, 5:55) = true;
 %      [H, theta, rho] = hough(BW);
 %      pics = houghpeaks(H, 3);
+%      size(pics, 2)        % 2 : une ligne et une colonne par pic
 %
 %   Voir aussi HOUGH, HOUGHLINES, IMREGIONALMAX.
     if nargin < 2 || isempty(nombre)

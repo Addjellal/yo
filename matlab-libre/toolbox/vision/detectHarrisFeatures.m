@@ -2,6 +2,12 @@ function [positions, reponses] = detectHarrisFeatures(I, varargin)
 %DETECTHARRISFEATURES Points d'intérêt par le détecteur de Harris.
 %   [P,R] = DETECTHARRISFEATURES(I) rend les coordonnées [x y] des coins et
 %   leur réponse. Option 'MinQuality' (0.01 par défaut).
+%
+%   Exemple :
+%      I = zeros(40);
+%      I(15:25, 15:25) = 1;
+%      [p, r] = detectHarrisFeatures(I);
+%      size(p, 2)                  % 2
     qualiteMin = 0.01;
     for k = 1:2:numel(varargin)-1
         if strcmpi(char(varargin{k}), 'minquality')

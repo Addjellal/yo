@@ -3,6 +3,10 @@ function t = array2table(a, varargin)
 %   T = ARRAY2TABLE(A) nomme les variables A1, A2, ...
 %   T = ARRAY2TABLE(A,'VariableNames',NOMS) impose les noms,
 %   T = ARRAY2TABLE(A,'RowNames',NOMS) nomme les lignes.
+%
+%   Exemple :
+%      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
+%      height(t)                   % 2
     noms = {}; lignes = {};
     k = 1;
     while k + 1 <= numel(varargin)

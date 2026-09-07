@@ -29,6 +29,10 @@ function [RF, DF] = filtresSplines(Nr, Nd)
 %   le fait MATLAB, et de somme un.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [RF, DF] = filtresSplines(2, 4);
+%      numel(RF) > 0 && numel(DF) > 0
     if mod(Nr + Nd, 2) ~= 0
         error('wavelet:filtresSplines:Parite', ...
               'La somme des deux ordres doit être paire.');

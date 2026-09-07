@@ -10,6 +10,10 @@ function [X, Y, Z] = peaks(a, b)
 %   La formule est celle de la documentation :
 %      z = 3(1-x)^2 e^{-x^2-(y+1)^2} - 10(x/5 - x^3 - y^5) e^{-x^2-y^2}
 %          - 1/3 e^{-(x+1)^2 - y^2}
+%
+%   Exemple :
+%      [X, Y, Z] = peaks(20);
+%      size(Z)                     % 20 20
     if nargin == 0
         a = 49;
     end

@@ -1,6 +1,10 @@
 function options = lireOptionsSvm(varargin)
 %LIREOPTIONSSVM Options communes à FITCSVM et FITRSVM.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      o = lireOptionsSvm('KernelFunction', 'rbf', 'BoxConstraint', 10);
+%      o.BoxConstraint             % 10
     options = struct('KernelFunction', 'linear', 'KernelScale', 1, ...
                      'PolynomialOrder', 3, 'BoxConstraint', 1, ...
                      'Standardize', false, 'Tolerance', 1e-6, ...

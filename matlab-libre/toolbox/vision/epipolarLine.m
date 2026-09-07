@@ -11,8 +11,14 @@ function lignes = epipolarLine(F, points)
 %   correspondant à des points de la seconde.
 %
 %   Exemple :
+%      rng(1);
+%      % Deux vues d'un meme nuage de points, decalees lateralement.
+%      p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+%      p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+%      n = size(p1, 1);
+%      F = estimateFundamentalMatrix(p1, p2);
 %      l = epipolarLine(F, p1);
-%      abs(sum(l .* [p2 ones(n,1)], 2))   % nul si p2 correspond à p1
+%      max(abs(sum(l .* [p2 ones(n,1)], 2)))   % petit si p2 correspond a p1
 %
 %   Voir aussi ESTIMATEFUNDAMENTALMATRIX, TRIANGULATE.
     F = double(F);

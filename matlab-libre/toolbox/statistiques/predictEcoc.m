@@ -1,6 +1,12 @@
 function [etiquettes, scores] = predictEcoc(modele, X)
 %PREDICTECOC Prédiction d'un modèle à codes correcteurs.
 %   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
+%      mean(predictEcoc(fitcecoc(X, y), X) == y) > 0.9
     X = double(X);
     n = size(X, 1);
     k = numel(modele.Classes);

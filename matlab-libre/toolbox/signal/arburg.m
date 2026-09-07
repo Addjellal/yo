@@ -7,7 +7,10 @@ function [a, e, k] = arburg(x, p)
 %   courtes, et le filtre reste toujours stable.
 %
 %   Exemple :
-%      a = arburg(x, 4);
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [a, e] = arburg(x, 4);
+%      all(abs(roots(a)) < 1) % 1 : Burg garantit un modele stable
     x = double(x(:));
     n = numel(x);
     avant = x;

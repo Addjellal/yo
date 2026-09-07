@@ -21,6 +21,8 @@ function rul = rulSimilarity(trajectoire, historiques, dureesVie)
 %   sait rien d'un mode de défaillance qu'aucun historique ne contient.
 %
 %   Exemple :
+%      enCours = (1:30)' / 100;
+%      historiques = {(1:100)' / 100, (1:120)' / 120, (1:90)' / 90, (1:110)' / 110};
 %      rul = rulSimilarity(enCours, historiques, [100 120 90 110]);
 %
 %   Voir aussi RULDEGRADATION, HEALTHINDICATOR, FAULTFEATURES.

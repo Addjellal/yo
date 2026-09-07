@@ -5,6 +5,10 @@ function sortie = impyramid(image, direction)
 %
 %   Le noyau est le noyau binomial 5 x 5 de Burt et Adelson, celui que
 %   MATLAB emploie : [1 4 6 4 1]/16 dans chaque direction.
+%
+%   Exemple :
+%      size(impyramid(ones(32), 'reduce'))    % 16 16 : la taille est divisee par deux
+%      size(impyramid(ones(16), 'expand'))    % 31 31
     noyau = [1 4 6 4 1] / 16;
     image = double(image);
     if strncmpi(char(direction), 'red', 3)

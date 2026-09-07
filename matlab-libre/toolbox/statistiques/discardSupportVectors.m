@@ -9,6 +9,9 @@ function modele = discardSupportVectors(modele)
 %   Un modèle à noyau non linéaire refuse : ses points sont sa frontière.
 %
 %   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
 %      m = fitcsvm(X, y);
 %      m = discardSupportVectors(m);
 %      isempty(m.SupportVectors)     % vrai

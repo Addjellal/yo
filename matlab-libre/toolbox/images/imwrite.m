@@ -2,6 +2,10 @@ function imwrite(x, nomFichier, format)
 %IMWRITE Écrit une image au format PGM (gris) ou PPM (couleur).
 %   Ces deux formats sont du texte : aucune bibliothèque externe n'est
 %   nécessaire, et tous les visionneurs les lisent.
+%
+%   Exemple :
+%      imwrite(uint8(magic(8) * 4), 'essai.pgm');
+%      max(max(abs(double(imread('essai.pgm')) - magic(8) * 4)))   % 0 : rien ne se perd
     if nargin < 3
         format = '';
     end

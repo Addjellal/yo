@@ -8,6 +8,8 @@ function [y, u, t] = mpcsim(controleur, consigne, nPas)
 %   stabilise. Une commande qui oscille indique un R trop petit devant Q.
 %
 %   Exemple :
+%      A = [1 0.1; 0 1]; B = [0.005; 0.1]; C = [1 0];
+%      ctrl = mpcSetup(A, B, C, 20, 5, 1, 0.1);
 %      [y, u, t] = mpcsim(ctrl, 1, 100);
 %      y(end)                          % 1 : la consigne est atteinte
 %      max(abs(diff(u)))               % l'a-coup de commande le plus fort

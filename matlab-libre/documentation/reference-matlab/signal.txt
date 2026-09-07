@@ -6,7 +6,7 @@ dct decimate deconv demod detrend dftmtx diric downsample dpss ellip ellipap
 ellipord envelope eqtflength fftfilt filtfilt filtic findpeaks fir1 fir2
 firls firpm flattopwin freqs freqz gauspuls gausswin goertzel grpdelay
 hamming hann highpass hilbert idct impinvar impz interp intfilt invfreqs
-invfreqz kaiser kaiserord latc2tf latcfilt levinson lowpass lpc maxflat
+invfreqz kaiser kaiserord latc2tf latcfilt levinson lowpass lp2bp lp2bs lp2hp lp2lp lpc maxflat
 medfilt1 modulate nuttallwin parzen pburg pcov peig periodogram pmcov pmtm
 pmusic polyscale polystab pow2db pulstran pwelch pyulear rceps rectpuls
 rectwin resample rlevinson rooteig rootmusic sawtooth sgolay sgolayfilt

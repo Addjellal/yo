@@ -27,6 +27,10 @@ function [psi, pic, sigmaT, sigmaW] = ondeletteAnalytique(nom, parametres, omega
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
+%   Exemple :
+%      [psi, pic] = ondeletteAnalytique('morl', [], linspace(0, 10, 128));
+%      numel(psi)                  % 128
+%
 %   Voir aussi CWTFILTERBANK, CWTFREQBOUNDS, WSST, WCOHERENCE.
     [nom, parametres] = normaliserOndeletteAnalytique(nom, parametres);
     psi = valeurOndeletteAnalytique(nom, parametres, omega);

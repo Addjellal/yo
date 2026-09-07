@@ -19,8 +19,13 @@ function indicateur = healthIndicator(donnees)
 %   l'information.
 %
 %   Exemple :
+%      rng(1);
+%      n = 50;
+%      efficaces = linspace(1, 2, n)' + 0.01 * randn(n, 1);
+%      kurtosis = linspace(3, 5, n)' + 0.01 * randn(n, 1);
+%      centroides = linspace(100, 200, n)' + randn(n, 1);
 %      sante = healthIndicator([efficaces, kurtosis, centroides]);
-%      rulDegradation(sante, 1.0)
+%      numel(sante)      % 50
 %
 %   Voir aussi FAULTFEATURES, RULDEGRADATION, RULSIMILARITY, PCA.
     [~, scores] = pca(donnees);

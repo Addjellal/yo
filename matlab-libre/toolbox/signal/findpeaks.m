@@ -3,6 +3,10 @@ function [pics, positions] = findpeaks(x, varargin)
 %   PICS = FINDPEAKS(X) rend les valeurs des maxima locaux.
 %   [PICS,POS] = FINDPEAKS(X) rend aussi leurs indices.
 %   Options par paires : 'MinPeakHeight', 'MinPeakDistance'.
+%
+%   Exemple :
+%      [pics, positions] = findpeaks([0 1 0 3 0 2 0]);
+%      positions                   % 2 4 6
     hauteurMin = -inf;
     distanceMin = 1;
     k = 1;

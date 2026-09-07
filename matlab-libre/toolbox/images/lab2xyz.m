@@ -1,6 +1,10 @@
 function xyz = lab2xyz(lab, varargin)
 %LAB2XYZ Passage de L*a*b* à XYZ.
 %   Réciproque exacte de XYZ2LAB.
+%
+%   Exemple :
+%      xyz = lab2xyz([100 0 0]);
+%      max(abs(xyz - [0.9504 1 1.0888])) < 1e-3   % L = 100 : le blanc D65
     blanc = whitepoint('d65');
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

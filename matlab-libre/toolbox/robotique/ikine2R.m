@@ -1,6 +1,11 @@
 function q = ikine2R(x, y, l1, l2, coudeHaut)
 %IKINE2R Cinématique inverse d'un bras plan à deux segments.
 %   Q = IKINE2R(X,Y,L1,L2) rend les deux angles articulaires.
+%
+%   Exemple :
+%      q = ikine2R(1, 1, 1, 1, true);
+%      [x, y] = fkine2R(q, 1, 1);
+%      max(abs([x y] - [1 1])) < 1e-9     % la cinematique inverse annule la directe
     if nargin < 3, l1 = 1; end
     if nargin < 4, l2 = 1; end
     if nargin < 5, coudeHaut = true; end

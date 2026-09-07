@@ -2,6 +2,14 @@ function [parametres, modele] = fitCurve(x, y, type, degre)
 %FITCURVE Ajustement par un modèle nommé.
 %   TYPE vaut 'poly', 'exp' (a e^{bx}), 'power' (a x^b), 'log' (a + b ln x)
 %   ou 'gauss' (a exp(-((x-b)/c)^2)).
+%
+%   Exemple :
+%      rng(1);
+%      x = linspace(0, 1, 40)';
+%      [c, modele] = fitCurve(x, 2 * x + 1 + 0.02 * randn(40, 1), 'poly', 1);
+%      abs(c(1) - 2) < 0.1         % la pente est retrouvee
+%      [c, modele] = fitCurve(x, 3 * exp(1.5 * x), 'exp');
+%      max(abs(c - [3 1.5])) < 0.1
     x = x(:);
     y = y(:);
     if nargin < 4

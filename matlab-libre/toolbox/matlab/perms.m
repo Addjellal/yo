@@ -2,6 +2,10 @@ function P = perms(v)
 %PERMS Toutes les permutations des éléments d'un vecteur.
 %   P = PERMS(V) rend une matrice dont chaque ligne est une permutation
 %   de V. L'ordre suit celui de MATLAB : lexicographique inverse.
+%
+%   Exemple :
+%      P = perms([1 2 3]);
+%      size(P, 1)                  % 6 : trois factorielle
     v = v(:).';
     n = numel(v);
     if n == 0

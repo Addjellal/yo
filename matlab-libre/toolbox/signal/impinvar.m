@@ -14,8 +14,10 @@ function [bz, az] = impinvar(b, a, fs, tol)
 %   FS vaut 1 par défaut.
 %
 %   Exemple :
-%      [b, a] = butter(4, 0.3, 's');
-%      [bz, az] = impinvar(b, a, 10);
+%      [b, a] = butter(4, 2 * pi * 2, 's');     % analogique, coupure 2 Hz
+%      [bz, az] = impinvar(b, a, 10);           % echantillonne a 10 Hz
+%      % Les reponses impulsionnelles coincident aux instants d'echantillonnage.
+%      numel(az) - 1                            % 4 : l'ordre est conserve
 %
 %   Voir aussi BILINEAR, RESIDUE, IMPZ.
     if nargin < 3 || isempty(fs)

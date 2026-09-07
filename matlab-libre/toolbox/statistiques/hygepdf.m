@@ -4,7 +4,8 @@ function y = hygepdf(x, m, k, n)
 %   de M, dont K portent le caractère cherché ; X est le nombre d'objets
 %   marqués obtenus.
 %
-%   Exemple :  hygepdf(2, 10, 4, 3)   % 0.3
+%   Exemple :
+%      hygepdf(2, 10, 4, 3)   % 0.3
     [x, m, k, n] = statAjuster(x, m, k, n);
     y = zeros(size(x));
     for indice = 1:numel(x)

@@ -2,6 +2,11 @@ function s = graycoprops(glcm, proprietes)
 %GRAYCOPROPS Descripteurs d'une matrice de cooccurrence.
 %   S = GRAYCOPROPS(GLCM) rend Contrast, Correlation, Energy et
 %   Homogeneity, telles que les définit la documentation MathWorks.
+%
+%   Exemple :
+%      glcm = graycomatrix(uint8(magic(8)));
+%      s = graycoprops(glcm, {'Contrast', 'Energy'});
+%      s.Energy > 0                % 1
     if nargin < 2 || isempty(proprietes)
         proprietes = {'Contrast', 'Correlation', 'Energy', 'Homogeneity'};
     elseif ischar(proprietes) || isstring(proprietes)

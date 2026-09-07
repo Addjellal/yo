@@ -6,6 +6,11 @@ function [b, a] = concevoirBande(w, genre, options)
 %   défaut.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [w, o] = lireOptionsBande(0.3);
+%      [b, a] = concevoirBande(w, 'low', o);
+%      abs(abs(polyval(b, 1) / polyval(a, 1)) - 1) < 0.2   % le continu passe
     marge = 1 - options.Steepness;
     ondulation = 0.1;
     attenuation = options.StopbandAttenuation;

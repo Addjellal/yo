@@ -22,12 +22,12 @@ classdef dlarray
 %      finddim      - la position d'une étiquette
 %
 %   Exemple :
-%      function [v, g] = carre(x)
-%          v = sum(x .^ 2);
-%          g = dlgradient(v, x);
-%      end
-%      [v, g] = dlfeval(@carre, dlarray([1 2 3]));
-%      extractdata(g)      % 2 4 6
+%      x = dlarray([1 2 3]);
+%      extractdata(x + 1)                  % 2 3 4
+%      % La derivee de la somme des carres vaut deux fois x.
+%      carre = @(v) deal(sum(v .^ 2), dlgradient(sum(v .^ 2), v));
+%      [v, g] = dlfeval(carre, x);
+%      extractdata(g)                      % 2 4 6
 %
 %   Voir aussi DLFEVAL, DLGRADIENT, DLNETWORK, EXTRACTDATA.
     properties

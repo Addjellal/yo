@@ -39,6 +39,18 @@ ADD_BLOCK Ajoute un bloc au modèle.
     saturation   UpperLimit, LowerLimit
     delay        InitialCondition
     relay        OnSwitch, OffSwitch, OnOutput, OffOutput
+
+  Un bloc porte un nom, et c'est par ce nom qu'ADD_LINE le relie : le
+  modèle n'est qu'une liste de blocs et d'arcs, dont SIM tire l'ordre de
+  calcul.
+
+  Exemple :
+     m = new_system('rampe');
+     m = add_block(m, 'constant', 'un', 'Value', 2);
+     m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
+     numel(m.blocs)              % 2
+
+  Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
 ```
 
 ## `add_line`
@@ -58,9 +70,15 @@ ADD_LINE Relie la sortie d'un bloc à l'entrée d'un autre.
   topologique n'a pas de solution.
 
   Exemple :
+     m = new_system('boucle');
+     m = add_block(m, 'constant', 'consigne', 'Value', 1);
+     m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+     m = add_block(m, 'gain', 'gain', 'Gain', 2);
+     m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
      m = add_line(m, 'consigne', 'erreur', 1);
      m = add_line(m, 'sortie', 'erreur', 2);   % le retour
      m = add_line(m, 'erreur', 'gain');
+     m = add_line(m, 'gain', 'sortie');
 
   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
 ```
@@ -107,9 +125,18 @@ SET_PARAM Modifie les paramètres d'un bloc.
   personne.
 
   Exemple :
+     m = new_system('boucle');
+     m = add_block(m, 'constant', 'consigne', 'Value', 1);
+     m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+     m = add_block(m, 'gain', 'gain', 'Gain', 2);
+     m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
+     m = add_line(m, 'consigne', 'erreur', 1);
+     m = add_line(m, 'sortie', 'erreur', 2);
+     m = add_line(m, 'erreur', 'gain');
+     m = add_line(m, 'gain', 'sortie');
      for K = [1 2 5]
          m = set_param(m, 'gain', 'Gain', K);
-         r = sim(m, 5, 0.001);
+         r = sim(m, 5, 0.01);
      end
 
   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
@@ -142,6 +169,14 @@ SIM Simule un modèle à pas fixe.
   RESULTAT.temps et RESULTAT.signaux.<nom> pour l'accès direct,
   RESULTAT.time et RESULTAT.signals(k).values pour la « structure with
   time » qu'attendent les scripts écrits pour Simulink.
+
+  Exemple :
+     m = new_system('rampe');
+     m = add_block(m, 'constant', 'un', 'Value', 2);
+     m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
+     m = add_line(m, 'un', 'integ');
+     r = sim(m, 5, 0.001);
+     abs(r.signaux.integ(end) - 10) < 0.01     % l'integrale de 2 sur 5 s
 ```
 
 ## `simplot`
@@ -153,9 +188,17 @@ SIMPLOT Trace les signaux relevés par SIM.
   quelques-uns, désignés par leur nom de bloc.
 
   Exemple :
-     r = sim(modele, 5, 0.001);
+     m = new_system('boucle');
+     m = add_block(m, 'constant', 'consigne', 'Value', 1);
+     m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+     m = add_block(m, 'gain', 'gain', 'Gain', 2);
+     m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
+     m = add_line(m, 'consigne', 'erreur', 1);
+     m = add_line(m, 'sortie', 'erreur', 2);
+     m = add_line(m, 'erreur', 'gain');
+     m = add_line(m, 'gain', 'sortie');
+     r = sim(m, 5, 0.01);
      simplot(r, {'consigne', 'sortie'});
-     legend('consigne', 'sortie');
 
   Voir aussi SIM, PLOT, LEGEND.
 ```

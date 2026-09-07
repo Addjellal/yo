@@ -4,6 +4,14 @@ function [poids, biais] = descenteLineaire(X, y, options, regression)
 %   moyennées : c'est ce qui garantit la convergence sans réglage.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(60, 2); randn(60, 2) + 3];
+%      cible = [-ones(60, 1); ones(60, 1)];
+%      o = lireOptionsLineaire(2, 'Lambda', 0.01);
+%      [poids, biais] = descenteLineaire(X, cible, o, false);
+%      mean(sign(X * poids(:) + biais) == cible) > 0.9
     [n, p] = size(X);
     poids = zeros(p, 1);
     biais = 0;

@@ -7,7 +7,10 @@ function A = convmtx(h, n)
 %
 %   Exemple :
 %      h = [1 2 3];
-%      isequal(convmtx(h, 4) * (1:4)', conv(h, 1:4)')   % vrai... en colonne
+%      % H en ligne : la matrice est n x (m+n-1), et l'on multiplie a gauche.
+%      isequal((1:4) * convmtx(h, 4), conv(1:4, h))       % vrai
+%      % H en colonne : la matrice est (m+n-1) x n, et l'on multiplie a droite.
+%      isequal(convmtx(h', 4) * (1:4)', conv(1:4, h)')    % vrai
 %
 %   Voir aussi CONV, CORRMTX, TOEPLITZ, FILTER.
     colonne = iscolumn(h);

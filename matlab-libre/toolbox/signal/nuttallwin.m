@@ -1,6 +1,10 @@
 function w = nuttallwin(n)
 %NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
 %   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
+%
+%   Exemple :
+%      w = nuttallwin(64);
+%      max(w)                      % 1
     n = round(n);
     if n <= 1, w = ones(max(n, 0), 1); return, end
     k = (0:n-1)' / (n - 1);

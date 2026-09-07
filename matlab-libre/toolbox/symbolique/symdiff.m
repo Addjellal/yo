@@ -2,6 +2,11 @@ function d = symdiff(e, variable)
 %SYMDIFF Dérivée symbolique d'une expression.
 %   D = SYMDIFF(E,'x') applique les règles usuelles : somme, produit,
 %   quotient, puissance et composition des fonctions élémentaires.
+%
+%   Exemple :
+%      x = sym('x');
+%      symstr(symsimplify(symdiff(sympow(x, symnum(2)), 'x')))     % la derivee de x au carre
+    e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur
         case 'num'

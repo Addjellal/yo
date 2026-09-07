@@ -3,6 +3,11 @@ function c = batchNormalizationLayer(varargin)
 %   Centre et réduit chaque composante sur le lot, puis applique un gain
 %   et un décalage appris. Les moyennes glissantes servent à la
 %   prédiction.
+%
+%   Exemple :
+%      couches = {featureInputLayer(3), fullyConnectedLayer(4), ...
+%                 batchNormalizationLayer(), reluLayer()};
+%      numel(couches)              % 4
     c = struct('type', 'batchnorm', 'epsilon', 1e-5, 'gamma', [], 'beta', [], ...
                'moyenne', [], 'variance', [], ...
                'nom', matlibre_couche_nom(varargin));

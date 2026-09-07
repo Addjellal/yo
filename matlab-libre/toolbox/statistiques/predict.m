@@ -13,12 +13,16 @@ function [etiquettes, scores] = predict(modele, X)
 %   « type » ; PREDICT s'y fie pour choisir la règle. MATLAB, lui,
 %   emploie des objets à méthode.
 %
-%   Exemple :
-%      m = fitcnb(X, y);
-%      etiquettes = predict(m, Xnouveau);
-%
 %   Un réseau de neurones passe par le même nom : PREDICT le reconnaît à
 %   ses couches et le confie à PREDICTRESEAU.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
+%      m = fitcnb(X, y);
+%      etiquettes = predict(m, X);
+%      mean(etiquettes == y) > 0.9        % 1
 %
 %   Voir aussi FITCTREE, FITCKNN, FITCNB, FITCDISCR, FITCSVM, FITCECOC,
 %   FITRGP, PREDICTRESEAU.

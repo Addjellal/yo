@@ -1,6 +1,11 @@
 function [duree, debut, fin] = falltime(x, fs, varargin)
 %FALLTIME Temps de descente d'un signal à deux états.
 %   Symétrique de RISETIME : de 90 % à 10 % sur chaque front descendant.
+%
+%   Exemple :
+%      t = (0:0.001:0.1)';
+%      [d, debut, fin] = falltime(double(t < 0.05), 1000);
+%      d > 0                       % 1 : la descente prend un temps fini
     if nargin < 2 || isempty(fs), fs = 1; end
     pourcentages = [10 90];
     for k = 1:2:numel(varargin) - 1

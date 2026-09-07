@@ -3,7 +3,8 @@ function [m, v] = fstat(v1, v2)
 %   La moyenne n'existe que pour V2 > 2, la variance que pour V2 > 4 ;
 %   ailleurs MATLAB rend NaN.
 %
-%   Exemple :  [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
+%   Exemple :
+%      [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
     [v1, v2] = statAjuster(v1, v2);
     m = NaN(size(v1));
     v = NaN(size(v1));

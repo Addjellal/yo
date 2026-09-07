@@ -2,6 +2,13 @@ function [historique, contexte] = sfrun(machine, entrees, contexte)
 %SFRUN Exécute la machine sur une suite d'entrées.
 %   [HISTORIQUE,CONTEXTE] = SFRUN(MACHINE,ENTREES) rend la suite des états
 %   visités, un par pas, et le contexte final.
+%
+%   Exemple :
+%      m = sfchart('tourniquet');
+%      m = sfstate(m, 'verrouille');
+%      m = sfstate(m, 'ouvert');
+%      m = sftransition(m, 'verrouille', 'ouvert', @(c,e) strcmp(e, 'piece'));
+%      sfrun(m, {'pousse', 'piece'})     % 'ouvert'
     if nargin < 3
         contexte = struct();
     end

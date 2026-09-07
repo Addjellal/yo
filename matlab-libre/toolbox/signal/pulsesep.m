@@ -2,6 +2,11 @@ function [separation, debut, fin] = pulsesep(x, fs, varargin)
 %PULSESEP Séparation entre impulsions.
 %   S = PULSESEP(X,FS) rend l'écart entre la fin d'une impulsion et le
 %   début de la suivante, mesuré au niveau médian.
+%
+%   Exemple :
+%      t = (0:0.001:0.5)';
+%      s = pulsesep(double(sin(2*pi*10*t) > 0), 1000);
+%      all(s > 0)                  % 1
     if nargin < 2 || isempty(fs), fs = 1; end
     positive = true;
     for k = 1:2:numel(varargin) - 1

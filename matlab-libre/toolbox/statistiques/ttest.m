@@ -2,6 +2,11 @@ function [h, p, ci, stats] = ttest(x, mu, alpha)
 %TTEST Test de Student sur la moyenne d'un échantillon.
 %   [H,P] = TTEST(X,MU) teste l'hypothèse « la moyenne de X vaut MU ».
 %   H vaut 1 si l'hypothèse est rejetée au seuil ALPHA (5 % par défaut).
+%
+%   Exemple :
+%      rng(1);
+%      [h, p] = ttest(normrnd(0, 1, 100, 1));
+%      h                           % 0 : on ne rejette pas la moyenne nulle
     if nargin < 2 || isempty(mu)
         mu = 0;
     end

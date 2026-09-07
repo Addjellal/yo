@@ -2,6 +2,9 @@ function d = minutes(x)
 %MINUTES Durée en minutes, ou minutes d'une durée.
 %   D = MINUTES(X) construit une durée dont le format d'affichage est 'm'.
 %   X = MINUTES(D) rend le nombre de minutes d'une durée.
+%
+%   Exemple :
+%      seconds(minutes(2))         % 120
     if isa(x, 'duration')
         d = x.Secondes / 60;
     elseif isa(x, 'calendarDuration')

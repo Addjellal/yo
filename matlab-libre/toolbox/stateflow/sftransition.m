@@ -14,6 +14,10 @@ function machine = sftransition(machine, depuis, vers, garde, action)
 %   faire est un comportement, non une erreur.
 %
 %   Exemple :
+%      m = sfchart('mesure');
+%      m = sfstate(m, 'depart');
+%      m = sfstate(m, 'petit');
+%      m = sfstate(m, 'grand');
 %      m = sftransition(m, 'depart', 'petit', @(c,e) e < 10);
 %      m = sftransition(m, 'depart', 'grand', @(c,e) e < 100);
 %      sfrun(m, 5)                     % 'petit' : la premiere gagne

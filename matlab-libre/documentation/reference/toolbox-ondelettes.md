@@ -133,6 +133,12 @@
 APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
   A = APPCOEF(C,L,ONDELETTE) rend l'approximation du dernier niveau.
   A = APPCOEF(C,L,ONDELETTE,N) reconstruit celle du niveau N.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 3, 'db2');
+     a = appcoef(c, l, 'db2');
+     numel(a) == l(1)            % 1 : l'approximation la plus grossiere
 ```
 
 ## `appcoef2`
@@ -140,6 +146,11 @@ APPCOEF Coefficients d'approximation d'une décomposition WAVEDEC.
 ```
 APPCOEF2 Coefficients d'approximation d'une image décomposée.
   A = APPCOEF2(C,S,NOM,N) reconstruit l'approximation du niveau N.
+
+  Exemple :
+     [C, S] = wavedec2(magic(8), 2, 'haar');
+     a = appcoef2(C, S, 'haar');
+     size(a, 1) == S(1, 1)       % 1
 ```
 
 ## `besttree`
@@ -355,6 +366,10 @@ COIFLETFILTRE Filtre d'échelle d'une coiflette, par ses conditions.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
+  Exemple :
+     h = coifletFiltre(2);
+     abs(sum(h) - sqrt(2)) < 1e-8    % un filtre d'echelle somme a racine de deux
+
   Voir aussi COIFWAVF, DAUBECHIESFILTRE, WFILTERS.
 ```
 
@@ -387,6 +402,10 @@ CONVOLUTIONCIRCULAIRE Corrélation périodique, longueur conservée.
   longueur de l'entrée, ce qu'exige la transformée stationnaire.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     y = convolutionCirculaire([1 2 3 4], [1 1 0 0]);
+     numel(y)                    % 4 : la longueur est conservee
 ```
 
 ## `cwt`
@@ -525,6 +544,11 @@ DAUBECHIESFILTRE Filtre d'échelle de Daubechies à N moments nuls.
   PHASE vaut 'minimale' (par défaut) ou 'symetrique'.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     h = daubechiesFiltre(2);
+     abs(sum(h) - sqrt(2)) < 1e-10
+     abs(sum(h .^ 2) - 1) < 1e-10    % et son energie vaut un
 ```
 
 ## `dbaux`
@@ -631,6 +655,11 @@ DETCOEF Coefficients de détail d'un niveau donné.
 DETCOEF2 Coefficients de détail d'une image décomposée.
   D = DETCOEF2('h',C,S,N) rend le détail horizontal du niveau N ;
   'v' le vertical, 'd' le diagonal, 'compact' ou 'all' les trois.
+
+  Exemple :
+     [C, S] = wavedec2(magic(8), 2, 'haar');
+     [h, v, d] = detcoef2('all', C, S, 1);
+     size(h)                     % les details horizontaux du premier niveau
 ```
 
 ## `dilaterFiltres`
@@ -641,6 +670,11 @@ DILATERFILTRES Insère 2^niveau - 1 zéros entre les coefficients.
   étire le filtre, ce qui garde toutes les positions.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [Lo, Hi] = wfilters('db2', 'd');
+     [bas, haut] = dilaterFiltres(Lo, Hi, 1);
+     numel(bas) == 2 * numel(Lo) - 1     % 1 : un zero entre deux coefficients
 ```
 
 ## `dtfilters`
@@ -908,6 +942,10 @@ FILTRESSPLINES Couple de filtres biorthogonaux splines.
   le fait MATLAB, et de somme un.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [RF, DF] = filtresSplines(2, 4);
+     numel(RF) > 0 && numel(DF) > 0
 ```
 
 ## `gauswavf`
@@ -1044,6 +1082,11 @@ IMODWPT Paquets d'ondelettes à chevauchement maximal, inverse.
 ```
 IMODWT Transformée à chevauchement maximal inverse.
   Reconstruction exacte : la MODWT est un cadre ajusté de constante 1.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     w = modwt(x, 'haar', 3);
+     max(abs(imodwt(w, 'haar') - x)) < 1e-10    % la reconstruction est exacte
 ```
 
 ## `ind2depo`
@@ -1070,6 +1113,10 @@ IND2DEPO Profondeur et place d'un nœud, à partir de son indice.
 INDICEDENOEUD Indice d'un nœud donné par son numéro ou par [D P].
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+     indiceDeNoeud(arbre, [1 0])     % 1 : le premier enfant de la racine
 ```
 
 ## `iswt`
@@ -1134,6 +1181,11 @@ LEAVES Nœuds terminaux d'un arbre de paquets d'ondelettes.
 LIRENOEUD Coefficients d'un nœud, vides s'il n'est pas dans l'arbre.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+     numel(lireNoeud(arbre, 0))      % 64 : la racine porte le signal
+     isempty(lireNoeud(arbre, 999))  % 1 : un noeud absent rend vide
 ```
 
 ## `measerr`
@@ -1393,6 +1445,9 @@ NORMALISERSOMME Met un filtre d'échelle à la somme demandée.
   de DBAUX et SYMAUX.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     sum(normaliserSomme([1 1 1 1], 2))     % 2
 ```
 
 ## `ntnode`
@@ -1441,6 +1496,10 @@ ONDELETTEANALYTIQUE Ondelette analytique, dans le domaine des fréquences.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
+  Exemple :
+     [psi, pic] = ondeletteAnalytique('morl', [], linspace(0, 10, 128));
+     numel(psi)                  % 128
+
   Voir aussi CWTFILTERBANK, CWTFREQBOUNDS, WSST, WCOHERENCE.
 ```
 
@@ -1452,6 +1511,10 @@ ORDREDENOM Ordre lu dans le nom d'une ondelette.
   Le nom est refusé s'il n'appartient pas à la famille demandée.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     ordreDeNom('db4', 'db')     % 4
+     ordreDeNom('haar', 'db')    % 1 : haar est db1
 ```
 
 ## `ordresBior`
@@ -1461,6 +1524,10 @@ ORDRESBIOR Les deux ordres lus dans un nom « biorNr.Nd ».
   [NR,ND] = ORDRESBIOR('bior2.4','bior') rend 2 et 4.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [nr, nd] = ordresBior('bior2.4', 'bior');
+     [nr nd]                     % 2 4
 ```
 
 ## `orthfilt`
@@ -1490,6 +1557,11 @@ ORTHFILT Banc de filtres orthogonal à partir du filtre d'échelle.
 POSERNOEUD Range les coefficients d'un nœud dans l'arbre.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+     arbre = poserNoeud(arbre, 500, [1 2 3]);
+     lireNoeud(arbre, 500)       % 1 2 3
 ```
 
 ## `qmf`
@@ -1536,6 +1608,10 @@ QSHIFTFILTRE Filtre de quart de retard pour l'arbre double.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
+  Exemple :
+     h = qshiftFiltre(10, 1);
+     numel(h) > 0
+
   Voir aussi DTFILTERS, DUALTREE, WFILTERS.
 ```
 
@@ -1569,6 +1645,14 @@ REFUSERHORSSPLINE Écarte les biorthogonales qui ne sont pas des splines.
   autre chose sous leur nom tromperait l'appelant.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     refuserHorsSpline(2, 4, 'bior');   % passe : c'est une spline
+     try
+         refuserHorsSpline(5, 5, 'bior');
+     catch e
+         e.identifier
+     end
 ```
 
 ## `scal2frq`
@@ -1592,6 +1676,11 @@ SCINDERNOEUD Coupe un nœud d'un arbre de paquets en ses enfants.
   enfants prennent les indices que DEPO2IND leur donne.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+     arbre = scinderNoeud(arbre, 1);
+     numel(lireNoeud(arbre, indiceDeNoeud(arbre, [2 0]))) > 0
 ```
 
 ## `shanwavf`
@@ -1798,6 +1887,12 @@ UPWLEV Remonte d'un niveau une décomposition en ondelettes.
   [NC,NL,CA] = UPWLEV(C,L,NOM) fusionne l'approximation la plus
   grossière avec son détail : la décomposition perd un niveau, et CA
   rend l'approximation reconstruite.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 3, 'db2');
+     [c2, l2] = upwlev(c, l, 'db2');
+     numel(l2) == numel(l) - 1   % 1 : un niveau de moins
 ```
 
 ## `upwlev2`
@@ -1822,6 +1917,12 @@ UPWLEV2 Remonte d'un niveau une décomposition d'image.
 WAVEDEC Décomposition multiniveaux en ondelettes.
   [C,L] = WAVEDEC(X,N,NOM) empile les coefficients : approximation de
   niveau N, puis détails du niveau N au niveau 1. L donne les longueurs.
+
+  Exemple :
+     x = sin((1:64) / 8);
+     [c, l] = wavedec(x, 3, 'db2');
+     sum(l(1:end-1)) == numel(c)     % 1 : tous les coefficients y sont
+     max(abs(waverec(c, l, 'db2') - x)) < 1e-10
 ```
 
 ## `wavedec2`
@@ -1855,11 +1956,6 @@ WAVEFUN Fonctions d'échelle et d'ondelette, par l'algorithme en cascade.
   donc 2^ITER*(L-1)+1 points et l'échelonnement est celui de MATLAB :
   l'intégrale de PHI vaut 1 et celle de PSI vaut 0.
 
-  Exemple :
-     [phi, psi, x] = wavefun('db2', 8);
-     numel(x)                % 769
-     sum(phi) * (x(2)-x(1))  % 1
-     sum(psi) * (x(2)-x(1))  % 0
 
   Pour une ondelette continue — 'mexh', 'morl', 'gausP' — il n'y a pas
   de fonction d'échelle : l'appel prend alors la forme de MATLAB
@@ -1868,6 +1964,12 @@ WAVEFUN Fonctions d'échelle et d'ondelette, par l'algorithme en cascade.
 
   et l'ondelette est échantillonnée sur 2^ITER points de son support
   effectif.
+
+  Exemple :
+     [phi, psi, x] = wavefun('db2', 8);
+     numel(x)                % 769
+     sum(phi) * (x(2)-x(1))  % 1
+     sum(psi) * (x(2)-x(1))  % 0
 
   Voir aussi WFILTERS, CENTFRQ, UPCOEF, MEXIHAT, MORLET, GAUSWAVF.
 ```
@@ -2013,6 +2115,10 @@ WAVEREC Reconstruction d'une décomposition multiniveaux.
 ```
 WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
   Réciproque de WAVEDEC2.
+
+  Exemple :
+     [C, S] = wavedec2(magic(8), 2, 'haar');
+     max(max(abs(waverec2(C, S, 'haar') - magic(8)))) < 1e-10
 ```
 
 ## `wcodemat`
@@ -2021,7 +2127,8 @@ WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
 WCODEMAT Met une matrice à l'échelle des indices de couleur.
   Y = WCODEMAT(X,NBCODES) ramène X dans 1..NBCODES.
 
-  Exemple :  wcodemat([0 1], 4)   % [1 4]
+  Exemple :
+     wcodemat([0 1], 4)   % [1 4]
 ```
 
 ## `wcoherence`
@@ -2453,7 +2560,8 @@ WMAXLEV Niveau de décomposition maximal utile.
 
   N = floor(log2(L / (Lf - 1))) où Lf est la longueur du filtre.
 
-  Exemple :  wmaxlev(64, 'db2')   % 4
+  Exemple :
+     wmaxlev(64, 'db2')   % 4
 ```
 
 ## `wnoise`
@@ -2742,6 +2850,11 @@ WRCOEF Reconstruit une composante d'une décomposition monodimensionnelle.
 WRCOEF2 Reconstruit une composante d'une décomposition d'image.
   Y = WRCOEF2('a',C,S,NOM,N) reconstruit l'approximation, 'h', 'v' ou
   'd' le détail correspondant, à la taille de l'image d'origine.
+
+  Exemple :
+     [C, S] = wavedec2(magic(8), 2, 'haar');
+     y = wrcoef2('a', C, S, 'haar', 1);
+     size(y)                     % 8 8 : la reconstruction garde la taille
 ```
 
 ## `wrev`
@@ -2850,6 +2963,10 @@ WTHCOEF2 Annule, atténue ou seuille les coefficients d'une image.
 ```
 WTHRESH Seuillage des coefficients d'ondelettes.
   Y = WTHRESH(X,'s',T) applique le seuillage doux, 'h' le seuillage dur.
+
+  Exemple :
+     wthresh([-3 -1 0 1 3], 'h', 2)     % -3 0 0 0 3 : le seuillage dur
+     wthresh([-3 -1 0 1 3], 's', 2)     % -1 0 0 0 1 : le seuillage doux
 ```
 
 ## `wvarchg`

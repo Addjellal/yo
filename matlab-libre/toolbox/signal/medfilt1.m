@@ -2,6 +2,9 @@ function y = medfilt1(x, n)
 %MEDFILT1 Filtre médian glissant d'ordre N.
 %   Y = MEDFILT1(X,N) remplace chaque échantillon par la médiane de la
 %   fenêtre de N points centrée dessus. N vaut 3 par défaut.
+%
+%   Exemple :
+%      medfilt1([1 100 2 3], 3)    % la valeur aberrante disparait
     if nargin < 2
         n = 3;
     end

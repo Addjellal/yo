@@ -16,6 +16,11 @@ function Lo_R = daubechiesFiltre(N, phase)
 %   PHASE vaut 'minimale' (par défaut) ou 'symetrique'.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      h = daubechiesFiltre(2);
+%      abs(sum(h) - sqrt(2)) < 1e-10
+%      abs(sum(h .^ 2) - 1) < 1e-10    % et son energie vaut un
     if nargin < 2 || isempty(phase), phase = 'minimale'; end
     N = round(N);
     if N < 1

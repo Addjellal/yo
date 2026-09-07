@@ -9,6 +9,9 @@ function t = dbUpdate(t, predicat, colonne, valeur)
 %   colonne écrite est connue à l'avance.
 %
 %   Exemple :
+%      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+%      t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+%      t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
 %      t = dbUpdate(t, @(l) strcmp(l{2}, 'ventes'), 'salaire', 45000);
 %
 %   Voir aussi DBSELECT, DBDELETE, DBINSERT.

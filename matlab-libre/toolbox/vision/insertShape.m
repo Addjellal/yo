@@ -2,6 +2,10 @@ function J = insertShape(I, forme, position)
 %INSERTSHAPE Dessine un rectangle ou une ligne dans une image.
 %   J = INSERTSHAPE(I,'rectangle',[x y w h]) trace le contour.
 %   J = INSERTSHAPE(I,'line',[x1 y1 x2 y2]) trace un segment.
+%
+%   Exemple :
+%      J = insertShape(zeros(20), 'rectangle', [5 5 8 8]);
+%      sum(J(:)) > 0               % 1
     J = im2double(I);
     [h, l] = size(J);
     switch lower(char(forme))

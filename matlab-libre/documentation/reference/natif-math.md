@@ -446,6 +446,35 @@ BITCMP  Complément bit à bit.
     Voir aussi BITAND, BITOR, BITXOR, BITSHIFT.
 ```
 
+## `bitget`
+
+```
+BITGET  Valeur d'un bit.
+    BITGET(A,RANG) rend le bit de rang RANG de A, compté depuis le poids
+    faible : le rang 1 est le bit des unités. Le résultat vaut 0 ou 1, et
+    porte la classe de A.
+
+    Le rang doit tenir dans la largeur du type : huit bits pour un uint8,
+    cinquante-trois pour un double, qui est la mantisse. Un rang hors de
+    cette largeur est refusé plutôt que rendu nul — un décalage au-delà de
+    la largeur n'a pas de valeur définie, et rendre zéro laisserait croire
+    que le bit existe et vaut zéro.
+
+    BITGET(A,RANG,TYPE) impose la largeur du type supposé.
+
+    Syntaxe
+       B = bitget(A,RANG)
+       B = bitget(A,RANG,TYPE)
+
+    Exemples
+       bitget(5, 1)               % 1 : cinq s'ecrit 101
+       bitget(5, 2)               % 0
+       bitget(5, 1:3)             % 1  0  1
+       bitget(uint8(160), 8)      % 1
+
+    Voir aussi BITSET, BITAND, BITOR, BITSHIFT, DEC2BIN.
+```
+
 ## `bitor`
 
 ```
@@ -462,6 +491,33 @@ BITOR  Ou bit à bit.
        bitor([1 2], [4 8])    % 5  10
 
     Voir aussi BITAND, BITXOR, BITCMP, BITSHIFT.
+```
+
+## `bitset`
+
+```
+BITSET  Pose un bit.
+    BITSET(A,RANG) met à un le bit de rang RANG de A. BITSET(A,RANG,V)
+    lui donne la valeur V, qui ne peut valoir que zéro ou un. Le résultat
+    garde la classe de A.
+
+    Poser un bit puis le lire redonne ce qu'on a posé, et poser deux fois
+    le même bit ne fait rien de plus que la première fois : l'opération
+    est idempotente, à la différence de BITXOR qui bascule.
+
+    BITSET(A,RANG,V,TYPE) impose la largeur du type supposé.
+
+    Syntaxe
+       C = bitset(A,RANG)
+       C = bitset(A,RANG,V)
+
+    Exemples
+       bitset(4, 1)               % 5
+       bitset(5, 1, 0)            % 4
+       bitget(bitset(0, 3), 3)    % 1 : on relit ce qu'on a pose
+       bitset(0, 1:4)             % 1  2  4  8
+
+    Voir aussi BITGET, BITAND, BITOR, BITXOR, BITSHIFT.
 ```
 
 ## `bitshift`

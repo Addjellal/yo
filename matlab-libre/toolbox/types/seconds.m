@@ -2,6 +2,10 @@ function d = seconds(x)
 %SECONDS Durée en secondes, ou secondes d'une durée.
 %   D = SECONDS(X) construit une durée dont le format d'affichage est 's'.
 %   X = SECONDS(D) rend le nombre de secondes d'une durée.
+%
+%   Exemple :
+%      seconds(90)                 % une minute et demie
+%      minutes(seconds(90))        % 1.5
     if isa(x, 'duration')
         d = x.Secondes / 1;
     elseif isa(x, 'calendarDuration')

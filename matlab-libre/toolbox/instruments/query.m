@@ -9,6 +9,7 @@ function [reponse, instrument] = query(instrument, commande)
 %   le reprendre pour que les appels suivants en tiennent compte.
 %
 %   Exemple :
+%      instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
 %      [identite, instrument] = query(instrument, '*IDN?');
 %      [texte, instrument] = query(instrument, 'MEAS:VOLT?');
 %      tension = str2double(texte);

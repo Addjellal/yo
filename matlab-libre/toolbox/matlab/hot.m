@@ -2,6 +2,10 @@ function carte = hot(m)
 %HOT Carte de couleurs noir - rouge - jaune - blanc.
 %   Les trois tiers de la rampe montent tour à tour le rouge, le vert
 %   puis le bleu : c'est la couleur d'un corps chauffé.
+%
+%   Exemple :
+%      carte = hot(8);
+%      all(diff(sum(carte, 2)) > 0)    % la clarte croit d'un bout a l'autre
     if nargin < 1 || isempty(m), m = 256; end
     m = round(m);
     n = fix(3 * m / 8);

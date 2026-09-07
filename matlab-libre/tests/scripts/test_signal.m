@@ -1219,4 +1219,63 @@ end
 assert(refuseGabarit, 'les bandes se donnent par paires');
 disp('firls : ok');
 
+%% -------------------------------- transformations de bande analogiques
+% Les quatre transformations partent du meme prototype de coupure unite.
+% Chacune se verifie sur la propriete qui la definit : ou passe le
+% continu, ou passe l'infini, et ce que devient l'ordre.
+[z0, p0, k0] = buttap(4);
+[num, den] = zp2tf(z0, p0, k0);
+
+[nt, dt] = lp2lp(num, den, 100);
+assert(abs(polyval(nt, 0) / polyval(dt, 0) - 1) < 1e-12, ...
+       'un passe-bas laisse passer le continu');
+assert(abs(abs(polyval(nt, 100i) / polyval(dt, 100i)) - 1/sqrt(2)) < 1e-10, ...
+       'et coupe a -3 dB en Wo');
+assert(numel(dt) == numel(den), 'la dilatation ne change pas l''ordre');
+
+[nt, dt] = lp2hp(num, den, 100);
+assert(abs(polyval(nt, 0) / polyval(dt, 0)) < 1e-12, ...
+       'un passe-haut annule le continu');
+assert(abs(abs(polyval(nt, 100i) / polyval(dt, 100i)) - 1/sqrt(2)) < 1e-10);
+assert(abs(abs(nt(1) / dt(1)) - 1) < 1e-12, 'et laisse tout passer a l''infini');
+
+[z2, p2, k2] = buttap(2);
+[n2, d2] = zp2tf(z2, p2, k2);
+[nt, dt] = lp2bp(n2, d2, 100, 20);
+assert(numel(dt) - 1 == 4, 'le passe-bande double l''ordre');
+assert(abs(abs(polyval(nt, 100i) / polyval(dt, 100i)) - 1) < 1e-10, ...
+       'et passe tout au centre');
+assert(abs(polyval(nt, 0) / polyval(dt, 0)) < 1e-12, 'rien au continu');
+
+[nt, dt] = lp2bs(n2, d2, 100, 20);
+assert(numel(dt) - 1 == 4, 'le coupe-bande aussi');
+assert(abs(polyval(nt, 100i) / polyval(dt, 100i)) < 1e-10, 'rejet total au centre');
+assert(abs(abs(polyval(nt, 0) / polyval(dt, 0)) - 1) < 1e-12, ...
+       'et le continu passe');
+
+% Les quatre familles se conçoivent aussi en analogique. Chacune a son
+% module propre a la frequence de coupure : -3 dB pour Butterworth, le bas
+% de l'ondulation pour Chebyshev I et l'elliptique, l'attenuation demandee
+% pour Chebyshev II.
+[b, a] = butter(4, 100, 's');
+assert(abs(abs(polyval(b, 100i) / polyval(a, 100i)) - 1/sqrt(2)) < 1e-10);
+assert(abs(polyval(b, 0) / polyval(a, 0) - 1) < 1e-12);
+[b, a] = butter(4, 100, 'high', 's');
+assert(abs(abs(polyval(b, 100i) / polyval(a, 100i)) - 1/sqrt(2)) < 1e-10);
+assert(abs(polyval(b, 0) / polyval(a, 0)) < 1e-12);
+[b, a] = butter(2, [90 110], 's');
+assert(numel(a) - 1 == 4);
+[b, a] = cheby1(4, 1, 100, 's');
+assert(abs(abs(polyval(b, 100i) / polyval(a, 100i)) - 10^(-1/20)) < 1e-10, ...
+       'Chebyshev I atteint le bas de l''ondulation en Wn');
+[b, a] = cheby2(4, 40, 100, 's');
+assert(abs(abs(polyval(b, 100i) / polyval(a, 100i)) - 0.01) < 1e-10, ...
+       'Chebyshev II atteint l''attenuation demandee en Wn');
+assert(abs(abs(polyval(b, 0) / polyval(a, 0)) - 1) < 1e-10);
+[b, a] = ellip(4, 1, 40, 100, 's');
+assert(abs(abs(polyval(b, 100i) / polyval(a, 100i)) - 10^(-1/20)) < 1e-10);
+% Le mot-cle 's' ne change rien a la conception numerique.
+[bn, an] = butter(4, 0.3);
+assert(abs(sum(bn) / sum(an) - 1) < 1e-12, 'gain unite au continu');
+
 disp('signal : toutes les verifications passent');

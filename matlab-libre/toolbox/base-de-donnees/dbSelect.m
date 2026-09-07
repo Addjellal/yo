@@ -14,6 +14,9 @@ function lignes = dbSelect(t, predicat)
 %   tel.
 %
 %   Exemple :
+%      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+%      t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+%      t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
 %      dbSelect(t, @(l) strcmp(l{2}, 'etudes'))
 %      dbSelect(t, @(l) l{3} > 40000 && l{4} > 4)
 %      dbSelect(t)                     % toute la table

@@ -13,8 +13,10 @@ function options = saoptimset(varargin)
 %   permet de sortir d'un creux local au début et de s'y poser à la fin.
 %
 %   Exemple :
-%      o = saoptimset('MaxIter', 5000, 'InitialTemperature', 50);
+%      o = saoptimset('MaxIter', 2000, 'InitialTemperature', 50);
+%      rng(1);
 %      x = simulannealbnd(@(v) sum(v .^ 2), [1 1], [-5 -5], [5 5], o);
+%      norm(x) < 1         % 1
 %
 %   Voir aussi SIMULANNEALBND, GAOPTIMSET, PSOPTIMSET, OPTIMOPTIONS.
     defauts = struct('MaxIter', 1000, 'InitialTemperature', 100, ...

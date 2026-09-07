@@ -2,6 +2,10 @@ function t = firtype(b)
 %FIRTYPE Type d'un filtre RIF à phase linéaire, de 1 à 4.
 %   Type 1 : symétrique, longueur impaire.  Type 2 : symétrique, paire.
 %   Type 3 : antisymétrique, impaire.       Type 4 : antisymétrique, paire.
+%
+%   Exemple :
+%      firtype([1 2 3 2 1])        % 1 : symetrique, longueur impaire
+%      firtype([1 2 2 1])          % 2 : symetrique, longueur paire
     b = double(b(:)).';
     tolerance = 1e-10 * max(1, max(abs(b)));
     symetrique = all(abs(b - fliplr(b)) <= tolerance);

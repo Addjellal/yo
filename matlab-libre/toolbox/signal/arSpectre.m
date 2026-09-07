@@ -4,6 +4,10 @@ function [pxx, f] = arSpectre(a, e, nfft, fs, unilateral)
 %   moitié positive du spectre quand on ne garde qu'un côté.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [pxx, f] = arSpectre([1 -0.5], 1, 512, 1);
+%      pxx(1) > pxx(end)           % 1 : un pole reel positif est passe-bas
     if nargin < 5, unilateral = true; end
     a = double(a(:)).';
     n = nfft;

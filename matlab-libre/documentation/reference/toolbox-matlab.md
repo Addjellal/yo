@@ -124,6 +124,11 @@ MEMOIZEDFUNCTION Fonction qui retient ses résultats.
   C'est l'objet que rend MEMOIZE. Il s'appelle comme la fonction
   d'origine ; les arguments déjà vus ne sont pas recalculés.
 
+  Exemple :
+     f = memoize(@(x) x ^ 2);
+     f(4)                        % 16
+     f(4)                        % 16, sans recalculer
+
   Voir aussi MEMOIZE, CLEARCACHE, STATS.
 ```
 
@@ -308,6 +313,10 @@ BLKDIAG Matrice diagonale par blocs.
 ```
 BONE Carte de couleurs gris à reflet bleuté.
   Sept huitièmes de gris et un huitième de HOT retourné.
+
+  Exemple :
+     carte = bone(8);
+     size(carte)                 % 8 3
 ```
 
 ## `bounds`
@@ -315,6 +324,10 @@ BONE Carte de couleurs gris à reflet bleuté.
 ```
 BOUNDS Minimum et maximum en un seul appel.
   [B,H] = BOUNDS(X) rend le plus petit et le plus grand élément.
+
+  Exemple :
+     [bas, haut] = bounds([3 1 4 1 5]);
+     [bas haut]                  % 1 5
 ```
 
 ## `boxchart`
@@ -1292,6 +1305,10 @@ FINDOBJ Cherche des objets graphiques par leurs propriétés.
 FLAG Carte de couleurs alternant rouge, blanc, bleu et noir.
   Utile pour faire ressortir les lignes de niveau : deux valeurs
   voisines y prennent des couleurs très différentes.
+
+  Exemple :
+     carte = flag(8);
+     size(carte)                 % 8 3
 ```
 
 ## `fmesh`
@@ -1442,6 +1459,15 @@ GINPUT Lecture de points à la souris (indisponible).
   coordonnées inventées. Un programme qui en a besoin doit prendre ses
   points autrement — INPUT au clavier, ou des coordonnées écrites en
   clair.
+
+  Exemple :
+     % Les figures de MatLibre ne se cliquent pas : GINPUT le dit plutot que
+     % de rendre des coordonnees inventees.
+     try
+         ginput(1);
+     catch e
+         e.identifier
+     end
 
   Voir aussi INPUT, DATACURSORMODE, GTEXT, WAITFORBUTTONPRESS.
 ```
@@ -1696,6 +1722,10 @@ HISTOGRAM2 Histogramme à deux dimensions.
 HOT Carte de couleurs noir - rouge - jaune - blanc.
   Les trois tiers de la rampe montent tour à tour le rouge, le vert
   puis le bleu : c'est la couleur d'un corps chauffé.
+
+  Exemple :
+     carte = hot(8);
+     all(diff(sum(carte, 2)) > 0)    % la clarte croit d'un bout a l'autre
 ```
 
 ## `hsv`
@@ -1704,6 +1734,10 @@ HOT Carte de couleurs noir - rouge - jaune - blanc.
 HSV Carte de couleurs parcourant le cercle des teintes.
   La saturation et la valeur restent à 1 : seule la teinte tourne, du
   rouge au rouge en passant par tout le spectre.
+
+  Exemple :
+     carte = hsv(6);
+     size(carte)                 % 6 3
 ```
 
 ## `humps`
@@ -1711,6 +1745,10 @@ HSV Carte de couleurs parcourant le cercle des teintes.
 ```
 HUMPS Fonction d'essai à deux pics, utilisée par les démonstrations.
   Y = HUMPS(X) évalue 1/((x-0.3)^2+0.01) + 1/((x-0.9)^2+0.04) - 6.
+
+  Exemple :
+     humps(0.3)                  % environ 96 : le sommet de la courbe
+     fzero(@humps, [1 2]) > 1        % elle change de signe entre 1 et 2
 ```
 
 ## `importdata`
@@ -1843,6 +1881,11 @@ INVHILB Inverse exacte de la matrice de Hilbert.
 ISKEYWORD Mot réservé du langage ?
   ISKEYWORD rend la liste des mots réservés.
   ISKEYWORD(NOM) dit si NOM en fait partie.
+
+  Exemple :
+     iskeyword('for')            % 1
+     iskeyword('toto')           % 0
+     numel(iskeyword()) > 10     % la liste des mots reserves
 ```
 
 ## `ismembertol`
@@ -2170,7 +2213,16 @@ MATLAB.ADDONS.TOOLBOX.INSTALLTOOLBOX Installe une toolbox.
   contenir un fichier Contents.m, comme toute toolbox MATLAB.
 
   Exemple :
-     matlab.addons.toolbox.installToolbox('/tmp/maToolbox');
+     % Une toolbox est un dossier qui porte un Contents.m. On la
+     % desinstalle aussitot : installer, c'est copier dans l'arborescence
+     % des toolboxes, et un essai n'a pas a y laisser de trace.
+     dossier = tempname();
+     mkdir(dossier);
+     f = fopen(fullfile(dossier, 'Contents.m'), 'w');
+     fprintf(f, '%% Ma toolbox\n');
+     fclose(f);
+     identifiant = matlab.addons.toolbox.installToolbox(dossier);
+     matlab.addons.toolbox.uninstallToolbox(identifiant);
 ```
 
 ## `matlab.addons.toolbox.packageToolbox`
@@ -2180,6 +2232,15 @@ MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX Empaquette une toolbox.
   F = ...PACKAGETOOLBOX(DOSSIER,NOM) fabrique une archive du dossier.
   MATLAB produit un .mltbx ; ici c'est une archive ZIP, lisible partout
   et réinstallable par installToolbox après décompression.
+
+  Exemple :
+     dossier = tempname();
+     mkdir(dossier);
+     f = fopen(fullfile(dossier, 'Contents.m'), 'w');
+     fprintf(f, '%% Ma toolbox\n');
+     fclose(f);
+     fichier = matlab.addons.toolbox.packageToolbox(dossier, 'ma.zip');
+     isfile(fichier)             % 1
 ```
 
 ## `matlab.addons.toolbox.uninstallToolbox`
@@ -2187,6 +2248,13 @@ MATLAB.ADDONS.TOOLBOX.PACKAGETOOLBOX Empaquette une toolbox.
 ```
 MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
   ...UNINSTALLTOOLBOX(ID) efface le dossier et le retire du chemin.
+
+  Exemple :
+     % Desinstaller ce qui n'est pas installe ne fait rien de mal.
+     try
+         matlab.addons.toolbox.uninstallToolbox('inconnue');
+     catch
+     end
 ```
 
 ## `matlabroot`
@@ -2194,6 +2262,9 @@ MATLAB.ADDONS.TOOLBOX.UNINSTALLTOOLBOX Retire une toolbox installée.
 ```
 MATLABROOT Racine de l'installation de MatLibre.
   C'est le dossier qui contient les toolboxes.
+
+  Exemple :
+     isfolder(matlabroot())      % 1 : la racine existe
 ```
 
 ## `matlibre_aberrantes`
@@ -2528,6 +2599,9 @@ NAMELENGTHMAX Longueur maximale d'un nom.
   N = NAMELENGTHMAX rend le nombre de caractères qu'un nom de
   variable, de fonction ou de champ peut compter.
 
+  Exemple :
+     namelengthmax()             % 63 : la longueur maximale d'un nom
+
   Voir aussi ISVARNAME, GENVARNAME.
 ```
 
@@ -2609,6 +2683,10 @@ NUMLOCK État de la touche de verrouillage numérique.
   pas —, l'état rendu est 'off' et la demande reste sans effet, sans
   erreur.
 
+  Exemple :
+     etat = numlock();
+     ischar(etat) || islogical(etat)
+
   Voir aussi INPUT, KEYBOARD.
 ```
 
@@ -2624,6 +2702,14 @@ OPENFIG Rouvre une figure enregistrée (indisponible).
   relire, et le dit plutôt que d'ouvrir une figure vide. SAVEFIG écrit
   du SVG, qu'un navigateur ou un éditeur d'images rouvre.
 
+  Exemple :
+     % OPENFIG demande un fichier .fig, que MatLibre n'ecrit pas.
+     try
+         openfig('inexistant.fig');
+     catch e
+         e.identifier
+     end
+
   Voir aussi SAVEFIG, SAVEAS, OPEN, FIGURE.
 ```
 
@@ -2633,6 +2719,11 @@ OPENFIG Rouvre une figure enregistrée (indisponible).
 PAGECTRANSPOSE Transposée conjuguée de chaque page d'un tableau.
   B = PAGECTRANSPOSE(A) échange les deux premières dimensions de A et
   conjugue les valeurs.
+
+  Exemple :
+     a = cat(3, [1 1i; 0 1], [1 0; 0 1]);
+     b = pagectranspose(a);
+     b(1, 2, 1)                  % 0 : la transposition conjugue aussi
 
   Voir aussi PAGETRANSPOSE, PAGEMTIMES.
 ```
@@ -2661,6 +2752,11 @@ PAGEMTIMES Produit matriciel page par page.
 PAGETRANSPOSE Transposée de chaque page d'un tableau.
   B = PAGETRANSPOSE(A) échange les deux premières dimensions de A, les
   suivantes restant en place.
+
+  Exemple :
+     a = cat(3, [1 2; 3 4], [5 6; 7 8]);
+     b = pagetranspose(a);
+     b(:, :, 1)                  % [1 3; 2 4]
 
   Voir aussi PAGECTRANSPOSE, PAGEMTIMES, PERMUTE.
 ```
@@ -2787,6 +2883,10 @@ PEAKS Surface d'essai à trois bosses et trois creux.
   La formule est celle de la documentation :
      z = 3(1-x)^2 e^{-x^2-(y+1)^2} - 10(x/5 - x^3 - y^5) e^{-x^2-y^2}
          - 1/3 e^{-(x+1)^2 - y^2}
+
+  Exemple :
+     [X, Y, Z] = peaks(20);
+     size(Z)                     % 20 20
 ```
 
 ## `perms`
@@ -2795,6 +2895,10 @@ PEAKS Surface d'essai à trois bosses et trois creux.
 PERMS Toutes les permutations des éléments d'un vecteur.
   P = PERMS(V) rend une matrice dont chaque ligne est une permutation
   de V. L'ordre suit celui de MATLAB : lexicographique inverse.
+
+  Exemple :
+     P = perms([1 2 3]);
+     size(P, 1)                  % 6 : trois factorielle
 ```
 
 ## `pie`
@@ -3007,6 +3111,10 @@ POLARPLOT Courbe en coordonnées polaires.
 POW2 Puissance de deux, ou mantisse mise à l'échelle.
   Y = POW2(X) rend 2.^X.
   Y = POW2(F,E) rend F .* 2.^E.
+
+  Exemple :
+     pow2(3)                     % 8
+     pow2(0.5, 4)                % 8 : mantisse et exposant
 ```
 
 ## `prism`
@@ -3097,6 +3205,10 @@ RAMPECARTE Rampe de 0 à 1 sur M points, colonne.
   Pour M = 1 la rampe vaut zéro, comme dans MATLAB.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = rampeCarte(5);
+     g'                          % 0 0.25 0.5 0.75 1
 ```
 
 ## `rat`
@@ -3106,6 +3218,11 @@ RAT Approximation rationnelle par fractions continues.
   [N,D] = RAT(X) rend deux entiers tels que N/D vaut X à la tolérance
   par défaut près (1e-6 fois la valeur).
   S = RAT(X) rend la chaîne « n/d ».
+
+  Exemple :
+     [n, d] = rat(0.75);
+     [n d]                       % 3 4
+     abs(n / d - 0.75) < 1e-12
 ```
 
 ## `readcell`
@@ -3244,6 +3361,10 @@ REPELEM Répétition élément par élément.
 RESCALE Remise à l'échelle linéaire d'un tableau.
   Y = RESCALE(X) ramène les valeurs dans [0,1].
   Y = RESCALE(X,A,B) les ramène dans [A,B].
+
+  Exemple :
+     rescale([2 4 6])            % 0 0.5 1
+     rescale([2 4 6], 10, 20)    % 10 15 20
 ```
 
 ## `residue`
@@ -3886,6 +4007,15 @@ UICONTROL Commande d'interface (indisponible).
   Ce manque est documenté dans documentation/manques.md, au chapitre
   du bureau.
 
+  Exemple :
+     % MatLibre ne trace que des courbes : UICONTROL le dit plutot que de
+     % rendre une poignee vers un bouton qui n'existe pas.
+     try
+         uicontrol('Style', 'pushbutton', 'String', 'ok');
+     catch e
+         e.identifier
+     end
+
   Voir aussi FIGURE, INPUT, MENU, DISP.
 ```
 
@@ -3895,6 +4025,10 @@ UICONTROL Commande d'interface (indisponible).
 UNIQUETOL Valeurs distinctes à une tolérance près.
   U = UNIQUETOL(X,TOL) regroupe les valeurs dont l'écart relatif est
   inférieur à TOL (1e-6 par défaut).
+
+  Exemple :
+     u = uniquetol([1 1 + 1e-9 2], 1e-6);
+     numel(u)                    % 2 : les deux premiers se confondent
 ```
 
 ## `unzip`
@@ -3903,6 +4037,13 @@ UNIQUETOL Valeurs distinctes à une tolérance près.
 UNZIP Extrait une archive ZIP.
   UNZIP(ARCHIVE,DOSSIER) extrait dans le dossier donné, le dossier
   courant par défaut.
+
+  Exemple :
+     f = fopen('a.txt', 'w'); fprintf(f, 'bonjour'); fclose(f);
+     zip('archive.zip', {'a.txt'});
+     delete('a.txt');
+     unzip('archive.zip');
+     fileread('a.txt')           % 'bonjour'
 ```
 
 ## `validatestring`
@@ -3912,6 +4053,9 @@ VALIDATESTRING Complète une option textuelle parmi une liste.
   S = VALIDATESTRING(CHAINE,OPTIONS) rend l'élément de OPTIONS dont
   CHAINE est un préfixe, sans distinction de casse. Une erreur est levée
   si aucun ou plusieurs éléments correspondent.
+
+  Exemple :
+     validatestring('lin', {'linear', 'cubic'})     % 'linear' : l'abrege suffit
 ```
 
 ## `vecnorm`
@@ -3921,6 +4065,10 @@ VECNORM Norme de chaque vecteur d'un tableau.
   N = VECNORM(A) rend la norme 2 de chaque colonne.
   N = VECNORM(A,P) utilise la norme P.
   N = VECNORM(A,P,DIM) travaille le long de la dimension DIM.
+
+  Exemple :
+     vecnorm([3 4]')             % 5 : la norme de la colonne
+     vecnorm([3 4; 0 0], 2, 2)'  % 5 0 : par ligne
 ```
 
 ## `vectorize`
@@ -4070,8 +4218,8 @@ WHAT Inventaire des fichiers MATLAB d'un dossier.
   Sans argument, WHAT décrit le dossier courant.
 
   Exemple :
-     s = what(fullfile(matlabroot, 'toolbox', 'matlab'));
-     numel(s.m)
+     s = what(matlibre_racine());     % le dossier des toolbox
+     numel(s.m) >= 0
 
   Voir aussi DIR, WHICH, EXIST, LS.
 ```
@@ -4184,6 +4332,11 @@ ZIP Fabrique une archive ZIP.
   L'archive est produite par la commande « zip » du système ; sans
   elle, la fonction le dit clairement plutôt que d'écrire un fichier
   incomplet.
+
+  Exemple :
+     f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
+     fichier = zip('archive.zip', {'b.txt'});
+     isfile(fichier)             % 1
 ```
 
 ## `zoom`

@@ -2,6 +2,13 @@ function fichiers = unzip(archive, dossier)
 %UNZIP Extrait une archive ZIP.
 %   UNZIP(ARCHIVE,DOSSIER) extrait dans le dossier donné, le dossier
 %   courant par défaut.
+%
+%   Exemple :
+%      f = fopen('a.txt', 'w'); fprintf(f, 'bonjour'); fclose(f);
+%      zip('archive.zip', {'a.txt'});
+%      delete('a.txt');
+%      unzip('archive.zip');
+%      fileread('a.txt')           % 'bonjour'
     if nargin < 2 || isempty(dossier), dossier = pwd(); end
     [codeVersion, ~] = system('unzip -v');
     if codeVersion ~= 0

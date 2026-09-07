@@ -81,6 +81,10 @@ MULTISTART Solveur global par départs multiples.
 CHAMPOPTIMISATION Lit une option, ou rend la valeur par défaut.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     champOptimisation(struct('PopulationSize', 30), 'PopulationSize', 50)     % 30
+     champOptimisation(struct(), 'PopulationSize', 50)                        % 50
 ```
 
 ## `createOptimProblem`
@@ -147,8 +151,10 @@ GAOPTIMSET Options d'un algorithme génétique.
   deux mènent à la même structure.
 
   Exemple :
-     o = gaoptimset('PopulationSize', 200, 'Generations', 300);
-     x = ga(@(v) sum(v .^ 2), 3, -5, 5, o);
+     o = gaoptimset('PopulationSize', 40, 'Generations', 60);
+     rng(1);
+     x = ga(@(v) sum(v .^ 2), 2, [], [], [], [], [-5 -5], [5 5], [], o);
+     norm(x) < 1         % 1 : le minimum est en zero
 
   Voir aussi GA, GAMULTIOBJ, PSOPTIMSET, SAOPTIMSET, OPTIMOPTIONS.
 ```
@@ -308,8 +314,10 @@ SAOPTIMSET Options d'un recuit simulé.
   permet de sortir d'un creux local au début et de s'y poser à la fin.
 
   Exemple :
-     o = saoptimset('MaxIter', 5000, 'InitialTemperature', 50);
+     o = saoptimset('MaxIter', 2000, 'InitialTemperature', 50);
+     rng(1);
      x = simulannealbnd(@(v) sum(v .^ 2), [1 1], [-5 -5], [5 5], o);
+     norm(x) < 1         % 1
 
   Voir aussi SIMULANNEALBND, GAOPTIMSET, PSOPTIMSET, OPTIMOPTIONS.
 ```
@@ -318,9 +326,14 @@ SAOPTIMSET Options d'un recuit simulé.
 
 ```
 SIMULANNEALBND Recuit simulé avec bornes.
-  [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT,ITERATIONS) minimise en
-  acceptant parfois de remonter, avec une probabilité qui décroît au
-  long du refroidissement.
+  [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT) minimise en acceptant
+  parfois de remonter, avec une probabilité qui décroît au long du
+  refroidissement.
+
+  [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT,OPTIONS) prend les réglages
+  rendus par SAOPTIMSET — c'est le champ MaxIter qui fixe le nombre
+  d'itérations. Un nombre est aussi accepté à cette place, et vaut alors
+  directement ce nombre d'itérations.
 
   C'est cette acceptation des mauvais pas qui distingue le recuit d'une
   descente : elle permet de sortir d'un minimum local. La température
@@ -336,6 +349,8 @@ SIMULANNEALBND Recuit simulé avec bornes.
   Exemple :
      f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);
      [x, v] = simulannealbnd(f, zeros(1,3), -5*ones(1,3), 5*ones(1,3));
+     [x, v] = simulannealbnd(f, zeros(1,3), -5*ones(1,3), 5*ones(1,3), ...
+                             saoptimset('MaxIter', 2000));
 
   Voir aussi PARTICLESWARM, GA, MULTISTART.
 ```

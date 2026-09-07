@@ -12,6 +12,15 @@ function h = uicontrol(varargin)
 %   Ce manque est documenté dans documentation/manques.md, au chapitre
 %   du bureau.
 %
+%   Exemple :
+%      % MatLibre ne trace que des courbes : UICONTROL le dit plutot que de
+%      % rendre une poignee vers un bouton qui n'existe pas.
+%      try
+%          uicontrol('Style', 'pushbutton', 'String', 'ok');
+%      catch e
+%          e.identifier
+%      end
+%
 %   Voir aussi FIGURE, INPUT, MENU, DISP.
     error('MATLAB:uicontrol:Unsupported', ...
           ['MatLibre figures carry plots only: there is no UICONTROL, ' ...

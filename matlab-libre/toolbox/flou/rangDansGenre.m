@@ -4,6 +4,16 @@ function indice = rangDansGenre(fis, variable, entree)
 %   entrée ne doit pas atteindre une sortie du même nom.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      fis = mamfis('Name', 'pilote');
+%      fis = addInput(fis, [0 10], 'Name', 'erreur');
+%      fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+%      fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+%      fis = addOutput(fis, [0 1], 'Name', 'commande');
+%      fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+%      fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+%      rangDansGenre(fis, 'erreur', true)     % 1
     variables = variablesDe(fis, entree);
     if isnumeric(variable)
         indice = round(variable);

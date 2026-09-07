@@ -2,6 +2,11 @@ function [sos, g] = zp2sos(z, p, k)
 %ZP2SOS Zéros et pôles vers sections du second ordre.
 %   Les racines complexes sont appariées avec leur conjuguée ; les racines
 %   réelles sont groupées deux par deux. Le résultat est réel.
+%
+%   Exemple :
+%      [z, p, k] = butter(4, 0.3);
+%      [sos, g] = zp2sos(z, p, k);
+%      size(sos, 2)                % 6 colonnes par section
     if nargin < 3, k = 1; end
     z = z(:);
     p = p(:);

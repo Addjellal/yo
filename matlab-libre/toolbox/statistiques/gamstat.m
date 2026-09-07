@@ -1,6 +1,7 @@
 function [m, v] = gamstat(a, b)
 %GAMSTAT Moyenne et variance de la loi gamma.
-%   Exemple :  [m,v] = gamstat(2, 3)   % 6 et 18
+%   Exemple :
+%      [m,v] = gamstat(2, 3)   % 6 et 18
     if nargin < 2, b = 1; end
     [a, b] = statAjuster(a, b);
     m = a .* b;

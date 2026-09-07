@@ -5,6 +5,9 @@ function nombre = days360psa(depart, arrivee)
 %   trente. Sans quoi un coupon partant du 28 février serait plus court
 %   que les autres.
 %
+%   Exemple :
+%      days360psa('31-Jan-2024', '28-Feb-2024')      % la convention americaine
+%
 %   Voir aussi DAYS360, DAYS360E, DAYS360ISDA, YEARFRAC.
     [a1, m1, j1, a2, m2, j2] = matlibre_deux_dates(depart, arrivee);
     finFevrier = (m1 == 2) & (j1 == eomday(a1, m1));

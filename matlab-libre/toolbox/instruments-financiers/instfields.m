@@ -4,6 +4,8 @@ function champs = instfields(jeu, varargin)
 %   INSTFIELDS(JEU,'Type',T) ne rend que ceux du type T.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+%      jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
 %      instfields(jeu, 'Type', 'Bond')
 %
 %   Voir aussi INSTTYPES, INSTGET, INSTDISP.

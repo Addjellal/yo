@@ -2,6 +2,10 @@ function c = maxPooling2dLayer(taille, varargin)
 %MAXPOOLING2DLAYER Sous-échantillonnage par le maximum.
 %   C = MAXPOOLING2DLAYER(TAILLE) ; le pas vaut la taille par défaut,
 %   comme dans MATLAB. Option : 'Stride'.
+%
+%   Exemple :
+%      c = maxPooling2dLayer(2);
+%      c.taille                    % 2 2 : une fenetre carree
     if numel(taille) < 2, taille = [taille taille]; end
     pas = taille;
     for k = 1:2:numel(varargin) - 1

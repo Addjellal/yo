@@ -2,6 +2,10 @@ function d = days(x)
 %DAYS Durée en jours, ou jours d'une durée.
 %   D = DAYS(X) construit une durée dont le format d'affichage est 'd'.
 %   X = DAYS(D) rend le nombre de jours d'une durée.
+%
+%   Exemple :
+%      days(1.5)                   % une duree d'un jour et demi
+%      hours(days(1))              % 24
     if isa(x, 'duration')
         d = x.Secondes / 86400;
     elseif isa(x, 'calendarDuration')

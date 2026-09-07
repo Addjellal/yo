@@ -4,6 +4,10 @@ function options = poserOptions(options, nomFonction, varargin)
 %   distingue une faute de frappe d'un réglage.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      o = poserOptions(struct('Alpha', 1), 'essai', 'Alpha', 3);
+%      o.Alpha                     % 3
     if numel(varargin) == 1 && isstruct(varargin{1})
         fournies = varargin{1};
         noms = fieldnames(fournies);

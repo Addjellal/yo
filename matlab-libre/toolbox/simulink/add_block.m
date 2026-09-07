@@ -15,6 +15,18 @@ function modele = add_block(modele, type, nom, varargin)
 %     saturation   UpperLimit, LowerLimit
 %     delay        InitialCondition
 %     relay        OnSwitch, OffSwitch, OnOutput, OffOutput
+%
+%   Un bloc porte un nom, et c'est par ce nom qu'ADD_LINE le relie : le
+%   modèle n'est qu'une liste de blocs et d'arcs, dont SIM tire l'ordre de
+%   calcul.
+%
+%   Exemple :
+%      m = new_system('rampe');
+%      m = add_block(m, 'constant', 'un', 'Value', 2);
+%      m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
+%      numel(m.blocs)              % 2
+%
+%   Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
     bloc = struct();
     bloc.type = lower(char(type));
     bloc.nom = nom;

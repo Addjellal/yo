@@ -8,8 +8,12 @@ function predictions = glmval(coefficients, X, lien, varargin)
 %   l'origine dans B.
 %
 %   Exemple :
+%      rng(1);
+%      X = randn(200, 1);
+%      y = double(rand(200, 1) < 1 ./ (1 + exp(-X)));
 %      b = glmfit(X, y, 'binomial');
 %      p = glmval(b, X, 'logit');       % probabilites entre zero et un
+%      all(p >= 0 & p <= 1)             % 1
 %
 %   Voir aussi GLMFIT, FITGLM.
     avecConstante = true;

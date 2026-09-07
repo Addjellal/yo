@@ -2,6 +2,12 @@ function [h, f] = tfestimate(x, y, fenetre, recouvrement, nfft, fs)
 %TFESTIMATE Estimation de la fonction de transfert entre deux signaux.
 %   H = TFESTIMATE(X,Y,...) vaut Pxy/Pxx : la réponse du système qui mène
 %   de X à Y, au sens des moindres carrés.
+%
+%   Exemple :
+%      rng(1);
+%      x = randn(4096, 1);
+%      [h, f] = tfestimate(x, filter(1, [1 -0.8], x), [], [], 256, 1);
+%      abs(abs(h(1)) - 5) < 1      % 1/(1-0.8) = 5 au continu
     if nargin < 3, fenetre = []; end
     if nargin < 4, recouvrement = []; end
     if nargin < 5, nfft = []; end

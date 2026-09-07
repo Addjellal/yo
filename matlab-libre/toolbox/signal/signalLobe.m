@@ -4,6 +4,11 @@ function [puissance, plage] = signalLobe(S, k)
 %   la fuite de la fenêtre est ainsi ramassée avec la raie.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      S = [1 3 2 0.5 4 1];
+%      [p, plage] = signalLobe(S, 2);
+%      p > 0                       % 1
     n = numel(S);
     k = max(1, min(n, k));
     gauche = k;

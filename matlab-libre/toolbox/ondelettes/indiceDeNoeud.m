@@ -2,6 +2,10 @@ function indice = indiceDeNoeud(arbre, noeud)
 %INDICEDENOEUD Indice d'un nœud donné par son numéro ou par [D P].
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+%      indiceDeNoeud(arbre, [1 0])     % 1 : le premier enfant de la racine
     noeud = double(noeud);
     if numel(noeud) == 2
         indice = depo2ind(arbre.ordre, noeud(:).');

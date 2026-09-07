@@ -2,7 +2,11 @@ function [p, snrValeur] = psnr(a, reference, maximum)
 %PSNR Rapport signal sur bruit de crête, en décibels.
 %   P = PSNR(A,REF) ; MAXIMUM vaut 1 pour un double et 255 pour un uint8.
 %
-%   Exemple :  psnr(x, x)   % Inf
+%   Exemple :
+%      rng(1);
+%      x = rand(32, 32);
+%      psnr(x, x)                  % Inf : deux images identiques
+%      psnr(x, x + 0.01 * randn(32, 32)) > 30
     if nargin < 3 || isempty(maximum)
         if isa(a, 'uint8'), maximum = 255;
         elseif isa(a, 'uint16'), maximum = 65535;

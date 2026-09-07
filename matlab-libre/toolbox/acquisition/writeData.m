@@ -6,6 +6,9 @@ function session = writeData(session, donnees)
 %   une file de sortie réelle.
 %
 %   Exemple :
+%      s = daq();
+%      s.frequence = 1000;
+%      s = addAnalogOutput(s, 'ao0');
 %      s = writeData(s, linspace(0, 5, 500).');
 %      s = writeData(s, linspace(5, 0, 500).');
 %      numel(s.ecrit)                  % 1000

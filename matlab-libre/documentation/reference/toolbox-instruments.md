@@ -25,6 +25,7 @@ QUERY Envoie une commande puis lit la réponse.
   le reprendre pour que les appels suivants en tiennent compte.
 
   Exemple :
+     instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
      [identite, instrument] = query(instrument, '*IDN?');
      [texte, instrument] = query(instrument, 'MEAS:VOLT?');
      tension = str2double(texte);
@@ -48,6 +49,7 @@ READLINE Lit la dernière réponse de l'instrument.
   enchaîne l'envoi et la lecture, évite cette confusion.
 
   Exemple :
+     instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
      instrument = writeline(instrument, 'MEAS:VOLT?');
      tension = str2double(readline(instrument));
 
@@ -105,6 +107,7 @@ WRITELINE Envoie une commande SCPI et prépare la réponse.
   programme de mesure ne doit jamais supposer deux lectures identiques.
 
   Exemple :
+     instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
      instrument = writeline(instrument, 'CONF:VOLT:DC 10');
      instrument = writeline(instrument, 'MEAS:VOLT?');
      tension = str2double(readline(instrument));

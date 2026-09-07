@@ -79,6 +79,9 @@ ADVICE Examine des données avant de les identifier.
   décrivent aucune dynamique, et fausse tout le reste.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      advice(z);
 
   Voir aussi IDDATA, DETREND, ARX, IMPULSEEST.
@@ -98,6 +101,9 @@ AIC Critère d'information d'Akaike.
   liste, ce que le critère d'Akaike ne garantit pas.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u), u);
      aic(arx(z, [2 2 1]))
 
   Voir aussi FPE, ARX, POLYEST.
@@ -187,6 +193,9 @@ BJ Estimation d'un modèle de Box et Jenkins.
   sur la façon dont le bruit entre.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = bj(z, [1 1 1 1 1]);
 
   Voir aussi OE, ARMAX, ARX, POLYEST.
@@ -197,6 +206,11 @@ BJ Estimation d'un modèle de Box et Jenkins.
 ```
 COMPAREFIT Qualité d'ajustement, en pour cent (critère de MathWorks).
   FIT = 100 (1 - ||y - yhat|| / ||y - moyenne(y)||)
+
+  Exemple :
+     y = (1:10)';
+     compareFit(y, y)            % 100 : un ajustement parfait
+     compareFit(y, mean(y) * ones(10, 1)) < 1e-10     % predire la moyenne fait zero
 ```
 
 ## `etfe`
@@ -217,6 +231,9 @@ ETFE Estimation empirique de la réponse fréquentielle.
   G = ETFE(Z,M,N) impose le nombre de points de fréquence.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      g = etfe(z, 30);
      bode(g);
 
@@ -241,6 +258,9 @@ FPE Critère d'erreur finale de prédiction d'Akaike.
   petit.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      fpe(arx(z, [2 2 1])) < fpe(arx(z, [1 1 1]))
 
   Voir aussi AIC, ARX, POLYEST.
@@ -298,6 +318,9 @@ IDFRD Réponse fréquentielle mesurée.
   Propriétés : ResponseData, Frequency, Ts, SpectrumData, CovarianceData.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      g = spa(z);
      bode(g);
 
@@ -384,6 +407,9 @@ IDPROC Modèle de procédé, décrit par ses constantes de temps.
   Propriétés : Type, K, Tp1, Tp2, Tz, Td, Ts, NoiseVariance, Report.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = procest(z, 'P1D');
      m.K, m.Tp1, m.Td
 
@@ -410,6 +436,9 @@ IDSS Modèle d'état estimé.
   résidus.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = n4sid(z, 2);
      [A, B, C, D] = ssdata(m);
 
@@ -431,6 +460,9 @@ IDTF Fonction de transfert estimée.
   Report.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = tfest(z, 2, 1);
      [num, den] = tfdata(m, 'v');
 
@@ -1776,6 +1808,9 @@ PEM Estimation par minimisation de l'erreur de prédiction.
   par la façon de démarrer.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = pem(z, [2 2 2 0 0 1]);
 
   Voir aussi POLYEST, SSEST, ARX, ARMAX, OE, BJ.
@@ -1802,6 +1837,9 @@ POLYEST Estimation d'un modèle polynomial quelconque.
   Options : 'MaxIter' (200) et 'Tolerance' (1e-10).
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = polyest(z, [2 2 1 0 0 1]);      % un ARMAX
 
   Voir aussi ARX, ARMAX, OE, BJ, PEM, IDPOLY.
@@ -1880,6 +1918,9 @@ SPA Analyse spectrale de la réponse fréquentielle.
   G = SPA(Z,M) impose cette largeur ; G = SPA(Z,M,W) les pulsations.
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      g = spa(z, 40);
      bode(g);
 
@@ -1904,6 +1945,9 @@ SSEST Estimation d'un modèle d'état par erreur de prédiction.
   Options : 'MaxIter' (100).
 
   Exemple :
+     rng(1);
+     u = randn(300, 1);
+     z = iddata(filter([0 0.5], [1 -0.8], u) + 0.01 * randn(300, 1), u, 1);
      m = ssest(z, 2);
      compare(m, z);
 

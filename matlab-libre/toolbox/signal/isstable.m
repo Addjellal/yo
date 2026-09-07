@@ -8,6 +8,10 @@ function stable = isstable(b, a)
 %   ISSTABLE(SYS) accepte un modèle linéaire : la stabilité s'y lit sur
 %   les pôles, strictement à gauche de l'axe imaginaire pour un modèle
 %   continu, strictement dans le cercle unité pour un modèle discret.
+%
+%   Exemple :
+%      isstable(1, [1 -0.5])       % 1 : le pole est dans le cercle unite
+%      isstable(1, [1 -1.5])       % 0
     if nargin < 2 && (isa(b, 'tf') || isa(b, 'ss') || ...
                       (isstruct(b) && isfield(b, 'type')))
         % Modèle linéaire de la Control System Toolbox : la stabilité se

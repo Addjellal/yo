@@ -2,6 +2,11 @@ function [pourcentage, valeur, instant] = undershoot(x, fs)
 %UNDERSHOOT Creux avant chaque transition, en pourcentage.
 %   Symétrique d'OVERSHOOT : l'extremum est cherché avant la transition,
 %   du côté opposé au niveau de départ.
+%
+%   Exemple :
+%      t = (0:0.001:0.2)';
+%      [p, v, instant] = undershoot(exp(-30*t) .* sin(2*pi*30*t) + double(t > 0), 1000);
+%      p >= 0                      % 1
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     t = (0:numel(x) - 1)' / fs;

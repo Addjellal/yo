@@ -16,8 +16,13 @@ function y = beamformerDAS(signaux, d, theta)
 %   qui exploite la structure de la covariance, le peut.
 %
 %   Exemple :
+%      rng(1);
+%      % Huit capteurs, une source a vingt degres, et du bruit.
+%      a = steeringVector(8, 0.5, deg2rad(20));
+%      recu = a * (randn(1, 200) + 1i * randn(1, 200)) / sqrt(2) ...
+%             + 0.1 * (randn(8, 200) + 1i * randn(8, 200));
 %      sortie = beamformerDAS(recu, 0.5, deg2rad(20));
-%      var(sortie) / var(beamformerDAS(recu, 0.5, deg2rad(50)))
+%      var(sortie) / var(beamformerDAS(recu, 0.5, deg2rad(50))) > 1    % 1
 %
 %   Voir aussi STEERINGVECTOR, MUSICSPECTRUM, ARRAYGAIN.
     n = size(signaux, 1);

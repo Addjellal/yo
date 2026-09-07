@@ -3,6 +3,12 @@ function [b, bint, r, rint, stats] = regress(y, X)
 %   B = REGRESS(Y,X) rend les coefficients de Y = X*B.
 %   [B,BINT,R,RINT,STATS] = REGRESS(...) rend aussi les intervalles de
 %   confiance à 95 %, les résidus, et [R2, F, p, variance résiduelle].
+%
+%   Exemple :
+%      rng(1);
+%      x = (1:50)';
+%      [b, bint] = regress(2 + 3 * x + randn(50, 1), [ones(50, 1), x]);
+%      bint(2, 1) < 3 && 3 < bint(2, 2)     % la vraie pente est dans l'intervalle
     y = y(:);
     b = X \ y;
     r = y - X * b;

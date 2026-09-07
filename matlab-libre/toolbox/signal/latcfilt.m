@@ -8,10 +8,13 @@ function [f, g] = latcfilt(k, varargin)
 %   K et V : F est alors la sortie du filtre récursif.
 %
 %   Exemple :
-%      [b, a] = butter(3, 0.4);
-%      k = tf2latc(b / b(1));
+%      % Le treillis demande un polynome a phase minimale : les zeros de
+%      % BUTTER sont sur le cercle unite, ceux-ci sont a l'interieur.
+%      b = poly([0.5 -0.3 0.2]);
+%      k = tf2latc(b);
+%      rng(1);
 %      x = randn(1, 100);
-%      max(abs(latcfilt(k, x) * b(1) - filter(b, 1, x)))
+%      max(abs(latcfilt(k, x) - filter(b, 1, x))) < 1e-10   % 1
 %
 %   Voir aussi TF2LATC, LATC2TF, FILTER.
     k = double(k(:));

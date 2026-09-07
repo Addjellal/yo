@@ -1,6 +1,10 @@
 function r = bboxOverlapRatio(a, b)
 %BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
 %   Les boîtes s'écrivent [x y largeur hauteur].
+%
+%   Exemple :
+%      bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
+%      bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
     r = zeros(size(a, 1), size(b, 1));
     for i = 1:size(a, 1)
         for j = 1:size(b, 1)

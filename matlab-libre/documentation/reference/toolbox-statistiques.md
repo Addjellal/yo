@@ -311,6 +311,9 @@ ANOVAN Analyse de la variance à plusieurs facteurs.
 ```
 BETACDF Fonction de répartition de la loi bêta.
   C'est la fonction bêta incomplète régularisée.
+
+  Exemple :
+     betacdf(0.5, 2, 2)          % 0.5 : la loi est symetrique pour a = b
 ```
 
 ## `betafit`
@@ -319,6 +322,11 @@ BETACDF Fonction de répartition de la loi bêta.
 BETAFIT Estimation des paramètres d'une loi bêta.
   Le maximum de vraisemblance est cherché par NELDER-MEAD sur
   BETALIKE, en partant de l'estimation par les moments.
+
+  Exemple :
+     rng(1);
+     p = betafit(betarnd(2, 5, 2000, 1));
+     max(abs(p - [2 5])) < 0.4
 ```
 
 ## `betainv`
@@ -327,7 +335,8 @@ BETAFIT Estimation des paramètres d'une loi bêta.
 BETAINV Quantile de la loi bêta.
   Inversion par dichotomie de la bêta incomplète régularisée sur [0,1].
 
-  Exemple :  betainv(0.5, 1, 1)   % 0.5, la loi uniforme
+  Exemple :
+     betainv(0.5, 1, 1)   % 0.5, la loi uniforme
 ```
 
 ## `betalike`
@@ -335,6 +344,11 @@ BETAINV Quantile de la loi bêta.
 ```
 BETALIKE Opposé de la log-vraisemblance d'une loi bêta.
   PARAMS vaut [A B] ; les données doivent être dans ]0,1[.
+
+  Exemple :
+     rng(1);
+     x = betarnd(2, 5, 500, 1);
+     betalike([2 5], x) < betalike([1 1], x)     % vrai : les bons parametres
 ```
 
 ## `betapdf`
@@ -344,7 +358,8 @@ BETAPDF Densité de la loi bêta.
   Y = BETAPDF(X,A,B) = x^(a-1)*(1-x)^(b-1)/B(a,b) sur [0,1], nulle
   ailleurs.
 
-  Exemple :  betapdf(0.5, 1, 1)   % 1 : la loi uniforme
+  Exemple :
+     betapdf(0.5, 1, 1)   % 1 : la loi uniforme
 ```
 
 ## `betarnd`
@@ -353,13 +368,19 @@ BETAPDF Densité de la loi bêta.
 BETARND Tirages d'une loi bêta.
   Le rapport G1/(G1+G2) de deux gammas indépendantes de formes A et B
   suit la loi bêta.
+
+  Exemple :
+     rng(1);
+     x = betarnd(2, 5, 1, 1000);
+     all(x > 0 & x < 1)          % 1 : la loi vit dans ]0,1[
 ```
 
 ## `betastat`
 
 ```
 BETASTAT Moyenne et variance de la loi bêta.
-  Exemple :  [m,v] = betastat(1, 1)   % 0.5 et 1/12
+  Exemple :
+     [m,v] = betastat(1, 1)   % 0.5 et 1/12
 ```
 
 ## `binocdf`
@@ -370,7 +391,8 @@ BINOCDF Répartition de la loi binomiale.
   régularisée : P(X <= k) = I_{1-p}(n-k, k+1). C'est exact pour tout N,
   là où la somme directe coûterait N termes.
 
-  Exemple :  binocdf(5, 10, 0.5)   % 0.623046875
+  Exemple :
+     binocdf(5, 10, 0.5)   % 0.623046875
 ```
 
 ## `binofit`
@@ -380,6 +402,10 @@ BINOFIT Estimation de la probabilité d'une loi binomiale.
   [PHAT,PCI] = BINOFIT(X,N,ALPHA) rend la proportion observée et
   l'intervalle de confiance exact de Clopper et Pearson, celui que
   MATLAB documente : ses bornes sont des quantiles de la loi bêta.
+
+  Exemple :
+     [p, ci] = binofit(30, 100);
+     ci(1) < p && p < ci(2)      % 1 : l'intervalle encadre l'estimation
 ```
 
 ## `binoinv`
@@ -388,7 +414,8 @@ BINOFIT Estimation de la probabilité d'une loi binomiale.
 BINOINV Quantile de la loi binomiale.
   Le plus petit entier X tel que BINOCDF(X,N,P) >= Y.
 
-  Exemple :  binoinv(0.5, 10, 0.5)   % 5
+  Exemple :
+     binoinv(0.5, 10, 0.5)   % 5
 ```
 
 ## `binornd`
@@ -397,13 +424,18 @@ BINOINV Quantile de la loi binomiale.
 BINORND Tirages d'une loi binomiale.
   Somme de N indicatrices de Bernoulli quand N est petit, inversion de
   la répartition sinon.
+
+  Exemple :
+     rng(1);
+     mean(binornd(10, 0.3, 1, 10000))     % proche de 3 = n p
 ```
 
 ## `binostat`
 
 ```
 BINOSTAT Moyenne et variance de la loi binomiale.
-  Exemple :  [m,v] = binostat(10, 0.5)   % 5 et 2.5
+  Exemple :
+     [m,v] = binostat(10, 0.5)   % 5 et 2.5
 ```
 
 ## `bootci`
@@ -545,7 +577,13 @@ CANONCORR Analyse des corrélations canoniques.
 CDF Fonction de répartition d'une loi nommée.
   P = CDF('name', X, A, B, C).
 
-  Exemple :  cdf('Poisson', 2, 1)   % 0.9197
+  P = CDF(PD,X) prend une loi ajustée par FITDIST, qui porte déjà son
+  nom et ses paramètres.
+
+  Exemples :
+     cdf('Poisson', 2, 1)                    % 0.9197
+     pd = fitdist(normrnd(0, 1, 500, 1), 'Normal');
+     abs(cdf(pd, pd.mu) - 0.5) < 1e-12       % la mediane d'une gaussienne
 ```
 
 ## `chi2cdf`
@@ -620,7 +658,8 @@ CHI2INV Quantile du khi-deux, par dichotomie sur la répartition.
   Les deux arguments se diffusent : un scalaire prend la taille de
   l'autre.
 
-  Exemple :  chi2inv(0.95, 1)      % 3.8415
+  Exemple :
+     chi2inv(0.95, 1)      % 3.8415
              chi2inv(0.95, 1:3)    % 3.8415  5.9915  7.8147
 ```
 
@@ -629,13 +668,18 @@ CHI2INV Quantile du khi-deux, par dichotomie sur la répartition.
 ```
 CHI2RND Tirages d'un khi-deux à V degrés de liberté.
   Le khi-deux à V degrés est une gamma de forme V/2 et d'échelle 2.
+
+  Exemple :
+     rng(1);
+     mean(chi2rnd(4, 1, 10000))           % proche de 4 : la moyenne est nu
 ```
 
 ## `chi2stat`
 
 ```
 CHI2STAT Moyenne et variance du khi-deux.
-  Exemple :  [m,v] = chi2stat(4)   % 4 et 8
+  Exemple :
+     [m,v] = chi2stat(4)   % 4 et 8
 ```
 
 ## `cluster`
@@ -674,6 +718,12 @@ va à la composante la plus probable.
 CLUSTERMELANGE Attribution des points aux composantes d'un mélange.
   Employer CLUSTER ou PREDICT ; cette fonction est le rouage qu'ils
   appellent.
+
+  Exemple :
+     rng(1);
+     m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
+     [indices, post] = clusterMelange(m, [0; 8]);
+     numel(unique(indices))               % 2 : les deux modes se distinguent
 ```
 
 ## `clusterdata`
@@ -991,6 +1041,14 @@ DESCENTELINEAIRE Descente de gradient d'un modèle linéaire régularisé.
   moyennées : c'est ce qui garantit la convergence sans réglage.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     rng(1);
+     X = [randn(60, 2); randn(60, 2) + 3];
+     cible = [-ones(60, 1); ones(60, 1)];
+     o = lireOptionsLineaire(2, 'Lambda', 0.01);
+     [poids, biais] = descenteLineaire(X, cible, o, false);
+     mean(sign(X * poids(:) + biais) == cible) > 0.9
 ```
 
 ## `discardSupportVectors`
@@ -1006,6 +1064,9 @@ DISCARDSUPPORTVECTORS Allège une SVM linéaire de ses points.
   Un modèle à noyau non linéaire refuse : ses points sont sa frontière.
 
   Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
      m = fitcsvm(X, y);
      m = discardSupportVectors(m);
      isempty(m.SupportVectors)     % vrai
@@ -1046,7 +1107,8 @@ ECDF Fonction de répartition empirique.
 
 ```
 EVCDF Répartition de la loi des valeurs extrêmes.
-  Exemple :  evcdf(0, 0, 1)   % 1 - exp(-1) = 0.6321
+  Exemple :
+     evcdf(0, 0, 1)   % 1 - exp(-1) = 0.6321
 ```
 
 ## `evinv`
@@ -1079,7 +1141,8 @@ EVPDF Densité de la loi des valeurs extrêmes.
   C'est la loi de Gumbel des minima, celle que MATLAB nomme « extreme
   value » : y = exp(z)*exp(-exp(z))/sigma avec z = (x-mu)/sigma.
 
-  Exemple :  evpdf(0, 0, 1)   % exp(-1) = 0.3679
+  Exemple :
+     evpdf(0, 0, 1)   % exp(-1) = 0.3679
 ```
 
 ## `evrnd`
@@ -1104,7 +1167,8 @@ EVRND Tirages d'une loi des valeurs extrêmes.
 EVSTAT Moyenne et variance de la loi des valeurs extrêmes.
   La moyenne vaut mu - sigma*gamma d'Euler, la variance sigma^2*pi^2/6.
 
-  Exemple :  [m,v] = evstat(0, 1)   % -0.5772 et 1.6449
+  Exemple :
+     [m,v] = evstat(0, 1)   % -0.5772 et 1.6449
 ```
 
 ## `expfit`
@@ -1136,7 +1200,8 @@ EXPFIT Estimation du paramètre d'une loi exponentielle.
 
 ```
 EXPINV Quantile de la loi exponentielle de moyenne MU.
-  Exemple :  expinv(0.5, 1)   % log(2) = 0.6931
+  Exemple :
+     expinv(0.5, 1)   % log(2) = 0.6931
 ```
 
 ## `exprnd`
@@ -1144,6 +1209,10 @@ EXPINV Quantile de la loi exponentielle de moyenne MU.
 ```
 EXPRND Tirages d'une loi exponentielle de moyenne MU.
   EXPRND(MU), EXPRND(MU,M), EXPRND(MU,M,N), EXPRND(MU,[M N]).
+
+  Exemple :
+     rng(1);
+     mean(exprnd(3, 1, 10000))            % proche de 3 : la moyenne est mu
 ```
 
 ## `expstat`
@@ -1168,6 +1237,9 @@ EXPSTAT Moyenne et variance de la loi exponentielle.
 ```
 FCDF Répartition de la loi de Fisher.
   F(x) = I_{d1 x / (d1 x + d2)}(d1/2, d2/2).
+
+  Exemple :
+     fcdf(1, 10, 10)             % 0.5 : a degres egaux, la mediane est en un
 ```
 
 ## `finv`
@@ -1177,7 +1249,8 @@ FINV Quantile de la loi de Fisher, par dichotomie.
   Les trois arguments se diffusent : un scalaire prend la taille des
   autres.
 
-  Exemple :  finv(0.95, 2, 30)     % 3.3158
+  Exemple :
+     finv(0.95, 2, 30)     % 3.3158
 ```
 
 ## `fitcdiscr`
@@ -1484,6 +1557,12 @@ FITGMDIST Ajuste un mélange gaussien par l'algorithme EM.
 FITLM Modèle linéaire avec ordonnée à l'origine.
   M = FITLM(X,Y) ajuste Y = b0 + X*b et rend une structure décrivant le
   modèle : coefficients, R2, résidus, écarts types.
+
+  Exemple :
+     rng(1);
+     x = (1:50)';
+     m = fitlm(x, 2 + 3 * x + randn(50, 1));
+     abs(m.Coefficients(2) - 3) < 0.1
 ```
 
 ## `fitlme`
@@ -1691,6 +1770,11 @@ FRIEDMAN Analyse de variance sur les rangs, par blocs.
 ```
 FRND Tirages d'une loi de Fisher-Snedecor.
   Le rapport de deux khi-deux réduits suit la loi F.
+
+  Exemple :
+     rng(1);
+     x = frnd(10, 10, 1, 1000);
+     all(x > 0)                  % 1 : un rapport de carres est positif
 ```
 
 ## `fstat`
@@ -1700,7 +1784,8 @@ FSTAT Moyenne et variance de la loi de Fisher-Snedecor.
   La moyenne n'existe que pour V2 > 2, la variance que pour V2 > 4 ;
   ailleurs MATLAB rend NaN.
 
-  Exemple :  [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
+  Exemple :
+     [m,v] = fstat(4, 10)   % 1.25 et 1.354166...
 ```
 
 ## `gamcdf`
@@ -1733,6 +1818,11 @@ GAMFIT Estimation des paramètres d'une loi gamma.
   l'approximation de Thom, puis l'échelle suit.
 
   PHAT vaut [A B] : forme et échelle.
+
+  Exemple :
+     rng(1);
+     p = gamfit(gamrnd(3, 2, 5000, 1));
+     max(abs(p - [3 2]) ./ [3 2]) < 0.15
 ```
 
 ## `gaminv`
@@ -1742,14 +1832,16 @@ GAMINV Quantile de la loi gamma de forme A et d'échelle B.
   L'inversion se fait par dichotomie sur GAMMAINC, la gamma incomplète
   régularisée : la répartition vaut gammainc(x/b, a).
 
-  Exemple :  gaminv(0.5, 1, 1)   % log(2) = 0.6931
+  Exemple :
+     gaminv(0.5, 1, 1)   % log(2) = 0.6931
 ```
 
 ## `gampdf`
 
 ```
 GAMPDF Densité de la loi gamma, de forme A et d'échelle B.
-  Exemple :  gampdf(1, 1, 1)   % exp(-1), la loi exponentielle
+  Exemple :
+     gampdf(1, 1, 1)   % exp(-1), la loi exponentielle
 ```
 
 ## `gamrnd`
@@ -1764,20 +1856,26 @@ GAMRND Tirages d'une loi gamma de forme A et d'échelle B.
   dépasse 95 %. Une forme inférieure à 1 se ramène à la précédente en
   multipliant par u^(1/a). Tous les tirages sont menés de front, seuls
   les refusés sont retirés au tour suivant.
+
+  Exemple :
+     rng(1);
+     mean(gamrnd(3, 2, 1, 10000))         % proche de 6 = a b
 ```
 
 ## `gamstat`
 
 ```
 GAMSTAT Moyenne et variance de la loi gamma.
-  Exemple :  [m,v] = gamstat(2, 3)   % 6 et 18
+  Exemple :
+     [m,v] = gamstat(2, 3)   % 6 et 18
 ```
 
 ## `geocdf`
 
 ```
 GEOCDF Répartition de la loi géométrique.
-  Exemple :  geocdf(2, 0.5)   % 0.875
+  Exemple :
+     geocdf(2, 0.5)   % 0.875
 ```
 
 ## `geoinv`
@@ -1828,7 +1926,8 @@ GEOPDF Probabilité de la loi géométrique.
   Comme dans MATLAB, X compte les échecs avant le premier succès : le
   support est 0, 1, 2, ...
 
-  Exemple :  geopdf(2, 0.5)   % 0.125
+  Exemple :
+     geopdf(2, 0.5)   % 0.125
 ```
 
 ## `geornd`
@@ -1853,7 +1952,8 @@ GEORND Tirages d'une loi géométrique.
 
 ```
 GEOSTAT Moyenne et variance de la loi géométrique.
-  Exemple :  [m,v] = geostat(0.25)   % 3 et 12
+  Exemple :
+     [m,v] = geostat(0.25)   % 3 et 12
 ```
 
 ## `gevcdf`
@@ -1985,8 +2085,12 @@ GLMFIT Ajustement d'un modèle linéaire généralisé.
   C'est l'interface historique ; FITGLM rend un modèle complet.
 
   Exemple :
+     rng(1);
+     X = randn(200, 1);
+     y = double(rand(200, 1) < 1 ./ (1 + exp(-X)));
      b = glmfit(X, y, 'binomial');
      p = glmval(b, X, 'logit');
+     all(p >= 0 & p <= 1)      % 1 : ce sont des probabilites
 
   Voir aussi GLMVAL, FITGLM, FITLM, MNRFIT.
 ```
@@ -2003,8 +2107,12 @@ GLMVAL Prédiction d'un modèle linéaire généralisé.
   l'origine dans B.
 
   Exemple :
+     rng(1);
+     X = randn(200, 1);
+     y = double(rand(200, 1) < 1 ./ (1 + exp(-X)));
      b = glmfit(X, y, 'binomial');
      p = glmval(b, X, 'logit');       % probabilites entre zero et un
+     all(p >= 0 & p <= 1)             % 1
 
   Voir aussi GLMFIT, FITGLM.
 ```
@@ -2340,6 +2448,9 @@ HOUGEN Modèle de vitesse de réaction de Hougen-Watson.
 ```
 HYGECDF Répartition de la loi hypergéométrique.
   Le support est fini : la somme directe des probabilités est exacte.
+
+  Exemple :
+     hygecdf(5, 50, 10, 5)       % 1 : on ne peut pas tirer plus de cinq marques
 ```
 
 ## `hygeinv`
@@ -2376,7 +2487,8 @@ HYGEPDF Probabilité de la loi hypergéométrique.
   de M, dont K portent le caractère cherché ; X est le nombre d'objets
   marqués obtenus.
 
-  Exemple :  hygepdf(2, 10, 4, 3)   % 0.3
+  Exemple :
+     hygepdf(2, 10, 4, 3)   % 0.3
 ```
 
 ## `hygernd`
@@ -2386,6 +2498,11 @@ HYGERND Tirages d'une loi hypergéométrique.
   Le support est fini et petit : quand les trois paramètres sont les
   mêmes partout — le cas courant — la répartition est tabulée une fois
   puis inversée d'un bloc.
+
+  Exemple :
+     rng(1);
+     x = hygernd(50, 10, 5, 1, 1000);
+     all(x >= 0 & x <= 5)        % 1 : au plus le nombre de tirages
 ```
 
 ## `hygestat`
@@ -2394,7 +2511,8 @@ HYGERND Tirages d'une loi hypergéométrique.
 HYGESTAT Moyenne et variance de la loi hypergéométrique.
   La variance porte le facteur de population finie (M-N)/(M-1).
 
-  Exemple :  [m,v] = hygestat(10, 4, 3)   % 1.2 et 0.56
+  Exemple :
+     [m,v] = hygestat(10, 4, 3)   % 1.2 et 0.56
 ```
 
 ## `icdf`
@@ -2403,7 +2521,12 @@ HYGESTAT Moyenne et variance de la loi hypergéométrique.
 ICDF Quantile d'une loi nommée.
   X = ICDF('name', P, A, B, C).
 
-  Exemple :  icdf('Normal', 0.975, 0, 1)   % 1.9600
+  X = ICDF(PD,P) prend une loi ajustée par FITDIST.
+
+  Exemples :
+     icdf('Normal', 0.975, 0, 1)             % 1.9600
+     pd = fitdist(normrnd(0, 1, 500, 1), 'Normal');
+     abs(cdf(pd, icdf(pd, 0.3)) - 0.3) < 1e-10   % l'aller-retour
 ```
 
 ## `indicesSymboles`
@@ -2411,6 +2534,9 @@ ICDF Quantile d'une loi nommée.
 ```
 INDICESSYMBOLES Traduit une suite de symboles en indices de colonne.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     indicesSymboles([2 1 2], [1 2], 2)     % 2 1 2
 ```
 
 ## `iqr`
@@ -2540,6 +2666,12 @@ JBTEST Test de normalité de Jarque-Bera.
 KMEANS Partition en k classes par l'algorithme de Lloyd.
   [IDX,C] = KMEANS(X,K) partitionne les lignes de X en K classes.
   Options : 'MaxIter' (100), 'Start' (matrice des centres initiaux).
+
+  Exemple :
+     rng(1);
+     X = [randn(50, 2); randn(50, 2) + 6];
+     [etiquettes, centres] = kmeans(X, 2);
+     norm(sort(centres(:, 1)) - [0; 6]) < 1
 ```
 
 ## `knnsearch`
@@ -2548,6 +2680,11 @@ KMEANS Partition en k classes par l'algorithme de Lloyd.
 KNNSEARCH Plus proches voisins par recherche exhaustive.
   [IDX,D] = KNNSEARCH(X,Y) trouve, pour chaque ligne de Y, la ligne de X
   la plus proche. Option 'K' pour en demander plusieurs.
+
+  Exemple :
+     X = [0 0; 1 0; 0 1];
+     [i, d] = knnsearch(X, [0.1 0.1], 'K', 2);
+     i(1)                        % 1 : le plus proche est l'origine
 ```
 
 ## `kruskalwallis`
@@ -2606,6 +2743,11 @@ KSTEST Test de Kolmogorov-Smirnov contre la loi normale centrée réduite.
   la loi normale standard. H vaut 1 quand l'hypothèse est rejetée.
 
   La p-valeur vient de la série de Kolmogorov, tronquée à cent termes.
+
+  Exemple :
+     rng(1);
+     [h, p] = kstest(randn(500, 1));
+     h                           % 0 : on ne rejette pas la normalite
 ```
 
 ## `kstest2`
@@ -2787,6 +2929,10 @@ LINKAGE Arbre de regroupement hiérarchique.
 ```
 LIRENOMSHMM Options « Symbols » et « Statenames » des fonctions HMM.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [symboles, etats] = lireNomsHmm('Symbols', {'a','b'}, 'Statenames', {'s1','s2'});
+     numel(symboles)             % 2
 ```
 
 ## `lireOptionsLineaire`
@@ -2794,6 +2940,10 @@ LIRENOMSHMM Options « Symbols » et « Statenames » des fonctions HMM.
 ```
 LIREOPTIONSLINEAIRE Options de FITCLINEAR et FITRLINEAR.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = lireOptionsLineaire(3, 'Lambda', 0.01);
+     o.Lambda
 ```
 
 ## `lireOptionsSvm`
@@ -2801,6 +2951,10 @@ LIREOPTIONSLINEAIRE Options de FITCLINEAR et FITRLINEAR.
 ```
 LIREOPTIONSSVM Options communes à FITCSVM et FITRSVM.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = lireOptionsSvm('KernelFunction', 'rbf', 'BoxConstraint', 10);
+     o.BoxConstraint             % 10
 ```
 
 ## `logncdf`
@@ -2830,6 +2984,11 @@ LOGNCDF Répartition de la loi log-normale.
 ```
 LOGNFIT Estimation des paramètres d'une loi log-normale.
   On ajuste une normale sur les logarithmes.
+
+  Exemple :
+     rng(1);
+     [mu, sigma] = lognfit(lognrnd(1, 0.5, 5000, 1));
+     abs(mu - 1) < 0.05 && abs(sigma - 0.5) < 0.05
 ```
 
 ## `logninv`
@@ -2839,7 +2998,8 @@ LOGNINV Quantile de la loi log-normale.
   Le logarithme d'une variable log-normale est normal : le quantile est
   l'exponentielle de celui de la normale.
 
-  Exemple :  logninv(0.5, 0, 1)   % 1
+  Exemple :
+     logninv(0.5, 0, 1)   % 1
 ```
 
 ## `lognpdf`
@@ -2847,6 +3007,9 @@ LOGNINV Quantile de la loi log-normale.
 ```
 LOGNPDF Densité de la loi log-normale.
   MU et SIGMA sont la moyenne et l'écart-type du logarithme.
+
+  Exemple :
+     lognpdf(1, 0, 1)            % 0.3989 : en x = 1, log x vaut zero
 ```
 
 ## `lognrnd`
@@ -2873,7 +3036,8 @@ LOGNRND Tirages d'une loi log-normale.
 LOGNSTAT Moyenne et variance de la loi log-normale.
   MU et SIGMA sont ceux du logarithme, pas ceux de la variable.
 
-  Exemple :  [m,v] = lognstat(0, 1)   % exp(0.5) et e(e-1)
+  Exemple :
+     [m,v] = lognstat(0, 1)   % exp(0.5) et e(e-1)
 ```
 
 ## `lsline`
@@ -3244,6 +3408,21 @@ MATLIBRE_STAT_INDICESGROUPES Numérote les groupes d'une liste quelconque.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_stat_loi_ajustee`
+
+```
+MATLIBRE_STAT_LOI_AJUSTEE Reconnaît une loi ajustée par FITDIST.
+  [OUI,NOM,PARAMETRES] = MATLIBRE_STAT_LOI_AJUSTEE(V) dit si V est la
+  structure que rend FITDIST, et en tire le nom de la loi et la liste de
+  ses paramètres, dans l'ordre qu'attendent les fonctions ...PDF.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  C'est ce qui permet à PDF, CDF, ICDF et RANDOM de prendre une loi
+  ajustée au lieu d'un nom suivi de ses paramètres : l'objet porte déjà
+  les deux, et les répéter serait une occasion de se tromper.
+```
+
 ## `mdscale`
 
 ```
@@ -3371,9 +3550,13 @@ MNRVAL Probabilités prédites par un modèle multinomial.
   plus que B : la dernière est celle de la catégorie de référence.
 
   Exemple :
+     rng(1);
+     X = [randn(60, 1); randn(60, 1) + 3; randn(60, 1) + 6];
+     y = [ones(60, 1); 2 * ones(60, 1); 3 * ones(60, 1)];
      B = mnrfit(X, y);
      P = mnrval(B, X);
      [~, predites] = max(P, [], 2);
+     max(abs(sum(P, 2) - 1)) < 1e-10    % 1 : les probabilites somment a un
 
   Voir aussi MNRFIT, FITGLM.
 ```
@@ -3714,6 +3897,9 @@ NANVAR Variance en écartant les valeurs manquantes.
 ```
 NBINCDF Répartition de la loi binomiale négative.
   P(X <= k) = I_p(r, k+1), la bêta incomplète régularisée.
+
+  Exemple :
+     nbincdf(10, 3, 0.5)         % la probabilite d'au plus dix echecs
 ```
 
 ## `nbininv`
@@ -3740,7 +3926,8 @@ NBININV Quantile de la loi binomiale négative.
 NBINPDF Probabilité de la loi binomiale négative.
   X compte les échecs avant le R-ième succès, R pouvant être réel.
 
-  Exemple :  nbinpdf(2, 3, 0.5)   % 0.1875
+  Exemple :
+     nbinpdf(2, 3, 0.5)   % 0.1875
 ```
 
 ## `nbinrnd`
@@ -3749,13 +3936,18 @@ NBINPDF Probabilité de la loi binomiale négative.
 NBINRND Tirages d'une loi binomiale négative.
   Mélange de Poisson par une gamma : c'est la représentation usuelle,
   valable même pour un R non entier.
+
+  Exemple :
+     rng(1);
+     mean(nbinrnd(3, 0.5, 1, 10000))      % proche de 3 = r(1-p)/p
 ```
 
 ## `nbinstat`
 
 ```
 NBINSTAT Moyenne et variance de la loi binomiale négative.
-  Exemple :  [m,v] = nbinstat(3, 0.5)   % 3 et 6
+  Exemple :
+     [m,v] = nbinstat(3, 0.5)   % 3 et 6
 ```
 
 ## `ncfcdf`
@@ -4039,6 +4231,11 @@ NORMALISERLIGNES Chaque ligne d'une matrice de probabilités somme à un.
   sort pas, et le signaler vaut mieux que d'inventer une loi uniforme.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     M = normaliserLignes([1 3; 0 0; 2 2]);
+     sum(M(1, :))                % 1
+     all(M(2, :) == 0)           % 1 : une ligne nulle le reste
 ```
 
 ## `normfit`
@@ -4075,6 +4272,11 @@ NORMFIT Estimation des paramètres d'une loi normale.
 ```
 NORMLIKE Opposé de la log-vraisemblance d'une loi normale.
   PARAMS vaut [MU SIGMA].
+
+  Exemple :
+     rng(1);
+     x = normrnd(5, 2, 500, 1);
+     normlike([5 2], x) < normlike([0 1], x)     % vrai
 ```
 
 ## `normplot`
@@ -4146,7 +4348,8 @@ NORMSPEC Densité normale, avec la région entre deux tolérances.
 
 ```
 NORMSTAT Moyenne et variance de la loi normale.
-  Exemple :  [m,v] = normstat(3, 2)   % 3 et 4
+  Exemple :
+     [m,v] = normstat(3, 2)   % 3 et 4
 ```
 
 ## `noyauGp`
@@ -4154,6 +4357,10 @@ NORMSTAT Moyenne et variance de la loi normale.
 ```
 NOYAUGP Fonction de covariance d'un processus gaussien.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     K = noyauGp([0; 1; 2], [0; 1; 2], 'squaredexponential', 1, 1);
+     max(abs(diag(K) - 1)) < 1e-12          % la variance a distance nulle
 ```
 
 ## `noyauSvm`
@@ -4161,6 +4368,11 @@ NOYAUGP Fonction de covariance d'un processus gaussien.
 ```
 NOYAUSVM Matrice de noyau entre deux jeux de points.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = lireOptionsSvm('KernelFunction', 'linear');
+     K = noyauSvm([1 0; 0 1], [1 0; 0 1], o);
+     max(max(abs(K - K'))) < 1e-12          % un noyau est symetrique
 ```
 
 ## `pca`
@@ -4170,6 +4382,12 @@ PCA Analyse en composantes principales.
   [C,S,L] = PCA(X) centre les colonnes de X, puis rend les vecteurs
   propres de la covariance (C), les coordonnées des individus (S) et les
   valeurs propres (L), triés par variance décroissante.
+
+  Exemple :
+     rng(1);
+     X = randn(200, 2) * [2 0; 0 0.1];
+     [c, s, v, expliquee] = pca(X);
+     expliquee(1) > 95           % le premier axe porte presque tout
 ```
 
 ## `pcacov`
@@ -4215,10 +4433,17 @@ PDF Densité ou probabilité d'une loi nommée.
   nommée. Les noms suivent MATLAB : 'Normal', 'Poisson', 'Weibull',
   'Chisquare', 'Discrete Uniform'…, avec leurs abréviations.
 
+  Y = PDF(PD,X) rend la densité d'une loi ajustée par FITDIST : l'objet
+  porte déjà son nom et ses paramètres, qu'il serait inutile — et
+  risqué — de répéter.
+
   Y = PDF(GM,X) rend la densité d'un mélange gaussien ajusté par
   FITGMDIST ou décrit par GMDISTRIBUTION.
 
-  Exemple :  pdf('Normal', 0, 0, 1)   % 0.3989
+  Exemples :
+     pdf('Normal', 0, 0, 1)                  % 0.3989
+     pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
+     abs(pdf(pd, pd.mu) - normpdf(pd.mu, pd.mu, pd.sigma)) < 1e-12
 ```
 
 ## `pdist`
@@ -4332,7 +4557,8 @@ PEARSRND Tirages d'une loi du système de Pearson.
 POISSCDF Répartition de la loi de Poisson.
   P(X <= k) est la gamma incomplète supérieure d'ordre k+1 en lambda.
 
-  Exemple :  poisscdf(2, 1)   % 0.919698602928
+  Exemple :
+     poisscdf(2, 1)   % 0.919698602928
 ```
 
 ## `poissfit`
@@ -4365,6 +4591,9 @@ POISSFIT Estimation de l'intensité d'une loi de Poisson.
 ```
 POISSINV Quantile de la loi de Poisson.
   Le plus petit entier X tel que POISSCDF(X,LAMBDA) >= P.
+
+  Exemple :
+     poissinv(0.5, 4)            % 4 : la mediane d'une loi de Poisson de moyenne 4
 ```
 
 ## `poissrnd`
@@ -4375,6 +4604,10 @@ POISSRND Tirages d'une loi de Poisson.
   multiplie des uniformes jusqu'à passer sous exp(-lambda). Au-delà,
   l'inversion de la répartition évite le nombre d'itérations qui
   croîtrait avec lambda.
+
+  Exemple :
+     rng(1);
+     mean(poissrnd(4, 1, 10000))          % proche de 4 : moyenne et variance
 ```
 
 ## `poisstat`
@@ -4470,12 +4703,16 @@ PREDICT Prédiction d'un modèle ajusté.
   « type » ; PREDICT s'y fie pour choisir la règle. MATLAB, lui,
   emploie des objets à méthode.
 
-  Exemple :
-     m = fitcnb(X, y);
-     etiquettes = predict(m, Xnouveau);
-
   Un réseau de neurones passe par le même nom : PREDICT le reconnaît à
   ses couches et le confie à PREDICTRESEAU.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     m = fitcnb(X, y);
+     etiquettes = predict(m, X);
+     mean(etiquettes == y) > 0.9        % 1
 
   Voir aussi FITCTREE, FITCKNN, FITCNB, FITCDISCR, FITCSVM, FITCECOC,
   FITRGP, PREDICTRESEAU.
@@ -4486,6 +4723,13 @@ PREDICT Prédiction d'un modèle ajusté.
 ```
 PREDICTARBREREGRESSION Prédiction d'un arbre construit par FITRTREE.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = [randn(60, 2); randn(60, 2) + 3];
+     z = X(:, 1) * 2 - X(:, 2);
+     m = fitrtree(X, z);
+     rms(predictArbreRegression(m, X) - z) < rms(z - mean(z))
 ```
 
 ## `predictBayesNaif`
@@ -4493,6 +4737,12 @@ PREDICTARBREREGRESSION Prédiction d'un arbre construit par FITRTREE.
 ```
 PREDICTBAYESNAIF Prédiction d'un classifieur bayésien naïf.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     mean(predictBayesNaif(fitcnb(X, y), X) == y) > 0.9
 ```
 
 ## `predictDiscriminant`
@@ -4514,6 +4764,12 @@ PREDICTDISCRIMINANT Prédiction d'une analyse discriminante.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
   où PREDICT est une méthode du modèle.
 
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     mean(predictDiscriminant(fitcdiscr(X, y), X) == y) > 0.9
+
   Voir aussi FITCDISCR, PREDICT.
 ```
 
@@ -4522,6 +4778,12 @@ PREDICTDISCRIMINANT Prédiction d'une analyse discriminante.
 ```
 PREDICTECOC Prédiction d'un modèle à codes correcteurs.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     mean(predictEcoc(fitcecoc(X, y), X) == y) > 0.9
 ```
 
 ## `predictGp`
@@ -4529,6 +4791,13 @@ PREDICTECOC Prédiction d'un modèle à codes correcteurs.
 ```
 PREDICTGP Prédiction d'un processus gaussien.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = randn(60, 2);
+     z = X(:, 1) * 2 - X(:, 2);
+     [mu, variance] = predictGp(fitrgp(X, z), X);
+     all(variance >= -1e-9)      % une variance ne peut pas etre negative
 ```
 
 ## `predictLineaire`
@@ -4536,6 +4805,12 @@ PREDICTGP Prédiction d'un processus gaussien.
 ```
 PREDICTLINEAIRE Prédiction d'un modèle linéaire de grande dimension.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     mean(predictLineaire(fitclinear(X, y), X) == y) > 0.8
 ```
 
 ## `predictSvm`
@@ -4543,6 +4818,12 @@ PREDICTLINEAIRE Prédiction d'un modèle linéaire de grande dimension.
 ```
 PREDICTSVM Prédiction d'une machine à vecteurs de support.
   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     X = [randn(40, 2); randn(40, 2) + 3];
+     y = [ones(40, 1); 2 * ones(40, 1)];
+     mean(predictSvm(fitcsvm(X, y), X) == y) > 0.9
 ```
 
 ## `predictknn`
@@ -4714,7 +4995,12 @@ RANDOM Tirages d'une loi nommée.
   R = RANDOM(GM,N) tire N points d'un mélange gaussien : on tire
   d'abord la composante, puis le point dans cette composante.
 
-  Exemple :  random('Poisson', 4, 1, 5)   % cinq tirages
+  R = RANDOM(PD,M,N) tire dans une loi ajustée par FITDIST.
+
+  Exemples :
+     random('Poisson', 4, 1, 5)              % cinq tirages
+     pd = fitdist(normrnd(5, 2, 500, 1), 'Normal');
+     size(random(pd, 1, 10))                 % 1 10
 ```
 
 ## `ranksum`
@@ -4752,13 +5038,18 @@ RAYLCDF Répartition de la loi de Rayleigh.
 ```
 RAYLFIT Estimation du paramètre d'une loi de Rayleigh.
   Le maximum de vraisemblance vaut sqrt(sum(x^2)/(2n)).
+
+  Exemple :
+     rng(1);
+     abs(raylfit(raylrnd(2, 5000, 1)) - 2) < 0.1
 ```
 
 ## `raylinv`
 
 ```
 RAYLINV Quantile de la loi de Rayleigh de paramètre B.
-  Exemple :  raylinv(0.5, 1)   % sqrt(2 log 2) = 1.1774
+  Exemple :
+     raylinv(0.5, 1)   % sqrt(2 log 2) = 1.1774
 ```
 
 ## `raylpdf`
@@ -4766,6 +5057,9 @@ RAYLINV Quantile de la loi de Rayleigh de paramètre B.
 ```
 RAYLPDF Densité de la loi de Rayleigh de paramètre B.
   Y = X/B^2 * exp(-X^2/(2*B^2)) pour X >= 0.
+
+  Exemple :
+     raylpdf(1, 1)               % 0.6065 : le mode est en sigma
 ```
 
 ## `raylrnd`
@@ -4789,7 +5083,8 @@ RAYLRND Tirages d'une loi de Rayleigh.
 
 ```
 RAYLSTAT Moyenne et variance de la loi de Rayleigh.
-  Exemple :  [m,v] = raylstat(1)   % sqrt(pi/2) et 2 - pi/2
+  Exemple :
+     [m,v] = raylstat(1)   % sqrt(pi/2) et 2 - pi/2
 ```
 
 ## `refcurve`
@@ -4846,6 +5141,12 @@ REGRESS Régression linéaire multiple par moindres carrés.
   B = REGRESS(Y,X) rend les coefficients de Y = X*B.
   [B,BINT,R,RINT,STATS] = REGRESS(...) rend aussi les intervalles de
   confiance à 95 %, les résidus, et [R2, F, p, variance résiduelle].
+
+  Exemple :
+     rng(1);
+     x = (1:50)';
+     [b, bint] = regress(2 + 3 * x + randn(50, 1), [ones(50, 1), x]);
+     bint(2, 1) < 3 && 3 < bint(2, 2)     % la vraie pente est dans l'intervalle
 ```
 
 ## `regstats`
@@ -4936,6 +5237,14 @@ RESOUDRESMO Optimisation minimale séquentielle du dual d'une SVM.
   multiplicateur est tiré au hasard parmi les autres.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     rng(1);
+     X = [randn(30, 2); randn(30, 2) + 4];
+     cible = [-ones(30, 1); ones(30, 1)];
+     K = X * X';
+     [alpha, biais] = resoudreSmo(K, cible, 1, 1e-3, 200);
+     abs(sum(alpha .* cible)) < 1e-6      % la contrainte d'egalite est tenue
 ```
 
 ## `ridge`
@@ -5121,6 +5430,11 @@ SEQUENTIALFS Choix séquentiel de variables.
 SIGNRANK Test des rangs signés de Wilcoxon, sur échantillons appariés.
   P = SIGNRANK(X) teste la médiane nulle ; SIGNRANK(X,Y) teste la
   médiane de X-Y.
+
+  Exemple :
+     rng(1);
+     p = signrank(randn(100, 1));
+     p > 0.01                    % on ne rejette pas la mediane nulle
 ```
 
 ## `signtest`
@@ -5265,6 +5579,10 @@ SQUAREFORM Passe du vecteur des distances à la matrice carrée, et retour.
 ```
 STANDARDISERSVM Centrage et réduction optionnels des colonnes.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [Xs, centre, echelle] = standardiserSvm([1 10; 2 20; 3 30], true);
+     max(abs(mean(Xs))) < 1e-12  % centrer met la moyenne a zero
 ```
 
 ## `statAjuster`
@@ -5277,6 +5595,10 @@ STATAJUSTER Étend les arguments à une taille commune.
   cette règle une fois pour toutes.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [a, b] = statAjuster([1 2 3], 5);
+     numel(b)                    % 3 : le scalaire s'est repandu
 ```
 
 ## `statEtendre`
@@ -5287,6 +5609,9 @@ STATETENDRE Répète un paramètre scalaire à la taille demandée.
   taille est une erreur, comme dans MATLAB.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     size(statEtendre(4, [2 3]))          % 2 3
 ```
 
 ## `statForme`
@@ -5298,6 +5623,10 @@ STATFORME Taille demandée à un générateur aléatoire.
   résultat prend la taille des paramètres.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     statForme([1 1], {2, 5})             % 2 5
+     statForme([1 1], {3})                % 3 3 : une dimension seule fait un carre
 ```
 
 ## `statPrefixeLoi`
@@ -5310,6 +5639,10 @@ STATPREFIXELOI Préfixe des fonctions d'une loi nommée.
   ...CDF, ...INV et ...RND.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     statPrefixeLoi('Normal')             % 'norm'
+     statPrefixeLoi('Poisson')            % 'poiss'
 ```
 
 ## `statQuantileDiscret`
@@ -5323,6 +5656,9 @@ STATQUANTILEDISCRET Plus petit entier dont la répartition atteint P.
   répartition que celle exportée, si bien que l'aller-retour est exact.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     statQuantileDiscret(@(t) binocdf(t, 10, 0.5), 0.5, 0, 10)
 ```
 
 ## `statget`
@@ -5382,7 +5718,10 @@ STATSET Structure d'options des fonctions statistiques.
 
   Exemples :
      options = statset('MaxIter', 1000, 'TolFun', 1e-12);
-     nlinfit(x, y, modele, depart, options);
+     rng(1);
+     x = linspace(0, 2, 40)';
+     y = 3 * exp(-1.5 * x) + 0.01 * randn(40, 1);
+     b = nlinfit(x, y, @(p, t) p(1) * exp(-p(2) * t), [1 1], options);
 
      serrees = statset(options, 'TolX', 1e-14);
 
@@ -5469,6 +5808,10 @@ STEPWISEFIT Régression pas à pas : quelles variables garder ?
 ```
 TABULATE Effectifs et fréquences des valeurs distinctes.
   T = TABULATE(X) rend une matrice [valeur, effectif, pourcentage].
+
+  Exemple :
+     t = tabulate([1 1 2 3 3 3]);
+     sum(t(:, 2))                % 6 : le total des effectifs
 ```
 
 ## `tcdf`
@@ -5478,6 +5821,9 @@ TCDF Fonction de répartition de la loi de Student.
   P = TCDF(T,NU) utilise la relation avec la fonction beta incomplète :
      P(T <= t) = 1 - I_{nu/(nu+t^2)}(nu/2, 1/2) / 2   pour t >= 0
   ce qui est exact et rapide, contrairement à une intégration numérique.
+
+  Exemple :
+     tcdf(0, 10)                 % 0.5 : la loi de Student est symetrique
 ```
 
 ## `tiedrank`
@@ -5516,7 +5862,8 @@ TINV Quantile de la loi de Student, par dichotomie sur TCDF.
   Les deux arguments se diffusent : un scalaire prend la taille de
   l'autre.
 
-  Exemple :  tinv(0.975, 10)       % 2.2281
+  Exemple :
+     tinv(0.975, 10)       % 2.2281
 ```
 
 ## `tirerMelange`
@@ -5524,6 +5871,12 @@ TINV Quantile de la loi de Student, par dichotomie sur TCDF.
 ```
 TIRERMELANGE Tirage dans un mélange gaussien.
   Employer RANDOM ; cette fonction est le rouage qu'il appelle.
+
+  Exemple :
+     rng(1);
+     m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
+     [x, composantes] = tirerMelange(m, 500);
+     all(composantes >= 1 & composantes <= 2)
 ```
 
 ## `trimmean`
@@ -5557,6 +5910,11 @@ TRIMMEAN Moyenne élaguée.
 TRND Tirages d'une loi de Student à V degrés de liberté.
   Le rapport d'une normale centrée réduite à la racine d'un khi-deux
   réduit suit la loi de Student.
+
+  Exemple :
+     rng(1);
+     x = trnd(10, 1, 5000);
+     abs(mean(x)) < 0.1          % la loi de Student est centree
 ```
 
 ## `tstat`
@@ -5564,6 +5922,11 @@ TRND Tirages d'une loi de Student à V degrés de liberté.
 ```
 TSTAT Moyenne et variance de la loi de Student.
   La moyenne n'existe que pour NU > 1, la variance que pour NU > 2.
+
+  Exemple :
+     [m, v] = tstat(10);
+     m                           % 0 : elle est centree des que nu > 1
+     v                           % 1.25 = nu/(nu-2)
 ```
 
 ## `ttest`
@@ -5572,6 +5935,11 @@ TSTAT Moyenne et variance de la loi de Student.
 TTEST Test de Student sur la moyenne d'un échantillon.
   [H,P] = TTEST(X,MU) teste l'hypothèse « la moyenne de X vaut MU ».
   H vaut 1 si l'hypothèse est rejetée au seuil ALPHA (5 % par défaut).
+
+  Exemple :
+     rng(1);
+     [h, p] = ttest(normrnd(0, 1, 100, 1));
+     h                           % 0 : on ne rejette pas la moyenne nulle
 ```
 
 ## `ttest2`
@@ -5636,7 +6004,8 @@ UNIDINV Quantile de la loi uniforme discrète sur 1..N.
 
 ```
 UNIDPDF Probabilité de la loi uniforme discrète sur 1..N.
-  Exemple :  unidpdf(3, 6)   % 1/6, un dé
+  Exemple :
+     unidpdf(3, 6)   % 1/6, un dé
 ```
 
 ## `unidrnd`
@@ -5670,7 +6039,8 @@ UNIDRND Tirages d'une loi uniforme discrète sur 1..N.
 
 ```
 UNIDSTAT Moyenne et variance de la loi uniforme discrète.
-  Exemple :  [m,v] = unidstat(6)   % 3.5 et 35/12, un dé
+  Exemple :
+     [m,v] = unidstat(6)   % 3.5 et 35/12, un dé
 ```
 
 ## `unifcdf`
@@ -5712,6 +6082,10 @@ UNIFINV Quantile de la loi uniforme continue sur [A,B].
 ```
 UNIFIT Estimation des bornes d'une loi uniforme continue.
   Le maximum de vraisemblance est le minimum et le maximum observés.
+
+  Exemple :
+     [a, b] = unifit([2 3 5 7]);
+     [a b]                       % 2 7 : les bornes observees
 ```
 
 ## `unifpdf`
@@ -5733,7 +6107,8 @@ UNIFPDF Densité de la loi uniforme continue sur [A,B].
 
 ```
 UNIFSTAT Moyenne et variance de la loi uniforme continue.
-  Exemple :  [m,v] = unifstat(0, 1)   % 0.5 et 1/12
+  Exemple :
+     [m,v] = unifstat(0, 1)   % 0.5 et 1/12
 ```
 
 ## `vartest`
@@ -5832,20 +6207,27 @@ WBLFIT Estimation des paramètres d'une loi de Weibull.
   par (sum(x^b)/n)^(1/b).
 
   PHAT vaut [A B] : échelle et forme.
+
+  Exemple :
+     rng(1);
+     p = wblfit(wblrnd(2, 3, 5000, 1));
+     max(abs(p - [2 3]) ./ [2 3]) < 0.1
 ```
 
 ## `wblinv`
 
 ```
 WBLINV Quantile de la loi de Weibull d'échelle A et de forme B.
-  Exemple :  wblinv(1 - exp(-1), 1, 1)   % 1
+  Exemple :
+     wblinv(1 - exp(-1), 1, 1)   % 1
 ```
 
 ## `wblpdf`
 
 ```
 WBLPDF Densité de la loi de Weibull, d'échelle A et de forme B.
-  Exemple :  wblpdf(1, 1, 1)   % exp(-1)
+  Exemple :
+     wblpdf(1, 1, 1)   % exp(-1)
 ```
 
 ## `wblrnd`
@@ -5869,7 +6251,8 @@ WBLSTAT Moyenne et variance de la loi de Weibull.
   Les moments s'écrivent avec la fonction gamma :
   E[X] = a*gamma(1+1/b), Var[X] = a^2*(gamma(1+2/b) - gamma(1+1/b)^2).
 
-  Exemple :  [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
+  Exemple :
+     [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
 ```
 
 ## `wishrnd`

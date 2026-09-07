@@ -2,6 +2,9 @@ function [convexiteAnnees, convexitePeriodes] = bndconvp(prix, tauxCoupon, regle
 %BNDCONVP Convexité d'une obligation, à partir de son prix.
 %   Même chose que BNDCONVY, le rendement étant d'abord déduit du prix.
 %
+%   Exemple :
+%      bndconvp(100, 0.06, '01-Jan-2024', '01-Jan-2034') > 0     % la convexite est positive
+%
 %   Voir aussi BNDCONVY, BNDDURP, BNDYIELD.
     if nargin < 5,  periode = [];       end
     if nargin < 6,  base = [];          end

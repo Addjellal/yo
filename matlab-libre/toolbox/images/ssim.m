@@ -5,7 +5,11 @@ function [s, carte] = ssim(a, reference, varargin)
 %   11 points et d'écart-type 1,5, comme dans l'article de Wang et al.
 %   et dans MATLAB.
 %
-%   Exemple :  ssim(x, x)   % 1
+%   Exemple :
+%      rng(1);
+%      x = rand(32, 32);
+%      ssim(x, x)                  % 1 : la ressemblance parfaite
+%      ssim(x, x + 0.1 * randn(32, 32)) < 1
     dynamique = 1;
     if isa(a, 'uint8'), dynamique = 255; end
     for k = 1:2:numel(varargin) - 1

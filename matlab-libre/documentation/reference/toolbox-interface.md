@@ -82,6 +82,10 @@ CLOSEAPP Ferme une fenêtre d'application et tous ses composants.
 IDENTIFIANTPARENT Numéro du composant parent, quelle qu'en soit la forme.
   Accepte une poignée UIComposant, un numéro, ou rien : la fenêtre
   courante sert alors de parent.
+
+  Exemple :
+     f = uifigure();
+     identifiantParent(f) == identifiantParent(f)      % 1
 ```
 
 ## `matlibre_ui_appliquer`
@@ -335,5 +339,11 @@ UIWAIT Attend la fermeture d'une fenêtre.
   immédiatement, sans quoi l'interpréteur ne pourrait plus traiter les
   événements. La fonction existe pour que le code écrit pour MATLAB
   s'exécute sans retouche.
+
+  Exemple :
+     f = uifigure();
+     uiwait(f, 0.01);            % rend la main aussitot : les rappels sont deja passes
+     uiresume(f);
+     close all;
 ```
 

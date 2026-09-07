@@ -3,7 +3,8 @@ function x = logninv(p, mu, sigma)
 %   Le logarithme d'une variable log-normale est normal : le quantile est
 %   l'exponentielle de celui de la normale.
 %
-%   Exemple :  logninv(0.5, 0, 1)   % 1
+%   Exemple :
+%      logninv(0.5, 0, 1)   % 1
     if nargin < 2, mu = 0; end
     if nargin < 3, sigma = 1; end
     [p, mu, sigma] = statAjuster(p, mu, sigma);

@@ -383,6 +383,10 @@ SYMADD Somme de deux expressions.
   Ces constructeurs ne calculent rien : ils assemblent. C'est
   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
 
+  A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+  variable : chacun est converti en arbre au passage, si bien que
+  SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
+
   Exemple :
      x = sym('x');
      symstr(symsimplify(symadd(symnum(0), x)))
@@ -396,6 +400,10 @@ SYMADD Somme de deux expressions.
 SYMDIFF Dérivée symbolique d'une expression.
   D = SYMDIFF(E,'x') applique les règles usuelles : somme, produit,
   quotient, puissance et composition des fonctions élémentaires.
+
+  Exemple :
+     x = sym('x');
+     symstr(symsimplify(symdiff(sympow(x, symnum(2)), 'x')))     % la derivee de x au carre
 ```
 
 ## `symdiv`
@@ -413,6 +421,10 @@ SYMDIV Quotient de deux expressions.
   Ces constructeurs ne calculent rien : ils assemblent. C'est
   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
 
+  A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+  variable : chacun est converti en arbre au passage, si bien que
+  SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
+
   Exemple :
      x = sym('x');
      symstr(symsimplify(symdiv(x, symnum(1))))
@@ -425,13 +437,33 @@ SYMDIV Quotient de deux expressions.
 ```
 SYMEVAL Évaluation numérique d'une expression.
   V = SYMEVAL(E,{'x','y'},[1 2]) remplace puis calcule.
+
+  Exemple :
+     x = sym('x');
+     symeval(symadd(x, symnum(1)), {'x'}, {2})     % 3
 ```
 
 ## `symfun`
 
 ```
 SYMFUN Application d'une fonction élémentaire.
-  Fonctions reconnues : sin, cos, tan, exp, log, sqrt.
+  E = SYMFUN(NOM,ARGUMENT) construit l'arbre {NOM, ARGUMENT} : une
+  application de fonction, non son évaluation. ARGUMENT peut être un
+  arbre, un objet SYM, un nombre ou un nom de variable.
+
+  Fonctions reconnues par la dérivation, la simplification et
+  l'écriture : sin, cos, tan, exp, log, sqrt.
+
+  Un noeud d'application n'a qu'un opérande, là où les opérateurs
+  binaires en ont deux : c'est ce qui permet aux parcours de l'arbre de
+  distinguer les deux cas sur le seul nombre d'éléments de la cellule.
+
+  Exemple :
+     x = sym('x');
+     symstr(symfun('sin', x))                 % 'sin(x)'
+     symstr(symsubs(symfun('exp', x), 'x', 0))   % 'exp(0)'
+
+  Voir aussi SYMADD, SYMSIMPLIFY, SYMSTR, SYMDIFF.
 ```
 
 ## `symint`
@@ -439,6 +471,12 @@ SYMFUN Application d'une fonction élémentaire.
 ```
 SYMINT Primitive des formes polynomiales et élémentaires.
   Reconnaît les constantes, x^n, sin, cos, exp et les sommes.
+
+  Exemple :
+     x = sym('x');
+     primitive = symint(x, 'x');
+     symeval(symdiff(primitive, 'x'), {'x'}, {3})     % 3 : deriver annule integrer
+     symeval(primitive, {'x'}, {2})                   % 2 : l'aire sous x de 0 a 2
 ```
 
 ## `symmul`
@@ -455,6 +493,10 @@ SYMMUL Produit de deux expressions.
 
   Ces constructeurs ne calculent rien : ils assemblent. C'est
   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+  variable : chacun est converti en arbre au passage, si bien que
+  SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
 
   Exemple :
      x = sym('x');
@@ -495,6 +537,10 @@ SYMPOW Puissance : A élevé à B.
 
   Ces constructeurs ne calculent rien : ils assemblent. C'est
   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+  variable : chacun est converti en arbre au passage, si bien que
+  SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
 
   Exemple :
      x = sym('x');
@@ -595,6 +641,10 @@ SYMSUB Différence de deux expressions.
 
   Ces constructeurs ne calculent rien : ils assemblent. C'est
   SYMSIMPLIFY qui réduit, SYMSUBS qui substitue et SYMSTR qui écrit.
+
+  A et B peuvent être un arbre, un objet SYM, un nombre ou un nom de
+  variable : chacun est converti en arbre au passage, si bien que
+  SYMADD(X,2) et SYMADD(X,SYMNUM(2)) construisent la même chose.
 
   Exemple :
      x = sym('x');

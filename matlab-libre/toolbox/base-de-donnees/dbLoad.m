@@ -13,6 +13,9 @@ function t = dbLoad(nomFichier)
 %   compris.
 %
 %   Exemple :
+%      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+%      t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+%      t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
 %      dbSave(t, 'personnel.csv');
 %      relue = dbLoad('personnel.csv');
 %      isequal(relue.colonnes, t.colonnes)     % true

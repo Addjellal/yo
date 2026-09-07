@@ -92,6 +92,16 @@ AUTOBINNING Découpe automatique des caractéristiques d'une grille de score.
   'MinCount',M le nombre minimal d'observations par tranche.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
      sc = autobinning(sc, 'revenu', 'NumBins', 4);
 
   Voir aussi BININFO, BINDATA, FITMODEL, CREDITSCORECARD.
@@ -109,6 +119,17 @@ BINDATA Remplace les caractéristiques par leur tranche ou son poids.
   poids de la preuve : c'est ce que FITMODEL donne à la régression.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
      d = bindata(sc, [], 'OutputType', 'WOEModelInput');
 
   Voir aussi BININFO, AUTOBINNING, FITMODEL.
@@ -129,6 +150,17 @@ BININFO Contenu des tranches d'une caractéristique.
   caractéristique sépare.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
      [t, iv] = bininfo(sc, 'revenu')
 
   Voir aussi AUTOBINNING, BINDATA, FITMODEL, DISPLAYPOINTS.
@@ -184,8 +216,10 @@ CONFIDENCEBANDS Convergence d'une mesure de risque avec le nombre de scénarios.
   l'intervalle (0,95), 'NumPoints',P le nombre de points (100).
 
   Exemple :
+     c = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+                             repmat([0.6 0.8], 2, 1));
+     c = simulate(c, 2000);
      [b, n] = confidenceBands(c, 'RiskMeasure', 'VaR');
-     plot(n, b);
 
   Voir aussi PORTFOLIORISK, RISKCONTRIBUTION, CREDITDEFAULTCOPULA.
 ```
@@ -246,8 +280,13 @@ CREDITMIGRATIONCOPULA Modèle de portefeuille de crédit à migrations.
 
   Exemple :
      valeurs = [100 98 95 60; 100 98 95 60];
-     c = creditMigrationCopula(valeurs, [1; 2], transition, [0.4; 0.4], poids);
-     c = simulate(c, 20000);
+     transition = [0.90 0.07 0.02 0.01;
+                   0.05 0.85 0.07 0.03;
+                   0.01 0.10 0.80 0.09;
+                   0    0    0    1];
+     c = creditMigrationCopula(valeurs, [1; 2], transition, [0.4; 0.4], ...
+                               repmat([0.6 0.8], 2, 1));
+     c = simulate(c, 2000);
      portfolioRisk(c)
 
   Voir aussi CREDITDEFAULTCOPULA, TRANSPROBTOTHRESHOLDS, TRANSPROB.
@@ -315,11 +354,20 @@ CREDITSCORECARD Grille de score de crédit.
   une tranche.
 
   Exemple :
-     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut');
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
      sc = autobinning(sc);
      sc = fitmodel(sc);
      sc = formatpoints(sc, 'PointsOddsAndPDO', [500 2 50]);
-     displaypoints(sc)
+     bareme = displaypoints(sc);
 
   Voir aussi BININFO, BINDATA, FITMODEL, DISPLAYPOINTS, FORMATPOINTS,
   SCORE, PROBDEFAULT, VALIDATEMODEL.
@@ -339,6 +387,18 @@ DISPLAYPOINTS Barème d'une grille de score.
   dossier revient exactement à évaluer la régression logistique.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
+     sc = fitmodel(sc);
      [b, bas, haut] = displaypoints(sc);
 
   Voir aussi FORMATPOINTS, SCORE, PROBDEFAULT, FITMODEL.
@@ -394,6 +454,10 @@ ESBACKTEST Contrôle a posteriori d'une perte moyenne au-delà de la VaR.
   SUMMARY compte les dépassements.
 
   Exemple :
+     rng(1);
+     rendements = 0.01 * randn(500, 1);
+     valeursEnRisque = 0.023 * ones(500, 1);
+     pertesMoyennes = 0.028 * ones(500, 1);
      e = esbacktest(rendements, valeursEnRisque, pertesMoyennes);
      runtests(e)
 
@@ -449,6 +513,17 @@ FITMODEL Ajuste la régression logistique d'une grille de score.
   'VariableSelection','stepwise' les choisit une à une par leur apport.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
      [sc, m] = fitmodel(sc);
      m.Coefficients
 
@@ -472,6 +547,18 @@ FORMATPOINTS Choisit l'échelle des points d'une grille de score.
   extrêmes atteignables.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
+     sc = fitmodel(sc);
      sc = formatpoints(sc, 'PointsOddsAndPDO', [500 2 50]);
 
   Voir aussi DISPLAYPOINTS, SCORE, FITMODEL, PROBDEFAULT.
@@ -486,8 +573,11 @@ GETSCENARIOS Pertes simulées d'un portefeuille de crédit.
   GETSCENARIOS(C,I) ne rend que les scénarios demandés.
 
   Exemple :
+     c = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+                             repmat([0.6 0.8], 2, 1));
+     c = simulate(c, 2000);
      p = getScenarios(c);
-     sum(p, 2)                      % pertes de portefeuille
+     size(sum(p, 2), 1)             % 2000 pertes de portefeuille
 
   Voir aussi CREDITDEFAULTCOPULA, PORTFOLIORISK, RISKCONTRIBUTION.
 ```
@@ -875,6 +965,9 @@ MERTONBYTIMESERIES Modèle de Merton estimé sur une série de capitalisations.
   Le résultat porte sur la dernière date de la série.
 
   Exemple :
+     rng(1);
+     capitalisations = 100 * exp(cumsum(0.02 * randn(60, 1)));
+     dettes = 80 * ones(60, 1);
      [pd, dd] = mertonByTimeSeries(capitalisations, dettes, 0.03, 1)
 
   Voir aussi MERTONMODEL, ASRF.
@@ -922,7 +1015,11 @@ PORTFOLIORISK Résumé des pertes d'un portefeuille de crédit simulé.
   disent combien on peut se fier au résultat.
 
   Exemple :
-     c = simulate(creditDefaultCopula(pd, lgd, ead, poids), 20000);
+     pd = [0.01; 0.02; 0.05];
+     lgd = [0.4; 0.4; 0.5];
+     ead = [100; 200; 150];
+     poids = repmat([0.6 0.8], 3, 1);       % somme des carres : 1
+     c = simulate(creditDefaultCopula(pd, lgd, ead, poids), 2000);
      portfolioRisk(c)
 
   Voir aussi CREDITDEFAULTCOPULA, RISKCONTRIBUTION, CONFIDENCEBANDS.
@@ -941,6 +1038,18 @@ PROBDEFAULT Probabilité de défaut selon une grille de score.
   telle quelle.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
+     sc = fitmodel(sc);
      p = probdefault(sc);
 
   Voir aussi SCORE, VALIDATEMODEL, FITMODEL.
@@ -965,7 +1074,9 @@ RISKCONTRIBUTION Contribution de chaque composant au risque total.
 
   Exemple :
      riskContribution([0.5 0.5], [0.04 0.01; 0.01 0.09])
-     riskContribution(simulate(copule, 20000))
+     copule = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+                                  repmat([0.6 0.8], 2, 1));
+     riskContribution(simulate(copule, 2000))
 
   Voir aussi PORTFOLIORISK, CONFIDENCEBANDS, CREDITDEFAULTCOPULA.
 ```
@@ -982,7 +1093,19 @@ SCORE Note des dossiers par une grille de score.
   probabilité de ne pas faire défaut.
 
   Exemple :
-     [s, p] = score(sc, nouveauxDossiers);
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
+     sc = fitmodel(sc);
+     [s, p] = score(sc);
 
   Voir aussi PROBDEFAULT, DISPLAYPOINTS, FORMATPOINTS, VALIDATEMODEL.
 ```
@@ -996,6 +1119,9 @@ SUMMARY Résumé d'un contrôle a posteriori.
   est écrit.
 
   Exemple :
+     rng(1);
+     rendements = 0.01 * randn(500, 1);
+     valeursEnRisque = 0.023 * ones(500, 1);
      summary(varbacktest(rendements, valeursEnRisque))
 
   Voir aussi VARBACKTEST, ESBACKTEST, RUNTESTS.
@@ -1046,8 +1172,18 @@ TRANSPROBBYTOTALS Matrice de transition tirée de comptages agrégés.
   sans relire les migrations.
 
   Exemple :
-     [~, t] = transprob(donnees);
-     transprobbytotals(t)
+     rng(1);
+     P = [0.9 0.1; 0.2 0.8];
+     donnees = zeros(0, 3);
+     for e = 1:200
+         etat = 1 + (rand < 0.5);
+         for annee = 0:4
+             donnees(end+1, :) = [e, datenum(2015 + annee, 1, 1), etat];
+             etat = find(rand <= cumsum(P(etat, :)), 1);
+         end
+     end
+     [estimee, totaux] = transprob(donnees);
+     max(max(abs(transprobbytotals(totaux) - estimee))) < 1e-12   % 1
 
   Voir aussi TRANSPROB, TRANSPROBTOTHRESHOLDS.
 ```
@@ -1101,6 +1237,18 @@ VALIDATEMODEL Pouvoir discriminant d'une grille de score.
   Kolmogorov-Smirnov le plus grand écart entre les deux répartitions.
 
   Exemple :
+     rng(1);
+     n = 500;
+     revenu = 20000 + 40000 * rand(n, 1);
+     age = round(20 + 45 * rand(n, 1));
+     risque = -1 + 3 * (revenu - 40000) / 20000;
+     defaut = double(rand(n, 1) > 1 ./ (1 + exp(-risque)));
+     donnees = struct('id', (1:n)', 'revenu', revenu, 'age', age, ...
+                      'defaut', defaut);
+     sc = creditscorecard(donnees, 'IDVar', 'id', 'ResponseVar', 'defaut', ...
+                          'GoodLabel', 0);
+     sc = autobinning(sc);
+     sc = fitmodel(sc);
      s = validatemodel(sc);
      s.AUROC
 
@@ -1114,6 +1262,11 @@ VALUEATRISK Valeur en risque d'une série de rendements.
   V = VALUEATRISK(R,NIVEAU) rend la perte que l'on ne dépasse qu'avec la
   probabilité 1-NIVEAU (0.95 par défaut), par la méthode historique.
   'normal' utilise l'hypothèse gaussienne.
+
+  Exemple :
+     rng(1);
+     v = valueAtRisk(0.01 * randn(2000, 1), 0.95);
+     v > 0                       % 1 : la perte est comptee positivement
 ```
 
 ## `varbacktest`
@@ -1137,6 +1290,9 @@ VARBACKTEST Contrôle a posteriori d'un modèle de valeur en risque.
   RUNTESTS les passe tous, SUMMARY compte.
 
   Exemple :
+     rng(1);
+     rendements = 0.01 * randn(500, 1);
+     valeursEnRisque = 0.023 * ones(500, 1);
      v = varbacktest(rendements, valeursEnRisque, 'VaRLevel', 0.99);
      runtests(v)
 

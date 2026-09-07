@@ -1,5 +1,9 @@
 function y = dsigmf(x, params)
 %DSIGMF Différence de deux sigmoïdes.
 %   Y = DSIGMF(X,[A1 C1 A2 C2]) = sigmf(X,[A1 C1]) - sigmf(X,[A2 C2]).
+%
+%   Exemple :
+%      y = dsigmf([0 5 10], [2 2 2 8]);
+%      all(y >= 0 & y <= 1)        % 1 : c'est une appartenance
     y = sigmf(x, params(1:2)) - sigmf(x, params(3:4));
 end

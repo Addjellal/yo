@@ -4,6 +4,12 @@ function y = papillonHadamard(x)
 %   construction de Sylvester appliquée en place, en N log2 N additions.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      x = (1:8)';
+%      y = papillonHadamard(x);
+%      abs(y(1) - sum(x)) < 1e-12  % le premier coefficient est la somme
+%      max(abs(papillonHadamard(y) / 8 - x)) < 1e-12   % involutive au facteur N
     y = double(x);
     N = size(y, 1);
     pas = 1;

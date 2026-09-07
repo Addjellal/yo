@@ -2,6 +2,10 @@ function y = sawtooth(t, largeur)
 %SAWTOOTH Signal en dents de scie de période 2*pi.
 %   Y = SAWTOOTH(T) monte de -1 à +1 sur chaque période.
 %   Y = SAWTOOTH(T,LARGEUR) place le sommet à LARGEUR*2*pi.
+%
+%   Exemple :
+%      y = sawtooth(linspace(0, 4 * pi, 100));
+%      [min(y) max(y)]             % -1 et 1
     if nargin < 2
         largeur = 1;
     end

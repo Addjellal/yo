@@ -1,6 +1,10 @@
 function [symboles, nomsEtats] = lireNomsHmm(varargin)
 %LIRENOMSHMM Options « Symbols » et « Statenames » des fonctions HMM.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [symboles, etats] = lireNomsHmm('Symbols', {'a','b'}, 'Statenames', {'s1','s2'});
+%      numel(symboles)             % 2
     symboles = [];
     nomsEtats = [];
     k = 1;

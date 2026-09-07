@@ -3,6 +3,10 @@ function [amplitude, direction] = imgradient(a, b)
 %   [G,DIR] = IMGRADIENT(I) ou IMGRADIENT(GX,GY). La direction est en
 %   degrés, comptée depuis l'axe des x, positive dans le sens
 %   trigonométrique.
+%
+%   Exemple :
+%      [amplitude, direction] = imgradient(repmat((1:10), 10, 1));
+%      abs(mean(mean(direction(2:9, 2:9)))) < 1e-9   % la pente est horizontale
     if nargin == 2 && isnumeric(b) && ~ischar(b)
         gx = a; gy = b;
     elseif nargin == 2

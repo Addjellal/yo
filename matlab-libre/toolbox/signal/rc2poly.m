@@ -5,6 +5,10 @@ function [a, e] = rc2poly(k, r0)
 %
 %   [A,E] = RC2POLY(K,R0) rend aussi l'erreur de prédiction finale, à
 %   partir de la puissance R0 du signal.
+%
+%   Exemple :
+%      [a, e] = rc2poly([0.5 0.2], 1);
+%      all(abs(roots(a)) < 1)      % 1 : |k| < 1 donne un modele stable
     k = double(k(:));
     a = 1;
     for m = 1:numel(k)

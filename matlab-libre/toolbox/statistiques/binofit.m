@@ -3,6 +3,10 @@ function [phat, pci] = binofit(x, n, alpha)
 %   [PHAT,PCI] = BINOFIT(X,N,ALPHA) rend la proportion observée et
 %   l'intervalle de confiance exact de Clopper et Pearson, celui que
 %   MATLAB documente : ses bornes sont des quantiles de la loi bêta.
+%
+%   Exemple :
+%      [p, ci] = binofit(30, 100);
+%      ci(1) < p && p < ci(2)      % 1 : l'intervalle encadre l'estimation
     if nargin < 3, alpha = 0.05; end
     x = double(x(:));
     n = double(n);

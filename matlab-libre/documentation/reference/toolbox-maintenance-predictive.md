@@ -42,6 +42,9 @@ FAULTFEATURES Descripteurs vibratoires : efficace, crête, kurtosis, centroïde.
   bruit blanc tombe au milieu de la bande.
 
   Exemple :
+     rng(1);
+     t = (0:9999)' / 10000;
+     vibration = sin(2*pi*120*t) + 0.05 * randn(10000, 1);
      d = faultFeatures(vibration, 10000);
      d.kurtosis                      % au-dessus de 3 : des chocs
      d.centroide                     % ou l'energie se concentre
@@ -72,8 +75,13 @@ HEALTHINDICATOR Indicateur de santé : première composante principale
   l'information.
 
   Exemple :
+     rng(1);
+     n = 50;
+     efficaces = linspace(1, 2, n)' + 0.01 * randn(n, 1);
+     kurtosis = linspace(3, 5, n)' + 0.01 * randn(n, 1);
+     centroides = linspace(100, 200, n)' + randn(n, 1);
      sante = healthIndicator([efficaces, kurtosis, centroides]);
-     rulDegradation(sante, 1.0)
+     numel(sante)      % 50
 
   Voir aussi FAULTFEATURES, RULDEGRADATION, RULSIMILARITY, PCA.
 ```
@@ -131,6 +139,8 @@ RULSIMILARITY Durée de vie restante par similarité de trajectoires.
   sait rien d'un mode de défaillance qu'aucun historique ne contient.
 
   Exemple :
+     enCours = (1:30)' / 100;
+     historiques = {(1:100)' / 100, (1:120)' / 120, (1:90)' / 90, (1:110)' / 110};
      rul = rulSimilarity(enCours, historiques, [100 120 90 110]);
 
   Voir aussi RULDEGRADATION, HEALTHINDICATOR, FAULTFEATURES.

@@ -13,6 +13,8 @@ function droites = houghlines(BW, theta, rho, pics, varargin)
 %   (40 par défaut).
 %
 %   Exemple :
+%      BW = false(60, 60);
+%      BW(20, 5:55) = true;                 % une droite horizontale
 %      [H, theta, rho] = hough(BW);
 %      pics = houghpeaks(H, 3);
 %      droites = houghlines(BW, theta, rho, pics, 'MinLength', 10);

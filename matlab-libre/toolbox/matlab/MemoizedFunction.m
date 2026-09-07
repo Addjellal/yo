@@ -3,6 +3,11 @@ classdef MemoizedFunction < handle
 %   C'est l'objet que rend MEMOIZE. Il s'appelle comme la fonction
 %   d'origine ; les arguments déjà vus ne sont pas recalculés.
 %
+%   Exemple :
+%      f = memoize(@(x) x ^ 2);
+%      f(4)                        % 16
+%      f(4)                        % 16, sans recalculer
+%
 %   Voir aussi MEMOIZE, CLEARCACHE, STATS.
     properties
         Enabled = true;

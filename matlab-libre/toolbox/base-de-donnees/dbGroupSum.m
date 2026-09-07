@@ -12,6 +12,9 @@ function [cles, sommes] = dbGroupSum(t, colonneCle, colonneValeur)
 %   c'est l'ordre de la table, et il porte souvent une information.
 %
 %   Exemple :
+%      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+%      t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+%      t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
 %      [services, masses] = dbGroupSum(t, 'service', 'salaire');
 %      sum(masses)                     % le total general
 %

@@ -3,6 +3,9 @@ function p = tcdf(t, nu)
 %   P = TCDF(T,NU) utilise la relation avec la fonction beta incomplète :
 %      P(T <= t) = 1 - I_{nu/(nu+t^2)}(nu/2, 1/2) / 2   pour t >= 0
 %   ce qui est exact et rapide, contrairement à une intégration numérique.
+%
+%   Exemple :
+%      tcdf(0, 10)                 % 0.5 : la loi de Student est symetrique
     p = zeros(size(t));
     for k = 1:numel(t)
         x = t(k);

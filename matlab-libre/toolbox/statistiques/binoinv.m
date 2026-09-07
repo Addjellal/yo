@@ -2,7 +2,8 @@ function x = binoinv(y, n, pr)
 %BINOINV Quantile de la loi binomiale.
 %   Le plus petit entier X tel que BINOCDF(X,N,P) >= Y.
 %
-%   Exemple :  binoinv(0.5, 10, 0.5)   % 5
+%   Exemple :
+%      binoinv(0.5, 10, 0.5)   % 5
     [y, n, pr] = statAjuster(y, n, pr);
     x = zeros(size(y));
     for k = 1:numel(y)

@@ -15,6 +15,10 @@ function varargout = couchesConvolution(action, varargin)
 %   portant d'un coup toutes les positions, tous les plans et toutes les
 %   images. C'est la transposition du produit par une matrice de Toeplitz,
 %   et cela évite les boucles sur les pixels.
+%
+%   Exemple :
+%      c = convolution2dLayer(3, 2);
+%      c.type                      % 'conv2d'
     switch lower(char(action))
         case 'avant'
             [varargout{1}, varargout{2}] = avant(varargin{:});

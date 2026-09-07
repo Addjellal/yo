@@ -1,6 +1,9 @@
 function x = poissinv(p, lambda)
 %POISSINV Quantile de la loi de Poisson.
 %   Le plus petit entier X tel que POISSCDF(X,LAMBDA) >= P.
+%
+%   Exemple :
+%      poissinv(0.5, 4)            % 4 : la mediane d'une loi de Poisson de moyenne 4
     [p, lambda] = statAjuster(p, lambda);
     x = zeros(size(p));
     for k = 1:numel(p)

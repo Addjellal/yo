@@ -1,6 +1,7 @@
 function [m, v] = betastat(a, b)
 %BETASTAT Moyenne et variance de la loi bêta.
-%   Exemple :  [m,v] = betastat(1, 1)   % 0.5 et 1/12
+%   Exemple :
+%      [m,v] = betastat(1, 1)   % 0.5 et 1/12
     [a, b] = statAjuster(a, b);
     somme = a + b;
     m = a ./ somme;

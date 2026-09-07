@@ -1,6 +1,12 @@
 function [etiquettes, scores] = predictBayesNaif(modele, X)
 %PREDICTBAYESNAIF Prédiction d'un classifieur bayésien naïf.
 %   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
+%      mean(predictBayesNaif(fitcnb(X, y), X) == y) > 0.9
     X = double(X);
     n = size(X, 1);
     k = numel(modele.Classes);

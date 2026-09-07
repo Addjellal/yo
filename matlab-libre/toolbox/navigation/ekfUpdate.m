@@ -16,7 +16,11 @@ function [x, P] = ekfUpdate(x, P, z, h, H, R)
 %
 %   Exemple :
 %      H = [1 0];
+%      x = [0; 1];
+%      P = eye(2) * 10;
+%      mesure = 1.2;
 %      [x, P] = ekfUpdate(x, P, mesure, @(v) H * v, H, 0.5);
+%      P(1, 1) < 10        % 1 : corriger ne peut que la reduire
 %
 %   Voir aussi EKFPREDICT, KALMANFILTER.
     y = z(:) - h(x);

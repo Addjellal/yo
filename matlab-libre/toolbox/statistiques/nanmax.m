@@ -21,7 +21,10 @@ function [m, indice] = nanmax(x, y, dim)
     if nargin < 2
         [m, indice] = max(x);
     elseif nargin < 3
-        [m, indice] = max(x, y);
+        % La forme a deux tableaux compare terme a terme : il n'y a pas
+        % d'indice a rendre, et en demander un est une erreur.
+        m = max(x, y);
+        indice = [];
     else
         [m, indice] = max(x, y, dim);
     end

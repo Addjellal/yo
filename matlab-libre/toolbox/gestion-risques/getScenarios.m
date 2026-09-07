@@ -5,8 +5,11 @@ function pertes = getScenarios(modele, indices)
 %   GETSCENARIOS(C,I) ne rend que les scénarios demandés.
 %
 %   Exemple :
+%      c = creditDefaultCopula([0.01; 0.02], [0.4; 0.4], [100; 200], ...
+%                              repmat([0.6 0.8], 2, 1));
+%      c = simulate(c, 2000);
 %      p = getScenarios(c);
-%      sum(p, 2)                      % pertes de portefeuille
+%      size(sum(p, 2), 1)             % 2000 pertes de portefeuille
 %
 %   Voir aussi CREDITDEFAULTCOPULA, PORTFOLIORISK, RISKCONTRIBUTION.
     if ~matlibre_est_copule(modele)

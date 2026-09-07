@@ -3,6 +3,15 @@ function fichier = matlab.addons.toolbox.packageToolbox(dossier, nomArchive)
 %   F = ...PACKAGETOOLBOX(DOSSIER,NOM) fabrique une archive du dossier.
 %   MATLAB produit un .mltbx ; ici c'est une archive ZIP, lisible partout
 %   et réinstallable par installToolbox après décompression.
+%
+%   Exemple :
+%      dossier = tempname();
+%      mkdir(dossier);
+%      f = fopen(fullfile(dossier, 'Contents.m'), 'w');
+%      fprintf(f, '%% Ma toolbox\n');
+%      fclose(f);
+%      fichier = matlab.addons.toolbox.packageToolbox(dossier, 'ma.zip');
+%      isfile(fichier)             % 1
     if nargin < 2 || isempty(nomArchive)
         [~, nom] = fileparts(dossier);
         nomArchive = [nom '.zip'];

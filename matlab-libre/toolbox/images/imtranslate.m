@@ -3,6 +3,10 @@ function r = imtranslate(image, decalage, varargin)
 %   R = IMTRANSLATE(I,[DX DY]) décale de DX colonnes et DY lignes ; les
 %   pixels qui entrent valent zéro. Les décalages non entiers sont
 %   arrondis.
+%
+%   Exemple :
+%      r = imtranslate([1 2 3; 4 5 6; 7 8 9], [1 0]);
+%      r(1, :)                     % 0 1 2 : tout a glisse d'une colonne
     dx = round(decalage(1));
     dy = round(decalage(2));
     m = size(image, 1);

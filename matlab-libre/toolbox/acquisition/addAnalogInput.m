@@ -14,6 +14,8 @@ function session = addAnalogInput(session, nom, generateur)
 %   d'un moyennage.
 %
 %   Exemple :
+%      s = daq();
+%      s.frequence = 1000;
 %      s = addAnalogInput(s, 'tension', @(t) 5 * sin(2*pi*50*t));
 %      s = addAnalogInput(s, 'courant', @(t) 0.4 * sin(2*pi*50*t - pi/6));
 %

@@ -3,6 +3,12 @@ function positions = detectFASTFeatures(I, seuil)
 %   P = DETECTFASTFEATURES(I,SEUIL) rend les coordonnées [x y] des points
 %   dont au moins neuf voisins consécutifs du cercle sont tous plus clairs
 %   ou tous plus sombres que le centre, à SEUIL près.
+%
+%   Exemple :
+%      I = zeros(40);
+%      I(15:25, 15:25) = 1;        % un carre clair
+%      p = detectFASTFeatures(I, 0.1);
+%      size(p, 2)                  % 2 : ligne et colonne par point
     if nargin < 2
         seuil = 0.1;
     end

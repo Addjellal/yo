@@ -7,6 +7,8 @@ function resume = summarize(modele)
 %   S = SUMMARIZE(MDL) rend la structure au lieu de l'écrire.
 %
 %   Exemple :
+%      rng(1);
+%      y = simulate(arima('Constant', 0, 'AR', {0.7}, 'Variance', 1), 400);
 %      ajuste = estimate(arima(1, 0, 0), y, 'Display', 'off');
 %      summarize(ajuste)
 %

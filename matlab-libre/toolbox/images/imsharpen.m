@@ -3,6 +3,11 @@ function r = imsharpen(image, varargin)
 %   R = IMSHARPEN(I,'Radius',R,'Amount',A) retranche une version floutée :
 %   R = I + A*(I - flou(I)). Le rayon vaut 1 et le montant 0,8 par défaut,
 %   comme dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      x = imboxfilt(rand(30), 5);
+%      std(reshape(imsharpen(x), [], 1)) > std(x(:))   % l'accentuation releve le contraste
     rayon = 1;
     montant = 0.8;
     for k = 1:2:numel(varargin) - 1

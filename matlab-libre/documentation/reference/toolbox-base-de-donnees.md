@@ -27,6 +27,9 @@ DBDELETE Supprime les lignes vérifiant le prédicat.
   prédicat toujours vrai vide la table sans la détruire.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      t = dbDelete(t, @(l) l{4} < 4);       % anciennete de moins de 4 ans
      t = dbDelete(t, @(l) true);           % vide la table
 
@@ -49,6 +52,9 @@ DBGROUPSUM Somme d'une colonne, groupée par une autre.
   c'est l'ordre de la table, et il porte souvent une information.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      [services, masses] = dbGroupSum(t, 'service', 'salaire');
      sum(masses)                     % le total general
 
@@ -91,6 +97,9 @@ DBLOAD Lit une table depuis un fichier CSV.
   compris.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      dbSave(t, 'personnel.csv');
      relue = dbLoad('personnel.csv');
      isequal(relue.colonnes, t.colonnes)     % true
@@ -111,6 +120,9 @@ DBSAVE Écrit la table dans un fichier CSV.
   se convertit en nombre.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      dbSave(t, 'personnel.csv');
      relue = dbLoad('personnel.csv');
 
@@ -135,6 +147,9 @@ DBSELECT Sélectionne les lignes vérifiant un prédicat.
   tel.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      dbSelect(t, @(l) strcmp(l{2}, 'etudes'))
      dbSelect(t, @(l) l{3} > 40000 && l{4} > 4)
      dbSelect(t)                     % toute la table
@@ -178,6 +193,9 @@ DBUPDATE Met à jour une colonne pour les lignes retenues.
   colonne écrite est connue à l'avance.
 
   Exemple :
+     t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+     t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+     t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
      t = dbUpdate(t, @(l) strcmp(l{2}, 'ventes'), 'salaire', 45000);
 
   Voir aussi DBSELECT, DBDELETE, DBINSERT.

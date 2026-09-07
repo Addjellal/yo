@@ -3,6 +3,10 @@ function decalages = voisinageConnexite(connexite)
 %   Accepte 4, 8 ou un tableau logique 3 x 3.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      size(voisinageConnexite(4), 1)     % 4 decalages
+%      size(voisinageConnexite(8), 1)     % 8
     if numel(connexite) == 1
         if connexite == 4
             decalages = [-1 0; 1 0; 0 -1; 0 1];

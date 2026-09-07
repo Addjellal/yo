@@ -75,9 +75,12 @@ CODEGEN Traduit une fonction MATLAB en C.
   structure matlibre_cplx de deux double, définie dans l'en-tête.
 
   Exemple :
-     codegen('carreDeTest', '-args', {0}, '-report')
-     codegen('produitTest', '-args', {zeros(3,3), zeros(3,1)})
-     codegen('filtreTest',  '-args', {complex(zeros(1,8))})
+     % La fonction a traduire doit exister sur le chemin : on l'ecrit.
+     f = fopen('carreDeTest.m', 'w');
+     fprintf(f, 'function y = carreDeTest(x)\n  y = x * x;\nend\n');
+     fclose(f);
+     r = codegen('carreDeTest', '-args', {0}, '-report');
+     contains(r.source, 'double carreDeTest(double x)')     % 1
 
   Voir aussi CODEGENBUILD, CODER.TYPEOF.
 ```
@@ -90,6 +93,13 @@ CODEGENBUILD Génère le C puis le compile avec le compilateur du système.
   temporaire puis les compile en objet.
   CODEGENBUILD('f','-args',{...},'-d',DOSSIER) accepte les mêmes options
   que CODEGEN, plus '-exe' pour produire un exécutable de démonstration.
+
+  Exemple :
+     f = fopen('carreDeTest.m', 'w');
+     fprintf(f, 'function y = carreDeTest(x)\n  y = x * x;\nend\n');
+     fclose(f);
+     r = codegen('carreDeTest', '-args', {0}, '-report');
+     contains(r.source, 'carreDeTest')      % 1
 ```
 
 ## `coder.typeof`
@@ -104,7 +114,11 @@ CODER.TYPEOF Décrit le type et la taille d'une entrée pour CODEGEN.
   puis ignoré, et un avertissement le signale.
 
   Exemple :
-     codegen('f', '-args', {coder.typeof(int32(0), [3 3])})
+     f = fopen('doubleDeTest.m', 'w');
+     fprintf(f, 'function y = doubleDeTest(x)\n  y = x + x;\nend\n');
+     fclose(f);
+     r = codegen('doubleDeTest', '-args', {coder.typeof(int32(0), [3 3])}, '-report');
+     contains(r.entete, 'doubleDeTest')      % 1
 ```
 
 ## `compilateurC`

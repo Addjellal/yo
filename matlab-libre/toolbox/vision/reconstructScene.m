@@ -11,7 +11,9 @@ function pointsXYZ = reconstructScene(disparites, matriceReprojection)
 %
 %   Exemple :
 %      Q = [1 0 0 -320; 0 1 0 -240; 0 0 0 800; 0 0 1/0.1 0];
+%      disparites = 10 * ones(40, 40);
 %      P = reconstructScene(disparites, Q);
+%      size(P, 3)       % 3 : une coordonnee par plan
 %
 %   Voir aussi DISPARITYBM, DISPARITYSGM, RECTIFYSTEREOIMAGES, TRIANGULATE.
     disparites = double(disparites);

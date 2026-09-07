@@ -8,6 +8,14 @@ function h = openfig(nom, varargin)
 %   relire, et le dit plutôt que d'ouvrir une figure vide. SAVEFIG écrit
 %   du SVG, qu'un navigateur ou un éditeur d'images rouvre.
 %
+%   Exemple :
+%      % OPENFIG demande un fichier .fig, que MatLibre n'ecrit pas.
+%      try
+%          openfig('inexistant.fig');
+%      catch e
+%          e.identifier
+%      end
+%
 %   Voir aussi SAVEFIG, SAVEAS, OPEN, FIGURE.
     error('MATLAB:openfig:UnsupportedFormat', ...
           ['MatLibre cannot read the .fig format, which carries the ' ...

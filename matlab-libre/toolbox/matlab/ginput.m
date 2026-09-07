@@ -9,6 +9,15 @@ function [x, y, bouton] = ginput(n)
 %   points autrement — INPUT au clavier, ou des coordonnées écrites en
 %   clair.
 %
+%   Exemple :
+%      % Les figures de MatLibre ne se cliquent pas : GINPUT le dit plutot que
+%      % de rendre des coordonnees inventees.
+%      try
+%          ginput(1);
+%      catch e
+%          e.identifier
+%      end
+%
 %   Voir aussi INPUT, DATACURSORMODE, GTEXT, WAITFORBUTTONPRESS.
     if nargin < 1
         n = Inf;

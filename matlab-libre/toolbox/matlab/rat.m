@@ -3,6 +3,11 @@ function [n, d] = rat(x, tol)
 %   [N,D] = RAT(X) rend deux entiers tels que N/D vaut X à la tolérance
 %   par défaut près (1e-6 fois la valeur).
 %   S = RAT(X) rend la chaîne « n/d ».
+%
+%   Exemple :
+%      [n, d] = rat(0.75);
+%      [n d]                       % 3 4
+%      abs(n / d - 0.75) < 1e-12
     if nargin < 2
         tol = 1e-6 * max(abs(x(:)));
         if tol == 0

@@ -1,6 +1,12 @@
 function e = bweuler(bw, connexite)
 %BWEULER Nombre d'Euler : régions moins trous.
 %   E = BWEULER(BW,8) par défaut.
+%
+%   Exemple :
+%      bw = false(20, 20);
+%      bw(5:15, 5:15) = true;
+%      bw(8:12, 8:12) = false;     % un carre troue
+%      bweuler(bw)                 % 0 : un objet moins un trou
     if nargin < 2, connexite = 8; end
     bw = logical(bw);
     [~, regions] = bwlabel(bw, connexite);

@@ -6,6 +6,11 @@ function fichier = zip(nomArchive, fichiers, racine)
 %   L'archive est produite par la commande « zip » du système ; sans
 %   elle, la fonction le dit clairement plutôt que d'écrire un fichier
 %   incomplet.
+%
+%   Exemple :
+%      f = fopen('b.txt', 'w'); fprintf(f, 'x'); fclose(f);
+%      fichier = zip('archive.zip', {'b.txt'});
+%      isfile(fichier)             % 1
     if nargin < 3, racine = pwd(); end
     if ischar(fichiers) || isstring(fichiers)
         fichiers = {char(fichiers)};

@@ -5,7 +5,16 @@ function identifiant = matlab.addons.toolbox.installToolbox(source, varargin)
 %   contenir un fichier Contents.m, comme toute toolbox MATLAB.
 %
 %   Exemple :
-%      matlab.addons.toolbox.installToolbox('/tmp/maToolbox');
+%      % Une toolbox est un dossier qui porte un Contents.m. On la
+%      % desinstalle aussitot : installer, c'est copier dans l'arborescence
+%      % des toolboxes, et un essai n'a pas a y laisser de trace.
+%      dossier = tempname();
+%      mkdir(dossier);
+%      f = fopen(fullfile(dossier, 'Contents.m'), 'w');
+%      fprintf(f, '%% Ma toolbox\n');
+%      fclose(f);
+%      identifiant = matlab.addons.toolbox.installToolbox(dossier);
+%      matlab.addons.toolbox.uninstallToolbox(identifiant);
     if ~isfolder(source)
         error('MATLAB:addons:NotAFolder', ...
               'The toolbox source ''%s'' is not a folder.', source);

@@ -3,7 +3,8 @@ function y = betapdf(x, a, b)
 %   Y = BETAPDF(X,A,B) = x^(a-1)*(1-x)^(b-1)/B(a,b) sur [0,1], nulle
 %   ailleurs.
 %
-%   Exemple :  betapdf(0.5, 1, 1)   % 1 : la loi uniforme
+%   Exemple :
+%      betapdf(0.5, 1, 1)   % 1 : la loi uniforme
     x = double(x);
     y = zeros(size(x));
     dedans = x >= 0 & x <= 1;

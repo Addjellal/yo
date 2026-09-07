@@ -2,6 +2,10 @@ function y = imresize(x, facteur)
 %IMRESIZE Redimensionnement par interpolation bilinéaire.
 %   Y = IMRESIZE(X,F) multiplie les dimensions par F.
 %   Y = IMRESIZE(X,[H L]) impose la taille de sortie.
+%
+%   Exemple :
+%      size(imresize(ones(10), 2))     % 20 20
+%      size(imresize(ones(10), 0.5))   % 5 5
     [h, l] = size(x);
     if numel(facteur) == 2
         nh = facteur(1);

@@ -2,6 +2,11 @@ function phat = betafit(x)
 %BETAFIT Estimation des paramètres d'une loi bêta.
 %   Le maximum de vraisemblance est cherché par NELDER-MEAD sur
 %   BETALIKE, en partant de l'estimation par les moments.
+%
+%   Exemple :
+%      rng(1);
+%      p = betafit(betarnd(2, 5, 2000, 1));
+%      max(abs(p - [2 5])) < 0.4
     x = double(x(:));
     if any(x <= 0) || any(x >= 1)
         error('stats:betafit:BadData', 'Les données doivent être dans ]0,1[.');

@@ -1,6 +1,10 @@
 function c = leakyReluLayer(pente, varargin)
 %LEAKYRELULAYER Couche ReLU à fuite : pente non nulle pour les négatifs.
 %   C = LEAKYRELULAYER(PENTE) ; PENTE vaut 0,01 par défaut.
+%
+%   Exemple :
+%      c = leakyReluLayer(0.01);
+%      c.pente                     % 0.01 : la pente du cote negatif
     if nargin < 1 || isempty(pente), pente = 0.01; end
     c = struct('type', 'leakyrelu', 'pente', pente, 'nom', matlibre_couche_nom(varargin));
 end

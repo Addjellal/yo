@@ -14,6 +14,9 @@ function valeur = evm(recus, references)
 %   dense, moins on tolère d'erreur.
 %
 %   Exemple :
+%      rng(1);
+%      reference = exp(1i * (pi/4 + randi([0 3], 48, 5) * pi/2));
+%      bruit = (randn(size(reference)) + 1i * randn(size(reference))) / sqrt(2);
 %      evm(reference, reference)       % 0
 %      evm(reference + 0.1 * bruit, reference)
 %

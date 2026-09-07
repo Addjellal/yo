@@ -3,7 +3,8 @@ function [h, w] = freqs(b, a, w)
 %   H = FREQS(B,A,W) évalue B(s)/A(s) en s = j*W. Sans W, deux cents
 %   points logarithmiques couvrant les pôles et les zéros.
 %
-%   Exemple :  abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
+%   Exemple :
+%      abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
     b = double(b(:)).';
     a = double(a(:)).';
     if nargin < 3 || isempty(w)

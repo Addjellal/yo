@@ -2,6 +2,10 @@ function image = col2im(colonnes, blocs, taille, genre)
 %COL2IM Réassemble une image à partir de colonnes de blocs.
 %   Réciproque d'IM2COL pour le découpage disjoint ; pour le découpage
 %   glissant, chaque colonne fournit un pixel, comme dans MATLAB.
+%
+%   Exemple :
+%      colonnes = im2col(magic(4), [2 2], 'distinct');
+%      max(max(abs(col2im(colonnes, [2 2], [4 4], 'distinct') - magic(4))))   % 0
     if nargin < 4 || isempty(genre), genre = 'sliding'; end
     colonnes = double(colonnes);
     m = blocs(1);

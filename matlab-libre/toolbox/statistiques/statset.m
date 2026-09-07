@@ -30,7 +30,10 @@ function options = statset(varargin)
 %
 %   Exemples :
 %      options = statset('MaxIter', 1000, 'TolFun', 1e-12);
-%      nlinfit(x, y, modele, depart, options);
+%      rng(1);
+%      x = linspace(0, 2, 40)';
+%      y = 3 * exp(-1.5 * x) + 0.01 * randn(40, 1);
+%      b = nlinfit(x, y, @(p, t) p(1) * exp(-p(2) * t), [1 1], options);
 %
 %      serrees = statset(options, 'TolX', 1e-14);
 %

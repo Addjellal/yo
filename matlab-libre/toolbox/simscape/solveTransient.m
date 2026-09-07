@@ -8,6 +8,14 @@ function [temps, tensions] = solveTransient(c, tFinal, pas, sourceTemps)
 %
 %   SOURCETEMPS, facultative, est une poignée @(t) rendant un facteur
 %   multiplicatif appliqué aux sources de tension.
+%
+%   Exemple :
+%      c = circuit('RC');
+%      c = addVoltageSource(c, 1, 0, 5);
+%      c = addResistor(c, 1, 2, 1000);
+%      c = addCapacitor(c, 2, 0, 1e-6);
+%      [t, v] = solveTransient(c, 0.01, 1e-5);
+%      abs(v(end, 2) - 5) < 0.1    % le condensateur finit par se charger
     if nargin < 4
         sourceTemps = [];
     end

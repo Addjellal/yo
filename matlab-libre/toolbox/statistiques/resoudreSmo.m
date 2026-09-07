@@ -6,6 +6,14 @@ function [alpha, biais] = resoudreSmo(K, cible, C, tolerance, maxIter)
 %   multiplicateur est tiré au hasard parmi les autres.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(30, 2); randn(30, 2) + 4];
+%      cible = [-ones(30, 1); ones(30, 1)];
+%      K = X * X';
+%      [alpha, biais] = resoudreSmo(K, cible, 1, 1e-3, 200);
+%      abs(sum(alpha .* cible)) < 1e-6      % la contrainte d'egalite est tenue
     n = numel(cible);
     alpha = zeros(n, 1);
     biais = 0;

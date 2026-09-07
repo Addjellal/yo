@@ -6,6 +6,9 @@ function w = normaliserSomme(w, sumf)
 %   de DBAUX et SYMAUX.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      sum(normaliserSomme([1 1 1 1], 2))     % 2
     w = double(w(:))';
     total = sum(w);
     if total == 0

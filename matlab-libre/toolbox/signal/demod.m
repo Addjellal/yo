@@ -3,6 +3,12 @@ function [x, q] = demod(y, fc, fs, methode, opt)
 %   X = DEMOD(Y,FC,FS,METHODE). La démodulation d'amplitude multiplie par
 %   la porteuse puis filtre passe-bas ; celle de phase et de fréquence
 %   passe par la transformée de Hilbert.
+%
+%   Exemple :
+%      t = (0:999)' / 1000;
+%      porteuse = cos(2 * pi * 100 * t) .* (1 + 0.5 * cos(2 * pi * 5 * t));
+%      x = demod(porteuse, 100, 1000, 'am');
+%      numel(x)                    % 1000
     if nargin < 3 || isempty(fs), fs = 1; end
     if nargin < 4 || isempty(methode), methode = 'am'; end
     y = double(y);

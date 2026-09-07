@@ -87,7 +87,10 @@ EKFPREDICT Étape de prédiction d'un filtre de Kalman étendu.
 
   Exemple :
      F = [1 0.1; 0 1];
+     x = [0; 1];
+     P = eye(2);
      [x, P] = ekfPredict(x, P, @(v) F * v, F, diag([1e-3 1e-2]));
+     trace(P) > 2        % 1 : predire ne peut qu'augmenter l'incertitude
 
   Voir aussi EKFUPDATE, KALMANFILTER.
 ```
@@ -112,7 +115,11 @@ EKFUPDATE Étape de correction d'un filtre de Kalman étendu.
 
   Exemple :
      H = [1 0];
+     x = [0; 1];
+     P = eye(2) * 10;
+     mesure = 1.2;
      [x, P] = ekfUpdate(x, P, mesure, @(v) H * v, H, 0.5);
+     P(1, 1) < 10        % 1 : corriger ne peut que la reduire
 
   Voir aussi EKFPREDICT, KALMANFILTER.
 ```

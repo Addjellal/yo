@@ -3,7 +3,8 @@ function [m, v] = wblstat(a, b)
 %   Les moments s'écrivent avec la fonction gamma :
 %   E[X] = a*gamma(1+1/b), Var[X] = a^2*(gamma(1+2/b) - gamma(1+1/b)^2).
 %
-%   Exemple :  [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
+%   Exemple :
+%      [m,v] = wblstat(1, 1)   % 1 et 1, la loi exponentielle
     if nargin < 1, a = 1; end
     if nargin < 2, b = 1; end
     [a, b] = statAjuster(a, b);

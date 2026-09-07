@@ -20,6 +20,7 @@ function instrument = writeline(instrument, commande)
 %   programme de mesure ne doit jamais supposer deux lectures identiques.
 %
 %   Exemple :
+%      instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
 %      instrument = writeline(instrument, 'CONF:VOLT:DC 10');
 %      instrument = writeline(instrument, 'MEAS:VOLT?');
 %      tension = str2double(readline(instrument));

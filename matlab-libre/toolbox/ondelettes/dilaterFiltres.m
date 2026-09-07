@@ -4,6 +4,11 @@ function [bas, haut] = dilaterFiltres(Lo, Hi, niveau)
 %   étire le filtre, ce qui garde toutes les positions.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [Lo, Hi] = wfilters('db2', 'd');
+%      [bas, haut] = dilaterFiltres(Lo, Hi, 1);
+%      numel(bas) == 2 * numel(Lo) - 1     % 1 : un zero entre deux coefficients
     facteur = 2 ^ niveau;
     if facteur == 1
         bas = Lo;

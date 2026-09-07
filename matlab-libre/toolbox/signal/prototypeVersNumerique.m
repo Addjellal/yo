@@ -14,6 +14,11 @@ function [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, zeros_, gain, 
 %   continu pour un passe-bas, Nyquist pour un passe-haut, le centre de
 %   la bande pour un passe-bande ; il vaut 1 par défaut, mais un
 %   Chebyshev de type I d'ordre pair descend à 10^(-RP/20).
+%
+%   Exemple :
+%      [z0, p0, k0] = buttap(4);
+%      [b, a] = prototypeVersNumerique(p0, z0, k0, 0.3, 'low');
+%      numel(a) - 1                % 4 : l'ordre est conserve en passe-bas
     if nargin < 6, gainReference = 1; end
     poles = poles(:);
     zeros_ = zeros_(:);

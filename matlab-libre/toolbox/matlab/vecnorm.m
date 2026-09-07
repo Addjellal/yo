@@ -3,6 +3,10 @@ function n = vecnorm(A, p, dim)
 %   N = VECNORM(A) rend la norme 2 de chaque colonne.
 %   N = VECNORM(A,P) utilise la norme P.
 %   N = VECNORM(A,P,DIM) travaille le long de la dimension DIM.
+%
+%   Exemple :
+%      vecnorm([3 4]')             % 5 : la norme de la colonne
+%      vecnorm([3 4; 0 0], 2, 2)'  % 5 0 : par ligne
     if nargin < 2 || isempty(p)
         p = 2;
     end

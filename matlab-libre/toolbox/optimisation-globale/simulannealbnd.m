@@ -1,8 +1,13 @@
-function [x, valeur] = simulannealbnd(fonction, x0, bas, haut, iterations)
+function [x, valeur] = simulannealbnd(fonction, x0, bas, haut, options)
 %SIMULANNEALBND Recuit simulé avec bornes.
-%   [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT,ITERATIONS) minimise en
-%   acceptant parfois de remonter, avec une probabilité qui décroît au
-%   long du refroidissement.
+%   [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT) minimise en acceptant
+%   parfois de remonter, avec une probabilité qui décroît au long du
+%   refroidissement.
+%
+%   [X,VALEUR] = SIMULANNEALBND(F,X0,BAS,HAUT,OPTIONS) prend les réglages
+%   rendus par SAOPTIMSET — c'est le champ MaxIter qui fixe le nombre
+%   d'itérations. Un nombre est aussi accepté à cette place, et vaut alors
+%   directement ce nombre d'itérations.
 %
 %   C'est cette acceptation des mauvais pas qui distingue le recuit d'une
 %   descente : elle permet de sortir d'un minimum local. La température
@@ -18,10 +23,20 @@ function [x, valeur] = simulannealbnd(fonction, x0, bas, haut, iterations)
 %   Exemple :
 %      f = @(x) sum(x.^2 - 10 * cos(2*pi*x) + 10);
 %      [x, v] = simulannealbnd(f, zeros(1,3), -5*ones(1,3), 5*ones(1,3));
+%      [x, v] = simulannealbnd(f, zeros(1,3), -5*ones(1,3), 5*ones(1,3), ...
+%                              saoptimset('MaxIter', 2000));
 %
 %   Voir aussi PARTICLESWARM, GA, MULTISTART.
-    if nargin < 5
+    if nargin < 5 || isempty(options)
         iterations = 5000;
+    elseif isstruct(options)
+        % Les reglages de SAOPTIMSET : c'est MaxIter qui compte ici.
+        iterations = 5000;
+        if isfield(options, 'MaxIter') && ~isempty(options.MaxIter)
+            iterations = double(options.MaxIter);
+        end
+    else
+        iterations = double(options);
     end
     x = x0(:).';
     bas = bas(:).';

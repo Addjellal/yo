@@ -12,6 +12,7 @@ function reponse = readline(instrument)
 %   enchaîne l'envoi et la lecture, évite cette confusion.
 %
 %   Exemple :
+%      instrument = visadev('TCPIP0::192.168.1.10::inst0::INSTR');
 %      instrument = writeline(instrument, 'MEAS:VOLT?');
 %      tension = str2double(readline(instrument));
 %

@@ -2,6 +2,10 @@ function r = hsv2rgb(h, s, v)
 %HSV2RGB Teinte, saturation, valeur vers RVB.
 %   R = HSV2RGB(IMAGE) où IMAGE est MxNx3, ou HSV2RGB(CARTE) où CARTE
 %   est une carte de couleurs Mx3. La sortie garde la forme de l'entrée.
+%
+%   Exemple :
+%      max(abs(hsv2rgb([0 1 1]) - [1 0 0])) < 1e-12   % teinte nulle : du rouge pur
+%      max(abs(hsv2rgb([0 0 0.5]) - [0.5 0.5 0.5])) < 1e-12   % saturation nulle : du gris
     if nargin == 3
         image = cat(3, h, s, v);
     else

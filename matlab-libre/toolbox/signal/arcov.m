@@ -3,6 +3,12 @@ function [a, e] = arcov(x, p)
 %   Moindres carrés sur l'erreur de prédiction avant, sans fenêtrage : on
 %   n'utilise que les échantillons pour lesquels toute la fenêtre de
 %   prédiction existe.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [a, e] = arcov(x, 4);
+%      numel(a)                    % 5 : un modele d'ordre quatre
     x = double(x(:));
     n = numel(x);
     if p >= n

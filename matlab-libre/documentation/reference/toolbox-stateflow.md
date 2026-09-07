@@ -46,6 +46,13 @@ SFCHART Crée une machine à états vide.
 SFRUN Exécute la machine sur une suite d'entrées.
   [HISTORIQUE,CONTEXTE] = SFRUN(MACHINE,ENTREES) rend la suite des états
   visités, un par pas, et le contexte final.
+
+  Exemple :
+     m = sfchart('tourniquet');
+     m = sfstate(m, 'verrouille');
+     m = sfstate(m, 'ouvert');
+     m = sftransition(m, 'verrouille', 'ouvert', @(c,e) strcmp(e, 'piece'));
+     sfrun(m, {'pousse', 'piece'})     % 'ouvert'
 ```
 
 ## `sfstate`
@@ -72,6 +79,7 @@ SFSTATE Ajoute un état.
   seule mémoire d'état.
 
   Exemple :
+     m = sfchart('compteur');
      m = sfstate(m, 'compte', @(c) setfield(c, 'total', c.total + 1));
      [~, contexte] = sfrun(m, [1 0 1 0 1], struct('total', 0));
 
@@ -96,6 +104,10 @@ SFTRANSITION Ajoute une transition gardée.
   faire est un comportement, non une erreur.
 
   Exemple :
+     m = sfchart('mesure');
+     m = sfstate(m, 'depart');
+     m = sfstate(m, 'petit');
+     m = sfstate(m, 'grand');
      m = sftransition(m, 'depart', 'petit', @(c,e) e < 10);
      m = sftransition(m, 'depart', 'grand', @(c,e) e < 100);
      sfrun(m, 5)                     % 'petit' : la premiere gagne

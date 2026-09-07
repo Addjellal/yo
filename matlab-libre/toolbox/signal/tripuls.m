@@ -3,7 +3,8 @@ function y = tripuls(t, w, s)
 %   S vaut 0 pour un triangle symétrique, -1 pour une rampe descendante,
 %   +1 pour une rampe montante. W vaut 1 et S vaut 0 par défaut.
 %
-%   Exemple :  tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
+%   Exemple :
+%      tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
     if nargin < 2 || isempty(w), w = 1; end
     if nargin < 3 || isempty(s), s = 0; end
     if s < -1 || s > 1

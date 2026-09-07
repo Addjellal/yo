@@ -1,6 +1,10 @@
 function y = dct2(x, m, n)
 %DCT2 Transformée en cosinus discrète bidimensionnelle.
 %   Y = DCT2(X) applique DCT aux colonnes puis aux lignes.
+%
+%   Exemple :
+%      x = magic(4);
+%      max(max(abs(idct2(dct2(x)) - x))) < 1e-10   % la transformee est orthonormee
     if nargin >= 2
         x = redimensionner(x, m, n, nargin);
     end

@@ -2,6 +2,11 @@ function [indices, distances] = knnsearch(X, Y, varargin)
 %KNNSEARCH Plus proches voisins par recherche exhaustive.
 %   [IDX,D] = KNNSEARCH(X,Y) trouve, pour chaque ligne de Y, la ligne de X
 %   la plus proche. Option 'K' pour en demander plusieurs.
+%
+%   Exemple :
+%      X = [0 0; 1 0; 0 1];
+%      [i, d] = knnsearch(X, [0.1 0.1], 'K', 2);
+%      i(1)                        % 1 : le plus proche est l'origine
     k = 1;
     for i = 1:2:numel(varargin)-1
         if strcmpi(char(varargin{i}), 'k')

@@ -1,6 +1,9 @@
 function c = nbincdf(x, r, p)
 %NBINCDF Répartition de la loi binomiale négative.
 %   P(X <= k) = I_p(r, k+1), la bêta incomplète régularisée.
+%
+%   Exemple :
+%      nbincdf(10, 3, 0.5)         % la probabilite d'au plus dix echecs
     [x, r, p] = statAjuster(x, r, p);
     k = floor(x);
     c = zeros(size(x));

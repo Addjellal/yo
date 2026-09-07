@@ -3,6 +3,10 @@ function limites = stretchlim(image, tolerance)
 %   L = STRETCHLIM(I,TOL) rend [bas; haut] tels que la proportion TOL(1)
 %   des pixels soit sous « bas » et TOL(2) au-dessus de « haut ». TOL vaut
 %   [0.01 0.99] par défaut.
+%
+%   Exemple :
+%      limites = stretchlim([0.2 0.5 0.8]);
+%      limites(1) < limites(2)     % 1 : la borne basse precede la haute
     if nargin < 2 || isempty(tolerance), tolerance = [0.01 0.99]; end
     if isscalar(tolerance), tolerance = [tolerance, 1 - tolerance]; end
     x = im2double(image);

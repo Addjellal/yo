@@ -2,6 +2,13 @@ function [etiquettes, nombre] = bwlabeln(bw, connexite)
 %BWLABELN Étiquetage des composantes connexes, connexité quelconque.
 %   Sur une image bidimensionnelle, CONNEXITE peut valoir 4, 8 ou un
 %   tableau logique 3 x 3.
+%
+%   Exemple :
+%      bw = false(20, 20);
+%      bw(3:6, 3:6) = true;        % un carre de 16 pixels
+%      bw(10:18, 10:18) = true;    % un autre de 81
+%      [etiquettes, n] = bwlabeln(bw);
+%      n                           % 2
     if nargin < 2 || isempty(connexite), connexite = 8; end
     bw = logical(bw);
     if numel(connexite) == 1

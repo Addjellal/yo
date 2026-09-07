@@ -2,6 +2,11 @@ function y = wrcoef2(genre, C, S, nom, niveau)
 %WRCOEF2 Reconstruit une composante d'une décomposition d'image.
 %   Y = WRCOEF2('a',C,S,NOM,N) reconstruit l'approximation, 'h', 'v' ou
 %   'd' le détail correspondant, à la taille de l'image d'origine.
+%
+%   Exemple :
+%      [C, S] = wavedec2(magic(8), 2, 'haar');
+%      y = wrcoef2('a', C, S, 'haar', 1);
+%      size(y)                     % 8 8 : la reconstruction garde la taille
     if nargin < 4 || isempty(nom), nom = 'haar'; end
     niveauMax = size(S, 1) - 2;
     if nargin < 5 || isempty(niveau), niveau = niveauMax; end

@@ -7,6 +7,12 @@ function contour = bwtraceboundary(bw, depart, direction, connexite, nombre, sen
 %   L'algorithme est celui de Moore : on tourne autour du pixel courant à
 %   partir du voisin d'où l'on vient, et l'on saute sur le premier pixel
 %   allumé rencontré.
+%
+%   Exemple :
+%      bw = false(10, 10);
+%      bw(3:7, 3:7) = true;
+%      c = bwtraceboundary(bw, [3 3], 'E');
+%      size(c, 2)                  % 2 : ligne et colonne par point
     if nargin < 3 || isempty(direction), direction = 'N'; end
     if nargin < 4 || isempty(connexite), connexite = 8; end
     if nargin < 5 || isempty(nombre), nombre = Inf; end

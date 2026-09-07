@@ -7,6 +7,14 @@ function y = predictReseau(reseau, X)
 %
 %   Pour un réseau à couches spatiales, X est un tableau H x L x P x N ;
 %   la sortie reste une matrice, une colonne par observation.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(2, 30), randn(2, 30) + 4];
+%      Y = [repmat([1; 0], 1, 30), repmat([0; 1], 1, 30)];
+%      reseau = trainNetwork(X, Y, {fullyConnectedLayer(4), reluLayer(), ...
+%               fullyConnectedLayer(2), softmaxLayer()}, trainingOptions('sgdm'));
+%      max(abs(sum(predictReseau(reseau, X), 1) - 1)) < 1e-10     % un softmax somme a un
     y = X;
     couches = reseau.couches;
     for k = 1:numel(couches)

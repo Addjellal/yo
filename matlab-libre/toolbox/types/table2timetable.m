@@ -3,6 +3,12 @@ function tt = table2timetable(t, varargin)
 %   TT = TABLE2TIMETABLE(T) utilise la première variable datetime ou
 %   duration comme axe de temps. TABLE2TIMETABLE(T,'RowTimes',T0) impose
 %   un autre vecteur d'instants.
+%
+%   Exemple :
+%      t = table((1:3)', 'VariableNames', {'v'});
+%      t.Time = datetime(2024, 1, (1:3)');
+%      tt = table2timetable(t, 'RowTimes', 'Time');
+%      height(tt)                  % 3
     temps = [];
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'RowTimes'), temps = varargin{k + 1}; end

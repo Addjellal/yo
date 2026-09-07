@@ -4,6 +4,11 @@ function [duree, debut, fin] = settlingtime(x, fs, d)
 %   l'instant à partir duquel le signal reste dans une bande de D pour
 %   cent de l'écart entre états autour du niveau atteint. D vaut 2 par
 %   défaut.
+%
+%   Exemple :
+%      t = (0:0.001:1)';
+%      d = settlingtime(1 - exp(-20 * t), 1000);
+%      d > 0                       % 1
     if nargin < 2 || isempty(fs), fs = 1; end
     if nargin < 3 || isempty(d), d = 2; end
     x = double(x(:));

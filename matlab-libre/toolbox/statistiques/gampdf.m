@@ -1,6 +1,7 @@
 function y = gampdf(x, a, b)
 %GAMPDF Densité de la loi gamma, de forme A et d'échelle B.
-%   Exemple :  gampdf(1, 1, 1)   % exp(-1), la loi exponentielle
+%   Exemple :
+%      gampdf(1, 1, 1)   % exp(-1), la loi exponentielle
     if nargin < 3, b = 1; end
     x = double(x);
     y = zeros(size(x));

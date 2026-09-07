@@ -1,6 +1,10 @@
 function [x, y, coude] = fkine2R(q, l1, l2)
 %FKINE2R Cinématique directe d'un bras plan à deux segments.
 %   [X,Y] = FKINE2R([Q1 Q2],L1,L2) rend la position de l'effecteur.
+%
+%   Exemple :
+%      [x, y] = fkine2R([0 0], 1, 1);
+%      [x y]                       % 2 0 : le bras est tendu
     if nargin < 2, l1 = 1; end
     if nargin < 3, l2 = 1; end
     coude = [l1 * cos(q(1)), l1 * sin(q(1))];

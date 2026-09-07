@@ -1,6 +1,12 @@
 function [etiquettes, scores] = predictSvm(modele, X)
 %PREDICTSVM Prédiction d'une machine à vecteurs de support.
 %   Employer PREDICT ; cette fonction est le rouage qu'il appelle.
+%
+%   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
+%      mean(predictSvm(fitcsvm(X, y), X) == y) > 0.9
     X = double(X);
     X = (X - repmat(modele.Centre, size(X, 1), 1)) ./ ...
         repmat(modele.Echelle, size(X, 1), 1);

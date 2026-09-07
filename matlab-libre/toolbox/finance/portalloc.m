@@ -1,6 +1,11 @@
 function [poids, rendement, risque] = portalloc(rendements, covariance, cible)
 %PORTALLOC Portefeuille de variance minimale pour un rendement cible.
 %   Résolution analytique par multiplicateurs de Lagrange.
+%
+%   Exemple :
+%      C = [0.04 0.01; 0.01 0.09];
+%      [poids, r, risque] = portalloc([0.08 0.12], C, 0.10);
+%      abs(sum(poids) - 1) < 1e-9      % le portefeuille est pleinement investi
     n = numel(rendements);
     mu = rendements(:);
     un = ones(n, 1);

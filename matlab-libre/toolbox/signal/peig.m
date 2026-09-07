@@ -2,6 +2,13 @@ function [S, f] = peig(x, p, nfft, fs)
 %PEIG Pseudospectre par la méthode des vecteurs propres.
 %   Comme PMUSIC, avec chaque vecteur du sous-espace bruit pondéré par
 %   l'inverse de sa valeur propre.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [S, f] = peig(x, 2, 256, 1);
+%      [~, k] = max(S);
+%      abs(f(k) - 0.1) < 0.02      % la raie est retrouvee
     if nargin < 3 || isempty(nfft), nfft = 256; end
     if nargin < 4 || isempty(fs), fs = 1; end
     [R, m] = signalMatriceCorrelation(x, p, false);

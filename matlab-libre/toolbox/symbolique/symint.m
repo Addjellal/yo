@@ -1,6 +1,13 @@
 function primitive = symint(e, variable)
 %SYMINT Primitive des formes polynomiales et élémentaires.
 %   Reconnaît les constantes, x^n, sin, cos, exp et les sommes.
+%
+%   Exemple :
+%      x = sym('x');
+%      primitive = symint(x, 'x');
+%      symeval(symdiff(primitive, 'x'), {'x'}, {3})     % 3 : deriver annule integrer
+%      symeval(primitive, {'x'}, {2})                   % 2 : l'aire sous x de 0 a 2
+    e = matlibre_sym_arbre(e);
     operateur = e{1};
     switch operateur
         case 'num'

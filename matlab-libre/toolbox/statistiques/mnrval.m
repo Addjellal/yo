@@ -5,9 +5,13 @@ function P = mnrval(B, X, varargin)
 %   plus que B : la dernière est celle de la catégorie de référence.
 %
 %   Exemple :
+%      rng(1);
+%      X = [randn(60, 1); randn(60, 1) + 3; randn(60, 1) + 6];
+%      y = [ones(60, 1); 2 * ones(60, 1); 3 * ones(60, 1)];
 %      B = mnrfit(X, y);
 %      P = mnrval(B, X);
 %      [~, predites] = max(P, [], 2);
+%      max(abs(sum(P, 2) - 1)) < 1e-10    % 1 : les probabilites somment a un
 %
 %   Voir aussi MNRFIT, FITGLM.
     X = double(X);

@@ -1,6 +1,10 @@
 function K = noyauGp(A, B, nom, longueur, signal)
 %NOYAUGP Fonction de covariance d'un processus gaussien.
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      K = noyauGp([0; 1; 2], [0; 1; 2], 'squaredexponential', 1, 1);
+%      max(abs(diag(K) - 1)) < 1e-12          % la variance a distance nulle
     carres = repmat(sum(A .^ 2, 2), 1, size(B, 1)) + ...
              repmat(sum(B .^ 2, 2).', size(A, 1), 1) - 2 * (A * B.');
     d = sqrt(max(carres, 0));

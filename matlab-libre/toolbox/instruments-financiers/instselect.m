@@ -5,6 +5,8 @@ function [jeuChoisi, indices] = instselect(jeu, varargin)
 %   type ; INSTSELECT(JEU,'Index',I) ceux de numéros donnés.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+%      jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
 %      [court, rangs] = instselect(jeu, 'FieldName', 'CouponRate', 'Data', 0.05);
 %
 %   Voir aussi INSTGET, INSTDELETE, INSTFIELDS.

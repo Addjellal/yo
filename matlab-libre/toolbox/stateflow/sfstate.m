@@ -20,6 +20,7 @@ function machine = sfstate(machine, nom, entree, pendant, sortie)
 %   seule mémoire d'état.
 %
 %   Exemple :
+%      m = sfchart('compteur');
 %      m = sfstate(m, 'compte', @(c) setfield(c, 'total', c.total + 1));
 %      [~, contexte] = sfrun(m, [1 0 1 0 1], struct('total', 0));
 %

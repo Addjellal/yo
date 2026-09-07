@@ -4,6 +4,8 @@ function [donnees, noms, classes, indices] = instgetcell(jeu, varargin)
 %   D, une cellule par champ demandé, et leurs noms dans N.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+%      jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
 %      [d, n] = instgetcell(jeu, 'FieldList', {'CouponRate','Maturity'})
 %
 %   Voir aussi INSTGET, INSTFIELDS, INSTSELECT.

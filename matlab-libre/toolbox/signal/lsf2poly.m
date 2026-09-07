@@ -2,6 +2,10 @@ function a = lsf2poly(lsf)
 %LSF2POLY Polynôme de prédiction à partir des fréquences de raies.
 %   Inverse de POLY2LSF : les racines de rangs pairs reconstituent Q,
 %   celles de rangs impairs P, et A = (P + Q)/2.
+%
+%   Exemple :
+%      a = poly([0.5 -0.3]);
+%      max(abs(lsf2poly(poly2lsf(a)) - a)) < 1e-10
     lsf = double(lsf(:));
     p = numel(lsf);
     % Les LSF s'entrelacent : une racine sur deux appartient à P.

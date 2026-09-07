@@ -3,6 +3,10 @@ function [premier, second] = ordresBior(nom, prefixe)
 %   [NR,ND] = ORDRESBIOR('bior2.4','bior') rend 2 et 4.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [nr, nd] = ordresBior('bior2.4', 'bior');
+%      [nr nd]                     % 2 4
     nom = lower(strtrim(char(nom)));
     n = numel(prefixe);
     if numel(nom) <= n || ~strcmp(nom(1:n), prefixe)

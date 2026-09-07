@@ -3,6 +3,10 @@ function y = dct(x, n)
 %   Y = DCT(X) applique la transformée utilisée par MATLAB :
 %      y(k) = w(k) * sum_{m=1}^{N} x(m) cos(pi (2m-1)(k-1) / (2N))
 %   avec w(1) = 1/sqrt(N) et w(k) = sqrt(2/N) sinon.
+%
+%   Exemple :
+%      x = [1 2 3 4 5]';
+%      max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
     x = x(:);
     if nargin > 1 && ~isempty(n)
         if numel(x) > n

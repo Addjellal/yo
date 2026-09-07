@@ -37,10 +37,14 @@ COMPLEMENTARYFILTER Fusion d'un angle bruité et d'une vitesse dérivante.
   d'un modèle qu'il faut écrire.
 
   Exemple :
+     rng(1);
+     mesure = 30 + 2 * randn(100, 1);       % accelerometre, bruite
+     gyro = zeros(100, 1);                  % gyrometre, sans vitesse
      angle = 0;
      for k = 1:100
          angle = complementaryFilter(mesure(k), gyro(k), 0.01, 0.98, angle);
      end
+     abs(angle - 30) < 5                    % 1 : il converge vers la mesure
 
   Voir aussi KALMANFILTER, MADGWICKUPDATE.
 ```
@@ -71,7 +75,9 @@ KALMANFILTER Un pas de filtre de Kalman linéaire (prédiction et correction).
      A = [1 0.1; 0 1]; H = [1 0];
      Q = diag([1e-4 1e-3]); R = 0.5;
      x = [0; 0]; P = eye(2);
+     mesure = 1.2;
      [x, P] = kalmanFilter(x, P, mesure, A, H, Q, R);
+     trace(P) < 2                       % 1 : la mesure a reduit l'incertitude
 
   Voir aussi COMPLEMENTARYFILTER, EKFPREDICT, EKFUPDATE, TRACKASSIGN.
 ```
@@ -106,7 +112,9 @@ MADGWICKUPDATE Estimation d'attitude par la méthode de Madgwick.
 
   Exemple :
      q = [1 0 0 0];
-     for k = 1:1000
+     gyro = zeros(200, 3);
+     accel = repmat([0 0 -1], 200, 1);      % au repos, a plat
+     for k = 1:200
          q = madgwickUpdate(q, gyro(k, :), accel(k, :), 0.01, 0.1);
      end
      quat2eul(q)

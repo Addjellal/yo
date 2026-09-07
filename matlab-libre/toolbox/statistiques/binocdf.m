@@ -4,7 +4,8 @@ function p = binocdf(x, n, pr)
 %   régularisée : P(X <= k) = I_{1-p}(n-k, k+1). C'est exact pour tout N,
 %   là où la somme directe coûterait N termes.
 %
-%   Exemple :  binocdf(5, 10, 0.5)   % 0.623046875
+%   Exemple :
+%      binocdf(5, 10, 0.5)   % 0.623046875
     [x, n, pr] = statAjuster(x, n, pr);
     p = zeros(size(x));
     k = floor(x);

@@ -20,6 +20,9 @@ function descripteurs = faultFeatures(signal, fs)
 %   bruit blanc tombe au milieu de la bande.
 %
 %   Exemple :
+%      rng(1);
+%      t = (0:9999)' / 10000;
+%      vibration = sin(2*pi*120*t) + 0.05 * randn(10000, 1);
 %      d = faultFeatures(vibration, 10000);
 %      d.kurtosis                      % au-dessus de 3 : des chocs
 %      d.centroide                     % ou l'energie se concentre

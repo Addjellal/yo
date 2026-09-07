@@ -3,7 +3,8 @@ function [p, erreur_] = seqperiod(x)
 %   P = SEQPERIOD(X) cherche le plus petit P tel que X(k+P) = X(k) pour
 %   tout k possible. Sans période exacte, rend celle qui minimise l'écart.
 %
-%   Exemple :  seqperiod([1 2 1 2 1 2])   % 2
+%   Exemple :
+%      seqperiod([1 2 1 2 1 2])   % 2
     x = x(:);
     n = numel(x);
     meilleur = n;

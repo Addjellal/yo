@@ -17,8 +17,10 @@ function options = gaoptimset(varargin)
 %   deux mènent à la même structure.
 %
 %   Exemple :
-%      o = gaoptimset('PopulationSize', 200, 'Generations', 300);
-%      x = ga(@(v) sum(v .^ 2), 3, -5, 5, o);
+%      o = gaoptimset('PopulationSize', 40, 'Generations', 60);
+%      rng(1);
+%      x = ga(@(v) sum(v .^ 2), 2, [], [], [], [], [-5 -5], [5 5], [], o);
+%      norm(x) < 1         % 1 : le minimum est en zero
 %
 %   Voir aussi GA, GAMULTIOBJ, PSOPTIMSET, SAOPTIMSET, OPTIMOPTIONS.
     defauts = struct('PopulationSize', 50, 'Generations', 100, ...

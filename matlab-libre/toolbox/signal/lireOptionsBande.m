@@ -4,6 +4,10 @@ function [w, options] = lireOptionsBande(w, varargin)
 %   Steepness, StopbandAttenuation et ImpulseResponse.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [w, o] = lireOptionsBande(200, 1000, 'Steepness', 0.9);
+%      w                           % 0.4 : 200 Hz a 1 kHz
     options = struct('Steepness', 0.85, 'StopbandAttenuation', 60, ...
                      'ImpulseResponse', 'iir');
     w = double(w(:)).';

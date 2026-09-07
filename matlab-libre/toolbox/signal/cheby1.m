@@ -1,4 +1,4 @@
-function [b, a, k] = cheby1(n, rp, Wn, genre)
+function [b, a, k] = cheby1(n, rp, Wn, varargin)
 %CHEBY1 Filtre de Chebyshev de type I.
 %   [B,A] = CHEBY1(N,RP,WN) conçoit un passe-bas d'ordre N dont
 %   l'ondulation en bande passante vaut RP décibels ; WN est la fréquence
@@ -9,11 +9,14 @@ function [b, a, k] = cheby1(n, rp, Wn, genre)
 %   Le prototype analogique est transformé par la bilinéaire, avec
 %   pré-distorsion de la fréquence, comme le fait MATLAB.
 %
+%   [B,A] = CHEBY1(...,'s') conçoit un filtre analogique : WN est alors
+%   en radians par seconde, et aucune pré-distorsion n'a lieu.
+%
 %   Exemple :
 %      [b, a] = cheby1(2, 1, 0.3);
 %
 %   Voir aussi BUTTER, CHEBY2, FIR1.
-    if nargin < 4, genre = 'low'; end
+    [genre, analogique] = matlibre_genre_filtre(varargin);
     epsilon = sqrt(10^(rp / 10) - 1);
     % Pôles du prototype analogique, sur une ellipse.
     mu = asinh(1 / epsilon) / n;
@@ -31,7 +34,12 @@ function [b, a, k] = cheby1(n, rp, Wn, genre)
     else
         reference = 1;
     end
-    [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, [], gain, Wn, genre, reference);
+    if analogique
+        [b, a, zNum, pNum, kNum] = ...
+            matlibre_prototype_analogique(poles, [], gain, Wn, genre, reference);
+    else
+        [b, a, zNum, pNum, kNum] = prototypeVersNumerique(poles, [], gain, Wn, genre, reference);
+    end
     % Trois sorties : MATLAB rend alors la forme zéros-pôles-gain, dont la
     % conception numérique est plus stable que celle des coefficients.
     if nargout > 2

@@ -3,6 +3,12 @@ function [coefficients, scores, valeurs, expliquee] = pca(X)
 %   [C,S,L] = PCA(X) centre les colonnes de X, puis rend les vecteurs
 %   propres de la covariance (C), les coordonnées des individus (S) et les
 %   valeurs propres (L), triés par variance décroissante.
+%
+%   Exemple :
+%      rng(1);
+%      X = randn(200, 2) * [2 0; 0 0.1];
+%      [c, s, v, expliquee] = pca(X);
+%      expliquee(1) > 95           % le premier axe porte presque tout
     [n, p] = size(X);
     mu = mean(X);
     Xc = X - repmat(mu, n, 1);

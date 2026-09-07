@@ -2,6 +2,10 @@ function tf = islinphase(b, a)
 %ISLINPHASE Le filtre est-il à phase linéaire ?
 %   Un RIF est à phase linéaire si ses coefficients sont symétriques ou
 %   antisymétriques. Un RII ne l'est qu'avec un dénominateur trivial.
+%
+%   Exemple :
+%      islinphase([1 2 3 2 1], 1)  % 1 : un RIF symetrique est a phase lineaire
+%      islinphase([1 2 3], 1)      % 0
     if nargin < 2, a = 1; end
     a = double(a(:)).';
     b = double(b(:)).';

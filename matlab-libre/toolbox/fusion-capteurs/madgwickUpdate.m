@@ -26,7 +26,9 @@ function q = madgwickUpdate(q, gyro, accel, dt, beta)
 %
 %   Exemple :
 %      q = [1 0 0 0];
-%      for k = 1:1000
+%      gyro = zeros(200, 3);
+%      accel = repmat([0 0 -1], 200, 1);      % au repos, a plat
+%      for k = 1:200
 %          q = madgwickUpdate(q, gyro(k, :), accel(k, :), 0.01, 0.1);
 %      end
 %      quat2eul(q)

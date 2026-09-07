@@ -6,6 +6,12 @@ function [R, m] = signalMatriceCorrelation(x, p, estCorrelation)
 %   suffisant pour laisser un sous-espace bruit non vide.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [R, m] = signalMatriceCorrelation(x, 2, false);
+%      max(max(abs(R - R'))) < 1e-8           % 1 : elle est symetrique
     if nargin >= 3 && estCorrelation
         R = double(x);
         m = size(R, 1);

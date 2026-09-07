@@ -4,7 +4,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Fonctions natives
 
-651 fonctions ecrites en C++, reparties en 22 groupes.
+653 fonctions ecrites en C++, reparties en 22 groupes.
 
 | Groupe | Fichier |
 |---|---|
@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2636 fonctions ecrites dans le langage, reparties en 53 toolboxes.
+2644 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -68,6 +68,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`instruments-financiers`](reference/toolbox-instruments-financiers.md) | 82 |
 | [`interface`](reference/toolbox-interface.md) | 17 |
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
+| [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
 | [`matlab`](reference/toolbox-matlab.md) | 210 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
@@ -81,11 +82,11 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`rf`](reference/toolbox-rf.md) | 7 |
 | [`robotique`](reference/toolbox-robotique.md) | 74 |
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
-| [`signal`](reference/toolbox-signal.md) | 201 |
+| [`signal`](reference/toolbox-signal.md) | 208 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
 | [`simulink`](reference/toolbox-simulink.md) | 6 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
-| [`statistiques`](reference/toolbox-statistiques.md) | 292 |
+| [`statistiques`](reference/toolbox-statistiques.md) | 293 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 42 |
 | [`types`](reference/toolbox-types.md) | 40 |
 | [`vehicule`](reference/toolbox-vehicule.md) | 4 |

@@ -225,6 +225,11 @@ AC2POLY Polynôme de prédiction d'une suite d'autocorrélation.
 AC2RC Coefficients de réflexion d'une suite d'autocorrélation.
   [K,R0] = AC2RC(R) applique Levinson-Durbin : R(1) est la puissance du
   signal, K les coefficients de réflexion des ordres successifs.
+
+  Exemple :
+     r = [1 0.5 0.2];
+     [k, r0] = ac2rc(r);
+     all(abs(k) < 1)             % 1 : une autocorrelation valide donne |k| < 1
 ```
 
 ## `alignsignals`
@@ -233,6 +238,11 @@ AC2RC Coefficients de réflexion d'une suite d'autocorrélation.
 ALIGNSIGNALS Aligne deux signaux en compensant leur retard.
   [XA,YA,D] = ALIGNSIGNALS(X,Y) ajoute des zéros en tête du signal en
   avance, de sorte que les deux se superposent.
+
+  Exemple :
+     x = [0 0 1 2 3 0];
+     [xa, ya, d] = alignsignals(x, [1 2 3 0 0 0]);
+     d                           % le decalage retrouve
 ```
 
 ## `appliquerBande`
@@ -240,6 +250,13 @@ ALIGNSIGNALS Aligne deux signaux en compensant leur retard.
 ```
 APPLIQUERBANDE Filtrage à phase nulle des fonctions lowpass et voisines.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     rng(1);
+     t = (0:255)' / 256;
+     y = appliquerBande(sin(2*pi*5*t) + 0.5*sin(2*pi*90*t), b, a);
+     rms(y - sin(2*pi*5*t)) < 0.3
 ```
 
 ## `arSpectre`
@@ -250,6 +267,10 @@ ARSPECTRE Densité spectrale d'un modèle autorégressif.
   moitié positive du spectre quand on ne garde qu'un côté.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [pxx, f] = arSpectre([1 -0.5], 1, 512, 1);
+     pxx(1) > pxx(end)           % 1 : un pole reel positif est passe-bas
 ```
 
 ## `arburg`
@@ -263,7 +284,10 @@ ARBURG Modèle autorégressif par la méthode de Burg.
   courtes, et le filtre reste toujours stable.
 
   Exemple :
-     a = arburg(x, 4);
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [a, e] = arburg(x, 4);
+     all(abs(roots(a)) < 1) % 1 : Burg garantit un modele stable
 ```
 
 ## `arcov`
@@ -273,6 +297,12 @@ ARCOV Modèle autorégressif par la méthode de la covariance.
   Moindres carrés sur l'erreur de prédiction avant, sans fenêtrage : on
   n'utilise que les échantillons pour lesquels toute la fenêtre de
   prédiction existe.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [a, e] = arcov(x, 4);
+     numel(a)                    % 5 : un modele d'ordre quatre
 ```
 
 ## `armcov`
@@ -281,6 +311,12 @@ ARCOV Modèle autorégressif par la méthode de la covariance.
 ARMCOV Modèle autorégressif par la covariance modifiée.
   Moindres carrés sur les erreurs de prédiction avant et arrière à la
   fois : c'est la méthode qui résout le mieux deux sinusoïdes proches.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [a, e] = armcov(x, 4);
+     all(abs(roots(a)) < 1.2)
 ```
 
 ## `aryule`
@@ -463,6 +499,10 @@ BITREVORDER Range un vecteur en ordre de bits inversés.
 ```
 BLACKMANHARRIS Fenêtre de Blackman-Harris à quatre termes.
   Coefficients : 0,35875 ; 0,48829 ; 0,14128 ; 0,01168.
+
+  Exemple :
+     w = blackmanharris(64);
+     max(w)                      % 1 : la fenetre est normalisee a son sommet
 ```
 
 ## `bohmanwin`
@@ -537,14 +577,20 @@ BUTTER Filtre numérique de Butterworth.
   les deux bandes : il n'ondule nulle part, au prix d'une transition
   plus douce qu'un Chebyshev de même ordre.
 
+  [B,A] = BUTTER(N,WN,'s') conçoit un filtre analogique : WN est alors
+  en radians par seconde et n'est plus borné à un. 'high' et 'stop' se
+  combinent avec 's' — BUTTER(N,WN,'high','s').
+
   Le prototype analogique est transposé par transformation bilinéaire
   avec pré-distorsion de la fréquence, comme le fait la fonction de
-  référence.
+  référence. En analogique il n'y a rien à pré-distordre : seule la
+  transformation de bande s'applique.
 
   Exemples :
      [b, a] = butter(4, 0.3);
      [b, a] = butter(2, [0.2 0.5]);      % passe-bande d'ordre 4
      [z, p, k] = butter(4, 0.3);         % zeros, poles et gain
+     [b, a] = butter(4, 100, 's');       % analogique, 100 rad/s
 
   Voir aussi BUTTAP, BUTTORD, CHEBY1, CHEBY2, ELLIP, FILTFILT.
 ```
@@ -608,6 +654,10 @@ CHEB1AP Prototype analogique de Chebyshev de type I.
 CHEB1ORD Ordre minimal d'un filtre de Chebyshev de type I.
   [N,WN] = CHEB1ORD(WP,WS,RP,RS). WN vaut WP : la bande passante est
   fixée par l'ondulation.
+
+  Exemple :
+     [n, Wn] = cheb1ord(0.2, 0.3, 1, 40);
+     n                           % l'ordre minimal qui tient le gabarit
 ```
 
 ## `cheb2ap`
@@ -632,6 +682,10 @@ CHEB2AP Prototype analogique de Chebyshev de type II.
 ```
 CHEB2ORD Ordre minimal d'un filtre de Chebyshev de type II.
   WN vaut WS : c'est la bande atténuée qui est fixée.
+
+  Exemple :
+     [n, Wn] = cheb2ord(0.2, 0.3, 1, 40);
+     n
 ```
 
 ## `chebwin`
@@ -664,6 +718,9 @@ CHEBY1 Filtre de Chebyshev de type I.
   Le prototype analogique est transformé par la bilinéaire, avec
   pré-distorsion de la fréquence, comme le fait MATLAB.
 
+  [B,A] = CHEBY1(...,'s') conçoit un filtre analogique : WN est alors
+  en radians par seconde, et aucune pré-distorsion n'a lieu.
+
   Exemple :
      [b, a] = cheby1(2, 1, 0.3);
 
@@ -674,8 +731,36 @@ CHEBY1 Filtre de Chebyshev de type I.
 
 ```
 CHEBY2 Filtre de Chebyshev de type II, ondulation en bande atténuée.
-  [B,A] = CHEBY2(N,RS,WN) : RS est l'atténuation minimale en décibels
-  dans la bande coupée.
+  [B,A] = CHEBY2(N,RS,WN) conçoit un passe-bas d'ordre N de fréquence de
+  coupure normalisée WN (0 < WN < 1, 1 = Nyquist). RS est l'atténuation
+  minimale en décibels dans la bande coupée.
+  [Z,P,K] = CHEBY2(...) rend la forme zéros-pôles-gain.
+  [B,A] = CHEBY2(N,RS,WN,'high') conçoit un passe-haut, et
+  CHEBY2(N,RS,[W1 W2]) un passe-bande d'ordre 2N, 'stop' un coupe-bande.
+  [B,A] = CHEBY2(...,'s') conçoit un filtre analogique : WN est alors en
+  radians par seconde, et aucune pré-distorsion n'a lieu.
+
+  Le type II est l'inverse du type I : il ondule dans la bande coupée et
+  reste monotone dans la bande passante. C'est ce qui le fait préférer
+  quand la bande utile doit être plate — l'ondulation est reléguée là où
+  le signal ne passe pas.
+
+  Il l'obtient en plaçant des zéros sur l'axe imaginaire : la réponse
+  s'annule exactement à ces fréquences, et remonte entre elles jusqu'à
+  RS. Un ordre impair laisse un zéro à l'infini, si bien que le filtre
+  tend vers zéro au lieu d'osciller indéfiniment.
+
+  WN désigne ici le début de la bande coupée, non la coupure à -3 dB :
+  c'est la fréquence où l'atténuation atteint RS. Un Chebyshev de type I
+  et un de type II de mêmes ordre et WN n'ont donc pas la même bande
+  passante.
+
+  Exemples :
+     [b, a] = cheby2(4, 40, 0.3);
+     [b, a] = cheby2(6, 60, [0.2 0.5]);     % passe-bande d'ordre 12
+     [b, a] = cheby2(4, 40, 100, 's');      % analogique, 100 rad/s
+
+  Voir aussi CHEBY1, CHEB2AP, CHEB2ORD, BUTTER, ELLIP, FILTFILT.
 ```
 
 ## `chirp`
@@ -684,6 +769,11 @@ CHEBY2 Filtre de Chebyshev de type II, ondulation en bande atténuée.
 CHIRP Sinusoïde à fréquence instantanée variable.
   Y = CHIRP(T,F0,T1,F1) balaie linéairement de F0 (à t=0) à F1 (à t=T1).
   Y = CHIRP(T,F0,T1,F1,'quadratic') fait un balayage quadratique.
+
+  Exemple :
+     t = (0:1023)' / 1024;
+     y = chirp(t, 0, 1, 100);
+     numel(y)                    % 1024 : un point par instant
 ```
 
 ## `concevoirBande`
@@ -696,6 +786,11 @@ CONCEVOIRBANDE Filtre d'ordre minimal pour lowpass et ses voisines.
   défaut.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [w, o] = lireOptionsBande(0.3);
+     [b, a] = concevoirBande(w, 'low', o);
+     abs(abs(polyval(b, 1) / polyval(a, 1)) - 1) < 0.2   % le continu passe
 ```
 
 ## `convmtx`
@@ -709,7 +804,10 @@ CONVMTX Matrice de convolution.
 
   Exemple :
      h = [1 2 3];
-     isequal(convmtx(h, 4) * (1:4)', conv(h, 1:4)')   % vrai... en colonne
+     % H en ligne : la matrice est n x (m+n-1), et l'on multiplie a gauche.
+     isequal((1:4) * convmtx(h, 4), conv(1:4, h))       % vrai
+     % H en colonne : la matrice est (m+n-1) x n, et l'on multiplie a droite.
+     isequal(convmtx(h', 4) * (1:4)', conv(1:4, h)')    % vrai
 
   Voir aussi CONV, CORRMTX, TOEPLITZ, FILTER.
 ```
@@ -735,6 +833,12 @@ CORRMTX Matrice de données pour l'estimation de la corrélation.
 CPSD Densité interspectrale de puissance, par la méthode de Welch.
   [PXY,F] = CPSD(X,Y,...) : même découpage que PWELCH, mais le produit
   croisé X conjugué par Y.
+
+  Exemple :
+     rng(1);
+     x = randn(1024, 1);
+     [p, f] = cpsd(x, filter(1, [1 -0.8], x), [], [], 256, 1);
+     numel(p) == numel(f)        % 1
 ```
 
 ## `czt`
@@ -780,6 +884,10 @@ DCT Transformée en cosinus discrète de type II, normalisée.
   Y = DCT(X) applique la transformée utilisée par MATLAB :
      y(k) = w(k) * sum_{m=1}^{N} x(m) cos(pi (2m-1)(k-1) / (2N))
   avec w(1) = 1/sqrt(N) et w(k) = sqrt(2/N) sinon.
+
+  Exemple :
+     x = [1 2 3 4 5]';
+     max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
 ```
 
 ## `decimate`
@@ -801,6 +909,12 @@ DEMOD Démodulation, réciproque de MODULATE.
   X = DEMOD(Y,FC,FS,METHODE). La démodulation d'amplitude multiplie par
   la porteuse puis filtre passe-bas ; celle de phase et de fréquence
   passe par la transformée de Hilbert.
+
+  Exemple :
+     t = (0:999)' / 1000;
+     porteuse = cos(2 * pi * 100 * t) .* (1 + 0.5 * cos(2 * pi * 5 * t));
+     x = demod(porteuse, 100, 1000, 'am');
+     numel(x)                    % 1000
 ```
 
 ## `detrend`
@@ -829,6 +943,10 @@ DETREND Retire la tendance d'un signal.
 DFTMTX Matrice de la transformée de Fourier discrète.
   M = DFTMTX(N) : M*X vaut FFT(X). La matrice coûte N^2 : elle sert à
   raisonner, pas à calculer.
+
+  Exemple :
+     F = dftmtx(4);
+     max(abs(F * [1 0 0 0]' - ones(4, 1))) < 1e-12   % 1 : l'impulsion donne du plat
 ```
 
 ## `diric`
@@ -841,7 +959,8 @@ DIRIC Fonction de Dirichlet, ou sinus cardinal périodique.
   C'est la transformée de Fourier de la fenêtre rectangulaire de N
   points, normalisée.
 
-  Exemple :  diric(0, 5)   % 1
+  Exemple :
+     diric(0, 5)   % 1
 ```
 
 ## `dpss`
@@ -869,7 +988,8 @@ DPSS Suites sphéroïdales aplaties discrètes, ou fenêtres de Slepian.
 DST Transformée en sinus discrète, première espèce.
   Y(k) = somme des X(n) sin(pi n k/(N+1)), k = 1..N.
 
-  Exemple :  dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
+  Exemple :
+     dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
 ```
 
 ## `dutycycle`
@@ -897,8 +1017,13 @@ ELLIP Filtre elliptique, ou filtre de Cauer.
   plus raide : il ondule dans les deux bandes, là où Chebyshev n'ondule
   que dans l'une et Butterworth dans aucune.
 
-  Exemple :
+  [B,A] = ELLIP(...,'s') conçoit un filtre analogique : WN est alors
+  en radians par seconde, et aucune pré-distorsion n'a lieu.
+
+  Exemples :
      [b, a] = ellip(4, 1, 40, 0.3);
+
+     [b, a] = ellip(4, 1, 40, 100, 's');    % analogique, 100 rad/s
 
   Voir aussi ELLIPORD, BUTTER, CHEBY1, CHEBY2, BESSELF.
 ```
@@ -949,7 +1074,8 @@ ENBW Largeur de bande de bruit équivalente d'une fenêtre.
   B = ENBW(W) rend N*sum(w.^2)/sum(w)^2, en bacs de la transformée.
   ENBW(W,FS) la donne en hertz.
 
-  Exemple :  enbw(rectwin(10))   % 1
+  Exemple :
+     enbw(rectwin(10))   % 1
 ```
 
 ## `envelope`
@@ -1003,6 +1129,11 @@ EQTFLENGTH Met deux polynômes de transfert à la même longueur.
 ```
 FALLTIME Temps de descente d'un signal à deux états.
   Symétrique de RISETIME : de 90 % à 10 % sur chaque front descendant.
+
+  Exemple :
+     t = (0:0.001:0.1)';
+     [d, debut, fin] = falltime(double(t < 0.05), 1000);
+     d > 0                       % 1 : la descente prend un temps fini
 ```
 
 ## `filtic`
@@ -1049,6 +1180,10 @@ FINDPEAKS Maxima locaux d'un signal.
   PICS = FINDPEAKS(X) rend les valeurs des maxima locaux.
   [PICS,POS] = FINDPEAKS(X) rend aussi leurs indices.
   Options par paires : 'MinPeakHeight', 'MinPeakDistance'.
+
+  Exemple :
+     [pics, positions] = findpeaks([0 1 0 3 0 2 0]);
+     positions                   % 2 4 6
 ```
 
 ## `fir1`
@@ -1129,6 +1264,10 @@ FIRPM Filtre RIF équiondulant, par l'échange de Remez.
 FIRTYPE Type d'un filtre RIF à phase linéaire, de 1 à 4.
   Type 1 : symétrique, longueur impaire.  Type 2 : symétrique, paire.
   Type 3 : antisymétrique, impaire.       Type 4 : antisymétrique, paire.
+
+  Exemple :
+     firtype([1 2 3 2 1])        % 1 : symetrique, longueur impaire
+     firtype([1 2 2 1])          % 2 : symetrique, longueur paire
 ```
 
 ## `flattopwin`
@@ -1137,6 +1276,10 @@ FIRTYPE Type d'un filtre RIF à phase linéaire, de 1 à 4.
 FLATTOPWIN Fenêtre à sommet plat, pour la mesure d'amplitude.
   Coefficients de MathWorks : 0,21557895 ; 0,41663158 ; 0,277263158 ;
   0,083578947 ; 0,006947368.
+
+  Exemple :
+     w = flattopwin(64);
+     max(w)                      % 1 : elle sert a mesurer une amplitude
 ```
 
 ## `freqs`
@@ -1146,7 +1289,8 @@ FREQS Réponse en fréquence d'un filtre analogique.
   H = FREQS(B,A,W) évalue B(s)/A(s) en s = j*W. Sans W, deux cents
   points logarithmiques couvrant les pôles et les zéros.
 
-  Exemple :  abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
+  Exemple :
+     abs(freqs(1, [1 1], 1))   % 1/sqrt(2), le passe-bas RC
 ```
 
 ## `fwht`
@@ -1191,6 +1335,10 @@ GAUSSWIN Fenêtre gaussienne.
   demi-largeurs. ALPHA vaut 2,5 par défaut.
 
   W(k) = exp(-0.5 * (ALPHA * (2k/(N-1) - 1))^2).
+
+  Exemple :
+     w = gausswin(64);
+     abs(w(32) - max(w)) < 0.01  % le sommet est au milieu
 ```
 
 ## `goertzel`
@@ -1218,6 +1366,11 @@ GRPDELAY Temps de propagation de groupe d'un filtre numérique.
   Le retard est -d(arg H)/dw ; il se calcule ici par la formule exacte
   Re{ (B'(w)/B(w)) - (A'(w)/A(w)) }, où les dérivées viennent de la
   pondération des coefficients par leur indice.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [gd, w] = grpdelay(b, a, 128);
+     all(gd > 0)                 % 1 : un filtre causal retarde
 ```
 
 ## `highpass`
@@ -1277,6 +1430,10 @@ HILBERT Signal analytique par transformée de Hilbert.
 ICCEPS Cepstre complexe inverse.
   X = ICCEPS(XHAT,ND) reconstitue le signal à partir de son cepstre
   complexe et du retard ND rendu par CCEPS.
+
+  Exemple :
+     x = [1 0.5 0.25 0.125]';
+     max(abs(icceps(cceps(x), 0) - x)) < 1e-6
 ```
 
 ## `idct`
@@ -1309,6 +1466,10 @@ IDCT Transformée en cosinus discrète inverse.
 IDST Transformée en sinus discrète inverse.
   La matrice de la DST-I est symétrique et son carré vaut (N+1)/2 fois
   l'identité : l'inverse n'est donc qu'un facteur d'échelle.
+
+  Exemple :
+     x = [1 2 3 4]';
+     max(abs(idst(dst(x)) - x)) < 1e-12
 ```
 
 ## `ifwht`
@@ -1339,8 +1500,10 @@ IMPINVAR Transformation par invariance impulsionnelle.
   FS vaut 1 par défaut.
 
   Exemple :
-     [b, a] = butter(4, 0.3, 's');
-     [bz, az] = impinvar(b, a, 10);
+     [b, a] = butter(4, 2 * pi * 2, 's');     % analogique, coupure 2 Hz
+     [bz, az] = impinvar(b, a, 10);           % echantillonne a 10 Hz
+     % Les reponses impulsionnelles coincident aux instants d'echantillonnage.
+     numel(az) - 1                            % 4 : l'ordre est conserve
 
   Voir aussi BILINEAR, RESIDUE, IMPZ.
 ```
@@ -1364,6 +1527,11 @@ INTERP Augmente la fréquence d'échantillonnage d'un facteur entier.
   Y = INTERP(X,R) insère R-1 zéros entre les échantillons puis filtre
   passe-bas ; le résultat a R fois plus de points, et le gain est
   compensé pour que l'amplitude soit conservée.
+
+  Exemple :
+     x = sin(2 * pi * 0.05 * (0:63)');
+     y = interp(x, 4);
+     numel(y)                    % 256 : quatre fois plus de points
 ```
 
 ## `intfilt`
@@ -1452,6 +1620,10 @@ INVFREQZ Filtre numérique ajusté sur une réponse en fréquence complexe.
 ISLINPHASE Le filtre est-il à phase linéaire ?
   Un RIF est à phase linéaire si ses coefficients sont symétriques ou
   antisymétriques. Un RII ne l'est qu'avec un dénominateur trivial.
+
+  Exemple :
+     islinphase([1 2 3 2 1], 1)  % 1 : un RIF symetrique est a phase lineaire
+     islinphase([1 2 3], 1)      % 0
 ```
 
 ## `ismaxphase`
@@ -1459,6 +1631,9 @@ ISLINPHASE Le filtre est-il à phase linéaire ?
 ```
 ISMAXPHASE Le filtre est-il à phase maximale ?
   Tous les zéros sont hors du cercle unité, les pôles dedans.
+
+  Exemple :
+     ismaxphase([1 -2], 1)       % 1 : le zero est hors du cercle unite
 ```
 
 ## `isminphase`
@@ -1466,6 +1641,9 @@ ISMAXPHASE Le filtre est-il à phase maximale ?
 ```
 ISMINPHASE Le filtre est-il à phase minimale ?
   Tous les zéros et tous les pôles doivent être dans le cercle unité.
+
+  Exemple :
+     isminphase([1 -0.5], 1)     % 1 : le zero est dans le cercle unite
 ```
 
 ## `isstable`
@@ -1480,6 +1658,10 @@ ISSTABLE Le filtre est-il stable ?
   ISSTABLE(SYS) accepte un modèle linéaire : la stabilité s'y lit sur
   les pôles, strictement à gauche de l'axe imaginaire pour un modèle
   continu, strictement dans le cercle unité pour un modèle discret.
+
+  Exemple :
+     isstable(1, [1 -0.5])       % 1 : le pole est dans le cercle unite
+     isstable(1, [1 -1.5])       % 0
 ```
 
 ## `kaiser`
@@ -1540,10 +1722,13 @@ LATCFILT Filtrage par une structure en treillis.
   K et V : F est alors la sortie du filtre récursif.
 
   Exemple :
-     [b, a] = butter(3, 0.4);
-     k = tf2latc(b / b(1));
+     % Le treillis demande un polynome a phase minimale : les zeros de
+     % BUTTER sont sur le cercle unite, ceux-ci sont a l'interieur.
+     b = poly([0.5 -0.3 0.2]);
+     k = tf2latc(b);
+     rng(1);
      x = randn(1, 100);
-     max(abs(latcfilt(k, x) * b(1) - filter(b, 1, x)))
+     max(abs(latcfilt(k, x) - filter(b, 1, x))) < 1e-10   % 1
 
   Voir aussi TF2LATC, LATC2TF, FILTER.
 ```
@@ -1556,6 +1741,10 @@ LIREOPTIONSBANDE Arguments communs à lowpass, highpass, bandpass, bandstop.
   Steepness, StopbandAttenuation et ImpulseResponse.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [w, o] = lireOptionsBande(200, 1000, 'Steepness', 0.9);
+     w                           % 0.4 : 200 Hz a 1 kHz
 ```
 
 ## `lireOptionsSousEspace`
@@ -1565,6 +1754,10 @@ LIREOPTIONSSOUSESPACE Analyse les arguments communs aux méthodes sous-espace.
   Reconnaît une fréquence d'échantillonnage et le mot-clé 'corr'.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [fs, corr] = lireOptionsSousEspace({1000, 'corr'});
+     [fs corr]                   % 1000 et vrai
 ```
 
 ## `lowpass`
@@ -1601,12 +1794,122 @@ LOWPASS Filtre passe-bas appliqué à un signal.
   Voir aussi HIGHPASS, BANDPASS, BANDSTOP, ELLIP, FILTFILT, DESIGNFILT.
 ```
 
+## `lp2bp`
+
+```
+LP2BP Passe-bas analogique vers passe-bande.
+  [NT,DT] = LP2BP(NUM,DEN,WO,BW) transforme le passe-bas analogique de
+  coupure unité NUM(s)/DEN(s) en un passe-bande centré sur WO et de
+  largeur BW, tous deux en radians par seconde. WO et BW valent un par
+  défaut.
+
+  La transformation est s -> (s^2 + WO^2)/(BW*s). Elle double l'ordre :
+  chaque pôle du prototype en engendre deux, l'un au-dessus et l'autre
+  au-dessous de la fréquence centrale. C'est pourquoi BUTTER(N,[W1 W2])
+  rend un filtre d'ordre 2N.
+
+  Le centre est la moyenne géométrique des deux bords, non leur moyenne
+  arithmétique : la réponse est symétrique en échelle logarithmique.
+
+  Exemple :
+     [z, p, k] = buttap(2);
+     [num, den] = zp2tf(z, p, k);
+     [nt, dt] = lp2bp(num, den, 100, 20);
+     numel(dt) - 1                                    % 4 : l'ordre double
+     abs(abs(polyval(nt, 100i) / polyval(dt, 100i)) - 1) < 1e-10
+
+  Voir aussi LP2LP, LP2HP, LP2BS, BUTTAP, BILINEAR.
+```
+
+## `lp2bs`
+
+```
+LP2BS Passe-bas analogique vers coupe-bande.
+  [NT,DT] = LP2BS(NUM,DEN,WO,BW) transforme le passe-bas analogique de
+  coupure unité NUM(s)/DEN(s) en un coupe-bande centré sur WO et de
+  largeur BW, tous deux en radians par seconde. WO et BW valent un par
+  défaut.
+
+  La transformation est s -> BW*s/(s^2 + WO^2) : c'est l'inverse de
+  celle du passe-bande, et elle double l'ordre de la même façon. Le
+  continu et l'infini se retrouvent tous deux dans la bande passante, la
+  fréquence centrale dans la bande rejetée.
+
+  Elle place des zéros exactement en +/- j*WO : le rejet y est total,
+  ce qui en fait le filtre du réjecteur de secteur.
+
+  Exemple :
+     [z, p, k] = buttap(2);
+     [num, den] = zp2tf(z, p, k);
+     [nt, dt] = lp2bs(num, den, 100, 20);
+     abs(polyval(nt, 100i) / polyval(dt, 100i)) < 1e-10   % rejet total
+     abs(abs(polyval(nt, 0) / polyval(dt, 0)) - 1) < 1e-12
+
+  Voir aussi LP2LP, LP2HP, LP2BP, BUTTAP, BILINEAR.
+```
+
+## `lp2hp`
+
+```
+LP2HP Passe-bas analogique vers passe-haut.
+  [NT,DT] = LP2HP(NUM,DEN,WO) transforme le passe-bas analogique de
+  coupure unité NUM(s)/DEN(s) en un passe-haut de coupure WO en radians
+  par seconde. WO vaut un par défaut.
+
+  La transformation est s -> WO/s : elle retourne l'axe des fréquences,
+  le continu allant à l'infini et réciproquement. Ce qui était la bande
+  passante devient la bande atténuée, et le filtre obtenu a le même
+  ordre que le prototype.
+
+  Elle place autant de zéros à l'origine que le prototype avait de
+  pôles : un passe-haut doit annuler le continu, et c'est cette
+  transformation qui le lui donne.
+
+  Exemple :
+     [z, p, k] = buttap(4);
+     [num, den] = zp2tf(z, p, k);
+     [nt, dt] = lp2hp(num, den, 100);
+     abs(polyval(nt, 0) / polyval(dt, 0)) < 1e-12     % rien ne passe au continu
+
+  Voir aussi LP2LP, LP2BP, LP2BS, BUTTAP, BILINEAR.
+```
+
+## `lp2lp`
+
+```
+LP2LP Change la fréquence de coupure d'un passe-bas analogique.
+  [NT,DT] = LP2LP(NUM,DEN,WO) transforme le passe-bas analogique
+  NUM(s)/DEN(s), de coupure unité, en un passe-bas de coupure WO en
+  radians par seconde. WO vaut un par défaut.
+
+  La transformation est s -> s/WO : elle dilate l'axe des fréquences
+  sans rien changer à la forme de la réponse. Le gain au continu est
+  donc conservé, et l'ordre aussi.
+
+  C'est la première des quatre transformations de bande. Toutes partent
+  du même prototype de coupure unité — celui que rendent BUTTAP,
+  CHEB1AP, CHEB2AP et ELLIPAP — ce qui évite d'avoir à concevoir un
+  filtre différent pour chaque bande.
+
+  Exemple :
+     [z, p, k] = buttap(4);
+     [num, den] = zp2tf(z, p, k);
+     [nt, dt] = lp2lp(num, den, 100);
+     abs(polyval(nt, 0) / polyval(dt, 0) - 1) < 1e-12    % gain au continu
+
+  Voir aussi LP2HP, LP2BP, LP2BS, BUTTAP, BILINEAR, IMPINVAR.
+```
+
 ## `lsf2poly`
 
 ```
 LSF2POLY Polynôme de prédiction à partir des fréquences de raies.
   Inverse de POLY2LSF : les racines de rangs pairs reconstituent Q,
   celles de rangs impairs P, et A = (P + Q)/2.
+
+  Exemple :
+     a = poly([0.5 -0.3]);
+     max(abs(lsf2poly(poly2lsf(a)) - a)) < 1e-10
 ```
 
 ## `mag2db`
@@ -1620,6 +1923,61 @@ MAG2DB Amplitude en décibels.
      mag2db(10)      % 20
 
   Voir aussi DB2MAG, POW2DB, DB2POW.
+```
+
+## `matlibre_genre_filtre`
+
+```
+MATLIBRE_GENRE_FILTRE Démêle le type de bande et le mot-clé « s ».
+  [GENRE,ANALOGIQUE] = MATLIBRE_GENRE_FILTRE(ARGS) lit, dans les
+  arguments de queue de BUTTER, CHEBY1, CHEBY2 et ELLIP, le type de
+  bande — 'low', 'high', 'bandpass', 'stop' — et le mot-clé 's' qui
+  demande un filtre analogique. L'ordre des deux est indifférent, comme
+  dans MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `matlibre_lp_substituer`
+
+```
+MATLIBRE_LP_SUBSTITUER Remplace s par P(s)/Q(s) dans une fonction de transfert.
+  [N,D] = MATLIBRE_LP_SUBSTITUER(NUM,DEN,P,Q) rend la fonction de
+  transfert obtenue en substituant la fraction rationnelle P/Q à la
+  variable s dans NUM(s)/DEN(s).
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Le calcul suit la définition. Un polynôme A de degré n s'écrit
+  somme a_i s^(n-i) ; y substituer P/Q donne
+
+     A(P/Q) = (1/Q^n) * somme a_i P^(n-i) Q^i
+
+  Numérateur et dénominateur sont d'abord complétés à la même longueur,
+  si bien que le facteur 1/Q^n est le même pour les deux et disparaît du
+  quotient. C'est ce qui rend la substitution exacte : aucune division
+  de polynômes, seulement des produits.
+```
+
+## `matlibre_prototype_analogique`
+
+```
+MATLIBRE_PROTOTYPE_ANALOGIQUE Prototype passe-bas vers filtre analogique.
+  [B,A,Z,P,K] = MATLIBRE_PROTOTYPE_ANALOGIQUE(POLES,ZEROS,GAIN,WN,GENRE)
+  applique au prototype de coupure unité la transformation de bande
+  voulue, et rend le filtre analogique correspondant. WN est en radians
+  par seconde ; deux valeurs décrivent une bande. GAINREFERENCE est le
+  module attendu à la fréquence de référence — le continu pour un
+  passe-bas, l'infini pour un passe-haut, le centre pour un
+  passe-bande ; il vaut 1 par défaut, mais un Chebyshev de type I ou un
+  elliptique d'ordre pair descend à 10^(-RP/20).
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  C'est le pendant analogique de PROTOTYPEVERSNUMERIQUE : même
+  prototype, mêmes transformations de bande, mais sans transformation
+  bilinéaire ni pré-distorsion — l'axe des fréquences n'étant pas
+  replié, il n'y a rien à corriger.
 ```
 
 ## `maxflat`
@@ -1672,6 +2030,10 @@ MAXFLAT Filtre passe-bas à réponse la plus plate possible.
 ```
 MEANFREQ Fréquence moyenne, pondérée par la puissance spectrale.
   F = MEANFREQ(X,FS) rend le barycentre du spectre.
+
+  Exemple :
+     t = (0:1023)' / 1000;
+     abs(meanfreq(sin(2*pi*50*t), 1000) - 50) < 10
 ```
 
 ## `medfilt1`
@@ -1680,6 +2042,9 @@ MEANFREQ Fréquence moyenne, pondérée par la puissance spectrale.
 MEDFILT1 Filtre médian glissant d'ordre N.
   Y = MEDFILT1(X,N) remplace chaque échantillon par la médiane de la
   fenêtre de N points centrée dessus. N vaut 3 par défaut.
+
+  Exemple :
+     medfilt1([1 100 2 3], 3)    % la valeur aberrante disparait
 ```
 
 ## `medfreq`
@@ -1739,6 +2104,12 @@ MSCOHERE Cohérence quadratique moyenne entre deux signaux.
   C = MSCOHERE(X,Y,...) vaut |Pxy|^2 / (Pxx*Pyy) : entre 0 et 1, elle
   dit quelle part de Y s'explique linéairement par X, fréquence par
   fréquence.
+
+  Exemple :
+     rng(1);
+     x = randn(1024, 1);
+     [c, f] = mscohere(x, filter(1, [1 -0.8], x), [], [], 256, 1);
+     all(c >= -1e-12 & c <= 1 + 1e-12)     % 1 : c'est une coherence
 ```
 
 ## `nuttallwin`
@@ -1746,6 +2117,10 @@ MSCOHERE Cohérence quadratique moyenne entre deux signaux.
 ```
 NUTTALLWIN Fenêtre de Blackman-Nuttall à quatre termes.
   Coefficients : 0,3635819 ; 0,4891775 ; 0,1365995 ; 0,0106411.
+
+  Exemple :
+     w = nuttallwin(64);
+     max(w)                      % 1
 ```
 
 ## `overshoot`
@@ -1768,6 +2143,12 @@ PAPILLONHADAMARD Transformée de Hadamard rapide, ordre naturel.
   construction de Sylvester appliquée en place, en N log2 N additions.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     x = (1:8)';
+     y = papillonHadamard(x);
+     abs(y(1) - sum(x)) < 1e-12  % le premier coefficient est la somme
+     max(abs(papillonHadamard(y) / 8 - x)) < 1e-12   % involutive au facteur N
 ```
 
 ## `parzen`
@@ -1820,6 +2201,12 @@ PARZENWIN Fenêtre de Parzen, ou de de la Vallée Poussin.
 PBURG Densité spectrale par la méthode de Burg.
   Même principe que PYULEAR, avec un modèle estimé par ARBURG : plus
   sûr sur les séries courtes.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [pxx, f] = pburg(x, 4, 128, 1);
+     numel(pxx) == numel(f)      % 1
 ```
 
 ## `pcov`
@@ -1855,14 +2242,16 @@ PCOV Densité spectrale par la méthode de la covariance.
 
 ```
 PEAK2PEAK Écart entre le maximum et le minimum.
-  Exemple :  peak2peak([1 5 2])   % 4
+  Exemple :
+     peak2peak([1 5 2])   % 4
 ```
 
 ## `peak2rms`
 
 ```
 PEAK2RMS Rapport entre la valeur crête et la valeur efficace.
-  Exemple :  peak2rms([1 -1 1 -1])   % 1
+  Exemple :
+     peak2rms([1 -1 1 -1])   % 1
 ```
 
 ## `peig`
@@ -1871,6 +2260,13 @@ PEAK2RMS Rapport entre la valeur crête et la valeur efficace.
 PEIG Pseudospectre par la méthode des vecteurs propres.
   Comme PMUSIC, avec chaque vecteur du sous-espace bruit pondéré par
   l'inverse de sa valeur propre.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [S, f] = peig(x, 2, 256, 1);
+     [~, k] = max(S);
+     abs(f(k) - 0.1) < 0.02      % la raie est retrouvee
 ```
 
 ## `periodogram`
@@ -1880,6 +2276,13 @@ PERIODOGRAM Densité spectrale de puissance par périodogramme.
   [PXX,F] = PERIODOGRAM(X) estime la densité spectrale de X.
   [PXX,F] = PERIODOGRAM(X,FENETRE,NFFT,FS) précise la fenêtre, la taille
   de la transformée et la fréquence d'échantillonnage.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [pxx, f] = periodogram(x, [], 512, 1);
+     [~, k] = max(pxx);
+     abs(f(k) - 0.1) < 0.02
 ```
 
 ## `permutationWalsh`
@@ -1892,6 +2295,10 @@ PERMUTATIONWALSH Rangement des fonctions de Walsh.
   puis code de Gray, rangement par nombre de changements de signe).
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     p = permutationWalsh(8, 'sequency');
+     isequal(sort(p(:)'), 1:8)   % 1 : c'est une permutation
 ```
 
 ## `phasedelay`
@@ -1900,6 +2307,11 @@ PERMUTATIONWALSH Rangement des fonctions de Walsh.
 PHASEDELAY Retard de phase d'un filtre numérique.
   Le retard de phase vaut -phi(w)/w. Pour un filtre à phase linéaire
   d'ordre N il vaut N/2 échantillons, constant.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [pd, w] = phasedelay(b, a, 128);
+     numel(pd) == numel(w)       % 1
 ```
 
 ## `phasez`
@@ -1908,6 +2320,11 @@ PHASEDELAY Retard de phase d'un filtre numérique.
 PHASEZ Réponse en phase déroulée d'un filtre numérique.
   [PHI,W] = PHASEZ(B,A,N) rend la phase continue sur N points entre 0
   et pi, comme FREQZ pour le module.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [phi, w] = phasez(b, a, 128);
+     abs(phi(1)) < 1e-12         % la phase est nulle au continu
 ```
 
 ## `pmcov`
@@ -1950,7 +2367,11 @@ PMTM Densité spectrale par la méthode multi-fenêtres de Thomson.
   variance de l'estimation sans élargir autant qu'un lissage.
 
   Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [pxx, f] = pmtm(x, 4, 512, 1000);
+     [~, k] = max(pxx);
+     abs(f(k) - 100) < 5      % 1 : la raie est a 0,1 fois 1000 Hz
 ```
 
 ## `pmusic`
@@ -1963,7 +2384,11 @@ PMUSIC Pseudospectre par la méthode MUSIC.
   puissances.
 
   Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [S, f] = pmusic(x, 4, 1024, 1000);
+     [~, k] = max(S);
+     abs(f(k) - 100) < 5      % 1 : le sous-espace signal trouve la raie
 ```
 
 ## `poly2ac`
@@ -1972,6 +2397,11 @@ PMUSIC Pseudospectre par la méthode MUSIC.
 POLY2AC Autocorrélation d'un polynôme de prédiction.
   R = POLY2AC(A,EFINAL) rend la suite d'autocorrélation dont A est le
   filtre de prédiction et EFINAL l'erreur résiduelle.
+
+  Exemple :
+     a = [1 -0.5 0.2];
+     r = poly2ac(a, 1);
+     max(abs(ac2poly(r) - a)) < 1e-10       % l'aller-retour
 ```
 
 ## `poly2lsf`
@@ -2031,6 +2461,10 @@ POLYSTAB Stabilise un polynôme en repliant ses racines dans le disque.
   B = POLYSTAB(A) remplace chaque racine de module supérieur à 1 par son
   inverse conjugué : le module de la réponse est conservé, mais le
   polynôme devient à phase minimale.
+
+  Exemple :
+     b = polystab([1 -1.5]);
+     all(abs(roots(b)) <= 1 + 1e-12)        % 1 : les racines rentrent
 ```
 
 ## `pow2db`
@@ -2088,6 +2522,10 @@ PROTOTYPEELLIPTIQUE Pôles et zéros du prototype passe-bas de Cauer.
   Référence : les formules classiques de la conception elliptique,
   telles qu'on les trouve dans la littérature ouverte sur les filtres
   de Cauer.
+
+  Exemple :
+     [z, p, k] = prototypeElliptique(4, 1, 40);
+     all(real(p) < 0)            % 1 : un prototype stable a ses poles a gauche
 ```
 
 ## `prototypeVersNumerique`
@@ -2108,6 +2546,11 @@ PROTOTYPEVERSNUMERIQUE Prototype analogique -> filtre numérique.
   continu pour un passe-bas, Nyquist pour un passe-haut, le centre de
   la bande pour un passe-bande ; il vaut 1 par défaut, mais un
   Chebyshev de type I d'ordre pair descend à 10^(-RP/20).
+
+  Exemple :
+     [z0, p0, k0] = buttap(4);
+     [b, a] = prototypeVersNumerique(p0, z0, k0, 0.3, 'low');
+     numel(a) - 1                % 4 : l'ordre est conserve en passe-bas
 ```
 
 ## `puissancesSousEspace`
@@ -2119,6 +2562,13 @@ PUISSANCESSOUSESPACE Puissance de chaque composante sinusoïdale.
   carrés une fois les fréquences connues.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [R, m] = signalMatriceCorrelation(x, 2, false);
+     pow = puissancesSousEspace(R, 2 * pi * 0.1, eig(R), 2);
+     all(isfinite(pow))
 ```
 
 ## `pulseperiod`
@@ -2127,6 +2577,11 @@ PUISSANCESSOUSESPACE Puissance de chaque composante sinusoïdale.
 PULSEPERIOD Période des impulsions.
   P = PULSEPERIOD(X,FS) rend l'écart entre deux fronts montants
   consécutifs, mesuré au niveau médian.
+
+  Exemple :
+     t = (0:0.001:0.5)';
+     p = pulseperiod(double(sin(2*pi*10*t) > 0), 1000);
+     abs(mean(p) - 0.1) < 0.01   % dix hertz : une periode de 0,1 s
 ```
 
 ## `pulsesep`
@@ -2135,6 +2590,11 @@ PULSEPERIOD Période des impulsions.
 PULSESEP Séparation entre impulsions.
   S = PULSESEP(X,FS) rend l'écart entre la fin d'une impulsion et le
   début de la suivante, mesuré au niveau médian.
+
+  Exemple :
+     t = (0:0.001:0.5)';
+     s = pulsesep(double(sin(2*pi*10*t) > 0), 1000);
+     all(s > 0)                  % 1
 ```
 
 ## `pulsewidth`
@@ -2145,6 +2605,11 @@ PULSEWIDTH Largeur des impulsions à mi-hauteur.
   descendant qui le suit, mesurée au niveau médian.
 
   PULSEWIDTH(...,'Polarity','negative') mesure les creux.
+
+  Exemple :
+     t = (0:0.001:0.5)';
+     l = pulsewidth(double(sin(2*pi*10*t) > 0), 1000);
+     abs(mean(l) - 0.05) < 0.01  % un rapport cyclique de moitie
 ```
 
 ## `pulstran`
@@ -2194,7 +2659,11 @@ PYULEAR Densité spectrale par un modèle autorégressif de Yule-Walker.
   longueur de l'enregistrement mais de l'ordre choisi.
 
   Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
      [pxx, f] = pyulear(x, 8, 512, 1000);
+     [~, k] = max(pxx);
+     abs(f(k) - 100) < 10
 ```
 
 ## `rangerWalsh`
@@ -2203,6 +2672,10 @@ PYULEAR Densité spectrale par un modèle autorégressif de Yule-Walker.
 RANGERWALSH Passe de l'ordre naturel à l'ordre demandé.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     y = rangerWalsh((1:8)', 'sequency');
+     numel(y)                    % 8
 ```
 
 ## `rangerWalshInverse`
@@ -2211,6 +2684,10 @@ RANGERWALSH Passe de l'ordre naturel à l'ordre demandé.
 RANGERWALSHINVERSE Revient de l'ordre demandé à l'ordre naturel.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     x = (1:8)';
+     max(abs(rangerWalshInverse(rangerWalsh(x, 'sequency'), 'sequency') - x)) < 1e-12
 ```
 
 ## `rc2ac`
@@ -2219,6 +2696,11 @@ RANGERWALSHINVERSE Revient de l'ordre demandé à l'ordre naturel.
 RC2AC Autocorrélation à partir des coefficients de réflexion.
   R = RC2AC(K,R0) remonte la récurrence de Levinson : à chaque ordre,
   le nouveau terme d'autocorrélation se déduit du polynôme courant.
+
+  Exemple :
+     k = [0.5 0.2];
+     r = rc2ac(k, 1);
+     max(abs(ac2rc(r) - k(:))) < 1e-10      % l'aller-retour
 ```
 
 ## `rc2poly`
@@ -2230,6 +2712,10 @@ RC2POLY Polynôme de prédiction à partir des coefficients de réflexion.
 
   [A,E] = RC2POLY(K,R0) rend aussi l'erreur de prédiction finale, à
   partir de la puissance R0 du signal.
+
+  Exemple :
+     [a, e] = rc2poly([0.5 0.2], 1);
+     all(abs(roots(a)) < 1)      % 1 : |k| < 1 donne un modele stable
 ```
 
 ## `rceps`
@@ -2252,7 +2738,8 @@ RCEPS Cepstre réel.
 RECTPULS Impulsion rectangulaire de largeur W centrée en zéro.
   L'impulsion vaut 1 sur [-W/2, W/2[ et 0 ailleurs ; W vaut 1 par défaut.
 
-  Exemple :  rectpuls([-1 -0.4 0 0.4 1])   % [0 1 1 1 0]
+  Exemple :
+     rectpuls([-1 -0.4 0 0.4 1])   % [0 1 1 1 0]
 ```
 
 ## `resample`
@@ -2363,6 +2850,12 @@ ROOTEIG Fréquences par la méthode des vecteurs propres.
   Comme ROOTMUSIC, mais chaque vecteur propre du sous-espace bruit est
   pondéré par l'inverse de sa valeur propre : les directions les moins
   bruitées pèsent davantage.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     w = rooteig(x, 2);
+     abs(min(abs(w)) / (2 * pi) - 0.1) < 0.02
 ```
 
 ## `rootmusic`
@@ -2393,7 +2886,8 @@ ROOTMUSIC Fréquences par la méthode MUSIC, racines du polynôme du bruit.
 
 ```
 RSSQ Racine de la somme des carrés.
-  Exemple :  rssq([3 4])   % 5
+  Exemple :
+     rssq([3 4])   % 5
 ```
 
 ## `sawtooth`
@@ -2402,6 +2896,10 @@ RSSQ Racine de la somme des carrés.
 SAWTOOTH Signal en dents de scie de période 2*pi.
   Y = SAWTOOTH(T) monte de -1 à +1 sur chaque période.
   Y = SAWTOOTH(T,LARGEUR) place le sommet à LARGEUR*2*pi.
+
+  Exemple :
+     y = sawtooth(linspace(0, 4 * pi, 100));
+     [min(y) max(y)]             % -1 et 1
 ```
 
 ## `schurrc`
@@ -2424,7 +2922,8 @@ SEQPERIOD Période la plus courte qui explique une séquence.
   P = SEQPERIOD(X) cherche le plus petit P tel que X(k+P) = X(k) pour
   tout k possible. Sans période exacte, rend celle qui minimise l'écart.
 
-  Exemple :  seqperiod([1 2 1 2 1 2])   % 2
+  Exemple :
+     seqperiod([1 2 1 2 1 2])   % 2
 ```
 
 ## `settlingtime`
@@ -2435,6 +2934,11 @@ SETTLINGTIME Temps d'établissement après chaque transition.
   l'instant à partir duquel le signal reste dans une bande de D pour
   cent de l'écart entre états autour du niveau atteint. D vaut 2 par
   défaut.
+
+  Exemple :
+     t = (0:0.001:1)';
+     d = settlingtime(1 - exp(-20 * t), 1000);
+     d > 0                       % 1
 ```
 
 ## `sfdr`
@@ -2472,6 +2976,12 @@ SGOLAYFILT Lissage polynomial de Savitzky-Golay.
   Y = SGOLAYFILT(X,ORDRE,LONGUEUR) ajuste, sur chaque fenêtre de
   LONGUEUR points, un polynôme de degré ORDRE au sens des moindres
   carrés, et garde la valeur ajustée au centre.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.01 * (1:200)') + 0.1 * randn(200, 1);
+     y = sgolayfilt(x, 3, 21);
+     std(diff(y, 2)) < std(diff(x, 2))       % 1 : le lissage reduit la courbure
 ```
 
 ## `signalLobe`
@@ -2482,6 +2992,11 @@ SIGNALLOBE Puissance d'un lobe spectral autour de la raie K.
   la fuite de la fenêtre est ainsi ramassée avec la raie.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     S = [1 3 2 0.5 4 1];
+     [p, plage] = signalLobe(S, 2);
+     p > 0                       % 1
 ```
 
 ## `signalMatriceCorrelation`
@@ -2494,6 +3009,12 @@ SIGNALMATRICECORRELATION Matrice d'autocorrélation pour les méthodes sous-espa
   suffisant pour laisser un sous-espace bruit non vide.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [R, m] = signalMatriceCorrelation(x, 2, false);
+     max(max(abs(R - R'))) < 1e-8           % 1 : elle est symetrique
 ```
 
 ## `signalNiveaux`
@@ -2504,6 +3025,11 @@ SIGNALNIVEAUX Niveaux d'état et seuils de référence d'un signal.
   absolues, comme le font toutes les mesures de transition de MATLAB.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     t = (0:0.001:0.1)';
+     [bas, haut, seuils] = signalNiveaux(double(t >= 0.05), [10 90 50]);
+     seuils(1) < seuils(3) && seuils(3) < seuils(2)     % 1
 ```
 
 ## `signalSommet`
@@ -2512,6 +3038,10 @@ SIGNALNIVEAUX Niveaux d'état et seuils de référence d'un signal.
 SIGNALSOMMET Indice du maximum local le plus proche de AUTOUR.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     S = exp(-((1:100) - 40) .^ 2 / 50);
+     signalSommet(S, 42, 10)     % 40 : le sommet le plus proche
 ```
 
 ## `signalSpectrePuissance`
@@ -2524,6 +3054,12 @@ SIGNALSPECTREPUISSANCE Spectre de puissance unilatéral, fenêtre de Kaiser.
   secondaires à -180 dB laissent voir des harmoniques très faibles.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     rng(1);
+     x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+     [S, f] = signalSpectrePuissance(x, 1);
+     numel(S) == numel(f)        % 1
 ```
 
 ## `signalTransitions`
@@ -2536,6 +3072,12 @@ SIGNALTRANSITIONS Découpe le signal en transitions et les mesure.
   la traversée médiane.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     t = (0:0.001:0.1)';
+     tr = signalTransitions(double(t >= 0.05), t, 10, 90);
+     size(tr, 2)                 % 5 colonnes
+     tr(1, 4)                    % 1 : la transition est montante
 ```
 
 ## `signalTraverses`
@@ -2546,6 +3088,11 @@ SIGNALTRAVERSES Instants de traversée d'un seuil, par interpolation.
   si la traversée est montante.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     t = (0:0.001:0.1)';
+     [instants, montantes] = signalTraverses(double(t >= 0.05), t, 0.5);
+     abs(instants(1) - 0.05) < 2e-3
 ```
 
 ## `sinad`
@@ -2577,6 +3124,11 @@ SLEWRATE Vitesse de balayage d'un signal à deux états.
 ```
 SNR Rapport signal sur bruit, en décibels.
   R = SNR(SIGNAL,BRUIT) rend 10*log10(puissance signal / puissance bruit).
+
+  Exemple :
+     rng(1);
+     signal = sin(2 * pi * 0.05 * (0:999)');
+     abs(snr(signal, 0.1 * randn(1000, 1)) - 20 * log10(rms(signal) / 0.1)) < 1
 ```
 
 ## `sos2ss`
@@ -2636,6 +3188,12 @@ SOS2TF Sections du second ordre vers fonction de transfert.
 SOS2ZP Zéros, pôles et gain d'un enchaînement de sections du second ordre.
   [Z,P,K] = SOS2ZP(SOS,G) où SOS a une section par ligne, sous la forme
   [b0 b1 b2 a0 a1 a2].
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [sos, g] = tf2sos(b, a);
+     [z, p, k] = sos2zp(sos, g);
+     all(abs(p) < 1)             % 1 : le filtre est stable
 ```
 
 ## `sosfilt`
@@ -2644,6 +3202,13 @@ SOS2ZP Zéros, pôles et gain d'un enchaînement de sections du second ordre.
 SOSFILT Filtre par sections du second ordre, en cascade.
   Y = SOSFILT(SOS,X) applique chaque ligne de SOS l'une après l'autre.
   C'est la forme numériquement stable pour les filtres d'ordre élevé.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [sos, g] = tf2sos(b, a);
+     rng(1);
+     x = randn(100, 1);
+     max(abs(sosfilt(sos, x, g) - filter(b, a, x))) < 1e-10
 ```
 
 ## `spectrogram`
@@ -2668,6 +3233,10 @@ SPECTROGRAM Transformée de Fourier à court terme.
 SQUARE Signal carré de période 2*pi.
   Y = SQUARE(T) vaut +1 sur la première moitié de la période, -1 sur la
   seconde. Y = SQUARE(T,RAPPORT) fixe le rapport cyclique en pour cent.
+
+  Exemple :
+     y = square(linspace(0, 4 * pi, 100));
+     unique(y)                   % -1 et 1
 ```
 
 ## `ss2sos`
@@ -2703,6 +3272,12 @@ SS2SOS Sections du second ordre d'une représentation d'état.
 SS2ZP Zéros, pôles et gain d'une représentation d'état.
   Les pôles sont les valeurs propres de A ; les zéros sont les racines
   du numérateur de la fonction de transfert.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [A, B, C, D] = tf2ss(b, a);
+     [z, p, k] = ss2zp(A, B, C, D);
+     all(abs(p) < 1)             % 1
 ```
 
 ## `statelevels`
@@ -2726,6 +3301,11 @@ STATELEVELS Niveaux bas et haut d'un signal à deux états.
 ```
 STEPZ Réponse indicielle d'un filtre numérique.
   [H,T] = STEPZ(B,A,N) : la réponse à un échelon unité.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [h, t] = stepz(b, a, 100);
+     abs(h(end) - 1) < 0.01      % la reponse indicielle tend vers le gain continu
 ```
 
 ## `stmcb`
@@ -2819,6 +3399,11 @@ TF2SOS Fonction de transfert vers sections du second ordre.
   [SOS,G] = TF2SOS(B,A) rend une matrice Lx6, chaque ligne étant
   [b0 b1 b2 1 a1 a2], et le gain global G. Les pôles complexes sont
   appariés à leur conjugué, ce qui garde des coefficients réels.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     [sos, g] = tf2sos(b, a);
+     size(sos, 1)                % 2 sections pour un ordre 4
 ```
 
 ## `tf2zp`
@@ -2858,6 +3443,12 @@ TF2ZPK Transfert numérique -> zéros, pôles et gain.
 TFESTIMATE Estimation de la fonction de transfert entre deux signaux.
   H = TFESTIMATE(X,Y,...) vaut Pxy/Pxx : la réponse du système qui mène
   de X à Y, au sens des moindres carrés.
+
+  Exemple :
+     rng(1);
+     x = randn(4096, 1);
+     [h, f] = tfestimate(x, filter(1, [1 -0.8], x), [], [], 256, 1);
+     abs(abs(h(1)) - 5) < 1      % 1/(1-0.8) = 5 au continu
 ```
 
 ## `thd`
@@ -2916,7 +3507,8 @@ TRIPULS Impulsion triangulaire de largeur W et d'asymétrie S.
   S vaut 0 pour un triangle symétrique, -1 pour une rampe descendante,
   +1 pour une rampe montante. W vaut 1 et S vaut 0 par défaut.
 
-  Exemple :  tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
+  Exemple :
+     tripuls([-0.5 -0.25 0 0.25 0.5])   % [0 0.5 1 0.5 0]
 ```
 
 ## `tukeywin`
@@ -2973,6 +3565,11 @@ UENCODE Quantification uniforme d'un signal.
 UNDERSHOOT Creux avant chaque transition, en pourcentage.
   Symétrique d'OVERSHOOT : l'extremum est cherché avant la transition,
   du côté opposé au niveau de départ.
+
+  Exemple :
+     t = (0:0.001:0.2)';
+     [p, v, instant] = undershoot(exp(-30*t) .* sin(2*pi*30*t) + double(t > 0), 1000);
+     p >= 0                      % 1
 ```
 
 ## `vco`
@@ -3055,6 +3652,11 @@ ZEROPHASE Réponse en amplitude à phase nulle.
 ZP2SOS Zéros et pôles vers sections du second ordre.
   Les racines complexes sont appariées avec leur conjuguée ; les racines
   réelles sont groupées deux par deux. Le résultat est réel.
+
+  Exemple :
+     [z, p, k] = butter(4, 0.3);
+     [sos, g] = zp2sos(z, p, k);
+     size(sos, 2)                % 6 colonnes par section
 ```
 
 ## `zp2ss`
@@ -3086,6 +3688,10 @@ ZP2SS Représentation d'état à partir des zéros, pôles et gain.
 ```
 ZP2TF Zéros, pôles et gain vers fonction de transfert.
   [B,A] = ZP2TF(Z,P,K) rend les coefficients par puissances décroissantes.
+
+  Exemple :
+     [b, a] = zp2tf([], [-1 -2], 1);
+     a                           % 1 3 2 : (s+1)(s+2)
 ```
 
 ## `zplane`
@@ -3094,5 +3700,10 @@ ZP2TF Zéros, pôles et gain vers fonction de transfert.
 ZPLANE Trace les zéros et les pôles dans le plan complexe.
   ZPLANE(B,A) à partir des coefficients, ZPLANE(Z,P) à partir des zéros
   et des pôles. Le cercle unité sert de repère.
+
+  Exemple :
+     [b, a] = butter(4, 0.3);
+     zplane(b, a);
+     close all;
 ```
 

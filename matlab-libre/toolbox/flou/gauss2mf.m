@@ -2,6 +2,10 @@ function y = gauss2mf(x, params)
 %GAUSS2MF Deux demi-gaussiennes raccordées par un plateau.
 %   Y = GAUSS2MF(X,[S1 C1 S2 C2]) : montée gaussienne jusqu'à C1, plateau
 %   à 1 entre C1 et C2, descente gaussienne après C2.
+%
+%   Exemple :
+%      y = gauss2mf([0 5 10], [1 2 1 8]);
+%      y(2) > 0.9                  % le plateau entre les deux gaussiennes
     s1 = params(1); c1 = params(2);
     s2 = params(3); c2 = params(4);
     x = double(x);

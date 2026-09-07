@@ -5,6 +5,9 @@ function t = dbDelete(t, predicat)
 %   prédicat toujours vrai vide la table sans la détruire.
 %
 %   Exemple :
+%      t = dbTable({'nom', 'service', 'salaire', 'anciennete'});
+%      t = dbInsert(t, {'Dupont', 'etudes', 45000, 6});
+%      t = dbInsert(t, {'Martin', 'ventes', 38000, 3});
 %      t = dbDelete(t, @(l) l{4} < 4);       % anciennete de moins de 4 ans
 %      t = dbDelete(t, @(l) true);           % vide la table
 %

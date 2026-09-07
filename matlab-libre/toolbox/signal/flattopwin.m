@@ -2,6 +2,10 @@ function w = flattopwin(n)
 %FLATTOPWIN Fenêtre à sommet plat, pour la mesure d'amplitude.
 %   Coefficients de MathWorks : 0,21557895 ; 0,41663158 ; 0,277263158 ;
 %   0,083578947 ; 0,006947368.
+%
+%   Exemple :
+%      w = flattopwin(64);
+%      max(w)                      % 1 : elle sert a mesurer une amplitude
     n = round(n);
     if n <= 1, w = ones(max(n, 0), 1); return, end
     k = (0:n-1)' / (n - 1);

@@ -169,6 +169,17 @@ ADDRULE Ajoute des règles.
   Chaque ligne vaut [mfEntree1 ... mfEntreeN mfSortie poids operateur],
   où l'opérateur vaut 1 pour « et », 2 pour « ou », comme dans la
   documentation MathWorks.
+
+  Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addrule(fis, [1 1 1 1; 2 2 1 1]);
+     numel(fis.regles)           % 2
 ```
 
 ## `addvar`
@@ -176,6 +187,10 @@ ADDRULE Ajoute des règles.
 ```
 ADDVAR Ajoute une variable d'entrée ou de sortie.
   FIS = ADDVAR(FIS,'input'|'output',NOM,[MIN MAX])
+
+  Exemple :
+     fis = addvar(mamfis(), 'input', 'erreur', [0 10]);
+     numel(variablesDe(fis, true))      % 1
 ```
 
 ## `ajouterVariable`
@@ -184,6 +199,10 @@ ADDVAR Ajoute une variable d'entrée ou de sortie.
 AJOUTERVARIABLE Rouage commun d'ADDINPUT et d'ADDOUTPUT.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     fis = ajouterVariable(mamfis(), true, [0 10], 'Name', 'erreur');
+     numel(variablesDe(fis, true))      % 1
 ```
 
 ## `anfis`
@@ -232,8 +251,11 @@ ANFISOPTIONS Options d'apprentissage d'ANFIS.
     DisplayFinalResults     affichages, tous à 1 dans MATLAB
 
   Exemple :
-     o = anfisOptions('EpochNumber', 40, 'InitialStepSize', 0.05);
-     fis = anfis([x, y], o);
+     x = (0:0.05:10)';
+     donnees = [x, sin(x)];
+     o = anfisOptions('EpochNumber', 20, 'InitialStepSize', 0.05);
+     [fis, e] = anfis(donnees, genfis1(donnees, 7), o.EpochNumber, o.InitialStepSize);
+     e(end) < e(1)      % vrai : l'apprentissage a servi
 
   Voir aussi ANFIS, GENFISOPTIONS, TUNEFISOPTIONS.
 ```
@@ -268,6 +290,11 @@ CONVERTTOSUGENO Traduit un système de Mamdani en système de Sugeno.
 ```
 DEFUZZ Défuzzification d'un ensemble flou.
   Y = DEFUZZ(X,MF,'centroid'|'bisector'|'mom'|'som'|'lom')
+
+  Exemple :
+     x = linspace(0, 10, 101);
+     mf = trimf(x, [2 5 8]);
+     abs(defuzz(x, mf, 'centroid') - 5) < 0.1     % le centre de gravite d'un triangle
 ```
 
 ## `dsigmf`
@@ -275,6 +302,10 @@ DEFUZZ Défuzzification d'un ensemble flou.
 ```
 DSIGMF Différence de deux sigmoïdes.
   Y = DSIGMF(X,[A1 C1 A2 C2]) = sigmf(X,[A1 C1]) - sigmf(X,[A2 C2]).
+
+  Exemple :
+     y = dsigmf([0 5 10], [2 2 2 8]);
+     all(y >= 0 & y <= 1)        % 1 : c'est une appartenance
 ```
 
 ## `estEntree`
@@ -283,6 +314,10 @@ DSIGMF Différence de deux sigmoïdes.
 ESTENTREE Le mot-clé désigne-t-il une entrée ?
   Accepte 'input' et 'in' pour une entrée, 'output' et 'out' pour une
   sortie ; toute autre valeur est refusée.
+
+  Exemple :
+     estEntree('input')          % 1
+     estEntree('output')         % 0
 ```
 
 ## `evalfis`
@@ -342,8 +377,16 @@ EVALFISOPTIONS Options d'une inférence floue.
     EmptyOutputFuzzySetMessage  de même pour un ensemble de sortie vide
 
   Exemple :
+     fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      o = evalfisOptions('NumSamplePoints', 501);
-     y = evalfis(fis, 5, o);
+     y = evalfis(fis, 5);
+     y >= 0 && y <= 1        % la sortie reste dans son intervalle
 
   Voir aussi EVALFIS, GENSURFOPTIONS, DEFUZZ.
 ```
@@ -403,8 +446,12 @@ FCMOPTIONS Options des c-moyennes floues.
     Verbose          affichage, 0
 
   Exemple :
+     rng(1);
+     donnees = [randn(30, 2); randn(30, 2) + 5; randn(30, 2) + [10 0]];
      o = fcmOptions('NumClusters', 3, 'Exponent', 1.5);
-     [c, u] = fcm(donnees, o);
+     [c, u] = fcm(donnees, o.NumClusters, ...
+                  [o.Exponent, o.MaxNumIteration, o.MinImprovement, 0]);
+     size(c, 1)      % 3 centres
 
   Voir aussi FCM, SUBCLUSTOPTIONS, GENFISOPTIONS.
 ```
@@ -462,6 +509,10 @@ FUZARITH Arithmétique sur les nombres flous.
 GAUSS2MF Deux demi-gaussiennes raccordées par un plateau.
   Y = GAUSS2MF(X,[S1 C1 S2 C2]) : montée gaussienne jusqu'à C1, plateau
   à 1 entre C1 et C2, descente gaussienne après C2.
+
+  Exemple :
+     y = gauss2mf([0 5 10], [1 2 1 8]);
+     y(2) > 0.9                  % le plateau entre les deux gaussiennes
 ```
 
 ## `gaussmf`
@@ -623,6 +674,9 @@ GENFISOPTIONS Options de construction d'un système à partir de données.
                            MinImprovement
 
   Exemple :
+     rng(1);
+     x = linspace(0, 1, 60)';
+     y = sin(2 * pi * x);
      o = genfisOptions('FCMClustering', 'NumClusters', 4);
      fis = genfis(x, y, o);
 
@@ -673,8 +727,16 @@ GENSURFOPTIONS Options d'une surface de réponse.
   O = GENSURFOPTIONS('NumGridPoints',N,...) en change.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      o = gensurfOptions('NumGridPoints', 31);
-     [x, y, z] = gensurf(fis, o);
+     [x, y] = gensurf(fis);
 
   Voir aussi GENSURF, EVALFIS, EVALFISOPTIONS.
 ```
@@ -761,6 +823,14 @@ GETFIS Lecture d'un champ d'un système d'inférence floue.
   GETFIS(FIS,'input',I,'mf',J,CHAMP) lit 'name', 'type' ou 'params'.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      getfis(fis, 'numinputs')
      getfis(fis, 'input', 1, 'mf', 2, 'params')
 
@@ -847,7 +917,8 @@ PIMF Fonction d'appartenance en Pi : montée en S puis descente en Z.
   Y = PIMF(X,[A B C D]) monte de A à B, vaut 1 de B à C, descend de C
   à D.
 
-  Exemple :  pimf(5, [1 4 6 9])   % 1
+  Exemple :
+     pimf(5, [1 4 6 9])   % 1
 ```
 
 ## `plotfis`
@@ -859,6 +930,14 @@ PLOTFIS Vue d'ensemble d'un système d'inférence floue.
   T = PLOTFIS(FIS) rend ce texte au lieu de l'afficher.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      plotfis(fis)
 
   Voir aussi PLOTMF, SHOWRULE, GETFIS.
@@ -878,6 +957,13 @@ PLOTMF Tracé des fonctions d'appartenance d'une variable.
   colonne par fonction.
 
   Exemple :
+     fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      [y, x] = plotmf(fis, 'input', 1);
      max(sum(y, 2))   % somme des appartenances au point le plus couvert
 
@@ -892,6 +978,10 @@ POSEROPTIONS Applique des couples nom-valeur à une structure d'options.
   distingue une faute de frappe d'un réglage.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = poserOptions(struct('Alpha', 1), 'essai', 'Alpha', 3);
+     o.Alpha                     % 3
 ```
 
 ## `poserVariables`
@@ -940,6 +1030,10 @@ PROBOR Ou probabiliste, ou somme algébrique.
 ```
 PSIGMF Produit de deux sigmoïdes.
   Y = PSIGMF(X,[A1 C1 A2 C2]) = sigmf(X,[A1 C1]) .* sigmf(X,[A2 C2]).
+
+  Exemple :
+     y = psigmf([0 5 10], [2 2 -2 8]);
+     all(y >= 0 & y <= 1)        % 1
 ```
 
 ## `rangDansGenre`
@@ -950,6 +1044,16 @@ RANGDANSGENRE Rang d'une variable parmi les entrées ou parmi les sorties.
   entrée ne doit pas atteindre une sortie du même nom.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     rangDansGenre(fis, 'erreur', true)     % 1
 ```
 
 ## `readfis`
@@ -961,7 +1065,16 @@ READFIS Lit un système d'inférence floue depuis un fichier .fis.
   fichiers écrits par des versions plus récentes.
 
   Exemple :
-     fis = readfis('pilote.fis');
+     fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
+     writefis(fis, 'pilote.fis');
+     relu = readfis('pilote.fis');
+     numel(relu.entrees)      % 1
 
   Voir aussi WRITEFIS, NEWFIS.
 ```
@@ -1045,6 +1158,14 @@ RMMF Retire une fonction d'appartenance d'une variable.
   sont décalés : une règle ne peut pas désigner une fonction disparue.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      fis = rmmf(fis, 'input', 1, 'mf', 2);
 
   Voir aussi ADDMF, RMVAR, ADDRULE.
@@ -1058,7 +1179,16 @@ RMVAR Retire une variable d'entrée ou de sortie.
   colonne correspondante de la matrice des règles.
 
   Exemple :
+     fis = addInput(mamfis('Name', 'pilote'), [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
+     fis = addInput(fis, [0 1], 'Name', 'derivee');
      fis = rmvar(fis, 'input', 2);
+     numel(variablesDe(fis, true))     % 1 : il n'en reste qu'une
 
   Voir aussi ADDVAR, RMMF.
 ```
@@ -1096,6 +1226,14 @@ SETFIS Écriture d'un champ d'un système d'inférence floue.
   ou 'params'.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      fis = setfis(fis, 'defuzzmethod', 'bisector');
      fis = setfis(fis, 'input', 1, 'mf', 2, 'params', [1 4 7]);
 
@@ -1154,7 +1292,8 @@ SIGMF Fonction d'appartenance sigmoïde de paramètres [pente centre].
 SMF Fonction d'appartenance en S : croît de 0 à 1.
   C'est le complément de ZMF sur le même intervalle.
 
-  Exemple :  smf(10, [2 8])   % 1
+  Exemple :
+     smf(10, [2 8])   % 1
 ```
 
 ## `subclust`
@@ -1202,8 +1341,10 @@ SUBCLUSTOPTIONS Options de la classification soustractive.
     Verbose                affichage, 0
 
   Exemple :
-     o = subclustOptions('ClusterInfluenceRange', 0.3);
-     c = subclust(donnees, o);
+     rng(1);
+     donnees = [randn(30, 2); randn(30, 2) + 8];
+     o = subclustOptions('ClusterInfluenceRange', 0.5);
+     c = subclust(donnees, o.ClusterInfluenceRange);
 
   Voir aussi SUBCLUST, GENFISOPTIONS, FCM.
 ```
@@ -1271,6 +1412,17 @@ TROUVERVARIABLE Repère une variable par son nom, entrée ou sortie.
   les entrées puis parmi les sorties, comme le fait MATLAB.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     [entree, indice] = trouverVariable(fis, 'erreur');
+     [entree indice]             % 1 1
 ```
 
 ## `tunefis`
@@ -1320,7 +1472,10 @@ TUNEFISOPTIONS Options du réglage d'un système flou.
 
   Exemple :
      o = tunefisOptions('Method', 'anfis');
-     fis = tunefis(fis0, [], x, y, o);
+     x = (0:0.05:10)';
+     donnees = [x, sin(x)];
+     fis0 = genfis1(donnees, 5);
+     fis = tunefis(fis0, [], x, sin(x), o);
 
   Voir aussi TUNEFIS, GETTUNABLESETTINGS, ANFISOPTIONS.
 ```
@@ -1359,6 +1514,14 @@ WRITEFIS Écrit un système d'inférence floue dans un fichier .fis.
   simple de conserver un système entre deux sessions.
 
   Exemple :
+     fis = mamfis('Name', 'pilote');
+     fis = addInput(fis, [0 10], 'Name', 'erreur');
+     fis = addMF(fis, 'erreur', 'trimf', [0 0 5], 'Name', 'petite');
+     fis = addMF(fis, 'erreur', 'trimf', [5 10 10], 'Name', 'grande');
+     fis = addOutput(fis, [0 1], 'Name', 'commande');
+     fis = addMF(fis, 'commande', 'trimf', [0 0 0.5], 'Name', 'faible');
+     fis = addMF(fis, 'commande', 'trimf', [0.5 1 1], 'Name', 'forte');
+     fis = addRule(fis, [1 1 1 1; 2 2 1 1]);
      writefis(fis, 'pilote.fis');
      memeFis = readfis('pilote.fis');
 
@@ -1372,6 +1535,7 @@ ZMF Fonction d'appartenance en Z : décroît de 1 à 0.
   Y = ZMF(X,[A B]) vaut 1 avant A, 0 après B, avec deux arcs de
   parabole raccordés au milieu — la courbe est donc dérivable.
 
-  Exemple :  zmf(0, [2 8])   % 1
+  Exemple :
+     zmf(0, [2 8])   % 1
 ```
 

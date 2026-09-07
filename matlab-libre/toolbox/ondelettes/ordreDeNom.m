@@ -4,6 +4,10 @@ function ordre = ordreDeNom(nom, prefixe)
 %   Le nom est refusé s'il n'appartient pas à la famille demandée.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      ordreDeNom('db4', 'db')     % 4
+%      ordreDeNom('haar', 'db')    % 1 : haar est db1
     nom = lower(strtrim(char(nom)));
     if strcmp(nom, 'haar') && strcmp(prefixe, 'db')
         ordre = 1;

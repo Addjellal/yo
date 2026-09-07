@@ -19,7 +19,10 @@ function [m, indice] = nanmin(x, y, dim)
     if nargin < 2
         [m, indice] = min(x);
     elseif nargin < 3
-        [m, indice] = min(x, y);
+        % La forme a deux tableaux compare terme a terme : il n'y a pas
+        % d'indice a rendre, et en demander un est une erreur.
+        m = min(x, y);
+        indice = [];
     else
         [m, indice] = min(x, y, dim);
     end

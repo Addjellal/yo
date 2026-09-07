@@ -23,6 +23,11 @@ function [F, valides, statut] = estimateFundamentalMatrix(points1, points2, vara
 %   choisie pour F.
 %
 %   Exemple :
+%      rng(1);
+%      % Deux vues d'un meme nuage de points, decalees lateralement.
+%      p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+%      p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+%      n = size(p1, 1);
 %      F = estimateFundamentalMatrix(p1, p2);
 %      max(abs(sum(([p2 ones(n,1)] * F) .* [p1 ones(n,1)], 2)))   % petit
 %

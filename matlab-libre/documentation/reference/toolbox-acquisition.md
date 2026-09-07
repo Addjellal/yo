@@ -37,6 +37,8 @@ ADDANALOGINPUT Ajoute une voie d'entrée.
   d'un moyennage.
 
   Exemple :
+     s = daq();
+     s.frequence = 1000;
      s = addAnalogInput(s, 'tension', @(t) 5 * sin(2*pi*50*t));
      s = addAnalogInput(s, 'courant', @(t) 0.4 * sin(2*pi*50*t - pi/6));
 
@@ -52,6 +54,8 @@ ADDANALOGOUTPUT Ajoute une voie de sortie.
   qui permet de vérifier qu'on a bien envoyé ce qu'on croyait.
 
   Exemple :
+     s = daq();
+     s.frequence = 1000;
      s = addAnalogOutput(s, 'ao0');
      s = writeData(s, linspace(0, 5, 500).');
      numel(s.ecrit)                  % 500
@@ -101,6 +105,9 @@ READDATA Lit un bloc d'échantillons sur toutes les voies d'entrée.
   C'est le repliement, et aucun traitement postérieur ne le défait.
 
   Exemple :
+     s = daq();
+     s.frequence = 1000;
+     s = addAnalogInput(s, 'ai0', @(t) sin(2 * pi * 100 * t));
      [donnees, temps] = readData(s, 1000);
      1 / diff(temps(1:2))            % la frequence d'echantillonnage
 
@@ -117,6 +124,9 @@ WRITEDATA Écrit un bloc sur les voies de sortie.
   une file de sortie réelle.
 
   Exemple :
+     s = daq();
+     s.frequence = 1000;
+     s = addAnalogOutput(s, 'ao0');
      s = writeData(s, linspace(0, 5, 500).');
      s = writeData(s, linspace(5, 0, 500).');
      numel(s.ecrit)                  % 1000

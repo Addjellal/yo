@@ -3,6 +3,10 @@ function couleurs = label2rgb(etiquettes, carte, fond)
 %   RGB = LABEL2RGB(L) donne une couleur par étiquette ; le fond (zéro)
 %   reste blanc. LABEL2RGB(L,CARTE,FOND) choisit la palette et la couleur
 %   du fond.
+%
+%   Exemple :
+%      couleurs = label2rgb([0 1; 2 0]);
+%      size(couleurs)              % 2 2 3 : une image couleur
     if nargin < 3 || isempty(fond), fond = [1 1 1]; end
     n = max(1, max(etiquettes(:)));
     if nargin < 2 || isempty(carte) || ischar(carte)

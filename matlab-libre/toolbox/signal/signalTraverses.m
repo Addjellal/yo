@@ -4,6 +4,11 @@ function [instants, montantes] = signalTraverses(x, t, seuil)
 %   si la traversée est montante.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      t = (0:0.001:0.1)';
+%      [instants, montantes] = signalTraverses(double(t >= 0.05), t, 0.5);
+%      abs(instants(1) - 0.05) < 2e-3
     x = x(:);
     t = t(:);
     instants = [];

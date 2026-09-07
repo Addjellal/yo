@@ -2,6 +2,10 @@ function r = stdfilt(image, voisinage)
 %STDFILT Écart-type local.
 %   R = STDFILT(I,VOISINAGE) rend l'écart-type des pixels du voisinage,
 %   normalisé par n-1 comme le fait MATLAB.
+%
+%   Exemple :
+%      r = stdfilt(ones(10));
+%      max(r(:)) < 1e-12           % un plateau n'a pas d'ecart type
     if nargin < 2, voisinage = ones(3); end
     x = double(image);
     masque = double(logical(voisinage));

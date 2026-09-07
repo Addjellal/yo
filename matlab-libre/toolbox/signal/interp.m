@@ -3,6 +3,11 @@ function y = interp(x, r, l, alpha)
 %   Y = INTERP(X,R) insère R-1 zéros entre les échantillons puis filtre
 %   passe-bas ; le résultat a R fois plus de points, et le gain est
 %   compensé pour que l'amplitude soit conservée.
+%
+%   Exemple :
+%      x = sin(2 * pi * 0.05 * (0:63)');
+%      y = interp(x, 4);
+%      numel(y)                    % 256 : quatre fois plus de points
     if nargin < 3 || isempty(l), l = 4; end
     if nargin < 4 || isempty(alpha), alpha = 0.5; end
     ligne = isrow(x);

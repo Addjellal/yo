@@ -2,6 +2,11 @@ function [pd, w] = phasedelay(b, a, n)
 %PHASEDELAY Retard de phase d'un filtre numérique.
 %   Le retard de phase vaut -phi(w)/w. Pour un filtre à phase linéaire
 %   d'ordre N il vaut N/2 échantillons, constant.
+%
+%   Exemple :
+%      [b, a] = butter(4, 0.3);
+%      [pd, w] = phasedelay(b, a, 128);
+%      numel(pd) == numel(w)       % 1
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3, n = 512; end
     [phi, w] = phasez(b, a, n);

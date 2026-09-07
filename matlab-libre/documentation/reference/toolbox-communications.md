@@ -107,6 +107,9 @@ ALIGNERPOLYNOMES Complète de zéros le plus court de deux polynômes.
   tiendrait pas, le reste étant souvent de degré zéro.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [a, b] = alignerPolynomes([1 2], [1 2 3 4]);   % a devient [1 2 0 0]
 ```
 
 ## `alignerTermes`
@@ -119,6 +122,9 @@ ALIGNERTERMES Met deux tableaux à la même taille, terme à terme.
   même valeur.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [a, b] = alignerTermes(5, [1 2 3]);   % a devient [5 5 5]
 ```
 
 ## `amdemod`
@@ -171,6 +177,10 @@ AMMOD Modulation d'amplitude.
 AWGN Ajoute un bruit blanc gaussien pour atteindre un rapport donné.
   Y = AWGN(X,SNR) ajoute du bruit tel que le rapport signal sur bruit
   vaille SNR décibels, la puissance du signal étant mesurée sur X.
+
+  Exemple :
+     rng(1);
+           y = awgn(sin(2*pi*(0:999)/100), 20, 'measured');
 ```
 
 ## `base2dec`
@@ -288,7 +298,44 @@ BCHGENPOLY Polynôme générateur d'un code BCH.
 
 ```
 BERAWGN Taux d'erreur binaire théorique sur canal gaussien.
-  BER = BERAWGN(EBNO,'psk',M) ou BERAWGN(EBNO,'qam',M).
+  BER = BERAWGN(EBNO,METHODE,M) rend le taux d'erreur binaire d'une
+  modulation à M états sur un canal à bruit blanc gaussien additif, pour
+  les rapports EBNO donnés en décibels. EBNO est l'énergie par bit
+  rapportée à la densité spectrale de bruit, non le rapport signal sur
+  bruit : c'est ce qui rend les modulations comparables entre elles à
+  débit binaire égal.
+
+  METHODE vaut 'psk', 'dpsk', 'qam', 'pam' ou 'fsk'.
+
+  BER = BERAWGN(EBNO,'psk',M,CODAGE) tient compte du codage
+  différentiel : CODAGE vaut 'nondiff' (par défaut) ou 'diff'.
+  BER = BERAWGN(EBNO,'fsk',M,COHERENCE) où COHERENCE vaut 'coherent'
+  (par défaut) ou 'noncoherent'.
+
+  Les formules supposent un codage de Gray, qui fait différer d'un seul
+  bit deux points voisins de la constellation : c'est ce qui permet de
+  diviser le taux d'erreur symbole par le nombre de bits. Sans lui, une
+  erreur entre voisins peut faire basculer tous les bits d'un coup.
+
+  Le codage différentiel double à peu près le taux d'erreur, et coûte
+  donc de l'ordre du demi-décibel : chaque symbole reçu sert de
+  référence au suivant, si bien qu'une détection fausse en gâte deux.
+  C'est le prix de n'avoir pas à récupérer la phase de la porteuse.
+
+  La détection non cohérente en fréquence coûte davantage — environ un
+  décibel à taux courant, et sa courbe décroît en exponentielle et non
+  en fonction d'erreur complémentaire.
+
+  Ces courbes sont la référence à laquelle se compare une chaîne
+  réelle : l'écart horizontal entre la courbe mesurée et celle-ci est
+  exactement ce que coûte la mise en oeuvre.
+
+  Exemple :
+     berawgn(0:2:10, 'psk', 2)              % decroit tres vite
+     berawgn(10, 'psk', 2, 'diff') > berawgn(10, 'psk', 2)   % 1
+     berawgn(10, 'qam', 16) > berawgn(10, 'psk', 2)          % 1
+
+  Voir aussi BERCODING, BITERR, SYMERR, AWGN.
 ```
 
 ## `bercoding`
@@ -483,6 +530,9 @@ BSC Canal binaire symétrique.
 COMPLETERLONGUEUR Complète un polynôme de zéros, ou le tronque.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     completerLongueur([1 2 3], 5)     % [1 2 3 0 0]
 ```
 
 ## `convenc`
@@ -793,6 +843,10 @@ EXIGERPREMIER Refuse un ordre de corps qui n'est pas premier.
   composé donnerait des résultats faux sans le dire.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     exigerPremier(7, 'gf');    % passe
+     %      % exigerPremier(4, 'gf') leve comm:gf:NotPrime
 ```
 
 ## `eyediagram`
@@ -801,6 +855,11 @@ EXIGERPREMIER Refuse un ordre de corps qui n'est pas premier.
 EYEDIAGRAM Découpe un signal en segments de N échantillons.
   SEGMENTS = EYEDIAGRAM(X,N) rend une matrice dont chaque ligne est une
   trace ; sans sortie, la fonction les trace superposées.
+
+  Exemple :
+     rng(1);
+           eyediagram(rcosdesign(0.25, 4, 8) , 16);
+           close all;
 ```
 
 ## `fmdemod`
@@ -1439,6 +1498,9 @@ HUFFMANENCO Codage de Huffman.
 INSTANTS Vecteur des instants d'échantillonnage, à la forme de X.
   T = INSTANTS(X,FS) rend (0:n-1)'/FS répété autant de fois que X a de
   colonnes. Les fonctions de modulation analogique s'en servent toutes.
+
+  Exemple :
+     instants(100, 10)                 % les instants d'echantillonnage
 ```
 
 ## `intdump`
@@ -2071,6 +2133,10 @@ PAMMOD Modulation d'amplitude d'impulsions.
 PERMUTATIONALEATOIRE Permutation reproductible de 1 à N.
   L'état du générateur est sauvegardé puis restauré : appeler un
   entrelaceur ne doit pas déranger le reste du programme.
+
+  Exemple :
+     p = permutationAleatoire(20, 3);
+           isequal(p, permutationAleatoire(20, 3))     % 1 : meme germe
 ```
 
 ## `permutationMatricielle`
@@ -2078,6 +2144,10 @@ PERMUTATIONALEATOIRE Permutation reproductible de 1 à N.
 ```
 PERMUTATIONMATRICIELLE Ordre de lecture colonne par colonne d'une
   matrice remplie ligne par ligne.
+
+  Exemple :
+     p = permutationMatricielle(3, 4);
+           isequal(sort(p(:))', 1:12)                  % 1 : c'est une permutation
 ```
 
 ## `pmdemod`
@@ -2235,7 +2305,8 @@ QAMMOD Modulation d'amplitude en quadrature à M états (M carré).
 QFUNC Fonction Q : probabilité qu'une normale centrée réduite dépasse X.
   Q(X) = 0.5*erfc(X/sqrt(2)).
 
-  Exemple :  qfunc(0)   % 0.5
+  Exemple :
+     qfunc(0)   % 0.5
 ```
 
 ## `qfuncinv`
@@ -2330,6 +2401,10 @@ RANDINTRLV Entrelacement par une permutation pseudo-aléatoire.
 RCOSDESIGN Filtre en cosinus surélevé, ou sa racine.
   H = RCOSDESIGN(BETA,SPAN,SPS,'sqrt') rend la racine du cosinus
   surélevé, normalisée en énergie.
+
+  Exemple :
+     h = rcosdesign(0.25, 6, 4);
+           abs(sum(h .^ 2) - 1) < 1e-10      % 1 : energie unite
 ```
 
 ## `rsdec`
@@ -2516,6 +2591,10 @@ TABLEGRAY Table de renumérotation de Gray d'une constellation.
   CORRESPONDANCE(k+1) est le numéro de Gray du symbole binaire k. Pour
   les constellations à une dimension c'est le code de Gray usuel ; pour
   'qam' carrée, le code s'applique à chacune des deux coordonnées.
+
+  Exemple :
+     table = tableGray('psk', 8);
+           isequal(sort(table(:)'), 0:7)               % 1
 ```
 
 ## `tailleEntrelacement`
@@ -2524,6 +2603,10 @@ TABLEGRAY Table de renumérotation de Gray d'une constellation.
 TAILLEENTRELACEMENT Nombre d'éléments qu'un entrelaceur doit permuter.
   Pour un vecteur c'est sa longueur, pour une matrice son nombre de
   lignes : les colonnes sont entrelacées de la même façon.
+
+  Exemple :
+     tailleEntrelacement((1:10)')      % 10
+           tailleEntrelacement(zeros(6, 3))  % 6 : une matrice s'entrelace par lignes
 ```
 
 ## `vec2mat`
@@ -2549,6 +2632,9 @@ VERIFIERFREQUENCES Contrôle du critère de Shannon pour la porteuse.
   La porteuse doit tenir sous la moitié de la fréquence
   d'échantillonnage, sinon elle se replie et la modulation n'a plus de
   sens.
+
+  Exemple :
+     verifierFrequences(100, 1000);    % passe : 100 Hz est sous Nyquist
 ```
 
 ## `verifierPermutation`

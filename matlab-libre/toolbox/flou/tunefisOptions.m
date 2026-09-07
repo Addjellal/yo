@@ -13,7 +13,10 @@ function options = tunefisOptions(varargin)
 %
 %   Exemple :
 %      o = tunefisOptions('Method', 'anfis');
-%      fis = tunefis(fis0, [], x, y, o);
+%      x = (0:0.05:10)';
+%      donnees = [x, sin(x)];
+%      fis0 = genfis1(donnees, 5);
+%      fis = tunefis(fis0, [], x, sin(x), o);
 %
 %   Voir aussi TUNEFIS, GETTUNABLESETTINGS, ANFISOPTIONS.
     options = struct('Method', 'anfis', 'MethodOptions', [], ...

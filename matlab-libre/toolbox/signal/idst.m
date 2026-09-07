@@ -2,6 +2,10 @@ function x = idst(y, n)
 %IDST Transformée en sinus discrète inverse.
 %   La matrice de la DST-I est symétrique et son carré vaut (N+1)/2 fois
 %   l'identité : l'inverse n'est donc qu'un facteur d'échelle.
+%
+%   Exemple :
+%      x = [1 2 3 4]';
+%      max(abs(idst(dst(x)) - x)) < 1e-12
     y = double(y);
     ligne = isrow(y);
     if ligne, y = y(:); end

@@ -77,8 +77,11 @@ function verifierExemples(varargin)
     cd(avant);
     rmdir(bac, 's');
 
+    for k = 1:numel(sansExemple)
+        fprintf('  sans exemple : %s\n', sansExemple{k});
+    end
     for k = 1:numel(casses)
-    fprintf('  casse : %s\n', casses{k});
+        fprintf('  casse : %s\n', casses{k});
     end
     fprintf('\n  %d fonctions examinees, %d sans exemple, %d exemples casses\n', ...
         total, numel(sansExemple), numel(casses));

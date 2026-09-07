@@ -13,6 +13,9 @@ function [donnees, temps] = readData(session, nEchantillons)
 %   C'est le repliement, et aucun traitement postérieur ne le défait.
 %
 %   Exemple :
+%      s = daq();
+%      s.frequence = 1000;
+%      s = addAnalogInput(s, 'ai0', @(t) sin(2 * pi * 100 * t));
 %      [donnees, temps] = readData(s, 1000);
 %      1 / diff(temps(1:2))            % la frequence d'echantillonnage
 %

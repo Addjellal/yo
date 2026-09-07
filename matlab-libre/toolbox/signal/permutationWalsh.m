@@ -6,6 +6,10 @@ function ordreLignes = permutationWalsh(N, ordre)
 %   puis code de Gray, rangement par nombre de changements de signe).
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      p = permutationWalsh(8, 'sequency');
+%      isequal(sort(p(:)'), 1:8)   % 1 : c'est une permutation
     bits = round(log2(N));
     switch lower(char(ordre))
         case 'hadamard'

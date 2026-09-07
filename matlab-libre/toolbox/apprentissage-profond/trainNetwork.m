@@ -13,10 +13,14 @@ function reseau = trainNetwork(X, Y, couches, options)
 %   l'erreur quadratique sinon. La descente est stochastique avec inertie.
 %
 %   Exemple :
-%      couches = {imageInputLayer([8 8 1]), convolution2dLayer(3, 4), ...
-%                 reluLayer(), maxPooling2dLayer(2), flattenLayer(), ...
+%      rng(1);
+%      X = [randn(2, 30), randn(2, 30) + 4];
+%      Y = [repmat([1; 0], 1, 30), repmat([0; 1], 1, 30)];
+%      couches = {fullyConnectedLayer(4), reluLayer(), ...
 %                 fullyConnectedLayer(2), softmaxLayer()};
-%      reseau = trainNetwork(images, etiquettes, couches, options);
+%      reseau = trainNetwork(X, Y, couches, trainingOptions('sgdm'));
+%      [~, classes] = max(predict(reseau, X));
+%      mean(classes == [ones(1, 30), 2 * ones(1, 30)]) > 0.9
     if nargin < 4
         options = trainingOptions('sgdm');
     end

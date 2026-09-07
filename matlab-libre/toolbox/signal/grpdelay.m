@@ -6,6 +6,11 @@ function [gd, w] = grpdelay(b, a, n, fs)
 %   Le retard est -d(arg H)/dw ; il se calcule ici par la formule exacte
 %   Re{ (B'(w)/B(w)) - (A'(w)/A(w)) }, où les dérivées viennent de la
 %   pondération des coefficients par leur indice.
+%
+%   Exemple :
+%      [b, a] = butter(4, 0.3);
+%      [gd, w] = grpdelay(b, a, 128);
+%      all(gd > 0)                 % 1 : un filtre causal retarde
     if nargin < 2 || isempty(a), a = 1; end
     if nargin < 3 || isempty(n), n = 512; end
     b = b(:).';

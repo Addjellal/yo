@@ -2,6 +2,10 @@ function t = cell2table(c, varargin)
 %CELL2TABLE Convertit une cellule à deux dimensions en table.
 %   Chaque colonne devient une variable : numérique si toutes ses cases le
 %   sont, cellule de textes sinon.
+%
+%   Exemple :
+%      t = cell2table({1, 'a'; 2, 'b'}, 'VariableNames', {'n', 'lettre'});
+%      height(t)                   % 2
     noms = {}; lignes = {};
     k = 1;
     while k + 1 <= numel(varargin)

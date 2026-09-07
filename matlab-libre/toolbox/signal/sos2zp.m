@@ -2,6 +2,12 @@ function [z, p, k] = sos2zp(sos, g)
 %SOS2ZP Zéros, pôles et gain d'un enchaînement de sections du second ordre.
 %   [Z,P,K] = SOS2ZP(SOS,G) où SOS a une section par ligne, sous la forme
 %   [b0 b1 b2 a0 a1 a2].
+%
+%   Exemple :
+%      [b, a] = butter(4, 0.3);
+%      [sos, g] = tf2sos(b, a);
+%      [z, p, k] = sos2zp(sos, g);
+%      all(abs(p) < 1)             % 1 : le filtre est stable
     if nargin < 2, g = 1; end
     z = [];
     p = [];

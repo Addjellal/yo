@@ -2,6 +2,10 @@ function [call, put] = blsprice(S, K, r, T, sigma, q)
 %BLSPRICE Prix d'options européennes par la formule de Black-Scholes.
 %   [C,P] = BLSPRICE(S,K,R,T,SIGMA) rend les prix de l'achat et de la
 %   vente. Q est le taux de dividende continu (zéro par défaut).
+%
+%   Exemple :
+%      [c, p] = blsprice(100, 100, 0.05, 1, 0.2);
+%      abs(c - p - (100 - 100 * exp(-0.05))) < 1e-9   % la parite achat-vente
     if nargin < 6
         q = 0;
     end

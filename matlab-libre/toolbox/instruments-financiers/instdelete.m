@@ -5,6 +5,8 @@ function jeu = instdelete(jeu, varargin)
 %   ceux qui répondent au critère.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+%      jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
 %      jeu = instdelete(jeu, 'Index', 2);
 %
 %   Voir aussi INSTADD, INSTSELECT.

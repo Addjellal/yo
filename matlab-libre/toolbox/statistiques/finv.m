@@ -3,7 +3,8 @@ function x = finv(p, d1, d2)
 %   Les trois arguments se diffusent : un scalaire prend la taille des
 %   autres.
 %
-%   Exemple :  finv(0.95, 2, 30)     % 3.3158
+%   Exemple :
+%      finv(0.95, 2, 30)     % 3.3158
     [p, d1] = matlibre_diffuser_deux(p, d1, 'finv');
     [p, d2] = matlibre_diffuser_deux(p, d2, 'finv');
     [d1, d2] = matlibre_diffuser_deux(d1, d2, 'finv');

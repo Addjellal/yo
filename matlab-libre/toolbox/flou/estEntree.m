@@ -2,6 +2,10 @@ function oui = estEntree(genre)
 %ESTENTREE Le mot-clé désigne-t-il une entrée ?
 %   Accepte 'input' et 'in' pour une entrée, 'output' et 'out' pour une
 %   sortie ; toute autre valeur est refusée.
+%
+%   Exemple :
+%      estEntree('input')          % 1
+%      estEntree('output')         % 0
     mot = lower(char(genre));
     if any(strcmp(mot, {'input', 'in'}))
         oui = true;

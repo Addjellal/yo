@@ -13,11 +13,6 @@ function [phi, psi, xval] = wavefun(nom, iterations)
 %   donc 2^ITER*(L-1)+1 points et l'échelonnement est celui de MATLAB :
 %   l'intégrale de PHI vaut 1 et celle de PSI vaut 0.
 %
-%   Exemple :
-%      [phi, psi, x] = wavefun('db2', 8);
-%      numel(x)                % 769
-%      sum(phi) * (x(2)-x(1))  % 1
-%      sum(psi) * (x(2)-x(1))  % 0
 %
 %   Pour une ondelette continue — 'mexh', 'morl', 'gausP' — il n'y a pas
 %   de fonction d'échelle : l'appel prend alors la forme de MATLAB
@@ -26,6 +21,12 @@ function [phi, psi, xval] = wavefun(nom, iterations)
 %
 %   et l'ondelette est échantillonnée sur 2^ITER points de son support
 %   effectif.
+%
+%   Exemple :
+%      [phi, psi, x] = wavefun('db2', 8);
+%      numel(x)                % 769
+%      sum(phi) * (x(2)-x(1))  % 1
+%      sum(psi) * (x(2)-x(1))  % 0
 %
 %   Voir aussi WFILTERS, CENTFRQ, UPCOEF, MEXIHAT, MORLET, GAUSWAVF.
     if nargin < 2 || isempty(iterations), iterations = 8; end

@@ -6,6 +6,10 @@ function varargout = statAjuster(varargin)
 %   cette règle une fois pour toutes.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [a, b] = statAjuster([1 2 3], 5);
+%      numel(b)                    % 3 : le scalaire s'est repandu
     forme = [1 1];
     for k = 1:numel(varargin)
         d = size(varargin{k});

@@ -2,6 +2,11 @@ function [h, v, d] = detcoef2(genre, C, S, niveau)
 %DETCOEF2 Coefficients de détail d'une image décomposée.
 %   D = DETCOEF2('h',C,S,N) rend le détail horizontal du niveau N ;
 %   'v' le vertical, 'd' le diagonal, 'compact' ou 'all' les trois.
+%
+%   Exemple :
+%      [C, S] = wavedec2(magic(8), 2, 'haar');
+%      [h, v, d] = detcoef2('all', C, S, 1);
+%      size(h)                     % les details horizontaux du premier niveau
     niveauMax = size(S, 1) - 2;
     if niveau > niveauMax || niveau < 1
         error('wavelet:detcoef2:BadLevel', 'Niveau hors de la décomposition.');

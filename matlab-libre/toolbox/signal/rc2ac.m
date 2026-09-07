@@ -2,6 +2,11 @@ function r = rc2ac(k, r0)
 %RC2AC Autocorrélation à partir des coefficients de réflexion.
 %   R = RC2AC(K,R0) remonte la récurrence de Levinson : à chaque ordre,
 %   le nouveau terme d'autocorrélation se déduit du polynôme courant.
+%
+%   Exemple :
+%      k = [0.5 0.2];
+%      r = rc2ac(k, 1);
+%      max(abs(ac2rc(r) - k(:))) < 1e-10      % l'aller-retour
     k = double(k(:));
     r = r0;
     a = 1;

@@ -2,6 +2,10 @@ function rgb = xyz2rgb(xyz, varargin)
 %XYZ2RGB Passage de l'espace XYZ à sRGB.
 %   Réciproque de RGB2XYZ. Les valeurs hors du domaine affichable sont
 %   ramenées entre 0 et 1, comme le fait MATLAB.
+%
+%   Exemple :
+%      rgb = xyz2rgb([0.9504 1 1.0888]);
+%      max(abs(rgb - [1 1 1])) < 1e-2      % le blanc D65 donne du blanc
     blanc = [];
     for k = 1:2:numel(varargin) - 1
         if strcmpi(char(varargin{k}), 'WhitePoint')

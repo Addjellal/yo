@@ -6,6 +6,12 @@ function [S, f] = signalSpectrePuissance(x, fs)
 %   secondaires à -180 dB laissent voir des harmoniques très faibles.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [S, f] = signalSpectrePuissance(x, 1);
+%      numel(S) == numel(f)        % 1
     if nargin < 2 || isempty(fs), fs = 1; end
     x = double(x(:));
     n = numel(x);

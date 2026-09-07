@@ -6,6 +6,11 @@ function h = fspecial(genre, parametre, sigma)
 %   H = FSPECIAL('prewitt')        gradient vertical
 %   H = FSPECIAL('laplacian')      laplacien
 %   H = FSPECIAL('log',N,SIG)      laplacien de gaussienne
+%
+%   Exemple :
+%      h = fspecial('gaussian', 5, 1);
+%      abs(sum(h(:)) - 1) < 1e-12  % un lissage conserve la moyenne
+%      abs(sum(sum(fspecial('laplacian')))) < 1e-12   % un derivateur annule le continu
     if nargin < 2, parametre = 3; end
     if nargin < 3, sigma = 0.5; end
     switch lower(char(genre))

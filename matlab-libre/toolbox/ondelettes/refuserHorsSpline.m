@@ -6,6 +6,14 @@ function refuserHorsSpline(Nr, Nd, famille)
 %   autre chose sous leur nom tromperait l'appelant.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      refuserHorsSpline(2, 4, 'bior');   % passe : c'est une spline
+%      try
+%          refuserHorsSpline(5, 5, 'bior');
+%      catch e
+%          e.identifier
+%      end
     horsSpline = [5 5; 6 8];
     for k = 1:size(horsSpline, 1)
         if Nr == horsSpline(k, 1) && Nd == horsSpline(k, 2)

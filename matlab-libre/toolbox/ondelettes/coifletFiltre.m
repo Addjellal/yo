@@ -32,6 +32,10 @@ function h = coifletFiltre(N)
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
+%   Exemple :
+%      h = coifletFiltre(2);
+%      abs(sum(h) - sqrt(2)) < 1e-8    % un filtre d'echelle somme a racine de deux
+%
 %   Voir aussi COIFWAVF, DAUBECHIESFILTRE, WFILTERS.
     persistent connus
     N = round(N);

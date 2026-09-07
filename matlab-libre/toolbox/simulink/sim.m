@@ -23,6 +23,14 @@ function resultat = sim(modele, tFinal, pas)
 %   RESULTAT.temps et RESULTAT.signaux.<nom> pour l'accès direct,
 %   RESULTAT.time et RESULTAT.signals(k).values pour la « structure with
 %   time » qu'attendent les scripts écrits pour Simulink.
+%
+%   Exemple :
+%      m = new_system('rampe');
+%      m = add_block(m, 'constant', 'un', 'Value', 2);
+%      m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
+%      m = add_line(m, 'un', 'integ');
+%      r = sim(m, 5, 0.001);
+%      abs(r.signaux.integ(end) - 10) < 0.01     % l'integrale de 2 sur 5 s
     if nargin < 2, tFinal = 10; end
     if nargin < 3, pas = 0.01; end
     if ischar(modele) || isstring(modele)

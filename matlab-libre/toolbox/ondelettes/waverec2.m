@@ -1,6 +1,10 @@
 function x = waverec2(C, S, nom)
 %WAVEREC2 Reconstruction d'une image à partir de sa décomposition.
 %   Réciproque de WAVEDEC2.
+%
+%   Exemple :
+%      [C, S] = wavedec2(magic(8), 2, 'haar');
+%      max(max(abs(waverec2(C, S, 'haar') - magic(8)))) < 1e-10
     if nargin < 3 || isempty(nom), nom = 'haar'; end
     niveaux = size(S, 1) - 2;
     courant = reshape(C(1:prod(S(1, :))), S(1, :));

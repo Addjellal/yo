@@ -13,8 +13,12 @@ function [coefficients, deviance, statistiques] = glmfit(X, y, loi, varargin)
 %   C'est l'interface historique ; FITGLM rend un modèle complet.
 %
 %   Exemple :
+%      rng(1);
+%      X = randn(200, 1);
+%      y = double(rand(200, 1) < 1 ./ (1 + exp(-X)));
 %      b = glmfit(X, y, 'binomial');
 %      p = glmval(b, X, 'logit');
+%      all(p >= 0 & p <= 1)      % 1 : ce sont des probabilites
 %
 %   Voir aussi GLMVAL, FITGLM, FITLM, MNRFIT.
     if nargin < 3 || isempty(loi)

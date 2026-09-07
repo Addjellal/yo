@@ -1145,4 +1145,29 @@ fprintf('discriminant : classe 1 predite %d fois, %d avec a priori\n', ...
 assert(sum(avecBiais == 1) > sum(sansBiais == 1));
 disp('fitcdiscr : ok');
 
+%% ------------------------------------ une loi ajustee sert de loi
+% PDF, CDF, ICDF et RANDOM prennent l'objet rendu par FITDIST : il porte
+% deja son nom et ses parametres, et les repeter serait une occasion de se
+% tromper.
+rng(11);
+pd = fitdist(normrnd(5, 2, 2000, 1), 'Normal');
+assert(abs(pd.mu - 5) < 0.2 && abs(pd.sigma - 2) < 0.2);
+assert(abs(pdf(pd, pd.mu) - normpdf(pd.mu, pd.mu, pd.sigma)) < 1e-12);
+assert(abs(cdf(pd, pd.mu) - 0.5) < 1e-12, 'la mediane d''une gaussienne est sa moyenne');
+assert(abs(cdf(pd, icdf(pd, 0.3)) - 0.3) < 1e-10, 'l''aller-retour est exact');
+assert(isequal(size(random(pd, 1, 10)), [1 10]));
+pe = fitdist(exprnd(3, 2000, 1), 'Exponential');
+assert(abs(pe.mu - 3) < 0.4);
+assert(abs(cdf(pe, pe.mu) - (1 - exp(-1))) < 1e-12, ...
+       'une exponentielle a passe 63 % a sa moyenne');
+
+% NANMAX et NANMIN a deux tableaux comparent terme a terme : il n'y a pas
+% d'indice a rendre, et en demander un etait une erreur.
+assert(nanmax([1 NaN 5 2]) == 5);
+[m, i] = nanmax([1 NaN 5 2]);
+assert(m == 5 && i == 3);
+assert(isequal(nanmax([1 NaN], [NaN 4]), [1 4]));
+assert(isequal(nanmin([1 NaN], [NaN 4]), [1 4]));
+assert(nanmin([3 NaN 1 2]) == 1);
+
 disp('statistiques : toutes les verifications passent');

@@ -2,6 +2,11 @@ function y = imnoise(x, genre, parametre)
 %IMNOISE Ajoute du bruit à une image.
 %   Y = IMNOISE(X,'gaussian',VAR) ajoute un bruit blanc gaussien.
 %   Y = IMNOISE(X,'salt & pepper',D) remplace une fraction D des pixels.
+%
+%   Exemple :
+%      rng(1);
+%      x = 0.5 * ones(50);
+%      std(reshape(imnoise(x, 'gaussian', 0.01), [], 1)) > 0.05   % du bruit a ete ajoute
     x = im2double(x);
     if nargin < 2, genre = 'gaussian'; end
     if nargin < 3, parametre = 0.01; end

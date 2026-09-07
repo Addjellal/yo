@@ -2,7 +2,8 @@ function y = dst(x, n)
 %DST Transformée en sinus discrète, première espèce.
 %   Y(k) = somme des X(n) sin(pi n k/(N+1)), k = 1..N.
 %
-%   Exemple :  dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
+%   Exemple :
+%      dst([1 0 0])   % [sin(pi/4) sin(pi/2) sin(3pi/4)]
     x = double(x);
     ligne = isrow(x);
     if ligne, x = x(:); end

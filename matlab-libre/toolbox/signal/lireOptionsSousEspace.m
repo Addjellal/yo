@@ -3,6 +3,10 @@ function [fs, estCorrelation] = lireOptionsSousEspace(arguments)
 %   Reconnaît une fréquence d'échantillonnage et le mot-clé 'corr'.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      [fs, corr] = lireOptionsSousEspace({1000, 'corr'});
+%      [fs corr]                   % 1000 et vrai
     fs = [];
     estCorrelation = false;
     for k = 1:numel(arguments)

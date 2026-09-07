@@ -4,6 +4,13 @@ function [tensions, courants] = solveDC(c)
 %   la masse) et le courant de chaque source de tension.
 %   En régime continu, un condensateur est un circuit ouvert et une
 %   bobine un court-circuit.
+%
+%   Exemple :
+%      c = circuit('diviseur');
+%      c = addVoltageSource(c, 1, 0, 10);
+%      c = addResistor(c, 1, 2, 1000);
+%      c = addResistor(c, 2, 0, 2000);
+%      abs(solveDC(c)(2) - 20 / 3) < 1e-9     % deux tiers de dix volts
     n = c.noeuds;
     sourcesTension = [];
     for k = 1:numel(c.composants)

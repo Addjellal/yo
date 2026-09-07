@@ -8,6 +8,10 @@ function r = gamrnd(a, b, varargin)
 %   dépasse 95 %. Une forme inférieure à 1 se ramène à la précédente en
 %   multipliant par u^(1/a). Tous les tirages sont menés de front, seuls
 %   les refusés sont retirés au tour suivant.
+%
+%   Exemple :
+%      rng(1);
+%      mean(gamrnd(3, 2, 1, 10000))         % proche de 6 = a b
     if nargin < 2, b = 1; end
     forme = statForme(size(a + b), varargin);
     a = statEtendre(a, forme);

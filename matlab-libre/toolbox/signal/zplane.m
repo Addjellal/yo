@@ -2,6 +2,11 @@ function zplane(b, a)
 %ZPLANE Trace les zéros et les pôles dans le plan complexe.
 %   ZPLANE(B,A) à partir des coefficients, ZPLANE(Z,P) à partir des zéros
 %   et des pôles. Le cercle unité sert de repère.
+%
+%   Exemple :
+%      [b, a] = butter(4, 0.3);
+%      zplane(b, a);
+%      close all;
     if nargin < 2, a = 1; end
     if numel(b) > 1 && numel(a) > 1 && ~isreal(b(:)') || iscolumn(b)
         z = b; p = a;

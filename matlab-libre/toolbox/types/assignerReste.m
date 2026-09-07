@@ -11,6 +11,10 @@ function v = assignerReste(v, s, valeur)
 %   Fonction interne aux boîtes à outils de types : elle n'existe pas dans
 %   MATLAB.
 %
+%   Exemple :
+%      s = struct('type', '()', 'subs', {{2}});
+%      assignerReste([10 20 30], s, 99)   % 10 99 30
+%
 %   Voir aussi SUBSASGN, APPLIQUERRESTE.
     if isempty(s)
         v = valeur;

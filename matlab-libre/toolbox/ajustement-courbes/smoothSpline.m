@@ -2,6 +2,13 @@ function ylisse = smoothSpline(x, y, lambda)
 %SMOOTHSPLINE Lissage par pénalisation de la dérivée seconde.
 %   YLISSE = SMOOTHSPLINE(X,Y,LAMBDA) minimise
 %      sum (y - f)^2 + lambda * sum (f'')^2
+%
+%   Exemple :
+%      rng(1);
+%      x = linspace(0, 1, 60)';
+%      y = sin(2 * pi * x) + 0.2 * randn(60, 1);
+%      lisse = smoothSpline(x, y, 1);
+%      sum(diff(lisse, 2) .^ 2) < sum(diff(y, 2) .^ 2)     % lisser diminue la courbure
     if nargin < 3
         lambda = 1;
     end

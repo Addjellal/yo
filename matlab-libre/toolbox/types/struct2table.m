@@ -2,6 +2,10 @@ function t = struct2table(s, varargin)
 %STRUCT2TABLE Convertit un tableau de structures en table.
 %   Chaque champ devient une variable ; un tableau 1x1 dont les champs sont
 %   des colonnes est accepté également.
+%
+%   Exemple :
+%      t = struct2table(struct('a', {1; 2}, 'b', {3; 4}));
+%      height(t)                   % 2
     champs = fieldnames(s);
     n = numel(s);
     colonnes = cell(1, numel(champs));

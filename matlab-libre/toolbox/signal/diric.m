@@ -6,7 +6,8 @@ function y = diric(x, n)
 %   C'est la transformée de Fourier de la fenêtre rectangulaire de N
 %   points, normalisée.
 %
-%   Exemple :  diric(0, 5)   % 1
+%   Exemple :
+%      diric(0, 5)   % 1
     if n <= 0 || n ~= round(n)
         error('signal:diric:BadOrder', 'N doit être un entier positif.');
     end

@@ -11,11 +11,9 @@ function varargout = dlfeval(fonction, varargin)
 %   pourra demander la dérivée.
 %
 %   Exemple :
-%      function [perte, gradient] = coutQuadratique(x, cible)
-%          perte = sum((x - cible) .^ 2);
-%          gradient = dlgradient(perte, x);
-%      end
-%      [p, g] = dlfeval(@coutQuadratique, dlarray([1 2]), [0 0]);
+%      cout = @(x, cible) deal(sum((x - cible) .^ 2), ...
+%                              dlgradient(sum((x - cible) .^ 2), x));
+%      [p, g] = dlfeval(cout, dlarray([1 2]), [0 0]);
 %      extractdata(g)      % 2 4
 %
 %   Voir aussi DLARRAY, DLGRADIENT, ADAMUPDATE.

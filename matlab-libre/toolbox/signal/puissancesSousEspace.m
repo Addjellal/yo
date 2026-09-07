@@ -5,6 +5,13 @@ function pow = puissancesSousEspace(R, w, valeurs, p)
 %   carrés une fois les fréquences connues.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      [R, m] = signalMatriceCorrelation(x, 2, false);
+%      pow = puissancesSousEspace(R, 2 * pi * 0.1, eig(R), 2);
+%      all(isfinite(pow))
     m = size(R, 1);
     sigma2 = mean(valeurs(p+1:end));
     A = zeros(m, numel(w));

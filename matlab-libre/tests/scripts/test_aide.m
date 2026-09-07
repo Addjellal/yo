@@ -102,7 +102,13 @@ assert(isempty(sansFiche));
 % « Exemples » doit tourner. La verification porte sur les dossiers dont
 % toutes les fiches sont completes ; la liste s'allonge a mesure qu'on
 % les complete, et ce qui y entre ne peut plus en ressortir.
-dossiersVerifies = {'automatique', 'robuste', 'optimisation'};
+% Tous les dossiers y sont : outils/verifierExemples.m fait le meme
+% controle au moment d'ecrire, et aucun exemple ne manque plus nulle part.
+dossierToolbox = matlibre_racine();
+entrees = dir(dossierToolbox);
+entrees = entrees([entrees.isdir] & ~startsWith({entrees.name}, '.'));
+dossiersVerifies = sort({entrees.name});
+dossiersVerifies = dossiersVerifies(~strcmp(dossiersVerifies, 'aide'));
 bacM = tempname();
 mkdir(bacM);
 avant = pwd();

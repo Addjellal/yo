@@ -2,6 +2,12 @@ function [phi, bruit, constante] = arfit(y, p)
 %ARFIT Estimation d'un modèle autorégressif par Yule-Walker.
 %   [PHI,SIGMA2,C] = ARFIT(Y,P) rend les coefficients, la variance du
 %   bruit et la constante.
+%
+%   Exemple :
+%      rng(1);
+%      y = arsim(0.7, 500);
+%      p = arfit(y, 1);
+%      abs(p(1) - 0.7) < 0.15
     y = y(:);
     m = mean(y);
     z = y - m;

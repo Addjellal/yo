@@ -58,8 +58,13 @@ BEAMFORMERDAS Formation de voies par retard et somme.
   qui exploite la structure de la covariance, le peut.
 
   Exemple :
+     rng(1);
+     % Huit capteurs, une source a vingt degres, et du bruit.
+     a = steeringVector(8, 0.5, deg2rad(20));
+     recu = a * (randn(1, 200) + 1i * randn(1, 200)) / sqrt(2) ...
+            + 0.1 * (randn(8, 200) + 1i * randn(8, 200));
      sortie = beamformerDAS(recu, 0.5, deg2rad(20));
-     var(sortie) / var(beamformerDAS(recu, 0.5, deg2rad(50)))
+     var(sortie) / var(beamformerDAS(recu, 0.5, deg2rad(50))) > 1    % 1
 
   Voir aussi STEERINGVECTOR, MUSICSPECTRUM, ARRAYGAIN.
 ```
@@ -87,9 +92,14 @@ MUSICSPECTRUM Estimation de direction d'arrivée par la méthode MUSIC.
   faiblesse de la méthode, et elle est de principe.
 
   Exemple :
-     [spectre, angles] = musicSpectrum(recu, 0.5, 2);
-     [~, pics] = findpeaks(spectre / max(spectre));
-     rad2deg(angles(pics))
+     rng(1);
+     % Huit capteurs, une source a vingt degres, et du bruit.
+     a = steeringVector(8, 0.5, deg2rad(20));
+     recu = a * (randn(1, 200) + 1i * randn(1, 200)) / sqrt(2) ...
+            + 0.1 * (randn(8, 200) + 1i * randn(8, 200));
+     [spectre, angles] = musicSpectrum(recu, 0.5, 1);
+     [~, k] = max(spectre);
+     abs(rad2deg(angles(k)) - 20) < 5      % 1 : la source est retrouvee
 
   Voir aussi BEAMFORMERDAS, STEERINGVECTOR, ARRAYGAIN.
 ```

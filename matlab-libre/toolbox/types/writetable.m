@@ -3,6 +3,11 @@ function writetable(t, nomFichier, varargin)
 %   WRITETABLE(T,FICHIER) écrit un fichier CSV avec une ligne d'en-tête.
 %   WRITETABLE(...,'Delimiter',D) choisit le séparateur,
 %   WRITETABLE(...,'WriteVariableNames',false) supprime l'en-tête.
+%
+%   Exemple :
+%      t = array2table([1 2; 3 4], 'VariableNames', {'a', 'b'});
+%      writetable(t, 'sortie.csv');
+%      height(readtable('sortie.csv'))     % 2 : l'aller-retour
     if nargin < 2, nomFichier = 'table.txt'; end
     delimiteur = ',';
     entete = true;

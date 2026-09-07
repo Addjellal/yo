@@ -4,6 +4,11 @@ function y = morphologie(x, element, operation)
 %   plus l'infini pour l'érosion, moins l'infini pour la dilatation. Un
 %   pixel dont tout le voisinage sort du cadre garde donc sa valeur
 %   neutre, au lieu de faire échouer le calcul sur un ensemble vide.
+%
+%   Exemple :
+%      bw = false(10);
+%      bw(5, 5) = true;
+%      sum(sum(morphologie(double(bw), ones(3), 'dilate')))   % 9 : le point s'epaissit
     x = double(x);
     [h, l] = size(x);
     [he, le] = size(element);

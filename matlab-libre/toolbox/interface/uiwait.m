@@ -5,4 +5,10 @@ function uiwait(~, ~)
 %   immédiatement, sans quoi l'interpréteur ne pourrait plus traiter les
 %   événements. La fonction existe pour que le code écrit pour MATLAB
 %   s'exécute sans retouche.
+%
+%   Exemple :
+%      f = uifigure();
+%      uiwait(f, 0.01);            % rend la main aussitot : les rappels sont deja passes
+%      uiresume(f);
+%      close all;
 end

@@ -7,6 +7,8 @@ function varargout = instget(jeu, varargin)
 %   Un instrument dont le type ne porte pas le champ demandé rend NaN.
 %
 %   Exemple :
+%      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+%      jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
 %      [taux, echeance] = instget(jeu, 'FieldList', {'CouponRate','Maturity'})
 %
 %   Voir aussi INSTGETCELL, INSTSELECT, INSTFIELDS, INSTDISP.

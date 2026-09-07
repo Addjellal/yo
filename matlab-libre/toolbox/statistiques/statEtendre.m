@@ -4,6 +4,9 @@ function y = statEtendre(v, forme)
 %   taille est une erreur, comme dans MATLAB.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      size(statEtendre(4, [2 3]))          % 2 3
     v = double(v);
     if numel(v) == 1
         y = repmat(v, forme);

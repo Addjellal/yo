@@ -3,7 +3,8 @@ function x = tinv(p, nu)
 %   Les deux arguments se diffusent : un scalaire prend la taille de
 %   l'autre.
 %
-%   Exemple :  tinv(0.975, 10)       % 2.2281
+%   Exemple :
+%      tinv(0.975, 10)       % 2.2281
     [p, nu] = matlibre_diffuser_deux(p, nu, 'tinv');
     x = zeros(size(p));
     for k = 1:numel(p)

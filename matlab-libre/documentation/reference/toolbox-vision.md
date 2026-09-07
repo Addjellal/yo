@@ -102,6 +102,10 @@ BBOX2POINTS Coins d'une boîte englobante.
 ```
 BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
   Les boîtes s'écrivent [x y largeur hauteur].
+
+  Exemple :
+     bboxOverlapRatio([0 0 10 10], [0 0 10 10])     % 1 : deux boites identiques
+     bboxOverlapRatio([0 0 10 10], [20 20 5 5])     % 0 : disjointes
 ```
 
 ## `bboxOverlapRatioMatrix`
@@ -110,6 +114,10 @@ BBOXOVERLAPRATIO Recouvrement de boîtes englobantes (intersection/union).
 BBOXOVERLAPRATIOMATRIX Recouvrement de toutes les paires de boîtes.
   R(i,j) est le rapport de l'intersection sur l'union entre A(i,:) et
   B(j,:). C'est la forme matricielle de BBOXOVERLAPRATIO.
+
+  Exemple :
+     r = bboxOverlapRatioMatrix([0 0 10 10; 5 5 10 10], [0 0 10 10]);
+     size(r)                     % 2 1 : une ligne par boite de A
 ```
 
 ## `bboxPrecisionRecall`
@@ -250,6 +258,12 @@ DETECTFASTFEATURES Coins FAST (cercle de Bresenham de rayon 3).
   P = DETECTFASTFEATURES(I,SEUIL) rend les coordonnées [x y] des points
   dont au moins neuf voisins consécutifs du cercle sont tous plus clairs
   ou tous plus sombres que le centre, à SEUIL près.
+
+  Exemple :
+     I = zeros(40);
+     I(15:25, 15:25) = 1;        % un carre clair
+     p = detectFASTFeatures(I, 0.1);
+     size(p, 2)                  % 2 : ligne et colonne par point
 ```
 
 ## `detectHarrisFeatures`
@@ -258,6 +272,12 @@ DETECTFASTFEATURES Coins FAST (cercle de Bresenham de rayon 3).
 DETECTHARRISFEATURES Points d'intérêt par le détecteur de Harris.
   [P,R] = DETECTHARRISFEATURES(I) rend les coordonnées [x y] des coins et
   leur réponse. Option 'MinQuality' (0.01 par défaut).
+
+  Exemple :
+     I = zeros(40);
+     I(15:25, 15:25) = 1;
+     [p, r] = detectHarrisFeatures(I);
+     size(p, 2)                  % 2
 ```
 
 ## `detectMinEigenFeatures`
@@ -442,8 +462,14 @@ EPIPOLARLINE Droites épipolaires associées à des points.
   correspondant à des points de la seconde.
 
   Exemple :
+     rng(1);
+     % Deux vues d'un meme nuage de points, decalees lateralement.
+     p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+     p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+     n = size(p1, 1);
+     F = estimateFundamentalMatrix(p1, p2);
      l = epipolarLine(F, p1);
-     abs(sum(l .* [p2 ones(n,1)], 2))   % nul si p2 correspond à p1
+     max(abs(sum(l .* [p2 ones(n,1)], 2)))   % petit si p2 correspond a p1
 
   Voir aussi ESTIMATEFUNDAMENTALMATRIX, TRIANGULATE.
 ```
@@ -475,6 +501,11 @@ ESTIMATEFUNDAMENTALMATRIX Matrice fondamentale d'une paire d'images.
   choisie pour F.
 
   Exemple :
+     rng(1);
+     % Deux vues d'un meme nuage de points, decalees lateralement.
+     p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+     p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+     n = size(p1, 1);
      F = estimateFundamentalMatrix(p1, p2);
      max(abs(sum(([p2 ones(n,1)] * F) .* [p1 ones(n,1)], 2)))   % petit
 
@@ -487,6 +518,11 @@ ESTIMATEFUNDAMENTALMATRIX Matrice fondamentale d'une paire d'images.
 ESTIMATEGEOMETRICTRANSFORM Transformation entre deux jeux de points.
   T = ESTIMATEGEOMETRICTRANSFORM(P1,P2,'affine') rend la matrice 3x3 qui
   envoie P1 sur P2 au sens des moindres carrés.
+
+  Exemple :
+     p1 = [0 0; 1 0; 0 1; 1 1];
+     T = estimateGeometricTransform(p1, p1 + 3, 'similarity');
+     size(T)                     % 3 3 : une matrice homogene
 ```
 
 ## `estimateGeometricTransform2D`
@@ -541,9 +577,14 @@ ESTIMATEUNCALIBRATEDRECTIFICATION Rectifie une paire d'images sans calibrage.
   ne rompt pas l'alignement des lignes.
 
   Exemple :
+     rng(1);
+     % Deux vues d'un meme nuage de points, decalees lateralement.
+     p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+     p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+     n = size(p1, 1);
+     I1 = uint8(200 * rand(200, 200));
      F = estimateFundamentalMatrix(p1, p2);
      [T1, T2] = estimateUncalibratedRectification(F, p1, p2, size(I1));
-     [J1, J2] = rectifyStereoImages(I1, I2, T1, T2);
 
   Voir aussi ESTIMATEFUNDAMENTALMATRIX, RECTIFYSTEREOIMAGES, EPIPOLARLINE.
 ```
@@ -554,6 +595,12 @@ ESTIMATEUNCALIBRATEDRECTIFICATION Rectifie une paire d'images sans calibrage.
 EXTRACTFEATURES Descripteurs par imagette normalisée autour de chaque point.
   [D,P] = EXTRACTFEATURES(I,POSITIONS) rend une ligne de descripteur par
   point retenu : le voisinage centré, centré-réduit puis mis à plat.
+
+  Exemple :
+     rng(1);
+     I = rand(40);
+     [d, p] = extractFeatures(I, [10 10; 20 20], 5);
+     size(d, 1)                  % 2 : un descripteur par point
 ```
 
 ## `extractHOGFeatures`
@@ -649,6 +696,12 @@ GENERATECHECKERBOARDPOINTS Coins théoriques d'un damier d'étalonnage.
 HOUGHLINES Détection de droites par transformée de Hough.
   [D,A] = HOUGHLINES(BW,N) rend les N droites les plus votées, sous
   forme de couples [rho theta] (theta en degrés).
+
+  Exemple :
+     bw = false(40, 40);
+     bw(20, 5:35) = true;
+     droites = houghLines(bw, 1);
+     size(droites, 1)            % 1 : une droite trouvee
 ```
 
 ## `insertMarker`
@@ -658,6 +711,10 @@ INSERTMARKER Dessine des marqueurs sur une image.
   SORTIE = INSERTMARKER(I,POSITIONS,FORME) où FORME vaut 'circle',
   'x', 'plus' ou 'square'. POSITIONS est une matrice Nx2 de [x y].
   Options : 'Color' et 'Size'.
+
+  Exemple :
+     J = insertMarker(zeros(20), [10 10], 'circle');
+     sum(J(:)) > 0               % 1 : le marqueur a ete dessine
 ```
 
 ## `insertObjectAnnotation`
@@ -697,6 +754,10 @@ INSERTOBJECTANNOTATION Entoure des objets et les nomme.
 INSERTSHAPE Dessine un rectangle ou une ligne dans une image.
   J = INSERTSHAPE(I,'rectangle',[x y w h]) trace le contour.
   J = INSERTSHAPE(I,'line',[x1 y1 x2 y2]) trace un segment.
+
+  Exemple :
+     J = insertShape(zeros(20), 'rectangle', [5 5 8 8]);
+     sum(J(:)) > 0               % 1
 ```
 
 ## `insertText`
@@ -811,6 +872,11 @@ MATCHFEATURES Appariement de descripteurs par plus proche voisin.
   PAIRES = MATCHFEATURES(D1,D2) rend les couples d'indices appariés. Le
   test du rapport des deux meilleures distances (0.7) élimine les
   appariements ambigus.
+
+  Exemple :
+     d1 = [1 0; 0 1];
+     paires = matchFeatures(d1, d1);
+     isequal(paires, [1 1; 2 2])     % chaque descripteur se retrouve
 ```
 
 ## `matlibre_agreger_sgm`
@@ -1973,7 +2039,9 @@ RECONSTRUCTSCENE Reconstruit une scène à partir d'une carte de disparités.
 
   Exemple :
      Q = [1 0 0 -320; 0 1 0 -240; 0 0 0 800; 0 0 1/0.1 0];
+     disparites = 10 * ones(40, 40);
      P = reconstructScene(disparites, Q);
+     size(P, 3)       % 3 : une coordonnee par plan
 
   Voir aussi DISPARITYBM, DISPARITYSGM, RECTIFYSTEREOIMAGES, TRIANGULATE.
 ```
@@ -1998,10 +2066,16 @@ RECTIFYSTEREOIMAGES Redresse une paire stéréo.
   qui est nécessaire pour que la comparaison ligne à ligne ait un sens.
 
   Exemple :
+     rng(1);
+     % Deux vues d'un meme nuage de points, decalees lateralement.
+     p1 = [40 + 120 * rand(20, 1), 40 + 120 * rand(20, 1)];
+     p2 = p1 + [8 * ones(20, 1), zeros(20, 1)];
+     n = size(p1, 1);
+     I1 = uint8(200 * rand(120, 120));
+     I2 = uint8(200 * rand(120, 120));
      F = estimateFundamentalMatrix(p1, p2);
      [T1, T2] = estimateUncalibratedRectification(F, p1, p2, size(I1));
      [J1, J2] = rectifyStereoImages(I1, I2, T1, T2, 'OutputView', 'full');
-     carte = disparitySGM(J1, J2);
 
   Voir aussi ESTIMATEUNCALIBRATEDRECTIFICATION, DISPARITYSGM, DISPARITYBM.
 ```
@@ -2052,6 +2126,10 @@ ROTATIONVECTORTOMATRIX Formule de Rodrigues.
 SELECTSTRONGEST Garde les N points les plus forts.
   [P,IDX] = SELECTSTRONGEST(POINTS,METRIQUE,N) trie par métrique
   décroissante et garde les N premiers.
+
+  Exemple :
+     [choisis, indices] = selectStrongest([1 1; 2 2; 3 3], [0.1; 0.9; 0.5], 2);
+     indices'                    % 2 3 : les deux plus fortes reponses
 ```
 
 ## `selectStrongestBbox`

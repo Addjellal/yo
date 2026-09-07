@@ -2,7 +2,8 @@ function y = wcodemat(x, nbcodes, mode, absolu)
 %WCODEMAT Met une matrice à l'échelle des indices de couleur.
 %   Y = WCODEMAT(X,NBCODES) ramène X dans 1..NBCODES.
 %
-%   Exemple :  wcodemat([0 1], 4)   % [1 4]
+%   Exemple :
+%      wcodemat([0 1], 4)   % [1 4]
     if nargin < 2 || isempty(nbcodes), nbcodes = 16; end
     if nargin < 3 || isempty(mode), mode = 'mat'; end
     if nargin < 4 || isempty(absolu), absolu = 1; end

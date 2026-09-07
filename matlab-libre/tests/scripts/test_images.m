@@ -633,4 +633,19 @@ assert(max(max(abs(tournee(:, :, 2) - imrotate(motif * 0.5, 20)))) < 1e-12);
 assert(isa(imrotate(uint8(motif * 255), 45), 'uint8'));
 disp('imrotate : ok');
 
+%% ---------------------------- une liste de couleurs vaut une image
+% MATLAB lit une matrice N x 3 comme une palette : une couleur par ligne.
+% La sortie garde la forme de l'entree.
+assert(isequal(size(rgb2ycbcr([1 1 1])), [1 3]));
+assert(isequal(size(ycbcr2rgb([1 0.5 0.5])), [1 3]));
+assert(max(abs(ycbcr2rgb([1 0.5 0.5]) - [1 1 1])) < 1e-6, ...
+       'chrominance neutre et luminance pleine : du blanc');
+couleurs = [0.2 0.4 0.6; 0.9 0.1 0.3; 0 0 0];
+assert(isequal(size(rgb2ycbcr(couleurs)), [3 3]));
+assert(max(max(abs(ycbcr2rgb(rgb2ycbcr(couleurs)) - couleurs))) < 1e-5, ...
+       'l''aller-retour rend les couleurs');
+% Une image reste une image.
+assert(isequal(size(rgb2ycbcr(rand(4, 5, 3))), [4 5 3]));
+assert(isequal(size(ycbcr2rgb(rand(4, 5, 3))), [4 5 3]));
+
 disp('images : toutes les verifications passent');

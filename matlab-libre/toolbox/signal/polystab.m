@@ -3,6 +3,10 @@ function b = polystab(a)
 %   B = POLYSTAB(A) remplace chaque racine de module supérieur à 1 par son
 %   inverse conjugué : le module de la réponse est conservé, mais le
 %   polynôme devient à phase minimale.
+%
+%   Exemple :
+%      b = polystab([1 -1.5]);
+%      all(abs(roots(b)) <= 1 + 1e-12)        % 1 : les racines rentrent
     a = a(:).';
     if numel(a) <= 1, b = a; return, end
     r = roots(a);

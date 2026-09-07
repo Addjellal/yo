@@ -66,6 +66,9 @@ ASIANBYKV Prix d'une option asiatique géométrique, formule de Kemna et Vorst.
   est moins volatile que le cours final.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      asianbykv(c, s, 'call', 100, '01-Jan-2024', '01-Jan-2025')
 
   Voir aussi ASIANBYLEVY, LOOKBACKBYBLS, OPTSTOCKBYBLS.
@@ -87,6 +90,9 @@ ASIANBYLEVY Prix d'une option asiatique arithmétique, approximation de Levy.
   des moyennes valant terme à terme.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      asianbylevy(c, s, 'call', 100, '01-Jan-2024', '01-Jan-2025')
 
   Voir aussi ASIANBYKV, LOOKBACKBYBLS, OPTSTOCKBYBLS.
@@ -106,6 +112,9 @@ ASSETBYBLS Prix d'une option binaire en actif.
   deux termes.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      assetbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 100)
 
   Voir aussi CASHBYBLS, GAPBYBLS, SUPERSHAREBYBLS.
@@ -129,6 +138,9 @@ BARRIERBYBLS Prix d'une option à barrière, formule fermée.
   redonne l'option ordinaire — c'est ce qui la vérifie.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      barrierbybls(c, s, 'call', 100, '01-Jan-2024', '01-Jan-2025', 'DO', 90, 0)
 
   Voir aussi OPTSTOCKBYBLS, LOOKBACKBYBLS, ASIANBYKV.
@@ -210,6 +222,9 @@ BONDBYZERO Prix d'une obligation, sur une courbe zéro-coupon.
   quand elles sont valorisées sur la même courbe.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      bondbyzero(courbe, 0.05, '01-Jan-2024', '01-Jan-2029')
 
   Voir aussi CFBYZERO, FIXEDBYZERO, SWAPBYZERO, BNDPRICE, INTENVPRICE.
@@ -273,6 +288,9 @@ BONDDUR Durations de Macaulay et modifiée.
 ```
 BONDPRICE Prix d'une obligation à coupons constants.
   PRIX = BONDPRICE(TAUX,COUPON,ECHEANCE,NOMINAL,FREQUENCE)
+
+  Exemple :
+     abs(bondprice(0.06, 0.06, 10) - 100) < 1e-9     % au pair quand coupon et taux coincident
 ```
 
 ## `bondyield`
@@ -318,6 +336,9 @@ CAPBYBLK Prix d'un plafond de taux, modèle de Black.
   fixé, ne compte pas.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      capbyblk(courbe, 0.04, '01-Jan-2024', '01-Jan-2029', 0.2, 4)
 
   Voir aussi FLOORBYBLK, SWAPTIONBYBLK, BLKPRICE.
@@ -337,6 +358,9 @@ CASHBYBLS Prix d'une option binaire en espèces.
   signifie.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      cashbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 100, 10)
 
   Voir aussi ASSETBYBLS, GAPBYBLS, SUPERSHAREBYBLS.
@@ -384,6 +408,9 @@ CDSPRICE Prix d'un contrat de protection contre le défaut.
   d'une prime unitaire.
 
   Exemple :
+     taux = [datenum('01-Jan-2029') 0.03];
+     marche = [datenum('01-Jan-2029') 150];
+     [probabilites, h] = cdsbootstrap(taux, marche, '01-Jan-2024');
      cdsprice(taux, probabilites, '01-Jan-2024', '01-Jan-2029', 100)
 
   Voir aussi CDSSPREAD, CDSBOOTSTRAP.
@@ -404,6 +431,9 @@ CDSSPREAD Écart d'équilibre d'un contrat de protection contre le défaut.
   payée tant qu'il n'y a pas défaut.
 
   Exemple :
+     taux = [datenum('01-Jan-2029') 0.03];
+     marche = [datenum('01-Jan-2029') 150];
+     [probabilites, h] = cdsbootstrap(taux, marche, '01-Jan-2024');
      cdsspread(taux, probabilites, '01-Jan-2024', '01-Jan-2029')
 
   Voir aussi CDSBOOTSTRAP, CDSPRICE.
@@ -418,6 +448,9 @@ CFBYZERO Prix d'une série de flux, sur une courbe zéro-coupon.
   donnent par lignes.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      cfbyzero(courbe, [5 5 105], {'01-Jan-2025','01-Jan-2026','01-Jan-2027'}, ...
               '01-Jan-2024')
 
@@ -440,6 +473,9 @@ CHOOSERBYBLS Prix d'une option au choix.
   La formule est celle de Rubinstein.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      chooserbybls(c, s, '01-Jan-2024', '01-Jan-2025', 100, '01-Jul-2024')
 
   Voir aussi OPTSTOCKBYBLS, BARRIERBYBLS.
@@ -458,6 +494,10 @@ CRRPRICE Prix d'options par un arbre binomial.
   instrument.
 
   Exemple :
+     s = stockspec(0.2, 100);
+     c = intenvset('Rates', 0.05, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2025', 'Compounding', -1);
+     arbre = crrtree(s, c, crrtimespec('01-Jan-2024', '01-Jan-2025', 50));
      jeu = instadd('OptStock', 'call', 100, '01-Jan-2024', ...
                    '01-Jan-2025', 1);
      crrprice(arbre, jeu)
@@ -478,6 +518,12 @@ CRRSENS Sensibilités d'options calculées sur un arbre binomial.
   demande, lui, de rebâtir l'arbre à volatilité déplacée.
 
   Exemple :
+     s = stockspec(0.2, 100);
+     c = intenvset('Rates', 0.05, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2025', 'Compounding', -1);
+     arbre = crrtree(s, c, crrtimespec('01-Jan-2024', '01-Jan-2025', 50));
+     jeu = instadd('OptStock', 'call', 100, '01-Jan-2024', ...
+                   '01-Jan-2025', 1);
      [d, g, v, p] = crrsens(arbre, jeu)
 
   Voir aussi CRRPRICE, CRRTREE, BLSDELTA, BLSGAMMA.
@@ -571,6 +617,9 @@ FIXEDBYZERO Prix de la branche fixe d'un échange de taux.
   [P,FLUX,DATES] = FIXEDBYZERO(...) rend aussi les flux et leurs dates.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      fixedbyzero(courbe, 0.04, '01-Jan-2024', '01-Jan-2029', 2)
 
   Voir aussi FLOATBYZERO, SWAPBYZERO, BONDBYZERO.
@@ -591,6 +640,9 @@ FLOATBYZERO Prix de la branche variable d'un échange de taux.
   à chaque fixation.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      floatbyzero(courbe, 0, '01-Jan-2024', '01-Jan-2029', 4)
 
   Voir aussi FIXEDBYZERO, SWAPBYZERO.
@@ -608,6 +660,9 @@ FLOORBYBLK Prix d'un plancher de taux, modèle de Black.
   de fixe : c'est la parité achat-vente, appliquée période par période.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      floorbyblk(courbe, 0.04, '01-Jan-2024', '01-Jan-2029', 0.2, 4)
 
   Voir aussi CAPBYBLK, SWAPTIONBYBLK, BLKPRICE.
@@ -651,6 +706,9 @@ GAPBYBLS Prix d'une option à saut.
   ordinaire.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      gapbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 100, 95)
 
   Voir aussi CASHBYBLS, ASSETBYBLS, SUPERSHAREBYBLS, OPTSTOCKBYBLS.
@@ -705,6 +763,8 @@ INSTDELETE Retire des instruments d'un jeu.
   ceux qui répondent au critère.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+     jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
      jeu = instdelete(jeu, 'Index', 2);
 
   Voir aussi INSTADD, INSTSELECT.
@@ -731,6 +791,8 @@ INSTFIELDS Noms des champs d'un jeu d'instruments.
   INSTFIELDS(JEU,'Type',T) ne rend que ceux du type T.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+     jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
      instfields(jeu, 'Type', 'Bond')
 
   Voir aussi INSTTYPES, INSTGET, INSTDISP.
@@ -747,6 +809,8 @@ INSTGET Données d'un jeu d'instruments.
   Un instrument dont le type ne porte pas le champ demandé rend NaN.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+     jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
      [taux, echeance] = instget(jeu, 'FieldList', {'CouponRate','Maturity'})
 
   Voir aussi INSTGETCELL, INSTSELECT, INSTFIELDS, INSTDISP.
@@ -760,6 +824,8 @@ INSTGETCELL Données d'un jeu d'instruments, rendues en cellules.
   D, une cellule par champ demandé, et leurs noms dans N.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+     jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
      [d, n] = instgetcell(jeu, 'FieldList', {'CouponRate','Maturity'})
 
   Voir aussi INSTGET, INSTFIELDS, INSTSELECT.
@@ -784,6 +850,8 @@ INSTSELECT Sous-jeu d'instruments répondant à un critère.
   type ; INSTSELECT(JEU,'Index',I) ceux de numéros donnés.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
+     jeu = instadd(jeu, 'Bond', 0.06, '01-Jan-2024', '01-Jan-2034');
      [court, rangs] = instselect(jeu, 'FieldName', 'CouponRate', 'Data', 0.05);
 
   Voir aussi INSTGET, INSTDELETE, INSTFIELDS.
@@ -798,6 +866,7 @@ INSTSETFIELD Change la valeur d'un champ dans un jeu d'instruments.
   instruments par leur type.
 
   Exemple :
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
      jeu = instsetfield(jeu, 'Index', 1, 'FieldName', 'CouponRate', ...
                         'Data', 0.06);
 
@@ -823,6 +892,9 @@ INTENVGET Lit un champ d'un environnement de taux.
   sorties.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      taux = intenvget(courbe, 'Rates');
 
   Voir aussi INTENVSET, INTENVPRICE.
@@ -839,6 +911,9 @@ INTENVPRICE Prix de tous les instruments d'un jeu, sur une courbe.
   valorise d'un appel, et la même courbe sert à tous.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
      intenvprice(courbe, jeu)
 
@@ -862,6 +937,10 @@ INTENVSENS Sensibilités d'un jeu d'instruments à un déplacement de courbe.
   courbe déplacée.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
+     jeu = instadd('Bond', 0.05, '01-Jan-2024', '01-Jan-2029');
      [d, g, p] = intenvsens(courbe, jeu)
 
   Voir aussi INTENVPRICE, BNDDURP, INSTADD.
@@ -913,6 +992,9 @@ LOOKBACKBYBLS Prix d'une option rétrospective, formule fermée.
   observé jusqu'ici est pris égal au cours du jour.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      lookbackbybls(c, s, 'call', NaN, '01-Jan-2024', '01-Jan-2025')
 
   Voir aussi BARRIERBYBLS, ASIANBYKV, OPTSTOCKBYBLS.
@@ -1176,6 +1258,9 @@ OPTSTOCKSENSBYBLS Sensibilités d'options européennes sur action.
   'Vega', 'Lambda', 'Rho', 'Theta' ; par défaut, le prix seul.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      optstocksensbybls(c, s, '01-Jan-2024', '01-Jan-2025', 'call', 95, ...
                        {'Price', 'Delta', 'Gamma'})
 
@@ -1211,6 +1296,9 @@ SUPERSHAREBYBLS Prix d'une superaction.
   reproduit une fonction par des indicatrices.
 
   Exemple :
+     c = intenvset('Rates', 0.03, 'StartDates', '01-Jan-2024', ...
+                   'EndDates', '01-Jan-2026');
+     s = stockspec(0.2, 100);
      supersharebybls(c, s, '01-Jan-2024', '01-Jan-2025', 90, 110)
 
   Voir aussi CASHBYBLS, ASSETBYBLS, GAPBYBLS.
@@ -1233,6 +1321,9 @@ SWAPBYZERO Prix d'un échange de taux, sur une courbe zéro-coupon.
   FREQUENCES vaut [fixe variable], 1 et 1 par défaut.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      [p, t] = swapbyzero(courbe, [0.04 0], '01-Jan-2024', '01-Jan-2029')
 
   Voir aussi FIXEDBYZERO, FLOATBYZERO, BONDBYZERO.
@@ -1255,6 +1346,9 @@ SWAPTIONBYBLK Prix d'une option sur échange de taux, modèle de Black.
   fois l'écart entre le taux à terme et le taux d'exercice.
 
   Exemple :
+     courbe = intenvset('Rates', [0.03; 0.035; 0.04], ...
+                        'StartDates', '01-Jan-2024', ...
+                        'EndDates', {'01-Jan-2025'; '01-Jan-2027'; '01-Jan-2029'});
      swaptionbyblk(courbe, 'call', 0.04, '01-Jan-2024', '01-Jan-2026', ...
                    '01-Jan-2031', 0.2, 2)
 

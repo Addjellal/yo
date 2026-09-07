@@ -7,8 +7,8 @@ function s = what(dossier)
 %   Sans argument, WHAT décrit le dossier courant.
 %
 %   Exemple :
-%      s = what(fullfile(matlabroot, 'toolbox', 'matlab'));
-%      numel(s.m)
+%      s = what(matlibre_racine());     % le dossier des toolbox
+%      numel(s.m) >= 0
 %
 %   Voir aussi DIR, WHICH, EXIST, LS.
     if nargin < 1

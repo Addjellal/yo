@@ -2,6 +2,11 @@ function [p, h, statistiques] = signrank(x, y, alpha)
 %SIGNRANK Test des rangs signés de Wilcoxon, sur échantillons appariés.
 %   P = SIGNRANK(X) teste la médiane nulle ; SIGNRANK(X,Y) teste la
 %   médiane de X-Y.
+%
+%   Exemple :
+%      rng(1);
+%      p = signrank(randn(100, 1));
+%      p > 0.01                    % on ne rejette pas la mediane nulle
     if nargin < 2 || isempty(y), y = zeros(size(x)); end
     if nargin < 3, alpha = 0.05; end
     d = x(:) - y(:);

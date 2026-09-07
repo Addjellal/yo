@@ -35,6 +35,9 @@ ADDCAPACITOR Condensateur de C farads.
   conductance en parallèle avec une source de courant.
 
   Exemple :
+     c = circuit('diviseur');
+     c = addVoltageSource(c, 1, 0, 10);
+     c = addResistor(c, 1, 2, 1000);
      c = addCapacitor(c, 2, 0, 1e-6);
      [t, v] = solveTransient(c, 0.01, 1e-5);
 
@@ -53,6 +56,8 @@ ADDCOMPONENT Ajoute un composant entre deux nœuds.
   c'est ainsi qu'il connaît sa taille, sans qu'on ait à la déclarer.
 
   Exemple :
+     c = circuit('diviseur');
+     c = addVoltageSource(c, 1, 0, 10);
      c = addComponent(c, 'r', 1, 2, 1000);   % equivaut a addResistor
 
   Voir aussi ADDRESISTOR, ADDCAPACITOR, ADDINDUCTOR, CIRCUIT.
@@ -71,6 +76,7 @@ ADDCURRENTSOURCE Source de courant idéale, de n1 vers n2.
   dans la loi des nœuds, contrairement à une source de tension.
 
   Exemple :
+     c = circuit('source');
      c = addCurrentSource(c, 0, 1, 0.005);
      c = addResistor(c, 1, 0, 1000);
      solveDC(c)                      % 5 V : R I
@@ -90,7 +96,11 @@ ADDINDUCTOR Bobine de L henrys.
   ensemble donnent le second ordre — donc les oscillations.
 
   Exemple :
-     c = addInductor(c, 2, 3, 1e-3);
+     c = circuit('RL');
+     c = addVoltageSource(c, 1, 0, 5);
+     c = addInductor(c, 1, 2, 1e-3);
+     c = addResistor(c, 2, 0, 100);
+     [t, v] = solveTransient(c, 1e-4, 1e-7);
 
   Voir aussi ADDCAPACITOR, ADDRESISTOR, SOLVETRANSIENT.
 ```
@@ -107,7 +117,12 @@ ADDRESISTOR Résistance de R ohms entre deux nœuds.
   les lui dire.
 
   Exemple :
+     c = circuit('diviseur');
+     c = addVoltageSource(c, 1, 0, 10);
      c = addResistor(c, 1, 2, 1000);
+     c = addResistor(c, 2, 0, 2000);
+     v = solveDC(c);
+     abs(v(2) - 20 / 3) < 1e-9        % 1 : le pont diviseur
 
   Voir aussi ADDCAPACITOR, ADDINDUCTOR, SOLVEDC.
 ```
@@ -128,9 +143,11 @@ ADDVOLTAGESOURCE Source de tension idéale de V volts.
   il est donc négatif quand la source débite.
 
   Exemple :
+     c = circuit('source');
      c = addVoltageSource(c, 1, 0, 10);
+     c = addResistor(c, 1, 0, 1000);
      [v, i] = solveDC(c);
-     abs(i(1))                       % le courant debite
+     abs(i(1))                       % 0,01 A : dix volts dans mille ohms
 
   Voir aussi ADDCURRENTSOURCE, SOLVEDC, SOLVETRANSIENT.
 ```
@@ -141,7 +158,8 @@ ADDVOLTAGESOURCE Source de tension idéale de V volts.
 CIRCUIT Crée un circuit vide.
   C = CIRCUIT(NOM) rend un circuit sans composant. Le nœud 0 est la
   masse, et les autres se numérotent librement : le circuit compte comme
-  nœuds tous ceux qu'un composant nomme.
+  nœuds tous ceux qu'un composant nomme. CIRCUIT() rend un circuit sans
+  nom, ce qui suffit quand on n'en manipule qu'un.
 
   Décrire un circuit, non les équations qui le régissent : c'est le
   propos. On pose des composants entre des nœuds, et SOLVEDC ou
@@ -166,6 +184,13 @@ SOLVEDC Point de fonctionnement continu par analyse nodale modifiée.
   la masse) et le courant de chaque source de tension.
   En régime continu, un condensateur est un circuit ouvert et une
   bobine un court-circuit.
+
+  Exemple :
+     c = circuit('diviseur');
+     c = addVoltageSource(c, 1, 0, 10);
+     c = addResistor(c, 1, 2, 1000);
+     c = addResistor(c, 2, 0, 2000);
+     abs(solveDC(c)(2) - 20 / 3) < 1e-9     % deux tiers de dix volts
 ```
 
 ## `solveTransient`
@@ -180,5 +205,13 @@ SOLVETRANSIENT Réponse temporelle par Euler implicite.
 
   SOURCETEMPS, facultative, est une poignée @(t) rendant un facteur
   multiplicatif appliqué aux sources de tension.
+
+  Exemple :
+     c = circuit('RC');
+     c = addVoltageSource(c, 1, 0, 5);
+     c = addResistor(c, 1, 2, 1000);
+     c = addCapacitor(c, 2, 0, 1e-6);
+     [t, v] = solveTransient(c, 0.01, 1e-5);
+     abs(v(end, 2) - 5) < 0.1    % le condensateur finit par se charger
 ```
 

@@ -1,6 +1,7 @@
 function c = geocdf(x, p)
 %GEOCDF Répartition de la loi géométrique.
-%   Exemple :  geocdf(2, 0.5)   % 0.875
+%   Exemple :
+%      geocdf(2, 0.5)   % 0.875
     [x, p] = statAjuster(x, p);
     k = floor(x);
     c = zeros(size(x));

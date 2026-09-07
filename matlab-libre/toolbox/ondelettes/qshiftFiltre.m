@@ -29,6 +29,10 @@ function h = qshiftFiltre(L, K)
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
+%   Exemple :
+%      h = qshiftFiltre(10, 1);
+%      numel(h) > 0
+%
 %   Voir aussi DTFILTERS, DUALTREE, WFILTERS.
     if mod(L, 2) ~= 0 || L < 6
         error('wavelet:qshiftFiltre:Longueur', ...

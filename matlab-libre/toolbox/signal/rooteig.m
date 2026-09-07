@@ -3,6 +3,12 @@ function [w, pow] = rooteig(x, p, varargin)
 %   Comme ROOTMUSIC, mais chaque vecteur propre du sous-espace bruit est
 %   pondéré par l'inverse de sa valeur propre : les directions les moins
 %   bruitées pèsent davantage.
+%
+%   Exemple :
+%      rng(1);
+%      x = sin(2 * pi * 0.1 * (0:199)') + 0.1 * randn(200, 1);
+%      w = rooteig(x, 2);
+%      abs(min(abs(w)) / (2 * pi) - 0.1) < 0.02
     [fs, estCorrelation] = lireOptionsSousEspace(varargin);
     [R, m] = signalMatriceCorrelation(x, p, estCorrelation);
     [vecteurs, valeurs] = eig(R);

@@ -6,6 +6,12 @@ function transitions = signalTransitions(x, t, basPct, hautPct)
 %   la traversée médiane.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      t = (0:0.001:0.1)';
+%      tr = signalTransitions(double(t >= 0.05), t, 10, 90);
+%      size(tr, 2)                 % 5 colonnes
+%      tr(1, 4)                    % 1 : la transition est montante
     if nargin < 3 || isempty(basPct), basPct = 10; end
     if nargin < 4 || isempty(hautPct), hautPct = 90; end
     x = double(x(:));

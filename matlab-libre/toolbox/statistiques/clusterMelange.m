@@ -2,6 +2,12 @@ function [indices, posterieures, densites] = clusterMelange(modele, X)
 %CLUSTERMELANGE Attribution des points aux composantes d'un mélange.
 %   Employer CLUSTER ou PREDICT ; cette fonction est le rouage qu'ils
 %   appellent.
+%
+%   Exemple :
+%      rng(1);
+%      m = fitgmdist([randn(200, 1); randn(200, 1) + 8], 2);
+%      [indices, post] = clusterMelange(m, [0; 8]);
+%      numel(unique(indices))               % 2 : les deux modes se distinguent
     X = double(X);
     n = size(X, 1);
     k = modele.NumComponents;

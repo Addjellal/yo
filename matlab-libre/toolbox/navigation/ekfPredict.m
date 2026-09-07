@@ -18,7 +18,10 @@ function [x, P] = ekfPredict(x, P, f, F, Q)
 %
 %   Exemple :
 %      F = [1 0.1; 0 1];
+%      x = [0; 1];
+%      P = eye(2);
 %      [x, P] = ekfPredict(x, P, @(v) F * v, F, diag([1e-3 1e-2]));
+%      trace(P) > 2        % 1 : predire ne peut qu'augmenter l'incertitude
 %
 %   Voir aussi EKFUPDATE, KALMANFILTER.
     x = f(x);

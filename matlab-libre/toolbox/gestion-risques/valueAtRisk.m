@@ -3,6 +3,11 @@ function v = valueAtRisk(rendements, niveau, methode)
 %   V = VALUEATRISK(R,NIVEAU) rend la perte que l'on ne dépasse qu'avec la
 %   probabilité 1-NIVEAU (0.95 par défaut), par la méthode historique.
 %   'normal' utilise l'hypothèse gaussienne.
+%
+%   Exemple :
+%      rng(1);
+%      v = valueAtRisk(0.01 * randn(2000, 1), 0.95);
+%      v > 0                       % 1 : la perte est comptee positivement
     if nargin < 2, niveau = 0.95; end
     if nargin < 3, methode = 'historical'; end
     r = rendements(:);

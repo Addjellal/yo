@@ -34,6 +34,9 @@ EVM Amplitude du vecteur d'erreur, en pour cent.
   dense, moins on tolère d'erreur.
 
   Exemple :
+     rng(1);
+     reference = exp(1i * (pi/4 + randi([0 3], 48, 5) * pi/2));
+     bruit = (randn(size(reference)) + 1i * randn(size(reference))) / sqrt(2);
      evm(reference, reference)       % 0
      evm(reference + 0.1 * bruit, reference)
 
@@ -61,9 +64,11 @@ OFDMDEMOD Démodulation OFDM.
   c'est la limite que le dimensionnement doit respecter.
 
   Exemple :
+     rng(1);
+     symboles = exp(1i * (pi/4 + randi([0 3], 48, 5) * pi/2));
+     signal = ofdmMod(symboles, 64, 16);
      recus = ofdmDemod(signal, 64, 16, 48);
-     H = fft(canal, 64);
-     egalises = recus ./ H(1:48);
+     max(max(abs(recus - symboles))) < 1e-10     % 1 : sans canal, on retrouve tout
 
   Voir aussi OFDMMOD, EVM.
 ```

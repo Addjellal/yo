@@ -141,7 +141,12 @@ ADLINE Ligne d'accumulation et de distribution.
   dit avec quelle force.
 
   Exemple :
-     adline(hauts, bas, clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     hauts = clotures + 1;
+     bas = clotures - 1;
+     volumes = 1000 * ones(60, 1);
+     ligne = adline(hauts, bas, clotures, volumes);
 
   Voir aussi ADOSC, CHAIKOSC, ONBALVOL, WILLIAMSAD.
 ```
@@ -159,7 +164,9 @@ ADOSC Oscillateur d'accumulation et de distribution.
   plus haut, zéro dans le cas contraire.
 
   Exemple :
-     adosc(ouvertures, hauts, bas, clotures)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     adosc(clotures + 0.2, clotures + 1, clotures - 1, clotures)
 
   Voir aussi ADLINE, CHAIKOSC, WILLIAMSAD.
 ```
@@ -330,6 +337,10 @@ BLSLAMBDA Élasticité du prix d'une option au cours du sous-jacent.
 BLSPRICE Prix d'options européennes par la formule de Black-Scholes.
   [C,P] = BLSPRICE(S,K,R,T,SIGMA) rend les prix de l'achat et de la
   vente. Q est le taux de dividende continu (zéro par défaut).
+
+  Exemple :
+     [c, p] = blsprice(100, 100, 0.05, 1, 0.2);
+     abs(c - p - (100 - 100 * exp(-0.05))) < 1e-9   % la parite achat-vente
 ```
 
 ## `blsrho`
@@ -380,6 +391,9 @@ BLSVEGA Sensibilité du prix d'une option à la volatilité.
 ```
 BNDCONVP Convexité d'une obligation, à partir de son prix.
   Même chose que BNDCONVY, le rendement étant d'abord déduit du prix.
+
+  Exemple :
+     bndconvp(100, 0.06, '01-Jan-2024', '01-Jan-2034') > 0     % la convexite est positive
 
   Voir aussi BNDCONVY, BNDDURP, BNDYIELD.
 ```
@@ -510,7 +524,10 @@ BOLLING Bandes de Bollinger.
   l'écartement soudain qui se remarque.
 
   Exemple :
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
      [m, h, b] = bolling(clotures, 20, 0, 2);
+     all(h(20:end) >= m(20:end))       % 1 : la bande haute est au-dessus
 
   Voir aussi BOLLINGER, MOVAVG, CHAIKVOLAT.
 ```
@@ -523,6 +540,8 @@ BOLLINGER Bandes de Bollinger, dans l'ordre d'arguments moderne.
   BOLLING, les deux derniers arguments étant échangés.
 
   Exemple :
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
      [m, h, b] = bollinger(clotures, 20, 2);
 
   Voir aussi BOLLING, MOVAVG.
@@ -659,7 +678,9 @@ CHAIKOSC Oscillateur de Chaikin.
   plus en plus.
 
   Exemple :
-     chaikosc(hauts, bas, clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     chaikosc(clotures + 1, clotures - 1, clotures, 1000 * ones(60, 1))
 
   Voir aussi ADLINE, ADOSC, CHAIKVOLAT, MACD.
 ```
@@ -676,7 +697,9 @@ CHAIKVOLAT Volatilité de Chaikin.
   une amplitude qui se resserre, une phase calme.
 
   Exemple :
-     chaikvolat(hauts, bas, 10, 10)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     chaikvolat(clotures + 1, clotures - 1, 10, 10)
 
   Voir aussi CHAIKOSC, ADLINE, PRCROC.
 ```
@@ -817,6 +840,9 @@ DAYS360ISDA Nombre de jours, convention 30/360 de l'ISDA.
   dans la convention européenne, et la fin de février n'est pas
   allongée.
 
+  Exemple :
+     days360isda('01-Jan-2024', '01-Jan-2025')     % 360 : une annee de douze mois de trente jours
+
   Voir aussi DAYS360, DAYS360E, DAYS360PSA, YEARFRAC.
 ```
 
@@ -828,6 +854,9 @@ DAYS360PSA Nombre de jours, convention 30/360 de la PSA.
   date de départ est le dernier jour de février, elle compte pour un
   trente. Sans quoi un coupon partant du 28 février serait plus court
   que les autres.
+
+  Exemple :
+     days360psa('31-Jan-2024', '28-Feb-2024')      % la convention americaine
 
   Voir aussi DAYS360, DAYS360E, DAYS360ISDA, YEARFRAC.
 ```
@@ -1127,7 +1156,10 @@ FPCTKD Stochastiques rapides.
   mobile sur M séances. N vaut 10 par défaut, M vaut 3.
 
   Exemple :
-     [k, d] = fpctkd(hauts, bas, clotures);
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     [k, d] = fpctkd(clotures + 1, clotures - 1, clotures);
+     all(k >= 0 & k <= 100)            % 1 : c'est un pourcentage
 
   Voir aussi SPCTKD, STOCHOSC, WILLPCTR.
 ```
@@ -1275,8 +1307,9 @@ HIGHLOW Barres de cotation, sous forme de segments.
   avec PLOT.
 
   Exemple :
-     [h, b] = highlow(hauts, bas, clotures, ouvertures);
-     plot([1:numel(h); 1:numel(h)], [h.'; b.']);
+     rng(1);
+     clotures = 100 + cumsum(randn(20, 1));
+     [h, b] = highlow(clotures + 1, clotures - 1, clotures, clotures + 0.2);
 
   Voir aussi CANDLE, POINTFIG, MEDPRICE.
 ```
@@ -1334,7 +1367,9 @@ INFORATIO Ratio d'information d'un portefeuille.
   mandat est de battre un indice.
 
   Exemple :
-     inforatio(actif, indice)
+     rng(1);
+     indice = 0.001 + 0.01 * randn(120, 1);
+     inforatio(indice + 0.002, indice)
 
   Voir aussi SHARPE, PORTALPHA, MAXDRAWDOWN.
 ```
@@ -1424,7 +1459,8 @@ LPM Moment partiel inférieur d'une série de rendements.
   semi-variance.
 
   Exemple :
-     lpm(rendements, 0, 2)      % semi-variance sous zero
+     rng(1);
+     lpm(0.01 * randn(200, 1), 0, 2)      % semi-variance sous zero
 
   Voir aussi ELPM, MAXDRAWDOWN, SHARPE, INFORATIO.
 ```
@@ -1477,6 +1513,8 @@ MACD Convergence et divergence des moyennes mobiles.
   guettent ses utilisateurs.
 
   Exemple :
+     rng(1);
+     clotures = 100 + cumsum(randn(100, 1));
      [l, s] = macd(clotures);
 
   Voir aussi MOVAVG, RSINDEX, TSMOM, CHAIKOSC.
@@ -1737,7 +1775,7 @@ MEDPRICE Prix médian d'une séance.
   l'ouverture, le plus haut, le plus bas et la clôture.
 
   Exemple :
-     medprice([12 10; 14 11])       % [11; 12.5]
+     medprice([12; 14], [10; 11])       % [11; 12.5]
 
   Voir aussi TYPPRICE, WCLOSE, HHIGH, LLOW.
 ```
@@ -1800,7 +1838,9 @@ NEGVOLIDX Indice des jours de volume en baisse.
   n'agit pas dans la foule.
 
   Exemple :
-     negvolidx(clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(40, 1));
+     negvolidx(clotures, 1000 + 100 * randn(40, 1))
 
   Voir aussi POSVOLIDX, ONBALVOL, PVTREND.
 ```
@@ -1884,7 +1924,9 @@ ONBALVOL Volume à la hausse et à la baisse, cumulé.
   entre les deux annoncerait un retournement.
 
   Exemple :
-     onbalvol(clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(40, 1));
+     onbalvol(clotures, 1000 * ones(40, 1))
 
   Voir aussi ADLINE, NEGVOLIDX, POSVOLIDX, PVTREND.
 ```
@@ -2036,7 +2078,8 @@ POINTFIG Graphique en points et figures.
   Le renversement se fait à trois boîtes, comme le veut l'usage.
 
   Exemple :
-     [c, s] = pointfig(clotures, 1);
+     rng(1);
+     [c, s] = pointfig(100 + cumsum(randn(60, 1)), 1);
 
   Voir aussi HIGHLOW, CANDLE, MOVAVG.
 ```
@@ -2046,6 +2089,11 @@ POINTFIG Graphique en points et figures.
 ```
 PORTALLOC Portefeuille de variance minimale pour un rendement cible.
   Résolution analytique par multiplicateurs de Lagrange.
+
+  Exemple :
+     C = [0.04 0.01; 0.01 0.09];
+     [poids, r, risque] = portalloc([0.08 0.12], C, 0.10);
+     abs(sum(poids) - 1) < 1e-9      % le portefeuille est pleinement investi
 ```
 
 ## `portalpha`
@@ -2069,7 +2117,9 @@ PORTALPHA Rendement en excès, corrigé du risque.
   risque pris passivement.
 
   Exemple :
-     portalpha(actif, indice, 0.0002, 'sml')
+     rng(1);
+     indice = 0.001 + 0.02 * randn(120, 1);
+     portalpha(1.1 * indice + 0.001, indice, 0.0002, 'sml')
 
   Voir aussi SHARPE, INFORATIO, PORTSTATS.
 ```
@@ -2230,7 +2280,9 @@ POSVOLIDX Indice des jours de volume en hausse.
   défaut.
 
   Exemple :
-     posvolidx(clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(40, 1));
+     posvolidx(clotures, 1000 + 100 * randn(40, 1))
 
   Voir aussi NEGVOLIDX, ONBALVOL, PVTREND.
 ```
@@ -2361,7 +2413,9 @@ PVTREND Tendance du couple cours-volume.
   l'ampleur du mouvement plutôt que par son seul signe.
 
   Exemple :
-     pvtrend(clotures, volumes)
+     rng(1);
+     clotures = 100 + cumsum(randn(40, 1));
+     pvtrend(clotures, 1000 * ones(40, 1))
 
   Voir aussi ONBALVOL, NEGVOLIDX, POSVOLIDX, ADLINE.
 ```
@@ -2459,7 +2513,9 @@ RSINDEX Indice de force relative.
   un sur N, non deux sur N plus un.
 
   Exemple :
-     rsindex(clotures, 14)
+     rng(1);
+     indice = rsindex(100 + cumsum(randn(60, 1)), 14);
+     all(indice(15:end) >= 0 & indice(15:end) <= 100)   % 1 : c'est un pourcentage
 
   Voir aussi WILLPCTR, STOCHOSC, MACD.
 ```
@@ -2506,7 +2562,9 @@ SPCTKD Stochastiques lentes.
   les moins informatifs.
 
   Exemple :
-     [k, d] = fpctkd(hauts, bas, clotures);
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     [k, d] = fpctkd(clotures + 1, clotures - 1, clotures);
      [kl, dl] = spctkd(k, d);
 
   Voir aussi FPCTKD, STOCHOSC.
@@ -2525,7 +2583,9 @@ STOCHOSC Oscillateur stochastique.
   s'il a monté d'autant : c'est ce que l'indicateur mesure.
 
   Exemple :
-     [k, d] = stochosc(hauts, bas, clotures);
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     [k, d] = stochosc(clotures + 1, clotures - 1, clotures);
 
   Voir aussi FPCTKD, SPCTKD, WILLPCTR, RSINDEX.
 ```
@@ -2565,6 +2625,11 @@ THIRTYTWO2DEC Cours en trente-deuxièmes converti en décimal.
 TICK2RET Rendements à partir d'une série de cours.
   R = TICK2RET(P) rend les rendements simples ; 'continuous' donne les
   rendements logarithmiques.
+
+  Exemple :
+     r = tick2ret([100 110 99]);
+     max(abs(r(:)' - [0.1 -0.1])) < 1e-12
+     max(abs(ret2tick(r, 100)' - [100 110 99])) < 1e-10   % l'aller-retour
 ```
 
 ## `totalreturnprice`
@@ -2580,7 +2645,8 @@ TOTALRETURNPRICE Série de prix réinvestissant les dividendes.
   corrige cela.
 
   Exemple :
-     s = totalreturnprice(prix, [1.2 1.3], datesVersement, dates);
+     prix = [100; 101; 99; 103; 105];
+     s = totalreturnprice(prix, [1.2 1.3], [2 4], (1:5)');
 
   Voir aussi RET2TICK, TICK2RET, PRICE2RET.
 ```
@@ -2593,7 +2659,8 @@ TSACCEL Accélération d'une série.
   du cours, mesurée à la grosse. N vaut 12 par défaut.
 
   Exemple :
-     tsaccel(clotures, 12)
+     rng(1);
+     tsaccel(100 + cumsum(randn(60, 1)), 12)
 
   Voir aussi TSMOM, PRCROC, MACD.
 ```
@@ -2624,7 +2691,7 @@ TYPPRICE Prix typique d'une séance.
   derniers échanges.
 
   Exemple :
-     typprice([12 10 11], [14 11 13])
+     typprice([14; 15], [10; 11], [12; 13])       % la moyenne des trois
 
   Voir aussi MEDPRICE, WCLOSE, STOCHOSC.
 ```
@@ -2637,7 +2704,8 @@ VOLROC Taux de variation du volume.
   N séances. N vaut 12 par défaut.
 
   Exemple :
-     volroc(volumes, 12)
+     rng(1);
+     volroc(1000 + 100 * randn(40, 1), 12)
 
   Voir aussi PRCROC, CHAIKVOLAT, ONBALVOL.
 ```
@@ -2682,7 +2750,9 @@ WILLIAMSAD Accumulation et distribution de Williams.
   ce genre que ses utilisateurs guettent.
 
   Exemple :
-     williamsad(hauts, bas, clotures)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     williamsad(clotures + 1, clotures - 1, clotures)
 
   Voir aussi ADLINE, ADOSC, ONBALVOL.
 ```
@@ -2697,7 +2767,9 @@ WILLPCTR Indicateur de Williams, en pourcentage.
   défaut.
 
   Exemple :
-     willpctr(hauts, bas, clotures, 14)
+     rng(1);
+     clotures = 100 + cumsum(randn(60, 1));
+     willpctr(clotures + 1, clotures - 1, clotures, 14)
 
   Voir aussi STOCHOSC, HHIGH, LLOW, RSINDEX.
 ```

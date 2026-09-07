@@ -4,6 +4,10 @@ function y = convolutionCirculaire(x, h)
 %   longueur de l'entrée, ce qu'exige la transformée stationnaire.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      y = convolutionCirculaire([1 2 3 4], [1 1 0 0]);
+%      numel(y)                    % 4 : la longueur est conservee
     x = x(:)';
     h = h(:)';
     n = numel(x);

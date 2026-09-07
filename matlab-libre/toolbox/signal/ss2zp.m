@@ -2,6 +2,12 @@ function [z, p, k] = ss2zp(A, B, C, D, iu)
 %SS2ZP Zéros, pôles et gain d'une représentation d'état.
 %   Les pôles sont les valeurs propres de A ; les zéros sont les racines
 %   du numérateur de la fonction de transfert.
+%
+%   Exemple :
+%      [b, a] = butter(4, 0.3);
+%      [A, B, C, D] = tf2ss(b, a);
+%      [z, p, k] = ss2zp(A, B, C, D);
+%      all(abs(p) < 1)             % 1
     if nargin < 5, iu = 1; end
     [num, den] = ss2tf(A, B, C, D, iu);
     p = eig(A);

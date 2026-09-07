@@ -1,6 +1,10 @@
 function t = tabulate(x)
 %TABULATE Effectifs et fréquences des valeurs distinctes.
 %   T = TABULATE(X) rend une matrice [valeur, effectif, pourcentage].
+%
+%   Exemple :
+%      t = tabulate([1 1 2 3 3 3]);
+%      sum(t(:, 2))                % 6 : le total des effectifs
     x = x(:);
     v = unique(x);
     t = zeros(numel(v), 3);

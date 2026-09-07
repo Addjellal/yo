@@ -1,9 +1,22 @@
 function v = symeval(e, variables, valeurs)
 %SYMEVAL Évaluation numérique d'une expression.
 %   V = SYMEVAL(E,{'x','y'},[1 2]) remplace puis calcule.
+%
+%   Exemple :
+%      x = sym('x');
+%      symeval(symadd(x, symnum(1)), {'x'}, {2})     % 3
+    e = matlibre_sym_arbre(e);
     if nargin >= 3
+        if ~iscell(variables)
+            variables = cellstr(variables);
+        end
         for k = 1:numel(variables)
-            e = symsubs(e, variables{k}, valeurs(k));
+            if iscell(valeurs)
+                valeur = valeurs{k};
+            else
+                valeur = valeurs(k);
+            end
+            e = symsubs(e, variables{k}, valeur);
         end
     end
     operateur = e{1};

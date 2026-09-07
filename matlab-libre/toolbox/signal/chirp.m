@@ -2,6 +2,11 @@ function y = chirp(t, f0, t1, f1, methode)
 %CHIRP Sinusoïde à fréquence instantanée variable.
 %   Y = CHIRP(T,F0,T1,F1) balaie linéairement de F0 (à t=0) à F1 (à t=T1).
 %   Y = CHIRP(T,F0,T1,F1,'quadratic') fait un balayage quadratique.
+%
+%   Exemple :
+%      t = (0:1023)' / 1024;
+%      y = chirp(t, 0, 1, 100);
+%      numel(y)                    % 1024 : un point par instant
     if nargin < 5
         methode = 'linear';
     end

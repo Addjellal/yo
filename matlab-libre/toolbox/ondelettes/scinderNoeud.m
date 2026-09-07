@@ -5,6 +5,11 @@ function arbre = scinderNoeud(arbre, indice)
 %   enfants prennent les indices que DEPO2IND leur donne.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+%
+%   Exemple :
+%      arbre = wpdec(sin((1:64) / 5), 1, 'haar');
+%      arbre = scinderNoeud(arbre, 1);
+%      numel(lireNoeud(arbre, indiceDeNoeud(arbre, [2 0]))) > 0
     ordre = arbre.ordre;
     donnees = lireNoeud(arbre, indice);
     if isempty(donnees)

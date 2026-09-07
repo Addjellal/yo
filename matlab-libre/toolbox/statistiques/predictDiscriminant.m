@@ -15,6 +15,12 @@ function [etiquettes, scores] = predictDiscriminant(modele, X)
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
 %   où PREDICT est une méthode du modèle.
 %
+%   Exemple :
+%      rng(1);
+%      X = [randn(40, 2); randn(40, 2) + 3];
+%      y = [ones(40, 1); 2 * ones(40, 1)];
+%      mean(predictDiscriminant(fitcdiscr(X, y), X) == y) > 0.9
+%
 %   Voir aussi FITCDISCR, PREDICT.
     X = double(X);
     k = numel(modele.Classes);

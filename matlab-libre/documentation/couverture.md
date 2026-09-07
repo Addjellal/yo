@@ -15,10 +15,10 @@ fichier est produit par mesure, non écrit à la main.
   capture, `classdef` en sémantique de valeur avec surcharge d'opérateurs,
   le contrôle de flux, `try/catch` avec identifiants d'erreur, `global` et
   `persistent`, les listes séparées par des virgules.
-- **651 fonctions natives** couvrant le MATLAB de base, **toutes**
+- **653 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **2636 fonctions de toolbox** réparties en 53 modules, écrites dans le
+- **2644 fonctions de toolbox** réparties en 54 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -39,7 +39,7 @@ fichier est produit par mesure, non écrit à la main.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 634 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 636 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -53,9 +53,9 @@ fichier est produit par mesure, non écrit à la main.
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 634 exemples de l'aide — et 204 vérifications du bureau natif,
+  les 636 exemples de l'aide — et 204 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
-  plus chacune des 651 fonctions natives avec des arguments qu'elle
+  plus chacune des 653 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille
   absurde, une dimension négative — et vérifie qu'elle rend une erreur au
   lieu de tomber.
@@ -155,7 +155,7 @@ totalité.
    est refusée. Ce qui n'est pas traduisible est refusé avec le numéro de
    ligne, jamais approximé.
 6. **Les toolboxes couvrent l'essentiel de leur domaine, pas tout.**
-   La Signal Processing Toolbox compte 201 fonctions — conception de
+   La Signal Processing Toolbox compte 208 fonctions — conception de
    filtres avec choix d'ordre, sections du second ordre, douze fenêtres
    dont Dolph-Tchebychev et Taylor, analyse spectrale à court terme,
    cohérence, rééchantillonnage, cepstres réel et complexe,
@@ -233,7 +233,7 @@ totalité.
    chapeau mexicain, Morlet réelle et les huit dérivées de la
    gaussienne, avec les fréquences centrales publiées — 0.25, 0.8125,
    0.2 — retrouvées exactement.
-   La Statistics and Machine Learning Toolbox en compte 292 : dix-huit
+   La Statistics and Machine Learning Toolbox en compte 293 : dix-huit
    lois de probabilité complètes — densité, répartition, quantile,
    tirages, moments, estimation — plus les accès génériques `pdf`,
    `cdf`, `icdf` et `random` par nom de loi. Les quantiles continus

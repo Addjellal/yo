@@ -3,6 +3,10 @@ function T = dhTransform(a, alpha, d, theta)
 %   T = DHTRANSFORM(A,ALPHA,D,THETA) avec la convention standard :
 %   rotation THETA autour de z, translation D selon z, translation A selon
 %   x, rotation ALPHA autour de x.
+%
+%   Exemple :
+%      T = dhTransform(1, 0, 0, 0);
+%      T(1, 4)                     % 1 : une translation d'un metre le long de x
     ct = cos(theta); st = sin(theta);
     ca = cos(alpha); sa = sin(alpha);
     T = [ct, -st*ca,  st*sa, a*ct;

@@ -4,6 +4,10 @@ function v = appliquerReste(v, s)
 %   documentation de subsref : champs « type » et « subs ». Les classes de
 %   ce dossier s'en servent pour traiter la fin d'une chaîne d'accès une
 %   fois leur propre premier accès résolu.
+%
+%   Exemple :
+%      s = struct('type', '()', 'subs', {{2}});
+%      appliquerReste([10 20 30], s)      % 20
     for k = 1:numel(s)
         switch s(k).type
             case '()'
