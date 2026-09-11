@@ -3346,6 +3346,44 @@ MATLIBRE_CHAINER_ARETES Chaîne les arêtes de bord en un contour fermé.
   Voir aussi BOUNDARY, ALPHASHAPE, FREEBOUNDARY.
 ```
 
+## `matlibre_clip_booleen`
+
+```
+MATLIBRE_CLIP_BOOLEEN Réunion, intersection ou différence de polygones.
+  Les deux entrées sont des cellules de contours, chacun une matrice à
+  deux colonnes. L'opération vaut 'union', 'intersection' ou
+  'difference'.
+
+  L'algorithme est celui de Greiner et Hormann. On calcule d'abord
+  toutes les intersections des arêtes des deux polygones, et on les
+  insère dans les deux contours à leur place le long de l'arête. Chaque
+  intersection est alors marquée « entrante » ou « sortante » selon que
+  le sommet qui la précède est dedans ou dehors — c'est ce que veut
+  dire traverser une frontière. Il ne reste qu'à suivre : on part d'une
+  intersection, on avance le long d'un polygone jusqu'à la suivante, on
+  saute sur l'autre polygone, et l'on repart. Le sens dans lequel on
+  avance dépend de l'opération, et c'est tout ce qui les distingue.
+
+  Les cas dégénérés — un sommet posé exactement sur une arête de
+  l'autre, deux arêtes confondues — font échouer la marche, parce
+  qu'il n'y a alors ni entrée ni sortie franche. On les défait en
+  déplaçant l'un des deux polygones d'un cheveu : un milliardième de
+  son étendue, dans une direction qui ne retombe sur rien. Le résultat
+  est alors juste à ce déplacement près, ce qui est bien au-dessous de
+  ce qu'on peut lire, et c'est le prix à payer pour répondre là où
+  l'algorithme ne sait pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     a = {[0 0; 2 0; 2 2; 0 2]};
+     b = {[1 1; 3 1; 3 3; 1 3]};
+     c = matlibre_clip_booleen(a, b, 'intersection');
+     abs(polyarea(c{1}(:,1), c{1}(:,2)) - 1) < 1e-9
+
+  Voir aussi POLYSHAPE, UNION, INTERSECT, SUBTRACT.
+```
+
 ## `matlibre_composantes_triangles`
 
 ```
@@ -4189,6 +4227,176 @@ MATLIBRE_POIGNEE_DEPUIS_TEXTE Une poignée bâtie sur une expression écrite.
   Les variables sont devinées : « x » seul donne une fonction d'une
   variable, « x » et « y » une fonction de deux. Les opérateurs sont
   vectorisés au passage, de sorte que « x^2 » travaille sur un tableau.
+```
+
+## `matlibre_poly_aire_signee`
+
+```
+MATLIBRE_POLY_AIRE_SIGNEE Aire d'un contour, signe du sens de parcours compris.
+  La formule du lacet rend une aire positive pour un contour parcouru
+  dans le sens direct et négative dans l'autre. C'est ce signe qui
+  distingue un plein d'un trou, sans rien avoir à ajouter à la
+  structure.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_poly_aire_signee([0 0; 1 0; 1 1; 0 1])   % +1
+     matlibre_poly_aire_signee([0 0; 0 1; 1 1; 1 0])   % -1
+
+  Voir aussi POLYAREA, POLYSHAPE.
+```
+
+## `matlibre_poly_assembler`
+
+```
+MATLIBRE_POLY_ASSEMBLER Réunit des contours en une liste séparée par des NaN.
+  Un contour est orienté dans le sens direct s'il est à profondeur
+  paire — dehors, ou dans un trou —, et dans l'autre s'il est à
+  profondeur impaire — c'est alors un trou. C'est ainsi qu'un trou se
+  distingue d'un plein, et la seule information que porte
+  l'orientation.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     V = matlibre_poly_assembler({[0 0; 2 0; 2 2; 0 2]});
+     size(V, 1)                      % 4 sommets, aucun NaN
+
+  Voir aussi POLYSHAPE, MATLIBRE_POLY_SEPARER.
+```
+
+## `matlibre_poly_booleen`
+
+```
+MATLIBRE_POLY_BOOLEEN Opération booléenne entre deux régions.
+  Réunit les deux listes de contours, passe au découpage, et rassemble
+  le résultat en une région dont les orientations sont refaites.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     a = polyshape([0 2 2 0], [0 0 2 2]);
+     b = polyshape([1 3 3 1], [1 1 3 3]);
+     abs(area(matlibre_poly_booleen(a, b, 'intersection')) - 1) < 1e-9
+
+  Voir aussi POLYSHAPE, UNION, INTERSECT, SUBTRACT, XOR.
+```
+
+## `matlibre_poly_contenu`
+
+```
+MATLIBRE_POLY_CONTENU Le contour C est-il à l'intérieur du contour D ?
+  Les deux contours ne se coupent pas — c'est le cas dans un POLYSHAPE
+  bien formé —, donc il suffit de regarder où tombe un seul sommet de
+  C : s'il est dans D, tous le sont.
+
+  On prend un sommet, non le centre de gravité : le centre d'un contour
+  extérieur tombe volontiers dans le trou qu'il entoure, ce qui ferait
+  croire que le grand est dans le petit. Un sommet, lui, ne ment pas.
+
+  Un sommet posé exactement sur le bord de D ne tranche pas : on passe
+  au suivant.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     petit = [4 4; 6 4; 6 6; 4 6];
+     grand = [0 0; 10 0; 10 10; 0 10];
+     matlibre_poly_contenu(petit, grand)      % 1
+     matlibre_poly_contenu(grand, petit)      % 0
+
+  Voir aussi POLYSHAPE, INPOLYGON, MATLIBRE_POLY_ASSEMBLER.
+```
+
+## `matlibre_poly_entree`
+
+```
+MATLIBRE_POLY_ENTREE Démêle les arguments d'un POLYSHAPE.
+  Accepte une matrice à deux colonnes, deux vecteurs de coordonnées, ou
+  deux cellules de vecteurs — un contour par élément. Les contours
+  séparés par des NaN sont découpés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     c = matlibre_poly_entree({[0 1 1 0], [0 0 1 1]});
+     size(c{1})                      % 4 sommets, 2 colonnes
+
+  Voir aussi POLYSHAPE.
+```
+
+## `matlibre_poly_enveloppe`
+
+```
+MATLIBRE_POLY_ENVELOPPE Indices de l'enveloppe convexe d'un nuage.
+  Un simple relais vers CONVHULL. Il existe parce que POLYSHAPE porte
+  une méthode du même nom : à l'intérieur de la classe, écrire
+  « convhull(x, y) » appellerait la méthode, non la fonction. Passer
+  par un nom que la classe ne porte pas lève l'ambiguïté.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     k = matlibre_poly_enveloppe([0 0; 1 0; 1 1; 0 1; 0.5 0.5]);
+     numel(k)                        % 5 : quatre coins et le retour
+
+  Voir aussi CONVHULL, POLYSHAPE.
+```
+
+## `matlibre_poly_moments`
+
+```
+MATLIBRE_POLY_MOMENTS Aire signée et centre de gravité d'un contour.
+  Le centre de gravité d'une surface polygonale s'obtient de la même
+  somme que son aire : chaque côté contribue par le produit croisé de
+  ses deux extrémités, pondéré par leur somme. C'est l'intégrale de x
+  sur la surface, ramenée au bord par la formule de Green.
+
+  L'aire rendue garde son signe, ce qui permet à un trou de contribuer
+  en négatif et de déplacer le centre du bon côté.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [a, x, y] = matlibre_poly_moments([0 0; 2 0; 2 2; 0 2]);
+     abs(a - 4) < 1e-12 && abs(x - 1) < 1e-12 && abs(y - 1) < 1e-12
+
+  Voir aussi CENTROID, POLYAREA, POLYSHAPE.
+```
+
+## `matlibre_poly_point_interieur`
+
+```
+MATLIBRE_POLY_POINT_INTERIEUR Un point strictement dans un contour.
+  Le barycentre des sommets convient pour un contour convexe, mais pas
+  pour un contour en croissant, où il peut tomber dehors. On l'essaie,
+  et s'il ne va pas, on prend le milieu d'une diagonale qui reste
+  dedans — il en existe toujours une.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     p = matlibre_poly_point_interieur([0 0; 2 0; 2 2; 0 2]);
+     inpolygon(p(1), p(2), [0 2 2 0], [0 0 2 2])
+
+  Voir aussi INPOLYGON, POLYSHAPE.
+```
+
+## `matlibre_poly_separer`
+
+```
+MATLIBRE_POLY_SEPARER Découpe une liste de sommets sur les NaN.
+  Un NaN sépare deux contours. Les contours de moins de trois sommets
+  sont écartés : ils n'enferment rien.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     c = matlibre_poly_separer([0 0; 1 0; 1 1; NaN NaN; 2 2; 3 2; 3 3]);
+     numel(c)                        % 2 contours
+
+  Voir aussi POLYSHAPE, MATLIBRE_POLY_ASSEMBLER.
 ```
 
 ## `matlibre_racine_toolbox`
@@ -5898,6 +6106,49 @@ POLYAREA Aire d'un polygone.
      abs(polyarea(cos(0:0.01:2*pi), sin(0:0.01:2*pi)) - pi) < 1e-3
 
   Voir aussi INPOLYGON, CONVHULL, BOUNDARY, TRAPZ.
+```
+
+## `polyshape`
+
+```
+POLYSHAPE Région du plan délimitée par des polygones.
+  PG = POLYSHAPE(X,Y) construit la région bordée par le polygone de
+  sommets (X,Y). PG = POLYSHAPE(P) où P a deux colonnes fait de même.
+  Plusieurs contours se donnent séparés par des NaN, ou en cellules :
+  POLYSHAPE({X1,X2},{Y1,Y2}).
+
+  Un contour parcouru dans le sens direct est plein ; un contour
+  parcouru dans l'autre sens et contenu dans un plein est un trou.
+  C'est la convention de MATLAB, et elle suffit à décrire une région
+  percée sans rien ajouter à la structure.
+
+  Ce qu'on lui demande : AREA, PERIMETER, CENTROID, BOUNDINGBOX,
+  ISINTERIOR, BOUNDARY, NUMSIDES, NUMBOUNDARIES, NUMREGIONS, HOLES,
+  ISHOLE, REGIONS, TRANSLATE, SCALE, ROTATE, ADDBOUNDARY, RMBOUNDARY,
+  OVERLAPS, CONVHULL, PLOT, et les opérations booléennes UNION,
+  INTERSECT, SUBTRACT et XOR.
+
+  Ce qui n'est pas fait : la simplification automatique d'un contour
+  qui se recoupe lui-même. MATLAB la fait à la construction ; ici le
+  contour est pris tel quel, et une aire calculée sur un contour croisé
+  compte les régions selon leur enlacement.
+
+  Quand deux régions se touchent exactement — une arête commune, un
+  sommet posé sur une arête —, l'algorithme de découpage n'a ni entrée
+  ni sortie franche à suivre. Le cas est résolu en déplaçant l'une des
+  deux d'un cheveu : cent milliardièmes de son étendue. Le résultat est
+  alors juste à ce déplacement près, soit une dizaine de chiffres
+  significatifs, et non à la précision machine comme dans les autres
+  cas.
+
+  Exemple :
+     carre = polyshape([0 2 2 0], [0 0 2 2]);
+     area(carre)                     % 4
+     autre = polyshape([1 3 3 1], [1 1 3 3]);
+     area(intersect(carre, autre))   % 1 : le carre commun
+     area(union(carre, autre))       % 7 : 4 + 4 - 1
+
+  Voir aussi POLYAREA, INPOLYGON, CONVHULL, BOUNDARY, ALPHASHAPE.
 ```
 
 ## `pow2`

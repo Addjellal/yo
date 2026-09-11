@@ -226,6 +226,91 @@ classdef sym
             coefficients = matlibre_sym_coefficients(f.arbre, matlibre_sym_nom(variable));
         end
 
+        function r = factor(f, variable)
+        %FACTOR Factorisation d'un polynôme symbolique.
+        %   FACTOR(F) écrit F comme un produit : le contenu entier, les
+        %   facteurs (x - r) de ses racines rationnelles, et ce qui
+        %   reste. FACTOR(F,X) nomme la variable.
+        %
+        %   Les racines rationnelles sont trouvées exactement, par le
+        %   théorème qui porte leur nom : si p/q est racine d'un
+        %   polynôme entier, p divise le terme constant et q le
+        %   coefficient dominant. L'ensemble à essayer est donc fini, et
+        %   une racine non trouvée n'existe pas.
+        %
+        %   Ce qui reste après les avoir divisées n'est pas
+        %   nécessairement irréductible : x^4 + 1 n'a aucune racine
+        %   rationnelle et se factorise pourtant sur les rationnels. Le
+        %   trouver demanderait autre chose, et FACTOR le laisse tel
+        %   quel plutôt que de prétendre avoir fini.
+        %
+        %   Le produit des facteurs rendus vaut toujours F : c'est ce
+        %   qu'on peut vérifier, et c'est ce que les tests vérifient.
+            if nargin < 2 || isempty(variable)
+                variable = matlibre_sym_defaut(f);
+            end
+            nom = matlibre_sym_nom(variable);
+            coefficients = matlibre_sym_coefficients(...
+                matlibre_sym_developper(f.arbre), nom);
+            [contenu, racines, reste] = matlibre_sym_facteurs(coefficients);
+            % Une racine p/q donne le facteur entier (q*x - p), non
+            % (x - 0.333...) : le q sort du contenu, ce qui garde des
+            % coefficients entiers partout et rend la factorisation
+            % lisible autant qu'exacte.
+            facteurs = {};
+            for k = 1:numel(racines)
+                [p, q] = matlibre_sym_fraction(racines(k));
+                if q ~= 1
+                    contenu = contenu / q;
+                end
+                if q == 1
+                    gaucheFacteur = {'var', nom};
+                else
+                    gaucheFacteur = symmul(symnum(q), {'var', nom});
+                end
+                if p == 0
+                    facteurs{end + 1} = gaucheFacteur;   %#ok<AGROW>
+                elseif p > 0
+                    facteurs{end + 1} = symsub(gaucheFacteur, symnum(p));   %#ok<AGROW>
+                else
+                    facteurs{end + 1} = symadd(gaucheFacteur, symnum(-p));  %#ok<AGROW>
+                end
+            end
+            % Ce qui reste apres les racines, quand c'est un nombre, va
+            % dans le contenu : sans cela on ecrirait « 1/6*(3x-1)*(2x-1)*6 »
+            % la ou « (3x-1)*(2x-1) » dit la meme chose.
+            if numel(reste) == 1
+                contenu = contenu * reste;
+                reste = 1;
+            end
+            contenu = arrondirProche(contenu);
+            % Le contenu ne s'ecrit que s'il vaut autre chose qu'un : un
+            % facteur un n'apporte rien et alourdit la lecture.
+            arbre = [];
+            if contenu ~= 1
+                arbre = symnum(contenu);
+            end
+            for k = 1:numel(facteurs)
+                if isempty(arbre)
+                    arbre = facteurs{k};
+                else
+                    arbre = symmul(arbre, facteurs{k});
+                end
+            end
+            if numel(reste) > 1
+                facteur = matlibre_sym_polynome(reste, nom);
+                if isempty(arbre)
+                    arbre = facteur;
+                else
+                    arbre = symmul(arbre, facteur);
+                end
+            end
+            if isempty(arbre)
+                arbre = symnum(contenu);
+            end
+            r = sym(arbre);
+        end
+
         function racines = solve(equation, variable)
         %SOLVE Résolution d'une équation polynomiale.
         %   SOLVE(F) résout F = 0 ; SOLVE(F,X) nomme l'inconnue.
@@ -252,5 +337,15 @@ classdef sym
                 racines = racines{1};
             end
         end
+    end
+end
+
+function v = arrondirProche(x)
+% Les divisions successives laissent un residu d'arrondi : un contenu qui
+% vaut 2 a 1e-16 pres doit s'ecrire 2, non 1.9999999999999998.
+    if abs(x - round(x)) < 1e-9 * max(1, abs(x))
+        v = round(x);
+    else
+        v = x;
     end
 end

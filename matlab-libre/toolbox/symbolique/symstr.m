@@ -7,33 +7,16 @@ function s = symstr(e)
 %   lecteur : toutes les autres le transforment. Un arbre non simplifié
 %   s'écrit tel quel, ce qui permet de voir ce que SYMSIMPLIFY a fait.
 %
+%   Les parenthèses sont celles qu'impose la priorité des opérateurs, et
+%   pas une de plus : « x^2 + 2*x + 1 » s'écrit ainsi, non
+%   « (((x^2) + (2*x)) + 1) ». Une somme dans un produit, elle, en reçoit,
+%   parce que sans elles le sens changerait.
+%
 %   Exemple :
 %      x = sym('x');
 %      symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
+%      symstr(symadd(symmul(x, symnum(2)), symnum(1)))     % 'x*2 + 1'
 %
 %   Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.
-    e = matlibre_sym_arbre(e);
-    operateur = e{1};
-    switch operateur
-        case 'num'
-            if e{2} == round(e{2})
-                s = sprintf('%d', e{2});
-            else
-                s = sprintf('%g', e{2});
-            end
-        case 'var'
-            s = e{2};
-        case '+'
-            % Ajouter un nombre negatif s'ecrit comme une soustraction :
-            % « x + -1 » se lit mal, « x - 1 » se lit.
-            if strcmp(e{3}{1}, 'num') && e{3}{2} < 0
-                s = ['(' symstr(e{2}) ' - ' symstr(symnum(-e{3}{2})) ')'];
-            else
-                s = ['(' symstr(e{2}) ' + ' symstr(e{3}) ')'];
-            end
-        case {'-', '*', '/', '^'}
-            s = ['(' symstr(e{2}) ' ' operateur ' ' symstr(e{3}) ')'];
-        otherwise
-            s = [operateur '(' symstr(e{2}) ')'];
-    end
+    s = matlibre_sym_ecrire(matlibre_sym_arbre(e), 0);
 end

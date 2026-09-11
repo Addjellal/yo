@@ -45,6 +45,48 @@
 %   symint           - Primitive des formes polynomiales
 ```
 
+## `children`
+
+```
+CHILDREN Sous-expressions immédiates d'une expression symbolique.
+  C = CHILDREN(F) rend, dans une cellule, les opérandes de l'opérateur
+  de tête de F. Une somme rend ses deux termes, un produit ses deux
+  facteurs, une fonction son argument ; un nombre ou une variable, qui
+  n'ont pas d'opérateur de tête, se rendent eux-mêmes.
+
+  C'est la façon de descendre dans une expression sans rien savoir de
+  sa forme : on regarde l'opérateur, on prend les enfants, on
+  recommence. Tout ce qui parcourt un arbre symbolique s'écrit ainsi.
+
+  Exemple :
+     syms x
+     c = children(x + 1);
+     numel(c)                        % 2
+     char(c{1})                      % x
+
+  Voir aussi SYMVAR, SUBS, EXPAND, SIMPLIFY.
+```
+
+## `collect`
+
+```
+COLLECT Regroupe les termes d'une expression par puissances.
+  COLLECT(F) regroupe les termes de F selon sa variable ; COLLECT(F,X)
+  selon X.
+
+  Regrouper n'est pas simplifier : on développe d'abord, puis on
+  rassemble tout ce qui porte la même puissance. Le résultat est la
+  forme canonique d'un polynôme — deux expressions égales y deviennent
+  identiques —, ce qui est précisément ce qui permet de les comparer.
+
+  Exemple :
+     syms x
+     collect((x + 1)^2)              % x^2 + 2*x + 1
+     collect(x*(x + 2) - x^2)        % 2*x
+
+  Voir aussi EXPAND, SIMPLIFY, HORNER, SYM2POLY.
+```
+
 ## `hessian`
 
 ```
@@ -64,6 +106,31 @@ HESSIAN Matrice hessienne d'une expression symbolique.
      char(H{1, 2})                  % '2 * x'
 
   Voir aussi JACOBIAN, GRADIENT, DIFF.
+```
+
+## `horner`
+
+```
+HORNER Forme emboîtée d'un polynôme symbolique.
+  HORNER(F) réécrit F sous la forme de Horner : les puissances
+  s'emboîtent au lieu de s'additionner.
+
+     a x^3 + b x^2 + c x + d  devient  ((a x + b) x + c) x + d
+
+  HORNER(F,X) nomme la variable.
+
+  L'intérêt n'est pas l'apparence : la forme emboîtée s'évalue en n
+  multiplications au lieu de n(n+1)/2, et chaque étape ne combine que
+  deux nombres, ce qui la rend plus stable. C'est celle que POLYVAL
+  emploie, et celle que produit MATLABFUNCTION quand on lui donne un
+  polynôme.
+
+  Exemple :
+     syms x
+     h = horner(x^3 + 2*x^2 + 3*x + 4);
+     double(subs(h, x, 2)) == double(subs(x^3 + 2*x^2 + 3*x + 4, x, 2))
+
+  Voir aussi POLYVAL, COLLECT, EXPAND, SIMPLIFY, MATLABFUNCTION.
 ```
 
 ## `jacobian`
@@ -204,6 +271,82 @@ MATLIBRE_SYM_ECRIRE Écriture d'une expression, parenthèses minimales.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_sym_facteurs`
+
+```
+MATLIBRE_SYM_FACTEURS Décomposition d'un polynôme entier sur les rationnels.
+  Rend le contenu — le PGCD des coefficients, signe du dominant
+  compris —, la liste des racines rationnelles avec leur multiplicité,
+  et le facteur qui reste après les avoir divisées.
+
+  Ce qui est garanti : le produit du contenu, des (x - r) et du reste
+  redonne exactement le polynôme de départ. Ce qui ne l'est pas : que
+  le reste soit irréductible. Un polynôme comme x^4 + 1 n'a aucune
+  racine rationnelle et se factorise pourtant sur les rationnels ; le
+  trouver demanderait autre chose que le théorème des racines
+  rationnelles, et FACTOR le dit dans son aide plutôt que de le taire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [c, r, q] = matlibre_sym_facteurs([2 -6 4]);   % 2x^2 - 6x + 4
+     c                               % 2
+     isequal(r, [1 2])               % les deux racines
+     isequal(q, 1)                   % il ne reste rien
+
+  Voir aussi FACTOR, MATLIBRE_SYM_RACINES_RATIONNELLES.
+```
+
+## `matlibre_sym_fraction`
+
+```
+MATLIBRE_SYM_FRACTION Écrit un nombre comme une fraction irréductible.
+  [P,Q] = MATLIBRE_SYM_FRACTION(X) rend P et Q entiers, premiers entre
+  eux, tels que P/Q vaut X. Q vaut un pour un entier.
+
+  La recherche est celle des fractions continues : on prend la partie
+  entière, on inverse ce qui reste, et l'on recommence. Les
+  approximations qu'elle produit sont les meilleures possibles à
+  dénominateur donné — aucune autre fraction de dénominateur plus petit
+  n'approche mieux —, ce qui est exactement ce qu'il faut pour
+  reconnaître une fraction que l'arithmétique flottante a un peu abîmée.
+
+  Un nombre qui n'est pas rationnel à la tolérance près est rendu avec
+  le dénominateur maximal atteint.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [p, q] = matlibre_sym_fraction(1/3);
+     p == 1 && q == 3
+     [p, q] = matlibre_sym_fraction(4);
+     p == 4 && q == 1
+
+  Voir aussi RAT, RATS, FACTOR.
+```
+
+## `matlibre_sym_horner`
+
+```
+MATLIBRE_SYM_HORNER Arbre de la forme de Horner d'un polynôme.
+  Les coefficients vont par puissances décroissantes. La forme
+  emboîtée s'écrit
+
+     a x^3 + b x^2 + c x + d  =  ((a x + b) x + c) x + d
+
+  ce qui l'évalue en n multiplications et n additions au lieu des
+  n(n+1)/2 que demanderait le calcul terme à terme. C'est aussi la
+  forme la plus stable : chaque étape ne combine que deux nombres.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     a = matlibre_sym_horner([1 2 3], 'x');
+     char(sym(a))                    % (x + 2)*x + 3
+
+  Voir aussi HORNER, POLYVAL, MATLIBRE_SYM_POLYNOME.
+```
+
 ## `matlibre_sym_latex`
 
 ```
@@ -271,6 +414,30 @@ MATLIBRE_SYM_PROCHES Les variables les plus proches de « x ».
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_sym_racines_rationnelles`
+
+```
+MATLIBRE_SYM_RACINES_RATIONNELLES Racines rationnelles d'un polynôme entier.
+  Le théorème des racines rationnelles : si p/q est racine d'un
+  polynôme à coefficients entiers, alors p divise le terme constant et
+  q divise le coefficient dominant. Il suffit donc d'essayer les
+  quotients des diviseurs de l'un par ceux de l'autre — leur nombre est
+  fini, et aucune autre racine rationnelle n'existe.
+
+  C'est une preuve, non une recherche numérique : une racine trouvée
+  l'est exactement, et une racine non trouvée n'existe pas.
+
+  Les racines sont rendues avec leur multiplicité, en ordre croissant.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     r = matlibre_sym_racines_rationnelles([1 -3 2]);   % x^2 - 3x + 2
+     isequal(r, [1 2])
+
+  Voir aussi FACTOR, ROOTS, SOLVE.
+```
+
 ## `matlibre_sym_reduire`
 
 ```
@@ -303,6 +470,32 @@ MATLIBRE_SYM_VARIABLE Feuille « variable » d'un arbre d'expression.
   expression.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+```
+
+## `numden`
+
+```
+NUMDEN Numérateur et dénominateur d'une expression symbolique.
+  [N,D] = NUMDEN(F) rend N et D tels que F = N/D, D étant débarrassé
+  des divisions imbriquées.
+
+  La réduction se fait de bas en haut : le numérateur et le
+  dénominateur d'une somme s'obtiennent de ceux des deux termes en
+  croisant — a/b + c/d = (ad + cb)/(bd) —, ceux d'un produit en
+  multipliant, et ceux d'un quotient en échangeant. Une expression sans
+  division a pour dénominateur un.
+
+  Le dénominateur rendu n'est pas réduit : (x^2-1)/(x-1) garde son
+  dénominateur, la simplification de fraction rationnelle demandant une
+  division polynomiale que SIMPLIFY ne fait pas encore.
+
+  Exemple :
+     syms x
+     [n, d] = numden(1/x + 1/(x + 1));
+     char(n)                         % x + 1 + x
+     char(d)                         % x*(x + 1)
+
+  Voir aussi SIMPLIFY, EXPAND, COLLECT, PARTFRAC.
 ```
 
 ## `poly2sym`
@@ -626,9 +819,15 @@ SYMSTR Écriture lisible d'une expression symbolique.
   lecteur : toutes les autres le transforment. Un arbre non simplifié
   s'écrit tel quel, ce qui permet de voir ce que SYMSIMPLIFY a fait.
 
+  Les parenthèses sont celles qu'impose la priorité des opérateurs, et
+  pas une de plus : « x^2 + 2*x + 1 » s'écrit ainsi, non
+  « (((x^2) + (2*x)) + 1) ». Une somme dans un produit, elle, en reçoit,
+  parce que sans elles le sens changerait.
+
   Exemple :
      x = sym('x');
      symstr(symmul(symadd(x, symnum(1)), symnum(2)))     % '(x + 1) * 2'
+     symstr(symadd(symmul(x, symnum(2)), symnum(1)))     % 'x*2 + 1'
 
   Voir aussi SYMSIMPLIFY, SYMSUBS, SYMADD.
 ```
@@ -760,5 +959,36 @@ VPA Évaluation numérique d'une expression symbolique.
      char(vpa(sym(1) / 3, 6))               % '0.333333'
 
   Voir aussi DOUBLE, SYM, SUBS, DIGITS.
+```
+
+## `vpasolve`
+
+```
+VPASOLVE Résolution numérique d'une équation symbolique.
+  VPASOLVE(F) résout F = 0 numériquement. VPASOLVE(F,X) nomme
+  l'inconnue. VPASOLVE(F,X,X0) part de X0 et rend la racine trouvée
+  depuis là.
+
+  La différence avec SOLVE tient à ce qu'on cherche. SOLVE résout
+  exactement, et n'y arrive que sur les équations polynomiales.
+  VPASOLVE cherche numériquement, et y arrive sur toute équation dont
+  on sait évaluer le membre de gauche — y compris celles qui n'ont pas
+  de solution en forme close, comme x = cos(x).
+
+  Sans point de départ, l'équation polynomiale rend toutes ses racines
+  et les autres sont balayées sur un intervalle autour de zéro : une
+  racine lointaine peut échapper, et c'est pour cela que le point de
+  départ existe.
+
+  Une seule racine est rendue telle quelle ; plusieurs le sont dans une
+  cellule, comme SOLVE les rend.
+
+  Exemple :
+     syms x
+     double(vpasolve(cos(x) - x, x, 1))     % 0.739085..., le point fixe
+     deux = vpasolve(x^2 - 2, x);
+     abs(double(deux{2}) - sqrt(2)) < 1e-12
+
+  Voir aussi SOLVE, FZERO, ROOTS, DOUBLE.
 ```
 

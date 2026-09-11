@@ -74,3 +74,4 @@ polyarea rectint convhulln boundary triangulation delaunayTriangulation
 alphaShape scatteredInterpolant griddedInterpolant pchip makima superclasses
 readlines writelines readstruct writestruct xmlread xmlwrite weboptions
 clearAllMemoizedCaches
+polyshape

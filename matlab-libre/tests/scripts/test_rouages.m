@@ -500,7 +500,7 @@ close all;
 x = sym('x');
 % Les constructeurs montent l'arbre sans rien evaluer : 2 + 3 reste
 % « 2 + 3 » jusqu'a ce qu'on simplifie.
-assert(strcmp(symstr(symadd(symnum(2), symnum(3))), '(2 + 3)'));
+assert(strcmp(symstr(symadd(symnum(2), symnum(3))), '2 + 3'));
 assert(strcmp(symstr(symsimplify(symadd(symnum(2), symnum(3)))), '5'));
 assert(strcmp(symstr(symsimplify(symsub(symnum(5), symnum(3)))), '2'));
 assert(strcmp(symstr(symsimplify(symmul(symnum(2), symnum(3)))), '6'));

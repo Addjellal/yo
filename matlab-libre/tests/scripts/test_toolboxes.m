@@ -221,22 +221,22 @@ assert(abs(max(solution) - 0.125) < 1e-2);
 x = matlibre_sym_variable('x');
 f = sympow(x, symnum(3));
 assert(abs(symeval(symdiff(f, 'x'), {'x'}, 2) - 12) < 1e-12);
-assert(strcmp(symstr(symint(x, 'x')), '((x ^ 2) / 2)'));
+assert(strcmp(symstr(symint(x, 'x')), 'x^2/2'));
 
 % L'objet symbolique : les operateurs construisent l'expression, et les
 % fonctions de MATLAB la manipulent.
 syms t u
 assert(strcmp(class(t), 'sym'));
 expressionSym = t ^ 3 - 2 * t;
-assert(strcmp(char(diff(expressionSym)), '((3 * (t ^ 2)) - 2)'));
-assert(strcmp(char(diff(expressionSym, t, 2)), '(6 * t)'));
+assert(strcmp(char(diff(expressionSym)), '3*t^2 - 2'));
+assert(strcmp(char(diff(expressionSym, t, 2)), '6*t'));
 assert(double(subs(expressionSym, t, 2)) == 4);
 assert(abs(double(int(expressionSym, t, 0, 1)) + 0.75) < 1e-12);
 % Le developpement et les coefficients.
 assert(isequal(sym2poly(expand((t + 1) * (t - 1))), [1 0 -1]));
 assert(isequal(sym2poly(expand((t + 2) ^ 3)), [1 6 12 8]));
 assert(strcmp(char(simplify(t - t)), '0'));
-assert(strcmp(char(simplify(t + t)), '(2 * t)'));
+assert(strcmp(char(simplify(t + t)), '2*t'));
 % POLY2SYM et SYM2POLY se defont l'un l'autre.
 assert(isequal(sym2poly(poly2sym([1 0 -4])), [1 0 -4]));
 assert(isequal(sym2poly(poly2sym([2 -3 0 5], u), u), [2 -3 0 5]));
@@ -249,8 +249,8 @@ assert(abs(double(solve(3 * t - 6)) - 2) < 1e-12);
 % La variable sous-entendue est la plus proche de x.
 syms a x
 assert(strcmp(char(symvar(a * x ^ 2, 1)), 'x'));
-assert(strcmp(char(diff(a * x ^ 2)), '((a * 2) * x)') || ...
-       strcmp(char(diff(a * x ^ 2)), '(2 * (a * x))') || ...
+assert(strcmp(char(diff(a * x ^ 2)), 'a*2*x') || ...
+       strcmp(char(diff(a * x ^ 2)), '2*a*x') || ...
        abs(double(subs(subs(diff(a * x ^ 2), a, 3), x, 2)) - 12) < 1e-12);
 % Les derivees des fonctions elementaires.
 assert(strcmp(char(diff(sin(x))), 'cos(x)'));
@@ -300,7 +300,7 @@ assert(abs(double(symsum(1 / k ^ 2, k, 1, 1000)) - pi ^ 2 / 6) < 1e-3);
 assert(double(symprod(k, k, 1, 6)) == 720);
 
 % Ecritures : lisible, LaTeX, et arrondie.
-assert(strcmp(pretty(x ^ 2 + 3 * x - 1), 'x^2 + 3 * x - 1'));
+assert(strcmp(pretty(x ^ 2 + 3 * x - 1), 'x^2 + 3*x - 1'));
 assert(strcmp(latex((x + 1) / (x ^ 2)), '\frac{x + 1}{x^{2}}'));
 assert(strcmp(char(vpa(sym(1) / 3, 6)), '0.333333'));
 assert(abs(double(vpa(sym(2) ^ 10)) - 1024) < 1e-12);

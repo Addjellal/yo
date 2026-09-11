@@ -38,7 +38,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | interface | 15 | 100 % | 100 % | 100 % |
 | lidar | 4 | 100 % | 100 % | 100 % |
 | maintenance-predictive | 4 | 100 % | 100 % | 100 % |
-| matlab | 282 | 100 % | 100 % | 100 % |
+| matlab | 283 | 100 % | 100 % | 100 % |
 | mpc | 3 | 100 % | 100 % | 100 % |
 | navigation | 5 | 100 % | 100 % | 100 % |
 | ondelettes | 129 | 100 % | 100 % | 100 % |
@@ -55,11 +55,11 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | simulink | 6 | 100 % | 100 % | 100 % |
 | stateflow | 4 | 100 % | 100 % | 100 % |
 | statistiques | 272 | 100 % | 100 % | 100 % |
-| symbolique | 27 | 100 % | 100 % | 100 % |
+| symbolique | 32 | 100 % | 100 % | 100 % |
 | types | 41 | 100 % | 100 % | 100 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 100 % | 100 % | 100 % |
-| **ensemble** | **2180** | **100 %** | **100 %** | **100 %** |
+| **ensemble** | **2186** | **100 %** | **100 %** | **100 %** |
 
 ## Ce qui reste à faire
 

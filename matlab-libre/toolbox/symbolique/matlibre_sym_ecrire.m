@@ -33,6 +33,12 @@ function texte = matlibre_sym_ecrire(arbre, priorite)
         case '^', rang = 3;
         otherwise, rang = 3;
     end
+    % Ajouter un nombre negatif s'ecrit comme une soustraction : « x + -1 »
+    % se lit mal, « x - 1 » se lit.
+    if strcmp(operateur, '+') && strcmp(arbre{3}{1}, 'num') && arbre{3}{2} < 0
+        arbre = {'-', arbre{2}, {'num', -arbre{3}{2}}};
+        operateur = '-';
+    end
     gauche = matlibre_sym_ecrire(arbre{2}, rang);
     % Le membre droit d'une soustraction, d'une division ou d'une
     % puissance doit être protégé au même rang : a - (b - c) n'est pas
@@ -42,8 +48,12 @@ function texte = matlibre_sym_ecrire(arbre, priorite)
     else
         droite = matlibre_sym_ecrire(arbre{3}, rang);
     end
-    if strcmp(operateur, '^')
-        texte = [gauche '^' droite];
+    % L'espacement suit MATLAB : les termes d'une somme sont ecartes, les
+    % facteurs d'un produit sont colles. C'est ce qui fait voir la
+    % structure d'un coup d'oeil — « x^2 + 2*x + 1 » se lit en trois
+    % termes, « x^2 + 2 * x + 1 » demande de compter.
+    if any(strcmp(operateur, {'^', '*', '/'}))
+        texte = [gauche operateur droite];
     else
         texte = [gauche ' ' operateur ' ' droite];
     end
