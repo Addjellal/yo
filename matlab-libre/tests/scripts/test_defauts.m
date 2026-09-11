@@ -384,6 +384,47 @@ assert(refuse(@() codegen(@(x) x * 2, '-args', {0}, '-report')));
 cd(ancienChemin);
 delete(fullfile(tempdir, 'carreDefauts.m'));
 
+%% ------------------------------------ COMPARER DEUX LISTES DE TAILLES
+% Comparer deux listes de longueurs differentes n'a pas de sens : MATLAB
+% le refuse. La boucle lisait au-dela de la plus courte, ce qui passait
+% inapercu sur strcmp et faisait tomber strcmpi, qui recopie la chaine.
+for nomComparaison = {'strcmp', 'strcmpi'}
+    refuseTaille = false;
+    try
+        feval(nomComparaison{1}, ['a'; 'b'], {'x', 'y', 'z'});
+    catch err
+        refuseTaille = ~isempty(strfind(err.identifier, 'InputsSizeMismatch'));
+    end
+    assert(refuseTaille);
+end
+for nomComparaison = {'strncmp', 'strncmpi'}
+    refuseTaille = false;
+    try
+        feval(nomComparaison{1}, ['a'; 'b'], {'x', 'y', 'z'}, 1);
+    catch err
+        refuseTaille = ~isempty(strfind(err.identifier, 'InputsSizeMismatch'));
+    end
+    assert(refuseTaille);
+end
+% Des tailles egales, ou un cote unique, marchent toujours.
+assert(isequal(strcmpi(['a'; 'b'], {'A', 'b'}), [true; true]));
+assert(isequal(strcmp(['ab'; 'cd'], 'ab'), [true; false]));
+assert(isequal(strcmp({'a', 'b'}, {'a', 'c'}), [true, false]));
+
+% Une colonne de texte de plusieurs lignes n'est pas le nom d'une option :
+% la prendre pour tel menait a cette comparaison hors des bornes.
+colonne = ["a"; "b"];
+avecTexte = table(colonne, 'VariableNames', {'lettre'});
+assert(height(avecTexte) == 2);
+assert(isequal(avecTexte.lettre, colonne));
+avecCaracteres = table([1; 2], ['a'; 'b'], 'VariableNames', {'n', 'c'});
+assert(isequal(avecCaracteres.Properties.VariableNames, {'n', 'c'}));
+assert(height(avecCaracteres) == 2);
+assert(matlibre_est_nom_option('VariableNames'));
+assert(~matlibre_est_nom_option(["a"; "b"]));
+assert(~matlibre_est_nom_option(['a'; 'b']));
+assert(~matlibre_est_nom_option(42));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

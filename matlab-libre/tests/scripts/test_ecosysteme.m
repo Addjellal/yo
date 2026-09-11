@@ -141,4 +141,57 @@ rmdir(dossierAide);
 aideGenerale = help();
 assert(~isempty(strfind(aideGenerale, 'doc')));
 
+%% -------------------------------------------------------- JAVA, IMPORT
+% MatLibre n'embarque pas de machine virtuelle Java. La bonne reponse
+% n'est pas l'absence de la fonction — un programme qui interroge doit
+% pouvoir choisir une autre voie — mais une reponse franche.
+assert(usejava('jvm') == false);
+assert(usejava('awt') == false);
+assert(usejava('swing') == false);
+assert(usejava('desktop') == false);
+refuseComposant = false;
+try
+    usejava('inexistant');
+catch err
+    refuseComposant = strcmp(err.identifier, 'MATLAB:usejava:invalidComponent');
+end
+assert(refuseComposant);
+
+assert(isjava(42) == false);
+assert(isjava('texte') == false);
+assert(isempty(javaclasspath()));
+
+% Construire un objet Java echoue clairement, plutot que de rendre un
+% objet factice dont la premiere methode trahirait l'illusion.
+for nom = {'javaObject', 'javaMethod', 'javaArray', 'javaObjectEDT', 'javaMethodEDT'}
+    refuseJava = false;
+    try
+        feval(nom{1}, 'java.lang.String');
+    catch err
+        refuseJava = strcmp(err.identifier, 'MATLAB:Java:NoJVM');
+    end
+    assert(refuseJava);
+end
+for nom = {'javaaddpath', 'javarmpath'}
+    refuseChemin = false;
+    try
+        feval(nom{1}, '/tmp/inexistant.jar');
+    catch err
+        refuseChemin = strcmp(err.identifier, 'MATLAB:Java:NoJVM');
+    end
+    assert(refuseChemin);
+end
+
+% Sans espaces de noms, la liste des importations est vide — ce qui est
+% exact — et demander une importation echoue au lieu de se taire.
+assert(isempty(import()));
+assert(iscell(import()));
+refuseImport = false;
+try
+    import java.util.*;
+catch err
+    refuseImport = strcmp(err.identifier, 'MATLAB:import:NoNamespaces');
+end
+assert(refuseImport);
+
 disp('ecosysteme : toutes les verifications passent');

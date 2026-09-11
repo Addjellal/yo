@@ -344,8 +344,107 @@ assert(abs(double(subs(log10(x), x, 100)) - 2) < 1e-14);
 assert(strcmp(char(x + sym(-3)), 'x - 3'));
 assert(~isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), ' - ')));
 assert(isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), '+ -')));
-% Mais les parenthèses qui portent un sens restent.
-assert(~isempty(strfind(char(x - sym(-1)), '(-1)')));
+% Retrancher un terme négatif, c'est ajouter : « x - -1 » ne s'écrit pas.
+assert(strcmp(char(x - sym(-1)), 'x + 1'));
+% Mais les parenthèses qui portent un sens restent : sans elles, « x/-1 »
+% et « x^-1 » se reliraient de travers.
+assert(~isempty(strfind(char(x / sym(-1)), '(-1)')));
+assert(~isempty(strfind(char(x ^ sym(-1)), '(-1)')));
+% Un facteur -1 s'écrit comme un signe, non comme un produit.
+assert(strcmp(char(-x), '-x'));
+assert(strcmp(char((-x) / sym('y')), '-x/y'));
+assert(isempty(strfind(char(-x * sym('y')), '-1*')));
+% Deux facteurs de même base font une puissance, et le quotient se
+% retranche : c'est ce qui empêche une expression de gonfler.
+assert(strcmp(char(x * x), 'x^2'));
+assert(strcmp(char(x ^ 2 * x ^ 3), 'x^5'));
+assert(strcmp(char(x / x), '1'));
+assert(strcmp(char(x - x), '0'));
+assert(strcmp(char((x + 1) * (x + 1)), '(x + 1)^2'));
+% Le développement continue de rendre la forme etendue.
+assert(strcmp(char(expand((x + 1) ^ 2)), 'x^2 + 2*x + 1'));
 assert(strcmp(char((x + 1) * 2), '(x + 1)*2'));
+
+%% --------------------------------------------------------- SYMMATRIX
+% Une matrice symbolique se manipule comme un tout : « A*B + A » reste
+% « A*B + A », et c'est SYMMATRIX2SYM qui descend aux coefficients.
+A = symmatrix('A', [2 2]);
+B = symmatrix('B', [2 2]);
+assert(strcmp(char(A * B + A), 'A*B + A'));
+assert(strcmp(char(A'), ['A' char(39)]));
+assert(strcmp(char(inv(A)), 'inv(A)'));
+assert(strcmp(char(det(A)), 'det(A)'));
+assert(isequal(size(A * B), [2 2]));
+assert(isequal(size(symmatrix('C', [2 3]) * symmatrix('D', [3 4])), [2 4]));
+assert(numel(A) == 4);
+
+% Le developpement nomme les elements A1_1, A1_2, ... et suit l'algebre
+% matricielle : le produit devient une somme de produits.
+S = symmatrix2sym(A);
+assert(strcmp(char(S(1, 1)), 'A1_1'));
+assert(strcmp(char(S(2, 1)), 'A2_1'));
+carre = symmatrix2sym(A * A);
+assert(strcmp(char(carre(1, 1)), 'A1_1^2 + A1_2*A2_1'));
+assert(strcmp(char(carre(1, 2)), 'A1_1*A1_2 + A1_2*A2_2'));
+
+% Le determinant et la trace se developpent a la main connue.
+assert(strcmp(char(symmatrix2sym(det(A))), 'A1_1*A2_2 - A1_2*A2_1'));
+assert(strcmp(char(symmatrix2sym(trace(A))), 'A1_1 + A2_2'));
+
+% L'inverse est un quotient de determinants : aucun pivot n'est suppose
+% non nul, ce qui est la seule facon d'inverser sans connaitre les
+% valeurs. On le verifie sur la propriete : A*inv(A) vaut l'identite.
+produit = symmatrix2sym(A * inv(A));
+noms = {'A1_1', 'A1_2', 'A2_1', 'A2_2'};
+valeurs = {2, 1, 3, 4};
+for i = 1:2
+    for j = 1:2
+        attendu = double(i == j);
+        obtenu = symeval(matlibre_sym_arbre(produit(i, j)), noms, valeurs);
+        assert(abs(obtenu - attendu) < 1e-12);
+    end
+end
+
+% Une puissance entiere se ramene a des produits, et la puissance zero a
+% l'identite.
+puissance = symmatrix2sym(A ^ 2);
+assert(strcmp(char(puissance(1, 1)), 'A1_1^2 + A1_2*A2_1'));
+identite = symmatrix2sym(A ^ 0);
+assert(strcmp(char(identite(1, 1)), '1') && strcmp(char(identite(1, 2)), '0'));
+
+% Une constante matricielle se calcule vraiment.
+C = symmatrix([1 2; 3 4]);
+assert(strcmp(char(C), '[1, 2; 3, 4]'));
+produitC = symmatrix2sym(C * C);
+assert(strcmp(char(produitC(1, 1)), '7'));
+
+% Kronecker multiplie les tailles.
+K = symmatrix2sym(kron(symmatrix('P', [1 2]), symmatrix('Q', [2 1])));
+assert(isequal(size(K), [2 2]));
+assert(strcmp(char(K(2, 2)), 'P1_2*Q2_1'));
+
+% Les tailles sont verifiees a la construction, la ou l'erreur est encore
+% lisible.
+refuseSomme = false;
+try
+    symmatrix('A', [2 3]) + symmatrix('B', [3 2]);
+catch err
+    refuseSomme = strcmp(err.identifier, 'symbolic:symmatrix:Dimensions');
+end
+assert(refuseSomme);
+refuseProduit = false;
+try
+    symmatrix('A', [2 3]) * symmatrix('B', [2 3]);
+catch err
+    refuseProduit = strcmp(err.identifier, 'symbolic:symmatrix:Dimensions');
+end
+assert(refuseProduit);
+refuseCarree = false;
+try
+    det(symmatrix('A', [2 3]));
+catch err
+    refuseCarree = strcmp(err.identifier, 'symbolic:symmatrix:Carree');
+end
+assert(refuseCarree);
 
 disp('geometrie et symbolique : toutes les verifications passent');

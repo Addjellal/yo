@@ -37,7 +37,7 @@ classdef datetime
             positionnels = {};
             while k <= numel(arguments_)
                 a = arguments_{k};
-                if (ischar(a) || isstring(a)) && k < numel(arguments_) && ...
+                if matlibre_est_nom_option(a) && k < numel(arguments_) && ...
                         any(strcmpi(char(a), {'ConvertFrom', 'InputFormat', 'Format', 'TimeZone'}))
                     options.(datetime.nomOption(char(a))) = char(arguments_{k + 1});
                     k = k + 2;

@@ -49,6 +49,24 @@ function texte = matlibre_sym_ecrire(arbre, priorite, aGauche)
             arbre = {'-', arbre{2}, oppose};
             operateur = '-';
         end
+    elseif strcmp(operateur, '-')
+        % Retrancher un terme négatif, c'est ajouter : « a - -b » se lit
+        % mal, « a + b » se lit.
+        [negatif, oppose] = matlibre_sym_oppose(arbre{3});
+        if negatif
+            arbre = {'+', arbre{2}, oppose};
+            operateur = '+';
+        end
+    end
+    % Un produit dont le facteur de tête vaut -1 s'écrit avec un signe :
+    % « -x » et non « -1*x ». Le signe lie comme un produit, si bien que
+    % « -a/b » n'a pas besoin de parenthèses et « a/-b » en reçoit.
+    if strcmp(operateur, '*') && isequal(arbre{2}, {'num', -1})
+        texte = ['-' matlibre_sym_ecrire(arbre{3}, 2)];
+        if priorite > 2
+            texte = ['(' texte ')'];
+        end
+        return
     end
     gauche = matlibre_sym_ecrire(arbre{2}, rang, true);
     % Le membre droit d'une soustraction, d'une division ou d'une

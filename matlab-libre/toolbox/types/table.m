@@ -37,7 +37,7 @@ classdef table
             k = 1;
             while k <= numel(varargin)
                 a = varargin{k};
-                if (ischar(a) || isstring(a)) && k < numel(varargin) && ...
+                if matlibre_est_nom_option(a) && k < numel(varargin) && ...
                         any(strcmpi(char(a), {'VariableNames', 'RowNames', 'VariableUnits', ...
                                               'VariableDescriptions', 'DimensionNames'}))
                     valeur = varargin{k + 1};
@@ -207,7 +207,7 @@ classdef table
             k = 1;
             while k <= numel(varargin)
                 a = varargin{k};
-                if (ischar(a) || isstring(a)) && k < numel(varargin) && ...
+                if matlibre_est_nom_option(a) && k < numel(varargin) && ...
                         any(strcmpi(char(a), {'NewVariableNames', 'After', 'Before'}))
                     switch lower(char(a))
                         case 'newvariablenames', noms = table.enCellules(varargin{k + 1});

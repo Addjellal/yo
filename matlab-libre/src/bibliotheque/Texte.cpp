@@ -85,6 +85,22 @@ bool listeVide(const ListeTextes& a, const ListeTextes& b) {
     return a.valeurs.empty() || b.valeurs.empty();
 }
 
+// Comparer deux listes de longueurs différentes n'a pas de sens : MATLAB
+// l'interdit, sauf si l'un des deux côtés est unique et se répand sur
+// l'autre. Sans cette vérification, la boucle de comparaison lisait
+// au-delà de la plus courte — ce qui passait inaperçu sur strcmp et
+// faisait tomber strcmpi, qui recopie la chaîne pour la mettre en
+// minuscules.
+void exigerMemeTaille(const ListeTextes& a, const ListeTextes& b, const char* nom) {
+    if (a.valeurs.size() == 1 || b.valeurs.size() == 1) return;
+    if (a.valeurs.size() == b.valeurs.size()) return;
+    throw ErreurMatlab(std::string("MATLAB:") + nom + ":InputsSizeMismatch",
+                       std::string(nom) + " : les deux arguments doivent avoir la même "
+                       "taille, ou l'un des deux se réduire à un seul texte ; ici " +
+                       std::to_string(a.valeurs.size()) + " et " +
+                       std::to_string(b.valeurs.size()) + ".");
+}
+
 Valeur videLogique(const ListeTextes& modele) {
     Valeur r = Valeur::matriceDims(modele.dims);
     r.classe = Classe::Logique;
@@ -197,6 +213,7 @@ FONCTION(fnStrcmp) {
     if (!estTextuel(a) && a.classe != Classe::Cellule) return {Valeur::booleen(false)};
     ListeTextes la = listeDe(a), lb = listeDe(b);
     if (listeVide(la, lb)) return {videLogique(la.valeurs.empty() ? la : lb)};
+    exigerMemeTaille(la, lb, "strcmp");
     std::size_t n = std::max(la.valeurs.size(), lb.valeurs.size());
     std::vector<bool> r(n);
     for (std::size_t k = 0; k < n; ++k) {
@@ -213,6 +230,7 @@ FONCTION(fnStrcmpi) {
     exigerArguments(args, 2, 2, "strcmpi");
     ListeTextes la = listeDe(args[0]), lb = listeDe(args[1]);
     if (listeVide(la, lb)) return {videLogique(la.valeurs.empty() ? la : lb)};
+    exigerMemeTaille(la, lb, "strcmpi");
     std::size_t n = std::max(la.valeurs.size(), lb.valeurs.size());
     std::vector<bool> r(n);
     for (std::size_t k = 0; k < n; ++k)
@@ -227,6 +245,7 @@ FONCTION(fnStrncmp) {
     std::size_t n = (std::size_t)args[2].scal();
     ListeTextes la = listeDe(args[0]), lb = listeDe(args[1]);
     if (listeVide(la, lb)) return {videLogique(la.valeurs.empty() ? la : lb)};
+    exigerMemeTaille(la, lb, "strncmp");
     std::size_t m = std::max(la.valeurs.size(), lb.valeurs.size());
     std::vector<bool> r(m);
     for (std::size_t k = 0; k < m; ++k) {
@@ -243,6 +262,7 @@ FONCTION(fnStrncmpi) {
     std::size_t n = (std::size_t)args[2].scal();
     ListeTextes la = listeDe(args[0]), lb = listeDe(args[1]);
     if (listeVide(la, lb)) return {videLogique(la.valeurs.empty() ? la : lb)};
+    exigerMemeTaille(la, lb, "strncmpi");
     std::size_t m = std::max(la.valeurs.size(), lb.valeurs.size());
     std::vector<bool> r(m);
     for (std::size_t k = 0; k < m; ++k) {

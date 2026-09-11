@@ -38,7 +38,11 @@ function arbre = matlibre_sym_distribuer(arbre)
                 return
             end
         case '^'
-            if strcmp(b{1}, 'num') && b{2} == round(b{2}) && b{2} >= 2 && b{2} <= 12
+            % Seule une base qui est une somme a de quoi se distribuer ;
+            % développer x^2 en x*x ne ferait que défaire ce que la
+            % simplification vient de rassembler, sans jamais converger.
+            if any(strcmp(a{1}, {'+', '-'})) && strcmp(b{1}, 'num') && ...
+               b{2} == round(b{2}) && b{2} >= 2 && b{2} <= 12
                 produit = a;
                 for k = 2:b{2}
                     produit = symmul(produit, a);

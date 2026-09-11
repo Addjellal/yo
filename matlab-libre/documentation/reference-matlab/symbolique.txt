@@ -7,3 +7,4 @@ symvar taylor vpa
 collect horner numden vpasolve children factor
 partfrac isolate rewrite
 rhs lhs
+symmatrix symmatrix2sym

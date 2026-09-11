@@ -14,14 +14,14 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 673 fonctions natives, en C++ | 19 565 |
+| `src/bibliotheque` | 673 fonctions natives, en C++ | 19 745 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 900 fichiers `.m`, dont 2 204 fonctions publiques recensées par `outils/audit.m` | 132 441 |
-| `tests` | 42 scripts `.m` et 2 fichiers C++ | 21 087 |
+| `toolbox` | 2 956 fichiers `.m`, dont 2 226 fonctions publiques recensées par `outils/audit.m` | 135 181 |
+| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 482 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 326
+documentation MathWorks est complète : `outils/manques.m` compte **2 348
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
 pas, et cent trente-six ont été ajoutées de cette façon — la famille
@@ -103,6 +103,11 @@ suivant en donne quelques-unes, prises dans les tests.
 | `onCleanup` | la tâche part au retour normal, au `return` anticipé et sur une erreur ; l'ordre est celui d'une pile ; un échec n'arrête pas les autres |
 | magasins de données | la boucle « tant qu'il reste, lire » se termine, ne saute rien et ne compte rien deux fois ; la réunion des morceaux redonne le tout |
 | magasins appariés et transformés | `combine` s'arrête sur le plus court des magasins, jamais sur le plus long ; `transform` n'évalue sa fonction qu'à la lecture, et sur le morceau lu — le dernier, plus court, lui arrive tel quel |
+| calcul différé (`tall`) | `gather` rend exactement ce qu'aurait rendu la même chaîne sur le tableau ordinaire, et une chaîne bâtie sur un calcul qui échoue ne se manifeste qu'au `gather` — preuve qu'aucune étape n'a eu lieu avant |
+| matrices symboliques | `A*inv(A)` développé puis évalué en un point rend l'identité, sans qu'aucun pivot n'ait été supposé non nul |
+| échange des niveaux d'une table | `inner2outer` appliqué deux fois redonne la table de départ : aucune donnée ne bouge, seule la façon de la nommer change |
+| Parquet | la table relue porte les mêmes valeurs et les mêmes classes ; et le fichier de référence de `tests/donnees`, écrit par une autre implémentation, se lit ici — sans quoi l'aller-retour ne prouverait que la cohérence de MatLibre avec lui-même |
+| encodages de caractères | `native2unicode(unicode2native(t))` rend `t`, et l'aller-retour par les points de code conserve jusqu'aux caractères à quatre octets |
 
 ## 3. État par boîte à outils
 
@@ -155,7 +160,11 @@ programme d'école qui montre à quoi il sert.
 | Équations aux dérivées partielles | `pdepe` résout le cas parabolique et elliptique en 1-D, en plan, cylindrique et sphérique, par volumes finis et méthode des lignes ; `bvp4c` les problèmes aux limites par collocation d'ordre quatre | maillage adaptatif dans `bvp4c`, qui garde celui qu'on lui donne ; `bvp5c`, `ode15i`, les EDP en deux et trois dimensions |
 | Classes | `classdef` complet : propriétés, méthodes, opérateurs surchargés, `subsref`/`subsasgn`, méthodes statiques, événements, héritage simple et multiple avec appel au constructeur du parent, et la réflexion — `methods`, `properties`, `events`, `enumeration`, `metaclass`, `superclasses` | les membres énumérés comme valeurs — seuls leurs noms se relisent —, le destructeur `delete` d'une classe `handle` (`onCleanup` est écrit au niveau de la portée, ce qui couvre son usage mais pas l'effacement d'une variable), les attributs d'accès (`Access`, `SetAccess`) |
 | Géométrie du plan | `polyshape` porte les régions percées, les mesures, les transformations et les quatre opérations booléennes par l'algorithme de Greiner et Hormann | la simplification d'un contour qui se recoupe, et le traitement exact des contacts — deux régions qui se touchent sont séparées d'un cheveu, ce qui coûte six chiffres de précision sur ces cas-là |
-| Magasins de données | `datastore`, `tabularTextDatastore`, `imageDatastore` et `arrayDatastore` se parcourent par morceaux — `read`, `hasdata`, `reset`, `readall`, `preview` — et se copient par référence, comme dans MATLAB ; `combine` les apparie du même pas et `transform` applique un prétraitement morceau par morceau, sans rien évaluer avant la lecture | la lecture réellement paresseuse : le fichier est lu une fois pour toutes puis découpé, si bien que le programme est le même mais que la mémoire n'est pas économisée — ce qui est pourtant la seule raison d'employer un magasin. `tall` et les tableaux répartis reposent dessus et manquent donc aussi |
+| Magasins de données | `datastore`, `tabularTextDatastore`, `imageDatastore` et `arrayDatastore` se parcourent par morceaux — `read`, `hasdata`, `reset`, `readall`, `preview` — et se copient par référence, comme dans MATLAB ; `combine` les apparie du même pas et `transform` applique un prétraitement morceau par morceau, sans rien évaluer avant la lecture | la lecture réellement paresseuse : le fichier est lu une fois pour toutes puis découpé, si bien que le programme est le même mais que la mémoire n'est pas économisée — ce qui est pourtant la seule raison d'employer un magasin. les tableaux répartis reposent dessus et n'en tirent donc pas plus |
+| Calcul différé | `tall` diffère vraiment : arithmétique, comparaisons, réductions, indexation logique et filtrage se décrivent sans rien exécuter, et `gather` rend exactement ce qu'aurait rendu la même chaîne sur le tableau ordinaire | l'exécution hors mémoire : le `gather` calcule en mémoire, si bien que le programme est celui de MATLAB mais que la taille des données reste bornée par la mémoire |
+| Matrices symboliques | `symmatrix` garde l'algèbre au niveau de la matrice — somme, produit, transposée, inverse, déterminant, trace, puissance, Kronecker — et `symmatrix2sym` descend aux coefficients par cofacteurs | les identités matricielles démontrées sans descendre aux coefficients, et les fonctions de matrice |
+| Java | absent, et déclaré tel : `usejava` rend faux, `isjava` aussi, `javaclasspath` est vide, et les constructeurs échouent avec « MATLAB:Java:NoJVM » | une machine virtuelle Java, qui demanderait une dépendance d'un autre ordre |
+| Parquet | `parquetwrite`, `parquetread` et `parquetinfo` écrivent et lisent le format en colonnes : protocole compact Thrift pour les métadonnées, encodage PLAIN pour les données, classes restituées par le type converti, colonnes facultatives lues par leurs niveaux de définition | la compression et l'encodage en dictionnaire, refusés par leur nom ; les colonnes répétées ; les valeurs absentes dans une colonne entière, booléenne ou textuelle, faute de valeur pour les dire |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |
 | Durée des tests | la suite complète tient en quarante minutes | paralléliser l'exécution des scripts |

@@ -17,7 +17,7 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | images | 74 | 0 | 100 % |
 | instruments-financiers | 55 | 0 | 100 % |
 | matlab-graphique | 135 | 0 | 100 % |
-| matlab-langage | 569 | 0 | 100 % |
+| matlab-langage | 589 | 0 | 100 % |
 | ondelettes | 112 | 0 | 100 % |
 | optimisation-globale | 15 | 0 | 100 % |
 | optimisation | 31 | 0 | 100 % |
@@ -25,10 +25,10 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robuste | 69 | 0 | 100 % |
 | signal | 139 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
-| symbolique | 34 | 0 | 100 % |
+| symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2326** | **0** | **100 %** |
+| **ensemble** | **2348** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 

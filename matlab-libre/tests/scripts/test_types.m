@@ -626,4 +626,46 @@ melange = dictionary(["t", "v"], {'texte', [1 2 3]});
 assert(strcmp(melange("t"), 'texte'));
 assert(isequal(melange("v"), [1 2 3]));
 
+%% -------------------------------------------------------- INNER2OUTER
+% Echanger les deux niveaux d'une table de tables ne deplace aucune
+% donnee : seule la facon de la nommer change. Applique deux fois, on
+% retrouve la table de depart — c'est ce qui definit l'operation.
+un = table([1; 2], [3; 4], 'VariableNames', {'a', 'b'});
+deux = table([5; 6], [7; 8], 'VariableNames', {'a', 'b'});
+imbriquee = table(un, deux, 'VariableNames', {'un', 'deux'});
+echangee = inner2outer(imbriquee);
+assert(isequal(echangee.Properties.VariableNames, {'a', 'b'}));
+assert(isequal(echangee.a.Properties.VariableNames, {'un', 'deux'}));
+assert(isequal(echangee.a.un, imbriquee.un.a));
+assert(isequal(echangee.a.deux, imbriquee.deux.a));
+assert(isequal(echangee.b.un, imbriquee.un.b));
+retour = inner2outer(echangee);
+assert(isequal(retour.Properties.VariableNames, imbriquee.Properties.VariableNames));
+assert(isequal(retour.un.a, imbriquee.un.a));
+assert(isequal(retour.deux.b, imbriquee.deux.b));
+
+% Une variable interieure absente d'une des tables ne figure que la ou
+% elle existe : il n'y a rien d'autre a y mettre.
+trois = table([9; 10], 'VariableNames', {'a'});
+bancale = inner2outer(table(un, trois, 'VariableNames', {'un', 'trois'}));
+assert(isequal(bancale.Properties.VariableNames, {'a', 'b'}));
+assert(isequal(bancale.a.Properties.VariableNames, {'un', 'trois'}));
+assert(isequal(bancale.b.Properties.VariableNames, {'un'}));
+
+% Une table dont les variables ne sont pas des tables est refusee.
+refuseSimple = false;
+try
+    inner2outer(table([1; 2]));
+catch err
+    refuseSimple = strcmp(err.identifier, 'MATLAB:inner2outer:NestedTablesRequired');
+end
+assert(refuseSimple);
+refusePasTable = false;
+try
+    inner2outer([1 2 3]);
+catch err
+    refusePasTable = strcmp(err.identifier, 'MATLAB:inner2outer:InvalidInput');
+end
+assert(refusePasTable);
+
 disp('types : toutes les verifications passent');

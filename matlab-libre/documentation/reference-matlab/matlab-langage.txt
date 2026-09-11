@@ -80,3 +80,6 @@ methods events enumeration metaclass wordcloud
 onCleanup
 datastore tabularTextDatastore imageDatastore arrayDatastore
 combine transform
+webwrite usejava isjava javaObject javaMethod javaArray javaObjectEDT javaMethodEDT
+javaaddpath javarmpath javaclasspath import inner2outer tall istall
+parquetread parquetwrite parquetinfo unicode2native native2unicode

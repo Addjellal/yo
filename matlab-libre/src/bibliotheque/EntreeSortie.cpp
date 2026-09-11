@@ -891,17 +891,146 @@ FONCTION(fnFrewind) {
     return {};
 }
 
+// La precision dit combien d'octets fait un element, comment les lire, et
+// quelle classe rendre. « uint8 » les rend en double, « *uint8 » et
+// « uint8=>uint8 » gardent la classe, « uint8=>double » la laisse tomber :
+// c'est la convention de MATLAB, et « *char » en est l'usage le plus
+// courant, pour lire un fichier texte d'un coup.
+struct PrecisionES {
+    int octets = 1;
+    bool flottant = false;
+    bool signe = false;
+    Classe classe = Classe::Double;
+};
+
+static bool typeDePrecision(const std::string& nom, int& octets, bool& flottant,
+                            bool& signe, Classe& classe) {
+    struct Entree { const char* nom; int octets; bool flottant; bool signe; Classe classe; };
+    static const Entree table[] = {
+        {"uint8", 1, false, false, Classe::UInt8},
+        {"uchar", 1, false, false, Classe::UInt8},
+        {"unsigned char", 1, false, false, Classe::UInt8},
+        {"char", 1, false, false, Classe::Caractere},
+        {"int8", 1, false, true, Classe::Int8},
+        {"schar", 1, false, true, Classe::Int8},
+        {"signed char", 1, false, true, Classe::Int8},
+        {"uint16", 2, false, false, Classe::UInt16},
+        {"ushort", 2, false, false, Classe::UInt16},
+        {"int16", 2, false, true, Classe::Int16},
+        {"short", 2, false, true, Classe::Int16},
+        {"uint32", 4, false, false, Classe::UInt32},
+        {"uint", 4, false, false, Classe::UInt32},
+        {"ulong", 4, false, false, Classe::UInt32},
+        {"int32", 4, false, true, Classe::Int32},
+        {"int", 4, false, true, Classe::Int32},
+        {"long", 4, false, true, Classe::Int32},
+        {"uint64", 8, false, false, Classe::UInt64},
+        {"int64", 8, false, true, Classe::Int64},
+        {"single", 4, true, true, Classe::Simple},
+        {"float", 4, true, true, Classe::Simple},
+        {"float32", 4, true, true, Classe::Simple},
+        {"real*4", 4, true, true, Classe::Simple},
+        {"double", 8, true, true, Classe::Double},
+        {"float64", 8, true, true, Classe::Double},
+        {"real*8", 8, true, true, Classe::Double},
+    };
+    for (const auto& e : table)
+        if (nom == e.nom) {
+            octets = e.octets; flottant = e.flottant; signe = e.signe; classe = e.classe;
+            return true;
+        }
+    return false;
+}
+
+static PrecisionES lirePrecision(std::string nom, const char* fonction) {
+    for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+    while (!nom.empty() && nom.front() == ' ') nom.erase(nom.begin());
+    while (!nom.empty() && nom.back() == ' ') nom.pop_back();
+    std::string source = nom, cible;
+    bool garder = false;
+    if (!source.empty() && source[0] == '*') {
+        source = source.substr(1);
+        cible = source;
+        garder = true;
+    }
+    std::size_t fleche = source.find("=>");
+    if (fleche != std::string::npos) {
+        cible = source.substr(fleche + 2);
+        source = source.substr(0, fleche);
+        garder = true;
+    }
+    PrecisionES p;
+    Classe classeSource = Classe::Double;
+    if (!typeDePrecision(source, p.octets, p.flottant, p.signe, classeSource))
+        throw ErreurMatlab(std::string("MATLAB:") + fonction + ":unsupportedPrecision",
+                           std::string(fonction) + " : précision « " + nom +
+                           " » non prise en charge.");
+    p.classe = Classe::Double;
+    if (garder) {
+        int o; bool fl, si; Classe classeCible;
+        if (!cible.empty() && typeDePrecision(cible, o, fl, si, classeCible))
+            p.classe = classeCible;
+        else
+            p.classe = classeSource;
+    }
+    return p;
+}
+
+static double decoderElement(const char* tampon, const PrecisionES& p) {
+    if (p.flottant) {
+        if (p.octets == 4) { float x; std::memcpy(&x, tampon, 4); return (double)x; }
+        double x; std::memcpy(&x, tampon, 8); return x;
+    }
+    unsigned long long brut = 0;
+    for (int i = 0; i < p.octets; ++i)
+        brut |= (unsigned long long)(unsigned char)tampon[i] << (8 * i);
+    if (!p.signe) return (double)brut;
+    if (p.octets == 8) return (double)(long long)brut;
+    unsigned long long borne = 1ULL << (8 * p.octets);
+    if (brut >= borne / 2) return (double)brut - (double)borne;
+    return (double)brut;
+}
+
+static void encoderElement(std::ostream& f, double x, const PrecisionES& p) {
+    char tampon[8];
+    if (p.flottant) {
+        if (p.octets == 4) { float y = (float)x; std::memcpy(tampon, &y, 4); }
+        else { std::memcpy(tampon, &x, 8); }
+    } else {
+        long long entier = (long long)x;
+        unsigned long long brut = (unsigned long long)entier;
+        for (int i = 0; i < p.octets; ++i)
+            tampon[i] = (char)(unsigned char)((brut >> (8 * i)) & 0xFF);
+    }
+    f.write(tampon, p.octets);
+}
+
 FONCTION(fnFread) {
     INUTILISE
     exigerArguments(args, 1, 3, "fread");
     auto& f = fluxDe((int)args[0].scal());
     std::size_t combien = (std::size_t)-1;
-    if (args.size() > 1 && !args[1].estVide() && args[1].estNumerique())
-        combien = (std::size_t)args[1].scal();
-    std::vector<double> octets;
-    char c;
-    while (octets.size() < combien && f.get(c)) octets.push_back((double)(unsigned char)c);
-    return {Valeur::colonne(octets)};
+    std::size_t rangType = 0;
+    if (args.size() > 1) {
+        if (args[1].estTexte() || args[1].estChaine()) {
+            rangType = 1;
+        } else if (!args[1].estVide() && args[1].estNumerique()) {
+            double n = args[1].scal();
+            // « Inf » veut dire « tout ce qui reste » : le convertir en
+            // entier donnait zéro, et fread ne lisait alors rien du tout.
+            if (std::isfinite(n) && n >= 0) combien = (std::size_t)n;
+        }
+    }
+    if (args.size() > 2 && (args[2].estTexte() || args[2].estChaine())) rangType = 2;
+    PrecisionES p;
+    if (rangType) p = lirePrecision(args[rangType].versTexte(), "fread");
+    std::vector<double> valeurs;
+    std::vector<char> tampon((std::size_t)p.octets);
+    while (valeurs.size() < combien && f.read(tampon.data(), p.octets))
+        valeurs.push_back(decoderElement(tampon.data(), p));
+    Valeur r = Valeur::colonne(valeurs);
+    if (p.classe != Classe::Double) r.classe = p.classe;
+    return {r};
 }
 
 // « fscanf(fid, format) » : le meme decodage que sscanf, mais sur ce qui
@@ -939,12 +1068,14 @@ FONCTION(fnFwrite) {
     exigerArguments(args, 2, 3, "fwrite");
     auto& f = fluxDe((int)args[0].scal());
     const Valeur& v = args[1];
-    if (v.estTexte() || v.estChaine()) {
+    PrecisionES p;
+    if (args.size() > 2) p = lirePrecision(args[2].versTexte(), "fwrite");
+    if ((v.estTexte() || v.estChaine()) && p.octets == 1) {
         std::string s = v.versTexte();
         f.write(s.data(), (std::streamsize)s.size());
         return {Valeur::scalaire((double)s.size())};
     }
-    for (double x : v.re) f.put((char)(int)x);
+    for (double x : v.re) encoderElement(f, x, p);
     return {Valeur::scalaire((double)v.nelem())};
 }
 

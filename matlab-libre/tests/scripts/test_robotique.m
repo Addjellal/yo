@@ -192,6 +192,18 @@ assert(abs(importe.Bodies{1}.Mass - 2) < 1e-12, 'la masse est lue');
 Tu = getTransform(importe, [0 pi/2], 'l2');
 assert(abs(Tu(1,4) - 1) < 1e-12 && abs(Tu(2,4)) < 1e-12, ...
        'la transformation d''origine place le second corps');
+% Le meme document lu depuis un fichier donne le meme robot. La lecture
+% se faisait par « fread(id, Inf, '*char') », qui ne rendait rien : le
+% chemin passait pour un document sans balise « robot ».
+fichierUrdf = fullfile(tempdir, 'matlibre_essai.urdf');
+identifiantUrdf = fopen(fichierUrdf, 'w');
+fprintf(identifiantUrdf, '%s', urdf);
+fclose(identifiantUrdf);
+depuisFichier = importrobot(fichierUrdf, 'DataFormat', 'row');
+assert(strcmp(depuisFichier.BaseName, importe.BaseName));
+assert(matlibre_nddl(depuisFichier) == matlibre_nddl(importe));
+delete(fichierUrdf);
+
 fprintf('  UR5 et URDF : ok\n');
 
 %% Modèles de mobiles

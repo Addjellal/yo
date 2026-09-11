@@ -611,6 +611,135 @@ MATLIBRE_SYM_VARIABLE Feuille « variable » d'un arbre d'expression.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_symmat_constante`
+
+```
+MATLIBRE_SYMMAT_CONSTANTE Écriture d'une matrice constante.
+  TEXTE = MATLIBRE_SYMMAT_CONSTANTE(VALEURS) rend « [a, b; c, d] ».
+  Une matrice 1x1 s'écrit sans crochets : dans une expression, les
+  crochets d'un scalaire ne disent rien de plus.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_symmat_constante([1 2; 3 4])    % '[1, 2; 3, 4]'
+
+  Voir aussi SYMMATRIX, MATLIBRE_SYMMAT_ECRIRE.
+```
+
+## `matlibre_symmat_determinant`
+
+```
+MATLIBRE_SYMMAT_DETERMINANT Déterminant symbolique par les cofacteurs.
+  D = MATLIBRE_SYMMAT_DETERMINANT(A) développe le long de la première
+  ligne. L'élimination de Gauss serait moins coûteuse mais demanderait
+  de diviser par des expressions dont on ne sait pas si elles
+  s'annulent ; les cofacteurs n'ont pas ce défaut.
+
+  Le nombre de termes croît comme n! : c'est une méthode pour petites
+  matrices, et c'en est aussi la seule honnête sans hypothèse sur les
+  éléments.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     A = [sym('a') sym('b'); sym('c') sym('d')];
+     char(matlibre_symmat_determinant(A))    % 'a*d - b*c'
+
+  Voir aussi SYMMATRIX, DET, MATLIBRE_SYMMAT_INVERSE.
+```
+
+## `matlibre_symmat_ecrire`
+
+```
+MATLIBRE_SYMMAT_ECRIRE Écriture d'une expression matricielle symbolique.
+  TEXTE = MATLIBRE_SYMMAT_ECRIRE(ARBRE,PRIORITE) rend l'expression avec
+  le moins de parenthèses possible : on n'entoure que ce qui lierait
+  moins fort que le contexte. Une matrice se lit comme son nom, un
+  produit s'écrit collé, une somme espacée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_symmat_ecrire({'*', {'mat','A',[2 2]}, {'mat','B',[2 2]}}, 0)
+
+  Voir aussi SYMMATRIX, MATLIBRE_SYM_ECRIRE.
+```
+
+## `matlibre_symmat_etendre`
+
+```
+MATLIBRE_SYMMAT_ETENDRE Développe une expression matricielle en matrice de SYM.
+  M = MATLIBRE_SYMMAT_ETENDRE(ARBRE) rend la matrice des éléments. Une
+  matrice nommée A de taille mxn donne les éléments A1_1 à Am_n ; les
+  opérations sont ensuite menées élément par élément, ou selon
+  l'algèbre matricielle pour le produit, l'inverse et le déterminant.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     M = matlibre_symmat_etendre({'mat', 'A', [1 2]});
+     char(M(1,2))                    % 'A1_2'
+
+  Voir aussi SYMMATRIX2SYM, SYMMATRIX.
+```
+
+## `matlibre_symmat_inverse`
+
+```
+MATLIBRE_SYMMAT_INVERSE Inverse symbolique par la comatrice.
+  R = MATLIBRE_SYMMAT_INVERSE(A) rend la transposée de la comatrice
+  divisée par le déterminant. Chaque élément est donc un quotient de
+  déterminants, sans qu'aucun pivot n'ait été supposé non nul : c'est
+  ce qui permet d'inverser une matrice dont on ne connaît pas les
+  valeurs.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     A = [sym('a') sym('b'); sym('c') sym('d')];
+     R = matlibre_symmat_inverse(A);
+     char(R(1, 1))                   % 'd/(a*d - b*c)'
+
+  Voir aussi SYMMATRIX, INV, MATLIBRE_SYMMAT_DETERMINANT.
+```
+
+## `matlibre_symmat_produit`
+
+```
+MATLIBRE_SYMMAT_PRODUIT Produit de deux matrices de SYM.
+  C = MATLIBRE_SYMMAT_PRODUIT(A,B) rend le produit matriciel, terme à
+  terme : C(i,j) est la somme des A(i,k)*B(k,j). Un opérande 1x1 est
+  traité comme un facteur d'échelle.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     A = [sym('a') sym('b')];
+     B = [sym('c'); sym('d')];
+     char(matlibre_symmat_produit(A, B))     % 'a*c + b*d'
+
+  Voir aussi SYMMATRIX, MATLIBRE_SYMMAT_ETENDRE.
+```
+
+## `matlibre_symmat_taille`
+
+```
+MATLIBRE_SYMMAT_TAILLE Taille d'une expression matricielle symbolique.
+  D = MATLIBRE_SYMMAT_TAILLE(ARBRE) rend [lignes colonnes]. Les tailles
+  sont vérifiées en chemin : une somme de formats différents ou un
+  produit dont les dimensions intérieures ne concordent pas est refusé
+  à la construction, et non à l'expansion — c'est là que l'erreur est
+  encore lisible.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_symmat_taille({'mat', 'A', [2 3]})   % [2 3]
+
+  Voir aussi SYMMATRIX, SYMMATRIX2SYM.
+```
+
 ## `numden`
 
 ```
@@ -893,6 +1022,58 @@ SYMINT Primitive des formes polynomiales et élémentaires.
   Voir aussi SYMDIFF, SYMSIMPLIFY, SYMSTR.
 ```
 
+## `symmatrix`
+
+```
+SYMMATRIX Matrice symbolique, manipulée comme un tout.
+  A = SYMMATRIX('A',[M N]) crée une matrice symbolique MxN nommée A.
+  A = SYMMATRIX(V) fait d'une matrice numérique ou symbolique une
+  constante matricielle.
+
+  Les opérations ordinaires — somme, produit, transposition, inverse,
+  déterminant, trace, puissance, produit de Kronecker — s'écrivent
+  sans développer les éléments : « A*B + C » reste « A*B + C ». C'est
+  ce qui distingue SYMMATRIX de SYM : on raisonne sur la matrice, non
+  sur ses coefficients, et une identité matricielle reste lisible.
+
+  SYMMATRIX2SYM développe l'expression en une matrice de SYM, où la
+  matrice nommée A donne les éléments A1_1, A1_2, ...
+
+  Les tailles sont vérifiées à la construction : une somme de formats
+  différents ou un produit mal accordé est refusé tout de suite.
+
+  Exemple :
+     A = symmatrix('A', [2 2]);
+     B = symmatrix('B', [2 2]);
+     char(A * B + A)                 % 'A*B + A'
+     size(A * B)                     % [2 2]
+     S = symmatrix2sym(A);
+     char(S(2, 1))                   % 'A2_1'
+
+  Voir aussi SYM, SYMMATRIX2SYM, SYMS, INV, DET, KRON.
+```
+
+## `symmatrix2sym`
+
+```
+SYMMATRIX2SYM Développe une matrice symbolique en ses éléments.
+  M = SYMMATRIX2SYM(A) rend la matrice de SYM que A représente. Une
+  matrice nommée A de taille MxN donne les éléments A1_1 à AM_N ; une
+  expression est développée selon l'algèbre matricielle — le produit
+  devient une somme de produits, l'inverse un quotient de
+  déterminants.
+
+  C'est le passage du raisonnement sur la matrice au calcul sur ses
+  coefficients : l'un se relit, l'autre se substitue et s'évalue.
+
+  Exemple :
+     A = symmatrix('A', [2 2]);
+     M = symmatrix2sym(A * A);
+     char(M(1, 1))                   % 'A1_1^2 + A1_2*A2_1'
+
+  Voir aussi SYMMATRIX, SYM, SUBS, DOUBLE.
+```
+
 ## `symmul`
 
 ```
@@ -1006,6 +1187,14 @@ SYMSIMPLIFY Simplification des cas triviaux.
   disparaissent, la multiplication par zéro annule, la puissance zéro
   ou un se résout.
 
+  Elle rassemble aussi les facteurs de même base : x*x devient x^2,
+  x^2*x^3 devient x^5 et x/x devient 1. C'est ce qui empêche une
+  expression de gonfler à chaque produit — sans quoi la dérivée
+  seconde d'un polynôme s'écrirait en facteurs répétés.
+
+  Le quotient x/x vaut un pour x non nul ; la simplification le tient
+  pour acquis, comme le font les systèmes de calcul formel.
+
   Elle ne factorise pas, ne développe pas et ne reconnaît pas les
   identités remarquables : la simplification symbolique complète est un
   problème difficile, et une simplification partielle honnête vaut mieux
@@ -1019,6 +1208,8 @@ SYMSIMPLIFY Simplification des cas triviaux.
      symstr(symsimplify(symmul(symnum(1), x)))           % 'x'
      symstr(symsimplify(symadd(symnum(2), symnum(3))))   % '5'
      symstr(symsimplify(symmul(symnum(0), x)))           % '0'
+     symstr(symsimplify(symmul(x, x)))                   % 'x^2'
+     symstr(symsimplify(symdiv(x, x)))                   % '1'
 
   Voir aussi SYMSTR, SYMSUBS, SIMPLIFY.
 ```

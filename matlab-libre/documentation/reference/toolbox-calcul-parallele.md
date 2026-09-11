@@ -49,11 +49,16 @@ GATHER Rapatrie un tableau distribué.
   machine ce qui était réparti. Le placer dans une boucle est la façon
   la plus sûre de perdre tout le bénéfice du parallélisme.
 
+  Sur un tableau différé — celui que rend TALL — GATHER est au
+  contraire tout le calcul : c'est lui qui exécute enfin la chaîne
+  d'opérations décrite jusque-là, et rend un tableau ordinaire.
+
   Exemple :
      gather(distributed([]))         % []
      gather(distributed('texte'))    % 'texte'
+     gather(sum(tall([1 2 3])))      % 6 : la chaine differee aboutit
 
-  Voir aussi DISTRIBUTED, PARARRAYFUN.
+  Voir aussi DISTRIBUTED, TALL, ISTALL, PARARRAYFUN.
 ```
 
 ## `matlibre_par_appliquer`

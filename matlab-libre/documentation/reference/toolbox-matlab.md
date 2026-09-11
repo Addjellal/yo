@@ -2663,6 +2663,27 @@ IMAGEDATASTORE Lecture par morceaux d'une collection d'images.
   Voir aussi DATASTORE, TABULARTEXTDATASTORE, IMREAD, READ, READALL.
 ```
 
+## `import`
+
+```
+IMPORT Importe un espace de noms.
+  IMPORT ESPACE.* rendrait visibles sans préfixe les fonctions et les
+  classes d'un espace de noms. L = IMPORT() rend la liste des
+  importations en vigueur.
+
+  MatLibre n'a pas d'espaces de noms : toutes les fonctions sont
+  visibles par leur nom, et il n'y a donc jamais rien à importer. La
+  liste est vide — ce qui est la réponse exacte, non une lacune — et
+  demander une importation échoue au lieu de la passer sous silence,
+  car un programme qui croit avoir importé appellerait ensuite un nom
+  court que rien ne définit.
+
+  Exemple :
+     isempty(import())               % 1 : aucune importation
+
+  Voir aussi WHICH, EXIST, PATH, CLASS.
+```
+
 ## `importdata`
 
 ```
@@ -2688,6 +2709,35 @@ IMPORTDATA Charge un fichier sans dire de quel genre il est.
      a = importdata(f);       % a.data, a.colheaders
 
   Voir aussi READMATRIX, READTABLE, READCELL, LOAD, IMREAD.
+```
+
+## `inner2outer`
+
+```
+INNER2OUTER Échange les niveaux d'une table de tables.
+  T2 = INNER2OUTER(T1), où chaque variable de T1 est elle-même une
+  table, rend une table dont les variables portent les noms
+  intérieurs. T2.a.un vaut alors T1.un.a : la donnée ne bouge pas,
+  seule la façon de la nommer change.
+
+  C'est utile quand on a rangé des mesures par capteur alors qu'on veut
+  les lire par grandeur, ou l'inverse. Appliquée deux fois de suite,
+  l'opération redonne la table de départ lorsque toutes les tables
+  intérieures ont les mêmes variables : c'est ce qui la définit.
+
+  Quand une table intérieure n'a pas l'une des variables, la colonne
+  correspondante ne figure simplement pas dans le résultat : il n'y a
+  rien à y mettre, et inventer une valeur serait pire.
+
+  Exemple :
+     un = table([1; 2], [3; 4], 'VariableNames', {'a', 'b'});
+     deux = table([5; 6], [7; 8], 'VariableNames', {'a', 'b'});
+     T = table(un, deux, 'VariableNames', {'un', 'deux'});
+     S = inner2outer(T);
+     S.Properties.VariableNames         % {'a', 'b'}
+     isequal(S.a.deux, T.deux.a)        % 1 : la donnee est la meme
+
+  Voir aussi TABLE, SPLITVARS, MERGEVARS, ROWS2VARS, STACK.
 ```
 
 ## `inpolygon`
@@ -2851,6 +2901,21 @@ ISCHANGE Repère les ruptures dans une série.
      find(ischange(x, 'linear'))         % le sommet du toit
 
   Voir aussi ISLOCALMAX, ISOUTLIER, FINDCHANGEPTS, MOVMEAN.
+```
+
+## `isjava`
+
+```
+ISJAVA Dit si une valeur est un objet Java.
+  T = ISJAVA(A) rend vrai si A est un objet Java. MatLibre n'embarque
+  pas de machine virtuelle : aucune valeur n'en est un, et la réponse
+  est donc toujours faux.
+
+  Exemple :
+     isjava(42)                      % 0
+     isjava('texte')                 % 0
+
+  Voir aussi USEJAVA, ISOBJECT, CLASS, ISA.
 ```
 
 ## `iskeyword`
@@ -3068,6 +3133,151 @@ ISSTRPROP Nature de chaque caractère d'un texte.
      isstrprop('a1 ', 'digit')      % 0 1 0
 
   Voir aussi ISLETTER, ISSPACE, REGEXP.
+```
+
+## `istall`
+
+```
+ISTALL Dit si une valeur est un tableau différé.
+  T = ISTALL(X) rend vrai si X est un tableau dont le calcul est
+  différé, celui que rend TALL.
+
+  Exemple :
+     istall(tall([1 2 3]))           % 1
+     istall([1 2 3])                 % 0
+     istall(gather(tall(7)))         % 0 : rassemblé, il est ordinaire
+
+  Voir aussi TALL, GATHER.
+```
+
+## `javaArray`
+
+```
+JAVAARRAY Crée un tableau Java.
+  JAVAARRAY(CLASSE,DIMS...) construirait un tableau Java.
+
+  MatLibre n'embarque pas de machine virtuelle Java : l'appel échoue
+  avec l'identifiant « MATLAB:Java:NoJVM ». Échouer clairement vaut
+  mieux que rendre un objet factice, dont la première méthode appelée
+  trahirait l'illusion loin de sa cause.
+
+  Exemple :
+     try, javaArray('java.lang.String'); catch e, disp(e.identifier); end
+
+  Voir aussi USEJAVA, ISJAVA, JAVACLASSPATH.
+```
+
+## `javaMethod`
+
+```
+JAVAMETHOD Appelle une méthode Java.
+  JAVAMETHOD(NOM,OBJET,ARGS...) appellerait une méthode dun objet Java.
+
+  MatLibre n'embarque pas de machine virtuelle Java : l'appel échoue
+  avec l'identifiant « MATLAB:Java:NoJVM ». Échouer clairement vaut
+  mieux que rendre un objet factice, dont la première méthode appelée
+  trahirait l'illusion loin de sa cause.
+
+  Exemple :
+     try, javaMethod('java.lang.String'); catch e, disp(e.identifier); end
+
+  Voir aussi USEJAVA, ISJAVA, JAVACLASSPATH.
+```
+
+## `javaMethodEDT`
+
+```
+JAVAMETHODEDT Appelle une méthode Java sur le fil graphique.
+  JAVAMETHODEDT(NOM,OBJET,ARGS...) appellerait une méthode sur le fil de distribution des événements.
+
+  MatLibre n'embarque pas de machine virtuelle Java : l'appel échoue
+  avec l'identifiant « MATLAB:Java:NoJVM ». Échouer clairement vaut
+  mieux que rendre un objet factice, dont la première méthode appelée
+  trahirait l'illusion loin de sa cause.
+
+  Exemple :
+     try, javaMethodEDT('java.lang.String'); catch e, disp(e.identifier); end
+
+  Voir aussi USEJAVA, ISJAVA, JAVACLASSPATH.
+```
+
+## `javaObject`
+
+```
+JAVAOBJECT Crée un objet Java.
+  JAVAOBJECT(CLASSE,ARGS...) construirait un objet de la classe donnée.
+
+  MatLibre n'embarque pas de machine virtuelle Java : l'appel échoue
+  avec l'identifiant « MATLAB:Java:NoJVM ». Échouer clairement vaut
+  mieux que rendre un objet factice, dont la première méthode appelée
+  trahirait l'illusion loin de sa cause.
+
+  Exemple :
+     try, javaObject('java.lang.String'); catch e, disp(e.identifier); end
+
+  Voir aussi USEJAVA, ISJAVA, JAVACLASSPATH.
+```
+
+## `javaObjectEDT`
+
+```
+JAVAOBJECTEDT Crée un objet Java sur le fil graphique.
+  JAVAOBJECTEDT(CLASSE,ARGS...) construirait un objet sur le fil de distribution des événements.
+
+  MatLibre n'embarque pas de machine virtuelle Java : l'appel échoue
+  avec l'identifiant « MATLAB:Java:NoJVM ». Échouer clairement vaut
+  mieux que rendre un objet factice, dont la première méthode appelée
+  trahirait l'illusion loin de sa cause.
+
+  Exemple :
+     try, javaObjectEDT('java.lang.String'); catch e, disp(e.identifier); end
+
+  Voir aussi USEJAVA, ISJAVA, JAVACLASSPATH.
+```
+
+## `javaaddpath`
+
+```
+JAVAADDPATH Ajoute au chemin de classes Java.
+  JAVAADDPATH(CHEMIN) ajouterait CHEMIN au chemin de classes. MatLibre
+  n'embarque pas de machine virtuelle Java : l'appel échoue au lieu de
+  faire croire que la classe sera trouvée plus tard.
+
+  Exemple :
+     try, javaaddpath('/tmp/x.jar'); catch e, disp(e.identifier); end
+
+  Voir aussi JAVACLASSPATH, USEJAVA, JAVAOBJECT.
+```
+
+## `javaclasspath`
+
+```
+JAVACLASSPATH Chemin de classes Java.
+  C = JAVACLASSPATH() rend, dans une cellule, le chemin de classes
+  dynamique. MatLibre n'embarque pas de machine virtuelle Java : le
+  chemin est donc toujours vide.
+
+  C'est la réponse exacte, et non une approximation : un chemin vide
+  décrit fidèlement un interpréteur sans Java, et un programme qui
+  parcourt le résultat n'a rien de particulier à prévoir.
+
+  Exemple :
+     isempty(javaclasspath())        % 1 : aucune classe Java
+
+  Voir aussi USEJAVA, JAVAADDPATH, JAVAOBJECT.
+```
+
+## `javarmpath`
+
+```
+JAVARMPATH Retire du chemin de classes Java.
+  JAVARMPATH(CHEMIN) retirerait CHEMIN du chemin de classes. MatLibre
+  n'embarque pas de machine virtuelle Java : l'appel échoue.
+
+  Exemple :
+     try, javarmpath('/tmp/x.jar'); catch e, disp(e.identifier); end
+
+  Voir aussi JAVACLASSPATH, JAVAADDPATH, USEJAVA.
 ```
 
 ## `jet`
@@ -3712,6 +3922,25 @@ MATLIBRE_DISTANCE_INVERSE Moyenne pondérée par l'inverse du carré de la dista
   Voir aussi GRIDDATA.
 ```
 
+## `matlibre_encodage_nom`
+
+```
+MATLIBRE_ENCODAGE_NOM Nom canonique d'un encodage de caractères.
+  NOM = MATLIBRE_ENCODAGE_NOM(E) rend 'UTF-8', 'US-ASCII' ou
+  'ISO-8859-1', en acceptant les orthographes usuelles. Un encodage
+  non pris en charge est refusé par son nom : convertir en silence vers
+  un encodage voisin donnerait un texte presque juste, ce qui est la
+  pire des issues.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_encodage_nom('utf8')        % 'UTF-8'
+     matlibre_encodage_nom('latin1')      % 'ISO-8859-1'
+
+  Voir aussi UNICODE2NATIVE, NATIVE2UNICODE.
+```
+
 ## `matlibre_enveloppe3d`
 
 ```
@@ -3755,6 +3984,28 @@ MATLIBRE_ESSAIMER Écarte latéralement les points de même abscisse.
      numel(unique(xs))               % 3 : ils ne se recouvrent plus
 
   Voir aussi SWARMCHART, SCATTER.
+```
+
+## `matlibre_est_nom_option`
+
+```
+MATLIBRE_EST_NOM_OPTION Une valeur peut-elle être le nom d'une option ?
+  T = MATLIBRE_EST_NOM_OPTION(V) rend vrai si V est un vecteur de
+  caractères d'une seule ligne, ou une chaîne unique.
+
+  Cela distingue « 'VariableNames' » d'une colonne de texte. Sans la
+  distinction, une colonne de deux lignes de caractères serait
+  examinée comme un nom d'option — ce qui n'a pas de sens, et ce qui a
+  déjà coûté une comparaison hors des bornes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_est_nom_option('VariableNames')    % 1
+     matlibre_est_nom_option(["a"; "b"])         % 0 : deux textes
+     matlibre_est_nom_option(['a'; 'b'])         % 0 : deux lignes
+
+  Voir aussi TABLE, TIMETABLE, DATETIME.
 ```
 
 ## `matlibre_evaluer_courbe`
@@ -4441,6 +4692,153 @@ MATLIBRE_ODE_OPTION Lit une option d'ODESET, ou rend la valeur par défaut.
   Voir aussi ODESET, ODEGET, ODE89.
 ```
 
+## `matlibre_parquet_classe`
+
+```
+MATLIBRE_PARQUET_CLASSE Classe MATLAB d'une colonne Parquet.
+  CLASSE = MATLIBRE_PARQUET_CLASSE(PHYSIQUE,CONVERTI) rend le nom de la
+  classe à restituer. Le type converti l'emporte quand il est présent :
+  c'est lui qui distingue un int8 d'un int32, que Parquet range tous
+  deux en INT32.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_parquet_classe(1, 15)  % 'int8'
+     matlibre_parquet_classe(5, -1)  % 'double'
+
+  Voir aussi PARQUETREAD, MATLIBRE_PARQUET_TYPES.
+```
+
+## `matlibre_parquet_decoder`
+
+```
+MATLIBRE_PARQUET_DECODER Décodage « PLAIN » d'une colonne.
+  VALEURS = MATLIBRE_PARQUET_DECODER(OCTETS,PHYSIQUE,NOMBRE) rend les
+  NOMBRE valeurs écrites bout à bout dans OCTETS. C'est l'inverse exact
+  de MATLIBRE_PARQUET_ENCODER.
+
+  MATLIBRE_PARQUET_DECODER(...,CLASSE) dit comment relire les entiers :
+  les mêmes 32 ou 64 bits valent un nombre signé ou non selon ce que le
+  type converti annonçait, et s'en remettre au type physique seul
+  ramènerait un grand uint32 à sa borne signée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = matlibre_parquet_encoder([1 2 3], 5);
+     matlibre_parquet_decoder(o, 5, 3)          % [1; 2; 3]
+
+  Voir aussi PARQUETREAD, MATLIBRE_PARQUET_ENCODER.
+```
+
+## `matlibre_parquet_encoder`
+
+```
+MATLIBRE_PARQUET_ENCODER Encodage « PLAIN » d'une colonne.
+  OCTETS = MATLIBRE_PARQUET_ENCODER(COLONNE,PHYSIQUE) rend les valeurs
+  écrites bout à bout, sans compression ni dictionnaire : c'est
+  l'encodage PLAIN, que toute implémentation de Parquet sait lire.
+
+  Les nombres partent en petit-boutien ; les booléens sont tassés à
+  raison de huit par octet, bit de poids faible d'abord ; une chaîne
+  est précédée de sa longueur sur quatre octets.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numel(matlibre_parquet_encoder([1 2 3], 5))    % 24 : trois doubles
+
+  Voir aussi PARQUETWRITE, MATLIBRE_PARQUET_DECODER.
+```
+
+## `matlibre_parquet_niveaux`
+
+```
+MATLIBRE_PARQUET_NIVEAUX Décode les niveaux de définition d'une page.
+  NIVEAUX = MATLIBRE_PARQUET_NIVEAUX(OCTETS,LARGEUR,NOMBRE) décode le
+  codage hybride « série ou groupes tassés » que Parquet emploie pour
+  les niveaux. Un en-tête en varint dit lequel : pair, c'est une valeur
+  répétée ; impair, ce sont des groupes de huit valeurs tassées à
+  LARGEUR bits, bits de poids faible d'abord.
+
+  Ces niveaux disent, colonne par colonne, quelles lignes portent une
+  valeur. Sans eux, on ne saurait pas où sont les trous, et les valeurs
+  présentes se retrouveraient décalées.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     % une série de quatre fois la valeur 1 : en-tête 8 (4 << 1), puis 1
+     matlibre_parquet_niveaux(uint8([8 1]), 1, 4)'   % [1 1 1 1]
+
+  Voir aussi PARQUETREAD, MATLIBRE_PARQUET_DECODER.
+```
+
+## `matlibre_parquet_pied`
+
+```
+MATLIBRE_PARQUET_PIED Lit le fichier et en extrait les métadonnées.
+  [M,OCTETS] = MATLIBRE_PARQUET_PIED(FICHIER) rend la structure des
+  métadonnées, telle que le protocole compact la transporte — champs
+  nommés c1, c2, ... d'après leurs identifiants — et tous les octets du
+  fichier.
+
+  Un fichier Parquet se lit par la fin : « PAR1 » ferme le fichier,
+  précédé de la longueur du pied sur quatre octets, elle-même précédée
+  du pied. C'est ce qui permet d'écrire les données avant de savoir où
+  elles finiront.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     f = fullfile(tempdir, 'matlibre_pied.parquet');
+     parquetwrite(f, table([1; 2]));
+     m = matlibre_parquet_pied(f);
+     m.c3                            % 2 lignes
+
+  Voir aussi PARQUETREAD, PARQUETINFO.
+```
+
+## `matlibre_parquet_textes`
+
+```
+MATLIBRE_PARQUET_TEXTES Colonne de texte ramenée à une cellule de chaînes.
+  TEXTES = MATLIBRE_PARQUET_TEXTES(COLONNE) accepte une cellule, un
+  tableau de chaînes, une matrice de caractères ou une catégorielle, et
+  rend une cellule de vecteurs de caractères — une ligne par élément.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_parquet_textes(["a"; "b"])    % {'a', 'b'}
+
+  Voir aussi PARQUETWRITE, MATLIBRE_PARQUET_ENCODER.
+```
+
+## `matlibre_parquet_types`
+
+```
+MATLIBRE_PARQUET_TYPES Correspondance entre classes MATLAB et types Parquet.
+  [P,C,L] = MATLIBRE_PARQUET_TYPES(CLASSE) rend le type physique
+  Parquet, le type converti qui le précise, et le nom de la classe à
+  restituer à la lecture.
+
+  Parquet n'a que quatre types numériques physiques : INT32, INT64,
+  FLOAT et DOUBLE. Les entiers plus étroits s'y rangent en INT32, et
+  c'est le type converti — INT_8, UINT_16, ... — qui garde la largeur
+  d'origine. Sans lui, un int8 reviendrait en int32 : le fichier serait
+  valide, l'aller-retour ne le serait pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [p, c] = matlibre_parquet_types('int8');
+     p == 1 && c == 15               % INT32, converti en INT_8
+
+  Voir aussi PARQUETWRITE, PARQUETREAD.
+```
+
 ## `matlibre_pas_grille`
 
 ```
@@ -4490,6 +4888,21 @@ MATLIBRE_POIGNEE_DEPUIS_TEXTE Une poignée bâtie sur une expression écrite.
   Les variables sont devinées : « x » seul donne une fonction d'une
   variable, « x » et « y » une fonction de deux. Les opérateurs sont
   vectorisés au passage, de sorte que « x^2 » travaille sur un tableau.
+```
+
+## `matlibre_points_utf8`
+
+```
+MATLIBRE_POINTS_UTF8 Écriture UTF-8 d'une suite de points de code.
+  OCTETS = MATLIBRE_POINTS_UTF8(POINTS) rend la suite d'octets. C'est
+  l'inverse exact de MATLIBRE_UTF8_POINTS.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     double(matlibre_points_utf8(233))   % [195 169]
+
+  Voir aussi UNICODE2NATIVE, NATIVE2UNICODE, MATLIBRE_UTF8_POINTS.
 ```
 
 ## `matlibre_poly_aire_signee`
@@ -4727,6 +5140,75 @@ MATLIBRE_STRUCTURE_EN_XML Écrit une valeur en XML, récursivement.
   Voir aussi WRITESTRUCT, READSTRUCT.
 ```
 
+## `matlibre_tall_appliquer`
+
+```
+MATLIBRE_TALL_APPLIQUER Applique une fonction après avoir tout matérialisé.
+  V = MATLIBRE_TALL_APPLIQUER(F,ARGUMENTS) rend F appliquée aux
+  arguments, chacun ramené à sa valeur. C'est le corps de tout calcul
+  différé : il n'est exécuté qu'au GATHER.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_tall_appliquer(@plus, {tall(1), 2})   % 3
+
+  Voir aussi TALL, GATHER, MATLIBRE_TALL_VALEUR.
+```
+
+## `matlibre_tall_differer`
+
+```
+MATLIBRE_TALL_DIFFERER Décrit un calcul sans l'exécuter.
+  R = MATLIBRE_TALL_DIFFERER(F,ARGUMENTS) rend un tableau différé qui,
+  au GATHER, vaudra F appliquée aux arguments. Rien n'est calculé ici :
+  c'est ce qui permet d'enchaîner des opérations puis de ne payer
+  qu'une fois.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     r = matlibre_tall_differer(@plus, {tall(1), 2});
+     gather(r)                       % 3
+
+  Voir aussi TALL, GATHER, MATLIBRE_TALL_APPLIQUER.
+```
+
+## `matlibre_tall_indexer`
+
+```
+MATLIBRE_TALL_INDEXER Indexation d'une valeur matérialisée.
+  V = MATLIBRE_TALL_INDEXER(VALEUR,I,...) rend VALEUR(I,...). Elle
+  existe pour que l'indexation d'un tableau différé soit elle-même
+  différée : « t(t > 5) » décrit un filtre, il ne le fait pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_tall_indexer([10 20 30], [3 1])   % [30 10]
+
+  Voir aussi TALL, GATHER.
+```
+
+## `matlibre_tall_valeur`
+
+```
+MATLIBRE_TALL_VALEUR Valeur d'un argument, différée ou non.
+  V = MATLIBRE_TALL_VALEUR(X) rend X tel quel, ou le résultat du calcul
+  qu'il décrit si X est un tableau différé. Mêler un tableau différé et
+  un tableau ordinaire dans une même opération doit marcher : c'est
+  cette fonction qui le permet, en ramenant les deux au même plan au
+  moment où l'on calcule enfin.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_tall_valeur(3)                  % 3
+     matlibre_tall_valeur(tall([1 2 3]))      % [1 2 3]
+
+  Voir aussi TALL, GATHER, ISTALL.
+```
+
 ## `matlibre_texte_ou_nombre`
 
 ```
@@ -4746,6 +5228,122 @@ MATLIBRE_TEXTE_OU_NOMBRE Convertit un texte en nombre s'il en est un.
      matlibre_texte_ou_nombre('42abc')    % "42abc", en texte
 
   Voir aussi READSTRUCT, STR2DOUBLE, STR2NUM.
+```
+
+## `matlibre_thrift_dezigzag`
+
+```
+MATLIBRE_THRIFT_DEZIGZAG Retour du codage en zigzag.
+  N = MATLIBRE_THRIFT_DEZIGZAG(U) annule MATLIBRE_THRIFT_ZIGZAG.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_thrift_dezigzag(matlibre_thrift_zigzag(-7))   % -7
+
+  Voir aussi MATLIBRE_THRIFT_ZIGZAG, MATLIBRE_THRIFT_VARINT.
+```
+
+## `matlibre_thrift_lire`
+
+```
+MATLIBRE_THRIFT_LIRE Lecture d'une valeur en protocole compact.
+  [V,P] = MATLIBRE_THRIFT_LIRE(OCTETS,POSITION,TYPE) rend la valeur lue
+  et la position qui suit. Une structure devient une structure MATLAB
+  dont les champs se nomment c1, c2, ... d'après les identifiants du
+  protocole : le protocole ne transporte pas les noms, seulement les
+  numéros, et inventer des noms serait leur prêter un sens qu'ils
+  n'ont pas ici.
+
+  TYPE omis vaut 12, celui d'une structure.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = matlibre_thrift_structure({{1, 5, matlibre_thrift_varint(2)}});
+     s = matlibre_thrift_lire(o, 1);
+     s.c1                            % 1
+
+  Voir aussi PARQUETREAD, MATLIBRE_THRIFT_STRUCTURE.
+```
+
+## `matlibre_thrift_liste`
+
+```
+MATLIBRE_THRIFT_LISTE Écriture d'une liste en protocole compact.
+  OCTETS = MATLIBRE_THRIFT_LISTE(TYPE,ELEMENTS) rend l'en-tête de liste
+  — le nombre d'éléments et leur type — suivi des éléments, déjà
+  écrits. Au-delà de quatorze éléments, le nombre passe en varint après
+  l'en-tête.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     double(matlibre_thrift_liste(5, {matlibre_thrift_varint(2)}))
+
+  Voir aussi MATLIBRE_THRIFT_STRUCTURE, PARQUETWRITE.
+```
+
+## `matlibre_thrift_structure`
+
+```
+MATLIBRE_THRIFT_STRUCTURE Écriture d'une structure en protocole compact.
+  OCTETS = MATLIBRE_THRIFT_STRUCTURE(CHAMPS) rend l'écriture d'une
+  structure. CHAMPS est une cellule de triplets {identifiant, type,
+  charge} donnés dans l'ordre croissant des identifiants : le protocole
+  ne code que l'écart au champ précédent, ce qui tient sur un demi-octet
+  tant que l'écart ne dépasse pas quinze.
+
+  La charge est déjà écrite : un entier y est un varint en zigzag, une
+  chaîne une longueur suivie de ses octets, une structure imbriquée ses
+  propres octets, terminaison comprise.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = matlibre_thrift_structure({{1, 5, matlibre_thrift_varint(2)}});
+     double(o)                       % [21 2 0] : champ 1, i32, valeur 1
+
+  Voir aussi PARQUETWRITE, MATLIBRE_THRIFT_VARINT.
+```
+
+## `matlibre_thrift_varint`
+
+```
+MATLIBRE_THRIFT_VARINT Entier de longueur variable, sept bits à la fois.
+  OCTETS = MATLIBRE_THRIFT_VARINT(N) rend l'écriture de l'entier positif
+  N : sept bits de charge par octet, du poids faible au poids fort, le
+  bit de tête marquant qu'un octet suit.
+
+  C'est ce qui rend l'en-tête d'un fichier Parquet compact : les petits
+  nombres — et ils le sont presque tous — tiennent sur un octet.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     double(matlibre_thrift_varint(1))     % 1
+     double(matlibre_thrift_varint(300))   % [172 2]
+
+  Voir aussi PARQUETWRITE, PARQUETREAD, MATLIBRE_THRIFT_ZIGZAG.
+```
+
+## `matlibre_thrift_zigzag`
+
+```
+MATLIBRE_THRIFT_ZIGZAG Entier signé ramené aux entiers positifs.
+  U = MATLIBRE_THRIFT_ZIGZAG(N) rend 2*N pour N positif et -2*N-1 pour N
+  négatif : les petits nombres restent petits des deux côtés de zéro,
+  ce qu'un simple complément à deux ne donnerait pas — -1 y tiendrait
+  sur dix octets de varint.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_thrift_zigzag(0)       % 0
+     matlibre_thrift_zigzag(-1)      % 1
+     matlibre_thrift_zigzag(1)       % 2
+
+  Voir aussi MATLIBRE_THRIFT_VARINT, MATLIBRE_THRIFT_DEZIGZAG.
 ```
 
 ## `matlibre_tri_aretes`
@@ -4803,6 +5401,46 @@ MATLIBRE_TRIANGLES_ALPHA Triangles de Delaunay assez ramassés pour être gardé
   Voir aussi ALPHASHAPE, BOUNDARY, DELAUNAY.
 ```
 
+## `matlibre_url_encoder`
+
+```
+MATLIBRE_URL_ENCODER Encodage d'une valeur pour une adresse.
+  T = MATLIBRE_URL_ENCODER(TEXTE) remplace par %XX tout ce qui n'est ni
+  lettre, ni chiffre, ni l'un des caractères sûrs « -_.~ ».
+
+  Sans cela, un espace ou une esperluette dans une valeur couperait la
+  requête en deux : l'encodage n'est pas une politesse, c'est ce qui
+  sépare la donnée de la syntaxe.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_url_encoder('un chat&')   % 'un%20chat%26'
+
+  Voir aussi WEBSAVE, WEBREAD, WEBWRITE.
+```
+
+## `matlibre_utf8_points`
+
+```
+MATLIBRE_UTF8_POINTS Points de code d'une suite d'octets UTF-8.
+  POINTS = MATLIBRE_UTF8_POINTS(OCTETS) rend les points de code que la
+  suite représente. Un octet de tête dit combien d'octets suivent :
+  moins de 128 pour un caractère seul, 110xxxxx pour deux, 1110xxxx
+  pour trois, 11110xxx pour quatre.
+
+  Une suite mal formée est refusée plutôt que devinée : un octet de
+  continuation orphelin ne désigne aucun caractère, et lui en prêter un
+  ferait passer une donnée corrompue pour du texte.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_utf8_points(uint8([195 169]))   % 233, la lettre e accentuee
+
+  Voir aussi UNICODE2NATIVE, NATIVE2UNICODE, MATLIBRE_POINTS_UTF8.
+```
+
 ## `matlibre_valider`
 
 ```
@@ -4817,6 +5455,112 @@ MATLIBRE_VALIDER Lève l'erreur d'un validateur quand la condition échoue.
      matlibre_valider(true, 'MATLAB:essai', 'jamais vu');
 
   Voir aussi MUSTBENUMERIC, MUSTBEPOSITIVE, VALIDATEATTRIBUTES.
+```
+
+## `matlibre_web_contenu`
+
+```
+MATLIBRE_WEB_CONTENU Interprétation du corps d'une réponse web.
+  C = MATLIBRE_WEB_CONTENU(TEXTE,URL) rend le contenu décodé : un
+  document JSON devient structure ou cellule, un fichier délimité
+  devient une matrice, le reste reste du texte.
+
+  C = MATLIBRE_WEB_CONTENU(TEXTE,URL,TYPE) impose l'interprétation :
+  'auto' devine, 'json' décode, 'text' et 'raw' rendent le texte tel
+  quel.
+
+  Sans en-tête à notre disposition, « deviner » se règle sur
+  l'extension de l'adresse et sur la forme du texte lui-même : c'est
+  moins sûr qu'un Content-Type, et c'est pourquoi 'ContentType' existe.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_web_contenu('{"a":1}', 'http://x/y.json').a   % 1
+
+  Voir aussi WEBREAD, WEBWRITE, WEBSAVE, JSONDECODE.
+```
+
+## `matlibre_web_corps`
+
+```
+MATLIBRE_WEB_CORPS Corps d'une requête, et le type qui le déclare.
+  [CORPS,TYPE] = MATLIBRE_WEB_CORPS(DONNEES,REGLAGES) rend le texte à
+  envoyer et le type de média à déclarer. Des couples nom/valeur
+  partent comme un formulaire ; un texte part tel quel ; une structure
+  ou une cellule part en JSON.
+
+  'MediaType' des réglages l'emporte : un type mentionnant JSON force
+  l'encodage JSON même sur des couples, car déclarer un type et en
+  envoyer un autre est la faute la plus coûteuse à diagnostiquer.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [c, t] = matlibre_web_corps({'a', 1, 'b', 'x y'}, weboptions());
+     c                               % 'a=1&b=x%20y'
+
+  Voir aussi WEBWRITE, WEBOPTIONS, JSONENCODE.
+```
+
+## `matlibre_web_curl`
+
+```
+MATLIBRE_WEB_CURL Une requête web, menée par curl.
+  MATLIBRE_WEB_CURL(URL,FICHIER,REGLAGES) télécharge URL dans FICHIER.
+  REGLAGES est ce que rend WEBOPTIONS ; vide, ce sont les réglages par
+  défaut. MATLIBRE_WEB_CURL(URL,FICHIER,REGLAGES,METHODE,CORPS,TYPE)
+  envoie en plus le contenu du fichier CORPS, avec le type déclaré
+  TYPE et la méthode METHODE.
+
+  Rassembler ici la construction de la commande sert à ce que WEBSAVE
+  et WEBWRITE obéissent aux mêmes réglages : un délai, un agent, une
+  authentification ou un en-tête posés une fois valent pour les deux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = weboptions('Timeout', 30, 'UserAgent', 'MatLibre');
+     o.Timeout                       % 30 : le delai passe a curl
+
+  Voir aussi WEBSAVE, WEBREAD, WEBWRITE, WEBOPTIONS.
+```
+
+## `matlibre_web_reglages`
+
+```
+MATLIBRE_WEB_REGLAGES Sépare un objet WEBOPTIONS du reste des arguments.
+  [R,RESTE] = MATLIBRE_WEB_REGLAGES(ARGUMENTS) rend les réglages, ceux
+  par défaut s'il n'y en avait pas, et les autres arguments.
+
+  MATLAB reconnaît l'objet à sa classe ; ici les réglages sont une
+  structure, et c'est la présence conjointe des champs que WEBOPTIONS
+  pose qui les distingue d'une structure de données à envoyer.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [r, reste] = matlibre_web_reglages({'q', 'chat', weboptions('Timeout', 9)});
+     r.Timeout                       % 9
+     numel(reste)                    % 2 : le couple q/chat
+
+  Voir aussi WEBOPTIONS, WEBSAVE, WEBREAD, WEBWRITE.
+```
+
+## `matlibre_web_requete`
+
+```
+MATLIBRE_WEB_REQUETE Ajoute des paramètres à la partie requête d'une adresse.
+  U = MATLIBRE_WEB_REQUETE(URL,PAIRES) rend l'adresse suivie de
+  « ?nom=valeur&... », les valeurs étant encodées. Si l'adresse a déjà
+  une requête, les paramètres s'y ajoutent avec « & ».
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_web_requete('http://x', {'q', 'un chat'})
+
+  Voir aussi WEBSAVE, WEBREAD, WEBWRITE.
 ```
 
 ## `matlibre_xml_analyser`
@@ -5542,6 +6286,24 @@ NAMELENGTHMAX Longueur maximale d'un nom.
   Voir aussi ISVARNAME, GENVARNAME.
 ```
 
+## `native2unicode`
+
+```
+NATIVE2UNICODE Convertit des octets en texte.
+  T = NATIVE2UNICODE(B) interprète les octets B dans l'encodage par
+  défaut, qui est ici UTF-8. T = NATIVE2UNICODE(B,ENCODAGE) choisit
+  l'encodage : 'UTF-8', 'US-ASCII' ou 'ISO-8859-1'.
+
+  C'est l'inverse d'UNICODE2NATIVE : lire un fichier avec FREAD donne
+  des octets, et c'est ici qu'ils redeviennent du texte.
+
+  Exemple :
+     native2unicode(uint8([97 98 99]))                 % 'abc'
+     double(native2unicode(uint8(233), 'ISO-8859-1'))  % [195 169] : e accentue
+
+  Voir aussi UNICODE2NATIVE, CHAR, FREAD.
+```
+
 ## `newplot`
 
 ```
@@ -5913,6 +6675,94 @@ PARETO Diagramme de Pareto : les causes rangées par importance.
      pareto(defauts, {}, 0.8);
 
   Voir aussi BAR, BARH, SORT, CUMSUM, HISTOGRAM.
+```
+
+## `parquetinfo`
+
+```
+PARQUETINFO Renseigne sur un fichier Parquet sans le lire.
+  I = PARQUETINFO(FICHIER) rend une structure décrivant le fichier :
+  son chemin, le nombre de lignes, le nombre de groupes de lignes, les
+  noms des variables et leurs classes.
+
+  Seul le pied du fichier est lu. C'est ce qui permet de savoir ce que
+  contient un fichier de plusieurs gigaoctets sans en ouvrir une
+  colonne.
+
+  Exemple :
+     f = fullfile(tempdir, 'info.parquet');
+     parquetwrite(f, table([1; 2], ["x"; "y"], 'VariableNames', {'a', 'b'}));
+     i = parquetinfo(f);
+     i.NumRows                       % 2
+     i.VariableNames{2}              % 'b'
+
+  Voir aussi PARQUETREAD, PARQUETWRITE.
+```
+
+## `parquetread`
+
+```
+PARQUETREAD Lit un fichier Parquet dans une table.
+  T = PARQUETREAD(FICHIER) rend la table que contient le fichier.
+  T = PARQUETREAD(FICHIER,'SelectedVariableNames',NOMS) ne lit que les
+  colonnes nommées — c'est l'intérêt d'un format en colonnes : le reste
+  du fichier n'est pas touché.
+
+  Les classes sont restituées d'après le schéma : un int8 écrit revient
+  int8, une chaîne revient chaîne.
+
+  Une colonne facultative est lue : ses niveaux de définition disent où
+  sont les trous. Un trou devient NaN dans une colonne flottante ; dans
+  une colonne entière, booléenne ou textuelle, il n'existe pas de
+  valeur qui veuille dire « absent », et la lecture est refusée plutôt
+  que de mettre un zéro à la place.
+
+  Ce qui est lu : l'encodage PLAIN, sans compression. Un fichier
+  compressé ou encodé en dictionnaire est refusé avec la raison : mieux
+  vaut un refus net qu'une colonne muettement fausse.
+
+  Exemple :
+     f = fullfile(tempdir, 'lecture.parquet');
+     parquetwrite(f, table([1; 2], ["x"; "y"], 'VariableNames', {'a', 'b'}));
+     T = parquetread(f);
+     height(T)                       % 2
+
+  Voir aussi PARQUETWRITE, PARQUETINFO, READTABLE, TABLE.
+```
+
+## `parquetwrite`
+
+```
+PARQUETWRITE Écrit une table dans un fichier Parquet.
+  PARQUETWRITE(FICHIER,T) écrit la table T au format Parquet : un
+  groupe de lignes, encodage PLAIN, sans compression.
+
+  Parquet range les données par colonne, chaque colonne portant son
+  type. C'est ce qui permet de n'en lire qu'une, et de la lire sans
+  deviner : un CSV oblige à relire tout le fichier et à interpréter
+  chaque champ.
+
+  Les colonnes portées sont les numériques, les booléennes et les
+  textuelles. Un entier étroit garde sa largeur par le type converti,
+  si bien que PARQUETREAD rend exactement les classes écrites. Une
+  colonne d'un autre genre est refusée plutôt que rangée de travers.
+
+  Une colonne catégorielle part comme du texte : Parquet ne porte pas
+  la liste des catégories, et PARQUETREAD la rendra donc en chaînes.
+
+  Ce qui n'est pas écrit : ni compression, ni dictionnaire, ni valeurs
+  absentes — toutes les colonnes sont déclarées obligatoires. Les
+  fichiers produits se lisent partout ; ils sont seulement plus gros
+  qu'ils ne pourraient l'être.
+
+  Exemple :
+     f = fullfile(tempdir, 'exemple.parquet');
+     T = table([1; 2; 3], ["a"; "b"; "c"], 'VariableNames', {'n', 'nom'});
+     parquetwrite(f, T);
+     R = parquetread(f);
+     isequal(R.n, T.n) && isequal(R.nom, T.nom)   % 1 : rien n'a bouge
+
+  Voir aussi PARQUETREAD, PARQUETINFO, WRITETABLE, TABLE.
 ```
 
 ## `pascal`
@@ -7602,6 +8452,41 @@ TABULARTEXTDATASTORE Lecture par morceaux d'un ou plusieurs fichiers texte.
   Voir aussi DATASTORE, READTABLE, READ, READALL, PRESERVE.
 ```
 
+## `tall`
+
+```
+TALL Tableau dont le calcul est différé.
+  T = TALL(A) fait d'un tableau un tableau différé. T = TALL(MAGASIN)
+  part d'un magasin de données. Les opérations ordinaires — arithmétique,
+  comparaison, fonctions élémentaires, réductions, indexation — ne
+  calculent rien : elles décrivent ce qu'il faudra faire. GATHER
+  l'exécute et rend le résultat ordinaire.
+
+  C'est ce report qui fait l'intérêt du procédé : on écrit la chaîne
+  entière — filtrer, transformer, résumer — puis on la parcourt une
+  seule fois. Décrire ne coûte rien, et une chaîne qui ne finit pas par
+  GATHER ne coûte rien non plus.
+
+  Dans MATLAB, un tableau différé permet en outre de travailler sur des
+  données plus grandes que la mémoire. Ici le calcul est bien différé,
+  mais il s'effectue en mémoire au moment du GATHER : la forme du
+  programme est celle de MATLAB, l'économie de mémoire ne l'est pas.
+  TALL(MAGASIN) lit donc tout le magasin lorsqu'on rassemble.
+
+  SIZE, NUMEL, LENGTH et ISEMPTY répondent directement au lieu de
+  rendre un tableau différé comme le fait MATLAB : la taille est ici
+  connue sans détour, et imposer un GATHER pour l'obtenir n'apprendrait
+  rien à personne.
+
+  Exemple :
+     t = tall([1 2 3 4 5]);
+     grands = t(t > 2);
+     gather(sum(grands))             % 12
+     istall(grands)                  % 1 : rien n'a encore ete calcule
+
+  Voir aussi GATHER, ISTALL, DATASTORE, ARRAYDATASTORE, HEAD, TAIL.
+```
+
 ## `tensorprod`
 
 ```
@@ -7840,6 +8725,28 @@ UICONTROL Commande d'interface (indisponible).
   Voir aussi FIGURE, INPUT, MENU, DISP.
 ```
 
+## `unicode2native`
+
+```
+UNICODE2NATIVE Convertit du texte en octets.
+  B = UNICODE2NATIVE(T) rend les octets du texte T dans l'encodage par
+  défaut, qui est ici UTF-8. B = UNICODE2NATIVE(T,ENCODAGE) choisit
+  l'encodage : 'UTF-8', 'US-ASCII' ou 'ISO-8859-1'.
+
+  Dans MatLibre, un tableau de caractères contient déjà les octets
+  UTF-8 du texte : la conversion vers UTF-8 est donc un changement de
+  type et rien d'autre. Vers un encodage plus étroit, un caractère qui
+  n'y tient pas devient un point d'interrogation, comme dans MATLAB —
+  perdre un accent vaut mieux qu'échouer sur un fichier entier.
+
+  Exemple :
+     double(unicode2native('abc'))                 % [97 98 99]
+     numel(unicode2native('é'))                    % 2 : deux octets en UTF-8
+     double(unicode2native('é', 'ISO-8859-1'))     % 233 : un seul octet
+
+  Voir aussi NATIVE2UNICODE, CHAR, DOUBLE, FWRITE.
+```
+
 ## `uniquetol`
 
 ```
@@ -7869,6 +8776,26 @@ UNZIP Extrait une archive ZIP.
      fileread('a.txt')           % 'bonjour'
 
   Voir aussi ZIP.
+```
+
+## `usejava`
+
+```
+USEJAVA Dit si une partie de Java est disponible.
+  T = USEJAVA(COMPOSANT) rend vrai si le composant demandé est
+  utilisable. Les composants sont 'jvm', 'awt', 'swing' et 'desktop'.
+
+  MatLibre n'embarque pas de machine virtuelle Java : la réponse est
+  donc toujours faux. C'est la réponse utile — le rôle de USEJAVA est
+  précisément de permettre à un programme de choisir une autre voie,
+  et un programme qui interroge obtient ici de quoi le faire au lieu
+  d'une fonction introuvable.
+
+  Exemple :
+     usejava('jvm')                  % 0 : pas de machine virtuelle
+     if ~usejava('swing'), disp('interface en mode texte'); end
+
+  Voir aussi ISJAVA, JAVACLASSPATH, JAVAOBJECT, COMPUTER.
 ```
 
 ## `validatestring`
@@ -8010,13 +8937,16 @@ WEBREAD Lit le contenu d'une adresse.
 
   C = WEBREAD(URL,NOM1,VAL1,...) ajoute des paramètres à la requête.
 
+  C = WEBREAD(...,OPTIONS) obéit aux réglages de WEBOPTIONS ;
+  'ContentType' impose alors l'interprétation au lieu de la deviner.
+
   Le téléchargement passe par curl, qui doit être installé. Aucune
   donnée n'est envoyée que celles de l'appel.
 
   Exemple :
      s = webread('https://example.com');
 
-  Voir aussi WEBSAVE, JSONDECODE, URLREAD.
+  Voir aussi WEBSAVE, WEBWRITE, WEBOPTIONS, JSONDECODE, URLREAD.
 ```
 
 ## `websave`
@@ -8030,13 +8960,42 @@ WEBSAVE Enregistre le contenu d'une adresse dans un fichier.
   requête, comme le fait MATLAB : websave(f, url, 'q', 'chat') demande
   URL?q=chat.
 
+  F = WEBSAVE(...,OPTIONS) obéit en plus aux réglages de WEBOPTIONS :
+  délai, agent, authentification, en-têtes, autorité de certification.
+
   Le téléchargement passe par curl, qui doit être installé. Aucune
   donnée n'est envoyée que celles de l'appel.
 
   Exemple :
      f = websave(fullfile(tempdir, 'page.html'), 'https://example.com');
 
-  Voir aussi WEBREAD, URLREAD, FILEREAD.
+  Voir aussi WEBREAD, WEBWRITE, WEBOPTIONS, URLREAD, FILEREAD.
+```
+
+## `webwrite`
+
+```
+WEBWRITE Envoie des données à une adresse et rend sa réponse.
+  R = WEBWRITE(URL,NOM1,VAL1,...) envoie les couples en corps de
+  requête, encodés comme un formulaire, et rend la réponse décodée.
+
+  R = WEBWRITE(URL,DONNEES) envoie DONNEES : un texte part tel quel,
+  une structure ou une cellule part en JSON.
+
+  R = WEBWRITE(...,OPTIONS) obéit aux réglages de WEBOPTIONS.
+  'RequestMethod' choisit la méthode — POST par défaut, mais aussi PUT
+  ou DELETE ; 'MediaType' déclare le type envoyé ; 'ContentType' dit
+  comment lire la réponse.
+
+  L'envoi passe par curl, qui doit être installé. Rien n'est envoyé
+  que ce que l'appel contient.
+
+  Exemple :
+     o = weboptions('MediaType', 'application/json', 'RequestMethod', 'put');
+     strcmp(o.MediaType, 'application/json')   % 1 : le type declare
+     % r = webwrite('https://exemple.test/api', struct('a', 1), o);
+
+  Voir aussi WEBREAD, WEBSAVE, WEBOPTIONS, JSONENCODE.
 ```
 
 ## `weeknum`

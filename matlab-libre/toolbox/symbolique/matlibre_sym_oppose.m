@@ -30,7 +30,13 @@ function [negatif, oppose] = matlibre_sym_oppose(arbre)
             % bougent pas.
             [negatif, tete] = matlibre_sym_oppose(arbre{2});
             if negatif
-                oppose = {arbre{1}, tete, arbre{3}};
+                if strcmp(arbre{1}, '*') && isequal(tete, {'num', 1})
+                    % Retourner -1 donne 1 : un facteur qui ne dit rien,
+                    % et qu'on n'écrit donc pas.
+                    oppose = arbre{3};
+                else
+                    oppose = {arbre{1}, tete, arbre{3}};
+                end
             end
     end
 end
