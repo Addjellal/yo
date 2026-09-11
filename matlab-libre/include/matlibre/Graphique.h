@@ -183,6 +183,9 @@ Valeur poigneeTexteCourant(Interpreteur& it, const std::string& cible);
 Valeur poigneeFigureCourante(Interpreteur& it);
 // La poignee d'une courbe : « h = plot(x,y) ; set(h,'LineWidth',2) ».
 Valeur poigneeLigne(int figure, int axe, int serie);
+// La poignee d'un texte pose dans un axe : il est range comme une serie,
+// mais MATLAB en nomme la classe autrement, et « class(h) » doit le dire.
+Valeur poigneeTexteTrace(int figure, int axe, int serie);
 // Plusieurs courbes d'un coup : « h = plot(x, Y) » rend une colonne.
 Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series);
 // Une couleur ecrite comme MATLAB l'accepte — 'r', 'red', '#D95319' ou

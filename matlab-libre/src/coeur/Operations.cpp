@@ -600,7 +600,16 @@ static Classe classeConcat(const std::vector<Valeur>& v) {
         if (x.classe != Classe::Logique) logique = false;
         if (x.classe == Classe::Objet) {
             if (nomCommun.empty()) nomCommun = x.nomObjet;
-            else if (nomCommun != x.nomObjet) tousObjets = false;
+            // Deux poignees graphiques de sortes differentes restent des
+            // poignees graphiques : MATLAB les reunit sous
+            // « matlab.graphics.Graphics ». Les rendre en structure nue —
+            // ce qui se faisait — perdait leur nature en chemin.
+            else if (nomCommun != x.nomObjet) {
+                bool graphiques = nomCommun.rfind("matlab.graphics.", 0) == 0 &&
+                                  x.nomObjet.rfind("matlab.graphics.", 0) == 0;
+                if (graphiques) nomCommun = "matlab.graphics.Graphics";
+                else tousObjets = false;
+            }
         } else {
             tousObjets = false;
         }
@@ -714,9 +723,21 @@ Valeur concatener(const std::vector<Valeur>& elementsBruts, int dimension) {
     Valeur r;
     r.classe = cible;
     // Le nom de classe vient du premier element qui en porte un : « [] »
-    // en tete d'une concatenation ne doit pas l'effacer.
+    // en tete d'une concatenation ne doit pas l'effacer. Deux poignees
+    // graphiques de sortes differentes se reunissent sous le nom commun,
+    // comme MATLAB les reunit.
     for (const auto& e : conv)
         if (!e.nomObjet.empty()) { r.nomObjet = e.nomObjet; break; }
+    if (cible == Classe::Objet && !r.nomObjet.empty()) {
+        for (const auto& e : conv) {
+            if (e.nomObjet.empty() || e.nomObjet == r.nomObjet) continue;
+            if (r.nomObjet.rfind("matlab.graphics.", 0) == 0 &&
+                e.nomObjet.rfind("matlab.graphics.", 0) == 0) {
+                r.nomObjet = "matlab.graphics.Graphics";
+                break;
+            }
+        }
+    }
     r.dims = rd;
     std::size_t n = produitDims(rd);
     switch (cible) {

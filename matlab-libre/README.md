@@ -47,7 +47,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **2817 fonctions de toolbox** en langage MATLAB, réparties en
+- **2819 fonctions de toolbox** en langage MATLAB, réparties en
   **54 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -178,7 +178,7 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
 | [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
 | [`toolboxes.md`](documentation/toolboxes.md) | les 54 modules et leur correspondance MathWorks |
-| [`reference.md`](documentation/reference.md) | les 3485 fonctions, avec leur aide — généré |
+| [`reference.md`](documentation/reference.md) | les 3487 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |

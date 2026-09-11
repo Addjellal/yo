@@ -931,8 +931,11 @@ FONCTION(fnYlabel) {
     return {};
 }
 FONCTION(fnZlabel) {
-    INUTILISE
     axesCourants(it)->etiquetteZ = args.empty() ? "" : args[0].versTexte();
+    // Comme TITLE, XLABEL et YLABEL : la poignee du texte pose, pour
+    // pouvoir le reprendre ensuite. L'omettre rendait ZLABEL seul de sa
+    // famille a ne rien rendre.
+    if (nargout > 0) return {poigneeTexteCourant(it, "zlabel")};
     return {};
 }
 FONCTION(fnTitle) {
@@ -960,6 +963,9 @@ FONCTION(fnLegend) {
         }
     }
     a->legendeVisible = true;
+    // MATLAB rend la poignee de la legende : « l = legend(...) » sert a
+    // la deplacer ou a la masquer ensuite.
+    if (nargout > 0) return {poigneeTexteCourant(it, "legend")};
     return {};
 }
 
@@ -1409,7 +1415,14 @@ FONCTION(fnDrawnow) {
 }
 
 FONCTION(fnColormap) { INUTILISE return {}; }
-FONCTION(fnColorbar) { INUTILISE return {}; }
+FONCTION(fnColorbar) {
+    INUTILISE
+    // La barre de couleurs n'est pas encore dessinee ; la poignee rendue
+    // designe l'axe courant, de sorte que « c = colorbar; » ne casse pas
+    // un programme qui la garde pour plus tard.
+    if (nargout > 0) return {poigneeTexteCourant(it, "colorbar")};
+    return {};
+}
 FONCTION(fnBox) { INUTILISE return {}; }
 FONCTION(fnShading) { INUTILISE return {}; }
 
@@ -1468,7 +1481,8 @@ FONCTION(fnText) {
     }
     if (nargout <= 0 || identifiants.empty()) return {};
     if (identifiants.size() == 1)
-        return {poigneeLigne(figureCourante(it)->numero, axes->identifiant, identifiants[0])};
+        return {poigneeTexteTrace(figureCourante(it)->numero, axes->identifiant,
+                                  identifiants[0])};
     return {poigneeLignes(figureCourante(it)->numero, axes->identifiant, identifiants)};
 }
 

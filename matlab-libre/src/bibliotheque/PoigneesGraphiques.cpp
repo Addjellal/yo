@@ -50,13 +50,13 @@ Valeur poigneeTexte(int figure, int axe, const char* cible) {
     return v;
 }
 
-Valeur poigneeLigneInterne(int figure, int axe, int serie) {
+Valeur poigneeLigneInterne(int figure, int axe, int serie, bool texte) {
     Valeur v = Valeur::structureVide();
     v.poserChamp("NumeroFigure", Valeur::scalaire(figure));
     v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
     v.poserChamp("NumeroSerie", Valeur::scalaire(serie));
     v.classe = Classe::Objet;
-    v.nomObjet = CLASSE_LIGNE;
+    v.nomObjet = texte ? CLASSE_TEXTE : CLASSE_LIGNE;
     return v;
 }
 
@@ -78,6 +78,21 @@ Valeur poigneeLignesInterne(int figure, int axe, const std::vector<int>& series)
 
 bool estPoignee(const Valeur& v, const char* classe) {
     return v.classe == Classe::Objet && v.nomObjet == classe;
+}
+
+// Deux sortes de poignees portent le nom de classe d'un texte : celle
+// d'un titre ou d'une etiquette d'axe, qui designe sa cible par un nom,
+// et celle d'un texte pose dans l'axe, qui est range comme une serie et
+// porte donc un numero. C'est ce champ qui les distingue — le nom de
+// classe, lui, est le meme sous MATLAB, et doit l'etre ici aussi.
+bool estPoigneeSerie(const Valeur& v) {
+    if (v.classe != Classe::Objet) return false;
+    if (v.nomObjet != CLASSE_LIGNE && v.nomObjet != CLASSE_TEXTE) return false;
+    return v.aChamp("NumeroSerie");
+}
+
+bool estPoigneeEtiquette(const Valeur& v) {
+    return estPoignee(v, CLASSE_TEXTE) && !v.aChamp("NumeroSerie");
 }
 
 std::shared_ptr<Figure> figureDe(Interpreteur& it, const Valeur& p) {
@@ -439,8 +454,11 @@ FONCTION(fnSetPoignee) {
     const Valeur& p = args[0];
     bool axes = estPoignee(p, CLASSE_AXES);
     bool figure = estPoignee(p, CLASSE_FIGURE);
-    bool texte = estPoignee(p, CLASSE_TEXTE);
-    bool ligne = estPoignee(p, CLASSE_LIGNE);
+    // Une poignee de texte pose dans l'axe porte le nom de classe d'un
+    // texte mais se traite comme une serie : c'est « NumeroSerie » qui
+    // tranche, non le nom.
+    bool texte = estPoigneeEtiquette(p);
+    bool ligne = estPoigneeSerie(p);
     if (!axes && !figure && !texte && !ligne) return {};
     // « set(h, ...) » sur un tableau de poignees ecrit sur chacune.
     std::size_t combien = ligne ? std::max<std::size_t>(1, p.nelem()) : 1;
@@ -452,7 +470,7 @@ FONCTION(fnSetPoignee) {
             cible.poserChamp("NumeroAxe", p.champ("NumeroAxe", e));
             cible.poserChamp("NumeroSerie", p.champ("NumeroSerie", e));
             cible.classe = Classe::Objet;
-            cible.nomObjet = CLASSE_LIGNE;
+            cible.nomObjet = p.nomObjet;
         }
         for (std::size_t k = 1; k + 1 < args.size(); k += 2) {
             std::string nom = args[k].versTexte();
@@ -472,8 +490,8 @@ FONCTION(fnGetPoignee) {
     std::string nom = args[1].versTexte();
     Valeur sortie;
     if (estPoignee(p, CLASSE_AXES) && lireAxes(it, p, nom, sortie)) return {sortie};
-    if (estPoignee(p, CLASSE_TEXTE) && lireTexte(it, p, nom, sortie)) return {sortie};
-    if (estPoignee(p, CLASSE_LIGNE) && lireLigne(it, p, nom, sortie)) return {sortie};
+    if (estPoigneeEtiquette(p) && lireTexte(it, p, nom, sortie)) return {sortie};
+    if (estPoigneeSerie(p) && lireLigne(it, p, nom, sortie)) return {sortie};
     if (estPoignee(p, CLASSE_FIGURE) && lireFigure(it, p, nom, sortie)) return {sortie};
     return {Valeur::vide()};
 }
@@ -496,7 +514,13 @@ Valeur poigneeFigureCourante(Interpreteur& it) {
 }
 
 Valeur poigneeLigne(int figure, int axe, int serie) {
-    return poigneeLigneInterne(figure, axe, serie);
+    return poigneeLigneInterne(figure, axe, serie, false);
+}
+
+// Un texte pose dans un axe : meme poignee, mais MATLAB en nomme la
+// classe autrement, et « class(h) » doit le dire.
+Valeur poigneeTexteTrace(int figure, int axe, int serie) {
+    return poigneeLigneInterne(figure, axe, serie, true);
 }
 
 Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series) {
@@ -507,16 +531,16 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
-        if (estPoignee(objet, CLASSE_TEXTE)) return ecrireTexte(moteur, objet, nom, valeur);
-        if (estPoignee(objet, CLASSE_LIGNE)) return ecrireLigne(moteur, objet, nom, valeur);
+        if (estPoigneeEtiquette(objet)) return ecrireTexte(moteur, objet, nom, valeur);
+        if (estPoigneeSerie(objet)) return ecrireLigne(moteur, objet, nom, valeur);
         if (estPoignee(objet, CLASSE_FIGURE)) return ecrireFigure(moteur, objet, nom, valeur);
         return false;
     };
     crochetLirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                               const std::string& nom, Valeur& sortie) {
         if (estPoignee(objet, CLASSE_AXES)) return lireAxes(moteur, objet, nom, sortie);
-        if (estPoignee(objet, CLASSE_TEXTE)) return lireTexte(moteur, objet, nom, sortie);
-        if (estPoignee(objet, CLASSE_LIGNE)) return lireLigne(moteur, objet, nom, sortie);
+        if (estPoigneeEtiquette(objet)) return lireTexte(moteur, objet, nom, sortie);
+        if (estPoigneeSerie(objet)) return lireLigne(moteur, objet, nom, sortie);
         if (estPoignee(objet, CLASSE_FIGURE)) return lireFigure(moteur, objet, nom, sortie);
         return false;
     };

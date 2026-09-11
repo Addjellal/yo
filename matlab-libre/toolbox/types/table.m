@@ -809,7 +809,31 @@ classdef table
             end
         end
 
-        function summary(t)
+        function varargout = summary(t)
+        %SUMMARY Résumé des variables d'une table.
+        %   SUMMARY(T) affiche, pour chaque variable, sa taille, sa
+        %   classe et — pour ce qui est numérique — son minimum, sa
+        %   médiane, son maximum et le nombre de valeurs manquantes.
+        %   S = SUMMARY(T) rend le même contenu dans une structure, un
+        %   champ par variable, au lieu de l'afficher : c'est ce qui
+        %   permet de s'en servir dans un calcul plutôt que de le lire.
+            resume = struct();
+            for j = 1:width(t)
+                v = t.Donnees{j};
+                entree = struct('Size', [size(v, 1), size(v, 2)], 'Type', class(v));
+                if isnumeric(v) && ~isempty(v)
+                    fini = double(v(~isnan(double(v))));
+                    entree.Min = min(fini);
+                    entree.Median = median(fini);
+                    entree.Max = max(fini);
+                    entree.NumMissing = sum(isnan(double(v(:))));
+                end
+                resume.(matlibre_nom_valide(t.NomsVariables{j})) = entree;
+            end
+            if nargout > 0
+                varargout{1} = resume;
+                return
+            end
             fprintf('Variables:\n\n');
             for j = 1:width(t)
                 v = t.Donnees{j};

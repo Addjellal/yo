@@ -440,9 +440,18 @@ assert(bornesApres(2) <= 3.5);
 enfants = get(gca(), 'Children');
 assert(numel(enfants) == 3);
 % Un tableau de poignees garde sa classe : « [] » en tete ne l'efface pas.
-paire = [poigneeUne; poigneeTexte];
+paire = [poigneeUne; plot([1 2 3], [7 8 9])];
+assert(numel(paire) == 2);
 assert(strcmp(class(paire), 'matlab.graphics.chart.primitive.Line'));
 assert(strcmp(class([[]; poigneeUne]), 'matlab.graphics.chart.primitive.Line'));
+% Deux sortes de poignees se reunissent sous le nom commun, comme dans
+% MATLAB : elles restent des poignees graphiques, non une structure nue.
+melange = [poigneeUne; poigneeTexte];
+assert(numel(melange) == 2);
+assert(strcmp(class(melange), 'matlab.graphics.Graphics'));
+% Et chacune garde ce qu'elle est.
+assert(strcmp(class(poigneeTexte), 'matlab.graphics.primitive.Text'));
+assert(strcmp(class(poigneeUne), 'matlab.graphics.chart.primitive.Line'));
 % xline, fill et area rendent aussi une poignee.
 assert(strcmp(get(xline(2), 'Type'), 'line'));
 assert(~isempty(fill([0 1 1], [0 0 1], 'r')));

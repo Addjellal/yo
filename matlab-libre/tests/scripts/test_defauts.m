@@ -258,6 +258,70 @@ assert(im2single(uint8(255)) == single(1));
 assert(refuse(@() im2double(int32(5))));
 assert(refuse(@() im2uint8(int32(5))));
 
+%% --------------- une poignee graphique dit ce qu'elle designe
+% TEXT rendait une poignee de classe Line : « class(h) » mentait, et
+% l'objet n'etait pas ce qu'il disait etre. LEGEND, ZLABEL et COLORBAR,
+% eux, ne rendaient rien du tout, seuls de leur famille.
+figure;
+plot(1:3);
+poigneeTexte = text(1, 1, 'x');
+assert(strcmp(class(poigneeTexte), 'matlab.graphics.primitive.Text'));
+assert(strcmp(get(poigneeTexte, 'String'), 'x'));
+% Et la poignee marche : on peut la reprendre.
+set(poigneeTexte, 'Color', [1 0 0]);
+assert(~isempty(get(poigneeTexte, 'Color')));
+% Toute la famille des etiquettes rend une poignee.
+for fabrique = {@() title('t'), @() xlabel('x'), @() ylabel('y'), ...
+                @() zlabel('z'), @() legend('a'), @() colorbar}
+    poignee = fabrique{1}();
+    assert(strcmp(class(poignee), 'matlab.graphics.primitive.Text'));
+end
+% Un titre reste modifiable par sa poignee, malgre le nom de classe
+% partage avec le texte pose dans l'axe : c'est le champ interne qui les
+% distingue, non le nom.
+poigneeTitre = title('avant');
+set(poigneeTitre, 'String', 'apres');
+assert(strcmp(get(poigneeTitre, 'String'), 'apres'));
+% Une ligne reste une ligne.
+poigneeLigne = plot(1:3);
+assert(strcmp(class(poigneeLigne), 'matlab.graphics.chart.primitive.Line'));
+set(poigneeLigne, 'LineWidth', 3);
+assert(get(poigneeLigne, 'LineWidth') == 3);
+% Et un tableau de poignees s'ecrit d'un coup.
+plusieurs = plot([1 2 3]', [1 2 3; 4 5 6; 7 8 9]);
+set(plusieurs, 'LineWidth', 2);
+assert(numel(plusieurs) == 3);
+assert(get(plusieurs(1), 'LineWidth') == 2);
+close all;
+
+% SGTITLE et SUBTITLE existent, et rendent leur poignee.
+figure;
+subplot(1, 2, 1); plot(1:10);
+subplot(1, 2, 2); plot(10:-1:1);
+assert(strcmp(class(sgtitle('Deux vues')), 'matlab.graphics.primitive.Text'));
+close all;
+figure;
+plot(1:10);
+title('Signal');
+subtitle('mesure');
+assert(~isempty(strfind(get(get(gca, 'Title'), 'String'), 'mesure')));
+% Poser un second sous-titre remplace le premier, il ne s'y ajoute pas.
+subtitle('autre');
+assert(isempty(strfind(get(get(gca, 'Title'), 'String'), 'mesure')));
+assert(~isempty(strfind(get(get(gca, 'Title'), 'String'), 'Signal')));
+close all;
+
+%% ------------------ SUMMARY d'une table se lit et se calcule
+% Il affichait et ne rendait rien : « s = summary(T) » echouait.
+T = table([1; 2; NaN], {'a'; 'b'; 'c'}, 'VariableNames', {'n', 'L'});
+resume = summary(T);
+assert(isstruct(resume));
+assert(isfield(resume, 'n') && isfield(resume, 'L'));
+assert(resume.n.Min == 1 && resume.n.Max == 2);
+assert(resume.n.NumMissing == 1);        % le NaN est compte, non ignore
+assert(strcmp(resume.L.Type, 'cell'));
+assert(isequal(resume.L.Size, [3 1]));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
