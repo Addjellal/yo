@@ -292,9 +292,14 @@ static int rangOperateur(const std::string& op) {
 std::string texteExpression(const NoeudPtr& n) { return texteExpression(n, 0); }
 
 // PRIORITE est celle du contexte : on n'entoure de parentheses que ce qui
-// lierait moins fort que lui. Sans cela « @(y) y + 1 » revenait de
-// « func2str » sous la forme « @(y) (y + 1) » — juste, mais illisible des
+// lierait moins fort que lui. Sans cela « @(y)y+1 » revenait de
+// « func2str » sous la forme « @(y)(y+1) » — juste, mais illisible des
 // que l'expression grandit, et different de ce que l'utilisateur a ecrit.
+//
+// Rien n'est espace, pas meme apres une virgule : c'est ce que rend
+// MATLAB, dont la documentation donne « @(x)x.^2+1 ». Du code qui
+// compare le texte d'une poignee a une chaine attendue en depend, et
+// c'est le seul usage ou l'espacement se voie.
 std::string texteExpression(const NoeudPtr& n, int priorite) {
     if (!n) return "";
     switch (n->type) {
@@ -312,8 +317,8 @@ std::string texteExpression(const NoeudPtr& n, int priorite) {
             // Les operateurs sont associatifs a gauche : le membre droit
             // de meme rang a bien ete parenthese dans la source, et doit
             // le rester — « a - (b - c) » n'est pas « a - b - c ».
-            std::string texte = texteExpression(n->enfants[0], rang) + " " + n->texte +
-                                " " + texteExpression(n->enfants[1], rang + 1);
+            std::string texte = texteExpression(n->enfants[0], rang) + n->texte +
+                                texteExpression(n->enfants[1], rang + 1);
             return rang < priorite ? "(" + texte + ")" : texte;
         }
         case TypeN::OpUnaire: {
@@ -332,9 +337,9 @@ std::string texteExpression(const NoeudPtr& n, int priorite) {
         case TypeN::Cellule: {
             std::string s = n->type == TypeN::Matrice ? "[" : "{";
             for (std::size_t i = 0; i < n->rangees.size(); ++i) {
-                if (i) s += "; ";
+                if (i) s += ";";
                 for (std::size_t j = 0; j < n->rangees[i].size(); ++j) {
-                    if (j) s += ", ";
+                    if (j) s += ",";
                     s += texteExpression(n->rangees[i][j]);
                 }
             }
@@ -350,7 +355,7 @@ std::string texteExpression(const NoeudPtr& n, int priorite) {
                 } else {
                     s += (a.genre == '(') ? "(" : "{";
                     for (std::size_t k = 0; k < a.args.size(); ++k) {
-                        if (k) s += ", ";
+                        if (k) s += ",";
                         s += texteExpression(a.args[k]);
                     }
                     s += (a.genre == '(') ? ")" : "}";
@@ -364,7 +369,7 @@ std::string texteExpression(const NoeudPtr& n, int priorite) {
                 if (k) s += ",";
                 s += n->noms[k];
             }
-            return s + ") " + texteExpression(n->enfants[0]);
+            return s + ")" + texteExpression(n->enfants[0]);
         }
         case TypeN::PoigneeNom: return "@" + n->texte;
         default: return "";

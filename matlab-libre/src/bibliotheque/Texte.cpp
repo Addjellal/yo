@@ -157,6 +157,51 @@ FONCTION(fnStrtrim) {
     return {reconstituer(l, r)};
 }
 
+// STRIP fait plus que STRTRIM : il dit de quel cote retirer, et quoi.
+// « strip(t,'left','0') » enleve les zeros de tete sans toucher au reste,
+// ce qu'aucune composition de STRTRIM ne donne.
+FONCTION(fnStrip) {
+    INUTILISE
+    exigerArguments(args, 1, 3, "strip");
+    bool aGauche = true, aDroite = true;
+    bool surBlancs = true;
+    char remplissage = ' ';
+    std::size_t rang = 1;
+    if (args.size() > rang && (args[rang].estTexte() || args[rang].estChaine())) {
+        std::string mot = minuscules(args[rang].versTexte());
+        if (mot == "left" || mot == "right" || mot == "both") {
+            aGauche = (mot != "right");
+            aDroite = (mot != "left");
+            ++rang;
+        }
+    }
+    if (args.size() > rang) {
+        std::string caractere = args[rang].versTexte();
+        if (caractere.size() != 1)
+            throw ErreurMatlab("MATLAB:strip:InvalidPadCharacter",
+                               "strip : le caractere de remplissage tient sur un seul caractere.");
+        remplissage = caractere[0];
+        surBlancs = false;
+        ++rang;
+    }
+    if (rang < args.size())
+        throw ErreurMatlab("MATLAB:strip:TooManyInputs",
+                           "strip : trop d'arguments ; attendus un cote puis un caractere.");
+    ListeTextes l = listeDe(args[0]);
+    std::vector<std::string> r;
+    for (auto s : l.valeurs) {
+        auto aRetirer = [&](char c) {
+            return surBlancs ? std::isspace((unsigned char)c) != 0 : c == remplissage;
+        };
+        if (aGauche)
+            while (!s.empty() && aRetirer(s.front())) s.erase(s.begin());
+        if (aDroite)
+            while (!s.empty() && aRetirer(s.back())) s.pop_back();
+        r.push_back(s);
+    }
+    return {reconstituer(l, r)};
+}
+
 FONCTION(fnDeblank) {
     INUTILISE
     ListeTextes l = listeDe(args[0]);
@@ -505,6 +550,73 @@ FONCTION(fnExtractBetween) {
             r.push_back(s.substr(p + debut.size(), q - p - debut.size()));
     }
     return {reconstituer(l, r)};
+}
+
+// Les bornes d'un morceau se disent de deux facons : par position, ou par
+// les textes qui l'encadrent. La recherche est la meme pour extraire,
+// remplacer ou effacer ; seul ce qu'on met a la place change. RENDRE dit
+// ce que devient le morceau trouve.
+static std::vector<std::string> entreBornes(const ListeTextes& l, const Arguments& args,
+                                            const std::string& remplacement,
+                                            const char* nom) {
+    bool inclusif = false;
+    for (std::size_t k = 3; k + 1 < args.size(); k += 2)
+        if (minuscules(args[k].versTexte()) == "boundaries")
+            inclusif = minuscules(args[k + 1].versTexte()) == "inclusive";
+    bool parPosition = args[1].estNumerique() && args[2].estNumerique();
+    std::vector<std::string> r;
+    for (const auto& s : l.valeurs) {
+        std::size_t debutMorceau = std::string::npos, finMorceau = 0;
+        if (parPosition) {
+            long a = (long)args[1].scal();
+            long b = (long)args[2].scal();
+            if (a < 1 || b < a - 1 || (std::size_t)a > s.size() + 1)
+                throw ErreurMatlab(std::string("MATLAB:") + nom + ":InvalidPositions",
+                                   std::string(nom) + " : les positions sortent du texte.");
+            debutMorceau = (std::size_t)(a - 1);
+            finMorceau = std::min((std::size_t)b, s.size());
+            if (finMorceau < debutMorceau) finMorceau = debutMorceau;
+        } else {
+            std::string ouvrant = args[1].versTexte();
+            std::string fermant = args[2].versTexte();
+            if (ouvrant.empty() || fermant.empty()) { r.push_back(s); continue; }
+            std::size_t p = s.find(ouvrant);
+            if (p == std::string::npos) { r.push_back(s); continue; }
+            std::size_t q = s.find(fermant, p + ouvrant.size());
+            if (q == std::string::npos) { r.push_back(s); continue; }
+            if (inclusif) {
+                debutMorceau = p;
+                finMorceau = q + fermant.size();
+            } else {
+                debutMorceau = p + ouvrant.size();
+                finMorceau = q;
+            }
+        }
+        r.push_back(s.substr(0, debutMorceau) + remplacement + s.substr(finMorceau));
+    }
+    return r;
+}
+
+FONCTION(fnReplaceBetween) {
+    INUTILISE
+    exigerArguments(args, 4, 6, "replaceBetween");
+    ListeTextes l = listeDe(args[0]);
+    // Le remplacement est le quatrieme argument ; les options suivent.
+    std::string remplacement = args[3].versTexte();
+    std::vector<Valeur> passees;
+    passees.push_back(args[0]);
+    passees.push_back(args[1]);
+    passees.push_back(args[2]);
+    for (std::size_t k = 4; k < args.size(); ++k) passees.push_back(args[k]);
+    Arguments options(passees);
+    return {reconstituer(l, entreBornes(l, options, remplacement, "replaceBetween"))};
+}
+
+FONCTION(fnEraseBetween) {
+    INUTILISE
+    exigerArguments(args, 3, 5, "eraseBetween");
+    ListeTextes l = listeDe(args[0]);
+    return {reconstituer(l, entreBornes(l, args, std::string(), "eraseBetween"))};
 }
 
 // count compte les occurrences sans se recouvrir : « aaa » contient une
@@ -1306,7 +1418,7 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("strvcat", fnStrvcat, "texte", "strvcat  Empile des textes en lignes.");
     it.enregistrer("compose", fnSprintfChaine, "texte", "compose  Formate vers une string.");
     it.enregistrer("natsort", fnNatsort, "texte", "natsort  Tri naturel (identite ici).");
-    it.enregistrer("strip", fnStrtrim, "texte", "strip  Retire les blancs aux deux bouts.");
+    it.enregistrer("strip", fnStrip, "texte", "strip  Retire les blancs ou un caractere, d'un cote ou des deux.");
     it.enregistrer("matlab.lang.makeValidName", fnMakeValidName, "texte",
                    "matlab.lang.makeValidName  Rend un identifiant valide.");
     it.enregistrer("matlab.lang.makeUniqueStrings", fnMakeUniqueStrings, "texte",
@@ -1320,6 +1432,8 @@ void enregistrerTexte(Interpreteur& it) {
     it.enregistrer("extractAfter", fnExtractAfter, "texte", "extractAfter  Ce qui suit le motif.");
     it.enregistrer("extractBefore", fnExtractBefore, "texte", "extractBefore  Ce qui precede le motif.");
     it.enregistrer("extractBetween", fnExtractBetween, "texte", "extractBetween  Ce qui separe deux motifs.");
+    it.enregistrer("replaceBetween", fnReplaceBetween, "texte", "replaceBetween  Remplace ce qui est entre deux bornes.");
+    it.enregistrer("eraseBetween", fnEraseBetween, "texte", "eraseBetween  Efface ce qui est entre deux bornes.");
     it.enregistrer("count", fnCount, "texte", "count  Nombre d'occurrences d'un motif.");
     it.enregistrer("matches", fnMatches, "texte", "matches  Le texte est-il exactement le motif.");
     it.enregistrer("regexptranslate", fnRegexptranslate, "texte",

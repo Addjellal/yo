@@ -931,11 +931,16 @@ DCT Transformée en cosinus discrète de type II, normalisée.
      y(k) = w(k) * sum_{m=1}^{N} x(m) cos(pi (2m-1)(k-1) / (2N))
   avec w(1) = 1/sqrt(N) et w(k) = sqrt(2/N) sinon.
 
+  L'orientation est conservée, comme le fait FFT : une ligne rend une
+  ligne, une colonne rend une colonne. Sans cela, le résultat ne se
+  recombinait pas avec le signal d'origine sans transposition.
+
   Exemple :
      x = [1 2 3 4 5]';
      max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
+     isrow(dct([1 2 3 4]))                  % 1 : une ligne reste une ligne
 
-  Voir aussi IDCT, DST.
+  Voir aussi IDCT, DST, FFT.
 ```
 
 ## `decimate`
@@ -1545,9 +1550,13 @@ IDCT Transformée en cosinus discrète inverse.
   pour un signal corrélé, qui explique l'emploi de la DCT en JPEG et en
   MP3 plutôt que celui de la transformée de Fourier.
 
+  L'orientation est conservée, comme le fait IFFT : une ligne rend une
+  ligne, une colonne rend une colonne.
+
   Exemple :
      x = [1 2 3 4 5]';
      max(abs(idct(dct(x)) - x)) < 1e-12
+     isrow(idct([1 2 3 4]))          % 1 : une ligne reste une ligne
 
   Voir aussi DCT, FFT, IFFT.
 ```
@@ -2163,10 +2172,26 @@ MEDFILT1 Filtre médian glissant d'ordre N.
   Y = MEDFILT1(X,N) remplace chaque échantillon par la médiane de la
   fenêtre de N points centrée dessus. N vaut 3 par défaut.
 
+  Y = MEDFILT1(X,N,[],DIM) filtre suivant la dimension DIM.
+  Y = MEDFILT1(...,'zeropad') complète la fenêtre par des zéros aux
+  bords, ce qui est le comportement par défaut ; Y =
+  MEDFILT1(...,'truncate') la raccourcit au lieu de la compléter.
+
+  Les deux traitements des bords donnent des résultats différents, et
+  il faut choisir : compléter par des zéros tire le signal vers zéro
+  aux extrémités, raccourcir prend la médiane d'un échantillon plus
+  petit, donc plus bruité. MATLAB complète par défaut, et c'est aussi
+  ce qui rend le filtre invariant par décalage.
+
+  La médiane, contrairement à la moyenne, n'est pas déplacée par une
+  valeur aberrante : c'est tout l'intérêt de ce filtre, et ce qui le
+  distingue d'un lissage.
+
   Exemple :
      medfilt1([1 100 2 3], 3)    % la valeur aberrante disparait
+     medfilt1([1 100 1], 3)      % [1 1 1] : les bords sont completes
 
-  Voir aussi SGOLAYFILT, MEDFILT2.
+  Voir aussi SGOLAYFILT, MEDFILT2, MOVMEDIAN.
 ```
 
 ## `medfreq`

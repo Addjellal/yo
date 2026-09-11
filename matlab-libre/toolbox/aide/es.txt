@@ -493,3 +493,87 @@ LOAD  Relit des variables depuis un fichier MAT ou un fichier texte.
        delete(f);
 
     Voir aussi SAVE, WHOS, FOPEN.
+
+### ftell
+FTELL  Position courante dans le fichier.
+    POSITION = FTELL(FID) rend le nombre d'octets qui séparent le début
+    du fichier du curseur, ou -1 si la position ne peut pas être dite.
+
+    La position se compte en octets, non en caractères ni en lignes : un
+    fichier n'a pas d'autre repère commun à la lecture et à l'écriture.
+    Elle reste lisible après la fin du fichier, où elle vaut sa taille.
+
+    Syntaxe
+       position = ftell(fid)
+
+    Exemples
+       f = fullfile(tempdir,'t.bin');
+       fid = fopen(f,'w'); fwrite(fid, uint8(1:10), 'uint8'); fclose(fid);
+       fid = fopen(f,'r');
+       debut = ftell(fid);            % 0
+       fread(fid, 3, 'uint8');
+       apres = ftell(fid);            % 3
+       fclose(fid);
+       delete(f);
+       debut == 0 && apres == 3
+
+    Voir aussi FSEEK, FREWIND, FOPEN, FREAD.
+
+### fseek
+FSEEK  Déplace le curseur dans le fichier.
+    ETAT = FSEEK(FID,DECALAGE,ORIGINE) place le curseur à DECALAGE
+    octets de ORIGINE, qui vaut 'bof' (le début), 'cof' (la position
+    courante) ou 'eof' (la fin) — ou, dans le même ordre, -1, 0 et 1.
+    ETAT vaut 0 si le déplacement a eu lieu, -1 sinon.
+
+    Un décalage négatif depuis 'eof' compte à rebours : c'est ainsi qu'on
+    lit la fin d'un fichier sans le parcourir, ce dont vivent les formats
+    dont les métadonnées sont écrites en dernier.
+
+    Le curseur de lecture et celui d'écriture n'en font qu'un : déplacer
+    l'un déplace l'autre.
+
+    Syntaxe
+       etat = fseek(fid,decalage,origine)
+
+    Exemples
+       f = fullfile(tempdir,'s.bin');
+       fid = fopen(f,'w'); fwrite(fid, uint8(1:10), 'uint8'); fclose(fid);
+       fid = fopen(f,'r');
+       fseek(fid, -2, 'eof');
+       fin = fread(fid, Inf, 'uint8');
+       fclose(fid);
+       delete(f);
+       isequal(fin', [9 10])          % 1 : les deux derniers octets
+
+    Voir aussi FTELL, FREWIND, FOPEN, FREAD.
+
+### ferror
+FERROR  État du dernier accès au fichier.
+    MESSAGE = FERROR(FID) rend la description du dernier échec sur ce
+    fichier, ou une chaîne vide s'il n'y en a pas eu.
+    [MESSAGE,NUMERO] = FERROR(FID) rend aussi un code, nul quand tout va
+    bien.
+    FERROR(FID,'clear') efface l'état, ce qui permet de reprendre la
+    lecture après une tentative ratée.
+
+    Atteindre la fin du fichier n'est pas une erreur : FEOF le dit, et
+    FERROR se tait.
+
+    Syntaxe
+       message = ferror(fid)
+       [message,numero] = ferror(fid)
+       ferror(fid,'clear')
+
+    Exemples
+       f = fullfile(tempdir,'e.txt');
+       fid = fopen(f,'w'); fprintf(fid,'un\n'); fclose(fid);
+       fid = fopen(f,'r');
+       fgetl(fid); fgetl(fid);        % la seconde depasse la fin
+       [message, numero] = ferror(fid);
+       ferror(fid,'clear');
+       fclose(fid);
+       delete(f);
+       numero == 0 || numero == -1
+
+    Voir aussi FEOF, FOPEN, FREAD, FGETL.

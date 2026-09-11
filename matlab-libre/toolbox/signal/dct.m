@@ -4,11 +4,17 @@ function y = dct(x, n)
 %      y(k) = w(k) * sum_{m=1}^{N} x(m) cos(pi (2m-1)(k-1) / (2N))
 %   avec w(1) = 1/sqrt(N) et w(k) = sqrt(2/N) sinon.
 %
+%   L'orientation est conservée, comme le fait FFT : une ligne rend une
+%   ligne, une colonne rend une colonne. Sans cela, le résultat ne se
+%   recombinait pas avec le signal d'origine sans transposition.
+%
 %   Exemple :
 %      x = [1 2 3 4 5]';
 %      max(abs(idct(dct(x)) - x)) < 1e-12     % 1 : la transformee est orthonormee
+%      isrow(dct([1 2 3 4]))                  % 1 : une ligne reste une ligne
 %
-%   Voir aussi IDCT, DST.
+%   Voir aussi IDCT, DST, FFT.
+    enLigne = isrow(x);
     x = x(:);
     if nargin > 1 && ~isempty(n)
         if numel(x) > n
@@ -29,5 +35,8 @@ function y = dct(x, n)
         else
             y(k) = s * sqrt(2 / N);
         end
+    end
+    if enLigne
+        y = y.';
     end
 end

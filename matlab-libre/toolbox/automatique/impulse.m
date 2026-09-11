@@ -46,8 +46,74 @@ end
 
 function [y, t] = reponseImpulsion(sys, temps)
 %REPONSEIMPULSION Réponse d'un modèle à une impulsion.
-    t = matlibre_grille_temps(sys, temps);
-    ys = lsim(sys, ones(size(t)), t);
-    dt = t(2) - t(1);
-    y = [0; diff(ys) / dt];
+%   Une impulsion de Dirac ne fait que charger l'état : la réponse
+%   impulsionnelle est la réponse libre partant de x0 = B, soit
+%   y(t) = C*expm(A*t)*B. C'est exact, là où dériver numériquement la
+%   réponse indicielle ne l'est pas — et forçait y(0) à zéro, alors que
+%   la valeur initiale vaut C*B.
+%
+%   Le terme direct D d'un modèle non strictement propre ajouterait une
+%   impulsion, qu'aucune grille ne peut porter : il n'est donc pas
+%   représenté, comme dans MATLAB.
+    modele = ss(sys);
+    a = modele.A;
+    b = modele.B;
+    c = modele.C;
+    d = modele.D;
+    if size(b, 2) > 1 || size(c, 1) > 1
+        error('Control:analysis:MIMO', ...
+              'IMPULSE ne traite que les modèles à une entrée et une sortie.');
+    end
+    if modele.Ts > 0
+        t = grilleEchantillonnee(sys, temps, modele.Ts);
+    else
+        t = matlibre_grille_temps(sys, temps);
+    end
+    y = zeros(numel(t), 1);
+    if isempty(a)
+        return;
+    end
+
+    if modele.Ts > 0
+        % En temps discret, l'impulsion vaut 1/Ts au premier instant,
+        % comme dans MATLAB : c'est ce qui fait tendre la réponse vers
+        % celle du modèle continu quand la période diminue. La réponse à
+        % l'impulsion unité s'obtient en multipliant par Ts.
+        y(1) = d / modele.Ts;
+        etat = b(:) / modele.Ts;
+        for k = 2:numel(t)
+            y(k) = c * etat;
+            etat = a * etat;
+        end
+        return;
+    end
+
+    pas = diff(t);
+    uniforme = isempty(pas) || max(abs(pas - pas(1))) <= 1e-12 * max(1, abs(pas(1)));
+    if uniforme && ~isempty(pas)
+        avance = expm(a * pas(1));
+    end
+    etat = b(:);
+    for k = 1:numel(t)
+        y(k) = c * etat;
+        if k < numel(t)
+            if uniforme
+                etat = avance * etat;
+            else
+                etat = expm(a * pas(k)) * etat;
+            end
+        end
+    end
+end
+
+function t = grilleEchantillonnee(sys, temps, periode)
+% Un modèle à temps discret n'a de valeurs qu'aux multiples de sa
+% période : une grille régulière quelconque n'aurait pas de sens.
+    if ~isempty(temps) && numel(temps) > 1
+        t = temps(:);
+        return;
+    end
+    horizon = matlibre_grille_temps(sys, temps);
+    horizon = horizon(end);
+    t = (0:periode:horizon).';
 end

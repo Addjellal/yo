@@ -9,6 +9,12 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
 %   d'égalité, traitées par pénalisation quadratique, et les bornes. Une
 %   borne infinie est reconnue comme telle : elle ne contraint rien.
 %
+%   [X,VAL,DRAPEAU] = LINPROG(...) rend 1 si un optimum admissible a été
+%   trouvé, et -2 si le problème n'a aucun point admissible — X et VAL
+%   sont alors vides. Une barrière rend toujours un point : c'est la
+%   vérification finale, et elle seule, qui distingue une solution d'un
+%   point qui viole les contraintes.
+%
 %   Exemple :
 %      % Deux ressources, deux produits : on maximise 1*x + 2*y, donc on
 %      % minimise l'opposé.
@@ -73,18 +79,41 @@ function [x, valeur, drapeau] = linprog(f, A, b, Aeq, beq, bas, haut, x0)
             x = poli;
         end
     end
+    % Un problème peut n'avoir aucun point admissible ; la barrière, elle,
+    % rend toujours quelque chose. Sans ce contrôle, LINPROG rendait un
+    % point qui violait ses propres contraintes en annonçant la réussite,
+    % et INTLINPROG s'en servait comme d'une solution entière — c'est
+    % ainsi qu'une borne « x <= 2.5 » rendait 3.
+    if ~admissible(x, Ac, bc, Aeq, beq, 1e-6)
+        x = [];
+        valeur = [];
+        drapeau = -2;
+        return
+    end
     valeur = f' * x;
     drapeau = 1;
 end
 
-function bon = admissible(x, A, b, Aeq, beq)
-    bon = true;
-    tolerance = 1e-8;
-    if ~isempty(A) && any(A * x - b(:) > tolerance * max(1, max(abs(b))))
-        bon = false;
+function bon = admissible(x, A, b, Aeq, beq, tolerance)
+    if nargin < 6
+        tolerance = 1e-8;
     end
-    if bon && ~isempty(Aeq) && any(abs(Aeq * x - beq(:)) > tolerance * max(1, max(abs(beq))))
-        bon = false;
+    bon = true;
+    % La tolérance se mesure contrainte par contrainte. Rapportée au plus
+    % grand second membre, une borne de substitution à 1e9 rendait
+    % acceptable une violation de mille sur toutes les autres — et c'est
+    % ainsi qu'un point hors du domaine passait pour une solution.
+    if ~isempty(A)
+        marge = A * x - b(:);
+        if any(marge > tolerance * max(1, abs(b(:))))
+            bon = false;
+        end
+    end
+    if bon && ~isempty(Aeq)
+        ecart = abs(Aeq * x - beq(:));
+        if any(ecart > tolerance * max(1, abs(beq(:))))
+            bon = false;
+        end
     end
 end
 

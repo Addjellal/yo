@@ -13,11 +13,16 @@ function x = idct(y, n)
 %   pour un signal corrélé, qui explique l'emploi de la DCT en JPEG et en
 %   MP3 plutôt que celui de la transformée de Fourier.
 %
+%   L'orientation est conservée, comme le fait IFFT : une ligne rend une
+%   ligne, une colonne rend une colonne.
+%
 %   Exemple :
 %      x = [1 2 3 4 5]';
 %      max(abs(idct(dct(x)) - x)) < 1e-12
+%      isrow(idct([1 2 3 4]))          % 1 : une ligne reste une ligne
 %
 %   Voir aussi DCT, FFT, IFFT.
+    enLigne = isrow(y);
     y = y(:);
     if nargin > 1 && ~isempty(n)
         if numel(y) > n
@@ -34,5 +39,8 @@ function x = idct(y, n)
             s = s + sqrt(2/N) * y(k) * cos(pi * (2*m - 1) * (k - 1) / (2 * N));
         end
         x(m) = s;
+    end
+    if enLigne
+        x = x.';
     end
 end

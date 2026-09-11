@@ -699,6 +699,20 @@ FONCTION(fnSpline) {
         h[i] = x[i + 1] - x[i];
         dy[i] = y[i + 1] - y[i];
     }
+    std::vector<double> pente(n, 0.0);
+    if (n == 3) {
+        // A trois points, les deux conditions « not-a-knot » portent sur
+        // le meme noeud : le systeme devient singulier. La spline y est
+        // de toute facon la parabole unique qui passe par les trois
+        // points, et ses pentes se calculent directement — par les
+        // differences divisees de Newton, sans resoudre quoi que ce soit.
+        double premiere = dy[0] / h[0];
+        double seconde = dy[1] / h[1];
+        double courbure = (seconde - premiere) / (x[2] - x[0]);
+        pente[0] = premiere - courbure * h[0];
+        pente[1] = premiere + courbure * h[0];
+        pente[2] = pente[1] + 2.0 * courbure * h[1];
+    } else {
     std::vector<double> sousDiag(n, 0.0), diag(n, 0.0), surDiag(n, 0.0), second(n, 0.0);
     diag[0] = h[1];
     surDiag[0] = h[0] + h[1];
@@ -718,16 +732,20 @@ FONCTION(fnSpline) {
     second[dernier] = (hB * hB * dy[n - 3] / hA +
                        (2.0 * (hA + hB) + hB) * hA * dy[n - 2] / hB) /
                       (hA + hB);
-    std::vector<double> pente(n, 0.0), gamma(n, 0.0), delta(n, 0.0);
+    std::vector<double> gamma(n, 0.0), delta(n, 0.0);
     gamma[0] = surDiag[0] / diag[0];
     delta[0] = second[0] / diag[0];
     for (std::size_t i = 1; i < n; ++i) {
         double pivot = diag[i] - sousDiag[i] * gamma[i - 1];
+        if (pivot == 0.0)
+            throw ErreurMatlab("MATLAB:spline:PointsConfondus",
+                               "spline : les abscisses doivent etre distinctes et croissantes.");
         gamma[i] = surDiag[i] / pivot;
         delta[i] = (second[i] - sousDiag[i] * delta[i - 1]) / pivot;
     }
     pente[n - 1] = delta[n - 1];
     for (std::size_t i = n - 1; i-- > 0;) pente[i] = delta[i] - gamma[i] * pente[i + 1];
+    }
     std::vector<double> b(n - 1), c(n - 1), d(n - 1);
     for (std::size_t i = 0; i + 1 < n; ++i) {
         double pentePlate = dy[i] / h[i];

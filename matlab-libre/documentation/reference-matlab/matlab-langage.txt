@@ -83,3 +83,7 @@ combine transform
 webwrite usejava isjava javaObject javaMethod javaArray javaObjectEDT javaMethodEDT
 javaaddpath javarmpath javaclasspath import inner2outer tall istall
 parquetread parquetwrite parquetinfo unicode2native native2unicode
+ftell fseek ferror replaceBetween eraseBetween
+isdag hascycles allcycles allpaths cyclebasis reordernodes ismultigraph
+outedges inedges edgecount nearest isisomorphic isomorphism flipedge
+transclosure transreduction condensation

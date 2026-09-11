@@ -155,10 +155,17 @@ assert(strcmp(melange.lettres, 'ab'));
 %% ------------------ FUNC2STR n'ajoute pas de parentheses inutiles
 % Le texte doit se lire, et surtout se relire : l'aller-retour par
 % STR2FUNC ne doit rien changer a ce que la poignee calcule.
-assert(strcmp(func2str(@(y) y + 1), '@(y) y + 1'));
+% Rien n'est espace, comme dans MATLAB, dont la documentation donne
+% « @(x)x.^2+1 » : du code qui compare ce texte a une chaine attendue en
+% depend.
+assert(strcmp(func2str(@(y) y + 1), '@(y)y+1'));
+assert(strcmp(func2str(@(x) x .^ 2 + 1), '@(x)x.^2+1'));
+assert(strcmp(func2str(@(a, b, c) a - (b - c)), '@(a,b,c)a-(b-c)'));
+assert(strcmp(func2str(@(x) [x, 1; 2, 3]), '@(x)[x,1;2,3]'));
+assert(strcmp(func2str(@sin), '@sin'));
 assert(isempty(strfind(func2str(@(x) x + 1), '((')));
 % Les parentheses qui portent un sens restent.
-assert(~isempty(strfind(func2str(@(a, b, c) a - (b - c)), '(b - c)')));
+assert(~isempty(strfind(func2str(@(a, b, c) a - (b - c)), '(b-c)')));
 for poignee = {@(x) x^3 - 2*x + 1, @(a,b) (a + b) * (a - b), @(x) -x^2 + 3, ...
                @(a,b,c) a - (b - c), @(x) 1 / (1 + exp(-x))}
     refaite = str2func(func2str(poignee{1}));
@@ -424,6 +431,133 @@ assert(matlibre_est_nom_option('VariableNames'));
 assert(~matlibre_est_nom_option(["a"; "b"]));
 assert(~matlibre_est_nom_option(['a'; 'b']));
 assert(~matlibre_est_nom_option(42));
+
+%% ----------------------------- FICHIERS : POSITION, PRECISION, ETAT
+% FTELL dit ou l'on en est, FSEEK y va. Le curseur de lecture et celui
+% d'ecriture n'en font qu'un.
+fichierPosition = fullfile(tempdir, 'matlibre_position.bin');
+identifiant = fopen(fichierPosition, 'w');
+fwrite(identifiant, uint8(1:10), 'uint8');
+fclose(identifiant);
+identifiant = fopen(fichierPosition, 'r');
+assert(ftell(identifiant) == 0);
+fread(identifiant, 3, 'uint8');
+assert(ftell(identifiant) == 3);
+assert(fseek(identifiant, 0, 'bof') == 0);
+assert(ftell(identifiant) == 0);
+% Un decalage negatif depuis la fin compte a rebours : c'est ainsi qu'on
+% lit le pied d'un fichier sans le parcourir.
+assert(fseek(identifiant, -2, 'eof') == 0);
+assert(ftell(identifiant) == 8);
+assert(isequal(fread(identifiant, Inf, 'uint8')', [9 10]));
+assert(feof(identifiant));
+% La position reste lisible apres la fin, et vaut la taille.
+assert(ftell(identifiant) == 10);
+frewind(identifiant);
+assert(~feof(identifiant));
+assert(ftell(identifiant) == 0);
+% Les origines se disent aussi par -1, 0 et 1.
+fseek(identifiant, 2, -1);
+assert(ftell(identifiant) == 2);
+fseek(identifiant, 1, 0);
+assert(ftell(identifiant) == 3);
+% Atteindre la fin n'est pas une erreur : FERROR se tait.
+assert(isempty(ferror(identifiant)));
+refuseOrigine = false;
+try
+    fseek(identifiant, 0, 'nulle part');
+catch err
+    refuseOrigine = strcmp(err.identifier, 'MATLAB:fseek:invalidOrigin');
+end
+assert(refuseOrigine);
+fclose(identifiant);
+delete(fichierPosition);
+
+%% --------------------------------------------- STRIP, ET LES BORNES
+% STRIP dit de quel cote retirer, et quoi : aucune composition de
+% STRTRIM ne donne « retirer les zeros de tete seulement ».
+assert(strcmp(strip('  ab  '), 'ab'));
+assert(strcmp(strip('00420', 'left', '0'), '420'));
+assert(strcmp(strip('00420', 'right', '0'), '0042'));
+assert(strcmp(strip('00420', '0'), '42'));
+assert(strcmp(strip('xxab', 'left'), 'xxab'));   % rien a retirer : ce sont des blancs
+assert(isequal(strip({'  a ', ' b'}), {'a', 'b'}));
+refuseRemplissage = false;
+try
+    strip('abc', 'left', 'xy');
+catch err
+    refuseRemplissage = strcmp(err.identifier, 'MATLAB:strip:InvalidPadCharacter');
+end
+assert(refuseRemplissage);
+
+% REPLACEBETWEEN et ERASEBETWEEN prennent leurs bornes comme
+% EXTRACTBETWEEN : par deux textes, ou par deux positions.
+assert(strcmp(replaceBetween('a[b]c', '[', ']', 'Z'), 'a[Z]c'));
+assert(strcmp(replaceBetween('abcde', 2, 4, 'X'), 'aXe'));
+assert(strcmp(replaceBetween('a[b]c', '[', ']', 'Z', 'Boundaries', 'inclusive'), 'aZc'));
+assert(strcmp(eraseBetween('a[b]c', '[', ']'), 'a[]c'));
+assert(strcmp(eraseBetween('abcde', 2, 4), 'ae'));
+assert(strcmp(eraseBetween('a[b]c', '[', ']', 'Boundaries', 'inclusive'), 'ac'));
+% Un texte ou les bornes ne se trouvent pas revient inchange.
+assert(strcmp(replaceBetween('abc', '[', ']', 'Z'), 'abc'));
+assert(isequal(eraseBetween({'a[b]c', 'x[y]z'}, '[', ']'), {'a[]c', 'x[]z'}));
+
+%% ------------------------------------------------- SPLINE A TROIS POINTS
+% A trois points, les deux conditions « not-a-knot » portent sur le meme
+% noeud : le systeme tridiagonal devenait singulier et la spline rendait
+% NaN. Elle vaut la parabole unique qui passe par les trois points.
+assert(abs(spline([1 2 3], [1 4 9], 2) - 4) < 1e-12);
+assert(max(abs(spline([1 2 3], [1 4 9], [1.5 2.5]) - [2.25 6.25])) < 1e-12);
+assert(max(abs(spline([0 1 3], [0 1 9], [0.5 2]) - [0.25 4]) ) < 1e-12);
+% Et a quatre points et plus, elle reproduit exactement un cube.
+cubique = @(x) x .^ 3 - 2 * x + 1;
+noeuds = 0:4;
+assert(max(abs(spline(noeuds, cubique(noeuds), [0.3 1.7 3.2]) - cubique([0.3 1.7 3.2]))) < 1e-10);
+
+%% --------------------------------------- IMPULSE : LA VALEUR INITIALE
+% Une impulsion de Dirac ne fait que charger l'etat : la reponse vaut
+% C*expm(A*t)*B, et y(0) vaut C*B. La deriver de la reponse indicielle
+% forcait y(0) a zero.
+[reponse, instants] = impulse(tf(1, [1 1]), 0:0.1:5);
+assert(abs(reponse(1) - 1) < 1e-12);
+assert(max(abs(reponse - exp(-instants))) < 1e-10);
+% Un modele de degre relatif deux part bien de zero, lui.
+deuxiemeOrdre = impulse(tf(1, [1 0.4 1]), 0:0.05:20);
+assert(abs(deuxiemeOrdre(1)) < 1e-12);
+% Et C*B se lit directement sur un modele d'etat.
+etatSimple = impulse(ss(-2, 3, 5, 0), 0:0.1:3);
+assert(abs(etatSimple(1) - 15) < 1e-12);
+
+%% -------------------------------------- LINPROG : L'ADMISSIBILITE
+% Une barriere rend toujours un point ; encore faut-il qu'il respecte les
+% contraintes. Sans ce controle, LINPROG annoncait la reussite sur un
+% probleme sans solution, et INTLINPROG s'en servait comme d'une solution
+% entiere : « x <= 2.5 » rendait alors 3.
+[sansSolution, valeurVide, drapeauVide] = linprog([1; 1], [1 1; -1 -1], [1; -3], ...
+                                                  [], [], [0; 0], []);
+assert(isempty(sansSolution));
+assert(isempty(valeurVide));
+assert(drapeauVide == -2);
+% Une borne inferieure qui contredit une inegalite est aussi sans solution.
+[borneImpossible, ~, drapeauBorne] = linprog([-1], [1], [2.5], [], [], 3, 1e9);
+assert(isempty(borneImpossible));
+assert(drapeauBorne == -2);
+% Et ce qui a une solution la garde.
+[optimum, critere, drapeauBon] = linprog([-1; -2], [1 1; 1 3], [4; 6], ...
+                                         [], [], [0; 0], []);
+assert(drapeauBon == 1);
+assert(max(abs(optimum - [3; 1])) < 1e-4);
+assert(abs(critere + 5) < 1e-4);
+
+% INTLINPROG rend une solution entiere qui respecte les contraintes.
+entiere = intlinprog([-1], 1, [1], [2.5], [], [], 0, []);
+assert(entiere == 2);
+deuxEntieres = intlinprog([-1; -1], [1 2], [1 1; 1 0], [3.5; 2.2], ...
+                          [], [], [0; 0], []);
+assert(all(deuxEntieres == round(deuxEntieres)));
+assert(sum(deuxEntieres) <= 3.5 + 1e-9);
+assert(deuxEntieres(1) <= 2.2 + 1e-9);
+assert(sum(deuxEntieres) == 3);   % le meilleur total entier possible
 
 disp('defauts : toutes les verifications passent');
 

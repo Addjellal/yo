@@ -14,14 +14,14 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 673 fonctions natives, en C++ | 19 745 |
+| `src/bibliotheque` | 678 fonctions natives, en C++ | 19 965 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 956 fichiers `.m`, dont 2 226 fonctions publiques recensées par `outils/audit.m` | 135 181 |
-| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 482 |
+| `toolbox` | 2 973 fichiers `.m`, dont 2 226 fonctions publiques recensées par `outils/audit.m` | 136 310 |
+| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 781 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 348
+documentation MathWorks est complète : `outils/manques.m` compte **2 370
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
 pas, et cent trente-six ont été ajoutées de cette façon — la famille
@@ -108,6 +108,13 @@ suivant en donne quelques-unes, prises dans les tests.
 | échange des niveaux d'une table | `inner2outer` appliqué deux fois redonne la table de départ : aucune donnée ne bouge, seule la façon de la nommer change |
 | Parquet | la table relue porte les mêmes valeurs et les mêmes classes ; et le fichier de référence de `tests/donnees`, écrit par une autre implémentation, se lit ici — sans quoi l'aller-retour ne prouverait que la cohérence de MatLibre avec lui-même |
 | encodages de caractères | `native2unicode(unicode2native(t))` rend `t`, et l'aller-retour par les points de code conserve jusqu'aux caractères à quatre octets |
+| spline « not-a-knot » | elle reproduit exactement tout polynôme de degré trois, et à trois points la parabole qui passe par eux |
+| réponse impulsionnelle | `y(0)` vaut `C*B`, non zéro : une impulsion charge l'état, et la réponse est la réponse libre qui suit |
+| programme linéaire | le point rendu respecte les contraintes, une par une ; un problème sans solution est annoncé comme tel plutôt que résolu de travers, et `intlinprog` s'y appuie pour ne rendre que des entiers admissibles |
+| cycles d'un graphe | chaque cycle est énuméré une fois et une seule — le graphe complet à quatre sommets en a sept, quatre triangles et trois quadrilatères ; la base de cycles en compte E − N + C |
+| condensation | elle est toujours sans circuit : s'il en restait un, les composantes qu'il relie n'en feraient qu'une |
+| réduction transitive | elle a la même fermeture transitive que le graphe de départ, avec le moins d'arcs possible |
+| isomorphisme de graphes | la permutation rendue transporte effectivement les arêtes ; deux graphes de même suite de degrés ne sont pas pour autant isomorphes — le cycle à six sommets n'est pas la réunion de deux triangles |
 
 ## 3. État par boîte à outils
 
@@ -165,6 +172,7 @@ programme d'école qui montre à quoi il sert.
 | Matrices symboliques | `symmatrix` garde l'algèbre au niveau de la matrice — somme, produit, transposée, inverse, déterminant, trace, puissance, Kronecker — et `symmatrix2sym` descend aux coefficients par cofacteurs | les identités matricielles démontrées sans descendre aux coefficients, et les fonctions de matrice |
 | Java | absent, et déclaré tel : `usejava` rend faux, `isjava` aussi, `javaclasspath` est vide, et les constructeurs échouent avec « MATLAB:Java:NoJVM » | une machine virtuelle Java, qui demanderait une dépendance d'un autre ordre |
 | Parquet | `parquetwrite`, `parquetread` et `parquetinfo` écrivent et lisent le format en colonnes : protocole compact Thrift pour les métadonnées, encodage PLAIN pour les données, classes restituées par le type converti, colonnes facultatives lues par leurs niveaux de définition | la compression et l'encodage en dictionnaire, refusés par leur nom ; les colonnes répétées ; les valeurs absentes dans une colonne entière, booléenne ou textuelle, faute de valeur pour les dire |
+| Graphes | `graph` et `digraph` portent les parcours, les plus courts chemins, les composantes, l'arbre couvrant, le flot maximal, la centralité, et désormais l'énumération des cycles et des chemins simples, la base de cycles, la fermeture et la réduction transitives, la condensation, la renumérotation et l'isomorphisme | la réduction transitive d'un graphe à circuits, refusée parce qu'elle n'y est pas unique ; les composantes biconnexes |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |
 | Durée des tests | la suite complète tient en quarante minutes | paralléliser l'exécution des scripts |

@@ -888,7 +888,87 @@ FONCTION(fnFrewind) {
     auto& f = fluxDe((int)args[0].scal());
     f.clear();
     f.seekg(0);
+    // Un fichier ouvert en ecriture a lui aussi un curseur a ramener :
+    // ne replacer que celui de lecture laissait le prochain fwrite ou il
+    // en etait.
+    f.seekp(0);
     return {};
+}
+
+// La position courante dans le fichier. Un flux en echec — apres la fin,
+// par exemple — refuse de la dire ; on efface l'etat le temps de la lire
+// et on le remet, pour que FEOF garde sa reponse.
+FONCTION(fnFtell) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "ftell");
+    auto& f = fluxDe((int)args[0].scal());
+    std::ios::iostate etat = f.rdstate();
+    f.clear();
+    std::streampos position = f.tellg();
+    if (position == std::streampos(-1)) position = f.tellp();
+    f.clear(etat);
+    if (position == std::streampos(-1)) return {Valeur::scalaire(-1)};
+    return {Valeur::scalaire((double)position)};
+}
+
+// « bof », « cof » et « eof » — ou -1, 0 et 1 — disent d'ou compter le
+// decalage. Le curseur de lecture et celui d'ecriture partagent le meme
+// tampon : un seul deplacement suffit, et en deplacer deux ferait deux
+// fois le chemin quand on compte depuis la position courante.
+FONCTION(fnFseek) {
+    INUTILISE
+    exigerArguments(args, 2, 3, "fseek");
+    auto& f = fluxDe((int)args[0].scal());
+    std::streamoff decalage = (std::streamoff)args[1].scal();
+    std::ios::seekdir depuis = std::ios::beg;
+    if (args.size() > 2) {
+        std::string origine;
+        if (args[2].estTexte() || args[2].estChaine()) {
+            origine = args[2].versTexte();
+        } else {
+            double v = args[2].scal();
+            origine = v < 0 ? "bof" : (v > 0 ? "eof" : "cof");
+        }
+        for (auto& c : origine) c = (char)std::tolower((unsigned char)c);
+        if (origine == "bof" || origine == "-1") depuis = std::ios::beg;
+        else if (origine == "cof" || origine == "0") depuis = std::ios::cur;
+        else if (origine == "eof" || origine == "1") depuis = std::ios::end;
+        else
+            throw ErreurMatlab("MATLAB:fseek:invalidOrigin",
+                               "fseek : l'origine est « bof », « cof » ou « eof ».");
+    }
+    f.clear();
+    f.seekg(decalage, depuis);
+    if (f.fail()) {
+        f.clear();
+        f.seekp(decalage, depuis);
+        if (f.fail()) {
+            f.clear();
+            return {Valeur::scalaire(-1)};
+        }
+    }
+    return {Valeur::scalaire(0)};
+}
+
+// L'etat du flux, dit en clair. « clear » l'efface, comme dans MATLAB :
+// c'est ce qui permet de reprendre la lecture apres une tentative ratee.
+FONCTION(fnFerror) {
+    INUTILISE
+    exigerArguments(args, 1, 2, "ferror");
+    auto& f = fluxDe((int)args[0].scal());
+    bool effacer = args.size() > 1 && args[1].versTexte() == "clear";
+    std::string message;
+    double numero = 0;
+    if (f.bad()) {
+        message = "Erreur d'acces au fichier.";
+        numero = -1;
+    } else if (f.fail() && !f.eof()) {
+        message = "La derniere operation sur ce fichier a echoue.";
+        numero = -1;
+    }
+    if (effacer) f.clear();
+    if (nargout >= 2) return {Valeur::texte(message), Valeur::scalaire(numero)};
+    return {Valeur::texte(message)};
 }
 
 // La precision dit combien d'octets fait un element, comment les lire, et
@@ -1227,6 +1307,9 @@ void enregistrerEntreeSortie(Interpreteur& it) {
     it.enregistrer("fgets", fnFgets, "es", "fgets  Lit une ligne avec le saut de ligne.");
     it.enregistrer("feof", fnFeof, "es", "feof  Fin de fichier atteinte.");
     it.enregistrer("frewind", fnFrewind, "es", "frewind  Revient au debut du fichier.");
+    it.enregistrer("ftell", fnFtell, "es", "ftell  Position courante dans le fichier.");
+    it.enregistrer("fseek", fnFseek, "es", "fseek  Deplace le curseur dans le fichier.");
+    it.enregistrer("ferror", fnFerror, "es", "ferror  Etat du dernier acces au fichier.");
     it.enregistrer("fread", fnFread, "es", "fread  Lit des octets.");
     it.enregistrer("fwrite", fnFwrite, "es", "fwrite  Ecrit des octets.");
     it.enregistrer("fileread", fnFileread, "es", "fileread  Lit un fichier entier.");

@@ -163,6 +163,113 @@ classdef digraph
             obj = matlibre_graphe_sous(obj, noeuds);
         end
 
+        function t = hascycles(obj)
+        %HASCYCLES Le graphe contient-il un cycle ?
+            t = ~isempty(matlibre_graphe_cycles(obj, 1));
+        end
+
+        function [cycles, aretes] = allcycles(obj, varargin)
+        %ALLCYCLES Tous les cycles simples.
+            maximum = [];
+            for k = 1:2:numel(varargin) - 1
+                if strcmpi(char(varargin{k}), 'MaxNumCycles')
+                    maximum = varargin{k + 1};
+                end
+            end
+            [cycles, aretes] = matlibre_graphe_cycles(obj, maximum);
+            cycles = cycles(:);
+            aretes = aretes(:);
+        end
+
+        function [chemins, aretes] = allpaths(obj, source, cible, varargin)
+        %ALLPATHS Tous les chemins simples d'un nœud à un autre.
+            maximum = [];
+            for k = 1:2:numel(varargin) - 1
+                if strcmpi(char(varargin{k}), 'MaxNumPaths')
+                    maximum = varargin{k + 1};
+                end
+            end
+            [chemins, aretes] = matlibre_graphe_chemins(obj, source, cible, maximum);
+            chemins = chemins(:);
+            aretes = aretes(:);
+        end
+
+        function obj = reordernodes(obj, ordre)
+        %REORDERNODES Renumérote les nœuds suivant un ordre donné.
+            obj = matlibre_graphe_reordonner(obj, ordre);
+        end
+
+        function t = ismultigraph(obj)
+        %ISMULTIGRAPH Deux nœuds sont-ils joints par plusieurs arêtes ?
+            t = matlibre_graphe_multiple(obj);
+        end
+
+        function indices = outedges(obj, noeud)
+        %OUTEDGES Rangs des arêtes partant d'un nœud.
+            indices = matlibre_graphe_aretes_sortantes(obj, ...
+                matlibre_graphe_indices(obj, noeud))';
+        end
+
+        function indices = inedges(obj, noeud)
+        %INEDGES Rangs des arêtes arrivant sur un nœud.
+            indices = matlibre_graphe_aretes_entrantes(obj, ...
+                matlibre_graphe_indices(obj, noeud))';
+        end
+
+        function n = edgecount(obj, source, cible)
+        %EDGECOUNT Nombre d'arêtes entre deux nœuds.
+            n = matlibre_graphe_compter_aretes(obj, source, cible);
+        end
+
+        function [noeuds, d] = nearest(obj, source, rayon, varargin)
+        %NEAREST Nœuds à portée d'un nœud donné.
+            [noeuds, d] = matlibre_graphe_proches(obj, source, rayon, varargin{:});
+        end
+
+        function t = isisomorphic(obj, autre)
+        %ISISOMORPHIC Les deux graphes se correspondent-ils ?
+            t = matlibre_graphe_isomorphe(obj, autre);
+        end
+
+        function p = isomorphism(obj, autre)
+        %ISOMORPHISM Permutation qui fait correspondre les deux graphes.
+            [ok, p] = matlibre_graphe_isomorphe(obj, autre);
+            if ~ok
+                p = [];
+            else
+                p = p(:);
+            end
+        end
+
+        function t = isdag(obj)
+        %ISDAG Le graphe orienté est-il sans circuit ?
+            t = matlibre_graphe_acyclique(obj);
+        end
+
+        function obj = flipedge(obj, source, cible)
+        %FLIPEDGE Retourne le sens des arcs.
+            if nargin == 1
+                obj.Arcs = obj.Arcs(:, [2 1]);
+                return
+            end
+            obj = matlibre_graphe_retourner(obj, source, cible);
+        end
+
+        function h = transclosure(obj)
+        %TRANSCLOSURE Fermeture transitive.
+            h = matlibre_graphe_fermeture(obj);
+        end
+
+        function h = transreduction(obj)
+        %TRANSREDUCTION Réduction transitive.
+            h = matlibre_graphe_reduction(obj);
+        end
+
+        function [h, groupes] = condensation(obj)
+        %CONDENSATION Graphe des composantes fortement connexes.
+            [h, groupes] = matlibre_graphe_condensation(obj);
+        end
+
         function h = plot(obj, varargin)
         %PLOT Trace le graphe, les nœuds sur un cercle.
             h = matlibre_graphe_tracer(obj, varargin);

@@ -215,6 +215,12 @@ LINPROG Programmation linéaire : minimise f'*x sous A*x <= b.
   d'égalité, traitées par pénalisation quadratique, et les bornes. Une
   borne infinie est reconnue comme telle : elle ne contraint rien.
 
+  [X,VAL,DRAPEAU] = LINPROG(...) rend 1 si un optimum admissible a été
+  trouvé, et -2 si le problème n'a aucun point admissible — X et VAL
+  sont alors vides. Une barrière rend toujours un point : c'est la
+  vérification finale, et elle seule, qui distingue une solution d'un
+  point qui viole les contraintes.
+
   Exemple :
      % Deux ressources, deux produits : on maximise 1*x + 2*y, donc on
      % minimise l'opposé.

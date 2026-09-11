@@ -1,15 +1,17 @@
-function ordre = matlibre_graphe_toposort(g)
-%MATLIBRE_GRAPHE_TOPOSORT Tri topologique par l'algorithme de Kahn.
-%   On retire à chaque pas un nœud sans prédécesseur. S'il n'en reste
-%   aucun alors que des nœuds subsistent, c'est qu'il y a un cycle — et un
-%   graphe cyclique n'admet aucun ordre topologique.
+function [acyclique, ordre] = matlibre_graphe_acyclique(g)
+%MATLIBRE_GRAPHE_ACYCLIQUE Le graphe orienté est-il sans circuit ?
+%   [T,ORDRE] = MATLIBRE_GRAPHE_ACYCLIQUE(G) rend vrai si G n'a aucun
+%   circuit, et l'ordre topologique qui le prouve. C'est l'algorithme de
+%   Kahn, mais sans erreur : ne pas pouvoir trier est ici la réponse, non
+%   un échec.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
-%      matlibre_graphe_toposort(digraph([1 2], [2 3]))      % 1 2 3
+%      matlibre_graphe_acyclique(digraph([1 2], [2 3]))    % 1
+%      matlibre_graphe_acyclique(digraph([1 2], [2 1]))    % 0
 %
-%   Voir aussi TOPOSORT, DIGRAPH, CONNCOMP.
+%   Voir aussi ISDAG, TOPOSORT, HASCYCLES.
     n = g.Nombre;
     entrant = zeros(n, 1);
     for k = 1:size(g.Arcs, 1)
@@ -35,12 +37,6 @@ function ordre = matlibre_graphe_toposort(g)
         end
         restant = restant(garde, :);
     end
-    if numel(ordre) < n
-        error('MATLAB:digraph:CycleDetected', ...
-              'Un graphe cyclique n''admet pas de tri topologique.');
-    end
-    % MATLAB rend une ligne : c'est un ordre de visite, qui se lit de
-    % gauche a droite, et non une colonne de valeurs par noeud comme en
-    % rend CONNCOMP.
+    acyclique = numel(ordre) == n;
     ordre = ordre(:)';
 end

@@ -17,8 +17,17 @@ assert(abs(sum(b) - 1) < 1e-9);
 [bb, aa] = butter(2, 0.2);
 assert(abs(bb(1) - 0.0675) < 1e-3);
 assert(abs(aa(2) + 1.1430) < 1e-3);
-assert(isequal(medfilt1([1 5 2], 3), [3 2 3.5]));
-assert(max(abs(idct(dct([1 2 3 4])) - [1; 2; 3; 4])) < 1e-10);
+% MEDFILT1 complete la fenetre par des zeros aux bords, comme MATLAB :
+% la fenetre garde sa longueur, et le filtre reste invariant par
+% decalage. « truncate » raccourcit la fenetre a la place.
+assert(isequal(medfilt1([1 5 2], 3), [1 2 2]));
+assert(isequal(medfilt1([1 100 1], 3), [1 1 1]));
+assert(isequal(medfilt1([1 5 2], 3, 'truncate'), [3 2 3.5]));
+assert(iscolumn(medfilt1([1; 5; 2], 3)));
+% DCT et IDCT gardent l'orientation, comme FFT.
+assert(max(abs(idct(dct([1 2 3 4])) - [1 2 3 4])) < 1e-10);
+assert(isrow(dct([1 2 3 4])) && iscolumn(dct([1; 2; 3; 4])));
+assert(max(abs(idct(dct([1; 2; 3; 4])) - [1; 2; 3; 4])) < 1e-10);
 assert(abs(rms([3 4]) - sqrt(12.5)) < 1e-12);
 
 % DSP System

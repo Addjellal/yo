@@ -147,6 +147,27 @@ ERASE  Retire du texte.
     Voir aussi REPLACE, STRREP, INSERTAFTER, EXTRACTBEFORE.
 ```
 
+## `eraseBetween`
+
+```
+ERASEBETWEEN  Efface ce qui est entre deux bornes.
+    ERASEBETWEEN(S,DEBUT,FIN) retire le morceau compris entre les bornes.
+    C'est REPLACEBETWEEN avec un remplacement vide, et les bornes s'y
+    disent de la même façon : par deux textes, ou par deux positions.
+
+    Syntaxe
+       t = eraseBetween(s,debut,fin)
+       t = eraseBetween(s,i,j)
+       t = eraseBetween(...,'Boundaries','inclusive')
+
+    Exemples
+       eraseBetween('a[b]c', '[', ']')                 % 'a[]c'
+       eraseBetween('abcde', 2, 4)                     % 'ae'
+       eraseBetween('a[b]c', '[', ']', 'Boundaries', 'inclusive')   % 'ac'
+
+    Voir aussi REPLACEBETWEEN, EXTRACTBETWEEN, ERASE, STRREP.
+```
+
 ## `extractAfter`
 
 ```
@@ -576,6 +597,34 @@ REPLACE  Remplace un ou plusieurs motifs.
     Voir aussi ERASE, STRREP, REGEXPREP, INSERTAFTER.
 ```
 
+## `replaceBetween`
+
+```
+REPLACEBETWEEN  Remplace ce qui est entre deux bornes.
+    REPLACEBETWEEN(S,DEBUT,FIN,NOUVEAU) remplace le morceau compris entre
+    les bornes par NOUVEAU. Les bornes se disent par deux textes qui
+    l'encadrent, ou par deux positions.
+    L'option 'Boundaries' vaut 'exclusive' — les bornes restent, ce qui
+    est le cas par défaut — ou 'inclusive', et elles sont remplacées avec
+    le reste.
+
+    Un texte où les bornes ne se trouvent pas revient inchangé : c'est ce
+    qui permet d'appliquer la même substitution à toute une liste sans la
+    trier d'abord.
+
+    Syntaxe
+       t = replaceBetween(s,debut,fin,nouveau)
+       t = replaceBetween(s,i,j,nouveau)
+       t = replaceBetween(...,'Boundaries','inclusive')
+
+    Exemples
+       replaceBetween('a[b]c', '[', ']', 'Z')          % 'a[Z]c'
+       replaceBetween('abcde', 2, 4, 'X')              % 'aXe'
+       replaceBetween('a[b]c', '[', ']', 'Z', 'Boundaries', 'inclusive')
+
+    Voir aussi EXTRACTBETWEEN, ERASEBETWEEN, INSERTAFTER, STRREP.
+```
+
 ## `reverse`
 
 ```
@@ -707,17 +756,32 @@ STRING  Convertit en tableau de strings.
 ## `strip`
 
 ```
-STRIP  Retire les blancs aux deux bouts.
-    STRIP(S) est l'équivalent moderne de STRTRIM.
+STRIP  Retire les blancs ou un caractère, d'un côté ou des deux.
+    STRIP(S) retire les blancs aux deux bouts, comme STRTRIM.
+    STRIP(S,COTE) ne retire qu'à gauche ou qu'à droite : COTE vaut
+    'left', 'right' ou 'both'.
+    STRIP(S,C) retire le caractère C au lieu des blancs, et
+    STRIP(S,COTE,C) combine les deux.
+
+    Retirer les zéros de tête d'un identifiant sans toucher à ceux de
+    queue en est l'usage même : aucune composition de STRTRIM ne le
+    donne, parce que STRTRIM ne sait pas de quel côté il travaille.
 
     Syntaxe
        t = strip(s)
+       t = strip(s,cote)
+       t = strip(s,caractere)
+       t = strip(s,cote,caractere)
 
     Exemples
        strip('  abc  ')
        numel(strip('  a  '))              % 1
+       strip('00420', 'left', '0')        % '420'
+       strip('00420', 'right', '0')       % '0042'
+       strip('00420', '0')                % '42'
+       isequal(strip({'  a ', ' b'}), {'a', 'b'})   % 1 : une cellule aussi
 
-    Voir aussi STRTRIM, DEBLANK, PAD.
+    Voir aussi STRTRIM, DEBLANK, PAD, ERASE.
 ```
 
 ## `strjoin`

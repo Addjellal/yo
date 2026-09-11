@@ -4151,6 +4151,117 @@ MATLIBRE_GLISSANT Applique une fonction sur une fenêtre glissante.
   Voir aussi MOVMAD, MOVMEAN, MOVMEDIAN.
 ```
 
+## `matlibre_graphe_acyclique`
+
+```
+MATLIBRE_GRAPHE_ACYCLIQUE Le graphe orienté est-il sans circuit ?
+  [T,ORDRE] = MATLIBRE_GRAPHE_ACYCLIQUE(G) rend vrai si G n'a aucun
+  circuit, et l'ordre topologique qui le prouve. C'est l'algorithme de
+  Kahn, mais sans erreur : ne pas pouvoir trier est ici la réponse, non
+  un échec.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_acyclique(digraph([1 2], [2 3]))    % 1
+     matlibre_graphe_acyclique(digraph([1 2], [2 1]))    % 0
+
+  Voir aussi ISDAG, TOPOSORT, HASCYCLES.
+```
+
+## `matlibre_graphe_aretes_entrantes`
+
+```
+MATLIBRE_GRAPHE_ARETES_ENTRANTES Arêtes qui aboutissent à un nœud.
+  INDICES = MATLIBRE_GRAPHE_ARETES_ENTRANTES(G,N) rend les rangs des
+  arêtes arrivant sur N. Sur un graphe non orienté, une arête n'a pas
+  de sens : ce sont les mêmes que les sortantes.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_aretes_entrantes(digraph([1 2], [3 3]), 3)   % [1 2]
+
+  Voir aussi INEDGES, OUTEDGES.
+```
+
+## `matlibre_graphe_aretes_sortantes`
+
+```
+MATLIBRE_GRAPHE_ARETES_SORTANTES Arêtes qu'on peut emprunter depuis un nœud.
+  INDICES = MATLIBRE_GRAPHE_ARETES_SORTANTES(G,N) rend les rangs des
+  arêtes partant de N. Sur un graphe non orienté, une arête se parcourt
+  dans les deux sens : toutes celles qui touchent N en font partie.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_aretes_sortantes(graph([1 2], [2 3]), 2)   % [1 2]
+
+  Voir aussi OUTEDGES, INEDGES, ALLPATHS.
+```
+
+## `matlibre_graphe_autre_bout`
+
+```
+MATLIBRE_GRAPHE_AUTRE_BOUT Nœud atteint en empruntant une arête.
+  B = MATLIBRE_GRAPHE_AUTRE_BOUT(G,ARETE,COURANT) rend le nœud où l'on
+  arrive. Sur un graphe orienté c'est toujours la cible ; sur un graphe
+  non orienté, c'est l'autre extrémité que celle d'où l'on vient.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_autre_bout(graph([1 2], [2 3]), 1, 2)   % 1
+
+  Voir aussi ALLPATHS, ALLCYCLES.
+```
+
+## `matlibre_graphe_base_cycles`
+
+```
+MATLIBRE_GRAPHE_BASE_CYCLES Base de cycles fondamentaux.
+  [CYCLES,ARETES] = MATLIBRE_GRAPHE_BASE_CYCLES(G) rend une base de
+  l'espace des cycles : une forêt couvrante est construite, et chaque
+  arête restée hors de la forêt ferme exactement un cycle.
+
+  La base compte E - N + C éléments, où C est le nombre de composantes.
+  Tout cycle du graphe est une somme, arête par arête et modulo deux,
+  de ces cycles-là : c'est ce qui en fait une base, et la raison pour
+  laquelle on n'a pas besoin de les énumérer tous.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numel(matlibre_graphe_base_cycles(graph([1 2 3], [2 3 1])))   % 1
+
+  Voir aussi CYCLEBASIS, ALLCYCLES, MINSPANTREE.
+```
+
+## `matlibre_graphe_chemins`
+
+```
+MATLIBRE_GRAPHE_CHEMINS Tous les chemins simples d'un nœud à un autre.
+  [CHEMINS,ARETES] = MATLIBRE_GRAPHE_CHEMINS(G,S,T) rend, dans deux
+  cellules, la suite des nœuds et la suite des arêtes de chaque chemin
+  ne repassant jamais par le même nœud.
+
+  L'énumération se fait en profondeur, en marquant les nœuds du chemin
+  courant : c'est ce marquage, et lui seul, qui distingue un chemin
+  simple d'une promenade sans fin dans un cycle.
+
+  Le nombre de chemins peut croître très vite ; MAXIMUM, s'il est
+  donné, arrête l'énumération là.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     c = matlibre_graphe_chemins(digraph([1 1 2], [2 3 3]), 1, 3);
+     numel(c)                        % 2 : direct, et par le noeud 2
+
+  Voir aussi ALLPATHS, ALLCYCLES, SHORTESTPATH.
+```
+
 ## `matlibre_graphe_composantes`
 
 ```
@@ -4172,6 +4283,42 @@ MATLIBRE_GRAPHE_COMPOSANTES Composantes connexes d'un graphe.
   Voir aussi CONNCOMP, GRAPH, DIGRAPH.
 ```
 
+## `matlibre_graphe_compter_aretes`
+
+```
+MATLIBRE_GRAPHE_COMPTER_ARETES Nombre d'arêtes entre deux nœuds.
+  N = MATLIBRE_GRAPHE_COMPTER_ARETES(G,S,T) compte les arêtes joignant
+  S à T. Sur un graphe non orienté, le sens ne compte pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_compter_aretes(graph([1 1], [2 2]), 1, 2)   % 2
+
+  Voir aussi EDGECOUNT, FINDEDGE, ISMULTIGRAPH.
+```
+
+## `matlibre_graphe_condensation`
+
+```
+MATLIBRE_GRAPHE_CONDENSATION Graphe des composantes fortement connexes.
+  [H,GROUPES] = MATLIBRE_GRAPHE_CONDENSATION(G) rend le graphe dont
+  chaque nœud est une composante fortement connexe de G, et GROUPES le
+  numéro de composante de chaque nœud de G.
+
+  La condensation est toujours sans circuit : s'il en restait un, les
+  composantes qu'il relie n'en feraient qu'une. C'est ce qui permet de
+  ramener une question d'accessibilité sur un graphe quelconque à la
+  même question sur un graphe sans circuit.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numnodes(matlibre_graphe_condensation(digraph([1 2 3], [2 1 3])))   % 2
+
+  Voir aussi CONDENSATION, CONNCOMP, ISDAG.
+```
+
 ## `matlibre_graphe_construire`
 
 ```
@@ -4188,6 +4335,52 @@ MATLIBRE_GRAPHE_CONSTRUIRE Lit les arguments de GRAPH et de DIGRAPH.
      m                               % 3
 
   Voir aussi GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_cycles`
+
+```
+MATLIBRE_GRAPHE_CYCLES Tous les cycles simples d'un graphe.
+  [CYCLES,ARETES] = MATLIBRE_GRAPHE_CYCLES(G) rend, dans deux cellules,
+  les nœuds et les arêtes de chaque cycle ne repassant ni par un nœud
+  ni par une arête.
+
+  Chaque cycle est énuméré une fois. Deux précautions y suffisent : on
+  n'explore qu'à partir de son plus petit nœud, et sur un graphe non
+  orienté on ne garde qu'un des deux sens de parcours. Sans elles, un
+  triangle se compterait six fois.
+
+  MAXIMUM, s'il est donné, arrête l'énumération : le nombre de cycles
+  d'un graphe dense croît plus vite que toute fonction polynomiale de
+  sa taille.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numel(matlibre_graphe_cycles(graph([1 2 3], [2 3 1])))   % 1
+
+  Voir aussi ALLCYCLES, HASCYCLES, CYCLEBASIS.
+```
+
+## `matlibre_graphe_depuis`
+
+```
+MATLIBRE_GRAPHE_DEPUIS Construit un graphe du même genre qu'un autre.
+  H = MATLIBRE_GRAPHE_DEPUIS(MODELE,ARCS,POIDS,NOMS,NOMBRE) rend un
+  GRAPH ou un DIGRAPH selon MODELE, portant les arêtes données.
+
+  Passer par les propriétés plutôt que par le constructeur permet de
+  garder les nœuds isolés : deux listes d'extrémités ne disent pas
+  combien de nœuds le graphe compte, et un nœud sans arête y
+  disparaîtrait.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     h = matlibre_graphe_depuis(graph(), [1 2], 1, {}, 3);
+     numnodes(h)                     % 3 : le troisieme noeud reste
+
+  Voir aussi GRAPH, DIGRAPH, REORDERNODES.
 ```
 
 ## `matlibre_graphe_dijkstra`
@@ -4225,6 +4418,26 @@ MATLIBRE_GRAPHE_DISTANCES Longueur du plus court chemin entre tous les couples.
   Voir aussi DISTANCES, SHORTESTPATH.
 ```
 
+## `matlibre_graphe_fermeture`
+
+```
+MATLIBRE_GRAPHE_FERMETURE Fermeture transitive d'un graphe orienté.
+  H = MATLIBRE_GRAPHE_FERMETURE(G) rend le graphe où un arc joint U à V
+  dès que V est accessible depuis U par un chemin quelconque. Les
+  boucles sur un nœud ne sont pas conservées.
+
+  L'accessibilité se calcule par un parcours depuis chaque nœud : c'est
+  en O(N*(N+E)), là où l'élévation répétée de la matrice d'adjacence
+  serait en O(N^3) sans être plus claire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numedges(matlibre_graphe_fermeture(digraph([1 2], [2 3])))   % 3
+
+  Voir aussi TRANSCLOSURE, TRANSREDUCTION, CONDENSATION.
+```
+
 ## `matlibre_graphe_indices`
 
 ```
@@ -4239,6 +4452,45 @@ MATLIBRE_GRAPHE_INDICES Traduit des noms de nœuds en numéros.
      matlibre_graphe_indices(g, 2)      % 2
 
   Voir aussi GRAPH, DIGRAPH.
+```
+
+## `matlibre_graphe_isomorphe`
+
+```
+MATLIBRE_GRAPHE_ISOMORPHE Deux graphes se correspondent-ils ?
+  [OK,P] = MATLIBRE_GRAPHE_ISOMORPHE(G,H) cherche une permutation des
+  nœuds de G qui donne H : P(i) est le nœud de H auquel correspond le
+  nœud i de G. OK est faux s'il n'en existe aucune.
+
+  La recherche est un retour sur trace, guidé par les degrés : deux
+  nœuds ne peuvent se correspondre que s'ils ont le même degré, ce qui
+  élague l'arbre avant de l'explorer. Aucun algorithme polynomial n'est
+  connu pour ce problème ; sur de grands graphes réguliers, la
+  recherche peut donc être longue.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_isomorphe(graph([1 2], [2 3]), graph([2 3], [3 1]))
+
+  Voir aussi ISISOMORPHIC, ISOMORPHISM.
+```
+
+## `matlibre_graphe_multiple`
+
+```
+MATLIBRE_GRAPHE_MULTIPLE Deux nœuds sont-ils joints plusieurs fois ?
+  T = MATLIBRE_GRAPHE_MULTIPLE(G) rend vrai si une même paire de nœuds
+  porte plus d'une arête. Une boucle unique ne suffit pas : ce qui fait
+  un multigraphe est la répétition, non le retour sur soi.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_multiple(graph([1 1], [2 2]))   % 1 : deux fois 1-2
+     matlibre_graphe_multiple(graph([1], [1]))       % 0 : une boucle
+
+  Voir aussi ISMULTIGRAPH, SIMPLIFY.
 ```
 
 ## `matlibre_graphe_parcours`
@@ -4276,6 +4528,64 @@ MATLIBRE_GRAPHE_PRIM Arbre couvrant de poids minimal.
   Voir aussi MINSPANTREE, GRAPH.
 ```
 
+## `matlibre_graphe_proches`
+
+```
+MATLIBRE_GRAPHE_PROCHES Nœuds à portée d'un nœud donné.
+  [N,D] = MATLIBRE_GRAPHE_PROCHES(G,S,R) rend les nœuds dont la
+  distance à S ne dépasse pas R, classés par distance croissante, et
+  ces distances. Le nœud S lui-même n'y figure pas.
+
+  La distance est celle des poids d'arêtes, comme pour DISTANCES ;
+  R infini rend donc tous les nœuds accessibles.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_graphe_proches(graph([1 2], [2 3]), 1, 1)   % 2
+
+  Voir aussi NEAREST, DISTANCES, SHORTESTPATH.
+```
+
+## `matlibre_graphe_reduction`
+
+```
+MATLIBRE_GRAPHE_REDUCTION Réduction transitive d'un graphe sans circuit.
+  H = MATLIBRE_GRAPHE_REDUCTION(G) retire les arcs qu'un chemin plus
+  long rend inutiles : U->V disparaît s'il existe un autre chemin de U
+  à V. H a la même accessibilité que G, avec le moins d'arcs possible.
+
+  Sur un graphe sans circuit, cette réduction est unique. Elle ne l'est
+  plus dès qu'il y a un circuit — n'importe lequel de ses arcs peut
+  être celui qu'on garde — et MatLibre refuse alors, plutôt que de
+  choisir en silence.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     numedges(matlibre_graphe_reduction(digraph([1 1 2], [2 3 3])))   % 2
+
+  Voir aussi TRANSREDUCTION, TRANSCLOSURE, ISDAG.
+```
+
+## `matlibre_graphe_reordonner`
+
+```
+MATLIBRE_GRAPHE_REORDONNER Renumérote les nœuds d'un graphe.
+  H = MATLIBRE_GRAPHE_REORDONNER(G,ORDRE) rend le même graphe dont le
+  nœud k est celui qui portait le numéro ORDRE(k). ORDRE doit être une
+  permutation de 1 à N : renuméroter n'est pas trier, et il ne doit ni
+  manquer ni se répéter un nœud.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     h = matlibre_graphe_reordonner(graph([1 2], [2 3]), [3 2 1]);
+     h.Arcs                          % les aretes suivent les noeuds
+
+  Voir aussi REORDERNODES, SUBGRAPH.
+```
+
 ## `matlibre_graphe_retirer`
 
 ```
@@ -4289,6 +4599,22 @@ MATLIBRE_GRAPHE_RETIRER Retire des nœuds et renumérote les autres.
      numnodes(matlibre_graphe_retirer(graph([1 2], [2 3]), 3))   % 2
 
   Voir aussi RMNODE, SUBGRAPH.
+```
+
+## `matlibre_graphe_retourner`
+
+```
+MATLIBRE_GRAPHE_RETOURNER Retourne le sens de certains arcs.
+  H = MATLIBRE_GRAPHE_RETOURNER(G,S,T) rend le graphe où les arcs
+  allant de S à T ont été retournés ; les autres ne bougent pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     h = matlibre_graphe_retourner(digraph([1 2], [2 3]), 1, 2);
+     h.Arcs(1, :)                    % 2 1 : l'arc a change de sens
+
+  Voir aussi FLIPEDGE, DIGRAPH.
 ```
 
 ## `matlibre_graphe_sous`
@@ -4317,7 +4643,7 @@ MATLIBRE_GRAPHE_TOPOSORT Tri topologique par l'algorithme de Kahn.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
   Exemple :
-     matlibre_graphe_toposort(digraph([1 2], [2 3]))'     % 1 2 3
+     matlibre_graphe_toposort(digraph([1 2], [2 3]))      % 1 2 3
 
   Voir aussi TOPOSORT, DIGRAPH, CONNCOMP.
 ```
