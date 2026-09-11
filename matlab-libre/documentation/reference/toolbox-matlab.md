@@ -2918,9 +2918,13 @@ ISSORTED Vrai si le tableau est trié.
   'strictascend', 'strictdescend' ou 'strictmonotonic'.
   ISSORTED(A,'rows') teste les lignes d'une matrice ; voir ISSORTEDROWS.
 
+  Ce qui s'ordonne se teste, même sans passer par des nombres : dates,
+  durées, catégories ordonnées et textes se comparent directement.
+
   Exemples :
      issorted([1 2 2 5])                  % true
      issorted([1 2 2 5], 'strictascend')  % false
+     issorted([datetime(2024,1,1) datetime(2024,3,1)])   % true
 
   Voir aussi SORT, ISSORTEDROWS, SORTROWS.
 ```
@@ -3382,6 +3386,24 @@ MATLIBRE_CLIP_BOOLEEN Réunion, intersection ou différence de polygones.
      abs(polyarea(c{1}(:,1), c{1}(:,2)) - 1) < 1e-9
 
   Voir aussi POLYSHAPE, UNION, INTERSECT, SUBTRACT.
+```
+
+## `matlibre_comparer_textes`
+
+```
+MATLIBRE_COMPARER_TEXTES Compare deux textes, comme le fait un tri.
+  Rend -1 si A vient avant B, 0 s'ils sont égaux, 1 sinon. La
+  comparaison est celle des codes de caractères, position par position ;
+  à préfixe égal, le plus court vient d'abord.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_comparer_textes('a', 'b')      % -1
+     matlibre_comparer_textes('ab', 'a')     % 1
+     matlibre_comparer_textes('a', 'a')      % 0
+
+  Voir aussi ISSORTED, SORT, STRCMP.
 ```
 
 ## `matlibre_composantes_triangles`

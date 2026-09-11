@@ -262,6 +262,19 @@ classdef categorical
         function r = isvector(c), r = isvector(c.Codes); end
         function r = transpose(c), r = categorical.avec(c.Codes.', c.Noms, c.Ordinal); end
         function r = ctranspose(c), r = categorical.avec(c.Codes', c.Noms, c.Ordinal); end
+        % Reordonner ne touche qu'aux codes : les categories et leur
+        % ordre restent ceux du tableau d'origine.
+        function r = flip(c, varargin)
+            r = categorical.avec(flip(c.Codes, varargin{:}), c.Noms, c.Ordinal);
+        end
+        function r = fliplr(c), r = categorical.avec(fliplr(c.Codes), c.Noms, c.Ordinal); end
+        function r = flipud(c), r = categorical.avec(flipud(c.Codes), c.Noms, c.Ordinal); end
+        function r = circshift(c, varargin)
+            r = categorical.avec(circshift(c.Codes, varargin{:}), c.Noms, c.Ordinal);
+        end
+        function r = repmat(c, varargin)
+            r = categorical.avec(repmat(c.Codes, varargin{:}), c.Noms, c.Ordinal);
+        end
         function r = reshape(c, varargin)
             r = categorical.avec(reshape(c.Codes, varargin{:}), c.Noms, c.Ordinal);
         end

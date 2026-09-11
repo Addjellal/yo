@@ -301,9 +301,14 @@ DAYS Durée en jours, ou jours d'une durée.
   D = DAYS(X) construit une durée dont le format d'affichage est 'd'.
   X = DAYS(D) rend le nombre de jours d'une durée.
 
+  Une durée calendaire n'a de longueur en jours que si elle ne porte
+  pas de mois : un mois vaut vingt-huit à trente et un jours selon
+  lequel, et DAYS refuse plutôt que de choisir.
+
   Exemple :
      days(1.5)                   % une duree d'un jour et demi
      hours(days(1))              % 24
+     days(caldays(3))            % 3
 
   Voir aussi HOURS, MINUTES, SECONDS, YEARS, DURATION.
 ```

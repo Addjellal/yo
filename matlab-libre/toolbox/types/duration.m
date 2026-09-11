@@ -142,6 +142,23 @@ classdef duration
         function r = isrow(d), r = isrow(d.Secondes); end
         function r = transpose(d), r = duration.avec(d.Secondes.', d.Format); end
         function r = ctranspose(d), r = duration.avec(d.Secondes', d.Format); end
+        % Reordonner ne change pas la nature : une duree deplacee reste
+        % une duree, et garde son format d'affichage.
+        function r = flip(d, varargin), r = duration.avec(flip(d.Secondes, varargin{:}), d.Format); end
+        function r = fliplr(d), r = duration.avec(fliplr(d.Secondes), d.Format); end
+        function r = flipud(d), r = duration.avec(flipud(d.Secondes), d.Format); end
+        function r = circshift(d, varargin)
+            r = duration.avec(circshift(d.Secondes, varargin{:}), d.Format);
+        end
+        function r = repmat(d, varargin)
+            r = duration.avec(repmat(d.Secondes, varargin{:}), d.Format);
+        end
+        function varargout = unique(d, varargin)
+            [v, ia, ic] = unique(d.Secondes, varargin{:});
+            varargout{1} = duration.avec(v, d.Format);
+            if nargout > 1, varargout{2} = ia; end
+            if nargout > 2, varargout{3} = ic; end
+        end
         function r = reshape(d, varargin), r = duration.avec(reshape(d.Secondes, varargin{:}), d.Format); end
         function r = horzcat(varargin)
             v = []; f = '';

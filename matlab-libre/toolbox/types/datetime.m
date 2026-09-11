@@ -185,6 +185,30 @@ classdef datetime
         function r = isvector(t), r = isvector(t.Serie); end
         function r = transpose(t), r = datetime.avec(t.Serie.', t.Format, t.TimeZone); end
         function r = ctranspose(t), r = datetime.avec(t.Serie', t.Format, t.TimeZone); end
+        % Ce qui ne fait que deplacer des elements s'applique a la serie
+        % et se rhabille : une date reordonnee reste une date, et le
+        % format comme le fuseau la suivent.
+        function r = flip(t, varargin)
+            r = datetime.avec(flip(t.Serie, varargin{:}), t.Format, t.TimeZone);
+        end
+        function r = fliplr(t)
+            r = datetime.avec(fliplr(t.Serie), t.Format, t.TimeZone);
+        end
+        function r = flipud(t)
+            r = datetime.avec(flipud(t.Serie), t.Format, t.TimeZone);
+        end
+        function r = circshift(t, varargin)
+            r = datetime.avec(circshift(t.Serie, varargin{:}), t.Format, t.TimeZone);
+        end
+        function r = repmat(t, varargin)
+            r = datetime.avec(repmat(t.Serie, varargin{:}), t.Format, t.TimeZone);
+        end
+        function varargout = unique(t, varargin)
+            [v, ia, ic] = unique(t.Serie, varargin{:});
+            varargout{1} = datetime.avec(v, t.Format, t.TimeZone);
+            if nargout > 1, varargout{2} = ia; end
+            if nargout > 2, varargout{3} = ic; end
+        end
         function r = reshape(t, varargin)
             r = datetime.avec(reshape(t.Serie, varargin{:}), t.Format, t.TimeZone);
         end

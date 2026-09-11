@@ -174,6 +174,55 @@ for poignee = {@(x) x^3 - 2*x + 1, @(a,b) (a + b) * (a - b), @(x) -x^2 + 3, ...
     end
 end
 
+%% ------------- ce qui s'ordonne se teste, meme sans etre un nombre
+% ISSORTED passait par DOUBLE : les dates, les durees et les categories
+% s'ordonnent parfaitement et etaient pourtant refusees.
+dates = [datetime(2024,1,1) datetime(2024,2,1) datetime(2024,3,1)];
+assert(issorted(dates));
+assert(~issorted(fliplr(dates)));
+assert(issorted(fliplr(dates), 'descend'));
+assert(issorted(dates, 'strictascend'));
+assert(~issorted([dates(1) dates(1)], 'strictascend'));
+assert(issorted([seconds(1) seconds(2)]));
+assert(issorted({'a', 'b'}) && ~issorted({'b', 'a'}));
+assert(issorted(["a"; "b"]));
+% Le cas numerique n'a pas bouge.
+assert(issorted([1 2 2 5]));
+assert(~issorted([1 2 2 5], 'strictascend'));
+assert(issorted([5 2 1], 'descend'));
+assert(issorted([]) && issorted(7));
+
+%% ------------ reordonner ne change pas la nature de ce qu'on reordonne
+% FLIP, CIRCSHIFT, REPMAT et UNIQUE ne font que deplacer des elements ;
+% ils etaient pourtant refuses sur les types modernes.
+for avant = {dates, [seconds(1) seconds(2)], categorical({'a', 'b'})}
+    v = avant{1};
+    assert(strcmp(class(fliplr(v)), class(v)));
+    assert(strcmp(class(flipud(v')), class(v)));
+    assert(strcmp(class(flip(v)), class(v)));
+    assert(strcmp(class(circshift(v, 1)), class(v)));
+    assert(strcmp(class(repmat(v, 1, 2)), class(v)));
+    assert(numel(repmat(v, 1, 2)) == 2 * numel(v));
+end
+% Retourner deux fois revient au depart.
+assert(issorted(fliplr(fliplr(dates))));
+% UNIQUE reconnait les doublons de dates et de durees.
+assert(numel(unique([dates(1) dates(1) dates(2)])) == 2);
+assert(numel(unique([seconds(1) seconds(1)])) == 1);
+[~, iaDate] = unique([dates(1) dates(1)]);
+assert(size(iaDate, 2) == 1);
+
+%% ---------------- DAYS d'une duree calendaire : jours oui, mois non
+% Rendre le seul temps donnait zero pour CALDAYS(3). Rendre une longueur
+% pour un mois serait pire : c'est vingt-huit a trente et un jours selon
+% lequel, et l'on ne sait pas lequel.
+assert(days(caldays(3)) == 3);
+assert(abs(days(caldays(2) + hours(12)) - 2.5) < 1e-12);
+assert(refuse(@() days(calmonths(2))));
+% Et l'arithmetique calendaire n'a pas bouge.
+assert(datetime(2024,1,1) + caldays(3) == datetime(2024,1,4));
+assert(datetime(2024,1,31) + calmonths(1) == datetime(2024,2,29));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)
