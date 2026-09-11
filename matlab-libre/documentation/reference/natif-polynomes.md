@@ -68,13 +68,57 @@ INTERP2  Interpolation sur une grille à deux dimensions.
 ## `makima`
 
 ```
-makima  Interpolation d'Akima modifiee.
+MAKIMA  Interpolation d'Akima modifiée.
+    MAKIMA(X,Y,XQ) rend les valeurs interpolées en XQ. La pente à chaque
+    nœud est la moyenne des deux pentes voisines, pondérée par la
+    variation des pentes d'à côté : là où le voisinage est droit, la
+    pente suit, et une donnée lointaine n'a pas d'influence.
+    PP = MAKIMA(X,Y) rend la forme par morceaux.
+
+    La modification apportée à la formule d'Akima ajoute la demi-somme
+    des pentes au poids. Elle supprime l'ondulation que la formule
+    d'origine produit sur un palier : un plateau suivi d'une pente reste
+    plat, là où AKIMA y creuse une vague.
+
+    Syntaxe
+       yq = makima(x,y,xq)
+       pp = makima(x,y)
+
+    Exemples
+       x = 0:7;  y = [0 0 0 0 1 2 3 4];
+       q = 0:0.05:3;
+       max(abs(makima(x, y, q))) < 1e-12       % le palier reste plat
+       max(abs(interp1(x, y, q, 'akima'))) > 0.05
+
+    Voir aussi INTERP1, PCHIP, SPLINE, PPVAL.
 ```
 
 ## `pchip`
 
 ```
-pchip  Interpolation cubique qui preserve la forme.
+PCHIP  Interpolation cubique qui préserve la forme.
+    PCHIP(X,Y,XQ) rend les valeurs interpolées en XQ par un polynôme
+    d'Hermite cubique dont les pentes sont choisies pour ne jamais faire
+    dépasser la courbe au-delà des données.
+    PP = PCHIP(X,Y) rend la forme par morceaux, à évaluer avec PPVAL.
+
+    Là où deux pentes voisines changent de signe, le nœud est un
+    extremum des données, et la pente y est mise à zéro. C'est ce qui
+    distingue PCHIP de SPLINE : la spline cherche la courbure la plus
+    douce et déborde volontiers, PCHIP reste dans l'enveloppe des points.
+
+    Syntaxe
+       yq = pchip(x,y,xq)
+       pp = pchip(x,y)
+
+    Exemples
+       x = 0:5;  y = [0 0 0 1 1 1];
+       yq = pchip(x, y, 0:0.05:5);
+       max(yq) <= 1 && min(yq) >= 0       % il ne depasse jamais
+       ys = spline(x, y, 0:0.05:5);
+       max(ys) > 1                        % la spline, elle, ondule
+
+    Voir aussi INTERP1, SPLINE, MAKIMA, PPVAL.
 ```
 
 ## `poly`

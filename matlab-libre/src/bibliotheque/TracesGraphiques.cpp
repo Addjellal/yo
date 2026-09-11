@@ -237,7 +237,76 @@ FONCTION(fnBar) { INUTILISE return tracer(it, args, GenreTrace::Barres, false, f
 FONCTION(fnScatter) { INUTILISE return tracer(it, args, GenreTrace::Points, false, false, nargout); }
 FONCTION(fnStairs) { INUTILISE return tracer(it, args, GenreTrace::Escalier, false, false, nargout); }
 FONCTION(fnStem) { INUTILISE return tracer(it, args, GenreTrace::Tige, false, false, nargout); }
-FONCTION(fnPlot3) { INUTILISE return tracer(it, args, GenreTrace::Ligne, false, false, nargout); }
+// Une courbe de l'espace. Le rendu est plan : on projette, mais on garde
+// les trois coordonnees d'origine dans la serie, si bien que « XData »,
+// « YData » et « ZData » rendent ce qu'on a donne.
+//
+// La projection est celle de la vue par defaut de MATLAB — azimut -37,5
+// degres, elevation 30 —, celle qui montre les trois axes a la fois sans
+// qu'aucun se cache derriere un autre.
+FONCTION(fnPlot3) {
+    INUTILISE
+    exigerArguments(args, 3, 0, "plot3");
+    const double azimut = -37.5 * 3.14159265358979323846 / 180.0;
+    const double elevation = 30.0 * 3.14159265358979323846 / 180.0;
+    const double sinA = std::sin(azimut), cosA = std::cos(azimut);
+    const double sinE = std::sin(elevation), cosE = std::cos(elevation);
+
+    nouveauTrace(it);
+    auto axes = axesCourants(it);
+    std::size_t indexCouleur = axes->series.size();
+    std::vector<int> identifiants;
+    std::size_t k = 0;
+    while (k + 2 < args.size() && args[k].estNumerique() && args[k + 1].estNumerique() &&
+           args[k + 2].estNumerique()) {
+        Serie s;
+        s.genre = GenreTrace::Ligne;
+        s.couleur.clear();
+        s.xVraies = valeursDe(args[k]);
+        s.yVraies = valeursDe(args[k + 1]);
+        s.z = valeursDe(args[k + 2]);
+        k += 3;
+        std::size_t n = std::min(s.xVraies.size(), std::min(s.yVraies.size(), s.z.size()));
+        s.xVraies.resize(n);
+        s.yVraies.resize(n);
+        s.z.resize(n);
+        s.x.resize(n);
+        s.y.resize(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            double x = s.xVraies[i], y = s.yVraies[i], z = s.z[i];
+            s.x[i] = -x * sinA + y * cosA;
+            s.y[i] = -x * cosA * sinE - y * sinA * sinE + z * cosE;
+        }
+        if (k < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+            std::string spec = args[k].versTexte();
+            if (estSpecificationStyle(spec)) {
+                decoderStyle(spec, s);
+                ++k;
+            }
+        }
+        while (k + 1 < args.size() && (args[k].estTexte() || args[k].estChaine())) {
+            std::string nom = args[k].versTexte();
+            for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+            if (nom == "linewidth") s.epaisseur = args[k + 1].scal();
+            else if (nom == "color") {
+                std::string couleur = couleurDepuisValeur(args[k + 1]);
+                if (!couleur.empty()) s.couleur = couleur;
+            } else if (nom == "displayname") s.etiquette = args[k + 1].versTexte();
+            else if (nom == "linestyle") s.style = args[k + 1].versTexte();
+            else if (nom == "marker") s.marqueur = args[k + 1].versTexte();
+            k += 2;
+        }
+        if (s.couleur.empty()) s.couleur = palette(indexCouleur++);
+        identifiants.push_back(ajouterSerie(it, s));
+    }
+    if (identifiants.empty())
+        erreur("MATLAB:plot3:Arguments", "PLOT3 attend au moins X, Y et Z.");
+    if (nargout <= 0) return {};
+    int numeroFigure = figureCourante(it)->numero;
+    if (identifiants.size() == 1)
+        return {poigneeLigne(numeroFigure, axes->identifiant, identifiants[0])};
+    return {poigneeLignes(numeroFigure, axes->identifiant, identifiants)};
+}
 
 FONCTION(fnHistogramme) {
     INUTILISE
@@ -1414,7 +1483,7 @@ FONCTION(fnFigureSVG) {
 
 void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("plot", fnPlot, "graphique", "plot  Trace des courbes 2-D.");
-    it.enregistrer("plot3", fnPlot3, "graphique", "plot3  Trace une courbe 3-D (projetee).");
+    it.enregistrer("plot3", fnPlot3, "graphique", "plot3  Trace une courbe de l'espace, projetee dans le plan.");
     it.enregistrer("semilogx", fnSemilogx, "graphique", "semilogx  Axe des x logarithmique.");
     it.enregistrer("semilogy", fnSemilogy, "graphique", "semilogy  Axe des y logarithmique.");
     it.enregistrer("loglog", fnLoglog, "graphique", "loglog  Deux axes logarithmiques.");

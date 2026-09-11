@@ -535,13 +535,27 @@ FONCTION(fnIsprime) {
 
 FONCTION(fnFactor) {
     INUTILISE
-    long long n = (long long)argScalaire(args, 0, "factor");
+    exigerArguments(args, 1, 1, "factor");
+    exigerNumerique(args[0], "factor");
+    // Ce qui n'est pas un entier positif n'a pas de decomposition. Sans ce
+    // controle, factor(2.5) rendait 2 et factor(0) rendait la liste vide,
+    // dont le produit vaut un : deux reponses vraisemblables et fausses.
+    if (args[0].nelem() != 1)
+        erreur("MATLAB:factor:needPositiveInteger",
+               "Input must be a positive integer scalar.");
+    double x = args[0].re[0];
+    if (!std::isfinite(x) || x < 1 || x != std::floor(x) || x > 9.007199254740992e15)
+        erreur("MATLAB:factor:needPositiveInteger",
+               "Input must be a positive integer scalar.");
+    long long n = (long long)x;
     std::vector<double> f;
     for (long long d = 2; d * d <= n; ++d)
         while (n % d == 0) {
             f.push_back((double)d);
             n /= d;
         }
+    // Ce qui reste apres la racine est premier : s'il ne l'etait pas, il
+    // porterait un facteur sous la racine, deja retire.
     if (n > 1) f.push_back((double)n);
     return {Valeur::ligne(f)};
 }

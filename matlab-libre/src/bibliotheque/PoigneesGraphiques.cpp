@@ -253,8 +253,16 @@ bool lireTexte(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur
 bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
                  const Valeur& v) {
     Serie* s = serieDe(it, p);
-    if (memeNom(nom, "XData")) { s->x = versVecteur(v); return true; }
-    if (memeNom(nom, "YData")) { s->y = versVecteur(v); return true; }
+    if (memeNom(nom, "XData")) {
+        s->x = versVecteur(v);
+        if (!s->xVraies.empty()) s->xVraies = s->x;
+        return true;
+    }
+    if (memeNom(nom, "YData")) {
+        s->y = versVecteur(v);
+        if (!s->yVraies.empty()) s->yVraies = s->y;
+        return true;
+    }
     if (memeNom(nom, "ZData")) { s->z = versVecteur(v); return true; }
     if (memeNom(nom, "Color")) {
         std::string couleur = couleurDepuisValeur(v);
@@ -290,8 +298,16 @@ bool ecrireLigne(Interpreteur& it, const Valeur& p, const std::string& nom,
 
 bool lireLigne(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
     Serie* s = serieDe(it, p);
-    if (memeNom(nom, "XData")) { sortie = depuisVecteur(s->x); return true; }
-    if (memeNom(nom, "YData")) { sortie = depuisVecteur(s->y); return true; }
+    // Une courbe de l'espace garde ses vraies coordonnees a cote de la
+    // projection : ce sont elles qu'on rend.
+    if (memeNom(nom, "XData")) {
+        sortie = depuisVecteur(s->xVraies.empty() ? s->x : s->xVraies);
+        return true;
+    }
+    if (memeNom(nom, "YData")) {
+        sortie = depuisVecteur(s->yVraies.empty() ? s->y : s->yVraies);
+        return true;
+    }
     if (memeNom(nom, "ZData")) { sortie = depuisVecteur(s->z); return true; }
     if (memeNom(nom, "Color")) { sortie = Valeur::texte(s->couleur); return true; }
     if (memeNom(nom, "LineWidth")) { sortie = Valeur::scalaire(s->epaisseur); return true; }

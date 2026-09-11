@@ -656,7 +656,9 @@ IS_FUNCTION_HANDLE  Vrai pour une poignée de fonction.
 ```
 ISA  La valeur est-elle de la classe donnée.
     ISA(X,'nom') teste la classe exacte, mais accepte aussi les familles
-    'numeric', 'float' et 'integer'.
+    'numeric', 'float' et 'integer'. Pour un objet, il remonte la chaîne
+    des ancêtres : une dérivée est aussi de la classe de son parent, et
+    c'est tout le propos de l'héritage.
 
     Syntaxe
        tf = isa(x,'nom')
@@ -667,7 +669,7 @@ ISA  La valeur est-elle de la classe donnée.
        isa(single(1),'float')     % 1
        isa('abc','numeric')       % 0
 
-    Voir aussi CLASS, ISNUMERIC, ISFLOAT, ISINTEGER.
+    Voir aussi CLASS, SUPERCLASSES, ISNUMERIC, ISFLOAT, ISINTEGER.
 ```
 
 ## `iscell`
@@ -1612,7 +1614,26 @@ SUBSTRUCT  Fabriquer la structure d'accès de SUBSREF.
 ## `superclasses`
 
 ```
-superclasses  Les classes dont une classe descend.
+SUPERCLASSES  Les classes dont une classe descend.
+    SUPERCLASSES(X) rend, dans une cellule, le nom de chaque ancêtre de
+    la classe de X, du plus proche au plus lointain. SUPERCLASSES('nom')
+    accepte aussi le nom de la classe directement.
+
+    Une classe sans parent rend une cellule vide. Les ancêtres rendus
+    sont transitifs : le parent du parent y figure aussi, puisqu'un objet
+    en est également.
+
+    Syntaxe
+       c = superclasses(x)
+       c = superclasses('nom')
+
+    Exemples
+       isempty(superclasses('double'))      % 1 : aucun parent
+       dt = delaunayTriangulation([0 0; 1 0; 0 1; 1 1]);
+       any(strcmp(superclasses(dt), 'triangulation'))    % 1
+       isa(dt, 'triangulation')             % 1 : ce que ca veut dire
+
+    Voir aussi ISA, CLASS, METHODS, PROPERTIES.
 ```
 
 ## `transpose`

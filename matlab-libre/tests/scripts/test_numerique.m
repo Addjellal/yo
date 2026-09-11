@@ -413,6 +413,38 @@ assert(abs(integral3(@(x, y, z) ones(size(x)), 0, 2, 0, 3, 0, 4) - 24) < 1e-9);
 assert(abs(quad2d(@(x, y) x .* y, 0, 1, 0, 1) - ...
            integral2(@(x, y) x .* y, 0, 1, 0, 1)) < 1e-14);
 
+%% ------------------------------------------------------------- FACTOR
+% La décomposition en facteurs premiers se vérifie sur elle-même : le
+% produit des facteurs vaut le nombre, et chacun est premier. Aucune table
+% n'est nécessaire.
+for n = [2 3 4 60 97 1024 1234567 999983 2^20 123456789]
+    f = factor(n);
+    assert(prod(f) == n);
+    assert(all(isprime(f)));
+    assert(all(diff(f) >= 0));          % rendus en ordre croissant
+end
+% Un nombre premier n'a que lui-même pour facteur.
+assert(isequal(factor(97), 97));
+assert(isequal(factor(999983), 999983));
+% Un carré parfait a ses facteurs deux fois.
+assert(isequal(factor(36), [2 2 3 3]));
+% Un n'a aucun facteur : le produit d'une liste vide vaut un.
+assert(isempty(factor(1)));
+assert(prod(factor(1)) == 1);
+% Ce qui n'est pas un entier positif est refusé.
+for mauvais = {0, -5, 2.5, [2 3]}
+    refuse = false;
+    try
+        factor(mauvais{1});
+    catch
+        refuse = true;
+    end
+    assert(refuse);
+end
+% Le plus grand facteur d'un produit de deux premiers est le plus grand
+% des deux : la division d'essai ne s'arrête pas trop tôt.
+assert(isequal(factor(7919 * 7907), [7907 7919]));
+
 disp('numerique : toutes les verifications passent');
 
 function [valeur, arret, sens] = evenementSol(t, y)

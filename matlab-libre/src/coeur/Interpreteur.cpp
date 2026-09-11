@@ -531,7 +531,13 @@ void Interpreteur::heriterParents(const std::shared_ptr<DefinitionClasse>& def) 
     if (!def || def->heritageFait) return;
     def->heritageFait = true;   // pose avant la descente : coupe les cycles
     for (const auto& nomParent : def->parents) {
-        if (nomParent == "handle") continue;
+        // « handle » n'a pas de fichier : c'est le marqueur qui dit que la
+        // classe se copie par reference. Il compte quand meme comme
+        // ancetre, pour que « isa(x, 'handle') » et SUPERCLASSES le disent.
+        if (nomParent == "handle") {
+            def->ancetres.push_back("handle");
+            continue;
+        }
         auto parent = classeDefinie(nomParent);
         if (!parent || parent.get() == def.get()) continue;
         heriterParents(parent);

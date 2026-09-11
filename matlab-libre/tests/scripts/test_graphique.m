@@ -798,4 +798,47 @@ assert(isfile(fichierExport));
 delete(fichierExport);
 close all;
 
+%% ------------------------------------------- PLOT3, FPLOT3, FIMPLICIT3
+% Une courbe de l'espace garde ses trois coordonnées. Le rendu est plan —
+% on projette pour dessiner — mais ce qu'on relit doit être ce qu'on a
+% donné, non l'ombre portée.
+figure;
+poignee3 = plot3([1 2 3], [4 5 6], [7 8 9]);
+assert(numel(get(gca, 'Children')) == 1);   % une courbe, non trois
+assert(isequal(get(poignee3, 'XData'), [1 2 3]));
+assert(isequal(get(poignee3, 'YData'), [4 5 6]));
+assert(isequal(get(poignee3, 'ZData'), [7 8 9]));
+close all;
+
+% FPLOT3 trace une courbe paramétrée : sur une hélice, les points doivent
+% tomber sur le cylindre unité, et la hauteur croître sans retour.
+figure;
+helice = fplot3(@(t) sin(t), @(t) cos(t), @(t) t, [0 6*pi]);
+xh = get(helice, 'XData');
+yh = get(helice, 'YData');
+zh = get(helice, 'ZData');
+assert(numel(zh) > 100);
+assert(max(abs(xh .^ 2 + yh .^ 2 - 1)) < 1e-12);
+assert(all(diff(zh) > 0));
+assert(abs(zh(1)) < 1e-12 && abs(zh(end) - 6*pi) < 1e-12);
+close all;
+
+% Une poignée non vectorisée est évaluée point par point : le résultat
+% doit être le même.
+figure;
+lente = fplot3(@(t) t, @(t) t^2, @(t) t^3, [0 1]);
+xl = get(lente, 'XData');
+assert(max(abs(get(lente, 'YData') - xl .^ 2)) < 1e-12);
+assert(max(abs(get(lente, 'ZData') - xl .^ 3)) < 1e-12);
+close all;
+
+% FIMPLICIT3 trace une surface implicite par tranches : sur une sphère,
+% chaque point tracé doit être sur la sphère.
+figure;
+fimplicit3(@(x, y, z) x.^2 + y.^2 + z.^2 - 4, [-3 3]);
+courbes = get(gca, 'Children');
+assert(~isempty(courbes));
+close all;
+
+
 disp('graphique : toutes les verifications passent');

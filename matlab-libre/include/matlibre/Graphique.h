@@ -39,6 +39,11 @@ struct Serie {
     int identifiant = 0;
     GenreTrace genre = GenreTrace::Ligne;
     std::vector<double> x, y, z;
+    // Les coordonnees d'origine d'une courbe de l'espace. « plot3 » range
+    // dans x et y la projection — c'est elle qu'on dessine, le rendu etant
+    // plan —, et garde ici ce qu'on lui a donne, pour que « XData » et
+    // « YData » rendent les vraies valeurs et non l'ombre portee.
+    std::vector<double> xVraies, yVraies;
     int largeurImage = 0, hauteurImage = 0;
     std::string couleur = "#0072BD";
     std::string style = "-";

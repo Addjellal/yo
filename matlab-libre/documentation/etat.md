@@ -13,23 +13,23 @@ documentation publique et vérifiée sur la propriété qui la définit.
 
 | partie | contenu | lignes |
 |---|---|---:|
-| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 023 |
-| `src/bibliotheque` | 668 fonctions natives, en C++ | 18 970 |
+| `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 029 |
+| `src/bibliotheque` | 668 fonctions natives, en C++ | 19 069 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 824 fichiers `.m`, dont 2 170 fonctions publiques | 128 057 |
-| `tests` | 38 scripts `.m` et 2 fichiers C++ | 19 721 |
+| `toolbox` | 2 848 fichiers `.m`, dont 2 180 fonctions publiques | 129 007 |
+| `tests` | 39 scripts `.m` et 2 fichiers C++ | 20 005 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 286
+documentation MathWorks est complète : `outils/manques.m` compte **2 296
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
-pas, et cent une ont été ajoutées de cette façon — la famille
+pas, et cent onze ont été ajoutées de cette façon — la famille
 moderne des chaînes, les extrema locaux et les ruptures, les méthodes de
 Krylov, les estimations de norme et de conditionnement, les graphes, les
 résumés par groupe, les vingt-quatre validateurs d'arguments, les solveurs d'équations aux
-dérivées partielles et de problèmes aux limites, la géométrie de calcul et
-les interpolants.
+dérivées partielles et de problèmes aux limites, la géométrie de calcul, les
+interpolants, la lecture et l'écriture du XML.
 
 ## 2. Ce qui est vérifié, et comment
 
@@ -51,7 +51,7 @@ portent un exemple, et celles qu'un test ou un exemple nomme. Il écrit
   quatre-vingt-onze exemples cassés dans douze boîtes à outils, presque
   tous employant une variable que personne n'avait définie.
 - `tests/scripts/test_aide.m` fait le même contrôle dans la suite de
-  tests, sur les 636 fiches natives et les 2 088 fiches de toolbox, et
+  tests, sur les 651 fiches natives et les 2 170 fiches de toolbox, et
   exige de surcroît un « Voir aussi » sur chacune.
 - `tests/scripts/test_exemples.m` exécute les 53 programmes d'école, qui
   ne se contentent pas d'appeler les fonctions : chacun vérifie ce que la
@@ -90,6 +90,8 @@ suivant en donne quelques-unes, prises dans les tests.
 | `pchip` contre `spline` | sur une marche, l'un ne dépasse jamais, l'autre ondule de 0,128 |
 | `makima` contre `akima` | sur un palier suivi d'une pente, l'un reste plat, l'autre ondule de 0,074 |
 | héritage de classe | une dérivée reçoit propriétés et méthodes, la redéfinition l'emporte, `isa` remonte la chaîne |
+| formats d'échange | écrire puis relire rend ce qu'on avait — lignes, XML, JSON, attributs et caractères réservés compris |
+| courbe de l'espace | `plot3` garde ses trois coordonnées ; sur une hélice, les points tombent sur le cylindre à 1e-16 |
 
 ## 3. État par boîte à outils
 
@@ -101,7 +103,7 @@ distingue une boîte complète d'une boîte esquissée.
 |---|---:|---|
 | statistiques | 272 | complète : lois, tests, régression, classification, mélanges, HMM |
 | signal | 205 | complète : conception RIF et RII, analogique et numérique, spectres, mesures d'impulsion |
-| matlab | 272 | noyau du langage, en complément des 668 natives |
+| matlab | 283 | noyau du langage, en complément des 668 natives |
 | finance | 148 | complète : indicateurs techniques, portefeuille, actualisation |
 | images | 138 | complète : morphologie, filtres, couleur, segmentation, texture |
 | ondelettes | 129 | complète : DWT, paquets, MODWT, CWT, débruitage |

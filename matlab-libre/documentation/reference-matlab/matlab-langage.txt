@@ -72,3 +72,5 @@ decomposition isIllConditioned ode89
 bvp4c bvpinit bvpset pdepe pdeval
 polyarea rectint convhulln boundary triangulation delaunayTriangulation
 alphaShape scatteredInterpolant griddedInterpolant pchip makima superclasses
+readlines writelines readstruct writestruct xmlread xmlwrite weboptions
+clearAllMemoizedCaches

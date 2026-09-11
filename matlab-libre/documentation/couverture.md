@@ -18,7 +18,7 @@ fichier est produit par mesure, non écrit à la main.
 - **668 fonctions natives** couvrant le MATLAB de base, **toutes**
   documentées : résumé, description, syntaxes, exemples exécutés par la
   suite de tests et fonctions voisines, dans `toolbox/aide/`.
-- **2770 fonctions de toolbox** réparties en4 modules, écrites dans le
+- **2794 fonctions de toolbox** réparties en4 modules, écrites dans le
   langage.
 - **Les types de données de MATLAB moderne** : `duration`,
   `calendarDuration`, `datetime`, `categorical`, `table`, `timetable`,
@@ -39,7 +39,7 @@ fichier est produit par mesure, non écrit à la main.
   MATLAB (tranches, réductions, diffusées, temporaires).
 - **Un générateur de code C** qui traduit l'arbre syntaxique, propage les
   types et les dimensions, et produit du C sans allocation.
-- **Une documentation qui ne ment pas** : 648 fonctions ont leur fiche —
+- **Une documentation qui ne ment pas** : 651 fonctions ont leur fiche —
   syntaxe, description, exemples, voisines —, le bureau les montre dans un
   navigateur d'aide, et chaque exemple est exécuté à chaque passage des
   tests.
@@ -53,7 +53,7 @@ fichier est produit par mesure, non écrit à la main.
   dans le langage — dont une qui contrôle un résultat exact par toolbox,
   une les types de données, une le calcul parallèle, une qui compile puis
   exécute le C produit pour le comparer à l'interpréteur, une qui exécute
-  les 648 exemples de l'aide — et 204 vérifications du bureau natif,
+  les 651 exemples de l'aide — et 204 vérifications du bureau natif,
   pilotées sans ouvrir de fenêtre. `outils/eprouverNatives.sh` appelle en
   plus chacune des 668 fonctions natives avec des arguments qu'elle
   n'attend pas — une cellule, une structure, une poignée, une taille

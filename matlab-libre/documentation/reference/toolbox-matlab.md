@@ -685,6 +685,28 @@ CLABEL Étiquette les lignes de niveau.
   Voir aussi CONTOUR, CONTOURF, CONTOURC, TEXT.
 ```
 
+## `clearAllMemoizedCaches`
+
+```
+CLEARALLMEMOIZEDCACHES Vide les caches de toutes les fonctions mémoïsées.
+  Une fonction mémoïsée retient ses résultats. Si ce dont elle dépend
+  change sans que ses arguments changent — un fichier relu, une
+  variable globale —, ce qu'elle retient devient faux : c'est le seul
+  défaut de la mémoïsation, et vider le cache est le remède.
+
+  Vider le cache d'un seul objet se fait par CLEARCACHE.
+
+  Exemple :
+     f = memoize(@(x) x + 1);
+     f(1); f(1);
+     clearAllMemoizedCaches();
+     f(1);
+     s = stats(f);
+     s.CacheOccupancyPercent         % le cache s'est rempli a nouveau
+
+  Voir aussi MEMOIZE, CLEARCACHE, STATS.
+```
+
 ## `clim`
 
 ```
@@ -1718,6 +1740,31 @@ FIMPLICIT Courbe implicite F(x,y) = 0.
   Voir aussi FCONTOUR, CONTOUR, FPLOT, EZPLOT, FSURF.
 ```
 
+## `fimplicit3`
+
+```
+FIMPLICIT3 Surface implicite F(x,y,z) = 0.
+  FIMPLICIT3(F) trace la surface où F s'annule, sur [-5 5]^3. F est une
+  poignée de trois variables.
+  FIMPLICIT3(F,[A B]) emploie le cube [A B]^3.
+  FIMPLICIT3(F,[A B C D E G]) emploie le pavé donné.
+
+  H = FIMPLICIT3(...) rend la poignée.
+
+  La surface est obtenue en découpant le pavé en tranches et en traçant
+  la ligne de niveau zéro de chacune. C'est la même idée qu'en deux
+  dimensions, empilée : une surface implicite est la réunion de ses
+  coupes, et chacune est une courbe implicite.
+
+  Une surface qui ne coupe aucune tranche ne se voit pas : serrer les
+  tranches est le remède, comme serrer la grille l'est pour une courbe.
+
+  Exemple :
+     fimplicit3(@(x, y, z) x.^2 + y.^2 + z.^2 - 4, [-3 3]);   % la sphere
+
+  Voir aussi FIMPLICIT, FSURF, ISOSURFACE, CONTOUR3, FPLOT3.
+```
+
 ## `findgroups`
 
 ```
@@ -1830,6 +1877,27 @@ FPLOT Trace une fonction donnée par une poignée.
      fplot(@(t) cos(3*t), @(t) sin(2*t), [0 2*pi]);   % une Lissajous
 
   Voir aussi PLOT, FSURF, FCONTOUR, EZPLOT, FIMPLICIT.
+```
+
+## `fplot3`
+
+```
+FPLOT3 Courbe paramétrée de l'espace.
+  FPLOT3(FX,FY,FZ) trace la courbe (FX(t),FY(t),FZ(t)) pour t allant de
+  -5 à 5. Les trois arguments sont des poignées d'une variable.
+  FPLOT3(FX,FY,FZ,[A B]) emploie l'intervalle donné.
+  FPLOT3(...,OPTIONS) passe les options de tracé à PLOT3.
+
+  H = FPLOT3(...) rend la poignée.
+
+  L'échantillonnage est régulier en paramètre, non en longueur d'arc :
+  une courbe qui accélère est donc moins finement décrite là où elle va
+  vite. Serrer l'intervalle est le remède.
+
+  Exemple :
+     fplot3(@(t) sin(t), @(t) cos(t), @(t) t, [0 6*pi]);   % une helice
+
+  Voir aussi FPLOT, PLOT3, FSURF, FIMPLICIT3.
 ```
 
 ## `fsurf`
@@ -3304,6 +3372,23 @@ MATLIBRE_CONTIENT_VARIABLE Vrai si le nom apparaît comme variable seule.
   « x + y » de celui de « ylabel ».
 ```
 
+## `matlibre_contour_segments`
+
+```
+MATLIBRE_CONTOUR_SEGMENTS Découpe une matrice de contour en morceaux.
+  La matrice que rend CONTOUR range ses courbes bout à bout, chacune
+  précédée d'un en-tête portant sa hauteur et son nombre de points.
+  C'est ce format qu'il faut défaire pour tracer les courbes une à une.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     s = matlibre_contour_segments([0 0 1; 2 0 1]);
+     size(s{1}, 2)                   % 2 points
+
+  Voir aussi CONTOUR, FIMPLICIT3, CONTOURC.
+```
+
 ## `matlibre_couleur_secteur`
 
 ```
@@ -3447,6 +3532,24 @@ MATLIBRE_ESSAIMER Écarte latéralement les points de même abscisse.
   Voir aussi SWARMCHART, SCATTER.
 ```
 
+## `matlibre_evaluer_courbe`
+
+```
+MATLIBRE_EVALUER_COURBE Évalue une poignée sur un vecteur de paramètres.
+  Une poignée vectorisée est appelée une fois ; une poignée qui ne l'est
+  pas est appelée point par point. On essaie la première façon et l'on
+  se rabat sur la seconde si le résultat n'a pas la bonne taille — c'est
+  plus sûr que d'exiger de l'appelant qu'il vectorise.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     v = matlibre_evaluer_courbe(@(t) t.^2, [1 2 3]);
+     isequal(v, [1 4 9])
+
+  Voir aussi FPLOT3, FPLOT, ARRAYFUN.
+```
+
 ## `matlibre_evaluer_grille`
 
 ```
@@ -3455,6 +3558,24 @@ MATLIBRE_EVALUER_GRILLE Évalue une fonction de deux variables sur une grille.
   FCONTOUR s'en servent ; comme pour une variable, une poignée non
   vectorisée est appelée point par point plutôt que de faire échouer le
   tracé.
+```
+
+## `matlibre_evaluer_grille3`
+
+```
+MATLIBRE_EVALUER_GRILLE3 Évalue une poignée de trois variables sur une tranche.
+  La troisième coordonnée est fixée : on obtient la coupe de la
+  fonction à cette altitude, dont la ligne de niveau zéro est la trace
+  de la surface implicite.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [X, Y] = meshgrid(-1:1, -1:1);
+     Z = matlibre_evaluer_grille3(@(x,y,z) x + y + z, X, Y, 1);
+     Z(2, 2)                         % 1 : au centre, x et y sont nuls
+
+  Voir aussi FIMPLICIT3, MATLIBRE_EVALUER_GRILLE.
 ```
 
 ## `matlibre_evaluer_sur`
@@ -3928,6 +4049,67 @@ MATLIBRE_LARGEUR_BANDE Distance maximale d'un coefficient non nul à la diagonal
   Voir aussi SYMRCM, SYMAMD, BANDWIDTH.
 ```
 
+## `matlibre_lire_options`
+
+```
+MATLIBRE_LIRE_OPTIONS Lit une suite de couples nom-valeur.
+  Les valeurs par défaut viennent d'une structure ; chaque couple
+  présent dans les arguments remplace la sienne. Un nom inconnu est
+  refusé plutôt qu'ignoré : une option mal orthographiée qui ne fait
+  rien est plus coûteuse qu'une erreur.
+
+  La comparaison des noms ignore la casse, comme dans MATLAB.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     o = matlibre_lire_options({'Seuil', 3}, struct('Seuil', 1));
+     o.Seuil                         % 3
+
+  Voir aussi INPUTPARSER, VARARGIN.
+```
+
+## `matlibre_memoire_globale`
+
+```
+MATLIBRE_MEMOIRE_GLOBALE Registre des fonctions mémoïsées vivantes.
+  Chaque MEMOIZEDFUNCTION s'y inscrit à sa construction, ce qui permet
+  à CLEARALLMEMOIZEDCACHES de toutes les vider d'un coup. C'est
+  possible parce que MEMOIZEDFUNCTION est une classe à poignée : le
+  registre garde la même chose que l'appelant, non une copie.
+
+  Le registre retient donc ses objets aussi longtemps que la session
+  dure. C'est le prix à payer pour pouvoir les atteindre, et MATLAB
+  fait de même.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     avant = matlibre_memoire_globale('compter');
+     f = memoize(@(x) x);
+     matlibre_memoire_globale('compter') > avant
+
+  Voir aussi MEMOIZE, CLEARALLMEMOIZEDCACHES, MEMOIZEDFUNCTION.
+```
+
+## `matlibre_nom_valide`
+
+```
+MATLIBRE_NOM_VALIDE Fait d'un texte un nom de champ acceptable.
+  Les caractères qui ne peuvent pas figurer dans un nom deviennent des
+  soulignés, et un nom qui commence par un chiffre reçoit un « x » en
+  tête : un champ de structure ne peut pas commencer par un chiffre.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB —
+  c'est MATLAB.LANG.MAKEVALIDNAME qui y répond.
+
+  Exemple :
+     matlibre_nom_valide('a-b')      % 'a_b'
+     matlibre_nom_valide('2x')       % 'x2x'
+
+  Voir aussi MATLIBRE_XML_BALISE, GENVARNAME, ISVARNAME.
+```
+
 ## `matlibre_noyau_plaque`
 
 ```
@@ -4056,6 +4238,45 @@ MATLIBRE_SEUIL_ALPHA Rayon au-delà duquel un triangle est retiré.
   Voir aussi BOUNDARY, ALPHASHAPE.
 ```
 
+## `matlibre_structure_en_xml`
+
+```
+MATLIBRE_STRUCTURE_EN_XML Écrit une valeur en XML, récursivement.
+  Un champ dont le nom finit par « Attribute » devient un attribut de
+  l'élément qui le porte ; les autres deviennent des éléments enfants.
+  Un tableau de structures devient une suite d'éléments frères de même
+  nom, ce qui est la façon dont le XML exprime une liste.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     t = matlibre_structure_en_xml(struct('a', 1), 'racine', 0);
+     ~isempty(strfind(t, '<a>1</a>'))
+
+  Voir aussi WRITESTRUCT, READSTRUCT.
+```
+
+## `matlibre_texte_ou_nombre`
+
+```
+MATLIBRE_TEXTE_OU_NOMBRE Convertit un texte en nombre s'il en est un.
+  Un texte qui s'écrit entièrement comme un nombre est rendu en nombre ;
+  tout autre reste du texte. C'est ce qui permet à un aller-retour par
+  WRITESTRUCT et READSTRUCT de rendre les nombres tels qu'on les a
+  donnés, sans rien reconvertir à la main.
+
+  La conversion exige que tout le texte soit consommé : « 12abc » reste
+  du texte, là où une conversion laxiste rendrait douze.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_texte_ou_nombre('42')       % 42, en nombre
+     matlibre_texte_ou_nombre('42abc')    % "42abc", en texte
+
+  Voir aussi READSTRUCT, STR2DOUBLE, STR2NUM.
+```
+
 ## `matlibre_tri_aretes`
 
 ```
@@ -4125,6 +4346,124 @@ MATLIBRE_VALIDER Lève l'erreur d'un validateur quand la condition échoue.
      matlibre_valider(true, 'MATLAB:essai', 'jamais vu');
 
   Voir aussi MUSTBENUMERIC, MUSTBEPOSITIVE, VALIDATEATTRIBUTES.
+```
+
+## `matlibre_xml_analyser`
+
+```
+MATLIBRE_XML_ANALYSER Arbre d'un document XML.
+  Le nœud rendu porte les champs Name, Attributes, Children et Text.
+  L'analyse est descendante : on lit les balises dans l'ordre, on
+  empile à l'ouverture et l'on dépile à la fermeture, en vérifiant que
+  le nom concorde — un document mal fermé est refusé, non deviné.
+
+  Ce qui n'est pas traité : les entités autres que les cinq
+  prédéfinies, les espaces de noms, les définitions de type. Une balise
+  de traitement — la déclaration en tête — et un commentaire sont
+  sautés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     n = matlibre_xml_analyser('<a><b>1</b></a>');
+     n.Name                          % 'a'
+     numel(n.Children)               % 1
+
+  Voir aussi READSTRUCT, XMLREAD.
+```
+
+## `matlibre_xml_balise`
+
+```
+MATLIBRE_XML_BALISE Nom et attributs d'une balise ouvrante.
+  Les attributs sont rendus dans une structure : un champ par attribut,
+  sa valeur étant le texte entre guillemets, déjà déséchappé.
+
+  La valeur peut être entourée de guillemets ou d'apostrophes : le XML
+  accepte les deux, et le délimiteur choisi permet d'écrire l'autre tel
+  quel à l'intérieur.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [n, a] = matlibre_xml_balise('point x="1" y="2"');
+     n                               % 'point'
+     a.x                             % '1'
+
+  Voir aussi MATLIBRE_XML_ANALYSER, READSTRUCT.
+```
+
+## `matlibre_xml_desechapper`
+
+```
+MATLIBRE_XML_DESECHAPPER Rend leur forme aux caractères protégés du XML.
+  L'inverse de MATLIBRE_XML_ECHAPPER. L'esperluette se traite en
+  dernier, symétriquement : la traiter d'abord transformerait
+  « &amp;lt; » en « &lt; », puis en « < », ce qui n'est pas le texte de
+  départ.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_xml_desechapper('a&lt;b &amp; c')     % 'a<b & c'
+
+  Voir aussi READSTRUCT, XMLREAD, MATLIBRE_XML_ECHAPPER.
+```
+
+## `matlibre_xml_echapper`
+
+```
+MATLIBRE_XML_ECHAPPER Protège les caractères réservés du XML.
+  Cinq caractères ne peuvent pas s'écrire tels quels dans du XML :
+  l'esperluette, les deux chevrons, l'apostrophe et le guillemet.
+  L'esperluette se traite en premier, sans quoi on échapperait les
+  esperluettes qu'on vient d'introduire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_xml_echapper('a<b & c')      % 'a&lt;b &amp; c'
+
+  Voir aussi WRITESTRUCT, XMLWRITE, MATLIBRE_XML_DESECHAPPER.
+```
+
+## `matlibre_xml_ecrire`
+
+```
+MATLIBRE_XML_ECRIRE Écrit un arbre XML, récursivement.
+  Un élément sans enfant ni texte s'écrit en balise seule ; un élément
+  qui ne porte que du texte tient sur une ligne ; les autres ouvrent un
+  bloc indenté. C'est la forme que produit un éditeur XML, et celle qui
+  se relit le mieux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     t = matlibre_xml_ecrire(matlibre_xml_analyser('<a>1</a>'), 0);
+     ~isempty(strfind(t, '<a>1</a>'))
+
+  Voir aussi XMLWRITE, XMLREAD.
+```
+
+## `matlibre_xml_en_structure`
+
+```
+MATLIBRE_XML_EN_STRUCTURE Convertit un arbre XML en structure.
+  Un élément sans enfant ni attribut devient son texte, converti en
+  nombre s'il en est un. Sinon, il devient une structure : un champ par
+  enfant, et un champ « nomAttribute » par attribut.
+
+  Des frères de même nom deviennent un tableau de structures — ou une
+  cellule quand leurs formes diffèrent —, ce qui est la façon dont le
+  XML exprime une liste.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     s = matlibre_xml_en_structure(matlibre_xml_analyser('<a><b>1</b></a>'));
+     s.b                             % 1
+
+  Voir aussi READSTRUCT, MATLIBRE_XML_ANALYSER.
 ```
 
 ## `maxk`
@@ -5707,6 +6046,34 @@ READCELL Lit un fichier délimité dans un tableau de cellules.
   Voir aussi WRITECELL, READMATRIX, READTABLE, READVARS.
 ```
 
+## `readlines`
+
+```
+READLINES Lit un fichier texte, une ligne par élément.
+  L = READLINES(FICHIER) rend un tableau de chaînes, une par ligne du
+  fichier, les fins de ligne retirées.
+  L = READLINES(FICHIER,'EmptyLineRule','skip') saute les lignes vides.
+  L = READLINES(FICHIER,'LineEnding',SEP) découpe sur SEP plutôt que sur
+  les fins de ligne usuelles.
+
+  Les trois conventions de fin de ligne sont reconnues : celle d'Unix,
+  celle de Windows et celle des anciens Mac. Un fichier écrit sur l'une
+  se relit donc sur l'autre, ce qui est le seul comportement utile.
+
+  Une dernière ligne vide — celle qu'un fichier bien formé laisse après
+  son dernier retour — n'est pas rendue : sans quoi tout aller-retour
+  par WRITELINES ajouterait un élément à chaque passage.
+
+  Exemple :
+     f = [tempname '.txt'];
+     writelines(["premiere"; "deuxieme"], f);
+     l = readlines(f);
+     numel(l)                        % 2
+     delete(f);
+
+  Voir aussi WRITELINES, FILEREAD, READTABLE, STRSPLIT, SPLITLINES.
+```
+
 ## `readmatrix`
 
 ```
@@ -5732,6 +6099,31 @@ READMATRIX Lit un fichier texte délimité et rend une matrice.
      readmatrix(f)      % [1 2; 3 4]
 
   Voir aussi WRITEMATRIX, READTABLE, DLMREAD, LOAD.
+```
+
+## `readstruct`
+
+```
+READSTRUCT Lit un fichier XML ou JSON dans une structure.
+  S = READSTRUCT(FICHIER) reconnaît le format à l'extension : .xml ou
+  .json. S = READSTRUCT(...,'FileType',TYPE) l'impose.
+
+  Un élément XML devient un champ ; ses attributs deviennent des champs
+  dont le nom porte le suffixe « Attribute », comme dans MATLAB. Des
+  éléments frères de même nom deviennent un tableau de structures.
+
+  Le texte d'un élément est converti en nombre quand il en est un :
+  c'est ce que fait MATLAB, et c'est ce qui permet de relire un fichier
+  écrit par WRITESTRUCT sans rien reconvertir.
+
+  Exemple :
+     f = [tempname '.xml'];
+     writestruct(struct('a', 1, 'b', "deux"), f);
+     s = readstruct(f);
+     s.a                             % 1, en nombre
+     delete(f);
+
+  Voir aussi WRITESTRUCT, XMLREAD, JSONDECODE, READTABLE.
 ```
 
 ## `readvars`
@@ -6968,6 +7360,29 @@ WATERFALL Surface dessinée en lignes, une par rangée.
   Voir aussi RIBBON, MESH, SURF, PLOT3, STACKEDPLOT.
 ```
 
+## `weboptions`
+
+```
+WEBOPTIONS Réglages d'une requête web.
+  O = WEBOPTIONS() rend les réglages par défaut. O = WEBOPTIONS(NOM,
+  VALEUR,...) en fixe. L'objet se passe ensuite à WEBREAD, WEBWRITE ou
+  WEBSAVE.
+
+  Les réglages reconnus : 'Timeout' (secondes), 'ContentType'
+  ('auto', 'text', 'json', 'raw'), 'MediaType' (le type envoyé),
+  'RequestMethod' ('auto', 'get', 'post', 'put', 'delete'),
+  'CharacterEncoding', 'UserAgent', 'Username', 'Password',
+  'HeaderFields' (une matrice de cellules à deux colonnes) et
+  'CertificateFilename'.
+
+  Exemple :
+     o = weboptions('Timeout', 30, 'ContentType', 'json');
+     o.Timeout                       % 30
+     o.ContentType                   % 'json'
+
+  Voir aussi WEBREAD, WEBWRITE, WEBSAVE, URLREAD.
+```
+
 ## `webread`
 
 ```
@@ -7106,6 +7521,27 @@ WRITECELL Écrit un tableau de cellules dans un fichier délimité.
   Voir aussi READCELL, WRITEMATRIX, WRITETABLE.
 ```
 
+## `writelines`
+
+```
+WRITELINES Écrit un texte dans un fichier, une ligne par élément.
+  WRITELINES(L,FICHIER) écrit chaque élément de L sur sa propre ligne.
+  WRITELINES(...,'WriteMode','append') ajoute à la suite au lieu de
+  remplacer. WRITELINES(...,'LineEnding',SEP) choisit la fin de ligne.
+
+  Le fichier se termine par une fin de ligne, comme le veut l'usage :
+  c'est ce qui fait qu'un outil de ligne de commande affiche la dernière
+  ligne correctement, et READLINES ne la compte pas pour autant.
+
+  Exemple :
+     f = [tempname '.txt'];
+     writelines(["une"; "deux"; "trois"], f);
+     isequal(readlines(f), ["une"; "deux"; "trois"])   % l'aller-retour revient
+     delete(f);
+
+  Voir aussi READLINES, FPRINTF, WRITETABLE, FILEWRITE.
+```
+
 ## `writematrix`
 
 ```
@@ -7127,6 +7563,77 @@ WRITEMATRIX Écrit une matrice dans un fichier texte délimité.
      isequal(readmatrix(f), magic(4))   % vrai
 
   Voir aussi READMATRIX, WRITETABLE, DLMWRITE, SAVE.
+```
+
+## `writestruct`
+
+```
+WRITESTRUCT Écrit une structure en XML ou en JSON.
+  WRITESTRUCT(S,FICHIER) reconnaît le format à l'extension : .xml ou
+  .json. WRITESTRUCT(...,'FileType',TYPE) l'impose.
+  WRITESTRUCT(...,'StructNodeName',NOM) nomme la racine du XML ;
+  « struct » par défaut, comme dans MATLAB.
+
+  Un champ devient un élément ; un champ dont le nom finit par
+  « Attribute » devient un attribut de l'élément parent. Un tableau de
+  structures devient une suite d'éléments frères de même nom.
+
+  Exemple :
+     f = [tempname '.xml'];
+     s = struct('nom', "essai", 'valeur', 42);
+     writestruct(s, f);
+     r = readstruct(f);
+     r.valeur == 42                  % l'aller-retour revient
+     delete(f);
+
+  Voir aussi READSTRUCT, XMLWRITE, JSONENCODE, WRITETABLE.
+```
+
+## `xmlread`
+
+```
+XMLREAD Lit un document XML.
+  N = XMLREAD(FICHIER) rend l'arbre du document : une structure portant
+  Name, Attributes, Children et Text, chaque enfant étant du même
+  genre.
+
+  MATLAB rend ici un objet du modèle DOM de Java. Il n'y a pas de Java
+  dans MatLibre : l'arbre est rendu tel quel, en structures, et se
+  parcourt avec les moyens du langage. Ce qui s'écrit
+  `n.getChildNodes.item(0)` sous MATLAB s'écrit `n.Children{1}` ici.
+
+  Ce qui n'est pas traité : les espaces de noms, les définitions de
+  type, les entités autres que les cinq prédéfinies.
+
+  Exemple :
+     f = [tempname '.xml'];
+     writelines("<mesure unite=""m"">3.5</mesure>", f);
+     n = xmlread(f);
+     n.Name                          % 'mesure'
+     n.Attributes.unite              % 'm'
+     delete(f);
+
+  Voir aussi XMLWRITE, READSTRUCT, WRITESTRUCT, JSONDECODE.
+```
+
+## `xmlwrite`
+
+```
+XMLWRITE Écrit un document XML.
+  XMLWRITE(FICHIER,N) écrit l'arbre N — celui que rend XMLREAD — dans
+  le fichier. T = XMLWRITE(N) rend le texte sans rien écrire.
+
+  L'écriture est indentée : deux espaces par niveau. Les cinq
+  caractères réservés du XML sont protégés, dans le texte comme dans
+  les valeurs d'attribut, faute de quoi le document produit ne se
+  relirait pas.
+
+  Exemple :
+     n = matlibre_xml_analyser('<a x="1"><b>2</b></a>');
+     t = xmlwrite(n);
+     ~isempty(strfind(t, '<b>2</b>'))
+
+  Voir aussi XMLREAD, WRITESTRUCT, READSTRUCT.
 ```
 
 ## `yyyymmdd`

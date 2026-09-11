@@ -26,6 +26,11 @@ classdef MemoizedFunction < handle
     methods
         function mf = MemoizedFunction(f)
             mf.Function = f;
+            % On s'inscrit au registre : c'est ce qui permet a
+            % CLEARALLMEMOIZEDCACHES de vider tous les caches d'un coup.
+            % Possible seulement parce que la classe est a poignee — le
+            % registre garde le meme objet, non une copie.
+            matlibre_memoire_globale('inscrire', mf);
         end
 
         function varargout = subsref(mf, s)

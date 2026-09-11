@@ -223,6 +223,32 @@ assert(sansArgument.cote == 7 && sansArgument.hauteur == 2);
 % Le constructeur du parent ne s'herite pas : appeler FormeDerivee ne doit
 % pas construire un FormeDeBase.
 assert(strcmp(class(FormeDerivee(1)), 'FormeDerivee'));
+% Une classe a poignee compte « handle » parmi ses ancetres, ce qui est
+% la facon de savoir qu'elle se copie par reference.
+f = memoize(@(x) x);
+assert(isa(f, 'handle'));
+assert(any(strcmp(superclasses(f), 'handle')));
+
+%% ------------------------------------------ CLEARALLMEMOIZEDCACHES
+% Une fonction memoisee retient ses resultats ; vider le cache les lui
+% fait oublier. C'est necessaire quand ce dont elle depend change sans
+% que ses arguments changent.
+compteur = 0;
+compter = memoize(@(x) x + 1);
+compter(1);
+compter(1);
+avant = stats(compter);
+assert(avant.CacheHits == 1);           % le second appel a ete retrouve
+assert(avant.CacheOccupancyPercent > 0);
+clearAllMemoizedCaches();
+apres = stats(compter);
+assert(apres.CacheOccupancyPercent == 0);
+% Apres vidage, le meme appel est recalcule, non retrouve.
+compter(1);
+recalcul = stats(compter);
+assert(recalcul.CacheHits == avant.CacheHits);
+(compteur);   %#ok<VUNUS>
+
 disp('heritage : ok');
 
 disp('classes : toutes les verifications passent');
