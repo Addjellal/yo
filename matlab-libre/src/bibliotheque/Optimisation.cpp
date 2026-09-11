@@ -189,6 +189,10 @@ FONCTION(fnFminsearch) {
         simplexe.push_back(p);
     }
     for (auto& p : simplexe) valeurs.push_back(evaluer(p));
+    // Le drapeau de sortie ne vaut 1 que si le simplexe s'est resserre.
+    // Rendre 1 dans tous les cas ferait passer une recherche arretee par
+    // le compteur d'iterations pour un minimum trouve.
+    bool convergence = false;
 
     for (int iteration = 0; iteration < maxIterations; ++iteration) {
         std::vector<std::size_t> ordre(simplexe.size());
@@ -210,7 +214,10 @@ FONCTION(fnFminsearch) {
             for (std::size_t j = 0; j < n; ++j)
                 ecartX = std::max(ecartX, std::fabs(simplexe[k][j] - simplexe[0][j]));
         }
-        if (ecartX < tolX && ecartF < tolF) break;
+        if (ecartX < tolX && ecartF < tolF) {
+            convergence = true;
+            break;
+        }
 
         std::vector<double> centre(n, 0.0);
         for (std::size_t k = 0; k + 1 < simplexe.size(); ++k)
@@ -251,6 +258,9 @@ FONCTION(fnFminsearch) {
         if (valeurs[k] < valeurs[meilleur]) meilleur = k;
     Valeur x = x0;
     for (std::size_t k = 0; k < n; ++k) x.re[k] = simplexe[meilleur][k];
+    if (nargout >= 3)
+        return {x, Valeur::scalaire(valeurs[meilleur]),
+                Valeur::scalaire(convergence ? 1.0 : 0.0)};
     if (nargout >= 2) return {x, Valeur::scalaire(valeurs[meilleur])};
     return {x};
 }
@@ -290,6 +300,16 @@ FONCTION(fnFsolve) {
             amplitude = std::max(amplitude, std::fabs(pas.re[j]));
         }
         if (amplitude < 1e-14) break;
+    }
+    // Le drapeau dit si la racine en est une : « fsolve(@(x) x^2+1, 1) »
+    // n'en a pas, et la derniere iteration ne doit pas passer pour une
+    // solution. MATLAB rend -2 quand l'algorithme s'arrete ailleurs.
+    if (nargout >= 3) {
+        Valeur fin = f(x);
+        double norme = 0;
+        for (double v : fin.re) norme += v * v;
+        double drapeau = std::sqrt(norme) < 1e-6 ? 1.0 : -2.0;
+        return {x, fin, Valeur::scalaire(drapeau)};
     }
     if (nargout >= 2) return {x, f(x)};
     return {x};
@@ -1693,6 +1713,18 @@ FONCTION(fnLsqnonneg) {
         Valeur solution = divisionGauche(A, b);
         for (int k = 0; k < n; ++k)
             x.re[(std::size_t)k] = std::max(0.0, solution.re[(std::size_t)k]);
+    }
+    // MATLAB rend aussi la norme du residu, le residu lui-meme et un
+    // drapeau : un appel qui les demande ne doit pas echouer faute de
+    // sorties.
+    if (nargout >= 2) {
+        Valeur residu = operationBinaire("-", b, produitMatrice(A, x));
+        double carre = 0;
+        for (double v : residu.re) carre += v * v;
+        std::vector<Valeur> sorties = {x, Valeur::scalaire(carre), residu,
+                                       Valeur::scalaire(1.0)};
+        sorties.resize((std::size_t)std::max(nargout, 1));
+        return sorties;
     }
     return {x};
 }

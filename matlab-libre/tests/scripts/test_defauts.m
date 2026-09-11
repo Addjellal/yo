@@ -559,6 +559,55 @@ assert(sum(deuxEntieres) <= 3.5 + 1e-9);
 assert(deuxEntieres(1) <= 2.2 + 1e-9);
 assert(sum(deuxEntieres) == 3);   % le meilleur total entier possible
 
+%% --------------------------- LES SOLVEURS DISENT S'ILS ONT REUSSI
+% Une penalisation rend toujours un point ; encore faut-il qu'il respecte
+% les contraintes. Sans ce controle, un probleme sans solution rendait un
+% point quelconque en annoncant la reussite.
+[sansSolution, critereVide, drapeauQuad] = quadprog(eye(2), [-1; -1], [1 1], -5, ...
+                                                    [], [], [0; 0], []);
+assert(isempty(sansSolution));
+assert(isempty(critereVide));
+assert(drapeauQuad == -2);
+[optimum, critere, drapeauBon] = quadprog(eye(2), [-1; -1]);
+assert(drapeauBon == 1);
+assert(max(abs(optimum - [1; 1])) < 1e-4);
+assert(abs(critere + 1) < 1e-4);
+
+[sansPoint, ~, drapeauCon] = fmincon(@(x) x, 0, [1], [-5], [], [], [0], []);
+assert(isempty(sansPoint));
+assert(drapeauCon == -2);
+[minimum, ~, drapeauCon2] = fmincon(@(x) (x - 3) ^ 2, 0, [], []);
+assert(drapeauCon2 == 1);
+assert(abs(minimum - 3) < 1e-3);
+
+% La verification se fait contrainte par contrainte.
+assert(matlibre_point_admissible([1; 1], [1 1], 3, [], [], [0; 0], []));
+assert(~matlibre_point_admissible([2; 2], [1 1], 3, [], [], [0; 0], []));
+assert(~matlibre_point_admissible([-1; 0], [], [], [], [], [0; 0], []));
+assert(~matlibre_point_admissible([0; 5], [], [], [], [], [], [1; 1]));
+assert(matlibre_point_admissible([1; 2], [], [], [1 1], 3, [], []));
+
+% FSOLVE dit si la racine en est une : « x^2+1 » n'en a pas de reelle, et
+% la derniere iteration ne doit pas passer pour une solution.
+[~, residu, drapeauSolve] = fsolve(@(x) x ^ 2 + 1, 1);
+assert(drapeauSolve == -2);
+assert(abs(residu) > 1e-6);
+[racine, residuBon, drapeauSolve2] = fsolve(@(x) x ^ 2 - 4, 1);
+assert(drapeauSolve2 == 1);
+assert(abs(racine - 2) < 1e-6);
+assert(abs(residuBon) < 1e-6);
+
+% FMINSEARCH ne rend 1 que si le simplexe s'est resserre.
+[~, ~, drapeauMin] = fminsearch(@(x) (x - 2) ^ 2, 0);
+assert(drapeauMin == 1);
+
+% LSQNONNEG rend aussi la norme du residu et le residu.
+[solution, normeResidu, residuMoindres, drapeauMoindres] = lsqnonneg([1 0; 0 1], [1; -1]);
+assert(isequal(round(solution, 10), [1; 0]));
+assert(abs(normeResidu - 1) < 1e-10);
+assert(numel(residuMoindres) == 2);
+assert(drapeauMoindres == 1);
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

@@ -1,4 +1,4 @@
-function [x, valeur] = fmincon(fonction, x0, A, b, Aeq, beq, bas, haut, nonlin)
+function [x, valeur, drapeau] = fmincon(fonction, x0, A, b, Aeq, beq, bas, haut, nonlin)
 %FMINCON Minimisation sous contraintes, par pénalisation extérieure.
 %   X = FMINCON(F,X0,A,B) minimise F sous A*x <= b.
 %   X = FMINCON(F,X0,A,B,AEQ,BEQ,LB,UB,NONLIN) ajoute les égalités, les
@@ -38,7 +38,23 @@ function [x, valeur] = fmincon(fonction, x0, A, b, Aeq, beq, bas, haut, nonlin)
     end
     if ~isempty(bas), x = max(x, bas(:)); end
     if ~isempty(haut), x = min(x, haut(:)); end
-    valeur = fonction(x);
+    % La pénalisation rend toujours un point ; encore faut-il qu'il
+    % respecte les contraintes. Un problème sans point admissible se dit,
+    % il ne se résout pas de travers.
+    admissible = matlibre_point_admissible(x, A, b, Aeq, beq, bas, haut);
+    if admissible && ~isempty(nonlin)
+        [c, ceq] = nonlin(x);
+        if ~isempty(c) && any(c(:) > 1e-6), admissible = false; end
+        if ~isempty(ceq) && any(abs(ceq(:)) > 1e-6), admissible = false; end
+    end
+    if admissible
+        drapeau = 1;
+        valeur = fonction(x);
+    else
+        drapeau = -2;
+        x = [];
+        valeur = [];
+    end
 end
 
 function v = violation(x, A, b, Aeq, beq, bas, haut, nonlin)

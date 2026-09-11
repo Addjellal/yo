@@ -1,4 +1,4 @@
-function [x, valeur] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
+function [x, valeur, drapeau] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
 %QUADPROG Programmation quadratique : minimise 0.5*x'Hx + f'x.
 %   X = QUADPROG(H,F) minimise sans contrainte : c'est -H\F.
 %   X = QUADPROG(H,F,A,B,AEQ,BEQ,LB,UB) impose A*x <= b, Aeq*x = beq et
@@ -53,7 +53,17 @@ function [x, valeur] = quadprog(H, f, A, b, Aeq, beq, bas, haut, x0)
         if ~isempty(bas), x = max(x, bas(:)); end
         if ~isempty(haut), x = min(x, haut(:)); end
     end
-    valeur = 0.5 * x' * H * x + f' * x;
+    % La pénalisation rend toujours un point ; il faut encore qu'il
+    % respecte les contraintes. Sans ce contrôle, un problème sans
+    % solution rendait un point quelconque en annonçant la réussite.
+    if matlibre_point_admissible(x, A, b, Aeq, beq, bas, haut)
+        drapeau = 1;
+        valeur = 0.5 * x' * H * x + f' * x;
+    else
+        drapeau = -2;
+        x = [];
+        valeur = [];
+    end
 end
 
 function p = penalite(x, A, b, Aeq, beq, bas, haut)
