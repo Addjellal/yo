@@ -228,6 +228,27 @@ ANNOTATION Flèche, trait, rectangle ou texte posé sur la figure.
   Voir aussi TEXT, LINE, RECTANGLE, GTEXT, TITLE.
 ```
 
+## `arrayDatastore`
+
+```
+ARRAYDATASTORE Magasin de données bâti sur un tableau déjà en mémoire.
+  DS = ARRAYDATASTORE(A) parcourt A par morceaux, ligne par ligne par
+  défaut. DS = ARRAYDATASTORE(A,'ReadSize',N) prend N lignes à la fois.
+  DS = ARRAYDATASTORE(A,'IterationDimension',D) parcourt suivant D.
+
+  Il n'économise aucune mémoire — le tableau y est déjà. Son emploi est
+  d'écrire une seule fois le code qui parcourt un magasin, et de le
+  faire marcher aussi bien sur un fichier que sur ce qu'on a sous la
+  main : c'est utile pour essayer, et pour les tests.
+
+  Exemple :
+     ds = arrayDatastore([1 2; 3 4; 5 6], 'ReadSize', 2);
+     size(read(ds))                  % 2 lignes prises
+     hasdata(ds)                     % 1 : il en reste une
+
+  Voir aussi DATASTORE, TABULARTEXTDATASTORE, READ, READALL.
+```
+
 ## `autumn`
 
 ```
@@ -1062,6 +1083,36 @@ DATACURSORMODE Curseur de données (accepté, sans effet).
      [get(h, 'XData')', get(h, 'YData')']     % la meme information
 
   Voir aussi BRUSH, ZOOM, PAN, GET, GINPUT.
+```
+
+## `datastore`
+
+```
+DATASTORE Magasin de données, choisi d'après ce qu'on lui donne.
+  DS = DATASTORE(CHEMIN) construit le magasin qui convient : texte
+  tabulaire pour un .csv, .txt ou .dat, images pour un dossier
+  d'images. DATASTORE(...,'Type',TYPE) l'impose : 'tabulartext' ou
+  'image'.
+
+  Un magasin se parcourt par morceaux : READ rend le suivant, HASDATA
+  dit s'il en reste, RESET revient au début, READALL lit tout d'un coup
+  et PREVIEW montre les premières lignes sans avancer.
+
+  Ce qui n'est pas fait : la lecture réellement paresseuse. Le fichier
+  est lu une fois pour toutes à la construction, puis découpé. Le
+  programme qui parcourt le magasin est donc le même que sous MATLAB,
+  mais la mémoire n'est pas économisée — et c'est la seule raison
+  d'employer un magasin. L'annoncer vaut mieux que de le laisser
+  découvrir sur un jeu qui ne tient pas.
+
+  Exemple :
+     f = [tempname '.csv'];
+     writelines(["a,b"; "1,2"; "3,4"], f);
+     ds = datastore(f);
+     height(readall(ds))             % 2 lignes de donnees
+     delete(f);
+
+  Voir aussi TABULARTEXTDATASTORE, IMAGEDATASTORE, READ, READALL, PREVIEW.
 ```
 
 ## `datetick`
@@ -2558,6 +2609,35 @@ ILU Factorisation LU incomplète.
   Voir aussi ICHOL, LU, GMRES, BICG, PCG.
 ```
 
+## `imageDatastore`
+
+```
+IMAGEDATASTORE Lecture par morceaux d'une collection d'images.
+  DS = IMAGEDATASTORE(CHEMIN) rassemble les images d'un dossier, d'une
+  liste de fichiers ou d'un motif. READ rend l'image suivante, HASDATA
+  dit s'il en reste, RESET revient au début, READALL les lit toutes.
+
+  DS.Labels peut recevoir une étiquette par image — c'est ainsi qu'on
+  décrit un jeu d'apprentissage, et COUNTEACHLABEL en compte les
+  classes.
+
+  Les formats lisibles sont ceux d'IMREAD : PGM et PPM en texte. Les
+  autres demandent une bibliothèque externe, et IMREAD le dit.
+
+  Le magasin se copie par référence : READ le fait avancer sans qu'on
+  ait à le réaffecter.
+
+  Exemple :
+     dossier = tempname;
+     mkdir(dossier);
+     imwrite(uint8(magic(4) * 15), fullfile(dossier, 'a.pgm'));
+     ds = imageDatastore(dossier);
+     numel(ds.Files)                 % 1 image trouvee
+     size(read(ds))                  % 4 par 4
+
+  Voir aussi DATASTORE, TABULARTEXTDATASTORE, IMREAD, READ, READALL.
+```
+
 ## `importdata`
 
 ```
@@ -3456,6 +3536,66 @@ MATLIBRE_COULEUR_SECTEUR La k-ième couleur de la palette des secteurs.
   Fonction interne : elle n'existe pas dans MATLAB. PIE, PIE3 et ROSE
   s'en servent pour que deux secteurs voisins se distinguent, sans
   dépendre de la palette des courbes, qui n'a que sept tons.
+```
+
+## `matlibre_datastore_deviner`
+
+```
+MATLIBRE_DATASTORE_DEVINER Le genre de magasin qui convient à un chemin.
+  L'extension décide : .csv, .txt et .dat donnent un magasin de texte
+  tabulaire ; .pgm, .ppm, .png et .jpg un magasin d'images. Un dossier
+  est jugé d'après ce qu'il contient.
+
+  Deviner vaut mieux qu'exiger, mais pas toujours : quand rien ne
+  tranche, on rend le texte tabulaire, qui est le cas courant, et
+  'Type' permet de dire autre chose.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     strcmp(matlibre_datastore_deviner('mesures.csv'), 'tabulartext')
+
+  Voir aussi DATASTORE.
+```
+
+## `matlibre_datastore_fichiers`
+
+```
+MATLIBRE_DATASTORE_FICHIERS Les fichiers désignés par un chemin.
+  Accepte un fichier, une cellule ou un tableau de chaînes de fichiers,
+  un dossier — dont on prend les fichiers dont l'extension convient —,
+  ou un motif à joker.
+
+  Les fichiers d'un dossier sont rendus en ordre alphabétique : sans
+  cela, le contenu d'un magasin dépendrait de l'ordre où le système de
+  fichiers les rend, qui n'est pas le même partout.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     f = [tempname '.csv'];
+     writelines("a,b", f);
+     numel(matlibre_datastore_fichiers(f, {'.csv'}))   % 1
+     delete(f);
+
+  Voir aussi TABULARTEXTDATASTORE, DATASTORE, DIR.
+```
+
+## `matlibre_datastore_typeSeul`
+
+```
+MATLIBRE_DATASTORE_TYPESEUL Repère le couple 'Type',VALEUR dans des options.
+  DATASTORE lit 'Type' pour choisir le magasin, et passe tout le reste
+  au constructeur choisi. Il faut donc séparer les deux, sans quoi le
+  constructeur refuserait une option qu'il ne connaît pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = matlibre_datastore_typeSeul({'Type', 'image', 'ReadSize', 3});
+     isequal(m, [true true false false])
+
+  Voir aussi DATASTORE.
 ```
 
 ## `matlibre_decomp_choisir`
@@ -7365,6 +7505,40 @@ SYMRCM Renumérotation de Cuthill-McKee inverse.
      matlibre_largeur_bande(A(p, p)) <= matlibre_largeur_bande(A)
 
   Voir aussi SYMAMD, COLAMD, CHOL, LU.
+```
+
+## `tabularTextDatastore`
+
+```
+TABULARTEXTDATASTORE Lecture par morceaux d'un ou plusieurs fichiers texte.
+  DS = TABULARTEXTDATASTORE(CHEMIN) ouvre un fichier, une liste de
+  fichiers, ou tous les fichiers d'un dossier. La lecture se fait
+  ensuite par morceaux : READ rend le suivant, HASDATA dit s'il en
+  reste, RESET revient au début, READALL lit tout d'un coup.
+
+  L'intérêt d'un magasin de données est de ne pas tout charger : un jeu
+  plus gros que la mémoire se traite morceau par morceau, et le
+  programme qui le parcourt ne change pas quand le jeu grandit. C'est
+  la seule raison d'en employer un ; pour un fichier qui tient en
+  mémoire, READTABLE suffit et va plus vite.
+
+  Réglages : 'ReadSize' (nombre de lignes par morceau, 20000 par
+  défaut), 'Delimiter', 'ReadVariableNames', 'TreatAsMissing'.
+
+  Le magasin se copie par référence : READ le fait avancer, sans qu'on
+  ait à le réaffecter. C'est ce qui permet d'écrire la boucle usuelle —
+  « while hasdata(ds), morceau = read(ds); end » — qui ne se terminerait
+  jamais sur un objet qui se copierait par valeur.
+
+  Exemple :
+     f = [tempname '.csv'];
+     writelines(["a,b"; "1,2"; "3,4"; "5,6"], f);
+     ds = tabularTextDatastore(f, 'ReadSize', 2);
+     premier = read(ds);
+     height(premier)                 % 2 lignes : le morceau demande
+     delete(f);
+
+  Voir aussi DATASTORE, READTABLE, READ, READALL, PRESERVE.
 ```
 
 ## `tensorprod`
