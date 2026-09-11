@@ -834,7 +834,20 @@ std::shared_ptr<DefinitionClasse> Analyseur::definitionClasse() {
         } else if (motDeClasse("enumeration")) {
             avancer();
             sauterSeparateurs();
-            while (!fini() && !motFin()) avancer();
+            // Le bloc etait saute en entier : ses membres se lisaient et
+            // rien n'en restait, si bien qu'« enumeration(Classe) »
+            // n'avait rien a rendre. On garde au moins leurs noms.
+            bool debutDeMembre = true;
+            while (!fini() && !motFin()) {
+                if (debutDeMembre && jeton().genre == Genre::Ident)
+                    c->enumerations.push_back(jeton().texte);
+                // Un membre peut porter des arguments — « Rouge(1) » — :
+                // seul le nom en tete de ligne compte.
+                debutDeMembre = jeton().genre == Genre::NouvelleLigne ||
+                                jeton().estOp(",") || jeton().estOp(";");
+                avancer();
+                if (jeton().genre == Genre::NouvelleLigne) debutDeMembre = true;
+            }
             exigerMotFin();
         } else {
             avancer();

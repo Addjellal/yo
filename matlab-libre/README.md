@@ -43,11 +43,11 @@ sous-fonctions, fonctions anonymes avec capture, `classdef` avec
 surcharge d'opérateurs, `try/catch` avec les identifiants d'erreur de
 MATLAB, `global` et `persistent`, listes séparées par des virgules.
 
-- **668 fonctions natives** en C++ : tableaux, mathématiques, algèbre
+- **672 fonctions natives** en C++ : tableaux, mathématiques, algèbre
   linéaire (LU, QR, Cholesky, SVD, valeurs propres), Fourier (Cooley-Tukey
   et Bluestein, donc exacte pour toute longueur), chaînes, cellules et
   structures, entrées-sorties, graphique, temps, système.
-- **2832 fonctions de toolbox** en langage MATLAB, réparties en
+- **2835 fonctions de toolbox** en langage MATLAB, réparties en
   **54 modules** : signal, image, vision, apprentissage profond,
   statistiques, optimisation, automatique, communications, ondelettes,
   logique floue, finance, économétrie, robotique, aérospatial, radar, RF,
@@ -63,7 +63,7 @@ MATLAB, `global` et `persistent`, listes séparées par des virgules.
 - **Un bureau natif** (`matlibre-bureau`) : une fenêtre Qt, l'éditeur, la
   fenêtre de commandes, l'espace de travail, les figures, le débogueur pas
   à pas et le profileur dans un seul exécutable.
-- **Une aide qui ne ment pas** : 651 fonctions ont leur fiche — syntaxe,
+- **Une aide qui ne ment pas** : 655 fonctions ont leur fiche — syntaxe,
   exemples, fonctions voisines —, et chaque exemple qu'elle montre est
   exécuté à chaque passage des tests.
 - **Un générateur de code C** : `codegen` traduit scalaires et matrices de
@@ -178,7 +178,7 @@ propres fonctions : l'aide est le bloc de commentaires placé sous la ligne
 | [`langage.md`](documentation/langage.md) | ce que l'interpréteur comprend, type par type |
 | [`installation.md`](documentation/installation.md) | compiler, installer, empaqueter, gérer les toolboxes |
 | [`toolboxes.md`](documentation/toolboxes.md) | les 54 modules et leur correspondance MathWorks |
-| [`reference.md`](documentation/reference.md) | les 3500 fonctions, avec leur aide — généré |
+| [`reference.md`](documentation/reference.md) | les 3507 fonctions, avec leur aide — généré |
 | [`architecture.md`](documentation/architecture.md) | comment l'interpréteur est bâti |
 | [`developpeur.md`](documentation/developpeur.md) | ajouter une fonction, une toolbox, un test |
 | [`couverture.md`](documentation/couverture.md) | ce qui manque, dit franchement |

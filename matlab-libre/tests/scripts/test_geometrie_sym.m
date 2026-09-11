@@ -275,9 +275,20 @@ assert(abs(double(subs(partfrac(x + 1), x, 3)) - 4) < 1e-12);
 % l'équation de départ : c'est ce qui la définit.
 for cas = {2*x + 3, x^2 - 4, 3*x, x/2 - 1, sqrt(x) - 3, exp(x) - 5, 5 - x, 10/x - 2}
     resolue = isolate(cas{1}, x);
+    % LHS et RHS ouvrent l'équation : à gauche l'inconnue seule, à droite
+    % sa valeur. Sans eux il faudrait descendre dans l'arbre à la main.
+    assert(strcmp(char(lhs(resolue)), 'x'));
     valeur = double(rhs(resolue));
     assert(abs(double(subs(cas{1}, x, valeur))) < 1e-9);
 end
+% Les deux refusent ce qui n'est pas une équation.
+refuseMembre = false;
+try
+    rhs(x + 1);
+catch
+    refuseMembre = true;
+end
+assert(refuseMembre);
 % Une inconnue qui paraît deux fois ne se défait pas : ISOLATE le dit.
 refuseIsolate = false;
 try

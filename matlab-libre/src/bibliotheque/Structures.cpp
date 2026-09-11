@@ -87,6 +87,97 @@ std::vector<std::string> proprietesDe(Interpreteur& it, const Valeur& v) {
     return noms;
 }
 
+// Le nom des membres d'une classe, par famille. MATLAB en fait quatre
+// fonctions du meme dessin : « methods », « events », « enumeration » et
+// « properties ». Les trois premieres manquaient.
+static std::vector<Valeur> membresDeClasse(Interpreteur& it, Arguments& args,
+                                           const char* nomFonction, char famille) {
+    exigerArguments(args, 1, 2, nomFonction);
+    std::string nomClasse = (args[0].estTexte() || args[0].estChaine())
+                                ? args[0].versTexte()
+                                : args[0].classeNom();
+    auto def = it.classeDefinie(nomClasse);
+    if (!def) {
+        // Une classe native n'a pas de definition a lire : elle n'a ni
+        // methode ni evenement declares, et le dire vaut mieux que de
+        // faire croire a une erreur.
+        return {Valeur::celluleDims({0, 1})};
+    }
+    std::vector<std::string> noms;
+    if (famille == 'm') {
+        for (const auto& kv : def->methodes) noms.push_back(kv.first);
+        std::sort(noms.begin(), noms.end());
+    } else if (famille == 'e') {
+        noms = def->evenements;
+    } else {
+        noms = def->enumerations;
+    }
+    Valeur r = Valeur::celluleDims({(int)noms.size(), 1});
+    for (std::size_t k = 0; k < noms.size(); ++k) r.cellules[k] = Valeur::texte(noms[k]);
+    return {r};
+}
+
+FONCTION(fnMethods) {
+    INUTILISE
+    return membresDeClasse(it, args, "methods", 'm');
+}
+
+FONCTION(fnEvents) {
+    INUTILISE
+    return membresDeClasse(it, args, "events", 'e');
+}
+
+FONCTION(fnEnumeration) {
+    INUTILISE
+    return membresDeClasse(it, args, "enumeration", 'n');
+}
+
+// La description d'une classe, reunie en une structure : son nom, ses
+// proprietes, ses methodes, ses evenements et ses ancetres. MATLAB rend
+// ici un objet « meta.class » ; il n'y a pas de hierarchie meta ici, et
+// une structure porte la meme information sans pretendre au contraire.
+FONCTION(fnMetaclass) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "metaclass");
+    std::string nomClasse = (args[0].estTexte() || args[0].estChaine())
+                                ? args[0].versTexte()
+                                : args[0].classeNom();
+    Valeur r = Valeur::structureVide();
+    r.poserChamp("Name", Valeur::texte(nomClasse));
+    auto enCellule = [](const std::vector<std::string>& v) {
+        Valeur c = Valeur::celluleDims({(int)v.size(), 1});
+        for (std::size_t k = 0; k < v.size(); ++k) c.cellules[k] = Valeur::texte(v[k]);
+        return c;
+    };
+    auto def = it.classeDefinie(nomClasse);
+    if (!def) {
+        std::vector<std::string> vide;
+        r.poserChamp("PropertyList", enCellule(vide));
+        r.poserChamp("MethodList", enCellule(vide));
+        r.poserChamp("EventList", enCellule(vide));
+        r.poserChamp("EnumerationMemberList", enCellule(vide));
+        r.poserChamp("SuperclassList", enCellule(vide));
+        r.poserChamp("HandleCompatible", Valeur::booleen(false));
+        return {r};
+    }
+    std::vector<std::string> methodes;
+    for (const auto& kv : def->methodes) methodes.push_back(kv.first);
+    std::sort(methodes.begin(), methodes.end());
+    std::vector<std::string> ancetres;
+    for (const auto& a : def->ancetres) {
+        bool deja = false;
+        for (const auto& q : ancetres) deja = deja || q == a;
+        if (!deja) ancetres.push_back(a);
+    }
+    r.poserChamp("PropertyList", enCellule(def->ordreProprietes));
+    r.poserChamp("MethodList", enCellule(methodes));
+    r.poserChamp("EventList", enCellule(def->evenements));
+    r.poserChamp("EnumerationMemberList", enCellule(def->enumerations));
+    r.poserChamp("SuperclassList", enCellule(ancetres));
+    r.poserChamp("HandleCompatible", Valeur::booleen(def->poignee));
+    return {r};
+}
+
 FONCTION(fnProperties) {
     INUTILISE
     exigerArguments(args, 1, 1, "properties");
@@ -308,6 +399,14 @@ void enregistrerStructures(Interpreteur& it) {
     it.enregistrer("struct", fnStruct, "structures", "struct  Construit une structure.");
     it.enregistrer("properties", fnProperties, "structures",
                    "properties  Proprietes d'un objet ou d'une classe.");
+    it.enregistrer("methods", fnMethods, "structures",
+                   "methods  Methodes d'un objet ou d'une classe.");
+    it.enregistrer("events", fnEvents, "structures",
+                   "events  Evenements declares par une classe.");
+    it.enregistrer("enumeration", fnEnumeration, "structures",
+                   "enumeration  Membres enumeres d'une classe.");
+    it.enregistrer("metaclass", fnMetaclass, "structures",
+                   "metaclass  Description d'une classe.");
     it.enregistrer("isprop", fnIsprop, "structures", "isprop  L'objet a-t-il cette propriete.");
     it.enregistrer("ismethod", fnIsmethod, "structures", "ismethod  La classe a-t-elle cette methode.");
     it.enregistrer("fieldnames", fnFieldnames, "structures", "fieldnames  Noms des champs.");

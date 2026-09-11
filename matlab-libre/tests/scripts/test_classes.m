@@ -249,6 +249,32 @@ recalcul = stats(compter);
 assert(recalcul.CacheHits == avant.CacheHits);
 (compteur);   %#ok<VUNUS>
 
+%% ------------------- ce qu'une classe declare se relit
+% PROPERTIES existait seul de sa famille : METHODS, EVENTS et ENUMERATION
+% manquaient, et le bloc « enumeration » etait analyse puis jete — ses
+% membres se lisaient, et rien n'en restait.
+assert(isequal(sort(methods('CouleurEssai')'), {'CouleurEssai', 'doubler'}));
+assert(isequal(events('CouleurEssai')', {'Change', 'Efface'}));
+assert(isequal(enumeration('CouleurEssai')', {'Rouge', 'Vert', 'Bleu'}));
+assert(isequal(properties('CouleurEssai')', {'code'}));
+% Un objet repond comme sa classe.
+assert(isequal(methods(CouleurEssai(1)), methods('CouleurEssai')));
+% Une classe native n'a rien de declare : le dire vaut mieux qu'une erreur.
+assert(isempty(methods('double')));
+
+% METACLASS reunit tout en une structure.
+description = metaclass(CouleurEssai(1));
+assert(strcmp(description.Name, 'CouleurEssai'));
+assert(numel(description.PropertyList) == 1);
+assert(numel(description.MethodList) == 2);
+assert(numel(description.EventList) == 2);
+assert(numel(description.EnumerationMemberList) == 3);
+assert(isempty(description.SuperclassList));
+% Et elle voit l'heritage.
+assert(isequal(metaclass(FormeDerivee(1)).SuperclassList', {'FormeDeBase'}));
+assert(metaclass(memoize(@(x) x)).HandleCompatible);
+disp('reflexion : ok');
+
 disp('heritage : ok');
 
 disp('classes : toutes les verifications passent');

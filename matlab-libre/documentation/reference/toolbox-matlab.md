@@ -4184,6 +4184,46 @@ MATLIBRE_NOYAU_PLAQUE Noyau radial de la plaque mince.
   Voir aussi MATLIBRE_PLAQUE_MINCE.
 ```
 
+## `matlibre_nuage_entree`
+
+```
+MATLIBRE_NUAGE_ENTREE Démêle les arguments d'un nuage de mots.
+  Accepte une liste de mots et leurs tailles, ou un texte brut dont les
+  mots sont comptés. Dans ce dernier cas, les mots d'une lettre et les
+  plus courants sont écartés : ils domineraient le nuage sans rien en
+  dire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [m, t] = matlibre_nuage_entree({["a" "b"], [2 1]});
+     numel(m) == 2 && t(1) == 2
+
+  Voir aussi WORDCLOUD.
+```
+
+## `matlibre_nuage_place`
+
+```
+MATLIBRE_NUAGE_PLACE Trouve une place libre sur une spirale.
+  On part du centre et l'on tourne en s'éloignant, en s'arrêtant au
+  premier endroit où le rectangle du mot ne recouvre aucun de ceux déjà
+  posés. C'est le placement usuel d'un nuage de mots : il met au centre
+  ce qu'on pose en premier, donc ce qui domine.
+
+  Deux rectangles alignés sur les axes se recouvrent si et seulement si
+  leurs projections se recouvrent sur les deux axes : le test est donc
+  immédiat, et c'est ce qui rend la recherche praticable.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [x, y] = matlibre_nuage_place(zeros(0, 4), 0.1, 0.1);
+     x == 0 && y == 0                % le premier va au centre
+
+  Voir aussi WORDCLOUD.
+```
+
 ## `matlibre_ode_option`
 
 ```
@@ -7823,6 +7863,33 @@ WINTER Carte de couleurs bleu - vert.
      all(carte(:, 1) == 0)
 
   Voir aussi AUTUMN, SPRING, SUMMER, COLORMAP, PARULA.
+```
+
+## `wordcloud`
+
+```
+WORDCLOUD Nuage de mots, dont la taille suit la fréquence.
+  WORDCLOUD(MOTS,TAILLES) place chaque mot, écrit d'autant plus grand
+  que sa taille est élevée.
+  WORDCLOUD(TEXTE) compte les mots d'un texte et les place.
+  H = WORDCLOUD(...) rend les poignées des textes posés.
+
+  Le placement est en spirale : le mot le plus fréquent au centre, les
+  suivants tournant autour, chacun au premier endroit libre. C'est la
+  disposition usuelle, et elle a l'avantage de mettre au centre ce qu'on
+  veut voir d'abord.
+
+  Un nuage de mots ne mesure rien : deux aires ne se comparent pas à
+  l'œil, et l'ordre des mots y est celui du hasard du placement. Il
+  montre ce qui domine, non de combien — pour cela, un diagramme en
+  barres dit la vérité et se lit.
+
+  Exemple :
+     figure;
+     wordcloud(["chat" "chien" "oiseau"], [10 6 3]);
+     close all;
+
+  Voir aussi BAR, TEXT, HISTOGRAM, CATEGORICAL.
 ```
 
 ## `writecell`

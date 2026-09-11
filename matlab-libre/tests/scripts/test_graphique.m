@@ -850,4 +850,35 @@ assert(~isempty(courbes));
 close all;
 
 
+%% ------------------------------------------------------- WORDCLOUD
+% Un nuage de mots place le plus frequent au centre et les autres autour,
+% sans qu'aucun n'en recouvre un autre.
+figure;
+poigneesNuage = wordcloud(["chat" "chien" "oiseau" "poisson"], [10 6 3 1]);
+assert(numel(poigneesNuage) == 4);
+assert(strcmp(class(poigneesNuage), 'matlab.graphics.primitive.Text'));
+abscisses = arrayfun(@(p) get(p, 'XData'), poigneesNuage);
+ordonnees = arrayfun(@(p) get(p, 'YData'), poigneesNuage);
+% Le premier — le plus frequent — est au centre.
+assert(abs(abscisses(1)) < 1e-9 && abs(ordonnees(1)) < 1e-9);
+% Aucun mot n'est pose au meme endroit qu'un autre.
+assert(numel(unique(abscisses + 1i * ordonnees)) == 4);
+% Le plus frequent est ecrit le plus grand.
+assert(get(poigneesNuage(1), 'FontSize') > get(poigneesNuage(end), 'FontSize'));
+close all;
+
+% Un texte brut se compte tout seul.
+figure;
+poigneesTexte = wordcloud('le chat mange le poisson et le chat dort');
+assert(numel(poigneesTexte) >= 3);
+close all;
+% Autant de tailles que de mots, sinon rien.
+refuseNuage = false;
+try
+    wordcloud(["a" "b"], 1);
+catch
+    refuseNuage = true;
+end
+assert(refuseNuage);
+
 disp('graphique : toutes les verifications passent');

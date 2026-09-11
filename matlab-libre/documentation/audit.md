@@ -38,7 +38,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | interface | 15 | 100 % | 100 % | 100 % |
 | lidar | 4 | 100 % | 100 % | 100 % |
 | maintenance-predictive | 4 | 100 % | 100 % | 100 % |
-| matlab | 285 | 100 % | 100 % | 100 % |
+| matlab | 286 | 100 % | 100 % | 100 % |
 | mpc | 3 | 100 % | 100 % | 100 % |
 | navigation | 5 | 100 % | 100 % | 100 % |
 | ondelettes | 129 | 100 % | 100 % | 100 % |
@@ -55,11 +55,11 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | simulink | 8 | 100 % | 100 % | 100 % |
 | stateflow | 4 | 100 % | 100 % | 100 % |
 | statistiques | 272 | 100 % | 100 % | 100 % |
-| symbolique | 37 | 100 % | 100 % | 97 % |
+| symbolique | 37 | 100 % | 100 % | 100 % |
 | types | 41 | 100 % | 100 % | 100 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 100 % | 100 % | 100 % |
-| **ensemble** | **2197** | **100 %** | **100 %** | **100 %** |
+| **ensemble** | **2198** | **100 %** | **100 %** | **100 %** |
 
 ## Ce qui reste à faire
 
@@ -71,7 +71,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 
 *Aucune.*
 
-1 fonctions ne sont nommées par aucun test ni aucun exemple : rien ne prouve qu'elles marchent.
+0 fonctions ne sont nommées par aucun test ni aucun exemple : rien ne prouve qu'elles marchent.
 
-`symbolique/lhs`
+*Aucune.*
 

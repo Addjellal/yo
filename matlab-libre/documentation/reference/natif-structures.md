@@ -83,6 +83,48 @@ DEAL  Distribue des valeurs à plusieurs sorties.
     Voir aussi STRUCT, CELL, VARARGOUT.
 ```
 
+## `enumeration`
+
+```
+ENUMERATION  Membres énumérés d'une classe.
+    C = ENUMERATION(X) rend, dans une cellule, le nom de chaque membre
+    déclaré dans le bloc « enumeration » de la classe de X.
+    ENUMERATION('nom') accepte aussi le nom de la classe.
+
+    Seuls les noms sont rendus : les membres ne sont pas encore des
+    valeurs qu'on peut manipuler, et l'annoncer vaut mieux que de le
+    laisser découvrir.
+
+    Syntaxe
+       c = enumeration(x)
+       c = enumeration('nom')
+
+    Exemples
+       isempty(enumeration('double'))       % 1 : rien d'enumere
+
+    Voir aussi METHODS, EVENTS, PROPERTIES, METACLASS.
+```
+
+## `events`
+
+```
+EVENTS  Événements déclarés par une classe.
+    C = EVENTS(X) rend, dans une cellule, le nom de chaque événement
+    déclaré dans le bloc « events » de la classe de X. EVENTS('nom')
+    accepte aussi le nom de la classe.
+
+    Une classe qui n'en déclare aucun rend une cellule vide.
+
+    Syntaxe
+       c = events(x)
+       c = events('nom')
+
+    Exemples
+       isempty(events('double'))            % 1 : aucun evenement
+
+    Voir aussi METHODS, PROPERTIES, ENUMERATION, METACLASS.
+```
+
 ## `fieldnames`
 
 ```
@@ -201,6 +243,54 @@ MAT2CELL  Découpe une matrice en blocs, dans une cellule.
        C{1,1}
 
     Voir aussi CELL2MAT, NUM2CELL, RESHAPE.
+```
+
+## `metaclass`
+
+```
+METACLASS  Description d'une classe.
+    M = METACLASS(X) rend une structure décrivant la classe de X : son
+    nom, ses propriétés, ses méthodes, ses événements, ses membres
+    énumérés, ses ancêtres, et si elle se copie par référence.
+
+    MATLAB rend ici un objet « meta.class ». Il n'y a pas de hiérarchie
+    meta dans MatLibre ; une structure porte la même information, et les
+    champs en portent les noms.
+
+    Syntaxe
+       m = metaclass(x)
+       m = metaclass('nom')
+
+    Exemples
+       m = metaclass('double');
+       strcmp(m.Name, 'double')             % 1
+       isempty(m.MethodList)                % 1 : rien de declare
+
+    Voir aussi METHODS, PROPERTIES, EVENTS, ENUMERATION, SUPERCLASSES, CLASS.
+```
+
+## `methods`
+
+```
+METHODS  Méthodes d'un objet ou d'une classe.
+    C = METHODS(X) rend, dans une cellule, le nom de chaque méthode de la
+    classe de X, en ordre alphabétique. METHODS('nom') accepte aussi le
+    nom de la classe.
+
+    Les méthodes héritées y figurent : une classe reçoit de ses parents
+    tout ce qu'elle ne redéfinit pas, et ce qu'elle reçoit fait partie de
+    ce qu'on peut lui demander. Une classe native n'ayant rien de déclaré
+    rend une cellule vide.
+
+    Syntaxe
+       c = methods(x)
+       c = methods('nom')
+
+    Exemples
+       isempty(methods('double'))           % 1 : rien de declare
+       any(strcmp(methods('sym'), 'diff'))  % 1 : sym porte diff
+
+    Voir aussi PROPERTIES, EVENTS, ENUMERATION, METACLASS, SUPERCLASSES.
 ```
 
 ## `num2cell`
