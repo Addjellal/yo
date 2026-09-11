@@ -3,6 +3,8 @@ function resultat = sim(modele, tFinal, pas)
 %   RESULTAT = SIM(MODELE,TFINAL,PAS) rend une structure contenant le
 %   vecteur des instants et, pour chaque bloc, le signal relevé à sa
 %   sortie.
+%   SIM(MODELE,INSTANTS) accepte aussi un vecteur d'instants réguliers :
+%   il donne alors à la fois l'instant final et le pas.
 %
 %   L'intégration se fait par la méthode d'Euler explicite ; les blocs
 %   sans état sont évalués dans l'ordre d'un tri topologique, ce qui
@@ -35,6 +37,33 @@ function resultat = sim(modele, tFinal, pas)
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIMPLOT.
     if nargin < 2, tFinal = 10; end
     if nargin < 3, pas = 0.01; end
+    % Un intervalle donne en vecteur — « sim(m, 0:0.01:1) » — dit a la
+    % fois l'instant final et le pas. Le prendre pour un scalaire ne
+    % simulait qu'un seul point, et le resultat, juste pour un bloc sans
+    % memoire, etait faux des qu'un etat entrait en jeu.
+    if ~isscalar(tFinal)
+        instantsDonnes = double(tFinal(:))';
+        if numel(instantsDonnes) < 2
+            error('simulink:sim:intervalle', ...
+                  'Un intervalle doit porter au moins deux instants.');
+        end
+        ecarts = diff(instantsDonnes);
+        if any(ecarts <= 0)
+            error('simulink:sim:intervalle', ...
+                  'Les instants doivent etre strictement croissants.');
+        end
+        if nargin < 3
+            % Un intervalle de deux bornes ne dit rien du pas : on garde
+            % celui par defaut. Au-dela, c'est l'ecart qui le donne.
+            if numel(instantsDonnes) > 2
+                pas = ecarts(1);
+            end
+        end
+        tFinal = instantsDonnes(end);
+    end
+    if ~isscalar(pas) || ~(pas > 0)
+        error('simulink:sim:pas', 'Le pas doit etre un nombre strictement positif.');
+    end
     if ischar(modele) || isstring(modele)
         % L'espace de travail à consulter est celui de l'appelant de SIM :
         % « evalin('caller') » depuis une sous-fonction ne verrait que

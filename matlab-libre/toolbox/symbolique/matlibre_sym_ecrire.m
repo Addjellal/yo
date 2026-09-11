@@ -1,9 +1,12 @@
-function texte = matlibre_sym_ecrire(arbre, priorite)
+function texte = matlibre_sym_ecrire(arbre, priorite, aGauche)
 %MATLIBRE_SYM_ECRIRE Écriture d'une expression, parenthèses minimales.
 %   PRIORITE est celle du contexte : on n'entoure de parenthèses que ce
-%   qui lierait moins fort que lui.
+%   qui lierait moins fort que lui. AGAUCHE dit si l'expression est
+%   l'opérande de gauche : un nombre négatif y est sans danger — « -1/x »
+%   se lit —, alors qu'à droite il en faut — « a - (-1) ».
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+    if nargin < 3, aGauche = false; end
     operateur = arbre{1};
     switch operateur
         case 'num'
@@ -13,7 +16,7 @@ function texte = matlibre_sym_ecrire(arbre, priorite)
             else
                 texte = sprintf('%g', valeur);
             end
-            if valeur < 0 && priorite > 0
+            if valeur < 0 && priorite > 0 && ~aGauche
                 texte = ['(' texte ')'];
             end
             return
@@ -26,6 +29,9 @@ function texte = matlibre_sym_ecrire(arbre, priorite)
         return
     end
     switch operateur
+        % L'egalite lie moins fort que tout le reste : ses deux membres
+        % n'ont donc jamais besoin de parentheses.
+        case '=', rang = 0;
         case '+', rang = 1;
         case '-', rang = 1;
         case '*', rang = 2;
@@ -33,17 +39,24 @@ function texte = matlibre_sym_ecrire(arbre, priorite)
         case '^', rang = 3;
         otherwise, rang = 3;
     end
-    % Ajouter un nombre negatif s'ecrit comme une soustraction : « x + -1 »
-    % se lit mal, « x - 1 » se lit.
-    if strcmp(operateur, '+') && strcmp(arbre{3}{1}, 'num') && arbre{3}{2} < 0
-        arbre = {'-', arbre{2}, {'num', -arbre{3}{2}}};
-        operateur = '-';
+    % Ajouter un terme negatif s'ecrit comme une soustraction : « x + -1 »
+    % et « a + -1/b » se lisent mal, « x - 1 » et « a - 1/b » se lisent.
+    % Un terme est negatif si son facteur de tete l'est, ce qui descend
+    % dans les produits et les quotients.
+    if strcmp(operateur, '+')
+        [negatif, oppose] = matlibre_sym_oppose(arbre{3});
+        if negatif
+            arbre = {'-', arbre{2}, oppose};
+            operateur = '-';
+        end
     end
-    gauche = matlibre_sym_ecrire(arbre{2}, rang);
+    gauche = matlibre_sym_ecrire(arbre{2}, rang, true);
     % Le membre droit d'une soustraction, d'une division ou d'une
     % puissance doit être protégé au même rang : a - (b - c) n'est pas
     % a - b - c.
-    if any(strcmp(operateur, {'-', '/', '^'}))
+    if strcmp(operateur, '=')
+        droite = matlibre_sym_ecrire(arbre{3}, 0, true);
+    elseif any(strcmp(operateur, {'-', '/', '^'}))
         droite = matlibre_sym_ecrire(arbre{3}, rang + 1);
     else
         droite = matlibre_sym_ecrire(arbre{3}, rang);

@@ -133,6 +133,31 @@ HORNER Forme emboîtée d'un polynôme symbolique.
   Voir aussi POLYVAL, COLLECT, EXPAND, SIMPLIFY, MATLABFUNCTION.
 ```
 
+## `isolate`
+
+```
+ISOLATE Isole une variable dans une équation.
+  ISOLATE(EQ,X) réécrit l'équation sous la forme X = ..., en défaisant
+  une à une les opérations qui entourent X.
+
+  Le procédé est celui qu'on apprend à l'école : on regarde ce qui
+  enveloppe l'inconnue et on applique l'opération inverse des deux
+  côtés. Une addition se défait par une soustraction, un produit par une
+  division, un carré par une racine, un sinus par un arc sinus. Cela ne
+  marche que si l'inconnue n'apparaît qu'une fois ; sinon il n'y a rien
+  à défaire, et ISOLATE le dit.
+
+  L'équation se donne comme une expression à annuler, ou avec un signe
+  d'égalité construit par EQ.
+
+  Exemple :
+     syms x
+     isolate(2*x + 3, x)             % x = -3/2
+     isolate(x^2 - 4, x)             % x = 2
+
+  Voir aussi SOLVE, VPASOLVE, SUBS, SIMPLIFY.
+```
+
 ## `jacobian`
 
 ```
@@ -166,6 +191,21 @@ LATEX Écriture LaTeX d'une expression symbolique.
      latex((x + 1) / (x ^ 2))       % '\frac{x + 1}{x^{2}}'
 
   Voir aussi PRETTY, CHAR, SYM.
+```
+
+## `lhs`
+
+```
+LHS Membre de gauche d'une équation symbolique.
+  LHS(EQ) rend ce qui est à gauche du signe d'égalité. RHS rend ce qui
+  est à droite.
+
+  Exemple :
+     syms x
+     char(lhs(isolate(2*x + 3, x)))     % 'x'
+     double(rhs(isolate(2*x + 3, x)))   % -1.5
+
+  Voir aussi RHS, ISOLATE, SOLVE, CHILDREN.
 ```
 
 ## `limit`
@@ -240,6 +280,46 @@ MATLIBRE_SYM_COEFFICIENTS Coefficients d'un polynôme en une variable.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_sym_compter`
+
+```
+MATLIBRE_SYM_COMPTER Combien de fois une variable paraît dans un arbre.
+  Sert à savoir si une équation se laisse isoler : défaire les
+  opérations une à une ne marche que si l'inconnue n'apparaît qu'une
+  fois. Deux occurrences demandent autre chose — regrouper, factoriser —
+  et ISOLATE refuse plutôt que de rendre une réponse partielle.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_sym_compter({'+', {'var','x'}, {'num',1}}, 'x')   % 1
+
+  Voir aussi ISOLATE, SYMVAR.
+```
+
+## `matlibre_sym_defaire`
+
+```
+MATLIBRE_SYM_DEFAIRE Défait une opération autour de l'inconnue.
+  Applique aux deux membres l'opération inverse de celle qui coiffe le
+  membre de gauche, de sorte que l'inconnue s'en trouve un cran moins
+  enveloppée. Un pas de ce que fait ISOLATE.
+
+  La branche qui ne porte pas l'inconnue passe à droite ; celle qui la
+  porte reste à gauche. C'est ce choix, et lui seul, qui fait avancer :
+  sans lui on tournerait en rond.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [g, d] = matlibre_sym_defaire({'+', {'var','x'}, {'num',3}}, ...
+                                   {'num', 0}, 'x');
+     char(sym(g))                    % x
+     char(sym(matlibre_sym_reduire(d)))   % -3
+
+  Voir aussi ISOLATE.
+```
+
 ## `matlibre_sym_defaut`
 
 ```
@@ -266,7 +346,9 @@ MATLIBRE_SYM_DEVELOPPER Distribue les produits sur les sommes.
 ```
 MATLIBRE_SYM_ECRIRE Écriture d'une expression, parenthèses minimales.
   PRIORITE est celle du contexte : on n'entoure de parenthèses que ce
-  qui lierait moins fort que lui.
+  qui lierait moins fort que lui. AGAUCHE dit si l'expression est
+  l'opérande de gauche : un nombre négatif y est sans danger — « -1/x »
+  se lit —, alors qu'à droite il en faut — « a - (-1) ».
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
@@ -390,6 +472,28 @@ MATLIBRE_SYM_NOMS Noms des variables d'un arbre d'expression.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_sym_oppose`
+
+```
+MATLIBRE_SYM_OPPOSE Un terme est-il négatif, et quel est son opposé ?
+  Un terme est négatif quand son facteur de tête l'est : c'est vrai
+  d'un nombre, et cela descend dans les produits et les quotients, dont
+  le signe est celui du numérateur.
+
+  Sert à écrire « a - 1/b » plutôt que « a + -1/b » : la somme d'un
+  terme négatif est une soustraction, et l'écrire ainsi est la seule
+  façon d'obtenir une expression qui se lit.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [n, o] = matlibre_sym_oppose({'num', -3});
+     n && o{2} == 3
+     matlibre_sym_oppose({'var', 'x'})      % faux : x n'a pas de signe
+
+  Voir aussi MATLIBRE_SYM_ECRIRE, SYMSTR.
+```
+
 ## `matlibre_sym_polynome`
 
 ```
@@ -451,6 +555,41 @@ MATLIBRE_SYM_REDUIRE Simplifie, et regroupe les termes semblables.
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 ```
 
+## `matlibre_sym_reecrire`
+
+```
+MATLIBRE_SYM_REECRIRE Remplace les fonctions d'un arbre par des équivalents.
+  Descend l'arbre et applique, à chaque nœud, l'identité qui exprime la
+  fonction rencontrée à l'aide de la cible demandée. Les identités sont
+  celles d'Euler et leurs conséquences, qui valent pour tout argument
+  complexe et pas seulement pour les réels.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     a = matlibre_sym_reecrire({'sin', {'var','x'}}, 'exp');
+     ~isempty(strfind(char(sym(a)), 'exp'))
+
+  Voir aussi REWRITE, SIMPLIFY.
+```
+
+## `matlibre_sym_terme_simple`
+
+```
+MATLIBRE_SYM_TERME_SIMPLE Un terme d'une décomposition en éléments simples.
+  Rend R / (X - P)^M, sous la forme la plus lisible : le dénominateur
+  n'est pas élevé à la puissance un, et un pôle nul ne s'écrit pas
+  « X - 0 ».
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     a = matlibre_sym_terme_simple(2, 1, 1, 'x');
+     char(sym(a))                    % 2/(x - 1)
+
+  Voir aussi PARTFRAC, RESIDUE.
+```
+
 ## `matlibre_sym_valeur`
 
 ```
@@ -498,6 +637,36 @@ NUMDEN Numérateur et dénominateur d'une expression symbolique.
   Voir aussi SIMPLIFY, EXPAND, COLLECT, PARTFRAC.
 ```
 
+## `partfrac`
+
+```
+PARTFRAC Décomposition en éléments simples.
+  PARTFRAC(F) réécrit une fraction rationnelle comme une somme de
+  termes dont les dénominateurs sont les facteurs du dénominateur de F.
+  PARTFRAC(F,X) nomme la variable.
+
+  Le principe tient à ce qu'un quotient de polynômes se décompose de
+  façon unique : à chaque racine du dénominateur correspond un terme
+  dont le dénominateur est cette racine seule. Les coefficients sont
+  les résidus, que RESIDUE calcule.
+
+  L'intérêt n'est pas l'apparence : sous cette forme, l'intégrale et la
+  transformée de Laplace inverse se lisent terme à terme, alors qu'elles
+  ne se lisent pas sur le quotient entier.
+
+  Ce qui est traité : les pôles réels, simples ou multiples. Les pôles
+  complexes donnent des termes à coefficients complexes plutôt que les
+  formes quadratiques réelles que MATLAB préfère, et l'aide le dit
+  plutôt que de le taire.
+
+  Exemple :
+     syms x
+     d = partfrac(1 / (x^2 - 3*x + 2));
+     abs(double(subs(d, x, 5)) - 1/12) < 1e-12   % meme valeur qu'avant
+
+  Voir aussi RESIDUE, NUMDEN, SIMPLIFY, FACTOR, COLLECT.
+```
+
 ## `poly2sym`
 
 ```
@@ -530,6 +699,52 @@ PRETTY Écriture lisible d'une expression symbolique.
      pretty(x ^ 2 + 3 * x - 1)      % x^2 + 3*x - 1
 
   Voir aussi SYM, CHAR, LATEX, DISP.
+```
+
+## `rewrite`
+
+```
+REWRITE Réécrit une expression avec d'autres fonctions.
+  REWRITE(F,CIBLE) remplace les fonctions de F par des équivalents
+  exprimés à l'aide de CIBLE. Les réécritures reconnues :
+
+     'exp'    sin, cos, tan, sinh, cosh, tanh en exponentielles
+     'sincos' tan en sinus sur cosinus
+     'tan'    sin et cos en tangente de l'arc moitié
+     'log'    asin, acos, atan en logarithmes
+     'sqrt'   ce qui s'écrit avec une racine
+
+  Une réécriture ne change pas la valeur : elle change la forme, ce qui
+  permet à une simplification de voir ce qu'elle ne voyait pas. C'est
+  son seul emploi, et c'est pour cela qu'on vérifie une réécriture en
+  comparant les deux formes en quelques points plutôt qu'en les lisant.
+
+  Exemple :
+     syms x
+     e = rewrite(sin(x), 'exp');
+     abs(double(subs(e, x, 1)) - sin(1)) < 1e-12
+
+  Voir aussi SIMPLIFY, EXPAND, COLLECT, SUBS.
+```
+
+## `rhs`
+
+```
+RHS Membre de droite d'une équation symbolique.
+  RHS(EQ) rend ce qui est à droite du signe d'égalité. LHS rend ce qui
+  est à gauche.
+
+  Une équation n'est pas une expression : elle a deux membres, et
+  beaucoup de ce qu'on veut en faire — évaluer la solution, la
+  substituer ailleurs — porte sur un seul des deux. Sans RHS il faudrait
+  descendre dans l'arbre à la main.
+
+  Exemple :
+     syms x
+     double(rhs(isolate(2*x + 3, x)))   % -1.5
+     char(lhs(isolate(2*x + 3, x)))     % 'x'
+
+  Voir aussi LHS, ISOLATE, SOLVE, CHILDREN.
 ```
 
 ## `sym`

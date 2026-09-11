@@ -39,6 +39,15 @@ function v = symeval(e, variables, valeurs)
         case 'exp', v = exp(symeval(e{2}));
         case 'log', v = log(symeval(e{2}));
         case 'sqrt', v = sqrt(symeval(e{2}));
+        case 'sinh', v = sinh(symeval(e{2}));
+        case 'cosh', v = cosh(symeval(e{2}));
+        case 'tanh', v = tanh(symeval(e{2}));
+        case 'asin', v = asin(symeval(e{2}));
+        case 'acos', v = acos(symeval(e{2}));
+        case 'atan', v = atan(symeval(e{2}));
+        case 'abs',  v = abs(symeval(e{2}));
+        case 'log2', v = log2(symeval(e{2}));
+        case 'log10', v = log10(symeval(e{2}));
         otherwise
             error('symbolic:symeval:unknown', 'Unknown operator ''%s''.', operateur);
     end

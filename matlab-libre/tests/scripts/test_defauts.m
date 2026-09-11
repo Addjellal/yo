@@ -322,6 +322,68 @@ assert(resume.n.NumMissing == 1);        % le NaN est compte, non ignore
 assert(strcmp(resume.L.Type, 'cell'));
 assert(isequal(resume.L.Size, [3 1]));
 
+%% ---------------- SIM accepte un intervalle, non seulement un instant
+% Un vecteur d'instants etait pris pour un scalaire : la simulation ne
+% faisait qu'un pas. Le resultat restait juste pour un bloc sans memoire,
+% ce qui rendait le defaut invisible jusqu'a ce qu'un etat entre en jeu.
+modele = new_system('essaiDefauts');
+modele = add_block(modele, 'constant', 'u', 'Value', 2);
+modele = add_block(modele, 'integrator', 'y', 'InitialCondition', 0);
+modele = add_line(modele, 'u', 'y');
+% L'integrale d'une constante est une rampe : y(1) doit valoir 2.
+parVecteur = sim(modele, 0:0.01:1);
+assert(numel(parVecteur.signaux.y) == 101);
+assert(abs(parVecteur.signaux.y(end) - 2) < 0.05);
+% Les trois formes donnent le meme resultat.
+parScalaire = sim(modele, 1, 0.01);
+assert(abs(parScalaire.signaux.y(end) - parVecteur.signaux.y(end)) < 1e-12);
+parBornes = sim(modele, [0 1]);
+assert(abs(parBornes.signaux.y(end) - 2) < 0.05);
+% Ce qui n'a pas de sens est refuse.
+assert(refuse(@() sim(modele, [1 0 2])));
+assert(refuse(@() sim(modele, 1, -1)));
+assert(refuse(@() sim(modele, 1, 0)));
+
+%% ------------------- GET_PARAM : on peut relire ce qu'on a ecrit
+% SET_PARAM existait sans GET_PARAM : un reglage s'ecrivait sans pouvoir
+% se relire, donc ni se verifier, ni s'afficher, ni se sauvegarder.
+reglage = new_system('reglage');
+reglage = add_block(reglage, 'gain', 'g1', 'Gain', 2);
+reglage = add_block(reglage, 'gain', 'g2', 'Gain', 3);
+reglage = add_block(reglage, 'constant', 'c', 'Value', 1);
+assert(get_param(reglage, 'g1', 'Gain') == 2);
+reglage = set_param(reglage, 'g1', 'Gain', 5);
+assert(get_param(reglage, 'g1', 'Gain') == 5);
+assert(strcmp(get_param(reglage, 'g1', 'BlockType'), 'gain'));
+assert(strcmp(get_param(reglage, 'Name'), 'reglage'));
+assert(numel(get_param(reglage, 'Blocks')) == 3);
+% Un parametre absent est nomme, non rendu vide.
+assert(refuse(@() get_param(reglage, 'g1', 'Inexistant')));
+assert(refuse(@() get_param(reglage, 'inconnu', 'Gain')));
+% FIND_SYSTEM filtre sur le type comme sur les parametres.
+assert(numel(find_system(reglage)) == 3);
+assert(numel(find_system(reglage, 'BlockType', 'gain')) == 2);
+assert(isequal(find_system(reglage, 'Gain', 3), {'g2'}));
+% Un parametre s'ecrit en nombre ou en texte : la recherche ne doit pas
+% dependre de la facon dont on l'a ecrit.
+assert(isequal(find_system(reglage, 'Gain', '3'), {'g2'}));
+
+%% -------------- CODEGEN dit ce qu'il lui faut quand on se trompe
+% Une poignee anonyme echouait sur « conversion en char », ce qui
+% n'apprenait rien. Une poignee nommee, elle, porte un nom et marche.
+identifiant = fopen(fullfile(tempdir, 'carreDefauts.m'), 'w');
+fprintf(identifiant, 'function y = carreDefauts(x)\n  y = x * x;\nend\n');
+fclose(identifiant);
+ancienChemin = pwd;
+cd(tempdir);
+rapport = codegen('carreDefauts', '-args', {0}, '-report');
+assert(~isempty(strfind(rapport.source, 'carreDefauts')));
+rapportPoignee = codegen(@carreDefauts, '-args', {0}, '-report');
+assert(~isempty(strfind(rapportPoignee.source, 'carreDefauts')));
+assert(refuse(@() codegen(@(x) x * 2, '-args', {0}, '-report')));
+cd(ancienChemin);
+delete(fullfile(tempdir, 'carreDefauts.m'));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

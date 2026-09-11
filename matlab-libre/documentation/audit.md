@@ -52,14 +52,14 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | robuste | 73 | 100 % | 100 % | 100 % |
 | signal | 205 | 100 % | 100 % | 100 % |
 | simscape | 9 | 100 % | 100 % | 100 % |
-| simulink | 6 | 100 % | 100 % | 100 % |
+| simulink | 8 | 100 % | 100 % | 100 % |
 | stateflow | 4 | 100 % | 100 % | 100 % |
 | statistiques | 272 | 100 % | 100 % | 100 % |
-| symbolique | 32 | 100 % | 100 % | 100 % |
+| symbolique | 37 | 100 % | 100 % | 97 % |
 | types | 41 | 100 % | 100 % | 100 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 100 % | 100 % | 100 % |
-| **ensemble** | **2190** | **100 %** | **100 %** | **100 %** |
+| **ensemble** | **2197** | **100 %** | **100 %** | **100 %** |
 
 ## Ce qui reste à faire
 
@@ -71,7 +71,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 
 *Aucune.*
 
-0 fonctions ne sont nommées par aucun test ni aucun exemple : rien ne prouve qu'elles marchent.
+1 fonctions ne sont nommées par aucun test ni aucun exemple : rien ne prouve qu'elles marchent.
 
-*Aucune.*
+`symbolique/lhs`
 

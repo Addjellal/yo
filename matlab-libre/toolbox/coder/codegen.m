@@ -35,7 +35,25 @@ function sortie = codegen(varargin)
     if isempty(varargin)
         error('coder:codegen:noFunction', 'Specify the name of a function to translate.');
     end
-    nom = char(varargin{1});
+    % CODEGEN traduit une fonction qui existe sur le chemin : il lui faut
+    % donc un nom. Une poignee nommee — « @carre » — en porte un et se
+    % laisse lire ; une poignee anonyme n'en a pas, et le dire vaut mieux
+    % que d'echouer sur une conversion en char.
+    if isa(varargin{1}, 'function_handle')
+        texte = func2str(varargin{1});
+        if ~isempty(texte) && texte(1) == '@' && isempty(strfind(texte, '('))
+            nom = texte(2:end);
+        elseif ~isempty(texte) && texte(1) == '@'
+            error('coder:codegen:anonyme', ...
+                  ['CODEGEN traduit une fonction du chemin, pas une fonction ' ...
+                   'anonyme : celle-ci n''a pas de nom a traduire. Ecrivez-la ' ...
+                   'dans un fichier .m et donnez son nom.']);
+        else
+            nom = texte;
+        end
+    else
+        nom = char(varargin{1});
+    end
     exemples = {};
     dossier = pwd();
     base = '';

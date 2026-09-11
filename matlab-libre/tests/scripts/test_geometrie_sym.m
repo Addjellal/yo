@@ -253,4 +253,88 @@ trouvees = sort(cellfun(@double, racinesSin));
 assert(any(abs(trouvees) < 1e-9));
 assert(any(abs(trouvees - pi) < 1e-6));
 
+%% ------------------------------------------ PARTFRAC, ISOLATE, REWRITE
+% Une décomposition en éléments simples ne change pas la fonction : c'est
+% la seule chose à vérifier, et elle se vérifie en quelques points.
+for expression = {1/(x^2 - 3*x + 2), 1/(x*(x + 1)), (x + 1)/(x^2 + 3*x + 2), ...
+                  1/(x - 1)^2, (x^2 + 1)/(x^2 - 1)}
+    decomposee = partfrac(expression{1});
+    for essai = [3 5 7.5 -4]
+        assert(abs(double(subs(decomposee, x, essai)) - ...
+                   double(subs(expression{1}, x, essai))) < 1e-8);
+    end
+end
+% La forme obtenue est bien une somme de termes simples : chaque
+% dénominateur ne porte plus qu'une racine.
+assert(~isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), 'x - 1')));
+assert(~isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), 'x - 2')));
+% Une expression sans dénominateur en x se rend telle quelle.
+assert(abs(double(subs(partfrac(x + 1), x, 3)) - 4) < 1e-12);
+
+% ISOLATE défait les opérations une à une. La solution rendue doit annuler
+% l'équation de départ : c'est ce qui la définit.
+for cas = {2*x + 3, x^2 - 4, 3*x, x/2 - 1, sqrt(x) - 3, exp(x) - 5, 5 - x, 10/x - 2}
+    resolue = isolate(cas{1}, x);
+    valeur = double(rhs(resolue));
+    assert(abs(double(subs(cas{1}, x, valeur))) < 1e-9);
+end
+% Une inconnue qui paraît deux fois ne se défait pas : ISOLATE le dit.
+refuseIsolate = false;
+try
+    isolate(x^2 + x, x);
+catch
+    refuseIsolate = true;
+end
+assert(refuseIsolate);
+
+% REWRITE change la forme, jamais la valeur.
+reecritures = {sin(x), 'exp'; cos(x), 'exp'; tan(x), 'exp'; sinh(x), 'exp'; ...
+               tanh(x), 'exp'; tan(x), 'sincos'; sin(x), 'tan'; cos(x), 'tan'; ...
+               atan(x), 'log'};
+for k = 1:size(reecritures, 1)
+    reecrite = rewrite(reecritures{k, 1}, reecritures{k, 2});
+    for essai = [0.3 0.7 1.2]
+        assert(abs(double(subs(reecritures{k, 1}, x, essai)) - ...
+                   double(subs(reecrite, x, essai))) < 1e-12);
+    end
+end
+% Et la réécriture a bien eu lieu : la fonction visée y paraît.
+assert(~isempty(strfind(char(rewrite(sin(x), 'exp')), 'exp')));
+assert(~isempty(strfind(char(rewrite(tan(x), 'sincos')), 'sin')));
+% Une cible inconnue est refusée.
+refuseCible = false;
+try
+    rewrite(sin(x), 'inconnu');
+catch
+    refuseCible = true;
+end
+assert(refuseCible);
+
+%% ------------- les fonctions élémentaires manquantes du calcul symbolique
+% Leurs dérivées doivent coïncider avec une différence finie : c'est ce
+% qui prouve la règle de dérivation sans la recopier d'une table.
+for fonction = {sinh(x), cosh(x), tanh(x), asin(x), acos(x), atan(x), ...
+                log2(x), log10(x)}
+    derivee = diff(fonction{1});
+    point = 0.4;
+    pas = 1e-6;
+    approchee = (double(subs(fonction{1}, x, point + pas)) - ...
+                 double(subs(fonction{1}, x, point - pas))) / (2 * pas);
+    assert(abs(approchee - double(subs(derivee, x, point))) < 1e-8);
+end
+% Et leur évaluation numérique est celle des fonctions ordinaires.
+assert(abs(double(subs(sinh(x), x, 1)) - sinh(1)) < 1e-14);
+assert(abs(double(subs(atan(x), x, 2)) - atan(2)) < 1e-14);
+assert(abs(double(subs(log10(x), x, 100)) - 2) < 1e-14);
+
+%% ---------------- l'écriture symbolique se lit sans parenthèses inutiles
+% Une somme dont le second terme est négatif s'écrit comme une
+% soustraction, y compris quand ce terme est un quotient.
+assert(strcmp(char(x + sym(-3)), 'x - 3'));
+assert(~isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), ' - ')));
+assert(isempty(strfind(char(partfrac(1/(x^2 - 3*x + 2))), '+ -')));
+% Mais les parenthèses qui portent un sens restent.
+assert(~isempty(strfind(char(x - sym(-1)), '(-1)')));
+assert(strcmp(char((x + 1) * 2), '(x + 1)*2'));
+
 disp('geometrie et symbolique : toutes les verifications passent');

@@ -108,6 +108,15 @@ classdef sym
         function r = exp(a),  r = matlibre_sym_appliquer('exp', a);  end
         function r = log(a),  r = matlibre_sym_appliquer('log', a);  end
         function r = sqrt(a), r = matlibre_sym_appliquer('sqrt', a); end
+        function r = sinh(a),  r = matlibre_sym_appliquer('sinh', a);  end
+        function r = cosh(a),  r = matlibre_sym_appliquer('cosh', a);  end
+        function r = tanh(a),  r = matlibre_sym_appliquer('tanh', a);  end
+        function r = asin(a),  r = matlibre_sym_appliquer('asin', a);  end
+        function r = acos(a),  r = matlibre_sym_appliquer('acos', a);  end
+        function r = atan(a),  r = matlibre_sym_appliquer('atan', a);  end
+        function r = abs(a),   r = matlibre_sym_appliquer('abs', a);   end
+        function r = log2(a),  r = matlibre_sym_appliquer('log2', a);  end
+        function r = log10(a), r = matlibre_sym_appliquer('log10', a); end
 
         function texte = char(a)
             texte = symstr(a.arbre);
