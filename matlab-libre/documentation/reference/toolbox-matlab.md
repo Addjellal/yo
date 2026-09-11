@@ -773,6 +773,31 @@ COLAMD Renumérotation des colonnes par degré minimal.
   Voir aussi SYMAMD, SYMRCM, LU, QR.
 ```
 
+## `combine`
+
+```
+COMBINE Réunit plusieurs magasins en un seul, lu en parallèle.
+  DS = COMBINE(DS1,DS2,...) rend un magasin dont chaque lecture prend
+  un morceau de chacun et les rend côte à côte, dans une cellule.
+
+  C'est ainsi qu'on apparie des données et leurs étiquettes quand elles
+  vivent dans deux magasins : les lire séparément ne garantirait pas
+  qu'on avance du même pas.
+
+  La lecture s'arrête dès que l'un des magasins est épuisé : apparier
+  au-delà n'aurait pas de sens, et continuer sur le plus long
+  produirait des paires boiteuses.
+
+  Exemple :
+     a = arrayDatastore([1; 2; 3]);
+     b = arrayDatastore([10; 20; 30]);
+     c = combine(a, b);
+     paire = read(c);
+     paire{1} == 1 && paire{2} == 10
+
+  Voir aussi DATASTORE, TRANSFORM, READ, HASDATA.
+```
+
 ## `comet`
 
 ```
@@ -4269,6 +4294,42 @@ MATLIBRE_LIRE_OPTIONS Lit une suite de couples nom-valeur.
   Voir aussi INPUTPARSER, VARARGIN.
 ```
 
+## `matlibre_magasin_combine`
+
+```
+MATLIBRE_MAGASIN_COMBINE Magasin qui lit plusieurs magasins de front.
+  C'est l'objet que rend COMBINE. Chaque lecture prend un morceau de
+  chacun des magasins réunis et les rend dans une cellule ; la lecture
+  s'arrête dès que l'un d'eux est épuisé.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
+  qui nomme cet objet CombinedDatastore.
+
+  Exemple :
+     c = matlibre_magasin_combine({arrayDatastore([1;2]), arrayDatastore([3;4])});
+     numel(read(c))                  % 2 : un morceau par magasin
+
+  Voir aussi COMBINE, TRANSFORM, DATASTORE.
+```
+
+## `matlibre_magasin_transforme`
+
+```
+MATLIBRE_MAGASIN_TRANSFORME Magasin dont chaque morceau passe par une fonction.
+  C'est l'objet que rend TRANSFORM. La fonction n'est appliquée qu'à la
+  lecture : décrire un prétraitement ne coûte donc rien tant qu'on ne
+  lit pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
+  qui nomme cet objet TransformedDatastore.
+
+  Exemple :
+     t = matlibre_magasin_transforme(arrayDatastore([1;2]), @(x) x * 2);
+     read(t)                         % 2
+
+  Voir aussi TRANSFORM, COMBINE, DATASTORE.
+```
+
 ## `matlibre_memoire_globale`
 
 ```
@@ -7653,6 +7714,26 @@ TOPKROWS Les K premières lignes dans l'ordre du tri.
      i                                     % 1 : la premiere ligne
 
   Voir aussi SORTROWS, SORT, MAXK, MINK.
+```
+
+## `transform`
+
+```
+TRANSFORM Applique une fonction à chaque morceau lu d'un magasin.
+  DS = TRANSFORM(MAGASIN,F) rend un magasin dont chaque lecture rend
+  F appliquée au morceau qu'aurait rendu MAGASIN.
+
+  La transformation est paresseuse : elle n'a lieu qu'au moment de la
+  lecture, morceau par morceau. C'est ce qui permet de décrire un
+  prétraitement — mettre à l'échelle, découper, recoder — sans jamais
+  tenir le jeu entier.
+
+  Exemple :
+     a = arrayDatastore([1; 2; 3]);
+     d = transform(a, @(x) x * 10);
+     read(d)                         % 10
+
+  Voir aussi COMBINE, DATASTORE, READ, CELLFUN.
 ```
 
 ## `triangulation`

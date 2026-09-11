@@ -79,3 +79,4 @@ get_param find_system
 methods events enumeration metaclass wordcloud
 onCleanup
 datastore tabularTextDatastore imageDatastore arrayDatastore
+combine transform

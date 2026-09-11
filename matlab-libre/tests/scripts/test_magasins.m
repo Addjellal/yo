@@ -141,6 +141,130 @@ catch
 end
 assert(refuseChemin);
 
+%% --------------------------------------------------- COMBINE, TRANSFORM
+% Apparier deux magasins : chaque lecture prend un morceau de chacun, et
+% les deux avancent du meme pas. C'est la seule chose que COMBINE
+% garantisse et que deux lectures separees ne garantiraient pas.
+a = arrayDatastore([1; 2; 3]);
+b = arrayDatastore([10; 20; 30]);
+c = combine(a, b);
+assert(numel(c.UnderlyingDatastores) == 2);
+assert(numpartitions(c) == 3);
+paire = read(c);
+assert(iscell(paire) && numel(paire) == 2);
+assert(paire{1} == 1 && paire{2} == 10);
+paire = read(c);
+assert(paire{1} == 2 && paire{2} == 20);
+
+% La boucle se termine, ne saute rien, ne compte rien deux fois.
+reset(c);
+gauche = [];
+droite = [];
+while hasdata(c)
+    p = read(c);
+    gauche(end + 1, 1) = p{1};
+    droite(end + 1, 1) = p{2};
+end
+assert(isequal(gauche, [1; 2; 3]));
+assert(isequal(droite, [10; 20; 30]));
+
+% L'apercu ne consomme rien : apres lui, la lecture repart du debut.
+reset(c);
+apercu = preview(c);
+assert(isequal(apercu{1}, [1; 2; 3]));
+assert(isequal(apercu{2}, [10; 20; 30]));
+p = read(c);
+assert(p{1} == 1);
+reset(c);
+entier = readall(c);
+assert(isequal(entier{1}, [1; 2; 3]));
+assert(isequal(entier{2}, [10; 20; 30]));
+
+% Le plus court decide : appariez 2 et 3, il y a 2 paires, pas 3. Une
+% quatrieme lecture n'invente pas de paire boiteuse, elle refuse.
+court = combine(arrayDatastore([1; 2]), arrayDatastore([10; 20; 30]));
+assert(numpartitions(court) == 2);
+n = 0;
+while hasdata(court)
+    read(court);
+    n = n + 1;
+end
+assert(n == 2);
+refuseFin = false;
+try
+    read(court);
+catch
+    refuseFin = true;
+end
+assert(refuseFin);
+
+% Apparier un seul magasin n'a pas de sens.
+refuseSeul = false;
+try
+    combine(arrayDatastore([1; 2]));
+catch
+    refuseSeul = true;
+end
+assert(refuseSeul);
+
+% TRANSFORM : la fonction s'applique a chaque morceau lu.
+d = transform(arrayDatastore([1; 2; 3]), @(x) x * 10);
+assert(numel(d.UnderlyingDatastores) == 1);
+assert(numel(d.Transforms) == 1);
+assert(numpartitions(d) == 3);
+assert(read(d) == 10);
+assert(read(d) == 20);
+reset(d);
+vus = [];
+while hasdata(d)
+    vus(end + 1, 1) = read(d);
+end
+assert(isequal(vus, [10; 20; 30]));
+assert(isequal(readall(d), [10; 20; 30]));
+assert(isequal(preview(d), [10; 20; 30]));
+
+% Morceau par morceau, et non sur le jeu entier : le dernier morceau est
+% plus court que les autres, et la fonction le voit tel quel.
+g = transform(arrayDatastore([1; 2; 3; 4; 5], 'ReadSize', 2), @(x) numel(x));
+assert(read(g) == 2);
+assert(read(g) == 2);
+assert(read(g) == 1);
+
+% Paresseuse : decrire la transformation n'evalue rien. Une fonction qui
+% echoue ne se manifeste donc qu'a la lecture, pas a la construction.
+f = transform(arrayDatastore([1; 2]), @(x) error('MATLAB:essai:tard', 'trop tard'));
+tardif = false;
+try
+    read(f);
+catch err
+    tardif = strcmp(err.identifier, 'MATLAB:essai:tard');
+end
+assert(tardif);
+
+% Sur un magasin de fichier, c'est aussi morceau par morceau.
+fichierTr = fullfile(dossier, 'matlibre_transforme.csv');
+writelines(["a,b"; "1,2"; "3,4"; "5,6"; "7,8"; "9,10"], fichierTr);
+tt = transform(tabularTextDatastore(fichierTr, 'ReadSize', 2), @(t) height(t));
+assert(read(tt) == 2);
+assert(read(tt) == 2);
+assert(read(tt) == 1);
+delete(fichierTr);
+
+% Les deux se composent : on apparie un magasin transforme et un autre.
+h = combine(transform(arrayDatastore([1; 2]), @(x) x * 100), ...
+            arrayDatastore([7; 8]));
+p = read(h);
+assert(p{1} == 100 && p{2} == 7);
+
+% Transformer par autre chose qu'une fonction est refuse.
+refuseF = false;
+try
+    transform(arrayDatastore([1; 2]), 'pasUneFonction');
+catch
+    refuseF = true;
+end
+assert(refuseF);
+
 delete(fichierCsv);
 delete(fullfile(dossierImages, 'a.pgm'));
 delete(fullfile(dossierImages, 'b.pgm'));
