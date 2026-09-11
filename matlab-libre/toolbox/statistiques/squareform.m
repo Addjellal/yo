@@ -12,22 +12,26 @@ function S = squareform(D, forme)
 %      SQUAREFORM(D,'tomatrix')  force le passage au carré ;
 %      SQUAREFORM(S,'tovector')  force le passage au vecteur.
 %
-%   Ce dernier sert quand l'argument est de taille 1 x 1, seul cas
-%   ambigu : c'est aussi bien la distance d'une paire que la matrice
-%   d'un unique point.
+%   Un argument de taille 1 x 1 est le seul cas ambigu : c'est aussi bien
+%   la distance d'une paire que la matrice d'un unique point. Il est lu
+%   comme un vecteur, parce que c'est ce que rend PDIST sur deux points —
+%   « squareform(pdist(X)) » doit marcher pour deux points comme pour
+%   mille. SQUAREFORM(D,'tovector') impose l'autre lecture.
 %
 %   Exemples :
 %      d = pdist([0 0; 3 4; 0 4])      % [5 4 3]
 %      S = squareform(d)               % [0 5 4; 5 0 3; 4 3 0]
 %      squareform(S)                   % [5 4 3], on revient au vecteur
+%      squareform(pdist([0 0; 3 4]))   % [0 5; 5 0], sur deux points
 %
 %   Voir aussi PDIST, PDIST2, LINKAGE, TRIU.
     if nargin >= 2
         sens = lower(char(forme));
-    elseif isvector(D) && ~isscalar(D)
+    elseif isempty(D)
+        % Aucune distance : c'est le vecteur d'une seule observation.
         sens = 'tomatrix';
-    elseif isscalar(D)
-        sens = 'tovector';
+    elseif isvector(D)
+        sens = 'tomatrix';
     else
         sens = 'tovector';
     end
@@ -35,6 +39,10 @@ function S = squareform(D, forme)
     if strcmp(sens, 'tomatrix')
         d = D(:)';
         m = numel(d);
+        if m == 0
+            S = zeros(1, 1);
+            return;
+        end
         n = round((1 + sqrt(1 + 8 * m)) / 2);
         if n * (n - 1) / 2 ~= m
             error('stats:squareform:BadVectorSize', ...

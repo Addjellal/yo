@@ -349,5 +349,8 @@ extern std::function<bool(Interpreteur&, const Valeur&, const std::string&, cons
     crochetEcrirePropriete;
 extern std::function<bool(Interpreteur&, const Valeur&, const std::string&, Valeur&)>
     crochetLirePropriete;
+// Et celui qui supprime : « delete(h) » sur une poignee doit retirer
+// l'objet du trace, non chercher un fichier de ce nom.
+extern std::function<bool(Interpreteur&, const Valeur&)> crochetSupprimerGraphique;
 
 }  // namespace matlibre

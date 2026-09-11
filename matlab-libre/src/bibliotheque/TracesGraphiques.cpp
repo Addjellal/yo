@@ -786,6 +786,18 @@ FONCTION(fnClf) {
     return {};
 }
 
+int numeroDeFigure(const Valeur& v);
+
+// La liste des figures ouvertes. ISHANDLE en a besoin pour dire si un
+// numero designe encore quelque chose, et rien d'autre ne l'expose.
+FONCTION(fnFiguresOuvertes) {
+    INUTILISE
+    std::vector<double> numeros;
+    for (const auto& f : it.figures)
+        if (f.second) numeros.push_back((double)f.first);
+    return {Valeur::ligne(numeros)};
+}
+
 FONCTION(fnClose) {
     INUTILISE
     if (args.empty()) {
@@ -798,10 +810,19 @@ FONCTION(fnClose) {
         it.figureCourante = 0;
         return {};
     }
-    it.figures.erase((int)args[0].scal());
+    it.figures.erase(numeroDeFigure(args[0]));
     if (!it.figures.count(it.figureCourante))
         it.figureCourante = it.figures.empty() ? 0 : it.figures.begin()->first;
     return {};
+}
+
+// « close(gcf) » est l'ecriture la plus courante, et GCF rend une poignee,
+// non un numero. Lire le numero dans la poignee evite d'avoir a ecrire
+// « close(get(gcf,'Number')) », que personne n'ecrit.
+int numeroDeFigure(const Valeur& v) {
+    if (v.classe == Classe::Objet && v.aChamp("NumeroFigure"))
+        return (int)v.champ("NumeroFigure", 0).scal();
+    return (int)v.scal();
 }
 
 FONCTION(fnSubplot) {
@@ -1522,6 +1543,8 @@ void enregistrerGraphique(Interpreteur& it) {
     it.enregistrer("figure", fnFigure, "graphique", "figure  Cree ou choisit une figure.");
     it.enregistrer("clf", fnClf, "graphique", "clf  Vide la figure courante.");
     it.enregistrer("close", fnClose, "graphique", "close  Ferme une figure.");
+    it.enregistrer("matlibre_figures_ouvertes", fnFiguresOuvertes, "graphique",
+                   "matlibre_figures_ouvertes  Numeros des figures ouvertes.");
     it.enregistrer("subplot", fnSubplot, "graphique", "subplot  Decoupe la figure en cases.");
     it.enregistrer("xline", fnXline, "graphique", "xline  Droite verticale.");
     it.enregistrer("yline", fnYline, "graphique", "yline  Droite horizontale.");

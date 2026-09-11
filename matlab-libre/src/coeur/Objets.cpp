@@ -206,6 +206,7 @@ std::function<bool(Interpreteur&, const Valeur&, const std::string&, const Valeu
     crochetEcrirePropriete;
 std::function<bool(Interpreteur&, const Valeur&, const std::string&, Valeur&)>
     crochetLirePropriete;
+std::function<bool(Interpreteur&, const Valeur&)> crochetSupprimerGraphique;
 
 Valeur Interpreteur::ecrireProprieteObjet(Valeur objet, const std::string& nom,
                                           const Valeur& valeur) {

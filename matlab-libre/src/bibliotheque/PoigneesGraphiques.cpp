@@ -28,6 +28,11 @@ const char* CLASSE_TEXTE = "matlab.graphics.primitive.Text";
 // Une courbe : ce que rend « h = plot(x,y) ». Elle designe sa figure, son
 // axe et son identifiant de serie.
 const char* CLASSE_LIGNE = "matlab.graphics.chart.primitive.Line";
+// La legende et la barre de couleurs sont des objets a part dans MATLAB,
+// et il le faut : leur chaine n'est pas celle du titre. Confondues avec
+// un texte d'axe, « set(l,'String',...) » ecrasait le titre de l'axe.
+const char* CLASSE_LEGENDE = "matlab.graphics.illustration.Legend";
+const char* CLASSE_BARRE = "matlab.graphics.illustration.ColorBar";
 
 Valeur poignee(const char* classe, int figure, int axe) {
     Valeur v = Valeur::structureVide();
@@ -46,7 +51,13 @@ Valeur poigneeTexte(int figure, int axe, const char* cible) {
     v.poserChamp("NumeroAxe", Valeur::scalaire(axe));
     v.poserChamp("Cible", Valeur::texte(cible));
     v.classe = Classe::Objet;
-    v.nomObjet = CLASSE_TEXTE;
+    if (std::string(cible) == "legend") {
+        v.nomObjet = CLASSE_LEGENDE;
+    } else if (std::string(cible) == "colorbar") {
+        v.nomObjet = CLASSE_BARRE;
+    } else {
+        v.nomObjet = CLASSE_TEXTE;
+    }
     return v;
 }
 
@@ -93,6 +104,14 @@ bool estPoigneeSerie(const Valeur& v) {
 
 bool estPoigneeEtiquette(const Valeur& v) {
     return estPoignee(v, CLASSE_TEXTE) && !v.aChamp("NumeroSerie");
+}
+
+bool estPoigneeLegende(const Valeur& v) {
+    return estPoignee(v, CLASSE_LEGENDE);
+}
+
+bool estPoigneeBarre(const Valeur& v) {
+    return estPoignee(v, CLASSE_BARRE);
 }
 
 std::shared_ptr<Figure> figureDe(Interpreteur& it, const Valeur& p) {
@@ -419,6 +438,13 @@ bool lireAxes(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur&
         return true;
     }
     if (memeNom(nom, "Type")) { sortie = Valeur::texte("axes"); return true; }
+    // Le parent d'un axe est sa figure, et une figure est une poignee :
+    // rendre son numero obligeait a savoir de quel cote de l'arbre on se
+    // trouvait pour lire la suite.
+    if (memeNom(nom, "Parent")) {
+        sortie = poignee(CLASSE_FIGURE, (int)p.champ("NumeroFigure", 0).scal(), 0);
+        return true;
+    }
     // « get(gca,'Children') » : les courbes de l'axe, la derniere tracee
     // en tete, comme MATLAB les empile.
     if (memeNom(nom, "Children")) {
@@ -441,6 +467,24 @@ bool lireFigure(Interpreteur& it, const Valeur& p, const std::string& nom, Valeu
         return true;
     }
     if (memeNom(nom, "Type")) { sortie = Valeur::texte("figure"); return true; }
+    // « get(gcf,'Children') » : les axes de la figure, le dernier cree en
+    // tete, comme MATLAB les empile. Sans eux, un parcours de l'arbre
+    // graphique s'arretait a la figure.
+    if (memeNom(nom, "Children")) {
+        std::vector<int> identifiants;
+        for (auto axe = f->axes.rbegin(); axe != f->axes.rend(); ++axe)
+            if (*axe) identifiants.push_back((*axe)->identifiant);
+        Valeur v = Valeur::structureVide();
+        v.dims = {(int)identifiants.size(), 1};
+        for (std::size_t k = 0; k < identifiants.size(); ++k) {
+            v.poserChamp("NumeroFigure", Valeur::scalaire(f->numero), k);
+            v.poserChamp("NumeroAxe", Valeur::scalaire(identifiants[k]), k);
+        }
+        v.classe = Classe::Objet;
+        v.nomObjet = CLASSE_AXES;
+        sortie = v;
+        return true;
+    }
     return false;
 }
 
@@ -448,6 +492,12 @@ bool lireFigure(Interpreteur& it, const Valeur& p, const std::string& nom, Valeu
     std::vector<Valeur> nom(Interpreteur& it, Arguments args, int nargout)
 
 // set(poignee, 'Nom', valeur, ...) — la forme historique, toujours en usage.
+// Déclarées ici : SET les appelle avant que le fichier ne les définisse.
+bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie);
+bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, const Valeur& v);
+bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie);
+bool ecrireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, const Valeur& v);
+
 FONCTION(fnSetPoignee) {
     (void)nargout;
     if (args.empty()) return {};
@@ -459,7 +509,9 @@ FONCTION(fnSetPoignee) {
     // tranche, non le nom.
     bool texte = estPoigneeEtiquette(p);
     bool ligne = estPoigneeSerie(p);
-    if (!axes && !figure && !texte && !ligne) return {};
+    bool legende = estPoigneeLegende(p);
+    bool barre = estPoigneeBarre(p);
+    if (!axes && !figure && !texte && !ligne && !legende && !barre) return {};
     // « set(h, ...) » sur un tableau de poignees ecrit sur chacune.
     std::size_t combien = ligne ? std::max<std::size_t>(1, p.nelem()) : 1;
     for (std::size_t e = 0; e < combien; ++e) {
@@ -476,11 +528,107 @@ FONCTION(fnSetPoignee) {
             std::string nom = args[k].versTexte();
             if (axes) ecrireAxes(it, cible, nom, args[k + 1]);
             else if (texte) ecrireTexte(it, cible, nom, args[k + 1]);
+            else if (legende) ecrireLegende(it, cible, nom, args[k + 1]);
+            else if (barre) ecrireBarre(it, cible, nom, args[k + 1]);
             else if (ligne) ecrireLigne(it, cible, nom, args[k + 1]);
             else ecrireFigure(it, cible, nom, args[k + 1]);
         }
     }
     return {};
+}
+
+// La legende a ses propres proprietes : sa chaine est la liste de ses
+// entrees, non le titre de l'axe. « String » y rend une cellule quand il
+// y a plusieurs entrees, comme dans MATLAB.
+bool lireLegende(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
+    auto a = axesDe(it, p);
+    if (memeNom(nom, "String")) {
+        if (a->legende.size() == 1) {
+            sortie = Valeur::texte(a->legende[0]);
+        } else {
+            sortie = Valeur::celluleDims({1, (int)a->legende.size()});
+            for (std::size_t k = 0; k < a->legende.size(); ++k)
+                sortie.cellules[k] = Valeur::texte(a->legende[k]);
+        }
+        return true;
+    }
+    if (memeNom(nom, "Visible")) {
+        sortie = Valeur::texte(a->legendeVisible ? "on" : "off");
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) {
+        sortie = Valeur::scalaire(a->taillePolice);
+        return true;
+    }
+    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
+        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter")) {
+        sortie = Valeur::texte("");
+        return true;
+    }
+    return false;
+}
+
+bool ecrireLegende(Interpreteur& it, const Valeur& p, const std::string& nom,
+                   const Valeur& v) {
+    auto a = axesDe(it, p);
+    if (memeNom(nom, "String")) {
+        a->legende.clear();
+        if (v.classe == Classe::Cellule) {
+            for (const auto& c : v.cellules) a->legende.push_back(c.versTexte());
+        } else if (v.classe == Classe::Chaine && v.nelem() > 1) {
+            for (const auto& s : v.chaines) a->legende.push_back(s);
+        } else {
+            a->legende.push_back(v.versTexte());
+        }
+        return true;
+    }
+    if (memeNom(nom, "Visible")) {
+        a->legendeVisible = v.versTexte() != "off";
+        return true;
+    }
+    if (memeNom(nom, "FontSize")) {
+        a->taillePolice = v.scal();
+        return true;
+    }
+    // Les autres proprietes sont acceptees sans effet : le rendu n'en a
+    // pas l'usage, et un programme qui les pose ne doit pas s'arreter.
+    if (memeNom(nom, "Location") || memeNom(nom, "Box") ||
+        memeNom(nom, "Orientation") || memeNom(nom, "Interpreter") ||
+        memeNom(nom, "Color") || memeNom(nom, "Position") ||
+        memeNom(nom, "NumColumns") || memeNom(nom, "AutoUpdate"))
+        return true;
+    erreur("MATLAB:hg:InvalidProperty",
+           "Unrecognized property '" + nom + "' for class 'Legend'.");
+}
+
+// La barre de couleurs n'est pas encore dessinee : ses proprietes se
+// posent et se relisent sans effet sur le trace, ce qui suffit a ce
+// qu'un programme qui la regle ne s'arrete pas.
+bool lireBarre(Interpreteur& it, const Valeur& p, const std::string& nom, Valeur& sortie) {
+    // La poignee designe bien un axe existant : le verifier ici fait que
+    // lire une propriete d'une barre supprimee echoue comme il se doit.
+    axesDe(it, p);
+    if (memeNom(nom, "Visible")) {
+        sortie = Valeur::texte("on");
+        return true;
+    }
+    if (memeNom(nom, "Location") || memeNom(nom, "Label")) {
+        sortie = Valeur::texte("");
+        return true;
+    }
+    return false;
+}
+
+bool ecrireBarre(Interpreteur& it, const Valeur& p, const std::string& nom,
+                 const Valeur& v) {
+    (void)it; (void)p; (void)v;
+    if (memeNom(nom, "Visible") ||
+        memeNom(nom, "Location") || memeNom(nom, "Label") ||
+        memeNom(nom, "FontSize") || memeNom(nom, "Ticks") ||
+        memeNom(nom, "TickLabels"))
+        return true;
+    erreur("MATLAB:hg:InvalidProperty",
+           "Unrecognized property '" + nom + "' for class 'ColorBar'.");
 }
 
 FONCTION(fnGetPoignee) {
@@ -491,6 +639,8 @@ FONCTION(fnGetPoignee) {
     Valeur sortie;
     if (estPoignee(p, CLASSE_AXES) && lireAxes(it, p, nom, sortie)) return {sortie};
     if (estPoigneeEtiquette(p) && lireTexte(it, p, nom, sortie)) return {sortie};
+    if (estPoigneeLegende(p) && lireLegende(it, p, nom, sortie)) return {sortie};
+    if (estPoigneeBarre(p) && lireBarre(it, p, nom, sortie)) return {sortie};
     if (estPoigneeSerie(p) && lireLigne(it, p, nom, sortie)) return {sortie};
     if (estPoignee(p, CLASSE_FIGURE) && lireFigure(it, p, nom, sortie)) return {sortie};
     return {Valeur::vide()};
@@ -527,11 +677,55 @@ Valeur poigneeLignes(int figure, int axe, const std::vector<int>& series) {
     return poigneeLignesInterne(figure, axe, series);
 }
 
+// Supprimer une poignee, c'est retirer du trace ce qu'elle designe : une
+// serie de son axe, un axe de sa figure, une figure de la liste. Rendre
+// faux laisse DELETE chercher un fichier, ce qu'il faut pour « delete
+// ('vieux.txt') ».
+bool supprimerGraphique(Interpreteur& moteur, const Valeur& p) {
+    if (p.classe != Classe::Objet) return false;
+    if (!p.aChamp("NumeroFigure")) return false;
+    for (std::size_t e = 0; e < std::max<std::size_t>(p.nelem(), 1); ++e) {
+        int numeroFigure = (int)p.champ("NumeroFigure", e).scal();
+        auto trouve = moteur.figures.find(numeroFigure);
+        if (trouve == moteur.figures.end() || !trouve->second) continue;
+        auto f = trouve->second;
+        if (!p.aChamp("NumeroAxe") || estPoignee(p, CLASSE_FIGURE)) {
+            moteur.figures.erase(numeroFigure);
+            if (!moteur.figures.count(moteur.figureCourante))
+                moteur.figureCourante =
+                    moteur.figures.empty() ? 0 : moteur.figures.begin()->first;
+            continue;
+        }
+        int identifiantAxe = (int)p.champ("NumeroAxe", e).scal();
+        std::shared_ptr<Axes> a;
+        for (const auto& candidat : f->axes)
+            if (candidat && candidat->identifiant == identifiantAxe) a = candidat;
+        if (!a) continue;
+        if (p.aChamp("NumeroSerie")) {
+            int serie = (int)p.champ("NumeroSerie", e).scal();
+            for (std::size_t k = 0; k < a->series.size(); ++k)
+                if (a->series[k].identifiant == serie) {
+                    a->series.erase(a->series.begin() + (long)k);
+                    break;
+                }
+            continue;
+        }
+        for (std::size_t k = 0; k < f->axes.size(); ++k)
+            if (f->axes[k] && f->axes[k]->identifiant == identifiantAxe) {
+                f->axes.erase(f->axes.begin() + (long)k);
+                break;
+            }
+    }
+    return true;
+}
+
 void enregistrerPoigneesGraphiques(Interpreteur& it) {
     crochetEcrirePropriete = [](Interpreteur& moteur, const Valeur& objet,
                                 const std::string& nom, const Valeur& valeur) {
         if (estPoignee(objet, CLASSE_AXES)) return ecrireAxes(moteur, objet, nom, valeur);
         if (estPoigneeEtiquette(objet)) return ecrireTexte(moteur, objet, nom, valeur);
+        if (estPoigneeLegende(objet)) return ecrireLegende(moteur, objet, nom, valeur);
+        if (estPoigneeBarre(objet)) return ecrireBarre(moteur, objet, nom, valeur);
         if (estPoigneeSerie(objet)) return ecrireLigne(moteur, objet, nom, valeur);
         if (estPoignee(objet, CLASSE_FIGURE)) return ecrireFigure(moteur, objet, nom, valeur);
         return false;
@@ -540,9 +734,14 @@ void enregistrerPoigneesGraphiques(Interpreteur& it) {
                               const std::string& nom, Valeur& sortie) {
         if (estPoignee(objet, CLASSE_AXES)) return lireAxes(moteur, objet, nom, sortie);
         if (estPoigneeEtiquette(objet)) return lireTexte(moteur, objet, nom, sortie);
+        if (estPoigneeLegende(objet)) return lireLegende(moteur, objet, nom, sortie);
+        if (estPoigneeBarre(objet)) return lireBarre(moteur, objet, nom, sortie);
         if (estPoigneeSerie(objet)) return lireLigne(moteur, objet, nom, sortie);
         if (estPoignee(objet, CLASSE_FIGURE)) return lireFigure(moteur, objet, nom, sortie);
         return false;
+    };
+    crochetSupprimerGraphique = [](Interpreteur& moteur, const Valeur& objet) {
+        return supprimerGraphique(moteur, objet);
     };
     it.enregistrer("set", fnSetPoignee, "graphique",
                    "set  Ecrit une propriete d'une poignee graphique.");

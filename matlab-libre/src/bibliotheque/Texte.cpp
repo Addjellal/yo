@@ -554,8 +554,8 @@ FONCTION(fnExtractBetween) {
 
 // Les bornes d'un morceau se disent de deux facons : par position, ou par
 // les textes qui l'encadrent. La recherche est la meme pour extraire,
-// remplacer ou effacer ; seul ce qu'on met a la place change. RENDRE dit
-// ce que devient le morceau trouve.
+// remplacer ou effacer ; seul ce qu'on met a la place change, et c'est
+// REMPLACEMENT qui le porte — vide pour effacer.
 static std::vector<std::string> entreBornes(const ListeTextes& l, const Arguments& args,
                                             const std::string& remplacement,
                                             const char* nom) {

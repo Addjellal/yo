@@ -881,4 +881,79 @@ catch
 end
 assert(refuseNuage);
 
+%% ------------------------------- LEGENDE, BARRE, SUPPRESSION, PARENTE
+% La legende n'est pas un texte d'axe : confondues, « set(l,'String',...) »
+% ecrasait le titre, et « get(l,'String') » le rendait a sa place.
+figure;
+plot([1 2], [3 4]);
+title('un titre bien a lui');
+poigneeLegende = legend('a', 'b');
+assert(strcmp(class(poigneeLegende), 'matlab.graphics.illustration.Legend'));
+assert(isequal(get(poigneeLegende, 'String'), {'a', 'b'}));
+set(poigneeLegende, 'String', {'c', 'd'});
+assert(isequal(get(poigneeLegende, 'String'), {'c', 'd'}));
+assert(strcmp(get(get(gca, 'Title'), 'String'), 'un titre bien a lui'));
+assert(strcmp(get(poigneeLegende, 'Visible'), 'on'));
+set(poigneeLegende, 'Visible', 'off');
+assert(strcmp(get(poigneeLegende, 'Visible'), 'off'));
+poigneeBarre = colorbar;
+assert(strcmp(class(poigneeBarre), 'matlab.graphics.illustration.ColorBar'));
+
+% Les enfants d'une figure sont ses axes : sans eux, un parcours de
+% l'arbre graphique s'arretait a la figure.
+figure;
+plot(1:3);
+enfantsFigure = get(gcf, 'Children');
+assert(numel(enfantsFigure) >= 1);
+assert(strcmp(get(enfantsFigure(1), 'Type'), 'axes'));
+assert(~isempty(findobj(gcf, 'Type', 'axes')));
+
+% Le parent d'un axe est sa figure, et c'est une poignee.
+assert(strcmp(get(get(gca, 'Parent'), 'Type'), 'figure'));
+assert(strcmp(class(get(gca, 'Parent')), 'matlab.ui.Figure'));
+courbe = plot(1:3);
+assert(strcmp(get(ancestor(courbe, 'axes'), 'Type'), 'axes'));
+assert(strcmp(get(ancestor(courbe, 'figure'), 'Type'), 'figure'));
+assert(strcmp(get(ancestor(gca, 'axes'), 'Type'), 'axes'));
+assert(isempty(ancestor(gcf, 'axes')));
+
+% DELETE d'une poignee retire l'objet du trace. Le nom de l'objet partait
+% auparavant a la suppression de fichier, qui ne trouvait rien et se
+% taisait : l'appel ne faisait rien du tout.
+figure;
+avant = plot(1:3);
+assert(numel(get(gca, 'Children')) == 1);
+delete(avant);
+assert(numel(get(gca, 'Children')) == 0);
+
+% ISHANDLE et ISGRAPHICS disent si l'objet existe encore, et de quel type.
+figure;
+assert(ishandle(gca));
+assert(isgraphics(gca));
+assert(isgraphics(gca, 'axes'));
+assert(~isgraphics(gca, 'figure'));
+assert(isgraphics(gcf, 'figure'));
+numeroFigure = double(get(gcf, 'Number'));
+assert(ishandle(numeroFigure));
+close(gcf);
+assert(~ishandle(numeroFigure));
+assert(~ishandle(9999));
+
+% CLOSE accepte la poignee que rend GCF, non seulement un numero : c'est
+% l'ecriture la plus courante.
+figure;
+close(gcf);
+assert(true);
+
+% Sans interaction a la souris, il n'y a pas d'objet courant : le dire
+% vaut mieux que rendre le dernier objet trace.
+assert(isempty(gco()));
+assert(isempty(gcbo()));
+
+% FINDALL rend la meme chose que FINDOBJ, aucune poignee n'etant masquee.
+figure;
+plot(1:3);
+assert(numel(findall(gca, 'Type', 'line')) == numel(findobj(gca, 'Type', 'line')));
+close all;
+
 disp('graphique : toutes les verifications passent');

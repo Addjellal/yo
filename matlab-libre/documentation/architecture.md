@@ -22,7 +22,7 @@ des jetons, les jetons un arbre, l'arbre est parcouru.
        ├── Affichage.cpp       mise en forme des résultats
        ├── FichierMat.cpp      le format MAT, lecture et écriture
        ├── Compression.cpp     DEFLATE, pour les MAT compressés
-       └── bibliotheque/       678 fonctions natives, par domaine
+       └── bibliotheque/       679 fonctions natives, par domaine
 ```
 
 ## Le type unique

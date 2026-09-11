@@ -147,6 +147,10 @@ FONCTION(fnDelete) {
             definirTaillePool(0);
             continue;
         }
+        // Une poignee graphique se supprime du trace. Sans ce cas, le
+        // nom de l'objet partait a FS::REMOVE, qui ne trouvait rien et
+        // se taisait : « delete(h) » ne faisait rien du tout.
+        if (crochetSupprimerGraphique && crochetSupprimerGraphique(it, a)) continue;
         std::error_code ec;
         fs::remove(a.versTexte(), ec);
     }

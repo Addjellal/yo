@@ -277,12 +277,30 @@ assert(strcmp(get(poigneeTexte, 'String'), 'x'));
 % Et la poignee marche : on peut la reprendre.
 set(poigneeTexte, 'Color', [1 0 0]);
 assert(~isempty(get(poigneeTexte, 'Color')));
-% Toute la famille des etiquettes rend une poignee.
-for fabrique = {@() title('t'), @() xlabel('x'), @() ylabel('y'), ...
-                @() zlabel('z'), @() legend('a'), @() colorbar}
+% Toute la famille des etiquettes rend une poignee de texte.
+for fabrique = {@() title('t'), @() xlabel('x'), @() ylabel('y'), @() zlabel('z')}
     poignee = fabrique{1}();
     assert(strcmp(class(poignee), 'matlab.graphics.primitive.Text'));
 end
+% La legende et la barre de couleurs sont des objets a part, comme dans
+% MATLAB — et il le faut : confondue avec un texte d'axe, la legende
+% lisait et ecrivait le titre a la place de ses propres entrees.
+poigneeLegende = legend('a', 'b');
+assert(strcmp(class(poigneeLegende), 'matlab.graphics.illustration.Legend'));
+assert(isequal(get(poigneeLegende, 'String'), {'a', 'b'}));
+title('un titre bien a lui');
+set(poigneeLegende, 'String', {'c', 'd'});
+assert(isequal(get(poigneeLegende, 'String'), {'c', 'd'}));
+assert(strcmp(get(get(gca, 'Title'), 'String'), 'un titre bien a lui'));
+assert(strcmp(get(poigneeLegende, 'Visible'), 'on'));
+set(poigneeLegende, 'Visible', 'off');
+assert(strcmp(get(poigneeLegende, 'Visible'), 'off'));
+poigneeBarre = colorbar;
+assert(strcmp(class(poigneeBarre), 'matlab.graphics.illustration.ColorBar'));
+% CLOSE accepte la poignee que rend GCF, non seulement un numero.
+figureAFermer = figure;
+close(gcf);
+assert(true);
 % Un titre reste modifiable par sa poignee, malgre le nom de classe
 % partage avec le texte pose dans l'axe : c'est le champ interne qui les
 % distingue, non le nom.
@@ -607,6 +625,36 @@ assert(isequal(round(solution, 10), [1; 0]));
 assert(abs(normeResidu - 1) < 1e-10);
 assert(numel(residuMoindres) == 2);
 assert(drapeauMoindres == 1);
+
+%% -------------------------------------- SQUAREFORM SUR DEUX POINTS
+% PDIST de deux points rend un scalaire : « squareform(pdist(X)) » doit
+% marcher pour deux points comme pour mille. Lu comme une matrice 1x1, il
+% rendait un vecteur vide.
+assert(isequal(squareform(pdist([0 0; 3 4])), [0 5; 5 0]));
+assert(isequal(squareform(5), [0 5; 5 0]));
+assert(isequal(squareform([0 5; 5 0]), 5));
+assert(isequal(squareform(pdist([0 0; 3 4; 0 4])), [0 5 4; 5 0 3; 4 3 0]));
+% L'aller-retour est exact, quel que soit le nombre de points.
+for nombre = 2:5
+    points = (1:nombre)' * [1 2];
+    d = pdist(points);
+    assert(isequal(round(squareform(squareform(d)), 12), round(d, 12)));
+end
+% Un vecteur vide, c'est une seule observation.
+assert(isequal(squareform(zeros(1, 0)), 0));
+% Et l'on peut imposer la lecture.
+assert(isequal(squareform(5, 'tovector'), zeros(1, 0)));
+
+%% ------------------------------------- DATETIME : UN FORMAT AU VOL
+% Demander un format sans changer celui de l'instant : « string(t,fmt) »
+% et « char(t,fmt) » sont les deux ecritures de MATLAB.
+instant = datetime(2024, 1, 2);
+assert(strcmp(char(string(instant, 'yyyy-MM-dd')), '2024-01-02'));
+assert(strcmp(char(instant, 'yyyy-MM-dd'), '2024-01-02'));
+% Le format de l'instant n'a pas bouge.
+assert(strcmp(char(instant), '02-Jan-2024'));
+% Et sans format, on garde le sien.
+assert(strcmp(char(string(instant)), '02-Jan-2024'));
 
 disp('defauts : toutes les verifications passent');
 

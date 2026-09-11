@@ -334,20 +334,33 @@ classdef datetime
         function s = exceltime(t), s = t.Serie - datetime.epoqueExcel(); end
         function s = juliandate(t), s = t.Serie + 1721058.5; end
         function r = isnat(t), r = isnan(t.Serie); end
-        function c = char(t)
+        function c = char(t, format)
+        %CHAR Texte des instants, dans leur format ou dans un autre.
+            if nargin < 2, format = t.Format; end
+            format = char(format);
             c = '';
             for k = 1:numel(t.Serie)
-                ligne = datetime.rendre(t.Serie(k), t.Format);
+                ligne = datetime.rendre(t.Serie(k), format);
                 if k == 1, c = ligne; else, c = strvcat(c, ligne); end %#ok<VCAT>
             end
         end
-        function c = cellstr(t)
+        function c = cellstr(t, format)
+        %CELLSTR Une cellule de textes, un par instant.
+            if nargin < 2, format = t.Format; end
+            format = char(format);
             c = cell(size(t.Serie));
             for k = 1:numel(t.Serie)
-                c{k} = datetime.rendre(t.Serie(k), t.Format);
+                c{k} = datetime.rendre(t.Serie(k), format);
             end
         end
-        function s = string(t), s = string(cellstr(t)); end
+        function s = string(t, format)
+        %STRING Chaînes des instants ; un format donné l'emporte sur le leur.
+            if nargin < 2
+                s = string(cellstr(t));
+            else
+                s = string(cellstr(t, format));
+            end
+        end
         function s = datestr(t, varargin)
             if isempty(varargin)
                 s = char(t);

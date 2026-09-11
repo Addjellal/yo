@@ -196,6 +196,28 @@ ALPHASHAPE Forme alpha d'un nuage de points du plan.
   Voir aussi BOUNDARY, CONVHULL, DELAUNAY, POLYAREA.
 ```
 
+## `ancestor`
+
+```
+ANCESTOR Ancêtre d'un objet graphique, d'un type donné.
+  P = ANCESTOR(H,TYPE) rend la poignée de l'ancêtre de H dont le type
+  est TYPE — 'axes' ou 'figure'. Si H est déjà de ce type, c'est H qui
+  est rendu. S'il n'y a pas d'ancêtre de ce type, P est vide.
+
+  TYPE peut être une cellule : le premier type rencontré en remontant
+  l'emporte.
+
+  Remonter l'arbre est ce qui permet d'agir sur la figure d'une courbe
+  sans l'avoir gardée : « set(ancestor(h,'figure'),'Name','x') ».
+
+  Exemple :
+     figure; courbe = plot(1:3);
+     strcmp(get(ancestor(courbe, 'axes'), 'Type'), 'axes')     % 1
+     strcmp(get(ancestor(courbe, 'figure'), 'Type'), 'figure') % 1
+
+  Voir aussi GCA, GCF, FINDOBJ, GET.
+```
+
 ## `annotation`
 
 ```
@@ -1841,6 +1863,25 @@ FIMPLICIT3 Surface implicite F(x,y,z) = 0.
   Voir aussi FIMPLICIT, FSURF, ISOSURFACE, CONTOUR3, FPLOT3.
 ```
 
+## `findall`
+
+```
+FINDALL Cherche des objets graphiques, y compris ceux qui se cachent.
+  H = FINDALL(...) prend les mêmes arguments que FINDOBJ et rend les
+  mêmes objets, en plus de ceux dont la poignée est masquée.
+
+  Dans MatLibre, aucune poignée n'est masquée : FINDALL et FINDOBJ y
+  rendent donc exactement la même chose. La fonction existe pour que le
+  programme écrit pour MATLAB tourne sans retouche, et la différence
+  est dite ici plutôt que laissée à découvrir.
+
+  Exemple :
+     figure; plot(1:3);
+     numel(findall(gca, 'Type', 'line'))   % 1
+
+  Voir aussi FINDOBJ, GCA, GCF, ALLCHILD.
+```
+
 ## `findgroups`
 
 ```
@@ -2000,6 +2041,43 @@ FSURF Trace une surface donnée par une poignée.
      fsurf(@(x, y) sin(x) .* cos(y), [-pi pi -pi pi]);
 
   Voir aussi SURF, FCONTOUR, FMESH, FPLOT, EZSURF, MESHGRID.
+```
+
+## `gcbo`
+
+```
+GCBO Poignée de l'objet dont le rappel s'exécute.
+  H = GCBO() rend la poignée de l'objet dont le rappel est en cours ;
+  [H,F] = GCBO() rend aussi sa figure.
+
+  MatLibre n'exécute pas les rappels d'objets graphiques : hors d'un
+  rappel, MATLAB rend lui aussi un tableau vide, et c'est donc la
+  réponse exacte.
+
+  Exemple :
+     isempty(gcbo())                 % 1 : aucun rappel en cours
+
+  Voir aussi GCO, GCA, GCF.
+```
+
+## `gco`
+
+```
+GCO Poignée de l'objet courant.
+  H = GCO() rend la poignée de l'objet sur lequel on a cliqué en
+  dernier dans la figure courante ; H = GCO(F) interroge la figure F.
+
+  MatLibre n'a pas d'interaction à la souris : aucun objet n'a jamais
+  été désigné, et GCO rend donc un tableau vide. C'est la réponse
+  exacte — MATLAB rend lui aussi un tableau vide tant qu'on n'a rien
+  cliqué — et non une approximation : rendre « le dernier objet tracé »
+  ferait marcher un programme pour de mauvaises raisons.
+
+  Exemple :
+     figure; plot(1:3);
+     isempty(gco())                  % 1 : rien n'a ete designe
+
+  Voir aussi GCA, GCF, GCBO, FINDOBJ.
 ```
 
 ## `genpath`
@@ -2901,6 +2979,43 @@ ISCHANGE Repère les ruptures dans une série.
      find(ischange(x, 'linear'))         % le sommet du toit
 
   Voir aussi ISLOCALMAX, ISOUTLIER, FINDCHANGEPTS, MOVMEAN.
+```
+
+## `isgraphics`
+
+```
+ISGRAPHICS Dit si une valeur est un objet graphique, d'un type donné.
+  T = ISGRAPHICS(H) rend vrai pour chaque élément de H qui désigne un
+  objet graphique existant. ISGRAPHICS(H,TYPE) exige en plus que son
+  type soit TYPE — 'figure', 'axes', 'line', 'text'.
+
+  Elle diffère d'ISHANDLE en ce qu'elle sait dire de quel type est
+  l'objet : ISHANDLE répond seulement s'il existe encore.
+
+  Exemple :
+     figure;
+     isgraphics(gca)                 % 1
+     isgraphics(gca, 'axes')         % 1
+     isgraphics(gca, 'figure')       % 0 : c'est un axe
+
+  Voir aussi ISHANDLE, GCA, GCF, CLASS.
+```
+
+## `ishandle`
+
+```
+ISHANDLE Dit si une valeur est une poignée graphique encore valide.
+  T = ISHANDLE(H) rend vrai pour chaque élément de H qui désigne un
+  objet graphique existant. Une poignée dont l'objet a été supprimé
+  rend faux : c'est tout l'intérêt de la question.
+
+  Exemple :
+     f = figure;
+     ishandle(gca)                   % 1
+     close(f);
+     ishandle(42)                    % 0 : aucun objet de ce numero
+
+  Voir aussi ISGRAPHICS, GCA, GCF, DELETE.
 ```
 
 ## `isjava`
@@ -3920,6 +4035,21 @@ MATLIBRE_DISTANCE_INVERSE Moyenne pondérée par l'inverse du carré de la dista
      matlibre_distance_inverse([0;1], [0;0], [0;1], 0.5, 0)      % 0.5
 
   Voir aussi GRIDDATA.
+```
+
+## `matlibre_element_poignee`
+
+```
+MATLIBRE_ELEMENT_POIGNEE Un élément d'un tableau de poignées.
+  E = MATLIBRE_ELEMENT_POIGNEE(H,K) rend le K-ième élément, que H soit
+  un tableau de poignées, une cellule ou un scalaire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_element_poignee([10 20], 2)   % 20
+
+  Voir aussi ISHANDLE, ISGRAPHICS.
 ```
 
 ## `matlibre_encodage_nom`
@@ -5018,6 +5148,22 @@ MATLIBRE_ODE_OPTION Lit une option d'ODESET, ou rend la valeur par défaut.
   Voir aussi ODESET, ODEGET, ODE89.
 ```
 
+## `matlibre_parent_graphique`
+
+```
+MATLIBRE_PARENT_GRAPHIQUE Objet qui contient une poignée graphique.
+  P = MATLIBRE_PARENT_GRAPHIQUE(H) rend l'axe d'une courbe ou d'un
+  texte, la figure d'un axe, et un tableau vide au-dessus d'une figure.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure; courbe = plot(1:3);
+     strcmp(get(matlibre_parent_graphique(courbe), 'Type'), 'axes')   % 1
+
+  Voir aussi ANCESTOR, GCA, GCF.
+```
+
 ## `matlibre_parquet_classe`
 
 ```
@@ -5214,6 +5360,25 @@ MATLIBRE_POIGNEE_DEPUIS_TEXTE Une poignée bâtie sur une expression écrite.
   Les variables sont devinées : « x » seul donne une fonction d'une
   variable, « x » et « y » une fonction de deux. Les opérateurs sont
   vectorisés au passage, de sorte que « x^2 » travaille sur un tableau.
+```
+
+## `matlibre_poignee_valide`
+
+```
+MATLIBRE_POIGNEE_VALIDE Une poignée désigne-t-elle un objet vivant ?
+  T = MATLIBRE_POIGNEE_VALIDE(H) rend vrai si H est une poignée
+  graphique dont l'objet existe encore, ou un numéro de figure ouverte.
+
+  La vérification se fait en lisant le type de l'objet : une poignée
+  dont la figure a été fermée lève, et c'est cette levée qui répond.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure;
+     matlibre_poignee_valide(gca)    % 1
+
+  Voir aussi ISHANDLE, ISGRAPHICS.
 ```
 
 ## `matlibre_points_utf8`

@@ -14,14 +14,14 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 678 fonctions natives, en C++ | 19 997 |
+| `src/bibliotheque` | 679 fonctions natives, en C++ | 20 223 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 974 fichiers `.m`, dont 2 226 fonctions publiques recensées par `outils/audit.m` | 136 390 |
-| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 830 |
+| `toolbox` | 2 983 fichiers `.m`, dont 2 232 fonctions publiques recensées par `outils/audit.m` | 136 632 |
+| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 953 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 370
+documentation MathWorks est complète : `outils/manques.m` compte **2 376
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
 pas, et cent trente-six ont été ajoutées de cette façon — la famille
@@ -112,6 +112,9 @@ suivant en donne quelques-unes, prises dans les tests.
 | réponse impulsionnelle | `y(0)` vaut `C*B`, non zéro : une impulsion charge l'état, et la réponse est la réponse libre qui suit |
 | programme linéaire | le point rendu respecte les contraintes, une par une ; un problème sans solution est annoncé comme tel plutôt que résolu de travers, et `intlinprog` s'y appuie pour ne rendre que des entiers admissibles |
 | drapeaux des solveurs | ils disent la vérité : `quadprog` et `fmincon` rendent -2 et un résultat vide quand aucun point n'est admissible, `fsolve` -2 quand le résidu n'est pas nul, `fminsearch` 0 quand c'est le compteur d'itérations qui l'a arrêté |
+| légende et barre de couleurs | leur chaîne est la leur : écrire dans la légende ne touche pas au titre de l'axe, et le relire ne rend pas le titre à sa place |
+| arbre graphique | une figure a ses axes pour enfants, un axe a sa figure pour parent, et `delete` retire vraiment l'objet du tracé |
+| aller-retour de `squareform` | il est exact pour deux points comme pour mille : un scalaire est le vecteur de distances d'une paire, non la matrice d'un point unique |
 | cycles d'un graphe | chaque cycle est énuméré une fois et une seule — le graphe complet à quatre sommets en a sept, quatre triangles et trois quadrilatères ; la base de cycles en compte E − N + C |
 | condensation | elle est toujours sans circuit : s'il en restait un, les composantes qu'il relie n'en feraient qu'une |
 | réduction transitive | elle a la même fermeture transitive que le graphe de départ, avec le moins d'arcs possible |

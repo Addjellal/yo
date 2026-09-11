@@ -14,3 +14,4 @@ ylabel ylim yline yticklabels yticks zlabel zlim zoom
 bubblechart exportgraphics geoplot geoscatter swarmchart
 fplot3 fimplicit3
 sgtitle subtitle
+ishandle isgraphics gco gcbo findall ancestor

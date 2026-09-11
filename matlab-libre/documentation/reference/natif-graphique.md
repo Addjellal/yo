@@ -722,6 +722,12 @@ LOGLOG  Trace avec les deux axes en échelle logarithmique.
     Voir aussi SEMILOGX, SEMILOGY, PLOT.
 ```
 
+## `matlibre_figures_ouvertes`
+
+```
+matlibre_figures_ouvertes  Numeros des figures ouvertes.
+```
+
 ## `matlibre_svg`
 
 ```
