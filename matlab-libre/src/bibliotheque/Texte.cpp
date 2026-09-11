@@ -800,12 +800,62 @@ FONCTION(fnPad) {
 
 // --------------------------------------------------------- expressions rég.
 
+// Retire les noms de groupe « (?<nom>... ) » du motif et rend, pour
+// chacun, le rang du groupe capturant correspondant. La bibliotheque
+// standard ne connait pas cette notation — elle vient de Perl et MATLAB
+// l'emploie —, mais un groupe nomme n'est qu'un groupe capturant qui
+// porte une etiquette : il suffit de retenir l'etiquette et de la rendre
+// au motif sans elle.
+std::string extraireNomsGroupes(const std::string& motif,
+                                std::vector<std::pair<std::string, int>>& noms) {
+    noms.clear();
+    std::string sortie;
+    int rangCapturant = 0;
+    for (std::size_t k = 0; k < motif.size(); ++k) {
+        // Ce qui est echappe n'ouvre rien.
+        if (motif[k] == '\\' && k + 1 < motif.size()) {
+            sortie += motif[k];
+            sortie += motif[k + 1];
+            ++k;
+            continue;
+        }
+        if (motif[k] != '(') {
+            sortie += motif[k];
+            continue;
+        }
+        if (k + 2 < motif.size() && motif[k + 1] == '?' && motif[k + 2] == '<' &&
+            k + 3 < motif.size() && motif[k + 3] != '=' && motif[k + 3] != '!') {
+            std::size_t ferme = motif.find('>', k + 3);
+            if (ferme != std::string::npos) {
+                ++rangCapturant;
+                noms.push_back({motif.substr(k + 3, ferme - k - 3), rangCapturant});
+                sortie += '(';
+                k = ferme;
+                continue;
+            }
+        }
+        // « (?: », « (?= », « (?! » ne capturent pas ; « ( » seul si.
+        if (!(k + 1 < motif.size() && motif[k + 1] == '?')) ++rangCapturant;
+        sortie += motif[k];
+    }
+    return sortie;
+}
+
 std::regex compilerMotif(const std::string& motif, bool ignorerCasse) {
     auto drapeaux = std::regex::ECMAScript;
     if (ignorerCasse) drapeaux |= std::regex::icase;
+    std::vector<std::pair<std::string, int>> noms;
+    std::string nu = extraireNomsGroupes(motif, noms);
     try {
-        return std::regex(motif, drapeaux);
+        return std::regex(nu, drapeaux);
     } catch (const std::regex_error& e) {
+        // Un motif valide que le moteur ne sait pas lire n'est pas un
+        // motif fautif : le dire autrement enverrait chercher une faute
+        // qui n'existe pas. La regression arriere en est le seul cas.
+        if (nu.find("(?<=") != std::string::npos || nu.find("(?<!") != std::string::npos)
+            erreur("MATLAB:regexp:unsupported",
+                   "La regression arriere « (?<= » n'est pas traitee par le moteur "
+                   "d'expressions regulieres employe ici.");
         erreur("MATLAB:regexp:badPattern",
                std::string("Invalid regular expression: ") + e.what());
     }
@@ -818,6 +868,8 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
     std::vector<std::string> options;
     for (std::size_t k = 2; k < args.size(); ++k) options.push_back(minuscules(args[k].versTexte()));
     bool uneFois = std::find(options.begin(), options.end(), "once") != options.end();
+    std::vector<std::pair<std::string, int>> nomsGroupes;
+    extraireNomsGroupes(motif, nomsGroupes);
     std::regex re = compilerMotif(motif, ignorerCasse);
 
     std::vector<double> debuts, fins;
@@ -835,6 +887,15 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
         for (std::size_t g = 1; g < m.size(); ++g)
             groupe.cellules[g - 1] = Valeur::texte(m[g].matched ? m.str(g) : "");
         jetons.push_back(groupe);
+        // Un groupe nomme donne un champ ; « names » n'etait qu'une
+        // structure vide, alors que l'aide la promettait remplie.
+        Valeur nomme = Valeur::structureVide();
+        for (const auto& nc : nomsGroupes) {
+            std::size_t g = (std::size_t)nc.second;
+            nomme.poserChamp(nc.first,
+                             Valeur::texte(g < m.size() && m[g].matched ? m.str(g) : ""));
+        }
+        nomsTrouves.push_back(nomme);
         if (uneFois) break;
     }
 
@@ -886,6 +947,15 @@ std::vector<Valeur> regexpInterne(std::vector<Valeur>& args, int nargout, bool i
             }
             morceaux.push_back(texte.substr(precedent));
             sorties.push_back(celluleDeTextes(morceaux));
+        } else if (d == "names") {
+            // MATLAB rend une structure par correspondance, reunies en un
+            // tableau de structures ; une seule correspondance rend une
+            // structure simple.
+            if (nomsTrouves.empty()) sorties.push_back(Valeur::structureVide());
+            else if (uneFois || nomsTrouves.size() == 1) sorties.push_back(nomsTrouves[0]);
+            else {
+                sorties.push_back(concatener(nomsTrouves, 2));
+            }
         } else {
             sorties.push_back(Valeur::structureVide());
         }

@@ -272,7 +272,30 @@ std::string nomMethodeOperateur(const std::string& op) {
     return "";
 }
 
-std::string texteExpression(const NoeudPtr& n) {
+// Le rang d'un operateur : plus il est haut, plus il lie fort. L'ordre
+// est celui de MATLAB, et c'est lui qui decide des parentheses.
+static int rangOperateur(const std::string& op) {
+    if (op == "||") return 1;
+    if (op == "&&") return 2;
+    if (op == "|") return 3;
+    if (op == "&") return 4;
+    if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "==" || op == "~=")
+        return 5;
+    if (op == ":") return 6;
+    if (op == "+" || op == "-") return 7;
+    if (op == "*" || op == "/" || op == "\\" || op == ".*" || op == "./" || op == ".\\")
+        return 8;
+    if (op == "^" || op == ".^") return 9;
+    return 10;
+}
+
+std::string texteExpression(const NoeudPtr& n) { return texteExpression(n, 0); }
+
+// PRIORITE est celle du contexte : on n'entoure de parentheses que ce qui
+// lierait moins fort que lui. Sans cela « @(y) y + 1 » revenait de
+// « func2str » sous la forme « @(y) (y + 1) » — juste, mais illisible des
+// que l'expression grandit, et different de ce que l'utilisateur a ecrit.
+std::string texteExpression(const NoeudPtr& n, int priorite) {
     if (!n) return "";
     switch (n->type) {
         case TypeN::Nombre: {
@@ -284,10 +307,21 @@ std::string texteExpression(const NoeudPtr& n) {
         case TypeN::Ident: return n->texte;
         case TypeN::FinIndice: return "end";
         case TypeN::DeuxPointsSeul: return ":";
-        case TypeN::OpBinaire:
-            return "(" + texteExpression(n->enfants[0]) + " " + n->texte + " " +
-                   texteExpression(n->enfants[1]) + ")";
-        case TypeN::OpUnaire: return n->texte + texteExpression(n->enfants[0]);
+        case TypeN::OpBinaire: {
+            int rang = rangOperateur(n->texte);
+            // Les operateurs sont associatifs a gauche : le membre droit
+            // de meme rang a bien ete parenthese dans la source, et doit
+            // le rester — « a - (b - c) » n'est pas « a - b - c ».
+            std::string texte = texteExpression(n->enfants[0], rang) + " " + n->texte +
+                                " " + texteExpression(n->enfants[1], rang + 1);
+            return rang < priorite ? "(" + texte + ")" : texte;
+        }
+        case TypeN::OpUnaire: {
+            // Un unaire lie plus fort qu'un produit, moins fort qu'une
+            // puissance : « -a*b » vaut « (-a)*b », « -a^2 » vaut « -(a^2) ».
+            std::string texte = n->texte + texteExpression(n->enfants[0], 9);
+            return 8 < priorite ? "(" + texte + ")" : texte;
+        }
         case TypeN::OpPostfixe: return texteExpression(n->enfants[0]) + n->texte;
         case TypeN::Plage: {
             std::string s = texteExpression(n->enfants[0]) + ":";

@@ -116,15 +116,24 @@ HISTCOUNTS  Compte les valeurs par classe.
     automatiquement.
     N = HISTCOUNTS(X,BORDS) compte selon les bords donnés : une valeur
     tombe dans la classe k si BORDS(k) <= x < BORDS(k+1).
+    N = HISTCOUNTS(...,'Normalization',MODE) dit ce que porte chaque
+    classe : 'count' (l'effectif, par défaut), 'probability' (la part du
+    total, dont la somme vaut un), 'pdf' (une densité, dont l'intégrale
+    vaut un quelle que soit la largeur des classes), 'countdensity',
+    'cumcount' (l'effectif cumulé) et 'cdf' (la fonction de répartition,
+    qui finit à un).
 
     Syntaxe
        n = histcounts(x)
        [n,bords] = histcounts(x)
        n = histcounts(x,bords)
+       n = histcounts(x,bords,'Normalization','pdf')
 
     Exemples
        histcounts([1 2 2 3], [1 2 3 4])       % [1 2 1]
        [n, bords] = histcounts(randn(1,1000));
+       d = histcounts([1 1 2 2 2 3], [0.5 1.5 2.5 3.5], 'Normalization', 'pdf');
+       abs(sum(d .* diff([0.5 1.5 2.5 3.5])) - 1) < 1e-12   % une densite
        sum(n)                                 % 1000
 
     Voir aussi HISTOGRAM, ACCUMARRAY, MODE, BAR.
@@ -177,13 +186,23 @@ MEDIAN  Médiane : la valeur du milieu.
 MODE  Valeur la plus fréquente.
     MODE(X) rend la valeur qui revient le plus souvent ; à égalité, la
     plus petite.
+    [M,F] = MODE(X) rend aussi le nombre de fois qu'elle revient.
+    [M,F,C] = MODE(X) rend en plus, dans une cellule, toutes les valeurs
+    également fréquentes : sans elle, on ne saurait pas qu'il y a eu
+    égalité.
 
     Syntaxe
        m = mode(x)
+       [m,f] = mode(x)
+       [m,f,c] = mode(x)
 
     Exemples
        mode([1 2 2 3 3 3])            % 3
        mode([1 1 2 2])                % 1 — la plus petite à égalité
+       [m, f] = mode([1 2 2 3]);
+       m == 2 && f == 2
+       [~, ~, c] = mode([1 1 2 2]);
+       isequal(sort(c{1}(:))', [1 2])   % les deux etaient a egalite
 
     Voir aussi MEDIAN, MEAN, HISTCOUNTS, UNIQUE.
 ```

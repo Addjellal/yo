@@ -201,6 +201,30 @@ FONCTION(fnMedian) {
     return {partieReelle};
 }
 
+// La valeur la plus frequente, et ce qui l'accompagne. Le parcours va du
+// plus petit au plus grand et ne retient que ce qui fait strictement
+// mieux : a egalite, c'est donc le plus petit qui gagne, comme MATLAB.
+static double modeDe(const std::vector<double>& brut, int* frequence,
+                     std::vector<double>* tousLesModes) {
+    std::vector<double> t = sansNaN(brut);
+    std::map<double, int> compte;
+    for (double x : t) ++compte[x];
+    double meilleur = NAN;
+    int n = -1;
+    for (const auto& kv : compte)
+        if (kv.second > n) {
+            n = kv.second;
+            meilleur = kv.first;
+        }
+    if (frequence) *frequence = std::max(n, 0);
+    if (tousLesModes) {
+        tousLesModes->clear();
+        for (const auto& kv : compte)
+            if (kv.second == n) tousLesModes->push_back(kv.first);
+    }
+    return meilleur;
+}
+
 FONCTION(fnMode) {
     INUTILISE
     optionOmettreNaN(args);
@@ -210,19 +234,30 @@ FONCTION(fnMode) {
     int dim = dimensionChoisie(args, 1, v);
     // MODE écarte toujours les NaN, avec ou sans option : ils ne sont
     // égaux à rien, pas même à eux-mêmes, donc ne peuvent dominer.
-    return {reduire(v, dim, false, [](const std::vector<double>& brut) {
-        std::vector<double> t = sansNaN(brut);
-        std::map<double, int> compte;
-        for (double x : t) ++compte[x];
-        double meilleur = NAN;
-        int n = -1;
-        for (const auto& kv : compte)
-            if (kv.second > n) {
-                n = kv.second;
-                meilleur = kv.first;
-            }
-        return meilleur;
-    })};
+    Valeur m = reduire(v, dim, false, [](const std::vector<double>& brut) {
+        return modeDe(brut, nullptr, nullptr);
+    });
+    if (nargout <= 1) return {m};
+    // [M,F] rend aussi le nombre de fois que le mode revient, et [M,F,C]
+    // la liste de toutes les valeurs egalement frequentes : sans elle on
+    // ne saurait pas qu'il y avait egalite.
+    Valeur f = reduire(v, dim, false, [](const std::vector<double>& brut) {
+        int frequence = 0;
+        modeDe(brut, &frequence, nullptr);
+        return (double)frequence;
+    });
+    if (nargout == 2) return {m, f};
+    std::vector<std::vector<double>> listes;
+    Valeur marque = reduire(v, dim, false, [&listes](const std::vector<double>& brut) {
+        std::vector<double> tous;
+        double r = modeDe(brut, nullptr, &tous);
+        listes.push_back(tous);
+        return r;
+    });
+    Valeur c = Valeur::celluleDims(marque.dims);
+    for (std::size_t k = 0; k < c.cellules.size() && k < listes.size(); ++k)
+        c.cellules[k] = Valeur::colonne(listes[k]);
+    return {m, f, c};
 }
 
 FONCTION(fnVar) {
@@ -384,13 +419,44 @@ FONCTION(fnCorr) {
 
 FONCTION(fnHistcounts) {
     INUTILISE
-    exigerArguments(args, 1, 3, "histcounts");
+    exigerArguments(args, 1, 0, "histcounts");
     exigerNumerique(args[0], "histcounts");
-    if (args.size() > 1) exigerNumerique(args[1], "histcounts");
     Valeur v = versDouble(args[0]);
     int nbClasses = 10;
     std::vector<double> bords;
-    if (args.size() > 1) {
+    // Les couples nom-valeur se lisent d'abord : « Normalization » decide
+    // de ce que porte chaque classe. Une option inconnue etait ignoree en
+    // silence, si bien que « histcounts(x,'Normalization','pdf') » rendait
+    // des effectifs bruts sans que rien ne le dise.
+    std::string normalisation = "count";
+    std::size_t finPositionnels = args.size();
+    for (std::size_t k = 1; k + 1 < args.size(); ++k) {
+        if (!(args[k].estTexte() || args[k].estChaine())) continue;
+        std::string nom = args[k].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (nom == "normalization") {
+            normalisation = args[k + 1].versTexte();
+            for (auto& c : normalisation) c = (char)std::tolower((unsigned char)c);
+            finPositionnels = std::min(finPositionnels, k);
+        } else if (nom == "binlimits" || nom == "numbins" || nom == "binwidth" ||
+                   nom == "binmethod") {
+            erreur("MATLAB:histcounts:NotSupported",
+                   "L'option '" + args[k].versTexte() + "' n'est pas encore traitee.");
+        } else {
+            erreur("MATLAB:histcounts:InvalidName",
+                   "Option inconnue : '" + args[k].versTexte() + "'.");
+        }
+    }
+    static const char* normalisationsConnues[] = {"count",      "probability", "pdf",
+                                                  "countdensity", "cumcount",  "cdf"};
+    bool normalisationConnue = false;
+    for (const char* n : normalisationsConnues)
+        normalisationConnue = normalisationConnue || normalisation == n;
+    if (!normalisationConnue)
+        erreur("MATLAB:histcounts:InvalidNormalization",
+               "Normalization inconnue : '" + normalisation + "'.");
+    if (finPositionnels > 1 && args.size() > 1) {
+        exigerNumerique(args[1], "histcounts");
         if (args[1].nelem() == 1) nbClasses = (int)args[1].scal();
         else
             for (std::size_t k = 0; k < args[1].nelem(); ++k) bords.push_back(args[1].re[k]);
@@ -421,6 +487,33 @@ FONCTION(fnHistcounts) {
                 break;
             }
         }
+    }
+    // La normalisation dit ce que porte chaque classe. « probability »
+    // divise par l'effectif total, « pdf » divise en plus par la largeur
+    // de la classe — ce qui rend une densite dont l'integrale vaut un,
+    // quelle que soit la largeur choisie.
+    double total = 0;
+    for (double c : compte) total += c;
+    if (normalisation == "probability") {
+        for (double& c : compte) c = total > 0 ? c / total : 0.0;
+    } else if (normalisation == "pdf") {
+        for (std::size_t k = 0; k < compte.size(); ++k) {
+            double largeur = bords[k + 1] - bords[k];
+            compte[k] = (total > 0 && largeur > 0) ? compte[k] / (total * largeur) : 0.0;
+        }
+    } else if (normalisation == "countdensity") {
+        for (std::size_t k = 0; k < compte.size(); ++k) {
+            double largeur = bords[k + 1] - bords[k];
+            compte[k] = largeur > 0 ? compte[k] / largeur : 0.0;
+        }
+    } else if (normalisation == "cumcount" || normalisation == "cdf") {
+        double cumul = 0;
+        for (std::size_t k = 0; k < compte.size(); ++k) {
+            cumul += compte[k];
+            compte[k] = cumul;
+        }
+        if (normalisation == "cdf" && total > 0)
+            for (double& c : compte) c /= total;
     }
     if (nargout >= 2) return {Valeur::ligne(compte), Valeur::ligne(bords)};
     return {Valeur::ligne(compte)};

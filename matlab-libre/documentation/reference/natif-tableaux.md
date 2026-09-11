@@ -96,13 +96,22 @@ CROSS  Produit vectoriel.
 
 ```
 CUMMAX  Maximum courant.
-    CUMMAX(X) rend, à chaque position, le plus grand élément vu jusque-là.
+    CUMMAX(X) rend, à chaque position, le plus grand élément vu jusque-là
+    suivant la première dimension qui n'est pas de longueur un — donc
+    colonne par colonne sur une matrice, chacune repartant de son propre
+    début. CUMMAX(X,DIM) choisit la dimension.
+
+    Un NaN ne remplace pas le maximum courant : il n'est plus grand que
+    rien, pas même que lui-même.
 
     Syntaxe
        y = cummax(x)
+       y = cummax(x,dim)
 
     Exemples
        cummax([3 1 4 1 5])                    % [3 3 4 4 5]
+       isequal(cummax([3 1; 2 4]), [3 1; 3 4])     % par colonne
+       isequal(cummax([3 1; 2 4], 2), [3 3; 2 4])  % par ligne
        plafond = cummax(randn(1,10));
 
     Voir aussi CUMMIN, CUMSUM, MAX, MOVMEAN.
@@ -538,17 +547,28 @@ SUM  Somme des éléments.
 
 ```
 TRAPZ  Intégration par la méthode des trapèzes.
-    TRAPZ(Y) intègre avec un pas de 1.
+    TRAPZ(Y) intègre avec un pas de 1, suivant la première dimension qui
+    n'est pas de longueur un — donc colonne par colonne sur une matrice.
     TRAPZ(X,Y) intègre Y en fonction de X.
+    TRAPZ(Y,DIM) et TRAPZ(X,Y,DIM) choisissent la dimension. Un second
+    argument scalaire est une dimension, non une abscisse.
+
+    La règle des trapèzes est exacte sur les fonctions affines et
+    d'ordre deux ailleurs : doubler les points divise l'erreur par
+    quatre.
 
     Syntaxe
        q = trapz(y)
        q = trapz(x,y)
+       q = trapz(y,dim)
+       q = trapz(x,y,dim)
 
     Exemples
        x = linspace(0, pi, 1000);
        abs(trapz(x, sin(x)) - 2) < 1e-4       % l'aire vaut 2
        trapz([1 1 1])                         % 2
+       isequal(trapz(ones(3,4), 2), [3;3;3])  % une valeur par ligne
+       isequal(trapz(ones(3,4)), [2 2 2 2])   % une valeur par colonne
 
     Voir aussi CUMTRAPZ, INTEGRAL, SUM, QUAD.
 ```

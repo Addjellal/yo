@@ -1002,6 +1002,30 @@ Valeur normeMatrice(const Valeur& a, const Valeur& type) {
         if (type.estTexte() || type.estChaine()) t = type.versTexte();
         else t = formater("%g", type.scal());
     }
+    // Un type inconnu ne doit pas se replier en silence sur la norme 2 ou
+    // sur « inf » : « norm(v, 'frobenius') » rendait alors un nombre
+    // vraisemblable et faux. Seuls comptent les noms que MATLAB accepte,
+    // et pour un vecteur, tout exposant fini.
+    {
+        bool nomConnu = t == "fro" || t == "inf" || t == "Inf" || t == "-inf" ||
+                        t == "-Inf";
+        if (!nomConnu) {
+            const char* debut = t.c_str();
+            char* fin = nullptr;
+            double p = std::strtod(debut, &fin);
+            bool nombreEntier = fin && *fin == '\0' && fin != debut && std::isfinite(p);
+            bool vecteur = a.estVecteur() || a.estScalaire();
+            if (!nombreEntier)
+                erreur("MATLAB:norm:unknownNormType",
+                       "The only matrix norms available are 1, 2, inf, and 'fro'.");
+            if (!vecteur && p != 1.0 && p != 2.0)
+                erreur("MATLAB:norm:unknownNormType",
+                       "The only matrix norms available are 1, 2, inf, and 'fro'.");
+            if (vecteur && p <= 0.0)
+                erreur("MATLAB:norm:unknownNormType",
+                       "The norm exponent must be positive.");
+        }
+    }
     int m = a.nlignes(), n = a.ncolonnes();
     auto valeurAbs = [&](std::size_t k) {
         double r = k < a.re.size() ? a.re[k] : 0.0;

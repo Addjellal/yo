@@ -531,6 +531,12 @@ FONCTION(fnCircshift) {
     exigerArguments(args, 2, 3, "circshift");
     exigerSansObjet(args[0], "circshift");
     for (std::size_t k = 1; k < args.size(); ++k) exigerNumerique(args[k], "circshift");
+    // Un decalage fractionnaire n'a pas de sens : il etait tronque en
+    // silence, si bien que circshift(x, 1.5) decalait de un sans le dire.
+    for (std::size_t k = 0; k < args[1].nelem(); ++k)
+        if (args[1].re[k] != std::floor(args[1].re[k]) || !std::isfinite(args[1].re[k]))
+            erreur("MATLAB:circshift:InvalidShiftType",
+                   "Shift amount must consist of integers.");
     const Valeur& v = args[0];
     Dims d = v.dims;
     std::vector<int> decalages(d.size(), 0);

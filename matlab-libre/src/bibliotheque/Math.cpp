@@ -478,6 +478,9 @@ FONCTION(fnNchoosek) {
     if (args[0].nelem() > 1) {
         // Toutes les combinaisons de k éléments.
         int n = (int)args[0].nelem(), k = (int)args[1].scal();
+        if (args[1].scal() != std::floor(args[1].scal()) || k < 0 || k > n)
+            erreur("MATLAB:nchoosek:InvalidArg",
+                   "K must be an integer between 0 and N.");
         std::vector<int> indices((std::size_t)k);
         for (int i = 0; i < k; ++i) indices[(std::size_t)i] = i;
         std::vector<std::vector<double>> lignes;
@@ -502,6 +505,12 @@ FONCTION(fnNchoosek) {
         return {r};
     }
     double n = argScalaire(args, 0, "nchoosek"), k = argScalaire(args, 1, "nchoosek");
+    // Le coefficient binomial n'est defini que pour 0 <= K <= N entiers.
+    // Ailleurs, la formule par les gammas rendait zero — un nombre qu'on
+    // peut croire, alors qu'il n'y a rien a compter.
+    if (n != std::floor(n) || k != std::floor(k) || n < 0 || k < 0 || k > n)
+        erreur("MATLAB:nchoosek:InvalidArg",
+               "K must be an integer between 0 and N.");
     double r = std::round(std::exp(std::lgamma(n + 1) - std::lgamma(k + 1) -
                                    std::lgamma(n - k + 1)));
     return {Valeur::scalaire(r)};
@@ -563,6 +572,16 @@ FONCTION(fnFactor) {
 FONCTION(fnNthroot) {
     INUTILISE
     exigerArguments(args, 2, 2, "nthroot");
+    // NTHROOT rend la racine reelle. Un negatif n'en a une que si N est
+    // impair : sinon std::pow rendait NaN, ce qui ressemble a un resultat
+    // et n'en est pas un. MATLAB refuse, et dit pourquoi.
+    for (std::size_t k = 0; k < args[0].nelem(); ++k) {
+        double x = args[0].re[k];
+        double n = args[1].re[std::min(k, args[1].nelem() - 1)];
+        if (x < 0 && (n == std::floor(n) ? std::fmod(n, 2.0) == 0.0 : true))
+            erreur("MATLAB:nthroot:negativeXevenN",
+                   "If X is negative, N must be an odd integer.");
+    }
     return {diffuser(args[0], args[1],
                      [](double x, double n) {
                          if (x < 0 && std::fmod(n, 2.0) == 1.0)

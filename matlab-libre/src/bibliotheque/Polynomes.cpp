@@ -626,6 +626,23 @@ FONCTION(fnMakima) {
 FONCTION(fnInterp2) {
     INUTILISE
     exigerArguments(args, 3, 6, "interp2");
+    // La methode n'est pas encore un choix : seule la bilineaire est
+    // ecrite. La nommer autrement ne doit donc pas passer sans bruit —
+    // « interp2(...,'spline') » rendait une interpolation lineaire en se
+    // faisant passer pour une spline.
+    for (std::size_t k = 3; k < args.size(); ++k) {
+        if (!(args[k].estTexte() || args[k].estChaine())) continue;
+        std::string methode = args[k].versTexte();
+        for (auto& c : methode) c = (char)std::tolower((unsigned char)c);
+        if (methode == "linear" || methode == "bilinear") continue;
+        if (methode == "nearest" || methode == "cubic" || methode == "spline" ||
+            methode == "makima")
+            erreur("MATLAB:interp2:NotSupported",
+                   "INTERP2 ne sait faire que 'linear' ; '" + args[k].versTexte() +
+                       "' n'est pas encore ecrite.");
+        erreur("MATLAB:interp2:InvalidMethod",
+               "Unrecognized interpolation method '" + args[k].versTexte() + "'.");
+    }
     // Interpolation bilinéaire sur une grille régulière.
     const Valeur& X = versDouble(args[0]);
     const Valeur& Y = versDouble(args[1]);

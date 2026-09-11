@@ -45,6 +45,7 @@ Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin
 bool comparerCas(const Valeur& sujet, const Valeur& cas);
 std::string nomMethodeOperateur(const std::string& op);
 std::string texteExpression(const NoeudPtr& n);
+std::string texteExpression(const NoeudPtr& n, int priorite);
 Valeur construireObjet(Interpreteur& it, const std::shared_ptr<DefinitionClasse>& def,
                        std::vector<Valeur>& args);
 

@@ -210,7 +210,14 @@ std::vector<Valeur> extremum(Interpreteur& it, std::vector<Valeur>& args, int na
                          cr)};
     }
     Valeur v = enDouble(args[0]);
-    if (v.estVide()) return {Valeur::vide(), Valeur::vide()};
+    if (v.estVide()) {
+        // On ne rend l'indice que s'il est demande. Le rendre toujours
+        // faisait de « max([]) » une liste de deux valeurs : passee en
+        // argument, elle en comptait deux, et « isempty(max([])) »
+        // echouait sur un « trop d'arguments » incomprehensible.
+        if (nargout >= 2) return {Valeur::vide(), Valeur::vide()};
+        return {Valeur::vide()};
+    }
     int dim = args.size() >= 3 ? (int)args[2].scal() - 1 : dimensionParDefaut(v);
     Dims d = v.dims;
     while ((int)d.size() <= dim) d.push_back(1);
@@ -255,27 +262,44 @@ std::vector<Valeur> extremum(Interpreteur& it, std::vector<Valeur>& args, int na
 FONCTION(fnMax) { return extremum(it, args, nargout, true); }
 FONCTION(fnMin) { return extremum(it, args, nargout, false); }
 
+// Le cumul d'un extremum, comme celui d'une somme : suivant une
+// dimension, non a travers tout le tableau. Le balayage lineaire cumulait
+// d'une colonne sur la suivante — cummax([3 1; 2 4]) rendait [3 3; 3 4]
+// au lieu de [3 1; 3 4] —, et l'argument de dimension etait ignore.
+static Valeur cumulExtremum(const Valeur& brut, int dim, bool maximum) {
+    Valeur v = enDouble(brut);
+    Valeur r = v;
+    r.classe = Classe::Double;
+    Dims d = v.dims;
+    while ((int)d.size() <= dim) d.push_back(1);
+    std::size_t interne = 1;
+    for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
+    std::size_t taille = (std::size_t)d[(std::size_t)dim];
+    std::size_t externe = taille ? v.nelem() / (interne * taille) : 0;
+    for (std::size_t a = 0; a < externe; ++a)
+        for (std::size_t b = 0; b < interne; ++b) {
+            double acc = maximum ? -INFINITY : INFINITY;
+            for (std::size_t i = 0; i < taille; ++i) {
+                std::size_t p = a * interne * taille + b + i * interne;
+                double x = v.re[p];
+                // Un NaN ne remplace pas l'accumulateur : MATLAB l'ignore,
+                // comme MAX et MIN l'ignorent.
+                if (!std::isnan(x)) acc = maximum ? std::max(acc, x) : std::min(acc, x);
+                r.re[p] = acc;
+            }
+        }
+    return r;
+}
+
 FONCTION(fnCummax) {
     INUTILISE
-    Valeur v = enDouble(args[0]);
-    Valeur r = v;
-    double acc = -INFINITY;
-    for (std::size_t k = 0; k < r.re.size(); ++k) {
-        acc = std::max(acc, v.re[k]);
-        r.re[k] = acc;
-    }
-    return {r};
+    exigerArguments(args, 1, 2, "cummax");
+    return {cumulExtremum(args[0], dimensionArgument(args, 1, args[0]), true)};
 }
 FONCTION(fnCummin) {
     INUTILISE
-    Valeur v = enDouble(args[0]);
-    Valeur r = v;
-    double acc = INFINITY;
-    for (std::size_t k = 0; k < r.re.size(); ++k) {
-        acc = std::min(acc, v.re[k]);
-        r.re[k] = acc;
-    }
-    return {r};
+    exigerArguments(args, 1, 2, "cummin");
+    return {cumulExtremum(args[0], dimensionArgument(args, 1, args[0]), false)};
 }
 
 // ------------------------------------------------------------------- tri
@@ -288,7 +312,13 @@ std::vector<Valeur> trier(std::vector<Valeur>& args, int nargout) {
     for (std::size_t k = 1; k < args.size(); ++k) {
         if (args[k].estTexte() || args[k].estChaine()) {
             std::string mode = args[k].versTexte();
+            // Un mode inconnu ne se replie pas en silence sur le tri
+            // croissant : « sort(x, 'decroissant') » rendait alors
+            // l'inverse de ce qu'on demandait, sans rien dire.
             if (mode == "descend") descendant = true;
+            else if (mode != "ascend")
+                erreur("MATLAB:sort:invalidDirection",
+                       "Invalid direction. Use 'ascend' or 'descend'.");
         } else if (!args[k].estVide()) {
             dim = (int)args[k].scal() - 1;
         }
@@ -668,10 +698,12 @@ FONCTION(fnUnique) {
     Valeur u = elementDe(v, gardes, colonne);
     std::vector<double> ia;
     for (auto g : gardes) ia.push_back((double)(g + 1));
+    // IA et IC sont toujours des colonnes, quelle que soit la forme de
+    // l'entree : c'est la regle de MATLAB, et elle compte — « x(ia) »
+    // rendait une ligne la ou le code appelant attendait une colonne.
     if (nargout <= 1) return {u};
-    if (nargout == 2) return {u, colonne ? Valeur::colonne(ia) : Valeur::ligne(ia)};
-    return {u, colonne ? Valeur::colonne(ia) : Valeur::ligne(ia),
-            colonne ? Valeur::colonne(ic) : Valeur::ligne(ic)};
+    if (nargout == 2) return {u, Valeur::colonne(ia)};
+    return {u, Valeur::colonne(ia), Valeur::colonne(ic)};
 }
 
 FONCTION(fnIsmember) {
@@ -968,16 +1000,89 @@ FONCTION(fnHistc) {
     return {r};
 }
 
+// Demele les arguments de TRAPZ et CUMTRAPZ. Avec deux arguments, un
+// second scalaire est la dimension — « trapz(Y, 2) » — et un second
+// tableau est l'ordonnee — « trapz(X, Y) ». Sans cette distinction,
+// « trapz(ones(3,4), 2) » prenait 2 pour une abscisse et rendait un
+// scalaire nul.
+static void demelerTrapz(Arguments& args, const char* nom, Valeur& y,
+                         std::vector<double>& x, int& dim) {
+    exigerNumerique(args[0], nom);
+    bool abscissesDonnees = false;
+    if (args.size() >= 3) {
+        exigerNumerique(args[1], nom);
+        abscissesDonnees = true;
+        dim = (int)args[2].scal() - 1;
+    } else if (args.size() == 2) {
+        exigerNumerique(args[1], nom);
+        if (args[1].nelem() == 1 && args[0].nelem() != 1) {
+            dim = (int)args[1].scal() - 1;
+        } else {
+            abscissesDonnees = true;
+            dim = -1;
+        }
+    } else {
+        dim = -1;
+    }
+    y = enDouble(abscissesDonnees ? args[1] : args[0]);
+    if (dim < 0) dim = dimensionParDefaut(y);
+    Dims d = y.dims;
+    while ((int)d.size() <= dim) d.push_back(1);
+    std::size_t taille = (std::size_t)d[(std::size_t)dim];
+    x.clear();
+    if (abscissesDonnees) {
+        const Valeur& a = enDouble(args[0]);
+        if (a.nelem() == taille)
+            for (std::size_t k = 0; k < a.nelem(); ++k) x.push_back(a.re[k]);
+        else if (a.nelem() == y.nelem())
+            for (std::size_t k = 0; k < taille; ++k) x.push_back(a.re[k]);
+        else
+            erreur("MATLAB:trapz:LengthXmismatchY",
+                   "X doit avoir autant de points que la dimension integree.");
+    } else {
+        for (std::size_t k = 0; k < taille; ++k) x.push_back((double)(k + 1));
+    }
+}
+
 FONCTION(fnCumtrapz) {
     INUTILISE
-    exigerArguments(args, 1, 2, "cumtrapz");
-    exigerNumerique(args[0], "cumtrapz");
-    const Valeur& y = enDouble(args.size() > 1 ? args[1] : args[0]);
-    std::vector<double> x;
-    if (args.size() > 1)
-        for (std::size_t k = 0; k < args[0].nelem(); ++k) x.push_back(args[0].re[k]);
-    else
-        for (std::size_t k = 0; k < y.nelem(); ++k) x.push_back((double)(k + 1));
+    exigerArguments(args, 1, 3, "cumtrapz");
+    Valeur y;
+    std::vector<double> xDemele;
+    int dimDemelee = -1;
+    demelerTrapz(args, "cumtrapz", y, xDemele, dimDemelee);
+    // Une matrice s'integre colonne par colonne, comme CUMSUM.
+    if (!y.estVecteur() && !y.estScalaire()) {
+        Dims d = y.dims;
+        while ((int)d.size() <= dimDemelee) d.push_back(1);
+        std::size_t interne = 1;
+        for (int k = 0; k < dimDemelee; ++k) interne *= (std::size_t)d[(std::size_t)k];
+        std::size_t taille = (std::size_t)d[(std::size_t)dimDemelee];
+        std::size_t externe = taille ? y.nelem() / (interne * taille) : 0;
+        Valeur r = y;
+        r.classe = Classe::Double;
+        bool complexe = y.estComplexe();
+        if (complexe) r.assurerImaginaire();
+        for (std::size_t a = 0; a < externe; ++a)
+            for (std::size_t b = 0; b < interne; ++b) {
+                double s = 0, si = 0;
+                std::size_t premier = a * interne * taille + b;
+                r.re[premier] = 0;
+                if (complexe) r.im[premier] = 0;
+                for (std::size_t i = 1; i < taille; ++i) {
+                    std::size_t p = premier + i * interne;
+                    std::size_t q = p - interne;
+                    double pas = 0.5 * (xDemele[i] - xDemele[i - 1]);
+                    s += pas * (y.re[p] + y.re[q]);
+                    if (complexe) si += pas * (y.im[p] + y.im[q]);
+                    r.re[p] = s;
+                    if (complexe) r.im[p] = si;
+                }
+            }
+        r.compacter();
+        return {r};
+    }
+    const std::vector<double>& x = xDemele;
     std::vector<double> r(y.nelem(), 0.0);
     for (std::size_t k = 1; k < y.nelem(); ++k)
         r[k] = r[k - 1] + 0.5 * (x[k] - x[k - 1]) * (y.re[k] + y.re[k - 1]);
@@ -997,22 +1102,37 @@ FONCTION(fnCumtrapz) {
 FONCTION(fnTrapz) {
     INUTILISE
     exigerArguments(args, 1, 3, "trapz");
-    exigerNumerique(args[0], "trapz");
-    if (args.size() > 1) exigerNumerique(args[1], "trapz");
-    const Valeur& y = enDouble(args.size() > 1 ? args[1] : args[0]);
+    Valeur y;
     std::vector<double> x;
-    if (args.size() > 1)
-        for (std::size_t k = 0; k < args[0].nelem(); ++k) x.push_back(args[0].re[k]);
-    else
-        for (std::size_t k = 0; k < y.nelem(); ++k) x.push_back((double)(k + 1));
-    double s = 0;
-    for (std::size_t k = 1; k < y.nelem(); ++k)
-        s += 0.5 * (x[k] - x[k - 1]) * (y.re[k] + y.re[k - 1]);
-    if (!y.estComplexe()) return {Valeur::scalaire(s)};
-    double si = 0;
-    for (std::size_t k = 1; k < y.nelem(); ++k)
-        si += 0.5 * (x[k] - x[k - 1]) * (y.im[k] + y.im[k - 1]);
-    return {Valeur::complexe(s, si)};
+    int dim = -1;
+    demelerTrapz(args, "trapz", y, x, dim);
+    Dims d = y.dims;
+    while ((int)d.size() <= dim) d.push_back(1);
+    Dims rd = d;
+    rd[(std::size_t)dim] = 1;
+    std::size_t interne = 1;
+    for (int k = 0; k < dim; ++k) interne *= (std::size_t)d[(std::size_t)k];
+    std::size_t taille = (std::size_t)d[(std::size_t)dim];
+    std::size_t externe = taille ? y.nelem() / (interne * taille) : 0;
+    Valeur r = Valeur::matriceDims(rd);
+    bool complexe = y.estComplexe();
+    if (complexe) r.assurerImaginaire();
+    for (std::size_t a = 0; a < externe; ++a)
+        for (std::size_t b = 0; b < interne; ++b) {
+            double s = 0, si = 0;
+            for (std::size_t i = 1; i < taille; ++i) {
+                std::size_t p = a * interne * taille + b + i * interne;
+                std::size_t q = p - interne;
+                double pas = 0.5 * (x[i] - x[i - 1]);
+                s += pas * (y.re[p] + y.re[q]);
+                if (complexe) si += pas * (y.im[p] + y.im[q]);
+            }
+            std::size_t sortie = a * interne + b;
+            r.re[sortie] = s;
+            if (complexe) r.im[sortie] = si;
+        }
+    r.compacter();
+    return {r};
 }
 
 FONCTION(fnMagic) {
