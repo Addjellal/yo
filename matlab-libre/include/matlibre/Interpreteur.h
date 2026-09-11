@@ -44,6 +44,10 @@ struct Portee {
     int nargin = 0;
     int nargout = 0;
     std::shared_ptr<FonctionUtilisateur> fonction;
+    // Les taches posees par ONCLEANUP : elles s'executent quand la portee
+    // se ferme, quelle qu'en soit la raison — retour normal, « return »,
+    // ou erreur qui remonte.
+    std::vector<Valeur> nettoyages;
     // Portée de la fonction englobante : une fonction imbriquée lit et écrit
     // les variables de son parent à travers ce chaînage.
     std::shared_ptr<Portee> englobante;
@@ -157,6 +161,10 @@ public:
     // ni indexé : le faire d'abord coûterait un appel système à chaque
     // appel de fonction, ce qui se paierait sur tout le reste.
     std::string fichierDossierCourant(const std::string& nom) const;
+    // Inscrit une tache de nettoyage dans la portee courante.
+    void inscrireNettoyage(const Valeur& tache);
+    // Execute les taches d'ONCLEANUP d'une portee qui se ferme.
+    void executerNettoyages(const std::shared_ptr<Portee>& portee);
     std::shared_ptr<DefinitionClasse> classeDefinie(const std::string& nom);
     // Verse dans une classe ce qu'elle tient de ses parents : proprietes,
     // methodes, constantes. Ce qu'elle definit elle-meme l'emporte.

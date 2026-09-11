@@ -745,6 +745,64 @@ assert(leve);
 mustBeA(int8(3), {'int8', 'int16'});
 mustBeA('abc', 'char');
 
+%% --------------------------------------------------------- ONCLEANUP
+% La promesse d'ONCLEANUP est « quoi qu'il arrive, ceci sera fait ».
+% Chacune des trois facons de quitter une fonction doit donc declencher
+% le nettoyage : le retour normal, le « return » anticipe, et l'erreur.
+global traceNettoyage
+traceNettoyage = {};
+nettoyageRetourNormal();
+assert(isequal(traceNettoyage, {'travail', 'nettoye'}));
+
+traceNettoyage = {};
+erreurVue = false;
+try
+    nettoyageAvecErreur();
+catch
+    erreurVue = true;
+end
+assert(erreurVue);
+assert(isequal(traceNettoyage, {'travail', 'nettoye'}));
+
+traceNettoyage = {};
+nettoyageRetourAnticipe();
+assert(isequal(traceNettoyage, {'travail', 'nettoye'}));
+
+% Plusieurs taches se defont dans l'ordre inverse : la derniere posee est
+% la premiere executee, comme une pile.
+traceNettoyage = {};
+nettoyagePlusieurs();
+assert(isequal(traceNettoyage, {'travail', 'second', 'premier'}));
+
+% Une tache qui echoue n'empeche pas les autres : sinon la premiere qui
+% rate laisserait tout le reste en plan, ce qu'ONCLEANUP existe justement
+% pour eviter.
+traceNettoyage = {};
+try
+    nettoyageQuiEchoue();
+catch
+end
+assert(isequal(traceNettoyage, {'travail', 'avant', 'apres'}));
+
+% Les portees imbriquees se nettoient de l'interieur vers l'exterieur.
+traceNettoyage = {};
+nettoyageImbrique();
+assert(isequal(traceNettoyage, ...
+               {'dans interne', 'interne', 'apres interne', 'exterieur'}));
+
+% L'objet rendu se range dans une variable et dit ce qu'il est.
+assert(strcmp(class(onCleanup(@() 1)), 'onCleanup'));
+% Ce qui n'est pas une poignee est refuse.
+refusNettoyage = false;
+try
+    onCleanup(42);
+catch
+    refusNettoyage = true;
+end
+assert(refusNettoyage);
+disp('onCleanup : ok');
+
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)
@@ -834,4 +892,43 @@ end
 
 function plusProfondEncore()
     error('Essai:profond', 'au fond');
+end
+
+function noterNettoyage(message)
+    global traceNettoyage
+    traceNettoyage{end+1} = message;
+end
+function nettoyageRetourNormal()
+    c = onCleanup(@() noterNettoyage('nettoye'));   %#ok<NASGU>
+    noterNettoyage('travail');
+end
+function nettoyageAvecErreur()
+    c = onCleanup(@() noterNettoyage('nettoye'));   %#ok<NASGU>
+    noterNettoyage('travail');
+    error('essai:nettoyage', 'echec voulu');
+end
+function nettoyageRetourAnticipe()
+    c = onCleanup(@() noterNettoyage('nettoye'));   %#ok<NASGU>
+    noterNettoyage('travail');
+    return
+end
+function nettoyagePlusieurs()
+    a = onCleanup(@() noterNettoyage('premier'));   %#ok<NASGU>
+    b = onCleanup(@() noterNettoyage('second'));    %#ok<NASGU>
+    noterNettoyage('travail');
+end
+function nettoyageQuiEchoue()
+    a = onCleanup(@() noterNettoyage('apres'));     %#ok<NASGU>
+    b = onCleanup(@() error('essai:rate', 'rate')); %#ok<NASGU>
+    c = onCleanup(@() noterNettoyage('avant'));     %#ok<NASGU>
+    noterNettoyage('travail');
+end
+function nettoyageImbrique()
+    c = onCleanup(@() noterNettoyage('exterieur')); %#ok<NASGU>
+    nettoyageInterne();
+    noterNettoyage('apres interne');
+end
+function nettoyageInterne()
+    c = onCleanup(@() noterNettoyage('interne'));   %#ok<NASGU>
+    noterNettoyage('dans interne');
 end

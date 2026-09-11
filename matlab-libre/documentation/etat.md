@@ -14,14 +14,14 @@ documentation publique et vérifiée sur la propriété qui la définit.
 | partie | contenu | lignes |
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
-| `src/bibliotheque` | 672 fonctions natives, en C++ | 19 565 |
+| `src/bibliotheque` | 673 fonctions natives, en C++ | 19 565 |
 | `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
 | `toolbox` | 2 889 fichiers `.m`, dont 2 208 fonctions publiques | 131 751 |
 | `tests` | 41 scripts `.m` et 2 fichiers C++ | 20 842 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 319
+documentation MathWorks est complète : `outils/manques.m` compte **2 320
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
 pas, et cent trente-six ont été ajoutées de cette façon — la famille
@@ -100,6 +100,7 @@ suivant en donne quelques-unes, prises dans les tests.
 | éléments simples | le produit des termes vaut la fraction de départ, en quatre points choisis |
 | dérivées hyperboliques et réciproques | comparées à une différence finie, jamais recopiées d'une table |
 | une poignée graphique | dit sa vraie classe ; deux sortes concaténées restent des poignées |
+| `onCleanup` | la tâche part au retour normal, au `return` anticipé et sur une erreur ; l'ordre est celui d'une pile ; un échec n'arrête pas les autres |
 
 ## 3. État par boîte à outils
 
@@ -111,7 +112,7 @@ distingue une boîte complète d'une boîte esquissée.
 |---|---:|---|
 | statistiques | 272 | complète : lois, tests, régression, classification, mélanges, HMM |
 | signal | 205 | complète : conception RIF et RII, analogique et numérique, spectres, mesures d'impulsion |
-| matlab | 290 | noyau du langage, en complément des 672 natives |
+| matlab | 290 | noyau du langage, en complément des 673 natives |
 | finance | 148 | complète : indicateurs techniques, portefeuille, actualisation |
 | images | 138 | complète : morphologie, filtres, couleur, segmentation, texture |
 | ondelettes | 129 | complète : DWT, paquets, MODWT, CWT, débruitage |
@@ -150,7 +151,7 @@ programme d'école qui montre à quoi il sert.
 | Grandes matrices creuses | stockage et opérations de base ; PCG, BICG, CGS, MINRES et GMRES résolvent sans former la matrice ; ICHOL et ILU préconditionnent, SYMRCM, SYMAMD et COLAMD réordonnent | factorisations creuses complètes — LU et Cholesky creux avec leur permutation |
 | Lecture de fichiers | `.mat` v4, v6 et v7, CSV, images PGM et PPM en texte ; un `.mat` v7.3 est reconnu et refusé avec la raison | HDF5, donc `.mat` v7.3 ; PNG, JPEG et TIFF, qui demandent une bibliothèque externe |
 | Équations aux dérivées partielles | `pdepe` résout le cas parabolique et elliptique en 1-D, en plan, cylindrique et sphérique, par volumes finis et méthode des lignes ; `bvp4c` les problèmes aux limites par collocation d'ordre quatre | maillage adaptatif dans `bvp4c`, qui garde celui qu'on lui donne ; `bvp5c`, `ode15i`, les EDP en deux et trois dimensions |
-| Classes | `classdef` complet : propriétés, méthodes, opérateurs surchargés, `subsref`/`subsasgn`, méthodes statiques, événements, héritage simple et multiple avec appel au constructeur du parent, et la réflexion — `methods`, `properties`, `events`, `enumeration`, `metaclass`, `superclasses` | les membres énumérés comme valeurs — seuls leurs noms se relisent —, les classes `handle` avec `delete`, les attributs d'accès (`Access`, `SetAccess`) |
+| Classes | `classdef` complet : propriétés, méthodes, opérateurs surchargés, `subsref`/`subsasgn`, méthodes statiques, événements, héritage simple et multiple avec appel au constructeur du parent, et la réflexion — `methods`, `properties`, `events`, `enumeration`, `metaclass`, `superclasses` | les membres énumérés comme valeurs — seuls leurs noms se relisent —, le destructeur `delete` d'une classe `handle` (`onCleanup` est écrit au niveau de la portée, ce qui couvre son usage mais pas l'effacement d'une variable), les attributs d'accès (`Access`, `SetAccess`) |
 | Géométrie du plan | `polyshape` porte les régions percées, les mesures, les transformations et les quatre opérations booléennes par l'algorithme de Greiner et Hormann | la simplification d'un contour qui se recoupe, et le traitement exact des contacts — deux régions qui se touchent sont séparées d'un cheveu, ce qui coûte six chiffres de précision sur ces cas-là |
 | Boîtes esquissées | 30 boîtes de 2 à 9 fonctions | les compléter domaine par domaine, en gardant la règle : rien sans test |
 | Performance | l'interpréteur est un parcours d'arbre | compilation en bytecode, vectorisation des boucles internes |

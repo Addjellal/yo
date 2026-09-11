@@ -72,7 +72,37 @@ std::string nomCourt(const std::string& nom, const std::string& fichier) {
 GardePortee::GardePortee(Interpreteur& i, std::shared_ptr<Portee> p) : it(i) {
     it.piles_.push_back(std::move(p));
 }
-GardePortee::~GardePortee() { it.piles_.pop_back(); }
+GardePortee::~GardePortee() {
+    // Avant de quitter la portee, on execute les nettoyages qu'elle
+    // porte : c'est ce que promet ONCLEANUP — « quoi qu'il arrive, ceci
+    // sera fait ». La portee est encore en place pendant l'appel, pour
+    // que le nettoyage voie ce qu'il doit voir.
+    it.executerNettoyages(it.piles_.back());
+    it.piles_.pop_back();
+}
+
+// Les objets ONCLEANUP d'une portee, executes dans l'ordre inverse de
+// leur creation : le dernier pose est le premier defait, comme une pile.
+// Une erreur dans un nettoyage n'empeche pas les autres — sinon le
+// premier qui echoue laisserait tout le reste en plan, ce qui est
+// exactement ce qu'ONCLEANUP existe pour eviter.
+void Interpreteur::inscrireNettoyage(const Valeur& tache) {
+    if (piles_.empty()) return;
+    piles_.back()->nettoyages.push_back(tache);
+}
+
+void Interpreteur::executerNettoyages(const std::shared_ptr<Portee>& portee) {
+    if (!portee || portee->nettoyages.empty()) return;
+    std::vector<Valeur> taches = portee->nettoyages;
+    portee->nettoyages.clear();
+    for (std::size_t k = taches.size(); k-- > 0;) {
+        try {
+            std::vector<Valeur> sansArgument;
+            appelerValeur(taches[k], sansArgument, 0);
+        } catch (...) {
+        }
+    }
+}
 
 // Empile un cadre d'exécution pour la durée d'un appel. Le cadre reste
 // lisible pendant le déroulement de la pile : c'est là que l'erreur va

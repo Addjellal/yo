@@ -348,6 +348,42 @@ NARGOUTCHK  Vérifie le nombre d'arguments de sortie.
     Voir aussi NARGINCHK, NARGOUT, ERROR.
 ```
 
+## `onCleanup`
+
+```
+ONCLEANUP  Tâche à exécuter en quittant la portée.
+    C = ONCLEANUP(@() ...) inscrit une tâche qui sera exécutée quand la
+    fonction se terminera — quelle qu'en soit la raison : retour normal,
+    « return » anticipé, ou erreur qui remonte.
+
+    C'est la façon sûre de rendre une ressource : fermer un fichier,
+    libérer un verrou, rétablir un réglage. Sans elle il faudrait prévoir
+    chaque sortie possible, et une erreur non prévue laisserait la
+    ressource ouverte.
+
+    Les tâches d'une même portée s'exécutent dans l'ordre inverse de leur
+    création : la dernière posée est la première défaite, comme une pile.
+    Une tâche qui échoue n'empêche pas les autres de s'exécuter.
+
+    MATLAB en fait un objet dont le destructeur agit, si bien qu'effacer
+    la variable déclenche le nettoyage aussitôt. Ici c'est la portée qui
+    porte la liste : le nettoyage a lieu à la fin de la fonction, non à
+    l'effacement de la variable. La différence ne se voit pas dans l'usage
+    courant, et elle est dite ici plutôt que laissée à découvrir.
+
+    Syntaxe
+       c = onCleanup(@() instruction)
+
+    Exemples
+       % Dans une fonction : « c = onCleanup(@() fclose(f)); » ferme le
+       % fichier quoi qu'il arrive. Ici, au plus haut niveau, la tache
+       % s'inscrit et l'objet rendu le montre.
+       c = onCleanup(@() 1);
+       strcmp(class(c), 'onCleanup')
+
+    Voir aussi TRY, FCLOSE, FUNCTION_HANDLE, CLEAR.
+```
+
 ## `run`
 
 ```

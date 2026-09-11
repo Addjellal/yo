@@ -48,6 +48,33 @@ FONCTION(fnBuiltin) {
     return n->fonction(it, passees, std::max(nargout, 1));
 }
 
+// ONCLEANUP inscrit une tache dans la portee de l'appelant : elle sera
+// executee quand cette portee se fermera, quelle qu'en soit la raison —
+// retour normal, « return », ou erreur qui remonte. C'est ce qui permet
+// de fermer un fichier ou de rendre un verrou sans avoir a prevoir toutes
+// les sorties possibles.
+//
+// MATLAB en fait un objet dont le destructeur agit. Ici la portee porte
+// la liste, ce qui produit le meme effet la ou ONCLEANUP sert : dans une
+// fonction. La difference est qu'effacer la variable ne declenche pas le
+// nettoyage avant la fin de la portee, et l'aide le dit.
+FONCTION(fnOnCleanup) {
+    INUTILISE
+    exigerArguments(args, 1, 1, "onCleanup");
+    if (args[0].classe != Classe::Fonction || !args[0].fn)
+        erreur("MATLAB:onCleanup:BadInput",
+               "ONCLEANUP attend une poignee de fonction.");
+    it.inscrireNettoyage(args[0]);
+    // On rend un objet qui se laisse ranger dans une variable, comme le
+    // fait MATLAB : c'est par lui que le lecteur voit qu'un nettoyage est
+    // pose.
+    Valeur r = Valeur::structureVide();
+    r.poserChamp("Task", args[0]);
+    r.classe = Classe::Objet;
+    r.nomObjet = "onCleanup";
+    return {r};
+}
+
 FONCTION(fnFunc2str) {
     INUTILISE
     exigerArguments(args, 1, 1, "func2str");
@@ -575,6 +602,8 @@ void enregistrerFonctionnel(Interpreteur& it) {
     it.enregistrer("builtin", fnBuiltin, "fonctionnel",
                    "builtin  Appelle la fonction native, sans surcharge.");
     it.enregistrer("func2str", fnFunc2str, "fonctionnel", "func2str  Poignee -> texte.");
+    it.enregistrer("onCleanup", fnOnCleanup, "fonctionnel",
+                   "onCleanup  Tache a executer en quittant la portee.");
     it.enregistrer("str2func", fnStr2func, "fonctionnel", "str2func  Texte -> poignee.");
     it.enregistrer("cellfun", fnCellfun, "fonctionnel", "cellfun  Applique a chaque case.");
     it.enregistrer("arrayfun", fnArrayfun, "fonctionnel", "arrayfun  Applique a chaque element.");

@@ -16,7 +16,7 @@ classdef CouleurEssai
         function o = CouleurEssai(c)
             if nargin > 0, o.code = c; end
         end
-        function r = doubler(o)
+        function r = doublerCouleur(o)
             r = 2 * o.code;
         end
     end

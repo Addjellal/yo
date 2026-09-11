@@ -253,7 +253,7 @@ assert(recalcul.CacheHits == avant.CacheHits);
 % PROPERTIES existait seul de sa famille : METHODS, EVENTS et ENUMERATION
 % manquaient, et le bloc « enumeration » etait analyse puis jete — ses
 % membres se lisaient, et rien n'en restait.
-assert(isequal(sort(methods('CouleurEssai')'), {'CouleurEssai', 'doubler'}));
+assert(isequal(sort(methods('CouleurEssai')'), {'CouleurEssai', 'doublerCouleur'}));
 assert(isequal(events('CouleurEssai')', {'Change', 'Efface'}));
 assert(isequal(enumeration('CouleurEssai')', {'Rouge', 'Vert', 'Bleu'}));
 assert(isequal(properties('CouleurEssai')', {'code'}));
