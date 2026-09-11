@@ -9,3 +9,4 @@ imread imregionalmax imresize imrotate imshow imsubtract imtophat imtranslate
 imwrite label2rgb mat2gray medfilt2 montage normxcorr2 ordfilt2 padarray
 poly2mask regionprops rgb2gray rgb2hsv rgb2ind roicolor roifilt2
 stdfilt strel stretchlim watershed
+im2uint16 im2single

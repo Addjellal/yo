@@ -10,12 +10,22 @@ function y = im2uint8(x)
 %   Exemple :
 %      im2uint8([0 0.5 1])             % [0 128 255]
 %      im2uint8(im2double(uint8(42)))  % 42 : l'aller-retour est exact
+%      im2uint8(im2uint16(uint8(42)))  % 42 : par seize bits aussi
 %
 %   Voir aussi IM2DOUBLE, IMWRITE.
     if isa(x, 'uint8')
         y = x;
     elseif islogical(x)
         y = uint8(x) * 255;
+    elseif isa(x, 'uint16')
+        % Une image sur seize bits se ramene a huit en divisant par 257,
+        % qui est exactement 65535/255 : le blanc reste le blanc, et
+        % l'aller-retour depuis UINT8 revient a l'identique. La traiter
+        % comme un flottant l'ecretait a 255 partout.
+        y = uint8(round(double(x) / 257));
+    elseif isinteger(x)
+        error('MATLAB:im2uint8:classe', ...
+              'IM2UINT8 ne traite pas la classe %s.', class(x));
     else
         y = uint8(round(max(0, min(1, double(x))) * 255));
     end

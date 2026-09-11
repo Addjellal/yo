@@ -17,8 +17,17 @@ function y = im2double(x)
         y = double(x) / 255;
     elseif isa(x, 'uint16')
         y = double(x) / 65535;
+    elseif isa(x, 'int16')
+        % INT16 va de -32768 a 32767 : le noir est au minimum, non a zero.
+        y = (double(x) + 32768) / 65535;
     elseif islogical(x)
         y = double(x);
+    elseif isinteger(x)
+        % Une classe entiere sans echelle definie ne se convertit pas :
+        % la diviser par rien rendrait une image hors de [0,1] sans
+        % qu'aucune valeur ne soit fausse pour autant.
+        error('MATLAB:im2double:classe', ...
+              'IM2DOUBLE ne sait pas mettre la classe %s a l''echelle.', class(x));
     else
         y = double(x);
     end

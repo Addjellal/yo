@@ -16,17 +16,29 @@ function g = rgb2gray(rgb)
 %
 %   Une image déjà en niveaux de gris est rendue telle quelle.
 %
+%   La classe est conservée : une image en UINT8 rend une image en UINT8,
+%   sur la même échelle de zéro à 255. Rendre un DOUBLE dans [0,1] pour
+%   une entrée entière — ce qui se faisait — cassait tout ce qui suit,
+%   affichage et seuillage compris, sans qu'aucune valeur ne soit fausse.
+%
 %   Exemple :
 %      gris = repmat(0.5, 2, 2, 3);
 %      max(max(abs(rgb2gray(gris) - 0.5)))  % 0 : le gris est conserve
+%      class(rgb2gray(uint8(zeros(2,2,3))))  % uint8 : la classe suit
 %
-%   Voir aussi IM2DOUBLE, IMADJUST, IMHIST.
+%   Voir aussi IM2DOUBLE, IM2UINT8, IMADJUST, IMHIST.
     if ndims(rgb) < 3
         g = rgb;
         return;
     end
+    classeEntree = class(rgb);
     x = im2double(rgb);
     g = 0.298936021293776 * x(:,:,1) ...
       + 0.587043074451121 * x(:,:,2) ...
       + 0.114020904255103 * x(:,:,3);
+    switch classeEntree
+        case 'uint8',  g = im2uint8(g);
+        case 'uint16', g = im2uint16(g);
+        case 'single', g = single(g);
+    end
 end

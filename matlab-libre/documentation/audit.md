@@ -32,7 +32,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | gestion-risques | 31 | 100 % | 100 % | 100 % |
 | identification | 27 | 100 % | 100 % | 100 % |
 | imagerie-medicale | 5 | 100 % | 100 % | 100 % |
-| images | 138 | 100 % | 100 % | 100 % |
+| images | 140 | 100 % | 100 % | 100 % |
 | instruments | 4 | 100 % | 100 % | 100 % |
 | instruments-financiers | 55 | 100 % | 100 % | 100 % |
 | interface | 15 | 100 % | 100 % | 100 % |
@@ -59,7 +59,7 @@ Pour chaque boîte à outils : le nombre de fonctions publiques, la part dont l'
 | types | 41 | 100 % | 100 % | 100 % |
 | vehicule | 4 | 100 % | 100 % | 100 % |
 | vision | 60 | 100 % | 100 % | 100 % |
-| **ensemble** | **2186** | **100 %** | **100 %** | **100 %** |
+| **ensemble** | **2188** | **100 %** | **100 %** | **100 %** |
 
 ## Ce qui reste à faire
 

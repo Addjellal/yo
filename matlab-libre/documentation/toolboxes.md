@@ -34,7 +34,7 @@ existant appellera.
 | `gestion-risques` | Risk Management Toolbox — mesures de risque. | 69 |
 | `identification` | System Identification Toolbox — identification de modèles. | 106 |
 | `imagerie-medicale` | Medical Imaging Toolbox — imagerie médicale. | 5 |
-| `images` | Image Processing Toolbox — traitement d'images. | 138 |
+| `images` | Image Processing Toolbox — traitement d'images. | 140 |
 | `instruments` | Instrument Control Toolbox — pilotage d'instruments (simulé). | 4 |
 | `instruments-financiers` | Financial Instruments Toolbox — instruments de taux. | 82 |
 | `lidar` | Lidar Toolbox — nuages de points. | 4 |

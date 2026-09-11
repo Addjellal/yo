@@ -223,6 +223,41 @@ assert(refuse(@() days(calmonths(2))));
 assert(datetime(2024,1,1) + caldays(3) == datetime(2024,1,4));
 assert(datetime(2024,1,31) + calmonths(1) == datetime(2024,2,29));
 
+%% ------------- une conversion d'image garde la classe et l'echelle
+% RGB2GRAY rendait un DOUBLE dans [0,1] pour une entree entiere : aucune
+% valeur n'etait fausse, et tout ce qui suit — affichage, seuillage,
+% indexation — s'en trouvait casse.
+blanc = uint8(cat(3, 255, 255, 255));
+assert(strcmp(class(rgb2gray(blanc)), 'uint8'));
+assert(rgb2gray(blanc) == 255);
+assert(rgb2gray(uint8(cat(3, 0, 0, 0))) == 0);
+% La ponderation BT.601 : le rouge pese environ 0,299.
+assert(abs(double(rgb2gray(uint8(cat(3, 255, 0, 0)))) - 76) <= 1);
+% Un gris reste exactement ce qu'il est : les trois poids somment a un.
+assert(max(max(abs(rgb2gray(repmat(0.5, 2, 2, 3)) - 0.5))) < 1e-15);
+% La classe suit l'entree, quelle qu'elle soit.
+assert(strcmp(class(rgb2gray(cat(3, 1, 1, 1))), 'double'));
+assert(strcmp(class(rgb2gray(single(cat(3, 1, 1, 1)))), 'single'));
+assert(strcmp(class(rgb2gray(uint16(cat(3, 1, 1, 1)))), 'uint16'));
+
+% Les conversions entre classes d'image font l'aller-retour sans perte
+% quand la precision le permet.
+assert(im2uint8(im2double(uint8(42))) == 42);
+assert(im2uint8(im2uint16(uint8(42))) == 42);
+assert(im2uint16(uint8(255)) == 65535);       % le blanc reste le blanc
+assert(im2uint8(uint16(65535)) == 255);
+assert(isequal(double(im2uint16([0 0.5 1])), [0 32768 65535]));
+assert(im2double(uint16(65535)) == 1);
+% INT16 a son noir au minimum, non a zero.
+assert(im2double(int16(-32768)) == 0);
+assert(im2double(int16(32767)) == 1);
+assert(strcmp(class(im2single(uint8(255))), 'single'));
+assert(im2single(uint8(255)) == single(1));
+% Une classe entiere sans echelle definie est refusee, non mise a
+% l'echelle au hasard.
+assert(refuse(@() im2double(int32(5))));
+assert(refuse(@() im2uint8(int32(5))));
+
 disp('defauts : toutes les verifications passent');
 
 function ok = verifierRefus(f)

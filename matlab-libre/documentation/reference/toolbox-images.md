@@ -935,6 +935,48 @@ IM2GRAY Rend une image en niveaux de gris, quelle que soit l'entrée.
   Voir aussi RGB2GRAY, IMSPLIT.
 ```
 
+## `im2single`
+
+```
+IM2SINGLE Convertit une image en simple précision, de 0 à 1.
+  Y = IM2SINGLE(X) ramène une image entière à l'intervalle [0,1] en
+  simple précision. Une image déjà flottante est convertie sans être
+  remise à l'échelle : elle y est déjà.
+
+  La simple précision porte environ sept chiffres significatifs — bien
+  assez pour une image, dont la source n'en porte que deux ou trois —
+  et occupe la moitié de la mémoire d'un double. C'est pour cela qu'elle
+  sert au traitement d'images plutôt qu'au calcul numérique.
+
+  Exemple :
+     im2single(uint8(255)) == single(1)     % le blanc vaut un
+     class(im2single(uint8(0)))             % single
+
+  Voir aussi IM2DOUBLE, IM2UINT8, IM2UINT16.
+```
+
+## `im2uint16`
+
+```
+IM2UINT16 Convertit une image en uint16 (0 à 65535).
+  Y = IM2UINT16(X) met une image flottante de [0,1] à l'échelle des
+  entiers sur seize bits. Ce qui sort de [0,1] est écrêté, non mis à
+  l'échelle. Une image UINT8 est remontée sur toute la plage, de sorte
+  que le blanc reste le blanc.
+
+  Seize bits valent 65536 niveaux au lieu de 256 : la conversion depuis
+  UINT8 n'ajoute aucune information, mais elle n'en perd pas non plus,
+  et l'aller-retour revient exactement — c'est ce qui la rend sûre pour
+  un calcul intermédiaire.
+
+  Exemple :
+     im2uint16([0 0.5 1])                   % [0 32768 65535]
+     im2uint16(uint8(255)) == 65535         % le blanc reste blanc
+     im2uint8(im2uint16(uint8(42))) == 42   % l'aller-retour est exact
+
+  Voir aussi IM2UINT8, IM2DOUBLE, IM2SINGLE, IMWRITE.
+```
+
 ## `im2uint8`
 
 ```
@@ -949,6 +991,7 @@ IM2UINT8 Convertit une image en uint8 (0 à 255).
   Exemple :
      im2uint8([0 0.5 1])             % [0 128 255]
      im2uint8(im2double(uint8(42)))  % 42 : l'aller-retour est exact
+     im2uint8(im2uint16(uint8(42)))  % 42 : par seize bits aussi
 
   Voir aussi IM2DOUBLE, IMWRITE.
 ```
@@ -2217,11 +2260,17 @@ RGB2GRAY Luminance d'une image couleur.
 
   Une image déjà en niveaux de gris est rendue telle quelle.
 
+  La classe est conservée : une image en UINT8 rend une image en UINT8,
+  sur la même échelle de zéro à 255. Rendre un DOUBLE dans [0,1] pour
+  une entrée entière — ce qui se faisait — cassait tout ce qui suit,
+  affichage et seuillage compris, sans qu'aucune valeur ne soit fausse.
+
   Exemple :
      gris = repmat(0.5, 2, 2, 3);
      max(max(abs(rgb2gray(gris) - 0.5)))  % 0 : le gris est conserve
+     class(rgb2gray(uint8(zeros(2,2,3))))  % uint8 : la classe suit
 
-  Voir aussi IM2DOUBLE, IMADJUST, IMHIST.
+  Voir aussi IM2DOUBLE, IM2UINT8, IMADJUST, IMHIST.
 ```
 
 ## `rgb2hsv`
