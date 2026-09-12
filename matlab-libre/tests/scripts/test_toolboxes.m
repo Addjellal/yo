@@ -1416,4 +1416,196 @@ catch err
 end
 assert(refuseEcriture);
 
+%% ------------------------------ SIMULINK : LES SOUS-SYSTEMES
+% Un sous-systeme n'est pas un bloc de plus : c'est le schema qu'il
+% abrege. La propriete qui le definit est donc celle-ci — il rend
+% exactement ce que rendrait le schema ecrit a plat.
+correcteurPI = new_system('correcteurPI');
+correcteurPI = add_block(correcteurPI, 'inport', 'e', 'Port', 1);
+correcteurPI = add_block(correcteurPI, 'gain', 'kp', 'Gain', 2);
+correcteurPI = add_block(correcteurPI, 'integrator', 'somme');
+correcteurPI = add_block(correcteurPI, 'gain', 'ki', 'Gain', 0.5);
+correcteurPI = add_block(correcteurPI, 'sum', 'total', 'Signs', '++');
+correcteurPI = add_block(correcteurPI, 'outport', 's', 'Port', 1);
+correcteurPI = add_line(correcteurPI, 'e', 'kp');
+correcteurPI = add_line(correcteurPI, 'e', 'somme');
+correcteurPI = add_line(correcteurPI, 'somme', 'ki');
+correcteurPI = add_line(correcteurPI, 'kp', 'total', 1);
+correcteurPI = add_line(correcteurPI, 'ki', 'total', 2);
+correcteurPI = add_line(correcteurPI, 'total', 's');
+
+emboite = new_system('emboite');
+emboite = add_block(emboite, 'step', 'consigne', 'Time', 0, 'After', 1);
+emboite = add_block(emboite, 'sum', 'ecart', 'Signs', '+-');
+emboite = add_block(emboite, 'subsystem', 'correcteur', 'Model', correcteurPI);
+emboite = add_block(emboite, 'integrator', 'sortie');
+emboite = add_line(emboite, 'consigne', 'ecart', 1);
+emboite = add_line(emboite, 'sortie', 'ecart', 2);
+emboite = add_line(emboite, 'ecart', 'correcteur', 1);
+emboite = add_line(emboite, 'correcteur', 'sortie');
+
+aPlat = new_system('aPlat');
+aPlat = add_block(aPlat, 'step', 'consigne', 'Time', 0, 'After', 1);
+aPlat = add_block(aPlat, 'sum', 'ecart', 'Signs', '+-');
+aPlat = add_block(aPlat, 'gain', 'kp', 'Gain', 2);
+aPlat = add_block(aPlat, 'integrator', 'somme');
+aPlat = add_block(aPlat, 'gain', 'ki', 'Gain', 0.5);
+aPlat = add_block(aPlat, 'sum', 'total', 'Signs', '++');
+aPlat = add_block(aPlat, 'integrator', 'sortie');
+aPlat = add_line(aPlat, 'consigne', 'ecart', 1);
+aPlat = add_line(aPlat, 'sortie', 'ecart', 2);
+aPlat = add_line(aPlat, 'ecart', 'kp');
+aPlat = add_line(aPlat, 'ecart', 'somme');
+aPlat = add_line(aPlat, 'somme', 'ki');
+aPlat = add_line(aPlat, 'kp', 'total', 1);
+aPlat = add_line(aPlat, 'ki', 'total', 2);
+aPlat = add_line(aPlat, 'total', 'sortie');
+
+avecBoite = sim(emboite, 3, 0.001);
+sansBoite = sim(aPlat, 3, 0.001);
+assert(max(abs(avecBoite.signaux.sortie - sansBoite.signaux.sortie)) == 0, ...
+       'un sous-systeme rend exactement ce que rend le schema a plat');
+% Le releve porte les blocs interieurs sous leur chemin, et le
+% sous-systeme lui-meme porte la valeur de sa sortie.
+assert(isfield(avecBoite.signaux, 'correcteur_kp'));
+assert(isequal(avecBoite.signaux.correcteur, avecBoite.signaux.correcteur_total), ...
+       'le releve du sous-systeme est celui de sa sortie');
+
+% Emboites : un sous-systeme dans un sous-systeme se deplie jusqu'au bout.
+dehors = new_system('dehors');
+dehors = add_block(dehors, 'inport', 'e', 'Port', 1);
+dehors = add_block(dehors, 'subsystem', 'dedans', 'Model', correcteurPI);
+dehors = add_block(dehors, 'outport', 's', 'Port', 1);
+dehors = add_line(add_line(dehors, 'e', 'dedans', 1), 'dedans', 's');
+deuxNiveaux = new_system('deuxNiveaux');
+deuxNiveaux = add_block(deuxNiveaux, 'step', 'consigne', 'Time', 0, 'After', 1);
+deuxNiveaux = add_block(deuxNiveaux, 'sum', 'ecart', 'Signs', '+-');
+deuxNiveaux = add_block(deuxNiveaux, 'subsystem', 'correcteur', 'Model', dehors);
+deuxNiveaux = add_block(deuxNiveaux, 'integrator', 'sortie');
+deuxNiveaux = add_line(deuxNiveaux, 'consigne', 'ecart', 1);
+deuxNiveaux = add_line(deuxNiveaux, 'sortie', 'ecart', 2);
+deuxNiveaux = add_line(deuxNiveaux, 'ecart', 'correcteur', 1);
+deuxNiveaux = add_line(deuxNiveaux, 'correcteur', 'sortie');
+deuxProfond = sim(deuxNiveaux, 3, 0.001);
+assert(max(abs(deuxProfond.signaux.sortie - sansBoite.signaux.sortie)) == 0, ...
+       'deux niveaux d''emboitement ne changent rien au resultat');
+
+% Les entrees se raccordent par leur rang, non par leur ordre d'ecriture.
+melange = new_system('melange');
+melange = add_block(melange, 'inport', 'tard', 'Port', 2);
+melange = add_block(melange, 'inport', 'tot', 'Port', 1);
+melange = add_block(melange, 'sum', 'ecart', 'Signs', '+-');
+melange = add_block(melange, 'outport', 's', 'Port', 1);
+melange = add_line(melange, 'tot', 'ecart', 1);
+melange = add_line(melange, 'tard', 'ecart', 2);
+melange = add_line(melange, 'ecart', 's');
+essaiRang = new_system('essaiRang');
+essaiRang = add_block(essaiRang, 'constant', 'dix', 'Value', 10);
+essaiRang = add_block(essaiRang, 'constant', 'trois', 'Value', 3);
+essaiRang = add_block(essaiRang, 'subsystem', 'boite', 'Model', melange);
+essaiRang = add_line(essaiRang, 'dix', 'boite', 1);
+essaiRang = add_line(essaiRang, 'trois', 'boite', 2);
+rangs = sim(essaiRang, 0.02, 0.01);
+assert(all(rangs.signaux.boite == 7), ...
+       'l''entree 1 va au bloc INPORT de rang 1, quel que soit l''ordre d''ecriture');
+
+% Un lien sur une entree que le sous-systeme n'a pas est refuse en le
+% nommant, plutot que perdu en chemin.
+refuseEntree = false;
+try
+    sim(add_line(essaiRang, 'dix', 'boite', 3), 0.02, 0.01);
+catch err
+    refuseEntree = strcmp(err.identifier, 'Simulink:Commands:SousSystemeEntreeAbsente');
+end
+assert(refuseEntree);
+refuseVide = false;
+try
+    sim(add_block(new_system('creux'), 'subsystem', 'rien'), 0.02, 0.01);
+catch err
+    refuseVide = strcmp(err.identifier, 'Simulink:Commands:SousSystemeVide');
+end
+assert(refuseVide);
+
+% Le schema emboite s'ecrit et se relit : le fichier batit le
+% sous-systeme dans sa propre variable avant de le donner au bloc.
+cheminEmboite = save_system(emboite, [tempname() '.m']);
+texteEmboite = fileread(cheminEmboite);
+assert(~isempty(strfind(texteEmboite, 'new_system(''correcteurPI'')')), ...
+       'le fichier batit aussi le modele du sous-systeme');
+reluEmboite = load_system(cheminEmboite);
+apresRelecture = sim(reluEmboite, 3, 0.001);
+assert(max(abs(apresRelecture.signaux.sortie - sansBoite.signaux.sortie)) == 0, ...
+       'et le modele relu se simule a l''identique');
+delete(cheminEmboite);
+
+% On descend et on remonte : c'est ainsi que l'editeur ouvre un
+% sous-systeme et y repose ce qu'on a change.
+assert(strcmp(matlibre_sl_dedans(emboite, 'correcteur').nom, 'correcteurPI'));
+assert(strcmp(matlibre_sl_dedans(deuxNiveaux, 'correcteur/dedans').nom, ...
+              'correcteurPI'));
+modifie = matlibre_sl_remplacer(emboite, 'correcteur', ...
+                                set_param(correcteurPI, 'kp', 'Gain', 9));
+assert(isequal(get_param(matlibre_sl_dedans(modifie, 'correcteur'), 'kp', 'Gain'), 9));
+assert(isequal(get_param(matlibre_sl_dedans(emboite, 'correcteur'), 'kp', 'Gain'), 2), ...
+       'et le modele de depart n''a pas bouge : on travaille sur une copie');
+refuseDescente = false;
+try
+    matlibre_sl_dedans(emboite, 'sortie');
+catch err
+    refuseDescente = strcmp(err.identifier, 'Simulink:Commands:PasUnSousSysteme');
+end
+assert(refuseDescente);
+
+% Le programme engendre a partir d'un schema emboite rend, lui aussi,
+% les memes nombres que SIM.
+dossierBoite = tempname();
+mkdir(dossierBoite);
+ancienBoite = pwd();
+cd(dossierBoite);
+matlibre_sl_ecrire(emboite, 'emboiteCalcule.m');
+rehash;
+parProgrammeBoite = emboiteCalcule(3, 0.001);
+cd(ancienBoite);
+assert(max(abs(parProgrammeBoite.signaux.sortie - avecBoite.signaux.sortie)) == 0, ...
+       'le programme engendre deplie le sous-systeme comme SIM');
+
+% Les bornes d'un sous-systeme sont les siennes, non celles du modele qui
+% l'abrege : LINMOD ne doit voir qu'une entree et une sortie, celles du
+% schema du dessus, quel que soit le nombre de bornes enfouies.
+integrateurEnBoite = new_system('integrateurEnBoite');
+integrateurEnBoite = add_block(integrateurEnBoite, 'inport', 'u', 'Port', 1);
+integrateurEnBoite = add_block(integrateurEnBoite, 'integrator', 'x');
+integrateurEnBoite = add_block(integrateurEnBoite, 'outport', 'y', 'Port', 1);
+integrateurEnBoite = add_line(add_line(integrateurEnBoite, 'u', 'x'), 'x', 'y');
+dessus = new_system('dessus');
+dessus = add_block(dessus, 'inport', 'u', 'Port', 1);
+dessus = add_block(dessus, 'subsystem', 'boite', 'Model', integrateurEnBoite);
+dessus = add_block(dessus, 'outport', 'y', 'Port', 1);
+dessus = add_line(add_line(dessus, 'u', 'boite', 1), 'boite', 'y');
+[Aboite, Bboite, Cboite, Dboite] = linmod(dessus);
+assert(isequal(size(Aboite), [1 1]) && isequal(size(Bboite), [1 1]) && ...
+       isequal(size(Cboite), [1 1]) && isequal(size(Dboite), [1 1]), ...
+       'un integrateur en boite reste un systeme du premier ordre, a une entree');
+assert(Aboite == 0 && Bboite == 1 && Cboite == 1 && Dboite == 0, ...
+       'et ce sont bien les matrices de l''integrateur');
+
+% Une entree du sous-systeme que rien n'alimente garde la valeur qu'elle
+% portait : c'est ce que SIM lui faisait deja rendre.
+boiteDetachee = new_system('boiteDetachee');
+boiteDetachee = add_block(boiteDetachee, 'inport', 'seul', 'Port', 1, 'Value', 6);
+boiteDetachee = add_block(boiteDetachee, 'outport', 'sortie', 'Port', 1);
+boiteDetachee = add_line(boiteDetachee, 'seul', 'sortie');
+autour = add_block(new_system('autour'), 'subsystem', 'b', 'Model', boiteDetachee);
+detachee = sim(autour, 0.02, 0.01);
+assert(all(detachee.signaux.b == 6), ...
+       'une entree que rien n''alimente rend la valeur qu''elle porte');
+
+% Le dessin : le bloc reste un bloc, et porte le nom du modele qu'il
+% abrege ; il a autant d'entrees que ce modele a de blocs INPORT.
+geoBoite = matlibre_sl_geometrie(emboite);
+assert(numel(geoBoite.blocs) == 4, 'le schema montre le sous-systeme, non son contenu');
+assert(strcmp(matlibre_sl_etiquette(emboite.blocs{3}), 'correcteurPI'));
+assert(numel(matlibre_sl_signes(essaiRang.blocs{3})) == 2, ...
+       'un sous-systeme a autant d''entrees qu''il abrege de blocs INPORT');
+
 disp('toolboxes : toutes les verifications passent');

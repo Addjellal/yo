@@ -54,6 +54,17 @@ function modele = add_block(modele, type, nom, varargin)
 %   terminator, display, toworkspace, fromworkspace, signalconversion,
 %   goto, from.
 %
+%   Un schéma dans un bloc :
+%     subsystem    Model                un modèle entier, abrégé en un bloc
+%
+%   Le sous-système porte le modèle qu'il abrège, bâti comme les autres
+%   par NEW_SYSTEM. Ses blocs INPORT sont ses entrées, dans l'ordre de
+%   leur paramètre Port, et son premier OUTPORT est sa sortie. SIM le
+%   déplie avant de simuler : le résultat est exactement celui du schéma
+%   écrit à plat, et le relevé porte à la fois le sous-système — la
+%   valeur de sa sortie — et chacun de ses blocs, sous le nom
+%   « sousSysteme/bloc ». Les sous-systèmes s'emboîtent.
+%
 %   Un type inconnu est refusé. Le laisser passer donnerait une
 %   simulation qui tourne et un résultat faux.
 %

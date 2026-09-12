@@ -57,6 +57,17 @@ function matlibre_sl_forme(bloc, x, y, largeur, hauteur)
             end
             patch(abscisses, ordonnees, remplissage, 'EdgeColor', contour);
             texte(x, y, matlibre_sl_etiquette(bloc));
+        case 'subsystem'
+            % Un rectangle a double trait. Simulink distingue ainsi ce
+            % qui s'ouvre de ce qui se calcule sur place : le second
+            % trait dit qu'il y a un schema dessous.
+            rectangle('Position', [x - largeur/2, y - hauteur/2, largeur, hauteur], ...
+                      'FaceColor', remplissage, 'EdgeColor', contour);
+            marge = min(largeur, hauteur) * 0.10;
+            rectangle('Position', [x - largeur/2 + marge, y - hauteur/2 + marge, ...
+                                   largeur - 2*marge, hauteur - 2*marge], ...
+                      'EdgeColor', contour);
+            texte(x, y, matlibre_sl_etiquette(bloc));
         otherwise
             rectangle('Position', [x - largeur/2, y - hauteur/2, largeur, hauteur], ...
                       'FaceColor', remplissage, 'EdgeColor', contour);

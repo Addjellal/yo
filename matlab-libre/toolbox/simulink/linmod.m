@@ -50,7 +50,7 @@ function [a, b, c, d] = linmod(modele, x, u, para)
     if numel(para) >= 3 && para(3) > 0
         perturbation = para(3);
     end
-    modele = matlibre_sl_modele(modele);
+    modele = matlibre_sl_aplatir(modele);
     refuserDerivateur(modele);
 
     [blocsEtat, rangs, entrees, sorties] = matlibre_sl_etats(modele);

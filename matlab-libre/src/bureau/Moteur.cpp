@@ -562,19 +562,41 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
         emit schemaSimulinkPret(schema);
         return;
     }
+    // Le nom peut porter un chemin — « asservi/correcteur » —, quand
+    // l'editeur est descendu dans un sous-systeme. La racine seule est
+    // une variable ; le reste se traverse.
+    const int barre = nom.indexOf(QLatin1Char('/'));
+    const QString racine = barre < 0 ? nom : nom.left(barre);
+    const QString chemin = barre < 0 ? QString() : nom.mid(barre + 1);
     Valeur modele;
     try {
-        modele = it_->lireVariable(nom.toStdString());
+        modele = it_->lireVariable(racine.toStdString());
     } catch (...) {
         schema.erreur =
-            QStringLiteral("« %1 » n'est plus dans l'espace de travail").arg(nom);
+            QStringLiteral("« %1 » n'est plus dans l'espace de travail").arg(racine);
         emit schemaSimulinkPret(schema);
         return;
     }
     if (!modele.estStructure() || !modele.aChamp("blocs")) {
-        schema.erreur = QStringLiteral("« %1 » n'est pas un modele").arg(nom);
+        schema.erreur = QStringLiteral("« %1 » n'est pas un modele").arg(racine);
         emit schemaSimulinkPret(schema);
         return;
+    }
+    if (!chemin.isEmpty()) {
+        try {
+            std::vector<Valeur> args = {modele, Valeur::texte(chemin.toStdString())};
+            auto sortie = it_->appeler("matlibre_sl_dedans", args, 1);
+            if (sortie.empty()) throw std::runtime_error("sous-systeme introuvable");
+            modele = sortie[0];
+        } catch (const std::exception& e) {
+            schema.erreur = QString::fromStdString(e.what());
+            emit schemaSimulinkPret(schema);
+            return;
+        } catch (...) {
+            schema.erreur = QStringLiteral("« %1 » ne s'ouvre pas").arg(nom);
+            emit schemaSimulinkPret(schema);
+            return;
+        }
     }
 
     Valeur geometrie;

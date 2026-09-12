@@ -39,6 +39,9 @@ ToileSimulink::ToileSimulink(QWidget* parent) : QWidget(parent) {
 
 int ToileSimulink::nombreEntrees(const QString& type, const QString& signes) {
     if (type == QLatin1String("sum")) return qMax(1, signes.size());
+    // Un sous-systeme a autant d'entrees qu'il abrege de blocs INPORT :
+    // le modele les compte, et les fait voyager dans la meme chaine.
+    if (type == QLatin1String("subsystem")) return qMax(1, signes.size());
     if (type == QLatin1String("switch")) return 3;
     if (type == QLatin1String("product") || type == QLatin1String("minmax") ||
         type == QLatin1String("logic") || type == QLatin1String("relational"))
@@ -592,7 +595,13 @@ void ToileSimulink::mouseMoveEvent(QMouseEvent* evenement) {
         const QPointF ecart = maintenant - saisiDepart_;
         for (int i = 0; i < choisis_.size() && i < saisiCadres_.size(); ++i)
             blocs_[choisis_[i]].cadre = saisiCadres_[i].translated(ecart);
-        deplacementFait_ = true;
+        // Seul un deplacement reel compte. Un clic qui ne bouge pas d'un
+        // pixel emettait pourtant sa POSITION : le modele etait recrit
+        // pour rien, la pile d'annulation grossissait d'un etat
+        // identique, et la commande qui suivait le clic se perdait, la
+        // console la refusant pendant ce calcul inutile.
+        if (!qFuzzyIsNull(ecart.x()) || !qFuzzyIsNull(ecart.y()))
+            deplacementFait_ = true;
         update();
         return;
     }

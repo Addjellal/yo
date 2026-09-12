@@ -94,6 +94,14 @@ const BlocBibliotheque blocs[] = {
     {"Discret", "discretestatespace", "Une représentation d'état échantillonnée",
      "'A', 0.5, 'B', 1, 'C', 1, 'D', 0, 'SampleTime', 0.1"},
 
+    // Un sous-système pose un modèle entier dans un bloc. Celui qu'on
+    // pose par défaut est le plus court qui serve à quelque chose : une
+    // entrée reliée à une sortie, qu'on garnit en l'ouvrant.
+    {"Sous-systèmes", "subsystem",
+     "Un schéma entier abrégé en un bloc ; un double-clic l'ouvre",
+     "'Model', add_line(add_block(add_block(new_system('sousSysteme'), "
+     "'inport', 'e', 'Port', 1), 'outport', 's', 'Port', 1), 'e', 's')"},
+
     {"Sorties", "outport", "La sortie du modèle, vue par LINMOD", "'Port', 1"},
     {"Sorties", "scope", "Un oscilloscope : le signal est relevé", ""},
     {"Sorties", "toworkspace", "Dépose le signal dans l'espace de travail",
@@ -251,14 +259,62 @@ void FenetreSimulink::envoyerModification(const QString& corps,
                                           const QString& annonce) {
     const QString modele = modeleChoisi();
     if (modele.isEmpty() || corps.isEmpty()) return;
-    emit commandeDemandee(
-        QStringLiteral("matlibre_sl_pile('poser', %1); %2").arg(modele, corps));
+    if (chemin_.isEmpty()) {
+        emit commandeDemandee(
+            QStringLiteral("matlibre_sl_pile('poser', %1); %2").arg(modele, corps));
+    } else {
+        // Dans un sous-systeme, le geste ne porte pas sur le modele mais
+        // sur celui qu'il abrite : on le sort, on le modifie, on le
+        // repose. Le tout tient en une ligne -- il le faut, la console
+        // refusant la seconde -- et Ctrl+Z le defait d'un coup, puisque
+        // c'est le modele entier qui est mis en reserve avant.
+        emit commandeDemandee(
+            QStringLiteral("matlibre_sl_pile('poser', %1); "
+                           "matlibre_sl_travail = matlibre_sl_dedans(%1, '%2'); %3 "
+                           "%1 = matlibre_sl_remplacer(%1, '%2', matlibre_sl_travail); "
+                           "clear matlibre_sl_travail;")
+                .arg(modele, chemin_, corps));
+    }
     poserEtat(annonce);
+}
+
+// La variable sur laquelle les gestes ecrivent. En surface, c'est le
+// modele lui-meme ; dans un sous-systeme, la variable de passage
+// qu'ENVOYERMODIFICATION sort et repose autour du geste.
+QString FenetreSimulink::cibleModele() const {
+    if (chemin_.isEmpty()) return modeleChoisi();
+    if (modeleChoisi().isEmpty()) return QString();
+    return QStringLiteral("matlibre_sl_travail");
+}
+
+// Le modele et le chemin reunis : « asservi » en surface,
+// « asservi/correcteur » une fois descendu. C'est ce que le moteur
+// attend, et ce que le schema rendu porte en retour.
+QString FenetreSimulink::ancreAffichee() const {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty() || chemin_.isEmpty()) return modele;
+    return modele + QLatin1Char('/') + chemin_;
+}
+
+void FenetreSimulink::remonter() {
+    if (chemin_.isEmpty()) return;
+    const int barre = chemin_.lastIndexOf(QLatin1Char('/'));
+    chemin_ = barre < 0 ? QString() : chemin_.left(barre);
+    majChemin();
+    const QString ancre = ancreAffichee();
+    if (!ancre.isEmpty()) emit schemaDemande(ancre);
+}
+
+void FenetreSimulink::surRemontee() { remonter(); }
+
+// Le bouton qui remonte n'a de sens qu'une fois descendu.
+void FenetreSimulink::majChemin() {
+    if (aRemonter_) aRemonter_->setEnabled(!chemin_.isEmpty());
 }
 
 void FenetreSimulink::surBlocsDeplaces(const QStringList& noms,
                                        const QVector<QRectF>& places) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty()) return;
     QStringList morceaux;
     for (int k = 0; k < noms.size() && k < places.size(); ++k)
@@ -278,7 +334,7 @@ void FenetreSimulink::surBlocsDeplaces(const QStringList& noms,
 
 void FenetreSimulink::surLienDemande(const QString& source, const QString& cible,
                                      int port) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty()) return;
     envoyerModification(QStringLiteral("%1 = add_line(%1, '%2', '%3', %4);")
                             .arg(modele, source, cible)
@@ -290,7 +346,7 @@ void FenetreSimulink::surLienDemande(const QString& source, const QString& cible
 }
 
 void FenetreSimulink::surBlocsSupprimes(const QStringList& noms) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty() || noms.isEmpty()) return;
     QStringList morceaux;
     for (const QString& nom : noms)
@@ -321,7 +377,7 @@ void FenetreSimulink::surRetablissement() {
 
 void FenetreSimulink::surLienSupprime(const QString& source, const QString& cible,
                                       int port) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty()) return;
     envoyerModification(QStringLiteral("%1 = delete_line(%1, '%2', '%3', %4);")
                             .arg(modele, source, cible)
@@ -331,12 +387,22 @@ void FenetreSimulink::surLienSupprime(const QString& source, const QString& cibl
 }
 
 void FenetreSimulink::surBlocOuvert(const QString& nom) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty()) return;
     const BlocSchema* bloc = nullptr;
     for (const BlocSchema& b : dernier_.blocs)
         if (b.nom == nom) bloc = &b;
     if (!bloc) return;
+    // Un sous-systeme ne se regle pas : il s'ouvre. C'est ce que fait
+    // Simulink, et c'est la seule facon de voir le schema qu'il abrege.
+    if (bloc->type == QLatin1String("subsystem")) {
+        chemin_ = chemin_.isEmpty() ? nom : chemin_ + QLatin1Char('/') + nom;
+        majChemin();
+        emit schemaDemande(ancreAffichee());
+        poserEtat(QStringLiteral("Ouvert « %1 ». « Remonter » ramene au schema "
+                                 "du dessus.").arg(ancreAffichee()));
+        return;
+    }
     DialogueBloc boite(bloc->nom, bloc->type, bloc->reglagesNoms,
                        bloc->reglagesValeurs, this);
     if (boite.exec() != QDialog::Accepted) return;
@@ -366,7 +432,7 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
 }
 
 void FenetreSimulink::surBlocDepose(const QPointF& place) {
-    const QString modele = modeleChoisi();
+    const QString modele = cibleModele();
     if (modele.isEmpty()) {
         poserEtat(QStringLiteral("Choisissez d'abord un modele, a droite."));
         return;
@@ -423,6 +489,12 @@ void FenetreSimulink::construireBarre() {
     connect(aProgramme_, &QAction::triggered, this, &FenetreSimulink::genererProgramme);
     barre->addSeparator();
 
+    aRemonter_ = barre->addAction(iconeDessinee(QStringLiteral("dossier-parent"), 20),
+                                  QStringLiteral("Remonter"));
+    aRemonter_->setToolTip(QStringLiteral(
+        "Revenir au schéma qui contient le sous-système ouvert"));
+    aRemonter_->setEnabled(false);
+    connect(aRemonter_, &QAction::triggered, this, &FenetreSimulink::surRemontee);
     aOuvrir_ = barre->addAction(iconeDessinee(QStringLiteral("simulink"), 20),
                                 QStringLiteral("Redessiner"));
     aOuvrir_->setToolTip(QStringLiteral("Retracer le schéma du modèle choisi"));
@@ -509,10 +581,17 @@ void FenetreSimulink::definirModeles(const QStringList& noms) {
     // console peut lui ajouter un bloc. On redemande son schéma, qui est
     // ainsi toujours celui de la valeur d'à présent.
     const QString courant = modeleChoisi();
+    // Si le modele affiche a change sous nos pieds -- efface de l'espace
+    // de travail, par exemple --, le chemin ouvert designait ses blocs :
+    // il n'a plus de sens dans celui qui prend sa place.
+    if (courant != choisi && !chemin_.isEmpty()) {
+        chemin_.clear();
+        majChemin();
+    }
     // Seulement si la fenêtre est ouverte : retracer un schéma après
     // chaque commande de la console coûterait un dessin à qui ne le
     // regarde pas.
-    if (!courant.isEmpty() && isVisible()) emit schemaDemande(courant);
+    if (!courant.isEmpty() && isVisible()) emit schemaDemande(ancreAffichee());
     if (courant.isEmpty()) {
         affiche_.clear();
         titreToile_->setText(QStringLiteral("Aucun schéma"));
@@ -521,7 +600,7 @@ void FenetreSimulink::definirModeles(const QStringList& noms) {
 }
 
 void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
-    if (schema.nom != modeleChoisi()) return;   // une réponse en retard
+    if (schema.nom != ancreAffichee()) return;   // une réponse en retard
     explorateur_->clear();
     if (!schema.erreur.isEmpty()) {
         titreToile_->setText(QStringLiteral("%1 — %2").arg(schema.nom, schema.erreur));
@@ -623,6 +702,10 @@ void FenetreSimulink::ajusterBoutons() {
 }
 
 void FenetreSimulink::surModeleChoisi() {
+    // Changer de modele ferme les sous-systemes ouverts : le chemin
+    // designait des blocs de l'ancien, et n'a plus de sens dans le neuf.
+    chemin_.clear();
+    majChemin();
     ajusterBoutons();
     const QString nom = modeleChoisi();
     if (!nom.isEmpty()) emit schemaDemande(nom);
@@ -640,8 +723,8 @@ void FenetreSimulink::insererBloc() {
 }
 
 void FenetreSimulink::ouvrirSchema() {
-    const QString nom = modeleChoisi();
-    if (!nom.isEmpty()) emit schemaDemande(nom);
+    const QString ancre = ancreAffichee();
+    if (!ancre.isEmpty()) emit schemaDemande(ancre);
 }
 
 void FenetreSimulink::simuler() {

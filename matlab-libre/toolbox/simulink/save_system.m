@@ -14,6 +14,10 @@ function fichier = save_system(modele, fichier)
 %   nombres et entre apostrophes pour le texte : ce qu'on relit est ce
 %   qu'on avait, à la représentation près.
 %
+%   Un sous-système porte tout un modèle en paramètre. Le fichier le
+%   bâtit d'abord, dans sa propre variable, puis le donne au bloc qui
+%   l'abrège : un schéma emboîté se relit donc comme un schéma plat.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'c', 'Value', 2);
@@ -53,35 +57,7 @@ function fichier = save_system(modele, fichier)
     lignes{end+1} = '%      numel(m.blocs) > 0';
     lignes{end+1} = '%';
     lignes{end+1} = '%   Voir aussi LOAD_SYSTEM, SAVE_SYSTEM, SIM.';
-    lignes{end+1} = sprintf('    m = new_system(%s);', citer(modele.nom));
-    for k = 1:numel(modele.blocs)
-        bloc = modele.blocs{k};
-        morceaux = {sprintf('    m = add_block(m, %s, %s', ...
-                            citer(bloc.type), citer(bloc.nom))};
-        champs = fieldnames(bloc.parametres);
-        for j = 1:numel(champs)
-            morceaux{end+1} = sprintf(', %s, %s', citer(champs{j}), ...
-                                      ecrireValeur(bloc.parametres.(champs{j}), ...
-                                                   bloc.nom, champs{j}));   %#ok<AGROW>
-        end
-        morceaux{end+1} = ');';   %#ok<AGROW>
-        lignes{end+1} = [morceaux{:}];   %#ok<AGROW>
-    end
-    if isfield(modele, 'parametres')
-        champs = fieldnames(modele.parametres);
-        for j = 1:numel(champs)
-            lignes{end+1} = sprintf('    m = add_param(m, %s, %s);', ...
-                                    citer(champs{j}), ...
-                                    ecrireValeur(modele.parametres.(champs{j}), ...
-                                                 modele.nom, champs{j}));   %#ok<AGROW>
-        end
-    end
-    for l = 1:size(modele.liens, 1)
-        lignes{end+1} = sprintf('    m = add_line(m, %s, %s, %d);', ...
-                                citer(modele.blocs{modele.liens(l, 1)}.nom), ...
-                                citer(modele.blocs{modele.liens(l, 2)}.nom), ...
-                                modele.liens(l, 3));   %#ok<AGROW>
-    end
+    [lignes, ~] = batir(modele, 'm', lignes, 0);
     lignes{end+1} = 'end';
 
     identifiantFichier = fopen(fichier, 'w');
@@ -93,6 +69,61 @@ function fichier = save_system(modele, fichier)
         fprintf(identifiantFichier, '%s\n', lignes{k});
     end
     fclose(identifiantFichier);
+end
+
+% Les lignes qui bâtissent un modèle dans la variable CIBLE. Un
+% sous-système est un modèle porté en paramètre : on le bâtit d'abord,
+% dans une variable à lui, et le bloc qui l'abrège la reçoit. COMPTEUR
+% donne à chacune un nom distinct, jusqu'au fond de l'emboîtement.
+function [lignes, compteur] = batir(modele, cible, lignes, compteur)
+    lignes{end+1} = sprintf('    %s = new_system(%s);', cible, citer(modele.nom));
+    for k = 1:numel(modele.blocs)
+        bloc = modele.blocs{k};
+        champs = fieldnames(bloc.parametres);
+        % Les modèles emboîtés d'abord : la variable doit exister avant
+        % la ligne qui la lit.
+        ecritures = cell(1, numel(champs));
+        for j = 1:numel(champs)
+            valeur = bloc.parametres.(champs{j});
+            if estModele(valeur)
+                compteur = compteur + 1;
+                dedans = sprintf('sous%d', compteur);
+                [lignes, compteur] = batir(valeur, dedans, lignes, compteur);
+                ecritures{j} = dedans;
+            else
+                ecritures{j} = ecrireValeur(valeur, bloc.nom, champs{j});
+            end
+        end
+        morceaux = {sprintf('    %s = add_block(%s, %s, %s', cible, cible, ...
+                            citer(bloc.type), citer(bloc.nom))};
+        for j = 1:numel(champs)
+            morceaux{end+1} = sprintf(', %s, %s', citer(champs{j}), ...
+                                      ecritures{j});   %#ok<AGROW>
+        end
+        morceaux{end+1} = ');';   %#ok<AGROW>
+        lignes{end+1} = [morceaux{:}];   %#ok<AGROW>
+    end
+    if isfield(modele, 'parametres')
+        champs = fieldnames(modele.parametres);
+        for j = 1:numel(champs)
+            lignes{end+1} = sprintf('    %s = add_param(%s, %s, %s);', ...
+                                    cible, cible, citer(champs{j}), ...
+                                    ecrireValeur(modele.parametres.(champs{j}), ...
+                                                 modele.nom, champs{j}));   %#ok<AGROW>
+        end
+    end
+    for l = 1:size(modele.liens, 1)
+        lignes{end+1} = sprintf('    %s = add_line(%s, %s, %s, %d);', ...
+                                cible, cible, ...
+                                citer(modele.blocs{modele.liens(l, 1)}.nom), ...
+                                citer(modele.blocs{modele.liens(l, 2)}.nom), ...
+                                modele.liens(l, 3));   %#ok<AGROW>
+    end
+end
+
+function oui = estModele(valeur)
+    oui = isstruct(valeur) && isscalar(valeur) && isfield(valeur, 'blocs') && ...
+          isfield(valeur, 'liens') && isfield(valeur, 'nom');
 end
 
 function texte = citer(valeur)

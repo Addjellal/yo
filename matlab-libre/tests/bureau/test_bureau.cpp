@@ -2070,6 +2070,111 @@ int main(int argc, char** argv) {
                     subsiste = true;
             verifier(!subsiste,
                      "efface de l'espace de travail, le modele quitte la liste");
+
+            // --- descendre dans un sous-systeme --------------------
+            //
+            // Un sous-systeme n'est pas un bloc qu'on regle : c'est un
+            // schema qu'on ouvre. Le double-clic y descend, la barre en
+            // remonte, et ce qu'on modifie dedans revient s'y poser --
+            // en une seule commande, sans quoi la console en perdrait
+            // la moitie.
+            envoyer(fenetre, QStringLiteral(
+                "sousBureau = add_block(new_system('sousBureau'), 'inport', 'e', "
+                "'Port', 1); "
+                "sousBureau = add_block(sousBureau, 'gain', 'interne', 'Gain', 2); "
+                "sousBureau = add_block(sousBureau, 'outport', 's', 'Port', 1); "
+                "sousBureau = add_line(add_line(sousBureau, 'e', 'interne'), "
+                "'interne', 's'); "
+                "modeleEmboite = add_block(new_system('modeleEmboite'), 'constant', "
+                "'source', 'Value', 4); "
+                "modeleEmboite = add_block(modeleEmboite, 'subsystem', 'boite', "
+                "'Model', sousBureau); "
+                "modeleEmboite = add_block(modeleEmboite, 'scope', 'oscillo'); "
+                "modeleEmboite = add_line(modeleEmboite, 'source', 'boite', 1); "
+                "modeleEmboite = add_line(modeleEmboite, 'boite', 'oscillo'); "
+                "clear sousBureau"));
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "le modele a sous-systeme est cree");
+            for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                if (simulink->listeModeles()->item(k)->text() ==
+                    QLatin1String("modeleEmboite"))
+                    simulink->listeModeles()->setCurrentRow(k);
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return simulink->modeleAffiche() ==
+                                    QLatin1String("modeleEmboite") &&
+                                compter(QStringLiteral("Blocs")) == 3;
+                     }, 20000),
+                     "la toile montre le sous-systeme comme un bloc, non son contenu");
+            verifier(simulink->cheminOuvert().isEmpty(),
+                     "et l'on est en surface");
+
+            // Le double-clic descend.
+            QMetaObject::invokeMethod(simulink, "surBlocOuvert",
+                                      Q_ARG(QString, QStringLiteral("boite")));
+            QCoreApplication::processEvents();
+            verifier(simulink->cheminOuvert() == QLatin1String("boite"),
+                     "un double-clic sur le sous-systeme y descend");
+            verifier(simulink->ancreAffichee() ==
+                         QLatin1String("modeleEmboite/boite"),
+                     "et le schema demande porte le chemin");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return simulink->modeleAffiche() ==
+                                    QLatin1String("modeleEmboite/boite") &&
+                                compter(QStringLiteral("Blocs")) == 3 &&
+                                compter(QStringLiteral("Liens")) == 2;
+                     }, 20000),
+                     "la toile porte le schema du dedans");
+            const QPointF viseInterne = viser(QStringLiteral("interne"));
+            verifier(!viseInterne.isNull(),
+                     "on y voit le bloc que le sous-systeme abrite");
+
+            // Ce qu'on modifie dedans revient s'y poser. Un clic sans
+            // deplacement choisit le bloc, « Suppr » le retire.
+            commandeVue.clear();
+            glisser(viseInterne, viseInterne);
+            verifier(toile->blocsChoisis() == QStringList{QStringLiteral("interne")},
+                     "un clic dedans choisit le bloc interieur");
+            verifier(commandeVue.isEmpty(),
+                     "et choisir n'ecrit rien : un clic qui ne deplace pas le bloc "
+                     "ne touche pas au modele");
+            {
+                QKeyEvent suppr(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+                QCoreApplication::sendEvent(toile, &suppr);
+                QCoreApplication::processEvents();
+            }
+            verifier(commandeVue.count(QLatin1String("matlibre_sl_travail")) >= 3 &&
+                         commandeVue.contains(
+                             QLatin1String("matlibre_sl_dedans(modeleEmboite, "
+                                           "'boite')")) &&
+                         commandeVue.contains(
+                             QLatin1String("matlibre_sl_remplacer(modeleEmboite, "
+                                           "'boite'")),
+                     "un geste dedans sort le sous-systeme, le modifie et le repose");
+            verifier(!commandeVue.contains(QLatin1Char('\n')),
+                     "et cela tient en une seule commande");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la commande passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Blocs")) == 2;
+                     }, 20000),
+                     "le bloc a bien disparu du sous-systeme");
+
+            // Et l'on remonte.
+            QMetaObject::invokeMethod(simulink, "surRemontee");
+            QCoreApplication::processEvents();
+            verifier(simulink->cheminOuvert().isEmpty(), "« Remonter » ramene en surface");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return simulink->modeleAffiche() ==
+                                    QLatin1String("modeleEmboite") &&
+                                compter(QStringLiteral("Blocs")) == 3;
+                     }, 20000),
+                     "et la toile reprend le schema du dessus, intact");
+            envoyer(fenetre, QStringLiteral("clear modeleEmboite"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est net");
         }
     }
 

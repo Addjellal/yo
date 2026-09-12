@@ -23,6 +23,12 @@ function resultat = sim(modele, tFinal, pas)
 %   résultat sans que le modèle ait bougé. Les blocs « toworkspace » et
 %   « fromworkspace » font l'échange dans les deux sens.
 %
+%   Un bloc « subsystem » porte tout un modèle : SIM le déplie avant de
+%   simuler, et rend exactement ce que rendrait le schéma écrit à plat.
+%   Le relevé porte alors les blocs intérieurs sous le nom
+%   « sousSysteme/bloc », et le sous-système lui-même porte la valeur de
+%   sa sortie.
+%
 %   SIM('NOM') accepte aussi le nom d'un modèle : une variable de
 %   l'espace de travail qui porte ce nom, ou un fichier NOM.m qui
 %   construit le modèle et le rend. Les modèles se décrivent ici en
@@ -114,6 +120,10 @@ function resultat = sim(modele, tFinal, pas)
     if ~isscalar(tFinal) || ~(tFinal >= 0)
         error('simulink:sim:duree', 'La duree doit etre un nombre positif.');
     end
+    % Un sous-systeme n'est pas un bloc : c'est le schema qu'il abrege.
+    % On le deplie ici, une fois pour toutes, et rien de ce qui suit n'a
+    % a savoir qu'il existait.
+    modele = matlibre_sl_aplatir(modele);
     n = numel(modele.blocs);
     instants = 0:pas:tFinal;
     nInstants = numel(instants);

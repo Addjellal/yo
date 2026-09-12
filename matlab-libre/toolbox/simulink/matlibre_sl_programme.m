@@ -38,7 +38,7 @@ function texte = matlibre_sl_programme(modele, nomFonction)
 %      ~isempty(strfind(p, 'function'))          % 1 : c'est une fonction
 %
 %   Voir aussi SAVE_SYSTEM, LOAD_SYSTEM, SIM, MATLIBRE_SL_ORDRE.
-    modele = matlibre_sl_modele(modele);
+    modele = matlibre_sl_aplatir(modele);
     if nargin < 2 || isempty(nomFonction)
         nomFonction = nomValide(modele.nom);
     end

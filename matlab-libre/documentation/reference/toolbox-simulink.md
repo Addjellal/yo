@@ -42,6 +42,14 @@
 %   retour : on ne remonte pas d'un calcul quelconque au schéma qui
 %   l'aurait produit. MATLIBRE_SL_ECRIRE le dépose dans un fichier.
 %
+% Un schéma dans un bloc
+%   Un bloc de type « subsystem » porte tout un modèle, bâti comme les
+%   autres. Ses blocs INPORT sont ses entrées, son premier OUTPORT sa
+%   sortie ; SIM le déplie avant de simuler, si bien qu'il rend
+%   exactement ce que rendrait le schéma écrit à plat. Le relevé porte
+%   ses blocs sous le nom « sousSysteme/bloc », et le sous-système
+%   lui-même porte la valeur de sa sortie. Ils s'emboîtent.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent
@@ -125,6 +133,17 @@ ADD_BLOCK Ajoute un bloc au modèle.
   Passe-plat, pour la lisibilité du schéma : scope, mux, demux,
   terminator, display, toworkspace, fromworkspace, signalconversion,
   goto, from.
+
+  Un schéma dans un bloc :
+    subsystem    Model                un modèle entier, abrégé en un bloc
+
+  Le sous-système porte le modèle qu'il abrège, bâti comme les autres
+  par NEW_SYSTEM. Ses blocs INPORT sont ses entrées, dans l'ordre de
+  leur paramètre Port, et son premier OUTPORT est sa sortie. SIM le
+  déplie avant de simuler : le résultat est exactement celui du schéma
+  écrit à plat, et le relevé porte à la fois le sous-système — la
+  valeur de sa sortie — et chacun de ses blocs, sous le nom
+  « sousSysteme/bloc ». Les sous-systèmes s'emboîtent.
 
   Un type inconnu est refusé. Le laisser passer donnerait une
   simulation qui tourne et un résultat faux.
@@ -613,6 +632,47 @@ MATLIBRE_SL_ALLURE Dessine dans le bloc l'allure de ce qu'il produit.
   Voir aussi MATLIBRE_SL_FORME, MATLIBRE_SL_ETIQUETTE.
 ```
 
+## `matlibre_sl_aplatir`
+
+```
+MATLIBRE_SL_APLATIR Déplie les sous-systèmes d'un modèle.
+  MODELE = MATLIBRE_SL_APLATIR(MODELE) rend le même modèle, où chaque
+  bloc de type « subsystem » a été remplacé par les blocs qu'il
+  contient. Un modèle sans sous-système est rendu tel quel.
+
+  C'est ainsi qu'un sous-système se simule : non pas comme un bloc à
+  part, mais comme le schéma qu'il abrège. SIM, LINMOD, TRIM et
+  MATLIBRE_SL_PROGRAMME appellent tous cette fonction d'abord, si bien
+  qu'aucun d'eux n'a besoin de savoir qu'un sous-système existe.
+
+  Le dépliage garde trois choses. Les blocs intérieurs prennent le nom
+  « sousSysteme/bloc », comme dans Simulink, et se retrouvent donc
+  nommés dans le relevé. Le bloc du sous-système lui-même ne
+  disparaît pas : il reste, en passe-plat, portant la valeur de son
+  premier OUTPORT — un relevé pris sur le sous-système reste donc
+  celui de sa sortie. Et les entrées se raccordent par leur rang : le
+  lien qui arrivait sur la deuxième entrée du bloc arrive sur le bloc
+  INPORT intérieur dont le paramètre Port vaut 2.
+
+  Les sous-systèmes s'emboîtent : un sous-système qui en contient un
+  autre est déplié jusqu'au bout.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     interne = new_system('doubleur');
+     interne = add_block(interne, 'inport', 'e', 'Port', 1);
+     interne = add_block(interne, 'gain', 'deux', 'Gain', 2);
+     interne = add_block(interne, 'outport', 's', 'Port', 1);
+     interne = add_line(add_line(interne, 'e', 'deux'), 'deux', 's');
+     m = add_block(new_system('dehors'), 'constant', 'un', 'Value', 3);
+     m = add_block(m, 'subsystem', 'boite', 'Model', interne);
+     m = add_line(m, 'un', 'boite');
+     numel(matlibre_sl_aplatir(m).blocs)      % 5 : un, boite, e, deux, s
+
+  Voir aussi SIM, ADD_BLOCK, MATLIBRE_SL_ORDRE.
+```
+
 ## `matlibre_sl_charger`
 
 ```
@@ -635,6 +695,30 @@ MATLIBRE_SL_CHARGER Relit un modèle et le dépose dans l'espace de travail.
      delete(chemin);
 
   Voir aussi LOAD_SYSTEM, SAVE_SYSTEM, OPEN_SYSTEM.
+```
+
+## `matlibre_sl_dedans`
+
+```
+MATLIBRE_SL_DEDANS Le modèle que porte un sous-système, au bout d'un chemin.
+  SOUS = MATLIBRE_SL_DEDANS(MODELE,CHEMIN) descend dans les
+  sous-systèmes que CHEMIN désigne — « boite » pour un seul niveau,
+  « boite/interne » pour deux — et rend le modèle trouvé au bout. Un
+  chemin vide rend le modèle lui-même.
+
+  C'est ainsi que l'éditeur du bureau ouvre un sous-système : il ne le
+  recopie pas, il le désigne. MATLIBRE_SL_REMPLACER fait le chemin
+  inverse, et repose dessous ce qu'on y a modifié.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     interne = add_block(new_system('dedans'), 'gain', 'k', 'Gain', 3);
+     m = add_block(new_system('dehors'), 'subsystem', 'boite', ...
+                   'Model', interne);
+     matlibre_sl_dedans(m, 'boite').nom          % 'dedans'
+
+  Voir aussi MATLIBRE_SL_REMPLACER, MATLIBRE_SL_APLATIR, ADD_BLOCK.
 ```
 
 ## `matlibre_sl_derivee`
@@ -1092,12 +1176,44 @@ MATLIBRE_SL_RANGS Range les blocs en couches, de la source vers la sortie.
   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_DISPOSITION.
 ```
 
+## `matlibre_sl_remplacer`
+
+```
+MATLIBRE_SL_REMPLACER Repose un modèle sous le sous-système d'où il vient.
+  MODELE = MATLIBRE_SL_REMPLACER(MODELE,CHEMIN,SOUS) rend MODELE où le
+  sous-système que CHEMIN désigne porte à présent SOUS. Le chemin
+  s'écrit « boite » pour un niveau, « boite/interne » pour deux ; un
+  chemin vide rend SOUS lui-même.
+
+  C'est le retour de MATLIBRE_SL_DEDANS. L'éditeur du bureau s'en sert
+  quand on modifie un bloc à l'intérieur d'un sous-système : il
+  descend, applique la modification, et repose le tout — en une seule
+  commande, si bien qu'un CTRL+Z la défait d'un coup.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     interne = add_block(new_system('dedans'), 'gain', 'k', 'Gain', 3);
+     m = add_block(new_system('dehors'), 'subsystem', 'boite', ...
+                   'Model', interne);
+     m = matlibre_sl_remplacer(m, 'boite', ...
+                               set_param(interne, 'k', 'Gain', 5));
+     get_param(matlibre_sl_dedans(m, 'boite'), 'k', 'Gain')     % 5
+
+  Voir aussi MATLIBRE_SL_DEDANS, MATLIBRE_SL_APLATIR, SET_PARAM.
+```
+
 ## `matlibre_sl_signes`
 
 ```
 MATLIBRE_SL_SIGNES Signes d'un bloc de sommation.
   SIGNES = MATLIBRE_SL_SIGNES(BLOC) rend la chaîne des signes, « ++ »
   par défaut : une sommation sans signe déclaré additionne.
+
+  C'est aussi par cette chaîne que le nombre d'entrées d'un bloc
+  voyage jusqu'à la toile de l'éditeur, qui compte ses caractères. Un
+  sous-système en rend donc autant qu'il abrège de blocs INPORT — sans
+  quoi ses liaisons arriveraient toutes au même point.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
@@ -1243,6 +1359,10 @@ SAVE_SYSTEM Enregistre un modèle dans un fichier .m qui le rebâtit.
   nombres et entre apostrophes pour le texte : ce qu'on relit est ce
   qu'on avait, à la représentation près.
 
+  Un sous-système porte tout un modèle en paramètre. Le fichier le
+  bâtit d'abord, dans sa propre variable, puis le donne au bloc qui
+  l'abrège : un schéma emboîté se relit donc comme un schéma plat.
+
   Exemple :
      m = new_system('boucle');
      m = add_block(m, 'constant', 'c', 'Value', 2);
@@ -1328,6 +1448,12 @@ SIM Simule un modèle à pas fixe.
   de travail de base : changer la variable et relancer SIM change le
   résultat sans que le modèle ait bougé. Les blocs « toworkspace » et
   « fromworkspace » font l'échange dans les deux sens.
+
+  Un bloc « subsystem » porte tout un modèle : SIM le déplie avant de
+  simuler, et rend exactement ce que rendrait le schéma écrit à plat.
+  Le relevé porte alors les blocs intérieurs sous le nom
+  « sousSysteme/bloc », et le sous-système lui-même porte la valeur de
+  sa sortie.
 
   SIM('NOM') accepte aussi le nom d'un modèle : une variable de
   l'espace de travail qui porte ce nom, ou un fichier NOM.m qui

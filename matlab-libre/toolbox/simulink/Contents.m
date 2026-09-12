@@ -39,6 +39,14 @@
 %   retour : on ne remonte pas d'un calcul quelconque au schéma qui
 %   l'aurait produit. MATLIBRE_SL_ECRIRE le dépose dans un fichier.
 %
+% Un schéma dans un bloc
+%   Un bloc de type « subsystem » porte tout un modèle, bâti comme les
+%   autres. Ses blocs INPORT sont ses entrées, son premier OUTPORT sa
+%   sortie ; SIM le déplie avant de simuler, si bien qu'il rend
+%   exactement ce que rendrait le schéma écrit à plat. Le relevé porte
+%   ses blocs sous le nom « sousSysteme/bloc », et le sous-système
+%   lui-même porte la valeur de sa sortie. Ils s'emboîtent.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent

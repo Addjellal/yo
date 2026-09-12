@@ -24,6 +24,7 @@ function [ordre, directe, memoire] = matlibre_sl_ordre(modele)
 %      matlibre_sl_ordre(m)             % [2 1] : la source avant le gain
 %
 %   Voir aussi SIM, MATLIBRE_SL_PROGRAMME.
+    modele = matlibre_sl_aplatir(modele);
     n = numel(modele.blocs);
     directe = true(1, n);
     memoire = false(1, n);

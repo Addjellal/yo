@@ -55,6 +55,18 @@ function texte = matlibre_sl_etiquette(bloc)
                 texte = lower(char(p.Operator));
             end
         case 'switch',     texte = 'u1 / u3';
+        case 'subsystem'
+            % Le nom du modele qu'il abrege, quand il en porte un :
+            % c'est ce qu'on veut lire avant de l'ouvrir.
+            texte = 'sous-systeme';
+            if isfield(p, 'Model') || isfield(p, 'Modele')
+                if isfield(p, 'Model'), dedans = p.Model; else, dedans = p.Modele; end
+                if isstruct(dedans) && isfield(dedans, 'nom')
+                    texte = char(dedans.nom);
+                elseif ischar(dedans) || isstring(dedans)
+                    texte = char(dedans);
+                end
+            end
         case 'pidcontroller', texte = 'PID';
         case 'discreteintegrator', texte = 'T/(z-1)';
         case 'discretestatespace', texte = 'A B C D (z)';

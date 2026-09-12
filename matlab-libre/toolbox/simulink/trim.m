@@ -31,7 +31,7 @@ function [x, u, y, dx] = trim(modele, x0, u0, y0, ix, iu, iy)
 %      abs(xe - 1) < 1e-8                   % l'equilibre de x' = u - x
 %
 %   Voir aussi LINMOD, DLINMOD, SIM, FSOLVE.
-    modele = matlibre_sl_modele(modele);
+    modele = matlibre_sl_aplatir(modele);
     [~, rangs, entrees, sorties] = matlibre_sl_etats(modele);
     nEtats = 0;
     for i = 1:numel(rangs)

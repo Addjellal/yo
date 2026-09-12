@@ -68,6 +68,13 @@ public:
     QLabel* description() const { return description_; }
     QString modeleChoisi() const;
     QString modeleAffiche() const { return affiche_; }
+    // Le chemin ouvert dans le modèle : vide en surface, « boite » ou
+    // « boite/interne » quand on est descendu dans un sous-système.
+    QString cheminOuvert() const { return chemin_; }
+    // Le modèle et le chemin réunis, tels que le moteur les attend.
+    QString ancreAffichee() const;
+    // Remonter d'un cran dans les sous-systèmes ouverts.
+    void remonter();
     // La ligne qu'insérerait « Insérer », pour le bloc choisi.
     QString ligneInsertion() const;
     // Le squelette d'un modèle neuf, tel que « Nouveau modèle » l'écrit.
@@ -107,6 +114,7 @@ private slots:
     void surRetablissement();
     void surLienSupprime(const QString& source, const QString& cible, int port);
     void surBlocOuvert(const QString& nom);
+    void surRemontee();
     void surBlocDepose(const QPointF& place);
     void ajusterVue();
 
@@ -116,6 +124,11 @@ private:
     // Toute modification part par ici : une seule ligne, precedee de la
     // mise en reserve de l etat courant pour Ctrl+Z.
     void envoyerModification(const QString& corps, const QString& annonce);
+    // La variable sur laquelle les gestes travaillent : le modèle
+    // lui-même en surface, une variable de passage dans un sous-système.
+    QString cibleModele() const;
+    // Le fil d'Ariane, et le bouton qui remonte.
+    void majChemin();
     void construireBarre();
     void ajusterBoutons();
     void poserEtat(const QString& texte);
@@ -134,6 +147,10 @@ private:
     QAction* aSimuler_ = nullptr;
     QAction* aEnregistrer_ = nullptr;
     QAction* aProgramme_ = nullptr;
+    QAction* aRemonter_ = nullptr;
+    // Le chemin des sous-systèmes ouverts, « boite/interne ». Vide en
+    // surface.
+    QString chemin_;
     // Le modèle dont la toile porte le schéma. Sert à savoir s'il faut le
     // redemander quand l'espace de travail change.
     QString affiche_;
