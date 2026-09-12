@@ -44,6 +44,7 @@
 #include "FenetreFigure.h"
 #include "FenetreProfileur.h"
 #include "FenetreSimulink.h"
+#include "ToileSimulink.h"
 #include "Icone.h"
 #include "Recherche.h"
 #include "Ruban.h"
@@ -1581,8 +1582,8 @@ int main(int argc, char** argv) {
                                 QLatin1String("modeleDuBureau");
                      }, 20000),
                      "et la toile porte son schema");
-            verifier(simulink->toile()->numero() != 0,
-                     "la figure du schema est bien arrivee jusqu'a la toile");
+            verifier(simulink->toile()->modele() == QLatin1String("modeleDuBureau"),
+                     "la toile porte bien ce modele");
 
             // L'explorateur nomme les blocs et les liens du modele.
             auto compter = [&](const QString& rubrique) {
@@ -1637,6 +1638,134 @@ int main(int argc, char** argv) {
                      }, 20000),
                      "l'editeur suit : cinq blocs, cinq liens, dont la contre-reaction");
 
+            // --- les gestes sur la toile ---------------------------
+            //
+            // C'est ce qui separe un editeur d'une image : on prend un
+            // bloc, on le deplace, on tire un fil, on efface. Chaque
+            // geste devient une commande sur le modele, si bien qu'une
+            // modification a la souris se relit au clavier.
+            // Ce que la fenetre demande a la console : chaque geste doit
+            // s'y retrouver, sans quoi la souris et le clavier ne
+            // travailleraient pas sur le meme modele.
+            QString commandeVue;
+            QObject::connect(simulink, &FenetreSimulink::commandeDemandee,
+                             [&commandeVue](const QString& c) { commandeVue = c; });
+            ToileSimulink* toile = simulink->toile();
+            simulink->resize(1180, 780);
+            QCoreApplication::processEvents();
+            toile->ajusterVue();
+            QCoreApplication::processEvents();
+
+            verifier(ToileSimulink::nombreEntrees(QStringLiteral("sum"),
+                                                  QStringLiteral("+-+")) == 3,
+                     "une sommation a autant d'entrees que de signes");
+            verifier(ToileSimulink::nombreEntrees(QStringLiteral("gain"),
+                                                  QString()) == 1,
+                     "un gain n'en a qu'une");
+            verifier(ToileSimulink::nombreEntrees(QStringLiteral("step"),
+                                                  QString()) == 0,
+                     "et une source aucune : un fil ne s'y raccroche pas");
+
+            auto viser = [&](const QString& nom) {
+                return toile->cadreEcranDe(nom).center();
+            };
+            auto glisser = [&](QPointF depuis, QPointF vers) {
+                QMouseEvent presse(QEvent::MouseButtonPress, depuis,
+                                   toile->mapToGlobal(depuis), Qt::LeftButton,
+                                   Qt::LeftButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(toile, &presse);
+                QMouseEvent bouge(QEvent::MouseMove, vers, toile->mapToGlobal(vers),
+                                  Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(toile, &bouge);
+                QMouseEvent lache(QEvent::MouseButtonRelease, vers,
+                                  toile->mapToGlobal(vers), Qt::LeftButton,
+                                  Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(toile, &lache);
+                QCoreApplication::processEvents();
+            };
+
+            // Deplacer un bloc : sa place part dans le modele, et le
+            // schema revient avec elle.
+            const QPointF avantDeplacement = viser(QStringLiteral("correcteur"));
+            verifier(!avantDeplacement.isNull(),
+                     "la toile sait ou se trouve chaque bloc");
+            commandeVue.clear();
+            glisser(avantDeplacement, avantDeplacement + QPointF(0, 90));
+            verifier(commandeVue.contains(QLatin1String("set_param")) &&
+                         commandeVue.contains(QLatin1String("'Position'")),
+                     "deplacer un bloc pose sa POSITION dans le modele");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la commande de deplacement passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         const QPointF apres = viser(QStringLiteral("correcteur"));
+                         return !apres.isNull() && apres.y() > avantDeplacement.y() + 20;
+                     }, 20000),
+                     "et le bloc reste ou on l'a laisse");
+
+            // Tirer un fil : depuis le bord droit d'un bloc jusqu'a un
+            // autre. Le port vise depend de l'endroit ou l'on lache.
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = add_block(modeleDuBureau, 'gain', 'ajout', "
+                "'Gain', 1, 'Position', [2 4 3.7 5]);"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "un bloc de plus");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return !toile->cadreEcranDe(QStringLiteral("ajout")).isNull();
+                     }, 20000),
+                     "il parait sur la toile");
+            const QRectF cadreSortie = toile->cadreEcranDe(QStringLiteral("sortie"));
+            commandeVue.clear();
+            glisser(QPointF(cadreSortie.right() - 2, cadreSortie.center().y()),
+                    viser(QStringLiteral("ajout")));
+            verifier(commandeVue.contains(QLatin1String("add_line")) &&
+                         commandeVue.contains(QLatin1String("'ajout'")),
+                     "tirer depuis le bord droit cable les deux blocs");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "le cablage passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Liens")) == 6;
+                     }, 20000),
+                     "et le lien de plus est dans le modele");
+
+            // Un fil ne se raccroche pas a une source : elle n'a pas
+            // d'entree, et le dire vaut mieux que poser un lien mort.
+            const QRectF cadreAjout = toile->cadreEcranDe(QStringLiteral("ajout"));
+            commandeVue.clear();
+            glisser(QPointF(cadreAjout.right() - 2, cadreAjout.center().y()),
+                    viser(QStringLiteral("consigne")));
+            verifier(commandeVue.isEmpty(),
+                     "un fil vers une source est refuse, non pose");
+
+            // « Suppr » sur le bloc choisi l'enleve, avec ses liens.
+            QMouseEvent choix(QEvent::MouseButtonPress, viser(QStringLiteral("ajout")),
+                              toile->mapToGlobal(viser(QStringLiteral("ajout"))),
+                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(toile, &choix);
+            QMouseEvent relache(QEvent::MouseButtonRelease,
+                                viser(QStringLiteral("ajout")),
+                                toile->mapToGlobal(viser(QStringLiteral("ajout"))),
+                                Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(toile, &relache);
+            QCoreApplication::processEvents();
+            verifier(toile->blocChoisi() == QLatin1String("ajout"),
+                     "un clic choisit le bloc");
+            commandeVue.clear();
+            QKeyEvent suppr(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+            QCoreApplication::sendEvent(toile, &suppr);
+            QCoreApplication::processEvents();
+            verifier(commandeVue.contains(QLatin1String("delete_block")),
+                     "« Suppr » retire le bloc choisi");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la suppression passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Blocs")) == 5 &&
+                                compter(QStringLiteral("Liens")) == 5;
+                     }, 20000),
+                     "et le modele revient a cinq blocs et cinq liens");
+
             // Une capture de la fenetre Simulink, pour qu'un humain puisse
             // regarder ce qui a ete construit.
             if (const char* capture = std::getenv("MATLIBRE_CAPTURE")) {
@@ -1658,9 +1787,6 @@ int main(int argc, char** argv) {
 
             // « Simuler » et « Enregistrer » passent par la console, et le
             // releve reste dans l'espace de travail.
-            QString commandeVue;
-            QObject::connect(simulink, &FenetreSimulink::commandeDemandee,
-                             [&commandeVue](const QString& c) { commandeVue = c; });
             QMetaObject::invokeMethod(simulink, "simuler");
             QCoreApplication::processEvents();
             verifier(commandeVue.startsWith(

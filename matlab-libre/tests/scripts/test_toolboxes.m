@@ -1155,4 +1155,90 @@ catch err
 end
 assert(refusForme);
 
+%% ------------------------------ SIMULINK : LA GEOMETRIE DU SCHEMA
+% Une seule mise en place sert au trace et a l'editeur du bureau : sans
+% cela, un bloc deplace a la souris se serait retrouve ailleurs dans la
+% figure.
+geoModele = new_system('geometrie');
+geoModele = add_block(geoModele, 'step', 'entree', 'Time', 0, 'After', 1);
+geoModele = add_block(geoModele, 'sum', 'somme', 'Signs', '+-');
+geoModele = add_block(geoModele, 'gain', 'gainG', 'Gain', 3);
+geoModele = add_block(geoModele, 'integrator', 'etat');
+geoModele = add_line(geoModele, 'entree', 'somme', 1);
+geoModele = add_line(geoModele, 'etat', 'somme', 2);
+geoModele = add_line(geoModele, 'somme', 'gainG');
+geoModele = add_line(geoModele, 'gainG', 'etat');
+
+geo = matlibre_sl_geometrie(geoModele);
+assert(numel(geo.blocs) == 4 && numel(geo.liens) == 4);
+assert(strcmp(geo.blocs(1).nom, 'entree') && strcmp(geo.blocs(1).type, 'step'));
+assert(strcmp(geo.blocs(3).etiquette, '3'), 'l''etiquette est celle du reglage');
+assert(strcmp(geo.blocs(2).signes, '+-'));
+% Les couches vont de la gauche vers la droite.
+assert(geo.blocs(2).gauche > geo.blocs(1).droite);
+assert(geo.blocs(3).gauche > geo.blocs(2).droite);
+% Une sommation est ronde : son cadre est carre.
+assert(abs((geo.blocs(2).droite - geo.blocs(2).gauche) - ...
+           (geo.blocs(2).bas - geo.blocs(2).haut)) < 1e-12);
+% Le lien qui referme la boucle est mis a part.
+assert(geo.liens(2).retour && ~geo.liens(1).retour);
+assert(geo.liens(2).source == 4 && geo.liens(2).cible == 2 && geo.liens(2).port == 2);
+assert(~any([geo.blocs.pose]), 'sans POSITION, la place est calculee');
+
+% POSITION fixe la place, et c'est ce qui retient un schema deplace.
+geoPose = set_param(geoModele, 'gainG', 'Position', [12 3 14 4]);
+geoDeux = matlibre_sl_geometrie(geoPose);
+assert(geoDeux.blocs(3).pose && geoDeux.blocs(3).gauche == 12);
+assert(geoDeux.blocs(3).droite == 14 && geoDeux.blocs(3).bas == 4);
+assert(~geoDeux.blocs(1).pose, 'les autres restent places par le calcul');
+
+% Et le trace suit : la figure montre le bloc a l'endroit demande, non a
+% celui que le rangement en couches lui aurait donne.
+figure;
+open_system(geoPose);
+dessinPose = matlibre_svg();
+assert(~isempty(strfind(dessinPose, 'gainG')));
+close all;
+
+% Un modele sans bloc ne fait pas d'erreur : il n'a rien a placer.
+assert(isempty(matlibre_sl_geometrie(new_system('vide')).blocs));
+refuseGeo = false;
+try
+    matlibre_sl_geometrie(42);
+catch err
+    refuseGeo = strcmp(err.identifier, 'Simulink:geometrie:Modele');
+end
+assert(refuseGeo);
+
+% Le fil contourne quand la cible n'est pas devant la source. Un bloc
+% deplace derriere celui qui l'alimente est le cas courant des lors qu'on
+% deplace a la souris ; une liaison directe reviendrait sur ses pas, et
+% la pointe de fleche pointerait a l'envers.
+figure;
+hold on;
+matlibre_sl_fil([5 0], [1 0], false, -3);
+% La pointe de fleche est un patch, que FINDOBJ range encore parmi les
+% lignes : c'est le trace qui a le plus de points.
+[xArriere, yArriere] = matlibre_trace_etendu(gca);
+close all;
+assert(min(yArriere) <= -3 + 1e-9, ...
+       'le fil descend dans le couloir plutot que de revenir sur ses pas');
+assert(abs(xArriere(end) - 1) < 1e-9 && abs(yArriere(end) - 0) < 1e-9, ...
+       'et il aboutit bien a l''entree visee');
+assert(xArriere(end - 1) < xArriere(end), ...
+       'en y entrant par la gauche : c''est ce qui donne son sens a la fleche');
+
+% Devant, il va tout droit : aucun detour par le couloir.
+figure;
+hold on;
+matlibre_sl_fil([1 0], [5 0], false, -3);
+[xDevant, yDevant] = matlibre_trace_etendu(gca);
+close all;
+assert(min(yDevant) > -0.5, ...
+       'devant la source, le fil ne descend pas dans le couloir');
+assert(abs(min(xDevant) - 1) < 1e-9 && abs(max(xDevant) - 5) < 1e-9, ...
+       'il joint bien les deux bouts');
+assert(numel(xArriere) > numel(xDevant), ...
+       'et le contournement demande plus de segments que la ligne droite');
+
 disp('toolboxes : toutes les verifications passent');

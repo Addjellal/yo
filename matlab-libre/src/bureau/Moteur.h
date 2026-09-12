@@ -79,16 +79,31 @@ struct FigureCopiee {
     matlibre::Figure figure;
 };
 
-// Un schéma-bloc prêt à peindre, avec de quoi remplir l'explorateur du
-// modèle : la figure que trace OPEN_SYSTEM, la liste des blocs et celle
-// des liens. Le tout est relevé dans le fil de calcul, en une fois, pour
-// que l'éditeur n'ait pas à interroger l'interpréteur bloc par bloc.
+// Un bloc tel que la toile de l'éditeur le dessine : ce qu'il est, ce
+// qu'il affiche, et le cadre qu'il occupe. Le cadre est en unités du
+// schéma, l'ordonnée vers le bas — la convention de Simulink pour
+// POSITION, qui est aussi celle des écrans.
+struct BlocSchema {
+    QString nom, type, etiquette, signes;
+    double gauche = 0, haut = 0, droite = 0, bas = 0;
+    bool pose = false;    // vrai quand POSITION fixait la place
+};
+
+struct LienSchema {
+    int source = 0, cible = 0, port = 1;   // rangs dans blocs, à partir de 1
+    bool retour = false;                   // il referme une boucle
+};
+
+// La géométrie d'un schéma, relevée en une fois dans le fil de calcul :
+// l'éditeur la peint, y cherche ce qu'on a cliqué, et en remplit son
+// explorateur. C'est celle de MATLIBRE_SL_GEOMETRIE, la même dont
+// OPEN_SYSTEM tire sa figure.
 struct SchemaSimulink {
     QString nom;
-    FigureCopiee figure;
-    QStringList blocs;    // « nom — type »
-    QStringList liens;    // « source -> destination (entrée n) »
-    QString erreur;       // vide quand le schéma s'est tracé
+    QVector<BlocSchema> blocs;
+    QVector<LienSchema> liens;
+    double hauteurType = 1.0;   // hauteur d'un bloc par défaut
+    QString erreur;             // vide quand le schéma s'est relevé
     bool trouve = false;
 };
 

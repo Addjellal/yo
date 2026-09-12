@@ -33,7 +33,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 
 ## Toolboxes
 
-2963 fonctions ecrites dans le langage, reparties en 54 toolboxes.
+2965 fonctions ecrites dans le langage, reparties en 54 toolboxes.
 
 | Toolbox | Fonctions |
 |---|---|
@@ -70,7 +70,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`lidar`](reference/toolbox-lidar.md) | 4 |
 | [`maToolbox`](reference/toolbox-maToolbox.md) | 0 |
 | [`maintenance-predictive`](reference/toolbox-maintenance-predictive.md) | 4 |
-| [`matlab`](reference/toolbox-matlab.md) | 457 |
+| [`matlab`](reference/toolbox-matlab.md) | 458 |
 | [`mpc`](reference/toolbox-mpc.md) | 3 |
 | [`navigation`](reference/toolbox-navigation.md) | 5 |
 | [`ondelettes`](reference/toolbox-ondelettes.md) | 129 |
@@ -84,7 +84,7 @@ Genere par `outils/genererReference.m`. Ne pas modifier a la main.
 | [`robuste`](reference/toolbox-robuste.md) | 93 |
 | [`signal`](reference/toolbox-signal.md) | 208 |
 | [`simscape`](reference/toolbox-simscape.md) | 9 |
-| [`simulink`](reference/toolbox-simulink.md) | 43 |
+| [`simulink`](reference/toolbox-simulink.md) | 44 |
 | [`stateflow`](reference/toolbox-stateflow.md) | 4 |
 | [`statistiques`](reference/toolbox-statistiques.md) | 293 |
 | [`symbolique`](reference/toolbox-symbolique.md) | 70 |

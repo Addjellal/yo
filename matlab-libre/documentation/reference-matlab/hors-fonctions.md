@@ -20,6 +20,15 @@ comblerait. Ils sont classés par ce qu'ils coûtent à l'utilisateur.
 - **Scripts vivants `.mlx`**. Le format est une archive OPC ; l'éditeur
   ne les ouvre pas.
 
+### Graphique
+
+- **La classe d'une poignée de tracé**. Un `patch` se déclare `Type =
+  'line'` et de classe `Line` : `findobj(gca,'Type','patch')` ne rend donc
+  rien. La classe est fixée à la création de la poignée, avant que le
+  genre du tracé ne soit connu ; la corriger demande de la faire suivre,
+  et de reprendre ce qui distingue une poignée de série des autres. Le
+  défaut est réel et connu ; il n'est pas corrigé.
+
 ### Langage
 
 - **Dossiers `private/`** : les fonctions privées d'un dossier ne sont pas

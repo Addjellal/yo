@@ -8,6 +8,7 @@
 #include <QEvent>
 #include <QResizeEvent>
 #include <QHBoxLayout>
+#include <QAbstractItemView>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -23,7 +24,7 @@
 
 #include "Ruban.h"
 #include "Theme.h"
-#include "VueFigure.h"
+#include "ToileSimulink.h"
 
 namespace {
 
@@ -143,27 +144,10 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
 
     auto* cadre = new QFrame;
     cadre->setFrameShape(QFrame::StyledPanel);
-    // La toile est centrée dans son cadre et gardée aux proportions du
-    // schéma : les ressorts autour d'elle absorbent ce qui reste.
     auto* dansCadre = new QVBoxLayout(cadre);
-    dansCadre->setContentsMargins(2, 2, 2, 2);
-    // La zone n'a pas de mise en page : la toile y est posée à la main,
-    // aux proportions du schéma. Passer par un ressort et une taille
-    // maximale faisait le contraire de ce qu'on voulait — la contrainte
-    // rétrécissait la zone, qui rétrécissait la contrainte.
-    zoneToile_ = new QWidget;
-    zoneToile_->setMinimumSize(200, 150);
-    // Le fond de la zone est celui de la toile : un schéma en long ne
-    // remplit pas un cadre carré, et une bordure grise autour ferait
-    // croire à un défaut plutôt qu'à de la marge.
-    zoneToile_->setAutoFillBackground(true);
-    QPalette fond = zoneToile_->palette();
-    fond.setColor(QPalette::Window, Qt::white);
-    zoneToile_->setPalette(fond);
-    zoneToile_->installEventFilter(this);
-    dansCadre->addWidget(zoneToile_, 1);
-    toile_ = new VueFigure(zoneToile_);
-    toile_->setGeometry(0, 0, 200, 150);
+    dansCadre->setContentsMargins(1, 1, 1, 1);
+    toile_ = new ToileSimulink;
+    dansCadre->addWidget(toile_);
     colonne->addWidget(cadre, 1);
     setCentralWidget(centre);
 
@@ -177,6 +161,10 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
     bibliotheque_->setHeaderLabels({QStringLiteral("Bloc"), QStringLiteral("Ce qu'il fait")});
     bibliotheque_->header()->setStretchLastSection(true);
     bibliotheque_->setColumnWidth(0, 190);
+    // On traîne un bloc de la bibliothèque jusqu'à la feuille, comme dans
+    // Simulink ; à défaut, « Insérer » écrit sa ligne dans l'éditeur.
+    bibliotheque_->setDragEnabled(true);
+    bibliotheque_->setDragDropMode(QAbstractItemView::DragOnly);
     colonneGauche->addWidget(bibliotheque_, 1);
     description_ = new QLabel;
     description_->setWordWrap(true);
@@ -225,6 +213,118 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
             [this](int) { surModeleChoisi(); });
     connect(modeles_, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem*) { ouvrirSchema(); });
+
+    // Les gestes de la toile deviennent des commandes sur le modele : c'est
+    // ce qui fait qu'une modification a la souris se relit au clavier, et
+    // que l'espace de travail reste le seul etat.
+    connect(toile_, &ToileSimulink::blocDeplace, this,
+            &FenetreSimulink::surBlocDeplace);
+    connect(toile_, &ToileSimulink::lienDemande, this,
+            &FenetreSimulink::surLienDemande);
+    connect(toile_, &ToileSimulink::blocSupprime, this,
+            &FenetreSimulink::surBlocSupprime);
+    connect(toile_, &ToileSimulink::lienSupprime, this,
+            &FenetreSimulink::surLienSupprime);
+    connect(toile_, &ToileSimulink::blocOuvert, this, &FenetreSimulink::surBlocOuvert);
+    connect(toile_, &ToileSimulink::blocDepose, this, &FenetreSimulink::surBlocDepose);
+    connect(toile_, &ToileSimulink::etatChange, this, &FenetreSimulink::poserEtat);
+}
+
+// Un nombre tel qu'un programme le relira : assez de chiffres pour que la
+// place retrouvee soit la place posee.
+static QString ecrireNombre(double v) {
+    return QString::number(v, 'g', 12);
+}
+
+void FenetreSimulink::surBlocDeplace(const QString& nom, const QRectF& place) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    emit commandeDemandee(QStringLiteral("%1 = set_param(%1, '%2', 'Position', "
+                                         "[%3 %4 %5 %6]);")
+                              .arg(modele, nom, ecrireNombre(place.left()),
+                                   ecrireNombre(place.top()),
+                                   ecrireNombre(place.right()),
+                                   ecrireNombre(place.bottom())));
+    poserEtat(QStringLiteral("« %1 » deplace ; sa place est enregistree dans le "
+                             "modele.").arg(nom));
+}
+
+void FenetreSimulink::surLienDemande(const QString& source, const QString& cible,
+                                     int port) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    emit commandeDemandee(QStringLiteral("%1 = add_line(%1, '%2', '%3', %4);")
+                              .arg(modele, source, cible)
+                              .arg(port));
+    poserEtat(QStringLiteral("« %1 » alimente l'entree %2 de « %3 ».")
+                  .arg(source)
+                  .arg(port)
+                  .arg(cible));
+}
+
+void FenetreSimulink::surBlocSupprime(const QString& nom) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    emit commandeDemandee(QStringLiteral("%1 = delete_block(%1, '%2');")
+                              .arg(modele, nom));
+    poserEtat(QStringLiteral("« %1 » retire, avec les liens qui y touchaient.")
+                  .arg(nom));
+}
+
+void FenetreSimulink::surLienSupprime(const QString& source, const QString& cible,
+                                      int port) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    emit commandeDemandee(QStringLiteral("%1 = delete_line(%1, '%2', '%3', %4);")
+                              .arg(modele, source, cible)
+                              .arg(port));
+    poserEtat(QStringLiteral("Le lien de « %1 » vers « %2 » est retire.")
+                  .arg(source, cible));
+}
+
+void FenetreSimulink::surBlocOuvert(const QString& nom) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    // Il n'y a pas de boite de dialogue par bloc : les reglages se lisent
+    // et se posent au clavier, et c'est la ligne a completer qu'on ecrit
+    // dans l'editeur plutot que d'inventer un formulaire par type.
+    emit insertionDemandee(QStringLiteral("%1 = set_param(%1, '%2', 'Nom', valeur);")
+                               .arg(modele, nom));
+    emit commandeDemandee(QStringLiteral("get_param(%1, '%2')").arg(modele, nom));
+    poserEtat(QStringLiteral("Les reglages de « %1 » sont affiches ; la ligne pour "
+                             "les changer vous attend dans l'editeur.").arg(nom));
+}
+
+void FenetreSimulink::surBlocDepose(const QPointF& place) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) {
+        poserEtat(QStringLiteral("Choisissez d'abord un modele, a droite."));
+        return;
+    }
+    QTreeWidgetItem* item = bibliotheque_->currentItem();
+    const QString type = item ? item->data(0, Qt::UserRole).toString() : QString();
+    if (type.isEmpty()) {
+        poserEtat(QStringLiteral("Choisissez un bloc dans la bibliotheque avant de "
+                                 "le poser."));
+        return;
+    }
+    const QString parametres = item->data(1, Qt::UserRole).toString();
+    const QString nom = QStringLiteral("%1%2").arg(type).arg(++poses_);
+    // Un bloc pose garde la place ou on l'a lache : c'est POSITION qui la
+    // retient, et le schema ne se replace donc plus tout seul.
+    const double demiL = type == QLatin1String("sum") ? 0.5 : 0.85;
+    QString ligne = QStringLiteral("%1 = add_block(%1, '%2', '%3'").arg(modele, type, nom);
+    if (!parametres.isEmpty()) ligne += QStringLiteral(", ") + parametres;
+    ligne += QStringLiteral(", 'Position', [%1 %2 %3 %4]);")
+                 .arg(ecrireNombre(place.x() - demiL), ecrireNombre(place.y() - 0.5),
+                      ecrireNombre(place.x() + demiL), ecrireNombre(place.y() + 0.5));
+    emit commandeDemandee(ligne);
+    poserEtat(QStringLiteral("« %1 » pose sur la feuille.").arg(nom));
+}
+
+void FenetreSimulink::ajusterVue() {
+    toile_->ajusterVue();
+    toile_->update();
 }
 
 void FenetreSimulink::construireBarre() {
@@ -259,6 +359,17 @@ void FenetreSimulink::construireBarre() {
     duree_->setToolTip(QStringLiteral("Instant final de la simulation, en secondes"));
     barre->addWidget(duree_);
     barre->addWidget(new QLabel(QStringLiteral(" s  ")));
+    barre->addSeparator();
+
+    QAction* aAjuster = barre->addAction(QStringLiteral("Ajuster"));
+    aAjuster->setToolTip(QStringLiteral("Ramener tout le schéma dans la vue"));
+    connect(aAjuster, &QAction::triggered, this, &FenetreSimulink::ajusterVue);
+    QAction* aPlus = barre->addAction(QStringLiteral("+"));
+    aPlus->setToolTip(QStringLiteral("Agrandir"));
+    connect(aPlus, &QAction::triggered, this, [this] { toile_->zoomer(1.25); });
+    QAction* aMoins = barre->addAction(QStringLiteral("−"));
+    aMoins->setToolTip(QStringLiteral("Réduire"));
+    connect(aMoins, &QAction::triggered, this, [this] { toile_->zoomer(1 / 1.25); });
     barre->addSeparator();
 
     QAction* aBibliotheque = barre->addAction(QStringLiteral("Bibliothèque"));
@@ -335,14 +446,12 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
     explorateur_->clear();
     if (!schema.erreur.isEmpty()) {
         titreToile_->setText(QStringLiteral("%1 — %2").arg(schema.nom, schema.erreur));
+        toile_->vider();
         poserEtat(schema.erreur);
         return;
     }
     affiche_ = schema.nom;
-    if (schema.figure.figure.hauteur > 0)
-        aspect_ = double(schema.figure.figure.largeur) / schema.figure.figure.hauteur;
-    toile_->definirFigure(schema.figure);
-    ajusterToile();
+    toile_->definirSchema(schema);
     titreToile_->setText(QStringLiteral("%1 — %2 bloc(s), %3 lien(s)")
                              .arg(schema.nom)
                              .arg(schema.blocs.size())
@@ -352,14 +461,25 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
     QFont grasse = rubriqueBlocs->font(0);
     grasse.setBold(true);
     rubriqueBlocs->setFont(0, grasse);
-    for (const QString& b : schema.blocs)
-        (new QTreeWidgetItem(rubriqueBlocs))->setText(0, b);
+    for (const BlocSchema& b : schema.blocs)
+        (new QTreeWidgetItem(rubriqueBlocs))
+            ->setText(0, QStringLiteral("%1 — %2").arg(b.nom, b.type));
     rubriqueBlocs->setExpanded(true);
     auto* rubriqueLiens = new QTreeWidgetItem(explorateur_);
     rubriqueLiens->setText(0, QStringLiteral("Liens (%1)").arg(schema.liens.size()));
     rubriqueLiens->setFont(0, grasse);
-    for (const QString& l : schema.liens)
-        (new QTreeWidgetItem(rubriqueLiens))->setText(0, l);
+    for (const LienSchema& l : schema.liens) {
+        const QString source = (l.source >= 1 && l.source <= schema.blocs.size())
+                                   ? schema.blocs[l.source - 1].nom
+                                   : QStringLiteral("?");
+        const QString cible = (l.cible >= 1 && l.cible <= schema.blocs.size())
+                                  ? schema.blocs[l.cible - 1].nom
+                                  : QStringLiteral("?");
+        (new QTreeWidgetItem(rubriqueLiens))
+            ->setText(0, QStringLiteral("%1 → %2 (entrée %3)")
+                             .arg(source, cible)
+                             .arg(l.port));
+    }
     rubriqueLiens->setExpanded(true);
     poserEtat(QStringLiteral("Schéma de « %1 » à jour.").arg(schema.nom));
 }
@@ -425,30 +545,6 @@ void FenetreSimulink::surModeleChoisi() {
     ajusterBoutons();
     const QString nom = modeleChoisi();
     if (!nom.isEmpty()) emit schemaDemande(nom);
-}
-
-bool FenetreSimulink::eventFilter(QObject* objet, QEvent* evenement) {
-    if (objet == zoneToile_ && evenement->type() == QEvent::Resize) ajusterToile();
-    return QMainWindow::eventFilter(objet, evenement);
-}
-
-void FenetreSimulink::ajusterToile() {
-    if (!toile_ || !zoneToile_) return;
-    const int disponibleL = zoneToile_->width();
-    const int disponibleH = zoneToile_->height();
-    if (disponibleL < 40 || disponibleH < 40) return;
-    if (!(aspect_ > 0)) {
-        toile_->setGeometry(0, 0, disponibleL, disponibleH);
-        return;
-    }
-    int largeur = disponibleL;
-    int hauteur = int(largeur / aspect_);
-    if (hauteur > disponibleH) {
-        hauteur = disponibleH;
-        largeur = int(hauteur * aspect_);
-    }
-    toile_->setGeometry((disponibleL - largeur) / 2, (disponibleH - hauteur) / 2,
-                        largeur, hauteur);
 }
 
 void FenetreSimulink::poserEtat(const QString& texte) {

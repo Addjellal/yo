@@ -5837,6 +5837,28 @@ MATLIBRE_THRIFT_ZIGZAG Entier signé ramené aux entiers positifs.
   Voir aussi MATLIBRE_THRIFT_VARINT, MATLIBRE_THRIFT_DEZIGZAG.
 ```
 
+## `matlibre_trace_etendu`
+
+```
+MATLIBRE_TRACE_ETENDU Le tracé d'un axe qui couvre le plus de terrain.
+  [X,Y] = MATLIBRE_TRACE_ETENDU(AXE) rend les coordonnées du tracé dont
+  le cadre est le plus grand. Sans argument, il prend l'axe courant.
+
+  Cela sert à examiner un tracé sans dépendre de l'ordre dans lequel
+  FINDOBJ rend les objets, ni de ce que d'autres tracés — une pointe de
+  flèche, un repère — auraient ajouté à côté. Le nombre de points ne
+  suffirait pas : une pointe de flèche en a trois, une liaison droite
+  deux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure; plot([0 10], [0 0]); hold on; plot([1 2], [0 1]);
+     max(matlibre_trace_etendu(gca))            % 10
+
+  Voir aussi FINDOBJ, GET, LINE.
+```
+
 ## `matlibre_tri_aretes`
 
 ```

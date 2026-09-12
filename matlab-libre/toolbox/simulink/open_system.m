@@ -46,9 +46,12 @@ function h = open_system(modele)
                'public, ne se lisent pas.']);
     end
 
-    [rangs, retours] = matlibre_sl_rangs(modele);
-    [x, y, largeur, hauteur] = matlibre_sl_disposition(modele, rangs);
-    n = numel(modele.blocs);
+    % Une seule mise en place, partagée avec l'éditeur du bureau : c'est
+    % ainsi qu'un bloc déplacé à la souris se retrouve au même endroit
+    % dans la figure.
+    geometrie = matlibre_sl_geometrie(modele);
+    n = numel(geometrie.blocs);
+    hauteur = geometrie.hauteur;
 
     % Les bornes du schéma se connaissent avant de tracer, et c'est ce
     % qui permet de tailler la toile à sa mesure. Sur une toile fixe,
@@ -57,13 +60,22 @@ function h = open_system(modele)
     % se multipliaient : la même largeur pour deux blocs et pour douze.
     marge = 0.9;
     nbRetours = 0;
-    if ~isempty(retours)
-        nbRetours = size(retours, 1);
+    for k = 1:numel(geometrie.liens)
+        if geometrie.liens(k).retour
+            nbRetours = nbRetours + 1;
+        end
     end
     if n > 0
-        basSchema = min([y, 0]) - hauteur * 1.4 - max(0, nbRetours - 1) * hauteur * 0.7;
-        bornesX = [min(x) - largeur / 2 - marge, max(x) + largeur / 2 + marge];
-        bornesY = [basSchema - marge, max(y) + hauteur / 2 + marge];
+        gauches = [geometrie.blocs.gauche];
+        droites = [geometrie.blocs.droite];
+        hauts = [geometrie.blocs.haut];
+        bas = [geometrie.blocs.bas];
+        % Le tracé a l'ordonnée vers le haut, la géométrie vers le bas.
+        centresY = -(hauts + bas) / 2;
+        basSchema = min([centresY, 0]) - hauteur * 1.4 - ...
+                    max(0, nbRetours - 1) * hauteur * 0.7;
+        bornesX = [min(gauches) - marge, max(droites) + marge];
+        bornesY = [basSchema - marge, max(centresY) + hauteur / 2 + marge];
     else
         bornesX = [-1, 1];
         bornesY = [-1, 1];
@@ -72,33 +84,33 @@ function h = open_system(modele)
     figure('Position', [100, 100, toileL, toileH]);
     hold on;
     for k = 1:n
-        matlibre_sl_forme(modele.blocs{k}, x(k), y(k), largeur, hauteur);
+        b = geometrie.blocs(k);
+        matlibre_sl_forme(modele.blocs{k}, (b.gauche + b.droite) / 2, ...
+                          -(b.haut + b.bas) / 2, b.droite - b.gauche, ...
+                          b.bas - b.haut);
     end
 
-    if ~isempty(modele.liens)
+    if n > 0 && ~isempty(geometrie.liens)
         % Chaque retour a sa propre profondeur : à la même hauteur, deux
         % contre-réactions se confondraient en un seul trait, et l'on ne
         % saurait plus laquelle va où.
-        bas = min([y, 0]) - hauteur * 1.4;
+        basRetours = min([-(hauts + bas) / 2, 0]) - hauteur * 1.4;
         profondeur = hauteur * 0.7;
         rangRetour = 0;
-        for k = 1:size(modele.liens, 1)
-            source = modele.liens(k, 1);
-            cible = modele.liens(k, 2);
-            port = modele.liens(k, 3);
-            estRetour = ~isempty(retours) && ...
-                any(retours(:, 1) == source & retours(:, 2) == cible & ...
-                    retours(:, 3) == port);
-            depart = [x(source) + demiLargeur(modele.blocs{source}, largeur, hauteur), ...
-                      y(source)];
-            arrivee = [x(cible) - demiLargeur(modele.blocs{cible}, largeur, hauteur), ...
-                       y(cible) + decalagePort(modele.blocs{cible}, port, hauteur)];
-            niveau = bas;
-            if estRetour
-                niveau = bas - rangRetour * profondeur;
+        for k = 1:numel(geometrie.liens)
+            lien = geometrie.liens(k);
+            source = geometrie.blocs(lien.source);
+            cible = geometrie.blocs(lien.cible);
+            depart = [source.droite, -(source.haut + source.bas) / 2];
+            arrivee = [cible.gauche, ...
+                       -(cible.haut + cible.bas) / 2 + ...
+                       decalagePort(cible, lien.port)];
+            niveau = basRetours;
+            if lien.retour
+                niveau = basRetours - rangRetour * profondeur;
                 rangRetour = rangRetour + 1;
             end
-            matlibre_sl_fil(depart, arrivee, estRetour, niveau);
+            matlibre_sl_fil(depart, arrivee, lien.retour, niveau);
         end
     end
 
@@ -120,16 +132,7 @@ function h = open_system(modele)
     end
 end
 
-function d = demiLargeur(bloc, largeur, hauteur)
-% Une sommation est ronde : son bord est plus près du centre.
-    if strcmp(bloc.type, 'sum')
-        d = hauteur / 2;
-    else
-        d = largeur / 2;
-    end
-end
-
-function d = decalagePort(bloc, port, hauteur)
+function d = decalagePort(bloc, port)
 % Les entrées d'une sommation se répartissent sur son bord gauche, dans
 % l'ordre des signes : sans cela, deux liaisons arriveraient au même
 % point et l'on ne saurait plus laquelle est retranchée.
@@ -137,9 +140,10 @@ function d = decalagePort(bloc, port, hauteur)
     if ~strcmp(bloc.type, 'sum')
         return
     end
-    signes = matlibre_sl_signes(bloc);
+    signes = bloc.signes;
     if numel(signes) < 2 || port < 1 || port > numel(signes)
         return
     end
+    hauteur = bloc.bas - bloc.haut;
     d = hauteur * (0.28 - 0.56 * (port - 1) / (numel(signes) - 1));
 end

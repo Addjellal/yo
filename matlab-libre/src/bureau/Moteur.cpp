@@ -3,6 +3,7 @@
 
 #include <QCoreApplication>
 #include <algorithm>
+#include <stdexcept>
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -549,10 +550,10 @@ void Moteur::demanderAide(const QString& nom) {
     emit aidePrete(fiche);
 }
 
-// Le schema d'un modele, trace dans une figure qui ne survit pas a
-// l'appel. La liste des blocs et des liens est relevee dans la foulee :
-// l'editeur la montre a cote de la toile, et une seule traversee du fil
-// suffit a tout obtenir.
+// La geometrie d'un schema : ou se place chaque bloc, et par ou passe
+// chaque lien. C'est MATLIBRE_SL_GEOMETRIE qui la calcule — la meme que
+// celle dont OPEN_SYSTEM tire sa figure —, si bien que la toile de
+// l'editeur et la figure montrent la meme chose.
 void Moteur::demanderSchemaSimulink(const QString& nom) {
     SchemaSimulink schema;
     schema.nom = nom;
@@ -565,8 +566,8 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
     try {
         modele = it_->lireVariable(nom.toStdString());
     } catch (...) {
-        schema.erreur = QStringLiteral("« %1 » n'est plus dans l'espace de travail")
-                            .arg(nom);
+        schema.erreur =
+            QStringLiteral("« %1 » n'est plus dans l'espace de travail").arg(nom);
         emit schemaSimulinkPret(schema);
         return;
     }
@@ -575,64 +576,55 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
         emit schemaSimulinkPret(schema);
         return;
     }
-    schema.trouve = true;
 
-    // L'inventaire du modele, lu directement dans la valeur.
-    Valeur blocs = modele.champ("blocs");
-    std::vector<QString> nomsBlocs;
-    for (std::size_t k = 0; k < blocs.cellules.size(); ++k) {
-        const Valeur& b = blocs.cellules[k];
-        QString nomBloc = b.aChamp("nom")
-                              ? QString::fromStdString(b.champ("nom").versTexte())
-                              : QStringLiteral("?");
-        QString typeBloc = b.aChamp("type")
-                               ? QString::fromStdString(b.champ("type").versTexte())
-                               : QStringLiteral("?");
-        nomsBlocs.push_back(nomBloc);
-        schema.blocs << QStringLiteral("%1 — %2").arg(nomBloc, typeBloc);
-    }
-    Valeur liens = modele.champ("liens");
-    int nLiens = liens.nlignes();
-    for (int l = 0; l < nLiens; ++l) {
-        auto nomDe = [&](int rang) {
-            return (rang >= 1 && rang <= (int)nomsBlocs.size())
-                       ? nomsBlocs[rang - 1]
-                       : QStringLiteral("?");
-        };
-        int source = (int)liens.re[l];
-        int cible = (int)liens.re[l + nLiens];
-        int entree = liens.ncolonnes() >= 3 ? (int)liens.re[l + 2 * nLiens] : 1;
-        schema.liens << QStringLiteral("%1 → %2 (entrée %3)")
-                            .arg(nomDe(source), nomDe(cible))
-                            .arg(entree);
-    }
-
-    // Le trace. La figure qu'OPEN_SYSTEM cree est recopiee puis retiree :
-    // sans cela, le bureau ouvrirait une fenetre de figure par-dessus
-    // l'editeur, ce qui est justement ce qu'on veut eviter.
-    std::vector<int> avant;
-    for (const auto& kv : it_->figures) avant.push_back(kv.first);
+    Valeur geometrie;
     try {
         std::vector<Valeur> args = {modele};
-        it_->appeler("open_system", args, 0);
+        auto sortie = it_->appeler("matlibre_sl_geometrie", args, 1);
+        if (sortie.empty()) throw std::runtime_error("aucune geometrie rendue");
+        geometrie = sortie[0];
     } catch (const std::exception& e) {
         schema.erreur = QString::fromStdString(e.what());
+        emit schemaSimulinkPret(schema);
+        return;
     } catch (...) {
-        schema.erreur = QStringLiteral("le schema n'a pas pu etre trace");
+        schema.erreur = QStringLiteral("le schema n'a pas pu etre place");
+        emit schemaSimulinkPret(schema);
+        return;
     }
-    int neuve = 0;
-    for (const auto& kv : it_->figures)
-        if (std::find(avant.begin(), avant.end(), kv.first) == avant.end()) neuve = kv.first;
-    if (neuve && it_->figures[neuve]) {
-        schema.figure.numero = neuve;
-        schema.figure.contenu = true;
-        schema.figure.figure = *it_->figures[neuve];
-        schema.figure.figure.axes.clear();
-        for (const auto& a : it_->figures[neuve]->axes)
-            schema.figure.figure.axes.push_back(a ? std::make_shared<Axes>(*a) : nullptr);
-        it_->figures.erase(neuve);
-        if (!it_->figures.count(it_->figureCourante))
-            it_->figureCourante = it_->figures.empty() ? 0 : it_->figures.begin()->first;
+    schema.trouve = true;
+    if (geometrie.aChamp("hauteur")) schema.hauteurType = geometrie.champ("hauteur").scal();
+
+    if (geometrie.aChamp("blocs")) {
+        Valeur blocs = geometrie.champ("blocs");
+        // Un tableau de structures : chaque champ porte autant de valeurs
+        // qu'il y a de blocs, et « champ(nom, k) » en donne la k-ieme.
+        std::size_t nBlocs = blocs.nelem();
+        for (std::size_t k = 0; k < nBlocs; ++k) {
+            BlocSchema b;
+            b.nom = QString::fromStdString(blocs.champ("nom", k).versTexte());
+            b.type = QString::fromStdString(blocs.champ("type", k).versTexte());
+            b.etiquette = QString::fromStdString(blocs.champ("etiquette", k).versTexte());
+            b.signes = QString::fromStdString(blocs.champ("signes", k).versTexte());
+            b.gauche = blocs.champ("gauche", k).scal();
+            b.haut = blocs.champ("haut", k).scal();
+            b.droite = blocs.champ("droite", k).scal();
+            b.bas = blocs.champ("bas", k).scal();
+            b.pose = blocs.champ("pose", k).scal() != 0.0;
+            schema.blocs.push_back(b);
+        }
+    }
+    if (geometrie.aChamp("liens")) {
+        Valeur liens = geometrie.champ("liens");
+        std::size_t nLiens = liens.nelem();
+        for (std::size_t k = 0; k < nLiens; ++k) {
+            LienSchema l;
+            l.source = (int)liens.champ("source", k).scal();
+            l.cible = (int)liens.champ("cible", k).scal();
+            l.port = (int)liens.champ("port", k).scal();
+            l.retour = liens.champ("retour", k).scal() != 0.0;
+            schema.liens.push_back(l);
+        }
     }
     emit schemaSimulinkPret(schema);
 }

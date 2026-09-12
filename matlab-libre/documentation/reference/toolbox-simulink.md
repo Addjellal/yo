@@ -124,6 +124,12 @@ ADD_BLOCK Ajoute un bloc au modèle.
   modèle n'est qu'une liste de blocs et d'arcs, dont SIM tire l'ordre de
   calcul.
 
+  Tout bloc accepte en outre POSITION, [gauche haut droite bas] comme
+  dans Simulink : il garde alors la place qu'on lui donne, au lieu
+  d'être rangé par couches. C'est ainsi qu'un schéma déplacé à la
+  souris dans l'éditeur du bureau se retient — l'ordonnée y descend,
+  comme sur un écran.
+
   Un paramètre numérique donné entre apostrophes est une expression,
   évaluée dans l'espace de travail de base au moment où l'on simule —
   comme dans Simulink. C'est ainsi qu'un modèle et un programme
@@ -739,6 +745,11 @@ MATLIBRE_SL_FIL Trace une liaison entre deux blocs, à angles droits.
   gauche, puis remonte. Tracée en ligne droite, elle passerait au
   travers des blocs qu'elle enjambe.
 
+  Le contournement sert aussi quand la cible n'est pas devant la
+  source, retour ou non : un bloc déplacé à la souris peut se retrouver
+  derrière celui qui l'alimente, et une liaison directe reviendrait
+  alors sur ses pas, la pointe de flèche pointant à l'envers.
+
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 
   Exemple :
@@ -767,6 +778,45 @@ MATLIBRE_SL_FORME Dessine un bloc, selon ce qu'il fait.
                               'parametres', struct('Gain', 3)), 0, 0, 1.7, 1);
 
   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_FIL.
+```
+
+## `matlibre_sl_geometrie`
+
+```
+MATLIBRE_SL_GEOMETRIE Où se place chaque bloc, et par où passe chaque lien.
+  G = MATLIBRE_SL_GEOMETRIE(MODELE) rend une structure décrivant le
+  schéma : pour chaque bloc son nom, son type, son étiquette, ses signes
+  et son cadre ; pour chaque lien ses deux bouts, son port d'arrivée et
+  s'il referme une boucle.
+
+  C'est la géométrie que partagent les deux façons de montrer un
+  schéma : OPEN_SYSTEM la trace dans une figure, l'éditeur du bureau la
+  peint sur sa toile et s'en sert pour savoir où l'on a cliqué. Une
+  seule mise en place, donc, et deux dessins qui s'accordent.
+
+  Un bloc qui porte un paramètre POSITION garde la place qu'on lui a
+  donnée — c'est ainsi qu'un schéma déplacé à la souris se retient.
+  POSITION vaut [gauche haut droite bas], comme dans Simulink. Les
+  autres sont placés par couches, de la source vers la sortie.
+
+  Les champs rendus :
+    G.blocs(k).nom, .type, .etiquette, .signes
+    G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
+    G.blocs(k).pose                            vrai si POSITION le fixait
+    G.liens(k).source, .cible, .port, .retour
+    G.largeur, G.hauteur                       la taille d'un bloc par défaut
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('c');
+     m = add_block(m, 'constant', 'u', 'Value', 1);
+     m = add_block(m, 'gain', 'k', 'Gain', 2);
+     m = add_line(m, 'u', 'k');
+     g = matlibre_sl_geometrie(m);
+     g.blocs(2).gauche > g.blocs(1).gauche      % le gain est a droite
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_DISPOSITION, MATLIBRE_SL_RANGS.
 ```
 
 ## `matlibre_sl_indice`

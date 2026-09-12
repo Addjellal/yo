@@ -17,6 +17,8 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QPointF>
+#include <QRectF>
 #include <QString>
 #include <QStringList>
 
@@ -30,7 +32,7 @@ class QDockWidget;
 class QPushButton;
 class QTreeWidget;
 class QTreeWidgetItem;
-class VueFigure;
+class ToileSimulink;
 
 // Un bloc de la bibliothèque : sa famille, son type, ce qu'il fait, et
 // les paramètres qu'ADD_BLOCK lui reconnaît.
@@ -61,7 +63,7 @@ public:
     QTreeWidget* bibliotheque() const { return bibliotheque_; }
     QListWidget* listeModeles() const { return modeles_; }
     QTreeWidget* explorateur() const { return explorateur_; }
-    VueFigure* toile() const { return toile_; }
+    ToileSimulink* toile() const { return toile_; }
     QLabel* description() const { return description_; }
     QString modeleChoisi() const;
     QString modeleAffiche() const { return affiche_; }
@@ -88,19 +90,18 @@ private slots:
     void enregistrerModele();
     void montrerBloc();
     void surModeleChoisi();
+    // Les gestes de la toile, traduits en commandes sur le modele.
+    void surBlocDeplace(const QString& nom, const QRectF& place);
+    void surLienDemande(const QString& source, const QString& cible, int port);
+    void surBlocSupprime(const QString& nom);
+    void surLienSupprime(const QString& source, const QString& cible, int port);
+    void surBlocOuvert(const QString& nom);
+    void surBlocDepose(const QPointF& place);
+    void ajusterVue();
 
-protected:
-    // La zone de dessin prévient de ses changements de taille : c'est elle
-    // qui commande le placement de la toile, non la fenêtre — dont le
-    // redimensionnement précède la mise en page de ses enfants.
-    bool eventFilter(QObject* objet, QEvent* evenement) override;
 
 private:
     void construireBibliotheque();
-    // Donne à la toile les proportions du schéma : sans cela « axis equal »
-    // ajuste l'échelle au côté le plus contraint et laisse le reste en
-    // blanc — un schéma en long se retrouvait en bandeau au milieu.
-    void ajusterToile();
     void construireBarre();
     void ajusterBoutons();
     void poserEtat(const QString& texte);
@@ -108,11 +109,10 @@ private:
     QTreeWidget* bibliotheque_;
     QListWidget* modeles_;
     QTreeWidget* explorateur_;
-    VueFigure* toile_;
+    ToileSimulink* toile_;
     QLabel* description_;
     QLabel* etatModeles_;
     QLabel* titreToile_;
-    QWidget* zoneToile_;
     QLineEdit* duree_;
     QDockWidget* dockBibliotheque_;
     QPushButton* bInserer_;
@@ -122,7 +122,7 @@ private:
     // Le modèle dont la toile porte le schéma. Sert à savoir s'il faut le
     // redemander quand l'espace de travail change.
     QString affiche_;
-    // Largeur sur hauteur du schéma affiché, telle qu'OPEN_SYSTEM l'a
-    // voulue. Zéro tant qu'aucun schéma n'est peint.
-    double aspect_ = 0.0;
+    // Le compte des blocs posés depuis la bibliothèque : de quoi donner
+    // un nom neuf à chacun sans écraser le précédent.
+    int poses_ = 0;
 };

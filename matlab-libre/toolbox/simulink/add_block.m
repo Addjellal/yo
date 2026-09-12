@@ -61,6 +61,12 @@ function modele = add_block(modele, type, nom, varargin)
 %   modèle n'est qu'une liste de blocs et d'arcs, dont SIM tire l'ordre de
 %   calcul.
 %
+%   Tout bloc accepte en outre POSITION, [gauche haut droite bas] comme
+%   dans Simulink : il garde alors la place qu'on lui donne, au lieu
+%   d'être rangé par couches. C'est ainsi qu'un schéma déplacé à la
+%   souris dans l'éditeur du bureau se retient — l'ordonnée y descend,
+%   comme sur un écran.
+%
 %   Un paramètre numérique donné entre apostrophes est une expression,
 %   évaluée dans l'espace de travail de base au moment où l'on simule —
 %   comme dans Simulink. C'est ainsi qu'un modèle et un programme
