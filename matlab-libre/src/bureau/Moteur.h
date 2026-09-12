@@ -79,6 +79,19 @@ struct FigureCopiee {
     matlibre::Figure figure;
 };
 
+// Un schéma-bloc prêt à peindre, avec de quoi remplir l'explorateur du
+// modèle : la figure que trace OPEN_SYSTEM, la liste des blocs et celle
+// des liens. Le tout est relevé dans le fil de calcul, en une fois, pour
+// que l'éditeur n'ait pas à interroger l'interpréteur bloc par bloc.
+struct SchemaSimulink {
+    QString nom;
+    FigureCopiee figure;
+    QStringList blocs;    // « nom — type »
+    QStringList liens;    // « source -> destination (entrée n) »
+    QString erreur;       // vide quand le schéma s'est tracé
+    bool trouve = false;
+};
+
 class Moteur : public QObject {
     Q_OBJECT
 
@@ -119,6 +132,10 @@ public slots:
     // de calcul répond par un signal, sans jamais bloquer la fenêtre.
     void demanderAide(const QString& nom);
     void demanderIndexAide();
+    // L'éditeur Simulink demande le schéma d'un modèle : le fil de
+    // calcul le trace, le recopie, puis efface la figure — le schéma
+    // appartient à l'éditeur, non à la liste des fenêtres de figures.
+    void demanderSchemaSimulink(const QString& nom);
 
     // --- débogueur ------------------------------------------------------
     //
@@ -152,6 +169,7 @@ signals:
     // liste, qui se met ainsi a jour comme l'espace de travail — les deux
     // cotes partagent les memes variables, il n'y a pas deux etats a tenir.
     void modelesSimulinkChanges(const QStringList& noms);
+    void schemaSimulinkPret(const SchemaSimulink& schema);
     void effacementDemande();   // « clc »
     void aidePrete(const FicheAide& fiche);
     void indexAidePret(const QVector<EntreeIndexAide>& entrees);

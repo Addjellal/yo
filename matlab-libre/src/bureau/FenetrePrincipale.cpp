@@ -125,6 +125,8 @@ FenetrePrincipale::FenetrePrincipale() {
             &FenetrePrincipale::surEspaceTravail);
     connect(moteur_, &Moteur::modelesSimulinkChanges, this,
             &FenetrePrincipale::surModelesSimulink);
+    connect(moteur_, &Moteur::schemaSimulinkPret, this,
+            &FenetrePrincipale::surSchemaSimulink);
     connect(moteur_, &Moteur::figuresChangees, this, &FenetrePrincipale::surFigures);
     connect(moteur_, &Moteur::dossierChange, this, &FenetrePrincipale::surDossier);
     connect(moteur_, &Moteur::nomsConnus, this,
@@ -862,6 +864,8 @@ FenetreSimulink* FenetrePrincipale::fenetreSimulink() {
                 &FenetrePrincipale::insererLigne);
         connect(simulink_, &FenetreSimulink::nouveauModeleDemande, this,
                 &FenetrePrincipale::nouveauModeleSimulink);
+        connect(simulink_, &FenetreSimulink::schemaDemande, this,
+                &FenetrePrincipale::demanderSchemaSimulink);
         // La fenetre peut naitre apres que le moteur a publie sa liste :
         // on lui donne ce qu'on a retenu, sinon elle s'ouvrirait vide sur
         // un espace de travail qui, lui, porte deja des modeles.
@@ -878,6 +882,16 @@ void FenetrePrincipale::montrerSimulink() {
 void FenetrePrincipale::surModelesSimulink(const QStringList& noms) {
     modelesSimulink_ = noms;
     if (simulink_) simulink_->definirModeles(noms);
+}
+
+// L'editeur veut le schema d'un modele : c'est le fil de calcul qui le
+// trace, puisque c'est lui qui tient l'interpreteur.
+void FenetrePrincipale::demanderSchemaSimulink(const QString& nom) {
+    versMoteur([this, nom] { moteur_->demanderSchemaSimulink(nom); });
+}
+
+void FenetrePrincipale::surSchemaSimulink(const SchemaSimulink& schema) {
+    if (simulink_) simulink_->definirSchema(schema);
 }
 
 // Une ligne venue de la bibliotheque de blocs. Elle va dans l'editeur —

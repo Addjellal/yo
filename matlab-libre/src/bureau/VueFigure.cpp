@@ -351,9 +351,17 @@ void VueFigure::peindreAxes(QPainter& peintre, const Axes& axes, const QRectF& c
                 for (std::size_t k = 1; k < n; ++k)
                     chemin.lineTo(versEcranX(serie.x[k]), versEcranY(serie.y[k]));
                 chemin.closeSubpath();
+                // Le remplissage suit « FaceAlpha », et le contour
+                // « EdgeColor ». Une opacite figee a 0,4 et un contour pris
+                // sur la couleur de fond donnaient, ici, un tout autre
+                // dessin que le SVG : un triangle blanc au bord blanc
+                // disparaissait, et un fond opaque paraissait delave.
                 QColor remplissage = couleur;
-                remplissage.setAlphaF(0.4);
-                peintre.setPen(crayon);
+                remplissage.setAlphaF(serie.opacite);
+                QPen contour = crayon;
+                if (!serie.couleurBord.empty())
+                    contour.setColor(couleurDe(serie.couleurBord, rang));
+                peintre.setPen(contour);
                 peintre.setBrush(remplissage);
                 peintre.drawPath(chemin);
                 peintre.setBrush(Qt::NoBrush);

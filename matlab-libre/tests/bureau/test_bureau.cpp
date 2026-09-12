@@ -24,6 +24,7 @@
 #include <QTextBrowser>
 #include <QLineEdit>
 #include <QLabel>
+#include <QToolBar>
 #include <QListWidget>
 #include <QFile>
 #include <QFileInfo>
@@ -1363,6 +1364,55 @@ int main(int argc, char** argv) {
     }
 
 
+    // --- une surface remplie, peinte comme le SVG la rend ---------------
+    //
+    // La toile du bureau et le SVG doivent montrer la meme chose. La toile
+    // figeait l'opacite a 0,4 et prenait le contour sur la couleur de
+    // fond : un polygone blanc au bord noir y perdait son bord, et un
+    // fond opaque y paraissait delave. C'est ce que ces deux mesures
+    // attrapent, en comptant des pixels plutot qu'en croyant le code.
+    {
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        envoyer(fenetre, QStringLiteral(
+            "figure(11); hold on; "
+            "patch([0.05 0.45 0.45 0.05], [0.2 0.2 0.8 0.8], [1 1 1], "
+            "'EdgeColor', [0 0 0], 'FaceAlpha', 1); "
+            "patch([0.55 0.95 0.95 0.55], [0.2 0.2 0.8 0.8], [1 0 0], "
+            "'FaceAlpha', 1); "
+            "axis([0 1 0 1]); axis off;"));
+        VueFigure* vuePatch = nullptr;
+        verifier(attendre([&] {
+                     for (FenetreFigure* f : fenetre.findChildren<FenetreFigure*>())
+                         if (!f->isHidden() &&
+                             f->windowTitle().startsWith(QLatin1String("Figure 11")))
+                             vuePatch = f->vue();
+                     return vuePatch != nullptr;
+                 }),
+                 "la figure des surfaces remplies s'ouvre");
+        if (vuePatch) {
+            vuePatch->resize(600, 400);
+            QCoreApplication::processEvents();
+            QImage image(600, 400, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            vuePatch->render(&image);
+            // Le polygone blanc doit garder son contour : de l'encre
+            // sombre quelque part dans sa moitie de l'image.
+            int sombres = 0;
+            for (int y = 0; y < 400; ++y)
+                for (int x = 0; x < 300; ++x)
+                    if (qGray(image.pixel(x, y)) < 100) ++sombres;
+            verifier(sombres > 200,
+                     "un polygone blanc garde le contour noir qu'on lui a donne");
+            // Le polygone rouge doit etre franc, non delave : au centre,
+            // le vert doit avoir cede la place.
+            QRgb centre = image.pixel(450, 200);
+            verifier(qRed(centre) > 180 && qGreen(centre) < 90,
+                     "et un fond opaque est peint opaque, non a quatre dixiemes");
+        }
+        envoyer(fenetre, QStringLiteral("close(11)"));
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+    }
+
     // --- Simulink dans le bureau --------------------------------------
     //
     // MATLAB donne a Simulink un bouton et une fenetre. Ici la fenetre
@@ -1382,6 +1432,15 @@ int main(int argc, char** argv) {
             int familles = biblio->topLevelItemCount();
             int types = 0;
             for (int k = 0; k < familles; ++k) types += biblio->topLevelItem(k)->childCount();
+            verifier(!simulink->findChildren<QToolBar*>().isEmpty(),
+                     "l'editeur a sa barre d'outils, comme une fenetre a part entiere");
+            verifier(simulink->findChildren<QDockWidget*>().size() >= 2,
+                     "la bibliotheque et les modeles sont des volets detachables");
+            verifier(simulink->centralWidget() != nullptr &&
+                         simulink->toile() != nullptr,
+                     "et le schema occupe le centre");
+            verifier(simulink->width() >= 1000 && simulink->height() >= 600,
+                     "la fenetre est pleine, non un panneau");
             verifier(familles >= 6, "la bibliotheque range les blocs par famille");
             bool accentsIntacts = false;
             for (int k = 0; k < familles; ++k)
@@ -1435,21 +1494,6 @@ int main(int argc, char** argv) {
                     nomme = true;
             verifier(nomme, "et il y porte son nom");
 
-            // Une capture de la fenetre Simulink, pour qu'un humain puisse
-            // regarder ce qui a ete construit.
-            if (const char* capture = std::getenv("MATLIBRE_CAPTURE")) {
-                QString chemin = QString::fromLocal8Bit(capture);
-                chemin.replace(QRegularExpression(QStringLiteral("\\.png$")),
-                               QStringLiteral("-simulink.png"));
-                simulink->resize(920, 580);
-                QCoreApplication::processEvents();
-                QImage vue(simulink->size(), QImage::Format_ARGB32);
-                vue.fill(Qt::white);
-                simulink->render(&vue);
-                vue.save(chemin);
-                std::printf("  capture de Simulink ecrite dans %s\n",
-                            chemin.toLocal8Bit().constData());
-            }
 
 
             // Une variable qui n'est pas un modele n'y entre pas : la liste
@@ -1468,8 +1512,10 @@ int main(int argc, char** argv) {
             // decor : il tourne.
             const QString squelette = FenetreSimulink::squeletteModele();
             verifier(squelette.contains(QLatin1String("new_system")) &&
-                         squelette.contains(QLatin1String("open_system")),
-                     "le modele de depart pose et montre un schema");
+                         squelette.contains(QLatin1String("add_line")),
+                     "le modele de depart pose des blocs et les cable");
+            verifier(!squelette.contains(QLatin1String("open_system")),
+                     "et n'appelle pas OPEN_SYSTEM : c'est l'editeur qui dessine");
             QString fichierSquelette =
                 QDir::current().absoluteFilePath(QStringLiteral("essaiSquelette.m"));
             {
@@ -1517,24 +1563,120 @@ int main(int argc, char** argv) {
                      "et se simulent tous : la bibliotheque ne propose rien qui n'existe");
             QFile::remove(fichierTous);
 
-            // « Ouvrir le schema » demande bien OPEN_SYSTEM sur le modele
-            // choisi, et une figure en sort.
+            // La toile porte le schema du modele choisi : c'est le fil de
+            // calcul qui le trace, et l'editeur qui le peint. C'est la
+            // difference avec la fenetre utilitaire d'avant — ici le
+            // schema est au centre, et MATLAB reste derriere.
             for (int k = 0; k < simulink->listeModeles()->count(); ++k)
                 if (simulink->listeModeles()->item(k)->text() ==
                     QLatin1String("modeleDuBureau"))
                     simulink->listeModeles()->setCurrentRow(k);
-            QCoreApplication::processEvents();
-            verifier(simulink->modeleChoisi() == QLatin1String("modeleDuBureau"),
+            verifier(attendre([&] {
+                         return simulink->modeleChoisi() ==
+                                QLatin1String("modeleDuBureau");
+                     }),
                      "le modele choisi est celui qu'on a designe");
+            verifier(attendre([&] {
+                         return simulink->modeleAffiche() ==
+                                QLatin1String("modeleDuBureau");
+                     }, 20000),
+                     "et la toile porte son schema");
+            verifier(simulink->toile()->numero() != 0,
+                     "la figure du schema est bien arrivee jusqu'a la toile");
+
+            // L'explorateur nomme les blocs et les liens du modele.
+            auto compter = [&](const QString& rubrique) {
+                for (int k = 0; k < simulink->explorateur()->topLevelItemCount(); ++k) {
+                    QTreeWidgetItem* item = simulink->explorateur()->topLevelItem(k);
+                    if (item->text(0).startsWith(rubrique)) return item->childCount();
+                }
+                return -1;
+            };
+            verifier(compter(QStringLiteral("Blocs")) == 1,
+                     "l'explorateur compte le bloc du modele");
+            verifier(compter(QStringLiteral("Liens")) == 0,
+                     "et ses liens, qu'il n'y en ait pas");
+
+            // L'espace de travail est partage jusqu'au bout : un bloc
+            // ajoute a la console apparait sur la toile sans qu'on
+            // touche a la fenetre.
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = add_block(modeleDuBureau, 'gain', 'k', 'Gain', 2); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'x', 'k');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le modele grandit");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Blocs")) == 2 &&
+                                compter(QStringLiteral("Liens")) == 1;
+                     }, 20000),
+                     "et le schema le montre : deux blocs, un lien, sans un clic");
+
+            // Un vrai asservissement, avec sa contre-reaction : c'est ce
+            // que l'editeur doit savoir montrer, et c'est ce qu'on garde
+            // en image.
+            envoyer(fenetre, QStringLiteral(
+                "K = 4; modeleDuBureau = new_system('modeleDuBureau'); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'step', 'consigne', "
+                "'Time', 0, 'After', 1); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'sum', 'ecart', "
+                "'Signs', '+-'); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'gain', 'correcteur', "
+                "'Gain', 'K'); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'integrator', 'sortie'); "
+                "modeleDuBureau = add_block(modeleDuBureau, 'scope', 'oscillo'); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'consigne', 'ecart', 1); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'sortie', 'ecart', 2); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'ecart', 'correcteur'); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'correcteur', 'sortie'); "
+                "modeleDuBureau = add_line(modeleDuBureau, 'sortie', 'oscillo');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "l'asservissement est bati");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return compter(QStringLiteral("Blocs")) == 5 &&
+                                compter(QStringLiteral("Liens")) == 5;
+                     }, 20000),
+                     "l'editeur suit : cinq blocs, cinq liens, dont la contre-reaction");
+
+            // Une capture de la fenetre Simulink, pour qu'un humain puisse
+            // regarder ce qui a ete construit.
+            if (const char* capture = std::getenv("MATLIBRE_CAPTURE")) {
+                QString chemin = QString::fromLocal8Bit(capture);
+                chemin.replace(QRegularExpression(QStringLiteral("\\.png$")),
+                               QStringLiteral("-simulink.png"));
+                simulink->resize(1180, 780);
+                QCoreApplication::processEvents();
+                QImage vue(simulink->size(), QImage::Format_ARGB32);
+                vue.fill(Qt::white);
+                simulink->render(&vue);
+                vue.save(chemin);
+                std::printf("  capture de Simulink ecrite dans %s\n",
+                            chemin.toLocal8Bit().constData());
+            }
+
+
+
+
+            // « Simuler » et « Enregistrer » passent par la console, et le
+            // releve reste dans l'espace de travail.
             QString commandeVue;
             QObject::connect(simulink, &FenetreSimulink::commandeDemandee,
                              [&commandeVue](const QString& c) { commandeVue = c; });
-            QMetaObject::invokeMethod(simulink, "ouvrirSchema");
+            QMetaObject::invokeMethod(simulink, "simuler");
             QCoreApplication::processEvents();
-            verifier(commandeVue == QLatin1String("open_system(modeleDuBureau)"),
-                     "« Ouvrir le schema » appelle OPEN_SYSTEM sur ce modele");
+            verifier(commandeVue.startsWith(
+                         QLatin1String("resultatSimulink = sim(modeleDuBureau, 10)")),
+                     "« Simuler » lance SIM sur la duree affichee");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
+                     "et la simulation aboutit");
+            commandeVue.clear();
+            QMetaObject::invokeMethod(simulink, "enregistrerModele");
+            QCoreApplication::processEvents();
+            verifier(commandeVue == QLatin1String("save_system(modeleDuBureau)"),
+                     "« Enregistrer » ecrit le .m qui rebatit le modele");
             verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
-                     "et le schema se trace");
+                     "et l'enregistrement aboutit");
+            QFile::remove(QDir::current().absoluteFilePath(
+                QStringLiteral("modeleDuBureau.m")));
             envoyer(fenetre, QStringLiteral("clear modeleDuBureau pasUnModele; close all"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est rendu net");
             QCoreApplication::processEvents();

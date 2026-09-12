@@ -791,8 +791,9 @@ MATLIBRE_SL_INDICE Rang d'un bloc désigné par son nom.
 ```
 MATLIBRE_SL_MODELE Rend un modèle, qu'on l'ait donné par valeur ou par nom.
   MODELE = MATLIBRE_SL_MODELE(ENTREE) accepte un modèle bâti par
-  NEW_SYSTEM, ou le nom d'un modèle ouvert dans la session, ou le nom
-  d'un fichier .m qui le rend.
+  NEW_SYSTEM, ou le nom d'une variable de l'espace de travail de base
+  qui en porte un, ou le nom d'un modèle ouvert dans la session, ou le
+  nom d'un fichier .m qui le rend.
 
   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 

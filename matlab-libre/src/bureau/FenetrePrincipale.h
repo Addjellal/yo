@@ -87,6 +87,8 @@ private slots:
     void surSortie(const QString& texte);
     void surEspaceTravail(const QVector<LigneEspaceTravail>& lignes);
     void surModelesSimulink(const QStringList& noms);
+    void surSchemaSimulink(const SchemaSimulink& schema);
+    void demanderSchemaSimulink(const QString& nom);
     // Une ligne venue de la bibliotheque de blocs : dans l'editeur
     // s'il y en a un, dans la console sinon.
     void insererLigne(const QString& ligne);

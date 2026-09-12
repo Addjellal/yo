@@ -1,8 +1,9 @@
 function modele = matlibre_sl_modele(entree)
 %MATLIBRE_SL_MODELE Rend un modèle, qu'on l'ait donné par valeur ou par nom.
 %   MODELE = MATLIBRE_SL_MODELE(ENTREE) accepte un modèle bâti par
-%   NEW_SYSTEM, ou le nom d'un modèle ouvert dans la session, ou le nom
-%   d'un fichier .m qui le rend.
+%   NEW_SYSTEM, ou le nom d'une variable de l'espace de travail de base
+%   qui en porte un, ou le nom d'un modèle ouvert dans la session, ou le
+%   nom d'un fichier .m qui le rend.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
@@ -20,6 +21,17 @@ function modele = matlibre_sl_modele(entree)
         if matlibre_sl_ouverts('connu', nom)
             modele = matlibre_sl_ouverts('lire', nom);
             return
+        end
+        % Une variable de l'espace de travail qui porte ce nom : c'est la
+        % forme la plus evidente, et elle manquait — un modele bati par
+        % NEW_SYSTEM y vit, sans avoir ete « ouvert » ni enregistre.
+        if isvarname(nom) && ...
+                evalin('base', sprintf('exist(''%s'', ''var'')', nom)) == 1
+            candidat = evalin('base', nom);
+            if isstruct(candidat) && isfield(candidat, 'blocs')
+                modele = candidat;
+                return
+            end
         end
         if exist(nom, 'file') == 2 || exist(nom, 'file') == 6
             modele = feval(nom);
