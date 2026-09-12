@@ -4,12 +4,14 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QResizeEvent>
 #include <QWheelEvent>
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -53,7 +55,7 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
     const bool memeModele = (schema.nom == modele_);
     modele_ = schema.nom;
     hauteurType_ = schema.hauteurType > 0 ? schema.hauteurType : 1.0;
-    const QString choisiAvant = blocChoisi();
+    const QStringList choisisAvant = blocsChoisis();
     blocs_.clear();
     liens_.clear();
     for (const BlocSchema& b : schema.blocs) {
@@ -74,11 +76,11 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
         liens_.push_back(t);
     }
     // Le choix survit à une remise à jour du même modèle : sans cela,
-    // ajouter un bloc à la console ferait perdre celui qu'on tenait.
-    choisi_ = -1;
-    if (memeModele && !choisiAvant.isEmpty())
+    // ajouter un bloc à la console ferait perdre ce qu'on tenait.
+    choisis_.clear();
+    if (memeModele && !choisisAvant.isEmpty())
         for (int k = 0; k < blocs_.size(); ++k)
-            if (blocs_[k].nom == choisiAvant) choisi_ = k;
+            if (choisisAvant.contains(blocs_[k].nom)) choisis_.push_back(k);
     lienChoisi_ = -1;
     if (!memeModele) ajusterVue();
     update();
@@ -89,22 +91,35 @@ void ToileSimulink::vider() {
     modele_.clear();
     blocs_.clear();
     liens_.clear();
-    choisi_ = -1;
+    choisis_.clear();
     lienChoisi_ = -1;
     update();
 }
 
 QString ToileSimulink::blocChoisi() const {
-    if (choisi_ < 0 || choisi_ >= blocs_.size()) return QString();
-    return blocs_[choisi_].nom;
+    if (choisis_.isEmpty()) return QString();
+    const int k = choisis_.first();
+    return (k >= 0 && k < blocs_.size()) ? blocs_[k].nom : QString();
+}
+
+QStringList ToileSimulink::blocsChoisis() const {
+    QStringList noms;
+    for (int k : choisis_)
+        if (k >= 0 && k < blocs_.size()) noms << blocs_[k].nom;
+    return noms;
 }
 
 void ToileSimulink::annoncerChoix() {
     emit choixChange();
-    if (choisi_ >= 0 && choisi_ < blocs_.size()) {
-        const BlocToile& b = blocs_[choisi_];
+    if (choisis_.size() > 1) {
+        emit etatChange(QStringLiteral("%1 blocs choisis. Les déplacer les déplace "
+                                       "tous ; « Suppr » les enlève tous.")
+                            .arg(choisis_.size()));
+    } else if (choisis_.size() == 1) {
+        const BlocToile& b = blocs_[choisis_.first()];
         emit etatChange(QStringLiteral("%1 — %2. Tirez son bord droit pour "
-                                       "cabler, « Suppr » pour l'enlever.")
+                                       "cabler, « Suppr » pour l'enlever, "
+                                       "double-cliquez pour le régler.")
                             .arg(b.nom, b.type));
     } else if (lienChoisi_ >= 0) {
         emit etatChange(QStringLiteral("Lien choisi. « Suppr » l'enlève."));
@@ -431,7 +446,18 @@ void ToileSimulink::paintEvent(QPaintEvent*) {
                             k == lienChoisi_ ? 2.2 : 1.2));
         dessinerFil(peintre, liens_[k], basRetour);
     }
-    for (int k = 0; k < blocs_.size(); ++k) dessinerBloc(peintre, blocs_[k], k == choisi_);
+    for (int k = 0; k < blocs_.size(); ++k)
+        dessinerBloc(peintre, blocs_[k], choisis_.contains(k));
+
+    // Le rectangle qu'on trace pour choisir plusieurs blocs d'un coup.
+    if (elastique_) {
+        peintre.setPen(QPen(kChoix, 1.0, Qt::DashLine));
+        QColor voile = kChoix;
+        voile.setAlphaF(0.10);
+        peintre.setBrush(voile);
+        peintre.drawRect(QRectF(elastiqueDe_, elastiqueA_).normalized());
+        peintre.setBrush(Qt::NoBrush);
+    }
 
     // Le fil qu'on est en train de tirer.
     if (filDepuis_ >= 0) {
@@ -511,28 +537,45 @@ void ToileSimulink::mousePressEvent(QMouseEvent* evenement) {
         QWidget::mousePressEvent(evenement);
         return;
     }
+    const bool ajoute = evenement->modifiers().testFlag(Qt::ControlModifier) ||
+                        evenement->modifiers().testFlag(Qt::ShiftModifier);
     if (sous >= 0) {
-        choisi_ = sous;
+        // Ctrl ou Maj ajoute au lot, comme partout ailleurs ; un clic nu
+        // sur un bloc déjà du lot le garde, pour qu'on puisse déplacer
+        // plusieurs blocs en en prenant un.
+        if (ajoute) {
+            if (choisis_.contains(sous)) choisis_.removeAll(sous);
+            else choisis_.push_back(sous);
+        } else if (!choisis_.contains(sous)) {
+            choisis_ = {sous};
+        }
         lienChoisi_ = -1;
         const QRectF r = cadreEcran(blocs_[sous].cadre);
         // Près du bord droit, on tire un fil ; ailleurs, on déplace le
         // bloc. C'est le geste de Simulink, et il évite un mode à choisir.
-        if (ecran.x() >= r.right() - qMax(6.0, kZonePort * echelle_)) {
+        if (!ajoute && ecran.x() >= r.right() - qMax(6.0, kZonePort * echelle_)) {
             filDepuis_ = sous;
             filVers_ = ecran;
             emit etatChange(QStringLiteral("Tirez jusqu'à l'entrée d'un bloc."));
-        } else {
+        } else if (!ajoute) {
             saisi_ = sous;
             saisiDepart_ = versSchema(ecran);
-            saisiCadre_ = blocs_[sous].cadre;
+            saisiCadres_.clear();
+            for (int k : choisis_) saisiCadres_.push_back(blocs_[k].cadre);
             deplacementFait_ = false;
         }
         annoncerChoix();
         update();
         return;
     }
-    choisi_ = -1;
+    if (!ajoute) choisis_.clear();
     lienChoisi_ = lienSous(ecran);
+    if (lienChoisi_ < 0) {
+        // Sur le vide : on trace un rectangle, et ce qu'il touche est pris.
+        elastique_ = true;
+        elastiqueDe_ = ecran;
+        elastiqueA_ = ecran;
+    }
     annoncerChoix();
     update();
 }
@@ -547,8 +590,14 @@ void ToileSimulink::mouseMoveEvent(QMouseEvent* evenement) {
     if (saisi_ >= 0) {
         const QPointF maintenant = versSchema(ecran);
         const QPointF ecart = maintenant - saisiDepart_;
-        blocs_[saisi_].cadre = saisiCadre_.translated(ecart);
+        for (int i = 0; i < choisis_.size() && i < saisiCadres_.size(); ++i)
+            blocs_[choisis_[i]].cadre = saisiCadres_[i].translated(ecart);
         deplacementFait_ = true;
+        update();
+        return;
+    }
+    if (elastique_) {
+        elastiqueA_ = ecran;
         update();
         return;
     }
@@ -587,10 +636,32 @@ void ToileSimulink::mouseReleaseEvent(QMouseEvent* evenement) {
         return;
     }
     if (saisi_ >= 0) {
-        const int bouge = saisi_;
         saisi_ = -1;
-        if (deplacementFait_) emit blocDeplace(blocs_[bouge].nom, blocs_[bouge].cadre);
+        if (deplacementFait_) {
+            QStringList noms;
+            QVector<QRectF> places;
+            for (int k : choisis_) {
+                noms << blocs_[k].nom;
+                places << blocs_[k].cadre;
+            }
+            emit blocsDeplaces(noms, places);
+        }
         deplacementFait_ = false;
+        return;
+    }
+    if (elastique_) {
+        elastique_ = false;
+        const QRectF pris = QRectF(elastiqueDe_, elastiqueA_).normalized();
+        // Un rectangle d'un pixel est un clic, non une sélection : sans
+        // ce garde-fou, cliquer sur le vide prendrait ce qui est dessous.
+        if (pris.width() > 3 && pris.height() > 3)
+            for (int k = 0; k < blocs_.size(); ++k)
+                if (pris.intersects(cadreEcran(blocs_[k].cadre)) &&
+                    !choisis_.contains(k))
+                    choisis_.push_back(k);
+        std::sort(choisis_.begin(), choisis_.end());
+        annoncerChoix();
+        update();
         return;
     }
     QWidget::mouseReleaseEvent(evenement);
@@ -599,7 +670,7 @@ void ToileSimulink::mouseReleaseEvent(QMouseEvent* evenement) {
 void ToileSimulink::mouseDoubleClickEvent(QMouseEvent* evenement) {
     const int sous = blocSous(evenement->position());
     if (sous >= 0) {
-        choisi_ = sous;
+        choisis_ = {sous};
         update();
         emit blocOuvert(blocs_[sous].nom);
         return;
@@ -608,9 +679,25 @@ void ToileSimulink::mouseDoubleClickEvent(QMouseEvent* evenement) {
 }
 
 void ToileSimulink::keyPressEvent(QKeyEvent* evenement) {
+    if (evenement->matches(QKeySequence::Undo)) {
+        emit annulationDemandee();
+        return;
+    }
+    if (evenement->matches(QKeySequence::Redo)) {
+        emit retablissementDemande();
+        return;
+    }
+    if (evenement->matches(QKeySequence::SelectAll)) {
+        choisis_.clear();
+        for (int k = 0; k < blocs_.size(); ++k) choisis_.push_back(k);
+        lienChoisi_ = -1;
+        annoncerChoix();
+        update();
+        return;
+    }
     if (evenement->key() == Qt::Key_Delete || evenement->key() == Qt::Key_Backspace) {
-        if (choisi_ >= 0 && choisi_ < blocs_.size()) {
-            emit blocSupprime(blocs_[choisi_].nom);
+        if (!choisis_.isEmpty()) {
+            emit blocsSupprimes(blocsChoisis());
             return;
         }
         if (lienChoisi_ >= 0 && lienChoisi_ < liens_.size()) {
@@ -623,9 +710,10 @@ void ToileSimulink::keyPressEvent(QKeyEvent* evenement) {
         }
     }
     if (evenement->key() == Qt::Key_Escape) {
-        choisi_ = -1;
+        choisis_.clear();
         lienChoisi_ = -1;
         filDepuis_ = -1;
+        elastique_ = false;
         update();
         annoncerChoix();
         return;

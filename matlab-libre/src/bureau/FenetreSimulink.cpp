@@ -218,12 +218,16 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
     // Les gestes de la toile deviennent des commandes sur le modele : c'est
     // ce qui fait qu'une modification a la souris se relit au clavier, et
     // que l'espace de travail reste le seul etat.
-    connect(toile_, &ToileSimulink::blocDeplace, this,
-            &FenetreSimulink::surBlocDeplace);
+    connect(toile_, &ToileSimulink::blocsDeplaces, this,
+            &FenetreSimulink::surBlocsDeplaces);
     connect(toile_, &ToileSimulink::lienDemande, this,
             &FenetreSimulink::surLienDemande);
-    connect(toile_, &ToileSimulink::blocSupprime, this,
-            &FenetreSimulink::surBlocSupprime);
+    connect(toile_, &ToileSimulink::blocsSupprimes, this,
+            &FenetreSimulink::surBlocsSupprimes);
+    connect(toile_, &ToileSimulink::annulationDemandee, this,
+            &FenetreSimulink::surAnnulation);
+    connect(toile_, &ToileSimulink::retablissementDemande, this,
+            &FenetreSimulink::surRetablissement);
     connect(toile_, &ToileSimulink::lienSupprime, this,
             &FenetreSimulink::surLienSupprime);
     connect(toile_, &ToileSimulink::blocOuvert, this, &FenetreSimulink::surBlocOuvert);
@@ -237,50 +241,92 @@ static QString ecrireNombre(double v) {
     return QString::number(v, 'g', 12);
 }
 
-void FenetreSimulink::surBlocDeplace(const QString& nom, const QRectF& place) {
+// Toute modification passe par ici : une seule ligne, precedee de la mise
+// en reserve de l'etat courant. La console refuse ce qu'on lui envoie
+// pendant qu'elle calcule, si bien que deux lignes d'affilee en
+// perdraient une ; et sans la mise en reserve, Ctrl+Z n'aurait rien a
+// defaire.
+void FenetreSimulink::envoyerModification(const QString& corps,
+                                          const QString& annonce) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty() || corps.isEmpty()) return;
+    emit commandeDemandee(
+        QStringLiteral("matlibre_sl_pile('poser', %1); %2").arg(modele, corps));
+    poserEtat(annonce);
+}
+
+void FenetreSimulink::surBlocsDeplaces(const QStringList& noms,
+                                       const QVector<QRectF>& places) {
     const QString modele = modeleChoisi();
     if (modele.isEmpty()) return;
-    emit commandeDemandee(QStringLiteral("%1 = set_param(%1, '%2', 'Position', "
-                                         "[%3 %4 %5 %6]);")
-                              .arg(modele, nom, ecrireNombre(place.left()),
-                                   ecrireNombre(place.top()),
-                                   ecrireNombre(place.right()),
-                                   ecrireNombre(place.bottom())));
-    poserEtat(QStringLiteral("« %1 » deplace ; sa place est enregistree dans le "
-                             "modele.").arg(nom));
+    QStringList morceaux;
+    for (int k = 0; k < noms.size() && k < places.size(); ++k)
+        morceaux << QStringLiteral("%1 = set_param(%1, '%2', 'Position', "
+                                   "[%3 %4 %5 %6]);")
+                        .arg(modele, noms[k], ecrireNombre(places[k].left()),
+                             ecrireNombre(places[k].top()),
+                             ecrireNombre(places[k].right()),
+                             ecrireNombre(places[k].bottom()));
+    envoyerModification(morceaux.join(QLatin1Char(' ')),
+                        noms.size() == 1
+                            ? QStringLiteral("« %1 » deplace ; sa place est "
+                                             "enregistree dans le modele.")
+                                  .arg(noms.first())
+                            : QStringLiteral("%1 blocs deplaces.").arg(noms.size()));
 }
 
 void FenetreSimulink::surLienDemande(const QString& source, const QString& cible,
                                      int port) {
     const QString modele = modeleChoisi();
     if (modele.isEmpty()) return;
-    emit commandeDemandee(QStringLiteral("%1 = add_line(%1, '%2', '%3', %4);")
-                              .arg(modele, source, cible)
-                              .arg(port));
-    poserEtat(QStringLiteral("« %1 » alimente l'entree %2 de « %3 ».")
-                  .arg(source)
-                  .arg(port)
-                  .arg(cible));
+    envoyerModification(QStringLiteral("%1 = add_line(%1, '%2', '%3', %4);")
+                            .arg(modele, source, cible)
+                            .arg(port),
+                        QStringLiteral("« %1 » alimente l'entree %2 de « %3 ».")
+                            .arg(source)
+                            .arg(port)
+                            .arg(cible));
 }
 
-void FenetreSimulink::surBlocSupprime(const QString& nom) {
+void FenetreSimulink::surBlocsSupprimes(const QStringList& noms) {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty() || noms.isEmpty()) return;
+    QStringList morceaux;
+    for (const QString& nom : noms)
+        morceaux << QStringLiteral("%1 = delete_block(%1, '%2');").arg(modele, nom);
+    envoyerModification(morceaux.join(QLatin1Char(' ')),
+                        noms.size() == 1
+                            ? QStringLiteral("« %1 » retire, avec les liens qui y "
+                                             "touchaient.").arg(noms.first())
+                            : QStringLiteral("%1 blocs retires, avec leurs liens.")
+                                  .arg(noms.size()));
+}
+
+void FenetreSimulink::surAnnulation() {
     const QString modele = modeleChoisi();
     if (modele.isEmpty()) return;
-    emit commandeDemandee(QStringLiteral("%1 = delete_block(%1, '%2');")
-                              .arg(modele, nom));
-    poserEtat(QStringLiteral("« %1 » retire, avec les liens qui y touchaient.")
-                  .arg(nom));
+    emit commandeDemandee(
+        QStringLiteral("%1 = matlibre_sl_pile('annuler', %1);").arg(modele));
+    poserEtat(QStringLiteral("Annulé."));
+}
+
+void FenetreSimulink::surRetablissement() {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    emit commandeDemandee(
+        QStringLiteral("%1 = matlibre_sl_pile('refaire', %1);").arg(modele));
+    poserEtat(QStringLiteral("Rétabli."));
 }
 
 void FenetreSimulink::surLienSupprime(const QString& source, const QString& cible,
                                       int port) {
     const QString modele = modeleChoisi();
     if (modele.isEmpty()) return;
-    emit commandeDemandee(QStringLiteral("%1 = delete_line(%1, '%2', '%3', %4);")
-                              .arg(modele, source, cible)
-                              .arg(port));
-    poserEtat(QStringLiteral("Le lien de « %1 » vers « %2 » est retire.")
-                  .arg(source, cible));
+    envoyerModification(QStringLiteral("%1 = delete_line(%1, '%2', '%3', %4);")
+                            .arg(modele, source, cible)
+                            .arg(port),
+                        QStringLiteral("Le lien de « %1 » vers « %2 » est retire.")
+                            .arg(source, cible));
 }
 
 void FenetreSimulink::surBlocOuvert(const QString& nom) {
@@ -312,9 +358,10 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
         poserEtat(QStringLiteral("Rien n'a change pour « %1 ».").arg(nom));
         return;
     }
-    emit commandeDemandee(morceaux.join(QLatin1Char(' ')));
-    poserEtat(QStringLiteral("Reglages de « %1 » enregistres dans le modele.")
-                  .arg(neuf.isEmpty() ? nom : neuf));
+    envoyerModification(morceaux.join(QLatin1Char(' ')),
+                        QStringLiteral("Reglages de « %1 » enregistres dans le "
+                                       "modele.")
+                            .arg(neuf.isEmpty() ? nom : neuf));
 }
 
 void FenetreSimulink::surBlocDepose(const QPointF& place) {
@@ -340,8 +387,7 @@ void FenetreSimulink::surBlocDepose(const QPointF& place) {
     ligne += QStringLiteral(", 'Position', [%1 %2 %3 %4]);")
                  .arg(ecrireNombre(place.x() - demiL), ecrireNombre(place.y() - 0.5),
                       ecrireNombre(place.x() + demiL), ecrireNombre(place.y() + 0.5));
-    emit commandeDemandee(ligne);
-    poserEtat(QStringLiteral("« %1 » pose sur la feuille.").arg(nom));
+    envoyerModification(ligne, QStringLiteral("« %1 » pose sur la feuille.").arg(nom));
 }
 
 void FenetreSimulink::ajusterVue() {

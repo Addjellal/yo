@@ -8,6 +8,15 @@ BIN   ?= $(BUILD)/bin
 TYPE  ?= Release
 PREFIX ?= /usr/local
 JOBS  ?= $(shell nproc 2>/dev/null || echo 4)
+# Les scripts de test sont independants : chacun se donne un dossier
+# temporaire quand il ecrit, et prend ses donnees par le chemin de son
+# propre fichier. Ils tournent donc de front, ce qui divise l'attente par
+# le nombre de coeurs. La sortie de chacun va dans son journal, et n'est
+# montree que s'il echoue -- sans quoi quatre scripts ecriraient dans la
+# meme console et l'on ne saurait plus qui dit quoi.
+# « make test SERIE=1 » les remet en file, pour suivre une execution pas
+# a pas.
+TESTS_JOBS ?= $(JOBS)
 
 # Une compilation part d'un arbre neuf : l'ancien est efface avant de
 # reconfigurer. C'est ce qui evite les objets orphelins — le .o d'un
@@ -56,10 +65,26 @@ test: tout
 	    $(BIN)/matlibre_tests_bureau; \
 	fi
 	@MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre outils/verifierDoublons.m
-	@for f in tests/scripts/test_*.m; do \
-	  echo "--> $$f"; \
-	  MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre --path tests/scripts $$f || exit 1; \
-	done
+	@rm -rf $(BUILD)/journaux && mkdir -p $(BUILD)/journaux
+	@if [ "$(SERIE)" = "1" ]; then \
+	  for f in tests/scripts/test_*.m; do \
+	    echo "--> $$f"; \
+	    MATLIBRE_TOOLBOX=$(CURDIR)/toolbox $(BIN)/matlibre --path tests/scripts $$f \
+	      || exit 1; \
+	  done; \
+	else \
+	  echo "--> $$(ls tests/scripts/test_*.m | wc -l) scripts, $(TESTS_JOBS) de front"; \
+	  ls tests/scripts/test_*.m | MATLIBRE_TOOLBOX=$(CURDIR)/toolbox \
+	    MATLIBRE_BIN=$(CURDIR)/$(BIN)/matlibre MATLIBRE_JOURNAUX=$(CURDIR)/$(BUILD)/journaux \
+	    xargs -P $(TESTS_JOBS) -I@ sh -c \
+	      'n=`basename @ .m`; \
+	       if "$$MATLIBRE_BIN" --path tests/scripts @ \
+	            > "$$MATLIBRE_JOURNAUX/$$n.log" 2>&1; then \
+	         echo "    $$n ok"; \
+	       else \
+	         echo "    $$n ECHEC"; cat "$$MATLIBRE_JOURNAUX/$$n.log"; exit 1; \
+	       fi' || exit 1; \
+	fi
 	@echo "tous les tests passent"
 
 tests: test

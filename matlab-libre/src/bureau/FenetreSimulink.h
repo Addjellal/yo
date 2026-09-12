@@ -19,6 +19,7 @@
 #include <QMainWindow>
 #include <QPointF>
 #include <QRectF>
+#include <QVector>
 #include <QString>
 #include <QStringList>
 
@@ -91,9 +92,11 @@ private slots:
     void montrerBloc();
     void surModeleChoisi();
     // Les gestes de la toile, traduits en commandes sur le modele.
-    void surBlocDeplace(const QString& nom, const QRectF& place);
+    void surBlocsDeplaces(const QStringList& noms, const QVector<QRectF>& places);
     void surLienDemande(const QString& source, const QString& cible, int port);
-    void surBlocSupprime(const QString& nom);
+    void surBlocsSupprimes(const QStringList& noms);
+    void surAnnulation();
+    void surRetablissement();
     void surLienSupprime(const QString& source, const QString& cible, int port);
     void surBlocOuvert(const QString& nom);
     void surBlocDepose(const QPointF& place);
@@ -102,6 +105,9 @@ private slots:
 
 private:
     void construireBibliotheque();
+    // Toute modification part par ici : une seule ligne, precedee de la
+    // mise en reserve de l etat courant pour Ctrl+Z.
+    void envoyerModification(const QString& corps, const QString& annonce);
     void construireBarre();
     void ajusterBoutons();
     void poserEtat(const QString& texte);

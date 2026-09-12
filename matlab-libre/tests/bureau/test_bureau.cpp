@@ -35,6 +35,7 @@
 #include <QTextLayout>
 #include <QTimer>
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -1695,6 +1696,8 @@ int main(int argc, char** argv) {
             verifier(commandeVue.contains(QLatin1String("set_param")) &&
                          commandeVue.contains(QLatin1String("'Position'")),
                      "deplacer un bloc pose sa POSITION dans le modele");
+            verifier(commandeVue.startsWith(QLatin1String("matlibre_sl_pile('poser'")),
+                     "et l'etat d'avant est mis en reserve, pour Ctrl+Z");
             verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
                      "la commande de deplacement passe");
             verifier(attendre([&] {
@@ -1841,6 +1844,69 @@ int main(int argc, char** argv) {
                 "modeleDuBureau = set_param(modeleDuBureau, 'regulateur', "
                 "'Name', 'correcteur');"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "et on le remet");
+
+            // --- choisir plusieurs blocs, et defaire ----------------
+            //
+            // Un rectangle trace sur le vide prend ce qu'il touche ; les
+            // deplacer les deplace tous, « Suppr » les enleve tous. Et
+            // Ctrl+Z rend l'etat d'avant, puisque chaque modification l'a
+            // mis en reserve.
+            const QRectF cadreConsigne = toile->cadreEcranDe(QStringLiteral("consigne"));
+            const QRectF cadreEcart = toile->cadreEcranDe(QStringLiteral("ecart"));
+            const QRectF englobant =
+                cadreConsigne.united(cadreEcart).adjusted(-12, -12, 12, 12);
+            glisser(englobant.topLeft(), englobant.bottomRight());
+            verifier(toile->blocsChoisis().size() >= 2,
+                     "un rectangle trace sur le vide prend ce qu'il touche");
+            const QStringList lot = toile->blocsChoisis();
+            verifier(lot.contains(QStringLiteral("consigne")) &&
+                         lot.contains(QStringLiteral("ecart")),
+                     "et il prend bien ceux qu'on visait");
+
+            commandeVue.clear();
+            const QPointF avantLot = toile->cadreEcranDe(QStringLiteral("consigne")).center();
+            glisser(avantLot, avantLot + QPointF(0, -60));
+            verifier(commandeVue.count(QLatin1String("'Position'")) >= 2,
+                     "les deplacer les deplace tous, en une seule commande");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la commande passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         const QRectF apres =
+                             toile->cadreEcranDe(QStringLiteral("ecart"));
+                         return !apres.isNull() &&
+                                apres.center().y() < cadreEcart.center().y() - 15;
+                     }, 20000),
+                     "et les deux ont bouge dans le modele");
+
+            // Ctrl+Z rend l'etat d'avant.
+            commandeVue.clear();
+            QKeyEvent defaire(QEvent::KeyPress, Qt::Key_Z, Qt::ControlModifier);
+            QCoreApplication::sendEvent(toile, &defaire);
+            QCoreApplication::processEvents();
+            verifier(commandeVue.contains(QLatin1String("matlibre_sl_pile('annuler'")),
+                     "Ctrl+Z demande l'etat d'avant");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "l'annulation passe");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         const QRectF revenu =
+                             toile->cadreEcranDe(QStringLiteral("ecart"));
+                         return !revenu.isNull() &&
+                                std::abs(revenu.center().y() -
+                                         cadreEcart.center().y()) < 6;
+                     }, 20000),
+                     "et les blocs reviennent ou ils etaient");
+
+            // Ctrl+A prend tout.
+            QKeyEvent tout(QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier);
+            QCoreApplication::sendEvent(toile, &tout);
+            QCoreApplication::processEvents();
+            verifier(toile->blocsChoisis().size() == 5, "Ctrl+A prend tous les blocs");
+            QKeyEvent echap(QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier);
+            QCoreApplication::sendEvent(toile, &echap);
+            QCoreApplication::processEvents();
+            verifier(toile->blocsChoisis().isEmpty(), "« Echap » lache tout");
 
             // Une capture de la fenetre Simulink, pour qu'un humain puisse
             // regarder ce qui a ete construit.

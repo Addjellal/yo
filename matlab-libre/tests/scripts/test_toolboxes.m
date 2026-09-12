@@ -1278,4 +1278,54 @@ assert(~any(strcmp(geoReglages.blocs(2).noms, 'Position')));
 geoExpression = matlibre_sl_geometrie(set_param(renom, 'correcteur', 'Gain', 'K'));
 assert(strcmp(geoExpression.blocs(2).valeurs{1}, 'K'));
 
+% La pile d'annulation : chaque modification met l'etat d'avant en
+% reserve, et « annuler » le rend. Elle vit dans le langage, non dans la
+% fenetre, si bien qu'elle sert aussi au clavier.
+pile = add_block(new_system('pile'), 'gain', 'k', 'Gain', 1);
+matlibre_sl_pile('vider', pile);
+assert(matlibre_sl_pile('profondeur', pile) == 0);
+matlibre_sl_pile('poser', pile);
+pile = set_param(pile, 'k', 'Gain', 5);
+matlibre_sl_pile('poser', pile);
+pile = add_block(pile, 'constant', 'c', 'Value', 2);
+assert(numel(pile.blocs) == 2 && matlibre_sl_pile('profondeur', pile) == 2);
+
+pile = matlibre_sl_pile('annuler', pile);
+assert(numel(pile.blocs) == 1, 'le bloc ajoute est defait');
+assert(get_param(pile, 'k', 'Gain') == 5, 'mais pas le reglage d''avant');
+pile = matlibre_sl_pile('annuler', pile);
+assert(get_param(pile, 'k', 'Gain') == 1, 'la deuxieme annulation defait le reglage');
+assert(matlibre_sl_pile('refaisables', pile) == 2);
+pile = matlibre_sl_pile('refaire', pile);
+assert(get_param(pile, 'k', 'Gain') == 5, 'et « refaire » revient dessus');
+
+% Un chemin neuf efface ce qu'on pouvait refaire : retablir un etat qui
+% n'a plus de suite n'aurait pas de sens.
+pile = matlibre_sl_pile('annuler', pile);
+matlibre_sl_pile('poser', pile);
+assert(matlibre_sl_pile('refaisables', pile) == 0);
+
+% Annuler quand il n'y a rien a annuler rend le modele tel quel, sans
+% erreur : c'est ce qu'attend une touche qu'on presse deux fois.
+intact = new_system('jamaisTouche');
+assert(isequal(matlibre_sl_pile('annuler', intact), intact));
+assert(isequal(matlibre_sl_pile('refaire', intact), intact));
+
+% Les piles sont rangees par nom : deux modeles ne se melangent pas.
+premier = add_block(new_system('unA'), 'gain', 'g', 'Gain', 1);
+second = add_block(new_system('unB'), 'gain', 'g', 'Gain', 2);
+matlibre_sl_pile('vider', premier);
+matlibre_sl_pile('vider', second);
+matlibre_sl_pile('poser', premier);
+assert(matlibre_sl_pile('profondeur', premier) == 1);
+assert(matlibre_sl_pile('profondeur', second) == 0, ...
+       'la pile de l''un ne compte pas pour l''autre');
+refusePile = false;
+try
+    matlibre_sl_pile('poser', 42);
+catch err
+    refusePile = strcmp(err.identifier, 'simulink:pile:modele');
+end
+assert(refusePile);
+
 disp('toolboxes : toutes les verifications passent');

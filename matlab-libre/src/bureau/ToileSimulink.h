@@ -30,8 +30,10 @@ public:
     void definirSchema(const SchemaSimulink& schema);
     void vider();
     const QString& modele() const { return modele_; }
-    // Le bloc choisi, ou une chaîne vide. Publié pour la vérification.
+    // Le bloc choisi, ou le premier d'entre eux quand il y en a plusieurs.
     QString blocChoisi() const;
+    // Tous les blocs choisis, dans l'ordre du modèle.
+    QStringList blocsChoisis() const;
     int lienChoisi() const { return lienChoisi_; }
     // Le rectangle qu'occupe un bloc à l'écran, pour qu'un test puisse y
     // viser sans deviner.
@@ -45,17 +47,21 @@ public:
     double echelle() const { return echelle_; }
 
 signals:
-    // Un bloc a été déplacé : sa nouvelle place, en unités du schéma.
-    void blocDeplace(const QString& nom, const QRectF& place);
+    // Des blocs ont été déplacés : leurs nouvelles places, en unités du
+    // schéma. Plusieurs à la fois quand plusieurs sont choisis.
+    void blocsDeplaces(const QStringList& noms, const QVector<QRectF>& places);
     // Un fil a été tiré d'une sortie vers une entrée.
     void lienDemande(const QString& source, const QString& cible, int port);
     // « Suppr » sur ce qui est choisi.
-    void blocSupprime(const QString& nom);
+    void blocsSupprimes(const QStringList& noms);
     void lienSupprime(const QString& source, const QString& cible, int port);
     // Un double-clic : on veut régler le bloc.
     void blocOuvert(const QString& nom);
     // Quelque chose a été lâché sur la toile depuis la bibliothèque.
     void blocDepose(const QPointF& place);
+    // Ctrl+Z, Ctrl+Y : défaire et refaire.
+    void annulationDemandee();
+    void retablissementDemande();
     // De quoi renseigner la barre d'état.
     void etatChange(const QString& texte);
     void choixChange();
@@ -102,11 +108,14 @@ private:
     double echelle_ = 40.0;
     QPointF origine_{0.0, 0.0};   // le point du schéma peint en haut à gauche
 
-    int choisi_ = -1;         // bloc choisi
+    QVector<int> choisis_;    // les blocs choisis, rangs dans blocs_
     int lienChoisi_ = -1;     // lien choisi
-    int saisi_ = -1;          // bloc en cours de déplacement
+    int saisi_ = -1;          // bloc par lequel on tient le lot
     QPointF saisiDepart_;     // là où la souris a pris le bloc, en schéma
-    QRectF saisiCadre_;       // le cadre du bloc au moment de la prise
+    QVector<QRectF> saisiCadres_;   // les cadres au moment de la prise
+    // Le rectangle d'élastique, quand on trace une sélection sur le vide.
+    bool elastique_ = false;
+    QPointF elastiqueDe_, elastiqueA_;
     int filDepuis_ = -1;      // bloc d'où part le fil en cours
     QPointF filVers_;         // le bout libre du fil, à l'écran
     bool deplacementFait_ = false;
