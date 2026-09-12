@@ -43,6 +43,7 @@
 #include "FenetreFigure.h"
 #include "FenetreAide.h"
 #include "FenetreProfileur.h"
+#include "FenetreSimulink.h"
 #include "Icone.h"
 #include "Recherche.h"
 #include "Ruban.h"
@@ -122,6 +123,8 @@ FenetrePrincipale::FenetrePrincipale() {
     connect(moteur_, &Moteur::sortieProduite, this, &FenetrePrincipale::surSortie);
     connect(moteur_, &Moteur::espaceTravailChange, this,
             &FenetrePrincipale::surEspaceTravail);
+    connect(moteur_, &Moteur::modelesSimulinkChanges, this,
+            &FenetrePrincipale::surModelesSimulink);
     connect(moteur_, &Moteur::figuresChangees, this, &FenetrePrincipale::surFigures);
     connect(moteur_, &Moteur::dossierChange, this, &FenetrePrincipale::surDossier);
     connect(moteur_, &Moteur::nomsConnus, this,
@@ -577,6 +580,21 @@ void FenetrePrincipale::construireMenus() {
             &QToolButton::clicked, aQuitterDebug_, &QAction::trigger);
     ruban_->ajouterGroupe(QStringLiteral("Accueil"), debogageGroupe);
 
+    // MATLAB donne a Simulink sa place dans le ruban de l'accueil : c'est
+    // par la qu'on l'ouvre, et c'est ce qu'on cherche des yeux.
+    auto* simulinkGroupe = new GroupeRuban(QStringLiteral("Simulink"));
+    QToolButton* bSimulink = simulinkGroupe->ajouter(
+        QStringLiteral("Simulink"), QStringLiteral("simulink"),
+        QStringLiteral("Bibliothèque de blocs et modèles de l'espace de travail"));
+    connect(bSimulink, &QToolButton::clicked, this, &FenetrePrincipale::montrerSimulink);
+    QToolButton* bModele = simulinkGroupe->ajouter(
+        QStringLiteral("Nouveau\nmodèle"), QStringLiteral("modele"),
+        QStringLiteral("Ouvrir un modèle de départ dans l'éditeur"));
+    connect(bModele, &QToolButton::clicked, this, [this] {
+        nouveauModeleSimulink(FenetreSimulink::squeletteModele());
+    });
+    ruban_->ajouterGroupe(QStringLiteral("Accueil"), simulinkGroupe);
+
     auto* aideGroupe = new GroupeRuban(QStringLiteral("Ressources"));
     QToolButton* bAide = aideGroupe->ajouter(
         QStringLiteral("Aide"), QStringLiteral("aide"),
@@ -833,6 +851,59 @@ FenetreProfileur* FenetrePrincipale::profileur() {
 void FenetrePrincipale::montrerProfileur() {
     profileur()->show();
     profileur()->raise();
+}
+
+FenetreSimulink* FenetrePrincipale::fenetreSimulink() {
+    if (!simulink_) {
+        simulink_ = new FenetreSimulink(this);
+        connect(simulink_, &FenetreSimulink::commandeDemandee, this,
+                &FenetrePrincipale::envoyerCommande);
+        connect(simulink_, &FenetreSimulink::insertionDemandee, this,
+                &FenetrePrincipale::insererLigne);
+        connect(simulink_, &FenetreSimulink::nouveauModeleDemande, this,
+                &FenetrePrincipale::nouveauModeleSimulink);
+        // La fenetre peut naitre apres que le moteur a publie sa liste :
+        // on lui donne ce qu'on a retenu, sinon elle s'ouvrirait vide sur
+        // un espace de travail qui, lui, porte deja des modeles.
+        simulink_->definirModeles(modelesSimulink_);
+    }
+    return simulink_;
+}
+
+void FenetrePrincipale::montrerSimulink() {
+    fenetreSimulink()->show();
+    fenetreSimulink()->raise();
+}
+
+void FenetrePrincipale::surModelesSimulink(const QStringList& noms) {
+    modelesSimulink_ = noms;
+    if (simulink_) simulink_->definirModeles(noms);
+}
+
+// Une ligne venue de la bibliotheque de blocs. Elle va dans l'editeur —
+// c'est la que vit un modele MatLibre, qui est un programme — et dans la
+// console seulement s'il n'y a pas d'editeur ouvert.
+void FenetrePrincipale::insererLigne(const QString& ligne) {
+    Editeur* editeur = editeurCourant();
+    if (!editeur) {
+        envoyer(ligne);
+        return;
+    }
+    QTextCursor curseur = editeur->textCursor();
+    curseur.movePosition(QTextCursor::EndOfLine);
+    curseur.insertText(QStringLiteral("\n") + ligne);
+    editeur->setTextCursor(curseur);
+    editeur->setFocus();
+    onglets_->setCurrentWidget(editeur);
+}
+
+void FenetrePrincipale::nouveauModeleSimulink(const QString& squelette) {
+    nouveauFichier();
+    Editeur* editeur = editeurCourant();
+    if (editeur) {
+        editeur->setPlainText(squelette);
+        editeur->setFocus();
+    }
 }
 
 void FenetrePrincipale::surProfil(const QVector<LigneProfil>& entrees, double duree) {

@@ -3,21 +3,60 @@
 ```
 % Simulink — simulation de schémas-blocs.
 %
-% Un modèle est une structure : une liste de blocs et une liste de liens.
-% La simulation est à pas fixe et l'ordre d'exécution vient d'un tri
-% topologique, si bien qu'une entrée est toujours calculée avant la sortie
-% qui l'emploie. Les intégrateurs et les retards fournissent la mémoire,
-% et cassent donc les boucles algébriques.
+% Un modèle est une structure : une liste de blocs, une liste de liens et
+% quelques réglages. La simulation est à pas fixe et l'ordre d'exécution
+% vient d'un tri topologique, si bien qu'une entrée est toujours calculée
+% avant la sortie qui l'emploie. Les blocs sans transmission directe —
+% intégrateur, retard, mémoire, retard pur — fournissent la mémoire, et
+% cassent donc les boucles algébriques.
+%
+% Un modèle est une valeur, non une référence : chaque fonction en rend
+% une nouvelle et laisse l'ancienne intacte.
+%
+% L'espace de travail est partagé, comme dans Simulink : un paramètre
+% numérique écrit entre apostrophes est une expression, évaluée à la
+% simulation — un gain réglé sur 'K' vaut ce que vaut K. Dans l'autre
+% sens, le bloc « toworkspace » y dépose son signal et « fromworkspace »
+% y lit le sien. Les fichiers .slx de
+% MathWorks, dont le format n'est pas public, ne se lisent pas ;
+% save_system écrit à leur place un programme .m qui rebâtit le modèle.
 %
 % Modèle
-%   new_system  - Crée un modèle vide
-%   add_block   - Ajoute un bloc, avec ses paramètres
-%   add_line    - Relie une sortie à une entrée
-%   set_param   - Change les paramètres d'un bloc
+%   new_system    - Crée un modèle vide
+%   open_system   - Dessine le schéma-bloc, et ouvre le modèle
+%   close_system  - Ferme un modèle, et sa figure
+%   bdclose       - Ferme un modèle, ou tous
+%   bdroot        - Le nom du modèle
+%   bdIsLoaded    - Dit si un modèle est ouvert
+%   gcs           - Le nom du dernier modèle ouvert
+%   getfullname   - Le chemin « modele/bloc » d'un bloc
+%   save_system   - Écrit un .m qui rebâtit le modèle
+%   load_system   - Relit ce .m
+%
+% Blocs et liens
+%   add_block     - Ajoute un bloc, avec ses paramètres
+%   delete_block  - Retire un bloc, et les liens qui y touchent
+%   replace_block - Change le type de tous les blocs d'un type
+%   add_line      - Relie une sortie à une entrée
+%   delete_line   - Supprime un lien
+%   find_system   - Les blocs, éventuellement filtrés
+%
+% Réglages
+%   get_param     - Lit un paramètre de bloc, ou du modèle
+%   set_param     - Change les paramètres d'un bloc, ou du modèle
+%   add_param     - Pose un réglage sur le modèle
+%   delete_param  - Retire un réglage du modèle
 %
 % Simulation
-%   sim         - Simule à pas fixe ; rend temps et signaux
-%   simplot     - Trace les signaux relevés
+%   sim           - Simule à pas fixe ; rend temps et signaux
+%   simset        - Rassemble les options d'une simulation
+%   simget        - Lit une option
+%   simplot       - Trace les signaux relevés
+%
+% Linéarisation
+%   linmod        - Linéarise autour d'un point de fonctionnement
+%   dlinmod       - Linéarise et échantillonne
+%   trim          - Cherche un point d'équilibre
 ```
 
 ## `add_block`
@@ -26,23 +65,79 @@
 ADD_BLOCK Ajoute un bloc au modèle.
   MODELE = ADD_BLOCK(MODELE,TYPE,NOM,'Param',VALEUR,...)
 
-  Paramètres reconnus selon le type :
+  Sources — elles n'ont pas d'entrée :
     constant     Value
     step         Time, Before, After
     ramp         Slope
     sine         Amplitude, Frequency, Phase
+    inport       Port, Value          l'entrée du modèle, vue par LINMOD
+
+  Opérations sans mémoire :
     gain         Gain
+    bias         Bias
     sum          Signs (par exemple '+-')
+    product      —                    le produit de toutes ses entrées
+    abs          —
+    sign         —
+    math         Operator : square, sqrt, exp, log, reciprocal
+    trigonometry Operator : sin, cos, tan, asin, acos, atan, atan2,
+                 sinh, cosh, tanh, asinh, acosh, atanh
+    minmax       Function : min ou max, sur toutes les entrées
+    logic        Operator : AND, OR, NAND, NOR, XOR, NXOR, NOT
+    relational   Operator : ==, ~=, <, <=, >, >=
+    switch       Threshold, Criteria : 'u2>=Threshold', 'u2>Threshold',
+                 'u2~=0' — la première entrée passe, ou la troisième
+    saturation   UpperLimit, LowerLimit
+    deadzone     UpperValue, LowerValue
+    quantizer    QuantizationInterval
+    lookup       BreakpointsData, TableData
+    outport      Port                 la sortie du modèle
+
+  Blocs à mémoire — ce sont eux qui coupent les boucles :
     integrator   InitialCondition
+    delay        InitialCondition     aussi nommé unitdelay
+    memory       InitialCondition     la valeur du pas précédent
+    transportdelay DelayTime, InitialOutput
+    derivative   —                    transmission directe : ne coupe rien
+    relay        OnSwitch, OffSwitch, OnOutput, OffOutput
+    ratelimiter  RisingSlewLimit, FallingSlewLimit, InitialOutput
     transferfcn  Numerator, Denominator
     statespace   A, B, C, D, X0
-    saturation   UpperLimit, LowerLimit
-    delay        InitialCondition
-    relay        OnSwitch, OffSwitch, OnOutput, OffOutput
+    pidcontroller P, I, D, N          dérivée filtrée par N/(1+N/s)
+
+  Blocs échantillonnés — ils ne relisent leur entrée qu'à leur période :
+    zoh                  SampleTime   aussi nommé zeroorderhold
+    discreteintegrator   Gain, SampleTime, InitialCondition,
+                         IntegratorMethod : ForwardEuler, BackwardEuler,
+                         Trapezoidal
+    discretetransferfcn  Numerator, Denominator, SampleTime
+    discretestatespace   A, B, C, D, X0, SampleTime
+
+  Passe-plat, pour la lisibilité du schéma : scope, mux, demux,
+  terminator, display, toworkspace, fromworkspace, signalconversion,
+  goto, from.
+
+  Un type inconnu est refusé. Le laisser passer donnerait une
+  simulation qui tourne et un résultat faux.
 
   Un bloc porte un nom, et c'est par ce nom qu'ADD_LINE le relie : le
   modèle n'est qu'une liste de blocs et d'arcs, dont SIM tire l'ordre de
   calcul.
+
+  Un paramètre numérique donné entre apostrophes est une expression,
+  évaluée dans l'espace de travail de base au moment où l'on simule —
+  comme dans Simulink. C'est ainsi qu'un modèle et un programme
+  partagent leurs variables :
+
+     K = 4;
+     m = add_block(m, 'gain', 'k', 'Gain', 'K');   % non pas 4, mais K
+     r = sim(m, 1, 0.01);                          % le gain vaut 4
+     K = 10; r = sim(m, 1, 0.01);                  % il vaut 10
+
+  Le modèle, lui, n'a pas bougé : il porte toujours l'expression, et
+  c'est elle que le schéma affiche. Les paramètres qui sont du texte —
+  Signs, Operator, Criteria, Function, IntegratorMethod, VariableName —
+  restent lus tels quels.
 
   Exemple :
      m = new_system('rampe');
@@ -50,7 +145,7 @@ ADD_BLOCK Ajoute un bloc au modèle.
      m = add_block(m, 'integrator', 'integ', 'InitialCondition', 0);
      numel(m.blocs)              % 2
 
-  Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
+  Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, DELETE_BLOCK, SIM, OPEN_SYSTEM.
 ```
 
 ## `add_line`
@@ -83,6 +178,219 @@ ADD_LINE Relie la sortie d'un bloc à l'entrée d'un autre.
   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
 ```
 
+## `add_param`
+
+```
+ADD_PARAM Pose un réglage sur le modèle lui-même.
+  MODELE = ADD_PARAM(MODELE,'Nom',VALEUR,...) ajoute un ou plusieurs
+  réglages au modèle. Ce ne sont pas les paramètres d'un bloc : ils
+  valent pour la simulation entière.
+
+  Deux sont lus par SIM quand on ne lui donne ni durée ni pas :
+    StopTime    l'instant final
+    FixedStep   le pas d'intégration
+
+  Un réglage déjà posé est refusé en le nommant : c'est SET_PARAM qui
+  le change, comme dans MATLAB, où ADD_PARAM ne sert qu'à créer.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_block(m, 'constant', 'c', 'Value', 3);
+     m = add_param(m, 'StopTime', 2, 'FixedStep', 0.5);
+     r = sim(m);
+     r.temps(end)                     % 2
+     numel(r.temps)                   % 5 : de 0 a 2 par pas de 0,5
+
+  Voir aussi DELETE_PARAM, SET_PARAM, GET_PARAM, NEW_SYSTEM, SIM.
+```
+
+## `bdIsLoaded`
+
+```
+BDISLOADED Dit si un modèle est ouvert dans la session.
+  R = BDISLOADED(NOM) rend vrai si un modèle de ce nom a été ouvert par
+  OPEN_SYSTEM ou LOAD_SYSTEM et pas encore fermé.
+
+  Exemple :
+     bdclose('all');
+     m = new_system('essai');
+     bdIsLoaded('essai')              % faux : construit n'est pas ouvert
+     open_system(m);
+     bdIsLoaded('essai')              % vrai
+     bdclose('all');
+
+  Voir aussi OPEN_SYSTEM, CLOSE_SYSTEM, BDCLOSE, GCS, LOAD_SYSTEM.
+```
+
+## `bdclose`
+
+```
+BDCLOSE Ferme un modèle, ou tous.
+  BDCLOSE(NOM) retire du registre le modèle nommé. BDCLOSE('all') les
+  retire tous. BDCLOSE() sans argument ferme le dernier ouvert.
+
+  Fermer ne détruit pas la valeur : la variable qui porte le modèle
+  reste, et un nouvel OPEN_SYSTEM le rouvre. C'est le registre de la
+  session qui se vide, celui que lisent GCS et BDISLOADED.
+
+  Exemple :
+     m = new_system('essai');
+     open_system(m);
+     bdclose('essai');
+     bdIsLoaded('essai')              % faux
+
+  Voir aussi CLOSE_SYSTEM, OPEN_SYSTEM, BDISLOADED, GCS.
+```
+
+## `bdroot`
+
+```
+BDROOT Le nom du modèle.
+  NOM = BDROOT(MODELE) rend le nom du modèle. BDROOT() sans argument
+  rend celui du dernier modèle ouvert par OPEN_SYSTEM.
+
+  Dans MATLAB, BDROOT remonte du bloc courant jusqu'au modèle qui le
+  contient. Ici un modèle est une valeur qu'on tient dans une variable,
+  et non un objet ouvert dans une fenêtre : il n'y a rien à remonter,
+  sinon le nom.
+
+  Exemple :
+     m = new_system('asservissement');
+     bdroot(m)                        % 'asservissement'
+
+  Voir aussi NEW_SYSTEM, GCS, OPEN_SYSTEM, FIND_SYSTEM.
+```
+
+## `close_system`
+
+```
+CLOSE_SYSTEM Ferme un modèle, en l'enregistrant au besoin.
+  CLOSE_SYSTEM(MODELE) retire le modèle du registre de la session et
+  ferme la figure que OPEN_SYSTEM avait tracée, s'il y en avait une.
+  CLOSE_SYSTEM(MODELE,FICHIER) l'enregistre d'abord, par SAVE_SYSTEM.
+  CLOSE_SYSTEM(NOM) accepte aussi le nom d'un modèle ouvert, et
+  CLOSE_SYSTEM() sans argument ferme le dernier ouvert.
+
+  Fermer ne détruit pas la valeur : la variable qui porte le modèle
+  reste. C'est le registre de la session qui se vide, celui que lisent
+  GCS et BDISLOADED.
+
+  Exemple :
+     m = new_system('essai');
+     open_system(m);
+     close_system(m);
+     bdIsLoaded('essai')              % faux
+
+  Voir aussi OPEN_SYSTEM, BDCLOSE, SAVE_SYSTEM, GCS.
+```
+
+## `delete_block`
+
+```
+DELETE_BLOCK Retire un bloc du modèle, et les liens qui y touchent.
+  MODELE = DELETE_BLOCK(MODELE,NOM) enlève le bloc nommé. Les liens qui
+  partaient de lui ou arrivaient à lui disparaissent avec lui : laisser
+  un lien vers un bloc absent rendrait le modèle insimulable.
+
+  Les blocs qui suivent sont renumérotés, puisque les liens désignent
+  les blocs par leur rang. C'est transparent : on désigne toujours un
+  bloc par son nom.
+
+  Comme ADD_BLOCK, la fonction rend un nouveau modèle et laisse
+  l'ancien intact : un modèle est ici une valeur, non une référence.
+  Dans MATLAB, DELETE_BLOCK modifie le modèle ouvert et ne rend rien.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_block(m, 'constant', 'c', 'Value', 1);
+     m = add_block(m, 'gain', 'g', 'Gain', 2);
+     m = add_line(m, 'c', 'g');
+     m = delete_block(m, 'g');
+     numel(m.blocs)                       % 1
+     isempty(m.liens)                     % le lien est parti avec le bloc
+
+  Voir aussi ADD_BLOCK, DELETE_LINE, REPLACE_BLOCK, FIND_SYSTEM.
+```
+
+## `delete_line`
+
+```
+DELETE_LINE Supprime le lien qui va d'un bloc à un autre.
+  MODELE = DELETE_LINE(MODELE,SOURCE,DESTINATION) supprime le lien
+  allant de la sortie du premier bloc à l'entrée du second.
+  DELETE_LINE(MODELE,SOURCE,DESTINATION,NUMERO) précise laquelle des
+  entrées, quand plusieurs liens joignent les deux mêmes blocs.
+
+  Un lien qui n'existe pas lève une erreur qui nomme les deux blocs,
+  plutôt que de laisser croire à une suppression qui n'a pas eu lieu.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_block(m, 'constant', 'c', 'Value', 1);
+     m = add_block(m, 'gain', 'g', 'Gain', 2);
+     m = add_line(m, 'c', 'g');
+     m = delete_line(m, 'c', 'g');
+     isempty(m.liens)                 % vrai
+
+  Voir aussi ADD_LINE, DELETE_BLOCK, NEW_SYSTEM.
+```
+
+## `delete_param`
+
+```
+DELETE_PARAM Retire un réglage du modèle.
+  MODELE = DELETE_PARAM(MODELE,'Nom',...) enlève un ou plusieurs
+  réglages posés par ADD_PARAM. Le modèle retrouve alors le
+  comportement par défaut : SIM reprend ses dix secondes et son
+  centième de seconde.
+
+  Un réglage absent est refusé en le nommant, plutôt que passé sous
+  silence : croire avoir retiré ce qui n'y était pas mène à chercher
+  longtemps pourquoi rien n'a changé.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_param(m, 'StopTime', 2);
+     m = delete_param(m, 'StopTime');
+     isfield(m.parametres, 'StopTime')        % faux
+
+  Voir aussi ADD_PARAM, SET_PARAM, GET_PARAM, NEW_SYSTEM.
+```
+
+## `dlinmod`
+
+```
+DLINMOD Linéarise un modèle et l'échantillonne à la période TS.
+  [A,B,C,D] = DLINMOD(MODELE,TS) linéarise le modèle comme LINMOD, puis
+  discrétise le résultat par bloqueur d'ordre zéro : l'entrée est tenue
+  constante entre deux instants d'échantillonnage.
+  [A,B,C,D] = DLINMOD(MODELE,TS,X,U) choisit le point de
+  fonctionnement ; PARA joue le même rôle que dans LINMOD.
+  SYS = DLINMOD(...) rend la structure à champs a, b, c, d.
+
+  La discrétisation est exacte, non approchée : Ad et Bd sortent d'une
+  seule exponentielle de matrice, celle de [A B ; 0 0]*TS, dont le bloc
+  supérieur droit vaut l'intégrale de exp(A t) B — ce qui évite d'avoir
+  à inverser A, qui est souvent singulière.
+
+  TS nul rend la linéarisation continue elle-même, comme dans MATLAB.
+
+  Exemple :
+     m = new_system('premier');
+     m = add_block(m, 'inport', 'u', 'Port', 1);
+     m = add_block(m, 'sum', 's', 'Signs', '+-');
+     m = add_block(m, 'integrator', 'x');
+     m = add_block(m, 'outport', 'y', 'Port', 1);
+     m = add_line(m, 'u', 's', 1);
+     m = add_line(m, 'x', 's', 2);
+     m = add_line(m, 's', 'x');
+     m = add_line(m, 'x', 'y');
+     [Ad, Bd] = dlinmod(m, 0.5);
+     abs(Ad - exp(-0.5)) < 1e-12          % le pole continu -1
+
+  Voir aussi LINMOD, TRIM, C2D, SIM.
+```
+
 ## `find_system`
 
 ```
@@ -110,6 +418,27 @@ FIND_SYSTEM Les blocs d'un modèle, éventuellement filtrés.
   Voir aussi GET_PARAM, SET_PARAM, ADD_BLOCK, NEW_SYSTEM.
 ```
 
+## `gcs`
+
+```
+GCS Le nom du dernier modèle ouvert.
+  NOM = GCS() rend le nom du modèle ouvert le plus récemment par
+  OPEN_SYSTEM ou LOAD_SYSTEM, et une chaîne vide si aucun ne l'est.
+
+  Dans MATLAB, GCS rend le système courant, celui dont la fenêtre a le
+  focus. Il n'y a pas de fenêtre ici, et la notion la plus proche est
+  celle du dernier modèle ouvert : c'est ce que rend GCS.
+
+  Exemple :
+     bdclose('all');
+     m = new_system('regulateur');
+     open_system(m);
+     gcs()                            % 'regulateur'
+     bdclose('all');
+
+  Voir aussi OPEN_SYSTEM, CLOSE_SYSTEM, BDROOT, BDISLOADED.
+```
+
 ## `get_param`
 
 ```
@@ -118,7 +447,8 @@ GET_PARAM Lit un paramètre d'un bloc, ou la description d'un bloc.
   nommé. GET_PARAM(MODELE,NOM) rend la structure entière du bloc : son
   type, son nom et tous ses paramètres.
   GET_PARAM(MODELE,'Name') et GET_PARAM(MODELE,'Blocks') répondent sur
-  le modèle lui-même.
+  le modèle lui-même, ainsi que tout réglage posé par ADD_PARAM —
+  StopTime, FixedStep — quand aucun bloc ne porte ce nom.
 
   C'est le pendant de SET_PARAM, sans lequel on pouvait écrire un
   réglage sans jamais pouvoir le relire — et donc ni le vérifier, ni le
@@ -135,8 +465,98 @@ GET_PARAM Lit un paramètre d'un bloc, ou la description d'un bloc.
      m = set_param(m, 'g', 'Gain', 5);
      get_param(m, 'g', 'Gain')            % 5
      get_param(m, 'g').type               % 'gain'
+     m = add_param(m, 'StopTime', 4);
+     get_param(m, 'StopTime')             % 4
 
-  Voir aussi SET_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+  Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+```
+
+## `getfullname`
+
+```
+GETFULLNAME Le chemin complet d'un bloc, « modele/bloc ».
+  CHEMIN = GETFULLNAME(MODELE,NOM) rend 'modele/bloc', la forme sous
+  laquelle Simulink désigne un bloc. GETFULLNAME(MODELE) rend le nom du
+  modèle seul.
+
+  Le bloc doit exister : un chemin vers un bloc absent se propagerait
+  sans erreur jusqu'à l'endroit où il ne veut rien dire.
+
+  Exemple :
+     m = new_system('boucle');
+     m = add_block(m, 'gain', 'k', 'Gain', 2);
+     getfullname(m, 'k')              % 'boucle/k'
+
+  Voir aussi FIND_SYSTEM, GET_PARAM, BDROOT, NEW_SYSTEM.
+```
+
+## `linmod`
+
+```
+LINMOD Linéarise un modèle autour d'un point de fonctionnement.
+  [A,B,C,D] = LINMOD(MODELE) linéarise le modèle autour de l'état nul
+  et de l'entrée nulle. Les entrées sont les blocs INPORT, classés par
+  leur paramètre Port ; les sorties, les blocs OUTPORT ; les états, les
+  intégrateurs et les représentations d'état, dans l'ordre du modèle.
+
+  [A,B,C,D] = LINMOD(MODELE,X,U) choisit le point de fonctionnement.
+  [A,B,C,D] = LINMOD(MODELE,X,U,PARA) donne dans PARA(3) le pas de
+  perturbation, et dans PARA(1) le pas de simulation employé pour
+  relever les signaux.
+  SYS = LINMOD(...) rend une structure à champs a, b, c, d, StateName,
+  InputName et OutputName, comme MATLAB.
+
+  La linéarisation est numérique, par différences centrées : elle est
+  donc exacte, à l'arrondi près, sur un modèle déjà linéaire. Sur un
+  bloc à cassure — saturation, zone morte, relais, aiguillage — elle
+  rend la pente locale, et n'a pas de sens au point de cassure même.
+
+  Un bloc DERIVATIVE est refusé : sa sortie dépend du pas de calcul,
+  si bien que sa linéarisation dépendrait d'un réglage du simulateur
+  plutôt que du modèle.
+
+  Exemple :
+     m = new_system('deuxieme');
+     m = add_block(m, 'inport', 'u', 'Port', 1);
+     m = add_block(m, 'sum', 's', 'Signs', '+-');
+     m = add_block(m, 'integrator', 'v');
+     m = add_block(m, 'integrator', 'p');
+     m = add_block(m, 'gain', 'k', 'Gain', 4);
+     m = add_block(m, 'outport', 'y', 'Port', 1);
+     m = add_line(m, 'u', 's', 1);
+     m = add_line(m, 'k', 's', 2);
+     m = add_line(m, 's', 'v');
+     m = add_line(m, 'v', 'p');
+     m = add_line(m, 'p', 'k');
+     m = add_line(m, 'p', 'y');
+     [A, B, C, D] = linmod(m);
+     A                                   % [0 -4 ; 1 0]
+
+  Voir aussi DLINMOD, TRIM, SIM, SS.
+```
+
+## `load_system`
+
+```
+LOAD_SYSTEM Relit un modèle enregistré, et l'ouvre dans la session.
+  MODELE = LOAD_SYSTEM(NOM) exécute le fichier NOM.m — celui qu'écrit
+  SAVE_SYSTEM, ou tout autre programme qui rend un modèle — et rend le
+  modèle obtenu. Le modèle est inscrit au registre de la session :
+  BDISLOADED répond vrai, et GCS le nomme.
+
+  Le chemin peut porter l'extension .m ou non. Un fichier .slx ou .mdl
+  est refusé en disant pourquoi : leur format n'est pas public.
+
+  Exemple :
+     m = new_system('petit');
+     m = add_block(m, 'constant', 'c', 'Value', 7);
+     chemin = save_system(m, [tempname() '.m']);
+     relu = load_system(chemin);
+     get_param(relu, 'c', 'Value')            % 7
+     bdclose('petit');
+     delete(chemin);
+
+  Voir aussi SAVE_SYSTEM, OPEN_SYSTEM, BDISLOADED, GCS, SIM.
 ```
 
 ## `matlibre_meme_valeur`
@@ -178,6 +598,33 @@ MATLIBRE_SL_ALLURE Dessine dans le bloc l'allure de ce qu'il produit.
   Voir aussi MATLIBRE_SL_FORME, MATLIBRE_SL_ETIQUETTE.
 ```
 
+## `matlibre_sl_derivee`
+
+```
+MATLIBRE_SL_DERIVEE Dérivée d'état et sortie d'un modèle en un point.
+  [DX,Y] = MATLIBRE_SL_DERIVEE(MODELE,X,U,PAS) place les états
+  continus à X et les entrées à U, simule un seul instant, et relève la
+  dérivée de chaque état ainsi que la valeur de chaque sortie.
+
+  La dérivée ne se mesure pas : elle se lit. L'entrée d'un intégrateur
+  est sa dérivée, et le simulateur relève déjà la sortie de chaque
+  bloc. Pour une représentation d'état, c'est A x + B u, calculé sur
+  l'entrée relevée.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('chaine');
+     m = add_block(m, 'inport', 'u', 'Port', 1);
+     m = add_block(m, 'gain', 'k', 'Gain', 3);
+     m = add_block(m, 'integrator', 'x');
+     m = add_line(m, 'u', 'k');
+     m = add_line(m, 'k', 'x');
+     matlibre_sl_derivee(m, 0, 2, 1e-3)     % 6 : la dérivée vaut 3*u
+
+  Voir aussi LINMOD, DLINMOD, TRIM, SIM.
+```
+
 ## `matlibre_sl_disposition`
 
 ```
@@ -203,6 +650,34 @@ MATLIBRE_SL_DISPOSITION Place les blocs d'un schéma sur la feuille.
   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_RANGS.
 ```
 
+## `matlibre_sl_etats`
+
+```
+MATLIBRE_SL_ETATS Recense les états continus, les entrées et les sorties.
+  [BLOCS,RANGS,ENTREES,SORTIES] = MATLIBRE_SL_ETATS(MODELE) rend, pour
+  chaque bloc à état continu, son rang dans le modèle (BLOCS) et le
+  rang des composantes d'état qu'il porte dans le vecteur global
+  (RANGS, une cellule par bloc). ENTREES et SORTIES rendent les rangs
+  des blocs INPORT et OUTPORT, classés par leur paramètre Port.
+
+  Seuls l'intégrateur et la représentation d'état — donc aussi la
+  fonction de transfert, qui s'y ramène — portent un état continu.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('chaine');
+     m = add_block(m, 'inport', 'u', 'Port', 1);
+     m = add_block(m, 'integrator', 'x');
+     m = add_block(m, 'outport', 'y', 'Port', 1);
+     m = add_line(m, 'u', 'x');
+     m = add_line(m, 'x', 'y');
+     [b, r] = matlibre_sl_etats(m);
+     numel(b)                          % 1 : un seul etat
+
+  Voir aussi LINMOD, DLINMOD, TRIM, SIM.
+```
+
 ## `matlibre_sl_etiquette`
 
 ```
@@ -221,6 +696,34 @@ MATLIBRE_SL_ETIQUETTE Ce qui s'écrit dans un bloc.
      matlibre_sl_etiquette(struct('type', 'integrator', 'parametres', struct()))
 
   Voir aussi MATLIBRE_SL_FORME, OPEN_SYSTEM, GET_PARAM.
+```
+
+## `matlibre_sl_expression`
+
+```
+MATLIBRE_SL_EXPRESSION Évalue un paramètre de bloc donné par une expression.
+  V = MATLIBRE_SL_EXPRESSION(TEXTE,BLOC,PARAMETRE) évalue TEXTE dans
+  l'espace de travail de base et rend sa valeur numérique.
+
+  C'est ainsi qu'un modèle et l'espace de travail partagent leurs
+  variables : un gain réglé à 'K' vaut ce que vaut K au moment où l'on
+  simule, non ce qu'il valait quand on a posé le bloc. Changer K et
+  relancer SIM suffit ; le modèle, lui, ne bouge pas.
+
+  L'espace consulté est celui de base, comme dans Simulink : un modèle
+  ne voit pas les variables locales de la fonction qui le simule.
+
+  Une expression qui ne s'évalue pas, ou qui ne rend pas un nombre, est
+  refusée en nommant le bloc et le paramètre — sans quoi on chercherait
+  longtemps d'où vient un résultat faux.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     K = 3;
+     matlibre_sl_expression('2 * K', 'gain', 'Gain')      % 6
+
+  Voir aussi SIM, ADD_BLOCK, SET_PARAM, EVALIN.
 ```
 
 ## `matlibre_sl_fil`
@@ -264,6 +767,67 @@ MATLIBRE_SL_FORME Dessine un bloc, selon ce qu'il fait.
                               'parametres', struct('Gain', 3)), 0, 0, 1.7, 1);
 
   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_FIL.
+```
+
+## `matlibre_sl_indice`
+
+```
+MATLIBRE_SL_INDICE Rang d'un bloc désigné par son nom.
+  K = MATLIBRE_SL_INDICE(MODELE,NOM) rend le rang du bloc dans
+  MODELE.blocs, et lève une erreur qui nomme le bloc s'il n'existe pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_block(m, 'gain', 'g', 'Gain', 2);
+     matlibre_sl_indice(m, 'g')       % 1
+
+  Voir aussi ADD_LINE, DELETE_BLOCK, GET_PARAM.
+```
+
+## `matlibre_sl_modele`
+
+```
+MATLIBRE_SL_MODELE Rend un modèle, qu'on l'ait donné par valeur ou par nom.
+  MODELE = MATLIBRE_SL_MODELE(ENTREE) accepte un modèle bâti par
+  NEW_SYSTEM, ou le nom d'un modèle ouvert dans la session, ou le nom
+  d'un fichier .m qui le rend.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('essai');
+     nom = matlibre_sl_modele(m).nom;      % 'essai'
+
+  Voir aussi LINMOD, TRIM, OPEN_SYSTEM, LOAD_SYSTEM, SIM.
+```
+
+## `matlibre_sl_ouverts`
+
+```
+MATLIBRE_SL_OUVERTS Registre des modèles ouverts dans la session.
+  Un modèle est ici une valeur, non une fenêtre. « Ouvert » veut donc
+  dire « connu de la session » : OPEN_SYSTEM et LOAD_SYSTEM y
+  inscrivent le modèle, CLOSE_SYSTEM et BDCLOSE l'en retirent, GCS rend
+  le dernier inscrit, et BDISLOADED répond sur un nom.
+
+  L'inscription retient aussi le numéro de la figure où le schéma est
+  tracé, quand il y en a une, pour que CLOSE_SYSTEM sache laquelle
+  fermer.
+
+  Actions : 'inscrire', 'retirer', 'vider', 'lire', 'figure', 'connu',
+  'noms', 'dernier'.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_sl_ouverts('vider');
+     matlibre_sl_ouverts('inscrire', 'essai', new_system('essai'));
+     matlibre_sl_ouverts('dernier')          % 'essai'
+     matlibre_sl_ouverts('vider');
+
+  Voir aussi OPEN_SYSTEM, CLOSE_SYSTEM, GCS, BDISLOADED, LOAD_SYSTEM.
 ```
 
 ## `matlibre_sl_pointe`
@@ -328,20 +892,48 @@ MATLIBRE_SL_SIGNES Signes d'un bloc de sommation.
   Voir aussi MATLIBRE_SL_FORME, ADD_BLOCK.
 ```
 
+## `matlibre_sl_toile`
+
+```
+MATLIBRE_SL_TOILE Taille de figure qui convient à un schéma.
+  [L,H] = MATLIBRE_SL_TOILE(UX,UY) rend la largeur et la hauteur en
+  pixels d'une figure où un schéma de UX sur UY unités se lise : assez
+  grande pour qu'un nom de bloc tienne sous son bloc, assez petite pour
+  tenir sur un écran.
+
+  La toile garde les proportions du schéma. Sans cela, « axis equal »
+  ajuste l'échelle au côté le plus contraint et laisse le reste en
+  blanc : un schéma en long se retrouvait en bandeau au milieu d'une
+  toile carrée, ses étiquettes serrées à l'illisible.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     [l, h] = matlibre_sl_toile(20, 5);
+     abs(l / h - 4) < 0.05            % la toile suit les proportions
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_DISPOSITION.
+```
+
 ## `new_system`
 
 ```
 NEW_SYSTEM Crée un modèle Simulink vide.
   MODELE = NEW_SYSTEM(NOM) rend un modèle sans bloc ni lien. On le
   remplit par ADD_BLOCK, on le câble par ADD_LINE, on le règle par
-  SET_PARAM, et on le simule par SIM.
+  SET_PARAM, on le regarde par OPEN_SYSTEM, et on le simule par SIM.
 
-  Le modèle est une structure à trois champs : NOM, BLOCS et LIENS.
-  C'est une valeur, non une référence : chaque fonction en rend une
-  nouvelle et laisse l'ancienne intacte.
+  Le modèle est une structure à quatre champs : NOM, BLOCS, LIENS et
+  PARAMETRES. C'est une valeur, non une référence : chaque fonction en
+  rend une nouvelle et laisse l'ancienne intacte.
+
+  PARAMETRES porte les réglages du modèle lui-même — StopTime,
+  FixedStep —, que SIM emploie quand on ne lui donne ni durée ni pas.
+  ADD_PARAM les pose, DELETE_PARAM les retire.
 
   Les modèles se décrivent ici en appelant ces fonctions ; les fichiers
   .slx de MathWorks, dont le format n'est pas public, ne se lisent pas.
+  SAVE_SYSTEM en écrit un programme .m, que LOAD_SYSTEM relit.
 
   Exemple :
      m = new_system('rampe');
@@ -350,7 +942,7 @@ NEW_SYSTEM Crée un modèle Simulink vide.
      m = add_line(m, 'un', 'integ');
      r = sim(m, 5, 0.001);
 
-  Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
+  Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, ADD_PARAM, SIM, OPEN_SYSTEM.
 ```
 
 ## `open_system`
@@ -371,6 +963,11 @@ OPEN_SYSTEM Ouvre un modèle et en dessine le schéma-bloc.
   MATLAB ouvre un éditeur, MatLibre rend une figure — on voit le
   schéma, on ne le modifie pas là.
 
+  Le modèle est inscrit au registre de la session : GCS le nomme,
+  BDISLOADED répond vrai, et CLOSE_SYSTEM le ferme avec sa figure.
+  OPEN_SYSTEM(NOM) rouvre un modèle déjà inscrit, ou exécute le
+  fichier NOM.m qui le rend.
+
   Exemple :
      m = new_system('boucle');
      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -382,8 +979,66 @@ OPEN_SYSTEM Ouvre un modèle et en dessine le schéma-bloc.
      m = add_line(m, 'erreur', 'correcteur');
      m = add_line(m, 'correcteur', 'sortie');
      open_system(m);
+     close_system(m);
 
-  Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIM, SIMPLOT.
+  Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM, GCS, SIM.
+```
+
+## `replace_block`
+
+```
+REPLACE_BLOCK Remplace les blocs d'un type par un autre type.
+  MODELE = REPLACE_BLOCK(MODELE,ANCIEN,NOUVEAU) change le type de tous
+  les blocs de type ANCIEN en NOUVEAU. Les noms, les liens et les
+  paramètres sont conservés.
+  REPLACE_BLOCK(MODELE,ANCIEN,NOUVEAU,'Param',VALEUR,...) fixe en outre
+  des paramètres sur chaque bloc remplacé.
+
+  Le câblage ne bouge pas : c'est tout l'intérêt, remplacer un
+  intégrateur continu par son équivalent discret sans redessiner le
+  schéma.
+
+  Exemple :
+     m = new_system('essai');
+     m = add_block(m, 'integrator', 'i1');
+     m = add_block(m, 'integrator', 'i2');
+     m = replace_block(m, 'integrator', 'discreteintegrator', ...
+                       'SampleTime', 0.1);
+     get_param(m, 'i1', 'BlockType')          % 'discreteintegrator'
+     get_param(m, 'i2', 'SampleTime')         % 0.1
+
+  Voir aussi ADD_BLOCK, DELETE_BLOCK, SET_PARAM, FIND_SYSTEM.
+```
+
+## `save_system`
+
+```
+SAVE_SYSTEM Enregistre un modèle dans un fichier .m qui le rebâtit.
+  SAVE_SYSTEM(MODELE) écrit MODELE.nom.m dans le dossier courant.
+  SAVE_SYSTEM(MODELE,FICHIER) choisit le nom du fichier ; l'extension
+  .m est ajoutée si elle manque. La fonction rend le chemin écrit.
+
+  Le fichier produit est un programme : une fonction sans argument qui
+  appelle NEW_SYSTEM, ADD_BLOCK et ADD_LINE, et rend le modèle.
+  LOAD_SYSTEM le relit, et SIM l'accepte par son nom. C'est un format
+  qui se lit, se compare et se range dans un dépôt — ce que le .slx de
+  MathWorks, binaire et non documenté, ne permet pas.
+
+  Les valeurs de paramètres sont réécrites par MAT2STR pour les
+  nombres et entre apostrophes pour le texte : ce qu'on relit est ce
+  qu'on avait, à la représentation près.
+
+  Exemple :
+     m = new_system('boucle');
+     m = add_block(m, 'constant', 'c', 'Value', 2);
+     m = add_block(m, 'gain', 'g', 'Gain', 3);
+     m = add_line(m, 'c', 'g');
+     chemin = save_system(m, [tempname() '.m']);
+     relu = load_system(chemin);
+     get_param(relu, 'g', 'Gain')             % 3
+     delete(chemin);
+
+  Voir aussi LOAD_SYSTEM, NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM.
 ```
 
 ## `set_param`
@@ -402,6 +1057,12 @@ SET_PARAM Modifie les paramètres d'un bloc.
   type de bloc. Un nom inconnu est simplement ajouté ; il ne sera lu par
   personne.
 
+  MODELE = SET_PARAM(MODELE,'Nom',VALEUR) — une seule valeur, sans nom
+  de bloc devant — change un réglage du modèle lui-même, comme
+  StopTime ou FixedStep. La forme se distingue sans ambiguïté : un
+  réglage de bloc se donne toujours par couples, donc en nombre pair
+  d'arguments après le nom du bloc.
+
   Exemple :
      m = new_system('boucle');
      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -417,7 +1078,7 @@ SET_PARAM Modifie les paramètres d'un bloc.
          r = sim(m, 5, 0.01);
      end
 
-  Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
+  Voir aussi ADD_BLOCK, ADD_PARAM, NEW_SYSTEM, SIM.
 ```
 
 ## `sim`
@@ -431,13 +1092,21 @@ SIM Simule un modèle à pas fixe.
   il donne alors à la fois l'instant final et le pas.
 
   L'intégration se fait par la méthode d'Euler explicite ; les blocs
-  sans état sont évalués dans l'ordre d'un tri topologique, ce qui
-  garantit qu'une entrée est calculée avant la sortie qui l'utilise.
-  Les intégrateurs et les retards fournissent la mémoire, et cassent
-  donc les boucles algébriques.
+  sont évalués dans l'ordre d'un tri topologique, ce qui garantit
+  qu'une entrée est calculée avant la sortie qui l'utilise. Seuls les
+  blocs sans transmission directe — intégrateur, retard, mémoire,
+  retard pur, tenue d'ordre zéro, et les représentations d'état dont D
+  est nul — coupent la remontée, et cassent donc les boucles
+  algébriques. Un bloc à mémoire mais à transmission directe, comme le
+  dérivateur ou le relais, ne la coupe pas : sa sortie dépend de son
+  entrée à l'instant même.
 
   Tous les paramètres sont résolus avant la boucle : à l'intérieur, il
-  ne reste que de l'arithmétique.
+  ne reste que de l'arithmétique. Un paramètre numérique donné entre
+  apostrophes est une expression, évaluée à ce moment-là dans l'espace
+  de travail de base : changer la variable et relancer SIM change le
+  résultat sans que le modèle ait bougé. Les blocs « toworkspace » et
+  « fromworkspace » font l'échange dans les deux sens.
 
   SIM('NOM') accepte aussi le nom d'un modèle : une variable de
   l'espace de travail qui porte ce nom, ou un fichier NOM.m qui
@@ -458,7 +1127,23 @@ SIM Simule un modèle à pas fixe.
      r = sim(m, 5, 0.001);
      abs(r.signaux.integ(end) - 10) < 0.01     % l'integrale de 2 sur 5 s
 
-  Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIMPLOT.
+  Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIMPLOT, LINMOD.
+```
+
+## `simget`
+
+```
+SIMGET Lit une option de simulation.
+  V = SIMGET(OPTIONS,'Nom') rend la valeur de l'option, et une matrice
+  vide si elle n'est pas réglée. SIMGET(OPTIONS) rend la structure
+  entière.
+
+  Exemple :
+     o = simset('FixedStep', 0.02);
+     simget(o, 'FixedStep')           % 0.02
+     isempty(simget(simset(), 'FixedStep'))   % vrai : rien n'est regle
+
+  Voir aussi SIMSET, SIM.
 ```
 
 ## `simplot`
@@ -483,5 +1168,71 @@ SIMPLOT Trace les signaux relevés par SIM.
      simplot(r, {'consigne', 'sortie'});
 
   Voir aussi SIM, PLOT, LEGEND.
+```
+
+## `simset`
+
+```
+SIMSET Rassemble les options d'une simulation.
+  OPTIONS = SIMSET('Nom',VALEUR,...) rend une structure d'options que
+  SIM accepte à la place du pas : SIM(MODELE,TFINAL,OPTIONS).
+  OPTIONS = SIMSET(ANCIENNES,'Nom',VALEUR,...) part d'un jeu existant.
+  SIMSET() sans argument rend le jeu par défaut.
+
+  Options lues :
+    FixedStep       le pas d'intégration
+    Solver          le nom du solveur ; seul 'FixedStepDiscrete' et
+                    l'Euler explicite 'ode1' existent ici, et tout
+                    autre nom est refusé plutôt qu'ignoré
+
+  Les options que MATLAB accepte et que MatLibre ne sait pas honorer
+  sont refusées en le disant : une option acceptée sans effet ferait
+  croire à un réglage qui n'a pas lieu.
+
+  Exemple :
+     o = simset('FixedStep', 0.05);
+     m = new_system('essai');
+     m = add_block(m, 'constant', 'c', 'Value', 1);
+     r = sim(m, 1, o);
+     numel(r.temps)                   % 21
+
+  Voir aussi SIMGET, SIM, ADD_PARAM.
+```
+
+## `trim`
+
+```
+TRIM Cherche un point d'équilibre d'un modèle.
+  [X,U,Y,DX] = TRIM(MODELE) cherche l'état et l'entrée qui annulent
+  toutes les dérivées, en partant de zéro.
+  TRIM(MODELE,X0,U0,Y0) part des valeurs données et vise la sortie Y0.
+  TRIM(MODELE,X0,U0,Y0,IX,IU,IY) tient fixées les composantes désignées
+  par IX dans l'état et IU dans l'entrée, et n'impose la sortie que sur
+  les composantes IY.
+
+  La recherche est un Gauss-Newton amorti sur le résidu formé des
+  dérivées d'état et des écarts de sortie imposés. Le jacobien vient de
+  différences centrées, comme dans LINMOD : sur un modèle linéaire,
+  l'équilibre est donc atteint en une itération, à l'arrondi près.
+
+  DX est rendu pour qu'on puisse juger : un équilibre trouvé se
+  reconnaît à ce que DX y est nul, non à ce que la fonction a rendu
+  sans erreur. Quand la recherche n'y parvient pas, l'avertissement le
+  dit et le meilleur point trouvé est rendu quand même.
+
+  Exemple :
+     m = new_system('premier');
+     m = add_block(m, 'inport', 'u', 'Port', 1);
+     m = add_block(m, 'sum', 's', 'Signs', '+-');
+     m = add_block(m, 'integrator', 'x');
+     m = add_block(m, 'outport', 'y', 'Port', 1);
+     m = add_line(m, 'u', 's', 1);
+     m = add_line(m, 'x', 's', 2);
+     m = add_line(m, 's', 'x');
+     m = add_line(m, 'x', 'y');
+     [xe, ue, ye, dxe] = trim(m, 0, 1, [], [], 1, []);
+     abs(xe - 1) < 1e-8                   % l'equilibre de x' = u - x
+
+  Voir aussi LINMOD, DLINMOD, SIM, FSOLVE.
 ```
 

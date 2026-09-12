@@ -613,6 +613,7 @@ void Moteur::publierEtat() {
         emit dossierChange(dossier);
     }
     QVector<LigneEspaceTravail> lignes;
+    QStringList modeles;
     for (const auto& nom : it_->nomsVariables()) {
         Valeur v = it_->lireVariable(nom);
         LigneEspaceTravail l;
@@ -621,8 +622,14 @@ void Moteur::publierEtat() {
         l.classe = classeTexte(v);
         l.valeur = resumeValeur(*it_, v);
         lignes.push_back(l);
+        // Un modele Simulink se reconnait a ses trois champs : c'est ce que
+        // NEW_SYSTEM rend, et ce que SIM et OPEN_SYSTEM attendent.
+        if (v.estStructure() && v.aChamp("nom") && v.aChamp("blocs") &&
+            v.aChamp("liens"))
+            modeles << l.nom;
     }
     emit espaceTravailChange(lignes);
+    emit modelesSimulinkChanges(modeles);
 
     QVector<FigureCopiee> figures;
     std::map<int, std::uint64_t> presentes;

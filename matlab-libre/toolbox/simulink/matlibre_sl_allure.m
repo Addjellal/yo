@@ -36,6 +36,36 @@ function trace = matlibre_sl_allure(bloc, x, y, largeur, hauteur)
             line([x - a, x - a, x + a], [y + b, y - b, y - b], 'Color', couleur);
             t = linspace(0, 1, 20);
             line(x - a + 2 * a * t, y - b + 1.6 * b * t .^ 2, 'Color', couleur);
+        case 'deadzone'
+            % La bande morte : plat au centre, deux pentes aux bouts.
+            line([x - a, x - a/3, x + a/3, x + a], [y - b, y, y, y + b], ...
+                 'Color', couleur);
+        case 'quantizer'
+            % Un escalier : trois marches suffisent à le dire.
+            line([x - a, x - a/3, x - a/3, x + a/3, x + a/3, x + a], ...
+                 [y - b, y - b, y, y, y + b, y + b], 'Color', couleur);
+        case 'sign'
+            line([x - a, x - a/8, x - a/8, x + a/8, x + a/8, x + a], ...
+                 [y - b, y - b, y, y, y + b, y + b], 'Color', couleur);
+        case 'ratelimiter'
+            % La pente est bornée : le trait ne monte jamais plus vite
+            % qu'une droite, quoi que fasse l'entrée.
+            line([x - a, x, x + a], [y - b, y + b, y + b], 'Color', couleur);
+            line([x - a, x + a], [y - b, y + b * 1.1], 'Color', couleur, ...
+                 'LineStyle', ':');
+        case 'zoh'
+            % Une tenue d'ordre zéro : des paliers.
+            line([x - a, x - a/3, x - a/3, x + a/3, x + a/3, x + a], ...
+                 [y - b, y - b, y + b/2, y + b/2, y - b/2, y - b/2], 'Color', couleur);
+        case {'lookup', 'lookup1d'}
+            line([x - a, x - a/3, x + a/4, x + a], [y - b, y + b/3, y - b/4, y + b], ...
+                 'Color', couleur);
+        case 'transportdelay'
+            % Le même motif, deux fois, décalé : c'est ce que fait le bloc.
+            line([x - a, x - a/2, x - a/2, x], [y + b/4, y + b/4, y + b, y + b], ...
+                 'Color', couleur);
+            line([x - a/4, x + a/4, x + a/4, x + a], ...
+                 [y - b, y - b, y - b/4, y - b/4], 'Color', couleur, 'LineStyle', ':');
         otherwise
             trace = false;
     end

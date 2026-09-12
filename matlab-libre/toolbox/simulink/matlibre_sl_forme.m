@@ -39,6 +39,24 @@ function matlibre_sl_forme(bloc, x, y, largeur, hauteur)
                 text(x - hauteur * 0.24, place, signes(k), ...
                      'HorizontalAlignment', 'center', 'FontSize', 10);
             end
+        case {'inport', 'outport'}
+            % Les bornes du modèle : un pentagone pointé vers le sens du
+            % signal, comme dans Simulink. On voit d'un coup d'œil par où
+            % le modèle est alimenté et par où il rend.
+            demiL = largeur / 2;
+            demiH = hauteur / 2;
+            pointe = demiL * 0.45;
+            if strcmp(bloc.type, 'inport')
+                abscisses = [x - demiL, x + demiL - pointe, x + demiL, ...
+                             x + demiL - pointe, x - demiL];
+                ordonnees = [y - demiH, y - demiH, y, y + demiH, y + demiH];
+            else
+                abscisses = [x - demiL + pointe, x + demiL, x + demiL, ...
+                             x - demiL + pointe, x - demiL];
+                ordonnees = [y - demiH, y - demiH, y + demiH, y + demiH, y];
+            end
+            patch(abscisses, ordonnees, remplissage, 'EdgeColor', contour);
+            texte(x, y, matlibre_sl_etiquette(bloc));
         otherwise
             rectangle('Position', [x - largeur/2, y - hauteur/2, largeur, hauteur], ...
                       'FaceColor', remplissage, 'EdgeColor', contour);

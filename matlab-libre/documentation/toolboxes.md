@@ -53,7 +53,7 @@ existant appellera.
 | `robuste` | Robust Control Toolbox — analyse de robustesse. | 93 |
 | `signal` | Signal Processing Toolbox — traitement du signal. | 208 |
 | `simscape` | Simscape — réseaux physiques. | 9 |
-| `simulink` | Simulink — simulation de schémas-blocs. | 18 |
+| `simulink` | Simulink — simulation de schémas-blocs. | 43 |
 | `stateflow` | Stateflow — machines à états finis. | 4 |
 | `statistiques` | Statistics and Machine Learning Toolbox — statistiques et apprentissage. | 293 |
 | `symbolique` | Symbolic Math Toolbox — calcul formel. | 70 |

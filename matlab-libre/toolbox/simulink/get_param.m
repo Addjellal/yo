@@ -4,7 +4,8 @@ function valeur = get_param(modele, nom, parametre)
 %   nommé. GET_PARAM(MODELE,NOM) rend la structure entière du bloc : son
 %   type, son nom et tous ses paramètres.
 %   GET_PARAM(MODELE,'Name') et GET_PARAM(MODELE,'Blocks') répondent sur
-%   le modèle lui-même.
+%   le modèle lui-même, ainsi que tout réglage posé par ADD_PARAM —
+%   StopTime, FixedStep — quand aucun bloc ne porte ce nom.
 %
 %   C'est le pendant de SET_PARAM, sans lequel on pouvait écrire un
 %   réglage sans jamais pouvoir le relire — et donc ni le vérifier, ni le
@@ -21,8 +22,10 @@ function valeur = get_param(modele, nom, parametre)
 %      m = set_param(m, 'g', 'Gain', 5);
 %      get_param(m, 'g', 'Gain')            % 5
 %      get_param(m, 'g').type               % 'gain'
+%      m = add_param(m, 'StopTime', 4);
+%      get_param(m, 'StopTime')             % 4
 %
-%   Voir aussi SET_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+%   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
     if nargin == 2 && (strcmpi(nom, 'Name') || strcmpi(nom, 'Blocks'))
         if strcmpi(nom, 'Name')
             valeur = modele.nom;
@@ -57,6 +60,11 @@ function valeur = get_param(modele, nom, parametre)
             error('simulink:get_param:unknownParameter', ...
                   'Le bloc ''%s'' n''a pas de paramètre ''%s''.', nom, champ);
         end
+    end
+    % Aucun bloc de ce nom : c'est peut-être un réglage du modèle.
+    if nargin == 2 && isfield(modele, 'parametres') && isfield(modele.parametres, char(nom))
+        valeur = modele.parametres.(char(nom));
+        return
     end
     error('simulink:get_param:unknownBlock', 'Unknown block ''%s''.', nom);
 end

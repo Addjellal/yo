@@ -34,6 +34,32 @@ function texte = matlibre_sl_etiquette(bloc)
             if isfield(p, 'Operator')
                 texte = char(p.Operator);
             end
+        case 'bias',       texte = ['u + ' nombre(p, 'Bias', 0)];
+        case 'memory',     texte = 'u(k-1)';
+        case 'unitdelay',  texte = '1/z';
+        case 'inport',     texte = ['in ' nombre(p, 'Port', 1)];
+        case 'outport',    texte = ['out ' nombre(p, 'Port', 1)];
+        case 'minmax'
+            texte = 'min';
+            if isfield(p, 'Function')
+                texte = lower(char(p.Function));
+            end
+        case {'logic', 'relational'}
+            texte = 'op';
+            if isfield(p, 'Operator')
+                texte = char(p.Operator);
+            end
+        case 'trigonometry'
+            texte = 'sin';
+            if isfield(p, 'Operator')
+                texte = lower(char(p.Operator));
+            end
+        case 'switch',     texte = 'u1 / u3';
+        case 'pidcontroller', texte = 'PID';
+        case 'discreteintegrator', texte = 'T/(z-1)';
+        case 'discretestatespace', texte = 'A B C D (z)';
+        case 'discretetransferfcn'
+            texte = [vecteur(p, 'Numerator') ' / ' vecteur(p, 'Denominator') '  (z)'];
         otherwise
             texte = bloc.type;
     end
@@ -43,6 +69,13 @@ function t = nombre(p, nom, defaut)
     v = defaut;
     if isfield(p, nom)
         v = p.(nom);
+    end
+    % Un paramètre donné par une expression s'écrit tel quel : « K » dit
+    % d'où vient la valeur, là où le nombre qu'elle vaut aujourd'hui ne le
+    % dirait pas. C'est ce que Simulink affiche dans le bloc.
+    if ischar(v) || isstring(v)
+        t = char(v);
+        return
     end
     if isscalar(v) && v == round(v)
         t = sprintf('%d', v);
@@ -55,6 +88,10 @@ end
 
 function t = vecteur(p, nom)
     if isfield(p, nom)
+        if ischar(p.(nom)) || isstring(p.(nom))
+            t = char(p.(nom));
+            return
+        end
         t = mat2str(p.(nom));
     else
         t = '1';

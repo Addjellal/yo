@@ -120,6 +120,16 @@ suivant en donne quelques-unes, prises dans les tests.
 | réduction transitive | elle a la même fermeture transitive que le graphe de départ, avec le moins d'arcs possible |
 | isomorphisme de graphes | la permutation rendue transporte effectivement les arêtes ; deux graphes de même suite de degrés ne sont pas pour autant isomorphes — le cycle à six sommets n'est pas la réunion de deux triangles |
 | schéma-bloc | le rang d'un bloc est le plus long chemin qui y mène, non le plus court : une sommation alimentée par deux branches attend la plus longue ; un lien qui referme une boucle est mis à part, et tracé en retour à sa propre profondeur |
+| ordre de calcul d'un schéma | un bloc à transmission directe est calculé après son entrée, fût-il déclaré avant elle : le carré d'une rampe vaut t², non t² d'un pas plus tôt |
+| intégrateur discret | les trois méthodes de Simulink se distinguent exactement d'un demi-pas d'échantillonnage sur une entrée constante — Euler avant l'intègre juste, Euler arrière avance d'un pas, le trapèze d'un demi |
+| retard pur | il décale sans déformer : sur une rampe, la sortie est la rampe elle-même translatée du retard, à 1e-12 |
+| linéarisation | sur un modèle linéaire, LINMOD rend exactement les matrices que la théorie donne, valeurs propres comprises ; sur une saturation, la pente locale — un dans la bande, zéro au-delà |
+| point d'équilibre | TRIM rend la dérivée qu'il a atteinte, non seulement le point : un équilibre se reconnaît à ce que DX y est nul |
+| modèle enregistré | SAVE_SYSTEM puis LOAD_SYSTEM redonnent le même câblage, les mêmes paramètres — matrices comprises — et le même comportement sous LINMOD |
+| taille d'une figure | `figure('Position',…)` la fixe vraiment : le SVG porte la largeur et la hauteur demandées, et une unité que MatLibre ne mesure pas est refusée plutôt qu'ignorée |
+| espace de travail partagé | un paramètre de bloc écrit `'K'` vaut ce que vaut K au moment où l'on simule : changer K et relancer `sim` change le résultat sans que le modèle ait bougé, et le modèle porte toujours l'expression, non sa valeur |
+| échanges avec l'espace de travail | un bloc « vers l'espace de travail » y crée sa variable, et un bloc « depuis l'espace de travail » relit la sienne — aux instants donnés, la valeur donnée ; entre eux, la droite qui les joint ; au-delà, la dernière tenue |
+| bibliothèque du bureau | chacun des quarante blocs que la fenêtre Simulink propose est posé puis simulé par le test : elle ne peut donc pas offrir au clic un bloc que `sim` ne connaîtrait pas |
 
 ## 3. État par boîte à outils
 
@@ -150,6 +160,7 @@ distingue une boîte complète d'une boîte esquissée.
 | ajustement-courbes | 23 | modèles nommés, surfaces, lissage |
 | optimisation, optimisation-globale | 35 | linéaire, quadratique, non linéaire, génétique, recuit |
 | interface | 15 | composants et rappels, sans boucle d'événements modale |
+| simulink | 27 | schémas-blocs : trente-six types de blocs, continus et échantillonnés, tracé du schéma, linéarisation, équilibre |
 | les 30 autres | 2 à 9 | esquisses : les fonctions les plus employées du domaine |
 
 Les boîtes de deux à neuf fonctions — acquisition, aérospatial, audio,
@@ -162,7 +173,7 @@ programme d'école qui montre à quoi il sert.
 | sujet | état | ce qu'il faudrait |
 |---|---|---|
 | Interface graphique | `interface` rend des poignées et exécute les rappels au fil de l'eau ; il n'y a pas de boucle d'événements modale | une boucle d'événements, pour que `uiwait` attende vraiment |
-| Simulink | schémas-blocs à solveur explicite, pas de boucle algébrique ; `open_system` dessine le schéma — blocs rangés en couches, forme disant la fonction, câblage à angles droits, contre-réactions étagées par-dessous | solveur implicite, sous-systèmes, blocs à état discret ; le schéma se regarde et ne se déplace pas à la souris, et la toile est de taille fixe |
+| Simulink | trente-six types de blocs, continus et échantillonnés, à solveur explicite ; `open_system` dessine le schéma ; `linmod`, `dlinmod` et `trim` donnent les matrices et les équilibres ; `save_system` écrit un `.m` qui rebâtit le modèle ; le bureau l'ouvre par son bouton du ruban, avec sa bibliothèque de blocs et la liste des modèles que porte l'espace de travail | solveur implicite et pas variable, sous-systèmes, boucles algébriques résolues plutôt que refusées ; le schéma se regarde et ne se déplace pas à la souris |
 | Simscape | circuits électriques linéaires, continu et transitoire | composants non linéaires, autres domaines physiques |
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
 | Symbolique | dérivation — trigonométriques, hyperboliques, réciproques, logarithmes de toute base —, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, développement, regroupement, forme de Horner, éléments simples, isolement d'une inconnue, réécriture entre familles de fonctions, factorisation sur les rationnels, résolution exacte des polynômes et numérique du reste, sortie LaTeX | factorisation au-delà des racines rationnelles — x⁴+1 reste entier —, décomposition en éléments simples, arithmétique rationnelle exacte, expressions à plusieurs variables dans COLLECT et FACTOR |

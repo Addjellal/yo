@@ -147,6 +147,11 @@ signals:
     void arreteSur(const QString& fichier, int ligne);
     void repriseEffectuee();
     void espaceTravailChange(const QVector<LigneEspaceTravail>& lignes);
+    // Les modeles Simulink que porte l'espace de travail : une structure a
+    // champs « nom », « blocs » et « liens ». La fenetre Simulink en fait sa
+    // liste, qui se met ainsi a jour comme l'espace de travail — les deux
+    // cotes partagent les memes variables, il n'y a pas deux etats a tenir.
+    void modelesSimulinkChanges(const QStringList& noms);
     void effacementDemande();   // « clc »
     void aidePrete(const FicheAide& fiche);
     void indexAidePret(const QVector<EntreeIndexAide>& entrees);

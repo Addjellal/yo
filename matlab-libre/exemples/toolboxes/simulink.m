@@ -165,4 +165,104 @@ assert(~isempty(position), 'le signal se retrouve par son nom');
 assert(max(abs(r.signals(position).values(:) - r.signaux.sys(:))) < 1e-15, ...
        'et les valeurs sont les memes');
 
+%% 7. Linéariser un modèle autour d'un point de fonctionnement
+% Un schéma-bloc décrit une dynamique ; l'automatique la veut sous forme
+% de matrices. LINMOD fait le passage, par différences centrées : sur un
+% modèle linéaire, le résultat est exact à l'arrondi près.
+pendule = new_system('pendule');
+pendule = add_block(pendule, 'inport', 'couple', 'Port', 1);
+pendule = add_block(pendule, 'sum', 'somme', 'Signs', '+--');
+pendule = add_block(pendule, 'integrator', 'vitesse');
+pendule = add_block(pendule, 'integrator', 'angle');
+pendule = add_block(pendule, 'gain', 'raideur', 'Gain', 9);
+pendule = add_block(pendule, 'gain', 'frottement', 'Gain', 0.6);
+pendule = add_block(pendule, 'outport', 'mesure', 'Port', 1);
+pendule = add_line(pendule, 'couple', 'somme', 1);
+pendule = add_line(pendule, 'raideur', 'somme', 2);
+pendule = add_line(pendule, 'frottement', 'somme', 3);
+pendule = add_line(pendule, 'somme', 'vitesse');
+pendule = add_line(pendule, 'vitesse', 'angle');
+pendule = add_line(pendule, 'angle', 'raideur');
+pendule = add_line(pendule, 'vitesse', 'frottement');
+pendule = add_line(pendule, 'angle', 'mesure');
+
+[A, B, C, D] = linmod(pendule);
+fprintf('\nLinearisation du pendule amorti :\n');
+fprintf('  A = [%g %g ; %g %g]\n', A(1,1), A(1,2), A(2,1), A(2,2));
+assert(max(max(abs(A - [-0.6 -9; 1 0]))) < 1e-7, 'la matrice d''etat est exacte');
+assert(max(abs(B - [1; 0])) < 1e-7 && max(abs(C - [0 1])) < 1e-7);
+
+% Les valeurs propres disent ce que la simulation montrera : une
+% pulsation propre de 3 rad/s, amortie à 0,1.
+poles = eig(A);
+pulsation = abs(poles(1));
+amortissement = -real(poles(1)) / pulsation;
+fprintf('  pulsation propre %.3f rad/s, amortissement %.3f\n', ...
+        pulsation, amortissement);
+assert(abs(pulsation - 3) < 1e-6 && abs(amortissement - 0.1) < 1e-6);
+
+% Et la simulation le confirme : la pseudo-période vaut 2*pi/(w*sqrt(1-z^2)).
+libre = set_param(pendule, 'angle', 'InitialCondition', 1);
+r = sim(libre, 10, 1e-3);
+[~, sommets] = findpeaks(r.signaux.angle);
+periodeMesuree = mean(diff(r.temps(sommets)));
+periodeAttendue = 2 * pi / (pulsation * sqrt(1 - amortissement ^ 2));
+fprintf('  pseudo-periode mesuree %.4f s, attendue %.4f s\n', ...
+        periodeMesuree, periodeAttendue);
+assert(abs(periodeMesuree - periodeAttendue) < 5e-3, ...
+       'la linearisation predit ce que la simulation fait');
+
+%% 8. Un équilibre, cherché plutôt que deviné
+% TRIM annule les dérivées. Sur le pendule, un couple constant maintient
+% un angle : celui pour lequel le rappel l'équilibre.
+[xEquilibre, uEquilibre, yEquilibre, dxEquilibre] = ...
+    trim(pendule, [0; 0], 2, [], [], 1, []);
+fprintf('\nEquilibre sous un couple de 2 :\n');
+fprintf('  angle %.6f rad, derivees %.2e\n', yEquilibre, norm(dxEquilibre));
+assert(norm(dxEquilibre) < 1e-9, 'les derivees y sont nulles');
+assert(abs(yEquilibre - 2 / 9) < 1e-8, 'le couple divise par la raideur');
+assert(abs(xEquilibre(1)) < 1e-9, 'et la vitesse y est nulle');
+assert(abs(uEquilibre - 2) < 1e-12, 'le couple est reste celui qu''on tenait');
+
+%% 9. Le même correcteur, continu puis échantillonné
+% Un intégrateur discret ne fait pas la même chose selon la méthode :
+% sur une entrée constante, Euler avant ignore l'échantillon courant,
+% Euler arrière le prend entier, le trapèze pour moitié. L'écart entre
+% les trois est exactement la moitié d'un pas d'échantillonnage.
+periode = 0.05;
+valeurs = zeros(1, 3);
+methodes = {'ForwardEuler', 'Trapezoidal', 'BackwardEuler'};
+for k = 1:3
+    accumule = new_system('accumule');
+    accumule = add_block(accumule, 'constant', 'u', 'Value', 2);
+    accumule = add_block(accumule, 'discreteintegrator', 'i', ...
+                         'SampleTime', periode, 'IntegratorMethod', methodes{k});
+    accumule = add_line(accumule, 'u', 'i');
+    r = sim(accumule, 1, periode);
+    valeurs(k) = r.signaux.i(end);
+end
+fprintf('\nIntegrateur discret sur une constante de 2, a t = 1 s :\n');
+for k = 1:3
+    fprintf('  %-14s %.4f\n', methodes{k}, valeurs(k));
+end
+assert(abs(valeurs(1) - 2) < 1e-12, 'Euler avant rend l''integrale exacte');
+assert(max(abs(diff(valeurs) - 2 * periode / 2)) < 1e-12, ...
+       'les trois methodes s''ecartent d''un demi-pas chacune');
+
+%% 10. Enregistrer le modèle, et le relire
+% Le format .slx n'est pas public. SAVE_SYSTEM écrit à sa place un
+% programme .m qui rebâtit le modèle : cela se lit, se compare et se
+% range dans un dépôt.
+fichier = save_system(pendule, [tempname() '.m']);
+relu = load_system(fichier);
+fprintf('\nLe modele relu porte %d blocs et %d liens.\n', ...
+        numel(relu.blocs), size(relu.liens, 1));
+assert(numel(relu.blocs) == numel(pendule.blocs));
+assert(isequal(relu.liens, pendule.liens), 'le cablage se relit tel quel');
+[A2, B2] = linmod(relu);
+assert(max(max(abs(A2 - A))) < 1e-9 && max(abs(B2 - B)) < 1e-9, ...
+       'et il se linearise de la meme facon');
+bdclose('all');
+delete(fichier);
+
 fprintf('\nToutes les verifications passent.\n');

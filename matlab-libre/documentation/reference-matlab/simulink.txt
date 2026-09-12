@@ -1,0 +1,42 @@
+# Simulink — interface programmatique.
+#
+# Les fonctions qui n'ont de sens qu'avec un éditeur ouvert et une
+# souris — gcb, gch, getSimulinkBlockHandle, la bibliothèque « simulink »
+# elle-même — ne figurent pas ici : il n'y a pas de sélection à
+# interroger. Ce qui suit se pilote entièrement par programme.
+
+# Le modèle
+new_system
+open_system
+close_system
+bdclose
+bdroot
+bdIsLoaded
+load_system
+save_system
+gcs
+getfullname
+
+# Les blocs et les liens
+add_block
+delete_block
+replace_block
+add_line
+delete_line
+find_system
+
+# Les réglages
+get_param
+set_param
+add_param
+delete_param
+
+# La simulation
+sim
+simset
+simget
+
+# La linéarisation
+linmod
+dlinmod
+trim

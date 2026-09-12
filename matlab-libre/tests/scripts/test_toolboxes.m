@@ -572,4 +572,587 @@ end
 assert(refuseModele);
 close all;
 
+%% ------------------------------ SIMULINK : L'ORDRE DE CALCUL
+% Un bloc a transmission directe doit etre calcule apres son entree, meme
+% s'il est declare avant elle. Le tri les distinguait par un seuil sur le
+% code du type, qui rangeait « math », « derivative » et une
+% representation d'etat a D non nul parmi les blocs a memoire : leur
+% sortie retardait alors d'un pas.
+ordreCarre = new_system('ordre');
+ordreCarre = add_block(ordreCarre, 'math', 'carre', 'Operator', 'square');
+ordreCarre = add_block(ordreCarre, 'ramp', 'r', 'Slope', 1);
+ordreCarre = add_line(ordreCarre, 'r', 'carre');
+resOrdre = sim(ordreCarre, 0.05, 0.01);
+assert(max(abs(resOrdre.signaux.carre - resOrdre.temps .^ 2)) < 1e-12, ...
+       'le carre suit sa source dans le meme pas');
+
+ordreDerive = new_system('ordre2');
+ordreDerive = add_block(ordreDerive, 'derivative', 'd');
+ordreDerive = add_block(ordreDerive, 'ramp', 'rd', 'Slope', 3);
+ordreDerive = add_line(ordreDerive, 'rd', 'd');
+resDerive = sim(ordreDerive, 0.05, 0.01);
+assert(max(abs(resDerive.signaux.d(2:end) - 3)) < 1e-12, ...
+       'la derivee d''une rampe de pente 3 vaut 3');
+
+ordreEtat = new_system('ordre3');
+ordreEtat = add_block(ordreEtat, 'statespace', 'ss1', 'A', 0, 'B', 0, 'C', 0, 'D', 2);
+ordreEtat = add_block(ordreEtat, 'constant', 'un', 'Value', 5);
+ordreEtat = add_line(ordreEtat, 'un', 'ss1');
+resEtat = sim(ordreEtat, 0.02, 0.01);
+assert(max(abs(resEtat.signaux.ss1 - 10)) < 1e-12, ...
+       'D non nul transmet l''entree a l''instant meme');
+
+% Un bloc sans transmission directe casse bien la boucle : il est le seul
+% a pouvoir etre calcule avant son entree.
+boucleFermee = new_system('boucleFermee');
+boucleFermee = add_block(boucleFermee, 'constant', 'c', 'Value', 1);
+boucleFermee = add_block(boucleFermee, 'sum', 'e', 'Signs', '+-');
+boucleFermee = add_block(boucleFermee, 'integrator', 'x');
+boucleFermee = add_line(boucleFermee, 'c', 'e', 1);
+boucleFermee = add_line(boucleFermee, 'x', 'e', 2);
+boucleFermee = add_line(boucleFermee, 'e', 'x');
+resBoucle = sim(boucleFermee, 5, 1e-3);
+assert(abs(resBoucle.signaux.x(end) - (1 - exp(-5))) < 1e-3, ...
+       'x'' = 1 - x tend vers un');
+
+% Un type de bloc inconnu passait sans bruit et rendait un resultat faux.
+typeRefuse = false;
+try
+    sim(add_block(new_system('t'), 'chose', 'b'), 1, 0.1);
+catch err
+    typeRefuse = strcmp(err.identifier, 'Simulink:Commands:InvalidBlockType');
+end
+assert(typeRefuse, 'un bloc de type inconnu est refuse, non ignore');
+
+%% ------------------------------ SIMULINK : LES BLOCS SANS MEMOIRE
+sansMemoire = new_system('statique');
+sansMemoire = add_block(sansMemoire, 'ramp', 'u', 'Slope', 1);
+sansMemoire = add_block(sansMemoire, 'deadzone', 'zm', ...
+                        'LowerValue', -0.5, 'UpperValue', 0.5);
+sansMemoire = add_block(sansMemoire, 'quantizer', 'q', 'QuantizationInterval', 0.25);
+sansMemoire = add_block(sansMemoire, 'sign', 'sg');
+sansMemoire = add_block(sansMemoire, 'bias', 'b', 'Bias', 3);
+sansMemoire = add_block(sansMemoire, 'trigonometry', 'tr', 'Operator', 'tanh');
+sansMemoire = add_block(sansMemoire, 'lookup', 'tab', ...
+                        'BreakpointsData', [0 1 2], 'TableData', [0 10 30]);
+for cible = {'zm', 'q', 'sg', 'b', 'tr', 'tab'}
+    sansMemoire = add_line(sansMemoire, 'u', cible{1});
+end
+resStatique = sim(sansMemoire, 2, 0.01);
+tStatique = resStatique.temps;
+
+% Zone morte : nulle dans la bande, et continue a ses deux bords.
+attenduZone = zeros(size(tStatique));
+attenduZone(tStatique > 0.5) = tStatique(tStatique > 0.5) - 0.5;
+assert(max(abs(resStatique.signaux.zm - attenduZone)) < 1e-12);
+assert(all(resStatique.signaux.zm(tStatique <= 0.5) == 0), 'la bande est morte');
+
+% Quantificateur : la sortie est un multiple du pas, jamais plus loin que
+% la moitie du pas de l'entree.
+assert(max(abs(resStatique.signaux.q / 0.25 - round(resStatique.signaux.q / 0.25))) < 1e-12);
+assert(max(abs(resStatique.signaux.q - tStatique)) <= 0.125 + 1e-12);
+
+assert(all(resStatique.signaux.sg(tStatique > 0) == 1) && resStatique.signaux.sg(1) == 0);
+assert(max(abs(resStatique.signaux.b - (tStatique + 3))) < 1e-12);
+assert(max(abs(resStatique.signaux.tr - tanh(tStatique))) < 1e-12);
+
+% Table : exacte aux points donnes, lineaire entre eux, tenue au-dela.
+assert(abs(resStatique.signaux.tab(1) - 0) < 1e-12);
+assert(abs(interp1(tStatique, resStatique.signaux.tab, 0.5) - 5) < 1e-9);
+assert(abs(resStatique.signaux.tab(end) - 30) < 1e-12, 'au-dela, la valeur est tenue');
+
+% Aiguillage, comparaison et logique : trois entrees, un critere.
+aiguillage = new_system('aiguillage');
+aiguillage = add_block(aiguillage, 'constant', 'a', 'Value', 10);
+aiguillage = add_block(aiguillage, 'ramp', 'sel', 'Slope', 1);
+aiguillage = add_block(aiguillage, 'constant', 'c', 'Value', -10);
+aiguillage = add_block(aiguillage, 'switch', 'sw', 'Threshold', 0.5);
+aiguillage = add_block(aiguillage, 'relational', 'cmp', 'Operator', '>');
+aiguillage = add_block(aiguillage, 'constant', 'demi', 'Value', 0.5);
+aiguillage = add_block(aiguillage, 'logic', 'nonPas', 'Operator', 'NOT');
+aiguillage = add_line(aiguillage, 'a', 'sw', 1);
+aiguillage = add_line(aiguillage, 'sel', 'sw', 2);
+aiguillage = add_line(aiguillage, 'c', 'sw', 3);
+aiguillage = add_line(aiguillage, 'sel', 'cmp', 1);
+aiguillage = add_line(aiguillage, 'demi', 'cmp', 2);
+aiguillage = add_line(aiguillage, 'cmp', 'nonPas', 1);
+resAiguillage = sim(aiguillage, 1, 0.01);
+tAig = resAiguillage.temps;
+assert(all(resAiguillage.signaux.sw(tAig >= 0.5) == 10), 'au-dessus du seuil, u1');
+assert(all(resAiguillage.signaux.sw(tAig < 0.5) == -10), 'au-dessous, u3');
+assert(all(resAiguillage.signaux.cmp == double(tAig > 0.5)));
+assert(all(resAiguillage.signaux.nonPas == 1 - resAiguillage.signaux.cmp), ...
+       'NOT retourne exactement la comparaison');
+
+%% ------------------------------ SIMULINK : LES BLOCS A MEMOIRE
+memoireEtRetard = new_system('memoire');
+memoireEtRetard = add_block(memoireEtRetard, 'ramp', 'r', 'Slope', 1);
+memoireEtRetard = add_block(memoireEtRetard, 'memory', 'mem', 'InitialCondition', 0);
+memoireEtRetard = add_block(memoireEtRetard, 'transportdelay', 'td', ...
+                            'DelayTime', 0.5, 'InitialOutput', 0);
+memoireEtRetard = add_block(memoireEtRetard, 'ratelimiter', 'rl', ...
+                            'RisingSlewLimit', 0.5, 'FallingSlewLimit', -0.5, ...
+                            'InitialOutput', 0);
+memoireEtRetard = add_line(memoireEtRetard, 'r', 'mem');
+memoireEtRetard = add_line(memoireEtRetard, 'r', 'td');
+memoireEtRetard = add_line(memoireEtRetard, 'r', 'rl');
+resMemoire = sim(memoireEtRetard, 1, 0.01);
+tMem = resMemoire.temps;
+
+% Memoire : la valeur du pas precedent, exactement.
+assert(resMemoire.signaux.mem(1) == 0);
+assert(max(abs(resMemoire.signaux.mem(2:end) - tMem(1:end-1))) < 1e-12);
+
+% Retard pur : y(t) = u(t - 0,5), et la sortie initiale avant cela.
+assert(all(resMemoire.signaux.td(tMem < 0.5 - 1e-9) == 0));
+avecRetard = tMem >= 0.5;
+assert(max(abs(resMemoire.signaux.td(avecRetard) - (tMem(avecRetard) - 0.5))) < 1e-12, ...
+       'le retard decale le signal, il ne le deforme pas');
+
+% Limiteur de pente : devant une rampe plus rapide que sa limite, il ne
+% la rattrape jamais et monte a sa propre pente.
+assert(max(diff(resMemoire.signaux.rl)) <= 0.5 * 0.01 + 1e-12);
+assert(max(abs(resMemoire.signaux.rl - 0.5 * tMem)) < 1e-12, ...
+       'la sortie monte a la limite, non a la pente de l''entree');
+
+% Devant un echelon, il monte a sa limite puis rattrape et tient.
+echelonLimite = new_system('echelonLimite');
+echelonLimite = add_block(echelonLimite, 'step', 'e', 'Time', 0, 'After', 1);
+echelonLimite = add_block(echelonLimite, 'ratelimiter', 'rl', ...
+                          'RisingSlewLimit', 2, 'FallingSlewLimit', -2, ...
+                          'InitialOutput', 0);
+echelonLimite = add_line(echelonLimite, 'e', 'rl');
+resEchelon = sim(echelonLimite, 1, 0.01);
+assert(max(diff(resEchelon.signaux.rl)) <= 2 * 0.01 + 1e-12, ...
+       'la pente reste sous la limite');
+assert(abs(resEchelon.signaux.rl(end) - 1) < 1e-12, 'et la sortie rattrape l''entree');
+assert(any(resEchelon.signaux.rl < 1), 'sans y arriver du premier coup');
+
+%% ------------------------------ SIMULINK : LES BLOCS ECHANTILLONNES
+% Tenue d'ordre zero : la sortie ne change qu'aux instants
+% d'echantillonnage, et vaut alors l'entree.
+tenue = new_system('tenue');
+tenue = add_block(tenue, 'ramp', 'r', 'Slope', 1);
+tenue = add_block(tenue, 'zoh', 'z', 'SampleTime', 0.1);
+tenue = add_line(tenue, 'r', 'z');
+resTenue = sim(tenue, 1, 0.01);
+paliers = unique(round(resTenue.signaux.z * 1e9) / 1e9);
+assert(numel(paliers) == 11, 'onze paliers de zero a un');
+assert(max(abs(paliers(:)' - (0:0.1:1))) < 1e-8);
+assert(all(diff(resTenue.signaux.z) >= -1e-12), 'la tenue ne redescend pas');
+
+% Integrateur discret : les trois methodes se distinguent exactement, sur
+% une entree constante, par ce qu'elles font de l'echantillon courant.
+constante = 2;
+periode = 0.05;
+for essai = {{'ForwardEuler', 0}, {'BackwardEuler', periode}, ...
+             {'Trapezoidal', periode / 2}}
+    methode = essai{1}{1};
+    decalage = essai{1}{2};
+    integ = new_system('integ');
+    integ = add_block(integ, 'constant', 'c', 'Value', constante);
+    integ = add_block(integ, 'discreteintegrator', 'i', 'SampleTime', periode, ...
+                      'IntegratorMethod', methode, 'InitialCondition', 0);
+    integ = add_line(integ, 'c', 'i');
+    resInteg = sim(integ, 0.5, periode);
+    attendu = constante * (resInteg.temps + decalage);
+    assert(max(abs(resInteg.signaux.i - attendu)) < 1e-12, ...
+           sprintf('%s integre une constante exactement', methode));
+end
+
+% Fonction de transfert discrete 1/(z - a) : la reponse indicielle
+% analytique, (1 - a^n)/(1 - a).
+a = 0.6;
+filtre = new_system('filtre');
+filtre = add_block(filtre, 'constant', 'un', 'Value', 1);
+filtre = add_block(filtre, 'discretetransferfcn', 'h', ...
+                   'Numerator', [0 1], 'Denominator', [1 -a], 'SampleTime', 0.1);
+filtre = add_line(filtre, 'un', 'h');
+resFiltre = sim(filtre, 1, 0.1);
+n = (0:numel(resFiltre.temps) - 1)';
+assert(max(abs(resFiltre.signaux.h - (1 - a .^ n) / (1 - a))) < 1e-12, ...
+       'la reponse indicielle suit la formule fermee');
+
+% Representation d'etat discrete : x(k+1) = 0,5 x(k) + u, y = x.
+etatD = new_system('etatD');
+etatD = add_block(etatD, 'constant', 'un', 'Value', 1);
+etatD = add_block(etatD, 'discretestatespace', 'sd', 'A', 0.5, 'B', 1, ...
+                  'C', 1, 'D', 0, 'X0', 0, 'SampleTime', 0.1);
+etatD = add_line(etatD, 'un', 'sd');
+resEtatD = sim(etatD, 1, 0.1);
+nD = (0:numel(resEtatD.temps) - 1)';
+assert(max(abs(resEtatD.signaux.sd - 2 * (1 - 0.5 .^ nD))) < 1e-12);
+
+% PID : sur une erreur constante, la sortie est la somme des trois
+% termes, dont l'integral croit lineairement.
+regulateur = new_system('pid');
+regulateur = add_block(regulateur, 'constant', 'e', 'Value', 1);
+regulateur = add_block(regulateur, 'pidcontroller', 'k', 'P', 2, 'I', 3, ...
+                       'D', 0, 'N', 100);
+regulateur = add_line(regulateur, 'e', 'k');
+resPid = sim(regulateur, 1, 1e-3);
+assert(max(abs(resPid.signaux.k - (2 + 3 * resPid.temps))) < 1e-9, ...
+       'proportionnel plus integral, sans derivee');
+avecDerivee = set_param(regulateur, 'k', 'D', 0.1, 'I', 0);
+resDeriv = sim(avecDerivee, 0.5, 1e-3);
+assert(abs(resDeriv.signaux.k(1) - (2 + 0.1 * 100)) < 1e-9, ...
+       'a l''instant zero, la derivee filtree vaut D*N');
+assert(abs(resDeriv.signaux.k(end) - 2) < 1e-3, ...
+       'la derivee d''une constante s''eteint');
+
+% Un derivateur filtre refuse un N nul : il ne se calculerait pas.
+refuseN = false;
+try
+    sim(add_block(new_system('n'), 'pidcontroller', 'p', 'N', 0), 1, 0.1);
+catch err
+    refuseN = strcmp(err.identifier, 'simulink:sim:filtreDerive');
+end
+assert(refuseN);
+
+%% ------------------------------ SIMULINK : MODIFIER UN MODELE
+edition = new_system('edition');
+edition = add_block(edition, 'constant', 'c', 'Value', 1);
+edition = add_block(edition, 'gain', 'g', 'Gain', 2);
+edition = add_block(edition, 'integrator', 'i');
+edition = add_line(edition, 'c', 'g');
+edition = add_line(edition, 'g', 'i');
+assert(strcmp(getfullname(edition, 'g'), 'edition/g'));
+assert(strcmp(getfullname(edition), 'edition'));
+assert(strcmp(bdroot(edition), 'edition'));
+
+% Retirer un bloc emporte ses liens, et renumerote ceux qui restent.
+sansGain = delete_block(edition, 'g');
+assert(numel(sansGain.blocs) == 2 && isempty(sansGain.liens), ...
+       'les deux liens touchaient au gain');
+sansMilieu = delete_block(add_line(edition, 'c', 'i', 2), 'g');
+assert(size(sansMilieu.liens, 1) == 1, 'le lien qui ne touche pas au gain survit');
+assert(isequal(sansMilieu.liens(1, 1:2), [1 2]), ...
+       'l''integrateur a recule d''un rang');
+
+% Retirer un lien qui n'existe pas est refuse, non ignore.
+sansLien = delete_line(edition, 'c', 'g');
+assert(size(sansLien.liens, 1) == 1);
+refuseLien = false;
+try
+    delete_line(edition, 'i', 'c');
+catch err
+    refuseLien = strcmp(err.identifier, 'simulink:delete_line:lienInconnu');
+end
+assert(refuseLien);
+
+% Remplacer un type garde le cablage et les noms.
+discret = replace_block(edition, 'integrator', 'discreteintegrator', ...
+                        'SampleTime', 0.1);
+assert(strcmp(get_param(discret, 'i', 'BlockType'), 'discreteintegrator'));
+assert(get_param(discret, 'i', 'SampleTime') == 0.1);
+assert(isequal(discret.liens, edition.liens), 'le cablage n''a pas bouge');
+
+%% ------------------------------ SIMULINK : LES REGLAGES DU MODELE
+regle = new_system('regle');
+regle = add_block(regle, 'constant', 'c', 'Value', 3);
+regle = add_param(regle, 'StopTime', 2, 'FixedStep', 0.5);
+assert(get_param(regle, 'StopTime') == 2);
+resRegle = sim(regle);
+assert(resRegle.temps(end) == 2 && numel(resRegle.temps) == 5, ...
+       'SIM lit la duree et le pas portes par le modele');
+% Un argument donne l'emporte sur le reglage enregistre.
+resForce = sim(regle, 1, 0.25);
+assert(resForce.temps(end) == 1 && numel(resForce.temps) == 5);
+
+regle = set_param(regle, 'StopTime', 4);
+assert(get_param(regle, 'StopTime') == 4, 'SET_PARAM a un seul couple regle le modele');
+regle = delete_param(regle, 'StopTime');
+assert(~isfield(regle.parametres, 'StopTime'));
+refuseReglage = false;
+try
+    delete_param(regle, 'StopTime');
+catch err
+    refuseReglage = strcmp(err.identifier, 'Simulink:Commands:DeleteParamAbsent');
+end
+assert(refuseReglage);
+refuseDouble = false;
+try
+    add_param(add_param(new_system('d'), 'StopTime', 1), 'StopTime', 2);
+catch err
+    refuseDouble = strcmp(err.identifier, 'Simulink:Commands:AddParamExiste');
+end
+assert(refuseDouble);
+
+% Les options de SIMSET tiennent lieu de pas, et une option non honoree
+% est refusee plutot qu'acceptee sans effet.
+options = simset('FixedStep', 0.25);
+assert(simget(options, 'FixedStep') == 0.25);
+assert(isempty(simget(simset(), 'FixedStep')));
+resOptions = sim(add_block(new_system('o'), 'constant', 'c', 'Value', 1), 1, options);
+assert(numel(resOptions.temps) == 5);
+refuseOption = false;
+try
+    simset('RelTol', 1e-6);
+catch err
+    refuseOption = strcmp(err.identifier, 'Simulink:Commands:SimsetInconnue');
+end
+assert(refuseOption);
+
+%% ------------------------------ SIMULINK : ENREGISTRER ET RELIRE
+aRanger = new_system('aRanger');
+aRanger = add_block(aRanger, 'constant', 'c', 'Value', 7);
+aRanger = add_block(aRanger, 'gain', 'g', 'Gain', [1 2; 3 4]);
+aRanger = add_block(aRanger, 'sum', 's', 'Signs', '+-');
+aRanger = add_line(aRanger, 'c', 's', 1);
+aRanger = add_line(aRanger, 'g', 's', 2);
+aRanger = add_param(aRanger, 'StopTime', 3);
+fichierModele = [tempname() '.m'];
+chemin = save_system(aRanger, fichierModele);
+relu = load_system(chemin);
+assert(strcmp(relu.nom, aRanger.nom));
+assert(numel(relu.blocs) == numel(aRanger.blocs));
+assert(isequal(relu.liens, aRanger.liens), 'le cablage se relit tel quel');
+assert(isequal(get_param(relu, 'g', 'Gain'), [1 2; 3 4]), ...
+       'une matrice se relit matrice');
+assert(strcmp(get_param(relu, 's', 'Signs'), '+-'));
+assert(get_param(relu, 'StopTime') == 3, 'le reglage du modele se relit aussi');
+bdclose('all');
+delete(chemin);
+
+% Ce que SAVE_SYSTEM ne sait pas ecrire, il le refuse en le nommant.
+refuseValeur = false;
+try
+    save_system(add_block(new_system('x'), 'gain', 'g', 'Gain', {1}), ...
+                [tempname() '.m']);
+catch err
+    refuseValeur = strcmp(err.identifier, 'Simulink:Commands:SaveUnsupported');
+end
+assert(refuseValeur);
+
+%% ------------------------------ SIMULINK : LE REGISTRE DE LA SESSION
+bdclose('all');
+assert(isempty(gcs()), 'aucun modele ouvert, aucun nom');
+inscrit = new_system('inscrit');
+inscrit = add_block(inscrit, 'constant', 'c', 'Value', 1);
+assert(~bdIsLoaded('inscrit'), 'construire n''est pas ouvrir');
+open_system(inscrit);
+assert(bdIsLoaded('inscrit') && strcmp(gcs(), 'inscrit'));
+close_system(inscrit);
+assert(~bdIsLoaded('inscrit') && isempty(gcs()));
+open_system(inscrit);
+open_system(add_block(new_system('second'), 'constant', 'c', 'Value', 1));
+assert(strcmp(gcs(), 'second'), 'GCS nomme le dernier ouvert');
+bdclose('all');
+assert(isempty(gcs()));
+close all;
+
+%% ------------------------------ SIMULINK : LINEARISATION
+% Un modele lineaire se linearise exactement : la derivee centree d'une
+% fonction affine est cette fonction, a l'arrondi pres.
+oscillateur = new_system('oscillateur');
+oscillateur = add_block(oscillateur, 'inport', 'u', 'Port', 1);
+oscillateur = add_block(oscillateur, 'sum', 's', 'Signs', '+-');
+oscillateur = add_block(oscillateur, 'integrator', 'v');
+oscillateur = add_block(oscillateur, 'integrator', 'p');
+oscillateur = add_block(oscillateur, 'gain', 'k', 'Gain', 4);
+oscillateur = add_block(oscillateur, 'outport', 'y', 'Port', 1);
+oscillateur = add_line(oscillateur, 'u', 's', 1);
+oscillateur = add_line(oscillateur, 'k', 's', 2);
+oscillateur = add_line(oscillateur, 's', 'v');
+oscillateur = add_line(oscillateur, 'v', 'p');
+oscillateur = add_line(oscillateur, 'p', 'k');
+oscillateur = add_line(oscillateur, 'p', 'y');
+[Alin, Blin, Clin, Dlin] = linmod(oscillateur);
+assert(max(max(abs(Alin - [0 -4; 1 0]))) < 1e-8, 'la matrice d''etat');
+assert(max(abs(Blin - [1; 0])) < 1e-8);
+assert(max(abs(Clin - [0 1])) < 1e-8);
+assert(abs(Dlin) < 1e-12);
+
+% Les valeurs propres disent la pulsation propre : deux integrateurs et
+% un gain de 4 oscillent a 2 rad/s.
+assert(max(abs(sort(imag(eig(Alin))) - [-2; 2])) < 1e-7);
+
+% Une seule sortie demandee rend la structure, comme dans MATLAB.
+structure = linmod(oscillateur);
+assert(isstruct(structure) && isfield(structure, 'a'));
+assert(isequal(structure.StateName, {'v', 'p'}));
+assert(isequal(structure.InputName, {'u'}) && isequal(structure.OutputName, {'y'}));
+
+% Un derivateur est refuse : sa linearisation dependrait du pas de calcul.
+refuseDerivateur = false;
+try
+    linmod(add_block(oscillateur, 'derivative', 'd'));
+catch err
+    refuseDerivateur = strcmp(err.identifier, 'Simulink:Commands:LinmodDerivateur');
+end
+assert(refuseDerivateur);
+
+% Premier ordre : x' = u - x. La discretisation exacte vaut exp(-Ts).
+premier = new_system('premier');
+premier = add_block(premier, 'inport', 'u', 'Port', 1);
+premier = add_block(premier, 'sum', 's', 'Signs', '+-');
+premier = add_block(premier, 'integrator', 'x');
+premier = add_block(premier, 'outport', 'y', 'Port', 1);
+premier = add_line(premier, 'u', 's', 1);
+premier = add_line(premier, 'x', 's', 2);
+premier = add_line(premier, 's', 'x');
+premier = add_line(premier, 'x', 'y');
+[Ac, Bc] = linmod(premier);
+assert(abs(Ac + 1) < 1e-8 && abs(Bc - 1) < 1e-8);
+[Ad, Bd, Cd, Dd] = dlinmod(premier, 0.5);
+assert(abs(Ad - exp(-0.5)) < 1e-8, 'le pole continu se transporte par l''exponentielle');
+assert(abs(Bd - (1 - exp(-0.5))) < 1e-8, 'et l''entree par son integrale');
+assert(abs(Cd - 1) < 1e-8 && abs(Dd) < 1e-12);
+assert(abs(dlinmod(premier, 0).a + 1) < 1e-8, 'une periode nulle rend le continu');
+
+% Le point d'equilibre de x' = u - x, a u tenu a 1, est x = 1.
+[xEq, uEq, yEq, dxEq] = trim(premier, 0, 1, [], [], 1, []);
+assert(abs(xEq - 1) < 1e-9 && abs(uEq - 1) < 1e-12);
+assert(abs(yEq - 1) < 1e-9 && abs(dxEq) < 1e-9, ...
+       'un equilibre se reconnait a ce que la derivee y est nulle');
+
+% Le nombre d'etats donne est verifie : un vecteur de la mauvaise taille
+% donnerait une matrice sans rapport avec le modele.
+refuseTaille = false;
+try
+    linmod(premier, [0 0], 0);
+catch err
+    refuseTaille = strcmp(err.identifier, 'Simulink:Commands:LinmodEtat');
+end
+assert(refuseTaille);
+
+% Une saturation se linearise par sa pente locale : un dans la bande,
+% zero au-dela.
+sature = new_system('sature');
+sature = add_block(sature, 'inport', 'u', 'Port', 1);
+sature = add_block(sature, 'saturation', 'sat', 'UpperLimit', 1, 'LowerLimit', -1);
+sature = add_block(sature, 'integrator', 'x');
+sature = add_block(sature, 'outport', 'y', 'Port', 1);
+sature = add_line(sature, 'u', 'sat');
+sature = add_line(sature, 'sat', 'x');
+sature = add_line(sature, 'x', 'y');
+[~, Bdans] = linmod(sature, 0, 0.5);
+[~, Bdehors] = linmod(sature, 0, 5);
+assert(abs(Bdans - 1) < 1e-6, 'dans la bande, la saturation transmet');
+assert(abs(Bdehors) < 1e-6, 'au-dela, elle ne transmet plus rien');
+
+% Une fonction de transfert porte ses etats : LINMOD retrouve exactement
+% la realisation de TF2SS, et donc les poles du denominateur.
+transmittance = new_system('transmittance');
+transmittance = add_block(transmittance, 'inport', 'u', 'Port', 1);
+transmittance = add_block(transmittance, 'transferfcn', 'h', ...
+                          'Numerator', 1, 'Denominator', [1 3 2]);
+transmittance = add_block(transmittance, 'outport', 'y', 'Port', 1);
+transmittance = add_line(transmittance, 'u', 'h');
+transmittance = add_line(transmittance, 'h', 'y');
+[Ah, Bh, Ch, Dh] = linmod(transmittance);
+[Aref, Bref, Cref, Dref] = tf2ss(1, [1 3 2]);
+assert(max(max(abs(Ah - Aref))) < 1e-8 && max(abs(Bh - Bref)) < 1e-8);
+assert(max(abs(Ch - Cref)) < 1e-8 && abs(Dh - Dref) < 1e-12);
+assert(max(abs(sort(eig(Ah)) - [-2; -1])) < 1e-7, 'les poles sont ceux du denominateur');
+
+% Et son equilibre : le gain statique vaut 1/2, donc une entree de 6
+% donne une sortie de 3.
+[~, ~, ySortie] = trim(transmittance, [0; 0], 6, [], [], 1, []);
+assert(abs(ySortie - 3) < 1e-8, 'le gain statique du transfert');
+
+% La toile suit les proportions du schema plutot que de rester carree.
+[toileLarge, toileHaute] = matlibre_sl_toile(20, 5);
+assert(abs(toileLarge / toileHaute - 4) < 0.05);
+[carreeL, carreeH] = matlibre_sl_toile(4, 3);
+assert(carreeL == 800 && carreeH == 600, 'un petit schema garde la toile par defaut');
+[borneeL, borneeH] = matlibre_sl_toile(200, 10);
+assert(borneeL <= 2000 && borneeH <= 1400, 'une toile immense est ramenee a l''ecran');
+assert(abs(borneeL / borneeH - 20) < 0.05, 'sans deformer le schema');
+
+%% ------------------------------ SIMULINK : L'ESPACE DE TRAVAIL PARTAGE
+% Un paramètre donne par une expression vaut ce que vaut l'espace de
+% travail au moment ou l'on simule, comme dans Simulink : c'est ce qui
+% fait qu'un modele et un programme partagent leurs variables.
+gainPartage = 4;
+partage = new_system('partage');
+partage = add_block(partage, 'constant', 'un', 'Value', 1);
+partage = add_block(partage, 'gain', 'k', 'Gain', 'gainPartage');
+partage = add_block(partage, 'gain', 'compose', 'Gain', '2 * gainPartage + 1');
+partage = add_line(partage, 'un', 'k');
+partage = add_line(partage, 'un', 'compose');
+resPartage = sim(partage, 0.02, 0.01);
+assert(all(resPartage.signaux.k == 4), 'le gain vaut la variable');
+assert(all(resPartage.signaux.compose == 9), 'et une expression s''evalue');
+gainPartage = 10;
+resChange = sim(partage, 0.02, 0.01);
+assert(all(resChange.signaux.k == 10), ...
+       'changer la variable change la simulation, sans toucher au modele');
+assert(isequal(get_param(partage, 'k', 'Gain'), 'gainPartage'), ...
+       'et le modele porte toujours l''expression, non sa valeur');
+
+% L'etiquette du schema montre l'expression : elle dit d'ou vient la
+% valeur, ce que le nombre ne dirait pas.
+assert(strcmp(matlibre_sl_etiquette(partage.blocs{2}), 'gainPartage'));
+
+% Une expression qui ne s'evalue pas, ou qui ne rend pas un nombre, est
+% refusee en nommant le bloc et le parametre.
+refusExpression = false;
+try
+    sim(add_block(new_system('x'), 'gain', 'g', 'Gain', 'variableQuiNExistePas'), 1, 0.5);
+catch err
+    refusExpression = strcmp(err.identifier, 'Simulink:Commands:ParametreNonEvalue');
+end
+assert(refusExpression);
+texteEnGain = 'bonjour';                                        %#ok<NASGU>
+refusClasse = false;
+try
+    sim(add_block(new_system('x'), 'gain', 'g', 'Gain', 'texteEnGain'), 1, 0.5);
+catch err
+    refusClasse = strcmp(err.identifier, 'Simulink:Commands:ParametreNonNumerique');
+end
+assert(refusClasse);
+
+% Un bloc « vers l'espace de travail » y depose son signal.
+depot = new_system('depot');
+depot = add_block(depot, 'ramp', 'r', 'Slope', 3);
+depot = add_block(depot, 'toworkspace', 'sortie', 'VariableName', 'releveSimulink');
+depot = add_line(depot, 'r', 'sortie');
+clear releveSimulink;
+resDepot = sim(depot, 0.05, 0.01);
+assert(exist('releveSimulink', 'var') == 1, 'la variable est creee');
+assert(max(abs(releveSimulink - 3 * resDepot.temps)) < 1e-12, ...
+       'et porte le signal releve');
+
+% Et « depuis l'espace de travail » lit une variable a deux colonnes,
+% reechantillonnee sur les instants de la simulation.
+signalDonne = [(0:0.1:1)', (0:0.1:1)' .^ 2];
+lecture = new_system('lecture');
+lecture = add_block(lecture, 'fromworkspace', 'src', 'VariableName', 'signalDonne');
+lecture = add_block(lecture, 'gain', 'deux', 'Gain', 2);
+lecture = add_line(lecture, 'src', 'deux');
+resLecture = sim(lecture, 1, 0.1);
+assert(max(abs(resLecture.signaux.src - resLecture.temps .^ 2)) < 1e-12, ...
+       'aux instants donnes, le signal est celui qu''on a fourni');
+assert(max(abs(resLecture.signaux.deux - 2 * resLecture.signaux.src)) < 1e-12);
+
+% Entre deux points donnes, il est interpole ; au-dela, il est tenu.
+resFin = sim(lecture, 2, 0.1);
+assert(all(abs(resFin.signaux.src(resFin.temps > 1) - 1) < 1e-12), ...
+       'passe la fin des donnees, la derniere valeur est tenue');
+milieu = sim(lecture, 0.15, 0.05);
+assert(abs(milieu.signaux.src(2) - 0.005) < 1e-12, ...
+       ['entre deux points donnes, la droite qui les joint : a 0,05, la ' ...
+        'moitie de 0 et de 0,01 — non 0,0025, qui serait la parabole dont ' ...
+        'les points sont tires']);
+
+% Une variable absente est nommee, plutot que traitee comme un zero.
+refusAbsente = false;
+try
+    sim(add_block(new_system('x'), 'fromworkspace', 's', ...
+                  'VariableName', 'signalQuiNExistePas'), 1, 0.5);
+catch err
+    refusAbsente = strcmp(err.identifier, 'simulink:sim:variableAbsente');
+end
+assert(refusAbsente);
+malForme = 1:5;                                                 %#ok<NASGU>
+refusForme = false;
+try
+    sim(add_block(new_system('x'), 'fromworkspace', 's', 'VariableName', 'malForme'), ...
+        1, 0.5);
+catch err
+    refusForme = strcmp(err.identifier, 'simulink:sim:signalMalForme');
+end
+assert(refusForme);
+
 disp('toolboxes : toutes les verifications passent');

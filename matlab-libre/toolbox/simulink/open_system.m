@@ -14,6 +14,11 @@ function h = open_system(modele)
 %   MATLAB ouvre un éditeur, MatLibre rend une figure — on voit le
 %   schéma, on ne le modifie pas là.
 %
+%   Le modèle est inscrit au registre de la session : GCS le nomme,
+%   BDISLOADED répond vrai, et CLOSE_SYSTEM le ferme avec sa figure.
+%   OPEN_SYSTEM(NOM) rouvre un modèle déjà inscrit, ou exécute le
+%   fichier NOM.m qui le rend.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -25,10 +30,14 @@ function h = open_system(modele)
 %      m = add_line(m, 'erreur', 'correcteur');
 %      m = add_line(m, 'correcteur', 'sortie');
 %      open_system(m);
+%      close_system(m);
 %
-%   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIM, SIMPLOT.
+%   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, CLOSE_SYSTEM, GCS, SIM.
     if nargin < 1
         error('MATLAB:minrhs', 'OPEN_SYSTEM attend un modèle.');
+    end
+    if ischar(modele) || isstring(modele)
+        modele = matlibre_sl_modele(modele);
     end
     if ~isstruct(modele) || ~isfield(modele, 'blocs')
         error('Simulink:openSystem:Modele', ...
@@ -41,7 +50,26 @@ function h = open_system(modele)
     [x, y, largeur, hauteur] = matlibre_sl_disposition(modele, rangs);
     n = numel(modele.blocs);
 
-    figure;
+    % Les bornes du schéma se connaissent avant de tracer, et c'est ce
+    % qui permet de tailler la toile à sa mesure. Sur une toile fixe,
+    % « axis equal » laissait un bandeau vide au-dessus et au-dessous
+    % d'un schéma en long, et serrait les étiquettes dès que les couches
+    % se multipliaient : la même largeur pour deux blocs et pour douze.
+    marge = 0.9;
+    nbRetours = 0;
+    if ~isempty(retours)
+        nbRetours = size(retours, 1);
+    end
+    if n > 0
+        basSchema = min([y, 0]) - hauteur * 1.4 - max(0, nbRetours - 1) * hauteur * 0.7;
+        bornesX = [min(x) - largeur / 2 - marge, max(x) + largeur / 2 + marge];
+        bornesY = [basSchema - marge, max(y) + hauteur / 2 + marge];
+    else
+        bornesX = [-1, 1];
+        bornesY = [-1, 1];
+    end
+    [toileL, toileH] = matlibre_sl_toile(diff(bornesX), diff(bornesY));
+    figure('Position', [100, 100, toileL, toileH]);
     hold on;
     for k = 1:n
         matlibre_sl_forme(modele.blocs{k}, x(k), y(k), largeur, hauteur);
@@ -81,18 +109,14 @@ function h = open_system(modele)
         % Le cadrage suit le schéma : « axis equal » garde les proportions,
         % et des bornes serrées évitent de noyer un petit schéma dans du
         % vide. La marge du bas laisse la place aux noms et aux retours.
-        marge = 0.9;
-        nbRetours = 0;
-        if ~isempty(retours)
-            nbRetours = size(retours, 1);
-        end
-        basSchema = min([y, 0]) - hauteur * 1.4 - max(0, nbRetours - 1) * hauteur * 0.7;
-        xlim([min(x) - largeur / 2 - marge, max(x) + largeur / 2 + marge]);
-        ylim([basSchema - marge, max(y) + hauteur / 2 + marge]);
+        xlim(bornesX);
+        ylim(bornesY);
     end
     title(modele.nom);
+    poignee = gcf;
+    matlibre_sl_ouverts('inscrire', modele.nom, modele, poignee);
     if nargout > 0
-        h = gcf;
+        h = poignee;
     end
 end
 

@@ -956,4 +956,61 @@ plot(1:3);
 assert(numel(findall(gca, 'Type', 'line')) == numel(findobj(gca, 'Type', 'line')));
 close all;
 
+% FIGURE lisait ses couples nom-valeur et les jetait : « Position »
+% n'avait aucun effet, et la toile restait de huit cents pixels sur six
+% cents quoi qu'on demande.
+close all;
+figure('Position', [0 0 1200 400]);
+plot(1:3);
+assert(isequal(get(gcf, 'Position'), [0 0 1200 400]), 'la position se relit');
+toile = matlibre_svg();
+assert(~isempty(strfind(toile, 'width="1200"')), 'la toile fait la largeur demandee');
+assert(~isempty(strfind(toile, 'height="400"')), 'et la hauteur');
+
+% Le numero peut preceder les couples, comme dans MATLAB.
+figure(7, 'Position', [0 0 640 480], 'Name', 'essai');
+assert(isequal(get(gcf, 'Number'), 7), 'le numero donne est celui de la figure');
+assert(strcmp(get(gcf, 'Name'), 'essai'));
+assert(isequal(get(gcf, 'Position'), [0 0 640 480]));
+
+% Ce qui n'aurait pas d'effet est refuse, plutot qu'accepte en silence.
+refusUnite = false;
+try
+    figure('Units', 'inches', 'Position', [0 0 4 3]);
+catch err
+    refusUnite = strcmp(err.identifier, 'MATLAB:hg:InvalidProperty');
+end
+assert(refusUnite, 'une unite que MatLibre ne mesure pas est refusee');
+
+refusPropriete = false;
+try
+    figure('Chose', 3);
+catch err
+    refusPropriete = strcmp(err.identifier, 'MATLAB:hg:InvalidProperty');
+end
+assert(refusPropriete);
+
+refusTaille = false;
+try
+    figure('Position', [0 0 100]);
+catch err
+    refusTaille = strcmp(err.identifier, 'MATLAB:hg:shaped_arrays');
+end
+assert(refusTaille);
+
+refusNegatif = false;
+try
+    figure('Position', [0 0 -10 20]);
+catch err
+    refusNegatif = strcmp(err.identifier, 'MATLAB:hg:shaped_arrays');
+end
+assert(refusNegatif, 'une toile de largeur negative ne se dessine pas');
+
+% Les proprietes de fenetre qui n'ont pas de sens sans fenetre sont
+% acceptees sans effet : le resultat est le meme, et les programmes
+% ecrits pour MATLAB tournent.
+figure('NumberTitle', 'off', 'MenuBar', 'none', 'Position', [0 0 500 500]);
+assert(isequal(get(gcf, 'Position'), [0 0 500 500]));
+close all;
+
 disp('graphique : toutes les verifications passent');

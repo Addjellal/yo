@@ -758,8 +758,11 @@ FONCTION(fnContourc) {
 FONCTION(fnFigure) {
     INUTILISE
     int numero = 0;
-    if (!args.empty() && args[0].estNumerique() && !args[0].estVide())
+    std::size_t premierCouple = 0;
+    if (!args.empty() && args[0].estNumerique() && !args[0].estVide()) {
         numero = (int)args[0].scal();
+        premierCouple = 1;
+    }
     if (numero == 0) {
         numero = 1;
         while (it.figures.count(numero)) ++numero;
@@ -771,6 +774,50 @@ FONCTION(fnFigure) {
         it.figures[numero] = f;
     }
     it.figureCourante = numero;
+    // Les couples nom-valeur etaient lus puis jetes : « figure('Position',
+    // [0 0 1200 400]) » rendait une toile de huit cents pixels sur six
+    // cents, sans rien dire. Ils sont desormais appliques, et un nom que
+    // la figure ne porte pas est refuse plutot qu'ignore.
+    auto& fig = *it.figures[numero];
+    for (std::size_t k = premierCouple; k < args.size(); k += 2) {
+        if (!args[k].estTexte())
+            erreur("MATLAB:hg:InvalidProperty",
+                   "FIGURE attend des couples nom-valeur.");
+        std::string nom = args[k].versTexte();
+        for (auto& c : nom) c = (char)std::tolower((unsigned char)c);
+        if (k + 1 >= args.size())
+            erreur("MATLAB:hg:PairedArgs",
+                   "La propriete '" + nom + "' est donnee sans valeur.");
+        const Valeur& v = args[k + 1];
+        if (nom == "position" || nom == "outerposition") {
+            if (v.re.size() != 4)
+                erreur("MATLAB:hg:shaped_arrays", "Position must have four elements.");
+            double largeur = v.re[2], hauteur = v.re[3];
+            if (!(largeur > 0) || !(hauteur > 0))
+                erreur("MATLAB:hg:shaped_arrays",
+                       "Position must have positive width and height.");
+            fig.largeur = (int)largeur;
+            fig.hauteur = (int)hauteur;
+        } else if (nom == "name") {
+            fig.nom = v.versTexte();
+        } else if (nom == "units") {
+            std::string unite = v.versTexte();
+            for (auto& c : unite) c = (char)std::tolower((unsigned char)c);
+            if (unite != "pixels")
+                erreur("MATLAB:hg:InvalidProperty",
+                       "MatLibre ne mesure une figure qu'en pixels : l'unite '" +
+                           v.versTexte() + "' n'aurait pas d'effet.");
+        } else if (nom == "numbertitle" || nom == "visible" || nom == "menubar" ||
+                   nom == "toolbar") {
+            // Rien a faire : il n'y a ni fenetre, ni menu, ni barre. Les
+            // accepter en silence ne ment pas, puisque le resultat est le
+            // meme, et laisse tourner les programmes ecrits pour MATLAB.
+        } else {
+            erreur("MATLAB:hg:InvalidProperty",
+                   "Unrecognized property '" + args[k].versTexte() +
+                       "' for class 'Figure'.");
+        }
+    }
     if (nargout > 0) return {Valeur::scalaire(numero)};
     return {};
 }

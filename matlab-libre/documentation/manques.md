@@ -24,11 +24,12 @@ Fichier produit par `outils/manques.m` ; ne pas le corriger à la main.
 | robotique | 73 | 0 | 100 % |
 | robuste | 69 | 0 | 100 % |
 | signal | 139 | 0 | 100 % |
+| simulink | 26 | 0 | 100 % |
 | statistiques | 219 | 0 | 100 % |
 | symbolique | 36 | 0 | 100 % |
 | types | 100 | 0 | 100 % |
 | vision | 59 | 0 | 100 % |
-| **ensemble** | **2377** | **0** | **100 %** |
+| **ensemble** | **2403** | **0** | **100 %** |
 
 ## Ce qui manque au-delà des fonctions
 

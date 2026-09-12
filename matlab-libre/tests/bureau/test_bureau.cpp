@@ -23,6 +23,7 @@
 #include <QTreeWidget>
 #include <QTextBrowser>
 #include <QLineEdit>
+#include <QLabel>
 #include <QListWidget>
 #include <QFile>
 #include <QFileInfo>
@@ -41,6 +42,7 @@
 #include "FenetreAide.h"
 #include "FenetreFigure.h"
 #include "FenetreProfileur.h"
+#include "FenetreSimulink.h"
 #include "Icone.h"
 #include "Recherche.h"
 #include "Ruban.h"
@@ -1357,6 +1359,192 @@ int main(int argc, char** argv) {
             vue.save(chemin);
             std::printf("  capture du profileur ecrite dans %s\n",
                         chemin.toLocal8Bit().constData());
+        }
+    }
+
+
+    // --- Simulink dans le bureau --------------------------------------
+    //
+    // MATLAB donne a Simulink un bouton et une fenetre. Ici la fenetre
+    // montre la bibliotheque de blocs a gauche et, a droite, les modeles
+    // que porte l'espace de travail — car un modele MatLibre est une
+    // valeur, non un fichier. Ce qui se verifie : que le bouton ouvre la
+    // fenetre, que la bibliotheque ne ment pas sur ce qu'elle propose, et
+    // que l'espace de travail est bien le meme des deux cotes.
+    {
+        verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
+        QMetaObject::invokeMethod(&fenetre, "montrerSimulink");
+        QCoreApplication::processEvents();
+        FenetreSimulink* simulink = fenetre.findChild<FenetreSimulink*>();
+        verifier(simulink != nullptr, "le bouton du ruban ouvre la fenetre Simulink");
+        if (simulink) {
+            QTreeWidget* biblio = simulink->bibliotheque();
+            int familles = biblio->topLevelItemCount();
+            int types = 0;
+            for (int k = 0; k < familles; ++k) types += biblio->topLevelItem(k)->childCount();
+            verifier(familles >= 6, "la bibliotheque range les blocs par famille");
+            bool accentsIntacts = false;
+            for (int k = 0; k < familles; ++k)
+                if (biblio->topLevelItem(k)->text(0) == QString::fromUtf8("Opérations"))
+                    accentsIntacts = true;
+            verifier(accentsIntacts,
+                     "et les nomme sans abimer leurs accents : le fichier est en UTF-8");
+            verifier(types >= 35, "et propose au moins trente-cinq blocs");
+
+            // Choisir un bloc donne la ligne qui le pose, et « Inserer »
+            // l'ecrit dans l'editeur : c'est la que vit un modele, qui est
+            // un programme.
+            QTreeWidgetItem* familleSources = biblio->topLevelItem(0);
+            verifier(familleSources->childCount() > 0, "la premiere famille a des blocs");
+            biblio->setCurrentItem(familleSources->child(0));
+            QCoreApplication::processEvents();
+            const QString ligne = simulink->ligneInsertion();
+            verifier(ligne.startsWith(QLatin1String("m = add_block(m, 'constant'")),
+                     "le bloc choisi donne sa ligne ADD_BLOCK");
+            verifier(simulink->description()->text().contains(QLatin1String("add_block")),
+                     "et la fenetre la montre avant de l'ecrire");
+
+            if (editeur) {
+                // L'insertion vise l'editeur courant : on amene celui qu'on
+                // observe au premier plan, comme le ferait un clic d'onglet.
+                for (QTabWidget* t : fenetre.findChildren<QTabWidget*>())
+                    if (t->indexOf(editeur) >= 0) t->setCurrentWidget(editeur);
+                QCoreApplication::processEvents();
+                editeur->setPlainText(QStringLiteral("m = new_system('depuisRuban');"));
+                QMetaObject::invokeMethod(simulink, "insererBloc");
+                QCoreApplication::processEvents();
+                verifier(editeur->toPlainText().contains(ligne),
+                         "« Inserer » ecrit la ligne dans l'editeur");
+            }
+
+            // L'espace de travail est partage : un modele cree a la console
+            // apparait dans la liste de la fenetre, sans qu'on la rafraichisse.
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = add_block(new_system('modeleDuBureau'), "
+                "'integrator', 'x');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le modele est cree");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return simulink->listeModeles()->count() > 0;
+                     }),
+                     "le modele de l'espace de travail apparait dans la fenetre");
+            bool nomme = false;
+            for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                if (simulink->listeModeles()->item(k)->text() ==
+                    QLatin1String("modeleDuBureau"))
+                    nomme = true;
+            verifier(nomme, "et il y porte son nom");
+
+            // Une capture de la fenetre Simulink, pour qu'un humain puisse
+            // regarder ce qui a ete construit.
+            if (const char* capture = std::getenv("MATLIBRE_CAPTURE")) {
+                QString chemin = QString::fromLocal8Bit(capture);
+                chemin.replace(QRegularExpression(QStringLiteral("\\.png$")),
+                               QStringLiteral("-simulink.png"));
+                simulink->resize(920, 580);
+                QCoreApplication::processEvents();
+                QImage vue(simulink->size(), QImage::Format_ARGB32);
+                vue.fill(Qt::white);
+                simulink->render(&vue);
+                vue.save(chemin);
+                std::printf("  capture de Simulink ecrite dans %s\n",
+                            chemin.toLocal8Bit().constData());
+            }
+
+
+            // Une variable qui n'est pas un modele n'y entre pas : la liste
+            // dit ce qu'elle promet.
+            envoyer(fenetre, QStringLiteral("pasUnModele = struct('a', 1);"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "la structure est creee");
+            QCoreApplication::processEvents();
+            bool intrus = false;
+            for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                if (simulink->listeModeles()->item(k)->text() ==
+                    QLatin1String("pasUnModele"))
+                    intrus = true;
+            verifier(!intrus, "une structure quelconque n'est pas prise pour un modele");
+
+            // Le squelette du bouton « Nouveau modele » n'est pas un
+            // decor : il tourne.
+            const QString squelette = FenetreSimulink::squeletteModele();
+            verifier(squelette.contains(QLatin1String("new_system")) &&
+                         squelette.contains(QLatin1String("open_system")),
+                     "le modele de depart pose et montre un schema");
+            QString fichierSquelette =
+                QDir::current().absoluteFilePath(QStringLiteral("essaiSquelette.m"));
+            {
+                QFile f(fichierSquelette);
+                if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                    f.write(squelette.toUtf8());
+            }
+            int avant = console->toPlainText().size();
+            envoyer(fenetre, QStringLiteral("run('%1'); disp('SQUELETTE OK')")
+                                 .arg(fichierSquelette));
+            verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
+                     "le modele de depart s'execute");
+            QString sortie = console->toPlainText().mid(avant);
+            verifier(sortie.contains(QLatin1String("SQUELETTE OK")),
+                     "et il va jusqu'au bout, schema et simulation compris");
+            QFile::remove(fichierSquelette);
+
+            // La bibliotheque ne propose que des blocs qui existent : chacun
+            // est pose puis simule. Sans ce controle, un bloc offert au
+            // clic pourrait ne pas etre reconnu par SIM.
+            QString essaiTous = QStringLiteral("signal = [0 0; 1 1];\n");
+            for (const BlocBibliotheque* b = bibliothequeSimulink(); b->famille; ++b) {
+                essaiTous += QStringLiteral("m = new_system('t');\n");
+                essaiTous += QStringLiteral("m = add_block(m, '%1', '%1'").arg(
+                    QLatin1String(b->type));
+                if (*b->parametres) essaiTous += QStringLiteral(", ") +
+                                                 QString::fromUtf8(b->parametres);
+                essaiTous += QStringLiteral(");\n");
+                essaiTous += QStringLiteral("sim(m, 0.02, 0.01);\n");
+            }
+            essaiTous += QStringLiteral("disp('TOUS LES BLOCS OK')\n");
+            QString fichierTous =
+                QDir::current().absoluteFilePath(QStringLiteral("essaiBlocs.m"));
+            {
+                QFile f(fichierTous);
+                if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                    f.write(essaiTous.toUtf8());
+            }
+            avant = console->toPlainText().size();
+            envoyer(fenetre, QStringLiteral("run('%1')").arg(fichierTous));
+            verifier(attendre([&] { return !fenetre.occupe(); }, 60000),
+                     "les blocs de la bibliotheque se posent tous");
+            sortie = console->toPlainText().mid(avant);
+            verifier(sortie.contains(QLatin1String("TOUS LES BLOCS OK")),
+                     "et se simulent tous : la bibliotheque ne propose rien qui n'existe");
+            QFile::remove(fichierTous);
+
+            // « Ouvrir le schema » demande bien OPEN_SYSTEM sur le modele
+            // choisi, et une figure en sort.
+            for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                if (simulink->listeModeles()->item(k)->text() ==
+                    QLatin1String("modeleDuBureau"))
+                    simulink->listeModeles()->setCurrentRow(k);
+            QCoreApplication::processEvents();
+            verifier(simulink->modeleChoisi() == QLatin1String("modeleDuBureau"),
+                     "le modele choisi est celui qu'on a designe");
+            QString commandeVue;
+            QObject::connect(simulink, &FenetreSimulink::commandeDemandee,
+                             [&commandeVue](const QString& c) { commandeVue = c; });
+            QMetaObject::invokeMethod(simulink, "ouvrirSchema");
+            QCoreApplication::processEvents();
+            verifier(commandeVue == QLatin1String("open_system(modeleDuBureau)"),
+                     "« Ouvrir le schema » appelle OPEN_SYSTEM sur ce modele");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "et le schema se trace");
+            envoyer(fenetre, QStringLiteral("clear modeleDuBureau pasUnModele; close all"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est rendu net");
+            QCoreApplication::processEvents();
+            bool subsiste = false;
+            for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                if (simulink->listeModeles()->item(k)->text() ==
+                    QLatin1String("modeleDuBureau"))
+                    subsiste = true;
+            verifier(!subsiste,
+                     "efface de l'espace de travail, le modele quitte la liste");
         }
     }
 

@@ -50,6 +50,49 @@ void dessiner(QPainter& p, const QString& nom, const QRectF& r) {
         return;
     }
     if (nom == QLatin1String("script")) { feuille(bleu); return; }
+    if (nom == QLatin1String("simulink") || nom == QLatin1String("modele")) {
+        // Un schema-bloc : deux blocs relies par une fleche, et un retour
+        // par-dessous. C'est ce que Simulink dessine, non son logo.
+        const double l = r.width(), h = r.height();
+        QRectF un(r.left() + l * 0.06, r.top() + h * 0.20, l * 0.32, h * 0.30);
+        QRectF deux(r.left() + l * 0.60, r.top() + h * 0.20, l * 0.32, h * 0.30);
+        p.setPen(QPen(bleu, l * 0.07));
+        p.setBrush(nom == QLatin1String("modele") ? QBrush(Qt::white) : QBrush(bleu.lighter(185)));
+        p.drawRoundedRect(un, l * 0.06, l * 0.06);
+        p.drawRoundedRect(deux, l * 0.06, l * 0.06);
+        p.setPen(QPen(gris, l * 0.07, Qt::SolidLine, Qt::RoundCap));
+        double milieu = un.center().y();
+        p.drawLine(QPointF(un.right(), milieu), QPointF(deux.left() - l * 0.05, milieu));
+        // La pointe de la fleche.
+        QPainterPath pointe;
+        pointe.moveTo(deux.left(), milieu);
+        pointe.lineTo(deux.left() - l * 0.12, milieu - h * 0.07);
+        pointe.lineTo(deux.left() - l * 0.12, milieu + h * 0.07);
+        pointe.closeSubpath();
+        p.setPen(Qt::NoPen);
+        p.setBrush(gris);
+        p.drawPath(pointe);
+        // Le retour, qui fait la boucle : c'est lui qui dit « asservi ».
+        p.setPen(QPen(vert, l * 0.07, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::NoBrush);
+        QPainterPath boucle;
+        double bas = r.bottom() - h * 0.14;
+        boucle.moveTo(deux.center().x(), deux.bottom());
+        boucle.lineTo(deux.center().x(), bas);
+        boucle.lineTo(un.center().x(), bas);
+        boucle.lineTo(un.center().x(), un.bottom());
+        p.drawPath(boucle);
+        if (nom == QLatin1String("modele")) {
+            // Le « plus » distingue « nouveau modele » de « Simulink » :
+            // les deux icones se ressemblaient a s'y meprendre.
+            p.setPen(QPen(vert, l * 0.13, Qt::SolidLine, Qt::RoundCap));
+            double cx = r.right() - l * 0.14, cy = r.top() + h * 0.14;
+            double b = l * 0.13;
+            p.drawLine(QPointF(cx - b, cy), QPointF(cx + b, cy));
+            p.drawLine(QPointF(cx, cy - b), QPointF(cx, cy + b));
+        }
+        return;
+    }
     if (nom == QLatin1String("ouvrir")) {
         p.setPen(QPen(orange.darker(120), r.width() * 0.07));
         p.setBrush(jaune);

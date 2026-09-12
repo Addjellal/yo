@@ -12,6 +12,12 @@ function modele = set_param(modele, nom, varargin)
 %   type de bloc. Un nom inconnu est simplement ajouté ; il ne sera lu par
 %   personne.
 %
+%   MODELE = SET_PARAM(MODELE,'Nom',VALEUR) — une seule valeur, sans nom
+%   de bloc devant — change un réglage du modèle lui-même, comme
+%   StopTime ou FixedStep. La forme se distingue sans ambiguïté : un
+%   réglage de bloc se donne toujours par couples, donc en nombre pair
+%   d'arguments après le nom du bloc.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -27,7 +33,15 @@ function modele = set_param(modele, nom, varargin)
 %          r = sim(m, 5, 0.01);
 %      end
 %
-%   Voir aussi ADD_BLOCK, NEW_SYSTEM, SIM.
+%   Voir aussi ADD_BLOCK, ADD_PARAM, NEW_SYSTEM, SIM.
+    if mod(numel(varargin), 2) == 1
+        % Nombre impair : c'est « nom du reglage, valeur » sur le modele.
+        if ~isfield(modele, 'parametres')
+            modele.parametres = struct();
+        end
+        modele.parametres.(char(nom)) = varargin{1};
+        return
+    end
     for i = 1:numel(modele.blocs)
         if strcmp(modele.blocs{i}.nom, nom)
             b = modele.blocs{i};
