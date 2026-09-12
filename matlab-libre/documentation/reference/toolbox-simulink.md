@@ -801,6 +801,7 @@ MATLIBRE_SL_GEOMETRIE Où se place chaque bloc, et par où passe chaque lien.
 
   Les champs rendus :
     G.blocs(k).nom, .type, .etiquette, .signes
+    G.blocs(k).noms, .valeurs                  ses réglages, en texte
     G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
     G.blocs(k).pose                            vrai si POSITION le fixait
     G.liens(k).source, .cible, .port, .retour
@@ -1108,6 +1109,10 @@ SET_PARAM Modifie les paramètres d'un bloc.
   type de bloc. Un nom inconnu est simplement ajouté ; il ne sera lu par
   personne.
 
+  'Name' fait exception : il renomme le bloc, comme dans Simulink, au
+  lieu de poser un réglage de ce nom. Les liens désignent les blocs par
+  leur rang, si bien que le câblage ne bouge pas.
+
   MODELE = SET_PARAM(MODELE,'Nom',VALEUR) — une seule valeur, sans nom
   de bloc devant — change un réglage du modèle lui-même, comme
   StopTime ou FixedStep. La forme se distingue sans ambiguïté : un
@@ -1128,6 +1133,8 @@ SET_PARAM Modifie les paramètres d'un bloc.
          m = set_param(m, 'gain', 'Gain', K);
          r = sim(m, 5, 0.01);
      end
+     m = set_param(m, 'gain', 'Name', 'correcteur');
+     get_param(m, 'correcteur', 'Gain')       % 5 : le bloc a change de nom
 
   Voir aussi ADD_BLOCK, ADD_PARAM, NEW_SYSTEM, SIM.
 ```

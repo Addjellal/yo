@@ -1241,4 +1241,41 @@ assert(abs(min(xDevant) - 1) < 1e-9 && abs(max(xDevant) - 5) < 1e-9, ...
 assert(numel(xArriere) > numel(xDevant), ...
        'et le contournement demande plus de segments que la ligne droite');
 
+% SET_PARAM sait renommer un bloc : c'est le pendant de GET_PARAM, qui
+% rendait deja « Name ». Les liens designent les blocs par leur rang, si
+% bien que le cablage ne bouge pas.
+renom = new_system('renom');
+renom = add_block(renom, 'constant', 'source', 'Value', 5);
+renom = add_block(renom, 'gain', 'k', 'Gain', 3);
+renom = add_line(renom, 'source', 'k');
+cablageAvant = renom.liens;
+renom = set_param(renom, 'k', 'Name', 'correcteur');
+assert(strcmp(get_param(renom, 'correcteur', 'Name'), 'correcteur'));
+assert(get_param(renom, 'correcteur', 'Gain') == 3, 'les reglages suivent le bloc');
+assert(isequal(renom.liens, cablageAvant), 'et le cablage ne bouge pas');
+assert(~isfield(get_param(renom, 'correcteur').parametres, 'Name'), ...
+       '« Name » renomme, il ne pose pas un reglage de ce nom');
+resRenom = sim(renom, 0.02, 0.01);
+assert(all(resRenom.signaux.correcteur == 15), 'et le modele se simule encore');
+refuseRenom = false;
+try
+    set_param(renom, 'k', 'Name', 'autre');
+catch err
+    refuseRenom = strcmp(err.identifier, 'simulink:set_param:unknownBlock');
+end
+assert(refuseRenom, 'l''ancien nom ne designe plus rien');
+
+% La geometrie porte les reglages, pour que la boite de dialogue du bureau
+% les montre. POSITION n'y est pas : la place se regle a la souris.
+geoReglages = matlibre_sl_geometrie(set_param(renom, 'correcteur', ...
+                                              'Position', [0 0 1.7 1]));
+assert(isequal(geoReglages.blocs(2).noms, {'Gain'}), ...
+       'le gain est le seul reglage montre');
+assert(strcmp(geoReglages.blocs(2).valeurs{1}, '3'));
+assert(~any(strcmp(geoReglages.blocs(2).noms, 'Position')));
+% Une expression se rend telle quelle : l'ecrire entre apostrophes la
+% ferait lire deux fois.
+geoExpression = matlibre_sl_geometrie(set_param(renom, 'correcteur', 'Gain', 'K'));
+assert(strcmp(geoExpression.blocs(2).valeurs{1}, 'K'));
+
 disp('toolboxes : toutes les verifications passent');

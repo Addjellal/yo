@@ -611,6 +611,15 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             b.droite = blocs.champ("droite", k).scal();
             b.bas = blocs.champ("bas", k).scal();
             b.pose = blocs.champ("pose", k).scal() != 0.0;
+            const Valeur noms = blocs.champ("noms", k);
+            const Valeur valeurs = blocs.champ("valeurs", k);
+            for (std::size_t j = 0; j < noms.cellules.size(); ++j) {
+                b.reglagesNoms << QString::fromStdString(noms.cellules[j].versTexte());
+                b.reglagesValeurs << (j < valeurs.cellules.size()
+                                          ? QString::fromStdString(
+                                                valeurs.cellules[j].versTexte())
+                                          : QString());
+            }
             schema.blocs.push_back(b);
         }
     }

@@ -12,6 +12,10 @@ function modele = set_param(modele, nom, varargin)
 %   type de bloc. Un nom inconnu est simplement ajouté ; il ne sera lu par
 %   personne.
 %
+%   'Name' fait exception : il renomme le bloc, comme dans Simulink, au
+%   lieu de poser un réglage de ce nom. Les liens désignent les blocs par
+%   leur rang, si bien que le câblage ne bouge pas.
+%
 %   MODELE = SET_PARAM(MODELE,'Nom',VALEUR) — une seule valeur, sans nom
 %   de bloc devant — change un réglage du modèle lui-même, comme
 %   StopTime ou FixedStep. La forme se distingue sans ambiguïté : un
@@ -32,6 +36,8 @@ function modele = set_param(modele, nom, varargin)
 %          m = set_param(m, 'gain', 'Gain', K);
 %          r = sim(m, 5, 0.01);
 %      end
+%      m = set_param(m, 'gain', 'Name', 'correcteur');
+%      get_param(m, 'correcteur', 'Gain')       % 5 : le bloc a change de nom
 %
 %   Voir aussi ADD_BLOCK, ADD_PARAM, NEW_SYSTEM, SIM.
     if mod(numel(varargin), 2) == 1
@@ -46,7 +52,16 @@ function modele = set_param(modele, nom, varargin)
         if strcmp(modele.blocs{i}.nom, nom)
             b = modele.blocs{i};
             for k = 1:2:numel(varargin)-1
-                b.parametres.(char(varargin{k})) = varargin{k+1};
+                champ = char(varargin{k});
+                % « Name » renomme le bloc, il ne pose pas un reglage de ce
+                % nom : c'est ce que GET_PARAM rend deja, et il faut que
+                % l'un soit le pendant de l'autre. Les liens designent les
+                % blocs par leur rang, le cablage ne bouge donc pas.
+                if strcmpi(champ, 'Name')
+                    b.nom = char(varargin{k + 1});
+                    continue
+                end
+                b.parametres.(champ) = varargin{k+1};
             end
             modele.blocs{i} = b;
             return;

@@ -24,6 +24,7 @@
 
 #include "Ruban.h"
 #include "Theme.h"
+#include "DialogueBloc.h"
 #include "ToileSimulink.h"
 
 namespace {
@@ -285,14 +286,35 @@ void FenetreSimulink::surLienSupprime(const QString& source, const QString& cibl
 void FenetreSimulink::surBlocOuvert(const QString& nom) {
     const QString modele = modeleChoisi();
     if (modele.isEmpty()) return;
-    // Il n'y a pas de boite de dialogue par bloc : les reglages se lisent
-    // et se posent au clavier, et c'est la ligne a completer qu'on ecrit
-    // dans l'editeur plutot que d'inventer un formulaire par type.
-    emit insertionDemandee(QStringLiteral("%1 = set_param(%1, '%2', 'Nom', valeur);")
-                               .arg(modele, nom));
-    emit commandeDemandee(QStringLiteral("get_param(%1, '%2')").arg(modele, nom));
-    poserEtat(QStringLiteral("Les reglages de « %1 » sont affiches ; la ligne pour "
-                             "les changer vous attend dans l'editeur.").arg(nom));
+    const BlocSchema* bloc = nullptr;
+    for (const BlocSchema& b : dernier_.blocs)
+        if (b.nom == nom) bloc = &b;
+    if (!bloc) return;
+    DialogueBloc boite(bloc->nom, bloc->type, bloc->reglagesNoms,
+                       bloc->reglagesValeurs, this);
+    if (boite.exec() != QDialog::Accepted) return;
+
+    // Une seule commande, quoi qu'on ait change : la console refuse ce
+    // qu'on lui envoie pendant qu'elle calcule, si bien que deux commandes
+    // d'affilee auraient perdu la seconde -- changer un reglage et
+    // renommer aurait perdu le renommage. Le renommage vient en dernier
+    // dans la ligne : ce qui precede designe encore le bloc par son
+    // ancien nom.
+    QStringList morceaux;
+    for (const auto& couple : boite.changements())
+        morceaux << QStringLiteral("%1 = set_param(%1, '%2', '%3', '%4');")
+                        .arg(modele, nom, couple.first, couple.second);
+    const QString neuf = boite.nomDemande();
+    if (!neuf.isEmpty() && neuf != nom)
+        morceaux << QStringLiteral("%1 = set_param(%1, '%2', 'Name', '%3');")
+                        .arg(modele, nom, neuf);
+    if (morceaux.isEmpty()) {
+        poserEtat(QStringLiteral("Rien n'a change pour « %1 ».").arg(nom));
+        return;
+    }
+    emit commandeDemandee(morceaux.join(QLatin1Char(' ')));
+    poserEtat(QStringLiteral("Reglages de « %1 » enregistres dans le modele.")
+                  .arg(neuf.isEmpty() ? nom : neuf));
 }
 
 void FenetreSimulink::surBlocDepose(const QPointF& place) {
@@ -451,6 +473,7 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
         return;
     }
     affiche_ = schema.nom;
+    dernier_ = schema;
     toile_->definirSchema(schema);
     titreToile_->setText(QStringLiteral("%1 — %2 bloc(s), %3 lien(s)")
                              .arg(schema.nom)

@@ -44,6 +44,7 @@
 #include "FenetreFigure.h"
 #include "FenetreProfileur.h"
 #include "FenetreSimulink.h"
+#include "DialogueBloc.h"
 #include "ToileSimulink.h"
 #include "Icone.h"
 #include "Recherche.h"
@@ -1765,6 +1766,81 @@ int main(int argc, char** argv) {
                                 compter(QStringLiteral("Liens")) == 5;
                      }, 20000),
                      "et le modele revient a cinq blocs et cinq liens");
+
+            // --- la boite de reglages -------------------------------
+            //
+            // Le double-clic ouvre les parametres du bloc, comme dans
+            // Simulink. Ce qu'on y ecrit ressort en SET_PARAM ; ce qu'on
+            // n'a pas touche n'en sort pas, sans quoi on ecrirait dans le
+            // modele des reglages que personne n'a demande de changer.
+            {
+                DialogueBloc boite(QStringLiteral("correcteur"),
+                                   QStringLiteral("gain"),
+                                   {QStringLiteral("Gain")}, {QStringLiteral("K")});
+                verifier(boite.nomDemande() == QLatin1String("correcteur"),
+                         "la boite montre le nom du bloc");
+                verifier(boite.champReglage(QStringLiteral("Gain")) != nullptr &&
+                             boite.champReglage(QStringLiteral("Gain"))->text() ==
+                                 QLatin1String("K"),
+                         "et la valeur de son reglage, expression comprise");
+                verifier(boite.changements().isEmpty(),
+                         "sans rien toucher, rien n'en ressort");
+                boite.champReglage(QStringLiteral("Gain"))->setText(QStringLiteral("7"));
+                verifier(boite.changements().size() == 1 &&
+                             boite.changements()[0].second == QLatin1String("7"),
+                         "un champ modifie ressort seul");
+                boite.champNom()->setText(QStringLiteral("regulateur"));
+                verifier(boite.nomDemande() == QLatin1String("regulateur"),
+                         "et le nom demande est celui qu'on a ecrit");
+            }
+
+            // Le chemin entier : double-clic, boite, commande. La boite est
+            // modale ; un rendez-vous differe la remplit et la valide de
+            // l'interieur de sa propre boucle d'evenements.
+            commandeVue.clear();
+            QStringList commandesVues;
+            QMetaObject::Connection lien = QObject::connect(
+                simulink, &FenetreSimulink::commandeDemandee,
+                [&commandesVues](const QString& c) { commandesVues << c; });
+            QTimer::singleShot(0, [&] {
+                auto* ouverte = simulink->findChild<DialogueBloc*>(
+                    QStringLiteral("dialogueBloc"));
+                if (!ouverte) return;
+                if (auto* champ = ouverte->champReglage(QStringLiteral("Gain")))
+                    champ->setText(QStringLiteral("9"));
+                ouverte->champNom()->setText(QStringLiteral("regulateur"));
+                ouverte->accept();
+            });
+            QMetaObject::invokeMethod(simulink, "surBlocOuvert",
+                                      Q_ARG(QString, QStringLiteral("correcteur")));
+            QCoreApplication::processEvents();
+            QObject::disconnect(lien);
+            // Une seule commande, et non deux : la console refuse ce qu'on
+            // lui envoie pendant qu'elle calcule, si bien que la seconde
+            // se perdrait.
+            verifier(commandesVues.size() == 1, "une seule commande part");
+            if (commandesVues.size() == 1) {
+                verifier(commandesVues[0].contains(QLatin1String("'Gain', '9'")),
+                         "le reglage change y est");
+                verifier(commandesVues[0].contains(QLatin1String("'Name', 'regulateur'")),
+                         "le renommage aussi");
+                verifier(commandesVues[0].indexOf(QLatin1String("'Gain'")) <
+                             commandesVues[0].indexOf(QLatin1String("'Name'")),
+                         "et le renommage vient apres, quand l'ancien nom designe "
+                         "encore le bloc");
+            }
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "les commandes passent");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         return !toile->cadreEcranDe(QStringLiteral("regulateur"))
+                                     .isNull();
+                     }, 20000),
+                     "le bloc renomme parait sous son nouveau nom");
+            envoyer(fenetre, QStringLiteral(
+                "modeleDuBureau = set_param(modeleDuBureau, 'regulateur', "
+                "'Name', 'correcteur');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }), "et on le remet");
 
             // Une capture de la fenetre Simulink, pour qu'un humain puisse
             // regarder ce qui a ete construit.

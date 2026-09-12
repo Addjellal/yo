@@ -122,6 +122,9 @@ private:
     // Le modèle dont la toile porte le schéma. Sert à savoir s'il faut le
     // redemander quand l'espace de travail change.
     QString affiche_;
+    // Le dernier schema recu : c'est la qu'on retrouve les reglages d'un
+    // bloc quand on double-clique dessus.
+    SchemaSimulink dernier_;
     // Le compte des blocs posés depuis la bibliothèque : de quoi donner
     // un nom neuf à chacun sans écraser le précédent.
     int poses_ = 0;

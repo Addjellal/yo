@@ -17,6 +17,7 @@ function geometrie = matlibre_sl_geometrie(modele)
 %
 %   Les champs rendus :
 %     G.blocs(k).nom, .type, .etiquette, .signes
+%     G.blocs(k).noms, .valeurs                  ses réglages, en texte
 %     G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
 %     G.blocs(k).pose                            vrai si POSITION le fixait
 %     G.liens(k).source, .cible, .port, .retour
@@ -46,7 +47,8 @@ function geometrie = matlibre_sl_geometrie(modele)
     geometrie.largeur = largeur;
     geometrie.hauteur = hauteur;
     blocs = struct('nom', {}, 'type', {}, 'etiquette', {}, 'signes', {}, ...
-                   'gauche', {}, 'haut', {}, 'droite', {}, 'bas', {}, 'pose', {});
+                   'gauche', {}, 'haut', {}, 'droite', {}, 'bas', {}, ...
+                   'pose', {}, 'noms', {}, 'valeurs', {});
     for k = 1:n
         bloc = modele.blocs{k};
         pose = false;
@@ -64,12 +66,25 @@ function geometrie = matlibre_sl_geometrie(modele)
             cadre = [x(k) - demiL, -y(k) - hauteur / 2, ...
                      x(k) + demiL, -y(k) + hauteur / 2];
         end
+        % Les réglages, écrits tels qu'un programme les relira : c'est ce
+        % que la boîte de dialogue montre, et ce qu'elle renvoie.
+        champs = fieldnames(bloc.parametres);
+        noms = {};
+        valeurs = {};
+        for j = 1:numel(champs)
+            if strcmp(champs{j}, 'Position')
+                continue   % la place se règle à la souris, non au clavier
+            end
+            noms{end + 1} = champs{j};                          %#ok<AGROW>
+            valeurs{end + 1} = ecrireReglage(bloc.parametres.(champs{j}));  %#ok<AGROW>
+        end
         blocs(end + 1) = struct('nom', bloc.nom, 'type', bloc.type, ...
                                 'etiquette', matlibre_sl_etiquette(bloc), ...
                                 'signes', matlibre_sl_signes(bloc), ...
                                 'gauche', cadre(1), 'haut', cadre(2), ...
                                 'droite', cadre(3), 'bas', cadre(4), ...
-                                'pose', pose);   %#ok<AGROW>
+                                'pose', pose, 'noms', {noms}, ...
+                                'valeurs', {valeurs});   %#ok<AGROW>
     end
     geometrie.blocs = blocs;
 
@@ -85,6 +100,19 @@ function geometrie = matlibre_sl_geometrie(modele)
                                 'port', port, 'retour', estRetour);   %#ok<AGROW>
     end
     geometrie.liens = liens;
+end
+
+% Un réglage tel qu'on le relira : le texte tel quel — c'est une
+% expression, et l'écrire entre apostrophes la ferait lire deux fois —,
+% les nombres par MAT2STR.
+function t = ecrireReglage(v)
+    if ischar(v) || isstring(v)
+        t = char(v);
+    elseif isnumeric(v) || islogical(v)
+        t = mat2str(v);
+    else
+        t = ['<' class(v) '>'];
+    end
 end
 
 function d = demiLargeur(type, largeur, hauteur)

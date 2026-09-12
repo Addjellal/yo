@@ -87,6 +87,10 @@ struct BlocSchema {
     QString nom, type, etiquette, signes;
     double gauche = 0, haut = 0, droite = 0, bas = 0;
     bool pose = false;    // vrai quand POSITION fixait la place
+    // Les réglages du bloc, écrits tels qu'un programme les relira. C'est
+    // ce que la boîte de dialogue montre au double-clic. POSITION n'y est
+    // pas : la place se règle à la souris.
+    QStringList reglagesNoms, reglagesValeurs;
 };
 
 struct LienSchema {
