@@ -495,4 +495,81 @@ autocorrLpc = arrayfun(@(k) sum(courtLpc(1:nLpc-k) .* courtLpc(1+k:nLpc)) / nLpc
 assert(max(abs(levinson(autocorrLpc, 2) - aCourt)) < 1e-10);
 disp('fftfilt et lpc : ok');
 
+%% ------------------------------------------ OPEN_SYSTEM : LE SCHEMA
+% Le rangement en couches : chaque bloc apres celui qui l'alimente, et
+% les liens de rebouclage mis a part pour etre traces en retour.
+schema = new_system('boucle');
+schema = add_block(schema, 'step', 'consigne', 'Time', 0, 'After', 1);
+schema = add_block(schema, 'sum', 'erreur', 'Signs', '+-');
+schema = add_block(schema, 'gain', 'correcteur', 'Gain', 4);
+schema = add_block(schema, 'integrator', 'sortie', 'InitialCondition', 0);
+schema = add_line(schema, 'consigne', 'erreur', 1);
+schema = add_line(schema, 'sortie', 'erreur', 2);
+schema = add_line(schema, 'erreur', 'correcteur');
+schema = add_line(schema, 'correcteur', 'sortie');
+
+[rangs, retours] = matlibre_sl_rangs(schema);
+assert(isequal(rangs, [0 1 2 3]), 'la chaine se range de la source vers la sortie');
+assert(size(retours, 1) == 1, 'la contre-reaction est le seul lien de retour');
+assert(isequal(retours(1, 1:2), [4 2]), 'elle va de la sortie vers la sommation');
+
+% La disposition met chaque couche a sa place, de la gauche vers la droite.
+[xSchema, ySchema, largeurBloc, hauteurBloc] = matlibre_sl_disposition(schema, rangs);
+assert(issorted(xSchema), 'les abscisses suivent les couches');
+assert(numel(unique(xSchema)) == 4, 'quatre couches, quatre abscisses');
+assert(largeurBloc > 0 && hauteurBloc > 0);
+
+% Un schema sans circuit n'a aucun retour ; un circuit pur en a un.
+chaine = new_system('chaine');
+chaine = add_block(chaine, 'constant', 'a', 'Value', 1);
+chaine = add_block(chaine, 'gain', 'b', 'Gain', 2);
+chaine = add_line(chaine, 'a', 'b');
+[~, sansRetour] = matlibre_sl_rangs(chaine);
+assert(isempty(sansRetour));
+
+% Le rang est le plus long chemin, non le plus court : un bloc alimente a
+% la fois par la source et par le bout de la chaine se place au bout.
+losange = new_system('losange');
+losange = add_block(losange, 'constant', 'entree', 'Value', 1);
+losange = add_block(losange, 'gain', 'court', 'Gain', 1);
+losange = add_block(losange, 'gain', 'long1', 'Gain', 1);
+losange = add_block(losange, 'gain', 'long2', 'Gain', 1);
+losange = add_block(losange, 'sum', 'fin', 'Signs', '++');
+losange = add_line(losange, 'entree', 'court');
+losange = add_line(losange, 'entree', 'long1');
+losange = add_line(losange, 'long1', 'long2');
+losange = add_line(losange, 'court', 'fin', 1);
+losange = add_line(losange, 'long2', 'fin', 2);
+rangsLosange = matlibre_sl_rangs(losange);
+assert(rangsLosange(5) == 3, 'la sommation attend la plus longue branche');
+
+% Ce que chaque bloc affiche : le reglage, non le type.
+assert(strcmp(matlibre_sl_etiquette(schema.blocs{3}), '4'));
+assert(strcmp(matlibre_sl_etiquette(schema.blocs{4}), '1/s'));
+assert(strcmp(matlibre_sl_etiquette(struct('type', 'delay', 'parametres', struct())), '1/z'));
+assert(strcmp(matlibre_sl_etiquette(struct('type', 'derivative', 'parametres', struct())), 'du/dt'));
+assert(strcmp(matlibre_sl_signes(schema.blocs{2}), '+-'));
+assert(strcmp(matlibre_sl_signes(struct('parametres', struct())), '++'), ...
+       'une sommation sans signe declare additionne');
+
+% Le trace lui-meme : il produit une figure, et les formes y sont.
+figure;
+poigneeSchema = open_system(schema);
+assert(strcmp(class(poigneeSchema), 'matlab.ui.Figure'));
+dessin = matlibre_svg();
+assert(~isempty(strfind(dessin, 'consigne')), 'les noms de blocs sont ecrits');
+assert(~isempty(strfind(dessin, '1/s')), 'l''integrateur porte sa transmittance');
+assert(~isempty(strfind(dessin, 'boucle')), 'le titre est le nom du modele');
+assert(~isempty(strfind(dessin, '<path')), 'les triangles et les pointes sont traces');
+
+% Un modele qui n'en est pas un est refuse.
+refuseModele = false;
+try
+    open_system(42);
+catch err
+    refuseModele = strcmp(err.identifier, 'Simulink:openSystem:Modele');
+end
+assert(refuseModele);
+close all;
+
 disp('toolboxes : toutes les verifications passent');

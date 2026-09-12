@@ -46,6 +46,14 @@ struct Serie {
     std::vector<double> xVraies, yVraies;
     int largeurImage = 0, hauteurImage = 0;
     std::string couleur = "#0072BD";
+    // Le contour d'une surface remplie se règle à part : « patch(x,y,c,
+    // 'EdgeColor',k) » veut un bord noir sur un fond clair, et sans ce
+    // champ la couleur de remplissage servait aussi de contour — un
+    // polygone blanc y devenait invisible.
+    std::string couleurBord;
+    // L'opacité du remplissage. MATLAB remplit opaque ; « FaceAlpha » la
+    // baisse quand on veut voir au travers.
+    double opacite = 1.0;
     std::string style = "-";
     std::string marqueur;
     std::string etiquette;

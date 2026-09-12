@@ -31,6 +31,10 @@ function H = patch(varargin)
     faces = [];
     sommets = [];
     couleur = [];
+    % Le contour et la transparence se transmettent à FILL : les accepter
+    % sans effet donnait un polygone dont le bord prenait la couleur du
+    % fond — invisible dès que le remplissage était clair.
+    reglages = {};
     entrees = varargin;
     % La forme « 'Faces', F, 'Vertices', V », et les paires nom-valeur.
     k = 1;
@@ -48,6 +52,9 @@ function H = patch(varargin)
                     sommets = entrees{k + 1};
                 case 'facecolor'
                     couleur = entrees{k + 1};
+                case {'edgecolor', 'facealpha', 'linewidth'}
+                    reglages{end + 1} = char(entrees{k});   %#ok<AGROW>
+                    reglages{end + 1} = entrees{k + 1};     %#ok<AGROW>
                 otherwise
                     % acceptes et sans effet
             end
@@ -69,7 +76,7 @@ function H = patch(varargin)
             indices = faces(f, :);
             indices = indices(~isnan(indices));
             H(end + 1) = fill(sommets(indices, 1), sommets(indices, 2), ...
-                              'FaceColor', couleur);   %#ok<AGROW>
+                              'FaceColor', couleur, reglages{:});   %#ok<AGROW>
         end
     else
         if numel(positionnels) < 2
@@ -95,7 +102,8 @@ function H = patch(varargin)
             y = y(:);
         end
         for j = 1:size(x, 2)
-            H(end + 1) = fill(x(:, j), y(:, j), 'FaceColor', couleur);   %#ok<AGROW>
+            H(end + 1) = fill(x(:, j), y(:, j), 'FaceColor', couleur, ...
+                              reglages{:});   %#ok<AGROW>
         end
     end
     if ~aEffacer

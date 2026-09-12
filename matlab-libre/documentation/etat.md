@@ -15,13 +15,13 @@ documentation publique et vérifiée sur la propriété qui la définit.
 |---|---|---:|
 | `src/coeur` | lexeur, analyseur, interpréteur, algèbre linéaire | 10 087 |
 | `src/bibliotheque` | 679 fonctions natives, en C++ | 20 223 |
-| `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 901 |
-| `toolbox` | 2 983 fichiers `.m`, dont 2 232 fonctions publiques recensées par `outils/audit.m` | 136 632 |
-| `tests` | 44 scripts `.m` et 2 fichiers C++ | 23 953 |
+| `src/graphique`, `src/console`, `src/bureau` | tracé, console, application de bureau | 5 902 |
+| `toolbox` | 2 992 fichiers `.m`, dont 2 233 fonctions publiques recensées par `outils/audit.m` | 137 158 |
+| `tests` | 44 scripts `.m` et 2 fichiers C++ | 24 030 |
 | `exemples` | 53 programmes d'école, un par boîte à outils | 9 132 |
 
 La couverture par rapport à la liste de référence tirée de la
-documentation MathWorks est complète : `outils/manques.m` compte **2 376
+documentation MathWorks est complète : `outils/manques.m` compte **2 377
 fonctions attendues, 0 manquante**. La liste elle-même est vivante : une
 fonction courante qui n'y figurait pas est une fonction qui n'existait
 pas, et cent trente-six ont été ajoutées de cette façon — la famille
@@ -119,6 +119,7 @@ suivant en donne quelques-unes, prises dans les tests.
 | condensation | elle est toujours sans circuit : s'il en restait un, les composantes qu'il relie n'en feraient qu'une |
 | réduction transitive | elle a la même fermeture transitive que le graphe de départ, avec le moins d'arcs possible |
 | isomorphisme de graphes | la permutation rendue transporte effectivement les arêtes ; deux graphes de même suite de degrés ne sont pas pour autant isomorphes — le cycle à six sommets n'est pas la réunion de deux triangles |
+| schéma-bloc | le rang d'un bloc est le plus long chemin qui y mène, non le plus court : une sommation alimentée par deux branches attend la plus longue ; un lien qui referme une boucle est mis à part, et tracé en retour à sa propre profondeur |
 
 ## 3. État par boîte à outils
 
@@ -161,7 +162,7 @@ programme d'école qui montre à quoi il sert.
 | sujet | état | ce qu'il faudrait |
 |---|---|---|
 | Interface graphique | `interface` rend des poignées et exécute les rappels au fil de l'eau ; il n'y a pas de boucle d'événements modale | une boucle d'événements, pour que `uiwait` attende vraiment |
-| Simulink | schémas-blocs à solveur explicite, pas de boucle algébrique | solveur implicite, sous-systèmes, blocs à état discret |
+| Simulink | schémas-blocs à solveur explicite, pas de boucle algébrique ; `open_system` dessine le schéma — blocs rangés en couches, forme disant la fonction, câblage à angles droits, contre-réactions étagées par-dessous | solveur implicite, sous-systèmes, blocs à état discret ; le schéma se regarde et ne se déplace pas à la souris, et la toile est de taille fixe |
 | Simscape | circuits électriques linéaires, continu et transitoire | composants non linéaires, autres domaines physiques |
 | Coder | sous-ensemble scalaire et matriciel vers C et C++ | structures, cellules, fonctions imbriquées |
 | Symbolique | dérivation — trigonométriques, hyperboliques, réciproques, logarithmes de toute base —, intégration des formes usuelles, limites, séries de Taylor, jacobienne et hessienne, développement, regroupement, forme de Horner, éléments simples, isolement d'une inconnue, réécriture entre familles de fonctions, factorisation sur les rationnels, résolution exacte des polynômes et numérique du reste, sortie LaTeX | factorisation au-delà des racines rationnelles — x⁴+1 reste entier —, décomposition en éléments simples, arithmétique rationnelle exacte, expressions à plusieurs variables dans COLLECT et FACTOR |

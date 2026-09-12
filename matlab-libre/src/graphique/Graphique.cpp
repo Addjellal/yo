@@ -492,7 +492,8 @@ std::string rendreSVG(const Figure& figure) {
                 }
                 chemin += " Z";
                 out << "<path d=\"" << chemin << "\" fill=\"" << s.couleur
-                    << "\" fill-opacity=\"0.4\" stroke=\"" << s.couleur
+                    << "\" fill-opacity=\"" << s.opacite << "\" stroke=\""
+                    << (s.couleurBord.empty() ? s.couleur : s.couleurBord)
                     << "\" stroke-width=\"" << s.epaisseur << "\"/>\n";
                 continue;
             }

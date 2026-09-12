@@ -1188,6 +1188,11 @@ std::vector<Valeur> surfaceRemplie(Interpreteur& it, Arguments args, GenreTrace 
             if (nomPropriete == "facecolor" || nomPropriete == "color") {
                 std::string couleur = couleurDepuisValeur(args[k + 1]);
                 if (!couleur.empty()) s.couleur = couleur;
+            } else if (nomPropriete == "edgecolor") {
+                std::string bord = couleurDepuisValeur(args[k + 1]);
+                if (!bord.empty()) s.couleurBord = bord;
+            } else if (nomPropriete == "facealpha") {
+                s.opacite = args[k + 1].scal();
             } else if (nomPropriete == "linewidth") {
                 s.epaisseur = args[k + 1].scal();
             } else if (nomPropriete == "displayname") {

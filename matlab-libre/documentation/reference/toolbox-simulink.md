@@ -158,6 +158,176 @@ MATLIBRE_MEME_VALEUR Compare deux valeurs de paramètre, texte ou nombre.
   Voir aussi FIND_SYSTEM, GET_PARAM.
 ```
 
+## `matlibre_sl_allure`
+
+```
+MATLIBRE_SL_ALLURE Dessine dans le bloc l'allure de ce qu'il produit.
+  TRACE = MATLIBRE_SL_ALLURE(BLOC,X,Y,L,H) trace la petite courbe qui
+  figure la fonction du bloc — l'échelon, la rampe, la sinusoïde, la
+  saturation — et rend vrai si elle a été tracée.
+
+  Un dessin dit d'un coup ce qu'un nom demande de lire. Les blocs sans
+  allure connue rendent faux, et c'est alors leur étiquette qui parle.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure;
+     matlibre_sl_allure(struct('type', 'step'), 0, 0, 1.7, 1)   % 1
+
+  Voir aussi MATLIBRE_SL_FORME, MATLIBRE_SL_ETIQUETTE.
+```
+
+## `matlibre_sl_disposition`
+
+```
+MATLIBRE_SL_DISPOSITION Place les blocs d'un schéma sur la feuille.
+  [X,Y,L,H] = MATLIBRE_SL_DISPOSITION(MODELE,RANGS) rend le centre de
+  chaque bloc, ainsi que la largeur et la hauteur communes.
+
+  Les blocs d'une même couche sont ordonnés par la hauteur moyenne de
+  ceux qui les alimentent — le barycentre. Deux passes suffisent à
+  défaire l'essentiel des croisements ; les ranger dans l'ordre de
+  création en produirait à chaque embranchement.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('c');
+     m = add_block(m, 'constant', 'u', 'Value', 1);
+     m = add_block(m, 'gain', 'k', 'Gain', 2);
+     m = add_line(m, 'u', 'k');
+     [x, y] = matlibre_sl_disposition(m, matlibre_sl_rangs(m));
+     x(2) > x(1)                     % 1 : le gain est a droite
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_RANGS.
+```
+
+## `matlibre_sl_etiquette`
+
+```
+MATLIBRE_SL_ETIQUETTE Ce qui s'écrit dans un bloc.
+  TEXTE = MATLIBRE_SL_ETIQUETTE(BLOC) rend ce que le bloc affiche : sa
+  valeur pour une constante, son gain pour un gain, sa transmittance
+  pour un intégrateur ou un retard.
+
+  C'est le réglage qui s'écrit, non le type : « 1/s » dit plus qu'
+  « integrator », et un gain de 2 se lit d'un coup d'œil là où il
+  faudrait sinon ouvrir le bloc.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_sl_etiquette(struct('type', 'integrator', 'parametres', struct()))
+
+  Voir aussi MATLIBRE_SL_FORME, OPEN_SYSTEM, GET_PARAM.
+```
+
+## `matlibre_sl_fil`
+
+```
+MATLIBRE_SL_FIL Trace une liaison entre deux blocs, à angles droits.
+  MATLIBRE_SL_FIL(DEPART,ARRIVEE) relie le point DEPART au point
+  ARRIVEE par des segments horizontaux et verticaux, et pose une
+  pointe de flèche à l'arrivée.
+
+  MATLIBRE_SL_FIL(DEPART,ARRIVEE,true,BAS) trace un retour de boucle :
+  la liaison descend sous le schéma, à la hauteur BAS, revient vers la
+  gauche, puis remonte. Tracée en ligne droite, elle passerait au
+  travers des blocs qu'elle enjambe.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure;
+     matlibre_sl_fil([0 0], [3 1]);
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_FORME.
+```
+
+## `matlibre_sl_forme`
+
+```
+MATLIBRE_SL_FORME Dessine un bloc, selon ce qu'il fait.
+  MATLIBRE_SL_FORME(BLOC,X,Y,L,H) trace le bloc centré en (X,Y).
+
+  La forme dit la fonction avant que le texte ne la nomme : un gain est
+  un triangle, une sommation un cercle, une source porte l'allure de
+  son signal. C'est la convention des schémas-blocs, et elle se lit
+  plus vite qu'une liste de rectangles étiquetés.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure;
+     matlibre_sl_forme(struct('type', 'gain', 'nom', 'k', ...
+                              'parametres', struct('Gain', 3)), 0, 0, 1.7, 1);
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_FIL.
+```
+
+## `matlibre_sl_pointe`
+
+```
+MATLIBRE_SL_POINTE Pointe de flèche à l'entrée d'un bloc.
+  MATLIBRE_SL_POINTE(ARRIVEE) pose un petit triangle plein pointant
+  vers la droite au point donné.
+
+  Sans elle, un schéma-bloc ne dit pas dans quel sens l'information
+  circule — et c'est précisément ce qu'un schéma-bloc sert à dire.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     figure;
+     matlibre_sl_pointe([1 1]);
+
+  Voir aussi MATLIBRE_SL_FIL, OPEN_SYSTEM.
+```
+
+## `matlibre_sl_rangs`
+
+```
+MATLIBRE_SL_RANGS Range les blocs en couches, de la source vers la sortie.
+  [RANGS,RETOURS] = MATLIBRE_SL_RANGS(MODELE) rend le numéro de couche
+  de chaque bloc et la liste des liens de rebouclage.
+
+  Un schéma bouclé n'a pas d'ordre : le rangement se fait sur la partie
+  sans circuit, et les liens qui referment une boucle sont mis à part
+  pour être tracés en retour. C'est ce qui donne au schéma sa lecture
+  de gauche à droite, la contre-réaction passant par-dessous.
+
+  Le rang d'un bloc est la longueur du plus long chemin qui y mène :
+  prendre le plus court tasserait les blocs contre leur source et
+  ferait se croiser les liaisons.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('c');
+     m = add_block(m, 'constant', 'u', 'Value', 1);
+     m = add_block(m, 'gain', 'k', 'Gain', 2);
+     m = add_line(m, 'u', 'k');
+     matlibre_sl_rangs(m)            % [0 1]
+
+  Voir aussi OPEN_SYSTEM, MATLIBRE_SL_DISPOSITION.
+```
+
+## `matlibre_sl_signes`
+
+```
+MATLIBRE_SL_SIGNES Signes d'un bloc de sommation.
+  SIGNES = MATLIBRE_SL_SIGNES(BLOC) rend la chaîne des signes, « ++ »
+  par défaut : une sommation sans signe déclaré additionne.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_sl_signes(struct('parametres', struct('Signs', '+-')))
+
+  Voir aussi MATLIBRE_SL_FORME, ADD_BLOCK.
+```
+
 ## `new_system`
 
 ```
@@ -181,6 +351,39 @@ NEW_SYSTEM Crée un modèle Simulink vide.
      r = sim(m, 5, 0.001);
 
   Voir aussi ADD_BLOCK, ADD_LINE, SET_PARAM, SIM, SIMPLOT.
+```
+
+## `open_system`
+
+```
+OPEN_SYSTEM Ouvre un modèle et en dessine le schéma-bloc.
+  OPEN_SYSTEM(MODELE) trace le schéma : un bloc par élément, sa forme
+  disant ce qu'il fait, et les liaisons fléchées entre eux.
+  H = OPEN_SYSTEM(MODELE) rend en plus la poignée de la figure.
+
+  Les blocs sont rangés en couches, de la source vers la sortie, et
+  ordonnés dans chaque couche pour croiser le moins de liaisons
+  possible. Une contre-réaction passe sous le schéma : tracée en ligne
+  droite, elle traverserait les blocs qu'elle enjambe.
+
+  Le schéma est reconstruit à partir du modèle à chaque appel : il n'y
+  a pas de position enregistrée, et donc rien à déplacer à la souris.
+  MATLAB ouvre un éditeur, MatLibre rend une figure — on voit le
+  schéma, on ne le modifie pas là.
+
+  Exemple :
+     m = new_system('boucle');
+     m = add_block(m, 'constant', 'consigne', 'Value', 1);
+     m = add_block(m, 'sum', 'erreur', 'Signs', '+-');
+     m = add_block(m, 'gain', 'correcteur', 'Gain', 2);
+     m = add_block(m, 'integrator', 'sortie', 'InitialCondition', 0);
+     m = add_line(m, 'consigne', 'erreur', 1);
+     m = add_line(m, 'sortie', 'erreur', 2);
+     m = add_line(m, 'erreur', 'correcteur');
+     m = add_line(m, 'correcteur', 'sortie');
+     open_system(m);
+
+  Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SIM, SIMPLOT.
 ```
 
 ## `set_param`
