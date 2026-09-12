@@ -33,6 +33,15 @@
 %   save_system   - Écrit un .m qui rebâtit le modèle
 %   load_system   - Relit ce .m
 %
+% Du schéma au programme
+%   Deux chemins, qu'il ne faut pas confondre. SAVE_SYSTEM écrit le
+%   programme qui rebâtit le modèle, et LOAD_SYSTEM le relit : c'est
+%   l'aller-retour du schéma. MATLIBRE_SL_PROGRAMME, lui, écrit le
+%   programme qui fait ce que le schéma fait — des variables, une boucle,
+%   de l'arithmétique, aucun appel à Simulink — et il n'y a pas de
+%   retour : on ne remonte pas d'un calcul quelconque au schéma qui
+%   l'aurait produit. MATLIBRE_SL_ECRIRE le dépose dans un fichier.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent
@@ -604,6 +613,30 @@ MATLIBRE_SL_ALLURE Dessine dans le bloc l'allure de ce qu'il produit.
   Voir aussi MATLIBRE_SL_FORME, MATLIBRE_SL_ETIQUETTE.
 ```
 
+## `matlibre_sl_charger`
+
+```
+MATLIBRE_SL_CHARGER Relit un modèle et le dépose dans l'espace de travail.
+  NOM = MATLIBRE_SL_CHARGER(CHEMIN) exécute le fichier .m qui bâtit un
+  modèle — celui qu'écrit SAVE_SYSTEM — et pose le modèle obtenu dans
+  l'espace de travail de base, sous son propre nom. Il rend ce nom.
+
+  C'est ce que fait l'éditeur du bureau quand on ouvre un modèle : il
+  ne garde pas le modèle pour lui, il le met là où tout le monde le
+  voit — la console, l'explorateur de variables, et l'éditeur.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = add_block(new_system('reprise'), 'gain', 'k', 'Gain', 2);
+     chemin = save_system(m, [tempname() '.m']);
+     nom = matlibre_sl_charger(chemin);
+     strcmp(nom, 'reprise')                  % 1
+     delete(chemin);
+
+  Voir aussi LOAD_SYSTEM, SAVE_SYSTEM, OPEN_SYSTEM.
+```
+
 ## `matlibre_sl_derivee`
 
 ```
@@ -654,6 +687,26 @@ MATLIBRE_SL_DISPOSITION Place les blocs d'un schéma sur la feuille.
      x(2) > x(1)                     % 1 : le gain est a droite
 
   Voir aussi OPEN_SYSTEM, MATLIBRE_SL_RANGS.
+```
+
+## `matlibre_sl_ecrire`
+
+```
+MATLIBRE_SL_ECRIRE Écrit dans un fichier le programme qui simule un schéma.
+  CHEMIN = MATLIBRE_SL_ECRIRE(MODELE,CHEMIN) écrit à cet endroit le
+  programme que rend MATLIBRE_SL_PROGRAMME, et rend le chemin écrit.
+  L'extension .m est ajoutée si elle manque, et le nom de la fonction
+  est celui du fichier — sans quoi elle ne s'appellerait pas.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = add_block(new_system('petit'), 'constant', 'c', 'Value', 1);
+     f = matlibre_sl_ecrire(m, [tempname() '.m']);
+     isfile(f)                                % 1
+     delete(f);
+
+  Voir aussi MATLIBRE_SL_PROGRAMME, SAVE_SYSTEM.
 ```
 
 ## `matlibre_sl_etats`
@@ -855,6 +908,36 @@ MATLIBRE_SL_MODELE Rend un modèle, qu'on l'ait donné par valeur ou par nom.
   Voir aussi LINMOD, TRIM, OPEN_SYSTEM, LOAD_SYSTEM, SIM.
 ```
 
+## `matlibre_sl_ordre`
+
+```
+MATLIBRE_SL_ORDRE L'ordre dans lequel les blocs se calculent.
+  [ORDRE,DIRECTE,MEMOIRE] = MATLIBRE_SL_ORDRE(MODELE) rend l'ordre de
+  calcul des blocs, et pour chacun s'il transmet son entrée à l'instant
+  même et s'il porte un état.
+
+  Un bloc à transmission directe se calcule après ce qui l'alimente.
+  Un bloc qui n'en a pas — intégrateur, retard, mémoire, et une
+  représentation d'état dont D est nul — rend une valeur qui ne dépend
+  que de son état : il peut donc être placé le premier, et c'est ce qui
+  casse les boucles.
+
+  C'est la même règle que celle de SIM. Elle est ici pour que le
+  programme engendré par MATLIBRE_SL_PROGRAMME calcule dans le même
+  ordre — sans quoi il rendrait d'autres nombres que la simulation.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     m = new_system('c');
+     m = add_block(m, 'gain', 'k', 'Gain', 2);
+     m = add_block(m, 'constant', 'u', 'Value', 1);
+     m = add_line(m, 'u', 'k');
+     matlibre_sl_ordre(m)             % [2 1] : la source avant le gain
+
+  Voir aussi SIM, MATLIBRE_SL_PROGRAMME.
+```
+
 ## `matlibre_sl_ouverts`
 
 ```
@@ -935,6 +1018,50 @@ MATLIBRE_SL_POINTE Pointe de flèche à l'entrée d'un bloc.
      matlibre_sl_pointe([1 1]);
 
   Voir aussi MATLIBRE_SL_FIL, OPEN_SYSTEM.
+```
+
+## `matlibre_sl_programme`
+
+```
+MATLIBRE_SL_PROGRAMME Écrit le programme .m qui simule un schéma-bloc.
+  TEXTE = MATLIBRE_SL_PROGRAMME(MODELE) rend le texte d'une fonction
+  MATLAB qui calcule ce que calcule le schéma, sans passer par
+  Simulink : des variables, une boucle, de l'arithmétique.
+  MATLIBRE_SL_PROGRAMME(MODELE,NOM) choisit le nom de la fonction.
+
+  Ce n'est pas SAVE_SYSTEM. SAVE_SYSTEM écrit le programme qui
+  *rebâtit* le modèle — NEW_SYSTEM, ADD_BLOCK, ADD_LINE —, et
+  LOAD_SYSTEM le relit : c'est l'aller-retour du schéma. Ici, on écrit
+  le programme qui *fait ce que le schéma fait*, et il n'y a pas de
+  retour : on ne remonte pas d'un calcul quelconque au schéma qui
+  l'aurait produit.
+
+  Le programme rendu ne dépend de rien : les réglages y sont inscrits
+  tels qu'ils valent au moment où on l'écrit. Un gain réglé sur « K »
+  y devient la valeur de K, non la lettre — sans quoi le programme
+  demanderait un espace de travail qu'il n'a pas. C'est ce que fait
+  aussi le générateur de code de MathWorks.
+
+  L'ordre de calcul est celui de SIM, et l'intégration la même : le
+  programme rend donc les mêmes nombres, au bit près. C'est ce que
+  vérifie le test.
+
+  Les blocs échantillonnés, le retard pur et les échanges avec l'espace
+  de travail ne s'écrivent pas encore : ils sont refusés en les
+  nommant, plutôt que passés sous silence.
+
+  Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
+  dont le générateur de code écrit du C, non du MATLAB.
+
+  Exemple :
+     m = new_system('chute');
+     m = add_block(m, 'constant', 'g', 'Value', -9.81);
+     m = add_block(m, 'integrator', 'vitesse');
+     m = add_line(m, 'g', 'vitesse');
+     p = matlibre_sl_programme(m);
+     ~isempty(strfind(p, 'function'))          % 1 : c'est une fonction
+
+  Voir aussi SAVE_SYSTEM, LOAD_SYSTEM, SIM, MATLIBRE_SL_ORDRE.
 ```
 
 ## `matlibre_sl_rangs`

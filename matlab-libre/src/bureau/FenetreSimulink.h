@@ -73,6 +73,12 @@ public:
     // Le squelette d'un modèle neuf, tel que « Nouveau modèle » l'écrit.
     static QString squeletteModele();
 
+    // Les trois chemins, sans boite de dialogue : c'est par la que le
+    // test passe, et les boutons ne font que leur choisir un fichier.
+    void enregistrerVers(const QString& chemin);
+    void genererVers(const QString& chemin);
+    void ouvrirDepuis(const QString& chemin);
+
 signals:
     // Une commande à exécuter dans la console.
     void commandeDemandee(const QString& commande);
@@ -89,6 +95,8 @@ private slots:
     void insererBloc();
     void nouveauModele();
     void enregistrerModele();
+    void genererProgramme();
+    void ouvrirModele();
     void montrerBloc();
     void surModeleChoisi();
     // Les gestes de la toile, traduits en commandes sur le modele.
@@ -125,6 +133,7 @@ private:
     QAction* aOuvrir_ = nullptr;
     QAction* aSimuler_ = nullptr;
     QAction* aEnregistrer_ = nullptr;
+    QAction* aProgramme_ = nullptr;
     // Le modèle dont la toile porte le schéma. Sert à savoir s'il faut le
     // redemander quand l'espace de travail change.
     QString affiche_;

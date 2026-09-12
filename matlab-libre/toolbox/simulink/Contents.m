@@ -30,6 +30,15 @@
 %   save_system   - Écrit un .m qui rebâtit le modèle
 %   load_system   - Relit ce .m
 %
+% Du schéma au programme
+%   Deux chemins, qu'il ne faut pas confondre. SAVE_SYSTEM écrit le
+%   programme qui rebâtit le modèle, et LOAD_SYSTEM le relit : c'est
+%   l'aller-retour du schéma. MATLIBRE_SL_PROGRAMME, lui, écrit le
+%   programme qui fait ce que le schéma fait — des variables, une boucle,
+%   de l'arithmétique, aucun appel à Simulink — et il n'y a pas de
+%   retour : on ne remonte pas d'un calcul quelconque au schéma qui
+%   l'aurait produit. MATLIBRE_SL_ECRIRE le dépose dans un fichier.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent

@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QGuiApplication>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFrame>
 #include <QEvent>
 #include <QResizeEvent>
@@ -404,12 +405,22 @@ void FenetreSimulink::construireBarre() {
     QAction* aNouveau = barre->addAction(iconeDessinee(QStringLiteral("modele"), 20),
                                          QStringLiteral("Nouveau modèle"));
     connect(aNouveau, &QAction::triggered, this, &FenetreSimulink::nouveauModele);
+    QAction* aOuvrirFichier = barre->addAction(
+        iconeDessinee(QStringLiteral("ouvrir"), 20), QStringLiteral("Ouvrir"));
+    aOuvrirFichier->setToolTip(QStringLiteral(
+        "Relire un modèle écrit en .m, et le poser dans l'espace de travail"));
+    connect(aOuvrirFichier, &QAction::triggered, this, &FenetreSimulink::ouvrirModele);
     aEnregistrer_ = barre->addAction(iconeDessinee(QStringLiteral("enregistrer"), 20),
                                      QStringLiteral("Enregistrer"));
     aEnregistrer_->setToolTip(QStringLiteral(
         "Écrire un .m qui rebâtit le modèle : le format .slx n'est pas public"));
     connect(aEnregistrer_, &QAction::triggered, this,
             &FenetreSimulink::enregistrerModele);
+    aProgramme_ = barre->addAction(iconeDessinee(QStringLiteral("script"), 20),
+                                   QStringLiteral("Générer le .m"));
+    aProgramme_->setToolTip(QStringLiteral(
+        "Écrire le programme qui fait ce que le schéma fait, sans Simulink"));
+    connect(aProgramme_, &QAction::triggered, this, &FenetreSimulink::genererProgramme);
     barre->addSeparator();
 
     aOuvrir_ = barre->addAction(iconeDessinee(QStringLiteral("simulink"), 20),
@@ -608,6 +619,7 @@ void FenetreSimulink::ajusterBoutons() {
     if (aOuvrir_) aOuvrir_->setEnabled(choisi);
     if (aSimuler_) aSimuler_->setEnabled(choisi);
     if (aEnregistrer_) aEnregistrer_->setEnabled(choisi);
+    if (aProgramme_) aProgramme_->setEnabled(choisi);
 }
 
 void FenetreSimulink::surModeleChoisi() {
@@ -651,12 +663,72 @@ void FenetreSimulink::simuler() {
                              "resultatSimulink.").arg(nom, duree_->text()));
 }
 
+// Un chemin peut porter une apostrophe — « /home/…/l'essai/pid.m » —, et
+// dans une chaîne MATLAB elle se double. Sans cela la chaîne se
+// refermerait au milieu du chemin, et la fin passerait pour du code.
+static QString chaineMatlab(const QString& texte) {
+    QString echappe = texte;
+    echappe.replace(QLatin1Char('\''), QLatin1String("''"));
+    return QStringLiteral("'%1'").arg(echappe);
+}
+
 void FenetreSimulink::enregistrerModele() {
     const QString nom = modeleChoisi();
     if (nom.isEmpty()) return;
-    emit commandeDemandee(QStringLiteral("save_system(%1)").arg(nom));
-    poserEtat(QStringLiteral("« %1 » écrit dans %1.m — un programme qui le rebâtit.")
-                  .arg(nom));
+    const QString chemin = QFileDialog::getSaveFileName(
+        this, QStringLiteral("Enregistrer le modèle"), nom + QStringLiteral(".m"),
+        QStringLiteral("Programmes MatLibre (*.m)"));
+    if (!chemin.isEmpty()) enregistrerVers(chemin);
+}
+
+// Le .m qui rebatit le modele : NEW_SYSTEM, ADD_BLOCK, ADD_LINE. C'est
+// l'aller du schema ; LOAD_SYSTEM en est le retour.
+void FenetreSimulink::enregistrerVers(const QString& chemin) {
+    const QString nom = modeleChoisi();
+    if (nom.isEmpty() || chemin.isEmpty()) return;
+    emit commandeDemandee(
+        QStringLiteral("save_system(%1, %2);").arg(nom, chaineMatlab(chemin)));
+    poserEtat(QStringLiteral("« %1 » écrit dans %2 — un programme qui le rebâtit.")
+                  .arg(nom, chemin));
+}
+
+void FenetreSimulink::genererProgramme() {
+    const QString nom = modeleChoisi();
+    if (nom.isEmpty()) return;
+    const QString chemin = QFileDialog::getSaveFileName(
+        this, QStringLiteral("Générer le programme de simulation"),
+        nom + QStringLiteral("_simule.m"), QStringLiteral("Programmes MatLibre (*.m)"));
+    if (!chemin.isEmpty()) genererVers(chemin);
+}
+
+// Le .m qui *fait ce que le schema fait* : des variables, une boucle, de
+// l'arithmetique. Les reglages y sont inscrits tels qu'ils valent ; le
+// programme ne depend donc de rien, et rend les memes nombres que SIM.
+void FenetreSimulink::genererVers(const QString& chemin) {
+    const QString nom = modeleChoisi();
+    if (nom.isEmpty() || chemin.isEmpty()) return;
+    emit commandeDemandee(
+        QStringLiteral("matlibre_sl_ecrire(%1, %2);").arg(nom, chaineMatlab(chemin)));
+    poserEtat(QStringLiteral("Le programme qui simule « %1 » est écrit dans %2.")
+                  .arg(nom, chemin));
+}
+
+void FenetreSimulink::ouvrirModele() {
+    const QString chemin = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Ouvrir un modèle"), QString(),
+        QStringLiteral("Programmes MatLibre (*.m)"));
+    if (!chemin.isEmpty()) ouvrirDepuis(chemin);
+}
+
+// Le modele relu ne reste pas dans la fenetre : il est pose dans l'espace
+// de travail, sous son propre nom, ou la console et l'explorateur de
+// variables le voient comme les autres.
+void FenetreSimulink::ouvrirDepuis(const QString& chemin) {
+    if (chemin.isEmpty()) return;
+    emit commandeDemandee(
+        QStringLiteral("matlibre_sl_charger(%1);").arg(chaineMatlab(chemin)));
+    poserEtat(QStringLiteral("Modèle relu depuis %1 ; il paraît à droite dès qu'il "
+                             "est dans l'espace de travail.").arg(chemin));
 }
 
 void FenetreSimulink::nouveauModele() {

@@ -24,6 +24,7 @@
 #include <QTextBrowser>
 #include <QLineEdit>
 #include <QLabel>
+#include <QAction>
 #include <QToolBar>
 #include <QListWidget>
 #include <QFile>
@@ -399,7 +400,11 @@ int main(int argc, char** argv) {
             return n;
         };
         verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est libre");
-        verifier(fenetresOuvertes() == 1, "une figure est ouverte");
+        // La fenetre de figure parait au tour de boucle suivant, non a
+        // l'instant ou le moteur se libere : l'attendre, sinon la machine
+        // chargee fait echouer ce qui n'a rien a se reprocher.
+        verifier(attendre([&] { return fenetresOuvertes() == 1; }, 8000),
+                 "une figure est ouverte");
 
         // Une commande qui ne trace rien ne doit pas toucher aux figures.
         FenetreFigure* premiere = fenetre.findChild<FenetreFigure*>();
@@ -1770,6 +1775,110 @@ int main(int argc, char** argv) {
                      }, 20000),
                      "et le modele revient a cinq blocs et cinq liens");
 
+            // --- du schema au programme, et retour -------------------
+            //
+            // Deux chemins que la barre expose : « Enregistrer » ecrit le
+            // .m qui rebatit le modele, « Generer le .m » celui qui fait
+            // ce qu'il fait, et « Ouvrir » relit le premier. Les boutons
+            // ne font que choisir un fichier ; c'est le chemin nomme qui
+            // est eprouve ici.
+            {
+                QTemporaryDir bac;
+                verifier(bac.isValid(), "un dossier d'essai pour les fichiers");
+                const QString cheminModele = bac.filePath(QStringLiteral("copie.m"));
+                const QString cheminProgramme = bac.filePath(QStringLiteral("calcul.m"));
+
+                simulink->enregistrerVers(cheminModele);
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "l'enregistrement passe");
+                verifier(QFile::exists(cheminModele), "le .m du modele est ecrit");
+                QString contenu;
+                {
+                    QFile f(cheminModele);
+                    if (f.open(QIODevice::ReadOnly | QIODevice::Text))
+                        contenu = QString::fromUtf8(f.readAll());
+                }
+                verifier(contenu.contains(QLatin1String("new_system")) &&
+                             contenu.contains(QLatin1String("add_block")),
+                         "et il rebatit le modele, bloc par bloc");
+
+                simulink->genererVers(cheminProgramme);
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "la generation passe");
+                verifier(QFile::exists(cheminProgramme),
+                         "le programme de simulation est ecrit");
+                QString calcul;
+                {
+                    QFile f(cheminProgramme);
+                    if (f.open(QIODevice::ReadOnly | QIODevice::Text))
+                        calcul = QString::fromUtf8(f.readAll());
+                }
+                verifier(calcul.contains(QLatin1String("function resultat = calcul")),
+                         "c'est une fonction, nommee d'apres son fichier");
+                verifier(!calcul.contains(QLatin1String("add_block")) &&
+                             !calcul.contains(QLatin1String("sim(")),
+                         "elle ne rebatit rien et n'appelle pas SIM : elle calcule");
+                verifier(calcul.contains(QLatin1String("for pas_k")),
+                         "avec une boucle sur les instants");
+
+                auto dansListe = [&](const QString& nom) {
+                    QCoreApplication::processEvents();
+                    for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                        if (simulink->listeModeles()->item(k)->text() == nom) return true;
+                    return false;
+                };
+
+                // Le retour. On efface d'abord le modele : sans cela, le
+                // relire ne prouverait rien, puisqu'il serait deja la. Il
+                // quitte la liste, puis le .m l'y ramene sous son propre
+                // nom, avec ses cinq blocs redessines.
+                envoyer(fenetre, QStringLiteral("clear modeleDuBureau"));
+                verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est net");
+                verifier(attendre([&] {
+                             return !dansListe(QStringLiteral("modeleDuBureau"));
+                         }, 20000),
+                         "efface, le modele quitte la liste");
+                simulink->ouvrirDepuis(cheminModele);
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "la relecture passe");
+                verifier(attendre([&] {
+                             return dansListe(QStringLiteral("modeleDuBureau"));
+                         }, 20000),
+                         "et le .m relu le ramene, sous son propre nom");
+                // Efface, il avait emporte la selection avec lui : la
+                // liste en porte un autre, et elle ne revient pas toute
+                // seule. On le designe donc, comme on le ferait du doigt,
+                // et la toile doit rendre le schema tel qu'il etait.
+                for (int k = 0; k < simulink->listeModeles()->count(); ++k)
+                    if (simulink->listeModeles()->item(k)->text() ==
+                        QLatin1String("modeleDuBureau"))
+                        simulink->listeModeles()->setCurrentRow(k);
+                verifier(attendre([&] {
+                             QCoreApplication::processEvents();
+                             return simulink->toile()->modele() ==
+                                        QLatin1String("modeleDuBureau") &&
+                                    compter(QStringLiteral("Blocs")) == 5 &&
+                                    compter(QStringLiteral("Liens")) == 5;
+                         }, 20000),
+                         "et le schema revient entier : cinq blocs, cinq liens");
+
+                // Un chemin qui porte une apostrophe. Dans une chaine
+                // MATLAB elle se double : sans cela la chaine se
+                // refermerait au milieu du chemin, la commande serait
+                // rejetee et le fichier ne serait jamais ecrit.
+                const QString dossierAccentue =
+                    bac.filePath(QString::fromUtf8("l'essai"));
+                verifier(QDir().mkpath(dossierAccentue),
+                         "un dossier dont le nom porte une apostrophe");
+                const QString cheminApostrophe =
+                    QDir(dossierAccentue).filePath(QStringLiteral("copie.m"));
+                simulink->enregistrerVers(cheminApostrophe);
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "l'enregistrement y passe");
+                verifier(QFile::exists(cheminApostrophe),
+                         "et le fichier y est bien ecrit, apostrophe comprise");
+            }
+
             // --- la boite de reglages -------------------------------
             //
             // Le double-clic ouvre les parametres du bloc, comme dans
@@ -1936,15 +2045,21 @@ int main(int argc, char** argv) {
                      "« Simuler » lance SIM sur la duree affichee");
             verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
                      "et la simulation aboutit");
-            commandeVue.clear();
-            QMetaObject::invokeMethod(simulink, "enregistrerModele");
-            QCoreApplication::processEvents();
-            verifier(commandeVue == QLatin1String("save_system(modeleDuBureau)"),
-                     "« Enregistrer » ecrit le .m qui rebatit le modele");
-            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
-                     "et l'enregistrement aboutit");
-            QFile::remove(QDir::current().absoluteFilePath(
-                QStringLiteral("modeleDuBureau.m")));
+            // « Enregistrer », « Generer le .m » et « Ouvrir » demandent
+            // un fichier avant d'agir : les invoquer ici ouvrirait une
+            // boite modale qui ne se refermerait jamais. Ce qu'ils font
+            // une fois le fichier choisi est eprouve plus haut, par
+            // ENREGISTRERVERS, GENERERVERS et OUVRIRDEPUIS ; ce qui reste
+            // a verifier, c'est que la barre les expose et qu'ils sont
+            // offerts des qu'un modele est choisi.
+            QStringList titresBarre;
+            for (QToolBar* barre : simulink->findChildren<QToolBar*>())
+                for (QAction* action : barre->actions())
+                    if (action->isEnabled()) titresBarre << action->text();
+            verifier(titresBarre.contains(QString::fromUtf8("Enregistrer")) &&
+                         titresBarre.contains(QString::fromUtf8("Générer le .m")) &&
+                         titresBarre.contains(QString::fromUtf8("Ouvrir")),
+                     "la barre offre l'aller, le programme et le retour");
             envoyer(fenetre, QStringLiteral("clear modeleDuBureau pasUnModele; close all"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est rendu net");
             QCoreApplication::processEvents();

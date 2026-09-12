@@ -1328,4 +1328,92 @@ catch err
 end
 assert(refusePile);
 
+%% ------------------------------ SIMULINK : DU SCHEMA AU PROGRAMME
+% Deux chemins, qu'il ne faut pas confondre. SAVE_SYSTEM ecrit le
+% programme qui *rebatit* le modele, et LOAD_SYSTEM le relit : c'est
+% l'aller-retour du schema. MATLIBRE_SL_PROGRAMME ecrit le programme qui
+% *fait ce que le schema fait* — et il n'y a pas de retour.
+gainProgramme = 4;
+schemaSource = new_system('asserviProg');
+schemaSource = add_block(schemaSource, 'step', 'consigne', 'Time', 0, 'After', 1);
+schemaSource = add_block(schemaSource, 'sum', 'ecart', 'Signs', '+-');
+schemaSource = add_block(schemaSource, 'gain', 'correcteur', 'Gain', 'gainProgramme');
+schemaSource = add_block(schemaSource, 'saturation', 'limite', ...
+                         'UpperLimit', 3, 'LowerLimit', -3);
+schemaSource = add_block(schemaSource, 'transferfcn', 'procede', ...
+                         'Numerator', 1, 'Denominator', [1 2 1]);
+schemaSource = add_block(schemaSource, 'integrator', 'sortie');
+schemaSource = add_block(schemaSource, 'derivative', 'vitesse');
+schemaSource = add_block(schemaSource, 'math', 'carre', 'Operator', 'square');
+schemaSource = add_line(schemaSource, 'consigne', 'ecart', 1);
+schemaSource = add_line(schemaSource, 'sortie', 'ecart', 2);
+schemaSource = add_line(schemaSource, 'ecart', 'correcteur');
+schemaSource = add_line(schemaSource, 'correcteur', 'limite');
+schemaSource = add_line(schemaSource, 'limite', 'procede');
+schemaSource = add_line(schemaSource, 'procede', 'sortie');
+schemaSource = add_line(schemaSource, 'sortie', 'vitesse');
+schemaSource = add_line(schemaSource, 'vitesse', 'carre');
+
+texteProgramme = matlibre_sl_programme(schemaSource);
+assert(~isempty(strfind(texteProgramme, 'function resultat = asserviProg')));
+assert(isempty(strfind(texteProgramme, 'add_block')), ...
+       'le programme ne rebatit pas le modele : il le calcule');
+assert(isempty(strfind(texteProgramme, 'sim(')), 'et il n''appelle pas SIM');
+% Un reglage donne par une expression y est inscrit tel qu'il vaut : le
+% programme ne peut pas dependre d'un espace de travail qu'il n'a pas.
+assert(~isempty(strfind(texteProgramme, '4 * ecart')), 'le gain y vaut quatre');
+assert(isempty(strfind(texteProgramme, 'gainProgramme')), ...
+       'et la lettre n''y est plus');
+
+% Le programme rend les memes nombres que SIM. C'est la propriete qui
+% definit la traduction : tout le reste n'est que mise en forme.
+dossierProg = tempname();
+mkdir(dossierProg);
+ancienProg = pwd();
+cd(dossierProg);
+matlibre_sl_ecrire(schemaSource, 'asserviProg.m');
+rehash;
+parProgramme = asserviProg(2, 0.001);
+cd(ancienProg);
+parSimulation = sim(schemaSource, 2, 0.001);
+nomsSignaux = fieldnames(parSimulation.signaux);
+pireEcart = 0;
+for k = 1:numel(nomsSignaux)
+    pireEcart = max(pireEcart, max(abs(parSimulation.signaux.(nomsSignaux{k}) - ...
+                                       parProgramme.signaux.(nomsSignaux{k}))));
+end
+assert(pireEcart == 0, ...
+       'le programme refait la simulation au bit pres, non a peu pres');
+assert(isequal(parSimulation.temps, parProgramme.temps));
+
+% Changer la variable ne change plus rien au programme deja ecrit : il
+% porte la valeur, non la lettre. C'est ce que fait aussi le generateur
+% de code de MathWorks, et il faut le savoir.
+gainProgramme = 99;
+assert(~isempty(strfind(matlibre_sl_programme(schemaSource), '99 * ecart')), ...
+       'un programme ecrit apres coup porte la nouvelle valeur');
+gainProgramme = 4;   %#ok<NASGU>
+
+% L'aller-retour du schema, lui, est un vrai aller-retour.
+cheminModele = save_system(schemaSource, [tempname() '.m']);
+nomRelu = matlibre_sl_charger(cheminModele);
+assert(strcmp(nomRelu, 'asserviProg'));
+modeleRelu = evalin('base', nomRelu);
+assert(numel(modeleRelu.blocs) == numel(schemaSource.blocs));
+assert(isequal(modeleRelu.liens, schemaSource.liens));
+assert(strcmp(get_param(modeleRelu, 'correcteur', 'Gain'), 'gainProgramme'), ...
+       'le modele relu porte encore l''expression, non sa valeur');
+delete(cheminModele);
+evalin('base', 'clear asserviProg');
+
+% Ce qui ne s'ecrit pas encore est refuse en le nommant, plutot que
+% traduit de travers.
+refuseEcriture = false;
+try
+    matlibre_sl_programme(add_block(new_system('x'), 'zoh', 'z', 'SampleTime', 0.1));
+catch err
+    refuseEcriture = strcmp(err.identifier, 'Simulink:programme:BlocNonEcrit');
+end
+assert(refuseEcriture);
+
 disp('toolboxes : toutes les verifications passent');
