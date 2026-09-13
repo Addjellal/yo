@@ -6,8 +6,19 @@ function resultat = sim(modele, tFinal, pas)
 %   SIM(MODELE,INSTANTS) accepte aussi un vecteur d'instants réguliers :
 %   il donne alors à la fois l'instant final et le pas.
 %
-%   L'intégration se fait par la méthode d'Euler explicite ; les blocs
-%   sont évalués dans l'ordre d'un tri topologique, ce qui garantit
+%   L'intégration se fait par défaut par la méthode d'Euler explicite.
+%   SIM(MODELE,TFINAL,SIMSET('Solver','ode4')) en choisit une autre :
+%   ode1 (Euler), ode2 (Heun), ode3 (Bogacki-Shampine) et ode4
+%   (Runge-Kutta d'ordre quatre) sont à pas fixe, et l'erreur d'un
+%   solveur d'ordre p décroît comme le pas à la puissance p. Un solveur
+%   d'ordre supérieur évalue la dérivée en des points intermédiaires du
+%   pas : cela n'a de sens que pour un état continu — intégrateur,
+%   représentation d'état, fonction de transfert, PID —, et un modèle
+%   qui porte un retard ou un bloc échantillonné est refusé en nommant
+%   le bloc. Le modèle peut porter son solveur lui-même, par
+%   ADD_PARAM(M,'Solver','ode4').
+%
+%   Les blocs sont évalués dans l'ordre d'un tri topologique, ce qui garantit
 %   qu'une entrée est calculée avant la sortie qui l'utilise. Seuls les
 %   blocs sans transmission directe — intégrateur, retard, mémoire,
 %   retard pur, tenue d'ordre zéro, et les représentations d'état dont D
@@ -53,7 +64,10 @@ function resultat = sim(modele, tFinal, pas)
     pasDonne = nargin >= 3 && ~isempty(pas);
     % Le troisième argument peut être un jeu d'options de SIMSET plutôt
     % qu'un pas : c'est la forme héritée que Simulink documente encore.
+    solveur = '';
     if pasDonne && isstruct(pas)
+        demande = simget(pas, 'Solver');
+        if ~isempty(demande), solveur = char(demande); end
         choisi = simget(pas, 'FixedStep');
         pasDonne = ~isempty(choisi);
         pas = choisi;
@@ -113,6 +127,18 @@ function resultat = sim(modele, tFinal, pas)
         if ~pasDonne && isfield(modele.parametres, 'FixedStep')
             pas = double(modele.parametres.FixedStep);
         end
+        if isempty(solveur) && isfield(modele.parametres, 'Solver')
+            solveur = char(modele.parametres.Solver);
+        end
+    end
+    if isempty(solveur), solveur = 'ode1'; end
+    solveur = lower(solveur);
+    if strcmp(solveur, 'fixedstepdiscrete'), solveur = 'ode1'; end
+    if ~any(strcmp(solveur, {'ode1', 'ode2', 'ode3', 'ode4'}))
+        error('Simulink:Commands:SolveurInconnu', ...
+              ['Le solveur ''%s'' n''existe pas ici : ode1 (Euler), ode2 ' ...
+               '(Heun), ode3 (Bogacki-Shampine) et ode4 (Runge-Kutta) sont ' ...
+               'a pas fixe.'], solveur);
     end
     if ~isscalar(pas) || ~(pas > 0)
         error('simulink:sim:pas', 'Le pas doit etre un nombre strictement positif.');
@@ -420,22 +446,92 @@ function resultat = sim(modele, tFinal, pas)
     sorties = zeros(1, n);
     releves = zeros(nInstants, n);
 
-    for t = 1:nInstants
-        temps = instants(t);
-        for i = 1:numel(ordre)
-            k = ordre(i);
-            entrees = rassembler(sources{k}, sorties);
-            [sorties(k), etats{k}] = evaluerBloc(types(k), p1(k), p2(k), p3(k), p4(k), ...
-                                                 signes{k}, matrices{k}, entrees, ...
-                                                 etats{k}, temps, pas, false);
-        end
-        releves(t, :) = sorties;
-        for k = 1:n
-            if memoire(k)
+    if strcmp(solveur, 'ode1')
+        % Euler explicite : la sortie se lit, puis l'etat avance d'un pas.
+        % C'est la marche d'origine, et elle sert aussi aux blocs a memoire
+        % qui ne s'integrent pas -- retards, blocs echantillonnes.
+        for t = 1:nInstants
+            temps = instants(t);
+            for i = 1:numel(ordre)
+                k = ordre(i);
                 entrees = rassembler(sources{k}, sorties);
-                [~, etats{k}] = evaluerBloc(types(k), p1(k), p2(k), p3(k), p4(k), ...
-                                            signes{k}, matrices{k}, entrees, etats{k}, ...
-                                            temps, pas, true);
+                [sorties(k), etats{k}] = evaluerBloc(types(k), p1(k), p2(k), p3(k), p4(k), ...
+                                                     signes{k}, matrices{k}, entrees, ...
+                                                     etats{k}, temps, pas, false);
+            end
+            releves(t, :) = sorties;
+            for k = 1:n
+                if memoire(k)
+                    entrees = rassembler(sources{k}, sorties);
+                    [~, etats{k}] = evaluerBloc(types(k), p1(k), p2(k), p3(k), p4(k), ...
+                                                signes{k}, matrices{k}, entrees, etats{k}, ...
+                                                temps, pas, true);
+                end
+            end
+        end
+    else
+        % --- Runge-Kutta a pas fixe ---------------------------------
+        %
+        % Un solveur d'ordre superieur evalue la derivee plusieurs fois
+        % par pas, en des points intermediaires. Cela n'a de sens que
+        % pour un etat continu : un retard ou un bloc echantillonne n'a
+        % pas de derivee, et l'evaluer a mi-pas ne voudrait rien dire.
+        % On refuse donc en nommant le bloc, plutot que d'integrer de
+        % travers ce qui ne s'integre pas.
+        continus = (types == 11) | (types == 14) | (types == 33);
+        for k = 1:n
+            if memoire(k) && ~continus(k)
+                error('Simulink:Commands:SolveurEtatDiscret', ...
+                      ['Le bloc ''%s'', de type ''%s'', ne porte pas un etat ' ...
+                       'continu : il ne s''integre qu''au pas fixe. Simulez ce ' ...
+                       'modele avec le solveur ''ode1''.'], ...
+                      modele.blocs{k}.nom, modele.blocs{k}.type);
+            end
+        end
+        for t = 1:nInstants
+            temps = instants(t);
+            [sorties, d1] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                        signes, matrices, etats, temps, pas, continus);
+            releves(t, :) = sorties;
+            if t == nInstants
+                break   % rien a avancer apres le dernier instant releve
+            end
+            switch solveur
+                case 'ode2'
+                    % Heun : une pente au depart, une a l'arrivee, la
+                    % moyenne des deux.
+                    [~, d2] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d1, continus, pas), ...
+                                          temps + pas, pas, continus);
+                    etats = combiner(etats, {d1, d2}, [1/2, 1/2], continus, pas);
+                case 'ode3'
+                    [~, d2] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d1, continus, pas / 2), ...
+                                          temps + pas / 2, pas, continus);
+                    [~, d3] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d2, continus, 3 * pas / 4), ...
+                                          temps + 3 * pas / 4, pas, continus);
+                    etats = combiner(etats, {d1, d2, d3}, [2/9, 3/9, 4/9], ...
+                                     continus, pas);
+                otherwise
+                    % ode4 : le Runge-Kutta classique d'ordre quatre.
+                    [~, d2] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d1, continus, pas / 2), ...
+                                          temps + pas / 2, pas, continus);
+                    [~, d3] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d2, continus, pas / 2), ...
+                                          temps + pas / 2, pas, continus);
+                    [~, d4] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                          signes, matrices, ...
+                                          avancer(etats, d3, continus, pas), ...
+                                          temps + pas, pas, continus);
+                    etats = combiner(etats, {d1, d2, d3, d4}, ...
+                                     [1/6, 1/3, 1/3, 1/6], continus, pas);
             end
         end
     end
@@ -488,6 +584,73 @@ function modele = chargerModele(nom)
     end
     error('Simulink:Commands:OpenSystemUnknownSystem', ...
           'Invalid Simulink object name: ''%s''.', nom);
+end
+
+% Une passe de sortie complete, a etats donnes : elle rend la sortie de
+% chaque bloc et, pour chaque bloc a etat continu, la derivee de cet etat.
+% Rien n'y avance : c'est ce qui permet de l'appeler plusieurs fois par
+% pas, en des points intermediaires, comme le veut Runge-Kutta.
+function [sorties, derivees] = passeSortie(ordre, sources, types, p1, p2, p3, p4, ...
+                                           signes, matrices, etats, temps, pas, ...
+                                           continus)
+    n = numel(types);
+    sorties = zeros(1, n);
+    derivees = cell(1, n);
+    for i = 1:numel(ordre)
+        k = ordre(i);
+        entrees = rassembler(sources{k}, sorties);
+        [sorties(k), ~] = evaluerBloc(types(k), p1(k), p2(k), p3(k), p4(k), ...
+                                      signes{k}, matrices{k}, entrees, etats{k}, ...
+                                      temps, pas, false);
+    end
+    % Les derivees seulement une fois toutes les sorties connues. Un bloc
+    % a etat n'a pas de transmission directe : le tri le calcule donc
+    % avant ce qui l'alimente, et lire son entree pendant la passe
+    % l'aurait trouvee a zero -- l'etat n'aurait jamais bouge.
+    for k = 1:numel(types)
+        if ~continus(k)
+            continue
+        end
+        % La derivee ne se mesure pas, elle se lit : l'entree d'un
+        % integrateur est sa derivee, et une representation d'etat donne
+        % A x + B u. Le PID en a deux, celle de son integrale et celle
+        % de sa derivee filtree.
+        u = rassembler(sources{k}, sorties);
+        u = u(1);
+        switch types(k)
+            case 11
+                derivees{k} = u;
+            case 14
+                derivees{k} = matrices{k}{1} * etats{k} + matrices{k}{2} * u;
+            otherwise
+                derivees{k} = [u, u - p4(k) * etats{k}(2)];
+        end
+    end
+end
+
+% Les etats continus avances d'un pas H selon une seule pente : c'est le
+% point ou Runge-Kutta va relire la derivee.
+function etats = avancer(etats, derivees, continus, h)
+    for k = 1:numel(etats)
+        if continus(k)
+            etats{k} = etats{k} + h * derivees{k};
+        end
+    end
+end
+
+% Les etats avances d'un pas complet, selon la moyenne ponderee des
+% pentes relevees : c'est la formule du solveur.
+function etats = combiner(etats, pentes, poids, continus, pas)
+    for k = 1:numel(etats)
+        if ~continus(k)
+            continue
+        end
+        cumul = 0 * etats{k};
+        for j = 1:numel(pentes)
+            cumul = cumul + poids(j) * pentes{j}{k};
+        end
+        etats{k} = etats{k} + pas * cumul;
+    end
 end
 
 function entrees = rassembler(liste, sorties)

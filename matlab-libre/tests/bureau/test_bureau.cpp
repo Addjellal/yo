@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QDockWidget>
@@ -2045,6 +2046,29 @@ int main(int argc, char** argv) {
                      "« Simuler » lance SIM sur la duree affichee");
             verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
                      "et la simulation aboutit");
+
+            // Le solveur se choisit dans la barre. Il ne parait dans la
+            // commande que s'il n'est pas celui par defaut : une ligne
+            // courte se relit et se retape.
+            verifier(simulink->choixSolveur() != nullptr &&
+                         simulink->choixSolveur()->count() == 4,
+                     "la barre offre les quatre solveurs a pas fixe");
+            verifier(simulink->choixSolveur()->currentText() ==
+                         QLatin1String("ode1"),
+                     "et part sur celui de SIM");
+            simulink->choixSolveur()->setCurrentIndex(3);
+            QCoreApplication::processEvents();
+            commandeVue.clear();
+            QMetaObject::invokeMethod(simulink, "simuler");
+            QCoreApplication::processEvents();
+            verifier(commandeVue.startsWith(
+                         QLatin1String("resultatSimulink = sim(modeleDuBureau, 10, "
+                                       "simset('Solver', 'ode4'))")),
+                     "choisir ode4 le passe a SIM");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
+                     "et la simulation par ode4 aboutit");
+            simulink->choixSolveur()->setCurrentIndex(0);
+            QCoreApplication::processEvents();
             // « Enregistrer », « Generer le .m » et « Ouvrir » demandent
             // un fichier avant d'agir : les invoquer ici ouvrirait une
             // boite modale qui ne se refermerait jamais. Ce qu'ils font

@@ -1608,4 +1608,79 @@ assert(strcmp(matlibre_sl_etiquette(emboite.blocs{3}), 'correcteurPI'));
 assert(numel(matlibre_sl_signes(essaiRang.blocs{3})) == 2, ...
        'un sous-systeme a autant d''entrees qu''il abrege de blocs INPORT');
 
+%% ------------------------------ SIMULINK : LES SOLVEURS A PAS FIXE
+% Ce qui definit un solveur d'ordre p, c'est que son erreur decroit
+% comme le pas a la puissance p. On le mesure : halver le pas doit
+% diviser l'erreur par 2^p. Verifier une valeur recopiee ne dirait rien.
+decroissance = new_system('decroissance');
+decroissance = add_block(decroissance, 'gain', 'moins', 'Gain', -1);
+decroissance = add_block(decroissance, 'integrator', 'x', 'InitialCondition', 1);
+decroissance = add_line(decroissance, 'x', 'moins');
+decroissance = add_line(decroissance, 'moins', 'x');
+pasEssayes = [0.1 0.05 0.025];
+ordresAttendus = struct('ode1', 1, 'ode2', 2, 'ode3', 3, 'ode4', 4);
+nomsSolveurs = fieldnames(ordresAttendus);
+for kSolveur = 1:numel(nomsSolveurs)
+    solveurEssai = nomsSolveurs{kSolveur};
+    erreurs = zeros(1, numel(pasEssayes));
+    for kPas = 1:numel(pasEssayes)
+        rSolveur = sim(decroissance, 1, ...
+                       simset('FixedStep', pasEssayes(kPas), 'Solver', solveurEssai));
+        erreurs(kPas) = abs(rSolveur.signaux.x(end) - exp(-1));
+    end
+    ordreMesure = log2(erreurs(1:end-1) ./ erreurs(2:end));
+    assert(all(abs(ordreMesure - ordresAttendus.(solveurEssai)) < 0.25), ...
+           sprintf('%s doit converger a l''ordre %d', solveurEssai, ...
+                   ordresAttendus.(solveurEssai)));
+end
+% Et l'un est bien meilleur que l'autre au meme pas : ce n'est pas
+% seulement une pente, c'est un gain.
+erreurEuler = abs(sim(decroissance, 1, simset('FixedStep', 0.1, ...
+                                              'Solver', 'ode1')).signaux.x(end) - exp(-1));
+erreurRK = abs(sim(decroissance, 1, simset('FixedStep', 0.1, ...
+                                           'Solver', 'ode4')).signaux.x(end) - exp(-1));
+assert(erreurRK < erreurEuler / 1000, ...
+       'au meme pas, ode4 est de plusieurs ordres de grandeur plus juste');
+
+% Euler ne tient pas un oscillateur non amorti : son amplitude enfle.
+% ode4 le tient. C'est la difference qui compte en pratique.
+oscillateur = add_block(new_system('oscillateur'), 'statespace', 'sys', ...
+                        'A', [0 1; -1 0], 'B', [0; 0], 'C', [1 0], 'D', 0, ...
+                        'X0', [1; 0]);
+oscEuler = sim(oscillateur, 10, simset('FixedStep', 0.01, 'Solver', 'ode1'));
+oscRK = sim(oscillateur, 10, simset('FixedStep', 0.01, 'Solver', 'ode4'));
+assert(max(abs(oscEuler.signaux.sys - cos(oscEuler.temps))) > 1e-2);
+assert(max(abs(oscRK.signaux.sys - cos(oscRK.temps))) < 1e-8, ...
+       'ode4 suit le cosinus la ou Euler s''en ecarte');
+
+% Le modele peut porter son solveur, comme sa duree et son pas.
+porteSolveur = add_param(decroissance, 'Solver', 'ode4', 'FixedStep', 0.1);
+assert(abs(sim(porteSolveur, 1).signaux.x(end) - exp(-1)) < 1e-6, ...
+       'ADD_PARAM pose le solveur sur le modele');
+% Un argument explicite l'emporte sur le reglage enregistre.
+assert(abs(sim(porteSolveur, 1, simset('FixedStep', 0.1, ...
+                                       'Solver', 'ode1')).signaux.x(end) - exp(-1)) > 1e-3);
+
+% Un etat qui n'est pas continu ne s'integre pas a mi-pas : le bloc est
+% nomme, plutot que traite de travers.
+avecRetard = add_block(new_system('avecRetard'), 'step', 'u', 'Time', 0);
+avecRetard = add_block(avecRetard, 'delay', 'z', 'InitialCondition', 0);
+avecRetard = add_line(avecRetard, 'u', 'z');
+refuseSolveur = false;
+try
+    sim(avecRetard, 1, simset('Solver', 'ode4'));
+catch err
+    refuseSolveur = strcmp(err.identifier, 'Simulink:Commands:SolveurEtatDiscret');
+end
+assert(refuseSolveur);
+assert(numel(sim(avecRetard, 1, simset('Solver', 'ode1')).temps) == 101, ...
+       'et le meme modele se simule sans rien dire au pas fixe');
+refuseNom = false;
+try
+    simset('Solver', 'ode45');
+catch err
+    refuseNom = strcmp(err.identifier, 'Simulink:Commands:SolveurInconnu');
+end
+assert(refuseNom, 'un solveur qui n''existe pas est refuse, non ignore');
+
 disp('toolboxes : toutes les verifications passent');

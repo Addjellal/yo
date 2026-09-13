@@ -4,9 +4,10 @@ function modele = add_param(modele, varargin)
 %   réglages au modèle. Ce ne sont pas les paramètres d'un bloc : ils
 %   valent pour la simulation entière.
 %
-%   Deux sont lus par SIM quand on ne lui donne ni durée ni pas :
+%   Trois sont lus par SIM quand l'appel ne les donne pas :
 %     StopTime    l'instant final
 %     FixedStep   le pas d'intégration
+%     Solver      le solveur : ode1, ode2, ode3 ou ode4
 %
 %   Un réglage déjà posé est refusé en le nommant : c'est SET_PARAM qui
 %   le change, comme dans MATLAB, où ADD_PARAM ne sert qu'à créer.

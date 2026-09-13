@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QGuiApplication>
 #include <QDockWidget>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFrame>
 #include <QEvent>
@@ -509,6 +510,15 @@ void FenetreSimulink::construireBarre() {
     duree_->setMaximumWidth(70);
     duree_->setToolTip(QStringLiteral("Instant final de la simulation, en secondes"));
     barre->addWidget(duree_);
+    barre->addWidget(new QLabel(QStringLiteral("  solveur ")));
+    solveur_ = new QComboBox();
+    solveur_->addItems({QStringLiteral("ode1"), QStringLiteral("ode2"),
+                        QStringLiteral("ode3"), QStringLiteral("ode4")});
+    solveur_->setToolTip(QStringLiteral(
+        "ode1 : Euler explicite. ode2, ode3 et ode4 évaluent la dérivée en des "
+        "points intermédiaires du pas et gagnent un ordre à chaque fois ; ils "
+        "demandent que tous les états soient continus."));
+    barre->addWidget(solveur_);
     barre->addWidget(new QLabel(QStringLiteral(" s  ")));
     barre->addSeparator();
 
@@ -738,12 +748,21 @@ void FenetreSimulink::simuler() {
     }
     // Le résultat reste dans l'espace de travail sous « resultatSimulink » :
     // la simulation n'est pas un cul-de-sac, on la reprend au clavier.
+    // Le solveur ne parait dans la commande que s'il n'est pas celui par
+    // defaut : une ligne courte se relit et se retape, et SIM prend ode1
+    // quand on ne lui dit rien.
+    const QString choisi = solveur_ ? solveur_->currentText() : QString();
+    QString options;
+    if (!choisi.isEmpty() && choisi != QLatin1String("ode1"))
+        options = QStringLiteral(", simset('Solver', '%1')").arg(choisi);
     emit commandeDemandee(
-        QStringLiteral("resultatSimulink = sim(%1, %2); figure; "
+        QStringLiteral("resultatSimulink = sim(%1, %2%3); figure; "
                        "simplot(resultatSimulink)")
-            .arg(nom, duree_->text()));
-    poserEtat(QStringLiteral("Simulation de « %1 » sur %2 s ; le relevé est dans "
-                             "resultatSimulink.").arg(nom, duree_->text()));
+            .arg(nom, duree_->text(), options));
+    poserEtat(QStringLiteral("Simulation de « %1 » sur %2 s par %3 ; le relevé est "
+                             "dans resultatSimulink.")
+                  .arg(nom, duree_->text(),
+                       choisi.isEmpty() ? QStringLiteral("ode1") : choisi));
 }
 
 // Un chemin peut porter une apostrophe — « /home/…/l'essai/pid.m » —, et

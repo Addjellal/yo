@@ -26,6 +26,7 @@
 #include "Moteur.h"
 
 class QAction;
+class QComboBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -63,6 +64,7 @@ public:
     // Publiés pour que la fenêtre se vérifie sans être montrée.
     QTreeWidget* bibliotheque() const { return bibliotheque_; }
     QListWidget* listeModeles() const { return modeles_; }
+    QComboBox* choixSolveur() const { return solveur_; }
     QTreeWidget* explorateur() const { return explorateur_; }
     ToileSimulink* toile() const { return toile_; }
     QLabel* description() const { return description_; }
@@ -141,6 +143,8 @@ private:
     QLabel* etatModeles_;
     QLabel* titreToile_;
     QLineEdit* duree_;
+    // Le solveur choisi pour la simulation : ode1 par defaut, comme SIM.
+    QComboBox* solveur_ = nullptr;
     QDockWidget* dockBibliotheque_;
     QPushButton* bInserer_;
     QAction* aOuvrir_ = nullptr;

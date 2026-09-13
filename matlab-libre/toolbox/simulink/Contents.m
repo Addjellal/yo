@@ -47,6 +47,15 @@
 %   ses blocs sous le nom « sousSysteme/bloc », et le sous-système
 %   lui-même porte la valeur de sa sortie. Ils s'emboîtent.
 %
+% Le solveur
+%   L'intégration se fait à pas fixe. ode1 (Euler explicite) est celui
+%   par défaut ; ode2, ode3 et ode4 évaluent la dérivée en des points
+%   intermédiaires du pas et gagnent un ordre à chaque fois. Ils ne
+%   valent que pour un état continu : un modèle qui porte un retard ou
+%   un bloc échantillonné est refusé en nommant le bloc, plutôt
+%   qu'intégré de travers. SIMSET le choisit, ADD_PARAM le pose sur le
+%   modèle.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent

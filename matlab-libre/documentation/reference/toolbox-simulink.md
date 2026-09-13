@@ -50,6 +50,15 @@
 %   ses blocs sous le nom « sousSysteme/bloc », et le sous-système
 %   lui-même porte la valeur de sa sortie. Ils s'emboîtent.
 %
+% Le solveur
+%   L'intégration se fait à pas fixe. ode1 (Euler explicite) est celui
+%   par défaut ; ode2, ode3 et ode4 évaluent la dérivée en des points
+%   intermédiaires du pas et gagnent un ordre à chaque fois. Ils ne
+%   valent que pour un état continu : un modèle qui porte un retard ou
+%   un bloc échantillonné est refusé en nommant le bloc, plutôt
+%   qu'intégré de travers. SIMSET le choisit, ADD_PARAM le pose sur le
+%   modèle.
+%
 % Blocs et liens
 %   add_block     - Ajoute un bloc, avec ses paramètres
 %   delete_block  - Retire un bloc, et les liens qui y touchent
@@ -220,9 +229,10 @@ ADD_PARAM Pose un réglage sur le modèle lui-même.
   réglages au modèle. Ce ne sont pas les paramètres d'un bloc : ils
   valent pour la simulation entière.
 
-  Deux sont lus par SIM quand on ne lui donne ni durée ni pas :
+  Trois sont lus par SIM quand l'appel ne les donne pas :
     StopTime    l'instant final
     FixedStep   le pas d'intégration
+    Solver      le solveur : ode1, ode2, ode3 ou ode4
 
   Un réglage déjà posé est refusé en le nommant : c'est SET_PARAM qui
   le change, comme dans MATLAB, où ADD_PARAM ne sert qu'à créer.
@@ -1432,8 +1442,19 @@ SIM Simule un modèle à pas fixe.
   SIM(MODELE,INSTANTS) accepte aussi un vecteur d'instants réguliers :
   il donne alors à la fois l'instant final et le pas.
 
-  L'intégration se fait par la méthode d'Euler explicite ; les blocs
-  sont évalués dans l'ordre d'un tri topologique, ce qui garantit
+  L'intégration se fait par défaut par la méthode d'Euler explicite.
+  SIM(MODELE,TFINAL,SIMSET('Solver','ode4')) en choisit une autre :
+  ode1 (Euler), ode2 (Heun), ode3 (Bogacki-Shampine) et ode4
+  (Runge-Kutta d'ordre quatre) sont à pas fixe, et l'erreur d'un
+  solveur d'ordre p décroît comme le pas à la puissance p. Un solveur
+  d'ordre supérieur évalue la dérivée en des points intermédiaires du
+  pas : cela n'a de sens que pour un état continu — intégrateur,
+  représentation d'état, fonction de transfert, PID —, et un modèle
+  qui porte un retard ou un bloc échantillonné est refusé en nommant
+  le bloc. Le modèle peut porter son solveur lui-même, par
+  ADD_PARAM(M,'Solver','ode4').
+
+  Les blocs sont évalués dans l'ordre d'un tri topologique, ce qui garantit
   qu'une entrée est calculée avant la sortie qui l'utilise. Seuls les
   blocs sans transmission directe — intégrateur, retard, mémoire,
   retard pur, tenue d'ordre zéro, et les représentations d'état dont D
@@ -1528,9 +1549,16 @@ SIMSET Rassemble les options d'une simulation.
 
   Options lues :
     FixedStep       le pas d'intégration
-    Solver          le nom du solveur ; seul 'FixedStepDiscrete' et
-                    l'Euler explicite 'ode1' existent ici, et tout
-                    autre nom est refusé plutôt qu'ignoré
+    Solver          le nom du solveur, à pas fixe : 'ode1' (Euler
+                    explicite, celui par défaut), 'ode2' (Heun),
+                    'ode3' (Bogacki-Shampine), 'ode4' (Runge-Kutta
+                    d'ordre quatre), ou 'FixedStepDiscrete', qui vaut
+                    ode1. Tout autre nom est refusé plutôt qu'ignoré.
+
+  Un solveur d'ordre supérieur évalue la dérivée en des points
+  intermédiaires du pas : cela n'a de sens que pour un état continu.
+  Un modèle qui porte un retard ou un bloc échantillonné est refusé
+  par SIM en nommant le bloc, plutôt qu'intégré de travers.
 
   Les options que MATLAB accepte et que MatLibre ne sait pas honorer
   sont refusées en le disant : une option acceptée sans effet ferait

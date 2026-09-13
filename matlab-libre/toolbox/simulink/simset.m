@@ -7,9 +7,16 @@ function options = simset(varargin)
 %
 %   Options lues :
 %     FixedStep       le pas d'intégration
-%     Solver          le nom du solveur ; seul 'FixedStepDiscrete' et
-%                     l'Euler explicite 'ode1' existent ici, et tout
-%                     autre nom est refusé plutôt qu'ignoré
+%     Solver          le nom du solveur, à pas fixe : 'ode1' (Euler
+%                     explicite, celui par défaut), 'ode2' (Heun),
+%                     'ode3' (Bogacki-Shampine), 'ode4' (Runge-Kutta
+%                     d'ordre quatre), ou 'FixedStepDiscrete', qui vaut
+%                     ode1. Tout autre nom est refusé plutôt qu'ignoré.
+%
+%   Un solveur d'ordre supérieur évalue la dérivée en des points
+%   intermédiaires du pas : cela n'a de sens que pour un état continu.
+%   Un modèle qui porte un retard ou un bloc échantillonné est refusé
+%   par SIM en nommant le bloc, plutôt qu'intégré de travers.
 %
 %   Les options que MATLAB accepte et que MatLibre ne sait pas honorer
 %   sont refusées en le disant : une option acceptée sans effet ferait
@@ -49,10 +56,12 @@ function options = simset(varargin)
         valeur = varargin{k + 1};
         if rang == 2
             valeur = char(valeur);
-            if ~any(strcmpi(valeur, {'ode1', 'FixedStepDiscrete'}))
+            if ~any(strcmpi(valeur, {'ode1', 'ode2', 'ode3', 'ode4', ...
+                                     'FixedStepDiscrete'}))
                 error('Simulink:Commands:SolveurInconnu', ...
-                      ['Le solveur ''%s'' n''existe pas ici : l''integration se ' ...
-                       'fait par Euler explicite a pas fixe (''ode1'').'], valeur);
+                      ['Le solveur ''%s'' n''existe pas ici : ode1 (Euler), ' ...
+                       'ode2 (Heun), ode3 (Bogacki-Shampine) et ode4 ' ...
+                       '(Runge-Kutta) sont a pas fixe.'], valeur);
             end
         end
         options.(connues{rang}) = valeur;
