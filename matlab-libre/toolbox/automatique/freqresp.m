@@ -34,4 +34,20 @@ function [H, w] = freqresp(sys, w)
         g = tf(sys);
         H = polyval(g.num, points) ./ polyval(g.den, points);
     end
+    % Un retard pur ne change pas le module : il tourne la phase de w*D,
+    % et c'est exactement ce qu'il faut voir -- c'est par la qu'un retard
+    % mange la marge de phase. Chaque voie porte le sien.
+    if hasdelay(sys)
+        d = totaldelay(sys);
+        if ndims(H) == 3
+            for i = 1:size(H, 1)
+                for j = 1:size(H, 2)
+                    H(i, j, :) = reshape(H(i, j, :), 1, []) .* ...
+                                 exp(-1i * w(:).' * d(i, j));
+                end
+            end
+        else
+            H = H(:) .* exp(-1i * w(:) * d(1));
+        end
+    end
 end

@@ -29,6 +29,12 @@ function sys = feedback(direct, retour, signe)
     if signe == 0
         signe = -1;
     end
+    % Un retard dans une boucle fermee n'est plus un retard d'entree ni de
+    % sortie : il devient un retard interne, que le modele ne porte pas.
+    % Le laisser passer rendrait une boucle fermee sans retard, c'est-a-dire
+    % stable la ou elle ne l'est pas.
+    matlibre_sans_retard(direct, 'FEEDBACK');
+    matlibre_sans_retard(retour, 'FEEDBACK');
     % Deux transmittances monovariables restent des polynômes : le
     % résultat s'écrit et se lit comme dans un cours.
     if matlibre_est_siso_tf(direct) && matlibre_est_siso_tf(retour)

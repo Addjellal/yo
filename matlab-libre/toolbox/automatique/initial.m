@@ -28,4 +28,16 @@ function [y, t, x] = initial(systeme, x0, tFinal)
         etat = expm(a * pas) * etat;
     end
     y = (c * x')';
+    % L'etat initial est deja dans le systeme : ce n'est pas lui qui
+    % attend. Seul un retard de sortie decale ce qu'on observe.
+    retard = matlibre_retard_scalaire(sortieSeule(systeme), 'INITIAL');
+    if retard ~= 0
+        y = interp1(t, y, t - retard, 'linear', 0);
+        y = reshape(y, [], size(c, 1));
+    end
+end
+
+function sys = sortieSeule(sys)
+    sys.InputDelay = 0;
+    sys.IODelay = 0;
 end

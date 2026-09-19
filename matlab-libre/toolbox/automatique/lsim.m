@@ -27,6 +27,16 @@ function [y, t, x] = lsim(sys, u, t, x0)
         error('control:lsim:TooFewSamples', 'T must contain at least two instants.');
     end
     dt = t(2) - t(1);
+    % Un retard d'entree retarde ce qui arrive, un retard de sortie ce
+    % qui sort. On les applique donc de part et d'autre de la simulation
+    % plutot qu'en bloc : l'etat initial, lui, est deja la, et sa reponse
+    % libre ne doit pas etre decalee.
+    retardEntree = matlibre_retard_scalaire(decaleEntree(sys), 'LSIM');
+    retardSortie = matlibre_retard_scalaire(decaleSortie(sys), 'LSIM');
+    if retardEntree ~= 0
+        u = interp1(t, u, t - retardEntree, 'linear', 0);
+        u = u(:);
+    end
     if s.Ts > 0
         Ad = s.A;
         Bd = s.B;
@@ -46,4 +56,19 @@ function [y, t, x] = lsim(sys, u, t, x0)
         y(k) = s.C * etat + s.D * u(k);
         etat = Ad * etat + Bd * u(k);
     end
+    if retardSortie ~= 0
+        y = interp1(t, y, t - retardSortie, 'linear', 0);
+        y = y(:);
+    end
+end
+
+% Les deux moities du retard. Le retard de couple compte comme un retard
+% d'entree : pour une voie, les deux sont indiscernables.
+function sys = decaleEntree(sys)
+    sys.OutputDelay = 0;
+end
+
+function sys = decaleSortie(sys)
+    sys.InputDelay = 0;
+    sys.IODelay = 0;
 end

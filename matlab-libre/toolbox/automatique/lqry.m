@@ -12,6 +12,7 @@ function [K, S, poles] = lqry(sys, Q, R, N)
 %      lqry(ss(0, 1, 1, 0), 1, 1)   % 1
 %
 %   Voir aussi LQR, LQI, DLQR.
+    matlibre_sans_retard(sys, 'LQRY');
     s = ss(sys);
     if nargin < 4 || isempty(N), N = zeros(size(s.C, 1), size(s.B, 2)); end
     Qx = s.C' * Q * s.C;

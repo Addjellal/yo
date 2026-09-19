@@ -61,5 +61,8 @@ function sysc = d2c(sys, methode)
             C = s.C;
             D = s.D;
     end
-    sysc = ss(real(A), real(B), real(C), real(D), 0);
+    % La discretisation ne touche qu'a la partie rationnelle : le retard
+    % reste ce qu'il est, compte en secondes de part et d'autre. Le perdre
+    % ici l'aurait fait disparaitre sans rien dire.
+    sysc = matlibre_porter_retard(ss(real(A), real(B), real(C), real(D), 0), sys);
 end

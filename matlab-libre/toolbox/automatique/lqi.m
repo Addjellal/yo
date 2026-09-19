@@ -15,6 +15,7 @@ function [K, S, poles] = lqi(sys, Q, R, N)
 %      numel(k)   % 2 : un gain d'état et un gain d'intégrateur
 %
 %   Voir aussi LQR, LQRY, LQE.
+    matlibre_sans_retard(sys, 'LQI');
     s = ss(sys);
     n = size(s.A, 1);
     ny = size(s.C, 1);

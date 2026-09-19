@@ -18,6 +18,11 @@ function [racines, gains] = rlocus(varargin)
 %      rlocus(tf(1, [1 2 0]))
 %
 %   Voir aussi PZMAP, POLE, FEEDBACK, PLACE.
+    for kRetard = 1:numel(varargin)
+        if isa(varargin{kRetard}, 'ss') || isa(varargin{kRetard}, 'tf')
+            matlibre_sans_retard(varargin{kRetard}, 'RLOCUS');
+        end
+    end
     [modeles, styles, gains] = matlibre_arguments_lti(varargin);
     if isempty(modeles)
         error('MATLAB:minrhs', 'Not enough input arguments.');

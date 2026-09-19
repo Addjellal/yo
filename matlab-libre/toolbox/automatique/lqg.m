@@ -20,6 +20,7 @@ function [reg, info] = lqg(sys, QXU, QWV)
 %      max(real(pole(feedback(G, -C)))) < 0     % la boucle est stable
 %
 %   Voir aussi LQR, KALMAN, LQGREG, CARE, H2SYN.
+    matlibre_sans_retard(sys, 'LQG');
     sys = ss(sys);
     n = size(sys.A, 1);
     nu = size(sys.B, 2);

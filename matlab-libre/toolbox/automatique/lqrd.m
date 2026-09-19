@@ -22,6 +22,7 @@ function [K, S, poles] = lqrd(A, B, Q, R, Ts, N)
 %      k = lqrd(0, 1, 1, 1, 0.01);   % voisin de lqr(0,1,1,1) = 1
 %
 %   Voir aussi DLQR, LQR, C2D.
+    if isa(A, 'ss') || isa(A, 'tf'), matlibre_sans_retard(A, 'LQRD'); end
     n = size(A, 1);
     m = size(B, 2);
     if nargin < 6 || isempty(N), N = zeros(n, m); end

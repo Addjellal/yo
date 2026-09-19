@@ -8,6 +8,10 @@ function [num, den] = pade(T, n)
 %   SYS = PADE(T,N) rend directement le modèle. Sans sortie, la fonction
 %   trace la réponse indicielle et compare à un retard exact.
 %
+%   PADE(SYS,N) rend le modèle où les retards portés par SYS sont
+%   remplacés par leur approximation : ce qu'une synthèse refuse de
+%   porter devient alors rationnel, et se calcule partout.
+%
 %   Un retard est ce qui déstabilise une boucle sans qu'on le voie venir :
 %   il ne change pas le gain, seulement la phase, et l'approximer permet
 %   de le porter dans un calcul de marges ou une synthèse.
@@ -24,6 +28,23 @@ function [num, den] = pade(T, n)
 %   Voir aussi C2D, MARGIN, TF, EXP.
     if nargin < 2 || isempty(n)
         n = 1;
+    end
+    % PADE(SYS,N) remplace les retards d'un modele par leur approximation :
+    % c'est le passage d'un modele retarde -- que la synthese refuse -- a un
+    % modele rationnel, qui se calcule partout.
+    if isa(T, 'ss') || isa(T, 'tf')
+        modele = T;
+        retard = matlibre_retard_scalaire(modele, 'PADE');
+        modele.InputDelay = 0;
+        modele.OutputDelay = 0;
+        modele.IODelay = 0;
+        if retard == 0
+            num = modele;
+        else
+            num = series(modele, pade(retard, n));
+            num.InputDelay = 0;
+        end
+        return
     end
     if T < 0
         error('Control:pade:NegativeDelay', 'The delay must not be negative.');

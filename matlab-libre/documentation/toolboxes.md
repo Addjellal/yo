@@ -15,7 +15,7 @@ existant appellera.
 | `antennes` | Antenna Toolbox — rayonnement et réseaux. | 5 |
 | `apprentissage-profond` | Deep Learning Toolbox — réseaux de neurones, denses et convolutifs. | 141 |
 | `audio` | Audio Toolbox — sons et descripteurs. | 7 |
-| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 119 |
+| `automatique` | Control System Toolbox — systèmes asservis linéaires. | 122 |
 | `base-de-donnees` | Database Toolbox — stockage tabulaire. | 8 |
 | `bioinformatique` | Bioinformatics Toolbox — séquences biologiques. | 8 |
 | `calcul-parallele` | Parallel Computing Toolbox — exécution parallèle. | 6 |

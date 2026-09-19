@@ -24,6 +24,11 @@ function sys = connect(varargin)
 %      size(TU)                   % 2 sorties, 1 entree
 %
 %   Voir aussi SUMBLK, SYSIC, APPEND, FEEDBACK, SERIES, LFT.
+    for kRetard = 1:numel(varargin)
+        if isa(varargin{kRetard}, 'ss') || isa(varargin{kRetard}, 'tf')
+            matlibre_sans_retard(varargin{kRetard}, 'CONNECT');
+        end
+    end
     if numel(varargin) < 3
         error('MATLAB:narginchk:notEnoughInputs', ...
               'CONNECT needs blocks, then the input and output names.');

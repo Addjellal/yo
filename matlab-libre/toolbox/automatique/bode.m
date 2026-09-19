@@ -94,6 +94,13 @@ function [module, phase, w] = reponseBode(sys, w)
         s = 1i * w;
     end
     h = polyval(g.num, s) ./ polyval(g.den, s);
+    % Le retard tourne la phase de w*D, sans toucher au module : c'est
+    % ainsi qu'il mange la marge de phase, et MARGIN, NYQUIST et NICHOLS
+    % le voient parce qu'ils passent tous par ici.
+    d = matlibre_retard_scalaire(sys, 'BODE');
+    if d ~= 0
+        h = h(:) .* exp(-1i * w(:) * d);
+    end
     module = abs(h);
     phase = unwrap(angle(h)) * 180 / pi;
 end

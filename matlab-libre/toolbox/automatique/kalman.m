@@ -13,6 +13,7 @@ function [estimateur, L, P] = kalman(systeme, Q, R)
 %      max(real(eig(-1 - L))) < 0           % l'observateur converge
 %
 %   Voir aussi LQE, LQR, LQG, CARE, ESTIM.
+    matlibre_sans_retard(systeme, 'KALMAN');
     A = systeme.A;
     B = systeme.B;
     C = systeme.C;

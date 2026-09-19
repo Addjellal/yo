@@ -42,5 +42,7 @@ function sys = minreal(systeme, tolerance)
     poles = poles(garde);
     nouveauNum = facteurNum * real(poly(zeros_));
     nouveauDen = facteurDen * real(poly(poles));
-    sys = tf(nouveauNum / nouveauDen(1), nouveauDen / nouveauDen(1), s.Ts);
+    % La reduction ne touche qu'a la partie rationnelle : le retard suit.
+    sys = matlibre_porter_retard( ...
+        tf(nouveauNum / nouveauDen(1), nouveauDen / nouveauDen(1), s.Ts), systeme);
 end

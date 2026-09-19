@@ -13,8 +13,12 @@ function H = evalfr(sys, x)
     if strcmp(sys.type, 'ss') && ~issiso(sys)
         n = size(sys.A, 1);
         H = sys.C * ((x * eye(n) - sys.A) \ sys.B) + sys.D;
+        H = H .* exp(-x * totaldelay(sys));
         return
     end
     g = tf(sys);
     H = polyval(g.num, x) ./ polyval(g.den, x);
+    % Le retard vaut e^(-x D) au point x du plan complexe : en s = jw,
+    % c'est le dephasage pur, et l'evaluation ailleurs suit la meme loi.
+    H = H .* exp(-x * matlibre_retard_scalaire(sys, 'EVALFR'));
 end

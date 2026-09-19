@@ -17,6 +17,7 @@ function est = estim(sys, L, capteurs, connues)
 %      pole(e)   % -3 : l'observateur est plus rapide que le procédé
 %
 %   Voir aussi REG, KALMAN, LQE, PLACE.
+    matlibre_sans_retard(sys, 'ESTIM');
     s = ss(sys);
     n = size(s.A, 1);
     ny = size(s.C, 1);

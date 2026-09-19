@@ -41,6 +41,20 @@ classdef frd
         FrequencyUnit = 'rad/TimeUnit'
         Ts = 0
         Name = ''
+        InputName = {}
+        OutputName = {}
+        % Les retards purs. MATLAB les porte ainsi ; MatLibre les honore
+        % là où c'est exact — la réponse fréquentielle les multiplie par
+        % e^(-jwT), la réponse temporelle décale — et refuse en les
+        % nommant là où ils ne se portent pas, plutôt que de les perdre
+        % en chemin. PADE en donne une approximation rationnelle.
+        InputDelay = 0
+        OutputDelay = 0
+        IODelay = 0
+        % L'unité de temps du modèle. CHGTIMEUNIT la change en
+        % rééchelonnant les coefficients : elle dit donc dans quoi se
+        % lisent les constantes de temps.
+        TimeUnit = 'seconds'
     end
 
     methods

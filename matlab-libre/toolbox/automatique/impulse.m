@@ -44,8 +44,20 @@ function [y, t] = impulse(varargin)
     title('Réponse impulsionnelle');
 end
 
+% La reponse impulsionnelle d'un modele retarde est la meme, decalee : une
+% impulsion qui met D a arriver produit la meme chose D plus tard. Le
+% calcul se fait donc sans le retard, et le decalage vient apres.
 function [y, t] = reponseImpulsion(sys, temps)
-%REPONSEIMPULSION Réponse d'un modèle à une impulsion.
+    retard = matlibre_retard_scalaire(sys, 'IMPULSE');
+    [y, t] = reponseImpulsionNue(sys, temps);
+    if retard ~= 0
+        y = interp1(t, y, t - retard, 'linear', 0);
+        y = y(:);
+    end
+end
+
+function [y, t] = reponseImpulsionNue(sys, temps)
+%REPONSEIMPULSIONNUE Réponse d'un modèle à une impulsion.
 %   Une impulsion de Dirac ne fait que charger l'état : la réponse
 %   impulsionnelle est la réponse libre partant de x0 = B, soit
 %   y(t) = C*expm(A*t)*B. C'est exact, là où dériver numériquement la

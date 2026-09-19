@@ -37,5 +37,8 @@ function sysd = c2d(sys, Ts, methode)
             Cd = s.C;
             Dd = s.D;
     end
-    sysd = ss(Ad, Bd, Cd, Dd, Ts);
+    % La discretisation ne touche qu'a la partie rationnelle : le retard
+    % reste ce qu'il est, compte en secondes de part et d'autre. Le perdre
+    % ici l'aurait fait disparaitre sans rien dire.
+    sysd = matlibre_porter_retard(ss(Ad, Bd, Cd, Dd, Ts), sys);
 end

@@ -848,4 +848,130 @@ for essaiLieu = [1 50 numel(gainsLieu)]
 end
 disp('stepinfo et rlocus : ok');
 
+%% ------------------------------ LES RETARDS PURS
+% Un retard etait accepte puis oublie : on l'ecrivait, il etait range, et
+% aucune reponse n'en tenait compte. Il est a present porte, honore la ou
+% c'est exact, et refuse en le nommant la ou il ne se porte pas.
+sansRetard = tf(1, [1 1]);
+avecRetard = sansRetard;
+avecRetard.InputDelay = 2;
+assert(~hasdelay(sansRetard));
+assert(hasdelay(avecRetard) && totaldelay(avecRetard) == 2);
+avecRetard.OutputDelay = 0.5;
+assert(totaldelay(avecRetard) == 2.5, 'les retards s''ajoutent le long de la voie');
+avecRetard.OutputDelay = 0;
+
+% Une propriete que la classe ne declare pas est refusee, au lieu d'etre
+% posee sur l'objet et lue par personne.
+refuseChamp = false;
+try
+    sansRetard.RetardInvente = 3;
+catch err
+    refuseChamp = strcmp(err.identifier, 'MATLAB:noPublicFieldForClass');
+end
+assert(refuseChamp, 'une propriete inconnue est refusee, non rangee en silence');
+
+% Le retard traverse les conversions : le perdre en route reviendrait a
+% l'oublier sans le dire.
+assert(totaldelay(ss(avecRetard)) == 2);
+assert(totaldelay(tf(ss(avecRetard))) == 2);
+assert(totaldelay(c2d(ss(avecRetard), 0.1)) == 2);
+assert(totaldelay(minreal(avecRetard)) == 2);
+
+% La reponse temporelle est la meme, decalee : c'est la definition d'un
+% retard pur, et le test la verifie plutot qu'une valeur recopiee.
+tRetard = (0:0.01:8)';
+yNu = step(sansRetard, tRetard);
+yRetarde = step(avecRetard, tRetard);
+kRetard = round(2 / 0.01);
+assert(all(abs(yRetarde(1:kRetard)) < 1e-12), ...
+       'avant le retard, rien n''est arrive');
+assert(max(abs(yRetarde(kRetard+1:end) - yNu(1:end-kRetard))) < 1e-12, ...
+       'apres le retard, c''est exactement la meme reponse');
+yImpulsion = impulse(avecRetard, tRetard);
+assert(all(abs(yImpulsion(1:kRetard)) < 1e-12) && ...
+       max(abs(yImpulsion(kRetard+1:end) - impulse(sansRetard, tRetard)(1:end-kRetard))) < 1e-12);
+
+% La reponse frequentielle porte e^(-jwD) : meme module, phase tournee.
+wRetard = logspace(-2, 1, 40)';
+assert(max(abs(freqresp(avecRetard, wRetard)(:) - ...
+                freqresp(sansRetard, wRetard)(:) .* exp(-1i * wRetard * 2))) < 1e-12, ...
+       'la reponse frequentielle d''un retard est exactement e^(-jwD)');
+[moduleRetarde, phaseRetardee] = bode(avecRetard, wRetard);
+[moduleNu, phaseNue] = bode(sansRetard, wRetard);
+assert(max(abs(moduleRetarde - moduleNu)) < 1e-12, ...
+       'un retard ne change pas le module');
+ecartPhase = (phaseRetardee - phaseNue) * pi / 180 + wRetard * 2;
+assert(max(abs(ecartPhase - 2*pi*round(ecartPhase/(2*pi)))) < 1e-9, ...
+       'il tourne la phase de w*D, au tour pres');
+
+% Et c'est ainsi qu'un retard mange la marge : un integrateur double n'a
+% pas de marge de gain finie, un retard lui en donne une.
+assert(isinf(margin(tf(1, [1 1 0]))));
+avecPetitRetard = tf(1, [1 1 0]);
+avecPetitRetard.InputDelay = 0.3;
+assert(isfinite(margin(avecPetitRetard)) && margin(avecPetitRetard) > 0, ...
+       'un retard donne une marge de gain finie a ce qui n''en avait pas');
+
+% Les assemblages : deux retards en cascade s'ajoutent ; deux branches
+% paralleles de retards differents demanderaient un retard interne, et
+% sont refusees plutot que d'en oublier un.
+unRetard = sansRetard; unRetard.InputDelay = 1;
+deuxRetards = sansRetard; deuxRetards.InputDelay = 2;
+assert(totaldelay(series(unRetard, deuxRetards)) == 3);
+assert(totaldelay(parallel(unRetard, unRetard)) == 1);
+refuseParallele = false;
+try
+    parallel(unRetard, deuxRetards);
+catch err
+    refuseParallele = strcmp(err.identifier, 'Control:ltiobject:delayNotSupported');
+end
+assert(refuseParallele);
+refuseBoucle = false;
+try
+    feedback(unRetard, 1);
+catch err
+    refuseBoucle = strcmp(err.identifier, 'Control:ltiobject:delayNotSupported');
+end
+assert(refuseBoucle, 'un retard dans la boucle serait un retard interne');
+
+% Ce qui ne sait pas porter un retard le refuse en le nommant : un retour
+% d'etat calcule sur (A,B,C,D) ignorerait le temps de transport, et le
+% correcteur aurait l'air regle sans l'etre.
+for nomRefus = {'lqr', 'kalman', 'rlocus'}
+    refuseSynthese = false;
+    try
+        switch nomRefus{1}
+            case 'lqr',    lqr(ss(avecRetard), 1, 1);
+            case 'kalman', kalman(ss(avecRetard), 1, 1);
+            case 'rlocus', rlocus(avecRetard);
+        end
+    catch err
+        refuseSynthese = strcmp(err.identifier, 'Control:ltiobject:delayNotSupported');
+    end
+    assert(refuseSynthese, sprintf('%s doit refuser un modele retarde', nomRefus{1}));
+end
+
+% PADE est le passage : il remplace le retard par une fraction
+% rationnelle, et ce qui refusait accepte alors.
+approximation = pade(avecRetard, 3);
+assert(~hasdelay(approximation), 'PADE consomme le retard');
+assert(order(ss(approximation)) == order(ss(sansRetard)) + 3);
+K = lqr(ss(approximation), 1, 1);
+assert(numel(K) == 4, 'et la synthese passe sur l''approximation');
+% L'approximation vaut ce qu'elle promet, et ce qu'elle promet croit avec
+% l'ordre : c'est la propriete qui la definit, non une tolerance choisie.
+wBasse = logspace(-1, 0, 10)';
+[~, phaseExacte] = bode(avecRetard, wBasse);
+ecartsPade = zeros(1, 3);
+ordresPade = [1 3 6];
+for kPade = 1:numel(ordresPade)
+    [~, phasePade] = bode(pade(avecRetard, ordresPade(kPade)), wBasse);
+    ecartsPade(kPade) = max(abs(phaseExacte - phasePade));
+end
+assert(all(diff(ecartsPade) < 0), ...
+       'l''approximation de Pade serre le retard de plus pres a chaque ordre');
+assert(ecartsPade(end) < 1e-6, ...
+       'et a l''ordre six elle le suit au millionieme de degre');
+
 disp('automatique : toutes les verifications passent');

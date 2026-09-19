@@ -208,12 +208,35 @@ std::function<bool(Interpreteur&, const Valeur&, const std::string&, Valeur&)>
     crochetLirePropriete;
 std::function<bool(Interpreteur&, const Valeur&)> crochetSupprimerGraphique;
 
+static bool contientNom(const std::vector<std::string>& liste, const std::string& nom) {
+    for (const auto& n : liste)
+        if (n == nom) return true;
+    return false;
+}
+
 Valeur Interpreteur::ecrireProprieteObjet(Valeur objet, const std::string& nom,
                                           const Valeur& valeur) {
     if (crochetEcrirePropriete && crochetEcrirePropriete(*this, objet, nom, valeur))
         return objet;
     auto def = classeDe(objet);
     if (def) {
+        // Une classe dit quelles propriétés elle porte. En écrire une
+        // autre ne la crée pas : elle serait posée sur l'objet et lue par
+        // personne — le réglage aurait l'air pris et ne vaudrait rien.
+        // C'est ainsi qu'« InputDelay » se posait sur un modèle LTI qui
+        // l'ignorait. On refuse, en nommant la propriété et la classe.
+        if (!estCarte(objet) && !def->ordreProprietes.empty() &&
+            !contientNom(def->ordreProprietes, nom) &&
+            !contientNom(def->dependantes, nom) && !def->aMethode("set." + nom)) {
+            std::string liste;
+            for (const auto& p : def->ordreProprietes) {
+                if (!liste.empty()) liste += ", ";
+                liste += p;
+            }
+            erreur("MATLAB:noPublicFieldForClass",
+                   "Unrecognized property '" + nom + "' for class '" + objet.nomObjet +
+                       "'. Declared properties: " + liste + ".");
+        }
         std::string accesseur = "set." + nom;
         if (def->aMethode(accesseur)) {
             auto r = appelerMethode(objet, accesseur, {valeur}, 1);

@@ -22,6 +22,7 @@ function rsys = reg(sys, K, L)
 %      sort(pole(feedback(series(c, g), 1, +1)))   % -12 -10 -4 -3
 %
 %   Voir aussi ESTIM, PLACE, LQR, KALMAN.
+    matlibre_sans_retard(sys, 'REG');
     s = ss(sys);
     Ac = s.A - s.B * K - L * s.C + L * s.D * K;
     rsys = ss(Ac, L, -K, zeros(size(K, 1), size(L, 2)), s.Ts);

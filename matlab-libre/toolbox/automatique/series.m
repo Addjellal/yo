@@ -11,11 +11,20 @@ function sys = series(sys1, sys2)
 %      L = series(tf(1, [1 1]), tf(10, [1 0]))   % 10/(s^2+s)
 %
 %   Voir aussi FEEDBACK, PARALLEL, APPEND, LFT.
+    % Deux retards en cascade s'ajoutent : le signal attend l'un puis
+    % l'autre. C'est le seul assemblage ou un retard se compose sans
+    % qu'il faille le representer a l'interieur de la boucle.
+    retard = matlibre_retard_scalaire(sys1, 'SERIES') + ...
+             matlibre_retard_scalaire(sys2, 'SERIES');
     if matlibre_est_siso_tf(sys1) && matlibre_est_siso_tf(sys2)
         a = tf(sys1);
         b = tf(sys2);
         sys = tf(conv(a.num, b.num), conv(a.den, b.den), max(a.Ts, b.Ts));
-        return
+    else
+        sys = ss(sys2) * ss(sys1);
+        sys.InputDelay = 0;
+        sys.OutputDelay = 0;
+        sys.IODelay = 0;
     end
-    sys = ss(sys2) * ss(sys1);
+    sys.InputDelay = retard;
 end

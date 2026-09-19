@@ -954,17 +954,21 @@ GRAM Grammiens de commandabilité et d'observabilité.
 ```
 HASDELAY Vrai si le modèle porte un retard.
   HASDELAY(SYS) dit si le modèle a un retard, en entrée, en sortie ou
-  dans la boucle.
+  sur un couple entrée-sortie.
 
-  MatLibre ne représente pas les retards autrement que par leur
-  approximation : la fonction rend donc toujours faux. Pour porter un
-  retard dans un calcul, PADE en donne une fonction de transfert.
+  Un modèle retardé se trace et se répond exactement : la réponse
+  fréquentielle porte e^(-jwD), la réponse temporelle est décalée. Les
+  calculs qui ne savent pas porter un retard — réalisation d'état,
+  synthèse par retour d'état, lieu des racines — le refusent en le
+  nommant, plutôt que de l'oublier. PADE en donne une approximation
+  rationnelle, qui passe alors partout.
 
   Exemples :
      hasdelay(tf(1, [1 1]))           % faux
-     hasdelay(ss(-1, 1, 1, 0))        % faux
+     g = tf(1, [1 1]); g.InputDelay = 0.5;
+     hasdelay(g)                      % vrai
 
-  Voir aussi PADE, TOTALDELAY, C2D.
+  Voir aussi TOTALDELAY, PADE, C2D, MATLIBRE_SANS_RETARD.
 ```
 
 ## `hsvd`
@@ -1579,6 +1583,26 @@ MATLIBRE_NOMS_VOIES Les noms d'un signal à plusieurs voies.
   Voir aussi SUMBLK, CONNECT.
 ```
 
+## `matlibre_porter_retard`
+
+```
+MATLIBRE_PORTER_RETARD Reporte sur un modèle les retards d'un autre.
+  CIBLE = MATLIBRE_PORTER_RETARD(CIBLE,SOURCE) copie les retards et
+  l'unité de temps de SOURCE sur CIBLE. Les transformations qui ne
+  touchent qu'à la partie rationnelle — discrétisation, réduction,
+  changement de réalisation — doivent les reporter : un retard perdu
+  en chemin ne se voit nulle part.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = tf(1, [1 1]); g.InputDelay = 2;
+     totaldelay(matlibre_porter_retard(tf(1, [1 2]), g))    % 2
+
+  Voir aussi TOTALDELAY, HASDELAY, MATLIBRE_SANS_RETARD.
+```
+
 ## `matlibre_pulsations`
 
 ```
@@ -1630,6 +1654,25 @@ MATLIBRE_REGLAGES_BODE Ce qu'un tracé retient d'une structure d'options.
   Voir aussi BODE, BODEMAG, BODEOPTIONS.
 ```
 
+## `matlibre_retard_scalaire`
+
+```
+MATLIBRE_RETARD_SCALAIRE Le retard d'un modèle, quand il n'en a qu'un.
+  D = MATLIBRE_RETARD_SCALAIRE(SYS,QUOI) rend le retard total du
+  modèle. Toutes les voies doivent porter le même : un calcul qui ne
+  sait appliquer qu'un seul décalage ne peut pas en honorer plusieurs,
+  et le dire vaut mieux que d'en choisir un au hasard.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     g = tf(1, [1 1]); g.InputDelay = 2;
+     matlibre_retard_scalaire(g, 'LSIM')      % 2
+
+  Voir aussi TOTALDELAY, HASDELAY, MATLIBRE_SANS_RETARD.
+```
+
 ## `matlibre_riccati`
 
 ```
@@ -1666,6 +1709,30 @@ MATLIBRE_RICCATI Solution stabilisante d'une équation de Riccati.
   Automatique : elle n'existe pas dans MATLAB.
 
   Voir aussi CARE, DARE, HINFSYN.
+```
+
+## `matlibre_sans_retard`
+
+```
+MATLIBRE_SANS_RETARD Refuse un modèle retardé, en le nommant.
+  SYS = MATLIBRE_SANS_RETARD(SYS,QUOI) rend le modèle tel quel s'il ne
+  porte aucun retard, et échoue sinon en disant quel calcul ne sait pas
+  le porter.
+
+  Un retard pur n'est pas une fraction rationnelle : il n'a pas de
+  réalisation d'état de dimension finie, et un retour d'état calculé
+  sur (A,B,C,D) ignorerait le temps qu'il faut au signal pour arriver.
+  Le laisser passer donnerait un correcteur qui a l'air réglé et ne
+  l'est pas ; PADE en donne une approximation rationnelle, qui passe
+  alors partout.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_sans_retard(tf(1, [1 1]), 'LQR');   % passe : aucun retard
+
+  Voir aussi HASDELAY, TOTALDELAY, PADE, THIRAN.
 ```
 
 ## `minreal`
@@ -1846,6 +1913,10 @@ PADE Approximation d'un retard pur par une fonction de transfert.
   SYS = PADE(T,N) rend directement le modèle. Sans sortie, la fonction
   trace la réponse indicielle et compare à un retard exact.
 
+  PADE(SYS,N) rend le modèle où les retards portés par SYS sont
+  remplacés par leur approximation : ce qu'une synthèse refuse de
+  porter devient alors rationnel, et se calcule partout.
+
   Un retard est ce qui déstabilise une boucle sans qu'on le voie venir :
   il ne change pas le gain, seulement la phase, et l'approximer permet
   de le porter dans un calcul de marges ou une synthèse.
@@ -1874,6 +1945,10 @@ PARALLEL Mise en parallèle de deux modèles.
      parallel(tf(1, [1 1]), tf(1, [1 2]))
 
   Voir aussi SERIES, FEEDBACK, APPEND.
+Deux branches en parallele ne partagent leur retard que s'il est le
+meme : sinon il faudrait le porter dans une seule des deux, ce
+qu'un modele sans retard interne ne sait pas faire. On le dit,
+plutot que d'en garder un et d'oublier l'autre.
 ```
 
 ## `pid`
@@ -2179,6 +2254,9 @@ SERIES Mise en série de deux modèles.
      L = series(tf(1, [1 1]), tf(10, [1 0]))   % 10/(s^2+s)
 
   Voir aussi FEEDBACK, PARALLEL, APPEND, LFT.
+Deux retards en cascade s'ajoutent : le signal attend l'un puis
+l'autre. C'est le seul assemblage ou un retard se compose sans
+qu'il faille le representer a l'interieur de la boucle.
 ```
 
 ## `sgrid`
@@ -2544,16 +2622,19 @@ THIRAN Filtre passe-tout à retard fractionnaire.
 ```
 TOTALDELAY Retard total de chaque voie d'un modèle.
   D = TOTALDELAY(SYS) rend la matrice des retards, une valeur par couple
-  entrée-sortie.
+  entrée-sortie : le retard d'entrée de la voie, plus celui de sortie,
+  plus celui du couple.
 
-  MatLibre ne représente pas les retards : la matrice est nulle. PADE
-  donne l'approximation d'un retard sous forme de transmittance.
+  C'est cette somme que les réponses honorent — la réponse temporelle
+  la décale, la réponse fréquentielle la porte en e^(-jwD) — et que
+  refusent en la nommant les calculs qui ne savent pas la porter.
 
   Exemples :
      totaldelay(tf(1, [1 1]))         % 0
-     isequal(size(totaldelay(ss(zeros(2), zeros(2), zeros(2), zeros(2)))), [2 2])
+     g = tf(1, [1 1]); g.InputDelay = 2;
+     totaldelay(g)                    % 2
 
-  Voir aussi HASDELAY, PADE.
+  Voir aussi HASDELAY, PADE, MATLIBRE_SANS_RETARD.
 ```
 
 ## `tzero`

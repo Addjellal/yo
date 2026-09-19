@@ -40,6 +40,23 @@ classdef tf
         % Comment l'afficher : 'polynome' comme TF, 'facteurs' comme ZPK.
         % La valeur calculée est la même — c'est la mise en page qui change.
         forme = 'polynome'
+        % Les retards purs. MATLAB les porte ainsi ; MatLibre les honore
+        % là où c'est exact — la réponse fréquentielle les multiplie par
+        % e^(-jwT), la réponse temporelle décale — et refuse en les
+        % nommant là où ils ne se portent pas, plutôt que de les perdre
+        % en chemin. PADE en donne une approximation rationnelle.
+        InputDelay = 0
+        OutputDelay = 0
+        IODelay = 0
+        % L'unité de temps du modèle. CHGTIMEUNIT la change en
+        % rééchelonnant les coefficients : elle dit donc dans quoi se
+        % lisent les constantes de temps.
+        TimeUnit = 'seconds'
+        % Les noms des voies, comme en porte un modèle d'état : CONNECT
+        % relie par ces noms, et les tracés les affichent.
+        InputName = {}
+        OutputName = {}
+        Name = ''
     end
 
     methods
@@ -74,11 +91,29 @@ classdef tf
                     sys.num = n(:).';
                     sys.den = d(:).';
                     sys.Ts = modele.Ts;
+                    % Les retards suivent la conversion : une realisation
+                    % d'etat ne les porte pas dans ses matrices, mais le
+                    % modele les porte toujours, et les reponses les
+                    % honorent. Les perdre ici les aurait fait disparaitre
+                    % sans rien dire.
+                    sys.InputDelay = modele.InputDelay;
+                    sys.OutputDelay = modele.OutputDelay;
+                    sys.IODelay = modele.IODelay;
+                    sys.TimeUnit = modele.TimeUnit;
                     return
                 end
                 sys.num = modele.num;
                 sys.den = modele.den;
                 sys.Ts = modele.Ts;
+                    % Les retards suivent la conversion : une realisation
+                    % d'etat ne les porte pas dans ses matrices, mais le
+                    % modele les porte toujours, et les reponses les
+                    % honorent. Les perdre ici les aurait fait disparaitre
+                    % sans rien dire.
+                    sys.InputDelay = modele.InputDelay;
+                    sys.OutputDelay = modele.OutputDelay;
+                    sys.IODelay = modele.IODelay;
+                    sys.TimeUnit = modele.TimeUnit;
                 return
             end
             if nargin == 1

@@ -29,6 +29,18 @@ classdef ss
         OutputName = {}
         StateName = {}
         Name = ''
+        % Les retards purs. MATLAB les porte ainsi ; MatLibre les honore
+        % là où c'est exact — la réponse fréquentielle les multiplie par
+        % e^(-jwT), la réponse temporelle décale — et refuse en les
+        % nommant là où ils ne se portent pas, plutôt que de les perdre
+        % en chemin. PADE en donne une approximation rationnelle.
+        InputDelay = 0
+        OutputDelay = 0
+        IODelay = 0
+        % L'unité de temps du modèle. CHGTIMEUNIT la change en
+        % rééchelonnant les coefficients : elle dit donc dans quoi se
+        % lisent les constantes de temps.
+        TimeUnit = 'seconds'
     end
 
     methods
@@ -48,11 +60,29 @@ classdef ss
                     sys.OutputName = modele.OutputName;
                     sys.StateName = modele.StateName;
                     sys.Name = modele.Name;
+                    % Les retards suivent la conversion : une realisation
+                    % d'etat ne les porte pas dans ses matrices, mais le
+                    % modele les porte toujours, et les reponses les
+                    % honorent. Les perdre ici les aurait fait disparaitre
+                    % sans rien dire.
+                    sys.InputDelay = modele.InputDelay;
+                    sys.OutputDelay = modele.OutputDelay;
+                    sys.IODelay = modele.IODelay;
+                    sys.TimeUnit = modele.TimeUnit;
                     return
                 end
                 [a, b, c, d] = tf2ss(modele.num, modele.den);
                 sys.A = a; sys.B = b; sys.C = c; sys.D = d;
                 sys.Ts = modele.Ts;
+                    % Les retards suivent la conversion : une realisation
+                    % d'etat ne les porte pas dans ses matrices, mais le
+                    % modele les porte toujours, et les reponses les
+                    % honorent. Les perdre ici les aurait fait disparaitre
+                    % sans rien dire.
+                    sys.InputDelay = modele.InputDelay;
+                    sys.OutputDelay = modele.OutputDelay;
+                    sys.IODelay = modele.IODelay;
+                    sys.TimeUnit = modele.TimeUnit;
                 return
             end
             if nargin == 1
@@ -254,8 +284,11 @@ classdef ss
             end
             if strcmp(s(1).type, '.')
                 nom = s(1).subs;
-                if any(strcmp(nom, {'type', 'num', 'den', 'Ts', 'A', 'B', 'C', 'D', ...
-                                    'InputName', 'OutputName', 'StateName', 'Name'}))
+                % La liste des proprietes se demande a la classe : ecrite
+                % a la main, elle oubliait celles qu'on ajoutait ensuite,
+                % et « sys.InputDelay » partait chercher une fonction de
+                % ce nom au lieu de lire la propriete.
+                if isprop(sys, nom)
                     valeur = sys.(nom);
                     if numel(s) > 1
                         [varargout{1:max(nargout, 1)}] = subsref(valeur, s(2:end));

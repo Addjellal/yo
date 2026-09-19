@@ -126,10 +126,15 @@ qu'ils ne font pas encore comme MATLAB.
 
 ### Systèmes asservis
 
-- **Pas de retards internes** : MATLAB garde le retard exact dans un
-  modèle d'état (`InternalDelay`). `delayss` l'approche par Padé d'ordre
-  trois, ce qui est juste en basse fréquence et s'écarte au-delà.
-  `thiran`, lui, est exact au sens du retard de groupe plat en zéro.
+- **Pas de retards internes** : `InputDelay`, `OutputDelay` et `IODelay`
+  sont portés et honorés — la réponse fréquentielle en `e^(-jwD)`, la
+  réponse temporelle par décalage, exactement —, mais un retard *dans*
+  une boucle fermée devient un retard interne, que le modèle ne porte
+  pas. `feedback`, `connect` et les synthèses par retour d'état
+  refusent donc un modèle retardé en le nommant, plutôt que de l'oublier
+  et de rendre une boucle stable là où elle ne l'est pas. `pade` en
+  donne l'approximation rationnelle, qui passe alors partout ; `thiran`
+  est exact au sens du retard de groupe plat en zéro.
 - **`pidtool` et `sisotool`** ne sont pas interactifs : MatLibre règle le
   correcteur — comme `pidtune` — et trace les vues une fois, là où MATLAB
   ouvre une application à curseurs.
