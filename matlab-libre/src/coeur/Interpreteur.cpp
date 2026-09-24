@@ -1193,6 +1193,83 @@ std::vector<std::size_t> Interpreteur::ciblesCellule(const NoeudPtr& cible) {
     return positions;
 }
 
+// Les deux écritures les plus fréquentes d'une boucle, « x(i) = v » et
+// « s.champ(i) = v », faites dans la variable même. Le chemin général
+// recopie la variable avant d'y écrire : juste, mais une boucle qui
+// remplit un tableau de n cases faisait n copies de n cases.
+//
+// Les indices sont évalués d'abord, la variable en place — un « end » s'y
+// résout, et un indice qui lit la variable la lit intacte. On la cherche
+// ensuite à nouveau : l'évaluation a pu la changer, ou l'effacer. Quand le
+// cas n'est pas de ceux qu'on sait écrire sur place, l'écriture se fait
+// sur une copie avec les indices déjà évalués, comme le chemin général —
+// sans les évaluer deux fois. Rend faux quand rien n'a été fait.
+bool Interpreteur::affecterEnPlace(const NoeudPtr& cible, const Valeur& v) {
+    const auto& acces = cible->acces;
+    const std::string& nom = cible->enfants[0]->texte;
+    auto ordinaire = [](const Valeur* x) {
+        return x && x->classe != Classe::Objet && x->classe != Classe::Fonction &&
+               x->classe != Classe::Structure && !x->estCreux();
+    };
+    if (acces.size() == 1 && (acces[0].genre == '(' || acces[0].genre == '{') &&
+        !acces[0].args.empty()) {
+        const Valeur* trouve = trouverVariable(nom);
+        if (!ordinaire(trouve)) return false;
+        const ElementAcces& e = acces[0];
+        auto idx = evaluerIndices(e.args, trouve, 0, (int)e.args.size());
+        Valeur* place = const_cast<Valeur*>(trouverVariable(nom));
+        if (!ordinaire(place)) {
+            Valeur depart = place ? *place
+                                  : (e.genre == '{' ? Valeur::celluleDims({0, 0}) : Valeur::vide());
+            ecrireVariable(nom, affecterIndex(std::move(depart), acces, 0, v, false));
+            return true;
+        }
+        if (ecrireIndexEnPlace(*place, idx, v, e.genre)) return true;
+        Valeur copie = *place;
+        ecrireVariable(nom, ecrireIndex(std::move(copie), idx, v, e.genre));
+        return true;
+    }
+    if (acces.size() == 2 && acces[0].genre == '.' && acces[1].genre == '(' &&
+        !acces[1].args.empty()) {
+        const Valeur* trouve = trouverVariable(nom);
+        if (!trouve || trouve->classe != Classe::Structure || !trouve->st ||
+            trouve->nelem() != 1 || trouve->poigneeObjet)
+            return false;
+        const std::string& champ = acces[0].nom;
+        auto it = trouve->st->champs.find(champ);
+        if (it == trouve->st->champs.end() || it->second.size() != 1 ||
+            !ordinaire(&it->second[0]))
+            return false;
+        // La garde tient les champs en vie le temps d'évaluer les indices :
+        // une écriture dans la structure pendant ce temps la détache.
+        std::shared_ptr<ChampsStructure> garde = trouve->st;
+        auto idx = evaluerIndices(acces[1].args, &it->second[0], 0,
+                                  (int)acces[1].args.size());
+        garde.reset();
+        Valeur* place = const_cast<Valeur*>(trouverVariable(nom));
+        if (!place || place->classe != Classe::Structure || !place->st ||
+            place->nelem() != 1 || place->st->champs.find(champ) == place->st->champs.end() ||
+            place->st->champs[champ].size() != 1) {
+            // La variable a changé de nature pendant l'évaluation : le
+            // chemin général, sur ce qu'elle est devenue.
+            Valeur depart = place ? *place : Valeur::structureVide();
+            Valeur ancienne = depart.estStructure() && depart.aChamp(champ) && depart.nelem() == 1
+                                  ? depart.champ(champ, 0)
+                                  : Valeur::vide();
+            depart.poserChamp(champ, ecrireIndex(std::move(ancienne), idx, v, '('), 0);
+            ecrireVariable(nom, std::move(depart));
+            return true;
+        }
+        place->detacherStructure();
+        Valeur& valeurChamp = place->st->champs[champ][0];
+        if (ordinaire(&valeurChamp) && ecrireIndexEnPlace(valeurChamp, idx, v, '(')) return true;
+        Valeur copie = valeurChamp;
+        place->poserChamp(champ, ecrireIndex(std::move(copie), idx, v, '('), 0);
+        return true;
+    }
+    return false;
+}
+
 void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
     if (cible->type == TypeN::Ident) {
         if (cible->texte == "~") return;
@@ -1206,6 +1283,7 @@ void Interpreteur::affecter(const NoeudPtr& cible, const Valeur& v) {
         erreur("MATLAB:invalidAssignment",
                "Left side of an assignment must be a variable.");
     const std::string& nom = base->texte;
+    if (affecterEnPlace(cible, v)) return;
     Valeur courante;
     const Valeur* p = trouverVariable(nom);
     if (p) courante = *p;
@@ -1746,6 +1824,59 @@ std::vector<Valeur> Interpreteur::evaluerListe(const std::vector<NoeudPtr>& args
     return sortie;
 }
 
+// La lecture indexée d'une variable, « x(i) », « c{k} » ou « s.champ(i) »,
+// sans recopier la variable : on descend dans les champs d'une structure
+// scalaire par pointeur, puis on n'extrait que les éléments désignés.
+// Recopier d'abord coûtait la taille entière de la variable à chaque
+// lecture — une boucle qui parcourt un vecteur en devenait quadratique.
+//
+// Les structures traversées sont tenues par une garde : si l'évaluation
+// d'un indice écrit dans la variable, l'écriture détache ses champs, et
+// ceux qu'on lit restent en vie. La variable elle-même est cherchée à
+// nouveau après l'évaluation des indices, qui a pu l'effacer.
+//
+// Rend le nombre d'accès consommés ; « courant » porte la valeur obtenue,
+// et l'appelant poursuit la chaîne à partir de là.
+std::size_t Interpreteur::lireSansCopie(const std::string& nom, const NoeudPtr& n,
+                                        std::vector<Valeur>& courant) {
+    const auto& acces = n->acces;
+    const Valeur* cur = trouverVariable(nom);
+    std::vector<std::shared_ptr<ChampsStructure>> gardes;
+    std::size_t k = 0;
+    while (k + 1 < acces.size() && acces[k].genre == '.' && cur->classe == Classe::Structure &&
+           cur->st && cur->nelem() == 1 && !cur->poigneeObjet) {
+        auto it = cur->st->champs.find(acces[k].nom);
+        if (it == cur->st->champs.end() || it->second.size() != 1) break;
+        gardes.push_back(cur->st);
+        cur = &it->second[0];
+        ++k;
+    }
+    const ElementAcces& e = acces[k];
+    if ((e.genre != '(' && e.genre != '{') || cur->classe == Classe::Objet ||
+        cur->classe == Classe::Fonction) {
+        courant.push_back(*cur);
+        return k;
+    }
+    auto idx = evaluerIndices(e.args, cur, 0, (int)e.args.size());
+    if (k == 0) {
+        cur = trouverVariable(nom);
+        if (!cur)
+            erreur("MATLAB:UndefinedFunction",
+                   "Unrecognized function or variable '" + nom + "'.");
+        if (cur->classe == Classe::Objet || cur->classe == Classe::Fonction) {
+            courant.push_back(*cur);
+            return 0;
+        }
+    }
+    if (e.genre == '(') {
+        courant.push_back(indexer(*cur, idx, '('));
+    } else {
+        auto liste = indexerListe(*cur, idx, '{');
+        for (auto& x : liste) courant.push_back(std::move(x));
+    }
+    return k + 1;
+}
+
 // Développe les listes séparées par des virgules d'un accès.
 Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Valeur>* multi) {
     const NoeudPtr& baseNoeud = n->enfants[0];
@@ -1755,7 +1886,10 @@ Valeur Interpreteur::evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Va
     if (baseNoeud->type == TypeN::Ident) {
         const std::string& nom = baseNoeud->texte;
         const Valeur* v = trouverVariable(nom);
-        if (v) {
+        if (v && !n->acces.empty() && v->classe != Classe::Objet &&
+            v->classe != Classe::Fonction) {
+            debut = lireSansCopie(nom, n, courant);
+        } else if (v) {
             courant.push_back(*v);
             // Appel d'une poignée de fonction stockée dans une variable.
             if (v->classe == Classe::Fonction && !n->acces.empty() &&

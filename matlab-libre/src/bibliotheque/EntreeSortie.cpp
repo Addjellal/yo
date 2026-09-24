@@ -774,9 +774,27 @@ FONCTION(fnWarning) {
     } else {
         message = formatMatlab(premier, args, 1);
     }
+    it.dernierAvertissement = message;
+    it.dernierAvertissementId = id;
     if (!it.avertissementsActifs || it.avertissementsEteints.count(id)) return {};
     it.erreurSortie() << "Warning: " << message << "\n";
     return {};
+}
+
+// [MESSAGE,ID] = LASTWARN() rend le dernier avertissement ; LASTWARN(MSG)
+// et LASTWARN(MSG,ID) le remplacent — LASTWARN('') l'efface —, en rendant
+// celui d'avant quand on le demande.
+FONCTION(fnLastwarn) {
+    INUTILISE
+    exigerArguments(args, 0, 2, "lastwarn");
+    std::vector<Valeur> avant = {Valeur::texte(it.dernierAvertissement),
+                                 Valeur::texte(it.dernierAvertissementId)};
+    if (!args.empty()) {
+        it.dernierAvertissement = args[0].versTexte();
+        it.dernierAvertissementId = args.size() > 1 ? args[1].versTexte() : std::string();
+    }
+    if (nargout <= 1) avant.resize(1);
+    return avant;
 }
 
 FONCTION(fnLasterr) {
@@ -1298,6 +1316,8 @@ void enregistrerEntreeSortie(Interpreteur& it) {
     it.enregistrer("error", fnError, "es", "error  Leve une erreur.");
     it.enregistrer("warning", fnWarning, "es", "warning  Emet un avertissement.");
     it.enregistrer("lasterr", fnLasterr, "es", "lasterr  Dernier message d'erreur.");
+    it.enregistrer("lastwarn", fnLastwarn, "es",
+                   "lastwarn  Dernier avertissement : message et identifiant.");
     it.enregistrer("MException", fnMException, "es", "MException  Construit une exception.");
     it.enregistrer("rethrow", fnRethrow, "es", "rethrow  Relance une exception.");
     it.enregistrer("throw", fnAssertLance, "es", "throw  Lance une exception.");

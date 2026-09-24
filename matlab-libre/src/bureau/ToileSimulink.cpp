@@ -47,10 +47,16 @@ int ToileSimulink::nombreEntrees(const QString& type, const QString& signes) {
         type == QLatin1String("logic") || type == QLatin1String("relational"))
         return 2;
     // Les sources n'ont pas d'entrée : un fil ne s'y raccroche pas.
-    if (type == QLatin1String("constant") || type == QLatin1String("step") ||
-        type == QLatin1String("ramp") || type == QLatin1String("sine") ||
-        type == QLatin1String("inport") || type == QLatin1String("fromworkspace"))
-        return 0;
+    static const QStringList sources = {
+        QStringLiteral("constant"), QStringLiteral("step"), QStringLiteral("ramp"),
+        QStringLiteral("sine"), QStringLiteral("inport"), QStringLiteral("fromworkspace"),
+        QStringLiteral("clock"), QStringLiteral("digitalclock"),
+        QStringLiteral("pulsegenerator"), QStringLiteral("ground"),
+        QStringLiteral("repeatingsequence"), QStringLiteral("randomnumber"),
+        QStringLiteral("uniformrandomnumber"), QStringLiteral("from")};
+    if (sources.contains(type)) return 0;
+    if (type == QLatin1String("dotproduct") || type == QLatin1String("lookup2d"))
+        return 2;
     return 1;
 }
 
@@ -67,6 +73,8 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
         t.type = b.type;
         t.etiquette = b.etiquette;
         t.signes = b.signes;
+        t.entrees = b.entrees;
+        t.sorties = qMax(0, b.sorties);
         t.cadre = QRectF(QPointF(b.gauche, b.haut), QPointF(b.droite, b.bas));
         blocs_.push_back(t);
     }
@@ -75,6 +83,7 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
         t.source = l.source;
         t.cible = l.cible;
         t.port = l.port;
+        t.sortie = qMax(1, l.sortie);
         t.retour = l.retour;
         liens_.push_back(t);
     }
@@ -346,14 +355,29 @@ void ToileSimulink::dessinerBloc(QPainter& peintre, const BlocToile& bloc,
                      Qt::AlignHCenter | Qt::AlignTop, bloc.nom);
 }
 
-QPointF ToileSimulink::pointSortie(int bloc) const {
-    const QRectF r = blocs_[bloc].cadre;
-    return QPointF(r.right(), r.center().y());
+// Les sorties se répartissent sur le bord droit comme les entrées sur le
+// bord gauche : un Demux montre autant de ports qu'il a de sorties, et un
+// fil part de celui qu'on a pris.
+QPointF ToileSimulink::pointSortie(int bloc, int sortie) const {
+    const BlocToile& b = blocs_[bloc];
+    const QRectF r = b.cadre;
+    if (b.sorties <= 1) return QPointF(r.right(), r.center().y());
+    const int rang = qBound(1, sortie, b.sorties);
+    const double part = double(rang - 1) / (b.sorties - 1);
+    return QPointF(r.right(), r.top() + r.height() * (0.22 + 0.56 * part));
+}
+
+// Le nombre d'entrées d'un bloc : celui que le schéma a relevé, sinon
+// celui que son type laisse deviner.
+int ToileSimulink::entreesDe(int bloc) const {
+    const BlocToile& b = blocs_[bloc];
+    if (b.entrees >= 0) return b.entrees;
+    return nombreEntrees(b.type, b.signes);
 }
 
 QPointF ToileSimulink::pointEntree(int bloc, int port) const {
     const BlocToile& b = blocs_[bloc];
-    const int entrees = nombreEntrees(b.type, b.signes);
+    const int entrees = entreesDe(bloc);
     const QRectF r = b.cadre;
     if (entrees <= 1) return QPointF(r.left(), r.center().y());
     const int rang = qBound(1, port, entrees);
@@ -368,7 +392,7 @@ void ToileSimulink::dessinerFil(QPainter& peintre, const LienToile& lien,
                                 double basRetour) const {
     if (lien.source < 1 || lien.source > blocs_.size()) return;
     if (lien.cible < 1 || lien.cible > blocs_.size()) return;
-    const QPointF depart = pointSortie(lien.source - 1);
+    const QPointF depart = pointSortie(lien.source - 1, lien.sortie);
     const QPointF arrivee = pointEntree(lien.cible - 1, lien.port);
     const double marge = 0.45;
     QVector<QPointF> points;
@@ -465,7 +489,7 @@ void ToileSimulink::paintEvent(QPaintEvent*) {
     // Le fil qu'on est en train de tirer.
     if (filDepuis_ >= 0) {
         peintre.setPen(QPen(kChoix, 1.6, Qt::DashLine));
-        peintre.drawLine(versEcran(pointSortie(filDepuis_)), filVers_);
+        peintre.drawLine(versEcran(pointSortie(filDepuis_, filSortie_)), filVers_);
     }
 }
 
@@ -488,7 +512,7 @@ int ToileSimulink::lienSous(const QPointF& ecran) const {
         const LienToile& l = liens_[k];
         if (l.source < 1 || l.source > blocs_.size()) continue;
         if (l.cible < 1 || l.cible > blocs_.size()) continue;
-        const QPointF depart = pointSortie(l.source - 1);
+        const QPointF depart = pointSortie(l.source - 1, l.sortie);
         const QPointF arrivee = pointEntree(l.cible - 1, l.port);
         const double marge = 0.45;
         QVector<QPointF> points;
@@ -522,9 +546,18 @@ int ToileSimulink::lienSous(const QPointF& ecran) const {
     return -1;
 }
 
+int ToileSimulink::sortieVisee(int bloc, const QPointF& ecran) const {
+    const BlocToile& b = blocs_[bloc];
+    if (b.sorties <= 1) return 1;
+    const QRectF r = cadreEcran(b.cadre);
+    if (r.height() <= 0) return 1;
+    const double part = qBound(0.0, (ecran.y() - r.top()) / r.height(), 1.0);
+    return qBound(1, int(part * b.sorties) + 1, b.sorties);
+}
+
 int ToileSimulink::portVise(int bloc, const QPointF& ecran) const {
     const BlocToile& b = blocs_[bloc];
-    const int entrees = nombreEntrees(b.type, b.signes);
+    const int entrees = entreesDe(bloc);
     if (entrees <= 1) return 1;
     const QRectF r = cadreEcran(b.cadre);
     if (r.height() <= 0) return 1;
@@ -556,8 +589,10 @@ void ToileSimulink::mousePressEvent(QMouseEvent* evenement) {
         const QRectF r = cadreEcran(blocs_[sous].cadre);
         // Près du bord droit, on tire un fil ; ailleurs, on déplace le
         // bloc. C'est le geste de Simulink, et il évite un mode à choisir.
-        if (!ajoute && ecran.x() >= r.right() - qMax(6.0, kZonePort * echelle_)) {
+        if (!ajoute && blocs_[sous].sorties > 0 &&
+            ecran.x() >= r.right() - qMax(6.0, kZonePort * echelle_)) {
             filDepuis_ = sous;
+            filSortie_ = sortieVisee(sous, ecran);
             filVers_ = ecran;
             emit etatChange(QStringLiteral("Tirez jusqu'à l'entrée d'un bloc."));
         } else if (!ajoute) {
@@ -635,13 +670,13 @@ void ToileSimulink::mouseReleaseEvent(QMouseEvent* evenement) {
             emit etatChange(QStringLiteral("Le fil n'aboutit nulle part."));
             return;
         }
-        if (nombreEntrees(blocs_[cible].type, blocs_[cible].signes) == 0) {
+        if (entreesDe(cible) == 0) {
             emit etatChange(QStringLiteral("« %1 » est une source : elle n'a pas "
                                            "d'entrée.").arg(blocs_[cible].nom));
             return;
         }
         emit lienDemande(blocs_[depuis].nom, blocs_[cible].nom,
-                         portVise(cible, ecran));
+                         portVise(cible, ecran), filSortie_);
         return;
     }
     if (saisi_ >= 0) {
@@ -714,7 +749,7 @@ void ToileSimulink::keyPressEvent(QKeyEvent* evenement) {
             if (l.source >= 1 && l.source <= blocs_.size() && l.cible >= 1 &&
                 l.cible <= blocs_.size())
                 emit lienSupprime(blocs_[l.source - 1].nom, blocs_[l.cible - 1].nom,
-                                  l.port);
+                                  l.port, l.sortie);
             return;
         }
     }

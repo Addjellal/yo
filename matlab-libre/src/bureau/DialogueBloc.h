@@ -19,14 +19,18 @@
 #include <QStringList>
 #include <QVector>
 
+class QComboBox;
 class QLineEdit;
 
 class DialogueBloc : public QDialog {
     Q_OBJECT
 public:
+    // CHOIX porte, pour chaque réglage, ses valeurs admises séparées par
+    // « | » quand c'est un choix — la boîte montre alors une liste —, ou
+    // une chaîne vide pour un réglage libre.
     DialogueBloc(const QString& nomBloc, const QString& type,
                  const QStringList& noms, const QStringList& valeurs,
-                 QWidget* parent = nullptr);
+                 const QStringList& choix = QStringList(), QWidget* parent = nullptr);
 
     // Le nom demandé, qui peut différer de celui d'origine.
     QString nomDemande() const;
@@ -35,11 +39,16 @@ public:
     // Publiés pour que la boîte se vérifie sans être montrée.
     QLineEdit* champNom() const { return champNom_; }
     QLineEdit* champReglage(const QString& nom) const;
+    QComboBox* listeReglage(const QString& nom) const;
 
 private:
+    QString valeurDe(int k) const;
+
     QString nomOrigine_;
     QStringList noms_;
     QStringList valeursOrigine_;
     QLineEdit* champNom_;
+    // Un champ ou une liste par réglage : l'un des deux est nul.
     QVector<QLineEdit*> champs_;
+    QVector<QComboBox*> listes_;
 };

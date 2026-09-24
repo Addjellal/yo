@@ -803,6 +803,101 @@ assert(refusNettoyage);
 disp('onCleanup : ok');
 
 
+%% ------------------------------------ ecrire et lire sans recopier
+% « x(i) = v » s'ecrit dans la variable meme : le resultat est celui du
+% chemin general, et une copie prise avant ne bouge pas.
+x = zeros(1, 5);
+copie = x;
+x(3) = 7;
+assert(isequal(x, [0 0 7 0 0]) && isequal(copie, zeros(1, 5)), 'la copie ne suit pas');
+x(end + 1) = 9;
+assert(isequal(size(x), [1 6]) && x(6) == 9, 'une ligne grandit en ligne');
+colonne = zeros(3, 1);
+colonne(5) = 1;
+assert(isequal(size(colonne), [5 1]), 'une colonne grandit en colonne');
+scalaire = 4;
+scalaire(3) = 1;
+assert(isequal(scalaire, [4 0 1]), 'un scalaire grandit en ligne');
+M = magic(3);
+M(2, :) = [1 2 3];
+M(:, 1) = 0;
+assert(isequal(M, [0 1 6; 0 2 3; 0 9 2]), 'lignes et colonnes');
+entiers = int8([1 2 3]);
+entiers(2) = 5;
+assert(isa(entiers, 'int8') && isequal(entiers, int8([1 5 3])));
+mot = 'abc';
+mot(5) = 'e';
+assert(double(mot(4)) == 0 && mot(5) == 'e', 'un texte grandit avec des nuls');
+logiques = true(1, 3);
+logiques(2) = false;
+assert(islogical(logiques) && isequal(logiques, [true false true]));
+reel = [1 2 3];
+reel(2) = 1i;
+assert(~isreal(reel) && reel(2) == 1i, 'un complexe rend le tableau complexe');
+cellules = {1, 2};
+autre = cellules;
+cellules{2} = 'deux';
+assert(strcmp(cellules{2}, 'deux') && autre{2} == 2, ...
+       'une cellule s''ecrit sans toucher a sa copie');
+cellules{4} = 4;
+assert(numel(cellules) == 4 && isempty(cellules{3}));
+enregistrement = struct('v', zeros(1, 3));
+copieStructure = enregistrement;
+enregistrement.v(2) = 5;
+assert(isequal(enregistrement.v, [0 5 0]) && isequal(copieStructure.v, [0 0 0]), ...
+       'un champ s''ecrit sans toucher a la copie de la structure');
+enregistrement.v(end + 1) = 1;
+assert(numel(enregistrement.v) == 4);
+% Un indice qui lit la variable la lit intacte.
+x = [10 20 30];
+x(x(1) / 10) = x(3);
+assert(isequal(x, [30 20 30]));
+% Une ecriture refusee laisse la variable telle quelle.
+x = [1 2 3];
+try
+    x([1 2]) = [4 5 6];
+catch
+end
+assert(isequal(x, [1 2 3]), 'une ecriture refusee ne change rien');
+try
+    x(0) = 1;
+catch
+end
+assert(isequal(x, [1 2 3]));
+% Et le cout ne depend plus de la taille : remplir cent mille cases prend
+% le temps de cent mille ecritures, non celui de cent mille copies.
+grand = zeros(1, 100000);
+debut = tic;
+for k = 1:100000
+    grand(k) = k;
+end
+assert(toc(debut) < 20 && grand(end) == 100000, 'remplir un tableau est lineaire');
+debut = tic;
+somme = 0;
+for k = 1:100000
+    somme = somme + grand(k);
+end
+assert(toc(debut) < 20 && somme == 5000050000, 'le lire aussi');
+% x(1:0) garde l'orientation de x, comme dans MATLAB : une colonne donne
+% 0 x 1, et se concatene a une colonne.
+assert(isequal(size(colonne(1:0)), [0 1]) && isequal(size(x(1:0)), [1 0]));
+assert(size([5; colonne(1:0)], 1) == 1);
+
+% LASTWARN rend le dernier avertissement, meme eteint : on le tait, on ne
+% l'oublie pas.
+lastwarn('');
+warning('essai:un', 'premier %d', 1);
+[texteAvert, idAvert] = lastwarn();
+assert(strcmp(texteAvert, 'premier 1') && strcmp(idAvert, 'essai:un'));
+etatAvert = warning('off', 'essai:deux');
+warning('essai:deux', 'tu');
+[texteAvert, idAvert] = lastwarn();
+assert(strcmp(texteAvert, 'tu') && strcmp(idAvert, 'essai:deux'), ...
+       'un avertissement eteint est range');
+warning(etatAvert);
+lastwarn('pose', 'essai:pose');
+assert(strcmp(lastwarn(), 'pose'));
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

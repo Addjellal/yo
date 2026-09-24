@@ -1,6 +1,7 @@
 // DialogueBloc.cpp — les réglages d'un bloc.
 #include "DialogueBloc.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QLabel>
@@ -9,7 +10,7 @@
 
 DialogueBloc::DialogueBloc(const QString& nomBloc, const QString& type,
                            const QStringList& noms, const QStringList& valeurs,
-                           QWidget* parent)
+                           const QStringList& choix, QWidget* parent)
     : QDialog(parent), nomOrigine_(nomBloc), noms_(noms), valeursOrigine_(valeurs) {
     setWindowTitle(QStringLiteral("Réglages de « %1 »").arg(nomBloc));
     setObjectName(QStringLiteral("dialogueBloc"));
@@ -26,10 +27,30 @@ DialogueBloc::DialogueBloc(const QString& nomBloc, const QString& type,
     champNom_->setObjectName(QStringLiteral("champNom"));
     formulaire->addRow(QStringLiteral("Nom du bloc"), champNom_);
     for (int k = 0; k < noms.size(); ++k) {
-        auto* champ = new QLineEdit(k < valeurs.size() ? valeurs[k] : QString());
+        const QString valeur = k < valeurs.size() ? valeurs[k] : QString();
+        const QString admises = k < choix.size() ? choix[k] : QString();
+        if (!admises.isEmpty()) {
+            // Un choix se prend dans une liste : taper « u2>=Threshold » à
+            // la main, c'était risquer une valeur que le bloc refuse.
+            auto* liste = new QComboBox;
+            liste->addItems(admises.split(QLatin1Char('|')));
+            const int rang = liste->findText(valeur);
+            if (rang >= 0) liste->setCurrentIndex(rang);
+            else {
+                liste->addItem(valeur);
+                liste->setCurrentIndex(liste->count() - 1);
+            }
+            liste->setObjectName(QStringLiteral("liste_") + noms[k]);
+            formulaire->addRow(noms[k], liste);
+            champs_.push_back(nullptr);
+            listes_.push_back(liste);
+            continue;
+        }
+        auto* champ = new QLineEdit(valeur);
         champ->setObjectName(QStringLiteral("champ_") + noms[k]);
         formulaire->addRow(noms[k], champ);
         champs_.push_back(champ);
+        listes_.push_back(nullptr);
     }
     if (noms.isEmpty())
         formulaire->addRow(new QLabel(QStringLiteral(
@@ -56,6 +77,18 @@ QLineEdit* DialogueBloc::champReglage(const QString& nom) const {
     return nullptr;
 }
 
+QComboBox* DialogueBloc::listeReglage(const QString& nom) const {
+    for (int k = 0; k < noms_.size() && k < listes_.size(); ++k)
+        if (noms_[k] == nom) return listes_[k];
+    return nullptr;
+}
+
+QString DialogueBloc::valeurDe(int k) const {
+    if (k < champs_.size() && champs_[k]) return champs_[k]->text();
+    if (k < listes_.size() && listes_[k]) return listes_[k]->currentText();
+    return QString();
+}
+
 QVector<QPair<QString, QString>> DialogueBloc::changements() const {
     // Seuls les champs touchés ressortent : renvoyer les autres écrirait
     // dans le modèle des réglages que personne n'a demandé de changer, et
@@ -63,7 +96,7 @@ QVector<QPair<QString, QString>> DialogueBloc::changements() const {
     QVector<QPair<QString, QString>> liste;
     for (int k = 0; k < noms_.size() && k < champs_.size(); ++k) {
         const QString avant = k < valeursOrigine_.size() ? valeursOrigine_[k] : QString();
-        const QString apres = champs_[k]->text();
+        const QString apres = valeurDe(k);
         if (apres != avant) liste.push_back({noms_[k], apres});
     }
     return liste;

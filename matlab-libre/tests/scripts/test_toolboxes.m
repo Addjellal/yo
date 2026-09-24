@@ -824,7 +824,10 @@ assert(strcmp(bdroot(edition), 'edition'));
 sansGain = delete_block(edition, 'g');
 assert(numel(sansGain.blocs) == 2 && isempty(sansGain.liens), ...
        'les deux liens touchaient au gain');
-sansMilieu = delete_block(add_line(edition, 'c', 'i', 2), 'g');
+% L'integrateur n'a qu'une entree, deja prise par le gain : on la libere
+% avant d'y relier la constante. ADD_LINE refuse desormais un port que le
+% bloc n'a pas, la ou il le rangeait sans rien dire.
+sansMilieu = delete_block(add_line(delete_line(edition, 'g', 'i'), 'c', 'i'), 'g');
 assert(size(sansMilieu.liens, 1) == 1, 'le lien qui ne touche pas au gain survit');
 assert(isequal(sansMilieu.liens(1, 1:2), [1 2]), ...
        'l''integrateur a recule d''un rang');
@@ -1661,20 +1664,32 @@ assert(abs(sim(porteSolveur, 1).signaux.x(end) - exp(-1)) < 1e-6, ...
 assert(abs(sim(porteSolveur, 1, simset('FixedStep', 0.1, ...
                                        'Solver', 'ode1')).signaux.x(end) - exp(-1)) > 1e-3);
 
-% Un etat qui n'est pas continu ne s'integre pas a mi-pas : le bloc est
-% nomme, plutot que traite de travers.
+% Un etat qui n'est pas continu n'avance qu'aux pas majeurs : les points
+% intermediaires d'un solveur d'ordre superieur ne le touchent pas. Un
+% modele sans etat continu rend donc la meme chose avec tous les
+% solveurs. (Il etait refuse, avant que le moteur ne distingue les pas
+% majeurs des pas mineurs.)
 avecRetard = add_block(new_system('avecRetard'), 'step', 'u', 'Time', 0);
 avecRetard = add_block(avecRetard, 'delay', 'z', 'InitialCondition', 0);
 avecRetard = add_line(avecRetard, 'u', 'z');
-refuseSolveur = false;
-try
-    sim(avecRetard, 1, simset('Solver', 'ode4'));
-catch err
-    refuseSolveur = strcmp(err.identifier, 'Simulink:Commands:SolveurEtatDiscret');
-end
-assert(refuseSolveur);
-assert(numel(sim(avecRetard, 1, simset('Solver', 'ode1')).temps) == 101, ...
-       'et le meme modele se simule sans rien dire au pas fixe');
+retardEuler = sim(avecRetard, 1, simset('Solver', 'ode1'));
+retardRK = sim(avecRetard, 1, simset('Solver', 'ode4'));
+assert(numel(retardEuler.temps) == 101, 'le modele se simule au pas par defaut');
+assert(isequal(retardRK.signaux.z, retardEuler.signaux.z), ...
+       'un retard rend la meme chose avec tous les solveurs');
+assert(retardRK.signaux.z(1) == 0 && all(retardRK.signaux.z(2:end) == 1), ...
+       'et c''est bien l''echelon, retarde d''un pas');
+% Un modele mixte : l'integrale d'un echantillonneur. La tenue fait un
+% escalier, dont l'integrale sur une seconde vaut 0,1 * 0,1 * (0 + 1 +
+% ... + 9) = 0,45. ode4 la rend a l'arrondi pres : aux pas mineurs, la
+% tenue garde sa valeur, et il n'y a rien de continu a interpoler.
+mixte = add_block(new_system('mixte'), 'ramp', 'r', 'Slope', 1);
+mixte = add_block(mixte, 'zoh', 'z', 'SampleTime', 0.1);
+mixte = add_block(mixte, 'integrator', 'x');
+mixte = add_line(add_line(mixte, 'r', 'z'), 'z', 'x');
+mixteRK = sim(mixte, 1, simset('FixedStep', 0.01, 'Solver', 'ode4'));
+assert(abs(mixteRK.signaux.x(end) - 0.45) < 1e-12, ...
+       'l''integrale d''une tenue est exacte, quel que soit le solveur');
 refuseNom = false;
 try
     simset('Solver', 'ode45');

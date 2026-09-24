@@ -17,6 +17,7 @@
 #include <QListWidget>
 #include <QPalette>
 #include <QPushButton>
+#include <QKeySequence>
 #include <QScreen>
 #include <QStatusBar>
 #include <QToolBar>
@@ -27,6 +28,7 @@
 #include "Ruban.h"
 #include "Theme.h"
 #include "DialogueBloc.h"
+#include "DialogueConfiguration.h"
 #include "ToileSimulink.h"
 
 namespace {
@@ -42,6 +44,17 @@ const BlocBibliotheque blocs[] = {
     {"Sources", "inport", "L'entrée du modèle, vue par LINMOD", "'Port', 1"},
     {"Sources", "fromworkspace", "Un signal lu dans l'espace de travail",
      "'VariableName', 'signal'"},
+    {"Sources", "clock", "Le temps de la simulation", ""},
+    {"Sources", "digitalclock", "Le temps, échantillonné", "'SampleTime', 0.1"},
+    {"Sources", "pulsegenerator", "Un train d'impulsions",
+     "'Amplitude', 1, 'Period', 1, 'PulseWidth', 50"},
+    {"Sources", "repeatingsequence", "Une séquence périodique",
+     "'rep_seq_t', [0 1 2], 'rep_seq_y', [0 1 0]"},
+    {"Sources", "randomnumber", "Un bruit gaussien", "'Seed', 0, 'SampleTime', 0.1"},
+    {"Sources", "uniformrandomnumber", "Un bruit uniforme",
+     "'Seed', 0, 'SampleTime', 0.1"},
+    {"Sources", "ground", "Un zéro, pour une entrée qu'on ne veut pas laisser en l'air",
+     ""},
 
     {"Opérations", "gain", "Multiplie par un gain", "'Gain', 1"},
     {"Opérations", "bias", "Ajoute une constante", "'Bias', 0"},
@@ -55,11 +68,23 @@ const BlocBibliotheque blocs[] = {
      "'Operator', 'sin'"},
     {"Opérations", "minmax", "Le plus petit ou le plus grand de ses entrées",
      "'Function', 'max'"},
+    {"Opérations", "unaryminus", "L'opposé", ""},
+    {"Opérations", "rounding", "Arrondit : floor, ceil, round, fix",
+     "'Operator', 'floor'"},
+    {"Opérations", "polynomial", "Évalue un polynôme en son entrée", "'coefs', [1 0 0]"},
+    {"Opérations", "sqrt", "Racine carrée", ""},
+    {"Opérations", "dotproduct", "Le produit scalaire de ses deux entrées", ""},
 
     {"Logique", "logic", "ET, OU, NON, OU exclusif", "'Operator', 'AND'"},
     {"Logique", "relational", "Compare deux entrées", "'Operator', '<'"},
     {"Logique", "switch", "Aiguille selon un seuil sur la deuxième entrée",
      "'Threshold', 0"},
+    {"Logique", "comparetoconstant", "Compare l'entrée à une constante",
+     "'relop', '>=', 'const', 0"},
+    {"Logique", "comparetozero", "Compare l'entrée à zéro", "'relop', '>'"},
+    {"Logique", "detectchange", "Vaut 1 quand l'entrée change", ""},
+    {"Logique", "detectincrease", "Vaut 1 quand l'entrée augmente", ""},
+    {"Logique", "detectdecrease", "Vaut 1 quand l'entrée diminue", ""},
 
     {"Non-linéarités", "saturation", "Borne le signal",
      "'UpperLimit', 1, 'LowerLimit', -1"},
@@ -73,6 +98,28 @@ const BlocBibliotheque blocs[] = {
      "'RisingSlewLimit', 1, 'FallingSlewLimit', -1"},
     {"Non-linéarités", "relay", "Bascule à deux seuils",
      "'OnSwitch', 0.5, 'OffSwitch', -0.5, 'OnOutput', 1, 'OffOutput', 0"},
+    {"Non-linéarités", "hitcrossing", "Vaut 1 quand l'entrée franchit un seuil",
+     "'HitCrossingOffset', 0"},
+    {"Non-linéarités", "backlash", "Un jeu mécanique", "'BacklashWidth', 1"},
+    {"Non-linéarités", "coulombfriction", "Frottement sec et visqueux",
+     "'Offset', 1, 'Gain', 1"},
+    {"Non-linéarités", "lookup2d", "Interpole dans une table à deux entrées",
+     "'BreakpointsForDimension1', [0 1], 'BreakpointsForDimension2', [0 1], "
+     "'Table', [0 1; 1 2]"},
+
+    // L'aiguillage fait voyager les signaux vecteurs : on les réunit, on
+    // les sépare, on en prend des éléments, on les envoie au loin.
+    {"Aiguillage", "mux", "Réunit ses entrées en un vecteur", "'Inputs', 2"},
+    {"Aiguillage", "demux", "Sépare un vecteur en ses parties", "'Outputs', 2"},
+    {"Aiguillage", "selector", "Choisit des éléments par leurs indices", "'Indices', 1"},
+    {"Aiguillage", "concatenate", "Met ses entrées bout à bout", "'NumInputs', 2"},
+    {"Aiguillage", "multiportswitch", "La première entrée choisit laquelle passe",
+     "'Inputs', 2, 'DataPortOrder', 'Zero-based contiguous'"},
+    {"Aiguillage", "reshape", "Change les dimensions du signal", ""},
+    {"Aiguillage", "goto", "Envoie son entrée aux blocs From de même étiquette",
+     "'GotoTag', 'A'"},
+    {"Aiguillage", "from", "Rend le signal du Goto de même étiquette", "'GotoTag', 'A'"},
+    {"Aiguillage", "signalconversion", "Laisse passer son entrée", ""},
 
     {"Continu", "integrator", "Intègre : 1/s", "'InitialCondition', 0"},
     {"Continu", "derivative", "Dérive : du/dt", ""},
@@ -84,6 +131,8 @@ const BlocBibliotheque blocs[] = {
      "'P', 1, 'I', 0, 'D', 0, 'N', 100"},
     {"Continu", "transportdelay", "Retarde le signal d'une durée",
      "'DelayTime', 1, 'InitialOutput', 0"},
+    {"Continu", "zeropole", "Une transmittance par ses zéros, ses pôles et son gain",
+     "'Zeros', [], 'Poles', -1, 'Gain', 1"},
 
     {"Discret", "delay", "Retard d'un pas : 1/z", "'InitialCondition', 0"},
     {"Discret", "memory", "La valeur du pas précédent", "'InitialCondition', 0"},
@@ -94,6 +143,8 @@ const BlocBibliotheque blocs[] = {
      "'Numerator', [0 1], 'Denominator', [1 -0.5], 'SampleTime', 0.1"},
     {"Discret", "discretestatespace", "Une représentation d'état échantillonnée",
      "'A', 0.5, 'B', 1, 'C', 1, 'D', 0, 'SampleTime', 0.1"},
+    {"Discret", "discretefilter", "Un filtre en puissances de z^-1",
+     "'Numerator', 1, 'Denominator', [1 -0.5], 'SampleTime', 0.1"},
 
     // Un sous-système pose un modèle entier dans un bloc. Celui qu'on
     // pose par défaut est le plus court qui serve à quelque chose : une
@@ -108,6 +159,11 @@ const BlocBibliotheque blocs[] = {
     {"Sorties", "toworkspace", "Dépose le signal dans l'espace de travail",
      "'VariableName', 'simout'"},
     {"Sorties", "terminator", "Ferme une sortie qu'on ne lit pas", ""},
+    {"Sorties", "display", "Affiche la valeur de son entrée", ""},
+    {"Sorties", "stopsimulation", "Arrête la simulation quand l'entrée n'est plus nulle",
+     ""},
+    {"Sorties", "assertion", "Signale quand l'entrée s'annule",
+     "'StopWhenAssertionFail', 'off'"},
 
     {nullptr, nullptr, nullptr, nullptr},
 };
@@ -333,17 +389,36 @@ void FenetreSimulink::surBlocsDeplaces(const QStringList& noms,
                             : QStringLiteral("%1 blocs deplaces.").arg(noms.size()));
 }
 
+// Une chaîne telle que MATLAB la relira entre apostrophes : défini plus
+// bas, avec les autres utilitaires d'écriture.
+static QString chaineMatlab(const QString& texte);
+
 void FenetreSimulink::surLienDemande(const QString& source, const QString& cible,
-                                     int port) {
+                                     int port, int sortie) {
     const QString modele = cibleModele();
     if (modele.isEmpty()) return;
-    envoyerModification(QStringLiteral("%1 = add_line(%1, '%2', '%3', %4);")
-                            .arg(modele, source, cible)
-                            .arg(port),
-                        QStringLiteral("« %1 » alimente l'entree %2 de « %3 ».")
-                            .arg(source)
-                            .arg(port)
-                            .arg(cible));
+    // La sortie ne parait dans la commande que si ce n'est pas la
+    // premiere : la commande reste celle qu'on aurait tapee.
+    const QString commande =
+        sortie > 1 ? QStringLiteral("%1 = add_line(%1, %2, %3, %4, %5);")
+                         .arg(modele, chaineMatlab(source), chaineMatlab(cible))
+                         .arg(port)
+                         .arg(sortie)
+                   : QStringLiteral("%1 = add_line(%1, %2, %3, %4);")
+                         .arg(modele, chaineMatlab(source), chaineMatlab(cible))
+                         .arg(port);
+    envoyerModification(commande,
+                        sortie > 1
+                            ? QStringLiteral("La sortie %1 de « %2 » alimente l'entree %3 "
+                                             "de « %4 ».")
+                                  .arg(sortie)
+                                  .arg(source)
+                                  .arg(port)
+                                  .arg(cible)
+                            : QStringLiteral("« %1 » alimente l'entree %2 de « %3 ».")
+                                  .arg(source)
+                                  .arg(port)
+                                  .arg(cible));
 }
 
 void FenetreSimulink::surBlocsSupprimes(const QStringList& noms) {
@@ -377,12 +452,18 @@ void FenetreSimulink::surRetablissement() {
 }
 
 void FenetreSimulink::surLienSupprime(const QString& source, const QString& cible,
-                                      int port) {
+                                      int port, int sortie) {
     const QString modele = cibleModele();
     if (modele.isEmpty()) return;
-    envoyerModification(QStringLiteral("%1 = delete_line(%1, '%2', '%3', %4);")
-                            .arg(modele, source, cible)
-                            .arg(port),
+    const QString commande =
+        sortie > 1 ? QStringLiteral("%1 = delete_line(%1, %2, %3, %4, %5);")
+                         .arg(modele, chaineMatlab(source), chaineMatlab(cible))
+                         .arg(port)
+                         .arg(sortie)
+                   : QStringLiteral("%1 = delete_line(%1, %2, %3, %4);")
+                         .arg(modele, chaineMatlab(source), chaineMatlab(cible))
+                         .arg(port);
+    envoyerModification(commande,
                         QStringLiteral("Le lien de « %1 » vers « %2 » est retire.")
                             .arg(source, cible));
 }
@@ -404,8 +485,14 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
                                  "du dessus.").arg(ancreAffichee()));
         return;
     }
-    DialogueBloc boite(bloc->nom, bloc->type, bloc->reglagesNoms,
-                       bloc->reglagesValeurs, this);
+    // Tous les réglages du type, avec leur valeur — donnée ou par défaut —
+    // quand le schéma les porte : c'est la boîte de Simulink, où l'on voit
+    // tout ce qui se règle. Seuls les champs touchés en ressortent.
+    const bool complet = !bloc->parametresNoms.isEmpty();
+    DialogueBloc boite(bloc->nom, bloc->type,
+                       complet ? bloc->parametresNoms : bloc->reglagesNoms,
+                       complet ? bloc->parametresValeurs : bloc->reglagesValeurs,
+                       complet ? bloc->parametresChoix : QStringList(), this);
     if (boite.exec() != QDialog::Accepted) return;
 
     // Une seule commande, quoi qu'on ait change : la console refuse ce
@@ -510,16 +597,27 @@ void FenetreSimulink::construireBarre() {
     duree_->setMaximumWidth(70);
     duree_->setToolTip(QStringLiteral("Instant final de la simulation, en secondes"));
     barre->addWidget(duree_);
+    connect(duree_, &QLineEdit::editingFinished, this, &FenetreSimulink::surDureeChangee);
     barre->addWidget(new QLabel(QStringLiteral("  solveur ")));
     solveur_ = new QComboBox();
     solveur_->addItems({QStringLiteral("ode1"), QStringLiteral("ode2"),
-                        QStringLiteral("ode3"), QStringLiteral("ode4")});
+                        QStringLiteral("ode3"), QStringLiteral("ode4"),
+                        QStringLiteral("ode5"), QStringLiteral("FixedStepDiscrete")});
     solveur_->setToolTip(QStringLiteral(
-        "ode1 : Euler explicite. ode2, ode3 et ode4 évaluent la dérivée en des "
-        "points intermédiaires du pas et gagnent un ordre à chaque fois ; ils "
-        "demandent que tous les états soient continus."));
+        "Le solveur du modèle. ode1 : Euler explicite. ode2 à ode5 évaluent la "
+        "dérivée en des points intermédiaires du pas et gagnent un ordre chacun. "
+        "Le choix se pose sur le modèle ; Ctrl+E ouvre tous les réglages."));
+    connect(solveur_, &QComboBox::currentIndexChanged, this,
+            &FenetreSimulink::surSolveurChoisi);
     barre->addWidget(solveur_);
     barre->addWidget(new QLabel(QStringLiteral(" s  ")));
+    aConfiguration_ = barre->addAction(QStringLiteral("Configuration"));
+    aConfiguration_->setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
+    aConfiguration_->setToolTip(QStringLiteral(
+        "Paramètres de configuration (Ctrl+E) : temps, solveur, pas, tolérances, "
+        "diagnostics"));
+    connect(aConfiguration_, &QAction::triggered, this,
+            &FenetreSimulink::ouvrirConfiguration);
     barre->addSeparator();
 
     QAction* aAjuster = barre->addAction(QStringLiteral("Ajuster"));
@@ -621,6 +719,26 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
     affiche_ = schema.nom;
     dernier_ = schema;
     toile_->definirSchema(schema);
+    // La barre montre les réglages du modèle : son solveur, sa durée. Ce
+    // n'est pas un choix de l'utilisateur, rien ne doit partir.
+    if (chemin_.isEmpty() && !schema.configuration.isEmpty()) {
+        majReglages_ = true;
+        const QStringList offerts = schema.solveursFixes + schema.solveursVariables;
+        if (!offerts.isEmpty()) {
+            QStringList actuels;
+            for (int k = 0; k < solveur_->count(); ++k) actuels << solveur_->itemText(k);
+            if (actuels != offerts) {
+                solveur_->clear();
+                solveur_->addItems(offerts);
+            }
+        }
+        const int rang = solveur_->findText(schema.configuration.value(QStringLiteral("Solver")),
+                                            Qt::MatchFixedString);
+        if (rang >= 0) solveur_->setCurrentIndex(rang);
+        const QString fin = schema.configuration.value(QStringLiteral("StopTime"));
+        if (!fin.isEmpty() && !duree_->hasFocus()) duree_->setText(fin);
+        majReglages_ = false;
+    }
     titreToile_->setText(QStringLiteral("%1 — %2 bloc(s), %3 lien(s)")
                              .arg(schema.nom)
                              .arg(schema.blocs.size())
@@ -645,9 +763,14 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
                                   ? schema.blocs[l.cible - 1].nom
                                   : QStringLiteral("?");
         (new QTreeWidgetItem(rubriqueLiens))
-            ->setText(0, QStringLiteral("%1 → %2 (entrée %3)")
-                             .arg(source, cible)
-                             .arg(l.port));
+            ->setText(0, l.sortie > 1 ? QStringLiteral("%1 (sortie %2) → %3 (entrée %4)")
+                                            .arg(source)
+                                            .arg(l.sortie)
+                                            .arg(cible)
+                                            .arg(l.port)
+                                      : QStringLiteral("%1 → %2 (entrée %3)")
+                                            .arg(source, cible)
+                                            .arg(l.port));
     }
     rubriqueLiens->setExpanded(true);
     poserEtat(QStringLiteral("Schéma de « %1 » à jour.").arg(schema.nom));
@@ -747,22 +870,82 @@ void FenetreSimulink::simuler() {
         return;
     }
     // Le résultat reste dans l'espace de travail sous « resultatSimulink » :
-    // la simulation n'est pas un cul-de-sac, on la reprend au clavier.
-    // Le solveur ne parait dans la commande que s'il n'est pas celui par
-    // defaut : une ligne courte se relit et se retape, et SIM prend ode1
-    // quand on ne lui dit rien.
+    // la simulation n'est pas un cul-de-sac, on la reprend au clavier. Le
+    // solveur n'y parait pas : il est sur le modèle, où la liste de la
+    // barre et la boîte de configuration l'ont posé, et SIM l'y lit.
     const QString choisi = solveur_ ? solveur_->currentText() : QString();
-    QString options;
-    if (!choisi.isEmpty() && choisi != QLatin1String("ode1"))
-        options = QStringLiteral(", simset('Solver', '%1')").arg(choisi);
     emit commandeDemandee(
-        QStringLiteral("resultatSimulink = sim(%1, %2%3); figure; "
+        QStringLiteral("resultatSimulink = sim(%1, %2); figure; "
                        "simplot(resultatSimulink)")
-            .arg(nom, duree_->text(), options));
+            .arg(nom, duree_->text()));
     poserEtat(QStringLiteral("Simulation de « %1 » sur %2 s par %3 ; le relevé est "
                              "dans resultatSimulink.")
                   .arg(nom, duree_->text(),
                        choisi.isEmpty() ? QStringLiteral("ode1") : choisi));
+}
+
+// La liste des solveurs a changé. Quand c'est l'utilisateur, le choix se
+// pose sur le modèle — une seule commande, qu'on peut défaire.
+void FenetreSimulink::surSolveurChoisi(int rang) {
+    if (majReglages_ || rang < 0) return;
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) return;
+    const QString choisi = solveur_->itemText(rang);
+    if (choisi == dernier_.configuration.value(QStringLiteral("Solver"))) return;
+    envoyerModification(QStringLiteral("%1 = set_param(%1, 'Solver', %2);")
+                            .arg(modele, chaineMatlab(choisi)),
+                        QStringLiteral("Le solveur de « %1 » est désormais %2.")
+                            .arg(modele, choisi));
+}
+
+// La durée de la barre est le StopTime du modèle, comme dans Simulink.
+void FenetreSimulink::surDureeChangee() {
+    if (majReglages_) return;
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty() || !chemin_.isEmpty()) return;
+    const QString texte = duree_->text().trimmed();
+    if (texte.isEmpty() || texte == dernier_.configuration.value(QStringLiteral("StopTime")))
+        return;
+    envoyerModification(QStringLiteral("%1 = set_param(%1, 'StopTime', %2);")
+                            .arg(modele, chaineMatlab(texte)),
+                        QStringLiteral("La simulation de « %1 » s'arrêtera à %2 s.")
+                            .arg(modele, texte));
+}
+
+// Ctrl+E : les réglages de simulation du modèle, dans une boîte à volets.
+// Ce qu'on y change part en un seul SET_PARAM.
+void FenetreSimulink::ouvrirConfiguration() {
+    const QString modele = modeleChoisi();
+    if (modele.isEmpty()) {
+        poserEtat(QStringLiteral("Choisissez d'abord un modèle."));
+        return;
+    }
+    if (!chemin_.isEmpty()) {
+        poserEtat(QStringLiteral("Les réglages de simulation sont ceux du modèle : "
+                                 "remontez à sa surface pour les changer."));
+        return;
+    }
+    if (dernier_.configuration.isEmpty()) {
+        poserEtat(QStringLiteral("Le schéma n'est pas encore relevé."));
+        return;
+    }
+    QStringList fixes = dernier_.solveursFixes;
+    if (fixes.isEmpty()) fixes << QStringLiteral("ode1");
+    DialogueConfiguration boite(modele, dernier_.configuration, fixes,
+                                dernier_.solveursVariables, this);
+    if (boite.exec() != QDialog::Accepted) return;
+    const auto changements = boite.changements();
+    if (changements.isEmpty()) {
+        poserEtat(QStringLiteral("Rien n'a changé dans la configuration."));
+        return;
+    }
+    QStringList couples;
+    for (const auto& couple : changements)
+        couples << QStringLiteral("'%1', %2").arg(couple.first, chaineMatlab(couple.second));
+    envoyerModification(QStringLiteral("%1 = set_param(%1, %2);")
+                            .arg(modele, couples.join(QStringLiteral(", "))),
+                        QStringLiteral("Configuration de « %1 » enregistrée dans le "
+                                       "modèle.").arg(modele));
 }
 
 // Un chemin peut porter une apostrophe — « /home/…/l'essai/pid.m » —, et

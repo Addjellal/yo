@@ -12,11 +12,18 @@ function modele = matlibre_sl_aplatir(modele)
 %   Le dépliage garde trois choses. Les blocs intérieurs prennent le nom
 %   « sousSysteme/bloc », comme dans Simulink, et se retrouvent donc
 %   nommés dans le relevé. Le bloc du sous-système lui-même ne
-%   disparaît pas : il reste, en passe-plat, portant la valeur de son
-%   premier OUTPORT — un relevé pris sur le sous-système reste donc
-%   celui de sa sortie. Et les entrées se raccordent par leur rang : le
-%   lien qui arrivait sur la deuxième entrée du bloc arrive sur le bloc
-%   INPORT intérieur dont le paramètre Port vaut 2.
+%   disparaît pas : il reste, en passe-plat à autant de ports qu'il a de
+%   sorties, chaque OUTPORT intérieur alimentant la sortie de même rang
+%   — un relevé pris sur le sous-système reste donc celui de sa première
+%   sortie, et un lien qui partait de sa deuxième sortie part toujours de
+%   la sortie de l'OUTPORT de rang 2. Et les entrées se raccordent par
+%   leur rang : le lien qui arrivait sur la deuxième entrée du bloc
+%   arrive sur le bloc INPORT intérieur dont le paramètre Port vaut 2.
+%
+%   Les types sont ramenés à leur nom MatLibre par le catalogue : un
+%   bloc intérieur posé sous son nom Simulink (« In1 », « SubSystem »)
+%   se déplie comme les autres. Les liens rendus ont quatre colonnes —
+%   source, destination, entrée, sortie.
 %
 %   Les sous-systèmes s'emboîtent : un sous-système qui en contient un
 %   autre est déplié jusqu'au bout.
@@ -36,6 +43,10 @@ function modele = matlibre_sl_aplatir(modele)
 %
 %   Voir aussi SIM, ADD_BLOCK, MATLIBRE_SL_ORDRE.
     modele = matlibre_sl_modele(modele);
+    modele.liens = matlibre_sl_liens(modele);
+    for j = 1:numel(modele.blocs)
+        modele.blocs{j}.type = typeCanonique(modele.blocs{j}.type);
+    end
     % Un modèle ordinaire ne paie rien : le dépliage ne coûte que le
     % parcours qui constate qu'il n'y a rien à déplier.
     garde = 0;
@@ -54,6 +65,18 @@ function modele = matlibre_sl_aplatir(modele)
     end
 end
 
+% Le nom MatLibre d'un type, quelle que soit la façon dont on l'a écrit.
+% Un type inconnu reste tel quel : c'est la compilation qui le refusera,
+% en nommant le bloc par son chemin.
+function t = typeCanonique(type)
+    try
+        entree = matlibre_sl_catalogue('type', type);
+        t = entree.type;
+    catch
+        t = char(type);
+    end
+end
+
 function k = premier(modele)
     k = 0;
     for j = 1:numel(modele.blocs)
@@ -67,15 +90,25 @@ end
 function modele = deplier(modele, k)
     bloc = modele.blocs{k};
     interne = contenu(bloc);
+    interne.liens = matlibre_sl_liens(interne);
+    for j = 1:numel(interne.blocs)
+        interne.blocs{j}.type = typeCanonique(interne.blocs{j}.type);
+    end
     n = numel(modele.blocs);
     m = numel(interne.blocs);
+    entrees = parRang(interne, 'inport');
+    sorties = parRang(interne, 'outport');
 
     % Le bloc du sous-système garde sa place dans la liste — donc son
     % rang, donc tous les liens qui le désignent —, mais devient un
-    % passe-plat : il portera la valeur de la sortie intérieure.
+    % passe-plat : chacune de ses sorties portera la valeur de l'OUTPORT
+    % intérieur de même rang.
     passePlat = bloc;
     passePlat.type = 'signalconversion';
     passePlat.parametres = struct();
+    if numel(sorties) > 1
+        passePlat.parametres.NombreDePorts = numel(sorties);
+    end
     if isfield(bloc.parametres, 'Position')
         passePlat.parametres.Position = bloc.parametres.Position;
     end
@@ -96,11 +129,8 @@ function modele = deplier(modele, k)
     if ~isempty(interne.liens)
         modele.liens = [modele.liens; ...
                         [interne.liens(:, 1) + n, interne.liens(:, 2) + n, ...
-                         interne.liens(:, 3)]];
+                         interne.liens(:, 3:4)]];
     end
-
-    entrees = parRang(interne, 'inport');
-    sorties = parRang(interne, 'outport');
 
     % Les bornes d'un sous-système sont les siennes, non celles du modèle
     % qui l'abrège : dépliées telles quelles, LINMOD et TRIM les auraient
@@ -110,8 +140,7 @@ function modele = deplier(modele, k)
     % ce que SIM lui faisait déjà rendre.
     for j = 1:numel(sorties)
         modele.blocs{n + sorties(j)}.type = 'signalconversion';
-        modele.blocs{n + sorties(j)}.parametres = ...
-            sansPort(modele.blocs{n + sorties(j)}.parametres);
+        modele.blocs{n + sorties(j)}.parametres = struct();
     end
     for j = 1:numel(entrees)
         indice = n + entrees(j);
@@ -120,9 +149,7 @@ function modele = deplier(modele, k)
             valeur = modele.blocs{indice}.parametres.Value;
         end
         modele.blocs{indice}.type = 'constant';
-        modele.blocs{indice}.parametres = ...
-            sansPort(modele.blocs{indice}.parametres);
-        modele.blocs{indice}.parametres.Value = valeur;
+        modele.blocs{indice}.parametres = struct('Value', {valeur});
     end
 
     % Chaque lien qui arrivait sur le bloc arrive à présent sur l'INPORT
@@ -141,23 +168,25 @@ function modele = deplier(modele, k)
         end
         interieur = n + entrees(port);
         modele.blocs{interieur}.type = 'signalconversion';
-        if isfield(modele.blocs{interieur}.parametres, 'Value')
-            modele.blocs{interieur}.parametres = ...
-                rmfield(modele.blocs{interieur}.parametres, 'Value');
-        end
+        modele.blocs{interieur}.parametres = struct();
         modele.liens(l, 2) = interieur;
         modele.liens(l, 3) = 1;
     end
 
-    % Et la sortie du sous-système est celle de son premier OUTPORT.
-    if ~isempty(sorties)
-        modele.liens = [modele.liens; n + sorties(1), k, 1];
+    % Un lien qui part d'une sortie que le sous-système n'a pas est refusé
+    % en le nommant : il ne mènerait nulle part.
+    for l = 1:size(modele.liens, 1)
+        if modele.liens(l, 1) == k && modele.liens(l, 4) > max(1, numel(sorties))
+            error('Simulink:Commands:SousSystemeSortieAbsente', ...
+                  ['Un lien part de la sortie %d du sous-systeme ''%s'', qui n''a ' ...
+                   'que %d bloc(s) OUTPORT.'], modele.liens(l, 4), char(bloc.nom), ...
+                  numel(sorties));
+        end
     end
-end
 
-function parametres = sansPort(parametres)
-    if isfield(parametres, 'Port')
-        parametres = rmfield(parametres, 'Port');
+    % Et chaque sortie du sous-système est celle de l'OUTPORT de même rang.
+    for j = 1:numel(sorties)
+        modele.liens = [modele.liens; n + sorties(j), k, j, 1];
     end
 end
 

@@ -101,7 +101,8 @@ function h = open_system(modele)
             lien = geometrie.liens(k);
             source = geometrie.blocs(lien.source);
             cible = geometrie.blocs(lien.cible);
-            depart = [source.droite, -(source.haut + source.bas) / 2];
+            depart = [source.droite, -(source.haut + source.bas) / 2 + ...
+                      decalageSortie(source, lien.sortie)];
             arrivee = [cible.gauche, ...
                        -(cible.haut + cible.bas) / 2 + ...
                        decalagePort(cible, lien.port)];
@@ -146,4 +147,15 @@ function d = decalagePort(bloc, port)
     end
     hauteur = bloc.bas - bloc.haut;
     d = hauteur * (0.28 - 0.56 * (port - 1) / (numel(signes) - 1));
+end
+
+% Les sorties se répartissent sur le bord droit comme les entrées sur le
+% bord gauche : les fils d'un Demux partent chacun de leur port.
+function d = decalageSortie(bloc, sortie)
+    d = 0;
+    if bloc.sorties <= 1
+        return
+    end
+    part = (min(max(sortie, 1), bloc.sorties) - 1) / (bloc.sorties - 1);
+    d = (bloc.bas - bloc.haut) * (0.28 - 0.56 * part);
 end

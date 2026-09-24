@@ -48,6 +48,7 @@
 #include "FenetreProfileur.h"
 #include "FenetreSimulink.h"
 #include "DialogueBloc.h"
+#include "DialogueConfiguration.h"
 #include "ToileSimulink.h"
 #include "Icone.h"
 #include "Recherche.h"
@@ -1553,6 +1554,16 @@ int main(int argc, char** argv) {
                 if (*b->parametres) essaiTous += QStringLiteral(", ") +
                                                  QString::fromUtf8(b->parametres);
                 essaiTous += QStringLiteral(");\n");
+                // Deux blocs ne vivent pas seuls, dans Simulink non plus : un
+                // From lit un Goto, un Demux sépare un vecteur. On leur donne
+                // ce qu'ils attendent.
+                if (QLatin1String(b->type) == QLatin1String("from"))
+                    essaiTous += QStringLiteral(
+                        "m = add_block(m, 'goto', 'envoi', 'GotoTag', 'A');\n");
+                if (QLatin1String(b->type) == QLatin1String("demux"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
+                        "'v', 'demux');\n");
                 essaiTous += QStringLiteral("sim(m, 0.02, 0.01);\n");
             }
             essaiTous += QStringLiteral("disp('TOUS LES BLOCS OK')\n");
@@ -2047,28 +2058,125 @@ int main(int argc, char** argv) {
             verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
                      "et la simulation aboutit");
 
-            // Le solveur se choisit dans la barre. Il ne parait dans la
-            // commande que s'il n'est pas celui par defaut : une ligne
-            // courte se relit et se retape.
+            // Le solveur se choisit dans la barre, et c'est un reglage du
+            // modele, comme dans Simulink : le choisir le pose sur le
+            // modele par SET_PARAM, et SIM l'y lit.
             verifier(simulink->choixSolveur() != nullptr &&
-                         simulink->choixSolveur()->count() == 4,
-                     "la barre offre les quatre solveurs a pas fixe");
+                         simulink->choixSolveur()->count() >= 5 &&
+                         simulink->choixSolveur()->findText(QStringLiteral("ode5")) >= 0,
+                     "la barre offre les solveurs a pas fixe, ode5 compris");
             verifier(simulink->choixSolveur()->currentText() ==
                          QLatin1String("ode1"),
-                     "et part sur celui de SIM");
-            simulink->choixSolveur()->setCurrentIndex(3);
+                     "et montre celui du modele, ode1 par defaut");
+            commandeVue.clear();
+            simulink->choixSolveur()->setCurrentIndex(
+                simulink->choixSolveur()->findText(QStringLiteral("ode4")));
             QCoreApplication::processEvents();
+            verifier(commandeVue.contains(QLatin1String(
+                         "modeleDuBureau = set_param(modeleDuBureau, 'Solver', 'ode4');")),
+                     "choisir ode4 le pose sur le modele");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
+                     "et la commande passe");
             commandeVue.clear();
             QMetaObject::invokeMethod(simulink, "simuler");
             QCoreApplication::processEvents();
             verifier(commandeVue.startsWith(
-                         QLatin1String("resultatSimulink = sim(modeleDuBureau, 10, "
-                                       "simset('Solver', 'ode4'))")),
-                     "choisir ode4 le passe a SIM");
+                         QLatin1String("resultatSimulink = sim(modeleDuBureau, 10)")),
+                     "SIM n'a plus a le recevoir : il est sur le modele");
             verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
                      "et la simulation par ode4 aboutit");
-            simulink->choixSolveur()->setCurrentIndex(0);
-            QCoreApplication::processEvents();
+            {
+                const int avantSolveur = console->toPlainText().size();
+                envoyer(fenetre, QStringLiteral("disp(get_param(modeleDuBureau, 'Solver'))"));
+                verifier(attendre([&] { return !fenetre.occupe(); }, 30000) &&
+                             console->toPlainText().mid(avantSolveur).contains(
+                                 QLatin1String("ode4")),
+                         "le modele porte bien ode4");
+            }
+            // Une fois le schema relu, la barre montre le reglage du modele.
+            verifier(attendre([&] {
+                         return simulink->choixSolveur()->currentText() ==
+                                QLatin1String("ode4");
+                     }, 20000),
+                     "la barre suit le solveur du modele");
+
+            // Ctrl+E : les parametres de configuration. La boite montre
+            // les reglages du modele, et ce qu'on y change part en un seul
+            // SET_PARAM.
+            {
+                verifier(simulink->actionConfiguration() != nullptr &&
+                             simulink->actionConfiguration()->shortcut() ==
+                                 QKeySequence(QStringLiteral("Ctrl+E")),
+                         "la configuration s'ouvre par Ctrl+E");
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("StartTime"), QStringLiteral("0"));
+                valeurs.insert(QStringLiteral("StopTime"), QStringLiteral("10"));
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode1"));
+                valeurs.insert(QStringLiteral("FixedStep"), QStringLiteral("0.01"));
+                valeurs.insert(QStringLiteral("AlgebraicLoopMsg"), QStringLiteral("warning"));
+                DialogueConfiguration boite(QStringLiteral("m"), valeurs,
+                                            {QStringLiteral("ode1"), QStringLiteral("ode4")},
+                                            {});
+                verifier(boite.changements().isEmpty(), "sans rien toucher, rien ne part");
+                verifier(boite.choixSolveur()->currentText() == QLatin1String("ode1"),
+                         "la boite montre le solveur du modele");
+                verifier(boite.champ(QStringLiteral("FixedStep"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("RelTol"))->isEnabled(),
+                         "a pas fixe, le pas se regle et les tolerances non");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode4")));
+                boite.champ(QStringLiteral("StopTime"))->setText(QStringLiteral("5"));
+                boite.liste(QStringLiteral("AlgebraicLoopMsg"))
+                    ->setCurrentIndex(boite.liste(QStringLiteral("AlgebraicLoopMsg"))
+                                          ->findText(QStringLiteral("error")));
+                const auto changes = boite.changements();
+                QStringList noms;
+                for (const auto& c : changes) noms << c.first;
+                verifier(noms == QStringList({QStringLiteral("StopTime"),
+                                              QStringLiteral("Solver"),
+                                              QStringLiteral("AlgebraicLoopMsg")}),
+                         "les reglages touches ressortent, et eux seuls, dans l'ordre des volets");
+                verifier(boite.volets()->count() == 2, "deux volets : solveur et diagnostics");
+            }
+            {
+                // Le chemin entier : Ctrl+E, la boite, la commande.
+                QStringList commandesConfig;
+                QMetaObject::Connection lienConfig = QObject::connect(
+                    simulink, &FenetreSimulink::commandeDemandee,
+                    [&commandesConfig](const QString& c) { commandesConfig << c; });
+                QTimer::singleShot(0, [&] {
+                    auto* ouverte = simulink->findChild<DialogueConfiguration*>(
+                        QStringLiteral("dialogueConfiguration"));
+                    if (!ouverte) return;
+                    ouverte->champ(QStringLiteral("StopTime"))->setText(QStringLiteral("4"));
+                    ouverte->choixSolveur()->setCurrentIndex(
+                        ouverte->choixSolveur()->findText(QStringLiteral("ode1")));
+                    ouverte->accept();
+                });
+                QMetaObject::invokeMethod(simulink, "ouvrirConfiguration");
+                QCoreApplication::processEvents();
+                QObject::disconnect(lienConfig);
+                verifier(commandesConfig.size() == 1 &&
+                             commandesConfig.first().contains(QLatin1String(
+                                 "modeleDuBureau = set_param(modeleDuBureau, 'StopTime', "
+                                 "'4', 'Solver', 'ode1');")),
+                         "la boite part en un seul SET_PARAM");
+                verifier(attendre([&] { return !fenetre.occupe(); }, 30000),
+                         "et la commande passe");
+                verifier(attendre([&] {
+                             return simulink->champDuree()->text() == QLatin1String("4");
+                         }, 20000),
+                         "la duree de la barre suit le StopTime du modele");
+                // On remet la duree d'origine, pour la suite du test.
+                envoyer(fenetre, QStringLiteral(
+                    "modeleDuBureau = set_param(modeleDuBureau, 'StopTime', 10);"));
+                verifier(attendre([&] { return !fenetre.occupe(); }, 30000) &&
+                             attendre([&] {
+                                 return simulink->champDuree()->text() == QLatin1String("10");
+                             }, 20000),
+                         "et elle revient avec lui");
+            }
             // « Enregistrer », « Generer le .m » et « Ouvrir » demandent
             // un fichier avant d'agir : les invoquer ici ouvrirait une
             // boite modale qui ne se refermerait jamais. Ce qu'ils font

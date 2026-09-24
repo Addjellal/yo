@@ -205,6 +205,12 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
                 formeResultat =
                     idx[0].estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
             }
+        } else if (base.estVecteur() && idx[0].dims.size() == 2 && idx[0].nelem() == 0 &&
+                   (idx[0].dims[0] == 1 || idx[0].dims[1] == 1)) {
+            // Un indice vide en ligne, « x(1:0) », garde lui aussi
+            // l'orientation de la source : une colonne donne 0 x 1, comme
+            // dans MATLAB, et « [a; x(1:0)] » se concatène.
+            formeResultat = base.estLigne() ? Dims{1, 0} : Dims{0, 1};
         } else if (idx[0].dims.size() == 2 && !idx[0].estVecteur() && !idx[0].estScalaire()) {
             formeResultat = idx[0].dims;
         } else if (base.estVecteur() && idx[0].estVecteur()) {
@@ -532,6 +538,107 @@ static Valeur ecrire(Valeur base, std::vector<Valeur>& idx, const Valeur& valeur
         }
     }
     return base;
+}
+
+// Écriture sur place. « ecrire » reçoit la valeur par copie et la rend :
+// c'est juste, mais chaque « x(i) = v » recopiait alors x en entier, et
+// une boucle qui remplit un tableau coûtait le carré de sa longueur. Ici
+// on écrit dans la valeur même, pour les cas où le résultat se sait
+// d'avance : classe inchangée, pas de partie imaginaire à créer, indices
+// dans les bornes — ou un vecteur qui grandit par le bout, ce que
+// std::vector fait sans tout déplacer à chaque fois. Tout autre cas rend
+// faux sans avoir rien touché, et le chemin général s'en charge : les
+// erreurs et les conversions restent les siennes.
+bool Interpreteur::ecrireIndexEnPlace(Valeur& base, std::vector<Valeur>& idx, const Valeur& v,
+                                      char genre) {
+    if (base.estCreux() || base.poigneeObjet || idx.empty()) return false;
+    if (base.dims.size() != 2) return false;
+    auto croissanceVecteur = [&](std::size_t bmax, Dims& nd) {
+        if (base.estVide() || !(base.estVecteur() || base.estScalaire())) return false;
+        nd = base.estColonne() && base.dims[1] == 1 && base.dims[0] > 1
+                 ? Dims{(int)bmax, 1}
+                 : Dims{1, (int)bmax};
+        if (base.estColonne() && !base.estLigne()) nd = Dims{(int)bmax, 1};
+        return true;
+    };
+    if (genre == '{') {
+        if (base.classe != Classe::Cellule || idx.size() != 1) return false;
+        std::size_t bmax;
+        auto p = positions(idx[0], base.nelem(), true, bmax);
+        if (p.size() != 1) return false;
+        if (bmax > base.nelem()) {
+            Dims nd;
+            if (!croissanceVecteur(bmax, nd)) return false;
+            base.cellules.resize(bmax, Valeur::vide());
+            base.dims = nd;
+        }
+        base.cellules[p[0]] = v;
+        return true;
+    }
+    if (genre != '(') return false;
+    auto simple = [](Classe c) {
+        return classeNumerique(c) || c == Classe::Logique || c == Classe::Caractere;
+    };
+    if (!simple(base.classe) || !simple(v.classe) || v.estCreux() || base.estVide())
+        return false;
+    if (classeApresAffectation(base, v) != base.classe) return false;
+    if (!v.im.empty() && base.im.empty()) return false;
+    const std::size_t nv = v.nelem();
+    if (nv == 0 || v.re.size() < nv) return false;
+    auto poser = [&](std::size_t dst, std::size_t k) {
+        std::size_t src = nv == 1 ? 0 : k;
+        base.re[dst] = v.re[src];
+        if (!base.im.empty()) base.im[dst] = src < v.im.size() ? v.im[src] : 0.0;
+    };
+
+    if (idx.size() == 1) {
+        std::size_t bmax;
+        auto p = positions(idx[0], base.nelem(), true, bmax);
+        if (nv != 1 && nv != p.size()) return false;
+        if (bmax > base.nelem()) {
+            Dims nd;
+            if (!croissanceVecteur(bmax, nd)) return false;
+            base.re.resize(bmax, 0.0);
+            if (!base.im.empty()) base.im.resize(bmax, 0.0);
+            base.dims = nd;
+        }
+        for (std::size_t k = 0; k < p.size(); ++k) poser(p[k], k);
+        return true;
+    }
+
+    // Plusieurs indices : aucune croissance ici, c'est au chemin général de
+    // redimensionner une matrice.
+    const Dims& bd = base.dims;
+    if (idx.size() > bd.size()) return false;
+    std::vector<std::vector<std::size_t>> pos;
+    std::vector<std::size_t> pas(idx.size(), 1);
+    for (std::size_t k = 0; k < idx.size(); ++k) {
+        std::size_t taille = (std::size_t)bd[k];
+        if (k + 1 == idx.size() && idx.size() < bd.size()) {
+            taille = 1;
+            for (std::size_t d = k; d < bd.size(); ++d) taille *= (std::size_t)bd[d];
+        }
+        if (estColonMagique(idx[k]) && taille == 0) return false;
+        std::size_t bmax;
+        auto p = positions(idx[k], taille, true, bmax);
+        if (bmax > taille) return false;
+        pos.push_back(std::move(p));
+        if (k > 0) pas[k] = pas[k - 1] * (std::size_t)std::max(1, bd[k - 1]);
+    }
+    std::size_t n = 1;
+    for (auto& p : pos) n *= p.size();
+    if (nv != 1 && nv != n) return false;
+    std::vector<std::size_t> compteur(pos.size(), 0);
+    for (std::size_t k = 0; k < n; ++k) {
+        std::size_t dst = 0;
+        for (std::size_t d = 0; d < pos.size(); ++d) dst += pos[d][compteur[d]] * pas[d];
+        poser(dst, k);
+        for (std::size_t d = 0; d < pos.size(); ++d) {
+            if (++compteur[d] < pos[d].size()) break;
+            compteur[d] = 0;
+        }
+    }
+    return true;
 }
 
 // Écriture par indices déjà évalués : c'est « ecrire » rendu accessible aux

@@ -18,10 +18,17 @@ function geometrie = matlibre_sl_geometrie(modele)
 %   Les champs rendus :
 %     G.blocs(k).nom, .type, .etiquette, .signes
 %     G.blocs(k).noms, .valeurs                  ses réglages, en texte
+%     G.blocs(k).parametres, .defauts, .choix    tous ceux que le type
+%                                                accepte, avec leur valeur
+%                                                et leurs choix « a|b|c »
+%     G.blocs(k).entrees, .sorties               son nombre de ports
 %     G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
 %     G.blocs(k).pose                            vrai si POSITION le fixait
-%     G.liens(k).source, .cible, .port, .retour
+%     G.liens(k).source, .cible, .port, .sortie, .retour
 %     G.largeur, G.hauteur                       la taille d'un bloc par défaut
+%     G.configuration                            les réglages de simulation,
+%                                                en texte
+%     G.solveurs.fixe, .variable                 les solveurs disponibles
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
@@ -48,7 +55,8 @@ function geometrie = matlibre_sl_geometrie(modele)
     geometrie.hauteur = hauteur;
     blocs = struct('nom', {}, 'type', {}, 'etiquette', {}, 'signes', {}, ...
                    'gauche', {}, 'haut', {}, 'droite', {}, 'bas', {}, ...
-                   'pose', {}, 'noms', {}, 'valeurs', {});
+                   'pose', {}, 'noms', {}, 'valeurs', {}, 'entrees', {}, ...
+                   'sorties', {}, 'parametres', {}, 'defauts', {}, 'choix', {});
     for k = 1:n
         bloc = modele.blocs{k};
         pose = false;
@@ -78,28 +86,44 @@ function geometrie = matlibre_sl_geometrie(modele)
             noms{end + 1} = champs{j};                          %#ok<AGROW>
             valeurs{end + 1} = ecrireReglage(bloc.parametres.(champs{j}));  %#ok<AGROW>
         end
+        [entrees, sorties] = ports(bloc);
+        [tous, defauts, choix] = dialogue(bloc);
         blocs(end + 1) = struct('nom', bloc.nom, 'type', bloc.type, ...
                                 'etiquette', matlibre_sl_etiquette(bloc), ...
                                 'signes', matlibre_sl_signes(bloc), ...
                                 'gauche', cadre(1), 'haut', cadre(2), ...
                                 'droite', cadre(3), 'bas', cadre(4), ...
                                 'pose', pose, 'noms', {noms}, ...
-                                'valeurs', {valeurs});   %#ok<AGROW>
+                                'valeurs', {valeurs}, 'entrees', entrees, ...
+                                'sorties', sorties, 'parametres', {tous}, ...
+                                'defauts', {defauts}, 'choix', {choix});   %#ok<AGROW>
     end
     geometrie.blocs = blocs;
 
-    liens = struct('source', {}, 'cible', {}, 'port', {}, 'retour', {});
-    for l = 1:size(modele.liens, 1)
-        source = modele.liens(l, 1);
-        cible = modele.liens(l, 2);
-        port = modele.liens(l, 3);
+    liens = struct('source', {}, 'cible', {}, 'port', {}, 'sortie', {}, 'retour', {});
+    tous = matlibre_sl_liens(modele);
+    for l = 1:size(tous, 1)
+        source = tous(l, 1);
+        cible = tous(l, 2);
+        port = tous(l, 3);
         estRetour = ~isempty(retours) && ...
             any(retours(:, 1) == source & retours(:, 2) == cible & ...
                 retours(:, 3) == port);
         liens(end + 1) = struct('source', source, 'cible', cible, ...
-                                'port', port, 'retour', estRetour);   %#ok<AGROW>
+                                'port', port, 'sortie', tous(l, 4), ...
+                                'retour', estRetour);   %#ok<AGROW>
     end
     geometrie.liens = liens;
+
+    % Les réglages de simulation, en texte : c'est ce que la boîte
+    % « Paramètres de configuration » du bureau montre.
+    configuration = matlibre_sl_config('lire', modele);
+    noms = fieldnames(configuration);
+    geometrie.configuration = struct();
+    for k = 1:numel(noms)
+        geometrie.configuration.(noms{k}) = ecrireReglage(configuration.(noms{k}));
+    end
+    geometrie.solveurs = matlibre_sl_config('solveurs');
 end
 
 % Un réglage tel qu'on le relira : le texte tel quel — c'est une
@@ -121,5 +145,56 @@ function d = demiLargeur(type, largeur, hauteur)
         d = hauteur / 2;
     else
         d = largeur / 2;
+    end
+end
+
+% Le nombre de ports d'un bloc, tel que ses paramètres le fixent. Un
+% nombre que seule la simulation connaîtra — une expression — ou un type
+% inconnu laissent l'éditeur deviner : -1 entrée, une sortie.
+function [entrees, sorties] = ports(bloc)
+    entrees = -1;
+    sorties = 1;
+    try
+        [ne, ns] = matlibre_sl_ports(bloc);
+    catch
+        return
+    end
+    if isfinite(ne)
+        entrees = ne;
+    end
+    if isfinite(ns)
+        sorties = ns;
+    end
+end
+
+% Tous les paramètres du type, avec la valeur que le bloc porte — ou, à
+% défaut, celle par défaut — et, pour un choix, les valeurs admises. C'est
+% ce que la boîte de réglages du bureau montre, comme celle de Simulink.
+function [tous, valeurs, choix] = dialogue(bloc)
+    tous = {};
+    valeurs = {};
+    choix = {};
+    try
+        entree = matlibre_sl_catalogue('type', bloc.type);
+    catch
+        return
+    end
+    for k = 1:size(entree.params, 1)
+        nom = entree.params{k, 1};
+        nature = entree.params{k, 3};
+        if strcmp(nom, 'NombreDePorts') || strcmp(nature, 'modele')
+            continue   % l'un est interne, l'autre s'ouvre au lieu de se régler
+        end
+        valeur = entree.params{k, 2};
+        if isfield(bloc.parametres, nom)
+            valeur = bloc.parametres.(nom);
+        end
+        tous{end + 1} = nom;                          %#ok<AGROW>
+        valeurs{end + 1} = ecrireReglage(valeur);     %#ok<AGROW>
+        if iscell(nature)
+            choix{end + 1} = strjoin(nature, '|');    %#ok<AGROW>
+        else
+            choix{end + 1} = '';                      %#ok<AGROW>
+        end
     end
 end

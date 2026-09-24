@@ -1936,6 +1936,26 @@ LASTERR  Message de la dernière erreur.
 
     Voir aussi ERROR, MEXCEPTION, RETHROW, TRY.
 
+### lastwarn
+LASTWARN  Le dernier avertissement : son message et son identifiant.
+    [MSG,ID] = LASTWARN rend le message et l'identifiant du dernier
+    avertissement émis par WARNING — y compris d'un avertissement éteint,
+    qu'on a tu sans l'oublier. LASTWARN(MSG) et LASTWARN(MSG,ID) les
+    remplacent, et LASTWARN('') les efface : c'est ainsi qu'un programme
+    vérifie qu'un calcul a, ou n'a pas, averti.
+
+    Syntaxe
+       [msg, id] = lastwarn
+       lastwarn(msg)
+       lastwarn(msg, id)
+
+    Exemples
+       lastwarn('');
+       warning('essai:un', 'attention %d', 3);
+       [msg, id] = lastwarn()        % 'attention 3', 'essai:un'
+
+    Voir aussi WARNING, LASTERR, ERROR.
+
 ### eval
 EVAL  Exécute du code écrit dans un texte.
     EVAL(TEXTE) exécute le texte.

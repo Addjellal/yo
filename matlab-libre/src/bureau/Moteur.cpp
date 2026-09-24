@@ -616,6 +616,22 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
     }
     schema.trouve = true;
     if (geometrie.aChamp("hauteur")) schema.hauteurType = geometrie.champ("hauteur").scal();
+    if (geometrie.aChamp("configuration")) {
+        const Valeur conf = geometrie.champ("configuration");
+        for (const std::string& nomReglage : conf.champs())
+            schema.configuration.insert(QString::fromStdString(nomReglage),
+                                        QString::fromStdString(
+                                            conf.champ(nomReglage).versTexte()));
+    }
+    if (geometrie.aChamp("solveurs")) {
+        const Valeur solveurs = geometrie.champ("solveurs");
+        if (solveurs.aChamp("fixe"))
+            for (const Valeur& v : solveurs.champ("fixe").cellules)
+                schema.solveursFixes << QString::fromStdString(v.versTexte());
+        if (solveurs.aChamp("variable"))
+            for (const Valeur& v : solveurs.champ("variable").cellules)
+                schema.solveursVariables << QString::fromStdString(v.versTexte());
+    }
 
     if (geometrie.aChamp("blocs")) {
         Valeur blocs = geometrie.champ("blocs");
@@ -633,6 +649,26 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             b.droite = blocs.champ("droite", k).scal();
             b.bas = blocs.champ("bas", k).scal();
             b.pose = blocs.champ("pose", k).scal() != 0.0;
+            if (blocs.aChamp("entrees") && !blocs.champ("entrees", k).estVide())
+                b.entrees = (int)blocs.champ("entrees", k).scal();
+            if (blocs.aChamp("sorties") && !blocs.champ("sorties", k).estVide())
+                b.sorties = (int)blocs.champ("sorties", k).scal();
+            if (blocs.aChamp("parametres")) {
+                const Valeur tous = blocs.champ("parametres", k);
+                const Valeur defauts = blocs.champ("defauts", k);
+                const Valeur choix = blocs.champ("choix", k);
+                for (std::size_t j = 0; j < tous.cellules.size(); ++j) {
+                    b.parametresNoms << QString::fromStdString(tous.cellules[j].versTexte());
+                    b.parametresValeurs << (j < defauts.cellules.size()
+                                                ? QString::fromStdString(
+                                                      defauts.cellules[j].versTexte())
+                                                : QString());
+                    b.parametresChoix << (j < choix.cellules.size()
+                                              ? QString::fromStdString(
+                                                    choix.cellules[j].versTexte())
+                                              : QString());
+                }
+            }
             const Valeur noms = blocs.champ("noms", k);
             const Valeur valeurs = blocs.champ("valeurs", k);
             for (std::size_t j = 0; j < noms.cellules.size(); ++j) {
@@ -653,6 +689,8 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             l.source = (int)liens.champ("source", k).scal();
             l.cible = (int)liens.champ("cible", k).scal();
             l.port = (int)liens.champ("port", k).scal();
+            if (liens.aChamp("sortie") && !liens.champ("sortie", k).estVide())
+                l.sortie = (int)liens.champ("sortie", k).scal();
             l.retour = liens.champ("retour", k).scal() != 0.0;
             schema.liens.push_back(l);
         }

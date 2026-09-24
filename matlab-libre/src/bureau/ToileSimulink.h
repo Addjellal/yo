@@ -50,11 +50,12 @@ signals:
     // Des blocs ont été déplacés : leurs nouvelles places, en unités du
     // schéma. Plusieurs à la fois quand plusieurs sont choisis.
     void blocsDeplaces(const QStringList& noms, const QVector<QRectF>& places);
-    // Un fil a été tiré d'une sortie vers une entrée.
-    void lienDemande(const QString& source, const QString& cible, int port);
+    // Un fil a été tiré d'une sortie vers une entrée. SORTIE est le port
+    // de sortie de la source : un Demux en a plusieurs.
+    void lienDemande(const QString& source, const QString& cible, int port, int sortie);
     // « Suppr » sur ce qui est choisi.
     void blocsSupprimes(const QStringList& noms);
-    void lienSupprime(const QString& source, const QString& cible, int port);
+    void lienSupprime(const QString& source, const QString& cible, int port, int sortie);
     // Un double-clic : on veut régler le bloc.
     void blocOuvert(const QString& nom);
     // Quelque chose a été lâché sur la toile depuis la bibliothèque.
@@ -81,10 +82,11 @@ protected:
 private:
     struct BlocToile {
         QString nom, type, etiquette, signes;
+        int entrees = -1, sorties = 1;   // -1 : le type en décide
         QRectF cadre;   // en unités du schéma, l'ordonnée vers le bas
     };
     struct LienToile {
-        int source = 0, cible = 0, port = 1;
+        int source = 0, cible = 0, port = 1, sortie = 1;
         bool retour = false;
     };
 
@@ -94,8 +96,10 @@ private:
     int blocSous(const QPointF& ecran) const;
     int lienSous(const QPointF& ecran) const;
     int portVise(int bloc, const QPointF& ecran) const;
+    int sortieVisee(int bloc, const QPointF& ecran) const;
+    int entreesDe(int bloc) const;
     QPointF pointEntree(int bloc, int port) const;
-    QPointF pointSortie(int bloc) const;
+    QPointF pointSortie(int bloc, int sortie = 1) const;
     void dessinerBloc(QPainter& peintre, const BlocToile& bloc, bool choisi) const;
     void dessinerFil(QPainter& peintre, const LienToile& lien, double basRetour) const;
     void annoncerChoix();
@@ -117,6 +121,7 @@ private:
     bool elastique_ = false;
     QPointF elastiqueDe_, elastiqueA_;
     int filDepuis_ = -1;      // bloc d'où part le fil en cours
+    int filSortie_ = 1;       // et le port de sortie qu'on y a pris
     QPointF filVers_;         // le bout libre du fil, à l'écran
     bool deplacementFait_ = false;
 };

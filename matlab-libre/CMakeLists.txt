@@ -231,6 +231,7 @@ if(MATLIBRE_BUREAU)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreSimulink.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/ToileSimulink.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/DialogueBloc.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/DialogueConfiguration.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/FenetreAide.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Recherche.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/bureau/Icone.cpp)

@@ -65,6 +65,8 @@ public:
     QTreeWidget* bibliotheque() const { return bibliotheque_; }
     QListWidget* listeModeles() const { return modeles_; }
     QComboBox* choixSolveur() const { return solveur_; }
+    QLineEdit* champDuree() const { return duree_; }
+    QAction* actionConfiguration() const { return aConfiguration_; }
     QTreeWidget* explorateur() const { return explorateur_; }
     ToileSimulink* toile() const { return toile_; }
     QLabel* description() const { return description_; }
@@ -110,15 +112,21 @@ private slots:
     void surModeleChoisi();
     // Les gestes de la toile, traduits en commandes sur le modele.
     void surBlocsDeplaces(const QStringList& noms, const QVector<QRectF>& places);
-    void surLienDemande(const QString& source, const QString& cible, int port);
+    void surLienDemande(const QString& source, const QString& cible, int port, int sortie);
     void surBlocsSupprimes(const QStringList& noms);
     void surAnnulation();
     void surRetablissement();
-    void surLienSupprime(const QString& source, const QString& cible, int port);
+    void surLienSupprime(const QString& source, const QString& cible, int port, int sortie);
     void surBlocOuvert(const QString& nom);
     void surRemontee();
     void surBlocDepose(const QPointF& place);
     void ajusterVue();
+    // Ctrl+E : les paramètres de configuration du modèle.
+    void ouvrirConfiguration();
+    // Le solveur choisi dans la barre se pose sur le modèle, comme dans
+    // la boîte de configuration.
+    void surSolveurChoisi(int rang);
+    void surDureeChangee();
 
 
 private:
@@ -143,8 +151,13 @@ private:
     QLabel* etatModeles_;
     QLabel* titreToile_;
     QLineEdit* duree_;
-    // Le solveur choisi pour la simulation : ode1 par defaut, comme SIM.
+    // Le solveur du modèle : la liste suit son réglage Solver, et le
+    // changer le pose sur le modèle.
     QComboBox* solveur_ = nullptr;
+    // Vrai pendant que la fenêtre met la liste et la durée à jour d'après
+    // le modèle : ce n'est pas un choix de l'utilisateur, rien ne part.
+    bool majReglages_ = false;
+    QAction* aConfiguration_ = nullptr;
     QDockWidget* dockBibliotheque_;
     QPushButton* bInserer_;
     QAction* aOuvrir_ = nullptr;

@@ -4,10 +4,14 @@ function modele = add_param(modele, varargin)
 %   réglages au modèle. Ce ne sont pas les paramètres d'un bloc : ils
 %   valent pour la simulation entière.
 %
-%   Trois sont lus par SIM quand l'appel ne les donne pas :
-%     StopTime    l'instant final
-%     FixedStep   le pas d'intégration
-%     Solver      le solveur : ode1, ode2, ode3 ou ode4
+%   Ceux de la boîte « Paramètres de configuration » sont lus par SIM
+%   quand l'appel ne les donne pas, et vérifiés dès qu'on les pose :
+%     StartTime, StopTime   les instants de début et de fin
+%     FixedStep             le pas d'intégration
+%     Solver                le solveur : ode1 à ode5, FixedStepDiscrete
+%     AlgebraicLoopMsg, UnconnectedInputMsg, UnconnectedOutputMsg
+%                           none, warning ou error
+%   Tout autre nom est un réglage propre au modèle, rangé tel quel.
 %
 %   Un réglage déjà posé est refusé en le nommant : c'est SET_PARAM qui
 %   le change, comme dans MATLAB, où ADD_PARAM ne sert qu'à créer.
@@ -30,6 +34,18 @@ function modele = add_param(modele, varargin)
             error('Simulink:Commands:AddParamExiste', ...
                   ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
                    'pour le changer.'], nom);
+        end
+        % Un réglage de la boîte de configuration est vérifié comme par
+        % SET_PARAM, et rangé sous son écriture canonique.
+        canon = matlibre_sl_config('nom', nom);
+        if ~isempty(canon)
+            if isfield(modele.parametres, canon)
+                error('Simulink:Commands:AddParamExiste', ...
+                      ['Le modele porte deja un reglage ''%s'' : employez SET_PARAM ' ...
+                       'pour le changer.'], canon);
+            end
+            modele.parametres.(canon) = matlibre_sl_config('valider', canon, varargin{k + 1});
+            continue
         end
         modele.parametres.(nom) = varargin{k + 1};
     end

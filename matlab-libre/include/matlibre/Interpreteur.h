@@ -221,6 +221,10 @@ public:
     std::mt19937_64 generateur{5489u};
     std::string dernierIdentifiant;
     std::string dernierMessage;
+    // Le dernier avertissement émis, message et identifiant : ce que
+    // LASTWARN rend. Un avertissement éteint y est rangé aussi, comme dans
+    // MATLAB — on le tait, on ne l'oublie pas.
+    std::string dernierAvertissement, dernierAvertissementId;
     Valeur derniereErreur;
     std::set<std::string> avertissementsEteints;
     bool avertissementsActifs = true;
@@ -289,6 +293,12 @@ public:
                              std::size_t debut, std::size_t fin, Valeur& sortie);
     std::vector<Valeur> indexerListe(const Valeur& base, std::vector<Valeur>& idx, char genre);
     Valeur ecrireIndex(Valeur base, std::vector<Valeur>& idx, const Valeur& v, char genre);
+    // Écrit « base(idx) = v » ou « base{idx} = v » dans la valeur même,
+    // sans la recopier. Rend faux, sans rien toucher, quand le cas demande
+    // le chemin général : conversion de classe, croissance d'une matrice,
+    // tableau creux, objet.
+    bool ecrireIndexEnPlace(Valeur& base, std::vector<Valeur>& idx, const Valeur& v,
+                            char genre);
     Valeur affecterIndex(Valeur base, const std::vector<ElementAcces>& chaine, std::size_t k,
                          const Valeur& v, bool suppression);
     std::vector<Valeur> evaluerIndices(const std::vector<NoeudPtr>& args, const Valeur* base,
@@ -315,7 +325,10 @@ private:
     std::shared_ptr<std::ostream> journal_;
 
     Valeur evaluerAcces(const NoeudPtr& n, int nargout, std::vector<Valeur>* multi);
+    std::size_t lireSansCopie(const std::string& nom, const NoeudPtr& n,
+                              std::vector<Valeur>& courant);
     void affecter(const NoeudPtr& cible, const Valeur& v);
+    bool affecterEnPlace(const NoeudPtr& cible, const Valeur& v);
     std::vector<std::size_t> ciblesCellule(const NoeudPtr& cible);
     friend struct GardePortee;
 };

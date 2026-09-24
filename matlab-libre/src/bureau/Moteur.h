@@ -6,6 +6,7 @@
 // figures quand la commande est finie.
 #pragma once
 
+#include <QMap>
 #include <QObject>
 #include <QPair>
 #include <QString>
@@ -87,14 +88,23 @@ struct BlocSchema {
     QString nom, type, etiquette, signes;
     double gauche = 0, haut = 0, droite = 0, bas = 0;
     bool pose = false;    // vrai quand POSITION fixait la place
+    // Le nombre de ports, tel que les paramètres du bloc le fixent : un
+    // Demux a autant de sorties que son réglage Outputs. -1 quand le
+    // schéma ne le dit pas ; la toile le devine alors par le type.
+    int entrees = -1, sorties = 1;
     // Les réglages du bloc, écrits tels qu'un programme les relira. C'est
     // ce que la boîte de dialogue montre au double-clic. POSITION n'y est
     // pas : la place se règle à la souris.
     QStringList reglagesNoms, reglagesValeurs;
+    // Tous les paramètres que le type accepte, avec leur valeur — donnée
+    // ou par défaut — et, pour un choix, les valeurs admises séparées par
+    // « | ». C'est la boîte de Simulink : on y voit tout ce qui se règle.
+    QStringList parametresNoms, parametresValeurs, parametresChoix;
 };
 
 struct LienSchema {
     int source = 0, cible = 0, port = 1;   // rangs dans blocs, à partir de 1
+    int sortie = 1;                        // le port de sortie de la source
     bool retour = false;                   // il referme une boucle
 };
 
@@ -106,6 +116,10 @@ struct SchemaSimulink {
     QString nom;
     QVector<BlocSchema> blocs;
     QVector<LienSchema> liens;
+    // Les réglages de simulation du modèle — ceux de la boîte « Paramètres
+    // de configuration » —, en texte, et les solveurs disponibles.
+    QMap<QString, QString> configuration;
+    QStringList solveursFixes, solveursVariables;
     double hauteurType = 1.0;   // hauteur d'un bloc par défaut
     QString erreur;             // vide quand le schéma s'est relevé
     bool trouve = false;
