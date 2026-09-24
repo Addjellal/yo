@@ -974,4 +974,148 @@ assert(all(diff(ecartsPade) < 0), ...
 assert(ecartsPade(end) < 1e-6, ...
        'et a l''ordre six elle le suit au millionieme de degre');
 
+%% ------------------------------ PLUSIEURS VOIES
+% Un modele a plusieurs entrees et sorties cassait STEP et BODE sur une
+% erreur interne, et faisait rendre a MARGIN un nombre calcule sur un
+% tableau aplati. Chaque fonction est a present eprouvee sur la propriete
+% qui la definit, et comparee a la voie prise seule.
+Gm = ss(-diag([1 2]), eye(2), [1 1; 0 1], zeros(2));
+tm = (0:0.01:5)';
+Nm = numel(tm);
+
+% LSIM : une colonne par sortie, et la superposition -- le modele est
+% lineaire, la reponse aux deux entrees est la somme des reponses a
+% chacune.
+u1 = ones(Nm, 1);
+u2 = sin(tm);
+Yboth = lsim(Gm, [u1, u2], tm);
+assert(isequal(size(Yboth), [Nm 2]), 'une colonne par sortie');
+Ysum = lsim(Gm, [u1, zeros(Nm, 1)], tm) + lsim(Gm, [zeros(Nm, 1), u2], tm);
+assert(max(abs(Yboth(:) - Ysum(:))) < 1e-12, 'la reponse se superpose');
+assert(max(abs(Yboth(:, 1) - lsim(Gm(1, 1), u1, tm) - lsim(Gm(1, 2), u2, tm))) < 1e-12, ...
+       'et chaque sortie est la somme des voies qui y arrivent');
+
+% Le bloqueur d'ordre zero est exact, integrateurs compris. L'ancienne
+% formule se rabattait sur B*dt quand A n'etait pas inversible : pour un
+% double integrateur, la position prenait du retard sur la vitesse --
+% 12,475 au lieu de 12,5 a cinq secondes.
+doubleIntegrateur = ss([0 1; 0 0], [0; 1], [1 0], 0);
+yDouble = lsim(doubleIntegrateur, ones(Nm, 1), tm);
+assert(max(abs(yDouble - tm .^ 2 / 2)) < 1e-10, ...
+       'un echelon sur 1/s^2 donne t^2/2 exactement aux instants de la grille');
+
+% STEP et IMPULSE : NT x NY x NU, chaque case etant la reponse a la seule
+% entree J -- comparee a la forme fermee C*expm(A*t)*B(:,J).
+[Ystep, tstep] = step(Gm, 5);
+assert(isequal(size(Ystep), [numel(tstep) 2 2]));
+assert(max(max(abs(squeeze(Ystep(end, :, :)) - dcgain(Gm)))) < 1e-2, ...
+       'chaque voie tend vers son gain statique');
+Yimp = impulse(Gm, tm);
+fermee = zeros(Nm, 2, 2);
+for kt = 1:Nm
+    fermee(kt, :, :) = reshape(Gm.C * expm(Gm.A * tm(kt)) * Gm.B, 1, 2, 2);
+end
+assert(max(abs(Yimp(:) - fermee(:))) < 1e-12, 'la reponse impulsionnelle est exacte, voie par voie');
+
+% BODE : NY x NU x NW, et chaque case est le Bode de la voie prise seule.
+wm = logspace(-2, 2, 30)';
+[modM, phaseM] = bode(Gm, wm);
+assert(isequal(size(modM), [2 2 30]) && isequal(size(phaseM), [2 2 30]));
+for iv = 1:2
+    for jv = 1:2
+        [modSeul, phaseSeule] = bode(Gm(iv, jv), wm);
+        assert(max(abs(reshape(modM(iv, jv, :), [], 1) - modSeul)) < 1e-12, ...
+               'le module de chaque case est celui de la voie seule');
+        if any(modSeul > 0)
+            assert(max(abs(reshape(phaseM(iv, jv, :), [], 1) - phaseSeule)) < 1e-9);
+        end
+    end
+end
+
+% Une marge, une bande passante sont des notions monovariables. On les
+% refuse sur une matrice de transferts, plutot que d'en rendre une
+% calculee sur un tableau aplati.
+for nomSISO = {'margin', 'allmargin', 'bandwidth'}
+    refuseMIMO = false;
+    try
+        feval(nomSISO{1}, Gm);
+    catch err
+        refuseMIMO = strcmp(err.identifier, 'Control:analysis:RequiresSISO');
+    end
+    assert(refuseMIMO, sprintf('%s doit refuser un modele a plusieurs voies', nomSISO{1}));
+end
+assert(abs(bandwidth(Gm(1, 1)) - bandwidth(tf(1, [1 1]))) < 1e-9, ...
+       'et SYS(I,J) en choisit une voie, qui se mesure');
+
+% STEPINFO et LSIMINFO : une structure par voie, egale a celle de la voie
+% seule.
+infoM = stepinfo(Gm);
+assert(isequal(size(infoM), [2 2]));
+assert(abs(infoM(1, 1).RiseTime - stepinfo(tf(1, [1 1])).RiseTime) < 1e-2);
+infoL = lsiminfo(Yboth, tm);
+assert(isequal(size(infoL), [2 1]) && infoL(2).Max == max(Yboth(:, 2)));
+
+% NORM(SYS) rendait 0 : la norme numerique s'appliquait a l'objet. C'est
+% la norme H2, et NORM(SYS,INF) la norme H-infini.
+Wc = lyap(Gm.A, Gm.B * Gm.B');
+assert(abs(norm(Gm) - sqrt(trace(Gm.C * Wc * Gm.C'))) < 1e-10, ...
+       'la norme H2 est celle que donne le grammien');
+assert(abs(norm(tf(1, [1 1])) - sqrt(1/2)) < 1e-12);
+assert(abs(norm(tf(1, [1 1]), Inf) - 1) < 1e-9, 'le gain maximal d''un premier ordre vaut 1');
+refuseNorme = false;
+try
+    norm(struct('a', 1));
+catch err
+    refuseNorme = strcmp(err.identifier, 'MATLAB:UndefinedFunction');
+end
+assert(refuseNorme, 'la norme numerique refuse ce qui n''est pas une matrice');
+
+% EIG(A,B) avec B singuliere rendait des nombres quelconques : B\A n'a
+% plus de sens. Les valeurs finies annulent det(A - lambda B), il y a
+% autant de valeurs infinies que B a perdu de rang, et un faisceau
+% singulier rend NaN.
+Ap = [1 2; 3 4];
+Bp = [1 0; 0 0];
+lp = eig(Ap, Bp);
+finies = lp(isfinite(lp));
+assert(numel(finies) == 1 && abs(det(Ap - finies * Bp)) < 1e-12, ...
+       'la valeur finie annule le determinant du faisceau');
+assert(sum(isinf(lp)) == size(Bp, 1) - rank(Bp), ...
+       'autant de valeurs infinies que de rang perdu');
+[Vp, Dp] = eig(Ap, Bp);
+kf = find(isfinite(diag(Dp)));
+assert(norm(Ap * Vp(:, kf) - Dp(kf, kf) * Bp * Vp(:, kf)) < 1e-12, ...
+       'et son vecteur propre verifie A v = lambda B v');
+assert(all(isnan(eig([1 0; 0 0], [1 0; 0 0]))), 'un faisceau singulier rend NaN');
+assert(isequal(eig([2 0; 0 3], [4 0; 0 1]), [0.5; 3]), 'le cas symetrique defini positif ne bouge pas');
+
+% Les zeros de transmission d'un modele carre a plusieurs voies : la
+% matrice de Rosenbrock y perd son rang.
+Gz = ss(diag([-1 -2]), eye(2), diag([2 1]), diag([1 0]));
+zm = tzero(Gz.A, Gz.B, Gz.C, Gz.D);
+assert(numel(zm) == 1 && abs(zm + 3) < 1e-10, '(s+3)/(s+1) apporte son zero en -3');
+rosenbrock = [Gz.A - zm * eye(2), Gz.B; Gz.C, Gz.D];
+assert(rank(rosenbrock) < 4, 'et la matrice de Rosenbrock y perd son rang');
+assert(isempty(tzero(Gm.A, Gm.B, Gm.C, Gm.D)), 'un modele sans zero fini n''en rend aucun');
+[pz, zz] = pzmap(Gz);
+assert(isequal(sort(pz), [-2; -1]) && abs(zz + 3) < 1e-10);
+
+% TF et les cellules : une case est une transmittance ; plusieurs ne se
+% portent pas dans un TF, et le message dit comment les assembler. Le
+% conseil doit tenir : l'assemblage rend bien la matrice de transferts.
+unique = tf({1}, {[1 1]});
+assert(isequal(unique.num, 1) && isequal(unique.den, [1 1]));
+refuseCellules = false;
+try
+    tf({1, 2}, {[1 1], [1 2]});
+catch err
+    refuseCellules = strcmp(err.identifier, 'Control:tf:MIMONotSupported');
+end
+assert(refuseCellules, 'une matrice de transferts n''est plus avalee en 1 x 1');
+assemble = [tf(1, [1 1]), tf(1, [1 2]); tf(0, 1), tf(1, [1 2])];
+Hassemble = freqresp(assemble, wm);
+Hattendu = freqresp(Gm, wm);
+assert(max(abs(Hassemble(:) - Hattendu(:))) < 1e-12, ...
+       'l''assemblage conseille rend la matrice de transferts attendue');
+
 disp('automatique : toutes les verifications passent');

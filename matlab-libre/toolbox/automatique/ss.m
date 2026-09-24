@@ -266,6 +266,23 @@ classdef ss
             end
         end
         function n = order(sys), n = size(sys.A, 1); end
+        % NORM(SYS) est la norme H2 -- l'energie de la reponse
+        % impulsionnelle --, NORM(SYS,INF) la norme H-infini -- le plus grand
+        % gain sur toutes les pulsations --, comme dans MATLAB. Sans cette
+        % methode, la norme numerique s'appliquait a l'objet et rendait 0.
+        % Un retard pur n'y change rien : il ne touche ni au module ni a
+        % l'energie.
+        function n = norm(sys, type)
+            if nargin < 2 || (isnumeric(type) && isscalar(type) && type == 2)
+                n = h2norm(sys);
+            elseif (isnumeric(type) && isscalar(type) && isinf(type)) || ...
+                    ((ischar(type) || isstring(type)) && strcmpi(type, 'inf'))
+                n = hinfnorm(sys);
+            else
+                error('Control:analysis:NormType', ...
+                      'NORM(SYS,TYPE) accepte TYPE = 2 (norme H2) ou Inf (norme H-infini).');
+            end
+        end
         function r = isempty(sys), r = isempty(sys.D); end
 
         % L'indexation d'un modèle choisit des voies : SYS(I,J) est le

@@ -135,6 +135,25 @@ qu'ils ne font pas encore comme MATLAB.
   et de rendre une boucle stable là où elle ne l'est pas. `pade` en
   donne l'approximation rationnelle, qui passe alors partout ; `thiran`
   est exact au sens du retard de groupe plat en zéro.
+- **Pas de matrice de transferts dans un `tf`** : `tf` n'a qu'un
+  numérateur et un dénominateur. `tf({…},{…})` à plusieurs cases est
+  refusé en disant comment faire — assembler les voies,
+  `[G11 G12; G21 G22]`, ce qui rend le modèle d'état à plusieurs voies
+  que `step`, `bode`, `impulse`, `lsim`, `freqresp` et `sigma` traitent.
+- **Un modèle à une voie rend des colonnes** : `[m,p] = bode(sys)` et
+  `y = step(sys)` rendent des vecteurs colonnes, là où MATLAB rend des
+  tableaux 1 × 1 × N qu'on passe à `squeeze`. À plusieurs voies, les
+  formes sont celles de MATLAB : NY × NU × NW pour `bode`, NT × NY × NU
+  pour `step` et `impulse`.
+- **`margin`, `allmargin` et `bandwidth` ne valent que pour une voie** :
+  sur une matrice de transferts, ils refusent en le disant et en
+  renvoyant à `sys(i,j)` ; `loopmargin` traite la boucle multivariable.
+  MATLAB calcule en plus les marges « une boucle à la fois » dans
+  `allmargin`.
+- **`tzero` ne traite que les modèles carrés** à plusieurs voies : les
+  zéros de transmission y sont les valeurs finies du faisceau de
+  Rosenbrock. Un modèle qui n'a pas autant d'entrées que de sorties est
+  refusé en le nommant.
 - **`pidtool` et `sisotool`** ne sont pas interactifs : MatLibre règle le
   correcteur — comme `pidtune` — et trace les vues une fois, là où MATLAB
   ouvre une application à curseurs.

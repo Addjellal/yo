@@ -25,7 +25,7 @@ function [gainMarge, phaseMarge, wGain, wPhase] = margin(varargin)
         w = varargin{3}(:);
         sys = [];
     elseif numel(varargin) == 1
-        sys = varargin{1};
+        sys = matlibre_monovoie(varargin{1}, 'MARGIN', 'LOOPMARGIN');
         w = logspace(-4, 4, 4000).';
         [m, p] = bode(sys, w);
     else

@@ -14,7 +14,12 @@ function z = zero(sys)
 %      zero(tf([1 -1], [1 1]))              % 1 : a non-minimum de phase
 %
 %   Voir aussi POLE, TZERO, PZMAP, ROOTS.
-    if strcmp(sys.type, 'ss')
+    if strcmp(sys.type, 'ss') && (size(sys.D, 1) > 1 || size(sys.D, 2) > 1)
+        % A plusieurs voies, les zeros d'un modele sont ses zeros de
+        % transmission : les pulsations complexes ou la matrice de
+        % transfert perd son rang. SS2TF, lui, ne rend qu'une voie.
+        z = tzero(sys.A, sys.B, sys.C, sys.D);
+    elseif strcmp(sys.type, 'ss')
         [num, ~] = ss2tf(sys.A, sys.B, sys.C, sys.D);
         z = roots(num);
     else

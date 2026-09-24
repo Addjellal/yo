@@ -17,6 +17,7 @@ function m = allmargin(sys)
 %      m.GainMargin   % 2
 %
 %   Voir aussi MARGIN, BODE, NYQUIST.
+    matlibre_monovoie(sys, 'ALLMARGIN', 'LOOPMARGIN');
     w = logspace(-4, 4, 8000).';
     [module, phase, w] = bode(sys, w);
     dB = 20 * log10(module);

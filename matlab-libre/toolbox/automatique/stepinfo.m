@@ -37,6 +37,18 @@ function s = stepinfo(systeme, varargin)
         end
     else
         [y, t] = step(systeme);
+        if ndims(y) == 3 || size(y, 2) > 1
+            % A plusieurs voies, un tableau de structures : S(I,J) decrit
+            % la reponse de la sortie I a un echelon sur l'entree J, comme
+            % dans MATLAB.
+            gains = dcgain(systeme);
+            for i = 1:size(y, 2)
+                for j = 1:size(y, 3)
+                    s(i, j) = stepinfo(reshape(y(:, i, j), [], 1), t, gains(i, j)); %#ok<AGROW>
+                end
+            end
+            return
+        end
         y = y(:);
         t = t(:);
         finale = y(end);

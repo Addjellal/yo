@@ -13,6 +13,12 @@ function [y, t] = step(varargin)
 %
 %   [Y,T] = STEP(SYS) ne trace rien et rend la réponse et les instants.
 %
+%   Un modèle à plusieurs entrées et sorties répond sur chaque couple :
+%   Y est alors de taille NT x NY x NU, Y(:,I,J) étant la réponse de la
+%   sortie I à un échelon sur la seule entrée J. Le tracé en fait une
+%   grille, une case par couple, comme dans MATLAB. Un modèle à une voie
+%   rend une colonne, comme avant.
+%
 %   STEP(...,OPTIONS) où OPTIONS vient de STEPDATAOPTIONS part du niveau
 %   InputOffset et monte de StepAmplitude, au lieu de l'échelon unité.
 %
@@ -33,6 +39,10 @@ function [y, t] = step(varargin)
                    'is not supported.']);
         end
         [y, t] = reponseEchelon(modeles{1}, temps, depart, amplitude);
+        return;
+    end
+    if ~estMonovoie(modeles{1})
+        tracerGrille(modeles, styles, temps, depart, amplitude);
         return;
     end
     courbes = {};
@@ -70,7 +80,21 @@ function [y, t] = reponseEchelon(sys, temps, depart, amplitude)
 %   DEPART+AMPLITUDE est ce niveau, plus AMPLITUDE fois la réponse à
 %   l'échelon unité partant du repos.
     t = matlibre_grille_temps(sys, temps);
-    [y, t] = lsim(sys, ones(size(t)), t);
+    modele = ss(sys);
+    ny = size(modele.D, 1);
+    nu = size(modele.D, 2);
+    if ny == 1 && nu == 1
+        [y, t] = lsim(sys, ones(size(t)), t);
+    else
+        % Un echelon sur une seule entree a la fois : c'est ce que montre
+        % chaque case de la grille, et ce que rend Y(:,:,J).
+        y = zeros(numel(t), ny, nu);
+        for j = 1:nu
+            u = zeros(numel(t), nu);
+            u(:, j) = 1;
+            y(:, :, j) = lsim(sys, u, t);
+        end
+    end
     y = amplitude * y;
     if depart ~= 0
         gain = dcgain(sys);
@@ -79,6 +103,53 @@ function [y, t] = reponseEchelon(sys, temps, depart, amplitude)
                   ['InputOffset demande un gain statique fini ; ce modèle ' ...
                    'n''en a pas.']);
         end
-        y = y + depart * gain;
+        if ny == 1 && nu == 1
+            y = y + depart * gain;
+        else
+            for j = 1:nu
+                y(:, :, j) = y(:, :, j) + depart * repmat(gain(:, j).', numel(t), 1);
+            end
+        end
+    end
+end
+
+function oui = estMonovoie(sys)
+    modele = ss(sys);
+    oui = size(modele.D, 1) == 1 && size(modele.D, 2) == 1;
+end
+
+% Une case par couple (sortie, entree), et chaque modele superpose dans
+% chacune. Tous les modeles doivent avoir les memes dimensions : sinon les
+% cases ne se correspondraient pas.
+function tracerGrille(modeles, styles, temps, depart, amplitude)
+    reference = ss(modeles{1});
+    [cases, entrees, sorties] = matlibre_grille_voies(modeles{1});
+    reponses = cell(1, numel(modeles));
+    instants = cell(1, numel(modeles));
+    for k = 1:numel(modeles)
+        autre = ss(modeles{k});
+        if ~isequal(size(autre.D), size(reference.D))
+            error('Control:analysis:MultipleModels', ...
+                  'Les modeles superposes doivent avoir les memes entrees et sorties.');
+        end
+        [reponses{k}, instants{k}] = reponseEchelon(modeles{k}, temps, depart, amplitude);
+    end
+    for i = 1:size(cases, 1)
+        for j = 1:size(cases, 2)
+            axes(cases{i, j});
+            courbes = {};
+            for k = 1:numel(modeles)
+                courbes{end + 1} = instants{k};                  %#ok<AGROW>
+                courbes{end + 1} = reponses{k}(:, i, j);         %#ok<AGROW>
+                if ~isempty(styles{k})
+                    courbes{end + 1} = styles{k};                %#ok<AGROW>
+                end
+            end
+            plot(courbes{:});
+            grid on;
+            title(sprintf('De %s vers %s', entrees{j}, sorties{i}));
+            if i == size(cases, 1), xlabel('Temps (s)'); end
+            if j == 1, ylabel('Amplitude'); end
+        end
     end
 end

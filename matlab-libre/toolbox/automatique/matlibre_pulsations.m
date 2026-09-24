@@ -15,8 +15,16 @@ function w = matlibre_pulsations(sys, points)
     if nargin < 2 || isempty(points)
         points = 200;
     end
-    g = tf(sys);
-    p = [roots(g.den); roots(g.num)];
+    modele = ss(sys);
+    if size(modele.D, 1) == 1 && size(modele.D, 2) == 1
+        g = tf(sys);
+        p = [roots(g.den); roots(g.num)];
+    else
+        % A plusieurs voies, la transmittance n'est pas une fraction : ce
+        % sont les poles de la realisation qui disent ou se passe le
+        % comportement.
+        p = eig(modele.A);
+    end
     p = p(abs(p) > 1e-9);
     if isempty(p)
         centre = 1;

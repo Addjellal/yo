@@ -19,6 +19,18 @@ function s = lsiminfo(y, t, valeurFinale)
 %      s.Max                                          % proche de 1
 %
 %   Voir aussi STEPINFO, LSIM, STEP, IMPULSE.
+    if ~isvector(y) && size(y, 2) > 1
+        % Une colonne par sortie : une structure par sortie, comme dans
+        % MATLAB. Aplatir la matrice melangeait les voies.
+        for i = 1:size(y, 2)
+            if nargin < 3 || isempty(valeurFinale)
+                s(i, 1) = lsiminfo(y(:, i), t);                %#ok<AGROW>
+            else
+                s(i, 1) = lsiminfo(y(:, i), t, valeurFinale(i)); %#ok<AGROW>
+            end
+        end
+        return
+    end
     y = y(:);
     t = t(:);
     if nargin < 3 || isempty(valeurFinale)

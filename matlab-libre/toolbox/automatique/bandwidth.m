@@ -16,6 +16,7 @@ function w = bandwidth(systeme, chute)
 %
 %   Voir aussi DCGAIN, BODE, MARGIN, STEPINFO.
     if nargin < 2 || isempty(chute), chute = -3; end
+    matlibre_monovoie(systeme, 'BANDWIDTH');
     gainContinu = abs(dcgain(systeme));
     if gainContinu == 0 || ~isfinite(gainContinu)
         w = NaN;

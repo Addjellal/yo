@@ -88,6 +88,9 @@ FONCTION(fnRcond) {
 FONCTION(fnNorm) {
     INUTILISE
     exigerArguments(args, 1, 2, "norm");
+    // Un objet n'est pas une matrice. Faute de ce controle, « norm(sys) »
+    // sur un modele LTI rendait 0 -- une norme fausse, et sans un mot.
+    exigerNumerique(args[0], "norm");
     return {normeMatrice(args[0], args.size() > 1 ? args[1] : Valeur::vide())};
 }
 FONCTION(fnExpm) {
@@ -191,8 +194,77 @@ void valeursPropresGeneralisees(const Valeur& a, const Valeur& b, Valeur& valeur
         if (vecteurs) *vecteurs = divisionGauche(Lt, *vecteurs);
         return;
     }
-    Valeur C = divisionGauche(b, a);
-    valeursPropres(C, valeurs, vecteurs);
+    // B inversible et bien conditionnee : B\A est exact, et c'est ce qui
+    // tournait deja. On ne le change pas.
+    const int n = a.nlignes();
+    const double condB = conditionnement(b).scal();
+    if (std::isfinite(condB) && condB < 1e12) {
+        Valeur C = divisionGauche(b, a);
+        valeursPropres(C, valeurs, vecteurs);
+        return;
+    }
+    // B singuliere -- c'est le cas du faisceau de Rosenbrock dont on tire
+    // les zeros de transmission. « B\A » n'y a plus de sens, et rendait des
+    // nombres quelconques sans rien dire. On decale et on inverse : si
+    // (A - s B) est inversible, les valeurs propres mu de (A - s B)\B
+    // donnent lambda = s + 1/mu, et mu nul dit une valeur propre infinie,
+    // comme MATLAB la rend. Les vecteurs propres sont les memes.
+    const double echelle = std::max({1.0, normeMatrice(a, Valeur::vide()).scal(),
+                                     normeMatrice(b, Valeur::vide()).scal()});
+    const double decalages[] = {0.6180339887, -1.3247179572, 2.2360679775,
+                                -0.4142135624, 3.1415926536};
+    for (double d : decalages) {
+        const double sigma = d * echelle;
+        Valeur decale = operationBinaire("-", a,
+                                         operationBinaire("*", Valeur::scalaire(sigma), b));
+        const double cond = conditionnement(decale).scal();
+        if (!std::isfinite(cond) || cond > 1e12) continue;
+        Valeur M = divisionGauche(decale, b);
+        Valeur mu;
+        valeursPropres(M, mu, vecteurs);
+        const double seuil = 64.0 * 2.220446049250313e-16 * n *
+                             std::max(1.0, normeMatrice(M, Valeur::vide()).scal());
+        // Avec les vecteurs, les valeurs viennent en matrice diagonale ;
+        // sans eux, en colonne. On lit la diagonale dans les deux cas, et
+        // l'on rend la meme forme que la reponse ordinaire.
+        const bool diagonale = vecteurs != nullptr;
+        const bool complexe = !mu.im.empty();
+        std::vector<double> lambdaRe((std::size_t)n, 0.0), lambdaIm((std::size_t)n, 0.0);
+        bool aImag = false;
+        for (int i = 0; i < n; ++i) {
+            const std::size_t place = diagonale ? (std::size_t)i + (std::size_t)i * n
+                                                : (std::size_t)i;
+            const double re = mu.re[place];
+            const double im = complexe ? mu.im[place] : 0.0;
+            const double mod2 = re * re + im * im;
+            if (std::sqrt(mod2) <= seuil) {
+                lambdaRe[(std::size_t)i] = INFINITY;
+                continue;
+            }
+            lambdaRe[(std::size_t)i] = sigma + re / mod2;
+            lambdaIm[(std::size_t)i] = -im / mod2;
+            if (lambdaIm[(std::size_t)i] != 0.0) aImag = true;
+        }
+        if (diagonale) {
+            valeurs = Valeur::matrice(n, n);
+            std::vector<double> im((std::size_t)n * n, 0.0);
+            for (int i = 0; i < n; ++i) {
+                valeurs.re[(std::size_t)i + (std::size_t)i * n] = lambdaRe[(std::size_t)i];
+                im[(std::size_t)i + (std::size_t)i * n] = lambdaIm[(std::size_t)i];
+            }
+            if (aImag) valeurs.im = im;
+        } else {
+            valeurs = Valeur::matrice(n, 1);
+            valeurs.re = lambdaRe;
+            if (aImag) valeurs.im = lambdaIm;
+        }
+        return;
+    }
+    // Aucun decalage ne rend A - s B inversible : le faisceau est
+    // singulier, det(A - lambda B) est nul pour tout lambda, et MATLAB rend
+    // alors NaN. Rendre autre chose serait inventer.
+    valeurs = Valeur::matrice(n, 1, NAN);
+    if (vecteurs) *vecteurs = Valeur::matrice(n, n, NAN);
 }
 
 FONCTION(fnEig) {

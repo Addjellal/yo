@@ -271,6 +271,12 @@ BODE Diagramme de Bode : module et phase de la réponse fréquentielle.
   Pour un modèle échantillonné, la réponse est évaluée sur le cercle
   unité, en exp(j*W*Ts) ; pour un modèle continu, en j*W.
 
+  Un modèle à plusieurs entrées et sorties répond sur chaque couple :
+  MODULE et PHASE sont alors de taille NY x NU x NW, comme dans MATLAB,
+  et le tracé en fait une grille — pour chaque sortie, une ligne de
+  modules au-dessus d'une ligne de phases. Un modèle à une voie rend
+  des colonnes, comme avant.
+
   BODE(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé :
   FreqUnits, MagUnits, PhaseUnits, Grid, XLim, YLim, Title, XLabel et
   YLabel sont suivis.
@@ -995,8 +1001,10 @@ HSVD Valeurs singulières de Hankel d'un modèle stable.
 
 ```
 IMPULSE Réponse impulsionnelle.
-  IMPULSE(SYS) trace la réponse du modèle SYS à une impulsion de Dirac,
-  obtenue en dérivant la réponse indicielle.
+  IMPULSE(SYS) trace la réponse du modèle SYS à une impulsion de Dirac.
+  Elle est calculée exactement, comme la réponse libre partant de
+  l'état B — non en dérivant la réponse indicielle, ce qui forcerait
+  y(0) à zéro alors qu'elle vaut C*B.
 
   IMPULSE(SYS,TFINAL) impose l'horizon, en secondes ; IMPULSE(SYS,T)
   impose la grille de temps.
@@ -1005,6 +1013,11 @@ IMPULSE Réponse impulsionnelle.
   style peut suivre chacun d'eux, comme dans PLOT.
 
   [Y,T] = IMPULSE(SYS) ne trace rien et rend la réponse et les instants.
+
+  Un modèle à plusieurs entrées et sorties répond sur chaque couple :
+  Y est alors de taille NT x NY x NU, Y(:,I,J) étant la réponse de la
+  sortie I à une impulsion sur la seule entrée J, et le tracé en fait
+  une grille. Chaque couple porte son propre retard.
 
   Exemple :
      impulse(tf(1, [1 0.4 1]))
@@ -1341,11 +1354,19 @@ LQRY Commande linéaire quadratique pondérée sur la sortie.
 ```
 LSIM Réponse à une entrée quelconque.
   [Y,T,X] = LSIM(SYS,U,T) simule la réponse du modèle à l'entrée U
-  échantillonnée aux instants T. L'entrée est interpolée linéairement
-  entre deux instants ; le pas doit être assez fin devant les
-  constantes de temps du modèle.
+  échantillonnée aux instants T, régulièrement espacés. U porte une
+  colonne par entrée du modèle et une ligne par instant ; Y porte une
+  colonne par sortie. L'entrée est tenue constante sur chaque pas —
+  un bloqueur d'ordre zéro —, et la discrétisation est exacte pour
+  cette entrée tenue, intégrateurs compris : elle passe par
+  l'exponentielle de la matrice augmentée [A B; 0 0].
 
   [Y,T,X] = LSIM(SYS,U,T,X0) part d'une condition initiale.
+
+  Les retards du modèle sont honorés voie par voie : une entrée
+  retardée arrive plus tard, une sortie retardée part plus tard, et la
+  réponse libre due à X0 — déjà dans le système — n'attend que le
+  retard de sortie.
 
   Exemples :
      t = linspace(0, 5, 200)';
@@ -1353,6 +1374,9 @@ LSIM Réponse à une entrée quelconque.
      abs(y(end) - 1) < 0.02               % la reponse indicielle converge vers 1
      y2 = lsim(tf(1, [1 1]), sin(t), t);
      max(abs(y2)) < 1                     % un premier ordre attenue
+     G = ss(-eye(2), eye(2), [1 1; 0 1], zeros(2));
+     Y = lsim(G, [ones(200, 1), zeros(200, 1)], t);
+     size(Y)                              % [200 2] : une colonne par sortie
 
   Voir aussi STEP, IMPULSE, INITIAL, GENSIG.
 ```
@@ -1546,6 +1570,34 @@ MATLIBRE_GRILLE_TEMPS Grille de temps d'une simulation.
   Voir aussi STEP, IMPULSE, LSIM.
 ```
 
+## `matlibre_grille_voies`
+
+```
+MATLIBRE_GRILLE_VOIES Découpe la figure en une case par couple de voies.
+  [CASES,ENTREES,SORTIES] = MATLIBRE_GRILLE_VOIES(SYS) crée une grille
+  d'axes à autant de lignes que le modèle a de sorties et de colonnes
+  qu'il a d'entrées : c'est ainsi que MATLAB trace la réponse d'un
+  modèle à plusieurs voies, chaque case montrant ce qu'une entrée fait
+  à une sortie. CASES{I,J} est l'axe du couple (sortie I, entrée J).
+  ENTREES et SORTIES rendent les noms des voies — ceux du modèle s'il
+  en porte, sinon u(1), u(2)... et y(1), y(2)...
+
+  MATLIBRE_GRILLE_VOIES(SYS,L) donne L lignes à chaque sortie : BODE en
+  demande deux, le module au-dessus de la phase. CASES est alors de
+  taille (L*NY) x NU.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     G = ss(-eye(2), eye(2), eye(2), zeros(2));
+     figure;
+     cases = matlibre_grille_voies(G);
+     size(cases)                      % [2 2]
+
+  Voir aussi STEP, IMPULSE, BODE, MATLIBRE_NOMS_VOIES.
+```
+
 ## `matlibre_liste_noms`
 
 ```
@@ -1563,6 +1615,31 @@ MATLIBRE_LISTE_NOMS Une liste de noms de signaux, quelle qu'en soit l'écriture.
      matlibre_liste_noms({'a', 'b'})     % {'a', 'b'}
 
   Voir aussi CONNECT, SUMBLK.
+```
+
+## `matlibre_monovoie`
+
+```
+MATLIBRE_MONOVOIE Refuse un modèle à plusieurs voies, en le nommant.
+  SYS = MATLIBRE_MONOVOIE(SYS,QUOI) rend le modèle tel quel s'il a une
+  entrée et une sortie, et échoue sinon en disant quel calcul ne vaut
+  que pour une voie.
+
+  Une marge de gain, une bande passante sont des notions de boucle
+  monovariable. Appliquées à une matrice de transfert, elles rendaient
+  un nombre calculé sur un tableau aplati : il avait l'air d'une marge
+  et n'en était pas une. SYS(I,J) choisit la voie qu'on veut mesurer.
+
+  MATLIBRE_MONOVOIE(SYS,QUOI,AILLEURS) ajoute au message le nom de la
+  fonction qui, elle, traite le cas multivariable.
+
+  Cette fonction est un utilitaire interne de la boîte à outils
+  Automatique : elle n'existe pas dans MATLAB.
+
+  Exemple :
+     matlibre_monovoie(tf(1, [1 1]), 'MARGIN');   % passe : une seule voie
+
+  Voir aussi ISSISO, MARGIN, BANDWIDTH, LOOPMARGIN.
 ```
 
 ## `matlibre_noms_voies`
@@ -2450,6 +2527,12 @@ STEP Réponse indicielle.
   STEP(SYS,'b',SYSCORRIGE,'r--').
 
   [Y,T] = STEP(SYS) ne trace rien et rend la réponse et les instants.
+
+  Un modèle à plusieurs entrées et sorties répond sur chaque couple :
+  Y est alors de taille NT x NY x NU, Y(:,I,J) étant la réponse de la
+  sortie I à un échelon sur la seule entrée J. Le tracé en fait une
+  grille, une case par couple, comme dans MATLAB. Un modèle à une voie
+  rend une colonne, comme avant.
 
   STEP(...,OPTIONS) où OPTIONS vient de STEPDATAOPTIONS part du niveau
   InputOffset et monte de StepAmplitude, au lieu de l'échelon unité.

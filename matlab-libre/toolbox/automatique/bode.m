@@ -20,6 +20,12 @@ function [module, phase, w] = bode(varargin)
 %   Pour un modèle échantillonné, la réponse est évaluée sur le cercle
 %   unité, en exp(j*W*Ts) ; pour un modèle continu, en j*W.
 %
+%   Un modèle à plusieurs entrées et sorties répond sur chaque couple :
+%   MODULE et PHASE sont alors de taille NY x NU x NW, comme dans MATLAB,
+%   et le tracé en fait une grille — pour chaque sortie, une ligne de
+%   modules au-dessus d'une ligne de phases. Un modèle à une voie rend
+%   des colonnes, comme avant.
+%
 %   BODE(...,OPTIONS) où OPTIONS vient de BODEOPTIONS règle le tracé :
 %   FreqUnits, MagUnits, PhaseUnits, Grid, XLim, YLim, Title, XLabel et
 %   YLabel sont suivis.
@@ -46,6 +52,10 @@ function [module, phase, w] = bode(varargin)
     end
 
     reglage = matlibre_reglages_bode(options);
+    if ~estMonovoie(modeles{1})
+        tracerGrille(modeles, styles, w, reglage);
+        return;
+    end
     gain = {};
     dephasage = {};
     for k = 1:numel(modeles)
@@ -83,6 +93,26 @@ end
 
 function [module, phase, w] = reponseBode(sys, w)
 %REPONSEBODE Module et phase d'un modèle sur une grille de pulsations.
+    if ~estMonovoie(sys)
+        % A plusieurs voies, FREQRESP rend deja la matrice de transfert en
+        % chaque pulsation, retards compris : le module et la phase se
+        % lisent couple par couple, la phase deroulee le long des
+        % pulsations.
+        if isempty(w)
+            w = matlibre_pulsations(sys);
+        end
+        w = w(:);
+        H = freqresp(sys, w);
+        module = abs(H);
+        phase = zeros(size(H));
+        for i = 1:size(H, 1)
+            for j = 1:size(H, 2)
+                phase(i, j, :) = reshape(unwrap(angle(reshape(H(i, j, :), [], 1))), ...
+                                         1, 1, []) * 180 / pi;
+            end
+        end
+        return
+    end
     g = tf(sys);
     if isempty(w)
         w = matlibre_pulsations(g);
@@ -103,4 +133,59 @@ function [module, phase, w] = reponseBode(sys, w)
     end
     module = abs(h);
     phase = unwrap(angle(h)) * 180 / pi;
+end
+
+function oui = estMonovoie(sys)
+    modele = ss(sys);
+    oui = size(modele.D, 1) == 1 && size(modele.D, 2) == 1;
+end
+
+% Pour chaque sortie, deux lignes de cases : les modules au-dessus, les
+% phases dessous ; une colonne par entree. Chaque modele se superpose.
+function tracerGrille(modeles, styles, w, reglage)
+    reference = ss(modeles{1});
+    [cases, entrees, sorties] = matlibre_grille_voies(modeles{1}, 2);
+    modules = cell(1, numel(modeles));
+    phases = cell(1, numel(modeles));
+    grilles = cell(1, numel(modeles));
+    for k = 1:numel(modeles)
+        autre = ss(modeles{k});
+        if ~isequal(size(autre.D), size(reference.D))
+            error('Control:analysis:MultipleModels', ...
+                  'Les modeles superposes doivent avoir les memes entrees et sorties.');
+        end
+        [modules{k}, phases{k}, grilles{k}] = reponseBode(modeles{k}, w);
+    end
+    ny = size(reference.D, 1);
+    nu = size(reference.D, 2);
+    for i = 1:ny
+        for j = 1:nu
+            courbesModule = {};
+            courbesPhase = {};
+            for k = 1:numel(modeles)
+                pulsations = grilles{k} / reglage.diviseurW;
+                m = reshape(modules{k}(i, j, :), [], 1);
+                if reglage.enDecibels
+                    m = 20 * log10(m);
+                end
+                courbesModule = [courbesModule, {pulsations, m}];              %#ok<AGROW>
+                courbesPhase = [courbesPhase, {pulsations, ...
+                    reshape(phases{k}(i, j, :), [], 1) * reglage.facteurPhase}]; %#ok<AGROW>
+                if ~isempty(styles{k})
+                    courbesModule{end + 1} = styles{k};                        %#ok<AGROW>
+                    courbesPhase{end + 1} = styles{k};                         %#ok<AGROW>
+                end
+            end
+            axes(cases{2 * i - 1, j});
+            semilogx(courbesModule{:});
+            grid(reglage.grille);
+            title(sprintf('De %s vers %s', entrees{j}, sorties{i}));
+            if j == 1, ylabel(reglage.nomGain); end
+            axes(cases{2 * i, j});
+            semilogx(courbesPhase{:});
+            grid(reglage.grille);
+            if j == 1, ylabel(reglage.nomPhase); end
+            if i == ny, xlabel(reglage.nomPulsation); end
+        end
+    end
 end

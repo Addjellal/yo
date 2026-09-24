@@ -116,6 +116,28 @@ classdef tf
                     sys.TimeUnit = modele.TimeUnit;
                 return
             end
+            % Les cellules disent une matrice de transferts, une case par
+            % couple (sortie, entree). Une seule case est une transmittance
+            % ordinaire. Plusieurs, TF ne sait pas les porter : il n'a
+            % qu'un numerateur et un denominateur. Les accepter rendait un
+            % modele 1 x 1 fait des cellules elles-memes -- on refuse en
+            % disant comment l'ecrire.
+            if iscell(num) || (nargin >= 2 && iscell(den))
+                if ~(iscell(num) && iscell(den)) || ~isequal(size(num), size(den))
+                    error('Control:tf:CellSize', ...
+                          'NUM et DEN doivent etre deux cellules de meme taille.');
+                end
+                if numel(num) ~= 1
+                    error('Control:tf:MIMONotSupported', ...
+                          ['Une matrice de transferts %d x %d ne se porte pas dans un ' ...
+                           'seul TF. Ecrivez chaque voie, puis assemblez-les : ' ...
+                           '[G11 G12; G21 G22] rend le modele d''etat a plusieurs ' ...
+                           'voies, que STEP, BODE et les autres savent traiter.'], ...
+                          size(num, 1), size(num, 2));
+                end
+                num = num{1};
+                den = den{1};
+            end
             if nargin == 1
                 % Gain statique : tf(K) vaut K/1.
                 den = 1;
@@ -225,6 +247,24 @@ classdef tf
                 modeles{k} = ss(varargin{k});
             end
             r = vertcat(modeles{:});
+        end
+
+        % NORM(SYS) est la norme H2 -- l'energie de la reponse
+        % impulsionnelle --, NORM(SYS,INF) la norme H-infini -- le plus grand
+        % gain sur toutes les pulsations --, comme dans MATLAB. Sans cette
+        % methode, la norme numerique s'appliquait a l'objet et rendait 0.
+        % Un retard pur n'y change rien : il ne touche ni au module ni a
+        % l'energie.
+        function n = norm(sys, type)
+            if nargin < 2 || (isnumeric(type) && isscalar(type) && type == 2)
+                n = h2norm(sys);
+            elseif (isnumeric(type) && isscalar(type) && isinf(type)) || ...
+                    ((ischar(type) || isstring(type)) && strcmpi(type, 'inf'))
+                n = hinfnorm(sys);
+            else
+                error('Control:analysis:NormType', ...
+                      'NORM(SYS,TYPE) accepte TYPE = 2 (norme H2) ou Inf (norme H-infini).');
+            end
         end
 
         % --- affichage ------------------------------------------------------

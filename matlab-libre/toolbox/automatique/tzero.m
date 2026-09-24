@@ -27,8 +27,28 @@ function z = tzero(a, b, c, d)
         z = eig(a - b * (d \ c));
         return
     end
-    % D singulière ou système non carré : les zéros sont les racines du
-    % numérateur de la fonction de transfert.
+    ny = size(d, 1);
+    nu = size(d, 2);
+    if ny > 1 || nu > 1
+        if ~carre
+            error('Control:analysis:TzeroNonSquare', ...
+                  ['TZERO ne sait calculer les zeros de transmission que d''un ' ...
+                   'modele a autant d''entrees que de sorties ; celui-ci en a %d ' ...
+                   'et %d. SYS(I,J) en choisit une voie.'], nu, ny);
+        end
+        % A plusieurs voies et D singuliere, les zeros de transmission sont
+        % les valeurs propres finies du faisceau de Rosenbrock : les
+        % lambda ou [A - lambda I, B; C, D] perd son rang. La seconde
+        % matrice du faisceau est singuliere, et c'est ce que EIG(A,B)
+        % sait a present traiter ; les valeurs infinies ne sont pas des
+        % zeros.
+        n = size(a, 1);
+        valeurs = eig([a, b; c, d], blkdiag(eye(n), zeros(nu)));
+        z = valeurs(isfinite(valeurs));
+        return
+    end
+    % Une voie, D nulle : les zéros sont les racines du numérateur de la
+    % fonction de transfert.
     [num, ~] = ss2tf(a, b, c, d);
     num = num(:).';
     while numel(num) > 1 && abs(num(1)) < 1e-12
