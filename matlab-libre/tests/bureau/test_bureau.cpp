@@ -1560,6 +1560,10 @@ int main(int argc, char** argv) {
                 if (QLatin1String(b->type) == QLatin1String("from"))
                     essaiTous += QStringLiteral(
                         "m = add_block(m, 'goto', 'envoi', 'GotoTag', 'A');\n");
+                if (QLatin1String(b->type) == QLatin1String("busselector"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'buscreator', 'bus', 'Inputs', 'a,b'), "
+                        "'bus', 'busselector');\n");
                 if (QLatin1String(b->type) == QLatin1String("demux"))
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'constant', 'v', 'Value', [1 2]), "
@@ -2353,6 +2357,62 @@ int main(int argc, char** argv) {
                                 compter(QStringLiteral("Blocs")) == 3;
                      }, 20000),
                      "et la toile reprend le schema du dessus, intact");
+
+            // --- un sous-systeme masque ----------------------------
+            //
+            // Masque, le sous-systeme se regle comme un bloc : le
+            // double-clic ouvre la boite de ses variables de masque, et
+            // Ctrl+U regarde dessous.
+            envoyer(fenetre, QStringLiteral(
+                "modeleEmboite = set_param(modeleEmboite, 'boite', 'Mask', 'on', "
+                "'MaskVariables', 'K=@1;', 'MaskValueString', '3');"));
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "le sous-systeme se masque");
+            verifier(attendre([&] {
+                         QCoreApplication::processEvents();
+                         for (const BlocSchema& b : simulink->schemaAffiche().blocs)
+                             if (b.nom == QLatin1String("boite")) return b.masque;
+                         return false;
+                     }, 20000),
+                     "et le schema le sait masque");
+            QStringList reglagesMasque;
+            QString valeurMasque;
+            commandesVues.clear();
+            lien = QObject::connect(
+                simulink, &FenetreSimulink::commandeDemandee,
+                [&commandesVues](const QString& c) { commandesVues << c; });
+            QTimer::singleShot(0, [&] {
+                auto* ouverte = simulink->findChild<DialogueBloc*>(
+                    QStringLiteral("dialogueBloc"));
+                if (!ouverte) return;
+                if (auto* champ = ouverte->champReglage(QStringLiteral("K"))) {
+                    valeurMasque = champ->text();
+                    champ->setText(QStringLiteral("5"));
+                }
+                ouverte->accept();
+            });
+            QMetaObject::invokeMethod(simulink, "surBlocOuvert",
+                                      Q_ARG(QString, QStringLiteral("boite")));
+            QCoreApplication::processEvents();
+            QObject::disconnect(lien);
+            verifier(simulink->cheminOuvert().isEmpty(),
+                     "le double-clic sur un sous-systeme masque n'y descend pas");
+            verifier(valeurMasque == QLatin1String("3"),
+                     "il ouvre la boite de ses variables de masque");
+            verifier(commandesVues.size() == 1 &&
+                         commandesVues[0].contains(QLatin1String("'K', '5'")),
+                     "et la valeur changee part en SET_PARAM");
+            verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                     "la commande passe");
+            const QPointF viseBoite = viser(QStringLiteral("boite"));
+            glisser(viseBoite, viseBoite);
+            simulink->actionSousMasque()->trigger();
+            QCoreApplication::processEvents();
+            verifier(simulink->cheminOuvert() == QLatin1String("boite"),
+                     "Ctrl+U regarde sous le masque");
+            QMetaObject::invokeMethod(simulink, "surRemontee");
+            QCoreApplication::processEvents();
+            verifier(simulink->cheminOuvert().isEmpty(), "et l'on remonte");
             envoyer(fenetre, QStringLiteral("clear modeleEmboite"));
             verifier(attendre([&] { return !fenetre.occupe(); }), "le bureau est net");
         }

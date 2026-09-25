@@ -33,9 +33,20 @@ function modele = matlibre_sl_modele(entree)
                 return
             end
         end
+        [~, ~, extension] = fileparts(nom);
+        if any(strcmpi(extension, {'.slx', '.mdl'}))
+            modele = matlibre_sl_slx('lire', nom);
+            return
+        end
         if exist(nom, 'file') == 2 || exist(nom, 'file') == 6
             modele = feval(nom);
             if isstruct(modele) && isfield(modele, 'blocs')
+                return
+            end
+        end
+        for extension = {'.slx', '.mdl'}
+            if exist([nom extension{1}], 'file') == 2
+                modele = matlibre_sl_slx('lire', [nom extension{1}]);
                 return
             end
         end

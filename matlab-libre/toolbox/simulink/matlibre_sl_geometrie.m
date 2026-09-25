@@ -24,6 +24,9 @@ function geometrie = matlibre_sl_geometrie(modele)
 %     G.blocs(k).entrees, .sorties               son nombre de ports
 %     G.blocs(k).gauche, .haut, .droite, .bas    le cadre du bloc
 %     G.blocs(k).pose                            vrai si POSITION le fixait
+%     G.blocs(k).masque                          vrai pour un sous-système
+%                                                masqué : ses paramètres sont
+%                                                les variables du masque
 %     G.liens(k).source, .cible, .port, .sortie, .retour
 %     G.largeur, G.hauteur                       la taille d'un bloc par défaut
 %     G.configuration                            les réglages de simulation,
@@ -56,7 +59,8 @@ function geometrie = matlibre_sl_geometrie(modele)
     blocs = struct('nom', {}, 'type', {}, 'etiquette', {}, 'signes', {}, ...
                    'gauche', {}, 'haut', {}, 'droite', {}, 'bas', {}, ...
                    'pose', {}, 'noms', {}, 'valeurs', {}, 'entrees', {}, ...
-                   'sorties', {}, 'parametres', {}, 'defauts', {}, 'choix', {});
+                   'sorties', {}, 'parametres', {}, 'defauts', {}, 'choix', {}, ...
+                   'masque', {});
     for k = 1:n
         bloc = modele.blocs{k};
         pose = false;
@@ -96,7 +100,9 @@ function geometrie = matlibre_sl_geometrie(modele)
                                 'pose', pose, 'noms', {noms}, ...
                                 'valeurs', {valeurs}, 'entrees', entrees, ...
                                 'sorties', sorties, 'parametres', {tous}, ...
-                                'defauts', {defauts}, 'choix', {choix});   %#ok<AGROW>
+                                'defauts', {defauts}, 'choix', {choix}, ...
+                                'masque', ~isempty(matlibre_sl_masque('variables', ...
+                                                                      bloc)));   %#ok<AGROW>
     end
     geometrie.blocs = blocs;
 
@@ -174,6 +180,17 @@ function [tous, valeurs, choix] = dialogue(bloc)
     tous = {};
     valeurs = {};
     choix = {};
+    % Un sous-système masqué montre les variables de son masque, comme un
+    % bloc de la bibliothèque montre ses paramètres.
+    variablesMasque = matlibre_sl_masque('variables', bloc);
+    if ~isempty(variablesMasque)
+        for k = 1:numel(variablesMasque)
+            tous{end + 1} = variablesMasque{k};                                %#ok<AGROW>
+            valeurs{end + 1} = matlibre_sl_masque('lire', bloc, variablesMasque{k}); %#ok<AGROW>
+            choix{end + 1} = '';                                               %#ok<AGROW>
+        end
+        return
+    end
     try
         entree = matlibre_sl_catalogue('type', bloc.type);
     catch

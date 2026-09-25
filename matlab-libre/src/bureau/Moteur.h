@@ -100,6 +100,9 @@ struct BlocSchema {
     // ou par défaut — et, pour un choix, les valeurs admises séparées par
     // « | ». C'est la boîte de Simulink : on y voit tout ce qui se règle.
     QStringList parametresNoms, parametresValeurs, parametresChoix;
+    // Un sous-système masqué : ses paramètres sont les variables de son
+    // masque, et le double-clic les règle au lieu de l'ouvrir.
+    bool masque = false;
 };
 
 struct LienSchema {

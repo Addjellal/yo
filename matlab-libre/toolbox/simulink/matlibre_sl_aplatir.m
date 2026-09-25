@@ -54,6 +54,7 @@ function modele = matlibre_sl_aplatir(modele)
 %   Voir aussi SIM, ADD_BLOCK, MATLIBRE_SL_ORDRE.
     modele = matlibre_sl_modele(modele);
     modele.liens = matlibre_sl_liens(modele);
+    modele = rafraichirLiens(modele);
     for j = 1:numel(modele.blocs)
         modele.blocs{j}.type = typeCanonique(modele.blocs{j}.type);
     end
@@ -72,6 +73,54 @@ function modele = matlibre_sl_aplatir(modele)
                    'sous-systeme se contient lui-meme, directement ou non.']);
         end
         modele = deplier(modele, k);
+    end
+end
+
+% Un bloc lié à une bibliothèque reprend ce qu'elle porte au moment de
+% simuler : son type, ses paramètres, son contenu. Il garde son nom, et les
+% valeurs qu'on a données à son masque. Une bibliothèque introuvable laisse
+% la copie, en le disant.
+function modele = rafraichirLiens(modele)
+    for j = 1:numel(modele.blocs)
+        bloc = modele.blocs{j};
+        if ~isfield(bloc, 'reference') || isempty(bloc.reference)
+            continue
+        end
+        barre = find(bloc.reference == '/', 1);
+        source = [];
+        try
+            bibliotheque = matlibre_sl_modele(bloc.reference(1:barre - 1));
+            chemin = bloc.reference(barre + 1:end);
+            dernier = find(chemin == '/', 1, 'last');
+            if ~isempty(dernier)
+                bibliotheque = matlibre_sl_dedans(bibliotheque, chemin(1:dernier - 1));
+                chemin = chemin(dernier + 1:end);
+            end
+            for k = 1:numel(bibliotheque.blocs)
+                if strcmp(bibliotheque.blocs{k}.nom, chemin)
+                    source = bibliotheque.blocs{k};
+                end
+            end
+        catch
+        end
+        if isempty(source)
+            warning('Simulink:Libraries:MissingSourceBlock', ...
+                    ['Le bloc ''%s'' est lie a ''%s'', introuvable : sa copie sert a la ' ...
+                     'place.'], char(bloc.nom), bloc.reference);
+            continue
+        end
+        neuf = bloc;
+        neuf.type = source.type;
+        neuf.parametres = source.parametres;
+        valeurs = matlibre_sl_masque('variables', bloc);
+        if isfield(bloc.parametres, 'MaskValueString') && ...
+           isequal(valeurs, matlibre_sl_masque('variables', neuf))
+            neuf.parametres.MaskValueString = bloc.parametres.MaskValueString;
+        end
+        if isfield(bloc.parametres, 'Position')
+            neuf.parametres.Position = bloc.parametres.Position;
+        end
+        modele.blocs{j} = neuf;
     end
 end
 
@@ -101,6 +150,7 @@ function modele = deplier(modele, k)
     bloc = modele.blocs{k};
     interne = contenu(bloc);
     interne.liens = matlibre_sl_liens(interne);
+    interne = rafraichirLiens(interne);
     for j = 1:numel(interne.blocs)
         interne.blocs{j}.type = typeCanonique(interne.blocs{j}.type);
     end
@@ -112,6 +162,16 @@ function modele = deplier(modele, k)
     gardeParent = 0;
     if isfield(bloc, 'garde')
         gardeParent = bloc.garde;
+    end
+    % Un masque ouvre un espace : ses variables, évaluées dans l'espace de
+    % celui qui l'englobe, valent pour tous les blocs du dedans.
+    espaceParent = struct();
+    if isfield(bloc, 'espace')
+        espaceParent = bloc.espace;
+    end
+    espaceInterieur = espaceParent;
+    if ~isempty(matlibre_sl_masque('variables', bloc))
+        espaceInterieur = matlibre_sl_masque('espace', bloc, espaceParent, char(bloc.nom));
     end
 
     % Le bloc du sous-système garde sa place dans la liste — donc son
@@ -145,6 +205,9 @@ function modele = deplier(modele, k)
         enfant.garde = gardeParent;
         if g > 0 && ~any(j == controles.tous)
             enfant.garde = n + g;
+        end
+        if ~isempty(fieldnames(espaceInterieur))
+            enfant.espace = espaceInterieur;
         end
         modele.blocs{n + j} = enfant;
     end

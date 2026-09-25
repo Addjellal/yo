@@ -65,6 +65,14 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nEntrees = 3;
         case 'multiportswitch'
             nEntrees = 1 + entier(lire(p, 'Inputs', 3));
+        case 'buscreator'
+            nEntrees = compterNoms(lire(p, 'Inputs', '2'));
+        case 'busselector'
+            if strcmpi(char(lire(p, 'OutputAsBus', 'off')), 'on')
+                nSorties = 1;
+            else
+                nSorties = compterNoms(lire(p, 'OutputSignals', 'signal1,signal2'));
+            end
         case 'mux'
             nEntrees = compterParties(lire(p, 'Inputs', 2));
         case 'demux'
@@ -228,6 +236,21 @@ function n = compterSignes(v, admis)
         return
     end
     n = sum(ismember(texte, admis));
+end
+
+% Un nombre, ou une liste de noms séparés par des virgules.
+function n = compterNoms(v)
+    if isnumeric(v)
+        n = entier(v);
+        return
+    end
+    texte = strtrim(char(v));
+    valeur = str2double(texte);
+    if ~isnan(valeur)
+        n = valeur;
+        return
+    end
+    n = numel(strsplit(texte, ','));
 end
 
 % Mux et Demux : un nombre de voies, ou un vecteur de largeurs dont chaque

@@ -1,4 +1,4 @@
-function modele = new_system(nom)
+function modele = new_system(nom, genre)
 %NEW_SYSTEM Crée un modèle Simulink vide.
 %   MODELE = NEW_SYSTEM(NOM) rend un modèle sans bloc ni lien. On le
 %   remplit par ADD_BLOCK, on le câble par ADD_LINE, on le règle par
@@ -12,9 +12,14 @@ function modele = new_system(nom)
 %   FixedStep —, que SIM emploie quand on ne lui donne ni durée ni pas.
 %   ADD_PARAM les pose, DELETE_PARAM les retire.
 %
-%   Les modèles se décrivent ici en appelant ces fonctions ; les fichiers
-%   .slx de MathWorks, dont le format n'est pas public, ne se lisent pas.
-%   SAVE_SYSTEM en écrit un programme .m, que LOAD_SYSTEM relit.
+%   NEW_SYSTEM(NOM,'Library') crée une bibliothèque : ses blocs se posent
+%   dans d'autres modèles par ADD_BLOCK(M,'nomBibliotheque/bloc',NOM), qui
+%   y garde le lien — la bibliothèque changée, le bloc suit —, mais elle ne
+%   se simule pas elle-même.
+%
+%   Les modèles se décrivent ici en appelant ces fonctions, ou se lisent
+%   d'un fichier .slx ou .mdl de Simulink par LOAD_SYSTEM. SAVE_SYSTEM en
+%   écrit un programme .m, ou un .slx, que LOAD_SYSTEM relit.
 %
 %   Exemple :
 %      m = new_system('rampe');
@@ -29,4 +34,14 @@ function modele = new_system(nom)
     modele.blocs = {};
     modele.liens = [];
     modele.parametres = struct();
+    if nargin >= 2
+        switch lower(char(genre))
+            case 'library'
+                modele.parametres.BlockDiagramType = 'library';
+            case 'model'
+            otherwise
+                error('Simulink:Commands:NewSystemType', ...
+                      'NEW_SYSTEM(NOM,TYPE) : le type est ''Model'' ou ''Library''.');
+        end
+    end
 end

@@ -3,12 +3,14 @@ function fichier = save_system(modele, fichier)
 %   SAVE_SYSTEM(MODELE) écrit MODELE.nom.m dans le dossier courant.
 %   SAVE_SYSTEM(MODELE,FICHIER) choisit le nom du fichier ; l'extension
 %   .m est ajoutée si elle manque. La fonction rend le chemin écrit.
+%   SAVE_SYSTEM(MODELE,'nom.slx') écrit au format de Simulink, une
+%   archive de fichiers XML que LOAD_SYSTEM relit (voir MATLIBRE_SL_SLX).
 %
 %   Le fichier produit est un programme : une fonction sans argument qui
 %   appelle NEW_SYSTEM, ADD_BLOCK et ADD_LINE, et rend le modèle.
 %   LOAD_SYSTEM le relit, et SIM l'accepte par son nom. C'est un format
-%   qui se lit, se compare et se range dans un dépôt — ce que le .slx de
-%   MathWorks, binaire et non documenté, ne permet pas.
+%   qui se lit, se compare et se range dans un dépôt, mieux qu'une
+%   archive .slx.
 %
 %   Les valeurs de paramètres sont réécrites par MAT2STR pour les
 %   nombres et entre apostrophes pour le texte : ce qu'on relit est ce
@@ -37,6 +39,11 @@ function fichier = save_system(modele, fichier)
         fichier = [modele.nom '.m'];
     end
     fichier = char(fichier);
+    [~, ~, extension] = fileparts(fichier);
+    if strcmpi(extension, '.slx')
+        matlibre_sl_slx('ecrire', modele, fichier);
+        return
+    end
     if numel(fichier) < 2 || ~strcmp(fichier(end-1:end), '.m')
         fichier = [fichier '.m'];
     end

@@ -1469,6 +1469,8 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                             y = y .* u + T.P(p + j);
                         end
                         V(a:b) = y;
+                    case 34   % data type conversion
+                        V(a:b) = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u);
                     case 33   % sqrt
                         switch sub(k)
                             case 1
@@ -1993,6 +1995,50 @@ function [x, Z, refaire] = remettre(T, V, Z, x)
             refaire = true;
         end
     end
+end
+
+% Une conversion de type : le signal reste un double, mais prend les valeurs
+% que le type admet — arrondi selon le mode demandé, puis saturé ou
+% replié modulo 2^n à la façon des entiers de Simulink.
+function y = convertirType(type, arrondi, saturer, u)
+    switch type
+        case {1, 2}   % hérité, double : rien ne change
+            y = u;
+            return
+        case 3
+            y = double(single(u));
+            return
+        case 10
+            y = double(u ~= 0);
+            return
+    end
+    switch arrondi
+        case 1
+            v = fix(u);
+        case 2   % Nearest : au plus proche, la moitié vers +inf
+            v = floor(u + 0.5);
+        case 3   % Round : au plus proche, la moitié loin de zéro
+            v = round(u);
+        case 4
+            v = floor(u);
+        case 5
+            v = ceil(u);
+        case 6   % Convergent : la moitié vers le pair
+            v = round(u);
+            moitie = abs(u - fix(u)) == 0.5;
+            v(moitie) = 2 * round(u(moitie) / 2);
+        otherwise
+            v = fix(u);
+    end
+    bornes = [-128 127; 0 255; -32768 32767; 0 65535; -2147483648 2147483647; 0 4294967295];
+    b = bornes(type - 3, :);
+    if saturer
+        y = min(max(v, b(1)), b(2));
+    else
+        etendue = b(2) - b(1) + 1;
+        y = mod(v - b(1), etendue) + b(1);
+    end
+    y(isnan(u)) = 0;
 end
 
 % --- les modes figés du pas variable

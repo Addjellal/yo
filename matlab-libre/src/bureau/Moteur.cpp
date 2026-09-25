@@ -649,6 +649,7 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             b.droite = blocs.champ("droite", k).scal();
             b.bas = blocs.champ("bas", k).scal();
             b.pose = blocs.champ("pose", k).scal() != 0.0;
+            if (blocs.aChamp("masque")) b.masque = blocs.champ("masque", k).scal() != 0.0;
             if (blocs.aChamp("entrees") && !blocs.champ("entrees", k).estVide())
                 b.entrees = (int)blocs.champ("entrees", k).scal();
             if (blocs.aChamp("sorties") && !blocs.champ("sorties", k).estVide())

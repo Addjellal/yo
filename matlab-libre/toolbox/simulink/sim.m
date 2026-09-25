@@ -116,6 +116,13 @@ function varargout = sim(modele, varargin)
                'ADD_LINE, or the name of one.']);
     end
 
+    if isfield(modele, 'parametres') && isfield(modele.parametres, 'BlockDiagramType') && ...
+       strcmpi(modele.parametres.BlockDiagramType, 'library')
+        error('Simulink:Engine:CannotSimulateLibrary', ...
+              ['''%s'' est une bibliotheque : ses blocs se posent dans un modele, par ' ...
+               'ADD_BLOCK(M, ''%s/bloc'', NOM), et c''est le modele qui se simule.'], ...
+              char(modele.nom), char(modele.nom));
+    end
     [config, imposes] = lireArguments(matlibre_sl_config('lire', modele), varargin);
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
@@ -475,18 +482,23 @@ function deposer(c, T, J, instants)
 end
 
 % Un modèle désigné par son nom : une variable de l'espace de travail de
-% l'appelant, ou un fichier .m qui le construit. Les .slx de MathWorks ne
-% se lisent pas encore.
+% l'appelant, un fichier .m qui le construit, ou un fichier .slx ou .mdl
+% de Simulink, que MATLIBRE_SL_SLX lit.
 function modele = chargerModele(nom)
+    [~, ~, extension] = fileparts(nom);
+    if any(strcmpi(extension, {'.slx', '.mdl'}))
+        modele = matlibre_sl_slx('lire', nom);
+        return
+    end
     if exist(nom, 'file') == 2 || exist(nom, 'file') == 6
         modele = feval(nom);
         return
     end
-    if exist([nom '.slx'], 'file') || exist([nom '.mdl'], 'file')
-        error('Simulink:Commands:SlxNonLu', ...
-              ['MatLibre ne lit pas encore les fichiers .slx ni .mdl. Decrivez le ' ...
-               'modele ''%s'' en appelant NEW_SYSTEM, ADD_BLOCK et ADD_LINE, dans un ' ...
-               'fichier %s.m qui le rend.'], nom, nom);
+    for autre = {'.slx', '.mdl'}
+        if exist([nom autre{1}], 'file') == 2
+            modele = matlibre_sl_slx('lire', [nom autre{1}]);
+            return
+        end
     end
     error('Simulink:Commands:OpenSystemUnknownSystem', ...
           'Invalid Simulink object name: ''%s''.', nom);

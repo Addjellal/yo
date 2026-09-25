@@ -5,8 +5,10 @@ function modele = load_system(nom)
 %   modèle obtenu. Le modèle est inscrit au registre de la session :
 %   BDISLOADED répond vrai, et GCS le nomme.
 %
-%   Le chemin peut porter l'extension .m ou non. Un fichier .slx ou .mdl
-%   est refusé en disant pourquoi : leur format n'est pas public.
+%   Le chemin peut porter l'extension .m ou non. Un fichier .slx ou .mdl,
+%   ceux qu'enregistre Simulink, se lit aussi : ses blocs, ses liens, ses
+%   sous-systèmes et sa configuration deviennent un modèle de MatLibre
+%   (voir MATLIBRE_SL_SLX).
 %
 %   Exemple :
 %      m = new_system('petit');
@@ -21,13 +23,19 @@ function modele = load_system(nom)
     nom = char(nom);
     [dossier, base, extension] = fileparts(nom);
     if strcmpi(extension, '.slx') || strcmpi(extension, '.mdl')
-        error('Simulink:Commands:SlxNonLu', ...
-              ['MatLibre ne lit pas les fichiers .slx ni .mdl : leur format ' ...
-               'n''est pas public. Decrivez le modele en appelant NEW_SYSTEM, ' ...
-               'ADD_BLOCK et ADD_LINE, ou enregistrez-le par SAVE_SYSTEM.']);
+        modele = matlibre_sl_slx('lire', nom);
+        matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+        return
     end
     chemin = fullfile(dossier, [base '.m']);
     if exist(chemin, 'file') ~= 2
+        for autre = {'.slx', '.mdl'}
+            if exist(fullfile(dossier, [base autre{1}]), 'file') == 2
+                modele = matlibre_sl_slx('lire', fullfile(dossier, [base autre{1}]));
+                matlibre_sl_ouverts('inscrire', modele.nom, modele, 0);
+                return
+            end
+        end
         error('Simulink:Commands:OpenSystemUnknownSystem', ...
               'Invalid Simulink object name: ''%s''.', nom);
     end

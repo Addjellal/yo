@@ -20,8 +20,9 @@
 % numérique écrit entre apostrophes est une expression, évaluée à la
 % simulation — un gain réglé sur 'K' vaut ce que vaut K. Dans l'autre
 % sens, le bloc « toworkspace » y dépose son signal et « fromworkspace »
-% y lit le sien. Les fichiers .slx de MathWorks ne se lisent pas encore ;
-% save_system écrit à leur place un programme .m qui rebâtit le modèle.
+% y lit le sien. Les fichiers .slx et .mdl de Simulink se lisent par
+% load_system et s'écrivent par save_system(m, 'nom.slx') ; par défaut,
+% save_system écrit un programme .m qui rebâtit le modèle.
 %
 % Modèle
 %   new_system    - Crée un modèle vide

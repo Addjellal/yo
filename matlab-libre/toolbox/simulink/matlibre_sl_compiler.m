@@ -181,6 +181,7 @@ function c = matlibre_sl_compiler(modele, options)
 
     % --- 6. dimensions ------------------------------------------------------
     c.dims = propagerDimensions(c);
+    c.dimsCourants = c.dims;   % la forme des bus se lit sur les dimensions
     c.largeur = zeros(1, c.nPorts);
     for gp = 1:c.nPorts
         c.largeur(gp) = prod(c.dims{gp});
@@ -302,7 +303,9 @@ function p = lireParametres(entree, bloc, chemin)
         if iscell(nature)
             p.(nom) = choisir(v, nature, chemin, nom);
         elseif strcmp(nature, 'nombre')
-            if ischar(v) || isstring(v)
+            if (ischar(v) || isstring(v)) && isfield(bloc, 'espace')
+                v = matlibre_sl_masque('evaluer', char(v), bloc.espace, chemin, nom);
+            elseif ischar(v) || isstring(v)
                 v = matlibre_sl_expression(char(v), chemin, nom);
             end
             if ~(isnumeric(v) || islogical(v))
@@ -374,7 +377,8 @@ function x = codeDe(type)
                 'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
                 'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
                 'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
-                'sfunction', 103; 'chart', 104};
+                'sfunction', 103; 'chart', 104; ...
+                'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -551,6 +555,9 @@ function dims = propagerDimensions(c)
                 continue
             end
             [dimsE, complet] = dimsEntrees(c, k, dims, connu);
+            if strcmp(c.types{k}, 'busselector')
+                c.dimsCourants = dims;   % il lit la forme du bus en amont
+            end
             sortie = regleDims(c, k, dimsE, complet, forcer);
             if isempty(sortie) || any(cellfun(@isempty, sortie))
                 continue
@@ -578,6 +585,7 @@ function dims = propagerDimensions(c)
     end
     % Une fois tout connu, chaque bloc vérifie ses entrées : c'est là que
     % tombent les désaccords de dimensions.
+    c.dimsCourants = dims;
     for k = 1:c.n
         [dimsE, ~] = dimsEntrees(c, k, dims, connu);
         sortie = regleDims(c, k, dimsE, true, true);
@@ -840,6 +848,20 @@ function s = regleTraitement(c, k, dE, complet, forcer)
                       'L''entree de commande de ''%s'' doit etre scalaire.', c.chemins{k});
             end
             s = {accorder(dE(2:end), c, k, q(2:end))};
+        case 'buscreator'
+            s = {[sum(cellfun(@prod, dE)) 1]};
+        case 'busselector'
+            choix = elementsChoisis(c, k);
+            if isempty(choix)
+                return   % la forme du bus n'est pas encore connue
+            end
+            if strcmp(p.OutputAsBus, 'on')
+                s = {[sum([choix.largeur]) 1]};
+            else
+                s = arrayfun(@(e) e.dims, choix, 'UniformOutput', false);
+            end
+        case 'datatypeconversion'
+            s = dE(1);
         case 'mux'
             largeurs = cellfun(@prod, dE);
             attendues = double(p.Inputs);
@@ -1550,6 +1572,32 @@ function c = abaisser(c, pas, tDebut)
                     debut = debut + L;
                 end
                 seg = bornes;
+            case 'busselector'            % comme un Demux, ou comme un Selector
+                choix = elementsChoisis(c, k);
+                if strcmp(p.OutputAsBus, 'on')
+                    indices = [];
+                    for q = 1:numel(choix)
+                        indices = [indices, choix(q).debut:choix(q).debut + ...
+                                   choix(q).largeur - 1]; %#ok<AGROW>
+                    end
+                    c.code(k) = 64;
+                    seg = [numel(indices); indices(:)];
+                else
+                    bornes = zeros(2 * numel(choix), 1);
+                    for q = 1:numel(choix)
+                        bornes(2 * q - 1:2 * q) = [choix(q).debut; ...
+                                                   choix(q).debut + choix(q).largeur - 1];
+                    end
+                    seg = bornes;
+                end
+            case 'datatypeconversion'     % [type; arrondi; saturation]
+                types = {'Inherit: Inherit via back propagation', 'double', 'single', ...
+                         'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'boolean'};
+                arrondis = {'Zero', 'Nearest', 'Round', 'Floor', 'Ceiling', 'Convergent', ...
+                            'Simplest'};
+                seg = [find(strcmp(types, p.OutDataTypeStr)); ...
+                       find(strcmp(arrondis, p.RndMeth)); ...
+                       strcmp(p.SaturateOnIntegerOverflow, 'on')];
             case 'selector'               % [n; indices]
                 indices = double(p.Indices(:));
                 seg = [numel(indices); indices];
@@ -2172,6 +2220,103 @@ function s = dimsFonction(c, k, dE)
                   'La sortie %d du bloc ''%s'' est vide.', q, c.chemins{k});
         end
         s{q} = d;
+    end
+end
+
+% === bus =======================================================================
+%
+% La forme d'un bus : ses éléments, chacun avec son nom, ses dimensions, sa
+% place dans le vecteur qui les porte bout à bout, et, s'il est lui-même
+% un bus, sa forme. On la lit en remontant du port jusqu'au Bus Creator,
+% à travers les passe-plats — un sous-système déplié, un Goto et son
+% From.
+function forme = formeBus(c, gp)
+    forme = [];
+    for pas = 1:c.n
+        if gp == 0
+            return
+        end
+        a = c.proprio(gp);
+        switch c.types{a}
+            case 'buscreator'
+                break
+            case {'signalconversion', 'from'}
+                gp = c.entrees{a}(max(1, min(c.rang(gp), c.nIn(a))));
+            otherwise
+                return
+        end
+    end
+    noms = nomsDuBus(c.p{a}.Inputs, c.nIn(a));
+    forme = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {}, 'sous', {});
+    debut = 1;
+    for j = 1:c.nIn(a)
+        source = c.entrees{a}(j);
+        d = [1 1];
+        if source > 0
+            if ~isfield(c, 'dimsCourants') || isempty(c.dimsCourants{source})
+                forme = [];
+                return
+            end
+            d = c.dimsCourants{source};
+        end
+        w = prod(d);
+        forme(end + 1) = struct('nom', noms{j}, 'dims', d, 'largeur', w, 'debut', debut, ...
+                                'sous', {formeBus(c, source)}); %#ok<AGROW>
+        debut = debut + w;
+    end
+end
+
+function noms = nomsDuBus(entrees, n)
+    texte = strtrim(char(num2str(entrees)));
+    if isnan(str2double(texte))
+        noms = strtrim(strsplit(texte, ','));
+    else
+        noms = arrayfun(@(j) sprintf('signal%d', j), 1:n, 'UniformOutput', false);
+    end
+end
+
+% Les éléments qu'un Bus Selector reprend, dans l'ordre de OutputSignals ;
+% « mesures.vitesse » descend dans un bus emboîté.
+function choix = elementsChoisis(c, k)
+    choix = [];
+    forme = formeBus(c, c.entrees{k}(1));
+    if isempty(forme)
+        if c.entrees{k}(1) == 0 || (isfield(c, 'dimsCourants') && ...
+                                    ~isempty(c.dimsCourants{c.entrees{k}(1)}))
+            error('Simulink:Bus:SelectorInputNotBus', ...
+                  ['L''entree du Bus Selector ''%s'' n''est pas un bus : il lui faut le ' ...
+                   'signal d''un Bus Creator.'], c.chemins{k});
+        end
+        return
+    end
+    demandes = strtrim(strsplit(char(c.p{k}.OutputSignals), ','));
+    choix = struct('nom', {}, 'dims', {}, 'largeur', {}, 'debut', {});
+    for q = 1:numel(demandes)
+        parties = strsplit(demandes{q}, '.');
+        niveau = forme;
+        decalage = 0;
+        element = [];
+        for i = 1:numel(parties)
+            rang = find(strcmp({niveau.nom}, parties{i}), 1);
+            if isempty(rang)
+                error('Simulink:Bus:SelectorElementNotFound', ...
+                      ['Le Bus Selector ''%s'' demande ''%s'', que le bus ne porte pas ; ' ...
+                       'ses elements sont : %s.'], c.chemins{k}, demandes{q}, ...
+                      strjoin({niveau.nom}, ', '));
+            end
+            element = niveau(rang);
+            decalage = decalage + element.debut - 1;
+            if i < numel(parties)
+                if isempty(element.sous)
+                    error('Simulink:Bus:SelectorElementNotFound', ...
+                          ['Le Bus Selector ''%s'' demande ''%s'', mais ''%s'' n''est ' ...
+                           'pas un bus.'], c.chemins{k}, demandes{q}, parties{i});
+                end
+                niveau = element.sous;
+            end
+        end
+        choix(end + 1) = struct('nom', demandes{q}, 'dims', element.dims, ...
+                                'largeur', element.largeur, 'debut', decalage + 1); %#ok<AGROW>
     end
 end
 

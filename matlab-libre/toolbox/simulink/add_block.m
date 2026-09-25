@@ -156,6 +156,13 @@ function modele = add_block(modele, type, nom, varargin)
 %   leur valeur initiale (OutputWhenDisabled), et ses états tiennent, ou
 %   repartent à la reprise (StatesWhenEnabling).
 %
+%   ADD_BLOCK(MODELE,'bibliotheque/bloc',NOM) recopie un bloc d'une
+%   bibliothèque bâtie par NEW_SYSTEM(...,'Library') — ou d'un autre
+%   modèle —, ouverte, dans l'espace de travail ou en fichier. Le bloc
+%   d'une bibliothèque y reste lié : GET_PARAM(...,'ReferenceBlock') le
+%   dit, et la simulation reprend la bibliothèque telle qu'elle est alors,
+%   en gardant les valeurs du masque que le bloc a reçues.
+%
 %   Un type inconnu est refusé, comme un paramètre que le bloc n'a pas :
 %   rangé sans être lu, il ferait croire à un réglage qui n'a pas lieu.
 %   Les noms de paramètres se lisent sans égard à la casse, et les noms
@@ -184,8 +191,15 @@ function modele = add_block(modele, type, nom, varargin)
 %      get_param(m, 'integ', 'BlockType')         % 'integrator'
 %
 %   Voir aussi NEW_SYSTEM, ADD_LINE, SET_PARAM, DELETE_BLOCK, SIM, OPEN_SYSTEM.
-    entree = matlibre_sl_catalogue('type', type);
     nom = char(nom);
+    % « bibliotheque/bloc » : un bloc d'une bibliothèque de l'utilisateur,
+    % ou d'un autre modèle, recopié — et lié s'il vient d'une bibliothèque.
+    [source, reference] = blocAilleurs(type);
+    if ~isempty(source)
+        modele = poserCopie(modele, source, reference, nom, varargin);
+        return
+    end
+    entree = matlibre_sl_catalogue('type', type);
     unique = false;
     reglages = {};
     for k = 1:2:numel(varargin)
@@ -277,6 +291,78 @@ function gabarit = gabaritDeSousSysteme(designation, nom)
     gabarit = add_line(gabarit, 'In1', 'Out1');
     for k = 1:size(controles, 1)
         gabarit = add_block(gabarit, controles{k, 1}, controles{k, 2});
+    end
+end
+
+% Un bloc désigné par « modele/bloc », quand MODELE est une bibliothèque
+% ou un modèle connus — ouverts, dans l'espace de travail ou en fichier — et
+% qu'il y porte un bloc de ce nom. Les chemins de la bibliothèque de
+% Simulink ne s'y prennent pas : ils sont au catalogue.
+function [source, reference] = blocAilleurs(designation)
+    source = [];
+    reference = '';
+    if ~(ischar(designation) || isstring(designation))
+        return
+    end
+    texte = char(designation);
+    barre = find(texte == '/', 1);
+    if isempty(barre) || any(strcmpi(texte(1:barre - 1), {'simulink', 'sflib'}))
+        return
+    end
+    nomModele = texte(1:barre - 1);
+    chemin = texte(barre + 1:end);
+    try
+        bibliotheque = matlibre_sl_modele(nomModele);
+    catch
+        return
+    end
+    [parent, feuille] = deuxParties(chemin);
+    if ~isempty(parent)
+        try
+            bibliotheque = matlibre_sl_dedans(bibliotheque, parent);
+        catch
+            return
+        end
+    end
+    for k = 1:numel(bibliotheque.blocs)
+        if strcmp(bibliotheque.blocs{k}.nom, feuille)
+            source = bibliotheque.blocs{k};
+            if isfield(bibliotheque.parametres, 'BlockDiagramType') && ...
+               strcmpi(bibliotheque.parametres.BlockDiagramType, 'library')
+                reference = texte;
+            end
+            return
+        end
+    end
+end
+
+function [parent, feuille] = deuxParties(chemin)
+    barre = find(chemin == '/', 1, 'last');
+    if isempty(barre)
+        parent = '';
+        feuille = chemin;
+    else
+        parent = chemin(1:barre - 1);
+        feuille = chemin(barre + 1:end);
+    end
+end
+
+function modele = poserCopie(modele, source, reference, nom, reglages)
+    if existe(modele, nom)
+        error('Simulink:Commands:AddBlockCantAdd', ...
+              ['Le modele ''%s'' porte deja un bloc nomme ''%s'' : deux blocs d''un ' ...
+               'meme systeme ne portent pas le meme nom.'], char(modele.nom), nom);
+    end
+    bloc = struct('type', source.type, 'nom', nom, 'parametres', source.parametres);
+    if ~isempty(reference)
+        bloc.reference = reference;
+    end
+    modele.blocs{end + 1} = bloc;
+    for k = 1:2:numel(reglages) - 1
+        if strcmpi(char(reglages{k}), 'MakeNameUnique')
+            continue
+        end
+        modele = set_param(modele, nom, reglages{k}, reglages{k + 1});
     end
 end
 

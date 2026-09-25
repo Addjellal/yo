@@ -67,6 +67,7 @@ public:
     QComboBox* choixSolveur() const { return solveur_; }
     QLineEdit* champDuree() const { return duree_; }
     QAction* actionConfiguration() const { return aConfiguration_; }
+    QAction* actionSousMasque() const { return aSousMasque_; }
     QTreeWidget* explorateur() const { return explorateur_; }
     ToileSimulink* toile() const { return toile_; }
     QLabel* description() const { return description_; }
@@ -75,6 +76,7 @@ public:
     // Le chemin ouvert dans le modèle : vide en surface, « boite » ou
     // « boite/interne » quand on est descendu dans un sous-système.
     QString cheminOuvert() const { return chemin_; }
+    const SchemaSimulink& schemaAffiche() const { return dernier_; }
     // Le modèle et le chemin réunis, tels que le moteur les attend.
     QString ancreAffichee() const;
     // Remonter d'un cran dans les sous-systèmes ouverts.
@@ -123,6 +125,7 @@ private slots:
     void ajusterVue();
     // Ctrl+E : les paramètres de configuration du modèle.
     void ouvrirConfiguration();
+    void regarderSousMasque();
     // Le solveur choisi dans la barre se pose sur le modèle, comme dans
     // la boîte de configuration.
     void surSolveurChoisi(int rang);
@@ -158,6 +161,7 @@ private:
     // le modèle : ce n'est pas un choix de l'utilisateur, rien ne part.
     bool majReglages_ = false;
     QAction* aConfiguration_ = nullptr;
+    QAction* aSousMasque_ = nullptr;
     QDockWidget* dockBibliotheque_;
     QPushButton* bInserer_;
     QAction* aOuvrir_ = nullptr;

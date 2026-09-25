@@ -1,8 +1,9 @@
 function nom = matlibre_sl_charger(chemin)
 %MATLIBRE_SL_CHARGER Relit un modèle et le dépose dans l'espace de travail.
-%   NOM = MATLIBRE_SL_CHARGER(CHEMIN) exécute le fichier .m qui bâtit un
-%   modèle — celui qu'écrit SAVE_SYSTEM — et pose le modèle obtenu dans
-%   l'espace de travail de base, sous son propre nom. Il rend ce nom.
+%   NOM = MATLIBRE_SL_CHARGER(CHEMIN) relit le modèle — le fichier .m qui
+%   le bâtit, celui qu'écrit SAVE_SYSTEM, ou un fichier .slx ou .mdl venu
+%   de Simulink — et pose le modèle obtenu dans l'espace de travail de
+%   base, sous son propre nom. Il rend ce nom.
 %
 %   C'est ce que fait l'éditeur du bureau quand on ouvre un modèle : il
 %   ne garde pas le modèle pour lui, il le met là où tout le monde le

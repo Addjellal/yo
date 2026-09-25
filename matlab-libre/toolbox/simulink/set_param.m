@@ -16,7 +16,8 @@ function modele = set_param(modele, nom, varargin)
 %   se change pas — REPLACE_BLOCK change le type d'un bloc.
 %
 %   'Name' fait exception : il renomme le bloc, comme dans Simulink, au
-%   lieu de poser un réglage de ce nom. Les liens désignent les blocs par
+%   lieu de poser un réglage de ce nom. Sur un sous-système masqué, une
+%   variable du masque (MaskVariables) se règle comme un paramètre. Les liens désignent les blocs par
 %   leur rang, si bien que le câblage ne bouge pas.
 %
 %   MODELE = SET_PARAM(MODELE,'Reglage',VALEUR,...) — sans nom de bloc
@@ -87,6 +88,13 @@ function modele = set_param(modele, nom, varargin)
             error('Simulink:Commands:ParamReadOnly', ...
                   ['Le type d''un bloc ne se change pas par SET_PARAM : REPLACE_BLOCK ' ...
                    'le fait, en gardant le cablage.']);
+        end
+        % Une variable de masque est un paramètre du bloc masqué, comme
+        % dans Simulink.
+        variablesMasque = matlibre_sl_masque('variables', b);
+        if any(strcmp(variablesMasque, champ))
+            b = matlibre_sl_masque('poser', b, champ, valeur);
+            continue
         end
         canon = matlibre_sl_catalogue('parametre', entree, champ);
         if isempty(canon)

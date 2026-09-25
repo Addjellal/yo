@@ -86,6 +86,24 @@ function valeur = get_param(modele, nom, parametre)
             valeur = [ne, ns, 0, 0, 0, 0, 0, 0];
             return
     end
+    if any(strcmp(matlibre_sl_masque('variables', bloc), champ))
+        valeur = matlibre_sl_masque('lire', bloc, champ);
+        return
+    end
+    switch lower(champ)
+        case 'referenceblock'
+            valeur = '';
+            if isfield(bloc, 'reference')
+                valeur = bloc.reference;
+            end
+            return
+        case 'linkstatus'
+            valeur = 'none';
+            if isfield(bloc, 'reference')
+                valeur = 'resolved';
+            end
+            return
+    end
     entree = matlibre_sl_catalogue('type', bloc.type);
     if strcmpi(champ, 'DialogParameters')
         valeur = struct();

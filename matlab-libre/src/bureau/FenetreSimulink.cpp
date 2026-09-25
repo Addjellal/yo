@@ -74,6 +74,8 @@ const BlocBibliotheque blocs[] = {
     {"Opérations", "polynomial", "Évalue un polynôme en son entrée", "'coefs', [1 0 0]"},
     {"Opérations", "sqrt", "Racine carrée", ""},
     {"Opérations", "dotproduct", "Le produit scalaire de ses deux entrées", ""},
+    {"Opérations", "datatypeconversion", "Convertit le signal : entier, simple, booléen",
+     "'OutDataTypeStr', 'int8'"},
 
     {"Logique", "logic", "ET, OU, NON, OU exclusif", "'Operator', 'AND'"},
     {"Logique", "relational", "Compare deux entrées", "'Operator', '<'"},
@@ -120,6 +122,10 @@ const BlocBibliotheque blocs[] = {
      "'GotoTag', 'A'"},
     {"Aiguillage", "from", "Rend le signal du Goto de même étiquette", "'GotoTag', 'A'"},
     {"Aiguillage", "signalconversion", "Laisse passer son entrée", ""},
+    {"Aiguillage", "buscreator", "Réunit ses entrées en un bus, chacune sous son nom",
+     "'Inputs', 'a,b'"},
+    {"Aiguillage", "busselector", "Reprend des éléments d'un bus par leur nom",
+     "'OutputSignals', 'a'"},
     {"Aiguillage", "merge", "Rend la sortie du sous-système qui vient de calculer",
      "'Inputs', 2"},
 
@@ -508,7 +514,7 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
     if (!bloc) return;
     // Un sous-systeme ne se regle pas : il s'ouvre. C'est ce que fait
     // Simulink, et c'est la seule facon de voir le schema qu'il abrege.
-    if (bloc->type == QLatin1String("subsystem")) {
+    if (bloc->type == QLatin1String("subsystem") && !bloc->masque) {
         chemin_ = chemin_.isEmpty() ? nom : chemin_ + QLatin1Char('/') + nom;
         majChemin();
         emit schemaDemande(ancreAffichee());
@@ -653,6 +659,12 @@ void FenetreSimulink::construireBarre() {
         "diagnostics"));
     connect(aConfiguration_, &QAction::triggered, this,
             &FenetreSimulink::ouvrirConfiguration);
+    // Ctrl+U : sous le masque d'un sous-système, comme dans Simulink — le
+    // double-clic, lui, en règle les paramètres.
+    aSousMasque_ = new QAction(QStringLiteral("Regarder sous le masque"), this);
+    aSousMasque_->setShortcut(QKeySequence(QStringLiteral("Ctrl+U")));
+    connect(aSousMasque_, &QAction::triggered, this, &FenetreSimulink::regarderSousMasque);
+    addAction(aSousMasque_);
     barre->addSeparator();
 
     QAction* aAjuster = barre->addAction(QStringLiteral("Ajuster"));
@@ -947,6 +959,21 @@ void FenetreSimulink::surDureeChangee() {
                             .arg(modele, texte));
 }
 
+// Ctrl+U : ouvrir le sous-système choisi, fût-il masqué.
+void FenetreSimulink::regarderSousMasque() {
+    const QString nom = toile_->blocChoisi();
+    for (const BlocSchema& b : dernier_.blocs) {
+        if (b.nom != nom || b.type != QLatin1String("subsystem")) continue;
+        chemin_ = chemin_.isEmpty() ? nom : chemin_ + QLatin1Char('/') + nom;
+        majChemin();
+        emit schemaDemande(ancreAffichee());
+        poserEtat(QStringLiteral("Sous le masque de « %1 ». « Remonter » ramène au "
+                                 "schéma du dessus.").arg(nom));
+        return;
+    }
+    poserEtat(QStringLiteral("Choisissez d'abord un sous-système."));
+}
+
 // Ctrl+E : les réglages de simulation du modèle, dans une boîte à volets.
 // Ce qu'on y change part en un seul SET_PARAM.
 void FenetreSimulink::ouvrirConfiguration() {
@@ -1007,19 +1034,23 @@ void FenetreSimulink::enregistrerModele() {
     if (nom.isEmpty()) return;
     const QString chemin = QFileDialog::getSaveFileName(
         this, QStringLiteral("Enregistrer le modèle"), nom + QStringLiteral(".m"),
-        QStringLiteral("Programmes MatLibre (*.m)"));
+        QStringLiteral("Programmes MatLibre (*.m);;Modèles Simulink (*.slx)"));
     if (!chemin.isEmpty()) enregistrerVers(chemin);
 }
 
-// Le .m qui rebatit le modele : NEW_SYSTEM, ADD_BLOCK, ADD_LINE. C'est
-// l'aller du schema ; LOAD_SYSTEM en est le retour.
+// Le .m qui rebatit le modele : NEW_SYSTEM, ADD_BLOCK, ADD_LINE — ou le
+// .slx de Simulink, si c'est l'extension choisie. C'est l'aller du schema ;
+// LOAD_SYSTEM en est le retour.
 void FenetreSimulink::enregistrerVers(const QString& chemin) {
     const QString nom = modeleChoisi();
     if (nom.isEmpty() || chemin.isEmpty()) return;
     emit commandeDemandee(
         QStringLiteral("save_system(%1, %2);").arg(nom, chaineMatlab(chemin)));
-    poserEtat(QStringLiteral("« %1 » écrit dans %2 — un programme qui le rebâtit.")
-                  .arg(nom, chemin));
+    poserEtat(chemin.endsWith(QLatin1String(".slx"), Qt::CaseInsensitive)
+                  ? QStringLiteral("« %1 » écrit dans %2, au format de Simulink.")
+                        .arg(nom, chemin)
+                  : QStringLiteral("« %1 » écrit dans %2 — un programme qui le rebâtit.")
+                        .arg(nom, chemin));
 }
 
 void FenetreSimulink::genererProgramme() {
@@ -1046,7 +1077,8 @@ void FenetreSimulink::genererVers(const QString& chemin) {
 void FenetreSimulink::ouvrirModele() {
     const QString chemin = QFileDialog::getOpenFileName(
         this, QStringLiteral("Ouvrir un modèle"), QString(),
-        QStringLiteral("Programmes MatLibre (*.m)"));
+        QStringLiteral("Modèles (*.m *.slx *.mdl);;Programmes MatLibre (*.m);;"
+                       "Modèles Simulink (*.slx *.mdl)"));
     if (!chemin.isEmpty()) ouvrirDepuis(chemin);
 }
 

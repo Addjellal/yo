@@ -134,10 +134,18 @@ totalité.
    d'un modèle et journalise dans les deux formes de Simulink,
    `res.signaux.<nom>` et `res.signals(k).values`. L'éditeur du bureau
    pose, câble, règle et simule ; Ctrl+E ouvre les paramètres de
-   configuration. Les fichiers `.slx` et `.mdl` de MathWorks ne se lisent
-   pas encore, et `sim` le dit au lieu d'échouer sur autre chose.
-   Manquent aussi : les sous-systèmes itérés, les bus, les masques, et
-   les états hiérarchiques de Stateflow.
+   configuration. Les fichiers `.slx` et `.mdl` de MathWorks se lisent —
+   blocs, liens, sous-systèmes, masques, configuration du solveur — et
+   `save_system` écrit un `.slx` que Simulink relit ; un bloc qu'on ne
+   connaît pas est nommé dans l'erreur, avec tous les autres. Les
+   sous-systèmes se masquent (`Mask`, `MaskVariables`,
+   `MaskValueString`), les bibliothèques se bâtissent avec
+   `new_system(nom, 'Library')` et leurs copies restent liées ; les bus
+   se forment et se défont par nom (Bus Creator, Bus Selector) ; Data
+   Type Conversion convertit en entier, simple ou booléen, avec arrondi
+   et saturation. Manquent : les sous-systèmes itérés, les objets
+   `Simulink.Bus`, les types propagés d'un bloc à l'autre, et les états
+   hiérarchiques de Stateflow.
 5. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et
