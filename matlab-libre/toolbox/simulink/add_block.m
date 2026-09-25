@@ -24,6 +24,12 @@ function modele = add_block(modele, type, nom, varargin)
 %     fromworkspace VariableName, Interpolate, OutputAfterFinalValue
 %     from         GotoTag                      le signal d'un Goto
 %
+%   Les blocs à cassure — abs, sign, saturation, deadzone, relay,
+%   relational, comparaisons, minmax, switch, hitcrossing, backlash,
+%   coulombfriction, step, fromworkspace, integrator borné — portent
+%   ZeroCross ('on' par défaut) : à pas variable, le solveur localise le
+%   franchissement de leur seuil.
+%
 %   Opérations :
 %     gain         Gain, Multiplication : 'Element-wise(K.*u)',
 %                  'Matrix(K*u)', 'Matrix(u*K)'
@@ -71,6 +77,8 @@ function modele = add_block(modele, type, nom, varargin)
 %     reshape      OutputDimensionality, OutputDimensions
 %     goto         GotoTag, TagVisibility : local, scoped, global
 %     signalconversion  —
+%     merge        Inputs, InitialOutput        l'entrée dont le sous-système
+%                                               vient de calculer
 %
 %   Continu — l'intégrateur et les représentations d'état coupent les
 %   boucles :
@@ -80,7 +88,7 @@ function modele = add_block(modele, type, nom, varargin)
 %     transferfcn  Numerator, Denominator
 %     statespace   A, B, C, D, X0
 %     zeropole     Zeros, Poles, Gain
-%     transportdelay DelayTime, InitialOutput
+%     transportdelay DelayTime, InitialOutput, BufferSize
 %     pidcontroller P, I, D, N                  dérivée filtrée par N/(1+N/s)
 %
 %   Discret — ils ne calculent qu'aux instants de leur période :
@@ -96,7 +104,7 @@ function modele = add_block(modele, type, nom, varargin)
 %     discretestatespace A, B, C, D, X0, SampleTime
 %
 %   Sorties :
-%     outport      Port                         la sortie du modèle
+%     outport      Port, InitialOutput, OutputWhenDisabled (held, reset)
 %     scope        NumInputPorts ; display ; terminator
 %     toworkspace  VariableName, SaveFormat : Array, Structure With Time,
 %                  Structure
@@ -105,12 +113,33 @@ function modele = add_block(modele, type, nom, varargin)
 %                  l'entrée s'annule
 %
 %   Un schéma dans un bloc :
-%     subsystem    Model                un modèle entier, abrégé en un bloc
+%     subsystem    Model                un modèle entier, abrégé en un bloc ;
+%                  'Enabled Subsystem', 'Triggered Subsystem', 'Enabled
+%                  and Triggered Subsystem', 'If Action Subsystem' et
+%                  'Switch Case Action Subsystem' en donnent un qui porte
+%                  déjà In1, Out1 et ses ports de contrôle, comme dans
+%                  la bibliothèque de Simulink
+%     enableport   StatesWhenEnabling (held, reset)    posé dedans : il ne
+%                  calcule que quand ce port reçoit un signal positif
+%     triggerport  TriggerType (rising, falling, either)    posé dedans :
+%                  il ne calcule qu'aux fronts du signal de ce port
+%     actionport   InitializeStates     posé dedans : il calcule quand un
+%                  If ou un Switch Case le désigne
+%     if           NumInputs, IfExpression, ElseIfExpressions, ShowElse —
+%                  conditions sur u1, u2... ; une sortie d'action par
+%                  branche
+%     switchcase   CaseConditions ('{1, [2 3]}'), ShowDefaultCase
 %
 %   Le sous-système porte le modèle qu'il abrège, bâti comme les autres
 %   par NEW_SYSTEM. Ses blocs INPORT sont ses entrées et ses blocs OUTPORT
 %   ses sorties, dans l'ordre de leur paramètre Port. SIM le déplie avant
 %   de simuler : le résultat est exactement celui du schéma écrit à plat.
+%   Un port de contrôle posé dedans en fait un sous-système conditionnel :
+%   ce port est une entrée de plus, après les autres, que ADD_LINE
+%   désigne par 'sous/Enable', 'sous/Trigger' ou 'sous/Ifaction'. À
+%   l'arrêt, ses sorties tiennent leur dernière valeur, ou reviennent à
+%   leur valeur initiale (OutputWhenDisabled), et ses états tiennent, ou
+%   repartent à la reprise (StatesWhenEnabling).
 %
 %   Un type inconnu est refusé, comme un paramètre que le bloc n'a pas :
 %   rangé sans être lu, il ferait croire à un réglage qui n'a pas lieu.
@@ -160,6 +189,16 @@ function modele = add_block(modele, type, nom, varargin)
         error('Simulink:Commands:InvalidModel', ...
               'ADD_BLOCK attend un modele bati par NEW_SYSTEM.');
     end
+    % Les sous-systèmes conditionnels de la bibliothèque arrivent garnis,
+    % comme dans Simulink : une entrée reliée à une sortie, et leurs ports
+    % de contrôle.
+    if strcmp(entree.type, 'subsystem') && ...
+       ~any(strcmpi(reglages(1:2:end), 'Model') | strcmpi(reglages(1:2:end), 'Modele'))
+        gabarit = gabaritDeSousSysteme(type, nom);
+        if ~isempty(gabarit)
+            reglages(end + 1:end + 2) = {'Model', gabarit};
+        end
+    end
     if existe(modele, nom)
         if ~unique
             error('Simulink:Commands:AddBlockCantAdd', ...
@@ -190,6 +229,40 @@ function modele = add_block(modele, type, nom, varargin)
         bloc.parametres.(canon) = reglages{k + 1};
     end
     modele.blocs{end + 1} = bloc;
+end
+
+% Le contenu d'un sous-système conditionnel de la bibliothèque, désigné
+% par son nom ou son chemin ; vide pour un autre.
+function gabarit = gabaritDeSousSysteme(designation, nom)
+    gabarit = [];
+    if isstruct(designation)
+        return
+    end
+    texte = char(designation);
+    barre = find(texte == '/', 1, 'last');
+    if ~isempty(barre)
+        texte = texte(barre + 1:end);
+    end
+    cle = lower(regexprep(texte, '\s', ''));
+    switch cle
+        case 'enabledsubsystem'
+            controles = {'enableport', 'Enable'};
+        case 'triggeredsubsystem'
+            controles = {'triggerport', 'Trigger'};
+        case 'enabledandtriggeredsubsystem'
+            controles = {'enableport', 'Enable'; 'triggerport', 'Trigger'};
+        case {'ifactionsubsystem', 'switchcaseactionsubsystem'}
+            controles = {'actionport', 'Action Port'};
+        otherwise
+            return
+    end
+    gabarit = new_system(regexprep(nom, '[^A-Za-z0-9_]', '_'));
+    gabarit = add_block(gabarit, 'inport', 'In1', 'Port', 1);
+    gabarit = add_block(gabarit, 'outport', 'Out1', 'Port', 1);
+    gabarit = add_line(gabarit, 'In1', 'Out1');
+    for k = 1:size(controles, 1)
+        gabarit = add_block(gabarit, controles{k, 1}, controles{k, 2});
+    end
 end
 
 function oui = existe(modele, nom)

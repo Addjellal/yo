@@ -2140,6 +2140,38 @@ int main(int argc, char** argv) {
                 verifier(boite.volets()->count() == 2, "deux volets : solveur et diagnostics");
             }
             {
+                // Le pas variable : le type change la liste des solveurs et
+                // les options qui valent — les tolerances, non le pas fixe.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Fixed-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode4"));
+                valeurs.insert(QStringLiteral("RelTol"), QStringLiteral("0.001"));
+                DialogueConfiguration boite(
+                    QStringLiteral("m"), valeurs,
+                    {QStringLiteral("ode1"), QStringLiteral("ode4")},
+                    {QStringLiteral("ode45"), QStringLiteral("ode23"), QStringLiteral("ode23s")});
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Variable-step")));
+                verifier(boite.choixSolveur()->findText(QStringLiteral("ode45")) >= 0 &&
+                             boite.choixSolveur()->findText(QStringLiteral("ode4")) < 0,
+                         "a pas variable, la liste offre ode45 et plus ode4");
+                verifier(!boite.champ(QStringLiteral("FixedStep"))->isEnabled() &&
+                             boite.champ(QStringLiteral("RelTol"))->isEnabled() &&
+                             boite.champ(QStringLiteral("MaxStep"))->isEnabled(),
+                         "a pas variable, les tolerances se reglent et le pas fixe non");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode23s")));
+                boite.champ(QStringLiteral("RelTol"))->setText(QStringLiteral("1e-6"));
+                QStringList noms;
+                for (const auto& c : boite.changements()) noms << c.first;
+                verifier(noms == QStringList({QStringLiteral("SolverType"),
+                                              QStringLiteral("Solver"),
+                                              QStringLiteral("RelTol")}),
+                         "le type, le solveur et la tolerance ressortent ensemble");
+            }
+            verifier(simulink->choixSolveur()->findText(QStringLiteral("ode45")) >= 0,
+                     "la barre offre aussi les solveurs a pas variable");
+            {
                 // Le chemin entier : Ctrl+E, la boite, la commande.
                 QStringList commandesConfig;
                 QMetaObject::Connection lienConfig = QObject::connect(

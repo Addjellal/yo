@@ -87,8 +87,11 @@ DialogueConfiguration::DialogueConfiguration(const QString& modele,
                                          "il suit les tolérances"));
     solveur_ = nouvelleListe(QStringLiteral("Solver"), formulaireSolveur,
                              QStringLiteral("Solveur"), fixes_ + variables_,
-                             QStringLiteral("ode1 : Euler. ode2 à ode5 gagnent un ordre "
-                                            "chacun. FixedStepDiscrete : sans état continu."));
+                             QStringLiteral("À pas fixe — ode1 : Euler ; ode2 à ode5 gagnent "
+                                            "un ordre chacun ; FixedStepDiscrete : sans état "
+                                            "continu. À pas variable — ode45 : Dormand-Prince ; "
+                                            "ode23 : Bogacki-Shampine ; ode23s : pour les "
+                                            "systèmes raides."));
     colonneSolveur->addWidget(groupeSolveur);
 
     auto* groupeOptions = new QGroupBox(QStringLiteral("Options du solveur"));

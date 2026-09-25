@@ -17,12 +17,23 @@ function varargout = matlibre_sl_config(action, varargin)
 %   S = MATLIBRE_SL_CONFIG('solveurs') rend la liste des solveurs
 %   disponibles, en deux champs : fixe et variable.
 %
+%   T = MATLIBRE_SL_CONFIG('type',SOLVEUR) rend le type d'un solveur,
+%   'Fixed-step' ou 'Variable-step' ; MATLIBRE_SL_CONFIG('automatique',T)
+%   le solveur automatique d'un type.
+%
 %   Les réglages reconnus, avec leur valeur par défaut :
 %     StartTime            0          l'instant initial
 %     StopTime             10         l'instant final
 %     SolverType           'Fixed-step'  ou 'Variable-step'
-%     Solver               'ode1'     le solveur : ode1 à ode5, ou
-%                                     FixedStepDiscrete sans état continu
+%     Solver               'ode1'     le solveur. À pas fixe : ode1 à
+%                                     ode5, FixedStepDiscrete sans état
+%                                     continu, FixedStepAuto (ode3, ou
+%                                     le discret s'il n'y a pas d'état
+%                                     continu). À pas variable : ode45,
+%                                     ode23, ode23s (raide),
+%                                     VariableStepDiscrete, et
+%                                     VariableStepAuto (ode45, ou le
+%                                     discret).
 %     FixedStep            0.01       le pas, en pas fixe
 %     MaxStep, MinStep, InitialStep   'auto'  bornes du pas variable
 %     RelTol               1e-3       tolérance relative du pas variable
@@ -31,6 +42,11 @@ function varargout = matlibre_sl_config(action, varargin)
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
 %     UnconnectedOutputMsg 'none'     sortie non reliée : none, warning, error
+%
+%   Le solveur et son type vont ensemble, comme dans Simulink : poser
+%   Solver sur ode45 fait le type Variable-step ; poser SolverType sur
+%   Variable-step quand le solveur est à pas fixe le remplace par
+%   VariableStepAuto, et inversement par FixedStepAuto.
 %
 %   MatLibre part du pas fixe et d'Euler, là où Simulink part du pas
 %   variable : les modèles écrits avant que le pas variable n'existe
@@ -55,6 +71,10 @@ function varargout = matlibre_sl_config(action, varargin)
             varargout{1} = solveurs();
         case 'defauts'
             varargout{1} = defauts();
+        case 'type'
+            varargout{1} = typeDe(varargin{1}, 'Fixed-step');
+        case 'automatique'
+            varargout{1} = automatique(varargin{1});
         otherwise
             error('Simulink:Config:Action', 'Action inconnue : %s.', char(action));
     end
@@ -72,8 +92,10 @@ end
 % Les solveurs écrits ici. Simulink en a d'autres : ils sont refusés en
 % le disant, au lieu d'être acceptés et remplacés en silence.
 function s = solveurs()
-    s = struct('fixe', {{'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'FixedStepDiscrete'}}, ...
-               'variable', {{}});
+    s = struct('fixe', {{'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'FixedStepDiscrete', ...
+                         'FixedStepAuto'}}, ...
+               'variable', {{'ode45', 'ode23', 'ode23s', 'VariableStepDiscrete', ...
+                             'VariableStepAuto'}});
 end
 
 function c = lire(modele)
@@ -89,10 +111,22 @@ function c = lire(modele)
         end
         c.(nom) = modele.parametres.(champs{k});
     end
-    % Le type suit le solveur quand on n'a donné que lui : « ode45 » est à
-    % pas variable sans qu'on ait à le redire.
-    if ~isfield(modele.parametres, 'SolverType') && isfield(c, 'Solver')
+    % Le type suit le solveur quand on a donné le solveur : « ode45 » est à
+    % pas variable sans qu'on ait à le redire. Un type donné seul choisit
+    % le solveur automatique de ce type.
+    if isfield(modele.parametres, 'Solver')
         c.SolverType = typeDe(c.Solver, c.SolverType);
+    elseif ~strcmp(typeDe(c.Solver, c.SolverType), c.SolverType)
+        c.Solver = automatique(c.SolverType);
+    end
+end
+
+% Le solveur que Simulink choisit quand on ne donne que le type.
+function s = automatique(type)
+    if strcmpi(type, 'Variable-step')
+        s = 'VariableStepAuto';
+    else
+        s = 'FixedStepAuto';
     end
 end
 
@@ -126,10 +160,8 @@ function v = valider(nom, v)
             v = char(v);
             trouve = find(strcmpi(v, connus), 1);
             if isempty(trouve)
-                simulinkSeul = {'ode8', 'ode14x', 'ode45', 'ode23', 'ode113', ...
-                                'ode15s', 'ode23s', 'ode23t', 'ode23tb', ...
-                                'VariableStepDiscrete', 'VariableStepAuto', ...
-                                'FixedStepAuto'};
+                simulinkSeul = {'ode8', 'ode14x', 'ode1be', 'ode113', 'ode15s', ...
+                                'ode23t', 'ode23tb', 'odeN', 'daessc'};
                 if any(strcmpi(v, simulinkSeul))
                     error('Simulink:Commands:SolveurInconnu', ...
                           ['Le solveur ''%s'' est un solveur de Simulink que MatLibre ' ...

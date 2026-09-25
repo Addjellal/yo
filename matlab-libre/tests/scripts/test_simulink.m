@@ -615,6 +615,549 @@ assert(max(max(abs(A))) < 1e-9 && max(max(abs(B - diag([2 3])))) < 1e-8 && ...
        max(max(abs(C - eye(2)))) < 1e-8 && max(max(abs(D))) < 1e-12, ...
        'deux voies, deux etats, deux entrees et deux sorties');
 
+%% --------------------------------------------------------- 13. Pas variable
+% La tolérance commande l'erreur : pour chaque solveur, une tolérance
+% plus fine donne une erreur plus petite, et plus de pas.
+m = new_system('decroissance');
+m = add_block(m, 'gain', 'k', 'Gain', -1);
+m = add_block(m, 'integrator', 'x', 'InitialCondition', 1);
+m = add_line(m, 'x', 'k');
+m = add_line(m, 'k', 'x');
+for solveur = {'ode45', 'ode23', 'ode23s'}
+    erreurs = zeros(1, 3);
+    nombresDePas = zeros(1, 3);
+    tolerances = [1e-3 1e-5 1e-7];
+    for kT = 1:3
+        r = sim(m, 'Solver', solveur{1}, 'RelTol', tolerances(kT), 'MaxStep', Inf, ...
+                'StopTime', 5);
+        erreurs(kT) = max(abs(r.signaux.x - exp(-r.temps)));
+        nombresDePas(kT) = numel(r.temps) - 1;
+        assert(erreurs(kT) < 100 * tolerances(kT), ...
+               sprintf('%s : erreur %g pour la tolerance %g', solveur{1}, erreurs(kT), ...
+                       tolerances(kT)));
+    end
+    assert(all(diff(erreurs) < 0) && all(diff(nombresDePas) > 0), ...
+           [solveur{1} ' : une tolerance plus fine, une erreur plus petite et plus de pas']);
+end
+% Le pas maximal borne le pas : MaxStep par défaut vaut le cinquantième
+% de la durée, et le relevé porte un instant par pas majeur.
+r = sim(m, 'Solver', 'ode45', 'StopTime', 5);
+assert(max(diff(r.temps)) <= 0.1 + 1e-12 && numel(r.temps) >= 51, ...
+       'le cinquantieme de la duree borne le pas');
+r = sim(m, [0 0.5 1 2], simset('Solver', 'ode45'));
+assert(isequal(r.temps(:).', [0 0.5 1 2]) && abs(r.signaux.x(end) - exp(-2)) < 1e-5, ...
+       'les instants imposes sont les seuls releves, et atteints exactement');
+r = sim(m, 'Solver', 'VariableStepAuto', 'StopTime', 1);
+r45 = sim(m, 'Solver', 'ode45', 'StopTime', 1);
+assert(isequal(r.temps, r45.temps) && isequal(r.signaux.x, r45.signaux.x), ...
+       'VariableStepAuto prend ode45 quand il y a des etats continus');
+
+% Les instants d'échantillonnage sont atteints exactement, et un bloc
+% discret y rend ce que rend le pas fixe : deux périodes, un décalage.
+m = new_system('multicadence');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'zoh', 'lent', 'SampleTime', 0.3);
+m = add_block(m, 'discretetransferfcn', 'filtre', 'Numerator', [0 0.4], ...
+              'Denominator', [1 -0.6], 'SampleTime', [0.2 0.05]);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'horloge', 'lent');
+m = add_line(m, 'lent', 'filtre');
+m = add_line(m, 'lent', 'x');
+rVariable = sim(m, 'Solver', 'ode45', 'StopTime', 2);
+rFixe = sim(m, 'Solver', 'ode4', 'FixedStep', 0.05, 'StopTime', 2);
+for instant = [0:0.3:2, 0.05:0.2:2]
+    iV = find(abs(rVariable.temps - instant) < 1e-12, 1);
+    iF = find(abs(rFixe.temps - instant) < 1e-12, 1);
+    assert(~isempty(iV), sprintf('l''instant %g est atteint', instant));
+    assert(abs(rVariable.signaux.filtre(iV) - rFixe.signaux.filtre(iF)) < 1e-12 && ...
+           abs(rVariable.signaux.lent(iV) - rFixe.signaux.lent(iF)) < 1e-12, ...
+           sprintf('a %g, les blocs discrets rendent ce que rend le pas fixe', instant));
+end
+assert(abs(rVariable.signaux.x(end) - sum(0.3 * (0:0.3:1.5)) - 0.2 * 1.8) < 1e-9, ...
+       'l''integrale d''une tenue est exacte');
+
+% Les cassures des sources sont des fins de pas : l'intégrale d'un échelon
+% et d'un train d'impulsions est exacte, quel que soit le solveur.
+for solveur = {'ode45', 'ode23', 'ode23s'}
+    m = new_system('cassures');
+    m = add_block(m, 'step', 'echelon', 'Time', 0.4567, 'After', 2);
+    m = add_block(m, 'pulsegenerator', 'train', 'Period', 0.3, 'PulseWidth', 40, ...
+                  'PhaseDelay', 0.05);
+    m = add_block(m, 'integrator', 'xe');
+    m = add_block(m, 'integrator', 'xp');
+    m = add_line(m, 'echelon', 'xe');
+    m = add_line(m, 'train', 'xp');
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 1.25);
+    assert(abs(r.signaux.xe(end) - 2 * (1.25 - 0.4567)) < 1e-10, ...
+           [solveur{1} ' : l''echelon tombe sur une fin de pas']);
+    assert(abs(r.signaux.xp(end) - 4 * 0.12) < 1e-10, ...
+           [solveur{1} ' : chaque front d''impulsion aussi']);
+    assert(any(abs(r.temps - 0.4567) < 1e-12), [solveur{1} ' : l''instant de l''echelon']);
+end
+
+% Les passages par zéro : chaque bloc à cassure, sur une entrée
+% sin(2t) + 0,3, alimente un intégrateur. L'intégrale se compare au calcul
+% direct, morceau par morceau entre les instants où l'entrée franchit le
+% seuil du bloc — que le solveur doit localiser.
+u = @(t) sin(2 * t) + 0.3;
+franchit = @(c) sort([(asin(c - 0.3) + 2 * pi * (0:1)) / 2, ...
+                      (pi - asin(c - 0.3) + 2 * pi * (0:1)) / 2]);
+cas = {
+    'abs',               {},                                         @(v) abs(v),            0
+    'sign',              {},                                         @(v) sign(v),           0
+    'saturation',        {'UpperLimit', 0.5, 'LowerLimit', -0.5},    @(v) min(max(v, -0.5), 0.5), [0.5 -0.5]
+    'deadzone',          {'UpperValue', 0.4, 'LowerValue', -0.4},    @(v) (v > 0.4) .* (v - 0.4) + (v < -0.4) .* (v + 0.4), [0.4 -0.4]
+    'comparetoconstant', {'relop', '>=', 'const', 0.2},              @(v) double(v >= 0.2),  0.2
+    'comparetozero',     {'relop', '>'},                             @(v) double(v > 0),     0
+    'coulombfriction',   {'Offset', 1, 'Gain', 2},                   @(v) sign(v) .* (1 + 2 * abs(v)), 0
+    };
+duree = 3;
+for kC = 1:size(cas, 1)
+    coupures = [];
+    for seuil = cas{kC, 4}
+        coupures = [coupures, franchit(seuil)]; %#ok<AGROW>
+    end
+    attendu = integrerParMorceaux(@(t) cas{kC, 3}(u(t)), 0, duree, coupures);
+    for solveur = {'ode45', 'ode23'}
+        m = new_system('franchissement');
+        m = add_block(m, 'sine', 'entree', 'Frequency', 2, 'Bias', 0.3);
+        m = add_block(m, cas{kC, 1}, 'bloc', cas{kC, 2}{:});
+        m = add_block(m, 'integrator', 'x');
+        m = add_line(m, 'entree', 'bloc');
+        m = add_line(m, 'bloc', 'x');
+        r = sim(m, 'Solver', solveur{1}, 'StopTime', duree, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+        assert(abs(r.signaux.x(end) - attendu) < 1e-7, ...
+               sprintf('%s par %s : %g au lieu de %g', cas{kC, 1}, solveur{1}, ...
+                       r.signaux.x(end), attendu));
+    end
+end
+% Deux entrées : la comparaison, le plus grand, l'aiguillage.
+cas2 = {
+    'relational', {'Operator', '<'},       @(v) double(v < 0.1)
+    'minmax',     {'Function', 'max'},     @(v) max(v, 0.1)
+    };
+for kC = 1:size(cas2, 1)
+    attendu = integrerParMorceaux(@(t) cas2{kC, 3}(u(t)), 0, duree, franchit(0.1));
+    m = new_system('deuxEntrees');
+    m = add_block(m, 'sine', 'entree', 'Frequency', 2, 'Bias', 0.3);
+    m = add_block(m, 'constant', 'seuil', 'Value', 0.1);
+    m = add_block(m, cas2{kC, 1}, 'bloc', cas2{kC, 2}{:});
+    m = add_block(m, 'integrator', 'x');
+    m = add_line(m, 'entree', 'bloc', 1);
+    m = add_line(m, 'seuil', 'bloc', 2);
+    m = add_line(m, 'bloc', 'x');
+    r = sim(m, 'Solver', 'ode45', 'StopTime', duree, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+    assert(abs(r.signaux.x(end) - attendu) < 1e-7, [cas2{kC, 1} ' : le seuil est localise']);
+end
+m = new_system('aiguillage');
+m = add_block(m, 'sine', 'entree', 'Frequency', 2, 'Bias', 0.3);
+m = add_block(m, 'constant', 'haut', 'Value', 1);
+m = add_block(m, 'constant', 'bas', 'Value', -1);
+m = add_block(m, 'switch', 'choix', 'Threshold', 0.1);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'haut', 'choix', 1);
+m = add_line(m, 'entree', 'choix', 2);
+m = add_line(m, 'bas', 'choix', 3);
+m = add_line(m, 'choix', 'x');
+r = sim(m, 'Solver', 'ode45', 'StopTime', duree, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+attendu = integrerParMorceaux(@(t) 2 * (u(t) >= 0.1) - 1, 0, duree, franchit(0.1));
+assert(abs(r.signaux.x(end) - attendu) < 1e-7, 'l''aiguillage bascule au bon instant');
+
+% Le relais : ses seuils de marche et d'arrêt sont franchis tour à tour.
+% Sans la détection, le mode ne change qu'au pas majeur suivant, et
+% l'intégrale s'en ressent : la détection se coupe pour tout le modèle
+% (ZeroCrossControl) ou pour le seul bloc (ZeroCross).
+m = new_system('relais');
+m = add_block(m, 'sine', 'entree', 'Frequency', 2, 'Bias', 0.3);
+m = add_block(m, 'relay', 'r', 'OnSwitch', 0.5, 'OffSwitch', -0.5, 'OnOutput', 1, ...
+              'OffOutput', 0);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'entree', 'r');
+m = add_line(m, 'r', 'x');
+marche = franchit(0.5);
+arret = franchit(-0.5);
+% Parti à l'arrêt (0,3 < 0,5) : en marche du premier franchissement
+% montant de 0,5 au franchissement descendant de -0,5 qui suit.
+enMarche = [marche(1), arret(2); marche(3), arret(4)];
+enMarche = min(enMarche, duree);
+attendu = sum(enMarche(:, 2) - enMarche(:, 1));
+r = sim(m, 'Solver', 'ode45', 'StopTime', duree);
+assert(abs(r.signaux.x(end) - attendu) < 1e-8, 'le relais bascule a ses seuils');
+sansModele = sim(m, 'Solver', 'ode45', 'StopTime', duree, 'ZeroCrossControl', 'DisableAll');
+sansBloc = sim(set_param(m, 'r', 'ZeroCross', 'off'), 'Solver', 'ode45', 'StopTime', duree);
+assert(abs(sansModele.signaux.x(end) - attendu) > 1e-4 && ...
+       isequal(sansModele.signaux.x, sansBloc.signaux.x), ...
+       'sans la detection, le relais bascule en retard, et les deux reglages l''eteignent');
+avecTout = sim(set_param(m, 'r', 'ZeroCross', 'off'), 'Solver', 'ode45', ...
+               'StopTime', duree, 'ZeroCrossControl', 'EnableAll');
+assert(abs(avecTout.signaux.x(end) - attendu) < 1e-8, 'EnableAll passe outre le bloc');
+
+% Hit Crossing : un seul pas marque le franchissement, juste après lui.
+m = new_system('franchi');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'hitcrossing', 'hc', 'HitCrossingOffset', 0.3337);
+m = add_line(m, 'horloge', 'hc');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 1);
+marques = find(r.signaux.hc == 1);
+assert(numel(marques) == 1 && abs(r.temps(marques) - 0.3337) < 1e-8, ...
+       'le franchissement est marque une fois, a son instant');
+
+% L'intégrateur borné touche sa borne et la quitte au bon instant :
+% x' = 2 cos t, borné à 1,5 — il y reste tant que la dérivée pousse.
+m = new_system('borne');
+m = add_block(m, 'sine', 'derivee', 'Amplitude', 2, 'Phase', pi / 2);
+m = add_block(m, 'integrator', 'x', 'LimitOutput', 'on', 'UpperSaturationLimit', 1.5);
+m = add_line(m, 'derivee', 'x');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 3, 'RelTol', 1e-8);
+assert(abs(r.signaux.x(end) - (1.5 + 2 * (sin(3) - 1))) < 1e-6, ...
+       'la borne est tenue puis quittee a l''instant ou la derivee change de signe');
+
+% Stop Simulation, sans instant final : l'arrêt tombe au franchissement.
+m = new_system('arret');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'comparetoconstant', 'assez', 'relop', '>=', 'const', 2.345);
+m = add_block(m, 'stopsimulation', 'stop');
+m = add_line(m, 'horloge', 'assez');
+m = add_line(m, 'assez', 'stop');
+r = sim(m, 'Solver', 'ode45', 'StopTime', Inf);
+assert(abs(r.temps(end) - 2.345) < 1e-8, 'l''arret tombe a l''instant du franchissement');
+
+% Le retard pur garde les instants avec les valeurs : il interpole entre
+% deux pas majeurs, et son tampon grandit au-delà de sa taille initiale.
+m = new_system('retard');
+m = add_block(m, 'sine', 'entree', 'Frequency', 2);
+m = add_block(m, 'transportdelay', 'retard', 'DelayTime', 0.37, 'BufferSize', 16);
+m = add_line(m, 'entree', 'retard');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 3, 'MaxStep', 0.007);
+attendu = sin(2 * (r.temps - 0.37));
+attendu(r.temps < 0.37) = 0;
+assert(max(abs(r.signaux.retard - attendu)) < 1e-4, ...
+       'le retard interpole entre les instants gardes, au-dela de la taille initiale');
+
+% Une boucle algébrique se résout aussi à pas variable.
+m = new_system('boucle');
+m = add_block(m, 'sine', 'entree');
+m = add_block(m, 'sum', 'e', 'Signs', '+-');
+m = add_block(m, 'gain', 'k', 'Gain', 3);
+m = add_line(m, 'entree', 'e', 1);
+m = add_line(m, 'k', 'e', 2);
+m = add_line(m, 'e', 'k');
+m = set_param(m, 'AlgebraicLoopMsg', 'none');
+r = sim(m, 'Solver', 'ode23', 'StopTime', 2);
+assert(max(abs(r.signaux.e - sin(r.temps) / 4)) < 1e-12, 'e = u - 3e, soit u / 4');
+
+% Un système raide : ode23s y garde un grand pas, ode45 piétine.
+m = new_system('raide');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'trigonometry', 'consigne', 'Operator', 'cos');
+m = add_block(m, 'sum', 'ecart', 'Signs', '+-');
+m = add_block(m, 'gain', 'raideur', 'Gain', 1000);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'horloge', 'consigne');
+m = add_line(m, 'consigne', 'ecart', 1);
+m = add_line(m, 'x', 'ecart', 2);
+m = add_line(m, 'ecart', 'raideur');
+m = add_line(m, 'raideur', 'x');
+r45 = sim(m, 'Solver', 'ode45', 'StopTime', 2, 'MaxStep', 1);
+r23s = sim(m, 'Solver', 'ode23s', 'StopTime', 2, 'MaxStep', 1);
+permanent = (1e6 * cos(2) + 1e3 * sin(2)) / (1e6 + 1);
+assert(numel(r23s.temps) * 5 < numel(r45.temps) && ...
+       abs(r23s.signaux.x(end) - permanent) < 1e-3 && abs(r45.signaux.x(end) - permanent) < 1e-3, ...
+       'ode23s traverse le systeme raide en bien moins de pas');
+
+% Le solveur et son type vont ensemble.
+m = new_system('types');
+m = set_param(m, 'SolverType', 'Variable-step');
+assert(strcmp(get_param(m, 'Solver'), 'VariableStepAuto'), ...
+       'un type donne seul prend le solveur automatique');
+m = set_param(m, 'Solver', 'ode4');
+assert(strcmp(get_param(m, 'SolverType'), 'Fixed-step'), 'le type suit le solveur');
+m = set_param(m, 'SolverType', 'Variable-step');
+assert(strcmp(get_param(m, 'Solver'), 'VariableStepAuto'), ...
+       'un type qui ne convient plus remplace le solveur');
+m = set_param(m, 'Solver', 'ode23');
+assert(strcmp(get_param(m, 'SolverType'), 'Variable-step'), 'ode23 est a pas variable');
+
+% Les erreurs du pas variable, chacune avec son identifiant.
+m = new_system('explose');
+m = add_block(m, 'math', 'carre', 'Operator', 'square');
+m = add_block(m, 'integrator', 'x', 'InitialCondition', 1);
+m = add_line(m, 'x', 'carre');
+m = add_line(m, 'carre', 'x');
+decalage = add_block(new_system('decalage'), 'zoh', 'h', 'SampleTime', [0.1 0.2]);
+casErreurs = {
+    @() sim(m, 'Solver', 'ode45', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'singularite'
+    @() sim(m, 'Solver', 'VariableStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'explose/x'
+    @() sim(decalage, 'Solver', 'ode45'), 'Simulink:SampleTime:InvalidOffset', 'decalage/h'
+    @() sim(m, 'Solver', 'ode45', 'RelTol', -1), 'Simulink:Config:InvalidValue', 'RelTol'
+    @() sim(m, 'Solver', 'ode45', 'MinStep', 1, 'MaxStep', 0.1), 'Simulink:Config:InvalidValue', 'pas minimal'
+    @() set_param(m, 'Solver', 'ode113'), 'Simulink:Commands:SolveurInconnu', 'ode23s'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('pas variable, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('pas variable : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% --------------------------------------- 14. Sous-systemes conditionnels
+% Un sous-système activé n'intègre que quand son Enable est positif : un
+% intégrateur de 1 y compte le temps passé activé. Ses états tiennent à
+% l'arrêt (held), ou repartent de zéro à la reprise (reset) ; sa sortie
+% tient, ou revient à sa valeur initiale.
+interne = new_system('chrono');
+interne = add_block(interne, 'constant', 'un', 'Value', 1);
+interne = add_block(interne, 'integrator', 'x');
+interne = add_block(interne, 'outport', 's', 'Port', 1);
+interne = add_block(interne, 'enableport', 'Enable');
+interne = add_line(interne, 'un', 'x');
+interne = add_line(interne, 'x', 's');
+m = new_system('active');
+m = add_block(m, 'pulsegenerator', 'porte', 'Period', 2, 'PulseWidth', 50);
+m = add_block(m, 'subsystem', 'sous', 'Model', interne);
+m = add_line(m, 'porte', 'sous/Enable');
+% À l'arrêt, la sortie tient la valeur du dernier pas majeur où le
+% sous-système a calculé — celui d'avant la coupure, que l'impulsion fait
+% tomber sur un pas, à pas fixe comme à pas variable.
+for solveur = {'ode1', 'ode4', 'ode45', 'ode23'}
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 3.5, 'FixedStep', 0.01);
+    iCoupure = find(r.temps >= 1 - 1e-12, 1);
+    iReprise = find(r.temps >= 2 - 1e-12, 1);
+    iFin = find(r.temps >= 3 - 1e-12, 1);
+    avantCoupure = r.temps(iCoupure - 1);
+    assert(abs(r.temps(iCoupure) - 1) < 1e-12 && ...
+           all(r.signaux.sous(iCoupure:iReprise - 1) == r.signaux.sous(iCoupure - 1)) && ...
+           abs(r.signaux.sous(iCoupure - 1) - avantCoupure) < 1e-9, ...
+           [solveur{1} ' : a l''arret, la sortie tient celle du dernier pas actif']);
+    assert(abs(r.signaux.sous(end) - (1 + r.temps(iFin - 1) - 2)) < 1e-9, ...
+           [solveur{1} ' : l''etat a tenu, puis repris : la duree active s''ajoute']);
+end
+reprise = set_param(m, 'sous', 'Model', set_param(interne, 'Enable', ...
+                                                  'StatesWhenEnabling', 'reset'));
+for solveur = {'ode1', 'ode45'}
+    r = sim(reprise, 'Solver', solveur{1}, 'StopTime', 3.5, 'FixedStep', 0.01);
+    iFin = find(r.temps >= 3 - 1e-12, 1);
+    assert(abs(r.signaux.sous(end) - (r.temps(iFin - 1) - 2)) < 1e-9, ...
+           [solveur{1} ' : reset, l''etat repart de zero a la reprise']);
+end
+retour = set_param(m, 'sous', 'Model', set_param(interne, 's', 'OutputWhenDisabled', ...
+                                                 'reset', 'InitialOutput', -1));
+r = sim(retour, 'Solver', 'ode4', 'StopTime', 3.5, 'FixedStep', 0.01);
+assert(r.signaux.sous(find(r.temps >= 1.5, 1)) == -1 && r.signaux.sous(end) == -1 && ...
+       abs(r.signaux.sous(find(r.temps >= 0.5, 1)) - 0.5) < 1e-9, ...
+       'a l''arret, la sortie revient a sa valeur initiale');
+% Le passage par zéro de l'Enable est localisé : activé tant que
+% sin(t + 0,5) > 0, soit jusqu'à pi - 0,5.
+m = new_system('activeSinus');
+m = add_block(m, 'sine', 'porte', 'Phase', 0.5);
+m = add_block(m, 'subsystem', 'sous', 'Model', interne);
+m = add_line(m, 'porte', 'sous/Enable');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 4);
+assert(abs(r.signaux.sous(end) - (pi - 0.5)) < 1e-8, 'l''arret tombe a pi - 0,5, localise');
+iPaire = find(abs(r.temps - (pi - 0.5)) < 1e-8);
+assert(numel(iPaire) == 2 && r.signaux.porte(iPaire(1)) > 0 && r.signaux.porte(iPaire(2)) < 0, ...
+       'deux pas majeurs encadrent le passage par zero, comme dans Simulink');
+
+% Un sous-système déclenché ne calcule qu'aux fronts : un compteur fait
+% d'un retard y compte les fronts, montants, descendants ou les deux. Pas
+% de front à la première évaluation, comme dans Simulink.
+compteur = new_system('compteur');
+compteur = add_block(compteur, 'constant', 'un', 'Value', 1);
+compteur = add_block(compteur, 'sum', 'plus', 'Signs', '++');
+compteur = add_block(compteur, 'delay', 'avant', 'DelayLength', 1);
+compteur = add_block(compteur, 'outport', 'n', 'Port', 1);
+compteur = add_block(compteur, 'triggerport', 'Trigger');
+compteur = add_line(compteur, 'un', 'plus', 1);
+compteur = add_line(compteur, 'avant', 'plus', 2);
+compteur = add_line(compteur, 'plus', 'avant');
+compteur = add_line(compteur, 'plus', 'n');
+fronts = struct('rising', 3, 'falling', 4, 'either', 7);
+for type = fieldnames(fronts).'
+    m = new_system('fronts');
+    m = add_block(m, 'pulsegenerator', 'horloge', 'Period', 1, 'PulseWidth', 50);
+    m = add_block(m, 'subsystem', 'compte', 'Model', ...
+                  set_param(compteur, 'Trigger', 'TriggerType', type{1}));
+    m = add_line(m, 'horloge', 'compte/Trigger');
+    for solveur = {'ode1', 'ode45'}
+        r = sim(m, 'Solver', solveur{1}, 'StopTime', 3.7, 'FixedStep', 0.01);
+        assert(r.signaux.compte(end) == fronts.(type{1}), ...
+               sprintf('%s par %s : %g fronts comptes', type{1}, solveur{1}, ...
+                       r.signaux.compte(end)));
+    end
+end
+% Activé et déclenché : les fronts ne comptent que pendant l'activation.
+double = add_block(set_param(compteur, 'Trigger', 'TriggerType', 'rising'), ...
+                   'enableport', 'Enable');
+m = new_system('activeDeclenche');
+m = add_block(m, 'pulsegenerator', 'horloge', 'Period', 1, 'PulseWidth', 50);
+m = add_block(m, 'step', 'autorise', 'Time', 1.5);
+m = add_block(m, 'subsystem', 'compte', 'Model', double);
+m = add_line(m, 'autorise', 'compte/Enable');
+m = add_line(m, 'horloge', 'compte/Trigger');
+r = sim(m, 'Solver', 'ode1', 'StopTime', 3.7, 'FixedStep', 0.01);
+assert(r.signaux.compte(end) == 2, 'seuls les fronts de 2 et 3 comptent');
+
+% If, deux sous-systèmes d'action et un Merge : la valeur absolue.
+positif = new_system('positif');
+positif = add_block(positif, 'inport', 'u', 'Port', 1);
+positif = add_block(positif, 'outport', 'y', 'Port', 1);
+positif = add_block(positif, 'actionport', 'Action');
+positif = add_line(positif, 'u', 'y');
+negatif = add_block(positif, 'gain', 'moins', 'Gain', -1);
+negatif = add_line(delete_line(negatif, 'u', 'y'), 'u', 'moins');
+negatif = add_line(negatif, 'moins', 'y');
+m = new_system('valeurAbsolue');
+m = add_block(m, 'sine', 'u', 'Frequency', 3);
+m = add_block(m, 'if', 'si', 'IfExpression', 'u1 > 0');
+m = add_block(m, 'subsystem', 'alors', 'Model', positif);
+m = add_block(m, 'subsystem', 'sinon', 'Model', negatif);
+m = add_block(m, 'merge', 'fusion');
+m = add_line(m, 'u', 'si');
+m = add_line(m, 'u', 'alors', 1);
+m = add_line(m, 'u', 'sinon', 1);
+m = add_line(m, 'si/1', 'alors/Ifaction');
+m = add_line(m, 'si/2', 'sinon/Ifaction');
+m = add_line(m, 'alors', 'fusion', 1);
+m = add_line(m, 'sinon', 'fusion', 2);
+for solveur = {'ode4', 'ode45'}
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 3, 'FixedStep', 0.01);
+    assert(max(abs(r.signaux.fusion - abs(sin(3 * r.temps)))) < 1e-12, ...
+           [solveur{1} ' : le Merge rend la branche choisie']);
+end
+% Trois branches — if, elseif, else — sur deux entrées.
+m = new_system('troisBranches');
+m = add_block(m, 'clock', 't');
+m = add_block(m, 'constant', 'seuil', 'Value', 2);
+m = add_block(m, 'if', 'si', 'NumInputs', 2, 'IfExpression', 'u1 < 1', ...
+              'ElseIfExpressions', 'u1 < u2');
+valeurs = [10 20 30];
+for j = 1:3
+    branche = new_system(sprintf('branche%d', j));
+    branche = add_block(branche, 'constant', 'v', 'Value', valeurs(j));
+    branche = add_block(branche, 'outport', 'y', 'Port', 1);
+    branche = add_block(branche, 'actionport', 'Action');
+    branche = add_line(branche, 'v', 'y');
+    m = add_block(m, 'subsystem', sprintf('b%d', j), 'Model', branche);
+    m = add_line(m, sprintf('si/%d', j), sprintf('b%d/Ifaction', j));
+end
+m = add_block(m, 'merge', 'fusion', 'Inputs', 3);
+m = add_line(m, 't', 'si', 1);
+m = add_line(m, 'seuil', 'si', 2);
+for j = 1:3
+    m = add_line(m, sprintf('b%d', j), 'fusion', j);
+end
+r = sim(m, 'Solver', 'ode1', 'StopTime', 3, 'FixedStep', 0.25);
+attendu = 10 * (r.temps < 1) + 20 * (r.temps >= 1 & r.temps < 2) + 30 * (r.temps >= 2);
+assert(isequal(r.signaux.fusion, attendu), 'if, elseif, else');
+% Switch Case, avec un défaut.
+m = new_system('parCas');
+m = add_block(m, 'clock', 't');
+m = add_block(m, 'rounding', 'entier', 'Operator', 'floor');
+m = add_block(m, 'switchcase', 'selon', 'CaseConditions', '{0, [1 2]}');
+m = add_line(m, 't', 'entier');
+m = add_line(m, 'entier', 'selon');
+for j = 1:3
+    branche = new_system(sprintf('cas%d', j));
+    branche = add_block(branche, 'constant', 'v', 'Value', valeurs(j));
+    branche = add_block(branche, 'outport', 'y', 'Port', 1);
+    branche = add_block(branche, 'actionport', 'Action');
+    branche = add_line(branche, 'v', 'y');
+    m = add_block(m, 'subsystem', sprintf('c%d', j), 'Model', branche);
+    m = add_line(m, sprintf('selon/%d', j), sprintf('c%d/Ifaction', j));
+end
+m = add_block(m, 'merge', 'fusion', 'Inputs', 3, 'InitialOutput', -5);
+for j = 1:3
+    m = add_line(m, sprintf('c%d', j), 'fusion', j);
+end
+r = sim(m, 'Solver', 'ode1', 'StopTime', 4, 'FixedStep', 0.5);
+attendu = 10 * (r.temps < 1) + 20 * (r.temps >= 1 & r.temps < 3) + 30 * (r.temps >= 3);
+assert(isequal(r.signaux.fusion, attendu), 'le cas 0, les cas 1 et 2, puis le defaut');
+
+% Emboîtés : un sous-système activé dans un sous-système activé ne
+% calcule que quand les deux le permettent.
+dedans = set_param(interne, 'Enable', 'StatesWhenEnabling', 'held');
+milieu = new_system('milieu');
+milieu = add_block(milieu, 'inport', 'e', 'Port', 1);
+milieu = add_block(milieu, 'subsystem', 'dedans', 'Model', dedans);
+milieu = add_block(milieu, 'outport', 's', 'Port', 1);
+milieu = add_block(milieu, 'enableport', 'Enable');
+milieu = add_line(milieu, 'e', 'dedans/Enable');
+milieu = add_line(milieu, 'dedans', 's');
+m = new_system('emboites');
+m = add_block(m, 'step', 'exterieur', 'Time', 1);
+m = add_block(m, 'pulsegenerator', 'inter2', 'Period', 1, 'PulseWidth', 50);
+m = add_block(m, 'subsystem', 'milieu', 'Model', milieu);
+m = add_line(m, 'inter2', 'milieu', 1);
+m = add_line(m, 'exterieur', 'milieu/Enable');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 3.2);
+% Actif quand t >= 1 et que l'impulsion est haute : [1,1.5), [2,2.5), [3,3.2].
+assert(abs(r.signaux.milieu(end) - 1.2) < 1e-9, 'les deux gardes s''ajoutent');
+
+% Les sous-systèmes conditionnels de la bibliothèque arrivent garnis : In1
+% relié à Out1, et leurs ports de contrôle, qui comptent comme entrées.
+gabarits = {'Enabled Subsystem', 2; 'Triggered Subsystem', 2; ...
+            'Enabled and Triggered Subsystem', 3; 'If Action Subsystem', 2; ...
+            'simulink/Ports & Subsystems/Switch Case Action Subsystem', 2};
+for kG = 1:size(gabarits, 1)
+    m = add_block(new_system('gabarit'), gabarits{kG, 1}, 'sous');
+    ports = get_param(m, 'sous', 'Ports');
+    assert(ports(1) == gabarits{kG, 2} && ports(2) == 1, ...
+           [gabarits{kG, 1} ' : ses entrees, controles compris']);
+end
+m = new_system('gabaritActive');
+m = add_block(m, 'Enabled Subsystem', 'es');
+m = add_block(m, 'step', 'porte', 'Time', 0.5);
+m = add_block(m, 'constant', 'entree', 'Value', 3);
+m = add_line(m, 'entree', 'es', 1);
+m = add_line(m, 'porte', 'es/Enable');
+r = sim(m, 'Solver', 'ode1', 'StopTime', 1, 'FixedStep', 0.25);
+assert(isequal(r.signaux.es.', [0 0 3 3 3]), 'In1 passe a Out1 des que Enable s''allume');
+
+% Les erreurs des sous-systèmes conditionnels.
+continu = add_block(compteur, 'integrator', 'intrus');
+continu = add_line(continu, 'un', 'intrus');
+avecContinu = add_block(new_system('declencheContinu'), 'subsystem', 'compte', ...
+                        'Model', continu);
+deuxEnable = add_block(add_block(interne, 'enableport', 'Enable2'), 'triggerport', 'T');
+deuxEnable = add_block(new_system('deuxPorts'), 'subsystem', 'sous', 'Model', ...
+                       add_block(deuxEnable, 'enableport', 'Enable3'));
+actionEtEnable = add_block(new_system('melange'), 'subsystem', 'sous', 'Model', ...
+                           add_block(interne, 'actionport', 'Action'));
+siFaux = add_block(new_system('siFaux'), 'if', 'si', 'IfExpression', 'u1 > inconnue');
+casFaux = add_block(new_system('casFaux'), 'switchcase', 'selon', 'CaseConditions', ...
+                    '{1.5}');
+casErreurs = {
+    @() sim(avecContinu), 'Simulink:blocks:TriggeredSubsystemContinuousStates', 'compte/intrus'
+    @() sim(deuxEnable), 'Simulink:blocks:ControlPortDuplicate', 'sous'
+    @() sim(actionEtEnable), 'Simulink:blocks:ActionPortWithEnableTrigger', 'sous'
+    @() sim(siFaux), 'Simulink:blocks:IfExpressionInvalid', 'siFaux/si'
+    @() sim(casFaux), 'Simulink:blocks:SwitchCaseConditionsInvalid', 'casFaux/selon'
+    @() add_line(add_block(new_system('x'), 'subsystem', 'sous', 'Model', interne), ...
+                 'sous', 'sous/Trigger'), 'Simulink:Commands:AddLineInvalidPort', 'Trigger'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('conditionnels, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('sous-systemes conditionnels : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -626,5 +1169,15 @@ function p = etendreSource(type, p)
             p{2} = [0.7; 0.35; -0.2];
         case 'step'
             p{6} = [-0.6; 0.1; 1.2];
+    end
+end
+
+function aire = integrerParMorceaux(f, a, b, coupures)
+    % L'intégrale d'une fonction qui casse en des instants connus : un
+    % morceau lisse après l'autre.
+    bornes = unique([a, coupures(coupures > a & coupures < b), b]);
+    aire = 0;
+    for k = 1:numel(bornes) - 1
+        aire = aire + integral(f, bornes(k), bornes(k + 1), 'AbsTol', 1e-13, 'RelTol', 1e-12);
     end
 end

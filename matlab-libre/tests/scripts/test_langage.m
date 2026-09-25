@@ -882,6 +882,22 @@ assert(toc(debut) < 20 && somme == 5000050000, 'le lire aussi');
 % 0 x 1, et se concatene a une colonne.
 assert(isequal(size(colonne(1:0)), [0 1]) && isequal(size(x(1:0)), [1 0]));
 assert(size([5; colonne(1:0)], 1) == 1);
+% Un deux-points sur une dimension vide : une source non scalaire en
+% donne la taille, un scalaire non — sauf sur la matrice nulle 0 x 0.
+sansLigne = zeros(0, 4);
+sansLigne(:, 8) = 0;
+assert(isequal(size(sansLigne), [0 8]), 'x(:,8) = 0 garde les zero lignes');
+nulle = [];
+nulle(:, 1) = 5;
+assert(isequal(nulle, 5), 'sur [], x(:,1) = 5 fait 5');
+deuxLignes = zeros(0, 3);
+deuxLignes(:, 1) = [1; 2];
+assert(isequal(deuxLignes, [1 0 0; 2 0 0]), 'une colonne donne ses lignes');
+% Un scalaire n'a pas d'orientation : indexé, il prend la forme de
+% l'indice — « a(ones(3,1)) » est une colonne, la vieille astuce de Tony.
+scalaire = 7;
+assert(isequal(scalaire(ones(3, 1)), [7; 7; 7]) && isequal(scalaire([1 1]), [7 7]));
+assert(isequal(size(scalaire(zeros(0, 1))), [0 1]) && isequal(size(scalaire(zeros(1, 0))), [1 0]));
 
 % LASTWARN rend le dernier avertissement, meme eteint : on le tait, on ne
 % l'oublie pas.

@@ -120,6 +120,8 @@ const BlocBibliotheque blocs[] = {
      "'GotoTag', 'A'"},
     {"Aiguillage", "from", "Rend le signal du Goto de même étiquette", "'GotoTag', 'A'"},
     {"Aiguillage", "signalconversion", "Laisse passer son entrée", ""},
+    {"Aiguillage", "merge", "Rend la sortie du sous-système qui vient de calculer",
+     "'Inputs', 2"},
 
     {"Continu", "integrator", "Intègre : 1/s", "'InitialCondition', 0"},
     {"Continu", "derivative", "Dérive : du/dt", ""},
@@ -153,6 +155,24 @@ const BlocBibliotheque blocs[] = {
      "Un schéma entier abrégé en un bloc ; un double-clic l'ouvre",
      "'Model', add_line(add_block(add_block(new_system('sousSysteme'), "
      "'inport', 'e', 'Port', 1), 'outport', 's', 'Port', 1), 'e', 's')"},
+    // Les sous-systèmes conditionnels arrivent garnis de leurs ports de
+    // contrôle ; les ports eux-mêmes se posent aussi dans un sous-système
+    // qu'on a ouvert.
+    {"Sous-systèmes", "Enabled Subsystem",
+     "Ne calcule que quand son entrée Enable est positive", ""},
+    {"Sous-systèmes", "Triggered Subsystem",
+     "Ne calcule qu'aux fronts de son entrée Trigger", ""},
+    {"Sous-systèmes", "If Action Subsystem", "Calcule quand un If ou un Switch Case le désigne",
+     ""},
+    {"Sous-systèmes", "enableport", "Posé dans un sous-système, le rend activable", ""},
+    {"Sous-systèmes", "triggerport", "Posé dans un sous-système, le rend déclenché",
+     "'TriggerType', 'rising'"},
+    {"Sous-systèmes", "actionport", "Posé dans un sous-système, le rend sous-système d'action",
+     ""},
+    {"Sous-systèmes", "if", "Choisit une branche par des conditions sur ses entrées",
+     "'IfExpression', 'u1 > 0'"},
+    {"Sous-systèmes", "switchcase", "Choisit une branche selon la valeur de son entrée",
+     "'CaseConditions', '{1, 2}'"},
 
     {"Sorties", "outport", "La sortie du modèle, vue par LINMOD", "'Port', 1"},
     {"Sorties", "scope", "Un oscilloscope : le signal est relevé", ""},

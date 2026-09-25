@@ -189,7 +189,9 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
         auto p = positions(idx[0], total, false, bmax);
         pos.push_back(p);
         // Forme du résultat : celle de l'indice, sauf pour un vecteur indexé
-        // par un vecteur — l'orientation de la source l'emporte alors.
+        // par un vecteur — l'orientation de la source l'emporte alors. Un
+        // scalaire n'a pas d'orientation : « a(ones(3,1)) » est une colonne.
+        const bool sourceVecteur = base.estVecteur() && !base.estScalaire();
         if (estColonMagique(idx[0])) {
             formeResultat = {(int)p.size(), 1};
         } else if (idx[0].classe == Classe::Logique) {
@@ -198,14 +200,14 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
             // deux vecteurs laissent l'orientation à la source.
             if (!idx[0].estVecteur()) {
                 formeResultat = Dims{(int)p.size(), 1};
-            } else if (base.estVecteur()) {
+            } else if (sourceVecteur) {
                 formeResultat =
                     base.estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
             } else {
                 formeResultat =
                     idx[0].estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
             }
-        } else if (base.estVecteur() && idx[0].dims.size() == 2 && idx[0].nelem() == 0 &&
+        } else if (sourceVecteur && idx[0].dims.size() == 2 && idx[0].nelem() == 0 &&
                    (idx[0].dims[0] == 1 || idx[0].dims[1] == 1)) {
             // Un indice vide en ligne, « x(1:0) », garde lui aussi
             // l'orientation de la source : une colonne donne 0 x 1, comme
@@ -213,7 +215,7 @@ std::vector<Valeur> Interpreteur::indexerListe(const Valeur& base, std::vector<V
             formeResultat = base.estLigne() ? Dims{1, 0} : Dims{0, 1};
         } else if (idx[0].dims.size() == 2 && !idx[0].estVecteur() && !idx[0].estScalaire()) {
             formeResultat = idx[0].dims;
-        } else if (base.estVecteur() && idx[0].estVecteur()) {
+        } else if (sourceVecteur && idx[0].estVecteur()) {
             formeResultat = base.estLigne() ? Dims{1, (int)p.size()} : Dims{(int)p.size(), 1};
         } else {
             formeResultat = idx[0].dims;
@@ -507,7 +509,17 @@ static Valeur ecrire(Valeur base, std::vector<Valeur>& idx, const Valeur& valeur
         std::size_t bmax;
         std::vector<std::size_t> p;
         if (estColonMagique(idx[k]) && taille == 0) {
+            // Un deux-points sur une dimension vide prend la taille de la
+            // source. Un scalaire n'en donne pas — « x = zeros(0,4);
+            // x(:,8) = 0 » reste sans ligne, 0 x 8 — sauf sur la matrice
+            // nulle 0 x 0, où « x(:,1) = 5 » fait 5, comme dans MATLAB.
             std::size_t vt = k < v.dims.size() ? (std::size_t)v.dims[k] : 1;
+            if (v.nelem() == 1) {
+                bool nulle = true;
+                for (int d : base.dims)
+                    if (d != 0) nulle = false;
+                vt = nulle ? 1 : 0;
+            }
             p.resize(vt);
             for (std::size_t x = 0; x < vt; ++x) p[x] = x;
             bmax = vt;
@@ -714,6 +726,20 @@ Valeur Interpreteur::affecterIndex(Valeur base, const std::vector<ElementAcces>&
         return base;
     }
 
+    // Une containers.Map rangée dans une structure ou une cellule reste une
+    // poignée : « s.carte(cle) = v » écrit dans la carte partagée, comme
+    // « carte(cle) = v ». Sans ce détour, l'écriture passait par celle d'un
+    // tableau et se perdait sans rien dire.
+    if (estCarte(base) && e.genre == '(') {
+        auto args = evaluerListe(e.args);
+        if (args.size() != 1)
+            erreur("MATLAB:Map:invalidKeyType", "Specify a single key when writing to a Map.");
+        if (k + 1 != chaine.size())
+            erreur("MATLAB:Containers:Map:OnlyOneLevel",
+                   "Only one level of indexing is supported by a containers.Map.");
+        ecrireCarte(base, args[0], v);
+        return base;
+    }
     auto idx = evaluerIndices(e.args, &base, 0, (int)e.args.size());
     if (k + 1 == chaine.size()) {
         if (suppression && e.genre == '(') return supprimer(base, idx);

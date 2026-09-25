@@ -28,6 +28,16 @@ function modele = matlibre_sl_aplatir(modele)
 %   Les sous-systèmes s'emboîtent : un sous-système qui en contient un
 %   autre est déplié jusqu'au bout.
 %
+%   Un sous-système qui porte un port de contrôle — Enable, Trigger, ou
+%   Action Port — est conditionnel. Ses ports de contrôle sont des entrées
+%   de plus, après les autres : Enable, puis Trigger ; ou Action Port. Le
+%   dépliage fait de son premier port de contrôle une « garde », un bloc
+%   qui dit à chaque pas si le sous-système calcule ; chaque bloc
+%   intérieur en porte le rang dans son champ garde, et la compilation
+%   le lit. Un sous-système emboîté dans un conditionnel en hérite. Les
+%   OUTPORT intérieurs gardent leur valeur initiale et leur conduite à
+%   l'arrêt (OutputWhenDisabled) dans le champ sortieConditionnelle.
+%
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB.
 %
 %   Exemple :
@@ -98,6 +108,11 @@ function modele = deplier(modele, k)
     m = numel(interne.blocs);
     entrees = parRang(interne, 'inport');
     sorties = parRang(interne, 'outport');
+    [controles, g] = portsDeControle(interne, bloc);
+    gardeParent = 0;
+    if isfield(bloc, 'garde')
+        gardeParent = bloc.garde;
+    end
 
     % Le bloc du sous-système garde sa place dans la liste — donc son
     % rang, donc tous les liens qui le désignent —, mais devient un
@@ -112,6 +127,7 @@ function modele = deplier(modele, k)
     if isfield(bloc.parametres, 'Position')
         passePlat.parametres.Position = bloc.parametres.Position;
     end
+    passePlat.garde = gardeParent;
     modele.blocs{k} = passePlat;
 
     % Les blocs intérieurs viennent à la suite, sous le nom
@@ -123,6 +139,12 @@ function modele = deplier(modele, k)
         enfant.nom = [char(bloc.nom) '/' char(enfant.nom)];
         if isfield(enfant.parametres, 'Position')
             enfant.parametres = rmfield(enfant.parametres, 'Position');
+        end
+        % Un bloc intérieur calcule sous la garde du sous-système, s'il est
+        % conditionnel, sinon sous celle qui gardait le sous-système.
+        enfant.garde = gardeParent;
+        if g > 0 && ~any(j == controles.tous)
+            enfant.garde = n + g;
         end
         modele.blocs{n + j} = enfant;
     end
@@ -139,8 +161,39 @@ function modele = deplier(modele, k)
     % l'entrée que rien n'alimente devient la constante qu'elle valait,
     % ce que SIM lui faisait déjà rendre.
     for j = 1:numel(sorties)
+        interieur = modele.blocs{n + sorties(j)};
+        if g > 0
+            % La sortie d'un sous-système conditionnel part de sa valeur
+            % initiale, et y revient à l'arrêt si OutputWhenDisabled vaut
+            % reset ; sinon elle tient la dernière.
+            initiale = 0;
+            if isfield(interieur.parametres, 'InitialOutput')
+                initiale = interieur.parametres.InitialOutput;
+            end
+            revient = isfield(interieur.parametres, 'OutputWhenDisabled') && ...
+                      strcmpi(char(interieur.parametres.OutputWhenDisabled), 'reset');
+            modele.blocs{n + sorties(j)}.sortieConditionnelle = ...
+                struct('initiale', {initiale}, 'revient', revient);
+        end
         modele.blocs{n + sorties(j)}.type = 'signalconversion';
         modele.blocs{n + sorties(j)}.parametres = struct();
+    end
+    % Le premier port de contrôle devient la garde ; le Trigger d'un
+    % sous-système qui a aussi un Enable devient le passe-plat de son
+    % signal, que la garde lit en seconde entrée.
+    if g > 0
+        garde = modele.blocs{n + g};
+        garde.type = 'garde';
+        garde.parametres = parametresDeGarde(interne, controles);
+        garde.garde = gardeParent;
+        modele.blocs{n + g} = garde;
+        if controles.enable > 0 && controles.trigger > 0
+            declencheur = modele.blocs{n + controles.trigger};
+            declencheur.type = 'signalconversion';
+            declencheur.parametres = struct();
+            modele.blocs{n + controles.trigger} = declencheur;
+            modele.liens = [modele.liens; n + controles.trigger, n + g, 2, 1];
+        end
     end
     for j = 1:numel(entrees)
         indice = n + entrees(j);
@@ -160,11 +213,24 @@ function modele = deplier(modele, k)
             continue
         end
         port = modele.liens(l, 3);
+        if port > numel(entrees) && port <= numel(entrees) + numel(controles.ordre)
+            % Un port de contrôle : le lien arrive sur la garde, ou sur le
+            % passe-plat du Trigger.
+            cible = controles.ordre(port - numel(entrees));
+            if cible == g
+                modele.liens(l, 2) = n + g;
+                modele.liens(l, 3) = 1;
+            else
+                modele.liens(l, 2) = n + cible;
+                modele.liens(l, 3) = 1;
+            end
+            continue
+        end
         if port < 1 || port > numel(entrees)
             error('Simulink:Commands:SousSystemeEntreeAbsente', ...
                   ['Le sous-systeme ''%s'' recoit un lien sur son entree %d, ' ...
-                   'mais il n''a que %d bloc(s) INPORT.'], ...
-                  char(bloc.nom), port, numel(entrees));
+                   'mais il n''a que %d bloc(s) INPORT et %d port(s) de controle.'], ...
+                  char(bloc.nom), port, numel(entrees), numel(controles.ordre));
         end
         interieur = n + entrees(port);
         modele.blocs{interieur}.type = 'signalconversion';
@@ -200,6 +266,72 @@ function interne = contenu(bloc)
               ['Le sous-systeme ''%s'' ne porte pas de modele : donnez-le ' ...
                'par ADD_BLOCK(...,''subsystem'',NOM,''Model'',SOUSMODELE).'], ...
               char(bloc.nom));
+    end
+end
+
+% Les ports de contrôle d'un sous-système : Enable, Trigger, Action Port,
+% un de chaque au plus, et Action Port seul. G est le rang de celui qui
+% devient la garde, 0 s'il n'y en a pas. CONTROLES.ordre les range comme
+% les entrées de contrôle du bloc : Enable, puis Trigger ; ou Action.
+function [controles, g] = portsDeControle(interne, bloc)
+    controles = struct('enable', 0, 'trigger', 0, 'action', 0, 'ordre', [], 'tous', []);
+    noms = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'action'};
+    for i = 1:size(noms, 1)
+        trouves = find(cellfun(@(b) strcmp(b.type, noms{i, 1}), interne.blocs));
+        if numel(trouves) > 1
+            error('Simulink:blocks:ControlPortDuplicate', ...
+                  ['Le sous-systeme ''%s'' porte %d blocs ''%s'' : un sous-systeme n''a ' ...
+                   'qu''un port de chaque sorte.'], char(bloc.nom), numel(trouves), ...
+                  interne.blocs{trouves(1)}.nom);
+        end
+        if ~isempty(trouves)
+            controles.(noms{i, 2}) = trouves;
+        end
+    end
+    if controles.action > 0 && (controles.enable > 0 || controles.trigger > 0)
+        error('Simulink:blocks:ActionPortWithEnableTrigger', ...
+              ['Le sous-systeme ''%s'' porte un Action Port avec un port Enable ou ' ...
+               'Trigger : un sous-systeme d''action n''a que son Action Port.'], ...
+              char(bloc.nom));
+    end
+    controles.ordre = [controles.enable, controles.trigger, controles.action];
+    controles.ordre = controles.ordre(controles.ordre > 0);
+    controles.tous = controles.ordre;
+    g = 0;
+    if ~isempty(controles.ordre)
+        g = controles.ordre(1);
+    end
+end
+
+% Ce que la garde doit savoir : quels contrôles, quel front, et s'il faut
+% remettre les états à zéro quand le sous-système reprend.
+function p = parametresDeGarde(interne, controles)
+    p = struct('Enable', double(controles.enable > 0), 'Trigger', 'none', ...
+               'Action', double(controles.action > 0), 'Reset', 0, 'ZeroCross', 'on');
+    if controles.enable > 0
+        q = interne.blocs{controles.enable}.parametres;
+        if isfield(q, 'StatesWhenEnabling') && strcmpi(char(q.StatesWhenEnabling), 'reset')
+            p.Reset = 1;
+        end
+        if isfield(q, 'ZeroCross')
+            p.ZeroCross = lower(char(q.ZeroCross));
+        end
+    end
+    if controles.trigger > 0
+        p.Trigger = 'rising';
+        q = interne.blocs{controles.trigger}.parametres;
+        if isfield(q, 'TriggerType')
+            p.Trigger = lower(char(q.TriggerType));
+        end
+        if isfield(q, 'ZeroCross') && strcmpi(char(q.ZeroCross), 'off')
+            p.ZeroCross = 'off';
+        end
+    end
+    if controles.action > 0
+        q = interne.blocs{controles.action}.parametres;
+        if isfield(q, 'InitializeStates') && strcmpi(char(q.InitializeStates), 'reset')
+            p.Reset = 1;
+        end
     end
 end
 

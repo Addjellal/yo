@@ -249,6 +249,23 @@ copie('quatre') = 4;
 assert(carte.Count == 4);
 remove(carte, 'quatre');
 assert(carte.Count == 3);
+% Rangée dans une structure ou une cellule, la carte reste une poignée :
+% on y écrit à travers le champ, et l'original le voit.
+porteuse.carte = carte;
+porteuse.carte('cinq') = 5;
+casier = {carte};
+casier{1}('six') = 6;
+assert(isKey(carte, 'cinq') && isKey(carte, 'six') && carte.Count == 5, ...
+       'une ecriture a travers un champ ou une case touche la carte partagee');
+refuseNiveau = false;
+try
+    porteuse.carte('cinq').x = 1;
+catch err
+    refuseNiveau = strcmp(err.identifier, 'MATLAB:Containers:Map:OnlyOneLevel');
+end
+assert(refuseNiveau, 'un seul niveau d''indexation dans une carte');
+remove(carte, 'cinq');
+remove(carte, 'six');
 
 %% ------------------------------------------------------------------- creux
 A = sparse([1 3], [2 3], [5 7], 3, 3);

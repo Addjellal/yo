@@ -115,18 +115,26 @@ totalité.
    sous-système dont le format n'est pas public ; les tableaux de chaînes,
    pour la même raison, sont écrits en cellules de caractères. `-v7.3`
    (HDF5) est accepté mais écrit du niveau 5.
-4. **Simulink se simule, mais ne se dessine plus.** Le solveur est là :
-   dix-sept blocs, `new_system` / `add_block` / `add_line`, pas fixe, tri
-   topologique, blocs à état, analyse nodale modifiée pour les circuits.
-   `sim` accepte le nom d'un modèle — une variable de l'espace de travail,
-   ou un fichier `.m` qui le construit — et journalise dans les deux
-   formes de Simulink, `res.signaux.<nom>` et
-   `res.signals(k).values`. Les fichiers `.slx` et `.mdl` de MathWorks ne
-   se lisent pas : leur format n'est pas public, et `sim` le dit au lieu
-   d'échouer sur autre chose. L'éditeur graphique, lui, vivait dans
-   l'atelier du navigateur, retiré de la compilation : il reviendra dans
-   le bureau natif. Manquent aussi : les sous-systèmes, les bus, le pas
-   variable, et les éditeurs graphiques de Stateflow et Simscape.
+4. **Simulink se simule et se dessine.** Le modèle est compilé comme
+   dans Simulink : paramètres, ports, dimensions des signaux —
+   scalaires, vecteurs, matrices —, périodes d'échantillonnage, ordre de
+   calcul ; chaque erreur nomme le bloc par son chemin. Les boucles
+   algébriques sont résolues par la méthode de Newton. Neuf solveurs :
+   ode1 à ode5 et FixedStepDiscrete à pas fixe ; ode45, ode23 et ode23s
+   à pas variable, qui s'arrêtent sur les instants d'échantillonnage et
+   les cassures des sources, et localisent les passages par zéro des
+   relais, saturations, aiguillages et comparaisons. Les sous-systèmes
+   conditionnels — Enable, Trigger, If et Switch Case avec leurs
+   sous-systèmes d'action, Merge — calculent quand leur garde le
+   permet, et tiennent ou remettent à zéro sorties et états comme dans
+   Simulink. `sim` accepte le nom
+   d'un modèle et journalise dans les deux formes de Simulink,
+   `res.signaux.<nom>` et `res.signals(k).values`. L'éditeur du bureau
+   pose, câble, règle et simule ; Ctrl+E ouvre les paramètres de
+   configuration. Les fichiers `.slx` et `.mdl` de MathWorks ne se lisent
+   pas encore, et `sim` le dit au lieu d'échouer sur autre chose.
+   Manquent aussi : les sous-systèmes itérés, les bus, les masques, les
+   blocs MATLAB Function, et Stateflow dans les schémas.
 5. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et

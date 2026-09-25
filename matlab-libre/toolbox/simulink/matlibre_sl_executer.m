@@ -12,6 +12,18 @@ function varargout = matlibre_sl_executer(action, varargin)
 %   relevée, dans l'ordre de T.releves —, les états continus, et le rang
 %   du dernier instant simulé, qu'un bloc Stop Simulation peut avancer.
 %
+%   J = MATLIBRE_SL_EXECUTER('simulerVariable',T,TDEBUT,TFINAL,SOLVEUR,
+%   REGLAGES,IMPOSES) simule à pas variable, pour un modèle compilé avec
+%   l'option variable : ode45 (Dormand-Prince 5(4)), ode23
+%   (Bogacki-Shampine 3(2)), ode23s (Rosenbrock, pour les systèmes
+%   raides) ou VariableStepDiscrete. Le pas suit les tolérances RelTol et
+%   AbsTol de REGLAGES, borné par MaxStep et MinStep ; il s'arrête sur
+%   chaque instant d'échantillonnage, chaque cassure d'une source
+%   (échelon, front d'impulsion) et chaque passage par zéro, localisé
+%   dans le pas. IMPOSES, s'il n'est pas vide, donne les seuls instants
+%   relevés, que le solveur atteint exactement. J porte en plus le champ
+%   temps, les instants relevés.
+%
 %   [Y,DX] = MATLIBRE_SL_EXECUTER('point',T,X,U) évalue le modèle en un
 %   point : états continus X, entrées U des blocs INPORT dans l'ordre de
 %   leur paramètre Port. Y rend les sorties — ce qui arrive aux blocs
@@ -39,11 +51,13 @@ function varargout = matlibre_sl_executer(action, varargin)
 %      J.etats(end)                           % 2 : l'intégrale de 2 sur 1 s
 %
 %   Voir aussi SIM, MATLIBRE_SL_COMPILER, LINMOD.
-    switch action
+    switch lower(char(action))
         case 'preparer'
             varargout{1} = preparer(varargin{1});
         case 'simuler'
             varargout{1} = simuler(varargin{:});
+        case 'simulervariable'
+            varargout{1} = simulerVariable(varargin{:});
         case 'point'
             [y, dx] = point(varargin{:});
             varargout{1} = y;
@@ -110,13 +124,57 @@ function T = preparer(c)
         T.zA(k) = numel(T.Z0) + 1;
         T.Z0 = [T.Z0; c.z0{k}];
     end
+    T.zN = cellfun(@numel, c.z0);
     T.x0 = c.x0;
     T.xA = c.xA;
     T.xB = c.xB;
     T.V0 = zeros(c.nV, 1);
+    % Les sous-systèmes conditionnels : la garde de chaque bloc, ce que
+    % rendent leurs sorties avant le premier calcul et à l'arrêt, et les
+    % objets que leurs blocs de choix consultent.
+    T.garde = zeros(1, n);
+    if isfield(c, 'garde')
+        T.garde = c.garde;
+    end
+    T.objets = cell(1, n);
+    if isfield(c, 'objets')
+        T.objets = c.objets;
+    end
+    T.revient = false(1, n);
+    T.initiale = cell(1, n);
+    for k = 1:n
+        if isfield(c, 'sortieCond') && ~isempty(c.sortieCond{k})
+            w = c.oB(k) - c.oA(k) + 1;
+            valeur = double(c.sortieCond{k}.initiale(:));
+            if isempty(valeur)
+                valeur = 0;
+            end
+            valeur = valeur + zeros(w, 1);
+            T.V0(c.oA(k):c.oB(k)) = valeur;
+            T.revient(k) = c.sortieCond{k}.revient;
+            T.initiale{k} = valeur;
+        elseif strcmp(c.types{k}, 'merge')
+            w = c.oB(k) - c.oA(k) + 1;
+            T.V0(c.oA(k):c.oB(k)) = c.seg{k}(2:1 + w);
+        end
+    end
+    T.sousGarde = cell(1, n);
+    for k = 1:n
+        g = T.garde(k);
+        while g > 0
+            T.sousGarde{g}(end + 1) = k;
+            g = T.garde(g);
+        end
+    end
+    T.remises = [];
+    for k = find(strcmp(c.types, 'garde'))
+        if c.seg{k}(4) ~= 0
+            T.remises(end + 1) = k;
+        end
+    end
     T.h = c.pas;
     T.tDebut = c.tDebut;
-    T.fixe = true;
+    T.fixe = ~(isfield(c, 'variable') && c.variable);
 
     % Le mode de chaque bloc : 0 calculé à chaque passe, 1 aux seuls pas
     % majeurs, 2 aux instants de sa période, 3 une fois pour toutes.
@@ -129,7 +187,13 @@ function T = preparer(c)
             T.mode(k) = 3;
         elseif cadence > 0
             T.mode(k) = 2;
-            cle = [c.periodePas(k), c.decalagePas(k)];
+            % Un groupe par période : comptée en pas à pas fixe, en
+            % secondes à pas variable.
+            if T.fixe
+                cle = [c.periodePas(k), c.decalagePas(k)];
+            else
+                cle = [c.cadence(k), c.decalage(k)];
+            end
             g = find(T.groupes(:, 1) == cle(1) & T.groupes(:, 2) == cle(2), 1);
             if isempty(g)
                 T.groupes(end + 1, :) = cle;
@@ -137,6 +201,18 @@ function T = preparer(c)
             end
             T.grp(k) = g;
         elseif c.majeurSeul(k)
+            T.mode(k) = 1;
+        end
+        % Dans un sous-système déclenché, un bloc ne calcule qu'aux fronts,
+        % donc aux pas majeurs, quelle que soit sa période.
+        if isfield(c, 'declenche') && c.declenche(k) && T.mode(k) ~= 3
+            T.mode(k) = 1;
+            T.grp(k) = 0;
+        end
+        % Une constante gardée ne se calcule pas une fois pour toutes : son
+        % sous-système peut dormir au premier pas. Elle se calcule aux pas
+        % majeurs où il est actif.
+        if isfield(c, 'garde') && c.garde(k) > 0 && T.mode(k) == 3
             T.mode(k) = 1;
         end
     end
@@ -165,7 +241,8 @@ function T = preparer(c)
     % Les listes de calcul. Les blocs qui ne calculent rien — ceux qui ne
     % font que recevoir un signal, et la masse — n'y sont pas.
     rien = ismember(c.types, {'outport', 'scope', 'display', 'toworkspace', ...
-                              'terminator', 'goto', 'ground'});
+                              'terminator', 'goto', 'ground', 'enableport', ...
+                              'triggerport', 'actionport'});
     liste = [];
     numero = 0;
     for e = 1:numel(c.etapes)
@@ -201,7 +278,7 @@ function T = preparer(c)
             case {'relay', 'ratelimiter', 'hitcrossing', 'backlash', 'detectchange', ...
                   'detectincrease', 'detectdecrease', 'derivative', 'memory', ...
                   'discreteintegrator', 'discretetransferfcn', 'discretefilter', ...
-                  'discretestatespace', 'randomnumber', 'uniformrandomnumber'}
+                  'discretestatespace', 'randomnumber', 'uniformrandomnumber', 'garde'}
                 T.aMettreAJour(end + 1) = k;
             case 'delay'
                 if c.seg{k}(1) > 0
@@ -214,6 +291,65 @@ function T = preparer(c)
         end
     end
     T.continus = find(c.xA > 0);
+
+    % Pour le pas variable : les blocs dont on surveille les passages par
+    % zéro, les instants où une source casse, et les générateurs
+    % d'impulsions, dont les fronts se calculent en marchant.
+    T.zc = [];
+    if isfield(c, 'zc')
+        T.zc = find(c.zc);
+    end
+    T.cassures = zeros(0, 1);
+    T.impulsions = [];
+    for k = 1:n
+        s = c.seg{k};
+        w = c.oB(k) - c.oA(k) + 1;
+        switch c.types{k}
+            case 'step'
+                T.cassures = [T.cassures; s(1:w)];
+            case 'ramp'
+                T.cassures = [T.cassures; s(w + 1:2 * w)];
+            case 'fromworkspace'
+                nt = s(1);
+                temps = s(5:4 + nt);
+                if s(3) == 0
+                    T.cassures = [T.cassures; temps];
+                else
+                    T.cassures = [T.cassures; temps(end)];
+                end
+            case 'pulsegenerator'
+                if c.sub(k) == 1
+                    T.impulsions(end + 1) = k;
+                end
+        end
+    end
+    T.cassures = unique(T.cassures(isfinite(T.cassures)));
+    % À pas variable, un bloc surveillé fige son mode entre deux pas
+    % majeurs — le côté du seuil où il était —, comme dans Simulink : aux
+    % pas mineurs, il prolonge la formule de ce côté-là. Le franchissement
+    % est alors vu par la détection, et le mode change au pas majeur qui
+    % le suit. Les modes sont rangés au bout de Z.
+    % La sortie d'un sous-système conditionnel à l'arrêt tient la valeur du
+    % dernier pas majeur où il a calculé : elle est rangée au bout de Z, car
+    % les pas mineurs écrivent dans V des valeurs de passage.
+    T.zTenue = zeros(1, n);
+    for k = find(T.revient | ~cellfun(@isempty, T.initiale))
+        if ~T.revient(k)
+            T.zTenue(k) = numel(T.Z0) + 1;
+            T.Z0 = [T.Z0; T.initiale{k}];
+        end
+    end
+    T.gele = false(1, n);
+    T.zmA = zeros(1, n);
+    if ~T.fixe
+        for k = T.zc
+            if any(T.code(k) == [23 24 27 40 41 47 51 52 53 60])
+                T.gele(k) = true;
+                T.zmA(k) = numel(T.Z0) + 1;
+                T.Z0 = [T.Z0; zeros(c.oB(k) - c.oA(k) + 1, 1)];
+            end
+        end
+    end
     T.bornes = [];
     for k = find(strcmp(c.types, 'integrator'))
         if c.seg{k}(1) ~= 0
@@ -346,6 +482,12 @@ function J = simuler(T, instants, solveur, reprise)
         else
             [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
         end
+        if ~isempty(T.remises)
+            [x, Z, refaire] = remettre(T, V, Z, x);
+            if refaire
+                [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, i, true, touche);
+            end
+        end
         releveV(:, r) = V(journal);
         etats(:, r) = x;
         if Z(1) ~= 0
@@ -410,6 +552,625 @@ function x = borner(T, x)
     end
 end
 
+% === pas variable ==============================================================
+%
+% Les solveurs à pas variable de Simulink. ode45 (Dormand et Prince,
+% ordres 5 et 4) et ode23 (Bogacki et Shampine, ordres 3 et 2) portent à
+% chaque pas deux solutions d'ordres voisins : leur écart estime l'erreur,
+% et le pas suivant s'en déduit ; un pas trop grand est refait plus court.
+% ode23s est la formule de Rosenbrock de Shampine et Reichelt, d'ordre 2
+% avec une estimation d'ordre 3 : implicite, elle garde un grand pas là où
+% un système raide forcerait les deux autres à piétiner. Son jacobien se
+% mesure par différences finies, une fois par pas.
+%
+% Le pas s'arrête exactement sur les instants d'échantillonnage, sur les
+% cassures des sources — l'instant d'un échelon, les fronts d'un
+% générateur d'impulsions — et sur les instants imposés. Un seuil franchi
+% dans le pas — passage par zéro de l'entrée d'un relais, d'une
+% saturation, d'un aiguillage — est localisé par dichotomie, et le pas
+% s'arrête juste après : le mode du bloc change au pas majeur suivant, et
+% la solution ne franchit pas l'événement à l'aveugle.
+function [A, b, bEtoile, c, ordre] = tableauVariable(solveur)
+    switch solveur
+        case 'ode45'
+            A = [0 0 0 0 0 0 0
+                 1/5 0 0 0 0 0 0
+                 3/40 9/40 0 0 0 0 0
+                 44/45 -56/15 32/9 0 0 0 0
+                 19372/6561 -25360/2187 64448/6561 -212/729 0 0 0
+                 9017/3168 -355/33 46732/5247 49/176 -5103/18656 0 0
+                 35/384 0 500/1113 125/192 -2187/6784 11/84 0];
+            b = [35/384 0 500/1113 125/192 -2187/6784 11/84 0];
+            bEtoile = [5179/57600 0 7571/16695 393/640 -92097/339200 187/2100 1/40];
+            c = [0 1/5 3/10 4/5 8/9 1 1];
+            ordre = 5;
+        case 'ode23'
+            A = [0 0 0 0
+                 1/2 0 0 0
+                 0 3/4 0 0
+                 2/9 1/3 4/9 0];
+            b = [2/9 1/3 4/9 0];
+            bEtoile = [7/24 1/4 1/3 1/8];
+            c = [0 1/2 3/4 1];
+            ordre = 3;
+        case 'ode23s'
+            A = [];
+            b = [];
+            bEtoile = [];
+            c = [];
+            ordre = 3;
+        otherwise   % variablestepdiscrete : pas d'état continu à intégrer
+            A = 0;
+            b = 1;
+            bEtoile = 1;
+            c = 0;
+            ordre = 1;
+    end
+end
+
+% REGLAGES porte RelTol, AbsTol, MaxStep, MinStep et InitialStep : un
+% nombre, ou 'auto'. IMPOSES, s'il n'est pas vide, porte les seuls
+% instants à relever.
+function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
+    if nargin < 6
+        imposes = [];
+    end
+    imposes = sort(double(imposes(:)));
+    solveur = lower(char(solveur));
+    nx = numel(T.x0);
+    discret = strcmp(solveur, 'variablestepdiscrete') || nx == 0;
+    M = struct();
+    [M.A, M.b, M.bE, M.c, M.ordre] = tableauVariable(solveur);
+    M.rosenbrock = strcmp(solveur, 'ode23s');
+    M.J = [];
+    M.dfdt = [];
+
+    % Les tampons du retard pur, hors de Z : ils grandissent au besoin.
+    tampons = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    for k = find(T.code == 75)
+        p = T.pA(k);
+        if T.P(p) > 0
+            w = T.oB(k) - T.oA(k) + 1;
+            L = T.P(p + 1);
+            tampons(k) = struct('t', zeros(L, 1), 'v', zeros(w, L), 'tete', 1, 'n', 0);
+        end
+    end
+    T.tampons = tampons;
+
+    duree = tFinal - tDebut;
+    if ischar(reglages.MaxStep)
+        if isfinite(duree) && duree > 0
+            pasMax = duree / 50;
+        else
+            pasMax = 0.2;   % Simulink prend 0,2 s quand la fin est infinie
+        end
+    else
+        pasMax = double(reglages.MaxStep);
+    end
+    minimumDonne = ~ischar(reglages.MinStep);
+    if minimumDonne
+        pasMin = double(reglages.MinStep);
+    else
+        pasMin = 0;
+    end
+    rtol = double(reglages.RelTol);
+    absoluAuto = ischar(reglages.AbsTol);
+    if absoluAuto
+        atol = rtol * 1e-3 * ones(nx, 1);
+    else
+        atol = double(reglages.AbsTol) .* ones(nx, 1);
+    end
+    maxAbs = abs(T.x0);
+
+    % Les groupes de période, en secondes : le rang de leur prochain
+    % instant est compté en entiers, pour que l'arrondi ne dérive pas.
+    G = size(T.groupes, 1);
+    periodes = T.groupes(:, 1);
+    decalages = T.groupes(:, 2);
+    rangs = zeros(G, 1);
+    for g = 1:G
+        rangs(g) = max(0, ceil((tDebut - decalages(g)) / periodes(g) - 1e-9));
+    end
+    prochain = decalages + rangs .* periodes;
+
+    capacite = 256;
+    temps = zeros(1, capacite);
+    releveV = zeros(numel(T.journal), capacite);
+    etats = zeros(nx, capacite);
+    n = 0;
+    iImpose = 1;
+    while iImpose <= numel(imposes) && imposes(iImpose) < tDebut - toleranceTemps(tDebut)
+        iImpose = iImpose + 1;
+    end
+
+    t = tDebut;
+    x = T.x0;
+    Z = T.Z0;
+    touche = (abs(prochain - t) <= toleranceTemps(t)).';
+    [V, Z] = passe(T, T.listeTout, T.V0, Z, x, t, 0, true, touche);
+    if ~isempty(T.remises)
+        [x, Z, refaire] = remettre(T, V, Z, x);
+        if refaire
+            [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
+        end
+    end
+    [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, V(T.journal), ...
+                                                x, imposes, iImpose);
+    avant = passagesZero(T, V, Z, x, t);
+    arret = Z(1) ~= 0;
+    hPropose = [];
+    hForce = [];
+    consecutifs = 0;
+    averti = false;
+    while ~arret && (isinf(tFinal) || t < tFinal - toleranceTemps(tFinal))
+        % Les états discrets avancent aux instants qui viennent de tomber.
+        k1 = zeros(nx, 1);
+        if nx > 0
+            k1 = derivees(T, V, x);
+            if ~all(isfinite(k1))
+                deriveeInfinie(T, k1, t);
+            end
+        end
+        Z = majs(T, V, Z, t, touche);
+        rangs(touche) = rangs(touche) + 1;
+        prochain = decalages + rangs .* periodes;
+
+        % La borne du pas : la fin, le prochain instant d'échantillonnage,
+        % la prochaine cassure d'une source, le prochain instant imposé.
+        cible = min([tFinal; prochain; prochaineCassure(T, t)]);
+        if iImpose <= numel(imposes)
+            cible = min(cible, imposes(iImpose));
+        end
+        borne = min(cible - t, pasMax);
+        if ~isempty(hForce)
+            % le pas de droite d'un événement : il ne fait que le franchir
+            borne = min(borne, hForce);
+            hForce = [];
+        end
+        err = 0;
+        parErreur = false;
+        if discret
+            h = borne;
+            xNouveau = x;
+        else
+            if M.rosenbrock
+                [M.J, M.dfdt, V, Z] = jacobien(T, V, Z, x, k1, t, touche);
+            end
+            if isempty(hPropose)
+                if ischar(reglages.InitialStep)
+                    [hPropose, V, Z] = pasInitial(T, V, Z, x, k1, t, borne, atol, rtol, ...
+                                                  M.ordre, touche);
+                else
+                    hPropose = double(reglages.InitialStep);
+                end
+            end
+            hPropose = min(hPropose, pasMax);
+            h = min(hPropose, borne);
+            plancher = max(pasMin, 16 * eps(max(abs(t), 1)));
+            while true
+                [xNouveau, err, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+                if err <= 1
+                    break
+                end
+                if h <= plancher
+                    if ~isfinite(err)
+                        error('Simulink:Engine:DerivNotFinite', ...
+                              ['Le pas du solveur ne peut plus diminuer a t = %g : les ' ...
+                               'derivees ne sont pas finies. La solution a peut-etre une ' ...
+                               'singularite.'], t);
+                    end
+                    if ~minimumDonne
+                        error('Simulink:Engine:SolverMinStepViolation', ...
+                              ['A t = %g, le solveur %s ne tient plus la tolerance sans ' ...
+                               'reduire le pas sous %g, le plus petit que permet la ' ...
+                               'precision des nombres. La solution a peut-etre une ' ...
+                               'singularite ; si le systeme est raide, essayez ode23s.'], ...
+                              t, solveur, plancher);
+                    end
+                    if ~averti
+                        warning('Simulink:Engine:SolverMinStepViolation', ...
+                                ['A t = %g, le solveur %s ne tient pas la tolerance au pas ' ...
+                                 'minimal MinStep = %g : il avance quand meme.'], ...
+                                t, solveur, pasMin);
+                        averti = true;
+                    end
+                    break
+                end
+                h = max(h * max(0.1, 0.9 * err ^ (-1 / M.ordre)), plancher);
+                parErreur = true;
+            end
+        end
+        if isfinite(cible) && abs(t + h - cible) <= toleranceTemps(cible)
+            h = cible - t;
+        end
+        tNouveau = t + h;
+
+        % Un seuil franchi dans le pas : on le localise entre deux instants
+        % très proches. Comme Simulink, on fait deux pas majeurs : l'un
+        % juste avant le franchissement, où les blocs calculent encore dans
+        % leur ancien mode — c'est la valeur que tient un sous-système qui
+        % s'arrête —, l'autre juste après, au pas suivant.
+        if ~isempty(avant)
+            [Vc, ~] = passe(T, T.listeMineure, V, Z, xNouveau, tNouveau, 0, false, touche);
+            apres = passagesZero(T, Vc, Z, xNouveau, tNouveau);
+            if any(sign(avant) .* sign(apres) < 0)
+                [gauche, droite, V, Z] = localiser(T, M, V, Z, x, k1, t, h, atol, rtol, ...
+                                                   avant, touche, discret);
+                if gauche > 0
+                    hEvenement = gauche;
+                    hForce = droite - gauche;
+                else
+                    hEvenement = droite;
+                end
+                if hEvenement < h
+                    h = hEvenement;
+                    tNouveau = t + h;
+                    if ~discret
+                        [xNouveau, ~, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, ...
+                                                    touche);
+                    end
+                end
+                if h <= 1e3 * toleranceTemps(t)
+                    consecutifs = consecutifs + 1;
+                    if consecutifs > 1000
+                        error('Simulink:Engine:SolverConsecutiveZCNum', ...
+                              ['Plus de 1000 passages par zero consecutifs a t = %g : le ' ...
+                               'modele bascule sans avancer (comportement de Zenon). ' ...
+                               'Revoyez le seuil qui bascule, ou coupez la detection des ' ...
+                               'passages par zero (ZeroCrossControl, ou le parametre ' ...
+                               'ZeroCross du bloc).'], t);
+                    end
+                else
+                    consecutifs = 0;
+                end
+            end
+        end
+
+        % Le pas majeur.
+        t = tNouveau;
+        x = xNouveau;
+        if ~isempty(T.bornes)
+            x = borner(T, x);
+        end
+        touche = (abs(prochain - t) <= toleranceTemps(t)).';
+        [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
+        if ~isempty(T.remises)
+            [x, Z, refaire] = remettre(T, V, Z, x);
+            if refaire
+                [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
+            end
+        end
+        [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, ...
+                                                    V(T.journal), x, imposes, iImpose);
+        arret = Z(1) ~= 0;
+        avant = passagesZero(T, V, Z, x, t);
+        if nx > 0
+            maxAbs = max(maxAbs, abs(x));
+            if absoluAuto
+                atol = rtol * max(maxAbs, 1e-3);
+            end
+        end
+        % Le pas suivant : celui que l'erreur permet. Un pas raccourci pour
+        % tomber sur un instant ne dit rien de l'erreur : on garde alors
+        % celui qu'on avait proposé.
+        if ~discret
+            facteur = min(5, max(0.2, 0.9 * max(err, 1e-10) ^ (-1 / M.ordre)));
+            if parErreur || h >= hPropose
+                hPropose = h * facteur;
+            else
+                hPropose = max(hPropose, h * facteur);
+            end
+        end
+    end
+    J = struct('temps', temps(1:n), 'releve', releveV(:, 1:n), 'etats', etats(:, 1:n), ...
+               'dernier', n, 'arret', arret, 'V', V, 'Z', Z, 'x', x);
+end
+
+% Un instant relevé : tous, ou seulement les instants imposés. La
+% capacité double quand elle est pleine — un relevé qui grandirait d'une
+% colonne à la fois se recopierait à chaque pas.
+function [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, valeurs, ...
+                                                     x, imposes, iImpose)
+    if ~isempty(imposes)
+        if iImpose > numel(imposes) || abs(imposes(iImpose) - t) > toleranceTemps(t)
+            return
+        end
+        iImpose = iImpose + 1;
+    end
+    if n == numel(temps)
+        temps = [temps, zeros(1, n)];
+        releveV = [releveV, zeros(size(releveV, 1), n)];
+        etats = [etats, zeros(size(etats, 1), n)];
+    end
+    n = n + 1;
+    temps(n) = t;
+    releveV(:, n) = valeurs;
+    etats(:, n) = x;
+end
+
+function tol = toleranceTemps(t)
+    tol = 1e-10 * max(1, abs(t));
+end
+
+% Un pas de taille H : la solution, et l'erreur relative estimée — 1 est
+% la tolérance.
+function [xNouveau, err, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    if M.rosenbrock
+        [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+        return
+    end
+    S = numel(M.b);
+    K = zeros(numel(x), S);
+    K(:, 1) = k1;
+    for s = 2:S
+        xs = x + h * (K(:, 1:s - 1) * M.A(s, 1:s - 1).');
+        if ~isempty(T.bornes)
+            xs = borner(T, xs);
+        end
+        [V, Z] = passe(T, T.listeMineure, V, Z, xs, t + M.c(s) * h, 0, false, touche);
+        K(:, s) = derivees(T, V, xs);
+    end
+    xNouveau = x + h * (K * M.b.');
+    ecart = h * (K * (M.b - M.bE).');
+    err = normeErreur(ecart, x, xNouveau, atol, rtol);
+end
+
+function err = normeErreur(ecart, x, xNouveau, atol, rtol)
+    echelle = atol + rtol * max(abs(x), abs(xNouveau));
+    err = max(abs(ecart) ./ echelle);
+    if isempty(err)
+        err = 0;
+    end
+    if ~all(isfinite(xNouveau))
+        err = Inf;
+    end
+end
+
+% La formule de Rosenbrock d'ode23s (Shampine et Reichelt, 1997) :
+% W = I - h d J, trois résolutions linéaires par pas, la troisième pour
+% l'erreur.
+function [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    d = 1 / (2 + sqrt(2));
+    e32 = 6 + sqrt(2);
+    nx = numel(x);
+    W = eye(nx) - h * d * M.J;
+    F0 = k1;
+    r1 = W \ (F0 + h * d * M.dfdt);
+    x1 = x + 0.5 * h * r1;
+    [V, Z] = passe(T, T.listeMineure, V, Z, x1, t + 0.5 * h, 0, false, touche);
+    F1 = derivees(T, V, x1);
+    r2 = W \ (F1 - r1) + r1;
+    xNouveau = x + h * r2;
+    [V, Z] = passe(T, T.listeMineure, V, Z, xNouveau, t + h, 0, false, touche);
+    F2 = derivees(T, V, xNouveau);
+    r3 = W \ (F2 - e32 * (r2 - F1) - 2 * (r1 - F0) + h * d * M.dfdt);
+    ecart = h / 6 * (r1 - 2 * r2 + r3);
+    err = normeErreur(ecart, x, xNouveau, atol, rtol);
+end
+
+% Le jacobien des dérivées par rapport aux états, et leur dérivée par
+% rapport au temps, par différences finies.
+function [Jac, dfdt, V, Z] = jacobien(T, V, Z, x, f0, t, touche)
+    nx = numel(x);
+    Jac = zeros(nx, nx);
+    for j = 1:nx
+        xp = x;
+        delta = sqrt(eps) * max(abs(x(j)), 1);
+        xp(j) = xp(j) + delta;
+        [V, Z] = passe(T, T.listeMineure, V, Z, xp, t, 0, false, touche);
+        Jac(:, j) = (derivees(T, V, xp) - f0) / delta;
+    end
+    dt = sqrt(eps) * max(abs(t), 1);
+    [V, Z] = passe(T, T.listeMineure, V, Z, x, t + dt, 0, false, touche);
+    dfdt = (derivees(T, V, x) - f0) / dt;
+end
+
+% Le premier pas, estimé comme le proposent Hairer, Nørsett et Wanner : à
+% partir de la taille de l'état et de ses deux premières dérivées.
+function [h, V, Z] = pasInitial(T, V, Z, x, k1, t, borne, atol, rtol, ordre, touche)
+    echelle = atol + rtol * abs(x);
+    d0 = max(abs(x) ./ echelle);
+    d1 = max(abs(k1) ./ echelle);
+    if d0 < 1e-5 || d1 < 1e-5
+        h0 = 1e-6;
+    else
+        h0 = 0.01 * d0 / d1;
+    end
+    h0 = min(h0, borne);
+    x1 = x + h0 * k1;
+    [V, Z] = passe(T, T.listeMineure, V, Z, x1, t + h0, 0, false, touche);
+    d2 = max(abs(derivees(T, V, x1) - k1) ./ echelle) / h0;
+    if max(d1, d2) <= 1e-15
+        h1 = max(1e-6, h0 * 1e-3);
+    else
+        h1 = (0.01 / max(d1, d2)) ^ (1 / ordre);
+    end
+    h = min([100 * h0, h1, borne]);
+end
+
+% La dichotomie qui localise un passage par zéro : le plus petit pas au
+% bout duquel un seuil a changé de signe, à la tolérance près.
+function [bas, haut, V, Z] = localiser(T, M, V, Z, x, k1, t, h, atol, rtol, avant, touche, ...
+                                      discret)
+    bas = 0;
+    haut = h;
+    tolerance = max(10 * toleranceTemps(t), 64 * eps(abs(t) + h));
+    while haut - bas > tolerance
+        milieu = (bas + haut) / 2;
+        xm = x;
+        if ~discret
+            [xm, ~, V, Z] = unPas(T, M, V, Z, x, k1, t, milieu, atol, rtol, touche);
+        end
+        [V, Z] = passe(T, T.listeMineure, V, Z, xm, t + milieu, 0, false, touche);
+        if any(sign(avant) .* sign(passagesZero(T, V, Z, xm, t + milieu)) < 0)
+            haut = milieu;
+        else
+            bas = milieu;
+        end
+    end
+end
+
+% La prochaine cassure d'une source après t : un instant d'échelon, le
+% début d'une rampe, un instant d'un signal tenu de l'espace de travail,
+% un front de générateur d'impulsions.
+function tc = prochaineCassure(T, t)
+    tc = Inf;
+    tol = toleranceTemps(t);
+    if ~isempty(T.cassures)
+        j = find(T.cassures > t + tol, 1);
+        if ~isempty(j)
+            tc = T.cassures(j);
+        end
+    end
+    for k = T.impulsions
+        p = T.pA(k);
+        w = T.oB(k) - T.oA(k) + 1;
+        for i = 1:w
+            periode = T.P(p + w + i - 1);
+            largeur = T.P(p + 2 * w + i - 1) / 100 * periode;
+            retard = T.P(p + 3 * w + i - 1);
+            if t + tol < retard
+                tc = min(tc, retard);
+                continue
+            end
+            base = retard + floor((t - retard) / periode + 1e-9) * periode;
+            for candidat = [base + largeur, base + periode, base + periode + largeur]
+                if candidat > t + tol
+                    tc = min(tc, candidat);
+                    break
+                end
+            end
+        end
+    end
+end
+
+% Les seuils que surveille la détection des passages par zéro : pour
+% chaque bloc à cassure, l'écart entre ce qui le fait basculer et son
+% seuil. Ce sont ceux de Simulink — Abs, Sign, Relational Operator,
+% MinMax, Saturation, Dead Zone, Relay, Switch, Hit Crossing, Backlash,
+% Coulomb Friction, Compare To Zero et To Constant, et les bornes d'un
+% intégrateur.
+function g = passagesZero(T, V, Z, x, t) %#ok<INUSD>
+    g = zeros(0, 1);
+    for k = T.zc
+        p = T.pA(k);
+        e = T.eD(k);
+        u = V(T.eA(e + 1):T.eB(e + 1));
+        w = T.oB(k) - T.oA(k) + 1;
+        switch T.code(k)
+            case {23, 24, 47, 53}   % abs, sign, coulomb, compare to zero
+                g = [g; u(:)]; %#ok<AGROW>
+            case {52, 45}   % compare to constant, hit crossing
+                g = [g; u(:) - T.P(p:p + w - 1)]; %#ok<AGROW>
+            case 51   % relational
+                g = [g; u(:) - V(T.eA(e + 2):T.eB(e + 2))]; %#ok<AGROW>
+            case 27   % minmax : chaque paire d'entrées
+                nIn = T.P(p);
+                for a = 1:nIn - 1
+                    ua = V(T.eA(e + a):T.eB(e + a));
+                    for b = a + 1:nIn
+                        g = [g; ua(:) - V(T.eA(e + b):T.eB(e + b))]; %#ok<AGROW>
+                    end
+                end
+            case {40, 41, 42}   % saturation, dead zone, relay : deux seuils
+                g = [g; u(:) - T.P(p:p + w - 1); u(:) - T.P(p + w:p + 2 * w - 1)]; %#ok<AGROW>
+            case 46   % backlash : les deux bords du jeu
+                y = Z(T.zA(k):T.zA(k) + w - 1);
+                demi = T.P(p:p + w - 1) / 2;
+                g = [g; u(:) - y - demi; u(:) - y + demi]; %#ok<AGROW>
+            case 60   % switch
+                u2 = V(T.eA(e + 2):T.eB(e + 2));
+                if T.sub(k) == 3
+                    g = [g; u2(:)]; %#ok<AGROW>
+                else
+                    g = [g; u2(:) - T.P(p + 1:p + T.P(p))]; %#ok<AGROW>
+                end
+            case 113   % garde : l'entrée Enable, le signal du Trigger
+                rang = 0;
+                if T.P(p) ~= 0
+                    rang = 1;
+                    g = [g; u(:)]; %#ok<AGROW>
+                end
+                if T.P(p + 1) > 0
+                    ut = V(T.eA(e + rang + 1):T.eB(e + rang + 1));
+                    g = [g; ut(:)]; %#ok<AGROW>
+                end
+            case 70   % intégrateur borné
+                xk = x(T.xA(k):T.xB(k));
+                g = [g; xk - T.P(p + 1:p + w); xk - T.P(p + 1 + w:p + 2 * w)]; %#ok<AGROW>
+        end
+    end
+end
+
+% Le retard pur à pas variable : les pas n'ont pas tous la même durée, le
+% tampon garde donc les instants avec les valeurs, en anneau. On y cherche
+% par dichotomie les deux échantillons qui encadrent t - retard, et l'on
+% interpole entre eux.
+function y = retardVariable(T, k, p, t, w)
+    B = T.tampons(k);
+    if B.n == 0
+        y = T.P(p + 2:p + 1 + w);
+        return
+    end
+    cible = t - T.P(p);
+    L = numel(B.t);
+    ancien = mod(B.tete - B.n - 1, L) + 1;
+    recent = mod(B.tete - 2, L) + 1;
+    if cible < B.t(ancien)
+        y = T.P(p + 2:p + 1 + w);
+        return
+    end
+    if cible >= B.t(recent)
+        y = B.v(:, recent);
+        return
+    end
+    bas = 0;
+    haut = B.n - 1;
+    while haut - bas > 1
+        milieu = floor((bas + haut) / 2);
+        if B.t(mod(ancien + milieu - 1, L) + 1) <= cible
+            bas = milieu;
+        else
+            haut = milieu;
+        end
+    end
+    i0 = mod(ancien + bas - 1, L) + 1;
+    i1 = mod(ancien + haut - 1, L) + 1;
+    y = B.v(:, i0);
+    if B.t(i1) > B.t(i0)
+        f = (cible - B.t(i0)) / (B.t(i1) - B.t(i0));
+        y = (1 - f) * y + f * B.v(:, i1);
+    end
+end
+
+% Une valeur de plus dans le tampon d'un retard pur. Plein, il écrase le
+% plus ancien échantillon s'il ne sert plus ; sinon il double, comme le
+% bloc de Simulink qui alloue au-delà de sa taille initiale.
+function pousserRetard(T, k, p, t, u)
+    tampons = T.tampons;
+    B = tampons(k);
+    L = numel(B.t);
+    if B.n == L
+        ancien = B.tete;   % plein : la tête est aussi le plus ancien
+        suivant = mod(ancien, L) + 1;
+        if B.t(suivant) > t - T.P(p)
+            % Le plus ancien sert encore : on déroule l'anneau et l'on double.
+            ordre = [ancien:L, 1:ancien - 1];
+            B.t = [B.t(ordre); zeros(L, 1)];
+            B.v = [B.v(:, ordre), zeros(size(B.v, 1), L)];
+            B.tete = L + 1;
+            L = 2 * L;
+        else
+            B.n = B.n - 1;
+        end
+    end
+    B.t(B.tete) = t;
+    B.v(:, B.tete) = u;
+    B.tete = mod(B.tete, L) + 1;
+    B.n = B.n + 1;
+    tampons(k) = B;
+end
+
 % === un point ==================================================================
 
 function [y, dx] = point(T, x, u)
@@ -439,6 +1200,8 @@ end
 % algébrique, résolue là. MAJEUR dit si c'est un pas majeur ; TOUCHE,
 % quels groupes de période tombent à cet instant.
 function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
+    gele = T.gele;
+    gardes = T.garde;
     code = T.code;
     fam = T.fam;
     mode = T.mode;
@@ -470,6 +1233,27 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
         b = oB(k);
         p = pA(k);
         e = eD(k);
+        gk = gardes(k);
+        if gk > 0 && V(oA(gk)) == 0
+            % Le sous-système ne calcule pas : le bloc tient sa sortie — une
+            % garde emboîtée s'éteint, une sortie « reset » revient à sa
+            % valeur initiale.
+            if code(k) == 113
+                V(a) = 0;
+            elseif T.revient(k)
+                V(a:b) = T.initiale{k};
+            elseif T.zTenue(k) > 0
+                V(a:b) = Z(T.zTenue(k):T.zTenue(k) + b - a);
+            end
+            continue
+        end
+        if gele(k)
+            if ~majeur
+                V(a:b) = sortieGelee(T, k, V, Z, a, b, p, e);
+                continue
+            end
+            Z = noterMode(T, k, V, Z, b - a + 1, p, e);
+        end
         switch fam(k)
             case 0
                 switch code(k)
@@ -847,6 +1631,9 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         for j = 1:T.P(p)
                             V(T.poA(pd + j - 1):T.poB(pd + j - 1)) = V(eA(e + j):eB(e + j));
                         end
+                        if majeur && T.zTenue(k) > 0
+                            Z(T.zTenue(k):T.zTenue(k) + b - a) = V(a:b);
+                        end
                 end
             case 7
                 switch code(k)
@@ -883,8 +1670,10 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                     case 75   % transport delay
                         if T.P(p) == 0
                             V(a:b) = V(eA(e + 1):eB(e + 1));
-                        else
+                        elseif T.fixe
                             V(a:b) = retardPur(T, p, Z, zA(k), t, b - a + 1);
+                        else
+                            V(a:b) = retardVariable(T, k, p, t, b - a + 1);
                         end
                     case 76   % PID controller
                         u = V(eA(e + 1):eB(e + 1));
@@ -935,6 +1724,26 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                         V(a:b) = sortieEtat(T, p, Z(zA(k):zA(k) + nx - 1), u);
                 end
+            case 11
+                switch code(k)
+                    case {110, 111}   % if, switch case : une sortie d'action par branche
+                        choisi = brancheChoisie(T, k, V, p, e);
+                        pd = T.pd(k);
+                        for q2 = 1:T.nOut(k)
+                            V(T.poA(pd + q2 - 1)) = double(q2 == choisi);
+                        end
+                    case 112   % merge : l'entrée dont le sous-système vient de calculer
+                        nIn = T.P(p);
+                        w = b - a + 1;
+                        for j = 1:nIn
+                            g = T.P(p + w + j);
+                            if g == 0 || V(oA(g)) ~= 0
+                                V(a:b) = V(eA(e + j):eB(e + j)) + zeros(w, 1);
+                            end
+                        end
+                    case 113   % garde d'un sous-système conditionnel
+                        V(a) = double(gardeActive(T, k, V, Z, p, e));
+                end
             case 9
                 switch code(k)
                     case 95   % stop simulation
@@ -953,6 +1762,192 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                 end
         end
+    end
+end
+
+% --- les sous-systèmes conditionnels
+
+% La branche d'un If — la première condition vraie, sinon le « else » —
+% ou d'un Switch Case — le premier cas qui contient l'entrée, sinon le
+% défaut. 0 si aucune.
+function choisi = brancheChoisie(T, k, V, p, e)
+    choisi = 0;
+    if T.code(k) == 110
+        nIn = T.P(p);
+        u = cell(1, nIn);
+        for j = 1:nIn
+            u{j} = V(T.eA(e + j):T.eB(e + j));
+        end
+        conditions = T.objets{k};
+        for i = 1:numel(conditions)
+            if conditions{i}(u{:})
+                choisi = i;
+                return
+            end
+        end
+        if T.P(p + 2) ~= 0
+            choisi = numel(conditions) + 1;
+        end
+        return
+    end
+    valeur = fix(V(T.eA(e + 1)));
+    cas = T.objets{k};
+    for i = 1:numel(cas)
+        if any(cas{i} == valeur)
+            choisi = i;
+            return
+        end
+    end
+    if T.P(p + 1) ~= 0
+        choisi = numel(cas) + 1;
+    end
+end
+
+% Un sous-système calcule si son Enable est positif, s'il vient d'y avoir
+% un front de son Trigger, si son If ou son Switch Case l'a désigné. Un
+% front se lit contre la valeur du pas majeur précédent : pas de front à
+% la première évaluation, comme le réglage par défaut de Simulink.
+function active = gardeActive(T, k, V, Z, p, e)
+    active = true;
+    rang = 0;
+    if T.P(p) ~= 0
+        rang = 1;
+        active = any(V(T.eA(e + 1):T.eB(e + 1)) > 0);
+    end
+    front = T.P(p + 1);
+    if front > 0
+        rang = rang + 1;
+        u = V(T.eA(e + rang):T.eB(e + rang));
+        z = T.zA(k);
+        if Z(z) == 0
+            active = false;
+        else
+            avant = Z(z + 2:z + 1 + numel(u));
+            monte = (avant < 0 & u >= 0) | (avant == 0 & u > 0);
+            descend = (avant > 0 & u <= 0) | (avant == 0 & u < 0);
+            switch front
+                case 1
+                    declenche = any(monte);
+                case 2
+                    declenche = any(descend);
+                otherwise
+                    declenche = any(monte | descend);
+            end
+            active = active && declenche;
+        end
+    end
+    if T.P(p + 2) ~= 0
+        active = V(T.eA(e + 1)) ~= 0;
+    end
+end
+
+% Un sous-système qui reprend avec StatesWhenEnabling (ou
+% InitializeStates) à reset repart de ses conditions initiales : ses
+% états, continus et discrets, y reviennent, et la passe se refait.
+function [x, Z, refaire] = remettre(T, V, Z, x)
+    refaire = false;
+    for g = T.remises
+        z = T.zA(g);
+        if V(T.oA(g)) ~= 0 && Z(z) ~= 0 && Z(z + 1) == 0
+            for k = T.sousGarde{g}
+                if T.xA(k) > 0
+                    x(T.xA(k):T.xB(k)) = T.x0(T.xA(k):T.xB(k));
+                end
+                if T.zN(k) > 0
+                    plage = T.zA(k):T.zA(k) + T.zN(k) - 1;
+                    Z(plage) = T.Z0(plage);
+                end
+            end
+            refaire = true;
+        end
+    end
+end
+
+% --- les modes figés du pas variable
+
+% Le mode d'un bloc surveillé, vu au pas majeur : le côté de chaque seuil.
+function Z = noterMode(T, k, V, Z, w, p, e)
+    z = T.zmA(k);
+    u = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+    switch T.code(k)
+        case 23   % abs : la pente, +1 ou -1
+            mode = 2 * (u >= 0) - 1;
+        case {24, 51, 52, 53}   % sign, comparaisons : la valeur même
+            switch T.code(k)
+                case 24
+                    mode = sign(u);
+                case 51
+                    mode = comparer(T.sub(k), u, V(T.eA(e + 2):T.eB(e + 2)));
+                case 52
+                    mode = comparer(T.sub(k), u, T.P(p:p + w - 1));
+                otherwise
+                    mode = comparer(T.sub(k), u, 0);
+            end
+        case 27   % minmax : le rang de l'entrée retenue
+            U = entreesEnColonnes(T, V, e, T.P(p), w);
+            if T.sub(k) == 1
+                [~, mode] = min(U, [], 2);
+            else
+                [~, mode] = max(U, [], 2);
+            end
+        case {40, 41}   % saturation, zone morte : au-dessus, entre, au-dessous
+            mode = (u > T.P(p:p + w - 1)) - (u < T.P(p + w:p + 2 * w - 1));
+        case 47   % frottement : le signe
+            mode = sign(u);
+        otherwise   % switch : la première entrée passe-t-elle ?
+            u2 = V(T.eA(e + 2):T.eB(e + 2));
+            switch T.sub(k)
+                case 1
+                    mode = u2 >= T.P(p + 1:p + T.P(p));
+                case 2
+                    mode = u2 > T.P(p + 1:p + T.P(p));
+                otherwise
+                    mode = u2 ~= 0;
+            end
+            mode = double(mode) + zeros(w, 1);
+    end
+    Z(z:z + w - 1) = mode;
+end
+
+% La sortie d'un bloc surveillé à un pas mineur : la formule du côté où
+% le pas majeur l'a trouvé, prolongée.
+function y = sortieGelee(T, k, V, Z, a, b, p, e)
+    w = b - a + 1;
+    mode = Z(T.zmA(k):T.zmA(k) + w - 1);
+    u = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+    switch T.code(k)
+        case 23
+            y = mode .* u;
+        case {24, 51, 52, 53}
+            y = mode;
+        case 27
+            U = entreesEnColonnes(T, V, e, T.P(p), w);
+            y = U(sub2ind(size(U), (1:w).', mode));
+        case 40
+            y = u;
+            haut = T.P(p:p + w - 1);
+            bas = T.P(p + w:p + 2 * w - 1);
+            y(mode > 0) = haut(mode > 0);
+            y(mode < 0) = bas(mode < 0);
+        case 41
+            y = zeros(w, 1);
+            haut = T.P(p:p + w - 1);
+            bas = T.P(p + w:p + 2 * w - 1);
+            y(mode > 0) = u(mode > 0) - haut(mode > 0);
+            y(mode < 0) = u(mode < 0) - bas(mode < 0);
+        case 47
+            y = mode .* T.P(p:p + w - 1) + T.P(p + w:p + 2 * w - 1) .* u;
+        otherwise
+            y = V(T.eA(e + 3):T.eB(e + 3)) + zeros(w, 1);
+            premier = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+            y(mode ~= 0) = premier(mode ~= 0);
+    end
+end
+
+function U = entreesEnColonnes(T, V, e, nIn, w)
+    U = zeros(w, nIn);
+    for j = 1:nIn
+        U(:, j) = V(T.eA(e + j):T.eB(e + j)) + zeros(w, 1);
     end
 end
 
@@ -1517,6 +2512,10 @@ end
 function dx = derivees(T, V, x)
     dx = zeros(numel(x), 1);
     for k = T.continus
+        g = T.garde(k);
+        if g > 0 && V(T.oA(g)) == 0
+            continue   % sous-système à l'arrêt : l'état tient
+        end
         a = T.xA(k);
         b = T.xB(k);
         p = T.pA(k);
@@ -1551,6 +2550,10 @@ function Z = majs(T, V, Z, t, touche)
         if T.mode(k) == 2 && ~touche(T.grp(k))
             continue
         end
+        g = T.garde(k);
+        if g > 0 && V(T.oA(g)) == 0
+            continue
+        end
         z = T.zA(k);
         p = T.pA(k);
         e = T.eD(k);
@@ -1583,6 +2586,10 @@ function Z = majs(T, V, Z, t, touche)
                 Z(z + 1) = t;
                 Z(z + 2:z + 1 + numel(u)) = u;
             case 75   % transport delay
+                if ~T.fixe
+                    pousserRetard(T, k, p, t, u + zeros(w, 1));
+                    continue
+                end
                 longueur = T.P(p + 1);
                 n = Z(z);
                 debut = z + 1 + mod(n, longueur) * w;
@@ -1617,6 +2624,14 @@ function Z = majs(T, V, Z, t, touche)
                 nx = T.P(p);
                 if nx > 0
                     Z(z:z + nx - 1) = deriveeEtat(T, p, Z(z:z + nx - 1), u);
+                end
+            case 113   % garde : ce qu'elle était, et le signal du front
+                Z(z) = 1;
+                Z(z + 1) = V(a);
+                largeur = T.P(p + 4);
+                if largeur > 0
+                    rang = 1 + (T.P(p) ~= 0);
+                    Z(z + 2:z + 1 + largeur) = V(T.eA(e + rang):T.eB(e + rang));
                 end
         end
     end

@@ -890,11 +890,17 @@ resOptions = sim(add_block(new_system('o'), 'constant', 'c', 'Value', 1), 1, opt
 assert(numel(resOptions.temps) == 5);
 refuseOption = false;
 try
-    simset('RelTol', 1e-6);
+    simset('Decimation', 2);
 catch err
     refuseOption = strcmp(err.identifier, 'Simulink:Commands:SimsetInconnue');
 end
 assert(refuseOption);
+% Les tolérances du pas variable, elles, sont honorées.
+optionsVariables = simset('Solver', 'ode45', 'RelTol', 1e-8, 'MaxStep', 0.25);
+assert(simget(optionsVariables, 'RelTol') == 1e-8);
+resVariable = sim(add_block(new_system('o'), 'constant', 'c', 'Value', 1), 1, ...
+                  optionsVariables);
+assert(isequal(resVariable.temps(:).', 0:0.25:1));
 
 %% ------------------------------ SIMULINK : ENREGISTRER ET RELIRE
 aRanger = new_system('aRanger');
@@ -1692,10 +1698,18 @@ assert(abs(mixteRK.signaux.x(end) - 0.45) < 1e-12, ...
        'l''integrale d''une tenue est exacte, quel que soit le solveur');
 refuseNom = false;
 try
-    simset('Solver', 'ode45');
+    simset('Solver', 'ode99');
 catch err
     refuseNom = strcmp(err.identifier, 'Simulink:Commands:SolveurInconnu');
 end
 assert(refuseNom, 'un solveur qui n''existe pas est refuse, non ignore');
+refuseNom = false;
+try
+    simset('Solver', 'ode113');
+catch err
+    refuseNom = strcmp(err.identifier, 'Simulink:Commands:SolveurInconnu') && ...
+                ~isempty(strfind(err.message, 'pas encore'));
+end
+assert(refuseNom, 'un solveur de Simulink pas encore ecrit est refuse en le disant');
 
 disp('toolboxes : toutes les verifications passent');

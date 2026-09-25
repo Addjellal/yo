@@ -23,10 +23,13 @@ function modele = set_param(modele, nom, varargin)
 %   devant, donc en nombre impair d'arguments — change les réglages du
 %   modèle lui-même, ceux de la boîte « Paramètres de configuration » de
 %   Simulink : StartTime, StopTime, Solver ('ode1' à 'ode5',
-%   'FixedStepDiscrete'), SolverType, FixedStep, AlgebraicLoopMsg,
-%   UnconnectedInputMsg, UnconnectedOutputMsg... La valeur est vérifiée
-%   avant d'être posée : un solveur inconnu est refusé en disant ceux qui
-%   existent. Un réglage posé par ADD_PARAM se change de même.
+%   'FixedStepDiscrete' à pas fixe ; 'ode45', 'ode23', 'ode23s',
+%   'VariableStepDiscrete' à pas variable), SolverType, FixedStep,
+%   RelTol, AbsTol, MaxStep, MinStep, InitialStep, ZeroCrossControl,
+%   AlgebraicLoopMsg, UnconnectedInputMsg, UnconnectedOutputMsg... La
+%   valeur est vérifiée avant d'être posée : un solveur inconnu est
+%   refusé en disant ceux qui existent. Le type suit le solveur. Un
+%   réglage posé par ADD_PARAM se change de même.
 %
 %   Exemple :
 %      m = new_system('boucle');
@@ -114,12 +117,18 @@ function modele = reglerModele(modele, couples)
         canon = matlibre_sl_config('nom', nom);
         if ~isempty(canon)
             modele.parametres.(canon) = matlibre_sl_config('valider', canon, valeur);
+            % Le solveur et son type vont ensemble, comme dans Simulink :
+            % le type suit le solveur, et un type qui ne convient plus au
+            % solveur le remplace par le solveur automatique de ce type.
             if strcmp(canon, 'Solver') && isfield(modele.parametres, 'SolverType')
-                liste = matlibre_sl_config('solveurs');
-                if any(strcmpi(modele.parametres.Solver, liste.fixe))
-                    modele.parametres.SolverType = 'Fixed-step';
-                else
-                    modele.parametres.SolverType = 'Variable-step';
+                modele.parametres.SolverType = matlibre_sl_config('type', ...
+                                                                  modele.parametres.Solver);
+            elseif strcmp(canon, 'SolverType')
+                actuel = matlibre_sl_config('lire', modele);
+                if ~strcmp(matlibre_sl_config('type', actuel.Solver), ...
+                           modele.parametres.SolverType)
+                    modele.parametres.Solver = matlibre_sl_config('automatique', ...
+                                                                  modele.parametres.SolverType);
                 end
             end
             continue

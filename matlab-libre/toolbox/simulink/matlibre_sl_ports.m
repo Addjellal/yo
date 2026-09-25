@@ -84,7 +84,60 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
             nSorties = nEntrees;
         case 'subsystem'
             [nEntrees, nSorties] = bornesSousSysteme(p);
+        case {'enableport', 'triggerport', 'actionport'}
+            nEntrees = 0;
+            nSorties = 0;
+        case 'if'
+            nEntrees = entier(lire(p, 'NumInputs', 1));
+            nSorties = 1 + numel(expressionsSinonSi(lire(p, 'ElseIfExpressions', ''))) + ...
+                       strcmpi(char(lire(p, 'ShowElse', 'on')), 'on');
+        case 'switchcase'
+            cas = lire(p, 'CaseConditions', '{1}');
+            if ischar(cas) || isstring(cas)
+                try
+                    cas = eval(char(cas));
+                catch
+                    cas = NaN;
+                end
+            end
+            if iscell(cas)
+                nSorties = numel(cas) + strcmpi(char(lire(p, 'ShowDefaultCase', 'on')), 'on');
+            else
+                nSorties = NaN;
+            end
+        case 'merge'
+            nEntrees = entier(lire(p, 'Inputs', 2));
+        case 'garde'
+            nEntrees = (lire(p, 'Enable', 0) ~= 0) + ~strcmpi(char(lire(p, 'Trigger', 'none')), ...
+                                                             'none') + (lire(p, 'Action', 0) ~= 0);
     end
+end
+
+% Les conditions « sinon si » d'un bloc If : une liste séparée par des
+% virgules, hors des parenthèses — « u1 > 0, max(u1,u2) < 3 » en porte
+% deux.
+function liste = expressionsSinonSi(texte)
+    liste = {};
+    texte = char(texte);
+    if isempty(strtrim(texte))
+        return
+    end
+    profondeur = 0;
+    debut = 1;
+    for i = 1:numel(texte)
+        switch texte(i)
+            case {'(', '[', '{'}
+                profondeur = profondeur + 1;
+            case {')', ']', '}'}
+                profondeur = profondeur - 1;
+            case ','
+                if profondeur == 0
+                    liste{end + 1} = strtrim(texte(debut:i - 1)); %#ok<AGROW>
+                    debut = i + 1;
+                end
+        end
+    end
+    liste{end + 1} = strtrim(texte(debut:end));
 end
 
 function v = lire(p, nom, defaut)
@@ -182,7 +235,9 @@ function [nEntrees, nSorties] = bornesSousSysteme(p)
     end
     for k = 1:numel(modele.blocs)
         switch typeCanonique(modele.blocs{k}.type)
-            case 'inport'
+            case {'inport', 'enableport', 'triggerport', 'actionport'}
+                % Les ports de contrôle viennent après les entrées : Enable,
+                % puis Trigger ; ou Action Port.
                 nEntrees = nEntrees + 1;
             case 'outport'
                 nSorties = nSorties + 1;

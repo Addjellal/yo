@@ -12,7 +12,10 @@ function c = matlibre_sl_compiler(modele, options)
 %   tDebut, tFinal et config (la configuration du modèle, que lit
 %   MATLIBRE_SL_CONFIG). Le champ silencieux, vrai, tait les diagnostics
 %   de connexion et de boucle — LINMOD s'en sert, qui compile plusieurs
-%   fois le même modèle.
+%   fois le même modèle. Le champ variable, vrai, prépare un solveur à
+%   pas variable : les périodes n'ont plus à diviser un pas, le retard
+%   pur garde les instants avec les valeurs, et les blocs à cassure sont
+%   marqués pour la détection des passages par zéro (c.zc).
 %
 %   Chaque erreur nomme le bloc par son chemin, « modele/bloc », comme
 %   Simulink le fait : un port qui n'existe pas, deux liens vers une même
@@ -38,6 +41,7 @@ function c = matlibre_sl_compiler(modele, options)
     tDebut = champ(options, 'tDebut', 0);
     tFinal = champ(options, 'tFinal', 10);
     silencieux = champ(options, 'silencieux', false);
+    variable = champ(options, 'variable', false);
     config = champ(options, 'config', []);
     if isempty(config)
         config = matlibre_sl_config('lire', modele);
@@ -51,6 +55,7 @@ function c = matlibre_sl_compiler(modele, options)
     c.nom = nomModele;
     c.n = n;
     c.pas = pas;
+    c.variable = variable;
     c.tDebut = tDebut;
     c.tFinal = tFinal;
     c.config = config;
@@ -61,6 +66,11 @@ function c = matlibre_sl_compiler(modele, options)
     c.p = cell(1, n);
     c.nIn = zeros(1, n);
     c.nOut = zeros(1, n);
+    % La garde de chaque bloc — le rang du bloc qui dit si son sous-système
+    % conditionnel calcule, 0 hors d'eux —, et la conduite des sorties d'un
+    % sous-système conditionnel.
+    c.garde = zeros(1, n);
+    c.sortieCond = cell(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     for k = 1:n
@@ -76,6 +86,12 @@ function c = matlibre_sl_compiler(modele, options)
         end
         c.types{k} = entree.type;
         c.code(k) = codeDe(entree.type);
+        if isfield(bloc, 'garde')
+            c.garde(k) = bloc.garde;
+        end
+        if isfield(bloc, 'sortieConditionnelle')
+            c.sortieCond{k} = bloc.sortieConditionnelle;
+        end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
         [ne, ns] = matlibre_sl_ports(struct('type', entree.type, 'nom', bloc.nom, ...
                                             'parametres', c.p{k}), entree.type);
@@ -205,11 +221,34 @@ function c = matlibre_sl_compiler(modele, options)
 
     % --- 9. ce que le calcul lira : paramètres et états ---------------------
     c = abaisser(c, pas, tDebut);
+    % Un sous-système déclenché ne calcule qu'aux fronts : un état continu
+    % n'y aurait rien à intégrer entre deux, et Simulink le refuse.
+    c.declenche = false(1, n);
+    for k = 1:n
+        g = c.garde(k);
+        while g > 0
+            if ~strcmp(c.p{g}.Trigger, 'none')
+                c.declenche(k) = true;
+                break
+            end
+            g = c.garde(g);
+        end
+        if c.declenche(k) && c.xA(k) > 0
+            error('Simulink:blocks:TriggeredSubsystemContinuousStates', ...
+                  ['Le bloc ''%s'' a des etats continus, mais il est dans un ' ...
+                   'sous-systeme declenche, qui ne calcule qu''aux fronts de son ' ...
+                   'entree Trigger. Prenez un bloc discret, ou un sous-systeme ' ...
+                   'active par Enable.'], c.chemins{k});
+        end
+    end
 
     % --- 10. ordre de calcul et boucles algébriques --------------------------
     c = ordonner(c);
 
-    % --- 11. diagnostics ----------------------------------------------------
+    % --- 11. passages par zéro ------------------------------------------------
+    c.zc = passagesParZero(c);
+
+    % --- 12. diagnostics ----------------------------------------------------
     if ~silencieux
         diagnostiquer(c);
     end
@@ -323,7 +362,9 @@ function x = codeDe(type)
                 'discretestatespace', 86; ...
                 'outport', 90; 'scope', 91; 'display', 92; 'toworkspace', 93; ...
                 'terminator', 94; 'stopsimulation', 95; 'assertion', 96; ...
-                'subsystem', 99};
+                'subsystem', 99; ...
+                'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
+                'enableport', 114; 'triggerport', 115; 'actionport', 116};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -642,6 +683,8 @@ function s = regleDims(c, k, dE, complet, forcer)
                           {'Amplitude', 'Frequency', 'Phase', 'Bias'})};
         case {'clock', 'digitalclock', 'ground', 'repeatingsequence'}
             s = {[1 1]};
+        case {'enableport', 'triggerport', 'actionport'}
+            s = {};
         case 'pulsegenerator'
             s = {accorder({dimsDe(p.Amplitude), dimsDe(p.Period), dimsDe(p.PulseWidth), ...
                            dimsDe(p.PhaseDelay)}, c, k, ...
@@ -903,6 +946,10 @@ function s = regleTraitement(c, k, dE, complet, forcer)
                           {'l''entree', 'InitialOutput'})};
         case 'pidcontroller'
             s = dE(1);
+        case {'garde', 'if', 'switchcase'}
+            s = repmat({[1 1]}, 1, c.nOut(k));
+        case 'merge'
+            s = {accorder([dE, {dimsDe(p.InitialOutput)}], c, k, [q, {'InitialOutput'}])};
     end
 end
 
@@ -1009,22 +1056,41 @@ function c = periodes(c, pas)
                 if isfield(p, 'SampleTime') && p.SampleTime(1) > 0
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
                 end
+                % À pas variable, une source qui casse ne change qu'aux pas
+                % majeurs : le solveur s'arrête sur chaque cassure, et les
+                % pas mineurs du pas qui y mène ne voient pas la valeur
+                % d'après — comme le mode figé d'un bloc de Simulink.
+                if c.variable && (strcmp(t, 'step') || ...
+                                  (strcmp(t, 'fromworkspace') && strcmp(p.Interpolate, 'off')))
+                    c.majeurSeul(k) = true;
+                end
             case 'pulsegenerator'
                 c.cadence(k) = 0;
                 if strcmp(p.PulseType, 'Sample based')
                     [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                elseif c.variable
+                    c.majeurSeul(k) = true;   % comme l'échelon
                 end
             case {'digitalclock', 'randomnumber', 'uniformrandomnumber'}
                 [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
             case {'integrator', 'transferfcn', 'statespace', 'zeropole', 'pidcontroller'}
                 c.cadence(k) = 0;
+            case {'garde', 'if', 'switchcase'}
+                % La condition d'un sous-système se décide aux pas majeurs :
+                % entre deux, il garde son état, comme dans Simulink.
+                c.cadence(k) = 0;
+                c.majeurSeul(k) = true;
+            case {'enableport', 'triggerport', 'actionport'}
+                c.cadence(k) = Inf;   % hors d'un sous-système : sans effet
             case {'derivative', 'transportdelay', 'memory', 'ratelimiter', 'relay', ...
                   'backlash', 'hitcrossing', 'detectchange', 'detectincrease', ...
                   'detectdecrease'}
                 % Continus pour ce qui les suit, mais calculés aux seuls pas
                 % majeurs : ils comparent l'entrée à celle du pas précédent.
+                % Le retard pur à pas variable fait exception : il lit son
+                % tampon à chaque passe, pas mineurs compris, comme Simulink.
                 c.cadence(k) = 0;
-                c.majeurSeul(k) = true;
+                c.majeurSeul(k) = ~(c.variable && strcmp(t, 'transportdelay'));
             case {'delay', 'discreteintegrator', 'discretetransferfcn', ...
                   'discretefilter', 'discretestatespace', 'zoh'}
                 periode = p.SampleTime;
@@ -1054,6 +1120,14 @@ function c = periodes(c, pas)
                 end
         end
     end
+    % Dans un sous-système conditionnel, rien n'est constant : ce qui ne
+    % change jamais doit encore se calculer quand le sous-système s'éveille.
+    % Une constante y prend donc la cadence de sa garde, aux pas majeurs —
+    % comme Simulink, où elle hérite de celle du sous-système.
+    for k = find(c.garde > 0 & isinf(c.cadence))
+        c.cadence(k) = 0;
+        c.majeurSeul(k) = true;
+    end
     % L'héritage : on propage jusqu'à ce que plus rien ne change.
     for tour = 1:(n + 2)
         change = false;
@@ -1062,6 +1136,10 @@ function c = periodes(c, pas)
             e = e(e > 0);
             if isempty(e)
                 c.cadence(k) = Inf;
+                if c.garde(k) > 0
+                    c.cadence(k) = 0;
+                    c.majeurSeul(k) = true;
+                end
                 change = true;
                 continue
             end
@@ -1073,6 +1151,10 @@ function c = periodes(c, pas)
                 continue
             elseif all(isinf(cad))
                 c.cadence(k) = Inf;
+                if c.garde(k) > 0
+                    c.cadence(k) = 0;
+                    c.majeurSeul(k) = true;
+                end
             else
                 finies = cad(isfinite(cad) & cad > 0);
                 c.cadence(k) = min(finies);
@@ -1088,7 +1170,18 @@ function c = periodes(c, pas)
     c.periodePas = zeros(1, n);
     c.decalagePas = zeros(1, n);
     for k = 1:n
-        if c.cadence(k) > 0 && isfinite(c.cadence(k))
+        if c.cadence(k) > 0 && isfinite(c.cadence(k)) && ...
+           (c.decalage(k) < 0 || c.decalage(k) >= c.cadence(k))
+            error('Simulink:SampleTime:InvalidOffset', ...
+                  ['Le decalage %g de la periode de ''%s'' doit etre positif et ' ...
+                   'inferieur a la periode %g : [periode, decalage] avec 0 <= decalage ' ...
+                   '< periode.'], c.decalage(k), c.chemins{k}, c.cadence(k));
+        end
+        if c.variable && c.cadence(k) > 0 && isfinite(c.cadence(k))
+            % À pas variable, le solveur s'arrête sur chaque instant
+            % d'échantillonnage : une période n'a rien à diviser.
+            c.majeurSeul(k) = true;
+        elseif c.cadence(k) > 0 && isfinite(c.cadence(k))
             rapport = c.cadence(k) / pas;
             if abs(rapport - round(rapport)) > 1e-9 * max(1, rapport) || round(rapport) < 1
                 error('Simulink:SampleTime:NotMultipleOfFixedStep', ...
@@ -1134,6 +1227,7 @@ end
 % celle que lit MATLIBRE_SL_EXECUTER.
 function c = abaisser(c, pas, tDebut)
     n = c.n;
+    c.objets = cell(1, n);
     c.xA = zeros(1, n);
     c.xB = zeros(1, n);
     c.x0 = zeros(0, 1);
@@ -1459,9 +1553,20 @@ function c = abaisser(c, pas, tDebut)
                     error('simulink:sim:retardNegatif', ...
                           'Le bloc ''%s'' demande un retard negatif.', ch);
                 end
-                longueur = ceil(p.DelayTime / pas - 1e-9) + 2;
-                seg = [p.DelayTime; longueur; etendre(p.InitialOutput, w, ch, 'InitialOutput')];
-                z0 = [0; zeros(w * longueur, 1)];
+                if c.variable
+                    % À pas variable, le tampon garde les instants avec les
+                    % valeurs, et grandit au besoin : il vit hors de Z, dans
+                    % les tampons du simulateur. Sa longueur est la taille
+                    % initiale, BufferSize.
+                    longueur = max(16, round(double(p.BufferSize)));
+                    seg = [p.DelayTime; longueur; ...
+                           etendre(p.InitialOutput, w, ch, 'InitialOutput')];
+                else
+                    longueur = ceil(p.DelayTime / pas - 1e-9) + 2;
+                    seg = [p.DelayTime; longueur; ...
+                           etendre(p.InitialOutput, w, ch, 'InitialOutput')];
+                    z0 = [0; zeros(w * longueur, 1)];
+                end
             case 'pidcontroller'          % [P; I; D; N], w chacun
                 N = etendre(p.N, w, ch, 'N');
                 if any(N <= 0)
@@ -1528,6 +1633,26 @@ function c = abaisser(c, pas, tDebut)
                 end
             case 'assertion'              % [active; arreter]
                 seg = [strcmp(p.Enabled, 'on'); strcmp(p.StopWhenAssertionFail, 'on')];
+            % --- sous-systèmes conditionnels ---
+            case 'garde'                  % [enable; front; action; remise; largeur du front]
+                % Z : [amorcée; active au pas d'avant; front d'avant]
+                fronts = struct('none', 0, 'rising', 1, 'falling', 2, 'either', 3);
+                largeurFront = 0;
+                if ~strcmp(p.Trigger, 'none')
+                    largeurFront = largeurEntree(c, k, 1 + (p.Enable ~= 0));
+                end
+                seg = [p.Enable ~= 0; fronts.(p.Trigger); p.Action ~= 0; p.Reset ~= 0; ...
+                       largeurFront];
+                z0 = [0; 0; zeros(largeurFront, 1)];
+            case 'if'                     % [entrées; conditions; sinon]
+                [c.objets{k}, nCond] = conditionsSi(p, c.nIn(k), ch, c, k);
+                seg = [c.nIn(k); nCond; strcmpi(p.ShowElse, 'on')];
+            case 'switchcase'             % [cas; défaut]
+                c.objets{k} = casDe(p.CaseConditions, ch);
+                seg = [numel(c.objets{k}); strcmpi(p.ShowDefaultCase, 'on')];
+            case 'merge'                  % [entrées; valeur initiale (w); garde de chaque source]
+                seg = [c.nIn(k); etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
+                       gardesDesSources(c, k)];
         end
         c.seg{k} = double(seg(:));
         c.sub(k) = sub;
@@ -1633,6 +1758,18 @@ function c = ordonner(c)
             if e(j) > 0
                 a = c.proprio(e(j));
                 succ{a}(end + 1) = k;
+            end
+        end
+        % Un bloc gardé lit la garde de son sous-système : elle calcule
+        % avant lui. Un Merge lit celles de ses sources.
+        if c.garde(k) > 0
+            succ{c.garde(k)}(end + 1) = k;
+        end
+        if strcmp(c.types{k}, 'merge')
+            for g = unique(c.seg{k}(end - c.nIn(k) + 1:end)).'
+                if g > 0
+                    succ{g}(end + 1) = k;
+                end
             end
         end
     end
@@ -1806,6 +1943,160 @@ function boucle = decouper(c, comp, succ)
     end
     boucle = struct('blocs', comp, 'ordre', [ordreRestants, dechires], ...
                     'dechires', dechires, 'z', indices);
+end
+
+% === sous-systèmes conditionnels ================================================
+%
+% Les conditions d'un bloc If deviennent des fonctions de u1, u2... : la
+% première qui vaut vrai choisit sa sortie. Chacune est essayée à la
+% compilation sur des zéros, pour qu'une faute de frappe se dise en
+% nommant le bloc, non au milieu de la simulation.
+function [conditions, nCond] = conditionsSi(p, nIn, chemin, c, k)
+    textes = [{char(p.IfExpression)}, expressionsSinonSi(p.ElseIfExpressions)];
+    nCond = numel(textes);
+    arguments = strjoin(arrayfun(@(j) sprintf('u%d', j), 1:nIn, 'UniformOutput', false), ',');
+    essai = cell(1, nIn);
+    for j = 1:nIn
+        essai{j} = zeros(max(1, largeurEntree(c, k, j)), 1);
+    end
+    conditions = cell(1, nCond);
+    for i = 1:nCond
+        if isempty(strtrim(textes{i}))
+            error('Simulink:blocks:IfExpressionEmpty', ...
+                  'La condition %d du bloc If ''%s'' est vide.', i, chemin);
+        end
+        try
+            conditions{i} = str2func(sprintf('@(%s) %s', arguments, textes{i}));
+            r = conditions{i}(essai{:});
+            if ~(isnumeric(r) || islogical(r)) || numel(r) ~= 1
+                error('Simulink:blocks:IfExpressionNotScalar', 'pas scalaire');
+            end
+        catch err
+            error('Simulink:blocks:IfExpressionInvalid', ...
+                  ['La condition ''%s'' du bloc If ''%s'' ne s''evalue pas en un booleen ' ...
+                   'scalaire de ses entrees u1 a u%d : %s'], textes{i}, chemin, nIn, ...
+                  err.message);
+        end
+    end
+end
+
+function liste = expressionsSinonSi(texte)
+    liste = {};
+    texte = char(texte);
+    if isempty(strtrim(texte))
+        return
+    end
+    profondeur = 0;
+    debut = 1;
+    for i = 1:numel(texte)
+        switch texte(i)
+            case {'(', '[', '{'}
+                profondeur = profondeur + 1;
+            case {')', ']', '}'}
+                profondeur = profondeur - 1;
+            case ','
+                if profondeur == 0
+                    liste{end + 1} = strtrim(texte(debut:i - 1)); %#ok<AGROW>
+                    debut = i + 1;
+                end
+        end
+    end
+    liste{end + 1} = strtrim(texte(debut:end));
+end
+
+% Les cas d'un Switch Case : une cellule de valeurs entières, écrite comme
+% dans Simulink, « {1, [2 3], 7} ».
+function cas = casDe(texte, chemin)
+    cas = texte;
+    if ischar(cas) || isstring(cas)
+        try
+            cas = evalin('base', char(cas));
+        catch err
+            error('Simulink:blocks:SwitchCaseConditionsInvalid', ...
+                  'Les cas de ''%s'' ne s''evaluent pas : %s', chemin, err.message);
+        end
+    end
+    if isnumeric(cas)
+        cas = num2cell(cas);
+    end
+    if ~iscell(cas) || isempty(cas) || ...
+       ~all(cellfun(@(v) isnumeric(v) && ~isempty(v) && all(v(:) == round(v(:))), cas))
+        error('Simulink:blocks:SwitchCaseConditionsInvalid', ...
+              ['Les cas de ''%s'' sont une cellule de valeurs entieres, comme ' ...
+               '{1, [2 3], 7}.'], chemin);
+    end
+    cas = cellfun(@(v) double(v(:)), cas, 'UniformOutput', false);
+end
+
+% Pour chaque entrée d'un Merge, la garde du sous-système d'où vient son
+% signal — en remontant les passe-plats —, ou 0 s'il n'en vient d'aucun.
+function gardes = gardesDesSources(c, k)
+    gardes = zeros(c.nIn(k), 1);
+    for j = 1:c.nIn(k)
+        gp = c.entrees{k}(j);
+        for pas = 1:c.n
+            if gp == 0
+                break
+            end
+            a = c.proprio(gp);
+            if c.garde(a) > 0
+                gardes(j) = c.garde(a);
+                break
+            end
+            if ~strcmp(c.types{a}, 'signalconversion')
+                break
+            end
+            gp = c.entrees{a}(c.rang(gp));
+        end
+    end
+end
+
+% === passages par zéro ========================================================
+%
+% Les blocs dont la sortie casse quand un signal franchit un seuil : leur
+% entrée, comparée au seuil, est surveillée par le solveur à pas
+% variable, qui localise l'instant du franchissement au lieu de le
+% sauter. C'est la liste de Simulink, et son réglage : ZeroCrossControl
+% vaut UseLocalSettings (le paramètre ZeroCross de chaque bloc décide),
+% EnableAll ou DisableAll.
+function zc = passagesParZero(c)
+    zc = false(1, c.n);
+    capables = {'abs', 'sign', 'comparetozero', 'comparetoconstant', 'relational', ...
+                'minmax', 'saturation', 'deadzone', 'relay', 'hitcrossing', 'switch', ...
+                'integrator', 'backlash', 'coulombfriction', 'garde'};
+    controle = 'UseLocalSettings';
+    if isstruct(c.config) && isfield(c.config, 'ZeroCrossControl')
+        controle = char(c.config.ZeroCrossControl);
+    end
+    if strcmpi(controle, 'DisableAll')
+        return
+    end
+    for k = 1:c.n
+        type = c.types{k};
+        if ~any(strcmp(type, capables))
+            continue
+        end
+        p = c.p{k};
+        switch type
+            case 'integrator'
+                if c.seg{k}(1) == 0
+                    continue   % sans bornes, rien ne casse
+                end
+            case 'minmax'
+                if c.nIn(k) < 2
+                    continue
+                end
+            case 'garde'
+                if c.nIn(k) == 0 || p.Action ~= 0
+                    continue   % une action se décide au pas majeur, par le If
+                end
+        end
+        if strcmpi(controle, 'EnableAll')
+            zc(k) = true;
+        else
+            zc(k) = ~isfield(p, 'ZeroCross') || strcmpi(char(p.ZeroCross), 'on');
+        end
+    end
 end
 
 % === diagnostics ===============================================================

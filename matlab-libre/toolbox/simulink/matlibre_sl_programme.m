@@ -27,8 +27,8 @@ function texte = matlibre_sl_programme(modele, nomFonction)
 %   Ne s'écrivent pas encore, et sont refusés en les nommant plutôt que
 %   traduits de travers : les blocs échantillonnés à une autre période
 %   que le pas, le retard pur, les échanges avec l'espace de travail, les
-%   nombres au hasard, les signaux matrices, les boucles algébriques, et
-%   les solveurs autres qu'Euler.
+%   nombres au hasard, les signaux matrices, les boucles algébriques,
+%   les sous-systèmes conditionnels, et les solveurs autres qu'Euler.
 %
 %   Fonction interne à la boîte à outils : elle n'existe pas dans MATLAB,
 %   dont le générateur de code écrit du C, non du MATLAB.
@@ -74,6 +74,15 @@ function texte = matlibre_sl_programme(modele, nomFonction)
     end
     c = matlibre_sl_compiler(modele, struct('silencieux', true, 'pas', 1, ...
                                              'config', config));
+    % Un sous-système conditionnel ne calcule que quand sa garde le permet :
+    % le programme engendré n'a pas encore de quoi l'écrire.
+    conditionnel = find(ismember(c.types, {'garde', 'if', 'switchcase', 'merge'}), 1);
+    if ~isempty(conditionnel)
+        error('Simulink:programme:BlocNonEcrit', ...
+              ['Le bloc ''%s'' appartient a un sous-systeme conditionnel (Enable, ' ...
+               'Trigger, If, Switch Case, Merge) : le programme engendre ne les ecrit ' ...
+               'pas encore.'], c.chemins{conditionnel});
+    end
     if ~isempty(c.boucles)
         error('Simulink:programme:BoucleAlgebrique', ...
               ['Le modele ''%s'' contient une boucle algebrique (%s) : le programme ' ...

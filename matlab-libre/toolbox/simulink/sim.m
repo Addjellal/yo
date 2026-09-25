@@ -15,14 +15,31 @@ function varargout = sim(modele, varargin)
 %
 %   Les réglages sont ceux de la boîte « Paramètres de configuration » de
 %   Simulink, que SET_PARAM(MODELE,'Solver','ode4') pose sur le modèle et
-%   que GET_PARAM relit : StartTime, StopTime, Solver, FixedStep, et les
+%   que GET_PARAM relit : StartTime, StopTime, Solver, FixedStep, RelTol,
+%   AbsTol, MaxStep, MinStep, InitialStep, ZeroCrossControl, et les
 %   diagnostics AlgebraicLoopMsg, UnconnectedInputMsg et
-%   UnconnectedOutputMsg (none, warning ou error). Les solveurs sont à pas
-%   fixe : ode1 (Euler, celui par défaut), ode2 (Heun), ode3
-%   (Bogacki-Shampine), ode4 (Runge-Kutta) et ode5 (Dormand-Prince) ;
-%   l'erreur d'un solveur d'ordre p décroît comme le pas à la puissance
-%   p. FixedStepDiscrete sert aux modèles sans état continu. Un argument
-%   explicite l'emporte toujours sur le réglage enregistré.
+%   UnconnectedOutputMsg (none, warning ou error). Un argument explicite
+%   l'emporte toujours sur le réglage enregistré.
+%
+%   Les solveurs à pas fixe : ode1 (Euler, celui par défaut), ode2
+%   (Heun), ode3 (Bogacki-Shampine), ode4 (Runge-Kutta) et ode5
+%   (Dormand-Prince) ; l'erreur d'un solveur d'ordre p décroît comme le
+%   pas à la puissance p. FixedStepDiscrete sert aux modèles sans état
+%   continu, et FixedStepAuto choisit ode3 ou le discret.
+%
+%   Les solveurs à pas variable : ode45 (Dormand-Prince 5(4)), ode23
+%   (Bogacki-Shampine 3(2)), ode23s (Rosenbrock, pour les systèmes
+%   raides), VariableStepDiscrete, et VariableStepAuto qui choisit ode45
+%   ou le discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
+%   par MaxStep (le cinquantième de la durée par défaut) et MinStep. Il
+%   s'arrête exactement sur les instants d'échantillonnage et les
+%   cassures des sources (échelon, fronts d'impulsion) ; un seuil franchi
+%   dans un pas — l'entrée d'un relais, d'une saturation, d'un
+%   aiguillage, d'un Hit Crossing — est localisé par la détection des
+%   passages par zéro, que règlent ZeroCrossControl et le paramètre
+%   ZeroCross de chaque bloc. Le relevé porte alors un instant par pas
+%   majeur ; SIM(MODELE,[T0 T1 ... TN]) ne relève que les instants donnés,
+%   que le solveur atteint exactement.
 %
 %   Les signaux sont des scalaires, des vecteurs ou des matrices : un Mux
 %   réunit ses entrées en un vecteur, un Demux les sépare, un gain
@@ -36,9 +53,10 @@ function varargout = sim(modele, varargin)
 %   AlgebraicLoopMsg.
 %
 %   Les blocs échantillonnés ne calculent qu'aux instants de leur
-%   période, qui doit être un multiple du pas, et gardent leur valeur
-%   entre deux. Un solveur d'ordre supérieur évalue le modèle en des
-%   points intermédiaires du pas ; les états discrets n'y bougent pas.
+%   période — qui, à pas fixe, doit être un multiple du pas — et gardent
+%   leur valeur entre deux. Un solveur d'ordre supérieur évalue le modèle
+%   en des points intermédiaires du pas ; les états discrets n'y bougent
+%   pas.
 %
 %   Tous les paramètres sont résolus avant la boucle : à l'intérieur, il
 %   ne reste que de l'arithmétique. Un paramètre numérique donné entre
@@ -77,6 +95,8 @@ function varargout = sim(modele, varargin)
 %      m = set_param(m, 'Solver', 'ode4', 'StopTime', 1);
 %      r = sim(m);
 %      r.temps(end)                               % 1
+%      r = sim(m, 'Solver', 'ode45', 'RelTol', 1e-6);
+%      abs(r.signaux.integ(end) - 2) < 1e-9       % exact : l'état est une droite
 %
 %   Voir aussi NEW_SYSTEM, ADD_BLOCK, ADD_LINE, SET_PARAM, SIMSET, LINMOD.
     if ischar(modele) || isstring(modele)
@@ -96,7 +116,7 @@ function varargout = sim(modele, varargin)
                'ADD_LINE, or the name of one.']);
     end
 
-    config = lireArguments(matlibre_sl_config('lire', modele), varargin);
+    [config, imposes] = lireArguments(matlibre_sl_config('lire', modele), varargin);
     nomModele = char(modele.nom);
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
@@ -104,12 +124,7 @@ function varargout = sim(modele, varargin)
         error('simulink:sim:duree', ...
               'La duree doit etre un nombre positif : l''instant final precede le debut.');
     end
-    if strcmpi(config.SolverType, 'Variable-step')
-        error('Simulink:Commands:SolveurInconnu', ...
-              ['Le modele ''%s'' demande un solveur a pas variable, que MatLibre n''a ' ...
-               'pas encore. Choisissez un solveur a pas fixe : ' ...
-               'set_param(modele, ''Solver'', ''ode4'').'], nomModele);
-    end
+    variable = strcmpi(matlibre_sl_config('type', config.Solver), 'Variable-step');
     solveur = lower(char(config.Solver));
     pas = config.FixedStep;
     if ischar(pas) && strcmpi(pas, 'auto')
@@ -124,18 +139,44 @@ function varargout = sim(modele, varargin)
         error('simulink:sim:pas', 'Le pas doit etre un nombre strictement positif.');
     end
 
-    options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config);
+    options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config, ...
+                     'variable', variable);
     c = matlibre_sl_compiler(modele, options);
-    if strcmp(solveur, 'fixedstepdiscrete') && ~isempty(c.x0)
+    % Les solveurs automatiques choisissent selon qu'il y a des états
+    % continus ou non, comme dans Simulink.
+    continus = ~isempty(c.x0);
+    switch solveur
+        case 'variablestepauto'
+            solveur = 'ode45';
+            if ~continus
+                solveur = 'variablestepdiscrete';
+            end
+        case 'fixedstepauto'
+            solveur = 'ode3';
+            if ~continus
+                solveur = 'fixedstepdiscrete';
+            end
+    end
+    if any(strcmp(solveur, {'fixedstepdiscrete', 'variablestepdiscrete'})) && continus
         k = find(c.xA > 0, 1);
+        if variable
+            autres = 'ode45, ode23 ou ode23s';
+        else
+            autres = 'ode1 a ode5';
+        end
         error('Simulink:Engine:DiscreteSolverContinuousStates', ...
               ['Le modele ''%s'' porte des etats continus — le bloc ''%s'' en a — que ' ...
-               'le solveur discret FixedStepDiscrete n''integre pas. Choisissez un ' ...
-               'solveur ode1 a ode5.'], c.nom, c.chemins{k});
+               'le solveur discret %s n''integre pas. Choisissez un solveur %s.'], ...
+              c.nom, c.chemins{k}, char(config.Solver), autres);
     end
     T = matlibre_sl_executer('preparer', c);
 
-    if isinf(tFinal)
+    if variable
+        reglages = reglagesVariables(config, nomModele);
+        J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, reglages, ...
+                                 imposes);
+        instants = J.temps;
+    elseif isinf(tFinal)
         [instants, J] = sansFin(T, tDebut, pas, solveur);
     else
         instants = tDebut:pas:tFinal;
@@ -154,8 +195,10 @@ end
 
 % Les arguments après le modèle : la forme ancienne (instant final, pas
 % ou options), ou les réglages par nom. Ils l'emportent sur ceux du
-% modèle, qu'ils ne changent pas.
-function config = lireArguments(config, args)
+% modèle, qu'ils ne changent pas. IMPOSES porte les instants donnés un à
+% un, au-delà de deux : à pas variable, ce sont les seuls relevés.
+function [config, imposes] = lireArguments(config, args)
+    imposes = [];
     if isempty(args)
         return
     end
@@ -194,6 +237,9 @@ function config = lireArguments(config, args)
             if numel(intervalle) > 2 && numel(args) < 2
                 config.FixedStep = ecarts(1);
             end
+            if numel(intervalle) > 2
+                imposes = intervalle;
+            end
         end
     end
     if numel(args) >= 2 && ~isempty(args{2})
@@ -201,12 +247,21 @@ function config = lireArguments(config, args)
         if isstruct(troisieme)
             demande = simget(troisieme, 'Solver');
             if ~isempty(demande)
-                config.Solver = matlibre_sl_config('valider', 'Solver', demande);
-                config.SolverType = 'Fixed-step';
+                config = poser(config, 'Solver', demande);
             end
-            choisi = simget(troisieme, 'FixedStep');
-            if ~isempty(choisi)
-                config.FixedStep = choisi;
+            for nom = {'FixedStep', 'RelTol', 'AbsTol', 'MaxStep', 'MinStep', 'InitialStep'}
+                choisi = simget(troisieme, nom{1});
+                if ~isempty(choisi)
+                    config = poser(config, nom{1}, choisi);
+                end
+            end
+            detection = simget(troisieme, 'ZeroCross');
+            if ~isempty(detection)
+                if strcmpi(char(detection), 'off')
+                    config.ZeroCrossControl = 'DisableAll';
+                else
+                    config.ZeroCrossControl = 'UseLocalSettings';
+                end
             end
         else
             if ~(isnumeric(troisieme) && isscalar(troisieme) && troisieme > 0)
@@ -232,11 +287,45 @@ function config = poser(config, nom, valeur)
               strjoin(fieldnames(matlibre_sl_config('defauts')).', ', '));
     end
     config.(canon) = matlibre_sl_config('valider', canon, valeur);
+    % Le solveur et son type vont ensemble, comme sur le modèle.
     if strcmp(canon, 'Solver')
-        liste = matlibre_sl_config('solveurs');
-        if any(strcmpi(config.Solver, liste.fixe))
-            config.SolverType = 'Fixed-step';
+        config.SolverType = matlibre_sl_config('type', config.Solver);
+    elseif strcmp(canon, 'SolverType') && ...
+           ~strcmp(matlibre_sl_config('type', config.Solver), config.SolverType)
+        config.Solver = matlibre_sl_config('automatique', config.SolverType);
+    end
+end
+
+% Les réglages du pas variable, évalués et vérifiés : un nombre, ou
+% 'auto' là où Simulink l'admet.
+function r = reglagesVariables(config, nomModele)
+    r = struct();
+    for nom = {'RelTol', 'AbsTol', 'MaxStep', 'MinStep', 'InitialStep'}
+        v = config.(nom{1});
+        if ~(ischar(v) && strcmpi(v, 'auto'))
+            v = nombre(v, nomModele, nom{1});
+            if ~isscalar(v) || ~isreal(v) || isnan(v) || v < 0 || ...
+               (v == 0 && ~strcmp(nom{1}, 'MinStep')) || ...
+               (isinf(v) && ~strcmp(nom{1}, 'MaxStep'))
+                error('Simulink:Config:InvalidValue', ...
+                      ['Le reglage %s du modele ''%s'' vaut %s : il faut un nombre ' ...
+                       'strictement positif, ou ''auto''.'], nom{1}, nomModele, mat2str(v));
+            end
+        elseif strcmp(nom{1}, 'RelTol')
+            v = 1e-3;
         end
+        r.(nom{1}) = v;
+    end
+    if r.RelTol < 100 * eps
+        error('Simulink:Config:InvalidValue', ...
+              ['La tolerance relative %g du modele ''%s'' est trop fine pour la ' ...
+               'precision des nombres : prenez-la au-dessus de %g.'], r.RelTol, ...
+              nomModele, 100 * eps);
+    end
+    if ~ischar(r.MinStep) && ~ischar(r.MaxStep) && r.MinStep > r.MaxStep
+        error('Simulink:Config:InvalidValue', ...
+              ['Le pas minimal %g du modele ''%s'' depasse son pas maximal %g.'], ...
+              r.MinStep, nomModele, r.MaxStep);
     end
 end
 

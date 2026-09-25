@@ -11,7 +11,10 @@ function modele = add_line(modele, source, destination, entree, sortie)
 %   La syntaxe de Simulink est acceptée : ADD_LINE(MODELE,'demux/2',
 %   'scope/1') relie la deuxième sortie du Demux à la première entrée du
 %   Scope. Un bloc dont le nom lui-même se termine par « /n » l'emporte
-%   sur cette lecture.
+%   sur cette lecture. Les ports de contrôle d'un sous-système
+%   conditionnel se désignent par leur nom : 'sous/Enable',
+%   'sous/Trigger', 'sous/Ifaction' ; ce sont ses entrées qui suivent
+%   celles de ses blocs INPORT.
 %
 %   Une sortie peut alimenter plusieurs entrées : il suffit de plusieurs
 %   liens. Une entrée, non : un second lien vers une entrée déjà reliée
@@ -113,6 +116,15 @@ function [k, port] = designer(modele, texte, role)
             return
         end
     end
+    jetons = regexp(texte, '^(.*)/(Enable|Trigger|Ifaction)$', 'tokens', 'once', ...
+                    'ignorecase');
+    if ~isempty(jetons) && strcmp(role, 'destination')
+        k = chercher(modele, jetons{1});
+        if k > 0
+            port = portDeControle(modele.blocs{k}, jetons{2}, texte);
+            return
+        end
+    end
     error('simulink:add_line:unknownBlock', 'Unknown block ''%s'' (%s du lien).', ...
           texte, role);
 end
@@ -140,6 +152,50 @@ function c = cheminBloc(modele, bloc)
         c = char(bloc);
     else
         c = [modele '/' char(bloc)];
+    end
+end
+
+% Le rang d'un port de contrôle parmi les entrées d'un sous-système : après
+% ses INPORT, Enable puis Trigger, ou Action Port.
+function port = portDeControle(bloc, nom, texte)
+    if ~estSousSysteme(bloc)
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              'Le bloc ''%s'' n''est pas un sous-systeme : il n''a pas de port %s.', ...
+              char(bloc.nom), nom);
+    end
+    interne = [];
+    if isfield(bloc.parametres, 'Model')
+        interne = matlibre_sl_modele(bloc.parametres.Model);
+    elseif isfield(bloc.parametres, 'Modele')
+        interne = matlibre_sl_modele(bloc.parametres.Modele);
+    end
+    types = {};
+    if ~isempty(interne)
+        types = cellfun(@(b) typeCanonique(b.type), interne.blocs, 'UniformOutput', false);
+    end
+    ordre = {};
+    for candidat = {'enableport', 'triggerport', 'actionport'}
+        if any(strcmp(types, candidat{1}))
+            ordre{end + 1} = candidat{1}; %#ok<AGROW>
+        end
+    end
+    voulu = struct('enable', 'enableport', 'trigger', 'triggerport', 'ifaction', 'actionport');
+    rang = find(strcmp(ordre, voulu.(lower(nom))), 1);
+    if isempty(rang)
+        error('Simulink:Commands:AddLineInvalidPort', ...
+              ['Le sous-systeme ''%s'' n''a pas de port %s : posez-y un bloc %s ' ...
+               '(''%s'').'], char(bloc.nom), nom, ...
+              strrep(voulu.(lower(nom)), 'port', ' port'), texte);
+    end
+    port = sum(strcmp(types, 'inport')) + rang;
+end
+
+function t = typeCanonique(type)
+    try
+        entree = matlibre_sl_catalogue('type', type);
+        t = entree.type;
+    catch
+        t = lower(char(type));
     end
 end
 
