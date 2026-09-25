@@ -106,6 +106,14 @@ function c = matlibre_sl_compiler(modele, options)
         c.nOut(k) = ns;
     end
 
+    % Les blocs de code : leur fonction se prépare une fois, ici — une
+    % expression devient une poignée, un texte de MATLAB Function un
+    % fichier, une S-fonction dit ses tailles.
+    c.fonctions = cell(1, n);
+    for k = 1:n
+        c.fonctions{k} = preparerCode(c, k);
+    end
+
     % --- 2. ports de sortie, numérotés d'un bout à l'autre du modèle --------
     c.portDebut = zeros(1, n);
     c.proprio = zeros(1, 0);
@@ -364,7 +372,9 @@ function x = codeDe(type)
                 'terminator', 94; 'stopsimulation', 95; 'assertion', 96; ...
                 'subsystem', 99; ...
                 'if', 110; 'switchcase', 111; 'merge', 112; 'garde', 113; ...
-                'enableport', 114; 'triggerport', 115; 'actionport', 116};
+                'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
+                'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
+                'sfunction', 103; 'chart', 104};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -449,6 +459,8 @@ function d = transmissionDirecte(c, k)
             d = p.DelayTime == 0;
         case 'discreteintegrator'
             d = ~strcmp(p.IntegratorMethod, 'ForwardEuler');
+        case 'sfunction'
+            d = c.fonctions{k}.tailles(6) ~= 0;
         case {'discretetransferfcn', 'discretefilter'}
             [b, ~] = filtreDiscret(p.Numerator, p.Denominator, ...
                                    strcmp(c.types{k}, 'discretetransferfcn'), c.chemins{k});
@@ -719,7 +731,7 @@ function s = regleDims(c, k, dE, complet, forcer)
             if ~complet && ~forcer && ~ismember(t, {'statespace', 'transferfcn', ...
                     'zeropole', 'discretetransferfcn', 'discretefilter', ...
                     'discretestatespace', 'integrator', 'delay', 'memory', ...
-                    'discreteintegrator'})
+                    'discreteintegrator', 'sfunction'})
                 return
             end
             s = regleTraitement(c, k, dE, complet, forcer);
@@ -948,6 +960,27 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             s = dE(1);
         case {'garde', 'if', 'switchcase'}
             s = repmat({[1 1]}, 1, c.nOut(k));
+        case 'fcn'
+            s = {[1 1]};
+        case 'interpretedmatlabfunction'
+            d = double(p.OutputDimensions);
+            if isequal(d, -1)
+                s = dE(1);
+            else
+                if isscalar(d), d = [d 1]; end
+                s = {d(1:2)};
+            end
+        case 'matlabfunction'
+            s = dimsFonction(c, k, dE);
+        case 'chart'
+            s = c.fonctions{k}.dims;
+        case 'sfunction'
+            ny = c.fonctions{k}.tailles(3);
+            if ny < 0
+                s = dE(1);   % dimensionnée par son entrée
+            else
+                s = {[ny 1]};
+            end
         case 'merge'
             s = {accorder([dE, {dimsDe(p.InitialOutput)}], c, k, [q, {'InitialOutput'}])};
     end
@@ -1082,6 +1115,35 @@ function c = periodes(c, pas)
                 c.majeurSeul(k) = true;
             case {'enableport', 'triggerport', 'actionport'}
                 c.cadence(k) = Inf;   % hors d'un sous-système : sans effet
+            case 'sfunction'
+                ts = c.fonctions{k}.ts;
+                if ts(1) == -1
+                    c.cadence(k) = -1;
+                elseif ts(1) == 0
+                    c.cadence(k) = 0;
+                    c.majeurSeul(k) = numel(ts) >= 2 && ts(2) == 1;   % [0 1] : aux pas majeurs
+                else
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(ts);
+                end
+            case 'chart'
+                % Un diagramme fait un pas par instant d'échantillonnage : à
+                % ses instants s'il en a, sinon à chaque pas majeur.
+                c.cadence(k) = -1;
+                if p.SampleTime(1) ~= -1
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                end
+                c.majeurSeul(k) = true;
+            case 'matlabfunction'
+                c.cadence(k) = -1;
+                if p.SampleTime(1) ~= -1
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                end
+                % Une fonction qui garde un état entre deux appels ne se
+                % rappelle qu'aux pas majeurs : un pas mineur ne doit pas
+                % faire avancer sa mémoire.
+                if c.fonctions{k}.persistante
+                    c.majeurSeul(k) = true;
+                end
             case {'derivative', 'transportdelay', 'memory', 'ratelimiter', 'relay', ...
                   'backlash', 'hitcrossing', 'detectchange', 'detectincrease', ...
                   'detectdecrease'}
@@ -1650,6 +1712,24 @@ function c = abaisser(c, pas, tDebut)
             case 'switchcase'             % [cas; défaut]
                 c.objets{k} = casDe(p.CaseConditions, ch);
                 seg = [numel(c.objets{k}); strcmpi(p.ShowDefaultCase, 'on')];
+            case {'fcn', 'interpretedmatlabfunction'}   % [largeur d'entrée]  poignée dans objets
+                c.objets{k} = c.fonctions{k}.h;
+                verifierCode(c, k, w);
+                seg = largeurEntree(c, k, 1);
+            case 'chart'                  % [entrées; sorties]  machine dans objets
+                c.objets{k} = c.fonctions{k};
+                seg = [c.nIn(k); c.nOut(k)];
+            case 'matlabfunction'         % [entrées; sorties]  poignée dans objets
+                c.objets{k} = c.fonctions{k}.h;
+                seg = [c.nIn(k); c.nOut(k)];
+            case 'sfunction'              % [continus; discrets; sorties; entrées]
+                T0 = c.fonctions{k};
+                nc = T0.tailles(1);
+                nd = T0.tailles(2);
+                c.objets{k} = struct('f', T0.h, 'p', {T0.parametres});
+                c = ajouterEtat(c, k, T0.x0(1:nc));
+                z0 = T0.x0(nc + 1:nc + nd);
+                seg = [nc; nd; w * (c.nOut(k) > 0); T0.tailles(4)];
             case 'merge'                  % [entrées; valeur initiale (w); garde de chaque source]
                 seg = [c.nIn(k); etendre(p.InitialOutput, w, ch, 'InitialOutput'); ...
                        gardesDesSources(c, k)];
@@ -1943,6 +2023,156 @@ function boucle = decouper(c, comp, succ)
     end
     boucle = struct('blocs', comp, 'ordre', [ordreRestants, dechires], ...
                     'dechires', dechires, 'z', indices);
+end
+
+% === blocs de code ============================================================
+
+function code = preparerCode(c, k)
+    code = [];
+    p = c.p{k};
+    ch = c.chemins{k};
+    switch c.types{k}
+        case 'fcn'
+            code.h = matlibre_sl_fonction('expression', p.Expr, ch);
+        case 'interpretedmatlabfunction'
+            code.h = matlibre_sl_fonction('expression', p.MATLABFcn, ch);
+        case 'chart'
+            code = preparerGraphe(p, ch);
+        case 'matlabfunction'
+            code.h = matlibre_sl_fonction('installer', p.Script, ch);
+            code.persistante = ~isempty(regexp(char(p.Script), '(^|\n)\s*persistent\s', 'once'));
+        case 'sfunction'
+            parametres = p.Parameters;
+            if ischar(parametres) || isstring(parametres)
+                try
+                    parametres = evalin('base', ['{' char(parametres) '}']);
+                catch err
+                    error('Simulink:blocks:SFunctionParameters', ...
+                          'Les parametres ''%s'' du bloc ''%s'' ne s''evaluent pas : %s', ...
+                          char(p.Parameters), ch, err.message);
+                end
+            elseif ~iscell(parametres)
+                parametres = {parametres};
+            end
+            [code.tailles, code.x0, code.ts] = matlibre_sl_fonction('sfonction', ...
+                                                                    p.FunctionName, parametres, ch);
+            code.h = str2func(char(p.FunctionName));
+            code.parametres = parametres;
+            if any(code.tailles(1:2) < 0)
+                error('Simulink:blocks:SFunctionSizes', ...
+                      'La S-fonction du bloc ''%s'' annonce un nombre d''etats negatif.', ch);
+            end
+    end
+end
+
+% Un diagramme Stateflow : la machine bâtie par SFCHART, les champs du
+% contexte qu'il rend — « etat », le rang de l'état actif —, et leurs
+% dimensions, lues au démarrage de la machine.
+function code = preparerGraphe(p, chemin)
+    machine = p.Chart;
+    if ~isstruct(machine) || ~isfield(machine, 'etats') || ~isfield(machine, 'transitions')
+        error('Simulink:blocks:ChartMachineMissing', ...
+              ['Le bloc Chart ''%s'' ne porte pas de machine : donnez-lui celle que ' ...
+               'batissent SFCHART, SFSTATE et SFTRANSITION, par son parametre Chart.'], ...
+              chemin);
+    end
+    if isempty(machine.etats)
+        error('Simulink:blocks:ChartNoState', 'La machine du bloc ''%s'' n''a pas d''etat.', ...
+              chemin);
+    end
+    sorties = p.Outputs;
+    if ischar(sorties) || isstring(sorties)
+        sorties = cellstr(sorties);
+    end
+    contexte = p.InitialContext;
+    if isempty(contexte)
+        contexte = struct();
+    end
+    try
+        [courant, contexte] = sfstep(machine, '', contexte, []);
+    catch err
+        error('Simulink:blocks:ChartError', ...
+              'La machine du bloc ''%s'' echoue en entrant dans son etat initial : %s', ...
+              chemin, err.message);
+    end
+    code = struct('machine', machine, 'sorties', {sorties}, 'contexte', contexte, ...
+                  'initial', p.InitialContext);
+    code.noms = cellfun(@(e) e.nom, machine.etats, 'UniformOutput', false);
+    code.dims = cell(1, numel(sorties));
+    for q = 1:numel(sorties)
+        if strcmp(sorties{q}, 'etat')
+            code.dims{q} = [1 1];
+            continue
+        end
+        if ~isfield(contexte, sorties{q})
+            error('Simulink:blocks:ChartOutputMissing', ...
+                  ['La sortie ''%s'' du bloc Chart ''%s'' n''est pas un champ du contexte ' ...
+                   'de sa machine ; donnez-le dans InitialContext, ou par une action ' ...
+                   'd''entree de l''etat initial ''%s''.'], sorties{q}, chemin, courant);
+        end
+        v = contexte.(sorties{q});
+        if ~(isnumeric(v) || islogical(v)) || isempty(v) || ndims(v) > 2
+            error('Simulink:blocks:ChartOutputType', ...
+                  'La sortie ''%s'' du bloc Chart ''%s'' n''est pas un tableau de nombres.', ...
+                  sorties{q}, chemin);
+        end
+        code.dims{q} = size(v);
+    end
+end
+
+% Une expression de Fcn ou d'Interpreted MATLAB Function s'essaie sur des
+% zéros : ce qu'elle rend doit avoir la largeur de la sortie.
+function verifierCode(c, k, w)
+    u = zeros(max(1, largeurEntree(c, k, 1)), 1);
+    try
+        y = c.objets{k}(u);
+    catch err
+        error('Simulink:blocks:FcnEvaluationError', ...
+              'Le bloc ''%s'' echoue sur une entree de %d zero(s) : %s', c.chemins{k}, ...
+              numel(u), err.message);
+    end
+    if ~(isnumeric(y) || islogical(y)) || numel(y) ~= w
+        if strcmp(c.types{k}, 'fcn')
+            detail = 'un Fcn rend un scalaire';
+        else
+            detail = sprintf('OutputDimensions en annonce %d', w);
+        end
+        error('Simulink:blocks:FcnOutputDimension', ...
+              'Le bloc ''%s'' rend %d valeur(s) : %s.', c.chemins{k}, numel(y), detail);
+    end
+end
+
+% Les dimensions des sorties d'une MATLAB Function : un appel d'essai sur
+% des zéros, puis ses variables persistantes remises à zéro.
+function s = dimsFonction(c, k, dE)
+    h = c.fonctions{k}.h;
+    u = cell(1, c.nIn(k));
+    for j = 1:c.nIn(k)
+        u{j} = zeros(dE{j});
+    end
+    sorties = cell(1, c.nOut(k));
+    try
+        [sorties{:}] = h(u{:});
+    catch err
+        error('Simulink:blocks:MATLABFunctionError', ...
+              'La fonction du bloc ''%s'' echoue sur des entrees nulles : %s', ...
+              c.chemins{k}, err.message);
+    end
+    clear(func2str(h));
+    s = cell(1, c.nOut(k));
+    for q = 1:c.nOut(k)
+        if ~(isnumeric(sorties{q}) || islogical(sorties{q})) || ndims(sorties{q}) > 2
+            error('Simulink:blocks:MATLABFunctionOutput', ...
+                  ['La sortie %d du bloc ''%s'' n''est pas un tableau de nombres a deux ' ...
+                   'dimensions.'], q, c.chemins{k});
+        end
+        d = size(sorties{q});
+        if prod(d) == 0
+            error('Simulink:blocks:MATLABFunctionOutput', ...
+                  'La sortie %d du bloc ''%s'' est vide.', q, c.chemins{k});
+        end
+        s{q} = d;
+    end
 end
 
 % === sous-systèmes conditionnels ================================================

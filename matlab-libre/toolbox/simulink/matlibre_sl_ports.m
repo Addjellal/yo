@@ -110,6 +110,39 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
         case 'garde'
             nEntrees = (lire(p, 'Enable', 0) ~= 0) + ~strcmpi(char(lire(p, 'Trigger', 'none')), ...
                                                              'none') + (lire(p, 'Action', 0) ~= 0);
+        case 'chart'
+            nEntrees = entier(lire(p, 'Inputs', 1));
+            sorties = lire(p, 'Outputs', {'etat'});
+            if ischar(sorties) || isstring(sorties)
+                sorties = cellstr(sorties);
+            end
+            nSorties = numel(sorties);
+        case 'matlabfunction'
+            % Les arguments de la fonction sont les entrées, ses sorties les
+            % sorties.
+            try
+                [nEntrees, nSorties] = matlibre_sl_fonction('signature', ...
+                    lire(p, 'Script', sprintf('function y = fcn(u)\ny = u;')));
+            catch
+                nEntrees = NaN;
+                nSorties = NaN;
+            end
+        case 'sfunction'
+            % Une S-fonction dit ses tailles au drapeau 0 : un port d'entrée
+            % si elle a des entrées, un de sortie si elle a des sorties.
+            try
+                parametres = lire(p, 'Parameters', '');
+                if ischar(parametres) || isstring(parametres)
+                    parametres = evalin('base', ['{' char(parametres) '}']);
+                end
+                tailles = matlibre_sl_fonction('sfonction', lire(p, 'FunctionName', ...
+                                               'system'), parametres, bloc.nom);
+                nEntrees = double(tailles(4) ~= 0);
+                nSorties = double(tailles(3) ~= 0);
+            catch
+                nEntrees = 1;
+                nSorties = 1;
+            end
     end
 end
 

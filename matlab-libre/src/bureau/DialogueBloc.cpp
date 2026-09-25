@@ -4,8 +4,10 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QFontDatabase>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPlainTextEdit>
 #include <QVBoxLayout>
 
 DialogueBloc::DialogueBloc(const QString& nomBloc, const QString& type,
@@ -44,6 +46,21 @@ DialogueBloc::DialogueBloc(const QString& nomBloc, const QString& type,
             formulaire->addRow(noms[k], liste);
             champs_.push_back(nullptr);
             listes_.push_back(liste);
+            textes_.push_back(nullptr);
+            continue;
+        }
+        if (noms[k] == QLatin1String("Script") || valeur.contains(QLatin1Char('\n'))) {
+            // Le code d'un bloc MATLAB Function : des lignes, en chasse
+            // fixe, comme dans l'éditeur de Simulink.
+            auto* texte = new QPlainTextEdit(valeur);
+            texte->setObjectName(QStringLiteral("texte_") + noms[k]);
+            texte->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+            texte->setMinimumHeight(160);
+            texte->setLineWrapMode(QPlainTextEdit::NoWrap);
+            formulaire->addRow(noms[k], texte);
+            champs_.push_back(nullptr);
+            listes_.push_back(nullptr);
+            textes_.push_back(texte);
             continue;
         }
         auto* champ = new QLineEdit(valeur);
@@ -51,6 +68,7 @@ DialogueBloc::DialogueBloc(const QString& nomBloc, const QString& type,
         formulaire->addRow(noms[k], champ);
         champs_.push_back(champ);
         listes_.push_back(nullptr);
+        textes_.push_back(nullptr);
     }
     if (noms.isEmpty())
         formulaire->addRow(new QLabel(QStringLiteral(
@@ -83,9 +101,16 @@ QComboBox* DialogueBloc::listeReglage(const QString& nom) const {
     return nullptr;
 }
 
+QPlainTextEdit* DialogueBloc::texteReglage(const QString& nom) const {
+    for (int k = 0; k < noms_.size() && k < textes_.size(); ++k)
+        if (noms_[k] == nom) return textes_[k];
+    return nullptr;
+}
+
 QString DialogueBloc::valeurDe(int k) const {
     if (k < champs_.size() && champs_[k]) return champs_[k]->text();
     if (k < listes_.size() && listes_[k]) return listes_[k]->currentText();
+    if (k < textes_.size() && textes_[k]) return textes_[k]->toPlainText();
     return QString();
 }
 

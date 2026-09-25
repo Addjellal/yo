@@ -112,6 +112,21 @@ function modele = add_block(modele, type, nom, varargin)
 %     assertion    Enabled, StopWhenAssertionFail — échoue dès que
 %                  l'entrée s'annule
 %
+%   Fonctions de l'utilisateur :
+%     fcn          Expr                         une expression de u, scalaire :
+%                                               'u(1)*sin(u(2))', ou u[2]
+%     interpretedmatlabfunction MATLABFcn, OutputDimensions — un nom de
+%                  fonction ('sin') ou une expression de u
+%     matlabfunction Script                     le texte d'une fonction
+%                  MATLAB : ses arguments sont les entrées, ses sorties
+%                  les sorties ; une variable persistante y garde un état
+%     sfunction    FunctionName, Parameters     une S-fonction de niveau 1,
+%                  [sys,x0,str,ts] = f(t,x,u,flag,p1,...)
+%     chart        Chart, Inputs, Outputs, InitialContext — une machine à
+%                  états bâtie par SFCHART, SFSTATE et SFTRANSITION ; ses
+%                  sorties sont des champs de son contexte, ou « etat »,
+%                  le rang de l'état actif
+%
 %   Un schéma dans un bloc :
 %     subsystem    Model                un modèle entier, abrégé en un bloc ;
 %                  'Enabled Subsystem', 'Triggered Subsystem', 'Enabled

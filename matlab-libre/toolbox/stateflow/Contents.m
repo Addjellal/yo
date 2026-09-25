@@ -9,3 +9,5 @@
 % Exécution
 %   sfrun        - Exécute sur une suite d'entrées ; rend l'historique
 %                  des états et le contexte final
+%   sfstep       - Fait un pas, avec la règle de Stateflow : une
+%                  transition valide, sinon l'action de séjour

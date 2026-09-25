@@ -994,12 +994,12 @@ for type = fieldnames(fronts).'
     end
 end
 % Activé et déclenché : les fronts ne comptent que pendant l'activation.
-double = add_block(set_param(compteur, 'Trigger', 'TriggerType', 'rising'), ...
+activeDeclenche = add_block(set_param(compteur, 'Trigger', 'TriggerType', 'rising'), ...
                    'enableport', 'Enable');
 m = new_system('activeDeclenche');
 m = add_block(m, 'pulsegenerator', 'horloge', 'Period', 1, 'PulseWidth', 50);
 m = add_block(m, 'step', 'autorise', 'Time', 1.5);
-m = add_block(m, 'subsystem', 'compte', 'Model', double);
+m = add_block(m, 'subsystem', 'compte', 'Model', activeDeclenche);
 m = add_line(m, 'autorise', 'compte/Enable');
 m = add_line(m, 'horloge', 'compte/Trigger');
 r = sim(m, 'Solver', 'ode1', 'StopTime', 3.7, 'FixedStep', 0.01);
@@ -1157,6 +1157,174 @@ for kE = 1:size(casErreurs, 1)
                    casErreurs{kE, 2}, vu, message));
 end
 fprintf('sous-systemes conditionnels : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------------------ 15. Blocs de code et Stateflow
+% Fcn : une expression de u, écrite comme en MATLAB ou comme dans
+% Simulink (u[2]), qui lit l'espace de travail au moment de simuler.
+m = new_system('fonctions');
+m = add_block(m, 'clock', 't');
+m = add_block(m, 'constant', 'deux', 'Value', 2);
+m = add_block(m, 'mux', 'mx', 'Inputs', 2);
+m = add_block(m, 'fcn', 'f', 'Expr', 'u[2]*sin(u(1)) + decalageFcn');
+m = add_block(m, 'interpretedmatlabfunction', 'g', 'MATLABFcn', 'cos');
+m = add_block(m, 'interpretedmatlabfunction', 'h', 'MATLABFcn', 'u * [1 2 3]', ...
+              'OutputDimensions', 3);
+m = add_line(m, 't', 'mx', 1);
+m = add_line(m, 'deux', 'mx', 2);
+m = add_line(m, 'mx', 'f');
+m = add_line(m, 't', 'g');
+m = add_line(m, 't', 'h');
+assignin('base', 'decalageFcn', 0.5);
+r = sim(m, 'Solver', 'ode1', 'StopTime', 1, 'FixedStep', 0.1);
+assert(max(abs(r.signaux.f - (2 * sin(r.temps) + 0.5))) < 1e-14, 'Fcn : u[2]*sin(u(1)) + une variable');
+assert(max(abs(r.signaux.g - cos(r.temps))) < 1e-14, 'Interpreted MATLAB Function : un nom de fonction');
+assert(isequal(size(r.signaux.h), [11 3]) && max(max(abs(r.signaux.h - r.temps * [1 2 3]))) < 1e-14, ...
+       'Interpreted MATLAB Function : une expression, trois sorties');
+
+% MATLAB Function : deux arguments, deux sorties, une variable persistante.
+% La persistante compte les appels : un par pas majeur, et elle repart de
+% zéro à chaque simulation.
+script = sprintf(['function [somme, appels] = f(a, b)\n' ...
+                  'persistent n\n' ...
+                  'if isempty(n)\n' ...
+                  '    n = 0;\n' ...
+                  'end\n' ...
+                  'n = n + 1;\n' ...
+                  'somme = a + b;\n' ...
+                  'appels = n;\n']);
+m = new_system('mfb');
+m = add_block(m, 'clock', 't');
+m = add_block(m, 'constant', 'c', 'Value', [1; 2]);
+m = add_block(m, 'matlabfunction', 'f', 'Script', script);
+m = add_line(m, 't', 'f', 1);
+m = add_line(m, 'c', 'f', 2);
+[ne, ns] = matlibre_sl_ports(struct('type', 'matlabfunction', 'nom', 'f', ...
+                                    'parametres', struct('Script', script)));
+assert(ne == 2 && ns == 2, 'les arguments font les entrees, les sorties les sorties');
+for essai = 1:2
+    r = sim(m, 'Solver', 'ode4', 'StopTime', 1, 'FixedStep', 0.1);
+    assert(isequal(size(r.signaux.f), [11 2]) && ...
+           max(max(abs(r.signaux.f - (r.temps + [1 2])))) < 1e-14, 'la somme d''un scalaire et d''un vecteur');
+    assert(isequal(r.signaux.f_port2.', 1:11), ...
+           'un appel par pas majeur, et la persistante repart a chaque simulation');
+end
+
+% S-fonctions de niveau 1 : une continue, x' = -a x + u, y = 2 x ; une
+% discrète qui compte ses instants.
+dossierSfn = tempname();
+mkdir(dossierSfn);
+f = fopen(fullfile(dossierSfn, 'sfnPremierOrdre.m'), 'w');
+fprintf(f, ['function [sys, x0, str, ts] = sfnPremierOrdre(t, x, u, flag, a)\n' ...
+            'switch flag\n' ...
+            '    case 0\n' ...
+            '        sys = [1, 0, 1, 1, 0, 0, 1]; x0 = 0; str = []; ts = [0 0];\n' ...
+            '    case 1\n' ...
+            '        sys = -a * x + u; x0 = []; str = []; ts = [];\n' ...
+            '    case 3\n' ...
+            '        sys = 2 * x; x0 = []; str = []; ts = [];\n' ...
+            '    otherwise\n' ...
+            '        sys = []; x0 = []; str = []; ts = [];\n' ...
+            'end\n']);
+fclose(f);
+f = fopen(fullfile(dossierSfn, 'sfnCompteur.m'), 'w');
+fprintf(f, ['function [sys, x0, str, ts] = sfnCompteur(t, x, u, flag)\n' ...
+            'switch flag\n' ...
+            '    case 0\n' ...
+            '        sys = [0, 1, 1, 0, 0, 0, 1]; x0 = 0; str = []; ts = [0.1 0];\n' ...
+            '    case 2\n' ...
+            '        sys = x + 1; x0 = []; str = []; ts = [];\n' ...
+            '    case 3\n' ...
+            '        sys = x; x0 = []; str = []; ts = [];\n' ...
+            '    otherwise\n' ...
+            '        sys = []; x0 = []; str = []; ts = [];\n' ...
+            'end\n']);
+fclose(f);
+addpath(dossierSfn);
+m = new_system('sfn');
+m = add_block(m, 'step', 'e', 'Time', 0);
+m = add_block(m, 'sfunction', 's', 'FunctionName', 'sfnPremierOrdre', 'Parameters', '3');
+m = add_line(m, 'e', 's');
+r = sim(m, 'Solver', 'ode45', 'StopTime', 2, 'RelTol', 1e-8);
+assert(max(abs(r.signaux.s - 2 * (1 - exp(-3 * r.temps)) / 3)) < 1e-6, ...
+       'la S-fonction continue integre ses derivees');
+m = add_block(new_system('sfnDiscrete'), 'sfunction', 's', 'FunctionName', 'sfnCompteur');
+r = sim(m, 'Solver', 'FixedStepDiscrete', 'StopTime', 0.5, 'FixedStep', 0.05);
+assert(isequal(r.signaux.s.', [0 0 1 1 2 2 3 3 4 4 5]), ...
+       'la S-fonction discrete avance a sa periode, 0,1');
+rmpath(dossierSfn);
+
+% Stateflow : un thermostat. La machine chauffe sous 19 degres et s'arrête
+% au-dessus de 21 ; la pièce perd vers l'extérieur. Le diagramme fait un
+% pas par pas majeur ; la température reste dans la bande.
+machine = sfchart('thermostat');
+machine = sfstate(machine, 'arret', @(c) setfield(c, 'chauffe', 0));
+machine = sfstate(machine, 'marche', @(c) setfield(c, 'chauffe', 1));
+machine = sftransition(machine, 'arret', 'marche', @(c, u) u < 19);
+machine = sftransition(machine, 'marche', 'arret', @(c, u) u > 21);
+m = new_system('piece');
+m = add_block(m, 'chart', 'regulateur', 'Chart', machine, 'Outputs', {'chauffe', 'etat'}, ...
+              'InitialContext', struct('chauffe', 0));
+m = add_block(m, 'gain', 'puissance', 'Gain', 5);
+m = add_block(m, 'sum', 'bilan', 'Signs', '+-');
+m = add_block(m, 'gain', 'pertes', 'Gain', 0.2);
+m = add_block(m, 'constant', 'exterieur', 'Value', 10);
+m = add_block(m, 'sum', 'ecart', 'Signs', '+-');
+m = add_block(m, 'integrator', 'temperature', 'InitialCondition', 20);
+m = add_line(m, 'temperature', 'regulateur');
+m = add_line(m, 'regulateur', 'puissance');
+m = add_line(m, 'temperature', 'ecart', 1);
+m = add_line(m, 'exterieur', 'ecart', 2);
+m = add_line(m, 'ecart', 'pertes');
+m = add_line(m, 'puissance', 'bilan', 1);
+m = add_line(m, 'pertes', 'bilan', 2);
+m = add_line(m, 'bilan', 'temperature');
+r = sim(m, 'Solver', 'ode4', 'StopTime', 30, 'FixedStep', 0.05);
+apres = r.temps > 5;
+assert(min(r.signaux.temperature(apres)) > 18.9 && max(r.signaux.temperature(apres)) < 21.1, ...
+       'le thermostat tient la piece entre 19 et 21');
+assert(all(r.signaux.regulateur_port2 == r.signaux.regulateur + 1), ...
+       'etat 1 : arret, chauffe 0 ; etat 2 : marche, chauffe 1');
+% La machine suit la règle de Stateflow : on vérifie chaque pas contre
+% SFSTEP appliqué à la température relevée au pas.
+courant = '';
+contexte = struct('chauffe', 0);
+for i = 1:numel(r.temps)
+    [courant, contexte] = sfstep(machine, courant, contexte, r.signaux.temperature(i));
+    assert(contexte.chauffe == r.signaux.regulateur(i), 'le bloc fait le pas de SFSTEP');
+end
+
+% Les erreurs des blocs de code.
+casErreurs = {
+    @() sim(add_block(new_system('e1'), 'fcn', 'f', 'Expr', 'u(1) +')), ...
+        'Simulink:blocks:FcnExpressionInvalid', 'e1/f'
+    @() sim(add_block(new_system('e2'), 'fcn', 'f', 'Expr', '[u u]')), ...
+        'Simulink:blocks:FcnOutputDimension', 'e2/f'
+    @() sim(add_block(new_system('e3'), 'interpretedmatlabfunction', 'g', 'MATLABFcn', ...
+                      'u * [1 2]', 'OutputDimensions', 3)), ...
+        'Simulink:blocks:FcnOutputDimension', 'e3/g'
+    @() sim(add_block(new_system('e4'), 'matlabfunction', 'f', 'Script', ...
+                      sprintf('function y = f(u)\ny = inconnue(u);'))), ...
+        'Simulink:blocks:MATLABFunctionError', 'e4/f'
+    @() sim(add_block(new_system('e5'), 'sfunction', 's', 'FunctionName', 'pasUneSfonction')), ...
+        'Simulink:blocks:SFunctionNotFound', 'e5/s'
+    @() sim(add_block(new_system('e6'), 'chart', 'c')), 'Simulink:blocks:ChartMachineMissing', 'e6/c'
+    @() sim(add_block(new_system('e7'), 'chart', 'c', 'Chart', machine, 'Outputs', {'absent'})), ...
+        'Simulink:blocks:ChartOutputMissing', 'absent'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('blocs de code, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('blocs de code et Stateflow : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
 disp('simulink : toutes les verifications passent');
 

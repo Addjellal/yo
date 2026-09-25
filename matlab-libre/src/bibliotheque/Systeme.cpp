@@ -472,10 +472,23 @@ FONCTION(fnClear) {
         std::string n = a.versTexte();
         if (n == "all" || n == "variables") {
             for (const auto& v : it.nomsVariables()) it.effacerVariable(v);
+            // « clear all » décharge aussi les fonctions, et avec elles
+            // leurs variables persistantes, comme dans MATLAB.
+            if (n == "all") it.persistantes.clear();
         } else if (n == "functions") {
             it.reindexerChemin();
+            it.persistantes.clear();
         } else {
             it.effacerVariable(n);
+            // « clear f » décharge la fonction f : ses variables persistantes
+            // repartent de zéro au prochain appel.
+            const std::string prefixe = n + "::";
+            for (auto p = it.persistantes.begin(); p != it.persistantes.end();) {
+                if (p->first.compare(0, prefixe.size(), prefixe) == 0)
+                    p = it.persistantes.erase(p);
+                else
+                    ++p;
+            }
         }
     }
     return {};

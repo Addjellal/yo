@@ -39,6 +39,7 @@ void enregistrerParallele(Interpreteur& it);
 void enregistrerGenerationC(Interpreteur& it);
 void enregistrerDeboguage(Interpreteur& it);
 void enregistrerInterface(Interpreteur& it);
+void enregistrerArchives(Interpreteur& it);
 
 // --- utilitaires communs ---
 Valeur construirePlage(const Valeur& debut, const Valeur& pas, const Valeur& fin);

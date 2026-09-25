@@ -1917,6 +1917,22 @@ int main(int argc, char** argv) {
                 verifier(boite.nomDemande() == QLatin1String("regulateur"),
                          "et le nom demande est celui qu'on a ecrit");
             }
+            {
+                // Le code d'un bloc MATLAB Function tient sur plusieurs
+                // lignes : il s'edite dans un texte, non dans un champ.
+                const QString code = QStringLiteral("function y = f(u)\ny = 2 * u;");
+                DialogueBloc boite(QStringLiteral("f"), QStringLiteral("matlabfunction"),
+                                   {QStringLiteral("Script")}, {code});
+                verifier(boite.texteReglage(QStringLiteral("Script")) != nullptr &&
+                             boite.champReglage(QStringLiteral("Script")) == nullptr &&
+                             boite.texteReglage(QStringLiteral("Script"))->toPlainText() == code,
+                         "le code d'une MATLAB Function s'edite sur plusieurs lignes");
+                boite.texteReglage(QStringLiteral("Script"))
+                    ->setPlainText(QStringLiteral("function y = f(u)\ny = 3 * u';"));
+                verifier(boite.changements().size() == 1 &&
+                             boite.changements()[0].second.contains(QLatin1Char('\n')),
+                         "et ressort avec ses retours a la ligne");
+            }
 
             // Le chemin entier : double-clic, boite, commande. La boite est
             // modale ; un rendez-vous differe la remplit et la valide de

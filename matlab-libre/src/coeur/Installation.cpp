@@ -40,6 +40,7 @@ void Interpreteur::installerBibliotheque() {
     enregistrerGenerationC(*this);
     enregistrerDeboguage(*this);
     enregistrerInterface(*this);
+    enregistrerArchives(*this);
 }
 
 std::string racineToolboxes(const std::string& executable) {

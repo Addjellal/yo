@@ -914,6 +914,25 @@ warning(etatAvert);
 lastwarn('pose', 'essai:pose');
 assert(strcmp(lastwarn(), 'pose'));
 
+% CLEAR F décharge la fonction F : ses variables persistantes repartent de
+% zéro. FUNC2STR d'une poignée nommée rend le nom seul, que CLEAR comprend.
+dossierPersistant = tempname();
+mkdir(dossierPersistant);
+f = fopen(fullfile(dossierPersistant, 'compteurPersistant.m'), 'w');
+fprintf(f, ['function y = compteurPersistant()\npersistent n\nif isempty(n)\n' ...
+            '    n = 0;\nend\nn = n + 1;\ny = n;\n']);
+fclose(f);
+addpath(dossierPersistant);
+compteurPersistant();
+assert(compteurPersistant() == 2, 'la persistante garde sa valeur');
+clear compteurPersistant
+assert(compteurPersistant() == 1, 'clear f la remet a zero');
+poigneeCompteur = str2func('compteurPersistant');
+poigneeCompteur();
+clear(func2str(poigneeCompteur));
+assert(poigneeCompteur() == 1, 'clear(func2str(h)) aussi');
+rmpath(dossierPersistant);
+
 disp('langage : toutes les verifications passent');
 
 function nom = nomRecu(~)

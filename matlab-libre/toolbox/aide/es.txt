@@ -577,3 +577,53 @@ FERROR  État du dernier accès au fichier.
        numero == 0 || numero == -1
 
     Voir aussi FEOF, FOPEN, FREAD, FGETL.
+
+### zip
+ZIP  Fabrique une archive ZIP.
+    NOMS = ZIP(ARCHIVE,FICHIERS) range les fichiers dans l'archive, sous
+    leur chemin relatif au dossier courant ; FICHIERS est un nom ou une
+    cellule de noms, et un dossier y entre avec tout son contenu. NOMS
+    rend les noms des entrées.
+    ZIP(ARCHIVE,FICHIERS,RACINE) prend les chemins relatifs à RACINE.
+    Sans extension, ARCHIVE prend « .zip ».
+
+    L'archive s'écrit sans commande extérieure : les entrées y sont
+    stockées, non compressées, et se relisent avec n'importe quel outil.
+
+    Syntaxe
+       noms = zip(archive, fichiers)
+       noms = zip(archive, fichiers, racine)
+
+    Exemples
+
+       dossier = tempname(); mkdir(dossier);
+       fid = fopen(fullfile(dossier, 'a.txt'), 'w'); fprintf(fid, 'bonjour'); fclose(fid);
+       noms = zip(fullfile(dossier, 'paquet.zip'), {'a.txt'}, dossier)
+
+    Voir aussi UNZIP, FILEREAD.
+
+### unzip
+UNZIP  Extrait une archive ZIP.
+    FICHIERS = UNZIP(ARCHIVE) extrait dans le dossier courant, et rend
+    les chemins des fichiers extraits. UNZIP(ARCHIVE,DOSSIER) extrait
+    dans DOSSIER, créé au besoin, sous-dossiers compris.
+
+    L'archive se lit sans commande extérieure : les entrées stockées et
+    celles compressées par DEFLATE — celles de presque tous les outils,
+    et celles d'un modèle .slx de Simulink — sont reconnues, et le CRC de
+    chacune vérifié. Une entrée qui sortirait du dossier de destination
+    (« ../x ») est refusée.
+
+    Syntaxe
+       fichiers = unzip(archive)
+       fichiers = unzip(archive, dossier)
+
+    Exemples
+
+       dossier = tempname(); mkdir(dossier);
+       fid = fopen(fullfile(dossier, 'a.txt'), 'w'); fprintf(fid, 'bonjour'); fclose(fid);
+       zip(fullfile(dossier, 'paquet.zip'), {'a.txt'}, dossier);
+       extraits = unzip(fullfile(dossier, 'paquet.zip'), fullfile(dossier, 'sortie'));
+       fileread(extraits{1})
+
+    Voir aussi ZIP, FILEREAD.

@@ -162,7 +162,9 @@ assert(strcmp(func2str(@(y) y + 1), '@(y)y+1'));
 assert(strcmp(func2str(@(x) x .^ 2 + 1), '@(x)x.^2+1'));
 assert(strcmp(func2str(@(a, b, c) a - (b - c)), '@(a,b,c)a-(b-c)'));
 assert(strcmp(func2str(@(x) [x, 1; 2, 3]), '@(x)[x,1;2,3]'));
-assert(strcmp(func2str(@sin), '@sin'));
+% Une poignée nommée rend le nom seul, sans arobase : c'est ce que
+% MATLAB documente, « func2str(@memoize) » donne 'memoize'.
+assert(strcmp(func2str(@sin), 'sin') && strcmp(func2str(str2func('cos')), 'cos'));
 assert(isempty(strfind(func2str(@(x) x + 1), '((')));
 % Les parentheses qui portent un sens restent.
 assert(~isempty(strfind(func2str(@(a, b, c) a - (b - c)), '(b-c)')));

@@ -127,14 +127,17 @@ totalité.
    conditionnels — Enable, Trigger, If et Switch Case avec leurs
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans
-   Simulink. `sim` accepte le nom
+   Simulink. Les blocs de code — Fcn, MATLAB Function, Interpreted
+   MATLAB Function, S-fonctions de niveau 1 — et le bloc Chart, qui fait
+   faire un pas à une machine Stateflow à chaque instant, y prennent place.
+   `sim` accepte le nom
    d'un modèle et journalise dans les deux formes de Simulink,
    `res.signaux.<nom>` et `res.signals(k).values`. L'éditeur du bureau
    pose, câble, règle et simule ; Ctrl+E ouvre les paramètres de
    configuration. Les fichiers `.slx` et `.mdl` de MathWorks ne se lisent
    pas encore, et `sim` le dit au lieu d'échouer sur autre chose.
-   Manquent aussi : les sous-systèmes itérés, les bus, les masques, les
-   blocs MATLAB Function, et Stateflow dans les schémas.
+   Manquent aussi : les sous-systèmes itérés, les bus, les masques, et
+   les états hiérarchiques de Stateflow.
 5. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et

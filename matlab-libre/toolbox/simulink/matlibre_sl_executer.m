@@ -125,6 +125,9 @@ function T = preparer(c)
         T.Z0 = [T.Z0; c.z0{k}];
     end
     T.zN = cellfun(@numel, c.z0);
+    % L'état des diagrammes Stateflow : une poignée, neuve à chaque
+    % préparation, que les tranches d'une simulation sans fin partagent.
+    T.graphes = containers.Map('KeyType', 'double', 'ValueType', 'any');
     T.x0 = c.x0;
     T.xA = c.xA;
     T.xB = c.xB;
@@ -139,6 +142,13 @@ function T = preparer(c)
     T.objets = cell(1, n);
     if isfield(c, 'objets')
         T.objets = c.objets;
+    end
+    T.formes = cell(1, n);
+    for k = find(strcmp(c.types, 'matlabfunction'))
+        T.formes{k} = cell(1, c.nIn(k));
+        for j = 1:c.nIn(k)
+            T.formes{k}{j} = c.inDims{k}{j};
+        end
     end
     T.revient = false(1, n);
     T.initiale = cell(1, n);
@@ -280,6 +290,10 @@ function T = preparer(c)
                   'discreteintegrator', 'discretetransferfcn', 'discretefilter', ...
                   'discretestatespace', 'randomnumber', 'uniformrandomnumber', 'garde'}
                 T.aMettreAJour(end + 1) = k;
+            case 'sfunction'
+                if c.seg{k}(2) > 0
+                    T.aMettreAJour(end + 1) = k;
+                end
             case 'delay'
                 if c.seg{k}(1) > 0
                     T.aMettreAJour(end + 1) = k;
@@ -498,12 +512,12 @@ function J = simuler(T, instants, solveur, reprise)
             break
         end
         if nx > 0
-            k1 = derivees(T, V, x);
+            k1 = derivees(T, V, x, t);
             if ~all(isfinite(k1))
                 deriveeInfinie(T, k1, t);
             end
         end
-        Z = majs(T, V, Z, t, touche);
+        Z = majs(T, V, Z, t, touche, x);
         if nx > 0
             if nEtages == 1
                 x = x + h * k1;
@@ -517,7 +531,7 @@ function J = simuler(T, instants, solveur, reprise)
                     end
                     [V, Z] = passe(T, T.listeMineure, V, Z, xs, t + cq(s) * h, i, false, ...
                                    touche);
-                    K(:, s) = derivees(T, V, xs);
+                    K(:, s) = derivees(T, V, xs, t + cq(s) * h);
                 end
                 x = x + h * (K * bq.');
             end
@@ -706,12 +720,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         % Les états discrets avancent aux instants qui viennent de tomber.
         k1 = zeros(nx, 1);
         if nx > 0
-            k1 = derivees(T, V, x);
+            k1 = derivees(T, V, x, t);
             if ~all(isfinite(k1))
                 deriveeInfinie(T, k1, t);
             end
         end
-        Z = majs(T, V, Z, t, touche);
+        Z = majs(T, V, Z, t, touche, x);
         rangs(touche) = rangs(touche) + 1;
         prochain = decalages + rangs .* periodes;
 
@@ -908,7 +922,7 @@ function [xNouveau, err, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touc
             xs = borner(T, xs);
         end
         [V, Z] = passe(T, T.listeMineure, V, Z, xs, t + M.c(s) * h, 0, false, touche);
-        K(:, s) = derivees(T, V, xs);
+        K(:, s) = derivees(T, V, xs, t + M.c(s) * h);
     end
     xNouveau = x + h * (K * M.b.');
     ecart = h * (K * (M.b - M.bE).');
@@ -938,11 +952,11 @@ function [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rt
     r1 = W \ (F0 + h * d * M.dfdt);
     x1 = x + 0.5 * h * r1;
     [V, Z] = passe(T, T.listeMineure, V, Z, x1, t + 0.5 * h, 0, false, touche);
-    F1 = derivees(T, V, x1);
+    F1 = derivees(T, V, x1, t + 0.5 * h);
     r2 = W \ (F1 - r1) + r1;
     xNouveau = x + h * r2;
     [V, Z] = passe(T, T.listeMineure, V, Z, xNouveau, t + h, 0, false, touche);
-    F2 = derivees(T, V, xNouveau);
+    F2 = derivees(T, V, xNouveau, t + h);
     r3 = W \ (F2 - e32 * (r2 - F1) - 2 * (r1 - F0) + h * d * M.dfdt);
     ecart = h / 6 * (r1 - 2 * r2 + r3);
     err = normeErreur(ecart, x, xNouveau, atol, rtol);
@@ -958,11 +972,11 @@ function [Jac, dfdt, V, Z] = jacobien(T, V, Z, x, f0, t, touche)
         delta = sqrt(eps) * max(abs(x(j)), 1);
         xp(j) = xp(j) + delta;
         [V, Z] = passe(T, T.listeMineure, V, Z, xp, t, 0, false, touche);
-        Jac(:, j) = (derivees(T, V, xp) - f0) / delta;
+        Jac(:, j) = (derivees(T, V, xp, t) - f0) / delta;
     end
     dt = sqrt(eps) * max(abs(t), 1);
     [V, Z] = passe(T, T.listeMineure, V, Z, x, t + dt, 0, false, touche);
-    dfdt = (derivees(T, V, x) - f0) / dt;
+    dfdt = (derivees(T, V, x, t + dt) - f0) / dt;
 end
 
 % Le premier pas, estimé comme le proposent Hairer, Nørsett et Wanner : à
@@ -979,7 +993,7 @@ function [h, V, Z] = pasInitial(T, V, Z, x, k1, t, borne, atol, rtol, ordre, tou
     h0 = min(h0, borne);
     x1 = x + h0 * k1;
     [V, Z] = passe(T, T.listeMineure, V, Z, x1, t + h0, 0, false, touche);
-    d2 = max(abs(derivees(T, V, x1) - k1) ./ echelle) / h0;
+    d2 = max(abs(derivees(T, V, x1, t + h0) - k1) ./ echelle) / h0;
     if max(d1, d2) <= 1e-15
         h1 = max(1e-6, h0 * 1e-3);
     else
@@ -1174,6 +1188,7 @@ end
 % === un point ==================================================================
 
 function [y, dx] = point(T, x, u)
+    T.graphes = containers.Map('KeyType', 'double', 'ValueType', 'any');
     P = T.P;
     pos = 0;
     for k = T.entreesModele
@@ -1189,7 +1204,7 @@ function [y, dx] = point(T, x, u)
         touche(g) = T.groupes(g, 2) == 0;
     end
     [V, ~] = passe(T, T.listeTout, T.V0, T.Z0, x(:), T.tDebut, 0, true, touche);
-    dx = derivees(T, V, x(:));
+    dx = derivees(T, V, x(:), T.tDebut);
     y = V(T.sortiesModele);
 end
 
@@ -1724,6 +1739,23 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                         V(a:b) = sortieEtat(T, p, Z(zA(k):zA(k) + nx - 1), u);
                 end
+            case 10
+                switch code(k)
+                    case 100   % fcn
+                        V(a) = T.objets{k}(V(eA(e + 1):eB(e + 1)));
+                    case 102   % interpreted MATLAB function
+                        y = T.objets{k}(V(eA(e + 1):eB(e + 1)));
+                        V(a:b) = double(y(:));
+                    case 101   % MATLAB function : ses arguments, ses sorties
+                        V = appelerFonction(T, k, V, p, e);
+                    case 103   % S-function : les sorties, drapeau 3
+                        if T.P(p + 2) > 0
+                            sys = appelerSFonction(T, k, V, Z, x, t, 3);
+                            V(a:b) = double(sys(:));
+                        end
+                    case 104   % chart : un pas de la machine, puis ses sorties
+                        V = pasGraphe(T, k, V, p, e, t);
+                end
             case 11
                 switch code(k)
                     case {110, 111}   % if, switch case : une sortie d'action par branche
@@ -1761,6 +1793,106 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                                     'Assertion detectee dans ''%s'' a t = %g.', T.chemins{k}, t);
                         end
                 end
+        end
+    end
+end
+
+% --- les blocs de code
+
+% Une MATLAB Function : chaque entrée est un argument, chaque sortie un
+% port, à la forme que l'appel d'essai a mesurée.
+function V = appelerFonction(T, k, V, p, e)
+    nIn = T.P(p);
+    nOut = T.P(p + 1);
+    u = cell(1, nIn);
+    for j = 1:nIn
+        u{j} = reshape(V(T.eA(e + j):T.eB(e + j)), T.formes{k}{j});
+    end
+    sorties = cell(1, nOut);
+    [sorties{:}] = T.objets{k}(u{:});
+    pd = T.pd(k);
+    for q = 1:nOut
+        a = T.poA(pd + q - 1);
+        b = T.poB(pd + q - 1);
+        y = double(sorties{q});
+        if numel(y) ~= b - a + 1
+            error('Simulink:blocks:MATLABFunctionOutputSize', ...
+                  ['La sortie %d du bloc ''%s'' change de taille : %d valeur(s) au lieu ' ...
+                   'de %d.'], q, T.chemins{k}, numel(y), b - a + 1);
+        end
+        V(a:b) = y(:);
+    end
+end
+
+% Une S-fonction de niveau 1 : [sys,x0,str,ts] = f(t,x,u,flag,p1,...).
+% Ses états sont les continus puis les discrets.
+function sys = appelerSFonction(T, k, V, Z, x, t, drapeau)
+    p = T.pA(k);
+    nc = T.P(p);
+    nd = T.P(p + 1);
+    etats = zeros(nc + nd, 1);
+    if nc > 0
+        etats(1:nc) = x(T.xA(k):T.xB(k));
+    end
+    if nd > 0 && ~isempty(Z)
+        etats(nc + 1:nc + nd) = Z(T.zA(k):T.zA(k) + nd - 1);
+    end
+    u = zeros(0, 1);
+    if T.P(p + 3) ~= 0
+        e = T.eD(k);
+        u = V(T.eA(e + 1):T.eB(e + 1));
+    end
+    S = T.objets{k};
+    sys = S.f(t, etats, u, drapeau, S.p{:});
+end
+
+% Un diagramme Stateflow fait un pas par instant : le premier le démarre
+% dans son état initial, les suivants suivent la règle de SFSTEP. L'état
+% actif et le contexte vivent dans les graphes du simulateur, une poignée
+% que chaque simulation recrée ; un instant déjà vu ne refait pas le pas —
+% une passe refaite au même instant rend les mêmes sorties.
+function V = pasGraphe(T, k, V, p, e, t)
+    graphes = T.graphes;
+    G = T.objets{k};
+    if isKey(graphes, k)
+        etat = graphes(k);
+    else
+        etat = struct('courant', '', 'contexte', G.initial, 't', -Inf);
+        if isempty(etat.contexte)
+            etat.contexte = struct();
+        end
+    end
+    if t > etat.t
+        nIn = T.P(p);
+        if nIn == 0
+            u = [];
+        elseif nIn == 1
+            u = V(T.eA(e + 1):T.eB(e + 1));
+        else
+            u = cell(1, nIn);
+            for j = 1:nIn
+                u{j} = V(T.eA(e + j):T.eB(e + j));
+            end
+        end
+        [etat.courant, etat.contexte] = sfstep(G.machine, etat.courant, etat.contexte, u);
+        etat.t = t;
+        graphes(k) = etat;
+    end
+    pd = T.pd(k);
+    for q = 1:numel(G.sorties)
+        a = T.poA(pd + q - 1);
+        b = T.poB(pd + q - 1);
+        if strcmp(G.sorties{q}, 'etat')
+            V(a) = find(strcmp(G.noms, etat.courant), 1);
+        else
+            y = double(etat.contexte.(G.sorties{q}));
+            if numel(y) ~= b - a + 1
+                error('Simulink:blocks:ChartOutputSize', ...
+                      ['La sortie ''%s'' du bloc Chart ''%s'' change de taille : %d ' ...
+                       'valeur(s) au lieu de %d.'], G.sorties{q}, T.chemins{k}, numel(y), ...
+                      b - a + 1);
+            end
+            V(a:b) = y(:);
         end
     end
 end
@@ -2509,7 +2641,7 @@ end
 
 % === dérivées ==================================================================
 
-function dx = derivees(T, V, x)
+function dx = derivees(T, V, x, t)
     dx = zeros(numel(x), 1);
     for k = T.continus
         g = T.garde(k);
@@ -2535,6 +2667,9 @@ function dx = derivees(T, V, x)
                 end
             case {72, 73, 74}
                 dx(a:b) = deriveeEtat(T, p, x(a:b), u);
+            case 103   % S-function : les dérivées, drapeau 1
+                sys = appelerSFonction(T, k, V, [], x, t, 1);
+                dx(a:b) = double(sys(:));
             case 76   % PID : l'intégrale, et le filtre de la dérivée
                 w = (b - a + 1) / 2;
                 dx(a:a + w - 1) = u;
@@ -2545,7 +2680,7 @@ end
 
 % === mises à jour ==============================================================
 
-function Z = majs(T, V, Z, t, touche)
+function Z = majs(T, V, Z, t, touche, x)
     for k = T.aMettreAJour
         if T.mode(k) == 2 && ~touche(T.grp(k))
             continue
@@ -2624,6 +2759,12 @@ function Z = majs(T, V, Z, t, touche)
                 nx = T.P(p);
                 if nx > 0
                     Z(z:z + nx - 1) = deriveeEtat(T, p, Z(z:z + nx - 1), u);
+                end
+            case 103   % S-function : les états discrets, drapeau 2
+                nd = T.P(p + 1);
+                if nd > 0
+                    sys = appelerSFonction(T, k, V, Z, x, t, 2);
+                    Z(z:z + nd - 1) = double(sys(:));
                 end
             case 113   % garde : ce qu'elle était, et le signal du front
                 Z(z) = 1;

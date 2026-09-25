@@ -80,8 +80,12 @@ FONCTION(fnFunc2str) {
     exigerArguments(args, 1, 1, "func2str");
     if (args[0].classe != Classe::Fonction || !args[0].fn)
         erreur("MATLAB:func2str:BadInput", "Input must be a function handle.");
-    return {Valeur::texte(args[0].fn->texte.empty() ? "@" + args[0].fn->nom
-                                                    : args[0].fn->texte)};
+    // Une poignée anonyme rend son texte, « @(x)x+1 » ; une poignée vers
+    // une fonction nommée rend le nom seul, « sin », comme MATLAB.
+    const std::string& texte = args[0].fn->texte;
+    if (texte.size() > 1 && texte[0] == '@' && texte[1] == '(') return {Valeur::texte(texte)};
+    if (!texte.empty() && texte[0] == '@') return {Valeur::texte(texte.substr(1))};
+    return {Valeur::texte(texte.empty() ? args[0].fn->nom : texte)};
 }
 
 FONCTION(fnStr2func) {

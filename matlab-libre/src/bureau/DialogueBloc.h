@@ -21,6 +21,7 @@
 
 class QComboBox;
 class QLineEdit;
+class QPlainTextEdit;
 
 class DialogueBloc : public QDialog {
     Q_OBJECT
@@ -40,6 +41,7 @@ public:
     QLineEdit* champNom() const { return champNom_; }
     QLineEdit* champReglage(const QString& nom) const;
     QComboBox* listeReglage(const QString& nom) const;
+    QPlainTextEdit* texteReglage(const QString& nom) const;
 
 private:
     QString valeurDe(int k) const;
@@ -48,7 +50,10 @@ private:
     QStringList noms_;
     QStringList valeursOrigine_;
     QLineEdit* champNom_;
-    // Un champ ou une liste par réglage : l'un des deux est nul.
+    // Un champ, une liste ou un texte par réglage : les autres sont nuls.
+    // Le texte sert au code d'un bloc MATLAB Function, qui tient sur
+    // plusieurs lignes.
     QVector<QLineEdit*> champs_;
     QVector<QComboBox*> listes_;
+    QVector<QPlainTextEdit*> textes_;
 };

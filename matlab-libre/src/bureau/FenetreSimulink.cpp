@@ -148,6 +148,16 @@ const BlocBibliotheque blocs[] = {
     {"Discret", "discretefilter", "Un filtre en puissances de z^-1",
      "'Numerator', 1, 'Denominator', [1 -0.5], 'SampleTime', 0.1"},
 
+    // Les blocs de code : une expression, une fonction MATLAB, et la
+    // machine à états de Stateflow.
+    {"Fonctions", "fcn", "Une expression de l'entrée u : u(1)*sin(u(2))", "'Expr', 'u^2'"},
+    {"Fonctions", "matlabfunction",
+     "Une fonction MATLAB : ses arguments sont les entrées, ses sorties les sorties", ""},
+    {"Fonctions", "interpretedmatlabfunction", "Une fonction MATLAB appliquée à l'entrée",
+     "'MATLABFcn', 'sin'"},
+    {"Stateflow", "chart", "Une machine à états, bâtie par SFCHART, un pas par instant",
+     "'Chart', sfstate(sfchart('machine'), 'repos')"},
+
     // Un sous-système pose un modèle entier dans un bloc. Celui qu'on
     // pose par défaut est le plus court qui serve à quelque chose : une
     // entrée reliée à une sortie, qu'on garnit en l'ouvrant.
@@ -412,6 +422,7 @@ void FenetreSimulink::surBlocsDeplaces(const QStringList& noms,
 // Une chaîne telle que MATLAB la relira entre apostrophes : défini plus
 // bas, avec les autres utilitaires d'écriture.
 static QString chaineMatlab(const QString& texte);
+static QString texteMatlab(const QString& texte);
 
 void FenetreSimulink::surLienDemande(const QString& source, const QString& cible,
                                      int port, int sortie) {
@@ -521,14 +532,18 @@ void FenetreSimulink::surBlocOuvert(const QString& nom) {
     // renommer aurait perdu le renommage. Le renommage vient en dernier
     // dans la ligne : ce qui precede designe encore le bloc par son
     // ancien nom.
+    // Chaque valeur passe en chaîne MATLAB, apostrophes doublées : une
+    // expression « u' * K » ou un nom « l'entrée » restaient sinon coupés
+    // en deux. Un code sur plusieurs lignes se recoud par char(10).
     QStringList morceaux;
     for (const auto& couple : boite.changements())
-        morceaux << QStringLiteral("%1 = set_param(%1, '%2', '%3', '%4');")
-                        .arg(modele, nom, couple.first, couple.second);
+        morceaux << QStringLiteral("%1 = set_param(%1, %2, '%3', %4);")
+                        .arg(modele, chaineMatlab(nom), couple.first,
+                             texteMatlab(couple.second));
     const QString neuf = boite.nomDemande();
     if (!neuf.isEmpty() && neuf != nom)
-        morceaux << QStringLiteral("%1 = set_param(%1, '%2', 'Name', '%3');")
-                        .arg(modele, nom, neuf);
+        morceaux << QStringLiteral("%1 = set_param(%1, %2, 'Name', %3);")
+                        .arg(modele, chaineMatlab(nom), chaineMatlab(neuf));
     if (morceaux.isEmpty()) {
         poserEtat(QStringLiteral("Rien n'a change pour « %1 ».").arg(nom));
         return;
@@ -975,6 +990,16 @@ static QString chaineMatlab(const QString& texte) {
     QString echappe = texte;
     echappe.replace(QLatin1Char('\''), QLatin1String("''"));
     return QStringLiteral("'%1'").arg(echappe);
+}
+
+// Un texte de plusieurs lignes — le code d'un bloc MATLAB Function — ne
+// tient pas dans une chaîne MATLAB : ses lignes s'y recousent par char(10).
+static QString texteMatlab(const QString& texte) {
+    if (!texte.contains(QLatin1Char('\n'))) return chaineMatlab(texte);
+    QStringList lignes;
+    for (const QString& ligne : texte.split(QLatin1Char('\n')))
+        lignes << chaineMatlab(ligne);
+    return QStringLiteral("strjoin({%1}, char(10))").arg(lignes.join(QStringLiteral(", ")));
 }
 
 void FenetreSimulink::enregistrerModele() {
