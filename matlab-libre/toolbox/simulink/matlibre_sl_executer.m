@@ -266,7 +266,8 @@ function T = preparer(c)
     % font que recevoir un signal, et la masse — n'y sont pas.
     rien = ismember(c.types, {'outport', 'scope', 'display', 'toworkspace', ...
                               'terminator', 'goto', 'ground', 'enableport', ...
-                              'triggerport', 'actionport'});
+                              'triggerport', 'actionport', 'xygraph', 'tofile', ...
+                              'datastorememory'});
     liste = [];
     numero = 0;
     for e = 1:numel(c.etapes)
@@ -302,8 +303,18 @@ function T = preparer(c)
             case {'relay', 'ratelimiter', 'hitcrossing', 'backlash', 'detectchange', ...
                   'detectincrease', 'detectdecrease', 'derivative', 'memory', ...
                   'discreteintegrator', 'discretetransferfcn', 'discretefilter', ...
-                  'discretestatespace', 'randomnumber', 'uniformrandomnumber', 'garde'}
+                  'discretestatespace', 'randomnumber', 'uniformrandomnumber', 'garde', ...
+                  'counterfreerunning', 'counterlimited', 'repeatingsequencestair', 'ic', ...
+                  'discretederivative', 'tappeddelay', 'difference'}
                 T.aMettreAJour(end + 1) = k;
+            case 'signalgenerator'
+                if c.sub(k) == 4
+                    T.aMettreAJour(end + 1) = k;
+                end
+            case 'ratetransition'
+                if c.sub(k) == 2
+                    T.aMettreAJour(end + 1) = k;
+                end
             case 'sfunction'
                 if c.seg{k}(2) > 0
                     T.aMettreAJour(end + 1) = k;
@@ -347,6 +358,10 @@ function T = preparer(c)
                 end
             case 'pulsegenerator'
                 if c.sub(k) == 1
+                    T.impulsions(end + 1) = k;
+                end
+            case 'signalgenerator'
+                if any(c.sub(k) == [2 3])
                     T.impulsions(end + 1) = k;
                 end
         end
@@ -1501,6 +1516,21 @@ function tc = prochaineCassure(T, t)
     for k = T.impulsions
         p = T.pA(k);
         w = T.oB(k) - T.oA(k) + 1;
+        if T.code(k) == 18
+            % carré : un front chaque demi-période ; dent de scie : une
+            % chute chaque période, décalée d'une demi
+            for i = 1:w
+                periode = 2 * pi / T.P(p + w + i - 1);
+                if T.sub(k) == 2
+                    pas = periode / 2;
+                    tc = min(tc, (floor(t / pas + 1e-9) + 1) * pas);
+                else
+                    tc = min(tc, (floor((t - periode / 2) / periode + 1e-9) + 1) * periode + ...
+                                 periode / 2);
+                end
+            end
+            continue
+        end
         for i = 1:w
             periode = T.P(p + w + i - 1);
             largeur = T.P(p + 2 * w + i - 1) / 100 * periode;
@@ -1854,6 +1884,51 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         Z(zA(k)) = rangEspace(T, p, Z(zA(k)), t);
                     case 14   % from
                         V(a:b) = V(eA(e + 1):eB(e + 1));
+                    case 15   % chirp : la fréquence va de f1 à f2 en T
+                        w = b - a + 1;
+                        f1 = T.P(p:p + w - 1);
+                        cible = T.P(p + w:p + 2 * w - 1);
+                        f2 = T.P(p + 2 * w:p + 3 * w - 1);
+                        V(a:b) = sin(2 * pi * (f1 * t + (f2 - f1) ./ (2 * cible) * t ^ 2));
+                    case {16, 17}   % counters
+                        V(a) = Z(zA(k));
+                    case 18   % signal generator
+                        w = b - a + 1;
+                        amplitude = T.P(p:p + w - 1);
+                        tours = T.P(p + w:p + 2 * w - 1) * t / (2 * pi);
+                        % Le carré et la dent de scie cassent : à pas variable, le
+                        % morceau où l'on est se fige au pas majeur, et les pas
+                        % mineurs le prolongent jusqu'à la cassure, où le pas
+                        % s'arrête.
+                        switch sub(k)
+                            case 1
+                                V(a:b) = amplitude .* sin(2 * pi * tours);
+                            case 2
+                                morceau = floor(2 * tours + 1e-9);
+                                if ~T.fixe
+                                    if majeur
+                                        Z(zA(k):zA(k) + w - 1) = morceau;
+                                    else
+                                        morceau = Z(zA(k):zA(k) + w - 1);
+                                    end
+                                end
+                                V(a:b) = amplitude .* (1 - 2 * mod(morceau, 2));
+                            case 3
+                                phase = tours + 0.5;
+                                morceau = floor(phase + 1e-9);
+                                if ~T.fixe
+                                    if majeur
+                                        Z(zA(k):zA(k) + w - 1) = morceau;
+                                    else
+                                        morceau = Z(zA(k):zA(k) + w - 1);
+                                    end
+                                end
+                                V(a:b) = amplitude .* (2 * (phase - morceau) - 1);
+                            otherwise
+                                V(a:b) = Z(zA(k) + w:zA(k) + 2 * w - 1);
+                        end
+                    case 19   % repeating sequence stair
+                        V(a) = T.P(p + 1 + Z(zA(k)));
                 end
             case 2
                 u = V(eA(e + 1):eB(e + 1));
@@ -1964,6 +2039,31 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         V(a:b) = y;
                     case 34   % data type conversion
                         V(a:b) = convertirType(T.P(p), T.P(p + 1), T.P(p + 2), u);
+                    case 35   % wrap to zero
+                        V(a:b) = u .* (u <= T.P(p:p + b - a));
+                    case 36   % interval test
+                        w = b - a + 1;
+                        haut = T.P(p:p + w - 1);
+                        bas = T.P(p + w:p + 2 * w - 1);
+                        if T.P(p + 2 * w) ~= 0
+                            dessous = u <= haut;
+                        else
+                            dessous = u < haut;
+                        end
+                        if T.P(p + 2 * w + 1) ~= 0
+                            dessus = u >= bas;
+                        else
+                            dessus = u > bas;
+                        end
+                        V(a:b) = double(dessous & dessus);
+                    case 37   % saturation dynamic : up, u, lo
+                        V(a:b) = min(max(V(eA(e + 2):eB(e + 2)), V(eA(e + 3):eB(e + 3))), u);
+                    case 38   % dead zone dynamic : up, u, lo
+                        v = V(eA(e + 2):eB(e + 2));
+                        lo = V(eA(e + 3):eB(e + 3));
+                        V(a:b) = (v > u) .* (v - u) + (v < lo) .* (v - lo);
+                    case 39   % manual switch
+                        V(a:b) = V(eA(e + sub(k)):eB(e + sub(k)));
                     case 33   % sqrt
                         switch sub(k)
                             case 1
@@ -2071,6 +2171,17 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         V(a:b) = double(u > Z(zA(k):zA(k) + b - a));
                     case 56   % detect decrease
                         V(a:b) = double(u < Z(zA(k):zA(k) + b - a));
+                    case 57   % IC : sa valeur au premier instant, puis l'entrée
+                        if Z(zA(k)) == 0
+                            V(a:b) = T.P(p:p + b - a);
+                        else
+                            V(a:b) = u;
+                        end
+                    case 58   % width
+                        V(a) = T.P(p);
+                    case 59   % data store read
+                        z = zA(T.P(p));
+                        V(a:b) = Z(z:z + T.P(p + 1) - 1);
                 end
             case 6
                 switch code(k)
@@ -2144,9 +2255,21 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         if majeur && T.zTenue(k) > 0
                             Z(T.zTenue(k):T.zTenue(k) + b - a) = V(a:b);
                         end
+                    case 69   % data store write : aux pas majeurs
+                        if majeur
+                            z = zA(T.P(p));
+                            largeur = T.P(p + 1);
+                            Z(z:z + largeur - 1) = V(eA(e + 1):eB(e + 1)) + zeros(largeur, 1);
+                        end
                 end
             case 7
                 switch code(k)
+                    case 77   % second-order integrator : x, puis dx/dt
+                        w = T.P(p);
+                        xa = T.xA(k);
+                        V(a:b) = x(xa:xa + w - 1);
+                        gp = T.pd(k) + 1;
+                        V(T.poA(gp):T.poB(gp)) = x(xa + w:xa + 2 * w - 1);
                     case 70   % integrator
                         if T.P(p) == 0
                             V(a:b) = x(T.xA(k):T.xB(k));
@@ -2204,6 +2327,21 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                 end
             case 8
                 switch code(k)
+                    case 87   % discrete derivative : K u / Ts - K u d'avant / Ts
+                        V(a:b) = T.P(p:p + b - a) .* V(eA(e + 1):eB(e + 1)) - ...
+                                 Z(zA(k):zA(k) + b - a);
+                    case 88   % tapped delay : les N dernières valeurs
+                        N = T.P(p);
+                        valeurs = Z(zA(k):zA(k) + N - 1);
+                        if T.P(p + 2) ~= 0
+                            valeurs = [valeurs; V(eA(e + 1))];
+                        end
+                        if T.P(p + 1) ~= 0
+                            valeurs = valeurs(end:-1:1);
+                        end
+                        V(a:b) = valeurs;
+                    case 89   % difference
+                        V(a:b) = V(eA(e + 1):eB(e + 1)) - Z(zA(k):zA(k) + b - a);
                     case 80   % delay
                         if T.P(p) == 0
                             V(a:b) = V(eA(e + 1):eB(e + 1));
@@ -2273,6 +2411,19 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         end
                     case 113   % garde d'un sous-système conditionnel
                         V(a) = double(gardeActive(T, k, V, Z, p, e));
+                    case 118   % rate transition : tenue, ou retard d'une période lente
+                        if sub(k) == 1
+                            V(a:b) = V(eA(e + 1):eB(e + 1));
+                        else
+                            % Z : [tenue; entrée prise à l'instant lent d'avant]. À
+                            % un instant lent, la sortie devient cette entrée.
+                            w = b - a + 1;
+                            if estInstant(t, T.P(p), T.P(p + 1))
+                                V(a:b) = Z(zA(k) + w:zA(k) + 2 * w - 1);
+                            else
+                                V(a:b) = Z(zA(k):zA(k) + w - 1);
+                            end
+                        end
                 end
             case 9
                 switch code(k)
@@ -3337,6 +3488,10 @@ function dx = derivees(T, V, x, t)
             case 103   % S-function : les dérivées, drapeau 1
                 sys = appelerSFonction(T, k, V, [], x, t, 1);
                 dx(a:b) = double(sys(:));
+            case 77   % second-order integrator : x' = dx, dx' = u
+                w = (b - a + 1) / 2;
+                dx(a:a + w - 1) = x(a + w:b);
+                dx(a + w:b) = u + zeros(w, 1);
             case 76   % PID : l'intégrale, et le filtre de la dérivée
                 w = (b - a + 1) / 2;
                 dx(a:a + w - 1) = u;
@@ -3346,6 +3501,17 @@ function dx = derivees(T, V, x, t)
 end
 
 % === mises à jour ==============================================================
+
+% T est-il un instant de la période P, décalée de D ? Au dix-milliardième
+% près, pour que l'arrondi des pas ne le manque pas.
+function oui = estInstant(t, P, D)
+    if ~(P > 0) || ~isfinite(P)
+        oui = true;
+        return
+    end
+    rang = round((t - D) / P);
+    oui = rang >= 0 && abs(t - D - rang * P) <= 1e-10 * max(1, abs(t));
+end
 
 function Z = majs(T, V, Z, t, touche, x)
     for k = T.aMettreAJour
@@ -3432,6 +3598,36 @@ function Z = majs(T, V, Z, t, touche, x)
                 if nd > 0
                     sys = appelerSFonction(T, k, V, Z, x, t, 2);
                     Z(z:z + nd - 1) = double(sys(:));
+                end
+            case 16   % counter free-running
+                Z(z) = mod(Z(z) + 1, T.P(p));
+            case 17   % counter limited
+                if Z(z) >= T.P(p)
+                    Z(z) = 0;
+                else
+                    Z(z) = Z(z) + 1;
+                end
+            case 18   % signal generator, random : le tirage suivant
+                [valeurs, etats] = matlibre_sl_hasard(Z(z:z + w - 1), false, ...
+                                                      -T.P(p:p + w - 1), T.P(p:p + w - 1));
+                Z(z:z + w - 1) = etats;
+                Z(z + w:z + 2 * w - 1) = valeurs;
+            case 19   % repeating sequence stair
+                Z(z) = mod(Z(z) + 1, T.P(p));
+            case 57   % IC : le premier instant est passé
+                Z(z) = 1;
+            case 87   % discrete derivative
+                Z(z:z + w - 1) = T.P(p:p + w - 1) .* u;
+            case 88   % tapped delay
+                N = T.P(p);
+                Z(z:z + N - 2) = Z(z + 1:z + N - 1);
+                Z(z + N - 1) = u(1);
+            case 89   % difference
+                Z(z:z + w - 1) = u;
+            case 118   % rate transition vers le rapide : l'entrée, à ses instants
+                if estInstant(t, T.P(p), T.P(p + 1))
+                    Z(z:z + w - 1) = Z(z + w:z + 2 * w - 1);
+                    Z(z + w:z + 2 * w - 1) = u;
                 end
             case 113   % garde : ce qu'elle était, et le signal du front
                 Z(z) = 1;

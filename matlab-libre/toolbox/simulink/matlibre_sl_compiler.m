@@ -85,7 +85,6 @@ function c = matlibre_sl_compiler(modele, options)
                    'pour la liste des types reconnus.'], c.chemins{k}, char(bloc.type));
         end
         c.types{k} = entree.type;
-        c.code(k) = codeDe(entree.type);
         if isfield(bloc, 'garde')
             c.garde(k) = bloc.garde;
         end
@@ -93,8 +92,13 @@ function c = matlibre_sl_compiler(modele, options)
             c.sortieCond{k} = bloc.sortieConditionnelle;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
-        [ne, ns] = matlibre_sl_ports(struct('type', entree.type, 'nom', bloc.nom, ...
-                                            'parametres', c.p{k}), entree.type);
+        % Un bloc qui n'est qu'une autre façon d'en écrire un se ramène à lui :
+        % Band-Limited White Noise à Random Number, Discrete Zero-Pole à
+        % Discrete Transfer Fcn.
+        [c.types{k}, c.p{k}] = normaliser(c.types{k}, c.p{k}, c.chemins{k});
+        c.code(k) = codeDe(c.types{k});
+        [ne, ns] = matlibre_sl_ports(struct('type', c.types{k}, 'nom', bloc.nom, ...
+                                            'parametres', c.p{k}), c.types{k});
         if ~(isfinite(ne) && ne >= 0 && ne == round(ne) && isfinite(ns) && ...
              ns >= 0 && ns == round(ns))
             error('Simulink:Parameters:InvalidPortCount', ...
@@ -170,8 +174,9 @@ function c = matlibre_sl_compiler(modele, options)
         c.entrees{b}(pe) = c.portDebut(a) + ps - 1;
     end
 
-    % --- 4. Goto et From ----------------------------------------------------
+    % --- 4. Goto et From, mémoires partagées ----------------------------------
     c = resoudreGoto(c);
+    c = resoudreMemoires(c);
 
     % --- 5. transmission directe -------------------------------------------
     c.direct = true(1, n);
@@ -323,6 +328,38 @@ function p = lireParametres(entree, bloc, chemin)
     end
 end
 
+function [type, p] = normaliser(type, p, chemin)
+    switch type
+        case 'bandlimitedwhitenoise'
+            % Un bruit blanc de densité Cov, tenu pendant Ts : sa variance
+            % est Cov / Ts, comme dans le bloc de Simulink.
+            Ts = double(p.Ts);
+            if isempty(Ts) || Ts(1) <= 0
+                error('Simulink:Parameters:InvalidValue', ...
+                      'La periode Ts du bruit blanc ''%s'' doit etre positive.', chemin);
+            end
+            if any(double(p.Cov(:)) < 0)
+                error('Simulink:Parameters:InvalidValue', ...
+                      'La puissance Cov du bruit blanc ''%s'' ne peut pas etre negative.', ...
+                      chemin);
+            end
+            p = struct('Mean', 0, 'Variance', double(p.Cov) / Ts(1), 'Seed', p.seed, ...
+                       'SampleTime', Ts);
+            type = 'randomnumber';
+        case 'discretezeropole'
+            numerateur = double(p.Gain) * poly(double(p.Zeros(:)));
+            denominateur = poly(double(p.Poles(:)));
+            if numel(p.Zeros) > numel(p.Poles)
+                error('Simulink:blocks:TransferFcnImproper', ...
+                      ['''%s'' porte plus de zeros que de poles : sa transmittance n''est ' ...
+                       'pas propre.'], chemin);
+            end
+            p = struct('Numerator', numerateur, 'Denominator', denominateur, ...
+                       'SampleTime', p.SampleTime);
+            type = 'discretetransferfcn';
+    end
+end
+
 % Un choix se compare sans la casse ni les espaces : « u2>=Threshold » et
 % « u2 >= Threshold » disent la même chose.
 function v = choisir(v, admis, chemin, nom)
@@ -378,7 +415,16 @@ function x = codeDe(type)
                 'enableport', 114; 'triggerport', 115; 'actionport', 116; ...
                 'fcn', 100; 'matlabfunction', 101; 'interpretedmatlabfunction', 102; ...
                 'sfunction', 103; 'chart', 104; ...
-                'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34};
+                'buscreator', 62; 'busselector', 63; 'datatypeconversion', 34; ...
+                'chirp', 15; 'counterfreerunning', 16; 'counterlimited', 17; ...
+                'signalgenerator', 18; 'repeatingsequencestair', 19; ...
+                'wraptozero', 35; 'intervaltest', 36; 'saturationdynamic', 37; ...
+                'deadzonedynamic', 38; 'manualswitch', 39; ...
+                'ic', 57; 'width', 58; 'datastoreread', 59; 'datastorewrite', 69; ...
+                'secondorderintegrator', 77; ...
+                'discretederivative', 87; 'tappeddelay', 88; 'difference', 89; ...
+                'xygraph', 97; 'tofile', 98; ...
+                'datastorememory', 117; 'ratetransition', 118};
         table = containers.Map(noms(:, 1)', noms(:, 2)');
     end
     x = table(type);
@@ -432,6 +478,49 @@ function c = resoudreGoto(c)
     end
 end
 
+% Un Data Store Read ou Write désigne sa mémoire par son nom : le bloc Data
+% Store Memory de ce nom dans son système, ou dans un système qui
+% l'englobe — le plus proche. C.MEMOIRE rend son rang.
+function c = resoudreMemoires(c)
+    c.memoire = zeros(1, c.n);
+    memoires = find(strcmp(c.types, 'datastorememory'));
+    for m = memoires
+        nom = char(c.p{m}.DataStoreName);
+        doubles = memoires(arrayfun(@(j) strcmp(char(c.p{j}.DataStoreName), nom) && ...
+                                    strcmp(parent(c.noms{j}), parent(c.noms{m})), memoires));
+        if numel(doubles) > 1
+            error('Simulink:DataStores:DuplicateDataStore', ...
+                  'La memoire partagee ''%s'' est definie deux fois dans le meme systeme : %s.', ...
+                  nom, strjoin(c.chemins(doubles), ', '));
+        end
+    end
+    for k = find(ismember(c.types, {'datastoreread', 'datastorewrite'}))
+        nom = char(c.p{k}.DataStoreName);
+        systeme = parent(c.noms{k});
+        meilleur = 0;
+        profondeur = -1;
+        for m = memoires
+            if ~strcmp(char(c.p{m}.DataStoreName), nom)
+                continue
+            end
+            sien = parent(c.noms{m});
+            visible = isempty(sien) || strcmp(sien, systeme) || ...
+                      strncmp([sien '/'], [systeme '/'], numel(sien) + 1);
+            if visible && numel(sien) > profondeur
+                meilleur = m;
+                profondeur = numel(sien);
+            end
+        end
+        if meilleur == 0
+            error('Simulink:DataStores:DataStoreNotFound', ...
+                  ['Le bloc ''%s'' designe la memoire partagee ''%s'', qu''aucun bloc ' ...
+                   'Data Store Memory visible depuis lui ne definit. Posez-en un dans ' ...
+                   'son systeme, ou dans un systeme qui l''englobe.'], c.chemins{k}, nom);
+        end
+        c.memoire(k) = meilleur;
+    end
+end
+
 function s = parent(nom)
     barre = find(nom == '/', 1, 'last');
     if isempty(barre)
@@ -452,6 +541,10 @@ function d = transmissionDirecte(c, k)
     switch c.types{k}
         case {'integrator', 'delay', 'memory'}
             d = strcmp(c.types{k}, 'delay') && p.DelayLength == 0;
+        case {'secondorderintegrator', 'width'}
+            d = false;
+        case 'tappeddelay'
+            d = strcmp(p.includeCurrent, 'on');
         case {'statespace', 'discretestatespace'}
             d = any(p.D(:) ~= 0);
         case 'transferfcn'
@@ -701,8 +794,17 @@ function s = regleDims(c, k, dE, complet, forcer)
             s = {accorder({dimsDe(p.Amplitude), dimsDe(p.Frequency), dimsDe(p.Phase), ...
                            dimsDe(p.Bias)}, c, k, ...
                           {'Amplitude', 'Frequency', 'Phase', 'Bias'})};
-        case {'clock', 'digitalclock', 'ground', 'repeatingsequence'}
+        case {'clock', 'digitalclock', 'ground', 'repeatingsequence', ...
+              'counterfreerunning', 'counterlimited', 'repeatingsequencestair', 'width'}
             s = {[1 1]};
+        case 'chirp'
+            s = {accorder({dimsDe(p.f1), dimsDe(p.T), dimsDe(p.f2)}, c, k, ...
+                          {'f1', 'T', 'f2'})};
+        case 'signalgenerator'
+            s = {accorder({dimsDe(p.Amplitude), dimsDe(p.Frequency)}, c, k, ...
+                          {'Amplitude', 'Frequency'})};
+        case 'datastoreread'
+            s = {dimsDe(c.p{c.memoire(k)}.InitialValue)};
         case {'enableport', 'triggerport', 'actionport'}
             s = {};
         case 'pulsegenerator'
@@ -739,7 +841,8 @@ function s = regleDims(c, k, dE, complet, forcer)
             if ~complet && ~forcer && ~ismember(t, {'statespace', 'transferfcn', ...
                     'zeropole', 'discretetransferfcn', 'discretefilter', ...
                     'discretestatespace', 'integrator', 'delay', 'memory', ...
-                    'discreteintegrator', 'sfunction'})
+                    'discreteintegrator', 'sfunction', 'secondorderintegrator', ...
+                    'tappeddelay', 'ratetransition'})
                 return
             end
             s = regleTraitement(c, k, dE, complet, forcer);
@@ -983,6 +1086,40 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             s = repmat({d}, 1, c.nOut(k));
         case {'delay', 'memory'}
             s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
+        case 'secondorderintegrator'
+            d = dimsAvecEtat(dE, p.ICX, complet, forcer);
+            if numel(p.ICDXDT) > 1 && prod(d) == 1
+                d = dimsDe(p.ICDXDT);
+            end
+            s = {d, d};
+        case 'ratetransition'
+            s = {dimsAvecEtat(dE, p.X0, complet, forcer)};
+        case 'tappeddelay'
+            if complet && ~isempty(dE{1}) && prod(dE{1}) ~= 1
+                error('Simulink:Engine:DimensionMismatch', ...
+                      ['L''entree de ''%s'' est de largeur %d : un Tapped Delay retarde ' ...
+                       'un signal scalaire.'], c.chemins{k}, prod(dE{1}));
+            end
+            s = {[double(p.NumDelays) + strcmp(p.includeCurrent, 'on'), 1]};
+        case {'wraptozero', 'ic', 'difference', 'discretederivative'}
+            switch t
+                case 'wraptozero'
+                    s = {accorder({dE{1}, dimsDe(p.Threshold)}, c, k, ...
+                                  {'l''entree', 'Threshold'})};
+                case 'ic'
+                    s = {accorder({dE{1}, dimsDe(p.Value)}, c, k, {'l''entree', 'Value'})};
+                case 'difference'
+                    s = {accorder({dE{1}, dimsDe(p.ICPrevInput)}, c, k, ...
+                                  {'l''entree', 'ICPrevInput'})};
+                otherwise
+                    s = {accorder({dE{1}, dimsDe(p.gainval), dimsDe(p.ICPrevScaledInput)}, ...
+                                  c, k, {'l''entree', 'gainval', 'ICPrevScaledInput'})};
+            end
+        case 'intervaltest'
+            s = {accorder({dE{1}, dimsDe(p.uplimit), dimsDe(p.lowlimit)}, c, k, ...
+                          {'l''entree', 'uplimit', 'lowlimit'})};
+        case {'saturationdynamic', 'deadzonedynamic', 'manualswitch'}
+            s = {accorder(dE, c, k, q)};
         case 'discreteintegrator'
             s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
         case {'transferfcn', 'zeropole', 'discretetransferfcn', 'discretefilter'}
@@ -1160,8 +1297,47 @@ function c = periodes(c, pas)
                 end
             case {'digitalclock', 'randomnumber', 'uniformrandomnumber'}
                 [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
-            case {'integrator', 'transferfcn', 'statespace', 'zeropole', 'pidcontroller'}
+            case {'integrator', 'transferfcn', 'statespace', 'zeropole', 'pidcontroller', ...
+                  'secondorderintegrator', 'chirp'}
                 c.cadence(k) = 0;
+            case 'signalgenerator'
+                c.cadence(k) = 0;
+                c.majeurSeul(k) = strcmp(p.WaveForm, 'random');   % un tirage par pas majeur
+            case {'counterfreerunning', 'counterlimited', 'repeatingsequencestair'}
+                % Sans période donnée, une source hérite du pas de base : le
+                % pas fixe, ou chaque pas majeur à pas variable.
+                if p.tsamp(1) == -1 || p.tsamp(1) == 0
+                    if c.variable
+                        c.cadence(k) = 0;
+                        c.majeurSeul(k) = true;
+                    else
+                        c.cadence(k) = pas;
+                    end
+                else
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.tsamp);
+                end
+            case 'datastoreread'
+                c.cadence(k) = 0;
+                if p.SampleTime(1) > 0
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                end
+            case 'datastorewrite'
+                % L'écriture se fait aux pas majeurs, ou aux instants de sa
+                % période : un pas mineur ne touche pas à la mémoire.
+                c.majeurSeul(k) = true;
+                if p.SampleTime(1) > 0
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.SampleTime);
+                end
+            case {'datastorememory', 'width'}
+                c.cadence(k) = Inf;
+            case 'ratetransition'
+                if p.OutPortSampleTime(1) > 0
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.OutPortSampleTime);
+                end
+            case 'tappeddelay'
+                if p.samptime(1) > 0
+                    [c.cadence(k), c.decalage(k)] = lirePeriode(p.samptime);
+                end
             case {'garde', 'if', 'switchcase'}
                 % La condition d'un sous-système se décide aux pas majeurs :
                 % entre deux, il garde son état, comme dans Simulink.
@@ -1282,6 +1458,37 @@ function c = periodes(c, pas)
         end
     end
     c.cadence(c.cadence == -1) = 0;   % une boucle d'héritiers : continue
+
+    % Un IC ne se calcule pas une fois pour toutes : il rend sa valeur au
+    % premier instant, puis son entrée, fût-elle constante.
+    for k = find(strcmp(c.types, 'ic') & isinf(c.cadence))
+        c.cadence(k) = 0;
+        c.majeurSeul(k) = true;
+    end
+    % Les blocs discrets par nature qui héritent leur période ne peuvent
+    % hériter d'un signal continu : Simulink le refuse, et le dit.
+    for k = find(ismember(c.types, {'discretederivative', 'difference', 'tappeddelay'}))
+        if c.cadence(k) == 0 && c.garde(k) == 0
+            error('Simulink:SampleTime:DiscreteBlockContinuous', ...
+                  ['Le bloc ''%s'' est discret, et herite de son entree une periode ' ...
+                   'continue. Donnez-lui une periode, ou echantillonnez son entree ' ...
+                   '(Zero-Order Hold, Rate Transition).'], c.chemins{k});
+        end
+    end
+    % Le Rate Transition : vers une période plus lente, il tient l'entrée à
+    % ses instants ; vers une plus rapide, il la retarde d'une période de
+    % l'entrée, ce qui rend le transfert déterministe.
+    c.periodeEntree = zeros(1, n);
+    c.decalageEntree = zeros(1, n);
+    for k = find(strcmp(c.types, 'ratetransition'))
+        e = c.entrees{k};
+        if isempty(e) || e(1) == 0
+            continue
+        end
+        source = c.proprio(e(1));
+        c.periodeEntree(k) = c.cadence(source);
+        c.decalageEntree(k) = c.decalage(source);
+    end
 
     c.periodePas = zeros(1, n);
     c.decalagePas = zeros(1, n);
@@ -1642,6 +1849,104 @@ function c = abaisser(c, pas, tDebut)
                 seg = [double(p.ConcatenateDimension); c.nIn(k); d];
             case 'signalconversion'
                 seg = c.nIn(k);
+            case 'manualswitch'
+                sub = 1 + strcmp(p.sw, '0');
+            case 'intervaltest'           % [haut; bas; fermé à droite; fermé à gauche]
+                seg = [etendre(p.uplimit, w, ch, 'uplimit'); ...
+                       etendre(p.lowlimit, w, ch, 'lowlimit'); ...
+                       strcmp(p.IntervalClosedRight, 'on'); strcmp(p.IntervalClosedLeft, 'on')];
+            case 'wraptozero'
+                seg = etendre(p.Threshold, w, ch, 'Threshold');
+            case 'ic'                     % [valeur]  Z : [passé]
+                seg = etendre(p.Value, w, ch, 'Value');
+                z0 = 0;
+            case 'width'
+                seg = largeurEntree(c, k, 1);
+            case {'datastoreread', 'datastorewrite'}   % [mémoire; largeur]
+                m = c.memoire(k);
+                largeur = numel(c.p{m}.InitialValue);
+                if strcmp(c.types{k}, 'datastorewrite')
+                    lue = largeurEntree(c, k, 1);
+                    if ~any(lue == [1 largeur])
+                        error('Simulink:DataStores:DataStoreWidthMismatch', ...
+                              ['''%s'' ecrit %d valeur(s) dans la memoire ''%s'', qui en ' ...
+                               'porte %d.'], ch, lue, char(c.p{m}.DataStoreName), largeur);
+                    end
+                end
+                seg = [m; largeur];
+            case 'datastorememory'
+                z0 = double(p.InitialValue(:));
+            case 'ratetransition'         % [mode; période de l'entrée; décalage]  Z : [tenue]
+                x0 = etendre(p.X0, w, ch, 'X0');
+                lent = c.cadence(k) > 0 && isfinite(c.cadence(k)) && ...
+                       c.periodeEntree(k) > c.cadence(k) + 1e-12 && ...
+                       isfinite(c.periodeEntree(k)) && strcmp(p.Deterministic, 'on');
+                sub = 1 + lent;
+                seg = [c.periodeEntree(k); c.decalageEntree(k)];
+                if lent
+                    z0 = [x0; x0];   % la tenue, et l'entrée prise à l'instant lent
+                end
+            case 'chirp'                  % [f1; T; f2]
+                seg = [etendre(p.f1, w, ch, 'f1'); etendre(p.T, w, ch, 'T'); ...
+                       etendre(p.f2, w, ch, 'f2')];
+                if any(seg(w + 1:2 * w) <= 0)
+                    error('Simulink:Parameters:InvalidValue', ...
+                          'Le temps cible T de ''%s'' doit etre positif.', ch);
+                end
+            case 'signalgenerator'        % [amplitude; pulsation]  Z (random) : [états; valeurs]
+                sub = find(strcmp(p.WaveForm, {'sine', 'square', 'sawtooth', 'random'}));
+                pulsation = etendre(p.Frequency, w, ch, 'Frequency');
+                if strcmp(p.Units, 'Hertz')
+                    pulsation = 2 * pi * pulsation;
+                end
+                amplitude = etendre(p.Amplitude, w, ch, 'Amplitude');
+                seg = [amplitude; pulsation];
+                if sub == 4
+                    etats = (1:w).';
+                    [valeurs, etats] = matlibre_sl_hasard(etats, false, -amplitude, amplitude);
+                    z0 = [etats; valeurs];
+                elseif sub > 1
+                    z0 = zeros(w, 1);   % le morceau où l'on est, figé au pas majeur
+                end
+            case 'counterfreerunning'     % [modulo]  Z : [compte]
+                if p.NumBits < 1 || p.NumBits ~= round(p.NumBits) || p.NumBits > 52
+                    error('Simulink:Parameters:InvalidValue', ...
+                          'Le nombre de bits de ''%s'' est un entier de 1 a 52.', ch);
+                end
+                seg = 2 ^ double(p.NumBits);
+                z0 = 0;
+            case 'counterlimited'         % [limite]  Z : [compte]
+                if p.uplimit < 0 || p.uplimit ~= round(p.uplimit)
+                    error('Simulink:Parameters:InvalidValue', ...
+                          'La limite du compteur ''%s'' est un entier positif.', ch);
+                end
+                seg = double(p.uplimit);
+                z0 = 0;
+            case 'repeatingsequencestair' % [n; valeurs]  Z : [rang]
+                valeurs = double(p.OutValues(:));
+                if isempty(valeurs)
+                    error('Simulink:Parameters:InvalidValue', ...
+                          'La suite de valeurs de ''%s'' est vide.', ch);
+                end
+                seg = [numel(valeurs); valeurs];
+                z0 = 0;
+            case 'secondorderintegrator'  % [largeur]  états : [x; dx]
+                c = ajouterEtat(c, k, [etendre(p.ICX, w, ch, 'ICX'); ...
+                                       etendre(p.ICDXDT, w, ch, 'ICDXDT')]);
+                seg = w;
+            case 'discretederivative'     % [K / Ts]  Z : [K u d'avant / Ts]
+                seg = etendre(p.gainval, w, ch, 'gainval') / c.cadence(k);
+                z0 = etendre(p.ICPrevScaledInput, w, ch, 'ICPrevScaledInput');
+            case 'difference'             % Z : [u d'avant]
+                z0 = etendre(p.ICPrevInput, w, ch, 'ICPrevInput');
+            case 'tappeddelay'            % [N; plus récent d'abord; courant]  Z : [N valeurs]
+                N = double(p.NumDelays);
+                if N < 1 || N ~= round(N)
+                    error('Simulink:Parameters:InvalidValue', ...
+                          'Le nombre de retards de ''%s'' est un entier positif.', ch);
+                end
+                seg = [N; strcmp(p.DelayOrder, 'Newest'); strcmp(p.includeCurrent, 'on')];
+                z0 = etendre(p.vinit, N, ch, 'vinit');
             % --- continu ---
             case 'integrator'             % [borne; haut; bas; remise; externe; wr; sat; etat]
                 % Z, s'il y a remise ou condition initiale externe : [vu;
@@ -1952,6 +2257,14 @@ function c = ordonner(c)
                     succ{g}(end + 1) = k;
                 end
             end
+        end
+    end
+    % Une mémoire partagée se lit avant de s'écrire : chaque Data Store
+    % Read passe avant les Data Store Write de sa mémoire, et rend ce que le
+    % pas d'avant y a laissé.
+    for w = find(strcmp(c.types, 'datastorewrite'))
+        for r = find(strcmp(c.types, 'datastoreread') & c.memoire == c.memoire(w))
+            succ{r}(end + 1) = w;
         end
     end
     composantes = tarjan(succ, n);

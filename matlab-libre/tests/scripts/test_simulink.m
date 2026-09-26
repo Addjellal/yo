@@ -2134,6 +2134,373 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('integrateur : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ----------------------------------------- 21. Les blocs courants qui manquaient
+% Les sources. Chirp : une sinusoïde dont la fréquence va de f1 à f2 en
+% T, soit sin(2 pi (f1 t + (f2 - f1) t^2 / (2 T))).
+m = add_block(new_system('chirp'), 'chirp', 'balayage', 'f1', 0.5, 'T', 2, 'f2', 1.5);
+for solveur = {'ode4', 'ode45'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.01, 'StopTime', 3);
+    assert(max(abs(r.signaux.balayage - sin(2 * pi * (0.5 * r.temps + 0.25 * r.temps .^ 2)))) ...
+           < 1e-12, [solveur{1} ' : le chirp suit sa loi']);
+end
+% Band-Limited White Noise : un bruit tenu Ts, de variance Cov / Ts, que
+% la graine rend reproductible.
+m = add_block(new_system('bruit'), 'bandlimitedwhitenoise', 'b', 'Cov', 0.2, 'Ts', 0.01, ...
+              'seed', 7);
+r1 = sim(m, 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 50);
+r2 = sim(m, 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 50);
+r3 = sim(set_param(m, 'b', 'seed', 8), 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 50);
+assert(abs(var(r1.signaux.b) / 20 - 1) < 0.05 && abs(mean(r1.signaux.b)) < 0.2, ...
+       'le bruit blanc a la variance Cov / Ts');
+assert(isequal(r1.signaux.b, r2.signaux.b) && ~isequal(r1.signaux.b, r3.signaux.b), ...
+       'la meme graine rend le meme bruit, une autre un autre');
+rTenu = sim(m, 'Solver', 'ode1', 'FixedStep', 0.005, 'StopTime', 0.1);
+assert(all(rTenu.signaux.b(1:2:end - 1) == rTenu.signaux.b(2:2:end)), ...
+       'entre deux tirages, le bruit est tenu');
+% Les compteurs et la suite en escalier, à leur période ; à pas variable,
+% ils comptent aux mêmes instants.
+m = new_system('compteurs');
+m = add_block(m, 'counterlimited', 'borne', 'uplimit', 3, 'tsamp', 0.1);
+m = add_block(m, 'counterfreerunning', 'libre', 'NumBits', 2, 'tsamp', 0.1);
+m = add_block(m, 'repeatingsequencestair', 'escalier', 'OutValues', [5 6 7], 'tsamp', 0.1);
+rFixe = sim(m, 'Solver', 'ode1', 'FixedStep', 0.05, 'StopTime', 0.9);
+rVariable = sim(m, 'Solver', 'ode45', 'StopTime', 0.9);
+attendus = struct('borne', [0 1 2 3 0 1 2 3 0 1], 'libre', [0 1 2 3 0 1 2 3 0 1], ...
+                  'escalier', [5 6 7 5 6 7 5 6 7 5]);
+for nom = fieldnames(attendus).'
+    for n = 0:9
+        iF = find(abs(rFixe.temps - n / 10) < 1e-9, 1);
+        iV = find(abs(rVariable.temps - n / 10) < 1e-9, 1);
+        assert(rFixe.signaux.(nom{1})(iF) == attendus.(nom{1})(n + 1) && ...
+               (iF == numel(rFixe.temps) || ...
+                rFixe.signaux.(nom{1})(iF + 1) == attendus.(nom{1})(n + 1)) && ...
+               rVariable.signaux.(nom{1})(iV) == attendus.(nom{1})(n + 1), ...
+               sprintf('%s : a %g, %d attendu', nom{1}, n / 10, attendus.(nom{1})(n + 1)));
+    end
+end
+% Le générateur de signaux : l'intégrale de chaque forme sur 2,25 s, à pas
+% variable, que les cassures n'abîment pas.
+integrales = struct('sine', (1 - cos(2 * pi * 2.25)) / pi, 'square', 0.5, ...
+                    'sawtooth', 0.125);
+for forme = fieldnames(integrales).'
+    m = add_block(new_system('generateur'), 'signalgenerator', 'g', 'WaveForm', forme{1}, ...
+                  'Amplitude', 2, 'Frequency', 1, 'Units', 'Hertz');
+    m = add_line(add_block(m, 'integrator', 'x'), 'g', 'x');
+    for solveur = {'ode45', 'ode15s', 'ode23t'}
+        r = sim(m, 'Solver', solveur{1}, 'StopTime', 2.25, 'RelTol', 1e-9, 'AbsTol', 1e-12);
+        assert(abs(r.signaux.x(end) - integrales.(forme{1})) < 1e-6, ...
+               sprintf('%s par %s : %g au lieu de %g', forme{1}, solveur{1}, ...
+                       r.signaux.x(end), integrales.(forme{1})));
+    end
+end
+m = add_block(new_system('generateur'), 'signalgenerator', 'g', 'WaveForm', 'random', ...
+              'Amplitude', 3);
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 5);
+assert(all(abs(r.signaux.g) <= 3) && std(r.signaux.g) > 1, ...
+       'la forme random tire dans [-A, A]');
+m = add_block(new_system('generateur'), 'signalgenerator', 'g', 'Frequency', 2);
+r = sim(m, 'Solver', 'ode4', 'FixedStep', 0.01, 'StopTime', 1);
+assert(max(abs(r.signaux.g - sin(2 * r.temps))) < 1e-12, ...
+       'en rad/sec, la frequence est une pulsation');
+
+% Les non-linéarités à bornes dynamiques, Wrap To Zero, Interval Test et
+% Manual Switch, sur un sinus.
+m = new_system('dynamiques');
+m = add_block(m, 'constant', 'haut', 'Value', 0.5);
+m = add_block(m, 'constant', 'bas', 'Value', -0.2);
+m = add_block(m, 'sine', 'u');
+m = add_block(m, 'saturationdynamic', 'sat');
+m = add_block(m, 'deadzonedynamic', 'zone');
+m = add_block(m, 'wraptozero', 'repli', 'Threshold', 0.3);
+m = add_block(m, 'intervaltest', 'dedans', 'uplimit', 0.5, 'lowlimit', -0.5);
+m = add_block(m, 'intervaltest', 'ouvert', 'uplimit', 0.5, 'lowlimit', -0.5, ...
+              'IntervalClosedRight', 'off', 'IntervalClosedLeft', 'off');
+m = add_block(m, 'manualswitch', 'bas_choisi', 'sw', '0');
+m = add_block(m, 'manualswitch', 'haut_choisi');
+for nom = {'sat', 'zone'}
+    m = add_line(m, 'haut', nom{1}, 1);
+    m = add_line(m, 'u', nom{1}, 2);
+    m = add_line(m, 'bas', nom{1}, 3);
+end
+m = add_line(m, 'u', 'repli');
+m = add_line(m, 'u', 'dedans');
+m = add_line(m, 'u', 'ouvert');
+for nom = {'bas_choisi', 'haut_choisi'}
+    m = add_line(m, 'haut', nom{1}, 1);
+    m = add_line(m, 'u', nom{1}, 2);
+end
+r = sim(m, 'Solver', 'ode1', 'FixedStep', pi / 12, 'StopTime', 2 * pi);
+u = sin(r.temps);
+assert(max(abs(r.signaux.sat - min(max(u, -0.2), 0.5))) < 1e-12, 'Saturation Dynamic');
+assert(max(abs(r.signaux.zone - ((u > 0.5) .* (u - 0.5) + (u < -0.2) .* (u + 0.2)))) < 1e-12, ...
+       'Dead Zone Dynamic');
+assert(isequal(r.signaux.repli, u .* (u <= 0.3)), 'Wrap To Zero');
+assert(isequal(r.signaux.dedans, double(abs(u) <= 0.5)), 'Interval Test sur un sinus');
+assert(isequal(r.signaux.bas_choisi, u) && all(r.signaux.haut_choisi == 0.5), ...
+       'Manual Switch rend l''entree choisie');
+
+% Aux bornes mêmes, l'intervalle fermé les compte, l'ouvert non.
+m = new_system('bornes');
+m = add_block(m, 'repeatingsequencestair', 'valeurs', 'OutValues', [0.5 -0.5 0 0.7 -0.7], ...
+              'tsamp', 1);
+m = add_block(m, 'intervaltest', 'ferme', 'uplimit', 0.5, 'lowlimit', -0.5);
+m = add_block(m, 'intervaltest', 'ouvert', 'uplimit', 0.5, 'lowlimit', -0.5, ...
+              'IntervalClosedRight', 'off', 'IntervalClosedLeft', 'off');
+m = add_line(m, 'valeurs', 'ferme');
+m = add_line(m, 'valeurs', 'ouvert');
+r = sim(m, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 4);
+assert(isequal(r.signaux.ferme.', [1 1 1 0 0]) && isequal(r.signaux.ouvert.', [0 0 1 0 0]), ...
+       'Interval Test : les bornes comprises ou non');
+
+% IC rend sa valeur au premier instant, puis l'entrée ; Width compte.
+m = new_system('ic');
+m = add_block(m, 'constant', 'c', 'Value', [1 2 3]);
+m = add_block(m, 'ic', 'depart', 'Value', 7);
+m = add_block(m, 'width', 'largeur');
+m = add_line(m, 'c', 'depart');
+m = add_line(m, 'c', 'largeur');
+for solveur = {'ode1', 'ode45'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 0.3);
+    assert(isequal(r.signaux.depart(1, :), [7 7 7]) && ...
+           isequal(r.signaux.depart(end, :), [1 2 3]) && all(r.signaux.largeur == 3), ...
+           [solveur{1} ' : IC, puis l''entree ; Width vaut 3']);
+end
+
+% Les mémoires partagées : un compteur qui lit, ajoute un et écrit. La
+% lecture passe avant l'écriture, et rend ce que le pas d'avant a laissé.
+% Une mémoire posée dans un sous-système y cache celle du dessus.
+m = new_system('memoires');
+m = add_block(m, 'datastorememory', 'memoire', 'DataStoreName', 'compte', 'InitialValue', 10);
+m = add_block(m, 'datastoreread', 'lecture', 'DataStoreName', 'compte');
+m = add_block(m, 'bias', 'plusUn', 'Bias', 1);
+m = add_block(m, 'datastorewrite', 'ecriture', 'DataStoreName', 'compte');
+m = add_line(m, 'lecture', 'plusUn');
+m = add_line(m, 'plusUn', 'ecriture');
+interne = new_system('interne');
+interne = add_block(interne, 'datastorememory', 'locale', 'DataStoreName', 'compte', ...
+                    'InitialValue', -5);
+interne = add_block(interne, 'datastoreread', 'lue', 'DataStoreName', 'compte');
+interne = add_block(interne, 'outport', 's', 'Port', 1);
+interne = add_line(interne, 'lue', 's');
+m = add_block(m, 'subsystem', 'dedans', 'Model', interne);
+for solveur = {'ode1', 'ode45'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 0.5, 'MaxStep', 0.1);
+    assert(isequal(r.signaux.lecture(1:6).', 10:15) && all(r.signaux.dedans == -5), ...
+           [solveur{1} ' : lire avant d''ecrire, et la memoire locale cache l''autre']);
+end
+
+% Rate Transition : vers le lent, la tenue ; vers le rapide, le retard
+% d'une période lente, qui part de sa condition initiale.
+m = new_system('transitions');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'zoh', 'lent', 'SampleTime', 0.5);
+m = add_block(m, 'ratetransition', 'versRapide', 'OutPortSampleTime', 0.1, 'X0', -1);
+m = add_block(m, 'zoh', 'rapide', 'SampleTime', 0.1);
+m = add_block(m, 'ratetransition', 'versLent', 'OutPortSampleTime', 0.5);
+m = add_line(m, 'horloge', 'lent');
+m = add_line(m, 'lent', 'versRapide');
+m = add_line(m, 'horloge', 'rapide');
+m = add_line(m, 'rapide', 'versLent');
+for solveur = {'ode1', 'ode45'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 1.5);
+    for instant = 0:0.1:1.5
+        i = find(abs(r.temps - instant) < 1e-9, 1);
+        rapide = -1;
+        if instant >= 0.5 - 1e-9
+            rapide = 0.5 * floor(instant / 0.5 + 1e-9) - 0.5;
+        end
+        assert(abs(r.signaux.versRapide(i) - rapide) < 1e-12 && ...
+               abs(r.signaux.versLent(i) - 0.5 * floor(instant / 0.5 + 1e-9)) < 1e-12, ...
+               sprintf('%s : Rate Transition a %g', solveur{1}, instant));
+    end
+end
+
+% L'intégrateur du second ordre : la chute libre, x et v exacts.
+m = new_system('chute');
+m = add_block(m, 'constant', 'g', 'Value', -9.81);
+m = add_block(m, 'secondorderintegrator', 'corps', 'ICX', 10, 'ICDXDT', 2);
+m = add_line(m, 'g', 'corps');
+% Les formules exactes sur un polynôme le sont ici ; les NDF d'ode15s,
+% corrigées, s'en écartent à la tolérance près.
+seuils = struct('ode45', 1e-9, 'ode113', 1e-9, 'ode15s', 1e-6, 'ode4', 1e-9);
+for solveur = fieldnames(seuils).'
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 1, 'FixedStep', 0.01, 'RelTol', 1e-8);
+    assert(max(abs(r.signaux.corps - (10 + 2 * r.temps - 9.81 / 2 * r.temps .^ 2))) < ...
+           seuils.(solveur{1}) && ...
+           max(abs(r.signaux.corps_port2 - (2 - 9.81 * r.temps))) < seuils.(solveur{1}), ...
+           [solveur{1} ' : la chute libre par l''integrateur du second ordre']);
+end
+
+% Les blocs discrets : dérivée, différence, retards en prise, zéros-pôles.
+m = new_system('discrets');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'zoh', 'echantillon', 'SampleTime', 0.1);
+m = add_block(m, 'math', 'carre', 'Operator', 'square');
+m = add_block(m, 'discretederivative', 'derivee', 'gainval', 2);
+m = add_block(m, 'difference', 'ecart');
+m = add_block(m, 'tappeddelay', 'prises', 'NumDelays', 3, 'includeCurrent', 'on');
+m = add_block(m, 'tappeddelay', 'recentes', 'NumDelays', 3, 'DelayOrder', 'Newest');
+m = add_block(m, 'discretezeropole', 'zp', 'Zeros', [], 'Poles', 0.5, 'Gain', 1, ...
+              'SampleTime', 0.1);
+m = add_block(m, 'discretetransferfcn', 'tf', 'Numerator', 1, 'Denominator', [1 -0.5], ...
+              'SampleTime', 0.1);
+m = add_line(m, 'horloge', 'echantillon');
+m = add_line(m, 'echantillon', 'carre');
+for nom = {'derivee', 'ecart', 'prises', 'recentes', 'zp', 'tf'}
+    m = add_line(m, 'carre', nom{1});
+end
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 0.5);
+u = (0:5).' .^ 2 / 100;
+precedent = [0; u(1:end - 1)];
+assert(max(abs(r.signaux.derivee - 2 * (u - precedent) / 0.1)) < 1e-12, ...
+       'Discrete Derivative : K (u - u d''avant) / Ts');
+assert(max(abs(r.signaux.ecart - (u - precedent))) < 1e-12, 'Difference');
+assert(max(abs(r.signaux.prises(end, :) - [u(3) u(4) u(5) u(6)])) < 1e-12 && ...
+       max(abs(r.signaux.recentes(end, :) - [u(5) u(4) u(3)])) < 1e-12, ...
+       'Tapped Delay : le plus ancien d''abord, ou le plus recent');
+assert(max(abs(r.signaux.zp - r.signaux.tf)) < 1e-15, ...
+       'Discrete Zero-Pole est la transmittance de ses zeros et poles');
+
+% To File écrit le temps et le signal, une colonne sur Decimation ; XY
+% Graph relève ses deux entrées.
+fichier = [tempname() '.mat'];
+m = new_system('fichier');
+m = add_block(m, 'sine', 'sinus');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'tofile', 'enregistre', 'Filename', fichier, 'MatrixName', 'donnees', ...
+              'Decimation', 2);
+m = add_block(m, 'xygraph', 'trace');
+m = add_line(m, 'sinus', 'enregistre');
+m = add_line(m, 'horloge', 'trace', 1);
+m = add_line(m, 'sinus', 'trace', 2);
+r = sim(m, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1);
+lu = load(fichier);
+assert(isequal(size(lu.donnees), [2 6]) && max(abs(lu.donnees(1, :) - (0:0.2:1))) < 1e-12 && ...
+       max(abs(lu.donnees(2, :) - sin(0:0.2:1))) < 1e-12, ...
+       'To File ecrit le temps et le signal, decimes');
+assert(isequal(r.signaux.trace, r.temps) && isequal(r.signaux.trace_port2, sin(r.temps)), ...
+       'XY Graph releve x et y');
+delete(fichier);
+
+% Un .slx qui porte les nouveaux blocs se relit et simule à l'identique :
+% les blocs masqués de la bibliothèque y sont des Reference.
+m = new_system('nouveaux');
+m = add_block(m, 'chirp', 'balayage', 'f1', 0.2, 'T', 1, 'f2', 1);
+m = add_block(m, 'ratetransition', 'rt', 'OutPortSampleTime', 0.1);
+m = add_block(m, 'difference', 'ecart');
+m = add_block(m, 'datastorememory', 'memoire', 'DataStoreName', 'M', 'InitialValue', 0);
+m = add_block(m, 'datastorewrite', 'ecrit', 'DataStoreName', 'M');
+m = add_block(m, 'datastoreread', 'lit', 'DataStoreName', 'M');
+m = add_block(m, 'secondorderintegrator', 'double', 'ICX', 1);
+m = add_block(m, 'counterlimited', 'compte', 'uplimit', 4, 'tsamp', 0.1);
+m = add_line(m, 'balayage', 'rt');
+m = add_line(m, 'rt', 'ecart');
+m = add_line(m, 'ecart', 'ecrit');
+m = add_line(m, 'lit', 'double');
+chemin = [tempname() '.slx'];
+save_system(m, chemin);
+relu = load_system(chemin);
+r = sim(m, 'Solver', 'ode45', 'StopTime', 1);
+rRelu = sim(relu, 'Solver', 'ode45', 'StopTime', 1);
+assert(isequal(r.temps, rRelu.temps) && isequal(r.signaux.double, rRelu.signaux.double) && ...
+       isequal(r.signaux.compte, rRelu.signaux.compte), ...
+       'le .slx des nouveaux blocs se relit et simule a l''identique');
+delete(chemin);
+
+% Tous les solveurs sur un même modèle qui croise les familles : un bruit
+% tenu, passé à une période lente, différencié, écrit dans une mémoire,
+% relu, intégré ; un compteur ; un chirp borné par des signaux. Ce qui est
+% discret ne dépend pas du solveur, et l'intégrale d'un signal tenu est
+% exacte pour tous.
+m = new_system('croisement');
+m = add_block(m, 'bandlimitedwhitenoise', 'bruit', 'Cov', 0.01, 'Ts', 0.1);
+m = add_block(m, 'ratetransition', 'lent', 'OutPortSampleTime', 0.5);
+m = add_block(m, 'difference', 'ecart');
+m = add_block(m, 'datastorememory', 'memoire', 'DataStoreName', 'D', 'InitialValue', 0);
+m = add_block(m, 'datastorewrite', 'ecrit', 'DataStoreName', 'D');
+m = add_block(m, 'datastoreread', 'lit', 'DataStoreName', 'D', 'SampleTime', 0.1);
+m = add_block(m, 'ic', 'depart', 'Value', 1);
+m = add_block(m, 'integrator', 'somme');
+m = add_block(m, 'counterlimited', 'compte', 'uplimit', 5, 'tsamp', 0.1);
+m = add_block(m, 'chirp', 'balayage', 'f1', 0.2, 'T', 3, 'f2', 1);
+m = add_block(m, 'constant', 'plafond', 'Value', 0.5);
+m = add_block(m, 'unaryminus', 'plancher');
+m = add_block(m, 'saturationdynamic', 'borne');
+m = add_line(m, 'bruit', 'lent');
+m = add_line(m, 'lent', 'ecart');
+m = add_line(m, 'ecart', 'ecrit');
+m = add_line(m, 'lit', 'depart');
+m = add_line(m, 'lit', 'somme');
+m = add_line(m, 'plafond', 'borne', 1);
+m = add_line(m, 'balayage', 'borne', 2);
+m = add_line(m, 'plafond', 'plancher');
+m = add_line(m, 'plancher', 'borne', 3);
+reference = sim(m, 'Solver', 'ode1', 'FixedStep', 0.01, 'StopTime', 3);
+instants = 0:0.1:3;
+for solveur = {'ode4', 'ode8', 'ode14x', 'ode1be', 'ode45', 'ode113', 'ode15s', 'ode23t', ...
+               'ode23tb', 'ode23s'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.01, 'StopTime', 3);
+    for instant = instants
+        i = find(abs(r.temps - instant) < 1e-9, 1);
+        iR = find(abs(reference.temps - instant) < 1e-9, 1);
+        assert(~isempty(i) && ...
+               abs(r.signaux.ecart(i) - reference.signaux.ecart(iR)) < 1e-12 && ...
+               abs(r.signaux.lit(i) - reference.signaux.lit(iR)) < 1e-12 && ...
+               r.signaux.compte(i) == reference.signaux.compte(iR) && ...
+               abs(r.signaux.somme(i) - reference.signaux.somme(iR)) < 1e-9, ...
+               sprintf('%s : a %g, le modele croise rend ce que rend ode1', solveur{1}, instant));
+    end
+    assert(all(abs(r.signaux.borne) <= 0.5 + 1e-12) && r.signaux.depart(1) == 1, ...
+           [solveur{1} ' : le chirp reste borne, et IC part de sa valeur']);
+end
+
+% Les erreurs, chacune avec son identifiant et le bloc nommé.
+sansMemoire = add_block(new_system('sansMemoire'), 'datastoreread', 'lit', ...
+                        'DataStoreName', 'X');
+deuxMemoires = add_block(add_block(new_system('deuxMemoires'), 'datastorememory', 'a', ...
+                         'DataStoreName', 'X'), 'datastorememory', 'b', 'DataStoreName', 'X');
+largeurMemoire = new_system('largeurMemoire');
+largeurMemoire = add_block(largeurMemoire, 'datastorememory', 'm', 'DataStoreName', 'X', ...
+                           'InitialValue', [0 0]);
+largeurMemoire = add_block(largeurMemoire, 'constant', 'c', 'Value', [1 2 3]);
+largeurMemoire = add_block(largeurMemoire, 'datastorewrite', 'w', 'DataStoreName', 'X');
+largeurMemoire = add_line(largeurMemoire, 'c', 'w');
+continuDiscret = add_line(add_block(add_block(new_system('continuDiscret'), 'sine', 's'), ...
+                          'difference', 'd'), 's', 'd');
+largeurPrises = add_line(add_block(add_block(new_system('largeurPrises'), 'constant', 'c', ...
+                         'Value', [1 2]), 'tappeddelay', 't', 'samptime', 0.1), 'c', 't');
+casErreurs = {
+    @() sim(sansMemoire), 'Simulink:DataStores:DataStoreNotFound', 'sansMemoire/lit'
+    @() sim(deuxMemoires), 'Simulink:DataStores:DuplicateDataStore', 'deux fois'
+    @() sim(largeurMemoire), 'Simulink:DataStores:DataStoreWidthMismatch', 'largeurMemoire/w'
+    @() sim(continuDiscret), 'Simulink:SampleTime:DiscreteBlockContinuous', 'continuDiscret/d'
+    @() sim(largeurPrises), 'Simulink:Engine:DimensionMismatch', 'scalaire'
+    @() sim(add_block(new_system('b'), 'bandlimitedwhitenoise', 'n', 'Ts', 0)), ...
+        'Simulink:Parameters:InvalidValue', 'positive'
+    @() sim(add_block(new_system('c'), 'counterfreerunning', 'n', 'NumBits', 0.5)), ...
+        'Simulink:Parameters:InvalidValue', 'bits'
+    @() sim(add_block(new_system('g'), 'signalgenerator', 'g', 'WaveForm', 'triangle')), ...
+        'Simulink:Parameters:InvalidValue', 'sawtooth'
+    @() sim(add_block(new_system('z'), 'discretezeropole', 'z', 'Zeros', [1 2], 'Poles', 0.5)), ...
+        'Simulink:blocks:TransferFcnImproper', 'propre'
+    @() matlibre_sl_programme(add_block(new_system('p'), 'chirp', 'c')), ...
+        'Simulink:programme:BlocNonEcrit', 'p/c'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('nouveaux blocs, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('nouveaux blocs : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

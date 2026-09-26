@@ -130,7 +130,14 @@ totalité.
    multiples repartent de l'ordre 1 après chaque discontinuité.
    L'intégrateur a sa remise externe (fronts, niveau, niveau tenu), sa
    condition initiale externe et ses ports de saturation et d'état : la
-   balle qui rebondit se bâtit comme dans l'exemple de Simulink. Les sous-systèmes
+   balle qui rebondit se bâtit comme dans l'exemple de Simulink. Les
+   blocs courants de la bibliothèque y sont : Chirp, Signal Generator,
+   Band-Limited White Noise, les compteurs, Rate Transition, les
+   mémoires partagées (Data Store Memory, Read, Write, lues avant d'être
+   écrites), IC, Width, Manual Switch, Interval Test, les non-linéarités
+   à bornes dynamiques, l'intégrateur du second ordre, Discrete
+   Derivative, Difference, Tapped Delay, Discrete Zero-Pole, XY Graph et
+   To File. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans

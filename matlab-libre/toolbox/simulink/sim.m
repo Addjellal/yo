@@ -468,6 +468,10 @@ function deposer(c, T, J, instants)
     N = numel(instants);
     for q = 1:numel(T.releves)
         R = T.releves(q);
+        if strcmp(c.types{R.bloc}, 'tofile') && R.port == 1
+            ecrireFichier(c.p{R.bloc}, instants, J.releve(R.lignes, :));
+            continue
+        end
         if ~strcmp(c.types{R.bloc}, 'toworkspace') || R.port ~= 1
             continue
         end
@@ -490,6 +494,21 @@ function deposer(c, T, J, instants)
         end
         assignin('base', char(p.VariableName), valeur);
     end
+end
+
+% Le bloc To File : une matrice dont la première ligne est le temps, et les
+% suivantes le signal, un instant par colonne — une colonne sur Decimation.
+function ecrireFichier(p, instants, valeurs)
+    decimation = max(1, round(double(p.Decimation)));
+    garder = 1:decimation:numel(instants);
+    contenu = struct();
+    nom = char(p.MatrixName);
+    if ~isvarname(nom)
+        error('Simulink:blocks:ToFileInvalidName', ...
+              'Le nom de variable ''%s'' du bloc To File n''est pas un nom valide.', nom);
+    end
+    contenu.(nom) = [instants(garder).'; valeurs(:, garder)];
+    save(char(p.Filename), '-struct', 'contenu');
 end
 
 % Un modèle désigné par son nom : une variable de l'espace de travail de

@@ -1560,6 +1560,19 @@ int main(int argc, char** argv) {
                 if (QLatin1String(b->type) == QLatin1String("from"))
                     essaiTous += QStringLiteral(
                         "m = add_block(m, 'goto', 'envoi', 'GotoTag', 'A');\n");
+                // Une mémoire partagée se lit et s'écrit là où elle est
+                // définie ; un bloc discret par nature veut une entrée
+                // échantillonnée.
+                if (QLatin1String(b->type) == QLatin1String("datastoreread") ||
+                    QLatin1String(b->type) == QLatin1String("datastorewrite"))
+                    essaiTous += QStringLiteral(
+                        "m = add_block(m, 'datastorememory', 'memoire', "
+                        "'DataStoreName', 'A');\n");
+                if (QLatin1String(b->type) == QLatin1String("difference") ||
+                    QLatin1String(b->type) == QLatin1String("discretederivative"))
+                    essaiTous += QStringLiteral(
+                        "m = add_line(add_block(m, 'zoh', 'echantillon', 'SampleTime', "
+                        "0.01), 'echantillon', '%1');\n").arg(QLatin1String(b->type));
                 if (QLatin1String(b->type) == QLatin1String("busselector"))
                     essaiTous += QStringLiteral(
                         "m = add_line(add_block(m, 'buscreator', 'bus', 'Inputs', 'a,b'), "

@@ -34,8 +34,24 @@ function [nEntrees, nSorties] = matlibre_sl_ports(bloc, type)
     switch type
         case {'constant', 'step', 'ramp', 'sine', 'clock', 'digitalclock', ...
               'pulsegenerator', 'ground', 'repeatingsequence', 'randomnumber', ...
-              'uniformrandomnumber', 'inport', 'fromworkspace', 'from'}
+              'uniformrandomnumber', 'inport', 'fromworkspace', 'from', 'chirp', ...
+              'bandlimitedwhitenoise', 'counterfreerunning', 'counterlimited', ...
+              'signalgenerator', 'repeatingsequencestair', 'datastoreread'}
             nEntrees = 0;
+        case {'saturationdynamic', 'deadzonedynamic'}
+            nEntrees = 3;   % up, u, lo
+        case 'manualswitch'
+            nEntrees = 2;
+        case 'datastorememory'
+            nEntrees = 0;
+            nSorties = 0;
+        case {'datastorewrite', 'tofile'}
+            nSorties = 0;
+        case 'xygraph'
+            nEntrees = 2;
+            nSorties = 0;
+        case 'secondorderintegrator'
+            nSorties = 2;   % x, dx/dt
         case 'math'
             if any(strcmpi(lire(p, 'Operator', 'square'), {'pow', 'hypot', 'rem', 'mod'}))
                 nEntrees = 2;

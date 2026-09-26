@@ -23,6 +23,12 @@ function modele = add_block(modele, type, nom, varargin)
 %     inport       Port, Value, PortDimensions  l'entrée du modèle
 %     fromworkspace VariableName, Interpolate, OutputAfterFinalValue
 %     from         GotoTag                      le signal d'un Goto
+%     chirp        f1, T, f2                    la fréquence va de f1 à f2 en T
+%     bandlimitedwhitenoise Cov, Ts, seed       variance Cov / Ts, tenu Ts
+%     counterfreerunning NumBits, tsamp ; counterlimited uplimit, tsamp
+%     signalgenerator WaveForm (sine, square, sawtooth, random),
+%                  Amplitude, Frequency, Units (rad/sec, Hertz)
+%     repeatingsequencestair OutValues, tsamp   une valeur par instant
 %
 %   Les blocs à cassure — abs, sign, saturation, deadzone, relay,
 %   relational, comparaisons, minmax, switch, hitcrossing, backlash,
@@ -59,12 +65,15 @@ function modele = add_block(modele, type, nom, varargin)
 %     coulombfriction Offset, Gain
 %     lookup       BreakpointsData, TableData, InterpMethod, ExtrapMethod
 %     lookup2d     BreakpointsForDimension1, BreakpointsForDimension2, Table
+%     saturationdynamic, deadzonedynamic — trois entrées : up, u, lo
+%     wraptozero   Threshold                    zéro au-delà du seuil
 %
 %   Logique :
 %     logic        Operator : AND, OR, NAND, NOR, XOR, NXOR, NOT ; Inputs
 %     relational   Operator : ==, ~=, <, <=, >=, >
 %     comparetoconstant relop, const ; comparetozero relop
 %     detectchange, detectincrease, detectdecrease  vinit
+%     intervaltest uplimit, lowlimit, IntervalClosedRight, IntervalClosedLeft
 %
 %   Aiguillage :
 %     switch       Threshold, Criteria : 'u2 >= Threshold', 'u2 > Threshold',
@@ -79,6 +88,15 @@ function modele = add_block(modele, type, nom, varargin)
 %     signalconversion  —
 %     merge        Inputs, InitialOutput        l'entrée dont le sous-système
 %                                               vient de calculer
+%     manualswitch sw ('1' : la première entrée, '0' : la seconde)
+%     datastorememory DataStoreName, InitialValue ; datastoreread et
+%                  datastorewrite DataStoreName — une mémoire partagée,
+%                  lue avant d'être écrite à chaque pas
+%     ratetransition OutPortSampleTime, X0, Deterministic — tenue vers une
+%                  période plus lente, retard d'une période lente vers une
+%                  plus rapide
+%     ic           Value                        au premier instant, puis l'entrée
+%     width        —                            le nombre d'éléments de l'entrée
 %
 %   Continu — l'intégrateur et les représentations d'état coupent les
 %   boucles :
@@ -94,6 +112,7 @@ function modele = add_block(modele, type, nom, varargin)
 %     zeropole     Zeros, Poles, Gain
 %     transportdelay DelayTime, InitialOutput, BufferSize
 %     pidcontroller P, I, D, N                  dérivée filtrée par N/(1+N/s)
+%     secondorderintegrator ICX, ICDXDT         deux sorties : x et dx/dt
 %
 %   Discret — ils ne calculent qu'aux instants de leur période :
 %     delay        InitialCondition, DelayLength, SampleTime ; aussi
@@ -106,12 +125,19 @@ function modele = add_block(modele, type, nom, varargin)
 %                  SampleTime
 %     discretefilter Numerator, Denominator (puissances de z^-1), SampleTime
 %     discretestatespace A, B, C, D, X0, SampleTime
+%     discretezeropole Zeros, Poles, Gain, SampleTime
+%     discretederivative gainval, ICPrevScaledInput   K (u - u d'avant) / Ts
+%     difference   ICPrevInput                  u - u d'avant
+%     tappeddelay  NumDelays, vinit, samptime, DelayOrder, includeCurrent
 %
 %   Sorties :
 %     outport      Port, InitialOutput, OutputWhenDisabled (held, reset)
 %     scope        NumInputPorts ; display ; terminator
 %     toworkspace  VariableName, SaveFormat : Array, Structure With Time,
 %                  Structure
+%     tofile       Filename, MatrixName, Decimation — [temps ; signal] dans
+%                  un fichier MAT, en fin de simulation
+%     xygraph      xmin, xmax, ymin, ymax        y en fonction de x
 %     stopsimulation — arrête la simulation dès que l'entrée n'est plus nulle
 %     assertion    Enabled, StopWhenAssertionFail — échoue dès que
 %                  l'entrée s'annule
