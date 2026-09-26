@@ -93,6 +93,12 @@ function T = preparer(c)
     % échoué sur une erreur imprévue, pour nommer le bloc fautif.
     T.diagnostic = false;
     enCours(0);
+    % Les types des sorties : une sortie qui n'est pas double se ramène à
+    % son type après chaque calcul du bloc (voir MATLIBRE_SL_TYPES).
+    T.typePort = c.typePort;
+    T.castK = c.castK;
+    T.arrondiK = c.arrondiK;
+    T.saturerK = c.saturerK;
     T.nom = c.nom;
     T.chemins = c.chemins;
     T.noms = c.noms;
@@ -1810,6 +1816,7 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
     zA = T.zA;
     sub = T.sub;
     diagnostic = T.diagnostic;
+    castK = T.castK;
     for q = 1:numel(liste)
         k = liste(q);
         if diagnostic
@@ -2530,6 +2537,24 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                                     'Assertion detectee dans ''%s'' a t = %g.', T.chemins{k}, t);
                         end
                 end
+        end
+        if castK(k)
+            V = convertirSorties(T, k, V);
+        end
+    end
+end
+
+% Les sorties d'un bloc ramenées à leur type : arrondies, repliées ou
+% saturées aux bornes d'un entier, à la précision d'un single, à 0 ou 1
+% pour un booléen.
+function V = convertirSorties(T, k, V)
+    pd = T.pd(k);
+    for q = 1:T.nOut(k)
+        type = T.typePort(pd + q - 1);
+        if type > 2
+            a = T.poA(pd + q - 1);
+            b = T.poB(pd + q - 1);
+            V(a:b) = convertirType(type, T.arrondiK(k), T.saturerK(k), V(a:b));
         end
     end
 end

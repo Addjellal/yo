@@ -504,8 +504,20 @@ function resultat = assembler(c, T, J, instants)
         rangs(i) = double(c.p{sorties(i)}.Port);
     end
     [~, ordre] = sort(rangs);
+    typesSorties = zeros(1, numel(sorties));
     for k = sorties(ordre)
         yout = [yout, reshape(parBloc{k}, N, [])]; %#ok<AGROW>
+    end
+    for i = 1:numel(sorties)
+        source = c.entrees{sorties(i)}(1);
+        typesSorties(i) = 2;
+        if source > 0
+            typesSorties(i) = c.typePort(source);
+        end
+    end
+    % des sorties toutes d'un même type rendent yout de ce type
+    if ~isempty(typesSorties) && all(typesSorties == typesSorties(1)) && typesSorties(1) > 2
+        yout = cast(yout, matlibre_sl_types('classe', typesSorties(1)));
     end
     resultat.yout = yout;
 end
@@ -548,6 +560,11 @@ function resultat = deposer(c, T, J, instants, resultat)
         end
         p = c.p{R.bloc};
         donnees = forme(J.releve(R.lignes, :), R.dims, N);
+        % la variable a la classe du signal : int8, single, logical...
+        source = c.entrees{R.bloc}(1);
+        if source > 0 && c.typePort(source) > 2
+            donnees = cast(donnees, matlibre_sl_types('classe', c.typePort(source)));
+        end
         switch p.SaveFormat
             case 'Array'
                 valeur = donnees;

@@ -707,8 +707,8 @@ cas = {
     'sign',              {},                                         @(v) sign(v),           0
     'saturation',        {'UpperLimit', 0.5, 'LowerLimit', -0.5},    @(v) min(max(v, -0.5), 0.5), [0.5 -0.5]
     'deadzone',          {'UpperValue', 0.4, 'LowerValue', -0.4},    @(v) (v > 0.4) .* (v - 0.4) + (v < -0.4) .* (v + 0.4), [0.4 -0.4]
-    'comparetoconstant', {'relop', '>=', 'const', 0.2},              @(v) double(v >= 0.2),  0.2
-    'comparetozero',     {'relop', '>'},                             @(v) double(v > 0),     0
+    'comparetoconstant', {'relop', '>=', 'const', 0.2, 'OutDataTypeStr', 'double'}, @(v) double(v >= 0.2), 0.2
+    'comparetozero',     {'relop', '>', 'OutDataTypeStr', 'double'}, @(v) double(v > 0),     0
     'coulombfriction',   {'Offset', 1, 'Gain', 2},                   @(v) sign(v) .* (1 + 2 * abs(v)), 0
     };
 duree = 3;
@@ -731,9 +731,11 @@ for kC = 1:size(cas, 1)
                        r.signaux.x(end), attendu));
     end
 end
-% Deux entrées : la comparaison, le plus grand, l'aiguillage.
+% Deux entrées : la comparaison, le plus grand, l'aiguillage. Un
+% comparateur rend un booléen, que l'intégrateur refuse comme dans
+% Simulink : on lui demande un double (OutDataTypeStr).
 cas2 = {
-    'relational', {'Operator', '<'},       @(v) double(v < 0.1)
+    'relational', {'Operator', '<', 'OutDataTypeStr', 'double'}, @(v) double(v < 0.1)
     'minmax',     {'Function', 'max'},     @(v) max(v, 0.1)
     };
 for kC = 1:size(cas2, 1)
@@ -3865,6 +3867,120 @@ fprintf('S-fonctions de niveau 2 : %d cas d''erreur verifies\n', size(casErreurs
 rmpath(dossierSFonctions);
 rmdir(dossierSFonctions, 's');
 
+%% ---------------------------------------------- 30. Types de données propagés
+% Chaque signal a un type — double, single, int8 à uint32, boolean — que
+% Simulink propage de bloc en bloc : une constante a celui de sa valeur
+% ou de son OutDataTypeStr, un comparateur rend un booléen, un bloc de
+% calcul hérite du type de ses entrées et y ramène son résultat —
+% arrondi selon RndMeth, replié au-delà des bornes, ou saturé si
+% SaturateOnIntegerOverflow vaut 'on'.
+cas = {
+    % bloc      a            b            parametres                              attendu   classe
+    'sum',      int8(100),   int8(100),   {},                                     -56,      'int8'
+    'sum',      int8(100),   int8(100),   {'SaturateOnIntegerOverflow', 'on'},    127,      'int8'
+    'sum',      uint8(5),    uint8(10),   {'Signs', '+-'},                        251,      'uint8'
+    'sum',      uint8(5),    uint8(10),   {'Signs', '+-', 'SaturateOnIntegerOverflow', 'on'}, 0, 'uint8'
+    'product',  int16(7),    int16(2),    {'Inputs', '*/'},                       3,        'int16'
+    'product',  int16(7),    int16(2),    {'Inputs', '*/', 'RndMeth', 'Nearest'}, 4,        'int16'
+    'product',  int16(-7),   int16(2),    {'Inputs', '*/', 'RndMeth', 'Floor'},   -4,       'int16'
+    'product',  int16(300),  int16(300),  {},                                     24464,    'int16'
+    'sum',      single(1),   single(1e-8), {},                                    1,        'single'
+    'sum',      int8(3),     2.5,         {},                                     5.5,      'double'
+    'relational', 3,         4,           {'Operator', '<'},                      1,        'logical'
+    'switch',   int8(-5),    int8(1),     {},                                     -5,       'int8'
+    };
+for kT = 1:size(cas, 1)
+    m = typesDeux(cas{kT, 1}, cas{kT, 2}, cas{kT, 3}, cas{kT, 4});
+    if strcmp(cas{kT, 1}, 'switch')
+        m = add_block(m, 'constant', 'c', 'Value', int8(9));
+        m = add_line(m, 'c/1', 'op/3');
+    end
+    r = sim(m, 'StopTime', 1);
+    assert(strcmp(class(r.yout), cas{kT, 6}) && double(r.yout(end)) == cas{kT, 5}, ...
+           sprintf('types, cas %d (%s) : %s %g attendu, %s %g rendu', kT, cas{kT, 1}, ...
+                   cas{kT, 6}, cas{kT, 5}, class(r.yout), double(r.yout(end))));
+end
+fprintf('types de donnees : %d cas de calcul verifies\n', size(cas, 1));
+
+% Le gain d'un entier, arrondi par défaut vers le bas.
+m = new_system('gainEntier');
+m = add_block(m, 'constant', 'a', 'Value', int8(-3));
+m = add_block(m, 'gain', 'g', 'Gain', 0.5);
+m = add_block(m, 'gain', 'z', 'Gain', 0.5, 'RndMeth', 'Zero');
+m = add_block(m, 'outport', 'o1');
+m = add_block(m, 'outport', 'o2');
+m = add_line(m, 'a/1', 'g/1');
+m = add_line(m, 'a/1', 'z/1');
+m = add_line(m, 'g/1', 'o1/1');
+m = add_line(m, 'z/1', 'o2/1');
+r = sim(m, 'StopTime', 1);
+assert(isequal(r.yout(end, :), int8([-2 -1])), 'gain d''un int8 : Floor, puis Zero');
+
+% Le type va jusqu'à l'espace de travail : To Workspace range la classe du
+% signal ; une constante typée par OutDataTypeStr, une Data Type
+% Conversion, une MATLAB Function donnent le leur.
+m = new_system('jusquau');
+m = add_block(m, 'constant', 'c', 'Value', 200, 'OutDataTypeStr', 'uint8');
+m = add_block(m, 'datatypeconversion', 'd', 'OutDataTypeStr', 'int16');
+m = add_block(m, 'matlabfunction', 'f', 'Script', sprintf('function y = f(u)\ny = single(u) / 3;'));
+m = add_block(m, 'toworkspace', 't1', 'VariableName', 'enUint8', 'SaveFormat', 'Array');
+m = add_block(m, 'toworkspace', 't2', 'VariableName', 'enInt16', 'SaveFormat', 'Array');
+m = add_block(m, 'toworkspace', 't3', 'VariableName', 'enSingle', 'SaveFormat', 'Array');
+m = add_line(m, 'c/1', 'd/1');
+m = add_line(m, 'c/1', 't1/1');
+m = add_line(m, 'd/1', 't2/1');
+m = add_line(m, 'd/1', 'f/1');
+m = add_line(m, 'f/1', 't3/1');
+sim(m, 'StopTime', 1);
+assert(strcmp(class(enUint8), 'uint8') && enUint8(end) == 200 && ...
+       strcmp(class(enInt16), 'int16') && enInt16(end) == 200 && ...
+       strcmp(class(enSingle), 'single') && enSingle(end) == single(200) / 3, ...
+       'To Workspace range la classe du signal');
+clear enUint8 enInt16 enSingle
+
+% Les erreurs de type, comme Simulink les donne.
+fusion = new_system('fusion');
+fusion = add_block(fusion, 'constant', 'a', 'Value', int8(1));
+fusion = add_block(fusion, 'constant', 'b', 'Value', 2);
+fusion = add_block(fusion, 'merge', 'm');
+fusion = add_line(fusion, 'a/1', 'm/1');
+fusion = add_line(fusion, 'b/1', 'm/2');
+sortieTypee = new_system('sortieTypee');
+sortieTypee = add_block(sortieTypee, 'constant', 'c', 'Value', 1);
+sortieTypee = add_block(sortieTypee, 'outport', 'o', 'OutDataTypeStr', 'int16');
+sortieTypee = add_line(sortieTypee, 'c/1', 'o/1');
+casErreurs = {
+    @() sim(add_line(add_block(add_block(new_system('entier'), 'constant', 'c', 'Value', ...
+        int8(1)), 'integrator', 'i'), 'c/1', 'i/1')), ...
+        'Simulink:DataType:InputPortDataTypeMismatch', 'entier/i'
+    @() sim(add_line(add_block(add_block(new_system('logique'), 'constant', 'c', 'Value', ...
+        true), 'transferfcn', 'h'), 'c/1', 'h/1')), ...
+        'Simulink:DataType:InputPortDataTypeMismatch', 'boolean'
+    @() sim(add_line(add_block(add_block(new_system('trig'), 'constant', 'c', 'Value', ...
+        uint8(1)), 'trigonometry', 't'), 'c/1', 't/1')), ...
+        'Simulink:DataType:InputPortDataTypeMismatch', 'trig/t'
+    @() sim(fusion), 'Simulink:DataType:MergeDataTypeMismatch', 'fusion/m'
+    @() sim(sortieTypee), 'Simulink:DataType:InputPortDataTypeMismatch', 'sortieTypee/o'
+    @() sim(add_block(new_system('deborde'), 'constant', 'c', 'Value', 300, 'OutDataTypeStr', ...
+        'int8')), 'Simulink:Parameters:ParamOverflow', 'deborde/c'
+    @() sim(add_block(new_system('inconnu'), 'constant', 'c', 'OutDataTypeStr', 'int7')), ...
+        'Simulink:DataType:UnknownDataType', 'int7'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('types de donnees, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('types de donnees : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -4032,4 +4148,16 @@ function m = niveau2Avec(nom, parametres)
     m = add_block(m, 'terminator', 't');
     m = add_line(m, 'u/1', 's/1');
     m = add_line(m, 's/1', 't/1');
+end
+
+% Un bloc a deux entrees, nourri de deux constantes.
+function m = typesDeux(type, valeurA, valeurB, parametres)
+    m = new_system('typesDeux');
+    m = add_block(m, 'constant', 'a', 'Value', valeurA);
+    m = add_block(m, 'constant', 'b', 'Value', valeurB);
+    m = add_block(m, type, 'op', parametres{:});
+    m = add_block(m, 'outport', 'y');
+    m = add_line(m, 'a/1', 'op/1');
+    m = add_line(m, 'b/1', 'op/2');
+    m = add_line(m, 'op/1', 'y/1');
 end

@@ -165,8 +165,10 @@ totalité.
    Iterator) et appelés par fonction y sont aussi, comme les entrées
    externes de `sim`, les références de modèle, les tables n-D, les
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
-   Manquent : les types de données propagés d'un bloc à l'autre, et
-   les fonctions graphiques, jonctions et tables de vérité de Stateflow.
+   Les types de données se propagent de bloc en bloc — double, single,
+   entiers, booléens —, arrondis, repliés ou saturés comme dans Simulink.
+   Manquent : les fonctions graphiques, jonctions et tables de vérité de
+   Stateflow.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :

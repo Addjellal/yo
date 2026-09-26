@@ -239,6 +239,10 @@ function c = compiler(modele, options)
     c.dims = propagerDimensions(c);
     c.dimsCourants = c.dims;   % la forme des bus se lit sur les dimensions
     verifierTypesBus(c);
+
+    % --- 6 bis. types de données ---------------------------------------------
+    c.typePort = matlibre_sl_types('propager', c);
+    [c.castK, c.arrondiK, c.saturerK] = conversionsDesSorties(c);
     c.largeur = zeros(1, c.nPorts);
     for gp = 1:c.nPorts
         c.largeur(gp) = prod(c.dims{gp});
@@ -368,6 +372,14 @@ function p = lireParametres(entree, bloc, chemin)
             if ~(isnumeric(v) || islogical(v))
                 error('Simulink:Parameters:InvalidValue', ...
                       'Le parametre ''%s'' du bloc ''%s'' doit etre numerique.', nom, chemin);
+            end
+            if ~isa(v, 'double')
+                % la classe d'origine, que la propagation des types lit :
+                % une constante int8(5) donne un signal int8
+                if ~isfield(p, 'Classes')
+                    p.Classes = struct();
+                end
+                p.Classes.(nom) = class(v);
             end
             if any(strcmp(nom, {'SampleTime', 'tsamp', 'samptime', 'sample_time', 'Ts', ...
                                 'OutPortSampleTime'}))
@@ -2981,6 +2993,38 @@ function forme = formeBus(c, gp)
         forme(end + 1) = struct('nom', noms{j}, 'dims', d, 'largeur', w, 'debut', debut, ...
                                 'sous', {formeBus(c, source)}); %#ok<AGROW>
         debut = debut + w;
+    end
+end
+
+% Les blocs dont une sortie n'est pas double, et qui calculent : leur
+% résultat se ramène au type de la sortie, arrondi selon RndMeth (Floor
+% par défaut, Zero pour un produit) et, au-delà des bornes, replié — ou
+% saturé si SaturateOnIntegerOverflow vaut 'on'. Les blocs d'aiguillage
+% et de mémoire ne font que transmettre des valeurs déjà typées.
+function [castK, arrondiK, saturerK] = conversionsDesSorties(c)
+    aiguillage = {'zoh', 'memory', 'delay', 'ratetransition', 'from', 'selector', 'reshape', ...
+                  'demux', 'mux', 'concatenate', 'merge', 'switch', 'multiportswitch', ...
+                  'manualswitch', 'busselector', 'tappeddelay', 'signalconversion', ...
+                  'datatypeconversion', 'constant', 'matlabfunction', 'chart', 'logic', ...
+                  'relational', 'comparetoconstant', 'comparetozero', 'detectchange', ...
+                  'detectincrease', 'detectdecrease', 'intervaltest'};
+    arrondis = {'Zero', 'Nearest', 'Round', 'Floor', 'Ceiling', 'Convergent', 'Simplest'};
+    castK = false(1, c.n);
+    arrondiK = 4 * ones(1, c.n);
+    saturerK = false(1, c.n);
+    for k = 1:c.n
+        if c.nOut(k) == 0 || any(strcmp(c.types{k}, aiguillage))
+            continue
+        end
+        ports = c.portDebut(k) + (0:c.nOut(k) - 1);
+        castK(k) = any(c.typePort(ports) ~= 2);
+        p = c.p{k};
+        if isfield(p, 'RndMeth')
+            arrondiK(k) = find(strcmp(arrondis, p.RndMeth), 1);
+        end
+        if isfield(p, 'SaturateOnIntegerOverflow')
+            saturerK(k) = strcmp(p.SaturateOnIntegerOverflow, 'on');
+        end
     end
 end
 
