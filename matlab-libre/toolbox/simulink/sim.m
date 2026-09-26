@@ -16,21 +16,27 @@ function varargout = sim(modele, varargin)
 %   Les réglages sont ceux de la boîte « Paramètres de configuration » de
 %   Simulink, que SET_PARAM(MODELE,'Solver','ode4') pose sur le modèle et
 %   que GET_PARAM relit : StartTime, StopTime, Solver, FixedStep, RelTol,
-%   AbsTol, MaxStep, MinStep, InitialStep, ZeroCrossControl, et les
+%   AbsTol, MaxStep, MinStep, InitialStep, MaxOrder, ExtrapolationOrder,
+%   NumberNewtonIterations, ZeroCrossControl, et les
 %   diagnostics AlgebraicLoopMsg, UnconnectedInputMsg et
 %   UnconnectedOutputMsg (none, warning ou error). Un argument explicite
 %   l'emporte toujours sur le réglage enregistré.
 %
 %   Les solveurs à pas fixe : ode1 (Euler, celui par défaut), ode2
-%   (Heun), ode3 (Bogacki-Shampine), ode4 (Runge-Kutta) et ode5
-%   (Dormand-Prince) ; l'erreur d'un solveur d'ordre p décroît comme le
-%   pas à la puissance p. FixedStepDiscrete sert aux modèles sans état
-%   continu, et FixedStepAuto choisit ode3 ou le discret.
+%   (Heun), ode3 (Bogacki-Shampine), ode4 (Runge-Kutta), ode5
+%   (Dormand-Prince) et ode8 (Prince-Dormand) ; l'erreur d'un solveur
+%   d'ordre p décroît comme le pas à la puissance p. Pour les systèmes
+%   raides, ode1be (Euler implicite) et ode14x (Euler implicite
+%   extrapolé, d'ordre ExtrapolationOrder), qui font NumberNewtonIterations
+%   itérations de Newton par pas. FixedStepDiscrete sert aux modèles sans
+%   état continu, et FixedStepAuto choisit ode3 ou le discret.
 %
 %   Les solveurs à pas variable : ode45 (Dormand-Prince 5(4)), ode23
-%   (Bogacki-Shampine 3(2)), ode23s (Rosenbrock, pour les systèmes
-%   raides), VariableStepDiscrete, et VariableStepAuto qui choisit ode45
-%   ou le discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
+%   (Bogacki-Shampine 3(2)), ode113 (Adams, d'ordre variable, pour les
+%   tolérances fines), et pour les systèmes raides ode15s (NDF, d'ordre 1
+%   à MaxOrder), ode23s (Rosenbrock), ode23t (trapèzes) et ode23tb
+%   (TR-BDF2) ; VariableStepDiscrete, et VariableStepAuto qui choisit
+%   ode45 ou le discret. Le pas suit l'erreur estimée — RelTol, AbsTol —, borné
 %   par MaxStep (le cinquantième de la durée par défaut) et MinStep. Il
 %   s'arrête exactement sur les instants d'échantillonnage et les
 %   cassures des sources (échelon, fronts d'impulsion) ; un seuil franchi
@@ -167,9 +173,9 @@ function varargout = sim(modele, varargin)
     if any(strcmp(solveur, {'fixedstepdiscrete', 'variablestepdiscrete'})) && continus
         k = find(c.xA > 0, 1);
         if variable
-            autres = 'ode45, ode23 ou ode23s';
+            autres = 'ode45, ode23, ode113, ode15s, ode23s, ode23t ou ode23tb';
         else
-            autres = 'ode1 a ode5';
+            autres = 'ode1 a ode5, ode8, ode14x ou ode1be';
         end
         error('Simulink:Engine:DiscreteSolverContinuousStates', ...
               ['Le modele ''%s'' porte des etats continus — le bloc ''%s'' en a — que ' ...
@@ -177,6 +183,9 @@ function varargout = sim(modele, varargin)
               c.nom, c.chemins{k}, char(config.Solver), autres);
     end
     T = matlibre_sl_executer('preparer', c);
+    T.reglagesSolveur = struct('ExtrapolationOrder', config.ExtrapolationOrder, ...
+                               'NumberNewtonIterations', config.NumberNewtonIterations, ...
+                               'MaxOrder', config.MaxOrder);
 
     if variable
         reglages = reglagesVariables(config, nomModele);
@@ -256,7 +265,8 @@ function [config, imposes] = lireArguments(config, args)
             if ~isempty(demande)
                 config = poser(config, 'Solver', demande);
             end
-            for nom = {'FixedStep', 'RelTol', 'AbsTol', 'MaxStep', 'MinStep', 'InitialStep'}
+            for nom = {'FixedStep', 'RelTol', 'AbsTol', 'MaxStep', 'MinStep', 'InitialStep', ...
+                       'MaxOrder'}
                 choisi = simget(troisieme, nom{1});
                 if ~isempty(choisi)
                     config = poser(config, nom{1}, choisi);
@@ -329,6 +339,7 @@ function r = reglagesVariables(config, nomModele)
                'precision des nombres : prenez-la au-dessus de %g.'], r.RelTol, ...
               nomModele, 100 * eps);
     end
+    r.MaxOrder = config.MaxOrder;
     if ~ischar(r.MinStep) && ~ischar(r.MaxStep) && r.MinStep > r.MaxStep
         error('Simulink:Config:InvalidValue', ...
               ['Le pas minimal %g du modele ''%s'' depasse son pas maximal %g.'], ...

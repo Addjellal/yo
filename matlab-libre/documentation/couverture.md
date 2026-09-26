@@ -119,11 +119,15 @@ totalité.
    dans Simulink : paramètres, ports, dimensions des signaux —
    scalaires, vecteurs, matrices —, périodes d'échantillonnage, ordre de
    calcul ; chaque erreur nomme le bloc par son chemin. Les boucles
-   algébriques sont résolues par la méthode de Newton. Neuf solveurs :
-   ode1 à ode5 et FixedStepDiscrete à pas fixe ; ode45, ode23 et ode23s
-   à pas variable, qui s'arrêtent sur les instants d'échantillonnage et
-   les cassures des sources, et localisent les passages par zéro des
-   relais, saturations, aiguillages et comparaisons. Les sous-systèmes
+   algébriques sont résolues par la méthode de Newton. Les solveurs sont
+   ceux de Simulink, sauf odeN et daessc : ode1 à ode5, ode8, ode1be et
+   ode14x (implicites, pour les systèmes raides) et FixedStepDiscrete à
+   pas fixe ; ode45, ode23, ode113 (Adams, d'ordre 1 à 12), ode15s (NDF,
+   d'ordre 1 à MaxOrder), ode23s, ode23t et ode23tb à pas variable, qui
+   s'arrêtent sur les instants d'échantillonnage et les cassures des
+   sources, et localisent les passages par zéro des relais, saturations,
+   aiguillages, comparaisons et intégrateurs bornés ; les solveurs à pas
+   multiples repartent de l'ordre 1 après chaque discontinuité. Les sous-systèmes
    conditionnels — Enable, Trigger, If et Switch Case avec leurs
    sous-systèmes d'action, Merge — calculent quand leur garde le
    permet, et tiennent ou remettent à zéro sorties et états comme dans

@@ -2189,6 +2189,47 @@ int main(int argc, char** argv) {
                                               QStringLiteral("RelTol")}),
                          "le type, le solveur et la tolerance ressortent ensemble");
             }
+            {
+                // Les options propres a un solveur ne se reglent que lui
+                // choisi : l'ordre maximal d'ode15s, l'extrapolation
+                // d'ode14x, les iterations de Newton d'ode14x et d'ode1be.
+                QMap<QString, QString> valeurs;
+                valeurs.insert(QStringLiteral("SolverType"), QStringLiteral("Variable-step"));
+                valeurs.insert(QStringLiteral("Solver"), QStringLiteral("ode45"));
+                valeurs.insert(QStringLiteral("MaxOrder"), QStringLiteral("5"));
+                valeurs.insert(QStringLiteral("ExtrapolationOrder"), QStringLiteral("4"));
+                valeurs.insert(QStringLiteral("NumberNewtonIterations"), QStringLiteral("1"));
+                DialogueConfiguration boite(
+                    QStringLiteral("m"), valeurs,
+                    {QStringLiteral("ode4"), QStringLiteral("ode14x"), QStringLiteral("ode1be")},
+                    {QStringLiteral("ode45"), QStringLiteral("ode15s")});
+                verifier(!boite.champ(QStringLiteral("MaxOrder"))->isEnabled() &&
+                             !boite.champ(QStringLiteral("ExtrapolationOrder"))->isEnabled(),
+                         "avec ode45, ni l'ordre maximal ni l'extrapolation ne se reglent");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode15s")));
+                verifier(boite.champ(QStringLiteral("MaxOrder"))->isEnabled(),
+                         "ode15s choisi, son ordre maximal se regle");
+                boite.champ(QStringLiteral("MaxOrder"))->setText(QStringLiteral("2"));
+                boite.choixType()->setCurrentIndex(
+                    boite.choixType()->findText(QStringLiteral("Fixed-step")));
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode14x")));
+                verifier(!boite.champ(QStringLiteral("MaxOrder"))->isEnabled() &&
+                             boite.champ(QStringLiteral("ExtrapolationOrder"))->isEnabled() &&
+                             boite.champ(QStringLiteral("NumberNewtonIterations"))->isEnabled(),
+                         "ode14x choisi, l'extrapolation et les iterations se reglent");
+                boite.choixSolveur()->setCurrentIndex(
+                    boite.choixSolveur()->findText(QStringLiteral("ode1be")));
+                verifier(!boite.champ(QStringLiteral("ExtrapolationOrder"))->isEnabled() &&
+                             boite.champ(QStringLiteral("NumberNewtonIterations"))->isEnabled(),
+                         "ode1be choisi, les iterations seules");
+                QStringList noms;
+                for (const auto& c : boite.changements()) noms << c.first;
+                verifier(noms.contains(QStringLiteral("MaxOrder")) &&
+                             noms.contains(QStringLiteral("Solver")),
+                         "l'ordre maximal change ressort avec le solveur");
+            }
             verifier(simulink->choixSolveur()->findText(QStringLiteral("ode45")) >= 0,
                      "la barre offre aussi les solveurs a pas variable");
             {

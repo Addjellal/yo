@@ -891,7 +891,7 @@ casErreurs = {
     @() sim(decalage, 'Solver', 'ode45'), 'Simulink:SampleTime:InvalidOffset', 'decalage/h'
     @() sim(m, 'Solver', 'ode45', 'RelTol', -1), 'Simulink:Config:InvalidValue', 'RelTol'
     @() sim(m, 'Solver', 'ode45', 'MinStep', 1, 'MaxStep', 0.1), 'Simulink:Config:InvalidValue', 'pas minimal'
-    @() set_param(m, 'Solver', 'ode113'), 'Simulink:Commands:SolveurInconnu', 'ode23s'
+    @() set_param(m, 'Solver', 'daessc'), 'Simulink:Commands:SolveurInconnu', 'ode15s'
     };
 for kE = 1:size(casErreurs, 1)
     vu = '';
@@ -1680,6 +1680,283 @@ for kE = 1:size(casErreurs, 1)
            sprintf('bus, cas %d : %s attendu, %s rendu (%s)', kE, casErreurs{kE, 2}, vu, message));
 end
 fprintf('bus et types : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------------------ 19. Tous les solveurs de Simulink
+% Les solveurs à pas fixe qui manquaient : ode8 converge à l'ordre huit,
+% ode1be à l'ordre un, ode14x à l'ordre de son extrapolation — quel que
+% soit le nombre d'itérations de Newton sur ce modèle linéaire.
+m = new_system('ordresHauts');
+m = add_block(m, 'integrator', 'x', 'InitialCondition', 1);
+m = add_block(m, 'gain', 'k', 'Gain', -1);
+m = add_block(m, 'sine', 'force', 'Frequency', 2);
+m = add_block(m, 'sum', 's', 'Signs', '++');
+m = add_line(m, 'x', 'k');
+m = add_line(m, 'k', 's', 1);
+m = add_line(m, 'force', 's', 2);
+m = add_line(m, 's', 'x');
+exacte = @(t) 7 / 5 * exp(-t) + (sin(2 * t) - 2 * cos(2 * t)) / 5;
+casOrdres = {
+    'ode8',   {},                                                   8, [0.8 0.4 0.2]
+    'ode1be', {},                                                   1, [0.1 0.05 0.025]
+    'ode14x', {},                                                   4, [0.2 0.1 0.05]
+    'ode14x', {'ExtrapolationOrder', 2},                            2, [0.1 0.05 0.025]
+    'ode14x', {'ExtrapolationOrder', 3, 'NumberNewtonIterations', 3}, 3, [0.2 0.1 0.05]
+    };
+for kS = 1:size(casOrdres, 1)
+    erreurs = zeros(1, 3);
+    for kP = 1:3
+        r = sim(m, 'Solver', casOrdres{kS, 1}, 'FixedStep', casOrdres{kS, 4}(kP), ...
+                'StopTime', 4, casOrdres{kS, 2}{:});
+        erreurs(kP) = abs(r.signaux.x(end) - exacte(4));
+    end
+    mesure = log2(erreurs(2) / erreurs(3));
+    assert(abs(mesure - casOrdres{kS, 3}) < 0.35, ...
+           sprintf('%s converge a l''ordre %g, non %d', casOrdres{kS, 1}, mesure, ...
+                   casOrdres{kS, 3}));
+end
+
+% Un système raide, x' = 1000 (cos t - x). Au pas de 0,05 s, Euler
+% explicite diverge ; ode1be et ode14x, implicites, suivent la solution.
+m = new_system('raide');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'trigonometry', 'consigne', 'Operator', 'cos');
+m = add_block(m, 'sum', 'ecart', 'Signs', '+-');
+m = add_block(m, 'gain', 'raideur', 'Gain', 1000);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'horloge', 'consigne');
+m = add_line(m, 'consigne', 'ecart', 1);
+m = add_line(m, 'x', 'ecart', 2);
+m = add_line(m, 'ecart', 'raideur');
+m = add_line(m, 'raideur', 'x');
+lambda = 1000;
+exacteRaide = @(t) (lambda ^ 2 * cos(t) + lambda * sin(t)) / (lambda ^ 2 + 1) - ...
+                   lambda ^ 2 / (lambda ^ 2 + 1) * exp(-lambda * t);
+rEuler = sim(m, 'Solver', 'ode1', 'FixedStep', 0.05, 'StopTime', 2);
+assert(~(abs(rEuler.signaux.x(end)) < 10), 'Euler explicite diverge sur le systeme raide');
+for solveur = {'ode1be', 'ode14x'}
+    r = sim(m, 'Solver', solveur{1}, 'FixedStep', 0.05, 'StopTime', 2);
+    assert(abs(r.signaux.x(end) - exacteRaide(2)) < 1e-4, ...
+           [solveur{1} ' : l''implicite tient le systeme raide au grand pas']);
+end
+% À pas variable, les solveurs raides le traversent en bien moins de pas
+% qu'ode45 et ode113, que la stabilité bride ; tous tiennent la tolérance.
+r45 = sim(m, 'Solver', 'ode45', 'StopTime', 2, 'RelTol', 1e-4, 'MaxStep', Inf);
+for solveur = {'ode15s', 'ode23t', 'ode23tb', 'ode23s'}
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 2, 'RelTol', 1e-4, 'MaxStep', Inf);
+    assert(numel(r.temps) * 5 < numel(r45.temps), ...
+           sprintf('%s : %d pas, contre %d pour ode45', solveur{1}, numel(r.temps), ...
+                   numel(r45.temps)));
+    assert(max(abs(r.signaux.x - exacteRaide(r.temps))) < 2e-3, ...
+           [solveur{1} ' : la solution du systeme raide']);
+end
+r113 = sim(m, 'Solver', 'ode113', 'StopTime', 2, 'RelTol', 1e-4, 'MaxStep', Inf);
+assert(max(abs(r113.signaux.x - exacteRaide(r113.temps))) < 2e-3, ...
+       'ode113 tient le systeme raide, a petits pas');
+
+% La tolérance commande l'erreur, pour chaque nouveau solveur à pas
+% variable : plus fine, une erreur plus petite et plus de pas.
+m = new_system('decroissance');
+m = add_block(m, 'gain', 'k', 'Gain', -1);
+m = add_block(m, 'integrator', 'x', 'InitialCondition', 1);
+m = add_line(m, 'x', 'k');
+m = add_line(m, 'k', 'x');
+nouveaux = {'ode113', 'ode15s', 'ode23t', 'ode23tb'};
+for solveur = nouveaux
+    erreurs = zeros(1, 3);
+    nombresDePas = zeros(1, 3);
+    tolerances = [1e-3 1e-5 1e-7];
+    for kT = 1:3
+        r = sim(m, 'Solver', solveur{1}, 'RelTol', tolerances(kT), 'MaxStep', Inf, ...
+                'StopTime', 5);
+        erreurs(kT) = max(abs(r.signaux.x - exp(-r.temps)));
+        nombresDePas(kT) = numel(r.temps) - 1;
+        assert(erreurs(kT) < 100 * tolerances(kT), ...
+               sprintf('%s : erreur %g pour la tolerance %g', solveur{1}, erreurs(kT), ...
+                       tolerances(kT)));
+    end
+    assert(all(diff(erreurs) < 0) && all(diff(nombresDePas) > 0), ...
+           [solveur{1} ' : une tolerance plus fine, une erreur plus petite et plus de pas']);
+end
+% L'ordre maximal d'ode15s : plus il est haut, moins il faut de pas à
+% tolérance fine.
+pasParOrdre = zeros(1, 3);
+ordresMax = [1 3 5];
+for kO = 1:3
+    r = sim(m, 'Solver', 'ode15s', 'RelTol', 1e-6, 'StopTime', 5, 'MaxStep', Inf, ...
+            'MaxOrder', ordresMax(kO));
+    pasParOrdre(kO) = numel(r.temps);
+    assert(max(abs(r.signaux.x - exp(-r.temps))) < 1e-3, ...
+           sprintf('ode15s d''ordre au plus %d tient la tolerance', ordresMax(kO)));
+end
+assert(all(diff(pasParOrdre) < 0), 'un ordre maximal plus haut, moins de pas');
+
+% Chaque nouveau solveur croise les autres familles de blocs : blocs
+% échantillonnés à deux cadences, cassures des sources, passage par zéro
+% d'une saturation, intégrateur borné, retard pur, boucle algébrique,
+% arrêt. À chaque discontinuité, la mémoire des pas multiples repart.
+modeles = struct();
+m = new_system('multicadence');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'zoh', 'lent', 'SampleTime', 0.3);
+m = add_block(m, 'discretetransferfcn', 'filtre', 'Numerator', [0 0.4], ...
+              'Denominator', [1 -0.6], 'SampleTime', [0.2 0.05]);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'horloge', 'lent');
+m = add_line(m, 'lent', 'filtre');
+m = add_line(m, 'lent', 'x');
+modeles.cadences = m;
+rFixe = sim(m, 'Solver', 'ode4', 'FixedStep', 0.05, 'StopTime', 2);
+m = new_system('cassures');
+m = add_block(m, 'step', 'echelon', 'Time', 0.4567, 'After', 2);
+m = add_block(m, 'pulsegenerator', 'train', 'Period', 0.3, 'PulseWidth', 40, ...
+              'PhaseDelay', 0.05);
+m = add_block(m, 'integrator', 'xe');
+m = add_block(m, 'integrator', 'xp');
+m = add_line(m, 'echelon', 'xe');
+m = add_line(m, 'train', 'xp');
+modeles.cassures = m;
+m = new_system('franchissement');
+m = add_block(m, 'sine', 'entree', 'Frequency', 2, 'Bias', 0.3);
+m = add_block(m, 'saturation', 'bloc', 'UpperLimit', 0.5, 'LowerLimit', -0.5);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'entree', 'bloc');
+m = add_line(m, 'bloc', 'x');
+modeles.saturation = m;
+u = @(t) sin(2 * t) + 0.3;
+franchit = @(c) sort([(asin(c - 0.3) + 2 * pi * (0:1)) / 2, ...
+                      (pi - asin(c - 0.3) + 2 * pi * (0:1)) / 2]);
+attenduSaturation = integrerParMorceaux(@(t) min(max(u(t), -0.5), 0.5), 0, 3, ...
+                                        [franchit(0.5), franchit(-0.5)]);
+m = new_system('borne');
+m = add_block(m, 'sine', 'derivee', 'Amplitude', 2, 'Phase', pi / 2);
+m = add_block(m, 'integrator', 'x', 'LimitOutput', 'on', 'UpperSaturationLimit', 1.5);
+m = add_line(m, 'derivee', 'x');
+modeles.borne = m;
+m = new_system('retard');
+m = add_block(m, 'sine', 'entree', 'Frequency', 2);
+m = add_block(m, 'transportdelay', 'retard', 'DelayTime', 0.37, 'BufferSize', 16);
+m = add_line(m, 'entree', 'retard');
+modeles.retard = m;
+m = new_system('boucle');
+m = add_block(m, 'sine', 'entree');
+m = add_block(m, 'sum', 'e', 'Signs', '+-');
+m = add_block(m, 'gain', 'k', 'Gain', 3);
+m = add_block(m, 'integrator', 'x');
+m = add_line(m, 'entree', 'e', 1);
+m = add_line(m, 'k', 'e', 2);
+m = add_line(m, 'e', 'k');
+m = add_line(m, 'e', 'x');
+modeles.boucle = set_param(m, 'AlgebraicLoopMsg', 'none');
+m = new_system('arret');
+m = add_block(m, 'clock', 'horloge');
+m = add_block(m, 'comparetoconstant', 'assez', 'relop', '>=', 'const', 2.345);
+m = add_block(m, 'stopsimulation', 'stop');
+m = add_line(m, 'horloge', 'assez');
+m = add_line(m, 'assez', 'stop');
+modeles.arret = m;
+% Les solveurs d'ordre 2 accumulent une erreur par pas plus grande à même
+% tolérance : leur seuil suit leur ordre.
+seuils = struct('ode113', 1e-6, 'ode15s', 1e-6, 'ode23t', 2e-5, 'ode23tb', 2e-5);
+for solveur = nouveaux
+    s = solveur{1};
+    r = sim(modeles.cadences, 'Solver', s, 'StopTime', 2);
+    for instant = [0:0.3:2, 0.05:0.2:2]
+        iV = find(abs(r.temps - instant) < 1e-12, 1);
+        iF = find(abs(rFixe.temps - instant) < 1e-12, 1);
+        assert(~isempty(iV) && abs(r.signaux.filtre(iV) - rFixe.signaux.filtre(iF)) < 1e-12, ...
+               sprintf('%s : a %g, le filtre discret rend ce que rend le pas fixe', s, instant));
+    end
+    assert(abs(r.signaux.x(end) - sum(0.3 * (0:0.3:1.5)) - 0.2 * 1.8) < 1e-9, ...
+           [s ' : l''integrale d''une tenue est exacte']);
+    r = sim(modeles.cassures, 'Solver', s, 'StopTime', 1.25);
+    assert(abs(r.signaux.xe(end) - 2 * (1.25 - 0.4567)) < 1e-10 && ...
+           abs(r.signaux.xp(end) - 4 * 0.12) < 1e-10, ...
+           [s ' : l''echelon et les fronts tombent sur des fins de pas']);
+    r = sim(modeles.saturation, 'Solver', s, 'StopTime', 3, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+    assert(abs(r.signaux.x(end) - attenduSaturation) < seuils.(s), ...
+           sprintf('%s : la saturation bascule au bon instant (%g)', s, ...
+                   abs(r.signaux.x(end) - attenduSaturation)));
+    r = sim(modeles.borne, 'Solver', s, 'StopTime', 3, 'RelTol', 1e-8);
+    assert(abs(r.signaux.x(end) - (1.5 + 2 * (sin(3) - 1))) < 10 * seuils.(s), ...
+           [s ' : l''integrateur borne touche sa borne et la quitte au bon instant']);
+    r = sim(modeles.retard, 'Solver', s, 'StopTime', 3, 'MaxStep', 0.007);
+    attendu = sin(2 * (r.temps - 0.37));
+    attendu(r.temps < 0.37) = 0;
+    assert(max(abs(r.signaux.retard - attendu)) < 1e-4, [s ' : le retard pur interpole']);
+    r = sim(modeles.boucle, 'Solver', s, 'StopTime', 2, 'RelTol', 1e-8);
+    assert(max(abs(r.signaux.e - sin(r.temps) / 4)) < 1e-12 && ...
+           abs(r.signaux.x(end) - (1 - cos(2)) / 4) < 10 * seuils.(s), ...
+           [s ' : la boucle algebrique se resout a chaque pas']);
+    r = sim(modeles.arret, 'Solver', s, 'StopTime', Inf);
+    assert(abs(r.temps(end) - 2.345) < 1e-8, [s ' : l''arret tombe au franchissement']);
+end
+
+% Un sous-système activé dont l'état repart de zéro à chaque activation :
+% la remise est une discontinuité de l'état, que la mémoire de ode15s et
+% d'ode113 franchit en repartant ; la sortie tient à l'arrêt.
+interne = new_system('chronoRemis');
+interne = add_block(interne, 'constant', 'un', 'Value', 1);
+interne = add_block(interne, 'integrator', 'x');
+interne = add_block(interne, 'outport', 's', 'Port', 1);
+interne = add_block(interne, 'enableport', 'Enable', 'StatesWhenEnabling', 'reset');
+interne = add_line(interne, 'un', 'x');
+interne = add_line(interne, 'x', 's');
+m = new_system('activeRemise');
+m = add_block(m, 'pulsegenerator', 'porte', 'Period', 2, 'PulseWidth', 50);
+m = add_block(m, 'subsystem', 'sous', 'Model', interne);
+m = add_line(m, 'porte', 'sous/Enable');
+for solveur = nouveaux
+    r = sim(m, 'Solver', solveur{1}, 'StopTime', 3.5);
+    iCoupure = find(r.temps >= 1 - 1e-12, 1);
+    iFin = find(r.temps >= 3 - 1e-12, 1);
+    assert(abs(r.signaux.sous(iCoupure) - r.temps(iCoupure - 1)) < 1e-9 && ...
+           abs(r.signaux.sous(end) - (r.temps(iFin - 1) - 2)) < 1e-9, ...
+           [solveur{1} ' : l''etat repart de zero a la reprise, la sortie tient a l''arret']);
+end
+
+% Les réglages propres aux solveurs se vérifient comme les autres.
+m = new_system('reglagesSolveur');
+m = set_param(m, 'Solver', 'ode15s', 'MaxOrder', 2);
+assert(get_param(m, 'MaxOrder') == 2 && strcmp(get_param(m, 'SolverType'), 'Variable-step'), ...
+       'MaxOrder se pose et se relit');
+m = set_param(m, 'Solver', 'ode14x', 'ExtrapolationOrder', '3', 'NumberNewtonIterations', 2);
+assert(get_param(m, 'ExtrapolationOrder') == 3 && get_param(m, 'NumberNewtonIterations') == 2 ...
+       && strcmp(get_param(m, 'SolverType'), 'Fixed-step'), ...
+       'ode14x est a pas fixe, et ses reglages se relisent');
+o = simset('Solver', 'ode15s', 'MaxOrder', 3);
+assert(o.MaxOrder == 3, 'simset porte MaxOrder');
+decroissance = add_line(add_line(add_block(add_block(new_system('d'), 'gain', 'k', ...
+    'Gain', -1), 'integrator', 'x', 'InitialCondition', 1), 'x', 'k'), 'k', 'x');
+explose = add_line(add_line(add_block(add_block(new_system('explose'), 'math', 'carre', ...
+    'Operator', 'square'), 'integrator', 'x', 'InitialCondition', 1), 'x', 'carre'), ...
+    'carre', 'x');
+casErreurs = {
+    @() set_param(m, 'MaxOrder', 6), 'Simulink:Config:InvalidValue', 'de 1 a 5'
+    @() set_param(m, 'MaxOrder', 2.5), 'Simulink:Config:InvalidValue', 'MaxOrder'
+    @() set_param(m, 'ExtrapolationOrder', 0), 'Simulink:Config:InvalidValue', 'de 1 a 4'
+    @() set_param(m, 'NumberNewtonIterations', 0), 'Simulink:Config:InvalidValue', 'au moins'
+    @() simset('MaxOrder', 9), 'Simulink:Config:InvalidValue', 'MaxOrder'
+    @() set_param(m, 'Solver', 'odeN'), 'Simulink:Commands:SolveurInconnu', 'ode113'
+    @() sim(decroissance, 'Solver', 'ode15s', 'MaxOrder', 0), 'Simulink:Config:InvalidValue', 'MaxOrder'
+    @() sim(explose, 'Solver', 'ode15s', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'ode15s'
+    @() sim(explose, 'Solver', 'ode113', 'StopTime', 2), 'Simulink:Engine:SolverMinStepViolation', 'essayez ode15s'
+    @() sim(decroissance, 'Solver', 'VariableStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'ode15s'
+    @() sim(decroissance, 'Solver', 'FixedStepDiscrete'), 'Simulink:Engine:DiscreteSolverContinuousStates', 'ode14x'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('solveurs, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('solveurs : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
 disp('simulink : toutes les verifications passent');
 

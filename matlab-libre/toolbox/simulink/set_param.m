@@ -23,8 +23,9 @@ function modele = set_param(modele, nom, varargin)
 %   MODELE = SET_PARAM(MODELE,'Reglage',VALEUR,...) — sans nom de bloc
 %   devant, donc en nombre impair d'arguments — change les réglages du
 %   modèle lui-même, ceux de la boîte « Paramètres de configuration » de
-%   Simulink : StartTime, StopTime, Solver ('ode1' à 'ode5',
-%   'FixedStepDiscrete' à pas fixe ; 'ode45', 'ode23', 'ode23s',
+%   Simulink : StartTime, StopTime, Solver ('ode1' à 'ode5', 'ode8',
+%   'ode14x', 'ode1be', 'FixedStepDiscrete' à pas fixe ; 'ode45', 'ode23',
+%   'ode113', 'ode15s', 'ode23s', 'ode23t', 'ode23tb',
 %   'VariableStepDiscrete' à pas variable), SolverType, FixedStep,
 %   RelTol, AbsTol, MaxStep, MinStep, InitialStep, ZeroCrossControl,
 %   AlgebraicLoopMsg, UnconnectedInputMsg, UnconnectedOutputMsg... La

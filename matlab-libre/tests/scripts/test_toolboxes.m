@@ -1705,11 +1705,14 @@ end
 assert(refuseNom, 'un solveur qui n''existe pas est refuse, non ignore');
 refuseNom = false;
 try
-    simset('Solver', 'ode113');
+    simset('Solver', 'daessc');
 catch err
     refuseNom = strcmp(err.identifier, 'Simulink:Commands:SolveurInconnu') && ...
                 ~isempty(strfind(err.message, 'pas encore'));
 end
 assert(refuseNom, 'un solveur de Simulink pas encore ecrit est refuse en le disant');
+assert(strcmp(simget(simset('Solver', 'ODE113'), 'Solver'), 'ode113') && ...
+       strcmp(simget(simset('Solver', 'ode14x'), 'Solver'), 'ode14x'), ...
+       'ode113 et ode14x sont acceptes, sous leur nom canonique');
 
 disp('toolboxes : toutes les verifications passent');

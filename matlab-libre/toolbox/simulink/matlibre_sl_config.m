@@ -26,11 +26,13 @@ function varargout = matlibre_sl_config(action, varargin)
 %     StopTime             10         l'instant final
 %     SolverType           'Fixed-step'  ou 'Variable-step'
 %     Solver               'ode1'     le solveur. À pas fixe : ode1 à
-%                                     ode5, FixedStepDiscrete sans état
-%                                     continu, FixedStepAuto (ode3, ou
-%                                     le discret s'il n'y a pas d'état
-%                                     continu). À pas variable : ode45,
-%                                     ode23, ode23s (raide),
+%                                     ode5, ode8, ode14x et ode1be
+%                                     (raides), FixedStepDiscrete sans
+%                                     état continu, FixedStepAuto (ode3,
+%                                     ou le discret s'il n'y a pas
+%                                     d'état continu). À pas variable :
+%                                     ode45, ode23, ode113, ode15s,
+%                                     ode23s, ode23t et ode23tb (raides),
 %                                     VariableStepDiscrete, et
 %                                     VariableStepAuto (ode45, ou le
 %                                     discret).
@@ -38,6 +40,11 @@ function varargout = matlibre_sl_config(action, varargin)
 %     MaxStep, MinStep, InitialStep   'auto'  bornes du pas variable
 %     RelTol               1e-3       tolérance relative du pas variable
 %     AbsTol               'auto'     tolérance absolue du pas variable
+%     MaxOrder             5          l'ordre maximal d'ode15s, de 1 à 5
+%     ExtrapolationOrder   4          l'ordre d'extrapolation d'ode14x,
+%                                     de 1 à 4
+%     NumberNewtonIterations  1       les itérations de Newton d'ode14x
+%                                     et d'ode1be à chaque pas
 %     ZeroCrossControl     'UseLocalSettings'  détection des passages par zéro
 %     AlgebraicLoopMsg     'warning'  boucle algébrique : none, warning, error
 %     UnconnectedInputMsg  'warning'  entrée non reliée : none, warning, error
@@ -84,18 +91,20 @@ function d = defauts()
     d = struct('StartTime', 0, 'StopTime', 10, 'SolverType', 'Fixed-step', ...
                'Solver', 'ode1', 'FixedStep', 0.01, 'MaxStep', 'auto', ...
                'MinStep', 'auto', 'InitialStep', 'auto', 'RelTol', 1e-3, ...
-               'AbsTol', 'auto', 'ZeroCrossControl', 'UseLocalSettings', ...
+               'AbsTol', 'auto', 'MaxOrder', 5, 'ExtrapolationOrder', 4, ...
+               'NumberNewtonIterations', 1, 'ZeroCrossControl', 'UseLocalSettings', ...
                'AlgebraicLoopMsg', 'warning', 'UnconnectedInputMsg', 'warning', ...
                'UnconnectedOutputMsg', 'none');
 end
 
-% Les solveurs écrits ici. Simulink en a d'autres : ils sont refusés en
-% le disant, au lieu d'être acceptés et remplacés en silence.
+% Les solveurs écrits ici. Simulink en a deux autres, odeN et daessc :
+% ils sont refusés en le disant, au lieu d'être acceptés et remplacés en
+% silence.
 function s = solveurs()
-    s = struct('fixe', {{'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'FixedStepDiscrete', ...
-                         'FixedStepAuto'}}, ...
-               'variable', {{'ode45', 'ode23', 'ode23s', 'VariableStepDiscrete', ...
-                             'VariableStepAuto'}});
+    s = struct('fixe', {{'ode1', 'ode2', 'ode3', 'ode4', 'ode5', 'ode8', 'ode14x', ...
+                         'ode1be', 'FixedStepDiscrete', 'FixedStepAuto'}}, ...
+               'variable', {{'ode45', 'ode23', 'ode113', 'ode15s', 'ode23s', 'ode23t', ...
+                             'ode23tb', 'VariableStepDiscrete', 'VariableStepAuto'}});
 end
 
 function c = lire(modele)
@@ -160,8 +169,7 @@ function v = valider(nom, v)
             v = char(v);
             trouve = find(strcmpi(v, connus), 1);
             if isempty(trouve)
-                simulinkSeul = {'ode8', 'ode14x', 'ode1be', 'ode113', 'ode15s', ...
-                                'ode23t', 'ode23tb', 'odeN', 'daessc'};
+                simulinkSeul = {'odeN', 'daessc'};
                 if any(strcmpi(v, simulinkSeul))
                     error('Simulink:Commands:SolveurInconnu', ...
                           ['Le solveur ''%s'' est un solveur de Simulink que MatLibre ' ...
@@ -183,6 +191,12 @@ function v = valider(nom, v)
             v = nombre(nom, v, false);
         case {'MaxStep', 'MinStep', 'InitialStep', 'AbsTol'}
             v = nombre(nom, v, true);
+        case 'MaxOrder'
+            v = entier(nom, v, 1, 5);
+        case 'ExtrapolationOrder'
+            v = entier(nom, v, 1, 4);
+        case 'NumberNewtonIterations'
+            v = entier(nom, v, 1, Inf);
         case ''
             error('Simulink:Commands:ParamUnknown', ...
                   'Le modele n''a pas de reglage nomme ''%s''.', char(nom));
@@ -197,6 +211,23 @@ function v = choix(nom, v, admis)
               nom, strjoin(admis, ', '), char(v));
     end
     v = admis{trouve};
+end
+
+% Un entier compris entre deux bornes, donné en nombre ou en texte.
+function v = entier(nom, v, bas, haut)
+    if ischar(v) || isstring(v)
+        v = str2double(char(v));
+    end
+    if ~(isnumeric(v) && isscalar(v) && isreal(v)) || isnan(v) || v ~= round(v) || ...
+       v < bas || v > haut
+        if isinf(haut)
+            error('Simulink:Config:InvalidValue', ...
+                  'Le reglage %s est un entier au moins egal a %d.', nom, bas);
+        end
+        error('Simulink:Config:InvalidValue', ...
+              'Le reglage %s est un entier de %d a %d.', nom, bas, haut);
+    end
+    v = double(v);
 end
 
 % Un nombre, ou l'expression qui le donne ; « auto » là où Simulink

@@ -7,7 +7,9 @@ function varargout = matlibre_sl_executer(action, varargin)
 %   J = MATLIBRE_SL_EXECUTER('simuler',T,INSTANTS,SOLVEUR) simule aux
 %   INSTANTS, régulièrement espacés du pas de la compilation, avec le
 %   solveur à pas fixe SOLVEUR : ode1 (Euler), ode2 (Heun), ode3
-%   (Bogacki-Shampine), ode4 (Runge-Kutta) ou ode5 (Dormand-Prince). J
+%   (Bogacki-Shampine), ode4 (Runge-Kutta), ode5 (Dormand-Prince), ode8
+%   (Prince-Dormand, d'ordre huit), ou, pour les systèmes raides, ode1be
+%   (Euler implicite) et ode14x (Euler implicite extrapolé). J
 %   porte le relevé — une colonne par instant, une ligne par valeur
 %   relevée, dans l'ordre de T.releves —, les états continus, et le rang
 %   du dernier instant simulé, qu'un bloc Stop Simulation peut avancer.
@@ -15,8 +17,10 @@ function varargout = matlibre_sl_executer(action, varargin)
 %   J = MATLIBRE_SL_EXECUTER('simulerVariable',T,TDEBUT,TFINAL,SOLVEUR,
 %   REGLAGES,IMPOSES) simule à pas variable, pour un modèle compilé avec
 %   l'option variable : ode45 (Dormand-Prince 5(4)), ode23
-%   (Bogacki-Shampine 3(2)), ode23s (Rosenbrock, pour les systèmes
-%   raides) ou VariableStepDiscrete. Le pas suit les tolérances RelTol et
+%   (Bogacki-Shampine 3(2)), ode113 (Adams, d'ordre 1 à 12), et pour les
+%   systèmes raides ode15s (NDF, d'ordre 1 à MaxOrder), ode23s
+%   (Rosenbrock), ode23t (trapèzes) et ode23tb (TR-BDF2) ; ou
+%   VariableStepDiscrete. Le pas suit les tolérances RelTol et
 %   AbsTol de REGLAGES, borné par MaxStep et MinStep ; il s'arrête sur
 %   chaque instant d'échantillonnage, chaque cassure d'une source
 %   (échelon, front d'impulsion) et chaque passage par zéro, localisé
@@ -419,7 +423,9 @@ end
 % Le tableau de Butcher de chaque solveur à pas fixe. Un solveur d'ordre
 % p rend une erreur qui décroît comme le pas à la puissance p ; les
 % coefficients sont ceux de la littérature — Heun, Bogacki et Shampine,
-% Kutta, Dormand et Prince —, et c'est leur ordre que le test mesure.
+% Kutta, Dormand et Prince, Prince et Dormand pour ode8 —, et c'est leur
+% ordre que le test mesure. ode1be et ode14x, implicites, n'ont pas de
+% tableau : leur pas se fait à part.
 function [A, b, c] = tableau(solveur)
     switch lower(solveur)
         case {'ode1', 'fixedstepdiscrete'}
@@ -447,10 +453,110 @@ function [A, b, c] = tableau(solveur)
                  9017/3168 -355/33 46732/5247 49/176 -5103/18656 0];
             b = [35/384 0 500/1113 125/192 -2187/6784 11/84];
             c = [0 1/5 3/10 4/5 8/9 1];
+        case 'ode8'
+            [A, b, c] = tableauOde8();
+        case {'ode1be', 'ode14x'}
+            A = [];
+            b = [];
+            c = [];
         otherwise
             error('Simulink:Config:InvalidSolver', ...
                   'Le solveur a pas fixe ''%s'' est inconnu.', solveur);
     end
+end
+
+% La formule RK8(7)13M de Prince et Dormand (1981) : treize étages, la
+% solution d'ordre huit. Ses coefficients sont les fractions publiées.
+function [A, b, c] = tableauOde8()
+    A = zeros(13, 13);
+    A(2, 1) = 1/18;
+    A(3, 1:2) = [1/48 1/16];
+    A(4, [1 3]) = [1/32 3/32];
+    A(5, [1 3 4]) = [5/16 -75/64 75/64];
+    A(6, [1 4 5]) = [3/80 3/16 3/20];
+    A(7, [1 4 5 6]) = [29443841/614563906 77736538/692538347 -28693883/1125000000 ...
+                       23124283/1800000000];
+    A(8, [1 4 5 6 7]) = [16016141/946692911 61564180/158732637 22789713/633445777 ...
+                         545815736/2771057229 -180193667/1043307555];
+    A(9, [1 4 5 6 7 8]) = [39632708/573591083 -433636366/683701615 ...
+                           -421739975/2616292301 100302831/723423059 ...
+                           790204164/839813087 800635310/3783071287];
+    A(10, [1 4:9]) = [246121993/1340847787 -37695042795/15268766246 ...
+                      -309121744/1061227803 -12992083/490766935 ...
+                      6005943493/2108947869 393006217/1396673457 ...
+                      123872331/1001029789];
+    A(11, [1 4:10]) = [-1028468189/846180014 8478235783/508512852 ...
+                       1311729495/1432422823 -10304129995/1701304382 ...
+                       -48777925059/3047939560 15336726248/1032824649 ...
+                       -45442868181/3398467696 3065993473/597172653];
+    A(12, [1 4:11]) = [185892177/718116043 -3185094517/667107341 ...
+                       -477755414/1098053517 -703635378/230739211 ...
+                       5731566787/1027545527 5232866602/850066563 ...
+                       -4093664535/808688257 3962137247/1805957418 ...
+                       65686358/487910083];
+    A(13, [1 4:12]) = [403863854/491063109 -5068492393/434740067 ...
+                       -411421997/543043805 652783627/914296604 ...
+                       11173962825/925320556 -13158990841/6184727034 ...
+                       3936647629/1978049680 -160528059/685178525 ...
+                       248638103/1413531060 0];
+    b = [14005451/335480064 0 0 0 0 -59238493/1068277825 181606767/758867731 ...
+         561292985/797845732 -1041891430/1371343529 760417239/1151165299 ...
+         118820643/751138087 -528747749/2220607170 1/4];
+    c = [0 1/18 1/12 1/8 5/16 3/8 59/400 93/200 5490023248/9719169821 13/20 ...
+         1201146811/1299019798 1 1];
+end
+
+% Les réglages des solveurs implicites, que SIM pose sur T : l'ordre
+% d'extrapolation d'ode14x, le nombre d'itérations de Newton d'ode1be et
+% d'ode14x, l'ordre maximal d'ode15s. Sans eux, les valeurs de Simulink.
+function r = reglagesSolveur(T)
+    r = struct('ExtrapolationOrder', 4, 'NumberNewtonIterations', 1, 'MaxOrder', 5);
+    if isfield(T, 'reglagesSolveur')
+        for nom = fieldnames(T.reglagesSolveur).'
+            r.(nom{1}) = double(T.reglagesSolveur.(nom{1}));
+        end
+    end
+end
+
+% Le pas des solveurs implicites à pas fixe. ode1be est Euler implicite,
+% résolu par un nombre fixe d'itérations de Newton — une seule par
+% défaut : le coût d'un pas ne dépend pas de la difficulté. ode14x fait le
+% pas en 1, 2, ..., p sous-pas d'Euler implicite, puis extrapole les p
+% résultats à pas nul (Richardson, tableau d'Aitken et Neville) : l'ordre
+% monte à p, l'ordre d'extrapolation. Le jacobien se mesure une fois par
+% pas.
+function [x, V, Z] = pasImpliciteFixe(T, V, Z, x, k1, t, h, solveur, touche)
+    r = reglagesSolveur(T);
+    iterations = max(1, round(r.NumberNewtonIterations));
+    [Jac, ~, V, Z] = jacobien(T, V, Z, x, k1, t, touche);
+    if strcmp(solveur, 'ode1be')
+        p = 1;
+    else
+        p = max(1, min(4, round(r.ExtrapolationOrder)));
+    end
+    tab = cell(p, p);
+    for j = 1:p
+        hj = h / j;
+        W = eye(numel(x)) - hj * Jac;
+        y = x;
+        for s = 1:j
+            ts = t + s * hj;
+            z = y;
+            for iteration = 1:iterations
+                [V, Z] = passe(T, T.listeMineure, V, Z, z, ts, 0, false, touche);
+                z = z + W \ (y + hj * derivees(T, V, z, ts) - z);
+                if ~isempty(T.bornes)
+                    z = borner(T, z);
+                end
+            end
+            y = z;
+        end
+        tab{j, 1} = y;
+        for q = 2:j
+            tab{j, q} = tab{j, q - 1} + (tab{j, q - 1} - tab{j - 1, q - 1}) / (j / (j - q + 1) - 1);
+        end
+    end
+    x = tab{p, p};
 end
 
 % === simulation ================================================================
@@ -519,7 +625,9 @@ function J = simuler(T, instants, solveur, reprise)
         end
         Z = majs(T, V, Z, t, touche, x);
         if nx > 0
-            if nEtages == 1
+            if nEtages == 0
+                [x, V, Z] = pasImpliciteFixe(T, V, Z, x, k1, t, h, lower(solveur), touche);
+            elseif nEtages == 1
                 x = x + h * k1;
             else
                 K = zeros(nx, nEtages);
@@ -574,8 +682,20 @@ end
 % et le pas suivant s'en déduit ; un pas trop grand est refait plus court.
 % ode23s est la formule de Rosenbrock de Shampine et Reichelt, d'ordre 2
 % avec une estimation d'ordre 3 : implicite, elle garde un grand pas là où
-% un système raide forcerait les deux autres à piétiner. Son jacobien se
-% mesure par différences finies, une fois par pas.
+% un système raide forcerait les deux autres à piétiner. ode23t est la
+% règle des trapèzes, ode23tb la formule TR-BDF2 — un pas de trapèzes
+% puis un pas de BDF2 — : implicites elles aussi, d'ordre 2, leur erreur
+% s'estime par une différence divisée des dérivées. Les solveurs
+% implicites mesurent leur jacobien par différences finies, une fois par
+% pas.
+%
+% ode15s et ode113 sont à pas multiples : ils se souviennent des pas
+% passés, et leur ordre varie. ode15s, les NDF de Klopfenstein et
+% Shampine, d'ordre 1 à 5, pour les systèmes raides ; ode113, les
+% formules d'Adams-Bashforth-Moulton, d'ordre 1 à 12, pour les
+% tolérances fines. Leur mémoire repart de l'ordre 1 après toute
+% discontinuité : un passage par zéro, un état remis, une source qui
+% casse, un bloc échantillonné qui change la dérivée.
 %
 % Le pas s'arrête exactement sur les instants d'échantillonnage, sur les
 % cassures des sources — l'instant d'un échelon, les fronts d'un
@@ -607,12 +727,18 @@ function [A, b, bEtoile, c, ordre] = tableauVariable(solveur)
             bEtoile = [7/24 1/4 1/3 1/8];
             c = [0 1/2 3/4 1];
             ordre = 3;
-        case 'ode23s'
+        case {'ode23s', 'ode23t', 'ode23tb'}
             A = [];
             b = [];
             bEtoile = [];
             c = [];
             ordre = 3;
+        case {'ode15s', 'ode113'}
+            A = [];
+            b = [];
+            bEtoile = [];
+            c = [];
+            ordre = 2;   % l'ordre 1 du départ, dont l'erreur va comme h^2
         otherwise   % variablestepdiscrete : pas d'état continu à intégrer
             A = 0;
             b = 1;
@@ -635,7 +761,22 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     discret = strcmp(solveur, 'variablestepdiscrete') || nx == 0;
     M = struct();
     [M.A, M.b, M.bE, M.c, M.ordre] = tableauVariable(solveur);
-    M.rosenbrock = strcmp(solveur, 'ode23s');
+    methodes = struct('ode23s', 'rosenbrock', 'ode23t', 'trapeze', 'ode23tb', 'trbdf2', ...
+                      'ode15s', 'ndf', 'ode113', 'adams');
+    M.methode = 'rk';
+    if isfield(methodes, solveur)
+        M.methode = methodes.(solveur);
+    end
+    M.implicite = any(strcmp(M.methode, {'rosenbrock', 'trapeze', 'trbdf2', 'ndf'}));
+    M.multipas = any(strcmp(M.methode, {'ndf', 'adams'}));
+    M.ordreMax = 12;
+    if strcmp(M.methode, 'ndf')
+        M.ordreMax = 5;
+        if isfield(reglages, 'MaxOrder') && ~ischar(reglages.MaxOrder)
+            M.ordreMax = double(reglages.MaxOrder);
+        end
+    end
+    M.H = struct('valide', false, 'k', 1, 'h', 0, 'D', [], 'nconst', 0, 'fin', []);
     M.J = [];
     M.dfdt = [];
 
@@ -710,6 +851,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
     end
     [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, V(T.journal), ...
                                                 x, imposes, iImpose);
+    T = figerBornes(T, V, x);
     avant = passagesZero(T, V, Z, x, t);
     arret = Z(1) ~= 0;
     hPropose = [];
@@ -724,6 +866,17 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             if ~all(isfinite(k1))
                 deriveeInfinie(T, k1, t);
             end
+        end
+        % Une dérivée qui saute depuis la fin du pas précédent — un bloc
+        % échantillonné, un mode qui bascule — rend la mémoire des pas
+        % passés fausse : les solveurs à pas multiples repartent.
+        if M.multipas && M.H.valide && ...
+           normeErreur(M.H.h * (k1 - M.H.fin), x, x, atol, rtol) > 0.1
+            M.H.valide = false;
+        end
+        if M.multipas && ~M.H.valide
+            M.ordre = 2;
+            hPropose = [];
         end
         Z = majs(T, V, Z, t, touche, x);
         rangs(touche) = rangs(touche) + 1;
@@ -747,7 +900,7 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             h = borne;
             xNouveau = x;
         else
-            if M.rosenbrock
+            if M.implicite
                 [M.J, M.dfdt, V, Z] = jacobien(T, V, Z, x, k1, t, touche);
             end
             if isempty(hPropose)
@@ -762,7 +915,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             h = min(hPropose, borne);
             plancher = max(pasMin, 16 * eps(max(abs(t), 1)));
             while true
-                [xNouveau, err, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+                [xNouveau, err, V, Z, aux] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, ...
+                                                   touche);
                 if err <= 1
                     break
                 end
@@ -774,12 +928,15 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                                'singularite.'], t);
                     end
                     if ~minimumDonne
+                        conseil = ' ; si le systeme est raide, essayez ode15s ou ode23s';
+                        if M.implicite
+                            conseil = '';
+                        end
                         error('Simulink:Engine:SolverMinStepViolation', ...
                               ['A t = %g, le solveur %s ne tient plus la tolerance sans ' ...
                                'reduire le pas sous %g, le plus petit que permet la ' ...
                                'precision des nombres. La solution a peut-etre une ' ...
-                               'singularite ; si le systeme est raide, essayez ode23s.'], ...
-                              t, solveur, plancher);
+                               'singularite%s.'], t, solveur, plancher, conseil);
                     end
                     if ~averti
                         warning('Simulink:Engine:SolverMinStepViolation', ...
@@ -820,8 +977,8 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                     h = hEvenement;
                     tNouveau = t + h;
                     if ~discret
-                        [xNouveau, ~, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, ...
-                                                    touche);
+                        [xNouveau, ~, V, Z, aux] = unPas(T, M, V, Z, x, k1, t, h, atol, ...
+                                                         rtol, touche);
                     end
                 end
                 if h <= 1e3 * toleranceTemps(t)
@@ -840,7 +997,11 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
             end
         end
 
-        % Le pas majeur.
+        % Le pas majeur. Un intégrateur tenu à sa borne n'en a pas bougé :
+        % l'arrondi d'un solveur implicite ne l'en décolle pas.
+        if any(T.satures)
+            xNouveau(T.satures) = x(T.satures);
+        end
         t = tNouveau;
         x = xNouveau;
         if ~isempty(T.bornes)
@@ -854,9 +1015,19 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 [V, Z] = passe(T, T.listeMajeure, V, Z, x, t, 0, true, touche);
             end
         end
+        % La mémoire des pas multiples retient ce pas ; un état remis, ou
+        % tenu dans ses bornes, n'est plus celui qu'elle prolonge.
+        choixMultipas = [];
+        if M.multipas && ~discret
+            [M, choixMultipas] = retenirPas(M, aux, xNouveau, err, atol, rtol);
+            if ~isequal(x, xNouveau)
+                M.H.valide = false;
+            end
+        end
         [temps, releveV, etats, n, iImpose] = noter(temps, releveV, etats, n, t, ...
                                                     V(T.journal), x, imposes, iImpose);
         arret = Z(1) ~= 0;
+        T = figerBornes(T, V, x);
         avant = passagesZero(T, V, Z, x, t);
         if nx > 0
             maxAbs = max(maxAbs, abs(x));
@@ -867,8 +1038,12 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
         % Le pas suivant : celui que l'erreur permet. Un pas raccourci pour
         % tomber sur un instant ne dit rien de l'erreur : on garde alors
         % celui qu'on avait proposé.
-        if ~discret
-            facteur = min(5, max(0.2, 0.9 * max(err, 1e-10) ^ (-1 / M.ordre)));
+        if ~discret && ~isempty(hPropose)
+            if M.multipas
+                facteur = choixMultipas;
+            else
+                facteur = min(5, max(0.2, 0.9 * max(err, 1e-10) ^ (-1 / M.ordre)));
+            end
             if parErreur || h >= hPropose
                 hPropose = h * facteur;
             else
@@ -908,10 +1083,24 @@ end
 
 % Un pas de taille H : la solution, et l'erreur relative estimée — 1 est
 % la tolérance.
-function [xNouveau, err, V, Z] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
-    if M.rosenbrock
-        [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
-        return
+function [xNouveau, err, V, Z, aux] = unPas(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    aux = [];
+    switch M.methode
+        case 'rosenbrock'
+            [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+            return
+        case 'trapeze'
+            [xNouveau, err, V, Z] = pasTrapeze(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+            return
+        case 'trbdf2'
+            [xNouveau, err, V, Z] = pasTRBDF2(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+            return
+        case 'ndf'
+            [xNouveau, err, V, Z, aux] = pasNDF(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+            return
+        case 'adams'
+            [xNouveau, err, V, Z, aux] = pasAdams(T, M, V, Z, x, k1, t, h, atol, rtol, touche);
+            return
     end
     S = numel(M.b);
     K = zeros(numel(x), S);
@@ -960,6 +1149,269 @@ function [xNouveau, err, V, Z] = pasRosenbrock(T, M, V, Z, x, k1, t, h, atol, rt
     r3 = W \ (F2 - e32 * (r2 - F1) - 2 * (r1 - F0) + h * d * M.dfdt);
     ecart = h / 6 * (r1 - 2 * r2 + r3);
     err = normeErreur(ecart, x, xNouveau, atol, rtol);
+end
+
+% Résout Y = A + C*H*F(T1,Y) par les itérations de Newton simplifiées : la
+% matrice W = I - C*H*J, où J est le jacobien mesuré en début de pas, ne
+% change pas d'une itération à l'autre. Les itérations s'arrêtent quand la
+% correction tombe bien sous la tolérance, ou quand leur vitesse promet
+% qu'elle y tombera ; elles échouent si elles divergent, ou si quatre ne
+% suffisent pas. FY est la dérivée en la solution trouvée. La solution
+% n'est pas tenue dans les bornes des intégrateurs : le pas majeur l'y
+% ramène.
+function [y, fy, converge, V, Z] = implicite(T, M, V, Z, a, c, h, t1, y, atol, rtol, touche)
+    W = eye(numel(y)) - c * h * M.J;
+    converge = false;
+    precedente = Inf;
+    for iteration = 1:4
+        [V, Z] = passe(T, T.listeMineure, V, Z, y, t1, 0, false, touche);
+        fy = derivees(T, V, y, t1);
+        correction = W \ (a + c * h * fy - y);
+        y = y + correction;
+        if ~all(isfinite(y))
+            return
+        end
+        norme = max(abs(correction) ./ (atol + rtol * abs(y)));
+        if isempty(norme) || norme <= 1e-2
+            converge = true;
+            break
+        end
+        if iteration > 1
+            taux = norme / precedente;
+            if taux >= 0.9
+                return
+            end
+            if taux / (1 - taux) * norme <= 5e-2
+                converge = true;
+                break
+            end
+        end
+        precedente = norme;
+    end
+    if converge
+        [V, Z] = passe(T, T.listeMineure, V, Z, y, t1, 0, false, touche);
+        fy = derivees(T, V, y, t1);
+    end
+end
+
+% Des itérations de Newton qui ne convergent pas : le pas est refait
+% trois fois plus court, comme une erreur trop grande le ferait.
+function err = echecNewton(M)
+    err = 3 ^ M.ordre;
+end
+
+% La règle des trapèzes d'ode23t : X1 = X + H/2 (F0 + F(X1)). Son erreur,
+% -H^3/12 X''', s'estime par la différence seconde des dérivées au début,
+% au milieu — sur l'interpolant d'Hermite — et à la fin du pas ; W la
+% filtre, pour qu'un mode raide ne la gonfle pas.
+function [xNouveau, err, V, Z] = pasTrapeze(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    [xNouveau, f1, converge, V, Z] = implicite(T, M, V, Z, x + h / 2 * k1, 1 / 2, h, ...
+                                               t + h, x + h * k1, atol, rtol, touche);
+    if ~converge
+        err = echecNewton(M);
+        return
+    end
+    xm = (x + xNouveau) / 2 + h / 8 * (k1 - f1);
+    [V, Z] = passe(T, T.listeMineure, V, Z, xm, t + h / 2, 0, false, touche);
+    fm = derivees(T, V, xm, t + h / 2);
+    W = eye(numel(x)) - h / 2 * M.J;
+    ecart = W \ (h / 3 * (k1 - 2 * fm + f1));
+    err = normeErreur(ecart, x, xNouveau, atol, rtol);
+end
+
+% TR-BDF2 (Bank et al., Hosea et Shampine) : les trapèzes jusqu'à
+% t + g*h, puis BDF2 sur les trois points ; avec g = 2 - sqrt(2), les deux
+% étages partagent la même matrice W. L'erreur, C*H^3*X''', s'estime par
+% la différence divisée seconde des trois dérivées.
+function [xNouveau, err, V, Z] = pasTRBDF2(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    g = 2 - sqrt(2);
+    d = g / 2;
+    [xg, fg, converge, V, Z] = implicite(T, M, V, Z, x + d * h * k1, d, h, t + g * h, ...
+                                         x + g * h * k1, atol, rtol, touche);
+    if ~converge
+        xNouveau = xg;
+        err = echecNewton(M);
+        return
+    end
+    a = (sqrt(2) + 1) / 2 * xg - (sqrt(2) - 1) / 2 * x;
+    [xNouveau, f1, converge, V, Z] = implicite(T, M, V, Z, a, d, h, t + h, ...
+                                               xg + (1 - g) * h * fg, atol, rtol, touche);
+    if ~converge
+        err = echecNewton(M);
+        return
+    end
+    C = (-3 * g ^ 2 + 4 * g - 2) / (12 * (2 - g));
+    W = eye(numel(x)) - d * h * M.J;
+    ecart = W \ (C * 2 * h * ((f1 - fg) / (1 - g) - (fg - k1) / g));
+    err = normeErreur(ecart, x, xNouveau, atol, rtol);
+end
+
+% La matrice qui réécrit les différences arrière 1 à K d'une grille de pas
+% H sur la grille de pas RHO*H : la valeur en t - m*RHO*H du polynôme
+% qu'elles décrivent, puis ses différences.
+function R = changementDePas(K, rho)
+    R = zeros(K, K);
+    for j = 1:K
+        binome = 1;
+        for m = 0:j
+            if m > 0
+                binome = binome * (j - m + 1) / m;
+            end
+            s = -m * rho;
+            beta = 1;
+            for i = 1:K
+                beta = beta * (s + i - 1) / i;
+                R(i, j) = R(i, j) + (-1) ^ m * binome * beta;
+            end
+        end
+    end
+end
+
+% ode15s : les NDF de Klopfenstein et Shampine. La formule d'ordre k,
+%   (1 - kappa) g_k (X1 - X0) + somme(g_j D_j) = H F(X1),
+% où X0 est la prédiction, D_j les différences arrière et g_j = 1 + ... +
+% 1/j, se résout par Newton ; X1 - X0 est la différence d'ordre k + 1, et
+% donne l'erreur.
+function [xNouveau, err, V, Z, aux] = pasNDF(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    kappa = [-0.1850, -1/9, -0.0823, -0.0415, 0];
+    G = cumsum(1 ./ (1:5));
+    H = M.H;
+    if H.valide
+        k = H.k;
+        D = H.D;
+        if h ~= H.h
+            D(:, 1:k) = D(:, 1:k) * changementDePas(k, h / H.h);
+        end
+    else
+        k = 1;
+        D = zeros(numel(x), M.ordreMax + 2);
+        D(:, 1) = h * k1;
+    end
+    inverse = 1 / ((1 - kappa(k)) * G(k));
+    prediction = x + sum(D(:, 1:k), 2);
+    psi = (D(:, 1:k) * G(1:k).') * inverse;
+    [xNouveau, fin, converge, V, Z] = implicite(T, M, V, Z, prediction - psi, inverse, h, ...
+                                                t + h, prediction, atol, rtol, touche);
+    aux = struct('D', D, 'k', k, 'h', h, 'ecart', xNouveau - prediction, 'fin', fin);
+    if ~converge
+        err = echecNewton(M);
+        return
+    end
+    err = normeErreur(constanteNDF(k) * aux.ecart, x, xNouveau, atol, rtol);
+end
+
+function e = constanteNDF(k)
+    kappa = [-0.1850, -1/9, -0.0823, -0.0415, 0];
+    G = cumsum(1 ./ (1:5));
+    e = kappa(k) * G(k) + 1 / (k + 1);
+end
+
+% Les coefficients des formules d'Adams : GS(j+1), ceux de la formule
+% explicite, et GI(j+1) = GS(j+1) - GS(j), ceux de la formule implicite.
+function [gs, gi] = coefficientsAdams(n)
+    gs = zeros(1, n);
+    gs(1) = 1;
+    for j = 1:n - 1
+        gs(j + 1) = 1 - sum(gs(1:j) ./ (j + 1:-1:2));
+    end
+    gi = [1, diff(gs)];
+end
+
+% ode113 : Adams-Bashforth d'ordre k prédit, Adams-Moulton corrige, en
+% une évaluation de plus (PECE). La mémoire est faite des différences
+% arrière des dérivées ; la correction est H*GS(k+1)*(la différence
+% d'ordre k de la dérivée prédite), l'erreur la même différence pesée par
+% le coefficient implicite.
+function [xNouveau, err, V, Z, aux] = pasAdams(T, M, V, Z, x, k1, t, h, atol, rtol, touche)
+    H = M.H;
+    if H.valide
+        k = H.k;
+        F = H.D;
+        if h ~= H.h && k > 1
+            F(:, 2:k) = F(:, 2:k) * changementDePas(k - 1, h / H.h);
+        end
+    else
+        k = 1;
+        F = zeros(numel(x), M.ordreMax + 2);
+        F(:, 1) = k1;
+    end
+    [gs, gi] = coefficientsAdams(M.ordreMax + 2);
+    prediction = x + h * (F(:, 1:k) * gs(1:k).');
+    if ~isempty(T.bornes)
+        prediction = borner(T, prediction);
+    end
+    [V, Z] = passe(T, T.listeMineure, V, Z, prediction, t + h, 0, false, touche);
+    difference = derivees(T, V, prediction, t + h) - sum(F(:, 1:k), 2);
+    % La solution n'est pas tenue dans ses bornes ici : c'est le pas
+    % majeur qui l'y ramène, et la mémoire, qui ne la prolonge plus, repart.
+    xNouveau = prediction + h * gs(k + 1) * difference;
+    [V, Z] = passe(T, T.listeMineure, V, Z, xNouveau, t + h, 0, false, touche);
+    fin = derivees(T, V, xNouveau, t + h);
+    aux = struct('D', F, 'k', k, 'h', h, 'fin', fin);
+    err = normeErreur(h * gi(k + 1) * difference, x, xNouveau, atol, rtol);
+end
+
+% Un pas réussi d'un solveur à pas multiples : les différences avancent
+% d'un cran, puis l'ordre et le pas du suivant se choisissent. Comme dans
+% ode15s, on ne les change qu'après k + 2 pas égaux : la mémoire sert
+% mieux à pas constant. L'ordre voisin gagne s'il permet un plus grand
+% pas ; le pas ne grandit que si l'erreur le permet nettement. FACTEUR
+% rapporte le pas suivant à celui qu'on vient de faire.
+function [M, facteur] = retenirPas(M, aux, xNouveau, err, atol, rtol)
+    H = M.H;
+    k = aux.k;
+    D = aux.D;
+    h = aux.h;
+    memePas = H.valide && h == H.h && k == H.k;
+    constants = 1;
+    if memePas
+        constants = H.nconst + 1;
+    end
+    Dn = zeros(size(D));
+    if strcmp(M.methode, 'ndf')
+        Dn(:, k + 1) = aux.ecart;
+        Dn(:, k + 2) = aux.ecart - D(:, k + 1);
+        for j = k:-1:1
+            Dn(:, j) = D(:, j) + Dn(:, j + 1);
+        end
+        erreurDe = @(q) normeErreur(constanteNDF(q) * Dn(:, q + 1), xNouveau, xNouveau, ...
+                                    atol, rtol);
+    else
+        Dn(:, 1) = aux.fin;
+        for j = 1:k + 1
+            Dn(:, j + 1) = Dn(:, j) - D(:, j);
+        end
+        [~, gi] = coefficientsAdams(M.ordreMax + 2);
+        erreurDe = @(q) normeErreur(h * gi(q + 1) * Dn(:, q + 1), xNouveau, xNouveau, ...
+                                    atol, rtol);
+    end
+    facteur = 1;
+    kNouveau = k;
+    if constants >= k + 2
+        meilleur = 1 / max(1.2 * max(err, 1e-10) ^ (1 / (k + 1)), 0.1);
+        if k > 1
+            f = 1 / max(1.3 * max(erreurDe(k - 1), 1e-10) ^ (1 / k), 0.1);
+            if f > meilleur
+                meilleur = f;
+                kNouveau = k - 1;
+            end
+        end
+        if k < M.ordreMax
+            f = 1 / max(1.4 * max(erreurDe(k + 1), 1e-10) ^ (1 / (k + 2)), 0.1);
+            if f > meilleur
+                meilleur = f;
+                kNouveau = k + 1;
+            end
+        end
+        if kNouveau ~= k
+            facteur = meilleur;
+        elseif meilleur > 1
+            facteur = meilleur;
+        end
+    end
+    M.H = struct('valide', true, 'k', kNouveau, 'h', h, 'D', Dn, 'nconst', constants, ...
+                 'fin', aux.fin);
+    M.ordre = kNouveau + 1;
 end
 
 % Le jacobien des dérivées par rapport aux états, et leur dérivée par
@@ -1109,11 +1561,35 @@ function g = passagesZero(T, V, Z, x, t) %#ok<INUSD>
                     ut = V(T.eA(e + rang + 1):T.eB(e + rang + 1));
                     g = [g; ut(:)]; %#ok<AGROW>
                 end
-            case 70   % intégrateur borné
+            case 70   % intégrateur borné : ses bornes, et sa dérivée s'il y est tenu
                 xk = x(T.xA(k):T.xB(k));
                 g = [g; xk - T.P(p + 1:p + w); xk - T.P(p + 1 + w:p + 2 * w)]; %#ok<AGROW>
+                if isfield(T, 'satures')
+                    g = [g; (u(:) + zeros(w, 1)) .* T.satures(T.xA(k):T.xB(k))]; %#ok<AGROW>
+                end
         end
     end
+end
+
+% À pas variable, un intégrateur borné décide au pas majeur s'il est tenu
+% à sa borne — il y est, et sa dérivée pousse au-delà —, et s'y tient
+% pendant tout le pas, comme dans Simulink : un état qui franchit la borne
+% à un pas mineur continue sa course, le passage par zéro le localise, et
+% le pas majeur qui suit le ramène à la borne.
+function T = figerBornes(T, V, x)
+    satures = false(numel(x), 1);
+    for k = T.bornes
+        a = T.xA(k);
+        b = T.xB(k);
+        p = T.pA(k);
+        w = b - a + 1;
+        e = T.eD(k);
+        u = V(T.eA(e + 1):T.eB(e + 1)) + zeros(w, 1);
+        xk = x(a:b);
+        satures(a:b) = (xk >= T.P(p + 1:p + w) & u > 0) | ...
+                       (xk <= T.P(p + 1 + w:p + 2 * w) & u < 0);
+    end
+    T.satures = satures;
 end
 
 % Le retard pur à pas variable : les pas n'ont pas tous la même durée, le
@@ -2706,9 +3182,13 @@ function dx = derivees(T, V, x, t)
                 else
                     w = b - a + 1;
                     d = u + zeros(w, 1);
-                    xk = x(a:b);
-                    d(xk >= T.P(p + 1:p + w) & d > 0) = 0;
-                    d(xk <= T.P(p + 1 + w:p + 2 * w) & d < 0) = 0;
+                    if isfield(T, 'satures')
+                        d(T.satures(a:b)) = 0;
+                    else
+                        xk = x(a:b);
+                        d(xk >= T.P(p + 1:p + w) & d > 0) = 0;
+                        d(xk <= T.P(p + 1 + w:p + 2 * w) & d < 0) = 0;
+                    end
                     dx(a:b) = d;
                 end
             case {72, 73, 74}

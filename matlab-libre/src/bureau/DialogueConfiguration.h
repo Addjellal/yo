@@ -43,6 +43,7 @@ public:
 
 private:
     void typeChange();
+    void solveurChange();
     QString valeurDe(const QString& nom) const;
 
     // Les valeurs affichées à l'ouverture, réglage par réglage.

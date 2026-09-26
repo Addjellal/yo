@@ -10,13 +10,16 @@ function options = simset(varargin)
 %     Solver          le solveur. À pas fixe : 'ode1' (Euler explicite),
 %                     'ode2' (Heun), 'ode3' (Bogacki-Shampine), 'ode4'
 %                     (Runge-Kutta d'ordre quatre), 'ode5'
-%                     (Dormand-Prince), 'FixedStepDiscrete' pour un
-%                     modèle sans état continu. À pas variable : 'ode45',
-%                     'ode23', 'ode23s' (raide), 'VariableStepDiscrete'.
-%                     Tout autre nom est refusé plutôt qu'ignoré.
+%                     (Dormand-Prince), 'ode8', 'ode14x' et 'ode1be'
+%                     (raides), 'FixedStepDiscrete' pour un modèle sans
+%                     état continu. À pas variable : 'ode45', 'ode23',
+%                     'ode113', 'ode15s', 'ode23s', 'ode23t', 'ode23tb'
+%                     (raides), 'VariableStepDiscrete'. Tout autre nom
+%                     est refusé plutôt qu'ignoré.
 %     FixedStep       le pas d'intégration, à pas fixe
 %     RelTol, AbsTol  les tolérances du pas variable
 %     MaxStep, MinStep, InitialStep   les bornes du pas variable
+%     MaxOrder        l'ordre maximal d'ode15s, de 1 à 5
 %     ZeroCross       'on' ou 'off' : la détection des passages par zéro
 %
 %   Les blocs échantillonnés et les retards se simulent avec tous les
@@ -39,7 +42,7 @@ function options = simset(varargin)
 %
 %   Voir aussi SIMGET, SIM, SET_PARAM.
     connues = {'FixedStep', 'Solver', 'RelTol', 'AbsTol', 'MaxStep', 'MinStep', ...
-               'InitialStep', 'ZeroCross'};
+               'InitialStep', 'MaxOrder', 'ZeroCross'};
     if ~isempty(varargin) && isstruct(varargin{1})
         options = varargin{1};
         debut = 2;

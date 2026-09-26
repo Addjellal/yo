@@ -61,8 +61,12 @@
 %   SET_PARAM(MODELE,'Solver','ode4') les pose et GET_PARAM les relit,
 %   avec leur valeur par défaut. L'intégration se fait à pas fixe : ode1
 %   (Euler, celui par défaut), ode2 (Heun), ode3 (Bogacki-Shampine), ode4
-%   (Runge-Kutta) et ode5 (Dormand-Prince) gagnent chacun un ordre ;
-%   FixedStepDiscrete sert aux modèles sans état continu. Les états
+%   (Runge-Kutta), ode5 (Dormand-Prince) et ode8 (Prince-Dormand) gagnent
+%   en ordre ; ode1be et ode14x, implicites, tiennent les systèmes
+%   raides ; FixedStepDiscrete sert aux modèles sans état continu. Ou à
+%   pas variable, avec la détection des passages par zéro : ode45, ode23
+%   et ode113, et pour les systèmes raides ode15s, ode23s, ode23t et
+%   ode23tb. Les états
 %   discrets n'avancent qu'aux pas majeurs, si bien que tous les solveurs
 %   acceptent tous les blocs.
 %
