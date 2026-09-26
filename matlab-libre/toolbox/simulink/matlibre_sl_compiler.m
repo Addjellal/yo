@@ -34,6 +34,29 @@ function c = matlibre_sl_compiler(modele, options)
 %      c.dims{c.portDebut(2)}                 % [3 1] : un vecteur de trois
 %
 %   Voir aussi SIM, MATLIBRE_SL_SORTIES, MATLIBRE_SL_CATALOGUE.
+    if nargin < 2
+        options = struct();
+    end
+    % Une erreur imprévue, pendant qu'un bloc se compile, devient une
+    % erreur de Simulink qui nomme ce bloc et le paramètre qui paraît
+    % fautif. Un modèle intérieur — celui d'un sous-système itéré — se
+    % compile au milieu d'un autre : on rend l'état d'avant en sortant.
+    avant = enCours('sauver');
+    try
+        c = compiler(modele, options);
+    catch err
+        [k, bloc, chemin] = enCours('lire');
+        enCours('restaurer', avant);
+        if k == 0 || strncmp(err.identifier, 'Simulink:', 9) || ...
+           strncmp(err.identifier, 'Stateflow:', 10)
+            rethrow(err);
+        end
+        throw(matlibre_sl_fautif(err, bloc.type, bloc.parametres, chemin));
+    end
+    enCours('restaurer', avant);
+end
+
+function c = compiler(modele, options)
     if nargin < 2 || isempty(options)
         options = struct();
     end
@@ -74,7 +97,10 @@ function c = matlibre_sl_compiler(modele, options)
     c.sortieCond = cell(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
+    enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
+                                            modele.blocs, 'UniformOutput', false));
     for k = 1:n
+        enCours('bloc', k);
         bloc = modele.blocs{k};
         c.noms{k} = char(bloc.nom);
         c.chemins{k} = [nomModele '/' c.noms{k}];
@@ -129,6 +155,7 @@ function c = matlibre_sl_compiler(modele, options)
     % fichier, une S-fonction dit ses tailles.
     c.fonctions = cell(1, n);
     for k = 1:n
+        enCours('bloc', k);
         c.fonctions{k} = preparerCode(c, k);
     end
 
@@ -196,6 +223,7 @@ function c = matlibre_sl_compiler(modele, options)
     % --- 5. transmission directe -------------------------------------------
     c.direct = true(1, n);
     for k = 1:n
+        enCours('bloc', k);
         c.direct(k) = transmissionDirecte(c, k);
     end
 
@@ -332,6 +360,12 @@ function p = lireParametres(entree, bloc, chemin)
                 error('Simulink:Parameters:InvalidValue', ...
                       'Le parametre ''%s'' du bloc ''%s'' doit etre numerique.', nom, chemin);
             end
+            if any(strcmp(nom, {'SampleTime', 'tsamp', 'samptime', 'sample_time', 'Ts', ...
+                                'OutPortSampleTime'}))
+                verifierPeriode(v, entree.params{i, 2}, chemin, nom);
+            else
+                verifierNombre(v, entree.params{i, 2}, chemin, nom);
+            end
             p.(nom) = double(v);
         elseif strcmp(nature, 'texte')
             if isnumeric(v)
@@ -345,6 +379,12 @@ end
 
 function [type, p] = normaliser(type, p, chemin)
     switch type
+        case 'sum'
+            verifierSignes(p.Signs, '+-', chemin, 'Signs', ...
+                           'des + et des - (et des | pour espacer les ports)');
+        case 'product'
+            verifierSignes(p.Inputs, '*/', chemin, 'Inputs', ...
+                           'des * et des / (multiplier, diviser)');
         case 'bandlimitedwhitenoise'
             % Un bruit blanc de densité Cov, tenu pendant Ts : sa variance
             % est Cov / Ts, comme dans le bloc de Simulink.
@@ -388,7 +428,7 @@ function [type, p] = normaliser(type, p, chemin)
                        'pas propre.'], chemin);
             end
             p = struct('Numerator', numerateur, 'Denominator', denominateur, ...
-                       'SampleTime', p.SampleTime);
+                       'SampleTime', p.SampleTime, 'ZeroPole', true);
             type = 'discretetransferfcn';
     end
 end
@@ -674,7 +714,7 @@ function [b, a] = filtreDiscret(num, den, enZ, chemin)
         end
     end
     if isempty(a) || a(1) == 0
-        error('simulink:sim:denominateurNul', ...
+        error('Simulink:blocks:TransferFcnZeroDenominator', ...
               ['Le bloc ''%s'' a un denominateur dont le premier coefficient ' ...
                'est nul : la recurrence ne se resout pas.'], chemin);
     end
@@ -709,6 +749,7 @@ function dims = propagerDimensions(c)
     for tour = 1:(4 * c.n + 10)
         progres = false;
         for k = 1:c.n
+            enCours('bloc', k);
             if c.nOut(k) == 0
                 continue
             end
@@ -749,6 +790,7 @@ function dims = propagerDimensions(c)
     % tombent les désaccords de dimensions.
     c.dimsCourants = dims;
     for k = 1:c.n
+        enCours('bloc', k);
         [dimsE, ~] = dimsEntrees(c, k, dims, connu);
         sortie = regleDims(c, k, dimsE, true, true);
         if c.nOut(k) == 0
@@ -1202,7 +1244,17 @@ function s = regleTraitement(c, k, dE, complet, forcer)
             s = {accorder(dE, c, k, q)};
         case 'discreteintegrator'
             s = {dimsAvecEtat(dE, p.InitialCondition, complet, forcer)};
-        case {'transferfcn', 'zeropole', 'discretetransferfcn', 'discretefilter'}
+        case {'discretetransferfcn', 'discretefilter'}
+            % Comme dans Simulink, chaque élément d'un vecteur ou d'une
+            % matrice est une voie, filtrée à part — sauf pour le
+            % Discrete Zero-Pole, qui ne traite qu'un scalaire.
+            if isfield(p, 'ZeroPole') && complet && prod(dE{1}) ~= 1
+                error('Simulink:Engine:DimensionMismatch', ...
+                      ['L''entree de ''%s'' est de largeur %d : un Discrete Zero-Pole ' ...
+                       'ne traite qu''un signal scalaire.'], c.chemins{k}, prod(dE{1}));
+            end
+            s = {dimsAvecEtat(dE, 0, complet, forcer)};
+        case {'transferfcn', 'zeropole'}
             if complet && prod(dE{1}) ~= 1
                 error('Simulink:Engine:DimensionMismatch', ...
                       ['L''entree de ''%s'' est de largeur %d : une transmittance ne ' ...
@@ -1346,6 +1398,7 @@ function c = periodes(c, pas)
     c.decalage = zeros(1, n);
     c.majeurSeul = false(1, n);
     for k = 1:n
+        enCours('bloc', k);
         p = c.p{k};
         t = c.types{k};
         switch t
@@ -1656,6 +1709,7 @@ function c = abaisser(c, pas, tDebut)
     c.sub = zeros(1, n);
     c.z0 = cell(1, n);
     for k = 1:n
+        enCours('bloc', k);
         p = c.p{k};
         w = sortieLargeur(c, k);
         ch = c.chemins{k};
@@ -1846,12 +1900,12 @@ function c = abaisser(c, pas, tDebut)
                 x = double(p.BreakpointsData(:));
                 y = double(p.TableData(:));
                 if numel(x) ~= numel(y)
-                    error('simulink:sim:tableIncoherente', ...
+                    error('Simulink:blocks:LookupTableDimensionMismatch', ...
                           ['Le bloc ''%s'' porte %d abscisses et %d valeurs : ' ...
                            'il en faut autant.'], ch, numel(x), numel(y));
                 end
                 if numel(x) < 2
-                    error('simulink:sim:tableIncoherente', ...
+                    error('Simulink:blocks:LookupTableDimensionMismatch', ...
                           'La table de ''%s'' demande au moins deux points.', ch);
                 end
                 if any(diff(x) <= 0)
@@ -1870,7 +1924,7 @@ function c = abaisser(c, pas, tDebut)
                 s = double(p.BreakpointsForDimension2(:));
                 T = double(p.Table);
                 if ~isequal(size(T), [numel(r), numel(s)])
-                    error('simulink:sim:tableIncoherente', ...
+                    error('Simulink:blocks:LookupTableDimensionMismatch', ...
                           ['La table de ''%s'' est de taille %s ; ses abscisses en ' ...
                            'demandent %s.'], ch, mat2str(size(T)), mat2str([numel(r), numel(s)]));
                 end
@@ -2051,7 +2105,8 @@ function c = abaisser(c, pas, tDebut)
                     z0 = zeros(w, 1);   % le morceau où l'on est, figé au pas majeur
                 end
             case 'counterfreerunning'     % [modulo]  Z : [compte]
-                if p.NumBits < 1 || p.NumBits ~= round(p.NumBits) || p.NumBits > 52
+                if ~isscalar(p.NumBits) || ~(p.NumBits >= 1) || ...
+                   p.NumBits ~= round(p.NumBits) || p.NumBits > 52
                     error('Simulink:Parameters:InvalidValue', ...
                           'Le nombre de bits de ''%s'' est un entier de 1 a 52.', ch);
                 end
@@ -2160,7 +2215,7 @@ function c = abaisser(c, pas, tDebut)
                 seg = matricesSegment(A, B, C, D);
             case 'transportdelay'         % [retard; longueur; sortie initiale]  Z : [n; tampon]
                 if p.DelayTime < 0
-                    error('simulink:sim:retardNegatif', ...
+                    error('Simulink:blocks:TransportDelayNegativeDelay', ...
                           'Le bloc ''%s'' demande un retard negatif.', ch);
                 end
                 if c.variable
@@ -2180,7 +2235,7 @@ function c = abaisser(c, pas, tDebut)
             case 'pidcontroller'          % [P; I; D; N], w chacun
                 N = etendre(p.N, w, ch, 'N');
                 if any(N <= 0)
-                    error('simulink:sim:filtreDerive', ...
+                    error('Simulink:blocks:PIDFilterCoefficientNotPositive', ...
                           ['Le bloc ''%s'' demande un coefficient de filtre N ' ...
                            'strictement positif : une derivee non filtree ne ' ...
                            's''integre pas.'], ch);
@@ -2219,7 +2274,7 @@ function c = abaisser(c, pas, tDebut)
                 [b, a] = filtreDiscret(p.Numerator, p.Denominator, ...
                                        strcmp(c.types{k}, 'discretetransferfcn'), ch);
                 seg = [numel(a) - 1; b(:); a(:)];
-                z0 = zeros(numel(a) - 1, 1);
+                z0 = zeros((numel(a) - 1) * w, 1);   % une colonne d'états par voie
             case 'discretestatespace'     % [nx; ny; nu; A; B; C; D]  Z : x
                 [A, B, C, D] = matricesEtat(p, ch);
                 x0 = double(p.X0(:));
@@ -2235,9 +2290,21 @@ function c = abaisser(c, pas, tDebut)
                 seg = matricesSegment(A, B, C, D);
                 z0 = x0;
             % --- sorties ---
+            case 'tofile'
+                fichier = p.Filename;
+                if ~(ischar(fichier) || isstring(fichier)) || isempty(strtrim(char(fichier))) || ...
+                   any(char(fichier) < 32)
+                    error('Simulink:blocks:ToFileInvalidFileName', ...
+                          'Le bloc To File ''%s'' ne nomme pas de fichier ou il puisse ecrire.', ch);
+                end
+                if ~isvarname(char(p.MatrixName))
+                    error('Simulink:blocks:ToFileInvalidName', ...
+                          ['Le nom de variable ''%s'' du bloc To File ''%s'' n''est pas un ' ...
+                           'nom valide.'], char(p.MatrixName), ch);
+                end
             case 'toworkspace'
                 if ~isvarname(char(p.VariableName))
-                    error('simulink:sim:nomVariable', ...
+                    error('Simulink:blocks:ToWorkspaceInvalidVariableName', ...
                           ['Le bloc ''%s'' veut ecrire dans ''%s'', qui n''est ' ...
                            'pas un nom de variable.'], ch, char(p.VariableName));
                 end
@@ -2769,7 +2836,11 @@ function s = dimsFonction(c, k, dE)
     h = c.fonctions{k}.h;
     u = cell(1, c.nIn(k));
     for j = 1:c.nIn(k)
-        u{j} = zeros(dE{j});
+        if j <= numel(dE) && ~isempty(dE{j})
+            u{j} = zeros(dE{j});
+        else
+            u{j} = 0;   % dans une boucle, une entrée pas encore connue : un scalaire
+        end
     end
     sorties = cell(1, c.nOut(k));
     try
@@ -3020,6 +3091,7 @@ function zc = passagesParZero(c)
         return
     end
     for k = 1:c.n
+        enCours('bloc', k);
         type = c.types{k};
         if ~any(strcmp(type, capables))
             continue
@@ -3117,14 +3189,14 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
         return
     end
     if isempty(nomVariable)
-        error('simulink:sim:variableAbsente', ...
+        error('Simulink:blocks:FromWorkspaceVariableNotFound', ...
               ['Le bloc ''%s'' ne dit pas quelle variable lire : donnez-lui ' ...
                'un parametre VariableName.'], nomBloc);
     end
     if ~isvarname(nomVariable)
         donnees = matlibre_sl_expression(nomVariable, nomBloc, 'VariableName');
     elseif evalin('base', sprintf('exist(''%s'', ''var'')', nomVariable)) ~= 1
-        error('simulink:sim:variableAbsente', ...
+        error('Simulink:blocks:FromWorkspaceVariableNotFound', ...
               ['Le bloc ''%s'' lit la variable ''%s'', qui n''existe pas dans ' ...
                'l''espace de travail de base.'], nomBloc, nomVariable);
     else
@@ -3144,15 +3216,139 @@ function [temps, valeurs] = lireSignalEspace(p, nomBloc)
         temps = double(donnees(:, 1));
         valeurs = double(donnees(:, 2:end));
     else
-        error('simulink:sim:signalMalForme', ...
+        error('Simulink:SimInput:InvalidFormat', ...
               ['La variable ''%s'' que lit le bloc ''%s'' doit porter au moins deux ' ...
                'colonnes — le temps puis une valeur par element du signal — ou la ' ...
                'structure a temps que SIM journalise. Elle est de taille %s.'], ...
               nomVariable, nomBloc, mat2str(size(donnees)));
     end
     if numel(temps) ~= size(valeurs, 1)
-        error('simulink:sim:signalMalForme', ...
+        error('Simulink:SimInput:InvalidFormat', ...
               'La variable ''%s'' porte %d instants et %d valeurs.', ...
               nomVariable, numel(temps), size(valeurs, 1));
+    end
+end
+
+% Une période d'échantillonnage : -1 (héritée), 0 (continue), Inf
+% (constante), une période positive, ou [période, décalage]. Vide
+% seulement là où le bloc l'admet par défaut.
+function verifierPeriode(v, defaut, chemin, nom)
+    if isempty(v) && isempty(defaut)
+        return
+    end
+    v = double(v);
+    bon = ~isempty(v) && numel(v) <= 2 && isreal(v) && ~any(isnan(v(:))) && ...
+          (v(1) == -1 || v(1) >= 0);
+    if bon && numel(v) == 2
+        bon = isfinite(v(2)) && (v(1) > 0 || v(2) == 0);
+    end
+    if ~bon
+        error('Simulink:SampleTime:InvalidSampleTime', ...
+              ['La periode d''echantillonnage de ''%s'' (parametre %s) vaut %s : elle ' ...
+               'doit etre -1 (heritee), 0 (continue), inf (constante), une periode ' ...
+               'positive, ou [periode, decalage].'], chemin, nom, apercu(v));
+    end
+end
+
+% Le bloc que la compilation traite, et le modèle aplati où il se trouve.
+function varargout = enCours(action, varargin)
+    persistent k blocs chemins
+    if isempty(k)
+        k = 0;
+        blocs = {};
+        chemins = {};
+    end
+    switch action
+        case 'modele'
+            blocs = varargin{1};
+            chemins = varargin{2};
+            k = 0;
+        case 'bloc'
+            k = varargin{1};
+        case 'lire'
+            if k < 1 || k > numel(blocs)
+                varargout = {0, [], ''};
+            else
+                varargout = {k, blocs{k}, chemins{k}};
+            end
+        case 'sauver'
+            varargout = {{k, blocs, chemins}};
+        case 'restaurer'
+            etat = varargin{1};
+            [k, blocs, chemins] = etat{:};
+    end
+end
+
+function t = apercu(v)
+    if isempty(v)
+        t = '[]';
+    elseif isnumeric(v) || islogical(v)
+        t = mat2str(v, 6);
+        if numel(t) > 40
+            t = sprintf('une matrice %dx%d', size(v, 1), size(v, 2));
+        end
+    else
+        t = ['''' char(v) ''''];
+    end
+end
+
+% Les valeurs qu'aucun bloc ne sait employer, refusées avant de simuler
+% comme Simulink les refuse : un nombre complexe (MatLibre ne simule que
+% des signaux réels), une valeur vide là où le bloc en attend une, un
+% nombre de ports ou de retards qui n'est pas un entier positif, un
+% retard négatif ou infini.
+function verifierNombre(v, defaut, chemin, nom)
+    if ~isreal(v)
+        error('Simulink:Parameters:InvParamSetting', ...
+              ['Le parametre ''%s'' de ''%s'' vaut %s, un nombre complexe : MatLibre ne ' ...
+               'simule que des signaux reels.'], nom, chemin, apercu(v));
+    end
+    if isempty(v) && ~isempty(defaut) && ...
+       ~any(strcmp(nom, {'Zeros', 'Poles', 'A', 'B', 'C', 'D', 'X0'}))
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' est vide : le bloc demande une valeur.', ...
+              nom, chemin);
+    end
+    entiers = {'Port', 'NumDelays', 'BufferSize', 'NumberOfTableDimensions', ...
+               'NumInputPorts', 'Decimation'};
+    if any(strcmp(nom, entiers)) && ~(isscalar(v) && v >= 1 && v == round(v) && isfinite(v))
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' vaut %s : il faut un entier positif.', ...
+              nom, chemin, apercu(v));
+    end
+    if strcmp(nom, 'DelayLength') && ~(isscalar(v) && v >= 0 && v == round(v) && isfinite(v))
+        error('Simulink:Parameters:InvParamSetting', ...
+              'Le parametre ''%s'' de ''%s'' vaut %s : il faut un entier positif ou nul.', ...
+              nom, chemin, apercu(v));
+    end
+    if strcmp(nom, 'ConcatenateDimension') && ~(isscalar(v) && any(v == [1 2]))
+        error('Simulink:Parameters:InvParamSetting', ...
+              ['Le parametre ''%s'' de ''%s'' vaut %s : on concatene selon la dimension ' ...
+               '1 ou 2.'], nom, chemin, apercu(v));
+    end
+    if strcmp(nom, 'DelayTime') && ~(all(isfinite(v(:))) && all(v(:) >= 0))
+        error('Simulink:blocks:TransportDelayNegativeDelay', ...
+              ['Le retard de ''%s'' vaut %s : il doit etre positif ou nul, et fini.'], ...
+              chemin, apercu(v));
+    end
+end
+
+% La liste des signes d'une somme ou d'un produit : un entier positif,
+% ou des caractères admis — l'espaceur | en plus.
+function verifierSignes(v, admis, chemin, nom, attendu)
+    if isnumeric(v) || islogical(v)
+        bon = isscalar(v) && isreal(v) && v >= 1 && v == round(v);
+    else
+        texte = strtrim(char(v));
+        bon = ~isempty(regexp(texte, '^\d+$', 'once')) && str2double(texte) >= 1;
+        if ~bon
+            reste = texte(~ismember(texte, ['|' admis]));
+            bon = isempty(reste) && any(ismember(texte, admis));
+        end
+    end
+    if ~bon
+        error('Simulink:Parameters:InvParamSetting', ...
+              ['Le parametre ''%s'' de ''%s'' vaut %s : il faut un nombre d''entrees, ou ' ...
+               '%s.'], nom, chemin, apercu(v), attendu);
     end
 end

@@ -142,7 +142,7 @@ function varargout = sim(modele, varargin)
     tDebut = nombre(config.StartTime, nomModele, 'StartTime');
     tFinal = nombre(config.StopTime, nomModele, 'StopTime');
     if ~isscalar(tFinal) || ~(tFinal >= tDebut)
-        error('simulink:sim:duree', ...
+        error('Simulink:SolverConfig:StopTimeBeforeStartTime', ...
               'La duree doit etre un nombre positif : l''instant final precede le debut.');
     end
     variable = strcmpi(matlibre_sl_config('type', config.Solver), 'Variable-step');
@@ -157,7 +157,7 @@ function varargout = sim(modele, varargin)
         pas = nombre(pas, nomModele, 'FixedStep');
     end
     if ~isscalar(pas) || ~(pas > 0) || isinf(pas)
-        error('simulink:sim:pas', 'Le pas doit etre un nombre strictement positif.');
+        error('Simulink:SolverConfig:InvalidFixedStep', 'Le pas doit etre un nombre strictement positif.');
     end
 
     options = struct('pas', pas, 'tDebut', tDebut, 'tFinal', tFinal, 'config', config, ...
@@ -197,32 +197,20 @@ function varargout = sim(modele, varargin)
                'le solveur discret %s n''integre pas. Choisissez un solveur %s.'], ...
               c.nom, c.chemins{k}, char(config.Solver), autres);
     end
-    T = matlibre_sl_executer('preparer', c);
-    T.reglagesSolveur = struct('ExtrapolationOrder', config.ExtrapolationOrder, ...
-                               'NumberNewtonIterations', config.NumberNewtonIterations, ...
-                               'MaxOrder', config.MaxOrder);
-
     % StartFcn quand la simulation commence, StopFcn quand elle s'achève —
     % sur une erreur aussi.
     matlibre_sl_rappel(modele, 'StartFcn');
+    deroulement = {c, config, variable, solveur, tDebut, tFinal, pas, imposes, nomModele};
     try
-        if variable
-            reglages = reglagesVariables(config, nomModele);
-            J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
-                                     reglages, imposes);
-            instants = J.temps;
-        elseif isinf(tFinal)
-            [instants, J] = sansFin(T, tDebut, pas, solveur);
-        else
-            instants = tDebut:pas:tFinal;
-            J = matlibre_sl_executer('simuler', T, instants, solveur);
-            instants = instants(1:J.dernier);
-        end
+        [T, J, instants] = derouler(deroulement{:}, false);
         resultat = assembler(c, T, J, instants(:));
         resultat = deposer(c, T, J, instants(:), resultat);
     catch err
         matlibre_sl_rappel(modele, 'StopFcn');
-        rethrow(err);
+        if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10)
+            rethrow(err);
+        end
+        throw(localiser(err, deroulement));
     end
     matlibre_sl_rappel(modele, 'StopFcn');
     if nargout == 0
@@ -238,6 +226,50 @@ function varargout = sim(modele, varargin)
         varargout{1} = resultat;
     else
         varargout = {resultat.tout, resultat.xout, resultat.yout};
+    end
+end
+
+% La simulation proprement dite : préparer le simulateur, puis avancer à
+% pas fixe, à pas variable, ou sans fin. En mode diagnostic, le
+% simulateur note chaque bloc qu'il calcule.
+function [T, J, instants] = derouler(c, config, variable, solveur, tDebut, tFinal, pas, ...
+                                     imposes, nomModele, diagnostic)
+    T = matlibre_sl_executer('preparer', c);
+    T.diagnostic = diagnostic;
+    T.reglagesSolveur = struct('ExtrapolationOrder', config.ExtrapolationOrder, ...
+                               'NumberNewtonIterations', config.NumberNewtonIterations, ...
+                               'MaxOrder', config.MaxOrder);
+    if variable
+        reglages = reglagesVariables(config, nomModele);
+        J = matlibre_sl_executer('simulerVariable', T, tDebut, tFinal, solveur, ...
+                                 reglages, imposes);
+        instants = J.temps;
+    elseif isinf(tFinal)
+        [instants, J] = sansFin(T, tDebut, pas, solveur);
+    else
+        instants = tDebut:pas:tFinal;
+        J = matlibre_sl_executer('simuler', T, instants, solveur);
+        instants = instants(1:J.dernier);
+    end
+end
+
+% Une erreur imprévue pendant la simulation — presque toujours la valeur
+% d'un paramètre que le bloc ne sait pas employer. Elle ne dit pas quel
+% bloc calculait : on rejoue la simulation en mode diagnostic, qui le
+% note, pour rendre l'erreur de Simulink qui le nomme. Si le rejeu passe,
+% l'erreur n'était pas celle d'un bloc : elle reste telle quelle.
+function err = localiser(err, deroulement)
+    matlibre_sl_executer('encours', 0);
+    echoue = false;
+    try
+        derouler(deroulement{:}, true);
+    catch
+        echoue = true;
+    end
+    k = matlibre_sl_executer('encours');
+    c = deroulement{1};
+    if echoue && k >= 1 && k <= c.n
+        err = matlibre_sl_fautif(err, c.types{k}, c.p{k}, c.chemins{k});
     end
 end
 
@@ -276,7 +308,7 @@ function [config, imposes, externe] = lireArguments(config, args)
         else
             ecarts = diff(intervalle);
             if any(ecarts <= 0)
-                error('simulink:sim:intervalle', ...
+                error('Simulink:SolverConfig:TimeSpanNotIncreasing', ...
                       'Les instants doivent etre strictement croissants.');
             end
             config.StartTime = intervalle(1);
@@ -315,7 +347,7 @@ function [config, imposes, externe] = lireArguments(config, args)
             end
         else
             if ~(isnumeric(troisieme) && isscalar(troisieme) && troisieme > 0)
-                error('simulink:sim:pas', 'Le pas doit etre un nombre strictement positif.');
+                error('Simulink:SolverConfig:InvalidFixedStep', 'Le pas doit etre un nombre strictement positif.');
             end
             config.FixedStep = double(troisieme);
         end
@@ -503,7 +535,7 @@ function resultat = deposer(c, T, J, instants, resultat)
     for q = 1:numel(T.releves)
         R = T.releves(q);
         if strcmp(c.types{R.bloc}, 'tofile') && R.port == 1
-            ecrireFichier(c.p{R.bloc}, instants, J.releve(R.lignes, :));
+            ecrireFichier(c.p{R.bloc}, c.chemins{R.bloc}, instants, J.releve(R.lignes, :));
             continue
         end
         if ~strcmp(c.types{R.bloc}, 'toworkspace') || R.port ~= 1
@@ -676,17 +708,24 @@ end
 
 % Le bloc To File : une matrice dont la première ligne est le temps, et les
 % suivantes le signal, un instant par colonne — une colonne sur Decimation.
-function ecrireFichier(p, instants, valeurs)
+function ecrireFichier(p, chemin, instants, valeurs)
     decimation = max(1, round(double(p.Decimation)));
     garder = 1:decimation:numel(instants);
     contenu = struct();
     nom = char(p.MatrixName);
     if ~isvarname(nom)
         error('Simulink:blocks:ToFileInvalidName', ...
-              'Le nom de variable ''%s'' du bloc To File n''est pas un nom valide.', nom);
+              'Le nom de variable ''%s'' du bloc To File ''%s'' n''est pas un nom valide.', ...
+              nom, chemin);
     end
     contenu.(nom) = [instants(garder).'; valeurs(:, garder)];
-    save(char(p.Filename), '-struct', 'contenu');
+    try
+        save(char(p.Filename), '-struct', 'contenu');
+    catch err
+        error('Simulink:blocks:ToFileWriteError', ...
+              'Le bloc To File ''%s'' ne peut pas ecrire ''%s'' : %s', chemin, ...
+              char(p.Filename), err.message);
+    end
 end
 
 % Un modèle désigné par son nom : une variable de l'espace de travail de

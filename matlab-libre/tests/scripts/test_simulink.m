@@ -2932,6 +2932,478 @@ for kE = 1:size(casErreurs, 1)
 end
 fprintf('rappels et commandes : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------------------------------------- 25. Stateflow : hierarchie et temps
+% Des états emboîtés : on entre du plus haut au plus profond, on sort du
+% plus profond au plus haut ; une transition partie d'un parent sort de
+% son sous-état actif, quel qu'il soit. Le journal du contexte garde
+% l'ordre des actions.
+noter = @(quoi) @(c) setfield(c, 'journal', [c.journal, {quoi}]);
+m = sfchart('feux');
+m = sfstate(m, 'marche', noter('entre marche'), [], noter('sort marche'));
+m = sfstate(m, 'marche.vert', noter('entre vert'), [], noter('sort vert'));
+m = sfstate(m, 'marche.orange', noter('entre orange'), [], noter('sort orange'));
+m = sfstate(m, 'panne', noter('entre panne'));
+m = sftransition(m, 'marche.vert', 'marche.orange', @(c, u) u == 1);
+m = sftransition(m, 'marche', 'panne', @(c, u) u == 9);
+m = sftransition(m, 'panne', 'marche', @(c, u) u == 0);
+[e, c] = sfstep(m, '', struct('journal', {{}}), []);
+assert(strcmp(e, 'marche.vert') && isequal(c.journal, {'entre marche', 'entre vert'}), ...
+       'on entre du plus haut au sous-etat par defaut');
+[e, c] = sfstep(m, e, c, 1);
+assert(strcmp(e, 'marche.orange') && isequal(c.journal(3:4), {'sort vert', 'entre orange'}), ...
+       'une transition entre freres ne sort pas du parent');
+[e, c] = sfstep(m, e, c, 9);
+assert(strcmp(e, 'panne') && ...
+       isequal(c.journal(5:7), {'sort orange', 'sort marche', 'entre panne'}), ...
+       'la transition du parent sort de son sous-etat actif, puis de lui');
+[e, c] = sfstep(m, e, c, 0);
+assert(strcmp(e, 'marche.vert'), 'revenir au parent, c''est entrer dans son defaut');
+% Le parent passe avant ses sous-états : sa transition l'emporte.
+m2 = sftransition(m, 'marche.vert', 'marche.orange', @(c, u) u == 9);
+[e2, ~] = sfrun(m2, 9, struct('journal', {{}}));
+assert(strcmp(e2{1}, 'panne'), 'la transition du parent est essayee d''abord');
+% Une transition vers soi sort et rentre.
+m3 = sftransition(m, 'panne', 'panne', @(c, u) u == 5);
+[e3, c3] = sfrun(m3, [9 5], struct('journal', {{}}));
+assert(strcmp(e3{2}, 'panne') && sum(strcmp(c3.journal, 'entre panne')) == 2, ...
+       'une transition vers soi rentre dans l''etat');
+
+% Deux régions parallèles, chacune sa machine ; l'historique ramène au
+% sous-état quitté ; SFDEFAULT choisit l'entrée.
+m = sfchart('voiture');
+m = sfstate(m, 'phares');
+m = sfstate(m, 'phares.eteints');
+m = sfstate(m, 'phares.allumes');
+m = sfstate(m, 'moteur');
+m = sfstate(m, 'moteur.arret');
+m = sfstate(m, 'moteur.marche');
+m = sfdecomposition(m, '', 'parallel');
+m = sftransition(m, 'phares.eteints', 'phares.allumes', @(c, u) u == 1);
+m = sftransition(m, 'moteur.arret', 'moteur.marche', @(c, u) u == 2);
+h = sfrun(m, [1 2]);
+assert(isequal(h{1}, {'phares.allumes', 'moteur.arret'}) && ...
+       isequal(h{2}, {'phares.allumes', 'moteur.marche'}), ...
+       'les regions paralleles avancent chacune');
+m = sfchart('lecteur');
+m = sfstate(m, 'arret');
+m = sfstate(m, 'lecture');
+m = sfstate(m, 'lecture.piste1');
+m = sfstate(m, 'lecture.piste2');
+m = sftransition(m, 'lecture.piste1', 'lecture.piste2', @(c, u) u == 1);
+m = sftransition(m, 'lecture', 'arret', @(c, u) u == 2);
+m = sftransition(m, 'arret', 'lecture', @(c, u) u == 3);
+h = sfrun(m, [3 1 2 3]);
+assert(strcmp(h{4}, 'lecture.piste1'), 'sans historique, on rentre par le defaut');
+h = sfrun(sfhistory(m, 'lecture'), [3 1 2 3]);
+assert(strcmp(h{4}, 'lecture.piste2'), 'avec historique, on rentre ou l''on etait');
+h = sfrun(sfdefault(m, 'lecture.piste2'), 3);
+assert(strcmp(h{1}, 'lecture.piste2'), 'SFDEFAULT choisit le sous-etat d''entree');
+
+% La logique temporelle : après N réveils, avant, au N-ième, tous les N ;
+% en secondes, avec l'instant de chaque pas.
+m = sfchart('minuterie');
+m = sfstate(m, 'attente');
+m = sfstate(m, 'fini');
+m = sftransition(m, 'attente', 'fini', @(c, u) sfafter(c, 3));
+h = sfrun(m, zeros(1, 4));
+assert(isequal(h, {'attente', 'attente', 'fini', 'fini'}), 'after(3, tick)');
+mSec = sftransition(sfstate(sfstate(sfchart('s'), 'a'), 'b'), 'a', 'b', ...
+                    @(c, u) sfafter(c, 0.25, 'sec'));
+h = sfrun(mSec, zeros(1, 4), struct(), 0:0.1:0.4);
+assert(isequal(h, {'a', 'a', 'b', 'b'}), 'after(0.25, sec)');
+m = sfchart('clignotant');
+m = sfstate(m, 'actif', [], @(c, u) setfield(c, 'coups', c.coups + sfevery(c, 2)));
+[~, c] = sfrun(m, zeros(1, 6), struct('coups', 0));
+assert(c.coups == 3, 'every(2, tick)');
+m = sftransition(sfstate(sfstate(sfchart('i'), 'bas'), 'haut'), 'bas', 'haut', ...
+                 @(c, u) sfat(c, 2));
+assert(isequal(sfrun(m, zeros(1, 3)), {'bas', 'haut', 'haut'}), 'at(2, tick)');
+m = sftransition(sfstate(sfstate(sfchart('f'), 'ouverte'), 'vue'), 'ouverte', 'vue', ...
+                 @(c, u) u == 1 && sfbefore(c, 2));
+assert(isequal(sfrun(m, [0 0 1]), {'ouverte', 'ouverte', 'ouverte'}), 'before(2, tick)');
+
+% Dans un schéma : un clignotant qui bascule toutes les 0,5 s, en secondes
+% de simulation, et deux régions parallèles dont la sortie etat rend la
+% première.
+m = sfchart('clignoteur');
+m = sfstate(m, 'eteint', @(c) setfield(c, 'lampe', 0));
+m = sfstate(m, 'allume', @(c) setfield(c, 'lampe', 1));
+m = sftransition(m, 'eteint', 'allume', @(c, u) sfafter(c, 0.5, 'sec'));
+m = sftransition(m, 'allume', 'eteint', @(c, u) sfafter(c, 0.5, 'sec'));
+schema = new_system('clignote');
+schema = add_block(schema, 'chart', 'lampe', 'Chart', m, 'Inputs', 0, ...
+                   'Outputs', {'lampe', 'etat'}, 'InitialContext', struct('lampe', 0), ...
+                   'SampleTime', 0.1);
+for solveur = {'ode1', 'ode45'}
+    r = sim(schema, 'Solver', solveur{1}, 'FixedStep', 0.1, 'StopTime', 2);
+    for instant = [0 0.4 0.5 0.9 1.0 1.5]
+        i = find(abs(r.temps - instant) < 1e-9, 1);
+        assert(r.signaux.lampe(i) == mod(floor(instant / 0.5 + 1e-9), 2), ...
+               sprintf('%s : le clignotant a %g', solveur{1}, instant));
+    end
+end
+
+% Le langage d'action en texte : étiquettes d'état « en: du: ex: »,
+% étiquettes de transition « evenement[condition]{action}/action », et
+% logique temporelle écrite comme dans Stateflow.
+m = sfchart('compteur');
+m = sfstate(m, 'arret', 'en: y = 0;');
+m = sfstate(m, 'compte', 'en: n = 0; du: n = n + u; ex: y = n;');
+m = sftransition(m, 'arret', 'compte', 'go');
+m = sftransition(m, 'compte', 'arret', '[n >= 3]{alerte = 1;}', 'fin = 1;');
+[h, c] = sfrun(m, {'rien', 'go', 1, 1, 1, 0}, struct('alerte', 0));
+assert(isequal(h, {'arret', 'compte', 'compte', 'compte', 'compte', 'arret'}), ...
+       'texte : une entree dans un etat n''execute pas son sejour au meme pas');
+assert(c.n == 3 && c.alerte == 1 && c.fin == 1 && c.y == 0, 'texte : actions');
+assert(~isfield(c, 'ans'), 'texte : ans ne remonte pas au contexte');
+m = sfchart('minuterie');
+m = sfstate(m, 'a');
+m = sfstate(m, 'b');
+m = sftransition(m, 'a', 'b', '[after(3, tick)]');
+assert(isequal(sfrun(m, zeros(1, 4)), {'a', 'a', 'b', 'b'}), 'texte : after(3, tick)');
+m = sfchart('rythme');
+m = sfstate(m, 'a', 'du: k = k + every(2, tick);');
+[~, c] = sfrun(m, zeros(1, 6), struct('k', 0));
+assert(c.k == 3, 'texte : every(2, tick)');
+m = sfchart('t');
+m = sfstate(m, 'tourne', 'du: s = s + u;');
+[~, c] = sfrun(m, [1 2 3], struct('s', 0));
+assert(c.s == 6, 'texte : action de sejour');
+c = matlibre_sf_evaluer('x = x + u; z = 2 * x;', struct('x', 1), 2, false);
+assert(c.x == 3 && c.z == 6, 'texte : evaluer');
+m = sfchart('mixte');
+m = sfstate(m, 'a', 'v = 1;', @(c, u) setfield(c, 'v', c.v + u), '');
+[~, c] = sfrun(m, [2 3]);
+assert(c.v == 6, 'texte : poignees et texte melanges');
+% dans un bloc Chart, les événements arrivent par l'entrée
+schema = new_system('lampeTexte');
+schema = add_block(schema, 'constant', 'u', 'Value', 1);
+m = sfchart('lampeTexte');
+m = sfstate(m, 'eteint', 'en: lampe = 0;');
+m = sfstate(m, 'allume', 'en: lampe = 1;');
+m = sftransition(m, 'eteint', 'allume', '[after(0.5, sec) && u > 0]');
+m = sftransition(m, 'allume', 'eteint', '[after(0.5, sec)]');
+schema = add_block(schema, 'chart', 'lampe', 'Chart', m, 'Inputs', 1, ...
+                   'Outputs', {'lampe'}, 'InitialContext', struct('lampe', 0), ...
+                   'SampleTime', 0.1);
+schema = add_line(schema, 'u/1', 'lampe/1');
+r = sim(schema, 'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 2);
+for instant = [0 0.4 0.5 0.9 1.0 1.5]
+    i = find(abs(r.temps - instant) < 1e-9, 1);
+    assert(r.signaux.lampe(i) == mod(floor(instant / 0.5 + 1e-9), 2), ...
+           sprintf('texte : le clignotant a %g', instant));
+end
+
+% Les erreurs.
+casErreurs = {
+    @() sfstate(sfchart('x'), 'a.b'), 'Stateflow:EtatParentAbsent', 'a'
+    @() sfstate(sfstate(sfchart('x'), 'a'), 'a'), 'Stateflow:EtatDouble', 'a'
+    @() sfdecomposition(sfchart('x'), '', 'melange'), 'Stateflow:DecompositionInconnue', 'melange'
+    @() sfhistory(sfchart('x'), 'absent'), 'Stateflow:EtatInconnu', 'absent'
+    @() sfrun(sftransition(sfdecomposition(sfstate(sfstate(sfchart('x'), 'a'), 'b'), '', ...
+        'parallel'), 'a', 'b', @(c, u) true), 1), 'Stateflow:TransitionEntreParalleles', 'paralleles'
+    @() sfafter(struct(), 1), 'Stateflow:TempsInconnu', 'sf_ticks'
+    @() sfrun(mSec, 0), 'Stateflow:TempsInconnu', 'sf_t'
+    @() sfafter(struct('sf_ticks', 1), 1, 'minute'), 'Stateflow:UniteTemporelle', 'minute'
+    @() sfrun(sfstate(sfchart('x'), 'a', 'du: y = inconnue + 1;'), [1 2]), 'Stateflow:TexteInvalide', 'inconnue'
+    @() sfrun(sftransition(sfstate(sfstate(sfchart('x'), 'a'), 'b'), 'a', 'b', ...
+        '[every(2, sec)]'), [1 2]), 'Stateflow:UniteTemporelle', 'every'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('stateflow, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('stateflow : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------------------------- 26. Batteries croisees sur tout le catalogue
+% Chaque type de bloc du catalogue, seul, puis dans une boucle fermée,
+% puis en amont et en aval des autres. Chaque modèle ainsi bâti doit
+% soit se simuler, soit être refusé par une erreur de Simulink — un
+% identifiant « Simulink:… » ou « Stateflow:… », et un message qui nomme
+% un bloc par son chemin —, jamais par une erreur interne du simulateur.
+% Les modèles de la batterie écrivent — un To File pose son fichier là où
+% l'on se trouve — : on travaille dans un dossier temporaire, effacé à la
+% fin, pour ne rien laisser derrière soi.
+dossierBatterie = tempname();
+mkdir(dossierBatterie);
+dossierAvantBatterie = pwd();
+cd(dossierBatterie);
+catalogueBatterie = matlibre_sl_catalogue();
+typesBatterie = {};
+for kT = 1:numel(catalogueBatterie)
+    if ~strcmp(catalogueBatterie(kT).famille, 'Interne')
+        typesBatterie{end + 1} = catalogueBatterie(kT).type; %#ok<SAGROW>
+    end
+end
+nTypes = numel(typesBatterie);
+
+% Chaque type seul, sur un scalaire et sur un vecteur.
+nSimules = 0;
+nRefuses = 0;
+for kT = 1:nTypes
+    for valeur = {0.5, [0.5; 1.5; 2.5]}
+        [s, ok] = batterieModele('solo', typesBatterie(kT), valeur{1});
+        if ~ok, continue, end
+        for solveur = {'ode1', 'ode45'}
+            id = batterieSimuler(s, solveur{1}, typesBatterie{kT});
+            if strcmp(id, 'ok'), nSimules = nSimules + 1; else, nRefuses = nRefuses + 1; end
+        end
+    end
+end
+fprintf('batterie, chaque bloc seul : %d simulations, %d refus nommes\n', nSimules, nRefuses);
+
+% Chaque type dans une boucle fermée r - T(e) -> e, sous trois solveurs.
+nSimules = 0;
+nRefuses = 0;
+for kT = 1:nTypes
+    s = new_system('boucle');
+    s = add_block(s, typesBatterie{kT}, 'b');
+    [ne, ns] = matlibre_sl_ports(s.blocs{1});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    if ne == 0 || ns == 0, continue, end
+    s = add_block(s, 'sine', 'r', 'Amplitude', 0.5, 'Bias', 0.25);
+    s = add_block(s, 'sum', 'e', 'Signs', '+-');
+    s = add_line(s, 'r/1', 'e/1');
+    s = add_line(s, 'e/1', 'b/1');
+    s = add_line(s, 'b/1', 'e/2');
+    for i = 2:ne
+        s = add_block(s, 'constant', sprintf('c%d', i), 'Value', 0.5);
+        s = add_line(s, sprintf('c%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        s = add_block(s, 'outport', sprintf('o%d', j));
+        s = add_line(s, sprintf('b/%d', j), sprintf('o%d/1', j));
+    end
+    for solveur = {'ode1', 'ode45', 'ode15s'}
+        id = batterieSimuler(s, solveur{1}, ['boucle sur ' typesBatterie{kT}]);
+        if strcmp(id, 'ok'), nSimules = nSimules + 1; else, nRefuses = nRefuses + 1; end
+    end
+end
+fprintf('batterie, chaque bloc en boucle : %d simulations, %d refus nommes\n', ...
+        nSimules, nRefuses);
+
+% Chaque type seul dans un sous-système activé, déclenché, itéré, masqué,
+% ou sous une période discrète : les ports de contrôle en double, les
+% itérateurs mal placés, les états continus là où Simulink les refuse,
+% tout est une erreur nommée.
+nSimules = 0;
+nRefuses = 0;
+contextesBatterie = {'enable', 'trigger', 'for', 'discret', 'masque'};
+for kT = 1:nTypes
+    for kC = 1:numel(contextesBatterie)
+        m = batterieContexte(typesBatterie{kT}, contextesBatterie{kC});
+        solveur = {'ode1', 'ode45'};
+        id = batterieSimuler(m, solveur{1 + mod(kT + kC, 2)}, ...
+                             [typesBatterie{kT} ' dans ' contextesBatterie{kC}]);
+        if strcmp(id, 'ok'), nSimules = nSimules + 1; else, nRefuses = nRefuses + 1; end
+    end
+end
+fprintf('batterie, chaque bloc dans un sous-systeme : %d simulations, %d refus nommes\n', ...
+        nSimules, nRefuses);
+
+% Chaque paramètre de chaque type, mis à une valeur qu'on pourrait taper
+% par erreur : une variable qui n'existe pas, NaN, vide, une matrice, un
+% nombre négatif, un complexe, une expression mal formée, un choix qui
+% n'existe pas. Le bloc se simule, ou il est refusé — par ADD_BLOCK ou
+% par SIM — par une erreur de Simulink qui le nomme.
+nEssais = 0;
+nRefuses = 0;
+for kT = 1:nTypes
+    entree = catalogueBatterie(strcmp({catalogueBatterie.type}, typesBatterie{kT}));
+    for q = 1:size(entree.params, 1)
+        nomP = entree.params{q, 1};
+        nature = entree.params{q, 3};
+        if iscell(nature)
+            fautes = {'choixInexistant', 3};
+        elseif ischar(nature) && strcmp(nature, 'modele')
+            fautes = {42};
+        else
+            fautes = {'variableInexistante', NaN, [], [1 2; 3 4], -1, 1 + 2i, 'texte ('};
+        end
+        for f = 1:numel(fautes)
+            nEssais = nEssais + 1;
+            contexte = sprintf('%s.%s = %s', typesBatterie{kT}, nomP, ...
+                               strtrim(evalc('disp(fautes{f})')));
+            try
+                s = batterieFautif(typesBatterie{kT}, nomP, fautes{f});
+            catch err
+                assert(strncmp(err.identifier, 'Simulink:', 9), ...
+                       sprintf('%s : erreur interne %s : %s', contexte, err.identifier, ...
+                               err.message));
+                nRefuses = nRefuses + 1;
+                continue
+            end
+            if ~strcmp(batterieSimuler(s, 'ode45', contexte), 'ok')
+                nRefuses = nRefuses + 1;
+            end
+        end
+    end
+end
+fprintf('batterie, parametres fautifs : %d essais, %d refus nommes\n', nEssais, nRefuses);
+
+% Les paires : un type en amont d'un autre. Toutes les paires se
+% simulent en quelques minutes ; la batterie en prend une sur sept, choisie
+% pour que chaque type soit en amont et en aval d'une quinzaine d'autres.
+nSimules = 0;
+nRefuses = 0;
+for k1 = 1:nTypes
+    for k2 = 1:nTypes
+        if mod(k1 + 3 * k2, 7) ~= 0, continue, end
+        [s, ok] = batterieModele('paire', typesBatterie([k1 k2]), 1.5);
+        if ~ok, continue, end
+        solveur = {'ode1', 'ode45'};
+        id = batterieSimuler(s, solveur{1 + mod(k1 + k2, 2)}, ...
+                             [typesBatterie{k1} ' -> ' typesBatterie{k2}]);
+        if strcmp(id, 'ok'), nSimules = nSimules + 1; else, nRefuses = nRefuses + 1; end
+    end
+end
+fprintf('batterie, paires de blocs : %d simulations, %d refus nommes\n', nSimules, nRefuses);
+
+% Les défauts de Simulink : une Transfer Fcn posée telle quelle est
+% 1/(s+1), une Discrete Transfer Fcn 1/(z+0.5) ; une transmittance
+% réduite à un gain n'a pas d'état et se simule.
+s = new_system('defauts');
+s = add_block(s, 'step', 'u');
+s = add_block(s, 'transferfcn', 'h');
+s = add_block(s, 'transferfcn', 'g', 'Numerator', 3, 'Denominator', 2);
+s = add_block(s, 'discretetransferfcn', 'd', 'SampleTime', 1);
+s = add_line(s, 'u/1', 'h/1');
+s = add_line(s, 'u/1', 'g/1');
+s = add_line(s, 'u/1', 'd/1');
+s = add_block(s, 'outport', 'oh');
+s = add_line(s, 'h/1', 'oh/1');
+s = add_block(s, 'outport', 'og');
+s = add_line(s, 'g/1', 'og/1');
+s = add_block(s, 'outport', 'od');
+s = add_line(s, 'd/1', 'od/1');
+r = sim(s, 'Solver', 'ode45', 'StopTime', 5, 'RelTol', 1e-8, 'AbsTol', 1e-10);
+tS = r.tout;
+assert(max(abs(r.yout(tS >= 1, 1) - (1 - exp(-(tS(tS >= 1) - 1))))) < 1e-5, ...
+       'defaut de la Transfer Fcn : 1/(s+1)');
+assert(all(abs(r.yout(tS >= 1, 2) - 1.5) < 1e-12), 'transmittance reduite a un gain');
+iD = find(abs(tS - 4) < 1e-9, 1);
+% y(k) = -0.5 y(k-1) + u(k-1), l'échelon en k = 1 : y(2) = 1, y(3) = 0.5, y(4) = 0.75
+assert(abs(r.yout(iD, 3) - 0.75) < 1e-12, 'defaut de la Discrete Transfer Fcn : 1/(z+0.5)');
+
+% Un filtre discret sur un vecteur : chaque élément est une voie, filtrée
+% à part, comme dans Simulink. Le Discrete Zero-Pole reste scalaire.
+s = new_system('voies');
+s = add_block(s, 'sine', 'u', 'Amplitude', [1; 2; 3], 'Frequency', [1; 2; 3]);
+s = add_block(s, 'discretetransferfcn', 'f', 'Numerator', [1 0.2], ...
+              'Denominator', [1 -0.5 0.06], 'SampleTime', 0.1);
+s = add_block(s, 'discretefilter', 'g', 'Numerator', [0 1], 'Denominator', [1 -0.8], ...
+              'SampleTime', 0.1);
+s = add_line(s, 'u/1', 'f/1');
+s = add_line(s, 'u/1', 'g/1');
+s = add_block(s, 'outport', 'o1');
+s = add_line(s, 'f/1', 'o1/1');
+s = add_block(s, 'outport', 'o2');
+s = add_line(s, 'g/1', 'o2/1');
+r = sim(s, 'Solver', 'FixedStepDiscrete', 'FixedStep', 0.1, 'StopTime', 2);
+for j = 1:3
+    u = j * sin(j * r.tout);
+    assert(max(abs(r.yout(:, j) - filter([0 1 0.2], [1 -0.5 0.06], u))) < 1e-12, ...
+           sprintf('voie %d du Discrete Transfer Fcn', j));
+    assert(max(abs(r.yout(:, 3 + j) - filter([0 1], [1 -0.8], u))) < 1e-12, ...
+           sprintf('voie %d du Discrete Filter', j));
+end
+s = new_system('boucleVoies');
+s = add_block(s, 'constant', 'r', 'Value', [1; 2]);
+s = add_block(s, 'sum', 'e', 'Signs', '+-');
+s = add_block(s, 'discretetransferfcn', 'f', 'Numerator', 0.5, 'Denominator', [1 -0.5], ...
+              'SampleTime', 1);
+s = add_line(s, 'r/1', 'e/1');
+s = add_line(s, 'e/1', 'f/1');
+s = add_line(s, 'f/1', 'e/2');
+s = add_block(s, 'outport', 'o');
+s = add_line(s, 'f/1', 'o/1');
+r = sim(s, 'Solver', 'FixedStepDiscrete', 'FixedStep', 1, 'StopTime', 60);
+assert(max(abs(r.yout(end, :) - [0.5 1])) < 1e-9, 'boucle vectorielle par un filtre discret');
+
+% Une MATLAB Function dans une boucle : sa taille se déduit de la boucle.
+s = new_system('boucleFonction');
+s = add_block(s, 'constant', 'r', 'Value', 1);
+s = add_block(s, 'sum', 'e', 'Signs', '+-');
+s = add_block(s, 'matlabfunction', 'f', 'Script', sprintf('function y = f(u)\ny = 0.5 * u;'));
+s = add_block(s, 'outport', 'o');
+s = add_line(s, 'r/1', 'e/1');
+s = add_line(s, 'e/1', 'f/1');
+s = add_line(s, 'f/1', 'e/2');
+s = add_line(s, 'f/1', 'o/1');
+evalc('r = sim(s, ''Solver'', ''ode1'', ''FixedStep'', 0.1, ''StopTime'', 0.2);');
+assert(max(abs(r.yout - 1 / 3)) < 1e-9, 'MATLAB Function dans une boucle algebrique');
+
+% Les erreurs.
+modeleVoisin = add_block(new_system('m'), 'constant', 'c');
+casErreurs = {
+    @() sim(add_line(add_block(add_block(new_system('zp'), 'constant', 'u', 'Value', [1; 2]), ...
+        'discretezeropole', 'z', 'SampleTime', 1), 'u/1', 'z/1')), ...
+        'Simulink:Engine:DimensionMismatch', 'zp/z'
+    @() add_block(new_system('m'), 'iterateur', 'i'), 'Simulink:Commands:InvalidBlockType', 'interne'
+    @() add_block(new_system('m'), 'garde', 'g'), 'Simulink:Commands:InvalidBlockType', 'interne'
+    @() sim(add_block(new_system('vide'), 'subsystem', 's')), 'Simulink:Commands:SousSystemeVide', 'vide/s'
+    @() sim(add_block(new_system('r'), 'modelreference', 'm')), ...
+        'Simulink:modelReference:ModelNameEmpty', 'r/m'
+    @() get_param(modeleVoisin, 'absent', 'Value'), 'Simulink:Commands:InvSimulinkObjectName', 'absent'
+    @() set_param(modeleVoisin, 'absent', 'Value', 1), 'Simulink:Commands:InvSimulinkObjectName', 'absent'
+    @() add_line(modeleVoisin, 'c/1', 'absent/1'), 'Simulink:Commands:InvSimulinkObjectName', 'absent'
+    @() get_param(modeleVoisin, 'c', 'Absent'), 'Simulink:Commands:ParamUnknown', 'Absent'
+    @() delete_line(modeleVoisin, 'c/1', 'c/1'), 'Simulink:Commands:DeleteLineNoLine', 'c'
+    @() sim(modeleVoisin, 'StartTime', 2, 'StopTime', 1), ...
+        'Simulink:SolverConfig:StopTimeBeforeStartTime', 'duree'
+    @() sim(add_block(new_system('fw'), 'fromworkspace', 'f')), ...
+        'Simulink:blocks:FromWorkspaceVariableNotFound', 'fw/f'
+    @() sim(add_block(new_system('cplx'), 'gain', 'g', 'Gain', 1 + 2i)), ...
+        'Simulink:Parameters:InvParamSetting', 'complexe'
+    @() sim(add_block(new_system('vide'), 'constant', 'c', 'Value', [])), ...
+        'Simulink:Parameters:InvParamSetting', 'vide/c'
+    @() sim(add_block(new_system('sg'), 'sum', 's', 'Signs', '+x')), ...
+        'Simulink:Parameters:InvParamSetting', 'Signs'
+    @() sim(add_block(new_system('pr'), 'product', 'p', 'Inputs', '*+')), ...
+        'Simulink:Parameters:InvParamSetting', 'Inputs'
+    @() sim(add_block(new_system('st'), 'constant', 'c', 'SampleTime', NaN)), ...
+        'Simulink:SampleTime:InvalidSampleTime', 'st/c'
+    @() sim(add_block(new_system('po'), 'inport', 'i', 'Port', 0)), ...
+        'Simulink:Parameters:InvParamSetting', 'entier positif'
+    @() sim(add_block(new_system('tf'), 'tofile', 'f', 'MatrixName', 'a b')), ...
+        'Simulink:blocks:ToFileInvalidName', 'tf/f'
+    @() sim(add_block(new_system('ssm'), 'subsystem', 's', 'Model', 42)), ...
+        'Simulink:Commands:SousSystemeVide', 'ssm/s'
+    @() sim(add_line(add_line(add_block(add_block(add_block(new_system('nan'), 'constant', ...
+        'u'), 'integrator', 'i', 'InitialCondition', NaN), 'outport', 'o'), 'u/1', 'i/1'), ...
+        'i/1', 'o/1'), 'Solver', 'ode45'), 'Simulink:Engine:DerivNotFinite', 'nan/i'
+    @() sim(batterieFautif('switch', 'Threshold', [1 2; 3 4]), 'Solver', 'ode45'), ...
+        'Simulink:Parameters:InvParamSetting', 'Threshold'
+    @() sim(batterieFautif('transportdelay', 'DelayTime', -1)), ...
+        'Simulink:blocks:TransportDelayNegativeDelay', 'fautif/b'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('batterie, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('batterie : %d cas d''erreur verifies\n', size(casErreurs, 1));
+cd(dossierAvantBatterie);
+rmdir(dossierBatterie, 's');
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)
@@ -2953,5 +3425,127 @@ function aire = integrerParMorceaux(f, a, b, coupures)
     aire = 0;
     for k = 1:numel(bornes) - 1
         aire = aire + integral(f, bornes(k), bornes(k + 1), 'AbsTol', 1e-13, 'RelTol', 1e-12);
+    end
+end
+
+% Un modèle : le bloc T, ses entrées nourries par des sources, ses
+% sorties vers des OUTPORT ; la première entrée peut venir d'un autre bloc.
+function [s, ok] = batterieModele(nom, types, valeur)
+    s = new_system(nom);
+    ok = false;
+    for q = 1:numel(types)
+        s = add_block(s, types{q}, sprintf('b%d', q));
+    end
+    for q = 1:numel(types)
+        [ne, ns] = matlibre_sl_ports(s.blocs{q});
+        if isnan(ne), ne = 1; end
+        if isnan(ns), ns = 1; end
+        if q < numel(types) && (ns == 0 || ne == 0 && q > 1)
+            return
+        end
+        premiere = 1 + (q > 1);
+        for i = premiere:ne
+            source = sprintf('c%d_%d', q, i);
+            s = add_block(s, 'constant', source, 'Value', valeur);
+            s = add_line(s, [source '/1'], sprintf('b%d/%d', q, i));
+        end
+        for j = 1 + (q < numel(types)):ns
+            puits = sprintf('o%d_%d', q, j);
+            s = add_block(s, 'outport', puits);
+            s = add_line(s, sprintf('b%d/%d', q, j), [puits '/1']);
+        end
+        if q < numel(types)
+            [ne2, ~] = matlibre_sl_ports(s.blocs{q + 1});
+            if ~isnan(ne2) && ne2 == 0
+                return
+            end
+            s = add_line(s, sprintf('b%d/1', q), sprintf('b%d/1', q + 1));
+        end
+    end
+    ok = true;
+end
+
+% Simuler, et ne tolérer que les erreurs de Simulink.
+function id = batterieSimuler(s, solveur, contexte)
+    id = 'ok';
+    try
+        evalc('sim(s, ''Solver'', solveur, ''FixedStep'', 0.1, ''StopTime'', 0.5);');
+    catch err
+        id = err.identifier;
+        assert(strncmp(id, 'Simulink:', 9) || strncmp(id, 'Stateflow:', 10), ...
+               sprintf('%s (%s) : erreur interne %s : %s', contexte, solveur, id, err.message));
+        assert(~isempty(strfind(err.message, [s.nom '/'])), ...
+               sprintf('%s (%s) : le message ne nomme pas de bloc : %s', contexte, ...
+                       solveur, err.message));
+    end
+end
+
+% Un modèle où le bloc T est seul dans un sous-système : activé,
+% déclenché, itéré, masqué, ou sous une période discrète.
+function m = batterieContexte(type, contexte)
+    interne = new_system('dedans');
+    interne = add_block(interne, type, 'b');
+    [ne, ns] = matlibre_sl_ports(interne.blocs{end});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    for i = 1:ne
+        interne = add_block(interne, 'inport', sprintf('in%d', i));
+        interne = add_line(interne, sprintf('in%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        interne = add_block(interne, 'outport', sprintf('out%d', j));
+        interne = add_line(interne, sprintf('b/%d', j), sprintf('out%d/1', j));
+    end
+    switch contexte
+        case 'enable'
+            interne = add_block(interne, 'enableport', 'Enable');
+        case 'trigger'
+            interne = add_block(interne, 'triggerport', 'Trigger');
+        case 'for'
+            interne = add_block(interne, 'foriterator', 'iteration', 'IterationLimit', 3);
+    end
+    m = new_system('ctx');
+    if strcmp(contexte, 'masque')
+        m = add_block(m, 'subsystem', 'sous', 'Model', interne, 'Mask', 'on', ...
+                      'MaskVariables', 'k=@1;', 'MaskValueString', '2');
+    else
+        m = add_block(m, 'subsystem', 'sous', 'Model', interne);
+    end
+    periode = 0;
+    if strcmp(contexte, 'discret'), periode = 0.1; end
+    for i = 1:ne
+        m = add_block(m, 'sine', sprintf('u%d', i), 'Amplitude', 0.5, 'Bias', 1.5, ...
+                      'SampleTime', periode);
+        m = add_line(m, sprintf('u%d/1', i), sprintf('sous/%d', i));
+    end
+    switch contexte
+        case 'enable'
+            m = add_block(m, 'pulsegenerator', 'porte', 'Period', 0.4, 'PulseWidth', 50);
+            m = add_line(m, 'porte/1', 'sous/Enable');
+        case 'trigger'
+            m = add_block(m, 'pulsegenerator', 'porte', 'Period', 0.2, 'PulseWidth', 50);
+            m = add_line(m, 'porte/1', 'sous/Trigger');
+    end
+    for j = 1:ns
+        m = add_block(m, 'outport', sprintf('o%d', j));
+        m = add_line(m, sprintf('sous/%d', j), sprintf('o%d/1', j));
+    end
+end
+
+% Le bloc T, un paramètre mis à une valeur fautive, ses entrées nourries
+% par des sinus, ses sorties vers des OUTPORT.
+function s = batterieFautif(type, nom, valeur)
+    s = new_system('fautif');
+    s = add_block(s, type, 'b', nom, valeur);
+    [ne, ns] = matlibre_sl_ports(s.blocs{end});
+    if isnan(ne), ne = 1; end
+    if isnan(ns), ns = 1; end
+    for i = 1:ne
+        s = add_block(s, 'sine', sprintf('c%d', i), 'Bias', 1.5);
+        s = add_line(s, sprintf('c%d/1', i), sprintf('b/%d', i));
+    end
+    for j = 1:ns
+        s = add_block(s, 'outport', sprintf('o%d', j));
+        s = add_line(s, sprintf('b/%d', j), sprintf('o%d/1', j));
     end
 end

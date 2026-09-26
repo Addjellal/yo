@@ -369,6 +369,20 @@ FONCTION(fnPrintf) {
     return {};
 }
 
+// NaN et les infinis s'ecrivent comme MATLAB les ecrit : NaN, Inf, -Inf,
+// et non comme la bibliotheque C (nan, inf).
+static bool nonFini(double x, std::string& s) {
+    if (std::isnan(x)) {
+        s = "NaN";
+        return true;
+    }
+    if (std::isinf(x)) {
+        s = x < 0 ? "-Inf" : "Inf";
+        return true;
+    }
+    return false;
+}
+
 FONCTION(fnNum2str) {
     INUTILISE
     exigerArguments(args, 1, 2, "num2str");
@@ -382,12 +396,15 @@ FONCTION(fnNum2str) {
     int chiffres = args.size() > 1 ? (int)args[1].scal() : 0;
     auto un = [&](double x, double y) {
         std::string s;
-        if (chiffres > 0) s = formater("%.*g", chiffres, x);
+        if (nonFini(x, s)) {
+        } else if (chiffres > 0) s = formater("%.*g", chiffres, x);
         else if (x == std::floor(x) && std::fabs(x) < 1e15) s = formater("%.0f", x);
         else s = formater("%.4g", x);
         if (y != 0) {
-            std::string si = (chiffres > 0) ? formater("%.*g", chiffres, std::fabs(y))
-                                            : formater("%.4g", std::fabs(y));
+            std::string si;
+            if (!nonFini(std::fabs(y), si))
+                si = (chiffres > 0) ? formater("%.*g", chiffres, std::fabs(y))
+                                    : formater("%.4g", std::fabs(y));
             s += (y < 0 ? "-" : "+") + si + "i";
         }
         return s;
@@ -458,9 +475,14 @@ FONCTION(fnMat2str) {
         for (int j = 0; j < v.ncolonnes(); ++j) {
             if (j) s += " ";
             std::size_t k = (std::size_t)i + (std::size_t)j * v.nlignes();
-            s += formater("%.*g", chiffres, v.re[k]);
-            if (!v.im.empty() && v.im[k] != 0)
-                s += formater("%+.*gi", chiffres, v.im[k]);
+            std::string t;
+            s += nonFini(v.re[k], t) ? t : formater("%.*g", chiffres, v.re[k]);
+            if (!v.im.empty() && v.im[k] != 0) {
+                if (nonFini(v.im[k], t))
+                    s += (t[0] == '-' ? "" : "+") + t + "i";
+                else
+                    s += formater("%+.*gi", chiffres, v.im[k]);
+            }
         }
     }
     if (crochets) s += "]";

@@ -399,4 +399,17 @@ assert(~isempty(regexp('a.b', regexptranslate('escape', 'a.b'), 'once')));
 assert(isempty(regexp('axb', regexptranslate('escape', 'a.b'), 'once')), ...
        'echappe, le point ne joue plus le joker');
 
+% NaN et les infinis s'ecrivent comme MATLAB les ecrit — NaN, Inf, -Inf —
+% et non comme la bibliotheque C (nan, inf) : un texte que MAT2STR rend se
+% relit, et un message qui cite une valeur la cite telle qu'on l'a tapee.
+assert(strcmp(num2str(NaN), 'NaN') && strcmp(num2str(Inf), 'Inf') && ...
+       strcmp(num2str(-Inf), '-Inf'), 'num2str de NaN et des infinis');
+assert(isequal(num2str([1 NaN; Inf 2]), ['  1  NaN'; 'Inf    2']), 'num2str d''une matrice');
+assert(strcmp(mat2str([1 NaN -Inf Inf]), '[1 NaN -Inf Inf]'), 'mat2str de NaN et des infinis');
+assert(isequaln(eval(mat2str([1 NaN -Inf Inf])), [1 NaN -Inf Inf]), 'mat2str se relit');
+assert(strcmp(mat2str(complex(1, Inf)), '1+Infi') && strcmp(mat2str(complex(1, -Inf)), '1-Infi'));
+assert(strcmp(num2str(complex(NaN, 2)), 'NaN+2i'));
+assert(strcmp(int2str(Inf), 'Inf') && strcmp(int2str(-Inf), '-Inf'));
+assert(string(NaN) == "NaN" && string(-Inf) == "-Inf", 'string de NaN et des infinis');
+
 disp('texte et entrees-sorties : toutes les verifications passent');

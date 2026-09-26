@@ -162,8 +162,13 @@ totalité.
    externes de `sim`, les références de modèle, les tables n-D, les
    rappels du modèle (InitFcn, StopFcn...) et SimulationCommand.
    Manquent : les objets
-   `Simulink.Bus`, les types propagés d'un bloc à l'autre, et les états
-   hiérarchiques de Stateflow.
+   `Simulink.Bus`, les types propagés d'un bloc à l'autre, et les
+   fonctions graphiques, jonctions et tables de vérité de Stateflow.
+   Stateflow a ses états emboîtés, ses régions parallèles, son
+   historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
+   en réveils ou en secondes — et ses étiquettes écrites en texte :
+   « en: du: ex: » pour les états, « evenement[condition]{action}/action »
+   pour les transitions.
 5. **La génération de code couvre les matrices, les types et les
    complexes, pas tout.** `codegen` travaille sur l'arbre syntaxique et
    propage les types depuis la signature donnée par `-args` : scalaires et

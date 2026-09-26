@@ -67,7 +67,8 @@ function modele = set_param(modele, nom, varargin)
     end
     i = trouver(modele, feuille);
     if i == 0
-        error('simulink:set_param:unknownBlock', 'Unknown block ''%s''.', nom);
+        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
+               'aucun bloc ne s''appelle ''%s''.'], nom);
     end
     b = modele.blocs{i};
     entree = matlibre_sl_catalogue('type', b.type);

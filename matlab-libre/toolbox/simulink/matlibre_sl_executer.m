@@ -68,6 +68,14 @@ function varargout = matlibre_sl_executer(action, varargin)
             varargout{2} = dx;
         case 'tableau'
             [varargout{1}, varargout{2}, varargout{3}] = tableau(varargin{1});
+        case 'encours'
+            % Le bloc qu'exécutait le simulateur, que SIM lit quand une
+            % erreur imprévue tombe ; ENCOURS,0 l'oublie.
+            if isempty(varargin)
+                varargout{1} = enCours();
+            else
+                enCours(varargin{1});
+            end
         otherwise
             error('Simulink:Engine:Action', 'Action inconnue : %s.', char(action));
     end
@@ -79,6 +87,11 @@ function T = preparer(c)
     n = c.n;
     T = struct();
     T.n = n;
+    % En mode diagnostic, la passe, les dérivées et les mises à jour notent
+    % le bloc qu'elles calculent : SIM rejoue ainsi une simulation qui a
+    % échoué sur une erreur imprévue, pour nommer le bloc fautif.
+    T.diagnostic = false;
+    enCours(0);
     T.nom = c.nom;
     T.chemins = c.chemins;
     T.noms = c.noms;
@@ -106,6 +119,7 @@ function T = preparer(c)
     T.eB = ones(1, total + 1);
     pos = 0;
     for k = 1:n
+        enCours(k);
         T.eD(k) = pos;
         for j = 1:c.nIn(k)
             T.eA(pos + j) = c.inA{k}(j);
@@ -118,6 +132,7 @@ function T = preparer(c)
     T.pA = zeros(1, n);
     T.P = zeros(0, 1);
     for k = 1:n
+        enCours(k);
         T.pA(k) = numel(T.P) + 1;
         T.P = [T.P; c.seg{k}];
     end
@@ -125,6 +140,7 @@ function T = preparer(c)
     T.zA = zeros(1, n);
     T.Z0 = 0;
     for k = 1:n
+        enCours(k);
         T.zA(k) = numel(T.Z0) + 1;
         T.Z0 = [T.Z0; c.z0{k}];
     end
@@ -159,6 +175,7 @@ function T = preparer(c)
     T.revient = false(1, n);
     T.initiale = cell(1, n);
     for k = 1:n
+        enCours(k);
         if isfield(c, 'sortieCond') && ~isempty(c.sortieCond{k})
             w = c.oB(k) - c.oA(k) + 1;
             valeur = double(c.sortieCond{k}.initiale(:));
@@ -176,6 +193,7 @@ function T = preparer(c)
     end
     T.sousGarde = cell(1, n);
     for k = 1:n
+        enCours(k);
         g = T.garde(k);
         while g > 0
             T.sousGarde{g}(end + 1) = k;
@@ -208,6 +226,7 @@ function T = preparer(c)
     T.grp = zeros(1, n);
     T.groupes = zeros(0, 2);
     for k = 1:n
+        enCours(k);
         cadence = c.cadence(k);
         if isinf(cadence)
             T.mode(k) = 3;
@@ -307,6 +326,7 @@ function T = preparer(c)
     % instant de leur période.
     T.aMettreAJour = [];
     for k = 1:n
+        enCours(k);
         switch c.types{k}
             case {'relay', 'ratelimiter', 'hitcrossing', 'backlash', 'detectchange', ...
                   'detectincrease', 'detectdecrease', 'derivative', 'memory', ...
@@ -349,6 +369,7 @@ function T = preparer(c)
     T.cassures = zeros(0, 1);
     T.impulsions = [];
     for k = 1:n
+        enCours(k);
         s = c.seg{k};
         w = c.oB(k) - c.oA(k) + 1;
         switch c.types{k}
@@ -413,6 +434,7 @@ function T = preparer(c)
     T.journal = zeros(0, 1);
     T.releves = struct('bloc', {}, 'port', {}, 'entree', {}, 'dims', {}, 'lignes', {});
     for k = 1:n
+        enCours(k);
         if c.nOut(k) >= 1
             for q = 1:c.nOut(k)
                 gp = c.portDebut(k) + q - 1;
@@ -445,6 +467,7 @@ function blocs = parPort(c, type)
     blocs = find(strcmp(c.types, type));
     rangs = zeros(size(blocs));
     for i = 1:numel(blocs)
+        enCours(blocs(i));
         rangs(i) = double(c.p{blocs(i)}.Port);
     end
     [~, ordre] = sort(rangs);
@@ -692,6 +715,19 @@ function deriveeInfinie(T, dx, t)
                   ['La derivee de l''etat de ''%s'' n''est pas finie a t = %g : la ' ...
                    'simulation s''arrete. La solution a peut-etre une singularite ' ...
                    '(division par zero, entree infinie).'], T.chemins{k}, t);
+        end
+    end
+end
+
+% Le bloc dont l'état, ou l'état que le pas propose, n'est pas fini — le
+% modèle, s'il n'y en a pas.
+function nom = blocNonFini(T, x, xNouveau)
+    nom = T.nom;
+    for k = T.continus
+        i = T.xA(k):T.xB(k);
+        if ~all(isfinite(x(i))) || ~all(isfinite(xNouveau(i)))
+            nom = T.chemins{k};
+            return
         end
     end
 end
@@ -956,9 +992,11 @@ function J = simulerVariable(T, tDebut, tFinal, solveur, reglages, imposes)
                 if h <= plancher
                     if ~isfinite(err)
                         error('Simulink:Engine:DerivNotFinite', ...
-                              ['Le pas du solveur ne peut plus diminuer a t = %g : les ' ...
-                               'derivees ne sont pas finies. La solution a peut-etre une ' ...
-                               'singularite.'], t);
+                              ['La derivee de l''etat de ''%s'' n''est pas finie a t = %g : ' ...
+                               'le pas du solveur ne peut plus diminuer. La solution a ' ...
+                               'peut-etre une singularite (division par zero, entree ' ...
+                               'infinie, condition initiale NaN).'], ...
+                              blocNonFini(T, x, xNouveau), t);
                     end
                     if ~minimumDonne
                         conseil = ' ; si le systeme est raide, essayez ode15s ou ode23s';
@@ -1761,8 +1799,12 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
     pA = T.pA;
     zA = T.zA;
     sub = T.sub;
+    diagnostic = T.diagnostic;
     for q = 1:numel(liste)
         k = liste(q);
+        if diagnostic
+            enCours(k);
+        end
         if k < 0
             [V, Z] = resoudreBoucle(T, -k, V, Z, x, t, i, majeur, touche);
             continue
@@ -2311,7 +2353,11 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                         else
                             u = 0;
                         end
-                        V(a:b) = sortieEtat(T, p, x(T.xA(k):T.xB(k)), u);
+                        if T.xA(k) > 0
+                            V(a:b) = sortieEtat(T, p, x(T.xA(k):T.xB(k)), u);
+                        else
+                            V(a:b) = sortieEtat(T, p, zeros(0, 1), u);   % un gain pur
+                        end
                     case 75   % transport delay
                         if T.P(p) == 0
                             V(a:b) = V(eA(e + 1):eB(e + 1));
@@ -2374,7 +2420,7 @@ function [V, Z] = passe(T, liste, V, Z, x, t, i, majeur, touche)
                                 V(a:b) = xk + T.P(p) * V(eA(e + 1):eB(e + 1)) / 2;
                         end
                     case {84, 85}   % discrete transfer fcn, discrete filter
-                        V(a) = sortieFiltre(T, p, Z, zA(k), V(eA(e + 1)));
+                        V(a:b) = sortieFiltre(T, p, Z, zA(k), V(eA(e + 1):eB(e + 1)));
                     case 86   % discrete state-space
                         nx = T.P(p);
                         if T.direct(k)
@@ -2666,6 +2712,9 @@ function V = pasGraphe(T, k, V, p, e, t)
                 u{j} = V(T.eA(e + j):T.eB(e + j));
             end
         end
+        if isstruct(etat.contexte)
+            etat.contexte.sf_t = t;   % pour la logique temporelle en secondes
+        end
         [etat.courant, etat.contexte] = sfstep(G.machine, etat.courant, etat.contexte, u);
         etat.t = t;
         graphes(k) = etat;
@@ -2675,7 +2724,11 @@ function V = pasGraphe(T, k, V, p, e, t)
         a = T.poA(pd + q - 1);
         b = T.poB(pd + q - 1);
         if strcmp(G.sorties{q}, 'etat')
-            V(a) = find(strcmp(G.noms, etat.courant), 1);
+            feuille = etat.courant;
+            if iscell(feuille)
+                feuille = feuille{1};   % plusieurs régions : la première
+            end
+            V(a) = find(strcmp(G.noms, feuille), 1);
         else
             y = double(etat.contexte.(G.sorties{q}));
             if numel(y) ~= b - a + 1
@@ -3386,13 +3439,14 @@ function y = sortieFiltre(T, p, Z, z, u)
         y = b0 * u;
         return
     end
-    s = Z(z:z + m - 1);
+    n = numel(u);
+    S = reshape(Z(z:z + m * n - 1), m, n);   % une colonne d'états par voie
     ia = p + 2 + m;
-    w = u - T.P(ia + 1:ia + m).' * s;
     if b0 ~= 0
-        y = b0 * w + T.P(p + 2:p + 1 + m).' * s;
+        w = u(:).' - T.P(ia + 1:ia + m).' * S;
+        y = (b0 * w + T.P(p + 2:p + 1 + m).' * S).';
     else
-        y = T.P(p + 2:p + 1 + m).' * s;
+        y = (T.P(p + 2:p + 1 + m).' * S).';
     end
 end
 
@@ -3593,7 +3647,11 @@ end
 
 function dx = derivees(T, V, x, t)
     dx = zeros(numel(x), 1);
+    diagnostic = T.diagnostic;
     for k = T.continus
+        if diagnostic
+            enCours(k);
+        end
         g = T.garde(k);
         if g > 0 && V(T.oA(g)) == 0
             continue   % sous-système à l'arrêt : l'état tient
@@ -3661,7 +3719,11 @@ function oui = estInstant(t, P, D)
 end
 
 function Z = majs(T, V, Z, t, touche, x)
+    diagnostic = T.diagnostic;
     for k = T.aMettreAJour
+        if diagnostic
+            enCours(k);
+        end
         if T.mode(k) == 2 && ~touche(T.grp(k))
             continue
         end
@@ -3730,10 +3792,11 @@ function Z = majs(T, V, Z, t, touche, x)
             case {84, 85}   % discrete transfer fcn, discrete filter
                 m = T.P(p);
                 if m > 0
-                    s = Z(z:z + m - 1);
+                    n = numel(u);
+                    S = reshape(Z(z:z + m * n - 1), m, n);   % une colonne par voie
                     ia = p + 2 + m;
-                    Z(z + 1:z + m - 1) = s(1:m - 1);
-                    Z(z) = u - T.P(ia + 1:ia + m).' * s;
+                    S = [u(:).' - T.P(ia + 1:ia + m).' * S; S(1:m - 1, :)];
+                    Z(z:z + m * n - 1) = S(:);
                 end
             case 86   % discrete state-space
                 nx = T.P(p);
@@ -3785,5 +3848,18 @@ function Z = majs(T, V, Z, t, touche, x)
                     Z(z + 2:z + 1 + largeur) = V(T.eA(e + rang):T.eB(e + rang));
                 end
         end
+    end
+end
+
+% Le bloc en cours de calcul, retenu d'un appel à l'autre.
+function k = enCours(k)
+    persistent courant
+    if isempty(courant)
+        courant = 0;
+    end
+    if nargin > 0
+        courant = k;
+    else
+        k = courant;
     end
 end

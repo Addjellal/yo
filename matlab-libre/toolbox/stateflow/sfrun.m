@@ -1,8 +1,11 @@
-function [historique, contexte] = sfrun(machine, entrees, contexte)
+function [historique, contexte] = sfrun(machine, entrees, contexte, instants)
 %SFRUN Exécute la machine sur une suite d'entrées.
 %   [HISTORIQUE,CONTEXTE] = SFRUN(MACHINE,ENTREES) rend la suite des états
 %   visités, un par pas, et le contexte final. SFRUN(MACHINE,ENTREES,
-%   CONTEXTE) part du contexte donné.
+%   CONTEXTE) part du contexte donné. SFRUN(MACHINE,ENTREES,CONTEXTE,
+%   INSTANTS) donne l'instant de chaque pas — celui du démarrage d'abord,
+%   puis un par entrée —, que lit la logique temporelle en secondes
+%   (SFAFTER(C,N,'sec')).
 %
 %   La machine démarre dans son état initial, puis fait un pas par entrée,
 %   avec la règle de Stateflow que SFSTEP applique : une transition valide
@@ -20,6 +23,12 @@ function [historique, contexte] = sfrun(machine, entrees, contexte)
     if nargin < 3
         contexte = struct();
     end
+    if nargin < 4
+        instants = [];
+    end
+    if ~isempty(instants) && isstruct(contexte)
+        contexte.sf_t = instants(1);
+    end
     % Le démarrage entre dans l'état initial ; chaque entrée fait ensuite
     % un pas, avec la règle de Stateflow : une transition si l'une est
     % valide, sinon l'action de séjour.
@@ -30,6 +39,9 @@ function [historique, contexte] = sfrun(machine, entrees, contexte)
             u = entrees{k};
         else
             u = entrees(k);
+        end
+        if numel(instants) > k && isstruct(contexte)
+            contexte.sf_t = instants(k + 1);
         end
         [courant, contexte] = sfstep(machine, courant, contexte, u);
         historique{k} = courant;

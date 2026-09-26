@@ -37,7 +37,7 @@ function sortie = matlibre_sl_pile(action, modele)
         futurs = {};
     end
     if ~isstruct(modele) || ~isfield(modele, 'nom')
-        error('simulink:pile:modele', ...
+        error('Simulink:Commands:InvalidModel', ...
               'MATLIBRE_SL_PILE attend un modele bati par NEW_SYSTEM.');
     end
     nom = char(modele.nom);
@@ -88,6 +88,6 @@ function sortie = matlibre_sl_pile(action, modele)
         case 'refaisables'
             sortie = numel(futurs{k});
         otherwise
-            error('simulink:pile:action', 'Action inconnue : %s.', char(action));
+            error('Simulink:Commands:InvalidAction', 'Action inconnue : %s.', char(action));
     end
 end

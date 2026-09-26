@@ -39,7 +39,7 @@ function modele = delete_line(modele, source, destination, entree, sortie)
         candidats = candidats(liens(candidats, 4) == portSortie);
     end
     if isempty(candidats)
-        error('simulink:delete_line:lienInconnu', ...
+        error('Simulink:Commands:DeleteLineNoLine', ...
               'Aucun lien ne va de ''%s'' a ''%s''.', char(source), char(destination));
     end
     liens(candidats, :) = [];

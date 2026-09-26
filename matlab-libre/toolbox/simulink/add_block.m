@@ -156,10 +156,12 @@ function modele = add_block(modele, type, nom, varargin)
 %                  les sorties ; une variable persistante y garde un état
 %     sfunction    FunctionName, Parameters     une S-fonction de niveau 1,
 %                  [sys,x0,str,ts] = f(t,x,u,flag,p1,...)
-%     chart        Chart, Inputs, Outputs, InitialContext — une machine à
-%                  états bâtie par SFCHART, SFSTATE et SFTRANSITION ; ses
-%                  sorties sont des champs de son contexte, ou « etat »,
-%                  le rang de l'état actif
+%     chart        Chart, Inputs, Outputs, InitialContext, SampleTime —
+%                  une machine à états bâtie par SFCHART, SFSTATE et
+%                  SFTRANSITION, états emboîtés, régions parallèles et
+%                  logique temporelle compris (SFAFTER... en secondes de
+%                  simulation) ; ses sorties sont des champs de son
+%                  contexte, ou « etat », le rang de l'état actif
 %
 %   Un schéma dans un bloc :
 %     subsystem    Model                un modèle entier, abrégé en un bloc ;
@@ -251,6 +253,13 @@ function modele = add_block(modele, type, nom, varargin)
         return
     end
     entree = matlibre_sl_catalogue('type', type);
+    if strcmp(entree.famille, 'Interne')
+        % les blocs que le dépliage fabrique ne se posent pas à la main
+        error('Simulink:Commands:InvalidBlockType', ...
+              ['Le type de bloc ''%s'' est interne a MatLibre : le depliage des ' ...
+               'sous-systemes le fabrique, il ne se pose pas. Posez le sous-systeme.'], ...
+              char(type));
+    end
     unique = false;
     reglages = {};
     for k = 1:2:numel(varargin)

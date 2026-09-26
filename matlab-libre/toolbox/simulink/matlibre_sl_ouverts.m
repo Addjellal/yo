@@ -71,7 +71,7 @@ function sortie = matlibre_sl_ouverts(action, nom, modele, numeroFigure)
                 sortie = noms{end};
             end
         otherwise
-            error('simulink:ouverts:action', 'Action inconnue : %s.', char(action));
+            error('Simulink:Commands:InvalidAction', 'Action inconnue : %s.', char(action));
     end
 end
 

@@ -84,16 +84,16 @@ end
 % Un sous-système itéré reste un bloc : son modèle, dont chaque bloc garde
 % l'espace du masque qui l'englobe, tourne à part. Un seul itérateur, et
 % pas de port de contrôle, comme dans Simulink.
-function iterateur = sousSystemeItere(bloc, interne, iterateurs, g)
+function iterateur = sousSystemeItere(bloc, interne, iterateurs, g, chemin)
     if numel(iterateurs) > 1
         error('Simulink:blocks:IteratorDuplicate', ...
               ['Le sous-systeme ''%s'' porte %d blocs d''iteration : un sous-systeme ' ...
-               'itere n''en a qu''un.'], char(bloc.nom), numel(iterateurs));
+               'itere n''en a qu''un.'], chemin, numel(iterateurs));
     end
     if g > 0
         error('Simulink:blocks:IteratorWithControlPort', ...
               ['Le sous-systeme itere ''%s'' porte un port Enable, Trigger ou Action : ' ...
-               'placez-le dans un sous-systeme conditionnel plutot.'], char(bloc.nom));
+               'placez-le dans un sous-systeme conditionnel plutot.'], chemin);
     end
     espace = struct();
     if isfield(bloc, 'espace')
@@ -187,7 +187,12 @@ end
 
 function modele = deplier(modele, k)
     bloc = modele.blocs{k};
-    interne = contenu(bloc);
+    % le chemin du bloc, comme Simulink le donne dans ses messages
+    chemin = char(bloc.nom);
+    if isfield(modele, 'nom') && ~isempty(modele.nom)
+        chemin = [char(modele.nom) '/' chemin];
+    end
+    interne = contenu(bloc, chemin);
     interne.liens = matlibre_sl_liens(interne);
     interne = rafraichirLiens(interne);
     for j = 1:numel(interne.blocs)
@@ -197,7 +202,7 @@ function modele = deplier(modele, k)
     m = numel(interne.blocs);
     entrees = parRang(interne, 'inport');
     sorties = parRang(interne, 'outport');
-    [controles, g] = portsDeControle(interne, bloc);
+    [controles, g] = portsDeControle(interne, chemin);
     gardeParent = 0;
     if isfield(bloc, 'garde')
         gardeParent = bloc.garde;
@@ -205,7 +210,7 @@ function modele = deplier(modele, k)
     types = cellfun(@(b) b.type, interne.blocs, 'UniformOutput', false);
     iterateurs = find(ismember(types, {'foriterator', 'whileiterator'}));
     if ~isempty(iterateurs)
-        modele.blocs{k} = sousSystemeItere(bloc, interne, iterateurs, g);
+        modele.blocs{k} = sousSystemeItere(bloc, interne, iterateurs, g, chemin);
         return
     end
     % Un masque ouvre un espace : ses variables, évaluées dans l'espace de
@@ -338,7 +343,7 @@ function modele = deplier(modele, k)
             error('Simulink:Commands:SousSystemeEntreeAbsente', ...
                   ['Le sous-systeme ''%s'' recoit un lien sur son entree %d, ' ...
                    'mais il n''a que %d bloc(s) INPORT et %d port(s) de controle.'], ...
-                  char(bloc.nom), port, numel(entrees), numel(controles.ordre));
+                  chemin, port, numel(entrees), numel(controles.ordre));
         end
         interieur = n + entrees(port);
         modele.blocs{interieur}.type = 'signalconversion';
@@ -353,7 +358,7 @@ function modele = deplier(modele, k)
         if modele.liens(l, 1) == k && modele.liens(l, 4) > max(1, numel(sorties))
             error('Simulink:Commands:SousSystemeSortieAbsente', ...
                   ['Un lien part de la sortie %d du sous-systeme ''%s'', qui n''a ' ...
-                   'que %d bloc(s) OUTPORT.'], modele.liens(l, 4), char(bloc.nom), ...
+                   'que %d bloc(s) OUTPORT.'], modele.liens(l, 4), chemin, ...
                   numel(sorties));
         end
     end
@@ -364,7 +369,7 @@ function modele = deplier(modele, k)
     end
 end
 
-function interne = contenu(bloc)
+function interne = contenu(bloc, chemin)
     if strcmp(bloc.type, 'modelreference')
         % Une référence de modèle relit son modèle à chaque simulation.
         nom = '';
@@ -374,7 +379,7 @@ function interne = contenu(bloc)
         if isempty(nom)
             error('Simulink:modelReference:ModelNameEmpty', ...
                   'La reference de modele ''%s'' ne nomme pas de modele (ModelName).', ...
-                  char(bloc.nom));
+                  chemin);
         end
         nom = regexprep(nom, '\.(slx|mdl)$', '');
         try
@@ -382,19 +387,28 @@ function interne = contenu(bloc)
         catch err
             error('Simulink:modelReference:ModelNotFound', ...
                   'La reference de modele ''%s'' designe ''%s'', introuvable : %s', ...
-                  char(bloc.nom), nom, err.message);
+                  chemin, nom, err.message);
         end
         return
     end
-    if isfield(bloc.parametres, 'Model')
-        interne = matlibre_sl_modele(bloc.parametres.Model);
-    elseif isfield(bloc.parametres, 'Modele')
-        interne = matlibre_sl_modele(bloc.parametres.Modele);
+    if isfield(bloc.parametres, 'Model') || isfield(bloc.parametres, 'Modele')
+        if isfield(bloc.parametres, 'Model')
+            dedans = bloc.parametres.Model;
+        else
+            dedans = bloc.parametres.Modele;
+        end
+        try
+            interne = matlibre_sl_modele(dedans);
+        catch err
+            error('Simulink:Commands:SousSystemeVide', ...
+                  ['Le sous-systeme ''%s'' porte, dans son parametre Model, ce qui ' ...
+                   'n''est pas un modele : %s'], chemin, err.message);
+        end
     else
         error('Simulink:Commands:SousSystemeVide', ...
               ['Le sous-systeme ''%s'' ne porte pas de modele : donnez-le ' ...
                'par ADD_BLOCK(...,''subsystem'',NOM,''Model'',SOUSMODELE).'], ...
-              char(bloc.nom));
+              chemin);
     end
 end
 
@@ -402,16 +416,18 @@ end
 % un de chaque au plus, et Action Port seul. G est le rang de celui qui
 % devient la garde, 0 s'il n'y en a pas. CONTROLES.ordre les range comme
 % les entrées de contrôle du bloc : Enable, puis Trigger ; ou Action.
-function [controles, g] = portsDeControle(interne, bloc)
+function [controles, g] = portsDeControle(interne, chemin)
     controles = struct('enable', 0, 'trigger', 0, 'action', 0, 'ordre', [], 'tous', []);
     noms = {'enableport', 'enable'; 'triggerport', 'trigger'; 'actionport', 'action'};
     for i = 1:size(noms, 1)
         trouves = find(cellfun(@(b) strcmp(b.type, noms{i, 1}), interne.blocs));
         if numel(trouves) > 1
+            ports = cellfun(@(b) ['''' chemin '/' char(b.nom) ''''], ...
+                            interne.blocs(trouves), 'UniformOutput', false);
             error('Simulink:blocks:ControlPortDuplicate', ...
-                  ['Le sous-systeme ''%s'' porte %d blocs ''%s'' : un sous-systeme n''a ' ...
-                   'qu''un port de chaque sorte.'], char(bloc.nom), numel(trouves), ...
-                  interne.blocs{trouves(1)}.nom);
+                  ['Le sous-systeme ''%s'' porte %d ports de la meme sorte (%s) : un ' ...
+                   'sous-systeme n''a qu''un port de chaque sorte.'], chemin, ...
+                  numel(trouves), strjoin(ports, ', '));
         end
         if ~isempty(trouves)
             controles.(noms{i, 2}) = trouves;
@@ -421,7 +437,7 @@ function [controles, g] = portsDeControle(interne, bloc)
         error('Simulink:blocks:ActionPortWithEnableTrigger', ...
               ['Le sous-systeme ''%s'' porte un Action Port avec un port Enable ou ' ...
                'Trigger : un sous-systeme d''action n''a que son Action Port.'], ...
-              char(bloc.nom));
+              chemin);
     end
     controles.ordre = [controles.enable, controles.trigger, controles.action];
     controles.ordre = controles.ordre(controles.ordre > 0);

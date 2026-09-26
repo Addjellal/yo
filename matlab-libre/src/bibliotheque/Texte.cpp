@@ -1171,8 +1171,13 @@ FONCTION(fnString) {
     r.dims = v.dims;
     for (std::size_t k = 0; k < v.nelem(); ++k) {
         double x = v.re[k];
-        r.chaines.push_back(x == std::floor(x) && std::fabs(x) < 1e15 ? formater("%.0f", x)
-                                                                      : formater("%g", x));
+        if (std::isnan(x))
+            r.chaines.push_back("NaN");   // comme MATLAB, non comme la bibliotheque C
+        else if (std::isinf(x))
+            r.chaines.push_back(x < 0 ? "-Inf" : "Inf");
+        else
+            r.chaines.push_back(x == std::floor(x) && std::fabs(x) < 1e15 ? formater("%.0f", x)
+                                                                          : formater("%g", x));
     }
     return {r};
 }

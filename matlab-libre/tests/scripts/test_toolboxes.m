@@ -805,7 +805,7 @@ refuseN = false;
 try
     sim(add_block(new_system('n'), 'pidcontroller', 'p', 'N', 0), 1, 0.1);
 catch err
-    refuseN = strcmp(err.identifier, 'simulink:sim:filtreDerive');
+    refuseN = strcmp(err.identifier, 'Simulink:blocks:PIDFilterCoefficientNotPositive');
 end
 assert(refuseN);
 
@@ -839,7 +839,7 @@ refuseLien = false;
 try
     delete_line(edition, 'i', 'c');
 catch err
-    refuseLien = strcmp(err.identifier, 'simulink:delete_line:lienInconnu');
+    refuseLien = strcmp(err.identifier, 'Simulink:Commands:DeleteLineNoLine');
 end
 assert(refuseLien);
 
@@ -1151,7 +1151,7 @@ try
     sim(add_block(new_system('x'), 'fromworkspace', 's', ...
                   'VariableName', 'signalQuiNExistePas'), 1, 0.5);
 catch err
-    refusAbsente = strcmp(err.identifier, 'simulink:sim:variableAbsente');
+    refusAbsente = strcmp(err.identifier, 'Simulink:blocks:FromWorkspaceVariableNotFound');
 end
 assert(refusAbsente);
 malForme = 1:5;                                                 %#ok<NASGU>
@@ -1160,7 +1160,7 @@ try
     sim(add_block(new_system('x'), 'fromworkspace', 's', 'VariableName', 'malForme'), ...
         1, 0.5);
 catch err
-    refusForme = strcmp(err.identifier, 'simulink:sim:signalMalForme');
+    refusForme = strcmp(err.identifier, 'Simulink:SimInput:InvalidFormat');
 end
 assert(refusForme);
 
@@ -1270,7 +1270,7 @@ refuseRenom = false;
 try
     set_param(renom, 'k', 'Name', 'autre');
 catch err
-    refuseRenom = strcmp(err.identifier, 'simulink:set_param:unknownBlock');
+    refuseRenom = strcmp(err.identifier, 'Simulink:Commands:InvSimulinkObjectName');
 end
 assert(refuseRenom, 'l''ancien nom ne designe plus rien');
 
@@ -1333,7 +1333,7 @@ refusePile = false;
 try
     matlibre_sl_pile('poser', 42);
 catch err
-    refusePile = strcmp(err.identifier, 'simulink:pile:modele');
+    refusePile = strcmp(err.identifier, 'Simulink:Commands:InvalidModel');
 end
 assert(refusePile);
 

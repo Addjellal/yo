@@ -63,7 +63,8 @@ function valeur = get_param(modele, nom, parametre)
         end
     end
     if i == 0
-        error('simulink:get_param:unknownBlock', 'Unknown block ''%s''.', nom);
+        error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
+               'aucun bloc ne s''appelle ''%s''.'], nom);
     end
     bloc = modele.blocs{i};
     if nargin < 3
@@ -120,7 +121,7 @@ function valeur = get_param(modele, nom, parametre)
     end
     canon = matlibre_sl_catalogue('parametre', entree, champ);
     if isempty(canon)
-        error('simulink:get_param:unknownParameter', ...
+        error('Simulink:Commands:ParamUnknown', ...
               'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
     end
     if isfield(bloc.parametres, canon)
@@ -133,7 +134,7 @@ function valeur = get_param(modele, nom, parametre)
             return
         end
     end
-    error('simulink:get_param:unknownParameter', ...
+    error('Simulink:Commands:ParamUnknown', ...
           'Le bloc ''%s'' n''a pas de paramètre ''%s''.', feuille, champ);
 end
 

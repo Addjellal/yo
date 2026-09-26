@@ -135,7 +135,8 @@ function [k, port] = designer(modele, texte, role)
             return
         end
     end
-    error('simulink:add_line:unknownBlock', 'Unknown block ''%s'' (%s du lien).', ...
+    error('Simulink:Commands:InvSimulinkObjectName', ['Nom d''objet Simulink invalide : ' ...
+           'aucun bloc ne s''appelle ''%s'' (%s du lien).'], ...
           texte, role);
 end
 
