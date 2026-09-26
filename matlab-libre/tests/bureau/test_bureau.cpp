@@ -1809,6 +1809,75 @@ int main(int argc, char** argv) {
                      }, 20000),
                      "et le modele revient a cinq blocs et cinq liens");
 
+            // --- nommer et journaliser un signal ---------------------
+            //
+            // Le clic droit sur un lien ouvre son menu : nommer le
+            // signal, le journaliser. Chaque action devient un SET_PARAM
+            // sur la poignee du port d'ou part le signal ; le schema
+            // redessine montre le nom et la marque du journal, et SIM
+            // range le signal dans logsout.
+            {
+                int lienCorrecteur = -1;
+                for (int k = 0; k < simulink->explorateur()->topLevelItemCount(); ++k) {
+                    QTreeWidgetItem* rubrique = simulink->explorateur()->topLevelItem(k);
+                    if (!rubrique->text(0).startsWith(QLatin1String("Liens"))) continue;
+                    for (int j = 0; j < rubrique->childCount(); ++j)
+                        if (rubrique->child(j)->text(0).startsWith(
+                                QString::fromUtf8("correcteur \u2192")))
+                            lienCorrecteur = j;
+                }
+                verifier(lienCorrecteur >= 0, "le lien qui part du correcteur est dans la liste");
+                QMenu* menu = toile->menuDuLien(lienCorrecteur, simulink);
+                verifier(menu != nullptr && menu->actions().size() == 2,
+                         "le menu d'un lien : nommer le signal, le journaliser");
+                QAction* journaliser = menu ? menu->actions().value(1) : nullptr;
+                verifier(journaliser && journaliser->isCheckable() &&
+                             !journaliser->isChecked(),
+                         "un signal n'est pas journalise tant qu'on ne l'a pas demande");
+                commandeVue.clear();
+                if (journaliser) journaliser->setChecked(true);
+                QCoreApplication::processEvents();
+                verifier(commandeVue.contains(QLatin1String("PortHandles")) &&
+                             commandeVue.contains(QLatin1String("'DataLogging', 'on'")),
+                         "journaliser devient un SET_PARAM sur la poignee du port");
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "la journalisation passe");
+                delete menu;
+                commandeVue.clear();
+                toile->nommerSignal(lienCorrecteur, QStringLiteral("commande"));
+                QCoreApplication::processEvents();
+                verifier(commandeVue.contains(QLatin1String("'Name', 'commande'")),
+                         "nommer le signal aussi");
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "le nommage passe");
+                verifier(attendre([&] {
+                             QCoreApplication::processEvents();
+                             return toile->nomDuSignal(lienCorrecteur) ==
+                                        QLatin1String("commande") &&
+                                    toile->signalJournalise(lienCorrecteur);
+                         }, 20000),
+                         "la toile montre le nom du signal et la marque du journal");
+                bool ditDansExplorateur = false;
+                for (int k = 0; k < simulink->explorateur()->topLevelItemCount(); ++k) {
+                    QTreeWidgetItem* rubrique = simulink->explorateur()->topLevelItem(k);
+                    for (int j = 0; j < rubrique->childCount(); ++j)
+                        ditDansExplorateur = ditDansExplorateur ||
+                            (rubrique->child(j)->text(0).contains(QLatin1String("commande")) &&
+                             rubrique->child(j)->text(0).contains(
+                                 QString::fromUtf8("journalis\u00e9")));
+                }
+                verifier(ditDansExplorateur, "l'explorateur dit le nom et le journal du lien");
+                const int avantJournal = console->toPlainText().size();
+                envoyer(fenetre, QStringLiteral(
+                    "rJournal = sim(modeleDuBureau, 1); nomsJournal = "
+                    "rJournal.logsout.getElementNames; disp(['JOURNAL ' nomsJournal{1}])"));
+                verifier(attendre([&] { return !fenetre.occupe(); }, 20000),
+                         "la simulation journalisee passe");
+                verifier(console->toPlainText().mid(avantJournal).contains(
+                             QLatin1String("JOURNAL commande")),
+                         "et logsout porte le signal nomme");
+            }
+
             // --- du schema au programme, et retour -------------------
             //
             // Deux chemins que la barre expose : « Enregistrer » ecrit le

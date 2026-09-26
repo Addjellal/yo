@@ -155,6 +155,7 @@ function S = systemeXml(noeud, dossierSystemes)
                 if ~isempty(masque)
                     b.parametres = fusionner(b.parametres, parametresMasque(masque));
                 end
+                b.signaux = portsLus(e, @parametresP);
                 sousSysteme = enfant(e, 'System');
                 if ~isempty(sousSysteme)
                     if isfield(sousSysteme.Attributes, 'Ref')
@@ -170,18 +171,55 @@ function S = systemeXml(noeud, dossierSystemes)
 end
 
 % Un lien et ses branches : une source, et autant de destinations.
-function liens = liensXml(e, source)
+function liens = liensXml(e, source, nom)
+    if nargin < 3
+        nom = '';
+    end
     liens = {};
     P = parametresP(e);
     if isfield(P, 'Src')
         source = P.Src;
     end
+    if isfield(P, 'Name')
+        nom = P.Name;
+    end
     if isfield(P, 'Dst') && ~isempty(source)
-        liens{end + 1} = struct('source', source, 'destination', P.Dst);
+        liens{end + 1} = struct('source', source, 'destination', P.Dst, 'nom', nom);
     end
     for k = 1:numel(e.Children)
         if strcmp(e.Children{k}.Name, 'Branch')
-            liens = [liens, liensXml(e.Children{k}, source)]; %#ok<AGROW>
+            liens = [liens, liensXml(e.Children{k}, source, nom)]; %#ok<AGROW>
+        end
+    end
+end
+
+% Les ports de sortie d'un bloc lu, et les réglages de leur signal : son
+% nom, sa journalisation. Seuls ceux qui s'écartent des défauts restent.
+function signaux = portsLus(e, lire)
+    signaux = [];
+    rang = 0;
+    for k = 1:numel(e.Children)
+        port = e.Children{k};
+        if ~strcmp(port.Name, 'Port')
+            continue
+        end
+        rang = rang + 1;
+        P = lire(port);
+        if isfield(P, 'PortType') && ~strcmpi(P.PortType, 'outport')
+            continue
+        end
+        numero = rang;
+        if isfield(P, 'PortNumber')
+            numero = str2double(P.PortNumber);
+        end
+        bloc = struct();
+        bloc = matlibre_sl_signaux('bloc', bloc, numero, P);
+        if isfield(bloc, 'signaux')
+            if isempty(signaux)
+                signaux = bloc.signaux;
+            else
+                signaux(end + 1) = bloc.signaux; %#ok<AGROW>
+            end
         end
     end
 end
@@ -322,6 +360,7 @@ function S = systemeMdl(noeud)
                 P = parametresMdl(e);
                 b = struct('type', champTexte(P, 'BlockType'), 'nom', champTexte(P, 'Name'), ...
                            'sid', champTexte(P, 'Name'), 'parametres', P, 'interieur', []);
+                b.signaux = portsLus(e, @parametresMdl);
                 sousSysteme = enfant(e, 'System');
                 if ~isempty(sousSysteme)
                     b.interieur = systemeMdl(sousSysteme);
@@ -335,9 +374,15 @@ end
 
 % Un lien de .mdl nomme ses blocs : « SrcBlock "Gain" » et « SrcPort 1 ».
 % On le ramène à l'écriture du .slx, « nom#out:1 ».
-function liens = liensMdl(e, source)
+function liens = liensMdl(e, source, nom)
+    if nargin < 3
+        nom = '';
+    end
     liens = {};
     P = parametresMdl(e);
+    if isfield(P, 'Name')
+        nom = P.Name;
+    end
     if isfield(P, 'SrcBlock')
         port = '1';
         if isfield(P, 'SrcPort')
@@ -355,11 +400,11 @@ function liens = liensMdl(e, source)
         else
             destination = sprintf('%s#%s', P.DstBlock, port);
         end
-        liens{end + 1} = struct('source', source, 'destination', destination);
+        liens{end + 1} = struct('source', source, 'destination', destination, 'nom', nom);
     end
     for k = 1:numel(e.Children)
         if strcmp(e.Children{k}.Name, 'Branch')
-            liens = [liens, liensMdl(e.Children{k}, source)]; %#ok<AGROW>
+            liens = [liens, liensMdl(e.Children{k}, source, nom)]; %#ok<AGROW>
         end
     end
 end
@@ -529,6 +574,9 @@ function [modele, refuses] = construire(S, nom, defauts, refuses)
         end
         modele.blocs{end + 1} = struct('type', entree.type, 'nom', b.nom, ...
                                        'parametres', parametres); %#ok<AGROW>
+        if isfield(b, 'signaux') && ~isempty(b.signaux)
+            modele.blocs{end}.signaux = b.signaux;
+        end
         sids{end + 1} = b.sid; %#ok<AGROW>
     end
     for k = 1:numel(S.liens)
@@ -550,6 +598,16 @@ function [modele, refuses] = construire(S, nom, defauts, refuses)
             continue
         end
         modele.liens(end + 1, :) = [a, d, pe, ps];
+        % Le nom d'un lien est celui du signal : il va au port d'où il part,
+        % à moins que le port n'en porte déjà un.
+        if isfield(S.liens{k}, 'nom') && ~isempty(S.liens{k}.nom)
+            if ~isfield(modele.blocs{a}, 'signaux') || ...
+               ~any([modele.blocs{a}.signaux.Port] == ps & ...
+                    ~cellfun(@isempty, {modele.blocs{a}.signaux.Name}))
+                modele.blocs{a} = matlibre_sl_signaux('bloc', modele.blocs{a}, ps, ...
+                                                      struct('Name', S.liens{k}.nom));
+            end
+        end
     end
 end
 
@@ -870,6 +928,24 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
             end
             lignes{end + 1} = [marge '    </Mask>']; %#ok<AGROW>
         end
+        if isfield(b, 'signaux')
+            % Les signaux qui partent du bloc, comme Simulink les range :
+            % un Port par sortie réglée, avec ce qui s'écarte des défauts.
+            defauts = matlibre_sl_signaux('defauts');
+            for j = 1:numel(b.signaux)
+                lignes{end + 1} = [marge '    <Port>']; %#ok<AGROW>
+                lignes{end + 1} = sprintf('%s      <P Name="PortNumber">%d</P>', marge, ...
+                                          b.signaux(j).Port); %#ok<AGROW>
+                for nom = fieldnames(defauts).'
+                    valeur = b.signaux(j).(nom{1});
+                    if ~isequal(valeur, defauts.(nom{1}))
+                        lignes{end + 1} = sprintf('%s      <P Name="%s">%s</P>', marge, ...
+                                                  nom{1}, matlibre_xml_echapper(valeur)); %#ok<AGROW>
+                    end
+                end
+                lignes{end + 1} = [marge '    </Port>']; %#ok<AGROW>
+            end
+        end
         if strcmp(entree.type, 'subsystem') && isfield(b.parametres, 'Model')
             [lignes, compteur] = ecrireSysteme(matlibre_sl_modele(b.parametres.Model), ...
                                                lignes, [marge '    '], compteur);
@@ -889,6 +965,11 @@ function [lignes, compteur] = ecrireSysteme(modele, lignes, marge, compteur)
             source = sprintf('%d#state', sids(liens(l, 1)));
         end
         lignes{end + 1} = sprintf('%s  <Line>', marge); %#ok<AGROW>
+        nomSignal = matlibre_sl_signaux('nom', modele.blocs{liens(l, 1)}, liens(l, 4));
+        if ~isempty(nomSignal)
+            lignes{end + 1} = sprintf('%s    <P Name="Name">%s</P>', marge, ...
+                                      matlibre_xml_echapper(nomSignal)); %#ok<AGROW>
+        end
         lignes{end + 1} = sprintf('%s    <P Name="Src">%s</P>', marge, source); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s    <P Name="Dst">%s</P>', marge, destination); %#ok<AGROW>
         lignes{end + 1} = sprintf('%s  </Line>', marge); %#ok<AGROW>

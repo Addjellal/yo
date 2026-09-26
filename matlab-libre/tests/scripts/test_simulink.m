@@ -4451,6 +4451,262 @@ end
 assert(~exist('Kvar', 'var'), 'aucune simulation en erreur ne laisse sa variable');
 fprintf('parametres et SimulationInput : %d cas d''erreur verifies\n', size(casErreurs, 1));
 
+%% ------------------------------ 34. Journal des signaux : logsout et ports
+% Un signal se règle sur le port de sortie d'où il part : GET_PARAM rend
+% les poignées des ports d'un bloc, SET_PARAM sur l'une d'elles nomme le
+% signal et le journalise, et SIM range les signaux journalisés dans
+% logsout, un Simulink.SimulationData.Dataset.
+jr = new_system('journalise');
+jr = add_block(jr, 'sine', 's');
+jr = add_block(jr, 'gain', 'g', 'Gain', 2);
+jr = add_block(jr, 'outport', 'y');
+jr = add_line(add_line(jr, 's', 'g'), 'g', 'y');
+pg = get_param(jr, 'g', 'PortHandles');
+assert(numel(pg.Inport) == 1 && numel(pg.Outport) == 1 && isempty(pg.Enable) && ...
+       isempty(pg.Trigger), 'PortHandles : une poignee par port');
+assert(isequal(get_param(jr, 'journalise/g', 'PortHandles'), pg), 'les memes poignees');
+assert(strcmp(get_param(jr, pg.Outport(1), 'PortType'), 'outport') && ...
+       get_param(jr, pg.Outport(1), 'PortNumber') == 1 && ...
+       strcmp(get_param(jr, pg.Inport(1), 'Parent'), 'journalise/g') && ...
+       strcmp(get_param(jr, pg.Inport(1), 'PortType'), 'inport'), ...
+       'PortType, PortNumber, Parent');
+assert(strcmp(get_param(jr, pg.Outport(1), 'DataLogging'), 'off') && ...
+       isempty(get_param(jr, pg.Outport(1), 'Name')), 'les defauts d''un port');
+jr = set_param(jr, pg.Outport(1), 'Name', 'double', 'DataLogging', 'on');
+reglage = {'Solver', 'ode1', 'FixedStep', 0.1, 'StopTime', 1};
+r = sim(jr, reglage{:});
+assert(isa(r.logsout, 'Simulink.SimulationData.Dataset') && r.logsout.numElements == 1 && ...
+       strcmp(r.logsout.Name, 'logsout'), 'logsout, un Dataset');
+element = r.logsout.get('double');
+valeurs = element.Values.Data;
+assert(strcmp(element.BlockPath, 'journalise/g') && element.PortIndex == 1 && ...
+       strcmp(element.Name, 'double') && isa(element.Values, 'timeseries') && ...
+       numel(element.Values.Time) == 11 && abs(valeurs(end) - 2 * sin(1)) < 1e-12, ...
+       'un element : son nom, son bloc, son port, ses valeurs');
+ps = get_param(jr, 's', 'PortHandles');
+jr = set_param(jr, ps.Outport(1), 'Name', 'onde');
+assert(strcmp(get_param(jr, pg.Inport(1), 'Name'), 'onde'), ...
+       'un port d''entree voit le nom du signal qui lui arrive');
+jr = set_param(jr, ps.Outport(1), 'DataLogging', 'on', 'DataLoggingNameMode', 'Custom', ...
+               'DataLoggingName', 'source', 'DataLoggingDecimateData', 'on', ...
+               'DataLoggingDecimation', 5);
+assert(strcmp(get_param(jr, ps.Outport(1), 'DataLoggingDecimation'), '5'), ...
+       'un nombre se range en texte, comme dans Simulink');
+r = sim(jr, reglage{:});
+source = r.logsout.get('source');
+assert(isequal(r.logsout.getElementNames, {'source'; 'double'}) && ...
+       max(abs(source.Values.Time(:)' - [0 0.5 1])) < 1e-12, ...
+       'DataLoggingName et un instant sur cinq');
+jr = set_param(jr, ps.Outport(1), 'DataLoggingLimitDataPoints', 'on', 'DataLoggingMaxPoints', '2');
+r = sim(jr, reglage{:});
+source = r.logsout.get('source');
+assert(max(abs(source.Values.Time(:)' - [0.5 1])) < 1e-12, 'les deux derniers seulement');
+r = sim(jr, reglage{:}, 'SignalLogging', 'off');
+assert(~isfield(r, 'logsout'), 'SignalLogging off : pas de journal');
+r = sim(jr, reglage{:}, 'SignalLoggingName', 'journal');
+assert(isfield(r, 'journal') && ~isfield(r, 'logsout'), 'SignalLoggingName');
+r = sim(new_system('rien'), 1);
+assert(~isfield(r, 'logsout'), 'sans signal journalise, pas de logsout');
+sim(set_param(jr, 'ReturnWorkspaceOutputs', 'off'), reglage{:});
+assert(exist('logsout', 'var') == 1 && logsout.numElements == 2, ...
+       'sans sortie, logsout va dans l''espace de travail');
+clear logsout tout yout
+out = sim(Simulink.SimulationInput(jr));
+assert(out.logsout.numElements == 2, 'sim(in) journalise aussi');
+
+% Les signaux vecteurs et matrices ; un signal dans un sous-système.
+vm = new_system('formes');
+vm = add_block(vm, 'constant', 'v', 'Value', [1 2 3]);
+vm = add_block(vm, 'constant', 'mat', 'Value', [1 2; 3 4]);
+vm = add_block(vm, 'terminator', 't1');
+vm = add_block(vm, 'terminator', 't2');
+vm = add_line(add_line(vm, 'v', 't1'), 'mat', 't2');
+pv = get_param(vm, 'v', 'PortHandles');
+pm = get_param(vm, 'mat', 'PortHandles');
+vm = set_param(vm, pv.Outport(1), 'Name', 'vecteur', 'DataLogging', 'on');
+vm = set_param(vm, pm.Outport(1), 'Name', 'matrice', 'DataLogging', 'on');
+r = sim(vm, reglage{:});
+vecteur = r.logsout.get('vecteur').Values.Data;
+matrice = r.logsout.get('matrice').Values.Data;
+assert(isequal(size(vecteur), [11 3]) && isequal(vecteur(end, :), [1 2 3]) && ...
+       isequal(size(matrice), [2 2 11]) && isequal(matrice(:, :, 5), [1 2; 3 4]), ...
+       'un vecteur par ligne, une matrice par page');
+dedans = new_system('dedans');
+dedans = add_block(dedans, 'inport', 'e');
+dedans = add_block(dedans, 'gain', 'k', 'Gain', 3);
+dedans = add_block(dedans, 'outport', 'o');
+dedans = add_line(add_line(dedans, 'e', 'k'), 'k', 'o');
+em = new_system('emboite');
+em = add_block(em, 'constant', 'c', 'Value', 2);
+em = add_block(em, 'subsystem', 'sous', 'Model', dedans);
+em = add_block(em, 'outport', 'y');
+em = add_line(add_line(em, 'c', 'sous'), 'sous', 'y');
+pk = get_param(em, 'sous/k', 'PortHandles');
+em = set_param(em, pk.Outport(1), 'Name', 'triple', 'DataLogging', 'on');
+assert(strcmp(get_param(em, pk.Outport(1), 'Parent'), 'emboite/sous/k'), 'un port du dedans');
+psous = get_param(em, 'emboite/sous', 'PortHandles');
+em = set_param(em, psous.Outport(1), 'Name', 'sortieSous', 'DataLogging', 'on');
+r = sim(em, 1);
+triple = r.logsout.get('triple');
+valeurs = triple.Values.Data;
+assert(isequal(r.logsout.getElementNames, {'sortieSous'; 'triple'}) && ...
+       strcmp(triple.BlockPath, 'emboite/sous/k') && valeurs(end) == 6, ...
+       'un signal journalise dans un sous-systeme');
+
+% Les noms et la journalisation passent par les fichiers : le .m de
+% SAVE_SYSTEM, le .slx, et le .mdl de Simulink.
+dossierJournal = tempname();
+mkdir(dossierJournal);
+fichierM = save_system(em, fullfile(dossierJournal, 'emboite_journal.m'));
+r = sim(load_system(fichierM), 1);
+assert(isequal(r.logsout.getElementNames, {'sortieSous'; 'triple'}), 'le .m reprend le journal');
+save_system(em, fullfile(dossierJournal, 'emboite_journal.slx'));
+relu = load_system(fullfile(dossierJournal, 'emboite_journal.slx'));
+r = sim(relu, 1);
+pkRelu = get_param(relu, 'sous/k', 'PortHandles');
+assert(isequal(r.logsout.getElementNames, {'sortieSous'; 'triple'}) && ...
+       strcmp(get_param(relu, pkRelu.Outport(1), 'Name'), 'triple'), 'le .slx aussi');
+texteMdl = sprintf(['Model {\n  Name "journalMdl"\n  System {\n    Name "journalMdl"\n' ...
+    '    Block {\n      BlockType Constant\n      Name "C"\n      Value "4"\n    }\n' ...
+    '    Block {\n      BlockType Gain\n      Name "G"\n      Gain "3"\n' ...
+    '      Port {\n        PortNumber 1\n        Name "produit"\n        DataLogging on\n' ...
+    '      }\n    }\n' ...
+    '    Block {\n      BlockType Outport\n      Name "Out1"\n    }\n' ...
+    '    Line {\n      Name "consigne"\n      SrcBlock "C"\n      SrcPort 1\n' ...
+    '      DstBlock "G"\n      DstPort 1\n    }\n' ...
+    '    Line {\n      SrcBlock "G"\n      SrcPort 1\n      DstBlock "Out1"\n' ...
+    '      DstPort 1\n    }\n  }\n}\n']);
+fichierMdl = fullfile(dossierJournal, 'journalMdl.mdl');
+identifiant = fopen(fichierMdl, 'w');
+fprintf(identifiant, '%s', texteMdl);
+fclose(identifiant);
+lu = load_system(fichierMdl);
+r = sim(lu, 1);
+produit = r.logsout.get('produit');
+valeurs = produit.Values.Data;
+pgLu = get_param(lu, 'G', 'PortHandles');
+assert(valeurs(end) == 12 && strcmp(get_param(lu, pgLu.Inport(1), 'Name'), 'consigne'), ...
+       'le .mdl : un Port journalise, un lien nomme');
+rmdir(dossierJournal, 's');
+
+autre = add_block(new_system('autre'), 'gain', 'g');
+sansGain = delete_block(jr, 'g');
+casErreurs = {
+    @() set_param(jr, pg.Outport(1), 'DataLogging', 'peut-etre'), ...
+        'Simulink:Commands:SetParamInvalidValue', '''off'' ou ''on'''
+    @() set_param(jr, pg.Outport(1), 'Couleur', 'rouge'), 'Simulink:Commands:ParamUnknown', ...
+        'Couleur'
+    @() set_param(jr, pg.Inport(1), 'DataLogging', 'on'), 'Simulink:Commands:ParamReadOnly', ...
+        'port de sortie'
+    @() set_param(jr, 12345.5, 'Name', 'x'), 'Simulink:Commands:InvalidPortHandle', ...
+        'PortHandles'
+    @() set_param(autre, pg.Outport(1), 'Name', 'x'), 'Simulink:Commands:InvalidPortHandle', ...
+        'journalise'
+    @() set_param(jr, pg.Outport(1), 'DataLoggingDecimation', 0), ...
+        'Simulink:Commands:SetParamInvalidValue', 'entier'
+    @() set_param(jr, pg.Outport(1), 'Name'), 'Simulink:Commands:SetParamArguments', 'paires'
+    @() set_param(jr, pg.Outport(1), 'DataLoggingNameMode', 'Auto'), ...
+        'Simulink:Commands:SetParamInvalidValue', 'Custom'
+    @() get_param(jr, pg.Outport(1)), 'Simulink:Commands:GetParamArguments', 'reglage'
+    @() get_param(jr, pg.Outport(1), 'Couleur'), 'Simulink:Commands:ParamUnknown', 'Couleur'
+    @() get_param(jr, 'absent', 'PortHandles'), 'Simulink:Commands:InvSimulinkObjectName', ...
+        'absent'
+    @() set_param(sansGain, pg.Outport(1), 'Name', 'x'), ...
+        'Simulink:Commands:InvSimulinkObjectName', 'plus de bloc'
+    @() sim(jr, 'SignalLoggingName', '1x'), 'Simulink:Config:InvalidValue', 'SignalLoggingName'
+    @() sim(jr, 'SignalLogging', 'parfois'), 'Simulink:Config:InvalidValue', 'SignalLogging'
+    };
+for kE = 1:size(casErreurs, 1)
+    vu = '';
+    message = '';
+    try
+        casErreurs{kE, 1}();
+    catch err
+        vu = err.identifier;
+        message = err.message;
+    end
+    assert(strcmp(vu, casErreurs{kE, 2}) && ~isempty(strfind(message, casErreurs{kE, 3})), ...
+           sprintf('journal des signaux, cas %d : %s attendu, %s rendu (%s)', kE, ...
+                   casErreurs{kE, 2}, vu, message));
+end
+fprintf('journal des signaux : %d cas d''erreur verifies\n', size(casErreurs, 1));
+
+%% ------------ 35. Batterie : journal et parsim sur tout le catalogue
+% Chaque type de bloc du catalogue, seul, sur un scalaire puis sur un
+% vecteur, toutes ses sorties journalisées, simulé par PARSIM sous deux
+% solveurs. Chaque simulation aboutit — et logsout porte un élément par
+% sortie, un échantillon par instant —, ou range dans ErrorMessage une
+% erreur de Simulink qui nomme le bloc ; jamais une erreur interne.
+dossierBatterie = tempname();
+mkdir(dossierBatterie);
+dossierAvantBatterie = pwd();
+cd(dossierBatterie);
+catalogueBatterie = matlibre_sl_catalogue();
+typesBatterie = {};
+for kT = 1:numel(catalogueBatterie)
+    if ~strcmp(catalogueBatterie(kT).famille, 'Interne')
+        typesBatterie{end + 1} = catalogueBatterie(kT).type; %#ok<SAGROW>
+    end
+end
+lotBatterie = Simulink.SimulationInput.empty;
+attendus = [];
+contextes = {};
+for kT = 1:numel(typesBatterie)
+    for valeur = {0.5, [0.5; 1.5; 2.5]}
+        [s, ok] = batterieModele('journalBatterie', typesBatterie(kT), valeur{1});
+        if ~ok, continue, end
+        portsB = get_param(s, 'b1', 'PortHandles');
+        for h = portsB.Outport
+            s = set_param(s, h, 'DataLogging', 'on', 'Name', sprintf('sortie%d', ...
+                          get_param(s, h, 'PortNumber')));
+        end
+        for solveur = {'ode3', 'ode45'}
+            entreeB = Simulink.SimulationInput(s);
+            entreeB = entreeB.setModelParameter('Solver', solveur{1}, 'FixedStep', '0.1', ...
+                                                'StopTime', '0.5');
+            lotBatterie(end + 1) = entreeB; %#ok<SAGROW>
+            attendus(end + 1) = numel(portsB.Outport); %#ok<SAGROW>
+            contextes{end + 1} = sprintf('%s (%s)', typesBatterie{kT}, solveur{1}); %#ok<SAGROW>
+        end
+    end
+end
+evalc('sortiesBatterie = parsim(lotBatterie, ''ShowProgress'', ''off'');');
+nJournalises = 0;
+nRefuses = 0;
+for kB = 1:numel(lotBatterie)
+    o = sortiesBatterie(kB);
+    if isempty(o.ErrorMessage)
+        if attendus(kB) == 0
+            continue
+        end
+        assert(isfield(o, 'logsout') && o.logsout.numElements == attendus(kB), ...
+               sprintf('%s : %d sorties journalisees attendues', contextes{kB}, attendus(kB)));
+        for kE = 1:attendus(kB)
+            element = o.logsout.get(sprintf('sortie%d', kE));
+            assert(numel(element.Values.Time) == numel(o.tout) && ...
+                   strcmp(element.BlockPath, 'journalBatterie/b1'), ...
+                   sprintf('%s : la sortie %d n''a pas un echantillon par instant', ...
+                           contextes{kB}, kE));
+        end
+        nJournalises = nJournalises + 1;
+    else
+        diagnostic = o.SimulationMetadata.ExecutionInfo.ErrorDiagnostic;
+        assert(strncmp(diagnostic.identifier, 'Simulink:', 9) || ...
+               strncmp(diagnostic.identifier, 'Stateflow:', 10), ...
+               sprintf('%s : erreur interne %s : %s', contextes{kB}, diagnostic.identifier, ...
+                       o.ErrorMessage));
+        assert(~isempty(strfind(o.ErrorMessage, 'journalBatterie/')), ...
+               sprintf('%s : le message ne nomme pas de bloc : %s', contextes{kB}, ...
+                       o.ErrorMessage));
+        nRefuses = nRefuses + 1;
+    end
+end
+cd(dossierAvantBatterie);
+rmdir(dossierBatterie, 's');
+assert(nJournalises > 300, 'la batterie journalise la plupart des blocs');
+fprintf('batterie du journal par parsim : %d simulations journalisees, %d refus nommes\n', ...
+        nJournalises, nRefuses);
+
 disp('simulink : toutes les verifications passent');
 
 function p = etendreSource(type, p)

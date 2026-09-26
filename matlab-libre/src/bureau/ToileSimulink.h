@@ -15,6 +15,7 @@
 // OPEN_SYSTEM tire sa figure : la toile et la figure s'accordent.
 #pragma once
 
+#include <QMenu>
 #include <QPointF>
 #include <QRectF>
 #include <QVector>
@@ -46,6 +47,18 @@ public:
     void ajusterVue();
     double echelle() const { return echelle_; }
 
+    // Le signal que porte un lien : son nom, et s'il est journalisé.
+    QString nomDuSignal(int lien) const;
+    bool signalJournalise(int lien) const;
+    // Le menu du clic droit sur un lien : nommer le signal, le
+    // journaliser. Il est rendu plutôt qu'ouvert, pour qu'un test puisse
+    // en déclencher les actions.
+    QMenu* menuDuLien(int lien, QWidget* parent);
+    // Ce que font ces actions : une commande sur le modèle, par les
+    // signaux ci-dessous.
+    void nommerSignal(int lien, const QString& nom);
+    void journaliserSignal(int lien, bool actif);
+
 signals:
     // Des blocs ont été déplacés : leurs nouvelles places, en unités du
     // schéma. Plusieurs à la fois quand plusieurs sont choisis.
@@ -60,6 +73,10 @@ signals:
     void blocOuvert(const QString& nom);
     // Quelque chose a été lâché sur la toile depuis la bibliothèque.
     void blocDepose(const QPointF& place);
+    // Le signal qui part de la sortie SORTIE de SOURCE reçoit un nom, ou
+    // est journalisé — ce que SIM range dans logsout — ou ne l'est plus.
+    void signalNomme(const QString& source, int sortie, const QString& nom);
+    void journalisationDemandee(const QString& source, int sortie, bool actif);
     // Ctrl+Z, Ctrl+Y : défaire et refaire.
     void annulationDemandee();
     void retablissementDemande();
@@ -78,6 +95,7 @@ protected:
     void resizeEvent(QResizeEvent* evenement) override;
     void dragEnterEvent(QDragEnterEvent* evenement) override;
     void dropEvent(QDropEvent* evenement) override;
+    void contextMenuEvent(QContextMenuEvent* evenement) override;
 
 private:
     struct BlocToile {
@@ -88,6 +106,8 @@ private:
     struct LienToile {
         int source = 0, cible = 0, port = 1, sortie = 1;
         bool retour = false;
+        QString nom;
+        bool journal = false;
     };
 
     QPointF versEcran(const QPointF& point) const;

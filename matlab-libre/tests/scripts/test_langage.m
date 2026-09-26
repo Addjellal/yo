@@ -828,6 +828,58 @@ clear incrementer rappels double2
 disp('poignee en instruction : ok');
 
 
+%% ------------------- struct([]), getfield et setfield emboites, orderfields
+% « struct([]) » est le tableau de structures vide d'où l'on part ;
+% getfield et setfield descendent de champ en champ, une cellule portant
+% les indices d'un niveau ; orderfields range les champs dans l'ordre
+% qu'on lui donne, et rend la permutation.
+vide = struct([]);
+assert(isstruct(vide) && isempty(vide) && isequal(size(vide), [0 0]) && ...
+       isempty(fieldnames(vide)), 'struct([]) : vide, sans champ');
+vide(1).a = 3;
+assert(isequal(size(vide), [1 1]) && vide.a == 3, 'on y ajoute un element');
+deja = struct('x', 1);
+assert(isequal(struct(deja), deja), 'struct d''une structure la rend');
+refusStruct = '';
+try
+    struct(5);
+catch err
+    refusStruct = err.identifier;
+end
+assert(strcmp(refusStruct, 'MATLAB:invalidConversion'), 'struct(5) est refuse');
+s = struct('a', struct('b', [10 20 30]));
+assert(getfield(s, 'a', 'b', {2}) == 20, 'getfield descend et indexe');
+assert(isequal(getfield(s, 'a'), struct('b', [10 20 30])), 'getfield d''un seul niveau');
+lot = struct('v', {1, 2, 3});
+assert(getfield(lot, {3}, 'v') == 3, 'getfield d''un element d''un tableau');
+s = setfield(s, 'a', 'b', {2}, 99);
+assert(isequal(s.a.b, [10 99 30]), 'setfield descend, indexe et repose');
+s = setfield(s, 'c', 'd', 'profond');
+assert(strcmp(s.c.d, 'profond'), 'setfield cree les niveaux qui manquent');
+lot = setfield(lot, {2}, 'v', 20);
+assert(isequal([lot.v], [1 20 3]), 'setfield d''un element d''un tableau');
+desordre = struct('b', 2, 'c', 3, 'a', 1);
+[range, permutation] = orderfields(desordre);
+assert(isequal(fieldnames(range), {'a'; 'b'; 'c'}) && isequal(permutation, [3; 1; 2]), ...
+       'orderfields : l''ordre alphabetique, et la permutation');
+assert(isequal(fieldnames(orderfields(desordre, {'c', 'a', 'b'})), {'c'; 'a'; 'b'}), ...
+       'orderfields selon une liste de noms');
+assert(isequal(fieldnames(orderfields(desordre, [2 3 1])), {'c'; 'a'; 'b'}), ...
+       'orderfields selon une permutation');
+assert(isequal(fieldnames(orderfields(desordre, struct('c', 0, 'b', 0, 'a', 0))), ...
+               {'c'; 'b'; 'a'}), 'orderfields selon une autre structure');
+refusOrdre = '';
+try
+    orderfields(desordre, {'a', 'b'});
+catch err
+    refusOrdre = err.identifier;
+end
+assert(strcmp(refusOrdre, 'MATLAB:orderfields:InvalidFieldNames'), ...
+       'un ordre qui oublie un champ est refuse');
+clear vide deja s lot desordre range permutation
+disp('struct, getfield, setfield et orderfields : ok');
+
+
 %% ------------------------------------ ecrire et lire sans recopier
 % « x(i) = v » s'ecrit dans la variable meme : le resultat est celui du
 % chemin general, et une copie prise avant ne bouge pas.

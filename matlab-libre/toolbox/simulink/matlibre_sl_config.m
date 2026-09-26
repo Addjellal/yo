@@ -81,6 +81,9 @@ function varargout = matlibre_sl_config(action, varargin)
 %                                     dans l'ordre des colonnes de xout
 %     SaveFinalState       'off'      'on' : le résultat porte l'état
 %     FinalStateName       'xFinal'   final dans ce champ
+%     SignalLogging        'on'       les signaux dont le port a
+%     SignalLoggingName    'logsout'  DataLogging à 'on' vont dans ce
+%                                     champ du résultat, un Dataset
 %
 %   Le solveur et son type vont ensemble, comme dans Simulink : poser
 %   Solver sur ode45 fait le type Variable-step ; poser SolverType sur
@@ -134,7 +137,8 @@ function d = defauts()
                'ReturnWorkspaceOutputs', 'on', 'ReturnWorkspaceOutputsName', 'out', ...
                'SaveFormat', 'Array', 'LoadInitialState', 'off', ...
                'InitialState', 'xInitial', 'SaveFinalState', 'off', ...
-               'FinalStateName', 'xFinal');
+               'FinalStateName', 'xFinal', 'SignalLogging', 'on', ...
+               'SignalLoggingName', 'logsout');
 end
 
 % Les solveurs de Simulink, tous. odeN, à pas fixe, applique sans
@@ -220,13 +224,13 @@ function v = valider(nom, v)
         case 'SolverType'
             v = choix(nom, v, {'Fixed-step', 'Variable-step'});
         case {'LoadExternalInput', 'ReturnWorkspaceOutputs', 'LoadInitialState', ...
-              'SaveFinalState'}
+              'SaveFinalState', 'SignalLogging'}
             v = choix(nom, v, {'off', 'on'});
         case 'SimulationMode'
             v = choix(nom, v, {'normal', 'accelerator', 'rapid-accelerator', ...
                                'software-in-the-loop (sil)', ...
                                'processor-in-the-loop (pil)', 'external'});
-        case {'ReturnWorkspaceOutputsName', 'FinalStateName'}
+        case {'ReturnWorkspaceOutputsName', 'FinalStateName', 'SignalLoggingName'}
             v = char(v);
             if ~isvarname(v)
                 error('Simulink:Config:InvalidValue', ...

@@ -102,7 +102,13 @@
 %                               le simulent
 %   Simulink.Bus, Simulink.BusElement - Les types de bus
 %   Simulink.SimulationData.Dataset   - Le journal des sorties, en
-%                               SaveFormat 'Dataset'
+%                               SaveFormat 'Dataset', et celui des signaux,
+%                               logsout
+%
+% Signaux et journal
+%   GET_PARAM(M,BLOC,'PortHandles') rend les poignées des ports d'un bloc ;
+%   SET_PARAM(M,H,'Name','vitesse','DataLogging','on') nomme le signal qui
+%   part du port H et le journalise : SIM le range dans logsout.
 %
 % Linéarisation
 %   linmod        - Linéarise autour d'un point de fonctionnement

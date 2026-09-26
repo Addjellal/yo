@@ -94,6 +94,13 @@ function varargout = sim(modele, varargin)
 %   celle de SIM(NOM), sauf avec SIM(IN,'CaptureErrors','on'), qui la
 %   range dans ErrorMessage ; celle d'un tableau y est toujours rangée.
 %
+%   Un signal dont le port de sortie a DataLogging à 'on' — SET_PARAM
+%   sur la poignée que rend GET_PARAM(M,BLOC,'PortHandles') — est
+%   journalisé : RESULTAT.logsout est un Simulink.SimulationData.Dataset,
+%   un élément par signal, avec son nom, le chemin de son bloc, son port
+%   et ses valeurs en timeseries. SignalLogging ('off') l'éteint, et
+%   SignalLoggingName renomme le champ.
+%
 %   LoadInitialState ('on') et InitialState (un vecteur, ou l'expression
 %   qui le donne) posent l'état continu de départ, dans l'ordre des
 %   colonnes de xout ; SaveFinalState ('on') range l'état final dans le
@@ -243,6 +250,17 @@ function varargout = sim(modele, varargin)
         [T, J, instants] = derouler(deroulement{:}, false);
         resultat = assembler(c, T, J, instants(:));
         resultat = deposer(c, T, J, instants(:), resultat);
+        % Le journal des signaux : ceux dont le port a DataLogging à 'on'.
+        journalSignaux = [];
+        if strcmpi(config.SignalLogging, 'on')
+            journalSignaux = matlibre_sl_signaux('journal', c, T, J, instants(:));
+            if journalSignaux.numElements > 0
+                journalSignaux.Name = char(config.SignalLoggingName);
+                resultat.(char(config.SignalLoggingName)) = journalSignaux;
+            else
+                journalSignaux = [];
+            end
+        end
     catch err
         matlibre_sl_rappel(modele, 'StopFcn');
         if strncmp(err.identifier, 'Simulink:', 9) || strncmp(err.identifier, 'Stateflow:', 10)
@@ -270,6 +288,9 @@ function varargout = sim(modele, varargin)
             assignin('base', 'yout', resultat.yout);
             if strcmpi(config.SaveFinalState, 'on')
                 assignin('base', char(config.FinalStateName), xFinal);
+            end
+            if ~isempty(journalSignaux)
+                assignin('base', char(config.SignalLoggingName), journalSignaux);
             end
         end
     elseif nargout == 1

@@ -122,6 +122,28 @@ function [lignes, compteur] = batir(modele, cible, lignes, compteur)
                                                  modele.nom, champs{j}));   %#ok<AGROW>
         end
     end
+    % Les signaux réglés — nom, journalisation — se reposent par les
+    % poignées des ports, comme on les aurait posés.
+    defautsSignal = matlibre_sl_signaux('defauts');
+    for k = 1:numel(modele.blocs)
+        bloc = modele.blocs{k};
+        if ~isfield(bloc, 'signaux') || isempty(bloc.signaux)
+            continue
+        end
+        lignes{end+1} = sprintf('    poignees = get_param(%s, %s, ''PortHandles'');', ...
+                                cible, citer(bloc.nom));   %#ok<AGROW>
+        for j = 1:numel(bloc.signaux)
+            couples = '';
+            for nom = fieldnames(defautsSignal).'
+                valeur = bloc.signaux(j).(nom{1});
+                if ~isequal(valeur, defautsSignal.(nom{1}))
+                    couples = [couples, sprintf(', %s, %s', citer(nom{1}), citer(valeur))]; %#ok<AGROW>
+                end
+            end
+            lignes{end+1} = sprintf('    %s = set_param(%s, poignees.Outport(%d)%s);', ...
+                                    cible, cible, bloc.signaux(j).Port, couples);   %#ok<AGROW>
+        end
+    end
     liens = matlibre_sl_liens(modele);
     for l = 1:size(liens, 1)
         % La sortie de la source ne s'écrit que si ce n'est pas la première :

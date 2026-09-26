@@ -382,6 +382,9 @@ FenetreSimulink::FenetreSimulink(QWidget* parent) : QMainWindow(parent) {
             &FenetreSimulink::surRetablissement);
     connect(toile_, &ToileSimulink::lienSupprime, this,
             &FenetreSimulink::surLienSupprime);
+    connect(toile_, &ToileSimulink::signalNomme, this, &FenetreSimulink::surSignalNomme);
+    connect(toile_, &ToileSimulink::journalisationDemandee, this,
+            &FenetreSimulink::surJournalisation);
     connect(toile_, &ToileSimulink::blocOuvert, this, &FenetreSimulink::surBlocOuvert);
     connect(toile_, &ToileSimulink::blocDepose, this, &FenetreSimulink::surBlocDepose);
     connect(toile_, &ToileSimulink::etatChange, this, &FenetreSimulink::poserEtat);
@@ -553,6 +556,37 @@ void FenetreSimulink::surLienSupprime(const QString& source, const QString& cibl
     envoyerModification(commande,
                         QStringLiteral("Le lien de « %1 » vers « %2 » est retire.")
                             .arg(source, cible));
+}
+
+// Un signal se règle sur le port de sortie d'où il part, par sa poignée :
+// la commande est celle qu'on taperait, en une ligne.
+static QString portDeSortie(const QString& modele, const QString& source, int sortie) {
+    return QStringLiteral("getfield(get_param(%1, %2, 'PortHandles'), 'Outport', {%3})")
+        .arg(modele, chaineMatlab(source))
+        .arg(sortie);
+}
+
+void FenetreSimulink::surSignalNomme(const QString& source, int sortie, const QString& nom) {
+    const QString modele = cibleModele();
+    if (modele.isEmpty()) return;
+    envoyerModification(
+        QStringLiteral("%1 = set_param(%1, %2, 'Name', %3);")
+            .arg(modele, portDeSortie(modele, source, sortie), chaineMatlab(nom)),
+        nom.isEmpty() ? QStringLiteral("Le signal de « %1 » n'a plus de nom.").arg(source)
+                      : QStringLiteral("Le signal de « %1 » s'appelle « %2 ».")
+                            .arg(source, nom));
+}
+
+void FenetreSimulink::surJournalisation(const QString& source, int sortie, bool actif) {
+    const QString modele = cibleModele();
+    if (modele.isEmpty()) return;
+    envoyerModification(
+        QStringLiteral("%1 = set_param(%1, %2, 'DataLogging', '%3');")
+            .arg(modele, portDeSortie(modele, source, sortie),
+                 actif ? QStringLiteral("on") : QStringLiteral("off")),
+        actif ? QStringLiteral("Le signal de « %1 » est journalisé : SIM le range "
+                               "dans logsout.").arg(source)
+              : QStringLiteral("Le signal de « %1 » n'est plus journalisé.").arg(source));
 }
 
 void FenetreSimulink::surBlocOuvert(const QString& nom) {
@@ -862,15 +896,17 @@ void FenetreSimulink::definirSchema(const SchemaSimulink& schema) {
         const QString cible = (l.cible >= 1 && l.cible <= schema.blocs.size())
                                   ? schema.blocs[l.cible - 1].nom
                                   : QStringLiteral("?");
-        (new QTreeWidgetItem(rubriqueLiens))
-            ->setText(0, l.sortie > 1 ? QStringLiteral("%1 (sortie %2) → %3 (entrée %4)")
-                                            .arg(source)
-                                            .arg(l.sortie)
-                                            .arg(cible)
-                                            .arg(l.port)
-                                      : QStringLiteral("%1 → %2 (entrée %3)")
-                                            .arg(source, cible)
-                                            .arg(l.port));
+        QString texte = l.sortie > 1 ? QStringLiteral("%1 (sortie %2) → %3 (entrée %4)")
+                                           .arg(source)
+                                           .arg(l.sortie)
+                                           .arg(cible)
+                                           .arg(l.port)
+                                     : QStringLiteral("%1 → %2 (entrée %3)")
+                                           .arg(source, cible)
+                                           .arg(l.port);
+        if (!l.nom.isEmpty()) texte += QStringLiteral(" : « %1 »").arg(l.nom);
+        if (l.journal) texte += QStringLiteral(", journalisé");
+        (new QTreeWidgetItem(rubriqueLiens))->setText(0, texte);
     }
     rubriqueLiens->setExpanded(true);
     poserEtat(QStringLiteral("Schéma de « %1 » à jour.").arg(schema.nom));

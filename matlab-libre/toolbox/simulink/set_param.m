@@ -33,6 +33,16 @@ function modele = set_param(modele, nom, varargin)
 %   refusé en disant ceux qui existent. Le type suit le solveur. Un
 %   réglage posé par ADD_PARAM se change de même.
 %
+%   SET_PARAM(MODELE,H,'Name','vitesse','DataLogging','on'), H une
+%   poignée de port de sortie que rend GET_PARAM(MODELE,BLOC,
+%   'PortHandles'), nomme le signal qui part de ce port et le
+%   journalise : SIM le range alors dans logsout, un
+%   Simulink.SimulationData.Dataset. DataLoggingNameMode ('SignalName'
+%   ou 'Custom') et DataLoggingName nomment l'élément du journal ;
+%   DataLoggingDecimateData et DataLoggingDecimation n'en gardent qu'un
+%   instant sur N, DataLoggingLimitDataPoints et DataLoggingMaxPoints
+%   les derniers.
+%
 %   Exemple :
 %      m = new_system('boucle');
 %      m = add_block(m, 'constant', 'consigne', 'Value', 1);
@@ -53,6 +63,11 @@ function modele = set_param(modele, nom, varargin)
 %      get_param(m, 'Solver')                   % 'ode4'
 %
 %   Voir aussi GET_PARAM, ADD_PARAM, ADD_BLOCK, SIM, REPLACE_BLOCK.
+    % Une poignée de port : le signal qui en part, son nom et son journal.
+    if isnumeric(nom)
+        modele = matlibre_sl_signaux('poser', modele, nom, varargin{:});
+        return
+    end
     nom = char(nom);
     if mod(numel(varargin), 2) == 1
         modele = reglerModele(modele, [{nom}, varargin]);

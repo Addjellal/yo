@@ -25,6 +25,31 @@ FONCTION(fnCell) {
 FONCTION(fnStruct) {
     INUTILISE
     if (args.empty()) return {Valeur::structureVide()};
+    // Un argument seul : « struct([]) » est le tableau de structures vide,
+    // sans champ, d'où l'on part pour ajouter ; une structure se rend
+    // telle quelle ; un objet donne la structure de ses proprietes.
+    if (args.size() == 1) {
+        const Valeur& a = args[0];
+        if (a.classe == Classe::Structure) return {a};
+        if (a.classe == Classe::Objet && a.st) {
+            Valeur r = a;
+            r.classe = Classe::Structure;
+            r.nomObjet.clear();
+            r.poigneeObjet = false;
+            r.st = std::make_shared<ChampsStructure>(*a.st);
+            return {r};
+        }
+        if (a.estVide() && a.classe != Classe::Cellule) {
+            Valeur r;
+            r.classe = Classe::Structure;
+            r.dims = {0, 0};
+            r.st = std::make_shared<ChampsStructure>();
+            return {r};
+        }
+        erreur("MATLAB:invalidConversion",
+               formater("Conversion to struct from %s is not possible.",
+                        a.classeNom().c_str()));
+    }
     if (args.size() % 2 != 0)
         erreur("MATLAB:struct:NoValueForField",
                "Incorrect number of arguments: fields require values.");
@@ -267,27 +292,158 @@ FONCTION(fnRmfield) {
     return {s};
 }
 
+// Les indices que porte une cellule de GETFIELD ou SETFIELD : « {2} »,
+// « {1, ':'} ».
+static std::vector<Valeur> indicesDe(const Valeur& cellule) {
+    std::vector<Valeur> idx(cellule.cellules.begin(), cellule.cellules.end());
+    return idx;
+}
+
+static std::string nomDeChamp(const Valeur& v, const char* fonction) {
+    if (!v.estTexte() && !(v.estChaine() && v.estScalaire()))
+        erreur("MATLAB:" + std::string(fonction) + ":InvalidFieldName",
+               formater("%s : un nom de champ est un texte, ou une cellule d'indices.",
+                        fonction));
+    return v.versTexte();
+}
+
+static Valeur lireChampDe(Interpreteur& it, const Valeur& base, const std::string& nom) {
+    if (base.classe == Classe::Objet) return it.lireProprieteObjet(base, nom);
+    if (base.classe != Classe::Structure)
+        erreur("MATLAB:getfield:InvalidType",
+               formater("getfield : on lit le champ '%s' d'une structure, pas d'un %s.",
+                        nom.c_str(), base.classeNom().c_str()));
+    if (!base.aChamp(nom))
+        erreur("MATLAB:nonExistentField",
+               formater("Reference to non-existent field '%s'.", nom.c_str()));
+    if (base.nelem() == 0)
+        erreur("MATLAB:index:expected_one_output",
+               "getfield : la structure est vide, son champ n'a pas de valeur.");
+    return base.champ(nom, 0);
+}
+
+// SETFIELD(S, CHAMP1, {I}, CHAMP2, ..., V) : l'écriture en profondeur, de
+// la valeur V vers S, chaque niveau reposant ce qu'il a changé.
+static Valeur poserEnProfondeur(Interpreteur& it, Valeur base, Arguments args, std::size_t k) {
+    const std::size_t dernier = args.size() - 1;
+    if (k == dernier) return args[dernier];
+    const Valeur& cle = args[k];
+    if (cle.classe == Classe::Cellule) {
+        std::vector<Valeur> idx = indicesDe(cle);
+        Valeur dedans = Valeur::vide();
+        bool existe = true;
+        try {
+            std::vector<Valeur> copie = idx;
+            dedans = it.indexer(base, copie, '(');
+        } catch (...) {
+            existe = false;
+        }
+        if (!existe) dedans = Valeur::vide();
+        Valeur nouveau = poserEnProfondeur(it, dedans, args, k + 1);
+        return it.ecrireIndex(base, idx, nouveau, '(');
+    }
+    const std::string nom = nomDeChamp(cle, "setfield");
+    if (base.classe == Classe::Objet) {
+        Valeur dedans = k + 1 < dernier ? it.lireProprieteObjet(base, nom) : Valeur::vide();
+        Valeur nouveau = poserEnProfondeur(it, dedans, args, k + 1);
+        return it.ecrireProprieteObjet(base, nom, nouveau);
+    }
+    if (base.classe != Classe::Structure) {
+        if (!base.estVide())
+            erreur("MATLAB:setfield:InvalidType",
+                   formater("setfield : on pose le champ '%s' dans une structure, pas dans "
+                            "un %s.", nom.c_str(), base.classeNom().c_str()));
+        base = Valeur::structureVide();
+    }
+    if (base.nelem() == 0) {
+        base.dims = {1, 1};
+        base.detacherStructure();
+        for (auto& kv : base.st->champs) kv.second.assign(1, Valeur::vide());
+    }
+    Valeur dedans = base.aChamp(nom) ? base.champ(nom, 0) : Valeur::vide();
+    Valeur nouveau = poserEnProfondeur(it, dedans, args, k + 1);
+    base.poserChamp(nom, nouveau);
+    return base;
+}
+
 FONCTION(fnSetfield) {
     INUTILISE
-    exigerArguments(args, 3, 3, "setfield");
-    Valeur s = args[0];
-    s.poserChamp(args[1].versTexte(), args[2]);
-    return {s};
+    exigerArguments(args, 3, 0, "setfield");
+    // Un premier argument en cellule désigne l'élément d'un tableau de
+    // structures : « setfield(S, {2}, 'a', 5) ».
+    return {poserEnProfondeur(it, args[0], args, 1)};
 }
 
 FONCTION(fnGetfield) {
     INUTILISE
-    exigerArguments(args, 2, 2, "getfield");
-    return {args[0].champ(args[1].versTexte())};
+    exigerArguments(args, 2, 0, "getfield");
+    // « getfield(S, 'a', {2}, 'b') » : S.a(2).b, en autant de niveaux
+    // qu'on en donne ; une cellule porte les indices du niveau qui la
+    // précède.
+    Valeur courant = args[0];
+    for (std::size_t k = 1; k < args.size(); ++k) {
+        if (args[k].classe == Classe::Cellule) {
+            std::vector<Valeur> idx = indicesDe(args[k]);
+            courant = it.indexer(courant, idx, '(');
+            continue;
+        }
+        courant = lireChampDe(it, courant, nomDeChamp(args[k], "getfield"));
+    }
+    return {courant};
 }
 
 FONCTION(fnOrderfields) {
     INUTILISE
     exigerArguments(args, 1, 2, "orderfields");
     Valeur s = args[0];
+    if (s.classe != Classe::Structure)
+        erreur("MATLAB:orderfields:InvalidInput",
+               "orderfields : le premier argument est une structure.");
     s.detacherStructure();
-    std::sort(s.st->ordre.begin(), s.st->ordre.end());
-    return {s};
+    const std::vector<std::string> avant = s.st->ordre;
+    std::vector<std::string> ordre;
+    if (args.size() == 1) {
+        ordre = avant;
+        std::sort(ordre.begin(), ordre.end());
+    } else {
+        // Le second argument donne l'ordre : une structure aux mêmes
+        // champs, une cellule de noms, ou une permutation des rangs.
+        const Valeur& modele = args[1];
+        if (modele.classe == Classe::Structure) {
+            ordre = modele.champs();
+        } else if (modele.classe == Classe::Cellule) {
+            for (const Valeur& c : modele.cellules) ordre.push_back(c.versTexte());
+        } else if (modele.estNumerique()) {
+            for (std::size_t k = 0; k < modele.nelem(); ++k) {
+                double r = modele.re[k];
+                if (r != std::floor(r) || r < 1 || r > (double)avant.size())
+                    erreur("MATLAB:orderfields:InvalidPermutation",
+                           "orderfields : la permutation porte les rangs 1 a N des champs.");
+                ordre.push_back(avant[(std::size_t)r - 1]);
+            }
+        } else {
+            erreur("MATLAB:orderfields:InvalidInput",
+                   "orderfields : l'ordre se donne par une structure, une cellule de noms "
+                   "ou une permutation.");
+        }
+        std::vector<std::string> a = avant, b = ordre;
+        std::sort(a.begin(), a.end());
+        std::sort(b.begin(), b.end());
+        if (a != b)
+            erreur("MATLAB:orderfields:InvalidFieldNames",
+                   "orderfields : le nouvel ordre doit nommer chaque champ une fois, et "
+                   "seulement eux.");
+    }
+    s.st->ordre = ordre;
+    std::vector<Valeur> sorties = {s};
+    if (nargout > 1) {
+        Valeur p = Valeur::matrice((int)ordre.size(), 1);
+        for (std::size_t k = 0; k < ordre.size(); ++k)
+            p.re[k] = (double)(std::find(avant.begin(), avant.end(), ordre[k]) -
+                               avant.begin() + 1);
+        sorties.push_back(p);
+    }
+    return sorties;
 }
 
 FONCTION(fnStruct2cell) {

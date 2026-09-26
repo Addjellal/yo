@@ -1,7 +1,10 @@
 // ToileSimulink.cpp — la toile de l'éditeur Simulink.
 #include "ToileSimulink.h"
 
+#include <QContextMenuEvent>
 #include <QDragEnterEvent>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QDropEvent>
 #include <QKeyEvent>
 #include <QKeySequence>
@@ -85,6 +88,8 @@ void ToileSimulink::definirSchema(const SchemaSimulink& schema) {
         t.port = l.port;
         t.sortie = qMax(1, l.sortie);
         t.retour = l.retour;
+        t.nom = l.nom;
+        t.journal = l.journal;
         liens_.push_back(t);
     }
     // Le choix survit à une remise à jour du même modèle : sans cela,
@@ -429,6 +434,91 @@ void ToileSimulink::dessinerFil(QPainter& peintre, const LienToile& lien,
     peintre.setBrush(peintre.pen().color());
     peintre.drawPath(pointe);
     peintre.setBrush(ancien);
+
+    // Le nom du signal, au-dessus du fil près de sa source, et la marque
+    // d'un signal journalisé : deux ondes qui partent du fil, comme dans
+    // Simulink.
+    const QPointF source = versEcran(points[0]);
+    if (!lien.nom.isEmpty()) {
+        QFont police = peintre.font();
+        police.setPointSizeF(qBound(6.0, 0.2 * echelle_, 11.0));
+        peintre.save();
+        peintre.setFont(police);
+        peintre.drawText(QPointF(source.x() + 0.15 * echelle_, source.y() - 0.12 * echelle_),
+                         lien.nom);
+        peintre.restore();
+    }
+    if (lien.journal) {
+        peintre.save();
+        QPen stylo(kChoix, qMax(1.0, 0.03 * echelle_));
+        peintre.setPen(stylo);
+        peintre.setBrush(Qt::NoBrush);
+        const QPointF centre(source.x() + 0.3 * echelle_, source.y());
+        for (int k = 1; k <= 2; ++k) {
+            const double r = 0.09 * echelle_ * k;
+            peintre.drawArc(QRectF(centre.x() - r, centre.y() - r, 2 * r, 2 * r), 30 * 16,
+                            120 * 16);
+        }
+        peintre.setBrush(kChoix);
+        peintre.drawEllipse(centre, 0.03 * echelle_, 0.03 * echelle_);
+        peintre.restore();
+    }
+}
+
+QString ToileSimulink::nomDuSignal(int lien) const {
+    return (lien >= 0 && lien < liens_.size()) ? liens_[lien].nom : QString();
+}
+
+bool ToileSimulink::signalJournalise(int lien) const {
+    return lien >= 0 && lien < liens_.size() && liens_[lien].journal;
+}
+
+void ToileSimulink::nommerSignal(int lien, const QString& nom) {
+    if (lien < 0 || lien >= liens_.size()) return;
+    const LienToile& l = liens_[lien];
+    if (l.source < 1 || l.source > blocs_.size()) return;
+    emit signalNomme(blocs_[l.source - 1].nom, l.sortie, nom);
+}
+
+void ToileSimulink::journaliserSignal(int lien, bool actif) {
+    if (lien < 0 || lien >= liens_.size()) return;
+    const LienToile& l = liens_[lien];
+    if (l.source < 1 || l.source > blocs_.size()) return;
+    emit journalisationDemandee(blocs_[l.source - 1].nom, l.sortie, actif);
+}
+
+QMenu* ToileSimulink::menuDuLien(int lien, QWidget* parent) {
+    if (lien < 0 || lien >= liens_.size()) return nullptr;
+    auto* menu = new QMenu(parent);
+    QAction* nommer = menu->addAction(QStringLiteral("Nommer le signal…"));
+    connect(nommer, &QAction::triggered, this, [this, lien]() {
+        bool accepte = false;
+        const QString nom = QInputDialog::getText(
+            this, QStringLiteral("Nom du signal"),
+            QStringLiteral("Le nom du signal, vide pour l'effacer :"), QLineEdit::Normal,
+            nomDuSignal(lien), &accepte);
+        if (accepte) nommerSignal(lien, nom.trimmed());
+    });
+    QAction* journaliser = menu->addAction(QStringLiteral("Journaliser le signal"));
+    journaliser->setCheckable(true);
+    journaliser->setChecked(signalJournalise(lien));
+    connect(journaliser, &QAction::toggled, this,
+            [this, lien](bool actif) { journaliserSignal(lien, actif); });
+    return menu;
+}
+
+void ToileSimulink::contextMenuEvent(QContextMenuEvent* evenement) {
+    const int lien = lienSous(evenement->pos());
+    if (lien < 0) {
+        QWidget::contextMenuEvent(evenement);
+        return;
+    }
+    lienChoisi_ = lien;
+    choisis_.clear();
+    update();
+    QMenu* menu = menuDuLien(lien, this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->popup(evenement->globalPos());
 }
 
 void ToileSimulink::paintEvent(QPaintEvent*) {

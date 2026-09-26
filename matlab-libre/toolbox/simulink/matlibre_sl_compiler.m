@@ -96,6 +96,9 @@ function c = compiler(modele, options)
     % sous-système conditionnel.
     c.garde = zeros(1, n);
     c.sortieCond = cell(1, n);
+    % Les réglages des signaux qui partent de chaque bloc — leur nom, leur
+    % journalisation —, que SIM lit pour logsout.
+    c.signaux = cell(1, n);
 
     % --- 1. types et paramètres ---------------------------------------------
     enCours('modele', modele.blocs, cellfun(@(b) [nomModele '/' char(b.nom)], ...
@@ -118,6 +121,9 @@ function c = compiler(modele, options)
         end
         if isfield(bloc, 'sortieConditionnelle')
             c.sortieCond{k} = bloc.sortieConditionnelle;
+        end
+        if isfield(bloc, 'signaux')
+            c.signaux{k} = bloc.signaux;
         end
         c.p{k} = lireParametres(entree, bloc, c.chemins{k});
         % Un bloc qui n'est qu'une autre façon d'en écrire un se ramène à lui :

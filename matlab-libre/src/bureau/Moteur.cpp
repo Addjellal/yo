@@ -693,6 +693,10 @@ void Moteur::demanderSchemaSimulink(const QString& nom) {
             if (liens.aChamp("sortie") && !liens.champ("sortie", k).estVide())
                 l.sortie = (int)liens.champ("sortie", k).scal();
             l.retour = liens.champ("retour", k).scal() != 0.0;
+            if (liens.aChamp("nom"))
+                l.nom = QString::fromStdString(liens.champ("nom", k).versTexte());
+            if (liens.aChamp("journal") && !liens.champ("journal", k).estVide())
+                l.journal = liens.champ("journal", k).scal() != 0.0;
             schema.liens.push_back(l);
         }
     }

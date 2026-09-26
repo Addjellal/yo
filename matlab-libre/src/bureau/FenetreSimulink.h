@@ -119,6 +119,8 @@ private slots:
     void surAnnulation();
     void surRetablissement();
     void surLienSupprime(const QString& source, const QString& cible, int port, int sortie);
+    void surSignalNomme(const QString& source, int sortie, const QString& nom);
+    void surJournalisation(const QString& source, int sortie, bool actif);
     void surBlocOuvert(const QString& nom);
     void surRemontee();
     void surBlocDepose(const QPointF& place);

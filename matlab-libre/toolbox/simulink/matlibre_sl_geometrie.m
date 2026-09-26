@@ -28,6 +28,8 @@ function geometrie = matlibre_sl_geometrie(modele)
 %                                                masqué : ses paramètres sont
 %                                                les variables du masque
 %     G.liens(k).source, .cible, .port, .sortie, .retour
+%     G.liens(k).nom, .journal                  le nom du signal, et s'il
+%                                                est journalisé
 %     G.largeur, G.hauteur                       la taille d'un bloc par défaut
 %     G.configuration                            les réglages de simulation,
 %                                                en texte
@@ -106,7 +108,8 @@ function geometrie = matlibre_sl_geometrie(modele)
     end
     geometrie.blocs = blocs;
 
-    liens = struct('source', {}, 'cible', {}, 'port', {}, 'sortie', {}, 'retour', {});
+    liens = struct('source', {}, 'cible', {}, 'port', {}, 'sortie', {}, 'retour', {}, ...
+                   'nom', {}, 'journal', {});
     tous = matlibre_sl_liens(modele);
     for l = 1:size(tous, 1)
         source = tous(l, 1);
@@ -115,9 +118,11 @@ function geometrie = matlibre_sl_geometrie(modele)
         estRetour = ~isempty(retours) && ...
             any(retours(:, 1) == source & retours(:, 2) == cible & ...
                 retours(:, 3) == port);
+        signal = matlibre_sl_signaux('reglage', modele.blocs{source}, tous(l, 4));
         liens(end + 1) = struct('source', source, 'cible', cible, ...
                                 'port', port, 'sortie', tous(l, 4), ...
-                                'retour', estRetour);   %#ok<AGROW>
+                                'retour', estRetour, 'nom', signal.Name, ...
+                                'journal', strcmp(signal.DataLogging, 'on'));   %#ok<AGROW>
     end
     geometrie.liens = liens;
 

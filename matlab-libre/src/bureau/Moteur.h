@@ -109,6 +109,8 @@ struct LienSchema {
     int source = 0, cible = 0, port = 1;   // rangs dans blocs, à partir de 1
     int sortie = 1;                        // le port de sortie de la source
     bool retour = false;                   // il referme une boucle
+    QString nom;                           // le nom du signal, s'il en a un
+    bool journal = false;                  // il va dans logsout
 };
 
 // La géométrie d'un schéma, relevée en une fois dans le fil de calcul :

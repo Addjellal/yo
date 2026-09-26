@@ -11,6 +11,7 @@ function valeur = get_param(modele, nom, parametre)
 %     BlockType     le type MatLibre du bloc (« gain », « integrator »)
 %     Name, Parent  son nom, et le système qui le contient
 %     Ports         [entrées sorties 0 0 0 0 0 0], comme Simulink
+%     PortHandles   les poignées de ses ports : Inport, Outport...
 %     DialogParameters  la liste de ses paramètres, avec leurs valeurs
 %                   admises quand ce sont des choix
 %
@@ -18,6 +19,10 @@ function valeur = get_param(modele, nom, parametre)
 %   et ceux de la boîte « Paramètres de configuration » — StopTime,
 %   Solver, FixedStep... —, avec leur valeur par défaut quand on ne les a
 %   pas posés. Un réglage posé par ADD_PARAM se lit de même.
+%
+%   GET_PARAM(MODELE,H,'Reglage'), H une poignée de port, rend un réglage
+%   du signal qui part de ce port — Name, DataLogging... — ou PortType,
+%   PortNumber, Parent.
 %
 %   C'est le pendant de SET_PARAM. Un paramètre que le bloc n'a pas lève
 %   une erreur qui le nomme, plutôt que de rendre une valeur vide dont on
@@ -35,6 +40,19 @@ function valeur = get_param(modele, nom, parametre)
 %      get_param(m, 'Solver')               % 'ode1'
 %
 %   Voir aussi SET_PARAM, ADD_PARAM, ADD_BLOCK, FIND_SYSTEM, NEW_SYSTEM.
+    % Une poignée de port : les réglages du signal qui en part.
+    if isnumeric(nom)
+        if nargin < 3
+            error('Simulink:Commands:GetParamArguments', ...
+                  'GET_PARAM(MODELE,PORT,NOM) : il faut nommer le reglage du port.');
+        end
+        valeur = matlibre_sl_signaux('lire', modele, nom, parametre);
+        return
+    end
+    if nargin == 3 && strcmpi(char(parametre), 'PortHandles')
+        valeur = matlibre_sl_signaux('poignees', modele, char(nom));
+        return
+    end
     nom = char(nom);
     if nargin == 2
         [trouve, valeur] = reglageModele(modele, nom);

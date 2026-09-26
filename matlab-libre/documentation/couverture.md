@@ -174,9 +174,10 @@ totalité.
    un `Simulink.Signal` définit une mémoire globale, et
    `Simulink.SimulationInput` décrit une simulation — variables,
    paramètres de blocs, réglages, état initial — que `sim` ou `parsim`
-   font sans toucher au modèle. Manquent : les types
-   à virgule fixe, les signaux de taille variable, le journal des signaux
-   (logsout) et Simscape.
+   font sans toucher au modèle. Les signaux se nomment et se journalisent
+   par les poignées des ports, et `sim` les range dans `logsout`.
+   Manquent : les types à virgule fixe, les signaux de taille variable et
+   Simscape.
    Stateflow a ses états emboîtés, ses régions parallèles, son
    historique, sa logique temporelle — SFAFTER, SFBEFORE, SFAT, SFEVERY,
    en réveils ou en secondes — et ses étiquettes écrites en texte :
